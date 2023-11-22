@@ -378,11 +378,9 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - inversion H4.
         + (* PickUV_UniqueUB *)
           dependent destruction H5.
-          apply inj_pair2 in H6, H10.
+          apply inj_pair2 in H8, H10.
           subst.
           apply PickUV_UniqueUB. assumption.
-          destruct H11.
-          eexists; rewrite <- H3; eauto.
         + (* PickUV_UniqueRet *)
           dependent destruction H5.
           apply inj_pair2 in H6.
@@ -392,11 +390,9 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           rewrite <- H3. apply H11.
         + (* PickUV_NonPoisonUB *)
           dependent destruction H5.
-          apply inj_pair2 in H6, H10.
+          apply inj_pair2 in H8, H10.
           subst.
           apply PickUV_NonPoisonUB. assumption.
-          destruct H11.
-          eexists; rewrite <- H3; eauto.
         + (* PickUV_NonPoisonRet *)
           dependent destruction H5.
           apply inj_pair2 in H6.
@@ -414,11 +410,9 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - inversion H4.
         + (* PickUV_UniqueUB *)
           dependent destruction H5.
-          apply inj_pair2 in H6, H10.
+          apply inj_pair2 in H8, H10.
           subst.
           apply PickUV_UniqueUB. assumption.
-          destruct H11.
-          eexists; rewrite H3; eauto.
         + (* PickUV_UniqueRet *)
           dependent destruction H5.
           apply inj_pair2 in H6.
@@ -428,11 +422,9 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           rewrite H3. apply H11.
         + (* PickUV_NonPoisonUB *)
           dependent destruction H5.
-          apply inj_pair2 in H6, H10.
+          apply inj_pair2 in H8, H10.
           subst.
           apply PickUV_NonPoisonUB. assumption.
-          destruct H11.
-          eexists; rewrite H3; eauto.
         + (* PickUV_NonPoisonRet *)
           dependent destruction H5.
           apply inj_pair2 in H6.
@@ -569,9 +561,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
               rewrite HU. setoid_rewrite bind_ret_l. reflexivity.
           }
         + eapply PickUV_UniqueUB; eauto.
-          eexists.
-          cbn.
-          red.
       - destruct (Classical_Prop.classic (forall dt : dtyp, ~ concretize uv (DVALUE_Poison dt))).
         + eapply PickUV_NonPoisonRet with (res := concretize_uvalue uv); eauto.
           eapply concretize_u_concretize_uvalue.
@@ -650,7 +639,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       unfold model_undef.
       unfold exec_undef.
       exists x; split; auto.
-      apply interp_prop_oom_correct_exec; try reflexivity; auto.
+      apply interp_prop_oom_correct_exec; try typeclasses eauto;
+        try reflexivity; auto.
       repeat intro.
       unfold case_, Case_sum1, case_sum1.
       destruct e as [ | [ | ]]; eauto.

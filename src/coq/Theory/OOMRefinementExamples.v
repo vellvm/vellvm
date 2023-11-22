@@ -140,51 +140,53 @@ Module Infinite.
     - rewrite H. eauto.
   Qed.
 
-  Lemma model_undef_h_oom :
-    forall {R} oom_msg (t' : _ R),
-      model_undef_h (E := ExternalCallE) (F := OOME +' UBE +' DebugE +' FailureE) eq (raiseOOM oom_msg) t' ->
-      t' ≈ raiseOOM oom_msg.
-  Proof.
-    intros R.
-    pcofix CIH.
-    intros oom_msg t' Hmodel.
-    punfold Hmodel.
-    red in Hmodel.
+  (* addition of contains_UB in k_spec broke this *)
+  (* Lemma model_undef_h_oom : *)
+  (*   forall {R} oom_msg (t' : _ R), *)
+  (*     model_undef_h (E := ExternalCallE) (F := OOME +' UBE +' DebugE +' FailureE) eq (raiseOOM oom_msg) t' -> *)
+  (*     t' ≈ raiseOOM oom_msg. *)
+  (* Proof. *)
+  (*   intros R. *)
+  (*   pcofix CIH. *)
+  (*   intros oom_msg t' Hmodel. *)
+  (*   punfold Hmodel. *)
+  (*   red in Hmodel. *)
 
-    pstep; red.
-    unfold raiseOOM in *.
-    force_rewrite: @bind_trigger in Hmodel.
-    force_rewrite @bind_trigger.
+  (*   pstep; red. *)
+  (*   unfold raiseOOM in *. *)
+  (*   force_rewrite: @bind_trigger in Hmodel. *)
+  (*   force_rewrite @bind_trigger. *)
 
-    remember (observe
-                (vis (ThrowOOM (print_msg oom_msg)) (fun x : void => match x return (itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) R) with
-                                                         end))).
+  (*   remember (observe *)
+  (*               (vis (ThrowOOM (print_msg oom_msg)) (fun x : void => match x return (itree (ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) R) with *)
+  (*                                                        end))). *)
 
-    hinduction Hmodel before CIH; cbn; intros; inv Heqi; eauto; [solve [cbn in *; eapply EqTauL; auto] | | |]; try discriminate.
-    { destruct e, u.
-      pinversion HT1; subst_existT.
-      - unfold print_msg.
-        constructor.
-        intros [].
-      - inv CHECK0.
-    }
+  (*   hinduction Hmodel before CIH; cbn; intros; inv Heqi; eauto; [solve [cbn in *; eapply EqTauL; auto] | | |]; try discriminate. *)
+  (*   { destruct e, u. *)
+  (*     pinversion HT1; subst_existT. *)
+  (*     - unfold print_msg. *)
+  (*       constructor. *)
+  (*       intros []. *)
+  (*     - inv CHECK0. *)
+  (*   } *)
 
-    dependent destruction H3.
-    do 20 red in H.
-    setoid_rewrite bind_trigger in H.
-    rewrite H in H0.
-    setoid_rewrite bind_vis in H0.
-    setoid_rewrite bind_ret_l in H0.
-    clear -H0.
-    punfold H0.
-    red in H0.
-    cbn in *.
-    remember (VisF (subevent void (resum IFun void (ThrowOOM (print_msg oom_msg)))) (fun x : void => k2 x)).
-    hinduction H0 before i; intros; inv Heqi.
-    - dependent destruction H1.
-      econstructor; intros; contradiction.
-    - econstructor; auto; eapply IHeqitF.
-  Qed.
+  (*   dependent destruction H1. *)
+  (*   do 20 red in HSPEC. *)
+  (*   setoid_rewrite bind_trigger in HSPEC. *)
+  (*   red in KS. *)
+  (*   rewrite HSPEC in HK. *)
+  (*   setoid_rewrite bind_vis in H0. *)
+  (*   setoid_rewrite bind_ret_l in H0. *)
+  (*   clear -H0. *)
+  (*   punfold H0. *)
+  (*   red in H0. *)
+  (*   cbn in *. *)
+  (*   remember (VisF (subevent void (resum IFun void (ThrowOOM (print_msg oom_msg)))) (fun x : void => k2 x)). *)
+  (*   hinduction H0 before i; intros; inv Heqi. *)
+  (*   - dependent destruction H1. *)
+  (*     econstructor; intros; contradiction. *)
+  (*   - econstructor; auto; eapply IHeqitF. *)
+  (* Qed. *)
 
   Lemma model_undef_h_ret_pure :
     forall {E F : Type -> Type}
@@ -279,13 +281,34 @@ Module Infinite.
       setoid_rewrite HT1.
       exists A0. exists e0. exists k2.
       reflexivity.
-    - red in H; cbn in H; red in H.
-      setoid_rewrite bind_ret_r in H.
-      rewrite H in H0.
-      setoid_rewrite bind_trigger in H0.
+    - red in HSPEC; cbn in HSPEC; red in HSPEC.
+      setoid_rewrite bind_ret_r in HSPEC.
+      red in KS.
+      rewrite HSPEC in KS.
+      destruct KS as [UB | KS].
+      { exfalso.
+        destruct e.
+        clear - UB.
+        dependent induction UB.
+        - pinversion H; subst; cbn in *.
+          inv CHECK.
+        - pinversion H; repeat subst_existT.
+          setoid_rewrite resum_to_subevent in H5.
+          rewrite subevent_subevent in H5.
+          destruct e.
+          inv H5.
+          destruct s; inv H5.
+          destruct x.
+        - pinversion H; repeat subst_existT.
+          setoid_rewrite resum_to_subevent in H4.
+          repeat rewrite subevent_subevent in H4.
+          inv H4.
+      }
 
-      punfold H0; red in H0; cbn in H0.
-      dependent induction H0.
+      setoid_rewrite bind_trigger in KS.
+
+      punfold KS; red in KS; cbn in KS.
+      dependent induction KS.
       + rewrite <- x.
         cbn.
         exists A. exists (resum IFun A e). exists k1.
@@ -294,7 +317,7 @@ Module Infinite.
         cbn.
         setoid_rewrite tau_eutt.
         setoid_rewrite itree_eta.
-        eapply IHeqitF; eauto.
+        eapply IHKS; eauto.
   Qed.
 
   Definition alloc_code : code dtyp :=
@@ -595,7 +618,11 @@ Module Infinite.
 
     eexists (Ret5 genv (_, stack) sid ms_final _).
     split; cycle 1.
-    { do 2 red. rewrite H.
+    { do 2 red.
+      eapply interp_prop_oom_l_eutt_Proper; try typeclasses eauto.
+      rewrite H; reflexivity.
+      reflexivity.
+
       pstep; econstructor; eauto;
         repeat red; repeat econstructor; eauto. }
 
@@ -718,7 +745,10 @@ Module Infinite.
 
     eexists (Ret5 genv (_, stack) sid ms_final _).
     split; cycle 1.
-    { do 2 red. rewrite H.
+    { do 2 red.
+      eapply interp_prop_oom_l_eutt_Proper; try typeclasses eauto.
+      rewrite H; reflexivity.
+      reflexivity.
       pstep; econstructor; eauto;
         repeat red; repeat econstructor; eauto. }
 
@@ -867,15 +897,38 @@ Module Infinite.
       specialize (IHinterp_prop_oomTF eq_refl H eq_refl). punfold IHinterp_prop_oomTF.
     - inv CHECK.
     - pstep; red; cbn; eauto.
-    - dependent destruction H4.
-      cbn in H. red in H.
-      rewrite H in H0.
-      setoid_rewrite bind_bind in H0.
-      setoid_rewrite bind_trigger in H0.
-      rewrite <- itree_eta. rewrite H0.
+    - dependent destruction H2.
+      cbn in HSPEC. red in HSPEC.
+      red in KS.
+      rewrite HSPEC in KS.
+      destruct KS as [UB | KS].
+      { exfalso.
+        clear - UB.
+        setoid_rewrite bind_trigger in UB.
+        dependent induction UB.
+        - pinversion H; subst; cbn in *.
+          inv CHECK.
+        - pinversion H; repeat subst_existT.
+          setoid_rewrite resum_to_subevent in H5.
+          rewrite subevent_subevent in H5.
+          destruct e.
+          inv H5.
+          destruct s; inv H5.
+          destruct x.
+        - pinversion H; repeat subst_existT.
+          setoid_rewrite resum_to_subevent in H4.
+          repeat rewrite subevent_subevent in H4.
+          inv H4.
+      }
+
+      setoid_rewrite bind_bind in KS.
+      setoid_rewrite bind_trigger in KS.
+      eapply interp_prop_oom_l_eutt_Proper; try typeclasses eauto.
+      rewrite <- itree_eta, KS. reflexivity.
+      reflexivity.
       pstep. eapply Interp_Prop_OomT_Vis_OOM_L; auto.
       eapply eqit_Vis. intros; inv u.
-      Unshelve. intros. inv H2.
+      Unshelve. intros. inv H0.
   Qed.
 
   Lemma refine_OOM_h_model_undef_h_raise_ret:
@@ -892,7 +945,9 @@ Module Infinite.
       red.
       red.
       destruct OOM_CASE as (?&?&?&?).
-      rewrite H0.
+      eapply interp_prop_oom_l_eutt_Proper; try typeclasses eauto.
+      rewrite H0. reflexivity.
+      reflexivity.
       pstep; red; cbn.
       observe_vis.
       eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
@@ -987,15 +1042,35 @@ Module Infinite.
             reflexivity.
           }
 
-          cbn in H.
-          red in H.
-          setoid_rewrite bind_ret_r in H.
-          setoid_rewrite H in H0.
-          setoid_rewrite bind_trigger in H0.
+          cbn in HSPEC; red in HSPEC.
+          setoid_rewrite bind_ret_r in HSPEC.
+          red in KS.
+          setoid_rewrite HSPEC in KS.
+
+          destruct KS as [UB | KS].
+          { exfalso.
+            clear - UB.
+            dependent induction UB.
+            - pinversion H; subst; cbn in *.
+              inv CHECK.
+            - pinversion H; repeat subst_existT.
+              setoid_rewrite resum_to_subevent in H5.
+              rewrite subevent_subevent in H5.
+              destruct e.
+              inv H5.
+              destruct s; inv H5.
+              destruct x.
+            - pinversion H; repeat subst_existT.
+              setoid_rewrite resum_to_subevent in H4.
+              repeat rewrite subevent_subevent in H4.
+              inv H4.
+          }
+
+          setoid_rewrite bind_trigger in KS.
           rewrite (itree_eta t').
           setoid_rewrite <- x.
           rewrite <- itree_eta.
-          rewrite H0.
+          rewrite KS.
           pstep; red; cbn.
           change
             (@VisF (ExternalCallE +' OOME +' UBE +' DebugE +' FailureE)
@@ -1026,8 +1101,10 @@ Module Infinite.
           * cbn. red.
             setoid_rewrite bind_ret_r.
             reflexivity.
-          * setoid_rewrite bind_trigger.
+          * red.
+            setoid_rewrite bind_trigger.
             unfold print_msg. destruct u.
+            right.
             reflexivity.
       - reflexivity.
     }
@@ -1150,16 +1227,18 @@ Module Infinite.
       punfold H0; red in H0; cbn in H0.
       dependent induction H0.
       { setoid_rewrite (itree_eta t').
-        setoid_rewrite <- x.
         eapply interp_prop_oom_Proper_eq; try typeclasses eauto; auto.
+        setoid_rewrite <- x.
         rewrite tau_eutt; reflexivity.
         eapply IHinterp_prop_oomTF; eauto.
       }
 
       { setoid_rewrite (itree_eta t').
+        eapply interp_prop_oom_Proper_eq; try typeclasses eauto; auto.
         setoid_rewrite <- x.
         rewrite HT1.
         cbn.
+        reflexivity.
         destruct e.
         pstep; red; cbn.
         observe_vis.
@@ -1167,16 +1246,35 @@ Module Infinite.
         reflexivity.
       }
 
-      cbn in H2.
-      red in H2.
-      setoid_rewrite bind_ret_r in H2.
-      setoid_rewrite H2 in H0.
-      setoid_rewrite bind_trigger in H0.
+      cbn in HSPEC; red in HSPEC.
+      setoid_rewrite bind_ret_r in HSPEC.
+      red in KS.
+      setoid_rewrite HSPEC in KS.
+      destruct KS as [UB | KS].
+      { exfalso.
+        clear - UB.
+        dependent induction UB.
+        - pinversion H; subst; cbn in *.
+          inv CHECK.
+        - pinversion H; repeat subst_existT.
+          setoid_rewrite resum_to_subevent in H5.
+          rewrite subevent_subevent in H5.
+          destruct e.
+          destruct e0; inv H5.
+          destruct x.
+        - pinversion H; repeat subst_existT.
+          setoid_rewrite resum_to_subevent in H5.
+          repeat rewrite subevent_subevent in H5.
+          inv H5.
+      }
+
+      setoid_rewrite bind_trigger in KS.
       rewrite (itree_eta t').
+      eapply interp_prop_oom_Proper_eq; try typeclasses eauto; auto.
       setoid_rewrite <- x.
       rewrite <- itree_eta.
-      eapply interp_prop_oom_Proper_eq; try typeclasses eauto; auto.
-      rewrite H0. reflexivity.
+      rewrite KS.
+      reflexivity.
 
       pstep; red; cbn.
       rewrite itree_eta'.
@@ -1377,16 +1475,39 @@ Module Finite.
     - pstep; constructor; eauto.
       specialize (IHinterp_prop_oomTF eq_refl H eq_refl). punfold IHinterp_prop_oomTF.
     - inv CHECK.
-    - pstep; red; cbn; eauto.      
-    - dependent destruction H4.
-      cbn in H. red in H.
-      rewrite H in H0.
-      setoid_rewrite bind_bind in H0.
-      setoid_rewrite bind_trigger in H0.
-      rewrite <- itree_eta. rewrite H0.
+    - pstep; red; cbn; eauto.
+    - dependent destruction H2.
+      cbn in HSPEC. red in HSPEC.
+      red in KS.
+      rewrite HSPEC in KS.
+      destruct KS as [UB | KS].
+      { exfalso.
+        clear - UB.
+        setoid_rewrite bind_trigger in UB.
+        dependent induction UB.
+        - pinversion H; subst; cbn in *.
+          inv CHECK.
+        - pinversion H; repeat subst_existT.
+          setoid_rewrite resum_to_subevent in H5.
+          rewrite subevent_subevent in H5.
+          destruct e.
+          inv H5.
+          destruct s; inv H5.
+          destruct x.
+        - pinversion H; repeat subst_existT.
+          setoid_rewrite resum_to_subevent in H4.
+          repeat rewrite subevent_subevent in H4.
+          inv H4.
+      }
+
+      setoid_rewrite bind_bind in KS.
+      setoid_rewrite bind_trigger in KS.
+      eapply interp_prop_oom_l_eutt_Proper; try typeclasses eauto.
+      rewrite <- itree_eta, KS. reflexivity.
+      reflexivity.
       pstep. eapply Interp_Prop_OomT_Vis_OOM_L; auto.
       eapply eqit_Vis. intros; inv u.
-      Unshelve. intros. inv H2.
+      Unshelve. intros. inv H0.
   Qed.
 
   Lemma refine_OOM_h_model_undef_h_raise_ret:
@@ -1403,7 +1524,9 @@ Module Finite.
       red.
       red.
       destruct OOM_CASE as (?&?&?&?).
-      rewrite H0.
+      eapply interp_prop_oom_l_eutt_Proper; try typeclasses eauto.
+      rewrite H0. reflexivity.
+      reflexivity.
       pstep; red; cbn.
       observe_vis.
       eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
@@ -1666,13 +1789,34 @@ Module Finite.
       setoid_rewrite HT1.
       exists A0. exists e0. exists k2.
       reflexivity.
-    - red in H; cbn in H; red in H.
-      setoid_rewrite bind_ret_r in H.
-      rewrite H in H0.
-      setoid_rewrite bind_trigger in H0.
+    - red in HSPEC; cbn in HSPEC; red in HSPEC.
+      setoid_rewrite bind_ret_r in HSPEC.
+      red in KS.
+      rewrite HSPEC in KS.
+      destruct KS as [UB | KS].
+      { exfalso.
+        destruct e.
+        clear - UB.
+        dependent induction UB.
+        - pinversion H; subst; cbn in *.
+          inv CHECK.
+        - pinversion H; repeat subst_existT.
+          setoid_rewrite resum_to_subevent in H5.
+          rewrite subevent_subevent in H5.
+          destruct e.
+          inv H5.
+          destruct s; inv H5.
+          destruct x.
+        - pinversion H; repeat subst_existT.
+          setoid_rewrite resum_to_subevent in H4.
+          repeat rewrite subevent_subevent in H4.
+          inv H4.
+      }
 
-      punfold H0; red in H0; cbn in H0.
-      dependent induction H0.
+      setoid_rewrite bind_trigger in KS.
+
+      punfold KS; red in KS; cbn in KS.
+      dependent induction KS.
       + rewrite <- x.
         cbn.
         exists A. exists (resum IFun A e). exists k1.
@@ -1681,7 +1825,7 @@ Module Finite.
         cbn.
         setoid_rewrite tau_eutt.
         setoid_rewrite itree_eta.
-        eapply IHeqitF; eauto.
+        eapply IHKS; eauto.
   Qed.
 
   (* Add allocation in the finite language *)
@@ -1762,15 +1906,35 @@ Module Finite.
             reflexivity.
           }
 
-          cbn in H.
-          red in H.
-          setoid_rewrite bind_ret_r in H.
-          setoid_rewrite H in H0.
-          setoid_rewrite bind_trigger in H0.
+          cbn in HSPEC; red in HSPEC.
+          setoid_rewrite bind_ret_r in HSPEC.
+          red in KS.
+          setoid_rewrite HSPEC in KS.
+
+          destruct KS as [UB | KS].
+          { exfalso.
+            clear - UB.
+            dependent induction UB.
+            - pinversion H; subst; cbn in *.
+              inv CHECK.
+            - pinversion H; repeat subst_existT.
+              setoid_rewrite resum_to_subevent in H5.
+              rewrite subevent_subevent in H5.
+              destruct e.
+              inv H5.
+              destruct s; inv H5.
+              destruct x.
+            - pinversion H; repeat subst_existT.
+              setoid_rewrite resum_to_subevent in H4.
+              repeat rewrite subevent_subevent in H4.
+              inv H4.
+          }
+
+          setoid_rewrite bind_trigger in KS.
           rewrite (itree_eta t').
           setoid_rewrite <- x.
           rewrite <- itree_eta.
-          rewrite H0.
+          rewrite KS.
           pstep; red; cbn.
           change
             (@VisF (ExternalCallE +' OOME +' UBE +' DebugE +' FailureE)
@@ -1801,8 +1965,10 @@ Module Finite.
           * cbn. red.
             setoid_rewrite bind_ret_r.
             reflexivity.
-          * setoid_rewrite bind_trigger.
+          * red.
+            setoid_rewrite bind_trigger.
             unfold print_msg. destruct u.
+            right.
             reflexivity.
       - reflexivity.
     }
@@ -1925,16 +2091,18 @@ Module Finite.
       punfold H0; red in H0; cbn in H0.
       dependent induction H0.
       { setoid_rewrite (itree_eta t').
-        setoid_rewrite <- x.
         eapply interp_prop_oom_Proper_eq; try typeclasses eauto; auto.
+        setoid_rewrite <- x.
         rewrite tau_eutt; reflexivity.
         eapply IHinterp_prop_oomTF; eauto.
       }
 
       { setoid_rewrite (itree_eta t').
+        eapply interp_prop_oom_Proper_eq; try typeclasses eauto; auto.
         setoid_rewrite <- x.
         rewrite HT1.
         cbn.
+        reflexivity.
         destruct e.
         pstep; red; cbn.
         observe_vis.
@@ -1942,16 +2110,35 @@ Module Finite.
         reflexivity.
       }
 
-      cbn in H2.
-      red in H2.
-      setoid_rewrite bind_ret_r in H2.
-      setoid_rewrite H2 in H0.
-      setoid_rewrite bind_trigger in H0.
+      cbn in HSPEC; red in HSPEC.
+      setoid_rewrite bind_ret_r in HSPEC.
+      red in KS.
+      setoid_rewrite HSPEC in KS.
+      destruct KS as [UB | KS].
+      { exfalso.
+        clear - UB.
+        dependent induction UB.
+        - pinversion H; subst; cbn in *.
+          inv CHECK.
+        - pinversion H; repeat subst_existT.
+          setoid_rewrite resum_to_subevent in H5.
+          rewrite subevent_subevent in H5.
+          destruct e.
+          destruct e0; inv H5.
+          destruct x.
+        - pinversion H; repeat subst_existT.
+          setoid_rewrite resum_to_subevent in H5.
+          repeat rewrite subevent_subevent in H5.
+          inv H5.
+      }
+
+      setoid_rewrite bind_trigger in KS.
       rewrite (itree_eta t').
+      eapply interp_prop_oom_Proper_eq; try typeclasses eauto; auto.
       setoid_rewrite <- x.
       rewrite <- itree_eta.
-      eapply interp_prop_oom_Proper_eq; try typeclasses eauto; auto.
-      rewrite H0. reflexivity.
+      rewrite KS.
+      reflexivity.
 
       pstep; red; cbn.
       rewrite itree_eta'.

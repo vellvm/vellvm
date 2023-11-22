@@ -32257,12 +32257,15 @@ cofix CIH
   (* TODO: Move this *)
   Lemma interp_prop_oom_raiseOOM :
     forall {E F : Type -> Type} {OOM1 : OOME -< E} {OOM2 : OOME -< F}
-      (h : forall T : Type, E T -> PropT F T) {T : Type} (b1 b2 o1 : bool)
+      (h : forall T : Type, E T -> PropT F T)
+      (k_spec : forall T R2, E T -> itree F T -> (T -> itree F R2) -> itree F R2 -> Prop)
+      `{KSWF : @k_spec_WF _ _ h k_spec}
+      {T : Type} (b1 b2 o1 : bool)
       t oom_msg
       (RR : relation T),
-      interp_prop_oom' (OOM:=OOME) h RR b1 b2 o1 true t (raiseOOM oom_msg).
+      interp_prop_oom' (OOM:=OOME) h RR k_spec b1 b2 o1 true t (raiseOOM oom_msg).
   Proof.
-    intros E F OOM1 OOM2 h T b1 b2 o1 t oom_msg RR.
+    intros E F OOM1 OOM2 h k_spec KSWF T b1 b2 o1 t oom_msg RR.
     pstep; red; cbn.
     observe_vis_r.
     eapply Interp_Prop_OomT_Vis_OOM_R; eauto.
@@ -32352,7 +32355,8 @@ cofix CIH
         eapply CIH.
         - repeat rewrite <- itree_eta.
           eauto.
-        - repeat rewrite <- itree_eta.
+        - eapply interp_prop_oom_r_eutt_Proper; try typeclasses eauto;
+          repeat rewrite <- itree_eta; try reflexivity.
           apply HS.
       }
 
@@ -32371,7 +32375,7 @@ cofix CIH
             rewrite get_inf_tree_L4_equation.
             cbn.
             destruct x0; cbn.
-            apply interp_prop_oom_raiseOOM.
+            apply interp_prop_oom_raiseOOM; try typeclasses eauto.
           }
 
           destruct RUN as (?&?&?).
@@ -32420,7 +32424,11 @@ cofix CIH
                          (case_ (InfLLVM.Pick.E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
                             (case_ InfLLVM.Pick.PickUvalue_handler
                                (InfLLVM.Pick.F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))
-                         TLR_INF.R.refine_res3 true true false true) r (Vis e1 k1) (get_inf_tree_L4 (Tau t0))) by eauto.
+                         TLR_INF.R.refine_res3
+                         (@InfLLVM.Pick.model_undef_k_spec InfLP.Events.ExternalCallE
+                            (OOME +' UBE +' DebugE +' FailureE)
+                            (ReSum_inr IFun sum1 UBE (OOME +' UBE +' DebugE +' FailureE) InfLP.Events.ExternalCallE))
+                         true true false true) r (Vis e1 k1) (get_inf_tree_L4 (Tau t0))) by eauto.
             pstep; red; cbn.
             constructor; eauto.
             rewrite (itree_eta_ t2).
@@ -32448,19 +32456,38 @@ cofix CIH
               destruct e.
               destruct H as (?&?&?).
               subst.
-              cbn in H3.
-              red in H3.
-              setoid_rewrite bind_trigger in H3.
-              rewrite H3 in H2.
-              setoid_rewrite bind_vis in H2.
-              setoid_rewrite bind_ret_l in H2.
+              cbn in HSPEC.
+              red in HSPEC.
+              red in KS.
+              setoid_rewrite bind_trigger in HSPEC.
+              rewrite HSPEC in KS.
+              setoid_rewrite bind_vis in KS.
+              setoid_rewrite bind_ret_l in KS.
+              destruct KS as [UB | KS].
+              { exfalso.
+                clear - UB.
+                dependent induction UB.
+                - pinversion H; subst; cbn in *.
+                  inv CHECK.
+                - pinversion H; repeat subst_existT.
+                  destruct e; inv H5.
+                  specialize (REL x).
+                  rewrite <- REL in UB.
+                  eapply ContainsUB.ret_not_contains_UB in UB; eauto.
+                  cbn. reflexivity.
+                - pinversion H; repeat subst_existT.
+                  setoid_rewrite resum_to_subevent in H5.
+                  repeat rewrite subevent_subevent in H5.
+                  inv H5.
+              }
+              
               rewrite (itree_eta_ t2).
               rewrite <- x.
 
               pstep; red; cbn.
               constructor; eauto.
-              punfold H2; red in H2; cbn in H2.
-              dependent induction H2.
+              punfold KS; red in KS; cbn in KS.
+              dependent induction KS.
               - rewrite <- x.
                 cbn.
                 observe_vis_r.
@@ -32479,12 +32506,14 @@ cofix CIH
                 }
 
                 2: {
+                  red.
+                  right.
                   setoid_rewrite bind_trigger.
                   cbn.
                   erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
                   assert ((map fin_to_inf_dvalue args0) = args).
-                  { clear - H5.
-                    induction H5; cbn; auto.
+                  { clear - H3.
+                    induction H3; cbn; auto.
                     erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
                     rewrite IHForall2.
                     reflexivity.
@@ -32503,7 +32532,7 @@ cofix CIH
                   eapply paco2_mon_bot; eauto.
                   rewrite get_inf_tree_L4_equation.
                   cbn.
-                  eapply interp_prop_oom_raiseOOM.
+                  eapply interp_prop_oom_raiseOOM; typeclasses eauto.
                 }
 
                 right.
@@ -32518,7 +32547,7 @@ cofix CIH
 
                   specialize (HK d).
                   forward HK.
-                  { rewrite H3.
+                  { rewrite HSPEC.
                     eapply ReturnsVis.
                     reflexivity.
                     constructor.
@@ -32542,7 +32571,7 @@ cofix CIH
                 cbn.
                 constructor; eauto.
                 rewrite (itree_eta_ t2).
-                eapply IHeqitF; eauto.
+                eapply IHKS; eauto.
             }
 
             destruct s.
@@ -32551,7 +32580,7 @@ cofix CIH
               destruct s; try contradiction.
               destruct p, p0; cbn in *; try contradiction.
               { (* PickUnique *)
-                inv H3; subst_existT.
+                inv HSPEC; subst_existT.
                 2: {
                   (* repeat red in Conc. *)
                   (* rewrite FinLLVM.MEM.CP.CONC.concretize_uvalueM_equation in Conc. *)
@@ -32604,9 +32633,25 @@ cofix CIH
                 pose proof (Classical_Prop.classic (InterpreterStackBigIntptr.LLVM.Pick.unique_prop x0))
                   as [UNIQUE | NUNIQUE].
                 { exfalso.
-                  apply H6.
+                  apply H4.
                   eapply uvalue_refine_strict_unique_prop; eauto.
                 }
+
+                red in KS.
+                destruct KS as [UB | KS].
+                { clear - UB.
+                  dependent induction UB.
+                  - pinversion H; subst; cbn in *.
+                  - pinversion H; repeat subst_existT.
+                  - admit.
+                  - pinversion H; repeat subst_existT.
+                    setoid_rewrite resum_to_subevent in H5.
+                    repeat rewrite subevent_subevent in H5.
+                    inv H5.
+                }
+
+                destruct 
+
 
                 eapply paco2_mon_bot; eauto.
                 rewrite tau_eutt.
@@ -32616,7 +32661,7 @@ cofix CIH
                 vis node *)
                 pstep; red; cbn.
                 econstructor; eauto.
-                admit.
+
               }
 
               { (* PickNonPoison *)

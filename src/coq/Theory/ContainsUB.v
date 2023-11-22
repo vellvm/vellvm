@@ -404,7 +404,6 @@ Section interp_lemmas.
   Abort.
 End interp_lemmas.
 
-
 Section refine_OOM_h_lemmas.
   Context {Eff : Type -> Type}.
   Context `{OOMEff : OOME -< Eff}.
@@ -414,7 +413,7 @@ Section refine_OOM_h_lemmas.
 
   (* Only the <- direction is true *)
   Global Instance proper_refine_OOM_h
-           {R} {RR : relation R} : Proper (@refine_OOM_h Eff _ _ RR ==> flip impl) contains_UB.
+    {R} {RR : relation R} : Proper (@refine_OOM_h Eff _ _ RR ==> flip impl) contains_UB.
     unfold Proper, respectful.
     intros x y EQ UB; revert x EQ.
     induction UB.

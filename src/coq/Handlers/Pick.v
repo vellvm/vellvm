@@ -129,8 +129,36 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
       Definition F_trigger_prop : F ~> PropT (E +' F) :=
         fun R e => fun t => t ≈ r <- trigger e ;; ret r.
 
+      Require Import ContainsUB.
+      Definition model_undef_k_spec
+        `{UB: UBE -< E +' F}
+        {T R : Type}
+        (e : (E +' PickUvalueE +' F) T)
+        (ta : itree (E +' F) T)
+        (k2 : T -> itree (E +' F) R)
+        (t2 : itree (E +' F) R) : Prop
+        := contains_UB ta \/ eutt eq t2 (bind ta k2).
+
+      #[global] Instance k_spec_WF_model_undef_k_spec `{FAIL: FailureE -< E +' F} `{UB: UBE -< E +' F} `{OOM_OUT : OOME -< F} : k_spec_WF (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) (@model_undef_k_spec UB).
+      Proof.
+        split.
+        - intros A R2 e ta k2.
+          unfold Proper, respectful.
+          intros x y H.
+          unfold model_undef_k_spec.
+          split; intros [? | ?]; eauto.
+          + right. setoid_rewrite <- H.
+            auto.
+          + right. setoid_rewrite H.
+            auto.
+        - unfold model_undef_k_spec.
+          red.
+          intros T R2 e k2 t2 ta H H0.
+          auto.
+      Defined.
+
       Definition model_undef_h `{FAIL: FailureE -< E +' F} `{UB: UBE -< E +' F} `{OOM_OUT : OOME -< F} {R1 R2} (RR : R1 -> R2 -> Prop) :=
-        interp_prop_oom_r (OOM:=OOME) (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) RR.
+        interp_prop_oom_r (OOM:=OOME) (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) RR (@model_undef_k_spec UB).
 
       Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< F}
         {T} (RR : T -> T -> Prop) (ts : PropT (E +' PickUvalueE +' F) T) : PropT (E +' F) T:=

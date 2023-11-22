@@ -530,7 +530,6 @@ Section interp_lemmas.
   Abort.
 End interp_lemmas.
 
-
 Section refine_OOM_h_lemmas.
   Context {E F G : Type -> Type}.
   Local Notation Eff := (E +' F +' OOME +' UBE +' G).
@@ -539,144 +538,144 @@ Section refine_OOM_h_lemmas.
 
   (* Only the <- direction is true *)
   Global Instance proper_refine_OOM_h
-           {R} {RR : relation R} : Proper (@refine_OOM_h Eff _ _ RR ==> flip impl) contains_UB_Extra.
-    unfold Proper, respectful.
-    intros x y EQ UB; revert x EQ.
-    induction UB.
-    (*   - intros x EQ. *)
-    (*     apply IHUB. *)
+    {R} {RR : relation R} : Proper (@refine_OOM_h Eff _ _ RR ==> flip impl) contains_UB_Extra.
+  unfold Proper, respectful.
+  intros x y EQ UB; revert x EQ.
+  induction UB.
+  (*   - intros x EQ. *)
+  (*     apply IHUB. *)
 
-    (*     unfold refine_OOM_h in *. *)
-    (*     eapply interp_prop_eq_itree_Proper in EQ. *)
-    (*     3 : symmetry; apply H. 3 : reflexivity. 2 : typeclasses eauto. *)
-    (*     apply interp_prop_inv_tau_l in EQ. *)
-    (*     auto. typeclasses eauto. *)
-    (*   - rename Y into T. *)
-    (*     rename x into v. *)
-    (*     intros x EQ. *)
-    (*     revert e k H UB IHUB. *)
-    (*     punfold EQ; red in EQ. *)
-    (*     genobs t2 t2o.  *)
-    (*     revert t2 Heqt2o. *)
-    (*     induction EQ; intros ? Heqt2o e' k H UB IHUB. *)
-    (*     + punfold H; red in H. *)
-    (*       rewrite <- Heqt2o in H. *)
-    (*       inversion H. *)
+  (*     unfold refine_OOM_h in *. *)
+  (*     eapply interp_prop_eq_itree_Proper in EQ. *)
+  (*     3 : symmetry; apply H. 3 : reflexivity. 2 : typeclasses eauto. *)
+  (*     apply interp_prop_inv_tau_l in EQ. *)
+  (*     auto. typeclasses eauto. *)
+  (*   - rename Y into T. *)
+  (*     rename x into v. *)
+  (*     intros x EQ. *)
+  (*     revert e k H UB IHUB. *)
+  (*     punfold EQ; red in EQ. *)
+  (*     genobs t2 t2o.  *)
+  (*     revert t2 Heqt2o. *)
+  (*     induction EQ; intros ? Heqt2o e' k H UB IHUB. *)
+  (*     + punfold H; red in H. *)
+  (*       rewrite <- Heqt2o in H. *)
+  (*       inversion H. *)
 
-    (*     + punfold H; red in H. *)
-    (*       rewrite <- Heqt2o in H. *)
-    (*       inversion H; inversion CHECK. *)
+  (*     + punfold H; red in H. *)
+  (*       rewrite <- Heqt2o in H. *)
+  (*       inversion H; inversion CHECK. *)
 
-    (*     + punfold H; red in H. *)
-    (*       rewrite <- Heqt2o in H. *)
-    (*       inversion H; inversion CHECK. *)
+  (*     + punfold H; red in H. *)
+  (*       rewrite <- Heqt2o in H. *)
+  (*       inversion H; inversion CHECK. *)
 
-    (*     + punfold H; red in H. *)
+  (*     + punfold H; red in H. *)
 
-    (*     + punfold H; red in H. *)
-    (*       rewrite <- Heqt2o in H. cbn in H. *)
-    (*       dependent destruction H. *)
-    (*       destruct e' as [e | oome]; cbn in KS; cbn in HTA; red in HTA. *)
-    (*       * rewrite KS. *)
-    (*         rewrite HTA. *)
+  (*     + punfold H; red in H. *)
+  (*       rewrite <- Heqt2o in H. cbn in H. *)
+  (*       dependent destruction H. *)
+  (*       destruct e' as [e | oome]; cbn in KS; cbn in HTA; red in HTA. *)
+  (*       * rewrite KS. *)
+  (*         rewrite HTA. *)
 
-    (*         assert (ta ≈ vis e (fun x => ret x)) as TAvis. *)
-    (*         { rewrite HTA. *)
-    (*           reflexivity. *)
-    (*         } *)
+  (*         assert (ta ≈ vis e (fun x => ret x)) as TAvis. *)
+  (*         { rewrite HTA. *)
+  (*           reflexivity. *)
+  (*         } *)
 
-    (*       eapply ReturnsVis with (a := v) in TAvis. *)
-    (*       2: { *)
-    (*         econstructor. *)
-    (*         cbn. *)
-    (*         reflexivity. *)
-    (*       } *)
+  (*       eapply ReturnsVis with (a := v) in TAvis. *)
+  (*       2: { *)
+  (*         econstructor. *)
+  (*         cbn. *)
+  (*         reflexivity. *)
+  (*       } *)
 
-    (*       rewrite bind_trigger. *)
-    (*       eapply CrawlVis1 with (e := (resum IFun T e)) (k := k2). *)
-    (*       reflexivity. *)
-    (*       eapply IHUB. *)
-    (*       unfold refine_OOM_h. *)
-    (*       pclearbot. *)
-    (*       rewrite <- REL. *)
+  (*       rewrite bind_trigger. *)
+  (*       eapply CrawlVis1 with (e := (resum IFun T e)) (k := k2). *)
+  (*       reflexivity. *)
+  (*       eapply IHUB. *)
+  (*       unfold refine_OOM_h. *)
+  (*       pclearbot. *)
+  (*       rewrite <- REL. *)
 
-    (*       specialize (HK v TAvis). *)
-    (*       pclearbot. *)
-    (*       unfold interp_prop. *)
-    (*       apply HK. *)
-    (*     + (* t2 has OOM *) *)
-    (*       clear KS. *)
-    (*       clear HTA. *)
-    (*       inversion oome; subst. *)
-    (*       contradiction. *)
-    (*   - rename Y into T. *)
-    (*     rename x into v. *)
-    (*     intros x EQ. *)
-    (*     revert e k H UB IHUB. *)
-    (*     punfold EQ; red in EQ. *)
-    (*     genobs t2 t2o. *)
-    (*     revert t2 Heqt2o. *)
-    (*     induction EQ; rename t2 into x; intros t2 Heqt2o e' k H UB IHUB. *)
+  (*       specialize (HK v TAvis). *)
+  (*       pclearbot. *)
+  (*       unfold interp_prop. *)
+  (*       apply HK. *)
+  (*     + (* t2 has OOM *) *)
+  (*       clear KS. *)
+  (*       clear HTA. *)
+  (*       inversion oome; subst. *)
+  (*       contradiction. *)
+  (*   - rename Y into T. *)
+  (*     rename x into v. *)
+  (*     intros x EQ. *)
+  (*     revert e k H UB IHUB. *)
+  (*     punfold EQ; red in EQ. *)
+  (*     genobs t2 t2o. *)
+  (*     revert t2 Heqt2o. *)
+  (*     induction EQ; rename t2 into x; intros t2 Heqt2o e' k H UB IHUB. *)
 
-    (*     punfold H; red in H. *)
-    (*     rewrite <- Heqt2o in H. *)
-    (*     inversion H. *)
+  (*     punfold H; red in H. *)
+  (*     rewrite <- Heqt2o in H. *)
+  (*     inversion H. *)
 
-    (*     punfold H; red in H. *)
-    (*     rewrite <- Heqt2o in H. *)
-    (*     inversion H; inversion CHECK. *)
+  (*     punfold H; red in H. *)
+  (*     rewrite <- Heqt2o in H. *)
+  (*     inversion H; inversion CHECK. *)
 
-    (*     punfold H; red in H. *)
-    (*     rewrite <- Heqt2o in H. *)
-    (*     dependent induction H. *)
+  (*     punfold H; red in H. *)
+  (*     rewrite <- Heqt2o in H. *)
+  (*     dependent induction H. *)
 
-    (*     cbn in KS; *)
-    (*       cbn in HTA; red in HTA; try rewrite HTA in KS. *)
-    (*     + rewrite KS. *)
+  (*     cbn in KS; *)
+  (*       cbn in HTA; red in HTA; try rewrite HTA in KS. *)
+  (*     + rewrite KS. *)
 
-    (*       assert (ta ≈ vis e' (fun x => ret x)) as TAvis. *)
-    (*       { rewrite HTA. *)
-    (*         reflexivity. *)
-    (*       } *)
+  (*       assert (ta ≈ vis e' (fun x => ret x)) as TAvis. *)
+  (*       { rewrite HTA. *)
+  (*         reflexivity. *)
+  (*       } *)
 
-    (*       eapply ReturnsVis with (a := v) in TAvis. *)
-    (*       2: { *)
-    (*         econstructor. *)
-    (*         cbn. *)
-    (*         reflexivity. *)
-    (*       } *)
+  (*       eapply ReturnsVis with (a := v) in TAvis. *)
+  (*       2: { *)
+  (*         econstructor. *)
+  (*         cbn. *)
+  (*         reflexivity. *)
+  (*       } *)
 
-    (*       rewrite bind_trigger. *)
-    (*       eapply CrawlVis2 with (e := (resum IFun T e')) (k := k2). *)
-    (*       reflexivity. *)
-    (*       eapply IHUB. *)
-    (*       unfold refine_OOM_h. *)
-    (*       pclearbot. *)
-    (*       rewrite <- REL. *)
+  (*       rewrite bind_trigger. *)
+  (*       eapply CrawlVis2 with (e := (resum IFun T e')) (k := k2). *)
+  (*       reflexivity. *)
+  (*       eapply IHUB. *)
+  (*       unfold refine_OOM_h. *)
+  (*       pclearbot. *)
+  (*       rewrite <- REL. *)
 
-    (*       specialize (HK v TAvis). *)
-    (*       pclearbot. *)
-    (*       unfold interp_prop. *)
-    (*       apply HK. *)
-    (*   - intros y EQ. *)
-    (*     punfold H; red in H. *)
-    (*     dependent induction H. *)
-    (*     punfold EQ; red in EQ. *)
-    (*     genobs t2 ot2. *)
-    (*     clear t2 Heqot2. *)
+  (*       specialize (HK v TAvis). *)
+  (*       pclearbot. *)
+  (*       unfold interp_prop. *)
+  (*       apply HK. *)
+  (*   - intros y EQ. *)
+  (*     punfold H; red in H. *)
+  (*     dependent induction H. *)
+  (*     punfold EQ; red in EQ. *)
+  (*     genobs t2 ot2. *)
+  (*     clear t2 Heqot2. *)
 
-    (*     induction EQ; try inv x. *)
+  (*     induction EQ; try inv x. *)
 
-    (*     dependent destruction H1. *)
-    (*     cbn in KS. *)
-    (*     cbn in HTA; red in HTA. *)
-    (*     subst ta. *)
+  (*     dependent destruction H1. *)
+  (*     cbn in KS. *)
+  (*     cbn in HTA; red in HTA. *)
+  (*     subst ta. *)
 
-    (*     rewrite KS. *)
-    (*     rewrite bind_trigger. *)
-    (*     eapply FindUB with (s := s) (k:=k2). *)
-    (*     reflexivity. *)
-    (* } *)
+  (*     rewrite KS. *)
+  (*     rewrite bind_trigger. *)
+  (*     eapply FindUB with (s := s) (k:=k2). *)
+  (*     reflexivity. *)
+  (* } *)
   Admitted.
 
   Lemma contains_UB_Extra_refine_OOM_h :
@@ -689,28 +688,28 @@ Section refine_OOM_h_lemmas.
     rewrite REF.
     eauto.
   Qed.
-End refine_OOM_h_lemmas.
 
-Lemma contains_UB_Extra_raiseOOM :
-  forall {E F G J} `{O : OOME -< E +' F +' G +' UBE +' J} {X} msg,
-    (forall X e1 e2, O X e1 <> inr1 (inr1 (inr1 (inl1 e2)))) ->
-    ~ contains_UB_Extra (@raiseOOM _ _ X msg).
-Proof.
-  intros E F G J O X msg NUBE CONTRA.
-  dependent destruction CONTRA.
-  - pinversion H; subst; inv CHECK.
-  - pinversion H; do 2 subst_existT.
-    cbn in *.
-    inv x.
-  - pinversion H; do 2 subst_existT.
-    cbn in *.
-    inv x.
-  - pinversion H; do 2 subst_existT.
-    cbn in *.
-    subst.
-    rewrite subevent_subevent in H4.
-    unfold subevent in *.
-    repeat unfold resum, ReSum_id, id_, Id_IFun, ReSum_inr, ReSum_inl, inr_, inl_, cat, Cat_IFun, Inr_sum1, Inl_sum1 in H4.
-    apply NUBE in H4.
-    auto.
-Qed.
+  Lemma contains_UB_Extra_raiseOOM :
+    forall {E F G J} `{O : OOME -< E +' F +' G +' UBE +' J} {X} msg,
+      (forall X e1 e2, O X e1 <> inr1 (inr1 (inr1 (inl1 e2)))) ->
+      ~ contains_UB_Extra (@raiseOOM _ _ X msg).
+  Proof.
+    intros E0 F0 G0 J0 O X msg NUBE CONTRA.
+    dependent destruction CONTRA.
+    - pinversion H; subst; inv CHECK.
+    - pinversion H; do 2 subst_existT.
+      cbn in *.
+      inv x.
+    - pinversion H; do 2 subst_existT.
+      cbn in *.
+      inv x.
+    - pinversion H; do 2 subst_existT.
+      cbn in *.
+      subst.
+      rewrite subevent_subevent in H4.
+      unfold subevent in *.
+      repeat unfold resum, ReSum_id, id_, Id_IFun, ReSum_inr, ReSum_inl, inr_, inl_, cat, Cat_IFun, Inr_sum1, Inl_sum1 in H4.
+      apply NUBE in H4.
+      auto.
+  Qed.
+End refine_OOM_h_lemmas.
