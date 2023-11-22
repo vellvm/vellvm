@@ -33,7 +33,8 @@ From Vellvm Require Import
   Semantics.MemoryParams
   Semantics.Memory.MemBytes
   Semantics.ConcretizationParams
-  Handlers.Concretization.
+  Handlers.Concretization
+  ErrUbOomProp.
 
 From Vellvm.Utils Require Import
   InterpPropOOM.
@@ -63,10 +64,11 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
 
   Section PickPropositional.
 
-    (* Unique or the concretization fails *)
+    (* No UB, and the result is unique or the concretization fails *)
     Definition unique_prop (uv : uvalue) : Prop
-      := (exists x, concretize uv x /\ forall dv, concretize uv dv -> dv = x) \/
-           (forall dv, ~ concretize uv dv).
+      := (forall ub_msg, ~ concretize_u uv (UB_unERR_UB_OOM ub_msg)) /\
+           ((exists x, concretize uv x /\ forall dv, concretize uv dv -> dv = x) \/
+              (forall dv, ~ concretize uv dv)).
 
     Program Definition lift_err_ub_oom_post {A B} {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} (m:err_ub_oom A) (Post : B -> Prop) (f : forall (a : A), m = ret a -> itree E {b : B | Post b}) : itree E {b : B | Post b} :=
       match m with
