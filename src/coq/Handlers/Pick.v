@@ -67,6 +67,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
     (* No UB, and the result is unique or the concretization fails *)
     Definition unique_prop (uv : uvalue) : Prop
       := (forall ub_msg, ~ concretize_u uv (UB_unERR_UB_OOM ub_msg)) /\
+           (forall err_msg, ~ concretize_u uv (ERR_unERR_UB_OOM err_msg)) /\
            ((exists x, concretize uv x /\ forall dv, concretize uv dv -> dv = x) \/
               (forall dv, ~ concretize uv dv)).
 

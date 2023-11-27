@@ -12092,6 +12092,18 @@ Qed.
     admit.
   Admitted.
 
+  Lemma concretize_no_err_inf_fin :
+    forall uv_inf uv_fin
+      (REF : uvalue_refine_strict uv_inf uv_fin)
+      (ERR : forall err_msg : string, ~ IS1.LLVM.MEM.CP.CONC.concretize_u uv_inf (ERR_unERR_UB_OOM err_msg)),
+    forall err_msg : string, ~ concretize_u uv_fin (ERR_unERR_UB_OOM err_msg).
+  Proof.
+    intros uv_inf uv_fin REF UB err_msg.
+    intros CONC.
+    eapply UB.
+    admit.
+  Admitted.
+
   Lemma uvalue_refine_strict_unique_prop :
     forall uv_inf uv_fin,
       uvalue_refine_strict uv_inf uv_fin ->
@@ -12102,10 +12114,12 @@ Qed.
 
     unfold unique_prop.
     unfold IS1.LLVM.Pick.unique_prop in UNIQUE_INF.
-    destruct UNIQUE_INF as [NUB [[dv_inf [CONC UNIQUE_INF]] | NO_CONC]].
+    destruct UNIQUE_INF as [NUB [NERR [[dv_inf [CONC UNIQUE_INF]] | NO_CONC]]].
     2: {
       split.
       eapply concretize_no_ub_inf_fin; eauto.
+      split.
+      eapply concretize_no_err_inf_fin; eauto.
       right.
       eapply concretize_fails_inf_fin; eauto.
     }
@@ -12117,7 +12131,12 @@ Qed.
     pose proof concretize_inf_concretize_fin.
     specialize (H0 _ _ _ REF CONC).
     destruct H0 as [(dv_fin & CONC_FIN) | H0]; auto.
-    all: split; [eapply concretize_no_ub_inf_fin; eauto|auto].
+    all:
+      split;
+      [ eapply concretize_no_ub_inf_fin; eauto
+      | split;
+        [eapply concretize_no_err_inf_fin|];
+        eauto].
 
     left.
     exists dv_fin.
