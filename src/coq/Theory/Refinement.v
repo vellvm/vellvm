@@ -431,7 +431,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     destruct XY as (rx & TX & XY).
 
     exists rx; split; auto.
-    (* rewrite XY. eauto. *)
-  Abort.
+    rewrite XY. eauto.
+  Qed.
 
 End Make.

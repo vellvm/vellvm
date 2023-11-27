@@ -12149,6 +12149,43 @@ Qed.
       subst; auto.
   Qed.
 
+  Lemma uvalue_refine_strict_non_poison_prop :
+    forall uv_inf uv_fin,
+      uvalue_refine_strict uv_inf uv_fin ->
+      IS1.LLVM.Pick.non_poison_prop uv_inf ->
+      non_poison_prop uv_fin.
+  Proof.
+    intros uv_inf uv_fin REF NON_POISON_INF.
+
+    unfold non_poison_prop.
+    unfold IS1.LLVM.Pick.non_poison_prop in NON_POISON_INF.
+    destruct NON_POISON_INF as [NUB [NERR NON_POISON_INF]].
+    split.
+    eapply concretize_no_ub_inf_fin; eauto.
+    split.
+    eapply concretize_no_err_inf_fin; eauto.
+
+    intros dt CONTRA.
+    eapply (NON_POISON_INF dt).
+
+    replace (IS1.LP.Events.DV.DVALUE_Poison dt) with
+      (fin_to_inf_dvalue (DVALUE_Poison dt)).
+    2: {
+      unfold fin_to_inf_dvalue.
+      break_match_goal; subst.
+      destruct p.
+      unfold DVCrev.dvalue_convert_strict in e.
+      cbn in *.
+      clear Heqs.
+      inv e.
+      auto.
+    }
+
+    eapply uvalue_concretize_strict_concretize_inclusion.
+    apply REF.
+    apply CONTRA.
+  Qed.
+
   Lemma lift_err_uvalue_to_dvalue_rutt_strict :
     forall uv1 uv2,
       uvalue_refine_strict uv1 uv2 ->

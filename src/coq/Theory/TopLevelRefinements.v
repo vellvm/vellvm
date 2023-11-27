@@ -561,7 +561,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
               rewrite HU. setoid_rewrite bind_ret_l. reflexivity.
           }
         + eapply PickUV_UniqueUB; eauto.
-      - destruct (Classical_Prop.classic (forall dt : dtyp, ~ concretize uv (DVALUE_Poison dt))).
+      - destruct (Classical_Prop.classic (non_poison_prop uv)).
         + eapply PickUV_NonPoisonRet with (res := concretize_uvalue uv); eauto.
           eapply concretize_u_concretize_uvalue.
 
@@ -599,7 +599,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - eapply PickUV_Ret with (res := concretize_uvalue uv); eauto.
         eapply concretize_u_concretize_uvalue.
 
-        cbn.
+       cbn.
         unfold ITree.map.
         unfold lift_err_ub_oom_post_ret, lift_err_ub_oom_post.
         destruct ((concretize_uvalue uv) : err_ub_oom_T _ _) eqn: HU.

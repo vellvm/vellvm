@@ -71,6 +71,12 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
            ((exists x, concretize uv x /\ forall dv, concretize uv dv -> dv = x) \/
               (forall dv, ~ concretize uv dv)).
 
+    (* No UB or failure, and the result is not a poison value  *)
+    Definition non_poison_prop (uv : uvalue) : Prop
+      := (forall ub_msg, ~ concretize_u uv (UB_unERR_UB_OOM ub_msg)) /\
+           (forall err_msg, ~ concretize_u uv (ERR_unERR_UB_OOM err_msg)) /\
+           (forall dt, ~concretize uv (DVALUE_Poison dt)).
+
     Program Definition lift_err_ub_oom_post {A B} {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} (m:err_ub_oom A) (Post : B -> Prop) (f : forall (a : A), m = ret a -> itree E {b : B | Post b}) : itree E {b : B | Post b} :=
       match m with
       | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
@@ -98,6 +104,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
 
     Arguments lift_err_ub_oom_post_ret {_ _ _ _ _ _} _ _ _.
 
+
     Inductive PickUvalue_handler  {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : PickUvalueE ~> PropT E :=
     | PickUV_UniqueUB : forall x t,
         ~ (unique_prop x) ->
@@ -109,12 +116,12 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
         t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
         PickUvalue_handler (@pickUnique _ _ (fun _ _ => True) x) t
     | PickUV_NonPoisonUB : forall x t,
-        ~ (forall dt, ~concretize x (DVALUE_Poison dt)) ->
+        ~ (non_poison_prop x) ->
         PickUvalue_handler (@pickNonPoison _ _ (fun _ _ => True) x) t
     | PickUV_NonPoisonRet :
       forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True})
         (Conc : concretize_u x res),
-        (forall dt, ~concretize x (DVALUE_Poison dt)) ->
+        non_poison_prop x ->
         t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
         PickUvalue_handler (@pickNonPoison _ _ (fun _ _ => True) x) t                           
     | PickUV_Ret :
