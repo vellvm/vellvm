@@ -32807,7 +32807,7 @@ cofix CIH
               pstep; red; cbn.
               constructor; eauto.
               cbn.
-              observe_vis_r.
+
               eapply Interp_Prop_OomT_Vis with
                 (k2:=(fun x1 : void => match x1 return (itree InfLP.Events.L4 TopLevelBigIntptr.res_L6) with
                                     end)).
@@ -32818,60 +32818,14 @@ cofix CIH
 
               intros [].
 
+              repeat red.
+              left.
               setoid_rewrite bind_trigger.
-              cbn.
-              unfold print_msg.
-              destruct u.
-              rewrite bind_vis.
-              setoid_rewrite bind_ret_l.
-              reflexivity.
-
+              eapply ContainsUB.FindUB.
+              rewrite subevent_subevent.
               pstep; red; cbn.
-
-
-              
-              setoid_rewrite bind_vis in H2.
-              setoid_rewrite bind_ret_l in H2.
-
-              punfold H2; red in H2; cbn in H2.
-              dependent induction H2.
-              - rewrite (itree_eta_ t2).
-                rewrite <- x0, <- x.
-                pstep; red; cbn.
-                constructor; eauto.
-                cbn.
-                observe_vis_r.
-                eapply Interp_Prop_OomT_Vis with
-                  (k2:=(fun x1 : void => match x1 return (itree InfLP.Events.L4 TopLevelBigIntptr.res_L6) with
-                                      end)).
-                2: {
-                  repeat red.
-                  eapply paco2_eqit_refl.
-                }
-
-                intros [].
-
-                setoid_rewrite bind_trigger.
-                cbn.
-                unfold print_msg.
-                destruct u.
-                rewrite bind_vis.
-                setoid_rewrite bind_ret_l.
-                reflexivity.
-              - rewrite (itree_eta_ t2).
-                rewrite <- x0, <- x.
-                pstep; red; cbn; constructor; auto.
-                assert (paco2
-                          (interp_prop_oomT_ (OOM:=OOME)
-                             (case_ (InfLLVM.Pick.E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
-                                (case_ InfLLVM.Pick.PickUvalue_handler
-                                   (InfLLVM.Pick.F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))
-                             TLR_INF.R.refine_res3 true true false true) r
-                          (Vis (inr1 (inr1 (inr1 (inl1 (ThrowUB u))))) k1) (get_inf_tree_L4 (Tau t1))).
-                { eapply IHeqitF; eauto.
-                }
-
-                punfold H4.
+              constructor.
+              intros [].
             }
 
             destruct s.
@@ -32881,78 +32835,126 @@ cofix CIH
               destruct d, d0.
               destruct u, u0.
 
-              repeat red in H3.
-              rewrite H3 in H2.
-              setoid_rewrite bind_trigger in H2.
-              setoid_rewrite bind_vis in H2.
-              setoid_rewrite bind_ret_l in H2.
+              repeat red in KS.
+              repeat red in HSPEC.
+              move HSPEC after EQ.
+              move KS after EQ.
+              setoid_rewrite bind_trigger in HSPEC.
+              rewrite HSPEC in KS.
 
-              punfold H2; red in H2; cbn in H2.
-              dependent induction H2.
-              - rewrite (itree_eta_ t2).
-                rewrite <- x0, <- x.
-                pstep; red; cbn.
+              rewrite (itree_eta_ t2).
+              rewrite <- x.
+
+              destruct KS as [UB | KS].
+              { inv UB.
+                - pinversion H2.
+                  inv CHECK.
+                - pinversion H2; repeat subst_existT.
+                  destruct e;
+                    inv H9.
+                  red in H2.
+                  rewrite <- REL in H3.
+                  exfalso.
+                  inversion H3; subst.
+                  + pinversion H4; inv CHECK.
+                  + pinversion H4.
+                  + pinversion H4.
+                - punfold H2; red in H2; cbn in H2.
+                  inversion H2; subst.
+                  clear - H7 s.
+                  rewrite H7 in s.
+                  destruct s.
+              }
+
+              setoid_rewrite bind_vis in KS.
+              setoid_rewrite bind_ret_l in KS.
+              cbn.
+
+              specialize (H0 tt tt).
+              forward H0. reflexivity.
+              pclearbot.
+
+              rewrite (itree_eta_ (k1 _)) in H0.
+              rewrite (itree_eta_ (k2 _)) in H0.
+              specialize (HK tt).
+              forward HK.
+              { rewrite HSPEC.
+                eapply ReturnsVis.
+                reflexivity.
+                constructor.
+                cbn.
+                reflexivity.
+              }
+              pclearbot.
+
+              rewrite (itree_eta_ (k2 _)) in HK.
+              rewrite (itree_eta_ (k3 _)) in HK.
+
+              specialize (CIH _ _ _ H0 HK).
+
+              clear t2 x.
+              punfold KS; red in KS; cbn in KS.
+              dependent induction KS.
+              - pstep; red; cbn.
                 constructor; eauto.
+
+                rewrite <- x.
                 cbn.
                 observe_vis_r.
+
                 eapply Interp_Prop_OomT_Vis with
-                  (k2 := (fun H13 : unit => get_inf_tree_L4 (k1 H13))).
+                  (k2 := (fun H13 : unit => get_inf_tree_L4 (k3 H13))).
                 2: {
                   repeat red.
                   eapply paco2_eqit_refl.
                 }
 
                 2: {
+                  repeat red.
+                  right.
                   setoid_rewrite bind_trigger.
                   cbn.
                   rewrite bind_vis.
                   cbn.
                   setoid_rewrite bind_ret_l.
-                  reflexivity.
+                  specialize (REL tt).
+                  unfold id in *.
+                  pclearbot.
+                  pstep; red; cbn.
+                  constructor.
+                  intros [].
+                  red.
+                  left.
+                  eapply get_inf_tree_L4_eq_Proper.
+                  apply REL.
                 }
 
                 intros [] H2.
                 right.
-                rewrite (itree_eta_ (k0 _)).
                 rewrite (itree_eta_ (k1 _)).
+                rewrite (itree_eta_ (k3 _)).
                 eapply CIH; eauto;
                   repeat rewrite <- itree_eta.
-                { specialize (H0 tt tt).
-                  forward H0.
-                  repeat red; auto.
-                  pclearbot.
-                  apply H0.
-                }
-
-                specialize (REL tt).
-                red in REL; pclearbot.
-                rewrite REL.
-                specialize (HK tt).
-                forward HK.
-                { rewrite H3.
-                  eapply ReturnsVis.
-                  setoid_rewrite bind_trigger.
-                  cbn.
-                  reflexivity.
-                  constructor.
-                  reflexivity.
-                }
-
-                pclearbot; eauto.
-              - rewrite (itree_eta_ t2).
-                rewrite <- x0, <- x.
-                pstep; red; cbn; constructor; auto.
+              - rewrite <- x.
                 assert (paco2
                           (interp_prop_oomT_ (OOM:=OOME)
                              (case_ (InfLLVM.Pick.E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
                                 (case_ InfLLVM.Pick.PickUvalue_handler
                                    (InfLLVM.Pick.F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))
-                             TLR_INF.R.refine_res3 true true false true) r
+                             TLR_INF.R.refine_res3
+                             (@InfLLVM.Pick.model_undef_k_spec InfLP.Events.ExternalCallE
+                                (OOME +' UBE +' DebugE +' FailureE)
+                                (ReSum_inr IFun sum1 UBE (OOME +' UBE +' DebugE +' FailureE) InfLP.Events.ExternalCallE))
+                             true true false true)
+                          r
                           (Vis (inr1 (inr1 (inr1 (inr1 (inl1 (Debug tt)))))) k1) (get_inf_tree_L4 (Tau t1))).
-                { eapply IHeqitF; eauto.
+                { rewrite (itree_eta_ t1).
+                  eapply IHKS; eauto.
                 }
 
-                punfold H4.
+                pstep; red; cbn.
+                constructor; eauto.
+                punfold H2.
             }
 
             { (* FailureE *)
