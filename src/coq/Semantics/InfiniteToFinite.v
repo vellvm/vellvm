@@ -32962,14 +32962,28 @@ cofix CIH
               repeat (destruct s; try contradiction).
 
               destruct f, f0.
-              repeat red in H3.
-              rewrite H3 in H2.
-              setoid_rewrite bind_trigger in H2.
-              setoid_rewrite bind_vis in H2.
-              setoid_rewrite bind_ret_l in H2.
+              repeat red in HSPEC.
+              repeat red in KS.
+              rewrite HSPEC in KS.
+              destruct KS as [UB | KS].
+              { inv UB.
+                - pinversion H2.
+                  inv CHECK.
+                - pinversion H2; repeat subst_existT.
+                  cbn in *; subst.
+                  destruct x0.
+                - punfold H2; red in H2; cbn in H2.
+                  inversion H2; subst.
+                  repeat subst_existT.
+                  inv H.
+              }
 
-              punfold H2; red in H2; cbn in H2.
-              dependent induction H2.
+              setoid_rewrite bind_trigger in KS.
+              setoid_rewrite bind_vis in KS.
+              setoid_rewrite bind_ret_l in KS.
+
+              punfold KS; red in KS; cbn in KS.
+              dependent induction KS.
               - rewrite (itree_eta_ t2).
                 rewrite <- x0, <- x.
                 pstep; red; cbn.
@@ -32986,6 +33000,8 @@ cofix CIH
 
                 intros [].
 
+                red.
+                right.
                 setoid_rewrite bind_trigger.
                 cbn.
                 unfold print_msg.
@@ -33001,12 +33017,16 @@ cofix CIH
                              (case_ (InfLLVM.Pick.E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
                                 (case_ InfLLVM.Pick.PickUvalue_handler
                                    (InfLLVM.Pick.F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))
-                             TLR_INF.R.refine_res3 true true false true) r
+                             TLR_INF.R.refine_res3
+                             (@InfLLVM.Pick.model_undef_k_spec InfLP.Events.ExternalCallE
+                                (OOME +' UBE +' DebugE +' FailureE)
+                                (ReSum_inr IFun sum1 UBE (OOME +' UBE +' DebugE +' FailureE) InfLP.Events.ExternalCallE))
+                             true true false true)  r
                           (Vis (inr1 (inr1 (inr1 (inr1 (inr1 (Throw u)))))) k1) (get_inf_tree_L4 (Tau t1))).
-                { eapply IHeqitF; eauto.
+                { eapply IHKS; eauto.
                 }
 
-                punfold H4.
+                punfold H2.
             }
         - (* EqVisOOM *)
           rename RUN into REF.
