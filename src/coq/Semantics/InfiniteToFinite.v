@@ -31724,6 +31724,67 @@ cofix CIH
     reflexivity.
   Qed.
 
+  (* TODO: Move this *)
+  Lemma contains_UB_raiseOOM :
+    forall {Eff R} `{UB : UBE -< Eff} `{OOM : OOME -< Eff}
+      msg,
+      @subevent OOME Eff OOM void (ThrowOOM tt) <> @subevent UBE Eff UB void (ThrowUB tt) ->
+      ~ @ContainsUB.contains_UB Eff _ R (raiseOOM msg).
+  Proof.
+    intros Eff R UB OOM msg SUB CONTRA.
+    unfold raiseOOM in CONTRA.
+    rewrite bind_trigger in CONTRA.
+    inv CONTRA.
+    - pinversion H; subst.
+      inv CHECK.
+    - pinversion H; repeat subst_existT.
+      destruct x.
+    - pinversion H; repeat subst_existT.
+      setoid_rewrite subevent_subevent in H4.
+      apply SUB.
+      setoid_rewrite H4.
+      unfold ReSum_id, Id_IFun, id_.
+      replace (fun (x : Type) (f : UBE x) => UB x f) with UB.
+      destruct s; reflexivity.
+      repeat change (fun x => ?h x) with h.
+      reflexivity.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma contains_UB_raise :
+    forall {Eff R} `{UB : UBE -< Eff} `{ERR : FailureE -< Eff}
+      msg,
+      @subevent FailureE Eff ERR void (Throw tt) <> @subevent UBE Eff UB void (ThrowUB tt) ->
+      ~ @ContainsUB.contains_UB Eff _ R (LLVMEvents.raise msg).
+  Proof.
+    intros Eff R UB ERR msg SUB CONTRA.
+    unfold LLVMEvents.raise in CONTRA.
+    rewrite bind_trigger in CONTRA.
+    inv CONTRA.
+    - pinversion H; subst.
+      inv CHECK.
+    - pinversion H; repeat subst_existT.
+      destruct x.
+    - pinversion H; repeat subst_existT.
+      setoid_rewrite subevent_subevent in H4.
+      apply SUB.
+      setoid_rewrite H4.
+      unfold ReSum_id, Id_IFun, id_.
+      replace (fun (x : Type) (f : UBE x) => UB x f) with UB.
+      destruct s; reflexivity.
+      repeat change (fun x => ?h x) with h.
+      reflexivity.
+  Qed.
+
+  (* TODO: Move this, prove this *)
+  Lemma concretize_ub_fin_inf :
+    forall uv_inf uv_fin msg,
+      DVCInfFin.uvalue_refine_strict uv_inf uv_fin ->
+      FinLLVM.MEM.CP.CONC.concretize_u uv_fin (UB_unERR_UB_OOM msg) ->
+      InfLLVM.MEM.CP.CONC.concretize_u uv_inf (UB_unERR_UB_OOM msg).
+  Proof.
+  Admitted.
+
   Lemma model_undef_h_fin_inf :
     forall (t_fin : itree (FinLP.Events.ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                  (MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack (list (LLVMAst.raw_id * uvalue)) * res_L1))))
@@ -32040,16 +32101,8 @@ cofix CIH
                     destruct_err_ub_oom res; cbn in H5.
                     - exfalso.
                       rewrite H5 in UB.
-                      (* TODO: Pull this out into a lemma *)
-                      unfold raiseOOM in UB.
-                      rewrite bind_trigger in UB.
-                      inv UB.
-                      + pinversion H2; subst.
-                        inv CHECK.
-                      + pinversion H2; repeat subst_existT.
-                        destruct e; inv x2.
-                      + pinversion H2; repeat subst_existT.
-                        inv H9.
+                      eapply contains_UB_raiseOOM in UB; auto.
+                      intros CONTRA; inv CONTRA.
                     - (* UB *)
                       red in H4.
                       subst.
@@ -32064,16 +32117,6 @@ cofix CIH
                         red in CONTRA.
                         destruct CONTRA as [CONTRA _].
                         eapply CONTRA; eauto.
-
-                        Set Nested Proofs Allowed.
-                        Lemma concretize_ub_fin_inf :
-                          forall uv_inf uv_fin msg,
-                            DVCInfFin.uvalue_refine_strict uv_inf uv_fin ->
-                            FinLLVM.MEM.CP.CONC.concretize_u uv_fin (UB_unERR_UB_OOM msg) ->
-                            InfLLVM.MEM.CP.CONC.concretize_u uv_inf (UB_unERR_UB_OOM msg).
-                        Proof.
-                        Admitted.
-
                         eapply concretize_ub_fin_inf; eauto.
                       }
 
@@ -32097,16 +32140,9 @@ cofix CIH
                       eapply Returns_vis_inversion in RETb.
                       destruct RETb as [[] _].
                     - rewrite H5 in UB.
-                      (* TODO: Pull this out into a lemma *)
-                      unfold LLVMEvents.raise in UB.
-                      rewrite bind_trigger in UB.
-                      inv UB.
-                      + pinversion H2; subst.
-                        inv CHECK.
-                      + pinversion H2; repeat subst_existT.
-                        destruct e; inv x2.
-                      + pinversion H2; repeat subst_existT.
-                        inv H9.
+                      exfalso.
+                      apply contains_UB_raise in UB; auto.
+                      intros CONTRA; inv CONTRA.
                     - eapply ContainsUB.ret_not_contains_UB in UB;
                         try contradiction.
                       rewrite H5; cbn.
@@ -32300,16 +32336,8 @@ cofix CIH
                     destruct_err_ub_oom res; cbn in H5.
                     - exfalso.
                       rewrite H5 in UB.
-                      (* TODO: Pull this out into a lemma *)
-                      unfold raiseOOM in UB.
-                      rewrite bind_trigger in UB.
-                      inv UB.
-                      + pinversion H2; subst.
-                        inv CHECK.
-                      + pinversion H2; repeat subst_existT.
-                        destruct e; inv x2.
-                      + pinversion H2; repeat subst_existT.
-                        inv H9.
+                      eapply contains_UB_raiseOOM in UB; eauto.
+                      intros CONTRA; inv CONTRA.
                     - (* UB *)
                       subst.
                       pstep; red; cbn.
@@ -32345,17 +32373,10 @@ cofix CIH
 
                       eapply Returns_vis_inversion in RETb.
                       destruct RETb as [[] _].
-                    - rewrite H5 in UB.
-                      (* TODO: Pull this out into a lemma *)
-                      unfold LLVMEvents.raise in UB.
-                      rewrite bind_trigger in UB.
-                      inv UB.
-                      + pinversion H2; subst.
-                        inv CHECK.
-                      + pinversion H2; repeat subst_existT.
-                        destruct e; inv x2.
-                      + pinversion H2; repeat subst_existT.
-                        inv H9.
+                    - exfalso.
+                      rewrite H5 in UB.
+                      eapply contains_UB_raise in UB; eauto.
+                      intros CONTRA; inv CONTRA.
                     - eapply ContainsUB.ret_not_contains_UB in UB;
                         try contradiction.
                       rewrite H5; cbn.
@@ -32548,16 +32569,8 @@ cofix CIH
                   destruct_err_ub_oom res; cbn in H4.
                   - exfalso.
                     rewrite H4 in UB.
-                    (* TODO: Pull this out into a lemma *)
-                    unfold raiseOOM in UB.
-                    rewrite bind_trigger in UB.
-                    inv UB.
-                    + pinversion H2; subst.
-                      inv CHECK.
-                    + pinversion H2; repeat subst_existT.
-                      destruct e; inv x2.
-                    + pinversion H2; repeat subst_existT.
-                      inv H8.
+                    eapply contains_UB_raiseOOM; eauto.
+                    intros CONTRA; inv CONTRA.
                   - (* UB *)
                     subst.
                     pstep; red; cbn.
@@ -32591,17 +32604,10 @@ cofix CIH
 
                     eapply Returns_vis_inversion in RETb.
                     destruct RETb as [[] _].
-                  - rewrite H4 in UB.
-                    (* TODO: Pull this out into a lemma *)
-                    unfold LLVMEvents.raise in UB.
-                    rewrite bind_trigger in UB.
-                    inv UB.
-                    + pinversion H2; subst.
-                      inv CHECK.
-                    + pinversion H2; repeat subst_existT.
-                      destruct e; inv x2.
-                    + pinversion H2; repeat subst_existT.
-                      inv H8.
+                  - exfalso.
+                    rewrite H4 in UB.
+                    eapply contains_UB_raise in UB; eauto.
+                    intros CONTRA; inv CONTRA.
                   - eapply ContainsUB.ret_not_contains_UB in UB;
                       try contradiction.
                     rewrite H4; cbn.
@@ -33280,6 +33286,729 @@ cofix CIH
       }
 
       destruct s.
+      { (* Pick *)
+        repeat red in HSPEC.
+        repeat red in KS.
+        destruct p; cbn in *; try contradiction.
+        { (* PickUnique *)
+          inv HSPEC; subst_existT.
+          2: {
+            destruct KS as [UB | KS].
+            { move UB after H2.
+              destruct_err_ub_oom res; cbn in H2.
+              - exfalso.
+                rewrite H2 in UB.
+                apply contains_UB_raiseOOM in UB; auto.
+                intros CONTRA; inv CONTRA.
+              - (* UB *)
+                subst.
+                red in H1.
+                destruct H1.
+                apply H in Conc; try contradiction.
+              - exfalso.
+                rewrite H2 in UB.
+                eapply contains_UB_raise in UB; auto.
+                intros CONTRA; inv CONTRA.
+              - eapply ContainsUB.ret_not_contains_UB in UB;
+                  try contradiction.
+                rewrite H2; cbn.
+                reflexivity.
+            }
+
+            destruct_err_ub_oom res; cbn in H2; subst.
+            - (* OOM *)
+              subst.
+              rewrite H2 in KS.
+
+              setoid_rewrite Raise.raiseOOM_bind_itree in KS.
+              eapply paco2_mon_bot; eauto.
+              repeat rewrite <- itree_eta_.
+              rewrite KS.
+              rewrite get_inf_tree_L4_equation.
+              cbn.
+              eapply interp_prop_oom_raiseOOM.
+              typeclasses eauto.
+            - (* UB *)
+              red in H1.
+              destruct H1.
+              apply H in Conc; try contradiction.
+            - (* Err *)
+              red in H1.
+              destruct H1.
+              destruct H0.
+              apply H0 in Conc; try contradiction.
+            - (* Ret *)
+              specialize (HK (exist (fun _ : dvalue => True) (id res0) I)).
+              forward HK.
+              { rewrite H2.
+                constructor.
+                reflexivity.
+              }
+              pclearbot.
+
+              punfold REL; red in REL; cbn in REL.
+              dependent induction REL.
+              + repeat red in H.
+                destruct e1.
+                destruct e; try contradiction.
+                destruct s; try contradiction.
+                2: {
+                  repeat (destruct s; try contradiction).
+                }
+                destruct p; cbn in H; try contradiction.
+
+                unfold id in *.
+                specialize (H0 (exist _ (fin_to_inf_dvalue res0) I) (exist (fun _ : dvalue => True) res0 I)).
+                forward H0.
+                { split; eauto.
+                  apply fin_to_inf_dvalue_refine_strict.
+                }
+                pclearbot.
+
+                rewrite (itree_eta_ (k1 _)) in H0.
+                rewrite (itree_eta_ (k0 _)) in H0.
+                rewrite (itree_eta_ (k2 _)) in HK.
+                rewrite (itree_eta_ (k1 _)) in HK.
+                specialize (CIH _ _ _ H0 HK).
+                repeat rewrite <- itree_eta_ in CIH.
+
+                pstep; red; cbn.
+                eapply Interp_Prop_OomT_Vis
+                  with (ta:=Ret
+                              (exist
+                                 (fun _ : LLVMParamsBigIntptr.Events.DV.dvalue => True)
+                                 (fin_to_inf_dvalue res0) I))
+                       (k2:=(fun dv_inf =>
+                               match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                               | NoOom dv_fin => get_inf_tree_L4 (k2 (exist _ dv_fin I))
+                               | Oom s => raiseOOM s
+                               end)).
+
+                { intros a RET.
+                  apply Returns_ret_inv in RET.
+                  subst.
+                  right.
+                  cbn.
+                  rewrite fin_to_inf_dvalue_refine_strict.
+                  apply CIH.
+                }
+
+                { pose proof (Classical_Prop.classic (InterpreterStackBigIntptr.LLVM.Pick.unique_prop x0))
+                    as [UNIQUE | NUNIQUE].
+                  2: {
+                    repeat red.
+                    eapply InfLLVM.Pick.PickUV_UniqueUB; eauto.
+                  }
+
+                  repeat red.
+                  eapply InfLLVM.Pick.PickUV_UniqueRet.
+
+                  eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+                  apply Conc.
+                  eauto.
+
+                  cbn.
+                  unfold id.
+                  reflexivity.
+                }
+
+                repeat red.
+                cbn.
+                right.
+                rewrite bind_ret_l.
+                cbn.
+                rewrite fin_to_inf_dvalue_refine_strict.
+                rewrite KS.
+                rewrite H3.
+                rewrite bind_ret_l.
+                rewrite <- itree_eta_.
+                reflexivity.
+              + pstep; red; cbn.
+                constructor; eauto.
+                repeat (forward IHREL; eauto).
+                specialize (IHREL x k1).
+                repeat (forward IHREL; eauto).
+                specialize (IHREL _ _ _ _ HK KS Conc H1 H2).
+                punfold IHREL.
+          }
+
+          cbn.
+          punfold REL; red in REL; cbn in REL.
+          dependent induction REL.
+          2: {
+            pstep; red; cbn.
+            constructor; eauto.
+            repeat (forward IHREL; eauto).
+            specialize (IHREL x k1).
+            repeat (forward IHREL; eauto).
+            specialize (IHREL _ _ _ HK KS H1).
+            punfold IHREL.
+          }
+
+          repeat red in H.
+          destruct e1.
+          destruct e; contradiction.
+          destruct s; try contradiction.
+          2: {
+            repeat (destruct s; try contradiction).
+          }
+          destruct p; cbn in H; try contradiction.
+
+          pose proof (Classical_Prop.classic (InterpreterStackBigIntptr.LLVM.Pick.unique_prop x0))
+            as [UNIQUE | NUNIQUE].
+          { exfalso.
+            apply H2.
+            eapply uvalue_refine_strict_unique_prop; eauto.
+          }
+
+          destruct KS as [UB | KS].
+          { pstep; red; cbn.
+            eapply Interp_Prop_OomT_Vis with
+              (ta:= raise_ub "").
+
+            2: {
+              repeat red.
+              constructor; eauto.
+            }
+            2: {
+              repeat red.
+              left.
+              cbn.
+              unfold raiseUB.
+              rewrite bind_trigger.
+              eapply ContainsUB.FindUB.
+              rewrite subevent_subevent.
+              reflexivity.
+            }
+
+            intros b RETb.
+            unfold raise_ub in RETb.
+            cbn in RETb.
+            unfold raiseUB in RETb.
+            rewrite bind_trigger in RETb.
+
+            eapply Returns_vis_inversion in RETb.
+            destruct RETb as [[] _].
+          }
+
+          eapply paco2_mon_bot; eauto.
+          rewrite (itree_eta_ (get_inf_tree_L4 _)).
+
+          pstep; red; cbn.
+          eapply Interp_Prop_OomT_Vis
+            with (ta:= raise_ub "").
+          2: {
+            repeat red.
+            constructor; eauto.
+          }
+
+          { intros b RETb.
+            unfold raise_ub in RETb.
+            cbn in RETb.
+            unfold raiseUB in RETb.
+            rewrite bind_trigger in RETb.
+
+            eapply Returns_vis_inversion in RETb.
+            destruct RETb as [[] _].
+          }
+
+          left.
+          unfold raise_ub. cbn; unfold raiseUB; cbn.
+          rewrite bind_trigger.
+          eapply ContainsUB.FindUB.
+          rewrite subevent_subevent.
+          reflexivity.
+        }
+
+        { (* PickNonPoison *)
+          inv HSPEC; subst_existT.
+          2: {
+            red in KS.
+            destruct KS as [UB | KS].
+            { move UB after H5.
+              destruct_err_ub_oom res; cbn in H5.
+              - exfalso.
+                rewrite H5 in UB.
+                (* TODO: Pull this out into a lemma *)
+                unfold raiseOOM in UB.
+                rewrite bind_trigger in UB.
+                inv UB.
+                + pinversion H2; subst.
+                  inv CHECK.
+                + pinversion H2; repeat subst_existT.
+                  destruct e; inv x2.
+                + pinversion H2; repeat subst_existT.
+                  inv H9.
+              - (* UB *)
+                subst.
+                pstep; red; cbn.
+                constructor; eauto.
+                eapply Interp_Prop_OomT_Vis with
+                  (ta:= raise_ub "").
+                2: {
+                  repeat red.
+                  eapply InfLLVM.Pick.PickUV_NonPoisonUB; eauto.
+                  intros CONTRA.
+                  red in CONTRA.
+                  destruct CONTRA as [CONTRA _].
+                  eapply CONTRA; eauto.
+                  eapply concretize_ub_fin_inf; eauto.
+                }
+
+                2: {
+                  repeat red.
+                  left.
+                  cbn.
+                  unfold raiseUB.
+                  rewrite bind_trigger.
+                  eapply ContainsUB.FindUB.
+                  rewrite subevent_subevent.
+                  reflexivity.
+                }
+
+                intros b RETb.
+                unfold raise_ub in RETb.
+                cbn in RETb.
+                unfold raiseUB in RETb.
+                rewrite bind_trigger in RETb.
+
+                eapply Returns_vis_inversion in RETb.
+                destruct RETb as [[] _].
+              - rewrite H5 in UB.
+                (* TODO: Pull this out into a lemma *)
+                unfold LLVMEvents.raise in UB.
+                rewrite bind_trigger in UB.
+                inv UB.
+                + pinversion H2; subst.
+                  inv CHECK.
+                + pinversion H2; repeat subst_existT.
+                  destruct e; inv x2.
+                + pinversion H2; repeat subst_existT.
+                  inv H9.
+              - eapply ContainsUB.ret_not_contains_UB in UB;
+                  try contradiction.
+                rewrite H5; cbn.
+                reflexivity.
+            }
+
+            destruct_err_ub_oom res; cbn in H5; subst.
+            - (* OOM *)
+              subst.
+              rewrite H5 in KS.
+
+              setoid_rewrite Raise.raiseOOM_bind_itree in KS.
+              eapply paco2_mon_bot; eauto.
+
+              rewrite (itree_eta_ t2).
+              rewrite <- x.
+              rewrite <- itree_eta_.
+              rewrite tau_eutt.
+              rewrite KS.
+              rewrite get_inf_tree_L4_equation.
+              cbn.
+              eapply interp_prop_oom_raiseOOM.
+              typeclasses eauto.
+            - (* UB *)
+              red in H4.
+              destruct H4.
+              apply H2 in Conc; try contradiction.
+            - (* Err *)
+              red in H4.
+              destruct H4.
+              destruct H3.
+              apply H3 in Conc; try contradiction.
+            - (* Ret *)
+              subst.
+              rewrite H5 in KS.
+              setoid_rewrite bind_ret_l in KS.
+
+              specialize (HK (exist (fun _ : dvalue => True) (id res0) I)).
+              forward HK.
+              { rewrite H5.
+                constructor.
+                reflexivity.
+              }
+              pclearbot.
+
+              unfold id in *.
+              specialize (H0 (exist _ (fin_to_inf_dvalue res0) I) (exist (fun _ : dvalue => True) res0 I)).
+              forward H0.
+              { split; eauto.
+                apply fin_to_inf_dvalue_refine_strict.
+              }
+              pclearbot.
+
+              rewrite (itree_eta_ (k1 _)) in H0.
+              rewrite (itree_eta_ (k2 _)) in H0.
+              rewrite (itree_eta_ (k2 _)) in HK.
+              rewrite (itree_eta_ (k3 _)) in HK.
+              specialize (CIH _ _ _ H0 HK).
+              repeat rewrite <- itree_eta_ in CIH.
+
+              pstep; red; cbn.
+              constructor; eauto.
+              eapply Interp_Prop_OomT_Vis
+                with (ta:=Ret
+                            (exist
+                               (fun _ : LLVMParamsBigIntptr.Events.DV.dvalue => True)
+                               (fin_to_inf_dvalue res0) I))
+                     (k2:=(fun dv_inf =>
+                             match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                             | NoOom dv_fin => get_inf_tree_L4 (k3 (exist _ dv_fin I))
+                             | Oom s => raiseOOM s
+                             end)).
+
+              { intros a H2.
+                apply Returns_ret_inv in H2.
+                subst.
+                right.
+                cbn.
+                rewrite fin_to_inf_dvalue_refine_strict.
+                apply CIH.
+              }
+
+              { pose proof (Classical_Prop.classic (InterpreterStackBigIntptr.LLVM.Pick.non_poison_prop x0))
+                  as [NON_POISON | NOT_NON_POISON].
+                2: {
+                  repeat red.
+                  eapply InfLLVM.Pick.PickUV_NonPoisonUB; eauto.
+                }
+
+                repeat red.
+                eapply InfLLVM.Pick.PickUV_NonPoisonRet.
+
+                eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+                apply Conc.
+                eauto.
+
+                cbn.
+                unfold id.
+                reflexivity.
+              }
+
+              repeat red.
+              cbn.
+              right.
+              rewrite bind_ret_l.
+              cbn.
+              rewrite fin_to_inf_dvalue_refine_strict.
+              rewrite (itree_eta_ t2).
+              rewrite <- x.
+              rewrite <- itree_eta_.
+              rewrite KS.
+              reflexivity.
+          }
+
+          pose proof (Classical_Prop.classic (InterpreterStackBigIntptr.LLVM.Pick.non_poison_prop x0))
+            as [NON_POISON | NOT_NON_POISON].
+          { exfalso.
+            apply H4.
+            eapply uvalue_refine_strict_non_poison_prop; eauto.
+          }
+
+          red in KS.
+          destruct KS as [UB | KS].
+          { pstep; red; cbn.
+            constructor; eauto.
+
+            eapply Interp_Prop_OomT_Vis with
+              (ta:= raise_ub "").
+
+            2: {
+              repeat red.
+              constructor; eauto.
+            }
+            2: {
+              repeat red.
+              left.
+              cbn.
+              unfold raiseUB.
+              rewrite bind_trigger.
+              eapply ContainsUB.FindUB.
+              rewrite subevent_subevent.
+              reflexivity.
+            }
+
+            intros b RETb.
+            unfold raise_ub in RETb.
+            cbn in RETb.
+            unfold raiseUB in RETb.
+            rewrite bind_trigger in RETb.
+
+            eapply Returns_vis_inversion in RETb.
+            destruct RETb as [[] _].
+          }
+
+          eapply paco2_mon_bot; eauto.
+          rewrite tau_eutt.
+          rewrite (itree_eta_ (get_inf_tree_L4 _)).
+
+          pstep; red; cbn.
+          eapply Interp_Prop_OomT_Vis
+            with (ta:= raise_ub "").
+          2: {
+            repeat red.
+            constructor; eauto.
+          }
+
+          { intros b RETb.
+            unfold raise_ub in RETb.
+            cbn in RETb.
+            unfold raiseUB in RETb.
+            rewrite bind_trigger in RETb.
+
+            eapply Returns_vis_inversion in RETb.
+            destruct RETb as [[] _].
+          }
+
+          left.
+          unfold raise_ub. cbn; unfold raiseUB; cbn.
+          rewrite bind_trigger.
+          eapply ContainsUB.FindUB.
+          rewrite subevent_subevent.
+          reflexivity.
+        }
+
+        { (* Pick *)
+          inv HSPEC; subst_existT.
+          red in KS.
+          destruct KS as [UB | KS].
+          { move UB after H4.
+            destruct_err_ub_oom res; cbn in H4.
+            - exfalso.
+              rewrite H4 in UB.
+              (* TODO: Pull this out into a lemma *)
+              unfold raiseOOM in UB.
+              rewrite bind_trigger in UB.
+              inv UB.
+              + pinversion H2; subst.
+                inv CHECK.
+              + pinversion H2; repeat subst_existT.
+                destruct e; inv x2.
+              + pinversion H2; repeat subst_existT.
+                inv H8.
+            - (* UB *)
+              subst.
+              pstep; red; cbn.
+              constructor; eauto.
+              eapply Interp_Prop_OomT_Vis with
+                (ta:= raise_ub ub_x).
+              2: {
+                repeat red.
+                econstructor; eauto.
+                eapply concretize_ub_fin_inf; eauto.
+                cbn.
+                reflexivity.
+              }
+
+              2: {
+                repeat red.
+                left.
+                cbn.
+                unfold raiseUB.
+                rewrite bind_trigger.
+                eapply ContainsUB.FindUB.
+                rewrite subevent_subevent.
+                reflexivity.
+              }
+
+              intros b RETb.
+              unfold raise_ub in RETb.
+              cbn in RETb.
+              unfold raiseUB in RETb.
+              rewrite bind_trigger in RETb.
+
+              eapply Returns_vis_inversion in RETb.
+              destruct RETb as [[] _].
+            - rewrite H4 in UB.
+              (* TODO: Pull this out into a lemma *)
+              unfold LLVMEvents.raise in UB.
+              rewrite bind_trigger in UB.
+              inv UB.
+              + pinversion H2; subst.
+                inv CHECK.
+              + pinversion H2; repeat subst_existT.
+                destruct e; inv x2.
+              + pinversion H2; repeat subst_existT.
+                inv H8.
+            - eapply ContainsUB.ret_not_contains_UB in UB;
+                try contradiction.
+              rewrite H4; cbn.
+              reflexivity.
+          }
+
+          destruct_err_ub_oom res; cbn in H4; subst.
+          - (* OOM *)
+            subst.
+            rewrite H4 in KS.
+
+            setoid_rewrite Raise.raiseOOM_bind_itree in KS.
+            eapply paco2_mon_bot; eauto.
+
+            rewrite (itree_eta_ t2).
+            rewrite <- x.
+            rewrite <- itree_eta_.
+            rewrite tau_eutt.
+            rewrite KS.
+            rewrite get_inf_tree_L4_equation.
+            cbn.
+            eapply interp_prop_oom_raiseOOM.
+            typeclasses eauto.
+          - (* UB *)
+            pstep; red; cbn.
+            constructor; eauto.
+            eapply Interp_Prop_OomT_Vis with
+              (ta:= raise_ub ub_x).
+            2: {
+              repeat red.
+              econstructor; eauto.
+              eapply concretize_ub_fin_inf; eauto.
+              cbn.
+              reflexivity.
+            }
+
+            2: {
+              repeat red.
+              left.
+              cbn.
+              unfold raiseUB.
+              rewrite bind_trigger.
+              eapply ContainsUB.FindUB.
+              rewrite subevent_subevent.
+              reflexivity.
+            }
+
+            intros b RETb.
+            unfold raise_ub in RETb.
+            cbn in RETb.
+            unfold raiseUB in RETb.
+            rewrite bind_trigger in RETb.
+
+            eapply Returns_vis_inversion in RETb.
+            destruct RETb as [[] _].
+          - (* Err *)
+            rewrite H4 in KS.
+            rewrite Raise.raise_bind_itree in KS.
+            rewrite (itree_eta_ t2).
+            rewrite <- x.
+            rewrite <- itree_eta_.
+
+            pstep; red; cbn.
+            constructor; eauto.
+            eapply Interp_Prop_OomT_Vis with
+              (ta:= LLVMEvents.raise err_x).
+            2: {
+              repeat red.
+              econstructor; eauto.
+
+              Lemma concretize_err_fin_inf :
+                forall uv_inf uv_fin msg,
+                  DVCInfFin.uvalue_refine_strict uv_inf uv_fin ->
+                  FinLLVM.MEM.CP.CONC.concretize_u uv_fin (ERR_unERR_UB_OOM msg) ->
+                  InfLLVM.MEM.CP.CONC.concretize_u uv_inf (ERR_unERR_UB_OOM msg).
+              Proof.
+              Admitted.
+
+              eapply concretize_err_fin_inf; eauto.
+              cbn.
+              reflexivity.
+            }
+
+            2: {
+              repeat red.
+              right.
+              cbn.
+              rewrite KS.
+              repeat rewrite bind_trigger.
+              rewrite get_inf_tree_L4_equation.
+              cbn.
+              setoid_rewrite Raise.raise_bind_itree.
+              reflexivity.
+            }
+
+            intros b RETb.
+            unfold LLVMEvents.raise in RETb.
+            cbn in RETb.
+            rewrite bind_trigger in RETb.
+
+            eapply Returns_vis_inversion in RETb.
+            destruct RETb as [[] _].
+          - (* Ret *)
+            subst.
+            rewrite H4 in KS.
+            setoid_rewrite bind_ret_l in KS.
+
+            specialize (HK (exist (fun _ : dvalue => True) (id res0) I)).
+            forward HK.
+            { rewrite H4.
+              constructor.
+              reflexivity.
+            }
+            pclearbot.
+
+            unfold id in *.
+            specialize (H0 (exist _ (fin_to_inf_dvalue res0) I) (exist (fun _ : dvalue => True) res0 I)).
+            forward H0.
+            { split; eauto.
+              apply fin_to_inf_dvalue_refine_strict.
+            }
+            pclearbot.
+
+            rewrite (itree_eta_ (k1 _)) in H0.
+            rewrite (itree_eta_ (k2 _)) in H0.
+            rewrite (itree_eta_ (k2 _)) in HK.
+            rewrite (itree_eta_ (k3 _)) in HK.
+            specialize (CIH _ _ _ H0 HK).
+            repeat rewrite <- itree_eta_ in CIH.
+
+            pstep; red; cbn.
+            constructor; eauto.
+            eapply Interp_Prop_OomT_Vis
+              with (ta:=Ret
+                          (exist
+                             (fun _ : LLVMParamsBigIntptr.Events.DV.dvalue => True)
+                             (fin_to_inf_dvalue res0) I))
+                   (k2:=(fun dv_inf =>
+                           match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                           | NoOom dv_fin => get_inf_tree_L4 (k3 (exist _ dv_fin I))
+                           | Oom s => raiseOOM s
+                           end)).
+
+            { intros a H2.
+              apply Returns_ret_inv in H2.
+              subst.
+              right.
+              cbn.
+              rewrite fin_to_inf_dvalue_refine_strict.
+              apply CIH.
+            }
+
+            { repeat red.
+              eapply InfLLVM.Pick.PickUV_Ret.
+
+              eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+              apply Conc.
+              eauto.
+
+              cbn.
+              unfold id.
+              reflexivity.
+            }
+
+            repeat red.
+            cbn.
+            right.
+            rewrite bind_ret_l.
+            cbn.
+            rewrite fin_to_inf_dvalue_refine_strict.
+            rewrite (itree_eta_ t2).
+            rewrite <- x.
+            rewrite <- itree_eta_.
+            rewrite KS.
+            reflexivity.
+        }
+      }
+
       { (* Pick *)
         destruct e2; try contradiction.
         destruct s; try contradiction.
