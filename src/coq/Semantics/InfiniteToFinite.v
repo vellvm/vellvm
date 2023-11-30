@@ -33752,26 +33752,38 @@ cofix CIH
 
         { (* Pick *)
           inv HSPEC; subst_existT.
-          red in KS.
           destruct KS as [UB | KS].
-          { move UB after H4.
-            destruct_err_ub_oom res; cbn in H4.
+          { move UB after H1.
+            destruct_err_ub_oom res; cbn in H1.
             - exfalso.
-              rewrite H4 in UB.
-              (* TODO: Pull this out into a lemma *)
-              unfold raiseOOM in UB.
-              rewrite bind_trigger in UB.
-              inv UB.
-              + pinversion H2; subst.
-                inv CHECK.
-              + pinversion H2; repeat subst_existT.
-                destruct e; inv x2.
-              + pinversion H2; repeat subst_existT.
-                inv H8.
+              rewrite H1 in UB.
+              eapply contains_UB_raiseOOM; eauto.
+              intros CONTRA; inv CONTRA.
             - (* UB *)
               subst.
+              punfold REL; red in REL; cbn in REL.
+              dependent induction REL.
+              2: {
+                pstep; red; cbn.
+                constructor; eauto.
+                repeat (forward IHREL; eauto).
+                specialize (IHREL x k1).
+                repeat (forward IHREL; eauto).
+                specialize (IHREL _ _ t2 HK _ Conc H1 UB).
+                punfold IHREL.
+              }
+
+              repeat red in H.
+              destruct e1.
+              destruct e; contradiction.
+              destruct s; try contradiction.
+              2: {
+                repeat (destruct s; try contradiction).
+              }
+              destruct p; cbn in H; try contradiction.
+
+              subst.
               pstep; red; cbn.
-              constructor; eauto.
               eapply Interp_Prop_OomT_Vis with
                 (ta:= raise_ub ub_x).
               2: {
@@ -33801,43 +33813,55 @@ cofix CIH
 
               eapply Returns_vis_inversion in RETb.
               destruct RETb as [[] _].
-            - rewrite H4 in UB.
-              (* TODO: Pull this out into a lemma *)
-              unfold LLVMEvents.raise in UB.
-              rewrite bind_trigger in UB.
-              inv UB.
-              + pinversion H2; subst.
-                inv CHECK.
-              + pinversion H2; repeat subst_existT.
-                destruct e; inv x2.
-              + pinversion H2; repeat subst_existT.
-                inv H8.
+            - exfalso.
+              rewrite H1 in UB.
+              eapply contains_UB_raise in UB; eauto.
+              intros CONTRA; inv CONTRA.
             - eapply ContainsUB.ret_not_contains_UB in UB;
                 try contradiction.
-              rewrite H4; cbn.
+              rewrite H1; cbn.
               reflexivity.
           }
 
-          destruct_err_ub_oom res; cbn in H4; subst.
+          destruct_err_ub_oom res; cbn in H1; subst.
           - (* OOM *)
             subst.
-            rewrite H4 in KS.
+            rewrite H1 in KS.
 
             setoid_rewrite Raise.raiseOOM_bind_itree in KS.
             eapply paco2_mon_bot; eauto.
 
-            rewrite (itree_eta_ t2).
-            rewrite <- x.
-            rewrite <- itree_eta_.
-            rewrite tau_eutt.
             rewrite KS.
             rewrite get_inf_tree_L4_equation.
             cbn.
             eapply interp_prop_oom_raiseOOM.
             typeclasses eauto.
           - (* UB *)
+            subst.
+            punfold REL; red in REL; cbn in REL.
+            dependent induction REL.
+            2: {
+              pstep; red; cbn.
+              constructor; eauto.
+              repeat (forward IHREL; eauto).
+              specialize (IHREL x k1).
+              repeat (forward IHREL; eauto).
+              specialize (IHREL _ _ t2 HK KS _ Conc H1).
+              punfold IHREL.
+            }
+
+            repeat red in H.
+            destruct e1.
+            destruct e; contradiction.
+            destruct s; try contradiction.
+            2: {
+              repeat (destruct s; try contradiction).
+            }
+            destruct p; cbn in H; try contradiction.
+            
+            rewrite H2 in KS.
+            setoid_rewrite Raise.raiseUB_bind_itree in KS.
             pstep; red; cbn.
-            constructor; eauto.
             eapply Interp_Prop_OomT_Vis with
               (ta:= raise_ub ub_x).
             2: {
@@ -33868,27 +33892,38 @@ cofix CIH
             eapply Returns_vis_inversion in RETb.
             destruct RETb as [[] _].
           - (* Err *)
-            rewrite H4 in KS.
-            rewrite Raise.raise_bind_itree in KS.
-            rewrite (itree_eta_ t2).
-            rewrite <- x.
+            subst.
+            punfold REL; red in REL; cbn in REL.
+            dependent induction REL.
+            2: {
+              pstep; red; cbn.
+              constructor; eauto.
+              repeat (forward IHREL; eauto).
+              specialize (IHREL x k1).
+              repeat (forward IHREL; eauto).
+              specialize (IHREL _ _ t2 HK KS _ Conc H1).
+              punfold IHREL.
+            }
+
+            repeat red in H.
+            destruct e1.
+            destruct e; contradiction.
+            destruct s; try contradiction.
+            2: {
+              repeat (destruct s; try contradiction).
+            }
+            destruct p; cbn in H; try contradiction.
+
+            rewrite H2 in KS.
+            setoid_rewrite Raise.raise_bind_itree in KS.
             rewrite <- itree_eta_.
 
             pstep; red; cbn.
-            constructor; eauto.
             eapply Interp_Prop_OomT_Vis with
               (ta:= LLVMEvents.raise err_x).
             2: {
               repeat red.
               econstructor; eauto.
-
-              Lemma concretize_err_fin_inf :
-                forall uv_inf uv_fin msg,
-                  DVCInfFin.uvalue_refine_strict uv_inf uv_fin ->
-                  FinLLVM.MEM.CP.CONC.concretize_u uv_fin (ERR_unERR_UB_OOM msg) ->
-                  InfLLVM.MEM.CP.CONC.concretize_u uv_inf (ERR_unERR_UB_OOM msg).
-              Proof.
-              Admitted.
 
               eapply concretize_err_fin_inf; eauto.
               cbn.
@@ -33916,12 +33951,34 @@ cofix CIH
             destruct RETb as [[] _].
           - (* Ret *)
             subst.
-            rewrite H4 in KS.
+            punfold REL; red in REL; cbn in REL.
+            dependent induction REL.
+            2: {
+              pstep; red; cbn.
+              constructor; eauto.
+              repeat (forward IHREL; eauto).
+              specialize (IHREL x k1).
+              repeat (forward IHREL; eauto).
+              specialize (IHREL _ _ t2 HK KS _ Conc H1).
+              punfold IHREL.
+            }
+
+            repeat red in H.
+            destruct e1.
+            destruct e; contradiction.
+            destruct s; try contradiction.
+            2: {
+              repeat (destruct s; try contradiction).
+            }
+            destruct p; cbn in H; try contradiction.
+
+            subst.
+            rewrite H2 in KS.
             setoid_rewrite bind_ret_l in KS.
 
             specialize (HK (exist (fun _ : dvalue => True) (id res0) I)).
             forward HK.
-            { rewrite H4.
+            { rewrite H2.
               constructor.
               reflexivity.
             }
@@ -33936,14 +33993,13 @@ cofix CIH
             pclearbot.
 
             rewrite (itree_eta_ (k1 _)) in H0.
-            rewrite (itree_eta_ (k2 _)) in H0.
+            rewrite (itree_eta_ (k0 _)) in H0.
             rewrite (itree_eta_ (k2 _)) in HK.
-            rewrite (itree_eta_ (k3 _)) in HK.
+            rewrite (itree_eta_ (k1 _)) in HK.
             specialize (CIH _ _ _ H0 HK).
             repeat rewrite <- itree_eta_ in CIH.
 
             pstep; red; cbn.
-            constructor; eauto.
             eapply Interp_Prop_OomT_Vis
               with (ta:=Ret
                           (exist
@@ -33951,12 +34007,12 @@ cofix CIH
                              (fin_to_inf_dvalue res0) I))
                    (k2:=(fun dv_inf =>
                            match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
-                           | NoOom dv_fin => get_inf_tree_L4 (k3 (exist _ dv_fin I))
+                           | NoOom dv_fin => get_inf_tree_L4 (k2 (exist _ dv_fin I))
                            | Oom s => raiseOOM s
                            end)).
 
-            { intros a H2.
-              apply Returns_ret_inv in H2.
+            { intros a RET.
+              apply Returns_ret_inv in RET.
               subst.
               right.
               cbn.
@@ -33982,101 +34038,55 @@ cofix CIH
             rewrite bind_ret_l.
             cbn.
             rewrite fin_to_inf_dvalue_refine_strict.
-            rewrite (itree_eta_ t2).
-            rewrite <- x.
-            rewrite <- itree_eta_.
             rewrite KS.
+            rewrite <- itree_eta_.
             reflexivity.
-        }
-      }
-
-      { (* Pick *)
-        destruct e2; try contradiction.
-        destruct s; try contradiction.
-        destruct p, p0; cbn in *; try contradiction.
-        { (* PickUnique *)
-          inv H3; subst_existT.
-          2: {
-            (* repeat red in Conc. *)
-            (* rewrite FinLLVM.MEM.CP.CONC.concretize_uvalueM_equation in Conc. *)
-            (* clear - Conc H7. *)
-            (* { destruct x1; cbn in Conc; subst; *)
-            (*     cbn in H7. *)
-            (*   20: { *)
-            
-            (*   } *)
-            (* } *)
-            (* cbn in Conc. *)
-            
-            (* destruct_err_ub_oom res; *)
-            (* cbn in H7. *)
-            (* - (* OOM *) *)
-            (*   rewrite H7 in H2. *)
-            (*   move H2 after H7. *)
-            (*   setoid_rewrite Raise.raiseOOM_bind_itree in H2. *)
-            (*   eapply paco2_mon_bot; eauto. *)
-
-            (*   rewrite (itree_eta_ t2). *)
-            (*   rewrite <- x. *)
-            (*   rewrite <- itree_eta_. *)
-            (*   rewrite tau_eutt. *)
-            (*   rewrite H2. *)
-            (*   rewrite get_inf_tree_L4_equation. *)
-            (*   cbn. *)
-            (*   eapply interp_prop_oom_raiseOOM. *)
-            (* - (* UB *) *)
-            (*   rewrite H7 in H2. *)
-            (*   move H2 after H7. *)
-            (*   setoid_rewrite Raise.raiseUB_bind_itree in H2. *)
-            (*   eapply paco2_mon_bot; eauto. *)
-
-            (*   rewrite (itree_eta_ t2). *)
-            (*   rewrite <- x. *)
-            (*   rewrite <- itree_eta_. *)
-            (*   rewrite tau_eutt. *)
-            (*   rewrite H2. *)
-            (*   rewrite get_inf_tree_L4_equation. *)
-            (*   cbn. *)
-            (*   eapply interp_prop_oom_raiseUB. *)
-            (* - (* Err *) *)
-            (*   admit. *)
-            (* - (* Ret *) *)
-            (*   admit *)
-            admit.
-          }
-
-          pose proof (Classical_Prop.classic (InterpreterStackBigIntptr.LLVM.Pick.unique_prop x0))
-            as [UNIQUE | NUNIQUE].
-          { exfalso.
-            apply H6.
-            eapply uvalue_refine_strict_unique_prop; eauto.
-          }
-
-          eapply paco2_mon_bot; eauto.
-          rewrite tau_eutt.
-          rewrite (itree_eta_ (get_inf_tree_L4 _)).
-          (* May need to make pick explicitly be UB here, or
-                change h_spec in order to not force everything to be a
-                vis node *)
-          pstep; red; cbn.
-          econstructor; eauto.
-          admit.
-        }
-
-        { (* PickNonPoison *)
-          admit.
-        }
-
-        { (* Pick *)
-          admit.
         }
       }
 
       destruct s.
       { (* OOME *)
-        destruct e2; try contradiction.
-        repeat (destruct s; try contradiction).
-        exfalso; eapply H1; reflexivity.
+        repeat red in HSPEC.
+        repeat red in KS.
+        setoid_rewrite bind_trigger in HSPEC.
+        rewrite HSPEC in KS.
+        destruct KS as [UB | KS].
+        { inv UB.
+          - pinversion H; subst.
+            inv CHECK.
+          - pinversion H; repeat subst_existT.
+            destruct e; inv H6.
+            inv H; subst_existT.
+            specialize (REL1 x).
+            unfold id in *.
+            pclearbot.
+            assert (paco2 (eqit_ eq false false id) bot2 
+                      (Ret x) (k x)).
+            apply REL1.
+            assert (k x ≈ Ret x).
+            { rewrite H. reflexivity. }
+
+            rewrite H1 in H0.
+            eapply ContainsUB.ret_not_contains_UB in H0; try contradiction; eauto.
+            cbn.
+            reflexivity.
+          - pinversion H; repeat subst_existT.
+            setoid_rewrite subevent_subevent in H5.
+            inv H5.
+        }
+
+        setoid_rewrite bind_vis in KS.
+        setoid_rewrite bind_ret_l in KS.
+        subst.
+
+        eapply paco2_mon_bot; eauto.
+        rewrite KS.
+        cbn.
+        rewrite get_inf_tree_L4_equation.
+        destruct o.
+        cbn.
+        apply interp_prop_oom_raiseOOM.
+        typeclasses eauto.
       }
 
       destruct s.
