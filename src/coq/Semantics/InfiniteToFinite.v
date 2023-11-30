@@ -34730,14 +34730,14 @@ cofix CIH
         subst_existT.
         constructor.
       + exfalso.
-        rewrite (itree_eta_ t2) in H0.
-        rewrite x in H0.
-        red in H.
-        rewrite H in H0.
-        clear - H0.
-
-        setoid_rewrite bind_trigger in H0.
-        apply eutt_ret_vis_abs in H0; auto.
+        rewrite (itree_eta_ t2) in KS.
+        rewrite x in KS.
+        red in HSPEC.
+        red in KS.
+        rewrite HSPEC in KS.
+        clear - KS.
+        setoid_rewrite bind_trigger in KS.
+        apply eutt_ret_vis_abs in KS; auto.
     - (* EqTau *)
       assert (DEC: (exists m3, ot2 = TauF m3) \/ (forall m3, ot2 <> TauF m3)).
       { destruct ot2; eauto; right; red; intros; inv H0. }
@@ -34748,7 +34748,8 @@ cofix CIH
         constructor.
         right.
         eapply CIH.
-        apply InterpPropOOM.interp_prop_oom_inv_tau in REF.
+        apply InterpPropOOM.interp_prop_oom_inv_tau in REF;
+          try typeclasses eauto.
         apply REF.
         pclearbot.
         eauto.
@@ -34756,7 +34757,8 @@ cofix CIH
 
       pclearbot.
 
-      apply InterpPropOOM.interp_prop_oom_inv_tau_r in REF.
+      apply InterpPropOOM.interp_prop_oom_inv_tau_r in REF;
+        try typeclasses eauto.
       punfold REF.
       red in REF.
       cbn in REF.
@@ -34811,21 +34813,21 @@ cofix CIH
           constructor.
         }
 
-        red in H.
-        rewrite H in H0.
-        rewrite (itree_eta_ t2) in H0.
-        setoid_rewrite bind_trigger in H0.
-        setoid_rewrite H in HK.
+        red in HSPEC, KS.
+        rewrite HSPEC in KS.
+        rewrite (itree_eta_ t2) in KS.
+        setoid_rewrite bind_trigger in KS.
+        setoid_rewrite HSPEC in HK.
 
-        eapply orutt_Proper_R3 with (x:=L4_refine_strict) in H1.
-        6: symmetry; apply H0.
+        eapply orutt_Proper_R3 with (x:=L4_refine_strict) in H.
+        6: symmetry; apply KS.
         all: try reflexivity.
 
-        eapply orutt_inv_Vis_r in H1.
-        destruct H1 as [VIS | OOM].
+        eapply orutt_inv_Vis_r in H.
+        destruct H as [VIS | OOM].
         2: {
           destruct OOM.
-          destruct e; inv H1.
+          destruct e; inv H.
           change
             (@inr1 ExternalCallE (OOME +' UBE +' DebugE +' FailureE) A
                (@resum (Type -> Type) IFun OOME (OOME +' UBE +' DebugE +' FailureE)
@@ -34846,10 +34848,10 @@ cofix CIH
 
         pstep; red; cbn.
         constructor.
-        punfold H1; red in H1; cbn in H1.
+        punfold H; red in H; cbn in H.
         genobs m1 om1.
         clear m1 Heqom1.
-        dependent induction H1.
+        dependent induction H.
         2: {
           constructor.
           eapply IHeqitF; eauto.
@@ -34908,12 +34910,12 @@ cofix CIH
           apply OOMRutt.EqVisOOM.
         * inv CHECK0.
       + (* Not OOM *)
-        red in H.
-        rewrite H in H0.
-        rewrite (itree_eta_ t2) in H0.
-        rewrite x in H0.
-        setoid_rewrite bind_trigger in H0.
-        pinversion H0; repeat subst_existT.
+        red in HSPEC, KS.
+        rewrite HSPEC in KS.
+        rewrite (itree_eta_ t2) in KS.
+        rewrite x in KS.
+        setoid_rewrite bind_trigger in KS.
+        pinversion KS; repeat subst_existT.
 
         pstep; red; cbn.
         constructor; eauto.
@@ -34924,7 +34926,7 @@ cofix CIH
         specialize (HK b).
         forward HK.
         eapply ReturnsVis.
-        rewrite H.
+        rewrite HSPEC.
         unfold trigger.
         reflexivity.
         constructor.
@@ -34932,8 +34934,8 @@ cofix CIH
         pclearbot.
         apply HK.
 
-        repeat red in H0.
-        inv H0; subst_existT.
+        repeat red in KS.
+        inv KS; subst_existT.
         specialize (REL0 b); red in REL0.
         pclearbot.
 
@@ -34941,7 +34943,7 @@ cofix CIH
         5: symmetry; apply REL0.
         all: try reflexivity.
 
-        specialize (H2 _ _ H4).
+        specialize (H0 _ _ H4).
         pclearbot; eauto.
     - (* EqVisOOM *)
       punfold REF; red in REF; cbn in REF.
@@ -34962,14 +34964,14 @@ cofix CIH
           apply OOMRutt.EqVisOOM.
         * inv CHECK0.
       + (* Not OOM *)
-        red in H.
-        rewrite H in H0.
-        rewrite (itree_eta_ t2) in H0.
-        rewrite x in H0.
-        setoid_rewrite bind_trigger in H0.
-        pinversion H0; repeat subst_existT.
+        red in HSPEC, KS.
+        rewrite HSPEC in KS.
+        rewrite (itree_eta_ t2) in KS.
+        rewrite x in KS.
+        setoid_rewrite bind_trigger in KS.
+        pinversion KS; repeat subst_existT.
         pstep; red; cbn.
-        destruct e0; inv H6.
+        destruct e0; inv H4.
         change
           (@inr1 ExternalCallE (OOME +' UBE +' DebugE +' FailureE) A0
              (@resum (Type -> Type) IFun OOME (OOME +' UBE +' DebugE +' FailureE)
@@ -34995,6 +34997,7 @@ cofix CIH
       rewrite (itree_eta_ t2) in REF.
       specialize (IHEQV REF).
       auto.
+      typeclasses eauto.
   Qed.
 
   Lemma model_E1E2_56_orutt_strict :
