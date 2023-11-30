@@ -34091,59 +34091,80 @@ cofix CIH
 
       destruct s.
       { (* UBE *)
-        destruct e2; try contradiction.
+        repeat red in HSPEC.
+        repeat red in KS.
+        setoid_rewrite bind_trigger in HSPEC.
+        rewrite HSPEC in KS.
+
+        setoid_rewrite bind_vis in KS.
+        setoid_rewrite bind_ret_l in KS.
+
+        subst.
+        punfold REL; red in REL; cbn in REL.
+        dependent induction REL.
+        2: {
+          pstep; red; cbn.
+          constructor; eauto.
+          repeat (forward IHREL; eauto).
+          specialize (IHREL _ u k1).
+          repeat (forward IHREL; eauto).
+          specialize (IHREL _ _ t2 HK).
+          repeat (forward IHREL; eauto).
+          punfold IHREL.
+        }
+
+        repeat red in H.
+        destruct e1.
+        destruct e; contradiction.
         repeat (destruct s; try contradiction).
 
         destruct u, u0.
-        repeat red in H3.
-        rewrite H3 in H2.
-        setoid_rewrite bind_trigger in H2.
-        setoid_rewrite bind_vis in H2.
-        setoid_rewrite bind_ret_l in H2.
+        destruct u, u0.
 
-        punfold H2; red in H2; cbn in H2.
-        dependent induction H2.
-        - rewrite (itree_eta_ t2).
-          rewrite <- x0, <- x.
-          pstep; red; cbn.
-          constructor; eauto.
-          cbn.
-          observe_vis_r.
-          eapply Interp_Prop_OomT_Vis with
-            (k2:=(fun x1 : void => match x1 return (itree InfLP.Events.L4 TopLevelBigIntptr.res_L6) with
-                                   end)).
-          2: {
-            repeat red.
-            eapply paco2_eqit_refl.
-          }
+        pstep; red; cbn.
+        eapply Interp_Prop_OomT_Vis with
+          (k2:=(fun x1 : void => match x1 return (itree InfLP.Events.L4 TopLevelBigIntptr.res_L6) with
+                              end)).
+        2: {
+          repeat red.
+          eapply paco2_eqit_refl.
+        }
 
-          intros [].
+        intros [].
 
-          setoid_rewrite bind_trigger.
-          cbn.
-          unfold print_msg.
-          destruct u.
-          rewrite bind_vis.
-          setoid_rewrite bind_ret_l.
-          reflexivity.
-        - rewrite (itree_eta_ t2).
-          rewrite <- x0, <- x.
-          pstep; red; cbn; constructor; auto.
-          assert (paco2
-                    (interp_prop_oomT_ (OOM:=OOME)
-                       (case_ (InfLLVM.Pick.E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
-                          (case_ InfLLVM.Pick.PickUvalue_handler
-                             (InfLLVM.Pick.F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))
-                       TLR_INF.R.refine_res3 true true false true) r
-                    (Vis (inr1 (inr1 (inr1 (inl1 (ThrowUB u))))) k1) (get_inf_tree_L4 (Tau t1))).
-          { eapply IHeqitF; eauto.
-          }
-
-          punfold H4.
+        left.
+        setoid_rewrite bind_trigger.
+        eapply ContainsUB.FindUB.
+        rewrite subevent_subevent.
+        pstep; red; cbn.
+        constructor.
+        intros [].
       }
 
       destruct s.
       { (* DebugE *)
+        repeat red in HSPEC.
+        repeat red in KS.
+        setoid_rewrite bind_trigger in HSPEC.
+        rewrite HSPEC in KS.
+
+        setoid_rewrite bind_vis in KS.
+        setoid_rewrite bind_ret_l in KS.
+
+        subst.
+        punfold REL; red in REL; cbn in REL.
+        dependent induction REL.
+        2: {
+          pstep; red; cbn.
+          constructor; eauto.
+          repeat (forward IHREL; eauto).
+          specialize (IHREL _ d k1).
+          repeat (forward IHREL; eauto).
+          specialize (IHREL _ _ t2 HK).
+          repeat (forward IHREL; eauto).
+          punfold IHREL.
+        }
+
         destruct e2; try contradiction.
         repeat (destruct s; try contradiction).
         destruct d, d0.
