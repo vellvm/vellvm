@@ -130,3 +130,4 @@
 ./coq/QC/GenAST.v
 ./coq/QC/DList.v
 ./coq/QC/GenAlive2.v
+./coq/QC/QCVellvm.v

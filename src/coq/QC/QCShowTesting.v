@@ -6,6 +6,10 @@ Require Import ExtrOcamlString.
 From QuickChick Require Import QuickChick.
 From Vellvm Require Import ShowAST ReprAST GenAST TopLevel LLVMAst DynamicValues QCVellvm.
 
+
+Definition gen_PROG : GenLLVM PROG
+  := fmap Prog gen_llvm.
+
 Extraction Blacklist String List Char Core Z Format.
 
 Extract Constant defNumTests    => "100".

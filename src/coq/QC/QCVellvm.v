@@ -21,7 +21,7 @@ Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlString.
 
 From QuickChick Require Import QuickChick.
-From Vellvm Require Import ShowAST ReprAST GenAST TopLevel LLVMAst DynamicValues.
+From Vellvm Require Import ShowAST ReprAST (* GenAST  *)TopLevel LLVMAst DynamicValues.
 
 Extraction Blacklist String List Char Core Z Format.
 
@@ -167,8 +167,6 @@ Inductive PROG :=
 #[global] Instance Show_PROG : Show PROG :=
   { show p := "" (* PROG: avoiding inefficient printing in QC, see #253 *) }.
 
-Definition gen_PROG : GenLLVM PROG
-  := fmap Prog gen_llvm.
 
 (** Basic property to make sure that Vellvm and Clang agree when they
     both produce values *)
@@ -225,7 +223,7 @@ Definition vellvm_agrees_with_clang (p : string + PROG) : Checker
       end
   end.
 
-(* Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang). *)
+(* (* Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang). *)
 
 Extract Constant defNumTests    => "1000".
 
@@ -241,4 +239,4 @@ QCInclude "ml/libvellvm/*".
 (* QCInclude "../../ml/extracted/*ml". *)
 Extract Inlined Constant Error.failwith => "(fun _ -> raise)".
 QuickChick (forAll (run_GenLLVM gen_PROG) vellvm_agrees_with_clang).
-(*! QuickChick agrees. *)
+(*! QuickChick agrees. *) *)

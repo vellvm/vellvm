@@ -36,12 +36,11 @@ FRONTEND_EXE=_build/default/ml/frontend.exe
 COQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper
 FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
 
-
 .DEFAULT_GOAL := all
 
 ######## targets not in this "KNOWNTARGETS" list will be forwarded to CoqMakefile via invoke-coqmakefile
 ######## WARNING - every target of *this* Makefile must be listed here
-KNOWNTARGETS := CoqMakefile invoke-coqmakefile coq extracted $(EXTRACTDIR)/STAMP $(VELLVM_EXE) vellvm vellvmbc test check qc-tests rm-qc-test-vo clean extractedclean clean-coqmakefile doc/coq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-coq opam print-opam print-includes
+KNOWNTARGETS := CoqMakefile invoke-coqmakefile coq extracted $(EXTRACTDIR)/STAMP $(VELLVM_EXE) vellvm vellvmbc test check qc-tests yarpgen-tests rm-qc-test-vo clean extractedclean clean-coqmakefile doc/coq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-coq opam print-opam print-includes
 
 KNOWNFILES := Makefile _CoqProject
 
@@ -107,16 +106,20 @@ test: vellvm
 .PHONY: check
 check: test
 
+####### Yarpgen testing targets
+.PHONY: yarpgen-tests
+yarpgen-tests: rm-qc-test-vo coq
+	$(COQEXEC) coq/QC/QCVellvm.v
+
 ######## QuickChick testing targets
 
 .PHONY: qc-tests
 qc-tests: rm-qc-test-vo coq
-	$(COQEXEC) coq/QC/QCVellvm.v
+	$(COQEXEC) coq/QC/QCShowTesting.v
 
 .PHONY: rm-qc-test-vo
 rm-qc-test-vo:
-	rm -f coq/QC/QCVellvm.vo
-
+	rm -f coq/QC/QCShowTesting.vo
 
 ######## cleaning the project
 
@@ -135,7 +138,6 @@ extractedclean:
 
 clean-coqmakefile: CoqMakefile
 	$(MAKE) -j --no-print-directory -f CoqMakefile clean
-
 
 ######## documentation
 
