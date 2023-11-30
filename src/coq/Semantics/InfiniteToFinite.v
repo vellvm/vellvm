@@ -32109,7 +32109,12 @@ cofix CIH
                       pstep; red; cbn.
                       constructor; eauto.
                       eapply Interp_Prop_OomT_Vis with
-                        (ta:= raise_ub "").
+                        (ta:= raise_ub "")
+                        (k2:=(fun dv_inf =>
+                                   match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                                   | NoOom dv_fin => get_inf_tree_L4 (k3 (exist _ dv_fin I))
+                                   | Oom s => raiseOOM s
+                                   end)).
                       2: {
                         repeat red.
                         constructor; eauto.
@@ -32270,7 +32275,12 @@ cofix CIH
                   constructor; eauto.
 
                   eapply Interp_Prop_OomT_Vis with
-                    (ta:= raise_ub "").
+                    (ta:= raise_ub "")
+                    (k2:=(fun dv_inf =>
+                                   match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                                   | NoOom dv_fin => get_inf_tree_L4 (k3 (exist _ dv_fin I))
+                                   | Oom s => raiseOOM s
+                                   end)).
 
                   2: {
                     repeat red.
@@ -32303,7 +32313,12 @@ cofix CIH
 
                 pstep; red; cbn.
                 eapply Interp_Prop_OomT_Vis
-                  with (ta:= raise_ub "").
+                  with (ta:= raise_ub "")
+                       (k2:=(fun dv_inf =>
+                                   match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                                   | NoOom dv_fin => get_inf_tree_L4 (k3 (exist _ dv_fin I))
+                                   | Oom s => raiseOOM s
+                                   end)).
                 2: {
                   repeat red.
                   constructor; eauto.
@@ -32343,7 +32358,12 @@ cofix CIH
                       pstep; red; cbn.
                       constructor; eauto.
                       eapply Interp_Prop_OomT_Vis with
-                        (ta:= raise_ub "").
+                        (ta:= raise_ub "")
+                        (k2:=(fun dv_inf =>
+                                match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                                | NoOom dv_fin => get_inf_tree_L4 (k3 (exist _ dv_fin I))
+                                | Oom s => raiseOOM s
+                                end)).
                       2: {
                         repeat red.
                         eapply InfLLVM.Pick.PickUV_NonPoisonUB; eauto.
@@ -32504,7 +32524,12 @@ cofix CIH
                   constructor; eauto.
 
                   eapply Interp_Prop_OomT_Vis with
-                    (ta:= raise_ub "").
+                    (ta:= raise_ub "")
+                    (k2:=(fun dv_inf =>
+                            match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                            | NoOom dv_fin => get_inf_tree_L4 (k3 (exist _ dv_fin I))
+                            | Oom s => raiseOOM s
+                            end)).
 
                   2: {
                     repeat red.
@@ -32537,7 +32562,12 @@ cofix CIH
 
                 pstep; red; cbn.
                 eapply Interp_Prop_OomT_Vis
-                  with (ta:= raise_ub "").
+                  with (ta:= raise_ub "")
+                       (k2:=(fun dv_inf =>
+                            match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                            | NoOom dv_fin => get_inf_tree_L4 (k3 (exist _ dv_fin I))
+                            | Oom s => raiseOOM s
+                            end)).
                 2: {
                   repeat red.
                   constructor; eauto.
@@ -32576,7 +32606,13 @@ cofix CIH
                     pstep; red; cbn.
                     constructor; eauto.
                     eapply Interp_Prop_OomT_Vis with
-                      (ta:= raise_ub ub_x).
+                      (ta:= raise_ub ub_x)
+                      (k2:=(fun dv_inf =>
+                            match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                            | NoOom dv_fin => get_inf_tree_L4 (k3 (exist _ dv_fin I))
+                            | Oom s => raiseOOM s
+                            end)).
+
                     2: {
                       repeat red.
                       econstructor; eauto.
@@ -32635,7 +32671,12 @@ cofix CIH
                   pstep; red; cbn.
                   constructor; eauto.
                   eapply Interp_Prop_OomT_Vis with
-                    (ta:= raise_ub ub_x).
+                    (ta:= raise_ub ub_x)
+                    (k2:=(fun dv_inf =>
+                            match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                            | NoOom dv_fin => get_inf_tree_L4 (k3 (exist _ dv_fin I))
+                            | Oom s => raiseOOM s
+                            end)).
                   2: {
                     repeat red.
                     econstructor; eauto.
@@ -32673,7 +32714,12 @@ cofix CIH
                   pstep; red; cbn.
                   constructor; eauto.
                   eapply Interp_Prop_OomT_Vis with
-                    (ta:= LLVMEvents.raise err_x).
+                    (ta:= LLVMEvents.raise err_x)
+                    (k2:=(fun dv_inf =>
+                            match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                            | NoOom dv_fin => get_inf_tree_L4 (k3 (exist _ dv_fin I))
+                            | Oom s => raiseOOM s
+                            end)).
                   2: {
                     repeat red.
                     econstructor; eauto.
@@ -32815,10 +32861,12 @@ cofix CIH
               cbn.
 
               eapply Interp_Prop_OomT_Vis with
+                (ta:=(vis (inr1 (inl1 (ThrowUB tt))) (fun x : void => ret x)))
                 (k2:=(fun x1 : void => match x1 return (itree InfLP.Events.L4 TopLevelBigIntptr.res_L6) with
                                     end)).
               2: {
                 repeat red.
+                setoid_rewrite bind_trigger.
                 eapply paco2_eqit_refl.
               }
 
@@ -32826,8 +32874,7 @@ cofix CIH
 
               repeat red.
               left.
-              setoid_rewrite bind_trigger.
-              eapply ContainsUB.FindUB.
+              apply ContainsUB.FindUB with (s:=tt) (k:=(fun x0 : void => ret x0)).
               rewrite subevent_subevent.
               pstep; red; cbn.
               constructor.
@@ -32997,10 +33044,14 @@ cofix CIH
                 cbn.
                 observe_vis_r.
                 eapply Interp_Prop_OomT_Vis with
+                  (ta:=(vis (inr1 (inr1 (inr1 (Throw tt)))) (fun x1 : void => Ret x1)))
                   (k2:=(fun x1 : void => match x1 return (itree InfLP.Events.L4 TopLevelBigIntptr.res_L6) with
                                          end)).
                 2: {
                   repeat red.
+                  setoid_rewrite bind_trigger.
+                  destruct u.
+                  cbn.
                   eapply paco2_eqit_refl.
                 }
 
@@ -33012,7 +33063,6 @@ cofix CIH
                 cbn.
                 unfold print_msg.
                 destruct u.
-                rewrite bind_vis.
                 setoid_rewrite bind_ret_l.
                 reflexivity.
               - rewrite (itree_eta_ t2).
@@ -33464,7 +33514,12 @@ cofix CIH
           destruct KS as [UB | KS].
           { pstep; red; cbn.
             eapply Interp_Prop_OomT_Vis with
-              (ta:= raise_ub "").
+              (ta:= raise_ub "")
+              (k2:=(fun dv_inf =>
+                      match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                      | NoOom dv_fin => get_inf_tree_L4 (k2 (exist _ dv_fin I))
+                      | Oom s => raiseOOM s
+                      end)).
 
             2: {
               repeat red.
@@ -33496,7 +33551,12 @@ cofix CIH
 
           pstep; red; cbn.
           eapply Interp_Prop_OomT_Vis
-            with (ta:= raise_ub "").
+            with (ta:= raise_ub "")
+              (k2:=(fun dv_inf =>
+                      match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                      | NoOom dv_fin => get_inf_tree_L4 (k2 (exist _ dv_fin I))
+                      | Oom s => raiseOOM s
+                      end)).
           2: {
             repeat red.
             constructor; eauto.
@@ -33694,7 +33754,12 @@ cofix CIH
           destruct KS as [UB | KS].
           { pstep; red; cbn.
             eapply Interp_Prop_OomT_Vis with
-              (ta:= raise_ub "").
+              (ta:= raise_ub "")
+              (k2:=(fun dv_inf =>
+                      match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                      | NoOom dv_fin => get_inf_tree_L4 (k2 (exist _ dv_fin I))
+                      | Oom s => raiseOOM s
+                      end)).
 
             2: {
               repeat red.
@@ -33726,7 +33791,12 @@ cofix CIH
 
           pstep; red; cbn.
           eapply Interp_Prop_OomT_Vis
-            with (ta:= raise_ub "").
+            with (ta:= raise_ub "")
+              (k2:=(fun dv_inf =>
+                      match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                      | NoOom dv_fin => get_inf_tree_L4 (k2 (exist _ dv_fin I))
+                      | Oom s => raiseOOM s
+                      end)).
           2: {
             repeat red.
             constructor; eauto.
@@ -33785,7 +33855,12 @@ cofix CIH
               subst.
               pstep; red; cbn.
               eapply Interp_Prop_OomT_Vis with
-                (ta:= raise_ub ub_x).
+                (ta:= raise_ub ub_x)
+                (k2:=(fun dv_inf =>
+                        match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                        | NoOom dv_fin => get_inf_tree_L4 (k2 (exist _ dv_fin I))
+                        | Oom s => raiseOOM s
+                        end)).
               2: {
                 repeat red.
                 econstructor; eauto.
@@ -33863,7 +33938,12 @@ cofix CIH
             setoid_rewrite Raise.raiseUB_bind_itree in KS.
             pstep; red; cbn.
             eapply Interp_Prop_OomT_Vis with
-              (ta:= raise_ub ub_x).
+              (ta:= raise_ub ub_x)
+              (k2:=(fun dv_inf =>
+                      match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                      | NoOom dv_fin => get_inf_tree_L4 (k2 (exist _ dv_fin I))
+                      | Oom s => raiseOOM s
+                      end)).
             2: {
               repeat red.
               econstructor; eauto.
@@ -33920,7 +34000,12 @@ cofix CIH
 
             pstep; red; cbn.
             eapply Interp_Prop_OomT_Vis with
-              (ta:= LLVMEvents.raise err_x).
+              (ta:= LLVMEvents.raise err_x)
+              (k2:=(fun dv_inf =>
+                      match DVCInfFin.dvalue_convert_strict (proj1_sig dv_inf) with
+                      | NoOom dv_fin => get_inf_tree_L4 (k2 (exist _ dv_fin I))
+                      | Oom s => raiseOOM s
+                      end)).
             2: {
               repeat red.
               econstructor; eauto.
@@ -34123,18 +34208,19 @@ cofix CIH
 
         pstep; red; cbn.
         eapply Interp_Prop_OomT_Vis with
+          (ta:=(vis (inr1 (inl1 (ThrowUB tt))) (fun x : void => ret x)))
           (k2:=(fun x1 : void => match x1 return (itree InfLP.Events.L4 TopLevelBigIntptr.res_L6) with
                               end)).
         2: {
           repeat red.
+          setoid_rewrite bind_trigger.
           eapply paco2_eqit_refl.
         }
 
         intros [].
 
         left.
-        setoid_rewrite bind_trigger.
-        eapply ContainsUB.FindUB.
+        apply ContainsUB.FindUB with (s:=tt) (k:=(fun x0 : void => ret x0)).
         rewrite subevent_subevent.
         pstep; red; cbn.
         constructor.
@@ -34277,7 +34363,8 @@ cofix CIH
           - pinversion H2; repeat subst_existT.
             destruct e; inv H9.
             rewrite <- REL in H3.
-            eapply ContainsUB.ret_not_contains_UB in H3; try contradiction; eauto.
+            apply @ContainsUB.ret_not_contains_UB with (RR:=eq) (rv:=x) in H3;
+              try contradiction; eauto.
           - pinversion H2; repeat subst_existT.
             inv H7.
         }
@@ -34302,13 +34389,6 @@ cofix CIH
         constructor.
         intros [].
       }
-
-      Unshelve.
-      all: try solve
-             [intros ?; eapply get_inf_tree_L4; eauto
-             | intros []
-             ].
-      destruct x.
   Qed.
 
   Lemma model_E1E2_34_orutt_strict :
