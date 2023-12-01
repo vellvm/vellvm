@@ -2141,6 +2141,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       | UVALUE_Addr _
       | UVALUE_I1 _
       | UVALUE_I8 _
+      | UVALUE_I16 _
       | UVALUE_I32 _
       | UVALUE_I64 _
       | UVALUE_IPTR _
@@ -2293,6 +2294,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           | UVALUE_Addr _
           | UVALUE_I1 _
           | UVALUE_I8 _
+          | UVALUE_I16 _
           | UVALUE_I32 _
           | UVALUE_I64 _
           | UVALUE_IPTR _
@@ -3398,6 +3400,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       match args with
       | [DVALUE_I1 sz]
       | [DVALUE_I8 sz]
+      | [DVALUE_I16 sz]
       | [DVALUE_I32 sz]
       | [DVALUE_I64 sz] =>
           sid <- fresh_sid;;
@@ -4723,6 +4726,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       match args with
       | [DVALUE_I1 sz]
       | [DVALUE_I8 sz]
+      | [DVALUE_I16 sz]
       | [DVALUE_I32 sz]
       | [DVALUE_I64 sz] =>
           sid <- fresh_sid;;
