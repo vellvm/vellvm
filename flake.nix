@@ -104,7 +104,7 @@
           # Include a fixed version of clang in the development environment for testing.
           default = pkgs.mkShell {
             inputsFrom = [ packages.default ];
-            buildInputs = [ pkgs.clang_13 ocamlPkgs.utop ];
+            buildInputs = [ pkgs.clang_13 pkgs.llvmPackages_13.libllvm ocamlPkgs.utop ocamlPkgs.bisect_ppx ocamlPkgs.ppxlib ];
           };
         };
 
