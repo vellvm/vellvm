@@ -29,7 +29,8 @@ From Vellvm Require
      Utils.ParserHelper
      QC.ShowAST
      QC.ReprAST
-.
+     (* QC.QCVellvm *).
+
 
 Set Extraction AccessOpaque.
 
@@ -104,7 +105,7 @@ Extract Constant randomRInt  =>
 Extract Constant randomRN =>
   "(fun (x,y) r -> let yint = coqN2Int y in let xint = coqN2Int x in if yint < xint then failwith ""choose called with unordered arguments"" else  (int2CoqN (xint + (Random.State.int r (yint - xint + 1))), r))".
 
-Separate Extraction TopLevelBigIntptr ExtrOcamlIntConv TopLevel AstLib Transform ParserHelper ShowAST ReprAST Handlers GenAlive2.
+Separate Extraction TopLevelBigIntptr ExtrOcamlIntConv TopLevel AstLib Transform ParserHelper ShowAST ReprAST Handlers GenAlive2 (* QCVellvm *).
 
 
 

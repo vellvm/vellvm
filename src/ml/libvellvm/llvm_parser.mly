@@ -106,7 +106,6 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_DEFAULT
 %token KW_HIDDEN
 %token KW_PROTECTED
-
 (* dll storage *)
 %token KW_DLLIMPORT
 %token KW_DLLEXPORT
@@ -1014,6 +1013,8 @@ param_attr:
                                          { PARAMATTR_Alignstack n              }
   | KW_ALLOCALIGN                        { PARAMATTR_Allocalign                }
   | KW_ALLOCPTR                          { PARAMATTR_Allocptr                  }
+  | KW_WRITEONLY                         {
+  PARAMATTR_Writeonly                 }
 
 
 

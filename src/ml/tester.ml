@@ -373,3 +373,24 @@ let test_dir dir =
    Unimplemented" *)
 (* Printf.printf "%s\n" (outcome_to_string outcome) ; raise (Ran_tests
    (successful outcome)) *)
+
+(* ******** Section for comparing Vellvm and LLVM ******** *)
+
+(* llc_command_ocaml *)
+(* let llc_command_ocaml prog = let llvm_file_name = Filename.(concat
+   (get_temp_dir_name ()) " temporary_vellvm.ll ") in let test_binary =
+   Filename.(concat (get_temp_dir_name ()) " vellvmqc ") in let f = open_out
+   llvm_file_name in Printf.fprintf f "%s" prog ; close_out f ; Sys.command (
+   "clang -lm -Wno-everything " ^ llvm_file_name ^ " -o " ^ test_binary ^ "
+   && " ^ test_binary ) *)
+
+(* Use yarpgen to generate a test cases in a specific folders *)
+(* Run clang to compile it down *)
+(* run all files in that folders *)
+
+(* let runCsmith () = let command1 = "./generators/csmith/csmith" in let
+   argument1 = [| "> ./generators/csmith/temporary_csmith.c" |] in let
+   command2 = "clang -emit-llvm -S -I./generators/csmith/runtime -O0 -std=c99
+   ./generators/csmith/temporary_csmith.c -o
+   ./generators/csmith/temporary_csmith.ll" in let result =
+   Unix.create_process command *)

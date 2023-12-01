@@ -294,6 +294,28 @@ let test_genAlive2 () =
   Printf.printf "%s\n" (Buffer.contents buf)
 (* () *)
 
+let get_csmith_dir_name () = "generators/csmith/"
+
+let runCSmith () =
+  let c_file_name : string =
+    Filename.(concat (get_csmith_dir_name ()) "temporary_csmith.c")
+  in
+  let llvm_file_name : string =
+    Filename.(concat (get_csmith_dir_name ()) "temporary_csmith.ll")
+  in
+  let command1 : string = "./generators/csmith/csmith > " ^ c_file_name in
+  let command2 =
+    "clang -emit-llvm -S -I./generators/csmith/runtime -O0 -std=c99 "
+    ^ c_file_name ^ " -o " ^ llvm_file_name
+  in
+  let _ = Sys.command (command1 ^ "; " ^ command2) in
+  (* let _ = Sys.command command2 in *)
+  let res = Driver.run_ll_file llvm_file_name in
+  match res with
+  | Ok dval -> Printf.printf "%s\n" (string_of_dvalue dval)
+  | Error exit_cond ->
+      Printf.printf "%s\n" (Result.string_of_exit_condition exit_cond)
+
 let args =
   [ ( "-set-test-dir"
     , Set_string test_directory
@@ -332,6 +354,7 @@ let args =
   ; ( "-interpret"
     , Set Driver.interpret
     , "interpret ll program starting from 'main'" )
+  ; ("-csmith", Unit runCSmith, "Run CSmith and run Vellvm")
   ; ( "-i"
     , Set Driver.interpret
     , "interpret ll program starting from 'main' (same as -interpret)" )

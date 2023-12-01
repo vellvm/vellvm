@@ -17,10 +17,11 @@ From ITree Require Import
      Interp.Recursion
      Events.Exception.
 
-Require Import ExtrOcamlBasic.
-Require Import ExtrOcamlString.
+(* Require Import ExtrOcamlBasic. *)
+(* Require Import ExtrOcamlString. *)
 
-From QuickChick Require Import QuickChick.
+(* From QuickChick Require Import QuickChick. *)
+From QuickChick Require Import Show Checker.
 From Vellvm Require Import ShowAST ReprAST (* GenAST  *)TopLevel LLVMAst DynamicValues.
 
 Extraction Blacklist String List Char Core Z Format.
@@ -38,8 +39,8 @@ Proof.
   exact
     (fun res =>
        match res with
-       | MlOk _ _ a => ("Ok " ++ show a)%string
-       | MlError _ _ e => ("Error " ++ show e)%string
+       | MlOk a => ("Ok " ++ show a)%string
+       | MlError e => ("Error " ++ show e)%string
        end).
 Defined.
 
@@ -60,15 +61,15 @@ Fixpoint step (t : ITreeDefinition.itree L4 res_L4) : MlResult dvalue string
   := match observe t with
      | RetF (_,(_,(_,(_,x)))) => MlOk _ string x
      | TauF t => step t
-     | VisF (inl1 e) k =>
+     | VisF _ (inl1 e) k =>
          MlError _ string "Uninterpreted external call"
-     | VisF (inr1 (inl1 (ThrowOOM msg))) k =>
+     | VisF _ (inr1 (inl1 (ThrowOOM msg))) k =>
          MlError _ string ("OOM: " ++ msg)%string
-     | VisF (inr1 (inr1 (inl1 (ThrowUB msg)))) k =>
+     | VisF _ (inr1 (inr1 (inl1 (ThrowUB msg)))) k =>
          MlError _ string ("UB: " ++ msg)%string
-     | VisF (inr1 (inr1 (inr1 (inl1 (Debug msg))))) k =>
+     | VisF _ (inr1 (inr1 (inr1 (inl1 (Debug msg))))) k =>
          MlError _ string ("Debug: " ++ msg)%string
-     | VisF (inr1 (inr1 (inr1 (inr1 (LLVMEvents.Throw msg))))) k =>
+     | VisF _ (inr1 (inr1 (inr1 (inr1 (LLVMEvents.Throw msg))))) k =>
          MlError _ string ("Failure: " ++ msg)%string
      end.
 Set Guard Checking.
@@ -182,7 +183,7 @@ Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
     let vellvm_res := interpret prog in
     let clang_res := snd (waitpid nil pid) in
     match vellvm_res, clang_res with
-    | MlOk _ _ (DVALUE_I8 x), (WEXITED ocaml_y) =>
+    | MlOk (DVALUE_I8 x), (WEXITED ocaml_y) =>
         let y := repr (oint_to_Z ocaml_y) in
         if equ x y
         then checker true
@@ -214,7 +215,7 @@ Definition vellvm_agrees_with_clang (p : string + PROG) : Checker
       let clang_res := run_llc prog in
       let vellvm_res := interpret prog in
       match clang_res, vellvm_res with
-      | DVALUE_I8 y, MlOk _ _ (DVALUE_I8 x) =>
+      | DVALUE_I8 y, MlOk (DVALUE_I8 x) =>
           if equ x y
           then checker true
           else whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false

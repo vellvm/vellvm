@@ -92,7 +92,7 @@ let process_files files = List.iter process_file files
 (* file running ---------------------------------------------------------- *)
 (* Parses and runs the ll file at the given path, returning the dvalue
    produced. *)
-let run_ll_file path =
+let run_ll_file path : (DV.dvalue, Base.Result.exit_condition) result =
   let _ = Platform.verb @@ Printf.sprintf "* running file: %s\n" path in
   let ll_ast = IO.parse_file path in
   Interpreter.interpret ll_ast

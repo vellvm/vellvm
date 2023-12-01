@@ -363,6 +363,7 @@ Section ReprInstances.
     | PARAMATTR_Allocalign =>  "PARAMATTR_Allocalign"
     | PARAMATTR_Allocptr => "PARAMATTR_Allocptr"
     | PARAMATTR_Nofree => "PARAMATTR_Nofree"
+    | PARAMATTR_Writeonly=> "PARAMATTR_Writeonly"
     end.
 
   #[global]

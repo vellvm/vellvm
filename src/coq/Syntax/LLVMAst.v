@@ -150,6 +150,7 @@ Variant param_attr : Set :=
 | PARAMATTR_Alignstack (a : int)
 | PARAMATTR_Allocalign
 | PARAMATTR_Allocptr
+| PARAMATTR_Writeonly      
 .
 
 Variant frame_pointer_val : Set :=
