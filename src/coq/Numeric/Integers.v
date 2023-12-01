@@ -4040,6 +4040,16 @@ Strategy 0 [Wordsize_8.wordsize].
 
 Notation byte := Byte.int.
 
+Module Wordsize_16.
+  Definition wordsize := 16%nat.
+  Remark wordsize_not_zero: wordsize <> 0%nat.
+  Proof. unfold wordsize; congruence. Qed.
+End Wordsize_16.
+
+Strategy opaque [Wordsize_16.wordsize].
+
+Module Int16 := Make(Wordsize_16).
+
 Module Wordsize_64.
   Definition wordsize := 64%nat.
   Remark wordsize_not_zero: wordsize <> 0%nat.

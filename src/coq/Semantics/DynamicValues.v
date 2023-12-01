@@ -85,11 +85,13 @@ End Wordsize8.
 
 Module Int1 := Make(Wordsize1).
 Module Int8 := Make(Wordsize8).
+Module Int16 := Integers.Int16.
 Module Int32 := Integers.Int.
 Module Int64 := Integers.Int64.
 
 Definition int1 := Int1.int.
 Definition int8 := Int8.int.
+Definition int16 := Int16.int.
 Definition int32 := Int32.int.
 Definition int64 := Int64.int.
 
@@ -97,6 +99,7 @@ Definition inttyp (x:N) : Type :=
   match x with
   | 1 => int1
   | 8 => int8
+  | 16 => int16
   | 32 => int32
   | 64 => int64
   | _ => False
@@ -105,6 +108,7 @@ Definition inttyp (x:N) : Type :=
 Inductive IX_supported : N -> Prop :=
 | I1_Supported : IX_supported 1
 | I8_Supported : IX_supported 8
+| I16_Supported : IX_supported 16
 | I32_Supported : IX_supported 32
 | I64_Supported : IX_supported 64
 .
@@ -123,20 +127,23 @@ Proof.
     + left. subst. constructor.
     + decide (sz = 8)%N.
       * left. subst. constructor.
-      * decide (sz = 32).
+      * decide (sz = 16).
         -- left. subst. constructor.
-        -- decide (sz = 64).
+        -- decide (sz = 32).
            ++ left. subst. constructor.
-           ++ right. intro X.
-              inversion X; subst; contradiction.
+           ++ decide (sz = 64).
+              ** left. subst. constructor.
+              ** right. intro X.
+                 inversion X; subst; contradiction.
 Qed.
 
-Lemma unsupported_cases : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X),
+Lemma unsupported_cases : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x16 x8 x1 x : X),
     (if (sz =? 64) then x64
      else if (sz =? 32) then x32
-          else if (sz =? 8) then x8
-               else if (sz =? 1) then x1
-                    else x) = x.
+          else if (sz =? 16) then x16
+               else if (sz =? 8) then x8
+                    else if (sz =? 1) then x1
+                         else x) = x.
 Proof.
   intros.
   destruct (sz =? 64) eqn: H.
@@ -145,37 +152,43 @@ Proof.
   destruct (sz =? 32) eqn: H'.
   rewrite N.eqb_eq in H'.
   destruct N. rewrite H'. constructor.
-  destruct (sz =? 8) eqn: H''.
+  destruct (sz =? 16) eqn: H''.
   rewrite N.eqb_eq in H''.
   destruct N. rewrite H''. constructor.
-  destruct (sz =? 1) eqn: H'''.
+  destruct (sz =? 8) eqn: H'''.
   rewrite N.eqb_eq in H'''.
   destruct N. rewrite H'''. constructor.
+  destruct (sz =? 1) eqn: H''''.
+  rewrite N.eqb_eq in H''''.
+  destruct N. rewrite H''''. constructor.
   reflexivity.
 Qed.
 
-Function unsupported_cases_match_ {X} (sz : N) (x64 x32 x8 x1 x : X) :=
+Function unsupported_cases_match_ {X} (sz : N) (x64 x32 x16 x8 x1 x : X) :=
   match sz with
   | 64 => x64
   | 32 => x32
+  | 16 => x16
   | 8 => x8
   | 1 => x1
   | _ => x
   end.
 
-Lemma unsupported_cases_match : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X),
+Lemma unsupported_cases_match : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x16 x8 x1 x : X),
     match sz with
     | 64 => x64
     | 32 => x32
+    | 16 => x16
     | 8 => x8
     | 1 => x1
     | _ => x
     end = x.
 Proof.
   intros.
-  change ((unsupported_cases_match_ sz x64 x32 x8 x1 x) = x).
+  change ((unsupported_cases_match_ sz x64 x32 x16 x8 x1 x) = x).
   revert N.
   apply unsupported_cases_match__ind; intros.
+  - assert False. apply N.  econstructor. inversion H.
   - assert False. apply N.  econstructor. inversion H.
   - assert False. apply N.  econstructor. inversion H.
   - assert False. apply N.  econstructor. inversion H.
@@ -199,6 +212,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | DVALUE_Addr (a:A.addr)
   | DVALUE_I1 (x:int1)
   | DVALUE_I8 (x:int8)
+  | DVALUE_I16 (x:int16)
   | DVALUE_I32 (x:int32)
   | DVALUE_I64 (x:int64)
   | DVALUE_IPTR (x:intptr)
@@ -218,6 +232,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Addr a => "<addr>"
     | DVALUE_I1 x => "i1 " ++ show (Int1.unsigned x)
     | DVALUE_I8 x => "i8 " ++ show (Int8.unsigned x)
+    | DVALUE_I16 x => "i16 " ++ show (Int16.unsigned x)
     | DVALUE_I32 x => "i32 " ++ show (Int32.unsigned x)
     | DVALUE_I64 x => "i64 " ++ show (Int64.unsigned x)
     | DVALUE_IPTR x => "<intptr>"
@@ -236,6 +251,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Addr a => 1
     | DVALUE_I1 x => 1
     | DVALUE_I8 x => 1
+    | DVALUE_I16 x => 1
     | DVALUE_I32 x => 1
     | DVALUE_I64 x => 1
     | DVALUE_IPTR x => 1
@@ -273,6 +289,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Addr          : forall a, P (DVALUE_Addr a).
     Hypothesis IH_I1            : forall x, P (DVALUE_I1 x).
     Hypothesis IH_I8            : forall x, P (DVALUE_I8 x).
+    Hypothesis IH_I16            : forall x, P (DVALUE_I16 x).
     Hypothesis IH_I32           : forall x, P (DVALUE_I32 x).
     Hypothesis IH_I64           : forall x, P (DVALUE_I64 x).
     Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x).
@@ -318,6 +335,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_Addr (a:A.addr)
   | UVALUE_I1 (x:int1)
   | UVALUE_I8 (x:int8)
+  | UVALUE_I16 (x:int16)
   | UVALUE_I32 (x:int32)
   | UVALUE_I64 (x:int64)
   | UVALUE_IPTR (x:intptr)
@@ -355,6 +373,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_Addr a => 1
     | UVALUE_I1 x => 1
     | UVALUE_I8 x => 1
+    | UVALUE_I16 x => 1
     | UVALUE_I32 x => 1
     | UVALUE_I64 x => 1
     | UVALUE_IPTR x => 1
@@ -458,6 +477,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a).
     Hypothesis IH_I1             : forall x, P (UVALUE_I1 x).
     Hypothesis IH_I8             : forall x, P (UVALUE_I8 x).
+    Hypothesis IH_I16             : forall x, P (UVALUE_I16 x).
     Hypothesis IH_I32            : forall x, P (UVALUE_I32 x).
     Hypothesis IH_I64            : forall x, P (UVALUE_I64 x).
     Hypothesis IH_IPTR            : forall x, P (UVALUE_IPTR x).
@@ -541,6 +561,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a).
     Hypothesis IH_I1             : forall x, P (UVALUE_I1 x).
     Hypothesis IH_I8             : forall x, P (UVALUE_I8 x).
+    Hypothesis IH_I16             : forall x, P (UVALUE_I16 x).
     Hypothesis IH_I32            : forall x, P (UVALUE_I32 x).
     Hypothesis IH_I64            : forall x, P (UVALUE_I64 x).
     Hypothesis IH_IPTR            : forall x, P (UVALUE_IPTR x).
@@ -628,6 +649,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a).
     Hypothesis IH_I1             : forall x, P (UVALUE_I1 x).
     Hypothesis IH_I8             : forall x, P (UVALUE_I8 x).
+    Hypothesis IH_I16             : forall x, P (UVALUE_I16 x).
     Hypothesis IH_I32            : forall x, P (UVALUE_I32 x).
     Hypothesis IH_I64            : forall x, P (UVALUE_I64 x).
     Hypothesis IH_IPTR            : forall x, P (UVALUE_IPTR x).
@@ -848,6 +870,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Addr a => UVALUE_Addr a
     | DVALUE_I1 x => UVALUE_I1 x
     | DVALUE_I8 x => UVALUE_I8 x
+    | DVALUE_I16 x => UVALUE_I16 x
     | DVALUE_I32 x => UVALUE_I32 x
     | DVALUE_I64 x => UVALUE_I64 x
     | DVALUE_IPTR x => UVALUE_IPTR x
@@ -867,6 +890,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_Addr a                          => ret (DVALUE_Addr a)
     | UVALUE_I1 x                            => ret (DVALUE_I1 x)
     | UVALUE_I8 x                            => ret (DVALUE_I8 x)
+    | UVALUE_I16 x                           => ret (DVALUE_I16 x)
     | UVALUE_I32 x                           => ret (DVALUE_I32 x)
     | UVALUE_I64 x                           => ret (DVALUE_I64 x)
     | UVALUE_IPTR x                          => ret (DVALUE_IPTR x)
@@ -957,6 +981,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_Addr a => true
     | UVALUE_I1 x => true
     | UVALUE_I8 x => true
+    | UVALUE_I16 x => true
     | UVALUE_I32 x => true
     | UVALUE_I64 x => true
     | UVALUE_IPTR x => true
@@ -1007,6 +1032,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       | DVALUE_Addr a => Atom "address" (* TODO: insist that memory models can print addresses? *)
       | DVALUE_I1 x => Atom "dvalue(i1)"
       | DVALUE_I8 x => Atom "dvalue(i8)"
+      | DVALUE_I16 x => Atom "dvalue(i16)"
       | DVALUE_I32 x => Atom "dvalue(i32)"
       | DVALUE_I64 x => Atom "dvalue(i64)"
       | DVALUE_IPTR x => Atom "dvalue(iptr)"
@@ -1031,6 +1057,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       | UVALUE_Addr a => Atom (pre ++ "address" ++ post)%string (* TODO: insist that memory models can print addresses? *)
       | UVALUE_I1 x => Atom (pre ++ "uvalue(i1)" ++ post)%string
       | UVALUE_I8 x => Atom (pre ++ "uvalue(i8)" ++ post)%string
+      | UVALUE_I16 x => Atom (pre ++ "uvalue(i16)" ++ post)%string
       | UVALUE_I32 x => Atom (pre ++ "uvalue(i32)" ++ post)%string
       | UVALUE_I64 x => Atom (pre ++ "uvalue(i64)" ++ post)%string
       | UVALUE_Double x => Atom (pre ++ "uvalue(double)" ++ post)%string
@@ -1077,6 +1104,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           if Int1.eq_dec x1 x2 then true else false
       | DVALUE_I8 x1, DVALUE_I8 x2 =>
           if Int8.eq_dec x1 x2 then true else false
+      | DVALUE_I16 x1, DVALUE_I16 x2 =>
+          if Int16.eq_dec x1 x2 then true else false
       | DVALUE_I32 x1, DVALUE_I32 x2 =>
           if Int32.eq_dec x1 x2 then true else false
       | DVALUE_I64 x1, DVALUE_I64 x2 =>
@@ -1106,6 +1135,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 | DVALUE_Addr a1, DVALUE_Addr a2 => _
                 | DVALUE_I1 x1, DVALUE_I1 x2 => _
                 | DVALUE_I8 x1, DVALUE_I8 x2 => _
+                | DVALUE_I16 x1, DVALUE_I16 x2 => _
                 | DVALUE_I32 x1, DVALUE_I32 x2 => _
                 | DVALUE_I64 x1, DVALUE_I64 x2 => _
                 | DVALUE_IPTR x1, DVALUE_IPTR x2 => _
@@ -1126,6 +1156,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         * left; subst; reflexivity.
         * right; intros H; inversion H. contradiction.
       - destruct (Int8.eq_dec x1 x2).
+        * left; subst; reflexivity.
+        * right; intros H; inversion H. contradiction.
+      - destruct (Int16.eq_dec x1 x2).
         * left; subst; reflexivity.
         * right; intros H; inversion H. contradiction.
       - destruct (Int32.eq_dec x1 x2).
@@ -1212,6 +1245,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 | UVALUE_Addr a1, UVALUE_Addr a2 => _
                 | UVALUE_I1 x1, UVALUE_I1 x2 => _
                 | UVALUE_I8 x1, UVALUE_I8 x2 => _
+                | UVALUE_I16 x1, UVALUE_I16 x2 => _
                 | UVALUE_I32 x1, UVALUE_I32 x2 => _
                 | UVALUE_I64 x1, UVALUE_I64 x2 => _
                 | UVALUE_IPTR x1, UVALUE_IPTR x2 => _
@@ -1243,6 +1277,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       - destruct (A.eq_dec a1 a2)...
       - destruct (Int1.eq_dec x1 x2)...
       - destruct (Int8.eq_dec x1 x2)...
+      - destruct (Int16.eq_dec x1 x2)...
       - destruct (Int32.eq_dec x1 x2)...
       - destruct (Int64.eq_dec x1 x2)...
       - destruct (IP.eq_dec x1 x2)...
@@ -1321,6 +1356,12 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | _ => false
     end.
 
+  Definition is_DVALUE_I16 (d:dvalue) : bool :=
+    match d with
+    | DVALUE_I16 _ => true
+    | _ => false
+    end.
+
   Definition is_DVALUE_I32 (d:dvalue) : bool :=
     match d with
     | DVALUE_I32 _ => true
@@ -1334,7 +1375,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     end.
 
   Definition is_DVALUE_IX (d:dvalue) : bool :=
-    is_DVALUE_I1 d || is_DVALUE_I8 d || is_DVALUE_I32 d || is_DVALUE_I64 d.
+    is_DVALUE_I1 d || is_DVALUE_I8 d || is_DVALUE_I16 d || is_DVALUE_I32 d || is_DVALUE_I64 d.
 
 
   Class VInt I : Type :=
@@ -1560,6 +1601,60 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       repr := Int8.repr;
     }.
 
+  #[global] Instance ToDvalue_Int16 : ToDvalue Int16.int :=
+    { to_dvalue := DVALUE_I16 }.
+
+  #[global] Instance VInt16 : VInt Int16.int :=
+    {
+      (* Comparisons *)
+      equ := Int16.eq;
+      cmp := Int16.cmp;
+      cmpu := Int16.cmpu;
+
+      bitwidth := 16;
+
+      (* Constants *)
+      zero := Int16.zero;
+      one := Int16.one;
+
+      (* Arithmetic *)
+      add := Int16.add;
+      add_carry := Int16.add_carry;
+      add_overflow := Int16.add_overflow;
+
+      sub := Int16.sub;
+      sub_borrow := Int16.sub_borrow;
+      sub_overflow := Int16.sub_overflow;
+
+      mul := Int16.mul;
+
+      divu := Int16.divu;
+      divs := Int16.divs;
+      modu := Int16.modu;
+      mods := Int16.mods;
+
+      shl := Int16.shl;
+      shr := Int16.shr;
+      shru := Int16.shru;
+
+      negative := Int16.negative;
+
+    (* Logic *)
+    and := Int16.and;
+    or := Int16.or;
+    xor := Int16.xor;
+
+    (* Bounds *)
+    min_signed := Int16.min_signed;
+    max_signed := Int16.max_signed;
+
+    (* Conversion *)
+    unsigned := Int16.unsigned;
+    signed := Int16.signed;
+
+    repr := Int16.repr;
+  }.
+
   #[global] Instance ToDvalue_Int32 : ToDvalue Int32.int :=
     { to_dvalue := DVALUE_I32 }.
 
@@ -1673,6 +1768,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     := match uv with
        | UVALUE_I1 x
        | UVALUE_I8 x
+       | UVALUE_I16 x
        | UVALUE_I32 x
        | UVALUE_I64 x => Z.eqb (unsigned x) i
        | UVALUE_IPTR x => Z.eqb (IP.to_Z x) i
@@ -1683,6 +1779,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     := match dv with
        | DVALUE_I1 x => unsigned x
        | DVALUE_I8 x => unsigned x
+       | DVALUE_I16 x => unsigned x
        | DVALUE_I32 x => unsigned x
        | DVALUE_I64 x => unsigned x
        | DVALUE_IPTR x => IP.to_unsigned x
@@ -1724,6 +1821,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
   Definition undef_i1 : uvalue  := UVALUE_Undef (DTYPE_I 1).
   Definition undef_i8 : uvalue  := UVALUE_Undef (DTYPE_I 8).
+  Definition undef_i16 : uvalue := UVALUE_Undef (DTYPE_I 16).
   Definition undef_i32 : uvalue := UVALUE_Undef (DTYPE_I 32).
   Definition undef_i64 : uvalue := UVALUE_Undef (DTYPE_I 64).
   Definition undef_int {Int} `{VInt Int} : uvalue  := UVALUE_Undef (DTYPE_I (N.of_nat bitwidth)).
@@ -1926,6 +2024,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     match bits, x, y with
     | 1, x, y  => eval_int_op iop x y
     | 8, x, y  => eval_int_op iop x y
+    | 16, x, y => eval_int_op iop x y
     | 32, x, y => eval_int_op iop x y
     | 64, x, y => eval_int_op iop x y
     | _, _, _  => raise_error "unsupported bitsize"
@@ -1938,6 +2037,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     match bits with
     | Some 1  => ret (DVALUE_I1 (repr i))
     | Some 8  => ret (DVALUE_I8 (repr i))
+    | Some 16 => ret (DVALUE_I16 (repr i))
     | Some 32 => ret (DVALUE_I32 (repr i))
     | Some 64 => ret (DVALUE_I64 (repr i))
     | None    =>
@@ -1966,6 +2066,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     match v1, v2 with
     | DVALUE_I1 i1, DVALUE_I1 i2
     | DVALUE_I8 i1, DVALUE_I8 i2
+    | DVALUE_I16 i1, DVALUE_I16 i2
     | DVALUE_I32 i1, DVALUE_I32 i2
     | DVALUE_I64 i1, DVALUE_I64 i2
     | DVALUE_IPTR i1, DVALUE_IPTR i2 =>
@@ -2482,6 +2583,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | DVALUE_Addr_typ   : forall a, dvalue_has_dtyp (DVALUE_Addr a) DTYPE_Pointer
   | DVALUE_I1_typ     : forall x, dvalue_has_dtyp (DVALUE_I1 x) (DTYPE_I 1)
   | DVALUE_I8_typ     : forall x, dvalue_has_dtyp (DVALUE_I8 x) (DTYPE_I 8)
+  | DVALUE_I16_typ    : forall x, dvalue_has_dtyp (DVALUE_I16 x) (DTYPE_I 16)
   | DVALUE_I32_typ    : forall x, dvalue_has_dtyp (DVALUE_I32 x) (DTYPE_I 32)
   | DVALUE_I64_typ    : forall x, dvalue_has_dtyp (DVALUE_I64 x) (DTYPE_I 64)
   | DVALUE_IPTR_typ   : forall x, dvalue_has_dtyp (DVALUE_IPTR x) DTYPE_IPTR
@@ -2525,6 +2627,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_Addr_typ   : forall a, uvalue_has_dtyp (UVALUE_Addr a) DTYPE_Pointer
   | UVALUE_I1_typ     : forall x, uvalue_has_dtyp (UVALUE_I1 x) (DTYPE_I 1)
   | UVALUE_I8_typ     : forall x, uvalue_has_dtyp (UVALUE_I8 x) (DTYPE_I 8)
+  | UVALUE_I16_typ    : forall x, uvalue_has_dtyp (UVALUE_I16 x) (DTYPE_I 16)
   | UVALUE_I32_typ    : forall x, uvalue_has_dtyp (UVALUE_I32 x) (DTYPE_I 32)
   | UVALUE_I64_typ    : forall x, uvalue_has_dtyp (UVALUE_I64 x) (DTYPE_I 64)
   | UVALUE_IPTR_typ    : forall x, uvalue_has_dtyp (UVALUE_IPTR x) (DTYPE_IPTR)
@@ -2789,6 +2892,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Addr           : forall a, P (DVALUE_Addr a) DTYPE_Pointer.
     Hypothesis IH_I1             : forall x, P (DVALUE_I1 x) (DTYPE_I 1).
     Hypothesis IH_I8             : forall x, P (DVALUE_I8 x) (DTYPE_I 8).
+    Hypothesis IH_I16            : forall x, P (DVALUE_I16 x) (DTYPE_I 16).
     Hypothesis IH_I32            : forall x, P (DVALUE_I32 x) (DTYPE_I 32).
     Hypothesis IH_I64            : forall x, P (DVALUE_I64 x) (DTYPE_I 64).
     Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x) DTYPE_IPTR.
@@ -2874,6 +2978,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a) DTYPE_Pointer.
     Hypothesis IH_I1             : forall x, P (UVALUE_I1 x) (DTYPE_I 1).
     Hypothesis IH_I8             : forall x, P (UVALUE_I8 x) (DTYPE_I 8).
+    Hypothesis IH_I16            : forall x, P (UVALUE_I16 x) (DTYPE_I 16).
     Hypothesis IH_I32            : forall x, P (UVALUE_I32 x) (DTYPE_I 32).
     Hypothesis IH_I64            : forall x, P (UVALUE_I64 x) (DTYPE_I 64).
     Hypothesis IH_IPTR           : forall x, P (UVALUE_IPTR x) DTYPE_IPTR.
@@ -3566,6 +3671,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         try solve [eapply EqRet_NoFail in EVAL; eauto;
         exfalso; apply EVAL;
         first [apply mfails_ub | apply mfails_error | apply mfails_oom]; eauto].
+
       all : apply MReturns_ret in EVAL;
               apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
                           [ cbn in FAILS; apply MFails_ret in FAILS; contradiction |];
@@ -3693,11 +3799,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Definition default_dvalue_of_dtyp_i (sz : N) : err dvalue:=
     (if (sz =? 64) then ret (DVALUE_I64 (repr 0))
      else if (sz =? 32) then ret (DVALUE_I32 (repr 0))
-          else if (sz =? 8) then ret (DVALUE_I8 (repr 0))
-               else if (sz =? 1) then ret (DVALUE_I1 (repr 0))
-                    else failwith
-                           "Illegal size for generating default dvalue of DTYPE_I").
-
+          else if (sz =? 16) then ret (DVALUE_I16 (repr 0))
+               else if (sz =? 8) then ret (DVALUE_I8 (repr 0))
+                    else if (sz =? 1) then ret (DVALUE_I1 (repr 0))
+                         else failwith
+                                "Illegal size for generating default dvalue of DTYPE_I").
 
   (* Handler for PickE which concretizes everything to 0 *)
   (* If this succeeds the dvalue returned should agree with
@@ -3882,6 +3988,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
        | UVALUE_Addr a => "UVALUE_Addr"
        | UVALUE_I1 x => "UVALUE_I1"
        | UVALUE_I8 x => "UVALUE_I8"
+       | UVALUE_I16 x => "UVALUE_I16"
        | UVALUE_I32 x => "UVALUE_I32"
        | UVALUE_I64 x => "UVALUE_I64"
        | UVALUE_IPTR x => "UVALUE_IPTR"

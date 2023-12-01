@@ -143,6 +143,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
            ret (DV2.DVALUE_Addr a')
        | DV1.DVALUE_I1 x  => ret (DV2.DVALUE_I1 x)
        | DV1.DVALUE_I8 x  => ret (DV2.DVALUE_I8 x)
+       | DV1.DVALUE_I16 x => ret (DV2.DVALUE_I16 x)
        | DV1.DVALUE_I32 x => ret (DV2.DVALUE_I32 x)
        | DV1.DVALUE_I64 x => ret (DV2.DVALUE_I64 x)
        | DV1.DVALUE_IPTR x =>
@@ -174,6 +175,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
            ret (DV2.UVALUE_Addr a')
        | DV1.UVALUE_I1 x  => ret (DV2.UVALUE_I1 x)
        | DV1.UVALUE_I8 x  => ret (DV2.UVALUE_I8 x)
+       | DV1.UVALUE_I16 x => ret (DV2.UVALUE_I16 x)
        | DV1.UVALUE_I32 x => ret (DV2.UVALUE_I32 x)
        | DV1.UVALUE_I64 x => ret (DV2.UVALUE_I64 x)
        | DV1.UVALUE_IPTR x =>
@@ -267,6 +269,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
             ret (DV2.DVALUE_Addr a')
         | DV1.DVALUE_I1 x  => ret (DV2.DVALUE_I1 x)
         | DV1.DVALUE_I8 x  => ret (DV2.DVALUE_I8 x)
+        | DV1.DVALUE_I16 x => ret (DV2.DVALUE_I16 x)
         | DV1.DVALUE_I32 x => ret (DV2.DVALUE_I32 x)
         | DV1.DVALUE_I64 x => ret (DV2.DVALUE_I64 x)
         | DV1.DVALUE_IPTR x =>
@@ -307,6 +310,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
             ret (DV2.UVALUE_Addr a')
         | DV1.UVALUE_I1 x  => ret (DV2.UVALUE_I1 x)
         | DV1.UVALUE_I8 x  => ret (DV2.UVALUE_I8 x)
+        | DV1.UVALUE_I16 x => ret (DV2.UVALUE_I16 x)
         | DV1.UVALUE_I32 x => ret (DV2.UVALUE_I32 x)
         | DV1.UVALUE_I64 x => ret (DV2.UVALUE_I64 x)
         | DV1.UVALUE_IPTR x =>
