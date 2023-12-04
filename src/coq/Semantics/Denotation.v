@@ -102,7 +102,7 @@ Open Scope N_scope.
     itrees in the second phase.
  *)
 
-Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP Byte).
+Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (ByteMod : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP ByteMod).
   Import CP.
   Import CONC.
   Import MP.

@@ -22,7 +22,7 @@ From Vellvm Require Import
 Import MonadNotation.
 Import MonadReturnsLaws.
 
-Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP Byte).
+Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (ByteMod : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP ByteMod).
   Import CP.
   Import CONC.
   Import MP.
@@ -36,8 +36,8 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModul
   Import DV.
   Import GEP.
 
-  Export Byte.
-  Import Byte.
+  Export ByteMod.
+  Import ByteMod.
   Import BYTE_IMPL.
 
   Ltac eval_nseq :=
@@ -240,7 +240,7 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModul
   Qed.
 End MemBytesTheory.
 
-Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP Byte).
+Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (ByteMod : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP ByteMod).
   Import CP.
   Import CONC.
   Import MP.
@@ -248,9 +248,9 @@ Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
 
   Import Events.
 
-  Module MBT := MemBytesTheory LP MP Byte CP.
+  Module MBT := MemBytesTheory LP MP ByteMod CP.
   Import MBT.
-  Import Byte.
+  Import ByteMod.
   Import SIZEOF.
 
   Module Mem := MakeFiniteMemory LP.

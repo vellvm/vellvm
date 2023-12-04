@@ -20,8 +20,8 @@ Import EqvNotation.
 (* end hide *)
 
 (* Equalities --------------------------------------------------------------- *)
-#[global] Instance eq_dec_int : RelDec (@eq int) := Data.Z.RelDec_zeq.
-#[global] Instance eqv_int : Eqv int := (@eq int).
+#[global] Instance eq_dec_int : RelDec (@eq int_ast) := Data.Z.RelDec_zeq.
+#[global] Instance eqv_int : Eqv int_ast := (@eq int_ast).
 
 (* These should be moved to part of the standard library, or at least to ExtLib *)
 Module AsciiOrd <: UsualOrderedType.
@@ -411,10 +411,10 @@ Section ExpInd.
   Variable T : Set.
   Variable P : (exp T) -> Prop.
   Hypothesis IH_Ident   : forall (id:ident), P ((EXP_Ident id)).
-  Hypothesis IH_Integer : forall (x:int), P ((EXP_Integer x)).
-  Hypothesis IH_Float   : forall (f:float32), P ((EXP_Float f)).
-  Hypothesis IH_Double  : forall (f:float), P ((EXP_Double f)).
-  Hypothesis IH_Hex     : forall (h:float), P ((EXP_Hex h)).
+  Hypothesis IH_Integer : forall (x:int_ast), P ((EXP_Integer x)).
+  Hypothesis IH_Float   : forall (f:float32_ast), P ((EXP_Float f)).
+  Hypothesis IH_Double  : forall (f:float_ast), P ((EXP_Double f)).
+  Hypothesis IH_Hex     : forall (h:float_ast), P ((EXP_Hex h)).
   Hypothesis IH_Bool    : forall (b:bool), P ((EXP_Bool b)).
   Hypothesis IH_Null    : P ((EXP_Null)).
   Hypothesis IH_Zero_initializer : P ((EXP_Zero_initializer)).
@@ -436,8 +436,8 @@ Section ExpInd.
       P (snd vec) -> P (snd elt) -> P (snd idx) -> P ((OP_InsertElement vec elt idx)).
   Hypothesis IH_ShuffleVector : forall (vec1:(T * exp T)) (vec2:(T * exp T)) (idxmask:(T * exp T)),
       P (snd vec1) -> P (snd vec2 ) -> P (snd idxmask) -> P ((OP_ShuffleVector vec1 vec2 idxmask)).
-  Hypothesis IH_ExtractValue  : forall (vec:(T * exp T)) (idxs:list int), P (snd vec) -> P ((OP_ExtractValue vec idxs)).
-  Hypothesis IH_InsertValue   : forall (vec:(T * exp T)) (elt:(T * exp T)) (idxs:list int), P (snd vec) -> P (snd elt) -> P ((OP_InsertValue vec elt idxs)).
+  Hypothesis IH_ExtractValue  : forall (vec:(T * exp T)) (idxs:list int_ast), P (snd vec) -> P ((OP_ExtractValue vec idxs)).
+  Hypothesis IH_InsertValue   : forall (vec:(T * exp T)) (elt:(T * exp T)) (idxs:list int_ast), P (snd vec) -> P (snd elt) -> P ((OP_InsertValue vec elt idxs)).
   Hypothesis IH_Select        : forall (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select cnd v1 v2)).
   Hypothesis IH_Freeze        : forall (v:(T * exp T)), P (snd v) -> P ((OP_Freeze v)).
 
@@ -650,7 +650,7 @@ Section hiding_notation.
       end.
 
     #[global] Instance serialize_exp : Serialize (exp T) := serialize_exp'.
-    #[global] Instance serialize_int : Serialize int := fun i => Atom (show_Z i).
+    #[global] Instance serialize_int : Serialize int_ast := fun i => Atom (show_Z i).
 
     #[global] Instance serialize_texp : Serialize (texp T) :=
       fun '(t, e) =>

@@ -96,7 +96,7 @@ Qed.
   integer (type [Z]) plus a proof that it is in the range 0 (included) to
   [modulus] (excluded). *)
 
-Record int: Type := mkint { intval: Z; intrange: -1 < intval < modulus }.
+Record bounded_int: Type := mkint { intval: Z; intrange: -1 < intval < modulus }.
 
 (** Fast normalization modulo [2^wordsize] *)
 
@@ -193,16 +193,16 @@ Qed.
   to the given machine integer, interpreted as unsigned or signed
   respectively. *)
 
-Definition unsigned (n: int) : Z := intval n.
+Definition unsigned (n: bounded_int) : Z := intval n.
 
-Definition signed (n: int) : Z :=
+Definition signed (n: bounded_int) : Z :=
   let x := unsigned n in
   if zlt x half_modulus then x else x - modulus.
 
 (** Conversely, [repr] takes a Coq integer and returns the corresponding
   machine integer.  The argument is treated modulo [modulus]. *)
 
-Definition repr (x: Z) : int :=
+Definition repr (x: Z) : bounded_int :=
   mkint (Z_mod_modulus x) (Z_mod_modulus_range' x).
 
 Definition zero := repr 0.
@@ -226,7 +226,7 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma eq_dec: forall (x y: int), {x = y} + {x <> y}.
+Lemma eq_dec: forall (x y: bounded_int), {x = y} + {x <> y}.
 Proof.
   intros. destruct x; destruct y. destruct (zeq intval0 intval1).
   left. apply mkint_eq. auto.
@@ -235,88 +235,88 @@ Defined.
 
 (** * Arithmetic and logical operations over machine integers *)
 
-Definition eq (x y: int) : bool :=
+Definition eq (x y: bounded_int) : bool :=
   if zeq (unsigned x) (unsigned y) then true else false.
-Definition lt (x y: int) : bool :=
+Definition lt (x y: bounded_int) : bool :=
   if zlt (signed x) (signed y) then true else false.
-Definition ltu (x y: int) : bool :=
+Definition ltu (x y: bounded_int) : bool :=
   if zlt (unsigned x) (unsigned y) then true else false.
 
-Definition neg (x: int) : int := repr (- unsigned x).
+Definition neg (x: bounded_int) : bounded_int := repr (- unsigned x).
 
-Definition add (x y: int) : int :=
+Definition add (x y: bounded_int) : bounded_int :=
   repr (unsigned x + unsigned y).
-Definition sub (x y: int) : int :=
+Definition sub (x y: bounded_int) : bounded_int :=
   repr (unsigned x - unsigned y).
-Definition mul (x y: int) : int :=
+Definition mul (x y: bounded_int) : bounded_int :=
   repr (unsigned x * unsigned y).
 
-Definition divs (x y: int) : int :=
+Definition divs (x y: bounded_int) : bounded_int :=
   repr (Z.quot (signed x) (signed y)).
-Definition mods (x y: int) : int :=
+Definition mods (x y: bounded_int) : bounded_int :=
   repr (Z.rem (signed x) (signed y)).
 
-Definition divu (x y: int) : int :=
+Definition divu (x y: bounded_int) : bounded_int :=
   repr (unsigned x / unsigned y).
-Definition modu (x y: int) : int :=
+Definition modu (x y: bounded_int) : bounded_int :=
   repr ((unsigned x) mod (unsigned y)).
 
 (** Bitwise boolean operations. *)
 
-Definition and (x y: int): int := repr (Z.land (unsigned x) (unsigned y)).
-Definition or (x y: int): int := repr (Z.lor (unsigned x) (unsigned y)).
-Definition xor (x y: int) : int := repr (Z.lxor (unsigned x) (unsigned y)).
+Definition and (x y: bounded_int): bounded_int := repr (Z.land (unsigned x) (unsigned y)).
+Definition or (x y: bounded_int): bounded_int := repr (Z.lor (unsigned x) (unsigned y)).
+Definition xor (x y: bounded_int) : bounded_int := repr (Z.lxor (unsigned x) (unsigned y)).
 
-Definition not (x: int) : int := xor x mone.
+Definition not (x: bounded_int) : bounded_int := xor x mone.
 
 (** Shifts and rotates. *)
 
-Definition shl (x y: int): int := repr (Z.shiftl (unsigned x) (unsigned y)).
-Definition shru (x y: int): int := repr (Z.shiftr (unsigned x) (unsigned y)).
-Definition shr (x y: int): int := repr (Z.shiftr (signed x) (unsigned y)).
+Definition shl (x y: bounded_int): bounded_int := repr (Z.shiftl (unsigned x) (unsigned y)).
+Definition shru (x y: bounded_int): bounded_int := repr (Z.shiftr (unsigned x) (unsigned y)).
+Definition shr (x y: bounded_int): bounded_int := repr (Z.shiftr (signed x) (unsigned y)).
 
-Definition rol (x y: int) : int :=
+Definition rol (x y: bounded_int) : bounded_int :=
   let n := (unsigned y) mod zwordsize in
   repr (Z.lor (Z.shiftl (unsigned x) n) (Z.shiftr (unsigned x) (zwordsize - n))).
-Definition ror (x y: int) : int :=
+Definition ror (x y: bounded_int) : bounded_int :=
   let n := (unsigned y) mod zwordsize in
   repr (Z.lor (Z.shiftr (unsigned x) n) (Z.shiftl (unsigned x) (zwordsize - n))).
 
-Definition rolm (x a m: int): int := and (rol x a) m.
+Definition rolm (x a m: bounded_int): bounded_int := and (rol x a) m.
 
 (** Viewed as signed divisions by powers of two, [shrx] rounds towards
   zero, while [shr] rounds towards minus infinity. *)
 
-Definition shrx (x y: int): int :=
+Definition shrx (x y: bounded_int): bounded_int :=
   divs x (shl one y).
 
 (** High half of full multiply. *)
 
-Definition mulhu (x y: int): int := repr ((unsigned x * unsigned y) / modulus).
-Definition mulhs (x y: int): int := repr ((signed x * signed y) / modulus).
+Definition mulhu (x y: bounded_int): bounded_int := repr ((unsigned x * unsigned y) / modulus).
+Definition mulhs (x y: bounded_int): bounded_int := repr ((signed x * signed y) / modulus).
 
 (** Condition flags *)
 
-Definition negative (x: int): int :=
+Definition negative (x: bounded_int): bounded_int :=
   if lt x zero then one else zero.
 
-Definition add_carry (x y cin: int): int :=
+Definition add_carry (x y cin: bounded_int): bounded_int :=
   if zlt (unsigned x + unsigned y + unsigned cin) modulus then zero else one.
 
-Definition add_overflow (x y cin: int): int :=
+Definition add_overflow (x y cin: bounded_int): bounded_int :=
   let s := signed x + signed y + signed cin in
   if zle min_signed s && zle s max_signed then zero else one.
 
-Definition sub_borrow (x y bin: int): int :=
+Definition sub_borrow (x y bin: bounded_int): bounded_int :=
   if zlt (unsigned x - unsigned y - unsigned bin) 0 then one else zero.
 
-Definition sub_overflow (x y bin: int): int :=
+Definition sub_overflow (x y bin: bounded_int): bounded_int :=
   let s := signed x - signed y - signed bin in
   if zle min_signed s && zle s max_signed then zero else one.
 
 (** [shr_carry x y] is 1 if [x] is negative and at least one 1 bit is shifted away. *)
 
-Definition shr_carry (x y: int) : int :=
+Definition shr_carry (x y: bounded_int) : bounded_int :=
   if lt x zero && negb (eq (and x (sub (shl one y) one)) zero)
   then one else zero.
 
@@ -355,9 +355,9 @@ Definition Zsign_ext (n: Z) (x: Z) : Z :=
     (fun x => if Z.odd x then -1 else 0)
     x.
 
-Definition zero_ext (n: Z) (x: int) : int := repr (Zzero_ext n (unsigned x)).
+Definition zero_ext (n: Z) (x: bounded_int) : bounded_int := repr (Zzero_ext n (unsigned x)).
 
-Definition sign_ext (n: Z) (x: int) : int := repr (Zsign_ext n (unsigned x)).
+Definition sign_ext (n: Z) (x: bounded_int) : bounded_int := repr (Zsign_ext n (unsigned x)).
 
 (** Decomposition of a number as a sum of powers of two. *)
 
@@ -370,12 +370,12 @@ Fixpoint Z_one_bits (n: nat) (x: Z) (i: Z) {struct n}: list Z :=
       else Z_one_bits m (Z.div2 x) (i+1)
   end.
 
-Definition one_bits (x: int) : list int :=
+Definition one_bits (x: bounded_int) : list bounded_int :=
   List.map repr (Z_one_bits wordsize (unsigned x) 0).
 
 (** Recognition of powers of two. *)
 
-Definition is_power2 (x: int) : option int :=
+Definition is_power2 (x: bounded_int) : option bounded_int :=
   match Z_one_bits wordsize (unsigned x) 0 with
   | i :: nil => Some (repr i)
   | _ => None
@@ -383,7 +383,7 @@ Definition is_power2 (x: int) : option int :=
 
 (** Comparisons. *)
 
-Definition cmp (c: comparison) (x y: int) : bool :=
+Definition cmp (c: comparison) (x y: bounded_int) : bool :=
   match c with
   | Ceq => eq x y
   | Cne => negb (eq x y)
@@ -393,7 +393,7 @@ Definition cmp (c: comparison) (x y: int) : bool :=
   | Cge => negb (lt x y)
   end.
 
-Definition cmpu (c: comparison) (x y: int) : bool :=
+Definition cmpu (c: comparison) (x y: bounded_int) : bool :=
   match c with
   | Ceq => eq x y
   | Cne => negb (eq x y)
@@ -403,18 +403,18 @@ Definition cmpu (c: comparison) (x y: int) : bool :=
   | Cge => negb (ltu x y)
   end.
 
-Definition is_false (x: int) : Prop := x = zero.
-Definition is_true  (x: int) : Prop := x <> zero.
-Definition notbool  (x: int) : int  := if eq x zero then one else zero.
+Definition is_false (x: bounded_int) : Prop := x = zero.
+Definition is_true  (x: bounded_int) : Prop := x <> zero.
+Definition notbool  (x: bounded_int) : bounded_int  := if eq x zero then one else zero.
 
 (** x86-style extended division and modulus *)
 
-Definition divmodu2 (nhi nlo: int) (d: int) : option (int * int) :=
+Definition divmodu2 (nhi nlo: bounded_int) (d: bounded_int) : option (bounded_int * bounded_int) :=
   if eq_dec d zero then None else
    (let (q, r) := Z.div_eucl (unsigned nhi * modulus + unsigned nlo) (unsigned d) in
     if zle q max_unsigned then Some(repr q, repr r) else None).
 
-Definition divmods2 (nhi nlo: int) (d: int) : option (int * int) :=
+Definition divmods2 (nhi nlo: bounded_int) (d: bounded_int) : option (bounded_int * bounded_int) :=
   if eq_dec d zero then None else
    (let (q, r) := Z.quotrem (signed nhi * modulus + unsigned nlo) (signed d) in
     if zle min_signed q && zle q max_signed then Some(repr q, repr r) else None).
@@ -838,7 +838,7 @@ Proof.
   rewrite zeq_false. auto. auto.
 Qed.
 
-Theorem eq_spec: forall (x y: int), if eq x y then x = y else x <> y.
+Theorem eq_spec: forall (x y: bounded_int), if eq x y then x = y else x <> y.
 Proof.
   intros; unfold eq. case (eq_dec x y); intro.
   subst y. rewrite zeq_true. auto.
@@ -1595,7 +1595,7 @@ Qed.
 
 (** ** Bit-level reasoning over type [int] *)
 
-Definition testbit (x: int) (i: Z) : bool := Z.testbit (unsigned x) i.
+Definition testbit (x: bounded_int) (i: Z) : bool := Z.testbit (unsigned x) i.
 
 Lemma testbit_repr:
   forall x i,
@@ -1898,7 +1898,7 @@ Qed.
 (** Properties of bitwise complement.*)
 
 Theorem not_involutive:
-  forall (x: int), not (not x) = x.
+  forall (x: bounded_int), not (not x) = x.
 Proof.
   intros. unfold not. rewrite xor_assoc. rewrite xor_idem. apply xor_zero.
 Qed.
@@ -3522,7 +3522,7 @@ Proof.
   subst i. apply A. apply Z_one_bits_range with (unsigned x); auto.
 Qed.
 
-Fixpoint int_of_one_bits (l: list int) : int :=
+Fixpoint int_of_one_bits (l: list bounded_int) : bounded_int :=
   match l with
   | nil => zero
   | a :: b => add (shl one a) (int_of_one_bits b)
@@ -3748,7 +3748,7 @@ Qed.
 
 (** Non-overlapping test *)
 
-Definition no_overlap (ofs1: int) (sz1: Z) (ofs2: int) (sz2: Z) : bool :=
+Definition no_overlap (ofs1: bounded_int) (sz1: Z) (ofs2: bounded_int) (sz2: Z) : bool :=
   let x1 := unsigned ofs1 in let x2 := unsigned ofs2 in
      zlt (x1 + sz1) modulus && zlt (x2 + sz2) modulus
   && (zle (x1 + sz1) x2 || zle (x2 + sz2) x1).
@@ -3780,7 +3780,7 @@ Definition Zsize (x: Z) : Z :=
   | _ => 0
   end.
 
-Definition size (x: int) : Z := Zsize (unsigned x).
+Definition size (x: bounded_int) : Z := Zsize (unsigned x).
 
 Remark Zsize_pos: forall x, 0 <= Zsize x.
 Proof.
@@ -4018,7 +4018,7 @@ Module Int := Make(Wordsize_32).
 
 Strategy 0 [Wordsize_32.wordsize].
 
-Notation int := Int.int.
+Notation bounded_int := Int.bounded_int.
 
 Remark int_wordsize_divides_modulus:
   Z.divide (Z.of_nat Int.wordsize) Int.modulus.
@@ -4038,7 +4038,7 @@ Module Byte := Make(Wordsize_8).
 
 Strategy 0 [Wordsize_8.wordsize].
 
-Notation byte := Byte.int.
+Notation byte := Byte.bounded_int.
 
 Module Wordsize_16.
   Definition wordsize := 16%nat.
@@ -4064,19 +4064,19 @@ Include Make(Wordsize_64).
 
 (** Shifts with amount given as a 32-bit integer *)
 
-Definition iwordsize': Int.int := Int.repr zwordsize.
+Definition iwordsize': Int.bounded_int := Int.repr zwordsize.
 
-Definition shl' (x: int) (y: Int.int): int :=
+Definition shl' (x: bounded_int) (y: Int.bounded_int): bounded_int :=
   repr (Z.shiftl (unsigned x) (Int.unsigned y)).
-Definition shru' (x: int) (y: Int.int): int :=
+Definition shru' (x: bounded_int) (y: Int.bounded_int): bounded_int :=
   repr (Z.shiftr (unsigned x) (Int.unsigned y)).
-Definition shr' (x: int) (y: Int.int): int :=
+Definition shr' (x: bounded_int) (y: Int.bounded_int): bounded_int :=
   repr (Z.shiftr (signed x) (Int.unsigned y)).
-Definition rol' (x: int) (y: Int.int): int :=
+Definition rol' (x: bounded_int) (y: Int.bounded_int): bounded_int :=
   rol x (repr (Int.unsigned y)).
-Definition shrx' (x: int) (y: Int.int): int :=
+Definition shrx' (x: bounded_int) (y: Int.bounded_int): bounded_int :=
   divs x (shl' one y).
-Definition shr_carry' (x: int) (y: Int.int): int :=
+Definition shr_carry' (x: bounded_int) (y: Int.bounded_int): bounded_int :=
   if lt x zero && negb (eq (and x (sub (shl' one y) one)) zero)
   then one else zero.
 
@@ -4321,10 +4321,10 @@ Qed.
 
 (** Powers of two with exponents given as 32-bit ints *)
 
-Definition one_bits' (x: int) : list Int.int :=
+Definition one_bits' (x: bounded_int) : list Int.bounded_int :=
   List.map Int.repr (Z_one_bits wordsize (unsigned x) 0).
 
-Definition is_power2' (x: int) : option Int.int :=
+Definition is_power2' (x: bounded_int) : option Int.bounded_int :=
   match Z_one_bits wordsize (unsigned x) 0 with
   | i :: nil => Some (Int.repr i)
   | _ => None
@@ -4341,7 +4341,7 @@ Proof.
   assert (zwordsize < Int.max_unsigned) by reflexivity. lia.
 Qed.
 
-Fixpoint int_of_one_bits' (l: list Int.int) : int :=
+Fixpoint int_of_one_bits' (l: list Int.bounded_int) : bounded_int :=
   match l with
   | nil => zero
   | a :: b => add (shl' one a) (int_of_one_bits' b)
@@ -4423,11 +4423,11 @@ Qed.
 
 (** Decomposing 64-bit ints as pairs of 32-bit ints *)
 
-Definition loword (n: int) : Int.int := Int.repr (unsigned n).
+Definition loword (n: bounded_int) : Int.bounded_int := Int.repr (unsigned n).
 
-Definition hiword (n: int) : Int.int := Int.repr (unsigned (shru n (repr Int.zwordsize))).
+Definition hiword (n: bounded_int) : Int.bounded_int := Int.repr (unsigned (shru n (repr Int.zwordsize))).
 
-Definition ofwords (hi lo: Int.int) : int :=
+Definition ofwords (hi lo: Int.bounded_int) : bounded_int :=
   or (shl (repr (Int.unsigned hi)) (repr Int.zwordsize)) (repr (Int.unsigned lo)).
 
 Lemma bits_loword:
@@ -4815,7 +4815,7 @@ Proof.
   compute; [right|left]; apply Int.mkint_eq; auto.
 Qed.
 
-Definition mul' (x y: Int.int) : int := repr (Int.unsigned x * Int.unsigned y).
+Definition mul' (x y: Int.bounded_int) : bounded_int := repr (Int.unsigned x * Int.unsigned y).
 
 Lemma mul'_mulhu:
   forall x y, mul' x y = ofwords (Int.mulhu x y) (Int.mul x y).
@@ -4976,7 +4976,7 @@ End Int64.
 
 Strategy 0 [Wordsize_64.wordsize].
 
-Notation int64 := Int64.int.
+Notation int64 := Int64.bounded_int.
 
 Global Opaque Int.repr Int64.repr Byte.repr.
 
@@ -4994,21 +4994,21 @@ Module Ptrofs.
 
 Include Make(Wordsize_Ptrofs).
 
-Definition to_int (x: int): Int.int := Int.repr (unsigned x).
+Definition to_int (x: bounded_int): Int.bounded_int := Int.repr (unsigned x).
 
-Definition to_int64 (x: int): Int64.int := Int64.repr (unsigned x).
+Definition to_int64 (x: bounded_int): Int64.bounded_int := Int64.repr (unsigned x).
 
-Definition of_int (x: Int.int) : int := repr (Int.unsigned x).
+Definition of_int (x: Int.bounded_int) : bounded_int := repr (Int.unsigned x).
 
 Definition of_intu := of_int.
 
-Definition of_ints (x: Int.int) : int := repr (Int.signed x).
+Definition of_ints (x: Int.bounded_int) : bounded_int := repr (Int.signed x).
 
-Definition of_int64 (x: Int64.int) : int := repr (Int64.unsigned x).
+Definition of_int64 (x: Int64.bounded_int) : bounded_int := repr (Int64.unsigned x).
 
 Definition of_int64u := of_int64.
 
-Definition of_int64s (x: Int64.int) : int := repr (Int64.signed x).
+Definition of_int64s (x: Int64.bounded_int) : bounded_int := repr (Int64.signed x).
 
 Section AGREE32.
 
@@ -5027,7 +5027,7 @@ Proof.
   intros. unfold Int.eqm, eqm. rewrite modulus_eq32; tauto.
 Qed.
 
-Definition agree32 (a: Ptrofs.int) (b: Int.int) : Prop :=
+Definition agree32 (a: Ptrofs.bounded_int) (b: Int.bounded_int) : Prop :=
   Ptrofs.unsigned a = Int.unsigned b.
 
 Lemma agree32_repr:
@@ -5149,7 +5149,7 @@ Proof.
   intros. unfold Int64.eqm, eqm. rewrite modulus_eq64; tauto.
 Qed.
 
-Definition agree64 (a: Ptrofs.int) (b: Int64.int) : Prop :=
+Definition agree64 (a: Ptrofs.bounded_int) (b: Int64.bounded_int) : Prop :=
   Ptrofs.unsigned a = Int64.unsigned b.
 
 Lemma agree64_repr:
@@ -5252,7 +5252,7 @@ End Ptrofs.
 
 Strategy 0 [Wordsize_Ptrofs.wordsize].
 
-Notation ptrofs := Ptrofs.int.
+Notation ptrofs := Ptrofs.bounded_int.
 
 Global Opaque Ptrofs.repr.
 

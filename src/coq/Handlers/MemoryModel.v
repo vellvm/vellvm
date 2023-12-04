@@ -225,7 +225,7 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
 End MemoryModelSpecPrimitives.
 
-Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL).
+Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (ByteMod : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL).
   (*** Other helpers *)
   Import MP.GEP.
   Import MP.BYTE_IMPL.
@@ -237,7 +237,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Import LP.ITOP.
   Import LP.PROV.
   Import IP.
-  Import Byte.
+  Import ByteMod.
   Import Util.
 
   (* TODO: Move this? *)

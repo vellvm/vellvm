@@ -276,7 +276,7 @@ Section Endo.
            `{Endo raw_id}
            `{Endo T}
            `{Endo bool}
-           `{Endo int}
+           `{Endo int_ast}
            `{Endo string}
            `{Endo (exp T)}
       : Endo (global T) | 50 :=
@@ -294,7 +294,7 @@ Section Endo.
            `{Endo function_id}
            `{Endo T}
            `{Endo string}
-           `{Endo int}
+           `{Endo int_ast}
            `{Endo param_attr}
            `{Endo fn_attr}
            `{Endo (annotation T)}
@@ -330,7 +330,7 @@ Section Endo.
            `{Endo (declaration T)}
            `{Endo (definition T FnBody)}
            `{Endo fn_attr}
-           `{Endo int}
+           `{Endo int_ast}
            `{Endo string}
       : Endo (toplevel_entity T FnBody) | 50 :=
       fun tle =>
@@ -502,7 +502,7 @@ Section TFunctor.
  #[global] Instance TFunctor_cmpxchg
            `{Endo bool}
            `{Endo icmp}
-           `{Endo int}
+           `{Endo int_ast}
            `{Endo string}
            `{Endo ordering}
            `{TFunctor texp}
@@ -526,7 +526,7 @@ Section TFunctor.
            `{Endo atomic_rmw_operation}
            `{Endo string}
            `{Endo ordering}
-           `{Endo int}
+           `{Endo int_ast}
            `{TFunctor texp}
            (* `{TFunctor typ} *)
       : TFunctor atomicrmw | 50 :=
@@ -680,7 +680,7 @@ Section TFunctor.
     #[global] Instance TFunctor_global
            `{Endo raw_id}
            `{Endo bool}
-           `{Endo int}
+           `{Endo int_ast}
            `{TFunctor exp}
            `{TFunctor metadata}
       : TFunctor global | 50 :=
@@ -697,7 +697,7 @@ Section TFunctor.
     #[global] Instance TFunctor_declaration
            `{Endo function_id}
            `{Endo string}
-           `{Endo int}
+           `{Endo int_ast}
            `{Endo param_attr}
            `{Endo linkage}
            `{Endo visibility}
@@ -737,7 +737,7 @@ Section TFunctor.
            `{TFunctor declaration}
            `{TFunctor (fun T => definition T (FnBody T))}
            `{Endo fn_attr}
-           `{Endo int}
+           `{Endo int_ast}
            `{Endo string}
       : TFunctor (fun T => toplevel_entity T (FnBody T)) | 50 :=
       fun U V f tle =>

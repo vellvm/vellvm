@@ -298,18 +298,18 @@ Definition ordered (f1 f2: float) : bool :=
 Definition of_single: float32 -> float := Bconv _ _ 53 1024 __ __ of_single_nan mode_NE.
 Definition to_single: float -> float32 := Bconv _ _ 24 128 __ __ to_single_nan mode_NE.
 
-Definition to_int (f:float): option int := (**r conversion to signed 32-bit int *)
+Definition to_int (f:float): option bounded_int := (**r conversion to signed 32-bit int *)
   option_map Int.repr (ZofB_range _ _ f Int.min_signed Int.max_signed).
-Definition to_intu (f:float): option int := (**r conversion to unsigned 32-bit int *)
+Definition to_intu (f:float): option bounded_int := (**r conversion to unsigned 32-bit int *)
   option_map Int.repr (ZofB_range _ _ f 0 Int.max_unsigned).
 Definition to_long (f:float): option int64 := (**r conversion to signed 64-bit int *)
   option_map Int64.repr (ZofB_range _ _ f Int64.min_signed Int64.max_signed).
 Definition to_longu (f:float): option int64 := (**r conversion to unsigned 64-bit int *)
   option_map Int64.repr (ZofB_range _ _ f 0 Int64.max_unsigned).
 
-Definition of_int (n:int): float := (**r conversion from signed 32-bit int *)
+Definition of_int (n:bounded_int): float := (**r conversion from signed 32-bit int *)
   BofZ 53 1024 __ __ (Int.signed n).
-Definition of_intu (n:int): float:= (**r conversion from unsigned 32-bit int *)
+Definition of_intu (n:bounded_int): float:= (**r conversion from unsigned 32-bit int *)
   BofZ 53 1024 __ __ (Int.unsigned n).
 
 Definition of_long (n:int64): float := (**r conversion from signed 64-bit int *)
@@ -326,7 +326,7 @@ Definition from_parsed (base:positive) (intPart:positive) (expPart:Z) : float :=
 Definition to_bits (f: float): int64 := Int64.repr (bits_of_b64 f).
 Definition of_bits (b: int64): float := b64_of_bits (Int64.unsigned b).
 
-Definition from_words (hi lo: int) : float := of_bits (Int64.ofwords hi lo).
+Definition from_words (hi lo: bounded_int) : float := of_bits (Int64.ofwords hi lo).
 
 (** ** Properties *)
 
@@ -1073,18 +1073,18 @@ Definition ordered (f1 f2: float32) : bool :=
 Definition of_double : float -> float32 := Float.to_single.
 Definition to_double : float32 -> float := Float.of_single.
 
-Definition to_int (f:float32): option int := (**r conversion to signed 32-bit int *)
+Definition to_int (f:float32): option bounded_int := (**r conversion to signed 32-bit int *)
   option_map Int.repr (ZofB_range _ _ f Int.min_signed Int.max_signed).
-Definition to_intu (f:float32): option int := (**r conversion to unsigned 32-bit int *)
+Definition to_intu (f:float32): option bounded_int := (**r conversion to unsigned 32-bit int *)
   option_map Int.repr (ZofB_range _ _ f 0 Int.max_unsigned).
 Definition to_long (f:float32): option int64 := (**r conversion to signed 64-bit int *)
   option_map Int64.repr (ZofB_range _ _ f Int64.min_signed Int64.max_signed).
 Definition to_longu (f:float32): option int64 := (**r conversion to unsigned 64-bit int *)
   option_map Int64.repr (ZofB_range _ _ f 0 Int64.max_unsigned).
 
-Definition of_int (n:int): float32 := (**r conversion from signed 32-bit int to single-precision float *)
+Definition of_int (n:bounded_int): float32 := (**r conversion from signed 32-bit int to single-precision float *)
   BofZ 24 128 __ __ (Int.signed n).
-Definition of_intu (n:int): float32 := (**r conversion from unsigned 32-bit int to single-precision float *)
+Definition of_intu (n:bounded_int): float32 := (**r conversion from unsigned 32-bit int to single-precision float *)
   BofZ 24 128 __ __ (Int.unsigned n).
 
 Definition of_long (n:int64): float32 := (**r conversion from signed 64-bit int to single-precision float *)
@@ -1098,8 +1098,8 @@ Definition from_parsed (base:positive) (intPart:positive) (expPart:Z) : float32 
 (** Conversions between floats and their concrete in-memory representation
     as a sequence of 32 bits. *)
 
-Definition to_bits (f: float32) : int := Int.repr (bits_of_b32 f).
-Definition of_bits (b: int): float32 := b32_of_bits (Int.unsigned b).
+Definition to_bits (f: float32) : bounded_int := Int.repr (bits_of_b32 f).
+Definition of_bits (b: bounded_int): float32 := b32_of_bits (Int.unsigned b).
 
 (** ** Properties *)
 

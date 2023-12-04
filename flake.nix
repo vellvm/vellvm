@@ -37,6 +37,24 @@
                     };
                     meta.broken = false;
                   });
+
+              QuickChick = super.QuickChick.overrideAttrs
+                (s : rec
+                  { version = "1.6.4";
+                    name = "coq8.15-QuickChick-${version}";
+                    src = pkgs.fetchFromGitHub {
+                      owner = "Chobbes";
+                      repo = "QuickChick";
+                      rev = "a047b8d27375af2931b5d383ecffea69f6c7d895";
+                      sha256 = "sha256-bJErq5JF5pGSA5fGBzdOAHpWBxw6rXHThGhdQ7BeSqs=";
+                    };
+
+                    # src = fetchTarball {
+                    #   url = "https://github.com/Chobbes/QuickChick/archive/refs/heads/coverage-1.6.4.zip";
+                    #   sha256 = lib.fakeSha256;
+                    # };
+                    meta.broken = false;
+                  });
             });
 
         version = "vellvm:master";

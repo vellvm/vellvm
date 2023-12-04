@@ -51,7 +51,7 @@ Import MonadNotation.
   - The propositional one capture in [Prop] all possible values
   - The executable one interprets [undef] as 0 at the type
 *)
-Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP Byte).
+Module Make (LP : LLVMParams) (MP : MemoryParams LP) (ByteMod : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP ByteMod).
   Import CP.
   Import CONC.
   Import MP.

@@ -149,10 +149,10 @@ Section Helpers.
     end.
    *)
 
-  Definition genNatInt : G int
+  Definition genNatInt : G bounded_int
     := fmap (fun n => Int.repr (Z.of_nat n)) (arbitrary : G nat).
 
-  Definition genPosInt : G int
+  Definition genPosInt : G bounded_int
     := fmap (fun n => Int.repr (Z.of_nat (S n))) (arbitrary : G nat).
 
   Definition genPosZ : G Z
@@ -2320,11 +2320,11 @@ Section InstrGenerators.
     end.
 
   (* TODO: move this *)
-  Definition genInt : G int
+  Definition genInt : G bounded_int
     := fmap Int.repr (arbitrary : G Z).
 
-  Instance GenInt : Gen int
-    := Build_Gen int genInt.
+  Instance GenInt : Gen bounded_int
+    := Build_Gen bounded_int genInt.
 
   (* TODO: move this. Also give a less confusing name because genOption is a thing? *)
   Definition gen_option {A} (g : G A) : G (option A)
@@ -2594,7 +2594,7 @@ Section InstrGenerators.
          (sz : nat)
          (t : typ)
          (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
-         (bound : LLVMAst.int) {struct t} : GenLLVM (terminator typ * (block typ * list (block typ)))
+         (bound : LLVMAst.int_ast) {struct t} : GenLLVM (terminator typ * (block typ * list (block typ)))
     :=
       bid_entry <- new_block_id;;
       (* TODO: make it so I can generate constant expressions *)

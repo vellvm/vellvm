@@ -449,10 +449,10 @@ Section ShowInstances.
   #[global] Instance showFloat32 : Show float32
     := {| show := float_to_hex_string |}.
 
-  Definition show_int (x : Integers.Int.int) : string
+  Definition show_int (x : Integers.Int.bounded_int) : string
     := show (Int.unsigned x).
 
-  #[global] Instance Show_Int : Show Integers.Int.int
+  #[global] Instance Show_Int : Show Integers.Int.bounded_int
     := {| show := show_int|}.
 
   Definition show_fast_math (fm : fast_math) : string

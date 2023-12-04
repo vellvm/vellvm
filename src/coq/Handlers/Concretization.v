@@ -56,7 +56,7 @@ Proof.
   eapply Monad_stateT; typeclasses eauto.
 Defined.
 
-Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL).
+Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (ByteMod : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL).
   Import MP.
   Import LP.
   Import PTOI.
@@ -66,7 +66,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
   Import SIZEOF.
   Import Events.
 
-  Module MemHelpers := MemoryHelpers LP MP Byte.
+  Module MemHelpers := MemoryHelpers LP MP ByteMod.
   Import MemHelpers.
 
   Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} icmp v1 v2 : M dvalue :=
@@ -398,7 +398,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         | UVALUE_ExtractValue t uv idxs =>
             str <- concretize_uvalueM M undef_handler ERR_M lift_ue uv;;
             (let
-                fix loop (str0 : dvalue) (idxs0 : list int) {struct idxs0} : ERR_M dvalue :=
+                fix loop (str0 : dvalue) (idxs0 : list int_ast) {struct idxs0} : ERR_M dvalue :=
                 match idxs0 with
                 | [] => ret str0
                 | i :: tl => v <- index_into_str_dv str0 i;; loop v tl
@@ -454,7 +454,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         end.
 End ConcretizationBase.
 
-Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (SER : ConcretizationBase LP MP Byte) <: ConcretizationBase LP MP Byte.
+Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (ByteMod : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (SER : ConcretizationBase LP MP ByteMod) <: ConcretizationBase LP MP ByteMod.
   Include SER.
   Import MP.
   Import LP.
@@ -621,7 +621,7 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
 
 End Concretization.
 
-Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) <: ConcretizationBase LP MP Byte.
+Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (ByteMod : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) <: ConcretizationBase LP MP ByteMod.
   Import MP.
   Import LP.
   Import Events.
@@ -633,9 +633,9 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
   Import GEP.
   Open Scope list.
 
-  Export Byte.
+  Export ByteMod.
 
-  Module MemHelpers := MemoryHelpers LP MP Byte.
+  Module MemHelpers := MemoryHelpers LP MP ByteMod.
   Import MemHelpers.
 
   Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} icmp v1 v2 : M dvalue :=
@@ -1743,6 +1743,6 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
   Set Guard Checking.
 End MakeBase.
 
-Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (SER : ConcretizationBase LP MP Byte) : Concretization LP MP Byte SER.
-  Include Concretization LP MP Byte SER.
+Module Make (LP : LLVMParams) (MP : MemoryParams LP) (ByteMod : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (SER : ConcretizationBase LP MP ByteMod) : Concretization LP MP ByteMod SER.
+  Include Concretization LP MP ByteMod SER.
 End Make.
