@@ -84,7 +84,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         let i1 := ptr_to_int a1 in
         let i2 := ptr_to_int a2 in
         ret (eval_int_icmp icmp i1 i2)
-    | _, _ => raise_error "ill_typed-icmp"
+    | _, _ => raise_error ("ill_typed-icmp: " ++ show_dvalue v1 ++ ", " ++ show_dvalue v2)
     end.
   Arguments eval_icmp _ _ _ : simpl nomatch.
 
@@ -653,7 +653,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         let i1 := ptr_to_int a1 in
         let i2 := ptr_to_int a2 in
         ret (eval_int_icmp icmp i1 i2)
-    | _, _ => raise_error "ill_typed-icmp"
+    | _, _ => raise_error ("ill_typed-icmp: " ++ show_dvalue v1 ++ ", " ++ show_dvalue v2)
     end.
   Arguments eval_icmp _ _ _ : simpl nomatch.
 

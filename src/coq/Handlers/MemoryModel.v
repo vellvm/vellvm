@@ -3327,7 +3327,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     allocate_bytes_spec_MemPropT dt num_elements bytes.
 
   (** memcpy spec *)
-  Definition memcpy_spec (src dst : addr) (len : Z) (align : N) (volatile : bool) : MemPropT MemState unit :=
+  Definition memcpy_spec (src dst : addr) (len : Z) (volatile : bool) : MemPropT MemState unit :=
     if Z.ltb len 0
     then
       raise_ub "memcpy given negative length."
@@ -3378,21 +3378,18 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_I32 len ::
-                    DVALUE_I32 align :: (* alignment ignored *)
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (unsigned len) (Z.to_N (unsigned align)) (equ volatile one)
+          memcpy_spec src dst (unsigned len) (equ volatile one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_I64 len ::
-                    DVALUE_I64 align :: (* alignment ignored *)
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (unsigned len) (Z.to_N (unsigned align)) (equ volatile one)
+          memcpy_spec src dst (unsigned len) (equ volatile one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_IPTR len ::
-                    DVALUE_IPTR align :: (* alignment ignored *)
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (IP.to_Z len) (Z.to_N (IP.to_Z align)) (equ volatile one)
+          memcpy_spec src dst (IP.to_Z len) (equ volatile one)
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
@@ -4653,7 +4650,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       malloc_bytes_with_pr init_bytes pr.
 
     (** Handle memcpy *)
-    Definition memcpy `{MemMonad ExtraState MemM (itree Eff)} (src dst : addr) (len : Z) (align : N) (volatile : bool) : MemM unit :=
+    Definition memcpy `{MemMonad ExtraState MemM (itree Eff)} (src dst : addr) (len : Z) (volatile : bool) : MemM unit :=
       if Z.ltb len 0
       then
         raise_ub "memcpy given negative length."
@@ -4704,21 +4701,18 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_I32 len ::
-                    DVALUE_I32 align :: (* alignment ignored *)
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (unsigned len) (Z.to_N (unsigned align)) (equ volatile one)
+          memcpy src dst (unsigned len) (equ volatile one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_I64 len ::
-                    DVALUE_I64 align :: (* alignment ignored *)
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (unsigned len) (Z.to_N (unsigned align)) (equ volatile one)
+          memcpy src dst (unsigned len) (equ volatile one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_IPTR len ::
-                    DVALUE_IPTR align :: (* alignment ignored *)
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (IP.to_Z len) (Z.to_N (IP.to_Z align)) (equ volatile one)
+          memcpy src dst (IP.to_Z len) (equ volatile one)
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
@@ -5149,10 +5143,10 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Qed.
 
     Lemma memcpy_correct :
-      forall src dst len align volatile pre,
-        exec_correct pre (memcpy src dst len align volatile) (memcpy_spec src dst len align volatile).
+      forall src dst len volatile pre,
+        exec_correct pre (memcpy src dst len volatile) (memcpy_spec src dst len volatile).
     Proof.
-      intros src dst len align volatile pre.
+      intros src dst len volatile pre.
       unfold memcpy, memcpy_spec.
       break_match; [apply exec_correct_raise_ub|].
       unfold MME.OVER_H.no_overlap, MME.OVER.overlaps.
