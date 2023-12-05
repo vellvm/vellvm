@@ -379,7 +379,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     inputs from the command line is nontrivial since we have martial C-level strings
     into the Vellvm memory.  
    *)
-  Definition main_args := [DV.UVALUE_I64 (DynamicValues.Int64.zero);
+  Definition main_args := [DV.UVALUE_I32 (DynamicValues.Int32.zero);
                            DV.UVALUE_Addr null
     ].
 
