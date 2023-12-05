@@ -292,7 +292,8 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         then ret (fst byte)
         else
           raise_ub
-            ("Read from memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ show_prov pr ++ ", memory allocation id: " ++ Show.show (show_allocation_id aid) ++ " memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, show_allocation_id aid)) (IM.elements mem)))
+            "Read from memory with invalid provenance"
+            (* This error message can get quite long, and the specific details cause issues with bugpoint... Maybe make a debug message instead? *)
     end.
 
   Definition addr_allocated_prop (ptr : addr) (aid : AllocationId) : MemPropT memory_stack bool :=
