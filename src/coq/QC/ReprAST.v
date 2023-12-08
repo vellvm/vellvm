@@ -641,17 +641,87 @@ Section ReprInstances.
    Instance reprAnnotation : Repr (annotation typ) :=
     {| repr := repr_annotation |}.
 
+  Definition repr_ordering (ord : ordering) : string
+    := match ord with
+       | Unordered => "Unordered"
+       | Monotonic => "Monotonic"
+       | Acquire => "Acquire"
+       | Release => "Release"
+       | Acq_rel => "Acq_rel"
+       | Seq_cst => "Seq_cst"
+       end.
+
+  #[global]
+   Instance reprOrdering : Repr ordering :=
+    {| repr := repr_ordering |}.
+
+  Definition repr_atomic_rmw_operation (op : atomic_rmw_operation) :=
+    match op with
+    | Axchg => "Axchg"
+    | Aadd => "Aadd"
+    | Asub => "Asub"
+    | Aand => "Aand"
+    | Anand => "Anand"
+    | Aor => "Aor"
+    | Axor => "Axor"
+    | Amax => "Amax"
+    | Amin => "Amin"
+    | Aumax => "Aumax"
+    | Aumin => "Aumin"
+    | Afadd => "Afadd"
+    | Afsub => "Afsub"
+    end.
+
+  #[global]
+   Instance reprAtomicRMWOperation : Repr atomic_rmw_operation :=
+    {| repr := repr_atomic_rmw_operation |}.
+
+  Definition repr_atomicrmw (rmw : atomicrmw typ) : string
+    := match rmw with
+       | mk_atomicrmw a_volatile a_operation a_ptr a_val a_syncscope a_ordering a_align a_type =>
+           "(mk_atomicrmw " ++ repr a_volatile ++ " " ++ repr a_operation ++ " " ++
+             repr a_ptr ++ " " ++ repr a_val ++ " " ++ repr a_syncscope ++ " " ++
+             repr a_ordering ++ " " ++ repr a_align ++ " " ++ repr a_type ++ ")"
+       end.
+
+  #[global]
+   Instance reprAtomicRMW : Repr (atomicrmw typ) :=
+    {| repr := repr_atomicrmw |}.
+
+  Definition repr_cmpxchg (cmp : cmpxchg typ) : string
+    := match cmp with
+       | mk_cmpxchg c_weak c_volatile c_ptr c_cmp c_cmp_type c_new c_syncscope c_success_ordering
+           c_failure_ordering c_align =>
+           "(mk_cmpxchg " ++ repr c_weak ++ " " ++ repr c_volatile ++ " " ++ repr c_ptr ++ " " ++ repr c_cmp ++ " " ++ repr c_cmp_type ++ " " ++ repr c_new ++ " " ++ repr c_syncscope ++ " " ++ repr c_success_ordering
+           ++ " " ++ repr c_failure_ordering ++ " " ++ repr c_align ++ ")"
+       end.
+
+  #[global]
+   Instance reprCmpxchg : Repr (cmpxchg typ) :=
+    {| repr := repr_cmpxchg |}.
+
   Definition repr_instr (i : instr typ) : string
     := match i with
        | INSTR_Comment s => "(INSTR_Comment " ++ s ++ ")"
        | INSTR_Op e => "(INSTR_Op " ++ repr e ++ ")"
+       | INSTR_Call e params annotations =>
+           "INSTR_Call " ++ repr e ++ " " ++ repr params ++ " " ++ repr annotations ++ ")"
+       | INSTR_Alloca t anns =>
+         "(INSTR_Alloca " ++ repr t ++ " " ++ repr anns ++ ")"
        | INSTR_Load t ptr anns =>
          "(INSTR_Load " ++ repr t ++ " " ++ repr ptr ++ " " ++ repr anns ++ ")"
        | INSTR_Store tval ptr anns =>
          "(INSTR_Store " ++ repr tval ++ " " ++ repr ptr ++ " " ++ repr anns ++ ")"
-       | INSTR_Alloca t anns =>
-         "(INSTR_Alloca " ++ repr t ++ " " ++ repr anns ++ ")"
-       | _ => "repr_instr todo"
+       | INSTR_Fence str ord =>
+           "(INSTR_Fence " ++ show str ++ " " ++ repr ord ++ ")"
+       | INSTR_AtomicCmpXchg cmpx =>
+           "(INSTR_AtomicCmpXchg " ++ repr cmpx ++ ")"
+       | INSTR_AtomicRMW rmw =>
+           "(INSTR_AtomicRMW " ++ repr rmw ++ ")"
+       | INSTR_VAArg e t =>
+           "(INSTR_VAArg " ++ repr e ++ " " ++ repr t ++ ")"
+       | INSTR_LandingPad =>
+           "INSTR_LandingPad"
        end.
 
   #[global]

@@ -1013,10 +1013,7 @@ param_attr:
                                          { PARAMATTR_Alignstack n              }
   | KW_ALLOCALIGN                        { PARAMATTR_Allocalign                }
   | KW_ALLOCPTR                          { PARAMATTR_Allocptr                  }
-  | KW_WRITEONLY                         {
-  PARAMATTR_Writeonly                 }
-
-
+  | KW_WRITEONLY                         { PARAMATTR_Writeonly                 }
 
 call_arg: t=typ ra=list(param_attr) i=exp
     { ((t, i t), ra) }
