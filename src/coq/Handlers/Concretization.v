@@ -151,6 +151,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
+        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 64
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
           Conv_Pure (UVALUE_I64 (repr (unsigned i1)))
 
@@ -732,6 +733,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
+        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 64
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
           Conv_Pure (UVALUE_I64 (repr (unsigned i1)))
 
