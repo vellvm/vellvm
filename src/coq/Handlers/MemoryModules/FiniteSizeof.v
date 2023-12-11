@@ -50,6 +50,7 @@ Module FinSizeof : Sizeof.
     match ty with
     | DTYPE_I 1          => 1 (* TODO: i1 sizes... *)
     | DTYPE_I 8          => 1
+    | DTYPE_I 16         => 2
     | DTYPE_I 32         => 4
     | DTYPE_I 64         => 8
     | DTYPE_I _          => 0 (* Unsupported integers *)

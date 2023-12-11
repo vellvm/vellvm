@@ -205,23 +205,25 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         end
 
       | Bitcast =>
-          if bit_sizeof_dtyp t1 =? bit_sizeof_dtyp t2
-          then
-            let bytes := evalStateT (serialize_sbytes (dvalue_to_uvalue x) t1) 0%N in
-            match unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM bytes)))) with
-            | inl (OOM_message oom) =>
-                Conv_Illegal ("Bitcast OOM: " ++ oom)
-            | inr (inl (UB_message ub)) =>
-                Conv_Illegal ("Bitcast UB: " ++ ub)
-            | inr (inr (inl (ERR_message err))) =>
-                Conv_Illegal ("Bitcast Error: " ++ err)
-            | inr (inr (inr bytes)) =>
-                match deserialize_sbytes bytes t2 with
-                | inl msg => Conv_Illegal ("Bitcast failed: " ++ msg)
-                | inr uv => Conv_Pure uv
-                end
-            end
-          else Conv_Illegal "unequal bitsize in cast"
+          if dtyp_eqb t1 t2
+          then Conv_Pure (dvalue_to_uvalue x)
+          else if bit_sizeof_dtyp t1 =? bit_sizeof_dtyp t2
+               then
+                 let bytes := evalStateT (serialize_sbytes (dvalue_to_uvalue x) t1) 0%N in
+                 match unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM bytes)))) with
+                 | inl (OOM_message oom) =>
+                     Conv_Illegal ("Bitcast OOM: " ++ oom)
+                 | inr (inl (UB_message ub)) =>
+                     Conv_Illegal ("Bitcast UB: " ++ ub)
+                 | inr (inr (inl (ERR_message err))) =>
+                     Conv_Illegal ("Bitcast Error: " ++ err)
+                 | inr (inr (inr bytes)) =>
+                     match deserialize_sbytes bytes t2 with
+                     | inl msg => Conv_Illegal ("Bitcast failed: " ++ msg)
+                     | inr uv => Conv_Pure uv
+                     end
+                 end
+               else Conv_Illegal "unequal bitsize in cast"
 
       | Uitofp =>
         match t1, x, t2 with
@@ -784,23 +786,25 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         end
 
       | Bitcast =>
-          if bit_sizeof_dtyp t1 =? bit_sizeof_dtyp t2
-          then
-            let bytes := evalStateT (serialize_sbytes (dvalue_to_uvalue x) t1) 0%N in
-            match unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM bytes)))) with
-            | inl (OOM_message oom) =>
-                Conv_Illegal ("Bitcast OOM: " ++ oom)
-            | inr (inl (UB_message ub)) =>
-                Conv_Illegal ("Bitcast UB: " ++ ub)
-            | inr (inr (inl (ERR_message err))) =>
-                Conv_Illegal ("Bitcast Error: " ++ err)
-            | inr (inr (inr bytes)) =>
-                match deserialize_sbytes bytes t2 with
-                | inl msg => Conv_Illegal ("Bitcast failed: " ++ msg)
-                | inr uv => Conv_Pure uv
-                end
-            end
-          else Conv_Illegal "unequal bitsize in cast"
+          if dtyp_eqb t1 t2
+          then Conv_Pure (dvalue_to_uvalue x)
+          else if bit_sizeof_dtyp t1 =? bit_sizeof_dtyp t2
+               then
+                 let bytes := evalStateT (serialize_sbytes (dvalue_to_uvalue x) t1) 0%N in
+                 match unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM bytes)))) with
+                 | inl (OOM_message oom) =>
+                     Conv_Illegal ("Bitcast OOM: " ++ oom)
+                 | inr (inl (UB_message ub)) =>
+                     Conv_Illegal ("Bitcast UB: " ++ ub)
+                 | inr (inr (inl (ERR_message err))) =>
+                     Conv_Illegal ("Bitcast Error: " ++ err)
+                 | inr (inr (inr bytes)) =>
+                     match deserialize_sbytes bytes t2 with
+                     | inl msg => Conv_Illegal ("Bitcast failed: " ++ msg)
+                     | inr uv => Conv_Pure uv
+                     end
+                 end
+               else Conv_Illegal "unequal bitsize in cast"
 
       | Uitofp =>
         match t1, x, t2 with

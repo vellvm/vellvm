@@ -69,7 +69,7 @@ coq: real-all
 .PHONY: extracted
 extracted: $(EXTRACTDIR)/STAMP
 
-$(EXTRACTDIR)/STAMP: $(VFILES) $(EXTRACTDIR)/Extract.v
+$(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
 	@echo "Extracting"
 	$(COQEXEC) $(EXTRACTDIR)/Extract.v
 	@echo "Patching extraction"
