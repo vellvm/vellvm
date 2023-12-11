@@ -3346,6 +3346,15 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       else
         raise_ub "memcpy with overlapping or non-equal src and dst memory locations.".
 
+  (** memset spec *)
+  Definition memset_spec (dst : addr) (val : DynamicValues.int8) (len : Z) (sid : store_id) (volatile : bool) : MemPropT MemState unit :=
+    if Z.ltb len 0
+    then
+      raise_ub "memset given negative length."
+    else
+      let byte := uvalue_sbyte (UVALUE_I8 val) (DTYPE_I 8) (UVALUE_IPTR IP.zero) sid in
+      write_bytes_spec dst (repeatN (Z.to_N len) byte).
+
   (*** Handling memory events *)
   Section Handlers.
     Definition handle_memory_prop : MemoryE ~> MemPropT MemState
@@ -3393,6 +3402,23 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
+    Definition handle_memset_prop (args : list dvalue) : MemPropT MemState unit :=
+      match args with
+      | DVALUE_Addr dst ::
+          DVALUE_I8 val ::
+          DVALUE_I32 len ::
+          DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+          sid <- fresh_sid;;
+          memset_spec dst val (unsigned len) sid (equ volatile one)
+      | DVALUE_Addr dst ::
+          DVALUE_I8 val ::
+          DVALUE_I64 len ::
+          DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+          sid <- fresh_sid;;
+          memset_spec dst val (unsigned len) sid (equ volatile one)
+      | _ => raise_error "Unsupported arguments to memset."
+      end.
+
     Definition handle_malloc_prop (args : list dvalue) : MemPropT MemState addr :=
       match args with
       | [DVALUE_I1 sz]
@@ -3430,17 +3456,23 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
                  handle_memcpy_prop args;;
                  ret DVALUE_None
                else
-                 if (Coqlib.proj_sumbool (string_dec name "malloc"))
+                 if orb (Coqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i32"))
+                      (Coqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i64"))
                  then
-                   addr <- handle_malloc_prop args;;
-                   ret (DVALUE_Addr addr)
+                   handle_memset_prop args;;
+                   ret DVALUE_None
                  else
-                   if (Coqlib.proj_sumbool (string_dec name "free"))
+                   if (Coqlib.proj_sumbool (string_dec name "malloc"))
                    then
-                        handle_free_prop args;;
-                        ret DVALUE_None
+                     addr <- handle_malloc_prop args;;
+                     ret (DVALUE_Addr addr)
                    else
-                     raise_error ("Unknown intrinsic: " ++ name)
+                     if (Coqlib.proj_sumbool (string_dec name "free"))
+                     then
+                       handle_free_prop args;;
+                       ret DVALUE_None
+                     else
+                       raise_error ("Unknown intrinsic: " ++ name)
            end.
 
   End Handlers.
@@ -4669,6 +4701,16 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
         else
           raise_ub "memcpy with overlapping or non-equal src and dst memory locations.".
 
+    (** memset spec *)
+    Definition memset `{MemMonad ExtraState MemM (itree Eff)}
+      (dst : addr) (val : DynamicValues.int8) (len : Z) (sid : store_id) (volatile : bool) : MemM unit :=
+      if Z.ltb len 0
+      then
+        raise_ub "memset given negative length."
+      else
+        let byte := uvalue_sbyte (UVALUE_I8 val) (DTYPE_I 8) (UVALUE_IPTR IP.zero) sid in
+        write_bytes dst (repeatN (Z.to_N len) byte).
+
     Definition handle_memory `{MemMonad ExtraState MemM (itree Eff)} : MemoryE ~> MemM
       := fun T m =>
            match m with
@@ -4716,6 +4758,23 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
+    Definition handle_memset `{MemMonad ExtraState MemM (itree Eff)} (args : list dvalue) : MemM unit :=
+      match args with
+      | DVALUE_Addr dst ::
+          DVALUE_I8 val ::
+          DVALUE_I32 len ::
+          DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+          sid <- fresh_sid;;
+          memset dst val (unsigned len) sid (equ volatile one)
+      | DVALUE_Addr dst ::
+          DVALUE_I8 val ::
+          DVALUE_I64 len ::
+          DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+          sid <- fresh_sid;;
+          memset dst val (unsigned len) sid (equ volatile one)
+      | _ => raise_error "Unsupported arguments to memset."
+      end.
+
     Definition handle_malloc `{MemMonad ExtraState MemM (itree Eff)} (args : list dvalue) : MemM addr :=
       match args with
       | [DVALUE_I1 sz]
@@ -4753,17 +4812,23 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
                  handle_memcpy args;;
                  ret DVALUE_None
                else
-                 if (Coqlib.proj_sumbool (string_dec name "malloc"))
+                 if orb (Coqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i32"))
+                      (Coqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i64"))
                  then
-                   addr <- handle_malloc args;;
-                   ret (DVALUE_Addr addr)
+                   handle_memset args;;
+                   ret DVALUE_None
                  else
-                   if (Coqlib.proj_sumbool (string_dec name "free"))
+                   if (Coqlib.proj_sumbool (string_dec name "malloc"))
                    then
-                     handle_free args;;
-                     ret DVALUE_None
+                     addr <- handle_malloc args;;
+                     ret (DVALUE_Addr addr)
                    else
-                     raise_error ("Unknown intrinsic: " ++ name)
+                     if (Coqlib.proj_sumbool (string_dec name "free"))
+                     then
+                       handle_free args;;
+                       ret DVALUE_None
+                     else
+                       raise_error ("Unknown intrinsic: " ++ name)
            end.
 
   End Handlers.
@@ -5159,6 +5224,23 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       apply write_bytes_correct.
     Qed.
 
+    Lemma memset_correct :
+      forall dst val len sid volatile pre,
+        exec_correct pre (memset dst val len sid volatile) (memset_spec dst val len sid volatile).
+    Proof.
+      intros dst val len sid volatile pre.
+      unfold memset, memset_spec.
+      break_match; [apply exec_correct_raise_ub|].
+      eapply exec_correct_bind; eauto with EXEC_CORRECT.
+      eapply exec_correct_get_consecutive_pointers.
+
+      intros * RUN.
+      eapply exec_correct_map_monad_.
+      intros a0 pre0.
+      destruct a0.
+      apply write_byte_correct.
+    Qed.
+
     Lemma handle_memory_correct :
       forall T (m : MemoryE T) pre,
         exec_correct pre (handle_memory T m) (handle_memory_prop T m).
@@ -5196,6 +5278,27 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       unfold handle_memcpy, handle_memcpy_prop.
       repeat (break_match; try apply exec_correct_raise_error).
       all: apply memcpy_correct.
+    Qed.
+
+    Lemma handle_memset_correct:
+      forall args pre,
+        exec_correct pre (handle_memset args) (handle_memset_prop args).
+    Proof.
+      intros args.
+      unfold handle_memset, handle_memset_prop.
+      repeat (break_match; try apply exec_correct_raise_error).
+      { intros pre.
+        apply exec_correct_bind.
+        apply exec_correct_fresh_sid; eauto.
+        intros a0 ms_init ms_after_m st_init st_after_m H.
+        apply memset_correct.
+      }
+      { intros pre.
+        apply exec_correct_bind.
+        apply exec_correct_fresh_sid; eauto.
+        intros a0 ms_init ms_after_m st_init st_after_m H.
+        apply memset_correct.
+      }
     Qed.
 
     Lemma malloc_bytes_correct :
@@ -5242,6 +5345,14 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       { (* Memcpy *)
         apply exec_correct_bind.
         apply handle_memcpy_correct.
+        intros * RUN.
+        apply exec_correct_ret.
+      }
+
+      break_match.
+      { (* Memset *)
+        apply exec_correct_bind.
+        apply handle_memset_correct.
         intros * RUN.
         apply exec_correct_ret.
       }
