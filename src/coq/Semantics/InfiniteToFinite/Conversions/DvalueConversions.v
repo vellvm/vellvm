@@ -700,6 +700,86 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
 
   Parameter uvalue_refine_strict_R2_injective :
     R2_injective uvalue_refine_strict.
+
+  (** Inversion Lemmas *)
+  Parameter dvalue_convert_strict_addr_inv :
+    forall x a,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Addr a) ->
+      exists a',
+        AC.addr_convert a' = NoOom a /\
+          x = DV1.DVALUE_Addr a'.
+
+  Parameter dvalue_convert_strict_iptr_inv :
+    forall x n,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_IPTR n) ->
+      exists n',
+        LP2.IP.from_Z (LP1.IP.to_Z n') = NoOom n /\
+          x = DV1.DVALUE_IPTR n'.
+
+  Parameter dvalue_convert_strict_i1_inv :
+    forall x n,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_I1 n) ->
+      x = DV1.DVALUE_I1 n.
+
+  Parameter dvalue_convert_strict_i8_inv :
+    forall x n,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_I8 n) ->
+      x = DV1.DVALUE_I8 n.
+
+  Parameter dvalue_convert_strict_i32_inv :
+    forall x n,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_I32 n) ->
+      x = DV1.DVALUE_I32 n.
+
+  Parameter dvalue_convert_strict_i64_inv :
+    forall x n,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_I64 n) ->
+      x = DV1.DVALUE_I64 n.
+
+  Parameter dvalue_convert_strict_double_inv :
+    forall x v,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Double v) ->
+      x = DV1.DVALUE_Double v.
+
+  Parameter dvalue_convert_strict_float_inv :
+    forall x v,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Float v) ->
+      x = DV1.DVALUE_Float v.
+
+  Parameter dvalue_convert_strict_poison_inv :
+    forall x v,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Poison v) ->
+      x = DV1.DVALUE_Poison v.
+
+  Parameter dvalue_convert_strict_oom_inv :
+    forall x v,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Oom v) ->
+      x = DV1.DVALUE_Oom v.
+
+  Parameter dvalue_convert_strict_none_inv :
+    forall x,
+      dvalue_convert_strict x = NoOom DV2.DVALUE_None ->
+      x = DV1.DVALUE_None.
+
+  Parameter dvalue_convert_strict_struct_inv :
+    forall x fields,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Struct fields) ->
+      exists fields', x = DV1.DVALUE_Struct fields'.
+
+  Parameter dvalue_convert_strict_packed_struct_inv :
+    forall x fields,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Packed_struct fields) ->
+      exists fields', x = DV1.DVALUE_Packed_struct fields'.
+
+  Parameter dvalue_convert_strict_array_inv :
+    forall x elts,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Array elts) ->
+      exists elts', x = DV1.DVALUE_Array elts'.
+
+  Parameter dvalue_convert_strict_vector_inv :
+    forall x elts,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Vector elts) ->
+      exists elts', x = DV1.DVALUE_Vector elts'.
   
   (** Lemmas about values with types... *)
 
@@ -3513,8 +3593,6 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
        reflexivity.
   Qed.
 
-
-  (* TODO: inversion lemmas for dvalue_convert_strict *)
   Lemma dvalue_convert_strict_addr_inv :
     forall x a,
       dvalue_convert_strict x = NoOom (DV2.DVALUE_Addr a) ->
@@ -3683,7 +3761,6 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     break_match_hyp; inv H1.
     exists elts0. reflexivity.
   Qed.
-
   
   (** Lemmas about values with types... *)
 
