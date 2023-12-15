@@ -100,7 +100,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
             cbn in *; lia
       ].
 
-  
+
   (* Parameter dvalue_convert_lazy : DV1.dvalue -> DV2.dvalue. *)
   (* Parameter uvalue_convert_lazy : DV1.uvalue -> DV2.uvalue. *)
   (*
@@ -265,13 +265,13 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
              | _ => False
              end
          | DV2.DVALUE_Array elts2 =>
-             match dv1 with 
+             match dv1 with
              | DV1.DVALUE_Array elts1 =>
                  Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine_lazy e1 e2)
              | _ => False
              end
          | DV2.DVALUE_Vector elts2 =>
-             match dv1 with 
+             match dv1 with
              | DV1.DVALUE_Vector elts1 =>
                  Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine_lazy e1 e2)
              | _ => False
@@ -300,19 +300,19 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
                end
            | DV2.UVALUE_Array elts2 =>
                match uv1 with
-               | DV1.UVALUE_Array elts1 => 
+               | DV1.UVALUE_Array elts1 =>
                    Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine_lazy e1 e2)
                | _ => False
                end
            | DV2.UVALUE_Vector elts2 =>
                match uv1 with
-               | DV1.UVALUE_Vector elts1 => 
+               | DV1.UVALUE_Vector elts1 =>
                    Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine_lazy e1 e2)
                | _ => False
                end
            | DV2.UVALUE_IBinop iop2 v1_2 v2_2 =>
                match uv1 with
-               | DV1.UVALUE_IBinop iop1 v1_1 v2_1 => 
+               | DV1.UVALUE_IBinop iop1 v1_1 v2_1 =>
                    iop1 = iop2 /\
                      uvalue_refine_lazy v1_1 v1_2 /\
                      uvalue_refine_lazy v2_1 v2_2
@@ -320,7 +320,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
                end
            | DV2.UVALUE_ICmp cmp2 v1_2 v2_2 =>
                match uv1 with
-               | DV1.UVALUE_ICmp cmp1 v1_1 v2_1 => 
+               | DV1.UVALUE_ICmp cmp1 v1_1 v2_1 =>
                    cmp1 = cmp2 /\
                      uvalue_refine_lazy v1_1 v1_2 /\
                      uvalue_refine_lazy v2_1 v2_2
@@ -328,7 +328,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
                end
            | DV2.UVALUE_FBinop fop2 fm2 v1_2 v2_2 =>
                match uv1 with
-               | DV1.UVALUE_FBinop fop1 fm1 v1_1 v2_1 => 
+               | DV1.UVALUE_FBinop fop1 fm1 v1_1 v2_1 =>
                    fop1 = fop2 /\
                      fm1 = fm2 /\
                      uvalue_refine_lazy v1_1 v1_2 /\
@@ -337,7 +337,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
                end
            | DV2.UVALUE_FCmp cmp2 v1_2 v2_2 =>
                match uv1 with
-               | DV1.UVALUE_FCmp cmp1 v1_1 v2_1 => 
+               | DV1.UVALUE_FCmp cmp1 v1_1 v2_1 =>
                    cmp1 = cmp2 /\
                      uvalue_refine_lazy v1_1 v1_2 /\
                      uvalue_refine_lazy v2_1 v2_2
@@ -345,7 +345,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
                end
            | DV2.UVALUE_Conversion conv2 t_from2 v2 t_to2 =>
                match uv1 with
-               | DV1.UVALUE_Conversion conv1 t_from1 v1 t_to1 => 
+               | DV1.UVALUE_Conversion conv1 t_from1 v1 t_to1 =>
                    conv1 = conv2 /\
                      uvalue_refine_lazy v1 v2 /\
                      t_from1 = t_from2 /\
@@ -354,7 +354,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
                end
            | DV2.UVALUE_GetElementPtr t2 ptrval2 idxs2 =>
                match uv1 with
-               | DV1.UVALUE_GetElementPtr t1 ptrval1 idxs1 => 
+               | DV1.UVALUE_GetElementPtr t1 ptrval1 idxs1 =>
                    t1 = t2 /\
                      uvalue_refine_lazy ptrval1 ptrval2 /\
                      Forall2_HIn idxs1 idxs2 (fun ix1 ix2 IN1 IN2 => uvalue_refine_lazy ix1 ix2)
@@ -362,7 +362,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
                end
            | DV2.UVALUE_ExtractElement vec_typ2 vec2 idx2 =>
                match uv1 with
-               | DV1.UVALUE_ExtractElement vec_typ1 vec1 idx1 => 
+               | DV1.UVALUE_ExtractElement vec_typ1 vec1 idx1 =>
                    vec_typ1 = vec_typ2 /\
                      uvalue_refine_lazy vec1 vec2 /\
                      uvalue_refine_lazy idx1 idx2
@@ -370,7 +370,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
                end
            | DV2.UVALUE_InsertElement vec_typ2 vec2 elt2 idx2 =>
                match uv1 with
-               | DV1.UVALUE_InsertElement vec_typ1 vec1 elt1 idx1 => 
+               | DV1.UVALUE_InsertElement vec_typ1 vec1 elt1 idx1 =>
                    vec_typ1 = vec_typ2 /\
                      uvalue_refine_lazy vec1 vec2 /\
                      uvalue_refine_lazy elt1 elt2 /\
@@ -387,7 +387,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
                end
            | DV2.UVALUE_ExtractValue vec_typ2 vec2 idxs2 =>
                match uv1 with
-               | DV1.UVALUE_ExtractValue vec_typ1 vec1 idxs1 => 
+               | DV1.UVALUE_ExtractValue vec_typ1 vec1 idxs1 =>
                    vec_typ1 = vec_typ2 /\
                      uvalue_refine_lazy vec1 vec2 /\
                      idxs1 = idxs2
@@ -395,7 +395,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
                end
            | DV2.UVALUE_InsertValue vec_typ2 vec2 elt2 idxs2 =>
                match uv1 with
-               | DV1.UVALUE_InsertValue vec_typ1 vec1 elt1 idxs1 => 
+               | DV1.UVALUE_InsertValue vec_typ1 vec1 elt1 idxs1 =>
                    vec_typ1 = vec_typ2 /\
                      uvalue_refine_lazy vec1 vec2 /\
                      uvalue_refine_lazy elt1 elt2 /\
@@ -404,7 +404,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
                end
            | DV2.UVALUE_Select cnd2 v1_2 v2_2 =>
                match uv1 with
-               | DV1.UVALUE_Select cnd1 v1_1 v2_1 => 
+               | DV1.UVALUE_Select cnd1 v1_1 v2_1 =>
                    uvalue_refine_lazy cnd1 cnd2 /\
                      uvalue_refine_lazy v1_1 v1_2 /\
                      uvalue_refine_lazy v2_1 v2_2
@@ -412,7 +412,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
                end
            | DV2.UVALUE_ExtractByte uv2 dt2 idx2 sid2 =>
                match uv1 with
-               | DV1.UVALUE_ExtractByte uv1 dt1 idx1 sid1 => 
+               | DV1.UVALUE_ExtractByte uv1 dt1 idx1 sid1 =>
                    uvalue_refine_lazy uv1 uv2 /\
                      dt1 = dt2 /\
                      uvalue_refine_lazy idx1 idx2 /\
@@ -421,7 +421,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
                end
            | DV2.UVALUE_ConcatBytes uvs2 dt2 =>
                match uv1 with
-               | DV1.UVALUE_ConcatBytes uvs1 dt1 => 
+               | DV1.UVALUE_ConcatBytes uvs1 dt1 =>
                    Forall2_HIn uvs1 uvs2 (fun uv1 uv2 IN1 IN2 => uvalue_refine_lazy uv1 uv2) /\
                      dt1 = dt2
                | _ => False
@@ -503,7 +503,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
            fields' <- map_monad uvalue_convert_strict fields;;
            ret (DV2.UVALUE_Struct fields')
        | DV1.UVALUE_Packed_struct fields =>
-           fields' <- map_monad uvalue_convert_strict fields;;           
+           fields' <- map_monad uvalue_convert_strict fields;;
            ret (DV2.UVALUE_Packed_struct fields')
        | DV1.UVALUE_Array elts =>
            elts' <- map_monad uvalue_convert_strict elts;;
@@ -571,7 +571,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
            ret (DV2.UVALUE_ConcatBytes uvs' dt)
        end.
 
-  
+
   Definition dvalue_refine_strict (dv1 : DV1.dvalue) (dv2 : DV2.dvalue) : Prop
     := dvalue_convert_strict dv1 = NoOom dv2.
 
@@ -596,7 +596,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       dvalue_refine_lazy dv1 dv2 ->
       uvalue_refine_lazy (DV1.dvalue_to_uvalue dv1) (DV2.dvalue_to_uvalue dv2).
    *)
-  
+
   (* TODO: This seems better than lazy proof... Can probably do the same? *)
   Parameter dvalue_refine_strict_dvalue_to_uvalue :
     forall dv1 dv2,
@@ -764,23 +764,31 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
   Parameter dvalue_convert_strict_struct_inv :
     forall x fields,
       dvalue_convert_strict x = NoOom (DV2.DVALUE_Struct fields) ->
-      exists fields', x = DV1.DVALUE_Struct fields'.
+      exists fields',
+        x = DV1.DVALUE_Struct fields' /\
+          map_monad dvalue_convert_strict fields' = NoOom fields.
 
   Parameter dvalue_convert_strict_packed_struct_inv :
     forall x fields,
       dvalue_convert_strict x = NoOom (DV2.DVALUE_Packed_struct fields) ->
-      exists fields', x = DV1.DVALUE_Packed_struct fields'.
+      exists fields',
+        x = DV1.DVALUE_Packed_struct fields' /\
+          map_monad dvalue_convert_strict fields' = NoOom fields.
 
   Parameter dvalue_convert_strict_array_inv :
     forall x elts,
       dvalue_convert_strict x = NoOom (DV2.DVALUE_Array elts) ->
-      exists elts', x = DV1.DVALUE_Array elts'.
+      exists elts',
+        x = DV1.DVALUE_Array elts' /\
+          map_monad dvalue_convert_strict elts' = NoOom elts.
 
   Parameter dvalue_convert_strict_vector_inv :
     forall x elts,
       dvalue_convert_strict x = NoOom (DV2.DVALUE_Vector elts) ->
-      exists elts', x = DV1.DVALUE_Vector elts'.
-  
+      exists elts',
+        x = DV1.DVALUE_Vector elts' /\
+          map_monad dvalue_convert_strict elts' = NoOom elts.
+
   (** Lemmas about values with types... *)
 
   (*
@@ -801,8 +809,8 @@ with Module DV1 := Events1.DV
 with Module DV2 := Events2.DV.
   Import AC.
   Module DV1 := Events1.DV.
-  Module DV2 := Events2.DV.  
-  
+  Module DV2 := Events2.DV.
+
   (* TODO: Move into Dvalue *)
   Ltac solve_dvalue_measure :=
     match goal with
@@ -1114,7 +1122,7 @@ with Module DV2 := Events2.DV.
             let uvs' := map_In uvs (fun elt Hin => uvalue_convert_lazy elt) in
             DV2.UVALUE_ConcatBytes uvs' dt
         end.
-  
+
       Proof.
     (* intros uv. *)
     (* unfold uvalue_convert_lazy at 1. *)
@@ -1139,7 +1147,7 @@ with Module DV2 := Events2.DV.
   Definition dvalue_converted_lazy (dv1 : DV1.dvalue) (dv2 : DV2.dvalue) : Prop :=
     dvalue_convert_lazy dv1 = dv2.
 
-  
+
     (** A version of dvalue refinement between languages where OOM can be the lazy OOM value *)
   Program Fixpoint dvalue_refine_lazy (dv1 : DV1.dvalue) (dv2 : DV2.dvalue) {measure (DV1.dvalue_measure dv1)} : Prop
     := dvalue_converted_lazy dv1 dv2 \/
@@ -1157,13 +1165,13 @@ with Module DV2 := Events2.DV.
              | _ => False
              end
          | DV2.DVALUE_Array elts2 =>
-             match dv1 with 
+             match dv1 with
              | DV1.DVALUE_Array elts1 =>
                  Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine_lazy e1 e2)
              | _ => False
              end
          | DV2.DVALUE_Vector elts2 =>
-             match dv1 with 
+             match dv1 with
              | DV1.DVALUE_Vector elts1 =>
                  Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine_lazy e1 e2)
              | _ => False
@@ -1189,13 +1197,13 @@ with Module DV2 := Events2.DV.
              | _ => False
              end
          | DV2.DVALUE_Array elts2 =>
-             match dv1 with 
+             match dv1 with
              | DV1.DVALUE_Array elts1 =>
                  Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine_lazy e1 e2)
              | _ => False
              end
          | DV2.DVALUE_Vector elts2 =>
-             match dv1 with 
+             match dv1 with
              | DV1.DVALUE_Vector elts1 =>
                  Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => dvalue_refine_lazy e1 e2)
              | _ => False
@@ -1248,19 +1256,19 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_Array elts2 =>
              match uv1 with
-             | DV1.UVALUE_Array elts1 => 
+             | DV1.UVALUE_Array elts1 =>
                  Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine_lazy e1 e2)
              | _ => False
              end
          | DV2.UVALUE_Vector elts2 =>
              match uv1 with
-             | DV1.UVALUE_Vector elts1 => 
+             | DV1.UVALUE_Vector elts1 =>
                  Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine_lazy e1 e2)
              | _ => False
              end
          | DV2.UVALUE_IBinop iop2 v1_2 v2_2 =>
              match uv1 with
-             | DV1.UVALUE_IBinop iop1 v1_1 v2_1 => 
+             | DV1.UVALUE_IBinop iop1 v1_1 v2_1 =>
                  iop1 = iop2 /\
                    uvalue_refine_lazy v1_1 v1_2 /\
                    uvalue_refine_lazy v2_1 v2_2
@@ -1268,7 +1276,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_ICmp cmp2 v1_2 v2_2 =>
              match uv1 with
-             | DV1.UVALUE_ICmp cmp1 v1_1 v2_1 => 
+             | DV1.UVALUE_ICmp cmp1 v1_1 v2_1 =>
                  cmp1 = cmp2 /\
                    uvalue_refine_lazy v1_1 v1_2 /\
                    uvalue_refine_lazy v2_1 v2_2
@@ -1276,7 +1284,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_FBinop fop2 fm2 v1_2 v2_2 =>
              match uv1 with
-             | DV1.UVALUE_FBinop fop1 fm1 v1_1 v2_1 => 
+             | DV1.UVALUE_FBinop fop1 fm1 v1_1 v2_1 =>
                  fop1 = fop2 /\
                    fm1 = fm2 /\
                    uvalue_refine_lazy v1_1 v1_2 /\
@@ -1285,7 +1293,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_FCmp cmp2 v1_2 v2_2 =>
              match uv1 with
-             | DV1.UVALUE_FCmp cmp1 v1_1 v2_1 => 
+             | DV1.UVALUE_FCmp cmp1 v1_1 v2_1 =>
                  cmp1 = cmp2 /\
                    uvalue_refine_lazy v1_1 v1_2 /\
                    uvalue_refine_lazy v2_1 v2_2
@@ -1293,7 +1301,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_Conversion conv2 t_from2 v2 t_to2 =>
              match uv1 with
-             | DV1.UVALUE_Conversion conv1 t_from1 v1 t_to1 => 
+             | DV1.UVALUE_Conversion conv1 t_from1 v1 t_to1 =>
                  conv1 = conv2 /\
                    uvalue_refine_lazy v1 v2 /\
                    t_from1 = t_from2 /\
@@ -1302,7 +1310,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_GetElementPtr t2 ptrval2 idxs2 =>
              match uv1 with
-             | DV1.UVALUE_GetElementPtr t1 ptrval1 idxs1 => 
+             | DV1.UVALUE_GetElementPtr t1 ptrval1 idxs1 =>
                  t1 = t2 /\
                    uvalue_refine_lazy ptrval1 ptrval2 /\
                    Forall2_HIn idxs1 idxs2 (fun ix1 ix2 IN1 IN2 => uvalue_refine_lazy ix1 ix2)
@@ -1310,7 +1318,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_ExtractElement vec_typ2 vec2 idx2 =>
              match uv1 with
-             | DV1.UVALUE_ExtractElement vec_typ1 vec1 idx1 => 
+             | DV1.UVALUE_ExtractElement vec_typ1 vec1 idx1 =>
                  vec_typ1 = vec_typ2 /\
                    uvalue_refine_lazy vec1 vec2 /\
                    uvalue_refine_lazy idx1 idx2
@@ -1318,7 +1326,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_InsertElement vec_typ2 vec2 elt2 idx2 =>
              match uv1 with
-             | DV1.UVALUE_InsertElement vec_typ1 vec1 elt1 idx1 => 
+             | DV1.UVALUE_InsertElement vec_typ1 vec1 elt1 idx1 =>
                  vec_typ1 = vec_typ2 /\
                    uvalue_refine_lazy vec1 vec2 /\
                    uvalue_refine_lazy elt1 elt2 /\
@@ -1335,7 +1343,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_ExtractValue vec_typ2 vec2 idxs2 =>
              match uv1 with
-             | DV1.UVALUE_ExtractValue vec_typ1 vec1 idxs1 => 
+             | DV1.UVALUE_ExtractValue vec_typ1 vec1 idxs1 =>
                  vec_typ1 = vec_typ2 /\
                    uvalue_refine_lazy vec1 vec2 /\
                    idxs1 = idxs2
@@ -1343,7 +1351,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_InsertValue vec_typ2 vec2 elt2 idxs2 =>
              match uv1 with
-             | DV1.UVALUE_InsertValue vec_typ1 vec1 elt1 idxs1 => 
+             | DV1.UVALUE_InsertValue vec_typ1 vec1 elt1 idxs1 =>
                  vec_typ1 = vec_typ2 /\
                    uvalue_refine_lazy vec1 vec2 /\
                    uvalue_refine_lazy elt1 elt2 /\
@@ -1352,7 +1360,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_Select cnd2 v1_2 v2_2 =>
              match uv1 with
-             | DV1.UVALUE_Select cnd1 v1_1 v2_1 => 
+             | DV1.UVALUE_Select cnd1 v1_1 v2_1 =>
                  uvalue_refine_lazy cnd1 cnd2 /\
                    uvalue_refine_lazy v1_1 v1_2 /\
                    uvalue_refine_lazy v2_1 v2_2
@@ -1360,7 +1368,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_ExtractByte uv2 dt2 idx2 sid2 =>
              match uv1 with
-             | DV1.UVALUE_ExtractByte uv1 dt1 idx1 sid1 => 
+             | DV1.UVALUE_ExtractByte uv1 dt1 idx1 sid1 =>
                  uvalue_refine_lazy uv1 uv2 /\
                    dt1 = dt2 /\
                    uvalue_refine_lazy idx1 idx2 /\
@@ -1369,7 +1377,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_ConcatBytes uvs2 dt2 =>
              match uv1 with
-             | DV1.UVALUE_ConcatBytes uvs1 dt1 => 
+             | DV1.UVALUE_ConcatBytes uvs1 dt1 =>
                  Forall2_HIn uvs1 uvs2 (fun uv1 uv2 IN1 IN2 => uvalue_refine_lazy uv1 uv2) /\
                    dt1 = dt2
              | _ => False
@@ -1397,19 +1405,19 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_Array elts2 =>
              match uv1 with
-             | DV1.UVALUE_Array elts1 => 
+             | DV1.UVALUE_Array elts1 =>
                  Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine_lazy e1 e2)
              | _ => False
              end
          | DV2.UVALUE_Vector elts2 =>
              match uv1 with
-             | DV1.UVALUE_Vector elts1 => 
+             | DV1.UVALUE_Vector elts1 =>
                  Forall2_HIn elts1 elts2 (fun e1 e2 IN1 IN2 => uvalue_refine_lazy e1 e2)
              | _ => False
              end
          | DV2.UVALUE_IBinop iop2 v1_2 v2_2 =>
              match uv1 with
-             | DV1.UVALUE_IBinop iop1 v1_1 v2_1 => 
+             | DV1.UVALUE_IBinop iop1 v1_1 v2_1 =>
                  iop1 = iop2 /\
                    uvalue_refine_lazy v1_1 v1_2 /\
                    uvalue_refine_lazy v2_1 v2_2
@@ -1417,7 +1425,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_ICmp cmp2 v1_2 v2_2 =>
              match uv1 with
-             | DV1.UVALUE_ICmp cmp1 v1_1 v2_1 => 
+             | DV1.UVALUE_ICmp cmp1 v1_1 v2_1 =>
                  cmp1 = cmp2 /\
                    uvalue_refine_lazy v1_1 v1_2 /\
                    uvalue_refine_lazy v2_1 v2_2
@@ -1425,7 +1433,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_FBinop fop2 fm2 v1_2 v2_2 =>
              match uv1 with
-             | DV1.UVALUE_FBinop fop1 fm1 v1_1 v2_1 => 
+             | DV1.UVALUE_FBinop fop1 fm1 v1_1 v2_1 =>
                  fop1 = fop2 /\
                    fm1 = fm2 /\
                    uvalue_refine_lazy v1_1 v1_2 /\
@@ -1434,7 +1442,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_FCmp cmp2 v1_2 v2_2 =>
              match uv1 with
-             | DV1.UVALUE_FCmp cmp1 v1_1 v2_1 => 
+             | DV1.UVALUE_FCmp cmp1 v1_1 v2_1 =>
                  cmp1 = cmp2 /\
                    uvalue_refine_lazy v1_1 v1_2 /\
                    uvalue_refine_lazy v2_1 v2_2
@@ -1442,7 +1450,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_Conversion conv2 t_from2 v2 t_to2 =>
              match uv1 with
-             | DV1.UVALUE_Conversion conv1 t_from1 v1 t_to1 => 
+             | DV1.UVALUE_Conversion conv1 t_from1 v1 t_to1 =>
                  conv1 = conv2 /\
                    uvalue_refine_lazy v1 v2 /\
                    t_from1 = t_from2 /\
@@ -1451,7 +1459,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_GetElementPtr t2 ptrval2 idxs2 =>
              match uv1 with
-             | DV1.UVALUE_GetElementPtr t1 ptrval1 idxs1 => 
+             | DV1.UVALUE_GetElementPtr t1 ptrval1 idxs1 =>
                  t1 = t2 /\
                    uvalue_refine_lazy ptrval1 ptrval2 /\
                    Forall2_HIn idxs1 idxs2 (fun ix1 ix2 IN1 IN2 => uvalue_refine_lazy ix1 ix2)
@@ -1459,7 +1467,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_ExtractElement vec_typ2 vec2 idx2 =>
              match uv1 with
-             | DV1.UVALUE_ExtractElement vec_typ1 vec1 idx1 => 
+             | DV1.UVALUE_ExtractElement vec_typ1 vec1 idx1 =>
                  vec_typ1 = vec_typ2 /\
                    uvalue_refine_lazy vec1 vec2 /\
                    uvalue_refine_lazy idx1 idx2
@@ -1467,7 +1475,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_InsertElement vec_typ2 vec2 elt2 idx2 =>
              match uv1 with
-             | DV1.UVALUE_InsertElement vec_typ1 vec1 elt1 idx1 => 
+             | DV1.UVALUE_InsertElement vec_typ1 vec1 elt1 idx1 =>
                  vec_typ1 = vec_typ2 /\
                    uvalue_refine_lazy vec1 vec2 /\
                    uvalue_refine_lazy elt1 elt2 /\
@@ -1484,7 +1492,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_ExtractValue vec_typ2 vec2 idxs2 =>
              match uv1 with
-             | DV1.UVALUE_ExtractValue vec_typ1 vec1 idxs1 => 
+             | DV1.UVALUE_ExtractValue vec_typ1 vec1 idxs1 =>
                  vec_typ1 = vec_typ2 /\
                    uvalue_refine_lazy vec1 vec2 /\
                    idxs1 = idxs2
@@ -1492,7 +1500,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_InsertValue vec_typ2 vec2 elt2 idxs2 =>
              match uv1 with
-             | DV1.UVALUE_InsertValue vec_typ1 vec1 elt1 idxs1 => 
+             | DV1.UVALUE_InsertValue vec_typ1 vec1 elt1 idxs1 =>
                  vec_typ1 = vec_typ2 /\
                    uvalue_refine_lazy vec1 vec2 /\
                    uvalue_refine_lazy elt1 elt2 /\
@@ -1501,7 +1509,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_Select cnd2 v1_2 v2_2 =>
              match uv1 with
-             | DV1.UVALUE_Select cnd1 v1_1 v2_1 => 
+             | DV1.UVALUE_Select cnd1 v1_1 v2_1 =>
                  uvalue_refine_lazy cnd1 cnd2 /\
                    uvalue_refine_lazy v1_1 v1_2 /\
                    uvalue_refine_lazy v2_1 v2_2
@@ -1509,7 +1517,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_ExtractByte uv2 dt2 idx2 sid2 =>
              match uv1 with
-             | DV1.UVALUE_ExtractByte uv1 dt1 idx1 sid1 => 
+             | DV1.UVALUE_ExtractByte uv1 dt1 idx1 sid1 =>
                  uvalue_refine_lazy uv1 uv2 /\
                    dt1 = dt2 /\
                    uvalue_refine_lazy idx1 idx2 /\
@@ -1518,7 +1526,7 @@ with Module DV2 := Events2.DV.
              end
          | DV2.UVALUE_ConcatBytes uvs2 dt2 =>
              match uv1 with
-             | DV1.UVALUE_ConcatBytes uvs1 dt1 => 
+             | DV1.UVALUE_ConcatBytes uvs1 dt1 =>
                  Forall2_HIn uvs1 uvs2 (fun uv1 uv2 IN1 IN2 => uvalue_refine_lazy uv1 uv2) /\
                    dt1 = dt2
              | _ => False
@@ -1531,7 +1539,7 @@ with Module DV2 := Events2.DV.
     destruct uv2; Tactics.program_simpl; destruct uv1; try reflexivity.
      *)
     (* TODO: each of the remaing goals follows from:
-       
+
     unfold uvalue_refine_lazy at 1;
     unfold uvalue_refine_lazy_func;
     rewrite Wf.WfExtensionality.fix_sub_eq_ext at 1;
@@ -1577,7 +1585,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     intros uv1 uv2 CONV; inv CONV.
     apply uvalue_refine_lazy_uvalue_convert_lazy.
   Qed.
-*) 
+*)
 
 
     Fixpoint dvalue_convert_strict (dv1 : DV1.dvalue) : OOM DV2.dvalue
@@ -1635,7 +1643,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
            fields' <- map_monad uvalue_convert_strict fields;;
            ret (DV2.UVALUE_Struct fields')
        | DV1.UVALUE_Packed_struct fields =>
-           fields' <- map_monad uvalue_convert_strict fields;;           
+           fields' <- map_monad uvalue_convert_strict fields;;
            ret (DV2.UVALUE_Packed_struct fields')
        | DV1.UVALUE_Array elts =>
            elts' <- map_monad uvalue_convert_strict elts;;
@@ -1703,7 +1711,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
            ret (DV2.UVALUE_ConcatBytes uvs' dt)
        end.
 
-  
+
   Definition dvalue_refine_strict (dv1 : DV1.dvalue) (dv2 : DV2.dvalue) : Prop
     := dvalue_convert_strict dv1 = NoOom dv2.
 
@@ -1734,7 +1742,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     rewrite uvalue_convert_lazy_equation.
     rewrite dvalue_convert_lazy_equation.
     induction dv; try solve [ cbn; auto
-                            | Tactics.program_simpl; break_match; reflexivity 
+                            | Tactics.program_simpl; break_match; reflexivity
                     ].
 
     { (* Structs *)
@@ -2082,7 +2090,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           right.
           unfold DV1.dvalue_to_uvalue at 1.
           unfold DV2.dvalue_to_uvalue at 1.
-          cbn. 
+          cbn.
           repeat fold DV2.dvalue_to_uvalue in *.
           repeat fold DV1.dvalue_to_uvalue in *.
 
@@ -2170,7 +2178,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           right.
           unfold DV1.dvalue_to_uvalue at 1.
           unfold DV2.dvalue_to_uvalue at 1.
-          cbn. 
+          cbn.
           repeat fold DV2.dvalue_to_uvalue in *.
           repeat fold DV1.dvalue_to_uvalue in *.
 
@@ -2248,10 +2256,10 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       rewrite uvalue_refine_strict_equation.
       rewrite uvalue_convert_strict_equation.
       induction fields; simpl in *.
-      - inversion REF; subst. 
+      - inversion REF; subst.
         Tactics.program_simpl.
       - break_match_goal; break_match_hyp. simpl in *.
-      
+
       break_match_goal; break_match_hyp; inv REF.
       - Tactics.program_simpl.
         revert l0 Heqo0 l Heqo. induction fields; intros l0 Heqo0 l Heqo.
@@ -2313,9 +2321,9 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       uvalue_convert_strict (DV1.dvalue_to_uvalue u) = NoOom (DV2.dvalue_to_uvalue dv2)).
         { intros; apply H; auto. }
         clear H.
-        
+
         eapply Forall2_impl' in H0; eauto.
-        apply (Forall2_map_r (fun x y => uvalue_convert_strict (DV1.dvalue_to_uvalue x) = NoOom y) DV2.dvalue_to_uvalue) in H0.        
+        apply (Forall2_map_r (fun x y => uvalue_convert_strict (DV1.dvalue_to_uvalue x) = NoOom y) DV2.dvalue_to_uvalue) in H0.
         apply map_monad_oom_Forall2 in Heqo.
         apply Forall2_map_l in Heqo.
         specialize (Forall2_ext_m _ _ _ _ Heqo H0) as EQ.
@@ -2334,7 +2342,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         specialize (H _ HI _ EQ).
         rewrite H in HX. inversion HX.
     }
-        
+
     { (* Packed Structures *)
       break_match_goal; break_match_hyp; inv REF.
       - cbn.
@@ -2347,9 +2355,9 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       uvalue_convert_strict (DV1.dvalue_to_uvalue u) = NoOom (DV2.dvalue_to_uvalue dv2)).
         { intros; apply H; auto. }
         clear H.
-        
+
         eapply Forall2_impl' in H0; eauto.
-        apply (Forall2_map_r (fun x y => uvalue_convert_strict (DV1.dvalue_to_uvalue x) = NoOom y) DV2.dvalue_to_uvalue) in H0.        
+        apply (Forall2_map_r (fun x y => uvalue_convert_strict (DV1.dvalue_to_uvalue x) = NoOom y) DV2.dvalue_to_uvalue) in H0.
         apply map_monad_oom_Forall2 in Heqo.
         apply Forall2_map_l in Heqo.
         specialize (Forall2_ext_m _ _ _ _ Heqo H0) as EQ.
@@ -2367,7 +2375,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         unfold dvalue_refine_strict in *.
         specialize (H _ HI _ EQ).
         rewrite H in HX. inversion HX.
-    } 
+    }
 
     { (* Arrays *)
       break_match_goal; break_match_hyp; inv REF.
@@ -2381,9 +2389,9 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       uvalue_convert_strict (DV1.dvalue_to_uvalue u) = NoOom (DV2.dvalue_to_uvalue dv2)).
         { intros; apply H; auto. }
         clear H.
-        
+
         eapply Forall2_impl' in H0; eauto.
-        apply (Forall2_map_r (fun x y => uvalue_convert_strict (DV1.dvalue_to_uvalue x) = NoOom y) DV2.dvalue_to_uvalue) in H0.        
+        apply (Forall2_map_r (fun x y => uvalue_convert_strict (DV1.dvalue_to_uvalue x) = NoOom y) DV2.dvalue_to_uvalue) in H0.
         apply map_monad_oom_Forall2 in Heqo.
         apply Forall2_map_l in Heqo.
         specialize (Forall2_ext_m _ _ _ _ Heqo H0) as EQ.
@@ -2415,9 +2423,9 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       uvalue_convert_strict (DV1.dvalue_to_uvalue u) = NoOom (DV2.dvalue_to_uvalue dv2)).
         { intros; apply H; auto. }
         clear H.
-        
+
         eapply Forall2_impl' in H0; eauto.
-        apply (Forall2_map_r (fun x y => uvalue_convert_strict (DV1.dvalue_to_uvalue x) = NoOom y) DV2.dvalue_to_uvalue) in H0.        
+        apply (Forall2_map_r (fun x y => uvalue_convert_strict (DV1.dvalue_to_uvalue x) = NoOom y) DV2.dvalue_to_uvalue) in H0.
         apply map_monad_oom_Forall2 in Heqo.
         apply Forall2_map_l in Heqo.
         specialize (Forall2_ext_m _ _ _ _ Heqo H0) as EQ.
@@ -2533,7 +2541,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       + rewrite IHuv with (b:=false); auto.
   Qed.
  *)
-  
+
   Lemma uvalue_refine_strict_preserves_is_concrete :
     forall uv uvc b,
       uvalue_refine_strict uv uvc ->
@@ -2609,8 +2617,8 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           -- rewrite (H x H1 _ false H0); auto.
       + cbn in UVC. inversion UVC.
   Qed.
-             
-        
+
+
   (** Lemmas about uvalue_to_dvalue *)
 
   Lemma uvalue_to_dvalue_dvalue_refine_strict :
@@ -2636,7 +2644,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
                eexists; cbn; split; eauto;
                cbn; try rewrite Heqo; auto
         ])].
-    
+
     - (* Structures *)
       cbn in *.
       repeat break_match_hyp_inv.
@@ -2659,7 +2667,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         split; cbn.
         rewrite HDV. rewrite Heqs0. reflexivity.
         rewrite HCV. rewrite Heqo0. reflexivity.
-      
+
     - (* Packed structures *)
       cbn in *.
       repeat break_match_hyp_inv.
@@ -2775,7 +2783,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           break_match_goal.
           -- eexists; eauto.
           -- break_match_hyp_inv.
-      
+
     - cbn in *.
       repeat break_match_hyp_inv.
       cbn.
@@ -2840,7 +2848,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           -- eexists; eauto.
           -- break_match_hyp_inv.
   Qed.
-             
+
 
   (** Lemmas about default dvalues *)
 
@@ -2955,7 +2963,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     - apply default_dvalue_of_dtyp_i_dv1_dv2_equiv; auto.
     - cbn in *; inv V1;
         eexists; split; eauto.
-      cbn. 
+      cbn.
       rewrite LP1.IP.to_Z_0.
       rewrite LP2.IP.from_Z_0.
       auto.
@@ -2997,7 +3005,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         cbn in EQ2.
         repeat break_match_hyp_inv.
         assert (In x (x::l)) by (left; auto).
-        specialize (H0 x H1 y H). 
+        specialize (H0 x H1 y H).
         destruct H0 as [dv1 [HDV HCV]].
         exists (DV2.DVALUE_Struct (dv1 :: l0)).
         split; cbn.
@@ -3016,7 +3024,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         cbn in EQ2.
         repeat break_match_hyp_inv.
         assert (In x (x::l)) by (left; auto).
-        specialize (H0 x H1 y H). 
+        specialize (H0 x H1 y H).
         destruct H0 as [dv1 [HDV HCV]].
         exists (DV2.DVALUE_Packed_struct (dv1 :: l0)).
         split; cbn.
@@ -3053,7 +3061,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           cbn in CONVa.
           break_match_hyp_inv.
           cbn in EQ2.
-          break_match_hyp_inv.          
+          break_match_hyp_inv.
           inversion Heqo.
         }
         apply map_monad_oom_Forall2 in Heqo.
@@ -3118,13 +3126,13 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     - apply default_dvalue_of_dtyp_i_dv1_dv2_equiv'; auto.
     - cbn in *; inv V2;
         eexists; split; eauto.
-      cbn. 
+      cbn.
       rewrite LP1.IP.to_Z_0.
       rewrite LP2.IP.from_Z_0.
       auto.
     - cbn in *; inv V2;
         eexists; split; eauto.
-      cbn. 
+      cbn.
       rewrite addr_convert_null.
       reflexivity.
     - (* Arrays *)
@@ -3160,7 +3168,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         cbn in EQ2.
         repeat break_match_hyp_inv.
         assert (In x (x::l)) by (left; auto).
-        specialize (H0 x H1 y H). 
+        specialize (H0 x H1 y H).
         destruct H0 as [dv1 [HDV HCV]].
         exists (DV1.DVALUE_Struct (dv1 :: l0)).
         split; cbn in *.
@@ -3181,7 +3189,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         cbn in EQ2.
         repeat break_match_hyp_inv.
         assert (In x (x::l)) by (left; auto).
-        specialize (H0 x H1 y H). 
+        specialize (H0 x H1 y H).
         destruct H0 as [dv1 [HDV HCV]].
         exists (DV1.DVALUE_Packed_struct (dv1 :: l0)).
         split; cbn in *.
@@ -3230,7 +3238,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         apply map_monad_oom_Forall2 in Heqo0.
         eapply Forall2_repeat_OOM  in Heqo0; auto.
         rewrite Heqo0. reflexivity.
-        cbn. 
+        cbn.
         break_match_goal. inversion Heqo. reflexivity.
         inversion Heqo.
 
@@ -3268,10 +3276,10 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         apply map_monad_oom_Forall2 in Heqo.
         eapply Forall2_repeat_OOM in Heqo.
         rewrite Heqo. reflexivity.
-        cbn. 
+        cbn.
         reflexivity.
   Qed.
-   
+
 
   (* TODO: Move this? Seems more general... *)
   Lemma default_dvalue_of_dtyp_dv1_dv2_same_error :
@@ -3403,9 +3411,9 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
   Qed.
  *)
 
-  
-    
-  
+
+
+
   Lemma dvalue_refine_strict_R2_injective :
     R2_injective dvalue_refine_strict.
   Proof.
@@ -3460,12 +3468,12 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         clear H0.
         apply map_monad_oom_Forall2 in Heqo0.
         apply map_monad_oom_Forall2 in Heqo.
-        
+
         assert (fields = fields0).
         { eapply Forall2_inj_OOM_l; eauto. }
         rewrite H0.
         reflexivity.
-      } 
+      }
 
       { (* Packed Structs *)
         cbn in *;
@@ -3479,7 +3487,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         { eapply Forall2_inj_OOM_l; eauto. }
         rewrite H0.
         reflexivity.
-      } 
+      }
 
       { (* Arrays *)
         cbn in *;
@@ -3494,7 +3502,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         rewrite H0.
         reflexivity.
       }
-      
+
       { (* Vectors *)
         cbn in *;
           break_match_hyp; inv AB;
@@ -3507,7 +3515,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         { eapply Forall2_inj_OOM_l; eauto. }
         rewrite H0.
         reflexivity.
-      } 
+      }
   Qed.
 
 
@@ -3530,7 +3538,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           ];
         try (erewrite <- IHr1; eauto);
         try (erewrite <- IHr1_1; eauto);
-        try (erewrite <- IHr1_2; eauto); 
+        try (erewrite <- IHr1_2; eauto);
         try (erewrite <- IHr1_3; eauto).
 
       + (* addresses *)
@@ -3547,7 +3555,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
      +  (* Structs *)
         apply map_monad_oom_Forall2 in Heqo0.
         apply map_monad_oom_Forall2 in Heqo.
-        
+
         assert (fields = fields0).
         { eapply Forall2_inj_OOM_l; eauto. }
         rewrite H0.
@@ -3556,7 +3564,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
      +  (* Packed_structs *)
         apply map_monad_oom_Forall2 in Heqo0.
         apply map_monad_oom_Forall2 in Heqo.
-        
+
         assert (fields = fields0).
         { eapply Forall2_inj_OOM_l; eauto. }
         rewrite H0.
@@ -3721,47 +3729,59 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
   Lemma dvalue_convert_strict_struct_inv :
     forall x fields,
       dvalue_convert_strict x = NoOom (DV2.DVALUE_Struct fields) ->
-      exists fields', x = DV1.DVALUE_Struct fields'.
+      exists fields',
+        x = DV1.DVALUE_Struct fields' /\
+          map_monad dvalue_convert_strict fields' = NoOom fields.
   Proof.
     intros x fields H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     break_match_hyp; inv H1.
-    exists fields0. reflexivity.
+    exists fields0.
+    split; auto.
   Qed.
 
   Lemma dvalue_convert_strict_packed_struct_inv :
     forall x fields,
       dvalue_convert_strict x = NoOom (DV2.DVALUE_Packed_struct fields) ->
-      exists fields', x = DV1.DVALUE_Packed_struct fields'.
+      exists fields',
+        x = DV1.DVALUE_Packed_struct fields' /\
+          map_monad dvalue_convert_strict fields' = NoOom fields.
   Proof.
     intros x fields H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     break_match_hyp; inv H1.
-    exists fields0. reflexivity.
+    exists fields0.
+    split; auto.
   Qed.
 
   Lemma dvalue_convert_strict_array_inv :
     forall x elts,
       dvalue_convert_strict x = NoOom (DV2.DVALUE_Array elts) ->
-      exists elts', x = DV1.DVALUE_Array elts'.
+      exists elts',
+        x = DV1.DVALUE_Array elts' /\
+          map_monad dvalue_convert_strict elts' = NoOom elts.
   Proof.
     intros x elts H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     break_match_hyp; inv H1.
-    exists elts0. reflexivity.
+    exists elts0.
+    split; auto.
   Qed.
 
   Lemma dvalue_convert_strict_vector_inv :
     forall x elts,
       dvalue_convert_strict x = NoOom (DV2.DVALUE_Vector elts) ->
-      exists elts', x = DV1.DVALUE_Vector elts'.
+      exists elts',
+        x = DV1.DVALUE_Vector elts' /\
+          map_monad dvalue_convert_strict elts' = NoOom elts.
   Proof.
     intros x elts H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     break_match_hyp; inv H1.
-    exists elts0. reflexivity.
+    exists elts0.
+    split; auto.
   Qed.
-  
+
   (** Lemmas about values with types... *)
 
   (*
@@ -3817,7 +3837,7 @@ Module DVConvertSafe
   (*       destruct (IH _ _ _ HL x X0) as [c [HFC HR]]. *)
   (*       exists c. split; auto. right. assumption. *)
   (* Qed. *)
-  
+
   Lemma dvalue_convert_strict_safe :
     forall dv_f,
       { dv_i : DVC1.DV2.dvalue &
@@ -3866,7 +3886,7 @@ Module DVConvertSafe
                 destruct H3 as [HD2 IH2].
                 assert (InT a (a::l1)) by (left; auto).
                 destruct (X _ X0) as [dv2 [EQ1 EQ2]].
-             
+
                 specialize (DVC1.dvalue_refine_strict_R2_injective _ _ _ _ HD1 EQ1) as [EQA EQB].
                 specialize (DVC2.dvalue_refine_strict_R2_injective _ _ _ _ HD2 EQ2) as [EQC EQD].
                 rewrite EQC; auto.
@@ -3878,7 +3898,7 @@ Module DVConvertSafe
            }
            rewrite H. reflexivity.
         * apply map_monad_oom_Forall2T in Heqo.
-          rewrite map_monad_map_monad_InT in Heqo0.          
+          rewrite map_monad_map_monad_InT in Heqo0.
           apply map_monad_InT_OOM_fail in Heqo0.
           destruct Heqo0 as [a [IN CONVa]].
           destruct (Forall2T_InT_r _ _ _ Heqo _ IN).
@@ -3889,7 +3909,7 @@ Module DVConvertSafe
           rewrite EQA in *; auto.
           rewrite CONVa in EQx0.
           inversion EQx0.
-      + rewrite map_monad_map_monad_InT in Heqo.          
+      + rewrite map_monad_map_monad_InT in Heqo.
         apply map_monad_InT_OOM_fail in Heqo.
         exists DVC1.DV2.DVALUE_None. split.
         * destruct Heqo as [a [IN CONVa]].
@@ -3923,7 +3943,7 @@ Module DVConvertSafe
                 destruct H3 as [HD2 IH2].
                 assert (InT a (a::l1)) by (left; auto).
                 destruct (X _ X0) as [dv2 [EQ1 EQ2]].
-             
+
                 specialize (DVC1.dvalue_refine_strict_R2_injective _ _ _ _ HD1 EQ1) as [EQA EQB].
                 specialize (DVC2.dvalue_refine_strict_R2_injective _ _ _ _ HD2 EQ2) as [EQC EQD].
                 rewrite EQC; auto.
@@ -3935,7 +3955,7 @@ Module DVConvertSafe
            }
            rewrite H. reflexivity.
         * apply map_monad_oom_Forall2T in Heqo.
-          rewrite map_monad_map_monad_InT in Heqo0.          
+          rewrite map_monad_map_monad_InT in Heqo0.
           apply map_monad_InT_OOM_fail in Heqo0.
           destruct Heqo0 as [a [IN CONVa]].
           destruct (Forall2T_InT_r _ _ _ Heqo _ IN).
@@ -3946,7 +3966,7 @@ Module DVConvertSafe
           rewrite EQA in *; auto.
           rewrite CONVa in EQx0.
           inversion EQx0.
-      + rewrite map_monad_map_monad_InT in Heqo.          
+      + rewrite map_monad_map_monad_InT in Heqo.
         apply map_monad_InT_OOM_fail in Heqo.
         exists DVC1.DV2.DVALUE_None. split.
         * destruct Heqo as [a [IN CONVa]].
@@ -3980,7 +4000,7 @@ Module DVConvertSafe
                 destruct H3 as [HD2 IH2].
                 assert (InT a (a::l1)) by (left; auto).
                 destruct (X _ X0) as [dv2 [EQ1 EQ2]].
-             
+
                 specialize (DVC1.dvalue_refine_strict_R2_injective _ _ _ _ HD1 EQ1) as [EQA EQB].
                 specialize (DVC2.dvalue_refine_strict_R2_injective _ _ _ _ HD2 EQ2) as [EQC EQD].
                 rewrite EQC; auto.
@@ -3991,9 +4011,9 @@ Module DVConvertSafe
                 reflexivity.
            }
            rewrite H. reflexivity.
-           
+
         * apply map_monad_oom_Forall2T in Heqo.
-          rewrite map_monad_map_monad_InT in Heqo0.          
+          rewrite map_monad_map_monad_InT in Heqo0.
           apply map_monad_InT_OOM_fail in Heqo0.
           destruct Heqo0 as [a [IN CONVa]].
           destruct (Forall2T_InT_r _ _ _ Heqo _ IN).
@@ -4004,7 +4024,7 @@ Module DVConvertSafe
           rewrite EQA in *; auto.
           rewrite CONVa in EQx0.
           inversion EQx0.
-      + rewrite map_monad_map_monad_InT in Heqo.          
+      + rewrite map_monad_map_monad_InT in Heqo.
         apply map_monad_InT_OOM_fail in Heqo.
         exists DVC1.DV2.DVALUE_None. split.
         * destruct Heqo as [a [IN CONVa]].
@@ -4038,7 +4058,7 @@ Module DVConvertSafe
                 destruct H3 as [HD2 IH2].
                 assert (InT a (a::l1)) by (left; auto).
                 destruct (X _ X0) as [dv2 [EQ1 EQ2]].
-             
+
                 specialize (DVC1.dvalue_refine_strict_R2_injective _ _ _ _ HD1 EQ1) as [EQA EQB].
                 specialize (DVC2.dvalue_refine_strict_R2_injective _ _ _ _ HD2 EQ2) as [EQC EQD].
                 rewrite EQC; auto.
@@ -4049,9 +4069,9 @@ Module DVConvertSafe
                 reflexivity.
            }
            rewrite H. reflexivity.
-           
+
         * apply map_monad_oom_Forall2T in Heqo.
-          rewrite map_monad_map_monad_InT in Heqo0.          
+          rewrite map_monad_map_monad_InT in Heqo0.
           apply map_monad_InT_OOM_fail in Heqo0.
           destruct Heqo0 as [a [IN CONVa]].
           destruct (Forall2T_InT_r _ _ _ Heqo _ IN).
@@ -4062,7 +4082,7 @@ Module DVConvertSafe
           rewrite EQA in *; auto.
           rewrite CONVa in EQx0.
           inversion EQx0.
-      + rewrite map_monad_map_monad_InT in Heqo.          
+      + rewrite map_monad_map_monad_InT in Heqo.
         apply map_monad_InT_OOM_fail in Heqo.
         exists DVC1.DV2.DVALUE_None. split.
         * destruct Heqo as [a [IN CONVa]].
@@ -4075,8 +4095,8 @@ Module DVConvertSafe
           destruct p as [EQx' EQx0].
           rewrite CONVa in EQx'.
           inversion EQx'.
-  Qed.          
-   
+  Qed.
+
   Lemma uvalue_convert_strict_safe :
     forall uv_f,
       { uv_i : DVC1.DV2.uvalue &
@@ -4113,15 +4133,15 @@ Module DVConvertSafe
           eexists; split; eauto;
           cbn;
           rewrite UVif;
-          cbn; eauto                                                
+          cbn; eauto
         ].
-    
+
     - (* Addresses *)
       cbn.
       pose proof (ACSafe.addr_convert_succeeds a) as [a2 ACSUC].
       rewrite ACSUC.
       exists (DVC1.DV2.UVALUE_Addr a2).
-      cbn. 
+      cbn.
       rewrite (ACSafe.addr_convert_safe a); auto.
     - (* Intptr expressions... *)
       cbn.
@@ -4151,7 +4171,7 @@ Module DVConvertSafe
                 destruct H3 as [HD2 IH2].
                 assert (InT a (a::l1)) by (left; auto).
                 destruct (X _ X0) as [dv2 [EQ1 EQ2]].
-             
+
                 specialize (DVC1.uvalue_refine_strict_R2_injective _ _ _ _ HD1 EQ1) as [EQA EQB].
                 specialize (DVC2.uvalue_refine_strict_R2_injective _ _ _ _ HD2 EQ2) as [EQC EQD].
                 rewrite EQC; auto.
@@ -4163,7 +4183,7 @@ Module DVConvertSafe
            }
            rewrite H. reflexivity.
         * apply map_monad_oom_Forall2T in Heqo.
-          rewrite map_monad_map_monad_InT in Heqo0.          
+          rewrite map_monad_map_monad_InT in Heqo0.
           apply map_monad_InT_OOM_fail in Heqo0.
           destruct Heqo0 as [a [IN CONVa]].
           destruct (Forall2T_InT_r _ _ _ Heqo _ IN).
@@ -4174,7 +4194,7 @@ Module DVConvertSafe
           rewrite EQA in *; auto.
           rewrite CONVa in EQx0.
           inversion EQx0.
-      + rewrite map_monad_map_monad_InT in Heqo.          
+      + rewrite map_monad_map_monad_InT in Heqo.
         apply map_monad_InT_OOM_fail in Heqo.
         exists DVC1.DV2.UVALUE_None. split.
         * destruct Heqo as [a [IN CONVa]].
@@ -4208,7 +4228,7 @@ Module DVConvertSafe
                 destruct H3 as [HD2 IH2].
                 assert (InT a (a::l1)) by (left; auto).
                 destruct (X _ X0) as [dv2 [EQ1 EQ2]].
-             
+
                 specialize (DVC1.uvalue_refine_strict_R2_injective _ _ _ _ HD1 EQ1) as [EQA EQB].
                 specialize (DVC2.uvalue_refine_strict_R2_injective _ _ _ _ HD2 EQ2) as [EQC EQD].
                 rewrite EQC; auto.
@@ -4220,7 +4240,7 @@ Module DVConvertSafe
            }
            rewrite H. reflexivity.
         * apply map_monad_oom_Forall2T in Heqo.
-          rewrite map_monad_map_monad_InT in Heqo0.          
+          rewrite map_monad_map_monad_InT in Heqo0.
           apply map_monad_InT_OOM_fail in Heqo0.
           destruct Heqo0 as [a [IN CONVa]].
           destruct (Forall2T_InT_r _ _ _ Heqo _ IN).
@@ -4231,7 +4251,7 @@ Module DVConvertSafe
           rewrite EQA in *; auto.
           rewrite CONVa in EQx0.
           inversion EQx0.
-      + rewrite map_monad_map_monad_InT in Heqo.          
+      + rewrite map_monad_map_monad_InT in Heqo.
         apply map_monad_InT_OOM_fail in Heqo.
         exists DVC1.DV2.UVALUE_None. split.
         * destruct Heqo as [a [IN CONVa]].
@@ -4265,7 +4285,7 @@ Module DVConvertSafe
                 destruct H3 as [HD2 IH2].
                 assert (InT a (a::l1)) by (left; auto).
                 destruct (X _ X0) as [dv2 [EQ1 EQ2]].
-             
+
                 specialize (DVC1.uvalue_refine_strict_R2_injective _ _ _ _ HD1 EQ1) as [EQA EQB].
                 specialize (DVC2.uvalue_refine_strict_R2_injective _ _ _ _ HD2 EQ2) as [EQC EQD].
                 rewrite EQC; auto.
@@ -4276,9 +4296,9 @@ Module DVConvertSafe
                 reflexivity.
            }
            rewrite H. reflexivity.
-           
+
         * apply map_monad_oom_Forall2T in Heqo.
-          rewrite map_monad_map_monad_InT in Heqo0.          
+          rewrite map_monad_map_monad_InT in Heqo0.
           apply map_monad_InT_OOM_fail in Heqo0.
           destruct Heqo0 as [a [IN CONVa]].
           destruct (Forall2T_InT_r _ _ _ Heqo _ IN).
@@ -4289,7 +4309,7 @@ Module DVConvertSafe
           rewrite EQA in *; auto.
           rewrite CONVa in EQx0.
           inversion EQx0.
-      + rewrite map_monad_map_monad_InT in Heqo.          
+      + rewrite map_monad_map_monad_InT in Heqo.
         apply map_monad_InT_OOM_fail in Heqo.
         exists DVC1.DV2.UVALUE_None. split.
         * destruct Heqo as [a [IN CONVa]].
@@ -4324,7 +4344,7 @@ Module DVConvertSafe
                 destruct H3 as [HD2 IH2].
                 assert (InT a (a::l1)) by (left; auto).
                 destruct (X _ X0) as [dv2 [EQ1 EQ2]].
-             
+
                 specialize (DVC1.uvalue_refine_strict_R2_injective _ _ _ _ HD1 EQ1) as [EQA EQB].
                 specialize (DVC2.uvalue_refine_strict_R2_injective _ _ _ _ HD2 EQ2) as [EQC EQD].
                 rewrite EQC; auto.
@@ -4335,9 +4355,9 @@ Module DVConvertSafe
                 reflexivity.
            }
            rewrite H. reflexivity.
-           
+
         * apply map_monad_oom_Forall2T in Heqo.
-          rewrite map_monad_map_monad_InT in Heqo0.          
+          rewrite map_monad_map_monad_InT in Heqo0.
           apply map_monad_InT_OOM_fail in Heqo0.
           destruct Heqo0 as [a [IN CONVa]].
           destruct (Forall2T_InT_r _ _ _ Heqo _ IN).
@@ -4348,7 +4368,7 @@ Module DVConvertSafe
           rewrite EQA in *; auto.
           rewrite CONVa in EQx0.
           inversion EQx0.
-      + rewrite map_monad_map_monad_InT in Heqo.          
+      + rewrite map_monad_map_monad_InT in Heqo.
         apply map_monad_InT_OOM_fail in Heqo.
         exists DVC1.DV2.UVALUE_None. split.
         * destruct Heqo as [a [IN CONVa]].
@@ -4387,7 +4407,7 @@ Module DVConvertSafe
                 destruct H3 as [HD2 IH2].
                 assert (InT a (a::l1)) by (left; auto).
                 destruct (X _ X0) as [dv2 [EQ1 EQ2]].
-             
+
                 specialize (DVC1.uvalue_refine_strict_R2_injective _ _ _ _ HD1 EQ1) as [EQA EQB].
                 specialize (DVC2.uvalue_refine_strict_R2_injective _ _ _ _ HD2 EQ2) as [EQC EQD].
                 rewrite EQC; auto.
@@ -4399,7 +4419,7 @@ Module DVConvertSafe
            }
            rewrite H. reflexivity.
         * apply map_monad_oom_Forall2T in Heqo0.
-          rewrite map_monad_map_monad_InT in Heqo2.          
+          rewrite map_monad_map_monad_InT in Heqo2.
           apply map_monad_InT_OOM_fail in Heqo2.
           destruct Heqo2 as [a [IN CONVa]].
           destruct (Forall2T_InT_r _ _ _ Heqo0 _ IN).
@@ -4415,7 +4435,7 @@ Module DVConvertSafe
           rewrite EQF2 in Heqo1.
           inversion Heqo1.
 
-      + rewrite map_monad_map_monad_InT in Heqo0.          
+      + rewrite map_monad_map_monad_InT in Heqo0.
         apply map_monad_InT_OOM_fail in Heqo0.
         exists DVC1.DV2.UVALUE_None. split.
         * destruct Heqo0 as [a [IN CONVa]].
@@ -4451,7 +4471,7 @@ Module DVConvertSafe
                 destruct H3 as [HD2 IH2].
                 assert (InT a (a::l1)) by (left; auto).
                 destruct (X _ X0) as [dv2 [EQ1 EQ2]].
-             
+
                 specialize (DVC1.uvalue_refine_strict_R2_injective _ _ _ _ HD1 EQ1) as [EQA EQB].
                 specialize (DVC2.uvalue_refine_strict_R2_injective _ _ _ _ HD2 EQ2) as [EQC EQD].
                 rewrite EQC; auto.
@@ -4462,9 +4482,9 @@ Module DVConvertSafe
                 reflexivity.
            }
            rewrite H. reflexivity.
-           
+
         * apply map_monad_oom_Forall2T in Heqo.
-          rewrite map_monad_map_monad_InT in Heqo0.          
+          rewrite map_monad_map_monad_InT in Heqo0.
           apply map_monad_InT_OOM_fail in Heqo0.
           destruct Heqo0 as [a [IN CONVa]].
           destruct (Forall2T_InT_r _ _ _ Heqo _ IN).
@@ -4475,7 +4495,7 @@ Module DVConvertSafe
           rewrite EQA in *; auto.
           rewrite CONVa in EQx0.
           inversion EQx0.
-      + rewrite map_monad_map_monad_InT in Heqo.          
+      + rewrite map_monad_map_monad_InT in Heqo.
         apply map_monad_InT_OOM_fail in Heqo.
         exists DVC1.DV2.UVALUE_None. split.
         * destruct Heqo as [a [IN CONVa]].
