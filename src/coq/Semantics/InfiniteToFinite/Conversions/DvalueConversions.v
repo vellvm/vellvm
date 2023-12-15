@@ -3513,6 +3513,177 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
        reflexivity.
   Qed.
 
+
+  (* TODO: inversion lemmas for dvalue_convert_strict *)
+  Lemma dvalue_convert_strict_addr_inv :
+    forall x a,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Addr a) ->
+      exists a',
+        AC.addr_convert a' = NoOom a /\
+          x = DV1.DVALUE_Addr a'.
+  Proof.
+    intros x a H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    break_match_hyp; inv H1.
+    exists a0; auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_iptr_inv :
+    forall x n,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_IPTR n) ->
+      exists n',
+        LP2.IP.from_Z (LP1.IP.to_Z n') = NoOom n /\
+          x = DV1.DVALUE_IPTR n'.
+  Proof.
+    intros x n H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    break_match_hyp; inv H1.
+    exists x; auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_i1_inv :
+    forall x n,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_I1 n) ->
+      x = DV1.DVALUE_I1 n.
+  Proof.
+    intros x n H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    subst.
+    auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_i8_inv :
+    forall x n,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_I8 n) ->
+      x = DV1.DVALUE_I8 n.
+  Proof.
+    intros x n H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    subst.
+    auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_i32_inv :
+    forall x n,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_I32 n) ->
+      x = DV1.DVALUE_I32 n.
+  Proof.
+    intros x n H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    subst.
+    auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_i64_inv :
+    forall x n,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_I64 n) ->
+      x = DV1.DVALUE_I64 n.
+  Proof.
+    intros x n H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    subst.
+    auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_double_inv :
+    forall x v,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Double v) ->
+      x = DV1.DVALUE_Double v.
+  Proof.
+    intros x n H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    subst.
+    auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_float_inv :
+    forall x v,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Float v) ->
+      x = DV1.DVALUE_Float v.
+  Proof.
+    intros x n H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    subst.
+    auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_poison_inv :
+    forall x v,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Poison v) ->
+      x = DV1.DVALUE_Poison v.
+  Proof.
+    intros x n H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    subst.
+    auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_oom_inv :
+    forall x v,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Oom v) ->
+      x = DV1.DVALUE_Oom v.
+  Proof.
+    intros x n H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    subst.
+    auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_none_inv :
+    forall x,
+      dvalue_convert_strict x = NoOom DV2.DVALUE_None ->
+      x = DV1.DVALUE_None.
+  Proof.
+    intros x H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    subst.
+    auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_struct_inv :
+    forall x fields,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Struct fields) ->
+      exists fields', x = DV1.DVALUE_Struct fields'.
+  Proof.
+    intros x fields H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    break_match_hyp; inv H1.
+    exists fields0. reflexivity.
+  Qed.
+
+  Lemma dvalue_convert_strict_packed_struct_inv :
+    forall x fields,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Packed_struct fields) ->
+      exists fields', x = DV1.DVALUE_Packed_struct fields'.
+  Proof.
+    intros x fields H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    break_match_hyp; inv H1.
+    exists fields0. reflexivity.
+  Qed.
+
+  Lemma dvalue_convert_strict_array_inv :
+    forall x elts,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Array elts) ->
+      exists elts', x = DV1.DVALUE_Array elts'.
+  Proof.
+    intros x elts H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    break_match_hyp; inv H1.
+    exists elts0. reflexivity.
+  Qed.
+
+  Lemma dvalue_convert_strict_vector_inv :
+    forall x elts,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Vector elts) ->
+      exists elts', x = DV1.DVALUE_Vector elts'.
+  Proof.
+    intros x elts H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    break_match_hyp; inv H1.
+    exists elts0. reflexivity.
+  Qed.
+
   
   (** Lemmas about values with types... *)
 

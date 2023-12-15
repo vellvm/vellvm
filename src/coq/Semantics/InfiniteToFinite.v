@@ -117,17 +117,6 @@ Module InfiniteToFinite.
   Module DVCS := DVConvertSafe FinLP InfLP FinToInfAddrConvert InfToFinAddrConvert FinToInfAddrConvertSafe FinToInfIntptrConvertSafe FinLP.Events InfLP.Events DVC2 DVC1.
   Import DVCS.
 
-  (* TODO: Should we move this? *)
-  Definition addr_refine addr_inf addr_fin := InfToFinAddrConvert.addr_convert addr_inf = NoOom addr_fin.
-
-  (* TODO: Should we move this? *)
-  Definition fin_to_inf_addr (a : FinAddr.addr) : InfAddr.addr.
-    unfold FinAddr.addr in a.
-    unfold FiniteAddresses.Iptr in a.
-    pose proof FinToInfAddrConvertSafe.addr_convert_succeeds a as [a' _].
-    exact a'.
-  Defined.
-
   Lemma unsigned_repr_eq:
     forall i, ((0 <=? i)%Z && (i <? Int64.modulus)%Z)%bool = true ->
          Int64.unsigned (Int64.repr i) = i.
@@ -2756,19 +2745,6 @@ Lemma lift_memory_convert_mem_byte :
       apply EQV in IN.
       apply ptr_in_frame_prop_lift in IN.
       erewrite fin_to_inf_addr_conv_inf in IN; eauto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma addr_refine_fin_to_inf_addr :
-    forall addr_fin,
-      addr_refine (fin_to_inf_addr addr_fin) addr_fin.
-  Proof.
-    intros addr_fin.
-    red. unfold fin_to_inf_addr.
-    break_match_goal.
-    clear Heqs.
-    apply FinToInfAddrConvertSafe.addr_convert_safe in e.
-    auto.
   Qed.
 
   (* TODO: Move this *)
@@ -6065,176 +6041,6 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod MemPropT.stor
   Proof.
     intros E F T1 T2 OE OF R T1T2 pre post t_source t_oom t_final REF_OOM ORUTT.
   Abort.
-
-  (* TODO: inversion lemmas for dvalue_convert_strict *)
-  Lemma dvalue_convert_strict_addr_inv :
-    forall x a,
-      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Addr a) ->
-      exists a',
-        InfToFinAddrConvert.addr_convert a' = NoOom a /\
-          x = DVCInfFin.DV1.DVALUE_Addr a'.
-  Proof.
-    intros x a H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    break_match_hyp; inv H1.
-    exists a0; auto.
-  Qed.
-
-  Lemma dvalue_convert_strict_iptr_inv :
-    forall x n,
-      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_IPTR n) ->
-      exists n',
-        IP.from_Z (InterpreterStackBigIntptr.LP.IP.to_Z n') = NoOom n /\
-          x = DVCInfFin.DV1.DVALUE_IPTR n'.
-  Proof.
-    intros x n H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    break_match_hyp; inv H1.
-    exists x; auto.
-  Qed.
-
-  Lemma dvalue_convert_strict_i1_inv :
-    forall x n,
-      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_I1 n) ->
-      x = DVCInfFin.DV1.DVALUE_I1 n.
-  Proof.
-    intros x n H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    subst.
-    auto.
-  Qed.
-
-  Lemma dvalue_convert_strict_i8_inv :
-    forall x n,
-      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_I8 n) ->
-      x = DVCInfFin.DV1.DVALUE_I8 n.
-  Proof.
-    intros x n H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    subst.
-    auto.
-  Qed.
-
-  Lemma dvalue_convert_strict_i32_inv :
-    forall x n,
-      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_I32 n) ->
-      x = DVCInfFin.DV1.DVALUE_I32 n.
-  Proof.
-    intros x n H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    subst.
-    auto.
-  Qed.
-
-  Lemma dvalue_convert_strict_i64_inv :
-    forall x n,
-      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_I64 n) ->
-      x = DVCInfFin.DV1.DVALUE_I64 n.
-  Proof.
-    intros x n H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    subst.
-    auto.
-  Qed.
-
-  Lemma dvalue_convert_strict_double_inv :
-    forall x v,
-      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Double v) ->
-      x = DVCInfFin.DV1.DVALUE_Double v.
-  Proof.
-    intros x n H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    subst.
-    auto.
-  Qed.
-
-  Lemma dvalue_convert_strict_float_inv :
-    forall x v,
-      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Float v) ->
-      x = DVCInfFin.DV1.DVALUE_Float v.
-  Proof.
-    intros x n H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    subst.
-    auto.
-  Qed.
-
-  Lemma dvalue_convert_strict_poison_inv :
-    forall x v,
-      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Poison v) ->
-      x = DVCInfFin.DV1.DVALUE_Poison v.
-  Proof.
-    intros x n H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    subst.
-    auto.
-  Qed.
-
-  Lemma dvalue_convert_strict_oom_inv :
-    forall x v,
-      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Oom v) ->
-      x = DVCInfFin.DV1.DVALUE_Oom v.
-  Proof.
-    intros x n H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    subst.
-    auto.
-  Qed.
-
-  Lemma dvalue_convert_strict_none_inv :
-    forall x,
-      DVCInfFin.dvalue_convert_strict x = NoOom DVCInfFin.DV2.DVALUE_None ->
-      x = DVCInfFin.DV1.DVALUE_None.
-  Proof.
-    intros x H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    subst.
-    auto.
-  Qed.
-
-  Lemma dvalue_convert_strict_struct_inv :
-    forall x fields,
-      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Struct fields) ->
-      exists fields', x = DVCInfFin.DV1.DVALUE_Struct fields'.
-  Proof.
-    intros x fields H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    break_match_hyp; inv H1.
-    exists fields0. reflexivity.
-  Qed.
-
-  Lemma dvalue_convert_strict_packed_struct_inv :
-    forall x fields,
-      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Packed_struct fields) ->
-      exists fields', x = DVCInfFin.DV1.DVALUE_Packed_struct fields'.
-  Proof.
-    intros x fields H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    break_match_hyp; inv H1.
-    exists fields0. reflexivity.
-  Qed.
-
-  Lemma dvalue_convert_strict_array_inv :
-    forall x elts,
-      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Array elts) ->
-      exists elts', x = DVCInfFin.DV1.DVALUE_Array elts'.
-  Proof.
-    intros x elts H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    break_match_hyp; inv H1.
-    exists elts0. reflexivity.
-  Qed.
-
-  Lemma dvalue_convert_strict_vector_inv :
-    forall x elts,
-      DVCInfFin.dvalue_convert_strict x = NoOom (DVCInfFin.DV2.DVALUE_Vector elts) ->
-      exists elts', x = DVCInfFin.DV1.DVALUE_Vector elts'.
-  Proof.
-    intros x elts H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    break_match_hyp; inv H1.
-    exists elts0. reflexivity.
-  Qed.
 
   Lemma fin_inf_no_overlap :
     forall a1 sz1 a2 sz2 a1' a2',
@@ -31776,14 +31582,120 @@ cofix CIH
       reflexivity.
   Qed.
 
+  Lemma concretize_u_fin_inf :
+    forall uv_inf uv_fin res,
+      DVCInfFin.uvalue_refine_strict uv_inf uv_fin ->
+      FinLLVM.MEM.CP.CONC.concretize_u uv_fin res ->
+      InfLLVM.MEM.CP.CONC.concretize_u uv_inf (fmap fin_to_inf_dvalue res).
+  Proof.    
+    induction uv_inf;
+      intros uv_fin msg REF CONC;
+      try
+        solve
+        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF;
+          cbn in REF;
+          first [ break_match_hyp_inv | inv REF ];
+          cbn in CONC; inv CONC
+        ].
+  Qed.
   (* TODO: Move this, prove this *)
   Lemma concretize_ub_fin_inf :
     forall uv_inf uv_fin msg,
       DVCInfFin.uvalue_refine_strict uv_inf uv_fin ->
       FinLLVM.MEM.CP.CONC.concretize_u uv_fin (UB_unERR_UB_OOM msg) ->
       InfLLVM.MEM.CP.CONC.concretize_u uv_inf (UB_unERR_UB_OOM msg).
-  Proof.
-  Admitted.
+  Proof.    
+    induction uv_inf;
+      intros uv_fin msg REF CONC;
+      try
+        solve
+        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF;
+          cbn in REF;
+          first [ break_match_hyp_inv | inv REF ];
+          cbn in CONC; inv CONC
+        ].
+
+    - rewrite DVCInfFin.uvalue_refine_strict_equation in REF;
+        cbn in REF;
+        break_match_hyp_inv.
+
+      apply map_monad_oom_Forall2 in Heqo.
+      induction Heqo.
+      + cbn in CONC.
+        repeat red in CONC.
+        destruct CONC as (?&?&?&?&?).
+        subst.
+        cbn in *.
+        destruct H2 as [[] | H2].
+        rewrite <- H2 in H1; auto.
+        cbn in *; inv H1.
+      + repeat red in CONC.
+        rewrite Memory64BitIntptr.CP.CONCBASE.concretize_uvalueM_equation in CONC.
+        repeat red in CONC.
+        destruct CONC as (?&?&?&?&?).
+        rewrite map_monad_unfold in H1.
+        cbn in H1.
+        repeat red in H1.
+        destruct H1 as (?&?&?&?&?).
+
+        destruct_err_ub_oom x0; cbn in H2; subst; inv H2.
+        2: {
+          destruct_err_ub_oom x2; inv H4.
+          cbn in H3.
+          destruct H3 as [[] | H3].
+          specialize (H3 _ eq_refl).
+          rewrite <- H3 in H7.
+          inv H7.
+        }
+
+        destruct_err_ub_oom x2; inv H4.
+        2: {
+          destruct H5 as [[] | H5].
+          cbn in H5.
+          specialize (H5 _ eq_refl).
+          repeat red in H5.
+          destruct H5 as (?&?&?&?&?).
+          rewrite <- H4 in H6.
+          destruct_err_ub_oom x2; cbn in H6; inv H6.
+          2: {
+            cbn in H5.
+            destruct H5 as [[] | H5].
+            specialize (H5 _ eq_refl).
+            rewrite <- H5 in H8.
+            inv H8.
+          }
+
+          cbn in H3, H4, H5.
+          repeat red.
+          rewrite InfLLVM.MEM.CP.CONC.concretize_uvalueM_equation.
+          repeat red.
+
+          do 2 eexists.
+          repeat red.
+          split.
+          rewrite map_monad_unfold.
+          repeat red.
+          do 2 eexists.
+          split.
+
+          
+        }
+
+        pose proof (H x (or_introl eq_refl) _ msg H0 H1).
+        repeat red.
+        rewrite InfLLVM.MEM.CP.CONC.concretize_uvalueM_equation.
+        repeat red.
+        exists (UB_unERR_UB_OOM msg).
+        exists (fun a => success_unERR_UB_OOM (InterpreterStackBigIntptr.LP.Events.DV.DVALUE_Struct a)).
+
+        cbn; split; eauto.
+        repeat red.
+        exists (UB_unERR_UB_OOM msg).
+        exists (fun a => ret [a]).
+        cbn.
+        split; eauto.
+        
+  Qed.
 
   Lemma model_undef_h_fin_inf :
     forall (t_fin : itree (FinLP.Events.ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
