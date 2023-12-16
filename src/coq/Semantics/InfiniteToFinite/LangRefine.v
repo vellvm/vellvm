@@ -14134,20 +14134,66 @@ Qed.
       inv e.
       eapply DVCrev.dvalue_convert_strict_none_inv in e0.
       subst; auto.
-    - generalize dependent dv2.
-      induction fields.
+    - clear H.
+      unfold fin_to_inf_dvalue in LIFT.
+      break_match_hyp; clear Heqs; destruct p; clear e0.
+      break_match_hyp_inv; clear Heqs; destruct p; clear e1.
+      cbn in e.
+      break_match_hyp_inv.
+      eapply DVCrev.dvalue_convert_strict_struct_inv in e0.
+      destruct e0 as (?&?&?).
+      subst.
+      clear H.
+      assert (x = fields).
+      { generalize dependent l.
+        induction x, fields; intros l H1 Heqo; auto.
+        + cbn in H1; inv H1.
+          cbn in Heqo.
+          repeat break_match_hyp_inv.
+        + cbn in H1; inv H1.
+          cbn in Heqo; inv Heqo.
+          repeat break_match_hyp_inv.
+        + cbn in H1, Heqo.
+          repeat break_match_hyp_inv.
+          
+      }
+      
+      revert l x H1 Heqo H.
+      
+      induction fields; intros l x H1 Heqo H.
+      + cbn in Heqo.
+        symmetry in Heqo.
+        destruct x; inv Heqo; auto.
+        cbn in H1.
+        repeat break_match_hyp_inv.
+      + cbn in Heqo.
+        repeat break_match_hyp_inv.
+        specialize (IHfields l0 fields Heqo eq_refl eq_refl).
+
+      
+        destruct x; inv H1; auto.
+        break_match_hyp_inv.
+        break_match_hyp_inv.
       + intros dv2 H LIFT.
-        clear H.
-        unfold fin_to_inf_dvalue in *.
+        unfold fin_to_inf_dvalue in LIFT.
         break_match_hyp; clear Heqs; destruct p; clear e0.
         break_match_hyp_inv; clear Heqs; destruct p; clear e1.
         cbn in e.
-        inv e.
-        eapply DVCrev. dvalue_convert_strict_struct_inv in e0.
-        destruct e0 as (?&?).
-        subst.
-      induction fields.
-      + cbn in Heqo; inv Heqo.
+        repeat break_match_hyp_inv.
+        eapply DVCrev.dvalue_convert_strict_struct_inv in e0.
+        destruct e0 as (?&?&?); subst.
+
+        induction x; cbn in *; inv H2.
+        repeat break_match_hyp_inv.
+
+        
+        
+        destruct e0 as (?&?&?).
+        destruct x; inv H1; auto.
+        break_match_hyp_inv.
+        break_match_hyp_inv.
+
+
         
       subst; auto.
   Qed.
