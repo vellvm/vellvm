@@ -8190,6 +8190,27 @@ Qed.
       EVAL LIFT1 LIFT2 CONV.
   Admitted.
 
+  Lemma dvalue_convert_strict_fin_inf_succeeds_fin_to_inf_dvalue' :
+    forall res,
+      DVCrev.dvalue_convert_strict res = NoOom (fin_to_inf_dvalue res).
+  Proof.
+    intros res.
+    unfold fin_to_inf_dvalue.
+    break_match_goal.
+    destruct p.
+    clear Heqs.
+    auto.
+  Qed.
+
+  Hint Resolve
+    eval_int_op_i1_fin_inf
+    eval_int_op_i8_fin_inf
+    eval_int_op_i32_fin_inf
+    eval_int_op_i64_fin_inf
+    eval_int_op_iptr_fin_inf
+    dvalue_convert_strict_fin_inf_succeeds_fin_to_inf_dvalue'
+    : EVAL_INT_FIN_INF.
+
   (* TODO: Move this / generalize monad? *)
   Lemma eval_iop_integer_h_fin_inf :
     forall dv1_fin dv2_fin res_fin iop dv1_inf dv2_inf,
@@ -8210,391 +8231,19 @@ Qed.
     intros dv1_fin dv2_fin res_fin iop dv1_inf dv2_inf EVAL LIFT1 LIFT2.
     unfold eval_iop_integer_h in EVAL.
     (* Nasty case analysis... *)
-    break_match_hyp_inv.
-    { (* dv1: Addr *)
-      break_match_hyp_inv.
-      break_match_hyp_inv.
-      unfold fin_to_inf_dvalue.
-      break_match_goal.
-      destruct p; clear Heqs.
-      break_match_goal.
-      destruct p; clear Heqs.
-      cbn in *.
-      break_match_hyp_inv.
-      inv e1.
-      cbn in *.
-      (* These should be the same... *)
-      unfold IS1.LP.Events.DV.iop_is_div.
-      unfold iop_is_div in Heqb.
-      rewrite Heqb.
-      reflexivity.
-    }
-    { (* dv1: i1 *)
-      break_match_hyp_inv.
-      - unfold fin_to_inf_dvalue.
-        break_match_goal; clear Heqs.
-        destruct p; clear e0.
-        break_match_goal; clear Heqs.
-        destruct p; clear e1.
-        break_match_goal; clear Heqs.
-        destruct p; clear e2.
-        cbn in *.
-        inv e.
-        inv e0.
-        cbn.
-
-        eapply eval_int_op_i1_fin_inf; eauto.
-      - break_match_hyp_inv.
-
-        unfold fin_to_inf_dvalue.
-        break_match_goal; clear Heqs.
-        destruct p; clear e0.
-        break_match_goal; clear Heqs.
-        destruct p; clear e1.
-        cbn in *.
-        inv e.
-        inv e0.
-        cbn.
-
-        (* These should be the same... *)
-        unfold IS1.LP.Events.DV.iop_is_div.
-        unfold iop_is_div in Heqb.
-        rewrite Heqb.
-        reflexivity.
-    }
-
-    { (* dv1: i8 *)
-      break_match_hyp_inv.
-      - unfold fin_to_inf_dvalue.
-        break_match_goal; clear Heqs.
-        destruct p; clear e0.
-        break_match_goal; clear Heqs.
-        destruct p; clear e1.
-        break_match_goal; clear Heqs.
-        destruct p; clear e2.
-        cbn in *.
-        inv e.
-        inv e0.
-        cbn.
-
-        eapply eval_int_op_i8_fin_inf; eauto.
-      - break_match_hyp_inv.
-
-        unfold fin_to_inf_dvalue.
-        break_match_goal; clear Heqs.
-        destruct p; clear e0.
-        break_match_goal; clear Heqs.
-        destruct p; clear e1.
-
-        cbn in *.
-        inv e.
-        inv e0.
-        cbn.
-
-        (* These should be the same... *)
-        unfold IS1.LP.Events.DV.iop_is_div.
-        unfold iop_is_div in Heqb.
-        rewrite Heqb.
-        reflexivity.
-    }
-
-    { (* dv1: i32 *)
-      break_match_hyp_inv.
-      - unfold fin_to_inf_dvalue.
-        break_match_goal; clear Heqs.
-        destruct p; clear e0.
-        break_match_goal; clear Heqs.
-        destruct p; clear e1.
-        break_match_goal; clear Heqs.
-        destruct p; clear e2.
-        cbn in *.
-        inv e.
-        inv e0.
-        cbn.
-
-        eapply eval_int_op_i32_fin_inf; eauto.
-      - break_match_hyp_inv.
-
-        unfold fin_to_inf_dvalue.
-        break_match_goal; clear Heqs.
-        destruct p; clear e0.
-        break_match_goal; clear Heqs.
-        destruct p; clear e1.
-        cbn in *.
-        inv e.
-        inv e0.
-        cbn.
-
-        (* These should be the same... *)
-        unfold IS1.LP.Events.DV.iop_is_div.
-        unfold iop_is_div in Heqb.
-        rewrite Heqb.
-        reflexivity.
-    }
-
-    { (* dv1: i64 *)
-      break_match_hyp_inv.
-      - unfold fin_to_inf_dvalue.
-        break_match_goal; clear Heqs.
-        destruct p; clear e0.
-        break_match_goal; clear Heqs.
-        destruct p; clear e1.
-        break_match_goal; clear Heqs.
-        destruct p; clear e2.
-        cbn in *.
-        inv e.
-        inv e0.
-        cbn.
-
-        eapply eval_int_op_i64_fin_inf; eauto.
-      - break_match_hyp_inv.
-
-        unfold fin_to_inf_dvalue.
-        break_match_goal; clear Heqs.
-        destruct p; clear e0.
-        break_match_goal; clear Heqs.
-        destruct p; clear e1.
-        cbn in *.
-        inv e.
-        inv e0.
-        cbn.
-
-        (* These should be the same... *)
-        unfold IS1.LP.Events.DV.iop_is_div.
-        unfold iop_is_div in Heqb.
-        rewrite Heqb.
-        reflexivity.
-    }
+    repeat break_match_hyp_inv;
+      rewrite_fin_to_inf_dvalue;
+      cbn;
+      try setoid_rewrite Heqb; eauto with EVAL_INT_FIN_INF.
 
     { (* dv1: iptr *)
-      break_match_hyp_inv.
-      - unfold fin_to_inf_dvalue.
-        break_match_goal; clear Heqs.
-        destruct p; clear e0.
-        break_match_goal; clear Heqs.
-        destruct p; clear e1.
-        break_match_goal; clear Heqs.
-        destruct p; clear e2.
-        cbn in *.
-        inv e.
-        inv e0.
-        cbn.
-
-        break_match_hyp_inv.
-        break_match_hyp_inv.
-
-        eapply eval_int_op_iptr_fin_inf; eauto.
-      - break_match_hyp_inv.
-
-        unfold fin_to_inf_dvalue.
-        break_match_goal; clear Heqs.
-        destruct p; clear e0.
-        break_match_goal; clear Heqs.
-        destruct p; clear e1.
-        cbn in *.
-        inv e.
-        inv e0.
-        cbn.
-        break_match_hyp_inv.
-        cbn.
-
-        (* These should be the same... *)
-        unfold IS1.LP.Events.DV.iop_is_div.
-        unfold iop_is_div in Heqb.
-        rewrite Heqb.
-        reflexivity.
-    }
-
-    { (* dv1: Double *)
-      break_match_hyp_inv.
-      break_match_hyp_inv.
-      cbn.
-
       unfold fin_to_inf_dvalue.
       break_match_goal; clear Heqs.
       destruct p; clear e0.
-      break_match_goal; clear Heqs.
-      destruct p; clear e1.
-      cbn in *.
-      inv e.
-      inv e0.
-      cbn.
-
-      (* These should be the same... *)
-      unfold IS1.LP.Events.DV.iop_is_div.
-      unfold iop_is_div in Heqb.
-      rewrite Heqb.
-      reflexivity.
-    }
-
-    { (* dv1: Float *)
-      break_match_hyp_inv.
-      break_match_hyp_inv.
-      cbn.
-
-      unfold fin_to_inf_dvalue.
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      break_match_goal; clear Heqs.
-      destruct p; clear e1.
-      cbn in *.
-      inv e.
-      inv e0.
-      cbn.
-
-      (* These should be the same... *)
-      unfold IS1.LP.Events.DV.iop_is_div.
-      unfold iop_is_div in Heqb.
-      rewrite Heqb.
-      reflexivity.
-    }
-
-    { (* dv1: Poison *)
-      cbn.
-      unfold fin_to_inf_dvalue.
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      break_match_goal; clear Heqs.
-      destruct p; clear e1.
-      cbn in *.
-      inv e.
-      cbn.
-      reflexivity.
-    }
-
-    { (* dv1: OOM *)
-      cbn.
-      unfold fin_to_inf_dvalue.
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      break_match_goal; clear Heqs.
-      destruct p; clear e1.
-      cbn in *.
-      inv e.
-      cbn.
-      break_match_hyp_inv.
-      cbn in e0.
-      cbn in *.
-      inv e0.
-
-      break_match_hyp_inv.
-
-      (* These should be the same... *)
-      unfold IS1.LP.Events.DV.iop_is_div.
-      unfold iop_is_div in Heqb.
-      rewrite Heqb.
-
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      cbn in *.
-      inv e.
-      reflexivity.
-    }
-
-    { (* dv1: None *)
-      cbn.
-      unfold fin_to_inf_dvalue.
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      break_match_goal; clear Heqs.
-      destruct p; clear e1.
-      cbn in *.
-      inv e.
-      break_match_hyp_inv.
-      cbn in e0.
-      cbn in *.
-      inv e0.
-
-      break_match_hyp_inv.
-
-      (* These should be the same... *)
-      unfold IS1.LP.Events.DV.iop_is_div.
-      unfold iop_is_div in Heqb.
-      rewrite Heqb.
-
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      cbn in *.
-      inv e.
-      reflexivity.
-    }
-
-    { (* dv1: Struct *)
-      break_match_hyp_inv.
-      break_match_hyp_inv.
-
-      cbn.
-      unfold fin_to_inf_dvalue.
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      break_match_goal; clear Heqs.
-      destruct p; clear e1.
-      cbn in *.
-      break_match_hyp_inv.
-      cbn in e0.
-      cbn in *.
-      inv e0.
-
-      (* These should be the same... *)
-      unfold IS1.LP.Events.DV.iop_is_div.
-      unfold iop_is_div in Heqb.
-      rewrite Heqb.
-      reflexivity.
-    }
-
-    { (* dv1: Packed Struct *)
-      break_match_hyp_inv.
-      break_match_hyp_inv.
-
-      cbn.
-      unfold fin_to_inf_dvalue.
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      break_match_goal; clear Heqs.
-      destruct p; clear e1.
-      cbn in *.
-      break_match_hyp_inv.
-      cbn in e0.
-      cbn in *.
-      inv e0.
-
-      (* These should be the same... *)
-      unfold IS1.LP.Events.DV.iop_is_div.
-      unfold iop_is_div in Heqb.
-      rewrite Heqb.
-      reflexivity.
-    }
-
-    { (* dv1: Array *)
-      break_match_hyp_inv.
-      break_match_hyp_inv.
-
-      cbn.
-      unfold fin_to_inf_dvalue.
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      break_match_goal; clear Heqs.
-      destruct p; clear e1.
-      cbn in *.
-      break_match_hyp_inv.
-      cbn in e0.
-      cbn in *.
-      inv e0.
-
-      (* These should be the same... *)
-      unfold IS1.LP.Events.DV.iop_is_div.
-      unfold iop_is_div in Heqb.
-      rewrite Heqb.
-      reflexivity.
-    }
-
-    { (* dv1: Vector *)
-      repeat break_match_hyp_inv.
-      cbn.
-      rewrite_fin_to_inf_dvalue.
-      cbn.
-      setoid_rewrite Heqb.
-      reflexivity.
+      unfold intptr_fin_inf.
+      repeat break_match_goal.
+      clear Heqs Heqs0.
+      eapply eval_int_op_iptr_fin_inf; eauto.
     }
   Qed.
 
@@ -8618,7 +8267,11 @@ Qed.
     intros dv1_fin dv2_fin res_fin iop dv1_inf dv2_inf EVAL LIFT1 LIFT2.
     unfold eval_iop in EVAL.
     (* Nasty case analysis... *)
-    break_match_hyp_inv.
+    repeat break_match_hyp_inv;
+      rewrite_fin_to_inf_dvalue;
+      cbn;
+      try setoid_rewrite Heqb; auto.
+    eapply eval_int_op_i1_fin_inf; eauto.
     { (* dv1: Addr *)
       break_match_hyp_inv.
       break_match_hyp_inv.
