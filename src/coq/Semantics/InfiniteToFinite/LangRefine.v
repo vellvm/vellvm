@@ -6823,13 +6823,392 @@ Qed.
     apply dvi.
   Defined.
 
+
+  Lemma fin_to_inf_dvalue_i1 :
+    forall x,
+      fin_to_inf_dvalue (DVALUE_I1 x) =
+        DVCrev.DV2.DVALUE_I1 x.
+  Proof.
+    intros x.
+    unfold fin_to_inf_dvalue.
+    break_match_goal; clear Heqs; destruct p; clear e0;
+      cbn in e; subst; inv e.
+    auto.
+  Qed.
+
+  Lemma fin_to_inf_dvalue_i8 :
+    forall x,
+      fin_to_inf_dvalue (DVALUE_I8 x) =
+        DVCrev.DV2.DVALUE_I8 x.
+  Proof.
+    intros x.
+    unfold fin_to_inf_dvalue.
+    break_match_goal; clear Heqs; destruct p; clear e0;
+      cbn in e; subst; inv e.
+    auto.
+  Qed.
+
+  Lemma fin_to_inf_dvalue_i32 :
+    forall x,
+      fin_to_inf_dvalue (DVALUE_I32 x) =
+        DVCrev.DV2.DVALUE_I32 x.
+  Proof.
+    intros x.
+    unfold fin_to_inf_dvalue.
+    break_match_goal; clear Heqs; destruct p; clear e0;
+      cbn in e; subst; inv e.
+    auto.
+  Qed.
+
+  Lemma fin_to_inf_dvalue_i64 :
+    forall x,
+      fin_to_inf_dvalue (DVALUE_I64 x) =
+        DVCrev.DV2.DVALUE_I64 x.
+  Proof.
+    intros x.
+    unfold fin_to_inf_dvalue.
+    break_match_goal; clear Heqs; destruct p; clear e0;
+      cbn in e; subst; inv e.
+    auto.
+  Qed.
+
+  Definition intptr_fin_inf (x : IP.intptr) : IS1.LP.IP.intptr.
+    pose proof intptr_convert_succeeds x.
+    destruct H.
+    apply x0.
+  Defined.
+
+  Lemma fin_to_inf_dvalue_iptr :
+    forall x,
+      fin_to_inf_dvalue (DVALUE_IPTR x) =
+        DVCrev.DV2.DVALUE_IPTR (intptr_fin_inf x).
+  Proof.
+    intros x.
+    unfold fin_to_inf_dvalue.
+    break_match_goal; clear Heqs; destruct p; clear e0;
+      cbn in e; subst; inv e.
+
+    pose proof intptr_convert_succeeds x.
+    destruct H.
+    rewrite e in H0.
+    inv H0.
+
+    unfold intptr_fin_inf.
+    break_match_goal.
+    clear Heqs.
+    congruence.
+  Qed.
+
+  (* TODO: Should we move this? *)
+  Definition addr_refine addr_inf (addr_fin : addr) := AC1.addr_convert addr_inf = NoOom addr_fin.
+
+  (* TODO: Should we move this? *)
+  Definition fin_to_inf_addr (a : addr) : IS1.LP.ADDR.addr.
+    unfold FinAddr.addr in a.
+    unfold FiniteAddresses.Iptr in a.
+    pose proof ACS.addr_convert_succeeds a as [a' _].
+    exact a'.
+  Defined.
+
+  (* TODO: Move this *)
+  Lemma addr_refine_fin_to_inf_addr :
+    forall addr_fin,
+      addr_refine (fin_to_inf_addr addr_fin) addr_fin.
+  Proof.
+    intros addr_fin.
+    red. unfold fin_to_inf_addr.
+    break_match_goal.
+    clear Heqs.
+    apply ACS.addr_convert_safe in e.
+    auto.
+  Qed.
+
+  Lemma addr_convert_fin_to_inf_addr :
+    forall addr_fin,
+      AC1.addr_convert (fin_to_inf_addr addr_fin) = NoOom addr_fin.
+  Proof.
+    intros addr_fin.
+    unfold fin_to_inf_addr in *.
+    destruct (ACS.addr_convert_succeeds addr_fin).
+    apply ACS.addr_convert_safe in e.
+    auto.
+  Qed.
+
+  Lemma fin_to_inf_dvalue_addr :
+    forall a,
+      fin_to_inf_dvalue (DVALUE_Addr a) =
+        DVCrev.DV2.DVALUE_Addr (fin_to_inf_addr a).
+  Proof.
+    intros a.
+    unfold fin_to_inf_dvalue.
+    break_match_goal; clear Heqs; destruct p; clear e0.
+    cbn in e.
+    break_match_hyp_inv.
+    unfold fin_to_inf_addr.
+    break_match_goal.
+    clear Heqs.
+    rewrite Heqo in e.
+    inv e.
+    auto.
+  Qed.
+
+  Lemma fin_to_inf_dvalue_float :
+    forall f,
+      fin_to_inf_dvalue (DVALUE_Float f) =
+        DVCrev.DV2.DVALUE_Float f.
+  Proof.
+    intros a.
+    unfold fin_to_inf_dvalue.
+    break_match_goal; clear Heqs; destruct p; clear e0.
+    cbn in e. inv e.
+    reflexivity.
+  Qed.
+
+  Lemma fin_to_inf_dvalue_double :
+    forall f,
+      fin_to_inf_dvalue (DVALUE_Double f) =
+        DVCrev.DV2.DVALUE_Double f.
+  Proof.
+    intros a.
+    unfold fin_to_inf_dvalue.
+    break_match_goal; clear Heqs; destruct p; clear e0.
+    cbn in e. inv e.
+    reflexivity.
+  Qed.
+
+  Lemma fin_to_inf_dvalue_poison :
+    forall t,
+      fin_to_inf_dvalue (DVALUE_Poison t) =
+        DVCrev.DV2.DVALUE_Poison t.
+  Proof.
+    intros x.
+    unfold fin_to_inf_dvalue.
+    break_match_goal; clear Heqs; destruct p; clear e0;
+      cbn in e; subst; inv e.
+    auto.
+  Qed.
+
+  Lemma fin_to_inf_dvalue_oom :
+    forall t,
+      fin_to_inf_dvalue (DVALUE_Oom t) =
+        DVCrev.DV2.DVALUE_Oom t.
+  Proof.
+    intros x.
+    unfold fin_to_inf_dvalue.
+    break_match_goal; clear Heqs; destruct p; clear e0;
+      cbn in e; subst; inv e.
+    auto.
+  Qed.
+
+  Lemma fin_to_inf_dvalue_none :
+      fin_to_inf_dvalue DVALUE_None =
+        DVCrev.DV2.DVALUE_None.
+  Proof.
+    unfold fin_to_inf_dvalue.
+    break_match_goal; clear Heqs; destruct p; clear e0;
+      cbn in e; subst; inv e.
+    auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma sizeof_dtyp_fin_inf :
+    forall t,
+      IS1.LP.SIZEOF.sizeof_dtyp t = SIZEOF.sizeof_dtyp t.
+  Proof.
+    (* Need to expose more stuff to be able to prove this *)
+  Admitted.
+
+  Lemma fin_to_inf_dvalue_struct :
+    forall elts,
+      fin_to_inf_dvalue (DVALUE_Struct elts) =
+        DVCrev.DV2.DVALUE_Struct (map fin_to_inf_dvalue elts).
+  Proof.
+    induction elts.
+    - cbn.
+      unfold fin_to_inf_dvalue.
+      break_match_goal; clear Heqs; destruct p; clear e0;
+        cbn in e; subst; inv e.
+      auto.
+    - unfold fin_to_inf_dvalue in *.
+      break_match_goal; clear Heqs; destruct p; clear e0;
+        cbn in e; subst; inv e.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+
+      break_match_hyp_inv; clear Heqs; destruct p; clear e0.
+      cbn in e; subst; inv e.
+
+      break_match_hyp_inv.
+      rewrite map_cons.
+      inv Heqo.
+
+      break_match_goal; clear Heqs; destruct p; clear e0.
+      rewrite Heqo0 in e.
+      inv e.
+      auto.
+  Qed.
+
+  Lemma fin_to_inf_dvalue_packed_struct :
+    forall elts,
+      fin_to_inf_dvalue (DVALUE_Packed_struct elts) =
+        DVCrev.DV2.DVALUE_Packed_struct (map fin_to_inf_dvalue elts).
+  Proof.
+    induction elts.
+    - cbn.
+      unfold fin_to_inf_dvalue.
+      break_match_goal; clear Heqs; destruct p; clear e0;
+        cbn in e; subst; inv e.
+      auto.
+    - unfold fin_to_inf_dvalue in *.
+      break_match_goal; clear Heqs; destruct p; clear e0;
+        cbn in e; subst; inv e.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+
+      break_match_hyp_inv; clear Heqs; destruct p; clear e0.
+      cbn in e; subst; inv e.
+
+      break_match_hyp_inv.
+      rewrite map_cons.
+      inv Heqo.
+
+      break_match_goal; clear Heqs; destruct p; clear e0.
+      rewrite Heqo0 in e.
+      inv e.
+      auto.
+  Qed.
+
+  Lemma fin_to_inf_dvalue_array :
+    forall elts,
+      fin_to_inf_dvalue (DVALUE_Array elts) =
+        DVCrev.DV2.DVALUE_Array (map fin_to_inf_dvalue elts).
+  Proof.
+    induction elts.
+    - cbn.
+      unfold fin_to_inf_dvalue.
+      break_match_goal; clear Heqs; destruct p; clear e0;
+        cbn in e; subst; inv e.
+      auto.
+    - unfold fin_to_inf_dvalue in *.
+      break_match_goal; clear Heqs; destruct p; clear e0;
+        cbn in e; subst; inv e.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+      rewrite map_cons.
+
+      break_match_hyp_inv; clear Heqs; destruct p; clear e0.
+      cbn in e; subst; inv e.
+
+      break_match_hyp_inv.
+      inv Heqo.
+
+      break_match_goal; clear Heqs; destruct p; clear e0.
+      rewrite Heqo0 in e.
+      inv e.
+      auto.
+  Qed.
+
+  Lemma fin_to_inf_dvalue_vector :
+    forall elts,
+      fin_to_inf_dvalue (DVALUE_Vector elts) =
+        DVCrev.DV2.DVALUE_Vector (map fin_to_inf_dvalue elts).
+  Proof.
+    induction elts.
+    - cbn.
+      unfold fin_to_inf_dvalue.
+      break_match_goal; clear Heqs; destruct p; clear e0;
+        cbn in e; subst; inv e.
+      auto.
+    - unfold fin_to_inf_dvalue in *.
+      break_match_goal; clear Heqs; destruct p; clear e0;
+        cbn in e; subst; inv e.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+      break_match_hyp_inv.
+      rewrite map_cons.
+
+      break_match_hyp_inv; clear Heqs; destruct p; clear e0.
+      cbn in e; subst; inv e.
+
+      break_match_hyp_inv.
+
+      break_match_goal; clear Heqs; destruct p; clear e0.
+      rewrite Heqo0 in e.
+      inv e.
+
+      inv Heqo.
+      auto.
+  Qed.
+
+  Ltac rewrite_fin_to_inf_dvalue :=
+    repeat
+      first
+      [ rewrite fin_to_inf_dvalue_i1
+      | rewrite fin_to_inf_dvalue_i8
+      | rewrite fin_to_inf_dvalue_i32
+      | rewrite fin_to_inf_dvalue_i64
+      | rewrite fin_to_inf_dvalue_iptr
+      | rewrite fin_to_inf_dvalue_addr
+      | rewrite fin_to_inf_dvalue_float
+      | rewrite fin_to_inf_dvalue_double
+      | rewrite fin_to_inf_dvalue_poison
+      | rewrite fin_to_inf_dvalue_oom
+      | rewrite fin_to_inf_dvalue_none
+      | rewrite fin_to_inf_dvalue_array
+      | rewrite fin_to_inf_dvalue_vector
+      | rewrite fin_to_inf_dvalue_struct
+      | rewrite fin_to_inf_dvalue_packed_struct
+      ].
+
   Lemma dvalue_has_dtyp_fin_to_inf_dvalue :
     forall dv_fin t,
       dvalue_has_dtyp dv_fin t ->
       IS1.LP.Events.DV.dvalue_has_dtyp (fin_to_inf_dvalue dv_fin) t.
-   Proof.
-    (* TODO: Prove this. Probably want new dvalue_has_dtyp... *)
-  Admitted.
+  Proof.
+    intros dv_fin t TYP.
+    induction TYP;
+      rewrite_fin_to_inf_dvalue;
+      try solve [ constructor; eauto ].
+    - (* Structs *)
+      induction H; cbn.
+      + constructor; constructor.
+      + constructor.
+        constructor; eauto.
+        inv IHForall2.
+        auto.
+    - (* Packed Structs *)
+      induction H; cbn.
+      + constructor; constructor.
+      + constructor.
+        constructor; eauto.
+        inv IHForall2.
+        auto.
+    - (* Arrays *)
+      constructor; eauto.
+      { apply Forall_forall; eauto.
+        intros x H2.
+        apply in_map_iff in H2.
+        destruct H2 as (?&?&?); subst.
+        eauto.
+      }
+
+      rewrite map_length.
+      auto.
+    - (* Vectors *)
+      constructor; eauto.
+      { apply Forall_forall; eauto.
+        intros x H3.
+        apply in_map_iff in H3.
+        destruct H3 as (?&?&?); subst.
+        eauto.
+      }
+
+      rewrite map_length.
+      auto.
+  Qed.
 
   Lemma fin_to_inf_dvalue_refine_strict' :
     forall d_inf d_fin,
@@ -8256,345 +8635,6 @@ Qed.
       reflexivity.
     }
   Admitted.
-
-  Lemma fin_to_inf_dvalue_array :
-    forall elts,
-      fin_to_inf_dvalue (DVALUE_Array elts) =
-        DVCrev.DV2.DVALUE_Array (map fin_to_inf_dvalue elts).
-  Proof.
-    induction elts.
-    - cbn.
-      unfold fin_to_inf_dvalue.
-      break_match_goal; clear Heqs; destruct p; clear e0;
-        cbn in e; subst; inv e.
-      auto.
-    - unfold fin_to_inf_dvalue in *.
-      break_match_goal; clear Heqs; destruct p; clear e0;
-        cbn in e; subst; inv e.
-      break_match_hyp_inv.
-      break_match_hyp_inv.
-      break_match_hyp_inv.
-      rewrite map_cons.
-
-      break_match_hyp_inv; clear Heqs; destruct p; clear e0.
-      cbn in e; subst; inv e.
-
-      break_match_hyp_inv.
-      inv Heqo.
-
-      break_match_goal; clear Heqs; destruct p; clear e0.
-      rewrite Heqo0 in e.
-      inv e.
-      auto.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_vector :
-    forall elts,
-      fin_to_inf_dvalue (DVALUE_Vector elts) =
-        DVCrev.DV2.DVALUE_Vector (map fin_to_inf_dvalue elts).
-  Proof.
-    induction elts.
-    - cbn.
-      unfold fin_to_inf_dvalue.
-      break_match_goal; clear Heqs; destruct p; clear e0;
-        cbn in e; subst; inv e.
-      auto.
-    - unfold fin_to_inf_dvalue in *.
-      break_match_goal; clear Heqs; destruct p; clear e0;
-        cbn in e; subst; inv e.
-      break_match_hyp_inv.
-      break_match_hyp_inv.
-      break_match_hyp_inv.
-      rewrite map_cons.
-
-      break_match_hyp_inv; clear Heqs; destruct p; clear e0.
-      cbn in e; subst; inv e.
-
-      break_match_hyp_inv.
-
-      break_match_goal; clear Heqs; destruct p; clear e0.
-      rewrite Heqo0 in e.
-      inv e.
-
-      inv Heqo.
-      auto.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_i1 :
-    forall x,
-      fin_to_inf_dvalue (DVALUE_I1 x) =
-        DVCrev.DV2.DVALUE_I1 x.
-  Proof.
-    intros x.
-    unfold fin_to_inf_dvalue.
-    break_match_goal; clear Heqs; destruct p; clear e0;
-      cbn in e; subst; inv e.
-    auto.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_i8 :
-    forall x,
-      fin_to_inf_dvalue (DVALUE_I8 x) =
-        DVCrev.DV2.DVALUE_I8 x.
-  Proof.
-    intros x.
-    unfold fin_to_inf_dvalue.
-    break_match_goal; clear Heqs; destruct p; clear e0;
-      cbn in e; subst; inv e.
-    auto.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_i32 :
-    forall x,
-      fin_to_inf_dvalue (DVALUE_I32 x) =
-        DVCrev.DV2.DVALUE_I32 x.
-  Proof.
-    intros x.
-    unfold fin_to_inf_dvalue.
-    break_match_goal; clear Heqs; destruct p; clear e0;
-      cbn in e; subst; inv e.
-    auto.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_i64 :
-    forall x,
-      fin_to_inf_dvalue (DVALUE_I64 x) =
-        DVCrev.DV2.DVALUE_I64 x.
-  Proof.
-    intros x.
-    unfold fin_to_inf_dvalue.
-    break_match_goal; clear Heqs; destruct p; clear e0;
-      cbn in e; subst; inv e.
-    auto.
-  Qed.
-
-  Definition intptr_fin_inf (x : IP.intptr) : IS1.LP.IP.intptr.
-    pose proof intptr_convert_succeeds x.
-    destruct H.
-    apply x0.
-  Defined.
-
-  Lemma fin_to_inf_dvalue_iptr :
-    forall x,
-      fin_to_inf_dvalue (DVALUE_IPTR x) =
-        DVCrev.DV2.DVALUE_IPTR (intptr_fin_inf x).
-  Proof.
-    intros x.
-    unfold fin_to_inf_dvalue.
-    break_match_goal; clear Heqs; destruct p; clear e0;
-      cbn in e; subst; inv e.
-
-    pose proof intptr_convert_succeeds x.
-    destruct H.
-    rewrite e in H0.
-    inv H0.
-
-    unfold intptr_fin_inf.
-    break_match_goal.
-    clear Heqs.
-    congruence.
-  Qed.
-
-  (* TODO: Should we move this? *)
-  Definition addr_refine addr_inf (addr_fin : addr) := AC1.addr_convert addr_inf = NoOom addr_fin.
-
-  (* TODO: Should we move this? *)
-  Definition fin_to_inf_addr (a : addr) : IS1.LP.ADDR.addr.
-    unfold FinAddr.addr in a.
-    unfold FiniteAddresses.Iptr in a.
-    pose proof ACS.addr_convert_succeeds a as [a' _].
-    exact a'.
-  Defined.
-
-  (* TODO: Move this *)
-  Lemma addr_refine_fin_to_inf_addr :
-    forall addr_fin,
-      addr_refine (fin_to_inf_addr addr_fin) addr_fin.
-  Proof.
-    intros addr_fin.
-    red. unfold fin_to_inf_addr.
-    break_match_goal.
-    clear Heqs.
-    apply ACS.addr_convert_safe in e.
-    auto.
-  Qed.
-
-  Lemma addr_convert_fin_to_inf_addr :
-    forall addr_fin,
-      AC1.addr_convert (fin_to_inf_addr addr_fin) = NoOom addr_fin.
-  Proof.
-    intros addr_fin.
-    unfold fin_to_inf_addr in *.
-    destruct (ACS.addr_convert_succeeds addr_fin).
-    apply ACS.addr_convert_safe in e.
-    auto.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_addr :
-    forall a,
-      fin_to_inf_dvalue (DVALUE_Addr a) =
-        DVCrev.DV2.DVALUE_Addr (fin_to_inf_addr a).
-  Proof.
-    intros a.
-    unfold fin_to_inf_dvalue.
-    break_match_goal; clear Heqs; destruct p; clear e0.
-    cbn in e.
-    break_match_hyp_inv.
-    unfold fin_to_inf_addr.
-    break_match_goal.
-    clear Heqs.
-    rewrite Heqo in e.
-    inv e.
-    auto.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_float :
-    forall f,
-      fin_to_inf_dvalue (DVALUE_Float f) =
-        DVCrev.DV2.DVALUE_Float f.
-  Proof.
-    intros a.
-    unfold fin_to_inf_dvalue.
-    break_match_goal; clear Heqs; destruct p; clear e0.
-    cbn in e. inv e.
-    reflexivity.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_double :
-    forall f,
-      fin_to_inf_dvalue (DVALUE_Double f) =
-        DVCrev.DV2.DVALUE_Double f.
-  Proof.
-    intros a.
-    unfold fin_to_inf_dvalue.
-    break_match_goal; clear Heqs; destruct p; clear e0.
-    cbn in e. inv e.
-    reflexivity.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_poison :
-    forall t,
-      fin_to_inf_dvalue (DVALUE_Poison t) =
-        DVCrev.DV2.DVALUE_Poison t.
-  Proof.
-    intros x.
-    unfold fin_to_inf_dvalue.
-    break_match_goal; clear Heqs; destruct p; clear e0;
-      cbn in e; subst; inv e.
-    auto.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_oom :
-    forall t,
-      fin_to_inf_dvalue (DVALUE_Oom t) =
-        DVCrev.DV2.DVALUE_Oom t.
-  Proof.
-    intros x.
-    unfold fin_to_inf_dvalue.
-    break_match_goal; clear Heqs; destruct p; clear e0;
-      cbn in e; subst; inv e.
-    auto.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_none :
-      fin_to_inf_dvalue DVALUE_None =
-        DVCrev.DV2.DVALUE_None.
-  Proof.
-    unfold fin_to_inf_dvalue.
-    break_match_goal; clear Heqs; destruct p; clear e0;
-      cbn in e; subst; inv e.
-    auto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma sizeof_dtyp_fin_inf :
-    forall t,
-      IS1.LP.SIZEOF.sizeof_dtyp t = SIZEOF.sizeof_dtyp t.
-  Proof.
-    (* Need to expose more stuff to be able to prove this *)
-  Admitted.
-
-  Lemma fin_to_inf_dvalue_struct :
-    forall elts,
-      fin_to_inf_dvalue (DVALUE_Struct elts) =
-        DVCrev.DV2.DVALUE_Struct (map fin_to_inf_dvalue elts).
-  Proof.
-    induction elts.
-    - cbn.
-      unfold fin_to_inf_dvalue.
-      break_match_goal; clear Heqs; destruct p; clear e0;
-        cbn in e; subst; inv e.
-      auto.
-    - unfold fin_to_inf_dvalue in *.
-      break_match_goal; clear Heqs; destruct p; clear e0;
-        cbn in e; subst; inv e.
-      break_match_hyp_inv.
-      break_match_hyp_inv.
-      break_match_hyp_inv.
-
-      break_match_hyp_inv; clear Heqs; destruct p; clear e0.
-      cbn in e; subst; inv e.
-
-      break_match_hyp_inv.
-      rewrite map_cons.
-      inv Heqo.
-
-      break_match_goal; clear Heqs; destruct p; clear e0.
-      rewrite Heqo0 in e.
-      inv e.
-      auto.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_packed_struct :
-    forall elts,
-      fin_to_inf_dvalue (DVALUE_Packed_struct elts) =
-        DVCrev.DV2.DVALUE_Packed_struct (map fin_to_inf_dvalue elts).
-  Proof.
-    induction elts.
-    - cbn.
-      unfold fin_to_inf_dvalue.
-      break_match_goal; clear Heqs; destruct p; clear e0;
-        cbn in e; subst; inv e.
-      auto.
-    - unfold fin_to_inf_dvalue in *.
-      break_match_goal; clear Heqs; destruct p; clear e0;
-        cbn in e; subst; inv e.
-      break_match_hyp_inv.
-      break_match_hyp_inv.
-      break_match_hyp_inv.
-
-      break_match_hyp_inv; clear Heqs; destruct p; clear e0.
-      cbn in e; subst; inv e.
-
-      break_match_hyp_inv.
-      rewrite map_cons.
-      inv Heqo.
-
-      break_match_goal; clear Heqs; destruct p; clear e0.
-      rewrite Heqo0 in e.
-      inv e.
-      auto.
-  Qed.
-
-  Ltac rewrite_fin_to_inf_dvalue :=
-    repeat
-      first
-      [ rewrite fin_to_inf_dvalue_i1
-      | rewrite fin_to_inf_dvalue_i8
-      | rewrite fin_to_inf_dvalue_i32
-      | rewrite fin_to_inf_dvalue_i64
-      | rewrite fin_to_inf_dvalue_iptr
-      | rewrite fin_to_inf_dvalue_addr
-      | rewrite fin_to_inf_dvalue_float
-      | rewrite fin_to_inf_dvalue_double
-      | rewrite fin_to_inf_dvalue_poison
-      | rewrite fin_to_inf_dvalue_oom
-      | rewrite fin_to_inf_dvalue_none
-      | rewrite fin_to_inf_dvalue_array
-      | rewrite fin_to_inf_dvalue_vector
-      | rewrite fin_to_inf_dvalue_struct
-      | rewrite fin_to_inf_dvalue_packed_struct
-      ].
 
   Lemma eval_int_icmp_fin_inf :
     forall {Int} {VMInt : VellvmIntegers.VMemInt Int} icmp a b,

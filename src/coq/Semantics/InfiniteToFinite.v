@@ -1058,7 +1058,7 @@ Module InfiniteToFinite.
           convert_Block b = NoOom b'.
   Proof.
     intros h_inf h_fin k b H H0.
-  Admitted.
+  Abort.
 
   Lemma fin_inf_ptoi :
     forall a a',
@@ -2142,7 +2142,7 @@ Lemma lift_memory_convert_mem_byte :
     Transparent convert_memory lift_memory.
     Transparent convert_Heap lift_Heap.
     Transparent convert_FrameStack lift_FrameStack.
-  Admitted.
+  Abort.
 
   Lemma fin_to_inf_uvalue_injective :
     forall uv1 uv2,
