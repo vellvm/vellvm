@@ -175,13 +175,12 @@ Proof.
   - apply P_mod_two_p_eq.
   - generalize (P_mod_two_p_range wordsize p) (P_mod_two_p_eq wordsize p).
     fold modulus. intros A B.
-    exploit (Z_div_mod_eq (Zpos p) modulus). apply modulus_pos. intros C.
+    exploit (Zmod_eq (Zpos p) modulus). apply modulus_pos. intros C.
     set (q := Zpos p / modulus) in *.
     set (r := P_mod_two_p p wordsize) in *.
     rewrite <- B in C.
     change (Z.neg p) with (- (Z.pos p)). destruct (zeq r 0).
-    + symmetry. apply Zmod_unique with (-q). rewrite C; rewrite e. ring.
-      generalize modulus_pos; lia.
+    + symmetry. apply Zmod_unique with (-q); lia.
     + symmetry. apply Zmod_unique with (-q - 1). rewrite C. ring.
       lia.
 Qed.
@@ -549,7 +548,7 @@ Lemma eqmod_mod:
   forall x, eqmod x (x mod modul).
 Proof.
   intros; red. exists (x / modul).
-  rewrite Z.mul_comm. apply Z_div_mod_eq. auto.
+  rewrite Z.mul_comm. apply Z_div_mod_eq_full.
 Qed.
 
 Lemma eqmod_add:
@@ -650,7 +649,7 @@ Qed.
 Lemma eqm_unsigned_repr:
   forall z, eqm z (unsigned (repr z)).
 Proof.
-  unfold eqm; intros. rewrite unsigned_repr_eq. apply eqmod_mod. auto with ints.
+  unfold eqm; intros. rewrite unsigned_repr_eq. apply eqmod_mod.
 Qed.
 #[global] Hint Resolve eqm_unsigned_repr: ints.
 
@@ -1132,11 +1131,10 @@ Proof.
   apply eqm_samerepr.
   set (x' := unsigned x). set (y' := unsigned y).
   apply eqm_trans with ((x' / y') * y' + x' mod y').
-  apply eqm_refl2. rewrite Z.mul_comm. apply Z_div_mod_eq.
+  apply eqm_refl2. rewrite Z.mul_comm. apply Z_div_mod_eq_full.
   generalize (unsigned_range y); intro.
   assert (unsigned y <> 0). red; intro.
   elim H. rewrite <- (repr_unsigned y). unfold zero. congruence.
-  unfold y'. lia.
   auto with ints.
 Qed.
 
@@ -1724,7 +1722,7 @@ Qed.
 
 Theorem and_zero: forall x, and x zero = zero.
 Proof.
-  bit_solve. apply andb_b_false.
+  bit_solve.
 Qed.
 
 Corollary and_zero_l: forall x, and zero x = zero.
@@ -1734,7 +1732,7 @@ Qed.
 
 Theorem and_mone: forall x, and x mone = x.
 Proof.
-  bit_solve. apply andb_b_true.
+  bit_solve.
 Qed.
 
 Corollary and_mone_l: forall x, and mone x = x.
@@ -2396,7 +2394,7 @@ Lemma bits_rol:
   testbit (rol x y) i = testbit x ((i - unsigned y) mod zwordsize).
 Proof.
   intros. unfold rol.
-  exploit (Z_div_mod_eq (unsigned y) zwordsize). apply wordsize_pos.
+  exploit (Zmod_eq (unsigned y) zwordsize). apply wordsize_pos.
   set (j := unsigned y mod zwordsize). set (k := unsigned y / zwordsize).
   intros EQ.
   exploit (Z_mod_lt (unsigned y) zwordsize). apply wordsize_pos.
@@ -2424,7 +2422,7 @@ Lemma bits_ror:
   testbit (ror x y) i = testbit x ((i + unsigned y) mod zwordsize).
 Proof.
   intros. unfold ror.
-  exploit (Z_div_mod_eq (unsigned y) zwordsize). apply wordsize_pos.
+  exploit (Zmod_eq (unsigned y) zwordsize). apply wordsize_pos.
   set (j := unsigned y mod zwordsize). set (k := unsigned y / zwordsize).
   intros EQ.
   exploit (Z_mod_lt (unsigned y) zwordsize). apply wordsize_pos.
@@ -2530,13 +2528,13 @@ Proof.
   set (M := unsigned m); set (N := unsigned n).
   apply eqmod_trans with (i - M - N).
   apply eqmod_sub.
-  apply eqmod_sym. apply eqmod_mod. apply wordsize_pos.
+  apply eqmod_sym. apply eqmod_mod.
   apply eqmod_refl.
   replace (i - M - N) with (i - (M + N)) by lia.
   apply eqmod_sub.
   apply eqmod_refl.
   apply eqmod_trans with (Z.modulo (unsigned n + unsigned m) zwordsize).
-  replace (M + N) with (N + M) by lia. apply eqmod_mod. apply wordsize_pos.
+  replace (M + N) with (N + M) by lia. apply eqmod_mod.
   unfold modu, add. fold M; fold N. rewrite unsigned_repr_wordsize.
   assert (forall a, eqmod zwordsize a (unsigned (repr a))).
     intros. eapply eqmod_divides. apply eqm_unsigned_repr. assumption.
@@ -2914,8 +2912,7 @@ Proof.
       apply Zmod_unique with (x1 / two_p x).
       rewrite !Zshiftin_spec. rewrite Z.add_assoc. f_equal.
       transitivity (2 * (two_p x * (x1 / two_p x) + x1 mod two_p x)).
-      f_equal. apply Z_div_mod_eq. apply two_p_gt_ZERO; auto.
-      ring.
+      f_equal. apply Z_div_mod_eq_full. ring.
       rewrite Zshiftin_spec. exploit (Z_mod_lt x1 (two_p x)). apply two_p_gt_ZERO; auto.
       destruct (Z.odd x0); lia.
 Qed.
@@ -2962,7 +2959,7 @@ Proof.
        exploit (Z_mod_lt (x + y - 1) y); auto.
        rewrite Z.abs_eq. lia. lia.
      + transitivity ((y * ((x + y - 1) / y) + (x + y - 1) mod y) - (y-1)).
-       rewrite <- Z_div_mod_eq. ring. auto. ring.
+       rewrite <- Z_div_mod_eq_full. ring. auto. ring.
   - apply Zquot_Zdiv_pos; lia.
 Qed.
 
@@ -3048,11 +3045,11 @@ Lemma Zdiv_shift:
   forall x y, y > 0 ->
   (x + (y - 1)) / y = x / y + if zeq (Z.modulo x y) 0 then 0 else 1.
 Proof.
-  intros. generalize (Z_div_mod_eq x y H). generalize (Z_mod_lt x y H).
+  intros. generalize (Zmod_eq x y H). generalize (Z_mod_lt x y H).
   set (q := x / y). set (r := x mod y). intros.
   destruct (zeq r 0).
-  apply Zdiv_unique with (y - 1). rewrite H1. rewrite e. ring. lia.
-  apply Zdiv_unique with (r - 1). rewrite H1. ring. lia.
+  apply Zdiv_unique with (y - 1); lia.
+  apply Zdiv_unique with (r - 1); lia.
 Qed.
 
 Theorem shrx_carry:
@@ -3440,7 +3437,6 @@ Lemma eqmod_zero_ext:
   forall n x, 0 <= n < zwordsize -> eqmod (two_p n) (unsigned (zero_ext n x)) (unsigned x).
 Proof.
   intros. rewrite zero_ext_mod; auto. apply eqmod_sym. apply eqmod_mod.
-  apply two_p_gt_ZERO. lia.
 Qed.
 
 (** [sign_ext n x] is the unique integer congruent to [x] modulo [2^n]
@@ -4807,7 +4803,7 @@ Proof.
   set (p := Int.unsigned x * Int.unsigned y).
   set (ph := p / Int.modulus). set (pl := p mod Int.modulus).
   transitivity (repr (ph * Int.modulus + pl)).
-- f_equal. rewrite Z.mul_comm. apply Z_div_mod_eq. apply Int.modulus_pos.
+- f_equal. rewrite Z.mul_comm. apply Z_div_mod_eq_full.
 - apply eqm_samerepr. apply eqm_add. apply eqm_mul_2p32. auto with ints.
   rewrite Int.unsigned_repr_eq. apply eqm_refl.
 Qed.

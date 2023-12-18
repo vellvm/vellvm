@@ -116,21 +116,20 @@ Proof.
     + unfold raise.
       rewrite interp_global_bind.
       rewrite interp_global_trigger. cbn.
-      rewrite subevent_subevent.
       rewrite !interp_local_bind.
       rewrite interp_local_trigger.
       cbn.
-      rewrite subevent_subevent, !bind_bind.
+      rewrite !bind_bind.
       rewrite interp_memory_bind,interp_memory_trigger.
       cbn.
-      rewrite subevent_subevent, !bind_bind.
+      rewrite !bind_bind.
       apply has_post_bind; intros [].
     + rewrite interp_global_ret, interp_local_ret, interp_memory_ret.
       apply eutt_Ret; repeat red; auto.
   - cbn.
     rewrite subevent_subevent.
     rewrite interp_global_trigger.
-    cbn; rewrite subevent_subevent.
+    cbn.
     rewrite interp_local_bind, interp_local_trigger.
     cbn; rewrite subevent_subevent.
     rewrite !bind_bind.

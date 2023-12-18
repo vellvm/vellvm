@@ -17,19 +17,26 @@
 
 (** Formalization of floating-point numbers, using the Flocq library. *)
 
+Require Import Reals.
 Require Import Coqlib Zbits Integers.
-Require Import Coq.micromega.Lia.
-(*From Flocq*)
-From Flocq Require Import Binary Bits Core.
+From Flocq Require Import BinarySingleNaN Binary Bits Core.
 Require Import IEEE754_extra.
 Require Import Program.
 Require Archi.
+Import ListNotations.
 
 Close Scope R_scope.
 Open Scope Z_scope.
+Set Asymmetric Patterns.
 
 Definition float := binary64. (**r the type of IEE754 double-precision FP numbers *)
 Definition float32 := binary32. (**r the type of IEE754 single-precision FP numbers *)
+
+Lemma integer_representable_n :
+  forall n : Z, - 2 ^ 53 <= n <= 2 ^ 53 -> integer_representable 53 1024 n.
+Proof.
+now apply integer_representable_n.
+Qed.
 
 (** Boolean-valued comparisons *)
 
@@ -173,8 +180,10 @@ Definition expand_nan s p H : {x | is_nan _ _ x = true} :=
 
 Definition of_single_nan (f : float32) : { x : float | is_nan _ _ x = true } :=
   match f with
-  | B754_nan _ _ s p H =>
-    if Archi.float_of_single_preserves_sNaN
+  | B754_nan s p H =>
+    if Archi.float_conversion_default_nan
+    then default_nan_64
+    else if Archi.float_of_single_preserves_sNaN
     then expand_nan s p H
     else quiet_nan_64 (s, expand_nan_payload p)
   | _ => default_nan_64
@@ -189,7 +198,10 @@ Definition reduce_nan_payload (p: positive) :=
 
 Definition to_single_nan (f : float) : { x : float32 | is_nan _ _ x = true } :=
   match f with
-  | B754_nan _ _ s p H => quiet_nan_32 (s, reduce_nan_payload p)
+  | B754_nan s p H =>
+    if Archi.float_conversion_default_nan
+    then default_nan_32
+    else quiet_nan_32 (s, reduce_nan_payload p)
   | _ => default_nan_32
   end.
 
@@ -197,13 +209,13 @@ Definition to_single_nan (f : float) : { x : float32 | is_nan _ _ x = true } :=
 
 Definition neg_nan (f : float) : { x : float | is_nan _ _ x = true } :=
   match f with
-  | B754_nan _ _ s p H => exist _ (B754_nan 53 1024 (negb s) p H) (eq_refl true)
+  | B754_nan s p H => exist _ (B754_nan 53 1024 (negb s) p H) (eq_refl true)
   | _ => default_nan_64
   end.
 
 Definition abs_nan (f : float) : { x : float | is_nan _ _ x = true } :=
   match f with
-  | B754_nan _ _ s p H => exist _ (B754_nan 53 1024 false p H) (eq_refl true)
+  | B754_nan s p H => exist _ (B754_nan 53 1024 false p H) (eq_refl true)
   | _ => default_nan_64
   end.
 
@@ -222,13 +234,13 @@ Additionally, signaling NaNs are converted to quiet NaNs, as required by the sta
 *)
 
 Definition cons_pl (x: float) (l: list (bool * positive)) :=
-  match x with B754_nan _ _ s p _ => (s, p) :: l | _ => l end.
+  match x with B754_nan s p _ => (s, p) :: l | _ => l end.
 
 Definition unop_nan (x: float) : {x : float | is_nan _ _ x = true} :=
-  quiet_nan_64 (Archi.choose_nan_64 (cons_pl x nil)).
+  quiet_nan_64 (Archi.choose_nan_64 (cons_pl x [])).
 
 Definition binop_nan (x y: float) : {x : float | is_nan _ _ x = true} :=
-  quiet_nan_64 (Archi.choose_nan_64 (cons_pl x (cons_pl y nil))).
+  quiet_nan_64 (Archi.choose_nan_64 (cons_pl x (cons_pl y []))).
 
 (** For fused multiply-add, the order in which arguments are examined
   to select a NaN payload varies across platforms.  E.g. in [fma x y z],
@@ -238,7 +250,7 @@ Definition binop_nan (x y: float) : {x : float | is_nan _ _ x = true} :=
 
 Definition fma_nan_1 (x y z: float) : {x : float | is_nan _ _ x = true} :=
   let '(a, b, c) := Archi.fma_order x y z in
-  quiet_nan_64 (Archi.choose_nan_64 (cons_pl a (cons_pl b (cons_pl c nil)))).
+  quiet_nan_64 (Archi.choose_nan_64 (cons_pl a (cons_pl b (cons_pl c [])))).
 
 (** One last wrinkle for fused multiply-add: [fma zero infinity nan]
   can return either the quiesced [nan], or the default NaN arising out
@@ -248,9 +260,9 @@ Definition fma_nan_1 (x y z: float) : {x : float | is_nan _ _ x = true} :=
 
 Definition fma_nan (x y z: float) : {x : float | is_nan _ _ x = true} :=
   match x, y with
-  | B754_infinity _ _ _, B754_zero _ _ _ | B754_zero _ _ _, B754_infinity _ _ _ =>
+  | B754_infinity _, B754_zero _ | B754_zero _, B754_infinity _ =>
       if Archi.fma_invalid_mul_is_nan
-      then quiet_nan_64 (Archi.choose_nan_64 (Archi.default_nan_64 :: cons_pl z nil))
+      then quiet_nan_64 (Archi.choose_nan_64 (Archi.default_nan_64 :: cons_pl z []))
       else fma_nan_1 x y z
   | _, _ =>
       fma_nan_1 x y z
@@ -330,7 +342,7 @@ Definition from_words (hi lo: int) : float := of_bits (Int64.ofwords hi lo).
 Ltac compute_this val :=
   let x := fresh in set val as x in *; vm_compute in x; subst x.
 
-Ltac smart_lia :=
+Ltac smart_omega :=
   simpl radix_val in *; simpl Z.pow in *;
   compute_this Int.modulus; compute_this Int.half_modulus;
   compute_this Int.max_unsigned;
@@ -460,7 +472,7 @@ Theorem of_intu_of_int_1:
 Proof.
   unfold of_intu, of_int, Int.signed, Int.ltu; intro.
   change (Int.unsigned ox8000_0000) with Int.half_modulus.
-  destruct (zlt (Int.unsigned x) Int.half_modulus); now intuition.
+  destruct (zlt (Int.unsigned x) Int.half_modulus); now intuition auto.
 Qed.
 
 Theorem of_intu_of_int_2:
@@ -472,14 +484,14 @@ Proof.
   set (y := Int.sub x ox8000_0000).
   pose proof (Int.unsigned_range x); pose proof (Int.signed_range y).
   assert (Ry: integer_representable 53 1024 (Int.signed y)).
-  { apply integer_representable_n; auto; smart_lia. }
+  { apply integer_representable_n. smart_omega. }
   assert (R8: integer_representable 53 1024 (Int.unsigned ox8000_0000)).
-  { apply integer_representable_2p with (p := 31);auto; smart_lia. }
+  { apply integer_representable_2p with (p := 31); easy. }
   rewrite BofZ_plus by auto.
   f_equal.
   unfold Int.ltu in H. destruct zlt in H; try discriminate.
   unfold y, Int.sub. rewrite Int.signed_repr. lia.
-  compute_this (Int.unsigned ox8000_0000); smart_lia.
+  compute_this (Int.unsigned ox8000_0000); smart_omega.
 Qed.
 
 Theorem of_intu_of_int_3:
@@ -491,7 +503,7 @@ Proof.
   set (lo := Int.and x ox7FFF_FFFF).
   assert (R: forall n, integer_representable 53 1024 (Int.signed n)).
   { intros. pose proof (Int.signed_range n).
-    apply integer_representable_n; auto; smart_lia. }
+    apply integer_representable_n. smart_omega. }
   unfold sub, of_int. rewrite BofZ_minus by auto. unfold of_intu. f_equal.
   assert (E: Int.add hi lo = x).
   { unfold hi, lo. rewrite Int.add_is_or. 
@@ -532,7 +544,7 @@ Proof.
   destruct (ZofB_range 53 1024 x 0 Int.max_unsigned) as [p|] eqn:E; simpl in H0; inv H0.
   exploit ZofB_range_inversion; eauto. intros (A & B & C).
   unfold to_int, ZofB_range. rewrite C.
-  rewrite Zle_bool_true by smart_lia. rewrite Zle_bool_true; auto.
+  rewrite Zle_bool_true by smart_omega. rewrite Zle_bool_true; auto.
   exploit (BofZ_exact 53 1024 __ __ (Int.unsigned ox8000_0000)).
   vm_compute; intuition congruence.
   set (y := of_intu ox8000_0000) in *.
@@ -541,7 +553,7 @@ Proof.
   assert (FINx: is_finite _ _ x = true).
   { rewrite ZofB_correct in C. destruct (is_finite _ _ x) eqn:FINx; congruence. }
   destruct (zeq p 0).
-  subst p; smart_lia.
+  subst p; smart_omega.
   destruct (ZofB_range_pos 53 1024 __ __ x p C) as [P Q]. lia.
   assert (CMP: Bcompare _ _ x y = Some Lt).
   { unfold cmp, cmp_of_comparison, compare in H. destruct (Bcompare _ _ x y) as [[]|]; auto; discriminate. }
@@ -578,7 +590,7 @@ Proof.
   }
   assert (EQ: ZofB_range _ _ (sub x y) Int.min_signed Int.max_signed = Some (p - Int.unsigned ox8000_0000)).
   { apply ZofB_range_minus. exact E.
-    compute_this (Int.unsigned ox8000_0000). smart_lia.
+    compute_this (Int.unsigned ox8000_0000). smart_omega.
     apply Rge_le; auto.
   }
   unfold to_int; rewrite EQ. simpl. unfold Int.sub. rewrite Int.unsigned_repr by lia. auto.
@@ -614,10 +626,10 @@ Proof.
   rewrite B2R_FF2B, is_finite_FF2B, Bsign_FF2B.
   unfold binary_float_of_bits_aux; rewrite split_bits_or; simpl; pose proof (Int.unsigned_range x).
   destruct (Int.unsigned x + Z.pow_pos 2 52) eqn:?.
-  exfalso; now smart_lia.
+  exfalso; now smart_omega.
   simpl; rewrite <- Heqz;  unfold F2R; simpl. split; auto.
   rewrite Rmult_1_r, plus_IZR. apply Rplus_comm.
-  exfalso; now smart_lia.
+  exfalso; now smart_omega.
 Qed.
 
 Lemma from_words_eq:
@@ -627,10 +639,10 @@ Proof.
   pose proof (Int.unsigned_range x).
   destruct (from_words_value x) as (A & B & C).
   destruct (BofZ_exact 53 1024 __ __ (2^52 + Int.unsigned x)) as (D & E & F).
-  smart_lia.
+  smart_omega.
   apply B2R_Bsign_inj; auto.
   rewrite A, D. rewrite plus_IZR. auto.
-  rewrite C, F. symmetry. apply Zlt_bool_false. smart_lia.
+  rewrite C, F. symmetry. apply Zlt_bool_false. smart_omega.
 Qed.
 
 Theorem of_intu_from_words:
@@ -640,8 +652,8 @@ Proof.
   intros. pose proof (Int.unsigned_range x).
   rewrite ! from_words_eq. unfold sub. rewrite BofZ_minus.
   unfold of_intu. apply (f_equal (BofZ 53 1024 __ __)). rewrite Int.unsigned_zero. lia.
-  apply integer_representable_n; auto; smart_lia.
-  apply integer_representable_n; auto; rewrite Int.unsigned_zero; smart_lia.
+  apply integer_representable_n. smart_omega.
+  apply integer_representable_n. easy.
 Qed.
 
 Lemma ox8000_0000_signed_unsigned:
@@ -650,9 +662,9 @@ Lemma ox8000_0000_signed_unsigned:
 Proof.
   intro; unfold Int.signed, Int.add; pose proof (Int.unsigned_range x).
   destruct (zlt (Int.unsigned x) Int.half_modulus).
-  rewrite Int.unsigned_repr; compute_this (Int.unsigned ox8000_0000); now smart_lia.
+  rewrite Int.unsigned_repr; compute_this (Int.unsigned ox8000_0000); now smart_omega.
   rewrite (Int.eqm_samerepr _ (Int.unsigned x + -2147483648)).
-  rewrite Int.unsigned_repr; now smart_lia.
+  rewrite Int.unsigned_repr; now smart_omega.
   apply Int.eqm_add; [now apply Int.eqm_refl|exists 1;reflexivity].
 Qed.
 
@@ -667,8 +679,8 @@ Proof.
   change (Int.unsigned ox8000_0000) with Int.half_modulus.
   unfold sub. rewrite BofZ_minus.
   unfold of_int. apply f_equal. lia.
-  apply integer_representable_n; auto; smart_lia.
-  apply integer_representable_n; auto; smart_lia.
+  apply integer_representable_n. smart_omega.
+  apply integer_representable_n. easy.
 Qed.
 
 Definition ox4530_0000 := Int.repr 1160773632.        (**r [0x4530_0000] *)
@@ -696,12 +708,12 @@ Proof.
   rewrite B2R_FF2B, is_finite_FF2B, Bsign_FF2B.
   unfold binary_float_of_bits_aux; rewrite split_bits_or'; simpl; pose proof (Int.unsigned_range x).
   destruct (Int.unsigned x + Z.pow_pos 2 52) eqn:?.
-  exfalso; now smart_lia.
+  exfalso; now smart_omega.
   simpl; rewrite <- Heqz;  unfold F2R; simpl. split; auto.
   rewrite plus_IZR, Rmult_plus_distr_r, <- 2!mult_IZR, Rplus_comm.
   easy.
   assert (Zneg p < 0) by reflexivity.
-  exfalso; now smart_lia.
+  exfalso; now smart_omega.
 Qed.
 
 Lemma from_words_eq':
@@ -713,7 +725,7 @@ Proof.
   destruct (BofZ_representable 53 1024 __ __ (2^84 + Int.unsigned x * 2^32)) as (D & E & F).
   replace (2^84 + Int.unsigned x * 2^32)
     with  ((2^52 + Int.unsigned x) * 2^32) by ring.
-  apply integer_representable_n2p; auto. smart_lia. lia. lia.
+  apply integer_representable_n2p; try easy. smart_omega.
   apply B2R_Bsign_inj; auto.
   rewrite A, D. rewrite <- IZR_Zpower by lia. rewrite <- plus_IZR. auto.
   rewrite C, F. symmetry. apply Zlt_bool_false.
@@ -743,13 +755,13 @@ Proof.
   unfold of_longu. f_equal.
   rewrite <- (Int64.ofwords_recompose l) at 1. rewrite Int64.ofwords_add'.
   fold xh; fold xl. compute_this (two_p 32); compute_this p20; ring.
-  apply integer_representable_n2p; auto.
-  compute_this p20; smart_lia. lia. lia.
-  apply integer_representable_n; auto; smart_lia.
+  apply integer_representable_n2p; try easy.
+  compute_this p20; smart_omega.
+  apply integer_representable_n. smart_omega.
   replace (2^84 + xh * 2^32) with ((2^52 + xh) * 2^32) by ring.
-  apply integer_representable_n2p; auto. smart_lia. lia. lia.
+  apply integer_representable_n2p; try easy. smart_omega.
   change (2^84 + p20 * 2^32) with ((2^52 + 1048576) * 2^32).
-  apply integer_representable_n2p; auto. lia. lia.
+  apply integer_representable_n2p; easy.
 Qed.
 
 Theorem of_long_from_words:
@@ -777,16 +789,15 @@ Proof.
   unfold of_long. apply f_equal.
   rewrite <- (Int64.ofwords_recompose l) at 1. rewrite Int64.ofwords_add''.
   fold xh; fold xl. compute_this (two_p 32); ring.
-  apply integer_representable_n2p; auto.
-  compute_this (2^20); smart_lia. lia. lia.
-  apply integer_representable_n; auto; smart_lia.
+  apply integer_representable_n2p; try easy.
+  compute_this (2^20); smart_omega.
+  apply integer_representable_n. smart_omega.
   replace (2^84 + (xh + Int.half_modulus) * 2^32)
      with ((2^52 + xh + Int.half_modulus) * 2^32)
        by (compute_this Int.half_modulus; ring).
-  apply integer_representable_n2p; auto. smart_lia. lia. lia.
+  apply integer_representable_n2p; try easy. smart_omega.
   change (2^84 + p * 2^32) with ((2^52 + p) * 2^32).
-  apply integer_representable_n2p; auto.
-  compute_this p; smart_lia. lia.
+  apply integer_representable_n2p; easy.
 Qed.
 
 (** Conversions from 64-bit integers can be expressed in terms of
@@ -808,11 +819,11 @@ Proof.
   assert (DECOMP: x = yh * 2^32 + yl).
   { unfold x. rewrite <- (Int64.ofwords_recompose l). apply Int64.ofwords_add'. }
   rewrite BofZ_mult. rewrite BofZ_plus. rewrite DECOMP; auto.
-  apply integer_representable_n2p; auto. smart_lia. lia. lia.
-  apply integer_representable_n; auto; smart_lia.
-  apply integer_representable_n; auto; smart_lia.
-  apply integer_representable_n; auto; smart_lia.
-  compute; auto.
+  apply integer_representable_n2p; try easy. smart_omega.
+  apply integer_representable_n. smart_omega.
+  apply integer_representable_n. smart_omega.
+  apply integer_representable_n. easy.
+  easy.
 Qed.
 
 Theorem of_long_decomp:
@@ -831,11 +842,11 @@ Proof.
   assert (DECOMP: x = yh * 2^32 + yl).
   { unfold x. rewrite <- (Int64.ofwords_recompose l), Int64.ofwords_add''. auto. }
   rewrite BofZ_mult. rewrite BofZ_plus. rewrite DECOMP; auto.
-  apply integer_representable_n2p; auto. smart_lia. lia. lia.
-  apply integer_representable_n; auto; smart_lia.
-  apply integer_representable_n; auto; smart_lia.
-  apply integer_representable_n; auto. compute; intuition congruence.
-  compute; auto.
+  apply integer_representable_n2p; try easy. smart_omega.
+  apply integer_representable_n. smart_omega.
+  apply integer_representable_n. smart_omega.
+  apply integer_representable_n. easy.
+  easy.
 Qed.
 
 (** Conversions from unsigned longs can be expressed in terms of conversions from signed longs.
@@ -849,7 +860,7 @@ Theorem of_longu_of_long_1:
 Proof.
   unfold of_longu, of_long, Int64.signed, Int64.ltu; intro.
   change (Int64.unsigned (Int64.repr Int64.half_modulus)) with Int64.half_modulus.
-  destruct (zlt (Int64.unsigned x) Int64.half_modulus); now intuition.
+  destruct (zlt (Int64.unsigned x) Int64.half_modulus); now intuition auto.
 Qed.
 
 Theorem of_longu_of_long_2:
@@ -896,7 +907,7 @@ Proof.
   }
   assert (EQ: Int64.signed n * 2 = int_round_odd (Int64.unsigned x) 1).
   {
-  symmetry. apply (int_round_odd_bits 53 1024). lia.
+  symmetry. apply int_round_odd_bits. easy.
   intros. rewrite NB2 by lia. replace i with 0 by lia. auto.
   rewrite NB2 by lia. rewrite dec_eq_false by lia. rewrite dec_eq_true.
   rewrite orb_comm. unfold Int64.testbit. change (2^1) with 2.
@@ -909,16 +920,16 @@ Proof.
   rewrite BofZ_mult_2p.
 - change (2^1) with 2. rewrite EQ. apply BofZ_round_odd with (p := 1).
 + lia.
-+ apply Z.le_trans with Int64.modulus; trivial. smart_lia.
++ apply Z.le_trans with Int64.modulus; trivial. smart_omega.
 + lia.
-+ apply Z.le_trans with (2^63). compute; intuition congruence. lia.
++ apply Z.le_trans with (2^63). compute; intuition congruence. extlia.
 - apply Z.le_trans with Int64.modulus; trivial.
   pose proof (Int64.signed_range n).
   compute_this Int64.min_signed; compute_this Int64.max_signed;
-  compute_this Int64.modulus; lia.
+  compute_this Int64.modulus; extlia.
 - assert (2^63 <= int_round_odd (Int64.unsigned x) 1).
-  { change (2^63) with (int_round_odd (2^63) 1). apply (int_round_odd_le 0 0); lia. }
-  rewrite <- EQ in H1. compute_this (2^63). compute_this (2^53). lia.
+  { change (2^63) with (int_round_odd (2^63) 1). apply int_round_odd_le; lia. }
+  rewrite <- EQ in H1. compute_this (2^63). compute_this (2^53). extlia.
 - lia.
 Qed.
 
@@ -974,21 +985,21 @@ Theorem of_int_of_long:
   forall n, of_int n = of_long (Int64.repr (Int.signed n)).
 Proof.
   unfold of_int, of_long. intros. f_equal. rewrite Int64.signed_repr. auto.
-  generalize (Int.signed_range n). compute_this Int64.min_signed. compute_this Int64.max_signed. smart_lia.
+  generalize (Int.signed_range n). compute_this Int64.min_signed. compute_this Int64.max_signed. smart_omega.
 Qed.
 
 Theorem of_intu_of_longu:
   forall n, of_intu n = of_longu (Int64.repr (Int.unsigned n)).
 Proof.
   unfold of_intu, of_longu. intros. f_equal. rewrite Int64.unsigned_repr. auto.
-  generalize (Int.unsigned_range n). smart_lia.
+  generalize (Int.unsigned_range n). smart_omega.
 Qed.
 
 Theorem of_intu_of_long:
   forall n, of_intu n = of_long (Int64.repr (Int.unsigned n)).
 Proof.
   unfold of_intu, of_long. intros. f_equal. rewrite Int64.signed_repr. auto.
-  generalize (Int.unsigned_range n). compute_this Int64.min_signed; compute_this Int64.max_signed; smart_lia.
+  generalize (Int.unsigned_range n). compute_this Int64.min_signed; compute_this Int64.max_signed; smart_omega.
 Qed.
 
 End Float.
@@ -999,34 +1010,34 @@ Module Float32.
 
 Definition neg_nan (f : float32) : { x : float32 | is_nan _ _ x = true } :=
   match f with
-  | B754_nan _ _ s p H => exist _ (B754_nan 24 128 (negb s) p H) (eq_refl true)
+  | B754_nan s p H => exist _ (B754_nan 24 128 (negb s) p H) (eq_refl true)
   | _ => default_nan_32
   end.
 
 Definition abs_nan (f : float32) : { x : float32 | is_nan _ _ x = true } :=
   match f with
-  | B754_nan _ _ s p H => exist _ (B754_nan 24 128 false p H) (eq_refl true)
+  | B754_nan s p H => exist _ (B754_nan 24 128 false p H) (eq_refl true)
   | _ => default_nan_32
   end.
 
 Definition cons_pl (x: float32) (l: list (bool * positive)) :=
-  match x with B754_nan _ _ s p _ => (s, p) :: l | _ => l end.
+  match x with B754_nan s p _ => (s, p) :: l | _ => l end.
 
 Definition unop_nan (x: float32) : {x : float32 | is_nan _ _ x = true} :=
-  quiet_nan_32 (Archi.choose_nan_32 (cons_pl x nil)).
+  quiet_nan_32 (Archi.choose_nan_32 (cons_pl x [])).
 
 Definition binop_nan (x y: float32) : {x : float32 | is_nan _ _ x = true} :=
-  quiet_nan_32 (Archi.choose_nan_32 (cons_pl x (cons_pl y nil))).
+  quiet_nan_32 (Archi.choose_nan_32 (cons_pl x (cons_pl y []))).
 
 Definition fma_nan_1 (x y z: float32) : {x : float32 | is_nan _ _ x = true} :=
   let '(a, b, c) := Archi.fma_order x y z in
-  quiet_nan_32 (Archi.choose_nan_32 (cons_pl a (cons_pl b (cons_pl c nil)))).
+  quiet_nan_32 (Archi.choose_nan_32 (cons_pl a (cons_pl b (cons_pl c [])))).
 
 Definition fma_nan (x y z: float32) : {x : float32 | is_nan _ _ x = true} :=
   match x, y with
-  | B754_infinity _ _ _, B754_zero _ _ _ | B754_zero _ _ _, B754_infinity _ _ _ =>
+  | B754_infinity _, B754_zero _ | B754_zero _, B754_infinity _ =>
       if Archi.fma_invalid_mul_is_nan
-      then quiet_nan_32 (Archi.choose_nan_32 (Archi.default_nan_32 :: cons_pl z nil))
+      then quiet_nan_32 (Archi.choose_nan_32 (Archi.default_nan_32 :: cons_pl z []))
       else fma_nan_1 x y z
   | _, _ =>
       fma_nan_1 x y z
@@ -1216,14 +1227,14 @@ Theorem of_int_double:
   forall n, of_int n = of_double (Float.of_int n).
 Proof.
   intros. symmetry. apply Bconv_BofZ.
-  apply integer_representable_n; auto. generalize (Int.signed_range n); Float.smart_lia.
+  apply integer_representable_n. generalize (Int.signed_range n); Float.smart_omega.
 Qed.
 
 Theorem of_intu_double:
   forall n, of_intu n = of_double (Float.of_intu n).
 Proof.
   intros. symmetry. apply Bconv_BofZ.
-  apply integer_representable_n; auto. generalize (Int.unsigned_range n); Float.smart_lia.
+  apply integer_representable_n; auto. generalize (Int.unsigned_range n); Float.smart_omega.
 Qed.
 
 (** Conversion of single-precision floats to integers can be decomposed
@@ -1323,20 +1334,18 @@ Lemma of_long_round_odd:
 Proof.
   intros. rewrite <- (int_round_odd_plus 11) by lia.
   assert (-2^64 <= int_round_odd n 11).
-  { change (-2^64) with (int_round_odd (-2^64) 11). apply (int_round_odd_le 0 0); lia. }
+  { change (-2^64) with (int_round_odd (-2^64) 11). apply int_round_odd_le; extlia. }
   assert (int_round_odd n 11 <= 2^64).
-  { change (2^64) with (int_round_odd (2^64) 11). apply (int_round_odd_le 0 0); lia. }
+  { change (2^64) with (int_round_odd (2^64) 11). apply int_round_odd_le; extlia. }
   rewrite Bconv_BofZ.
   apply BofZ_round_odd with (p := 11).
   lia.
   apply Z.le_trans with (2^64). lia. compute; intuition congruence.
   lia.
   exact (proj1 H).
-  unfold int_round_odd. apply integer_representable_n2p_wide. auto. lia.
+  unfold int_round_odd. apply integer_representable_n2p_wide; try easy.
   unfold int_round_odd in H0, H1.
   split; (apply Zmult_le_reg_r with (2^11); [compute; auto | assumption]).
-  lia.
-  lia.
 Qed.
 
 Theorem of_longu_double_1:
@@ -1365,10 +1374,10 @@ Proof.
   set (n' := Z.land (Z.lor (Int64.unsigned n) (Z.land (Int64.unsigned n) 2047 + 2047)) (-2048)).
   assert (int_round_odd (Int64.unsigned n) 11 = n') by (apply int_round_odd_plus; lia).
   assert (0 <= n').
-  { rewrite <- H1. change 0 with (int_round_odd 0 11). apply (int_round_odd_le 0 0); lia. }
+  { rewrite <- H1. change 0 with (int_round_odd 0 11). apply int_round_odd_le; lia. }
   assert (n' < Int64.modulus).
   { apply Z.le_lt_trans with (int_round_odd (Int64.modulus - 1) 11).
-    rewrite <- H1. apply (int_round_odd_le 0 0); lia.
+    rewrite <- H1. apply int_round_odd_le; lia.
     compute; auto. }
   rewrite <- (Int64.unsigned_repr n') by (unfold Int64.max_unsigned; lia).
   f_equal. Int64.bit_solve. rewrite Int64.testbit_repr by auto. unfold n'.
@@ -1383,7 +1392,7 @@ Proof.
   exploit (Z_mod_lt (Int64.unsigned n) (2^11)). compute; auto.
   assert (2^11 < Int64.max_unsigned) by (compute; auto). lia.
   apply Int64.same_bits_eqm; auto. exists (-1); auto.
-  split. lia. change (2^64) with Int64.modulus. lia.
+  split. extlia. change (2^64) with Int64.modulus. extlia.
 Qed.
 
 Theorem of_long_double_1:
@@ -1391,7 +1400,7 @@ Theorem of_long_double_1:
   Z.abs (Int64.signed n) <= 2^53 ->
   of_long n = of_double (Float.of_long n).
 Proof.
-  intros. symmetry; apply Bconv_BofZ. apply integer_representable_n; auto. lia.
+  intros. symmetry; apply Bconv_BofZ. apply integer_representable_n; auto. extlia.
 Qed.
 
 Theorem of_long_double_2:
@@ -1411,10 +1420,10 @@ Proof.
   set (n' := Z.land (Z.lor (Int64.signed n) (Z.land (Int64.signed n) 2047 + 2047)) (-2048)).
   assert (int_round_odd (Int64.signed n) 11 = n') by (apply int_round_odd_plus; lia).
   assert (Int64.min_signed <= n').
-  { rewrite <- H1. change Int64.min_signed with (int_round_odd Int64.min_signed 11). apply (int_round_odd_le 0 0); lia. }
+  { rewrite <- H1. change Int64.min_signed with (int_round_odd Int64.min_signed 11). apply int_round_odd_le; lia. }
   assert (n' <= Int64.max_signed).
   { apply Z.le_trans with (int_round_odd Int64.max_signed 11).
-    rewrite <- H1. apply (int_round_odd_le 0 0); lia.
+    rewrite <- H1. apply int_round_odd_le; lia.
     compute; intuition congruence. }
   rewrite <- (Int64.signed_repr n') by lia.
   f_equal. Int64.bit_solve. rewrite Int64.testbit_repr by auto. unfold n'.
@@ -1436,7 +1445,7 @@ Proof.
   apply Int64.same_bits_eqm; auto. exists (-1); auto.
   split. auto. assert (-2^64 < Int64.min_signed) by (compute; auto).
   assert (Int64.max_signed < 2^64) by (compute; auto).
-  lia.
+  extlia.
 Qed.
 
 End Float32.

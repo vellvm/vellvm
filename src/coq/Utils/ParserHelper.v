@@ -148,13 +148,12 @@ Section Correctness.
   Proof.
     unfold FLX.Prec_gt_0, bounded, canonical_mantissa, FLX.Prec_gt_0 in *.
     rewrite Bool.andb_true_iff, Z.leb_le, <-Zeq_is_eq_bool, digits2_pos_digits.
-    unfold FLT.FLT_exp.
+    unfold fexp.
     remember (3 - emax - prec) as emin.
     split; intro.
     all: destruct (Z_lt_le_dec (digits m + e - prec) emin).
-    all: try rewrite Z.max_r in * by lia.
-    all: try rewrite Z.max_l in * by lia.
-    all: lia.
+    all: try solve [try rewrite Z.max_l in *; unfold SpecFloat.emin in *; try lia].
+    all: try solve [rewrite Z.max_r in *; unfold SpecFloat.emin in *; try lia].
   Qed.
 
   Definition valid_float (prec emax : Z) (f : bfloat) :=

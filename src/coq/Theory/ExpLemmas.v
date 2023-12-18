@@ -432,13 +432,11 @@ Section ExpPure.
     rewrite interp_intrinsics_trigger.
     cbn.
     unfold Intrinsics.F_trigger; cbn.
-    rewrite subevent_subevent.
     rewrite interp_global_trigger; cbn.
-    rewrite subevent_subevent.
     rewrite interp_local_bind, interp_local_trigger; cbn.
-    rewrite subevent_subevent, bind_bind.
+    rewrite bind_bind.
     rewrite interp_memory_bind, interp_memory_trigger; cbn.
-    rewrite subevent_subevent, !bind_bind.
+    rewrite !bind_bind.
     apply has_post_bind; intros [].
   Qed.
 

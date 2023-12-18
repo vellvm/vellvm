@@ -17,8 +17,8 @@
 
 (** Architecture-dependent parameters for PowerPC *)
 
-Require Import ZArith List.
 From Flocq Require Import Binary Bits.
+Require Import ZArith List.
 
 Definition ptr64 := false.
 
@@ -29,6 +29,10 @@ Definition align_float64 := 8%Z.
 
 (** Can we use the 64-bit extensions to the PowerPC architecture? *)
 Parameter ppc64 : bool.
+
+(** Should single-precision FP arguments passed on stack be passed 
+    as singles or use double FP format. *)
+Parameter single_passed_as_single : bool.
 
 Definition splitlong := negb ppc64.
 
@@ -62,8 +66,11 @@ Definition fma_invalid_mul_is_nan := false.
 
 Definition float_of_single_preserves_sNaN := true.
 
+Definition float_conversion_default_nan := false.
+
 Global Opaque ptr64 big_endian splitlong
               default_nan_64 choose_nan_64
               default_nan_32 choose_nan_32
               fma_order fma_invalid_mul_is_nan
-              float_of_single_preserves_sNaN.
+              float_of_single_preserves_sNaN
+              float_conversion_default_nan.
