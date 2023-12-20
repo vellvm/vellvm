@@ -31,10 +31,12 @@ Open Scope monad_scope.
 
 #[local] Open Scope Z_scope.
 
+
 Module BigIP : MemoryAddress.INTPTR with
 Definition intptr := Z with
 Definition from_Z := (fun (x : Z) => ret x : OOM Z) with
-Definition to_Z := fun (x : Z) => x.
+Definition to_Z := fun (x : Z) => x with
+Definition VMemInt_intptr := VMemInt_Z.
   Definition intptr := Z.
   Definition zero := 0%Z.
 
@@ -42,6 +44,8 @@ Definition to_Z := fun (x : Z) => x.
   Definition eqb := Z.eqb.
 
   Definition to_Z (x : intptr) := x.
+
+  Definition VMemInt_intptr := VMemInt_Z.
 
   (* TODO: negatives.... ???? *)
   Definition to_unsigned := to_Z.
@@ -120,55 +124,6 @@ Definition to_Z := fun (x : Z) => x.
     | Cge => Z.geb x y
     end.
 
-  Instance VMemInt_intptr : VMemInt intptr
-    :=
-    { mequ  := mequ_Z;
-      mcmp  := mcmp_Z;
-      mcmpu := mcmpu_Z;
-
-      mbitwidth := None;
-      mzero     := 0%Z;
-      mone      := 1%Z;
-
-      madd := fun x y => ret (Z.add x y);
-      (* No overflows *)
-      madd_carry := fun x y c => 0%Z;
-      madd_overflow := fun x y c => 0%Z;
-
-      msub := fun x y => ret (Z.sub x y);
-      (* No overflows *)
-      msub_borrow := fun x y c => 0%Z;
-      msub_overflow := fun x y c => 0%Z;
-
-      mmul := fun x y => ret (Z.mul x y);
-
-      mdivu := fun x y => Z.div x y;
-      mdivs := fun x y => ret (Z.div x y);
-
-      mmodu := fun x y => Z.modulo x y;
-      mmods := fun x y => ret (Z.modulo x y);
-
-      mshl := fun x y => ret (Z.shiftl x y);
-      mshr := fun x y => Z.shiftr x y;
-      mshru := fun x y => Z.shiftr x y;
-
-      mnegative := fun x => ret (0 - x)%Z;
-
-      mand := Z.land;
-      mor := Z.lor;
-      mxor := Z.lxor;
-
-      mmin_signed := None;
-      mmax_signed := None;
-
-      munsigned := fun x => x;
-      msigned := fun x => x;
-
-      mrepr := fun x => ret x;
-
-      mdtyp_of_int := DTYPE_IPTR
-    }.
-
   Lemma VMemInt_intptr_dtyp :
     @mdtyp_of_int intptr VMemInt_intptr = DTYPE_IPTR.
   Proof.
@@ -208,7 +163,110 @@ Module BigIP_BIG : MemoryAddress.INTPTR_BIG BigIP.
   Qed.
 End BigIP_BIG.
 
-Module IP64Bit : MemoryAddress.INTPTR.
+Definition from_Z_64 := (fun (x : Z) =>
+    if (x <=? Int64.max_signed)%Z && (x >=? Int64.min_signed)%Z
+    then ret (Int64.repr x)
+    else Oom "IP64Bit from_Z oom.").
+
+Instance VMemInt_intptr_i64 : VMemInt int64
+  :=
+  { (* Comparisons *)
+    mequ := Int64.eq;
+    mcmp := Int64.cmp;
+    mcmpu := Int64.cmpu;
+
+    (* Constants *)
+    mbitwidth := Some 64%nat;
+    mzero := Int64.zero;
+    mone := Int64.one;
+
+    (* Arithmetic *)
+    madd := fun x y =>
+              if (Int64.eq (Int64.add_overflow x y Int64.zero) Int64.one)
+              then Oom "IP64Bit addition overflow."
+              else ret (Int64.add x y);
+    madd_carry := fun x y c => Int64.zero;
+    madd_overflow := fun x y c => Int64.zero;
+
+    msub := fun x y =>
+              if (Int64.eq (Int64.sub_overflow x y Int64.zero) Int64.one)
+              then Oom "IP64Bit addition overflow."
+              else ret (Int64.sub x y);
+    msub_borrow := fun x y c => Int64.zero;
+    msub_overflow := fun x y c => Int64.zero;
+
+    mmul :=
+      fun x y =>
+        let res_s' := ((Int64.signed x) * (Int64.signed y))%Z in
+
+        let min_s_bound := Int64.min_signed >? res_s' in
+        let max_s_bound := res_s' >? Int64.max_signed in
+
+        if (orb min_s_bound max_s_bound)
+        then Oom "IP64Bit multiplication overflow."
+        else NoOom (Int64.mul x y);
+
+    mdivu := Int64.divu;
+    mdivs :=
+      fun x y =>
+        if (Int64.signed x =? Int64.max_signed) && (Int64.signed y =? (-1)%Z)
+        then Oom "IP64Bit signed division overflow."
+        else ret (Int64.divs x y);
+
+    mmodu := Int64.modu;
+    mmods :=
+      (* TODO: is this overflow check needed? *)
+      fun x y =>
+        if (Int64.signed x =? Int64.max_signed) && (Int64.signed y =? (-1)%Z)
+        then Oom "IP64Bit signed modulo overflow."
+        else ret (Int64.mods x y);
+
+    mshl :=
+      fun x y =>
+        let res := Int64.shl x y in
+        if Int64.signed res =? Int64.min_signed
+        then Oom "IP64Bit left shift overflow (res is min signed, should not happen)."
+        else
+          let nres := Int64.negative res in
+          if (negb (Z.shiftr (Int64.unsigned x)
+                      (64%Z - Int64.unsigned y)
+                    =? (Int64.unsigned nres)
+                       * (Z.pow 2 (Int64.unsigned y) - 1))%Z)
+          then Oom "IP64Bit left shift overflow."
+          else ret res;
+    mshr := Int64.shr;
+    mshru := Int64.shru;
+
+    mnegative :=
+      fun x =>
+        if (Int64.signed x =? Int64.min_signed)
+        then Oom "IP64Bit taking negative of smallest number."
+        else ret (Int64.negative x);
+
+    (* Logic *)
+    mand := Int64.and;
+    mor := Int64.or;
+    mxor := Int64.xor;
+
+    (* Bounds *)
+    mmin_signed := ret Int64.min_signed;
+    mmax_signed := ret Int64.max_signed;
+
+    (* Conversion *)
+    munsigned := Int64.unsigned;
+    msigned := Int64.signed;
+
+    mrepr := from_Z_64;
+
+    mdtyp_of_int := DTYPE_IPTR
+  }.
+
+Module IP64Bit : MemoryAddress.INTPTR with
+Definition intptr := int64 with
+Definition from_Z := from_Z_64 with
+Definition to_Z := Int64.signed with
+Definition VMemInt_intptr := VMemInt_intptr_i64.
+
   Definition intptr := int64.
   Definition zero := Int64.zero.
 
@@ -217,12 +275,11 @@ Module IP64Bit : MemoryAddress.INTPTR.
 
   Definition to_Z (x : intptr) := Int64.signed x.
 
+  Definition VMemInt_intptr := VMemInt_intptr_i64.
+
   (* TODO: negatives.... ???? *)
   Definition to_unsigned := to_Z.
-  Definition from_Z (x : Z) : OOM intptr :=
-    if (x <=? Int64.max_signed)%Z && (x >=? Int64.min_signed)%Z
-    then ret (Int64.repr x)
-    else Oom "IP64Bit from_Z oom.".
+  Definition from_Z (x : Z) : OOM intptr := from_Z_64 x.
 
   Lemma from_Z_to_Z :
     forall (z : Z) (i : intptr),
@@ -230,7 +287,7 @@ Module IP64Bit : MemoryAddress.INTPTR.
       to_Z i = z.
   Proof.
     intros z i FROM.
-    unfold from_Z in FROM.
+    unfold from_Z, from_Z_64 in FROM.
     break_match_hyp; inversion FROM.
     unfold to_Z.
     apply Integers.Int64.signed_repr.
@@ -244,7 +301,7 @@ Module IP64Bit : MemoryAddress.INTPTR.
       z1 = z2.
   Proof.
     intros z1 z2 i Z1 Z2.
-    unfold from_Z in *.
+    unfold from_Z, from_Z_64 in *.
     break_match_hyp; inversion Z2.
     break_match_hyp; inversion Z1.
     pose proof Integers.Int64.signed_repr z1.
@@ -259,7 +316,7 @@ Module IP64Bit : MemoryAddress.INTPTR.
       from_Z (to_Z i) = NoOom i.
   Proof.
     intros i.
-    unfold from_Z, to_Z.
+    unfold from_Z, from_Z_64, to_Z.
     break_match.
     - rewrite Int64.repr_signed; auto.
     - unfold intptr in *.
@@ -298,99 +355,6 @@ Module IP64Bit : MemoryAddress.INTPTR.
     - assert (intval = intval0) by lia; subst.
       rewrite (proof_irrelevance _ intrange intrange0); auto.
   Admitted. (* This is probably awful because of lia? *)
-
-  Instance VMemInt_intptr : VMemInt intptr
-    :=
-    { (* Comparisons *)
-      mequ := Int64.eq;
-      mcmp := Int64.cmp;
-      mcmpu := Int64.cmpu;
-
-      (* Constants *)
-      mbitwidth := Some 64%nat;
-      mzero := Int64.zero;
-      mone := Int64.one;
-
-      (* Arithmetic *)
-      madd := fun x y =>
-               if (Int64.eq (Int64.add_overflow x y Int64.zero) Int64.one)
-               then Oom "IP64Bit addition overflow."
-               else ret (Int64.add x y);
-      madd_carry := Int64.add_carry;
-      madd_overflow := Int64.add_overflow;
-
-      msub := fun x y =>
-               if (Int64.eq (Int64.sub_overflow x y Int64.zero) Int64.one)
-               then Oom "IP64Bit addition overflow."
-               else ret (Int64.sub x y);
-      msub_borrow := Int64.sub_borrow;
-      msub_overflow := Int64.sub_overflow;
-
-      mmul :=
-      fun x y =>
-        let res_s' := ((Int64.signed x) * (Int64.signed y))%Z in
-
-        let min_s_bound := Int64.min_signed >? res_s' in
-        let max_s_bound := res_s' >? Int64.max_signed in
-
-        if (orb min_s_bound max_s_bound)
-        then Oom "IP64Bit multiplication overflow."
-        else NoOom (Int64.mul x y);
-
-      mdivu := Int64.divu;
-      mdivs :=
-      fun x y =>
-        if (Int64.signed x =? Int64.max_signed) && (Int64.signed y =? (-1)%Z)
-        then Oom "IP64Bit signed division overflow."
-        else ret (Int64.divs x y);
-
-      mmodu := Int64.modu;
-      mmods :=
-      (* TODO: is this overflow check needed? *)
-      fun x y =>
-        if (Int64.signed x =? Int64.max_signed) && (Int64.signed y =? (-1)%Z)
-        then Oom "IP64Bit signed modulo overflow."
-        else ret (Int64.mods x y);
-
-      mshl :=
-      fun x y =>
-        let res := Int64.shl x y in
-        if Int64.signed res =? Int64.min_signed
-        then Oom "IP64Bit left shift overflow (res is min signed, should not happen)."
-        else
-          let nres := Int64.negative res in
-          if (negb (Z.shiftr (Int64.unsigned x)
-                             (64%Z - Int64.unsigned y)
-                    =? (Int64.unsigned nres)
-                       * (Z.pow 2 (Int64.unsigned y) - 1))%Z)
-          then Oom "IP64Bit left shift overflow."
-          else ret res;
-      mshr := Int64.shr;
-      mshru := Int64.shru;
-
-      mnegative :=
-      fun x =>
-        if (Int64.signed x =? Int64.min_signed)
-        then Oom "IP64Bit taking negative of smallest number."
-        else ret (Int64.negative x);
-
-      (* Logic *)
-      mand := Int64.and;
-      mor := Int64.or;
-      mxor := Int64.xor;
-
-      (* Bounds *)
-      mmin_signed := ret Int64.min_signed;
-      mmax_signed := ret Int64.max_signed;
-
-      (* Conversion *)
-      munsigned := Int64.unsigned;
-      msigned := Int64.signed;
-
-      mrepr := from_Z;
-
-      mdtyp_of_int := DTYPE_IPTR
-    }.
 
   Lemma VMemInt_intptr_dtyp :
     @mdtyp_of_int intptr VMemInt_intptr = DTYPE_IPTR.

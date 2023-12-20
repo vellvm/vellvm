@@ -43,7 +43,8 @@ From Vellvm Require Import
      Utils.ErrUbOomProp
      Handlers.MemoryModules.FiniteAddresses
      Handlers.MemoryModules.InfiniteAddresses
-     Handlers.MemoryModelImplementation.
+     Handlers.MemoryModelImplementation
+     Handlers.SerializationTheory.
 
 From ExtLib Require Import
      Structures.Monads
@@ -168,6 +169,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Module DVCSafe := DVConvertSafe IS2.LP IS1.LP AC2 AC1 ACS IPS IS2.LP.Events IS1.LP.Events DVCrev DVC.
   Import DVCSafe.
+
+  Module MBT := MemBytesTheory IS2.LP IS2.LLVM.MEM.MP ByteM IS2.LLVM.MEM.CP.
+  Import MBT.
 
   (**  Converting state between the two languages *)
 
@@ -8188,6 +8192,29 @@ Qed.
   Proof.
     intros v1_fin v2_fin v1_inf v2_inf iop res_fin res_inf
       EVAL LIFT1 LIFT2 CONV.
+    destruct iop.
+    - cbn in *.
+      repeat break_match_hyp_inv.
+      Set Printing Implicit.
+
+  (* May be a problem...
+
+     madd_carry / madd_overflow will always return 0 for the infinite
+     intptr types (because they never overflow)...
+
+     This means the finite version may return poison in overflow
+     cases.
+
+     Consider changing madd_carry and madd_overflow for finite intptrs
+     to never overflow and just OOM instead.
+   *)
+
+      unfold VellvmIntegers.madd_carry in *.
+      unfold VellvmIntegers.mequ in *.
+      cbn.
+      unfold IS1.LP.Events.DV.VMemInt_intptr'.
+      break_inner_match_goal.
+      IS1.LP.IP.VMemInt_intptr.
   Admitted.
 
   Lemma dvalue_convert_strict_fin_inf_succeeds_fin_to_inf_dvalue' :
@@ -8492,6 +8519,8 @@ Qed.
       pose proof IS1.LP.IP.to_Z_from_Z i.
       pose proof IS1.LP.IP.from_Z_injective _ _ _ Heqo H.
       rewrite H0 in Heqo.
+      cbn.
+      unfold IS1.LP.Events.DV.eval_int_icmp.
       admit.
     }
 
@@ -8650,18 +8679,6 @@ Qed.
         ].
   Qed.
 
-  (* TODO: May need to know something about byte
-     conversion... Currently this is in InfiniteToFinite.v and
-     needs to know something about actual MemState implementation... *)
-  Lemma runStateT_succeeds_serialize_sbytes_fin_inf :
-    forall dv t res_fin,
-      StateMonad.runStateT (MemHelpers.serialize_sbytes (dvalue_to_uvalue dv) t) 0 = success_unERR_UB_OOM res_fin ->
-      exists res_inf, StateMonad.runStateT
-                   (IS1.LLVM.MEM.CP.CONC.MemHelpers.serialize_sbytes
-                      (IS1.LP.Events.DV.dvalue_to_uvalue (fin_to_inf_dvalue dv)) t) 0 = success_unERR_UB_OOM res_inf.
-  Proof.
-  Admitted.
-
   (* TODO: Move this / generalize monad? *)
   Lemma eval_fcmp_fin_inf :
     forall dv1_fin dv2_fin res_fin fcmp dv1_inf dv2_inf,
@@ -8776,7 +8793,6 @@ Qed.
     forall t,
       IS1.LP.SIZEOF.bit_sizeof_dtyp t = SIZEOF.bit_sizeof_dtyp t.
   Proof.
-    (* Need to expose more stuff to be able to prove this *)
   Admitted.
 
   Lemma get_conv_case_pure_fin_inf:
@@ -8884,6 +8900,19 @@ Qed.
 
       repeat rewrite bit_sizeof_dtyp_fin_inf.
       repeat break_match_hyp_inv.
+      remember (StateMonad.evalStateT
+                     (IS1.LLVM.MEM.CP.CONC.MemHelpers.serialize_sbytes
+                        (IS1.LP.Events.DV.dvalue_to_uvalue (fin_to_inf_dvalue dv)) t_from) 0) as ser_res.
+
+      destruct t_to; inv Heqs.
+      - unfold MemHelpers.deserialize_sbytes in *.
+        (* Not necessarily the same type *)
+        erewrite from_ubytes_to_ubytes in Heqs0.
+
+
+      destruct_err_ub_oom ser_res; cbn; subst.
+      1-3: exfalso.
+      subst.
       destruct unERR_UB_OOM.
       do 3 destruct unEitherT.
       destruct unIdent;
