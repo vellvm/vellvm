@@ -158,7 +158,20 @@ Proof.
       constructor; eauto.
 Qed.
 
-Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI) (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC).
+Import VellvmIntegers.
+Module Type VMemInt_Eqv (IP1 : INTPTR) (IP2 : INTPTR).
+  Parameter madd_carry_eqv :
+    forall x y c x1 y1 c1 x2 y2 c2,
+      IP1.from_Z x = NoOom x1 ->
+      IP1.from_Z y = NoOom y1 ->
+      IP1.from_Z c = NoOom c1 ->
+      IP2.from_Z x = NoOom x2 ->
+      IP2.from_Z y = NoOom y2 ->
+      IP2.from_Z c = NoOom c2 ->
+      IP1.to_Z (@madd_carry _ IP1.VMemInt_intptr x1 y1 c1) = IP2.to_Z (@madd_carry _ IP2.VMemInt_intptr x2 y2 c2).
+End VMemInt_Eqv.
+
+Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI) (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC) (VMEQV : VMemInt_Eqv IS1.LP.IP IS2.LP.IP).
   Import TLR.
 
   Import TC.
@@ -8195,8 +8208,6 @@ Qed.
     destruct iop.
     - cbn in *.
       repeat break_match_hyp_inv.
-      Set Printing Implicit.
-
   (* May be a problem...
 
      madd_carry / madd_overflow will always return 0 for the infinite
@@ -8208,11 +8219,31 @@ Qed.
      Consider changing madd_carry and madd_overflow for finite intptrs
      to never overflow and just OOM instead.
    *)
+      Import VMEQV.
+      pose proof madd_carry_eqv (IP.to_Z v1_fin) (IP.to_Z v2_fin) 0%Z v1_inf v2_inf (@mzero IS1.LP.IP.intptr IS1.LP.Events.DV.VMemInt_intptr') v1_fin v2_fin (@mzero IS2.LP.IP.intptr IS2.LP.Events.DV.VMemInt_intptr').
+      do 2 (forward H; eauto).
+      forward H. admit.
+      forward H. rewrite IP.to_Z_from_Z; auto.
+      forward H. rewrite IP.to_Z_from_Z; auto.
+      forward H. admit.
+
+      Set Nested Proofs Allowed.
+      Lemma mequ_to_Z :
+        forall x y a b,
+          IS1.LP.IP.to_Z x = a ->
+          IS1.LP.IP.to_Z y = b ->
+          mequ x y = Z.eqb a b.
+      Proof.
+      Admitted.
+
+      erewrite mequ_to_Z; eauto.
+
+      assert (mequ (madd_carry v1_inf v2_inf mzero) mone
 
       unfold VellvmIntegers.madd_carry in *.
       unfold VellvmIntegers.mequ in *.
       cbn.
-      unfold IS1.LP.Events.DV.VMemInt_intptr'.
+      unfold IS1.LP.Events.DV.VMemInt_intptr', IS1.LP.IP.VMemInt_intptr.
       break_inner_match_goal.
       IS1.LP.IP.VMemInt_intptr.
   Admitted.
