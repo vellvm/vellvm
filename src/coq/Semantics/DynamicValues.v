@@ -97,7 +97,7 @@ Inductive dvalue : Set :=
   | DVALUE_I64           (n:int64)
   | DVALUE_Double        (n:ll_double)
   | DVALUE_Float         (n:ll_float)
-  | DVALUE_Poison        (t:dtyp)
+  | DVALUE_Poison        (τ:dtyp)
   | DVALUE_None
   | DVALUE_Struct        (fields:list dvalue)
   | DVALUE_Packed_struct (fields:list dvalue)
@@ -106,6 +106,13 @@ Inductive dvalue : Set :=
   .
 
 Set Elimination Schemes.
+
+Tactic Notation "struct_case" hyp(H) hyp(IH) constr(x) :=
+  let IHfields := fresh "IHfields" in
+  let Hin := fresh "Hin" in
+  revert x; fix IHfields 1; intros [|u fields'] u';
+    [ intros [] | intros [<-|Hin] ];
+    [ apply IH | eapply IHfields ; apply Hin].
 
 Section DvalueInd.
 
@@ -118,7 +125,7 @@ Section DvalueInd.
   Hypothesis IH_I64    : forall n, P (DVALUE_I64 n).
   Hypothesis IH_Double : forall n, P (DVALUE_Double n).
   Hypothesis IH_Float  : forall n, P (DVALUE_Float n).
-  Hypothesis IH_Poison : forall t, P (DVALUE_Poison t).
+  Hypothesis IH_Poison : forall τ, P (DVALUE_Poison τ).
   Hypothesis IH_None   : P DVALUE_None.
 
   Hypothesis IH_Struct :
@@ -130,16 +137,8 @@ Section DvalueInd.
   Hypothesis IH_Vector :
     forall elts, (forall e, In e elts -> P e) -> P (DVALUE_Vector elts).
 
-  Tactic Notation "struct_case" hyp(H) hyp(IH) constr(x) :=
-    let IHfields := fresh "IHfields" in
-    let Hin := fresh "Hin" in
-    revert x; fix IHfields 1; intros [|u fields'] u';
-      [ intros [] | intros [<-|Hin] ];
-      [ apply IH | eapply IHfields ; apply Hin].
-
   Lemma dvalue_ind : forall (dv:dvalue), P dv.
     fix IH 1; remember P as P0 in IH; destruct dv; auto; subst.
-
     all: repeat
     match goal with
     | [ H : forall _, _ -> P _ |- P (_ ?a)] =>
@@ -157,120 +156,115 @@ Unset Elimination Schemes.
 
 Inductive uvalue : Set :=
   | UVALUE_Addr (a:A.addr)
-  | UVALUE_I1 (x:int1)
-  | UVALUE_I8 (x:int8)
-  | UVALUE_I32 (x:int32)
-  | UVALUE_I64 (x:int64)
-  | UVALUE_Double (x:ll_double)
-  | UVALUE_Float (x:ll_float)
-  | UVALUE_Undef (t:dtyp)
-  | UVALUE_Poison (t: dtyp)
+  | UVALUE_I1     (n:int1)
+  | UVALUE_I8     (n:int8)
+  | UVALUE_I32    (n:int32)
+  | UVALUE_I64    (n:int64)
+  | UVALUE_Double (n:ll_double)
+  | UVALUE_Float  (n:ll_float)
+  | UVALUE_Undef  (τ:dtyp)
+  | UVALUE_Poison (τ:dtyp)
   | UVALUE_None
   | UVALUE_Struct        (fields: list uvalue)
   | UVALUE_Packed_struct (fields: list uvalue)
   | UVALUE_Array         (elts: list uvalue)
   | UVALUE_Vector        (elts: list uvalue)
-  | UVALUE_IBinop           (iop:ibinop) (v1:uvalue) (v2:uvalue)
-  | UVALUE_ICmp             (cmp:icmp)   (v1:uvalue) (v2:uvalue)
-  | UVALUE_FBinop           (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue)
-  | UVALUE_FCmp             (cmp:fcmp)   (v1:uvalue) (v2:uvalue)
-  | UVALUE_Conversion       (conv:conversion_type) (v:uvalue) (t_to:dtyp)
-  | UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)) (* TODO: do we ever need this? GEP raises an event? *)
-  | UVALUE_ExtractElement   (vec: uvalue) (idx: uvalue)
-  | UVALUE_InsertElement    (vec: uvalue) (elt:uvalue) (idx:uvalue)
-  | UVALUE_ShuffleVector    (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue)
-  | UVALUE_ExtractValue     (vec:uvalue) (idxs:list Integers.int)
-  | UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list Integers.int)
-  | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
-  .
+  | UVALUE_IBinop (iop:ibinop) (v1:uvalue) (v2:uvalue)
+  | UVALUE_ICmp   (cmp:icmp)   (v1:uvalue) (v2:uvalue)
+  | UVALUE_FBinop (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue)
+  | UVALUE_FCmp   (cmp:fcmp)   (v1:uvalue) (v2:uvalue)
+  | UVALUE_Conversion     (conv:conversion_type) (v:uvalue) (τ_to:dtyp)
+  | UVALUE_ExtractElement (vec: uvalue) (idx: uvalue)
+  | UVALUE_InsertElement  (vec: uvalue) (elt:uvalue) (idx:uvalue)
+  | UVALUE_ShuffleVector  (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue)
+  | UVALUE_ExtractValue   (vec:uvalue) (idxs:list Integers.int)
+  | UVALUE_InsertValue    (vec:uvalue) (elt:uvalue) (idxs:list Integers.int)
+  | UVALUE_Select         (cnd:uvalue) (v1:uvalue) (v2:uvalue).
+
 Set Elimination Schemes.
 
 Section UvalueInd.
   Variable P : uvalue -> Prop.
-  Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a).
-  Hypothesis IH_I1             : forall x, P (UVALUE_I1 x).
-  Hypothesis IH_I8             : forall x, P (UVALUE_I8 x).
-  Hypothesis IH_I32            : forall x, P (UVALUE_I32 x).
-  Hypothesis IH_I64            : forall x, P (UVALUE_I64 x).
-  Hypothesis IH_Double         : forall x, P (UVALUE_Double x).
-  Hypothesis IH_Float          : forall x, P (UVALUE_Float x).
-  Hypothesis IH_Undef          : forall t, P (UVALUE_Undef t).
-  Hypothesis IH_Poison         : P UVALUE_Poison.
-  Hypothesis IH_None           : P UVALUE_None.
-  Hypothesis IH_Struct         : forall (fields: list uvalue), (forall u, In u fields -> P u) -> P (UVALUE_Struct fields).
-  Hypothesis IH_Packed_Struct  : forall (fields: list uvalue), (forall u, In u fields -> P u) -> P (UVALUE_Packed_struct fields).
-  Hypothesis IH_Array          : forall (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Array elts).
-  Hypothesis IH_Vector         : forall (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Vector elts).
-  Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
-  Hypothesis IH_ICmp           : forall (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp cmp v1 v2).
-  Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
-  Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
-  Hypothesis IH_Conversion     : forall (conv:conversion_type) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv v t_to).
-  Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, In idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
-  Hypothesis IH_ExtractElement : forall (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement vec idx).
-  Hypothesis IH_InsertElement  : forall (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement vec elt idx).
-  Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
-  Hypothesis IH_ExtractValue   : forall (vec:uvalue) (idxs:list Integers.int), P vec -> P (UVALUE_ExtractValue vec idxs).
-  Hypothesis IH_InsertValue    : forall (vec:uvalue) (elt:uvalue) (idxs:list Integers.int), P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
-  Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
+  Hypothesis IH_Addr   : forall a, P (UVALUE_Addr a).
+  Hypothesis IH_I1     : forall n, P (UVALUE_I1 n).
+  Hypothesis IH_I8     : forall n, P (UVALUE_I8 n).
+  Hypothesis IH_I32    : forall n, P (UVALUE_I32 n).
+  Hypothesis IH_I64    : forall n, P (UVALUE_I64 n).
+  Hypothesis IH_Double : forall n, P (UVALUE_Double n).
+  Hypothesis IH_Float  : forall n, P (UVALUE_Float n).
+  Hypothesis IH_Undef  : forall t, P (UVALUE_Undef t).
+  Hypothesis IH_Poison : forall t, P (UVALUE_Poison t).
+  Hypothesis IH_None   : P UVALUE_None.
+  Hypothesis IH_Struct :
+    forall fields, (forall u, In u fields -> P u) -> P (UVALUE_Struct fields).
+  Hypothesis IH_Packed_Struct  :
+    forall fields, (forall u, In u fields -> P u) -> P (UVALUE_Packed_struct fields).
+  Hypothesis IH_Array :
+    forall elts, (forall e, In e elts -> P e) -> P (UVALUE_Array elts).
+  Hypothesis IH_Vector :
+    forall elts, (forall e, In e elts -> P e) -> P (UVALUE_Vector elts).
+  Hypothesis IH_IBinop :
+    forall iop v1 v2, P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
+  Hypothesis IH_ICmp :
+    forall cmp v1 v2, P v1 -> P v2 -> P (UVALUE_ICmp cmp v1 v2).
+  Hypothesis IH_FBinop :
+    forall fop fm v1 v2, P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
+  Hypothesis IH_FCmp :
+    forall cmp v1 v2, P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
+  Hypothesis IH_Conversion :
+    forall conv v t_to, P v -> P (UVALUE_Conversion conv v t_to).
+  Hypothesis IH_ExtractElement :
+    forall vec idx, P vec -> P idx -> P (UVALUE_ExtractElement vec idx).
+  Hypothesis IH_InsertElement :
+    forall vec elt idx, P vec -> P elt -> P idx -> P (UVALUE_InsertElement vec elt idx).
+  Hypothesis IH_ShuffleVector :
+    forall vec1 vec2 idxmask,
+      P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
+  Hypothesis IH_ExtractValue :
+    forall vec idxs, P vec -> P (UVALUE_ExtractValue vec idxs).
+  Hypothesis IH_InsertValue :
+    forall vec elt idxs, P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
+  Hypothesis IH_Select :
+    forall cnd v1 v2, P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
 
   Lemma uvalue_ind : forall (uv:uvalue), P uv.
     fix IH 1.
     remember P as P0 in IH.
     destruct uv; auto; subst.
-    - apply IH_Struct.
-      { revert fields.
-        fix IHfields 1. intros [|u fields']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
-      }
-    - apply IH_Packed_Struct.
-      { revert fields.
-        fix IHfields 1. intros [|u fields']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
-      }
-    - apply IH_Array.
-      { revert elts.
-        fix IHelts 1. intros [|u elts']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
-      }
-    - apply IH_Vector.
-      { revert elts.
-        fix IHelts 1. intros [|u elts']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
-      }
-    - apply IH_IBinop; auto.
-    - apply IH_ICmp; auto.
-    - apply IH_FBinop; auto.
-    - apply IH_FCmp; auto.
-    - apply IH_Conversion; auto.
-    - apply IH_GetElementPtr. apply IH.
-      { revert idxs.
-        fix IHidxs 1. intros [|u idxs']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHidxs. apply Hin.
-      }
-    - apply IH_ExtractElement; auto.
-    - apply IH_InsertElement; auto.
-    - apply IH_ShuffleVector; auto.
-    - apply IH_ExtractValue; auto.
-    - apply IH_InsertValue; auto.
-    - apply IH_Select; auto.
+    (* Struct cases *)
+    all: repeat
+    match goal with
+    | [ H : forall _, _ -> P _ |- P (_ ?a)] =>
+        match type of a with
+        | list _ => tryif apply H; struct_case H IH a then idtac else clear H
+        end
+    end.
+    (* Other cases *)
+    all: repeat
+    match goal with
+    | [ H : context [P _ -> P _] |- P _] =>
+        try (eapply H in IH; apply IH; auto); clear H
+    end.
   Qed.
+
 End UvalueInd.
 
 (* Injection of [dvalue] into [uvalue] *)
 Fixpoint dvalue_to_uvalue (dv : dvalue) : uvalue :=
   match dv with
-  | DVALUE_Addr a => UVALUE_Addr a
-  | DVALUE_I1 x => UVALUE_I1 x
-  | DVALUE_I8 x => UVALUE_I8 x
-  | DVALUE_I32 x => UVALUE_I32 x
-  | DVALUE_I64 x => UVALUE_I64 x
-  | DVALUE_Double x => UVALUE_Double x
-  | DVALUE_Float x => UVALUE_Float x
-  | DVALUE_Poison => UVALUE_Poison
-  | DVALUE_None => UVALUE_None
-  | DVALUE_Struct fields => UVALUE_Struct (map dvalue_to_uvalue fields)
-  | DVALUE_Packed_struct fields => UVALUE_Packed_struct (map dvalue_to_uvalue fields)
+  | DVALUE_Addr a   => UVALUE_Addr a
+  | DVALUE_I1 n     => UVALUE_I1 n
+  | DVALUE_I8 n     => UVALUE_I8 n
+  | DVALUE_I32 n    => UVALUE_I32 n
+  | DVALUE_I64 n    => UVALUE_I64 n
+  | DVALUE_Double n => UVALUE_Double n
+  | DVALUE_Float n  => UVALUE_Float n
+  | DVALUE_Poison τ => UVALUE_Poison τ
+  | DVALUE_None     => UVALUE_None
+  | DVALUE_Struct fields =>
+      UVALUE_Struct (map dvalue_to_uvalue fields)
+  | DVALUE_Packed_struct fields =>
+      UVALUE_Packed_struct (map dvalue_to_uvalue fields)
   | DVALUE_Array elts => UVALUE_Array (map dvalue_to_uvalue elts)
   | DVALUE_Vector elts => UVALUE_Vector (map dvalue_to_uvalue elts)
   end.
@@ -278,88 +272,54 @@ Fixpoint dvalue_to_uvalue (dv : dvalue) : uvalue :=
 (* Partial injection of [uvalue] into [dvalue] *)
 Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
   match uv with
-  | UVALUE_Addr a                          => ret (DVALUE_Addr a)
-  | UVALUE_I1 x                            => ret (DVALUE_I1 x)
-  | UVALUE_I8 x                            => ret (DVALUE_I8 x)
-  | UVALUE_I32 x                           => ret (DVALUE_I32 x)
-  | UVALUE_I64 x                           => ret (DVALUE_I64 x)
-  | UVALUE_Double x                        => ret (DVALUE_Double x)
-  | UVALUE_Float x                         => ret (DVALUE_Float x)
-  | UVALUE_Undef t                         => failwith "Attempting to convert a non-defined uvalue to dvalue. The conversion should be guarded by is_concrete"
-  | UVALUE_Poison                          => ret (DVALUE_Poison)
-  | UVALUE_None                            => ret (DVALUE_None)
-
-  | UVALUE_Struct fields                   =>
+  | UVALUE_Addr a   => ret (DVALUE_Addr a)
+  | UVALUE_I1 n     => ret (DVALUE_I1 n)
+  | UVALUE_I8 n     => ret (DVALUE_I8 n)
+  | UVALUE_I32 n    => ret (DVALUE_I32 n)
+  | UVALUE_I64 n    => ret (DVALUE_I64 n)
+  | UVALUE_Double n => ret (DVALUE_Double n)
+  | UVALUE_Float n  => ret (DVALUE_Float n)
+  | UVALUE_Undef _  =>
+      failwith "Attempting to convert a non-defined uvalue to dvalue. \
+                The conversion should be guarded by [is_concrete]"
+  | UVALUE_Poison τ => ret (DVALUE_Poison τ)
+  | UVALUE_None     => ret (DVALUE_None)
+  | UVALUE_Struct fields =>
     fields' <- map_monad uvalue_to_dvalue fields ;;
     ret (DVALUE_Struct fields')
-
-  | UVALUE_Packed_struct fields            =>
+  | UVALUE_Packed_struct fields =>
     fields' <- map_monad uvalue_to_dvalue fields ;;
     ret (DVALUE_Packed_struct fields')
-
-  | UVALUE_Array elts                      =>
+  | UVALUE_Array elts =>
     elts' <- map_monad uvalue_to_dvalue elts ;;
     ret (DVALUE_Array elts')
-
-  | UVALUE_Vector elts                     =>
+  | UVALUE_Vector elts =>
     elts' <- map_monad uvalue_to_dvalue elts ;;
     ret (DVALUE_Vector elts')
-
-  | _ => failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"
+  | _ =>
+      failwith "Attempting to convert a partially non-reduced uvalue to \
+                dvalue."
 end.
 
-Lemma uvalue_to_dvalue_of_dvalue_to_uvalue :
-  forall (d : dvalue),
-    uvalue_to_dvalue (dvalue_to_uvalue d) = inr d.
-Proof.
-  intros.
-  induction d; auto.
-  - cbn. induction fields. cbn. reflexivity.
-    assert (forall u : dvalue,
-               In u fields ->
-               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
-    intros. apply H. apply in_cons; auto. specialize (IHfields H0).
-    clear H0. rewrite map_cons. rewrite list_cons_app.
-    rewrite map_monad_app. cbn.
-    destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue fields)) eqn: EQ.
-    + discriminate IHfields.
-    + rewrite H. cbn. inversion IHfields. reflexivity.
-      constructor; auto.
-  - cbn. induction fields. cbn. reflexivity.
-    assert (forall u : dvalue,
-               In u fields ->
-               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
-    intros. apply H. apply in_cons; auto. specialize (IHfields H0).
-    clear H0. rewrite map_cons. rewrite list_cons_app.
-    rewrite map_monad_app. cbn.
-    destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue fields)) eqn: EQ.
-    + discriminate IHfields.
-    + rewrite H. cbn. inversion IHfields. reflexivity.
-      constructor; auto.
-  - cbn. induction elts. cbn. reflexivity.
-    assert (forall u : dvalue,
-               In u elts ->
-               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
-    intros. apply H. apply in_cons; auto. specialize (IHelts H0).
-    clear H0. rewrite map_cons. rewrite list_cons_app.
-    rewrite map_monad_app. cbn.
-    destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue elts)) eqn: EQ.
-    + discriminate IHelts.
-    + rewrite H. cbn. inversion IHelts. reflexivity.
-      constructor; auto.
-  - cbn. induction elts. cbn. reflexivity.
-    assert (forall u : dvalue,
-               In u elts ->
-               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
-    intros. apply H. apply in_cons; auto. specialize (IHelts H0).
-    clear H0. rewrite map_cons. rewrite list_cons_app.
-    rewrite map_monad_app. cbn.
-    destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue elts)) eqn: EQ.
-    + discriminate IHelts.
-    + rewrite H. cbn. inversion IHelts. reflexivity.
-      constructor; auto.
-Qed.
+Ltac map_simpl := rewrite map_cons, list_cons_app, map_monad_app.
 
+Lemma uvalue_dvalue_round_trip:
+  forall (d : dvalue), uvalue_to_dvalue (dvalue_to_uvalue d) = inr d.
+Proof.
+  intros; induction d; auto; cbn;
+    match goal with
+      | [ l : list _ |- _ ] => induction l; [ reflexivity | ]
+    end.
+  all: map_simpl.
+  all:
+    match goal with
+    | [ IH : context [match _ with | _ => _ end] |- _ ] =>
+        forward IH;
+        [ intros; apply H; apply in_cons; auto; fail | ];
+        flatten_hyp IH; inv IH
+    end.
+  all: cbn; rewrite H; auto; constructor; auto.
+Qed.
 
 (* returns true iff the uvalue contains no occurrence of UVALUE_Undef. *)
 Fixpoint is_concrete (uv : uvalue) : bool :=
@@ -372,7 +332,7 @@ Fixpoint is_concrete (uv : uvalue) : bool :=
   | UVALUE_Double x => true
   | UVALUE_Float x => true
   | UVALUE_Undef t => false
-  | UVALUE_Poison => true
+  | UVALUE_Poison τ => true
   | UVALUE_None => true
   | UVALUE_Struct fields => forallb is_concrete fields
   | UVALUE_Packed_struct fields => forallb is_concrete fields
@@ -381,87 +341,121 @@ Fixpoint is_concrete (uv : uvalue) : bool :=
   | _ => false
   end.
 
-(* If both operands are concrete, uvalue_to_dvalue them and run them through
-   opd, else run the abstract ones through opu *)
-Definition uvalue_to_dvalue_binop {A : Type}
-           (opu : uvalue -> uvalue -> A) (opd : dvalue -> dvalue -> A) (uv1 uv2 : uvalue) : A :=
-  let ma := dv1 <- uvalue_to_dvalue uv1 ;; dv2 <- uvalue_to_dvalue uv2 ;; ret (opd dv1 dv2)
-  in match ma with
-     | inl e => opu uv1 uv2
-     | inr a => a
-     end.
+Definition value_binop {A : Type}
+  (opu : uvalue -> uvalue -> A)
+  (opd : dvalue -> dvalue -> A)
+  (uv1 uv2 : uvalue) : A :=
+  let ma :=
+    dv1 <- uvalue_to_dvalue uv1 ;;
+    dv2 <- uvalue_to_dvalue uv2 ;;
+    ret (opd dv1 dv2)
+  in
+  match ma with
+  | inl e => opu uv1 uv2
+  | inr a => a
+  end.
 
-(* Like uvalue_to_dvalue_binop, but the second operand is already concrete *)
-Definition uvalue_to_dvalue_binop2 {A : Type}
-           (opu : uvalue -> uvalue -> A) (opd : dvalue -> dvalue -> A) (uv1 : uvalue) (dv2 : dvalue) : A :=
-  let ma := dv1 <- uvalue_to_dvalue uv1 ;; ret (opd dv1 dv2)
-  in match ma with
-     | inl e => opu uv1 (dvalue_to_uvalue dv2)
-     | inr a => a
-     end.
+(* Like value_binop, but the second operand is already concrete *)
+Definition value_binop2 {A : Type}
+  (opu : uvalue -> uvalue -> A)
+  (opd : dvalue -> dvalue -> A)
+  (uv1 : uvalue) (dv2 : dvalue) : A :=
+  let ma :=
+    dv1 <- uvalue_to_dvalue uv1 ;;
+    ret (opd dv1 dv2)
+  in
+  match ma with
+  | inl e => opu uv1 (dvalue_to_uvalue dv2)
+  | inr a => a
+  end.
 
-Definition uvalue_to_dvalue_uop {A : Type}
-           (opu : uvalue -> A) (opd : dvalue -> A) (uv : uvalue) : A :=
-  let ma := dv <- uvalue_to_dvalue uv ;; ret (opd dv)
-  in match ma with
-     | inl e => opu uv
-     | inr a => a
-     end.
+Definition value_uop {A : Type}
+  (opu : uvalue -> A) (opd : dvalue -> A) (uv : uvalue) : A :=
+  let ma :=
+    dv <- uvalue_to_dvalue uv ;; ret (opd dv)
+  in
+  match ma with
+  | inl e => opu uv
+  | inr a => a
+  end.
 
 Section hiding_notation.
   #[local] Open Scope sexp_scope.
 
-  Fixpoint serialize_dvalue' (dv:dvalue): sexp :=
+  Fixpoint _serialize_dvalue (dv:dvalue): sexp :=
     match dv with
-    | DVALUE_Addr a => Atom "address" (* TODO: insist that memory models can print addresses? *)
-    | DVALUE_I1 x => Atom "dvalue(i1)"
-    | DVALUE_I8 x => Atom "dvalue(i8)"
-    | DVALUE_I32 x => Atom "dvalue(i32)"
-    | DVALUE_I64 x => Atom "dvalue(i64)"
+    (* TODO: insist that memory models can print addresses? *)
+    | DVALUE_Addr a   => Atom "address"
+    | DVALUE_I1 x     => Atom "dvalue(i1)"
+    | DVALUE_I8 x     => Atom "dvalue(i8)"
+    | DVALUE_I32 x    => Atom "dvalue(i32)"
+    | DVALUE_I64 x    => Atom "dvalue(i64)"
     | DVALUE_Double x => Atom "dvalue(double)"
-    | DVALUE_Float x => Atom "dvalue(float)"
-    | DVALUE_Poison => Atom "poison"
-    | DVALUE_None => Atom "none"
-    | DVALUE_Struct fields
-      => [Atom "{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) fields) ; Atom "}"]
-    | DVALUE_Packed_struct fields
-      => [Atom "packed{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) fields) ; Atom "}"]
-    | DVALUE_Array elts
-      => [Atom "[" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) elts) ; Atom "]"]
-    | DVALUE_Vector elts
-      => [Atom "<" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom  ","]) elts) ; Atom ">"]
+    | DVALUE_Float x  => Atom "dvalue(float)"
+    | DVALUE_Poison τ => [Atom "poison(" ; to_sexp τ ; Atom ")"]
+    | DVALUE_None     => Atom "none"
+    | DVALUE_Struct fields =>
+        [Atom "{" ;
+         to_sexp (List.map (fun x => [_serialize_dvalue x ; Atom ","]) fields) ;
+         Atom "}"]
+    | DVALUE_Packed_struct fields =>
+        [Atom "packed{" ;
+         to_sexp (List.map (fun x => [_serialize_dvalue x ; Atom ","]) fields) ;
+         Atom "}"]
+    | DVALUE_Array elts =>
+        [Atom "[" ;
+         to_sexp (List.map (fun x => [_serialize_dvalue x ; Atom ","]) elts) ;
+         Atom "]"]
+    | DVALUE_Vector elts =>
+        [Atom "<" ;
+         to_sexp (List.map (fun x => [_serialize_dvalue x ; Atom  ","]) elts) ;
+         Atom ">"]
     end.
 
-  #[global] Instance serialize_dvalue : Serialize dvalue := serialize_dvalue'.
+  #[global] Instance serialize_dvalue : Serialize dvalue := _serialize_dvalue.
 
-  Fixpoint serialize_uvalue' (pre post: string) (uv:uvalue): sexp :=
+  Fixpoint _serialize_uvalue (pre post: string) (uv:uvalue): sexp :=
     match uv with
-    | UVALUE_Addr a => Atom (pre ++ "address" ++ post)%string (* TODO: insist that memory models can print addresses? *)
+    | UVALUE_Addr a => Atom (pre ++ "address" ++ post)%string
     | UVALUE_I1 x => Atom (pre ++ "uvalue(i1)" ++ post)%string
     | UVALUE_I8 x => Atom (pre ++ "uvalue(i8)" ++ post)%string
     | UVALUE_I32 x => Atom (pre ++ "uvalue(i32)" ++ post)%string
     | UVALUE_I64 x => Atom (pre ++ "uvalue(i64)" ++ post)%string
     | UVALUE_Double x => Atom (pre ++ "uvalue(double)" ++ post)%string
     | UVALUE_Float x => Atom (pre ++ "uvalue(float)" ++ post)%string
-    | UVALUE_Poison => Atom (pre ++ "poison" ++ post)%string
+    | UVALUE_Poison τ =>
+        [ Atom pre ; Atom "undef(" ; to_sexp τ ; Atom ")" ; Atom post]
     | UVALUE_None => Atom (pre ++ "none" ++ post)%string
-    | UVALUE_Struct fields
-      => [Atom "{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; Atom "}"]
-    | UVALUE_Packed_struct fields
-      => [Atom "packed{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; Atom "}"]
-    | UVALUE_Array elts
-      => [Atom "[" ; to_sexp (List.map (serialize_uvalue' "" ",") elts) ; Atom "]"]
-    | UVALUE_Vector elts
-      => [Atom "<" ; to_sexp (List.map (serialize_uvalue' "" ",") elts) ; Atom ">"]
+    | UVALUE_Struct fields =>
+        [Atom "{" ;
+         to_sexp (List.map (_serialize_uvalue "" ",") fields) ;
+         Atom "}"]
+    | UVALUE_Packed_struct fields =>
+        [Atom "packed{" ;
+         to_sexp (List.map (_serialize_uvalue "" ",") fields) ;
+         Atom "}"]
+    | UVALUE_Array elts =>
+        [Atom "[" ;
+         to_sexp (List.map (_serialize_uvalue "" ",") elts) ;
+         Atom "]"]
+    | UVALUE_Vector elts =>
+        [Atom "<" ;
+         to_sexp (List.map (_serialize_uvalue "" ",") elts) ;
+         Atom ">"]
     | UVALUE_Undef t => [Atom "undef(" ; to_sexp t ; Atom ")"]
-    | UVALUE_IBinop iop v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp iop ; serialize_uvalue' "" ")" v2]
-    | UVALUE_ICmp cmp v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp cmp; serialize_uvalue' "" ")" v2]
-    | UVALUE_FBinop fop _ v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp fop; serialize_uvalue' "" ")" v2]
-    | UVALUE_FCmp cmp v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp cmp; serialize_uvalue' "" ")" v2]
+    | UVALUE_IBinop iop v1 v2 =>
+        [_serialize_uvalue "(" "" v1; to_sexp iop ; _serialize_uvalue "" ")" v2]
+    | UVALUE_ICmp cmp v1 v2 =>
+        [_serialize_uvalue "(" "" v1; to_sexp cmp; _serialize_uvalue "" ")" v2]
+    | UVALUE_FBinop fop _ v1 v2 =>
+        [_serialize_uvalue "(" "" v1; to_sexp fop; _serialize_uvalue "" ")" v2]
+    | UVALUE_FCmp cmp v1 v2 =>
+        [_serialize_uvalue "(" "" v1; to_sexp cmp; _serialize_uvalue "" ")" v2]
     | _ => Atom "TODO: show_uvalue"
     end.
 
-  #[global] Instance serialize_uvalue : Serialize uvalue := serialize_uvalue' "" "".
+  #[global] Instance serialize_uvalue : Serialize uvalue :=
+    _serialize_uvalue "" "".
 
 End hiding_notation.
 
@@ -472,7 +466,6 @@ Ltac dec_dvalue :=
   | [ |- { ?X = ?X } + { ?X <> ?X } ] => left; reflexivity
   | [ |- { ?X = ?Y } + { ?X <> ?Y } ] => right; intros H; inversion H
   end.
-
 
 Section DecidableEquality.
 
