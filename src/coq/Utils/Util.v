@@ -9,8 +9,98 @@ From Coq Require Import
      ZArith
      Nat 
      NPeano
-     Psatz.
+     Psatz
+     DecidableClass.
 Require Import FunInd Recdef.
+
+From ExtLib Require Import Programming.Eqv.
+
+(* Equivalence and properties of decidability for nat representations. *)
+
+#[global] Instance Eqv_nat : Eqv nat := (@eq nat).
+
+#[global,refine] Instance Decidable_eq_N :
+  forall (x y : N), Decidable (eq x y) := { Decidable_witness := N.eqb x y }.
+ apply N.eqb_eq.
+Qed.
+
+(* Properties of supported integers. *)
+
+Inductive IX_supported : N -> Prop :=
+| I1_Supported : IX_supported 1
+| I8_Supported : IX_supported 8
+| I32_Supported : IX_supported 32
+| I64_Supported : IX_supported 64
+.
+
+Lemma IX_supported_dec : forall (sz:N), {IX_supported sz} + {~IX_supported sz}.
+Proof.
+  intros sz.
+  - decide (sz = 1)%N.
+    + left. subst. constructor.
+    + decide (sz = 8)%N.
+      * left. subst. constructor.
+      * decide (sz = 32)%N.
+        -- left. subst. constructor.
+        -- decide (sz = 64)%N.
+           ++ left. subst. constructor.
+           ++ right. intro X.
+              inversion X; subst; contradiction.
+Qed.
+
+Lemma unsupported_cases : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X),
+    (if (sz =? 64)%N then x64
+      else if (sz =? 32)%N then x32
+          else if (sz =? 8)%N then x8
+                else if (sz =? 1)%N then x1
+                    else x) = x.
+Proof.
+  intros.
+  destruct (sz =? 64)%N eqn: H.
+  rewrite N.eqb_eq in H.
+  destruct N. rewrite H. constructor.
+  destruct (sz =? 32)%N eqn: H'.
+  rewrite N.eqb_eq in H'.
+  destruct N. rewrite H'. constructor.
+  destruct (sz =? 8)%N eqn: H''.
+  rewrite N.eqb_eq in H''.
+  destruct N. rewrite H''. constructor.
+  destruct (sz =? 1)%N eqn: H'''.
+  rewrite N.eqb_eq in H'''.
+  destruct N. rewrite H'''. constructor.
+  reflexivity.
+Qed.
+
+Function unsupported_cases_match_ {X} (sz : N) (x64 x32 x8 x1 x : X) :=
+    match sz with
+    | 64%N => x64
+    | 32%N => x32
+    | 8%N => x8
+    | 1%N => x1
+    | _ => x
+    end.
+
+Lemma unsupported_cases_match : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X),
+    match sz with
+    | 64%N => x64
+    | 32%N => x32
+    | 8%N => x8
+    | 1%N => x1
+    | _ => x
+    end = x.
+Proof.
+  intros.
+  change ((unsupported_cases_match_ sz x64 x32 x8 x1 x) = x).
+  revert N.
+  apply unsupported_cases_match__ind; intros.
+  - assert False. apply N.  econstructor. inversion H.
+  - assert False. apply N.  econstructor. inversion H.
+  - assert False. apply N.  econstructor. inversion H.
+  - assert False. apply N.  econstructor. inversion H.
+  - reflexivity.
+Qed.
+
+(* Show properties for nat *)
 
 Section nat_Show.
   #[local] Open Scope string.

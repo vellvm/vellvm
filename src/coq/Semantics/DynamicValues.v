@@ -37,22 +37,21 @@ Set Contextual Implicit.
 Open Scope N_scope.
 (* end hide *)
 
-
 (** * Dynamic values
     Definition of the dynamic values manipulated by VIR.
     They come in two flavors:
     - [dvalue] are the concrete notion of values computed.
-    - [uvalue] (_under-defined values_) are an extension of [dvalue] as symbolic values:
+    - [uvalue] (_under-defined values_) are an extension of [dvalue] as
+      symbolic values:
       + a special [undef τ] value modeling LLVM's "undef"
-      + delayed numerical operations.
- *)
+      + delayed numerical operations. *)
 
-#[global] Instance Eqv_nat : Eqv nat := (@eq nat).
+(** * Numerical representations *)
 
 (* Floating-point rounding mode *)
 Definition FT_Rounding:mode := mode_NE.
 
-(* Set up representations for for i1, i32, and i64 *)
+(* Set up representations for for i1, i8, i32, and i64 *)
 Module Wordsize1.
   Definition wordsize := 1%nat.
   Remark wordsize_not_zero: wordsize <> 0%nat.
@@ -77,193 +76,113 @@ Definition int64 := Int64.int.
 
 Definition inttyp (x:N) : Type :=
   match x with
-  | 1 => int1
-  | 8 => int8
-  | 32 => int32
-  | 64 => int64
-  | _ => False
+  | 1 => int1 | 8 => int8 | 32 => int32 | 64 => int64 | _ => False
   end.
-
-Inductive IX_supported : N -> Prop :=
-| I1_Supported : IX_supported 1
-| I8_Supported : IX_supported 8
-| I32_Supported : IX_supported 32
-| I64_Supported : IX_supported 64
-.
-
-(* TODO: This probably should live somewhere else... *)
-#[global,refine] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
-  Decidable_witness := N.eqb x y
-}.
- apply N.eqb_eq.
-Qed.
-
-Lemma IX_supported_dec : forall (sz:N), {IX_supported sz} + {~IX_supported sz}.
-Proof.
-  intros sz.
-  - decide (sz = 1)%N.
-    + left. subst. constructor.
-    + decide (sz = 8)%N.
-      * left. subst. constructor.
-      * decide (sz = 32).
-        -- left. subst. constructor.
-        -- decide (sz = 64).
-           ++ left. subst. constructor.
-           ++ right. intro X.
-              inversion X; subst; contradiction.
-Qed.
-
-Lemma unsupported_cases : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X),
-    (if (sz =? 64) then x64
-      else if (sz =? 32) then x32
-          else if (sz =? 8) then x8
-                else if (sz =? 1) then x1
-                    else x) = x.
-Proof.
-  intros.
-  destruct (sz =? 64) eqn: H.
-  rewrite N.eqb_eq in H.
-  destruct N. rewrite H. constructor.
-  destruct (sz =? 32) eqn: H'.
-  rewrite N.eqb_eq in H'.
-  destruct N. rewrite H'. constructor.
-  destruct (sz =? 8) eqn: H''.
-  rewrite N.eqb_eq in H''.
-  destruct N. rewrite H''. constructor.
-  destruct (sz =? 1) eqn: H'''.
-  rewrite N.eqb_eq in H'''.
-  destruct N. rewrite H'''. constructor.
-  reflexivity.
-Qed.
-
-Function unsupported_cases_match_ {X} (sz : N) (x64 x32 x8 x1 x : X) :=
-    match sz with
-    | 64 => x64
-    | 32 => x32
-    | 8 => x8
-    | 1 => x1
-    | _ => x
-    end.
-
-Lemma unsupported_cases_match : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X),
-    match sz with
-    | 64 => x64
-    | 32 => x32
-    | 8 => x8
-    | 1 => x1
-    | _ => x
-    end = x.
-Proof.
-  intros.
-  change ((unsupported_cases_match_ sz x64 x32 x8 x1 x) = x).
-  revert N.
-  apply unsupported_cases_match__ind; intros.
-  - assert False. apply N.  econstructor. inversion H.
-  - assert False. apply N.  econstructor. inversion H.
-  - assert False. apply N.  econstructor. inversion H.
-  - assert False. apply N.  econstructor. inversion H.
-  - reflexivity.
-Qed.
-
 
 Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
 
+(** *Dynamic values *)
+(* The set of dynamic values manipulated by an LLVM program. *)
+
 Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS).
 
-  (* The set of dynamic values manipulated by an LLVM program. *)
- Unset Elimination Schemes.
+Unset Elimination Schemes.
+
 Inductive dvalue : Set :=
-| DVALUE_Addr (a:A.addr)
-| DVALUE_I1 (x:int1)
-| DVALUE_I8 (x:int8)
-| DVALUE_I32 (x:int32)
-| DVALUE_I64 (x:int64)
-| DVALUE_Double (x:ll_double)
-| DVALUE_Float (x:ll_float)
-| DVALUE_Poison
-| DVALUE_None
-| DVALUE_Struct        (fields: list dvalue)
-| DVALUE_Packed_struct (fields: list dvalue)
-| DVALUE_Array         (elts: list dvalue)
-| DVALUE_Vector        (elts: list dvalue)
-.
+  | DVALUE_Addr          (a:A.addr)
+  | DVALUE_I1            (n:int1)
+  | DVALUE_I8            (n:int8)
+  | DVALUE_I32           (n:int32)
+  | DVALUE_I64           (n:int64)
+  | DVALUE_Double        (n:ll_double)
+  | DVALUE_Float         (n:ll_float)
+  | DVALUE_Poison        (t:dtyp)
+  | DVALUE_None
+  | DVALUE_Struct        (fields:list dvalue)
+  | DVALUE_Packed_struct (fields:list dvalue)
+  | DVALUE_Array         (elts:list dvalue)
+  | DVALUE_Vector        (elts:list dvalue)
+  .
+
 Set Elimination Schemes.
 
 Section DvalueInd.
+
   Variable P : dvalue -> Prop.
-  Hypothesis IH_Addr          : forall a, P (DVALUE_Addr a).
-  Hypothesis IH_I1            : forall x, P (DVALUE_I1 x).
-  Hypothesis IH_I8            : forall x, P (DVALUE_I8 x).
-  Hypothesis IH_I32           : forall x, P (DVALUE_I32 x).
-  Hypothesis IH_I64           : forall x, P (DVALUE_I64 x).
-  Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
-  Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
-  Hypothesis IH_Poison        : P DVALUE_Poison.
-  Hypothesis IH_None          : P DVALUE_None.
-  Hypothesis IH_Struct        : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Struct fields).
-  Hypothesis IH_Packed_Struct : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Packed_struct fields).
-  Hypothesis IH_Array         : forall (elts: list dvalue), (forall e, In e elts -> P e) -> P (DVALUE_Array elts).
-  Hypothesis IH_Vector        : forall (elts: list dvalue), (forall e, In e elts -> P e) -> P (DVALUE_Vector elts).
+
+  Hypothesis IH_Addr   : forall a, P (DVALUE_Addr a).
+  Hypothesis IH_I1     : forall n, P (DVALUE_I1 n).
+  Hypothesis IH_I8     : forall n, P (DVALUE_I8 n).
+  Hypothesis IH_I32    : forall n, P (DVALUE_I32 n).
+  Hypothesis IH_I64    : forall n, P (DVALUE_I64 n).
+  Hypothesis IH_Double : forall n, P (DVALUE_Double n).
+  Hypothesis IH_Float  : forall n, P (DVALUE_Float n).
+  Hypothesis IH_Poison : forall t, P (DVALUE_Poison t).
+  Hypothesis IH_None   : P DVALUE_None.
+
+  Hypothesis IH_Struct :
+    forall fields, (forall u, In u fields -> P u) -> P (DVALUE_Struct fields).
+  Hypothesis IH_Packed_Struct :
+    forall fields, (forall u, In u fields -> P u) -> P (DVALUE_Packed_struct fields).
+  Hypothesis IH_Array :
+    forall elts, (forall e, In e elts -> P e) -> P (DVALUE_Array elts).
+  Hypothesis IH_Vector :
+    forall elts, (forall e, In e elts -> P e) -> P (DVALUE_Vector elts).
+
+  Tactic Notation "struct_case" hyp(H) hyp(IH) constr(x) :=
+    let IHfields := fresh "IHfields" in
+    let Hin := fresh "Hin" in
+    revert x; fix IHfields 1; intros [|u fields'] u';
+      [ intros [] | intros [<-|Hin] ];
+      [ apply IH | eapply IHfields ; apply Hin].
 
   Lemma dvalue_ind : forall (dv:dvalue), P dv.
-    fix IH 1.
-    remember P as P0 in IH.
-    destruct dv; auto; subst.
-    - apply IH_Struct.
-      { revert fields.
-        fix IHfields 1. intros [|u fields']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
-      }
-    - apply IH_Packed_Struct.
-      { revert fields.
-        fix IHfields 1. intros [|u fields']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
-      }
-    - apply IH_Array.
-      { revert elts.
-        fix IHelts 1. intros [|u elts']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
-      }
-    - apply IH_Vector.
-      { revert elts.
-        fix IHelts 1. intros [|u elts']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
-      }
+    fix IH 1; remember P as P0 in IH; destruct dv; auto; subst.
+
+    all: repeat
+    match goal with
+    | [ H : forall _, _ -> P _ |- P (_ ?a)] =>
+        match type of a with
+        | list _ => tryif apply H; struct_case H IH a then idtac else clear H
+        end
+    end.
   Qed.
+
 End DvalueInd.
 
-
-(* The set of dynamic values manipulated by an LLVM program. *)
+(** *Under-defined values *)
+(* The set of under-defined values manipulated by an LLVM program. *)
 Unset Elimination Schemes.
+
 Inductive uvalue : Set :=
-| UVALUE_Addr (a:A.addr)
-| UVALUE_I1 (x:int1)
-| UVALUE_I8 (x:int8)
-| UVALUE_I32 (x:int32)
-| UVALUE_I64 (x:int64)
-| UVALUE_Double (x:ll_double)
-| UVALUE_Float (x:ll_float)
-| UVALUE_Undef (t:dtyp)
-| UVALUE_Poison
-| UVALUE_None
-| UVALUE_Struct        (fields: list uvalue)
-| UVALUE_Packed_struct (fields: list uvalue)
-| UVALUE_Array         (elts: list uvalue)
-| UVALUE_Vector        (elts: list uvalue)
-| UVALUE_IBinop           (iop:ibinop) (v1:uvalue) (v2:uvalue)
-| UVALUE_ICmp             (cmp:icmp)   (v1:uvalue) (v2:uvalue)
-| UVALUE_FBinop           (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue)
-| UVALUE_FCmp             (cmp:fcmp)   (v1:uvalue) (v2:uvalue)
-| UVALUE_Conversion       (conv:conversion_type) (v:uvalue) (t_to:dtyp)
-| UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)) (* TODO: do we ever need this? GEP raises an event? *)
-| UVALUE_ExtractElement   (vec: uvalue) (idx: uvalue)
-| UVALUE_InsertElement    (vec: uvalue) (elt:uvalue) (idx:uvalue)
-| UVALUE_ShuffleVector    (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue)
-| UVALUE_ExtractValue     (vec:uvalue) (idxs:list Integers.int)
-| UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list Integers.int)
-| UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
-.
+  | UVALUE_Addr (a:A.addr)
+  | UVALUE_I1 (x:int1)
+  | UVALUE_I8 (x:int8)
+  | UVALUE_I32 (x:int32)
+  | UVALUE_I64 (x:int64)
+  | UVALUE_Double (x:ll_double)
+  | UVALUE_Float (x:ll_float)
+  | UVALUE_Undef (t:dtyp)
+  | UVALUE_Poison (t: dtyp)
+  | UVALUE_None
+  | UVALUE_Struct        (fields: list uvalue)
+  | UVALUE_Packed_struct (fields: list uvalue)
+  | UVALUE_Array         (elts: list uvalue)
+  | UVALUE_Vector        (elts: list uvalue)
+  | UVALUE_IBinop           (iop:ibinop) (v1:uvalue) (v2:uvalue)
+  | UVALUE_ICmp             (cmp:icmp)   (v1:uvalue) (v2:uvalue)
+  | UVALUE_FBinop           (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue)
+  | UVALUE_FCmp             (cmp:fcmp)   (v1:uvalue) (v2:uvalue)
+  | UVALUE_Conversion       (conv:conversion_type) (v:uvalue) (t_to:dtyp)
+  | UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)) (* TODO: do we ever need this? GEP raises an event? *)
+  | UVALUE_ExtractElement   (vec: uvalue) (idx: uvalue)
+  | UVALUE_InsertElement    (vec: uvalue) (elt:uvalue) (idx:uvalue)
+  | UVALUE_ShuffleVector    (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue)
+  | UVALUE_ExtractValue     (vec:uvalue) (idxs:list Integers.int)
+  | UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list Integers.int)
+  | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
+  .
 Set Elimination Schemes.
 
 Section UvalueInd.
@@ -645,7 +564,7 @@ Section DecidableEquality.
   #[global] Instance eqv_dvalue : Eqv dvalue := (@eq dvalue).
   Hint Unfold eqv_dvalue : core.
 
-	Lemma dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
+	Definition dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
     refine (fix f t1 t2 :=
               let lsteq_dec := list_eq_dec f in
               match t1, t2 with
@@ -686,7 +605,7 @@ Section DecidableEquality.
       + left; subst; reflexivity.
       + right; intros H; inversion H. contradiction.
         * right; intros H; inversion H. contradiction.
-  Qed.
+  Defined.
   Arguments dtyp_eq_dec: clear implicits.
 
  Lemma ibinop_eq_dec : forall (op1 op2:ibinop), {op1 = op2} + {op1 <> op2}.
