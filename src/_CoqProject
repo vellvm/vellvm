@@ -1,7 +1,4 @@
 -R coq Vellvm
--I ../lib/QuickChick/src
--I ../lib/QuickChick/plugin
--R ../lib/QuickChick/src QuickChick
 
 -arg -w -arg -masking-absolute-name
 -arg -w -arg -deprecated-hint-without-locality
@@ -47,6 +44,7 @@
 ./coq/QC/ReprAST.v
 ./coq/QC/ShowAST.v
 ./coq/QC/Utils.v
+./coq/QC/DList.v
 ./coq/Semantics.v
 ./coq/Semantics/ConcretizationParams.v
 ./coq/Semantics/Denotation.v

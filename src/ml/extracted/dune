@@ -1,11 +1,15 @@
 (env
  (dev
-  (flags (:standard -g -w -20-32-33-39)))
+  (flags
+   (:standard -g -w -20-32-33-39)))
  (release
-  (flags (:standard -O3 -w -20-32-33-39))))
-  
+  (flags
+   (:standard -O3 -w -20-32-33-39))))
+
 (library
-  (name extracted)
-  (wrapped false)
-  (synopsis "ML code extracted from Coq")
-  )
+ (name extracted)
+ (wrapped false)
+ (synopsis "ML code extracted from Coq")
+ (libraries zarith)
+ (instrumentation
+  (backend bisect_ppx)))

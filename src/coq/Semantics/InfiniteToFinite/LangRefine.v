@@ -171,7 +171,7 @@ Module Type VMemInt_Eqv (IP1 : INTPTR) (IP2 : INTPTR).
       IP1.to_Z (@madd_carry _ IP1.VMemInt_intptr x1 y1 c1) = IP2.to_Z (@madd_carry _ IP2.VMemInt_intptr x2 y2 c2).
 End VMemInt_Eqv.
 
-Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI) (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC) (VMEQV : VMemInt_Eqv IS1.LP.IP IS2.LP.IP).
+Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI) (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC). (* (VMEQV : VMemInt_Eqv IS1.LP.IP IS2.LP.IP). *)
   Import TLR.
 
   Import TC.
@@ -590,6 +590,172 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           dependent destruction x.
           cbn in *; subst.
           observe_vis; solve_interp_prop_oom.
+      + (* stdout *)
+        red.
+        setoid_rewrite bind_trigger in H1.
+        rewrite <- (itree_eta_ i) in H1.
+        rewrite <- (itree_eta_ i0) in H2.
+
+        pinversion H1; subst_existT; try inv CHECK.
+        eapply Interp_Prop_OomT_Vis
+          with
+          (ta:=(interp L0_convert_strict (trigger (inl1 (E1.IO_stdout str)))))
+          (k2:=(fun r0 : unit => interp L0_convert_strict (k2 r0))).
+        3: {
+          red.
+          setoid_rewrite H2.
+          rewrite <- unfold_interp.
+          setoid_rewrite KS.
+          rewrite interp_bind.
+          reflexivity.
+        }
+
+        2: {
+          red.
+          rewrite interp_trigger.
+          cbn.
+          reflexivity.
+        }
+
+        intros [] RET.
+        specialize (REL tt).
+        left.
+        eapply paco2_mon_bot; eauto.
+        rewrite REL.
+        rewrite tau_eutt.
+
+        specialize (HK tt).
+        forward HK.
+        rewrite HSPEC.
+        eapply ReturnsVis.
+        unfold trigger.
+        reflexivity.
+        cbn.
+        constructor.
+        reflexivity.
+
+        pclearbot.
+
+        (* TODO: Move this... Can this be generalized? *)
+        Set Nested Proofs Allowed.
+        Lemma interp_prop_oom'_refine_OOM_interp :
+          forall {T} (RR : relation T) t1 t2,
+            paco2
+              (interp_prop_oomT_ (OOM:=OOME) (refine_OOM_handler (E:=E1.L0)) (flip RR) (@refine_OOM_k_spec E1.L0) true
+                 true true false) bot2 t1 t2 ->
+            paco2
+              (interp_prop_oomT_ (OOM:=OOME) (refine_OOM_handler (E:=E2.L0)) (flip RR) (@refine_OOM_k_spec E2.L0) true true
+                 true false) bot2 (interp L0_convert_strict t1) (interp L0_convert_strict t2).
+        Proof.
+          intros T RR.
+          pcofix CIH.
+          intros t1 t2 REL.
+
+          rewrite (itree_eta_ t1) in *.
+          rewrite (itree_eta_ t2) in *.
+          genobs t1 ot1.
+          genobs t2 ot2.
+          clear t1 t2 Heqot1 Heqot2.
+
+          punfold REL; red in REL; cbn in REL.
+          induction REL.
+          - eapply paco2_mon_bot; eauto.
+            setoid_rewrite interp_ret.
+            pstep; red; cbn.
+            constructor; auto.
+          - pstep; red; cbn.
+            constructor.
+            right.
+            eapply CIH.
+            pclearbot; eauto.
+          - (* TauL *)
+            pstep; red; cbn.
+            constructor; auto.
+            punfold IHREL; eauto.
+          - (* TauR *)
+            pstep; red; cbn.
+            constructor; auto.
+            punfold IHREL; eauto.
+          - (* Vis_OOM_L *)
+            pinversion HT1; subst_existT; try inv CHECK0.
+            eapply paco2_mon_bot; eauto.
+            setoid_rewrite interp_vis.
+            destruct e.
+            cbn.
+            setoid_rewrite Raise.raiseOOM_bind_itree.
+            pstep; red; cbn.
+            observe_vis.
+            eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
+            reflexivity.
+          - (* Vis_OOM_R *)
+            inv CHECK.
+          - (* Vis vis *)
+            red in HSPEC, KS.
+            rewrite HSPEC in KS.
+
+            eapply paco2_mon_bot; eauto.
+
+            setoid_rewrite unfold_interp.
+            cbn.
+            unfold L0_convert_strict.
+            destruct e.
+            + destruct e.
+            cbn.
+            pstep; red; cbn.
+        Abort.
+
+        admit.
+        (* apply interp_prop_oom'_refine_OOM_interp.
+        eauto. *)
+      + (* Stderr *)
+        red.
+        setoid_rewrite bind_trigger in H1.
+        rewrite <- (itree_eta_ i) in H1.
+        rewrite <- (itree_eta_ i0) in H2.
+
+        pinversion H1; subst_existT; try inv CHECK.
+        eapply Interp_Prop_OomT_Vis
+          with
+          (ta:=(interp L0_convert_strict (trigger (inl1 (E1.IO_stderr str)))))
+          (k2:=(fun r0 : unit => interp L0_convert_strict (k2 r0))).
+        3: {
+          red.
+          setoid_rewrite H2.
+          rewrite <- unfold_interp.
+          setoid_rewrite KS.
+          rewrite interp_bind.
+          reflexivity.
+        }
+
+        2: {
+          red.
+          rewrite interp_trigger.
+          cbn.
+          reflexivity.
+        }
+
+        intros [] RET.
+        specialize (REL tt).
+        left.
+        eapply paco2_mon_bot; eauto.
+        rewrite REL.
+        rewrite tau_eutt.
+
+        specialize (HK tt).
+        forward HK.
+        rewrite HSPEC.
+        eapply ReturnsVis.
+        unfold trigger.
+        reflexivity.
+        cbn.
+        constructor.
+        reflexivity.
+
+        pclearbot.
+
+        admit.
+        (* apply interp_prop_oom'_refine_OOM_interp. *)
+        (* eauto. *)
       + destruct s.
         { (* Intrinsic *)
           admit.
@@ -1326,6 +1492,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           observe_vis.
           eapply Interp_Prop_OomT_Vis_OOM_L; eauto.
           reflexivity.
+      + (* Stdout *)
+        admit.
+      + (* Stderr *)
+        admit.
       + destruct s.
         * unfold raiseOOM in H1.
           destruct o.
@@ -1593,6 +1763,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     refine (match e1, e2 with
             | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
                 _
+            | inl1 (E1.IO_stdout msg1), inl1 (E2.IO_stdout msg2) =>
+                _
+            | inl1 (E1.IO_stderr msg1), inl1 (E2.IO_stderr msg2) =>
+                _
             | inr1 (inl1 (E1.Intrinsic dt1 name1 args1)), inr1 (inl1 (E2.Intrinsic dt2 name2 args2)) =>
                 _ (* IntrinsicE *)
             | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
@@ -1623,6 +1797,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply (dt1 = dt2 /\
                uvalue_refine_strict f1 f2 /\
                Forall2 dvalue_refine_strict args1 args2).
+    }
+
+    (* Stdout *)
+    { apply (msg1 = msg2).
+    }
+
+    (* Stderr *)
+    { apply (msg1 = msg2).
     }
 
     (* Intrinsics *)
@@ -1750,6 +1932,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     refine (match e1, e2 with
             | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
                 _
+            | inl1 (E1.IO_stdout msg1), inl1 (E2.IO_stdout msg2) =>
+                _
+            | inl1 (E1.IO_stderr msg1), inl1 (E2.IO_stderr msg2) =>
+                _
             | inr1 (inl1 (E1.Intrinsic dt1 name1 args1)), inr1 (inl1 (E2.Intrinsic dt2 name2 args2)) =>
                 _ (* IntrinsicE *)
             | inr1 (inr1 (inl1 (inl1 e1))), inr1 (inr1 (inl1 (inl1 e2))) =>
@@ -1778,6 +1964,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply (dt1 = dt2 /\
                uvalue_refine_strict f1 f2 /\
                Forall2 dvalue_refine_strict args1 args2).
+    }
+
+    (* Stdout *)
+    { apply (msg1 = msg2).
+    }
+
+    (* Stderr *)
+    { apply (msg1 = msg2).
     }
 
     (* Intrinsics *)
@@ -1892,6 +2086,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     refine (match e1, e2 with
             | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
                 _
+            | inl1 (E1.IO_stdout msg1), inl1 (E2.IO_stdout msg2) =>
+                _
+            | inl1 (E1.IO_stderr msg1), inl1 (E2.IO_stderr msg2) =>
+                _
             | inr1 (inl1 (E1.Intrinsic dt1 name1 args1)), inr1 (inl1 (E2.Intrinsic dt2 name2 args2)) =>
                 _ (* IntrinsicE *)
             | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
@@ -1916,6 +2114,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply (dt1 = dt2 /\
                uvalue_refine_strict f1 f2 /\
                Forall2 dvalue_refine_strict args1 args2).
+    }
+
+    (* Stdout *)
+    { apply (msg1 = msg2).
+    }
+
+    (* Stderr *)
+    { apply (msg1 = msg2).
     }
 
     (* Intrinsics *)
@@ -2005,6 +2211,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     refine (match e1, e2 with
             | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
                 _
+            | inl1 (E1.IO_stdout msg1), inl1 (E2.IO_stdout msg2) =>
+                _
+            | inl1 (E1.IO_stderr msg1), inl1 (E2.IO_stderr msg2) =>
+                _
             | inr1 (inl1 e1), inr1 (inl1 e2) =>
                 _ (* PickE *)
             | inr1 (inr1 (inl1 e0)), inr1 (inr1 (inl1 e1)) =>
@@ -2025,6 +2235,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply (dt1 = dt2 /\
                uvalue_refine_strict f1 f2 /\
                Forall2 dvalue_refine_strict args1 args2).
+    }
+
+    (* Stdout *)
+    { apply (msg1 = msg2).
+    }
+
+    (* Stderr *)
+    { apply (msg1 = msg2).
     }
 
     (* PickE *)
@@ -2076,6 +2294,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     refine (match e1, e2 with
             | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
                 _
+            | inl1 (E1.IO_stdout msg1), inl1 (E2.IO_stdout msg2) =>
+                _
+            | inl1 (E1.IO_stderr msg1), inl1 (E2.IO_stderr msg2) =>
+                _
             | inr1 (inl1 e1), inr1 (inl1 e2) =>
                 _ (* OOME *)
             | inr1 (inr1 (inl1 e0)), inr1 (inr1 (inl1 e1)) =>
@@ -2094,6 +2316,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply (dt1 = dt2 /\
                uvalue_refine_strict f1 f2 /\
                Forall2 dvalue_refine_strict args1 args2).
+    }
+
+    (* Stdout *)
+    { apply (msg1 = msg2).
+    }
+
+    (* Stderr *)
+    { apply (msg1 = msg2).
     }
 
     (* OOME *)
@@ -2444,13 +2674,27 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     (* External Calls *)
     { inv e1.
-      inv e2.
-
-      apply (t = t0 /\
-               uvalue_refine_strict f f0 /\
-               Forall2 dvalue_refine_strict args args0 /\
-               dvalue_refine_strict res1 res2
-            ).
+      - (* ExternalCall *)
+        inv e2.
+        { apply (t = t0 /\
+                 uvalue_refine_strict f f0 /\
+                 Forall2 dvalue_refine_strict args args0 /\
+                 dvalue_refine_strict res1 res2
+                ).
+        }
+        all: exact False. (* Mismatch of event types *)
+      - (* Stdout *)
+        inv e2.
+        2: {
+          apply (str = str0).
+        }
+        all: exact False. (* Mismatch of event types *)
+      - (* Stderr *)
+        inv e2.
+        3: {
+          apply (str = str0).
+        }
+        all: exact False. (* Mismatch of event types *)
     }
 
     (* Intrinsics *)
@@ -2618,13 +2862,27 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     (* External Calls *)
     { inv e1.
-      inv e2.
-
-      apply (t = t0 /\
-               uvalue_refine_strict f f0 /\
-               Forall2 dvalue_refine_strict args args0 /\
-               dvalue_refine_strict res1 res2
-            ).
+      - (* ExternalCall *)
+        inv e2.
+        { apply (t = t0 /\
+                 uvalue_refine_strict f f0 /\
+                 Forall2 dvalue_refine_strict args args0 /\
+                 dvalue_refine_strict res1 res2
+                ).
+        }
+        all: exact False. (* Mismatch of event types *)
+      - (* Stdout *)
+        inv e2.
+        2: {
+          apply (str = str0).
+        }
+        all: exact False. (* Mismatch of event types *)
+      - (* Stderr *)
+        inv e2.
+        3: {
+          apply (str = str0).
+        }
+        all: exact False. (* Mismatch of event types *)
     }
 
     (* Intrinsics *)
@@ -2770,15 +3028,30 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 (* Mismatch of event types *)
                 False
             end).
+
     (* External Calls *)
     { inv e1.
-      inv e2.
-
-      apply (t = t0 /\
-               uvalue_refine_strict f f0 /\
-               Forall2 dvalue_refine_strict args args0 /\
-               dvalue_refine_strict res1 res2
-            ).
+      - (* ExternalCall *)
+        inv e2.
+        { apply (t = t0 /\
+                 uvalue_refine_strict f f0 /\
+                 Forall2 dvalue_refine_strict args args0 /\
+                 dvalue_refine_strict res1 res2
+                ).
+        }
+        all: exact False. (* Mismatch of event types *)
+      - (* Stdout *)
+        inv e2.
+        2: {
+          apply (str = str0).
+        }
+        all: exact False. (* Mismatch of event types *)
+      - (* Stderr *)
+        inv e2.
+        3: {
+          apply (str = str0).
+        }
+        all: exact False. (* Mismatch of event types *)
     }
 
     (* Intrinsics *)
@@ -2897,13 +3170,27 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     (* External Calls *)
     { inv e1.
-      inv e2.
-
-      apply (t = t0 /\
-               uvalue_refine_strict f f0 /\
-               Forall2 dvalue_refine_strict args args0 /\
-               dvalue_refine_strict res1 res2
-            ).
+      - (* ExternalCall *)
+        inv e2.
+        { apply (t = t0 /\
+                 uvalue_refine_strict f f0 /\
+                 Forall2 dvalue_refine_strict args args0 /\
+                 dvalue_refine_strict res1 res2
+                ).
+        }
+        all: exact False. (* Mismatch of event types *)
+      - (* Stdout *)
+        inv e2.
+        2: {
+          apply (str = str0).
+        }
+        all: exact False. (* Mismatch of event types *)
+      - (* Stderr *)
+        inv e2.
+        3: {
+          apply (str = str0).
+        }
+        all: exact False. (* Mismatch of event types *)
     }
 
     (* PickE *)
@@ -2976,13 +3263,27 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     (* External Calls *)
     { inv e1.
-      inv e2.
-
-      apply (t = t0 /\
-               uvalue_refine_strict f f0 /\
-               Forall2 dvalue_refine_strict args args0 /\
-               dvalue_refine_strict res1 res2
-            ).
+      - (* ExternalCall *)
+        inv e2.
+        { apply (t = t0 /\
+                 uvalue_refine_strict f f0 /\
+                 Forall2 dvalue_refine_strict args args0 /\
+                 dvalue_refine_strict res1 res2
+                ).
+        }
+        all: exact False. (* Mismatch of event types *)
+      - (* Stdout *)
+        inv e2.
+        2: {
+          apply (str = str0).
+        }
+        all: exact False. (* Mismatch of event types *)
+      - (* Stderr *)
+        inv e2.
+        3: {
+          apply (str = str0).
+        }
+        all: exact False. (* Mismatch of event types *)
     }
 
     (* OOME *)
@@ -6865,6 +7166,18 @@ Qed.
     auto.
   Qed.
 
+  Lemma fin_to_inf_dvalue_i16 :
+    forall x,
+      fin_to_inf_dvalue (DVALUE_I16 x) =
+        DVCrev.DV2.DVALUE_I16 x.
+  Proof.
+    intros x.
+    unfold fin_to_inf_dvalue.
+    break_match_goal; clear Heqs; destruct p; clear e0;
+      cbn in e; subst; inv e.
+    auto.
+  Qed.
+
   Lemma fin_to_inf_dvalue_i32 :
     forall x,
       fin_to_inf_dvalue (DVALUE_I32 x) =
@@ -7165,6 +7478,7 @@ Qed.
       first
       [ rewrite fin_to_inf_dvalue_i1
       | rewrite fin_to_inf_dvalue_i8
+      | rewrite fin_to_inf_dvalue_i16
       | rewrite fin_to_inf_dvalue_i32
       | rewrite fin_to_inf_dvalue_i64
       | rewrite fin_to_inf_dvalue_iptr
@@ -8038,6 +8352,65 @@ Qed.
   Qed.
 
   (* TODO: Move this *)
+  Lemma eval_int_op_i16_fin_inf :
+    forall v1 v2 iop res_fin res_inf,
+      @eval_int_op err_ub_oom int16 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@VIntVMemInt int16 VInt16) ToDvalue_Int16
+        iop v1 v2 = success_unERR_UB_OOM res_fin ->
+      DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
+      @IS1.LP.Events.DV.eval_int_op err_ub_oom int16
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@IS1.LP.Events.DV.VIntVMemInt int16 IS1.LP.Events.DV.VInt16) IS1.LP.Events.DV.ToDvalue_Int16
+        iop v1 v2 = success_unERR_UB_OOM res_inf.
+  Proof.
+    intros v1 v2 iop res_fin res_inf EVAL CONV.
+    destruct iop.
+    1-3:
+      try solve
+        [ cbn in *;
+          repeat break_match_hyp_inv; cbn in *;
+          cbn in CONV; inv CONV;
+          cbn in *; reflexivity
+        ].
+
+    { cbn in *.
+      break_match_hyp_inv.
+      cbn in CONV; inv CONV; cbn; auto.
+      break_match_hyp_inv.
+      cbn in CONV; inv CONV; cbn; auto.
+      destruct nsw.
+      2: {
+        cbn in H1; inv H1; cbn.
+        cbn in CONV;
+          inv CONV; cbn; auto.
+      }
+
+      break_match_hyp;
+        cbn in H1; inv H1; cbn;
+        cbn in CONV;
+        inv CONV; cbn; auto.
+    }
+
+    all: try solve
+           [ cbn in *;
+             repeat break_match_hyp_inv; cbn in *;
+             cbn in CONV; inv CONV;
+             cbn in *; reflexivity
+           ].
+
+    all: try solve
+           [ cbn in *;
+             repeat break_match_hyp_inv; cbn in *; inv EVAL;
+             cbn in CONV; inv CONV;
+             cbn in *; reflexivity
+           ].
+  Qed.
+
+  (* TODO: Move this *)
   Lemma eval_int_op_i32_fin_inf :
     forall v1 v2 iop res_fin res_inf,
       @eval_int_op err_ub_oom int32 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -8203,49 +8576,44 @@ Qed.
         IS1.LP.Events.DV.VMemInt_intptr' IS1.LP.Events.DV.ToDvalue_intptr
         iop v1_inf v2_inf = success_unERR_UB_OOM res_inf.
   Proof.
-    intros v1_fin v2_fin v1_inf v2_inf iop res_fin res_inf
-      EVAL LIFT1 LIFT2 CONV.
-    destruct iop.
-    - cbn in *.
-      repeat break_match_hyp_inv.
-  (* May be a problem...
+  (*   intros v1_fin v2_fin v1_inf v2_inf iop res_fin res_inf *)
+  (*     EVAL LIFT1 LIFT2 CONV. *)
+  (*   destruct iop. *)
+  (*   - cbn in *. *)
+  (*     repeat break_match_hyp_inv. *)
+  (* (* May be a problem... *)
 
-     madd_carry / madd_overflow will always return 0 for the infinite
-     intptr types (because they never overflow)...
+  (*    madd_carry / madd_overflow will always return 0 for the infinite *)
+  (*    intptr types (because they never overflow)... *)
 
-     This means the finite version may return poison in overflow
-     cases.
+  (*    This means the finite version may return poison in overflow *)
+  (*    cases. *)
 
-     Consider changing madd_carry and madd_overflow for finite intptrs
-     to never overflow and just OOM instead.
-   *)
-      Import VMEQV.
-      pose proof madd_carry_eqv (IP.to_Z v1_fin) (IP.to_Z v2_fin) 0%Z v1_inf v2_inf (@mzero IS1.LP.IP.intptr IS1.LP.Events.DV.VMemInt_intptr') v1_fin v2_fin (@mzero IS2.LP.IP.intptr IS2.LP.Events.DV.VMemInt_intptr').
-      do 2 (forward H; eauto).
-      forward H. admit.
-      forward H. rewrite IP.to_Z_from_Z; auto.
-      forward H. rewrite IP.to_Z_from_Z; auto.
-      forward H. admit.
+  (*    Consider changing madd_carry and madd_overflow for finite intptrs *)
+  (*    to never overflow and just OOM instead. *)
+  (*  *) *)
+  (*     Import VMEQV. *)
+  (*     pose proof madd_carry_eqv (IP.to_Z v1_fin) (IP.to_Z v2_fin) 0%Z v1_inf v2_inf (@mzero IS1.LP.IP.intptr IS1.LP.Events.DV.VMemInt_intptr') v1_fin v2_fin (@mzero IS2.LP.IP.intptr IS2.LP.Events.DV.VMemInt_intptr'). *)
+  (*     do 2 (forward H; eauto). *)
+  (*     forward H. admit. *)
+  (*     forward H. rewrite IP.to_Z_from_Z; auto. *)
+  (*     forward H. rewrite IP.to_Z_from_Z; auto. *)
+  (*     forward H. admit. *)
 
-      Set Nested Proofs Allowed.
-      Lemma mequ_to_Z :
-        forall x y a b,
-          IS1.LP.IP.to_Z x = a ->
-          IS1.LP.IP.to_Z y = b ->
-          mequ x y = Z.eqb a b.
-      Proof.
-      Admitted.
+  (*     Set Nested Proofs Allowed. *)
+  (*     Lemma mequ_to_Z : *)
+  (*       forall x y a b, *)
+  (*         IS1.LP.IP.to_Z x = a -> *)
+  (*         IS1.LP.IP.to_Z y = b -> *)
+  (*         mequ x y = Z.eqb a b. *)
+  (*     Proof. *)
+  (*     Admitted. *)
 
-      erewrite mequ_to_Z; eauto.
+  (*     erewrite mequ_to_Z; eauto. *)
 
-      assert (mequ (madd_carry v1_inf v2_inf mzero) mone
-
-      unfold VellvmIntegers.madd_carry in *.
-      unfold VellvmIntegers.mequ in *.
-      cbn.
-      unfold IS1.LP.Events.DV.VMemInt_intptr', IS1.LP.IP.VMemInt_intptr.
-      break_inner_match_goal.
-      IS1.LP.IP.VMemInt_intptr.
+  (*     unfold VellvmIntegers.madd_carry in *. *)
+  (*     unfold VellvmIntegers.mequ in *. *)
+  (*     cbn. *)
   Admitted.
 
   Lemma dvalue_convert_strict_fin_inf_succeeds_fin_to_inf_dvalue' :
@@ -8263,6 +8631,7 @@ Qed.
   Hint Resolve
     eval_int_op_i1_fin_inf
     eval_int_op_i8_fin_inf
+    eval_int_op_i16_fin_inf
     eval_int_op_i32_fin_inf
     eval_int_op_i64_fin_inf
     eval_int_op_iptr_fin_inf
@@ -8829,13 +9198,14 @@ Qed.
   Lemma get_conv_case_pure_fin_inf:
     forall conv t_from dv t_to res,
       get_conv_case conv t_from dv t_to = Conv_Pure res ->
-      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = IS1.LP.Events.DV.Conv_Pure (fin_to_inf_dvalue res).
+      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = IS1.LP.Events.DV.Conv_Pure (fin_to_inf_uvalue res).
   Proof.
     intros conv t_from dv t_to res CONV.
     destruct conv.
     { cbn in *;
         repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
+        unfold fin_to_inf_uvalue;
         break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
         cbn in e; inv e; try discriminate;
 
@@ -8846,6 +9216,7 @@ Qed.
     { cbn in *;
         repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
+        unfold fin_to_inf_uvalue;
         break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
         cbn in e; inv e; try discriminate;
 
@@ -8856,6 +9227,7 @@ Qed.
     { cbn in *;
         repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
+        unfold fin_to_inf_uvalue;
         break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
         cbn in e; inv e; try discriminate;
 
@@ -8865,27 +9237,18 @@ Qed.
 
     { cbn in *;
         repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue; inv CONV.
+        unfold fin_to_inf_dvalue, fin_to_inf_uvalue; inv CONV.
     }
 
     { cbn in *;
         repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue; inv CONV.
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
+        unfold fin_to_inf_dvalue, fin_to_inf_uvalue; inv CONV.
     }
 
     { cbn in *;
         repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
+        unfold fin_to_inf_uvalue;
         break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
         cbn in e; inv e; try discriminate;
 
@@ -8896,18 +9259,32 @@ Qed.
     { cbn in *;
         repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
+        unfold fin_to_inf_uvalue;
+        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        unfold fin_to_inf_uvalue;
         inv CONV.
     }
 
     { cbn in *;
         repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
+        unfold fin_to_inf_uvalue;
         inv CONV.
     }
 
     { cbn in *;
         repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
+        unfold fin_to_inf_uvalue;
         break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
         cbn in e; inv e; try discriminate;
 
@@ -8918,6 +9295,7 @@ Qed.
     { cbn in *;
         repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
+        unfold fin_to_inf_uvalue;
         break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
         cbn in e; inv e; try discriminate;
 
@@ -8935,21 +9313,21 @@ Qed.
                      (IS1.LLVM.MEM.CP.CONC.MemHelpers.serialize_sbytes
                         (IS1.LP.Events.DV.dvalue_to_uvalue (fin_to_inf_dvalue dv)) t_from) 0) as ser_res.
 
-      destruct t_to; inv Heqs.
-      - unfold MemHelpers.deserialize_sbytes in *.
-        (* Not necessarily the same type *)
-        erewrite from_ubytes_to_ubytes in Heqs0.
+      (* destruct t_to; inv Heqser_res. *)
+      (* - unfold MemHelpers.deserialize_sbytes in *. *)
+      (*   (* Not necessarily the same type *) *)
+      (*   erewrite from_ubytes_to_ubytes in Heqsb. *)
 
 
-      destruct_err_ub_oom ser_res; cbn; subst.
-      1-3: exfalso.
-      subst.
-      destruct unERR_UB_OOM.
-      do 3 destruct unEitherT.
-      destruct unIdent;
-        inv Heqs;
-        unfold StateMonad.evalStateT;
-        cbn.
+      (* destruct_err_ub_oom ser_res; cbn; subst. *)
+      (* 1-3: exfalso. *)
+      (* subst. *)
+      (* destruct unERR_UB_OOM. *)
+      (* do 3 destruct unEitherT. *)
+      (* destruct unIdent; *)
+      (*   inv Heqs; *)
+      (*   unfold StateMonad.evalStateT; *)
+      (*   cbn. *)
       admit.
       admit.
     }
@@ -8958,6 +9336,7 @@ Qed.
       cbn in *;
         repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
+        unfold fin_to_inf_uvalue;
         break_match_goal; inv CONV.
     }
   Admitted.
@@ -10442,7 +10821,7 @@ Qed.
       - eapply IH2; eauto.
     }
 
-    13: { (* Vector conditional *)
+    14: { (* Vector conditional *)
       rewrite eval_select_equation in *.
       rewrite IS1.MEM.CP.CONC.eval_select_equation.
 
@@ -13377,7 +13756,9 @@ Qed.
       { (* Conv_Pure *)
         pose proof get_conv_case_pure_fin_inf _ _ _ _ _ Heqc as CONV.
         rewrite CONV.
-        rewrite <- H1 in H3; inv H3; auto.
+        remember (x0 x1) as x0x1.
+        destruct_err_ub_oom x0x1; inv H3.
+        admit.
       }
 
       { (* Conv_ItoP *)
@@ -16693,6 +17074,94 @@ Qed.
     split; auto.
   Qed.
 
+  Lemma puts_denotation_refine_strict :
+    function_denotation_refine_strict LLVM1.puts_denotation LLVM2.puts_denotation.
+  Proof.
+    red.
+    intros args1 args2 ARGS.
+    induction ARGS.
+    - cbn.
+      apply orutt_raise.
+      + intros [] o CONTRA.
+        inv CONTRA.
+      + repeat red.
+        constructor.
+        cbn; auto.
+    - destruct ARGS.
+      2: {
+        cbn.
+        apply orutt_raise.
+        + intros [] o CONTRA.
+          inv CONTRA.
+        + repeat red.
+          constructor.
+          cbn; auto.
+      }
+      destruct x.
+      + unfold uvalue_refine_strict in H.
+        cbn in H.
+        break_match_hyp_inv.
+        cbn.
+        setoid_rewrite bind_ret_l.
+        eapply orutt_bind.
+        { eapply orutt_bind with (RR:=fun ip_inf ip_fin => intptr_fin_inf ip_fin = ip_inf).
+          - rewrite IP.from_Z_0, IS1.LP.IP.from_Z_0.
+            cbn.
+            eapply orutt_Ret.
+            unfold intptr_fin_inf.
+            break_match_goal.
+            clear Heqs.
+            admit. (* from_Z / to_Z nonsense *)
+          - intros r1 r2 R1R2.
+            eapply orutt_bind.
+            admit.
+            admit.
+        }
+  Admitted.
+
+  Lemma address_one_builtin_functions_E1E2_orutt :
+    forall dfns1 dfns2,
+      Forall2 (eq × function_denotation_refine_strict) dfns1 dfns2 ->
+      orutt event_refine_strict event_res_refine_strict
+        (Forall2 (dvalue_refine_strict × function_denotation_refine_strict))
+        (map_monad LLVM1.address_one_builtin_function dfns1)
+        (map_monad address_one_builtin_function dfns2)
+        (OOM:=OOME).
+  Proof.
+    intros dfns1 dfns2 EQV.
+    eapply map_monad_orutt2 with (VV:=prod_rel eq function_denotation_refine_strict); eauto.
+    intros [id1 f1] [id2 f2] EQV'.
+    inv EQV'.
+    cbn in *; subst.
+    eapply orutt_bind with (RR:=dvalue_refine_strict).
+    { eapply rutt_orutt.
+      apply GlobalRead_L0_E1E2_rutt.
+      intros A e2.
+      apply L0_dec_oom.
+    }
+
+    intros r1 r2 H.
+    eapply orutt_Ret.
+    constructor; eauto.
+  Qed.
+
+  Lemma builtins_refine_strict :
+    forall decs,
+      Forall2 (eq × function_denotation_refine_strict)
+        (LLVM1.built_in_functions decs)
+        (built_in_functions decs).
+  Proof.
+    intros decs.
+    induction decs.
+    - cbn; constructor.
+    - unfold built_in_functions.
+      unfold LLVM1.built_in_functions.
+      break_match_goal; constructor; eauto.
+      constructor; eauto.
+      cbn.
+      apply puts_denotation_refine_strict.
+  Qed.
+
   Lemma model_E1E2_L0_orutt_strict_sound
     (p : list
            (LLVMAst.toplevel_entity
@@ -16709,15 +17178,19 @@ Qed.
     intros [] [] _.
     eapply orutt_bind; [apply address_one_functions_E1E2_orutt|].
 
+    intros r1' r2' R1R2'.
+    eapply orutt_bind; [apply address_one_builtin_functions_E1E2_orutt; apply builtins_refine_strict|].
+
     intros r1 r2 R1R2.
     eapply orutt_bind;
       [apply rutt_orutt;
-       [apply GlobalRead_L0_E1E2_rutt | solve_dec_oom]|].
+       [try apply GlobalRead_L0_E1E2_rutt | solve_dec_oom]|].
 
     intros r3 r4 R3R4.
     eapply orutt_bind.
 
     { apply denote_mcfg_E1E2_orutt; auto.
+      - apply Forall2_app; auto.
       - apply dvalue_refine_strict_dvalue_to_uvalue; auto.
       - (* TODO: fold into main_args lemma probably *)
         unfold main_args.
@@ -17982,6 +18455,32 @@ Qed.
           ]
         ].
 
+    - cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF);
+        cbn.
+      eapply orutt_bind.
+      apply orutt_trigger; cbn; eauto.
+      intros [] [] ?; reflexivity.
+      intros o CONTRA. inv CONTRA.
+      intros [] [] ?.
+      apply orutt_Ret; split; eauto.
+      unfold local_stack_refine_strict in LSR.
+      destruct ls1, ls2, LSR.
+      constructor; cbn; eauto.
+    - cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF);
+        cbn.
+      eapply orutt_bind.
+      apply orutt_trigger; cbn; eauto.
+      intros [] [] ?; reflexivity.
+      intros o CONTRA. inv CONTRA.
+      intros [] [] ?.
+      apply orutt_Ret; split; eauto.
+      unfold local_stack_refine_strict in LSR.
+      destruct ls1, ls2, LSR.
+      constructor; cbn; eauto.
     - cbn in REF;
         destruct e2; try inv REF;
         repeat (break_match_hyp; try inv REF).

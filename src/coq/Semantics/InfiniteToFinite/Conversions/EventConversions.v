@@ -70,7 +70,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
     refine (fun A e => _).
 
     refine (match e with
-            | inl1 (E1.ExternalCall dt f args) =>
+            | inl1 e0 =>
                 _
             | inr1 (inl1 (E1.Intrinsic dt name args)) =>
                 _ (* IntrinsicE *)
@@ -95,13 +95,17 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
             end).
 
     (* External Calls *)
-    { refine (f' <- lift_OOM (uvalue_convert f);;
-              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
-              dv <- trigger (E2.ExternalCall dt f' args');;
-              _).
-
-      inversion e0.
-      apply (lift_OOM (rev_dvalue_convert dv)).
+    { destruct e0.
+      - (* ExternalCall *)        
+        refine (f' <- lift_OOM (uvalue_convert f);;
+                args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+                dv <- trigger (E2.ExternalCall t f' args');;
+                _).
+        apply (lift_OOM (rev_dvalue_convert dv)).
+      - (* Stdout *)
+        apply (trigger (E2.IO_stdout str)).
+      - (* Stderr *)
+        apply (trigger (E2.IO_stderr str)).
     }
 
     (* Intrinsics *)
@@ -223,7 +227,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
     refine (fun A e => _).
 
     refine (match e with
-            | inl1 (E1.ExternalCall dt f args) =>
+            | inl1 e0 =>
                 _
             | inr1 (inl1 (E1.Intrinsic dt name args)) =>
                 _ (* IntrinsicE *)
@@ -246,13 +250,17 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
             end).
 
     (* External Calls *)
-    { refine (f' <- lift_OOM (uvalue_convert f);;
-              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
-              dv <- trigger (E2.ExternalCall dt f' args');;
-              _).
-
-      inversion e0.
-      apply (lift_OOM (rev_dvalue_convert dv)).
+    { destruct e0.
+      - (* ExternalCall *)        
+        refine (f' <- lift_OOM (uvalue_convert f);;
+                args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+                dv <- trigger (E2.ExternalCall t f' args');;
+                _).
+        apply (lift_OOM (rev_dvalue_convert dv)).
+      - (* Stdout *)
+        apply (trigger (E2.IO_stdout str)).
+      - (* Stderr *)
+        apply (trigger (E2.IO_stderr str)).
     }
 
     (* Intrinsics *)
@@ -364,7 +372,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
     refine (fun A e => _).
 
     refine (match e with
-            | inl1 (E1.ExternalCall dt f args) =>
+            | inl1 e0 =>
                 _
             | inr1 (inl1 (E1.Intrinsic dt name args)) =>
                 _ (* IntrinsicE *)
@@ -383,13 +391,17 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
             end).
 
     (* External Calls *)
-    { refine (f' <- lift_OOM (uvalue_convert f);;
-              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
-              dv <- trigger (E2.ExternalCall dt f' args');;
-              _).
-
-      inversion e0.
-      apply (lift_OOM (rev_dvalue_convert dv)).
+    { destruct e0.
+      - (* ExternalCall *)        
+        refine (f' <- lift_OOM (uvalue_convert f);;
+                args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+                dv <- trigger (E2.ExternalCall t f' args');;
+                _).
+        apply (lift_OOM (rev_dvalue_convert dv)).
+      - (* Stdout *)
+        apply (trigger (E2.IO_stdout str)).
+      - (* Stderr *)
+        apply (trigger (E2.IO_stderr str)).
     }
 
     (* Intrinsics *)
@@ -477,7 +489,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
     refine (fun A e => _).
 
     refine (match e with
-            | inl1 (E1.ExternalCall dt f args) =>
+            | inl1 e0 =>
                 _
             | inr1 (inl1 e0) =>
                 _ (* PickE *)
@@ -492,13 +504,17 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
             end).
 
     (* External Calls *)
-    { refine (f' <- lift_OOM (uvalue_convert f);;
-              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
-              dv <- trigger (E2.ExternalCall dt f' args');;
-              _).
-
-      inversion e0.
-      apply (lift_OOM (rev_dvalue_convert dv)).
+    { destruct e0.
+      - (* ExternalCall *)        
+        refine (f' <- lift_OOM (uvalue_convert f);;
+                args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+                dv <- trigger (E2.ExternalCall t f' args');;
+                _).
+        apply (lift_OOM (rev_dvalue_convert dv)).
+      - (* Stdout *)
+        apply (trigger (E2.IO_stdout str)).
+      - (* Stderr *)
+        apply (trigger (E2.IO_stderr str)).
     }
 
     (* PickE *)
@@ -560,7 +576,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
     refine (fun A e => _).
 
     refine (match e with
-            | inl1 (E1.ExternalCall dt f args) =>
+            | inl1 e0 =>
                 _
             | inr1 (inl1 e0) =>
                 _
@@ -573,13 +589,17 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
             end).
 
     (* External Calls *)
-    { refine (f' <- lift_OOM (uvalue_convert f);;
-              args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
-              dv <- trigger (E2.ExternalCall dt f' args');;
-              _).
-
-      inversion e0.
-      apply (lift_OOM (rev_dvalue_convert dv)).
+    { destruct e0.
+      - (* ExternalCall *)        
+        refine (f' <- lift_OOM (uvalue_convert f);;
+                args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+                dv <- trigger (E2.ExternalCall t f' args');;
+                _).
+        apply (lift_OOM (rev_dvalue_convert dv)).
+      - (* Stdout *)
+        apply (trigger (E2.IO_stdout str)).
+      - (* Stderr *)
+        apply (trigger (E2.IO_stderr str)).
     }
 
     (* OOME *)
@@ -692,158 +712,4 @@ Module EventConvertSafe
 
   Module E1 := Events1.
   Module E2 := Events2.
-  
-  Definition L0_convert_safe
-    : forall T, E1.L0 T -> E2.L0 T.
-    refine (fun A e => _).
-
-    refine (match e with
-            | inl1 (E1.ExternalCall dt f args) =>
-                _
-            | inr1 (inl1 (E1.Intrinsic dt name args)) =>
-                _ (* IntrinsicE *)
-            | inr1 (inr1 (inl1 e0)) =>
-                _ (* Globals *)
-            | inr1 (inr1 (inr1 (inl1 (inl1 e0)))) =>
-                _ (* Locals *)
-            | inr1 (inr1 (inr1 (inl1 (inr1 e0)))) =>
-                _ (* Stack *)
-            | inr1 (inr1 (inr1 (inr1 (inl1 e0)))) =>
-                _ (* MemoryE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0))))) =>
-                _ (* PickE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0)))))) =>
-                _ (* OOME *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0))))))) =>
-                _ (* UBE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0)))))))) =>
-                _ (* DebugE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e0)))))))) =>
-                _ (* FailureE *)
-            end).
-
-    (* External Calls *)
-    { inv e0.
-      refine (let f' := uvalue_convert_safe f in
-              let args' := map dvalue_convert_safe args in
-              _).
-
-      (* I can only construct an external call that gives me an E2.DV.dvalue (infinite)...
-
-         I need to convert it back to a finite dvalue, which I can do
-         with rev_dvalue_convert... But I need to know how the
-         external call is handled in order to know that the dvalue
-         won't cause OOM.
-       *)
-      epose proof (@subevent E2.ExternalCallE E2.L0 _ E2.DV.dvalue (E2.ExternalCall dt f' args')).
-    (*   eapply fmap. *)
-    (*   2: eauto. *)
-    (*   intros dv. *)
-    (*   remember (rev_dvalue_convert dv) as dvr. *)
-
-    (*   eapply X. *)
-      
-    (*   forward X. *)
-    (*   eapply E2.ExternalCall. *)
-
-    (*   apply (subevent _ (E2.ExternalCall dt f' args')). *)
-
-    (*           dv <- trigger (E2.ExternalCall dt f' args');; *)
-
-    (*   inversion e0. *)
-    (*   apply (lift_OOM (rev_dvalue_convert dv)). *)
-    (* } *)
-
-    (* (* Intrinsics *) *)
-    (* { inversion i; subst. *)
-    (*   apply (args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));; *)
-    (*          dv <- trigger (E2.Intrinsic dt name args');; *)
-    (*          lift_OOM (rev_dvalue_convert dv)). *)
-    (* } *)
-
-    (* (* Globals *) *)
-    (* { inversion e0. *)
-    (*   - (* Global write *) *)
-    (*     apply (dv <- lift_OOM (dvalue_convert dv);; *)
-    (*            trigger (GlobalWrite id dv)). *)
-    (*   - (* Global read *) *)
-    (*     apply (dv <- trigger (GlobalRead id);; *)
-    (*            lift_OOM (rev_dvalue_convert dv)). *)
-    (* } *)
-
-    (* (* Locals *) *)
-    (* { inversion e0. *)
-    (*   - (* Local write *) *)
-    (*     apply (dv <- lift_OOM (uvalue_convert dv);; *)
-    (*            trigger (LocalWrite id dv)). *)
-    (*   - (* Local read *) *)
-    (*     apply (dv <- trigger (LocalRead id);; *)
-    (*            lift_OOM (rev_uvalue_convert dv)). *)
-    (* } *)
-
-    (* (* Stack *) *)
-    (* { inversion e0. *)
-    (*   - (* Stack Push *) *)
-    (*     apply (args' <- lift_OOM *)
-    (*                      (map_monad_In args *)
-    (*                         (fun '(id, uv) Hin => *)
-    (*                            uv' <- uvalue_convert uv;; *)
-    (*                            ret (id, uv') *)
-    (*                      ));; *)
-    (*            trigger (StackPush args')). *)
-    (*   - (* Stack Pop *) *)
-    (*     apply (trigger StackPop). *)
-    (* } *)
-
-    (* (* MemoryE *) *)
-    (* { inversion e0. *)
-    (*   - (* MemPush *) *)
-    (*     apply (trigger E2.MemPush). *)
-    (*   - (* MemPop *) *)
-    (*     apply (trigger E2.MemPop). *)
-    (*   - (* Alloca *) *)
-    (*     apply (ptr <- trigger (E2.Alloca t num_elements align);; *)
-    (*            lift_OOM (rev_dvalue_convert ptr)). *)
-    (*   - (* Load *) *)
-    (*     apply (a' <- lift_OOM (dvalue_convert a);; *)
-    (*            uv <- trigger (E2.Load t a');; *)
-    (*            lift_OOM (rev_uvalue_convert uv)). *)
-    (*   - (* Store *) *)
-    (*     apply (a' <- lift_OOM (dvalue_convert a);; *)
-    (*            v' <- lift_OOM (uvalue_convert v);; *)
-    (*            trigger (E2.Store t a' v')). *)
-    (* } *)
-
-    (* (* PickE *) *)
-    (* { (* TODO: confirm whether this is sane... *) *)
-    (*   inversion e0. *)
-    (*   subst. *)
-    (*   refine (x' <- lift_OOM (uvalue_convert x);; *)
-    (*           dv <- trigger (E2.pick Pre x');; *)
-    (*           _). *)
-    (*   destruct dv as [res _]. *)
-    (*   apply (res' <- lift_OOM (rev_dvalue_convert res);; *)
-    (*          ret (exist (fun x => True) res' I)). *)
-    (* } *)
-
-    (* (* OOME *) *)
-    (* { inversion e0. *)
-    (*   apply (raise_oom H). *)
-    (* } *)
-
-    (* (* UBE *) *)
-    (* { inversion e0. *)
-    (*   apply (raise_ub H). *)
-    (* } *)
-
-    (* (* DebugE *) *)
-    (* { inversion e0. *)
-    (*   apply (debug H). *)
-    (* } *)
-
-    (* (* FailureE *) *)
-    (* { inversion e0. *)
-    (*   apply (raise_error H). *)
-    (* } *)
-  Admitted.
 End EventConvertSafe.

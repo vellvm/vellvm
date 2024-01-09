@@ -71,13 +71,51 @@ Definition fabs_64_decl: declaration typ :=
     dc_annotations  := []
   |}.
 
-Definition memcpy_8_decl: declaration typ :=
+Definition memcpy_8_32_decl: declaration typ :=
   let pt := TYPE_Pointer (TYPE_I 8%N) in
   let i32 := TYPE_I 32%N in
   let i1 := TYPE_I 1%N in
   {|
     dc_name        := Name "llvm.memcpy.p0i8.p0i8.i32";
-    dc_type        := TYPE_Function TYPE_Void [pt; pt; i32; i32; i1] false;
+    dc_type        := TYPE_Function TYPE_Void [pt; pt; i32; i1] false;
+    dc_param_attrs := ([], [[];[];[];[];[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
+Definition memcpy_8_64_decl: declaration typ :=
+  let pt := TYPE_Pointer (TYPE_I 8%N) in
+  let i64 := TYPE_I 64%N in
+  let i1 := TYPE_I 1%N in
+  {|
+    dc_name        := Name "llvm.memcpy.p0i8.p0i8.i64";
+    dc_type        := TYPE_Function TYPE_Void [pt; pt; i64; i1] false;
+    dc_param_attrs := ([], [[];[];[];[];[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
+Definition memset_8_32_decl: declaration typ :=
+  let pt := TYPE_Pointer (TYPE_I 8%N) in
+  let i32 := TYPE_I 32%N in
+  let i8 := TYPE_I 8%N in
+  let i1 := TYPE_I 1%N in
+  {|
+    dc_name        := Name "llvm.memset.p0i8.i32";
+    dc_type        := TYPE_Function TYPE_Void [pt; i8; i32; i1] false;
+    dc_param_attrs := ([], [[];[];[];[];[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
+Definition memset_8_64_decl: declaration typ :=
+  let pt := TYPE_Pointer (TYPE_I 8%N) in
+  let i64 := TYPE_I 64%N in
+  let i8 := TYPE_I 8%N in
+  let i1 := TYPE_I 1%N in
+  {|
+    dc_name        := Name "llvm.memset.p0i8.i64";
+    dc_type        := TYPE_Function TYPE_Void [pt; i8; i64; i1] false;
     dc_param_attrs := ([], [[];[];[];[];[]]);
     dc_attrs       := [];
     dc_annotations  := []
@@ -145,7 +183,7 @@ Definition minimum_32_decl: declaration typ :=
    2. It includes declarations for built-in memory-dependent intrinisics such as `memcpy`.
  *)
 Definition defined_intrinsics_decls :=
-  [ fabs_32_decl; fabs_64_decl; maxnum_32_decl ; maxnum_64_decl; minimum_32_decl; minimum_64_decl; memcpy_8_decl; malloc_decl; free_decl ].
+  [ fabs_32_decl; fabs_64_decl; maxnum_32_decl ; maxnum_64_decl; minimum_32_decl; minimum_64_decl; memcpy_8_32_decl; memcpy_8_64_decl; memset_8_32_decl; memset_8_64_decl; malloc_decl; free_decl ].
 
 (* This functor module provides a way to (extensibly) add the semantic behavior
    for intrinsics defined outside of the core Vellvm operational semantics.

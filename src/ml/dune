@@ -1,25 +1,20 @@
 (env
-  (dev
-    (flags (:standard -warn-error -A -w -34))))
+ (dev
+  (flags
+   (:standard -warn-error -A -w -34))))
 
 (library
-  (name base)
-  (modules assert platform IO)
-  (libraries libvellvm unix str)
-  )
+ (name base)
+ (modules assert platform IO result)
+ (libraries libvellvm unix str testing))
 
 (executables
-  (names frontend)
-  (modules frontend frontend_test)
-  (libraries base extracted libvellvm unix str)
-  )
-
+ (names frontend)
+ (modules frontend frontend_test)
+ (libraries base extracted libvellvm unix str))
 
 (executables
  (names main)
-  (modules main driver interpreter test)
-  (libraries base extracted libvellvm testing unix str)
-  )
-
-
-
+ (modes byte exe)
+ (modules main driver interpreter test tester)
+ (libraries base extracted libvellvm testing unix str))

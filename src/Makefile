@@ -30,23 +30,23 @@ CP=cp
 
 ######## The full vellvm executable
 VELLVM_EXE=_build/default/ml/main.exe
+VELLVM_BC =_build/default/ml/main.bc
 
 ######## The "frontend" is only the parser/pretty-printer 
 FRONTEND_EXE=_build/default/ml/frontend.exe
 COQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper
 FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
 
-
 .DEFAULT_GOAL := all
 
 ######## targets not in this "KNOWNTARGETS" list will be forwarded to CoqMakefile via invoke-coqmakefile
 ######## WARNING - every target of *this* Makefile must be listed here
-KNOWNTARGETS := CoqMakefile invoke-coqmakefile coq extracted $(EXTRACTDIR)/STAMP $(VELLVM_EXE) vellvm quickchick update-quickchick update-submodules distclean test check qc-tests rm-qc-test-vo clean extractedclean clean-coqmakefile doc/coq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-coq opam print-opam print-includes
+KNOWNTARGETS := CoqMakefile invoke-coqmakefile coq extracted $(EXTRACTDIR)/STAMP $(VELLVM_EXE) vellvm vellvmbc test check qc-tests yarpgen-tests rm-qc-test-vo clean extractedclean clean-coqmakefile doc/coq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-coq opam print-opam print-includes
 
 KNOWNFILES := Makefile _CoqProject
 
 CoqMakefile: _CoqProject
-	$(COQMAKEFILE) TIMED = true -docroot ../doc -f _CoqProject -o CoqMakefile
+	$(COQMAKEFILE) -docroot ../doc -f _CoqProject -o CoqMakefile
 
 ######## defer to CoqMakefile for anything not in $(KNOWNTARGETS)
 .PHONY: invoke-coqmakefile 
@@ -62,7 +62,7 @@ endif
 endif
 
 .PHONY: all $(KNOWNFILES)
-all: quickchick vellvm
+all: vellvm
 
 .PHONY: coq
 coq: real-all
@@ -70,11 +70,13 @@ coq: real-all
 .PHONY: extracted
 extracted: $(EXTRACTDIR)/STAMP
 
-$(EXTRACTDIR)/STAMP: $(VFILES) $(EXTRACTDIR)/Extract.v
+$(EXTRACTDIR)/STAMP: $(VFILES) $(VOFILES) $(EXTRACTDIR)/Extract.v
 	@echo "Extracting"
 	$(COQEXEC) $(EXTRACTDIR)/Extract.v
 	@echo "Patching extraction"
-	patch -p0 < CRelationClasses.mli.patch
+	# patch -p0 < CRelationClasses.mli.patch
+	# patch -u $(EXTRACTDIR)/GenAlive2.ml -i GenAlive2.ml.patch
+	@echo "Fixing Extraction"
 	bash fix-extraction.sh
 	touch $(EXTRACTDIR)/STAMP
 
@@ -86,22 +88,15 @@ vellvm: $(VELLVM_EXE)
 	cp $(VELLVM_EXE) vellvm
 	chmod u+w vellvm
 
-######## quickchick library 
-.PHONY: quickchick
-quickchick:
-	$(MAKE) -C $(QUICKCHICKDIR) compat
-	$(MAKE) -C $(QUICKCHICKDIR)
+.PHONY: vellvmbc
+vellvmbc: $(VELLVM_BC)
+	@echo "Something"
+	cp $(VELLVM_BC) vellvmbc
+	chmod u+w vellvmbc
 
-.PHONY: update-quickchick
-update-quickchick:
-	git submodule update -- $(QUICKCHICKDIR)
+$(VELLVM_BC): extracted ml/dune ml/extracted/dune ml/testing/dune
+	dune build ml/main.bc
 
-.PHONY: update-submodules
-update-submodules: update-quickchick
-
-.PHONY: distclean
-distclean: clean
-	make -C $(QUICKCHICKDIR) clean
 
 ######## testing the Vellvm interperter
 
@@ -111,6 +106,11 @@ test: vellvm
 
 .PHONY: check
 check: test
+
+####### Yarpgen testing targets
+.PHONY: yarpgen-tests
+yarpgen-tests: rm-qc-test-vo coq
+	$(COQEXEC) coq/QC/QCVellvm.v
 
 ######## QuickChick testing targets
 
@@ -136,11 +136,10 @@ clean: extractedclean clean-coqmakefile
 
 .PHONY: extractedclean
 extractedclean:
-	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/FRONTEND_STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
+	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/FRONTEND_STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli $(EXTRACTDIR)/\#* $(EXTRACTDIR)/.!*
 
 clean-coqmakefile: CoqMakefile
 	$(MAKE) -j --no-print-directory -f CoqMakefile clean
-
 
 ######## documentation
 
@@ -165,6 +164,7 @@ $(EXTRACTDIR)/FRONTEND_STAMP: $(FRONTEND_VOFILES) $(EXTRACTDIR)/ExtractFrontend.
 	rm -f $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
 	$(COQEXEC) $(EXTRACTDIR)/ExtractFrontend.v
 	patch -p0 < CRelationClasses.mli.patch
+	patch -p0 < GenAlive2.ml.patch
 	touch $(EXTRACTDIR)/FRONTEND_STAMP
 	rm -f $(EXTRACTDIR)/STAMP   # invalidate "normal" extraction
 

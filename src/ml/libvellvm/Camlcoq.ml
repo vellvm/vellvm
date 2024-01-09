@@ -55,7 +55,7 @@ module P = struct
 
   let one = Coq_xH
   let succ = Pos.succ
-  let pred = Pos.pred
+  let pred = Pos.pred_double
   let eq x y = (Pos.compare x y = Eq)
   let lt x y = (Pos.compare x y = Lt)
   let gt x y = (Pos.compare x y = Gt)
@@ -272,8 +272,8 @@ let coqint_of_camlint : int32 -> Integers.Int.int = Z.of_uint32
 let camlint64_of_coqint : Integers.Int64.int -> int64 = Z.to_int64
 let coqint_of_camlint64 : int64 -> Integers.Int64.int = Z.of_uint64
    (* interpret the int64 as unsigned so that result Z is in range for int *)
-let camlint64_of_ptrofs : Integers.Ptrofs.int -> int64 =
-  fun x -> Z.to_int64 (Integers.Ptrofs.signed x)
+(* let camlint64_of_ptrofs : Integers.Ptrofs.int -> int64 =
+ *   fun x -> Z.to_int64 (Integers.Ptrofs.signed x) *)
 
 (* Atoms (positive integers representing strings) *)
 

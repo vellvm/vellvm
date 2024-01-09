@@ -326,6 +326,7 @@ End hiding_notation.
 Inductive IX_supported : N -> Prop :=
 | I1_Supported : IX_supported 1
 | I8_Supported : IX_supported 8
+| I16_Supported : IX_supported 16
 | I32_Supported : IX_supported 32
 | I64_Supported : IX_supported 64
 .
@@ -344,12 +345,14 @@ Proof.
     + left. subst. constructor.
     + decide (sz = 8)%N.
       * left. subst. constructor.
-      * decide (sz = 32)%N.
+      * decide (sz = 16)%N.
         -- left. subst. constructor.
-        -- decide (sz = 64)%N.
+        -- decide (sz = 32)%N.
            ++ left. subst. constructor.
-           ++ right. intro X.
-              inversion X; subst; contradiction.
+           ++ decide (sz = 64)%N.
+              ** left. subst. constructor.
+              ** right. intro X.
+                 inversion X; subst; contradiction.
 Qed.
 
 Fixpoint ALL_IX_SUPPORTED (dt : dtyp) : Prop := 

@@ -141,7 +141,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
           else
             raise_ub
-              ("Read from memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ show_prov pr ++ ", memory allocation id: " ++ Show.show (show_allocation_id aid) ++ " memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, show_allocation_id aid)) (IM.elements mem)))
+              ("Read from memory with invalid provenance")
+              (* This error message can get quite long, and the specific details cause issues with bugpoint... Maybe make a debug message instead? *)
+              (* ("Read from memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ show_prov pr ++ ", memory allocation id: " ++ Show.show (show_allocation_id aid) ++ " memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, show_allocation_id aid)) (IM.elements mem))) *)
       end.
 
     (** Writes *)
@@ -160,8 +162,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             let fs := mem_state_frame_stack ms in
             let h := mem_state_heap ms in
             put_mem_state (mkMemState (mkMemoryStack mem' fs h) prov)
-          else raise_ub
-                 ("Trying to write to memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ show_prov pr ++ ", memory allocation id: " ++ show_allocation_id aid ++ " Memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, show_allocation_id aid)) (IM.elements mem)))
+          else
+            raise_ub
+              "Trying to write to memory with invalid provenance"
+              (* This error message can get quite long, and the specific details cause issues with bugpoint... Maybe make a debug message instead? *)
+              (* ("Trying to write to memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ show_prov pr ++ ", memory allocation id: " ++ show_allocation_id aid ++ " Memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, show_allocation_id aid)) (IM.elements mem))) *)
       end.
 
     (** Allocations *)

@@ -455,6 +455,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
            ret (DV2.DVALUE_Addr a')
        | DV1.DVALUE_I1 x  => ret (DV2.DVALUE_I1 x)
        | DV1.DVALUE_I8 x  => ret (DV2.DVALUE_I8 x)
+       | DV1.DVALUE_I16 x => ret (DV2.DVALUE_I16 x)
        | DV1.DVALUE_I32 x => ret (DV2.DVALUE_I32 x)
        | DV1.DVALUE_I64 x => ret (DV2.DVALUE_I64 x)
        | DV1.DVALUE_IPTR x =>
@@ -488,6 +489,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
            ret (DV2.UVALUE_Addr a')
        | DV1.UVALUE_I1 x  => ret (DV2.UVALUE_I1 x)
        | DV1.UVALUE_I8 x  => ret (DV2.UVALUE_I8 x)
+       | DV1.UVALUE_I16 x => ret (DV2.UVALUE_I16 x)
        | DV1.UVALUE_I32 x => ret (DV2.UVALUE_I32 x)
        | DV1.UVALUE_I64 x => ret (DV2.UVALUE_I64 x)
        | DV1.UVALUE_IPTR x =>
@@ -725,6 +727,11 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
     forall x n,
       dvalue_convert_strict x = NoOom (DV2.DVALUE_I8 n) ->
       x = DV1.DVALUE_I8 n.
+
+  Parameter dvalue_convert_strict_i16_inv :
+    forall x n,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_I16 n) ->
+      x = DV1.DVALUE_I16 n.
 
   Parameter dvalue_convert_strict_i32_inv :
     forall x n,
@@ -1595,6 +1602,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
            ret (DV2.DVALUE_Addr a')
        | DV1.DVALUE_I1 x  => ret (DV2.DVALUE_I1 x)
        | DV1.DVALUE_I8 x  => ret (DV2.DVALUE_I8 x)
+       | DV1.DVALUE_I16 x => ret (DV2.DVALUE_I16 x)
        | DV1.DVALUE_I32 x => ret (DV2.DVALUE_I32 x)
        | DV1.DVALUE_I64 x => ret (DV2.DVALUE_I64 x)
        | DV1.DVALUE_IPTR x =>
@@ -1628,6 +1636,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
            ret (DV2.UVALUE_Addr a')
        | DV1.UVALUE_I1 x  => ret (DV2.UVALUE_I1 x)
        | DV1.UVALUE_I8 x  => ret (DV2.UVALUE_I8 x)
+       | DV1.UVALUE_I16 x => ret (DV2.UVALUE_I16 x)
        | DV1.UVALUE_I32 x => ret (DV2.UVALUE_I32 x)
        | DV1.UVALUE_I64 x => ret (DV2.UVALUE_I64 x)
        | DV1.UVALUE_IPTR x =>
@@ -2303,10 +2312,10 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
      unfold uvalue_refine_strict;
       cbn in *.
 
-    1-11:
+    1-12:
       try solve
-        [ break_match_hyp; inv REF; auto
-        | inv REF; auto
+        [ break_match_hyp; inv REF; cbn; auto
+        | inv REF; cbn; auto
         ].
 
     { (* Structures *)
@@ -2867,14 +2876,16 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           (intros CONTRA; subst; apply NSUPPORTED; constructor).
         assert (sz <> 8)%N by
           (intros CONTRA; subst; apply NSUPPORTED; constructor).
+        assert (sz <> 16)%N by
+          (intros CONTRA; subst; apply NSUPPORTED; constructor).
         assert (sz <> 32)%N by
           (intros CONTRA; subst; apply NSUPPORTED; constructor).
         assert (sz <> 64)%N by
           (intros CONTRA; subst; apply NSUPPORTED; constructor).
 
-        apply N.eqb_neq in H, H0, H1, H2.
-        rewrite H, H0, H1, H2 in S.
-        rewrite H, H0, H1, H2.
+        apply N.eqb_neq in H, H0, H1, H2, H3.
+        rewrite H, H0, H1, H2, H3 in S.
+        rewrite H, H0, H1, H2, H3.
         inv S. auto.
     }
     { pose proof (@IX_supported_dec sz) as [SUPPORTED | NSUPPORTED].
@@ -2884,14 +2895,16 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           (intros CONTRA; subst; apply NSUPPORTED; constructor).
         assert (sz <> 8)%N by
           (intros CONTRA; subst; apply NSUPPORTED; constructor).
+        assert (sz <> 16)%N by
+          (intros CONTRA; subst; apply NSUPPORTED; constructor).
         assert (sz <> 32)%N by
           (intros CONTRA; subst; apply NSUPPORTED; constructor).
         assert (sz <> 64)%N by
           (intros CONTRA; subst; apply NSUPPORTED; constructor).
 
-        apply N.eqb_neq in H, H0, H1, H2.
-        rewrite H, H0, H1, H2 in S.
-        rewrite H, H0, H1, H2.
+        apply N.eqb_neq in H, H0, H1, H2, H3.
+        rewrite H, H0, H1, H2, H3 in S.
+        rewrite H, H0, H1, H2, H3.
         inv S. auto.
     }
   Qed.
@@ -2911,13 +2924,15 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         (intros CONTRA; subst; apply NSUPPORTED; constructor).
       assert (sz <> 8)%N by
         (intros CONTRA; subst; apply NSUPPORTED; constructor).
+      assert (sz <> 16)%N by
+        (intros CONTRA; subst; apply NSUPPORTED; constructor).
       assert (sz <> 32)%N by
         (intros CONTRA; subst; apply NSUPPORTED; constructor).
       assert (sz <> 64)%N by
         (intros CONTRA; subst; apply NSUPPORTED; constructor).
 
-      apply N.eqb_neq in H, H0, H1, H2.
-      rewrite H, H0, H1, H2 in V1.
+      apply N.eqb_neq in H, H0, H1, H2, H3.
+      rewrite H, H0, H1, H2, H3 in V1.
       inv V1.
   Qed.
 
@@ -2936,13 +2951,15 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         (intros CONTRA; subst; apply NSUPPORTED; constructor).
       assert (sz <> 8)%N by
         (intros CONTRA; subst; apply NSUPPORTED; constructor).
+      assert (sz <> 16)%N by
+        (intros CONTRA; subst; apply NSUPPORTED; constructor).
       assert (sz <> 32)%N by
         (intros CONTRA; subst; apply NSUPPORTED; constructor).
       assert (sz <> 64)%N by
         (intros CONTRA; subst; apply NSUPPORTED; constructor).
 
-      apply N.eqb_neq in H, H0, H1, H2.
-      rewrite H, H0, H1, H2 in V2.
+      apply N.eqb_neq in H, H0, H1, H2, H3.
+      rewrite H, H0, H1, H2, H3 in V2.
       inv V2.
   Qed.
 
@@ -3642,6 +3659,17 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     forall x n,
       dvalue_convert_strict x = NoOom (DV2.DVALUE_I8 n) ->
       x = DV1.DVALUE_I8 n.
+  Proof.
+    intros x n H.
+    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
+    subst.
+    auto.
+  Qed.
+
+  Lemma dvalue_convert_strict_i16_inv :
+    forall x n,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_I16 n) ->
+      x = DV1.DVALUE_I16 n.
   Proof.
     intros x n H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].

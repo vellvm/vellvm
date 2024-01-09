@@ -15,6 +15,7 @@
 **/_build
 src/main.native
 src/vellvm
+src/vellvmqc
 src/frontend
 **/.merlin
 *~
@@ -43,6 +44,8 @@ src/coq/.lia.cache
 *.cache
 *.DS_Store
 *a.out
+lib/.FLOCQQUICKCHICK_STAMP
+lib/.QUICKCHICK_STAMP
 
 CoqMakefile
 .CoqMakefile.d

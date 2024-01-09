@@ -425,6 +425,15 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
               cbn in H.
               apply Forall_cons; eauto.
               apply Forall_impl with (P := fun id => In id (List.map snd brs)); eauto.
+            --
+              go.
+              eapply eutt_clo_bind; eauto.
+              intros u1 u2 H.
+              apply eutt_Ret.
+              cbn.
+              cbn in H.
+              apply Forall_cons; eauto.
+              apply Forall_impl with (P := fun id => In id (List.map snd brs)); eauto.
         + intros x1 H.
           destruct (select_switch x0 default_dest x1) eqn:HSwitch; cbn.
           apply raise_has_all_posts.

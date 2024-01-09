@@ -358,23 +358,23 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
         setoid_rewrite Heqb in H1.
         inversion H1.
         reflexivity.
-      + solve_bind_res.
-      + solve_bind_res.
-      + repeat break_match_goal;
-          solve [ destruct (VellvmIntegers.mmul x x0); cbn in *; inversion EVAL;
-                  apply to_dvalue_OOM_NoOom
-                | unfold lift_OOM; break_match_goal; cbn in *; inversion EVAL;
-                  rewrite bind_ret_l; repeat break_match_goal; inversion EVAL;
-                  subst; solve [auto]
-            ].
-    - destruct a, b; cbn in *; inversion EVAL; auto.
+    (*   + solve_bind_res. *)
+    (*   + solve_bind_res. *)
+    (*   + repeat break_match_goal; *)
+    (*       solve [ destruct (VellvmIntegers.mmul x x0); cbn in *; inversion EVAL; *)
+    (*               apply to_dvalue_OOM_NoOom *)
+    (*             | unfold lift_OOM; break_match_goal; cbn in *; inversion EVAL; *)
+    (*               rewrite bind_ret_l; repeat break_match_goal; inversion EVAL; *)
+    (*               subst; solve [auto] *)
+    (*         ]. *)
+    (* - destruct a, b; cbn in *; inversion EVAL; auto. *)
 
-      + rewrite bind_ret_l.
-        cbn.
-        break_match_goal.
-        cbn in *.
-        inversion H0.
-        reflexivity.
+    (*   + rewrite bind_ret_l. *)
+    (*     cbn. *)
+    (*     break_match_goal. *)
+    (*     cbn in *. *)
+    (*     inversion H0. *)
+    (*     reflexivity. *)
   Abort.
 
   Lemma concretize_icmp_inv:

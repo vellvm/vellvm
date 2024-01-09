@@ -17,11 +17,12 @@ From ITree Require Import
      Interp.Recursion
      Events.Exception.
 
-Require Import ExtrOcamlBasic.
-Require Import ExtrOcamlString.
+(* Require Import ExtrOcamlBasic. *)
+(* Require Import ExtrOcamlString. *)
 
-From QuickChick Require Import QuickChick.
-From Vellvm Require Import ShowAST ReprAST GenAST TopLevel LLVMAst DynamicValues.
+(* From QuickChick Require Import QuickChick. *)
+From QuickChick Require Import Show Checker.
+From Vellvm Require Import ShowAST ReprAST (* GenAST  *)TopLevel LLVMAst DynamicValues.
 
 Extraction Blacklist String List Char Core Z Format.
 
@@ -38,8 +39,8 @@ Proof.
   exact
     (fun res =>
        match res with
-       | MlOk _ _ a => ("Ok " ++ show a)%string
-       | MlError _ _ e => ("Error " ++ show e)%string
+       | MlOk a => ("Ok " ++ show a)%string
+       | MlError e => ("Error " ++ show e)%string
        end).
 Defined.
 
@@ -60,15 +61,15 @@ Fixpoint step (t : ITreeDefinition.itree L4 res_L4) : MlResult dvalue string
   := match observe t with
      | RetF (_,(_,(_,(_,x)))) => MlOk _ string x
      | TauF t => step t
-     | VisF (inl1 e) k =>
+     | VisF _ (inl1 e) k =>
          MlError _ string "Uninterpreted external call"
-     | VisF (inr1 (inl1 (ThrowOOM msg))) k =>
+     | VisF _ (inr1 (inl1 (ThrowOOM msg))) k =>
          MlError _ string ("OOM: " ++ msg)%string
-     | VisF (inr1 (inr1 (inl1 (ThrowUB msg)))) k =>
+     | VisF _ (inr1 (inr1 (inl1 (ThrowUB msg)))) k =>
          MlError _ string ("UB: " ++ msg)%string
-     | VisF (inr1 (inr1 (inr1 (inl1 (Debug msg))))) k =>
+     | VisF _ (inr1 (inr1 (inr1 (inl1 (Debug msg))))) k =>
          MlError _ string ("Debug: " ++ msg)%string
-     | VisF (inr1 (inr1 (inr1 (inr1 (LLVMEvents.Throw msg))))) k =>
+     | VisF _ (inr1 (inr1 (inr1 (inr1 (LLVMEvents.Throw msg))))) k =>
          MlError _ string ("Failure: " ++ msg)%string
      end.
 Set Guard Checking.
@@ -167,8 +168,6 @@ Inductive PROG :=
 #[global] Instance Show_PROG : Show PROG :=
   { show p := "" (* PROG: avoiding inefficient printing in QC, see #253 *) }.
 
-Definition gen_PROG : GenLLVM PROG
-  := fmap Prog gen_llvm.
 
 (** Basic property to make sure that Vellvm and Clang agree when they
     both produce values *)
@@ -184,7 +183,7 @@ Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
     let vellvm_res := interpret prog in
     let clang_res := snd (waitpid nil pid) in
     match vellvm_res, clang_res with
-    | MlOk _ _ (DVALUE_I8 x), (WEXITED ocaml_y) =>
+    | MlOk (DVALUE_I8 x), (WEXITED ocaml_y) =>
         let y := repr (oint_to_Z ocaml_y) in
         if equ x y
         then checker true
@@ -197,28 +196,43 @@ Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
         whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
     end.
 
+#[global] Instance Show_sum {A B} `{Show A} `{Show B} : Show (A + B) :=
+  { show :=  (fun x =>
+    match x with
+    | inl a => ("inl " ++ show a)%string
+    | inr b => ("inr " ++ show b)%string 
+    end) }.
+
 (** Basic property to make sure that Vellvm and Clang agree when they
     both produce values *)
-Definition vellvm_agrees_with_clang (p : PROG) : Checker
+Definition vellvm_agrees_with_clang (p : string + PROG) : Checker
   :=
-  (* collect (show prog) *)
-  let '(Prog prog) := p in
-  let clang_res := run_llc prog in
-  let vellvm_res := interpret prog in
-  match clang_res, vellvm_res with
-  | DVALUE_I8 y, MlOk _ _ (DVALUE_I8 x) =>
-      if equ x y
-      then checker true
-      else whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
-  | _, _ =>
-      whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
+  match p with
+  | inl msg => checker false
+  | inr p => 
+      (* collect (show prog) *)
+      let '(Prog prog) := p in
+      let clang_res := run_llc prog in
+      let vellvm_res := interpret prog in
+      match clang_res, vellvm_res with
+      | DVALUE_I8 y, MlOk (DVALUE_I8 x) =>
+          if equ x y
+          then checker true
+          else whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
+      | _, _ =>
+          whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
+      end
   end.
 
-(* Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang). *)
+(* (* Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang). *)
 
-Extract Constant defNumTests    => "5000".
-QCInclude "../../ml/*".
-QCInclude "../../ml/libvellvm/*".
+Extract Constant defNumTests    => "1000".
+
+(* SAZ: These paths are relative to where the coqc command that runs the extraction is executed. 
+   For invoking `make qc-tests` from the `/src` directory, we need these:
+*)
+QCInclude "ml/*".
+QCInclude "ml/libvellvm/*".
 
 
 (* QCInclude "../../ml/libvellvm/llvm_printer.ml". *)
@@ -226,4 +240,4 @@ QCInclude "../../ml/libvellvm/*".
 (* QCInclude "../../ml/extracted/*ml". *)
 Extract Inlined Constant Error.failwith => "(fun _ -> raise)".
 QuickChick (forAll (run_GenLLVM gen_PROG) vellvm_agrees_with_clang).
-(*! QuickChick agrees. *)
+(*! QuickChick agrees. *) *)

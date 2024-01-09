@@ -52,6 +52,11 @@ make
 *Note:* It is important to use ~git clone --recursive~, otherwise you
 will be missing the custom QuickChick submodules.
 
+*NOTE:* If you have cloned before it is important to do ~make
+update-submodules~ when you pull. Otherwise you may have an old
+version of the git submodules checked out and vellvm will fail to
+build.
+
 *Note:* The command ~nix develop .~ will put you in a new shell that has
 all of the necessary dependencies. You will need to do this any time
 you want to build vellvm. It will be easiest to start a proof
