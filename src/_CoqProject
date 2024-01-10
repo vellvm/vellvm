@@ -40,6 +40,7 @@
 ./coq/Numeric/Integers.v
 ./coq/Numeric/Zbits.v
 ./coq/QC/GenAST.v
+./coq/QC/GenAlive2.v
 ./coq/QC/Generators.v
 ./coq/QC/ReprAST.v
 ./coq/QC/ShowAST.v
