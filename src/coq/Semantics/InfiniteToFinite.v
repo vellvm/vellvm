@@ -35562,8 +35562,8 @@ cofix CIH
           reflexivity
         ].
 
-    (* Why isn't this getting rid of goals? *)
-    all:       try solve
+    admit.
+    1: (solve
         [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
           first [ break_match_hyp_inv | inv REF ];
           cbn in CONC; inv CONC;
@@ -35575,8 +35575,131 @@ cofix CIH
           repeat (cbn in *; break_match_hyp_inv);
           inv e;
           reflexivity
-        ].
-    Abort.
+        ]).
+    try (solve
+        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
+          first [ break_match_hyp_inv | inv REF ];
+          cbn in CONC; inv CONC;
+          cbn;
+          unfold fin_to_inf_dvalue;
+          break_match_goal; clear Heqs;
+          destruct p;
+          cbn in *;
+          repeat (cbn in *; break_match_hyp_inv);
+          inv e;
+          reflexivity
+        ]).
+    try (solve
+        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
+          first [ break_match_hyp_inv | inv REF ];
+          cbn in CONC; inv CONC;
+          cbn;
+          unfold fin_to_inf_dvalue;
+          break_match_goal; clear Heqs;
+          destruct p;
+          cbn in *;
+          repeat (cbn in *; break_match_hyp_inv);
+          inv e;
+          reflexivity
+        ]).
+    try (solve
+        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
+          first [ break_match_hyp_inv | inv REF ];
+          cbn in CONC; inv CONC;
+          cbn;
+          unfold fin_to_inf_dvalue;
+          break_match_goal; clear Heqs;
+          destruct p;
+          cbn in *;
+          repeat (cbn in *; break_match_hyp_inv);
+          inv e;
+          reflexivity
+        ]).
+    try (solve
+        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
+          first [ break_match_hyp_inv | inv REF ];
+          cbn in CONC; inv CONC;
+          cbn;
+          unfold fin_to_inf_dvalue;
+          break_match_goal; clear Heqs;
+          destruct p;
+          cbn in *;
+          repeat (cbn in *; break_match_hyp_inv);
+          inv e;
+          reflexivity
+        ]).
+
+    admit.
+
+    try (solve
+        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
+          first [ break_match_hyp_inv | inv REF ];
+          cbn in CONC; inv CONC;
+          cbn;
+          unfold fin_to_inf_dvalue;
+          break_match_goal; clear Heqs;
+          destruct p;
+          cbn in *;
+          repeat (cbn in *; break_match_hyp_inv);
+          inv e;
+          reflexivity
+        ]).
+    try (solve
+        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
+          first [ break_match_hyp_inv | inv REF ];
+          cbn in CONC; inv CONC;
+          cbn;
+          unfold fin_to_inf_dvalue;
+          break_match_goal; clear Heqs;
+          destruct p;
+          cbn in *;
+          repeat (cbn in *; break_match_hyp_inv);
+          inv e;
+          reflexivity
+        ]).
+
+    admit.
+
+    try (solve
+        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
+          first [ break_match_hyp_inv | inv REF ];
+          cbn in CONC; inv CONC;
+          cbn;
+          unfold fin_to_inf_dvalue;
+          break_match_goal; clear Heqs;
+          destruct p;
+          cbn in *;
+          repeat (cbn in *; break_match_hyp_inv);
+          inv e;
+          reflexivity
+        ]).
+    try (solve
+        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
+          first [ break_match_hyp_inv | inv REF ];
+          cbn in CONC; inv CONC;
+          cbn;
+          unfold fin_to_inf_dvalue;
+          break_match_goal; clear Heqs;
+          destruct p;
+          cbn in *;
+          repeat (cbn in *; break_match_hyp_inv);
+          inv e;
+          reflexivity
+        ]).
+    try (solve
+        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
+          first [ break_match_hyp_inv | inv REF ];
+          cbn in CONC; inv CONC;
+          cbn;
+          unfold fin_to_inf_dvalue;
+          break_match_goal; clear Heqs;
+          destruct p;
+          cbn in *;
+          repeat (cbn in *; break_match_hyp_inv);
+          inv e;
+          reflexivity
+        ]).
+  Admitted.
 
   (* TODO: Move this, prove this *)
   Lemma concretize_ub_fin_inf :
@@ -35584,97 +35707,19 @@ cofix CIH
       DVCInfFin.uvalue_refine_strict uv_inf uv_fin ->
       FinLLVM.MEM.CP.CONC.concretize_u uv_fin (UB_unERR_UB_OOM msg) ->
       InfLLVM.MEM.CP.CONC.concretize_u uv_inf (UB_unERR_UB_OOM msg).
-  Proof.    
-    induction uv_inf;
-      intros uv_fin msg REF CONC;
-      try
-        solve
-        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF;
-          cbn in REF;
-          first [ break_match_hyp_inv | inv REF ];
-          cbn in CONC; inv CONC
-        ].
+  Proof.
+    intros uv_inf uv_fin msg H H0.
+    eapply concretize_u_fin_inf in H0; eauto.
+  Qed.
 
-    - rewrite DVCInfFin.uvalue_refine_strict_equation in REF;
-        cbn in REF;
-        break_match_hyp_inv.
-
-      apply map_monad_oom_Forall2 in Heqo.
-      induction Heqo.
-      + cbn in CONC.
-        repeat red in CONC.
-        destruct CONC as (?&?&?&?&?).
-        subst.
-        cbn in *.
-        destruct H2 as [[] | H2].
-        rewrite <- H2 in H1; auto.
-        cbn in *; inv H1.
-      + repeat red in CONC.
-        rewrite Memory64BitIntptr.CP.CONCBASE.concretize_uvalueM_equation in CONC.
-        repeat red in CONC.
-        destruct CONC as (?&?&?&?&?).
-        rewrite map_monad_unfold in H1.
-        cbn in H1.
-        repeat red in H1.
-        destruct H1 as (?&?&?&?&?).
-
-        destruct_err_ub_oom x0; cbn in H2; subst; inv H2.
-        2: {
-          destruct_err_ub_oom x2; inv H4.
-          cbn in H3.
-          destruct H3 as [[] | H3].
-          specialize (H3 _ eq_refl).
-          rewrite <- H3 in H7.
-          inv H7.
-        }
-
-        destruct_err_ub_oom x2; inv H4.
-        2: {
-          destruct H5 as [[] | H5].
-          cbn in H5.
-          specialize (H5 _ eq_refl).
-          repeat red in H5.
-          destruct H5 as (?&?&?&?&?).
-          rewrite <- H4 in H6.
-          destruct_err_ub_oom x2; cbn in H6; inv H6.
-          2: {
-            cbn in H5.
-            destruct H5 as [[] | H5].
-            specialize (H5 _ eq_refl).
-            rewrite <- H5 in H8.
-            inv H8.
-          }
-
-          cbn in H3, H4, H5.
-          repeat red.
-          rewrite InfLLVM.MEM.CP.CONC.concretize_uvalueM_equation.
-          repeat red.
-
-          do 2 eexists.
-          repeat red.
-          split.
-          rewrite map_monad_unfold.
-          repeat red.
-          do 2 eexists.
-          split.
-
-          
-        }
-
-        pose proof (H x (or_introl eq_refl) _ msg H0 H1).
-        repeat red.
-        rewrite InfLLVM.MEM.CP.CONC.concretize_uvalueM_equation.
-        repeat red.
-        exists (UB_unERR_UB_OOM msg).
-        exists (fun a => success_unERR_UB_OOM (InterpreterStackBigIntptr.LP.Events.DV.DVALUE_Struct a)).
-
-        cbn; split; eauto.
-        repeat red.
-        exists (UB_unERR_UB_OOM msg).
-        exists (fun a => ret [a]).
-        cbn.
-        split; eauto.
-        
+  Lemma concretize_err_fin_inf :
+    forall uv_inf uv_fin msg,
+      DVCInfFin.uvalue_refine_strict uv_inf uv_fin ->
+      FinLLVM.MEM.CP.CONC.concretize_u uv_fin (ERR_unERR_UB_OOM msg) ->
+      InfLLVM.MEM.CP.CONC.concretize_u uv_inf (ERR_unERR_UB_OOM msg).
+  Proof.
+    intros uv_inf uv_fin msg H H0.
+    eapply concretize_u_fin_inf in H0; eauto.
   Qed.
 
   Lemma model_undef_h_fin_inf :
@@ -35856,127 +35901,341 @@ cofix CIH
             repeat red in H.
             destruct e1.
             { (* ExternalCallE *)
-              destruct e.
-              destruct e2; try contradiction.
-              destruct e.
-              destruct H as (?&?&?).
-              subst.
-              cbn in HSPEC.
-              red in HSPEC.
-              red in KS.
-              setoid_rewrite bind_trigger in HSPEC.
-              rewrite HSPEC in KS.
-              setoid_rewrite bind_vis in KS.
-              setoid_rewrite bind_ret_l in KS.
-              destruct KS as [UB | KS].
-              { exfalso.
-                clear - UB.
-                dependent induction UB.
-                - pinversion H; subst; cbn in *.
-                  inv CHECK.
-                - pinversion H; repeat subst_existT.
-                  destruct e; inv H5.
-                  specialize (REL x).
-                  rewrite <- REL in UB.
-                  eapply ContainsUB.ret_not_contains_UB in UB; eauto.
-                  cbn. reflexivity.
-                - pinversion H; repeat subst_existT.
-                  setoid_rewrite resum_to_subevent in H5.
-                  repeat rewrite subevent_subevent in H5.
-                  inv H5.
-              }
-              
-              rewrite (itree_eta_ t2).
-              rewrite <- x.
-
-              pstep; red; cbn.
-              constructor; eauto.
-              punfold KS; red in KS; cbn in KS.
-              dependent induction KS.
-              - rewrite <- x.
-                cbn.
-                observe_vis_r.
-                eapply Interp_Prop_OomT_Vis with
-                  (k2:=(fun v => get_inf_tree_L4
-                                match DVCInfFin.dvalue_convert_strict v with
-                                | NoOom a => k1 a
-                                | Oom s => raiseOOM s
-                                end)).
-
-                2: {
-                  cbn.
-                  red.
-                  setoid_rewrite bind_ret_r.
-                  reflexivity.
+              destruct e; try contradiction.
+              { (* ExternalCall *)
+                destruct e2; try contradiction.
+                destruct e; try contradiction.
+                destruct H as (?&?&?).
+                subst.
+                cbn in HSPEC.
+                red in HSPEC.
+                red in KS.
+                setoid_rewrite bind_trigger in HSPEC.
+                rewrite HSPEC in KS.
+                setoid_rewrite bind_vis in KS.
+                setoid_rewrite bind_ret_l in KS.
+                destruct KS as [UB | KS].
+                { exfalso.
+                  clear - UB.
+                  dependent induction UB.
+                  - pinversion H; subst; cbn in *.
+                    inv CHECK.
+                  - pinversion H; repeat subst_existT.
+                    destruct e; inv H5.
+                    specialize (REL x).
+                    rewrite <- REL in UB.
+                    eapply ContainsUB.ret_not_contains_UB in UB; eauto.
+                    cbn. reflexivity.
+                  - pinversion H; repeat subst_existT.
+                    setoid_rewrite resum_to_subevent in H5.
+                    repeat rewrite subevent_subevent in H5.
+                    inv H5.
                 }
+                
+                rewrite (itree_eta_ t2).
+                rewrite <- x.
 
-                2: {
-                  red.
-                  right.
-                  setoid_rewrite bind_trigger.
+                pstep; red; cbn.
+                constructor; eauto.
+                punfold KS; red in KS; cbn in KS.
+                dependent induction KS.
+                - rewrite <- x.
                   cbn.
-                  erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
-                  assert ((map fin_to_inf_dvalue args0) = args).
-                  { clear - H3.
-                    induction H3; cbn; auto.
-                    erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
-                    rewrite IHForall2.
-                    reflexivity.
-                  }
+                  observe_vis_r.
+                  eapply Interp_Prop_OomT_Vis with
+                    (k2:=(fun v => get_inf_tree_L4
+                                  match DVCInfFin.dvalue_convert_strict v with
+                                  | NoOom a => k1 a
+                                  | Oom s => raiseOOM s
+                                  end)).
 
-                  subst.
-                  reflexivity.
-                }
-
-                intros a RET.
-                break_match_goal.
-                2: {
-                  (* OOM *)
-                  cbn.
-                  left.
-                  eapply paco2_mon_bot; eauto.
-                  rewrite get_inf_tree_L4_equation.
-                  cbn.
-                  eapply interp_prop_oom_raiseOOM; typeclasses eauto.
-                }
-
-                right.
-                rewrite (itree_eta_ (k0 _)).
-                rewrite (itree_eta_ (k1 _)).
-                eapply CIH.
-                2: {
-                  specialize (REL d).
-                  red in REL.                  
-                  pclearbot.
-                  rewrite REL.
-
-                  specialize (HK d).
-                  forward HK.
-                  { rewrite HSPEC.
-                    eapply ReturnsVis.
-                    reflexivity.
-                    constructor.
+                  2: {
                     cbn.
+                    red.
+                    setoid_rewrite bind_ret_r.
                     reflexivity.
                   }
 
+                  2: {
+                    red.
+                    right.
+                    setoid_rewrite bind_trigger.
+                    cbn.
+                    erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+                    assert ((map fin_to_inf_dvalue args0) = args).
+                    { clear - H3.
+                      induction H3; cbn; auto.
+                      erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
+                      rewrite IHForall2.
+                      reflexivity.
+                    }
+
+                    subst.
+                    reflexivity.
+                  }
+
+                  intros a RET.
+                  break_match_goal.
+                  2: {
+                    (* OOM *)
+                    cbn.
+                    left.
+                    eapply paco2_mon_bot; eauto.
+                    rewrite get_inf_tree_L4_equation.
+                    cbn.
+                    eapply interp_prop_oom_raiseOOM; typeclasses eauto.
+                  }
+
+                  right.
+                  rewrite (itree_eta_ (k0 _)).
+                  rewrite (itree_eta_ (k1 _)).
+                  eapply CIH.
+                  2: {
+                    specialize (REL d).
+                    red in REL.                  
+                    pclearbot.
+                    rewrite REL.
+
+                    specialize (HK d).
+                    forward HK.
+                    { rewrite HSPEC.
+                      eapply ReturnsVis.
+                      reflexivity.
+                      constructor.
+                      cbn.
+                      reflexivity.
+                    }
+
+                    pclearbot.
+                    repeat rewrite <- itree_eta_.
+                    eauto.
+                  }
+
+                  specialize (H0 a d).
+                  forward H0.
+                  repeat red.
+                  tauto.
                   pclearbot.
                   repeat rewrite <- itree_eta_.
-                  eapply HK.
+                  eauto.
+                - rewrite <- x.
+                  cbn.
+                  constructor; eauto.
+                  rewrite (itree_eta_ t2).
+                  eapply IHKS; eauto.
+              }
+
+              { (* Stdout *)
+                destruct e2; try contradiction.
+                destruct e; try contradiction; subst.
+                red in KS.
+                red in HSPEC.
+                cbn in HSPEC.
+                red in HSPEC.
+                setoid_rewrite bind_trigger in HSPEC.
+                rewrite HSPEC in KS.
+                destruct KS as [UB | KS].
+                { exfalso.
+                  clear - UB.
+                  dependent induction UB.
+                  - pinversion H; subst; cbn in *.
+                    inv CHECK.
+                  - pinversion H; repeat subst_existT.
+                    destruct e; inv H5.
+                    specialize (REL x).
+                    rewrite <- REL in UB.
+                    eapply ContainsUB.ret_not_contains_UB in UB; eauto.
+                    cbn. reflexivity.
+                  - pinversion H; repeat subst_existT.
+                    setoid_rewrite resum_to_subevent in H5.
+                    repeat rewrite subevent_subevent in H5.
+                    inv H5.
                 }
 
-                specialize (H0 a d).
-                forward H0.
-                repeat red.
-                tauto.
-                pclearbot.
-                repeat rewrite <- itree_eta_.
-                eauto.
-              - rewrite <- x.
-                cbn.
-                constructor; eauto.
                 rewrite (itree_eta_ t2).
-                eapply IHKS; eauto.
+                rewrite <- x.
+                clear x t2.
+                setoid_rewrite bind_vis in KS.
+                punfold KS; red in KS; cbn in KS.
+                dependent induction KS.
+                - pstep; red; cbn.
+                  constructor; eauto.
+                  rewrite <- x.
+                  eapply Interp_Prop_OomT_Vis with
+                    (k2:=(fun H5 : unit => match H5 with
+                                            | tt => get_inf_tree_L4 (k1 tt)
+                                            end));
+                    eauto.
+                  2: {
+                    repeat red.
+                    eapply paco2_eqit_RR_refl; eauto.
+                  }
+                  2: {
+                    repeat red.
+                    right.
+                    setoid_rewrite bind_trigger.
+                    rewrite get_inf_tree_L4_equation.
+                    cbn.
+                    rewrite bind_vis.
+                    setoid_rewrite bind_ret_l.
+                    reflexivity.
+                  }
+
+                  intros [] RET.
+                  rewrite (itree_eta_ (k0 _)).
+                  rewrite (itree_eta_ (k1 _)).
+                  right.
+                  eapply CIH.
+                  + specialize (H0 tt tt).
+                    forward H0; cbn; eauto.
+                    pclearbot.
+                    repeat rewrite <- itree_eta_.
+                    apply H0.
+                  + specialize (REL tt).
+                    red in REL.
+                    pclearbot.
+                    rewrite bind_ret_l in REL.
+                    repeat rewrite <- itree_eta_.
+                    rewrite REL.
+
+                    specialize (HK tt).
+                    forward HK.
+                    rewrite HSPEC.
+                    eapply ReturnsVis.
+                    reflexivity.
+                    eapply ReturnsRet.
+                    cbn.
+                    reflexivity.
+
+                    pclearbot; eauto.
+                - pstep; red; cbn.
+                  constructor; eauto.
+                  rewrite <- x.
+
+                  assert (paco2
+           (interp_prop_oomT_ (OOM:=OOME)
+              (case_ (InfLLVM.Pick.E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
+                 (case_ InfLLVM.Pick.PickUvalue_handler
+                    (InfLLVM.Pick.F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))
+              TLR_INF.R.refine_res3
+              (@InfLLVM.Pick.model_undef_k_spec InfLP.Events.ExternalCallE
+                 (OOME +' UBE +' DebugE +' FailureE)
+                 (ReSum_inr IFun sum1 UBE (OOME +' UBE +' DebugE +' FailureE)
+                    InfLP.Events.ExternalCallE)) true true false true) r
+           (Vis (inl1 (InterpreterStackBigIntptr.LP.Events.IO_stdout str0)) k1)
+           (get_inf_tree_L4 (Tau {| _observe := observe t1 |}))).
+                  { eapply IHKS; auto.
+                  }
+
+                  rewrite <- itree_eta_ in H.
+                  punfold H.
+              }
+
+              { (* Stderr *)
+                destruct e2; try contradiction.
+                destruct e; try contradiction; subst.
+                red in KS.
+                red in HSPEC.
+                cbn in HSPEC.
+                red in HSPEC.
+                setoid_rewrite bind_trigger in HSPEC.
+                rewrite HSPEC in KS.
+                destruct KS as [UB | KS].
+                { exfalso.
+                  clear - UB.
+                  dependent induction UB.
+                  - pinversion H; subst; cbn in *.
+                    inv CHECK.
+                  - pinversion H; repeat subst_existT.
+                    destruct e; inv H5.
+                    specialize (REL x).
+                    rewrite <- REL in UB.
+                    eapply ContainsUB.ret_not_contains_UB in UB; eauto.
+                    cbn. reflexivity.
+                  - pinversion H; repeat subst_existT.
+                    setoid_rewrite resum_to_subevent in H5.
+                    repeat rewrite subevent_subevent in H5.
+                    inv H5.
+                }
+
+                rewrite (itree_eta_ t2).
+                rewrite <- x.
+                clear x t2.
+                setoid_rewrite bind_vis in KS.
+                punfold KS; red in KS; cbn in KS.
+                dependent induction KS.
+                - pstep; red; cbn.
+                  constructor; eauto.
+                  rewrite <- x.
+                  eapply Interp_Prop_OomT_Vis with
+                    (k2:=(fun H5 : unit => match H5 with
+                                            | tt => get_inf_tree_L4 (k1 tt)
+                                            end));
+                    eauto.
+                  2: {
+                    repeat red.
+                    eapply paco2_eqit_RR_refl; eauto.
+                  }
+                  2: {
+                    repeat red.
+                    right.
+                    setoid_rewrite bind_trigger.
+                    rewrite get_inf_tree_L4_equation.
+                    cbn.
+                    rewrite bind_vis.
+                    setoid_rewrite bind_ret_l.
+                    reflexivity.
+                  }
+
+                  intros [] RET.
+                  rewrite (itree_eta_ (k0 _)).
+                  rewrite (itree_eta_ (k1 _)).
+                  right.
+                  eapply CIH.
+                  + specialize (H0 tt tt).
+                    forward H0; cbn; eauto.
+                    pclearbot.
+                    repeat rewrite <- itree_eta_.
+                    apply H0.
+                  + specialize (REL tt).
+                    red in REL.
+                    pclearbot.
+                    rewrite bind_ret_l in REL.
+                    repeat rewrite <- itree_eta_.
+                    rewrite REL.
+
+                    specialize (HK tt).
+                    forward HK.
+                    rewrite HSPEC.
+                    eapply ReturnsVis.
+                    reflexivity.
+                    eapply ReturnsRet.
+                    cbn.
+                    reflexivity.
+
+                    pclearbot; eauto.
+                - pstep; red; cbn.
+                  constructor; eauto.
+                  rewrite <- x.
+
+                  assert (paco2
+           (interp_prop_oomT_ (OOM:=OOME)
+              (case_ (InfLLVM.Pick.E_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))
+                 (case_ InfLLVM.Pick.PickUvalue_handler
+                    (InfLLVM.Pick.F_trigger_prop (F:=OOME +' UBE +' DebugE +' FailureE))))
+              TLR_INF.R.refine_res3
+              (@InfLLVM.Pick.model_undef_k_spec InfLP.Events.ExternalCallE
+                 (OOME +' UBE +' DebugE +' FailureE)
+                 (ReSum_inr IFun sum1 UBE (OOME +' UBE +' DebugE +' FailureE)
+                    InfLP.Events.ExternalCallE)) true true false true) r
+           (Vis (inl1 (InterpreterStackBigIntptr.LP.Events.IO_stderr str0)) k1)
+           (get_inf_tree_L4 (Tau {| _observe := observe t1 |}))).
+                  { eapply IHKS; auto.
+                  }
+
+                  rewrite <- itree_eta_ in H.
+                  punfold H.
+              }
             }
 
             destruct s.
@@ -36616,14 +36875,6 @@ cofix CIH
                     repeat red.
                     econstructor; eauto.
 
-                    Lemma concretize_err_fin_inf :
-                      forall uv_inf uv_fin msg,
-                        DVCInfFin.uvalue_refine_strict uv_inf uv_fin ->
-                        FinLLVM.MEM.CP.CONC.concretize_u uv_fin (ERR_unERR_UB_OOM msg) ->
-                        InfLLVM.MEM.CP.CONC.concretize_u uv_inf (ERR_unERR_UB_OOM msg).
-                    Proof.
-                    Admitted.
-
                     eapply concretize_err_fin_inf; eauto.
                     cbn.
                     reflexivity.
@@ -37076,155 +37327,391 @@ cofix CIH
       destruct e.
       { (* ExternalCallE *)
         destruct e.
-        repeat red in HSPEC.
-        red in KS.
-        rewrite HSPEC in KS.
+        { (* ExternalCall *)
+          repeat red in HSPEC.
+          red in KS.
+          rewrite HSPEC in KS.
 
-        destruct KS as [UB | KS].
-        { setoid_rewrite bind_trigger in UB.
-          inv UB.
-          - pinversion H.
-            inv CHECK.
-          - pinversion H; repeat subst_existT.
-            cbn in *; subst.
-            rewrite <- REL0 in H0.
-            eapply ContainsUB.ret_not_contains_UB in H0;
-              try contradiction.
-            cbn; reflexivity.
-          - pinversion H;
-            repeat subst_existT.
-            subst.
-            exfalso.
-            remember (FinLP.Events.DV.DVALUE_None).
-            clear Heqd.
-            rewrite H4 in d.
-            destruct d.
-        }
+          destruct KS as [UB | KS].
+          { setoid_rewrite bind_trigger in UB.
+            inv UB.
+            - pinversion H.
+              inv CHECK.
+            - pinversion H; repeat subst_existT.
+              cbn in *; subst.
+              rewrite <- REL0 in H0.
+              eapply ContainsUB.ret_not_contains_UB in H0;
+                try contradiction.
+              cbn; reflexivity.
+            - pinversion H;
+                repeat subst_existT.
+              subst.
+              exfalso.
+              remember (FinLP.Events.DV.DVALUE_None).
+              clear Heqd.
+              rewrite H4 in d.
+              destruct d.
+          }
 
-        setoid_rewrite bind_trigger in KS.
-        setoid_rewrite bind_vis in KS.
-        setoid_rewrite bind_ret_l in KS.
+          setoid_rewrite bind_trigger in KS.
+          setoid_rewrite bind_vis in KS.
+          setoid_rewrite bind_ret_l in KS.
 
-        eapply orutt_inv_Vis_r in REL.
-        destruct REL as [REL | OOM].
-        2: {
-          destruct OOM.
-          inv H.
-        }
+          eapply orutt_inv_Vis_r in REL.
+          destruct REL as [REL | OOM].
+          2: {
+            destruct OOM.
+            inv H.
+          }
 
-        setoid_rewrite bind_trigger in HSPEC.
-        destruct REL as (?&?&?&?&?&?).
-        repeat red in H0.
-        destruct x0; try contradiction.
-        2: {
-          repeat (destruct s; try contradiction).
-        }
-        destruct e.
-        destruct H0 as (?&?&?).
-        subst.
+          setoid_rewrite bind_trigger in HSPEC.
+          destruct REL as (?&?&?&?&?&?).
+          repeat red in H0.
+          destruct x0; try contradiction.
+          2: {
+            repeat (destruct s; try contradiction).
+          }
+          destruct e; try contradiction.
+          destruct H0 as (?&?&?).
+          subst.
 
-        punfold KS; red in KS; cbn in KS.
-        dependent induction KS.
-        - rewrite <- x.
-          punfold H; red in H; cbn in H.
-          dependent induction H.
-          + pstep; red; cbn.
-            observe_vis_r.
-            eapply Interp_Prop_OomT_Vis with
-              (ta:= trigger (E1.ExternalCall t (fin_to_inf_uvalue f) (map fin_to_inf_dvalue args)))
-              (k2:=(fun x3 : E1.DV.dvalue =>
-                      get_inf_tree_L4
-                        match DVCInfFin.dvalue_convert_strict x3 with
-                        | NoOom a => k0 a
-                        | Oom s => raiseOOM s
-                        end)).
+          punfold KS; red in KS; cbn in KS.
+          dependent induction KS.
+          - rewrite <- x.
+            punfold H; red in H; cbn in H.
+            dependent induction H.
+            + pstep; red; cbn.
+              observe_vis_r.
+              eapply Interp_Prop_OomT_Vis with
+                (ta:= trigger (E1.ExternalCall t (fin_to_inf_uvalue f) (map fin_to_inf_dvalue args)))
+                (k2:=(fun x3 : E1.DV.dvalue =>
+                        get_inf_tree_L4
+                          match DVCInfFin.dvalue_convert_strict x3 with
+                          | NoOom a => k0 a
+                          | Oom s => raiseOOM s
+                          end)).
 
-            3: {
-              repeat red.
-              right.
-              setoid_rewrite bind_trigger.
-              reflexivity.
-            }
-
-            2: {
-              repeat red.
-              cbn.
-              rewrite bind_trigger.
-              erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
-              assert ((map fin_to_inf_dvalue args) = args0).
-              { clear - H3.
-                induction H3; cbn; auto.
-                erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
-                rewrite IHForall2.
+              3: {
+                repeat red.
+                right.
+                setoid_rewrite bind_trigger.
                 reflexivity.
               }
-              subst.
-              unfold ITree.trigger.
-              cbn.
-              apply paco2_eqit_RR_refl; typeclasses eauto.
-            }
 
-            intros a H.
-            break_match_goal.
-            2: {
-              left.
-              eapply paco2_mon_bot; eauto.
-              setoid_rewrite bind_trigger.
-              setoid_rewrite get_inf_tree_L4_equation.
-              cbn.
-              apply interp_prop_oom_raiseOOM; typeclasses eauto.
-            }
+              2: {
+                repeat red.
+                cbn.
+                rewrite bind_trigger.
+                erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+                assert ((map fin_to_inf_dvalue args) = args0).
+                { clear - H3.
+                  induction H3; cbn; auto.
+                  erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
+                  rewrite IHForall2.
+                  reflexivity.
+                }
+                subst.
+                unfold ITree.trigger.
+                cbn.
+                apply paco2_eqit_RR_refl; typeclasses eauto.
+              }
 
-            rewrite (itree_eta_ (k3 _)).
-            rewrite (itree_eta_ (k0 _)).
-            right.
-            eapply CIH.
-            { repeat rewrite <- itree_eta_.
-              specialize (REL0 a).
-              red in REL0.
+              intros a H.
+              break_match_goal.
+              2: {
+                left.
+                eapply paco2_mon_bot; eauto.
+                setoid_rewrite bind_trigger.
+                setoid_rewrite get_inf_tree_L4_equation.
+                cbn.
+                apply interp_prop_oom_raiseOOM; typeclasses eauto.
+              }
+
+              rewrite (itree_eta_ (k3 _)).
+              rewrite (itree_eta_ (k0 _)).
+              right.
+              eapply CIH.
+              { repeat rewrite <- itree_eta_.
+                specialize (REL0 a).
+                red in REL0.
+                pclearbot.
+                rewrite REL0.
+                eapply H1.
+                repeat red.
+                eauto.
+              }
+
+              specialize (REL d).
+              red in REL.
               pclearbot.
-              rewrite REL0.
-              eapply H1.
-              repeat red.
+              repeat rewrite <- itree_eta_.
+              rewrite REL.
+
+              specialize (HK d).
+              forward HK.
+              { rewrite HSPEC.
+                eapply ReturnsVis.
+                reflexivity.
+                constructor.
+                cbn.
+                reflexivity.
+              }
+
+              pclearbot.
               eauto.
-            }
-
-            specialize (REL d).
-            red in REL.
-            pclearbot.
-            repeat rewrite <- itree_eta_.
-            rewrite REL.
-
-            specialize (HK d).
-            forward HK.
-            { rewrite HSPEC.
-              eapply ReturnsVis.
-              reflexivity.
-              constructor.
-              cbn.
-              reflexivity.
-            }
-
-            pclearbot.
-            eauto.
-          + move IHeqitF after x.
-            specialize (IHeqitF f0 args0 x1 t).
-            repeat (forward IHeqitF; eauto).
-            specialize (IHeqitF t2).
-            repeat (forward IHeqitF; eauto).
+            + move IHeqitF after x.
+              specialize (IHeqitF f0 args0 x1 t).
+              repeat (forward IHeqitF; eauto).
+              specialize (IHeqitF t2).
+              repeat (forward IHeqitF; eauto).
+              pstep; red; cbn.
+              constructor; eauto.
+              punfold IHeqitF.
+          - repeat (forward IHKS; eauto).
+            specialize (IHKS _ _ _ H H2 H3).
+            repeat (forward IHKS; eauto).
+            specialize (IHKS _ t1 HK HSPEC).
+            repeat (forward IHKS; eauto).
+            move IHKS after x.
+            rewrite <- x.
             pstep; red; cbn.
             constructor; eauto.
-            punfold IHeqitF.
-        - repeat (forward IHKS; eauto).
-          specialize (IHKS _ _ _ H H2 H3).
-          repeat (forward IHKS; eauto).
-          specialize (IHKS _ t1 HK HSPEC).
-          repeat (forward IHKS; eauto).
-          move IHKS after x.
-          rewrite <- x.
-          pstep; red; cbn.
-          constructor; eauto.
-          punfold IHKS.
+            punfold IHKS.
+        }
+
+        { (* Stdout *)
+          repeat red in HSPEC.
+          red in KS.
+          rewrite HSPEC in KS.
+
+          destruct KS as [UB | KS].
+          { setoid_rewrite bind_trigger in UB.
+            inv UB.
+            - pinversion H.
+              inv CHECK.
+            - pinversion H; repeat subst_existT.
+              cbn in *; subst.
+              rewrite <- REL0 in H0.
+              eapply ContainsUB.ret_not_contains_UB in H0;
+                try contradiction.
+              cbn; reflexivity.
+            - pinversion H;
+                repeat subst_existT.
+              subst.
+              exfalso.
+              remember tt.
+              clear Hequ.
+              rewrite H4 in u.
+              destruct u.
+          }
+
+          setoid_rewrite bind_trigger in KS.
+          setoid_rewrite bind_vis in KS.
+          setoid_rewrite bind_ret_l in KS.
+
+          eapply orutt_inv_Vis_r in REL.
+          destruct REL as [REL | OOM].
+          2: {
+            destruct OOM.
+            inv H.
+          }
+
+          setoid_rewrite bind_trigger in HSPEC.
+          destruct REL as (?&?&?&?&?&?).
+          repeat red in H0.
+          destruct x0; try contradiction.
+          2: {
+            repeat (destruct s; try contradiction).
+          }
+          destruct e; try contradiction; subst.
+          specialize (H1 tt tt).
+          forward H1; cbn; eauto.
+
+          punfold KS; red in KS; cbn in KS.
+          dependent induction KS.
+          - rewrite <- x.
+            punfold H; red in H; cbn in H.
+            dependent induction H.
+            + pstep; red; cbn.
+              observe_vis_r.
+              eapply Interp_Prop_OomT_Vis with
+                (ta:=trigger (E1.IO_stdout str))
+                (k2:=
+                   (fun H5 : unit => match H5 with
+                                  | tt => get_inf_tree_L4 (k0 tt)
+                                  end)).
+              3: {
+                repeat red.
+                right.
+                setoid_rewrite bind_trigger.
+                reflexivity.
+              }
+
+              2: {
+                repeat red.
+                cbn.
+                rewrite bind_ret_r.
+                apply paco2_eqit_RR_refl; typeclasses eauto.
+              }
+
+              intros [] RET.
+              specialize (REL0 tt); red in REL0.
+              specialize (REL tt); red in REL.
+              pclearbot.
+
+              rewrite (itree_eta_ (k3 _)).
+              rewrite (itree_eta_ (k0 _)).
+              right.
+              eapply CIH;
+                repeat rewrite <- itree_eta_.
+              -- rewrite REL0.
+                 eapply H1.
+              -- rewrite REL.
+                 specialize (HK tt).
+                 forward HK.
+                 { rewrite HSPEC.
+                   eapply ReturnsVis.
+                   reflexivity.
+                   constructor.
+                   cbn.
+                   reflexivity.
+                 }
+                 pclearbot.
+                 eauto.
+            + move IHeqitF after x.
+              specialize (IHeqitF x1 str).
+              repeat (forward IHeqitF; eauto).
+              specialize (IHeqitF t2).
+              repeat (forward IHeqitF; eauto).
+              pstep; red; cbn.
+              constructor; eauto.
+              punfold IHeqitF.
+          - repeat (forward IHKS; eauto).
+            specialize (IHKS _ H H1 _ t1 HK HSPEC).
+            repeat (forward IHKS; eauto).
+            move IHKS after x.
+            rewrite <- x.
+            pstep; red; cbn.
+            constructor; eauto.
+            punfold IHKS.
+        }
+
+        { (* Stderr *)
+          repeat red in HSPEC.
+          red in KS.
+          rewrite HSPEC in KS.
+
+          destruct KS as [UB | KS].
+          { setoid_rewrite bind_trigger in UB.
+            inv UB.
+            - pinversion H.
+              inv CHECK.
+            - pinversion H; repeat subst_existT.
+              cbn in *; subst.
+              rewrite <- REL0 in H0.
+              eapply ContainsUB.ret_not_contains_UB in H0;
+                try contradiction.
+              cbn; reflexivity.
+            - pinversion H;
+                repeat subst_existT.
+              subst.
+              exfalso.
+              remember tt.
+              clear Hequ.
+              rewrite H4 in u.
+              destruct u.
+          }
+
+          setoid_rewrite bind_trigger in KS.
+          setoid_rewrite bind_vis in KS.
+          setoid_rewrite bind_ret_l in KS.
+
+          eapply orutt_inv_Vis_r in REL.
+          destruct REL as [REL | OOM].
+          2: {
+            destruct OOM.
+            inv H.
+          }
+
+          setoid_rewrite bind_trigger in HSPEC.
+          destruct REL as (?&?&?&?&?&?).
+          repeat red in H0.
+          destruct x0; try contradiction.
+          2: {
+            repeat (destruct s; try contradiction).
+          }
+          destruct e; try contradiction; subst.
+          specialize (H1 tt tt).
+          forward H1; cbn; eauto.
+
+          punfold KS; red in KS; cbn in KS.
+          dependent induction KS.
+          - rewrite <- x.
+            punfold H; red in H; cbn in H.
+            dependent induction H.
+            + pstep; red; cbn.
+              observe_vis_r.
+              eapply Interp_Prop_OomT_Vis with
+                (ta:=trigger (E1.IO_stderr str))
+                (k2:=
+                   (fun H5 : unit => match H5 with
+                                  | tt => get_inf_tree_L4 (k0 tt)
+                                  end)).
+              3: {
+                repeat red.
+                right.
+                setoid_rewrite bind_trigger.
+                reflexivity.
+              }
+
+              2: {
+                repeat red.
+                cbn.
+                rewrite bind_ret_r.
+                apply paco2_eqit_RR_refl; typeclasses eauto.
+              }
+
+              intros [] RET.
+              specialize (REL0 tt); red in REL0.
+              specialize (REL tt); red in REL.
+              pclearbot.
+
+              rewrite (itree_eta_ (k3 _)).
+              rewrite (itree_eta_ (k0 _)).
+              right.
+              eapply CIH;
+                repeat rewrite <- itree_eta_.
+              -- rewrite REL0.
+                 eapply H1.
+              -- rewrite REL.
+                 specialize (HK tt).
+                 forward HK.
+                 { rewrite HSPEC.
+                   eapply ReturnsVis.
+                   reflexivity.
+                   constructor.
+                   cbn.
+                   reflexivity.
+                 }
+                 pclearbot.
+                 eauto.
+            + move IHeqitF after x.
+              specialize (IHeqitF x1 str).
+              repeat (forward IHeqitF; eauto).
+              specialize (IHeqitF t2).
+              repeat (forward IHeqitF; eauto).
+              pstep; red; cbn.
+              constructor; eauto.
+              punfold IHeqitF.
+          - repeat (forward IHKS; eauto).
+            specialize (IHKS _ H H1 _ t1 HK HSPEC).
+            repeat (forward IHKS; eauto).
+            move IHKS after x.
+            rewrite <- x.
+            pstep; red; cbn.
+            constructor; eauto.
+            punfold IHKS.
+        }
       }
 
       destruct s.
@@ -38378,30 +38865,80 @@ cofix CIH
         destruct e1.
         { (* ExternalCallE *)
           destruct e0.
-          repeat red in H2.
-          break_match_hyp; try contradiction.
-          destruct e0.
-          destruct H2 as (?&?&?).
+          { (* Externalcall *)
+            repeat red in H2.
+            break_match_hyp; try contradiction.
+            destruct e0; try contradiction.
+            destruct H2 as (?&?&?).
 
-          specialize (H0 (fin_to_inf_dvalue x0) x0).
-          forward H0.
-          cbn.
-          repeat split; eauto.
-          apply fin_to_inf_dvalue_refine_strict.
-          
-          eapply ContainsUB.CrawlVis with (k:=k1).
-          change 
-            (@inl1 InterpreterStackBigIntptr.LP.Events.ExternalCallE (OOME +' UBE +' DebugE +' FailureE)
-               InterpreterStackBigIntptr.LP.Events.DV.dvalue
-               (InterpreterStackBigIntptr.LP.Events.ExternalCall t f args))
-            with
-            (@subevent InterpreterStackBigIntptr.LP.Events.L4 InterpreterStackBigIntptr.LP.Events.L4
-             (@ReSum_id (forall _ : Type, Type) IFun Id_IFun InterpreterStackBigIntptr.LP.Events.L4)
-             InterpreterStackBigIntptr.LP.Events.DV.dvalue (inl1 (InterpreterStackBigIntptr.LP.Events.ExternalCall t f args))).
-          reflexivity.
+            specialize (H0 (fin_to_inf_dvalue x0) x0).
+            forward H0.
+            cbn.
+            repeat split; eauto.
+            apply fin_to_inf_dvalue_refine_strict.
+            
+            eapply ContainsUB.CrawlVis with (k:=k1).
+            change 
+              (@inl1 InterpreterStackBigIntptr.LP.Events.ExternalCallE (OOME +' UBE +' DebugE +' FailureE)
+                 InterpreterStackBigIntptr.LP.Events.DV.dvalue
+                 (InterpreterStackBigIntptr.LP.Events.ExternalCall t f args))
+              with
+              (@subevent InterpreterStackBigIntptr.LP.Events.L4 InterpreterStackBigIntptr.LP.Events.L4
+                 (@ReSum_id (forall _ : Type, Type) IFun Id_IFun InterpreterStackBigIntptr.LP.Events.L4)
+                 InterpreterStackBigIntptr.LP.Events.DV.dvalue (inl1 (InterpreterStackBigIntptr.LP.Events.ExternalCall t f args))).
+            reflexivity.
 
-          eapply IHUB.
-          pclearbot; eauto.
+            eapply IHUB.
+            pclearbot; eauto.
+          }
+
+          { (* Stdout *)
+            repeat red in H2.
+            break_match_hyp; try contradiction.
+            destruct e0; try contradiction; subst.
+
+            specialize (H0 tt tt).
+            forward H0.
+            cbn; auto.
+            destruct x0.
+
+            eapply ContainsUB.CrawlVis with (x:=tt) (k:=k1).
+            change 
+              (@inl1 InterpreterStackBigIntptr.LP.Events.ExternalCallE (OOME +' UBE +' DebugE +' FailureE) unit
+                 (InterpreterStackBigIntptr.LP.Events.IO_stdout str0))
+              with
+              (@subevent InterpreterStackBigIntptr.LP.Events.L4 InterpreterStackBigIntptr.LP.Events.L4
+                 (@ReSum_id (forall _ : Type, Type) IFun Id_IFun InterpreterStackBigIntptr.LP.Events.L4)
+                 unit (inl1 (InterpreterStackBigIntptr.LP.Events.IO_stdout str0))).
+            reflexivity.
+
+            eapply IHUB.
+            pclearbot; eauto.
+          }
+
+          { (* Stderr *)
+            repeat red in H2.
+            break_match_hyp; try contradiction.
+            destruct e0; try contradiction; subst.
+
+            specialize (H0 tt tt).
+            forward H0.
+            cbn; auto.
+            destruct x0.
+
+            eapply ContainsUB.CrawlVis with (x:=tt) (k:=k1).
+            change 
+              (@inl1 InterpreterStackBigIntptr.LP.Events.ExternalCallE (OOME +' UBE +' DebugE +' FailureE) unit
+                 (InterpreterStackBigIntptr.LP.Events.IO_stderr str0))
+              with
+              (@subevent InterpreterStackBigIntptr.LP.Events.L4 InterpreterStackBigIntptr.LP.Events.L4
+                 (@ReSum_id (forall _ : Type, Type) IFun Id_IFun InterpreterStackBigIntptr.LP.Events.L4)
+                 unit (inl1 (InterpreterStackBigIntptr.LP.Events.IO_stderr str0))).
+            reflexivity.
+
+            eapply IHUB.
+            pclearbot; eauto.
+          }
         }
 
         destruct s.
@@ -38467,36 +39004,30 @@ cofix CIH
       punfold EQV; red in EQV; cbn in EQV.
       dependent induction EQV.
       + destruct e1 as [e1 | [e1 | [e1 | e1]]];
-          cbn in H2.
-        * destruct e1.
-          try contradiction.
-        * repeat break_match_hyp; try contradiction.
-        * repeat break_match_hyp; try contradiction.
-          subst.
-          destruct e1.
+          cbn in H2; destruct e1; try contradiction.
+        subst.
 
-          eapply ContainsUB.FindUB.
-          rewrite itree_eta.
-          setoid_rewrite <- x.
-          rewrite subevent_subevent.
+        eapply ContainsUB.FindUB.
+        rewrite itree_eta.
+        setoid_rewrite <- x.
+        rewrite subevent_subevent.
 
-          change 
-            (@inr1 InterpreterStackBigIntptr.LP.Events.ExternalCallE (OOME +' UBE +' DebugE +' FailureE)
-               void
-               (@inr1 OOME (UBE +' DebugE +' FailureE) void (@inl1 UBE (DebugE +' FailureE) void (ThrowUB u))))
-            with
-            (@subevent UBE InfLP.Events.L4
-               (fun (x0 : Type) (f : UBE x0) =>
-                  @ReSum_id (forall _ : Type, Type) IFun Id_IFun InfLP.Events.L4 x0
-                    (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 UBE
-                       (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) InfLP.Events.ExternalCallE
-                       (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 UBE
-                          (sum1 UBE (sum1 DebugE FailureE)) OOME
-                          (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 UBE UBE
-                             (sum1 DebugE FailureE) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun UBE)))
-                       x0 f)) Empty_set (ThrowUB u)).
-          reflexivity.
-        * repeat break_match_hyp; try contradiction.
+        change 
+          (@inr1 InterpreterStackBigIntptr.LP.Events.ExternalCallE (OOME +' UBE +' DebugE +' FailureE)
+             void
+             (@inr1 OOME (UBE +' DebugE +' FailureE) void (@inl1 UBE (DebugE +' FailureE) void (ThrowUB u))))
+          with
+          (@subevent UBE InfLP.Events.L4
+             (fun (x0 : Type) (f : UBE x0) =>
+                @ReSum_id (forall _ : Type, Type) IFun Id_IFun InfLP.Events.L4 x0
+                  (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 UBE
+                     (sum1 OOME (sum1 UBE (sum1 DebugE FailureE))) InfLP.Events.ExternalCallE
+                     (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 UBE
+                        (sum1 UBE (sum1 DebugE FailureE)) OOME
+                        (@ReSum_inl (forall _ : Type, Type) IFun sum1 Cat_IFun Inl_sum1 UBE UBE
+                           (sum1 DebugE FailureE) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun UBE)))
+                     x0 f)) Empty_set (ThrowUB u)).
+        reflexivity.
       + rewrite itree_eta.
         setoid_rewrite <- x.
         rewrite tau_eutt.
@@ -38943,7 +39474,4 @@ cofix CIH
   Qed.
 
   Print Assumptions model_E1E2_L6_orutt_strict_sound.
-
-  (* Bogus for safety... *)
-  euoauaohuhaoseu
 End InfiniteToFinite.
