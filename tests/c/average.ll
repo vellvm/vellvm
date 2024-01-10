@@ -59,7 +59,7 @@ define i32 @main() #0 {
   %3 = alloca i32, align 4
   store i32 0, i32* %1, align 4
   %4 = bitcast [3 x i32]* %2 to i8*
-  call void @llvm.memcpy.p0i8.p0i8.i32(i8* %4, i8* bitcast ([3 x i32]* @__const.main.array to i8*), i32 12, i32 0, i1 false)
+  call void @llvm.memcpy.p0i8.p0i8.i32(i8* %4, i8* bitcast ([3 x i32]* @__const.main.array to i8*), i32 12, i1 false)
   %5 = getelementptr inbounds [3 x i32], [3 x i32]* %2, i64 0, i64 0
   %6 = call i32 @average(i32* %5, i32 3)
   store i32 %6, i32* %3, align 4
