@@ -35539,7 +35539,7 @@ cofix CIH
       repeat change (fun x => ?h x) with h.
       reflexivity.
   Qed.
-
+    
   Lemma concretize_u_fin_inf :
     forall uv_inf uv_fin res,
       DVCInfFin.uvalue_refine_strict uv_inf uv_fin ->
@@ -35551,7 +35551,7 @@ cofix CIH
       try solve
         [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
           first [ break_match_hyp_inv | inv REF ];
-          cbn in CONC; inv CONC;
+          cbn in CONC; inversion CONC; try subst;
           cbn;
           unfold fin_to_inf_dvalue;
           break_match_goal; clear Heqs;
@@ -35562,143 +35562,97 @@ cofix CIH
           reflexivity
         ].
 
-    admit.
-    1: (solve
-        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
-          first [ break_match_hyp_inv | inv REF ];
-          cbn in CONC; inv CONC;
-          cbn;
-          unfold fin_to_inf_dvalue;
-          break_match_goal; clear Heqs;
-          destruct p;
-          cbn in *;
-          repeat (cbn in *; break_match_hyp_inv);
-          inv e;
-          reflexivity
-        ]).
-    try (solve
-        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
-          first [ break_match_hyp_inv | inv REF ];
-          cbn in CONC; inv CONC;
-          cbn;
-          unfold fin_to_inf_dvalue;
-          break_match_goal; clear Heqs;
-          destruct p;
-          cbn in *;
-          repeat (cbn in *; break_match_hyp_inv);
-          inv e;
-          reflexivity
-        ]).
-    try (solve
-        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
-          first [ break_match_hyp_inv | inv REF ];
-          cbn in CONC; inv CONC;
-          cbn;
-          unfold fin_to_inf_dvalue;
-          break_match_goal; clear Heqs;
-          destruct p;
-          cbn in *;
-          repeat (cbn in *; break_match_hyp_inv);
-          inv e;
-          reflexivity
-        ]).
-    try (solve
-        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
-          first [ break_match_hyp_inv | inv REF ];
-          cbn in CONC; inv CONC;
-          cbn;
-          unfold fin_to_inf_dvalue;
-          break_match_goal; clear Heqs;
-          destruct p;
-          cbn in *;
-          repeat (cbn in *; break_match_hyp_inv);
-          inv e;
-          reflexivity
-        ]).
-    try (solve
-        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
-          first [ break_match_hyp_inv | inv REF ];
-          cbn in CONC; inv CONC;
-          cbn;
-          unfold fin_to_inf_dvalue;
-          break_match_goal; clear Heqs;
-          destruct p;
-          cbn in *;
-          repeat (cbn in *; break_match_hyp_inv);
-          inv e;
-          reflexivity
-        ]).
+    - (* Addr *)
+      rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
+        first [ break_match_hyp_inv | inv REF ];
+        cbn in CONC; inversion CONC; try subst;
+        cbn;
+        unfold fin_to_inf_dvalue;
+        break_match_goal; clear Heqs;
+        destruct p;
+        cbn in *;
+        repeat (cbn in *; break_match_hyp_inv).
+      pose proof InfToFinAddrConvert.addr_convert_injective _ _ _ Heqo Heqo1; subst.
+      reflexivity.
+    - (* Iptr *)
+      rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
+        first [ break_match_hyp_inv | inv REF ];
+        cbn in CONC; inversion CONC; try subst;
+        cbn;
+        unfold fin_to_inf_dvalue;
+        break_match_goal; clear Heqs;
+        destruct p;
+        cbn in *;
+        repeat (cbn in *; break_match_hyp_inv).
+      inv e.
+      cbn in e0.
+      break_match_hyp_inv.
+      cbn in Heqo0.
+      unfold InterpreterStackBigIntptr.LP.IP.to_Z in *.
+      pose proof IP64Bit.from_Z_injective _ _ _ Heqo Heqo0; subst.
+      reflexivity.
+    - (* Undef *)
+      rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
+        first [ break_match_hyp_inv | inv REF ].
+      cbn in CONC.
+      destruct_err_ub_oom msg; cbn in CONC; try contradiction.
+      destruct CONC.
+      subst.
+      cbn.
+      split; eauto.
+      eapply dvalue_has_dtyp_fin_to_inf_dvalue; eauto.
+      eapply fin_to_inf_dvalue_not_poison; eauto.
+    - (* Struct *)
+      rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
+        first [ break_match_hyp_inv | inv REF ].
+      induction fields.
+      + cbn in Heqo; inv Heqo.
+        cbn in CONC. red in CONC.
+        destruct CONC as (ma&k'&?&?&?).
+        destruct_err_ub_oom ma; inv H0.
+        destruct H2 as [CONTRA | K'].
+        { cbn in CONTRA; try contradiction.
+        }
 
-    admit.
+        cbn.
+        red.
+        exists (ret []).
+        cbn.
+        exists (fun _ => fmap fin_to_inf_dvalue (k' [])).
 
-    try (solve
-        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
-          first [ break_match_hyp_inv | inv REF ];
-          cbn in CONC; inv CONC;
-          cbn;
-          unfold fin_to_inf_dvalue;
-          break_match_goal; clear Heqs;
-          destruct p;
-          cbn in *;
-          repeat (cbn in *; break_match_hyp_inv);
-          inv e;
-          reflexivity
-        ]).
-    try (solve
-        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
-          first [ break_match_hyp_inv | inv REF ];
-          cbn in CONC; inv CONC;
-          cbn;
-          unfold fin_to_inf_dvalue;
-          break_match_goal; clear Heqs;
-          destruct p;
-          cbn in *;
-          repeat (cbn in *; break_match_hyp_inv);
-          inv e;
-          reflexivity
-        ]).
+        split; eauto.
+        specialize (K' []).
+        forward K'; cbn; auto.
+        rewrite <- K'.
+        cbn.
 
-    admit.
+        split; eauto.
+        right.
+        intros a H0; subst.
+        unfold fin_to_inf_dvalue.
+        break_match_goal; clear Heqs.
+        destruct p.
+        cbn in e, e0.
+        inv e.
+        reflexivity.
+      + cbn in Heqo.
+        break_match_hyp_inv.
+        break_match_hyp_inv.
+        repeat red in CONC.
+        red in CONC.
+        rewrite Memory64BitIntptr.CP.CONCBASE.concretize_uvalueM_equation in CONC.
+        rewrite map_monad_unfold in CONC.
 
-    try (solve
-        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
-          first [ break_match_hyp_inv | inv REF ];
-          cbn in CONC; inv CONC;
-          cbn;
-          unfold fin_to_inf_dvalue;
-          break_match_goal; clear Heqs;
-          destruct p;
-          cbn in *;
-          repeat (cbn in *; break_match_hyp_inv);
-          inv e;
-          reflexivity
-        ]).
-    try (solve
-        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
-          first [ break_match_hyp_inv | inv REF ];
-          cbn in CONC; inv CONC;
-          cbn;
-          unfold fin_to_inf_dvalue;
-          break_match_goal; clear Heqs;
-          destruct p;
-          cbn in *;
-          repeat (cbn in *; break_match_hyp_inv);
-          inv e;
-          reflexivity
-        ]).
-    try (solve
-        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
-          first [ break_match_hyp_inv | inv REF ];
-          cbn in CONC; inv CONC;
-          cbn;
-          unfold fin_to_inf_dvalue;
-          break_match_goal; clear Heqs;
-          destruct p;
-          cbn in *;
-          repeat (cbn in *; break_match_hyp_inv);
-          inv e;
-          reflexivity
-        ]).
+        cbn.
+        repeat red.
+        red in CONC.
+
+      cbn in CONC.
+      destruct_err_ub_oom msg; cbn in CONC; try contradiction.
+      admit.
+      admit.
+      admit.
+      admit.
   Admitted.
 
   (* TODO: Move this, prove this *)
