@@ -33,7 +33,7 @@ VELLVM_BC =_build/default/ml/main.bc
 
 ######## The "frontend" is only the parser/pretty-printer 
 FRONTEND_EXE=_build/default/ml/frontend.exe
-COQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper
+COQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper Semantics/TopLevel Semantics/InterpretationStack QC/GenAlive2 Syntax/LLVMAst Syntax/AstLib
 FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
 
 .DEFAULT_GOAL := all
@@ -162,8 +162,10 @@ $(EXTRACTDIR)/FRONTEND_STAMP: $(FRONTEND_VOFILES) $(EXTRACTDIR)/ExtractFrontend.
 	@echo "Extracting Frontend"
 	rm -f $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
 	$(COQEXEC) $(EXTRACTDIR)/ExtractFrontend.v
-	patch -p0 < CRelationClasses.mli.patch
-	patch -p0 < GenAlive2.ml.patch
+	# patch -p0 < CRelationClasses.mli.patch
+	# patch -p0 < GenAlive2.ml.patch
+	@echo "Fixing Extraction"
+	bash fix-extraction.sh
 	touch $(EXTRACTDIR)/FRONTEND_STAMP
 	rm -f $(EXTRACTDIR)/STAMP   # invalidate "normal" extraction
 
