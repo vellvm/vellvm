@@ -17474,7 +17474,46 @@ Qed.
 
     intros r1 r2 R1R2.
     eapply orutt_bind with (RR:=addr_refine).
-    { admit.
+    { cbn.
+      unfold intptr_fin_inf in R1R2.
+      break_match_hyp.
+      clear Heqs.
+      subst.
+
+      pose proof AC1.addr_convert_ptoi _ _ REF.
+      rewrite H.
+      rewrite sizeof_dtyp_fin_inf.
+      assert (IS1.LP.IP.to_Z r1 = IP.to_Z r2).
+      { eapply IS1.LP.IP.from_Z_to_Z in e.
+        eauto.
+      }
+
+      (* Finite conversion *)
+      destruct (ITOP.int_to_ptr (PTOI.ptr_to_int addr2 + Z.of_N (SIZEOF.sizeof_dtyp (DTYPE_I 8)) * IP.to_Z r2)
+                  (PROV.address_provenance addr2)) eqn:HITOP.
+      2: apply orutt_raiseOOM.
+
+      cbn.
+
+      pose proof addr_convert_succeeds addr2 as (?&?).
+      pose proof addr_convert_succeeds a as (?&?).
+      pose proof HITOP as HITOP'.
+      eapply addr_convert_int_to_ptr in HITOP'; eauto.
+
+      assert (IS1.LP.PROV.address_provenance x = IS1.LP.PROV.address_provenance addr1).
+      { clear - e0 REF.
+        pose proof addr_convert_safe _ _ e0.
+        pose proof AC1.addr_convert_injective _ _ _ REF H; subst.
+        reflexivity.
+      }
+
+      rewrite H1 in HITOP'.
+      rewrite H0.
+      rewrite HITOP'.
+
+      cbn.
+      eapply orutt_Ret.
+      eapply addr_convert_safe; eauto.
     }
 
     intros r0 r3 H.
@@ -17503,7 +17542,7 @@ Qed.
 
     eapply orutt_Ret.
     reflexivity.
-  Admitted.
+  Qed.
 
   Opaque LLVM1.i8_str_index.
   Opaque LLVM2.i8_str_index.
