@@ -34,6 +34,7 @@ Open Scope monad_scope.
 
 Module BigIP : MemoryAddress.INTPTR with
 Definition intptr := Z with
+  Definition zero := 0%Z with
 Definition from_Z := (fun (x : Z) => ret x : OOM Z) with
 Definition to_Z := fun (x : Z) => x with
 Definition VMemInt_intptr := VMemInt_Z.
@@ -263,6 +264,7 @@ Instance VMemInt_intptr_i64 : VMemInt int64
 
 Module IP64Bit : MemoryAddress.INTPTR with
 Definition intptr := int64 with
+Definition zero := Int64.zero with
 Definition from_Z := from_Z_64 with
 Definition to_Z := Int64.signed with
 Definition VMemInt_intptr := VMemInt_intptr_i64.

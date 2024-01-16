@@ -159,19 +159,274 @@ Proof.
 Qed.
 
 Import VellvmIntegers.
-Module Type VMemInt_Eqv (IP1 : INTPTR) (IP2 : INTPTR).
-  Parameter madd_carry_eqv :
-    forall x y c x1 y1 c1 x2 y2 c2,
-      IP1.from_Z x = NoOom x1 ->
-      IP1.from_Z y = NoOom y1 ->
-      IP1.from_Z c = NoOom c1 ->
-      IP2.from_Z x = NoOom x2 ->
-      IP2.from_Z y = NoOom y2 ->
-      IP2.from_Z c = NoOom c2 ->
-      IP1.to_Z (@madd_carry _ IP1.VMemInt_intptr x1 y1 c1) = IP2.to_Z (@madd_carry _ IP2.VMemInt_intptr x2 y2 c2).
-End VMemInt_Eqv.
 
-Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI) (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC). (* (VMEQV : VMemInt_Eqv IS1.LP.IP IS2.LP.IP). *)
+(* TODO: Move this (FiniteIntptr.v) *)
+Module Type VMemInt_Intptr_Properties (IP : INTPTR).
+  (* No overflows *)
+  Parameter madd_carry_zero :
+    forall x y c,
+      (@madd_carry _ IP.VMemInt_intptr x y c) = IP.zero.
+
+  Parameter madd_overflow_zero :
+    forall x y c,
+      (@madd_overflow _ IP.VMemInt_intptr x y c) = IP.zero.
+
+  Parameter msub_borrow_zero :
+    forall x y c,
+      (@msub_borrow _ IP.VMemInt_intptr x y c) = IP.zero.
+
+  Parameter msub_overflow_zero :
+    forall x y c,
+      (@msub_overflow _ IP.VMemInt_intptr x y c) = IP.zero.
+
+  (* Equality properties *)
+  Parameter mequ_zero_one_false :
+    @mequ _ IP.VMemInt_intptr IP.zero (@mone _ IP.VMemInt_intptr) = false.
+
+  Parameter mequ_one_zero_false :
+    @mequ _ IP.VMemInt_intptr (@mone _ IP.VMemInt_intptr) IP.zero = false.
+End VMemInt_Intptr_Properties.
+
+Module Type VMemInt_Refine (IP_INF : INTPTR) (IP_FIN : INTPTR).
+  Parameter madd_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @madd _ IP_FIN.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
+      exists r_inf,
+        @madd _ IP_INF.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
+          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+
+  Parameter msub_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @msub _ IP_FIN.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
+      exists r_inf,
+        @msub _ IP_INF.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
+          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+
+  Parameter mshl_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @mshl _ IP_FIN.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
+      exists r_inf,
+        @mshl _ IP_INF.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
+          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+End VMemInt_Refine.
+
+Module VMemInt_Intptr_Properties_Inf : VMemInt_Intptr_Properties InterpreterStackBigIntptr.LP.IP.
+  (* No overflows *)
+  Lemma madd_carry_zero :
+    forall x y c,
+      (@madd_carry _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x y c) = InterpreterStackBigIntptr.LP.IP.zero.
+  Proof.
+    intros x y c.
+    cbn.
+    setoid_rewrite InterpreterStackBigIntptr.LP.IP.to_Z_0.
+    reflexivity.
+  Qed.
+
+  Lemma madd_overflow_zero :
+    forall x y c,
+      (@madd_overflow _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x y c) = InterpreterStackBigIntptr.LP.IP.zero.
+  Proof.
+    intros x y c.
+    cbn.
+    setoid_rewrite InterpreterStackBigIntptr.LP.IP.to_Z_0.
+    reflexivity.
+  Qed.
+
+  Lemma msub_borrow_zero :
+    forall x y c,
+      (@msub_borrow _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x y c) = InterpreterStackBigIntptr.LP.IP.zero.
+  Proof.
+    intros x y c.
+    cbn.
+    setoid_rewrite InterpreterStackBigIntptr.LP.IP.to_Z_0.
+    reflexivity.
+  Qed.
+
+  Lemma msub_overflow_zero :
+    forall x y c,
+      (@msub_overflow _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x y c) = InterpreterStackBigIntptr.LP.IP.zero.
+  Proof.
+    intros x y c.
+    cbn.
+    setoid_rewrite InterpreterStackBigIntptr.LP.IP.to_Z_0.
+    reflexivity.
+  Qed.
+
+  (* Equality properties *)
+  Lemma mequ_zero_one_false :
+    @mequ _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr InterpreterStackBigIntptr.LP.IP.zero (@mone _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr) = false.
+  Proof.
+    cbn; lia.
+  Qed.
+
+  Lemma mequ_one_zero_false :
+    @mequ _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr (@mone _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr) InterpreterStackBigIntptr.LP.IP.zero = false.
+  Proof.
+    cbn; lia.
+  Qed.
+
+End VMemInt_Intptr_Properties_Inf.
+
+Module VMemInt_Intptr_Properties_Fin : VMemInt_Intptr_Properties InterpreterStack64BitIntptr.LP.IP.
+  (* No overflows *)
+  Lemma madd_carry_zero :
+    forall x y c,
+      (@madd_carry _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x y c) = InterpreterStack64BitIntptr.LP.IP.zero.
+  Proof.
+    intros x y c.
+    cbn.
+    unfold InterpreterStack64BitIntptr.LP.IP.zero in *.
+    reflexivity.
+  Qed.
+
+  Lemma madd_overflow_zero :
+    forall x y c,
+      (@madd_overflow _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x y c) = InterpreterStack64BitIntptr.LP.IP.zero.
+  Proof.
+    intros x y c.
+    cbn.
+    unfold InterpreterStack64BitIntptr.LP.IP.zero in *.
+    reflexivity.
+  Qed.
+
+  Lemma msub_borrow_zero :
+    forall x y c,
+      (@msub_borrow _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x y c) = InterpreterStack64BitIntptr.LP.IP.zero.
+  Proof.
+    intros x y c.
+    cbn.
+    unfold InterpreterStack64BitIntptr.LP.IP.zero in *.
+    reflexivity.
+  Qed.
+
+  Lemma msub_overflow_zero :
+    forall x y c,
+      (@msub_overflow _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x y c) = InterpreterStack64BitIntptr.LP.IP.zero.
+  Proof.
+    intros x y c.
+    cbn.
+    reflexivity.
+  Qed.
+
+  (* Equality properties *)
+  Lemma mequ_zero_one_false :
+    @mequ _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr InterpreterStack64BitIntptr.LP.IP.zero (@mone _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr) = false.
+  Proof.
+    cbn.
+    reflexivity.
+  Qed.
+
+  Lemma mequ_one_zero_false :
+    @mequ _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr (@mone _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr) InterpreterStack64BitIntptr.LP.IP.zero = false.
+  Proof.
+    cbn.
+    reflexivity.
+  Qed.
+
+End VMemInt_Intptr_Properties_Fin.
+
+Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP InterpreterStack64BitIntptr.LP.IP.
+  Lemma madd_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @madd _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
+      exists r_inf,
+        @madd _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
+          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
+  Proof.
+    intros x_fin y_fin r_fin x_inf y_inf X Y ADD.
+    cbn.
+    exists (x_inf + y_inf)%Z.
+    split; auto.
+
+    cbn in ADD.
+    break_match_hyp_inv.
+
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    rewrite Int64.add_signed.
+    rewrite X, Y.
+    rewrite Int64.signed_repr; eauto.
+
+    (* TODO: Separate this into lemma? *)
+    unfold Int64.add_overflow in Heqb.
+    cbn in Heqb.
+    break_match_hyp; cbn in Heqb; try discriminate.
+
+    unfold Coqlib.zle in Heqb0.
+    apply Bool.andb_true_iff in Heqb0.
+    destruct Heqb0.
+
+    apply Coqlib.proj_sumbool_true in H, H0.
+    cbn in *.
+    rewrite X, Y, Int64.signed_zero in *.
+    lia.
+  Qed.
+
+  Lemma msub_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @msub _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
+      exists r_inf,
+        @msub _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
+          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
+  Proof.
+    intros x_fin y_fin r_fin x_inf y_inf X Y SUB.
+    cbn.
+    exists (x_inf - y_inf)%Z.
+    split; auto.
+
+    cbn in SUB.
+    break_match_hyp_inv.
+
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    rewrite Int64.sub_signed.
+    rewrite X, Y.
+    rewrite Int64.signed_repr; eauto.
+
+    (* TODO: Separate this into lemma? *)
+    unfold Int64.sub_overflow in Heqb.
+    cbn in Heqb.
+    break_match_hyp; cbn in Heqb; try discriminate.
+
+    unfold Coqlib.zle in Heqb0.
+    apply Bool.andb_true_iff in Heqb0.
+    destruct Heqb0.
+
+    apply Coqlib.proj_sumbool_true in H, H0.
+    cbn in *.
+    rewrite X, Y, Int64.signed_zero in *.
+    lia.
+  Qed.
+
+  Lemma mshl_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @mshl _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
+      exists r_inf,
+        @mshl _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
+          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
+  Proof.
+    intros x_fin y_fin r_fin x_inf y_inf X Y SHL.
+    cbn.
+    exists (Z.shiftl x_inf y_inf).
+    split; auto.
+
+    cbn in SHL.
+    break_match_hyp_inv.
+  Admitted.
+
+End VMemInt_Refine_InfFin.
+
+Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI) (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC) (VMEM_IP_PROP1 : VMemInt_Intptr_Properties IS1.LP.IP) (VMEM_IP_PROP2 : VMemInt_Intptr_Properties IS2.LP.IP) (VMEM_REF : VMemInt_Refine IS1.LP.IP IS2.LP.IP).
   Import TLR.
 
   Import TC.
@@ -8576,44 +8831,87 @@ Qed.
         IS1.LP.Events.DV.VMemInt_intptr' IS1.LP.Events.DV.ToDvalue_intptr
         iop v1_inf v2_inf = success_unERR_UB_OOM res_inf.
   Proof.
-  (*   intros v1_fin v2_fin v1_inf v2_inf iop res_fin res_inf *)
-  (*     EVAL LIFT1 LIFT2 CONV. *)
-  (*   destruct iop. *)
-  (*   - cbn in *. *)
-  (*     repeat break_match_hyp_inv. *)
-  (* (* May be a problem... *)
+    intros v1_fin v2_fin v1_inf v2_inf iop res_fin res_inf
+      EVAL LIFT1 LIFT2 CONV.
+    destruct iop.
+    - (* Add *)
+      cbn in *.
+      repeat rewrite VMEM_IP_PROP1.madd_carry_zero, VMEM_IP_PROP1.madd_overflow_zero.
+      repeat rewrite VMEM_IP_PROP2.madd_carry_zero, VMEM_IP_PROP2.madd_overflow_zero in EVAL.
+      setoid_rewrite VMEM_IP_PROP1.mequ_zero_one_false.
+      setoid_rewrite VMEM_IP_PROP2.mequ_zero_one_false in EVAL.
+      repeat rewrite Bool.andb_false_r.
+      repeat rewrite Bool.andb_false_r in EVAL.
+      cbn in *.
 
-  (*    madd_carry / madd_overflow will always return 0 for the infinite *)
-  (*    intptr types (because they never overflow)... *)
+      remember (lift_OOM (madd v1_fin v2_fin)) as add_result.
+      destruct_err_ub_oom add_result; inv EVAL.
+      symmetry in Heqadd_result.
+      destruct (madd v1_fin v2_fin) eqn:HADD; inv Heqadd_result.
 
-  (*    This means the finite version may return poison in overflow *)
-  (*    cases. *)
+      cbn in CONV.
+      break_match_hyp_inv.
 
-  (*    Consider changing madd_carry and madd_overflow for finite intptrs *)
-  (*    to never overflow and just OOM instead. *)
-  (*  *) *)
-  (*     Import VMEQV. *)
-  (*     pose proof madd_carry_eqv (IP.to_Z v1_fin) (IP.to_Z v2_fin) 0%Z v1_inf v2_inf (@mzero IS1.LP.IP.intptr IS1.LP.Events.DV.VMemInt_intptr') v1_fin v2_fin (@mzero IS2.LP.IP.intptr IS2.LP.Events.DV.VMemInt_intptr'). *)
-  (*     do 2 (forward H; eauto). *)
-  (*     forward H. admit. *)
-  (*     forward H. rewrite IP.to_Z_from_Z; auto. *)
-  (*     forward H. rewrite IP.to_Z_from_Z; auto. *)
-  (*     forward H. admit. *)
+      assert (IP.to_Z v1_fin = IS1.LP.IP.to_Z v1_inf) as V1.
+      { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
 
-  (*     Set Nested Proofs Allowed. *)
-  (*     Lemma mequ_to_Z : *)
-  (*       forall x y a b, *)
-  (*         IS1.LP.IP.to_Z x = a -> *)
-  (*         IS1.LP.IP.to_Z y = b -> *)
-  (*         mequ x y = Z.eqb a b. *)
-  (*     Proof. *)
-  (*     Admitted. *)
+      assert (IP.to_Z v2_fin = IS1.LP.IP.to_Z v2_inf) as V2.
+      { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
 
-  (*     erewrite mequ_to_Z; eauto. *)
+      pose proof VMEM_REF.madd_refine _ _ _ v1_inf v2_inf V1 V2 HADD as (?&?&?).
+      setoid_rewrite H. cbn.
+      rewrite H0 in Heqo.
+      rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+      inv Heqo.
+      reflexivity.
+    - (* Sub *)
+      cbn in *.
+      repeat rewrite VMEM_IP_PROP1.msub_borrow_zero, VMEM_IP_PROP1.msub_overflow_zero.
+      repeat rewrite VMEM_IP_PROP2.msub_borrow_zero, VMEM_IP_PROP2.msub_overflow_zero in EVAL.
+      setoid_rewrite VMEM_IP_PROP1.mequ_zero_one_false.
+      setoid_rewrite VMEM_IP_PROP2.mequ_zero_one_false in EVAL.
+      repeat rewrite Bool.andb_false_r.
+      repeat rewrite Bool.andb_false_r in EVAL.
+      cbn in *.
 
-  (*     unfold VellvmIntegers.madd_carry in *. *)
-  (*     unfold VellvmIntegers.mequ in *. *)
-  (*     cbn. *)
+      remember (lift_OOM (msub v1_fin v2_fin)) as sub_result.
+      destruct_err_ub_oom sub_result; inv EVAL.
+      symmetry in Heqsub_result.
+      destruct (msub v1_fin v2_fin) eqn:HSUB; inv Heqsub_result.
+
+      cbn in CONV.
+      break_match_hyp_inv.
+
+      assert (IP.to_Z v1_fin = IS1.LP.IP.to_Z v1_inf) as V1.
+      { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
+
+      assert (IP.to_Z v2_fin = IS1.LP.IP.to_Z v2_inf) as V2.
+      { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
+
+      epose proof VMEM_REF.msub_refine _ _ _ v1_inf v2_inf V1 V2 HSUB as (?&?&?).
+      setoid_rewrite H. cbn.
+      rewrite H0 in Heqo.
+      rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+      inv Heqo.
+      reflexivity.
+    - (* Mul *)
+      (* Not sure about overflow cases for this. May need to adjust eval_int_op *)
+      admit.
+    - (* Shl *)
+      cbn in *.
+      destruct (mshl v1_fin v2_fin) eqn:HSHL;
+        cbn in *; inv EVAL.
+
+      assert (IP.to_Z v1_fin = IS1.LP.IP.to_Z v1_inf) as V1.
+      { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
+
+      assert (IP.to_Z v2_fin = IS1.LP.IP.to_Z v2_inf) as V2.
+      { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
+
+      epose proof VMEM_REF.mshl_refine _ _ _ v1_inf v2_inf V1 V2 HSHL as (?&?&?).
+      setoid_rewrite H; cbn in *.
+
+      admit.
   Admitted.
 
   Lemma dvalue_convert_strict_fin_inf_succeeds_fin_to_inf_dvalue' :
@@ -19432,11 +19730,11 @@ Qed.
 End LangRefine.
 
 Module MakeLangRefine
-  (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI) (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC) : LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR IPS ACS DVC DVCrev EC TC.
-  Include LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR IPS ACS DVC DVCrev EC TC.
+  (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI) (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC) (VMEM_IP_PROP1 : VMemInt_Intptr_Properties IS1.LP.IP) (VMEM_IP_PROP2 : VMemInt_Intptr_Properties IS2.LP.IP) (VMEM_REF : VMemInt_Refine IS1.LP.IP IS2.LP.IP) : LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR IPS ACS DVC DVCrev EC TC VMEM_IP_PROP1 VMEM_IP_PROP2 VMEM_REF.
+  Include LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR IPS ACS DVC DVCrev EC TC VMEM_IP_PROP1 VMEM_IP_PROP2 VMEM_REF.
 End MakeLangRefine.
 
-Module InfFinLangRefine := MakeLangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr InfToFinAddrConvert FinToInfAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr FinToInfIntptrConvertSafe FinToInfAddrConvertSafe DVCInfFin DVCFinInf ECInfFin TCInfFin.
+Module InfFinLangRefine := MakeLangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr InfToFinAddrConvert FinToInfAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr FinToInfIntptrConvertSafe FinToInfAddrConvertSafe DVCInfFin DVCFinInf ECInfFin TCInfFin VMemInt_Intptr_Properties_Inf VMemInt_Intptr_Properties_Fin VMemInt_Refine_InfFin.
 
 (* Just planning on using this for L4_convert from finite to infinite events. *)
 (* Module FinInfLangRefine := MakeLangRefine InterpreterStack64BitIntptr InterpreterStackBigIntptr FinToInfAddrConvert InfToFinAddrConvert TopLevel64BitIntptr TopLevelBigIntptr TopLevelRefinementsBigIntptr FinToInfIntptrConvertSafe. DVCFinInf DVCInfFin ECFinInf . *)
