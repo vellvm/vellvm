@@ -206,6 +206,15 @@ Module Type VMemInt_Refine (IP_INF : INTPTR) (IP_FIN : INTPTR).
         @msub _ IP_INF.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
           IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
 
+  Parameter mmul_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @mmul _ IP_FIN.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
+      exists r_inf,
+        @mmul _ IP_INF.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
+          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+
   Parameter mshl_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
       IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
@@ -213,6 +222,87 @@ Module Type VMemInt_Refine (IP_INF : INTPTR) (IP_FIN : INTPTR).
       @mshl _ IP_FIN.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
       exists r_inf,
         @mshl _ IP_INF.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
+          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+
+  Parameter mdivu_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @mdivu _ IP_FIN.VMemInt_intptr x_fin y_fin = r_fin ->
+      exists r_inf,
+        @mdivu _ IP_INF.VMemInt_intptr x_inf y_inf = r_inf /\
+          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+
+  Parameter mdivs_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @mdivs _ IP_FIN.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
+      exists r_inf,
+        @mdivs _ IP_INF.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
+          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+
+  Parameter mshr_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @mshr _ IP_FIN.VMemInt_intptr x_fin y_fin = r_fin ->
+      exists r_inf,
+        @mshr _ IP_INF.VMemInt_intptr x_inf y_inf = r_inf /\
+          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+
+  Parameter mshru_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @mshru _ IP_FIN.VMemInt_intptr x_fin y_fin = r_fin ->
+      exists r_inf,
+        @mshru _ IP_INF.VMemInt_intptr x_inf y_inf = r_inf /\
+          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+
+  Parameter mmods_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @mmods _ IP_FIN.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
+      exists r_inf,
+        @mmods _ IP_INF.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
+          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+
+  Parameter mmodu_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @mmodu _ IP_FIN.VMemInt_intptr x_fin y_fin = r_fin ->
+      exists r_inf,
+        @mmodu _ IP_INF.VMemInt_intptr x_inf y_inf = r_inf /\
+          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+
+  Parameter mand_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @mand _ IP_FIN.VMemInt_intptr x_fin y_fin = r_fin ->
+      exists r_inf,
+        @mand _ IP_INF.VMemInt_intptr x_inf y_inf = r_inf /\
+          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+
+  Parameter mor_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @mor _ IP_FIN.VMemInt_intptr x_fin y_fin = r_fin ->
+      exists r_inf,
+        @mor _ IP_INF.VMemInt_intptr x_inf y_inf = r_inf /\
+          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+
+  Parameter mxor_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @mxor _ IP_FIN.VMemInt_intptr x_fin y_fin = r_fin ->
+      exists r_inf,
+        @mxor _ IP_INF.VMemInt_intptr x_inf y_inf = r_inf /\
           IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
 End VMemInt_Refine.
 
@@ -406,6 +496,31 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     lia.
   Qed.
 
+  Lemma mmul_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @mmul _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
+      exists r_inf,
+        @mmul _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
+          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
+  Proof.
+    intros x_fin y_fin r_fin x_inf y_inf X Y MUL.
+    cbn.
+    exists (x_inf * y_inf)%Z.
+    split; auto.
+
+    cbn in MUL.
+    break_match_hyp_inv.
+
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    rewrite Int64.mul_signed.
+    rewrite X, Y.
+    rewrite Int64.signed_repr; eauto.
+    cbn.
+    lia.
+  Qed.
+
   Lemma mshl_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
       InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
@@ -420,8 +535,224 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     exists (Z.shiftl x_inf y_inf).
     split; auto.
 
-    cbn in SHL.
+  (*   Opaque Z.sub. *)
+  (*   cbn in SHL. *)
+
+  (*   break_match_hyp_inv. *)
+  (*   break_match_hyp_inv. *)
+
+  (*   unfold Int64.shl in *. *)
+  (*   unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *. *)
+  (*   unfold Int64.signed in X, Y. *)
+  (*   break_match_hyp; break_match_hyp. *)
+  (*   - rewrite X, Y. *)
+  (*     rewrite Int64.signed_repr; eauto. *)
+
+  (*   mshl := *)
+  (*     fun x y => *)
+  (*       let res := Int64.shl x y in *)
+  (*       if Int64.signed res =? Int64.min_signed *)
+  (*       then Oom "IP64Bit left shift overflow (res is min signed, should not happen)." *)
+  (*       else *)
+  (*         let nres := Int64.negative res in *)
+  (*         if (negb (Z.shiftr (Int64.unsigned x) *)
+  (*                     (64%Z - Int64.unsigned y) *)
+  (*                   =? (Int64.unsigned nres) *)
+  (*                      * (Z.pow 2 (Int64.unsigned y) - 1))%Z) *)
+  (*         then Oom "IP64Bit left shift overflow." *)
+  (*         else ret res; *)
+    (* Qed. *)
+  Admitted.
+
+  Lemma mdivu_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @mdivu _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = r_fin ->
+      exists r_inf,
+        @mdivu _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = r_inf /\
+          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
+  Proof.
+    intros x_fin y_fin r_fin x_inf y_inf X Y DIV.
+    cbn.
+    exists (x_inf / y_inf)%Z.
+    split; auto.
+
+    cbn in DIV.
+    subst.
+
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+  Admitted.
+
+  Lemma mdivs_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @mdivs _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
+      exists r_inf,
+        @mdivs _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
+          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
+  Proof.
+    intros x_fin y_fin r_fin x_inf y_inf X Y DIV.
+    cbn.
+    exists (x_inf / y_inf)%Z.
+    split; auto.
+
+    cbn in *.
     break_match_hyp_inv.
+
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    unfold Int64.divs.
+    rewrite X, Y.
+    rewrite Int64.signed_repr; eauto.
+  Admitted.
+
+  Lemma mshr_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @mshr _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = r_fin ->
+      exists r_inf,
+        @mshr _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = r_inf /\
+          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
+  Proof.
+    intros x_fin y_fin r_fin x_inf y_inf X Y SHR.
+    cbn.
+    exists (Z.shiftr x_inf y_inf).
+    split; auto.
+
+    cbn in SHR.
+    subst.
+
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+  Admitted.
+
+  Lemma mshru_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @mshru _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = r_fin ->
+      exists r_inf,
+        @mshru _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = r_inf /\
+          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
+  Proof.
+    intros x_fin y_fin r_fin x_inf y_inf X Y SHR.
+    cbn.
+    exists (Z.shiftr x_inf y_inf).
+    split; auto.
+
+    cbn in SHR.
+    subst.
+
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+  Admitted.
+
+  Lemma mmods_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @mmods _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
+      exists r_inf,
+        @mmods _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
+          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
+  Proof.
+    intros x_fin y_fin r_fin x_inf y_inf X Y MOD.
+    cbn.
+    exists (x_inf mod y_inf)%Z.
+    split; auto.
+
+    cbn in MOD.
+    subst.
+
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    break_match_hyp_inv.
+  Admitted.
+
+  Lemma mmodu_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @mmodu _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = r_fin ->
+      exists r_inf,
+        @mmodu _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = r_inf /\
+          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
+  Proof.
+    intros x_fin y_fin r_fin x_inf y_inf X Y MOD.
+    cbn.
+    exists (x_inf mod y_inf)%Z.
+    split; auto.
+
+    cbn in MOD.
+    subst.
+
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+  Admitted.
+
+  Lemma mand_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @mand _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = r_fin ->
+      exists r_inf,
+        @mand _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = r_inf /\
+          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
+  Proof.
+    intros x_fin y_fin r_fin x_inf y_inf X Y AND.
+    cbn.
+    exists (Z.land x_inf y_inf).
+    split; auto.
+
+    cbn in AND.
+    unfold Int64.and in AND.
+    subst.
+
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    unfold Int64.signed in X, Y.
+    break_match_hyp; break_match_hyp.
+    - rewrite X, Y.
+      rewrite Int64.signed_repr; eauto.
+  Admitted.
+
+  Lemma mor_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @mor _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = r_fin ->
+      exists r_inf,
+        @mor _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = r_inf /\
+          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
+  Proof.
+    intros x_fin y_fin r_fin x_inf y_inf X Y OR.
+    cbn.
+    exists (Z.lor x_inf y_inf).
+    split; auto.
+
+    cbn in OR.
+    unfold Int64.or in OR.
+    subst.
+
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+  Admitted.
+
+  Lemma mxor_refine :
+    forall x_fin y_fin r_fin x_inf y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @mxor _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = r_fin ->
+      exists r_inf,
+        @mxor _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = r_inf /\
+          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
+  Proof.
+    intros x_fin y_fin r_fin x_inf y_inf X Y XOR.
+    cbn.
+    exists (Z.lxor x_inf y_inf).
+    split; auto.
+
+    cbn in XOR.
+    unfold Int64.xor in XOR.
+    subst.
+
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
   Admitted.
 
 End VMemInt_Refine_InfFin.
@@ -8833,6 +9164,13 @@ Qed.
   Proof.
     intros v1_fin v2_fin v1_inf v2_inf iop res_fin res_inf
       EVAL LIFT1 LIFT2 CONV.
+
+    assert (IP.to_Z v1_fin = IS1.LP.IP.to_Z v1_inf) as V1.
+    { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
+
+    assert (IP.to_Z v2_fin = IS1.LP.IP.to_Z v2_inf) as V2.
+    { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
+
     destruct iop.
     - (* Add *)
       cbn in *.
@@ -8851,12 +9189,6 @@ Qed.
 
       cbn in CONV.
       break_match_hyp_inv.
-
-      assert (IP.to_Z v1_fin = IS1.LP.IP.to_Z v1_inf) as V1.
-      { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
-
-      assert (IP.to_Z v2_fin = IS1.LP.IP.to_Z v2_inf) as V2.
-      { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
 
       pose proof VMEM_REF.madd_refine _ _ _ v1_inf v2_inf V1 V2 HADD as (?&?&?).
       setoid_rewrite H. cbn.
@@ -8882,12 +9214,6 @@ Qed.
       cbn in CONV.
       break_match_hyp_inv.
 
-      assert (IP.to_Z v1_fin = IS1.LP.IP.to_Z v1_inf) as V1.
-      { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
-
-      assert (IP.to_Z v2_fin = IS1.LP.IP.to_Z v2_inf) as V2.
-      { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
-
       epose proof VMEM_REF.msub_refine _ _ _ v1_inf v2_inf V1 V2 HSUB as (?&?&?).
       setoid_rewrite H. cbn.
       rewrite H0 in Heqo.
@@ -8895,23 +9221,123 @@ Qed.
       inv Heqo.
       reflexivity.
     - (* Mul *)
-      (* Not sure about overflow cases for this. May need to adjust eval_int_op *)
+      cbn in *.
+      destruct mbitwidth; cbn in EVAL.
+      2: {
+        remember (lift_OOM (mmul v1_fin v2_fin)) as mul_result.
+        destruct_err_ub_oom mul_result; inv EVAL.
+        symmetry in Heqmul_result.
+        destruct (mmul v1_fin v2_fin) eqn:HMUL; inv Heqmul_result.
+
+        cbn in H0.
+        setoid_rewrite IP.VMemInt_intptr_dtyp in H0.
+        setoid_rewrite dtyp_eqb_refl in H0.
+        break_match_hyp_inv.
+
+        cbn in CONV.
+        move CONV after Heqb.
+        break_match_hyp_inv.
+
+        epose proof VMEM_REF.mmul_refine _ _ _ v1_inf v2_inf V1 V2 HMUL as (?&?&?).
+        rewrite H0 in Heqo.
+        rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+        inv Heqo.
+        repeat setoid_rewrite H. cbn.
+        break_match_goal; try reflexivity.
+        setoid_rewrite IS1.LP.IP.VMemInt_intptr_dtyp.
+        setoid_rewrite dtyp_eqb_refl.
+        break_match_goal; try reflexivity.
+
+        (* Contradiction, but need to know something about munsigned *)
+        admit.
+      }
+
+      break_match_hyp_inv.
+
+      { remember (lift_OOM (mmul v1_fin v2_fin)) as mul_result.
+        destruct_err_ub_oom mul_result; inv H0.
+        symmetry in Heqmul_result.
+        destruct (mmul v1_fin v2_fin) eqn:HMUL; inv Heqmul_result.
+
+        cbn in CONV.
+        move CONV after Heqb.
+        break_match_hyp_inv.
+
+        epose proof VMEM_REF.mmul_refine _ _ _ v1_inf v2_inf V1 V2 HMUL as (?&?&?).
+        rewrite H0 in Heqo.
+        rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+        inv Heqo.
+        repeat setoid_rewrite H. cbn.
+        break_match_goal; try reflexivity.
+        setoid_rewrite IS1.LP.IP.VMemInt_intptr_dtyp.
+        setoid_rewrite dtyp_eqb_refl.
+        break_match_goal; try reflexivity.
+
+        (* Contradiction, but need to know something about munsigned *)
+        admit.
+      }
+
       admit.
     - (* Shl *)
       cbn in *.
       destruct (mshl v1_fin v2_fin) eqn:HSHL;
         cbn in *; inv EVAL.
 
-      assert (IP.to_Z v1_fin = IS1.LP.IP.to_Z v1_inf) as V1.
-      { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
-
-      assert (IP.to_Z v2_fin = IS1.LP.IP.to_Z v2_inf) as V2.
-      { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
-
       epose proof VMEM_REF.mshl_refine _ _ _ v1_inf v2_inf V1 V2 HSHL as (?&?&?).
       setoid_rewrite H; cbn in *.
 
       admit.
+    - (* UDiv *)
+      admit.
+    - (* SDiv *)
+      admit.
+    - (* LShr *)
+      admit.
+    - (* AShr *)
+      admit.
+    - (* URem *)
+      admit.
+    - (* SRem *)
+      admit.
+    - (* And *)
+      cbn in *; inv EVAL.
+      remember (mand v1_fin v2_fin) as res_fin.
+      symmetry in Heqres_fin.
+
+      epose proof VMEM_REF.mand_refine _ _ _ v1_inf v2_inf V1 V2 Heqres_fin as (?&?&?).
+      setoid_rewrite H; cbn in *.
+
+      break_match_hyp_inv.
+      rewrite H0 in Heqo.
+      rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+      inv Heqo.
+      reflexivity.
+    - (* Or *)
+      cbn in *; inv EVAL.
+      remember (mor v1_fin v2_fin) as res_fin.
+      symmetry in Heqres_fin.
+
+      epose proof VMEM_REF.mor_refine _ _ _ v1_inf v2_inf V1 V2 Heqres_fin as (?&?&?).
+      setoid_rewrite H; cbn in *.
+
+      break_match_hyp_inv.
+      rewrite H0 in Heqo.
+      rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+      inv Heqo.
+      reflexivity.
+    - (* Xor *)
+      cbn in *; inv EVAL.
+      remember (mxor v1_fin v2_fin) as res_fin.
+      symmetry in Heqres_fin.
+
+      epose proof VMEM_REF.mxor_refine _ _ _ v1_inf v2_inf V1 V2 Heqres_fin as (?&?&?).
+      setoid_rewrite H; cbn in *.
+
+      break_match_hyp_inv.
+      rewrite H0 in Heqo.
+      rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+      inv Heqo.
+      reflexivity.
   Admitted.
 
   Lemma dvalue_convert_strict_fin_inf_succeeds_fin_to_inf_dvalue' :
