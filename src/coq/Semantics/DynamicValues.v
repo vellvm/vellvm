@@ -2483,7 +2483,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
           if orb (andb nuw (res_u' >? munsigned res))
                  (andb nsw (orb min_s_bound max_s_bound))
-          then ret (DVALUE_Poison mdtyp_of_int)
+          then
+            (* TODO: Do we need to check for the unsigned case? Return result anyway? *)
+            if dtyp_eqb mdtyp_of_int DTYPE_IPTR
+            then raise_oom "Multiplication overflow on iptr."
+            else ret (DVALUE_Poison mdtyp_of_int)
           else ret (to_dvalue res)
 
     | Shl nuw nsw =>
@@ -2491,31 +2495,51 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       let res_u := munsigned res in
       let res_u' := Z.shiftl (munsigned x) (munsigned y) in
 
-      (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
-         then there is overflow. *)
-      if option_pred (fun bw => munsigned y >=? Z.of_nat bw) mbitwidth
-      then ret (DVALUE_Poison mdtyp_of_int)
+      if dtyp_eqb mdtyp_of_int DTYPE_IPTR
+      then
+        (* TODO: Do we need to check for the unsigned case? Return result anyway? *)
+        if (res_u' >? res_u)
+        then raise_oom "Shl unsigned overflow on iptr."
+        else
+          match mbitwidth with
+          | None =>
+              ret (to_dvalue res)
+          | Some bw =>
+              (* TODO: should this OOM here? *)
+              nres <- lift_OOM (mnegative res);;
+              if (negb (Z.shiftr (munsigned x)
+                          (Z.of_nat bw - munsigned y)
+                        =? (munsigned nres)
+                           * (Z.pow 2 (munsigned y) - 1))%Z)
+              then raise_oom "Shl signed overflow on iptr."
+              else ret (to_dvalue res)
+          end
       else
-        if andb nuw (res_u' >? res_u)
+        (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
+         then there is overflow. *)
+        if option_pred (fun bw => munsigned y >=? Z.of_nat bw) mbitwidth
         then ret (DVALUE_Poison mdtyp_of_int)
         else
-          (* Need to separate this out because mnegative can OOM *)
-          if nsw
-          then
-            match mbitwidth with
-            | None =>
-                ret (to_dvalue res)
-            | Some bw =>
-                (* TODO: should this OOM here? *)
-                nres <- lift_OOM (mnegative res);;
-                if (negb (Z.shiftr (munsigned x)
-                                   (Z.of_nat bw - munsigned y)
-                          =? (munsigned nres)
-                             * (Z.pow 2 (munsigned y) - 1))%Z)
-                then ret (DVALUE_Poison mdtyp_of_int)
-                else ret (to_dvalue res)
-            end
-          else ret (to_dvalue res)
+          if andb nuw (res_u' >? res_u)
+          then ret (DVALUE_Poison mdtyp_of_int)
+          else
+            (* Need to separate this out because mnegative can OOM *)
+            if nsw
+            then
+              match mbitwidth with
+              | None =>
+                  ret (to_dvalue res)
+              | Some bw =>
+                  (* TODO: should this OOM here? *)
+                  nres <- lift_OOM (mnegative res);;
+                  if (negb (Z.shiftr (munsigned x)
+                              (Z.of_nat bw - munsigned y)
+                            =? (munsigned nres)
+                               * (Z.pow 2 (munsigned y) - 1))%Z)
+                  then ret (DVALUE_Poison mdtyp_of_int)
+                  else ret (to_dvalue res)
+              end
+            else ret (to_dvalue res)
 
     | UDiv ex =>
       if (munsigned y =? 0)%Z
@@ -2533,14 +2557,14 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
            else to_dvalue_OOM (mdivs x y)
 
     | LShr ex =>
-      if option_pred (fun bw => (munsigned y) >=? Z.of_nat bw) mbitwidth
-      then ret (DVALUE_Poison mdtyp_of_int)
-      else if andb ex (negb ((munsigned x)
-                               mod (Z.pow 2 (munsigned y)) =? 0))%Z
-           then ret (DVALUE_Poison mdtyp_of_int) else ret (to_dvalue (mshru x y))
+        if option_pred (fun bw => (munsigned y) >=? Z.of_nat bw) mbitwidth && negb (dtyp_eqb mdtyp_of_int DTYPE_IPTR)
+        then ret (DVALUE_Poison mdtyp_of_int)
+        else if andb ex (negb ((munsigned x)
+                                 mod (Z.pow 2 (munsigned y)) =? 0))%Z
+             then ret (DVALUE_Poison mdtyp_of_int) else ret (to_dvalue (mshru x y))
 
     | AShr ex =>
-      if option_pred (fun bw => (munsigned y) >=? Z.of_nat bw) mbitwidth
+      if option_pred (fun bw => (munsigned y) >=? Z.of_nat bw) mbitwidth && negb (dtyp_eqb mdtyp_of_int DTYPE_IPTR)
       then ret (DVALUE_Poison mdtyp_of_int)
       else if andb ex (negb ((munsigned x)
                                mod (Z.pow 2 (munsigned y)) =? 0))%Z
@@ -4570,6 +4594,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Context {Eq1EQV : @Monad.Eq1Equivalence M Monad Eq1}.
     Context {RETS : @MonadReturns M Monad Eq1}.
     Context {NFR : @NoFailsRet M Monad Eq1 RETS}.
+    Context {MFR : @MonadReturnsFails M Monad Eq1 RETS}.
     Context {ERR : RAISE_ERROR M}.
     Context {UB : RAISE_UB M}.
     Context {OOM : RAISE_OOM M}.
@@ -4652,11 +4677,36 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         repeat break_match_hyp;
         pose proof EVAL as CONTRA;
         try solve
-            [first [ apply eq1_ret_ret in EVAL;
-                     subst;
-                     [ try (unfold VMemInt_intptr';
-                            rewrite VMemInt_intptr_dtyp)
-                     | solve [eauto]
+          [first [ apply eq1_ret_ret in EVAL;
+                   subst;
+                   [ try (unfold VMemInt_intptr';
+                          repeat rewrite VMemInt_intptr_dtyp in *)
+                         | solve [eauto]
+                       ]
+
+                   | eapply EqRet_NoFail in CONTRA; eauto;
+                     exfalso; apply CONTRA;
+                     apply mfails_ub; eauto
+
+                   | eapply EqRet_NoFail in CONTRA; eauto;
+                     exfalso; apply CONTRA;
+                     apply mfails_error; eauto
+
+                   | apply MReturns_ret in EVAL;
+                     apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
+                     [eapply EqRet_NoFail in CONTRA; eauto;
+                      exfalso; apply CONTRA;
+                      apply MFails_bind_ma; eauto
+                     | first
+                         [ apply MReturns_ret_inv in RET;
+                           cbn in RET
+                         | break_match_hyp;
+                           [ apply MFails_MReturns in RET; try contradiction;
+                             apply mfails_oom; eauto
+                           | apply MReturns_ret_inv in RET;
+                             cbn in RET
+                           ]
+                         ]
                      ]
 
                    | apply MReturns_ret in EVAL;
@@ -4664,17 +4714,16 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                      [eapply EqRet_NoFail in CONTRA; eauto;
                       exfalso; apply CONTRA;
                       apply MFails_bind_ma; eauto
-                     | apply MReturns_ret_inv in RET;
-                       cbn in RET
-                     ]
-
-                   | apply MReturns_ret in EVAL;
-                     apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
-                     [eapply EqRet_NoFail in CONTRA; eauto;
-                      exfalso; apply CONTRA;
-                      apply MFails_bind_ma; eauto
-                     | apply MReturns_ret_inv in RET;
-                       cbn in RET
+                     | first
+                         [ apply MReturns_ret_inv in RET;
+                           cbn in RET
+                         | break_match_hyp;
+                           [ apply MFails_MReturns in RET; try contradiction;
+                             apply mfails_oom; eauto
+                           | apply MReturns_ret_inv in RET;
+                             cbn in RET
+                           ]
+                         ]
                      ]
 
                    | apply MReturns_ret in EVAL;
@@ -4684,8 +4733,16 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                        apply MFails_bind_ma; eauto
                      | clear CONTRA;
                        break_match_hyp;
-                       apply MReturns_ret_inv in RET;
-                       cbn in RET
+                       first
+                         [ apply MReturns_ret_inv in RET;
+                           cbn in RET
+                         | break_match_hyp;
+                           [ apply MFails_MReturns in RET; try contradiction;
+                             apply mfails_oom; eauto
+                           | apply MReturns_ret_inv in RET;
+                             cbn in RET
+                           ]
+                         ]
                      ]
 
                    | apply MReturns_ret in EVAL;
@@ -4694,38 +4751,41 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                        exfalso; apply CONTRA;
                        apply MFails_bind_ma; eauto
                      | repeat match goal with
-                              | H : MReturns _ (if ?c then _ else _) |- _ =>
-                                  destruct c eqn:?
-                              end;
-                       [ apply MReturns_ret_inv in RET; cbn in RET
-                       | cbn in RET;
-                         apply MReturns_bind_inv in RET as [FAILS | (res' & MA' & RET)];
-                         [eapply EqRet_NoFail in CONTRA; eauto;
-                          exfalso; apply CONTRA;
-                          eapply MFails_bind_k; eauto;
-                          break_match;
-                          [ match goal with
-                            | H: true = false |- _ =>
-                                inversion H
-                            end
-                          |]; eapply MFails_bind_ma; eauto
-                         |]
-                       ];
+                         | H : MReturns _ (if ?c then _ else _) |- _ =>
+                             destruct c eqn:?
+                         end;
+                       try solve [ apply MFails_MReturns in RET; try contradiction;
+                                   apply mfails_oom; eauto
+                                 | apply MReturns_ret_inv in RET;
+                                   cbn in RET
+                         ];
+                       try (apply MReturns_bind_inv in RET as [FAILS | (res' & MA' & RET)];
+                            [eapply EqRet_NoFail in CONTRA; eauto;
+                             exfalso; apply CONTRA;
+                             eapply MFails_bind_k; eauto;
+                             break_match;
+                             [ match goal with
+                               | H: true = false |- _ =>
+                                   inversion H
+                               end
+                             |]; eapply MFails_bind_ma; eauto
+                            |]
+                         );
                        try (match goal with
                             | H : MReturns _ (if ?c then _ else _) |- _ =>
                                 destruct c eqn:?
-                            end;
-                            apply MReturns_ret_inv in RET; cbn in RET)
-                    ]
-                ]; subst;
-             try (unfold VMemInt_intptr';
-                  rewrite VMemInt_intptr_dtyp);
-             solve_dvalue_has_dtyp].
-
-      all:
-        try solve [eapply EqRet_NoFail in EVAL; eauto;
-        exfalso; apply EVAL;
-        first [apply mfails_ub | apply mfails_error | apply mfails_oom] ; eauto].
+                            end);
+                       try solve [ apply MFails_MReturns in RET; try contradiction;
+                                   apply mfails_oom; eauto
+                                 | apply MReturns_ret_inv in RET;
+                                   cbn in RET
+                         ];
+                       apply MReturns_ret_inv in RET; cbn in RET
+                     ]
+                   ]; subst;
+                   try (unfold VMemInt_intptr';
+                        rewrite VMemInt_intptr_dtyp);
+                   solve_dvalue_has_dtyp].
     Qed.
 
     Lemma eval_iop_dtyp_iptr :
