@@ -15315,6 +15315,18 @@ Qed.
   (*     subst; auto. *)
   (* Qed. *)
 
+
+  (* TODO: Move this *)
+  Lemma dtyp_inhabited_npoison_inf_fin :
+    forall dv_inf t,
+      dv_inf <> IS1.LP.Events.DV.DVALUE_Poison t ->
+      IS1.LP.Events.DV.dvalue_has_dtyp dv_inf t ->
+      exists dv_fin,
+        dvalue_has_dtyp dv_fin t /\ dv_fin <> DVALUE_Poison t.
+  Proof.
+    intros dv_inf t NPOISON DTYP.
+  Admitted.
+
   (* Could be the case that OOM happens...
 
      If uv_inf is an IBinop, for instance...
@@ -15405,18 +15417,6 @@ Qed.
       rewrite IS1.LLVM.MEM.CP.CONC.concretize_uvalueM_equation in CONC.
       cbn in CONC.
 
-      (* TODO: Move this *)
-      Set Nested Proofs Allowed.
-      Lemma dtyp_inhabited_npoison_inf_fin :
-        forall dv_inf t,
-          dv_inf <> IS1.LP.Events.DV.DVALUE_Poison t ->
-          IS1.LP.Events.DV.dvalue_has_dtyp dv_inf t ->
-          exists dv_fin,
-            dvalue_has_dtyp dv_fin t /\ dv_fin <> DVALUE_Poison t.
-      Proof.
-        intros dv_inf t NPOISON DTYP.
-      Admitted.
-
       left.
       destruct CONC as [CONC NPOISON].
       pose proof dtyp_inhabited_npoison_inf_fin dv_inf t NPOISON CONC as (dv&TYP&NPOISON').
@@ -15429,96 +15429,767 @@ Qed.
     }
 
     { (* UVALUE_Struct *)
-      left.
-      red in REF.
-      cbn in REF.
-      break_match_hyp_inv.
-
-      rewrite IS1.LLVM.MEM.CP.CONC.concretize_equation in CONC.
-      red in CONC.
-      rewrite IS1.LLVM.MEM.CP.CONC.concretize_uvalueM_equation in CONC.
-      cbn in CONC.
-      inv CONC.
-
-      destruct H0 as (?&?&?&?).
-      destruct_err_ub_oom x; subst; cbn in H1; inv H1.
-      destruct H2 as [[] | H2].
-      specialize (H2 x1 eq_refl).
-      rewrite <- H2 in H4.
-      cbn in H4.
-      inv H4.
-
-      apply map_monad_oom_Forall2 in Heqo.
-      induction Heqo.
-      - cbn in H0. inv H0.
-        eexists.
-        rewrite concretize_equation.
-        red.
-        rewrite concretize_uvalueM_equation.
-        cbn.
-        repeat red.
-
+      generalize dependent uv_fin.
+      generalize dependent dv_inf.
+      generalize dependent fields.
+      induction fields; intros H dv_inf CONC uv_fin REF.
+      - inv REF.
+        left.
+        exists (DV2.DVALUE_Struct []).
+        cbn. red.
         exists (ret []).
-        exists (fun dv_inf => ret (DVALUE_Struct [])).
-        split; eauto.
-        split; cbn; eauto.
-
-        right.
-        intros a H0; subst.
-        reflexivity.
-      - rewrite map_monad_unfold in H0.
-        repeat red in H0.
-
-        destruct H0 as (?&?&?&?&?).
-        destruct_err_ub_oom x2; subst; cbn in H3; inv H3.
-        destruct H4 as [[] | H4].
-        specialize (H4 _ eq_refl).
-
-        repeat red in H4.
-        destruct H4 as (?&?&?&?&?).
-
-        rewrite <- H4 in H6.
-        destruct_err_ub_oom x2; subst; cbn in H6; inv H6.
-        destruct H5 as [[] | H5].
-        specialize (H5 _ eq_refl).
-        cbn in H5.
-        rewrite <- H5 in H8.
-        cbn in H8.
-        inv H8.
-
-        forward IHHeqo.
-        { intros u H7 uv_fin dv_inf H8 H9.
+        exists (fun x => ret (DV2.DVALUE_Struct x)).
+        eauto.
+      - forward IHfields; eauto.
+        { intros u H0 uv_fin0 dv_inf0 H1 H2.
           eapply H; eauto.
           right; auto.
         }
 
-        forward IHHeqo.
-        { admit.
+        rewrite uvalue_refine_strict_equation in REF.
+        cbn in REF.
+        repeat break_match_hyp_inv.
+
+        rewrite IS1.LLVM.MEM.CP.CONC.concretize_equation in CONC.
+        red in CONC.
+        rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC.
+        rewrite map_monad_unfold in CONC.
+        cbn in CONC.
+        destruct CONC as (?&?&?&?&?).
+        destruct H0 as (?&?&?&?&?).
+        subst.
+        destruct_err_ub_oom x1; cbn in H1; inv H1.
+        destruct H4 as [[] | H4].
+        specialize (H4 x3).
+        forward H4; [constructor|].
+        destruct H4 as (?&?&?&?&?).
+        cbn in H3.
+        remember (x2 x3) as x2x3.
+        destruct_err_ub_oom x2x3; cbn in H5; inv H5.
+        destruct_err_ub_oom x; inv H3.
+        destruct H4 as [[] | H4].
+
+        assert ((exists dv_fin : dvalue, concretize u dv_fin) \/
+                  (forall dv_fin : dvalue, ~ concretize u dv_fin)) as CONC1.
+        { eapply H; cbn; eauto.
+          eapply H0.
         }
 
-        destruct IHHeqo as (?&?).
-        rewrite concretize_equation in H6.
-        red in H6.
-        rewrite concretize_uvalueM_equation in H6.
-        cbn in H6.
-        repeat red in H6.
-        cbn in H4.
-        rewrite <- H5 in H4.
-        cbn in H4.
+        destruct CONC1 as [(d&CONC1) | CONC1_FAIL].
+        2: {
+          right.
+          intros dv_fin CONTRA.
 
-        destruct H6 as (?&?&?&?).
+          rewrite concretize_equation in CONTRA.
+          red in CONTRA.
+          rewrite concretize_uvalueM_equation in CONTRA.
 
-        eexists.
-        rewrite concretize_equation.
-        red.
-        rewrite concretize_uvalueM_equation.
+          rewrite map_monad_unfold in CONTRA.
+          cbn in CONTRA.
+          red in CONTRA.
+          destruct CONTRA as (?&?&?&?&?); subst.
+          destruct H3 as (?&?&?&?&?); subst.
+          destruct_err_ub_oom x6; inv H5.
+
+          clear - H3 CONC1_FAIL.
+          eapply CONC1_FAIL.
+          eapply H3.
+        }
+
+        specialize (IHfields (DV1.DVALUE_Struct x4)).
+        forward IHfields.
+        { red. red.
+          rewrite IS1.LLVM.MEM.CP.CONC.concretize_uvalueM_equation.
+          cbn.
+          red.
+          exists (ret x4).
+          exists (fun x => ret (DV1.DVALUE_Struct x)).
+          split; eauto.
+        }
+
+        specialize (IHfields (DV2.UVALUE_Struct l0)).
+        forward IHfields.
+        { red; cbn.
+          rewrite Heqo.
+          reflexivity.
+        }
+
+        destruct IHfields as [(fields'&CONC2) | CONC2_FAIL].
+        2: {
+          right.
+          intros dv_fin CONTRA.
+
+          rewrite concretize_equation in CONTRA.
+          red in CONTRA.
+          rewrite concretize_uvalueM_equation in CONTRA.
+
+          rewrite map_monad_unfold in CONTRA.
+          cbn in CONTRA.
+          red in CONTRA.
+          destruct CONTRA as (?&?&?&?&?); subst.
+          destruct H3 as (?&?&?&?&?); subst.
+          destruct_err_ub_oom x6; inv H5.
+
+          destruct H10 as [[] | H10].
+          specialize (H10 x8).
+          forward H10; cbn; auto.
+
+          destruct H10 as (?&?&?&?&?); subst.
+          cbn in H9, H8.
+
+          destruct_err_ub_oom x; cbn in H9; subst;
+            rewrite <- H9 in H8, H11; cbn in H8, H11;
+            inv H11.
+
+          destruct H10 as [[] | H10].
+          specialize (H10 x9).
+          forward H10; cbn; auto.
+          rewrite <- H10 in H9.
+          inv H9.
+          rewrite <- H10 in H8, H13.
+          cbn in H8, H13.
+
+          destruct H8 as [[] | H8].
+          specialize (H8 (x8::x9)).
+          forward H8; auto.
+          rewrite <- H8 in H13.
+          inv H13.
+
+          eapply (CONC2_FAIL (DV2.DVALUE_Struct x9)).
+          red.
+          red.
+          rewrite CONC.concretize_uvalueM_equation.
+          cbn.
+          red.
+          exists (ret x9).
+          exists (fun x => ret (DV2.DVALUE_Struct x)).
+          split; eauto.
+        }
+
+        left.
+        move CONC2 after CONC1.
+
+        pose proof CONC2 as FIELDS.
+        do 2 red in FIELDS.
+        rewrite CONC.concretize_uvalueM_equation in FIELDS.
+        repeat red in FIELDS.
+        destruct FIELDS as (?&?&?&?&?).
+        destruct_err_ub_oom x; inv H5.
+        destruct H8 as [[] | H8].
+        specialize (H8 x6); forward H8; [cbn; auto|].
+        cbn in H8.
+        rewrite <- H8 in H10.
+        inv H10.
+
+        exists (DV2.DVALUE_Struct (d::x6)).
+        do 2 red.
+        rewrite CONC.concretize_uvalueM_equation.
+        cbn; red.
+        exists (ret (d::x6)).
+        exists (fun x => ret (DV2.DVALUE_Struct x)).
         cbn.
-        repeat red.
+        split; eauto.
 
-        eexists.
-        eexists.
+        red.
+        exists (ret d).
+        exists (fun x => ret (x::x6)).
 
-        admit.
+        split; eauto.
+        split; eauto.
+        right.
+
+        intros a0 H5.
+        eapply MonadReturnsLaws.MReturns_ret_inv in H5; subst.
+        red.
+        exists (ret x6).
+        exists (fun x => ret (d :: x)).
+
+        split; eauto.
+    }
+
+    { (* UVALUE_Packed_struct *)
+      generalize dependent uv_fin.
+      generalize dependent dv_inf.
+      generalize dependent fields.
+      induction fields; intros H dv_inf CONC uv_fin REF.
+      - inv REF.
+        left.
+        exists (DV2.DVALUE_Packed_struct []).
+        cbn. red.
+        exists (ret []).
+        exists (fun x => ret (DV2.DVALUE_Packed_struct x)).
+        eauto.
+      - forward IHfields; eauto.
+        { intros u H0 uv_fin0 dv_inf0 H1 H2.
+          eapply H; eauto.
+          right; auto.
+        }
+
+        rewrite uvalue_refine_strict_equation in REF.
+        cbn in REF.
+        repeat break_match_hyp_inv.
+
+        rewrite IS1.LLVM.MEM.CP.CONC.concretize_equation in CONC.
+        red in CONC.
+        rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC.
+        rewrite map_monad_unfold in CONC.
+        cbn in CONC.
+        destruct CONC as (?&?&?&?&?).
+        destruct H0 as (?&?&?&?&?).
+        subst.
+        destruct_err_ub_oom x1; cbn in H1; inv H1.
+        destruct H4 as [[] | H4].
+        specialize (H4 x3).
+        forward H4; [constructor|].
+        destruct H4 as (?&?&?&?&?).
+        cbn in H3.
+        remember (x2 x3) as x2x3.
+        destruct_err_ub_oom x2x3; cbn in H5; inv H5.
+        destruct_err_ub_oom x; inv H3.
+        destruct H4 as [[] | H4].
+
+        assert ((exists dv_fin : dvalue, concretize u dv_fin) \/
+                  (forall dv_fin : dvalue, ~ concretize u dv_fin)) as CONC1.
+        { eapply H; cbn; eauto.
+          eapply H0.
+        }
+
+        destruct CONC1 as [(d&CONC1) | CONC1_FAIL].
+        2: {
+          right.
+          intros dv_fin CONTRA.
+
+          rewrite concretize_equation in CONTRA.
+          red in CONTRA.
+          rewrite concretize_uvalueM_equation in CONTRA.
+
+          rewrite map_monad_unfold in CONTRA.
+          cbn in CONTRA.
+          red in CONTRA.
+          destruct CONTRA as (?&?&?&?&?); subst.
+          destruct H3 as (?&?&?&?&?); subst.
+          destruct_err_ub_oom x6; inv H5.
+
+          clear - H3 CONC1_FAIL.
+          eapply CONC1_FAIL.
+          eapply H3.
+        }
+
+        specialize (IHfields (DV1.DVALUE_Packed_struct x4)).
+        forward IHfields.
+        { red. red.
+          rewrite IS1.LLVM.MEM.CP.CONC.concretize_uvalueM_equation.
+          cbn.
+          red.
+          exists (ret x4).
+          exists (fun x => ret (DV1.DVALUE_Packed_struct x)).
+          split; eauto.
+        }
+
+        specialize (IHfields (DV2.UVALUE_Packed_struct l0)).
+        forward IHfields.
+        { red; cbn.
+          rewrite Heqo.
+          reflexivity.
+        }
+
+        destruct IHfields as [(fields'&CONC2) | CONC2_FAIL].
+        2: {
+          right.
+          intros dv_fin CONTRA.
+
+          rewrite concretize_equation in CONTRA.
+          red in CONTRA.
+          rewrite concretize_uvalueM_equation in CONTRA.
+
+          rewrite map_monad_unfold in CONTRA.
+          cbn in CONTRA.
+          red in CONTRA.
+          destruct CONTRA as (?&?&?&?&?); subst.
+          destruct H3 as (?&?&?&?&?); subst.
+          destruct_err_ub_oom x6; inv H5.
+
+          destruct H10 as [[] | H10].
+          specialize (H10 x8).
+          forward H10; cbn; auto.
+
+          destruct H10 as (?&?&?&?&?); subst.
+          cbn in H9, H8.
+
+          destruct_err_ub_oom x; cbn in H9; subst;
+            rewrite <- H9 in H8, H11; cbn in H8, H11;
+            inv H11.
+
+          destruct H10 as [[] | H10].
+          specialize (H10 x9).
+          forward H10; cbn; auto.
+          rewrite <- H10 in H9.
+          inv H9.
+          rewrite <- H10 in H8, H13.
+          cbn in H8, H13.
+
+          destruct H8 as [[] | H8].
+          specialize (H8 (x8::x9)).
+          forward H8; auto.
+          rewrite <- H8 in H13.
+          inv H13.
+
+          eapply (CONC2_FAIL (DV2.DVALUE_Packed_struct x9)).
+          red.
+          red.
+          rewrite CONC.concretize_uvalueM_equation.
+          cbn.
+          red.
+          exists (ret x9).
+          exists (fun x => ret (DV2.DVALUE_Packed_struct x)).
+          split; eauto.
+        }
+
+        left.
+        move CONC2 after CONC1.
+
+        pose proof CONC2 as FIELDS.
+        do 2 red in FIELDS.
+        rewrite CONC.concretize_uvalueM_equation in FIELDS.
+        repeat red in FIELDS.
+        destruct FIELDS as (?&?&?&?&?).
+        destruct_err_ub_oom x; inv H5.
+        destruct H8 as [[] | H8].
+        specialize (H8 x6); forward H8; [cbn; auto|].
+        cbn in H8.
+        rewrite <- H8 in H10.
+        inv H10.
+
+        exists (DV2.DVALUE_Packed_struct (d::x6)).
+        do 2 red.
+        rewrite CONC.concretize_uvalueM_equation.
+        cbn; red.
+        exists (ret (d::x6)).
+        exists (fun x => ret (DV2.DVALUE_Packed_struct x)).
+        cbn.
+        split; eauto.
+
+        red.
+        exists (ret d).
+        exists (fun x => ret (x::x6)).
+
+        split; eauto.
+        split; eauto.
+        right.
+
+        intros a0 H5.
+        eapply MonadReturnsLaws.MReturns_ret_inv in H5; subst.
+        red.
+        exists (ret x6).
+        exists (fun x => ret (d :: x)).
+
+        split; eauto.
+    }
+
+    { (* UVALUE_Array *)
+      generalize dependent uv_fin.
+      generalize dependent dv_inf.
+      generalize dependent elts.
+      induction elts; intros H dv_inf CONC uv_fin REF.
+      - inv REF.
+        left.
+        exists (DV2.DVALUE_Array []).
+        cbn. red.
+        exists (ret []).
+        exists (fun x => ret (DV2.DVALUE_Array x)).
+        eauto.
+      - forward IHelts; eauto.
+        { intros u H0 uv_fin0 dv_inf0 H1 H2.
+          eapply H; eauto.
+          right; auto.
+        }
+
+        rewrite uvalue_refine_strict_equation in REF.
+        cbn in REF.
+        repeat break_match_hyp_inv.
+
+        rewrite IS1.LLVM.MEM.CP.CONC.concretize_equation in CONC.
+        red in CONC.
+        rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC.
+        rewrite map_monad_unfold in CONC.
+        cbn in CONC.
+        destruct CONC as (?&?&?&?&?).
+        destruct H0 as (?&?&?&?&?).
+        subst.
+        destruct_err_ub_oom x1; cbn in H1; inv H1.
+        destruct H4 as [[] | H4].
+        specialize (H4 x3).
+        forward H4; [constructor|].
+        destruct H4 as (?&?&?&?&?).
+        cbn in H3.
+        remember (x2 x3) as x2x3.
+        destruct_err_ub_oom x2x3; cbn in H5; inv H5.
+        destruct_err_ub_oom x; inv H3.
+        destruct H4 as [[] | H4].
+
+        assert ((exists dv_fin : dvalue, concretize u dv_fin) \/
+                  (forall dv_fin : dvalue, ~ concretize u dv_fin)) as CONC1.
+        { eapply H; cbn; eauto.
+          eapply H0.
+        }
+
+        destruct CONC1 as [(d&CONC1) | CONC1_FAIL].
+        2: {
+          right.
+          intros dv_fin CONTRA.
+
+          rewrite concretize_equation in CONTRA.
+          red in CONTRA.
+          rewrite concretize_uvalueM_equation in CONTRA.
+
+          rewrite map_monad_unfold in CONTRA.
+          cbn in CONTRA.
+          red in CONTRA.
+          destruct CONTRA as (?&?&?&?&?); subst.
+          destruct H3 as (?&?&?&?&?); subst.
+          destruct_err_ub_oom x6; inv H5.
+
+          clear - H3 CONC1_FAIL.
+          eapply CONC1_FAIL.
+          eapply H3.
+        }
+
+        specialize (IHelts (DV1.DVALUE_Array x4)).
+        forward IHelts.
+        { red. red.
+          rewrite IS1.LLVM.MEM.CP.CONC.concretize_uvalueM_equation.
+          cbn.
+          red.
+          exists (ret x4).
+          exists (fun x => ret (DV1.DVALUE_Array x)).
+          split; eauto.
+        }
+
+        specialize (IHelts (DV2.UVALUE_Array l0)).
+        forward IHelts.
+        { red; cbn.
+          rewrite Heqo.
+          reflexivity.
+        }
+
+        destruct IHelts as [(fields'&CONC2) | CONC2_FAIL].
+        2: {
+          right.
+          intros dv_fin CONTRA.
+
+          rewrite concretize_equation in CONTRA.
+          red in CONTRA.
+          rewrite concretize_uvalueM_equation in CONTRA.
+
+          rewrite map_monad_unfold in CONTRA.
+          cbn in CONTRA.
+          red in CONTRA.
+          destruct CONTRA as (?&?&?&?&?); subst.
+          destruct H3 as (?&?&?&?&?); subst.
+          destruct_err_ub_oom x6; inv H5.
+
+          destruct H10 as [[] | H10].
+          specialize (H10 x8).
+          forward H10; cbn; auto.
+
+          destruct H10 as (?&?&?&?&?); subst.
+          cbn in H9, H8.
+
+          destruct_err_ub_oom x; cbn in H9; subst;
+            rewrite <- H9 in H8, H11; cbn in H8, H11;
+            inv H11.
+
+          destruct H10 as [[] | H10].
+          specialize (H10 x9).
+          forward H10; cbn; auto.
+          rewrite <- H10 in H9.
+          inv H9.
+          rewrite <- H10 in H8, H13.
+          cbn in H8, H13.
+
+          destruct H8 as [[] | H8].
+          specialize (H8 (x8::x9)).
+          forward H8; auto.
+          rewrite <- H8 in H13.
+          inv H13.
+
+          eapply (CONC2_FAIL (DV2.DVALUE_Array x9)).
+          red.
+          red.
+          rewrite CONC.concretize_uvalueM_equation.
+          cbn.
+          red.
+          exists (ret x9).
+          exists (fun x => ret (DV2.DVALUE_Array x)).
+          split; eauto.
+        }
+
+        left.
+        move CONC2 after CONC1.
+
+        pose proof CONC2 as FIELDS.
+        do 2 red in FIELDS.
+        rewrite CONC.concretize_uvalueM_equation in FIELDS.
+        repeat red in FIELDS.
+        destruct FIELDS as (?&?&?&?&?).
+        destruct_err_ub_oom x; inv H5.
+        destruct H8 as [[] | H8].
+        specialize (H8 x6); forward H8; [cbn; auto|].
+        cbn in H8.
+        rewrite <- H8 in H10.
+        inv H10.
+
+        exists (DV2.DVALUE_Array (d::x6)).
+        do 2 red.
+        rewrite CONC.concretize_uvalueM_equation.
+        cbn; red.
+        exists (ret (d::x6)).
+        exists (fun x => ret (DV2.DVALUE_Array x)).
+        cbn.
+        split; eauto.
+
+        red.
+        exists (ret d).
+        exists (fun x => ret (x::x6)).
+
+        split; eauto.
+        split; eauto.
+        right.
+
+        intros a0 H5.
+        eapply MonadReturnsLaws.MReturns_ret_inv in H5; subst.
+        red.
+        exists (ret x6).
+        exists (fun x => ret (d :: x)).
+
+        split; eauto.
+    }
+
+    { (* UVALUE_Vector *)
+      generalize dependent uv_fin.
+      generalize dependent dv_inf.
+      generalize dependent elts.
+      induction elts; intros H dv_inf CONC uv_fin REF.
+      - inv REF.
+        left.
+        exists (DV2.DVALUE_Vector []).
+        cbn. red.
+        exists (ret []).
+        exists (fun x => ret (DV2.DVALUE_Vector x)).
+        eauto.
+      - forward IHelts; eauto.
+        { intros u H0 uv_fin0 dv_inf0 H1 H2.
+          eapply H; eauto.
+          right; auto.
+        }
+
+        rewrite uvalue_refine_strict_equation in REF.
+        cbn in REF.
+        repeat break_match_hyp_inv.
+
+        rewrite IS1.LLVM.MEM.CP.CONC.concretize_equation in CONC.
+        red in CONC.
+        rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC.
+        rewrite map_monad_unfold in CONC.
+        cbn in CONC.
+        destruct CONC as (?&?&?&?&?).
+        destruct H0 as (?&?&?&?&?).
+        subst.
+        destruct_err_ub_oom x1; cbn in H1; inv H1.
+        destruct H4 as [[] | H4].
+        specialize (H4 x3).
+        forward H4; [constructor|].
+        destruct H4 as (?&?&?&?&?).
+        cbn in H3.
+        remember (x2 x3) as x2x3.
+        destruct_err_ub_oom x2x3; cbn in H5; inv H5.
+        destruct_err_ub_oom x; inv H3.
+        destruct H4 as [[] | H4].
+
+        assert ((exists dv_fin : dvalue, concretize u dv_fin) \/
+                  (forall dv_fin : dvalue, ~ concretize u dv_fin)) as CONC1.
+        { eapply H; cbn; eauto.
+          eapply H0.
+        }
+
+        destruct CONC1 as [(d&CONC1) | CONC1_FAIL].
+        2: {
+          right.
+          intros dv_fin CONTRA.
+
+          rewrite concretize_equation in CONTRA.
+          red in CONTRA.
+          rewrite concretize_uvalueM_equation in CONTRA.
+
+          rewrite map_monad_unfold in CONTRA.
+          cbn in CONTRA.
+          red in CONTRA.
+          destruct CONTRA as (?&?&?&?&?); subst.
+          destruct H3 as (?&?&?&?&?); subst.
+          destruct_err_ub_oom x6; inv H5.
+
+          clear - H3 CONC1_FAIL.
+          eapply CONC1_FAIL.
+          eapply H3.
+        }
+
+        specialize (IHelts (DV1.DVALUE_Vector x4)).
+        forward IHelts.
+        { red. red.
+          rewrite IS1.LLVM.MEM.CP.CONC.concretize_uvalueM_equation.
+          cbn.
+          red.
+          exists (ret x4).
+          exists (fun x => ret (DV1.DVALUE_Vector x)).
+          split; eauto.
+        }
+
+        specialize (IHelts (DV2.UVALUE_Vector l0)).
+        forward IHelts.
+        { red; cbn.
+          rewrite Heqo.
+          reflexivity.
+        }
+
+        destruct IHelts as [(fields'&CONC2) | CONC2_FAIL].
+        2: {
+          right.
+          intros dv_fin CONTRA.
+
+          rewrite concretize_equation in CONTRA.
+          red in CONTRA.
+          rewrite concretize_uvalueM_equation in CONTRA.
+
+          rewrite map_monad_unfold in CONTRA.
+          cbn in CONTRA.
+          red in CONTRA.
+          destruct CONTRA as (?&?&?&?&?); subst.
+          destruct H3 as (?&?&?&?&?); subst.
+          destruct_err_ub_oom x6; inv H5.
+
+          destruct H10 as [[] | H10].
+          specialize (H10 x8).
+          forward H10; cbn; auto.
+
+          destruct H10 as (?&?&?&?&?); subst.
+          cbn in H9, H8.
+
+          destruct_err_ub_oom x; cbn in H9; subst;
+            rewrite <- H9 in H8, H11; cbn in H8, H11;
+            inv H11.
+
+          destruct H10 as [[] | H10].
+          specialize (H10 x9).
+          forward H10; cbn; auto.
+          rewrite <- H10 in H9.
+          inv H9.
+          rewrite <- H10 in H8, H13.
+          cbn in H8, H13.
+
+          destruct H8 as [[] | H8].
+          specialize (H8 (x8::x9)).
+          forward H8; auto.
+          rewrite <- H8 in H13.
+          inv H13.
+
+          eapply (CONC2_FAIL (DV2.DVALUE_Vector x9)).
+          red.
+          red.
+          rewrite CONC.concretize_uvalueM_equation.
+          cbn.
+          red.
+          exists (ret x9).
+          exists (fun x => ret (DV2.DVALUE_Vector x)).
+          split; eauto.
+        }
+
+        left.
+        move CONC2 after CONC1.
+
+        pose proof CONC2 as FIELDS.
+        do 2 red in FIELDS.
+        rewrite CONC.concretize_uvalueM_equation in FIELDS.
+        repeat red in FIELDS.
+        destruct FIELDS as (?&?&?&?&?).
+        destruct_err_ub_oom x; inv H5.
+        destruct H8 as [[] | H8].
+        specialize (H8 x6); forward H8; [cbn; auto|].
+        cbn in H8.
+        rewrite <- H8 in H10.
+        inv H10.
+
+        exists (DV2.DVALUE_Vector (d::x6)).
+        do 2 red.
+        rewrite CONC.concretize_uvalueM_equation.
+        cbn; red.
+        exists (ret (d::x6)).
+        exists (fun x => ret (DV2.DVALUE_Vector x)).
+        cbn.
+        split; eauto.
+
+        red.
+        exists (ret d).
+        exists (fun x => ret (x::x6)).
+
+        split; eauto.
+        split; eauto.
+        right.
+
+        intros a0 H5.
+        eapply MonadReturnsLaws.MReturns_ret_inv in H5; subst.
+        red.
+        exists (ret x6).
+        exists (fun x => ret (d :: x)).
+
+        split; eauto.
+    }
+
+    { (* IBinop *)
+      admit.
+    }
+
+    { (* ICmp *)
+      admit.
+    }
+
+    { (* FBinop *)
+      admit.
+    }
+
+    { (* FCmp *)
+      admit.
+    }
+
+    { (* Conversion *)
+      admit.
+    }
+
+    { (* GEP *)
+      admit.
+    }
+
+    { (* ExtractElement *)
+      admit.
+    }
+
+    { (* InsertElement *)
+      admit.
+    }
+
+    { (* ExtractValue *)
+      admit.
+    }
+
+    { (* InsertValue *)
+      admit.
+    }
+
+    { (* Select *)
+      admit.
+    }
+
+    { (* ConcatBytes *)
+      admit.
     }
   Admitted.
 
