@@ -15039,6 +15039,12 @@ Qed.
       unfold uvalue_concretize_fin_inf_inclusion in *.
       intros dv_fin H0.
 
+      
+      Check (fix loop (x : uvalue) : uvalue := UVALUE_ExtractByte (loop x) DTYPE_Void 0 0).
+      (*
+        (fix x => UVALUE_ExtractByte t x [0])
+       *)
+
       red in REF.
       cbn in REF.
       break_match_hyp_inv.
@@ -15352,7 +15358,7 @@ Qed.
      Then the infinite concretization will produce a value, but the
      finite concretization should OOM.
    *)
-  Lemma concretize_inf_concretize_fin :
+  Lemma concretize_inf_excluded_middle :
     forall uv_fin,
       (exists dv_fin,
           IS2.LLVM.MEM.CP.CONC.concretize uv_fin dv_fin) \/
@@ -15378,6 +15384,259 @@ Qed.
     eapply uvalue_concretize_strict_concretize_inclusion; eauto.
   Qed.
 
+  (* TODO: Move this? *)
+  Ltac unfold_dvalue_refine_strict :=
+    rewrite dvalue_refine_strict_equation in *; cbn in *.
+
+  Ltac unfold_dvalue_refine_strict_goal :=
+    rewrite dvalue_refine_strict_equation; cbn.
+
+  Ltac unfold_dvalue_refine_strict_in H :=
+    rewrite dvalue_refine_strict_equation in H; cbn in H.
+
+  Ltac unfold_uvalue_refine_strict :=
+    rewrite uvalue_refine_strict_equation in *; cbn in *.
+
+  Ltac unfold_uvalue_refine_strict_goal :=
+    rewrite uvalue_refine_strict_equation; cbn.
+
+  Ltac unfold_uvalue_refine_strict_in H :=
+    rewrite uvalue_refine_strict_equation in H; cbn in H.
+          
+  (* TODO: can I generalize this? *)
+  (* TODO: Move this *)
+  Lemma map_monad_ErrUbOomProp_ub :
+    forall {A B} (f : A -> ErrUbOomProp B) l res,
+      @map_monad ErrUbOomProp Monad_ErrUbOomProp _ _ f l (raise_ub res) ->
+      exists a, In a l /\ f a (raise_ub res).
+  Proof.
+    intros A B f l b MAP.
+    generalize dependent b.
+    generalize dependent l.
+    induction l; intros b MAP.
+    - cbn in MAP.
+      inv MAP.
+    - cbn.
+      cbn in MAP.
+      repeat red in MAP.
+      destruct MAP as (?&?&?&?&?).
+      destruct_err_ub_oom x; subst; cbn in H0; inv H0.
+      + clear H1.
+        exists a; split; eauto.
+      + destruct H1 as [[] | H1].
+        specialize (H1 x1).
+        forward H1; [cbn; auto|].
+        repeat red in H1.
+        destruct H1 as (?&?&?&?&?).
+        rewrite <- H1 in H3.
+        destruct_err_ub_oom x; subst; cbn in H1, H3; inv H3.
+        * eapply IHl in H0; eauto.
+          destruct H0 as (?&?&?).
+          exists x.
+          split; eauto.
+        * destruct H2 as [[] | H2].
+          specialize (H2 x3).
+          forward H2; [cbn; auto|].
+          rewrite <- H2 in H5.
+          inv H5.
+  Qed.
+
+  Lemma concretize_ub_fin_inf :
+    forall uv_inf uv_fin ub_msg
+      (REF : uvalue_refine_strict uv_inf uv_fin)
+      (UB: concretize_u uv_fin (UB_unERR_UB_OOM ub_msg)),
+      IS1.LLVM.MEM.CP.CONC.concretize_u uv_inf (UB_unERR_UB_OOM ub_msg).
+  Proof.
+    induction uv_inf;
+      intros uv_fin ub_msg REF UB;
+      try
+        solve
+        [ unfold_uvalue_refine_strict;
+          try inv REF;
+          repeat break_match_hyp_inv;
+          repeat red in UB;
+          rewrite CONC.concretize_uvalueM_equation in UB; inv UB
+        ].
+    - (* Structs *)
+      unfold_uvalue_refine_strict_in REF.
+      break_match_hyp_inv.
+      eapply map_monad_oom_Forall2 in Heqo.
+
+      repeat red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      repeat red in UB.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
+
+      repeat red in UB.
+      destruct UB as (?&?&?&?&?).
+      destruct_err_ub_oom x; cbn in H1; inv H1.
+      { (* UB when concretizing l *)
+        clear H2.
+        induction Heqo.
+        - cbn in H0; inv H0.
+        - rewrite map_monad_unfold in H0.
+          repeat red in H0.
+          destruct H0 as (?&?&?&?&?).
+          destruct_err_ub_oom x1; inv H2.
+          { clear H3.
+            pose proof (H x (or_introl eq_refl) y ub_msg H1 H0).
+            rewrite map_monad_unfold.
+            repeat red.
+            exists (UB_unERR_UB_OOM ub_msg).
+            exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
+
+            split; cbn; eauto.
+            exists (UB_unERR_UB_OOM ub_msg).
+            exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
+
+            split; cbn; eauto.
+          }
+
+          (* No UB on first element *)
+          destruct H3 as [[] | H3].
+          specialize (H3 x3).
+          forward H3; [cbn; auto|].
+          destruct H3 as (?&?&?&?&?).
+          rewrite <- H3 in H5.
+          destruct_err_ub_oom x1; inv H5.
+          2: {
+            destruct H4 as [[] | H4].
+            specialize (H4 x5); forward H4; [cbn;auto|].
+
+            cbn in H4.
+            rewrite <- H4 in H7.
+            inv H7.
+          }
+
+          repeat red.
+          exists (UB_unERR_UB_OOM ub_msg).
+          exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
+          split; cbn; eauto.
+
+          repeat red.
+          pose proof uvalue_concretize_strict_concretize_inclusion _ _ H1 as INC.
+          red in INC.
+          specialize (INC _ H0).
+
+          exists (ret (fin_to_inf_dvalue x3)).
+          exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
+          split; cbn; eauto.
+          split; cbn; eauto.
+          right.
+          intros a H5; subst.
+
+          repeat red.
+          exists (UB_unERR_UB_OOM ub_msg).
+          exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
+          split; cbn; eauto.
+
+          forward IHHeqo.
+          intros u H5 uv_fin ub_msg0 REF UB.
+          eapply H; try right; eauto.
+          forward IHHeqo; eauto.
+          repeat red in IHHeqo.
+          destruct IHHeqo as (?&?&?&?&?).
+          destruct_err_ub_oom x1; inv H6; eauto.
+
+          destruct H7 as [[] | H7].
+          specialize (H7 x6); forward H7; [cbn;auto|].
+
+          cbn in H7.
+          rewrite <- H7 in H9.
+          inv H9.
+      }
+
+        eapply map_monad_ErrUbOomProp_ub in H0.
+        destruct H0 as (?&?&?).
+
+        pose proof Forall2_In_exists2 _ _ _ _ Heqo H0.
+        destruct H3 as (?&?&?).
+
+        specialize (H x1 H3 x ub_msg H4 H1).
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
+        split; cbn; eauto.
+
+        (* Err... I don't know the position of x1 in fields, so it could be the case that 
+        
+      }
+
+      (* Concretizing fields succeeds, should be a contradiction *)
+      destruct H2 as [[] | H2].
+      specialize (H2 x1 eq_refl).
+      cbn in H2.
+      rewrite <- H2 in H4.
+      cbn in H4. inv H4.
+
+
+      (* The hypothesis UB suggests that concretizing one of the
+         finite fields leads to UB... If this is the case, then H in
+         conjunction with Heqo should imply that the equivalent field
+         in the list of infinite fields also yields UB.
+
+         Will need to use
+         uvalue_concretize_strict_concretize_inclusion for the non-UB
+         cases.
+       *)
+
+      
+      
+      
+      induction Heqo.
+      + repeat red in UB.
+        rewrite CONC.concretize_uvalueM_equation in UB.
+        cbn in UB; repeat red in UB.
+        destruct UB as (?&?&?&?&?); subst.
+        cbn in H1.
+        destruct H2 as [[] | H2].
+        specialize (H2 []).
+        forward H2; [cbn; auto|].
+        rewrite <- H2 in H1.
+        cbn in H1; inv H1.
+      + repeat red in UB.
+        rewrite CONC.concretize_uvalueM_equation in UB.
+        rewrite map_monad_unfold in UB.
+        cbn in UB; repeat red in UB.
+        destruct UB as (?&?&?&?&?); subst.
+        destruct H1 as (?&?&?&?&?); subst.
+        cbn in H1.
+        destruct H2 as [[] | H2].
+        specialize (H2 []).
+        forward H2; [cbn; auto|].
+        rewrite <- H2 in H1.
+        cbn in H1; inv H1.
+    - (* Packed structs *)
+      admit.
+    - (* Arrays *)
+      admit.
+    - (* Vectors *)
+      admit.
+    - (* UVALUE_ICmp *)
+      admit.
+    - (* UVALUE_FBinop *)
+      admit.
+    - (* UVALUE_FCmp *)
+      admit.
+    - (* UVALUE_Conversion *)
+      admit.
+    - (* UVALUE_GetElementPtr *)
+      admit.
+    - (* UVALUE_ExtractElement *)
+      admit.
+    - (* UVALUE_InsertElement *)
+      admit.
+    - (* UVALUE_ExtractValue *)
+      admit.
+    - (* UVALUE_InsertValue *)
+      admit.
+    - (* UVALUE_Select *)
+      admit.
+    - (* UVALUE_ConcatBytes *)
+      admit.
+  Qed.
+
   Lemma concretize_no_ub_inf_fin :
     forall uv_inf uv_fin
       (REF : uvalue_refine_strict uv_inf uv_fin)
@@ -15386,9 +15645,9 @@ Qed.
   Proof.
     intros uv_inf uv_fin REF UB ub_msg.
     intros CONC.
-    eapply UB.
-    admit.
-  Admitted.
+    eapply UB;
+      eapply concretize_ub_fin_inf; eauto.
+  Qed.
 
   Lemma concretize_no_err_inf_fin :
     forall uv_inf uv_fin
@@ -15425,7 +15684,7 @@ Qed.
     pose proof uvalue_concretize_strict_concretize_inclusion _ _ REF.
     red in H.
 
-    pose proof concretize_inf_concretize_fin uv_fin.
+    pose proof concretize_inf_excluded_middle uv_fin.
     destruct H0 as [(dv_fin & CONC_FIN) | H0]; auto.
     all:
       split;
@@ -16050,26 +16309,6 @@ Qed.
       inv H2; inv Heqs0.
       reflexivity.
 Qed.
-
-  (* TODO: Move this? *)
-  Ltac unfold_dvalue_refine_strict :=
-    rewrite dvalue_refine_strict_equation in *; cbn in *.
-
-  Ltac unfold_dvalue_refine_strict_goal :=
-    rewrite dvalue_refine_strict_equation; cbn.
-
-  Ltac unfold_dvalue_refine_strict_in H :=
-    rewrite dvalue_refine_strict_equation in H; cbn in H.
-
-  Ltac unfold_uvalue_refine_strict :=
-    rewrite uvalue_refine_strict_equation in *; cbn in *.
-
-  Ltac unfold_uvalue_refine_strict_goal :=
-    rewrite uvalue_refine_strict_equation; cbn.
-
-  Ltac unfold_uvalue_refine_strict_in H :=
-    rewrite uvalue_refine_strict_equation in H; cbn in H.
-
 
   Lemma lift_err_uvalue_to_dvalue_orutt_strict_instr_E :
     forall uv1 uv2,
