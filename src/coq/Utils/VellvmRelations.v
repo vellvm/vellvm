@@ -48,10 +48,29 @@ Proof.
   - eapply rt_trans; eauto.
 Qed.
 
+Lemma clos_t_rt_inv :
+  forall {A : Type} {R : relation A} {x y : A},
+    clos_trans A R x y ->
+    exists z, R z y /\ clos_refl_trans A R x z.
+Proof.
+  intros A R x y SUB.
+  dependent induction SUB.
+  - exists x.
+    split; eauto.
+    apply rt_refl.
+  - clear IHSUB1.
+    destruct IHSUB2 as (?&?&?).
+    exists x0.
+    split; auto.
+    eapply rt_trans.
+    apply clos_t_rt; eauto.
+    eauto.
+Qed.
+
 Lemma clos_rt_t_inv :
   forall {A : Type} {R : relation A} {x y : A},
     clos_refl_trans A R x y ->
-    R x y \/ x=y \/ clos_trans A R x y.
+    x=y \/ R x y \/ clos_trans A R x y.
 Proof.
   intros A R x y RT.
   dependent induction RT; auto.
@@ -61,6 +80,21 @@ Proof.
     right; right;
     eapply t_trans; eauto;
     apply t_step; eauto.
+Qed.
+
+Lemma clos_rt_inv :
+  forall {A : Type} {R : relation A} {x y : A},
+    clos_refl_trans A R x y ->
+    x=y \/ exists z, R z y /\ clos_refl_trans A R x z.
+Proof.
+  intros A R x y SUB.
+  eapply clos_rt_t_inv in SUB.
+  destruct SUB as [? | [? | ?]]; subst; auto.
+  - right.
+    exists x; split; eauto.
+    apply rt_refl.
+  - apply clos_t_rt_inv in H.
+    auto.
 Qed.
 
 Lemma clos_trans_measure :
@@ -93,4 +127,27 @@ Proof.
   eapply clos_trans_measure in CONTRA; eauto.
   eapply clos_trans_measure in M; eauto.
   lia.
+Qed.
+
+Lemma clos_refl_trans_antisymmetric :
+  forall {A} {R : relation A} m,
+    (forall a b, R a b -> (m a < m b)%nat) ->
+    forall a b,
+      @clos_refl_trans A R a b ->
+      @clos_refl_trans A R b a ->
+      a = b.
+Proof.
+  intros A R m M a b AB BA.
+  eapply clos_rt_t_inv in AB.
+  destruct AB as [AB | [AB | AB]]; auto.
+  - eapply clos_rt_t_inv in BA.
+    destruct BA as [BA | [BA | BA]]; subst; auto; exfalso.
+    + apply M in AB, BA; lia.
+    + apply t_step in AB.
+      eapply clos_trans_not_sym; eauto.
+  - eapply clos_rt_t_inv in BA.
+    destruct BA as [BA | [BA | BA]]; subst; auto; exfalso.
+    + apply t_step in BA; auto.
+      eapply clos_trans_not_sym; eauto.
+    + eapply clos_trans_not_sym; eauto.
 Qed.
