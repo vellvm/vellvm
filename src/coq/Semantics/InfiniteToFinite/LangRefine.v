@@ -15039,12 +15039,6 @@ Qed.
       unfold uvalue_concretize_fin_inf_inclusion in *.
       intros dv_fin H0.
 
-      
-      Check (fix loop (x : uvalue) : uvalue := UVALUE_ExtractByte (loop x) DTYPE_Void 0 0).
-      (*
-        (fix x => UVALUE_ExtractByte t x [0])
-       *)
-
       red in REF.
       cbn in REF.
       break_match_hyp_inv.
@@ -15558,9 +15552,6 @@ Qed.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
         split; cbn; eauto.
-
-        (* Err... I don't know the position of x1 in fields, so it could be the case that 
-        
       }
 
       (* Concretizing fields succeeds, should be a contradiction *)

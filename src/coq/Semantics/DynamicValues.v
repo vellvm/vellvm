@@ -669,6 +669,42 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | _ => false
     end.
 
+  Inductive uvalue_direct_subterm : uvalue -> uvalue -> Prop :=
+  | UVALUE_Struct_subterm : forall f fields, In f fields -> uvalue_direct_subterm f (UVALUE_Struct fields)
+  | UVALUE_Packed_struct_subterm : forall f fields, In f fields -> uvalue_direct_subterm f (UVALUE_Packed_struct fields)
+  | UVALUE_Array_subterm : forall elt elts, In elt elts -> uvalue_direct_subterm elt (UVALUE_Array elts)
+  | UVALUE_Vector_subterm : forall elt elts, In elt elts -> uvalue_direct_subterm elt (UVALUE_Vector elts)
+  | UVALUE_IBinop_subterm_l : forall iop uv1 uv2, uvalue_direct_subterm uv1 (UVALUE_IBinop iop uv1 uv2)
+  | UVALUE_IBinop_subterm_r : forall iop uv1 uv2, uvalue_direct_subterm uv2 (UVALUE_IBinop iop uv1 uv2)
+  | UVALUE_ICmp_subterm_l : forall icmp uv1 uv2, uvalue_direct_subterm uv1 (UVALUE_ICmp icmp uv1 uv2)
+  | UVALUE_ICmp_subterm_r : forall icmp uv1 uv2, uvalue_direct_subterm uv2 (UVALUE_ICmp icmp uv1 uv2)
+  | UVALUE_FBinop_subterm_l : forall fop flags uv1 uv2, uvalue_direct_subterm uv1 (UVALUE_FBinop fop flags uv1 uv2)
+  | UVALUE_FBinop_subterm_r : forall fop flags uv1 uv2, uvalue_direct_subterm uv2 (UVALUE_FBinop fop flags uv1 uv2)
+  | UVALUE_FCmp_subterm_l : forall fcmp uv1 uv2, uvalue_direct_subterm uv1 (UVALUE_FCmp fcmp uv1 uv2)
+  | UVALUE_FCmp_subterm_r : forall fcmp uv1 uv2, uvalue_direct_subterm uv2 (UVALUE_FCmp fcmp uv1 uv2)
+  | UVALUE_Conversion_subterm : forall conv_type dt_from uv dt_to, uvalue_direct_subterm uv (UVALUE_Conversion conv_type dt_from uv dt_to)
+  | UVALUE_GetElementPtr_subterm_addr : forall dt uv_addr uv_idxs, uvalue_direct_subterm uv_addr (UVALUE_GetElementPtr dt uv_addr uv_idxs)
+  | UVALUE_GetElementPtr_subterm_idxs : forall dt uv_addr idx uv_idxs, In idx uv_idxs -> uvalue_direct_subterm idx (UVALUE_GetElementPtr dt uv_addr uv_idxs)
+  | UVALUE_ExtractElement_subterm_vec : forall vec_typ vec idx, uvalue_direct_subterm vec (UVALUE_ExtractElement vec_typ vec idx)
+  | UVALUE_ExtractElement_subterm_idx : forall vec_typ vec idx, uvalue_direct_subterm idx (UVALUE_ExtractElement vec_typ vec idx)
+  | UVALUE_InsertElement_subterm_vec : forall vec_typ vec elt idx, uvalue_direct_subterm vec (UVALUE_InsertElement vec_typ vec elt idx)
+  | UVALUE_InsertElement_subterm_elt : forall vec_typ vec elt idx, uvalue_direct_subterm elt (UVALUE_InsertElement vec_typ vec elt idx)
+  | UVALUE_InsertElement_subterm_idx : forall vec_typ vec elt idx, uvalue_direct_subterm idx (UVALUE_InsertElement vec_typ vec elt idx)
+  | UVALUE_ShuffleVector_subterm_vec1 : forall vec_typ vec1 vec2 idxmask, uvalue_direct_subterm vec1 (UVALUE_ShuffleVector vec_typ vec1 vec2 idxmask)
+  | UVALUE_ShuffleVector_subterm_vec2 : forall vec_typ vec1 vec2 idxmask, uvalue_direct_subterm vec2 (UVALUE_ShuffleVector vec_typ vec1 vec2 idxmask)
+  | UVALUE_ShuffleVector_subterm_idxmask : forall vec_typ vec1 vec2 idxmask, uvalue_direct_subterm idxmask (UVALUE_ShuffleVector vec_typ vec1 vec2 idxmask)
+  | UVALUE_ExtractValue_subterm : forall vec_typ vec idxs, uvalue_direct_subterm vec (UVALUE_ExtractValue vec_typ vec idxs)
+  | UVALUE_InsertValue_subterm_vec : forall vec_typ vec elt_typ elt idxs, uvalue_direct_subterm vec (UVALUE_InsertValue vec_typ vec elt_typ elt idxs)
+  | UVALUE_InsertValue_subterm_elt : forall vec_typ vec elt_typ elt idxs, uvalue_direct_subterm elt (UVALUE_InsertValue vec_typ vec elt_typ elt idxs)
+  | UVALUE_Select_subterm_cnd : forall cnd v1 v2, uvalue_direct_subterm cnd (UVALUE_Select cnd v1 v2)
+  | UVALUE_Select_subterm_v1 : forall cnd v1 v2, uvalue_direct_subterm v1 (UVALUE_Select cnd v1 v2)
+  | UVALUE_Select_subterm_v2 : forall cnd v1 v2, uvalue_direct_subterm v2 (UVALUE_Select cnd v1 v2)
+  | UVALUE_ExtractByte_subterm : forall uv dt idx sid, uvalue_direct_subterm uv (UVALUE_ExtractByte uv dt idx sid)
+  | UVALUE_ConcatBytes_subterm : forall dt uv uvs, In uv uvs -> uvalue_direct_subterm uv (UVALUE_ConcatBytes uvs dt).
+
+  Definition uvalue_strict_subterm := clos_trans _ uvalue_direct_subterm.
+  Definition uvalue_subterm := clos_refl_trans _ uvalue_direct_subterm.
+
   Section UvalueInd.
     Variable P : uvalue -> Prop.
     Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a).
@@ -753,6 +789,365 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         }
     Qed.
   End UvalueInd.
+
+  Lemma uvalue_strict_subterm_inv :
+    forall x dv,
+      uvalue_strict_subterm x dv ->
+      exists s, uvalue_direct_subterm s dv /\ uvalue_subterm x s.
+  Proof.
+    intros x dv H.
+    eapply clos_t_rt_inv; auto.
+  Qed.
+
+  Lemma uvalue_direct_subterm_uvalue_measure :
+    forall s e,
+      uvalue_direct_subterm s e ->
+      (uvalue_measure s < uvalue_measure e)%nat.
+  Proof.
+    intros s e SUB.
+    dependent induction SUB;
+      solve_uvalue_measure.
+  Qed.
+
+  Lemma uvalue_subterm_antisymmetric :
+    forall a b,
+      uvalue_subterm a b ->
+      uvalue_subterm b a ->
+      a = b.
+  Proof.
+    intros a b AB BA.
+    eapply clos_refl_trans_antisymmetric with (m:=uvalue_measure); eauto.
+    intros a0 b0 H.
+    apply uvalue_direct_subterm_uvalue_measure; auto.
+  Qed.
+
+  Section UvalueStrongInd.
+    Variable P : uvalue -> Prop.
+    Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a).
+    Hypothesis IH_I1             : forall x, P (UVALUE_I1 x).
+    Hypothesis IH_I8             : forall x, P (UVALUE_I8 x).
+    Hypothesis IH_I16             : forall x, P (UVALUE_I16 x).
+    Hypothesis IH_I32            : forall x, P (UVALUE_I32 x).
+    Hypothesis IH_I64            : forall x, P (UVALUE_I64 x).
+    Hypothesis IH_IPTR            : forall x, P (UVALUE_IPTR x).
+    Hypothesis IH_Double         : forall x, P (UVALUE_Double x).
+    Hypothesis IH_Float          : forall x, P (UVALUE_Float x).
+    Hypothesis IH_Undef          : forall t, P (UVALUE_Undef t).
+    Hypothesis IH_Poison         : forall t, P (UVALUE_Poison t).
+    Hypothesis IH_Oom            : forall t, P (UVALUE_Oom t).
+    Hypothesis IH_None           : P UVALUE_None.
+    Hypothesis IH_Subterm        : forall uv, (forall u, uvalue_strict_subterm u uv -> P u) -> P uv.
+
+    Lemma uvalue_strong_ind : forall (uv:uvalue), P uv.
+      intros uv.
+      enough (IH : forall s, uvalue_subterm s uv -> P s).
+      { apply IH. apply rt_refl. }
+
+      induction uv;
+        try solve
+          [ (* Solve simple cases where there are no subterms *)
+            match goal with
+            | _ : _ |- forall s, uvalue_subterm s ?UV -> P s =>
+                intros s H;
+                assert (s = UV);
+                [ dependent induction H; auto; inv H
+                | subst; auto
+                ]
+            end
+
+          | (* Solve structs and arrays *)
+            intros s H';
+            dependent induction H';
+            [ (* rt_step *)
+              match goal with
+              | H: uvalue_direct_subterm ?x _,
+                  IH : forall u : uvalue, In u _ -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                            |- P ?x =>
+                  inv H;
+                  apply IH_Subterm; eauto;
+                  intros; eapply IH; eauto;
+                  apply clos_t_rt; eauto
+              end
+            | (* rt_refl *)
+              apply IH_Subterm;
+              intros * STRICT;
+              dependent induction STRICT;
+              [ (* t_step *)
+                match goal with
+                | H: uvalue_direct_subterm ?x _,
+                    IH : forall u : uvalue, In u _ -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                              |- P ?x =>
+                    inv H;
+                    eapply IH; eauto;
+                    apply rt_refl
+                end
+              | (* t_trans *)
+                match goal with
+                | IH : forall u : uvalue, In u ?fields -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                            |- P ?x =>
+                    clear IHSTRICT1;
+                    specialize (IHSTRICT2 fields);
+                    repeat (forward IHSTRICT2; auto);
+                    pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
+                    eapply uvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
+                    inv DIRECT;
+                    eapply IH; eauto
+                end
+              ]
+            | (* rt_trans *)
+              match goal with
+              | XY : clos_refl_trans uvalue uvalue_direct_subterm ?x ?y,
+                  YZ : clos_refl_trans uvalue uvalue_direct_subterm ?y ?z,
+                    IH : forall u : uvalue, In u _ -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                              |- _ =>
+                  pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
+                  apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
+                  [ subst;
+                    pose proof uvalue_subterm_antisymmetric XY YZ; subst; eauto
+                  | inv R; eapply IH; eauto
+                  ]
+              end
+            ]
+          | (* Solve operations with 3 uvalues *)
+            intros s H';
+            dependent induction H';
+            [ (* rt_step *)
+              match goal with
+              | H: uvalue_direct_subterm ?x _,
+                  IHuv1 : forall s : uvalue, uvalue_subterm s ?uv1 -> P s,
+                IHuv2 : forall s : uvalue, uvalue_subterm s ?uv2 -> P s,
+                IHuv3 : forall s : uvalue, uvalue_subterm s ?uv3 -> P s
+                                      |- P ?x =>
+                inv H;
+                apply IH_Subterm; eauto;
+                [ intros; eapply IHuv1; eauto;
+                  apply clos_t_rt; eauto
+                | intros; eapply IHuv2; eauto;
+                  apply clos_t_rt; eauto
+                | intros; eapply IHuv3; eauto;
+                  apply clos_t_rt; eauto
+                ]
+              end
+            | (* rt_refl *)
+              eapply IH_Subterm;
+              intros * STRICT;
+              dependent induction STRICT;
+              [ (* t_step *)
+                match goal with
+                | H: uvalue_direct_subterm ?x _,
+                    IHuv1 : forall s : uvalue, uvalue_subterm s ?uv1 -> P s,
+                  IHuv2 : forall s : uvalue, uvalue_subterm s ?uv2 -> P s,
+                  IHuv3 : forall s : uvalue, uvalue_subterm s ?uv3 -> P s
+                                        |- P ?x =>
+                  inv H;
+                  [ eapply IHuv1; apply rt_refl
+                  | eapply IHuv2; apply rt_refl
+                  | eapply IHuv3; apply rt_refl
+                  ]
+                end
+              | pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
+                eapply uvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
+                inv DIRECT;
+                [ eapply IHuv1; eauto
+                | eapply IHuv2; eauto
+                | eapply IHuv3; eauto
+                ]
+              ]
+            | (* rt_trans *)
+              match goal with
+              | XY : clos_refl_trans uvalue uvalue_direct_subterm ?x ?y,
+                  YZ : clos_refl_trans uvalue uvalue_direct_subterm ?y ?z,
+                    IHuv1 : forall s : uvalue, uvalue_subterm s ?uv1 -> P s,
+                IHuv2 : forall s : uvalue, uvalue_subterm s ?uv2 -> P s,
+                IHuv3 : forall s : uvalue, uvalue_subterm s ?uv3 -> P s
+                |- _ =>
+                  pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
+                  apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
+                  [ subst;
+                    pose proof uvalue_subterm_antisymmetric XY YZ; subst; eauto
+                  | inv R;
+                    [ eapply IHuv1; eauto
+                    | eapply IHuv2; eauto
+                    | eapply IHuv3; eauto
+                    ]
+                  ]
+              end
+            ]
+          | (* Solve binops *)
+            intros s H';
+            dependent induction H';
+            [ (* rt_step *)
+              match goal with
+              | H: uvalue_direct_subterm ?x _,
+                  IHuv1 : forall s : uvalue, uvalue_subterm s ?uv1 -> P s,
+                IHuv2 : forall s : uvalue, uvalue_subterm s ?uv2 -> P s
+                                      |- P ?x =>
+                inv H;
+                apply IH_Subterm; eauto;
+                [ intros; eapply IHuv1; eauto;
+                  apply clos_t_rt; eauto
+                | intros; eapply IHuv2; eauto;
+                  apply clos_t_rt; eauto
+                ]
+              end
+            | (* rt_refl *)
+              eapply IH_Subterm;
+              intros * STRICT;
+              dependent induction STRICT;
+              [ (* t_step *)
+                match goal with
+                | H: uvalue_direct_subterm ?x _,
+                    IHuv1 : forall s : uvalue, uvalue_subterm s ?uv1 -> P s,
+                  IHuv2 : forall s : uvalue, uvalue_subterm s ?uv2 -> P s
+                                        |- P ?x =>
+                  inv H;
+                  [ eapply IHuv1; apply rt_refl
+                  | eapply IHuv2; apply rt_refl
+                  ]
+                end
+              | pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
+                eapply uvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
+                inv DIRECT;
+                [ eapply IHuv1; eauto
+                | eapply IHuv2; eauto
+                ]
+              ]
+            | (* rt_trans *)
+              match goal with
+              | XY : clos_refl_trans uvalue uvalue_direct_subterm ?x ?y,
+                  YZ : clos_refl_trans uvalue uvalue_direct_subterm ?y ?z
+                |- _ =>
+                  pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
+                  apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
+                  [ subst;
+                    pose proof uvalue_subterm_antisymmetric XY YZ; subst; eauto
+                  | inv R;
+                    [ eapply IHuv1; eauto
+                    | eapply IHuv2; eauto
+                    ]
+                  ]
+              end
+            ]
+          | (* Solve single subterm *)
+            intros s H';
+            dependent induction H';
+            [ (* rt_step *)
+              match goal with
+              | H: uvalue_direct_subterm ?x _,
+                  IHuv : forall s : uvalue, uvalue_subterm s ?uv1 -> P s
+                                      |- P ?x =>
+                inv H;
+                apply IH_Subterm; eauto;
+                intros; eapply IHuv; eauto;
+                apply clos_t_rt; eauto
+              end
+            | (* rt_refl *)
+              eapply IH_Subterm;
+              intros * STRICT;
+              dependent induction STRICT;
+              [ (* t_step *)
+                match goal with
+                | H: uvalue_direct_subterm ?x _,
+                    IHuv : forall s : uvalue, uvalue_subterm s ?uv1 -> P s
+                                        |- P ?x =>
+                  inv H;
+                  eapply IHuv; apply rt_refl
+                end
+              | pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
+                eapply uvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
+                inv DIRECT;
+                eapply IHuv; eauto
+              ]
+            | (* rt_trans *)
+              match goal with
+              | XY : clos_refl_trans uvalue uvalue_direct_subterm ?x ?y,
+                  YZ : clos_refl_trans uvalue uvalue_direct_subterm ?y ?z,
+                    IHuv : forall s : uvalue, uvalue_subterm s ?uv1 -> P s
+                |- _ =>
+                  pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
+                  apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
+                  [ subst;
+                    pose proof uvalue_subterm_antisymmetric XY YZ; subst; eauto
+                  | inv R;
+                    eapply IHuv; eauto
+                  ]
+              end
+            ]
+          ].
+
+      { (* GEP *)
+        intros s H';
+          dependent induction H'.
+        - (* rt_step *)
+          inv H0.
+          + (* addr *)
+            eapply IHuv; apply rt_refl.
+          + (* idxs *)
+            eapply H; eauto.
+            apply rt_refl.
+        - (* rt_refl *)
+          apply IH_Subterm;
+            intros * STRICT;
+            dependent induction STRICT.
+          + (* t_step *)
+            inv H0.
+            * (* addr *)
+              eapply IHuv; apply rt_refl.
+            * (* idxs *)
+              eapply H; eauto.
+              apply rt_refl.
+          + (* t_trans *)
+            pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
+              eapply uvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
+              inv DIRECT.
+            * eapply IHuv; eauto.
+            * eapply H; eauto.
+        - (* rt_trans *)
+          pose proof rt_trans _ _ _ _ _ H'1 H'2 as XZ;
+            apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
+            [ subst;
+              pose proof uvalue_subterm_antisymmetric H'1 H'2; subst; eauto
+            |
+            ].
+
+          inv R;
+            [ eapply IHuv; eauto
+            | eapply H; eauto
+            ].
+      }
+
+      { (* ConcatBytes *)
+        intros s H';
+          dependent induction H'.
+        - (* rt_step *)
+          inv H0.
+          eapply H; eauto; apply rt_refl.
+        - (* rt_refl *)
+          apply IH_Subterm;
+            intros * STRICT;
+            dependent induction STRICT.
+          + (* t_step *)
+            inv H0.
+            eapply H; eauto.
+            apply rt_refl.
+          + (* t_trans *)
+            pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
+              eapply uvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
+              inv DIRECT.
+            * eapply H; eauto.
+        - (* rt_trans *)
+          pose proof rt_trans _ _ _ _ _ H'1 H'2 as XZ;
+            apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
+            [ subst;
+              pose proof uvalue_subterm_antisymmetric H'1 H'2; subst; eauto
+            |
+            ].
+
+          inv R;
+            eapply H; eauto.
+      }
+    Qed.
+  End UvalueStrongInd.
 
   Section UvalueRec.
     Variable P : uvalue -> Set.
