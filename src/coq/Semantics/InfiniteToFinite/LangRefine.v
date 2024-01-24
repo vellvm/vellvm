@@ -15541,63 +15541,12 @@ Qed.
           inv H9.
       }
 
-        eapply map_monad_ErrUbOomProp_ub in H0.
-        destruct H0 as (?&?&?).
-
-        pose proof Forall2_In_exists2 _ _ _ _ Heqo H0.
-        destruct H3 as (?&?&?).
-
-        specialize (H x1 H3 x ub_msg H4 H1).
-        repeat red.
-        exists (UB_unERR_UB_OOM ub_msg).
-        exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
-        split; cbn; eauto.
-      }
-
       (* Concretizing fields succeeds, should be a contradiction *)
       destruct H2 as [[] | H2].
       specialize (H2 x1 eq_refl).
       cbn in H2.
       rewrite <- H2 in H4.
       cbn in H4. inv H4.
-
-
-      (* The hypothesis UB suggests that concretizing one of the
-         finite fields leads to UB... If this is the case, then H in
-         conjunction with Heqo should imply that the equivalent field
-         in the list of infinite fields also yields UB.
-
-         Will need to use
-         uvalue_concretize_strict_concretize_inclusion for the non-UB
-         cases.
-       *)
-
-      
-      
-      
-      induction Heqo.
-      + repeat red in UB.
-        rewrite CONC.concretize_uvalueM_equation in UB.
-        cbn in UB; repeat red in UB.
-        destruct UB as (?&?&?&?&?); subst.
-        cbn in H1.
-        destruct H2 as [[] | H2].
-        specialize (H2 []).
-        forward H2; [cbn; auto|].
-        rewrite <- H2 in H1.
-        cbn in H1; inv H1.
-      + repeat red in UB.
-        rewrite CONC.concretize_uvalueM_equation in UB.
-        rewrite map_monad_unfold in UB.
-        cbn in UB; repeat red in UB.
-        destruct UB as (?&?&?&?&?); subst.
-        destruct H1 as (?&?&?&?&?); subst.
-        cbn in H1.
-        destruct H2 as [[] | H2].
-        specialize (H2 []).
-        forward H2; [cbn; auto|].
-        rewrite <- H2 in H1.
-        cbn in H1; inv H1.
     - (* Packed structs *)
       admit.
     - (* Arrays *)
@@ -15626,7 +15575,7 @@ Qed.
       admit.
     - (* UVALUE_ConcatBytes *)
       admit.
-  Qed.
+  Admitted.
 
   Lemma concretize_no_ub_inf_fin :
     forall uv_inf uv_fin
