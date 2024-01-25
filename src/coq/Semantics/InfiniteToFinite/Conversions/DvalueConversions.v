@@ -703,7 +703,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
   Parameter uvalue_refine_strict_R2_injective :
     R2_injective uvalue_refine_strict.
 
-  (** Inversion Lemmas *)
+  (** Dvalue Inversion Lemmas *)
   Parameter dvalue_convert_strict_addr_inv :
     forall x a,
       dvalue_convert_strict x = NoOom (DV2.DVALUE_Addr a) ->
@@ -795,6 +795,285 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       exists elts',
         x = DV1.DVALUE_Vector elts' /\
           map_monad dvalue_convert_strict elts' = NoOom elts.
+
+  Ltac dvalue_convert_strict_inv H :=
+    first
+      [ apply dvalue_convert_strict_i1_inv in H
+      | apply dvalue_convert_strict_i8_inv in H
+      | apply dvalue_convert_strict_i16_inv in H
+      | apply dvalue_convert_strict_i32_inv in H
+      | apply dvalue_convert_strict_i64_inv in H
+      | apply dvalue_convert_strict_iptr_inv in H
+      | apply dvalue_convert_strict_addr_inv in H
+      | apply dvalue_convert_strict_double_inv in H
+      | apply dvalue_convert_strict_float_inv in H
+      | apply dvalue_convert_strict_poison_inv in H
+      | apply dvalue_convert_strict_oom_inv in H
+      | apply dvalue_convert_strict_none_inv in H
+      | apply dvalue_convert_strict_struct_inv in H
+      | apply dvalue_convert_strict_packed_struct_inv in H
+      | apply dvalue_convert_strict_array_inv in H
+      | apply dvalue_convert_strict_vector_inv in H
+      ];
+    try first [destruct H as (?&?&?)
+          | destruct H as (?&?)]; subst.
+
+  Ltac dvalue_refine_strict_inv H :=
+    rewrite dvalue_refine_strict_equation in H;
+    dvalue_convert_strict_inv H.
+
+  (** Uvalue Inversion Lemmas *)
+  Parameter uvalue_convert_strict_addr_inv :
+    forall x a,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Addr a) ->
+      exists a',
+        AC.addr_convert a' = NoOom a /\
+          x = DV1.UVALUE_Addr a'.
+
+  Parameter uvalue_convert_strict_iptr_inv :
+    forall x n,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_IPTR n) ->
+      exists n',
+        LP2.IP.from_Z (LP1.IP.to_Z n') = NoOom n /\
+          x = DV1.UVALUE_IPTR n'.
+
+  Parameter uvalue_convert_strict_i1_inv :
+    forall x n,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_I1 n) ->
+      x = DV1.UVALUE_I1 n.
+
+  Parameter uvalue_convert_strict_i8_inv :
+    forall x n,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_I8 n) ->
+      x = DV1.UVALUE_I8 n.
+
+  Parameter uvalue_convert_strict_i16_inv :
+    forall x n,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_I16 n) ->
+      x = DV1.UVALUE_I16 n.
+
+  Parameter uvalue_convert_strict_i32_inv :
+    forall x n,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_I32 n) ->
+      x = DV1.UVALUE_I32 n.
+
+  Parameter uvalue_convert_strict_i64_inv :
+    forall x n,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_I64 n) ->
+      x = DV1.UVALUE_I64 n.
+
+  Parameter uvalue_convert_strict_double_inv :
+    forall x v,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Double v) ->
+      x = DV1.UVALUE_Double v.
+
+  Parameter uvalue_convert_strict_float_inv :
+    forall x v,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Float v) ->
+      x = DV1.UVALUE_Float v.
+
+  Parameter uvalue_convert_strict_undef_inv :
+    forall x v,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Undef v) ->
+      x = DV1.UVALUE_Undef v.
+
+  Parameter uvalue_convert_strict_poison_inv :
+    forall x v,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Poison v) ->
+      x = DV1.UVALUE_Poison v.
+
+  Parameter uvalue_convert_strict_oom_inv :
+    forall x v,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Oom v) ->
+      x = DV1.UVALUE_Oom v.
+
+  Parameter uvalue_convert_strict_none_inv :
+    forall x,
+      uvalue_convert_strict x = NoOom DV2.UVALUE_None ->
+      x = DV1.UVALUE_None.
+
+  Parameter uvalue_convert_strict_struct_inv :
+    forall x fields,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Struct fields) ->
+      exists fields',
+        x = DV1.UVALUE_Struct fields' /\
+          map_monad uvalue_convert_strict fields' = NoOom fields.
+
+  Parameter uvalue_convert_strict_packed_struct_inv :
+    forall x fields,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Packed_struct fields) ->
+      exists fields',
+        x = DV1.UVALUE_Packed_struct fields' /\
+          map_monad uvalue_convert_strict fields' = NoOom fields.
+
+  Parameter uvalue_convert_strict_array_inv :
+    forall x elts,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Array elts) ->
+      exists elts',
+        x = DV1.UVALUE_Array elts' /\
+          map_monad uvalue_convert_strict elts' = NoOom elts.
+
+  Parameter uvalue_convert_strict_vector_inv :
+    forall x elts,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Vector elts) ->
+      exists elts',
+        x = DV1.UVALUE_Vector elts' /\
+          map_monad uvalue_convert_strict elts' = NoOom elts.
+
+  Parameter uvalue_convert_strict_ibinop_inv :
+    forall x iop uv1 uv2,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_IBinop iop uv1 uv2) ->
+      exists uv1' uv2',
+        x = DV1.UVALUE_IBinop iop uv1' uv2' /\
+          uvalue_convert_strict uv1' = NoOom uv1 /\
+          uvalue_convert_strict uv2' = NoOom uv2.
+
+  Parameter uvalue_convert_strict_icmp_inv :
+    forall x icmp uv1 uv2,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_ICmp icmp uv1 uv2) ->
+      exists uv1' uv2',
+        x = DV1.UVALUE_ICmp icmp uv1' uv2' /\
+          uvalue_convert_strict uv1' = NoOom uv1 /\
+          uvalue_convert_strict uv2' = NoOom uv2.
+
+  Parameter uvalue_convert_strict_fbinop_inv :
+    forall x fop flags uv1 uv2,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_FBinop fop flags uv1 uv2) ->
+      exists uv1' uv2',
+        x = DV1.UVALUE_FBinop fop flags uv1' uv2' /\
+          uvalue_convert_strict uv1' = NoOom uv1 /\
+          uvalue_convert_strict uv2' = NoOom uv2.
+
+  Parameter uvalue_convert_strict_fcmp_inv :
+    forall x fcmp uv1 uv2,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_FCmp fcmp uv1 uv2) ->
+      exists uv1' uv2',
+        x = DV1.UVALUE_FCmp fcmp uv1' uv2' /\
+          uvalue_convert_strict uv1' = NoOom uv1 /\
+          uvalue_convert_strict uv2' = NoOom uv2.
+
+  Parameter uvalue_convert_strict_conversion_inv :
+    forall x conv_type dt_from uv dt_to,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Conversion conv_type dt_from uv dt_to) ->
+      exists uv',
+        x = DV1.UVALUE_Conversion conv_type dt_from uv' dt_to /\
+          uvalue_convert_strict uv' = NoOom uv.
+
+  Parameter uvalue_convert_strict_gep_inv :
+    forall x dt uv_addr uv_idxs,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_GetElementPtr dt uv_addr uv_idxs) ->
+      exists uv_addr' uv_idxs',
+        x = DV1.UVALUE_GetElementPtr dt uv_addr' uv_idxs' /\
+          uvalue_convert_strict uv_addr' = NoOom uv_addr /\
+          map_monad uvalue_convert_strict uv_idxs' = NoOom uv_idxs.
+
+  Parameter uvalue_convert_strict_extract_element_inv :
+    forall x dt uv uv_idx,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_ExtractElement dt uv uv_idx) ->
+      exists uv' uv_idx',
+        x = DV1.UVALUE_ExtractElement dt uv' uv_idx' /\
+          uvalue_convert_strict uv' = NoOom uv /\
+          uvalue_convert_strict uv_idx' = NoOom uv_idx.
+
+  Parameter uvalue_convert_strict_insert_element_inv :
+    forall x dt uv_vec uv_elt uv_idx,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_InsertElement dt uv_vec uv_elt uv_idx) ->
+      exists uv_vec' uv_elt' uv_idx',
+        x = DV1.UVALUE_InsertElement dt uv_vec' uv_elt' uv_idx' /\
+          uvalue_convert_strict uv_vec' = NoOom uv_vec /\
+          uvalue_convert_strict uv_elt' = NoOom uv_elt /\
+          uvalue_convert_strict uv_idx' = NoOom uv_idx.
+
+  Parameter uvalue_convert_strict_shuffle_vector_inv :
+    forall x dt vec1 vec2 idxmask,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_ShuffleVector dt vec1 vec2 idxmask) ->
+      exists vec1' vec2' idxmask',
+        x = DV1.UVALUE_ShuffleVector dt vec1' vec2' idxmask' /\
+          uvalue_convert_strict vec1' = NoOom vec1 /\
+          uvalue_convert_strict vec2' = NoOom vec2 /\
+          uvalue_convert_strict idxmask' = NoOom idxmask.
+
+  Parameter uvalue_convert_strict_extract_value_inv :
+    forall x dt uv idxs,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_ExtractValue dt uv idxs) ->
+      exists uv',
+        x = DV1.UVALUE_ExtractValue dt uv' idxs /\
+          uvalue_convert_strict uv' = NoOom uv.
+
+  Parameter uvalue_convert_strict_insert_value_inv :
+    forall x dt uv dt_elt elt idxs,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_InsertValue dt uv dt_elt elt idxs) ->
+      exists uv' elt',
+        x = DV1.UVALUE_InsertValue dt uv' dt_elt elt' idxs /\
+          uvalue_convert_strict uv' = NoOom uv /\
+          uvalue_convert_strict elt' = NoOom elt.
+
+  Parameter uvalue_convert_strict_select_inv :
+    forall x cnd uv1 uv2,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Select cnd uv1 uv2) ->
+      exists cnd' uv1' uv2',
+        x = DV1.UVALUE_Select cnd' uv1' uv2' /\
+          uvalue_convert_strict cnd' = NoOom cnd /\
+          uvalue_convert_strict uv1' = NoOom uv1 /\
+          uvalue_convert_strict uv2' = NoOom uv2.
+
+  Parameter uvalue_convert_strict_extract_byte_inv :
+    forall x uv dt idx sid,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_ExtractByte uv dt idx sid) ->
+      exists uv',
+        x = DV1.UVALUE_ExtractByte uv' dt idx sid /\
+          uvalue_convert_strict uv' = NoOom uv.
+
+  Parameter uvalue_convert_strict_concat_bytes_inv :
+    forall x uv_bytes dt,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_ConcatBytes uv_bytes dt) ->
+      exists uv_bytes',
+        x = DV1.UVALUE_ConcatBytes uv_bytes' dt /\
+          map_monad uvalue_convert_strict uv_bytes' = NoOom uv_bytes.
+
+  Ltac uvalue_convert_strict_inv H :=
+    first
+      [ apply uvalue_convert_strict_i1_inv in H
+      | apply uvalue_convert_strict_i8_inv in H
+      | apply uvalue_convert_strict_i16_inv in H
+      | apply uvalue_convert_strict_i32_inv in H
+      | apply uvalue_convert_strict_i64_inv in H
+      | apply uvalue_convert_strict_iptr_inv in H
+      | apply uvalue_convert_strict_addr_inv in H
+      | apply uvalue_convert_strict_double_inv in H
+      | apply uvalue_convert_strict_float_inv in H
+      | apply uvalue_convert_strict_undef_inv in H
+      | apply uvalue_convert_strict_poison_inv in H
+      | apply uvalue_convert_strict_oom_inv in H
+      | apply uvalue_convert_strict_none_inv in H
+      | apply uvalue_convert_strict_struct_inv in H
+      | apply uvalue_convert_strict_packed_struct_inv in H
+      | apply uvalue_convert_strict_array_inv in H
+      | apply uvalue_convert_strict_vector_inv in H
+      | apply uvalue_convert_strict_ibinop_inv in H
+      | apply uvalue_convert_strict_icmp_inv in H
+      | apply uvalue_convert_strict_fbinop_inv in H
+      | apply uvalue_convert_strict_fcmp_inv in H
+      | apply uvalue_convert_strict_conversion_inv in H
+      | apply uvalue_convert_strict_gep_inv in H
+      | apply uvalue_convert_strict_extract_element_inv in H
+      | apply uvalue_convert_strict_insert_element_inv in H
+      | apply uvalue_convert_strict_shuffle_vector_inv in H
+      | apply uvalue_convert_strict_extract_value_inv in H
+      | apply uvalue_convert_strict_insert_value_inv in H
+      | apply uvalue_convert_strict_select_inv in H
+      | apply uvalue_convert_strict_extract_byte_inv in H
+      | apply uvalue_convert_strict_concat_bytes_inv in H
+      ];
+    try first
+      [ destruct H as (?&?&?&?&?&?&?)
+      | destruct H as (?&?&?&?&?)
+      | destruct H as (?&?&?)
+      | destruct H as (?&?)]; subst.
+
+  Ltac uvalue_refine_strict_inv H :=
+    rewrite uvalue_refine_strict_equation in H;
+    uvalue_convert_strict_inv H.
 
   (** Lemmas about values with types... *)
 
@@ -3809,6 +4088,532 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     exists elts0.
     split; auto.
   Qed.
+
+  Ltac dvalue_convert_strict_inv H :=
+    first
+      [ apply dvalue_convert_strict_i1_inv in H
+      | apply dvalue_convert_strict_i8_inv in H
+      | apply dvalue_convert_strict_i16_inv in H
+      | apply dvalue_convert_strict_i32_inv in H
+      | apply dvalue_convert_strict_i64_inv in H
+      | apply dvalue_convert_strict_iptr_inv in H
+      | apply dvalue_convert_strict_addr_inv in H
+      | apply dvalue_convert_strict_double_inv in H
+      | apply dvalue_convert_strict_float_inv in H
+      | apply dvalue_convert_strict_poison_inv in H
+      | apply dvalue_convert_strict_oom_inv in H
+      | apply dvalue_convert_strict_none_inv in H
+      | apply dvalue_convert_strict_struct_inv in H
+      | apply dvalue_convert_strict_packed_struct_inv in H
+      | apply dvalue_convert_strict_array_inv in H
+      | apply dvalue_convert_strict_vector_inv in H
+      ];
+    try first [destruct H as (?&?&?)
+          | destruct H as (?&?)]; subst.
+
+  Ltac dvalue_refine_strict_inv H :=
+    rewrite dvalue_refine_strict_equation in H;
+    dvalue_convert_strict_inv H.
+
+  (** Uvalue Inversion Lemmas *)
+  Lemma uvalue_convert_strict_addr_inv :
+    forall x a,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Addr a) ->
+      exists a',
+        AC.addr_convert a' = NoOom a /\
+          x = DV1.UVALUE_Addr a'.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_iptr_inv :
+    forall x n,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_IPTR n) ->
+      exists n',
+        LP2.IP.from_Z (LP1.IP.to_Z n') = NoOom n /\
+          x = DV1.UVALUE_IPTR n'.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_i1_inv :
+    forall x n,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_I1 n) ->
+      x = DV1.UVALUE_I1 n.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_i8_inv :
+    forall x n,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_I8 n) ->
+      x = DV1.UVALUE_I8 n.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_i16_inv :
+    forall x n,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_I16 n) ->
+      x = DV1.UVALUE_I16 n.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_i32_inv :
+    forall x n,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_I32 n) ->
+      x = DV1.UVALUE_I32 n.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_i64_inv :
+    forall x n,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_I64 n) ->
+      x = DV1.UVALUE_I64 n.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_double_inv :
+    forall x v,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Double v) ->
+      x = DV1.UVALUE_Double v.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_float_inv :
+    forall x v,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Float v) ->
+      x = DV1.UVALUE_Float v.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_undef_inv :
+    forall x v,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Undef v) ->
+      x = DV1.UVALUE_Undef v.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_poison_inv :
+    forall x v,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Poison v) ->
+      x = DV1.UVALUE_Poison v.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_oom_inv :
+    forall x v,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Oom v) ->
+      x = DV1.UVALUE_Oom v.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_none_inv :
+    forall x,
+      uvalue_convert_strict x = NoOom DV2.UVALUE_None ->
+      x = DV1.UVALUE_None.
+  Proof.
+    intros x H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_struct_inv :
+    forall x fields,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Struct fields) ->
+      exists fields',
+        x = DV1.UVALUE_Struct fields' /\
+          map_monad uvalue_convert_strict fields' = NoOom fields.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_packed_struct_inv :
+    forall x fields,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Packed_struct fields) ->
+      exists fields',
+        x = DV1.UVALUE_Packed_struct fields' /\
+          map_monad uvalue_convert_strict fields' = NoOom fields.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_array_inv :
+    forall x elts,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Array elts) ->
+      exists elts',
+        x = DV1.UVALUE_Array elts' /\
+          map_monad uvalue_convert_strict elts' = NoOom elts.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_vector_inv :
+    forall x elts,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Vector elts) ->
+      exists elts',
+        x = DV1.UVALUE_Vector elts' /\
+          map_monad uvalue_convert_strict elts' = NoOom elts.
+  Proof.
+    intros x a H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_ibinop_inv :
+    forall x iop uv1 uv2,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_IBinop iop uv1 uv2) ->
+      exists uv1' uv2',
+        x = DV1.UVALUE_IBinop iop uv1' uv2' /\
+          uvalue_convert_strict uv1' = NoOom uv1 /\
+          uvalue_convert_strict uv2' = NoOom uv2.
+  Proof.
+    intros x * H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_icmp_inv :
+    forall x icmp uv1 uv2,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_ICmp icmp uv1 uv2) ->
+      exists uv1' uv2',
+        x = DV1.UVALUE_ICmp icmp uv1' uv2' /\
+          uvalue_convert_strict uv1' = NoOom uv1 /\
+          uvalue_convert_strict uv2' = NoOom uv2.
+  Proof.
+    intros x * H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_fbinop_inv :
+    forall x fop flags uv1 uv2,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_FBinop fop flags uv1 uv2) ->
+      exists uv1' uv2',
+        x = DV1.UVALUE_FBinop fop flags uv1' uv2' /\
+          uvalue_convert_strict uv1' = NoOom uv1 /\
+          uvalue_convert_strict uv2' = NoOom uv2.
+  Proof.
+    intros x * H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_fcmp_inv :
+    forall x fcmp uv1 uv2,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_FCmp fcmp uv1 uv2) ->
+      exists uv1' uv2',
+        x = DV1.UVALUE_FCmp fcmp uv1' uv2' /\
+          uvalue_convert_strict uv1' = NoOom uv1 /\
+          uvalue_convert_strict uv2' = NoOom uv2.
+  Proof.
+    intros x * H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_conversion_inv :
+    forall x conv_type dt_from uv dt_to,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Conversion conv_type dt_from uv dt_to) ->
+      exists uv',
+        x = DV1.UVALUE_Conversion conv_type dt_from uv' dt_to /\
+          uvalue_convert_strict uv' = NoOom uv.
+  Proof.
+    intros x * H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_gep_inv :
+    forall x dt uv_addr uv_idxs,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_GetElementPtr dt uv_addr uv_idxs) ->
+      exists uv_addr' uv_idxs',
+        x = DV1.UVALUE_GetElementPtr dt uv_addr' uv_idxs' /\
+          uvalue_convert_strict uv_addr' = NoOom uv_addr /\
+          map_monad uvalue_convert_strict uv_idxs' = NoOom uv_idxs.
+  Proof.
+    intros x * H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_extract_element_inv :
+    forall x dt uv uv_idx,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_ExtractElement dt uv uv_idx) ->
+      exists uv' uv_idx',
+        x = DV1.UVALUE_ExtractElement dt uv' uv_idx' /\
+          uvalue_convert_strict uv' = NoOom uv /\
+          uvalue_convert_strict uv_idx' = NoOom uv_idx.
+  Proof.
+    intros x * H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_insert_element_inv :
+    forall x dt uv_vec uv_elt uv_idx,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_InsertElement dt uv_vec uv_elt uv_idx) ->
+      exists uv_vec' uv_elt' uv_idx',
+        x = DV1.UVALUE_InsertElement dt uv_vec' uv_elt' uv_idx' /\
+          uvalue_convert_strict uv_vec' = NoOom uv_vec /\
+          uvalue_convert_strict uv_elt' = NoOom uv_elt /\
+          uvalue_convert_strict uv_idx' = NoOom uv_idx.
+  Proof.
+    induction x;
+      intros * CONV;
+      repeat red in H; cbn in CONV;
+      repeat break_match_hyp_inv;
+      try inv CONV;
+      repeat eexists; eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_shuffle_vector_inv :
+    forall x dt vec1 vec2 idxmask,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_ShuffleVector dt vec1 vec2 idxmask) ->
+      exists vec1' vec2' idxmask',
+        x = DV1.UVALUE_ShuffleVector dt vec1' vec2' idxmask' /\
+          uvalue_convert_strict vec1' = NoOom vec1 /\
+          uvalue_convert_strict vec2' = NoOom vec2 /\
+          uvalue_convert_strict idxmask' = NoOom idxmask.
+  Proof.
+    induction x;
+      intros * CONV;
+      repeat red in H; cbn in CONV;
+      repeat break_match_hyp_inv;
+      try inv CONV;
+      repeat eexists; eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_extract_value_inv :
+    forall x dt uv idxs,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_ExtractValue dt uv idxs) ->
+      exists uv',
+        x = DV1.UVALUE_ExtractValue dt uv' idxs /\
+          uvalue_convert_strict uv' = NoOom uv.
+  Proof.
+    induction x;
+      intros * CONV;
+      repeat red in H; cbn in CONV;
+      repeat break_match_hyp_inv;
+      try inv CONV;
+      repeat eexists; eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_insert_value_inv :
+    forall x dt uv dt_elt elt idxs,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_InsertValue dt uv dt_elt elt idxs) ->
+      exists uv' elt',
+        x = DV1.UVALUE_InsertValue dt uv' dt_elt elt' idxs /\
+          uvalue_convert_strict uv' = NoOom uv /\
+          uvalue_convert_strict elt' = NoOom elt.
+  Proof.
+    induction x;
+      intros * CONV;
+      repeat red in H; cbn in CONV;
+      repeat break_match_hyp_inv;
+      try inv CONV;
+      repeat eexists; eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_select_inv :
+    forall x cnd uv1 uv2,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Select cnd uv1 uv2) ->
+      exists cnd' uv1' uv2',
+        x = DV1.UVALUE_Select cnd' uv1' uv2' /\
+          uvalue_convert_strict cnd' = NoOom cnd /\
+          uvalue_convert_strict uv1' = NoOom uv1 /\
+          uvalue_convert_strict uv2' = NoOom uv2.
+  Proof.
+    induction x;
+      intros * CONV;
+      repeat red in H; cbn in CONV;
+      repeat break_match_hyp_inv;
+      try inv CONV;
+      repeat eexists; eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_extract_byte_inv :
+    forall x uv dt idx sid,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_ExtractByte uv dt idx sid) ->
+      exists uv',
+        x = DV1.UVALUE_ExtractByte uv' dt idx sid /\
+          uvalue_convert_strict uv' = NoOom uv.
+  Proof.
+    induction x;
+      intros * CONV;
+      repeat red in H; cbn in CONV;
+      repeat break_match_hyp_inv;
+      try inv CONV;
+      repeat eexists; eauto.
+  Qed.
+
+  Lemma uvalue_convert_strict_concat_bytes_inv :
+    forall x uv_bytes dt,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_ConcatBytes uv_bytes dt) ->
+      exists uv_bytes',
+        x = DV1.UVALUE_ConcatBytes uv_bytes' dt /\
+          map_monad uvalue_convert_strict uv_bytes' = NoOom uv_bytes.
+  Proof.
+    induction x;
+      intros * CONV;
+      repeat red in H; cbn in CONV;
+      repeat break_match_hyp_inv;
+      try inv CONV;
+      repeat eexists; eauto.
+  Qed.
+
+  Ltac uvalue_convert_strict_inv H :=
+    first
+      [ apply uvalue_convert_strict_i1_inv in H
+      | apply uvalue_convert_strict_i8_inv in H
+      | apply uvalue_convert_strict_i16_inv in H
+      | apply uvalue_convert_strict_i32_inv in H
+      | apply uvalue_convert_strict_i64_inv in H
+      | apply uvalue_convert_strict_iptr_inv in H
+      | apply uvalue_convert_strict_addr_inv in H
+      | apply uvalue_convert_strict_double_inv in H
+      | apply uvalue_convert_strict_float_inv in H
+      | apply uvalue_convert_strict_undef_inv in H
+      | apply uvalue_convert_strict_poison_inv in H
+      | apply uvalue_convert_strict_oom_inv in H
+      | apply uvalue_convert_strict_none_inv in H
+      | apply uvalue_convert_strict_struct_inv in H
+      | apply uvalue_convert_strict_packed_struct_inv in H
+      | apply uvalue_convert_strict_array_inv in H
+      | apply uvalue_convert_strict_vector_inv in H
+      | apply uvalue_convert_strict_ibinop_inv in H
+      | apply uvalue_convert_strict_icmp_inv in H
+      | apply uvalue_convert_strict_fcmp_inv in H
+      | apply uvalue_convert_strict_conversion_inv in H
+      | apply uvalue_convert_strict_gep_inv in H
+      | apply uvalue_convert_strict_extract_element_inv in H
+      | apply uvalue_convert_strict_insert_element_inv in H
+      | apply uvalue_convert_strict_shuffle_vector_inv in H
+      | apply uvalue_convert_strict_extract_value_inv in H
+      | apply uvalue_convert_strict_insert_value_inv in H
+      | apply uvalue_convert_strict_select_inv in H
+      | apply uvalue_convert_strict_extract_byte_inv in H
+      | apply uvalue_convert_strict_concat_bytes_inv in H
+      ];
+    try first
+      [ destruct H as (?&?&?&?&?&?&?)
+      | destruct H as (?&?&?&?&?)
+      | destruct H as (?&?&?)
+      | destruct H as (?&?)]; subst.
+
+  Ltac uvalue_refine_strict_inv H :=
+    rewrite uvalue_refine_strict_equation in H;
+    uvalue_convert_strict_inv H.
 
   (** Lemmas about values with types... *)
 

@@ -48,6 +48,19 @@ Proof.
   - eapply rt_trans; eauto.
 Qed.
 
+Lemma clos_t_rt_t :
+  forall {A: Type} {R : relation A}
+    {x y z : A},
+    clos_trans A R x y ->
+    clos_refl_trans A R y z ->
+    clos_trans A R x z.
+Proof.
+  intros A R x y z T RT.
+  induction RT; subst; auto.
+  eapply t_trans; eauto.
+  apply t_step; auto.
+Qed.
+
 Lemma clos_t_rt_inv :
   forall {A : Type} {R : relation A} {x y : A},
     clos_trans A R x y ->
