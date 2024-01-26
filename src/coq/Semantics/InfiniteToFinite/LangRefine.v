@@ -13816,7 +13816,7 @@ Qed.
     forall uv_bytes_inf uv_bytes_fin uv_inf uv_fin ix sid dt,
       uvalue_refine_strict uv_inf uv_fin ->
       map_monad uvalue_convert_strict uv_bytes_inf = NoOom uv_bytes_fin ->
-      IS1.LLVM.MEM.CP.CONCBASE.all_extract_bytes_from_uvalue_helper ix sid dt uv_inf uv_bytes_inf =
+      IS1.MEM.ByteM.all_extract_bytes_from_uvalue_helper ix sid dt uv_inf uv_bytes_inf =
         fmap fin_to_inf_uvalue (all_extract_bytes_from_uvalue_helper ix sid dt uv_fin uv_bytes_fin).
   Proof.
     induction uv_bytes_inf;
@@ -13841,7 +13841,8 @@ Qed.
         { eapply RelDec.rel_dec_correct; eauto. }
         subst.
         rewrite UV_REF in Heqo1. inv Heqo1.
-        rewrite Util.eq_dec_eq in Heqo5; inv Heqo5.
+        rewrite Util.eq_dec_eq in Heqo6.
+        inv Heqo6.
       + destruct (RelDec.rel_dec u0 uv_fin) eqn:UV_FIN; inv Heqo3.
         assert (u0 = uv_fin) as AUV_FIN.
         { eapply RelDec.rel_dec_correct; eauto. }
@@ -13856,11 +13857,11 @@ Qed.
   Lemma all_extract_bytes_from_uvalue_fin_inf :
     forall uv_bytes_inf uv_bytes_fin dt,
       map_monad uvalue_convert_strict uv_bytes_inf = NoOom uv_bytes_fin ->
-      IS1.LLVM.MEM.CP.CONCBASE.all_extract_bytes_from_uvalue dt uv_bytes_inf =
+      IS1.MEM.ByteM.all_extract_bytes_from_uvalue dt uv_bytes_inf =
         fmap fin_to_inf_uvalue (all_extract_bytes_from_uvalue dt uv_bytes_fin).
   Proof.
     intros uv_bytes_inf uv_bytes_fin dt HMAPM.
-    unfold IS1.LLVM.MEM.CP.CONCBASE.all_extract_bytes_from_uvalue,
+    unfold IS1.MEM.ByteM.all_extract_bytes_from_uvalue,
       all_extract_bytes_from_uvalue.
 
     destruct uv_bytes_inf.
@@ -13880,15 +13881,6 @@ Qed.
       erewrite all_extract_bytes_from_uvalue_helper_fin_inf; eauto.
       reflexivity.
   Qed.
-
-
-  (* TODO: Move this where it applies for all uvalues *)
-  Lemma all_extract_bytes_from_uvalue_strict_subterm :
-    forall dt uv_bytes_fin u,
-      all_extract_bytes_from_uvalue dt uv_bytes_fin = Some u ->
-      DV2.uvalue_strict_subterm u (DV2.UVALUE_ConcatBytes uv_bytes_fin dt).
-  Proof.
-  Admitted.
 
   Lemma uvalue_direct_subterm_fin_inf :
     forall u_fin uv_fin u_inf uv_inf,

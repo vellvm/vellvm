@@ -13,7 +13,8 @@ From Vellvm Require Import
      Utils.ListUtil
      Utils.Error
      Utils.MonadReturnsLaws
-     Utils.MapMonadExtra.
+     Utils.MapMonadExtra
+     Utils.Tactics.
 
 Import Basics.Basics.Monads.
 
@@ -100,6 +101,30 @@ Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_I
        | _ => None
        end.
 
+  Lemma all_extract_bytes_from_uvalue_helper_some :
+    forall uv_bytes_fin idx sid dt parent u,
+      all_extract_bytes_from_uvalue_helper idx sid dt parent uv_bytes_fin = Some u ->
+      u = parent.
+  Proof.
+    induction uv_bytes_fin;
+      intros idx sid dt parent u EXTRACT.
+    - inv EXTRACT; auto.
+    - cbn in EXTRACT.
+      repeat break_match_hyp_inv.
+      eapply IHuv_bytes_fin; eauto.
+  Qed.
+
+  Lemma all_extract_bytes_from_uvalue_helper_strict_subterm :
+    forall uv_bytes_fin idx sid dt parent u,
+      uvalue_strict_subterm parent (UVALUE_ConcatBytes uv_bytes_fin dt) ->
+      all_extract_bytes_from_uvalue_helper idx sid dt parent uv_bytes_fin = Some u ->
+      uvalue_strict_subterm u (UVALUE_ConcatBytes uv_bytes_fin dt).
+  Proof.
+    intros uv_bytes_fin idx sid dt parent u SUB EXTRACT.
+    eapply all_extract_bytes_from_uvalue_helper_some in EXTRACT.
+    subst; auto.
+  Qed.
+
   (* Check that store ids, uvalues, and types match up, as well as
        that the extract byte indices are in the right order *)
   Definition all_extract_bytes_from_uvalue (t : dtyp) (bytes : list uvalue) : option uvalue
@@ -110,6 +135,34 @@ Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_I
            all_extract_bytes_from_uvalue_helper 0 sid dt uv bytes
        | _ => None
        end.
+
+  Lemma all_extract_bytes_from_uvalue_strict_subterm :
+    forall uv_bytes_fin dt u,
+      all_extract_bytes_from_uvalue dt uv_bytes_fin = Some u ->
+      uvalue_strict_subterm u (UVALUE_ConcatBytes uv_bytes_fin dt).
+  Proof.
+    intros uv_bytes_fin dt u EXTRACT.
+    unfold all_extract_bytes_from_uvalue in EXTRACT.
+    break_match_hyp_inv.
+    break_match_hyp_inv.
+    break_match_hyp_inv.
+    assert (dt = dt0).
+    { unfold guard_opt in Heqo.
+      destruct (dtyp_eqb dt dt0) eqn:DT; inv Heqo.
+      eapply dtyp_eqb_eq; eauto.
+    }
+    subst.
+    eapply all_extract_bytes_from_uvalue_helper_strict_subterm
+      with (idx:=0)
+           (sid:=sid)
+           (parent:=u1); cbn; auto.
+
+    eapply Relation_Operators.t_trans.
+    2: {
+      constructor; constructor; left; reflexivity.
+    }
+    constructor; constructor.
+  Qed.
 
   Definition from_ubytes (bytes : list SByte) (dt : dtyp) : uvalue
     :=
