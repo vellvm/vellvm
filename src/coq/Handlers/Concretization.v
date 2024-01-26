@@ -1434,6 +1434,24 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
       Context {OOM : RAISE_OOM ERR_M}.
       Variable lift_ue : forall {A}, ERR_M A -> M A.
 
+      Definition pre_concretized (acc : NMap (list (uvalue * dvalue))) (uv : uvalue) (sid : store_id) : option dvalue
+        := vs <- NM.find sid acc;;
+           assoc uv vs.
+
+      Definition new_concretized_byte
+        (acc : NMap (list (uvalue * dvalue))) (uv : uvalue) (dv : dvalue) (sid : store_id) : NMap (list (uvalue * dvalue))
+        := match NM.find sid acc with
+           | Some vs =>
+               match assoc uv vs with
+               | Some _ =>
+                   acc
+               | None =>
+                   NM.add sid (vs ++ [(uv, dv)]) acc
+               end
+           | None =>
+               NM.add sid [(uv, dv)] acc
+           end.
+
       (* TODO: satisfy the termination checker here. *)
       (* M will be err_or_ub / MPropT err_or_ub? *)
       (* Define a sum type f a, g b.... a + b. Mutual recursive
@@ -1581,37 +1599,37 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
 
          Concretize these identical uvalues...
        *)
-
-      concretize_uvalue_bytes_helper (uvs : list (N * uvalue)) (acc : NMap dvalue_byte) {struct uvs} : M (NMap dvalue_byte)
+      concretize_uvalue_bytes_helper (acc : NMap (list (uvalue * dvalue))) (uvs : list uvalue) {struct uvs} : M (list dvalue_byte)
       := match uvs with
-         | [] => ret acc
-         | ((n, uv)::uvs) =>
+         | [] => ret []
+         | (uv::uvs) =>
              match uv with
              | UVALUE_ExtractByte byte_uv dt idx sid =>
-                 let '(ins, outs) := filter_uvalue_sid_matches uv uvs in
-                 (* Concretize first uvalue *)
-                 dv <- concretize_uvalueM byte_uv;;
-                 let dv_byte := DVALUE_ExtractByte dv dt idx in
-                 let acc := @NM.add _ n dv_byte acc in
-                 (* Concretize entangled bytes *)
-                 acc <- monad_fold_right (fun acc '(n, uv) =>
-                                            dvb <- uvalue_byte_replace_with_dvalue_byte uv dv;;
-                                            ret (@NM.add _ n dvb acc)) ins acc;;
-                 (* Concretize the rest of the bytes *)
-                 concretize_uvalue_bytes_helper outs acc
-             | _ => lift_ue (raise_error "concretize_uvalue_bytes_helper: non-byte in uvs.")
+                 (* Check if this uvalue has been concretized already *)
+                 match pre_concretized acc byte_uv sid with
+                 | Some dv =>
+                     (* Use the pre_concretized value *)
+                     let dv_byte := DVALUE_ExtractByte dv dt idx in
+                     (* Concretize the rest of the bytes *)
+                     rest <- concretize_uvalue_bytes_helper acc uvs;;
+                     ret (dv_byte :: rest)
+                 | None =>
+                     (* Concretize the uvalue *)
+                     dv <- concretize_uvalueM byte_uv;;
+                     let dv_byte := DVALUE_ExtractByte dv dt idx in
+                     let acc := new_concretized_byte acc byte_uv dv sid in
+                     (* Concretize the rest of the bytes *)
+                     rest <- concretize_uvalue_bytes_helper acc uvs;;
+                     ret (dv_byte :: rest)
+                 end
+             | _ =>
+                 lift_ue (raise_error "concretize_uvalue_bytes_helper: non-byte in uvs.")
              end
          end
 
       with
-      concretize_uvalue_bytes (uvs : list uvalue) {struct uvs} : M (list dvalue_byte)
-      :=
-        let len := length uvs in
-        byte_map <- concretize_uvalue_bytes_helper (zip (Nseq 0 len) uvs) (@NM.empty _);;
-        match NM_find_many (Nseq 0 len) byte_map with
-        | Some dvbs => ret dvbs
-        | None => lift_ue (raise_error "concretize_uvalue_bytes: missing indices.")
-        end
+      concretize_uvalue_bytes (uvs : list uvalue) : M (list dvalue_byte)
+      := concretize_uvalue_bytes_helper (@NM.empty _) uvs
 
       with
       extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) {struct uvs} : M dvalue
