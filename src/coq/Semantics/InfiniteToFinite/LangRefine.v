@@ -14127,18 +14127,16 @@ Qed.
     repeat red in H.
     eapply NM.Raw.Proofs.empty_1 in H; auto.
   Qed.
-  
+
+  Definition concretization_list_refine : (list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)) -> (list (uvalue * dvalue)) -> Prop
+    :=
+    Forall2 (uvalue_refine_strict × dvalue_refine_strict).
+
   Definition concretization_map_refine
     (inf_map : NMap (list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)))
     (fin_map : NMap (list (uvalue * dvalue))) : Prop
     :=
-    let conc_ref :=
-      Forall2
-        (fun '(uv_inf, dv_inf) '(uv_fin, dv_fin)
-         => uvalue_refine_strict uv_inf uv_fin /\
-             dvalue_refine_strict dv_inf dv_fin)
-    in
-    NM_Refine conc_ref inf_map fin_map.
+    NM_Refine concretization_list_refine inf_map fin_map.
 
   Lemma concretization_map_refine_empty :
     concretization_map_refine (NM.empty (list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue))) (NM.empty (list (uvalue * dvalue))).
@@ -14153,6 +14151,95 @@ Qed.
       eapply NM.Raw.Proofs.empty_1 in H; contradiction.
   Qed.
 
+  Lemma NM_find_In :
+    forall {elt} k m e,
+      NM.find (elt:=elt) k m = Some e ->
+      NM.In k m.
+  Proof.
+    intros elt k m e FIND.
+    apply NM.find_2 in FIND.
+    repeat red.
+    exists e.
+    apply FIND.
+  Qed.
+
+  Lemma NM_find_not_In :
+    forall {elt} k m,
+      NM.find (elt:=elt) k m = None ->
+      ~ NM.In k m.
+  Proof.
+    intros elt k m NFIND CONTRA.
+    destruct CONTRA as (?&?).
+    apply NM.find_1 in H.
+    rewrite NFIND in H; inv H.
+  Qed.
+
+  Lemma NM_In_add_eq :
+    forall {elt} k v m,
+      NM.In (elt:=elt) k (NM.add k v m).
+  Proof.
+    intros elt k v m.
+    repeat red.
+    exists v.
+    apply NM.add_1; auto.
+  Qed.
+
+  Lemma NM_In_add_neq :
+    forall {elt} k1 k2 v m,
+      k1 <> k2 ->
+      NM.In (elt:=elt) k1 (NM.add k2 v m) <-> NM.In (elt:=elt) k1 m.
+  Proof.
+    intros elt k1 k2 v m NEQ.
+    split; intros [e MAPS]; exists e.
+    - eapply NM.add_3; eauto.
+    - eapply NM.add_2; eauto.
+  Qed.
+
+  Lemma NM_MapsTo_eq :
+    forall {elt} k e v m,
+      NM.MapsTo (elt:=elt) k e (NM.add k v m) ->
+      e = v.
+  Proof.
+  Admitted.
+
+  Lemma concretize_map_refine_find_none_inf_fin :
+    forall acc_inf acc_fin sid,
+      concretization_map_refine acc_inf acc_fin ->
+      NM.find (elt:=list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)) sid acc_inf = None ->
+      NM.find (elt:=list (uvalue * dvalue)) sid acc_fin = None.
+  Proof.
+    intros acc_inf acc_fin sid ACC_REF FIND.
+    destruct (NM.find (elt:=list (uvalue * dvalue)) sid acc_fin) eqn:FIND_FIN; auto.
+    exfalso.
+
+    destruct ACC_REF as (ACC_IN & ACC_MAPSTO).
+    apply NM_find_In in FIND_FIN.
+    apply ACC_IN in FIND_FIN.
+    apply NM_find_not_In in FIND.
+    contradiction.
+  Qed.
+
+  Lemma concretize_map_refine_find_some_inf_fin :
+    forall acc_inf acc_fin sid conc_list_inf,
+      concretization_map_refine acc_inf acc_fin ->
+      NM.find (elt:=list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)) sid acc_inf = Some conc_list_inf ->
+      exists conc_list_fin,
+        NM.find (elt:=list (uvalue * dvalue)) sid acc_fin = Some conc_list_fin /\
+          concretization_list_refine conc_list_inf conc_list_fin.
+  Proof.
+    intros acc_inf acc_fin sid conc_list_inf ACC_REF FIND.
+    destruct ACC_REF as (ACC_IN & ACC_MAPSTO).
+    pose proof FIND as IN.
+    apply NM_find_In in IN.
+    apply ACC_IN in IN.
+    destruct IN.
+    exists x.
+    apply NM.find_2 in FIND.
+    split.
+    - apply NM.find_1; auto.
+    - eapply ACC_MAPSTO; eauto.
+  Qed.
+
   Lemma concretize_map_refine_new_concretized_byte_fin_inf :
     forall acc_inf acc_fin uv_inf uv_fin dv_inf dv_fin sid,
       concretization_map_refine acc_inf acc_fin ->
@@ -14162,7 +14249,153 @@ Qed.
         (IS1.LLVM.MEM.CP.CONCBASE.new_concretized_byte acc_inf uv_inf dv_inf sid)
         (new_concretized_byte acc_fin uv_fin dv_fin sid).
   Proof.
-  Admitted.
+    intros acc_inf acc_fin uv_inf uv_fin dv_inf dv_fin
+      sid ACC_REF UV_REF DV_REF.
+    repeat red.
+    split.
+    { (* In *)
+      intros k.
+      unfold IS1.LLVM.MEM.CP.CONCBASE.new_concretized_byte,
+        new_concretized_byte in *.
+      split; intros IN.
+      - break_match_hyp.
+        + eapply concretize_map_refine_find_some_inf_fin in Heqo; eauto.
+          destruct Heqo as (?&?&?).
+          rewrite H.
+          break_match_hyp.
+          * eapply assoc_similar_lookup in Heqo.
+            3: apply H0.
+            2: apply uvalue_refine_strict_R2_injective.
+            destruct Heqo as (?&?&?&?&?&?).
+            assert (x0 = uv_fin).
+            { pose proof Util.Forall2_Nth H2 H3 H0.
+              destruct H4.
+              cbn in *.
+              red in UV_REF, fst_rel.
+              rewrite UV_REF in fst_rel.
+              inv fst_rel; auto.
+            }
+            subst.
+
+            rewrite H1.
+            apply ACC_REF; auto.
+          * assert (Util.assoc uv_fin x = None).
+            { eapply assoc_similar_no_lookup
+                with (xs:=l); eauto.
+              apply uvalue_refine_strict_R2_injective.
+            }
+            rewrite H1.
+
+            assert ((k = sid) \/ (k <> sid)) as [EQ | NEQ] by lia.
+            -- subst.
+               apply NM_In_add_eq.
+            -- apply NM_In_add_neq; eauto.
+               apply NM_In_add_neq in IN; eauto.
+               apply ACC_REF; auto.
+        + eapply concretize_map_refine_find_none_inf_fin in Heqo; eauto.
+          rewrite Heqo.
+
+          assert ((k = sid) \/ (k <> sid)) as [EQ | NEQ] by lia.
+          -- subst.
+             apply NM_In_add_eq.
+          -- apply NM_In_add_neq; eauto.
+             apply NM_In_add_neq in IN; eauto.
+             apply ACC_REF; auto.
+      - break_match_goal.
+        + eapply concretize_map_refine_find_some_inf_fin in Heqo; eauto.
+          destruct Heqo as (?&?&?).
+          rewrite H in IN.
+          break_match_goal.
+          * eapply assoc_similar_lookup in Heqo.
+            3: apply H0.
+            2: apply uvalue_refine_strict_R2_injective.
+            destruct Heqo as (?&?&?&?&?&?).
+            assert (x0 = uv_fin).
+            { pose proof Util.Forall2_Nth H2 H3 H0.
+              destruct H4.
+              cbn in *.
+              red in UV_REF, fst_rel.
+              rewrite UV_REF in fst_rel.
+              inv fst_rel; auto.
+            }
+            subst.
+
+            rewrite H1 in IN.
+            apply ACC_REF; auto.
+          * assert (Util.assoc uv_fin x = None).
+            { eapply assoc_similar_no_lookup
+                with (xs:=l); eauto.
+              apply uvalue_refine_strict_R2_injective.
+            }
+            rewrite H1 in IN.
+
+            assert ((k = sid) \/ (k <> sid)) as [EQ | NEQ] by lia.
+            -- subst.
+               apply NM_In_add_eq.
+            -- apply NM_In_add_neq; eauto.
+               apply NM_In_add_neq in IN; eauto.
+               apply ACC_REF; auto.
+        + eapply concretize_map_refine_find_none_inf_fin in Heqo; eauto.
+          rewrite Heqo in IN.
+
+          assert ((k = sid) \/ (k <> sid)) as [EQ | NEQ] by lia.
+          -- subst.
+             apply NM_In_add_eq.
+          -- apply NM_In_add_neq; eauto.
+             apply NM_In_add_neq in IN; eauto.
+             apply ACC_REF; auto.
+    }
+
+    { (* MapsTo *)
+      intros k e e' MAPS1 MAPS2.
+      unfold IS1.LLVM.MEM.CP.CONCBASE.new_concretized_byte,
+        new_concretized_byte in *.
+      red.
+      pose proof ACC_REF as [_ ACC_MAPS].
+      destruct (NM.find (elt:=list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)) sid acc_inf) eqn:FIND_INF.
+      - eapply concretize_map_refine_find_some_inf_fin in FIND_INF; eauto.
+        destruct FIND_INF as (?&?&?).
+        rewrite H in MAPS2.
+        destruct (Util.assoc uv_inf l) eqn:ASSOC.
+        + eapply assoc_similar_lookup
+            with (xs:=l) in ASSOC; eauto.
+          2: apply uvalue_refine_strict_R2_injective.
+
+          destruct ASSOC as (?&?&?&?&?&?).
+          assert (x0 = uv_fin).
+          { pose proof Util.Forall2_Nth H2 H3 H0.
+            destruct H4.
+            cbn in *.
+            red in UV_REF, fst_rel.
+            rewrite UV_REF in fst_rel.
+            inv fst_rel; auto.
+          }
+          subst.
+          rewrite H1 in MAPS2.
+          eapply ACC_MAPS; eauto.
+        + assert (Util.assoc uv_fin x = None).
+          { eapply assoc_similar_no_lookup
+              with (xs:=l); eauto.
+            apply uvalue_refine_strict_R2_injective.
+          }
+          rewrite H1 in MAPS2.
+
+          assert ((k = sid) \/ (k <> sid)) as [EQ | NEQ] by lia.
+          -- subst.
+             apply NM_MapsTo_eq in MAPS1, MAPS2; subst.
+             apply Forall2_app; auto.
+          -- apply NM.add_3 in MAPS1, MAPS2; auto.
+             eapply ACC_MAPS; eauto.
+      - eapply concretize_map_refine_find_none_inf_fin in FIND_INF; eauto.
+        rewrite FIND_INF in MAPS2.
+        assert ((k = sid) \/ (k <> sid)) as [EQ | NEQ] by lia.
+        -- subst.
+           apply NM_MapsTo_eq in MAPS1, MAPS2; subst.
+           repeat constructor; cbn; auto.
+        -- apply NM.add_3 in MAPS1, MAPS2; auto.
+           eapply ACC_MAPS; eauto.
+    }
+  Qed.
 
   Lemma pre_concretized_fin_inf :
     forall uv_inf uv_fin acc_inf acc_fin sid,
@@ -14171,6 +14404,11 @@ Qed.
       IS1.LLVM.MEM.CP.CONCBASE.pre_concretized acc_inf uv_inf sid =
         fmap fin_to_inf_dvalue (pre_concretized acc_fin uv_fin sid).
   Proof.
+    intros uv_inf uv_fin acc_inf acc_fin sid ACC_REF REF.
+    unfold pre_concretized,
+      IS1.LLVM.MEM.CP.CONCBASE.pre_concretized.
+    cbn.
+    break_match_goal.
   Admitted.
 
   Lemma concretize_uvalue_bytes_helper_fin_inf :
@@ -15457,7 +15695,7 @@ Qed.
            `uv_inf`... So, `fin_to_inf_dvalue x` has no hope of being
            one...
          *)
-
+        admit.
       }
 
       { (* Conv_ItoP *)
