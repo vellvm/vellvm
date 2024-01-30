@@ -14409,7 +14409,35 @@ Qed.
       IS1.LLVM.MEM.CP.CONCBASE.pre_concretized.
     cbn.
     break_match_goal.
-  Admitted.
+    - eapply concretize_map_refine_find_some_inf_fin in Heqo;
+        eauto.
+      destruct Heqo as (?&?&?).
+      rewrite H.
+      destruct (Util.assoc uv_inf l) eqn:ASSOC.
+      + eapply assoc_similar_lookup
+            with (xs:=l) in ASSOC; eauto.
+        2: apply uvalue_refine_strict_R2_injective.
+
+        destruct ASSOC as (?&?&?&?&?&?).
+        pose proof Util.Forall2_Nth H2 H3 H0.
+        destruct H4; cbn in *.
+        red in REF, fst_rel.
+        rewrite REF in fst_rel.
+        inv fst_rel; auto.
+
+        rewrite H1.
+        erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
+      + assert (Util.assoc uv_fin x = None).
+        { eapply assoc_similar_no_lookup
+            with (xs:=l); eauto.
+          apply uvalue_refine_strict_R2_injective.
+        }
+        rewrite H1; auto.
+    - eapply concretize_map_refine_find_none_inf_fin in Heqo;
+        eauto.
+      rewrite Heqo.
+      auto.
+  Qed.
 
   Lemma concretize_uvalue_bytes_helper_fin_inf :
     forall uvs_inf uvs_fin acc_inf acc_fin res
