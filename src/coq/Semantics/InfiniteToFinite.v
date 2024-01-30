@@ -1371,30 +1371,6 @@ Lemma lift_memory_convert_mem_byte :
     eexists; eauto.
   Qed.
 
-  Lemma fin_to_inf_dvalue_refine_strict :
-    forall d,
-      DVC1.dvalue_refine_strict (fin_to_inf_dvalue d) d.
-  Proof.
-    intros d.
-    rewrite DVC1.dvalue_refine_strict_equation.
-    unfold fin_to_inf_dvalue.
-    break_match; cbn in *.
-    destruct p.
-    auto.
-  Qed.
-
-  Lemma fin_to_inf_uvalue_refine_strict :
-    forall u,
-      DVC1.uvalue_refine_strict (fin_to_inf_uvalue u) u.
-  Proof.
-    intros u.
-    rewrite DVC1.uvalue_refine_strict_equation.
-    unfold fin_to_inf_uvalue.
-    break_match; cbn in *.
-    destruct p.
-    auto.
-  Qed.
-
   Import AListFacts.
 
   Definition lift_local_env (lenv : InterpreterStack64BitIntptr.LLVM.Local.local_env) : InterpreterStackBigIntptr.LLVM.Local.local_env.
