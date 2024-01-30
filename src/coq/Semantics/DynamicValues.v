@@ -799,6 +799,13 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     eapply clos_t_rt_inv; auto.
   Qed.
 
+  Lemma uvalue_concat_bytes_strict_subterm :
+    forall u uv_bytes dt,
+      Exists (uvalue_subterm u) uv_bytes ->
+      uvalue_strict_subterm u (UVALUE_ConcatBytes uv_bytes dt).
+  Proof.
+  Admitted.
+
   Lemma uvalue_direct_subterm_uvalue_measure :
     forall s e,
       uvalue_direct_subterm s e ->

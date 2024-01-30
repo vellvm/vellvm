@@ -41,6 +41,7 @@ From Vellvm Require Import
      Utils.AListFacts
      Utils.VellvmRelations
      Utils.ErrUbOomProp
+     Utils.NMaps
      Handlers.MemoryModules.FiniteAddresses
      Handlers.MemoryModules.InfiniteAddresses
      Handlers.MemoryModelImplementation
@@ -14098,36 +14099,6 @@ Qed.
     intros dvbs_fin dvbs_inf dt res REF FIN.
   Admitted.
 
-  Lemma uvalue_concat_bytes_strict_subterm :
-    forall u uv_bytes dt,
-      Exists (DV1.uvalue_subterm u) uv_bytes ->
-      DV1.uvalue_strict_subterm u (DV1.UVALUE_ConcatBytes uv_bytes dt).
-  Proof.
-  Admitted.
-
-  Require Import NMaps.
-
-  (* TODO: Move this to NMaps file. *)
-  Definition NM_Refine
-    {elt1 elt2 : Type}
-    (ref_elt : elt1 -> elt2 -> Prop)
-    (m1 : NM.t elt1)
-    (m2 : NM.t elt2) : Prop
-    :=
-    (forall k : NM.key, NM.In (elt:=elt1) k m1 <-> NM.In (elt:=elt2) k m2) /\
-      (forall (k : NM.key) e e', NM.MapsTo k e m1 -> NM.MapsTo k e' m2 -> ref_elt e e').
-
-  Lemma NM_In_empty_contra :
-    forall {elt : Type} k,
-      ~ (NM.In (elt:=elt) k (NM.empty elt)).
-  Proof.
-    intros elt k CONTRA.
-    repeat red in CONTRA.
-    destruct CONTRA as (?&?).
-    repeat red in H.
-    eapply NM.Raw.Proofs.empty_1 in H; auto.
-  Qed.
-
   Definition concretization_list_refine : (list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)) -> (list (uvalue * dvalue)) -> Prop
     :=
     Forall2 (uvalue_refine_strict × dvalue_refine_strict).
@@ -14150,57 +14121,6 @@ Qed.
       repeat red in H.
       eapply NM.Raw.Proofs.empty_1 in H; contradiction.
   Qed.
-
-  Lemma NM_find_In :
-    forall {elt} k m e,
-      NM.find (elt:=elt) k m = Some e ->
-      NM.In k m.
-  Proof.
-    intros elt k m e FIND.
-    apply NM.find_2 in FIND.
-    repeat red.
-    exists e.
-    apply FIND.
-  Qed.
-
-  Lemma NM_find_not_In :
-    forall {elt} k m,
-      NM.find (elt:=elt) k m = None ->
-      ~ NM.In k m.
-  Proof.
-    intros elt k m NFIND CONTRA.
-    destruct CONTRA as (?&?).
-    apply NM.find_1 in H.
-    rewrite NFIND in H; inv H.
-  Qed.
-
-  Lemma NM_In_add_eq :
-    forall {elt} k v m,
-      NM.In (elt:=elt) k (NM.add k v m).
-  Proof.
-    intros elt k v m.
-    repeat red.
-    exists v.
-    apply NM.add_1; auto.
-  Qed.
-
-  Lemma NM_In_add_neq :
-    forall {elt} k1 k2 v m,
-      k1 <> k2 ->
-      NM.In (elt:=elt) k1 (NM.add k2 v m) <-> NM.In (elt:=elt) k1 m.
-  Proof.
-    intros elt k1 k2 v m NEQ.
-    split; intros [e MAPS]; exists e.
-    - eapply NM.add_3; eauto.
-    - eapply NM.add_2; eauto.
-  Qed.
-
-  Lemma NM_MapsTo_eq :
-    forall {elt} k e v m,
-      NM.MapsTo (elt:=elt) k e (NM.add k v m) ->
-      e = v.
-  Proof.
-  Admitted.
 
   Lemma concretize_map_refine_find_none_inf_fin :
     forall acc_inf acc_fin sid,
@@ -14624,6 +14544,8 @@ Qed.
     eapply concretization_map_refine_empty.
   Qed.
 
+  Print Assumptions concretize_uvalue_bytes_fin_inf.
+
   Lemma dvalue_bytes_to_dvalue_fin_poison_contra :
     forall dvbs_fin dt dt',
       dvalue_bytes_to_dvalue dvbs_fin dt = {| EitherMonad.unEitherT := {| unMkOomableT := Poison (Oomable (ERR dvalue)) dt' |} |} ->
@@ -14982,7 +14904,7 @@ Qed.
             eapply extractbytes_to_dvalue_fin_inf; eauto.
             intros u H1 uv_fin H2 dv_fin0 H3.
             eapply H; eauto.
-            eapply uvalue_concat_bytes_strict_subterm; eauto.
+            eapply DVCrev.DV2.uvalue_concat_bytes_strict_subterm; eauto.
           }
 
           (* all_extract_bytes_from_uvalue should agree... *)
@@ -15027,7 +14949,7 @@ Qed.
           eapply extractbytes_to_dvalue_fin_inf; eauto.
           intros u H2 uv_fin H3 dv_fin0 H4.
           eapply H; eauto.
-          eapply uvalue_concat_bytes_strict_subterm; eauto.
+          eapply DVCrev.DV2.uvalue_concat_bytes_strict_subterm; eauto.
         }
 
         - (* Addresses *)
