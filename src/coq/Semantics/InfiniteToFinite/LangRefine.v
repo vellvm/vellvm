@@ -14153,6 +14153,26 @@ Qed.
       eapply NM.Raw.Proofs.empty_1 in H; contradiction.
   Qed.
 
+  Lemma concretize_map_refine_new_concretized_byte_fin_inf :
+    forall acc_inf acc_fin uv_inf uv_fin dv_inf dv_fin sid,
+      concretization_map_refine acc_inf acc_fin ->
+      uvalue_refine_strict uv_inf uv_fin ->
+      dvalue_refine_strict dv_inf dv_fin ->
+      concretization_map_refine
+        (IS1.LLVM.MEM.CP.CONCBASE.new_concretized_byte acc_inf uv_inf dv_inf sid)
+        (new_concretized_byte acc_fin uv_fin dv_fin sid).
+  Proof.
+  Admitted.
+
+  Lemma pre_concretized_fin_inf :
+    forall uv_inf uv_fin acc_inf acc_fin sid,
+      concretization_map_refine acc_inf acc_fin ->
+      uvalue_refine_strict uv_inf uv_fin ->
+      IS1.LLVM.MEM.CP.CONCBASE.pre_concretized acc_inf uv_inf sid =
+        fmap fin_to_inf_dvalue (pre_concretized acc_fin uv_fin sid).
+  Proof.
+  Admitted.
+
   Lemma concretize_uvalue_bytes_helper_fin_inf :
     forall uvs_inf uvs_fin acc_inf acc_fin res
       (IH : forall (u : DV1.uvalue),
@@ -14198,8 +14218,95 @@ Qed.
         (fun (A : Type) (x ue : err_ub_oom A) => x = ue) acc_inf uvs_inf (ret (map fin_to_inf_dvalue_byte res)).
   Proof.
     (* Will need something about acc_inf and acc_fin *)
-    intros uvs_inf uvs_fin acc_inf acc_fin res IH REF CONC.
-  Admitted.
+    induction uvs_inf;
+      intros uvs_fin acc_inf acc_fin res IH REF ACC_REF CONC.
+    - inv REF.
+      cbn in CONC; inv CONC; cbn.
+      reflexivity.
+    - inv REF.
+      rewrite concretize_uvalue_bytes_helper_equation in CONC.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalue_bytes_helper_equation.
+      destruct y; uvalue_refine_strict_inv H1; try inv CONC.
+      rewrite pre_concretized_fin_inf with (uv_fin:=y) (acc_fin:=acc_fin); eauto.
+      break_match_hyp_inv; repeat red.
+      + (* pre-concretization exists *)
+        destruct H as (?&?&?&?).
+        destruct_err_ub_oom x0; inv H1.
+        destruct H2 as [[] | H2].
+        specialize (H2 x2).
+        forward H2; [cbn; auto|].
+        cbn in H2.
+        rewrite <- H2 in H5.
+        inv H5.
+
+        specialize (IHuvs_inf l' acc_inf acc_fin x2).
+        repeat (forward IHuvs_inf; eauto).
+
+        exists (ret (map fin_to_inf_dvalue_byte x2)).
+        exists (fun _ => ret (map fin_to_inf_dvalue_byte (DVALUE_ExtractByte d dt idx :: x2))).
+        split; eauto.
+        split; eauto.
+
+        right.
+        intros a RETa.
+        inv RETa.
+        cbn.
+        reflexivity.
+      + (* No pre-concretization exists *)
+        destruct H as (?&?&?&?).
+        destruct_err_ub_oom x0; inv H1.
+        destruct H2 as [[] | H2].
+        specialize (H2 x2).
+        forward H2; [cbn; auto|].
+        cbn in H2.
+        repeat red in H2.
+        destruct H2 as (?&?&?&?&?).
+        rewrite <- H2 in H5.
+        destruct_err_ub_oom x0; inv H5.
+        destruct H4 as [[] | H4].
+        specialize (H4 x4).
+        forward H4; [cbn; auto|].
+        rewrite <- H4 in H7.
+        inv H7.
+
+        eapply IH in H; eauto.
+        2: solve [repeat constructor].
+        exists (ret (fin_to_inf_dvalue x2)).
+        exists (fun _ => ret (map fin_to_inf_dvalue_byte (DVALUE_ExtractByte x2 dt idx :: x4))).
+        split; eauto.
+        split; eauto.
+
+        right.
+        intros a RETa.
+        inv RETa.
+        cbn in H2.
+        rewrite <- H4 in H2.
+        inv H2.
+        repeat red.
+
+        specialize
+          (IHuvs_inf l'
+             (IS1.LLVM.MEM.CP.CONCBASE.new_concretized_byte acc_inf x (fin_to_inf_dvalue x2) sid)
+             (new_concretized_byte acc_fin y x2 sid) x4).
+        forward IHuvs_inf; eauto.
+        forward IHuvs_inf; eauto.
+        forward IHuvs_inf.
+        eapply concretize_map_refine_new_concretized_byte_fin_inf; eauto.
+        apply fin_to_inf_dvalue_refine_strict.
+        forward IHuvs_inf; eauto.
+
+        exists (ret (map fin_to_inf_dvalue_byte x4)).
+        exists (fun _ =>
+             ret (map fin_to_inf_dvalue_byte (DVALUE_ExtractByte x2 dt idx :: x4))).
+        split; eauto.
+        split; eauto.
+
+        right.
+        intros a RETa.
+        inv RETa.
+        cbn.
+        reflexivity.
+  Qed.
 
   Lemma concretize_uvalue_bytes_fin_inf :
     forall uvs_inf uvs_fin res
