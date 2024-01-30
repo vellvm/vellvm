@@ -14039,6 +14039,140 @@ Qed.
       apply dvalue_byte_refine_fin_to_inf_dvalue_byte.
   Qed.
 
+  Lemma dvalue_extract_byte_success_fin_inf :
+    forall dv_inf dv_fin dt idx res,
+      dvalue_refine_strict dv_inf dv_fin ->
+      @dvalue_extract_byte ErrOOMPoison
+        (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+           (@Monad_OomableT Poisonable MonadPoisonable))
+        (@RAISE_ERROR_MonadExc ErrOOMPoison
+           (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+              (@Monad_OomableT Poisonable MonadPoisonable)))
+        (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+              (@Monad_OomableT Poisonable MonadPoisonable))
+           (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
+              RAISE_POISON_Poisonable))
+        (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+              (@Monad_OomableT Poisonable MonadPoisonable))
+           (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dv_fin dt idx = ret res ->
+      @IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+        (@EitherMonad.Monad_eitherT ERR_MESSAGE
+           (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+           (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
+              IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
+        (@RAISE_ERROR_MonadExc IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+           (@EitherMonad.Exception_eitherT ERR_MESSAGE
+              (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+              (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
+                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)))
+        (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT
+           (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+           (EitherMonad.eitherT ERR_MESSAGE)
+           (@EitherMonad.MonadT_eitherT ERR_MESSAGE
+              (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+              (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
+                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
+           (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
+              IS1.LLVM.MEM.CP.CONCBASE.OomableT
+              (@IS1.LLVM.MEM.CP.CONCBASE.MonadT_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
+                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)
+              IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_Poisonable))
+        (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_E_MT
+           (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+           (EitherMonad.eitherT ERR_MESSAGE)
+           (@EitherMonad.MonadT_eitherT ERR_MESSAGE
+              (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+              (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
+                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
+           (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
+              IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)) dv_inf dt idx = ret res.
+  Proof.
+    intros dv_inf dv_fin dt idx res REF VAL.
+    rewrite dvalue_extract_byte_equation in VAL.
+    rewrite IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte_equation.
+
+    destruct dv_fin; dvalue_refine_strict_inv REF;
+      try solve
+        [ unfold extract_byte_Z, IS1.LLVM.MEM.CP.CONCBASE.extract_byte_Z in *;
+          inv VAL;
+          solve
+            [ reflexivity
+            | erewrite AC1.addr_convert_ptoi; eauto
+            | erewrite IP.from_Z_to_Z; eauto
+            ]
+        ].
+    - destruct dt; inv VAL.
+      Opaque dvalue_extract_byte.
+      Opaque IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte.
+      do 5 break_match_hyp_inv.
+      destruct (nth_error fields (N.to_nat n)) eqn:FIELDS;
+        [|inv H2].
+      cbn.
+  Admitted.
+
+  Lemma dvalue_byte_value_success_fin_inf :
+    forall dvb_inf dvb_fin res,
+      dvalue_byte_refine dvb_inf dvb_fin ->
+      @dvalue_byte_value ErrOOMPoison
+        (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+           (@Monad_OomableT Poisonable MonadPoisonable))
+        (@RAISE_ERROR_MonadExc ErrOOMPoison
+           (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+              (@Monad_OomableT Poisonable MonadPoisonable)))
+        (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+              (@Monad_OomableT Poisonable MonadPoisonable))
+           (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
+              RAISE_POISON_Poisonable))
+        (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+              (@Monad_OomableT Poisonable MonadPoisonable))
+           (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvb_fin = ret res ->
+      (@IS1.LLVM.MEM.CP.CONCBASE.dvalue_byte_value IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+         (@EitherMonad.Monad_eitherT ERR_MESSAGE
+            (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+            (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
+               IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
+         (@RAISE_ERROR_MonadExc IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+            (@EitherMonad.Exception_eitherT ERR_MESSAGE
+               (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+               (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
+                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)))
+         (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT
+            (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+            (EitherMonad.eitherT ERR_MESSAGE)
+            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
+               (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+               (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
+                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
+            (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
+               IS1.LLVM.MEM.CP.CONCBASE.OomableT
+               (@IS1.LLVM.MEM.CP.CONCBASE.MonadT_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
+                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)
+               IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_Poisonable))
+         (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_E_MT
+            (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+            (EitherMonad.eitherT ERR_MESSAGE)
+            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
+               (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+               (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
+                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
+            (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
+               IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))) dvb_inf = ret res.
+  Proof.
+    intros dvb_inf dvb_fin res REF VAL.
+    unfold dvalue_byte_value in VAL.
+    break_match_hyp; subst.
+    unfold IS1.LLVM.MEM.CP.CONCBASE.dvalue_byte_value.
+    break_match_goal; subst.
+    red in REF.
+    destruct REF as (?&?&?).
+    subst.
+    eapply dvalue_extract_byte_success_fin_inf; eauto.
+  Qed.
+
   Lemma dvalue_bytes_fin_to_dvalue_fin_inf_success :
     forall dvbs_fin dvbs_inf dt res,
       dvalue_bytes_refine dvbs_inf dvbs_fin ->
@@ -14097,6 +14231,8 @@ Qed.
                IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)) dvbs_inf dt) = ret (fin_to_inf_dvalue res).
   Proof.
     intros dvbs_fin dvbs_inf dt res REF FIN.
+    rewrite dvalue_bytes_to_dvalue_equation in FIN.
+    rewrite IS1.LLVM.MEM.CP.CONCBASE.dvalue_bytes_to_dvalue_equation.
   Admitted.
 
   Definition concretization_list_refine : (list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)) -> (list (uvalue * dvalue)) -> Prop

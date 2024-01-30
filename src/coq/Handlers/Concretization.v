@@ -1286,6 +1286,100 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
              end
          end.
 
+    Lemma dvalue_extract_byte_equation {M} `{HM: Monad M} `{RE: RAISE_ERROR M} `{RP: RAISE_POISON M} `{RO: RAISE_OOMABLE M} (dv : dvalue) (dt : dtyp) (idx : Z) :
+      @dvalue_extract_byte M HM RE RP RO dv dt idx =
+        match dv with
+        | DVALUE_I1 x
+        | DVALUE_I8 x
+        | DVALUE_I16 x
+        | DVALUE_I32 x
+        | DVALUE_I64 x =>
+            ret (extract_byte_vint x idx)
+        | DVALUE_IPTR x =>
+            ret (extract_byte_Z (IP.to_Z x) idx)
+        | DVALUE_Addr addr =>
+            (* Note: this throws away provenance *)
+            ret (extract_byte_Z (ptr_to_int addr) idx)
+        | DVALUE_Float f =>
+            ret (extract_byte_Z (unsigned (Float32.to_bits f)) idx)
+        | DVALUE_Double d =>
+            ret (extract_byte_Z (unsigned (Float.to_bits d)) idx)
+        | DVALUE_Poison dt => raise_poison dt
+        | DVALUE_Oom dt => raise_oomable dt
+        | DVALUE_None =>
+            (* TODO: Not sure if this should be an error, poison, or what. *)
+            raise_error "dvalue_extract_byte on DVALUE_None"
+
+        (* TODO: Take padding into account. *)
+        | DVALUE_Struct fields =>
+            match dt with
+            | DTYPE_Struct dts =>
+                (* Step to field which contains the byte we want *)
+                '(fdt, (field_idx, byte_idx)) <- extract_field_byte dts (Z.to_N idx);;
+                match List.nth_error fields (N.to_nat field_idx) with
+                | Some f =>
+                    (* call dvalue_extract_byte recursively on the field *)
+                    dvalue_extract_byte f fdt (Z.of_N byte_idx )
+                | None =>
+                    raise_error "dvalue_extract_byte: more fields in DVALUE_Struct than in dtyp."
+                end
+            | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Struct."
+            end
+
+        | DVALUE_Packed_struct fields =>
+            match dt with
+            | DTYPE_Packed_struct dts =>
+                (* Step to field which contains the byte we want *)
+                '(fdt, (field_idx, byte_idx)) <- extract_field_byte dts (Z.to_N idx);;
+                match List.nth_error fields (N.to_nat field_idx) with
+                | Some f =>
+                    (* call dvalue_extract_byte recursively on the field *)
+                    dvalue_extract_byte f fdt (Z.of_N byte_idx )
+                | None =>
+                    raise_error "dvalue_extract_byte: more fields in DVALUE_Packed_struct than in dtyp."
+                end
+            | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
+            end
+
+        | DVALUE_Array elts =>
+            match dt with
+            | DTYPE_Array sz dt =>
+                let elmt_sz  := sizeof_dtyp dt in
+                let elmt_idx := N.div (Z.to_N idx) elmt_sz in
+                let byte_idx := (Z.to_N idx) mod elmt_sz in
+                match List.nth_error elts (N.to_nat elmt_idx) with
+                | Some elmt =>
+                    (* call dvalue_extract_byte recursively on the field *)
+                    dvalue_extract_byte elmt dt (Z.of_N byte_idx)
+                | None =>
+                    raise_error "dvalue_extract_byte: more fields in dvalue than in dtyp."
+                end
+            | _ =>
+                raise_error "dvalue_extract_byte: type mismatch on DVALUE_Array."
+            end
+
+        | DVALUE_Vector elts =>
+            match dt with
+            | DTYPE_Vector sz dt =>
+                let elmt_sz  := sizeof_dtyp dt in
+                let elmt_idx := N.div (Z.to_N idx) elmt_sz in
+                let byte_idx := (Z.to_N idx) mod elmt_sz in
+                match List.nth_error elts (N.to_nat elmt_idx) with
+                | Some elmt =>
+                    (* call dvalue_extract_byte recursively on the field *)
+                    dvalue_extract_byte elmt dt (Z.of_N byte_idx)
+                | None =>
+                    raise_error "dvalue_extract_byte: more fields in dvalue than in dtyp."
+                end
+            | _ =>
+                raise_error "dvalue_extract_byte: type mismatch on DVALUE_Vector."
+            end
+        end.
+    Proof.
+      induction dv.
+      1-12: cbn; reflexivity.
+    Admitted.
+
     (* Taking a byte out of a dvalue...
 
       Unlike UVALUE_ExtractByte, I don't think this needs an sid
