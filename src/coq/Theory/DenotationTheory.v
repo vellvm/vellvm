@@ -71,7 +71,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   Lemma denote_code_nil :
     ⟦ [] ⟧c ≈ Ret tt.
-  Proof.
+  Proof using.
     intros.
     cbn.
     go.
@@ -81,7 +81,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Lemma denote_code_app :
     forall a b,
       ⟦ a ++ b ⟧c ≈ ⟦ a ⟧c;;  ⟦ b ⟧c.
-  Proof.
+  Proof using.
     induction a; intros b.
     - cbn; go; reflexivity.
     - cbn in *.
@@ -97,7 +97,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Lemma denote_code_app_eq_itree :
     forall a b,
       ⟦ a ++ b ⟧c ≅ ITree.bind ⟦ a ⟧c (fun _ => ⟦ b ⟧c).
-  Proof.
+  Proof using.
     induction a; intros b.
     - cbn.
       go.
@@ -119,7 +119,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Lemma denote_code_cons :
     forall i c,
       ⟦ i::c ⟧c ≈  ⟦ i ⟧i;; ⟦ c ⟧c.
-  Proof.
+  Proof using.
     intros.
     cbn.
     go.
@@ -132,7 +132,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Lemma denote_code_singleton :
     forall i,
       ⟦ [i] ⟧c ≈ ⟦ i ⟧i.
-  Proof.
+  Proof using.
     intros a.
     cbn.
     go.
@@ -147,7 +147,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Opaque assoc.
   Lemma denote_phi_hd : forall bid e id τ tl,
       ⟦ (id, Phi τ ((bid,e)::tl)) ⟧Φ bid ≈ uv <- ⟦ e at τ ⟧e;; Ret (id,uv).
-  Proof.
+  Proof using.
     intros; cbn.
     rewrite assoc_hd; reflexivity.
   Qed.
@@ -155,14 +155,14 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Lemma denote_phi_tl : forall bid bid' e id τ tl,
       bid <> bid' ->
       ⟦ (id, Phi τ ((bid',e)::tl)) ⟧Φ bid ≈ ⟦ (id, Phi τ tl) ⟧Φ bid.
-  Proof.
+  Proof using.
     intros; cbn.
     rewrite assoc_tl; auto; reflexivity.
   Qed.
 
   Lemma denote_no_phis : forall x,
       ⟦ [] ⟧Φs x ≈ Ret tt.
-  Proof.
+  Proof using.
     intros.
     cbn. go.
     cbn; go.
@@ -178,7 +178,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                                 ⟦ phis ⟧Φs origin;;
       ⟦ c ⟧c;;
       translate exp_to_instr ⟦ t ⟧t >>= k.
-  Proof.
+  Proof using.
     intros; cbn; repeat setoid_rewrite bind_bind.
     reflexivity.
   Qed.
@@ -189,13 +189,13 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                                 ⟦ phis ⟧Φs origin;;
       ⟦ c ⟧c;;
       translate exp_to_instr ⟦ t ⟧t.
-  Proof.
+  Proof using.
     intros; cbn; reflexivity.
   Qed.
 
   (** [denote_ocfg] *)
   Lemma denote_ocfg_nil: forall s, ⟦ [] ⟧bs s ≈ Ret (inl s).
-  Proof.
+  Proof using.
     intros []; unfold denote_ocfg.
     match goal with
     | |- CategoryOps.iter (C := ktree _) ?body ?s ≈ _ =>
@@ -213,7 +213,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       | inr v => Ret (inr v)
       | inl bid_target => ⟦ bks ⟧bs (bid_src, bid_target)
       end.
-  Proof.
+  Proof using.
     intros * GET_BK.
     cbn. unfold denote_ocfg at 1.
     rewrite KTreeFacts.unfold_iter_ktree. cbn.
@@ -227,7 +227,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Lemma denote_ocfg_unfold_not_in: forall bks bid_from bid_src,
       find_block bks bid_src = None ->
       ⟦ bks ⟧bs (bid_from, bid_src) ≈ Ret (inl (bid_from,bid_src)).
-  Proof.
+  Proof using.
     intros * GET_BK.
     unfold denote_ocfg.
     rewrite KTreeFacts.unfold_iter_ktree.
@@ -244,7 +244,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       | inr v => Ret (inr v)
       | inl bid_target => ⟦ bks ⟧bs (bid_src, bid_target)
       end.
-  Proof.
+  Proof using.
     intros * GET_BK.
     cbn. unfold denote_ocfg at 1.
     rewrite KTreeFacts.unfold_iter_ktree. cbn.
@@ -263,7 +263,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       | inr v => Ret (inr v)
       | inl bid_target => Tau (⟦ bks ⟧bs (bid_src, bid_target))
       end.
-  Proof.
+  Proof using.
     intros * GET_BK.
     cbn. unfold denote_ocfg at 1.
     rewrite KTreeFacts.unfold_iter_ktree. cbn.
@@ -278,7 +278,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Lemma denote_ocfg_unfold_not_in_eq_itree: forall bks bid_from bid_src,
       find_block bks bid_src = None ->
       ⟦ bks ⟧bs (bid_from, bid_src) ≅ Ret (inl (bid_from,bid_src)).
-  Proof.
+  Proof using.
     intros * GET_BK.
     unfold denote_ocfg.
     rewrite KTreeFacts.unfold_iter_ktree.
@@ -297,7 +297,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                           end
              | None => Ret (inl (bid_from,bid_src))
              end.
-  Proof.
+  Proof using.
     intros *.
     break_match_goal.
     - rewrite denote_ocfg_unfold_in_eq_itree; eauto; reflexivity.
@@ -310,27 +310,27 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Lemma raise_has_all_posts : forall {E X} `{FailureE -< E} s Q,
         @raise E X _ s ⤳ Q.
-    Proof.
+    Proof using.
       unfold raise; intros.
       apply has_post_bind; intros [].
     Qed.
 
     Lemma raiseUB_has_all_posts : forall {E X} `{UBE -< E} s Q,
         @raiseUB E _ X s ⤳ Q.
-    Proof.
+    Proof using.
       unfold raise; intros.
       apply has_post_bind; intros [].
     Qed.
 
     Lemma unEither_eta : forall {T m A} (x : eitherT T m A), {|unEitherT := unEitherT x|} = x.
-    Proof.
+    Proof using.
       intros.
       destruct x.
       f_equal.
     Qed.
 
     Lemma unIdent_eta : forall {A} (x : ident A), {|unIdent := unIdent x|} = x.
-    Proof.
+    Proof using.
       intros.
       destruct x.
       f_equal.
@@ -340,7 +340,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       forall x default_dest brs id,
         select_switch x default_dest brs = inr id ->
         id = default_dest \/ In id (List.map snd brs).
-    Proof.
+    Proof using.
       intros x default_dest brs id SELECT.
       induction brs.
       - inversion SELECT; auto.
@@ -355,7 +355,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Lemma denote_terminator_exits_in_outputs :
       forall term,
         ⟦ term ⟧t ⤳ sum_pred (fun id => In id (terminator_outputs term)) TT.
-    Proof.
+    Proof using.
       intros term; destruct term eqn:Hterm; cbn; try (apply raise_has_all_posts || apply eutt_Ret; cbn; eauto).
       - destruct v.
         apply has_post_bind; intros ?.
@@ -450,7 +450,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Lemma denote_bk_exits_in_outputs :
       forall b from,
         ⟦ b ⟧b from ⤳ sum_pred (fun id => In id (successors b)) TT.
-    Proof.
+    Proof using.
       intros.
       cbn.
       apply has_post_bind; intros [].
@@ -472,7 +472,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
             find_block bks (snd fto) = Some b ->
             ⟦ b ⟧b (fst fto) ⤳ sum_pred (fun to => Qb (snd fto, to)) Qv),
         ⟦ bks ⟧bs fto ⤳ sum_pred Qb Qv.
-    Proof.
+    Proof using.
       intros * INIT IND.
       eapply has_post_iter_strong; eauto.
       intros [f to] PRE.
@@ -495,7 +495,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
             find_block bks (snd fto) = Some b ->
             ⟦ b ⟧b (fst fto) ⤳ sum_pred Qb Qv),
         ⟦ bks ⟧bs fto ⤳ sum_pred (prod_pred TT Qb) Qv.
-    Proof.
+    Proof using.
       intros * IN IND.
       apply has_post_iter_strong with (Inv := fun x => In (snd x) (inputs bks) \/ Qb (snd x))
       ; eauto.
@@ -514,7 +514,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       forall bks fto,
         In (snd fto) (inputs bks) ->
         ⟦ bks ⟧bs fto ⤳ exits_in_outputs bks.
-    Proof.
+    Proof using.
       intros * IN.
       apply has_post_weaken with (P := sum_pred (prod_pred TT (fun b => In b (outputs bks))) TT).
       2: intros [[]|] ?; cbn in *; intuition.
@@ -535,7 +535,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       find_block bks1 (snd fto) = None ->
       no_reentrance bks1 bks2 ->
       ⟦ bks1 ++ bks2 ⟧bs fto ≈ ⟦ bks2 ⟧bs fto.
-  Proof.
+  Proof using.
     intros bks1 bks2 [f to] FIND NOBACK.
     apply (@KTreeFacts.eutt_iter_gen _ _ _ (fun fto fto' => fto' = fto /\ find_block bks1 (snd fto) = None)); auto.
     clear f to FIND; intros fto fto' [-> FIND]; destruct fto as [f to] .
@@ -562,7 +562,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       | inl fto2 => ⟦ bks2 ⟧bs fto2
       | inr v => Ret (inr v)
       end.
-  Proof.
+  Proof using.
     intros * NOBACK.
     revert fto.
     einit.
@@ -605,7 +605,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       In (snd fto) (inputs ocfg1) ->
       ⟦ ocfg1 ++ ocfg2 ⟧bs fto ≈
                         ⟦ ocfg1 ⟧bs fto.
-  Proof.
+  Proof using.
     intros * INDEP IN.
     rewrite denote_ocfg_app; [| auto using independent_flows_no_reentrance_l].
     bind_ret_r2.
@@ -625,7 +625,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       In (snd fto) (inputs ocfg2) ->
       ⟦ ocfg1 ++ ocfg2 ⟧bs fto ≈
                         ⟦ ocfg2 ⟧bs fto.
-  Proof.
+  Proof using.
     intros * INDEP IN.
     rewrite denote_ocfg_app; [| auto using independent_flows_no_reentrance_l].
     destruct fto as [f to]; cbn in *.
@@ -646,7 +646,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       | inr x => Ret (inr x)
       end
   .
-  Proof.
+  Proof using.
     intros * ->; revert from to.
     einit.
     ecofix CIH.

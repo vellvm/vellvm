@@ -294,7 +294,7 @@ Section TLE_To_Modul.
                                           df_args := df_args d;
                                           df_instrs := cfg_of_definition T d
                                         |}) l) = Some l.
-  Proof.
+  Proof using.
     induction l; simpl; auto.
     rewrite IHl. repeat f_equal.
     destruct a; simpl; f_equal.
@@ -304,7 +304,7 @@ Section TLE_To_Modul.
   Lemma modul_of_mcfg_of_modul:
     forall {T} (m: @modul T _),
       modul_of_mcfg (mcfg_of_modul m) = Some m.
-  Proof.
+  Proof using.
     destruct m.
     unfold mcfg_of_modul; simpl.
     unfold modul_of_mcfg; simpl.
@@ -331,7 +331,7 @@ Section TLE_To_Modul.
   Lemma modul_of_toplevel_entities_cons:
     forall {T X} tle tles,
       @modul_of_toplevel_entities T X (tle :: tles) = modul_app (modul_of_toplevel_entities [tle]) (modul_of_toplevel_entities tles).
-  Proof.
+  Proof using.
     intros.
     unfold modul_of_toplevel_entities; cbn; f_equal;
       try ((break_match_goal; reflexivity) || (rewrite <- !app_nil_end; reflexivity)).
@@ -340,7 +340,7 @@ Section TLE_To_Modul.
   Lemma modul_of_toplevel_entities_app:
     forall {T X} tle1 tle2,
     @modul_of_toplevel_entities T X (tle1 ++ tle2) = modul_app (modul_of_toplevel_entities tle1) (modul_of_toplevel_entities tle2).
-  Proof.
+  Proof using.
     induction tle1 as [| tle tle1 IH]; intros; cbn; [reflexivity |].
     rewrite modul_of_toplevel_entities_cons, IH; cbn.
     f_equal;
@@ -351,43 +351,43 @@ Section TLE_To_Modul.
 
   Lemma m_definitions_app: forall {T X} (p1 p2 : @modul T X),
       m_definitions (p1 @@ p2) = m_definitions p1 ++ m_definitions p2.
-  Proof.
+  Proof using.
     intros ? ? [] []; reflexivity.
   Qed.
 
   Lemma m_name_app: forall {T X} (p1 p2 : @modul T X),
       m_name (p1 @@ p2) = opt_first (m_name p1) (m_name p2).
-  Proof.
+  Proof using.
     intros ? ? [] []; reflexivity.
   Qed.
 
   Lemma m_target_app: forall {T X} (p1 p2 : @modul T X),
       m_target (p1 @@ p2) = opt_first (m_target p1) (m_target p2).
-  Proof.
+  Proof using.
     intros ? ? [] []; reflexivity.
   Qed.
 
   Lemma m_datalayout_app: forall {T X} (p1 p2 : @modul T X),
       m_datalayout (p1 @@ p2) = opt_first (m_datalayout p1) (m_datalayout p2).
-  Proof.
+  Proof using.
     intros ? ? [] []; reflexivity.
   Qed.
 
   Lemma m_type_defs_app: forall {T X} (p1 p2 : @modul T X),
       m_type_defs (p1 @@ p2) = m_type_defs p1 ++ m_type_defs p2.
-  Proof.
+  Proof using.
     intros ? ? [] []; reflexivity.
   Qed.
 
   Lemma m_globals_app: forall {T X} (p1 p2 : @modul T X),
       m_globals (p1 @@ p2) = m_globals p1 ++ m_globals p2.
-  Proof.
+  Proof using.
     intros ? ? [] []; reflexivity.
   Qed.
 
   Lemma m_declarations_app: forall {T X} (p1 p2 : @modul T X),
       m_declarations (p1 @@ p2) = m_declarations p1 ++ m_declarations p2.
-  Proof.
+  Proof using.
     intros ? ? [] []; reflexivity.
   Qed.
 
@@ -397,7 +397,7 @@ Section TLE_To_Modul.
         f a = Some b /\
         map_option f l = Some r' /\
         r = b :: r'.
-  Proof.
+  Proof using.
     intros.
     cbn in H; do 2 (break_match_hyp; try inv_option).
     do 2 eexists; repeat split; auto.
@@ -407,7 +407,7 @@ Section TLE_To_Modul.
         f a = Some b ->
         map_option f l = Some r ->
         map_option f (a :: l) = Some (b :: r).
-  Proof.
+  Proof using.
     intros * EQ1 EQ2; simpl; rewrite EQ1, EQ2; reflexivity.
   Qed.
 
@@ -417,7 +417,7 @@ Section TLE_To_Modul.
         map_option f l1 = Some r1 /\
         map_option f l2 = Some r2 /\
         r = r1 ++ r2.
-  Proof.
+  Proof using.
     induction l1 as [| x l1 IH]; intros * EQ.
     - do 2 eexists; repeat split; try reflexivity; auto.
     - generalize EQ; intros EQ'; apply map_option_cons_inv in EQ'; destruct EQ' as (b & ? & EQ1 & EQ2 & ->).
@@ -428,7 +428,7 @@ Section TLE_To_Modul.
 
   Lemma mcfg_of_app_modul: forall {T} (p1 p2 : @modul T _),
       mcfg_of_modul (p1 @@ p2) = mcfg_of_modul p1 @@ mcfg_of_modul p2.
-  Proof.
+  Proof using.
     intros; cbn.
     unfold mcfg_of_modul.
     rewrite  m_name_app, m_target_app, m_datalayout_app, m_type_defs_app, m_globals_app, m_declarations_app; f_equal; try reflexivity.

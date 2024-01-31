@@ -147,7 +147,7 @@ Section interp_memory_prop.
         (IN: interp_memory_PropTF b1 b2 sim x0 x1)
         (LE: sim <2= sim'):
     interp_memory_PropTF b1 b2 sim' x0 x1.
-  Proof.
+  Proof using.
     intros. induction IN; eauto.
   Qed.
 
@@ -158,13 +158,13 @@ Section interp_memory_prop.
   Hint Unfold interp_memory_PropT_ : core.
 
   Lemma interp_memory_PropT__mono b1 b2 : monotone2 (interp_memory_PropT_ b1 b2).
-  Proof.
+  Proof using.
     do 2 red. intros. eapply interp_memory_PropTF_mono; eauto.
   Qed.
   Hint Resolve interp_memory_PropT__mono : paco.
 
   Lemma interp_memory_PropT_idclo_mono: monotone2 (@id (itree E R1 -> itree F R2 -> Prop)).
-  Proof. unfold id. eauto. Qed.
+  Proof using. unfold id. eauto. Qed.
   Hint Resolve interp_memory_PropT_idclo_mono : paco.
 
   Definition interp_memory_prop' b1 b2 :=
@@ -175,20 +175,20 @@ Section interp_memory_prop.
 
   #[global] Instance interp_memory_prop_eq_itree_Proper_impl :
     Proper (eq_itree eq ==> eq_itree eq ==> impl) interp_memory_prop.
-  Proof.
+  Proof using.
     repeat intro.
     repeat intro. eapply bisimulation_is_eq in H, H0; subst; eauto.
   Qed.
 
   #[global] Instance interp_memory_prop_eq_itree_Proper :
     Proper (eq_itree eq ==> eq_itree eq ==> iff) interp_memory_prop.
-  Proof.
+  Proof using.
     split; intros; [rewrite <- H, <- H0 | rewrite H, H0]; auto.
   Qed.
 
   #[global] Instance interp_memory_prop_eq_itree_Proper_flip_impl :
     Proper (eq_itree eq ==> eq_itree eq ==> flip impl) interp_memory_prop.
-  Proof.
+  Proof using.
     pose proof interp_memory_prop_eq_itree_Proper as PROP.
     unfold Proper, respectful in *.
     intros x y H x0 y0 H0.
@@ -199,7 +199,7 @@ Section interp_memory_prop.
   Lemma interp_memory_prop_inv_tau_r t0 t1:
     interp_memory_prop t0 (Tau t1) ->
     interp_memory_prop t0 t1.
-  Proof.
+  Proof using E F OOM OOMF R1 R2 RR S1 S2 h_spec k_spec k_spec_wellformed.
     intros H.
     punfold H; red in H; cbn in H.
     rewrite (itree_eta t0).
@@ -229,7 +229,7 @@ Section interp_memory_prop.
   Lemma interp_memory_prop_inv_tau_l t0 t1:
     interp_memory_prop (Tau t0) t1 ->
     interp_memory_prop t0 t1.
-  Proof.
+  Proof using.
     intros H.
     punfold H; red in H; cbn in H.
     rewrite (itree_eta t1).
@@ -255,7 +255,7 @@ Section interp_memory_prop.
   Lemma interp_memory_prop_inv_tau t0 t1:
     interp_memory_prop (Tau t0) (Tau t1) ->
     interp_memory_prop t0 t1.
-  Proof.
+  Proof using E F OOM OOMF R1 R2 RR S1 S2 h_spec k_spec k_spec_wellformed.
     intros H.
     apply interp_memory_prop_inv_tau_l in H.
     apply interp_memory_prop_inv_tau_r in H; auto.
@@ -263,7 +263,7 @@ Section interp_memory_prop.
 
   #[global] Instance interp_memory_prop_eutt_Proper_impl_ :
     forall x, Proper (eutt eq ==> impl) (interp_memory_prop x).
-  Proof.
+  Proof using E F OOM OOMF R1 R2 RR S1 S2 h_spec k_spec k_spec_wellformed.
     repeat intro. red in H0.
     punfold H; punfold H0; red in H; red in H0; cbn in *.
     revert_until k_spec.
@@ -382,7 +382,7 @@ Section interp_memory_prop.
 
   #[global] Instance interp_memory_prop_eutt_Proper_impl :
     Proper (eutt eq ==> eutt eq ==> impl) (interp_memory_prop).
-  Proof.
+  Proof using E F OOM OOMF R1 R2 RR S1 S2 h_spec k_spec k_spec_wellformed.
     intros y y' EQ x x' EQ' H.
     rewrite <- EQ'. clear x' EQ'.
     punfold H; punfold EQ; red in H; red in EQ; cbn in *.
@@ -470,7 +470,7 @@ Section interp_memory_prop.
 
   #[global] Instance interp_memory_prop_eutt_Proper :
     Proper (eutt eq ==> eutt eq ==> iff) interp_memory_prop.
-  Proof.
+  Proof using E F OOM OOMF R1 R2 RR S1 S2 h_spec k_spec k_spec_wellformed.
     split; intros; [rewrite <- H, <- H0 | rewrite H, H0]; auto.
   Qed.
 
@@ -478,7 +478,7 @@ Section interp_memory_prop.
   Lemma interp_memory_prop_ret_inv:
     forall r1 t,
       interp_memory_prop (ret r1) t -> (exists r2 , RR r1 r2 /\ t ≈ ret r2) \/ (exists A (e : OOM A) k, t ≈ vis e k)%type.
-  Proof.
+  Proof using.
     intros r1 t INTERP.
     punfold INTERP.
     red in INTERP.
@@ -555,7 +555,7 @@ Section interp_memory_prop.
           @Returns E X a (trigger e) ->
           Returns b ta -> a = snd (snd b) -> interp_memory_prop (k a) (k' b)) ->
       interp_memory_prop (Vis e k) t.
-  Proof.
+  Proof using All.
     intros.
     red; pstep; eapply Interp_Memory_PropT_Vis; eauto.
     intros. left; eauto. eapply H1; eauto.
@@ -579,7 +579,7 @@ Hint Resolve interp_memory_PropT_idclo_mono : paco.
     k_spec `{KS_WF : @k_spec_WF _ _ E F h_spec k_spec}
     R (RR : R -> R -> Prop) (HR: Reflexive RR) (HT : Transitive RR),
     Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_memory_prop S1 S2 E F OOM OOME h_spec _ _ (fun x '(_, (_, y)) => RR x y) k_spec).
-Proof.
+Proof using.
   intros S1 S2 E F OOM OOME h_spec k_spec KS_WF R RR REFL TRANS.
   intros y y' EQ x x' EQ' H. subst.
   punfold H; punfold EQ; red in H; red in EQ; cbn in *.

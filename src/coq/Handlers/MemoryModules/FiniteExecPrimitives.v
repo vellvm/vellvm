@@ -115,14 +115,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma next_memory_key_next_key :
       forall m f h,
         next_memory_key (mkMemoryStack m f h) = next_key m.
-    Proof.
+    Proof using.
       auto.
     Qed.
 
     Lemma next_memory_key_next_key_memory_stack_memory :
       forall ms,
         next_memory_key ms = next_key (memory_stack_memory ms).
-    Proof.
+    Proof using.
       auto.
     Qed.
 
@@ -210,7 +210,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma add_to_frame_preserves_memory :
       forall ms k,
         memory_stack_memory (add_to_frame ms k) = memory_stack_memory ms.
-    Proof.
+    Proof using.
       intros [m fs] k.
       destruct fs; auto.
     Qed.
@@ -218,7 +218,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma add_to_heap_preserves_memory :
       forall ms root k,
         memory_stack_memory (add_to_heap ms root k) = memory_stack_memory ms.
-    Proof.
+    Proof using.
       intros [m fs] root k.
       destruct fs; auto.
     Qed.
@@ -226,7 +226,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma add_to_frame_preserves_heap :
       forall ms k,
         memory_stack_heap (add_to_frame ms k) = memory_stack_heap ms.
-    Proof.
+    Proof using.
       intros [m fs] k.
       destruct fs; auto.
     Qed.
@@ -234,7 +234,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma add_to_heap_preserves_frame_stack :
       forall ms root k,
         memory_stack_frame_stack (add_to_heap ms root k) = memory_stack_frame_stack ms.
-    Proof.
+    Proof using.
       intros [m fs] root k.
       destruct fs; auto.
     Qed.
@@ -242,7 +242,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma add_all_to_frame_preserves_memory :
       forall ms ks,
         memory_stack_memory (add_all_to_frame ms ks) = memory_stack_memory ms.
-    Proof.
+    Proof using.
       intros ms ks; revert ms;
         induction ks; intros ms; auto.
       cbn in *. unfold add_all_to_frame in IHks.
@@ -254,7 +254,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma add_all_to_heap'_preserves_memory :
       forall ms root ks,
         memory_stack_memory (add_all_to_heap' ms root ks) = memory_stack_memory ms.
-    Proof.
+    Proof using.
       intros ms root ks; revert ms root;
         induction ks; intros ms root; auto.
       specialize (IHks (add_to_heap ms root a) root).
@@ -267,7 +267,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma add_all_to_heap_preserves_memory :
       forall ms ks,
         memory_stack_memory (add_all_to_heap ms ks) = memory_stack_memory ms.
-    Proof.
+    Proof using.
       intros ms [|a ks]; auto.
       apply add_all_to_heap'_preserves_memory.
     Qed.
@@ -275,7 +275,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma add_all_to_frame_preserves_heap :
       forall ms ks,
         memory_stack_heap (add_all_to_frame ms ks) = memory_stack_heap ms.
-    Proof.
+    Proof using.
       intros ms ks; revert ms;
         induction ks; intros ms; auto.
       cbn in *. unfold add_all_to_frame in IHks.
@@ -287,7 +287,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma add_all_to_heap'_preserves_frame_stack :
       forall ms root ks,
         memory_stack_frame_stack (add_all_to_heap' ms root ks) = memory_stack_frame_stack ms.
-    Proof.
+    Proof using.
       intros ms root ks; revert root ms;
         induction ks; intros root ms; auto.
       cbn in *. unfold add_all_to_heap' in IHks.
@@ -299,7 +299,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma add_all_to_heap_preserves_frame_stack :
       forall ms ks,
         memory_stack_frame_stack (add_all_to_heap ms ks) = memory_stack_frame_stack ms.
-    Proof.
+    Proof using.
       intros ms [|a ks]; auto.
       apply add_all_to_heap'_preserves_frame_stack.
     Qed.
@@ -307,7 +307,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma add_all_to_frame_nil_preserves_frames :
       forall ms,
         memory_stack_frame_stack (add_all_to_frame ms []) = memory_stack_frame_stack ms.
-    Proof.
+    Proof using.
       intros [m fs].
       destruct fs; auto.
     Qed.
@@ -316,7 +316,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall ms ms',
         add_all_to_frame ms [] = ms' ->
         ms = ms'.
-    Proof.
+    Proof using.
       (* TODO: move to pre opaque *)
       Transparent add_all_to_frame.
       unfold add_all_to_frame.
@@ -330,7 +330,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         exists ms',
           add_to_frame ms ptr = ms' /\
             add_all_to_frame ms' ptrs = ms''.
-    Proof.
+    Proof using.
       (* TODO: move to pre opaque *)
       Transparent add_all_to_frame.
       unfold add_all_to_frame.
@@ -344,7 +344,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         exists ms',
           add_to_heap ms root ptr = ms' /\
             add_all_to_heap' ms' root ptrs = ms''.
-    Proof.
+    Proof using.
       cbn; eauto.
     Qed.
 
@@ -354,7 +354,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         exists ms',
           add_to_heap ms ptr ptr = ms' /\
             add_all_to_heap' ms' ptr ptrs = ms''.
-    Proof.
+    Proof using.
       cbn; eauto.
     Qed.
 
@@ -363,7 +363,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         add_to_frame ms ptr = ms' ->
         add_all_to_frame ms' ptrs = ms'' ->
         add_all_to_frame ms (ptr :: ptrs) = ms''.
-    Proof.
+    Proof using.
       (* TODO: move to pre opaque *)
       Transparent add_all_to_frame.
       unfold add_all_to_frame.
@@ -378,7 +378,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         add_to_heap ms root ptr = ms' ->
         add_all_to_heap' ms' root ptrs = ms'' ->
         add_all_to_heap' ms root (ptr :: ptrs) = ms''.
-    Proof.
+    Proof using.
       intros ptr ptrs ms ms' ms'' ADD ADD_ALL.
       cbn; subst; eauto.
     Qed.
@@ -386,7 +386,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma add_to_frame_add_all_to_frame :
       forall ptr ms,
         add_to_frame ms ptr = add_all_to_frame ms [ptr].
-    Proof.
+    Proof using.
       intros ptr ms.
       erewrite add_all_to_frame_cons.
       reflexivity.
@@ -399,7 +399,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma add_to_heap_add_all_to_heap :
       forall ptr root ms,
         add_to_heap ms root ptr = add_all_to_heap' ms root [ptr].
-    Proof.
+    Proof using.
       intros ptr root ms.
       erewrite add_all_to_heap_cons.
       reflexivity.
@@ -415,7 +415,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         add_to_frame ms ptr2 = ms2' ->
         add_to_frame ms2' ptr1 = ms2'' ->
         frame_stack_eqv (memory_stack_frame_stack ms1'') (memory_stack_frame_stack ms2'').
-    Proof.
+    Proof using.
       intros ptr1 ptr2 ms ms1' ms2' ms1'' ms2'' ADD1 ADD1' ADD2 ADD2'.
       destruct ms, ms1', ms2', ms1'', ms2''.
       cbn in *.
@@ -449,7 +449,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         add_to_heap ms root ptr2 = ms2' ->
         add_to_heap ms2' root ptr1 = ms2'' ->
         heap_eqv (memory_stack_heap ms1'') (memory_stack_heap ms2'').
-    Proof.
+    Proof using.
       intros ptr1 ptr2 root ms ms1' ms2' ms1'' ms2'' ADD1 ADD1' ADD2 ADD2'.
       destruct ms, ms1', ms2', ms1'', ms2''.
       cbn in *.
@@ -546,7 +546,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: move this *)
     #[global] Instance ptr_in_frame_prop_int_Proper :
       Proper (frame_eqv ==> (fun a b => ptr_to_int a = ptr_to_int b) ==> iff) ptr_in_frame_prop.
-    Proof.
+    Proof using.
       unfold Proper, respectful.
       intros x y XY a b AB.
       unfold frame_eqv in *.
@@ -556,7 +556,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     #[global] Instance ptr_in_frame_prop_Proper :
       Proper (frame_eqv ==> eq ==> iff) ptr_in_frame_prop.
-    Proof.
+    Proof using.
       unfold Proper, respectful.
       intros x y XY a b AB; subst.
       unfold frame_eqv in *.
@@ -565,7 +565,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     #[global] Instance frame_stack_eqv_add_ptr_to_frame_Proper :
       Proper (frame_eqv ==> eq ==> frame_eqv ==> iff) add_ptr_to_frame.
-    Proof.
+    Proof using.
       unfold Proper, respectful.
       intros x y XY ptr ptr' TU r s RS; subst.
 
@@ -604,7 +604,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     #[global] Instance frame_stack_eqv_add_ptr_to_frame_stack_Proper :
       Proper (frame_stack_eqv ==> eq ==> frame_stack_eqv ==> iff) add_ptr_to_frame_stack.
-    Proof.
+    Proof using.
       unfold Proper, respectful.
       intros x y XY ptr ptr' TU r s RS; subst.
 
@@ -650,7 +650,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         frame_eqv f1 f2 ->
         FSNth_eqv fs n f1 ->
         FSNth_eqv fs n f2.
-    Proof.
+    Proof using.
       induction n;
         intros fs f1 f2 EQV NTHEQV.
       - destruct fs; cbn in *;
@@ -661,7 +661,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: Move this *)
     #[global] Instance FSNth_eqv_Proper :
       Proper (frame_stack_eqv ==> eq ==> frame_eqv ==> iff) FSNth_eqv.
-    Proof.
+    Proof using.
       unfold Proper, respectful.
       intros x y H' x0 y0 H0 x1 y1 H1; subst.
       split; intros NTH.
@@ -676,7 +676,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     #[global] Instance heap_eqv_ptr_in_head_prop_Proper :
       Proper (heap_eqv ==> eq ==> eq ==> iff) ptr_in_heap_prop.
-    Proof.
+    Proof using.
       unfold Proper, respectful.
       intros x y XY root root' EQR ptr ptr' EQPTR; subst.
       rewrite XY.
@@ -685,7 +685,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     #[global] Instance heap_eqv_add_ptr_to_heap_Proper :
       Proper (heap_eqv ==> eq ==> eq ==> heap_eqv ==> iff) add_ptr_to_heap.
-    Proof.
+    Proof using.
       unfold Proper, respectful.
       intros x y XY root root' EQR ptr ptr' EQPTR r s RS; subst.
 
@@ -732,7 +732,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     #[global] Instance frame_stack_eqv_add_ptrs_to_frame_stack_Proper :
       Proper (frame_stack_eqv ==> eq ==> frame_stack_eqv ==> iff) add_ptrs_to_frame_stack.
-    Proof.
+    Proof using.
       unfold Proper, respectful.
       intros x y XY ptrs ptrs' TU r s RS; subst.
 
@@ -771,7 +771,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     #[global] Instance heap_eqv_add_ptrs_to_heap'_Proper :
       Proper (heap_eqv ==> eq ==> eq ==> heap_eqv ==> iff) add_ptrs_to_heap'.
-    Proof.
+    Proof using.
       unfold Proper, respectful.
       intros x y XY root root' ROOTS ptrs ptrs' TU r s RS; subst.
 
@@ -810,7 +810,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     #[global] Instance heap_eqv_add_ptrs_to_heap_Proper :
       Proper (heap_eqv ==> eq ==> heap_eqv ==> iff) add_ptrs_to_heap.
-    Proof.
+    Proof using.
       unfold Proper, respectful.
       intros x y XY ptrs ptrs' TU r s RS; subst.
       destruct ptrs'.
@@ -825,7 +825,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma disjoint_ptr_byte_dec :
       forall p1 p2,
         {disjoint_ptr_byte p1 p2} + { ~ disjoint_ptr_byte p1 p2}.
-    Proof.
+    Proof using.
       intros p1 p2.
       unfold disjoint_ptr_byte.
       pose proof Z.eq_dec (ptr_to_int p1) (ptr_to_int p2) as [EQ | NEQ].
@@ -841,7 +841,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         add_ptr_to_frame f ptr f' ->
         ptr_in_frame_prop f' ptr' ->
         (ptr_in_frame_prop f ptr' /\ disjoint_ptr_byte ptr ptr') \/ ptr_to_int ptr = ptr_to_int ptr'.
-    Proof.
+    Proof using.
       intros ptr ptr' f f' F F'.
       inv F.
       pose proof disjoint_ptr_byte_dec ptr ptr' as [DISJOINT | NDISJOINT].
@@ -861,7 +861,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         (ptr_in_heap_prop f root' ptr' /\ disjoint_ptr_byte ptr ptr') \/
           (ptr_in_heap_prop f root' ptr' /\ ptr_to_int ptr = ptr_to_int ptr' /\ disjoint_ptr_byte root root') \/
           (ptr_to_int ptr = ptr_to_int ptr' /\ ptr_to_int root = ptr_to_int root').
-    Proof.
+    Proof using.
       intros ptr ptr' root root' f f' F F'.
       inv F.
       pose proof disjoint_ptr_byte_dec ptr ptr' as [DISJOINT | NDISJOINT].
@@ -895,7 +895,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         add_ptr_to_frame f ptr f1 ->
         add_ptr_to_frame f ptr f2 ->
         frame_eqv f1 f2.
-    Proof.
+    Proof using.
       intros ptr f f1 f2 F1 F2.
       unfold frame_eqv.
       intros ptr0.
@@ -934,7 +934,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall ptr f f' fs fs',
         add_ptr_to_frame_stack (Snoc fs f) ptr (Snoc fs' f') ->
         add_ptr_to_frame f ptr f' /\ frame_stack_eqv fs fs'.
-    Proof.
+    Proof using.
       intros ptr f f' fs fs' ADD.
       unfold add_ptr_to_frame_stack in *.
       specialize (ADD f).
@@ -953,7 +953,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         add_ptr_to_frame_stack fs ptr fs1 ->
         add_ptr_to_frame_stack fs ptr fs2 ->
         frame_stack_eqv fs1 fs2.
-    Proof.
+    Proof using.
       intros ptr fs fs1 fs2 F1 F2.
       unfold add_ptr_to_frame_stack in *.
       intros f n.
@@ -1053,7 +1053,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         add_ptrs_to_frame_stack fs ptrs fs1 ->
         add_ptrs_to_frame_stack fs ptrs fs2 ->
         frame_stack_eqv fs1 fs2.
-    Proof.
+    Proof using.
       induction ptrs;
         intros fs fs1 fs2 ADD1 ADD2.
       - cbn in *.
@@ -1075,7 +1075,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         add_ptr_to_heap h root ptr h1 ->
         add_ptr_to_heap h root ptr h2 ->
         heap_eqv h1 h2.
-    Proof.
+    Proof using.
       intros ptr root h h1 h2 H1 H2.
       split.
       { intros root0.
@@ -1203,7 +1203,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         add_ptrs_to_heap' h root ptrs h1 ->
         add_ptrs_to_heap' h root ptrs h2 ->
         heap_eqv h1 h2.
-    Proof.
+    Proof using.
       induction ptrs;
         intros root h h1 h2 ADD1 ADD2.
       - cbn in *.
@@ -1223,7 +1223,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     #[global] Instance frame_stack_eqv_add_all_to_frame :
       Proper ((fun ms1 ms2 => frame_stack_eqv (memory_stack_frame_stack ms1) (memory_stack_frame_stack ms2)) ==> eq ==> (fun ms1 ms2 => frame_stack_eqv (memory_stack_frame_stack ms1) (memory_stack_frame_stack ms2))) add_all_to_frame.
-    Proof.
+    Proof using.
       unfold Proper, respectful.
       intros ms1 ms2 EQV y x EQ; subst.
 
@@ -1283,7 +1283,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     #[global] Instance heap_eqv_add_with :
       Proper (eq ==> eq ==> heap_eqv ==> heap_eqv) (fun root a => add_with root a ret cons).
-    Proof.
+    Proof using.
       unfold Proper, respectful.
       intros a b EQKEY p1 p2 EQPTR h1 h2 EQHEAP; subst.
       unfold add_with.
@@ -1371,7 +1371,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     #[global] Instance heap_eqv_add_all_to_heap :
       Proper ((fun ms1 ms2 => heap_eqv (memory_stack_heap ms1) (memory_stack_heap ms2)) ==> eq ==> eq ==> (fun ms1 ms2 => heap_eqv (memory_stack_heap ms1) (memory_stack_heap ms2))) add_all_to_heap'.
-    Proof.
+    Proof using.
       unfold Proper, respectful.
       intros ms1 ms2 EQV y x EQ z w EQ'; subst.
 
@@ -1417,7 +1417,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: move *)
     #[global] Instance snoc_Proper :
       Proper (frame_stack_eqv ==> frame_eqv ==> frame_stack_eqv) Snoc.
-    Proof.
+    Proof using.
       unfold Proper, respectful.
       intros x y XY f f' FF.
       red.
@@ -1433,7 +1433,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: move *)
     #[global] Instance push_frame_stack_spec_Proper :
       Proper (frame_stack_eqv ==> frame_eqv ==> frame_stack_eqv ==> iff) push_frame_stack_spec.
-    Proof.
+    Proof using.
       unfold Proper, respectful.
       intros x y XY f f' TU r s RS; subst.
 
@@ -1458,7 +1458,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     #[global] Instance member_ptr_to_int_heap_eqv_Proper :
       Proper ((fun p1 p2 => ptr_to_int p1 = ptr_to_int p2) ==> heap_eqv ==> iff) (fun p => member (ptr_to_int p)).
-    Proof.
+    Proof using.
       intros p1 p2 PTREQ h1 h2 HEAPEQ; subst.
       inv HEAPEQ.
       unfold root_in_heap_prop in *.
@@ -1477,7 +1477,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         add_to_frame ms2' ptr = ms2'' ->
 
         frame_stack_eqv (memory_stack_frame_stack ms1'') (memory_stack_frame_stack ms2'').
-    Proof.
+    Proof using.
       induction ptrs;
         intros ptr ms ms1' ms1'' ms2' ms2'' ADD ADD_ALL ADD_ALL' ADD'.
 
@@ -1576,7 +1576,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         add_to_heap ms2' root ptr = ms2'' ->
 
         heap_eqv (memory_stack_heap ms1'') (memory_stack_heap ms2'').
-    Proof.
+    Proof using.
       induction ptrs;
         intros ptr root ms ms1' ms1'' ms2' ms2'' ADD ADD_ALL ADD_ALL' ADD'.
 
@@ -1669,7 +1669,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall ptr (ms ms' : memory_stack),
         add_to_frame ms ptr = ms' ->
         add_ptr_to_frame_stack (memory_stack_frame_stack ms) ptr (memory_stack_frame_stack ms').
-    Proof.
+    Proof using.
       intros ptr ms ms' ADD.
       unfold add_ptr_to_frame_stack.
       intros f PEEK.
@@ -1704,7 +1704,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall ptrs (ms : memory_stack) (ms' : memory_stack),
         add_all_to_frame ms ptrs = ms' ->
         add_ptrs_to_frame_stack (memory_stack_frame_stack ms) ptrs (memory_stack_frame_stack ms').
-    Proof.
+    Proof using.
       induction ptrs;
         intros ms ms' ADD_ALL.
       - cbn in *.
@@ -1746,7 +1746,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall root ptr (ms : memory_stack) (ms' : memory_stack),
         add_to_heap ms root ptr = ms' ->
         add_ptr_to_heap (memory_stack_heap ms) root ptr (memory_stack_heap ms').
-    Proof.
+    Proof using.
       intros root ptr ms ms' ADD.
       split.
       - (* Old *)
@@ -1825,7 +1825,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall ptrs root (ms : memory_stack) (ms' : memory_stack),
         add_all_to_heap' ms root ptrs = ms' ->
         add_ptrs_to_heap' (memory_stack_heap ms) root ptrs (memory_stack_heap ms').
-    Proof.
+    Proof using.
       induction ptrs;
         intros root ms ms' ADD_ALL.
       - cbn in *; subst; reflexivity.
@@ -1864,7 +1864,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall ptrs (ms : memory_stack) (ms' : memory_stack),
         add_all_to_heap ms ptrs = ms' ->
         add_ptrs_to_heap (memory_stack_heap ms) ptrs (memory_stack_heap ms').
-    Proof.
+    Proof using.
       intros ptrs ms ms' H0.
       destruct ptrs.
       - cbn in *.
@@ -1880,7 +1880,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: Move this *)
     Lemma initial_frame_empty :
       empty_frame initial_frame.
-    Proof.
+    Proof using.
       unfold empty_frame.
       intros ptr.
       unfold initial_frame.
@@ -1893,7 +1893,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         empty_frame f1 ->
         empty_frame f2 ->
         frame_eqv f1 f2.
-    Proof.
+    Proof using.
       intros f1 f2 F1 F2.
       unfold empty_frame in *.
       unfold frame_eqv.
@@ -1905,7 +1905,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall ms fs,
         mem_state_frame_stack ms = fs ->
         mem_state_frame_stack_prop ms fs.
-    Proof.
+    Proof using.
       intros [[m fsm] pr] fs EQ; subst.
       red; cbn.
       red.
@@ -2012,7 +2012,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall fs1 f fs2,
         push_frame_stack fs1 f = fs2 ->
         push_frame_stack_spec fs1 f fs2.
-    Proof.
+    Proof using.
       intros fs1 f fs2 PUSH.
       unfold push_frame_stack in PUSH.
       subst.
@@ -2029,7 +2029,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         push_frame_stack_spec fs1 f fs2 ->
         push_frame_stack_spec fs1 f fs2' ->
         frame_stack_eqv fs2 fs2'.
-    Proof.
+    Proof using.
       intros fs1 f fs2 fs2' PUSH1 PUSH2.
       inv PUSH1.
       inv PUSH2.
@@ -2060,7 +2060,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma mem_state_frame_stack_prop_set_refl :
       forall ms fs,
         mem_state_frame_stack_prop (mem_state_set_frame_stack ms fs) fs.
-    Proof.
+    Proof using.
       intros [[m fsm] pr] fs.
       red; cbn.
       red.
@@ -2070,7 +2070,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma mem_state_heap_prop_set_refl :
       forall ms h,
         mem_state_heap_prop (mem_state_set_heap ms h) h.
-    Proof.
+    Proof using.
       intros [[m fsm h] pr] h'.
       red; cbn.
       red.
@@ -2082,7 +2082,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         frame_stack_eqv fs' fs'' ->
         mem_state_frame_stack_prop (mem_state_set_frame_stack ms fs) fs' ->
         mem_state_frame_stack_prop (mem_state_set_frame_stack ms fs) fs''.
-    Proof.
+    Proof using.
       intros [[m fsm] pr] fs fs' fs'' EQV MEMPROP.
       red; cbn.
       red in MEMPROP; cbn in MEMPROP.
@@ -2096,7 +2096,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         heap_eqv h' h'' ->
         mem_state_heap_prop (mem_state_set_heap ms h) h' ->
         mem_state_heap_prop (mem_state_set_heap ms h) h''.
-    Proof.
+    Proof using.
       intros [[m fsm] pr] h h' h'' EQV MEMPROP.
       red; cbn.
       red in MEMPROP; cbn in MEMPROP.
@@ -2154,19 +2154,19 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* Definition MemStateM := ErrSID_T (state MemState). *)
 
     (* Instance MemStateM_MonadAllocationId : MonadAllocationId AllocationId MemStateM. *)
-    (* Proof. *)
+    (* Proof using. *)
     (*   split. *)
     (*   apply ESID.fresh_allocation_id. *)
     (* Defined. *)
 
     (* Instance MemStateM_MonadStoreID : MonadStoreId MemStateM. *)
-    (* Proof. *)
+    (* Proof using. *)
     (*   split. *)
     (*   apply ESID.fresh_sid. *)
     (* Defined. *)
 
     (* Instance MemStateM_MonadMemState : MonadMemState MemState MemStateM. *)
-    (* Proof. *)
+    (* Proof using. *)
     (*   split. *)
     (*   - apply (lift MonadState.get). *)
     (*   - intros ms. *)
@@ -2174,7 +2174,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* Defined. *)
 
     (* Instance ErrSIDMemMonad : MemMonad MemState ExtraState AllocationId (ESID.ErrSID_T (state MemState)). *)
-    (* Proof. *)
+    (* Proof using. *)
     (*   split. *)
     (*   - (* MemMonad_runs_to *) *)
     (*     intros A ma ms. *)
@@ -2338,7 +2338,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         byte_allocated ms1 addr aid ->
         mem_state_memory_stack ms1 = mem_state_memory_stack ms2 ->
         byte_allocated ms2 addr aid.
-    Proof.
+    Proof using.
       intros [ms1 pr1] [ms2 pr2] addr aid ALLOC EQ.
       cbn in EQ; subst.
       cbn in *; auto.
@@ -2350,7 +2350,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         read_byte_prop ms1 addr sbyte ->
         mem_state_memory_stack ms1 = mem_state_memory_stack ms2 ->
         read_byte_prop ms2 addr sbyte.
-    Proof.
+    Proof using.
       intros [ms1 pr1] [ms2 pr2] addr aid READ EQ.
       cbn in EQ; subst.
       repeat red.
@@ -2363,7 +2363,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         disjoint_ptr_byte ptr ptr' ->
         mem_state_memory ms2 = set_byte_raw (mem_state_memory ms1) (ptr_to_int ptr') byte' ->
         read_byte_prop ms1 ptr byte <-> read_byte_prop ms2 ptr byte.
-    Proof.
+    Proof using.
       intros ms1 ms2 ptr ptr' byte byte' DISJOINT MEM.
       split; intros READ.
       - unfold mem_state_memory in *.
@@ -2403,7 +2403,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         byte_allocated ms p2 aid2 ->
         ptr_to_int p1 = ptr_to_int p2 ->
         aid1 = aid2.
-    Proof.
+    Proof using.
       intros p1 p2 ms byte aid1 aid2 READ ALLOC PEQ.
       repeat red in ALLOC.
       rewrite <- PEQ in ALLOC.
@@ -2455,7 +2455,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         byte_allocated m1 ptr aid ->
         mem_state_memory m2 = set_byte_raw (mem_state_memory m1) (ptr_to_int ptr) (new, new_aid) ->
         byte_allocated m2 ptr new_aid.
-    Proof.
+    Proof using.
       intros ptr aid new new_aid m1 m2 ALLOC MEM.
       repeat red in ALLOC.
       break_match_hyp; try contradiction.
@@ -2476,7 +2476,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         disjoint_ptr_byte ptr new_ptr ->
         mem_state_memory m2 = set_byte_raw (mem_state_memory m1) (ptr_to_int new_ptr) (new, new_aid) ->
         byte_allocated m2 ptr aid.
-    Proof.
+    Proof using.
       intros ptr aid new_ptr new new_aid m1 m2 ALLOC DISJOINT MEM.
       repeat red in ALLOC.
       repeat red.
@@ -2492,7 +2492,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         disjoint_ptr_byte ptr new_ptr ->
         mem_state_memory m2 = set_byte_raw (mem_state_memory m1) (ptr_to_int new_ptr) (new, new_aid) ->
         byte_allocated m1 ptr aid.
-    Proof.
+    Proof using.
       intros ptr aid new_ptr new new_aid m1 m2 ALLOC DISJOINT MEM.
       repeat red in ALLOC.
       repeat red.
@@ -2507,7 +2507,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         byte_allocated m1 ptr aid ->
         mem_state_memory m2 = set_byte_raw (mem_state_memory m1) (ptr_to_int ptr_new) new ->
         exists aid2, byte_allocated m2 ptr aid2.
-    Proof.
+    Proof using.
       intros ptr aid ptr_new new m1 m2 ALLOCATED MEM.
       pose proof (Z.eq_dec (ptr_to_int ptr) (ptr_to_int ptr_new)) as [EQ | NEQ].
       - (* EQ *)
@@ -2528,7 +2528,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         access_allowed (address_provenance ptr1) aid ->
         byte_allocated ms ptr2 aid' <->
           byte_allocated {| ms_memory_stack := {| memory_stack_memory := set_byte_raw (mem_state_memory ms) (ptr_to_int ptr1) (byte, aid); memory_stack_frame_stack := fs; memory_stack_heap := heap |}; ms_provenance := mem_state_provenance ms |} ptr2 aid'.
-    Proof.
+    Proof using.
       intros ms ptr1 ptr2 byte rbyte aid aid' fs heap READ ALLOWED.
       split; intros ALLOC.
       - pose proof disjoint_ptr_byte_dec ptr2 ptr1 as [DISJOINT | NDISJOINT].
@@ -2561,7 +2561,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory m2 = set_byte_raw (mem_state_memory m1) (ptr_to_int ptr_new) (new_byte, aid) ->
         byte_allocated m1 ptr aid' <->
           byte_allocated m2 ptr aid'.
-    Proof.
+    Proof using.
       intros m1 m2 ptr_new ptr new_byte rbyte aid aid' READ ALLOWED MEMEQ.
       split; intros ALLOC.
       - pose proof disjoint_ptr_byte_dec ptr ptr_new as [DISJOINT | NDISJOINT].
@@ -2716,7 +2716,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         ~disjoint_ptr_byte p1 p2 ->
         aid1 = aid2 ->
         set_byte_raw mem (ptr_to_int p1) (byte, aid1) = set_byte_raw mem (ptr_to_int p2) (byte, aid2).
-    Proof.
+    Proof using.
       intros p1 p2 mem byte aid1 aid2 H0 H1.
       prove_ptr_to_int_eq_subst p1 p2.
       subst; auto.
@@ -2728,7 +2728,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         access_allowed (address_provenance ptr1) aid ->
         write_byte_allowed ms ptr2 <->
           write_byte_allowed {| ms_memory_stack := {| memory_stack_memory := set_byte_raw (mem_state_memory ms) (ptr_to_int ptr1) (byte, aid); memory_stack_frame_stack := fs; memory_stack_heap := heap |}; ms_provenance := mem_state_provenance ms |} ptr2.
-    Proof.
+    Proof using.
       intros ms ptr1 ptr2 byte rbyte aid fs heap READ.
       split; intros WRITE_ALLOWED.
       - break_access_hyps; eexists; split; [| solve_access_allowed].
@@ -2769,7 +2769,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         access_allowed (address_provenance ptr1) aid ->
         read_byte_allowed ms ptr2 <->
           read_byte_allowed {| ms_memory_stack := {| memory_stack_memory := set_byte_raw (mem_state_memory ms) (ptr_to_int ptr1) (byte, aid); memory_stack_frame_stack := fs; memory_stack_heap := heap |}; ms_provenance := mem_state_provenance ms |} ptr2.
-    Proof.
+    Proof using.
       eapply write_byte_allowed_set_byte_raw.
     Qed.
 
@@ -2779,7 +2779,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         access_allowed (address_provenance ptr1) aid ->
         free_byte_allowed ms ptr2 <->
           free_byte_allowed {| ms_memory_stack := {| memory_stack_memory := set_byte_raw (mem_state_memory ms) (ptr_to_int ptr1) (byte, aid); memory_stack_frame_stack := fs; memory_stack_heap := heap |}; ms_provenance := mem_state_provenance ms |} ptr2.
-    Proof.
+    Proof using.
       eapply write_byte_allowed_set_byte_raw.
     Qed.
 
@@ -2876,7 +2876,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         disjoint_ptr_byte ptr ptr' ->
         mem_state_memory ms2 = set_byte_raw (mem_state_memory ms1) (ptr_to_int ptr') byte' ->
         read_byte_spec ms1 ptr byte <-> read_byte_spec ms2 ptr byte.
-    Proof.
+    Proof using.
       intros ms1 ms2 ptr ptr' byte [byte' aid_byte'] DISJOINT MEMEQ.
       split; intros [[aid' [READ_ALLOC READ_ALLOWED]] READ_PROP].
       { split.
@@ -2920,7 +2920,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall ms1 ms2,
         heap_eqv (mem_state_heap ms1) (mem_state_heap ms2) ->
         heap_preserved ms1 ms2.
-    Proof.
+    Proof using.
       intros ms1 ms2 EQ.
       destruct ms1, ms2.
       unfold mem_state_heap in *.
@@ -2999,7 +2999,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         read_byte_raw (mem_state_memory ms) (ptr_to_int ptr) = Some (sbyte, aid) ->
         access_allowed (address_provenance ptr) aid = true ->
         read_byte_allowed ms ptr.
-    Proof.
+    Proof using.
       intros ms ptr sbyte aid RBR ACCESS.
       repeat red.
       exists aid.
@@ -3015,7 +3015,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         read_byte_raw (mem_state_memory ms) (ptr_to_int ptr) = Some (sbyte, aid) ->
         access_allowed (address_provenance ptr) aid = true ->
         write_byte_allowed ms ptr.
-    Proof.
+    Proof using.
       eapply read_byte_raw_read_byte_allowed.
     Qed.
 
@@ -3024,7 +3024,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         read_byte_raw (mem_state_memory ms) (ptr_to_int ptr) = Some (sbyte, aid) ->
         access_allowed (address_provenance ptr) aid = true ->
         free_byte_allowed ms ptr.
-    Proof.
+    Proof using.
       eapply read_byte_raw_read_byte_allowed.
     Qed.
 
@@ -3037,7 +3037,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         read_byte_raw (mem_state_memory ms) (ptr_to_int ptr) = Some (sbyte, aid) ->
         access_allowed (address_provenance ptr) aid = true ->
         read_byte_prop ms ptr sbyte.
-    Proof.
+    Proof using.
       intros ms ptr sbyte aid RBR ACCESS.
       repeat red.
       unfold mem_state_memory in *.
@@ -3063,7 +3063,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma read_byte_allowed_set_frame_stack :
       forall ms f ptr,
         read_byte_allowed ms ptr <-> read_byte_allowed (mem_state_set_frame_stack ms f) ptr.
-    Proof.
+    Proof using.
       intros [[ms prov] fs] f ptr.
       cbn.
       unfold read_byte_allowed;
@@ -3075,7 +3075,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma write_byte_allowed_set_frame_stack :
       forall ms f ptr,
         write_byte_allowed ms ptr <-> write_byte_allowed (mem_state_set_frame_stack ms f) ptr.
-    Proof.
+    Proof using.
       intros [[ms prov] fs] f ptr.
       cbn.
       unfold write_byte_allowed;
@@ -3087,7 +3087,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma free_byte_allowed_set_frame_stack :
       forall ms f ptr,
         free_byte_allowed ms ptr <-> free_byte_allowed (mem_state_set_frame_stack ms f) ptr.
-    Proof.
+    Proof using.
       intros [[ms prov] fs] f ptr.
       cbn.
       unfold free_byte_allowed;
@@ -3099,7 +3099,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma read_byte_prop_set_frame_stack :
       forall ms f,
         read_byte_prop_all_preserved ms (mem_state_set_frame_stack ms f).
-    Proof.
+    Proof using.
       intros [[ms prov] fs] f.
       cbn.
       unfold read_byte_prop_all_preserved, read_byte_prop.
@@ -3111,7 +3111,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma write_byte_allowed_all_preserved_set_frame_stack :
       forall ms f,
         write_byte_allowed_all_preserved ms (mem_state_set_frame_stack ms f).
-    Proof.
+    Proof using.
       intros ms f ptr.
       eapply write_byte_allowed_set_frame_stack.
     Qed.
@@ -3119,7 +3119,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma free_byte_allowed_all_preserved_set_frame_stack :
       forall ms f,
         free_byte_allowed_all_preserved ms (mem_state_set_frame_stack ms f).
-    Proof.
+    Proof using.
       intros ms f ptr.
       eapply free_byte_allowed_set_frame_stack.
     Qed.
@@ -3127,7 +3127,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma allocations_preserved_set_frame_stack :
       forall ms f,
         allocations_preserved ms (mem_state_set_frame_stack ms f).
-    Proof.
+    Proof using.
       intros ms f ptr aid.
       destruct ms as [[ms fs] pr].
       split; intros ALLOC; repeat red in ALLOC; repeat red; cbn in *; auto.
@@ -3137,7 +3137,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma preserve_allocation_ids_set_frame_stack :
       forall ms f,
         preserve_allocation_ids ms (mem_state_set_frame_stack ms f).
-    Proof.
+    Proof using.
       intros ms f pr.
       destruct ms as [[ms fs] pr'].
       split; intros USED;
@@ -3147,7 +3147,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (** Correctness of the main operations on memory *)
     Lemma read_byte_correct :
       forall ptr pre, exec_correct pre (read_byte ptr) (read_byte_spec_MemPropT ptr).
-    Proof.
+    Proof using.
       unfold exec_correct.
       intros ptr pre ms st VALID.
 
@@ -3214,7 +3214,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma write_byte_correct :
       forall ptr byte pre, exec_correct pre (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
-    Proof.
+    Proof using.
       unfold exec_correct.
       intros ptr byte pre ms st VALID.
 
@@ -3309,7 +3309,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
            ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad (list addr)
            (@get_consecutive_ptrs M MM MOOM MERR ptr len) ms st)
               (fmap (fun ptrs => (st, (ms, ptrs))) (@get_consecutive_ptrs RunM MRun RunOOM RunERR ptr len)))%monad.
-    Proof.
+    Proof using.
       intros ExtraState0 M RunM MM0 MRun0 MPROV0 MSID0 MMS0 MERR0 MUB0 MOOM0 RunERR0 RunUB0 RunOOM0 MemMonad0 EQM' EQRI' MLAWS' EQV
              LAWS RAISE RAISEERR ms ptr len st.
       Opaque handle_gep_addr.
@@ -3362,7 +3362,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         MemState_get_memory ms = mem ->
         next_memory_key mem <= ptr_to_int ptr ->
         byte_not_allocated ms ptr.
-    Proof.
+    Proof using.
       intros mem ms ptr MEM NEXT.
       unfold byte_not_allocated.
       unfold byte_allocated.
@@ -3391,7 +3391,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       next_memory_key mem <= ptr_to_int ptr ->
       (ret ptrs {{ms}} ∈ {{ms'}} @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
       forall p, In p ptrs -> byte_not_allocated ms p.
-  Proof.
+  Proof using.
     intros M HM OOM ERR EQM' EQV WM EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR mem ms ms' ptr len ptrs MEM NEXT CONSEC p IN.
     pose proof get_consecutive_ptrs_ge ptr len ptrs (B:=err_ub_oom) as GE.
     forward GE.
@@ -3406,7 +3406,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma find_free_block_correct :
       forall len pr pre,
         exec_correct pre (get_free_block len pr) (find_free_block len pr).
-    Proof.
+    Proof using.
       unfold exec_correct.
       intros len pr pre ms st VALID.
       cbn.
@@ -3625,7 +3625,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall ms_init ms_fresh_pr (pr : Provenance),
         mem_state_fresh_provenance ms_init = (pr, ms_fresh_pr) ->
         @fresh_provenance Provenance (MemPropT MemState) _ ms_init (ret (ms_fresh_pr, pr)).
-    Proof.
+    Proof using.
       intros ms_init ms_fresh_pr pr FRESH.
       cbn.
       unfold mem_state_fresh_provenance in FRESH.
@@ -3642,7 +3642,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory ms = add_all_index bytes ix mem ->
         (forall mb, In mb bytes -> snd mb = aid) ->
         (forall p, ix <= ptr_to_int p < ix + (Z.of_nat (length bytes)) -> byte_allocated ms p aid).
-    Proof.
+    Proof using.
       intros ms mem bytes ix aid MEM IN p RANGE.
       repeat red.
 
@@ -3685,7 +3685,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         (forall mb, In mb bytes -> snd mb = aid) ->
         (ret ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
         forall p, In p ptrs -> byte_allocated ms p aid.
-    Proof.
+    Proof using.
       intros M HM OOM ERR EQM' Pre Post B MB WM EQV EQRET WRET LAWS
         RBMOOM RBMERR RWOOM RWERR
         mem ms ptr len ptrs
@@ -3702,7 +3702,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                (@MemPropT_RAISE_ERROR MemState) ptr len ms1 (ret (ms1, ptrs))) ->
         (@get_consecutive_ptrs (MemPropT MemState) (@MemPropT_Monad MemState) (@MemPropT_RAISE_OOM MemState)
                                (@MemPropT_RAISE_ERROR MemState) ptr len ms2 (ret (ms2, ptrs))).
-    Proof.
+    Proof using.
       intros ptr len ptrs ms1 ms2 CONSEC.
       cbn in *.
       destruct CONSEC as [ms' [ixs [SEQ MAPM]]].
@@ -3726,7 +3726,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         (@get_consecutive_ptrs (MemPropT MemState) (@MemPropT_Monad MemState) (@MemPropT_RAISE_OOM MemState)
            (@MemPropT_RAISE_ERROR MemState) ptr len ms1 (ret (ms2, ptrs))) ->
         ms1 = ms2.
-    Proof.
+    Proof using.
       intros ptr len ptrs ms1 ms2 CONSEC.
       cbn in *.
       destruct CONSEC as [ms' [ixs [SEQ MAPM]]].
@@ -3745,7 +3745,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                (@MemPropT_RAISE_ERROR MemState) ptr len ms1 (ret (ms1, ptrs))) ->
         (@get_consecutive_ptrs (MemPropT MemState) (@MemPropT_Monad MemState) (@MemPropT_RAISE_OOM MemState)
                                (@MemPropT_RAISE_ERROR MemState) ptr len ≈ ret ptrs)%monad.
-    Proof.
+    Proof using.
       intros ptr len ptrs ms1 CONSEC.
       cbn in *.
       destruct CONSEC as [ms' [ixs [SEQ MAPM]]].
@@ -3823,7 +3823,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall (ms ms' : MemState) (ptr : addr) (aid : AllocationId),
         byte_allocated ms ptr aid ->
         mem_state_memory ms = mem_state_memory ms' -> byte_allocated ms' ptr aid.
-    Proof.
+    Proof using.
       intros ms ms' ptr aid ALLOC MEM.
       repeat red in ALLOC.
       repeat red.
@@ -3853,7 +3853,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         (forall p : addr, In p ptrs -> disjoint_ptr_byte p ptr_old) ->
         (ret ptrs ∈ @get_consecutive_ptrs M HM OOM ERR ptr len)%monad ->
         byte_allocated ms ptr_old aid <-> byte_allocated ms' ptr_old aid.
-    Proof.
+    Proof using.
       intros M HM OOM ERR EQM0 Pre Post B MB WM
         EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr_old ptr
         len ptrs bytes aid MEM LEN DISJOINT CONSEC.
@@ -3912,7 +3912,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr ->
         mem_state_memory ms_extended = add_all_index (map (fun b : SByte => (b, provenance_to_allocation_id pr)) init_bytes) (ptr_to_int ptr) (mem_state_memory ms_init) ->
         extend_allocations ms_init ptrs pr ms_extended.
-    Proof.
+    Proof using.
       intros ms_init ms_found_free ms_extended pr ptr ptrs init_bytes [MS FREE] MEM.
       inv MS; inv FREE.
       split.
@@ -3949,7 +3949,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall ms1 ms2 len pr ptr ptrs,
         ret (ptr, ptrs) {{ms1}} ∈ {{ms2}} find_free_block len pr ->
         ms1 = ms2.
-    Proof.
+    Proof using.
       intros ms1 ms2 len pr ptr ptrs [MS FREE].
       auto.
     Qed.
@@ -3989,7 +3989,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           Util.Nth init_bytes ix byte ->
           access_allowed (address_provenance p) aid ->
           read_byte_prop ms' p byte.
-    Proof.
+    Proof using.
       intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr len ptrs
         init_bytes bytes pr aid MEM2 INMB BYTES CONSEC BYTELEN p ix
         byte PTRNTH BYTENTH ACCESS.
@@ -4055,7 +4055,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         (forall new_p, In new_p ptrs -> disjoint_ptr_byte new_p p) ->
         read_byte_prop ms p byte <->
           read_byte_prop ms' p byte.
-    Proof.
+    Proof using.
       intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR
         ms ms' ptr len ptrs
         bytes p byte MEM2 CONSEC BYTELEN DISJOINT.
@@ -4115,7 +4115,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr ->
         mem_state_memory ms_extended = add_all_index (map (fun b : SByte => (b, provenance_to_allocation_id pr)) init_bytes) (ptr_to_int ptr) (mem_state_memory ms_init) ->
         extend_reads ms_init ptrs init_bytes ms_extended.
-    Proof.
+    Proof using.
       intros ms_init ms_found_free ms_extended pr ptr ptrs init_bytes [MS FREE] MEM.
       inv MS; inv FREE.
       split.
@@ -4168,7 +4168,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         forall p, In p ptrs ->
              access_allowed (address_provenance p) aid ->
              read_byte_allowed ms' p.
-    Proof.
+    Proof using.
       intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR
         ms ms' ptr len ptrs
         bytes aid MEM2 INMB CONSEC BYTELEN p IN ACCESS.
@@ -4201,7 +4201,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         (forall new_p, In new_p ptrs -> disjoint_ptr_byte new_p p) ->
         read_byte_allowed ms p <->
           read_byte_allowed ms' p.
-    Proof.
+    Proof using.
       intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr len ptrs
         bytes p MEM2 CONSEC BYTELEN DISJOINT.
       split; intros ALLOC.
@@ -4220,7 +4220,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr ->
         mem_state_memory ms_extended = add_all_index (map (fun b : SByte => (b, provenance_to_allocation_id pr)) init_bytes) (ptr_to_int ptr) (mem_state_memory ms_init) ->
         extend_read_byte_allowed ms_init ptrs ms_extended.
-    Proof.
+    Proof using.
       intros ms_init ms_found_free ms_extended pr ptr ptrs init_bytes [MS FREE] MEM.
       inv MS; inv FREE.
       split.
@@ -4279,7 +4279,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         forall p, In p ptrs ->
              access_allowed (address_provenance p) aid ->
              write_byte_allowed ms' p.
-    Proof.
+    Proof using.
       intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr len ptrs
         bytes aid MEM2 INMB CONSEC BYTELEN p IN ACCESS.
       unfold write_byte_allowed.
@@ -4311,7 +4311,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         (forall new_p, In new_p ptrs -> disjoint_ptr_byte new_p p) ->
         write_byte_allowed ms p <->
           write_byte_allowed ms' p.
-    Proof.
+    Proof using.
       intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr len ptrs
         bytes p MEM2 CONSEC BYTELEN DISJOINT.
       split; intros ALLOC.
@@ -4330,7 +4330,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr ->
         mem_state_memory ms_extended = add_all_index (map (fun b : SByte => (b, provenance_to_allocation_id pr)) init_bytes) (ptr_to_int ptr) (mem_state_memory ms_init) ->
         extend_write_byte_allowed ms_init ptrs ms_extended.
-    Proof.
+    Proof using.
       intros ms_init ms_found_free ms_extended pr ptr ptrs init_bytes [MS FREE] MEM.
       inv MS; inv FREE.
       split.
@@ -4388,7 +4388,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         forall p, In p ptrs ->
              access_allowed (address_provenance p) aid ->
              free_byte_allowed ms' p.
-    Proof.
+    Proof using.
       intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr len ptrs
         bytes aid MEM2 INMB CONSEC BYTELEN p IN ACCESS.
       unfold free_byte_allowed.
@@ -4420,7 +4420,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         (forall new_p, In new_p ptrs -> disjoint_ptr_byte new_p p) ->
         read_byte_allowed ms p <->
           read_byte_allowed ms' p.
-    Proof.
+    Proof using.
       intros M HM OOM ERR EQM0 Pre Post B MB WM EQV EQRET WRET LAWS RBMOOM RBMERR RWOOM RWERR ms ms' ptr len ptrs
         bytes p MEM2 CONSEC BYTELEN DISJOINT.
       split; intros ALLOC.
@@ -4439,7 +4439,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr ->
         mem_state_memory ms_extended = add_all_index (map (fun b : SByte => (b, provenance_to_allocation_id pr)) init_bytes) (ptr_to_int ptr) (mem_state_memory ms_init) ->
         extend_free_byte_allowed ms_init ptrs ms_extended.
-    Proof.
+    Proof using.
       intros ms_init ms_found_free ms_extended pr ptr ptrs init_bytes [MS FREE] MEM.
       inv MS; inv FREE.
       split.
@@ -4501,7 +4501,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                  |})
         (FIND_FREE : ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr),
         allocate_bytes_post_conditions ms_found_free init_bytes pr ms_final ptr ptrs.
-    Proof.
+    Proof using.
       intros ms_init ms_found_free ms_final init_bytes pr ptr ptrs memory_stack_memory0
         memory_stack_frame_stack0 memory_stack_heap0 ms_provenance0 EQ EQF FIND_FREE.
       subst.
@@ -4550,7 +4550,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         (FIND_FREE : ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr),
       exists ms_final,
         allocate_bytes_post_conditions ms_found_free init_bytes pr ms_final ptr ptrs.
-    Proof.
+    Proof using.
       intros ms_init ms_found_free init_bytes pr ptr ptrs FIND_FREE.
       destruct ms_found_free.
       destruct ms_memory_stack0.
@@ -4565,7 +4565,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           (fun ms_k _ => ret (ptr, ptrs) {{ms_init}} ∈ {{ms_k}} find_free_block (Datatypes.length init_bytes) pr)
           (_ <- add_block_to_stack (provenance_to_allocation_id pr) ptr ptrs init_bytes;; ret ptr)
           (_ <- allocate_bytes_post_conditions_MemPropT init_bytes pr ptr ptrs;; ret ptr).
-    Proof.
+    Proof using.
       intros pr ms_init ptr ptrs init_bytes.
       unfold exec_correct.
       intros ms st VALID PRE.
@@ -4647,7 +4647,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                  |})
         (FIND_FREE : ret (ptr, ptrs) {{ms_init}} ∈ {{ms_found_free}} find_free_block (length init_bytes) pr),
         malloc_bytes_post_conditions ms_found_free init_bytes pr ms_final ptr ptrs.
-    Proof.
+    Proof using.
       intros ms_init ms_found_free ms_final init_bytes pr ptr ptrs memory_stack_memory0
         memory_stack_frame_stack0 memory_stack_heap0 ms_provenance0 EQ EQF FIND_FREE.
       subst.
@@ -4736,7 +4736,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           (fun ms_k _ => ret (ptr, ptrs) {{ms_init}} ∈ {{ms_k}} find_free_block (Datatypes.length init_bytes) pr)
           (_ <- add_block_to_heap (provenance_to_allocation_id pr) ptr ptrs init_bytes;; ret ptr)
           (_ <- malloc_bytes_post_conditions_MemPropT init_bytes pr ptr ptrs;; ret ptr).
-    Proof.
+    Proof using.
       intros pr ms_init ptr ptrs init_bytes.
       unfold exec_correct.
       intros ms st VALID PRE.
@@ -4794,7 +4794,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma allocate_bytes_with_pr_correct :
       forall init_bytes pr pre, exec_correct pre (allocate_bytes_with_pr init_bytes pr) (allocate_bytes_with_pr_spec_MemPropT init_bytes pr).
-    Proof.
+    Proof using.
       Opaque exec_correct.
       intros init_bytes pr pre.
 
@@ -4815,7 +4815,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             ix <= ptr_to_int p < ix + (Z.of_nat (length bytes)) ->
             access_allowed (address_provenance p) aid ->
             read_byte_allowed ms p).
-    Proof.
+    Proof using.
       intros ms mem bytes ix aid MEM AID p IN_BOUNDS ACCESS_ALLOWED.
       unfold read_byte_allowed.
       exists aid. split; auto.
@@ -4839,7 +4839,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         Util.Nth ptrs offset p ->
         access_allowed (address_provenance p) aid ->
         read_byte_prop ms p byte.
-    Proof.
+    Proof using.
       intros M HM OOM ERR EQM' EQV EQRET LAWS
              RAISE_OOM RAISE_ERR
              ms mem bytes byte offset aid p ptr ptrs
@@ -4884,7 +4884,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             ix <= ptr_to_int p < ix + (Z.of_nat (length bytes)) ->
             access_allowed (address_provenance p) aid ->
             write_byte_allowed ms p).
-    Proof.
+    Proof using.
       intros ms mem bytes ix aid MEM AID p IN_BOUNDS ACCESS_ALLOWED.
       unfold read_byte_allowed.
       exists aid. split; auto.
@@ -4894,7 +4894,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (** Malloc correctness *)
     Lemma malloc_bytes_with_pr_correct :
       forall init_bytes pr pre, exec_correct pre (malloc_bytes_with_pr init_bytes pr) (malloc_bytes_with_pr_spec_MemPropT init_bytes pr).
-    Proof.
+    Proof using.
       intros init_bytes pr pre.
 
       unfold malloc_bytes_with_pr.
@@ -4908,7 +4908,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (** Correctness of frame stack operations *)
     Lemma mempush_correct :
       forall pre, exec_correct pre mempush mempush_spec_MemPropT.
-    Proof.
+    Proof using.
       Transparent exec_correct.
       unfold exec_correct.
       intros pre ms st VALID PRE.
@@ -4998,7 +4998,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma read_byte_raw_memory_empty :
       forall ptr,
         read_byte_raw memory_empty ptr = None.
-    Proof.
+    Proof using.
       intros ptr.
       Transparent read_byte_raw.
       unfold read_byte_raw.
@@ -5011,7 +5011,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall m m' ptr,
         free_byte ptr m = m' ->
         read_byte_raw m' ptr = None.
-    Proof.
+    Proof using.
       intros m m' ptr FREE.
       Transparent read_byte_raw.
       unfold read_byte_raw.
@@ -5027,7 +5027,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         exists m'',
           free_byte (ptr_to_int a) m  = m'' /\
             free_frame_memory f m'' = m'.
-    Proof.
+    Proof using.
       intros f m m' a FREE.
       rewrite list_cons_app in FREE.
       unfold free_frame_memory in *.
@@ -5044,7 +5044,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         exists m'',
           free_byte (ptr_to_int a) m  = m'' /\
             free_block_memory block m'' = m'.
-    Proof.
+    Proof using.
       intros f m m' a FREE.
       rewrite list_cons_app in FREE.
       unfold free_block_memory in *.
@@ -5060,7 +5060,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         read_byte_raw m ptr = None ->
         free_byte ptr' m = m' ->
         read_byte_raw m' ptr = None.
-    Proof.
+    Proof using.
       intros m m' ptr ptr' READ FREE.
       Transparent read_byte_raw.
       unfold read_byte_raw in *.
@@ -5076,7 +5076,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         read_byte_raw m ptr = None ->
         free_frame_memory f m = m' ->
         read_byte_raw m' ptr = None.
-    Proof.
+    Proof using.
       induction f; intros m m' ptr READ FREE.
       - inv FREE; auto.
       - apply free_frame_memory_cons in FREE.
@@ -5092,7 +5092,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         read_byte_raw m ptr = None ->
         free_block_memory block m = m' ->
         read_byte_raw m' ptr = None.
-    Proof.
+    Proof using.
       apply free_frame_memory_no_add.
     Qed.
 
@@ -5101,7 +5101,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         free_frame_memory f m = m' ->
         ptr_in_frame_prop f ptr ->
         read_byte_raw m' (ptr_to_int ptr) = None.
-    Proof.
+    Proof using.
       induction f;
         intros m m' ptr FREE IN.
 
@@ -5121,7 +5121,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         free_block_memory block m = m' ->
         In (ptr_to_int ptr) (map ptr_to_int block) ->
         read_byte_raw m' (ptr_to_int ptr) = None.
-    Proof.
+    Proof using.
       induction block;
         intros m m' ptr FREE IN.
 
@@ -5142,7 +5142,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory ms = m ->
         mem_state_memory ms' = m' ->
         byte_not_allocated ms' ptr.
-    Proof.
+    Proof using.
       intros ms ms' m m' ptr FREE MS MS'.
       intros aid CONTRA.
       repeat red in CONTRA.
@@ -5163,7 +5163,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory ms = m ->
         mem_state_memory ms' = m' ->
         byte_not_allocated ms' ptr.
-    Proof.
+    Proof using.
       intros ms ms' m m' f ptr FREE IN MS MS'.
       intros aid CONTRA.
       repeat red in CONTRA.
@@ -5184,7 +5184,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory ms = m ->
         mem_state_memory ms' = m' ->
         byte_not_allocated ms' ptr.
-    Proof.
+    Proof using.
       intros ms ms' m m' block ptr FREE IN MS MS'.
       intros aid CONTRA.
       repeat red in CONTRA.
@@ -5204,7 +5204,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         free_byte ptr' m = m' ->
         ptr <> ptr' ->
         read_byte_raw m' ptr = read_byte_raw m ptr.
-    Proof.
+    Proof using.
       intros m m' ptr ptr' FREE NEQ.
       Transparent read_byte_raw.
       unfold read_byte_raw in *.
@@ -5219,7 +5219,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         ~ ptr_in_frame_prop f ptr ->
         free_frame_memory f m = m' ->
         read_byte_raw m' (ptr_to_int ptr) = read_byte_raw m (ptr_to_int ptr).
-    Proof.
+    Proof using.
       induction f; intros m m' ptr NIN FREE.
       - inv FREE; auto.
       - apply free_frame_memory_cons in FREE.
@@ -5237,7 +5237,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         free_frame_memory f m = m' ->
         ~ptr_in_frame_prop f ptr ->
         read_byte_raw m' (ptr_to_int ptr) = read_byte_raw m (ptr_to_int ptr).
-    Proof.
+    Proof using.
       induction f;
         intros m m' ptr FREE IN.
 
@@ -5258,7 +5258,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory ms' = m' ->
         disjoint_ptr_byte ptr ptr' ->
         byte_allocated ms ptr' aid <-> byte_allocated ms' ptr' aid.
-    Proof.
+    Proof using.
       intros ms ms' m m' ptr ptr' aid FREE MS MS' DISJOINT.
       split; intro ALLOC.
       - destruct ms as [[ms fs] pr].
@@ -5287,7 +5287,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory ms = m ->
         mem_state_memory ms' = m ->
         byte_allocated ms ptr aid <-> byte_allocated ms' ptr aid.
-    Proof.
+    Proof using.
       intros ms ms' m ptr aid MEQ1 MEQ2.
       split; intros ALLOC.
       - destruct ms as [[ms fs] pr].
@@ -5315,7 +5315,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory ms = m ->
         mem_state_memory ms' = m' ->
         byte_allocated ms ptr aid <-> byte_allocated ms' ptr aid.
-    Proof.
+    Proof using.
       induction f;
         intros ms ms' m m' ptr aid FREE NIN MS MS'.
       - inv FREE.
@@ -5348,7 +5348,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory ms = m ->
         mem_state_memory ms' = m' ->
         byte_allocated ms ptr aid <-> byte_allocated ms' ptr aid.
-    Proof.
+    Proof using.
       induction block;
         intros ms ms' m m' ptr aid FREE NIN MS MS'.
       - inv FREE.
@@ -5378,7 +5378,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         peek_frame_stack_prop fs f ->
         peek_frame_stack_prop fs f' ->
         frame_eqv f f'.
-    Proof.
+    Proof using.
       intros fs f f' PEEK1 PEEK2.
       destruct fs; cbn in *;
         rewrite <- PEEK2 in PEEK1;
@@ -5391,7 +5391,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_frame_stack_prop ms fs ->
         peek_frame_stack_prop fs f ->
         ~ ptr_in_frame_prop f ptr.
-    Proof.
+    Proof using.
       intros ptr ms fs f NIN FS PEEK IN.
       unfold ptr_in_current_frame in NIN.
       apply NIN.
@@ -5412,7 +5412,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory ms' = m' ->
         disjoint_ptr_byte ptr ptr' ->
         read_byte_allowed ms ptr' <-> read_byte_allowed ms' ptr'.
-    Proof.
+    Proof using.
       intros ms ms' m m' ptr ptr' FREE MS MS' DISJOINT.
       split; intro READ.
       - destruct ms as [[ms fs] pr].
@@ -5444,7 +5444,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory ms = m ->
         mem_state_memory ms' = m' ->
         read_byte_allowed ms ptr <-> read_byte_allowed ms' ptr.
-    Proof.
+    Proof using.
       intros f ms ms' m m' ptr FREE DISJOINT MS MS'.
       split; intro READ.
       - destruct ms as [[ms fs] pr].
@@ -5476,7 +5476,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory ms = m ->
         mem_state_memory ms' = m' ->
         read_byte_allowed ms ptr <-> read_byte_allowed ms' ptr.
-    Proof.
+    Proof using.
       intros block ms ms' m m' ptr FREE DISJOINT MS MS'.
       split; intro READ.
       - destruct ms as [[ms fs h] pr].
@@ -5508,7 +5508,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory ms' = m' ->
         disjoint_ptr_byte ptr ptr' ->
         read_byte_prop ms ptr' byte <-> read_byte_prop ms' ptr' byte.
-    Proof.
+    Proof using.
       intros ms ms' m m' ptr ptr' byte FREE MS MS' DISJOINT.
       split; intro READ.
       - destruct ms as [[ms fs] pr].
@@ -5538,7 +5538,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory ms = m ->
         mem_state_memory ms' = m' ->
         read_byte_prop ms ptr byte <-> read_byte_prop ms' ptr byte.
-    Proof.
+    Proof using.
       intros f ms ms' m m' ptr byte FREE DISJOINT MS MS'.
       split; intro READ.
       - destruct ms as [[ms fs] pr].
@@ -5570,7 +5570,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         mem_state_memory ms = m ->
         mem_state_memory ms' = m' ->
         read_byte_prop ms ptr byte <-> read_byte_prop ms' ptr byte.
-    Proof.
+    Proof using.
       intros block ms ms' m m' ptr byte FREE DISJOINT MS MS'.
       split; intro READ.
       - destruct ms as [[ms fs] pr].
@@ -5600,7 +5600,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall ms f,
         mem_state_frame_stack_prop ms (Singleton f) ->
         cannot_pop ms.
-    Proof.
+    Proof using.
       intros ms f FSP.
       unfold cannot_pop.
       intros fs1 fs2 FSP2.
@@ -5616,7 +5616,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma mempop_correct :
       forall pre, exec_correct pre mempop mempop_spec_MemPropT.
-    Proof.
+    Proof using.
       unfold exec_correct.
       intros pre ms st VALID PRE.
 
@@ -5778,7 +5778,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma byte_not_allocated_dec :
       forall ms ptr,
         {byte_not_allocated ms ptr} + {~ byte_not_allocated ms ptr}.
-    Proof.
+    Proof using.
       intros ([m fs h] & pr) ptr.
 
       unfold byte_not_allocated.
@@ -5804,7 +5804,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma byte_allocated_dec :
       forall ms ptr,
         {exists aid, byte_allocated ms ptr aid} + {~ exists aid, byte_allocated ms ptr aid}.
-    Proof.
+    Proof using.
       intros ([m fs h] & pr) ptr.
 
       unfold byte_not_allocated.
@@ -5829,7 +5829,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall m1 root ptr,
         ptr_in_memstate_heap m1 root ptr ->
         {exists aid, byte_allocated m1 ptr aid} + {byte_not_allocated m1 ptr}.
-    Proof.
+    Proof using.
       intros ([m fs h] & pr) root ptr INBLOCK.
 
       red in INBLOCK.
@@ -5862,7 +5862,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         byte_allocated ms ptr1 aid ->
         ptr_to_int ptr1 = ptr_to_int ptr2 ->
         byte_allocated ms ptr2 aid.
-    Proof.
+    Proof using.
       intros ms ptr1 ptr2 aid ALLOC INTEQ.
       do 2 red.
       do 2 red in ALLOC.
@@ -5878,7 +5878,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           ~(forall ptr,
                ptr_in_memstate_heap m1 root ptr ->
                exists aid, byte_allocated m1 ptr aid).
-    Proof.
+    Proof using.
       intros ms root.
       destruct ms as ([m fs h] & pr) eqn:MS.
 
@@ -5959,7 +5959,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Lemma free_correct :
       forall ptr pre,
         exec_correct pre (free ptr) (free_spec_MemPropT ptr).
-    Proof.
+    Proof using.
       unfold exec_correct.
       intros ptr pre ms st VALID PRE.
 
@@ -6279,13 +6279,13 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       }.
 
     Lemma initial_frame_correct : initial_frame_prop.
-    Proof.
+    Proof using.
       split.
       apply initial_frame_empty.
     Qed.
 
     Lemma initial_heap_correct : initial_heap_prop.
-    Proof.
+    Proof using.
       split.
       split.
       - intros root.
@@ -6303,7 +6303,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: move this? *)
     #[global] Instance empty_frame_stack_Proper :
       Proper (frame_stack_eqv ==> iff) empty_frame_stack.
-    Proof.
+    Proof using.
       intros fs' fs FS.
       split; intros [NOPOP EMPTY].
       - split.
@@ -6321,7 +6321,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: move this? *)
     #[global] Instance empty_frame_Proper :
       Proper (frame_eqv ==> iff) empty_frame.
-    Proof.
+    Proof using.
       intros f' f F.
       unfold empty_frame.
       setoid_rewrite F.
@@ -6331,7 +6331,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: move this? *)
     Lemma empty_frame_nil :
       empty_frame [].
-    Proof.
+    Proof using.
       red.
       cbn.
       auto.
@@ -6340,7 +6340,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: move this? *)
     Lemma empty_frame_stack_frame_empty :
       empty_frame_stack frame_empty.
-    Proof.
+    Proof using.
       unfold frame_empty.
       split.
       - intros f CONTRA.
@@ -6354,7 +6354,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: move this? *)
     #[global] Instance empty_heap_Proper :
       Proper (heap_eqv ==> iff) empty_heap.
-    Proof.
+    Proof using.
       intros f' f F.
       split; intros [ROOTS PTRS].
       - split; setoid_rewrite <- F; auto.
@@ -6364,7 +6364,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* TODO: move this? *)
     Lemma empty_heap_heap_empty :
       empty_heap heap_empty.
-    Proof.
+    Proof using.
       unfold heap_empty.
       split.
       - intros root CONTRA.
@@ -6380,7 +6380,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Qed.
 
     Lemma initial_memory_state_correct : initial_memory_state_prop.
-    Proof.
+    Proof using.
       split.
       - intros ptr aid CONTRA.
         unfold initial_memory_state in *.
@@ -6414,7 +6414,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         forall ms ptr,
           byte_not_allocated ms ptr ->
           ~ read_byte_allowed ms ptr.
-    Proof.
+    Proof using.
       intros ms ptr NALLOC.
       intros CONTRA.
       red in CONTRA, NALLOC.
@@ -6427,7 +6427,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         forall ms ptr byte,
           byte_not_allocated ms ptr ->
           ~ read_byte_prop ms ptr byte.
-    Proof.
+    Proof using.
       intros ms ptr byte NALLOC.
       intros CONTRA.
       red in CONTRA, NALLOC.
@@ -6446,7 +6446,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         forall ms ptr,
           byte_not_allocated ms ptr ->
           ~ write_byte_allowed ms ptr.
-    Proof.
+    Proof using.
       intros ms ptr NALLOC.
       intros CONTRA.
       red in CONTRA, NALLOC.
@@ -6459,7 +6459,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         forall ms ptr,
           byte_not_allocated ms ptr ->
           ~ free_byte_allowed ms ptr.
-    Proof.
+    Proof using.
       intros ms ptr NALLOC.
       intros CONTRA.
       red in CONTRA, NALLOC.

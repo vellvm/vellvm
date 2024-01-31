@@ -139,6 +139,9 @@
 ./coq/Utils/Raise.v
 ./coq/Utils/RefineProp.v
 ./coq/Utils/ErrUbOomProp.v
+./coq/Utils/ErrOomPoison.v
+./coq/Utils/Oomable.v
+./coq/Utils/Poisonable.v
 ./coq/Utils/VellvmRelations.v
 ./coq/Utils/RuttPropsExtra.v
 ./coq/Utils/StateMonads.v

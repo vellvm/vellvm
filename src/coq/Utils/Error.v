@@ -58,7 +58,7 @@ Definition OOM_to_err {A} (o : OOM A) : err A
      end.
 
 Global Instance MonadOOM : Monad OOM.
-Proof.
+Proof using.
   split.
   - refine (fun _ x => NoOom x).
   - refine (fun A B ma k =>
@@ -70,7 +70,7 @@ Proof.
 Defined.
 
 Global Instance FunctorOOM : Functor OOM.
-Proof.
+Proof using.
   split.
   - refine (fun A B f ma =>
               match ma with
@@ -81,7 +81,7 @@ Defined.
 
 Section OOMLaws.
   Global Instance MonadEq1OOM : Eq1 OOM.
-  Proof.
+  Proof using.
     unfold Eq1.
     refine (fun _ a b =>
               match a, b with
@@ -92,7 +92,7 @@ Section OOMLaws.
   Defined.
 
   Global Instance MonadEq1Eqv : Eq1Equivalence OOM.
-  Proof.
+  Proof using.
     split.
     - unfold eq1, Reflexive.
       intros x; destruct x; cbn; auto.
@@ -107,7 +107,7 @@ Section OOMLaws.
   Defined.
 
   Global Instance MonadLawsEOOM : @MonadLawsE OOM MonadEq1OOM MonadOOM.
-  Proof.
+  Proof using.
     split.
     - reflexivity.
     - intros A x.
@@ -137,7 +137,7 @@ Section OOMLaws.
   Lemma OOMFails_OOMReturns :
     forall {A} (ma : OOM A),
       OOMFails ma -> forall a, ~ OOMReturns a ma.
-  Proof.
+  Proof using.
     intros A ma H a.
     intros CONTRA.
     destruct ma; auto.
@@ -146,7 +146,7 @@ Section OOMLaws.
   Lemma OOMReturns_OOMFails :
     forall {A} (ma : OOM A) (a : A),
       OOMReturns a ma -> ~ OOMFails ma.
-  Proof.
+  Proof using.
     intros A ma a H.
     destruct ma; auto.
   Qed.
@@ -154,14 +154,14 @@ Section OOMLaws.
   Lemma OOMFails_ret :
     forall {A} (a : A),
       ~ OOMFails (ret a).
-  Proof.
+  Proof using.
     intros A a.
     cbn; auto.
   Qed.
 
   Lemma OOMFails_bind_ma : forall {A B} (ma : OOM A) (k : A -> OOM B),
       OOMFails ma -> OOMFails (bind ma k).
-  Proof.
+  Proof using.
     intros A B ma k FAILS.
     destruct ma; cbn in *; [contradiction|auto].
   Qed.
@@ -170,7 +170,7 @@ Section OOMLaws.
       OOMReturns a ma ->
       OOMFails (k a) ->
       OOMFails (bind ma k).
-  Proof.
+  Proof using.
     intros A B ma a k RETS FAILS.
     destruct ma; cbn in *;
       [subst; eauto | contradiction].
@@ -179,7 +179,7 @@ Section OOMLaws.
   Lemma OOMFails_bind_inv : forall {A B} (ma : OOM A) (k : A -> OOM B),
       OOMFails (bind ma k) ->
       OOMFails ma \/ (exists a, OOMReturns a ma /\ OOMFails (k a)).
-  Proof.
+  Proof using.
     intros A B ma k FAILS.
     destruct ma; cbn in *.
     - right; eexists; split; auto.
@@ -189,7 +189,7 @@ Section OOMLaws.
   Lemma OOMReturns_bind :
     forall {A B} (a : A) (b : B) (ma : OOM A) (k : A -> OOM B),
       OOMReturns a ma -> OOMReturns b (k a) -> OOMReturns b (bind ma k).
-  Proof.
+  Proof using.
     intros A B a b ma k RETA RETB.
     destruct ma; cbn; auto.
     inversion RETA; subst; auto.
@@ -198,7 +198,7 @@ Section OOMLaws.
   Lemma OOMReturns_strong_bind_inv :
     forall {A B} (ma : OOM A) (k : A -> OOM B) (b : B),
       OOMReturns b (bind ma k) -> exists a : A , OOMReturns a ma /\ OOMReturns b (k a).
-  Proof.
+  Proof using.
     intros A B ma k b RET.
     cbn in RET.
     destruct ma; cbn in RET; try contradiction.
@@ -209,7 +209,7 @@ Section OOMLaws.
   Lemma OOMReturns_bind_inv :
     forall {A B} (ma : OOM A) (k : A -> OOM B) (b : B),
       OOMReturns b (bind ma k) -> (OOMFails ma \/ exists a : A , OOMReturns a ma /\ OOMReturns b (k a)).
-  Proof.
+  Proof using.
     intros A B ma k b RET.
     right; apply OOMReturns_strong_bind_inv; auto.
   Qed.
@@ -217,7 +217,7 @@ Section OOMLaws.
   Lemma OOMReturns_ret :
     forall {A} (a : A) (ma : OOM A),
       eq1 ma (ret a) -> OOMReturns a ma.
-  Proof.
+  Proof using.
     intros A a ma EQ.
     destruct ma; cbn in *; auto.
   Qed.
@@ -225,13 +225,13 @@ Section OOMLaws.
   Lemma OOMReturns_ret_inv :
     forall {A} (x y : A),
       OOMReturns x (ret y) -> x = y.
-  Proof.
+  Proof using.
     intros A x y RET.
     cbn in RET; auto.
   Qed.
 
   Global Instance OOMReturns_Proper {A} {a : A} : Proper (eq1 ==> Basics.impl) (OOMReturns a).
-  Proof.
+  Proof using.
     unfold Proper, respectful.
     do 2 red.
     intros x y EQ RET.
@@ -261,7 +261,7 @@ Section OOMLaws.
     := {  MReturns_strong_bind_inv := fun A B => OOMReturns_strong_bind_inv }.
 
   Global Instance EQRET_OOM : @Eq1_ret_inv OOM MonadEq1OOM MonadOOM.
-  Proof.
+  Proof using.
     split.
     intros A x y H.
     cbn in H. auto.
@@ -435,7 +435,7 @@ Definition run_err_ub_oom {A} (euo : err_ub_oom A) : (OOM_MESSAGE + (UB_MESSAGE 
   IdentityMonad.unIdent (run_err_ub_oom_T euo).
 
 #[global] Instance err_ub_oom_T_MT {M : Type -> Type} `{HM: Monad M} : MonadT (err_ub_oom_T M) M.
-Proof.
+Proof using.
   constructor.
   intros T mt.
   refine (ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT _)))).
@@ -502,7 +502,7 @@ Section err_ub_oom_monad.
   Context {HM : Monad M}.
 
   #[global] Instance EqM_err_ub_oom : Monad.Eq1 err_ub_oom.
-  Proof.
+  Proof using.
     (* refine (fun T mt1 mt2 => _). *)
     (* destruct mt1, mt2. *)
     (* apply (Monad.eq1 unERR_UB_OOM0 unERR_UB_OOM1). *)
@@ -531,14 +531,14 @@ Section err_ub_oom_monad.
   Defined.
 
   #[global] Instance Reflexive_err_ub_oom_eq1 {A : Type} : Reflexive (@eq1 err_ub_oom _ A).
-  Proof.
+  Proof using.
     unfold Reflexive.
     intros x.
     destruct x as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x']]]]]]]] eqn:Hx; cbn; auto.
   Defined.
 
   #[global] Instance Transitive_err_ub_oom_eq1 {A : Type} : Transitive (@eq1 err_ub_oom _ A).
-  Proof.
+  Proof using.
     unfold Transitive.
     intros x y z XY YZ.
     destruct x as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x']]]]]]]] eqn:Hx;
@@ -548,7 +548,7 @@ Section err_ub_oom_monad.
   Defined.
 
   #[global] Instance Monad_err_ub_oom : Monad (err_ub_oom_T M).
-  Proof.
+  Proof using HM M.
     split.
     - exact (fun T t => ERR_UB_OOM (ret t)).
     - exact (fun A B ema k =>
@@ -559,7 +559,7 @@ Section err_ub_oom_monad.
   Defined.
 
   #[global] Instance Functor_err_ub_oom : Functor (err_ub_oom_T M).
-  Proof.
+  Proof using HM M.
     split.
     - exact (fun A B f ema =>
                ERR_UB_OOM (fmap f (unERR_UB_OOM ema))).
@@ -568,7 +568,7 @@ End err_ub_oom_monad.
 
 Section err_ub_oom_extra.
   #[global] Instance MonadLawsE_err_ub_oom : MonadLawsE err_ub_oom.
-  Proof.
+  Proof using.
     split.
     - intros A B f x.
       cbn.
@@ -619,7 +619,7 @@ Section err_ub_oom_extra.
   Lemma unERR_UB_OOM_bind :
     forall {A B} (ma : err_ub_oom A) (k : A -> err_ub_oom B),
       Monad.eq1 (unERR_UB_OOM (x <- ma;; k x)) (x <- unERR_UB_OOM ma;; (unERR_UB_OOM (k x))).
-  Proof.
+  Proof using.
     intros A B ma k.
     cbn.
     destruct ma as [[[[[[oom_ma | [ub_ma | [err_ma | ma]]]]]]]]; cbn; reflexivity.
@@ -650,14 +650,14 @@ Section err_ub_oom_extra.
 
     Lemma ErrUBOOMFails_ret : forall {A} (a : A),
         ~ ErrUBOOMFails (ret a).
-    Proof.
+    Proof using.
       intros A a CONTRA.
       inversion CONTRA.
     Qed.
 
     Lemma ErrUBOOMFails_bind_ma : forall {A B} (ma : err_ub_oom A) (k : A -> err_ub_oom B),
         ErrUBOOMFails ma -> ErrUBOOMFails (bind ma k).
-    Proof.
+    Proof using.
       intros A B ma k FAILS.
       destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma;
         cbn in *; auto; contradiction.
@@ -667,7 +667,7 @@ Section err_ub_oom_extra.
         ErrUBOOMReturns a ma ->
         ErrUBOOMFails (k a) ->
         ErrUBOOMFails (bind ma k).
-    Proof.
+    Proof using.
       intros A B ma a k RETS FAILS.
       destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a']]]]]]]] eqn:Hma;
         cbn in *; auto; subst.
@@ -678,7 +678,7 @@ Section err_ub_oom_extra.
     Lemma ErrUBOOMFails_bind_inv : forall {A B} (ma : err_ub_oom A) (k : A -> err_ub_oom B),
         ErrUBOOMFails (bind ma k) ->
         ErrUBOOMFails ma \/ (exists a, ErrUBOOMReturns a ma /\ ErrUBOOMFails (k a)).
-    Proof.
+    Proof using.
       intros A B ma k FAILS.
       destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a']]]]]]]] eqn:Hma;
         cbn in *; auto; subst.
@@ -689,7 +689,7 @@ Section err_ub_oom_extra.
     Lemma ErrUBOOMReturns_bind :
       forall {A B} (a : A) (b : B) (ma : err_ub_oom A) (k : A -> err_ub_oom B),
         ErrUBOOMReturns a ma -> ErrUBOOMReturns b (k a) -> ErrUBOOMReturns b (bind ma k).
-    Proof.
+    Proof using.
       intros * Ha Hb.
       unfold ErrUBOOMReturns in *.
       destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | ma]]]]]]]]; cbn in *; try solve [inversion Ha]; auto.
@@ -700,7 +700,7 @@ Section err_ub_oom_extra.
     Lemma ErrUBOOMReturns_bind_inv :
       forall {A B} (ma : err_ub_oom A) (k : A -> err_ub_oom B) (b : B),
         ErrUBOOMReturns b (bind ma k) -> (ErrUBOOMFails ma \/ exists a : A , ErrUBOOMReturns a ma /\ ErrUBOOMReturns b (k a)).
-    Proof.
+    Proof using.
       intros * Hb.
       unfold ErrUBOOMReturns in *.
       destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]];
@@ -717,7 +717,7 @@ Section err_ub_oom_extra.
     Lemma ErrUBOOMReturns_ret :
       forall {A} (a : A) (ma : err_ub_oom A),
         Monad.eq1 ma (ret a) -> ErrUBOOMReturns a ma.
-    Proof.
+    Proof using.
       intros * Hma.
       destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | ma]]]]]]]];
         cbn in *; auto; try contradiction.
@@ -726,7 +726,7 @@ Section err_ub_oom_extra.
     Lemma ErrUBOOMReturns_ret_inv :
       forall {A} (x y : A),
         ErrUBOOMReturns x (ret y) -> x = y.
-    Proof.
+    Proof using.
       intros * H.
       unfold ErrUBOOMReturns in H.
       inversion H; auto.

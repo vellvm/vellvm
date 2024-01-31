@@ -145,7 +145,7 @@ Ltac refine_uvalue :=
 Theorem undef_test6 :
   forall g l,
     refine_block_L2 undef_test6_block_refine undef_test6_block g l.
-Proof.
+Proof using.
   intros g l.
   simple_refine.
   refine_uvalue.
@@ -154,7 +154,7 @@ Qed.
 Theorem undef_test0 :
   forall g l,
     refine_block_L2 undef_test0_block_refine undef_test0_block g l.
-Proof.
+Proof using.
   intros g l.
   simple_refine.
   refine_uvalue.
@@ -163,7 +163,7 @@ Qed.
 Theorem undef_test1 :
   forall g l,
     refine_block_L2 undef_test1_block_refine undef_test1_block g l.
-Proof.
+Proof using.
   intros g l.
   simple_refine.
   refine_uvalue.
@@ -172,7 +172,7 @@ Qed.
 Theorem undef_test2 :
   forall g l,
     refine_block_L2 undef_test2_block_refine undef_test2_block g l.
-Proof.
+Proof using.
   intros g l.
   simple_refine.
   refine_uvalue.  
@@ -181,7 +181,7 @@ Qed.
 Theorem undef_test3 :
   forall g l
     refine_block_L2 undef_test3_block_refine undef_test3_block g l.
-Proof.
+Proof using.
   intros g l.
   simple_refine.
   refine_uvalue.
@@ -190,7 +190,7 @@ Qed.
 Theorem undef_test4 :
   forall g l
     refine_block_L2 undef_test4_block_refine undef_test4_block g l.
-Proof.
+Proof using.
   intros g l.
   simple_refine.
   refine_uvalue.
@@ -199,7 +199,7 @@ Qed.
 Theorem undef_test5 :
   forall g l,
     refine_block_L2 undef_test5_block_refine undef_test5_block g l.
-Proof.
+Proof using.
   intros g l.
   simple_refine.
   refine_uvalue.
@@ -208,7 +208,7 @@ Qed.
 Theorem undef_test6 :
   forall g l,
     refine_block_L2 undef_test6_block_refine undef_test6_block g l.
-Proof.
+Proof using.
   intros g l.
   simple_refine.
   refine_uvalue.
@@ -217,7 +217,7 @@ Qed.
 Theorem undef_test7 :
   forall g l,
     refine_block_L2 undef_test7_block_refine undef_test7_block g l.
-Proof.
+Proof using.
   intros g l.
   simple_refine.
   refine_uvalue.
@@ -226,7 +226,7 @@ Qed.
 Theorem undef_test8 :
   forall g l,
     refine_block_L2 undef_test8_block_refine undef_test8_block g l.
-Proof.
+Proof using.
   intros g l.
   simple_refine.
   refine_uvalue.
@@ -235,7 +235,7 @@ Qed.
 Theorem undef_test9 :
   forall g l,
     refine_block_L2 undef_test9_block_refine undef_test9_block g l.
-Proof.
+Proof using.
   intros g l.
   simple_refine.
   refine_uvalue.
@@ -244,7 +244,7 @@ Qed.
 Theorem undef_test10 :
   forall g l,
     refine_block_L2 undef_test10_block_refine undef_test10_block g l.
-Proof.
+Proof using.
   intros g l.
   simple_refine.
 
@@ -290,7 +290,7 @@ Lemma blk_id_eq :
   forall T b bid,
     (if @blk_id T b ~=? bid then true else false) = true ->
     bid = @blk_id T b.
-Proof.
+Proof using.
   intros T b bid H.
   destruct (blk_id b ~=? bid) eqn:Hbid; firstorder.
 Qed.
@@ -300,7 +300,7 @@ Lemma find_map :
     find p l = Some x ->
     (p x = true -> p y = true) ->
     find p (map (fun x => if p x then y else x) l) = Some y.
-Proof.
+Proof using.
   intros T p l; induction l; intros x y Hf Hp.
   - inversion Hf.
   - pose proof (find_some _ _ Hf) as [Hin Hpx].
@@ -321,7 +321,7 @@ Lemma blk_id_eq_if :
     blk_id x = blk_id y ->
     (if @blk_id T x ~=? bid then true else false) = true ->
     (if @blk_id T y ~=? bid then true else false) = true.
-Proof.
+Proof using.
   intros T x y bid H H0.
   apply blk_id_eq in H0. rewrite H0.
   subst. rewrite H.
@@ -332,7 +332,7 @@ Qed.
 Lemma if_lift :
   forall A T (b0 b : block T) (x y : A),
     (if blk_id b0 ~=? blk_id b then x else y) = (if (if blk_id b0 ~=? blk_id b then true else false) then x else y).
-Proof.
+Proof using.
   intros A T b0 b x y.
   destruct (blk_id b0 ~=? blk_id b); reflexivity.
 Qed.
@@ -341,7 +341,7 @@ Lemma map_if_lift :
   forall b blks,
     map (fun b0 : block dtyp => if if blk_id b0 ~=? blk_id b then true else false then b else b0) blks =
     map (fun b0 : block dtyp => if blk_id b0 ~=? blk_id b then b else b0) blks.
-Proof.
+Proof using.
   intros b blks. revert b.
   induction blks; intros b.
   - reflexivity.
@@ -355,7 +355,7 @@ Lemma cfg_replace_block_find :
     bid = blk_id b ->
     find_block dtyp (CFG.blks dtyp c) bid = Some b' ->
     find_block dtyp (CFG.blks dtyp (cfg_replace_block dtyp b c)) bid = Some b.
-Proof.
+Proof using.
   intros c b bid b' Hid Hfind.
   unfold find_block in *;
     destruct c; simpl in *; subst.
@@ -482,7 +482,7 @@ Theorem bl2_subst_cfgl2 :
     blk_id b1 = blk_id b2 ->
     refine_cfg_L2 (cfg_replace_block _ b1 c)
                   (cfg_replace_block _ b2 c).
-Proof.
+Proof using.
   intros b1 b2 blks c Hrefb Hids.
   unfold refine_cfg_L2, refine_block_L2 in *.
   unfold cfg_interp_L2, cfg_interp_L1, block_interp_L2, block_interp_L1 in *.
@@ -521,7 +521,7 @@ Theorem interp_bind_st
   : forall (E F : Type -> Type) (R S : Type) (ST : Type) (st : ST)
       (f : forall T : Type, E T -> stateT ST (itree F) T) (t : itree E R) (k : R -> itree E S),
     interp f (ITree.bind t k) st ≅ ITree.bind (interp f t st) (fun '(s, r) => interp f (k r) s).
-Proof.
+Proof using.
 Admitted.
 
 Theorem interp_translate_st
@@ -530,18 +530,18 @@ Theorem interp_translate_st
          (t : itree E R),
        interp h (translate f t) st
        ≅ interp (fun (T : Type) (e : E T) => h T (f T e)) t st.
-Proof.
+Proof using.
 Admitted.
 
 Theorem interp_ret_st :
   forall (E F : Type -> Type) (R : Type) (ST : Type) (st : ST) (f : forall T : Type, E T -> stateT ST (itree F) T) (x : R),
     interp f (Ret x) st ≅ ITree.map (fun x => (st, x)) (Ret x).
-Proof.
+Proof using.
 Admitted.
 
 Theorem interp_trigger_st :
   forall (E F : Type -> Type) (R : Type) (ST : Type) (st : ST) (f : forall T : Type, E T -> stateT ST (itree F) T)
     (e : E R), interp f (ITree.trigger e) st ≳ f R e st.
-Proof.
+Proof using.
 Admitted.
  *)

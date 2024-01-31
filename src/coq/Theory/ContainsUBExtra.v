@@ -45,7 +45,7 @@ Section contains_UB_Extra.
   | FindUB    : forall s k t2, t2 ≅ (vis (subevent (F:=Eff) _ (ThrowUB s)) k) -> contains_UB_Extra t2.
 
   #[global] Instance proper_eutt_contains_UB_Extra {R} {RR : relation R} : Proper (@eqit Eff _ _ RR true true ==> iff) contains_UB_Extra.
-  Proof.
+  Proof using.
     unfold Proper, respectful.
     intros x y EQ.
     split; intros UB.
@@ -352,7 +352,7 @@ Section contains_UB_Extra.
       stronger bx1 bx2 b1 ->
       stronger by1 by2 b2 ->
       Proper (eqit RR bx1 bx2 ==> eqit RR by1 by2 ==> iff) (@eqit E _ _ RR b1 b2).
-  Proof.
+  Proof using.
     intros E0 R RR bx1 bx2 by1 by2 b1 b2 STRONGX STRONGY.
     unfold Proper, respectful.
     intros x x' XX y y' YY.
@@ -373,7 +373,7 @@ Section contains_UB_Extra_lemmas.
 
   Lemma ret_not_contains_UB_Extra {R} {RR : relation R} :
     forall (t : itree Eff R) rv, eqit RR true true t (ret rv) -> ~ contains_UB_Extra t.
-  Proof.
+  Proof using.
     intros t rv EQ CUB.
     rewrite EQ in CUB.
     inversion CUB; subst;
@@ -390,7 +390,7 @@ Section bind_lemmas.
     forall {R T} (t : itree Eff R) (k : R -> itree Eff T),
       contains_UB_Extra t ->
       contains_UB_Extra (ITree.bind t k).
-  Proof.
+  Proof using.
     intros R T t k CUB.
     induction CUB.
     - rewrite H.
@@ -413,7 +413,7 @@ Section bind_lemmas.
       Returns a t ->
       contains_UB_Extra (k a) ->
       contains_UB_Extra (ITree.bind t k).
-  Proof.
+  Proof using.
     intros R T t k a RET CUB.
     induction RET.
     - rewrite H; rewrite bind_ret_l; auto.
@@ -451,7 +451,7 @@ Section bind_lemmas.
       contains_UB_Extra (ITree.bind t k) ->
       (forall x, ~ contains_UB_Extra (k x)) ->
       contains_UB_Extra t.
-  Proof.
+  Proof using.
     intros R T t k UB NUB.
   Admitted.
 End bind_lemmas.
@@ -520,7 +520,7 @@ Section interp_lemmas.
       handler_keeps_UB ->
       (forall {T} (e : Eff1 T), exists a, Returns a (handler T e)) ->
       contains_UB_Extra (interp handler t).
-  Proof.
+  Proof using.
     intros R t UB KEEP RET.
     Import InterpFacts.
     induction UB.
@@ -683,7 +683,7 @@ Section refine_OOM_h_lemmas.
       contains_UB_Extra y ->
       refine_OOM_h RR x y ->
       contains_UB_Extra x.
-  Proof.
+  Proof using.
     intros R RR x y UB REF.
     rewrite REF.
     eauto.
@@ -693,7 +693,7 @@ Section refine_OOM_h_lemmas.
     forall {E F G J} `{O : OOME -< E +' F +' G +' UBE +' J} {X} msg,
       (forall X e1 e2, O X e1 <> inr1 (inr1 (inr1 (inl1 e2)))) ->
       ~ contains_UB_Extra (@raiseOOM _ _ X msg).
-  Proof.
+  Proof using.
     intros E0 F0 G0 J0 O X msg NUBE CONTRA.
     dependent destruction CONTRA.
     - pinversion H; subst; inv CHECK.

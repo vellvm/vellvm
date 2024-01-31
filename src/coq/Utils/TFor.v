@@ -50,7 +50,7 @@ Section TFor.
   (* [tfor] excludes the upper bound, hence [tfor body k k] does nothing *)
   Lemma tfor_0: forall {E A} k (body : nat -> A -> itree E A) a0,
       tfor body k k a0 ≈ Ret a0.
-  Proof.
+  Proof using.
     intros; unfold tfor; cbn.
     unfold iter, CategoryKleisli.Iter_Kleisli, Basics.iter, MonadIter_itree.
     rewrite unfold_iter, Nat.eqb_refl, bind_ret_l.
@@ -62,7 +62,7 @@ Section TFor.
       i < j ->
       tfor body i j a0 ≈
            a <- body i a0;; tfor body (S i) j a.
-  Proof.
+  Proof using.
     intros; unfold tfor; cbn.
     unfold iter, CategoryKleisli.Iter_Kleisli, Basics.iter, MonadIter_itree.
     rewrite unfold_iter at 1.
@@ -79,7 +79,7 @@ Section TFor.
       j <= k ->
       tfor body i k a0 ≈
            a <- tfor body i j a0;; tfor body j k a.
-  Proof.
+  Proof using.
     intros * LE1 LE2.
     remember (j - i) as p; revert a0 i LE1 Heqp.
     induction p as [| p IH]; intros ? ? LE1 EQ.
@@ -101,7 +101,7 @@ Section TFor.
   Lemma eutt_tfor: forall {E A} (body body' : nat -> A -> itree E A) i j a0,
       (forall k i, body i k ≈ body' i k) ->
       (tfor body i j a0) ≈ (tfor body' i j a0).
-  Proof.
+  Proof using.
     intros.
     unfold tfor, iter, CategoryKleisli.Iter_Kleisli, Basics.iter, MonadIter_itree.
     eapply KTreeFacts.eutt_iter.
@@ -119,7 +119,7 @@ Section TFor.
       (forall x i j, body i x ≈ body j x) ->
       i <= j ->
       tfor body (S i) (S j) a0 ≈ tfor body i j a0.
-  Proof.
+  Proof using.
     intros; unfold tfor; cbn.
     unfold iter, CategoryKleisli.Iter_Kleisli, Basics.iter, MonadIter_itree.
     apply eutt_iter'' with (RI1:=fun '(a,x) '(b, y) => a = S b /\ x = y) (RI2:=fun '(a,x) '(b, y) => a = S b /\ x = y); auto.
@@ -147,7 +147,7 @@ Section TFor.
       (forall x i, body' (S i) x ≈ body i x) ->
       i <= j ->
       tfor body' (S i) (S j) a0 ≈ tfor body i j a0.
-  Proof.
+  Proof using.
     intros; unfold tfor; cbn.
     unfold iter, CategoryKleisli.Iter_Kleisli, Basics.iter, MonadIter_itree.
     eapply eutt_iter'' with
@@ -176,7 +176,7 @@ Section TFor.
       (forall x i j, body i x ≈ body j x) ->
       tfor body i (S j) a0 ≈
       a <- body i a0;; tfor body i j a.
-  Proof.
+  Proof using.
     intros E A i j. revert E A i.
     induction j; intros E A i body a0 H H0.
     - rewrite tfor_unroll; auto.

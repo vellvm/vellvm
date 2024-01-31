@@ -12,6 +12,9 @@ From Vellvm Require Import
      Utils.Monads
      Utils.MonadReturnsLaws
      Utils.ErrUbOomProp
+     Utils.Oomable
+     Utils.Poisonable
+     Utils.ErrOomPoison
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Syntax.DataLayout
@@ -1072,109 +1075,6 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
              byte + (Z.shiftl (concat_bytes_Z bytes) 8)
          end.
 
-    (* TODO: Move this??? *)
-    Inductive Poisonable (A : Type) : Type :=
-    | Unpoisoned : A -> Poisonable A
-    | Poison : forall (dt : dtyp), Poisonable A
-    .
-
-    Arguments Unpoisoned {A} a.
-    Arguments Poison {A}.
-
-    #[global] Instance MonadPoisonable : Monad Poisonable
-      := { ret  := @Unpoisoned;
-           bind := fun _ _ ma mab => match ma with
-                                     | Poison dt => Poison dt
-                                     | Unpoisoned v => mab v
-                                     end
-      }.
-
-    Class RAISE_POISON (M : Type -> Type) :=
-      { raise_poison : forall {A}, dtyp -> M A }.
-
-    #[global] Instance RAISE_POISON_Poisonable : RAISE_POISON Poisonable :=
-      { raise_poison := fun A dt => Poison dt }.
-
-    #[global] Instance RAISE_POISON_E_MT {M : Type -> Type} {MT : (Type -> Type) -> Type -> Type} `{MonadT (MT M) M} `{RAISE_POISON M} : RAISE_POISON (MT M) :=
-      { raise_poison := fun A dt => lift (raise_poison dt);
-      }.
-
-    (* TODO: Move this??? *)
-    Inductive Oomable (A : Type) : Type :=
-    | Unoomed : A -> Oomable A
-    | Oomed : forall (dt : dtyp), Oomable A
-    .
-
-    Arguments Unoomed {A} a.
-    Arguments Oomed {A}.
-
-    #[global] Instance MonadOomable : Monad Oomable
-      := { ret  := @Unoomed;
-           bind := fun _ _ ma mab => match ma with
-                                     | Oomed dt => Oomed dt
-                                     | Unoomed v => mab v
-                                     end
-      }.
-
-    Class RAISE_OOMABLE (M : Type -> Type) :=
-      { raise_oomable : forall {A}, dtyp -> M A }.
-
-    #[global] Instance RAISE_OOMABLE_Oomable : RAISE_OOMABLE Oomable :=
-      { raise_oomable := fun A dt => Oomed dt }.
-
-    #[global] Instance RAISE_OOMABLE_E_MT {M : Type -> Type} {MT : (Type -> Type) -> Type -> Type} `{MonadT (MT M) M} `{RAISE_OOMABLE M} : RAISE_OOMABLE (MT M) :=
-      { raise_oomable := fun A dt => lift (raise_oomable dt);
-      }.
-
-    Inductive OomableT (m : Type -> Type) (A : Type) : Type :=
-      mkOomableT
-        { unMkOomableT : m (Oomable A)
-        }.
-
-    Arguments mkOomableT {m A}.
-    Arguments unMkOomableT {m A}.
-
-    #[global] Instance MonadT_OomableT (m : Type -> Type) `{Monad m} : MonadT (OomableT m) m :=
-      { lift := fun T c => mkOomableT (liftM ret c) }.
-
-    Definition lift_OOMABLE {M : Type -> Type} `{Monad M} `{RAISE_OOMABLE M} {A} (dt : dtyp) (ma : OOM A) : M A
-      := match ma with
-         | NoOom a => ret a
-         | Oom s => raise_oomable dt
-         end.
-
-    #[global] Instance Monad_OomableT (m : Type -> Type) `{Monad m} : Monad (OomableT m) :=
-      {
-        ret := fun T x => mkOomableT (ret (Unoomed x));
-        bind := fun A B ma mab =>
-                  mkOomableT
-                    (oom_a <- unMkOomableT ma;;
-                     match oom_a with
-                     | Oomed dt =>
-                         ret (Oomed dt)
-                     | Unoomed a =>
-                         unMkOomableT (mab a)
-                     end
-                    )
-      }.
-
-    #[global] Instance RAISE_OOMABLE_OomableT m `{Monad m} : RAISE_OOMABLE (OomableT m) :=
-      { raise_oomable := fun A dt => mkOomableT (ret (Oomed dt)) }.
-
-    Definition ErrOOMPoison := eitherT ERR_MESSAGE (OomableT Poisonable).
-
-    Definition ErrOOMPoison_handle_poison_and_oom_dv {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_OOM M} (ep : ErrOOMPoison dvalue) : M dvalue
-      := match unMkOomableT (unEitherT ep) with
-         | Unpoisoned edv =>
-             match edv with
-             (* TODO: Should we use lazy OOM, or should we raise OOM here? *)
-             | Oomed dt => raise_oom "ErrOOMPoison_handle_poison_and_oom_dv: OOM."
-             | Unoomed (inl (ERR_message msg)) => raise_error msg
-             | Unoomed (inr val) => ret val
-             end
-         | Poison dt => ret (DVALUE_Poison dt)
-         end.
-
     (* Walk through a list *)
     (* Returns field index + number of bytes remaining *)
     Fixpoint extract_field_byte_helper {M} `{Monad M} `{RAISE_ERROR M} (fields : list dtyp) (field_idx : N) (byte_idx : N) : M (dtyp * (N * N))%type
@@ -1824,7 +1724,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
       with
       extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) {struct uvs} : M dvalue
       := dvbs <- concretize_uvalue_bytes uvs;;
-         lift_ue (ErrOOMPoison_handle_poison_and_oom_dv (dvalue_bytes_to_dvalue dvbs dt))
+         lift_ue (ErrOOMPoison_handle_poison_and_oom DVALUE_Poison (dvalue_bytes_to_dvalue dvbs dt))
 
       with
       eval_select
@@ -1878,8 +1778,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
              end
          | _ => lift_ue (raise_error "concretize_uvalueM: ill-typed select.")
          end.
-
-
+ 
       Lemma concretize_uvalueM_equation :
         forall u,
           concretize_uvalueM u =
@@ -2005,7 +1904,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
             | _ => lift_ue (raise_error ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u))
 
             end.
-      Proof.
+      Proof using.
         intros u.
         unfold concretize_uvalueM at 1.
         destruct u; try reflexivity.
@@ -2015,12 +1914,12 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         forall uvs dt,
           extractbytes_to_dvalue uvs dt =
             dvbs <- concretize_uvalue_bytes uvs;;
-            lift_ue (ErrOOMPoison_handle_poison_and_oom_dv (dvalue_bytes_to_dvalue dvbs dt)).
-      Proof.
+            lift_ue (ErrOOMPoison_handle_poison_and_oom DVALUE_Poison (dvalue_bytes_to_dvalue dvbs dt)).
+      Proof using.
         induction uvs;
           intros dt;
           unfold extractbytes_to_dvalue.
-        - Opaque ErrOOMPoison_handle_poison_and_oom_dv
+        - Opaque ErrOOMPoison_handle_poison_and_oom
             dvalue_bytes_to_dvalue.
           cbn.
           reflexivity.
@@ -2057,7 +1956,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                     lift_ue (raise_error "concretize_uvalue_bytes_helper: non-byte in uvs.")
                 end
             end.
-      Proof.
+      Proof using.
         intros acc uvs;
           induction uvs;
           unfold concretize_uvalue_bytes_helper.
@@ -2069,7 +1968,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
       Lemma concretize_uvalue_bytes_equation (uvs : list uvalue) :
         concretize_uvalue_bytes uvs =
           concretize_uvalue_bytes_helper (@NM.empty _) uvs.
-      Proof.
+      Proof using.
         induction uvs;
           unfold concretize_uvalue_bytes.
         - reflexivity.
@@ -2128,7 +2027,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                 end
             | _ => lift_ue (raise_error "concretize_uvalueM: ill-typed select.")
             end.
-      Proof.
+      Proof using.
         intros cnd v1 v2.
         unfold eval_select at 1.
         destruct cnd; try reflexivity.

@@ -101,7 +101,7 @@ Section StackMap.
           interp_local_stack (ITree.bind t k) s ≅
                              ITree.bind (interp_local_stack t s)
                              (fun '(s',r) => interp_local_stack (k r) s').
-      Proof.
+      Proof using.
         intros.
         unfold interp_local_stack.
         setoid_rewrite interp_state_bind.
@@ -113,7 +113,7 @@ Section StackMap.
       Lemma interp_local_stack_ret :
         forall (R : Type) l (x: R),
           interp_local_stack (Ret x: itree Effin R) l ≅ Ret (l,x).
-      Proof.
+      Proof using.
         intros; unfold interp_local_stack.
         apply interp_state_ret.
       Qed.
@@ -121,7 +121,7 @@ Section StackMap.
       Lemma interp_local_stack_vis_eqit:
         forall (ls : map * stack) S X (kk : X -> itree Effin S) (e : Effin X),
           interp_local_stack (Vis e kk) ls ≅ ITree.bind (interp_local_stack_h (handle_local (v:=v)) e ls) (fun (sx : map * stack * X) => Tau (interp_local_stack (kk (snd sx)) (fst sx))).
-      Proof.
+      Proof using.
         intros.
         unfold interp_local_stack.
         setoid_rewrite interp_state_vis.
@@ -131,7 +131,7 @@ Section StackMap.
       Lemma interp_local_stack_vis:
         forall (ls : (map * stack)) S X (kk : X -> itree Effin S) (e : Effin X),
           interp_local_stack (Vis e kk) ls ≈ ITree.bind (interp_local_stack_h (handle_local (v:=v)) e ls) (fun (sx : map * stack * X) => interp_local_stack (kk (snd sx)) (fst sx)).
-      Proof.
+      Proof using.
         intros.
         rewrite interp_local_stack_vis_eqit.
         apply eutt_eq_bind.
@@ -140,7 +140,7 @@ Section StackMap.
 
       Lemma interp_local_stack_trigger ls X (e : Effin X):
           interp_local_stack (ITree.trigger e) ls ≈ interp_local_stack_h (handle_local (v:=v)) e ls.
-      Proof.
+      Proof using.
         unfold interp_local_stack.
         rewrite interp_state_trigger.
         reflexivity.

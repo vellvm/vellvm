@@ -221,7 +221,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Lemma find_free_block_never_ub :
     forall sz prov msg,
       raise_ub msg ∉ find_free_block sz prov.
-  Proof.
+  Proof using.
     intros sz prov msg FREE.
     destruct FREE as [ms [ms' FREE]].
     cbn in FREE; auto.
@@ -231,7 +231,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Lemma find_free_block_never_err :
     forall sz prov msg,
       raise_error msg ∉ find_free_block sz prov.
-  Proof.
+  Proof using.
     intros sz prov msg FREE.
     destruct FREE as [ms [ms' FREE]].
     cbn in FREE.
@@ -246,7 +246,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     forall ms (len : nat) (pr : Provenance),
     exists ptr ptrs,
       ret (ptr, ptrs) {{ms}} ∈ {{ms}} find_free_block len pr.
-  Proof.
+  Proof using.
     intros ms len pr.
     pose proof @find_free_block_correct as GET_FREE.
     specialize (GET_FREE (MemStateFreshT (itree Eff)) Eff MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ _
@@ -432,7 +432,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     exists ms_final ptr ptrs,
       (ret (ptr, ptrs) {{ms_init}} ∈ {{ms_init}} find_free_block (length bytes) pr) /\
       allocate_bytes_post_conditions ms_init bytes pr ms_final ptr ptrs.
-  Proof.
+  Proof using.
     intros ms_init bytes pr.
 
     Opaque find_free_block.
@@ -671,7 +671,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     (*   forall sz prov ms (st : ExtraState), *)
     (*   exists ptr ptrs, *)
     (*     find_free_block sz prov ms (ret (ptr, ptrs)). *)
-    (* Proof. *)
+    (* Proof using. *)
     (*   intros sz prov ms st. *)
     (*   pose proof (find_free_block_correct sz prov (fun _ _ => True)) as GET_FREE. *)
     (*   unfold exec_correct in GET_FREE. *)
@@ -698,7 +698,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     (*     (NON_VOID : dt <> DTYPE_Void), *)
     (*   exists ms_final, *)
     (*     allocate_bytes_post_conditions ms_fresh_pr dt num_elements bytes pr ms_final ptr ptrs. *)
-    (* Proof. *)
+    (* Proof using. *)
     (*   intros ms_init ms_fresh_pr dt num_elements bytes pr ptr ptrs FRESH_PR FIND_FREE BYTES_SIZE NON_VOID. *)
 
     (*   destruct ms_fresh_pr as [[mem fs h] pr'] eqn:HMS.       *)

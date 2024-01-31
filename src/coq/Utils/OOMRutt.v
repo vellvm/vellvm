@@ -71,7 +71,7 @@ Section ORuttF.
   Hint Unfold orutt_ : itree.
 
   Lemma orutt_monot : monotone2 orutt_.
-  Proof.
+  Proof using.
     red. intros. red; induction IN; eauto with itree.
   Qed.
 
@@ -88,7 +88,7 @@ Section ORuttF.
     \/
       (exists (o : OOM U2),
           e2 = subevent _ o).
-  Proof.
+  Proof using.
     refine (fun H =>
       match H in oruttF _ _ t2 return
         match t2 return Prop with
@@ -111,7 +111,7 @@ Section ORuttF.
     : oruttF sim (VisF e1 k1) (VisF e2 k2) ->
       (forall (o : OOM U2), ~ (e2 = subevent _ o)) ->
       forall v1 v2, RAns e1 v1 e2 v2 -> sim (k1 v1) (k2 v2).
-  Proof.
+  Proof using.
     intros H NOOOM.
     inversion H;
       subst_existT.
@@ -134,7 +134,7 @@ Section ORuttF.
     ot1 = observe t1 ->
     ot2 = observe t2 ->
     orutt t1 t2.
-  Proof.
+  Proof using.
     intros * eq -> ->; pfold; auto.
   Qed.
 End ORuttF.
@@ -168,11 +168,11 @@ Variable (RR: R1 -> R2 -> Prop).
 Lemma orutt_Ret r1 r2:
   RR r1 r2 ->
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR (Ret r1: itree E1 R1) (Ret r2: itree E2 R2).
-Proof. intros. pstep; constructor; auto. Qed.
+Proof using. intros. pstep; constructor; auto. Qed.
 
 Lemma orutt_inv_Ret r1 r2:
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR (Ret r1) (Ret r2) -> RR r1 r2.
-Proof.
+Proof using.
   intros. punfold H. inv H. eauto.
 Qed.
 
@@ -181,7 +181,7 @@ Lemma orutt_inv_Ret_l r1 t2:
   (exists r2, t2 ≳ Ret r2 /\ RR r1 r2) \/
     (exists X (o : OOM X) k2,
         t2 ≈ vis o k2).
-Proof.
+Proof using.
   intros Hrutt; punfold Hrutt; red in Hrutt; cbn in Hrutt.
   setoid_rewrite (itree_eta t2). remember (RetF r1) as ot1; revert Heqot1.
   induction Hrutt; intros; try discriminate.
@@ -204,7 +204,7 @@ Qed.
 
 Lemma orutt_inv_Ret_r t1 r2:
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1 (Ret r2) -> exists r1, t1 ≳ Ret r1 /\ RR r1 r2.
-Proof.
+Proof using.
   intros Hrutt; punfold Hrutt; red in Hrutt; cbn in Hrutt.
   setoid_rewrite (itree_eta t1). remember (RetF r2) as ot2; revert Heqot2.
   induction Hrutt; intros; try discriminate.
@@ -216,7 +216,7 @@ Qed.
 Lemma orutt_inv_Tau_l t1 t2 :
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR (Tau t1) t2 ->
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1 t2.
-Proof.
+Proof using.
   intros. punfold H. red in H. simpl in *.
   remember (TauF t1) as tt1. genobs t2 ot2.
   hinduction H before t1; intros; try discriminate.
@@ -233,13 +233,13 @@ Qed.
 
 Lemma orutt_add_Tau_l t1 t2 :
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1 t2 -> @orutt E1 E2 OOM OOME R1 R2 REv RAns RR (Tau t1) t2.
-Proof.
+Proof using.
   intros. pfold. red. cbn. constructor. pstep_reverse.
 Qed.
 
 Lemma orutt_inv_Tau_r t1 t2 :
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1 (Tau t2) -> @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1 t2.
-Proof.
+Proof using.
   intros. punfold H. red in H. simpl in *.
   pstep. red. remember (TauF t2) as tt2 eqn:Ett2 in H.
   revert t2 Ett2; induction H; try discriminate; intros; inversion Ett2; subst; auto.
@@ -249,13 +249,13 @@ Qed.
 
 Lemma orutt_add_Tau_r t1 t2 :
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1 t2 -> @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1 (Tau t2).
-Proof.
+Proof using.
   intros. pfold. red. cbn. constructor. pstep_reverse.
 Qed.
 
 Lemma orutt_inv_Tau t1 t2 :
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR (Tau t1) (Tau t2) -> @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1 t2.
-Proof.
+Proof using.
   intros; apply orutt_inv_Tau_r, orutt_inv_Tau_l; assumption.
 Qed.
 
@@ -265,7 +265,7 @@ Lemma orutt_Vis {T1 T2} (e1: E1 T1) (e2: E2 T2)
   (forall t1 t2, RAns _ _ e1 t1 e2 t2 -> @orutt E1 E2 OOM OOME R1 R2 REv RAns RR (k1 t1) (k2 t2)) ->
   (forall o : OOM T2, e2 <> subevent T2 o) ->
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR (Vis e1 k1) (Vis e2 k2).
-Proof.
+Proof using.
   intros He Hk. pstep; constructor; auto.
   intros; left. apply Hk; auto.
 Qed.
@@ -278,7 +278,7 @@ Lemma orutt_inv_Vis_l {U1} (e1: E1 U1) k1 t2:
       (forall v1 v2, RAns _ _ e1 v1 e2 v2 -> @orutt E1 E2 OOM OOME R1 R2 REv RAns RR (k1 v1) (k2 v2))) \/
     (exists U2 (o : OOM U2) k2,
         t2 ≈ Vis (subevent _ o) k2).
-Proof.
+Proof using.
   intros Hrutt; punfold Hrutt; red in Hrutt; cbn in Hrutt.
   setoid_rewrite (itree_eta t2). remember (VisF e1 k1) as ot1; revert Heqot1.
   induction Hrutt; intros; try discriminate; subst.
@@ -308,7 +308,7 @@ Lemma orutt_inv_Vis_r {U2} t1 (e2: E2 U2) k2:
         (forall v1 v2, RAns _ _ e1 v1 e2 v2 -> @orutt E1 E2 OOM OOME R1 R2 REv RAns RR (k1 v1) (k2 v2))) \/
     (exists (o : OOM U2),
         e2 = subevent _ o).
-Proof.
+Proof using.
   intros Hrutt; punfold Hrutt; red in Hrutt; cbn in Hrutt.
   setoid_rewrite (itree_eta t1). remember (VisF e2 k2) as ot2; revert Heqot2.
   induction Hrutt; intros; try discriminate; subst.
@@ -334,7 +334,7 @@ Lemma orutt_inv_Vis U1 U2 (e1: E1 U1) (e2: E2 U2)
   ((forall u1 u2, RAns U1 U2 e1 u1 e2 u2 -> @orutt E1 E2 OOM OOME R1 R2 REv RAns RR (k1 u1) (k2 u2)) \/    
     (exists (o : OOM U2),
         e2 = subevent _ o)).
-Proof.
+Proof using.
   intros H.
   pinversion H; subst_existT.
   - left.
@@ -355,7 +355,7 @@ End ConstructionInversion.
 Lemma euttge_trans_clo_wcompat E1 E2 OOM OOME R1 R2 (REv : forall A B, E1 A -> E2 B -> Prop)
       (RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop ) (RR : R1 -> R2 -> Prop) :
   wcompatible2 (@orutt_ E1 E2 OOM OOME R1 R2 REv RAns RR) (euttge_trans_clo RR).
-Proof.
+Proof using.
   constructor; eauto with paco.
   { red. intros. eapply euttge_trans_clo_mon; eauto. }
   intros.
@@ -402,7 +402,7 @@ Qed.
        (LERR2: forall x y y', (RR2 y y': Prop) -> RS x y' -> RS x y) :
   Proper (eq_itree RR1 ==> eq_itree RR2 ==> flip impl)
          (gpaco2 (@orutt_ E1 E2 OOM OOME R1 R2 REv RAns RS) (euttge_trans_clo RS) r rg).
-Proof.
+Proof using.
   repeat intro. gclo. econstructor; eauto;
     try eapply eqit_mon; try apply H; try apply H0; auto.
 Qed.
@@ -413,7 +413,7 @@ Qed.
        (LERR2: forall x y y', (RR2 y y': Prop) -> RS x y' -> RS x y) :
   Proper (euttge RR1 ==> euttge RR2 ==> flip impl)
          (gpaco2 (@orutt_  E1 E2 OOM OOME R1 R2 REv RAns RS) (euttge_trans_clo RS) r rg).
-Proof.
+Proof using.
   repeat intro. gclo. econstructor; eauto.
 Qed.
 
@@ -423,7 +423,7 @@ Qed.
       {RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop} {RS : R1 -> R2 -> Prop} r rg:
     Proper (eq_itree eq ==> eq_itree eq ==> flip impl)
          (gpaco2 (@orutt_ E1 E2 OOM OOME R1 R2 REv RAns RS) (euttge_trans_clo RS) r rg).
-Proof.
+Proof using.
   apply gorutt_cong_eqit; now intros * ->.
 Qed.
 
@@ -431,6 +431,6 @@ Qed.
       {RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop} {RS : R1 -> R2 -> Prop} r rg:
     Proper (euttge eq ==> euttge eq ==> flip impl)
          (gpaco2 (@orutt_ E1 E2 OOM OOME R1 R2 REv RAns RS) (euttge_trans_clo RS) r rg).
-Proof.
+Proof using.
   apply gorutt_cong_euttge; now intros * ->.
 Qed.

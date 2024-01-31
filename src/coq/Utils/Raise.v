@@ -43,7 +43,7 @@ Section Failure.
   Lemma raise_bind_itree :
     forall A B (f : A -> itree E B) x,
       bind (raise x) f ≈ raise x.
-  Proof.
+  Proof using.
     intros A B f x.
     unfold raise.
     cbn.
@@ -57,7 +57,7 @@ Section Failure.
   Lemma raise_map_itree :
     forall A B (f : A -> B) x,
       ITree.map f (@raise _ _ FAIL x) ≈ raise x.
-  Proof.
+  Proof using.
     intros A B f x.
     unfold raise.
     rewrite map_bind.
@@ -70,7 +70,7 @@ Section Failure.
     forall A B (f : A -> B) t x,
       ITree.map f t ≈ @raise _ _ FAIL x ->
       t ≈ raise x.
-  Proof.
+  Proof using.
     unfold ITree.map. intros A B.
     ginit. gcofix CIH.
     intros. rewrite unfold_bind in H0.
@@ -116,7 +116,7 @@ Section Failure.
   Lemma raise_ret_inv_itree :
       forall A x (y : A),
         ~ (@raise _ _ FAIL x) ≈ (ret y).
-  Proof.
+  Proof using.
     intros A x y.
     intros CONTRA.
     cbn in CONTRA.
@@ -136,7 +136,7 @@ Section OOM.
   Lemma raiseOOM_bind_itree :
     forall A B (f : A -> itree E B) x,
       bind (raiseOOM x) f ≈ raiseOOM x.
-  Proof.
+  Proof using.
     intros A B f x.
     unfold raiseOOM.
     cbn.
@@ -150,7 +150,7 @@ Section OOM.
   Lemma raiseOOM_map_itree :
     forall A B (f : A -> B) x,
       ITree.map f (raiseOOM (E:=E) x) ≈ raiseOOM x.
-  Proof.
+  Proof using.
     intros A B f x.
     unfold raiseOOM, raise.
     rewrite map_bind.
@@ -163,7 +163,7 @@ Section OOM.
     forall A B (f : A -> B) t x,
       ITree.map f t ≈ raiseOOM (E:=E) x ->
       t ≈ raiseOOM x.
-  Proof.
+  Proof using.
     unfold ITree.map. intros A B.
     ginit. gcofix CIH.
     intros. rewrite unfold_bind in H0.
@@ -209,7 +209,7 @@ Section OOM.
   Lemma raiseOOM_ret_inv_itree :
       forall A x (y : A),
         ~ (raiseOOM (E:=E) x) ≈ (ret y).
-  Proof.
+  Proof using.
     intros A x y.
     intros CONTRA.
     cbn in CONTRA.
@@ -229,7 +229,7 @@ Section UB.
   Lemma raiseUB_bind_itree :
     forall A B (f : A -> itree E B) x,
       bind (raiseUB x) f ≈ raiseUB x.
-  Proof.
+  Proof using.
     intros A B f x.
     unfold raiseUB.
     cbn.
@@ -243,7 +243,7 @@ Section UB.
   Lemma raiseUB_map_itree :
     forall A B (f : A -> B) x,
       ITree.map f (raiseUB (E:=E) x) ≈ raiseUB x.
-  Proof.
+  Proof using.
     intros A B f x.
     unfold raiseUB, raise.
     rewrite map_bind.
@@ -256,7 +256,7 @@ Section UB.
     forall A B (f : A -> B) t x,
       ITree.map f t ≈ raiseUB (E:=E) x ->
       t ≈ raiseUB x.
-  Proof.
+  Proof using.
     unfold ITree.map. intros A B.
     ginit. gcofix CIH.
     intros. rewrite unfold_bind in H0.
@@ -303,7 +303,7 @@ Section UB.
   Lemma raiseUB_ret_inv_itree :
       forall A x (y : A),
         ~ (raiseUB (E:=E) x) ≈ (ret y).
-  Proof.
+  Proof using.
     intros A x y.
     intros CONTRA.
     cbn in CONTRA.

@@ -24,7 +24,7 @@ Section Pure.
       (* --------------- *)
       (p1;;p2,q1;;q2){{Q}}. 
 
-  Proof.
+  Proof using.
     intros.
     eapply eutt_clo_bind; eauto.
   Qed.
@@ -39,7 +39,7 @@ Section Pure.
       (* ----------------------------- *)
       (x <- p1;;p2 x, x <- q1;;q2 x){{Q}}. 
 
-  Proof.
+  Proof using.
     intros.
     eapply eutt_clo_bind; eauto.
   Qed.
@@ -77,7 +77,7 @@ Section State.
         (fun s1 => '(s2,_) <- p1 s1;; p2 s2,
          fun s1 => '(s2,_) <- q1 s1;; q2 s2)
       {{S}}.
-  Proof.
+  Proof using.
     intros * H1 H2.
     intros s1 s2 PRE; specialize (H1 _ _ PRE).
     destruct s1 as [s1 []], s2 as [s2 []]; cbn.
@@ -101,7 +101,7 @@ Section State.
         (fun s1 => '(s2,a1) <- p1 s1;; p2 a1 s2,
                 fun s1 => '(s2,b1) <- q1 s1;; q2 b1 s2)
         {{S}}.
-  Proof.
+  Proof using.
     intros * H1 H2.
     intros s1 s2 PRE; specialize (H1 _ _ PRE).
     destruct s1 as [s1 []], s2 as [s2 []]; cbn.
@@ -128,7 +128,7 @@ Section State.
         (fun _ s1 => '(s2,a) <- p1 s1 ;; p2 a s2,
                   fun _ s1 => '(s2,b) <- q1 s1 ;; q2 b s2)
         [[S]].
-  Proof.
+  Proof using.
     intros * H1 H2.
     intros s1 s2 PRE; specialize (H1 _ _ PRE).
     destruct s1 as [s1 ()], s2 as [s2 ()]; cbn.

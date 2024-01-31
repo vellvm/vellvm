@@ -114,7 +114,7 @@ Definition dtyp_eqb (dt1 dt2 : dtyp) : bool
 
 Lemma dtyp_eqb_refl :
   forall dt, dtyp_eqb dt dt = true.
-Proof.
+Proof using.
   intros dt.
   unfold dtyp_eqb.
   destruct (dtyp_eq_dec dt dt) eqn: H.
@@ -126,7 +126,7 @@ Lemma dtyp_eqb_eq :
   forall t1 t2,
     dtyp_eqb t1 t2 = true ->
     t1 = t2.
-Proof.
+Proof using.
   intros t1 t2 TYPE.
   unfold dtyp_eqb in TYPE.
   destruct (dtyp_eq_dec t1 t2); auto; discriminate.
@@ -287,7 +287,7 @@ Fixpoint dtyp_measure (t : dtyp) : nat :=
 Lemma dtyp_measure_gt_0 :
   forall (t : dtyp),
     0 < dtyp_measure t.
-Proof.
+Proof using.
   destruct t; cbn; auto.
   all: apply Nat.lt_0_succ.
 Qed.
@@ -339,7 +339,7 @@ apply N.eqb_eq.
 Qed.
 
 Lemma IX_supported_dec : forall (sz:N), {IX_supported sz} + {~IX_supported sz}.
-Proof.
+Proof using.
   intros sz.
   - decide (sz = 1)%N.
     + left. subst. constructor.
@@ -382,7 +382,7 @@ Fixpoint ALL_IX_SUPPORTED (dt : dtyp) : Prop :=
 Lemma ALL_IX_SUPPORTED_dec :
   forall dt,
     {ALL_IX_SUPPORTED dt} + {~ ALL_IX_SUPPORTED dt}.
-Proof.
+Proof using.
   intros dt.
   induction dt;
     try match goal with
@@ -403,7 +403,7 @@ Lemma ALL_IX_SUPPORTED_Struct_fields :
   forall dts,
     ALL_IX_SUPPORTED (DTYPE_Struct dts) ->
     (forall dt, In dt dts -> ALL_IX_SUPPORTED dt).
-Proof.
+Proof using.
   intros dts NV dt IN.
   cbn in NV.
   rewrite FORALL_forall in NV.
@@ -415,7 +415,7 @@ Lemma ALL_IX_SUPPORTED_Packed_struct_fields :
   forall dts,
     ALL_IX_SUPPORTED (DTYPE_Packed_struct dts) ->
     (forall dt, In dt dts -> ALL_IX_SUPPORTED dt).
-Proof.
+Proof using.
   intros dts NV dt IN.
   cbn in NV.
   rewrite FORALL_forall in NV.
@@ -427,7 +427,7 @@ Lemma ALL_IX_SUPPORTED_Struct_cons :
   forall dt dts,
     ALL_IX_SUPPORTED (DTYPE_Struct (dt :: dts)) ->
     ALL_IX_SUPPORTED (DTYPE_Struct dts).
-Proof.
+Proof using.
   intros dt dts H.
   cbn in *.
   intuition.
@@ -437,7 +437,7 @@ Lemma ALL_IX_SUPPORTED_Packed_struct_cons :
   forall dt dts,
     ALL_IX_SUPPORTED (DTYPE_Packed_struct (dt :: dts)) ->
     ALL_IX_SUPPORTED (DTYPE_Packed_struct dts).
-Proof.
+Proof using.
   intros dt dts H.
   cbn in *.  
   intuition.
@@ -448,7 +448,7 @@ Lemma ALL_IX_SUPPORTED_Struct_cons_inv :
     ALL_IX_SUPPORTED dt ->
     ALL_IX_SUPPORTED (DTYPE_Struct dts) ->
     ALL_IX_SUPPORTED (DTYPE_Struct (dt :: dts)).
-Proof.
+Proof using.
   intros dt dts NVdt NVdts.
   cbn in *.
   intuition.
@@ -459,7 +459,7 @@ Lemma ALL_IX_SUPPORTED_Packed_struct_cons_inv :
     ALL_IX_SUPPORTED dt ->
     ALL_IX_SUPPORTED (DTYPE_Packed_struct dts) ->
     ALL_IX_SUPPORTED (DTYPE_Packed_struct (dt :: dts)).
-Proof.
+Proof using.
   intros dt dts NVdt NVdts.
   cbn in *.
   intuition.
@@ -492,7 +492,7 @@ Lemma NO_VOID_Struct_fields :
   forall dts,
     NO_VOID (DTYPE_Struct dts) ->
     (forall dt, In dt dts -> NO_VOID dt).
-Proof.
+Proof using.
   intros dts NV dt IN.
   cbn in NV.
   rewrite FORALL_forall in NV.
@@ -504,7 +504,7 @@ Lemma NO_VOID_Packed_struct_fields :
   forall dts,
     NO_VOID (DTYPE_Packed_struct dts) ->
     (forall dt, In dt dts -> NO_VOID dt).
-Proof.
+Proof using.
   intros dts NV dt IN.
   cbn in NV.
   rewrite FORALL_forall in NV.
@@ -516,7 +516,7 @@ Lemma NO_VOID_Struct_cons :
   forall dt dts,
     NO_VOID (DTYPE_Struct (dt :: dts)) ->
     NO_VOID (DTYPE_Struct dts).
-Proof.
+Proof using.
   intros dt dts H.
   cbn in *.
   intuition.
@@ -526,7 +526,7 @@ Lemma NO_VOID_Packed_struct_cons :
   forall dt dts,
     NO_VOID (DTYPE_Packed_struct (dt :: dts)) ->
     NO_VOID (DTYPE_Packed_struct dts).
-Proof.
+Proof using.
   intros dt dts H.
   cbn in *.
   intuition.
@@ -535,7 +535,7 @@ Qed.
 Lemma NO_VOID_dec :
   forall dt,
     {NO_VOID dt} + {~NO_VOID dt}.
-Proof.
+Proof using.
   intros dt.
   induction dt.
   all:
@@ -554,7 +554,7 @@ Lemma NO_VOID_neq_dtyp :
     NO_VOID dt1 ->
     ~ NO_VOID dt2 ->
     dt1 <> dt2.
-Proof.
+Proof using.
   intros dt1 dt2 NV NNV.
   intros EQ.
   induction dt1, dt2; inversion EQ.
@@ -570,7 +570,7 @@ Lemma NO_VOID_Struct_cons_inv :
     NO_VOID dt ->
     NO_VOID (DTYPE_Struct dts) ->
     NO_VOID (DTYPE_Struct (dt :: dts)).
-Proof.
+Proof using.
   intros dt dts NVdt NVdts.
   cbn in *.
   intuition.
@@ -581,7 +581,7 @@ Lemma NO_VOID_Packed_struct_cons_inv :
     NO_VOID dt ->
     NO_VOID (DTYPE_Packed_struct dts) ->
     NO_VOID (DTYPE_Packed_struct (dt :: dts)).
-Proof.
+Proof using.
   intros dt dts NVdt NVdts.
   cbn in *.
   intuition.

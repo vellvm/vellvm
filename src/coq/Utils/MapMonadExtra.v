@@ -38,7 +38,7 @@ Definition map_monad2  {M} `{Monad M} `{RAISE_ERROR M} {A B C} (f : A -> B -> M 
             end
         | x::xs =>
             match l2 with
-            | [] => raise_error "map_monad2: length mismatch"%string 
+            | [] => raise_error "map_monad2: length mismatch"%string
             | y::ys =>
                 z <- f x y ;;
                 zs <- go xs ys ;;
@@ -74,7 +74,7 @@ Lemma map_monad_unfold :
     b <- f x;;
     bs <- map_monad (fun (x0 : A) => f x0) xs;;
     ret (b :: bs).
-Proof.
+Proof using.
   intros A B x xs f.
   induction xs; cbn; auto.
 Qed.
@@ -83,7 +83,7 @@ Lemma map_monad_length :
   forall {A B}  (xs : list A) (f : A -> M B) res,
     MReturns res (map_monad f xs) ->
     length xs = length res.
-Proof.
+Proof using EQM HM LAWS M MRET MRETSTR.
   intros A B xs.
   induction xs; intros f res Hmap.
   - cbn in Hmap.
@@ -110,7 +110,7 @@ Lemma map_monad_err_In :
     map_monad f l = ret res ->
     In x res ->
     exists y, f y = ret x /\ In y l.
-Proof.
+Proof using.
   intros A B f l res x MAP IN.
   generalize dependent l.
   induction res; intros l MAP.
@@ -136,7 +136,7 @@ Lemma map_monad_err_In' :
   forall {A B : Type} (f : A -> err B) (l : list A) (res : list B) (y : A),
     In y l ->
     map_monad f l = ret res -> exists x, ret x = f y /\ In x res.
-Proof.
+Proof using EQM EQRET HM LAWS M MRET MRETPROPER MRETPROPERFLIP MRETSTR.
   intros A B f l.
   induction l; intros res y IN MAP.
   - inversion IN.
@@ -161,7 +161,7 @@ Lemma map_monad_err_Nth :
     map_monad f l = ret res ->
     Util.Nth res n x ->
     exists y, f y = ret x /\ Util.Nth l n y.
-Proof.
+Proof using.
   intros A B f l res x n MAP NTH.
   generalize dependent l. generalize dependent n. revert x.
   induction res; intros x n NTH l MAP.
@@ -195,7 +195,7 @@ Lemma map_monad_err_succeeds :
   forall {A B} (f : A -> err B) l,
     (forall a, In a l -> exists b, f a = ret b) ->
     exists res, map_monad f l = ret res.
-Proof.
+Proof using.
   intros A B f l IN.
   generalize dependent l.
   induction l; intros IN.
@@ -224,7 +224,7 @@ Lemma map_monad_err_fail :
   forall {A B} (f : A -> err B) l b,
     map_monad f l = inl b ->
     exists a, In a l /\ f a = inl b.
-Proof.
+Proof using.
   intros A B f l b MAP.
   generalize dependent b.
   generalize dependent l.
@@ -248,7 +248,7 @@ Lemma map_monad_err_twin_fail :
     (MAPM2 : map_monad g xs = inl s2)
     (SAME_ERROR : forall x s, f x = inl s <-> g x = inl s),
     s1 = s2.
-Proof.
+Proof using.
   intros s1 s2 X Y Z xs.
   induction xs; intros f g MAPM1 MAPM2 SAME_ERROR.
   - cbn in *.
@@ -277,7 +277,7 @@ Lemma map_monad_err_twin_fail' :
         Util.Nth ys n y ->
         f x = inl s <-> g y = inl s),
     s1 = s2.
-Proof.
+Proof using.
   intros s1 s2 X Y Z W xs ys.
   remember (xs, ys) as ZIP.
   replace xs with (fst ZIP) in * by (subst; auto).
@@ -292,7 +292,7 @@ Proof.
           ]
       ].
 
-  cbn in *.          
+  cbn in *.
   break_match_hyp_inv; break_match_hyp_inv.
   - specialize (SAME_ERROR 0%nat x y s1 eq_refl eq_refl).
     apply SAME_ERROR in Heqs0.
@@ -316,7 +316,7 @@ Lemma map_monad_map :
     (g : A -> B)
     (xs : list A),
     (map_monad f (map g xs)) ≈ (map_monad (fun x => f (g x)) xs).
-Proof.
+Proof using EE EQM HM LAWS M.
   intros. induction xs.
   - simpl. reflexivity.
   - simpl.
@@ -324,35 +324,29 @@ Proof.
     reflexivity.
 Qed.
 
-
 Lemma bind_helper :
   forall A B (m : M A) (f : A -> M B),
     (bind m f) ≈ ((bind (bind m ret) f)).
-Proof.
+Proof using EE EQM HM LAWS M.
   intros.
   rewrite bind_ret_r.
   reflexivity.
 Qed.
 
-
-
 Lemma bind_f_assoc :
   forall A B C (a: A) (f : A -> M B) (g : B -> C),
     eq1 (bind (f a) (fun y => ret (g y)))
         (bind (bind (f a) ret) (fun y => ret (g y))).
-Proof.
+Proof using EE EQM HM LAWS M.
   intros. rewrite bind_bind. setoid_rewrite bind_ret_l.
   reflexivity.
 Qed.
-
-
-
 
 Lemma map_monad_g :
   forall A B C (f : A -> M B) (g : list B -> C) (xs:list A) (zs : list B)
     (EQ2 : (bind (map_monad f xs) (fun ys => ret ys)) ≈ (ret (zs))),
     (bind (map_monad f xs) (fun ys => ret (g ys))) ≈ (ret (g zs)).
-Proof.
+Proof using EE EQM HM LAWS M.
   intros.
   rewrite bind_helper.
   rewrite EQ2.
@@ -360,12 +354,11 @@ Proof.
   reflexivity.
 Qed.
 
-
 Lemma map_monad_cons_ret :
   forall A B (f : A -> M B) (a:A) (xs:list A) (z : B) (zs : list B)
     (EQ2 : (bind (map_monad f xs) (fun ys => ret ys)) ≈  (ret (zs))),
     (bind (map_monad f xs) (fun ys => ret (z::ys))) ≈ (ret ((z::zs))).
-Proof.
+Proof using EE EQM HM LAWS M.
   intros.
   apply map_monad_g with (g := (fun ys => z::ys)).
   assumption.
@@ -378,12 +371,11 @@ Lemma map_monad_append_ret :
     (bind (map_monad f xs) (fun ys => ret (ws ++ ys)%list))
       ≈
       (ret ((ws ++ zs)%list)).
-Proof.
+Proof using EE EQM HM LAWS M.
   intros.
   apply map_monad_g with (g := (fun ys => ws ++ ys)).
   assumption.
 Qed.
-
 
 Lemma map_monad_app
       {A B} (f:A -> M B) (l0 l1:list A):
@@ -391,7 +383,7 @@ Lemma map_monad_app
   bs1 <- map_monad f l0;;
   bs2 <- map_monad f l1;;
   ret (bs1 ++ bs2).
-Proof.
+Proof using EE EQM HM LAWS M.
   induction l0 as [| a l0 IH]; simpl; intros.
   - cbn; rewrite bind_ret_l, bind_ret_r.
     reflexivity.
@@ -402,11 +394,9 @@ Proof.
     reflexivity.
 Qed.
 
-
-
 (* FIXME TODO: This is poorly named and doesn't make sense as a lemma. *)
 Lemma map_monad_In {A B} (l : list A) (f: forall (x : A), In x l -> M B) : M (list B).
-Proof.
+Proof using HM M.
   induction l.
   - exact (ret []).
   - refine (b <- f a _;; bs <- IHl _;; ret (b::bs)).
@@ -422,7 +412,7 @@ Lemma map_monad_In_unfold :
     map_monad_In (x::xs) f = b <- f x (or_introl eq_refl);;
                             bs <- map_monad_In xs (fun x HIn => f x (or_intror HIn));;
                             ret (b :: bs).
-Proof.
+Proof using.
   intros A B x xs f.
   induction xs; cbn; auto.
 Qed.
@@ -433,52 +423,55 @@ Lemma map_monad_cons
   b <- f x;;
   bs2 <- map_monad f l;;
   ret (b :: bs2).
-Proof.
-  intros. reflexivity. Qed.
+Proof using EE EQM HM M.
+  intros. reflexivity.
+Qed.
 
 Lemma map_monad_nil
       {A B} (f:A -> M B) :
   (map_monad f []) ≈ ret [].
-Proof.
-  intros. reflexivity. Qed.
+Proof using EE EQM HM M.
+  intros. reflexivity.
+Qed.
 
 Lemma map_monad_ret_l : forall {A} (l : list A),
     map_monad ret l ≈ ret l.
-Proof.
+Proof using EE EQM HM LAWS M.
   intros. destruct LAWS.
   induction l.
   - apply map_monad_nil.
   - rewrite map_monad_cons.
-    rewrite bind_ret_l. rewrite IHl. rewrite bind_ret_l. reflexivity. Qed.
+    rewrite bind_ret_l. rewrite IHl. rewrite bind_ret_l. reflexivity.
+Qed.
 
 Lemma id_ret : forall A B (g: A -> B) (x: A),
     id (g x) = g x.
-Proof.
+Proof using.
   intros. unfold id. reflexivity. Qed.
 
 Lemma sequence : forall {A} (l : list A),
       sequence (map ret l) ≈ ret l.
-Proof. intros. induction l.
-       - simpl. reflexivity.
-       - rewrite map_cons. simpl. setoid_rewrite map_monad_map. rewrite id_ret.
-         rewrite <- map_monad_cons. rewrite map_monad_ret_l. reflexivity. Qed.
-
+Proof using EE EQM HM LAWS M.
+  intros. induction l.
+  - simpl. reflexivity.
+  - rewrite map_cons. simpl. setoid_rewrite map_monad_map. rewrite id_ret.
+    rewrite <- map_monad_cons. rewrite map_monad_ret_l. reflexivity.
+Qed.
 
 Lemma map_monad_ret_nil_inv_reverse {A B} (f : A -> M B) (l : list A) :
     (l = []) ->
     MReturns [] (map_monad f l).
-Proof.
+Proof using EE EQM HM M MRET MRETPROPER MRETPROPERFLIP MRETSTR.
   intros. induction l. unfold map_monad.
   - destruct MRET. apply MReturns_ret. reflexivity.
   - rewrite H. inversion H.
 Qed.
 
-
 Lemma map_monad_ret_nil_inv :
   forall {A B} (f : A -> M B) (l : list A)
   (HRet : MReturns [] (map_monad f l)),
   l = [].
-Proof.
+Proof using EQM HM LAWS M MRET MRETSTR.
   intros.
   apply map_monad_length in HRet.
   simpl in HRet.
@@ -490,7 +483,7 @@ Lemma map_monad_ret_nil_inv_pure :
   forall {A B} (f : A -> M B) (l : list A)
   (HEq : map_monad f l ≈ ret []),
   l = [].
-Proof.
+Proof using EE EQM HM LAWS M MRET MRETPROPER MRETSTR.
   intros.
   apply (map_monad_ret_nil_inv f).
   (* SHOULD BE ABLE TO DO: rewrite HEq at this point -- typeclasses are not set up correctly. *)
@@ -506,18 +499,18 @@ Lemma map_monad_ret_cons :
   forall {A B} (a : A) (b : B) (f : A -> M B) (l1 : list A) (l2 : list B)
     (H : map_monad f (a :: l1) ≈ ret (b :: l2)),
     map_monad f l1 ≈ ret l2.
-Proof.
+Proof using BINDRETINV EQM EQRET HM M.
   intros. simpl in H. apply BINDRETINV in H. repeat destruct H.
   apply BINDRETINV in H0. repeat destruct H0. apply EQRET in H1.
   inversion H1.
   subst. apply H0.
-  Qed.
+Qed.
 
 Lemma map_monad_head :
   forall {A B} (a : A) (b : B) (f : A -> M B) (l1 : list A) (l2 : list B)
     (H : map_monad f (a :: l1) ≈ ret (b :: l2)),
     f a ≈ ret b.
-Proof.
+Proof using BINDRETINV EQM EQRET HM M.
   intros. simpl in H. apply BINDRETINV in H. repeat destruct H.
   apply BINDRETINV in H0. repeat destruct H0. apply EQRET in H1.
   inversion H1.
@@ -528,26 +521,26 @@ Lemma map_monad_MReturns_cons :
   forall {A B} (a1 a2 : A) (b : B) (f : A -> M B) (l2 : list A) (l1 : list B)
     (H : MReturns (b :: l1) (map_monad f (a2 :: l2))),
     MReturns l1 (map_monad f l2).
-Proof.
+Proof using EQM HM M MRET MRETSTR.
   intros.
   destruct MRETSTR. simpl in H. apply MReturns_strong_bind_inv in H.
   repeat destruct H. apply MReturns_strong_bind_inv in H0. repeat destruct H0.
   apply MReturns_ret_inv in H1. inversion H1. subst.
   apply H0.
-  Qed.
+Qed.
 
 
 Lemma map_monad_MReturns_head :
   forall {A B} (a : A) (b : B) (f : A -> M B) (l1 : list A) (l2 : list B)
     (H : MReturns (b :: l2) (map_monad f (a :: l1))),
     MReturns b (f a).
-Proof.
+Proof using EQM HM M MRET MRETSTR.
   intros.
   destruct MRETSTR. simpl in H. apply MReturns_strong_bind_inv in H.
   repeat destruct H. apply MReturns_strong_bind_inv in H0. repeat destruct H0.
   apply MReturns_ret_inv in H1. inversion H1. subst.
   apply H.
-  Qed.
+Qed.
 
 
 Lemma map_monad_In_inv_pure :
@@ -555,7 +548,7 @@ Lemma map_monad_In_inv_pure :
     (HIn: In y l2)
     (HEq: map_monad f l1 ≈ ret l2),
     exists x, In x l1 /\ f x ≈ ret y.
-Proof.
+Proof using BINDRETINV EQM EQRET HM M MRET MRETSTR.
   intros. generalize dependent l1.
   destruct MRETSTR.
   induction l2.
@@ -578,7 +571,7 @@ Lemma map_monad_In_inv :
     (HIn: In y l2)
     (HEq: MReturns l2 (map_monad f l1)),
     exists x, In x l1 /\ (MReturns y (f x)).
-Proof.
+Proof using EQM HM M MRET MRETSTR.
   intros. generalize dependent l1.
   destruct MRETSTR.
   induction l2.
@@ -604,7 +597,7 @@ Definition commutative_maps {A} (g f : A -> M A) :=
 Lemma map_comm_lemma : forall {A B} (b : A) (xs : list A) (g : A -> M A) (f : A -> M A) (k : A -> list A -> M B) (HC : commutative_maps g f),
     (bs <- map_monad g xs ;; x <- f b ;; k x bs) ≈
       (x <- f b ;;  bs <- map_monad g xs ;; k x bs).
-Proof.
+Proof using EE EQM HM LAWS M.
   destruct LAWS.
   induction xs.
   + intros. simpl. rewrite bind_ret_l.
@@ -624,7 +617,7 @@ Lemma map_monad_commutative_maps :
     (ys <- map_monad g xs ;; map_monad f ys)
       ≈
     map_monad (fun x => y <- (g x) ;; f y) xs.
-Proof.
+Proof using EE EQM HM LAWS M.
   intros A xs. induction xs.
   + intros. simpl. rewrite bind_ret_l.
     apply map_monad_nil.
@@ -644,7 +637,7 @@ Qed.
 Lemma foldM_cons :
   forall {A B} (a : A) (b : B) (f : B -> A -> M B) (al : list A),
     foldM f b (a :: al) ≈ b' <- f b a;; foldM f b' al.
-Proof.
+Proof using EE EQM HM LAWS M.
   intros.
   induction al.
   destruct LAWS.
@@ -655,7 +648,7 @@ Qed.
 Lemma foldM_app :
   forall {A B} (l1 l2 : list A) (b : B) (f : B -> A -> M B),
     foldM f b (l1 ++ l2) ≈ a1 <- foldM f b l1 ;; foldM f a1 l2.
-Proof.
+Proof using EE EQM HM LAWS M.
   intros. generalize dependent b.
   induction l1.
   + intros. simpl. rewrite bind_ret_l. reflexivity.
@@ -666,19 +659,19 @@ Qed.
 Lemma foldM_nil :
   forall {A B} (l1 : list A) (b : B) (f : B -> A -> M B),
     foldM f b [] ≈ ret b.
-Proof.
+Proof using EE EQM HM M.
   intros. reflexivity.
 Qed.
 
 Lemma cons_app :
   forall {A} (l : list A) (a : A),
     a :: l = [a] ++ l.
-Proof. intros. reflexivity. Qed.
+Proof using. intros. reflexivity. Qed.
 
 Lemma cons_app_assoc :
   forall A (k y0 : list A) (y : A),
     k ++ y :: y0 = (k ++ [y]) ++ y0.
-Proof. intros. rewrite <- Lists.List.app_assoc. reflexivity. Qed.
+Proof using. intros. rewrite <- Lists.List.app_assoc. reflexivity. Qed.
 
 Ltac rewrite_under_bind H :=
   repeat (apply Proper_bind; [reflexivity |]; repeat intro); rewrite H.
@@ -686,27 +679,28 @@ Ltac rewrite_under_bind H :=
 Lemma foldM_implements_lemma :
   forall {A B} (l : list A) (k : list B) (f : A -> M B),
     l' <- map_monad f l ;; ret (k ++ l') ≈ foldM (fun x y => t <- f y ;; ret (x ++ [t])) k l.
-Proof. intros. generalize dependent k. induction l.
-       + simpl. intros. rewrite bind_ret_l. rewrite Lists.List.app_nil_r. reflexivity.
-       + simpl. intros. repeat setoid_rewrite bind_bind.
-         setoid_rewrite bind_ret_l. setoid_rewrite <- IHl.
-         pose proof @cons_app_assoc as Hassoc.
-         destruct LAWS. destruct EQRET.
-         rewrite_under_bind cons_app_assoc.
-         reflexivity.
-         Qed.
+Proof using EE EQM EQRET HM LAWS M.
+  intros. generalize dependent k. induction l.
+  + simpl. intros. rewrite bind_ret_l. rewrite Lists.List.app_nil_r. reflexivity.
+  + simpl. intros. repeat setoid_rewrite bind_bind.
+    setoid_rewrite bind_ret_l. setoid_rewrite <- IHl.
+    pose proof @cons_app_assoc as Hassoc.
+    destruct LAWS. destruct EQRET.
+    rewrite_under_bind cons_app_assoc.
+    reflexivity.
+Qed.
 
 Lemma foldM_implements_map_monad :
   forall {A B} (l : list A) (f : A -> M B),
      map_monad f l ≈ foldM (fun x y => t <- f y ;; ret (x ++ [t])) [] l.
-Proof.
+Proof using EE EQM EQRET HM LAWS M.
   intros. rewrite <- foldM_implements_lemma. simpl. rewrite bind_ret_r. reflexivity.
 Qed.
 
 Lemma foldM_map :
   forall {A B} (l : list B) (b : B) (f : B -> A -> M B) (g : B -> A),
     foldM f b (map g l) ≈ foldM (fun x y => f x (g y)) b l.
-Proof.
+Proof using EE EQM HM LAWS M.
   intros. generalize dependent b. induction l.
   + simpl. reflexivity.
   + simpl. intros. setoid_rewrite IHl. reflexivity.
@@ -727,7 +721,7 @@ Arguments map_monad_g {_ _ _ _ _ _ _ _}.
 Lemma map_monad_err_nil :
   forall {A B} (f : A -> err B) res,
     map_monad f [] = inr res <-> res = [].
-Proof.
+Proof using.
   intros A B f res.
   split; intros MAP.
   - cbn in MAP. inv MAP.
@@ -739,7 +733,7 @@ Qed.
 Lemma map_monad_oom_nil :
   forall {A B} (f : A -> OOM B) res,
     map_monad f [] = NoOom res <-> res = [].
-Proof.
+Proof using.
   intros A B f res.
   split; intros MAP.
   - cbn in MAP. inv MAP.
@@ -753,7 +747,7 @@ Lemma map_monad_err_Forall2 :
   forall {A B} (f : A -> err B) l res,
     map_monad f l = inr res <->
       Forall2 (fun a b => f a = inr b) l res.
-Proof.
+Proof using.
   intros A B f.
   induction l; intros res.
   - split; intros MAP.
@@ -783,7 +777,7 @@ Lemma map_monad_oom_Forall2 :
   forall {A B} (f : A -> OOM B) l res,
     map_monad f l = NoOom res <->
       Forall2 (fun a b => f a = NoOom b) l res.
-Proof.
+Proof using.
   intros A B f.
   induction l; intros res.
   - split; intros MAP.
@@ -813,7 +807,7 @@ Lemma map_monad_eqv :
     map_monad f1 l1 = res ->
     Forall2 (fun a b => f1 a = f2 b) l1 l2 ->
     map_monad f2 l2 = res.
-Proof.
+Proof using.
   intros M MM0 A B C f1 f2 l1 l2 res MAP1 ZIP.
   revert MAP1. revert res.
   induction ZIP; intros res MAP1.
@@ -829,7 +823,7 @@ Lemma map_monad_OOM_Nth :
     map_monad f l = ret res ->
     Util.Nth res n x ->
     exists y, f y = ret x /\ Util.Nth l n y.
-Proof.
+Proof using.
   intros A B f l res x n MAP NTH.
   generalize dependent l. generalize dependent n. revert x.
   induction res; intros x n NTH l MAP.
@@ -864,7 +858,7 @@ Lemma map_monad_OOM_fail :
   forall {A B} (f : A -> OOM B) l b,
     map_monad f l = Oom b ->
     exists a, In a l /\ f a = Oom b.
-Proof.
+Proof using.
   intros A B f l b MAP.
   generalize dependent b.
   generalize dependent l.
@@ -888,7 +882,7 @@ Lemma map_monad_In_cons
     (b <- f x (or_introl eq_refl);;
      bs2 <- map_monad_In l (fun x HIn => f x (or_intror HIn));;
      ret (b :: bs2)).
-Proof.
+Proof using.
   reflexivity.
 Qed.
 
@@ -896,7 +890,7 @@ Lemma map_monad_In_OOM_fail :
   forall {A B} l (f : forall (a : A), In a l -> OOM B) b,
     map_monad_In l f = Oom b ->
     exists a (HIn : In a l), f a HIn = Oom b.
-Proof.
+Proof using.
   intros A B l f b MAP.
   generalize dependent b.
   generalize dependent l.
@@ -918,7 +912,7 @@ Lemma map_monad_In_OOM_fail' :
   forall {A B} l (f : forall (a : A), In a l -> OOM B),
     (exists a b (HIn : In a l), f a HIn = Oom b) ->
     (exists s, map_monad_In l f = Oom s).
-Proof.
+Proof using.
   intros A B l f FAIL.
   generalize dependent l.
   induction l; intros f FAIL.
@@ -948,7 +942,7 @@ Lemma map_monad_In_oom_forall2 :
   forall {A B} l (f : forall (a : A), In a l -> OOM B) res,
     map_monad_In l f = NoOom res <->
       Forall2_HIn l res (fun a b INA INB => f a INA = NoOom b).
-Proof.
+Proof using.
   intros A B.
   induction l; intros f res.
   - split; intros MAP.
@@ -983,7 +977,7 @@ Lemma map_monad_In_OOM_succeeds' :
   forall {A B} l (f : forall (a : A), In a l -> OOM B) res,
     map_monad_In l f = ret res ->
     (forall a (HIn : In a l), exists b, f a HIn = ret b).
-Proof.
+Proof using.
   intros A B.
   induction l; intros f res MAP.
   - intros _ [].
@@ -1005,7 +999,7 @@ Lemma map_monad_In_OOM_repeat_success :
     map_monad_In (repeat x sz) f = ret res ->
     f x INx = NoOom y ->
     res = repeat y sz.
-Proof.
+Proof using.
   intros A B sz.
   induction sz; intros x f res y INx MAP F.
   - inv INx.
@@ -1033,7 +1027,7 @@ Lemma map_monad_In_err_fail :
   forall {A B} l (f : forall (a : A), In a l -> err B) b,
     map_monad_In l f = inl b ->
     exists a (HIn : In a l), f a HIn = inl b.
-Proof.
+Proof using.
   intros A B l f b MAP.
   generalize dependent b.
   generalize dependent l.
@@ -1055,7 +1049,7 @@ Lemma map_monad_In_err_fail' :
   forall {A B} l (f : forall (a : A), In a l -> err B),
     (exists a b (HIn : In a l), f a HIn = inl b) ->
     (exists s, map_monad_In l f = inl s).
-Proof.
+Proof using.
   intros A B l f FAIL.
   generalize dependent l.
   induction l; intros f FAIL.
@@ -1085,7 +1079,7 @@ Lemma map_monad_In_err_forall2 :
   forall {A B} l (f : forall (a : A), In a l -> err B) res,
     map_monad_In l f = inr res <->
       Forall2_HIn l res (fun a b INA INB => f a INA = inr b).
-Proof.
+Proof using.
   intros A B.
   induction l; intros f res.
   - split; intros MAP.
@@ -1120,7 +1114,7 @@ Lemma map_monad_In_err_succeeds' :
   forall {A B} l (f : forall (a : A), In a l -> err B) res,
     map_monad_In l f = ret res ->
     (forall a (HIn : In a l), exists b, f a HIn = ret b).
-Proof.
+Proof using.
   intros A B.
   induction l; intros f res MAP.
   - intros _ [].
@@ -1142,7 +1136,7 @@ Lemma map_monad_In_map :
     Monad.MonadLawsE M ->
     forall (A B C : Type) (xs : list A) (g : A -> B) (f : forall (b : B) (HIn : In b (map g xs)), M C),
       Monad.eq1 (map_monad_In (map g xs) f) (map_monad_In xs (fun (x : A) IN => f (g x) (in_map g xs x IN))).
-Proof.
+Proof using.
   intros. induction xs.
   - simpl. reflexivity.
   - simpl.
@@ -1157,7 +1151,7 @@ Abort.
 Lemma map_monad_map_monad_In :
   forall {M A B} `{HM : Monad M} xs (f : A -> M B),
     map_monad f xs = map_monad_In xs (fun x _ => f x).
-Proof.
+Proof using.
   intros M A B HM xs.
   induction xs; intros f.
   - cbn. reflexivity.
@@ -1169,7 +1163,7 @@ Qed.
 Lemma map_monad_map_err :
   forall (A B C : Type) (xs : list A) (g : A -> B) (f : B -> err C),
     map_monad f (map g xs) = map_monad (fun (x : A) => f (g x)) xs.
-Proof.
+Proof using.
   intros. induction xs.
   - simpl. reflexivity.
   - simpl.
@@ -1181,7 +1175,7 @@ Qed.
 Lemma map_monad_map_oom :
   forall (A B C : Type) (xs : list A) (g : A -> B) (f : B -> OOM C),
     map_monad f (map g xs) = map_monad (fun (x : A) => f (g x)) xs.
-Proof.
+Proof using.
   intros. induction xs.
   - simpl. reflexivity.
   - simpl.
@@ -1193,7 +1187,7 @@ Qed.
 Lemma map_monad_In_OOM_nil_inv :
   forall {A B : Type} (l : list A) (f : forall a : A, In a l -> OOM B),
     map_monad_In l f = ret [] -> l = [].
-Proof.
+Proof using.
   intros A B l f H.
   induction l; auto.
 
@@ -1209,7 +1203,7 @@ Lemma map_monad_In_OOM_cons_inv :
     exists x xs HInx (EQ : l = x :: xs),
       f x HInx = ret r /\
         map_monad_In xs (fun a HIn => f a (In_cons_right EQ HIn)) = ret res.
-Proof.
+Proof using.
   intros A B l.
   induction l; intros f r res H.
   - cbn in *.
@@ -1247,14 +1241,14 @@ Lemma map_monad_err_forall2_HIn:
   forall {A B : Type} (f : A -> err B) (l : list A) (res : list B),
     map_monad f l = inr res <->
       Forall2_HIn l res (fun (a : A) (b : B) (INA : In a l) (INB : In b res) => f a = inr b).
-Proof.
+Proof using.
 Admitted.
 
 Lemma map_monad_err_length :
   forall {A B} l (f : A -> err B) res,
     map_monad f l = inr res ->
     length l = length res.
-Proof.
+Proof using.
   intros A B l.
   induction l; intros f res H.
   - rewrite map_monad_err_nil in H; subst; auto.
@@ -1271,7 +1265,7 @@ Lemma map_monad_oom_length :
   forall {A B} l (f : A -> OOM B) res,
     map_monad f l = NoOom res ->
     length l = length res.
-Proof.
+Proof using.
   intros A B l.
   induction l; intros f res H.
   - rewrite map_monad_oom_nil in H; subst; auto.
@@ -1288,7 +1282,7 @@ Lemma map_monad_err_nil_inv :
   forall {A B} (f : A -> err B) l,
     map_monad f l = inr [] ->
     l = [].
-Proof.
+Proof using.
   intros A B f l H.
   induction l; cbn; auto.
   cbn in H.
@@ -1300,7 +1294,7 @@ Lemma map_monad_err_cons :
   forall {A B} (f : A -> err B) x xs res,
     map_monad f (x :: xs) = inr res ->
     exists b bs, res = b :: bs.
-Proof.
+Proof using.
   intros A B f x xs res H.
   cbn in H.
   break_match_hyp; inv H.
@@ -1313,7 +1307,7 @@ Lemma map_monad_err_cons_inv :
   forall {A B} (f : A -> err B) b bs l,
     map_monad f l = inr (b :: bs) ->
     exists x xs, l = x :: xs.
-Proof.
+Proof using.
   intros A B f b bs l H.
   induction l; cbn in *.
   - inv H.
@@ -1328,7 +1322,7 @@ Lemma map_monad_oom_succeeds :
   forall {A B} (f : A -> OOM B) l,
     (forall a, In a l -> exists b, f a = ret b) ->
     exists res, map_monad f l = ret res.
-Proof.
+Proof using.
   intros A B f l IN.
   generalize dependent l.
   induction l; intros IN.
@@ -1356,7 +1350,7 @@ Lemma map_monad_oom_In :
   forall {A B : Type} (f : A -> OOM B) (l : list A) (res : list B),
     map_monad f l = ret res -> forall (x : B),
     In x res -> exists y : A, f y = ret x /\ In y l.
-Proof.
+Proof using.
   intros A B f l res HMAPM x IN.
   pose proof In_Nth _ _ IN as (n&NTH).
   pose proof map_monad_OOM_Nth _ _ _ _ _ HMAPM NTH as (y&FY&NTHy).
@@ -1366,7 +1360,7 @@ Proof.
 Qed.
 
 Lemma map_monad_InT {M : Type -> Type} `{HM : Monad M} {A B} (l : list A) (f: forall (x : A), InT x l -> M B) : M (list B).
-Proof.
+Proof using.
   induction l.
   - exact (ret []).
   - refine (b <- f a _;; bs <- IHl _;; ret (b::bs)).
@@ -1381,7 +1375,7 @@ Lemma map_monad_InT_unfold :
     map_monad_InT (x::xs) f = b <- f x (inl eq_refl);;
                              bs <- map_monad_InT xs (fun x HIn => f x (inr HIn));;
                              ret (b :: bs).
-Proof.
+Proof using.
   intros M HM A B x xs f.
   induction xs; cbn; auto.
 Qed.
@@ -1393,14 +1387,14 @@ Lemma map_monad_InT_cons
     (b <- f x (inl eq_refl);;
      bs2 <- map_monad_InT l (fun x HIn => f x (inr HIn));;
      ret (b :: bs2)).
-Proof.
+Proof using.
   reflexivity.
 Qed.
 
 Lemma map_monad_map_monad_InT :
   forall {M} {A B} `{HM : Monad M} xs (f : A -> M B),
     @map_monad M HM A B f xs = @map_monad_InT M HM A B xs (fun x HIn => f x).
-Proof.
+Proof using.
   intros M A B HM xs.
   induction xs; intros f.
   - cbn. reflexivity.
@@ -1414,7 +1408,7 @@ Lemma map_monad_InT_OOM_fail :
   forall {A B} l (f : forall (a : A), InT a l -> OOM B) b,
     map_monad_InT l f = Oom b ->
     exists a (HIn : InT a l), f a HIn = Oom b.
-Proof.
+Proof using.
   intros A B l f b MAP.
   generalize dependent b.
   generalize dependent l.
@@ -1436,7 +1430,7 @@ Lemma map_monad_InT_OOM_failT :
   forall {A B} l (f : forall (a : A), InT a l -> OOM B) b,
     map_monad_InT l f = Oom b ->
     {a & {HIn : InT a l & f a HIn = Oom b}}.
-Proof.
+Proof using.
   intros A B l f b MAP.
   generalize dependent b.
   generalize dependent l.
@@ -1458,7 +1452,7 @@ Lemma map_monad_InT_OOM_succeeds' :
   forall {A B} l (f : forall (a : A), InT a l -> OOM B) res,
     map_monad_InT l f = ret res ->
     (forall a (HIn : InT a l), exists b, f a HIn = ret b).
-Proof.
+Proof using.
   intros A B.
   induction l; intros f res MAP.
   - intros _ [].
@@ -1479,7 +1473,7 @@ Lemma map_monad_InT_OOM_repeat_success :
     map_monad_InT (repeat x sz) f = ret res ->
     (forall INx : InT x (repeat x sz), f x INx = NoOom y) ->
     res = repeat y sz.
-Proof.
+Proof using.
   intros A B sz.
   induction sz; intros x f res y MAP F.
   - cbn in *.
@@ -1508,7 +1502,7 @@ Qed.
 Lemma map_monad_InT_OOM_nil_inv :
   forall {A B : Type} (l : list A) (f : forall a : A, InT a l -> OOM B),
     map_monad_InT l f = ret [] -> l = [].
-Proof.
+Proof using.
   intros A B l f H.
   induction l; auto.
 
@@ -1523,7 +1517,7 @@ Lemma map_monad_err_InT :
     map_monad f l = ret res ->
     InT x res ->
     {y & ((f y = ret x) * (InT y l))%type}.
-Proof.
+Proof using.
   intros A B f l res x MAP IN.
   generalize dependent l.
   induction res; intros l MAP.
@@ -1554,7 +1548,7 @@ Lemma map_monad_InT_OOM_Nth :
     map_monad_InT l f = ret res ->
     Util.Nth res n x ->
     exists (y : A) (HIN: InT y l), f y HIN = ret x /\ Util.Nth l n y.
-Proof.
+Proof using.
   intros A B l f res x n MAP NTH.
   generalize dependent l. generalize dependent n. revert x.
   induction res; intros x n NTH l f MAP.
@@ -1595,7 +1589,7 @@ Lemma map_monad_InT_OOM_Nth' :
     map_monad_InT l f = ret res ->
     Util.Nth l n x ->
     exists (y : B) (HIN : InT x l), f x HIN = ret y /\ Util.Nth res n y.
-Proof.
+Proof using.
   intros A B l f res x n MAP NTH.
   generalize dependent res. generalize dependent n. revert x.
   induction l; intros x n NTH res MAP.
@@ -1632,7 +1626,7 @@ Lemma map_monad_InT_oom_In :
     (res : list B) (x : B),
     map_monad_InT l f = ret res ->
     In x res -> exists (y : A) (HIN : InT y l), f y HIN = ret x.
-Proof.
+Proof using.
   intros A B f l res x HMAPM IN.
   pose proof In_Nth _ _ IN as (n&NTH).
   pose proof map_monad_InT_OOM_Nth _ _ _ _ _ HMAPM NTH as (y&IN'&FY&NTHy).
@@ -1645,7 +1639,7 @@ Lemma InT_cons_right :
   forall {A} {l : list A} {a x xs}
     (EQ : l = x :: xs) (HIn : InT a xs),
     InT a l.
-Proof.
+Proof using.
   intros A l x xs EQ a HIn.
   subst.
   cbn.
@@ -1655,14 +1649,14 @@ Defined.
 
 Lemma InT_map_impl : forall {X Y} (f : X -> Y) l {y : Y},
     InT y (map f l) -> {x & ((f x = y) * (InT x l))%type}.
-Proof.
+Proof using.
   intros X Y f l.
   induction l; firstorder (subst; auto).
 Qed.
 
 Lemma InT_map_flip : forall {X Y} (f : X -> Y) l {y : Y},
     {x & ((f x = y) * (InT x l))%type} -> InT y (map f l).
-Proof.
+Proof using.
   intros X Y f l.
   induction l; firstorder (subst; auto).
 Qed.
@@ -1674,7 +1668,7 @@ Lemma map_monad_InT_OOM_cons_inv :
     exists x xs HInx (EQ : l = x :: xs),
       f x HInx = ret r /\
         map_monad_InT xs (fun a HIn => f a (InT_cons_right EQ HIn)) = ret res.
-Proof.
+Proof using.
   intros A B l.
   induction l; intros f r res H.
   - cbn in *.
@@ -1693,7 +1687,7 @@ Qed.
 Lemma InT_Nth :
   forall {X} xs (x : X),
     InT x xs -> exists i, Util.Nth xs i x.
-Proof.
+Proof using.
   induction xs; intros x IN.
   - inversion IN.
   - destruct IN; subst.
@@ -1702,4 +1696,3 @@ Proof.
       exists (S i).
       cbn; auto.
 Qed.
-

@@ -77,7 +77,7 @@ Section PARAMS_MODEL.
     := eutt eq t2 (bind ta k2).
 
   #[global] Instance k_spec_WF_refine_OOM_k_spec : k_spec_WF refine_OOM_handler (@refine_OOM_k_spec).
-  Proof.
+  Proof using.
     split.
     - intros A R2 e ta k2.
       unfold Proper, respectful.
@@ -110,7 +110,7 @@ Section PARAMS_MODEL.
     end.
 
   #[global] Instance refine_OOM_h_flip_transitive {R} {RR : relation R} `{Transitive _ RR} : Transitive (refine_OOM_h_flip RR).
-  Proof.
+  Proof using.
     unfold Transitive.
 
     unfold refine_OOM_h_flip.
@@ -311,7 +311,7 @@ Section PARAMS_MODEL.
   Qed.
 
   #[global] Instance refine_OOM_h_reflexive {R} {RR : relation R} `{Reflexive _ RR} : Reflexive (refine_OOM_h RR).
-  Proof.
+  Proof using.
     unfold Reflexive.
 
     pcofix CIH. intros t.
@@ -328,7 +328,7 @@ Section PARAMS_MODEL.
   Qed.
 
   #[global] Instance refine_OOM_h_transitive {R} {RR : relation R} `{Transitive _ RR} : Transitive (refine_OOM_h RR).
-  Proof.
+  Proof using.
     unfold refine_OOM_h.
     assert (Transitive (flip RR)).
     { repeat intro. subst. unfold flip in *; etransitivity; eauto. }
@@ -366,7 +366,7 @@ Lemma eutt_refine_oom_h :
     (t1 t2 : itree (E +' OOME +' F) T),
     eutt RR t1 t2 ->
     refine_OOM_h RR t1 t2.
-Proof.
+Proof using.
   intros T E F RR REF TRANS t1 t2 H.
   unfold refine_OOM_h.
   pose proof @interp_prop_oom_Proper_eq.
@@ -385,7 +385,7 @@ Lemma refine_oom_h_raise_oom :
     (source : itree (E +' OOME +' F) T)
     (oom_msg : string),
     refine_OOM_h RR source (raiseOOM oom_msg).
-Proof.
+Proof using.
   intros T E F RR REF TRANS source oom_msg.
   unfold refine_OOM_h.
 
@@ -403,7 +403,7 @@ Qed.
 
 #[global] Instance refine_OOM_h_eutt_Proper {T : Type} {RR : relation T} {E F}:
   Proper (eutt eq ==> eutt eq ==> iff) (@refine_OOM_h E F T RR).
-Proof.
+Proof using.
   unfold Proper, respectful.
   intros x y XY z w ZW.
   split; intros REF; subst.
@@ -430,7 +430,7 @@ Qed.
 (*     (forall r1 r2, RR1 r1 r2 -> refine_OOM_h RR2 (k r1) (k r2)) -> *)
 (*     refine_OOM_h RR1 x y -> *)
 (*     refine_OOM_h RR2 (a <- x;; k a) (a <- y;; k a). *)
-(* Proof. *)
+(* Proof using. *)
 (*   intros T R E F. *)
 
 (*   unfold refine_OOM_h, refine_OOM_h_flip. *)

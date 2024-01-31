@@ -125,7 +125,7 @@ Section Correctness.
   (* closed form for Flocq's [digits2_pos] *)
   Lemma digits2_pos_digits (m : positive) :
     Z.pos (Digits.digits2_pos m) = digits m.
-  Proof.
+  Proof using.
     induction m; simpl.
     1,2:
       rewrite Pos2Z.inj_succ, IHm;
@@ -144,7 +144,7 @@ Section Correctness.
     or
       (digits m < prec /\ e = 3 - emax - prec)
       (digits m = prec /\ 3 - emax - prec <= e <= emax - prec).
-  Proof.
+  Proof using.
     unfold FLX.Prec_gt_0, bounded, canonical_mantissa, fexp, emin in *.
     rewrite Bool.andb_true_iff, Z.leb_le, <-Zeq_is_eq_bool, digits2_pos_digits.
     remember (3 - emax - prec) as emin.
@@ -171,7 +171,7 @@ Section Correctness.
       (e1 <= e2 /\ m1 = m2 * 2 ^ (e2 - e1)).
 
   Lemma float_eq_refl : Reflexive float_eq.
-  Proof.
+  Proof using.
     unfold Reflexive; intro f.
     unfold float_eq; left.
     replace (Fexp f - Fexp f) with 0.
@@ -179,7 +179,7 @@ Section Correctness.
   Qed.
 
   Lemma float_eq_sym : Symmetric float_eq.
-  Proof.
+  Proof using.
     unfold Symmetric, float_eq.
     intros; destruct H; auto.
   Qed.
@@ -188,7 +188,7 @@ Section Correctness.
     0 < b ->
     0 <= p1 <= p2 ->
     (b ^ p1 | b ^ p2).
-  Proof.
+  Proof using.
     intros B P.
     rewrite <-Z.mod_divide by (apply Z.pow_nonzero; lia).
     replace p2 with ((p2 - p1) + p1) by lia.
@@ -197,7 +197,7 @@ Section Correctness.
   Qed.
 
   Lemma float_eq_trans : Transitive float_eq.
-  Proof.
+  Proof using.
     unfold Transitive.
     destruct x as [mx ex], y as [my ey], z as [mz ez].
     unfold float_eq.
@@ -278,13 +278,13 @@ Section Correctness.
 
   Lemma not_zero_Zpos (m : positive) (e : Z) :
     not_zero (BFloat (Z.pos m) e).
-  Proof. unfold not_zero. simpl. discriminate. Qed.
+  Proof using. unfold not_zero. simpl. discriminate. Qed.
 
   Lemma not_zero_eq (f1 f2 : bfloat) :
     not_zero f1 ->
     float_eq f1 f2 ->
     not_zero f2.
-  Proof.
+  Proof using.
     unfold not_zero, float_eq.
     destruct f1 as [m1 e1], f2 as [m2 e2]; simpl.
     intros NZ1 H.
@@ -300,7 +300,7 @@ Section Correctness.
   Lemma inc_e_correct (f1 : bfloat) (de : positive) {f2 : bfloat} :
     inc_e f1 de = Some f2 ->
     Fexp f2 = Fexp f1 + Z.pos de.
-  Proof.
+  Proof using.
     unfold inc_e.
     intro; break_match; inversion H; clear H.
     reflexivity.
@@ -308,12 +308,12 @@ Section Correctness.
 
   Lemma dec_e_correct (f : bfloat) (de : positive) :
     Fexp (dec_e f de) = Fexp f - Z.pos de.
-  Proof. reflexivity. Qed.
+  Proof using. reflexivity. Qed.
 
   Lemma shift_e_correct (f1 : bfloat) (de : Z) {f2 : bfloat} :
     shift_e f1 de = Some f2 ->
     Fexp f2 = Fexp f1 + de.
-  Proof.
+  Proof using.
     unfold shift_e; intro; break_match; inversion H; clear H.
     lia.
     apply inc_e_correct; assumption.
@@ -323,7 +323,7 @@ Section Correctness.
   Lemma set_e_correct (f1 : bfloat) (e : Z) {f2 : bfloat} :
     set_e f1 e = Some f2 ->
     Fexp f2 = e.
-  Proof.
+  Proof using.
     unfold set_e.
     intro H.
     apply shift_e_correct in H.
@@ -334,7 +334,7 @@ Section Correctness.
   Lemma inc_e_eq (f1 : bfloat) (de : positive) {f2 : bfloat} :
     inc_e f1 de = Some f2 ->
     float_eq f1 f2.
-  Proof.
+  Proof using.
     intros.
     destruct f1 as [m1 e1], f2 as [m2 e2].
     unfold inc_e in H; break_match; inversion H; clear H.
@@ -359,7 +359,7 @@ Section Correctness.
 
   Lemma dec_e_eq (f : bfloat) (de : positive) :
     float_eq f (dec_e f de).
-  Proof.
+  Proof using.
     destruct f as [m e].
     unfold dec_e, float_eq.
     simpl.
@@ -374,7 +374,7 @@ Section Correctness.
   Lemma shift_e_eq (f1 : bfloat) (de : Z) {f2 : bfloat} :
     shift_e f1 de = Some f2 ->
     float_eq f1 f2.
-  Proof.
+  Proof using.
     destruct de; simpl.
     - intro H; inversion H; apply float_eq_refl.
     - apply inc_e_eq.
@@ -384,14 +384,14 @@ Section Correctness.
   Lemma set_e_eq (f1 : bfloat) (e : Z) {f2 : bfloat} :
     set_e f1 e = Some f2 ->
     float_eq f1 f2.
-  Proof.
+  Proof using.
     unfold set_e.
     apply shift_e_eq.
   Qed.
 
   Lemma Zdigits_mul_pow2 (m : Z) (d : positive) :
     m <> 0 -> Zdigits (m * two_power_pos d) = Zdigits m + Z.pos d.
-  Proof.
+  Proof using.
     intro.
     rewrite two_power_pos_equiv.
     unfold Zdigits.
@@ -406,7 +406,7 @@ Section Correctness.
     b <> 0 ->
     a mod b = 0 ->
     Z.abs (a / b) = Z.abs a / Z.abs b.
-  Proof.
+  Proof using.
     intros B AMB.
     apply Zmod_divides in AMB; [| assumption ].
     destruct AMB as [c AMB].
@@ -423,7 +423,7 @@ Section Correctness.
     m <> 0 ->
     m mod two_power_pos d = 0 ->
     Zdigits (m / two_power_pos d) = Zdigits m - Z.pos d.
-  Proof.
+  Proof using.
     intros M H.
     unfold Zdigits.
     rewrite Zabs_div_exact.
@@ -451,7 +451,7 @@ Section Correctness.
   Lemma inc_digits_m_correct (f : bfloat) (ddm : positive) :
     not_zero f ->
     Zdigits (Fnum (inc_digits_m f ddm)) = Zdigits (Fnum f) + Z.pos ddm.
-  Proof.
+  Proof using.
     unfold inc_digits_m, dec_e; simpl.
     apply Zdigits_mul_pow2.
   Qed.
@@ -460,7 +460,7 @@ Section Correctness.
     not_zero f1 ->
     dec_digits_m f1 ddm = Some f2 ->
     Zdigits (Fnum f2) = Zdigits (Fnum f1) - Z.pos ddm.
-  Proof.
+  Proof using.
     destruct f1 as [m1 e1], f2 as [m2 e2].
     unfold dec_digits_m, inc_e.
     simpl; intros M H.
@@ -473,7 +473,7 @@ Section Correctness.
     Fnum f1 <> 0 ->
     shift_digits_m f1 ddm = Some f2 ->
     Zdigits (Fnum f2) = Zdigits (Fnum f1) + ddm.
-  Proof.
+  Proof using.
     unfold shift_digits_m, shift_e.
     simpl; intros M H.
     break_match; inversion H; clear H; subst.
@@ -490,7 +490,7 @@ Section Correctness.
     not_zero f1 ->
     set_digits_m f1 dm = Some f2 ->
     Zdigits (Fnum f2) = dm.
-  Proof.
+  Proof using.
     intros M H.
     unfold set_digits_m in H.
     apply shift_digits_m_correct in H; [| assumption].
@@ -501,7 +501,7 @@ Section Correctness.
   (** changing the binary length of the mantissa preserves the float's value *)
   Lemma inc_digits_m_eq (f : bfloat) (ddm : positive) :
     float_eq f (inc_digits_m f ddm).
-  Proof.
+  Proof using.
     unfold inc_digits_m.
     apply dec_e_eq.
   Qed.
@@ -509,7 +509,7 @@ Section Correctness.
   Lemma dec_digits_m_eq (f1 : bfloat) (ddm : positive) {f2 : bfloat} :
     dec_digits_m f1 ddm = Some f2 ->
     float_eq f1 f2.
-  Proof.
+  Proof using.
     unfold dec_digits_m.
     apply inc_e_eq.
   Qed.
@@ -517,7 +517,7 @@ Section Correctness.
   Lemma shift_digits_m_eq (f1 : bfloat) (ddm : Z) {f2 : bfloat} :
     shift_digits_m f1 ddm = Some f2 ->
     float_eq f1 f2.
-  Proof.
+  Proof using.
     unfold shift_digits_m.
     apply shift_e_eq.
   Qed.
@@ -525,7 +525,7 @@ Section Correctness.
   Lemma set_digits_m_eq (f1 : bfloat) (dm : Z) {f2 : bfloat} :
     set_digits_m f1 dm = Some f2 ->
     float_eq f1 f2.
-  Proof.
+  Proof using.
     unfold set_digits_m.
     apply shift_digits_m_eq.
   Qed.
@@ -535,7 +535,7 @@ Section Correctness.
     float_eq f1 f2 ->
     Fexp f1 = Fexp f2 ->
     Fnum f1 = Fnum f2.
-  Proof.
+  Proof using.
     unfold float_eq.
     destruct f1 as [m1 e1], f2 as [m2 e2].
     simpl; intros H E; destruct H; destruct H as [T H]; clear T; subst.
@@ -546,7 +546,7 @@ Section Correctness.
     float_eq f1 f2 ->
     Fexp f1 = Fexp f2 ->
     f1 = f2.
-  Proof.
+  Proof using.
     intros.
     pose proof exponent_unique_fnum f1 f2 H H0.
     destruct f1, f2; simpl in *.
@@ -559,7 +559,7 @@ Section Correctness.
     float_eq f1 f2 ->
     Zdigits (Fnum f1) = Zdigits (Fnum f2) ->
     Fexp f1 = Fexp f2.
-  Proof.
+  Proof using.
     intros NZ1 H.
     assert (NZ2 : not_zero f2) by apply (not_zero_eq f1 f2 NZ1 H).
     unfold float_eq in *.
@@ -587,7 +587,7 @@ Section Correctness.
     float_eq f1 f2 ->
     Zdigits (Fnum f1) = Zdigits (Fnum f2) ->
     f1 = f2.
-  Proof.
+  Proof using.
     intros.
     pose proof Zdigits_m_unique_fexp f1 f2 H H0 H1.
     apply exponent_unique; assumption.
@@ -595,14 +595,14 @@ Section Correctness.
 
   Fact Zdigits_Zpos_log_inf (p : positive) :
   Zdigits (Z.pos p) = Z.succ (Z.log2 (Zpos p)).
-  Proof.
+  Proof using.
     unfold Zdigits, Z.abs.
     reflexivity.
   Qed.
 
   Fact Zdigits_Zneg_log_inf (p : positive) :
   Zdigits (Z.neg p) = Z.succ (Z.log2 (Zpos p)).
-  Proof.
+  Proof using.
     unfold Zdigits, Z.abs.
     reflexivity.
   Qed.
@@ -617,7 +617,7 @@ Section Correctness.
       or
         (Zdigits m < prec /\ e = emin)
         (Zdigits m = prec /\ emin <= e <= emax - prec).
-  Proof.
+  Proof using.
     destruct f as [m e].
     intro.
     unfold FLX.Prec_gt_0 in prec_gt_0.
@@ -642,7 +642,7 @@ Section Correctness.
 
   Lemma not_None_iff_exists_Some {A : Type} {x : option A} :
     x <> None <-> exists y, x = Some y.
-  Proof.
+  Proof using.
     split; intro.
     - destruct x.
       + exists a; reflexivity.
@@ -654,7 +654,7 @@ Section Correctness.
     float_eq f1 f2 ->
     float_eq f1 f3 ->
     float_eq f2 f3.
-  Proof.
+  Proof using.
     intros EQ12 EQ13.
     apply float_eq_sym in EQ12.
     apply float_eq_trans with (y := f1);
@@ -664,7 +664,7 @@ Section Correctness.
   Lemma float_eq_set_e (f1 f2 : bfloat) :
     float_eq f1 f2 ->
     set_e f1 (Fexp f2) = Some f2.
-  Proof.
+  Proof using.
     intro.
     destruct set_e as [f |] eqn:SE.
     - (* if successful, then equal *)
@@ -690,7 +690,7 @@ Section Correctness.
     not_zero f1 ->
     float_eq f1 f2 ->
     set_digits_m f1 (Zdigits (Fnum f2)) = Some f2.
-  Proof.
+  Proof using.
     intros NZ1 H.
     assert (NZ2 : not_zero f2) by apply (not_zero_eq f1 f2 NZ1 H).
     destruct set_digits_m as [f |] eqn:SDM.
@@ -740,7 +740,7 @@ Section Correctness.
   Lemma set_e_definition (f1 : bfloat) (e : Z) {f2 : bfloat} :
     set_e f1 e = Some f2 <->
     float_eq f1 f2 /\ Fexp f2 = e.
-  Proof.
+  Proof using.
     split; intro.
     - split.
       apply (set_e_eq f1 e H). apply (set_e_correct f1 e H).
@@ -754,7 +754,7 @@ Section Correctness.
     not_zero f1 ->
     set_digits_m f1 dm = Some f2 <->
     float_eq f1 f2 /\ Zdigits (Fnum f2) = dm.
-  Proof.
+  Proof using.
     intros NZ1.
     split; intro.
     - split.
@@ -772,7 +772,7 @@ Section Correctness.
     | None => forall (xf : bfloat),
         float_eq f xf -> valid_float prec emax xf = false
     end.
-  Proof.
+  Proof using.
     unfold FLX.Prec_gt_0 in prec_gt_0.
     break_match. rename b into nf.
     - (* successful normalization - equal and valid? *)
@@ -860,7 +860,7 @@ Section Correctness.
     normalize_float prec emax f = Some nf
     <->
     (float_eq f nf) /\ (valid_float prec emax nf = true).
-  Proof.
+  Proof using.
     pose proof normalize_correct' prec emax f NZ prec_gt_0 Hmax.
     split; intro.
     - rewrite H0 in H; clear H0; assumption.

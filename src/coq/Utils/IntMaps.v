@@ -114,7 +114,7 @@ Section Map_Operations.
     forall def l e,
       (e <=? def ->
        e <=? maximumBy Z.leb def l)%Z.
-  Proof.
+  Proof using.
     intros def l.
     revert def.
     induction l; intros def e LE.
@@ -128,7 +128,7 @@ Section Map_Operations.
   Definition maximumBy_Z_def :
     forall def l,
       (def <=? maximumBy Z.leb def l)%Z.
-  Proof.
+  Proof using.
     intros def l.
     apply maximumBy_Z_le_def; eauto.
     apply Z.leb_refl.
@@ -137,7 +137,7 @@ Section Map_Operations.
   Definition maximumBy_Z_correct :
     forall def (l : list Z),
     forall a, In a l -> Z.leb a (maximumBy Z.leb def l).
-  Proof.
+  Proof using.
     intros def l.
     revert def.
     induction l as [|x xs];
@@ -166,7 +166,7 @@ Section Map_Operations.
   Lemma next_key_gt_0 :
     forall {A} (m : IntMap A),
       next_key m >= 0.
-  Proof.
+  Proof using.
     intros A m.
     unfold next_key.
     pose proof maximumBy_Z_def (-1) (map fst (IM.elements (elt:=A) m)).
@@ -178,7 +178,7 @@ Section Map_Operations.
     IM.MapsTo k v m ->
     IM.MapsTo k v' m ->
     v = v'.
-  Proof.
+  Proof using.
     intros.
     apply IM.find_1 in H; apply IM.find_1 in H0.
     rewrite H0 in H; inversion H.
@@ -190,7 +190,7 @@ Section Map_Operations.
    *)
   Lemma member_lookup {a} : forall k (m : IntMap a),
       member k m -> exists v, lookup k m = Some v.
-  Proof.
+  Proof using.
     unfold member,lookup in *.
     intros * IN.
     apply IM.Raw.Proofs.mem_2, IM.Raw.Proofs.In_MapsTo in IN.
@@ -202,7 +202,7 @@ Section Map_Operations.
 
   Lemma lookup_member {a} : forall k v(m : IntMap a),
       lookup k m = Some v -> member k m .
-  Proof.
+  Proof using.
     unfold member,lookup in *.
     intros * IN.
     apply IM.Raw.Proofs.mem_1; [apply IM.is_bst |].
@@ -215,7 +215,7 @@ Section Map_Operations.
    *)
   Lemma lookup_add_eq : forall {a} k x (m : IntMap a),
       lookup k (add k x m) = Some x.
-  Proof.
+  Proof using.
     intros.
     unfold lookup, add.
     apply IM.find_1, IM.add_1; auto.
@@ -224,7 +224,7 @@ Section Map_Operations.
   Lemma lookup_add_ineq : forall {a} k k' x (m : IntMap a),
       k <> k' ->
       lookup k (add k' x m) = lookup k m.
-  Proof.
+  Proof using.
     intros.
     unfold lookup, add.
     match goal with
@@ -247,7 +247,7 @@ Section Map_Operations.
    *)
   Lemma member_add_eq {a}: forall k v (m: IntMap a),
       member k (add k v m).
-  Proof.
+  Proof using.
     intros.
     cbn.
     apply IM.Raw.Proofs.mem_1.
@@ -258,7 +258,7 @@ Section Map_Operations.
   Lemma member_add_ineq {a}: forall k k' v (m: IntMap a),
       k <> k' ->
       member k (add k' v m) <-> member k m.
-  Proof.
+  Proof using.
     intros.
     cbn. split.
     - intros IN; apply IM.Raw.Proofs.mem_2 in IN.
@@ -275,7 +275,7 @@ Section Map_Operations.
   Lemma member_add_preserved {a}: forall k k' v (m: IntMap a),
       member k m ->
       member k (add k' v m).
-  Proof.
+  Proof using.
     intros k k' v m H.
     cbn in *.
     apply IM.Raw.Proofs.mem_1.
@@ -290,7 +290,7 @@ Section Map_Operations.
         (assuming the relation on values is itself an equivalence for [Equiv]).
    *)
   #[global] Instance Equal_Equiv {a}: Equivalence (@Equal a).
-  Proof.
+  Proof using.
     split.
     - repeat intro; reflexivity.
     - repeat intro.
@@ -300,7 +300,7 @@ Section Map_Operations.
   Qed.
 
   #[global] Instance Equiv_Equiv {a} {r: a -> a -> Prop} {rE : Equivalence r} : Equivalence (Equiv r).
-  Proof.
+  Proof using.
     split.
     - intros ?; split.
       intros k; reflexivity.
@@ -321,13 +321,13 @@ Section Map_Operations.
   Qed.
 
   #[global] Instance Proper_lookup {a} k: Proper (@Equal a ==> Logic.eq) (lookup k).
-  Proof.
+  Proof using.
     repeat intro.
     apply H.
   Qed.
 
   #[global] Instance Proper_add {a} : Proper (Logic.eq ==> Logic.eq ==> Equal ==> Equal) (@add a).
-  Proof.
+  Proof using.
     repeat intro; subst.
     destruct (Z.eq_dec k y); [subst; rewrite 2 lookup_add_eq; auto | rewrite 2 lookup_add_ineq; auto].
   Qed.
@@ -337,7 +337,7 @@ Section Map_Operations.
    *)
   Lemma add_add : forall {a} off b1 b2 (m : IM.t a),
       Equal (add off b2 (add off b1 m)) (add off b2 m).
-  Proof.
+  Proof using.
     intros; intro key; cbn.
     rewrite IM.Raw.Proofs.add_find; [| apply IM.Raw.Proofs.add_bst, IM.is_bst].
     rewrite IM.Raw.Proofs.add_find; [| apply  IM.is_bst].
@@ -348,7 +348,7 @@ Section Map_Operations.
   Lemma Equiv_add_add : forall {a} {r: a -> a -> Prop} {rR: Reflexive r},
       forall k v1 v2 (m: IM.t a),
         Equiv r (add k v2 (add k v1 m)) (add k v2 m).
-  Proof.
+  Proof using.
     intros; split.
     - intros key.
       destruct (Z.eq_dec key k).
@@ -366,7 +366,7 @@ Section Map_Operations.
   Lemma add_add_ineq : forall {a} k1 k2 v1 v2 (m : IM.t a),
       k1 <> k2 ->
       Equal (add k2 v2 (add k1 v1 m)) (add k1 v1 (add k2 v2 m)).
-  Proof.
+  Proof using.
     intros; intro key; cbn.
     rewrite IM.Raw.Proofs.add_find; [| apply IM.Raw.Proofs.add_bst, IM.is_bst].
     rewrite IM.Raw.Proofs.add_find; [| apply  IM.is_bst].
@@ -393,7 +393,7 @@ Section Map_Operations.
       | Some val => val
       | None => def
       end :: lookup_all_index (Z.succ k) n m def.
-  Proof.
+  Proof using.
     intros.
     unfold lookup_all_index.
     rewrite Zseq_succ; try lia.
@@ -405,7 +405,7 @@ Section Map_Operations.
       (key < k \/ key >= k + Z.of_N n) ->
       lookup_all_index k n (add key x m) def =
       lookup_all_index k n m def.
-  Proof.
+  Proof using.
     induction l as [| x l IH]; simpl.
     - intros * EQ LT.
       unfold lookup_all_index; rewrite <- EQ; reflexivity.
@@ -427,14 +427,14 @@ Section Map_Operations.
       (key < k \/ key >= k + Z.of_N n) ->
       lookup_all_index k n (add key x m) def =
       lookup_all_index k n m def.
-  Proof.
+  Proof using.
     intros; eapply lookup_all_index_add_out_aux; eauto.
   Qed.
 
   Lemma lookup_all_index_add {a} : forall k (size : N) x (m : IntMap a) def,
       lookup_all_index k (N.succ size) (add k x m) def =
       x :: lookup_all_index (Z.succ k) size m def.
-  Proof.
+  Proof using.
     intros *.
     rewrite lookup_all_index_cons; auto; try lia.
     rewrite lookup_add_eq.
@@ -445,7 +445,7 @@ Section Map_Operations.
   Lemma pred_succ_of_nat :
     forall n,
       Pos.pred_N (Pos.of_succ_nat n) = N.of_nat n.
-  Proof.
+  Proof using.
     induction n; auto.
     cbn.
     rewrite Pos.pred_N_succ.
@@ -455,7 +455,7 @@ Section Map_Operations.
   Lemma lookup_all_index_length :
     forall {A} len off bytes (def : A),
       Datatypes.length (lookup_all_index off len bytes def) = N.to_nat len.
-  Proof.
+  Proof using.
     intros A len.
     remember (N.to_nat len) as n.
     assert (len = N.of_nat (N.to_nat len)) by lia.
@@ -481,7 +481,7 @@ Section Map_Operations.
       z <= k <= z + Zlength l - 1 ->
       list_nth_z l (k - z) = Some v ->
       lookup k (add_all_index l z m) = Some v.
-  Proof.
+  Proof using.
     induction l as [| x l IH]; simpl; intros * INEQ LU.
     inv LU.
     destruct (Z.eq_dec k z).
@@ -499,7 +499,7 @@ Section Map_Operations.
   Lemma lookup_add_all_index_out {a} : forall l k z (m : IntMap a),
       (k < z \/ k >= z + Zlength l) ->
       lookup k (add_all_index l z m) = lookup k m.
-  Proof.
+  Proof using.
     induction l as [| x l IH]; simpl; intros * INEQ; auto.
     destruct (Z.eq_dec k z).
     - subst. exfalso; destruct INEQ as [INEQ | INEQ]; try lia.
@@ -515,7 +515,7 @@ Section Map_Operations.
 
   Lemma key_in_range_or_not_aux {a} : forall (k z : Z) (l : list a),
       {z <= k <= z + Zlength l - 1} + {k < z} + {k >= z + Zlength l}.
-  Proof.
+  Proof using.
     induction l as [| x l IH]; intros.
     - cbn; rewrite Z.add_0_r.
       destruct (Z_lt_ge_dec k z); [left; right; auto | right; lia].
@@ -530,14 +530,14 @@ Section Map_Operations.
 
   Lemma key_in_range_or_not {a} : forall (k z : Z) (l : list a),
       {z <= k <= z + Zlength l - 1} + {k < z \/ k >= z + Zlength l}.
-  Proof.
+  Proof using.
     intros; destruct (@key_in_range_or_not_aux _ k z l) as [[? | ?] | ?]; [left; auto | right; auto | right; auto].
   Qed.
 
   Lemma range_list_nth_z : forall {a} (l : list a) k,
       0 <= k < Zlength l ->
       exists v, list_nth_z l k = Some v.
-  Proof.
+  Proof using.
     induction l as [| x l IH]; intros k INEQ; [cbn in *; lia |].
     cbn; flatten_goal; [eexists; reflexivity |].
     destruct (IH (Z.pred k)) as [v LU]; eauto.
@@ -547,7 +547,7 @@ Section Map_Operations.
   Lemma in_range_is_in {a} :  forall (k z : Z) (l : list a),
       z <= k <= z + Zlength l - 1 ->
       exists v, list_nth_z l (k - z) = Some v.
-  Proof.
+  Proof using.
     intros.
     apply range_list_nth_z; lia.
   Qed.
@@ -557,7 +557,7 @@ Section Map_Operations.
       Zlength l1 = Zlength l2 ->
       Equal (add_all_index l2 z (add_all_index l1 z m))
             (add_all_index l2 z m).
-  Proof.
+  Proof using.
     intros * EQ k.
     destruct (@key_in_range_or_not _ k z l2) as [IN | OUT].
     - destruct (in_range_is_in _ _ _ IN) as [? LU].

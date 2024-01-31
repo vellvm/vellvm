@@ -70,7 +70,7 @@ Section alistFacts.
     Lemma In_add_eq:
       forall k v (m: alist K V),
         alist_In k (alist_add k v m) v.
-    Proof.
+    Proof using K RR RRC V.
       intros; unfold alist_add, alist_In; simpl; flatten_goal; [reflexivity | rewrite <- neg_rel_dec_correct in Heq; tauto]. 
     Qed.
 
@@ -78,7 +78,7 @@ Section alistFacts.
     Lemma not_In_remove:
       forall (m : alist K V) (k : K) (v: V),
         ~ alist_In k (alist_remove k m) v.
-    Proof.
+    Proof using K RR RRC V.
       induction m as [| [k1 v1] m IH]; intros.
       - simpl; intros abs; inv abs. 
       - simpl; flatten_goal.
@@ -95,7 +95,7 @@ Section alistFacts.
         k <> k' ->
         alist_In k m v ->
         alist_In k (alist_remove k' m) v.
-    Proof.
+    Proof using K RR RRC V.
       induction m as [| [? ?] m IH]; intros ?k ?v ?k' ineq IN; [inversion IN |].
       simpl.
       flatten_goal.
@@ -112,7 +112,7 @@ Section alistFacts.
       forall (m : alist K V) (k : K) (v : V) (k' : K),
         alist_In k (alist_remove k' m) v ->
         alist_In k m v.
-    Proof.
+    Proof using K RR RRC V.
       induction m as [| [? ?] m IH]; intros ?k ?v ?k' IN; [inversion IN |].
       simpl in IN; flatten_hyp IN.
       - unfold alist_In in *; simpl in *.
@@ -131,7 +131,7 @@ Section alistFacts.
         k <> k' ->
         alist_In k (alist_remove k' m) v <->
           alist_In k m v.
-    Proof.
+    Proof using K RR RRC V.
       intros; split; eauto using In_In_remove_ineq, In_remove_In_ineq.
     Qed.       
 
@@ -141,7 +141,7 @@ Section alistFacts.
         k <> k' ->
         alist_In k m v ->
         alist_In k (alist_add k' v' m) v.
-    Proof.
+    Proof using K RR RRC V.
       intros.
       unfold alist_In; simpl; flatten_goal; [rewrite rel_dec_correct in Heq; subst; tauto |].
       apply In_In_remove_ineq; auto.
@@ -153,7 +153,7 @@ Section alistFacts.
         k <> k' ->
         alist_In k (alist_add k' v' m) v ->
         alist_In k m v. 
-    Proof.
+    Proof using K RR RRC V.
       intros k v k' v' m ineq IN.
       unfold alist_In in IN; simpl in IN; flatten_hyp IN; [rewrite rel_dec_correct in Heq; subst; tauto |].
       eapply In_remove_In_ineq; eauto.
@@ -164,13 +164,13 @@ Section alistFacts.
       forall m (v v' : V) (k k' : K),
         k <> k' ->
         alist_In k m v <-> alist_In k (alist_add k' v' m) v.
-    Proof.
+    Proof using K RR RRC V.
       intros; split; eauto using In_In_add_ineq, In_add_In_ineq.
     Qed.
 
     (* Looking a freshly added key returns the bound value *)
     Lemma alist_In_add_eq : forall m (k:K) (v n:V), alist_In k (alist_add k n m) v -> n = v.
-    Proof.
+    Proof using K RR RRC V.
       destruct m as [| [k1 v1]]; intros.
       - unfold alist_add in H.
         unfold alist_In in H. simpl in H.
@@ -190,7 +190,7 @@ Section alistFacts.
       forall {R : K -> K -> Prop} {RD : @RelDec K (@Logic.eq K)} {RDC : RelDec_Correct RD} (k : K) (v : V) l,
         In (k,v) l ->
         exists v', alist_In k l v'.
-    Proof.
+    Proof using.
       intros R RD RDC k v l IN.
       induction l; inversion IN.
       - exists v. subst. unfold alist_In.
@@ -219,7 +219,7 @@ Section alistFacts.
       forall {RDV:RelDec (@Logic.eq V)} {RDCV:RelDec_Correct RDV}
         (id : K) (l : alist K V) (v : V),
         {alist_In id l v} + {~(alist_In id l v)}.
-    Proof.
+    Proof using.
       intros.
       destruct (l @ id) eqn:EQ.
       - destruct (rel_dec v v0) eqn:H.
@@ -240,7 +240,7 @@ Section alistFacts.
         alist_fresh k2 m ->
         alist_In k1 m v1 ->
         alist_In k1 (alist_add k2 v2 m) v1.
-    Proof.
+    Proof using K RR RRC V.
       intros; apply In_add_ineq_iff; auto.
       unfold alist_fresh, alist_In in *; intros ->.
       rewrite H in H0; inv H0.
@@ -249,7 +249,7 @@ Section alistFacts.
     (* All keys are fresh in the empty map *)
     Lemma alist_fresh_nil : forall k,
         alist_fresh (V := V) k [].
-    Proof.
+    Proof using.
       intros; reflexivity.
     Qed.
 
@@ -263,7 +263,7 @@ Section alistFacts.
     Lemma alist_find_None:
       forall k (m: alist K V),
         (forall v, ~ In (k,v) m) <-> alist_find k m = None.
-    Proof.
+    Proof using K RR RRC V.
       induction m as [| [k1 v1] m IH]; [simpl; easy |].
       simpl; split; intros H. 
       - flatten_goal; [rewrite rel_dec_correct in Heq; subst; exfalso | rewrite <- neg_rel_dec_correct in Heq].
@@ -278,7 +278,7 @@ Section alistFacts.
         k2 <> k1 -> 
         alist_find k1 (alist_remove k2 m) = None -> 
         alist_find k1 m = None.
-    Proof.
+    Proof using K RR RRC V.
       induction m as [| [? ?] m IH]; intros ?k1 ?k2 ineq HF; simpl in *.
       - reflexivity.
       - destruct (rel_dec_p k1 k).
@@ -296,7 +296,7 @@ Section alistFacts.
       forall m (k r :K) (v:V), 
         alist_find k (alist_add r v m) = None ->
         alist_find k m = None.
-    Proof.
+    Proof using K RR RRC V.
       destruct m as [| [k1 v1]]; intros.
       - reflexivity.
       - simpl in *.
@@ -316,7 +316,7 @@ Section alistFacts.
     Qed.      
 
     Lemma alist_find_neq : forall m (k r:K) (v:V), k <> r -> alist_find k (alist_add r v m) = alist_find k m.
-    Proof.
+    Proof using K RR RRC V.
       intros.
       remember (alist_find k (alist_add r v m)) as x.
       destruct x.
@@ -331,7 +331,7 @@ Section alistFacts.
       :
       (k <> k0) ->
       alist_find k ((k0,v0)::xs) = alist_find k xs.
-    Proof.
+    Proof using K RR RRC V.
       intros H.
       cbn.
       destruct (rel_dec k k0) eqn:E.
@@ -347,7 +347,7 @@ Section alistFacts.
       (xs: alist K V)
       : (k = k0) ->
         alist_find k ((k0,v0)::xs) = Some v0.
-    Proof.
+    Proof using K RR RRC V.
       intros H.
       cbn.
       destruct (rel_dec k k0) eqn:E.
@@ -361,7 +361,7 @@ Section alistFacts.
       forall {RDV:RelDec (@Logic.eq V)} {RDCV:RelDec_Correct RDV}
         k (m1 m2 : alist K V),
         {m2 @ k = m1 @ k} + {m2 @ k <> m1 @ k}.
-    Proof.
+    Proof using.
       intros.
       destruct (m2 @ k) eqn:EQ2, (m1 @ k) eqn:EQ1.
       - destruct (rel_dec v v0) eqn:H.
@@ -376,7 +376,7 @@ Section alistFacts.
       forall {K V : Type} {RD:RelDec (@Logic.eq K)} {RDC:RelDec_Correct RD}
         k v (m : alist K V),
         (alist_add k v m) @ k = Some v.
-    Proof.
+    Proof using.
       intros.
       cbn. rewrite eq_dec_eq; reflexivity.
     Qed.
@@ -386,7 +386,7 @@ Section alistFacts.
   Section Alist_extend.
 
     #[global] Instance alist_extend_Reflexive : Reflexive (alist_extend (V := V)).
-    Proof.
+    Proof using K RR RRC V.
       unfold Reflexive.
       intros x.
       unfold alist_extend.
@@ -396,7 +396,7 @@ Section alistFacts.
     Qed.
 
     #[global] Instance alist_extend_Transitive : Transitive (alist_extend (V := V)).
-    Proof.
+    Proof using K RR RRC V.
       unfold Transitive.
       intros x.
       unfold alist_extend.
@@ -409,7 +409,7 @@ Section alistFacts.
     Lemma alist_extend_add :
       forall l k v,
         alist_extend l (alist_add (V := V) k v l).
-    Proof.
+    Proof using K RR RRC V.
       intros l k v.
       unfold alist_extend.
       unfold alist_In.
@@ -424,12 +424,12 @@ Section alistFacts.
   Section Alist_le.
 
     #[global] Instance alist_le_refl : Reflexive (alist_le (V := V)).
-    Proof.
+    Proof using K RR RRC V.
       repeat intro; auto.
     Qed.
 
     #[global] Instance alist_le_trans : Transitive (alist_le (V := V)).
-    Proof.
+    Proof using K RR RRC V.
       repeat intro; auto.
     Qed.
 
@@ -437,7 +437,7 @@ Section alistFacts.
       forall k v (m : alist K V),
         alist_fresh k m ->
         m ⊑ (alist_add k v m).
-    Proof.
+    Proof using K RR RRC V.
       repeat intro.
       unfold alist_In, alist_fresh in *.
       destruct (rel_dec_p k id).
@@ -452,7 +452,7 @@ Section alistFacts.
     Lemma lookup_alist_add_eq :
       forall k v (m : alist K V),
         lookup k (alist_add k v m) = Some v.
-    Proof.
+    Proof using K RR RRC V.
       intros; cbn.
       rewrite eq_dec_eq; reflexivity.
     Qed.
@@ -461,7 +461,7 @@ Section alistFacts.
       forall k k' v (m : alist K V),
         k <> k' ->
         lookup k (alist_add k' v m) = lookup k m.
-    Proof.
+    Proof using K RR RRC V.
       cbn; intros.
       rewrite eq_dec_neq; auto.
       rewrite remove_neq_alist; auto.
@@ -487,7 +487,7 @@ Section Alist_refine.
       forall k,
         (exists v1, alist_find k m1 = Some v1) <->
           (exists v2, alist_find k m2 = Some v2).
-  Proof.
+  Proof using.
     intros m1 m2 REF k.
     split; intros [v FIND]; specialize (REF k).
     - red in REF.
@@ -507,7 +507,7 @@ Section Alist_refine.
           alist_find k m1 = Some v1 ->
           alist_find k m2 = Some v2 ->
           R v1 v2).
-  Proof.
+  Proof using.
     intros m1 m2 REF k v1 v2 FIND1 FIND2.
     specialize (REF k).
     rewrite FIND1, FIND2 in REF.
@@ -517,7 +517,7 @@ Section Alist_refine.
 
   Lemma alist_refine_empty :
     alist_refine [] [].
-  Proof.
+  Proof using.
     red.
     intros k.
     cbn. auto.
@@ -529,7 +529,7 @@ Section Alist_refine.
       R (snd x) (snd y) ->
       alist_refine xs ys ->
       alist_refine (x :: xs) (y :: ys).
-  Proof.
+  Proof using K R RRC V1 V2.
     induction xs, ys; intros x y H H0 H1.
     - destruct x, y.
       cbn in *.
@@ -570,7 +570,7 @@ Section Alist_refine.
     forall xs ys rid,
       alist_refine xs ys ->
       alist_refine (FMapAList.alist_remove rid xs) (FMapAList.alist_remove rid ys).
-  Proof.
+  Proof using K R RR RRC V1 V2.
     induction xs, ys; intros rid REF.
     - cbn; auto.
     - red in REF.
@@ -604,7 +604,7 @@ Section Alist_refine.
       R (snd x) (snd y) ->
       alist_refine xs ys ->
       alist_refine (FMapAList.alist_add (fst x) (snd x) xs) (FMapAList.alist_add (fst y) (snd y) ys).
-  Proof.
+  Proof using K R RR RRC V1 V2.
     intros xs ys x y H H0 H1.
     apply alist_refine_cons; cbn; auto.
     rewrite H.
@@ -614,7 +614,7 @@ Section Alist_refine.
   Lemma alist_refine_nil_cons_inv :
     forall p l,
       ~ (alist_refine [] (p::l)).
-  Proof.
+  Proof using K R RR RRC V1 V2.
     intros p l REF.
     red in REF.
     cbn in REF.
@@ -629,7 +629,7 @@ Section Alist_refine.
   Lemma alist_refine_cons_nil_inv :
     forall p l,
       ~ (alist_refine (p::l) []).
-  Proof.
+  Proof using K R RR RRC V1 V2.
     intros p l REF.
     red in REF.
     cbn in REF.

@@ -66,7 +66,7 @@ Lemma sequence_cons :
       a <- ma;;
       rest <- sequence mas;;
       ret (a :: rest).
-Proof.
+Proof using.
   intros a ma mas.
   unfold sequence.
   cbn.
@@ -122,7 +122,7 @@ Global Instance EqM_eitherT {E} {M} `{Monad.Eq1 M} : Monad.Eq1 (eitherT E M)
 Global Instance Eq1Equivalence_eitherT :
   forall {M : Type -> Type} {H : Monad M} {H0 : Monad.Eq1 M} E,
     Monad.Eq1Equivalence M -> Monad.Eq1Equivalence (eitherT E M).
-Proof.
+Proof using.
   constructor; intuition;
   repeat intro.
   - unfold Monad.eq1, EqM_eitherT.
@@ -141,7 +141,7 @@ Global Instance Eq1_ident : Monad.Eq1 IdentityMonad.ident
 
 
 Global Instance Eq1Equivalence_ident : Monad.Eq1Equivalence IdentityMonad.ident.
-Proof.
+Proof using.
   split; red.
   - intros x.
     reflexivity.
@@ -155,7 +155,7 @@ Defined.
 
 
 Global Instance MonadLawsE_ident : Monad.MonadLawsE IdentityMonad.ident.
-Proof.
+Proof using.
   split; intros *.
   - reflexivity.
   - destruct x; reflexivity.
@@ -174,14 +174,14 @@ Lemma match_ret_sum :
     | inl a => ret (inl a)
     | inr a => ret (inr a)
     end ≈ @ret M _ _ ma.
-Proof.
+Proof using.
   intros X Y M HM EQM EQV ma.
   destruct ma; reflexivity.
 Qed.
 
 
 Global Instance MonadLaws_eitherT {E} {M} `{HM : Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM} `{@Monad.MonadLawsE M EQM _} : Monad.MonadLawsE (eitherT E M).
-Proof.
+Proof using.
   split; intros *.
   - cbn.
     destruct H.
@@ -251,7 +251,7 @@ Defined.
 
 #[global] Instance fmap_Monad_Proper :
   forall A B M `{MM : Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM} `{LAWS: @MonadLawsE M EQM MM}, Proper (eq ==> eq1 ==> eq1) (@fmap M (@Functor_Monad M MM) A B).
-Proof.
+Proof using.
   intros A B M MM0 EQM' EQV LAWS.
   unfold Proper, respectful.
   intros f1 f2 FEQ ma1 ma2 MEQ.

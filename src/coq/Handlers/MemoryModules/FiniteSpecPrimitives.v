@@ -118,7 +118,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall (mem : memory) (byte : mem_byte) (x y : Z),
         x = y ->
         read_byte_raw (set_byte_raw mem x byte) y = Some byte.
-    Proof.
+    Proof using.
       intros mem byte x y XY.
       apply IP.F.add_eq_o; auto.
     Qed.
@@ -127,7 +127,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall (mem : memory) (byte : mem_byte) (x y : Z),
         x <> y ->
         read_byte_raw (set_byte_raw mem x byte) y = read_byte_raw mem y.
-    Proof.
+    Proof using.
       intros mem byte x y XY.
       apply IP.F.add_neq_o; auto.
     Qed.
@@ -136,7 +136,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall (mem : memory) l z p,
         p < z \/ p >= z + Zlength l ->
         read_byte_raw (add_all_index l z mem) p = read_byte_raw mem p.
-    Proof.
+    Proof using.
       intros mem l z p BOUNDS.
       unfold read_byte_raw.
       eapply lookup_add_all_index_out; eauto.
@@ -147,7 +147,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         z <= p <= z + Zlength l - 1 ->
         list_nth_z l (p - z) = Some v ->
         read_byte_raw (add_all_index l z mem) p = Some v.
-    Proof.
+    Proof using.
       intros mem l z p v BOUNDS IN.
       unfold read_byte_raw.
       eapply lookup_add_all_index_in; eauto.
@@ -158,7 +158,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         z <= p <= z + Zlength l - 1 ->
         exists v, list_nth_z l (p - z) = Some v /\
                read_byte_raw (add_all_index l z mem) p = Some v.
-    Proof.
+    Proof using.
       intros mem l z p IN.
       pose proof range_list_nth_z l (p - z) as H.
       forward H.
@@ -175,7 +175,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall mem ix e,
         SetoidList.InA (IM.eq_key_elt (elt:=mem_byte)) (ix, e) (IM.elements (elt:=mem_byte) mem) ->
         In (ix, e) (IM.elements (elt:=mem_byte) mem).
-    Proof.
+    Proof using.
       intros mem.
       induction (IM.elements (elt:=mem_byte) mem);
         intros ix e INS.
@@ -191,7 +191,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall mem ix e,
         In (ix, e) (IM.elements (elt:=mem_byte) mem) ->
         SetoidList.InA (IM.eq_key_elt (elt:=mem_byte)) (ix, e) (IM.elements (elt:=mem_byte) mem).
-    Proof.
+    Proof using.
       intros mem.
       induction (IM.elements (elt:=mem_byte) mem);
         intros ix e INS.
@@ -207,7 +207,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall (mem : memory) ix,
         ix >= next_key mem ->
         read_byte_raw mem ix = None.
-    Proof.
+    Proof using.
       intros mem ix H.
       unfold read_byte_raw.
       apply IP.F.not_find_in_iff.
@@ -230,7 +230,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall (mem : memory) ix v,
         read_byte_raw mem ix = Some v ->
         ix < next_key mem.
-    Proof.
+    Proof using.
       intros mem ix H.
       intros FIND.
       pose proof (Z_lt_le_dec ix (next_key mem)) as [LT | GE]; auto.
@@ -324,7 +324,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     forall ptr, ptr_in_frame_prop f ptr <-> ptr_in_frame_prop f' ptr.
 
   #[global] Instance frame_eqv_Equivalence : Equivalence frame_eqv.
-  Proof.
+  Proof using.
     split.
     - intros f ptr.
       reflexivity.
@@ -367,7 +367,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     forall f n, FSNth_eqv fs n f <-> FSNth_eqv fs' n f.
 
   #[global] Instance frame_stack_eqv_Equivalence : Equivalence frame_stack_eqv.
-  Proof.
+  Proof using.
     split; try firstorder.
     - intros x y z XY YZ.
       unfold frame_stack_eqv in *.
@@ -414,7 +414,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
   #[global] Instance root_in_heap_prop_Proper :
     Proper (heap_eqv ==> eq ==> iff) root_in_heap_prop.
-  Proof.
+  Proof using.
     intros h h' HEAPEQ ptr ptr' PTREQ; subst.
     inv HEAPEQ.
     eauto.
@@ -422,14 +422,14 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
   #[global] Instance ptr_in_heap_prop_Proper :
     Proper (heap_eqv ==> eq ==> eq ==> iff) ptr_in_heap_prop.
-  Proof.
+  Proof using.
     intros h h' HEAPEQ root root' ROOTEQ ptr ptr' PTREQ; subst.
     inv HEAPEQ.
     eauto.
   Qed.
 
   #[global] Instance heap_Equivalence : Equivalence heap_eqv.
-  Proof.
+  Proof using.
     split.
     - intros h; split.
       + intros root.
@@ -466,7 +466,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Lemma get_fresh_provenance_fresh :
     forall (ms : MemState),
       ~ used_provenance_prop ms (get_fresh_provenance ms).
-  Proof.
+  Proof using.
     intros ms.
     unfold used_provenance_prop.
     destruct ms.
@@ -495,7 +495,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       MemState_get_memory ms = MemState_get_memory ms' /\
         (forall pr, used_provenance_prop ms pr -> used_provenance_prop ms' pr) /\
       ~ used_provenance_prop ms pr /\ used_provenance_prop ms' pr.
-  Proof.
+  Proof using.
     intros ms ms' pr MSFP.
     unfold mem_state_fresh_provenance in *.
     destruct ms; cbn in *; inv MSFP.
@@ -520,7 +520,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Lemma frame_stack_eqv_snoc_sing_inv :
     forall fs f1 f2,
       frame_stack_eqv (Snoc fs f1) (Singleton f2) -> False.
-  Proof.
+  Proof using.
     intros fs f1 f2 EQV.
     destruct fs.
     - unfold frame_stack_eqv in *.
@@ -540,7 +540,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Lemma frame_stack_eqv_sing_snoc_inv :
     forall fs f1 f2,
       frame_stack_eqv (Singleton f2) (Snoc fs f1) -> False.
-  Proof.
+  Proof using.
     intros fs f1 f2 EQV.
     destruct fs.
     - unfold frame_stack_eqv in *.
@@ -561,7 +561,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     forall R fs f n x,
       FSNth_rel R (Snoc fs f) (S n) x =
         FSNth_rel R fs n x.
-  Proof.
+  Proof using.
     intros R fs f n x.
     cbn. reflexivity.
   Qed.
@@ -570,7 +570,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     forall fs1 fs2 f1 f2,
       frame_stack_eqv (Snoc fs1 f1) (Snoc fs2 f2) ->
       frame_stack_eqv fs1 fs2.
-  Proof.
+  Proof using.
     intros fs1 fs2 f1 f2 EQV.
     unfold frame_stack_eqv in *.
     intros f n.
@@ -583,7 +583,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     forall fs1 fs2 f1 f2,
       frame_stack_eqv (Snoc fs1 f1) (Snoc fs2 f2) ->
       frame_eqv f1 f2.
-  Proof.
+  Proof using.
     intros fs1 fs2 f1 f2 EQV.
     unfold frame_stack_eqv in *.
     specialize (EQV f2 0%nat).
@@ -602,7 +602,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         (exists f1 f2,
             fs1 = Singleton f1 /\ fs2 = Singleton f2 /\
               frame_eqv f1 f2).
-  Proof.
+  Proof using.
     intros fs1 fs2 EQV.
     destruct fs1, fs2.
     - right.
@@ -628,7 +628,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
   #[global] Instance peek_frame_stack_prop_Proper :
     Proper (frame_stack_eqv ==> frame_eqv ==> iff) peek_frame_stack_prop.
-  Proof.
+  Proof using.
     unfold Proper, respectful.
     intros xs ys XSYS x y XY.
     eapply frame_stack_inv in XSYS as [XSYS | XSYS].
@@ -650,7 +650,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
   #[global] Instance peek_frame_stack_prop_impl_Proper :
     Proper (frame_stack_eqv ==> frame_eqv ==> Basics.impl ) peek_frame_stack_prop.
-  Proof.
+  Proof using.
     unfold Proper, respectful.
     intros xs ys XSYS x y XY.
     rewrite XY.
@@ -660,7 +660,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
   #[global] Instance pop_frame_stack_prop_Proper :
     Proper (frame_stack_eqv ==> frame_stack_eqv ==> iff) pop_frame_stack_prop.
-  Proof.
+  Proof using.
     unfold Proper, respectful.
     intros x y XY a b AB.
     eapply frame_stack_inv in XY as [XY | XY].
@@ -680,7 +680,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
   #[global] Instance frame_eqv_cons_Proper :
     Proper (eq ==> frame_eqv ==> frame_eqv) cons.
-  Proof.
+  Proof using.
     unfold Proper, respectful.
     intros ptr ptr' EQ f1 f2 EQV; subst.
     unfold frame_eqv in *.
@@ -690,7 +690,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   (* TODO: move this *)
   #[global] Instance ptr_in_frame_prop_int_Proper :
     Proper (frame_eqv ==> (fun a b => ptr_to_int a = ptr_to_int b) ==> iff) ptr_in_frame_prop.
-  Proof.
+  Proof using.
     unfold Proper, respectful.
     intros x y XY a b AB.
     unfold frame_eqv in *.
@@ -700,7 +700,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
   #[global] Instance ptr_in_frame_prop_Proper :
     Proper (frame_eqv ==> eq ==> iff) ptr_in_frame_prop.
-  Proof.
+  Proof using.
     unfold Proper, respectful.
     intros x y XY a b AB; subst.
     unfold frame_eqv in *.
@@ -713,7 +713,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       frame_eqv f1 f2 ->
       FSNth_eqv fs n f1 ->
       FSNth_eqv fs n f2.
-  Proof.
+  Proof using.
     induction n;
       intros fs f1 f2 EQV NTHEQV.
     - destruct fs; cbn in *;
@@ -724,7 +724,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   (* TODO: Move this *)
   #[global] Instance FSNth_eqv_Proper :
     Proper (frame_stack_eqv ==> eq ==> frame_eqv ==> iff) FSNth_eqv.
-  Proof.
+  Proof using.
     unfold Proper, respectful.
     intros x y H' x0 y0 H0 x1 y1 H1; subst.
     split; intros NTH.
@@ -739,7 +739,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
   #[global] Instance frame_stack_eqv_Singleton_Proper :
     Proper (frame_eqv ==> frame_stack_eqv) Singleton.
-  Proof.
+  Proof using.
     intros fs' fs FS.
     split; intros NTH.
     - cbn in *.
@@ -752,7 +752,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
   #[global] Instance frame_stack_eqv_Snoc_Proper :
     Proper (frame_stack_eqv ==> frame_eqv ==> frame_stack_eqv) Snoc.
-  Proof.
+  Proof using.
     unfold Proper, respectful.
     intros x y H x0 y0 H0.
     split.
@@ -775,7 +775,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Lemma MemState_get_put_memory :
     forall ms mem,
       MemState_get_memory (MemState_put_memory mem ms) = mem.
-  Proof.
+  Proof using.
     intros ms mem.
     destruct ms.
     cbn.
@@ -785,7 +785,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Lemma memory_stack_memory_mem_state_memory :
     forall m,
       memory_stack_memory (MemState_get_memory m) = mem_state_memory m.
-  Proof.
+  Proof using.
     intros m.
     destruct m.
     cbn.

@@ -41,6 +41,9 @@ From Vellvm Require Import
      Utils.AListFacts
      Utils.VellvmRelations
      Utils.ErrUbOomProp
+     Utils.ErrOomPoison
+     Utils.Oomable
+     Utils.Poisonable
      Utils.NMaps
      Handlers.MemoryModules.FiniteAddresses
      Handlers.MemoryModules.InfiniteAddresses
@@ -14040,76 +14043,88 @@ Qed.
   Qed.
 
   Lemma dvalue_extract_byte_success_fin_inf :
-    forall dv_inf dv_fin dt idx res,
+    forall {M} `{HM : Monad M} `{RE: RAISE_ERROR M} `{RP : Poisonable.RAISE_POISON M} `{RO : Oomable.RAISE_OOMABLE M}
+      dv_inf dv_fin dt idx res,
       dvalue_refine_strict dv_inf dv_fin ->
-      @dvalue_extract_byte ErrOOMPoison
-        (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-           (@Monad_OomableT Poisonable MonadPoisonable))
-        (@RAISE_ERROR_MonadExc ErrOOMPoison
-           (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
-              (@Monad_OomableT Poisonable MonadPoisonable)))
-        (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-              (@Monad_OomableT Poisonable MonadPoisonable))
-           (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
-              RAISE_POISON_Poisonable))
-        (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-              (@Monad_OomableT Poisonable MonadPoisonable))
-           (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dv_fin dt idx = ret res ->
-      @IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
-        (@EitherMonad.Monad_eitherT ERR_MESSAGE
-           (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-           (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-              IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-        (@RAISE_ERROR_MonadExc IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
-           (@EitherMonad.Exception_eitherT ERR_MESSAGE
-              (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-              (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)))
-        (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT
-           (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-           (EitherMonad.eitherT ERR_MESSAGE)
-           (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-              (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-              (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-           (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-              IS1.LLVM.MEM.CP.CONCBASE.OomableT
-              (@IS1.LLVM.MEM.CP.CONCBASE.MonadT_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)
-              IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_Poisonable))
-        (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_E_MT
-           (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-           (EitherMonad.eitherT ERR_MESSAGE)
-           (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-              (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-              (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-           (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-              IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)) dv_inf dt idx = ret res.
+      @dvalue_extract_byte M HM RE RP RO dv_fin dt idx = ret res ->
+      @IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte M HM RE RP RO dv_inf dt idx = ret res.
   Proof.
-    intros dv_inf dv_fin dt idx res REF VAL.
-    rewrite dvalue_extract_byte_equation in VAL.
-    rewrite IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte_equation.
+   (*  intros M HM RE RP RO dv_inf dv_fin dt idx res REF VAL. *)
+   (*  induction dv_fin; dvalue_refine_strict_inv REF; *)
+   (*    rewrite dvalue_extract_byte_equation in VAL; *)
+   (*    rewrite IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte_equation; *)
+   (*    try solve *)
+   (*      [ unfold extract_byte_Z, IS1.LLVM.MEM.CP.CONCBASE.extract_byte_Z in *; *)
+   (*        inv VAL; *)
+   (*        solve *)
+   (*          [ reflexivity *)
+   (*          | erewrite AC1.addr_convert_ptoi; eauto *)
+   (*          | erewrite IP.from_Z_to_Z; eauto *)
+   (*          ] *)
+   (*      ]. *)
+   (*  - Lemma extract_field_byte_fin_inf : *)
+   (*      forall {M : Type -> Type} {HM: Monad M} {RE: RAISE_ERROR M} *)
+   (*        (field_dts : list dtyp) (byte_idx : N), *)
+   (*        @IS1.LLVM.MEM.CP.CONCBASE.extract_field_byte M HM RE field_dts byte_idx = *)
+   (*          @extract_field_byte M HM RE field_dts byte_idx. *)
+   (*    Proof. *)
+   (*    Admitted. *)
 
-    destruct dv_fin; dvalue_refine_strict_inv REF;
-      try solve
-        [ unfold extract_byte_Z, IS1.LLVM.MEM.CP.CONCBASE.extract_byte_Z in *;
-          inv VAL;
-          solve
-            [ reflexivity
-            | erewrite AC1.addr_convert_ptoi; eauto
-            | erewrite IP.from_Z_to_Z; eauto
-            ]
-        ].
-    - destruct dt; inv VAL.
-      Opaque dvalue_extract_byte.
-      Opaque IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte.
-      do 5 break_match_hyp_inv.
-      destruct (nth_error fields (N.to_nat n)) eqn:FIELDS;
-        [|inv H2].
-      cbn.
+   (*    Opaque dvalue_extract_byte. *)
+   (*    Opaque IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte. *)
+
+   (*    destruct dt; inv VAL; auto. *)
+   (*    assert (forall (x0 : (dtyp * (N * N))%type), *)
+   (*               (let (fdt, p) := x0 in *)
+   (* let (field_idx, byte_idx) := p in *)
+   (* match nth_error x (N.to_nat field_idx) with *)
+   (* | Some f => IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte f fdt (Z.of_N byte_idx) *)
+   (* | None => raise_error "dvalue_extract_byte: more fields in DVALUE_Struct than in dtyp." *)
+   (* end) = (let (fdt, p) := x0 in *)
+   (* let (field_idx, byte_idx) := p in *)
+   (* match nth_error fields (N.to_nat field_idx) with *)
+   (* | Some f => dvalue_extract_byte f fdt (Z.of_N byte_idx) *)
+   (* | None => raise_error "dvalue_extract_byte: more fields in DVALUE_Struct than in dtyp." *)
+   (* end)). *)
+   (*    admit. *)
+   (*    reflexivity. *)
+   (*    erewrite H0. *)
+
+   (*    setoid_rewrite H0. *)
+   (*    rewrite extract_field_byte_fin_inf. *)
+   (*    setoid_erewrite H. *)
+   (*    destruct (extract_field_byte fields0 (Z.to_N idx)) eqn:EXTRACT_FIELDS. *)
+   (*    destruct unEitherT. *)
+   (*    break_inner_match_hyp; inv H1. *)
+   (*    do 4 break_match_hyp_inv; cbn in *. *)
+   (*    break_inner_match_hyp; cbn in *. *)
+   (*    2: inv H2. *)
+   (*    subst; cbn in *. *)
+   (*    Set Printing Implicit. *)
+   (*    setoid_rewrite EXTRACT_FIELDS. *)
+      
+   (*    destruct o; *)
+   (*    cbn in *. *)
+   (*    pose proof (@extract_field_byte_fin_inf ErrOOMPoison *)
+   (*      (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable) *)
+   (*         (@Monad_OomableT Poisonable MonadPoisonable)) *)
+   (*      (@RAISE_ERROR_MonadExc ErrOOMPoison *)
+   (*         (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable) *)
+   (*            (@Monad_OomableT Poisonable MonadPoisonable))) dts  *)
+   (*      (Z.to_N idx)). *)
+      
+
+   (*    assert (IS1.LLVM.MEM.CP.CONCBASE.extract_field_byte = extract_field_byte). *)
+   (*    { unfold IS1.LLVM.MEM.CP.CONCBASE.extract_field_byte, extract_field_byte. *)
+   (*      unfold IS1.LLVM.MEM.CP.CONCBASE.extract_field_byte_helper, extract_field_byte_helper. *)
+   (*      admit. *)
+   (*    } *)
+   (*    destruct dt; inv VAL. *)
+
+   (*    do 5 break_match_hyp_inv. *)
+   (*    destruct (nth_error fields (N.to_nat n)) eqn:FIELDS; *)
+   (*      [|inv H2]. *)
+   (*    cbn. *)
   Admitted.
 
   Lemma dvalue_byte_value_success_fin_inf :
@@ -14130,37 +14145,37 @@ Qed.
            (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
               (@Monad_OomableT Poisonable MonadPoisonable))
            (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvb_fin = ret res ->
-      (@IS1.LLVM.MEM.CP.CONCBASE.dvalue_byte_value IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+      (@IS1.LLVM.MEM.CP.CONCBASE.dvalue_byte_value ErrOOMPoison
          (@EitherMonad.Monad_eitherT ERR_MESSAGE
-            (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-            (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-               IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-         (@RAISE_ERROR_MonadExc IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+            (OomableT Poisonable)
+            (@Monad_OomableT Poisonable
+               MonadPoisonable))
+         (@RAISE_ERROR_MonadExc ErrOOMPoison
             (@EitherMonad.Exception_eitherT ERR_MESSAGE
-               (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-               (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)))
-         (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT
-            (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable)))
+         (@RAISE_POISON_E_MT
+            (OomableT Poisonable)
             (EitherMonad.eitherT ERR_MESSAGE)
             (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-               (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-            (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-               IS1.LLVM.MEM.CP.CONCBASE.OomableT
-               (@IS1.LLVM.MEM.CP.CONCBASE.MonadT_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)
-               IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_Poisonable))
-         (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_E_MT
-            (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable))
+            (@RAISE_POISON_E_MT Poisonable
+               OomableT
+               (@MonadT_OomableT Poisonable
+                  MonadPoisonable)
+               RAISE_POISON_Poisonable))
+         (@RAISE_OOMABLE_E_MT
+            (OomableT Poisonable)
             (EitherMonad.eitherT ERR_MESSAGE)
             (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-               (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-            (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-               IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))) dvb_inf = ret res.
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable))
+            (@RAISE_OOMABLE_OomableT Poisonable
+               MonadPoisonable))) dvb_inf = ret res.
   Proof.
     intros dvb_inf dvb_fin res REF VAL.
     unfold dvalue_byte_value in VAL.
@@ -14198,37 +14213,37 @@ Qed.
                (OomableT Poisonable)
                (@Monad_OomableT Poisonable MonadPoisonable))
             (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvbs_fin dt) = ret res ->
-      (@IS1.LLVM.MEM.CP.CONCBASE.dvalue_bytes_to_dvalue IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+      (@IS1.LLVM.MEM.CP.CONCBASE.dvalue_bytes_to_dvalue ErrOOMPoison
          (@EitherMonad.Monad_eitherT ERR_MESSAGE
-            (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-            (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-               IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-         (@RAISE_ERROR_MonadExc IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+            (OomableT Poisonable)
+            (@Monad_OomableT Poisonable
+               MonadPoisonable))
+         (@RAISE_ERROR_MonadExc ErrOOMPoison
             (@EitherMonad.Exception_eitherT ERR_MESSAGE
-               (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-               (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)))
-         (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT
-            (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable)))
+         (@RAISE_POISON_E_MT
+            (OomableT Poisonable)
             (EitherMonad.eitherT ERR_MESSAGE)
             (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-               (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-            (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-               IS1.LLVM.MEM.CP.CONCBASE.OomableT
-               (@IS1.LLVM.MEM.CP.CONCBASE.MonadT_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)
-               IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_Poisonable))
-         (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_E_MT
-            (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable))
+            (@RAISE_POISON_E_MT Poisonable
+               OomableT
+               (@MonadT_OomableT Poisonable
+                  MonadPoisonable)
+               RAISE_POISON_Poisonable))
+         (@RAISE_OOMABLE_E_MT
+            (OomableT Poisonable)
             (EitherMonad.eitherT ERR_MESSAGE)
             (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-               (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-            (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-               IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)) dvbs_inf dt) = ret (fin_to_inf_dvalue res).
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable))
+            (@RAISE_OOMABLE_OomableT Poisonable
+               MonadPoisonable)) dvbs_inf dt) = ret (fin_to_inf_dvalue res).
   Proof.
     intros dvbs_fin dvbs_inf dt res REF FIN.
     rewrite dvalue_bytes_to_dvalue_equation in FIN.
@@ -14684,7 +14699,22 @@ Qed.
 
   Lemma dvalue_bytes_to_dvalue_fin_poison_contra :
     forall dvbs_fin dt dt',
-      dvalue_bytes_to_dvalue dvbs_fin dt = {| EitherMonad.unEitherT := {| unMkOomableT := Poison (Oomable (ERR dvalue)) dt' |} |} ->
+      @dvalue_bytes_to_dvalue ErrOOMPoison
+        (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+           (@Monad_OomableT Poisonable MonadPoisonable))
+        (@RAISE_ERROR_MonadExc ErrOOMPoison
+           (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+              (@Monad_OomableT Poisonable MonadPoisonable)))
+        (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+              (@Monad_OomableT Poisonable MonadPoisonable))
+           (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
+              RAISE_POISON_Poisonable))
+        (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+              (@Monad_OomableT Poisonable MonadPoisonable))
+           (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvbs_fin dt =
+        {| EitherMonad.unEitherT := {| unMkOomableT := @Poison (Oomable (ERR dvalue)) dt' |} |} ->
       False.
   Proof.
     Opaque dvalue_bytes_to_dvalue.
@@ -14747,10 +14777,12 @@ Qed.
   Lemma handle_poison_and_oom_dv_dvalue_bytes_to_dvalue_fin_inf_success :
     forall dvbs_inf dvbs_fin dt res,
       dvalue_bytes_refine dvbs_inf dvbs_fin ->
-      @ErrOOMPoison_handle_poison_and_oom_dv err_ub_oom
+      @ErrOOMPoison_handle_poison_and_oom err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        _
+        DVALUE_Poison
         (@dvalue_bytes_to_dvalue ErrOOMPoison
            (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
               (@Monad_OomableT Poisonable MonadPoisonable))
@@ -14766,45 +14798,46 @@ Qed.
               (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
                  (@Monad_OomableT Poisonable MonadPoisonable))
               (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvbs_fin dt) = ret res ->
-      @IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison_handle_poison_and_oom_dv err_ub_oom
+      @ErrOOMPoison_handle_poison_and_oom err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@IS1.LLVM.MEM.CP.CONCBASE.dvalue_bytes_to_dvalue IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+        _
+        IS1.LP.Events.DV.DVALUE_Poison
+        (@IS1.LLVM.MEM.CP.CONCBASE.dvalue_bytes_to_dvalue ErrOOMPoison
            (@EitherMonad.Monad_eitherT ERR_MESSAGE
-              (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-              (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-           (@RAISE_ERROR_MonadExc IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+              (OomableT Poisonable)
+              (@Monad_OomableT Poisonable
+                 MonadPoisonable))
+           (@RAISE_ERROR_MonadExc ErrOOMPoison
               (@EitherMonad.Exception_eitherT ERR_MESSAGE
-                 (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-                 (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                    IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)))
-           (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT
-              (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+                 (OomableT Poisonable)
+                 (@Monad_OomableT Poisonable
+                    MonadPoisonable)))
+           (@RAISE_POISON_E_MT
+              (OomableT Poisonable)
               (EitherMonad.eitherT ERR_MESSAGE)
               (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-                 (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-                 (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                    IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-              (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                 IS1.LLVM.MEM.CP.CONCBASE.OomableT
-                 (@IS1.LLVM.MEM.CP.CONCBASE.MonadT_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                    IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)
-                 IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_Poisonable))
-           (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_E_MT
-              (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+                 (OomableT Poisonable)
+                 (@Monad_OomableT Poisonable
+                    MonadPoisonable))
+              (@RAISE_POISON_E_MT Poisonable
+                 OomableT
+                 (@MonadT_OomableT Poisonable
+                    MonadPoisonable)
+                 RAISE_POISON_Poisonable))
+           (@RAISE_OOMABLE_E_MT
+              (OomableT Poisonable)
               (EitherMonad.eitherT ERR_MESSAGE)
               (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-                 (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-                 (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                    IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-              (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)) dvbs_inf dt) = ret (fin_to_inf_dvalue res).
+                 (OomableT Poisonable)
+                 (@Monad_OomableT Poisonable
+                    MonadPoisonable))
+              (@RAISE_OOMABLE_OomableT Poisonable
+                 MonadPoisonable)) dvbs_inf dt) = ret (fin_to_inf_dvalue res).
   Proof.
     intros dvbs_inf dvbs_fin dt res REF RES.
-    unfold ErrOOMPoison_handle_poison_and_oom_dv in RES.
-    unfold IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison_handle_poison_and_oom_dv.
+    unfold ErrOOMPoison_handle_poison_and_oom in *.
     repeat break_match_hyp_inv.
     - (* No poison occurred *)
       Opaque dvalue_bytes_to_dvalue.

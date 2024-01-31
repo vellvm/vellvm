@@ -54,14 +54,14 @@ Fixpoint remove_key {A B : Type} (eq_dec : (forall (x y : A), {x = y} + {x <> y}
 
 Theorem wf_typ_order :
     well_founded typ_order.
-Proof.
+Proof using.
   unfold well_founded.
   induction a; constructor; intros y H'; inversion H'; subst; auto.
 Qed.
 
 Theorem wf_lt_typ_order :
   well_founded (lex_ord lt typ_order).
-Proof.
+Proof using.
   apply wf_lex_ord.
   apply lt_wf. apply wf_typ_order.
 Qed.
@@ -82,7 +82,7 @@ Lemma remove_key_in :
   forall (A B : Type) (a : A)  (b : B) eq_dec l,
     In (a, b) l ->
     (List.length (remove_key eq_dec a l) < List.length l)%nat.
-Proof.
+Proof using.
   induction l.
   - intros H. inversion H.
   - intros H.
@@ -191,7 +191,7 @@ Lemma typ_to_dtyp_equation  : forall env t,
     | TYPE_X86_mmx => DTYPE_X86_mmx
     | TYPE_Opaque => DTYPE_Opaque
     end.
-Proof.
+Proof using.
   intros env t.
   unfold typ_to_dtyp.
   unfold typ_to_dtyp_func at 1.
@@ -204,25 +204,25 @@ Defined.
 
 (* Specialized version of the characteristic equation for contexts where we don't want to compute *)
 Lemma typ_to_dtyp_I : forall s i, typ_to_dtyp s (TYPE_I i) = DTYPE_I i.
-Proof.
+Proof using.
   intros; rewrite typ_to_dtyp_equation; reflexivity.
 Qed.
 
 Lemma typ_to_dtyp_D : forall s, typ_to_dtyp s TYPE_Double = DTYPE_Double.
-Proof.
+Proof using.
   intros; rewrite typ_to_dtyp_equation; reflexivity.
 Qed.
 
 Lemma typ_to_dtyp_P :
   forall t s,
     typ_to_dtyp s (TYPE_Pointer t) = DTYPE_Pointer.
-Proof.
+Proof using.
   intros t s.
   apply typ_to_dtyp_equation.
 Qed.
 
 Lemma typ_to_dtyp_D_array : forall n s, typ_to_dtyp s (TYPE_Array n TYPE_Double) = DTYPE_Array n DTYPE_Double.
-Proof.
+Proof using.
   intros.
   rewrite typ_to_dtyp_equation.
   rewrite typ_to_dtyp_D.
@@ -278,7 +278,7 @@ End ConvertTyp.
 Lemma convert_typ_list_app :
   forall {F} `{TFunctor F} (a b : list (F typ)) (env : list (ident * typ)),
     convert_typ env (a ++ b)%list = (convert_typ env a ++ convert_typ env b)%list.
-Proof.
+Proof using.
   intros F H a.
   induction a; cbn; intros; auto.
   rewrite IHa; reflexivity.
@@ -292,12 +292,12 @@ Definition convert_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
   convert_typ (m_type_defs CFG) CFG.
 
 Lemma convert_typ_ocfg_app : forall (a b : ocfg typ) env, (convert_typ env (a ++ b) = convert_typ env a ++ convert_typ env b)%list.
-Proof.
+Proof using.
   intros; rewrite convert_typ_list_app; reflexivity.
 Qed.
 
 Lemma convert_typ_code_app : forall (a b : code typ) env, (convert_typ env (a ++ b) = convert_typ env a ++ convert_typ env b)%list.
-Proof.
+Proof using.
   induction a as [| [] a IH]; cbn; intros; auto.
   rewrite IH; reflexivity.
 Qed.
@@ -306,7 +306,7 @@ Lemma convert_typ_mcfg_app:
   forall mcfg1 mcfg2 : modul (cfg typ),
     convert_typ [] (mcfg1 @@ mcfg2) =
     convert_typ [] mcfg1 @@ convert_typ [] mcfg2.
-Proof.
+Proof using.
   intros [] []; cbn.
   unfold convert_typ,ConvertTyp_mcfg,tfmap,TFunctor_mcfg; cbn.
   f_equal; try (unfold endo, Endo_option; cbn; repeat flatten_goal; now intuition).
@@ -321,7 +321,7 @@ Lemma convert_types_app_mcfg : forall mcfg1 mcfg2,
     m_type_defs mcfg2 = [] ->
     convert_types (modul_app mcfg1 mcfg2) =
     modul_app (convert_types mcfg1) (convert_types mcfg2).
-Proof.
+Proof using.
   unfold convert_types.
   intros * EQ1 EQ2.
   rewrite m_type_defs_app, EQ1,EQ2.
@@ -334,7 +334,7 @@ Lemma mcfg_of_tle_app : forall x y,
     m_type_defs (mcfg_of_modul (modul_of_toplevel_entities y)) = nil ->
     convert_types (mcfg_of_tle (x ++ y)) =
     modul_app (convert_types (mcfg_of_tle x)) (convert_types (mcfg_of_tle y)).
-Proof.
+Proof using.
   intros.
   unfold mcfg_of_tle.
   rewrite modul_of_toplevel_entities_app.
@@ -347,6 +347,6 @@ Lemma mcfg_of_tle_cons : forall x y,
     m_type_defs (mcfg_of_modul (modul_of_toplevel_entities y)) = nil ->
     convert_types (mcfg_of_tle (x :: y)) =
     modul_app (convert_types  (mcfg_of_tle [x])) (convert_types  (mcfg_of_tle y)).
-Proof.
+Proof using.
   intros; rewrite list_cons_app; apply mcfg_of_tle_app; auto.
 Qed.

@@ -29,7 +29,7 @@ Open Scope monad_scope.
 Section Ident.
   Lemma eq1_ret_ret_ident :
     forall {A} (x y : A), (ret x : ident A) ≈ ret y -> x = y.
-  Proof.
+  Proof using.
     intros A x y EQ.
     unfold Monad.eq1, Eq1_either in EQ.
     inversion EQ.
@@ -46,7 +46,7 @@ Section Either.
 
   Lemma eq1_ret_ret_either:
     forall {A} (x y : A), (ret x : sum E A) ≈ ret y -> x = y.
-  Proof.
+  Proof using.
     intros A x y EQ.
     unfold Monad.eq1, Eq1_either in EQ.
     inversion EQ.
@@ -69,7 +69,7 @@ Section EitherT.
 
   Lemma eq1_ret_ret_eitherT:
     forall {A} (x y : A), (ret x : eitherT E M A) ≈ ret y -> x = y.
-  Proof.
+  Proof using All.
     intros A x y EQ.
     unfold Monad.eq1, Eq1_eitherT in EQ.
     destruct RINV.
@@ -89,7 +89,7 @@ Section ITree.
 
   Lemma eq1_ret_ret_itree :
     forall {A} (x y : A), (ret x : itree E A) ≈ ret y -> x = y.
-  Proof.
+  Proof using.
     intros A x y EQ.
     eapply Eqit.eutt_inv_Ret.
     cbn in EQ.

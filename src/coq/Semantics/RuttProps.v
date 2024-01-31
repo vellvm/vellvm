@@ -25,14 +25,14 @@ Variable (RR: R1 -> R2 -> Prop).
 Lemma rutt_Ret (r1: R1) (r2: R2):
   RR r1 r2 ->
   rutt REv RAns RR (Ret r1: itree E1 R1) (Ret r2: itree E2 R2).
-Proof. intros. pstep; constructor; auto. Qed.
+Proof using. intros. pstep; constructor; auto. Qed.
 
 Lemma rutt_Vis {T1 T2} (e1: E1 T1) (e2: E2 T2)
     (k1: T1 -> itree E1 R1) (k2: T2 -> itree E2 R2):
   REv _ _ e1 e2 ->
   (forall t1 t2, RAns _ _ e1 t1 e2 t2 -> rutt REv RAns RR (k1 t1) (k2 t2)) ->
   rutt REv RAns RR (Vis e1 k1) (Vis e2 k2).
-Proof.
+Proof using.
   intros He Hk. pstep; constructor; auto.
   intros; left. apply Hk; auto.
 Qed.
@@ -41,7 +41,7 @@ Lemma rutt_trigger (e1: E1 R1) (e2: E2 R2):
   REv _ _ e1 e2 ->
   (forall t1 t2, RAns _ _ e1 t1 e2 t2 -> RR t1 t2) ->
   rutt REv RAns RR (trigger e1) (trigger e2).
-Proof.
+Proof using.
   intros. apply rutt_Vis; auto.
   intros. apply rutt_Ret; auto.
 Qed.
@@ -51,7 +51,7 @@ End MakeRutt.
 
 Lemma eutt_inv_Ret_l {E R} (r1: R) (t2: itree E R):
   (Ret r1) ≈ t2 -> t2 ≳ (Ret r1).
-Proof.
+Proof using.
   intros Heutt. punfold Heutt; red in Heutt; cbn in Heutt.
   rewrite itree_eta. remember (RetF r1) as ot1.
   induction Heutt; intros; try discriminate.
@@ -61,7 +61,7 @@ Qed.
 
 Lemma eutt_inv_Ret_r {E R} (t1: itree E R) (r2: R):
   t1 ≈ (Ret r2) -> t1 ≳ (Ret r2).
-Proof.
+Proof using.
   intros Heutt. punfold Heutt; red in Heutt; cbn in Heutt.
   rewrite itree_eta. remember (RetF r2) as ot2.
   induction Heutt; intros; try discriminate.
@@ -76,7 +76,7 @@ Qed.
       {RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop} {RS : R1 -> R2 -> Prop} r rg:
     Proper (eq_itree eq ==> eq_itree eq ==> flip impl)
          (gpaco2 (Rutt.rutt_ REv RAns RS) (euttge_trans_clo RS) r rg).
-Proof.
+Proof using.
   apply grutt_cong_eqit; now intros * ->.
 Qed.
 
@@ -84,7 +84,7 @@ Qed.
       {RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop} {RS : R1 -> R2 -> Prop} r rg:
     Proper (euttge eq ==> euttge eq ==> flip impl)
          (gpaco2 (Rutt.rutt_ REv RAns RS) (euttge_trans_clo RS) r rg).
-Proof.
+Proof using.
   apply grutt_cong_euttge; now intros * ->.
 Qed.
 
@@ -113,7 +113,7 @@ Definition eq_REv {E1 E2: Type -> Type} (REv1 REv2: forall A B, E1 A -> E2 B -> 
   forall A B, eq_rel (REv1 A B) (REv2 A B).
 
 #[global] Instance eq_REv_Equivalence {E1 E2}: Equivalence (@eq_REv E1 E2).
-Proof.
+Proof using.
   constructor.
   - red. red. reflexivity.
   - red. intros * H. red in H. red. now symmetry.
@@ -125,7 +125,7 @@ Definition flip_REv {E1 E2: Type -> Type} (REv1: forall A B, E1 A -> E2 B -> Pro
 
 Lemma flip_flip_REv {E1 E2} REv1:
   @eq_REv E1 E2 (flip_REv (flip_REv REv1)) REv1.
-Proof. reflexivity. Qed.
+Proof using. reflexivity. Qed.
 
 (* For RAns we want to defer to eq_rel, but for that we need to regroup events
    and their return values into pairs *)
@@ -135,17 +135,17 @@ Definition RAns_pair E1 E2 (RAns: forall A B, E1 A -> A -> E2 B -> B -> Prop) {A
 
 Lemma RAns_pair_iff {E1 E2 A B} RAns1:
   forall e1 (a:A) e2 (b:B), RAns_pair E1 E2 RAns1 (e1,a) (e2,b) <-> RAns1 A B e1 a e2 b.
-Proof. reflexivity. Qed.
+Proof using. reflexivity. Qed.
 
 Definition eq_RAns {E1 E2} (RAns1 RAns2: forall A B, E1 A -> A -> E2 B -> B -> Prop) :=
   forall A B, eq_rel (@RAns_pair E1 E2 RAns1 A B) (@RAns_pair E1 E2 RAns2 A B).
 
 Lemma eq_RAns_iff {E1 E2} {RAns1 RAns2} (H: @eq_RAns E1 E2 RAns1 RAns2):
   forall A B e1 a e2 b, RAns2 A B e1 a e2 b <-> RAns1 A B e1 a e2 b.
-Proof. intros *. rewrite <- ! RAns_pair_iff. split; apply H. Qed.
+Proof using. intros *. rewrite <- ! RAns_pair_iff. split; apply H. Qed.
 
 #[global] Instance eq_RAns_Equivalence {E1 E2}: Equivalence (@eq_RAns E1 E2).
-Proof.
+Proof using.
   constructor.
   - red; red. reflexivity.
   - red; red. now symmetry.
@@ -157,11 +157,11 @@ Definition flip_RAns {E1 E2} (RAns: forall A B, E1 A -> A -> E2 B -> B -> Prop) 
 
 Lemma flip_RAns_iff {E1 E2 A B} RAns:
   forall e1 (a:A) e2 (b:B), @flip_RAns E1 E2 RAns B A e2 b e1 a <-> RAns _ _ e1 a e2 b.
-Proof. reflexivity. Qed.
+Proof using. reflexivity. Qed.
 
 Lemma flip_flip_RAns {E1 E2} (RAns: forall A B, E1 A -> A -> E2 B -> B -> Prop):
   eq_RAns (flip_RAns (flip_RAns RAns)) RAns.
-Proof. reflexivity. Qed.
+Proof using. reflexivity. Qed.
 
 (* Additional lemmas and properties on rutt:
    - Inversion principles
@@ -186,7 +186,7 @@ Lemma ruttF_inv_VisF_r {sim} t1 U2 (e2: E2 U2) (k2: U2 -> _):
   \/
   (exists t1', t1 = TauF t1' /\
     ruttF REv RAns RR sim (observe t1') (VisF e2 k2)).
-Proof.
+Proof using.
   refine (fun H =>
     match H in ruttF _ _ _ _ _ t2 return
       match t2 return Prop with
@@ -205,7 +205,7 @@ Lemma ruttF_inv_VisF {sim}
     U1 U2 (e1 : E1 U1) (e2 : E2 U2) (k1 : U1 -> _) (k2 : U2 -> _)
   : ruttF REv RAns RR sim (VisF e1 k1) (VisF e2 k2) ->
     forall v1 v2, RAns U1 U2 e1 v1 e2 v2 -> sim (k1 v1) (k2 v2).
-Proof.
+Proof using.
   intros H. dependent destruction H. assumption.
 Qed.
 
@@ -219,7 +219,7 @@ Lemma fold_ruttF:
   ot1 = observe t1 ->
   ot2 = observe t2 ->
   rutt REv RAns RR t1 t2.
-Proof.
+Proof using.
   intros * eq -> ->; pfold; auto.
 Qed.
 
@@ -228,7 +228,7 @@ Lemma ruttF_inv_Tau_l {r: itree E1 R1 -> itree E2 R2 -> Prop}:
   (*                  Maybe generalizable to r? vvvv *)
   ruttF REv RAns RR (upaco2 (rutt_ REv RAns RR) bot2) (TauF m1) (observe t2) ->
   ruttF REv RAns RR (upaco2 (rutt_ REv RAns RR) r) (observe m1) (observe t2).
-Proof.
+Proof using.
   intros * Hrutt. apply (fold_ruttF (Tau m1) t2) in Hrutt; auto.
   apply rutt_inv_Tau_l in Hrutt. punfold Hrutt; red in Hrutt.
   eapply rutt_monot; eauto using upaco2_mon_bot.
@@ -258,7 +258,7 @@ Qed.
       ==> @eq_rel R1 R2        (* RR *)
       ==> eq_rel               (* sim *)
       ==> eq_rel) (@ruttF E1 E2 R1 R2).
-Proof.
+Proof using.
   repeat red.
   intros; subst. split; hnf; intros.
   - induction H; try auto.
@@ -273,13 +273,13 @@ Qed.
 
 Lemma rutt_inv_Ret r1 r2:
   rutt REv RAns RR (Ret r1) (Ret r2) -> RR r1 r2.
-Proof.
+Proof using.
   intros. punfold H. inv H. eauto.
 Qed.
 
 Lemma rutt_inv_Ret_l r1 t2:
   rutt REv RAns RR (Ret r1) t2 -> exists r2, t2 ≳ Ret r2 /\ RR r1 r2.
-Proof.
+Proof using.
   intros Hrutt; punfold Hrutt; red in Hrutt; cbn in Hrutt.
   setoid_rewrite (itree_eta t2). remember (RetF r1) as ot1; revert Heqot1.
   induction Hrutt; intros; try discriminate.
@@ -290,7 +290,7 @@ Qed.
 
 Lemma rutt_inv_Ret_r t1 r2:
   rutt REv RAns RR t1 (Ret r2) -> exists r1, t1 ≳ Ret r1 /\ RR r1 r2.
-Proof.
+Proof using.
   intros Hrutt; punfold Hrutt; red in Hrutt; cbn in Hrutt.
   setoid_rewrite (itree_eta t1). remember (RetF r2) as ot2; revert Heqot2.
   induction Hrutt; intros; try discriminate.
@@ -305,7 +305,7 @@ Lemma rutt_inv_Vis_l {U1} (e1: E1 U1) k1 t2:
     t2 ≈ Vis e2 k2 /\
     REv _ _ e1 e2 /\
     (forall v1 v2, RAns _ _ e1 v1 e2 v2 -> rutt REv RAns RR (k1 v1) (k2 v2)).
-Proof.
+Proof using.
   intros Hrutt; punfold Hrutt; red in Hrutt; cbn in Hrutt.
   setoid_rewrite (itree_eta t2). remember (VisF e1 k1) as ot1; revert Heqot1.
   induction Hrutt; intros; try discriminate; subst.
@@ -324,7 +324,7 @@ Lemma rutt_inv_Vis_r {U2} t1 (e2: E2 U2) k2:
     t1 ≈ Vis e1 k1 /\
     REv U1 U2 e1 e2 /\
     (forall v1 v2, RAns _ _ e1 v1 e2 v2 -> rutt REv RAns RR (k1 v1) (k2 v2)).
-Proof.
+Proof using.
   intros Hrutt; punfold Hrutt; red in Hrutt; cbn in Hrutt.
   setoid_rewrite (itree_eta t1). remember (VisF e2 k2) as ot2; revert Heqot2.
   induction Hrutt; intros; try discriminate; subst.
@@ -341,7 +341,7 @@ Lemma rutt_inv_Vis U1 U2 (e1: E1 U1) (e2: E2 U2)
     (k1: U1 -> itree E1 R1) (k2: U2 -> itree E2 R2):
   rutt REv RAns RR (Vis e1 k1) (Vis e2 k2) ->
   forall u1 u2, RAns U1 U2 e1 u1 e2 u2 -> rutt REv RAns RR (k1 u1) (k2 u2).
-Proof.
+Proof using.
   intros H u1 u2 Hans. punfold H.
   apply ruttF_inv_VisF with (v1 := u1) (v2 := u2) in H. pclearbot; auto.
   assumption.
@@ -367,7 +367,7 @@ Tactic Notation "fold_ruttF" hyp(H) :=
 
 Lemma rutt_flip {E1 E2 R1 R2 REv RAns RR} (t1: itree E1 R1) (t2: itree E2 R2):
   rutt REv RAns RR t1 t2 <-> rutt (flip_REv REv) (flip_RAns RAns) (flip RR) t2 t1.
-Proof.
+Proof using.
   split; revert t1 t2; pcofix CIH; intros t1 t2 Hrutt;
   punfold Hrutt; red in Hrutt; pstep; red.
   - induction Hrutt; auto.
@@ -388,7 +388,7 @@ Qed.
       ==> going (eq_itree eq)                          (* t1 *)
       ==> going (eq_itree eq)                          (* t2 *)
       ==> iff) (@ruttF E1 E2 R1 R2).
-Proof.
+Proof using.
   intros REv REv' HREv RAns RAns' HRAns RR RR' HRR.
   intros sim sim' Hsim t1 t1' Ht1 t2 t2' Ht2.
   split; intros Hrutt.
@@ -448,7 +448,7 @@ Qed.
       ==> eq             (* t1 *)
       ==> eq             (* t2 *)
       ==> iff) (@rutt E1 E2 R1 R2).
-Proof.
+Proof using.
   intros REv1 REv2 HREv  RAns1 RAns2 HRAns RR1 RR2 HRR t1 _ <- t2 _ <-.
   split; intros Hrutt.
 
@@ -480,7 +480,7 @@ Qed.
       ==> eq_itree eq    (* t1 *)
       ==> eq_itree eq    (* t2 *)
       ==> iff) (@rutt E1 E2 R1 R2).
-Proof.
+Proof using.
   clear. intros REv1 REv2 HREv RAns1 RAns2 HRAns RR1 RR2 HRR t1 t1' Ht1 t2 t2' Ht2.
   split; intros Hrutt.
 
@@ -504,7 +504,7 @@ Lemma rutt_cong_eutt {E1 E2 R1 R2}:
   rutt REv RAns RR t1 t2 ->
   t1 ≈ t1' ->
   rutt REv RAns RR t1' t2.
-Proof.
+Proof using.
   (* First by coinduction; then do an induction on Hrutt to expose the ruttF
      linking t1 and t2; then an induction on Heutt to expose the relation
      between t1 and t1'. Finally, explore ruttF until landing on an rutt where
@@ -585,7 +585,7 @@ Qed.
       ==> eutt eq        (* t1 *)
       ==> eutt eq        (* t2 *)
       ==> iff) (@rutt E1 E2 R1 R2).
-Proof.
+Proof using.
   intros REv REv2 HREv RAns RAns2 HRAns RR RR2 HRR t1 t1' Ht1 t2 t2' Ht2.
   rewrite <- HREv, <- HRAns, <- HRR; clear HREv REv2 HRAns RAns2 HRR RR2.
   split; intros Hrutt.
@@ -615,7 +615,7 @@ Hint Constructors rutt_bind_clo: core.
 
 Lemma rutt_clo_bind :
   rutt_bind_clo <3= gupaco2 (rutt_ REv RAns RR) (euttge_trans_clo RR).
-Proof.
+Proof using.
   intros rr. gcofix CIH. intros. destruct PR.
   gclo; econstructor; auto_ctrans_eq.
   1,2: rewrite unfold_bind; reflexivity.
@@ -649,7 +649,7 @@ Lemma rutt_bind
     rutt REv RAns RR t1 t2 ->
     (forall r1 r2, RR r1 r2 -> rutt REv RAns RT (k1 r1) (k2 r2)) ->
     rutt REv RAns RT (ITree.bind t1 k1) (ITree.bind t2 k2).
-Proof.
+Proof using.
   intros. ginit.
   (* For some reason [guclo] fails, visibly trying to infer the type in a context with less information? *)
   eapply gpaco2_uclo; [|eapply rutt_clo_bind|]; eauto with paco.
@@ -671,7 +671,7 @@ Arguments RAns_in_reflexive {U e u1 u2}.
 
 Lemma eqit_rutt_subrelation: forall t1 t2,
   eutt RR t1 t2 -> rutt REv RAns RR t1 t2.
-Proof.
+Proof using E R1 R2 RAns RAns_in_reflexive REv REv_reflexive RR.
   pcofix CIH; intros * H. pstep. punfold H. red in H. red.
   hinduction H before CIH; intros; eauto.
   - apply EqTau. red. pclearbot. right. apply CIH. do 2 red. assumption.

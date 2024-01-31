@@ -34,7 +34,7 @@ Section ITreeRaiseError.
   Definition ITreeErrorMFails {A} (t : itree E A) := exists x, t ≈ raise_error x.
 
   #[global] Instance ITreeErrorMonadReturns : MonadReturns (itree E).
-  Proof.
+  Proof using E FAILE.
     split with
       (MReturns := @ITreeReturns)
       (MFails := @ITreeErrorMFails).

@@ -98,7 +98,7 @@ Module Simple.
       forall X (e : StateE X) h t,
         handler_prop' _ e h t ->
         handler_prop _ e h t. 
-    Proof.
+    Proof using.
       intros * HP.
       dependent destruction HP.
       constructor; auto.
@@ -110,7 +110,7 @@ Module Simple.
       forall X (e : StateE X) def h t,
         handler_exec def _ e h = t ->
         handler_prop _ e h t. 
-    Proof.
+    Proof using.
       intros * HP.
       destruct e; cbn in *.
       destruct (read h x) eqn:EQ.
@@ -209,7 +209,7 @@ Module Simple.
     Definition can_do := fun h a => valid_history h /\ can_do_step h a.
 
     Lemma handler_prop_valid : valid can_do.
-    Proof.
+    Proof using.
       constructor.
       (* - intros * SITE; split; intros CAN. *)
       (*   + destruct a, a'; try now constructor.  *)

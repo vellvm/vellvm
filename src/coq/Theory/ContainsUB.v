@@ -44,7 +44,7 @@ Section contains_UB.
   | FindUB    : forall s k t2, t2 ≅ (vis (@subevent UBE Eff Eff_UBE void (ThrowUB s)) k) -> contains_UB t2.
 
   #[global] Instance proper_eutt_contains_UB {R} {RR : relation R} : Proper (@eqit Eff _ _ RR true true ==> iff) contains_UB.
-  Proof.
+  Proof using.
     unfold Proper, respectful.
     intros x y EQ.
     split; intros UB.
@@ -241,7 +241,7 @@ Section contains_UB.
       stronger bx1 bx2 b1 ->
       stronger by1 by2 b2 ->
       Proper (eqit RR bx1 bx2 ==> eqit RR by1 by2 ==> iff) (@eqit E _ _ RR b1 b2).
-  Proof.
+  Proof using.
     intros E0 R RR bx1 bx2 by1 by2 b1 b2 STRONGX STRONGY.
     unfold Proper, respectful.
     intros x x' XX y y' YY.
@@ -262,7 +262,7 @@ Section contains_UB_lemmas.
 
   Lemma ret_not_contains_UB {R} {RR : relation R} :
     forall (t : itree Eff R) rv, eqit RR true true t (ret rv) -> ~ contains_UB t.
-  Proof.
+  Proof using.
     intros t rv EQ CUB.
     rewrite EQ in CUB.
     inversion CUB; subst;
@@ -287,7 +287,7 @@ Section bind_lemmas.
     forall {R T} (t : itree Eff R) (k : R -> itree Eff T),
       contains_UB t ->
       contains_UB (ITree.bind t k).
-  Proof.
+  Proof using.
     intros R T t k CUB.
     induction CUB.
     - rewrite H.
@@ -307,7 +307,7 @@ Section bind_lemmas.
       Returns a t ->
       contains_UB (k a) ->
       contains_UB (ITree.bind t k).
-  Proof.
+  Proof using.
     intros R T t k a RET CUB.
     induction RET.
     - rewrite H; rewrite bind_ret_l; auto.
@@ -325,7 +325,7 @@ Section bind_lemmas.
       contains_UB (ITree.bind t k) ->
       (forall x, ~ contains_UB (k x)) ->
       contains_UB t.
-  Proof.
+  Proof using.
     intros R T t k UB NUB.
   Admitted.
 End bind_lemmas.
@@ -394,7 +394,7 @@ Section interp_lemmas.
       handler_keeps_UB ->
       (forall {T} (e : Eff1 T), exists a, Returns a (handler T e)) ->
       contains_UB (interp handler t).
-  Proof.
+  Proof using.
     intros R t UB KEEP RET.
     Import InterpFacts.
     induction UB.
@@ -558,7 +558,7 @@ Section refine_OOM_h_lemmas.
       contains_UB y ->
       refine_OOM_h RR x y ->
       contains_UB x.
-  Proof.
+  Proof using.
     intros R RR x y UB REF.
     rewrite REF.
     eauto.
