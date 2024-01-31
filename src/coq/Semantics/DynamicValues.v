@@ -804,8 +804,29 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       Exists (uvalue_subterm u) uv_bytes ->
       uvalue_strict_subterm u (UVALUE_ConcatBytes uv_bytes dt).
   Proof.
-  Admitted.
-
+    intros u uv_bytes dt H. generalize dependent dt. 
+    induction H.
+    { unfold uvalue_subterm in H. unfold uvalue_strict_subterm.
+      (* The idea here: if uvalue_direct_subterm is refl, then clos_trans is transitive with x and x is *)
+      intros. 
+      eapply clos_rt_t.
+      - apply H.
+      - apply t_step; constructor; apply in_eq. }
+    { intros dt. apply Exists_In in H.
+      destruct H as (a&H1&H2).
+      unfold uvalue_subterm in H2. unfold uvalue_strict_subterm.
+      eapply clos_rt_t.
+      apply H2.
+      apply t_step. constructor. simpl. right. assumption.
+    }
+  Qed. 
+    
+  Lemma uvalue_concat_bytes_strict_subterm_neq :
+    forall u v uv_bytes dt,
+      u <> v ->
+      Exists (uvalue_subterm u) uv_bytes ->
+      uvalue_strict_subterm u ()
+  
   Lemma uvalue_direct_subterm_uvalue_measure :
     forall s e,
       uvalue_direct_subterm s e ->
