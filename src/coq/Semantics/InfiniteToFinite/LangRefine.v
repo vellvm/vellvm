@@ -14042,89 +14042,117 @@ Qed.
       apply dvalue_byte_refine_fin_to_inf_dvalue_byte.
   Qed.
 
-  Lemma dvalue_extract_byte_success_fin_inf :
-    forall {M} `{HM : Monad M} `{RE: RAISE_ERROR M} `{RP : Poisonable.RAISE_POISON M} `{RO : Oomable.RAISE_OOMABLE M}
-      dv_inf dv_fin dt idx res,
-      dvalue_refine_strict dv_inf dv_fin ->
-      @dvalue_extract_byte M HM RE RP RO dv_fin dt idx = ret res ->
-      @IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte M HM RE RP RO dv_inf dt idx = ret res.
+  Lemma extract_field_byte_helper_fin_inf :
+    forall {M : Type -> Type} {HM: Monad M} {RE: RAISE_ERROR M}
+      (field_dts : list dtyp) (field_idx : N) (byte_idx : N),
+      @IS1.LLVM.MEM.CP.CONCBASE.extract_field_byte_helper M HM RE field_dts field_idx byte_idx =
+        @extract_field_byte_helper M HM RE field_dts field_idx byte_idx.
   Proof.
-   (*  intros M HM RE RP RO dv_inf dv_fin dt idx res REF VAL. *)
-   (*  induction dv_fin; dvalue_refine_strict_inv REF; *)
-   (*    rewrite dvalue_extract_byte_equation in VAL; *)
-   (*    rewrite IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte_equation; *)
-   (*    try solve *)
-   (*      [ unfold extract_byte_Z, IS1.LLVM.MEM.CP.CONCBASE.extract_byte_Z in *; *)
-   (*        inv VAL; *)
-   (*        solve *)
-   (*          [ reflexivity *)
-   (*          | erewrite AC1.addr_convert_ptoi; eauto *)
-   (*          | erewrite IP.from_Z_to_Z; eauto *)
-   (*          ] *)
-   (*      ]. *)
-   (*  - Lemma extract_field_byte_fin_inf : *)
-   (*      forall {M : Type -> Type} {HM: Monad M} {RE: RAISE_ERROR M} *)
-   (*        (field_dts : list dtyp) (byte_idx : N), *)
-   (*        @IS1.LLVM.MEM.CP.CONCBASE.extract_field_byte M HM RE field_dts byte_idx = *)
-   (*          @extract_field_byte M HM RE field_dts byte_idx. *)
-   (*    Proof. *)
-   (*    Admitted. *)
+    intros M HM RE field_dts.
+    induction field_dts;
+      intros field_idx byte_idx;
+      cbn; auto.
+    rewrite sizeof_dtyp_fin_inf.
+    rewrite IHfield_dts.
+    reflexivity.
+  Qed.
 
-   (*    Opaque dvalue_extract_byte. *)
-   (*    Opaque IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte. *)
+  Lemma extract_field_byte_fin_inf :
+    forall {M : Type -> Type} {HM: Monad M} {RE: RAISE_ERROR M}
+      (field_dts : list dtyp) (byte_idx : N),
+      @IS1.LLVM.MEM.CP.CONCBASE.extract_field_byte M HM RE field_dts byte_idx =
+        @extract_field_byte M HM RE field_dts byte_idx.
+  Proof.
+    intros M HM RE field_dts byte_idx.
+    apply extract_field_byte_helper_fin_inf.
+  Qed.
 
-   (*    destruct dt; inv VAL; auto. *)
-   (*    assert (forall (x0 : (dtyp * (N * N))%type), *)
-   (*               (let (fdt, p) := x0 in *)
-   (* let (field_idx, byte_idx) := p in *)
-   (* match nth_error x (N.to_nat field_idx) with *)
-   (* | Some f => IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte f fdt (Z.of_N byte_idx) *)
-   (* | None => raise_error "dvalue_extract_byte: more fields in DVALUE_Struct than in dtyp." *)
-   (* end) = (let (fdt, p) := x0 in *)
-   (* let (field_idx, byte_idx) := p in *)
-   (* match nth_error fields (N.to_nat field_idx) with *)
-   (* | Some f => dvalue_extract_byte f fdt (Z.of_N byte_idx) *)
-   (* | None => raise_error "dvalue_extract_byte: more fields in DVALUE_Struct than in dtyp." *)
-   (* end)). *)
-   (*    admit. *)
-   (*    reflexivity. *)
-   (*    erewrite H0. *)
+  Lemma dvalue_extract_byte_success_fin_inf :
+    forall dv_inf dv_fin dt idx res,
+      dvalue_refine_strict dv_inf dv_fin ->
+      @dvalue_extract_byte ErrOOMPoison
+          (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+             (@Monad_OomableT Poisonable MonadPoisonable))
+          (@RAISE_ERROR_MonadExc ErrOOMPoison
+             (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+                (@Monad_OomableT Poisonable MonadPoisonable)))
+          (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+             (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                (@Monad_OomableT Poisonable MonadPoisonable))
+             (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
+                RAISE_POISON_Poisonable))
+          (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+             (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                (@Monad_OomableT Poisonable MonadPoisonable))
+             (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dv_fin dt idx =
+        @ret ErrOOMPoison
+          (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+             (@Monad_OomableT Poisonable MonadPoisonable)) Z res ->
+ @IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte ErrOOMPoison
+    (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+       (@Monad_OomableT Poisonable MonadPoisonable))
+    (@RAISE_ERROR_MonadExc ErrOOMPoison
+       (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+          (@Monad_OomableT Poisonable MonadPoisonable)))
+    (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+       (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+          (@Monad_OomableT Poisonable MonadPoisonable))
+       (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
+          RAISE_POISON_Poisonable))
+    (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+       (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+          (@Monad_OomableT Poisonable MonadPoisonable))
+       (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dv_inf dt idx =
+  @ret ErrOOMPoison
+    (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+       (@Monad_OomableT Poisonable MonadPoisonable)) Z res.
+  Proof.
+    intros dv_inf dv_fin dt idx res REF VAL.
+    Opaque dvalue_extract_byte.
+    Opaque IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte.
+    induction dv_fin using dvalue_strong_ind;
+      rewrite dvalue_extract_byte_equation in VAL;
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte_equation;
+      try solve
+        [ dvalue_refine_strict_inv REF;
+          unfold extract_byte_Z, IS1.LLVM.MEM.CP.CONCBASE.extract_byte_Z in *;
+          inv VAL;
+          solve
+            [ reflexivity
+            | erewrite AC1.addr_convert_ptoi; eauto
+            | erewrite IP.from_Z_to_Z; eauto
+            ]
+        ].
+    - destruct dv_fin; inv VAL;
+        try solve
+          [ dvalue_refine_strict_inv REF;
+            unfold extract_byte_Z, IS1.LLVM.MEM.CP.CONCBASE.extract_byte_Z in *;
+            try inv H0;
+            solve
+              [ reflexivity
+              | erewrite AC1.addr_convert_ptoi; eauto
+              | erewrite IP.from_Z_to_Z; eauto
+              ]
+          ].
 
-   (*    setoid_rewrite H0. *)
-   (*    rewrite extract_field_byte_fin_inf. *)
-   (*    setoid_erewrite H. *)
-   (*    destruct (extract_field_byte fields0 (Z.to_N idx)) eqn:EXTRACT_FIELDS. *)
-   (*    destruct unEitherT. *)
-   (*    break_inner_match_hyp; inv H1. *)
-   (*    do 4 break_match_hyp_inv; cbn in *. *)
-   (*    break_inner_match_hyp; cbn in *. *)
-   (*    2: inv H2. *)
-   (*    subst; cbn in *. *)
-   (*    Set Printing Implicit. *)
-   (*    setoid_rewrite EXTRACT_FIELDS. *)
-      
-   (*    destruct o; *)
-   (*    cbn in *. *)
-   (*    pose proof (@extract_field_byte_fin_inf ErrOOMPoison *)
-   (*      (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable) *)
-   (*         (@Monad_OomableT Poisonable MonadPoisonable)) *)
-   (*      (@RAISE_ERROR_MonadExc ErrOOMPoison *)
-   (*         (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable) *)
-   (*            (@Monad_OomableT Poisonable MonadPoisonable))) dts  *)
-   (*      (Z.to_N idx)). *)
-      
+      { (* Structs *)
+        destruct dt; inv H1.
+        rewrite extract_field_byte_fin_inf.
+        destruct (extract_field_byte fields0 (Z.to_N idx)) eqn:FIELD.
+        destruct unEitherT.
+        destruct unMkOomableT; inv H2.
+        destruct o; inv H1.
+        destruct s; inv H2.
+        destruct p as (?&?&?).
+        cbn in *.
+        destruct (nth_error fields (N.to_nat n)) eqn:NTH;
+          [|inv H1].
 
-   (*    assert (IS1.LLVM.MEM.CP.CONCBASE.extract_field_byte = extract_field_byte). *)
-   (*    { unfold IS1.LLVM.MEM.CP.CONCBASE.extract_field_byte, extract_field_byte. *)
-   (*      unfold IS1.LLVM.MEM.CP.CONCBASE.extract_field_byte_helper, extract_field_byte_helper. *)
-   (*      admit. *)
-   (*    } *)
-   (*    destruct dt; inv VAL. *)
-
-   (*    do 5 break_match_hyp_inv. *)
-   (*    destruct (nth_error fields (N.to_nat n)) eqn:FIELDS; *)
-   (*      [|inv H2]. *)
-   (*    cbn. *)
+        eapply map_monad_OOM_Nth in NTH; eauto.
+        destruct NTH as (?&?&?).
+        admit.
+        admit.
+      }
   Admitted.
 
   Lemma dvalue_byte_value_success_fin_inf :
