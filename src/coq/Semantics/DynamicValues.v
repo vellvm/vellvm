@@ -807,7 +807,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     intros u uv_bytes dt H. generalize dependent dt. 
     induction H.
     { unfold uvalue_subterm in H. unfold uvalue_strict_subterm.
-      (* The idea here: if uvalue_direct_subterm is refl, then clos_trans is transitive with x and x is *)
       intros. 
       eapply clos_rt_t.
       - apply H.
@@ -821,12 +820,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     }
   Qed. 
     
-  Lemma uvalue_concat_bytes_strict_subterm_neq :
-    forall u v uv_bytes dt,
-      u <> v ->
-      Exists (uvalue_subterm u) uv_bytes ->
-      uvalue_strict_subterm u ()
-  
   Lemma uvalue_direct_subterm_uvalue_measure :
     forall s e,
       uvalue_direct_subterm s e ->
