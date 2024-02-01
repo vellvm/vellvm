@@ -63,7 +63,7 @@ Proof.
   intros elt k CONTRA.
   repeat red in CONTRA.
   destruct CONTRA as (?&?).
-  repeat red in H.
+  (* repeat red in H. *) (* Seems that you don't need this. *)
   eapply NM.Raw.Proofs.empty_1 in H; auto.
 Qed.
 
@@ -111,9 +111,26 @@ Proof.
   - eapply NM.add_2; eauto.
 Qed.
 
+Lemma NM_MapsTo_injective : forall {elt} k v1 v2 m,
+    NM.MapsTo (elt:=elt) k v1 m -> NM.MapsTo(elt:=elt) k v2 m -> v1 = v2.
+Proof.
+  intros elt k v1 v2 m NMAP1 NMAP2.
+  apply NM.find_1 in NMAP1.
+  apply NM.find_1 in NMAP2.
+  rewrite NMAP1 in NMAP2.
+  injection NMAP2. auto.
+Qed.
+  
 Lemma NM_MapsTo_eq :
   forall {elt} k e v m,
     NM.MapsTo (elt:=elt) k e (NM.add k v m) ->
     e = v.
 Proof.
-Admitted.
+  intros elt k e v m NMAP.
+  pose proof NM.add_1.
+  assert (H1: k = k) by reflexivity.
+  apply (@NM.add_1 elt m k k v) in H1.
+  apply (NM_MapsTo_injective _ _ _ _ NMAP H1).
+Qed.
+
+
