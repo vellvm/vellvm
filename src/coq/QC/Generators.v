@@ -5,9 +5,7 @@ Require Import BinIntDef.
 Import ListNotations.
 
 (* From QuickChick Require Import QuickChick. *)
-From QuickChick Require Import GenLow GenHigh Show Sets.
-Import GenLow.
-Import GenHigh.
+From QuickChick Require Import QuickChick Generators Producer Show Sets.
 Set Warnings "-extraction-opaque-accessed,-extraction".
 
 (** [subst_max] performs as many [subst] as possible, clearing all
@@ -107,22 +105,25 @@ Qed.
 Definition binary32 := binary_float 24 128.
 Definition binary64 := binary_float 53 1024.
 
+Definition bool_gen : G bool :=
+  oneof (ret true) [ret true; ret false].
+
 (* Generates B754_zero values *)
-Definition zerg (prec emax : Z) := 
+Definition zerg (prec emax : Z) : G (binary_float prec emax) := 
   (liftGen (fun (s : bool) => B754_zero prec emax s)) 
-    (choose (true, false)).
+    bool_gen.
 
 (* Generates B754_infinity values *)
 Definition infg (prec emax : Z) := 
   (liftGen (fun (s : bool) => B754_infinity prec emax s))
-    (choose (true, false)).
+    bool_gen.
 
 (* Generates B754_nan values. Needs payload and nan_pl proof *)
 Definition nang (prec emax : Z) 
         (pl : positive) 
         (np : nan_pl prec pl = true) := 
   (liftGen (fun b => B754_nan prec emax b pl np))
-    (choose (true, false)).
+    bool_gen.
 
 Definition boundaries (prec emax : Z) (t : bool) :=
       if t 
@@ -130,22 +131,23 @@ Definition boundaries (prec emax : Z) (t : bool) :=
       else (2^(prec - 1), 2^prec - 1, 3 - emax - prec, emax - prec)%Z.
 
 (* Generates B754_finite values. Needs prec_gt_0 Hmax proof *)
+Definition bindGen' := @bindPf G ProducerGen.
 Program Definition fing (prec emax : Z) 
         (prec_gt_0 : Flocq.Core.FLX.Prec_gt_0 prec)
         (Hmax : (prec < emax)%Z) : G (binary_float prec emax) :=
-  bindGen' (choose (false, true)) (fun t => fun b0 => 
-    bindGen' (returnGen (boundaries prec emax t)) 
+  bindGen' _ _ bool_gen (fun t => fun b0 => 
+    bindGen' _ _ (returnGen (boundaries prec emax t)) 
     (fun '(m_min, m_max, e_min, e_max) => fun b1 =>
-      bindGen' (choose (false, true)) (fun (s : bool) => fun b2 =>
-        bindGen' (choose (m_min, m_max)) (fun (m : Z) => fun b3 =>
-          bindGen' (choose (e_min, e_max)) (fun (e : Z) => fun b4 =>
+      bindGen' _ _ bool_gen (fun (s : bool) => fun b2 =>
+        bindGen' _ _ (choose (m_min, m_max)) (fun (m : Z) => fun b3 =>
+          bindGen' _ _ (choose (e_min, e_max)) (fun (e : Z) => fun b4 =>
             returnGen (B754_finite prec emax s (Z.to_pos m) e _)))))).
 Next Obligation.
   (* get rid of technical junk *)
   clear s b0 b2; rename b3 into b2, b4 into b3.
-  apply semReturn in b1.
-  apply semChoose in b2.
-  apply semChoose in b3.
+  apply @semReturn in b1; try typeclasses eauto.
+  apply @semChoose in b2; try typeclasses eauto.
+  apply @semChoose in b3; try typeclasses eauto.
   all: unfold is_true, set1, boundaries in *.
 
   (* simplify *)

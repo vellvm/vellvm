@@ -29,10 +29,8 @@ Import Floats.
 From Coq Require Import
   ZArith Bool.Bool String.
 
-Require Import QuickChick.GenLow.
-Require Import QuickChick.GenHigh.
-Import GenHigh.
-Import GenLow.
+Require Import QuickChick.Generators.
+Require Import QuickChick.Producer.
 
 From ExtLib.Structures Require Export Functor.
 (* Import QcDefaultNotation. *)

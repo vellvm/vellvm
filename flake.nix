@@ -14,31 +14,7 @@
         lib = pkgs.lib;
         coq = pkgs.coq_8_15;
         ocamlPkgs = coq.ocamlPackages;
-        coqPkgs = pkgs.coqPackages_8_15.overrideScope'
-          (self: super:
-            { simple-io = super.simple-io.overrideAttrs
-              (s : rec
-                { version = "1.7.0";
-                  name = "coq8.15-simple-io-${version}";
-                  src = fetchTarball {
-                    url = "https://github.com/Lysxia/coq-simple-io/archive/refs/tags/1.7.0.zip";
-                    sha256 = "1a1q9x2abx71hqvjdai3n12jxzd49mhf3nqqh3ya2ssl2lj609ci";
-                  };
-                  meta.broken = false;
-                });
-
-              ITree = super.ITree.overrideAttrs
-                (s : rec
-                  { version = "5.0.0";
-                    name = "coq8.15-InteractionTrees-${version}";
-                    src = fetchTarball {
-                      # Version with rutt theory and mrec rutt theory.
-                      url = "https://github.com/DeepSpec/InteractionTrees/archive/9c1637ea57d1afcef587eb438438c73247639c0e.zip";
-                      sha256 = "sha256:0hcwplpaj2gx6c2abyp3w4g83hzvjnzfsh1sl9kfhd0r3pb9biar";
-                    };
-                    meta.broken = false;
-                  });
-            });
+        coqPkgs = pkgs.coqPackages_8_15;
 
         version = "vellvm:master";
       in rec {
@@ -51,6 +27,7 @@
         app.default = flake-utils.lib.mkApp { drv = packages.default; };
 
         checks = {
+          
           vellvm-test-suite =
             pkgs.stdenv.mkDerivation {
               name = "vellvm-test-suite";
