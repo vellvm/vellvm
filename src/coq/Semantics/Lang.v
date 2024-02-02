@@ -14,14 +14,16 @@ From Vellvm Require Import
      Handlers.MemoryInterpreters
      Handlers.Concretization.
 
+
   Module Type Memory (MP: PARAMS) (MMSP : MemoryModelSpecPrimitives MP) <: MMC MP.
-      Include  MMSP.
-      Include (_ADD_SERIALIZE MP).
-      Include (MemoryModelSpec MP).
-      Include (MemoryExecMonad MP).
-      Include (MemoryModelExecPrimitives MP).
-      Include (MemoryModelExec MP).
-      Include (Concretization.Make MP).
+    Include  MMSP.
+    Module MPS := (_ADD_SERIALIZE MP).
+    Include MPS.
+    Include (MemoryModelSpec MP).
+    Include (MemoryExecMonad MP).
+    Include (MemoryModelExecPrimitives MP).
+    Include (MemoryModelExec MP).
+    Include (Concretization.Make MP).
 
     Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter MP.
     Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter MP.
@@ -30,22 +32,25 @@ From Vellvm Require Import
     Export MP.IP MP.ByteImpl MP.GEP.
   End Memory.
 
+
   (* SAZ This is actually not needed, should be MMIC over in MemoryModelImplemention.v *)
   Module Type MemoryBig (MP: PARAMS_BIG) (MMSP : MemoryModelSpecPrimitives MP) <: MMC MP.
-      Include  MMSP.
-      Include (_ADD_SERIALIZE MP).
-      Include (MemoryModelSpec MP).
-      Include (MemoryExecMonad MP).
-      Include (MemoryModelExecPrimitives MP).
-      Include (MemoryModelExec MP).
-      Include (Concretization.Make MP).
-
+    Include  MMSP.
+    Module MPS := (_ADD_SERIALIZE MP).
+    Include MPS.
+    Include (MemoryModelSpec MP).
+    Include (MemoryExecMonad MP).
+    Include (MemoryModelExecPrimitives MP).
+    Include (MemoryModelExec MP).
+    Include (Concretization.Make MP).
+    
     Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter MP.
     Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter MP.
-
+    
     (* Concretization *)
     Export MP.IP MP.ByteImpl MP.GEP.
   End MemoryBig.
+
 
   Module Type LANG (MP : PARAMS) (M : MemoryModelSpecPrimitives MP).
     Include MP.
@@ -57,7 +62,6 @@ From Vellvm Require Import
     Module Intrinsics := Intrinsics.Make MP.
   End LANG.
     
-  
 
   Module Lang (MP: PARAMS) (M : MemoryModelSpecPrimitives MP) <: LANG MP M.
     Include MP.

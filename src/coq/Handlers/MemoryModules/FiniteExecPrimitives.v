@@ -74,7 +74,8 @@ Open Scope monad_scope.
 *)
 Module FiniteMemoryModelExecPrimitives (LP : PARAMS) <: MMEP LP.
   Include FiniteMemoryModelSpecPrimitives LP.
-  Include _ADD_SERIALIZE LP.
+  Module MSP := _ADD_SERIALIZE LP.
+  Include MSP.
   Include MemoryModelSpec LP.
   Include MemoryExecMonad LP.
   Include MemoryHelpers LP.
@@ -1950,7 +1951,7 @@ Module FiniteMemoryModelExecPrimitives (LP : PARAMS) <: MMEP LP.
       add_block_to_heap aid ptr ptrs init_bytes;;
       ret ptr.
 
-    Definition malloc_bytes `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
+    Definition malloc_bytes_exec `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
       pr <- fresh_provenance;;
       malloc_bytes_with_pr init_bytes pr.
 

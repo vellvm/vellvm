@@ -3003,7 +3003,7 @@ Module Type MemoryModelExec (LP : PARAMS) (M : MMEP LP).
       write_bytes ptr bytes.
 
     (** Allocating dtyps *)
-    Definition allocate_bytes `{MemMonad ExtraState MemM (itree Eff)}
+    Definition allocate_bytes_exec `{MemMonad ExtraState MemM (itree Eff)}
       (dt : dtyp) (num_elements : N) (init_bytes : list SByte)
       : MemM addr
       := pr <- fresh_provenance;;
@@ -3016,7 +3016,7 @@ Module Type MemoryModelExec (LP : PARAMS) (M : MMEP LP).
       := sid <- fresh_sid;;
          element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
          let bytes := concat element_bytes in
-         allocate_bytes dt num_elements bytes.
+         allocate_bytes_exec dt num_elements bytes.
 
     (** Malloc *)
     Definition malloc_bytes `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
@@ -5294,10 +5294,10 @@ Module MemoryModelTheory (LP : PARAMS) (M : MMME LP).
       apply write_bytes_correct.
     Qed.
 
-    Lemma allocate_bytes_correct :
+    Lemma allocate_bytes_exec_correct :
       forall dt num_elements bytes pre,
         exec_correct pre
-          (allocate_bytes dt num_elements bytes)
+          (allocate_bytes_exec dt num_elements bytes)
           (allocate_bytes_spec_MemPropT dt num_elements bytes).
     Proof.
       intros dt num_elements pr pre.
@@ -5307,7 +5307,7 @@ Module MemoryModelTheory (LP : PARAMS) (M : MMME LP).
       apply allocate_bytes_with_pr_correct.
     Qed.
 
-    Hint Resolve allocate_bytes_correct : EXEC_CORRECT.
+    Hint Resolve allocate_bytes_exec_correct : EXEC_CORRECT.
 
     Lemma exec_correct_repeatMN :
       forall {A} (n : N) (pre : MemState -> ExtraState -> Prop) (m_exec : MemM A) (m_spec : MemPropT MemState A),
@@ -5342,7 +5342,7 @@ Module MemoryModelTheory (LP : PARAMS) (M : MMME LP).
         apply exec_correct_lift_OOM.
       }
       intros * RUN2.
-      apply allocate_bytes_correct.
+      apply allocate_bytes_exec_correct.
     Qed.
 
     Lemma memcpy_correct :

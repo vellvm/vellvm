@@ -155,16 +155,10 @@ Module MemoryBigIntptrInfiniteSpec (LP : PARAMS_BIG) <: MMIC LP.
   Include (FiniteExecPrimitives.FiniteMemoryModelExecPrimitives LP).
   Include (Concretization.Make LP).
   Include (MemoryModelExec LP).
-End MemoryBigIntptrInfiniteSpec.  
 
-
-
+  Include (MemorySpecInterpreter LP).
   
-
-
-
-  
-  Include (MakeMemoryExecInterpreter LP).
+  Include (MemoryExecInterpreter LP).
 
   Context {E : Type -> Type}.
   Notation Eff := (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE).
