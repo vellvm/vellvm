@@ -806,7 +806,22 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       Exists (uvalue_subterm u) uv_bytes ->
       uvalue_strict_subterm u (UVALUE_ConcatBytes uv_bytes dt).
   Proof using.
-  Admitted.
+    intros u uv_bytes dt H. generalize dependent dt.
+    induction H.
+    { unfold uvalue_subterm in H. unfold uvalue_strict_subterm.
+      (* The idea here: if uvalue_direct_subterm is refl, then clos_trans is transitive with x and x is *)
+      intros.
+      eapply clos_rt_t.
+      - apply H.
+      - apply t_step; constructor; apply in_eq. }
+    { intros dt. apply Exists_In in H.
+      destruct H as (a&H1&H2).
+      unfold uvalue_subterm in H2. unfold uvalue_strict_subterm.
+      eapply clos_rt_t.
+      apply H2.
+      apply t_step. constructor. simpl. right. assumption.
+    }
+  Qed.
 
   Lemma uvalue_direct_subterm_uvalue_measure :
     forall s e,
@@ -5488,7 +5503,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         Monad.eq1 (eval_iop_integer_h op dx dy) (@ret M _ _ dv) ->
         dvalue_has_dtyp dv (DTYPE_I sz).
     Proof using ERR Eq1 FERR FUB M Monad NFR OOM RETS RET_INV UB.
-      intros dx dy dv sz op TYPx TYPy EVAL.      
+      intros dx dy dv sz op TYPx TYPy EVAL.
       inversion TYPx; inversion TYPy; subst;
         destruct op;
         cbn in EVAL;
