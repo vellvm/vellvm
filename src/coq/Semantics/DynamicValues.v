@@ -3341,149 +3341,143 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
          | None => false
          end.
 
-    Definition eval_int_op {M} {Int} `{Monad M} `{RAISE_UB M} `{RAISE_OOM M} `{VMemInt Int} `{ToDvalue Int} (iop:ibinop) (x y: Int) : M dvalue :=
+    Definition eval_int_op {M} {Int} `{Monad M} `{RAISE_UB M} `{RAISE_ERROR M} `{RAISE_OOM M} `{VMemInt Int} `{ToDvalue Int} (iop:ibinop) (x y: Int) : M dvalue :=
       match iop with
       (* Following to cases are probably right since they use CompCert *)
       | Add nuw nsw =>
           if orb (andb nuw (mequ (madd_carry x y mzero) mone))
-                 (andb nsw (mequ (madd_overflow x y mzero) mone))
+               (andb nsw (mequ (madd_overflow x y mzero) mone))
           then ret (DVALUE_Poison mdtyp_of_int)
           else to_dvalue_OOM (madd x y)
 
-    | Sub nuw nsw =>
-        if orb (andb nuw (mequ (msub_borrow x y mzero) mone))
+      | Sub nuw nsw =>
+          if orb (andb nuw (mequ (msub_borrow x y mzero) mone))
                (andb nsw (mequ (msub_overflow x y mzero) mone))
-        then ret (DVALUE_Poison mdtyp_of_int)
-        else to_dvalue_OOM (msub x y)
-
-    | Mul nuw nsw =>
-      (* I1 mul can't overflow, just based on the 4 possible multiplications. *)
-        if (option_pred (fun bw => Nat.eqb bw 1) mbitwidth)
-        then to_dvalue_OOM (mmul x y)
-        else
-          res <- lift_OOM (mmul x y);;
-
-          let res_u' := ((munsigned x) * (munsigned y))%Z in
-          let res_s' := ((msigned x) * (msigned y))%Z in
-
-          let min_s_bound := match fmap (fun m => m >? res_s') mmin_signed with
-                             | None => false
-                             | Some x => x
-                             end in
-          let max_s_bound := match fmap (fun m => res_s' >? m) mmax_signed with
-                             | None => false
-                             | Some x => x
-                             end in
-
-          if orb (andb nuw (res_u' >? munsigned res))
-                 (andb nsw (orb min_s_bound max_s_bound))
-          then
-            (* TODO: Do we need to check for the unsigned case? Return result anyway? *)
-            if dtyp_eqb mdtyp_of_int DTYPE_IPTR
-            then raise_oom "Multiplication overflow on iptr."
-            else ret (DVALUE_Poison mdtyp_of_int)
-          else ret (to_dvalue res)
-
-    | Shl nuw nsw =>
-      res <- lift_OOM (mshl x y);;
-      let res_u := munsigned res in
-      let res_u' := Z.shiftl (munsigned x) (munsigned y) in
-
-      if dtyp_eqb mdtyp_of_int DTYPE_IPTR
-      then
-        (* TODO: Do we need to check for the unsigned case? Return result anyway? *)
-        if (res_u' >? res_u)
-        then raise_oom "Shl unsigned overflow on iptr."
-        else
-          match mbitwidth with
-          | None =>
-              ret (to_dvalue res)
-          | Some bw =>
-              (* TODO: should this OOM here? *)
-              nres <- lift_OOM (mnegative res);;
-              if (negb (Z.shiftr (munsigned x)
-                          (Z.of_nat bw - munsigned y)
-                        =? (munsigned nres)
-                           * (Z.pow 2 (munsigned y) - 1))%Z)
-              then raise_oom "Shl signed overflow on iptr."
-              else ret (to_dvalue res)
-          end
-      else
-        (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
-         then there is overflow. *)
-        if option_pred (fun bw => munsigned y >=? Z.of_nat bw) mbitwidth
-        then ret (DVALUE_Poison mdtyp_of_int)
-        else
-          if andb nuw (res_u' >? res_u)
           then ret (DVALUE_Poison mdtyp_of_int)
+          else to_dvalue_OOM (msub x y)
+
+      | Mul nuw nsw =>
+          (* I1 mul can't overflow, just based on the 4 possible multiplications. *)
+          if (option_pred (fun bw => Nat.eqb bw 1) mbitwidth)
+          then to_dvalue_OOM (mmul x y)
           else
-            (* Need to separate this out because mnegative can OOM *)
-            if nsw
+            res <- lift_OOM (mmul x y);;
+
+            let res_u' := ((munsigned x) * (munsigned y))%Z in
+            let res_s' := ((msigned x) * (msigned y))%Z in
+
+            let min_s_bound := match fmap (fun m => m >? res_s') mmin_signed with
+                               | None => false
+                               | Some x => x
+                               end in
+            let max_s_bound := match fmap (fun m => res_s' >? m) mmax_signed with
+                               | None => false
+                               | Some x => x
+                               end in
+
+            if orb (andb nuw (res_u' >? munsigned res))
+                 (andb nsw (orb min_s_bound max_s_bound))
             then
-              match mbitwidth with
-              | None =>
-                  ret (to_dvalue res)
-              | Some bw =>
-                  (* TODO: should this OOM here? *)
-                  nres <- lift_OOM (mnegative res);;
-                  if (negb (Z.shiftr (munsigned x)
-                              (Z.of_nat bw - munsigned y)
-                            =? (munsigned nres)
-                               * (Z.pow 2 (munsigned y) - 1))%Z)
-                  then ret (DVALUE_Poison mdtyp_of_int)
-                  else ret (to_dvalue res)
-              end
+              (* TODO: Do we need to check for the unsigned case? Return result anyway? *)
+              if dtyp_eqb mdtyp_of_int DTYPE_IPTR
+              then raise_oom "Multiplication overflow on iptr."
+              else ret (DVALUE_Poison mdtyp_of_int)
             else ret (to_dvalue res)
 
-    | UDiv ex =>
-      if (munsigned y =? 0)%Z
-      then raise_ub "Unsigned division by 0."
-      else if andb ex (negb ((munsigned x) mod (munsigned y) =? 0))%Z
-           then ret (DVALUE_Poison mdtyp_of_int)
-           else ret (to_dvalue (mdivu x y))
+      | Shl nuw nsw =>
+          res <- lift_OOM (mshl x y);;
+          let res_u := munsigned res in
+          let res_u' := Z.shiftl (munsigned x) (munsigned y) in
 
-    | SDiv ex =>
-      (* What does signed i1 mean? *)
-      if (msigned y =? 0)%Z
-      then raise_ub "Signed division by 0."
-      else if andb ex (negb ((msigned x) mod (msigned y) =? 0))%Z
-           then ret (DVALUE_Poison mdtyp_of_int)
-           else to_dvalue_OOM (mdivs x y)
+          if dtyp_eqb (@mdtyp_of_int Int _) DTYPE_IPTR
+          then
+            (* TODO: Do we need to check for the unsigned case? Return result anyway? *)
+            if (res_u' >? res_u)
+            then raise_oom "Shl unsigned overflow on iptr."
+            else
+              ret (to_dvalue res)
+          else
+            (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
+         then there is overflow. *)
+            if option_pred (fun bw => munsigned y >=? Z.of_nat bw) mbitwidth
+            then ret (DVALUE_Poison mdtyp_of_int)
+            else
+              if andb nuw (res_u' >? res_u)
+              then ret (DVALUE_Poison mdtyp_of_int)
+              else
+                (* Need to separate this out because mnegative can OOM *)
+                if nsw
+                then
+                  match mbitwidth with
+                  | None =>
+                      ret (to_dvalue res)
+                  | Some bw =>
+                      (* TODO: should this OOM here? *)
+                      nres <- lift_OOM (mnegative res);;
+                      if (negb (Z.shiftr (munsigned x)
+                                  (Z.of_nat bw - munsigned y)
+                                =? (munsigned nres)
+                                   * (Z.pow 2 (munsigned y) - 1))%Z)
+                      then ret (DVALUE_Poison mdtyp_of_int)
+                      else ret (to_dvalue res)
+                  end
+                else ret (to_dvalue res)
 
-    | LShr ex =>
-        if option_pred (fun bw => (munsigned y) >=? Z.of_nat bw) mbitwidth && negb (dtyp_eqb mdtyp_of_int DTYPE_IPTR)
-        then ret (DVALUE_Poison mdtyp_of_int)
-        else if andb ex (negb ((munsigned x)
-                                 mod (Z.pow 2 (munsigned y)) =? 0))%Z
-             then ret (DVALUE_Poison mdtyp_of_int) else ret (to_dvalue (mshru x y))
+      | UDiv ex =>
+          if (munsigned y =? 0)%Z
+          then raise_ub "Unsigned division by 0."
+          else if andb ex (negb ((munsigned x) mod (munsigned y) =? 0))%Z
+               then ret (DVALUE_Poison mdtyp_of_int)
+               else ret (to_dvalue (mdivu x y))
 
-    | AShr ex =>
-      if option_pred (fun bw => (munsigned y) >=? Z.of_nat bw) mbitwidth && negb (dtyp_eqb mdtyp_of_int DTYPE_IPTR)
-      then ret (DVALUE_Poison mdtyp_of_int)
-      else if andb ex (negb ((munsigned x)
-                               mod (Z.pow 2 (munsigned y)) =? 0))%Z
-           then ret (DVALUE_Poison mdtyp_of_int) else ret (to_dvalue (mshr x y))
+      | SDiv ex =>
+          if dtyp_eqb mdtyp_of_int DTYPE_IPTR
+          then raise_error "Signed division for iptr."
+          else
+            (* What does signed i1 mean? *)
+            if (msigned y =? 0)%Z
+            then raise_ub "Signed division by 0."
+            else if andb ex (negb ((msigned x) mod (msigned y) =? 0))%Z
+                 then ret (DVALUE_Poison mdtyp_of_int)
+                 else to_dvalue_OOM (mdivs x y)
 
-    | URem =>
-      if (munsigned y =? 0)%Z
-      then raise_ub "Unsigned mod 0."
-      else ret (to_dvalue (mmodu x y))
+      | LShr ex =>
+          if option_pred (fun bw => (munsigned y) >=? Z.of_nat bw) mbitwidth && negb (dtyp_eqb mdtyp_of_int DTYPE_IPTR)
+          then ret (DVALUE_Poison mdtyp_of_int)
+          else if andb ex (negb ((munsigned x)
+                                   mod (Z.pow 2 (munsigned y)) =? 0))%Z
+               then ret (DVALUE_Poison mdtyp_of_int) else ret (to_dvalue (mshru x y))
 
-    | SRem =>
-      if (msigned y =? 0)%Z
-      then raise_ub "Signed mod 0."
-      else to_dvalue_OOM (mmods x y)
+      | AShr ex =>
+          if dtyp_eqb mdtyp_of_int DTYPE_IPTR
+          then raise_error "Arithmetic shift for iptr."
+          else
+            if option_pred (fun bw => (munsigned y) >=? Z.of_nat bw) mbitwidth
+            then ret (DVALUE_Poison mdtyp_of_int)
+            else if andb ex (negb ((munsigned x)
+                                     mod (Z.pow 2 (munsigned y)) =? 0))%Z
+                 then ret (DVALUE_Poison mdtyp_of_int) else ret (to_dvalue (mshr x y))
 
-    | And =>
-      ret (to_dvalue (mand x y))
+      | URem =>
+          if (munsigned y =? 0)%Z
+          then raise_ub "Unsigned mod 0."
+          else ret (to_dvalue (mmodu x y))
 
-    | Or =>
-      ret (to_dvalue (mor x y))
+      | SRem =>
+          if (msigned y =? 0)%Z
+          then raise_ub "Signed mod 0."
+          else to_dvalue_OOM (mmods x y)
 
-    | Xor =>
-      ret (to_dvalue (mxor x y))
-    end.
-  Arguments eval_int_op _ _ _ : simpl nomatch.
+      | And =>
+          ret (to_dvalue (mand x y))
+
+      | Or =>
+          ret (to_dvalue (mor x y))
+
+      | Xor =>
+          ret (to_dvalue (mxor x y))
+      end.
+    Arguments eval_int_op _ _ _ : simpl nomatch.
 
   (* Evaluate the given iop on the given arguments according to the bitsize *)
   Definition integer_op {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} (bits:N) (iop:ibinop) (x y:inttyp bits) : M dvalue :=
@@ -3568,20 +3562,34 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     end.
   Arguments eval_iop _ _ _ : simpl nomatch.
 
-  Definition eval_int_icmp {Int} `{VMemInt Int} icmp (x y : Int) : dvalue :=
-    if match icmp with
-       | Eq => mcmp Ceq x y
-       | Ne => mcmp Cne x y
-       | Ugt => mcmpu Cgt x y
-       | Uge => mcmpu Cge x y
-       | Ult => mcmpu Clt x y
-       | Ule => mcmpu Cle x y
-       | Sgt => mcmp Cgt x y
-       | Sge => mcmp Cge x y
-       | Slt => mcmp Clt x y
-       | Sle => mcmp Cle x y
-       end
-    then DVALUE_I1 (Int1.one) else DVALUE_I1 (Int1.zero).
+  Definition eval_int_icmp {M} `{Monad M} `{RAISE_ERROR M} {Int} `{VMI : VMemInt Int} icmp (x y : Int) : M dvalue :=
+    c <- match icmp with
+        | Eq => ret (mcmp Ceq x y)
+        | Ne => ret (mcmp Cne x y)
+        | Ugt => ret (mcmpu Cgt x y)
+        | Uge => ret (mcmpu Cge x y)
+        | Ult => ret (mcmpu Clt x y)
+        | Ule => ret (mcmpu Cle x y)
+        | Sgt =>
+            if dtyp_eqb (@mdtyp_of_int Int VMI) DTYPE_IPTR
+            then raise_error "Signed '>' comparison on iptr type."
+            else ret (mcmp Cgt x y)
+        | Sge =>
+            if dtyp_eqb (@mdtyp_of_int Int VMI) DTYPE_IPTR
+            then raise_error "Signed '>=' comparison on iptr type."
+            else ret (mcmp Cge x y)
+        | Slt =>
+            if dtyp_eqb (@mdtyp_of_int Int VMI) DTYPE_IPTR
+            then raise_error "Signed '<' comparison on iptr type."
+            else ret (mcmp Clt x y)
+        | Sle =>
+            if dtyp_eqb (@mdtyp_of_int Int VMI) DTYPE_IPTR
+            then raise_error "Signed '>' comparison on iptr type."
+            else ret (mcmp Cle x y)
+        end;;
+    ret (if c
+         then DVALUE_I1 (Int1.one)
+         else DVALUE_I1 (Int1.zero)).
   Arguments eval_int_icmp _ _ _ : simpl nomatch.
 
   Definition double_op {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} (fop:fbinop) (v1:ll_double) (v2:ll_double) : M dvalue :=

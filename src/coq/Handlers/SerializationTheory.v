@@ -260,26 +260,32 @@ Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
 
   Lemma eval_icmp_err_ub_oom_to_M :
     forall {M} `{HM : Monad M} `{HME : RAISE_ERROR M} op a b res,
+      (forall {A B} (a : A) (k : A -> M B), @bind M HM _ _ (@ret M HM _ a) k = k a) ->
       @eval_icmp err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
                  (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) op a b =
         success_unERR_UB_OOM res ->
       @eval_icmp M HM HME op a b = @ret M HM dvalue res.
   Proof.
-    intros M HM HME op a b res EVAL.
+    intros M HM HME op a b res BIND_RET_L EVAL.
     destruct op; cbn in *;
-      destruct a, b; cbn in *; inversion EVAL;
-      first [ break_match; inversion EVAL; reflexivity
-            | auto
+    destruct a, b; cbn in *; inv EVAL;
+      first [ unfold eval_int_icmp; cbn;
+              try rewrite BIND_RET_L;
+              reflexivity
+            | unfold eval_icmp, eval_int_icmp in *;
+              break_match;
+              [ cbn in *; inv H0
+              | cbn in *;
+                rewrite BIND_RET_L; inv H0; auto
+              ]
         ].
   Qed.
-
 
   From Vellvm.Utils Require Import Monads MonadExcLaws MonadEq1Laws.
   From ITree Require Import
        Basics.Monad.
 
   Require Import Morphisms.
-
 
   Lemma to_dvalue_OOM_NoOom :
     forall {Int} `{TD : ToDvalue Int} {M}
@@ -379,6 +385,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
 
   Lemma concretize_icmp_inv:
     forall {M} `{HM: Monad M} `{HME: RAISE_ERROR M} op x y dv,
+      (forall {A B} (a : A) (k : A -> M B), @bind M HM _ _ (@ret M HM _ a) k = k a) ->
       concretize_succeeds (UVALUE_ICmp op x y) ->
       concretize (UVALUE_ICmp op x y) dv ->
       exists dx dy,
@@ -388,7 +395,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
         concretize y dy /\
         @eval_icmp M HM HME op dx dy = ret dv.
   Proof.
-    intros M HM HME op x y dv SUCC CONC.
+    intros M HM HME op x y dv BIND_RET_L SUCC CONC.
 
     rewrite concretize_equation in CONC.
     red in CONC.
@@ -471,9 +478,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
       split; cbn; auto.
     }
 
-    apply eval_icmp_err_ub_oom_to_M.
-    rewrite Hmz.
-    reflexivity.
+    apply eval_icmp_err_ub_oom_to_M; eauto.
   Qed.
 
   Lemma concretize_ibinop_inv:

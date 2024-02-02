@@ -20,8 +20,6 @@ From Vellvm.Semantics Require Import
      DynamicValues
      VellvmIntegers.
 
-
-
 From ExtLib Require Import
      Structures.Monads.
 
@@ -165,7 +163,7 @@ Module BigIP_BIG : MemoryAddress.INTPTR_BIG BigIP.
 End BigIP_BIG.
 
 Definition from_Z_64 := (fun (x : Z) =>
-    if (x <=? Int64.max_signed)%Z && (x >=? Int64.min_signed)%Z
+    if (x <=? Int64.max_unsigned)%Z && (x >=? 0)%Z
     then ret (Int64.repr x)
     else Oom "IP64Bit from_Z oom.").
 
@@ -183,66 +181,42 @@ Instance VMemInt_intptr_i64 : VMemInt int64
 
     (* Arithmetic *)
     madd := fun x y =>
-              if (Int64.eq (Int64.add_overflow x y Int64.zero) Int64.one)
+              if (Int64.eq (Int64.add_carry x y Int64.zero) Int64.one)
               then Oom "IP64Bit addition overflow."
               else ret (Int64.add x y);
     madd_carry := fun x y c => Int64.zero;
     madd_overflow := fun x y c => Int64.zero;
 
     msub := fun x y =>
-              if (Int64.eq (Int64.sub_overflow x y Int64.zero) Int64.one)
-              then Oom "IP64Bit addition overflow."
+              if (Int64.unsigned y >? Int64.unsigned x)%Z
+              then Oom "IP64Bit subtraction underflow."
               else ret (Int64.sub x y);
     msub_borrow := fun x y c => Int64.zero;
     msub_overflow := fun x y c => Int64.zero;
 
     mmul :=
       fun x y =>
-        let res_s' := ((Int64.signed x) * (Int64.signed y))%Z in
-
-        let min_s_bound := Int64.min_signed >? res_s' in
-        let max_s_bound := res_s' >? Int64.max_signed in
-
-        if (orb min_s_bound max_s_bound)
+        let res := ((Int64.unsigned x) * (Int64.unsigned y))%Z in
+        if (res >? Int64.max_unsigned)
         then Oom "IP64Bit multiplication overflow."
-        else NoOom (Int64.mul x y);
+        else ret (Int64.repr res);
 
     mdivu := Int64.divu;
-    mdivs :=
-      fun x y =>
-        if (Int64.signed x =? Int64.max_signed) && (Int64.signed y =? (-1)%Z)
-        then Oom "IP64Bit signed division overflow."
-        else ret (Int64.divs x y);
+    mdivs := fun _ _ => Oom "IP64Bit signed division.";
 
     mmodu := Int64.modu;
-    mmods :=
-      (* TODO: is this overflow check needed? *)
-      fun x y =>
-        if (Int64.signed x =? Int64.max_signed) && (Int64.signed y =? (-1)%Z)
-        then Oom "IP64Bit signed modulo overflow."
-        else ret (Int64.mods x y);
+    mmods := fun _ _ => Oom "IP64Bit signed modulo.";
 
     mshl :=
       fun x y =>
-        let res := Int64.shl x y in
-        if Int64.signed res =? Int64.min_signed
-        then Oom "IP64Bit left shift overflow (res is min signed, should not happen)."
-        else
-          let nres := Int64.negative res in
-          if (negb (Z.shiftr (Int64.unsigned x)
-                      (64%Z - Int64.unsigned y)
-                    =? (Int64.unsigned nres)
-                       * (Z.pow 2 (Int64.unsigned y) - 1))%Z)
-          then Oom "IP64Bit left shift overflow."
-          else ret res;
+        let res_Z := Z.shiftl (Int64.unsigned x) (Int64.unsigned y) in
+        if res_Z >? Int64.max_unsigned
+        then Oom "IP64Bit left shift overflow."
+        else ret (Int64.repr res_Z);
     mshr := Int64.shr;
     mshru := Int64.shru;
 
-    mnegative :=
-      fun x =>
-        if (Int64.signed x =? Int64.min_signed)
-        then Oom "IP64Bit taking negative of smallest number."
-        else ret (Int64.negative x);
+    mnegative := fun _ => Oom "IP64Bit taking negative of a number.";
 
     (* Logic *)
     mand := Int64.and;
@@ -266,7 +240,7 @@ Module IP64Bit : MemoryAddress.INTPTR with
 Definition intptr := int64 with
 Definition zero := Int64.zero with
 Definition from_Z := from_Z_64 with
-Definition to_Z := Int64.signed with
+Definition to_Z := Int64.unsigned with
 Definition VMemInt_intptr := VMemInt_intptr_i64.
 
   Definition intptr := int64.
@@ -275,7 +249,7 @@ Definition VMemInt_intptr := VMemInt_intptr_i64.
   Definition eq_dec := Int64.eq_dec.
   Definition eqb := Int64.eq.
 
-  Definition to_Z (x : intptr) := Int64.signed x.
+  Definition to_Z (x : intptr) := Int64.unsigned x.
 
   Definition VMemInt_intptr := VMemInt_intptr_i64.
 
@@ -292,7 +266,7 @@ Definition VMemInt_intptr := VMemInt_intptr_i64.
     unfold from_Z, from_Z_64 in FROM.
     break_match_hyp; inversion FROM.
     unfold to_Z.
-    apply Integers.Int64.signed_repr.
+    apply Integers.Int64.unsigned_repr.
     lia.
   Qed.
 
@@ -306,8 +280,8 @@ Definition VMemInt_intptr := VMemInt_intptr_i64.
     unfold from_Z, from_Z_64 in *.
     break_match_hyp; inversion Z2.
     break_match_hyp; inversion Z1.
-    pose proof Integers.Int64.signed_repr z1.
-    pose proof Integers.Int64.signed_repr z2.
+    pose proof Integers.Int64.unsigned_repr z1.
+    pose proof Integers.Int64.unsigned_repr z2.
     forward H; try lia.
     forward H2; try lia.
     congruence.
@@ -320,9 +294,10 @@ Definition VMemInt_intptr := VMemInt_intptr_i64.
     intros i.
     unfold from_Z, from_Z_64, to_Z.
     break_match.
-    - rewrite Int64.repr_signed; auto.
+    - rewrite Int64.repr_unsigned; auto.
     - unfold intptr in *.
-      pose proof DynamicValues.Int64.signed_range i.
+      pose proof DynamicValues.Int64.unsigned_range i.
+      unfold Int64.max_unsigned in *.
       lia.
   Qed.
 
@@ -348,15 +323,10 @@ Definition VMemInt_intptr := VMemInt_intptr_i64.
     intros x y EQ.
     unfold to_Z in *.
     destruct x, y.
-    unfold Int64.signed, Int64.unsigned in *.
-    cbn in *.
-    break_match_hyp; break_match_hyp; subst.
-    - rewrite (proof_irrelevance _ intrange intrange0); auto.
-    - lia.
-    - lia.
-    - assert (intval = intval0) by lia; subst.
-      rewrite (proof_irrelevance _ intrange intrange0); auto.
-  Admitted. (* This is probably awful because of lia? *)
+    unfold Int64.unsigned in *.
+    cbn in *; subst.
+    rewrite (proof_irrelevance _ intrange intrange0); auto.
+  Qed.
 
   Lemma VMemInt_intptr_dtyp :
     @mdtyp_of_int intptr VMemInt_intptr = DTYPE_IPTR.

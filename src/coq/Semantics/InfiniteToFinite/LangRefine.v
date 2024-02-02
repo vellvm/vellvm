@@ -246,14 +246,14 @@ Module Type VMemInt_Refine (IP_INF : INTPTR) (IP_FIN : INTPTR).
         @mdivs _ IP_INF.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
           IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
 
-  Parameter mshr_refine :
-    forall x_fin y_fin r_fin x_inf y_inf,
-      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
-      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
-      @mshr _ IP_FIN.VMemInt_intptr x_fin y_fin = r_fin ->
-      exists r_inf,
-        @mshr _ IP_INF.VMemInt_intptr x_inf y_inf = r_inf /\
-          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+  (* Parameter mshr_refine : *)
+  (*   forall x_fin y_fin r_fin x_inf y_inf, *)
+  (*     IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf -> *)
+  (*     IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf -> *)
+  (*     @mshr _ IP_FIN.VMemInt_intptr x_fin y_fin = r_fin -> *)
+  (*     exists r_inf, *)
+  (*       @mshr _ IP_INF.VMemInt_intptr x_inf y_inf = r_inf /\ *)
+  (*         IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf. *)
 
   Parameter mshru_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
@@ -444,22 +444,20 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     break_match_hyp_inv.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-    rewrite Int64.add_signed.
+    rewrite Int64.add_unsigned.
     rewrite X, Y.
-    rewrite Int64.signed_repr; eauto.
+    rewrite Int64.unsigned_repr; eauto.
 
     (* TODO: Separate this into lemma? *)
-    unfold Int64.add_overflow in Heqb.
+    unfold Int64.add_carry in Heqb.
     cbn in Heqb.
     break_match_hyp; cbn in Heqb; try discriminate.
 
-    unfold Coqlib.zle in Heqb0.
-    apply Bool.andb_true_iff in Heqb0.
-    destruct Heqb0.
-
-    apply Coqlib.proj_sumbool_true in H, H0.
-    cbn in *.
-    rewrite X, Y, Int64.signed_zero in *.
+    subst.
+    unfold Int64.max_unsigned.
+    rewrite Integers.Int64.unsigned_zero in l.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
     lia.
   Qed.
 
@@ -479,24 +477,13 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
 
     cbn in SUB.
     break_match_hyp_inv.
-
+    unfold Int64.sub.
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-    rewrite Int64.sub_signed.
-    rewrite X, Y.
-    rewrite Int64.signed_repr; eauto.
-
-    (* TODO: Separate this into lemma? *)
-    unfold Int64.sub_overflow in Heqb.
-    cbn in Heqb.
-    break_match_hyp; cbn in Heqb; try discriminate.
-
-    unfold Coqlib.zle in Heqb0.
-    apply Bool.andb_true_iff in Heqb0.
-    destruct Heqb0.
-
-    apply Coqlib.proj_sumbool_true in H, H0.
-    cbn in *.
-    rewrite X, Y, Int64.signed_zero in *.
+    subst.
+    rewrite Int64.unsigned_repr; eauto.
+    unfold Int64.max_unsigned.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
     lia.
   Qed.
 
@@ -510,18 +497,18 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
           InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
   Proof.
     intros x_fin y_fin r_fin x_inf y_inf X Y MUL.
-    cbn.
     exists (x_inf * y_inf)%Z.
     split; auto.
 
+    Opaque Int64.modulus.
     cbn in MUL.
     break_match_hyp_inv.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-    rewrite Int64.mul_signed.
-    rewrite X, Y.
-    rewrite Int64.signed_repr; eauto.
-    cbn.
+    subst.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    rewrite Int64.unsigned_repr; eauto.
     lia.
   Qed.
 
@@ -537,36 +524,20 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     intros x_fin y_fin r_fin x_inf y_inf X Y SHL.
     cbn.
     exists (Z.shiftl x_inf y_inf).
+
+    cbn in SHL.
     split; auto.
+    break_match_hyp_inv.
 
-  (*   Opaque Z.sub. *)
-  (*   cbn in SHL. *)
-
-  (*   break_match_hyp_inv. *)
-  (*   break_match_hyp_inv. *)
-
-  (*   unfold Int64.shl in *. *)
-  (*   unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *. *)
-  (*   unfold Int64.signed in X, Y. *)
-  (*   break_match_hyp; break_match_hyp. *)
-  (*   - rewrite X, Y. *)
-  (*     rewrite Int64.signed_repr; eauto. *)
-
-  (*   mshl := *)
-  (*     fun x y => *)
-  (*       let res := Int64.shl x y in *)
-  (*       if Int64.signed res =? Int64.min_signed *)
-  (*       then Oom "IP64Bit left shift overflow (res is min signed, should not happen)." *)
-  (*       else *)
-  (*         let nres := Int64.negative res in *)
-  (*         if (negb (Z.shiftr (Int64.unsigned x) *)
-  (*                     (64%Z - Int64.unsigned y) *)
-  (*                   =? (Int64.unsigned nres) *)
-  (*                      * (Z.pow 2 (Int64.unsigned y) - 1))%Z) *)
-  (*         then Oom "IP64Bit left shift overflow." *)
-  (*         else ret res; *)
-    (* Qed. *)
-  Admitted.
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    subst.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    rewrite Int64.unsigned_repr; eauto.
+    unfold Int64.max_unsigned in *.
+    split; try lia.
+    apply Z.shiftl_nonneg; lia.
+  Qed.
 
   Lemma mdivu_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
@@ -586,7 +557,28 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     subst.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-  Admitted.
+    subst.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    unfold Int64.divu.
+    rewrite Int64.unsigned_repr; auto.
+    split; try lia.
+    apply Z_div_nonneg_nonneg; try lia.
+    unfold Int64.max_unsigned.
+    pose proof Z.div_lt (Int64.unsigned x_fin) (Int64.unsigned y_fin).
+    assert (Int64.unsigned x_fin = 0 \/ 0 < Int64.unsigned x_fin)%Z as [X_FIN | X_FIN] by lia.
+    - rewrite X_FIN.
+      cbn. lia.
+    - forward H1; try lia.
+      assert (Int64.unsigned y_fin = 0 \/ Int64.unsigned y_fin = 1 \/ 1 < Int64.unsigned y_fin)%Z as [Y_FIN | [Y_FIN | Y_FIN]] by lia.
+      + rewrite Y_FIN.
+        rewrite Zdiv_0_r.
+        lia.
+      + rewrite Y_FIN.
+        rewrite Z.div_1_r.
+        lia.
+      + lia.
+  Qed.
 
   Lemma mdivs_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
@@ -598,38 +590,50 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
           InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
   Proof.
     intros x_fin y_fin r_fin x_inf y_inf X Y DIV.
-    cbn.
-    exists (x_inf / y_inf)%Z.
-    split; auto.
+    cbn in DIV; inv DIV.
+  Qed.
 
-    cbn in *.
-    break_match_hyp_inv.
+  (* Lemma mshr_refine : *)
+  (*   forall x_fin y_fin r_fin x_inf y_inf, *)
+  (*     InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf -> *)
+  (*     InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf -> *)
+  (*     @mshr _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = r_fin -> *)
+  (*     exists r_inf, *)
+  (*       @mshr _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = r_inf /\ *)
+  (*         InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf. *)
+  (* Proof. *)
+  (*   intros x_fin y_fin r_fin x_inf y_inf X Y SHR. *)
+  (*   cbn. *)
+  (*   exists (Z.shiftr x_inf y_inf). *)
+  (*   split; auto. *)
 
-    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-    unfold Int64.divs.
-    rewrite X, Y.
-    rewrite Int64.signed_repr; eauto.
-  Admitted.
+  (*   cbn in SHR. *)
+  (*   subst. *)
 
-  Lemma mshr_refine :
-    forall x_fin y_fin r_fin x_inf y_inf,
-      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
-      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
-      @mshr _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = r_fin ->
-      exists r_inf,
-        @mshr _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = r_inf /\
-          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
-  Proof.
-    intros x_fin y_fin r_fin x_inf y_inf X Y SHR.
-    cbn.
-    exists (Z.shiftr x_inf y_inf).
-    split; auto.
+  (*   unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *. *)
+  (*   subst. *)
+  (*   pose proof Int64.unsigned_range x_fin. *)
+  (*   pose proof Int64.unsigned_range y_fin. *)
+  (*   unfold Int64.shr. *)
+  (*   rewrite Int64.unsigned_repr; auto. *)
+  (*   split; try lia. *)
+  (*   apply Z_div_nonneg_nonneg; try lia. *)
+  (*   unfold Int64.max_unsigned. *)
+  (*   pose proof Z.div_lt (Int64.unsigned x_fin) (Int64.unsigned y_fin). *)
+  (*   assert (Int64.unsigned x_fin = 0 \/ 0 < Int64.unsigned x_fin)%Z as [X_FIN | X_FIN] by lia. *)
+  (*   - rewrite X_FIN. *)
+  (*     cbn. lia. *)
+  (*   - forward H1; try lia. *)
+  (*     assert (Int64.unsigned y_fin = 0 \/ Int64.unsigned y_fin = 1 \/ 1 < Int64.unsigned y_fin)%Z as [Y_FIN | [Y_FIN | Y_FIN]] by lia. *)
+  (*     + rewrite Y_FIN. *)
+  (*       rewrite Zdiv_0_r. *)
+  (*       lia. *)
+  (*     + rewrite Y_FIN. *)
+  (*       rewrite Z.div_1_r. *)
+  (*       lia. *)
+  (*     + lia. *)
 
-    cbn in SHR.
-    subst.
-
-    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-  Admitted.
+  (* Admitted. *)
 
   Lemma mshru_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
@@ -649,6 +653,29 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     subst.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    subst.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    unfold Int64.shru.
+    rewrite Int64.unsigned_repr; auto.
+    unfold Int64.max_unsigned.
+    split.
+    - apply Z.shiftr_nonneg; lia.
+    - rewrite Int64.Zshiftr_div_two_p; try lia.
+    pose proof Z.div_lt (Int64.unsigned x_fin) (Int64.unsigned y_fin).
+    assert (Int64.unsigned x_fin = 0 \/ 0 < Int64.unsigned x_fin)%Z as [X_FIN | X_FIN] by lia.
+    -- rewrite X_FIN.
+      cbn. lia.
+    -- forward H1; try lia.
+      assert (Int64.unsigned y_fin = 0 \/ Int64.unsigned y_fin = 1 \/ 1 < Int64.unsigned y_fin)%Z as [Y_FIN | [Y_FIN | Y_FIN]] by lia.
+      + rewrite Y_FIN.
+        cbn.
+        rewrite Z.div_1_r.
+        lia.
+      + rewrite Y_FIN.
+        assert (two_p 1 = 2)%Z.
+        admit.
+        admit.
   Admitted.
 
   Lemma mmods_refine :
@@ -661,16 +688,8 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
           InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
   Proof.
     intros x_fin y_fin r_fin x_inf y_inf X Y MOD.
-    cbn.
-    exists (x_inf mod y_inf)%Z.
-    split; auto.
-
-    cbn in MOD.
-    subst.
-
-    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-    break_match_hyp_inv.
-  Admitted.
+    cbn in MOD; inv MOD.
+  Qed.
 
   Lemma mmodu_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
@@ -690,6 +709,9 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     subst.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    subst.
+    unfold Int64.modu.
+    rewrite Int64.unsigned_repr; try lia.
   Admitted.
 
   Lemma mand_refine :
@@ -711,10 +733,16 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     subst.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-    unfold Int64.signed in X, Y.
-    break_match_hyp; break_match_hyp.
-    - rewrite X, Y.
-      rewrite Int64.signed_repr; eauto.
+    subst.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    rewrite Int64.unsigned_repr; auto.
+    split.
+    - pose proof Z.land_nonneg (Int64.unsigned x_fin) (Int64.unsigned y_fin) as N.
+      destruct N as [_ N].
+      forward N; try lia.
+    - unfold Int64.max_unsigned.
+      admit.
   Admitted.
 
   Lemma mor_refine :
@@ -736,6 +764,10 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     subst.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    subst.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    rewrite Int64.unsigned_repr; auto.
   Admitted.
 
   Lemma mxor_refine :
@@ -757,6 +789,10 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     subst.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    subst.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    rewrite Int64.unsigned_repr; auto.
   Admitted.
 
 End VMemInt_Refine_InfFin.
@@ -8131,174 +8167,6 @@ Qed.
       auto.
   Qed.
 
-  Lemma fin_to_inf_dvalue_refine_strict' :
-    forall d_inf d_fin,
-      DVC.dvalue_refine_strict d_inf d_fin ->
-      d_inf = fin_to_inf_dvalue d_fin.
-  Proof.
-    intros d_inf d_fin H.
-    rewrite DVC.dvalue_refine_strict_equation in H.
-    unfold fin_to_inf_dvalue.
-    break_match; cbn in *.
-    destruct p.
-    clear Heqs.
-
-    revert d_fin H x e e0.
-    induction d_inf; intros d_fin H' x' e e0; try rename H into H''; rename H' into H;
-      try solve
-        [ cbn in *; inv H;
-          cbn in *; inv e;
-          auto
-        ].
-    - cbn in *.
-      break_match_hyp; inv H.
-      cbn in *.
-      break_match_hyp; inv e.
-      cbn in *.
-      break_match_hyp; inv e0.
-
-      pose proof AC1.addr_convert_injective a a1 a0 Heqo Heqo1.
-      subst.
-      auto.
-    - cbn in *; break_match_hyp; inv H.
-      cbn in *; inv e.
-      cbn in *; break_match_hyp; inv H0.
-      cbn in *; break_match_hyp; inv e0.
-
-      pose proof (IP.from_Z_injective _ _ _ Heqo Heqo1).
-      apply IS1.LP.IP.to_Z_inj in H.
-      subst.
-      reflexivity.
-    - cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHfields _ eq_refl l Heqo1).
-        forward IHfields; eauto.
-        forward IHfields; eauto.
-        inv IHfields.
-        reflexivity.
-    - cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHfields _ eq_refl l Heqo1).
-        forward IHfields; eauto.
-        forward IHfields; eauto.
-        inv IHfields.
-        reflexivity.
-    - cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHelts _ eq_refl l Heqo1).
-        forward IHelts; eauto.
-        forward IHelts; eauto.
-        inv IHelts.
-        reflexivity.
-    - cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHelts _ eq_refl l Heqo1).
-        forward IHelts; eauto.
-        forward IHelts; eauto.
-        inv IHelts.
-        reflexivity.
-  Qed.
-
   (* TODO: Should we move this? *)
   Definition fin_to_inf_uvalue (uv_fin : DVCrev.DV1.uvalue) : DVCrev.DV2.uvalue.
     pose proof uvalue_convert_strict_safe uv_fin as [uvi [CONV RCONV]].
@@ -8673,6 +8541,199 @@ Qed.
         reflexivity.
   Qed.
 
+  (* TODO: Move these *)
+  Lemma fin_to_inf_dvalue_refine_strict :
+    forall d,
+      dvalue_refine_strict (fin_to_inf_dvalue d) d.
+  Proof.
+    intros d.
+    rewrite dvalue_refine_strict_equation.
+    unfold fin_to_inf_dvalue.
+    break_match; cbn in *.
+    destruct p.
+    auto.
+  Qed.
+
+  Lemma fin_to_inf_uvalue_refine_strict :
+    forall u,
+      uvalue_refine_strict (fin_to_inf_uvalue u) u.
+  Proof.
+    intros u.
+    rewrite uvalue_refine_strict_equation.
+    unfold fin_to_inf_uvalue.
+    break_match; cbn in *.
+    destruct p.
+    auto.
+  Qed.
+
+  Lemma fin_to_inf_dvalue_refine_strict' :
+    forall d_inf d_fin,
+      DVC.dvalue_refine_strict d_inf d_fin ->
+      d_inf = fin_to_inf_dvalue d_fin.
+  Proof.
+    intros d_inf d_fin H.
+    rewrite DVC.dvalue_refine_strict_equation in H.
+    unfold fin_to_inf_dvalue.
+    break_match; cbn in *.
+    destruct p.
+    clear Heqs.
+
+    revert d_fin H x e e0.
+    induction d_inf; intros d_fin H' x' e e0; try rename H into H''; rename H' into H;
+      try solve
+        [ cbn in *; inv H;
+          cbn in *; inv e;
+          auto
+        ].
+    - cbn in *.
+      break_match_hyp; inv H.
+      cbn in *.
+      break_match_hyp; inv e.
+      cbn in *.
+      break_match_hyp; inv e0.
+
+      pose proof AC1.addr_convert_injective a a1 a0 Heqo Heqo1.
+      subst.
+      auto.
+    - cbn in *; break_match_hyp; inv H.
+      cbn in *; inv e.
+      cbn in *; break_match_hyp; inv H0.
+      cbn in *; break_match_hyp; inv e0.
+
+      pose proof (IP.from_Z_injective _ _ _ Heqo Heqo1).
+      apply IS1.LP.IP.to_Z_inj in H.
+      subst.
+      reflexivity.
+    - cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHfields _ eq_refl l Heqo1).
+        forward IHfields; eauto.
+        forward IHfields; eauto.
+        inv IHfields.
+        reflexivity.
+    - cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHfields _ eq_refl l Heqo1).
+        forward IHfields; eauto.
+        forward IHfields; eauto.
+        inv IHfields.
+        reflexivity.
+    - cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHelts _ eq_refl l Heqo1).
+        forward IHelts; eauto.
+        forward IHelts; eauto.
+        inv IHelts.
+        reflexivity.
+    - cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHelts _ eq_refl l Heqo1).
+        forward IHelts; eauto.
+        forward IHelts; eauto.
+        inv IHelts.
+        reflexivity.
+  Qed.
+
   Definition uvalue_concretize_u_fin_inf_inclusion uv_inf uv_fin :=
     forall res,
       IS2.MEM.CP.CONC.concretize_u uv_fin res ->
@@ -8887,6 +8948,7 @@ Qed.
     forall v1 v2 iop res_fin res_inf,
       @eval_int_op err_ub_oom int64 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@VIntVMemInt int64 VInt64) ToDvalue_Int64
         iop v1 v2 = success_unERR_UB_OOM res_fin ->
@@ -8894,6 +8956,7 @@ Qed.
       @IS1.LP.Events.DV.eval_int_op err_ub_oom int64
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@IS1.LP.Events.DV.VIntVMemInt int64 IS1.LP.Events.DV.VInt64) IS1.LP.Events.DV.ToDvalue_Int64
         iop v1 v2 = success_unERR_UB_OOM res_inf.
@@ -8946,6 +9009,7 @@ Qed.
     forall v1 v2 iop res_fin res_inf,
       @eval_int_op err_ub_oom int16 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@VIntVMemInt int16 VInt16) ToDvalue_Int16
         iop v1 v2 = success_unERR_UB_OOM res_fin ->
@@ -8953,6 +9017,7 @@ Qed.
       @IS1.LP.Events.DV.eval_int_op err_ub_oom int16
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@IS1.LP.Events.DV.VIntVMemInt int16 IS1.LP.Events.DV.VInt16) IS1.LP.Events.DV.ToDvalue_Int16
         iop v1 v2 = success_unERR_UB_OOM res_inf.
@@ -9005,6 +9070,7 @@ Qed.
     forall v1 v2 iop res_fin res_inf,
       @eval_int_op err_ub_oom int32 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@VIntVMemInt int32 VInt32) ToDvalue_Int32
         iop v1 v2 = success_unERR_UB_OOM res_fin ->
@@ -9012,6 +9078,7 @@ Qed.
       @IS1.LP.Events.DV.eval_int_op err_ub_oom int32
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@IS1.LP.Events.DV.VIntVMemInt int32 IS1.LP.Events.DV.VInt32) IS1.LP.Events.DV.ToDvalue_Int32
         iop v1 v2 = success_unERR_UB_OOM res_inf.
@@ -9064,6 +9131,7 @@ Qed.
     forall v1 v2 iop res_fin res_inf,
       @eval_int_op err_ub_oom int8 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@VIntVMemInt int8 VInt8) ToDvalue_Int8
         iop v1 v2 = success_unERR_UB_OOM res_fin ->
@@ -9071,6 +9139,7 @@ Qed.
       @IS1.LP.Events.DV.eval_int_op err_ub_oom int8
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@IS1.LP.Events.DV.VIntVMemInt int8 IS1.LP.Events.DV.VInt8) IS1.LP.Events.DV.ToDvalue_Int8
         iop v1 v2 = success_unERR_UB_OOM res_inf.
@@ -9123,6 +9192,7 @@ Qed.
     forall v1 v2 iop res_fin res_inf,
       @eval_int_op err_ub_oom int1 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@VIntVMemInt int1 VInt1) ToDvalue_Int1
         iop v1 v2 = success_unERR_UB_OOM res_fin ->
@@ -9130,6 +9200,7 @@ Qed.
       @IS1.LP.Events.DV.eval_int_op err_ub_oom int1
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@IS1.LP.Events.DV.VIntVMemInt int1 IS1.LP.Events.DV.VInt1) IS1.LP.Events.DV.ToDvalue_Int1
         iop v1 v2 = success_unERR_UB_OOM res_inf.
@@ -9153,6 +9224,7 @@ Qed.
     forall v1_fin v2_fin v1_inf v2_inf iop res_fin res_inf,
       @eval_int_op err_ub_oom IP.intptr (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         VMemInt_intptr' ToDvalue_intptr
         iop v1_fin v2_fin = success_unERR_UB_OOM res_fin ->
@@ -9162,6 +9234,7 @@ Qed.
       @IS1.LP.Events.DV.eval_int_op err_ub_oom IS1.LP.IP.intptr
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         IS1.LP.Events.DV.VMemInt_intptr' IS1.LP.Events.DV.ToDvalue_intptr
         iop v1_inf v2_inf = success_unERR_UB_OOM res_inf.
@@ -9530,20 +9603,54 @@ Qed.
 
   Hint Resolve eval_iop_fin_inf : EVAL_INT_FIN_INF.
 
-  Lemma eval_int_icmp_fin_inf :
-    forall {Int} {VMInt : VellvmIntegers.VMemInt Int} icmp a b,
-      DVCrev.dvalue_convert_strict (@eval_int_icmp Int VMInt icmp a b) =
-        NoOom
-          (@IS1.LP.Events.DV.eval_int_icmp Int VMInt icmp a b).
+  Lemma ptr_to_int_fin_to_inf_addr :
+    forall a,
+      IS1.LP.PTOI.ptr_to_int (fin_to_inf_addr a) = PTOI.ptr_to_int a.
   Proof.
-    intros Int VMInt icmp a b.
+    intros a.
+    unfold fin_to_inf_addr.
+    break_match_goal.
+    clear Heqs.
+    erewrite AC2.addr_convert_ptoi; eauto.
+  Qed.
+
+  Lemma eval_int_icmp_fin_inf :
+    forall {Int} {VMInt : VellvmIntegers.VMemInt Int} icmp a b res_fin,
+      @eval_int_icmp err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt icmp a b = ret res_fin  ->
+      @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt icmp a b = ret (fin_to_inf_dvalue res_fin).
+  Proof.
+    intros Int VMInt icmp a b res_fin FIN.
     unfold eval_int_icmp, IS1.LP.Events.DV.eval_int_icmp.
     destruct icmp;
       try solve
         [ break_match_goal;
           cbn; auto
         ].
-  Qed.
+  Admitted.
+
+  (* TODO: Move this *)
+  Lemma eval_int_icmp_iptr_fin_inf :
+    forall v1_fin v2_fin v1_inf v2_inf icmp res_fin res_inf,
+      @eval_int_icmp err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        IP.intptr
+        VMemInt_intptr'
+        icmp v1_fin v2_fin = success_unERR_UB_OOM res_fin ->
+      IS1.LP.IP.from_Z (IP.to_Z v1_fin) = NoOom v1_inf ->
+      IS1.LP.IP.from_Z (IP.to_Z v2_fin) = NoOom v2_inf ->
+      DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
+      @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        IS1.LP.IP.intptr
+        IS1.LP.Events.DV.VMemInt_intptr'
+        icmp v1_inf v2_inf = success_unERR_UB_OOM res_inf.
+  Proof.
+  Admitted.
 
   (* TODO: Move this / generalize monad? *)
   Lemma eval_icmp_fin_inf :
@@ -9559,115 +9666,41 @@ Qed.
         icmp dv1_inf dv2_inf = ret (fin_to_inf_dvalue res_fin).
   Proof.
     intros dv1_fin dv2_fin res_fin icmp dv1_inf dv2_inf EVAL LIFT1 LIFT2.
+    Opaque IS1.LP.Events.DV.eval_int_icmp
+      eval_int_icmp.
     unfold eval_icmp in EVAL.
     (* Nasty case analysis... *)
     break_match_hyp_inv;
       try solve
         [ (* Simple integer cases *)
           break_match_hyp_inv;
-          [ unfold fin_to_inf_dvalue;
-
-            break_match_goal; clear Heqs;
-            destruct p; clear e0;
-            cbn in *; inv e;
-
-            break_match_goal; clear Heqs;
-            destruct p; clear e0;
-            cbn in *; inv e;
-
-            break_match_goal; clear Heqs;
-            destruct p; clear e0;
-            cbn;
-
-            rewrite eval_int_icmp_fin_inf in e; inv e;
-            reflexivity
-          | unfold fin_to_inf_dvalue;
-
-            break_match_goal; clear Heqs;
-            destruct p; clear e0;
-            cbn in *; inv e;
-
-            break_match_goal; clear Heqs;
-            destruct p; clear e0;
-            cbn in *; inv e;
-
-            cbn;
-            reflexivity
-          ]
-        | (* Ill-typed cases *)
-          break_match_hyp_inv
+          repeat rewrite_fin_to_inf_dvalue;
+          cbn;
+          auto;
+          eapply eval_int_icmp_fin_inf in H1;
+          auto
         ].
 
     { (* dv1: addr *)
       break_match_hyp_inv.
-      unfold fin_to_inf_dvalue.
-
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      cbn in *.
-      break_match_hyp_inv.
-
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      cbn in *.
-      break_match_hyp_inv.
-
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
+      repeat rewrite_fin_to_inf_dvalue.
       cbn.
-
-      erewrite AC2.addr_convert_ptoi in e; eauto.
-      erewrite AC2.addr_convert_ptoi in e; eauto.
-
-      rewrite eval_int_icmp_fin_inf in e; inv e.
-      reflexivity.
+      eapply eval_int_icmp_fin_inf in H1.
+      repeat rewrite ptr_to_int_fin_to_inf_addr.
+      auto.
     }
 
     { (* dv1: iptr *)
       break_match_hyp_inv.
-      unfold fin_to_inf_dvalue.
-
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      cbn in *; inv e.
-
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      cbn in *; inv e.
-
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
+      repeat rewrite_fin_to_inf_dvalue.
       cbn.
-
-      repeat break_match_hyp_inv.
-
-      (* TODO: Annoying intptr differences... *)
-      (* NOTE: different implicit arguments *)
-      rewrite eval_int_icmp_fin_inf in e; inv e.
-      pose proof IS1.LP.IP.to_Z_from_Z i.
-      pose proof IS1.LP.IP.from_Z_injective _ _ _ Heqo H.
-      rewrite H0 in Heqo.
-      cbn.
-      unfold IS1.LP.Events.DV.eval_int_icmp.
-      admit.
+      unfold intptr_fin_inf.
+      do 2 break_match_goal.
+      clear Heqs Heqs0.
+      eapply eval_int_icmp_iptr_fin_inf in H1; eauto.
+      eapply dvalue_convert_strict_fin_inf_succeeds_fin_to_inf_dvalue'.
     }
-
-    { (* dv1: poison *)
-      break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-
-        break_match_goal; clear Heqs;
-        destruct p; clear e0;
-        cbn in *; inv e;
-
-        break_match_goal; clear Heqs;
-        destruct p; clear e0;
-        cbn in *; inv e;
-
-        cbn;
-        reflexivity.
-    }
-  Admitted.
+  Qed.
 
   Lemma double_op_fin_inf :
     forall fop a b res_fin res_inf,
@@ -13952,31 +13985,6 @@ Qed.
         apply convert_fin_to_inf_uvalue_succeeds.
       + eapply IHclos_trans_1n; auto.
         apply convert_fin_to_inf_uvalue_succeeds.
-  Qed.
-
-  (* TODO: Move these *)
-  Lemma fin_to_inf_dvalue_refine_strict :
-    forall d,
-      dvalue_refine_strict (fin_to_inf_dvalue d) d.
-  Proof.
-    intros d.
-    rewrite dvalue_refine_strict_equation.
-    unfold fin_to_inf_dvalue.
-    break_match; cbn in *.
-    destruct p.
-    auto.
-  Qed.
-
-  Lemma fin_to_inf_uvalue_refine_strict :
-    forall u,
-      uvalue_refine_strict (fin_to_inf_uvalue u) u.
-  Proof.
-    intros u.
-    rewrite uvalue_refine_strict_equation.
-    unfold fin_to_inf_uvalue.
-    break_match; cbn in *.
-    destruct p.
-    auto.
   Qed.
 
   Definition dvalue_byte_refine
