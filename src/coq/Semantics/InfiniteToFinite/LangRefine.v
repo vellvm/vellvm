@@ -9471,7 +9471,29 @@ Qed.
       setoid_rewrite dtyp_eqb_refl in EVAL.
       inv EVAL.
     - (* LShr *)
-      admit.
+      cbn in *.
+      setoid_rewrite IP.VMemInt_intptr_dtyp in EVAL.
+      setoid_rewrite dtyp_eqb_refl in EVAL.
+      setoid_rewrite IS1.LP.IP.VMemInt_intptr_dtyp.
+      setoid_rewrite dtyp_eqb_refl.
+      cbn in *.
+      rewrite Bool.andb_false_r in *.
+      setoid_rewrite VMEM_REF.munsigned_refine in EVAL; eauto.
+      break_match_hyp_inv; setoid_rewrite Heqb;
+        cbn in CONV; inv CONV.
+      + setoid_rewrite IP.VMemInt_intptr_dtyp;
+          setoid_rewrite IS1.LP.IP.VMemInt_intptr_dtyp.
+        reflexivity.
+      + break_match_hyp_inv.
+        remember (mshru v1_fin v2_fin) as shru_res.
+        symmetry in Heqshru_res.
+        pose proof VMEM_REF.mshru_refine _ _ _ _ _ V1 V2 Heqshru_res
+          as (?&?&?).
+        setoid_rewrite H.
+        rewrite H0 in Heqo.
+        rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+        inv Heqo.
+        auto.
     - (* AShr *)
       admit.
     - (* URem *)
