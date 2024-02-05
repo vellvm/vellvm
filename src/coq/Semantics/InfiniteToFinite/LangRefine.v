@@ -604,48 +604,6 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     cbn in DIV; inv DIV.
   Qed.
 
-  (* Lemma mshr_refine : *)
-  (*   forall x_fin y_fin r_fin x_inf y_inf, *)
-  (*     InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf -> *)
-  (*     InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf -> *)
-  (*     @mshr _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = r_fin -> *)
-  (*     exists r_inf, *)
-  (*       @mshr _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = r_inf /\ *)
-  (*         InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf. *)
-  (* Proof. *)
-  (*   intros x_fin y_fin r_fin x_inf y_inf X Y SHR. *)
-  (*   cbn. *)
-  (*   exists (Z.shiftr x_inf y_inf). *)
-  (*   split; auto. *)
-
-  (*   cbn in SHR. *)
-  (*   subst. *)
-
-  (*   unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *. *)
-  (*   subst. *)
-  (*   pose proof Int64.unsigned_range x_fin. *)
-  (*   pose proof Int64.unsigned_range y_fin. *)
-  (*   unfold Int64.shr. *)
-  (*   rewrite Int64.unsigned_repr; auto. *)
-  (*   split; try lia. *)
-  (*   apply Z_div_nonneg_nonneg; try lia. *)
-  (*   unfold Int64.max_unsigned. *)
-  (*   pose proof Z.div_lt (Int64.unsigned x_fin) (Int64.unsigned y_fin). *)
-  (*   assert (Int64.unsigned x_fin = 0 \/ 0 < Int64.unsigned x_fin)%Z as [X_FIN | X_FIN] by lia. *)
-  (*   - rewrite X_FIN. *)
-  (*     cbn. lia. *)
-  (*   - forward H1; try lia. *)
-  (*     assert (Int64.unsigned y_fin = 0 \/ Int64.unsigned y_fin = 1 \/ 1 < Int64.unsigned y_fin)%Z as [Y_FIN | [Y_FIN | Y_FIN]] by lia. *)
-  (*     + rewrite Y_FIN. *)
-  (*       rewrite Zdiv_0_r. *)
-  (*       lia. *)
-  (*     + rewrite Y_FIN. *)
-  (*       rewrite Z.div_1_r. *)
-  (*       lia. *)
-  (*     + lia. *)
-
-  (* Admitted. *)
-
   Lemma mshru_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
       InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
@@ -723,7 +681,21 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     subst.
     unfold Int64.modu.
     rewrite Int64.unsigned_repr; try lia.
-  Admitted.
+    unfold Int64.max_unsigned.
+
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    destruct (Z.eq_dec (Int64.unsigned y_fin) 0%Z).
+    { (* y_fin = 0 *)
+      rewrite e.
+      rewrite Zmod_0_r.
+      lia.
+    }
+      
+    pose proof Z.mod_bound_or (Int64.unsigned x_fin) (Int64.unsigned y_fin).
+    forward H1; auto.
+    lia.
+  Qed.
 
   Lemma mand_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
