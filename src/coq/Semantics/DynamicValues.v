@@ -3375,14 +3375,16 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                                | Some x => x
                                end in
 
-            if orb (andb nuw (res_u' >? munsigned res))
-                 (andb nsw (orb min_s_bound max_s_bound))
+            if dtyp_eqb mdtyp_of_int DTYPE_IPTR
             then
-              (* TODO: Do we need to check for the unsigned case? Return result anyway? *)
-              if dtyp_eqb mdtyp_of_int DTYPE_IPTR
+              if (res_u' >? munsigned res)
               then raise_oom "Multiplication overflow on iptr."
-              else ret (DVALUE_Poison mdtyp_of_int)
-            else ret (to_dvalue res)
+              else ret (to_dvalue res)
+            else
+              if orb (andb nuw (res_u' >? munsigned res))
+                   (andb nsw (orb min_s_bound max_s_bound))
+              then ret (DVALUE_Poison mdtyp_of_int)
+              else ret (to_dvalue res)
 
       | Shl nuw nsw =>
           res <- lift_OOM (mshl x y);;

@@ -217,7 +217,8 @@ Module Type VMemInt_Refine (IP_INF : INTPTR) (IP_FIN : INTPTR).
       @mmul _ IP_FIN.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
       exists r_inf,
         @mmul _ IP_INF.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
-          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf /\
+          (@munsigned _ IP_INF.VMemInt_intptr x_inf * @munsigned _ IP_INF.VMemInt_intptr y_inf >? @munsigned _ IP_INF.VMemInt_intptr r_inf = false)%Z.
 
   Parameter mshl_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
@@ -308,6 +309,11 @@ Module Type VMemInt_Refine (IP_INF : INTPTR) (IP_FIN : INTPTR).
       exists r_inf,
         @mxor _ IP_INF.VMemInt_intptr x_inf y_inf = r_inf /\
           IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+
+  Parameter munsigned_refine :
+    forall x_fin x_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      @munsigned _ IP_FIN.VMemInt_intptr x_fin = @munsigned _ IP_INF.VMemInt_intptr x_inf.
 End VMemInt_Refine.
 
 Module VMemInt_Intptr_Properties_Inf : VMemInt_Intptr_Properties InterpreterStackBigIntptr.LP.IP.
@@ -494,7 +500,8 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
       @mmul _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
       exists r_inf,
         @mmul _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
-          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
+          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf /\
+          (@munsigned _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf * @munsigned _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr y_inf >? @munsigned _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr r_inf = false)%Z.
   Proof.
     intros x_fin y_fin r_fin x_inf y_inf X Y MUL.
     exists (x_inf * y_inf)%Z.
@@ -509,6 +516,10 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     pose proof Int64.unsigned_range x_fin.
     pose proof Int64.unsigned_range y_fin.
     rewrite Int64.unsigned_repr; eauto.
+    2: lia.
+    split; auto.
+    unfold munsigned.
+    cbn.
     lia.
   Qed.
 
@@ -794,6 +805,17 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     pose proof Int64.unsigned_range y_fin.
     rewrite Int64.unsigned_repr; auto.
   Admitted.
+
+  Lemma munsigned_refine :
+    forall x_fin x_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      @munsigned _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin = @munsigned _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf.
+  Proof.
+    intros x_fin x_inf TOZ.
+    cbn in *.
+    unfold InterpreterStackBigIntptr.LP.IP.to_Z, InterpreterStack64BitIntptr.LP.IP.to_Z in *.
+    auto.
+  Qed.
 
 End VMemInt_Refine_InfFin.
 
@@ -9315,7 +9337,7 @@ Qed.
         move CONV after Heqb.
         break_match_hyp_inv.
 
-        epose proof VMEM_REF.mmul_refine _ _ _ v1_inf v2_inf V1 V2 HMUL as (?&?&?).
+        epose proof VMEM_REF.mmul_refine _ _ _ v1_inf v2_inf V1 V2 HMUL as (?&?&?&?).
         rewrite H0 in Heqo.
         rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
         inv Heqo.
@@ -9324,9 +9346,8 @@ Qed.
         setoid_rewrite IS1.LP.IP.VMemInt_intptr_dtyp.
         setoid_rewrite dtyp_eqb_refl.
         break_match_goal; try reflexivity.
-
-        (* Contradiction, but need to know something about munsigned *)
-        admit.
+        setoid_rewrite Heqb1 in H1.
+        inv H1.
       }
 
       break_match_hyp_inv.
@@ -9340,7 +9361,7 @@ Qed.
         move CONV after Heqb.
         break_match_hyp_inv.
 
-        epose proof VMEM_REF.mmul_refine _ _ _ v1_inf v2_inf V1 V2 HMUL as (?&?&?).
+        epose proof VMEM_REF.mmul_refine _ _ _ v1_inf v2_inf V1 V2 HMUL as (?&?&?&?).
         rewrite H0 in Heqo.
         rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
         inv Heqo.
@@ -9350,11 +9371,57 @@ Qed.
         setoid_rewrite dtyp_eqb_refl.
         break_match_goal; try reflexivity.
 
-        (* Contradiction, but need to know something about munsigned *)
-        admit.
+        setoid_rewrite Heqb1 in H1.
+        inv H1.
       }
 
-      admit.
+      break_match_goal.
+      {
+        remember (lift_OOM (mmul v1_fin v2_fin)) as mul_result.
+        destruct_err_ub_oom mul_result; inv H0.
+        symmetry in Heqmul_result.
+        destruct (mmul v1_fin v2_fin) eqn:HMUL; inv Heqmul_result.
+        epose proof VMEM_REF.mmul_refine _ _ _ v1_inf v2_inf V1 V2 HMUL as (?&?&?&?).
+        setoid_rewrite H.
+        cbn.
+
+        setoid_rewrite IP.VMemInt_intptr_dtyp in H1.
+        rewrite dtyp_eqb_refl in H1.
+        setoid_rewrite VMEM_REF.munsigned_refine in H1; eauto.
+        rewrite H2 in H1.
+        cbn in *.
+        inv H1.
+
+        cbn in CONV.
+        break_match_hyp_inv.
+        rewrite H0 in Heqo.
+        rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+        inv Heqo; auto.
+      }
+
+      remember (lift_OOM (mmul v1_fin v2_fin)) as mul_result.
+      destruct_err_ub_oom mul_result; inv H0.
+      symmetry in Heqmul_result.
+      destruct (mmul v1_fin v2_fin) eqn:HMUL; inv Heqmul_result.
+      epose proof VMEM_REF.mmul_refine _ _ _ v1_inf v2_inf V1 V2 HMUL as (?&?&?&?).
+      setoid_rewrite H.
+      cbn.
+      setoid_rewrite H2.
+
+      setoid_rewrite IP.VMemInt_intptr_dtyp in H1.
+      setoid_rewrite IS1.LP.IP.VMemInt_intptr_dtyp.
+      rewrite dtyp_eqb_refl.
+      rewrite dtyp_eqb_refl in H1.
+      setoid_rewrite VMEM_REF.munsigned_refine in H1; eauto.
+      rewrite H2 in H1.
+      cbn in *.
+      inv H1.
+
+      cbn in CONV.
+      break_match_hyp_inv.
+      rewrite H0 in Heqo.
+      rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+      inv Heqo; auto.
     - (* Shl *)
       cbn in *.
       destruct (mshl v1_fin v2_fin) eqn:HSHL;
