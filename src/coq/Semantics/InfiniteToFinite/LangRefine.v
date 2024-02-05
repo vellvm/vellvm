@@ -697,6 +697,22 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     lia.
   Qed.
 
+  (* TODO: Move this *)
+  Lemma Zland_range :
+    forall a b,
+      (0 <= a)%Z ->
+      (0 <= b)%Z ->
+      (0 <= Z.land a b /\ Z.land a b <= a /\ Z.land a b <= b)%Z.
+  Proof.
+    intros a b A B.
+    pose proof Z.land_nonneg a b as [_ N].
+    forward N; [lia|].
+    split; try lia.
+    split.
+    admit.
+    admit.
+  Admitted.
+
   Lemma mand_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
       InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
@@ -720,13 +736,10 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     pose proof Int64.unsigned_range x_fin.
     pose proof Int64.unsigned_range y_fin.
     rewrite Int64.unsigned_repr; auto.
-    split.
-    - pose proof Z.land_nonneg (Int64.unsigned x_fin) (Int64.unsigned y_fin) as N.
-      destruct N as [_ N].
-      forward N; try lia.
-    - unfold Int64.max_unsigned.
-      admit.
-  Admitted.
+    unfold Int64.max_unsigned.
+    pose proof Zland_range (Int64.unsigned x_fin) (Int64.unsigned y_fin) as (?&?&?).
+    all: try lia.
+  Qed.
 
   Lemma mor_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
