@@ -9466,7 +9466,10 @@ Qed.
         inv Heqo.
         auto.
     - (* SDiv *)
-      admit.
+      cbn in *.
+      setoid_rewrite IP.VMemInt_intptr_dtyp in EVAL.
+      setoid_rewrite dtyp_eqb_refl in EVAL.
+      inv EVAL.
     - (* LShr *)
       admit.
     - (* AShr *)
