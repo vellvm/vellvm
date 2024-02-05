@@ -9495,11 +9495,17 @@ Qed.
         inv Heqo.
         auto.
     - (* AShr *)
-      admit.
+      cbn in *.
+      setoid_rewrite IP.VMemInt_intptr_dtyp in EVAL.
+      setoid_rewrite dtyp_eqb_refl in EVAL.
+      inv EVAL.
     - (* URem *)
       admit.
     - (* SRem *)
-      admit.
+      cbn in *.
+      setoid_rewrite IP.VMemInt_intptr_dtyp in EVAL.
+      setoid_rewrite dtyp_eqb_refl in EVAL.
+      inv EVAL.
     - (* And *)
       cbn in *; inv EVAL.
       remember (mand v1_fin v2_fin) as res_fin.

@@ -3466,10 +3466,12 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           else ret (to_dvalue (mmodu x y))
 
       | SRem =>
-          if (msigned y =? 0)%Z
-          then raise_ub "Signed mod 0."
-          else to_dvalue_OOM (mmods x y)
-
+          if dtyp_eqb mdtyp_of_int DTYPE_IPTR
+          then raise_error "Signed division for iptr."
+          else
+            if (msigned y =? 0)%Z
+            then raise_ub "Signed mod 0."
+            else to_dvalue_OOM (mmods x y)
       | And =>
           ret (to_dvalue (mand x y))
 
