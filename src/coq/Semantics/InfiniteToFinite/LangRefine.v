@@ -9500,7 +9500,21 @@ Qed.
       setoid_rewrite dtyp_eqb_refl in EVAL.
       inv EVAL.
     - (* URem *)
-      admit.
+      cbn in *.
+      setoid_rewrite VMEM_REF.munsigned_refine in EVAL; eauto.
+      break_match_hyp_inv.
+      setoid_rewrite Heqb.
+      cbn in CONV.
+      break_match_hyp_inv.
+      remember (mmodu v1_fin v2_fin) as res.
+      symmetry in Heqres.
+      pose proof VMEM_REF.mmodu_refine _ _ _ _ _ V1 V2 Heqres
+        as (?&?&?).
+      setoid_rewrite H.
+      rewrite H0 in Heqo.
+      rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+      inv Heqo.
+      auto.
     - (* SRem *)
       cbn in *.
       setoid_rewrite IP.VMemInt_intptr_dtyp in EVAL.
@@ -9545,7 +9559,7 @@ Qed.
       rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
       inv Heqo.
       reflexivity.
-  Admitted.
+  Qed.
 
   Lemma dvalue_convert_strict_fin_inf_succeeds_fin_to_inf_dvalue' :
     forall res,
