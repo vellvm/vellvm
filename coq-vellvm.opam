@@ -31,7 +31,7 @@ depends: [
   "coq-flocq" {>= "4.1.1"}
   "coq-mathcomp-ssreflect" 
   "coq-simple-io" 
-  "coq-itree" {= "5.0.0"}
+  "coq-itree" {>= "5.1.1"}
   "coq-quickchick" {= "1.6.4"}
 ]
 
