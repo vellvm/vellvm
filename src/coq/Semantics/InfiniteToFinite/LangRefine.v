@@ -9443,7 +9443,28 @@ Qed.
       rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
       inv Heqo; auto.
     - (* UDiv *)
-      admit.
+      cbn.
+      cbn in EVAL.
+      setoid_rewrite VMEM_REF.munsigned_refine in EVAL; eauto.
+      break_match_hyp_inv.
+      setoid_rewrite Heqb.
+      setoid_rewrite VMEM_REF.munsigned_refine in H0; eauto.
+      break_match_hyp_inv;
+        setoid_rewrite Heqb0;
+        cbn in CONV; inv CONV.
+      + setoid_rewrite IP.VMemInt_intptr_dtyp;
+          setoid_rewrite IS1.LP.IP.VMemInt_intptr_dtyp.
+        reflexivity.
+      + break_match_hyp_inv.
+        remember (mdivu v1_fin v2_fin) as div_res.
+        symmetry in Heqdiv_res.
+        pose proof VMEM_REF.mdivu_refine _ _ _ _ _ V1 V2 Heqdiv_res
+          as (?&?&?).
+        setoid_rewrite H.
+        rewrite H0 in Heqo.
+        rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+        inv Heqo.
+        auto.
     - (* SDiv *)
       admit.
     - (* LShr *)
