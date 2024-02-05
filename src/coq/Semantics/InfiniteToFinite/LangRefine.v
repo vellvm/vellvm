@@ -9429,8 +9429,19 @@ Qed.
 
       epose proof VMEM_REF.mshl_refine _ _ _ v1_inf v2_inf V1 V2 HSHL as (?&?&?).
       setoid_rewrite H; cbn in *.
-
-      admit.
+      setoid_rewrite IP.VMemInt_intptr_dtyp in H0.
+      setoid_rewrite IS1.LP.IP.VMemInt_intptr_dtyp.
+      setoid_rewrite dtyp_eqb_refl.
+      setoid_rewrite dtyp_eqb_refl in H0.
+      setoid_rewrite VMEM_REF.munsigned_refine in H0; eauto.
+      break_match_hyp_inv.
+      setoid_rewrite Heqb.
+      cbn.
+      cbn in CONV.
+      break_match_hyp_inv.
+      rewrite H1 in Heqo.
+      rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+      inv Heqo; auto.
     - (* UDiv *)
       admit.
     - (* SDiv *)
