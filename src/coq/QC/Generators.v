@@ -5,7 +5,7 @@ Require Import BinIntDef.
 Import ListNotations.
 
 (* From QuickChick Require Import QuickChick. *)
-From QuickChick Require Import QuickChick Generators Producer Show Sets.
+From QuickChick Require Import Generators Producer Show Sets.
 Set Warnings "-extraction-opaque-accessed,-extraction".
 
 (** [subst_max] performs as many [subst] as possible, clearing all

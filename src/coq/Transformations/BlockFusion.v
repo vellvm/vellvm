@@ -319,13 +319,13 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
           assert (EQ2: predecessors f2 bks = []).
           { destruct (predecessors f2 bks ); auto.
             cbn in SINGLEPRED.
-            symmetry in SINGLEPRED; apply beq_nat_eq in SINGLEPRED.
+            apply Nat.eqb_eq in SINGLEPRED.
             lia.
           }
           assert (EQ3: predecessors f2 pre = []).
           { destruct (predecessors f2 pre); auto.
             cbn in SINGLEPRED.
-            symmetry in SINGLEPRED; apply beq_nat_eq in SINGLEPRED.
+            apply Nat.eqb_eq in SINGLEPRED.
             lia.
           }
           apply successor_predecessor with (G := pre ++ bk1 :: bks) in IN; auto.

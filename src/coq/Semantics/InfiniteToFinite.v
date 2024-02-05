@@ -8407,7 +8407,10 @@ cofix CIH
       rename a into ptr_fin.
 
       (* Need to break apart GCP to find out about ptr_fin *)
-      pose proof Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_nth_eq1 a_fin n addrs_fin.
+      epose proof
+        Memory64BitIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_nth_eq1
+        a_fin n addrs_fin.
+
       forward H0.
       {
         red. red.
@@ -10153,7 +10156,9 @@ cofix CIH
                                should share the same provenance as well.
          *)
 
-        pose proof (MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_nth_eq1  a_inf (S len') (a_inf :: a_inf' :: addrs_inf) (M:=(MemPropT MemoryBigIntptr.MMEP.MMSP.MemState))).
+        epose proof (MemoryBigIntptr.MMEP.MemSpec.MemHelpers.get_consecutive_ptrs_nth_eq1  a_inf (S len') (a_inf :: a_inf' :: addrs_inf) (M:=(MemPropT MemoryBigIntptr.MMEP.MMSP.MemState))).
+        Unshelve.
+
         forward H0.
         { red. red.
           intros ms x0.
@@ -14092,7 +14097,7 @@ cofix CIH
         apply InfMemMMSP.frame_stack_inv in MSR' as [MSR' | MSR'].
         2: {
           (* Singleton case is contradiction *)
-          destruct MSR' as (?&?&?&?&?&?).
+          destruct MSR' as (?&?&?&?&?).
           inv H0.
         }
 
@@ -14445,9 +14450,6 @@ cofix CIH
         eapply inf_fin_preserve_allocation_ids; eauto.
       + (* Heap preserved *)
         eapply inf_fin_heap_preserved; eauto.
-
-        Unshelve.
-        apply InfAddr.null.
   Qed.
 
   (* TODO: Move this *)
@@ -14683,29 +14685,21 @@ cofix CIH
     exists sid_fin.
     exists (lift_MemState ms_fin).
     cbn.
-    destruct MSR as (?&?&?&?&?&?&?&?).
+    destruct MSR as (?&?&?&?&?&?&?).
     destruct FRESH as (?&?&?&?&?&?&?&?).
     split.
     { split; [|split; [|split; [|split; [|split; [|split; [|split]]]]]]; auto.
       intros USED.
       apply used_store_id_lift_MemState in USED.
-      apply f.
+      apply H6.
 
       eapply used_store_id_read_byte_preserved_fin; eauto.
       symmetry; auto.
-      eapply fin_inf_heap_preserved; eauto.
-
-      red.
-      red.
-      split; [|split; [|split; [|split; [|split; [|split]]]]];
-        eauto with FinInf.
     }
 
     split; auto.
     split; [|split; [|split; [|split; [|split; [|split]]]]];
       eauto with FinInf.
-    Unshelve.
-    apply InfMem.MMEP.initial_heap.
   Qed.
 
   Lemma fin_inf_extend_provenance :
@@ -24607,9 +24601,13 @@ cofix CIH
                       specialize (REL0 x).
                       red in REL0.
                       pclearbot.
-                      rewrite <- REL0 in H1.
-                      eapply ret_not_contains_UB_Extra in H1; eauto.
+                      eapply ret_not_contains_UB_Extra
+                        with (rv:=(s2, (s1, x))) in H1; eauto.
                       cbn.
+                      symmetry.
+                      eapply eutt_cong_eq.
+                      apply REL0.
+                      reflexivity.
                       reflexivity.
                     - pinversion H0.
                       do 2 subst_existT.
@@ -24660,13 +24658,21 @@ cofix CIH
                       - pinversion H; subst; inv CHECK1.
                       - pinversion H; do 2 subst_existT.
                         specialize (REL0 x).
-                        rewrite <- REL0 in UB.
-                        eapply ret_not_contains_UB_Extra in UB; cbn; auto.
+                        eapply ret_not_contains_UB_Extra
+                          with (rv:=(s2, (s1, x))) in UB; eauto.
+                        cbn.
+                        symmetry.
+                        eapply eutt_cong_eq.
+                        apply REL0.
+                        reflexivity.
                         reflexivity.
                       - pinversion H; do 2 subst_existT.
                         specialize (REL0 x).
-                        rewrite <- REL0 in UB.
                         eapply ret_not_contains_UB_Extra in UB; cbn; auto.
+                        symmetry.
+                        eapply eutt_cong_eq.
+                        apply REL0.
+                        reflexivity.
                         reflexivity.
                       - pinversion H; do 2 subst_existT.
                         subst.
@@ -24816,8 +24822,9 @@ cofix CIH
                         reflexivity.
                       }
 
-                      rewrite REL.
-                      eapply K_RUTT; split; auto.
+                      eapply orutt_Proper_R3; eauto.
+                      all: try reflexivity.
+                      apply (REL b).
                     }
                     { specialize (EQ t1).
                       contradiction.
@@ -24835,15 +24842,21 @@ cofix CIH
                       inv UB; pinversion H; try inv CHECK1.
                       - repeat subst_existT.
                         specialize (REL0 x).
-                        setoid_rewrite <- REL0 in H0.
                         eapply ret_not_contains_UB_Extra with (rv:=(s2, (s1, x))) in H0;
                           try contradiction.
+                        symmetry.
+                        eapply eutt_cong_eq.
+                        apply REL0.
+                        reflexivity.
                         reflexivity.
                       - repeat subst_existT.
                         specialize (REL0 x).
-                        setoid_rewrite <- REL0 in H0.
                         eapply ret_not_contains_UB_Extra with (rv:=(s2, (s1, x))) in H0;
                           try contradiction.
+                        symmetry.
+                        eapply eutt_cong_eq.
+                        apply REL0.
+                        reflexivity.
                         reflexivity.
                       - repeat subst_existT.
                         remember tt.
@@ -24938,8 +24951,9 @@ cofix CIH
                         reflexivity.
                       }
 
-                      rewrite REL.
-                      eapply K_RUTT; split; auto.
+                      eapply orutt_Proper_R3; eauto.
+                      all: try reflexivity.
+                      apply (REL tt).
                     }
                     { specialize (EQ t1).
                       contradiction.
@@ -24957,15 +24971,21 @@ cofix CIH
                       inv UB; pinversion H; try inv CHECK1.
                       - repeat subst_existT.
                         specialize (REL0 x).
-                        setoid_rewrite <- REL0 in H0.
                         eapply ret_not_contains_UB_Extra with (rv:=(s2, (s1, x))) in H0;
                           try contradiction.
+                        symmetry.
+                        eapply eutt_cong_eq.
+                        apply REL0.
+                        reflexivity.
                         reflexivity.
                       - repeat subst_existT.
                         specialize (REL0 x).
-                        setoid_rewrite <- REL0 in H0.
                         eapply ret_not_contains_UB_Extra with (rv:=(s2, (s1, x))) in H0;
                           try contradiction.
+                        symmetry.
+                        eapply eutt_cong_eq.
+                        apply REL0.
+                        reflexivity.
                         reflexivity.
                       - repeat subst_existT.
                         remember tt.
@@ -25060,8 +25080,9 @@ cofix CIH
                         reflexivity.
                       }
 
-                      rewrite REL.
-                      eapply K_RUTT; split; auto.
+                      eapply orutt_Proper_R3; eauto.
+                      all: try reflexivity.
+                      apply (REL tt).
                     }
                     { specialize (EQ t1).
                       contradiction.
@@ -26510,9 +26531,8 @@ cofix CIH
                       pclearbot.
 
                       repeat rewrite <- itree_eta.
-                      rewrite REL.
-                      eapply K_RUTT.
-                      repeat (split; auto).
+                      eapply orutt_Proper_R3; eauto.
+                      all: try reflexivity.
                     }
                   }
 
@@ -26653,9 +26673,8 @@ cofix CIH
                       pclearbot.
 
                       repeat rewrite <- itree_eta.
-                      rewrite REL.
-                      eapply K_RUTT.
-                      repeat (split; auto).
+                      eapply orutt_Proper_R3; eauto.
+                      all: try reflexivity.
                     }
                   }
 
@@ -26854,9 +26873,8 @@ cofix CIH
                       pclearbot.
 
                       repeat rewrite <- itree_eta.
-                      rewrite REL.
-                      eapply K_RUTT.
-                      repeat (split; auto).
+                      eapply orutt_Proper_R3; eauto.
+                      all: try reflexivity.
                     }
                   }
 
@@ -27021,9 +27039,8 @@ cofix CIH
                       pclearbot.
 
                       repeat rewrite <- itree_eta.
-                      rewrite REL.
-                      eapply K_RUTT.
-                      repeat (split; auto).
+                      eapply orutt_Proper_R3; eauto.
+                      all: try reflexivity.
                     }
                   }
 
@@ -27337,9 +27354,8 @@ cofix CIH
                       pclearbot.
 
                       repeat rewrite <- itree_eta.
-                      rewrite REL.
-                      eapply K_RUTT.
-                      repeat (split; auto).
+                      eapply orutt_Proper_R3; eauto.
+                      all: try reflexivity.
                     }
                   }
 
@@ -27614,9 +27630,8 @@ cofix CIH
                       pclearbot.
 
                       repeat rewrite <- itree_eta.
-                      rewrite REL.
-                      eapply K_RUTT.
-                      repeat (split; auto).
+                      eapply orutt_Proper_R3; eauto.
+                      all: try reflexivity.
                     }
                   }
 
@@ -27639,15 +27654,21 @@ cofix CIH
                         - pinversion H; do 2 subst_existT; subst.
                           specialize (REL x).
                           exfalso.
-                          rewrite <- REL in VIS_HANDLED.
                           eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                          cbn; reflexivity.
+                          symmetry.
+                          eapply eutt_cong_eq.
+                          apply REL.
+                          reflexivity.
+                          reflexivity.
                         - pinversion H; do 2 subst_existT; subst.
                           specialize (REL x).
                           exfalso.
-                          rewrite <- REL in VIS_HANDLED.
                           eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                          cbn; reflexivity.
+                          symmetry.
+                          eapply eutt_cong_eq.
+                          apply REL.
+                          reflexivity.
+                          reflexivity.
                         - pinversion H; do 2 subst_existT; subst.
                           inversion H5.
                       }
@@ -27716,10 +27737,9 @@ cofix CIH
                         specialize (REL0 (exist (fun _ : dvalue => True) d t)).
                         red in REL0.
                         pclearbot.
-                        rewrite REL0.
                         destruct t.
-
-                        eapply paco2_eqit_RR_refl; typeclasses eauto.
+                        eapply get_inf_tree_Proper.
+                        apply REL0.
                       }
 
                       intros a b H H0 H1.
@@ -27771,7 +27791,8 @@ cofix CIH
                       specialize (REL (exist (fun _ : InterpreterStackBigIntptr.LP.Events.DV.dvalue => True) x1 I)).
                       red in REL.
                       pclearbot.
-                      rewrite REL.
+                      eapply orutt_Proper_R3; eauto.
+                      all: try reflexivity.
 
                       eapply K_RUTT.
                       split; eauto.
@@ -27797,15 +27818,21 @@ cofix CIH
                         - pinversion H; do 2 subst_existT; subst.
                           specialize (REL x).
                           exfalso.
-                          rewrite <- REL in VIS_HANDLED.
                           eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                          cbn; reflexivity.
+                          symmetry.
+                          eapply eutt_cong_eq.
+                          apply REL.
+                          reflexivity.
+                          reflexivity.
                         - pinversion H; do 2 subst_existT; subst.
                           specialize (REL x).
                           exfalso.
-                          rewrite <- REL in VIS_HANDLED.
                           eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                          cbn; reflexivity.
+                          symmetry.
+                          eapply eutt_cong_eq.
+                          apply REL.
+                          reflexivity.
+                          reflexivity.
                         - pinversion H; do 2 subst_existT; subst.
                           inversion H5.
                       }
@@ -27872,12 +27899,11 @@ cofix CIH
 
                         move REL0 after Heqo.
                         specialize (REL0 (exist (fun _ : dvalue => True) d t)).
+                        eapply get_inf_tree_Proper; eauto.
                         red in REL0.
                         pclearbot.
-                        rewrite REL0.
                         destruct t.
-
-                        eapply paco2_eqit_RR_refl; typeclasses eauto.
+                        apply REL0.
                       }
 
                       intros a b H H0 H1.
@@ -27929,7 +27955,7 @@ cofix CIH
                       specialize (REL (exist (fun _ : InterpreterStackBigIntptr.LP.Events.DV.dvalue => True) x1 I)).
                       red in REL.
                       pclearbot.
-                      rewrite REL.
+                      eapply orutt_Proper_R3; eauto; try reflexivity.
 
                       eapply K_RUTT.
                       split; eauto.
@@ -27955,15 +27981,21 @@ cofix CIH
                         - pinversion H; do 2 subst_existT; subst.
                           specialize (REL x).
                           exfalso.
-                          rewrite <- REL in VIS_HANDLED.
                           eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                          cbn; reflexivity.
+                          symmetry.
+                          eapply eutt_cong_eq.
+                          apply REL.
+                          reflexivity.
+                          reflexivity.
                         - pinversion H; do 2 subst_existT; subst.
                           specialize (REL x).
                           exfalso.
-                          rewrite <- REL in VIS_HANDLED.
                           eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                          cbn; reflexivity.
+                          symmetry.
+                          eapply eutt_cong_eq.
+                          apply REL.
+                          reflexivity.
+                          reflexivity.
                         - pinversion H; do 2 subst_existT; subst.
                           inversion H5.
                       }
@@ -28032,10 +28064,8 @@ cofix CIH
                         specialize (REL0 (exist (fun _ : dvalue => True) d t)).
                         red in REL0.
                         pclearbot.
-                        rewrite REL0.
                         destruct t.
-
-                        eapply paco2_eqit_RR_refl; typeclasses eauto.
+                        eapply get_inf_tree_Proper; eauto.
                       }
 
                       intros a b H H0 H1.
@@ -28087,7 +28117,7 @@ cofix CIH
                       specialize (REL (exist (fun _ : InterpreterStackBigIntptr.LP.Events.DV.dvalue => True) x1 I)).
                       red in REL.
                       pclearbot.
-                      rewrite REL.
+                      eapply orutt_Proper_R3; eauto; try reflexivity.
 
                       eapply K_RUTT.
                       split; eauto.
@@ -28111,15 +28141,21 @@ cofix CIH
                       - pinversion H; do 2 subst_existT; subst.
                         specialize (REL x).
                         exfalso.
-                        rewrite <- REL in VIS_HANDLED.
                         eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                        cbn; reflexivity.
+                        symmetry.
+                        eapply eutt_cong_eq.
+                        apply REL.
+                        reflexivity.
+                        reflexivity.
                       - pinversion H; do 2 subst_existT; subst.
                         specialize (REL x).
                         exfalso.
-                        rewrite <- REL in VIS_HANDLED.
                         eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                        cbn; reflexivity.
+                        symmetry.
+                        eapply eutt_cong_eq.
+                        apply REL.
+                        reflexivity.
+                        reflexivity.
                       - pinversion H; do 2 subst_existT; subst.
                         inversion H4.
                     }
@@ -28189,15 +28225,21 @@ cofix CIH
                       - pinversion H; do 2 subst_existT; subst.
                         specialize (REL x).
                         exfalso.
-                        rewrite <- REL in VIS_HANDLED.
                         eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                        cbn; reflexivity.
+                        symmetry.
+                        eapply eutt_cong_eq.
+                        apply REL.
+                        reflexivity.
+                        reflexivity.
                       - pinversion H; do 2 subst_existT; subst.
                         specialize (REL x).
                         exfalso.
-                        rewrite <- REL in VIS_HANDLED.
                         eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                        cbn; reflexivity.
+                        symmetry.
+                        eapply eutt_cong_eq.
+                        apply REL.
+                        reflexivity.
+                        reflexivity.
                       - pinversion H; do 2 subst_existT; subst.
                         inversion H5.
                     }
@@ -28238,9 +28280,9 @@ cofix CIH
                       specialize (REL1 tt).
                       red in REL1.
                       pclearbot.
-                      rewrite REL1.
-                      setoid_rewrite bind_ret_l.
-                      eapply paco2_eqit_RR_refl; typeclasses eauto.
+                      eapply get_inf_tree_Proper; eauto.
+                      setoid_rewrite bind_ret_l in REL1.
+                      apply REL1.
                     }
 
                     intros a b RETa RETb AB.
@@ -28288,9 +28330,7 @@ cofix CIH
                     }
 
                     repeat rewrite <- itree_eta.
-                    rewrite REL.
-                    specialize (K_RUTT tt tt eq_refl).
-                    exact K_RUTT.
+                    eapply orutt_Proper_R3; eauto; try reflexivity.
                   }
 
                   { (* FailureE *)
@@ -28308,15 +28348,21 @@ cofix CIH
                       - pinversion H; do 2 subst_existT; subst.
                         specialize (REL x).
                         exfalso.
-                        rewrite <- REL in VIS_HANDLED.
                         eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                        cbn; reflexivity.
+                        symmetry.
+                        eapply eutt_cong_eq.
+                        apply REL.
+                        reflexivity.
+                        reflexivity.
                       - pinversion H; do 2 subst_existT; subst.
                         specialize (REL x).
                         exfalso.
-                        rewrite <- REL in VIS_HANDLED.
                         eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                        cbn; reflexivity.
+                        symmetry.
+                        eapply eutt_cong_eq.
+                        apply REL.
+                        reflexivity.
+                        reflexivity.
                       - pinversion H; do 2 subst_existT; subst.
                         inversion H4.
                     }
@@ -28462,15 +28508,21 @@ cofix CIH
               - pinversion H; do 2 subst_existT; subst.
                 specialize (REL x).
                 exfalso.
-                rewrite <- REL in VIS_HANDLED.
                 eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                cbn; reflexivity.
+                symmetry.
+                eapply eutt_cong_eq.
+                apply REL.
+                reflexivity.
+                reflexivity.
               - pinversion H; do 2 subst_existT; subst.
                 specialize (REL x).
                 exfalso.
-                rewrite <- REL in VIS_HANDLED.
                 eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                cbn; reflexivity.
+                symmetry.
+                eapply eutt_cong_eq.
+                apply REL.
+                reflexivity.
+                reflexivity.
               - pinversion H; do 2 subst_existT; subst.
                 inversion H5.
             }
@@ -28609,16 +28661,14 @@ cofix CIH
               inv UB; pinversion H; try inv CHECK1; try inv CHECK.
               - repeat subst_existT.
                 specialize (REL0 x).
-                setoid_rewrite <- REL0 in H0.
                 eapply ret_not_contains_UB_Extra with (rv:=(s2, (s1, x))) in H0;
                   try contradiction.
-                reflexivity.
+                eapply eutt_cong_eq; eauto; try reflexivity.
               - repeat subst_existT.
                 specialize (REL0 x).
-                setoid_rewrite <- REL0 in H0.
                 eapply ret_not_contains_UB_Extra with (rv:=(s2, (s1, x))) in H0;
                   try contradiction.
-                reflexivity.
+                eapply eutt_cong_eq; eauto; try reflexivity.
               - repeat subst_existT.
                 remember tt.
                 clear Hequ.
@@ -28757,16 +28807,14 @@ cofix CIH
               inv UB; pinversion H; try inv CHECK1; try inv CHECK.
               - repeat subst_existT.
                 specialize (REL0 x).
-                setoid_rewrite <- REL0 in H0.
                 eapply ret_not_contains_UB_Extra with (rv:=(s2, (s1, x))) in H0;
                   try contradiction.
-                reflexivity.
+                eapply eutt_cong_eq; eauto; try reflexivity.
               - repeat subst_existT.
                 specialize (REL0 x).
-                setoid_rewrite <- REL0 in H0.
                 eapply ret_not_contains_UB_Extra with (rv:=(s2, (s1, x))) in H0;
                   try contradiction.
-                reflexivity.
+                eapply eutt_cong_eq; eauto; try reflexivity.
               - repeat subst_existT.
                 remember tt.
                 clear Hequ.
@@ -31629,15 +31677,21 @@ cofix CIH
                 - pinversion H; do 2 subst_existT; subst.
                   specialize (REL x0).
                   exfalso.
-                  rewrite <- REL in VIS_HANDLED.
                   eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                  cbn; reflexivity.
+                  symmetry.
+                  eapply eutt_cong_eq.
+                  apply REL.
+                  reflexivity.
+                  reflexivity.
                 - pinversion H; do 2 subst_existT; subst.
                   specialize (REL x0).
                   exfalso.
-                  rewrite <- REL in VIS_HANDLED.
                   eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                  cbn; reflexivity.
+                  symmetry.
+                  eapply eutt_cong_eq.
+                  apply REL.
+                  reflexivity.
+                  reflexivity.
                 - pinversion H; do 2 subst_existT; subst.
                   inversion H5.
               }
@@ -31711,9 +31765,9 @@ cofix CIH
                 destruct t.
                 specialize (REL (exist (fun _ : dvalue => True) d I)).
                 red in REL. pclearbot.
-                rewrite REL.
-                rewrite bind_ret_l.
-                eapply paco2_eqit_RR_refl; typeclasses eauto.
+                eapply get_inf_tree_Proper; eauto.
+                rewrite bind_ret_l in REL.
+                eapply REL.
               }
 
               intros a b H H0 H2.
@@ -31788,15 +31842,21 @@ cofix CIH
                 - pinversion H; do 2 subst_existT; subst.
                   specialize (REL x0).
                   exfalso.
-                  rewrite <- REL in VIS_HANDLED.
                   eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                  cbn; reflexivity.
+                  symmetry.
+                  eapply eutt_cong_eq.
+                  apply REL.
+                  reflexivity.
+                  reflexivity.
                 - pinversion H; do 2 subst_existT; subst.
                   specialize (REL x0).
                   exfalso.
-                  rewrite <- REL in VIS_HANDLED.
                   eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                  cbn; reflexivity.
+                  symmetry.
+                  eapply eutt_cong_eq.
+                  apply REL.
+                  reflexivity.
+                  reflexivity.
                 - pinversion H; do 2 subst_existT; subst.
                   inversion H5.
               }
@@ -31870,9 +31930,9 @@ cofix CIH
                 destruct t.
                 specialize (REL (exist (fun _ : dvalue => True) d I)).
                 red in REL. pclearbot.
-                rewrite REL.
-                rewrite bind_ret_l.
-                eapply paco2_eqit_RR_refl; typeclasses eauto.
+                eapply get_inf_tree_Proper; eauto.
+                rewrite bind_ret_l in REL.
+                apply REL.
               }
 
               intros a b H H0 H2.
@@ -31947,15 +32007,21 @@ cofix CIH
                 - pinversion H; do 2 subst_existT; subst.
                   specialize (REL x0).
                   exfalso.
-                  rewrite <- REL in VIS_HANDLED.
                   eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                  cbn; reflexivity.
+                  symmetry.
+                  eapply eutt_cong_eq.
+                  apply REL.
+                  reflexivity.
+                  reflexivity.
                 - pinversion H; do 2 subst_existT; subst.
                   specialize (REL x0).
                   exfalso.
-                  rewrite <- REL in VIS_HANDLED.
                   eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                  cbn; reflexivity.
+                  symmetry.
+                  eapply eutt_cong_eq.
+                  apply REL.
+                  reflexivity.
+                  reflexivity.
                 - pinversion H; do 2 subst_existT; subst.
                   inversion H5.
               }
@@ -32029,9 +32095,9 @@ cofix CIH
                 destruct t.
                 specialize (REL (exist (fun _ : dvalue => True) d I)).
                 red in REL. pclearbot.
-                rewrite REL.
-                rewrite bind_ret_l.
-                eapply paco2_eqit_RR_refl; typeclasses eauto.
+                eapply get_inf_tree_Proper; eauto.
+                rewrite bind_ret_l in REL.
+                apply REL.
               }
 
               intros a b H H0 H2.
@@ -32150,15 +32216,21 @@ cofix CIH
               - pinversion H; do 2 subst_existT; subst.
                 specialize (REL x).
                 exfalso.
-                rewrite <- REL in VIS_HANDLED.
                 eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                cbn; reflexivity.
+                symmetry.
+                eapply eutt_cong_eq.
+                apply REL.
+                reflexivity.
+                reflexivity.
               - pinversion H; do 2 subst_existT; subst.
                 specialize (REL x).
                 exfalso.
-                rewrite <- REL in VIS_HANDLED.
                 eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                cbn; reflexivity.
+                symmetry.
+                eapply eutt_cong_eq.
+                apply REL.
+                reflexivity.
+                reflexivity.
               - pinversion H; do 2 subst_existT; subst.
                 inversion H5.
             }
@@ -32265,15 +32337,21 @@ cofix CIH
               - pinversion H; do 2 subst_existT; subst.
                 specialize (REL x).
                 exfalso.
-                rewrite <- REL in VIS_HANDLED.
                 eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                cbn; reflexivity.
+                symmetry.
+                eapply eutt_cong_eq.
+                apply REL.
+                reflexivity.
+                reflexivity.
               - pinversion H; do 2 subst_existT; subst.
                 specialize (REL x).
                 exfalso.
-                rewrite <- REL in VIS_HANDLED.
                 eapply ret_not_contains_UB_Extra in VIS_HANDLED; eauto.
-                cbn; reflexivity.
+                symmetry.
+                eapply eutt_cong_eq.
+                apply REL.
+                reflexivity.
+                reflexivity.
               - pinversion H; do 2 subst_existT; subst.
                 inversion H4.
             }
@@ -32367,15 +32445,21 @@ cofix CIH
             - pinversion H; do 2 subst_existT; subst.
               specialize (REL x).
               exfalso.
-              rewrite <- REL in KS.
               eapply ret_not_contains_UB_Extra in KS; eauto.
-              cbn; reflexivity.
+              symmetry.
+              eapply eutt_cong_eq.
+              apply REL.
+              reflexivity.
+              reflexivity.
             - pinversion H; do 2 subst_existT; subst.
               specialize (REL x).
               exfalso.
-              rewrite <- REL in KS.
               eapply ret_not_contains_UB_Extra in KS; eauto.
-              cbn; reflexivity.
+              symmetry.
+              eapply eutt_cong_eq.
+              apply REL.
+              reflexivity.
+              reflexivity.
             - pinversion H; do 2 subst_existT; subst.
               inversion H4.
           }
@@ -35806,9 +35890,12 @@ cofix CIH
                   - pinversion H; repeat subst_existT.
                     destruct e; inv H5.
                     specialize (REL x).
-                    rewrite <- REL in UB.
                     eapply ContainsUB.ret_not_contains_UB in UB; eauto.
-                    cbn. reflexivity.
+                    symmetry.
+                    eapply eutt_cong_eq.
+                    apply REL.
+                    reflexivity.
+                    reflexivity.
                   - pinversion H; repeat subst_existT.
                     setoid_rewrite resum_to_subevent in H5.
                     repeat rewrite subevent_subevent in H5.
@@ -35875,9 +35962,12 @@ cofix CIH
                   eapply CIH.
                   2: {
                     specialize (REL d).
-                    red in REL.                  
+                    red in REL.
                     pclearbot.
-                    rewrite REL.
+                    eapply interp_prop_oom_r_eutt_Proper; try typeclasses eauto.
+                    reflexivity.
+                    rewrite <- itree_eta.
+                    apply REL.
 
                     specialize (HK d).
                     forward HK.
@@ -35926,9 +36016,12 @@ cofix CIH
                   - pinversion H; repeat subst_existT.
                     destruct e; inv H5.
                     specialize (REL x).
-                    rewrite <- REL in UB.
                     eapply ContainsUB.ret_not_contains_UB in UB; eauto.
-                    cbn. reflexivity.
+                    symmetry.
+                    eapply eutt_cong_eq.
+                    apply REL.
+                    reflexivity.
+                    reflexivity.
                   - pinversion H; repeat subst_existT.
                     setoid_rewrite resum_to_subevent in H5.
                     repeat rewrite subevent_subevent in H5.
@@ -35979,7 +36072,9 @@ cofix CIH
                     pclearbot.
                     rewrite bind_ret_l in REL.
                     repeat rewrite <- itree_eta_.
-                    rewrite REL.
+                    eapply interp_prop_oom_r_eutt_Proper; try typeclasses eauto.
+                    reflexivity.
+                    apply REL.
 
                     specialize (HK tt).
                     forward HK.
@@ -36032,9 +36127,12 @@ cofix CIH
                   - pinversion H; repeat subst_existT.
                     destruct e; inv H5.
                     specialize (REL x).
-                    rewrite <- REL in UB.
                     eapply ContainsUB.ret_not_contains_UB in UB; eauto.
-                    cbn. reflexivity.
+                    symmetry.
+                    eapply eutt_cong_eq.
+                    apply REL.
+                    reflexivity.
+                    reflexivity.
                   - pinversion H; repeat subst_existT.
                     setoid_rewrite resum_to_subevent in H5.
                     repeat rewrite subevent_subevent in H5.
@@ -36085,7 +36183,9 @@ cofix CIH
                     pclearbot.
                     rewrite bind_ret_l in REL.
                     repeat rewrite <- itree_eta_.
-                    rewrite REL.
+                    eapply interp_prop_oom_r_eutt_Proper; try typeclasses eauto.
+                    reflexivity.
+                    apply REL.
 
                     specialize (HK tt).
                     forward HK.
@@ -36165,8 +36265,13 @@ cofix CIH
                         cbn.
                         unfold raiseUB.
                         rewrite bind_trigger.
-                        eapply ContainsUB.FindUB.
+                        eapply ContainsUB.FindUB
+                          with (s:=tt)
+                               (k:=(fun x2 : void =>
+                                      match x2 return (itree InfLP.Events.L4 {_ : DVCInfFin.DV1.dvalue | True}) with
+                                      end)).
                         rewrite subevent_subevent.
+                        unfold print_msg.
                         reflexivity.
                       }
 
@@ -36326,7 +36431,11 @@ cofix CIH
                     cbn.
                     unfold raiseUB.
                     rewrite bind_trigger.
-                    eapply ContainsUB.FindUB.
+                    eapply ContainsUB.FindUB
+                      with (s:=tt)
+                           (k:=(fun x2 : void =>
+                                  match x2 return (itree InfLP.Events.L4 {_ : DVCInfFin.DV1.dvalue | True}) with
+                                  end)).
                     rewrite subevent_subevent.
                     reflexivity.
                   }
@@ -36371,7 +36480,11 @@ cofix CIH
                 left.
                 unfold raise_ub. cbn; unfold raiseUB; cbn.
                 rewrite bind_trigger.
-                eapply ContainsUB.FindUB.
+                eapply ContainsUB.FindUB
+                  with (s:=tt)
+                       (k:=(fun x2 : void =>
+                              match x2 return (itree InfLP.Events.L4 {_ : DVCInfFin.DV1.dvalue | True}) with
+                              end)).
                 rewrite subevent_subevent.
                 reflexivity.
               }
@@ -36414,7 +36527,11 @@ cofix CIH
                         cbn.
                         unfold raiseUB.
                         rewrite bind_trigger.
-                        eapply ContainsUB.FindUB.
+                        eapply ContainsUB.FindUB
+                          with (s:=tt)
+                               (k:=(fun x2 : void =>
+                                      match x2 return (itree InfLP.Events.L4 {_ : DVCInfFin.DV1.dvalue | True}) with
+                                      end)).
                         rewrite subevent_subevent.
                         reflexivity.
                       }
@@ -36575,7 +36692,11 @@ cofix CIH
                     cbn.
                     unfold raiseUB.
                     rewrite bind_trigger.
-                    eapply ContainsUB.FindUB.
+                    eapply ContainsUB.FindUB
+                      with (s:=tt)
+                           (k:=(fun x2 : void =>
+                                  match x2 return (itree InfLP.Events.L4 {_ : DVCInfFin.DV1.dvalue | True}) with
+                                  end)).
                     rewrite subevent_subevent.
                     reflexivity.
                   }
@@ -36620,7 +36741,11 @@ cofix CIH
                 left.
                 unfold raise_ub. cbn; unfold raiseUB; cbn.
                 rewrite bind_trigger.
-                eapply ContainsUB.FindUB.
+                eapply ContainsUB.FindUB
+                  with (s:=tt)
+                       (k:=(fun x2 : void =>
+                              match x2 return (itree InfLP.Events.L4 {_ : DVCInfFin.DV1.dvalue | True}) with
+                              end)).
                 rewrite subevent_subevent.
                 reflexivity.
               }
@@ -36661,7 +36786,11 @@ cofix CIH
                       cbn.
                       unfold raiseUB.
                       rewrite bind_trigger.
-                      eapply ContainsUB.FindUB.
+                      eapply ContainsUB.FindUB
+                        with (s:=tt)
+                             (k:=(fun x2 : void =>
+                                    match x2 return (itree InfLP.Events.L4 {_ : DVCInfFin.DV1.dvalue | True}) with
+                                    end)).
                       rewrite subevent_subevent.
                       reflexivity.
                     }
@@ -36725,7 +36854,11 @@ cofix CIH
                     cbn.
                     unfold raiseUB.
                     rewrite bind_trigger.
-                    eapply ContainsUB.FindUB.
+                    eapply ContainsUB.FindUB
+                      with (s:=tt)
+                           (k:=(fun x2 : void =>
+                                  match x2 return (itree InfLP.Events.L4 {_ : DVCInfFin.DV1.dvalue | True}) with
+                                  end)).
                     rewrite subevent_subevent.
                     reflexivity.
                   }
@@ -36878,7 +37011,6 @@ cofix CIH
               move HSPEC after EQ.
               move KS after EQ.
               setoid_rewrite bind_trigger in HSPEC.
-              rewrite HSPEC in KS.
 
               rewrite (itree_eta_ t2).
               rewrite <- x.
@@ -36919,20 +37051,28 @@ cofix CIH
               move HSPEC after EQ.
               move KS after EQ.
               setoid_rewrite bind_trigger in HSPEC.
-              rewrite HSPEC in KS.
 
               rewrite (itree_eta_ t2).
               rewrite <- x.
 
               destruct KS as [UB | KS].
-              { inv UB.
+              { eapply ContainsUB.proper_eutt_contains_UB in UB.
+                2: symmetry; apply HSPEC.
+
+                inv UB.
                 - pinversion H2.
                   inv CHECK.
                 - pinversion H2; repeat subst_existT.
                   destruct e;
                     inv H9.
                   red in H2.
-                  rewrite <- REL in H3.
+                  eapply ContainsUB.proper_eutt_contains_UB in H3.
+                  2: {
+                    eapply eutt_cong_eq.
+                    2: symmetry; apply REL.
+                    reflexivity.
+                    reflexivity.
+                  }
                   exfalso.
                   inversion H3; subst.
                   + pinversion H4; inv CHECK.
@@ -36944,6 +37084,13 @@ cofix CIH
                   rewrite H7 in s.
                   destruct s.
               }
+
+              assert
+                (ta ≈
+                   (vis (inr1 (inr1 (inl1 (Debug tt)))) (fun x : unit => ret x))).
+              apply HSPEC.
+              rewrite H2 in KS.
+              clear HSPEC. rename H2 into HSPEC.
 
               setoid_rewrite bind_vis in KS.
               setoid_rewrite bind_ret_l in KS.
@@ -37043,6 +37190,10 @@ cofix CIH
               destruct f, f0.
               repeat red in HSPEC.
               repeat red in KS.
+              assert
+                (ta ≈ (r <- trigger (inr1 (inr1 (inr1 (Throw u0))));; ret r)).
+              apply HSPEC.
+              clear HSPEC. rename H2 into HSPEC.
               rewrite HSPEC in KS.
               destruct KS as [UB | KS].
               { inv UB.
@@ -37145,6 +37296,15 @@ cofix CIH
           + (* Not OOM *)
             repeat red in HSPEC.
             red in KS.
+            assert (ta ≈
+                      (r <-
+                         trigger
+                           (@resum (Type -> Type) IFun OOME (OOME +' UBE +' DebugE +' FailureE)
+                              (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
+                                 (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME)) A e);;
+                       @ret (itree E2) (@Monad_itree E2) A r)).
+            apply HSPEC.
+            clear HSPEC. rename H into HSPEC.
             rewrite HSPEC in KS.
 
             destruct KS as [UB | KS].
@@ -37211,8 +37371,10 @@ cofix CIH
       { (* ExternalCallE *)
         destruct e.
         { (* ExternalCall *)
+          Opaque eutt.
           repeat red in HSPEC.
           red in KS.
+          Transparent eutt.
           rewrite HSPEC in KS.
 
           destruct KS as [UB | KS].
@@ -37222,7 +37384,14 @@ cofix CIH
               inv CHECK.
             - pinversion H; repeat subst_existT.
               cbn in *; subst.
-              rewrite <- REL0 in H0.
+              assert (k x ≈ Ret x).
+              { symmetry.
+                eapply eutt_cong_eq.
+                apply REL0.
+                reflexivity.
+                reflexivity.
+              }
+              rewrite H1 in H0.
               eapply ContainsUB.ret_not_contains_UB in H0;
                 try contradiction.
               cbn; reflexivity.
@@ -37318,7 +37487,7 @@ cofix CIH
                 specialize (REL0 a).
                 red in REL0.
                 pclearbot.
-                rewrite REL0.
+                eapply orutt_Proper_R3; eauto; try reflexivity.
                 eapply H1.
                 repeat red.
                 eauto.
@@ -37328,6 +37497,9 @@ cofix CIH
               red in REL.
               pclearbot.
               repeat rewrite <- itree_eta_.
+              assert (k0 d ≈ k2 d).
+              apply REL.
+              clear REL. rename H0 into REL.
               rewrite REL.
 
               specialize (HK d).
@@ -37363,8 +37535,10 @@ cofix CIH
         }
 
         { (* Stdout *)
+          Opaque eutt.
           repeat red in HSPEC.
           red in KS.
+          Transparent eutt.
           rewrite HSPEC in KS.
 
           destruct KS as [UB | KS].
@@ -37374,10 +37548,13 @@ cofix CIH
               inv CHECK.
             - pinversion H; repeat subst_existT.
               cbn in *; subst.
-              rewrite <- REL0 in H0.
               eapply ContainsUB.ret_not_contains_UB in H0;
                 try contradiction.
-              cbn; reflexivity.
+              symmetry.
+              eapply eutt_cong_eq.
+              apply REL0.
+              reflexivity.
+              reflexivity.
             - pinversion H;
                 repeat subst_existT.
               subst.
@@ -37441,6 +37618,11 @@ cofix CIH
               specialize (REL0 tt); red in REL0.
               specialize (REL tt); red in REL.
               pclearbot.
+              assert (k3 tt ≈ x1 tt) by apply REL0.
+              assert (k0 tt ≈ k2 tt) by apply REL.
+              clear REL REL0.
+              rename H into REL0.
+              rename H0 into REL.
 
               rewrite (itree_eta_ (k3 _)).
               rewrite (itree_eta_ (k0 _)).
@@ -37480,8 +37662,10 @@ cofix CIH
         }
 
         { (* Stderr *)
+          Opaque eutt.
           repeat red in HSPEC.
           red in KS.
+          Transparent eutt.
           rewrite HSPEC in KS.
 
           destruct KS as [UB | KS].
@@ -37491,10 +37675,13 @@ cofix CIH
               inv CHECK.
             - pinversion H; repeat subst_existT.
               cbn in *; subst.
-              rewrite <- REL0 in H0.
               eapply ContainsUB.ret_not_contains_UB in H0;
                 try contradiction.
-              cbn; reflexivity.
+              symmetry.
+              eapply eutt_cong_eq.
+              apply REL0.
+              reflexivity.
+              reflexivity.
             - pinversion H;
                 repeat subst_existT.
               subst.
@@ -37558,6 +37745,12 @@ cofix CIH
               specialize (REL0 tt); red in REL0.
               specialize (REL tt); red in REL.
               pclearbot.
+
+              assert (k3 tt ≈ x1 tt) by apply REL0.
+              assert (k0 tt ≈ k2 tt) by apply REL.
+              clear REL REL0.
+              rename H into REL0.
+              rename H0 into REL.
 
               rewrite (itree_eta_ (k3 _)).
               rewrite (itree_eta_ (k0 _)).
@@ -37793,7 +37986,11 @@ cofix CIH
               cbn.
               unfold raiseUB.
               rewrite bind_trigger.
-              eapply ContainsUB.FindUB.
+              eapply ContainsUB.FindUB
+                with (s:=tt)
+                     (k:=(fun x2 : void =>
+                            match x2 return (itree InfLP.Events.L4 {_ : DVCInfFin.DV1.dvalue | True}) with
+                            end)).
               rewrite subevent_subevent.
               reflexivity.
             }
@@ -37837,7 +38034,11 @@ cofix CIH
           left.
           unfold raise_ub. cbn; unfold raiseUB; cbn.
           rewrite bind_trigger.
-          eapply ContainsUB.FindUB.
+          eapply ContainsUB.FindUB
+            with (s:=tt)
+                 (k:=(fun x2 : void =>
+                        match x2 return (itree InfLP.Events.L4 {_ : DVCInfFin.DV1.dvalue | True}) with
+                        end)).
           rewrite subevent_subevent.
           reflexivity.
         }
@@ -38033,7 +38234,11 @@ cofix CIH
               cbn.
               unfold raiseUB.
               rewrite bind_trigger.
-              eapply ContainsUB.FindUB.
+              eapply ContainsUB.FindUB
+                with (s:=tt)
+                     (k:=(fun x2 : void =>
+                            match x2 return (itree InfLP.Events.L4 {_ : DVCInfFin.DV1.dvalue | True}) with
+                            end)).
               rewrite subevent_subevent.
               reflexivity.
             }
@@ -38077,7 +38282,11 @@ cofix CIH
           left.
           unfold raise_ub. cbn; unfold raiseUB; cbn.
           rewrite bind_trigger.
-          eapply ContainsUB.FindUB.
+          eapply ContainsUB.FindUB
+            with (s:=tt)
+                 (k:=(fun x2 : void =>
+                        match x2 return (itree InfLP.Events.L4 {_ : DVCInfFin.DV1.dvalue | True}) with
+                        end)).
           rewrite subevent_subevent.
           reflexivity.
         }
@@ -38137,7 +38346,11 @@ cofix CIH
                 cbn.
                 unfold raiseUB.
                 rewrite bind_trigger.
-                eapply ContainsUB.FindUB.
+                eapply ContainsUB.FindUB
+                  with (s:=tt)
+                       (k:=(fun x2 : void =>
+                              match x2 return (itree InfLP.Events.L4 {_ : DVCInfFin.DV1.dvalue | True}) with
+                              end)).
                 rewrite subevent_subevent.
                 reflexivity.
               }
@@ -38220,7 +38433,11 @@ cofix CIH
               cbn.
               unfold raiseUB.
               rewrite bind_trigger.
-              eapply ContainsUB.FindUB.
+              eapply ContainsUB.FindUB
+                with (s:=tt)
+                     (k:=(fun x2 : void =>
+                            match x2 return (itree InfLP.Events.L4 {_ : DVCInfFin.DV1.dvalue | True}) with
+                            end)).
               rewrite subevent_subevent.
               reflexivity.
             }
@@ -38393,8 +38610,10 @@ cofix CIH
 
       destruct s.
       { (* OOME *)
+        Opaque eutt.
         repeat red in HSPEC.
         repeat red in KS.
+        Transparent eutt.
         setoid_rewrite bind_trigger in HSPEC.
         rewrite HSPEC in KS.
         destruct KS as [UB | KS].
@@ -38411,7 +38630,7 @@ cofix CIH
                       (Ret x) (k x)).
             apply REL1.
             assert (k x ≈ Ret x).
-            { rewrite H. reflexivity. }
+            { symmetry; eapply eutt_cong_eq; eauto; reflexivity. }
 
             rewrite H1 in H0.
             eapply ContainsUB.ret_not_contains_UB in H0; try contradiction; eauto.
@@ -38438,8 +38657,10 @@ cofix CIH
 
       destruct s.
       { (* UBE *)
+        Opaque eutt.
         repeat red in HSPEC.
         repeat red in KS.
+        Transparent eutt.
         setoid_rewrite bind_trigger in HSPEC.
         rewrite HSPEC in KS.
 
@@ -38491,8 +38712,10 @@ cofix CIH
 
       destruct s.
       { (* DebugE *)
+        Opaque eutt.
         repeat red in HSPEC.
         repeat red in KS.
+        Transparent eutt.
         setoid_rewrite bind_trigger in HSPEC.
         rewrite HSPEC in KS.
 
@@ -38527,9 +38750,11 @@ cofix CIH
             inv CHECK.
           - pinversion H2; repeat subst_existT.
             destruct e; inv H9.
-            rewrite <- REL in H3.
             eapply ContainsUB.ret_not_contains_UB in H3; try contradiction; eauto.
-            cbn.
+            symmetry.
+            eapply eutt_cong_eq.
+            apply REL.
+            reflexivity.
             reflexivity.
           - pinversion H2; repeat subst_existT.
             clear - H7 s.
@@ -38588,8 +38813,10 @@ cofix CIH
       }
 
       { (* FailureE *)
+        Opaque eutt.        
         repeat red in HSPEC.
         repeat red in KS.
+        Transparent eutt.
         setoid_rewrite bind_trigger in HSPEC.
         rewrite HSPEC in KS.
 
@@ -38624,7 +38851,6 @@ cofix CIH
             inv CHECK.
           - pinversion H2; repeat subst_existT.
             destruct e; inv H9.
-            rewrite <- REL in H3.
             apply @ContainsUB.ret_not_contains_UB with (RR:=eq) (rv:=x) in H3;
               try contradiction; eauto.
           - pinversion H2; repeat subst_existT.

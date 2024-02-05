@@ -90,7 +90,7 @@ join_strings() {
 for f in "${GENFILES[@]}"
 do
     # Annotation
-    perl -i -pe "s/let coq_STGST =/ let coq_STGST : (coq_GenState, __ GenLow.GenLow.coq_G, __) stateT coq_Monad =/" $EXTRACT_DIR/$f
+    perl -i -pe "s/let coq_STGST =/ let coq_STGST : (coq_GenState, __ Generators.coq_G, __) stateT coq_Monad =/" $EXTRACT_DIR/$f
     perl -i -pe "s/let gen_float32 =/let gen_float32 : Floats.float32 coq_GenALIVE2 =/" $EXTRACT_DIR/$f
     perl -i -pe "s/let gen_tester =/let gen_tester : (typ, typ block * typ block list) toplevel_entity list coq_GenALIVE2 =/" $EXTRACT_DIR/$f
 

@@ -98,13 +98,13 @@ Next Obligation.
 Defined.
 Next Obligation.
   split. intros; intro C.
-  intuition. inversion H1.
-  intro C. intuition. inversion H2.
+  intuition. inversion H.
+  intro C. intuition. inversion H0.
 Defined.
 Next Obligation.
   split. intros; intro C.
-  intuition. inversion H2.
-  intro C. intuition. inversion H1.
+  intuition. inversion H0.
+  intro C. intuition. inversion H.
 Defined.
 
 (* Lemma map_monad_InT_oom_forall2 : *)
@@ -1341,7 +1341,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     constructor.
     reflexivity.
   Qed.
-
 
   Opaque FinPROV.initial_provenance.
   Opaque InfPROV.initial_provenance.
@@ -2802,7 +2801,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* Globals *)
     { inversion e1; subst.
       - (* Global write *)
-        destruct e2 eqn:HE2.
+        inversion e2; subst.
         + apply (id = id0 /\
                    dvalue_refine_strict dv dv0).
         + apply False.

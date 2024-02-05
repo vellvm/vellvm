@@ -89,7 +89,9 @@ Section contains_UB_Extra.
 
             apply IHUB.
             pclearbot.
-            rewrite <- REL0.
+            eapply eutt_cong_eq.
+            symmetry; apply REL0.
+            reflexivity.
             apply REL.
           - punfold H; red in H.
             rewrite <- Heqt2o in H.
@@ -143,7 +145,9 @@ Section contains_UB_Extra.
 
             apply IHUB.
             pclearbot.
-            rewrite <- REL0.
+            eapply eutt_cong_eq.
+            symmetry; apply REL0.
+            reflexivity.
             apply REL.
           - punfold H; red in H.
             rewrite <- Heqt2o in H.
@@ -227,7 +231,9 @@ Section contains_UB_Extra.
 
             apply IHUB.
             pclearbot.
-            rewrite <- REL0.
+            eapply eutt_cong_eq.
+            reflexivity.
+            symmetry; apply REL0.
             apply REL.
           - punfold H; red in H.
             cbn in H.
@@ -281,7 +287,9 @@ Section contains_UB_Extra.
 
             apply IHUB.
             pclearbot.
-            rewrite <- REL0.
+            eapply eutt_cong_eq.
+            reflexivity.
+            symmetry; apply REL0.
             apply REL.
           - punfold H; red in H.
             cbn in H.

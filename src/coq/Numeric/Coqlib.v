@@ -200,7 +200,7 @@ Variable f: positive -> A -> A.
 
 Lemma Ppred_Plt:
   forall x, x <> xH -> Plt (Pos.pred x) x.
-Proof.
+Proof using Type.
   intros. elim (Pos.succ_pred_or x); intro. contradiction.
   set (y := Pos.pred x) in *. rewrite <- H0. apply Plt_succ.
 Qed.
@@ -217,21 +217,21 @@ Definition positive_rec : positive -> A :=
 Lemma unroll_positive_rec:
   forall x,
   positive_rec x = iter x (fun y _ => positive_rec y).
-Proof.
+Proof using Type.
   unfold positive_rec. apply (Fix_eq Plt_wf (fun _ => A) iter).
   intros. unfold iter. case (peq x 1); intro. auto. decEq. apply H.
 Qed.
 
 Lemma positive_rec_base:
   positive_rec 1%positive = v1.
-Proof.
+Proof using Type.
   rewrite unroll_positive_rec. unfold iter. case (peq 1 1); intro.
   auto. elim n; auto.
 Qed.
 
 Lemma positive_rec_succ:
   forall x, positive_rec (Pos.succ x) = f x (positive_rec x).
-Proof.
+Proof using Type.
   intro. rewrite unroll_positive_rec. unfold iter.
   case (peq (Pos.succ x) 1); intro.
   destruct x; simpl in e; discriminate.
@@ -243,7 +243,7 @@ Lemma positive_Peano_ind:
   P xH ->
   (forall x, P x -> P (Pos.succ x)) ->
   forall x, P x.
-Proof.
+Proof using Type.
   intros.
   apply (well_founded_ind Plt_wf P).
   intros.
@@ -431,14 +431,14 @@ Proof.
   rewrite <- Zopp_mult_distr_r in H6. liaContradiction.
   apply H1 with (x mod y).
   apply Z_mod_lt. auto.
-  rewrite <- Z_div_mod_eq. auto. auto.
+  rewrite <- Z_div_mod_eq_full; auto.
 Qed.
 
 Lemma Zmod_small:
   forall x y, 0 <= x < y -> x mod y = x.
 Proof.
   intros. assert (y > 0). lia.
-  generalize (Z_div_mod_eq x y H0).
+  generalize (Z_div_mod_eq_full x y).
   rewrite (Zdiv_small x y H). lia.
 Qed.
 
@@ -463,8 +463,8 @@ Lemma Zdiv_Zdiv:
   b > 0 -> c > 0 -> (a / b) / c = a / (b * c).
 Proof.
   intros.
-  generalize (Z_div_mod_eq a b H). generalize (Z_mod_lt a b H). intros.
-  generalize (Z_div_mod_eq (a/b) c H0). generalize (Z_mod_lt (a/b) c H0). intros.
+  generalize (Z_div_mod_eq_full a b). generalize (Z_mod_lt a b). intros.
+  generalize (Z_div_mod_eq_full (a/b) c). generalize (Z_mod_lt (a/b) c). intros.
   set (q1 := a / b) in *. set (r1 := a mod b) in *.
   set (q2 := q1 / c) in *. set (r2 := q1 mod c) in *.
   symmetry. apply Zdiv_unique with (r2 * b + r1).
@@ -495,7 +495,7 @@ Lemma Zdiv_interval_1:
   lo <= a/b < hi.
 Proof.
   intros.
-  generalize (Z_div_mod_eq a b H1). generalize (Z_mod_lt a b H1). intros.
+  generalize (Z_div_mod_eq_full a b). generalize (Z_mod_lt a b H1). intros.
   set (q := a/b) in *. set (r := a mod b) in *.
   split.
   assert (lo < (q + 1)).
@@ -533,8 +533,8 @@ Proof.
   intros.
   set (xb := x/b).
   apply Zmod_unique with (xb/a).
-  generalize (Z_div_mod_eq x b H0); fold xb; intro EQ1.
-  generalize (Z_div_mod_eq xb a H); intro EQ2.
+  generalize (Z_div_mod_eq_full x b); fold xb; intro EQ1.
+  generalize (Z_div_mod_eq_full xb a); intro EQ2.
   rewrite EQ2 in EQ1.
   eapply eq_trans. eexact EQ1. ring.
   generalize (Z_mod_lt x b H0). intro.
@@ -559,7 +559,7 @@ Definition Zdivide_dec:
 Proof.
   intros. destruct (zeq (Z.modulo q p) 0).
   left. exists (q / p).
-  transitivity (p * (q / p) + (q mod p)). apply Z_div_mod_eq; auto.
+  transitivity (p * (q / p) + (q mod p)). apply Z_div_mod_eq_full; auto.
   transitivity (p * (q / p)). lia. ring.
   right; red; intros. elim n. apply Z_div_exact_1; auto.
   inv H0. rewrite Z_div_mult; auto. ring.
@@ -624,7 +624,7 @@ Definition align (n: Z) (amount: Z) :=
 Lemma align_le: forall x y, y > 0 -> x <= align x y.
 Proof.
   intros. unfold align.
-  generalize (Z_div_mod_eq (x + y - 1) y H). intro.
+  generalize (Z_div_mod_eq_full (x + y - 1) y). intro.
   replace ((x + y - 1) / y * y)
      with ((x + y - 1) - (x + y - 1) mod y).
   generalize (Z_mod_lt (x + y - 1) y H). lia.
@@ -906,7 +906,7 @@ Definition list_fold_right (l: list A) (base: B) : B :=
 Remark list_fold_left_app:
   forall l1 l2 accu,
   list_fold_left accu (l1 ++ l2) = list_fold_left (list_fold_left accu l1) l2.
-Proof.
+Proof using Type.
   induction l1; simpl; intros.
   auto.
   rewrite IHl1. auto.
@@ -916,7 +916,7 @@ Lemma list_fold_right_eq:
   forall l base,
   list_fold_right l base =
   match l with nil => base | x :: l' => f x (list_fold_right l' base) end.
-Proof.
+Proof using Type.
   unfold list_fold_right; intros.
   destruct l.
   auto.
@@ -926,7 +926,7 @@ Qed.
 
 Lemma list_fold_right_spec:
   forall l base, list_fold_right l base = List.fold_right f base l.
-Proof.
+Proof using Type.
   induction l; simpl; intros; rewrite list_fold_right_eq; congruence.
 Qed.
 
@@ -1079,7 +1079,7 @@ Proof.
     elim H4. apply in_or_app. tauto.
     auto.
   induction a; simpl; intros.
-  rewrite <- app_nil_end. auto.
+  rewrite app_nil_r. auto.
   inversion H0. apply H. auto.
   red; intro; elim H3. apply in_or_app. tauto.
   red; intro; elim H3. apply in_or_app. tauto.
@@ -1183,21 +1183,21 @@ Lemma list_forall2_app:
   forall a2 b2 a1 b1,
   list_forall2 a1 b1 -> list_forall2 a2 b2 ->
   list_forall2 (a1 ++ a2) (b1 ++ b2).
-Proof.
+Proof using Type.
   induction 1; intros; simpl. auto. constructor; auto.
 Qed.
 
 Lemma list_forall2_length:
   forall l1 l2,
   list_forall2 l1 l2 -> length l1 = length l2.
-Proof.
+Proof using Type.
   induction 1; simpl; congruence.
 Qed.
 
 Lemma list_forall2_in_left:
   forall x1 l1 l2,
   list_forall2 l1 l2 -> In x1 l1 -> exists x2, In x2 l2 /\ P x1 x2.
-Proof.
+Proof using Type.
   induction 1; simpl; intros. contradiction. destruct H1.
   subst; exists b1; auto.
   exploit IHlist_forall2; eauto. intros (x2 & U & V); exists x2; auto.
@@ -1206,7 +1206,7 @@ Qed.
 Lemma list_forall2_in_right:
   forall x2 l1 l2,
   list_forall2 l1 l2 -> In x2 l2 -> exists x1, In x1 l1 /\ P x1 x2.
-Proof.
+Proof using Type.
   induction 1; simpl; intros. contradiction. destruct H1.
   subst; exists a1; auto.
   exploit IHlist_forall2; eauto. intros (x1 & U & V); exists x1; auto.
@@ -1316,14 +1316,14 @@ Variable B: Type.
 Lemma dec_eq_true:
   forall (x: A) (ifso ifnot: B),
   (if dec_eq x x then ifso else ifnot) = ifso.
-Proof.
+Proof using Type.
   intros. destruct (dec_eq x x). auto. congruence.
 Qed.
 
 Lemma dec_eq_false:
   forall (x y: A) (ifso ifnot: B),
   x <> y -> (if dec_eq x y then ifso else ifnot) = ifnot.
-Proof.
+Proof using Type.
   intros. destruct (dec_eq x y). congruence. auto.
 Qed.
 
@@ -1331,7 +1331,7 @@ Lemma dec_eq_sym:
   forall (x y: A) (ifso ifnot: B),
   (if dec_eq x y then ifso else ifnot) =
   (if dec_eq y x then ifso else ifnot).
-Proof.
+Proof using Type.
   intros. destruct (dec_eq x y).
   subst y. rewrite dec_eq_true. auto.
   rewrite dec_eq_false; auto.
@@ -1347,13 +1347,13 @@ Variable A: Type.
 
 Lemma pred_dec_true:
   forall (a b: A), P -> (if dec then a else b) = a.
-Proof.
+Proof using Type.
   intros. destruct dec. auto. contradiction.
 Qed.
 
 Lemma pred_dec_false:
   forall (a b: A), ~P -> (if dec then a else b) = b.
-Proof.
+Proof using Type.
   intros. destruct dec. contradiction. auto.
 Qed.
 
@@ -1380,7 +1380,7 @@ Inductive lex_ord: A*B -> A*B -> Prop :=
 
 Lemma wf_lex_ord:
   well_founded ordA -> well_founded ordB -> well_founded lex_ord.
-Proof.
+Proof using Type.
   intros Awf Bwf.
   assert (forall a, Acc ordA a -> forall b, Acc ordB b -> Acc lex_ord (a, b)).
     induction 1. induction 1. constructor; intros. inv H3.
@@ -1391,7 +1391,7 @@ Qed.
 
 Lemma transitive_lex_ord:
   transitive _ ordA -> transitive _ ordB -> transitive _ lex_ord.
-Proof.
+Proof using Type.
   intros trA trB; red; intros.
   inv H; inv H0.
   left; eapply trA; eauto.

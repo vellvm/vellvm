@@ -26,7 +26,6 @@ From Coq Require Import Lia.
 
 Open Scope Z_scope.
 
-
 Fixpoint max_nat_list (l : list nat) : nat :=
   match l with
   | [] => 0

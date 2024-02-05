@@ -1355,7 +1355,10 @@ Module Infinite.
       pstep; red; cbn.
       rewrite itree_eta'.
       observe_vis.
-      eapply Interp_Prop_OomT_Vis_OOM_L with (e:=(resum IFun A e)); auto.
+      eapply Interp_Prop_OomT_Vis_OOM_L
+        with (e:=(resum IFun A e))
+             (k1:=(fun x3 : A => k2 x3));
+        auto.
       reflexivity.
     }
     destruct x2 as (?&?&?&?&?).
@@ -2223,7 +2226,10 @@ Module Finite.
       pstep; red; cbn.
       rewrite itree_eta'.
       observe_vis.
-      eapply Interp_Prop_OomT_Vis_OOM_L with (e:=(resum IFun A e)); auto.
+      eapply Interp_Prop_OomT_Vis_OOM_L
+        with (e:=(resum IFun A e))
+             (k1:=(fun x3 : A => k2 x3));
+        auto.
       reflexivity.
     }
     destruct x2 as (?&?&?&?&?).

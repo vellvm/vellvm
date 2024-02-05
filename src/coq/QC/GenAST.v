@@ -1171,7 +1171,7 @@ Section TypGenerators.
   Next Obligation.
     cbn.
     assert (0 <= 1)%nat by lia.
-    pose proof Nat.divmod_spec sz' 1 0 0 H0.
+    pose proof Nat.divmod_spec sz' 1 0 0 H.
     cbn; destruct (Nat.divmod sz' 1 0 0).
     cbn; lia.
   Qed.

@@ -102,7 +102,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       forall {E A B} (f g : A -> itree E B) (h : A -> A) (l : list A),
         (forall a, In a l -> f a ≈ g (h a)) ->
         map_monad f l ≈ map_monad g (map h l).
-    Proof.
+    Proof using Type.
       induction l as [| x l IH]; intros EQ; [reflexivity | cbn].
       apply eutt_clo_bind with (UU := eq).
       apply EQ; left; auto.
@@ -124,7 +124,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
                   | ANN_num_elements _ => true
                   | _ => false
                   end) (endo anns).
-    Proof.
+    Proof using Type.
       induction anns; cbn; auto.
       - destruct a; cbn; auto.
     Qed.
@@ -141,7 +141,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
                   | ANN_align _ => true
                   | _ => false
                   end) (endo anns).
-    Proof.
+    Proof using Type.
       induction anns; cbn; auto.
       - destruct a; cbn; auto.
     Qed.
@@ -156,7 +156,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
 
       Lemma exp_optim_correct_instr : forall x i g l,
           ⟦ (x,i) ⟧i2 g l ≈ ⟦ (x, endo i) ⟧i2 g l.
-      Proof.
+      Proof using opt_correct opt_respect_int.
         intros *.
         destruct i; try reflexivity.
         - destruct x; simpl; try reflexivity.
@@ -238,7 +238,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
 
       Lemma exp_optim_correct_term : forall t g l,
           ⟦ t ⟧t2 g l ≈ ⟦ endo t ⟧t2 g l.
-      Proof.
+      Proof using opt_correct.
         intros *.
         destruct t; try reflexivity.
         - destruct v.
@@ -272,7 +272,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
 
       Lemma exp_optim_correct_code : forall c g l,
           ⟦ c ⟧c2 g l ≈ ⟦ endo c ⟧c2 g l.
-      Proof.
+      Proof using opt_correct opt_respect_int.
         induction c as [| i c IH]; intros; [reflexivity |].
         unfold endo; simpl.
         rewrite 2denote_code_cons, 2interp_cfg2_bind.
@@ -284,7 +284,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
 
       Lemma exp_optim_correct_phi : forall phi f g l,
           ℑ2 (translate exp_to_instr ⟦ phi ⟧Φ (f)) g l ≈ ℑ2 (translate exp_to_instr ⟦ endo phi ⟧Φ (f)) g l.
-      Proof.
+      Proof using opt_correct.
         intros [id []] f.
         induction args as [| [] args IH]; intros; [reflexivity |].
         cbn.
@@ -332,7 +332,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
 
       Lemma exp_optim_correct_phis : forall phis f g l,
           ⟦ phis ⟧Φs2 f g l ≈ ⟦ endo phis ⟧Φs2 f g l.
-      Proof.
+      Proof using opt_correct.
         intros.
         unfold endo; simpl.
         cbn.
@@ -355,7 +355,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Arguments denote_block : simpl never.
       Lemma exp_optim_correct_block : forall bk f g l,
           ⟦ bk ⟧b2 f g l ≈ ⟦ endo bk ⟧b2 f g l.
-      Proof.
+      Proof using opt_correct opt_respect_int.
         intros *.
         destruct bk; unfold endo, Endo_block; cbn.
         rewrite !denote_block_unfold.
@@ -371,7 +371,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Qed.
 
       #[global] Instance eq_itree_interp_cfg2: forall {T : Type}, Proper (eq_itree eq ==> eq ==> eq ==> eq_itree eq) (@ℑ2 T).
-      Proof.
+      Proof using Type.
         repeat intro.
         unfold ℑ2.
         subst; rewrite H.
@@ -381,7 +381,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Lemma interp_cfg2_ret_eq_itree:
         forall (R : Type) (g : global_env) (l : local_env) (x : R),
           ℑ2 (Ret x) g l ≅ Ret2 g l x.
-      Proof.
+      Proof using Type.
         intros.
         unfold interp_cfg2.
         rewrite interp_intrinsics_ret, interp_global_ret, interp_local_ret.
@@ -392,7 +392,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
         forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g l,
           ℑ2 (t >>= k) g l ≅
              '(l',(g',x)) <- ℑ2 t g l ;; ℑ2 (k x) g' l'.
-      Proof.
+      Proof using Type.
         intros.
         unfold ℑ2.
         rewrite interp_intrinsics_bind, interp_global_bind, interp_local_bind.
@@ -402,7 +402,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Lemma interp_cfg2_Tau :
         forall {R} (t: itree instr_E R) g l,
           ℑ2 (Tau t) g l ≅ Tau (ℑ2 t g l).
-      Proof.
+      Proof using Type.
         intros.
         unfold ℑ2.
         rewrite interp_intrinsics_Tau, interp_global_Tau, interp_local_Tau.
@@ -417,7 +417,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
               find_block bks2 b = Some bk2 ->
               ⟦ bk1 ⟧b2 f g l ≈ ⟦ bk2 ⟧b2 f g l) ->
           ⟦ bks1 ⟧bs2 fto g l ≈ ⟦ bks2 ⟧bs2 fto g l.
-      Proof.
+      Proof using Type.
         intros * BIJ EQ.
         einit.
         destruct fto as [f to].
@@ -443,7 +443,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
 
       Lemma exp_optim_correct :
         forall G g l, ⟦ G ⟧cfg2 g l ≈ ⟦ opt_exp_cfg G ⟧cfg2 g l.
-      Proof.
+      Proof using opt_correct opt_respect_int.
         intros.
         unfold denote_cfg.
         cbn.
@@ -550,9 +550,9 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
       *)
     Lemma uvalue_dvalue_to_uvalue_M : forall d,
        eq1 (concretize_uvalueM M D ERR_M err (dvalue_to_uvalue d)) (ret d).
-    Proof.
+    Proof using EE Laws_M.
       intros.
-      induction d; simpl; rewrite concretize_uvalueM_equation; try reflexivity.
+      induction d; simpl; try reflexivity.
       - rewrite map_monad_map.
         apply map_monad_g;
         induction fields; simpl; auto.

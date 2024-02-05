@@ -24,11 +24,11 @@ Open Scope monad.
 Section monad.
   Variable m : Type -> Type.
   Variable M : Monad m.
-  
+
   Fixpoint monad_fold_right {A B} (f : B -> A -> m B) (l:list A) (b : B) : m B :=
     match l with
     | [] => ret b
-    | x::xs => 
+    | x::xs =>
       r <- monad_fold_right f xs b ;;
       f r x
     end.
@@ -50,7 +50,7 @@ Definition map_monad {m : Type -> Type} {H : Monad m} {A B} (f:A -> m B) : list 
     | a::l' =>
       b <- f a ;;
       bs <- loop l' ;;
-      ret (b::bs)  
+      ret (b::bs)
     end.
 
 Definition map_monad_ {A B}
@@ -100,7 +100,6 @@ Global Instance EqM_sum {E} : Monad.Eq1 (sum E) :=
 
 Global Instance EqMProps_sum {E} : Monad.Eq1Equivalence (sum E).
 constructor; intuition.
-repeat intro. etransitivity; eauto.
 Defined.
 
 
@@ -205,7 +204,7 @@ Proof using.
     cbn.
 
     rewrite bind_bind.
-    
+
     assert (forall v : (E + A)%type,
               xM <- match v with
                    | inl x0 => ret (inl x0)
@@ -241,7 +240,7 @@ Proof using.
     destruct H.
 
     do 3 red in H1.
-    
+
     unfold Proper, respectful in Proper_bind.
     apply Proper_bind; eauto.
     intros a.
@@ -263,4 +262,3 @@ Proof using.
 Qed.
 
 #[global] Existing Instance MonadState.MonadLawsE_stateTM.
-

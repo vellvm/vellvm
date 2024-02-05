@@ -630,7 +630,7 @@ Proof.
     destruct_prod.
     simpl. destruct_eq_dec.
     + apply Nat.lt_succ_diag_r.
-    + simpl. apply lt_n_S. apply IHl.
+    + simpl. apply -> Nat.succ_lt_mono. apply IHl.
       destruct H.
       * inversion H. subst. contradiction.
       * assumption.

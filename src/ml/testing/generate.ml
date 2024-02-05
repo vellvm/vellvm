@@ -6,7 +6,7 @@ module G = QCheck.Gen
 open MemoryModelImplementation
 open MemoryAddress
 module GA = GenAlive2.GEN_ALIVE2(MemoryModelImplementation.InfAddr)(MemoryModelImplementation.BigIP)(MemoryModelImplementation.FinSizeof)
-module GL = GenLow.GenLow
+module GL = Generators
 open Buffer
 
 let string_of_char_list : char list -> string = fun l ->

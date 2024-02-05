@@ -453,8 +453,8 @@ Proof using.
                red.
                pclearbot.
                left.
-               rewrite REL.
-               eapply paco2_eqit_refl.
+               eapply Symmetric_eqit_eq;
+                 auto.
              }
              apply H1.
            }
@@ -986,12 +986,10 @@ Section interp_prop_oom_extra.
       reflexivity.
 
       intros; subst.
-      right. eapply CIH.
-      specialize (REL a).
-      rewrite REL.
-      rewrite <- tau_eutt at 1.
+      right. eapply CIH with (t':=Tau (k2 a)).
+      rewrite tau_eutt.
+      apply REL.
       reflexivity.
-      cbn; reflexivity.
     - constructor; auto; eapply IHeq; eauto.
     - cbn in H2.
       apply eqitree_inv_Tau_r in H2.

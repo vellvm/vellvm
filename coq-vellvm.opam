@@ -24,8 +24,8 @@ depends: [
   "dune" 
   "menhir" 
   "qcheck" 
-  "coq" {= "8.15.2" & < "8.17~"}
-  "coq-ext-lib" 
+  "coq" {>= "8.19.0" & < "8.20~"}
+  "coq-ext-lib" {< "0.12.1"}
   "coq-paco" 
   "coq-ceres" 
   "coq-flocq" {>= "4.1.1"}

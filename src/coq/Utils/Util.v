@@ -8,8 +8,8 @@ From Coq Require Import
      Strings.String
      Arith.Arith
      ZArith
-     Nat 
-     NPeano
+     Nat
+     PeanoNat
      Psatz.
 Require Import FunInd Recdef.
 
@@ -43,8 +43,8 @@ Section nat_Show.
       a = b.
   Proof using.
     intros.
-    rewrite (NPeano.Nat.div_mod a q); auto.
-    rewrite (NPeano.Nat.div_mod b q); auto.
+    rewrite (Nat.div_mod a q); auto.
+    rewrite (Nat.div_mod b q); auto.
   Qed.
 
   Lemma get_last_digit_inj: forall n m,
@@ -61,9 +61,9 @@ Section nat_Show.
     subst.
     exfalso.
     destruct n8.
-    2: generalize (NPeano.Nat.mod_upper_bound n 10 (ltac:(auto))); intros EQ; rewrite Heq in EQ; lia. 
+    2: generalize (Nat.mod_upper_bound n 10 (ltac:(auto))); intros EQ; rewrite Heq in EQ; lia. 
     destruct n9.
-    2: generalize (NPeano.Nat.mod_upper_bound m 10 (ltac:(auto))); intros EQ; rewrite Heq0 in EQ; lia. 
+    2: generalize (Nat.mod_upper_bound m 10 (ltac:(auto))); intros EQ; rewrite Heq0 in EQ; lia. 
     exfalso; apply ineq,(mod_div_eq n m 10); lia.
   Qed.
 
@@ -633,7 +633,7 @@ Proof using.
 Qed.
 
 Lemma nth_error_replace : forall {A} l n (a : A) n' (Hn : n < length l),
-  nth_error (replace l n a) n' = if beq_nat n n' then Some a
+  nth_error (replace l n a) n' = if Nat.eqb n n' then Some a
                                  else nth_error l n'.
 Proof using.
   induction l; intros; try (solve [inversion Hn]); simpl in *.
@@ -724,7 +724,7 @@ Proof using.
   destruct (lt_dec n m).
   - unfold interval at 2; fold interval.
     destruct (le_lt_dec (S n) m); auto; lia.
-  - rewrite Lt.le_lt_or_eq_iff in *; destruct l; [contradiction | subst].
+  - apply le_lt_eq_dec in l; destruct l; [contradiction | subst].
     rewrite interval_nil; auto.
 Qed.
 
@@ -831,7 +831,7 @@ Lemma Nth_app : forall {A} (l l' : list A) n a (Hnth : Nth (l ++ l') n a),
   if lt_dec n (length l) then Nth l n a else Nth l' (n - length l) a.
 Proof using.
   induction l; simpl; intros.
-  - rewrite <- minus_n_O; auto.
+  - rewrite Nat.sub_0_r; auto.
   - destruct n; simpl in *; auto.
     specialize (IHl _ _ _ Hnth); destruct (lt_dec n (length l));
       destruct (lt_dec (S n) (S (length l))); auto; lia.
@@ -911,12 +911,12 @@ Proof using.
   induction j; simpl; auto; intros.
   destruct (Compare_dec.le_lt_dec i j).
   - erewrite IHj; eauto.
-    rewrite <- Minus.minus_Sn_m; simpl; [|lia].
+    rewrite Nat.sub_succ_l; simpl; [|lia].
     destruct (Compare_dec.le_lt_dec (i - k) (j - k)); [|lia].
     rewrite map_app; simpl.
     rewrite Nat.sub_add; auto; lia.
   - destruct (Compare_dec.le_lt_dec k j).
-    + rewrite <- Minus.minus_Sn_m; simpl; try lia.
+    + rewrite Nat.sub_succ_l; simpl; try lia.
       destruct (Compare_dec.le_lt_dec (i - k) (j - k)); auto; try lia.
     + assert (S j - k = 0) as Heq by lia; rewrite Heq; auto.
 Qed.

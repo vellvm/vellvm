@@ -41,7 +41,7 @@ Section TFor.
 
   Definition tfor {E X} (body : nat -> X -> itree E X) (from to : nat) : X -> itree E X :=
     fun x => ITree.iter (fun '(p,x) =>
-                        if beq_nat p to
+                        if Nat.eqb p to
                         then Ret (inr x)
                         else
                           y <- (body p x);; Ret (inl (S p,y))
@@ -193,7 +193,7 @@ Section TFor.
       subst.
 
       assert (i <= S j) by lia.
-      apply le_lt_or_eq in H1.
+      apply le_lt_eq_dec in H1.
       destruct H1.
       + rewrite IHj; [|lia|auto].
         rewrite tfor_unroll; [|lia].

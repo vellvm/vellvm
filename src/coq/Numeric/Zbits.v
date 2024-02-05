@@ -33,29 +33,29 @@ Hypothesis modul_pos: modul > 0.
 Definition eqmod (x y: Z) : Prop := exists k, x = k * modul + y.
 
 Lemma eqmod_refl: forall x, eqmod x x.
-Proof.
+Proof using Type.
   intros; red. exists 0. lia.
 Qed.
 
 Lemma eqmod_refl2: forall x y, x = y -> eqmod x y.
-Proof.
+Proof using Type.
   intros. subst y. apply eqmod_refl.
 Qed.
 
 Lemma eqmod_sym: forall x y, eqmod x y -> eqmod y x.
-Proof.
+Proof using Type.
   intros x y [k EQ]; red. exists (-k). subst x. ring.
 Qed.
 
 Lemma eqmod_trans: forall x y z, eqmod x y -> eqmod y z -> eqmod x z.
-Proof.
+Proof using Type.
   intros x y z [k1 EQ1] [k2 EQ2]; red.
   exists (k1 + k2). subst x; subst y. ring.
 Qed.
 
 Lemma eqmod_small_eq:
   forall x y, eqmod x y -> 0 <= x < modul -> 0 <= y < modul -> x = y.
-Proof.
+Proof using Type.
   intros x y [k EQ] I1 I2.
   generalize (Zdiv_unique _ _ _ _ EQ I2). intro.
   rewrite (Z.div_small x modul I1) in H. subst k. lia.
@@ -63,41 +63,41 @@ Qed.
 
 Lemma eqmod_mod_eq:
   forall x y, eqmod x y -> x mod modul = y mod modul.
-Proof.
+Proof using modul_pos.
   intros x y [k EQ]. subst x.
   rewrite Z.add_comm. apply Z_mod_plus. auto.
 Qed.
 
 Lemma eqmod_mod:
   forall x, eqmod x (x mod modul).
-Proof.
+Proof using Type.
   intros; red. exists (x / modul).
-  rewrite Z.mul_comm. apply Z_div_mod_eq. auto.
+  rewrite Z.mul_comm. apply Z_div_mod_eq_full.
 Qed.
 
 Lemma eqmod_add:
   forall a b c d, eqmod a b -> eqmod c d -> eqmod (a + c) (b + d).
-Proof.
+Proof using Type.
   intros a b c d [k1 EQ1] [k2 EQ2]; red.
   subst a; subst c. exists (k1 + k2). ring.
 Qed.
 
 Lemma eqmod_neg:
   forall x y, eqmod x y -> eqmod (-x) (-y).
-Proof.
+Proof using Type.
   intros x y [k EQ]; red. exists (-k). rewrite EQ. ring.
 Qed.
 
 Lemma eqmod_sub:
   forall a b c d, eqmod a b -> eqmod c d -> eqmod (a - c) (b - d).
-Proof.
+Proof using Type.
   intros a b c d [k1 EQ1] [k2 EQ2]; red.
   subst a; subst c. exists (k1 - k2). ring.
 Qed.
 
 Lemma eqmod_mult:
   forall a b c d, eqmod a c -> eqmod b d -> eqmod (a * b) (c * d).
-Proof.
+Proof using Type.
   intros a b c d [k1 EQ1] [k2 EQ2]; red.
   subst a; subst b.
   exists (k1 * k2 * modul + c * k2 + k1 * d).
@@ -187,7 +187,7 @@ Proof.
   - rewrite Zmod_0_l. auto.
   - apply P_mod_two_p_eq.
   - generalize (P_mod_two_p_range n p) (P_mod_two_p_eq n p). intros A B.
-    exploit (Z_div_mod_eq (Zpos p) (two_power_nat n)); auto. intros C.
+    pose proof (Z_div_mod_eq_full (Zpos p) (two_power_nat n)) as C.
     set (q := Zpos p / two_power_nat n) in *.
     set (r := P_mod_two_p p n) in *.
     rewrite <- B in C.
@@ -479,7 +479,7 @@ Proof.
       apply Zmod_unique with (x1 / two_p x).
       rewrite !Zshiftin_spec. rewrite Z.add_assoc. f_equal.
       transitivity (2 * (two_p x * (x1 / two_p x) + x1 mod two_p x)).
-      f_equal. apply Z_div_mod_eq. apply two_p_gt_ZERO; auto.
+      f_equal. apply Z_div_mod_eq_full.
       ring.
       rewrite Zshiftin_spec. exploit (Z_mod_lt x1 (two_p x)). apply two_p_gt_ZERO; auto.
       destruct (Z.odd x0); lia.
@@ -656,7 +656,6 @@ Lemma eqmod_Zzero_ext:
   forall n x, 0 <= n -> eqmod (two_p n) (Zzero_ext n x) x.
 Proof.
   intros. rewrite Zzero_ext_mod; auto. apply eqmod_sym. apply eqmod_mod.
-  apply two_p_gt_ZERO. lia.
 Qed.
 
 (** Relation between [Zsign_ext n x] and (Zzero_ext n x] *)
@@ -927,7 +926,7 @@ Proof.
        exploit (Z_mod_lt (x + y - 1) y); auto.
        rewrite Z.abs_eq. lia. lia.
      + transitivity ((y * ((x + y - 1) / y) + (x + y - 1) mod y) - (y-1)).
-       rewrite <- Z_div_mod_eq. ring. auto. ring.
+       rewrite <- Z_div_mod_eq_full. ring. auto. ring.
   - apply Zquot_Zdiv_pos; lia.
 Qed.
 
@@ -935,7 +934,7 @@ Lemma Zdiv_shift:
   forall x y, y > 0 ->
   (x + (y - 1)) / y = x / y + if zeq (Z.modulo x y) 0 then 0 else 1.
 Proof.
-  intros. generalize (Z_div_mod_eq x y H). generalize (Z_mod_lt x y H).
+  intros. generalize (Z_div_mod_eq_full x y). generalize (Z_mod_lt x y H).
   set (q := x / y). set (r := x mod y). intros.
   destruct (zeq r 0).
   apply Zdiv_unique with (y - 1). rewrite H1. rewrite e. ring. lia.

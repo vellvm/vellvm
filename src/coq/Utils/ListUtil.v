@@ -154,16 +154,16 @@ Next Obligation.
 Defined.
 Next Obligation.
   split.
-  intros x xs0 y ys0 CONTRA.
+  intros x xs0 ?y ys0 CONTRA.
   inversion CONTRA.
-  inversion H1.
+  inversion H.
 
   intros [_ CONTRA].
   inversion CONTRA.
 Defined.
 Next Obligation.
   split.
-  intros x xs0 y ys0 [_ CONTRA].
+  intros x xs0 ?y ys0 [_ CONTRA].
   inversion CONTRA.
 
   intros [CONTRA _].
@@ -1613,27 +1613,27 @@ Proof.
 Qed.
 
 
-(* TODO: move this / does this exist somewhere else? *)
-Lemma nat_strong_rect :
-  forall (P: nat -> Type)
-         (BASE: P 0%nat)
-         (IH: forall (n : nat), (forall (m : nat), m <= n -> P m)%nat -> P (S n)),
-  forall n, P n.
-Proof.
-  intros P BASE IH n.
-  destruct n.
-  - apply BASE.
-  - apply IH.
-    induction n; intros m LE.
-    + assert (m=0)%nat by lia; subst; auto.
-    + assert (m <= n \/ m = S n)%nat by lia.
-      pose proof NPeano.Nat.leb_spec0 m n.
-      inv H0; subst; auto.
-      pose proof NPeano.Nat.eqb_spec m (S n).
-      inv H0; subst; auto.
-      exfalso.
-      lia.
-Qed.
+  (* TODO: move this / does this exist somewhere else? *)
+  Lemma nat_strong_rect :
+    forall (P: nat -> Type)
+      (BASE: P 0%nat)
+      (IH: forall (n : nat), (forall (m : nat), m <= n -> P m)%nat -> P (S n)),
+    forall n, P n.
+  Proof.
+    intros P BASE IH n.
+    destruct n.
+    - apply BASE.
+    - apply IH.
+      induction n; intros m LE.
+      + assert (m=0)%nat by lia; subst; auto.
+      + assert (m <= n \/ m = S n)%nat by lia.
+        pose proof Nat.leb_spec0 m n.
+        inv H0; subst; auto.
+        pose proof Nat.eqb_spec m (S n).
+        inv H0; subst; auto.
+        exfalso.
+        lia.
+  Qed.
 
 
 Lemma length_strong_rect:
@@ -1648,13 +1648,13 @@ Proof.
     assert (length l = 0)%nat as LEN' by lia.
     apply length_zero_iff_nil in LEN'; subst; auto.
 
-    assert (length l <= n \/ length l = S n)%nat by lia.
-    pose proof NPeano.Nat.leb_spec0 (length l) n.
-    inv H0; subst; eauto.
-    pose proof NPeano.Nat.eqb_spec (length l) (S n).
-    inv H0; subst; eauto.
-    lia.
-  }
+      assert (length l <= n \/ length l = S n)%nat by lia.
+      pose proof Nat.leb_spec0 (length l) n.
+      inv H0; subst; eauto.
+      pose proof Nat.eqb_spec (length l) (S n).
+      inv H0; subst; eauto.
+      lia.
+    }
 
   intros l.
   eapply IHLEN.

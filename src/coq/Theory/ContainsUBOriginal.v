@@ -45,7 +45,7 @@ Section contains_UB.
   | FindUB    : forall s k t2, t2 ≅ (vis (subevent (F:=Eff) _ (ThrowUB s)) k) -> contains_UB t2.
 
   #[global] Instance proper_eutt_contains_UB {R} {RR : relation R} : Proper (@eqit Eff _ _ RR true true ==> iff) contains_UB.
-  Proof.
+  Proof using Type.
     unfold Proper, respectful.
     intros x y EQ.
     split; intros UB.
@@ -89,7 +89,9 @@ Section contains_UB.
 
             apply IHUB.
             pclearbot.
-            rewrite <- REL0.
+            eapply eutt_cong_eq.
+            symmetry; apply REL0.
+            reflexivity.
             apply REL.
           - punfold H; red in H.
             rewrite <- Heqt2o in H.
@@ -143,7 +145,9 @@ Section contains_UB.
 
             apply IHUB.
             pclearbot.
-            rewrite <- REL0.
+            eapply eutt_cong_eq.
+            symmetry; apply REL0.
+            reflexivity.
             apply REL.
           - punfold H; red in H.
             rewrite <- Heqt2o in H.
@@ -227,7 +231,9 @@ Section contains_UB.
 
             apply IHUB.
             pclearbot.
-            rewrite <- REL0.
+            eapply eutt_cong_eq.
+            reflexivity.
+            symmetry; apply REL0.
             apply REL.
           - punfold H; red in H.
             cbn in H.
@@ -281,7 +287,9 @@ Section contains_UB.
 
             apply IHUB.
             pclearbot.
-            rewrite <- REL0.
+            eapply eutt_cong_eq.
+            reflexivity.
+            symmetry; apply REL0.
             apply REL.
           - punfold H; red in H.
             cbn in H.
@@ -373,7 +381,7 @@ Section contains_UB_lemmas.
 
   Lemma ret_not_contains_UB {R} {RR : relation R} :
     forall (t : itree Eff R) rv, eqit RR true true t (ret rv) -> ~ contains_UB t.
-  Proof.
+  Proof using Type.
     intros t rv EQ CUB.
     rewrite EQ in CUB.
     inversion CUB; subst;
@@ -390,7 +398,7 @@ Section bind_lemmas.
     forall {R T} (t : itree Eff R) (k : R -> itree Eff T),
       contains_UB t ->
       contains_UB (ITree.bind t k).
-  Proof.
+  Proof using Type.
     intros R T t k CUB.
     induction CUB.
     - rewrite H.
@@ -413,7 +421,7 @@ Section bind_lemmas.
       Returns a t ->
       contains_UB (k a) ->
       contains_UB (ITree.bind t k).
-  Proof.
+  Proof using Type.
     intros R T t k a RET CUB.
     induction RET.
     - rewrite H; rewrite bind_ret_l; auto.
@@ -679,7 +687,7 @@ Section refine_OOM_h_lemmas.
       contains_UB y ->
       refine_OOM_h RR x y ->
       contains_UB x.
-  Proof.
+  Proof using Type.
     intros R RR x y UB REF.
     rewrite REF.
     eauto.
