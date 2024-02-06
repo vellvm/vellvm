@@ -11,6 +11,7 @@ From Vellvm.Semantics Require Import
      Memory.FiniteProvenance
      Memory.Sizeof
      Memory.MemBytes
+     Memory.DvalueBytes
      Memory.ErrSID
      GepM
      VellvmIntegers.
@@ -135,8 +136,9 @@ Module MakeFiniteMemory (LP : LLVMParams) <: Memory LP.
 
   Module GEP := GepM.Make ADDR IP SIZEOF Events PTOI PROV ITOP.
   Module Byte := FinByte ADDR IP SIZEOF Events.
+  Module DVALUE_BYTE := DvalueBytes.Make LP.
 
-  Module MP := MemoryParams.Make LP GEP Byte.
+  Module MP := MemoryParams.Make LP GEP Byte DVALUE_BYTE.
 
   Module MMEP := FiniteMemoryModelExecPrimitives LP MP.
   Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.

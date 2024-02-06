@@ -1058,7 +1058,7 @@ Section TypGenerators.
   Definition gen_ident_from_ctx (ctx : var_context) : GenLLVM ident
     := fmap fst (elems_LLVM ctx).
 
-  Program Fixpoint gen_sized_typ_size (sz : nat) {measure sz} : GenLLVM typ :=
+  Fixpoint gen_sized_typ_size (sz : nat) : GenLLVM typ :=
     match sz with
     | O => gen_sized_typ_0
     | (S sz') =>
@@ -1079,9 +1079,6 @@ Section TypGenerators.
         ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')))
           ])
     end.
-  Next Obligation.
-  lia.
-  Defined.
 
   Definition gen_sized_typ : GenLLVM typ
     := sized_LLVM (fun sz => gen_sized_typ_size sz).
@@ -1105,9 +1102,6 @@ Section TypGenerators.
         ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx sz' typs_in_ctx)))
         ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx sz' typs_in_ctx)))])
     end.
-  Next Obligation.
-  lia.
-  Defined.
 
   Definition gen_sized_typ_ptrin_fctx : GenLLVM typ
     :=

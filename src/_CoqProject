@@ -67,6 +67,7 @@
 ./coq/Semantics/Memory/ErrSID.v
 ./coq/Semantics/Memory/FiniteProvenance.v
 ./coq/Semantics/Memory/MemBytes.v
+./coq/Semantics/Memory/DvalueBytes.v
 ./coq/Semantics/Memory/Overlaps.v
 ./coq/Semantics/Memory/Sizeof.v
 ./coq/Semantics/Memory/StoreId.v

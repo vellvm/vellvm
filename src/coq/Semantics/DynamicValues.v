@@ -3291,7 +3291,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       with only four cases to actually build the tree.
      *)
     Variant conv_case : Set :=
-    | Conv_Pure (x : uvalue)
+    | Conv_Pure (x : dvalue)
     | Conv_ItoP (x : dvalue)
     | Conv_PtoI (x : dvalue)
     | Conv_Illegal (s: string).
