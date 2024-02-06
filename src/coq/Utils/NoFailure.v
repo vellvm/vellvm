@@ -70,7 +70,7 @@ Lemma interp_state_iter :
   forall {A R S : Type} (E F : Type -> Type) (s0 : S) (a0 : A) (h : E ~> Monads.stateT S (itree F)) f,
     State.interp_state (E := E) (T := R) h (ITree.iter f a0) s0 ≈
                  @Basics.iter _ MonadIter_stateT0 _ _ (fun a s => State.interp_state h (f a) s) a0 s0.
-Proof.
+Proof using.
   unfold iter, CategoryKleisli.Iter_Kleisli, Basics.iter, MonadIter_stateT0, Basics.iter, MonadIter_itree in *; cbn.
   einit. ecofix CIH; intros.
   rewrite 2 unfold_iter; cbn.
@@ -89,7 +89,7 @@ Lemma interp_fail_iter :
   forall {A R : Type} (E F : Type -> Type) (a0 : A) (h : E ~> failT (itree F)) f,
     interp_fail (E := E) (T := R) h (ITree.iter f a0) ≈
                 @Basics.iter _ failT_iter _ _ (fun a => interp_fail h (f a)) a0.
-Proof.
+Proof using.
   unfold Basics.iter, failT_iter, Basics.iter, MonadIter_itree in *; cbn.
   einit. ecofix CIH; intros *.
   rewrite 2 unfold_iter; cbn.
@@ -111,7 +111,7 @@ Lemma translate_iter :
   forall {A R : Type} (E F : Type -> Type) (a0 : A) (h : E ~> F) f,
     translate (E := E) (F := F) (T := R) h (ITree.iter f a0) ≈
               ITree.iter (fun a => translate h (f a)) a0.
-Proof.
+Proof using.
   intros; revert a0.
   einit; ecofix CIH; intros.
   rewrite 2 unfold_iter; cbn.
@@ -144,7 +144,7 @@ Section Handle_Fail.
 End Handle_Fail.
 
 Lemma post_returns : forall {E X} (t : itree E X), t ⤳ fun a => Returns a t.
-Proof.
+Proof using.
   intros; eapply eqit_mon; eauto.
   2: eapply PropT.eutt_Returns.
   intros ? ? [<- ?]; auto.
@@ -156,7 +156,7 @@ Lemma eutt_clo_bind_returns {E R1 R2 RR U1 U2 UU}
       (EQT: @eutt E U1 U2 UU t1 t2)
       (EQK: forall u1 u2, UU u1 u2 -> Returns u1 t1 -> Returns u2 t2 -> eutt RR (k1 u1) (k2 u2)):
   eutt RR (x <- t1;; k1 x) (x <- t2;; k2 x).
-Proof.
+Proof using.
   intros; eapply eutt_post_bind_gen; eauto using post_returns.
 Qed.
 
@@ -173,7 +173,7 @@ Section No_Failure.
     t ⤳ fun x => ~ x = None.
 
   Global Instance no_failure_eutt {E X} : Proper (eutt eq ==> iff) (@no_failure E X).
-  Proof.
+  Proof using.
     intros t s EQ; unfold no_failure; split; intros ?; [rewrite <- EQ | rewrite EQ]; auto.
   Qed.
 
@@ -184,7 +184,7 @@ Section No_Failure.
   Lemma no_failure_bind_prefix : forall {E X Y} (t : itree E (option X)) (k : X -> itree E (option Y)),
       no_failure (bind (m := failT (itree E)) t k) ->
       no_failure t.
-  Proof.
+  Proof using.
     unfold no_failure,has_post; intros E X Y.
     einit; ecofix CIH.
     intros * NOFAIL.
@@ -210,7 +210,7 @@ Section No_Failure.
       no_failure (bind (m := failT (itree E)) t k) ->
       forall u, Returns (E := E) (Some u) t -> 
               no_failure (k u).
-  Proof.
+  Proof using.
     intros * NOFAIL * ISRET.
     unfold no_failure in *.
     cbn in *.
@@ -220,7 +220,7 @@ Section No_Failure.
 
   Lemma no_failure_Ret :
     forall E T X x, @no_failure E X (@run_fail E T X (Ret x)).
-  Proof.
+  Proof using.
     intros.
     unfold run_fail, no_failure.
     cbn.
@@ -230,7 +230,7 @@ Section No_Failure.
 
   Lemma failure_throw : forall E Err X (s: Err),
       ~ no_failure (E := E) (X := X) (@run_fail E Err X (throw (E := _ +' E) s)).
-  Proof.
+  Proof using.
     intros * abs.
     unfold no_failure, throw, run_fail in *.
     rewrite interp_fail_vis in abs.
@@ -253,7 +253,7 @@ Section No_Failure.
                     | Some a0 => body k a0
                     | None => Ret None
                     end) i j None ≈ Ret None.
-  Proof.
+  Proof using.
     intros E A i j body; remember (j - i)%nat as k; revert i Heqk; induction k as [| k IH].
     - intros i EQ INEQ; replace j with i by lia; rewrite tfor_0; reflexivity. 
     - intros i EQ INEQ.
@@ -278,7 +278,7 @@ Section No_Failure.
                             | Some a0 => body k a0
                             | None => Ret None
                             end) (S i) j (Some a)).
-  Proof.
+  Proof using.
     intros *.
     remember (j - i)%nat as k.
     revert i Heqk a0.
@@ -315,7 +315,7 @@ Section No_Failure.
                                         | None => Ret None
                                         end) n k a0) ->
         no_failure (body k a).
-  Proof.
+  Proof using.
     intros E A body n m.
     remember (m - n)%nat as j.
     revert n Heqj.

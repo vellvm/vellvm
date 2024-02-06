@@ -90,6 +90,7 @@
             (nix-filter.matchExt "yml")
             (nix-filter.matchName "README")
             ./.gitignore
+            ./.git
           ];
         };
 

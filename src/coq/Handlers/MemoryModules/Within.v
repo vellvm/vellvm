@@ -42,7 +42,7 @@ Section Laws.
     forall {A} (pre : Pre) (post : Post) (b : B A) (m : M A),
       b {{pre}} ∈ {{post}} m ->
       b ∈ m.
-  Proof.
+  Proof using.
     intros A pre post b m W.
     exists pre. exists post.
     auto.
@@ -163,7 +163,7 @@ Definition transitive_within {Pre Post} {M1 M2 M3} `{EQM2 : Eq1 M2} `{EQM3 : Eq1
 
 Definition transitive_within_eq1_Proper {Pre Post} {M1 M2 M3} `{EQM2 : Eq1 M2} `{EQM3 : Eq1 M3} `{WM1M2 : @Within M2 EQM2 M1 Pre Post} `{WM2M3 : @Within M3 EQM3 M2 Pre Post} {A} :
   Proper (eq1 ==> eq ==> eq ==> eq ==> iff) (transitive_within (A:=A)).
-Proof.
+Proof using.
   unfold Proper, respectful.
   intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
   subst.
@@ -176,7 +176,7 @@ Proof.
 Defined.
 
 #[global] Instance Transitive_Within {Pre Post} {M1 M2 M3} `{EQM2 : Eq1 M2} `{EQM3 : Eq1 M3} `{WM1M2 : @Within M2 EQM2 M1 Pre Post} `{WM2M3 : @Within M3 EQM3 M2 Pre Post} : @Within M3 EQM3 M1 Pre Post.
-Proof.
+Proof using.
   esplit.
   Unshelve.
     2: {
@@ -199,7 +199,7 @@ Definition reflexive_within {Pre Post} {M} `{EQM : Eq1 M}
 
 Definition reflexive_within_eq1_Proper {Pre Post} {M} `{MM : Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM} {A} :
   Proper (eq1 ==> eq ==> eq ==> eq ==> iff) (reflexive_within (Pre:=Pre) (Post:=Post) (A:=A)).
-Proof.
+Proof using.
   unfold Proper, respectful.
   intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
   subst.
@@ -212,7 +212,7 @@ Proof.
 Defined.
 
 #[global] Instance Reflexive_Within {Pre Post} {M} `{MM : Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM} : @Within M EQM M Pre Post.
-Proof.
+Proof using.
   esplit.
   Unshelve.
   2: {
@@ -234,7 +234,7 @@ Defined.
   `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM}
   `{EQR : @Eq1_ret_inv M EQM MM} `{IPRE : Inhabited Pre} `{IPOST : Inhabited Post}:
   @Within_ret_inv M M Pre Post MM MM EQM (@Reflexive_Within Pre Post M MM EQM EQV).
-Proof.
+Proof using.
   split.
   - intros A x y RET.
     cbn in RET.
@@ -258,7 +258,7 @@ Defined.
   `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM}
   `{EQR : @Eq1_ret_inv M EQM MM}:
   @Within_ret_pre_post_inv M M Pre MM MM EQM (@Reflexive_Within Pre Pre M MM EQM EQV).
-Proof.
+Proof using.
   split.
   - intros A pre post x y RET.
     cbn in RET.
@@ -281,7 +281,7 @@ Defined.
   `{OOM : RAISE_OOM M}
   `{RBMOOM : @RaiseBindM M MM EQM string (@raise_oom M OOM)} :
   @RaiseWithin M M Pre Post MM EQM (@Reflexive_Within Pre Post M MM EQM EQV) string (@raise_oom M OOM).
-Proof.
+Proof using.
   split.
   intros X msg x.
   red.
@@ -298,7 +298,7 @@ Defined.
   `{ERR : RAISE_ERROR M}
   `{RBMOOM : @RaiseBindM M MM EQM string (@raise_error M ERR)} :
   @RaiseWithin M M Pre Post MM EQM (@Reflexive_Within Pre Post M MM EQM EQV) string (@raise_error M ERR).
-Proof.
+Proof using.
   split.
   intros X msg x.
   red.

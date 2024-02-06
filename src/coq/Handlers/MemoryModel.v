@@ -4925,7 +4925,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         byte_allocated ms ptr aid ->
         MemState_get_memory ms = MemState_get_memory ms' ->
         byte_allocated ms' ptr aid.
-    Proof.
+    Proof using Type.
       intros ms ms' ptr aid ALLOC EQ.
       unfold byte_allocated.
       cbn in *.
@@ -4940,7 +4940,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         read_byte_allowed ms ptr ->
         MemState_get_memory ms = MemState_get_memory ms' ->
         read_byte_allowed ms' ptr.
-    Proof.
+    Proof using Type.
       intros ms ms' ptr READ EQ.
       unfold read_byte_allowed in *.
       destruct READ as [aid [ALLOC ACCESS]].
@@ -4953,7 +4953,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         write_byte_allowed ms ptr ->
         MemState_get_memory ms = MemState_get_memory ms' ->
         write_byte_allowed ms' ptr.
-    Proof.
+    Proof using Type.
       intros ms ms' ptr WRITE EQ.
       unfold write_byte_allowed in *.
       destruct WRITE as [aid [ALLOC ACCESS]].
@@ -4966,7 +4966,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         free_byte_allowed ms ptr ->
         MemState_get_memory ms = MemState_get_memory ms' ->
         free_byte_allowed ms' ptr.
-    Proof.
+    Proof using Type.
       intros ms ms' ptr FREE EQ.
       unfold free_byte_allowed in *.
       destruct FREE as [aid [ALLOC ACCESS]].
@@ -4980,7 +4980,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         read_byte_prop ms ptr byte ->
         MemState_get_memory ms = MemState_get_memory ms' ->
         read_byte_prop ms' ptr byte.
-    Proof.
+    Proof using Type.
       intros ms ms' ptr byte READ EQ.
       unfold read_byte_prop.
       rewrite <- EQ.
@@ -4991,7 +4991,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       forall ms ms',
         MemState_get_memory ms = MemState_get_memory ms' ->
         read_byte_preserved ms ms'.
-    Proof.
+    Proof using Type.
       unfold read_byte_preserved.
       split; red.
       + intros ptr; split; intros READ_ALLOWED;
@@ -5004,7 +5004,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       forall ms ms',
         MemState_get_memory ms = MemState_get_memory ms' ->
         write_byte_allowed_all_preserved ms ms'.
-    Proof.
+    Proof using Type.
       intros ms ms' EQ.
       unfold write_byte_allowed_all_preserved.
       intros ptr.
@@ -5017,7 +5017,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       forall ms ms',
         MemState_get_memory ms = MemState_get_memory ms' ->
         free_byte_allowed_all_preserved ms ms'.
-    Proof.
+    Proof using Type.
       intros ms ms' EQ.
       unfold free_byte_allowed_all_preserved.
       intros ptr.
@@ -5030,7 +5030,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       forall ms ms',
         MemState_get_memory ms = MemState_get_memory ms' ->
         allocations_preserved ms ms'.
-    Proof.
+    Proof using Type.
       intros ms ms' EQ.
       unfold write_byte_allowed_all_preserved.
       intros ptr aid.
@@ -5041,7 +5041,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       forall ms ms',
         MemState_get_memory ms = MemState_get_memory ms' ->
         frame_stack_preserved ms ms'.
-    Proof.
+    Proof using Type.
       intros ms ms' EQ.
       unfold frame_stack_preserved.
       intros fs.
@@ -5050,7 +5050,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
     #[global] Instance Proper_heap_preserved :
       Proper ((fun ms1 ms2 => MemState_get_memory ms1 = MemState_get_memory ms2) ==> (fun ms1 ms2 => MemState_get_memory ms1 = MemState_get_memory ms2) ==> iff) heap_preserved.
-    Proof.
+    Proof using Type.
       unfold Proper, respectful.
       intros x y H x0 y0 H0.
       unfold heap_preserved.
@@ -5059,7 +5059,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     Qed.
 
     #[global] Instance Reflexive_heap_preserved : Reflexive heap_preserved.
-    Proof.
+    Proof using Type.
       unfold Reflexive.
       intros x.
       unfold heap_preserved.
@@ -5068,7 +5068,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
     Lemma exec_correct_fresh_provenance :
       forall pre, exec_correct pre fresh_provenance fresh_provenance.
-    Proof.
+    Proof using Type.
       red.
       intros pre ms st H PRE.
       right.
@@ -5501,7 +5501,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         exec_correct pre
                      (re_sid_ubytes_helper bytes nm)
                      (re_sid_ubytes_helper bytes nm).
-    Proof.
+    Proof using Type.
       intros bytes.
       induction bytes using length_strong_ind; intros pre nm.
       - apply exec_correct_ret.
@@ -5528,7 +5528,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         exec_correct pre
                      (trywith_error msg1 ma)
                      (trywith_error msg2 ma).
-    Proof.
+    Proof using Type.
       intros A msg1 msg2 [a |] pre;
         unfold trywith_error;
         auto with EXEC_CORRECT.
@@ -5539,7 +5539,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma exec_correct_re_sid_ubytes :
       forall bytes pre,
         exec_correct pre (re_sid_ubytes bytes) (re_sid_ubytes bytes).
-    Proof.
+    Proof using Type.
       intros bytes pre.
       apply exec_correct_bind; auto with EXEC_CORRECT.
     Qed.
@@ -5551,7 +5551,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         (BASE: forall dt, dtyp_measure dt = 1 -> P dt)
         (IH: forall (n : nat) (dt: dtyp), (forall (dt : dtyp), dtyp_measure dt <= n -> P dt) -> dtyp_measure dt = S n -> P dt),
       forall dt, P dt.
-    Proof.
+    Proof using Type.
       intros P BASE IH.
       assert (forall n dt, dtyp_measure dt <= n -> P dt) as IHDT.
       { induction n using nat_strong_ind; intros dt SIZE.
@@ -5569,7 +5569,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma exec_correct_serialize_by_dtyp_undef :
       forall dt CTR pre,
         exec_correct pre (serialize_by_dtyp CTR dt) (serialize_by_dtyp CTR dt).
-    Proof.
+    Proof using Type.
       induction dt; intros;
         try solve [
             eapply exec_correct_bind; auto with EXEC_CORRECT
@@ -5594,7 +5594,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma exec_correct_serialize_sbytes_undef :
       forall dt t pre,
         exec_correct pre (serialize_sbytes (UVALUE_Undef t) dt) (serialize_sbytes (UVALUE_Undef t) dt).
-    Proof.
+    Proof using Type.
       intros.
       unfold serialize_sbytes.
       auto with EXEC_CORRECT.
@@ -5605,7 +5605,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma exec_correct_serialize_sbytes_poison :
       forall dt t pre,
         exec_correct pre (serialize_sbytes (UVALUE_Poison t) dt) (serialize_sbytes (UVALUE_Poison t) dt).
-    Proof.
+    Proof using Type.
       intros.
       unfold serialize_sbytes.
       auto with EXEC_CORRECT.
@@ -5616,7 +5616,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma exec_correct_serialize_sbytes_oom :
       forall dt t pre,
         exec_correct pre (serialize_sbytes (UVALUE_Oom t) dt) (serialize_sbytes (UVALUE_Oom t) dt).
-    Proof.
+    Proof using Type.
       intros.
       unfold serialize_sbytes.
       auto with EXEC_CORRECT.
@@ -5631,7 +5631,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         (pre : MemState -> ExtraState -> Prop) (l1 : list A) (l2: list B)
         (H : forall a, In a l1 -> forall b (pre : MemState -> ExtraState -> Prop), exec_correct pre (f a b) (f a b)),
         exec_correct pre (map_monad2 f l1 l2) (map_monad2 f l1 l2).
-    Proof.
+    Proof using Type.
       intros.
       revert pre l2 H.
       induction l1.
@@ -5656,7 +5656,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma exec_correct_serialize_sbytes :
       forall uv dt pre,
         exec_correct pre (serialize_sbytes uv dt) (serialize_sbytes uv dt).
-    Proof.
+    Proof using Type.
       induction uv; intros dt' pre;
         try solve [
             auto with EXEC_CORRECT 
@@ -5667,7 +5667,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma read_bytes_correct :
       forall len ptr pre,
         exec_correct pre (read_bytes ptr len) (read_bytes_spec ptr len).
-    Proof.
+    Proof using Type.
       unfold read_bytes.
       unfold read_bytes_spec.
       intros len ptr pre.
@@ -5683,7 +5683,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma read_uvalue_correct :
       forall dt ptr pre,
         exec_correct pre (read_uvalue dt ptr) (read_uvalue_spec dt ptr).
-    Proof.
+    Proof using Type.
       intros dt ptr pre.
       eapply exec_correct_bind.
       apply read_bytes_correct.
@@ -5694,7 +5694,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma write_bytes_correct :
       forall ptr bytes pre,
         exec_correct pre (write_bytes ptr bytes) (write_bytes_spec ptr bytes).
-    Proof.
+    Proof using Type.
       intros ptr bytes pre.
       apply exec_correct_bind.
       apply exec_correct_get_consecutive_pointers.
@@ -5707,7 +5707,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma write_uvalue_correct :
       forall dt ptr uv pre,
         exec_correct pre (write_uvalue dt ptr uv) (write_uvalue_spec dt ptr uv).
-    Proof.
+    Proof using Type.
       intros dt ptr uv pre.
       apply exec_correct_bind.
       apply exec_correct_serialize_sbytes.
@@ -5720,7 +5720,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         exec_correct pre
           (allocate_bytes bytes)
           (allocate_bytes_spec_MemPropT bytes).
-    Proof.
+    Proof using Type.
       intros dt num_elements pr pre.
       apply exec_correct_bind.
       apply exec_correct_fresh_provenance.
@@ -5736,7 +5736,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         exec_correct pre
           (repeatMN n m_exec)
           (repeatMN n m_spec).
-    Proof.
+    Proof using Type.
       intros A n.
       induction n using N.peano_rect; intros pre m_exec m_spec EXEC.
       - apply exec_correct_ret.
@@ -5754,7 +5754,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         exec_correct pre m_exec m_spec ->
         assertion ->
         exec_correct pre m_exec (MemPropT_assert_pre assertion;; m_spec).
-    Proof.
+    Proof using Type.
       intros A pre m_exec m_spec assertion EXEC ASSERTION.
       repeat red.
       intros ms st H H0.
@@ -5792,7 +5792,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma allocate_dtyp_correct :
       forall dt num_elements pre,
         exec_correct pre (allocate_dtyp dt num_elements) (allocate_dtyp_spec dt num_elements).
-    Proof.
+    Proof using Type.
       intros dt num_elements pre.
       destruct (dtyp_eqb dt DTYPE_Void) eqn:DT.
       { (* UB because of attempting to allocate a void type... *)
@@ -5836,7 +5836,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma memcpy_correct :
       forall src dst len volatile pre,
         exec_correct pre (memcpy src dst len volatile) (memcpy_spec src dst len volatile).
-    Proof.
+    Proof using Type.
       intros src dst len volatile pre.
       unfold memcpy, memcpy_spec.
       break_match; [apply exec_correct_raise_ub|].
@@ -5853,7 +5853,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma memset_correct :
       forall dst val len sid volatile pre,
         exec_correct pre (memset dst val len sid volatile) (memset_spec dst val len sid volatile).
-    Proof.
+    Proof using Type.
       intros dst val len sid volatile pre.
       unfold memset, memset_spec.
       break_match; [apply exec_correct_raise_ub|].
@@ -5870,7 +5870,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma handle_memory_correct :
       forall T (m : MemoryE T) pre,
         exec_correct pre (handle_memory T m) (handle_memory_prop T m).
-    Proof.
+    Proof using Type.
       intros T m pre.
       destruct m.
       - (* MemPush *)
@@ -5899,7 +5899,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma handle_memcpy_correct:
       forall args pre,
         exec_correct pre (handle_memcpy args) (handle_memcpy_prop args).
-    Proof.
+    Proof using Type.
       intros args.
       unfold handle_memcpy, handle_memcpy_prop.
       repeat (break_match; try apply exec_correct_raise_error).
@@ -5909,7 +5909,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma handle_memset_correct:
       forall args pre,
         exec_correct pre (handle_memset args) (handle_memset_prop args).
-    Proof.
+    Proof using Type.
       intros args.
       unfold handle_memset, handle_memset_prop.
       repeat (break_match; try apply exec_correct_raise_error).
@@ -5930,7 +5930,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma malloc_bytes_correct :
       forall bytes pre,
         exec_correct pre (malloc_bytes bytes) (malloc_bytes_spec_MemPropT bytes).
-    Proof.
+    Proof using Type.
       intros bytes pre.
       apply exec_correct_bind.
       apply exec_correct_fresh_provenance.
@@ -5943,7 +5943,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma handle_malloc_correct:
       forall args pre,
         exec_correct pre (handle_malloc args) (handle_malloc_prop args).
-    Proof.
+    Proof using Type.
       intros args.
       unfold handle_malloc, handle_malloc_prop.
       repeat (break_match; try apply exec_correct_raise_error).
@@ -5953,7 +5953,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma handle_free_correct:
       forall args pre,
         exec_correct pre (handle_free args) (handle_free_prop args).
-    Proof.
+    Proof using Type.
       intros args pre.
       unfold handle_free, handle_free_prop.
       repeat (break_match; try apply exec_correct_raise_error).
@@ -5963,7 +5963,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma handle_intrinsic_correct:
       forall T (e : IntrinsicE T) pre,
         exec_correct pre (handle_intrinsic T e) (handle_intrinsic_prop T e).
-    Proof.
+    Proof using Type.
       intros T e pre.
       unfold handle_intrinsic, handle_intrinsic_prop.
       break_match.

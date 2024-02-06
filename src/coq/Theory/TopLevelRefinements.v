@@ -82,11 +82,11 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (** BEGIN TO MOVE *)
   Lemma subrelation_R_TT:
     forall A (R : relation A), subrelation R TT.
-  Proof. firstorder. Qed.
+  Proof using. firstorder. Qed.
 
   Lemma subrelation_prod_left :
     forall A B (R R' : relation A) (R2 : relation B), subrelation R R' -> subrelation (R × R2) (R' × R2).
-  Proof.
+  Proof using.
     intros A B R R' R2 H.
     unfold subrelation in *.
     intros x y HRR2.
@@ -96,7 +96,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Lemma eutt_tt_to_eq_prod :
     forall X R (RR : relation R) E (t1 t2 : itree E (X * R)),
       eutt (eq × RR) t1 t2 -> eutt (TT × RR) t1 t2.
-  Proof.
+  Proof using.
     intros X R RR E t1 t2 Heutt.
     unfold eutt.
     apply (eqit_mon (eq × RR) (TT × RR) true true true true); trivial.
@@ -108,7 +108,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Lemma alist_find_eq_dec_local_env :
     forall k (m1 m2 : local_env),
       {m2 @ k = m1 @ k} + {m2 @ k <> m1 @ k}.
-  Proof.
+  Proof using.
     intros; eapply alist_find_eq_dec.
   Qed.
 
@@ -116,7 +116,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   #[global] Instance interp_state_proper {T E F S}
    (h: forall T : Type, E T -> Monads.stateT S (itree F) T)
     : Proper (eutt Logic.eq ==> Monad.eq1) (State.interp_state h (T := T)).
-  Proof.
+  Proof using.
     einit. ecofix CIH. intros.
 
     rewrite !unfold_interp_state. punfold H0. red in H0.
@@ -133,7 +133,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   #[export] Hint Unfold TT : core.
   Instance TT_equiv :
     forall A, Equivalence (@TT A).
-  Proof.
+  Proof using.
     intros A; split; repeat intro; auto.
   Qed.
 
@@ -151,21 +151,21 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
      *)
     Lemma refine_01: forall t1 t2 g,
         refine_L0 t1 t2 -> refine_L1 (interp_global t1 g) (interp_global t2 g).
-    Proof.
+    Proof using.
       intros t1 t2 g REF.
       apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
     Qed.
 
     Lemma refine_12 : forall t1 t2 l,
         refine_L1 t1 t2 -> refine_L2 (interp_local_stack t1 l) (interp_local_stack t2 l).
-    Proof.
+    Proof using.
       intros t1 t2 l REF.
       apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
     Qed.
 
     Lemma refine_23 : forall t1 t2 sid m,
         refine_L2 t1 t2 -> refine_L3 (interp_memory_prop refine_res2 t1 sid m) (interp_memory_prop refine_res2 t2 sid m).
-    Proof.
+    Proof using.
       intros t1 t2 sid ms REF t Ht.
       exists t; split.
       - unfold L3 in *.
@@ -178,7 +178,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     (* Things are different for L4 and L5: we get into the [Prop] monad. *)
     Lemma refine_34 : forall t1 t2,
         refine_L3 t1 t2 -> refine_L4 (model_undef refine_res3 t1) (model_undef refine_res3 t2).
-    Proof.
+    Proof using.
       intros t1 t2 REF t Ht.
       exists t; split.
       - unfold model_undef in *.
@@ -193,7 +193,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Lemma refine_45 : forall Pt1 Pt2,
         refine_L4 Pt1 Pt2 -> refine_L5 (model_UB Pt1) (model_UB Pt2).
-    Proof.
+    Proof using.
       intros Pt1 Pt2 HR t2 HM.
       destruct HM as [Pt2_t2 | [ub [Pt2_ub UB]]].
       - specialize (HR t2 Pt2_t2) as [t1 [Pt1_t1 EQ]].
@@ -209,7 +209,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Lemma refine_56 : forall Pt1 Pt2,
         refine_L5 Pt1 Pt2 -> refine_L6 Pt1 Pt2.
-    Proof.
+    Proof using.
       intros Pt1 Pt2 HR t2 HM.
       apply HR in HM as (t1 & HPt1 & HPT1);
         exists t1; split; auto;
@@ -296,42 +296,42 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
      *)
     Lemma refine_mcfg_L1_correct: forall p1 p2,
         refine_mcfg_L1 p1 p2 -> refine_mcfg p1 p2.
-    Proof.
+    Proof using.
       intros p1 p2 HR;
         solve_refine.
     Qed.
 
     Lemma refine_mcfg_L2_correct: forall p1 p2,
         refine_mcfg_L2 p1 p2 -> refine_mcfg p1 p2.
-    Proof.
+    Proof using.
       intros p1 p2 HR;
         solve_refine.
     Qed.
 
     Lemma refine_mcfg_L3_correct: forall p1 p2,
         refine_mcfg_L3 p1 p2 -> refine_mcfg p1 p2.
-    Proof.
+    Proof using.
       intros p1 p2 HR;
         solve_refine.
     Qed.
 
     Lemma refine_mcfg_L4_correct: forall p1 p2,
         refine_mcfg_L4 p1 p2 -> refine_mcfg p1 p2.
-    Proof.
+    Proof using.
       intros p1 p2 HR;
         solve_refine.
     Qed.
 
     Lemma refine_mcfg_L5_correct: forall p1 p2,
         refine_mcfg_L5 p1 p2 -> refine_mcfg p1 p2.
-    Proof.
+    Proof using.
       intros p1 p2 HR;
         solve_refine.
     Qed.
 
     Lemma refine_mcfg_L6_correct: forall p1 p2,
         refine_mcfg_L6 p1 p2 -> refine_mcfg p1 p2.
-    Proof.
+    Proof using.
       intros p1 p2 HR;
         solve_refine.
     Qed.
@@ -356,7 +356,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     From Coq Require Import Program.Equality.
 
     #[global] Instance Proper_E_trigger_prop E F T : Proper (eq ==> (eutt eq) ==> iff) (@E_trigger_prop E F T).
-    Proof.
+    Proof using.
       repeat red; intros.
       split; intros; unfold E_trigger_prop in *.
       - rewrite <- H0. rewrite <- H. assumption.
@@ -364,7 +364,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Qed.
     
     #[global] Instance Proper_F_trigger_prop E F T : Proper (eq ==> (eutt eq) ==> iff) (@F_trigger_prop E F T).
-    Proof.
+    Proof using.
       repeat red; intros.
       split; intros; unfold F_trigger_prop in *.
       - rewrite <- H0. rewrite <- H. assumption.
@@ -372,7 +372,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Qed.
 
     #[global] Instance ProperPickUvalue_handler E T `{FailureE -< E} `{UBE -< E} `{OOME -< E} :  Proper (eq ==> (eutt eq) ==> iff) (@PickUvalue_handler E _ _ _ T).
-    Proof.
+    Proof using.
       repeat red; intros.
       split; intros.
       - inversion H4.
@@ -456,7 +456,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                  (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 UBE F E H)
                  (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 OOME F E H1))
               (@F_trigger_prop E F)) A e).
-    Proof.
+    Proof using.
       repeat red.
       intros.
       destruct e; simpl in *.
@@ -480,7 +480,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
             | inr (inr (inr x)) => ret x
             end
         end.
-    Proof.
+    Proof using.
       intros E OOM FAIL UB.
       induction u; unfold concretize_uvalue at 2; rewrite concretize_uvalueM_equation; 
         try solve [unfold concretize_uvalue; rewrite concretize_uvalueM_equation; reflexivity].
@@ -521,7 +521,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Lemma PickUvalue_handler_correct :
       forall E `{FailureE -< E} `{UBE -< E} `{OOME -< E},
         handler_correct (@PickUvalue_handler E _ _ _) concretize_picks.
-    Proof.
+    Proof using.
       unfold handler_correct.
       intros * EQ.
       destruct e as [uv | uv | uv];
@@ -634,7 +634,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       : forall (E F:Type -> Type) T TT (HR: Reflexive TT)  `{UBE -< F} `{FailureE -< F} `{OOME -< F}
                (xs : PropT _ T),
         forall x, xs x -> model_undef TT xs (@exec_undef E F _ _ _ _ x).
-    Proof.
+    Proof using.
       intros E F T TT REL UB FAIL OOM xs x XS.
       unfold model_undef.
       unfold exec_undef.
@@ -653,7 +653,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           (xs : PropT (E +' F +' UBE +' G) T) x,
         xs x ->
         model_UB xs x.
-    Proof.
+    Proof using.
       intros E F G T xs x XS.
       red.
       left; auto.
@@ -666,7 +666,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
      *)
     Theorem interpreter_sound: forall p,
         refine_L6 (model p) (build_singleton (interpreter p)).
-    Proof.
+    Proof using.
       intros p.
       intros ? [].
       exists (interpreter p).
@@ -692,7 +692,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     forall {R S} (t: itree L0 R) (k: R -> itree L0 S) s1 s2,
       ℑs2 (ITree.bind t k) s1 s2 ≈
           (ITree.bind (ℑs2 t s1 s2) (fun '(s1',(s2',x)) => ℑs2 (k x) s2' s1')).
-  Proof.
+  Proof using.
     intros.
     unfold ℑs2.
     rewrite interp_intrinsics_bind, interp_global_bind, interp_local_stack_bind.
@@ -702,7 +702,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Lemma interp2_ret:
     forall (R : Type) s1 s2 (x : R),
       ℑs2 (Ret x) s1 s2 ≈ Ret (s2, (s1, x)).
-  Proof.
+  Proof using.
     intros; unfold ℑs2.
     rewrite interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret; reflexivity.
   Qed.

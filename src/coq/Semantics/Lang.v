@@ -1,5 +1,6 @@
 From Vellvm Require Import
      Semantics.Memory.MemBytes
+     Semantics.Memory.DvalueBytes
      Semantics.LLVMParams
      Semantics.GepM
      Semantics.Denotation
@@ -16,8 +17,9 @@ From Vellvm Require Import
 
     Declare Module GEP  : GEPM ADDR PTOI PROV ITOP IP SIZEOF Events.
     Declare Module Byte : ByteImpl ADDR IP SIZEOF Events.
+    Declare Module DVALUE_BYTE : DvalueByte LP.
 
-    Module MP := MemoryParams.Make LP GEP Byte.
+    Module MP := MemoryParams.Make LP GEP Byte DVALUE_BYTE.
 
     Declare Module MMEP : MemoryModelExecPrimitives LP MP.
     Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.
@@ -28,7 +30,7 @@ From Vellvm Require Import
     Module ByteM := MemBytes.Byte ADDR IP SIZEOF LP.Events MP.BYTE_IMPL.
     Module CP := ConcretizationParams.Make LP MP ByteM.
 
-    Export GEP Byte MP MEM_MODEL CP.
+    Export GEP Byte DVALUE_BYTE MP MEM_MODEL CP.
   End Memory.
 
   Module Type Lang (LP: LLVMParams).

@@ -149,7 +149,7 @@ Section Sum.
   Lemma SumFails_SumReturns :
     forall {A} (ma : sum E A),
       SumFails ma -> forall a, ~ SumReturns a ma.
-  Proof.
+  Proof using.
     intros A ma H a.
     destruct H as (e & FAILS).
     subst.
@@ -159,7 +159,7 @@ Section Sum.
   Lemma SumReturns_SumFails :
     forall {A} (ma : sum E A) (a : A),
       SumReturns a ma -> ~ SumFails ma.
-  Proof.
+  Proof using.
     intros A ma a H.
     inversion H; subst.
     intros CONTRA; inversion CONTRA.
@@ -169,7 +169,7 @@ Section Sum.
   Lemma SumFails_ret :
     forall {A} (a : A),
       ~SumFails (ret a).
-  Proof.
+  Proof using.
     intros A a.
     intros FAILS.
     inversion FAILS.
@@ -178,7 +178,7 @@ Section Sum.
 
   Lemma SumFails_bind_ma : forall {A B} (ma : sum E A) (k : A -> sum E B),
       SumFails ma -> SumFails (bind ma k).
-  Proof.
+  Proof using.
     intros A B ma k FAILS.
     inversion FAILS; subst.
     cbn.
@@ -190,7 +190,7 @@ Section Sum.
       SumReturns a ma ->
       SumFails (k a) ->
       SumFails (bind ma k).
-  Proof.
+  Proof using.
     intros A B ma a k RETS FAILS.
     inversion FAILS;
       inversion RETS;
@@ -203,7 +203,7 @@ Section Sum.
   Lemma SumFails_bind_inv : forall {A B} (ma : sum E A) (k : A -> sum E B),
       SumFails (bind ma k) ->
       SumFails ma \/ (exists a, SumReturns a ma /\ SumFails (k a)).
-  Proof.
+  Proof using.
     intros A B ma k FAILS.
     inversion FAILS.
     destruct ma; cbn in *; inversion H; subst.
@@ -216,7 +216,7 @@ Section Sum.
   Lemma SumReturns_bind :
     forall {A B} (a : A) (b : B) (ma : sum E A) (k : A -> sum E B),
       SumReturns a ma -> SumReturns b (k a) -> SumReturns b (bind ma k).
-  Proof.
+  Proof using.
     intros * Ha Hb.
     unfold SumReturns in *.
     subst.
@@ -226,7 +226,7 @@ Section Sum.
   Lemma SumReturns_strong_bind_inv :
     forall {A B} (ma : sum E A) (k : A -> sum E B) (b : B),
       SumReturns b (bind ma k) -> exists a : A , SumReturns a ma /\ SumReturns b (k a).
-  Proof.
+  Proof using.
     intros * Hb.
     unfold SumReturns in *.
     destruct ma; inversion Hb.
@@ -237,7 +237,7 @@ Section Sum.
   Lemma SumReturns_bind_inv :
     forall {A B} (ma : sum E A) (k : A -> sum E B) (b : B),
       SumReturns b (bind ma k) -> (SumFails ma \/ exists a : A , SumReturns a ma /\ SumReturns b (k a)).
-  Proof.
+  Proof using.
     intros * Hb.
     right. apply SumReturns_strong_bind_inv; auto.
   Qed.
@@ -245,9 +245,9 @@ Section Sum.
   Lemma SumReturns_ret :
     forall {A} (a : A) (ma : sum E A),
       eq1 ma (ret a) -> SumReturns a ma.
-  Proof.
+  Proof using.
     intros * H.
-    cbn in *.    
+    cbn in *.
     unfold SumReturns.
     do 2 red in H.
     auto.
@@ -256,7 +256,7 @@ Section Sum.
   Lemma SumReturns_ret_inv :
     forall {A} (x y : A),
       SumReturns x (ret y) -> x = y.
-  Proof.
+  Proof using.
     intros * H.
     unfold SumReturns in H.
     inversion H; auto.
@@ -264,7 +264,7 @@ Section Sum.
 
   #[global] Instance SumReturns_ProperIff : forall {A} (a : A),
       Proper (eq1 ==> iff) (SumReturns a).
-  Proof.
+  Proof using.
     intros A a.
     unfold Proper, respectful.
     intros x y H.
@@ -273,7 +273,7 @@ Section Sum.
 
   #[global] Instance SumReturns_Proper : forall {A} (a : A),
       Proper (eq1 ==> Basics.impl) (SumReturns a).
-  Proof.
+  Proof using.
     intros A a.
     unfold Proper, respectful.
     intros x y H.
@@ -282,7 +282,7 @@ Section Sum.
 
   #[global] Instance SumReturns_ProperFlip : forall {A} (a : A),
       Proper (eq1 ==> fun A B => Basics.impl B A) (SumReturns a).
-  Proof.
+  Proof using.
     intros A a.
     unfold Proper, respectful.
     intros x y H.
@@ -312,8 +312,8 @@ Section Sum.
 
   Global Program Instance MonadReturns_Sum_ProperFlip : MonadReturns_ProperFlip (sum E)
     := { MReturns_ProperFlip := _ }.
-    
-  
+
+
   Global Instance MonadReturns_Sum_Fails : MonadReturnsFails (sum E)
     := { MReturns_MFails := fun A => SumReturns_SumFails;
          MFails_MReturns := fun A => SumFails_SumReturns
@@ -323,7 +323,7 @@ Section Sum.
     := {  MReturns_strong_bind_inv := fun A B => SumReturns_strong_bind_inv }.
 
   Global Instance NoFailsRet_Sum : NoFailsRet (sum E).
-  Proof.
+  Proof using.
     split.
     intros A a ma H.
     destruct ma; inversion H; subst.
@@ -347,7 +347,7 @@ Section Ident.
   Lemma IdentFails_IdentReturns :
     forall {A} (ma : ident A),
       IdentFails ma -> forall a, ~ IdentReturns a ma.
-  Proof.
+  Proof using.
     intros A ma FAILS a.
     unfold IdentFails in FAILS.
     intros CONTRA.
@@ -357,7 +357,7 @@ Section Ident.
   Lemma IdentReturns_IdentFails :
     forall {A} (ma : ident A) (a : A),
       IdentReturns a ma -> ~ IdentFails ma.
-  Proof.
+  Proof using.
     intros A ma a RETS.
     auto.
   Qed.
@@ -365,14 +365,14 @@ Section Ident.
   Lemma IdentFails_ret :
     forall {A} (a : A),
       ~ IdentFails (ret a).
-  Proof.
+  Proof using.
     intros A a.
     auto.
   Qed.
 
   Lemma IdentFails_bind_ma : forall {A B} (ma : ident A) (k : A -> ident B),
       IdentFails ma -> IdentFails (bind ma k).
-  Proof.
+  Proof using.
     intros A B ma k FAILS.
     inversion FAILS.
   Qed.
@@ -381,7 +381,7 @@ Section Ident.
       IdentReturns a ma ->
       IdentFails (k a) ->
       IdentFails (bind ma k).
-  Proof.
+  Proof using.
     intros A B ma a k RETS FAILS.
     inversion FAILS.
   Qed.
@@ -389,7 +389,7 @@ Section Ident.
   Lemma IdentFails_bind_inv : forall {A B} (ma : ident A) (k : A -> ident B),
       IdentFails (bind ma k) ->
       IdentFails ma \/ (exists a, IdentReturns a ma /\ IdentFails (k a)).
-  Proof.
+  Proof using.
     intros A B ma k FAILS.
     inversion FAILS.
   Qed.
@@ -397,7 +397,7 @@ Section Ident.
   Lemma IdentReturns_bind :
     forall {A B} (a : A) (b : B) (ma : ident A) (k : A -> ident B),
       IdentReturns a ma -> IdentReturns b (k a) -> IdentReturns b (bind ma k).
-  Proof.
+  Proof using.
     intros * Ha Hb.
     destruct ma as [a'].
     inversion Ha; subst.
@@ -412,7 +412,7 @@ Section Ident.
   Lemma IdentReturns_strong_bind_inv :
     forall {A B} (ma : ident A) (k : A -> ident B) (b : B),
       IdentReturns b (bind ma k) -> exists a : A , IdentReturns a ma /\ IdentReturns b (k a).
-  Proof.
+  Proof using.
     intros * Hb.
     unfold IdentReturns in *.
     destruct ma as [a]; cbn in *.
@@ -422,7 +422,7 @@ Section Ident.
   Lemma IdentReturns_bind_inv :
     forall {A B} (ma : ident A) (k : A -> ident B) (b : B),
       IdentReturns b (bind ma k) -> (IdentFails ma \/ exists a : A , IdentReturns a ma /\ IdentReturns b (k a)).
-  Proof.
+  Proof using.
     intros * Hb.
     right; apply IdentReturns_strong_bind_inv; auto.
   Qed.
@@ -430,7 +430,7 @@ Section Ident.
   Lemma IdentReturns_ret :
     forall {A} (a : A) (ma : ident A),
       eq1 ma (ret a) -> IdentReturns a ma.
-  Proof.
+  Proof using.
     intros * Hma.
     destruct ma as [a'].
     inversion Hma; subst; cbn;
@@ -440,7 +440,7 @@ Section Ident.
   Lemma IdentReturns_ret_inv :
     forall {A} (x y : A),
       IdentReturns x (ret y) -> x = y.
-  Proof.
+  Proof using.
     intros * H.
     unfold IdentReturns in H.
     cbn in H.
@@ -449,7 +449,7 @@ Section Ident.
 
   #[global] Instance IdentReturns_Proper : forall {A} (a : A),
       Proper (eq1 ==> Basics.impl) (IdentReturns a).
-  Proof.
+  Proof using.
     intros A a.
     unfold Proper, respectful.
     intros x y H.
@@ -460,7 +460,7 @@ Section Ident.
 
   #[global] Instance IdentReturns_ProperFlip : forall {A} (a : A),
       Proper (eq1 ==> fun A B => Basics.impl B A) (IdentReturns a).
-  Proof.
+  Proof using.
     intros A a.
     unfold Proper, respectful.
     intros x y H.
@@ -492,7 +492,7 @@ Section Ident.
 
 
   Global Instance NoFailsRet_Ident : NoFailsRet (ident).
-  Proof.
+  Proof using.
     split.
     intros A a ma H.
     auto.
@@ -521,7 +521,7 @@ Section EitherT.
   Lemma EitherTFails_EitherTReturns :
     forall {A} (ma : eitherT E M A),
       EitherTFails ma -> forall a, ~ EitherTReturns a ma.
-  Proof.
+  Proof using E EQM HM M MRET MRETF.
     intros A ma FAILS a.
     unfold EitherTFails in FAILS.
     intros CONTRA.
@@ -534,7 +534,7 @@ Section EitherT.
   Lemma EitherTReturns_EitherTFails :
     forall {A} (ma : eitherT E M A) (a : A),
       EitherTReturns a ma -> ~ EitherTFails ma.
-  Proof.
+  Proof using E EQM HM M MRET MRETF.
     intros A ma a RETS.
     unfold EitherTReturns, EitherTFails in *.
     eapply MReturns_MFails; eauto.
@@ -543,7 +543,7 @@ Section EitherT.
   Lemma EitherTFails_ret :
     forall {A} (a : A),
       ~ EitherTFails (ret a).
-  Proof.
+  Proof using.
     intros A a.
     unfold EitherTFails.
     apply MFails_ret.
@@ -551,7 +551,7 @@ Section EitherT.
 
   Lemma EitherTFails_bind_ma : forall {A B} (ma : eitherT E M A) (k : A -> eitherT E M B),
       EitherTFails ma -> EitherTFails (bind ma k).
-  Proof.
+  Proof using.
     intros A B ma k FAILS.
     apply MFails_bind_ma; eauto.
   Qed.
@@ -560,7 +560,7 @@ Section EitherT.
       EitherTReturns a ma ->
       EitherTFails (k a) ->
       EitherTFails (bind ma k).
-  Proof.
+  Proof using.
     intros A B ma a k RETS FAILS.
     eapply MFails_bind_k; eauto.
   Qed.
@@ -568,7 +568,7 @@ Section EitherT.
   Lemma EitherTFails_bind_inv : forall {A B} (ma : eitherT E M A) (k : A -> eitherT E M B),
       EitherTFails (bind ma k) ->
       EitherTFails ma \/ (exists a, EitherTReturns a ma /\ EitherTFails (k a)).
-  Proof.
+  Proof using.
     intros A B ma k FAILS.
     apply MFails_bind_inv in FAILS as [FAILS | ([e | a] & RETS & FAILS)].
     - left; eauto.
@@ -580,7 +580,7 @@ Section EitherT.
   Lemma EitherTReturns_bind :
     forall {A B} (a : A) (b : B) (ma : eitherT E M A) (k : A -> eitherT E M B),
       EitherTReturns a ma -> EitherTReturns b (k a) -> EitherTReturns b (bind ma k).
-  Proof.
+  Proof using.
     intros * Ha Hb.
     eapply MReturns_bind; eauto.
   Qed.
@@ -588,7 +588,7 @@ Section EitherT.
   Lemma EitherTReturns_strong_bind_inv :
     forall {A B} (ma : eitherT E M A) (k : A -> eitherT E M B) (b : B),
       EitherTReturns b (bind ma k) -> exists a : A , EitherTReturns a ma /\ EitherTReturns b (k a).
-  Proof.
+  Proof using E EQM HM M MRET MRETSTR.
     intros * Hb.
     unfold EitherTReturns in *.
     eapply MReturns_strong_bind_inv in Hb as (ea & Ha & Hb).
@@ -601,7 +601,7 @@ Section EitherT.
   Lemma EitherTReturns_bind_inv :
     forall {A B} (ma : eitherT E M A) (k : A -> eitherT E M B) (b : B),
       EitherTReturns b (bind ma k) -> (EitherTFails ma \/ exists a : A , EitherTReturns a ma /\ EitherTReturns b (k a)).
-  Proof.
+  Proof using.
     intros * Hb.
     unfold EitherTReturns in *.
     eapply MReturns_bind_inv in Hb as [fails | (ea & Ha & Hb)].
@@ -615,7 +615,7 @@ Section EitherT.
   Lemma EitherTReturns_ret :
     forall {A} (a : A) (ma : eitherT E M A),
       eq1 ma (ret a) -> EitherTReturns a ma.
-  Proof.
+  Proof using.
     intros * Hma.
     eapply MReturns_ret; eauto.
   Qed.
@@ -623,19 +623,19 @@ Section EitherT.
   Lemma EitherTReturns_ret_inv :
     forall {A} (x y : A),
       EitherTReturns x (ret y) -> x = y.
-  Proof.
+  Proof using E EQM EQV HM M MRET.
     intros * H.
     unfold EitherTReturns in H.
     eapply MReturns_ret_inv; eauto.
     eapply MReturns_ret_inv in H.
     inversion H.
-    apply MReturns_ret. 
+    apply MReturns_ret.
     reflexivity.
   Qed.
 
   #[global] Instance EitherTReturns_Proper : forall {A} (a : A),
       Proper ((fun x y => eq1 y x) ==> Basics.impl) (EitherTReturns a).
-  Proof.
+  Proof using E EQM HM M MRET MRETP.
     intros A a.
     unfold Proper, respectful.
     intros x y H.
@@ -645,7 +645,7 @@ Section EitherT.
 
   #[global] Instance EitherTReturns_ProperFlip : forall {A} (a : A),
       Proper (eq1 ==> Basics.impl) (EitherTReturns a).
-  Proof.
+  Proof using E EQM EQV HM M MRET MRETP.
     intros A a.
     unfold Proper, respectful.
     intros x y H.
@@ -677,7 +677,7 @@ Section EitherT.
     := {  MReturns_strong_bind_inv := fun A B => EitherTReturns_strong_bind_inv }.
 
   Global Instance NoFailsRet_EitherT `{NFR : @NoFailsRet M HM EQM MRET} : NoFailsRet (eitherT E M).
-  Proof.
+  Proof using.
     split.
     intros A a ma H.
     destruct ma.
@@ -714,7 +714,7 @@ Section StateT.
   (* Lemma StateTReturns_bind : *)
   (*   forall {A B} (s sa sb : S) (a : A) (b : B) (ma : stateT S M A) (k : A -> stateT S M B), *)
   (*     @StateTReturns A s sa a ma -> @StateTReturns B sa sb b (k a) -> @StateTReturns B s sb b (bind ma k). *)
-  (* Proof. *)
+  (* Proof using. *)
   (*   intros * Ha Hb. *)
   (*   unfold StateTReturns in *. *)
   (*   cbn in *. *)
@@ -739,7 +739,7 @@ Section StateT.
   Lemma StateTReturns_strong_bind_inv :
     forall {A B} (ma : stateT S M A) (k : A -> stateT S M B) (b : B),
       (forall s, exists sb, MReturns (b, sb) (runStateT (bind ma k) s)) -> forall s, exists (sa : S) (sb : S) (a : A), MReturns (a, sa) (runStateT ma s) /\ MReturns (b, sb) (runStateT (k a) sa).
-  Proof.
+  Proof using EQM EQV HM M MRET MRETSTR S.
     intros A B ma k b H s.
 
     specialize (H s) as (sb & RET).
@@ -760,7 +760,7 @@ Section StateT.
   (* Lemma StateTReturns_ret : *)
   (*   forall {A} (a : A) (ma : stateT S M A), *)
   (*     eq1 ma (ret a) -> StateTReturns a ma. *)
-  (* Proof. *)
+  (* Proof using. *)
   (*   intros * Hma. *)
   (*   eapply MReturns_ret; eauto. *)
   (* Qed. *)
@@ -768,7 +768,7 @@ Section StateT.
   (* Lemma StateTReturns_ret_inv : *)
   (*   forall {A} (x y : A), *)
   (*     StateTReturns x (ret y) -> x = y. *)
-  (* Proof. *)
+  (* Proof using. *)
   (*   intros * H. *)
   (*   unfold StateTReturns in H. *)
   (*   eapply MReturns_ret_inv; eauto. *)
@@ -787,4 +787,3 @@ Section StateT.
   (*      }. *)
 
 End StateT.
-

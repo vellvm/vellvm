@@ -76,7 +76,7 @@ Section Locals.
         forall (R S : Type) (t : itree Effin R) (k : R -> itree Effin S) s,
           interp_local (ITree.bind t k) s ≅
                        ITree.bind (interp_local t s) (fun '(s',r) => interp_local (k r) s').
-      Proof.
+      Proof using.
         intros.
         unfold interp_local.
         setoid_rewrite interp_state_bind.
@@ -88,14 +88,14 @@ Section Locals.
       Lemma interp_local_ret :
         forall (R : Type) l (x: R),
           interp_local (Ret x: itree Effin R) l ≅ Ret (l,x).
-      Proof.
+      Proof using.
         intros; apply interp_state_ret.
       Qed.
 
       Lemma interp_local_Tau :
         forall {R} (t: itree Effin R) l,
           interp_local (Tau t) l ≅ Tau (interp_local t l).
-      Proof.
+      Proof using.
         intros.
         unfold interp_local; rewrite interp_state_tau; reflexivity.
       Qed.
@@ -105,7 +105,7 @@ Section Locals.
           (kk : X -> itree Effin S)
           (e : Effin X),
           interp_local (Vis e kk) g ≅ ITree.bind (interp_local_h e g) (fun (sx : map * X) => Tau (interp_local (kk (snd sx)) (fst sx))).
-      Proof.
+      Proof using.
         intros.
         unfold interp_local.
         setoid_rewrite interp_state_vis.
@@ -115,7 +115,7 @@ Section Locals.
       Lemma interp_local_vis:
         forall (g : map) S X (kk : X -> itree Effin S) (e : Effin X),
           interp_local (Vis e kk) g ≈ ITree.bind (interp_local_h e g) (fun (sx : map * X) => interp_local (kk (snd sx)) (fst sx)).
-      Proof.
+      Proof using.
         intros.
         rewrite interp_local_vis_eqit.
         apply eutt_eq_bind.
@@ -125,7 +125,7 @@ Section Locals.
       Lemma interp_local_trigger:
         forall (g : map) X (e : Effin X),
           interp_local (ITree.trigger e) g ≈ interp_local_h e g.
-      Proof.
+      Proof using.
         intros.
         unfold interp_local.
         rewrite interp_state_trigger.
@@ -135,7 +135,7 @@ Section Locals.
       Lemma interp_local_bind_trigger_eqit:
         forall (g : map) S X (kk : X -> itree Effin S) (e : Effin X),
           interp_local (ITree.bind (trigger e) kk) g ≅ ITree.bind (interp_local_h e g) (fun (sx : map * X) => Tau (interp_local (kk (snd sx)) (fst sx))).
-      Proof.
+      Proof using.
         intros.
         unfold interp_local.
         rewrite bind_trigger.
@@ -146,7 +146,7 @@ Section Locals.
       Lemma interp_local_trigger_bind:
         forall (g : map) S X (kk : X -> itree Effin S) (e : Effin X),
           interp_local (ITree.bind (trigger e) kk) g ≈ ITree.bind (interp_local_h e g) (fun (sx : map * X) => interp_local (kk (snd sx)) (fst sx)).
-      Proof.
+      Proof using.
         intros.
         rewrite interp_local_bind_trigger_eqit.
         apply eutt_eq_bind.

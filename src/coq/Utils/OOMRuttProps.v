@@ -25,7 +25,7 @@ Lemma orutt_trigger {E1 E2 OOM : Type -> Type} {OOME : OOM -< E2} {R1 R2} {REv :
   (forall t1 t2, (RAns _ _ e1 t1 e2 t2: Prop) -> (RR t1 t2: Prop)) ->
   (forall o : OOM R2, e2 <> subevent _ o) ->
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR (trigger e1) (trigger e2).
-Proof.
+Proof using.
   intros. apply orutt_Vis; auto.
   intros. apply orutt_Ret; auto.
 Qed.
@@ -39,7 +39,7 @@ Definition eq_REv {E1 E2: Type -> Type} (REv1 REv2: forall A B, E1 A -> E2 B -> 
   forall A B, eq_rel (REv1 A B) (REv2 A B).
 
 #[global] Instance eq_REv_Equivalence {E1 E2}: Equivalence (@eq_REv E1 E2).
-Proof.
+Proof using.
   constructor.
   - red. red. reflexivity.
   - red. intros * H. red in H. red. now symmetry.
@@ -51,7 +51,7 @@ Definition flip_REv {E1 E2: Type -> Type} (REv1: forall A B, E1 A -> E2 B -> Pro
 
 Lemma flip_flip_REv {E1 E2} REv1:
   @eq_REv E1 E2 (flip_REv (flip_REv REv1)) REv1.
-Proof. reflexivity. Qed.
+Proof using. reflexivity. Qed.
 
 (* For RAns we want to defer to eq_rel, but for that we need to regroup events
    and their return values into pairs.
@@ -62,17 +62,17 @@ Definition RAns_pair E1 E2 (RAns: forall A B, E1 A -> A -> E2 B -> B -> Prop) {A
 
 Lemma RAns_pair_iff {E1 E2 A B} RAns1:
   forall e1 (a:A) e2 (b:B), RAns_pair E1 E2 RAns1 (e1,a) (e2,b) <-> RAns1 A B e1 a e2 b.
-Proof. reflexivity. Qed.
+Proof using. reflexivity. Qed.
 
 Definition eq_RAns {E1 E2} (RAns1 RAns2: forall A B, E1 A -> A -> E2 B -> B -> Prop) :=
   forall A B, eq_rel (@RAns_pair E1 E2 RAns1 A B) (@RAns_pair E1 E2 RAns2 A B).
 
 Lemma eq_RAns_iff {E1 E2} {RAns1 RAns2} (H: @eq_RAns E1 E2 RAns1 RAns2):
   forall A B e1 a e2 b, RAns2 A B e1 a e2 b <-> RAns1 A B e1 a e2 b.
-Proof. intros *. rewrite <- ! RAns_pair_iff. split; apply H. Qed.
+Proof using. intros *. rewrite <- ! RAns_pair_iff. split; apply H. Qed.
 
 #[global] Instance eq_RAns_Equivalence {E1 E2}: Equivalence (@eq_RAns E1 E2).
-Proof.
+Proof using.
   constructor.
   - red; red. reflexivity.
   - red; red. now symmetry.
@@ -84,16 +84,16 @@ Definition flip_RAns {E1 E2} (RAns: forall A B, E1 A -> A -> E2 B -> B -> Prop) 
 
 Lemma flip_RAns_iff {E1 E2 A B} RAns:
   forall e1 (a:A) e2 (b:B), @flip_RAns E1 E2 RAns B A e2 b e1 a <-> RAns _ _ e1 a e2 b.
-Proof. reflexivity. Qed.
+Proof using. reflexivity. Qed.
 
 Lemma flip_flip_RAns {E1 E2} (RAns: forall A B, E1 A -> A -> E2 B -> B -> Prop):
   eq_RAns (flip_RAns (flip_RAns RAns)) RAns.
-Proof. reflexivity. Qed.
+Proof using. reflexivity. Qed.
 
 (* (* This probably isn't true because OOM isn't symmetrical *) *)
 (* Lemma orutt_flip {E1 E2 OOM : Type -> Type} {OOME1 : OOM -< E1} {OOME2 : OOM -< E2} {R1 R2} {REv : prerel E1 E2} {RAns : postrel E1 E2} {RR : R1 -> R2 -> Prop} (t1: itree E1 R1) (t2: itree E2 R2): *)
 (*   @orutt E1 E2 OOM OOME2 R1 R2 REv RAns RR t1 t2 <-> @orutt E2 E1 OOM OOME1 R2 R1 (flip_REv REv) (flip_RAns RAns) (flip RR) t2 t1. *)
-(* Proof. *)
+(* Proof using. *)
 (*   split; revert t1 t2; pcofix CIH; intros t1 t2 Hrutt; *)
 (*   punfold Hrutt; red in Hrutt; pstep; red. *)
 (*   - induction Hrutt; try now constructor. *)
@@ -115,7 +115,7 @@ Proof. reflexivity. Qed.
       ==> eq             (* t1 *)
       ==> eq             (* t2 *)
       ==> iff) (@orutt E1 E2 OOM OOME R1 R2).
-Proof.
+Proof using.
   intros REv1 REv2 HREv  RAns1 RAns2 HRAns RR1 RR2 HRR t1 _ <- t2 _ <-.
   split; intros Hrutt.
 
@@ -152,7 +152,7 @@ Qed.
       ==> eq_itree eq    (* t1 *)
       ==> eq_itree eq    (* t2 *)
       ==> iff) (@orutt E1 E2 OOM OOME R1 R2).
-Proof.
+Proof using.
   clear. intros REv1 REv2 HREv RAns1 RAns2 HRAns RR1 RR2 HRR t1 t1' Ht1 t2 t2' Ht2.
   split; intros Horutt.
 
@@ -176,7 +176,7 @@ Lemma orutt_cong_eutt {E1 E2 OOM OOME R1 R2}:
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1 t2 ->
   t1 ≈ t1' ->
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1' t2.
-Proof.
+Proof using.
   (* First by coinduction; then do an induction on Horutt to expose the oruttF
      linking t1 and t2; then an induction on Heutt to expose the relation
      between t1 and t1'. Finally, explore oruttF until landing on an orutt where
@@ -261,7 +261,7 @@ Lemma orutt_cong_eutt2 {E1 E2 OOM OOME R1 R2}:
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1 t2 ->
   t2 ≈ t2' ->
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1 t2'.
-Proof.
+Proof using.
   (* First by coinduction; then do an induction on Horutt to expose the oruttF
      linking t1 and t2; then an induction on Heutt to expose the relation
      between t1 and t1'. Finally, explore oruttF until landing on an orutt where
@@ -356,7 +356,7 @@ Qed.
       ==> eutt eq        (* t1 *)
       ==> eutt eq        (* t2 *)
       ==> iff) (@orutt E1 E2 OOM OOME R1 R2).
-Proof.
+Proof using.
   intros REv REv2 HREv RAns RAns2 HRAns RR RR2 HRR t1 t1' Ht1 t2 t2' Ht2.
   rewrite <- HREv, <- HRAns, <- HRR; clear HREv REv2 HRAns RAns2 HRR RR2.
   split; intros Horutt.
@@ -388,7 +388,7 @@ Hint Constructors orutt_bind_clo: core.
 
 Lemma orutt_clo_bind :
   orutt_bind_clo <3= gupaco2 (@orutt_ E1 E2 OOM OOME R1 R2 REv RAns RR) (euttge_trans_clo RR).
-Proof.
+Proof using.
   intros rr. gcofix CIH. intros. destruct PR.
   gclo; econstructor; auto_ctrans_eq.
   1,2: rewrite unfold_bind; reflexivity.
@@ -419,7 +419,7 @@ Lemma orutt_bind {E1 E2 OOM OOME R1 R2 T1 T2}
       RR r1 r2 ->
       @orutt E1 E2 OOM OOME T1 T2 REv RAns RT (k1 r1) (k2 r2)) ->
     @orutt E1 E2 OOM OOME T1 T2 REv RAns RT (ITree.bind t1 k1) (ITree.bind t2 k2).
-Proof.
+Proof using.
   intros. ginit.
   (* For some reason [guclo] fails, apparently trying to infer the type in a
      context with less information? *)
@@ -441,7 +441,7 @@ Section OruttMrec.
   Lemma interp_mrec_orutt (R1 R2 : Type) (RR : R1 -> R2 -> Prop) : forall  (t1 : itree (D1 +' E1) R1) (t2 : itree (D2 +' E2) R2),
       @orutt _ _ OOM _ _ _ (sum_prerel RPreInv RPre) (sum_postrel RPostInv RPost) RR t1 t2 ->
       @orutt _ _ OOM _ _ _ RPre RPost RR (interp_mrec bodies1 t1) (interp_mrec bodies2 t2).
-  Proof.
+  Proof using D1 D2 E1 E2 Hbodies OOM OOME RPost RPostInv RPre RPreInv bodies1 bodies2.
     ginit. gcofix CIH.
     intros t1 t2 Ht12. punfold Ht12. red in Ht12.
     remember (observe t1) as ot1. remember (observe t2) as ot2.
@@ -482,7 +482,7 @@ Section OruttMrec.
     RPreInv A B d1 d2 ->
     @orutt _ _ OOM _ _ _ RPre RPost (fun (a : A) (b : B) => RPostInv A B d1 a d2 b)
          (mrec bodies1 d1) (mrec bodies2 d2).
-  Proof.
+  Proof using D1 D2 E1 E2 Hbodies OOM OOME RPost RPostInv RPre RPreInv bodies1 bodies2.
     intros. apply interp_mrec_orutt. auto.
   Qed.
 
@@ -493,7 +493,7 @@ Lemma rutt_orutt {E1 E2 OOM OOME R1 R2 REv RAns RR} (t1 : itree E1 R1) (t2 : itr
   rutt REv RAns RR t1 t2 ->
   (forall A (e2 : E2 A), {forall o : OOM A, e2 <> subevent _ o} + {exists o : OOM A, e2 = subevent _ o}) ->
   @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1 t2.
-Proof.
+Proof using.
   intros Hrutt.
   revert t1 t2 Hrutt; pcofix CIH; intros t1 t2 Hrutt DEC_OOM.
   pstep. punfold Hrutt. red in Hrutt; red.
@@ -542,7 +542,7 @@ Lemma orutt_weaken :
     (forall {A B} e1 r1 e2 r2, (POST2 A B e1 r1 e2 r2 -> POST1 _ _ e1 r1 e2 r2)) ->
     (forall r1 r2, (ResR1 r1 r2 -> ResR2 r1 r2)) ->
     orutt PRE2 POST2 ResR2 t1 t2 (OOM:=OOM).
-Proof.
+Proof using.
   intros E1 E2 OOM OOME R1 R2 PRE1 PRE2 POST1 POST2 ResR1 ResR2.
   pcofix CIH. pstep. intros t1 t2 RUTT. punfold RUTT.
   red in RUTT |- *. induction RUTT; pclearbot; eauto 7 with paco itree.
@@ -568,7 +568,7 @@ Lemma orutt_raise :
     (forall msg (o : OOM _), @subevent FailureE E2 FAIL2 void (Throw msg) <> @subevent OOM E2 OOME void o) ->
     PRE void void (subevent void (Throw tt)) (subevent void (Throw tt)) ->
     orutt PRE POST R1R2 (LLVMEvents.raise msg1) (LLVMEvents.raise msg2) (OOM:=OOM) (OOME:=OOME).
-Proof.
+Proof using.
   intros E1 E2 OOM OOME R1 R2 FAIL1 FAIL2 PRE POST R1R2 msg1 msg2 OOM_NOT_FAIL PRETHROW.
   unfold LLVMEvents.raise.
   repeat rewrite bind_trigger.
@@ -580,7 +580,7 @@ Lemma orutt_raiseOOM :
   forall {E1 E2 : Type -> Type} `{OOME2 : OOME -< E2} {R1 R2 : Type}
     {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop} t msg,
     orutt PRE POST R1R2 t (raiseOOM msg) (OOM:=OOME) (OOME:=OOME2).
-Proof.
+Proof using.
   intros E1 E2 OOME2 R1 R2 PRE POST R1R2 t msg.
   unfold raiseOOM.
   rewrite bind_trigger.
@@ -593,7 +593,7 @@ Lemma orutt_raise_oom :
   forall {E1 E2 : Type -> Type} `{OOME2 : OOME -< E2} {R1 R2 : Type}
     {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop} t msg,
     orutt PRE POST R1R2 t (raise_oom msg) (OOM:=OOME) (OOME:=OOME2).
-Proof.
+Proof using.
   intros E1 E2 OOME R1 R2 PRE POST R1R2 t msg.
   cbn.
   apply orutt_raiseOOM.
@@ -606,7 +606,7 @@ Lemma orutt_raiseUB :
     (forall msg (o : OOM _), @subevent UBE E2 UB2 void (ThrowUB msg) <> @subevent OOM E2 OOME void o) ->
     PRE void void (subevent void (ThrowUB tt)) (subevent void (ThrowUB tt)) ->
     orutt PRE POST R1R2 (raiseUB msg1) (raiseUB msg2) (OOM:=OOM) (OOME:=OOME).
-Proof.
+Proof using.
   intros E1 E2 OOM OOME R1 R2 UB1 UB2 PRE POST R1R2 msg1 msg2 H H0.
   unfold raiseUB.
   repeat rewrite bind_trigger.

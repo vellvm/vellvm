@@ -113,7 +113,7 @@ Section interp_prop_oom.
         (IN: interp_prop_oomTF b1 b2 o1 o2 sim x0 x1)
         (LE: sim <2= sim'):
     interp_prop_oomTF b1 b2 o1 o2 sim' x0 x1.
-  Proof.
+  Proof using.
     intros. induction IN; eauto.
   Qed.
 
@@ -124,13 +124,13 @@ Section interp_prop_oom.
   Hint Unfold interp_prop_oomT_ : core.
 
   Lemma interp_prop_oomT__mono b1 b2 o1 o2 : monotone2 (interp_prop_oomT_ b1 b2 o1 o2).
-  Proof.
+  Proof using.
     do 2 red. intros. eapply interp_prop_oomTF_mono; eauto.
   Qed.
   Hint Resolve interp_prop_oomT__mono : paco.
 
   Lemma interp_prop_oomT_idclo_mono: monotone2 (@id (itree E R1 -> itree F R2 -> Prop)).
-  Proof. unfold id. eauto. Qed.
+  Proof using. unfold id. eauto. Qed.
   Hint Resolve interp_prop_oomT_idclo_mono : paco.
 
   (* Definition 5.2 *)
@@ -148,26 +148,26 @@ Section interp_prop_oom.
 
   #[global] Instance interp_prop_oom_eq_itree_Proper_impl_ :
     forall (x : _ R1), Proper (eq ==> eq ==> eq ==> eq ==> eq_itree eq ==> impl) (fun b1 b2 o1 o2 => interp_prop_oom' b1 b2 o1 o2 x).
-  Proof.
+  Proof using.
     repeat intro; subst. eapply bisimulation_is_eq in H3; subst; eauto.
   Qed.
 
   #[global] Instance interp_prop_oom_eq_itree_Proper_impl :
     Proper (eq ==> eq ==> eq ==> eq ==> eq_itree eq ==> eq_itree eq ==> impl) interp_prop_oom'.
-  Proof.
+  Proof using.
     repeat intro; subst.
     eapply bisimulation_is_eq in H3, H4; subst; eauto.
   Qed.
 
   #[global] Instance interp_prop_oom_eq_itree_Proper :
     Proper (eq ==> eq ==> eq ==> eq ==> eq_itree eq ==> eq_itree eq ==> iff) interp_prop_oom'.
-  Proof.
+  Proof using.
     split; intros; subst; [rewrite <- H3, <- H4 | rewrite H3, H4]; auto.
   Qed.
 
   #[global] Instance interp_prop_oom_eq_itree_Proper_flip_impl :
     Proper (eq ==> eq ==> eq ==> eq ==> eq_itree eq ==> eq_itree eq ==> flip impl) interp_prop_oom'.
-  Proof.
+  Proof using.
     pose proof interp_prop_oom_eq_itree_Proper as PROP.
     unfold Proper, respectful in *.
     intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2 x3 y3 H3 x4 y4 H4; subst.
@@ -178,7 +178,7 @@ Section interp_prop_oom.
   Lemma interp_prop_oom_inv_tau_r (t0 : _ R1) t1 b2 o1 o2:
     interp_prop_oom' true b2 o1 o2 t0 (Tau t1) ->
     interp_prop_oom' true b2 o1 o2 t0 t1.
-  Proof.
+  Proof using All.
     intros H.
     punfold H; red in H; cbn in H.
     rewrite (itree_eta t0).
@@ -215,7 +215,7 @@ Section interp_prop_oom.
   Lemma interp_prop_oom_inv_tau_l (t0 : _ R1) t1 b1 o1 o2:
     interp_prop_oom' b1 true o1 o2 (Tau t0) t1 ->
     interp_prop_oom' b1 true o1 o2 t0 t1.
-  Proof.
+  Proof using.
     intros H.
     punfold H; red in H; cbn in H.
     rewrite (itree_eta t1).
@@ -240,7 +240,7 @@ Section interp_prop_oom.
   Lemma interp_prop_oom_inv_tau (t0 : _ R1) t1 o1 o2:
     interp_prop_oom' true true o1 o2 (Tau t0) (Tau t1) ->
     interp_prop_oom' true true o1 o2 t0 t1.
-  Proof.
+  Proof using All.
     intros H.
     apply interp_prop_oom_inv_tau_l in H.
     apply interp_prop_oom_inv_tau_r in H; auto.
@@ -276,7 +276,7 @@ Ltac solve_interp_prop_oom :=
       `{KSWF : @k_spec_WF _ _ h_spec k_spec}
     R (RR : R -> R -> Prop) (HR: Reflexive RR) (HT : Transitive RR) `{OOM -< E} `{OOM -< F},
     Proper (eq ==> eq ==> @eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_prop_oom' E F OOM _ _ h_spec _ _ RR k_spec true true).
-Proof.
+Proof using.
   intros E F OOM h_spec k_spec KSWF R RR REFL TRANS OOME OOMF.
   intros o1 o1' O1 o2 o2' O2 y y' EQ x x' EQ' H. subst.
   punfold H; punfold EQ; red in H; red in EQ; cbn in *.
@@ -389,7 +389,7 @@ Qed.
     {k_spec : forall T R2, E T -> itree F T -> (T -> itree F R2) -> itree F R2 -> Prop}
     `{KSWF : @k_spec_WF _ _ h_spec k_spec}
     `{OOME: OOM -< E} `{OOMF: OOM -< F} (x : _ R1), Proper (eutt eq ==> impl) (@interp_prop_oom' E F OOM OOME OOMF h_spec R1 R2 RR k_spec true true o1 o2 x).
-Proof.
+Proof using.
   repeat intro. red in H0.
   punfold H; punfold H0; red in H; cbn in *.
   revert_until OOMF.
@@ -524,7 +524,7 @@ Qed.
     `{KSWF : @k_spec_WF _ _ h_spec k_spec}
     `{OOME: OOM -< E} `{OOMF: OOM -< F},
   Proper (eq ==> eq ==> eutt eq ==> eutt eq ==> impl) (@interp_prop_oom' E F OOM OOME OOMF h_spec R1 R2 RR k_spec true true).
-Proof.
+Proof using.
   intros E F OOM h_spec R1 R2 RR k_spec KSWF OOME OOMF.
   intros o1 o1' O1 o2 o2' O2' y y' EQ x x' EQ' H; subst.
   rewrite <- EQ'. clear x' EQ'.
@@ -626,7 +626,7 @@ Qed.
     `{KSWF : @k_spec_WF _ _ h_spec k_spec}
     `{OOME: OOM -< E} `{OOMF: OOM -< F},
   Proper (eq ==> eq ==> eutt eq ==> eutt eq ==> iff) (@interp_prop_oom' E F OOM OOME OOMF h_spec R1 R2 RR k_spec true true).
-Proof.
+Proof using.
   split; intros; subst; [rewrite <- H1, <- H2 | rewrite H1, H2]; auto.
 Qed.
 
@@ -636,7 +636,7 @@ Qed.
     `{KSWF : @k_spec_WF _ _ h_spec k_spec}
     `{OOME: OOM -< E} `{OOMF: OOM -< F},
     Proper (eutt eq ==> eutt eq ==> iff) (@interp_prop_oom_l E F OOM OOME OOMF h_spec R1 R2 RR k_spec).
-Proof.
+Proof using.
   split; intros; subst.
   - eapply interp_prop_oom_eutt_Proper.
     6: apply H1.
@@ -652,7 +652,7 @@ Qed.
     `{KSWF : @k_spec_WF _ _ h_spec k_spec}
     `{OOME: OOM -< E} `{OOMF: OOM -< F},
     Proper (eutt eq ==> eutt eq ==> iff) (@interp_prop_oom_r E F OOM OOME OOMF h_spec R1 R2 RR k_spec).
-Proof.
+Proof using.
   split; intros; subst.
   - eapply interp_prop_oom_eutt_Proper.
     6: apply H1.
@@ -675,7 +675,7 @@ Section interp_prop_oom_extra.
   (*       (EQT: @interp_prop_oom' E F OOM _ _ h U _ eq k_spec b1 b2 o1 o2 t1 t2) *)
   (*       (EQK: forall u1 u2, eq u1 u2 -> @interp_prop_oom' E F OOM _ _ h _ _ eq k_spec b1 b2 o1 o2 (k1 u1) (k2 u2)): *)
   (*   @interp_prop_oom' E F OOM _ _ h _ _ eq k_spec b1 b2 o1 o2 (ITree.bind t1 k1) (ITree.bind (U := U) t2 k2). *)
-  (* Proof. *)
+  (* Proof using. *)
   (*   revert_until o2. *)
 
   (*   pcofix CIH. *)
@@ -746,7 +746,7 @@ Section interp_prop_oom_extra.
       (RR <2= RR') ->
       interp_prop_oom' h RR k_spec b1 b2 o1 o2 t1 t2 (OOME:=OOME) ->
       interp_prop_oom' h (F := F) (R1 := R1) (R2 := R2) RR' k_spec b1 b2 o1 o2 t1 t2 (OOME:=OOME).
-  Proof.
+  Proof using.
     intros ? ? ? ? ? ? ?.
     pcofix self. pstep. intros u v ? euv. punfold euv.
     red in euv |- *. induction euv; pclearbot; eauto 7 with paco.
@@ -760,7 +760,7 @@ Section interp_prop_oom_extra.
   (* Lemma interp_prop_oom_ret : *)
   (*   forall R (r : R), *)
   (*     (interp_prop_oom (F := F) (OOME:=OOME) h eq (ret r) ≈ ret r)%monad. *)
-  (* Proof. *)
+  (* Proof using. *)
   (*   intros. *)
   (*   repeat red. *)
   (*   split; [| split]. *)
@@ -819,7 +819,7 @@ Section interp_prop_oom_extra.
   (*     forall o1 o2  (t : itree E R1) (k : R1 -> itree E R2) (y : itree F R2), *)
   (*       (x0 <- interp_prop_oom' (OOME:=OOME) h eq k_spec true true o1 o2 t;; interp_prop_oom' (OOME:=OOME) h eq k_spec true true o1 o2 (k x0)) y -> *)
   (*       interp_prop_oom' (OOME:=OOME) h eq k_spec true true o1 o2 (x <- t;; k x) y. *)
-  (* Proof. *)
+  (* Proof using. *)
   (*   intros o1 o2 t k y H0. *)
   (*   destruct H0 as (x0&x1&?&?&?). *)
   (*   rewrite H0. clear H0 y. *)
@@ -917,7 +917,7 @@ Section interp_prop_oom_extra.
   Lemma interp_prop_oom_ret_pure :
     forall {T} b1 b2 o1 o2 (RR : relation T) `{REF: Reflexive _ RR} (x : T),
       interp_prop_oom' (F := F) (OOME:=OOME) h RR k_spec b1 b2 o1 o2 (ret x) (ret x).
-  Proof.
+  Proof using.
     intros.
     generalize dependent x.
     pcofix CIH.
@@ -932,7 +932,7 @@ Section interp_prop_oom_extra.
     forall {T} b1 b2 o1 o2 (RR : relation T) (x y : T),
       RR x y ->
       interp_prop_oom' (F := F) (OOME:=OOME) h RR k_spec b1 b2 o1 o2 (ret x) (ret y).
-  Proof.
+  Proof using.
     intros.
     generalize dependent y.
     generalize dependent x.
@@ -949,7 +949,7 @@ Section interp_prop_oom_extra.
       (HC : handler_correct h f),
       t ≈ t' ->
       interp_prop_oom' (OOME:=OOME) h RR k_spec true true o1 o2 t (interp f t').
-  Proof.
+  Proof using E F KSWF OOM OOME OOMF h k_spec.
     intros R o1 o2 RR0 H t t' f HC H1.
     setoid_rewrite unfold_interp.
     remember (_interp f (observe t')).
@@ -1005,7 +1005,7 @@ Section interp_prop_oom_extra.
   (* Lemma interp_prop_oom_trigger : *)
   (*   forall R (e : E R) (h : E ~> PropT (itree F)) (HProper: forall A e, Proper (eutt eq ==> iff) (h A e)), *)
   (*     (interp_prop_oom h eq (trigger e) ≈ h _ e)%monad. *)
-  (* Proof. *)
+  (* Proof using. *)
   (*   intros; red. *)
   (*   split; [| split]; cycle 1. *)
   (*   { do 3 red. intros; split; intros; [rewrite <- H | rewrite H] ; auto. } *)
@@ -1058,7 +1058,7 @@ Section interp_prop_oom_extra.
       interp_prop_oom' (F := F) (OOME:=OOME) h RR k_spec b1 b2 o1 o2 (ret r1) t ->
       (exists r2 , RR r1 r2 /\ t ≈ ret r2) \/
         (exists A (e : OOM A) k, t ≈ vis e k)%type.
-  Proof.
+  Proof using.
     intros r1 t b1 b2 o1 o2 INTERP.
     punfold INTERP.
     red in INTERP.
@@ -1143,7 +1143,7 @@ Section interp_prop_oom_extra.
     forall  r1 (t : itree F _),
       interp_prop_oom_l (F := F) (OOME:=OOME) h RR k_spec (ret r1) t ->
       (exists r2 , RR r1 r2 /\ t ≈ ret r2).
-  Proof.
+  Proof using.
     intros r1 t INTERP.
     punfold INTERP.
     red in INTERP.

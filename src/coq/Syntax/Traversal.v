@@ -802,7 +802,7 @@ End TFunctor.
 Lemma tfmap_list_app: forall U V H H' c1 c2 f,
     @tfmap code (@TFunctor_code H H') U V f (c1 ++ c2) =
     tfmap f c1  ++ tfmap f c2.
-Proof.
+Proof using.
   induction c1 as [| [] c1 IH]; cbn; intros; [reflexivity |].
   rewrite IH; reflexivity.
 Qed.

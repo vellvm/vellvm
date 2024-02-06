@@ -33,7 +33,7 @@ Section Failure.
   Lemma raise_bind_itree :
     forall A B (f : A -> itree E B) x,
       bind (raise x) f ≈ raise x.
-  Proof.
+  Proof using.
     intros A B f x.
     unfold raise.
     cbn.
@@ -57,7 +57,7 @@ Section OOM.
   Lemma raiseOOM_bind_itree :
     forall A B (f : A -> itree E B) x,
       bind (raiseOOM x) f ≈ raiseOOM x.
-  Proof.
+  Proof using.
     intros A B f x.
     unfold raiseOOM.
     cbn.
@@ -81,7 +81,7 @@ Section UB.
   Lemma raiseUB_bind_itree :
     forall A B (f : A -> itree E B) x,
       bind (raiseUB x) f ≈ raiseUB x.
-  Proof.
+  Proof using.
     intros A B f x.
     unfold raiseUB.
     cbn.

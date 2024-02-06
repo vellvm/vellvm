@@ -65,7 +65,7 @@ Section LABELS_OPERATIONS.
     := fold_left (fun acc bk => acc ++ successors bk) bks [].
 
   Lemma raw_id_eq_dec : forall (x y : raw_id), {x = y} + {x <> y}.
-  Proof.
+  Proof using.
     intros. destruct (Eqv.eqv_dec_p x y); auto.
   Qed.
 

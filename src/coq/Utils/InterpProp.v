@@ -84,7 +84,7 @@ Section interp_prop.
         (IN: interp_PropTF b1 b2 sim x0 x1)
         (LE: sim <2= sim'):
     interp_PropTF b1 b2 sim' x0 x1.
-  Proof.
+  Proof using.
     intros. induction IN; eauto.
   Qed.
 
@@ -95,13 +95,13 @@ Section interp_prop.
   Hint Unfold interp_PropT_ : core.
 
   Lemma interp_PropT__mono b1 b2 : monotone2 (interp_PropT_ b1 b2).
-  Proof.
+  Proof using.
     do 2 red. intros. eapply interp_PropTF_mono; eauto.
   Qed.
   Hint Resolve interp_PropT__mono : paco.
 
   Lemma interp_PropT_idclo_mono: monotone2 (@id (itree E R1 -> itree F R2 -> Prop)).
-  Proof. unfold id. eauto. Qed.
+  Proof using. unfold id. eauto. Qed.
   Hint Resolve interp_PropT_idclo_mono : paco.
 
   (* Definition 5.2 *)
@@ -115,26 +115,26 @@ Section interp_prop.
 
   #[global] Instance interp_prop_eq_itree_Proper_impl_ :
     forall (x : _ R1), Proper (eq_itree eq ==> impl) (interp_prop x).
-  Proof.
+  Proof using.
     repeat intro. eapply bisimulation_is_eq in H; subst; eauto.
   Qed.
 
   #[global] Instance interp_prop_eq_itree_Proper_impl :
     Proper (eq_itree eq ==> eq_itree eq ==> impl) interp_prop.
-  Proof.
+  Proof using.
     repeat intro.
     repeat intro. eapply bisimulation_is_eq in H, H0; subst; eauto.
   Qed.
 
   #[global] Instance interp_prop_eq_itree_Proper :
     Proper (eq_itree eq ==> eq_itree eq ==> iff) interp_prop.
-  Proof.
+  Proof using.
     split; intros; [rewrite <- H, <- H0 | rewrite H, H0]; auto.
   Qed.
 
   #[global] Instance interp_prop_eq_itree_Proper_flip_impl :
     Proper (eq_itree eq ==> eq_itree eq ==> flip impl) interp_prop.
-  Proof.
+  Proof using.
     pose proof interp_prop_eq_itree_Proper as PROP.
     unfold Proper, respectful in *.
     intros x y H x0 y0 H0.
@@ -145,7 +145,7 @@ Section interp_prop.
   Lemma interp_prop_inv_tau_r (t0 : _ R1) t1:
     interp_prop t0 (Tau t1) ->
     interp_prop t0 t1.
-  Proof.
+  Proof using.
     intros H.
     punfold H; red in H; cbn in H.
     rewrite (itree_eta t0).
@@ -166,7 +166,7 @@ Section interp_prop.
   Lemma interp_prop_inv_tau_l (t0 : _ R1) t1:
     interp_prop (Tau t0) t1 ->
     interp_prop t0 t1.
-  Proof.
+  Proof using.
     intros H.
     punfold H; red in H; cbn in H.
     rewrite (itree_eta t1).
@@ -184,7 +184,7 @@ Section interp_prop.
   Lemma interp_prop_inv_tau (t0 : _ R1) t1:
     interp_prop (Tau t0) (Tau t1) ->
     interp_prop t0 t1.
-  Proof.
+  Proof using.
     intros H.
     apply interp_prop_inv_tau_l in H.
     apply interp_prop_inv_tau_r in H; auto.
@@ -192,7 +192,7 @@ Section interp_prop.
 
   #[global] Instance interp_prop_eutt_Proper_impl_ :
     forall (x : _ R1), Proper (eutt eq ==> impl) (interp_prop x).
-  Proof.
+  Proof using.
     repeat intro. red in H0.
     punfold H; punfold H0; red in H; red in H0; cbn in *.
     revert_until RR.
@@ -274,7 +274,7 @@ Section interp_prop.
 
   #[global] Instance interp_prop_eutt_Proper_impl :
     Proper (eutt eq ==> eutt eq ==> impl) (interp_prop).
-  Proof.
+  Proof using.
     intros y y' EQ x x' EQ' H.
     rewrite <- EQ'. clear x' EQ'.
     punfold H; punfold EQ; red in H; red in EQ; cbn in *.
@@ -347,7 +347,7 @@ Section interp_prop.
 
   #[global] Instance interp_prop_eutt_Proper :
     Proper (eutt eq ==> eutt eq ==> iff) interp_prop.
-  Proof.
+  Proof using.
     split; intros; [rewrite <- H, <- H0 | rewrite H, H0]; auto.
   Qed.
 
@@ -366,7 +366,7 @@ Hint Resolve interp_PropT_idclo_mono : paco.
   forall (E F : Type -> Type) (h_spec : forall T : Type, E T -> PropT F T)
     R (RR : R -> R -> Prop) (HR: Reflexive RR) (HT : Transitive RR),
     Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_prop E F h_spec _ _ RR).
-Proof.
+Proof using.
   intros E F h_spec R RR REFL TRANS.
   intros y y' EQ x x' EQ' H. subst.
   punfold H; punfold EQ; red in H; red in EQ; cbn in *.
@@ -443,7 +443,7 @@ Qed.
   forall (E F : Type -> Type) (h_spec : forall T : Type, E T -> PropT F T)
     R (RR : R -> R -> Prop) (EQV: Equivalence RR),
     Proper (@eutt _ _ _ RR ==> eq ==> Basics.impl) (@interp_prop E F h_spec _ _ RR).
-Proof.
+Proof using.
   intros E F h_spec R RR EQV.
   intros y y' EQ x x' EQ' H. subst.
   punfold H; punfold EQ; red in H; red in EQ; cbn in *.
@@ -521,7 +521,7 @@ Qed.
   forall (E F : Type -> Type) (h_spec : forall T : Type, E T -> PropT F T)
     R (RR : R -> R -> Prop) (EQV: Equivalence RR),
     Proper (@eutt _ _ _ RR ==> eq ==> iff) (@interp_prop E F h_spec _ _ RR).
-Proof.
+Proof using.
   split; intros; [rewrite <- H, <- H0 | rewrite H, H0]; auto.
 Qed.
 
@@ -535,7 +535,7 @@ Section interp_prop_extra.
         (EQT: @interp_prop E F h U _ eq t1 t2)
         (EQK: forall u1 u2, eq u1 u2 -> @interp_prop E F h _ _ eq (k1 u1) (k2 u2)):
     @interp_prop E F h _ _ eq (ITree.bind t1 k1) (ITree.bind (U := U) t2 k2).
-  Proof.
+  Proof using.
     revert_until U.
 
     pcofix CIH.
@@ -587,7 +587,7 @@ Section interp_prop_extra.
       (RR <2= RR') ->
       @interp_prop _ _ h _ _ RR t1 t2 ->
       @interp_prop _ _ h R1 R2 RR' t1 t2.
-  Proof.
+  Proof using.
     intros ? ? ?.
     pcofix self. pstep. intros u v ? euv. punfold euv.
     red in euv |- *. induction euv; pclearbot; eauto 7 with paco.
@@ -600,7 +600,7 @@ Section interp_prop_extra.
   Lemma interp_prop_ret :
     forall R (r : R),
       (@interp_prop _ _ h _ _ eq (ret r) ≈ ret r)%monad.
-  Proof.
+  Proof using.
     intros.
     repeat red.
     split; [| split].
@@ -630,7 +630,7 @@ Section interp_prop_extra.
       forall (t : itree E R1) (k : R1 -> itree E R2) (y : itree F R2),
         (x0 <- @interp_prop _ _ h _ _ eq t;; @interp_prop _ _ h _ _ eq (k x0)) y ->
         interp_prop h eq (x <- t;; k x) y.
-  Proof.
+  Proof using.
     intros t k y H0.
     destruct H0 as (x0&x1&?&?&?).
     rewrite H0. clear H0 y.
@@ -712,7 +712,7 @@ Section interp_prop_extra.
   Lemma interp_prop_ret_pure :
     forall {T} (RR : relation T) `{REF: Reflexive _ RR} (x : T),
       interp_prop (F := F) h RR (ret x) (ret x).
-  Proof.
+  Proof using.
     intros.
     generalize dependent x.
     pcofix CIH.
@@ -727,7 +727,7 @@ Section interp_prop_extra.
     forall {T} (RR : relation T) (x y : T),
       RR x y ->
       interp_prop (F := F) h RR (ret x) (ret y).
-  Proof.
+  Proof using.
     intros.
     generalize dependent y.
     generalize dependent x.
@@ -744,7 +744,7 @@ Section interp_prop_extra.
       (HC : handler_correct h f),
       t ≈ t' ->
       interp_prop h RR t (interp f t').
-  Proof.
+  Proof using.
     intros R RR0 H t t' f HC H1.
     setoid_rewrite unfold_interp.
     remember (_interp f (observe t')).
@@ -788,7 +788,7 @@ Section interp_prop_extra.
   (* Lemma interp_prop_trigger : *)
   (*   forall R (e : E R) (h : E ~> PropT (itree F)) (HProper: forall A e, Proper (eutt eq ==> iff) (h A e)), *)
   (*     (interp_prop h eq (trigger e) ≈ h _ e)%monad. *)
-  (* Proof. *)
+  (* Proof using. *)
   (*   intros; red. *)
   (*   split; [| split]; cycle 1. *)
   (*   { do 3 red. intros; split; intros; [rewrite <- H | rewrite H] ; auto. } *)
@@ -839,7 +839,7 @@ Section interp_prop_extra.
   Lemma interp_prop_ret_inv:
     forall  r1 (t : itree F _),
       interp_prop (F := F) h RR (ret r1) t -> exists r2 , RR r1 r2 /\ t ≈ ret r2.
-  Proof.
+  Proof using.
     intros r1 t INTERP.
     punfold INTERP.
     red in INTERP.

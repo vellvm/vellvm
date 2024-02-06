@@ -61,7 +61,7 @@ Section Either.
   Lemma raise_bind_either :
     forall A B (f : A -> sum E B) (x : E),
       bind (raise x) f ≈ raise x.
-  Proof.
+  Proof using.
     intros A B f x.
     cbn.
     reflexivity.
@@ -69,7 +69,7 @@ Section Either.
 
   Lemma raise_catch_either :
     forall A (handler : E -> sum E A) (x : E) , catch (raise x) handler ≈ handler x.
-  Proof.
+  Proof using.
     intros A handler x.
     reflexivity.
   Qed.
@@ -109,7 +109,7 @@ Section EitherT.
 
 
   (* Instance proper_eq1_mkEitherT : forall {A}, Proper (@eq1 M EQM (E + A) ==> @eq1 (eitherT E M) _ A) mkEitherT. *)
-  (* Proof. *)
+  (* Proof using. *)
   (*   intros A. *)
   (*   unfold Proper. *)
   (*   unfold respectful. *)
@@ -123,7 +123,7 @@ Section EitherT.
   Lemma raise_bind_eitherT :
     forall A B (f : A -> eitherT E M B) (x : E),
       bind (raise x) f ≈ raise x.
-  Proof.
+  Proof using E EQM HM M MLAWS proper_eq1_mkEitherT.
     intros A B f x.
     cbn.
     destruct MLAWS.
@@ -132,14 +132,14 @@ Section EitherT.
                                                    | inl x0 => ret (inl x0)
                                                    | inr x0 => unEitherT (f x0)
                                               end) (inl x).
-    
+
     epose proof (proper_eq1_mkEitherT _ _ _ H).
     apply H0.
   Qed.
 
   Lemma raise_catch_eitherT :
     forall A (handler : E -> eitherT E M A) (x : E) , catch (raise x) handler ≈ handler x.
-  Proof.
+  Proof using E EQM HM M MLAWS proper_eq1_mkEitherT.
     intros A handler x.
     cbn.
     unfold Proper, respectful in proper_eq1_mkEitherT.
@@ -147,7 +147,7 @@ Section EitherT.
                                                    | inl x0 => unEitherT (handler x0)
                                                    | inr x0 => ret (inr x0)
                                               end) (inl x).
-    
+
     epose proof (proper_eq1_mkEitherT _ _ _ H).
 
     apply H0.
@@ -160,4 +160,3 @@ Section EitherT.
     { raise_catch := raise_catch_eitherT }.
 
 End EitherT.
-

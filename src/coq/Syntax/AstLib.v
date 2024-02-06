@@ -32,20 +32,20 @@ Module AsciiOrd <: UsualOrderedType.
   Definition eq_trans := @eq_trans t.
   Definition lt (a b:ascii) := N.lt (N_of_ascii a) (N_of_ascii b).
   Lemma lt_trans : forall a b c:t, lt a b -> lt b c -> lt a c.
-  Proof.
+  Proof using.
     intros a b c.
     unfold lt.
     apply N.lt_trans.
   Qed.
   Lemma lt_not_eq : forall a b:t, lt a b -> ~eq a b.
-  Proof.
+  Proof using.
     intros a b H.
     unfold eq. unfold not. intros He. rewrite He in H.
     eapply N.lt_neq. unfold lt in H. apply H. reflexivity.
   Qed.
 
   Lemma N_of_ascii_inj : forall x y, N_of_ascii x = N_of_ascii y -> x = y.
-  Proof.
+  Proof using.
     intros x y H.
     rewrite <- ascii_N_embedding.
     rewrite <- (@ascii_N_embedding x).
@@ -93,7 +93,7 @@ Module StringOrd <: UsualOrderedType.
     end.
 
   Lemma lt_trans : forall a b c : t, lt a b -> lt b c -> lt a c.
-  Proof.
+  Proof using.
     induction a.
     - destruct b; destruct c; simpl; intros; try tauto.
     - destruct b; destruct c; simpl; intros; try tauto.
@@ -108,7 +108,7 @@ Module StringOrd <: UsualOrderedType.
   Qed.
 
   Lemma lt_not_eq : forall a b:t, lt a b -> ~eq a b.
-  Proof.
+  Proof using.
     induction a; intros b H He; unfold eq in He; subst.
     - unfold lt in H. destruct H.
     - simpl in H.
@@ -183,13 +183,13 @@ Module RawIDOrd <: UsualOrderedType.
     end.
 
   Lemma lt_trans : forall a b c : t, lt a b -> lt b c -> lt a c.
-  Proof.
+  Proof using.
     destruct a; destruct b; destruct c; simpl; intros H1 H2; intuition.
     - eapply StringOrd.lt_trans; eauto.
   Qed.
 
   Lemma lt_not_eq : forall a b:t, lt a b -> ~eq a b.
-  Proof.
+  Proof using.
     destruct a; destruct b; simpl; intros H He; inversion He; subst.
     - apply StringOrd.lt_not_eq in H. apply H. unfold StringOrd.eq. reflexivity.
     - apply Z_as_OT.lt_not_eq in H. tauto.
@@ -250,7 +250,7 @@ Module InstrIDDec <: MiniDecidableType.
   Definition t := instr_id.
 
   Lemma eq_dec : forall (x y : instr_id), {x = y} + {x <> y}.
-  Proof.
+  Proof using.
     intros x y.
     destruct x as [xn | xn]; destruct y as [yn | yn].
     - destruct (xn ~=? yn). unfold eqv in e. unfold eqv_raw_id in e. subst. left. reflexivity.
@@ -271,7 +271,7 @@ Module IdentDec <: MiniDecidableType.
   Definition t := ident.
 
   Lemma eq_dec : forall (x y : ident), {x = y} + {x <> y}.
-  Proof.
+  Proof using.
     intros x y.
     destruct x as [xn | xn]; destruct y as [yn | yn].
     - destruct (xn ~=? yn). unfold eqv in e. unfold eqv_raw_id in e. subst. left. reflexivity.
@@ -788,6 +788,6 @@ Definition intrinsic_exp {T} (e:exp T) : option string :=
 Lemma Name_inj : forall s1 s2,
     Name s1 = Name s2 ->
     s1 = s2.
-Proof.
+Proof using.
   intros * EQ; inv EQ; auto.
 Qed.

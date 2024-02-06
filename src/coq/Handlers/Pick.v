@@ -150,7 +150,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
         := contains_UB ta \/ eutt eq t2 (bind ta k2).
 
       #[global] Instance k_spec_WF_model_undef_k_spec `{FAIL: FailureE -< E +' F} `{UB: UBE -< E +' F} `{OOM_OUT : OOME -< F} : k_spec_WF (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) (@model_undef_k_spec UB).
-      Proof.
+      Proof using.
         split.
         - intros A R2 e ta k2.
           unfold Proper, respectful.
@@ -185,7 +185,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
 
     Transparent map_monad.
     Lemma concretize_u_concretize_uvalue : forall u, concretize_u u (concretize_uvalue u).
-    Proof.
+    Proof using.
       (* intros u. *)
       (* induction u; try do_it. *)
       (* - (* cbn. *) (* destruct (default_dvalue_of_dtyp t) eqn: EQ. *) *)

@@ -24,7 +24,7 @@ Section UBPropositional.
   #[global] Instance Proper_model_UB :
     forall T,
       Proper ((eq ==> iff) ==> eq ==> flip impl) (@model_UB T).
-  Proof.
+  Proof using.
     intros T.
     unfold Proper, respectful, flip, impl.
     intros x y IFF x0 y0 EQ UB.

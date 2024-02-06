@@ -40,7 +40,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
   Arguments mkErrSID_T {_ _} _.
 
   #[global] Instance Monad_ErrSID_T {M} `{HM : Monad M} : Monad (ErrSID_T M).
-  Proof.
+  Proof using.
     split.
     - exact (fun T t => mkErrSID_T (ret t)).
     - exact (fun A B ma amb =>
@@ -49,7 +49,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
   Defined.
 
   #[global] Instance MonadT_ErrSID_T {M} `{HM : Monad M} : MonadT (ErrSID_T M) M.
-  Proof.
+  Proof using.
     split.
     intros A ma.
     refine (mkErrSID_T _).
@@ -58,7 +58,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
   Defined.
 
   #[global] Instance Monad_EQ1_ErrSID_T {M} `{HME : Monad.Eq1 M} : Monad.Eq1 (ErrSID_T M).
-  Proof.
+  Proof using.
     unfold Monad.Eq1.
     refine
       (fun T e1 e2 =>
@@ -71,7 +71,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
 
   #[global] Instance MonadLawsE_ErrSID
     : Monad.MonadLawsE ErrSID.
-  Proof.
+  Proof using.
     split.
     - (* bind_ret_l *)
       intros A B f x.
@@ -160,7 +160,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
   Defined.
 
   #[global] Instance Reflexive_EQ1_ErrSID {A} : Reflexive (@Monad.eq1 ErrSID _ A).
-  Proof.
+  Proof using.
     unfold Reflexive.
     intros x.
     destruct x.
@@ -170,7 +170,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
   Defined.
 
   #[global] Instance Transitive_EQ1_ErrSID {A} : Transitive (@Monad.eq1 ErrSID _ A).
-  Proof.
+  Proof using.
     unfold Transitive.
     intros x y z XY YZ.
     destruct x, y, z; cbn in *.
@@ -179,7 +179,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
   Defined.
 
   #[global] Instance Symmetric_EQ1_ErrSID {A} : Symmetric (@Monad.eq1 ErrSID _ A).
-  Proof.
+  Proof using.
     unfold Symmetric.
     intros x y XY.
     destruct x, y; cbn in *.
@@ -188,7 +188,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
   Defined.
 
   #[global] Instance Eq1Equivalence_EQ1_ErrSID : Monad.Eq1Equivalence ErrSID.
-  Proof.
+  Proof using.
     split; typeclasses eauto.
   Defined.
 
@@ -202,7 +202,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
     := { raise_oom := fun _ msg => mkErrSID_T (raise_oom msg) }.
 
   #[global] Instance RaiseBindM_ErrSID : RaiseBindM ErrSID string (@raise_error ErrSID _).
-  Proof.
+  Proof using.
     split.
     - intros A B f x.
       reflexivity.
@@ -252,7 +252,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
       ErrSID_succeeds e ->
       forall sid pr, exists x sid' pr',
         ErrSID_runs_to e sid pr x sid' pr'.
-  Proof.
+  Proof using.
     intros A e ESID sid pr.
     destruct e as [[[[[e]]]]].
     unfold ErrSID_succeeds in ESID.
@@ -280,21 +280,21 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
 
   Lemma fresh_sid_succeeds :
     ErrSID_succeeds fresh_sid.
-  Proof.
+  Proof using.
     intros sid pr.
     reflexivity.
   Qed.
 
   Lemma fresh_provenance_succeeds :
     ErrSID_succeeds fresh_provenance.
-  Proof.
+  Proof using.
     intros sid pr.
     reflexivity.
   Qed.
 
   Lemma fresh_allocation_id_succeeds :
     ErrSID_succeeds fresh_allocation_id.
-  Proof.
+  Proof using.
     intros sid pr.
     reflexivity.
   Qed.
@@ -304,7 +304,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
     ErrSID_succeeds ma ->
     (forall sid pr a, ErrSID_evals_to ma sid pr a -> ErrSID_succeeds (k a)) ->
     ErrSID_succeeds (bind ma k).
-  Proof.
+  Proof using.
     intros A B ma k MA KA.
     cbn.
 
@@ -339,7 +339,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
   Lemma ErrSID_succeeds_ret :
     forall {A} (x : A),
     ErrSID_succeeds (ret x).
-  Proof.
+  Proof using.
     intros A x.
     unfold ErrSID_succeeds; cbn; auto.
   Qed.
@@ -348,7 +348,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
     forall {A B} (ma : ErrSID A) (k : A -> ErrSID B),
     ErrSID_OOMs ma ->
     ErrSID_OOMs (bind ma k).
-  Proof.
+  Proof using.
     intros A B ma k MA.
     cbn.
 
@@ -367,7 +367,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
       ErrSID_succeeds ma ->
       (forall sid pr a, ErrSID_evals_to ma sid pr a -> ErrSID_OOMs (k a)) ->
       ErrSID_OOMs (bind ma k).
-  Proof.
+  Proof using.
     intros A B ma k MA KA.
     cbn.
 
@@ -413,7 +413,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
         exists sid' prov' x,
           ErrSID_runs_to m sid prov x sid' prov' /\
             ErrSID_evals_to (k x) sid' prov' res.
-    Proof.
+    Proof using.
       intros A X sid prov m k res EVAL.
 
       cbn in EVAL.
@@ -462,7 +462,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
         exists sid' prov' x,
           ErrSID_runs_to m sid prov x sid' prov' /\
             ErrSID_runs_to (k x) sid' prov' res sid_final prov_final.
-    Proof.
+    Proof using.
       intros A X sid prov m k res sid_final prov_final EVAL.
 
       cbn in EVAL.
@@ -509,7 +509,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
       forall {X} sid prov sid' prov' (m : ErrSID X) (res : X),
         ErrSID_runs_to m sid prov res sid' prov' ->
         ErrSID_evals_to m sid prov res.
-    Proof.
+    Proof using.
       intros X sid prov sid' prov' m res H.
       unfold ErrSID_runs_to in H.
       unfold ErrSID_evals_to.
@@ -526,7 +526,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
     Qed.
 
     Global Instance proper_eq1_runs_to : forall {A}, Proper (@Monad.eq1 _ _ A ==> eq ==> eq ==> eq ==> eq  ==> eq ==> iff) (ErrSID_runs_to).
-    Proof.
+    Proof using.
       repeat intro; subst. rename H into EQ.
 
       unfold Monad.eq1, Eq1_eitherT in EQ.

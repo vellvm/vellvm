@@ -41,6 +41,9 @@ From Vellvm Require Import
      Utils.AListFacts
      Utils.VellvmRelations
      Utils.ErrUbOomProp
+     Utils.ErrOomPoison
+     Utils.Oomable
+     Utils.Poisonable
      Utils.NMaps
      Handlers.MemoryModules.FiniteAddresses
      Handlers.MemoryModules.InfiniteAddresses
@@ -214,7 +217,8 @@ Module Type VMemInt_Refine (IP_INF : INTPTR) (IP_FIN : INTPTR).
       @mmul _ IP_FIN.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
       exists r_inf,
         @mmul _ IP_INF.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
-          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf /\
+          (@munsigned _ IP_INF.VMemInt_intptr x_inf * @munsigned _ IP_INF.VMemInt_intptr y_inf >? @munsigned _ IP_INF.VMemInt_intptr r_inf = false)%Z.
 
   Parameter mshl_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
@@ -243,14 +247,14 @@ Module Type VMemInt_Refine (IP_INF : INTPTR) (IP_FIN : INTPTR).
         @mdivs _ IP_INF.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
           IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
 
-  Parameter mshr_refine :
-    forall x_fin y_fin r_fin x_inf y_inf,
-      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
-      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
-      @mshr _ IP_FIN.VMemInt_intptr x_fin y_fin = r_fin ->
-      exists r_inf,
-        @mshr _ IP_INF.VMemInt_intptr x_inf y_inf = r_inf /\
-          IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+  (* Parameter mshr_refine : *)
+  (*   forall x_fin y_fin r_fin x_inf y_inf, *)
+  (*     IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf -> *)
+  (*     IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf -> *)
+  (*     @mshr _ IP_FIN.VMemInt_intptr x_fin y_fin = r_fin -> *)
+  (*     exists r_inf, *)
+  (*       @mshr _ IP_INF.VMemInt_intptr x_inf y_inf = r_inf /\ *)
+  (*         IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf. *)
 
   Parameter mshru_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
@@ -305,6 +309,18 @@ Module Type VMemInt_Refine (IP_INF : INTPTR) (IP_FIN : INTPTR).
       exists r_inf,
         @mxor _ IP_INF.VMemInt_intptr x_inf y_inf = r_inf /\
           IP_FIN.to_Z r_fin = IP_INF.to_Z r_inf.
+
+  Parameter munsigned_refine :
+    forall x_fin x_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      @munsigned _ IP_FIN.VMemInt_intptr x_fin = @munsigned _ IP_INF.VMemInt_intptr x_inf.
+
+  Parameter mrepr_refine :
+    forall z x_fin x_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      @mrepr _ IP_FIN.VMemInt_intptr z = NoOom x_fin ->
+      @mrepr _ IP_INF.VMemInt_intptr z = NoOom x_inf.
+
 End VMemInt_Refine.
 
 Module VMemInt_Intptr_Properties_Inf : VMemInt_Intptr_Properties InterpreterStackBigIntptr.LP.IP.
@@ -441,22 +457,20 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     break_match_hyp_inv.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-    rewrite Int64.add_signed.
+    rewrite Int64.add_unsigned.
     rewrite X, Y.
-    rewrite Int64.signed_repr; eauto.
+    rewrite Int64.unsigned_repr; eauto.
 
     (* TODO: Separate this into lemma? *)
-    unfold Int64.add_overflow in Heqb.
+    unfold Int64.add_carry in Heqb.
     cbn in Heqb.
     break_match_hyp; cbn in Heqb; try discriminate.
 
-    unfold Coqlib.zle in Heqb0.
-    apply Bool.andb_true_iff in Heqb0.
-    destruct Heqb0.
-
-    apply Coqlib.proj_sumbool_true in H, H0.
-    cbn in *.
-    rewrite X, Y, Int64.signed_zero in *.
+    subst.
+    unfold Int64.max_unsigned.
+    rewrite Integers.Int64.unsigned_zero in l.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
     lia.
   Qed.
 
@@ -476,24 +490,13 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
 
     cbn in SUB.
     break_match_hyp_inv.
-
+    unfold Int64.sub.
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-    rewrite Int64.sub_signed.
-    rewrite X, Y.
-    rewrite Int64.signed_repr; eauto.
-
-    (* TODO: Separate this into lemma? *)
-    unfold Int64.sub_overflow in Heqb.
-    cbn in Heqb.
-    break_match_hyp; cbn in Heqb; try discriminate.
-
-    unfold Coqlib.zle in Heqb0.
-    apply Bool.andb_true_iff in Heqb0.
-    destruct Heqb0.
-
-    apply Coqlib.proj_sumbool_true in H, H0.
-    cbn in *.
-    rewrite X, Y, Int64.signed_zero in *.
+    subst.
+    rewrite Int64.unsigned_repr; eauto.
+    unfold Int64.max_unsigned.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
     lia.
   Qed.
 
@@ -504,20 +507,25 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
       @mmul _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = NoOom r_fin ->
       exists r_inf,
         @mmul _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = NoOom r_inf /\
-          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
+          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf /\
+          (@munsigned _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf * @munsigned _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr y_inf >? @munsigned _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr r_inf = false)%Z.
   Proof.
     intros x_fin y_fin r_fin x_inf y_inf X Y MUL.
-    cbn.
     exists (x_inf * y_inf)%Z.
     split; auto.
 
+    Opaque Int64.modulus.
     cbn in MUL.
     break_match_hyp_inv.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-    rewrite Int64.mul_signed.
-    rewrite X, Y.
-    rewrite Int64.signed_repr; eauto.
+    subst.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    rewrite Int64.unsigned_repr; eauto.
+    2: lia.
+    split; auto.
+    unfold munsigned.
     cbn.
     lia.
   Qed.
@@ -534,36 +542,20 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     intros x_fin y_fin r_fin x_inf y_inf X Y SHL.
     cbn.
     exists (Z.shiftl x_inf y_inf).
+
+    cbn in SHL.
     split; auto.
+    break_match_hyp_inv.
 
-  (*   Opaque Z.sub. *)
-  (*   cbn in SHL. *)
-
-  (*   break_match_hyp_inv. *)
-  (*   break_match_hyp_inv. *)
-
-  (*   unfold Int64.shl in *. *)
-  (*   unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *. *)
-  (*   unfold Int64.signed in X, Y. *)
-  (*   break_match_hyp; break_match_hyp. *)
-  (*   - rewrite X, Y. *)
-  (*     rewrite Int64.signed_repr; eauto. *)
-
-  (*   mshl := *)
-  (*     fun x y => *)
-  (*       let res := Int64.shl x y in *)
-  (*       if Int64.signed res =? Int64.min_signed *)
-  (*       then Oom "IP64Bit left shift overflow (res is min signed, should not happen)." *)
-  (*       else *)
-  (*         let nres := Int64.negative res in *)
-  (*         if (negb (Z.shiftr (Int64.unsigned x) *)
-  (*                     (64%Z - Int64.unsigned y) *)
-  (*                   =? (Int64.unsigned nres) *)
-  (*                      * (Z.pow 2 (Int64.unsigned y) - 1))%Z) *)
-  (*         then Oom "IP64Bit left shift overflow." *)
-  (*         else ret res; *)
-    (* Qed. *)
-  Admitted.
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    subst.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    rewrite Int64.unsigned_repr; eauto.
+    unfold Int64.max_unsigned in *.
+    split; try lia.
+    apply Z.shiftl_nonneg; lia.
+  Qed.
 
   Lemma mdivu_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
@@ -583,7 +575,28 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     subst.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-  Admitted.
+    subst.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    unfold Int64.divu.
+    rewrite Int64.unsigned_repr; auto.
+    split; try lia.
+    apply Z_div_nonneg_nonneg; try lia.
+    unfold Int64.max_unsigned.
+    pose proof Z.div_lt (Int64.unsigned x_fin) (Int64.unsigned y_fin).
+    assert (Int64.unsigned x_fin = 0 \/ 0 < Int64.unsigned x_fin)%Z as [X_FIN | X_FIN] by lia.
+    - rewrite X_FIN.
+      cbn. lia.
+    - forward H1; try lia.
+      assert (Int64.unsigned y_fin = 0 \/ Int64.unsigned y_fin = 1 \/ 1 < Int64.unsigned y_fin)%Z as [Y_FIN | [Y_FIN | Y_FIN]] by lia.
+      + rewrite Y_FIN.
+        rewrite Zdiv_0_r.
+        lia.
+      + rewrite Y_FIN.
+        rewrite Z.div_1_r.
+        lia.
+      + lia.
+  Qed.
 
   Lemma mdivs_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
@@ -595,38 +608,8 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
           InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
   Proof.
     intros x_fin y_fin r_fin x_inf y_inf X Y DIV.
-    cbn.
-    exists (x_inf / y_inf)%Z.
-    split; auto.
-
-    cbn in *.
-    break_match_hyp_inv.
-
-    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-    unfold Int64.divs.
-    rewrite X, Y.
-    rewrite Int64.signed_repr; eauto.
-  Admitted.
-
-  Lemma mshr_refine :
-    forall x_fin y_fin r_fin x_inf y_inf,
-      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
-      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
-      @mshr _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = r_fin ->
-      exists r_inf,
-        @mshr _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf = r_inf /\
-          InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
-  Proof.
-    intros x_fin y_fin r_fin x_inf y_inf X Y SHR.
-    cbn.
-    exists (Z.shiftr x_inf y_inf).
-    split; auto.
-
-    cbn in SHR.
-    subst.
-
-    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-  Admitted.
+    cbn in DIV; inv DIV.
+  Qed.
 
   Lemma mshru_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
@@ -646,6 +629,29 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     subst.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    subst.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    unfold Int64.shru.
+    rewrite Int64.unsigned_repr; auto.
+    unfold Int64.max_unsigned.
+    split.
+    - apply Z.shiftr_nonneg; lia.
+    - rewrite Int64.Zshiftr_div_two_p; try lia.
+    pose proof Z.div_lt (Int64.unsigned x_fin) (Int64.unsigned y_fin).
+    assert (Int64.unsigned x_fin = 0 \/ 0 < Int64.unsigned x_fin)%Z as [X_FIN | X_FIN] by lia.
+    -- rewrite X_FIN.
+      cbn. lia.
+    -- forward H1; try lia.
+      assert (Int64.unsigned y_fin = 0 \/ Int64.unsigned y_fin = 1 \/ 1 < Int64.unsigned y_fin)%Z as [Y_FIN | [Y_FIN | Y_FIN]] by lia.
+      + rewrite Y_FIN.
+        cbn.
+        rewrite Z.div_1_r.
+        lia.
+      + rewrite Y_FIN.
+        assert (two_p 1 = 2)%Z.
+        admit.
+        admit.
   Admitted.
 
   Lemma mmods_refine :
@@ -658,16 +664,8 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
           InterpreterStack64BitIntptr.LP.IP.to_Z r_fin = InterpreterStackBigIntptr.LP.IP.to_Z r_inf.
   Proof.
     intros x_fin y_fin r_fin x_inf y_inf X Y MOD.
-    cbn.
-    exists (x_inf mod y_inf)%Z.
-    split; auto.
-
-    cbn in MOD.
-    subst.
-
-    unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-    break_match_hyp_inv.
-  Admitted.
+    cbn in MOD; inv MOD.
+  Qed.
 
   Lemma mmodu_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
@@ -687,6 +685,39 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     subst.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    subst.
+    unfold Int64.modu.
+    rewrite Int64.unsigned_repr; try lia.
+    unfold Int64.max_unsigned.
+
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    destruct (Z.eq_dec (Int64.unsigned y_fin) 0%Z).
+    { (* y_fin = 0 *)
+      rewrite e.
+      rewrite Zmod_0_r.
+      lia.
+    }
+      
+    pose proof Z.mod_bound_or (Int64.unsigned x_fin) (Int64.unsigned y_fin).
+    forward H1; auto.
+    lia.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma Zland_range :
+    forall a b,
+      (0 <= a)%Z ->
+      (0 <= b)%Z ->
+      (0 <= Z.land a b /\ Z.land a b <= a /\ Z.land a b <= b)%Z.
+  Proof.
+    intros a b A B.
+    pose proof Z.land_nonneg a b as [_ N].
+    forward N; [lia|].
+    split; try lia.
+    split.
+    admit.
+    admit.
   Admitted.
 
   Lemma mand_refine :
@@ -708,11 +739,14 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     subst.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-    unfold Int64.signed in X, Y.
-    break_match_hyp; break_match_hyp.
-    - rewrite X, Y.
-      rewrite Int64.signed_repr; eauto.
-  Admitted.
+    subst.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    rewrite Int64.unsigned_repr; auto.
+    unfold Int64.max_unsigned.
+    pose proof Zland_range (Int64.unsigned x_fin) (Int64.unsigned y_fin) as (?&?&?).
+    all: try lia.
+  Qed.
 
   Lemma mor_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
@@ -733,6 +767,10 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     subst.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    subst.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    rewrite Int64.unsigned_repr; auto.
   Admitted.
 
   Lemma mxor_refine :
@@ -754,7 +792,36 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     subst.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
+    subst.
+    pose proof Int64.unsigned_range x_fin.
+    pose proof Int64.unsigned_range y_fin.
+    rewrite Int64.unsigned_repr; auto.
   Admitted.
+
+  Lemma munsigned_refine :
+    forall x_fin x_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      @munsigned _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin = @munsigned _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf.
+  Proof.
+    intros x_fin x_inf TOZ.
+    cbn in *.
+    unfold InterpreterStackBigIntptr.LP.IP.to_Z, InterpreterStack64BitIntptr.LP.IP.to_Z in *.
+    auto.
+  Qed.
+
+  Lemma mrepr_refine :
+    forall z x_fin x_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      @mrepr _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr z = NoOom x_fin ->
+      @mrepr _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr z = NoOom x_inf.
+  Proof.
+    intros z x_fin x_inf H H0.
+    cbn.
+    rewrite IP64Bit.VMemInt_intptr_mrepr_from_Z in H0.
+    erewrite FiniteIntptr.IP64Bit.from_Z_to_Z in H; eauto.
+    subst.
+    reflexivity.
+  Qed.
 
 End VMemInt_Refine_InfFin.
 
@@ -8128,174 +8195,6 @@ Qed.
       auto.
   Qed.
 
-  Lemma fin_to_inf_dvalue_refine_strict' :
-    forall d_inf d_fin,
-      DVC.dvalue_refine_strict d_inf d_fin ->
-      d_inf = fin_to_inf_dvalue d_fin.
-  Proof.
-    intros d_inf d_fin H.
-    rewrite DVC.dvalue_refine_strict_equation in H.
-    unfold fin_to_inf_dvalue.
-    break_match; cbn in *.
-    destruct p.
-    clear Heqs.
-
-    revert d_fin H x e e0.
-    induction d_inf; intros d_fin H' x' e e0; try rename H into H''; rename H' into H;
-      try solve
-        [ cbn in *; inv H;
-          cbn in *; inv e;
-          auto
-        ].
-    - cbn in *.
-      break_match_hyp; inv H.
-      cbn in *.
-      break_match_hyp; inv e.
-      cbn in *.
-      break_match_hyp; inv e0.
-
-      pose proof AC1.addr_convert_injective a a1 a0 Heqo Heqo1.
-      subst.
-      auto.
-    - cbn in *; break_match_hyp; inv H.
-      cbn in *; inv e.
-      cbn in *; break_match_hyp; inv H0.
-      cbn in *; break_match_hyp; inv e0.
-
-      pose proof (IP.from_Z_injective _ _ _ Heqo Heqo1).
-      apply IS1.LP.IP.to_Z_inj in H.
-      subst.
-      reflexivity.
-    - cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHfields _ eq_refl l Heqo1).
-        forward IHfields; eauto.
-        forward IHfields; eauto.
-        inv IHfields.
-        reflexivity.
-    - cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHfields _ eq_refl l Heqo1).
-        forward IHfields; eauto.
-        forward IHfields; eauto.
-        inv IHfields.
-        reflexivity.
-    - cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHelts _ eq_refl l Heqo1).
-        forward IHelts; eauto.
-        forward IHelts; eauto.
-        inv IHelts.
-        reflexivity.
-    - cbn in *; break_match_hyp; inv H.
-      cbn in *; break_match_hyp; inv e.
-      cbn in *; break_match_hyp; inv e0.
-
-      revert l Heqo l0 Heqo1 H'' Heqo0.
-      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
-      + cbn in *. inv Heqo.
-        cbn in *. inv Heqo0.
-        reflexivity.
-      + rewrite map_monad_unfold in Heqo.
-        cbn in *.
-        break_match_hyp; inv Heqo.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo0.
-        cbn in *.
-        break_match_hyp; inv Heqo0.
-        break_match_hyp; inv H0.
-
-        rewrite map_monad_unfold in Heqo1.
-        cbn in *.
-        break_match_hyp; inv Heqo1.
-        break_match_hyp; inv H0.
-
-        (* Show that a = u0 *)
-        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
-
-        specialize (IHelts _ eq_refl l Heqo1).
-        forward IHelts; eauto.
-        forward IHelts; eauto.
-        inv IHelts.
-        reflexivity.
-  Qed.
-
   (* TODO: Should we move this? *)
   Definition fin_to_inf_uvalue (uv_fin : DVCrev.DV1.uvalue) : DVCrev.DV2.uvalue.
     pose proof uvalue_convert_strict_safe uv_fin as [uvi [CONV RCONV]].
@@ -8670,6 +8569,199 @@ Qed.
         reflexivity.
   Qed.
 
+  (* TODO: Move these *)
+  Lemma fin_to_inf_dvalue_refine_strict :
+    forall d,
+      dvalue_refine_strict (fin_to_inf_dvalue d) d.
+  Proof.
+    intros d.
+    rewrite dvalue_refine_strict_equation.
+    unfold fin_to_inf_dvalue.
+    break_match; cbn in *.
+    destruct p.
+    auto.
+  Qed.
+
+  Lemma fin_to_inf_uvalue_refine_strict :
+    forall u,
+      uvalue_refine_strict (fin_to_inf_uvalue u) u.
+  Proof.
+    intros u.
+    rewrite uvalue_refine_strict_equation.
+    unfold fin_to_inf_uvalue.
+    break_match; cbn in *.
+    destruct p.
+    auto.
+  Qed.
+
+  Lemma fin_to_inf_dvalue_refine_strict' :
+    forall d_inf d_fin,
+      DVC.dvalue_refine_strict d_inf d_fin ->
+      d_inf = fin_to_inf_dvalue d_fin.
+  Proof.
+    intros d_inf d_fin H.
+    rewrite DVC.dvalue_refine_strict_equation in H.
+    unfold fin_to_inf_dvalue.
+    break_match; cbn in *.
+    destruct p.
+    clear Heqs.
+
+    revert d_fin H x e e0.
+    induction d_inf; intros d_fin H' x' e e0; try rename H into H''; rename H' into H;
+      try solve
+        [ cbn in *; inv H;
+          cbn in *; inv e;
+          auto
+        ].
+    - cbn in *.
+      break_match_hyp; inv H.
+      cbn in *.
+      break_match_hyp; inv e.
+      cbn in *.
+      break_match_hyp; inv e0.
+
+      pose proof AC1.addr_convert_injective a a1 a0 Heqo Heqo1.
+      subst.
+      auto.
+    - cbn in *; break_match_hyp; inv H.
+      cbn in *; inv e.
+      cbn in *; break_match_hyp; inv H0.
+      cbn in *; break_match_hyp; inv e0.
+
+      pose proof (IP.from_Z_injective _ _ _ Heqo Heqo1).
+      apply IS1.LP.IP.to_Z_inj in H.
+      subst.
+      reflexivity.
+    - cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHfields _ eq_refl l Heqo1).
+        forward IHfields; eauto.
+        forward IHfields; eauto.
+        inv IHfields.
+        reflexivity.
+    - cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction fields; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHfields _ eq_refl l Heqo1).
+        forward IHfields; eauto.
+        forward IHfields; eauto.
+        inv IHfields.
+        reflexivity.
+    - cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHelts _ eq_refl l Heqo1).
+        forward IHelts; eauto.
+        forward IHelts; eauto.
+        inv IHelts.
+        reflexivity.
+    - cbn in *; break_match_hyp; inv H.
+      cbn in *; break_match_hyp; inv e.
+      cbn in *; break_match_hyp; inv e0.
+
+      revert l Heqo l0 Heqo1 H'' Heqo0.
+      induction elts; intros l Heqo l0 Heqo1 H'' Heqo0.
+      + cbn in *. inv Heqo.
+        cbn in *. inv Heqo0.
+        reflexivity.
+      + rewrite map_monad_unfold in Heqo.
+        cbn in *.
+        break_match_hyp; inv Heqo.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo0.
+        cbn in *.
+        break_match_hyp; inv Heqo0.
+        break_match_hyp; inv H0.
+
+        rewrite map_monad_unfold in Heqo1.
+        cbn in *.
+        break_match_hyp; inv Heqo1.
+        break_match_hyp; inv H0.
+
+        (* Show that a = u0 *)
+        pose proof (H'' a (or_introl eq_refl) _ Heqo2 _ Heqo3 Heqo4); subst.
+
+        specialize (IHelts _ eq_refl l Heqo1).
+        forward IHelts; eauto.
+        forward IHelts; eauto.
+        inv IHelts.
+        reflexivity.
+  Qed.
+
   Definition uvalue_concretize_u_fin_inf_inclusion uv_inf uv_fin :=
     forall res,
       IS2.MEM.CP.CONC.concretize_u uv_fin res ->
@@ -8884,6 +8976,7 @@ Qed.
     forall v1 v2 iop res_fin res_inf,
       @eval_int_op err_ub_oom int64 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@VIntVMemInt int64 VInt64) ToDvalue_Int64
         iop v1 v2 = success_unERR_UB_OOM res_fin ->
@@ -8891,6 +8984,7 @@ Qed.
       @IS1.LP.Events.DV.eval_int_op err_ub_oom int64
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@IS1.LP.Events.DV.VIntVMemInt int64 IS1.LP.Events.DV.VInt64) IS1.LP.Events.DV.ToDvalue_Int64
         iop v1 v2 = success_unERR_UB_OOM res_inf.
@@ -8943,6 +9037,7 @@ Qed.
     forall v1 v2 iop res_fin res_inf,
       @eval_int_op err_ub_oom int16 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@VIntVMemInt int16 VInt16) ToDvalue_Int16
         iop v1 v2 = success_unERR_UB_OOM res_fin ->
@@ -8950,6 +9045,7 @@ Qed.
       @IS1.LP.Events.DV.eval_int_op err_ub_oom int16
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@IS1.LP.Events.DV.VIntVMemInt int16 IS1.LP.Events.DV.VInt16) IS1.LP.Events.DV.ToDvalue_Int16
         iop v1 v2 = success_unERR_UB_OOM res_inf.
@@ -9002,6 +9098,7 @@ Qed.
     forall v1 v2 iop res_fin res_inf,
       @eval_int_op err_ub_oom int32 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@VIntVMemInt int32 VInt32) ToDvalue_Int32
         iop v1 v2 = success_unERR_UB_OOM res_fin ->
@@ -9009,6 +9106,7 @@ Qed.
       @IS1.LP.Events.DV.eval_int_op err_ub_oom int32
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@IS1.LP.Events.DV.VIntVMemInt int32 IS1.LP.Events.DV.VInt32) IS1.LP.Events.DV.ToDvalue_Int32
         iop v1 v2 = success_unERR_UB_OOM res_inf.
@@ -9061,6 +9159,7 @@ Qed.
     forall v1 v2 iop res_fin res_inf,
       @eval_int_op err_ub_oom int8 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@VIntVMemInt int8 VInt8) ToDvalue_Int8
         iop v1 v2 = success_unERR_UB_OOM res_fin ->
@@ -9068,6 +9167,7 @@ Qed.
       @IS1.LP.Events.DV.eval_int_op err_ub_oom int8
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@IS1.LP.Events.DV.VIntVMemInt int8 IS1.LP.Events.DV.VInt8) IS1.LP.Events.DV.ToDvalue_Int8
         iop v1 v2 = success_unERR_UB_OOM res_inf.
@@ -9120,6 +9220,7 @@ Qed.
     forall v1 v2 iop res_fin res_inf,
       @eval_int_op err_ub_oom int1 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@VIntVMemInt int1 VInt1) ToDvalue_Int1
         iop v1 v2 = success_unERR_UB_OOM res_fin ->
@@ -9127,6 +9228,7 @@ Qed.
       @IS1.LP.Events.DV.eval_int_op err_ub_oom int1
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@IS1.LP.Events.DV.VIntVMemInt int1 IS1.LP.Events.DV.VInt1) IS1.LP.Events.DV.ToDvalue_Int1
         iop v1 v2 = success_unERR_UB_OOM res_inf.
@@ -9150,6 +9252,7 @@ Qed.
     forall v1_fin v2_fin v1_inf v2_inf iop res_fin res_inf,
       @eval_int_op err_ub_oom IP.intptr (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         VMemInt_intptr' ToDvalue_intptr
         iop v1_fin v2_fin = success_unERR_UB_OOM res_fin ->
@@ -9159,6 +9262,7 @@ Qed.
       @IS1.LP.Events.DV.eval_int_op err_ub_oom IS1.LP.IP.intptr
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         IS1.LP.Events.DV.VMemInt_intptr' IS1.LP.Events.DV.ToDvalue_intptr
         iop v1_inf v2_inf = success_unERR_UB_OOM res_inf.
@@ -9239,7 +9343,7 @@ Qed.
         move CONV after Heqb.
         break_match_hyp_inv.
 
-        epose proof VMEM_REF.mmul_refine _ _ _ v1_inf v2_inf V1 V2 HMUL as (?&?&?).
+        epose proof VMEM_REF.mmul_refine _ _ _ v1_inf v2_inf V1 V2 HMUL as (?&?&?&?).
         rewrite H0 in Heqo.
         rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
         inv Heqo.
@@ -9248,9 +9352,8 @@ Qed.
         setoid_rewrite IS1.LP.IP.VMemInt_intptr_dtyp.
         setoid_rewrite dtyp_eqb_refl.
         break_match_goal; try reflexivity.
-
-        (* Contradiction, but need to know something about munsigned *)
-        admit.
+        setoid_rewrite Heqb1 in H1.
+        inv H1.
       }
 
       break_match_hyp_inv.
@@ -9264,7 +9367,7 @@ Qed.
         move CONV after Heqb.
         break_match_hyp_inv.
 
-        epose proof VMEM_REF.mmul_refine _ _ _ v1_inf v2_inf V1 V2 HMUL as (?&?&?).
+        epose proof VMEM_REF.mmul_refine _ _ _ v1_inf v2_inf V1 V2 HMUL as (?&?&?&?).
         rewrite H0 in Heqo.
         rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
         inv Heqo.
@@ -9274,11 +9377,57 @@ Qed.
         setoid_rewrite dtyp_eqb_refl.
         break_match_goal; try reflexivity.
 
-        (* Contradiction, but need to know something about munsigned *)
-        admit.
+        setoid_rewrite Heqb1 in H1.
+        inv H1.
       }
 
-      admit.
+      break_match_goal.
+      {
+        remember (lift_OOM (mmul v1_fin v2_fin)) as mul_result.
+        destruct_err_ub_oom mul_result; inv H0.
+        symmetry in Heqmul_result.
+        destruct (mmul v1_fin v2_fin) eqn:HMUL; inv Heqmul_result.
+        epose proof VMEM_REF.mmul_refine _ _ _ v1_inf v2_inf V1 V2 HMUL as (?&?&?&?).
+        setoid_rewrite H.
+        cbn.
+
+        setoid_rewrite IP.VMemInt_intptr_dtyp in H1.
+        rewrite dtyp_eqb_refl in H1.
+        setoid_rewrite VMEM_REF.munsigned_refine in H1; eauto.
+        rewrite H2 in H1.
+        cbn in *.
+        inv H1.
+
+        cbn in CONV.
+        break_match_hyp_inv.
+        rewrite H0 in Heqo.
+        rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+        inv Heqo; auto.
+      }
+
+      remember (lift_OOM (mmul v1_fin v2_fin)) as mul_result.
+      destruct_err_ub_oom mul_result; inv H0.
+      symmetry in Heqmul_result.
+      destruct (mmul v1_fin v2_fin) eqn:HMUL; inv Heqmul_result.
+      epose proof VMEM_REF.mmul_refine _ _ _ v1_inf v2_inf V1 V2 HMUL as (?&?&?&?).
+      setoid_rewrite H.
+      cbn.
+      setoid_rewrite H2.
+
+      setoid_rewrite IP.VMemInt_intptr_dtyp in H1.
+      setoid_rewrite IS1.LP.IP.VMemInt_intptr_dtyp.
+      rewrite dtyp_eqb_refl.
+      rewrite dtyp_eqb_refl in H1.
+      setoid_rewrite VMEM_REF.munsigned_refine in H1; eauto.
+      rewrite H2 in H1.
+      cbn in *.
+      inv H1.
+
+      cbn in CONV.
+      break_match_hyp_inv.
+      rewrite H0 in Heqo.
+      rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+      inv Heqo; auto.
     - (* Shl *)
       cbn in *.
       destruct (mshl v1_fin v2_fin) eqn:HSHL;
@@ -9286,20 +9435,97 @@ Qed.
 
       epose proof VMEM_REF.mshl_refine _ _ _ v1_inf v2_inf V1 V2 HSHL as (?&?&?).
       setoid_rewrite H; cbn in *.
-
-      admit.
+      setoid_rewrite IP.VMemInt_intptr_dtyp in H0.
+      setoid_rewrite IS1.LP.IP.VMemInt_intptr_dtyp.
+      setoid_rewrite dtyp_eqb_refl.
+      setoid_rewrite dtyp_eqb_refl in H0.
+      setoid_rewrite VMEM_REF.munsigned_refine in H0; eauto.
+      break_match_hyp_inv.
+      setoid_rewrite Heqb.
+      cbn.
+      cbn in CONV.
+      break_match_hyp_inv.
+      rewrite H1 in Heqo.
+      rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+      inv Heqo; auto.
     - (* UDiv *)
-      admit.
+      cbn.
+      cbn in EVAL.
+      setoid_rewrite VMEM_REF.munsigned_refine in EVAL; eauto.
+      break_match_hyp_inv.
+      setoid_rewrite Heqb.
+      setoid_rewrite VMEM_REF.munsigned_refine in H0; eauto.
+      break_match_hyp_inv;
+        setoid_rewrite Heqb0;
+        cbn in CONV; inv CONV.
+      + setoid_rewrite IP.VMemInt_intptr_dtyp;
+          setoid_rewrite IS1.LP.IP.VMemInt_intptr_dtyp.
+        reflexivity.
+      + break_match_hyp_inv.
+        remember (mdivu v1_fin v2_fin) as div_res.
+        symmetry in Heqdiv_res.
+        pose proof VMEM_REF.mdivu_refine _ _ _ _ _ V1 V2 Heqdiv_res
+          as (?&?&?).
+        setoid_rewrite H.
+        rewrite H0 in Heqo.
+        rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+        inv Heqo.
+        auto.
     - (* SDiv *)
-      admit.
+      cbn in *.
+      setoid_rewrite IP.VMemInt_intptr_dtyp in EVAL.
+      setoid_rewrite dtyp_eqb_refl in EVAL.
+      inv EVAL.
     - (* LShr *)
-      admit.
+      cbn in *.
+      setoid_rewrite IP.VMemInt_intptr_dtyp in EVAL.
+      setoid_rewrite dtyp_eqb_refl in EVAL.
+      setoid_rewrite IS1.LP.IP.VMemInt_intptr_dtyp.
+      setoid_rewrite dtyp_eqb_refl.
+      cbn in *.
+      rewrite Bool.andb_false_r in *.
+      setoid_rewrite VMEM_REF.munsigned_refine in EVAL; eauto.
+      break_match_hyp_inv; setoid_rewrite Heqb;
+        cbn in CONV; inv CONV.
+      + setoid_rewrite IP.VMemInt_intptr_dtyp;
+          setoid_rewrite IS1.LP.IP.VMemInt_intptr_dtyp.
+        reflexivity.
+      + break_match_hyp_inv.
+        remember (mshru v1_fin v2_fin) as shru_res.
+        symmetry in Heqshru_res.
+        pose proof VMEM_REF.mshru_refine _ _ _ _ _ V1 V2 Heqshru_res
+          as (?&?&?).
+        setoid_rewrite H.
+        rewrite H0 in Heqo.
+        rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+        inv Heqo.
+        auto.
     - (* AShr *)
-      admit.
+      cbn in *.
+      setoid_rewrite IP.VMemInt_intptr_dtyp in EVAL.
+      setoid_rewrite dtyp_eqb_refl in EVAL.
+      inv EVAL.
     - (* URem *)
-      admit.
+      cbn in *.
+      setoid_rewrite VMEM_REF.munsigned_refine in EVAL; eauto.
+      break_match_hyp_inv.
+      setoid_rewrite Heqb.
+      cbn in CONV.
+      break_match_hyp_inv.
+      remember (mmodu v1_fin v2_fin) as res.
+      symmetry in Heqres.
+      pose proof VMEM_REF.mmodu_refine _ _ _ _ _ V1 V2 Heqres
+        as (?&?&?).
+      setoid_rewrite H.
+      rewrite H0 in Heqo.
+      rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
+      inv Heqo.
+      auto.
     - (* SRem *)
-      admit.
+      cbn in *.
+      setoid_rewrite IP.VMemInt_intptr_dtyp in EVAL.
+      setoid_rewrite dtyp_eqb_refl in EVAL.
+      inv EVAL.
     - (* And *)
       cbn in *; inv EVAL.
       remember (mand v1_fin v2_fin) as res_fin.
@@ -9339,7 +9565,7 @@ Qed.
       rewrite IS1.LP.IP.to_Z_from_Z in Heqo.
       inv Heqo.
       reflexivity.
-  Admitted.
+  Qed.
 
   Lemma dvalue_convert_strict_fin_inf_succeeds_fin_to_inf_dvalue' :
     forall res,
@@ -9527,20 +9753,54 @@ Qed.
 
   Hint Resolve eval_iop_fin_inf : EVAL_INT_FIN_INF.
 
-  Lemma eval_int_icmp_fin_inf :
-    forall {Int} {VMInt : VellvmIntegers.VMemInt Int} icmp a b,
-      DVCrev.dvalue_convert_strict (@eval_int_icmp Int VMInt icmp a b) =
-        NoOom
-          (@IS1.LP.Events.DV.eval_int_icmp Int VMInt icmp a b).
+  Lemma ptr_to_int_fin_to_inf_addr :
+    forall a,
+      IS1.LP.PTOI.ptr_to_int (fin_to_inf_addr a) = PTOI.ptr_to_int a.
   Proof.
-    intros Int VMInt icmp a b.
+    intros a.
+    unfold fin_to_inf_addr.
+    break_match_goal.
+    clear Heqs.
+    erewrite AC2.addr_convert_ptoi; eauto.
+  Qed.
+
+  Lemma eval_int_icmp_fin_inf :
+    forall {Int} {VMInt : VellvmIntegers.VMemInt Int} icmp a b res_fin,
+      @eval_int_icmp err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt icmp a b = ret res_fin  ->
+      @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt icmp a b = ret (fin_to_inf_dvalue res_fin).
+  Proof.
+    intros Int VMInt icmp a b res_fin FIN.
     unfold eval_int_icmp, IS1.LP.Events.DV.eval_int_icmp.
     destruct icmp;
       try solve
         [ break_match_goal;
           cbn; auto
         ].
-  Qed.
+  Admitted.
+
+  (* TODO: Move this *)
+  Lemma eval_int_icmp_iptr_fin_inf :
+    forall v1_fin v2_fin v1_inf v2_inf icmp res_fin res_inf,
+      @eval_int_icmp err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        IP.intptr
+        VMemInt_intptr'
+        icmp v1_fin v2_fin = success_unERR_UB_OOM res_fin ->
+      IS1.LP.IP.from_Z (IP.to_Z v1_fin) = NoOom v1_inf ->
+      IS1.LP.IP.from_Z (IP.to_Z v2_fin) = NoOom v2_inf ->
+      DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
+      @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        IS1.LP.IP.intptr
+        IS1.LP.Events.DV.VMemInt_intptr'
+        icmp v1_inf v2_inf = success_unERR_UB_OOM res_inf.
+  Proof.
+  Admitted.
 
   (* TODO: Move this / generalize monad? *)
   Lemma eval_icmp_fin_inf :
@@ -9556,115 +9816,41 @@ Qed.
         icmp dv1_inf dv2_inf = ret (fin_to_inf_dvalue res_fin).
   Proof.
     intros dv1_fin dv2_fin res_fin icmp dv1_inf dv2_inf EVAL LIFT1 LIFT2.
+    Opaque IS1.LP.Events.DV.eval_int_icmp
+      eval_int_icmp.
     unfold eval_icmp in EVAL.
     (* Nasty case analysis... *)
     break_match_hyp_inv;
       try solve
         [ (* Simple integer cases *)
           break_match_hyp_inv;
-          [ unfold fin_to_inf_dvalue;
-
-            break_match_goal; clear Heqs;
-            destruct p; clear e0;
-            cbn in *; inv e;
-
-            break_match_goal; clear Heqs;
-            destruct p; clear e0;
-            cbn in *; inv e;
-
-            break_match_goal; clear Heqs;
-            destruct p; clear e0;
-            cbn;
-
-            rewrite eval_int_icmp_fin_inf in e; inv e;
-            reflexivity
-          | unfold fin_to_inf_dvalue;
-
-            break_match_goal; clear Heqs;
-            destruct p; clear e0;
-            cbn in *; inv e;
-
-            break_match_goal; clear Heqs;
-            destruct p; clear e0;
-            cbn in *; inv e;
-
-            cbn;
-            reflexivity
-          ]
-        | (* Ill-typed cases *)
-          break_match_hyp_inv
+          repeat rewrite_fin_to_inf_dvalue;
+          cbn;
+          auto;
+          eapply eval_int_icmp_fin_inf in H1;
+          auto
         ].
 
     { (* dv1: addr *)
       break_match_hyp_inv.
-      unfold fin_to_inf_dvalue.
-
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      cbn in *.
-      break_match_hyp_inv.
-
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      cbn in *.
-      break_match_hyp_inv.
-
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
+      repeat rewrite_fin_to_inf_dvalue.
       cbn.
-
-      erewrite AC2.addr_convert_ptoi in e; eauto.
-      erewrite AC2.addr_convert_ptoi in e; eauto.
-
-      rewrite eval_int_icmp_fin_inf in e; inv e.
-      reflexivity.
+      eapply eval_int_icmp_fin_inf in H1.
+      repeat rewrite ptr_to_int_fin_to_inf_addr.
+      auto.
     }
 
     { (* dv1: iptr *)
       break_match_hyp_inv.
-      unfold fin_to_inf_dvalue.
-
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      cbn in *; inv e.
-
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
-      cbn in *; inv e.
-
-      break_match_goal; clear Heqs.
-      destruct p; clear e0.
+      repeat rewrite_fin_to_inf_dvalue.
       cbn.
-
-      repeat break_match_hyp_inv.
-
-      (* TODO: Annoying intptr differences... *)
-      (* NOTE: different implicit arguments *)
-      rewrite eval_int_icmp_fin_inf in e; inv e.
-      pose proof IS1.LP.IP.to_Z_from_Z i.
-      pose proof IS1.LP.IP.from_Z_injective _ _ _ Heqo H.
-      rewrite H0 in Heqo.
-      cbn.
-      unfold IS1.LP.Events.DV.eval_int_icmp.
-      admit.
+      unfold intptr_fin_inf.
+      do 2 break_match_goal.
+      clear Heqs Heqs0.
+      eapply eval_int_icmp_iptr_fin_inf in H1; eauto.
+      eapply dvalue_convert_strict_fin_inf_succeeds_fin_to_inf_dvalue'.
     }
-
-    { (* dv1: poison *)
-      break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-
-        break_match_goal; clear Heqs;
-        destruct p; clear e0;
-        cbn in *; inv e;
-
-        break_match_goal; clear Heqs;
-        destruct p; clear e0;
-        cbn in *; inv e;
-
-        cbn;
-        reflexivity.
-    }
-  Admitted.
+  Qed.
 
   Lemma double_op_fin_inf :
     forall fop a b res_fin res_inf,
@@ -9923,7 +10109,7 @@ Qed.
   Lemma get_conv_case_pure_fin_inf:
     forall conv t_from dv t_to res,
       get_conv_case conv t_from dv t_to = Conv_Pure res ->
-      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = IS1.LP.Events.DV.Conv_Pure (fin_to_inf_uvalue res).
+      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = IS1.LP.Events.DV.Conv_Pure (fin_to_inf_dvalue res).
   Proof.
     intros conv t_from dv t_to res CONV.
     destruct conv.
@@ -10033,27 +10219,6 @@ Qed.
       unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
 
       repeat rewrite bit_sizeof_dtyp_fin_inf.
-      repeat break_match_hyp_inv.
-      remember (StateMonad.evalStateT
-                     (IS1.LLVM.MEM.CP.CONC.MemHelpers.serialize_sbytes
-                        (IS1.LP.Events.DV.dvalue_to_uvalue (fin_to_inf_dvalue dv)) t_from) 0) as ser_res.
-
-      (* destruct t_to; inv Heqser_res. *)
-      (* - unfold MemHelpers.deserialize_sbytes in *. *)
-      (*   (* Not necessarily the same type *) *)
-      (*   erewrite from_ubytes_to_ubytes in Heqsb. *)
-
-
-      (* destruct_err_ub_oom ser_res; cbn; subst. *)
-      (* 1-3: exfalso. *)
-      (* subst. *)
-      (* destruct unERR_UB_OOM. *)
-      (* do 3 destruct unEitherT. *)
-      (* destruct unIdent; *)
-      (*   inv Heqs; *)
-      (*   unfold StateMonad.evalStateT; *)
-      (*   cbn. *)
-      admit.
       admit.
     }
 
@@ -10176,8 +10341,112 @@ Qed.
     }
   Qed.
 
+  Lemma get_conv_case_ptoi_fin_inf:
+    forall conv t_from dv t_to res,
+      get_conv_case conv t_from dv t_to = Conv_PtoI res ->
+      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = IS1.LP.Events.DV.Conv_PtoI (fin_to_inf_dvalue res).
+  Proof.
+    intros conv t_from dv t_to res CONV.
+    destruct conv.
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue; inv CONV.
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue; inv CONV.
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        inv CONV.
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        inv CONV.
+    }
+
+    { (* inttoptr *)
+      cbn in *.
+      repeat break_match_hyp_inv; reflexivity.
+    }
+
+    { cbn in *.
+      repeat break_match_hyp_inv; auto.
+    }
+
+    { (* Conversions... *)
+      unfold get_conv_case in CONV.
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+
+      repeat rewrite bit_sizeof_dtyp_fin_inf.
+      repeat break_match_hyp_inv.
+    }
+
+    { (* Addrspacecast *)
+      cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        break_match_goal; inv CONV.
+    }
+  Qed.
+
   Lemma handle_gep_h_fin_inf :
-    forall idxs_fin idxs_inf t base res,
+    forall  idxs_fin idxs_inf t base res,
       GEP.handle_gep_h t base idxs_fin = inr res ->
       map fin_to_inf_dvalue idxs_fin = idxs_inf ->
       IS1.LLVM.MEM.MP.GEP.handle_gep_h t base idxs_inf = inr res.
@@ -13951,37 +14220,12 @@ Qed.
         apply convert_fin_to_inf_uvalue_succeeds.
   Qed.
 
-  (* TODO: Move these *)
-  Lemma fin_to_inf_dvalue_refine_strict :
-    forall d,
-      dvalue_refine_strict (fin_to_inf_dvalue d) d.
-  Proof.
-    intros d.
-    rewrite dvalue_refine_strict_equation.
-    unfold fin_to_inf_dvalue.
-    break_match; cbn in *.
-    destruct p.
-    auto.
-  Qed.
-
-  Lemma fin_to_inf_uvalue_refine_strict :
-    forall u,
-      uvalue_refine_strict (fin_to_inf_uvalue u) u.
-  Proof.
-    intros u.
-    rewrite uvalue_refine_strict_equation.
-    unfold fin_to_inf_uvalue.
-    break_match; cbn in *.
-    destruct p.
-    auto.
-  Qed.
-
   Definition dvalue_byte_refine
-    (dvb_inf : IS1.MEM.CP.CONCBASE.dvalue_byte)
+    (dvb_inf : IS1.MEM.DVALUE_BYTE.dvalue_byte)
     (dvb_fin : dvalue_byte) : Prop
     :=
     match dvb_inf, dvb_fin with
-    | (IS1.MEM.CP.CONCBASE.DVALUE_ExtractByte dv_inf dt_inf ix_inf),
+    | (IS1.MEM.DVALUE_BYTE.DVALUE_ExtractByte dv_inf dt_inf ix_inf),
       (DVALUE_ExtractByte dv_fin dt_fin ix_fin)
       =>
         dvalue_refine_strict dv_inf dv_fin /\
@@ -13990,27 +14234,27 @@ Qed.
     end.
 
   Definition inf_to_fin_dvalue_byte
-    (dvb_inf : IS1.MEM.CP.CONCBASE.dvalue_byte) : OOM dvalue_byte
+    (dvb_inf : IS1.MEM.DVALUE_BYTE.dvalue_byte) : OOM dvalue_byte
     :=
     match dvb_inf with
-    | (IS1.MEM.CP.CONCBASE.DVALUE_ExtractByte dv_inf dt ix)
+    | (IS1.MEM.DVALUE_BYTE.DVALUE_ExtractByte dv_inf dt ix)
       =>
         dv_fin <- dvalue_convert_strict dv_inf;;
         ret (DVALUE_ExtractByte dv_fin dt ix)
     end.
 
   Definition fin_to_inf_dvalue_byte
-    (dvb_fin : dvalue_byte) : IS1.MEM.CP.CONCBASE.dvalue_byte
+    (dvb_fin : dvalue_byte) : IS1.MEM.DVALUE_BYTE.dvalue_byte
     :=
     match dvb_fin with
     | DVALUE_ExtractByte dv_fin dt ix
       =>
         let dv_inf := fin_to_inf_dvalue dv_fin in
-        IS1.MEM.CP.CONCBASE.DVALUE_ExtractByte dv_inf dt ix
+        IS1.MEM.DVALUE_BYTE.DVALUE_ExtractByte dv_inf dt ix
     end.
 
   Definition dvalue_bytes_refine
-    (dvbs_inf : list IS1.MEM.CP.CONCBASE.dvalue_byte)
+    (dvbs_inf : list IS1.MEM.DVALUE_BYTE.dvalue_byte)
     (dvbs_fin : list dvalue_byte) : Prop
     := Forall2 dvalue_byte_refine dvbs_inf dvbs_fin.
 
@@ -14039,63 +14283,80 @@ Qed.
       apply dvalue_byte_refine_fin_to_inf_dvalue_byte.
   Qed.
 
+  Lemma extract_field_byte_helper_fin_inf :
+    forall {M : Type -> Type} {HM: Monad M} {RE: RAISE_ERROR M}
+      (field_dts : list dtyp) (field_idx : N) (byte_idx : N),
+      @IS1.LLVM.MEM.DVALUE_BYTE.extract_field_byte_helper M HM RE field_dts field_idx byte_idx =
+        @extract_field_byte_helper M HM RE field_dts field_idx byte_idx.
+  Proof.
+    intros M HM RE field_dts.
+    induction field_dts;
+      intros field_idx byte_idx;
+      cbn; auto.
+    rewrite sizeof_dtyp_fin_inf.
+    rewrite IHfield_dts.
+    reflexivity.
+  Qed.
+
+  Lemma extract_field_byte_fin_inf :
+    forall {M : Type -> Type} {HM: Monad M} {RE: RAISE_ERROR M}
+      (field_dts : list dtyp) (byte_idx : N),
+      @IS1.LLVM.MEM.DVALUE_BYTE.extract_field_byte M HM RE field_dts byte_idx =
+        @extract_field_byte M HM RE field_dts byte_idx.
+  Proof.
+    intros M HM RE field_dts byte_idx.
+    apply extract_field_byte_helper_fin_inf.
+  Qed.
+
   Lemma dvalue_extract_byte_success_fin_inf :
     forall dv_inf dv_fin dt idx res,
       dvalue_refine_strict dv_inf dv_fin ->
       @dvalue_extract_byte ErrOOMPoison
-        (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-           (@Monad_OomableT Poisonable MonadPoisonable))
-        (@RAISE_ERROR_MonadExc ErrOOMPoison
-           (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
-              (@Monad_OomableT Poisonable MonadPoisonable)))
-        (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-              (@Monad_OomableT Poisonable MonadPoisonable))
-           (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
-              RAISE_POISON_Poisonable))
-        (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-              (@Monad_OomableT Poisonable MonadPoisonable))
-           (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dv_fin dt idx = ret res ->
-      @IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
-        (@EitherMonad.Monad_eitherT ERR_MESSAGE
-           (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-           (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-              IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-        (@RAISE_ERROR_MonadExc IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
-           (@EitherMonad.Exception_eitherT ERR_MESSAGE
-              (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-              (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)))
-        (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT
-           (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-           (EitherMonad.eitherT ERR_MESSAGE)
-           (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-              (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-              (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-           (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-              IS1.LLVM.MEM.CP.CONCBASE.OomableT
-              (@IS1.LLVM.MEM.CP.CONCBASE.MonadT_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)
-              IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_Poisonable))
-        (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_E_MT
-           (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-           (EitherMonad.eitherT ERR_MESSAGE)
-           (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-              (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-              (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-           (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-              IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)) dv_inf dt idx = ret res.
+          (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+             (@Monad_OomableT Poisonable MonadPoisonable))
+          (@RAISE_ERROR_MonadExc ErrOOMPoison
+             (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+                (@Monad_OomableT Poisonable MonadPoisonable)))
+          (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+             (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                (@Monad_OomableT Poisonable MonadPoisonable))
+             (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
+                RAISE_POISON_Poisonable))
+          (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+             (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                (@Monad_OomableT Poisonable MonadPoisonable))
+             (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dv_fin dt idx =
+        @ret ErrOOMPoison
+          (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+             (@Monad_OomableT Poisonable MonadPoisonable)) Z res ->
+ @IS1.LLVM.MEM.DVALUE_BYTE.dvalue_extract_byte ErrOOMPoison
+    (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+       (@Monad_OomableT Poisonable MonadPoisonable))
+    (@RAISE_ERROR_MonadExc ErrOOMPoison
+       (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+          (@Monad_OomableT Poisonable MonadPoisonable)))
+    (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+       (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+          (@Monad_OomableT Poisonable MonadPoisonable))
+       (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
+          RAISE_POISON_Poisonable))
+    (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+       (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+          (@Monad_OomableT Poisonable MonadPoisonable))
+       (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dv_inf dt idx =
+  @ret ErrOOMPoison
+    (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+       (@Monad_OomableT Poisonable MonadPoisonable)) Z res.
   Proof.
     intros dv_inf dv_fin dt idx res REF VAL.
-    rewrite dvalue_extract_byte_equation in VAL.
-    rewrite IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte_equation.
-
-    destruct dv_fin; dvalue_refine_strict_inv REF;
+    Opaque dvalue_extract_byte.
+    Opaque IS1.LLVM.MEM.DVALUE_BYTE.dvalue_extract_byte.
+    induction dv_fin using dvalue_strong_ind;
+      rewrite dvalue_extract_byte_equation in VAL;
+      rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_extract_byte_equation;
       try solve
-        [ unfold extract_byte_Z, IS1.LLVM.MEM.CP.CONCBASE.extract_byte_Z in *;
+        [ dvalue_refine_strict_inv REF;
+          unfold extract_byte_Z, IS1.LLVM.MEM.DVALUE_BYTE.extract_byte_Z in *;
           inv VAL;
           solve
             [ reflexivity
@@ -14103,13 +14364,36 @@ Qed.
             | erewrite IP.from_Z_to_Z; eauto
             ]
         ].
-    - destruct dt; inv VAL.
-      Opaque dvalue_extract_byte.
-      Opaque IS1.LLVM.MEM.CP.CONCBASE.dvalue_extract_byte.
-      do 5 break_match_hyp_inv.
-      destruct (nth_error fields (N.to_nat n)) eqn:FIELDS;
-        [|inv H2].
-      cbn.
+    - destruct dv_fin; inv VAL;
+        try solve
+          [ dvalue_refine_strict_inv REF;
+            unfold extract_byte_Z, IS1.LLVM.MEM.DVALUE_BYTE.extract_byte_Z in *;
+            try inv H0;
+            solve
+              [ reflexivity
+              | erewrite AC1.addr_convert_ptoi; eauto
+              | erewrite IP.from_Z_to_Z; eauto
+              ]
+          ].
+
+      { (* Structs *)
+        destruct dt; inv H1.
+        rewrite extract_field_byte_fin_inf.
+        destruct (extract_field_byte fields0 (Z.to_N idx)) eqn:FIELD.
+        destruct unEitherT.
+        destruct unMkOomableT; inv H2.
+        destruct o; inv H1.
+        destruct s; inv H2.
+        destruct p as (?&?&?).
+        cbn in *.
+        destruct (nth_error fields (N.to_nat n)) eqn:NTH;
+          [|inv H1].
+
+        eapply map_monad_OOM_Nth in NTH; eauto.
+        destruct NTH as (?&?&?).
+        admit.
+        admit.
+      }
   Admitted.
 
   Lemma dvalue_byte_value_success_fin_inf :
@@ -14130,42 +14414,42 @@ Qed.
            (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
               (@Monad_OomableT Poisonable MonadPoisonable))
            (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvb_fin = ret res ->
-      (@IS1.LLVM.MEM.CP.CONCBASE.dvalue_byte_value IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+      (@IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte_value ErrOOMPoison
          (@EitherMonad.Monad_eitherT ERR_MESSAGE
-            (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-            (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-               IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-         (@RAISE_ERROR_MonadExc IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+            (OomableT Poisonable)
+            (@Monad_OomableT Poisonable
+               MonadPoisonable))
+         (@RAISE_ERROR_MonadExc ErrOOMPoison
             (@EitherMonad.Exception_eitherT ERR_MESSAGE
-               (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-               (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)))
-         (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT
-            (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable)))
+         (@RAISE_POISON_E_MT
+            (OomableT Poisonable)
             (EitherMonad.eitherT ERR_MESSAGE)
             (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-               (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-            (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-               IS1.LLVM.MEM.CP.CONCBASE.OomableT
-               (@IS1.LLVM.MEM.CP.CONCBASE.MonadT_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)
-               IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_Poisonable))
-         (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_E_MT
-            (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable))
+            (@RAISE_POISON_E_MT Poisonable
+               OomableT
+               (@MonadT_OomableT Poisonable
+                  MonadPoisonable)
+               RAISE_POISON_Poisonable))
+         (@RAISE_OOMABLE_E_MT
+            (OomableT Poisonable)
             (EitherMonad.eitherT ERR_MESSAGE)
             (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-               (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-            (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-               IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))) dvb_inf = ret res.
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable))
+            (@RAISE_OOMABLE_OomableT Poisonable
+               MonadPoisonable))) dvb_inf = ret res.
   Proof.
     intros dvb_inf dvb_fin res REF VAL.
     unfold dvalue_byte_value in VAL.
     break_match_hyp; subst.
-    unfold IS1.LLVM.MEM.CP.CONCBASE.dvalue_byte_value.
+    unfold IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte_value.
     break_match_goal; subst.
     red in REF.
     destruct REF as (?&?&?).
@@ -14198,41 +14482,41 @@ Qed.
                (OomableT Poisonable)
                (@Monad_OomableT Poisonable MonadPoisonable))
             (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvbs_fin dt) = ret res ->
-      (@IS1.LLVM.MEM.CP.CONCBASE.dvalue_bytes_to_dvalue IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+      (@IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue ErrOOMPoison
          (@EitherMonad.Monad_eitherT ERR_MESSAGE
-            (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-            (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-               IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-         (@RAISE_ERROR_MonadExc IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+            (OomableT Poisonable)
+            (@Monad_OomableT Poisonable
+               MonadPoisonable))
+         (@RAISE_ERROR_MonadExc ErrOOMPoison
             (@EitherMonad.Exception_eitherT ERR_MESSAGE
-               (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-               (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)))
-         (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT
-            (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable)))
+         (@RAISE_POISON_E_MT
+            (OomableT Poisonable)
             (EitherMonad.eitherT ERR_MESSAGE)
             (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-               (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-            (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-               IS1.LLVM.MEM.CP.CONCBASE.OomableT
-               (@IS1.LLVM.MEM.CP.CONCBASE.MonadT_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)
-               IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_Poisonable))
-         (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_E_MT
-            (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable))
+            (@RAISE_POISON_E_MT Poisonable
+               OomableT
+               (@MonadT_OomableT Poisonable
+                  MonadPoisonable)
+               RAISE_POISON_Poisonable))
+         (@RAISE_OOMABLE_E_MT
+            (OomableT Poisonable)
             (EitherMonad.eitherT ERR_MESSAGE)
             (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-               (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                  IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-            (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-               IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)) dvbs_inf dt) = ret (fin_to_inf_dvalue res).
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable))
+            (@RAISE_OOMABLE_OomableT Poisonable
+               MonadPoisonable)) dvbs_inf dt) = ret (fin_to_inf_dvalue res).
   Proof.
     intros dvbs_fin dvbs_inf dt res REF FIN.
     rewrite dvalue_bytes_to_dvalue_equation in FIN.
-    rewrite IS1.LLVM.MEM.CP.CONCBASE.dvalue_bytes_to_dvalue_equation.
+    rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue_equation.
   Admitted.
 
   Definition concretization_list_refine : (list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)) -> (list (uvalue * dvalue)) -> Prop
@@ -14684,7 +14968,22 @@ Qed.
 
   Lemma dvalue_bytes_to_dvalue_fin_poison_contra :
     forall dvbs_fin dt dt',
-      dvalue_bytes_to_dvalue dvbs_fin dt = {| EitherMonad.unEitherT := {| unMkOomableT := Poison (Oomable (ERR dvalue)) dt' |} |} ->
+      @dvalue_bytes_to_dvalue ErrOOMPoison
+        (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+           (@Monad_OomableT Poisonable MonadPoisonable))
+        (@RAISE_ERROR_MonadExc ErrOOMPoison
+           (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+              (@Monad_OomableT Poisonable MonadPoisonable)))
+        (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+              (@Monad_OomableT Poisonable MonadPoisonable))
+           (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
+              RAISE_POISON_Poisonable))
+        (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+              (@Monad_OomableT Poisonable MonadPoisonable))
+           (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvbs_fin dt =
+        {| EitherMonad.unEitherT := {| unMkOomableT := @Poison (Oomable (ERR dvalue)) dt' |} |} ->
       False.
   Proof.
     Opaque dvalue_bytes_to_dvalue.
@@ -14747,10 +15046,12 @@ Qed.
   Lemma handle_poison_and_oom_dv_dvalue_bytes_to_dvalue_fin_inf_success :
     forall dvbs_inf dvbs_fin dt res,
       dvalue_bytes_refine dvbs_inf dvbs_fin ->
-      @ErrOOMPoison_handle_poison_and_oom_dv err_ub_oom
+      @ErrOOMPoison_handle_poison_and_oom err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        _
+        DVALUE_Poison
         (@dvalue_bytes_to_dvalue ErrOOMPoison
            (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
               (@Monad_OomableT Poisonable MonadPoisonable))
@@ -14766,45 +15067,46 @@ Qed.
               (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
                  (@Monad_OomableT Poisonable MonadPoisonable))
               (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvbs_fin dt) = ret res ->
-      @IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison_handle_poison_and_oom_dv err_ub_oom
+      @ErrOOMPoison_handle_poison_and_oom err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@IS1.LLVM.MEM.CP.CONCBASE.dvalue_bytes_to_dvalue IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+        _
+        IS1.LP.Events.DV.DVALUE_Poison
+        (@IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue ErrOOMPoison
            (@EitherMonad.Monad_eitherT ERR_MESSAGE
-              (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-              (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-           (@RAISE_ERROR_MonadExc IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison
+              (OomableT Poisonable)
+              (@Monad_OomableT Poisonable
+                 MonadPoisonable))
+           (@RAISE_ERROR_MonadExc ErrOOMPoison
               (@EitherMonad.Exception_eitherT ERR_MESSAGE
-                 (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-                 (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                    IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)))
-           (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT
-              (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+                 (OomableT Poisonable)
+                 (@Monad_OomableT Poisonable
+                    MonadPoisonable)))
+           (@RAISE_POISON_E_MT
+              (OomableT Poisonable)
               (EitherMonad.eitherT ERR_MESSAGE)
               (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-                 (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-                 (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                    IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-              (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_E_MT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                 IS1.LLVM.MEM.CP.CONCBASE.OomableT
-                 (@IS1.LLVM.MEM.CP.CONCBASE.MonadT_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                    IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)
-                 IS1.LLVM.MEM.CP.CONCBASE.RAISE_POISON_Poisonable))
-           (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_E_MT
-              (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
+                 (OomableT Poisonable)
+                 (@Monad_OomableT Poisonable
+                    MonadPoisonable))
+              (@RAISE_POISON_E_MT Poisonable
+                 OomableT
+                 (@MonadT_OomableT Poisonable
+                    MonadPoisonable)
+                 RAISE_POISON_Poisonable))
+           (@RAISE_OOMABLE_E_MT
+              (OomableT Poisonable)
               (EitherMonad.eitherT ERR_MESSAGE)
               (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-                 (IS1.LLVM.MEM.CP.CONCBASE.OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable)
-                 (@IS1.LLVM.MEM.CP.CONCBASE.Monad_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                    IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable))
-              (@IS1.LLVM.MEM.CP.CONCBASE.RAISE_OOMABLE_OomableT IS1.LLVM.MEM.CP.CONCBASE.Poisonable
-                 IS1.LLVM.MEM.CP.CONCBASE.MonadPoisonable)) dvbs_inf dt) = ret (fin_to_inf_dvalue res).
+                 (OomableT Poisonable)
+                 (@Monad_OomableT Poisonable
+                    MonadPoisonable))
+              (@RAISE_OOMABLE_OomableT Poisonable
+                 MonadPoisonable)) dvbs_inf dt) = ret (fin_to_inf_dvalue res).
   Proof.
     intros dvbs_inf dvbs_fin dt res REF RES.
-    unfold ErrOOMPoison_handle_poison_and_oom_dv in RES.
-    unfold IS1.LLVM.MEM.CP.CONCBASE.ErrOOMPoison_handle_poison_and_oom_dv.
+    unfold ErrOOMPoison_handle_poison_and_oom in *.
     repeat break_match_hyp_inv.
     - (* No poison occurred *)
       Opaque dvalue_bytes_to_dvalue.
@@ -14894,6 +15196,39 @@ Qed.
   Qed.
 
   Print Assumptions extractbytes_to_dvalue_fin_inf.
+
+  Lemma dvalue_int_unsigned_E1E2 :
+    forall x y,
+      dvalue_refine_strict x y ->
+      IS1.LP.Events.DV.dvalue_int_unsigned x = dvalue_int_unsigned y.
+  Proof.
+    induction x; intros y REF;
+      try
+        solve
+        [ unfold dvalue_refine_strict in *;
+          cbn in *; inv REF; cbn; auto
+        | unfold dvalue_refine_strict in *;
+          cbn in *;
+          break_match_hyp; inv REF;
+          cbn; auto
+        ].
+    - unfold dvalue_refine_strict in *.
+      cbn in *.
+      break_match_hyp_inv.
+      unfold dvalue_int_unsigned.
+      apply IP.from_Z_to_Z in Heqo.
+      rewrite <- IP.to_Z_to_unsigned.
+      rewrite <- IS1.LP.IP.to_Z_to_unsigned.
+      auto.
+  Qed.
+
+  Lemma int_to_ptr_fin_inf :
+    forall z prov prov' a,
+      (* Need something relating prov / prov' *)
+      ITOP.int_to_ptr z prov = NoOom a ->
+      IS1.LP.ITOP.int_to_ptr z prov' = NoOom (fin_to_inf_addr a).
+  Proof.
+  Admitted.
 
   Lemma uvalue_concretize_strict_concretize_inclusion :
     forall uv_inf uv_fin,
@@ -15769,32 +16104,51 @@ Qed.
         rewrite CONV.
         remember (x0 x1) as x0x1.
         destruct_err_ub_oom x0x1; inv H3.
-
-        (* Is 'x' a subterm of uv_inf? I don't think it would be?
-
-           Heqc : get_conv_case conv t_from x1 t_to = Conv_Pure x
-
-           x1 is the dvalue from concretizing u (which is the finite
-           version of uv_inf)
-
-           `fin_to_inf_dvalue x1` isn't necessarily a subterm of
-           `uv_inf`... So, `fin_to_inf_dvalue x` has no hope of being
-           one...
-         *)
-        admit.
+        inv H1; auto.
       }
 
       { (* Conv_ItoP *)
         break_match_hyp;
           rewrite <- H1 in H3; inv H3.
-
+        
         pose proof get_conv_case_itop_fin_inf _ _ _ _ _ Heqc as CONV.
         rewrite CONV.
-        admit.
+        cbn.
+
+        erewrite dvalue_int_unsigned_E1E2;
+          [|apply fin_to_inf_dvalue_refine_strict].
+
+        erewrite int_to_ptr_fin_inf; eauto.
+        rewrite_fin_to_inf_dvalue; reflexivity.
       }
 
       { (* Conv_PtoI *)
-        admit.
+        remember (x0 x1) as x0x1.
+        destruct_err_ub_oom x0x1; inv H3.
+        break_match_hyp; try inv H1.
+        pose proof get_conv_case_ptoi_fin_inf _ _ _ _ _ Heqc as CONV.
+        break_match_hyp_inv.
+        { repeat break_match_hyp_inv;
+            rewrite CONV; rewrite_fin_to_inf_dvalue;
+            rewrite ptr_to_int_fin_to_inf_addr; auto.
+        }
+
+        remember (lift_OOM (mrepr (PTOI.ptr_to_int a))) as ptoi.
+        destruct_err_ub_oom ptoi; cbn in H2; inv H2.
+        rewrite CONV; rewrite_fin_to_inf_dvalue.
+        erewrite ptr_to_int_fin_to_inf_addr; eauto.
+        destruct (mrepr (PTOI.ptr_to_int a)) eqn:HREPR; inv Heqptoi.
+        erewrite VMEM_REF.mrepr_refine with (x_inf:=(intptr_fin_inf i)).
+        3: apply HREPR.
+        2: {
+          unfold intptr_fin_inf.
+          break_match_goal.
+          clear Heqs.
+          eapply intptr_convert_safe in e.
+          erewrite IP.from_Z_to_Z; eauto.
+        }
+        cbn.
+        reflexivity.
       }
 
       { (* Conv_Illegal *)
@@ -16326,7 +16680,7 @@ Qed.
       cbn in *.
       inv CONC_FIN.
       }
-  Admitted.
+  Qed.
 
   Lemma uvalue_concretize_strict_concretize_inclusion_inf_fin :
     forall uv_inf uv_fin,
@@ -18547,31 +18901,6 @@ Qed.
 
     (* May not need this direction *)
   Admitted.
-
-  Lemma dvalue_int_unsigned_E1E2 :
-    forall x y,
-      dvalue_refine_strict x y ->
-      IS1.LP.Events.DV.dvalue_int_unsigned x = dvalue_int_unsigned y.
-  Proof.
-    induction x; intros y REF;
-      try
-        solve
-        [ unfold dvalue_refine_strict in *;
-          cbn in *; inv REF; cbn; auto
-        | unfold dvalue_refine_strict in *;
-          cbn in *;
-          break_match_hyp; inv REF;
-          cbn; auto
-        ].
-    - unfold dvalue_refine_strict in *.
-      cbn in *.
-      break_match_hyp_inv.
-      unfold dvalue_int_unsigned.
-      apply IP.from_Z_to_Z in Heqo.
-      rewrite <- IP.to_Z_to_unsigned.
-      rewrite <- IS1.LP.IP.to_Z_to_unsigned.
-      auto.
-  Qed.
 
   Lemma denote_instr_orutt_strict :
     forall instr,

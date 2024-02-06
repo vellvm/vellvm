@@ -79,7 +79,7 @@ Section Globals.
         forall (R S : Type) (t : itree Effin R) (k : R -> itree Effin S) s,
           interp_global (ITree.bind t k) s ≅
                         ITree.bind (interp_global t s) (fun '(s',r) => interp_global (k r) s').
-      Proof.
+      Proof using.
         intros.
         unfold interp_global.
         setoid_rewrite interp_state_bind.
@@ -91,14 +91,14 @@ Section Globals.
       Lemma interp_global_ret :
         forall (R : Type) g (x: R),
           interp_global (Ret x: itree Effin R) g ≅ Ret (g,x).
-      Proof.
+      Proof using.
         intros; apply interp_state_ret.
       Qed.
 
       Lemma interp_global_Tau :
         forall {R} (t: itree Effin R) g,
           interp_global (Tau t) g ≅ Tau (interp_global t g).
-      Proof.
+      Proof using.
         intros.
         unfold interp_global; rewrite interp_state_tau; reflexivity.
       Qed.
@@ -106,7 +106,7 @@ Section Globals.
       Lemma interp_global_vis_eqit:
         forall (g : map) S X (kk : X -> itree Effin S) (e : Effin X),
           interp_global (Vis e kk) g ≅ ITree.bind (interp_global_h e g) (fun (sx : map * X) => Tau (interp_global (kk (snd sx)) (fst sx))).
-      Proof.
+      Proof using.
         intros.
         unfold interp_global.
         setoid_rewrite interp_state_vis.
@@ -116,7 +116,7 @@ Section Globals.
       Lemma interp_global_vis:
         forall (g : map) S X (kk : X -> itree Effin S) (e : Effin X),
           interp_global (Vis e kk) g ≈ ITree.bind (interp_global_h e g) (fun (sx : map * X) => interp_global (kk (snd sx)) (fst sx)).
-      Proof.
+      Proof using.
         intros.
         rewrite interp_global_vis_eqit.
         apply eutt_eq_bind.
@@ -126,7 +126,7 @@ Section Globals.
       Lemma interp_global_trigger:
         forall (g : map) X (e : Effin X),
           interp_global (ITree.trigger e) g ≈ interp_global_h e g.
-      Proof.
+      Proof using.
         intros.
         unfold interp_global.
         rewrite interp_state_trigger.
@@ -138,7 +138,7 @@ Section Globals.
           (kk : X -> itree Effin S)
           (e : Effin X),
           interp_global (ITree.bind (trigger e) kk) g ≅ ITree.bind (interp_global_h e g) (fun (sx : map * X) => Tau (interp_global (kk (snd sx)) (fst sx))).
-      Proof.
+      Proof using.
         intros.
         unfold interp_global.
         rewrite bind_trigger.
@@ -151,7 +151,7 @@ Section Globals.
           (kk : X -> itree Effin S)
           (e : Effin X),
           interp_global (ITree.bind (trigger e) kk) g ≈ ITree.bind (interp_global_h e g) (fun (sx : map * X) => interp_global (kk (snd sx)) (fst sx)).
-      Proof.
+      Proof using.
         intros.
         rewrite interp_global_bind_trigger_eqit.
         apply eutt_eq_bind.
@@ -160,7 +160,7 @@ Section Globals.
 
       #[global] Instance eutt_interp_global {R} :
         Proper (eutt eq ==> eq ==> eutt eq) (@interp_global R).
-      Proof.
+      Proof using.
         repeat intro.
         unfold interp_global.
         subst; rewrite H1.

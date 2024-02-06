@@ -8170,10 +8170,10 @@ cofix CIH
           break_match_hyp_inv.
           cbn in H6.
           unfold LLVMParams64BitIntptr.IP.to_Z in *.
-          rewrite Int64.signed_repr in H6.
+          rewrite Int64.unsigned_repr in H6.
           2: {
-            pose proof Int64.min_signed_neg.
-            pose proof Int64.max_signed_pos.
+            unfold Int64.max_unsigned.
+            pose proof Int64.modulus_pos.
             lia.
           }
 

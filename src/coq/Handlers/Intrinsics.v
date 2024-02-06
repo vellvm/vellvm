@@ -120,21 +120,21 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
       Lemma interp_intrinsics_bind :
         forall (R S : Type) (t : itree Eff R) (k : R -> itree _ S),
           interp_intrinsics (ITree.bind t k) ≅ ITree.bind (interp_intrinsics t) (fun r : R => interp_intrinsics (k r)).
-      Proof.
+      Proof using.
         intros; apply interp_bind.
       Qed.
 
       Lemma interp_intrinsics_ret :
         forall (R : Type) (x: R),
           interp_intrinsics (Ret x: itree Eff _) ≅ Ret x.
-      Proof.
+      Proof using.
         intros; apply interp_ret.
       Qed.
 
       Lemma interp_intrinsics_Tau :
         forall {R} (t: itree Eff R),
           interp_intrinsics (Tau t) ≅ Tau (interp_intrinsics t).
-      Proof.
+      Proof using.
         intros.
         unfold interp_intrinsics; rewrite interp_tau; reflexivity.
       Qed.
@@ -144,7 +144,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
           (kk : X -> itree Eff R),
           interp_intrinsics (Vis e kk) ≅
           ITree.bind (interp_intrinsics_h e) (fun x : X => Tau (interp_intrinsics (kk x))).
-      Proof.
+      Proof using.
         intros.
         unfold interp_intrinsics.
         rewrite interp_vis.
@@ -156,7 +156,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
           (kk : X -> itree Eff R),
           interp_intrinsics (Vis e kk) ≈
           ITree.bind (interp_intrinsics_h e) (fun x : X => interp_intrinsics (kk x)).
-      Proof.
+      Proof using.
         intros.
         rewrite interp_intrinsics_vis_eqit.
         apply eutt_eq_bind.
@@ -166,7 +166,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
       Lemma interp_intrinsics_trigger:
         forall X (e : Eff X),
           interp_intrinsics (ITree.trigger e) ≈ interp_intrinsics_h e.
-      Proof.
+      Proof using.
         intros *.
         unfold interp_intrinsics.
         rewrite interp_trigger.
@@ -177,7 +177,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
         forall X R (e : Eff X) (kk : X -> itree Eff R),
           interp_intrinsics (ITree.bind (trigger e) kk) ≅
           ITree.bind (interp_intrinsics_h e) (fun x : X => Tau (interp_intrinsics (kk x))).
-      Proof.
+      Proof using.
         intros *.
         unfold interp_intrinsics.
         rewrite bind_trigger.
@@ -189,7 +189,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
         forall X R (e : Eff X) (kk : X -> itree Eff R),
           interp_intrinsics (ITree.bind (trigger e) kk) ≈
           ITree.bind (interp_intrinsics_h e) (fun x : X => interp_intrinsics (kk x)).
-      Proof.
+      Proof using.
         intros.
         rewrite interp_intrinsics_bind_trigger_eqit.
         apply eutt_eq_bind.
@@ -198,7 +198,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
 
       #[global] Instance eutt_interp_intrinsics {R} :
         Proper (eutt Logic.eq ==> eutt Logic.eq) (@interp_intrinsics R).
-      Proof.
+      Proof using.
         do 2 red; intros * EQ.
         unfold interp_intrinsics.
         rewrite EQ; reflexivity.

@@ -54,61 +54,61 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Lemma LU_to_exp_Global : forall {X} (e : LLVMGEnvE X),
         subevent X (LU_to_exp (subevent X e)) = subevent (F:=exp_E) X e.
-    Proof.
+    Proof using.
       reflexivity.
     Qed.
 
     Lemma exp_to_instr_Global : forall {X} (e : LLVMGEnvE X),
         subevent X (exp_to_instr (subevent X e)) = subevent (F:=instr_E) X e.
-    Proof.
+    Proof using.
       reflexivity.
     Qed.
 
     Lemma LU_to_exp_Local : forall {X} (e : LLVMEnvE X),
         subevent X (LU_to_exp (subevent X e)) = subevent (F:=exp_E) X e.
-    Proof.
+    Proof using.
       reflexivity.
     Qed.
 
     Lemma exp_to_instr_Local : forall {X} (e : LLVMEnvE X),
         subevent X (exp_to_instr (subevent X e)) = subevent (F:=instr_E) X e.
-    Proof.
+    Proof using.
       reflexivity.
     Qed.
 
     Lemma exp_to_instr_Memory : forall {X} (e : MemoryE X),
         subevent X (exp_to_instr (subevent X e)) = subevent (F:=instr_E) X e.
-    Proof.
+    Proof using.
       reflexivity.
     Qed.
 
     Lemma exp_to_instr_Pick : forall {X} (e : PickE X),
         subevent X (exp_to_instr (subevent X e)) = subevent (F:=instr_E) X e.
-    Proof.
+    Proof using.
       reflexivity.
     Qed.
 
     Lemma exp_to_instr_UB : forall {X} (e : UBE X),
         subevent X (exp_to_instr (subevent X e)) = subevent (F:=instr_E) X e.
-    Proof.
+    Proof using.
       reflexivity.
     Qed.
 
     Lemma exp_to_instr_Fail : forall {X} (e : FailureE X),
         subevent X (exp_to_instr (subevent X e)) = subevent (F:=instr_E) X e.
-    Proof.
+    Proof using.
       reflexivity.
     Qed.
 
     Lemma FUB_to_exp_UB : forall {X} (e : UBE X),
         subevent X (FUB_to_exp (subevent X e)) = subevent (F:=exp_E) X e.
-    Proof.
+    Proof using.
       reflexivity.
     Qed.
 
     Lemma FUB_to_exp_Fail : forall {X} (e : FailureE X),
         subevent X (FUB_to_exp (subevent X e)) = subevent (F:=exp_E) X e.
-    Proof.
+    Proof using.
       reflexivity.
     Qed.
 
@@ -118,7 +118,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   Lemma repr_intval (i: int64):
     DynamicValues.Int64.repr (Int64.intval i) = i.
-  Proof.
+  Proof using.
     replace (Int64.intval i) with (Int64.unsigned i).
     - apply Int64.repr_unsigned.
     - destruct i.
@@ -127,7 +127,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   Lemma intval_to_from_nat_id:
     forall n, (Z.of_nat (Z.to_nat (Int64.intval n))) = Int64.intval n.
-  Proof.
+  Proof using.
     intros.
     destruct n.
     cbn.  lia.
@@ -189,7 +189,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         ⟦ EXP_Ident (ID_Global id) at τ ⟧e2 g l
                                          ≈
                                          Ret (l,(g,dvalue_to_uvalue v)).
-    Proof.
+    Proof using.
       intros; cbn.
       go.
       step.
@@ -200,7 +200,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Lemma denote_exp_LR :forall g l id v τ,
         Maps.lookup id l = Some v ->
         ⟦ EXP_Ident (ID_Local id) at τ ⟧e2 g l ≈ Ret (l,(g,v)).
-    Proof.
+    Proof using.
       intros; cbn.
       go.
       step.
@@ -212,7 +212,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         ⟦ EXP_Integer (Integers.Int64.intval t) at (DTYPE_I 64) ⟧e2 g l
                                                                  ≈
                                                                  Ret (l, (g, UVALUE_I64 t)).
-    Proof.
+    Proof using.
       intros; cbn.
       go.
       rewrite repr_intval.
@@ -225,7 +225,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         ⟦ EXP_Integer t at (DTYPE_I 64) ⟧e2 g l
                                          ≈
                                          Ret (l, (g, UVALUE_I64 (repr t))).
-    Proof.
+    Proof using.
       intros; cbn.
       go.
       rewrite map_ret.
@@ -237,7 +237,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         ⟦ EXP_Double t at DTYPE_Double ⟧e2 g l
                                         ≈
                                         Ret (l, (g, UVALUE_Double t)).
-    Proof.
+    Proof using.
       intros; cbn.
       go.
       reflexivity.
@@ -251,7 +251,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     (*     ⟦OP_Conversion conv τ1 e τ2⟧e3 g l m *)
     (*     ≈ *)
     (*     Ret3 g l m (dvalue_to_uvalue x). *)
-    (* Proof. *)
+    (* Proof using. *)
     (*   intros * He EQ Heval; cbn. *)
     (*   go. *)
     (*   rewrite He. *)
@@ -274,7 +274,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         uvalue_to_dvalue b = inr bv ->
         @eval_iop err_ub_oom _ _ _ _ op av bv  = ret x ->
         ⟦ OP_IBinop op τ e0 e1 ⟧e3 g l m ≈ Ret3 g l m (dvalue_to_uvalue x).
-    Proof.
+    Proof using.
       intros * A B AV BV EVAL.
       cbn.
       go.
@@ -302,7 +302,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         uvalue_to_dvalue b = inr bv ->
         @eval_fop err_ub_oom _ _ _ op av bv  = ret x ->
         ⟦ OP_FBinop op params τ e0 e1 ⟧e3 g l m ≈ Ret3 g l m (dvalue_to_uvalue x).
-    Proof.
+    Proof using.
       intros * A B AV BV EVAL.
       cbn.
       go.
@@ -330,7 +330,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         uvalue_to_dvalue b = inr bv ->
         @eval_fcmp err_ub_oom _ _ op av bv  = ret x ->
         ⟦ OP_FCmp op τ e0 e1 ⟧e3 g l m ≈ Ret3 g l m (dvalue_to_uvalue x).
-    Proof.
+    Proof using.
       intros * A B AV BV EVAL.
       cbn.
       go.
@@ -355,7 +355,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         uvalue_to_dvalue b = inr bv ->
         @eval_icmp err_ub_oom _ _ op av bv  = ret x ->
         ⟦ OP_ICmp op τ e0 e1 ⟧e3 g l m ≈ Ret3 g l m (dvalue_to_uvalue x).
-    Proof.
+    Proof using.
       intros * A B AV BV EVAL.
       cbn.
       go.
@@ -389,7 +389,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (*   Lemma failure_is_pure : forall R s, *)
   (*       pure (R := R) (interp_cfg3 (raise s)). *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     unfold pure, raise; intros. *)
   (*     go. *)
   (*     unfold interp_cfg3. *)
@@ -431,14 +431,14 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (*   (*         (exists v, eval_conv_h conv t1 x t2 = Ret v) \/ *) *)
   (*   (*         (exists z, eval_conv_h conv t1 x t2 = trigger (ItoP z)) \/ *) *)
   (*   (*         (exists z, eval_conv_h conv t1 x t2 = trigger (PtoI t2 z)). *) *)
-  (*   (* Proof. *) *)
+  (*   (* Proof using. *) *)
   (*   (*   intros. *) *)
   (*   (*   unfold eval_conv_h. *) *)
   (*   (*   break_match_goal; cbn in *; eauto. *) *)
   (*   (* Qed. *) *)
 
   (*   Lemma pick_is_pure : forall u P, pure (ℑ3 (trigger (pick_uvalue P u))). *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     intros. *)
   (*     unfold pure; intros. *)
   (*     go. *)
@@ -449,7 +449,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (*   Lemma UB_is_pure : forall R s, *)
   (*       pure (R := R) (ℑ3 (raiseUB s)). *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     unfold pure, raiseUB; intros. *)
   (*     go. *)
   (*     step. *)
@@ -459,7 +459,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (*   (* Lemma ItoP_is_pure : forall z, *) *)
   (*   (*     pure (ℑ3 (trigger (ItoP z))). *) *)
-  (*   (* Proof. *) *)
+  (*   (* Proof using. *) *)
   (*   (*   unfold pure; intros. *) *)
   (*   (*   unfold ℑ3. *) *)
   (*   (*   rewrite interp_intrinsics_trigger. *) *)
@@ -484,7 +484,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (*   (* BEGIN TO MOVE *) *)
   (*   Lemma FUB_to_exp_raiseUB : forall T s, *)
   (*       translate FUB_to_exp (raiseUB (X := T) s) ≈ raiseUB s. *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     unfold raiseUB; intros. *)
   (*     go. *)
   (*     apply eutt_eq_bind; intros []. *)
@@ -492,7 +492,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (*   Lemma exp_to_instr_raiseUB : forall T s, *)
   (*       translate exp_to_instr (raiseUB (X := T) s) ≈ raiseUB s. *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     unfold raiseUB; intros. *)
   (*     go. *)
   (*     apply eutt_eq_bind; intros []. *)
@@ -500,7 +500,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (*   Lemma FUB_to_exp_raise : forall T s, *)
   (*       translate FUB_to_exp (raise (A := T) s) ≈ raise s. *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     unfold raise; intros. *)
   (*     go.  *)
   (*     apply eutt_eq_bind; intros []. *)
@@ -508,7 +508,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (*   Lemma exp_to_instr_raise : forall T s, *)
   (*       translate exp_to_instr (raise (A := T) s) ≈ raise s. *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     unfold raise; intros. *)
   (*     go.  *)
   (*     apply eutt_eq_bind; intros []. *)
@@ -516,14 +516,14 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (*   Lemma exp_to_instr_pick : forall P uv, *)
   (*       translate exp_to_instr (trigger (pick_uvalue P uv)) ≈ trigger (pick_uvalue P uv). *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     intros. *)
   (*     go.  *)
   (*     reflexivity. *)
   (*   Qed. *)
 
   (*   Lemma concretize_or_pick_is_pure : forall v P, pure (ℑ3 (translate exp_to_instr (concretize_or_pick v P))). *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     unfold pure; intros. *)
   (*     unfold concretize_or_pick. *)
   (*     break_match_goal; [| rewrite exp_to_instr_pick; apply pick_is_pure]. *)
@@ -536,7 +536,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (*   Lemma translate_map_monad {E F A B} (l : list A) (ts : A -> itree E B) (h : E ~> F) : *)
   (*     translate h (map_monad ts l) ≈ map_monad (fun a => translate h (ts a)) l. *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     induction l as [| a l IH]. *)
   (*     - cbn; go; reflexivity. *)
   (*     - cbn; go.  *)
@@ -549,7 +549,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (*   Lemma interp_map_monad {E F A B} (l : list A) (ts : A -> itree E B) (h : E ~> itree F): *)
   (*     interp h (map_monad ts l) ≈ map_monad (fun a => interp h (ts a)) l. *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     intros; induction l as [| a l IH]; simpl. *)
   (*     - rewrite interp_ret; reflexivity. *)
   (*     - rewrite interp_bind. *)
@@ -561,7 +561,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (*   Lemma interp_state_map_monad {E F S A B} (l : list A) (ts : A -> itree E B) (h : E ~> Monads.stateT S (itree F)) (s : S): *)
   (*     interp_state h (map_monad ts l) s ≈ map_monad (m := Monads.stateT S (itree F)) (fun a => interp_state h (ts a)) l s. *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     intros; revert s; induction l as [| a l IH]; simpl; intros s. *)
   (*     - rewrite interp_state_ret; reflexivity. *)
   (*     - rewrite interp_state_bind. *)
@@ -577,7 +577,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (*     ℑ3 (map_monad ts xs) g l m ≈ *)
   (*        map_monad (m := Monads.stateT _ (Monads.stateT _ (Monads.stateT _ (itree _)))) *)
   (*        (fun a => ℑ3 (ts a)) xs g l m. *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     intros; revert g l m; induction xs as [| a xs IH]; simpl; intros. *)
   (*     - rewrite interp_cfg3_ret; reflexivity. *)
   (*     - rewrite interp_cfg3_bind. *)
@@ -592,7 +592,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (*       (forall a s, In a l -> I s -> (f a s) ⤳ fun '(s,_) => I s) -> *)
   (*       I s -> *)
   (*       map_monad f l s ⤳ fun '(s,_) => I s. *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     induction l as [| a l IH]; intros s HB HI; simpl. *)
   (*     - apply eutt_Ret; auto. *)
   (*     - setoid_rewrite has_post_post_strong in HB. *)
@@ -612,7 +612,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (*       (forall a s1 s2, In a l -> I s1 s2 -> (f a s1 s2) ⤳ fun '(s2',(s1',_)) => I s1' s2') -> *)
   (*       I s1 s2 -> *)
   (*       map_monad f l s1 s2 ⤳ fun '(s2',(s1',_)) => I s1' s2'. *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     induction l as [| a l IH]; intros s1 s2 HB HI; simpl. *)
   (*     - apply eutt_Ret; auto. *)
   (*     - setoid_rewrite has_post_post_strong in HB. *)
@@ -632,7 +632,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (*       (forall a s1 s2 s3, In a l -> I s1 s2 s3 -> (f a s1 s2 s3) ⤳ fun '(s3', (s2',(s1',_))) => I s1' s2' s3') -> *)
   (*       I s1 s2 s3 -> *)
   (*       map_monad f l s1 s2 s3 ⤳ fun '(s3', (s2',(s1',_))) => I s1' s2' s3'. *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     induction l as [| a l IH]; intros s1 s2 s3 HB HI; simpl. *)
   (*     - apply eutt_Ret; auto. *)
   (*     - setoid_rewrite has_post_post_strong in HB. *)
@@ -671,7 +671,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (*   Ltac intro_pure := intros (? & ? & ? & ?) (-> & -> & ->). *)
 
   (*   Lemma conv_to_exp_raise: forall (T : Type) (s : string), translate conv_to_exp (raise (A := T) s) ≈ raise s. *)
-  (*   Proof. *)
+  (*   Proof using. *)
   (*     unfold raise; intros. *)
   (*     go. *)
   (*     apply eutt_eq_bind; intros []. *)

@@ -32,7 +32,7 @@ Variant no_event_lF {E F X} (R: itree (E +' F) X -> Prop) : itree' (E +' F) X ->
 
 Lemma no_event_lF_mono : forall {E F X} (R1 R2 : itree (E +' F) X -> Prop) (LE : R1 <1= R2),
     no_event_lF R1 <1= no_event_lF R2.
-Proof.
+Proof using.
   intros.
   induction PR; auto.
 Qed.
@@ -41,7 +41,7 @@ Definition no_event_lF_ {E F X} R (t : itree (E +' F) X) := no_event_lF R (obser
 #[export] Hint Unfold no_event_lF_ : core.
 
 Lemma no_event_lF__mono : forall E F X, (monotone1 (@no_event_lF_ E F X)).
-Proof.
+Proof using.
   do 2 red.
   intros.
   eapply no_event_lF_mono; eauto.
@@ -59,7 +59,7 @@ Definition no_event_l {E F X} := paco1 (@no_event_lF_ E F X) bot1.
 Lemma inj_pair2 :
   forall (U : Type) (P : U -> Type) (p : U) (x y : P p),
     existT P p x = existT P p y -> x = y.
-  Proof.
+  Proof using.
     intros. apply JMeq.JMeq_eq.
     refine (
         match H in _ = w return JMeq.JMeq x (projT2 w) with
@@ -77,7 +77,7 @@ Variant no_event_rF {E F X} (R: itree (E +' F) X -> Prop): itree' (E +' F) X -> 
 
 Lemma no_event_rF_mono : forall {E F X} (R1 R2 : itree (E +' F) X -> Prop) (LE : R1 <1= R2),
     no_event_rF R1 <1= no_event_rF R2.
-Proof.
+Proof using.
   intros.
   induction PR; auto.
 Qed.
@@ -86,7 +86,7 @@ Definition no_event_rF_ {E F X} R (t : itree (E +' F) X) := no_event_rF R (obser
 #[export] Hint Unfold no_event_rF_ : core.
 
 Lemma no_event_rF__mono : forall E F X, (monotone1 (@no_event_rF_ E F X)).
-Proof.
+Proof using.
   do 2 red.
   intros.
   eapply no_event_rF_mono; eauto.
@@ -105,7 +105,7 @@ Variant no_eventF {E X} (R: itree E X -> Prop): itree' E X -> Prop :=
 
 Lemma no_eventF_mono : forall {E X} (R1 R2 : itree E X -> Prop) (LE : R1 <1= R2),
     no_eventF R1 <1= no_eventF R2.
-Proof.
+Proof using.
   intros.
   induction PR; auto.
 Qed.
@@ -114,7 +114,7 @@ Definition no_eventF_ {E X} R (t : itree E X) := no_eventF R (observe t).
 #[export] Hint Unfold no_eventF_ : core.
 
 Lemma no_eventF__mono : forall E X, (monotone1 (@no_eventF_ E X)).
-Proof.
+Proof using.
   do 2 red.
   intros.
   eapply no_eventF_mono; eauto.
@@ -147,13 +147,13 @@ Section eqit_closure.
         (IN: eqit_clo r1 t)
         (LE: r1 <1= r2):
     @eqit_clo E R r2 t.
-  Proof.
+  Proof using.
     destruct IN. econstructor; eauto.
   Qed.
 
   Lemma no_event_eqit_clo_wcompat {E R} :
     wcompatible1 (@no_eventF_ E R) eqit_clo.
-  Proof.
+  Proof using.
     econstructor.
     pmonauto.
     intros.
@@ -174,7 +174,7 @@ Section eqit_closure.
 
   #[global] Instance eq_itree_no_event_cong {E R} r rg :
     Proper ((eq_itree eq) ==> flip impl) (gpaco1 (@no_eventF_ E R) eqit_clo r rg).
-  Proof.
+  Proof using.
     repeat intro.
     gclo.
     econstructor; cycle -1; eauto.
@@ -182,7 +182,7 @@ Section eqit_closure.
 
   #[global] Instance euttge_no_event_cong {E R} r rg :
     Proper ((euttge eq) ==> flip impl) (gpaco1 (@no_eventF_ E R) eqit_clo r rg).
-  Proof.
+  Proof using.
     repeat intro.
     gclo.
     econstructor; cycle -1; eauto.
@@ -190,7 +190,7 @@ Section eqit_closure.
 
   Lemma no_event_r_eqit_clo_wcompat {E F R} :
     wcompatible1 (@no_event_rF_ E F R) eqit_clo.
-  Proof.
+  Proof using.
     econstructor.
     pmonauto.
     intros.
@@ -216,7 +216,7 @@ Section eqit_closure.
 
   #[global] Instance eq_itree_no_event_r_cong {E F R} r rg :
     Proper ((eq_itree eq) ==> flip impl) (gpaco1 (@no_event_rF_ E F R) eqit_clo r rg).
-  Proof.
+  Proof using.
     repeat intro.
     gclo.
     econstructor; cycle -1; eauto.
@@ -224,7 +224,7 @@ Section eqit_closure.
 
   #[global] Instance euttge_no_event_r_cong {E F R} r rg :
     Proper ((euttge eq) ==> flip impl) (gpaco1 (@no_event_rF_ E F R) eqit_clo r rg).
-  Proof.
+  Proof using.
     repeat intro.
     gclo.
     econstructor; cycle -1; eauto.
@@ -232,7 +232,7 @@ Section eqit_closure.
 
   Lemma no_event_l_eqit_clo_wcompat {E F R} :
     wcompatible1 (@no_event_lF_ E F R) eqit_clo.
-  Proof.
+  Proof using.
     econstructor.
     pmonauto.
     intros.
@@ -258,7 +258,7 @@ Section eqit_closure.
 
   #[global] Instance eq_itree_no_event_l_cong {E F R} r rg :
     Proper ((eq_itree eq) ==> flip impl) (gpaco1 (@no_event_lF_ E F R) eqit_clo r rg).
-  Proof.
+  Proof using.
     repeat intro.
     gclo.
     econstructor; cycle -1; eauto.
@@ -266,7 +266,7 @@ Section eqit_closure.
 
   #[global] Instance euttge_no_event_l_cong {E F R} r rg :
     Proper ((euttge eq) ==> flip impl) (gpaco1 (@no_event_lF_ E F R) eqit_clo r rg).
-  Proof.
+  Proof using.
     repeat intro.
     gclo.
     econstructor; cycle -1; eauto.
@@ -281,21 +281,21 @@ End eqit_closure.
 
 (* In particular [eq_itree] is hence a congruence for [no_event] *)
 #[global] Instance no_event_l_eq_itree {E F X} : Proper (eq_itree eq ==> iff) (@no_event_l E F X).
-Proof.
+Proof using.
   repeat red. intros. split; intros.
   ginit. rewrite <- H. gfinal; auto.
   ginit. rewrite H. gfinal; auto.
 Qed.
 
 #[global] Instance no_event_r_eq_itree {E F X} : Proper (eq_itree eq ==> iff) (@no_event_r E F X).
-Proof.
+Proof using.
   repeat red. intros. split; intros.
   ginit. rewrite <- H. gfinal; auto.
   ginit. rewrite H. gfinal; auto.
 Qed.
 
 #[global] Instance no_event_eq_itree {E X} : Proper (eq_itree eq ==> iff) (@no_event E X).
-Proof.
+Proof using.
   repeat red. intros. split; intros.
   ginit. rewrite <- H. gfinal; auto.
   ginit. rewrite H. gfinal; auto.
@@ -303,7 +303,7 @@ Qed.
 
 (* But although not a valid up-to, [eutt] is also a congruence for [no_event] *)
 #[global] Instance no_event_l_eutt {E F X} : Proper (eutt eq ==> iff) (@no_event_l E F X).
-Proof.
+Proof using.
   do 2 red.
   repeat red. intros. split; intros.
   - revert x y H H0.
@@ -353,7 +353,7 @@ Proof.
 Qed.
 
 #[global] Instance no_event_r_eutt {E F X} : Proper (eutt eq ==> iff) (@no_event_r E F X).
-Proof.
+Proof using.
   do 2 red.
   repeat red. intros. split; intros.
   - revert x y H H0.
@@ -405,7 +405,7 @@ Proof.
 Qed.
 
 #[global] Instance no_event_eutt {E X} : Proper (eutt eq ==> iff) (@no_event E X).
-Proof.
+Proof using.
   repeat red. intros. split; intros.
   - revert x y H H0.
     pcofix CIH.
@@ -445,7 +445,7 @@ Qed.
 
 (* Sanity check, trees with empty signature should have no event *)
 Lemma no_event_empty {X} : forall (t: itree void1 X), no_event t.
-Proof.
+Proof using.
   pcofix CIH.
   intros t.
   pstep.
@@ -458,7 +458,7 @@ Proof.
 Qed.
 
 Lemma no_event_l_empty {E X} : forall (t: itree (void1 +' E) X), no_event_l t.
-Proof.
+Proof using.
   pcofix CIH.
   intros t.
   pstep.
@@ -470,7 +470,7 @@ Proof.
 Qed.
 
 Lemma no_event_r_empty {E X} : forall (t: itree (E +' void1) X), no_event_r t.
-Proof.
+Proof using.
   pcofix CIH.
   intros t.
   pstep.
@@ -519,7 +519,7 @@ Lemma no_event_elim_l :
   forall {E F X} (t : itree (E +' F) X),
     no_event_l t ->
     forall (h : E ~> itree F) , elim_l t  ≈ interp (case_ h (id_ F)) t.
-Proof.
+Proof using.
   intros E F X.
   unfold elim_l.
   intros t H h.
@@ -542,7 +542,7 @@ Lemma no_event_elim_r :
   forall {E F X} (t : itree (E +' F) X),
     no_event_r t ->
     forall (h : F ~> itree E), elim_r t ≈ interp (case_ (id_ E) h) t.
-Proof.
+Proof using.
   intros E F X.
   unfold elim_r.
   intros t H h.
@@ -565,7 +565,7 @@ Lemma no_event_elim :
   forall {E X} (t : itree E X),
     no_event t ->
     forall h, elim t ≈ interp h t.
-Proof.
+Proof using.
   intros E X.
   unfold elim.
   intros t H h.
@@ -584,7 +584,7 @@ Lemma no_event_l_interp :
     no_event_l t ->
     forall (h : E ~> itree (E +' F)) ,
       t ≈ interp (case_ h inr_) t.
-Proof.
+Proof using.
   intros E F X.
   intros t H h.
   revert t H.
@@ -608,7 +608,7 @@ Lemma no_event_r_interp :
   forall {E F X} (t : itree (E +' F) X),
     no_event_r t ->
     forall (h : F ~> itree (E +' F)), t ≈ interp (case_ inl_ h) t.
-Proof.
+Proof using.
   intros E F X.
   intros t H h.
   revert t H.
@@ -632,7 +632,7 @@ Lemma no_event_interp :
   forall {E X} (t : itree E X),
     no_event t ->
     forall h, t ≈ interp h t.
-Proof.
+Proof using.
   intros E X.
   intros t H h.
   revert t H.
@@ -675,7 +675,7 @@ Tactic Notation "ecofix" ident(CIH) := ecofix CIH with gL gH.
 
 Lemma inject_no_event_l : forall {E F X} t,
   no_event_l (@inject_l E F X t).
-Proof.
+Proof using.
   intros E F X.
   ginit; gcofix CIH; intros t.
   setoid_rewrite unfold_translate.
@@ -687,7 +687,7 @@ Qed.
 
 Lemma inject_no_event_r : forall {E F X} t,
   no_event_r (@inject_r E F X t).
-Proof.
+Proof using.
   intros E F X.
   ginit; gcofix CIH; intros t.
   setoid_rewrite unfold_translate.
@@ -699,7 +699,7 @@ Qed.
 
 Lemma inject_no_event : forall {E X} t,
   no_event (@inject E X t).
-Proof.
+Proof using.
   intros E X.
   ginit; gcofix CIH; intros t.
   unfold inject; setoid_rewrite unfold_translate.
@@ -713,7 +713,7 @@ Qed.
 Lemma elim_inject_l :
   forall {E F X} (t : itree F X),
     elim_l (@inject_l E F _ t) ≈ t.
-Proof.
+Proof using.
   einit.
   ecofix CIH.
   intros.
@@ -735,7 +735,7 @@ Lemma inject_elim_l :
   forall {E F X} (t : itree (E +' F) X),
     no_event_l t ->
     inject_l (elim_l t) ≈ t.
-Proof.
+Proof using.
   einit.
   ecofix CIH.
   intros.
@@ -756,7 +756,7 @@ Qed.
 Lemma elim_inject_r :
   forall {E F X} (t : itree E X),
     elim_r (@inject_r E F _ t) ≈ t.
-Proof.
+Proof using.
   einit.
   ecofix CIH.
   intros.
@@ -776,7 +776,7 @@ Lemma inject_elim_r :
   forall {E F X} (t : itree (E +' F) X),
     no_event_r t ->
     inject_r (elim_r t) ≈ t.
-Proof.
+Proof using.
   einit.
   ecofix CIH.
   intros.
@@ -798,7 +798,7 @@ Qed.
 Lemma elim_inject :
   forall {E X} (t : itree void1 X),
     elim (@inject E _ t) ≈ t.
-Proof.
+Proof using.
   einit.
   ecofix CIH.
   intros.
@@ -816,7 +816,7 @@ Lemma inject_elim :
   forall {E X} (t : itree E X),
     no_event t ->
     inject (elim t) ≈ t.
-Proof.
+Proof using.
   einit.
   ecofix CIH.
   intros.
@@ -837,7 +837,7 @@ Qed.
 
 Lemma translate_ret_inv : forall E F A (h : E ~> F) (t : itree E A) a,
     translate h t ≅ ret a -> t ≅ ret a.
-Proof.
+Proof using.
   intros.
   rewrite (itree_eta t) in *.
   pinversion H.
@@ -847,7 +847,7 @@ Qed.
 
 Lemma translate_tau_inv : forall E F A (h : E ~> F) (t : itree E A) u,
     translate h t ≅ Tau u -> exists u', t ≅ Tau u'.
-Proof.
+Proof using.
   intros.
   setoid_rewrite (itree_eta t).
   rewrite (itree_eta t) in H.
@@ -857,7 +857,7 @@ Qed.
 
 Lemma translate_tau_vis : forall E F A B (h : E ~> F) (t : itree E B) f k,
     translate h t ≅ Vis f k -> exists e k', f = @h A e /\ t ≅ Vis e k'.
-Proof.
+Proof using.
   intros.
   setoid_rewrite (itree_eta t).
   rewrite (itree_eta t) in H.
@@ -881,7 +881,7 @@ Lemma eutt_disjoint_no_event_l :
   forall {E F X Y} (R : X -> Y -> Prop) (t : itree E X) (s : itree F Y),
     eutt R (inject_r t) (@inject_l E F _ s) ->
     no_event t.
-Proof.
+Proof using.
   intros E F X Y R.
   pcofix CIH.
   intros t s H0.
@@ -917,7 +917,7 @@ Lemma eutt_disjoint_no_event_r :
   forall {E F X Y} (R : X -> Y -> Prop) (t : itree E X) (s : itree F Y),
     eutt R (inject_r t) (@inject_l E F _ s) ->
     no_event s.
-Proof.
+Proof using.
   intros E F X Y R.
   pcofix CIH.
   intros t s H0.
@@ -949,7 +949,7 @@ Proof.
 Qed.
 
 #[global] Instance Proper_inject_l {E F X} : Proper (eq_itree eq ==> eq_itree eq) (@inject_l E F X).
-Proof.
+Proof using.
   do 3 red.
   intros x y EQ.
   rewrite EQ. reflexivity.
@@ -957,7 +957,7 @@ Qed.
 
 Lemma no_event_translate :
   forall {E F X} (m : E ~> F) (t : itree E X), no_event t -> no_event (translate m t).
-Proof.
+Proof using.
   ginit.
   intros E F X m t H.
   rewrite (itree_eta t).
@@ -983,7 +983,7 @@ Qed.
 (* And while we're at it, injection should not compromise [no_event] *)
 Lemma no_event_inject_l :
   forall {E F X} (t : itree F X), no_event t -> no_event (@inject_l E F _ t).
-Proof.
+Proof using.
   ginit.
   intros * H.
   rewrite (itree_eta t).
@@ -1098,7 +1098,7 @@ F gets "preserved"
 (*     is_singleton *)
 (*       (interp_prop (case_ h trigger_prop') X RX t) *)
 (*       (elim_l t). *)
-(* Proof. *)
+(* Proof using. *)
 
 (* Admitted. *)
 
@@ -1120,7 +1120,7 @@ Section DeterministicSingleton.
   (*     is_singleton ts t -> *)
   (*     no_event_l t ->  *)
   (*     is_singleton (interp_from_prop RX h ts) (elim_l t). *)
-  (* Proof. *)
+  (* Proof using. *)
   (* Admitted. *)
 
     (*
@@ -1135,7 +1135,7 @@ Section DeterministicSingleton.
     - we know that there is (t: itree void1 X),
     "inject (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) t ≈ interp_mcfg3 (denote_llvm p)"
    *)
-  Proof. Admitted.
+  Proof using. Admitted.
 *)
 End DeterministicSingleton.
 
