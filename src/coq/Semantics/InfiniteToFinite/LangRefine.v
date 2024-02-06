@@ -314,6 +314,13 @@ Module Type VMemInt_Refine (IP_INF : INTPTR) (IP_FIN : INTPTR).
     forall x_fin x_inf,
       IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
       @munsigned _ IP_FIN.VMemInt_intptr x_fin = @munsigned _ IP_INF.VMemInt_intptr x_inf.
+
+  Parameter mrepr_refine :
+    forall z x_fin x_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      @mrepr _ IP_FIN.VMemInt_intptr z = NoOom x_fin ->
+      @mrepr _ IP_INF.VMemInt_intptr z = NoOom x_inf.
+
 End VMemInt_Refine.
 
 Module VMemInt_Intptr_Properties_Inf : VMemInt_Intptr_Properties InterpreterStackBigIntptr.LP.IP.
@@ -800,6 +807,20 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     cbn in *.
     unfold InterpreterStackBigIntptr.LP.IP.to_Z, InterpreterStack64BitIntptr.LP.IP.to_Z in *.
     auto.
+  Qed.
+
+  Lemma mrepr_refine :
+    forall z x_fin x_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      @mrepr _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr z = NoOom x_fin ->
+      @mrepr _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr z = NoOom x_inf.
+  Proof.
+    intros z x_fin x_inf H H0.
+    cbn.
+    rewrite IP64Bit.VMemInt_intptr_mrepr_from_Z in H0.
+    erewrite FiniteIntptr.IP64Bit.from_Z_to_Z in H; eauto.
+    subst.
+    reflexivity.
   Qed.
 
 End VMemInt_Refine_InfFin.
@@ -10320,8 +10341,112 @@ Qed.
     }
   Qed.
 
+  Lemma get_conv_case_ptoi_fin_inf:
+    forall conv t_from dv t_to res,
+      get_conv_case conv t_from dv t_to = Conv_PtoI res ->
+      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = IS1.LP.Events.DV.Conv_PtoI (fin_to_inf_dvalue res).
+  Proof.
+    intros conv t_from dv t_to res CONV.
+    destruct conv.
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue; inv CONV.
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue; inv CONV.
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
+        cbn in e; inv e; try discriminate;
+
+        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e; reflexivity).
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        inv CONV.
+    }
+
+    { cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        inv CONV.
+    }
+
+    { (* inttoptr *)
+      cbn in *.
+      repeat break_match_hyp_inv; reflexivity.
+    }
+
+    { cbn in *.
+      repeat break_match_hyp_inv; auto.
+    }
+
+    { (* Conversions... *)
+      unfold get_conv_case in CONV.
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+
+      repeat rewrite bit_sizeof_dtyp_fin_inf.
+      repeat break_match_hyp_inv.
+    }
+
+    { (* Addrspacecast *)
+      cbn in *;
+        repeat break_match_hyp_inv;
+        unfold fin_to_inf_dvalue;
+        break_match_goal; inv CONV.
+    }
+  Qed.
+
   Lemma handle_gep_h_fin_inf :
-    forall idxs_fin idxs_inf t base res,
+    forall  idxs_fin idxs_inf t base res,
       GEP.handle_gep_h t base idxs_fin = inr res ->
       map fin_to_inf_dvalue idxs_fin = idxs_inf ->
       IS1.LLVM.MEM.MP.GEP.handle_gep_h t base idxs_inf = inr res.
@@ -15072,6 +15197,39 @@ Qed.
 
   Print Assumptions extractbytes_to_dvalue_fin_inf.
 
+  Lemma dvalue_int_unsigned_E1E2 :
+    forall x y,
+      dvalue_refine_strict x y ->
+      IS1.LP.Events.DV.dvalue_int_unsigned x = dvalue_int_unsigned y.
+  Proof.
+    induction x; intros y REF;
+      try
+        solve
+        [ unfold dvalue_refine_strict in *;
+          cbn in *; inv REF; cbn; auto
+        | unfold dvalue_refine_strict in *;
+          cbn in *;
+          break_match_hyp; inv REF;
+          cbn; auto
+        ].
+    - unfold dvalue_refine_strict in *.
+      cbn in *.
+      break_match_hyp_inv.
+      unfold dvalue_int_unsigned.
+      apply IP.from_Z_to_Z in Heqo.
+      rewrite <- IP.to_Z_to_unsigned.
+      rewrite <- IS1.LP.IP.to_Z_to_unsigned.
+      auto.
+  Qed.
+
+  Lemma int_to_ptr_fin_inf :
+    forall z prov prov' a,
+      (* Need something relating prov / prov' *)
+      ITOP.int_to_ptr z prov = NoOom a ->
+      IS1.LP.ITOP.int_to_ptr z prov' = NoOom (fin_to_inf_addr a).
+  Proof.
+  Admitted.
+
   Lemma uvalue_concretize_strict_concretize_inclusion :
     forall uv_inf uv_fin,
       uvalue_refine_strict uv_inf uv_fin ->
@@ -15946,32 +16104,51 @@ Qed.
         rewrite CONV.
         remember (x0 x1) as x0x1.
         destruct_err_ub_oom x0x1; inv H3.
-
-        (* Is 'x' a subterm of uv_inf? I don't think it would be?
-
-           Heqc : get_conv_case conv t_from x1 t_to = Conv_Pure x
-
-           x1 is the dvalue from concretizing u (which is the finite
-           version of uv_inf)
-
-           `fin_to_inf_dvalue x1` isn't necessarily a subterm of
-           `uv_inf`... So, `fin_to_inf_dvalue x` has no hope of being
-           one...
-         *)
-        admit.
+        inv H1; auto.
       }
 
       { (* Conv_ItoP *)
         break_match_hyp;
           rewrite <- H1 in H3; inv H3.
-
+        
         pose proof get_conv_case_itop_fin_inf _ _ _ _ _ Heqc as CONV.
         rewrite CONV.
-        admit.
+        cbn.
+
+        erewrite dvalue_int_unsigned_E1E2;
+          [|apply fin_to_inf_dvalue_refine_strict].
+
+        erewrite int_to_ptr_fin_inf; eauto.
+        rewrite_fin_to_inf_dvalue; reflexivity.
       }
 
       { (* Conv_PtoI *)
-        admit.
+        remember (x0 x1) as x0x1.
+        destruct_err_ub_oom x0x1; inv H3.
+        break_match_hyp; try inv H1.
+        pose proof get_conv_case_ptoi_fin_inf _ _ _ _ _ Heqc as CONV.
+        break_match_hyp_inv.
+        { repeat break_match_hyp_inv;
+            rewrite CONV; rewrite_fin_to_inf_dvalue;
+            rewrite ptr_to_int_fin_to_inf_addr; auto.
+        }
+
+        remember (lift_OOM (mrepr (PTOI.ptr_to_int a))) as ptoi.
+        destruct_err_ub_oom ptoi; cbn in H2; inv H2.
+        rewrite CONV; rewrite_fin_to_inf_dvalue.
+        erewrite ptr_to_int_fin_to_inf_addr; eauto.
+        destruct (mrepr (PTOI.ptr_to_int a)) eqn:HREPR; inv Heqptoi.
+        erewrite VMEM_REF.mrepr_refine with (x_inf:=(intptr_fin_inf i)).
+        3: apply HREPR.
+        2: {
+          unfold intptr_fin_inf.
+          break_match_goal.
+          clear Heqs.
+          eapply intptr_convert_safe in e.
+          erewrite IP.from_Z_to_Z; eauto.
+        }
+        cbn.
+        reflexivity.
       }
 
       { (* Conv_Illegal *)
@@ -16503,7 +16680,7 @@ Qed.
       cbn in *.
       inv CONC_FIN.
       }
-  Admitted.
+  Qed.
 
   Lemma uvalue_concretize_strict_concretize_inclusion_inf_fin :
     forall uv_inf uv_fin,
@@ -18724,31 +18901,6 @@ Qed.
 
     (* May not need this direction *)
   Admitted.
-
-  Lemma dvalue_int_unsigned_E1E2 :
-    forall x y,
-      dvalue_refine_strict x y ->
-      IS1.LP.Events.DV.dvalue_int_unsigned x = dvalue_int_unsigned y.
-  Proof.
-    induction x; intros y REF;
-      try
-        solve
-        [ unfold dvalue_refine_strict in *;
-          cbn in *; inv REF; cbn; auto
-        | unfold dvalue_refine_strict in *;
-          cbn in *;
-          break_match_hyp; inv REF;
-          cbn; auto
-        ].
-    - unfold dvalue_refine_strict in *.
-      cbn in *.
-      break_match_hyp_inv.
-      unfold dvalue_int_unsigned.
-      apply IP.from_Z_to_Z in Heqo.
-      rewrite <- IP.to_Z_to_unsigned.
-      rewrite <- IS1.LP.IP.to_Z_to_unsigned.
-      auto.
-  Qed.
 
   Lemma denote_instr_orutt_strict :
     forall instr,
