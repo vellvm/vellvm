@@ -698,7 +698,7 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
       rewrite Zmod_0_r.
       lia.
     }
-      
+
     pose proof Z.mod_bound_or (Int64.unsigned x_fin) (Int64.unsigned y_fin).
     forward H1; auto.
     lia.
@@ -10106,6 +10106,169 @@ Qed.
   Proof.
   Admitted.
 
+  Definition dvalue_byte_refine
+    (dvb_inf : IS1.MEM.DVALUE_BYTE.dvalue_byte)
+    (dvb_fin : dvalue_byte) : Prop
+    :=
+    match dvb_inf, dvb_fin with
+    | (IS1.MEM.DVALUE_BYTE.DVALUE_ExtractByte dv_inf dt_inf ix_inf),
+      (DVALUE_ExtractByte dv_fin dt_fin ix_fin)
+      =>
+        dvalue_refine_strict dv_inf dv_fin /\
+          dt_inf = dt_fin /\
+          ix_inf = ix_fin
+    end.
+
+  Definition inf_to_fin_dvalue_byte
+    (dvb_inf : IS1.MEM.DVALUE_BYTE.dvalue_byte) : OOM dvalue_byte
+    :=
+    match dvb_inf with
+    | (IS1.MEM.DVALUE_BYTE.DVALUE_ExtractByte dv_inf dt ix)
+      =>
+        dv_fin <- dvalue_convert_strict dv_inf;;
+        ret (DVALUE_ExtractByte dv_fin dt ix)
+    end.
+
+  Definition fin_to_inf_dvalue_byte
+    (dvb_fin : dvalue_byte) : IS1.MEM.DVALUE_BYTE.dvalue_byte
+    :=
+    match dvb_fin with
+    | DVALUE_ExtractByte dv_fin dt ix
+      =>
+        let dv_inf := fin_to_inf_dvalue dv_fin in
+        IS1.MEM.DVALUE_BYTE.DVALUE_ExtractByte dv_inf dt ix
+    end.
+
+  Definition dvalue_bytes_refine
+    (dvbs_inf : list IS1.MEM.DVALUE_BYTE.dvalue_byte)
+    (dvbs_fin : list dvalue_byte) : Prop
+    := Forall2 dvalue_byte_refine dvbs_inf dvbs_fin.
+
+  Definition fin_to_inf_dvalue_bytes := map fin_to_inf_dvalue_byte.
+
+  Lemma dvalue_byte_refine_fin_to_inf_dvalue_byte :
+    forall a,
+      dvalue_byte_refine (fin_to_inf_dvalue_byte a) a.
+  Proof.
+    intros a.
+    red.
+    repeat break_match_goal; subst.
+    cbn in Heqd.
+    inv Heqd.
+    split; auto.
+    apply fin_to_inf_dvalue_refine_strict.
+  Qed.
+
+  Lemma dvalue_bytes_refine_fin_to_inf_dvalue_bytes :
+    forall dvs,
+      dvalue_bytes_refine (fin_to_inf_dvalue_bytes dvs) dvs.
+  Proof.
+    induction dvs; cbn; auto.
+    - constructor.
+    - constructor; auto.
+      apply dvalue_byte_refine_fin_to_inf_dvalue_byte.
+  Qed.
+
+  Lemma dvalue_to_dvalue_bytes_fin_inf :
+    forall dv_fin dv_inf dt dvbs_fin,
+      dvalue_refine_strict dv_inf dv_fin ->
+      DVALUE_BYTE.dvalue_to_dvalue_bytes dv_fin dt = dvbs_fin ->
+      IS1.MEM.DVALUE_BYTE.dvalue_to_dvalue_bytes dv_inf dt = fin_to_inf_dvalue_bytes dvbs_fin.
+  Proof.
+    intros dv_fin dv_inf dt dvbs_fin DV_REF DV_DVBS.
+    unfold dvalue_to_dvalue_bytes in DV_DVBS.
+    unfold IS1.MEM.DVALUE_BYTE.dvalue_to_dvalue_bytes.
+    rewrite sizeof_dtyp_fin_inf.
+    subst.
+    unfold fin_to_inf_dvalue_bytes.
+    rewrite List.map_map.
+    cbn.
+    erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
+  Qed.
+
+  Lemma dvalue_bytes_fin_to_dvalue_fin_inf_success :
+    forall dvbs_fin dvbs_inf dt res,
+      dvalue_bytes_refine dvbs_inf dvbs_fin ->
+      (@dvalue_bytes_to_dvalue ErrOOMPoison
+         (@EitherMonad.Monad_eitherT ERR_MESSAGE
+            (OomableT Poisonable)
+            (@Monad_OomableT Poisonable MonadPoisonable))
+         (@RAISE_ERROR_MonadExc ErrOOMPoison
+            (@EitherMonad.Exception_eitherT ERR_MESSAGE
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable MonadPoisonable)))
+         (@RAISE_POISON_E_MT (OomableT Poisonable)
+            (EitherMonad.eitherT ERR_MESSAGE)
+            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable MonadPoisonable))
+            (@RAISE_POISON_E_MT Poisonable OomableT
+               (@MonadT_OomableT Poisonable MonadPoisonable)
+               RAISE_POISON_Poisonable))
+         (@RAISE_OOMABLE_E_MT (OomableT Poisonable)
+            (EitherMonad.eitherT ERR_MESSAGE)
+            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable MonadPoisonable))
+            (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvbs_fin dt) = ret res ->
+      (@IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue ErrOOMPoison
+         (@EitherMonad.Monad_eitherT ERR_MESSAGE
+            (OomableT Poisonable)
+            (@Monad_OomableT Poisonable
+               MonadPoisonable))
+         (@RAISE_ERROR_MonadExc ErrOOMPoison
+            (@EitherMonad.Exception_eitherT ERR_MESSAGE
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable)))
+         (@RAISE_POISON_E_MT
+            (OomableT Poisonable)
+            (EitherMonad.eitherT ERR_MESSAGE)
+            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable))
+            (@RAISE_POISON_E_MT Poisonable
+               OomableT
+               (@MonadT_OomableT Poisonable
+                  MonadPoisonable)
+               RAISE_POISON_Poisonable))
+         (@RAISE_OOMABLE_E_MT
+            (OomableT Poisonable)
+            (EitherMonad.eitherT ERR_MESSAGE)
+            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable))
+            (@RAISE_OOMABLE_OomableT Poisonable
+               MonadPoisonable)) dvbs_inf dt) = ret (fin_to_inf_dvalue res).
+  Proof.
+    intros dvbs_fin dvbs_inf dt res REF FIN.
+    rewrite dvalue_bytes_to_dvalue_equation in FIN.
+    rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue_equation.
+  Admitted.
+
+  Lemma dvalue_bytes_to_dvalue_fin_inf :
+    forall τ dvbs_inf dvbs_fin res,
+      dvalue_bytes_refine dvbs_inf dvbs_fin ->
+      @ErrOOMPoison_handle_poison_and_oom (err_ub_oom_T IdentityMonad.ident)
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident) dvalue
+        DVALUE_Poison (DVALUE_BYTES.dvalue_bytes_to_dvalue dvbs_fin τ) = success_unERR_UB_OOM res ->
+      @ErrOOMPoison_handle_poison_and_oom (err_ub_oom_T IdentityMonad.ident)
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        IS1.LP.Events.DV.dvalue IS1.LP.Events.DV.DVALUE_Poison (IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_bytes_to_dvalue dvbs_inf τ) = success_unERR_UB_OOM (fin_to_inf_dvalue res).
+  Proof.
+    induction τ;
+      intros dvbs_inf dvbs_fin res REF DVB_DV;
+      rewrite DVALUE_BYTES.dvalue_bytes_to_dvalue_equation in DVB_DV;
+      rewrite IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_bytes_to_dvalue_equation;
+      admit.
+  Admitted.
+
   Lemma get_conv_case_pure_fin_inf:
     forall conv t_from dv t_to res,
       get_conv_case conv t_from dv t_to = Conv_Pure res ->
@@ -10219,17 +10382,35 @@ Qed.
       unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
 
       repeat rewrite bit_sizeof_dtyp_fin_inf.
-      admit.
+      unfold MemHelpers.dtyp_eqb,
+        IS1.LLVM.MEM.CP.CONC.MemHelpers.dtyp_eqb in *.
+
+      break_match_hyp.
+      2: {
+        break_match_hyp.
+        - remember (ErrOOMPoison_handle_poison_and_oom DVALUE_Poison
+                            (DVALUE_BYTES.dvalue_bytes_to_dvalue
+                               (DVALUE_BYTES.dvalue_to_dvalue_bytes dv t_from) t_to)) as x.
+          destruct_err_ub_oom x; inv CONV.
+          erewrite dvalue_to_dvalue_bytes_fin_inf; eauto.
+          2: apply fin_to_inf_dvalue_refine_strict.
+
+          erewrite dvalue_bytes_to_dvalue_fin_inf; eauto.
+          2: apply dvalue_bytes_refine_fin_to_inf_dvalue_bytes.
+          cbn.
+          reflexivity.
+        - inv CONV.
+      }
+      inv CONV; auto.
     }
 
     { (* Addrspacecast *)
       cbn in *;
         repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
-        unfold fin_to_inf_uvalue;
         break_match_goal; inv CONV.
     }
-  Admitted.
+  Qed.
 
   Lemma get_conv_case_itop_fin_inf:
     forall conv t_from dv t_to res,
@@ -14220,69 +14401,6 @@ Qed.
         apply convert_fin_to_inf_uvalue_succeeds.
   Qed.
 
-  Definition dvalue_byte_refine
-    (dvb_inf : IS1.MEM.DVALUE_BYTE.dvalue_byte)
-    (dvb_fin : dvalue_byte) : Prop
-    :=
-    match dvb_inf, dvb_fin with
-    | (IS1.MEM.DVALUE_BYTE.DVALUE_ExtractByte dv_inf dt_inf ix_inf),
-      (DVALUE_ExtractByte dv_fin dt_fin ix_fin)
-      =>
-        dvalue_refine_strict dv_inf dv_fin /\
-          dt_inf = dt_fin /\
-          ix_inf = ix_fin
-    end.
-
-  Definition inf_to_fin_dvalue_byte
-    (dvb_inf : IS1.MEM.DVALUE_BYTE.dvalue_byte) : OOM dvalue_byte
-    :=
-    match dvb_inf with
-    | (IS1.MEM.DVALUE_BYTE.DVALUE_ExtractByte dv_inf dt ix)
-      =>
-        dv_fin <- dvalue_convert_strict dv_inf;;
-        ret (DVALUE_ExtractByte dv_fin dt ix)
-    end.
-
-  Definition fin_to_inf_dvalue_byte
-    (dvb_fin : dvalue_byte) : IS1.MEM.DVALUE_BYTE.dvalue_byte
-    :=
-    match dvb_fin with
-    | DVALUE_ExtractByte dv_fin dt ix
-      =>
-        let dv_inf := fin_to_inf_dvalue dv_fin in
-        IS1.MEM.DVALUE_BYTE.DVALUE_ExtractByte dv_inf dt ix
-    end.
-
-  Definition dvalue_bytes_refine
-    (dvbs_inf : list IS1.MEM.DVALUE_BYTE.dvalue_byte)
-    (dvbs_fin : list dvalue_byte) : Prop
-    := Forall2 dvalue_byte_refine dvbs_inf dvbs_fin.
-
-  Definition fin_to_inf_dvalue_bytes := map fin_to_inf_dvalue_byte.
-
-  Lemma dvalue_byte_refine_fin_to_inf_dvalue_byte :
-    forall a,
-      dvalue_byte_refine (fin_to_inf_dvalue_byte a) a.
-  Proof.
-    intros a.
-    red.
-    repeat break_match_goal; subst.
-    cbn in Heqd.
-    inv Heqd.
-    split; auto.
-    apply fin_to_inf_dvalue_refine_strict.
-  Qed.
-
-  Lemma dvalue_bytes_refine_fin_to_inf_dvalue_bytes :
-    forall dvs,
-      dvalue_bytes_refine (fin_to_inf_dvalue_bytes dvs) dvs.
-  Proof.
-    induction dvs; cbn; auto.
-    - constructor.
-    - constructor; auto.
-      apply dvalue_byte_refine_fin_to_inf_dvalue_byte.
-  Qed.
-
   Lemma extract_field_byte_helper_fin_inf :
     forall {M : Type -> Type} {HM: Monad M} {RE: RAISE_ERROR M}
       (field_dts : list dtyp) (field_idx : N) (byte_idx : N),
@@ -14456,68 +14574,6 @@ Qed.
     subst.
     eapply dvalue_extract_byte_success_fin_inf; eauto.
   Qed.
-
-  Lemma dvalue_bytes_fin_to_dvalue_fin_inf_success :
-    forall dvbs_fin dvbs_inf dt res,
-      dvalue_bytes_refine dvbs_inf dvbs_fin ->
-      (@dvalue_bytes_to_dvalue ErrOOMPoison
-         (@EitherMonad.Monad_eitherT ERR_MESSAGE
-            (OomableT Poisonable)
-            (@Monad_OomableT Poisonable MonadPoisonable))
-         (@RAISE_ERROR_MonadExc ErrOOMPoison
-            (@EitherMonad.Exception_eitherT ERR_MESSAGE
-               (OomableT Poisonable)
-               (@Monad_OomableT Poisonable MonadPoisonable)))
-         (@RAISE_POISON_E_MT (OomableT Poisonable)
-            (EitherMonad.eitherT ERR_MESSAGE)
-            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (OomableT Poisonable)
-               (@Monad_OomableT Poisonable MonadPoisonable))
-            (@RAISE_POISON_E_MT Poisonable OomableT
-               (@MonadT_OomableT Poisonable MonadPoisonable)
-               RAISE_POISON_Poisonable))
-         (@RAISE_OOMABLE_E_MT (OomableT Poisonable)
-            (EitherMonad.eitherT ERR_MESSAGE)
-            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (OomableT Poisonable)
-               (@Monad_OomableT Poisonable MonadPoisonable))
-            (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvbs_fin dt) = ret res ->
-      (@IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue ErrOOMPoison
-         (@EitherMonad.Monad_eitherT ERR_MESSAGE
-            (OomableT Poisonable)
-            (@Monad_OomableT Poisonable
-               MonadPoisonable))
-         (@RAISE_ERROR_MonadExc ErrOOMPoison
-            (@EitherMonad.Exception_eitherT ERR_MESSAGE
-               (OomableT Poisonable)
-               (@Monad_OomableT Poisonable
-                  MonadPoisonable)))
-         (@RAISE_POISON_E_MT
-            (OomableT Poisonable)
-            (EitherMonad.eitherT ERR_MESSAGE)
-            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (OomableT Poisonable)
-               (@Monad_OomableT Poisonable
-                  MonadPoisonable))
-            (@RAISE_POISON_E_MT Poisonable
-               OomableT
-               (@MonadT_OomableT Poisonable
-                  MonadPoisonable)
-               RAISE_POISON_Poisonable))
-         (@RAISE_OOMABLE_E_MT
-            (OomableT Poisonable)
-            (EitherMonad.eitherT ERR_MESSAGE)
-            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (OomableT Poisonable)
-               (@Monad_OomableT Poisonable
-                  MonadPoisonable))
-            (@RAISE_OOMABLE_OomableT Poisonable
-               MonadPoisonable)) dvbs_inf dt) = ret (fin_to_inf_dvalue res).
-  Proof.
-    intros dvbs_fin dvbs_inf dt res REF FIN.
-    rewrite dvalue_bytes_to_dvalue_equation in FIN.
-    rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue_equation.
-  Admitted.
 
   Definition concretization_list_refine : (list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)) -> (list (uvalue * dvalue)) -> Prop
     :=
@@ -16110,7 +16166,7 @@ Qed.
       { (* Conv_ItoP *)
         break_match_hyp;
           rewrite <- H1 in H3; inv H3.
-        
+
         pose proof get_conv_case_itop_fin_inf _ _ _ _ _ Heqc as CONV.
         rewrite CONV.
         cbn.
@@ -16681,18 +16737,6 @@ Qed.
       inv CONC_FIN.
       }
   Qed.
-
-  Lemma uvalue_concretize_strict_concretize_inclusion_inf_fin :
-    forall uv_inf uv_fin,
-      uvalue_refine_strict uv_inf uv_fin ->
-      uvalue_concretize_inf_fin_inclusion uv_inf uv_fin.
-  Proof.
-    (* I don't think this is true? *)
-    intros uv_inf uv_fin H.
-    unfold uvalue_concretize_inf_fin_inclusion.
-    intros dv_inf H0.
-    (* dv_inf may not have a finite equivalent *)
-  Abort.
 
   Lemma fin_to_inf_dvalue_injective :
     forall dv1 dv2,
