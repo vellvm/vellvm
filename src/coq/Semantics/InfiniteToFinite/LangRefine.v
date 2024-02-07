@@ -8223,6 +8223,92 @@ Qed.
     - admit.
   Admitted.
 
+  Lemma dvalue_bytes_fin_to_dvalue_fin_inf_poison :
+    forall dvbs_fin dvbs_inf dt,
+      dvalue_bytes_refine dvbs_inf dvbs_fin ->
+      (@dvalue_bytes_to_dvalue ErrOOMPoison
+         (@EitherMonad.Monad_eitherT ERR_MESSAGE
+            (OomableT Poisonable)
+            (@Monad_OomableT Poisonable MonadPoisonable))
+         (@RAISE_ERROR_MonadExc ErrOOMPoison
+            (@EitherMonad.Exception_eitherT ERR_MESSAGE
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable MonadPoisonable)))
+         (@RAISE_POISON_E_MT (OomableT Poisonable)
+            (EitherMonad.eitherT ERR_MESSAGE)
+            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable MonadPoisonable))
+            (@RAISE_POISON_E_MT Poisonable OomableT
+               (@MonadT_OomableT Poisonable MonadPoisonable)
+               RAISE_POISON_Poisonable))
+         (@RAISE_OOMABLE_E_MT (OomableT Poisonable)
+            (EitherMonad.eitherT ERR_MESSAGE)
+            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable MonadPoisonable))
+            (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvbs_fin dt) = {| EitherMonad.unEitherT := {| unMkOomableT := Poison dt |} |} ->
+      (@IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue ErrOOMPoison
+         (@EitherMonad.Monad_eitherT ERR_MESSAGE
+            (OomableT Poisonable)
+            (@Monad_OomableT Poisonable
+               MonadPoisonable))
+         (@RAISE_ERROR_MonadExc ErrOOMPoison
+            (@EitherMonad.Exception_eitherT ERR_MESSAGE
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable)))
+         (@RAISE_POISON_E_MT
+            (OomableT Poisonable)
+            (EitherMonad.eitherT ERR_MESSAGE)
+            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable))
+            (@RAISE_POISON_E_MT Poisonable
+               OomableT
+               (@MonadT_OomableT Poisonable
+                  MonadPoisonable)
+               RAISE_POISON_Poisonable))
+         (@RAISE_OOMABLE_E_MT
+            (OomableT Poisonable)
+            (EitherMonad.eitherT ERR_MESSAGE)
+            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable
+                  MonadPoisonable))
+            (@RAISE_OOMABLE_OomableT Poisonable
+               MonadPoisonable)) dvbs_inf dt) = {| EitherMonad.unEitherT := {| unMkOomableT := Poison dt |} |}.
+  Proof.
+  Admitted.
+
+  Lemma dvalue_bytes_to_dvalue_poison_dt :
+    forall dvbs_fin dt dt',
+      (@dvalue_bytes_to_dvalue ErrOOMPoison
+         (@EitherMonad.Monad_eitherT ERR_MESSAGE
+            (OomableT Poisonable)
+            (@Monad_OomableT Poisonable MonadPoisonable))
+         (@RAISE_ERROR_MonadExc ErrOOMPoison
+            (@EitherMonad.Exception_eitherT ERR_MESSAGE
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable MonadPoisonable)))
+         (@RAISE_POISON_E_MT (OomableT Poisonable)
+            (EitherMonad.eitherT ERR_MESSAGE)
+            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable MonadPoisonable))
+            (@RAISE_POISON_E_MT Poisonable OomableT
+               (@MonadT_OomableT Poisonable MonadPoisonable)
+               RAISE_POISON_Poisonable))
+         (@RAISE_OOMABLE_E_MT (OomableT Poisonable)
+            (EitherMonad.eitherT ERR_MESSAGE)
+            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
+               (OomableT Poisonable)
+               (@Monad_OomableT Poisonable MonadPoisonable))
+            (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvbs_fin dt) = {| EitherMonad.unEitherT := {| unMkOomableT := Poison dt' |} |} -> dt = dt'.
+  Proof.
+  Admitted.
+
   Lemma dvalue_bytes_to_dvalue_fin_inf :
     forall τ dvbs_inf dvbs_fin res,
       dvalue_bytes_refine dvbs_inf dvbs_fin ->
@@ -8237,12 +8323,44 @@ Qed.
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         IS1.LP.Events.DV.dvalue IS1.LP.Events.DV.DVALUE_Poison (IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_bytes_to_dvalue dvbs_inf τ) = success_unERR_UB_OOM (fin_to_inf_dvalue res).
   Proof.
-    induction τ;
-      intros dvbs_inf dvbs_fin res REF DVB_DV;
-      rewrite DVALUE_BYTES.dvalue_bytes_to_dvalue_equation in DVB_DV;
-      rewrite IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_bytes_to_dvalue_equation;
-      admit.
-  Admitted.
+    intros τ dvbs_inf dvbs_fin res H H0.
+    remember (@DVALUE_BYTES.dvalue_bytes_to_dvalue ErrOOMPoison
+            (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+               (@Monad_OomableT Poisonable MonadPoisonable))
+            (@RAISE_ERROR_MonadExc ErrOOMPoison
+               (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+                  (@Monad_OomableT Poisonable MonadPoisonable)))
+            (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+               (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                  (@Monad_OomableT Poisonable MonadPoisonable))
+               (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
+                  RAISE_POISON_Poisonable))
+            (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+               (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                  (@Monad_OomableT Poisonable MonadPoisonable))
+               (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvbs_fin τ).
+    destruct e.
+    destruct unEitherT.
+    destruct unMkOomableT; inv H0.
+    2: {
+      unfold ErrOOMPoison_handle_poison_and_oom.
+      symmetry in Heqe.
+      pose proof dvalue_bytes_to_dvalue_poison_dt _ _ _ Heqe; subst.
+      erewrite dvalue_bytes_fin_to_dvalue_fin_inf_poison; eauto.
+      cbn; rewrite_fin_to_inf_dvalue; eauto.
+    }
+    destruct o; inv H2.
+    repeat red in H1.
+    unfold ErrOOMPoison_handle_poison_and_oom in H1.
+    cbn in H1.
+    destruct s; inv H1.
+    destruct e; inv H2.
+    unfold ErrOOMPoison_handle_poison_and_oom.
+    erewrite dvalue_bytes_fin_to_dvalue_fin_inf_success; eauto.
+    cbn; reflexivity.
+    rewrite <- Heqe.
+    reflexivity.
+  Qed.
 
   Lemma get_conv_case_pure_fin_inf:
     forall conv t_from dv t_to res,
