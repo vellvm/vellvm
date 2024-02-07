@@ -758,6 +758,42 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
         eapply Z.log2_lt_pow2; lia.
   Qed.
 
+  (* TODO: Move this *)
+  Lemma Zlxor_range :
+    forall a b c,
+      (0 <= a < two_power_nat c)%Z ->
+      (0 <= b < two_power_nat c)%Z ->
+      (0 <= Z.lxor a b < two_power_nat c)%Z.
+  Proof.
+    intros a b c A B.
+    pose proof Z.lxor_nonneg a b as [_ N].
+    forward N; [lia|].
+    split; try lia.
+    pose proof (Z.log2_lxor a b).
+    repeat (forward H; [lia|]).
+    assert (Z.log2 (Z.lxor a b) <= Z.max (Z.log2 a) (Z.log2 b))%Z as LT by lia.
+    assert (a = 0 \/ 0 < a)%Z as [ZERO | POS] by lia.
+    - subst.
+      rewrite Z.lxor_0_l in *.
+      lia.
+    - assert (b = 0 \/ 0 < b)%Z as [ZEROb | POSb] by lia.
+      + subst.
+        rewrite Z.lxor_0_r in *.
+        lia.
+      + assert (Z.lxor a b = 0 \/ Z.lxor a b <> 0)%Z as [EQZ | NZ] by lia.
+        lia.
+
+        pose proof (two_p_correct (Z.of_nat c)) as POW.
+        rewrite <- Coqlib.two_power_nat_two_p in POW.
+        pose proof Z.log2_lt_pow2 a (Z.of_nat c) POS as [aBOUND _].
+        pose proof Z.log2_lt_pow2 b (Z.of_nat c) POSb as [bBOUND _].
+        forward aBOUND; [lia|].
+        forward bBOUND; [lia|].
+        eapply Z.max_le in LT.
+        rewrite POW.
+        eapply Z.log2_lt_pow2; lia.
+  Qed.
+
   Lemma mand_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
       InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
@@ -843,7 +879,16 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     pose proof Int64.unsigned_range x_fin.
     pose proof Int64.unsigned_range y_fin.
     rewrite Int64.unsigned_repr; auto.
-  Admitted.
+    unfold Int64.max_unsigned.
+    pose proof Z.log2_lxor (Int64.unsigned x_fin) (Int64.unsigned y_fin).
+    repeat (forward H1; [lia|]).
+
+    pose proof Zlxor_range _ _ _ H H0.
+    Transparent Int64.modulus.
+    unfold Int64.modulus in *.
+    Opaque Int64.modulus.
+    lia.
+  Qed.
 
   Lemma munsigned_refine :
     forall x_fin x_inf,
