@@ -7270,10 +7270,17 @@ Qed.
     unfold eval_int_icmp, IS1.LP.Events.DV.eval_int_icmp.
     destruct icmp;
       try solve
-        [ break_match_goal;
-          cbn; auto
+        [ cbn in *;
+          break_match_hyp_inv;
+          rewrite_fin_to_inf_dvalue;
+          eauto
+        | cbn in *;
+          repeat break_match_hyp_inv; inv Heqs;
+          cbn;
+          break_match_goal;
+          rewrite_fin_to_inf_dvalue; auto
         ].
-  Admitted.
+  Qed.
 
   (* TODO: Move this *)
   Lemma eval_int_icmp_iptr_fin_inf :
