@@ -321,6 +321,12 @@ Module Type VMemInt_Refine (IP_INF : INTPTR) (IP_FIN : INTPTR).
       @mrepr _ IP_FIN.VMemInt_intptr z = NoOom x_fin ->
       @mrepr _ IP_INF.VMemInt_intptr z = NoOom x_inf.
 
+  Parameter mcmpu_refine :
+    forall icmp x_fin x_inf y_fin y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @mcmpu _ IP_FIN.VMemInt_intptr icmp x_fin y_fin = @mcmpu _ IP_INF.VMemInt_intptr icmp x_inf y_inf.
+
 End VMemInt_Refine.
 
 Module VMemInt_Intptr_Properties_Inf : VMemInt_Intptr_Properties InterpreterStackBigIntptr.LP.IP.
@@ -939,6 +945,55 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     erewrite FiniteIntptr.IP64Bit.from_Z_to_Z in H; eauto.
     subst.
     reflexivity.
+  Qed.
+
+  Lemma mcmpu_refine :
+    forall icmp x_fin x_inf y_fin y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @mcmpu _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr icmp x_fin y_fin = @mcmpu _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr icmp x_inf y_inf.
+  Proof.
+    intros icmp x_fin x_inf y_fin y_inf X Y.
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z,
+      InterpreterStackBigIntptr.LP.IP.to_Z in *;
+      subst.
+
+    destruct icmp;
+      cbn in *.
+    - (* eq *)
+      pose proof Integers.Int64.eq_spec x_fin y_fin.
+      break_match_hyp; subst.
+      + rewrite Z.eqb_refl; auto.
+      + symmetry; apply Z.eqb_neq.
+        intros CONTRA.
+        destruct x_fin, y_fin.
+        cbn in *; subst.
+        unfold Integers.Int64.eq in Heqb.
+        cbn in *.
+        rewrite Coqlib.zeq_true in Heqb; inv Heqb.
+    - (* ne *)
+      pose proof Integers.Int64.eq_spec x_fin y_fin.
+      break_match_hyp; subst; cbn;
+        unfold Zneq_bool.
+      + rewrite Z.compare_refl; auto.
+      + break_match_goal; auto.
+        apply Z.compare_eq in Heqc.
+        destruct x_fin, y_fin; cbn in *; subst; cbn in *.
+        unfold Integers.Int64.eq in Heqb.
+        cbn in *.
+        rewrite Coqlib.zeq_true in Heqb; inv Heqb.
+    - (* lt *)
+      unfold Int64.ltu.
+      break_match_goal; lia.
+    - (* le *)
+      unfold Int64.ltu.
+      break_match_goal; lia.
+    - (* gt *)
+      unfold Int64.ltu.
+      break_match_goal; lia.
+    - (* ge *)
+      unfold Int64.ltu.
+      break_match_goal; lia.
   Qed.
 
 End VMemInt_Refine_InfFin.
@@ -7238,7 +7293,28 @@ Qed.
         IS1.LP.Events.DV.VMemInt_intptr'
         icmp v1_inf v2_inf = success_unERR_UB_OOM res_inf.
   Proof.
-  Admitted.
+    intros v1_fin v2_fin v1_inf v2_inf icmp res_fin res_inf EVAL LIFT1 LIFT2 CONV.
+
+    assert (IP.to_Z v1_fin = IS1.LP.IP.to_Z v1_inf) as V1.
+    { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
+
+    assert (IP.to_Z v2_fin = IS1.LP.IP.to_Z v2_inf) as V2.
+    { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
+
+    destruct icmp;
+      try
+        solve
+        [ cbn in *;
+          erewrite <- VMEM_REF.mcmpu_refine; eauto;
+          break_match_hyp_inv;
+          setoid_rewrite Heqb;
+          cbn in CONV; inv CONV; auto
+        | cbn in *;
+          setoid_rewrite IP.VMemInt_intptr_dtyp in EVAL;
+          setoid_rewrite dtyp_eqb_refl in EVAL;
+          inv EVAL
+        ].
+  Qed.
 
   (* TODO: Move this / generalize monad? *)
   Lemma eval_icmp_fin_inf :

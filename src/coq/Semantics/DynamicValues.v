@@ -3568,8 +3568,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
   Definition eval_int_icmp {M} `{Monad M} `{RAISE_ERROR M} {Int} `{VMI : VMemInt Int} icmp (x y : Int) : M dvalue :=
     c <- match icmp with
-        | Eq => ret (mcmp Ceq x y)
-        | Ne => ret (mcmp Cne x y)
+        | Eq => ret (mcmpu Ceq x y)
+        | Ne => ret (mcmpu Cne x y)
         | Ugt => ret (mcmpu Cgt x y)
         | Uge => ret (mcmpu Cge x y)
         | Ult => ret (mcmpu Clt x y)
