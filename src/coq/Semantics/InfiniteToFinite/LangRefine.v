@@ -8119,6 +8119,32 @@ Qed.
       reflexivity.
   Qed.
 
+  Lemma ErrOOMPoison_bind_ret_inv :
+    forall {A B} ma k res,
+      @bind ErrOOMPoison
+         (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+            (@Monad_OomableT Poisonable MonadPoisonable))
+         A B
+         ma k = ret res ->
+      exists a, ma = ret a /\ k a = ret res.
+  Proof.
+    intros A B ma k res H.
+    destruct ma, unEitherT, unMkOomableT; inv H.
+    repeat break_match_hyp_inv.
+    exists a.
+    split; auto.
+    destruct (k a), unEitherT, unMkOomableT; inv H1.
+    reflexivity.
+  Qed.
+
+  Lemma int_to_ptr_fin_inf :
+    forall z prov prov' a,
+      (* Need something relating prov / prov' *)
+      ITOP.int_to_ptr z prov = NoOom a ->
+      IS1.LP.ITOP.int_to_ptr z prov' = NoOom (fin_to_inf_addr a).
+  Proof.
+  Admitted.
+
   Lemma dvalue_bytes_fin_to_dvalue_fin_inf_success :
     forall dvbs_fin dvbs_inf dt res,
       dvalue_bytes_refine dvbs_inf dvbs_fin ->
@@ -8187,40 +8213,51 @@ Qed.
         end.
     - (* TODO: use IX_supported *)
       admit.
-    - cbn in *.
-      remember (map_monad dvalue_byte_value dvbs_fin).
-      destruct y.
-      destruct unEitherT.
-      destruct unMkOomableT; inv FIN.
-      destruct o; inv H0.
-      destruct s; inv H1.
+    - apply ErrOOMPoison_bind_ret_inv in FIN.
+      destruct FIN as (?&?&?).
       erewrite map_monad_dvalue_byte_value_success_fin_inf; eauto.
-      2: rewrite <- Heqy; reflexivity.
       cbn in *.
-      destruct (IP.from_Z (concat_bytes_Z l)) eqn:CONCAT;
+      destruct (IP.from_Z (concat_bytes_Z x)) eqn:CONCAT;
         cbn in H0; inv H0.
       pose proof intptr_convert_succeeds i as (?&?).
       apply intptr_convert_safe in e.
       pose proof IP.from_Z_injective _ _ _ CONCAT e.
       unfold concat_bytes_Z,
         IS1.LLVM.MEM.DVALUE_BYTE.concat_bytes_Z in *.
-      rewrite H.
-      clear H.
+      rewrite H0.
+      clear H0.
       rewrite IS1.LP.IP.to_Z_from_Z; cbn.
       rewrite_fin_to_inf_dvalue.
       unfold intptr_fin_inf.
       break_match_goal; clear Heqs.
       eapply intptr_convert_safe in e0.
       pose proof IP.from_Z_injective _ _ _ e0 e.
-      eapply IS1.LP.IP.to_Z_inj in H; subst.
+      eapply IS1.LP.IP.to_Z_inj in H0; subst.
       reflexivity.
+    - eapply ErrOOMPoison_bind_ret_inv in FIN as (?&?&?).
+      erewrite map_monad_dvalue_byte_value_success_fin_inf; eauto.
+      break_match_hyp_inv.
+      cbn.
+      erewrite int_to_ptr_fin_inf; eauto.
+      rewrite_fin_to_inf_dvalue.
+      reflexivity.
+    - eapply ErrOOMPoison_bind_ret_inv in FIN as (?&?&?).
+      erewrite map_monad_dvalue_byte_value_success_fin_inf; eauto.
+      cbn.
+      inv H0.
+      rewrite_fin_to_inf_dvalue.
+      unfold concat_bytes_Z_vint,
+        IS1.LLVM.MEM.DVALUE_BYTE.concat_bytes_Z_vint in *.
+      admit.
     - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
+    - (* Array *)
+      admit.
+    - (* Struct *)
+      admit.
+    - (* Packed Struct *)
+      admit.
+    - (* Vector *)
+      admit.
   Admitted.
 
   Lemma dvalue_bytes_fin_to_dvalue_fin_inf_poison :
@@ -8307,6 +8344,40 @@ Qed.
                (@Monad_OomableT Poisonable MonadPoisonable))
             (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvbs_fin dt) = {| EitherMonad.unEitherT := {| unMkOomableT := Poison dt' |} |} -> dt = dt'.
   Proof.
+    (* This isn't true when dv = DVALUE_Poison t where t <> dt. *)
+    intros dvbs_fin dt dt' H.
+    rewrite dvalue_bytes_to_dvalue_equation in H.
+    destruct dt.
+    - admit.
+    -
+      Set Nested Proofs Allowed.
+      Lemma dvalue_byte_value_poison :
+        forall dv dt idx dt',
+          (@dvalue_byte_value ErrOOMPoison
+             (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+                (@Monad_OomableT Poisonable MonadPoisonable))
+             (@RAISE_ERROR_MonadExc ErrOOMPoison
+                (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+                   (@Monad_OomableT Poisonable MonadPoisonable)))
+             (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+                (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                   (@Monad_OomableT Poisonable MonadPoisonable))
+                (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
+                   RAISE_POISON_Poisonable))
+             (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+                (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                   (@Monad_OomableT Poisonable MonadPoisonable))
+                (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)))
+            (DVALUE_ExtractByte dv dt idx) = {| EitherMonad.unEitherT := {| unMkOomableT := Poison dt' |} |} -> dt = dt'.
+      Proof.
+        intros dv dt idx dt' H.
+        cbn in H.
+        rewrite dvalue_extract_byte_equation in H.
+        destruct dv; try solve [cbn in *; inv H; subst; auto].
+        cbn in *; inv H; auto.
+      Abort.
+      
+    admit.
   Admitted.
 
   Lemma dvalue_bytes_to_dvalue_fin_inf :
@@ -8360,6 +8431,74 @@ Qed.
     cbn; reflexivity.
     rewrite <- Heqe.
     reflexivity.
+  Qed.
+
+  Lemma dvalue_to_dvalue_bytes_fin_to_inf_dvalue :
+    forall dv_fin t,
+      IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_to_dvalue_bytes (fin_to_inf_dvalue dv_fin) t =
+        fin_to_inf_dvalue_bytes (dvalue_to_dvalue_bytes dv_fin t).
+  Proof.
+    intros dv_fin t.
+    destruct dv_fin;
+      rewrite_fin_to_inf_dvalue;
+      try
+        solve
+        [ erewrite <- dvalue_to_dvalue_bytes_fin_inf; eauto;
+          reflexivity
+        ].
+
+    - erewrite <- dvalue_to_dvalue_bytes_fin_inf; eauto.
+      red.
+      cbn.
+      rewrite addr_refine_fin_to_inf_addr.
+      reflexivity.
+    - erewrite <- dvalue_to_dvalue_bytes_fin_inf; eauto.
+      red.
+      cbn.
+      pose proof intptr_convert_succeeds x as (?&?).
+      eapply intptr_convert_safe in e.
+      erewrite intptr_convert_safe.
+      reflexivity.
+      unfold intptr_fin_inf.
+      break_match_goal.
+      clear Heqs.
+      auto.
+    - erewrite <- dvalue_to_dvalue_bytes_fin_inf; eauto.
+      red.
+      cbn.
+      induction fields.
+      + cbn; reflexivity.
+      + cbn.
+        break_match_hyp_inv.
+        rewrite fin_to_inf_dvalue_refine_strict.
+        reflexivity.
+    - erewrite <- dvalue_to_dvalue_bytes_fin_inf; eauto.
+      red.
+      cbn.
+      induction fields.
+      + cbn; reflexivity.
+      + cbn.
+        break_match_hyp_inv.
+        rewrite fin_to_inf_dvalue_refine_strict.
+        reflexivity.
+    - erewrite <- dvalue_to_dvalue_bytes_fin_inf; eauto.
+      red.
+      cbn.
+      induction elts.
+      + cbn; reflexivity.
+      + cbn.
+        break_match_hyp_inv.
+        rewrite fin_to_inf_dvalue_refine_strict.
+        reflexivity.
+    - erewrite <- dvalue_to_dvalue_bytes_fin_inf; eauto.
+      red.
+      cbn.
+      induction elts.
+      + cbn; reflexivity.
+      + cbn.
+        break_match_hyp_inv.
+        rewrite fin_to_inf_dvalue_refine_strict.
+        reflexivity.
   Qed.
 
   Lemma get_conv_case_pure_fin_inf:
@@ -8485,8 +8624,12 @@ Qed.
                             (DVALUE_BYTES.dvalue_bytes_to_dvalue
                                (DVALUE_BYTES.dvalue_to_dvalue_bytes dv t_from) t_to)) as x.
           destruct_err_ub_oom x; inv CONV.
-          erewrite dvalue_to_dvalue_bytes_fin_inf; eauto.
-          2: apply fin_to_inf_dvalue_refine_strict.
+          erewrite dvalue_bytes_fin_to_dvalue_fin_inf_success; eauto.
+          2: {
+            rewrite dvalue_to_dvalue_bytes_fin_to_inf_dvalue.
+            eapply dvalue_bytes_refine_fin_to_inf_dvalue_bytes.
+          }
+          2: symmetry; apply Heqx. erewrite <- Heqx. apply fin_to_inf_dvalue_refine_strict.
 
           erewrite dvalue_bytes_to_dvalue_fin_inf; eauto.
           2: apply dvalue_bytes_refine_fin_to_inf_dvalue_bytes.
@@ -10975,14 +11118,6 @@ Qed.
       rewrite <- IS1.LP.IP.to_Z_to_unsigned.
       auto.
   Qed.
-
-  Lemma int_to_ptr_fin_inf :
-    forall z prov prov' a,
-      (* Need something relating prov / prov' *)
-      ITOP.int_to_ptr z prov = NoOom a ->
-      IS1.LP.ITOP.int_to_ptr z prov' = NoOom (fin_to_inf_addr a).
-  Proof.
-  Admitted.
 
   Lemma uvalue_concretize_strict_concretize_inclusion :
     forall uv_inf uv_fin,
