@@ -34,6 +34,7 @@ From ExtLib Require Import
 
 Import MonadNotation.
 Import DynamicTypes.
+Import DynamicValues.
 Import TranslateFacts.
 Import StateFacts.
 Import InterpFacts.
