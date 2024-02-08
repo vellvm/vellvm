@@ -56,6 +56,55 @@ Set Contextual Implicit.
 Open Scope N_scope.
 (* end hide *)
 
+Class VInt I : Type :=
+  {
+    (* Comparisons *)
+    equ : I -> I -> bool;
+    cmp : comparison -> I -> I -> bool;
+    cmpu : comparison -> I -> I -> bool;
+
+    (* Constants *)
+    bitwidth : nat;
+    zero : I;
+    one : I;
+
+    (* Arithmetic *)
+    add : I -> I -> I;
+    add_carry : I -> I -> I -> I;
+    add_overflow : I -> I -> I -> I;
+
+    sub : I -> I -> I;
+    sub_borrow : I -> I -> I -> I;
+    sub_overflow : I -> I -> I -> I;
+
+    mul : I -> I -> I;
+
+    divu : I -> I -> I;
+    divs : I -> I -> I;
+    modu : I -> I -> I;
+    mods : I -> I -> I;
+
+    shl : I -> I -> I;
+    shr : I -> I -> I;
+    shru : I -> I -> I;
+
+    negative : I -> I;
+
+    (* Logic *)
+    and : I -> I -> I;
+    or : I -> I -> I;
+    xor : I -> I -> I;
+
+    (* Bounds *)
+    min_signed : Z;
+    max_signed : Z;
+
+    (* Conversion *)
+    unsigned : I -> Z;
+    signed : I -> Z;
+
+    repr : Z -> I;
+  }.
 
 Definition store_id := N.
 
@@ -2819,57 +2868,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Definition is_DVALUE_IX (d:dvalue) : bool :=
     is_DVALUE_I1 d || is_DVALUE_I8 d || is_DVALUE_I16 d || is_DVALUE_I32 d || is_DVALUE_I64 d.
 
-
-  Class VInt I : Type :=
-    {
-      (* Comparisons *)
-      equ : I -> I -> bool;
-      cmp : comparison -> I -> I -> bool;
-      cmpu : comparison -> I -> I -> bool;
-
-      (* Constants *)
-      bitwidth : nat;
-      zero : I;
-      one : I;
-
-      (* Arithmetic *)
-      add : I -> I -> I;
-      add_carry : I -> I -> I -> I;
-      add_overflow : I -> I -> I -> I;
-
-      sub : I -> I -> I;
-      sub_borrow : I -> I -> I -> I;
-      sub_overflow : I -> I -> I -> I;
-
-      mul : I -> I -> I;
-
-      divu : I -> I -> I;
-      divs : I -> I -> I;
-      modu : I -> I -> I;
-      mods : I -> I -> I;
-
-      shl : I -> I -> I;
-      shr : I -> I -> I;
-      shru : I -> I -> I;
-
-      negative : I -> I;
-
-      (* Logic *)
-      and : I -> I -> I;
-      or : I -> I -> I;
-      xor : I -> I -> I;
-
-      (* Bounds *)
-      min_signed : Z;
-      max_signed : Z;
-
-      (* Conversion *)
-      unsigned : I -> Z;
-      signed : I -> Z;
-
-      repr : Z -> I;
-    }.
-
   Class ToDvalue I : Type :=
     { to_dvalue : I -> dvalue;
     }.
@@ -2886,7 +2884,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
       (* Constants *)
       mbitwidth := ret bitwidth;
-      mzero := zero;
+      mzero := DynamicValues.zero;
       mone := one;
 
       (* Arithmetic *)

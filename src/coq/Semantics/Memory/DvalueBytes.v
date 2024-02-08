@@ -10,6 +10,7 @@ From Vellvm Require Import
   LLVMParams
   Error
   DynamicTypes
+  DynamicValues
   Utils.ErrUbOomProp
   Utils.Oomable
   Utils.Poisonable
@@ -25,15 +26,8 @@ Import MonadNotation.
 
 Open Scope N_scope.
 
-Module Type DvalueByte (LP : LLVMParams).
-  Import LP.
-  Import PTOI.
-  Import ITOP.
-  Import PROV.
-  Import SIZEOF.
-  Import Events.DV.
 
-  (* Convert a list of UVALUE_ExtractByte values into a dvalue of
+(* Convert a list of UVALUE_ExtractByte values into a dvalue of
          a given type.
 
          Assumes bytes are in little endian form...
@@ -69,39 +63,47 @@ Module Type DvalueByte (LP : LLVMParams).
          convert the corresponding byte extractions into a single
          dvalue.
 
-   *)
+ *)
 
-  (* TODO: probably move this *)
-  (* TODO: Make these take endianess into account.
+(* TODO: probably move this *)
+(* TODO: Make these take endianess into account.
 
          Can probably use bitwidth from VInt to do big-endian...
-   *)
-  Definition extract_byte_vint {I} `{VInt I} (i : I) (idx : Z) : Z
-    := unsigned (modu (shru i (repr (idx * 8))) (repr 256)).
+ *)
+Definition extract_byte_vint {I} `{VInt I} (i : I) (idx : Z) : Z
+  := unsigned (modu (shru i (repr (idx * 8))) (repr 256)).
 
-  Fixpoint concat_bytes_vint {I} `{VInt I} (bytes : list I) : I
-    := match bytes with
-       | [] => repr 0
-       | (byte::bytes) =>
-           add byte (shl (concat_bytes_vint bytes) (repr 8))
-       end.
+Fixpoint concat_bytes_vint {I} `{VInt I} (bytes : list I) : I
+  := match bytes with
+     | [] => repr 0
+     | (byte::bytes) =>
+         add byte (shl (concat_bytes_vint bytes) (repr 8))
+     end.
 
-  (* TODO: Endianess *)
-  (* TODO: does this work correctly with negative x? *)
-  Definition extract_byte_Z (x : Z) (idx : Z) : Z
-    := (Z.shiftr x (idx * 8)) mod 256.
+(* TODO: Endianess *)
+(* TODO: does this work correctly with negative x? *)
+Definition extract_byte_Z (x : Z) (idx : Z) : Z
+  := (Z.shiftr x (idx * 8)) mod 256.
 
-  (* TODO: Endianess *)
-  Definition concat_bytes_Z_vint {I} `{VInt I} (bytes : list Z) : I
-    := concat_bytes_vint (map repr bytes).
+(* TODO: Endianess *)
+Definition concat_bytes_Z_vint {I} `{VInt I} (bytes : list Z) : I
+  := concat_bytes_vint (map repr bytes).
 
-  (* TODO: Endianess *)
-  Fixpoint concat_bytes_Z (bytes : list Z) : Z
-    := match bytes with
-       | [] => 0
-       | (byte::bytes) =>
-           byte + (Z.shiftl (concat_bytes_Z bytes) 8)
-       end.
+(* TODO: Endianess *)
+Fixpoint concat_bytes_Z (bytes : list Z) : Z
+  := match bytes with
+     | [] => 0
+     | (byte::bytes) =>
+         byte + (Z.shiftl (concat_bytes_Z bytes) 8)
+     end.
+
+Module Type DvalueByte (LP : LLVMParams).
+  Import LP.
+  Import PTOI.
+  Import ITOP.
+  Import PROV.
+  Import SIZEOF.
+  Import Events.DV.
 
   (* Walk through a list *)
   (* Returns field index + number of bytes remaining *)
@@ -117,7 +119,12 @@ Module Type DvalueByte (LP : LLVMParams).
        end.
 
   Definition extract_field_byte {M} `{Monad M} `{RAISE_ERROR M} (fields : list dtyp) (byte_idx : N) : M (dtyp * (N * N))%type
-    := extract_field_byte_helper fields 0 byte_idx.
+    := extract_field_byte_helper fields 0 byte_idx.  Fixpoint concat_bytes_vint {I} `{VInt I} (bytes : list I) : I
+    := match bytes with
+       | [] => repr 0
+       | (byte::bytes) =>
+           add byte (shl (concat_bytes_vint bytes) (repr 8))
+       end.
 
 
   (* Need the type of the dvalue in order to know how big fields and array elements are.

@@ -5,12 +5,13 @@ From ExtLib Require Import
      Structures.Functor.
 
 From Vellvm Require Import
-     DynamicTypes
-     LLVMEvents
-     Semantics.MemoryAddress
-     Semantics.Memory.Sizeof
-     Utils.Error
-     Utils.Tactics.
+  DynamicTypes
+  DynamicValues
+  LLVMEvents
+  Semantics.MemoryAddress
+  Semantics.Memory.Sizeof
+  Utils.Error
+  Utils.Tactics.
 
 Import ListNotations.
 Import MonadNotation.

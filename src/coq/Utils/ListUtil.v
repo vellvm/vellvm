@@ -519,7 +519,7 @@ Qed.
 
 Lemma split_n_err : forall {A} n (l:list A),
     (exists s, split_n n l = inl s) <->
-    length l < n.
+      length l < n.
 Proof.
   intros. split.
   - revert l.
@@ -533,7 +533,7 @@ Proof.
         break_match_hyp_inv.
         -- assert (exists s, split_n n l = inl s).
            { eexists; eauto. } 
-          apply IHn in H. lia.
+           apply IHn in H. lia.
         -- destruct p. inversion H0.
   - revert n.
     induction l; intros.
@@ -855,7 +855,7 @@ Qed.
 
 Lemma In_cons_right :
   forall {A} {l : list A} {a x xs}
-    (EQ : l = x :: xs) (HIn : In a xs),
+         (EQ : l = x :: xs) (HIn : In a xs),
     In a l.
 Proof.
   intros A l x xs EQ a HIn.
@@ -986,11 +986,11 @@ Qed.
 
 Lemma double_list_ind :
   forall {X Y}
-    (P: list X -> list Y -> Prop)
-    (NilNil : P nil nil)
-    (NilCons : forall y ys, P nil ys -> P nil (y :: ys))
-    (ConsNil : forall x xs, P xs nil -> P (x :: xs) nil)
-    (ConsCons : forall x xs y ys, P xs ys -> P (x :: xs) (y :: ys)),
+         (P: list X -> list Y -> Prop)
+         (NilNil : P nil nil)
+         (NilCons : forall y ys, P nil ys -> P nil (y :: ys))
+         (ConsNil : forall x xs, P xs nil -> P (x :: xs) nil)
+         (ConsCons : forall x xs y ys, P xs ys -> P (x :: xs) (y :: ys)),
   forall xs ys, P xs ys.
 Proof.
   intros X Y P NilNil NilCons ConsNil ConsCons xs.
@@ -1541,53 +1541,53 @@ Proof.
 Qed.
 
 
-  (* TODO: move this / does this exist somewhere else? *)
-  Lemma nat_strong_rect :
-    forall (P: nat -> Type)
-      (BASE: P 0%nat)
-      (IH: forall (n : nat), (forall (m : nat), m <= n -> P m)%nat -> P (S n)),
-    forall n, P n.
-  Proof.
-    intros P BASE IH n.
-    destruct n.
-    - apply BASE.
-    - apply IH.
-      induction n; intros m LE.
-      + assert (m=0)%nat by lia; subst; auto.
-      + assert (m <= n \/ m = S n)%nat by lia.
-        pose proof NPeano.Nat.leb_spec0 m n.
-        inv H0; subst; auto.
-        pose proof NPeano.Nat.eqb_spec m (S n).
-        inv H0; subst; auto.
-        exfalso.
-        lia.
-  Qed.
+(* TODO: move this / does this exist somewhere else? *)
+Lemma nat_strong_rect :
+  forall (P: nat -> Type)
+         (BASE: P 0%nat)
+         (IH: forall (n : nat), (forall (m : nat), m <= n -> P m)%nat -> P (S n)),
+  forall n, P n.
+Proof.
+  intros P BASE IH n.
+  destruct n.
+  - apply BASE.
+  - apply IH.
+    induction n; intros m LE.
+    + assert (m=0)%nat by lia; subst; auto.
+    + assert (m <= n \/ m = S n)%nat by lia.
+      pose proof NPeano.Nat.leb_spec0 m n.
+      inv H0; subst; auto.
+      pose proof NPeano.Nat.eqb_spec m (S n).
+      inv H0; subst; auto.
+      exfalso.
+      lia.
+Qed.
 
 
 Lemma length_strong_rect:
-    forall (X : Type) (P : list X -> Type)
-      (BASE: P nil)
-      (IH: forall (n : nat) (xs: list X), (forall (xs : list X), length xs <= n -> P xs)%nat -> length xs = S n -> P xs),
-    forall l, P l.
-  Proof.
-    intros X P BASE IH.
-    assert (forall n l, length l <= n -> P l)%nat as IHLEN.
-    { induction n using nat_strong_rect; intros l LEN; auto.
-      assert (length l = 0)%nat as LEN' by lia.
-      apply length_zero_iff_nil in LEN'; subst; auto.
+  forall (X : Type) (P : list X -> Type)
+         (BASE: P nil)
+         (IH: forall (n : nat) (xs: list X), (forall (xs : list X), length xs <= n -> P xs)%nat -> length xs = S n -> P xs),
+  forall l, P l.
+Proof.
+  intros X P BASE IH.
+  assert (forall n l, length l <= n -> P l)%nat as IHLEN.
+  { induction n using nat_strong_rect; intros l LEN; auto.
+    assert (length l = 0)%nat as LEN' by lia.
+    apply length_zero_iff_nil in LEN'; subst; auto.
 
-      assert (length l <= n \/ length l = S n)%nat by lia.
-      pose proof NPeano.Nat.leb_spec0 (length l) n.
-      inv H0; subst; eauto.
-      pose proof NPeano.Nat.eqb_spec (length l) (S n).
-      inv H0; subst; eauto.
-      lia.
-    }
+    assert (length l <= n \/ length l = S n)%nat by lia.
+    pose proof NPeano.Nat.leb_spec0 (length l) n.
+    inv H0; subst; eauto.
+    pose proof NPeano.Nat.eqb_spec (length l) (S n).
+    inv H0; subst; eauto.
+    lia.
+  }
 
-    intros l.
-    eapply IHLEN.
-    reflexivity.
-  Qed.
+  intros l.
+  eapply IHLEN.
+  reflexivity.
+Qed.
 
 
 Lemma fold_right_forall : forall {A} (P : A -> Prop) (l:list A),
@@ -1648,73 +1648,73 @@ Proof.
   induction Hforall; cbn; constructor; eauto.
 Qed.
 
-  Lemma Forall2_map_r {A B C} : forall (P: A -> B -> Prop) (f:C -> B),
-      forall (l1 : list A) (l2 : list C) , Forall2 P l1 (map f l2) <-> Forall2 (fun x y => P x (f y)) l1 l2.
-  Proof.
-    intros P f l1 l2.
-    split; intros H.
-    - remember (map f l2) as l3.
-      revert l2 Heql3.
-      induction H; intros l2 EQ.
-      + symmetry in EQ.
-        apply map_eq_nil in EQ. subst.
-        constructor.
-      + symmetry in EQ.
-        apply map_eq_cons in EQ.
-        destruct EQ as [c [tl [EQ1 [EQ2 M]]]].
-        subst.
-        constructor; auto.
-    - induction H; simpl; auto.
-  Qed.
+Lemma Forall2_map_r {A B C} : forall (P: A -> B -> Prop) (f:C -> B),
+  forall (l1 : list A) (l2 : list C) , Forall2 P l1 (map f l2) <-> Forall2 (fun x y => P x (f y)) l1 l2.
+Proof.
+  intros P f l1 l2.
+  split; intros H.
+  - remember (map f l2) as l3.
+    revert l2 Heql3.
+    induction H; intros l2 EQ.
+    + symmetry in EQ.
+      apply map_eq_nil in EQ. subst.
+      constructor.
+    + symmetry in EQ.
+      apply map_eq_cons in EQ.
+      destruct EQ as [c [tl [EQ1 [EQ2 M]]]].
+      subst.
+      constructor; auto.
+  - induction H; simpl; auto.
+Qed.
 
-  Lemma Forall2_map_l {A B C} : forall (P: A -> B -> Prop) (f:C -> A),
-      forall (l1 : list C) (l2 : list B) , Forall2 P (map f l1) l2 <-> Forall2 (fun x y => P (f x) y) l1 l2.
-  Proof.
-    intros P f l1 l2.
-    split; intros H.
-    - remember (map f l1) as l3.
-      revert l1 Heql3.
-      induction H; intros l1 EQ.
-      + symmetry in EQ.
-        apply map_eq_nil in EQ. subst.
-        constructor.
-      + symmetry in EQ.
-        apply map_eq_cons in EQ.
-        destruct EQ as [c [tl [EQ1 [EQ2 M]]]].
-        subst.
-        constructor; auto.
-    - induction H; simpl; auto.
-  Qed.
+Lemma Forall2_map_l {A B C} : forall (P: A -> B -> Prop) (f:C -> A),
+  forall (l1 : list C) (l2 : list B) , Forall2 P (map f l1) l2 <-> Forall2 (fun x y => P (f x) y) l1 l2.
+Proof.
+  intros P f l1 l2.
+  split; intros H.
+  - remember (map f l1) as l3.
+    revert l1 Heql3.
+    induction H; intros l1 EQ.
+    + symmetry in EQ.
+      apply map_eq_nil in EQ. subst.
+      constructor.
+    + symmetry in EQ.
+      apply map_eq_cons in EQ.
+      destruct EQ as [c [tl [EQ1 [EQ2 M]]]].
+      subst.
+      constructor; auto.
+  - induction H; simpl; auto.
+Qed.
 
-  Lemma Forall2_eq {A} : 
-      forall (l1 : list A) (l2 : list A) , Forall2 eq l1 l2 <-> l1 = l2.
-  Proof.
-    intros l1 l2.
-    split; intros H.
-    - induction H; subst; auto.
-    - revert l2 H.
-      induction l1; intros l2 EQ; subst; auto.
-  Qed.
+Lemma Forall2_eq {A} : 
+  forall (l1 : list A) (l2 : list A) , Forall2 eq l1 l2 <-> l1 = l2.
+Proof.
+  intros l1 l2.
+  split; intros H.
+  - induction H; subst; auto.
+  - revert l2 H.
+    induction l1; intros l2 EQ; subst; auto.
+Qed.
 
-  Lemma Forall2_ext_m : forall {A B} (f : A -> OOM B)
-      xs ys1 ys2,
-        Forall2 (fun a b => f a = NoOom b) xs ys1 ->
-        Forall2 (fun a b => f a = NoOom b) xs ys2 ->
-        ys1 = ys2.
-  Proof.
-    intros A B f xs ys1 ys2 H H0. 
-    revert ys2 H0.
-    induction H; intros ys2 F; inversion F; subst; auto.
-    rewrite H in H3. inversion H3; subst.
-    rewrite (IHForall2 l'0 H5).
-    reflexivity.
-  Qed.
+Lemma Forall2_ext_m : forall {A B} (f : A -> OOM B)
+                             xs ys1 ys2,
+    Forall2 (fun a b => f a = NoOom b) xs ys1 ->
+    Forall2 (fun a b => f a = NoOom b) xs ys2 ->
+    ys1 = ys2.
+Proof.
+  intros A B f xs ys1 ys2 H H0. 
+  revert ys2 H0.
+  induction H; intros ys2 F; inversion F; subst; auto.
+  rewrite H in H3. inversion H3; subst.
+  rewrite (IHForall2 l'0 H5).
+  reflexivity.
+Qed.
 
 Lemma Forall2_inj_l :
   forall A B (f : A -> B) (g : A -> B) (l1 l2 : list A) (l : list B)
-    (HINJ : forall a, In a l1 -> forall a', f a = g a' -> a' = a )
-    (HL1: Forall2 (fun a b => f a = b) l1 l)
-    (HL2: Forall2 (fun a b => g a = b) l2 l),
+         (HINJ : forall a, In a l1 -> forall a', f a = g a' -> a' = a )
+         (HL1: Forall2 (fun a b => f a = b) l1 l)
+         (HL2: Forall2 (fun a b => g a = b) l2 l),
     l1 = l2.
 Proof.
   intros A B f g l1 l2 l HINJ HL1.
@@ -1728,39 +1728,39 @@ Proof.
     reflexivity.
 Qed.
 
-  Lemma Forall2_inj_OOM_l :
-    forall A B (f : A -> OOM B) (g : A -> OOM B) (l1 l2 : list A) (l : list B)
-      (HINJ : forall a, In a l1 -> forall a' b, f a = NoOom b -> g a' = NoOom b -> a' = a )
-      (HL1: Forall2 (fun a b => f a = NoOom b) l1 l)
-      (HL2: Forall2 (fun a b => g a = NoOom b) l2 l),
-      l1 = l2.
-  Proof.
-    intros A B f g l1 l2 l HINJ HEQ1 HEQ2.
-    rewrite <- (Forall2_map_r (fun a b => f a = b) NoOom) in HEQ1.
-    rewrite <- (Forall2_map_r (fun a b => g a = b) NoOom) in HEQ2.
-    eapply Forall2_inj_l; eauto.
-    intros.
-    rewrite (Forall2_map_r (fun a b => f a = b) NoOom) in HEQ1.
-    destruct (Forall2_In _ a _ _ H HEQ1) as [b [_ HB]].
-    eapply HINJ; eauto.
-    rewrite <- H0.
-    auto.
-  Qed.
+Lemma Forall2_inj_OOM_l :
+  forall A B (f : A -> OOM B) (g : A -> OOM B) (l1 l2 : list A) (l : list B)
+         (HINJ : forall a, In a l1 -> forall a' b, f a = NoOom b -> g a' = NoOom b -> a' = a )
+         (HL1: Forall2 (fun a b => f a = NoOom b) l1 l)
+         (HL2: Forall2 (fun a b => g a = NoOom b) l2 l),
+    l1 = l2.
+Proof.
+  intros A B f g l1 l2 l HINJ HEQ1 HEQ2.
+  rewrite <- (Forall2_map_r (fun a b => f a = b) NoOom) in HEQ1.
+  rewrite <- (Forall2_map_r (fun a b => g a = b) NoOom) in HEQ2.
+  eapply Forall2_inj_l; eauto.
+  intros.
+  rewrite (Forall2_map_r (fun a b => f a = b) NoOom) in HEQ1.
+  destruct (Forall2_In _ a _ _ H HEQ1) as [b [_ HB]].
+  eapply HINJ; eauto.
+  rewrite <- H0.
+  auto.
+Qed.
 
 
-  Lemma Forall2_repeat_OOM : forall {A B} (f : A -> OOM B) (a:A) (b:B) n (l:list B),
-      f a = ret b ->
-      Forall2 (fun a b => f a = ret b) (repeat a n) l ->
-      l = repeat b n.
-  Proof.
-    intros A B f a b n l EQ F. 
-    revert l EQ F.
-    induction n; intros; cbn in *.
-    - inversion F. reflexivity.
-    - inversion F; subst.
-      rewrite EQ in H1. inversion H1; subst.
-      rewrite (IHn l'); auto.
-  Qed.
+Lemma Forall2_repeat_OOM : forall {A B} (f : A -> OOM B) (a:A) (b:B) n (l:list B),
+    f a = ret b ->
+    Forall2 (fun a b => f a = ret b) (repeat a n) l ->
+    l = repeat b n.
+Proof.
+  intros A B f a b n l EQ F. 
+  revert l EQ F.
+  induction n; intros; cbn in *.
+  - inversion F. reflexivity.
+  - inversion F; subst.
+    rewrite EQ in H1. inversion H1; subst.
+    rewrite (IHn l'); auto.
+Qed.
 
 (* Better behaved version of Forall that can be used in recursive functions *)
 Definition FORALL {A} (P : A -> Prop) (l : list A) :=
@@ -1773,7 +1773,7 @@ Proof.
 Qed.
 
 Lemma FORALL_dec : forall {A} (P : A -> Prop) (l:list A)
-                     (H : forall a, In a l -> {P a} + {~ P a}),
+                          (H : forall a, In a l -> {P a} + {~ P a}),
     {FORALL P l} + {~ FORALL P l}.
 Proof.
   intros A P l.
@@ -1796,35 +1796,35 @@ Inductive Forall2T {A B : Type} (f : A -> B -> Type) : list A -> list B -> Type 
 | Forall2T_nil : Forall2T f [] []
 | Forall2T_cons : forall a b l1 l2, (f a b) * Forall2T f l1 l2 -> Forall2T f (a::l1) (b::l2).
 
-  Lemma map_monad_oom_Forall2T : forall {A B : Type} (f : A -> OOM B) (l : list A) (res : list B),
-      map_monad f l = NoOom res -> Forall2T (fun (a : A) (b : B) => f a = NoOom b) l res.
-  Proof.
-    induction l; intros.
-    - cbn in H. inversion H; subst. constructor.
-    - cbn in H.
-      repeat break_match_hyp_inv.
-      constructor. split; auto.
-  Qed.
+Lemma map_monad_oom_Forall2T : forall {A B : Type} (f : A -> OOM B) (l : list A) (res : list B),
+    map_monad f l = NoOom res -> Forall2T (fun (a : A) (b : B) => f a = NoOom b) l res.
+Proof.
+  induction l; intros.
+  - cbn in H. inversion H; subst. constructor.
+  - cbn in H.
+    repeat break_match_hyp_inv.
+    constructor. split; auto.
+Qed.
 
-  Lemma Forall2T_InT_r :
-    forall {A B} (f : A -> B -> Type) (l1 : list A) (l2 : list B),
-      Forall2T f l1 l2 -> forall b,
-        InT b l2 -> { a : A & f a b * InT a l1}%type.
-  Proof.
-    intros A B.
-    fix IH 4.
-    intros f l1 l2 H; inversion H; subst; clear H; intros x HX.
-    - inversion HX.
-    - inversion HX; subst.
-      + destruct X as [HF HL].
-        exists a. split; auto. left. auto.
-      + destruct X as [_ HL].
-        destruct (IH _ _ _ HL x X0) as [c [HFC HR]].
-        exists c. split; auto. right. assumption.
-  Qed.
+Lemma Forall2T_InT_r :
+  forall {A B} (f : A -> B -> Type) (l1 : list A) (l2 : list B),
+    Forall2T f l1 l2 -> forall b,
+      InT b l2 -> { a : A & f a b * InT a l1}%type.
+Proof.
+  intros A B.
+  fix IH 4.
+  intros f l1 l2 H; inversion H; subst; clear H; intros x HX.
+  - inversion HX.
+  - inversion HX; subst.
+    + destruct X as [HF HL].
+      exists a. split; auto. left. auto.
+    + destruct X as [_ HL].
+      destruct (IH _ _ _ HL x X0) as [c [HFC HR]].
+      exists c. split; auto. right. assumption.
+Qed.
 
-  
-  (*
+
+(*
   Lemma Forall2T_map_r1 {A B C} : forall (P: A -> B -> Prop) (f:C -> B),
       forall (l1 : list A) (l2 : list C) , Forall2T (fun x y => P x (f y)) l1 l2 -> Forall2T P l1 (map f l2).
   Proof.
@@ -1895,7 +1895,7 @@ Inductive Forall2T {A B : Type} (f : A -> B -> Type) : list A -> list B -> Type 
     rewrite (IHForall2 l'0 H5).
     reflexivity.
   Qed.
-*)
+ *)
 
 Lemma nth_error_cons :
   forall {X} (x : X) xs n res,
@@ -1908,11 +1908,11 @@ Qed.
 
 Lemma double_list_rect :
   forall {X Y}
-    (P: (list X * list Y) -> Type)
-    (NilNil : P (nil, nil))
-    (NilCons : forall y ys, P (nil, ys) -> P (nil, (y :: ys)))
-    (ConsNil : forall x xs, P (xs, nil) -> P ((x :: xs), nil))
-    (ConsCons : forall x xs y ys, P (xs, ys) -> P ((x :: xs), (y :: ys))),
+         (P: (list X * list Y) -> Type)
+         (NilNil : P (nil, nil))
+         (NilCons : forall y ys, P (nil, ys) -> P (nil, (y :: ys)))
+         (ConsNil : forall x xs, P (xs, nil) -> P ((x :: xs), nil))
+         (ConsCons : forall x xs y ys, P (xs, ys) -> P ((x :: xs), (y :: ys))),
   forall l, P l.
 Proof.
   intros X Y P NilNil NilCons ConsNil ConsCons l.
@@ -1930,111 +1930,131 @@ Qed.
 
 
 
-  (* TODO: Move this to listutils or something *)
-  Lemma Forall2_take :
-    forall {X Y} amount (xs : list X) (ys : list Y) P,
-      Forall2 P xs ys ->
-      Forall2 P (take amount xs) (take amount ys).
-  Proof.
-    intros X Y amount xs ys P ALL.
-    generalize dependent amount.
-    induction ALL; intros amount.
-    - cbn; auto.
-    - destruct amount; cbn; auto.
-  Qed.
+(* TODO: Move this to listutils or something *)
+Lemma Forall2_take :
+  forall {X Y} amount (xs : list X) (ys : list Y) P,
+    Forall2 P xs ys ->
+    Forall2 P (take amount xs) (take amount ys).
+Proof.
+  intros X Y amount xs ys P ALL.
+  generalize dependent amount.
+  induction ALL; intros amount.
+  - cbn; auto.
+  - destruct amount; cbn; auto.
+Qed.
 
-  (* TODO: Move this to listutils or something *)
-  Lemma Forall2_drop :
-    forall {X Y} amount (xs : list X) (ys : list Y) P,
-      Forall2 P xs ys ->
-      Forall2 P (drop amount xs) (drop amount ys).
-  Proof.
-    intros X Y amount xs ys P ALL.
-    generalize dependent amount.
-    induction ALL; intros amount.
-    - cbn; auto.
-    - destruct amount; cbn; auto.
-  Qed.
+(* TODO: Move this to listutils or something *)
+Lemma Forall2_drop :
+  forall {X Y} amount (xs : list X) (ys : list Y) P,
+    Forall2 P xs ys ->
+    Forall2 P (drop amount xs) (drop amount ys).
+Proof.
+  intros X Y amount xs ys P ALL.
+  generalize dependent amount.
+  induction ALL; intros amount.
+  - cbn; auto.
+  - destruct amount; cbn; auto.
+Qed.
 
-  (* TODO: Move this to listutils or something *)
-  Lemma Forall2_between :
-    forall {X Y} (xs : list X) (ys : list Y) P start finish,
-      Forall2 P xs ys ->
-      Forall2 P (between start finish xs) (between start finish ys).
-  Proof.
-    unfold between.
-    intros X Y xs ys P start finish ALL.
-    apply Forall2_take.
-    apply Forall2_drop.
-    auto.
-  Qed.
+(* TODO: Move this to listutils or something *)
+Lemma Forall2_between :
+  forall {X Y} (xs : list X) (ys : list Y) P start finish,
+    Forall2 P xs ys ->
+    Forall2 P (between start finish xs) (between start finish ys).
+Proof.
+  unfold between.
+  intros X Y xs ys P start finish ALL.
+  apply Forall2_take.
+  apply Forall2_drop.
+  auto.
+Qed.
 
-  (* TODO: Move this to listutils or something *)
-  Lemma take_length :
-    forall {X} (xs : list X) amount,
-      (amount <= N.of_nat (length xs))%N ->
-      length (take amount xs) = N.to_nat amount.
-  Proof.
-    intros X xs.
-    induction xs; intros amount LE.
-    - destruct amount; cbn in *; auto.
+(* TODO: Move this to listutils or something *)
+Lemma take_length :
+  forall {X} (xs : list X) amount,
+    (amount <= N.of_nat (length xs))%N ->
+    length (take amount xs) = N.to_nat amount.
+Proof.
+  intros X xs.
+  induction xs; intros amount LE.
+  - destruct amount; cbn in *; auto.
+    lia.
+  - induction amount using N.peano_ind.
+    + cbn in *; auto.
+    + cbn.
+      break_match_goal;
+        break_match_hyp_inv; auto.
+
+      cbn in *.
+      rewrite IHxs;
+        lia.
+Qed.
+
+(* TODO: Move this to listutils or something *)
+Lemma drop_length :
+  forall {X} (xs : list X) amount,
+    (amount <= N.of_nat (length xs))%N ->
+    length (drop amount xs) = (length xs - N.to_nat amount)%nat.
+Proof.
+  intros X xs.
+  induction xs; intros amount LE.
+  - destruct amount; cbn in *; auto.
+  - induction amount using N.peano_ind.
+    + cbn in *; auto.
+    + cbn.
+      break_match_goal;
+        break_match_hyp_inv; auto.
+      break_match_goal.
       lia.
-    - induction amount using N.peano_ind.
-      + cbn in *; auto.
-      + cbn.
-        break_match_goal;
-        break_match_hyp_inv; auto.
-
-        cbn in *.
-        rewrite IHxs;
+      cbn in *.
+      rewrite IHxs;
         lia.
-  Qed.
+Qed.
 
-  (* TODO: Move this to listutils or something *)
-  Lemma drop_length :
-    forall {X} (xs : list X) amount,
-      (amount <= N.of_nat (length xs))%N ->
-      length (drop amount xs) = (length xs - N.to_nat amount)%nat.
-  Proof.
-    intros X xs.
-    induction xs; intros amount LE.
-    - destruct amount; cbn in *; auto.
-    - induction amount using N.peano_ind.
-      + cbn in *; auto.
-      + cbn.
-        break_match_goal;
-        break_match_hyp_inv; auto.
-        break_match_goal.
-        lia.
-        cbn in *.
-        rewrite IHxs;
-        lia.
-  Qed.
-  
-  (* TODO: Move this to listutils or something *)
-  Lemma between_length :
-    forall {X} (xs : list X) start finish,
-      (start <= finish)%N ->
-      (finish <= N.of_nat (length xs))%N ->
-      length (between start finish xs) = N.to_nat (finish - start).
-  Proof.
-    intros X xs start finish START_LE FINISH_LE.
-    unfold between.
-    apply take_length.
-    pose proof drop_length xs start as DROP.
-    forward DROP; lia.
-  Qed.
+(* TODO: Move this to listutils or something *)
+Lemma between_length :
+  forall {X} (xs : list X) start finish,
+    (start <= finish)%N ->
+    (finish <= N.of_nat (length xs))%N ->
+    length (between start finish xs) = N.to_nat (finish - start).
+Proof.
+  intros X xs start finish START_LE FINISH_LE.
+  unfold between.
+  apply take_length.
+  pose proof drop_length xs start as DROP.
+  forward DROP; lia.
+Qed.
 
-    Lemma Forall2_In_exists2:
-    forall {A B : Type} (f : A -> B -> Prop) (l1 : list A) (l2 : list B) (y : B),
-      Forall2 f l1 l2 -> In y l2 -> exists x : A, In x l1 /\ f x y.
-  Proof.
-    intros.
-    induction H.
-    - inversion H0.
-    - inversion H0.
-      + subst. exists x. split; auto. left; auto.
-      + subst. destruct (IHForall2 H2) as [z [HI Hz]].
-        exists z. split; auto. right; auto.
-  Qed.
+Lemma Forall2_In_exists2:
+  forall {A B : Type} (f : A -> B -> Prop) (l1 : list A) (l2 : list B) (y : B),
+    Forall2 f l1 l2 -> In y l2 -> exists x : A, In x l1 /\ f x y.
+Proof.
+  intros.
+  induction H.
+  - inversion H0.
+  - inversion H0.
+    + subst. exists x. split; auto. left; auto.
+    + subst. destruct (IHForall2 H2) as [z [HI Hz]].
+      exists z. split; auto. right; auto.
+Qed.
 
+Lemma split_every_Forall2 :
+  forall {A B} (P : A -> B -> Prop) xs ys xs' ys' n,
+    Forall2 P xs ys ->
+    split_every n xs = inr xs' ->
+    split_every n ys = inr ys' ->
+    Forall2 (Forall2 P) xs' ys'.
+Proof.
+  intros A B P xs ys xs' ys' n ALL SPLITX SPLITY.
+Admitted.
+
+Lemma split_every_n_succeeds :
+  forall {A B} (xs : list A) (ys : list B) n xs',
+    split_every n xs = inr xs' ->
+    exists ys', split_every n ys = inr ys'.
+Proof.
+  intros A B xs ys n xs' H.
+  unfold split_every in *.
+  destruct n; inv H.
+  eexists; reflexivity.
+Qed.
