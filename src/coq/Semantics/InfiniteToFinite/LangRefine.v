@@ -8943,23 +8943,10 @@ Qed.
                             (DVALUE_BYTES.dvalue_bytes_to_dvalue
                                (DVALUE_BYTES.dvalue_to_dvalue_bytes dv t_from) t_to)) as x.
           destruct_err_ub_oom x; inv CONV.
-          erewrite dvalue_bytes_fin_to_dvalue_fin_inf_success; eauto.
-          2: {
-            rewrite dvalue_to_dvalue_bytes_fin_to_inf_dvalue.
-            eapply dvalue_bytes_refine_fin_to_inf_dvalue_bytes.
-          }
-          2: {
-            destruct (DVALUE_BYTES.dvalue_bytes_to_dvalue (DVALUE_BYTES.dvalue_to_dvalue_bytes dv t_from) t_to).
-            destruct unEitherT.
-            destruct unMkOomableT; try destruct o; inv Heqx.
-            destruct s; try destruct e; inv H0.
-            reflexivity.
-
-          }
           erewrite dvalue_bytes_to_dvalue_fin_inf; eauto.
-          2: apply dvalue_bytes_refine_fin_to_inf_dvalue_bytes.
-          cbn.
-          reflexivity.
+          cbn; auto.
+          rewrite dvalue_to_dvalue_bytes_fin_to_inf_dvalue.
+          apply dvalue_bytes_refine_fin_to_inf_dvalue_bytes.
         - inv CONV.
       }
       inv CONV; auto.
