@@ -11173,8 +11173,6 @@ Qed.
     eapply concretization_map_refine_empty.
   Qed.
 
-  Print Assumptions concretize_uvalue_bytes_fin_inf.
-
   Lemma extractbytes_to_dvalue_fin_inf :
     forall uvs l dv_fin dt
       (Heqo : map_monad uvalue_convert_strict uvs = NoOom l)
@@ -11241,11 +11239,9 @@ Qed.
     right.
     intros a RETa.
     inv RETa.
-    eapply handle_poison_and_oom_dv_dvalue_bytes_to_dvalue_fin_inf_success; eauto.
+    eapply dvalue_bytes_to_dvalue_fin_inf; eauto.
     apply dvalue_bytes_refine_fin_to_inf_dvalue_bytes.
   Qed.
-
-  Print Assumptions extractbytes_to_dvalue_fin_inf.
 
   Lemma dvalue_int_unsigned_E1E2 :
     forall x y,
