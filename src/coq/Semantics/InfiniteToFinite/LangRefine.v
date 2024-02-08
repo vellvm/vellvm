@@ -7898,7 +7898,7 @@ Qed.
   Qed.
 
   Lemma dvalue_extract_byte_success_fin_inf :
-    forall dv_inf dv_fin dt idx res,
+    forall dv_fin dv_inf dt idx res,
       dvalue_refine_strict dv_inf dv_fin ->
       @dvalue_extract_byte ErrOOMPoison
           (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
@@ -7937,10 +7937,10 @@ Qed.
     (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
        (@Monad_OomableT Poisonable MonadPoisonable)) Z res.
   Proof.
-    intros dv_inf dv_fin dt idx res REF VAL.
     Opaque dvalue_extract_byte.
     Opaque IS1.LLVM.MEM.DVALUE_BYTE.dvalue_extract_byte.
     induction dv_fin using dvalue_strong_ind;
+      intros dv_inf dt idx res REF VAL;
       rewrite dvalue_extract_byte_equation in VAL;
       rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_extract_byte_equation;
       try solve
@@ -7967,23 +7967,112 @@ Qed.
 
       { (* Structs *)
         destruct dt; inv H1.
+        dvalue_refine_strict_inv REF.
         rewrite extract_field_byte_fin_inf.
         destruct (extract_field_byte fields0 (Z.to_N idx)) eqn:FIELD.
         destruct unEitherT.
         destruct unMkOomableT; inv H2.
-        destruct o; inv H1.
+        destruct o; inv H3.
         destruct s; inv H2.
         destruct p as (?&?&?).
         cbn in *.
         destruct (nth_error fields (N.to_nat n)) eqn:NTH;
-          [|inv H1].
+          [|inv H3].
 
-        eapply map_monad_OOM_Nth in NTH; eauto.
-        destruct NTH as (?&?&?).
-        admit.
-        admit.
+        eapply map_monad_oom_Forall2 in H1.
+        pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ NTH H1.
+        destruct H0 as (?&?&?).
+        rewrite H0.
+
+        remember (dvalue_extract_byte d0 d (Z.of_N n0)) as ext.
+        destruct ext.
+        destruct unEitherT.
+        destruct unMkOomableT; inv H3.
+
+        erewrite H; eauto.
+        2: {
+          repeat constructor.
+          eapply Util.Nth_In; eauto.
+        }
+
+        cbn.
+        auto.
       }
-  Admitted.
+
+      { (* Packed Structs *)
+        destruct dt; inv H1.
+        dvalue_refine_strict_inv REF.
+        rewrite extract_field_byte_fin_inf.
+        destruct (extract_field_byte fields0 (Z.to_N idx)) eqn:FIELD.
+        destruct unEitherT.
+        destruct unMkOomableT; inv H2.
+        destruct o; inv H3.
+        destruct s; inv H2.
+        destruct p as (?&?&?).
+        cbn in *.
+        destruct (nth_error fields (N.to_nat n)) eqn:NTH;
+          [|inv H3].
+
+        eapply map_monad_oom_Forall2 in H1.
+        pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ NTH H1.
+        destruct H0 as (?&?&?).
+        rewrite H0.
+
+        remember (dvalue_extract_byte d0 d (Z.of_N n0)) as ext.
+        destruct ext.
+        destruct unEitherT.
+        destruct unMkOomableT; inv H3.
+
+        erewrite H; eauto.
+        2: {
+          repeat constructor.
+          eapply Util.Nth_In; eauto.
+        }
+
+        cbn.
+        auto.
+      }
+
+      { (* Arrays *)
+        destruct dt; inv H1.
+        dvalue_refine_strict_inv REF.
+        rewrite sizeof_dtyp_fin_inf.
+        cbn.
+        break_match_hyp; [|inv H2].
+
+        eapply map_monad_oom_Forall2 in H1.
+        pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ Heqo H1.
+        destruct H0 as (?&?&?).
+        rewrite H0.
+
+        erewrite H; eauto.
+        3: apply H2.
+        reflexivity.
+
+        repeat constructor.
+        eapply Util.Nth_In; eauto.
+      }
+
+      { (* Vectors *)
+        destruct dt; inv H1.
+        dvalue_refine_strict_inv REF.
+        rewrite sizeof_dtyp_fin_inf.
+        cbn.
+        break_match_hyp; [|inv H2].
+
+        eapply map_monad_oom_Forall2 in H1.
+        pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ Heqo H1.
+        destruct H0 as (?&?&?).
+        rewrite H0.
+
+        erewrite H; eauto.
+        3: apply H2.
+        reflexivity.
+
+        repeat constructor.
+        eapply Util.Nth_In; eauto.
+      }
+  Qed.
 
   Lemma dvalue_extract_byte_raise_poison_fin_inf :
     forall dv_inf dv_fin dt idx dt_res,
