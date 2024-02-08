@@ -656,9 +656,36 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
         lia.
       + rewrite Y_FIN.
         assert (two_p 1 = 2)%Z.
-        admit.
-        admit.
-  Admitted.
+        { unfold two_p.
+          rewrite two_power_pos_correct. lia.
+        }
+        rewrite H2.
+        pose proof Z.div_le_upper_bound (Int64.unsigned x_fin) 2 (Int64.modulus - 1).
+        forward H3; [lia|].
+        forward H3; [lia|].
+        auto.
+      + forward H1.
+        lia.
+        pose proof Z.div_le_upper_bound (Int64.unsigned x_fin) (two_p (Int64.unsigned y_fin)) (Int64.modulus - 1).
+        forward H2.
+        { unfold two_p.
+          break_match_goal; try lia.
+          rewrite two_power_pos_correct; lia.
+        }
+        forward H2.
+        { unfold two_p.
+          break_match_goal; try lia.
+          rewrite two_power_pos_correct.
+          assert (1 <= Z.pow_pos 2 p)%Z.
+          { lia.
+          }
+          pose proof Z.mul_le_mono_nonneg_r 1 (Z.pow_pos 2 p) (Int64.modulus - 1).
+          forward H4; [lia|].
+          forward H4; [lia|].
+          lia.
+        }
+        auto.
+  Qed.
 
   Lemma mmods_refine :
     forall x_fin y_fin r_fin x_inf y_inf,
