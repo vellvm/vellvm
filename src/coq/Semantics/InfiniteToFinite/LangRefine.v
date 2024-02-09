@@ -18,6 +18,7 @@ From Vellvm Require Import
      Semantics.InterpretationStack
      Semantics.TopLevel
      Semantics.DynamicValues
+     Semantics.VellvmIntegers
      Semantics.LLVMParams
      Semantics.InfiniteToFinite.Conversions.BaseConversions
      Semantics.InfiniteToFinite.Conversions.DvalueConversions
@@ -6507,7 +6508,7 @@ Qed.
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@IS1.LP.Events.DV.VIntVMemInt int64 IS1.LP.Events.DV.VInt64) IS1.LP.Events.DV.ToDvalue_Int64
+        (@VIntVMemInt int64 VInt64) IS1.LP.Events.DV.ToDvalue_Int64
         iop v1 v2 = success_unERR_UB_OOM res_inf.
   Proof.
     intros v1 v2 iop res_fin res_inf EVAL CONV.
@@ -6568,7 +6569,7 @@ Qed.
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@IS1.LP.Events.DV.VIntVMemInt int16 IS1.LP.Events.DV.VInt16) IS1.LP.Events.DV.ToDvalue_Int16
+        (@VIntVMemInt int16 VInt16) IS1.LP.Events.DV.ToDvalue_Int16
         iop v1 v2 = success_unERR_UB_OOM res_inf.
   Proof.
     intros v1 v2 iop res_fin res_inf EVAL CONV.
@@ -6629,7 +6630,7 @@ Qed.
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@IS1.LP.Events.DV.VIntVMemInt int32 IS1.LP.Events.DV.VInt32) IS1.LP.Events.DV.ToDvalue_Int32
+        (@VIntVMemInt int32 VInt32) IS1.LP.Events.DV.ToDvalue_Int32
         iop v1 v2 = success_unERR_UB_OOM res_inf.
   Proof.
     intros v1 v2 iop res_fin res_inf EVAL CONV.
@@ -6690,7 +6691,7 @@ Qed.
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@IS1.LP.Events.DV.VIntVMemInt int8 IS1.LP.Events.DV.VInt8) IS1.LP.Events.DV.ToDvalue_Int8
+        (@VIntVMemInt int8 VInt8) IS1.LP.Events.DV.ToDvalue_Int8
         iop v1 v2 = success_unERR_UB_OOM res_inf.
   Proof.
     intros v1 v2 iop res_fin res_inf EVAL CONV.
@@ -6751,7 +6752,7 @@ Qed.
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@IS1.LP.Events.DV.VIntVMemInt int1 IS1.LP.Events.DV.VInt1) IS1.LP.Events.DV.ToDvalue_Int1
+        (@VIntVMemInt int1 VInt1) IS1.LP.Events.DV.ToDvalue_Int1
         iop v1 v2 = success_unERR_UB_OOM res_inf.
   Proof.
     intros v1 v2 iop res_fin res_inf EVAL CONV.
@@ -9498,7 +9499,7 @@ Qed.
             cbn.
 
             assert (exists x1, Int32.signed x1 = Z.pred (Z.pos p')) as (x1 & X1).
-            { exists (DynamicValues.repr (Z.pred (Z.pos p'))).
+            { exists (repr (Z.pred (Z.pos p'))).
               pose proof Int32.min_signed_neg.
               rewrite Int32.signed_repr; eauto.
               pose proof Int32.signed_range x0.
@@ -9619,7 +9620,7 @@ Qed.
             cbn.
 
             assert (exists x1, Int64.signed x1 = Z.pred (Z.pos p')) as (x1 & X1).
-            { exists (DynamicValues.repr (Z.pred (Z.pos p'))).
+            { exists (repr (Z.pred (Z.pos p'))).
               pose proof Int64.min_signed_neg.
               rewrite Int64.signed_repr; eauto.
               pose proof Int64.signed_range x0.
@@ -9741,7 +9742,7 @@ Qed.
             cbn.
 
             assert (exists x1, Int32.signed x1 = Z.pred (Z.pos p')) as (x1 & X1).
-            { exists (DynamicValues.repr (Z.pred (Z.pos p'))).
+            { exists (repr (Z.pred (Z.pos p'))).
               pose proof Int32.min_signed_neg.
               rewrite Int32.signed_repr; eauto.
               pose proof Int32.signed_range x0.
@@ -9863,7 +9864,7 @@ Qed.
             cbn.
 
             assert (exists x1, Int64.signed x1 = Z.pred (Z.pos p')) as (x1 & X1).
-            { exists (DynamicValues.repr (Z.pred (Z.pos p'))).
+            { exists (repr (Z.pred (Z.pos p'))).
               pose proof Int64.min_signed_neg.
               rewrite Int64.signed_repr; eauto.
               pose proof Int64.signed_range x0.

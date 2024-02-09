@@ -35,6 +35,7 @@ From ExtLib Require Import
 Import MonadNotation.
 Import DynamicTypes.
 Import DynamicValues.
+Import VellvmIntegers.
 Import TranslateFacts.
 Import StateFacts.
 Import InterpFacts.
@@ -403,7 +404,7 @@ Module Infinite.
     interp_instr_E_to_L0 dvalue alloc_tree ≈
       Vis (subevent _ (Alloca (DTYPE_I 64) 1 None))
           (fun u => Vis (subevent _ (LocalWrite (Name "ptr") (dvalue_to_uvalue u)))
-                     (fun _ => Ret (DVALUE_I1 DynamicValues.Int1.one))).
+                     (fun _ => Ret (DVALUE_I1 Int1.one))).
 
   Proof.
     unfold interp_instr_E_to_L0.
@@ -427,7 +428,7 @@ Module Infinite.
           (fun u => Vis (subevent _ (LocalWrite (Name "ptr") (dvalue_to_uvalue u)))
                       (fun x => Vis (subevent _ (LocalRead (Name "ptr")))
                                 (fun u1 => Vis (subevent _ (LocalWrite (Name "i") (UVALUE_Conversion Ptrtoint DTYPE_Pointer u1 DTYPE_IPTR)))
-                                            (fun _ => Ret (DVALUE_I1 DynamicValues.Int1.one))))).
+                                            (fun _ => Ret (DVALUE_I1 Int1.one))))).
   Proof.
     unfold interp_instr_E_to_L0.
     unfold ptoi_tree. cbn. go. cbn. go.
@@ -1179,7 +1180,7 @@ Module Infinite.
         inv ALLOC_OOM.
 
       rewrite MAP in H0.
-      exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
+      exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 Int1.one)).
       split; cycle 1.
       { clear - H0.
         eapply refine_OOM_h_model_undef_h_raise_OOM; eauto.
@@ -1189,7 +1190,7 @@ Module Infinite.
         apply interp_mcfg4_ret. } }
 
     clear ALLOCINV.
-    exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
+    exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 Int1.one)).
     destruct ALLOC_SUC as (?&?&?&?&?).
     rewrite H in H0; setoid_rewrite bind_ret_l in H0.
     split.
@@ -1428,7 +1429,7 @@ Module Finite.
     interp_instr_E_to_L0 dvalue alloc_tree ≈
       Vis (subevent _ (Alloca (DTYPE_I 64) 1 None))
           (fun u => Vis (subevent _ (LocalWrite (Name "ptr") (dvalue_to_uvalue u)))
-                     (fun _ => Ret (DVALUE_I1 DynamicValues.Int1.one))).
+                     (fun _ => Ret (DVALUE_I1 Int1.one))).
   Proof.
     unfold interp_instr_E_to_L0.
     unfold alloc_tree. cbn. go. cbn. go.
@@ -2043,7 +2044,7 @@ Module Finite.
         inv ALLOC_OOM.
 
       rewrite MAP in H0.
-      exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
+      exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 Int1.one)).
       split; cycle 1.
       { clear - H0.
         eapply refine_OOM_h_model_undef_h_raise_OOM; eauto.
@@ -2053,7 +2054,7 @@ Module Finite.
         apply interp_mcfg4_ret. } }
 
     clear ALLOCINV.
-    exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 DynamicValues.Int1.one)).
+    exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 Int1.one)).
     destruct ALLOC_SUC as (?&?&?&?&?).
     rewrite H in H0; setoid_rewrite bind_ret_l in H0.
     split.

@@ -3,13 +3,14 @@ From Vellvm.Syntax Require Import
      DynamicTypes.
 
 From Vellvm.Semantics Require Import
-     DynamicValues
-     MemoryAddress
-     MemoryParams
-     Memory.Overlaps
-     LLVMParams
-     LLVMEvents
-     ItreeRaiseMReturns.
+  DynamicValues
+  VellvmIntegers
+  MemoryAddress
+  MemoryParams
+  Memory.Overlaps
+  LLVMParams
+  LLVMEvents
+  ItreeRaiseMReturns.
 
 Require Import MemBytes.
 
@@ -3616,7 +3617,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         raise_ub "memcpy with overlapping or non-equal src and dst memory locations.".
 
   (** memset spec *)
-  Definition memset_spec (dst : addr) (val : DynamicValues.int8) (len : Z) (sid : store_id) (volatile : bool) : MemPropT MemState unit :=
+  Definition memset_spec (dst : addr) (val : int8) (len : Z) (sid : store_id) (volatile : bool) : MemPropT MemState unit :=
     if Z.ltb len 0
     then
       raise_ub "memset given negative length."
@@ -3657,17 +3658,17 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
                     DVALUE_Addr src ::
                     DVALUE_I32 len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (unsigned len) (equ volatile DynamicValues.one)
+          memcpy_spec src dst (unsigned len) (equ volatile VellvmIntegers.one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_I64 len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (unsigned len) (equ volatile DynamicValues.one)
+          memcpy_spec src dst (unsigned len) (equ volatile VellvmIntegers.one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_IPTR len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (IP.to_Z len) (equ volatile DynamicValues.one)
+          memcpy_spec src dst (IP.to_Z len) (equ volatile VellvmIntegers.one)
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
@@ -3678,13 +3679,13 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
           DVALUE_I32 len ::
           DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
           sid <- fresh_sid;;
-          memset_spec dst val (unsigned len) sid (equ volatile DynamicValues.one)
+          memset_spec dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
       | DVALUE_Addr dst ::
           DVALUE_I8 val ::
           DVALUE_I64 len ::
           DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
           sid <- fresh_sid;;
-          memset_spec dst val (unsigned len) sid (equ volatile DynamicValues.one)
+          memset_spec dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
       | _ => raise_error "Unsupported arguments to memset."
       end.
 
@@ -5337,7 +5338,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
 
     (** memset spec *)
     Definition memset `{MemMonad ExtraState MemM (itree Eff)}
-      (dst : addr) (val : DynamicValues.int8) (len : Z) (sid : store_id) (volatile : bool) : MemM unit :=
+      (dst : addr) (val : int8) (len : Z) (sid : store_id) (volatile : bool) : MemM unit :=
       if Z.ltb len 0
       then
         raise_ub "memset given negative length."
@@ -5378,17 +5379,17 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
                     DVALUE_Addr src ::
                     DVALUE_I32 len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (unsigned len) (equ volatile DynamicValues.one)
+          memcpy src dst (unsigned len) (equ volatile VellvmIntegers.one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_I64 len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (unsigned len) (equ volatile DynamicValues.one)
+          memcpy src dst (unsigned len) (equ volatile VellvmIntegers.one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_IPTR len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (IP.to_Z len) (equ volatile DynamicValues.one)
+          memcpy src dst (IP.to_Z len) (equ volatile VellvmIntegers.one)
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
@@ -5399,13 +5400,13 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
           DVALUE_I32 len ::
           DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
           sid <- fresh_sid;;
-          memset dst val (unsigned len) sid (equ volatile DynamicValues.one)
+          memset dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
       | DVALUE_Addr dst ::
           DVALUE_I8 val ::
           DVALUE_I64 len ::
           DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
           sid <- fresh_sid;;
-          memset dst val (unsigned len) sid (equ volatile DynamicValues.one)
+          memset dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
       | _ => raise_error "Unsupported arguments to memset."
       end.
 

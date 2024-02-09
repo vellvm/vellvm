@@ -23,7 +23,8 @@ From Vellvm Require Import
      Syntax
      Semantics
      Theory.StatePredicates
-     Theory.InterpreterCFG.
+     Theory.InterpreterCFG
+     VellvmIntegers.
 
 Open Scope itree_scope.
 Import ITreeNotations.
@@ -117,7 +118,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (* TO MOVE *)
 
   Lemma repr_intval (i: int64):
-    DynamicValues.Int64.repr (Int64.intval i) = i.
+    Int64.repr (Int64.intval i) = i.
   Proof using.
     replace (Int64.intval i) with (Int64.unsigned i).
     - apply Int64.repr_unsigned.

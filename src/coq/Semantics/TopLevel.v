@@ -23,7 +23,8 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Semantics.Denotation
      Semantics.IntrinsicsDefinitions
-     Semantics.InterpretationStack.
+     Semantics.InterpretationStack
+     Semantics.VellvmIntegers.
 
 Import MonadNotation.
 Import ListNotations.
@@ -80,7 +81,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       Propagates all memory failures and raises a Vellvm "Failure" if the 
       value read does not concretize to a DVALUE_I8.
    *)
-  Definition i8_str_index (strptr : addr) (index : Z) : itree L0' DynamicValues.Int8.int :=
+  Definition i8_str_index (strptr : addr) (index : Z) : itree L0' Int8.int :=
     iptr <- (@lift_OOM (itree L0') _ _ _ (LP.IP.from_Z index)) ;;
     addr <-
       match handle_gep_addr (DTYPE_I 8) strptr [DVALUE_IPTR iptr] with
@@ -108,16 +109,16 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
           bytes <- 
             ITree.iter
               (fun '(c, bytes, offset) =>
-                 if DynamicValues.Int8.eq c (DynamicValues.Int8.zero) then
+                 if Int8.eq c (Int8.zero) then
                    (* null terminated string so end the iteration, add the newline *)
-                   ret (inr ((DynamicValues.Int8.repr 10) :: bytes))
+                   ret (inr ((Int8.repr 10) :: bytes))
                  else 
                    next_char <- i8_str_index strptr offset ;;
                    ret (inl (next_char, c::bytes, (offset + 1)%Z))
               )
               (char, [], 1%Z) ;;
           v <- trigger (IO_stdout (DList.rev_tail_rec bytes)) ;;
-          ret (UVALUE_I8 (DynamicValues.Int8.zero))
+          ret (UVALUE_I8 (Int8.zero))
       | _ => raiseUB "puts got non-address argument"
       end
     in
@@ -380,7 +381,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     inputs from the command line is nontrivial since we have martial C-level strings
     into the Vellvm memory.  
    *)
-  Definition main_args := [DV.UVALUE_I32 (DynamicValues.Int32.zero);
+  Definition main_args := [DV.UVALUE_I32 (Int32.zero);
                            DV.UVALUE_Addr null
     ].
 

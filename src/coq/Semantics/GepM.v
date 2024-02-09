@@ -6,7 +6,7 @@ From ExtLib Require Import
 
 From Vellvm Require Import
   DynamicTypes
-  DynamicValues
+  VellvmIntegers
   LLVMEvents
   Semantics.MemoryAddress
   Semantics.Memory.Sizeof

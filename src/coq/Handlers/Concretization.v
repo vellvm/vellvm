@@ -18,6 +18,7 @@ From Vellvm Require Import
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Syntax.DataLayout
+     Semantics.VellvmIntegers
      Semantics.DynamicValues
      Semantics.MemoryAddress
      Semantics.GepM

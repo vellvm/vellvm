@@ -8,7 +8,7 @@ From Vellvm Require Import
   QC.Generators
   Handlers
   QC.DList
-  DynamicValues.
+  VellvmIntegers.
 (* Maybe also import InterpretationStack *)
 
 From ExtLib.Structures Require Export

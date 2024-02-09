@@ -296,7 +296,7 @@ Definition VMemInt_intptr := VMemInt_intptr_i64.
     break_match.
     - rewrite Int64.repr_unsigned; auto.
     - unfold intptr in *.
-      pose proof DynamicValues.Int64.unsigned_range i.
+      pose proof Int64.unsigned_range i.
       unfold Int64.max_unsigned in *.
       lia.
   Qed.

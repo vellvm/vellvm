@@ -18,6 +18,7 @@ From Vellvm Require Import
   Semantics.InterpretationStack
   Semantics.TopLevel
   Semantics.DynamicValues
+  Semantics.VellvmIntegers
   Semantics.LLVMParams
   Semantics.InfiniteToFinite.Conversions.BaseConversions
   Semantics.InfiniteToFinite.Conversions.DvalueConversions
@@ -13001,11 +13002,6 @@ cofix CIH
       unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
       red in HANDLER.
 
-      assert (LLVMParams64BitIntptr.Events.DV.unsigned x3 = LLVMParamsBigIntptr.Events.DV.unsigned x3) as X3.
-      { reflexivity.
-      }
-      rewrite <- X3; clear X3.
-
       destruct res_fin.
       break_match_hyp.
       {
@@ -13052,11 +13048,6 @@ cofix CIH
       unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
       unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
       red in HANDLER.
-
-      assert (LLVMParams64BitIntptr.Events.DV.unsigned x3 = LLVMParamsBigIntptr.Events.DV.unsigned x3) as X3.
-      { reflexivity.
-      }
-      rewrite <- X3; clear X3.
 
       destruct res_fin.
       break_match_hyp.
@@ -17647,7 +17638,7 @@ cofix CIH
       DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I1 x_fin) ->
       exists x_inf,
         v_inf = DVC1.DV1.DVALUE_I1 x_inf /\
-          LLVMParamsBigIntptr.Events.DV.unsigned x_inf = LLVMParams64BitIntptr.Events.DV.unsigned x_fin.
+          VellvmIntegers.unsigned x_inf = VellvmIntegers.unsigned x_fin.
   Proof.
     intros v_inf x_fin REF.
     rewrite DVC1.dvalue_refine_strict_equation in REF.
@@ -17661,7 +17652,7 @@ cofix CIH
       DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I8 x_fin) ->
       exists x_inf,
         v_inf = DVC1.DV1.DVALUE_I8 x_inf /\
-          LLVMParamsBigIntptr.Events.DV.unsigned x_inf = LLVMParams64BitIntptr.Events.DV.unsigned x_fin.
+          VellvmIntegers.unsigned x_inf = VellvmIntegers.unsigned x_fin.
   Proof.
     intros v_inf x_fin REF.
     rewrite DVC1.dvalue_refine_strict_equation in REF.
@@ -17675,7 +17666,7 @@ cofix CIH
       DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I16 x_fin) ->
       exists x_inf,
         v_inf = DVC1.DV1.DVALUE_I16 x_inf /\
-          LLVMParamsBigIntptr.Events.DV.unsigned x_inf = LLVMParams64BitIntptr.Events.DV.unsigned x_fin.
+          VellvmIntegers.unsigned x_inf = VellvmIntegers.unsigned x_fin.
   Proof.
     intros v_inf x_fin REF.
     rewrite DVC1.dvalue_refine_strict_equation in REF.
@@ -17689,7 +17680,7 @@ cofix CIH
       DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I32 x_fin) ->
       exists x_inf,
         v_inf = DVC1.DV1.DVALUE_I32 x_inf /\
-          LLVMParamsBigIntptr.Events.DV.unsigned x_inf = LLVMParams64BitIntptr.Events.DV.unsigned x_fin.
+          VellvmIntegers.unsigned x_inf = VellvmIntegers.unsigned x_fin.
   Proof.
     intros v_inf x_fin REF.
     rewrite DVC1.dvalue_refine_strict_equation in REF.
@@ -17703,7 +17694,7 @@ cofix CIH
       DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I64 x_fin) ->
       exists x_inf,
         v_inf = DVC1.DV1.DVALUE_I64 x_inf /\
-          LLVMParamsBigIntptr.Events.DV.unsigned x_inf = LLVMParams64BitIntptr.Events.DV.unsigned x_fin.
+          VellvmIntegers.unsigned x_inf = VellvmIntegers.unsigned x_fin.
   Proof.
     intros v_inf x_fin REF.
     rewrite DVC1.dvalue_refine_strict_equation in REF.
@@ -18151,9 +18142,9 @@ cofix CIH
     forall {ms_fin_start ms_fin_final ms_inf_start a a_inf val
          val_inf len len_inf volatile volatile_inf sid res_fin},
       addr_refine a_inf a ->
-      LLVMParamsBigIntptr.Events.DV.unsigned volatile_inf = LLVMParams64BitIntptr.Events.DV.unsigned volatile ->
-      LLVMParamsBigIntptr.Events.DV.unsigned val_inf = LLVMParams64BitIntptr.Events.DV.unsigned val ->
-      LLVMParamsBigIntptr.Events.DV.unsigned len_inf = LLVMParams64BitIntptr.Events.DV.unsigned len ->
+      VellvmIntegers.unsigned volatile_inf = VellvmIntegers.unsigned volatile ->
+      VellvmIntegers.unsigned val_inf = VellvmIntegers.unsigned val ->
+      VellvmIntegers.unsigned len_inf = VellvmIntegers.unsigned len ->
       MemState_refine_prop ms_inf_start ms_fin_start ->
       Memory64BitIntptr.MMEP.MemSpec.memset_spec a val (Int32.unsigned len) sid
         (Int1.eq volatile Int1.one) ms_fin_start (success_unERR_UB_OOM (ms_fin_final, res_fin)) ->
@@ -18170,7 +18161,7 @@ cofix CIH
     unfold Memory64BitIntptr.MMEP.MemSpec.memset_spec in HANDLE.
     break_match_hyp.
     - inv HANDLE.
-    - unfold LLVMParamsBigIntptr.Events.DV.unsigned in *.
+    - unfold VellvmIntegers.unsigned in *.
       cbn in LEN, VAL, VOL.
       rewrite <- LEN in Heqb. rewrite Heqb.
       eapply fin_inf_write_bytes_spec; eauto.
@@ -18190,9 +18181,9 @@ cofix CIH
     forall {ms_fin_start ms_fin_final ms_inf_start a a_inf val
          val_inf len len_inf volatile volatile_inf sid res_fin},
       addr_refine a_inf a ->
-      LLVMParamsBigIntptr.Events.DV.unsigned volatile_inf = LLVMParams64BitIntptr.Events.DV.unsigned volatile ->
-      LLVMParamsBigIntptr.Events.DV.unsigned val_inf = LLVMParams64BitIntptr.Events.DV.unsigned val ->
-      LLVMParamsBigIntptr.Events.DV.unsigned len_inf = LLVMParams64BitIntptr.Events.DV.unsigned len ->
+      VellvmIntegers.unsigned volatile_inf = VellvmIntegers.unsigned volatile ->
+      VellvmIntegers.unsigned val_inf = VellvmIntegers.unsigned val ->
+      VellvmIntegers.unsigned len_inf = VellvmIntegers.unsigned len ->
       MemState_refine_prop ms_inf_start ms_fin_start ->
       Memory64BitIntptr.MMEP.MemSpec.memset_spec a val (Int64.unsigned len) sid
         (Int1.eq volatile Int1.one) ms_fin_start (success_unERR_UB_OOM (ms_fin_final, res_fin)) ->
@@ -18209,7 +18200,7 @@ cofix CIH
     unfold Memory64BitIntptr.MMEP.MemSpec.memset_spec in HANDLE.
     break_match_hyp.
     - inv HANDLE.
-    - unfold LLVMParamsBigIntptr.Events.DV.unsigned in *.
+    - unfold VellvmIntegers.unsigned in *.
       cbn in LEN, VAL, VOL.
       rewrite <- LEN in Heqb. rewrite Heqb.
       eapply fin_inf_write_bytes_spec; eauto.
@@ -23198,11 +23189,10 @@ cofix CIH
       do 2 red in HANDLER.
       break_match_hyp; try contradiction.
       break_match_hyp; try contradiction.
-      unfold LLVMParams64BitIntptr.Events.DV.unsigned in Heqb, Heqb0.
+      unfold VellvmIntegers.unsigned in Heqb, Heqb0.
       cbn in Heqb, Heqb0.
-      unfold LLVMParamsBigIntptr.Events.DV.unsigned.
-      unfold LLVMParamsBigIntptr.Events.DV.VInt32.
-      rewrite Heqb.
+      unfold VellvmIntegers.unsigned.
+      unfold VInt32.
       erewrite <- fin_inf_no_overlap; eauto.
       repeat erewrite <- fin_inf_ptoi; eauto.
       rewrite Heqb0.
@@ -23230,11 +23220,10 @@ cofix CIH
       do 2 red in HANDLER.
       break_match_hyp; try contradiction.
       break_match_hyp; try contradiction.
-      unfold LLVMParams64BitIntptr.Events.DV.unsigned in Heqb, Heqb0.
+      unfold VellvmIntegers.unsigned in Heqb, Heqb0.
       cbn in Heqb, Heqb0.
-      unfold LLVMParamsBigIntptr.Events.DV.unsigned.
-      unfold LLVMParamsBigIntptr.Events.DV.VInt64.
-      rewrite Heqb.
+      unfold VellvmIntegers.unsigned.
+      unfold VInt64.
       erewrite <- fin_inf_no_overlap; eauto.
       repeat erewrite <- fin_inf_ptoi; eauto.
       rewrite Heqb0.
@@ -23262,7 +23251,7 @@ cofix CIH
       do 2 red in HANDLER.
       break_match_hyp; try contradiction.
       break_match_hyp; try contradiction.
-      unfold LLVMParams64BitIntptr.Events.DV.unsigned in Heqb, Heqb0.
+      unfold VellvmIntegers.unsigned in Heqb, Heqb0.
       cbn in Heqb, Heqb0.
       rename i into i0.
       assert (LLVMParams64BitIntptr.IP.to_Z i0 = LLVMParamsBigIntptr.IP.to_Z x) as X.
@@ -23528,9 +23517,9 @@ cofix CIH
     forall {ms_fin_start ms_inf_start a a_inf val
          val_inf len len_inf volatile volatile_inf sid msg},
       addr_refine a_inf a ->
-      LLVMParamsBigIntptr.Events.DV.unsigned volatile_inf = LLVMParams64BitIntptr.Events.DV.unsigned volatile ->
-      LLVMParamsBigIntptr.Events.DV.unsigned val_inf = LLVMParams64BitIntptr.Events.DV.unsigned val ->
-      LLVMParamsBigIntptr.Events.DV.unsigned len_inf = LLVMParams64BitIntptr.Events.DV.unsigned len ->
+      VellvmIntegers.unsigned volatile_inf = VellvmIntegers.unsigned volatile ->
+      VellvmIntegers.unsigned val_inf = VellvmIntegers.unsigned val ->
+      VellvmIntegers.unsigned len_inf = VellvmIntegers.unsigned len ->
       MemState_refine_prop ms_inf_start ms_fin_start ->
       Memory64BitIntptr.MMEP.MemSpec.memset_spec a val (Int32.unsigned len) sid
         (Int1.eq volatile Int1.one) ms_fin_start (raise_error msg) ->
@@ -23543,7 +23532,7 @@ cofix CIH
     unfold Memory64BitIntptr.MMEP.MemSpec.memset_spec in HANDLE.
     break_match_hyp.
     - inv HANDLE.
-    - unfold LLVMParamsBigIntptr.Events.DV.unsigned in *.
+    - unfold VellvmIntegers.unsigned in *.
       cbn in LEN, VAL, VOL.
       rewrite <- LEN in Heqb. rewrite Heqb.
       eapply fin_inf_write_bytes_spec_error; eauto.
@@ -23563,9 +23552,9 @@ cofix CIH
     forall {ms_fin_start ms_inf_start a a_inf val
          val_inf len len_inf volatile volatile_inf sid msg},
       addr_refine a_inf a ->
-      LLVMParamsBigIntptr.Events.DV.unsigned volatile_inf = LLVMParams64BitIntptr.Events.DV.unsigned volatile ->
-      LLVMParamsBigIntptr.Events.DV.unsigned val_inf = LLVMParams64BitIntptr.Events.DV.unsigned val ->
-      LLVMParamsBigIntptr.Events.DV.unsigned len_inf = LLVMParams64BitIntptr.Events.DV.unsigned len ->
+      VellvmIntegers.unsigned volatile_inf = VellvmIntegers.unsigned volatile ->
+      VellvmIntegers.unsigned val_inf = VellvmIntegers.unsigned val ->
+      VellvmIntegers.unsigned len_inf = VellvmIntegers.unsigned len ->
       MemState_refine_prop ms_inf_start ms_fin_start ->
       Memory64BitIntptr.MMEP.MemSpec.memset_spec a val (Int64.unsigned len) sid
         (Int1.eq volatile Int1.one) ms_fin_start (raise_error msg) ->
@@ -23578,7 +23567,7 @@ cofix CIH
     unfold Memory64BitIntptr.MMEP.MemSpec.memset_spec in HANDLE.
     break_match_hyp.
     - inv HANDLE.
-    - unfold LLVMParamsBigIntptr.Events.DV.unsigned in *.
+    - unfold VellvmIntegers.unsigned in *.
       cbn in LEN, VAL, VOL.
       rewrite <- LEN in Heqb. rewrite Heqb.
       eapply fin_inf_write_bytes_spec_error; eauto.

@@ -18,6 +18,7 @@ From Vellvm Require Import
      Semantics.InterpretationStack
      Semantics.TopLevel
      Semantics.DynamicValues
+     Semantics.VellvmIntegers
      Semantics.LLVMParams
      Syntax.DynamicTypes
      Theory.TopLevelRefinements

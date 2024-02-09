@@ -10,7 +10,7 @@ From Vellvm Require Import
   LLVMParams
   Error
   DynamicTypes
-  DynamicValues
+  VellvmIntegers
   Utils.ErrUbOomProp
   Utils.Oomable
   Utils.Poisonable
