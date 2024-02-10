@@ -3,12 +3,14 @@ From Vellvm.Syntax Require Import
      DynamicTypes.
 
 From Vellvm.Semantics Require Import
-     MemoryAddress
-     MemoryParams
-     Memory.Overlaps
-     LLVMParams
-     LLVMEvents
-     ItreeRaiseMReturns.
+  DynamicValues
+  VellvmIntegers
+  MemoryAddress
+  MemoryParams
+  Memory.Overlaps
+  LLVMParams
+  LLVMEvents
+  ItreeRaiseMReturns.
 
 Require Import MemBytes.
 
@@ -865,7 +867,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
       ptr len p ptrs,
       (ret (p :: ptrs) ∈ get_consecutive_ptrs ptr len)%monad ->
-      p = ptr /\ ((ptrs = [] /\ len = 1) \/ exists ptr' ip len', len = S len' /\ to_Z ip = 1%Z /\ handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ip] = inr (NoOom ptr') /\ (ret ptrs ∈ get_consecutive_ptrs ptr' len')%monad).
+      p = ptr /\ ((ptrs = [] /\ len = 1%nat) \/ exists ptr' ip len', len = S len' /\ to_Z ip = 1%Z /\ handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ip] = inr (NoOom ptr') /\ (ret ptrs ∈ get_consecutive_ptrs ptr' len')%monad).
   Proof.
     intros M HM EQM' Pre Post B MB WM EQRET WRET EQV OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR ptr len p ptrs CONSEC.
 
@@ -1011,7 +1013,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
           pose proof intptr_seq_len _ _ _ SEQ as UNSHIFTED_LENGTH.
           pose proof intptr_seq_len _ _ _ SEQ_SHIFT as SHIFTED_LENGTH.
-          assert (n < S len) as BOUND_n.
+          assert (n < S len)%nat as BOUND_n.
           { apply Nth_ix_lt_length in NTH.
             lia.
           }
@@ -1115,7 +1117,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       `{RWERR : @RaiseWithin M B _ _ _ EQM WM string (@raise_error M ERR)}
       ptr len p ptrs pre post,
       (ret (p :: ptrs) {{pre}} ∈ {{post}} get_consecutive_ptrs ptr len)%monad ->
-      p = ptr /\ ((ptrs = [] /\ len = 1) \/ exists ptr' ip len', len = S len' /\ to_Z ip = 1%Z /\ handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ip] = inr (NoOom ptr') /\ (ret ptrs {{pre}} ∈ {{post}} get_consecutive_ptrs ptr' len')%monad).
+      p = ptr /\ ((ptrs = [] /\ len = 1%nat) \/ exists ptr' ip len', len = S len' /\ to_Z ip = 1%Z /\ handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ip] = inr (NoOom ptr') /\ (ret ptrs {{pre}} ∈ {{post}} get_consecutive_ptrs ptr' len')%monad).
   Proof.
     intros M HM EQM' Pre B MB WM EQRET WRET WRET_PP EQV OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR ptr len p ptrs pre post CONSEC.
 
@@ -1268,7 +1270,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
           pose proof intptr_seq_len _ _ _ SEQ as UNSHIFTED_LENGTH.
           pose proof intptr_seq_len _ _ _ SEQ_SHIFT as SHIFTED_LENGTH.
-          assert (n < S len) as BOUND_n.
+          assert (n < S len)%nat as BOUND_n.
           { apply Nth_ix_lt_length in NTH.
             lia.
           }
@@ -3615,7 +3617,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         raise_ub "memcpy with overlapping or non-equal src and dst memory locations.".
 
   (** memset spec *)
-  Definition memset_spec (dst : addr) (val : DynamicValues.int8) (len : Z) (sid : store_id) (volatile : bool) : MemPropT MemState unit :=
+  Definition memset_spec (dst : addr) (val : int8) (len : Z) (sid : store_id) (volatile : bool) : MemPropT MemState unit :=
     if Z.ltb len 0
     then
       raise_ub "memset given negative length."
@@ -3656,17 +3658,17 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
                     DVALUE_Addr src ::
                     DVALUE_I32 len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (unsigned len) (equ volatile one)
+          memcpy_spec src dst (unsigned len) (equ volatile VellvmIntegers.one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_I64 len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (unsigned len) (equ volatile one)
+          memcpy_spec src dst (unsigned len) (equ volatile VellvmIntegers.one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_IPTR len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (IP.to_Z len) (equ volatile one)
+          memcpy_spec src dst (IP.to_Z len) (equ volatile VellvmIntegers.one)
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
@@ -3677,13 +3679,13 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
           DVALUE_I32 len ::
           DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
           sid <- fresh_sid;;
-          memset_spec dst val (unsigned len) sid (equ volatile one)
+          memset_spec dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
       | DVALUE_Addr dst ::
           DVALUE_I8 val ::
           DVALUE_I64 len ::
           DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
           sid <- fresh_sid;;
-          memset_spec dst val (unsigned len) sid (equ volatile one)
+          memset_spec dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
       | _ => raise_error "Unsupported arguments to memset."
       end.
 
@@ -5336,7 +5338,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
 
     (** memset spec *)
     Definition memset `{MemMonad ExtraState MemM (itree Eff)}
-      (dst : addr) (val : DynamicValues.int8) (len : Z) (sid : store_id) (volatile : bool) : MemM unit :=
+      (dst : addr) (val : int8) (len : Z) (sid : store_id) (volatile : bool) : MemM unit :=
       if Z.ltb len 0
       then
         raise_ub "memset given negative length."
@@ -5377,17 +5379,17 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
                     DVALUE_Addr src ::
                     DVALUE_I32 len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (unsigned len) (equ volatile one)
+          memcpy src dst (unsigned len) (equ volatile VellvmIntegers.one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_I64 len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (unsigned len) (equ volatile one)
+          memcpy src dst (unsigned len) (equ volatile VellvmIntegers.one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_IPTR len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (IP.to_Z len) (equ volatile one)
+          memcpy src dst (IP.to_Z len) (equ volatile VellvmIntegers.one)
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
@@ -5398,13 +5400,13 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
           DVALUE_I32 len ::
           DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
           sid <- fresh_sid;;
-          memset dst val (unsigned len) sid (equ volatile one)
+          memset dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
       | DVALUE_Addr dst ::
           DVALUE_I8 val ::
           DVALUE_I64 len ::
           DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
           sid <- fresh_sid;;
-          memset dst val (unsigned len) sid (equ volatile one)
+          memset dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
       | _ => raise_error "Unsupported arguments to memset."
       end.
 
@@ -5548,15 +5550,15 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
     Lemma dtyp_measure_strong_ind:
       forall (P : dtyp -> Prop)
-        (BASE: forall dt, dtyp_measure dt = 1 -> P dt)
-        (IH: forall (n : nat) (dt: dtyp), (forall (dt : dtyp), dtyp_measure dt <= n -> P dt) -> dtyp_measure dt = S n -> P dt),
+        (BASE: forall dt, dtyp_measure dt = 1%nat -> P dt)
+        (IH: forall (n : nat) (dt: dtyp), (forall (dt : dtyp), dtyp_measure dt <= n -> P dt)%nat -> dtyp_measure dt = S n -> P dt),
       forall dt, P dt.
     Proof using Type.
       intros P BASE IH.
-      assert (forall n dt, dtyp_measure dt <= n -> P dt) as IHDT.
+      assert (forall n dt, dtyp_measure dt <= n -> P dt)%nat as IHDT.
       { induction n using nat_strong_ind; intros dt SIZE.
         - destruct dt; cbn in SIZE; lia.
-        - assert (dtyp_measure dt <= n \/ dtyp_measure dt = S n) as [LEQ | EQ] by lia;
+        - assert (dtyp_measure dt <= n \/ dtyp_measure dt = S n)%nat as [LEQ | EQ] by lia;
           eauto.
       }
 

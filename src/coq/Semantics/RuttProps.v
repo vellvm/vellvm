@@ -682,3 +682,42 @@ Proof using E R1 R2 RAns RAns_in_reflexive REv REv_reflexive RR.
 Qed.
 
 End RuttEutt.
+
+(* TODO: Move this to rutt library *)
+Lemma rutt_iter' {E1 E2 I1 I2 R1 R2}
+  (RI : I1 -> I2 -> Prop)
+  (RR : R1 -> R2 -> Prop)
+  (pre : prerel E1 E2) (post : postrel E1 E2)
+  (body1 : I1 -> itree E1 (I1 + R1))
+  (body2 : I2 -> itree E2 (I2 + R2))
+  (rutt_body
+    : forall j1 j2, RI j1 j2 -> rutt pre post (sum_rel RI RR) (body1 j1) (body2 j2))
+  : forall (i1 : I1) (i2 : I2) (RI_i : RI i1 i2),
+    rutt pre post RR (ITree.iter body1 i1) (ITree.iter body2 i2).
+Proof.
+  ginit. gcofix CIH. intros.
+  specialize (rutt_body i1 i2 RI_i).
+  do 2 rewrite unfold_iter.
+  eapply gpaco2_uclo; [|eapply rutt_clo_bind|]; eauto with paco.
+  econstructor; eauto. intros ? ? [].
+  - gstep.
+    red; cbn.
+    constructor.
+    gbase.
+    auto.
+  - gstep.
+    red.
+    constructor.
+    auto.
+Qed.
+
+(* TODO: Move this to rutt library *)
+Lemma rutt_iter_gen :
+  forall {E1 E2 : Type -> Type} {A B1 B2 : Type} {R : relation A} {S : relationH B1 B2} (pre : prerel E1 E2) (post : postrel E1 E2),
+  forall (x : A -> itree E1 (A + B1)) (y : A -> itree E2 (A + B2)),
+    (forall x0 y0 : A, R x0 y0 -> rutt pre post (sum_rel R S) (x x0) (y y0)) ->
+    forall x0 y0 : A, R x0 y0 -> rutt pre post S (CategoryOps.iter x x0) (CategoryOps.iter y y0).
+Proof.
+  intros E1 E2 A B1 B2 R S pre post body1 body2 EQ_BODY x y Hxy.
+  eapply rutt_iter'; eauto.
+Qed.

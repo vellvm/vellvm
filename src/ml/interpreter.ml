@@ -42,16 +42,16 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
     | UVALUE_Addr _x -> fprintf ppf "UVALUE_Addr"
     | UVALUE_I1 x ->
         fprintf ppf "UVALUE_I1(%d)"
-          (Camlcoq.Z.to_int (DynamicValues.Int1.unsigned x))
+          (Camlcoq.Z.to_int (VellvmIntegers.Int1.unsigned x))
     | UVALUE_I8 x ->
         fprintf ppf "UVALUE_I8(%d)"
-          (Camlcoq.Z.to_int (DynamicValues.Int8.unsigned x))
+          (Camlcoq.Z.to_int (VellvmIntegers.Int8.unsigned x))
     | UVALUE_I32 x ->
         fprintf ppf "UVALUE_I32(%d)"
-          (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned x))
+          (Camlcoq.Z.to_int (VellvmIntegers.Int32.unsigned x))
     | UVALUE_I64 x ->
         fprintf ppf "UVALUE_I64(%s)"
-          (Int64.to_string (Z.to_int64 (DynamicValues.Int64.unsigned x)))
+          (Int64.to_string (Z.to_int64 (VellvmIntegers.Int64.unsigned x)))
     | UVALUE_IPTR x ->
         fprintf ppf "UVALUE_IPTR(%d)"
           (Camlcoq.Z.to_int
@@ -84,10 +84,10 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
     | _ -> fprintf ppf "pp_uvalue: todo"
 
 let char_of_I8 x =
-  char_of_int (Camlcoq.Z.to_int (DynamicValues.Int8.unsigned x))
+  char_of_int (Camlcoq.Z.to_int (VellvmIntegers.Int8.unsigned x))
 
-(* Converts a list of DynamicValues.Int8 values to OCaml string *)
-let string_of_bytes (bytes : DynamicValues.Int8.int list) : bytes =
+(* Converts a list of VellvmIntegers.Int8 values to OCaml string *)
+let string_of_bytes (bytes : VellvmIntegers.Int8.int list) : bytes =
   List.map char_of_I8 bytes |> List.to_seq |> Bytes.of_seq
 
 let debug_flag = ref false
@@ -160,7 +160,7 @@ let rec step
 (* | Call(_, f, _) ->
  *   (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n"
  *      (Camlcoq.camlstring_of_coqstring f));
- *   step (k (Obj.magic (DV.DVALUE_I64 DynamicValues.Int64.zero))) *)
+ *   step (k (Obj.magic (DV.DVALUE_I64 VellvmIntegers.Int64.zero))) *)
 
 (** Interpret an LLVM program, returning a result that contains either the
     dvalue result returned by the LLVM program, or an error message.

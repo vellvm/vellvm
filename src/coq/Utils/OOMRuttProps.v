@@ -623,3 +623,42 @@ Ltac solve_orutt_raiseUB :=
   apply orutt_raiseUB; cbn; auto;
   intros msg o CONTRA;
   inv CONTRA.
+
+(* TODO: Move this to rutt library *)
+Lemma orutt_iter' {OOME E1 E2 I1 I2 R1 R2} `{OOM: OOME -< E2}
+  (RI : I1 -> I2 -> Prop)
+  (RR : R1 -> R2 -> Prop)
+  (pre : prerel E1 E2) (post : postrel E1 E2)
+  (body1 : I1 -> itree E1 (I1 + R1))
+  (body2 : I2 -> itree E2 (I2 + R2))
+  (rutt_body
+    : forall j1 j2, RI j1 j2 -> orutt pre post (sum_rel RI RR) (body1 j1) (body2 j2) (OOM:=OOME))
+  : forall (i1 : I1) (i2 : I2) (RI_i : RI i1 i2),
+    orutt pre post RR (ITree.iter body1 i1) (ITree.iter body2 i2) (OOM:=OOME).
+Proof.
+  ginit. gcofix CIH. intros.
+  specialize (rutt_body i1 i2 RI_i).
+  do 2 rewrite unfold_iter.
+  eapply gpaco2_uclo; [|eapply orutt_clo_bind|]; eauto with paco.
+  econstructor; eauto. intros ? ? [].
+  - gstep.
+    red; cbn.
+    constructor.
+    gbase.
+    auto.
+  - gstep.
+    red.
+    constructor.
+    auto.
+Qed.
+
+(* TODO: Move this to orutt library *)
+Lemma orutt_iter_gen :
+  forall {OOME E1 E2 : Type -> Type} `{OOM: OOME -< E2} {A B1 B2 : Type} {R : relation A} {S : relationH B1 B2} (pre : prerel E1 E2) (post : postrel E1 E2),
+  forall (x : A -> itree E1 (A + B1)) (y : A -> itree E2 (A + B2)),
+    (forall x0 y0 : A, R x0 y0 -> orutt pre post (sum_rel R S) (x x0) (y y0) (OOM:=OOME)) ->
+    forall x0 y0 : A, R x0 y0 -> orutt pre post S (CategoryOps.iter x x0) (CategoryOps.iter y y0) (OOM:=OOME).
+Proof.
+  intros OOME E1 E2 OOM A B1 B2 R S pre post body1 body2 EQ_BODY x y Hxy.
+  eapply orutt_iter'; eauto.
+Qed.

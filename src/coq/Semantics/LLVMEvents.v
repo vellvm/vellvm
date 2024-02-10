@@ -32,7 +32,8 @@ From Vellvm Require Import
      Utilities
      Syntax
      Semantics.Memory.Sizeof
-     Semantics.DynamicValues.
+     Semantics.DynamicValues
+     Semantics.VellvmIntegers.
 
 Import ITreeNotations.
 (* end hide *)

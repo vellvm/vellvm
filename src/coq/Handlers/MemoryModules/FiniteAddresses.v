@@ -9,7 +9,7 @@ From Vellvm Require Import
 From Vellvm.Semantics Require Import
   MemoryAddress
   Memory.FiniteProvenance
-  DynamicValues.
+  VellvmIntegers.
 
 From QuickChick Require Import Show.
 
