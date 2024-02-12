@@ -7899,10 +7899,29 @@ Qed.
     apply extract_field_byte_helper_fin_inf.
   Qed.
 
-  Lemma dvalue_extract_byte_success_fin_inf :
-    forall dv_fin dv_inf dt idx res,
+  (* TODO: Move this and use this *)
+  Ltac destruct_err_oom_poison x :=
+    destruct x as [[[[[?err_x | ?x] | ?oom_x] | ?poison_x]]] eqn:?Hx.
+
+  Lemma dvalue_extract_byte_fin_inf :
+    forall dv_fin dv_inf dt idx,
       dvalue_refine_strict dv_inf dv_fin ->
       @dvalue_extract_byte ErrOOMPoison
+        (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+           (@Monad_OomableT Poisonable MonadPoisonable))
+        (@RAISE_ERROR_MonadExc ErrOOMPoison
+           (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+              (@Monad_OomableT Poisonable MonadPoisonable)))
+        (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+              (@Monad_OomableT Poisonable MonadPoisonable))
+           (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
+              RAISE_POISON_Poisonable))
+        (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+              (@Monad_OomableT Poisonable MonadPoisonable))
+           (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dv_fin dt idx =
+        @IS1.LLVM.MEM.DVALUE_BYTE.dvalue_extract_byte ErrOOMPoison
           (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
              (@Monad_OomableT Poisonable MonadPoisonable))
           (@RAISE_ERROR_MonadExc ErrOOMPoison
@@ -7916,46 +7935,25 @@ Qed.
           (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
              (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
                 (@Monad_OomableT Poisonable MonadPoisonable))
-             (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dv_fin dt idx =
-        @ret ErrOOMPoison
-          (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-             (@Monad_OomableT Poisonable MonadPoisonable)) Z res ->
- @IS1.LLVM.MEM.DVALUE_BYTE.dvalue_extract_byte ErrOOMPoison
-    (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-       (@Monad_OomableT Poisonable MonadPoisonable))
-    (@RAISE_ERROR_MonadExc ErrOOMPoison
-       (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
-          (@Monad_OomableT Poisonable MonadPoisonable)))
-    (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-       (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-          (@Monad_OomableT Poisonable MonadPoisonable))
-       (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
-          RAISE_POISON_Poisonable))
-    (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-       (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-          (@Monad_OomableT Poisonable MonadPoisonable))
-       (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dv_inf dt idx =
-  @ret ErrOOMPoison
-    (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-       (@Monad_OomableT Poisonable MonadPoisonable)) Z res.
+             (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dv_inf dt idx.
   Proof.
     Opaque dvalue_extract_byte.
     Opaque IS1.LLVM.MEM.DVALUE_BYTE.dvalue_extract_byte.
     induction dv_fin using dvalue_strong_ind;
-      intros dv_inf dt idx res REF VAL;
-      rewrite dvalue_extract_byte_equation in VAL;
-      rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_extract_byte_equation;
+      intros dv_inf dt idx REF;
+      rewrite dvalue_extract_byte_equation,
+      IS1.LLVM.MEM.DVALUE_BYTE.dvalue_extract_byte_equation;
       try solve
         [ dvalue_refine_strict_inv REF;
           unfold extract_byte_Z in *;
-          inv VAL;
+          try inv VAL;
           solve
             [ reflexivity
             | erewrite AC1.addr_convert_ptoi; eauto
             | erewrite IP.from_Z_to_Z; eauto
             ]
         ].
-    - destruct dv_fin; inv VAL;
+    - destruct dv_fin;
         try solve
           [ dvalue_refine_strict_inv REF;
             unfold extract_byte_Z in *;
@@ -7968,298 +7966,110 @@ Qed.
           ].
 
       { (* Structs *)
-        destruct dt; inv H1.
-        dvalue_refine_strict_inv REF.
+        destruct dt;
+        dvalue_refine_strict_inv REF; auto.
         rewrite extract_field_byte_fin_inf.
-        destruct (extract_field_byte fields0 (Z.to_N idx)) eqn:FIELD.
-        destruct unEitherT.
-        destruct unMkOomableT; inv H2.
-        destruct o; inv H3.
-        destruct s; inv H2.
-        destruct p as (?&?&?).
+        remember (extract_field_byte fields0 (Z.to_N idx)) eqn:FIELD.
+        destruct_err_oom_poison y; cbn; auto.
+        destruct y0 as (?&?&?).
         cbn in *.
         destruct (nth_error fields (N.to_nat n)) eqn:NTH;
-          [|inv H3].
-
-        eapply map_monad_oom_Forall2 in H1.
-        pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ NTH H1.
-        destruct H0 as (?&?&?).
-        rewrite H0.
-
-        remember (dvalue_extract_byte d0 d (Z.of_N n0)) as ext.
-        destruct ext.
-        destruct unEitherT.
-        destruct unMkOomableT; inv H3.
-
-        erewrite H; eauto.
-        2: {
+          cbn; auto.
+        - eapply map_monad_oom_Forall2 in H1.
+          pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ NTH H1.
+          destruct H0 as (?&?&?).
+          rewrite H0.
+          erewrite H; eauto.
           repeat constructor.
           eapply Util.Nth_In; eauto.
-        }
+        - cbn.
+          destruct (nth_error x (N.to_nat n)) eqn:NTH'.
+          { eapply map_monad_oom_Forall2 in H1.
+            pose proof @Util.Forall2_Nth_left _ _ _ _ _ _ _ NTH' H1.
+            destruct H0 as (?&?&?).
+            rewrite H0 in NTH.
+            inv NTH.
+          }
 
-        cbn.
-        auto.
+          cbn.
+          reflexivity.
       }
 
       { (* Packed Structs *)
-        destruct dt; inv H1.
-        dvalue_refine_strict_inv REF.
+        destruct dt;
+        dvalue_refine_strict_inv REF; auto.
         rewrite extract_field_byte_fin_inf.
-        destruct (extract_field_byte fields0 (Z.to_N idx)) eqn:FIELD.
-        destruct unEitherT.
-        destruct unMkOomableT; inv H2.
-        destruct o; inv H3.
-        destruct s; inv H2.
-        destruct p as (?&?&?).
+        remember (extract_field_byte fields0 (Z.to_N idx)) eqn:FIELD.
+        destruct_err_oom_poison y; cbn; auto.
+        destruct y0 as (?&?&?).
         cbn in *.
         destruct (nth_error fields (N.to_nat n)) eqn:NTH;
-          [|inv H3].
-
-        eapply map_monad_oom_Forall2 in H1.
-        pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ NTH H1.
-        destruct H0 as (?&?&?).
-        rewrite H0.
-
-        remember (dvalue_extract_byte d0 d (Z.of_N n0)) as ext.
-        destruct ext.
-        destruct unEitherT.
-        destruct unMkOomableT; inv H3.
-
-        erewrite H; eauto.
-        2: {
+          cbn; auto.
+        - eapply map_monad_oom_Forall2 in H1.
+          pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ NTH H1.
+          destruct H0 as (?&?&?).
+          rewrite H0.
+          erewrite H; eauto.
           repeat constructor.
           eapply Util.Nth_In; eauto.
-        }
+        - cbn.
+          destruct (nth_error x (N.to_nat n)) eqn:NTH'.
+          { eapply map_monad_oom_Forall2 in H1.
+            pose proof @Util.Forall2_Nth_left _ _ _ _ _ _ _ NTH' H1.
+            destruct H0 as (?&?&?).
+            rewrite H0 in NTH.
+            inv NTH.
+          }
 
-        cbn.
-        auto.
+          cbn.
+          reflexivity.
       }
 
       { (* Arrays *)
-        destruct dt; inv H1.
-        dvalue_refine_strict_inv REF.
+        destruct dt;
+        dvalue_refine_strict_inv REF; auto.
         rewrite sizeof_dtyp_fin_inf.
         cbn.
-        break_match_hyp; [|inv H2].
-
         eapply map_monad_oom_Forall2 in H1.
-        pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ Heqo H1.
-        destruct H0 as (?&?&?).
-        rewrite H0.
+        break_match_goal.
+        - pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ Heqo H1.
+          destruct H0 as (?&?&?).
+          rewrite H0.
 
-        erewrite H; eauto.
-        3: apply H2.
-        reflexivity.
-
-        repeat constructor.
-        eapply Util.Nth_In; eauto.
+          erewrite H; eauto.
+          repeat constructor.
+          eapply Util.Nth_In; eauto.
+        - break_match_goal; cbn; auto.
+          pose proof @Util.Forall2_Nth_left _ _ _ _ _ _ _ Heqo0 H1.
+          destruct H0 as (?&?&?).
+          rewrite H0 in Heqo.
+          inv Heqo.
       }
 
       { (* Vectors *)
-        destruct dt; inv H1.
-        dvalue_refine_strict_inv REF.
+        destruct dt;
+        dvalue_refine_strict_inv REF; auto.
         rewrite sizeof_dtyp_fin_inf.
         cbn.
-        break_match_hyp; [|inv H2].
-
         eapply map_monad_oom_Forall2 in H1.
-        pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ Heqo H1.
-        destruct H0 as (?&?&?).
-        rewrite H0.
+        break_match_goal.
+        - pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ Heqo H1.
+          destruct H0 as (?&?&?).
+          rewrite H0.
 
-        erewrite H; eauto.
-        3: apply H2.
-        reflexivity.
-
-        repeat constructor.
-        eapply Util.Nth_In; eauto.
+          erewrite H; eauto.
+          repeat constructor.
+          eapply Util.Nth_In; eauto.
+        - break_match_goal; cbn; auto.
+          pose proof @Util.Forall2_Nth_left _ _ _ _ _ _ _ Heqo0 H1.
+          destruct H0 as (?&?&?).
+          rewrite H0 in Heqo.
+          inv Heqo.
       }
   Qed.
 
-  Lemma dvalue_extract_byte_raise_poison_fin_inf :
-    forall dv_fin dv_inf dt idx dt_res,
-      dvalue_refine_strict dv_inf dv_fin ->
-      @dvalue_extract_byte ErrOOMPoison
-          (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-             (@Monad_OomableT Poisonable MonadPoisonable))
-          (@RAISE_ERROR_MonadExc ErrOOMPoison
-             (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
-                (@Monad_OomableT Poisonable MonadPoisonable)))
-          (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-             (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-                (@Monad_OomableT Poisonable MonadPoisonable))
-             (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
-                RAISE_POISON_Poisonable))
-          (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-             (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-                (@Monad_OomableT Poisonable MonadPoisonable))
-             (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dv_fin dt idx =
-        raise_poison dt_res ->
- @IS1.LLVM.MEM.DVALUE_BYTE.dvalue_extract_byte ErrOOMPoison
-    (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-       (@Monad_OomableT Poisonable MonadPoisonable))
-    (@RAISE_ERROR_MonadExc ErrOOMPoison
-       (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
-          (@Monad_OomableT Poisonable MonadPoisonable)))
-    (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-       (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-          (@Monad_OomableT Poisonable MonadPoisonable))
-       (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
-          RAISE_POISON_Poisonable))
-    (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-       (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-          (@Monad_OomableT Poisonable MonadPoisonable))
-       (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dv_inf dt idx =
-   raise_poison dt_res.
-  Proof.
-    Opaque dvalue_extract_byte.
-    Opaque IS1.LLVM.MEM.DVALUE_BYTE.dvalue_extract_byte.
-    induction dv_fin using dvalue_strong_ind;
-      intros dv_inf dt idx dt_res REF VAL;
-      rewrite dvalue_extract_byte_equation in VAL;
-      rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_extract_byte_equation;
-      try solve
-        [ dvalue_refine_strict_inv REF;
-          unfold extract_byte_Z in *;
-          inv VAL;
-          solve
-            [ reflexivity
-            | erewrite AC1.addr_convert_ptoi; eauto
-            | erewrite IP.from_Z_to_Z; eauto
-            ]
-        ].
-    - destruct dv_fin; inv VAL;
-        try solve
-          [ dvalue_refine_strict_inv REF;
-            unfold extract_byte_Z in *;
-            try inv H0;
-            solve
-              [ reflexivity
-              | erewrite AC1.addr_convert_ptoi; eauto
-              | erewrite IP.from_Z_to_Z; eauto
-              ]
-          ].
-
-
-      { (* Structs *)
-        destruct dt; inv H1.
-        dvalue_refine_strict_inv REF.
-        rewrite extract_field_byte_fin_inf.
-        destruct (extract_field_byte fields0 (Z.to_N idx)) eqn:FIELD.
-        destruct unEitherT.
-        destruct unMkOomableT; inv H2.
-        2: {
-          cbn; auto.
-        }
-
-        destruct o; inv H3.
-        destruct s; inv H2.
-        destruct p as (?&?&?).
-        cbn in *.
-        destruct (nth_error fields (N.to_nat n)) eqn:NTH;
-          [|inv H3].
-
-        eapply map_monad_oom_Forall2 in H1.
-        pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ NTH H1.
-        destruct H0 as (?&?&?).
-        rewrite H0.
-
-        remember (dvalue_extract_byte d0 d (Z.of_N n0)) as ext.
-        destruct ext.
-        destruct unEitherT.
-        destruct unMkOomableT; inv H3.
-
-        erewrite H; eauto.
-        2: {
-          repeat constructor.
-          eapply Util.Nth_In; eauto.
-        }
-
-        cbn.
-        auto.
-      }
-
-      { (* Packed Structs *)
-        destruct dt; inv H1.
-        dvalue_refine_strict_inv REF.
-        rewrite extract_field_byte_fin_inf.
-        destruct (extract_field_byte fields0 (Z.to_N idx)) eqn:FIELD.
-        destruct unEitherT.
-        destruct unMkOomableT; inv H2.
-        2: {
-          cbn; auto.
-        }
-
-        destruct o; inv H3.
-        destruct s; inv H2.
-        destruct p as (?&?&?).
-        cbn in *.
-        destruct (nth_error fields (N.to_nat n)) eqn:NTH;
-          [|inv H3].
-
-        eapply map_monad_oom_Forall2 in H1.
-        pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ NTH H1.
-        destruct H0 as (?&?&?).
-        rewrite H0.
-
-        remember (dvalue_extract_byte d0 d (Z.of_N n0)) as ext.
-        destruct ext.
-        destruct unEitherT.
-        destruct unMkOomableT; inv H3.
-
-        erewrite H; eauto.
-        2: {
-          repeat constructor.
-          eapply Util.Nth_In; eauto.
-        }
-
-        cbn.
-        auto.
-      }
-
-      { (* Arrays *)
-        destruct dt; inv H1.
-        dvalue_refine_strict_inv REF.
-        rewrite sizeof_dtyp_fin_inf.
-        cbn.
-        break_match_hyp; [|inv H2].
-
-        eapply map_monad_oom_Forall2 in H1.
-        pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ Heqo H1.
-        destruct H0 as (?&?&?).
-        rewrite H0.
-
-        erewrite H; eauto.
-        3: apply H2.
-        reflexivity.
-
-        repeat constructor.
-        eapply Util.Nth_In; eauto.
-      }
-
-      { (* Vectors *)
-        destruct dt; inv H1.
-        dvalue_refine_strict_inv REF.
-        rewrite sizeof_dtyp_fin_inf.
-        cbn.
-        break_match_hyp; [|inv H2].
-
-        eapply map_monad_oom_Forall2 in H1.
-        pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ Heqo H1.
-        destruct H0 as (?&?&?).
-        rewrite H0.
-
-        erewrite H; eauto.
-        3: apply H2.
-        reflexivity.
-
-        repeat constructor.
-        eapply Util.Nth_In; eauto.
-      }
-  Qed.
-
-  Lemma dvalue_byte_value_success_fin_inf :
-    forall dvb_inf dvb_fin res,
+  Lemma dvalue_byte_value_fin_inf :
+    forall dvb_inf dvb_fin,
       dvalue_byte_refine dvb_inf dvb_fin ->
       @dvalue_byte_value ErrOOMPoison
         (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
@@ -8275,7 +8085,7 @@ Qed.
         (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
            (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
               (@Monad_OomableT Poisonable MonadPoisonable))
-           (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvb_fin = ret res ->
+           (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvb_fin =
       (@IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte_value ErrOOMPoison
          (@EitherMonad.Monad_eitherT ERR_MESSAGE
             (OomableT Poisonable)
@@ -8306,82 +8116,21 @@ Qed.
                (@Monad_OomableT Poisonable
                   MonadPoisonable))
             (@RAISE_OOMABLE_OomableT Poisonable
-               MonadPoisonable))) dvb_inf = ret res.
+               MonadPoisonable))) dvb_inf.
   Proof.
-    intros dvb_inf dvb_fin res REF VAL.
-    unfold dvalue_byte_value in VAL.
-    break_match_hyp; subst.
+    intros dvb_inf dvb_fin REF.
+    unfold dvalue_byte_value.
+    break_match; subst.
     unfold IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte_value.
     break_match_goal; subst.
     red in REF.
     destruct REF as (?&?&?).
     subst.
-    eapply dvalue_extract_byte_success_fin_inf; eauto.
+    eapply dvalue_extract_byte_fin_inf; eauto.
   Qed.
 
-  Lemma dvalue_byte_value_poison_fin_inf :
-    forall dvb_inf dvb_fin dt,
-      dvalue_byte_refine dvb_inf dvb_fin ->
-      @dvalue_byte_value ErrOOMPoison
-        (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-           (@Monad_OomableT Poisonable MonadPoisonable))
-        (@RAISE_ERROR_MonadExc ErrOOMPoison
-           (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
-              (@Monad_OomableT Poisonable MonadPoisonable)))
-        (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-              (@Monad_OomableT Poisonable MonadPoisonable))
-           (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
-              RAISE_POISON_Poisonable))
-        (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-              (@Monad_OomableT Poisonable MonadPoisonable))
-           (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvb_fin = raise_poison dt ->
-      (@IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte_value ErrOOMPoison
-         (@EitherMonad.Monad_eitherT ERR_MESSAGE
-            (OomableT Poisonable)
-            (@Monad_OomableT Poisonable
-               MonadPoisonable))
-         (@RAISE_ERROR_MonadExc ErrOOMPoison
-            (@EitherMonad.Exception_eitherT ERR_MESSAGE
-               (OomableT Poisonable)
-               (@Monad_OomableT Poisonable
-                  MonadPoisonable)))
-         (@RAISE_POISON_E_MT
-            (OomableT Poisonable)
-            (EitherMonad.eitherT ERR_MESSAGE)
-            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (OomableT Poisonable)
-               (@Monad_OomableT Poisonable
-                  MonadPoisonable))
-            (@RAISE_POISON_E_MT Poisonable
-               OomableT
-               (@MonadT_OomableT Poisonable
-                  MonadPoisonable)
-               RAISE_POISON_Poisonable))
-         (@RAISE_OOMABLE_E_MT
-            (OomableT Poisonable)
-            (EitherMonad.eitherT ERR_MESSAGE)
-            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (OomableT Poisonable)
-               (@Monad_OomableT Poisonable
-                  MonadPoisonable))
-            (@RAISE_OOMABLE_OomableT Poisonable
-               MonadPoisonable))) dvb_inf = raise_poison dt.
-  Proof.
-    intros dvb_inf dvb_fin res REF VAL.
-    unfold dvalue_byte_value in VAL.
-    break_match_hyp; subst.
-    unfold IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte_value.
-    break_match_goal; subst.
-    red in REF.
-    destruct REF as (?&?&?).
-    subst.
-    eapply dvalue_extract_byte_raise_poison_fin_inf; eauto.
-  Qed.
-
-  Lemma map_monad_dvalue_byte_value_success_fin_inf :
-    forall dvbs_inf dvbs_fin res,
+  Lemma map_monad_dvalue_byte_value_fin_inf :
+    forall dvbs_inf dvbs_fin,
       dvalue_bytes_refine dvbs_inf dvbs_fin ->
       map_monad (@dvalue_byte_value ErrOOMPoison
         (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
@@ -8397,7 +8146,7 @@ Qed.
         (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
            (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
               (@Monad_OomableT Poisonable MonadPoisonable))
-           (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable))) dvbs_fin = ret res ->
+           (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable))) dvbs_fin =
       map_monad (@IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte_value ErrOOMPoison
          (@EitherMonad.Monad_eitherT ERR_MESSAGE
             (OomableT Poisonable)
@@ -8428,56 +8177,17 @@ Qed.
                (@Monad_OomableT Poisonable
                   MonadPoisonable))
             (@RAISE_OOMABLE_OomableT Poisonable
-               MonadPoisonable))) dvbs_inf = ret res.
+               MonadPoisonable))) dvbs_inf.
   Proof.
     induction dvbs_inf;
-      intros dvbs_fin res REF VAL.
+      intros dvbs_fin REF.
     + inv REF.
-      cbn in *; inv VAL; auto.
+      cbn in *; auto.
     + inv REF.
-      rewrite map_monad_unfold in VAL.
-      cbn in VAL.
-      repeat break_match_hyp_inv.
-      specialize (IHdvbs_inf _ l H3).
-      forward IHdvbs_inf.
-      { cbn in *.
-        destruct (map_monad (fun x0 : dvalue_byte => dvalue_byte_value x0) l') eqn:HMAP.
-        destruct unEitherT.
-        destruct unMkOomableT; inv Heqp0.
-        auto.
-      }
-
-      inv Heqp.
-      red in H1.
-      destruct a, y.
-      destruct H1 as (?&?&?); subst.
-      remember
-        (@dvalue_byte_value ErrOOMPoison
-           (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-              (@Monad_OomableT Poisonable MonadPoisonable))
-           (@RAISE_ERROR_MonadExc ErrOOMPoison
-              (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
-                 (@Monad_OomableT Poisonable MonadPoisonable)))
-           (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-              (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-                 (@Monad_OomableT Poisonable MonadPoisonable))
-              (@RAISE_POISON_E_MT Poisonable OomableT
-                 (@MonadT_OomableT Poisonable MonadPoisonable) RAISE_POISON_Poisonable))
-           (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-              (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-                 (@Monad_OomableT Poisonable MonadPoisonable))
-              (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable))
-           (DVALUE_ExtractByte dv0 dt0 idx0)).
-      destruct e, unEitherT, unMkOomableT; inv H0.
-
-      cbn in *.
-      erewrite dvalue_extract_byte_success_fin_inf; eauto.
-      2: rewrite <- Heqe; reflexivity.
+      rewrite map_monad_unfold.
       cbn.
-
-      rewrite IHdvbs_inf.
-      cbn.
-      reflexivity.
+      repeat erewrite dvalue_byte_value_fin_inf; eauto.
+      rewrite IHdvbs_inf; eauto.
   Qed.
 
   Lemma ErrOOMPoison_bind_ret_inv :
@@ -8521,6 +8231,29 @@ Qed.
       reflexivity.
   Qed.
 
+  Lemma ErrOOMPoison_bind_raise_oom_inv :
+    forall {A B} ma k dt,
+      @bind ErrOOMPoison
+        (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+           (@Monad_OomableT Poisonable MonadPoisonable))
+        A B
+        ma k = raise_oomable dt ->
+      ma = raise_oomable dt \/ exists a, ma = ret a /\ k a = raise_oomable dt.
+  Proof.
+    intros A B ma k res H.
+    destruct ma, unEitherT, unMkOomableT; inv H.
+    repeat break_match_hyp_inv.
+    - right.
+      exists a.
+      split; auto.
+      cbn.
+      destruct (k a), unEitherT, unMkOomableT; inv H1.
+      reflexivity.
+    - left.
+      cbn.
+      reflexivity.
+  Qed.
+
   Lemma int_to_ptr_fin_inf :
     forall z prov prov' a,
       (* Need something relating prov / prov' *)
@@ -8529,142 +8262,124 @@ Qed.
   Proof.
   Admitted.
 
-  Lemma map_monad_dvalue_byte_value_poison_fin_inf :
-    forall dvbs_inf dvbs_fin dt,
+  Lemma list_dvalue_bytes_to_dvalue_fin_inf :
+    forall dts dvbs_fin dvbs_inf res
+      (IH : forall u : dtyp,
+          In u dts ->
+          forall (dvbs_fin : list dvalue_byte) (dvbs_inf : list IS1.MEM.DVALUE_BYTE.dvalue_byte)
+            (res : ErrOOMPoison dvalue),
+            dvalue_bytes_refine dvbs_inf dvbs_fin ->
+            (forall x : dtyp, res <> raise_oomable x) ->
+            dvalue_bytes_to_dvalue dvbs_fin u = res ->
+            IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue dvbs_inf u = fmap fin_to_inf_dvalue res),
       dvalue_bytes_refine dvbs_inf dvbs_fin ->
-      map_monad (@dvalue_byte_value ErrOOMPoison
-        (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-           (@Monad_OomableT Poisonable MonadPoisonable))
-        (@RAISE_ERROR_MonadExc ErrOOMPoison
-           (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
-              (@Monad_OomableT Poisonable MonadPoisonable)))
-        (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-              (@Monad_OomableT Poisonable MonadPoisonable))
-           (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
-              RAISE_POISON_Poisonable))
-        (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-           (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-              (@Monad_OomableT Poisonable MonadPoisonable))
-           (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable))) dvbs_fin = raise_poison dt ->
-      map_monad (@IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte_value ErrOOMPoison
-         (@EitherMonad.Monad_eitherT ERR_MESSAGE
-            (OomableT Poisonable)
-            (@Monad_OomableT Poisonable
-               MonadPoisonable))
-         (@RAISE_ERROR_MonadExc ErrOOMPoison
-            (@EitherMonad.Exception_eitherT ERR_MESSAGE
-               (OomableT Poisonable)
-               (@Monad_OomableT Poisonable
-                  MonadPoisonable)))
-         (@RAISE_POISON_E_MT
-            (OomableT Poisonable)
-            (EitherMonad.eitherT ERR_MESSAGE)
-            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (OomableT Poisonable)
-               (@Monad_OomableT Poisonable
-                  MonadPoisonable))
-            (@RAISE_POISON_E_MT Poisonable
-               OomableT
-               (@MonadT_OomableT Poisonable
-                  MonadPoisonable)
-               RAISE_POISON_Poisonable))
-         (@RAISE_OOMABLE_E_MT
-            (OomableT Poisonable)
-            (EitherMonad.eitherT ERR_MESSAGE)
-            (@EitherMonad.MonadT_eitherT ERR_MESSAGE
-               (OomableT Poisonable)
-               (@Monad_OomableT Poisonable
-                  MonadPoisonable))
-            (@RAISE_OOMABLE_OomableT Poisonable
-               MonadPoisonable))) dvbs_inf = raise_poison dt.
+      (forall x : dtyp, res <> raise_oomable x) ->
+      ((fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
+         ErrOOMPoison (list dvalue) :=
+          match dts with
+          | [] => ret []
+          | dt :: dts0 =>
+              let sz := SIZEOF.sizeof_dtyp dt in
+              let init_bytes := take sz dbs in
+              let rest_bytes := drop sz dbs in
+              f <- dvalue_bytes_to_dvalue init_bytes dt;;
+              rest <- go dts0 rest_bytes;; ret (f :: rest)
+          end) dts dvbs_fin) = res ->
+      ((fix go (dts : list dtyp) (dbs : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte) {struct dts} :
+         ErrOOMPoison (list IS1.LP.Events.DV.dvalue) :=
+          match dts with
+          | [] => ret []
+          | dt :: dts0 =>
+              let sz := IS1.LP.SIZEOF.sizeof_dtyp dt in
+              let init_bytes := take sz dbs in
+              let rest_bytes := drop sz dbs in
+              f <- IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue init_bytes dt;;
+              rest <- go dts0 rest_bytes;; ret (f :: rest)
+          end) dts dvbs_inf)  = fmap (map fin_to_inf_dvalue) res.
   Proof.
-    induction dvbs_inf;
-      intros dvbs_fin dt REF VAL.
-    + inv REF.
-      cbn in *; inv VAL; auto.
-    + inv REF.
-      rewrite map_monad_unfold in VAL.
-      cbn in VAL.
-      repeat break_match_hyp_inv.
-      { (* No poison in first element *)
-        specialize (IHdvbs_inf l' dt H3).
-        forward IHdvbs_inf.
-        { cbn in *.
-          destruct (map_monad (fun x0 : dvalue_byte => dvalue_byte_value x0) l') eqn:HMAP.
-          destruct unEitherT.
-          destruct unMkOomableT; inv Heqp0.
-          auto.
-        }
-
-        inv Heqp.
-        red in H1.
-        destruct a, y.
-        destruct H1 as (?&?&?); subst.
-        remember
-          (@dvalue_byte_value ErrOOMPoison
-             (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-                (@Monad_OomableT Poisonable MonadPoisonable))
-             (@RAISE_ERROR_MonadExc ErrOOMPoison
-                (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
-                   (@Monad_OomableT Poisonable MonadPoisonable)))
-             (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-                (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-                   (@Monad_OomableT Poisonable MonadPoisonable))
-                (@RAISE_POISON_E_MT Poisonable OomableT
-                   (@MonadT_OomableT Poisonable MonadPoisonable) RAISE_POISON_Poisonable))
-             (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-                (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-                   (@Monad_OomableT Poisonable MonadPoisonable))
-                (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable))
-             (DVALUE_ExtractByte dv0 dt1 idx0)).
-        destruct e, unEitherT, unMkOomableT; inv H0.
-
-        cbn in *.
-        erewrite dvalue_extract_byte_success_fin_inf; eauto.
-        2: rewrite <- Heqe; reflexivity.
-        cbn.
-
-        rewrite IHdvbs_inf.
+    induction dts; intros dvbs_fin dvbs_inf res IH REF NOOM FIN.
+    - inv FIN; reflexivity.
+    - Opaque bind.
+      cbn in *.
+      rewrite sizeof_dtyp_fin_inf.
+      erewrite IH; eauto.
+      2: apply Forall2_take; eauto.
+      2: {
+        intros x CONTRA.
+        eapply (NOOM x).
+        subst.
+        rewrite CONTRA.
+        Transparent bind.
         cbn.
         reflexivity.
       }
 
-      (* Poison in first element *)
-      red in H1.
-      destruct a, y.
-      destruct H1 as (?&?&?); subst.
+      remember (dvalue_bytes_to_dvalue (take (SIZEOF.sizeof_dtyp a) dvbs_fin) a) as init.
+      destruct_err_oom_poison init;
+        try solve [subst; cbn; eauto].
 
       remember
-        (@dvalue_byte_value ErrOOMPoison
-           (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-              (@Monad_OomableT Poisonable MonadPoisonable))
-           (@RAISE_ERROR_MonadExc ErrOOMPoison
-              (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
-                 (@Monad_OomableT Poisonable MonadPoisonable)))
-           (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-              (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-                 (@Monad_OomableT Poisonable MonadPoisonable))
-              (@RAISE_POISON_E_MT Poisonable OomableT
-                 (@MonadT_OomableT Poisonable MonadPoisonable) RAISE_POISON_Poisonable))
-           (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-              (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-                 (@Monad_OomableT Poisonable MonadPoisonable))
-              (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable))
-           (DVALUE_ExtractByte dv0 dt1 idx0)).
-      destruct e, unEitherT, unMkOomableT; inv Heqp.
-      rewrite map_monad_unfold.
-      erewrite dvalue_byte_value_poison_fin_inf;
-        eauto.
-      3: symmetry; apply Heqe.
-      2: cbn; auto.
+        ((fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
+           ErrOOMPoison (list dvalue) :=
+            match dts with
+            | [] =>
+                {|
+                  EitherMonad.unEitherT :=
+                    {|
+                      unMkOomableT :=
+                        @Unpoisoned (Oomable (ERR (list dvalue)))
+                          (@Unoomed (ERR (list dvalue)) (@inr ERR_MESSAGE (list dvalue) []))
+                    |}
+                |}
+            | dt :: dts0 =>
+                f0 <-
+                  @dvalue_bytes_to_dvalue ErrOOMPoison
+                    (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+                       (@Monad_OomableT Poisonable MonadPoisonable))
+                    (@RAISE_ERROR_MonadExc ErrOOMPoison
+                       (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+                          (@Monad_OomableT Poisonable MonadPoisonable)))
+                    (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+                       (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                          (@Monad_OomableT Poisonable MonadPoisonable))
+                       (@RAISE_POISON_E_MT Poisonable OomableT
+                          (@MonadT_OomableT Poisonable MonadPoisonable) RAISE_POISON_Poisonable))
+                    (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+                       (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                          (@Monad_OomableT Poisonable MonadPoisonable))
+                       (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable))
+                    (@take dvalue_byte (SIZEOF.sizeof_dtyp dt) dbs) dt;;
+                rest <- go dts0 (@drop dvalue_byte (SIZEOF.sizeof_dtyp dt) dbs);;
+                {|
+                  EitherMonad.unEitherT :=
+                    {|
+                      unMkOomableT :=
+                        @Unpoisoned (Oomable (ERR (list dvalue)))
+                          (@Unoomed (ERR (list dvalue)) (@inr ERR_MESSAGE (list dvalue) (f0 :: rest)))
+                    |}
+                |}
+            end) dts (@drop dvalue_byte (SIZEOF.sizeof_dtyp a) dvbs_fin)) as rest.
 
-      cbn; auto.
+      erewrite IHdts with (res:=rest).
+      + destruct_err_oom_poison rest;
+          try solve [subst; cbn; eauto].
+      + eauto.
+      + eapply Forall2_drop; eauto.
+      + intros x CONTRA; subst.
+        specialize (NOOM x).
+        eapply NOOM.
+        rewrite CONTRA.
+        Transparent bind.
+        cbn.
+        reflexivity.
+      + subst.
+        reflexivity.
   Qed.
 
   Lemma dvalue_bytes_fin_to_dvalue_fin_inf :
     forall dt dvbs_fin dvbs_inf res,
       dvalue_bytes_refine dvbs_inf dvbs_fin ->
+      (forall x, res <> raise_oomable x) ->
       (@dvalue_bytes_to_dvalue ErrOOMPoison
          (@EitherMonad.Monad_eitherT ERR_MESSAGE
             (OomableT Poisonable)
@@ -8720,111 +8435,424 @@ Qed.
                MonadPoisonable)) dvbs_inf dt) = fmap fin_to_inf_dvalue res.
   Proof.
     induction dt;
-      intros dvbs_fin dvbs_inf res REF FIN;
+      intros dvbs_fin dvbs_inf res REF NOOM FIN;
+      try
+        solve
+        [ rewrite dvalue_bytes_to_dvalue_equation in FIN;
+          rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue_equation;
+          subst;
+          erewrite map_monad_dvalue_byte_value_fin_inf; eauto;
+          remember (map_monad IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte_value dvbs_inf) as res;
+          destruct_err_oom_poison res; cbn; auto;
+          cbn;
+          repeat break_match_goal;
+          try inv Heqp0;
+          try inv Heqp1;
+          try inv Heqp2;
+          try inv Heqp3;
+          try inv Heqp4;
+          try inv Heqp5;
+          try inv Heqp6;
+          try inv Heqp7;
+          try inv Heqp;
+          try reflexivity;
+          rewrite_fin_to_inf_dvalue; auto
+        | rewrite dvalue_bytes_to_dvalue_equation in FIN;
+          rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue_equation;
+          subst;
+          reflexivity
+        ].
+
+    { rewrite dvalue_bytes_to_dvalue_equation in FIN;
+        rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue_equation;
+        subst.
+      erewrite map_monad_dvalue_byte_value_fin_inf in NOOM; eauto.
+      erewrite map_monad_dvalue_byte_value_fin_inf; eauto;
+        remember (map_monad IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte_value dvbs_inf) as res.
+      destruct_err_oom_poison res; cbn; auto.
+      remember (lift_OOMABLE DTYPE_IPTR (IP.from_Z (concat_bytes_Z res0))) as y.
+      destruct_err_oom_poison y; cbn; auto;
+        unfold lift_OOMABLE in Heqy; break_match_hyp_inv.
+      2: {
+        cbn in *.
+        specialize (NOOM DTYPE_IPTR).
+        rewrite Heqo in NOOM.
+        contradiction.
+      }
+
+      pose proof intptr_convert_succeeds i as (?&?).
+      eapply intptr_convert_safe in e.
+      pose proof IP.from_Z_injective _ _ _ Heqo e.
+      rewrite H.
+      rewrite IS1.LP.IP.to_Z_from_Z; cbn.
+      rewrite_fin_to_inf_dvalue.
+      unfold intptr_fin_inf.
+      break_match_goal.
+      clear Heqs.
+      eapply intptr_convert_safe in e0.
+      pose proof IP.from_Z_injective _ _ _ e e0.
+      apply IS1.LP.IP.to_Z_inj in H0; subst; auto.
+    }
+
+    { rewrite dvalue_bytes_to_dvalue_equation in FIN;
+        rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue_equation;
+        subst.
+      erewrite map_monad_dvalue_byte_value_fin_inf in NOOM; eauto.
+      erewrite map_monad_dvalue_byte_value_fin_inf; eauto;
+        remember (map_monad IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte_value dvbs_inf) as res.
+      destruct_err_oom_poison res; cbn; auto.
+      specialize (NOOM DTYPE_Pointer).
+      cbn in NOOM.
+      break_match_hyp; try contradiction.
+      clear NOOM.
+      erewrite int_to_ptr_fin_inf; eauto.
+      cbn.
+      rewrite_fin_to_inf_dvalue.
+      reflexivity.
+    }
+
+    { (* Arrays *)
       rewrite dvalue_bytes_to_dvalue_equation in FIN;
-      rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue_equation.
+        rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue_equation;
+        subst.
+      rewrite sizeof_dtyp_fin_inf.
+      Opaque IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue
+        dvalue_bytes_to_dvalue.
+      cbn in *.
+      destruct (split_every (SIZEOF.sizeof_dtyp dt) dvbs_fin) eqn:SPLIT.
+      { unfold split_every in SPLIT.
+        move SPLIT after NOOM.
+        break_match_hyp_inv.
+        cbn in *; auto.
+      }
+      pose proof (Util.Forall2_length REF) as LEN.
+      pose proof split_every_n_succeeds _ dvbs_inf _ _ SPLIT as (y&SPLIT').
+      rewrite SPLIT'.
+      cbn in *.
+      pose proof split_every_Forall2 _ _ _ _ _ _ REF SPLIT' SPLIT as ALL.
+      clear SPLIT SPLIT'.
+      induction ALL.
+      - cbn.
+        rewrite_fin_to_inf_dvalue; reflexivity.
+      - repeat rewrite map_monad_unfold.
+        cbn.
+        erewrite IHdt.
+        2: apply H.
+        3: eauto.
+        2: {
+          clear - NOOM.
+          rewrite map_monad_unfold in *.
+          cbn in *.
+          remember (dvalue_bytes_to_dvalue y dt) as r.
+          intros x CONTRA.
+          destruct_err_oom_poison r; inv CONTRA.
+          cbn in NOOM.
+          specialize (NOOM x); contradiction.
+        }
 
-    (* Need to be able to do poison / success cases at the same time, so this lemma has to be generic... *)
-    (* {  *)
-    (*   try *)
-    (*     solve *)
-    (*     [ apply ErrOOMPoison_bind_raise_poison_inv in FIN as [FIN | FIN]; *)
-    (*       [ eapply map_monad_dvalue_byte_value_poison_fin_inf in FIN; eauto; *)
-    (*         rewrite FIN; *)
-    (*         cbn; auto *)
-    (*       | destruct FIN as (?&?&?); *)
-    (*         erewrite map_monad_dvalue_byte_value_success_fin_inf; eauto; *)
-    (*         cbn; *)
-    (*         unfold lift_OOMABLE in *; *)
-    (*         repeat break_match_hyp_inv; *)
-    (*         try inv H0 *)
-    (*       ] *)
-    (*     ]; *)
-    (*   try match goal with *)
-    (*     | H: raise_error _ = _ |- _ *)
-    (*       => *)
-    (*         inv H *)
-    (*     end. *)
-    (*   admit. *)
-    (* } *)
+        remember (dvalue_bytes_to_dvalue y dt) as r.
+        destruct_err_oom_poison r; cbn; auto.
+        remember (map_monad (fun x0 : list dvalue_byte => dvalue_bytes_to_dvalue x0 dt) l') as m.
+        forward IHALL.
+        { intros x0.
+          destruct_err_oom_poison m; cbn; intros CONTRA; inv CONTRA.
+          cbn in NOOM.
+          repeat rewrite <- Heqr, <- Heqm in NOOM.
+          cbn in NOOM.
+          specialize (NOOM x0).
+          contradiction.
+        }
 
-    
-    (*   try *)
-    (*     solve *)
-    (*     [ apply ErrOOMPoison_bind_raise_poison_inv in FIN as [FIN | FIN]; *)
-    (*       [ eapply map_monad_dvalue_byte_value_poison_fin_inf in FIN; eauto; *)
-    (*         rewrite FIN; *)
-    (*         cbn; auto *)
-    (*       | destruct FIN as (?&?&?); *)
-    (*         erewrite map_monad_dvalue_byte_value_success_fin_inf; eauto; *)
-    (*         cbn; *)
-    (*         unfold lift_OOMABLE in *; *)
-    (*         repeat break_match_hyp_inv; *)
-    (*         try inv H0 *)
-    (*       ] *)
-    (*     ]; *)
-    (*   try match goal with *)
-    (*     | H: raise_error _ = _ |- _ *)
-    (*       => *)
-    (*         inv H *)
-    (*     end. *)
+        destruct_err_oom_poison m; cbn; auto.
+        + cbn in IHALL.
+          remember (map_monad
+                            (fun es : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte =>
+                               IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue es dt) l) as w.
+          destruct_err_oom_poison w; cbn in *; auto; inv IHALL.
+        + cbn in IHALL.
+          remember (map_monad
+                            (fun es : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte =>
+                               IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue es dt) l) as w.
+          destruct_err_oom_poison w; cbn in *; auto; inv IHALL.
+          rewrite_fin_to_inf_dvalue; auto.
+          cbn.
+          rewrite fin_to_inf_dvalue_array in H1.
+          inv H1.
+          reflexivity.
+        + cbn in IHALL.
+          remember (map_monad
+                            (fun es : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte =>
+                               IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue es dt) l) as w.
+          destruct_err_oom_poison w; cbn in *; auto; inv IHALL.
+        + cbn in IHALL.
+          remember (map_monad
+                            (fun es : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte =>
+                               IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue es dt) l) as w.
+          destruct_err_oom_poison w; cbn in *; auto; inv IHALL.
+    }
 
-    (* - (* Arrays *) *)
-    (*   apply ErrOOMPoison_bind_raise_poison_inv in FIN as [FIN | FIN]; *)
-    (*     unfold lift_err_RAISE_ERROR in *; *)
-    (*     repeat break_match_hyp_inv; *)
-    (*     destruct H as (?&?); *)
-    (*     inv H. *)
+    { (* Structs *)
+      Opaque IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue
+        dvalue_bytes_to_dvalue.
 
-    (*   pose proof (Util.Forall2_length REF) as LEN. *)
-    (*   pose proof split_every_n_succeeds _ dvbs_inf _ _ Heqs as (y&SPLIT). *)
-    (*   rewrite sizeof_dtyp_fin_inf. *)
-    (*   rewrite SPLIT. *)
+      subst.
+      rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue_equation,
+        dvalue_bytes_to_dvalue_equation.
 
-    (*   epose proof split_every_Forall2 _ _ _ _ _ _ REF SPLIT Heqs as XY. *)
-    (*   apply ErrOOMPoison_bind_raise_poison_inv in H0 as [H0 | H0]. *)
-    (*   { (* map poison *) *)
-    (*     admit. *)
-    (*   } *)
+      remember (     fix go (dts : list dtyp) (dbs : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte) {struct dts} :
+         ErrOOMPoison (list IS1.LP.Events.DV.dvalue) :=
+       match dts with
+       | [] => ret []
+       | dt :: dts0 =>
+           let sz := IS1.LP.SIZEOF.sizeof_dtyp dt in
+           let init_bytes := take sz dbs in
+           let rest_bytes := drop sz dbs in
+           f <- IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue init_bytes dt;;
+           rest <- go dts0 rest_bytes;; ret (f :: rest)
+       end) as f1.
+      remember (fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} : ErrOOMPoison (list dvalue) :=
+         match dts with
+         | [] => ret []
+         | dt :: dts0 =>
+             let sz := SIZEOF.sizeof_dtyp dt in
+             let init_bytes := take sz dbs in
+             let rest_bytes := drop sz dbs in
+             f <- dvalue_bytes_to_dvalue init_bytes dt;; rest <- go dts0 rest_bytes;; ret (f :: rest)
+         end) as f2.
+      Opaque bind.
+      cbn.
+      subst.
+      erewrite list_dvalue_bytes_to_dvalue_fin_inf; eauto.
+      { Transparent bind.
+        remember ((fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
+                    ErrOOMPoison (list dvalue) :=
+                     match dts with
+                     | [] => ret []
+                     | dt :: dts0 =>
+                         let sz := SIZEOF.sizeof_dtyp dt in
+                         let init_bytes := take sz dbs in
+                         let rest_bytes := drop sz dbs in
+                         f <- dvalue_bytes_to_dvalue init_bytes dt;;
+                         rest <- go dts0 rest_bytes;; ret (f :: rest)
+                     end) fields dvbs_fin) as res.
+        destruct_err_oom_poison res; cbn; auto.
+        rewrite_fin_to_inf_dvalue.
+        reflexivity.
+      }
 
-    (*   destruct H0 as (?&?&?). *)
-    (*   inv H0. *)
-    (* - (* Structs *) *)
-    (*   destruct fields. *)
-    (*   inv FIN. *)
-    (*   rewrite sizeof_dtyp_fin_inf. *)
-    (*   Opaque dvalue_bytes_to_dvalue *)
-    (*     IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue. *)
-    (*   cbn in *. *)
-    (*   break_match_hyp_inv; *)
-    (*   remember (dvalue_bytes_to_dvalue (take (SIZEOF.sizeof_dtyp d) dvbs_fin) d); *)
-    (*     destruct y, unEitherT, unMkOomableT; inv Heqp. *)
+      intros x CONTRA.
+      eapply (NOOM x).
+      cbn.
+      rewrite dvalue_bytes_to_dvalue_equation.
+      remember (fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} : ErrOOMPoison (list dvalue) :=
+       match dts with
+       | [] =>
+           @ret ErrOOMPoison
+             (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+                (@Monad_OomableT Poisonable MonadPoisonable)) (list dvalue) []
+       | dt :: dts0 =>
+           let sz := SIZEOF.sizeof_dtyp dt in
+           let init_bytes := @take dvalue_byte sz dbs in
+           let rest_bytes := @drop dvalue_byte sz dbs in
+           f <-
+           @dvalue_bytes_to_dvalue ErrOOMPoison
+             (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+                (@Monad_OomableT Poisonable MonadPoisonable))
+             (@RAISE_ERROR_MonadExc ErrOOMPoison
+                (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+                   (@Monad_OomableT Poisonable MonadPoisonable)))
+             (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+                (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                   (@Monad_OomableT Poisonable MonadPoisonable))
+                (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
+                   RAISE_POISON_Poisonable))
+             (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+                (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                   (@Monad_OomableT Poisonable MonadPoisonable))
+                (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) init_bytes dt;;
+           rest <- go dts0 rest_bytes;;
+           @ret ErrOOMPoison
+             (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+                (@Monad_OomableT Poisonable MonadPoisonable)) (list dvalue) 
+             (f :: rest)
+       end) as res.
+      destruct_err_oom_poison res; inv CONTRA; cbn; auto.
+      setoid_rewrite Hx.
+      cbn.
+      auto.
+    }
 
-    (*   break_match_hyp_inv. *)
-    (*   2: { *)
-    (*     erewrite H; eauto. *)
-    (*     2: { *)
-    (*       apply Forall2_take; eauto. *)
-    (*     } *)
-    (*     cbn; auto. *)
-    (*   } *)
-    (*   break_match_hyp_inv. *)
-    (*   break_match_hyp_inv. *)
-    (*   2: { *)
-    (*     erewrite H. *)
-    (*     admit. *)
-    (*   } *)
-    (*   destruct o; [|inv H2]. *)
-    (*   destruct s; inv H2. *)
-    (*   destruct d1; inv H1. *)
-    (* - (* Packed structs *) *)
-    (*   destruct fields. *)
-    (*   inv FIN. *)
-    (*   rewrite sizeof_dtyp_fin_inf. *)
-    (*   admit. *)
-    (* - (* Vectors *) *)
-    (*   admit.  *)
-  Admitted.
+    { (* Packed structs *)
+      Opaque IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue
+        dvalue_bytes_to_dvalue.
+
+      subst.
+      rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue_equation,
+        dvalue_bytes_to_dvalue_equation.
+
+      remember (     fix go (dts : list dtyp) (dbs : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte) {struct dts} :
+         ErrOOMPoison (list IS1.LP.Events.DV.dvalue) :=
+       match dts with
+       | [] => ret []
+       | dt :: dts0 =>
+           let sz := IS1.LP.SIZEOF.sizeof_dtyp dt in
+           let init_bytes := take sz dbs in
+           let rest_bytes := drop sz dbs in
+           f <- IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue init_bytes dt;;
+           rest <- go dts0 rest_bytes;; ret (f :: rest)
+       end) as f1.
+      remember (fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} : ErrOOMPoison (list dvalue) :=
+         match dts with
+         | [] => ret []
+         | dt :: dts0 =>
+             let sz := SIZEOF.sizeof_dtyp dt in
+             let init_bytes := take sz dbs in
+             let rest_bytes := drop sz dbs in
+             f <- dvalue_bytes_to_dvalue init_bytes dt;; rest <- go dts0 rest_bytes;; ret (f :: rest)
+         end) as f2.
+      Opaque bind.
+      cbn.
+      subst.
+      erewrite list_dvalue_bytes_to_dvalue_fin_inf; eauto.
+      { Transparent bind.
+        remember ((fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
+                    ErrOOMPoison (list dvalue) :=
+                     match dts with
+                     | [] => ret []
+                     | dt :: dts0 =>
+                         let sz := SIZEOF.sizeof_dtyp dt in
+                         let init_bytes := take sz dbs in
+                         let rest_bytes := drop sz dbs in
+                         f <- dvalue_bytes_to_dvalue init_bytes dt;;
+                         rest <- go dts0 rest_bytes;; ret (f :: rest)
+                     end) fields dvbs_fin) as res.
+        destruct_err_oom_poison res; cbn; auto.
+        rewrite_fin_to_inf_dvalue.
+        reflexivity.
+      }
+
+      intros x CONTRA.
+      eapply (NOOM x).
+      cbn.
+      rewrite dvalue_bytes_to_dvalue_equation.
+      remember (fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} : ErrOOMPoison (list dvalue) :=
+       match dts with
+       | [] =>
+           @ret ErrOOMPoison
+             (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+                (@Monad_OomableT Poisonable MonadPoisonable)) (list dvalue) []
+       | dt :: dts0 =>
+           let sz := SIZEOF.sizeof_dtyp dt in
+           let init_bytes := @take dvalue_byte sz dbs in
+           let rest_bytes := @drop dvalue_byte sz dbs in
+           f <-
+           @dvalue_bytes_to_dvalue ErrOOMPoison
+             (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+                (@Monad_OomableT Poisonable MonadPoisonable))
+             (@RAISE_ERROR_MonadExc ErrOOMPoison
+                (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+                   (@Monad_OomableT Poisonable MonadPoisonable)))
+             (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+                (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                   (@Monad_OomableT Poisonable MonadPoisonable))
+                (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
+                   RAISE_POISON_Poisonable))
+             (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+                (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                   (@Monad_OomableT Poisonable MonadPoisonable))
+                (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) init_bytes dt;;
+           rest <- go dts0 rest_bytes;;
+           @ret ErrOOMPoison
+             (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+                (@Monad_OomableT Poisonable MonadPoisonable)) (list dvalue) 
+             (f :: rest)
+       end) as res.
+      destruct_err_oom_poison res; inv CONTRA; cbn; auto.
+      setoid_rewrite Hx.
+      cbn.
+      auto.
+    }
+
+    { (* Vectors *)
+      rewrite dvalue_bytes_to_dvalue_equation in FIN;
+        rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue_equation;
+        subst.
+      rewrite sizeof_dtyp_fin_inf.
+      Opaque IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue
+        dvalue_bytes_to_dvalue.
+      cbn in *.
+      destruct (split_every (SIZEOF.sizeof_dtyp dt) dvbs_fin) eqn:SPLIT.
+      { unfold split_every in SPLIT.
+        move SPLIT after NOOM.
+        break_match_hyp_inv.
+        cbn in *; auto.
+      }
+      pose proof (Util.Forall2_length REF) as LEN.
+      pose proof split_every_n_succeeds _ dvbs_inf _ _ SPLIT as (y&SPLIT').
+      rewrite SPLIT'.
+      cbn in *.
+      pose proof split_every_Forall2 _ _ _ _ _ _ REF SPLIT' SPLIT as ALL.
+      clear SPLIT SPLIT'.
+      induction ALL.
+      - cbn.
+        rewrite_fin_to_inf_dvalue; reflexivity.
+      - repeat rewrite map_monad_unfold.
+        cbn.
+        erewrite IHdt.
+        2: apply H.
+        3: eauto.
+        2: {
+          clear - NOOM.
+          rewrite map_monad_unfold in *.
+          cbn in *.
+          remember (dvalue_bytes_to_dvalue y dt) as r.
+          intros x CONTRA.
+          destruct_err_oom_poison r; inv CONTRA.
+          cbn in NOOM.
+          specialize (NOOM x); contradiction.
+        }
+
+        remember (dvalue_bytes_to_dvalue y dt) as r.
+        destruct_err_oom_poison r; cbn; auto.
+        remember (map_monad (fun x0 : list dvalue_byte => dvalue_bytes_to_dvalue x0 dt) l') as m.
+        forward IHALL.
+        { intros x0.
+          destruct_err_oom_poison m; cbn; intros CONTRA; inv CONTRA.
+          cbn in NOOM.
+          repeat rewrite <- Heqr, <- Heqm in NOOM.
+          cbn in NOOM.
+          specialize (NOOM x0).
+          contradiction.
+        }
+
+        destruct_err_oom_poison m; cbn; auto.
+        + cbn in IHALL.
+          remember (map_monad
+                            (fun es : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte =>
+                               IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue es dt) l) as w.
+          destruct_err_oom_poison w; cbn in *; auto; inv IHALL.
+        + cbn in IHALL.
+          remember (map_monad
+                            (fun es : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte =>
+                               IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue es dt) l) as w.
+          destruct_err_oom_poison w; cbn in *; auto; inv IHALL.
+          rewrite_fin_to_inf_dvalue; auto.
+          cbn.
+          rewrite fin_to_inf_dvalue_vector in H1.
+          inv H1.
+          reflexivity.
+        + cbn in IHALL.
+          remember (map_monad
+                            (fun es : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte =>
+                               IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue es dt) l) as w.
+          destruct_err_oom_poison w; cbn in *; auto; inv IHALL.
+        + cbn in IHALL.
+          remember (map_monad
+                            (fun es : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte =>
+                               IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue es dt) l) as w.
+          destruct_err_oom_poison w; cbn in *; auto; inv IHALL.
+    }
+  Qed.
 
   Lemma dvalue_bytes_to_dvalue_fin_inf :
     forall τ dvbs_inf dvbs_fin res,
@@ -8864,6 +8892,7 @@ Qed.
       symmetry in Heqe.
       erewrite dvalue_bytes_fin_to_dvalue_fin_inf; eauto.
       cbn; rewrite_fin_to_inf_dvalue; eauto.
+      intros ? CONTRA; inv CONTRA.
     }
     destruct o; inv H2.
     repeat red in H1.
@@ -8873,6 +8902,11 @@ Qed.
     destruct e; inv H2.
     unfold ErrOOMPoison_handle_poison_and_oom.
     erewrite dvalue_bytes_fin_to_dvalue_fin_inf; eauto.
+    2: {
+      intros ? CONTRA.
+      rewrite <- Heqe in CONTRA.
+      inv CONTRA.
+    }
     rewrite <- Heqe.
     cbn; reflexivity.
   Qed.

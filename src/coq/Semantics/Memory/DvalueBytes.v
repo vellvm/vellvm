@@ -336,8 +336,22 @@ Module Type DvalueByte (LP : LLVMParams).
          (Nseq 0 (N.to_nat (sizeof_dtyp dt))).
 
   Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia].
-  Program Fixpoint dvalue_bytes_to_dvalue {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOMABLE M} (dbs : list dvalue_byte) (dt : dtyp) {measure (dtyp_measure dt)} : M dvalue
-    := match dt with
+  Fixpoint dvalue_bytes_to_dvalue {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOMABLE M} (dbs : list dvalue_byte) (dt : dtyp) : M dvalue
+    :=
+    let list_dvalue_bytes_to_dvalue :=
+      fix go dts dbs :=
+        match dts with
+        | [] => ret []
+        | (dt::dts) =>
+            let sz := sizeof_dtyp dt in
+            let init_bytes := take sz dbs in
+            let rest_bytes := drop sz dbs in
+            f <- dvalue_bytes_to_dvalue init_bytes dt;;
+            rest <- go dts rest_bytes;;
+            ret (f :: rest)
+        end
+    in
+    match dt with
        | DTYPE_I sz =>
            zs <- map_monad dvalue_byte_value dbs;;
            match sz with
@@ -396,149 +410,94 @@ Module Type DvalueByte (LP : LLVMParams).
            elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
            ret (DVALUE_Vector elts)
        | DTYPE_Struct fields =>
-           match fields with
-           | [] => ret (DVALUE_Struct []) (* TODO: Not 100% sure about this. *)
-           | (dt::dts) =>
-               let sz := sizeof_dtyp dt in
-               let init_bytes := take sz dbs in
-               let rest_bytes := drop sz dbs in
-               f <- dvalue_bytes_to_dvalue init_bytes dt;;
-               rest <- dvalue_bytes_to_dvalue rest_bytes (DTYPE_Struct dts);;
-               match rest with
-               | DVALUE_Struct fs =>
-                   ret (DVALUE_Struct (f::fs))
-               | _ =>
-                   raise_error "dvalue_bytes_to_dvalue: DTYPE_Struct recursive call did not return a struct."
-               end
-           end
+           Functor.fmap DVALUE_Struct (list_dvalue_bytes_to_dvalue fields dbs)
        | DTYPE_Packed_struct fields =>
-           match fields with
-           | [] => ret (DVALUE_Packed_struct []) (* TODO: Not 100% sure about this. *)
-           | (dt::dts) =>
-               let sz := sizeof_dtyp dt in
-               let init_bytes := take sz dbs in
-               let rest_bytes := drop sz dbs in
-               f <- dvalue_bytes_to_dvalue init_bytes dt;;
-               rest <- dvalue_bytes_to_dvalue rest_bytes (DTYPE_Struct dts);;
-               match rest with
-               | DVALUE_Packed_struct fs =>
-                   ret (DVALUE_Packed_struct (f::fs))
-               | _ =>
-                   raise_error "dvalue_bytes_to_dvalue: DTYPE_Packed_struct recursive call did not return a struct."
-               end
-           end
+           Functor.fmap DVALUE_Packed_struct (list_dvalue_bytes_to_dvalue fields dbs)
        | DTYPE_Opaque =>
            raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Opaque."
        end.
-  Next Obligation.
-    pose proof dtyp_measure_gt_0 dt.
-    cbn.
-    unfold list_sum.
-    lia.
-  Qed.
-  Next Obligation.
-    pose proof dtyp_measure_gt_0 dt.
-    cbn.
-    unfold list_sum.
-    lia.
-  Qed.
 
   Lemma dvalue_bytes_to_dvalue_equation
     {M} `{HM : Monad M} `{RE: RAISE_ERROR M} `{RP: RAISE_POISON M} `{RO: RAISE_OOMABLE M} (dbs : list dvalue_byte) (dt : dtyp) :
     @dvalue_bytes_to_dvalue M HM RE RP RO dbs dt =
-      match dt with
-      | DTYPE_I sz =>
-          zs <- map_monad dvalue_byte_value dbs;;
-          match sz with
-          | 1 =>
-              ret (DVALUE_I1 (concat_bytes_Z_vint zs))
-          | 8 =>
-              ret (DVALUE_I8 (concat_bytes_Z_vint zs))
-          | 32 =>
-              ret (DVALUE_I32 (concat_bytes_Z_vint zs))
-          | 64 =>
-              ret (DVALUE_I64 (concat_bytes_Z_vint zs))
-          | _ => raise_error "Unsupported integer size."
-          end
-      | DTYPE_IPTR =>
-          zs <- map_monad dvalue_byte_value dbs;;
-          val <- lift_OOMABLE DTYPE_IPTR (IP.from_Z (concat_bytes_Z zs));;
-          ret (DVALUE_IPTR val)
-      | DTYPE_Pointer =>
-          (* TODO: not sure if this should be wildcard provenance.
+    let list_dvalue_bytes_to_dvalue :=
+      fix go dts dbs :=
+        match dts with
+        | [] => ret []
+        | (dt::dts) =>
+            let sz := sizeof_dtyp dt in
+            let init_bytes := take sz dbs in
+            let rest_bytes := drop sz dbs in
+            f <- dvalue_bytes_to_dvalue init_bytes dt;;
+            rest <- go dts rest_bytes;;
+            ret (f :: rest)
+        end
+    in
+    match dt with
+       | DTYPE_I sz =>
+           zs <- map_monad dvalue_byte_value dbs;;
+           match sz with
+           | 1 =>
+               ret (DVALUE_I1 (concat_bytes_Z_vint zs))
+           | 8 =>
+               ret (DVALUE_I8 (concat_bytes_Z_vint zs))
+           | 32 =>
+               ret (DVALUE_I32 (concat_bytes_Z_vint zs))
+           | 64 =>
+               ret (DVALUE_I64 (concat_bytes_Z_vint zs))
+           | _ => raise_error "Unsupported integer size."
+           end
+       | DTYPE_IPTR =>
+           zs <- map_monad dvalue_byte_value dbs;;
+           val <- lift_OOMABLE DTYPE_IPTR (IP.from_Z (concat_bytes_Z zs));;
+           ret (DVALUE_IPTR val)
+       | DTYPE_Pointer =>
+           (* TODO: not sure if this should be wildcard provenance.
                 TODO: not sure if this should truncate iptr value...
-           *)
-          (* TODO: not sure if this should be lazy OOM or not *)
-          zs <- map_monad dvalue_byte_value dbs;;
-          match int_to_ptr (concat_bytes_Z zs) wildcard_prov with
-          | NoOom a => ret (DVALUE_Addr a)
-          | Oom msg => raise_oomable DTYPE_Pointer
-          end
-      | DTYPE_Void =>
-          raise_error "dvalue_bytes_to_dvalue on void type."
-      | DTYPE_Half =>
-          raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Half."
-      | DTYPE_Float =>
-          zs <- map_monad dvalue_byte_value dbs;;
-          ret (DVALUE_Float (Float32.of_bits (concat_bytes_Z_vint zs)))
-      | DTYPE_Double =>
-          zs <- map_monad dvalue_byte_value dbs;;
-          ret (DVALUE_Double (Float.of_bits (concat_bytes_Z_vint zs)))
-      | DTYPE_X86_fp80 =>
-          raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_fp80."
-      | DTYPE_Fp128 =>
-          raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Fp128."
-      | DTYPE_Ppc_fp128 =>
-          raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Ppc_fp128."
-      | DTYPE_Metadata =>
-          raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Metadata."
-      | DTYPE_X86_mmx =>
-          raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_mmx."
-      | DTYPE_Array sz t =>
-          let sz := sizeof_dtyp t in
-          elt_bytes <- lift_err_RAISE_ERROR (split_every sz dbs);;
-          elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
-          ret (DVALUE_Array elts)
-      | DTYPE_Vector sz t =>
-          let sz := sizeof_dtyp t in
-          elt_bytes <- lift_err_RAISE_ERROR (split_every sz dbs);;
-          elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
-          ret (DVALUE_Vector elts)
-      | DTYPE_Struct fields =>
-          match fields with
-          | [] => ret (DVALUE_Struct []) (* TODO: Not 100% sure about this. *)
-          | (dt::dts) =>
-              let sz := sizeof_dtyp dt in
-              let init_bytes := take sz dbs in
-              let rest_bytes := drop sz dbs in
-              f <- dvalue_bytes_to_dvalue init_bytes dt;;
-              rest <- dvalue_bytes_to_dvalue rest_bytes (DTYPE_Struct dts);;
-              match rest with
-              | DVALUE_Struct fs =>
-                  ret (DVALUE_Struct (f::fs))
-              | _ =>
-                  raise_error "dvalue_bytes_to_dvalue: DTYPE_Struct recursive call did not return a struct."
-              end
-          end
-      | DTYPE_Packed_struct fields =>
-          match fields with
-          | [] => ret (DVALUE_Packed_struct []) (* TODO: Not 100% sure about this. *)
-          | (dt::dts) =>
-              let sz := sizeof_dtyp dt in
-              let init_bytes := take sz dbs in
-              let rest_bytes := drop sz dbs in
-              f <- dvalue_bytes_to_dvalue init_bytes dt;;
-              rest <- dvalue_bytes_to_dvalue rest_bytes (DTYPE_Struct dts);;
-              match rest with
-              | DVALUE_Packed_struct fs =>
-                  ret (DVALUE_Packed_struct (f::fs))
-              | _ =>
-                  raise_error "dvalue_bytes_to_dvalue: DTYPE_Packed_struct recursive call did not return a struct."
-              end
-          end
-      | DTYPE_Opaque =>
-          raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Opaque."
-      end.
+            *)
+           (* TODO: not sure if this should be lazy OOM or not *)
+           zs <- map_monad dvalue_byte_value dbs;;
+           match int_to_ptr (concat_bytes_Z zs) wildcard_prov with
+           | NoOom a => ret (DVALUE_Addr a)
+           | Oom msg => raise_oomable DTYPE_Pointer
+           end
+       | DTYPE_Void =>
+           raise_error "dvalue_bytes_to_dvalue on void type."
+       | DTYPE_Half =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Half."
+       | DTYPE_Float =>
+           zs <- map_monad dvalue_byte_value dbs;;
+           ret (DVALUE_Float (Float32.of_bits (concat_bytes_Z_vint zs)))
+       | DTYPE_Double =>
+           zs <- map_monad dvalue_byte_value dbs;;
+           ret (DVALUE_Double (Float.of_bits (concat_bytes_Z_vint zs)))
+       | DTYPE_X86_fp80 =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_fp80."
+       | DTYPE_Fp128 =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Fp128."
+       | DTYPE_Ppc_fp128 =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Ppc_fp128."
+       | DTYPE_Metadata =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Metadata."
+       | DTYPE_X86_mmx =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_mmx."
+       | DTYPE_Array sz t =>
+           let sz := sizeof_dtyp t in
+           elt_bytes <- lift_err_RAISE_ERROR (split_every sz dbs);;
+           elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
+           ret (DVALUE_Array elts)
+       | DTYPE_Vector sz t =>
+           let sz := sizeof_dtyp t in
+           elt_bytes <- lift_err_RAISE_ERROR (split_every sz dbs);;
+           elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
+           ret (DVALUE_Vector elts)
+       | DTYPE_Struct fields =>
+           Functor.fmap DVALUE_Struct (list_dvalue_bytes_to_dvalue fields dbs)
+       | DTYPE_Packed_struct fields =>
+           Functor.fmap DVALUE_Packed_struct (list_dvalue_bytes_to_dvalue fields dbs)
+       | DTYPE_Opaque =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Opaque."
+       end.
   Proof.
   Admitted.
 
