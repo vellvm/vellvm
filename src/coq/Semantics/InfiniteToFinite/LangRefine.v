@@ -13863,6 +13863,70 @@ Qed.
     repeat break_match_hyp_inv.
   Qed.
 
+  Lemma index_into_vec_dv_no_ub :
+    forall t vec idx ub_msg,
+      @index_into_vec_dv err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) t vec idx = UB_unERR_UB_OOM ub_msg -> False.
+  Proof.
+    intros t vec idx res INDEX.
+    unfold index_into_vec_dv in INDEX.
+
+    break_match_hyp_inv.
+    { (* Arrays *)
+      break_match_hyp_inv.
+      { (* i32 index *)
+        repeat break_match_hyp_inv.
+        - induction elts; cbn in *; inv H0.
+        - clear Heqz.
+          remember (Z.pos p) as z.
+          clear Heqz p.
+          generalize dependent z.
+          induction elts; intros z CONTRA; cbn in *; inv CONTRA.
+          break_match_hyp_inv.
+          eapply IHelts in H1; auto.
+      }
+
+      { (* i64 index *)
+        repeat break_match_hyp_inv.
+        - induction elts; cbn in *; inv H0.
+        - clear Heqz.
+          remember (Z.pos p) as z.
+          clear Heqz p.
+          generalize dependent z.
+          induction elts; intros z CONTRA; cbn in *; inv CONTRA.
+          break_match_hyp_inv.
+          eapply IHelts in H1; auto.
+      }
+    }
+
+    { (* Vectors *)
+      break_match_hyp_inv.
+      { (* i32 index *)
+        repeat break_match_hyp_inv.
+        - induction elts; cbn in *; inv H0.
+        - clear Heqz.
+          remember (Z.pos p) as z.
+          clear Heqz p.
+          generalize dependent z.
+          induction elts; intros z CONTRA; cbn in *; inv CONTRA.
+          break_match_hyp_inv.
+          eapply IHelts in H1; auto.
+      }
+
+      { (* i64 index *)
+        repeat break_match_hyp_inv.
+        - induction elts; cbn in *; inv H0.
+        - clear Heqz.
+          remember (Z.pos p) as z.
+          clear Heqz p.
+          generalize dependent z.
+          induction elts; intros z CONTRA; cbn in *; inv CONTRA.
+          break_match_hyp_inv.
+          eapply IHelts in H1; auto.
+      }
+    }
+  Qed.
+
   Lemma concretize_ub_fin_inf :
     forall uv_inf uv_fin ub_msg
       (REF : uvalue_refine_strict uv_inf uv_fin)
@@ -14738,7 +14802,68 @@ Qed.
       repeat break_match_hyp;
         rewrite <- H3 in H6; inv H6.
     - (* UVALUE_ExtractElement *)
-      admit.
+      unfold_uvalue_refine_strict_in REF.
+      repeat break_match_hyp_inv.
+
+      repeat red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      repeat red in UB.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
+
+      repeat red in UB.
+      destruct UB as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H0.
+      { (* UB when concretizing first operand *)
+        eapply IHuv_inf1 in H; eauto.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      (* No UB on first operand. *)
+      destruct H1 as [[] | H1].
+      specialize (H1 x1).
+      forward H1; [cbn; auto|].
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      rewrite <- H1 in H3.
+      destruct_err_ub_oom x; inv H3.
+
+      { (* UB in second operand *)
+        eapply IHuv_inf2 in H0; eauto.
+        repeat red.
+        exists (ret (fin_to_inf_dvalue x1)).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+        eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+        split; eauto.
+        right.
+        intros a H3.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      (* UB in evaluating operation? *)
+      destruct H2 as [[] | H2].
+      specialize (H2 x3).
+      forward H2; [cbn; auto|].
+      repeat red in H2.
+      destruct H2 as (?&?&?&?&?).
+      rewrite <- H3 in H5.
+      destruct t; inv H2; inv H5.
+
+      destruct H4 as [[] | H4].
+      specialize (H4 t).
+      forward H4; [cbn; auto|].
+      remember (index_into_vec_dv t x1 x3) as res.
+      rewrite <- H4 in H6.
+      destruct_err_ub_oom res; inv H6.
+      symmetry in Heqres.
+      eapply index_into_vec_dv_no_ub in Heqres; contradiction.
     - (* UVALUE_InsertElement *)
       admit.
     - (* UVALUE_ExtractValue *)
