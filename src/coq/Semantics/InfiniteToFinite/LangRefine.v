@@ -13637,6 +13637,232 @@ Qed.
   Qed.
 
   Hint Resolve eval_iop_ub_fin_inf : EVAL_INT_FIN_INF.
+
+  Lemma eval_int_icmp_ub_fin_inf :
+    forall {Int} {VMInt : VellvmIntegers.VMemInt Int} icmp a b ub_msg,
+      @eval_int_icmp err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt icmp a b = UB_unERR_UB_OOM ub_msg  ->
+      @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt icmp a b = UB_unERR_UB_OOM ub_msg.
+  Proof.
+    intros Int VMInt icmp a b ub_msg FIN.
+    Transparent eval_int_icmp IS1.LP.Events.DV.eval_int_icmp.
+    unfold eval_int_icmp, IS1.LP.Events.DV.eval_int_icmp.
+    destruct icmp;
+      try solve
+        [ cbn in *;
+          break_match_hyp_inv;
+          rewrite_fin_to_inf_dvalue;
+          eauto
+        | cbn in *;
+          repeat break_match_hyp_inv; inv Heqs;
+          cbn;
+          break_match_goal;
+          rewrite_fin_to_inf_dvalue; auto
+        ].
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma eval_int_icmp_iptr_ub_fin_inf :
+    forall v1_fin v2_fin v1_inf v2_inf icmp ub_msg,
+      @eval_int_icmp err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        IP.intptr
+        VMemInt_intptr'
+        icmp v1_fin v2_fin = UB_unERR_UB_OOM ub_msg ->
+      IS1.LP.IP.from_Z (IP.to_Z v1_fin) = NoOom v1_inf ->
+      IS1.LP.IP.from_Z (IP.to_Z v2_fin) = NoOom v2_inf ->
+      @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        IS1.LP.IP.intptr
+        IS1.LP.Events.DV.VMemInt_intptr'
+        icmp v1_inf v2_inf = UB_unERR_UB_OOM ub_msg.
+  Proof.
+    intros v1_fin v2_fin v1_inf v2_inf icmp ub_msg EVAL LIFT1 LIFT2.
+
+    assert (IP.to_Z v1_fin = IS1.LP.IP.to_Z v1_inf) as V1.
+    { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
+
+    assert (IP.to_Z v2_fin = IS1.LP.IP.to_Z v2_inf) as V2.
+    { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
+
+    destruct icmp;
+      try
+        solve
+        [ cbn in *;
+          erewrite <- VMEM_REF.mcmpu_refine; eauto;
+          break_match_hyp_inv;
+          setoid_rewrite Heqb;
+          cbn in CONV; inv CONV; auto
+        | cbn in *;
+          setoid_rewrite IP.VMemInt_intptr_dtyp in EVAL;
+          setoid_rewrite dtyp_eqb_refl in EVAL;
+          inv EVAL
+        ].
+  Qed.
+
+  (* TODO: Move this / generalize monad? *)
+  Lemma eval_icmp_ub_fin_inf :
+    forall dv1_fin dv2_fin ub_msg icmp dv1_inf dv2_inf,
+      @eval_icmp err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        icmp dv1_fin dv2_fin = UB_unERR_UB_OOM ub_msg ->
+      fin_to_inf_dvalue dv1_fin = dv1_inf ->
+      fin_to_inf_dvalue dv2_fin = dv2_inf ->
+      @IS1.MEM.CP.CONC.eval_icmp err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        icmp dv1_inf dv2_inf = UB_unERR_UB_OOM ub_msg.
+  Proof.
+    intros dv1_fin dv2_fin ub_msg icmp dv1_inf dv2_inf EVAL LIFT1 LIFT2.
+    Opaque IS1.LP.Events.DV.eval_int_icmp
+      eval_int_icmp.
+    unfold eval_icmp in EVAL.
+    (* Nasty case analysis... *)
+    break_match_hyp_inv;
+      try solve
+        [ (* Simple integer cases *)
+          break_match_hyp_inv;
+          repeat rewrite_fin_to_inf_dvalue;
+          cbn;
+          auto;
+          eapply eval_int_icmp_ub_fin_inf in H1;
+          auto
+        ].
+
+    { (* dv1: addr *)
+      break_match_hyp_inv.
+      repeat rewrite_fin_to_inf_dvalue.
+      cbn.
+      eapply eval_int_icmp_ub_fin_inf in H1.
+      repeat rewrite ptr_to_int_fin_to_inf_addr.
+      auto.
+    }
+
+    { (* dv1: iptr *)
+      break_match_hyp_inv.
+      repeat rewrite_fin_to_inf_dvalue.
+      cbn.
+      unfold intptr_fin_inf.
+      do 2 break_match_goal.
+      clear Heqs Heqs0.
+      eapply eval_int_icmp_iptr_ub_fin_inf in H1; eauto.
+    }
+  Qed.
+
+  Lemma double_op_ub_fin_inf :
+    forall fop a b ub_msg,
+      double_op fop a b = UB_unERR_UB_OOM ub_msg ->
+      IS1.LP.Events.DV.double_op fop a b = UB_unERR_UB_OOM ub_msg.
+  Proof.
+    intros fop a b ub_msg EVAL.
+    destruct fop; cbn in *; inv EVAL;
+      cbn in REF;
+      inv REF; reflexivity.
+  Qed.
+
+  Lemma float_op_ub_fin_inf :
+    forall fop a b ub_msg,
+      float_op fop a b = UB_unERR_UB_OOM ub_msg ->
+      IS1.LP.Events.DV.float_op fop a b = UB_unERR_UB_OOM ub_msg.
+  Proof.
+    intros fop a b ub_msg EVAL.
+    destruct fop; cbn in *; inv EVAL;
+      cbn in REF;
+      inv REF; reflexivity.
+  Qed.
+
+  (* TODO: Move this / generalize monad? *)
+  Lemma eval_fop_ub_fin_inf :
+    forall dv1_fin dv2_fin ub_msg fop dv1_inf dv2_inf,
+      @eval_fop err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        fop dv1_fin dv2_fin = UB_unERR_UB_OOM ub_msg ->
+      fin_to_inf_dvalue dv1_fin = dv1_inf ->
+      fin_to_inf_dvalue dv2_fin = dv2_inf ->
+      @IS1.LP.Events.DV.eval_fop err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        fop dv1_inf dv2_inf = UB_unERR_UB_OOM ub_msg.
+  Proof.
+    intros dv1_fin dv2_fin ub_msg fop dv1_inf dv2_inf EVAL LIFT1 LIFT2.
+    unfold eval_fop in EVAL.
+    (* Nasty case analysis... *)
+    break_match_hyp_inv.
+    { (* dv1: Double *)
+      break_match_hyp_inv.
+      2: {
+        break_match_hyp_inv.
+        unfold fin_to_inf_dvalue.
+        break_match_goal; clear Heqs; destruct p; clear e0.
+        break_match_goal; clear Heqs; destruct p; clear e1.
+        inv e; inv e0.
+        cbn.
+
+        (* These should be the same... *)
+        unfold IS1.LP.Events.DV.fop_is_div.
+        unfold fop_is_div in Heqb.
+        rewrite Heqb.
+        reflexivity.
+      }
+
+      unfold fin_to_inf_dvalue.
+      break_match_goal; clear Heqs; destruct p; clear e0.
+      break_match_goal; clear Heqs; destruct p; clear e1.
+      inv e; inv e0.
+      cbn.
+      eapply double_op_ub_fin_inf; eauto.
+    }
+
+    { (* dv1: Float *)
+      break_match_hyp_inv.
+      2: {
+        break_match_hyp_inv.
+        unfold fin_to_inf_dvalue.
+        break_match_goal; clear Heqs; destruct p; clear e0.
+        break_match_goal; clear Heqs; destruct p; clear e1.
+        inv e; inv e0.
+        cbn.
+
+        (* These should be the same... *)
+        unfold IS1.LP.Events.DV.fop_is_div.
+        unfold fop_is_div in Heqb.
+        rewrite Heqb.
+        reflexivity.
+      }
+
+      unfold fin_to_inf_dvalue.
+      break_match_goal; clear Heqs; destruct p; clear e0.
+      break_match_goal; clear Heqs; destruct p; clear e1.
+      inv e; inv e0.
+      cbn.
+      eapply float_op_ub_fin_inf; eauto.
+    }
+  Qed.
+
+  (* TODO: Move this / generalize monad? *)
+  Lemma eval_fcmp_ub_fin_inf :
+    forall dv1_fin dv2_fin ub_msg fcmp dv1_inf dv2_inf,
+      @eval_fcmp err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        fcmp dv1_fin dv2_fin = UB_unERR_UB_OOM ub_msg ->
+      fin_to_inf_dvalue dv1_fin = dv1_inf ->
+      fin_to_inf_dvalue dv2_fin = dv2_inf ->
+      @IS1.LP.Events.DV.eval_fcmp err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        fcmp dv1_inf dv2_inf = UB_unERR_UB_OOM ub_msg.
+  Proof.
+    intros dv1_fin dv2_fin ub_msg fcmp dv1_inf dv2_inf EVAL LIFT1 LIFT2.
+    unfold eval_fcmp in EVAL.
+    repeat break_match_hyp_inv.
+  Qed.
+
   Lemma concretize_ub_fin_inf :
     forall uv_inf uv_fin ub_msg
       (REF : uvalue_refine_strict uv_inf uv_fin)
@@ -14111,12 +14337,288 @@ Qed.
 
       intros a H3; subst.
       eapply eval_iop_ub_fin_inf; eauto.
+    - (* UVALUE_ICmp *)
+      unfold_uvalue_refine_strict_in REF.
+      repeat break_match_hyp_inv.
+
+      repeat red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      repeat red in UB.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
+
+      repeat red in UB.
+      destruct UB as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H0.
+      { (* UB when concretizing first operand *)
+        eapply IHuv_inf1 in H; eauto.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      (* No UB on first operand. *)
+      destruct H1 as [[] | H1].
+      specialize (H1 x1).
+      forward H1; [cbn; auto|].
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      rewrite <- H1 in H3.
+      destruct_err_ub_oom x; inv H3.
+
+      { (* UB in second operand *)
+        eapply IHuv_inf2 in H0; eauto.
+        repeat red.
+        exists (ret (fin_to_inf_dvalue x1)).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+        eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+        split; eauto.
+        right.
+        intros a H3.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      (* UB in evaluating operation? *)
+      destruct H2 as [[] | H2].
+      specialize (H2 x3).
+      forward H2; [cbn; auto|].
+      rewrite <- H2 in H5.
+
+      remember (eval_icmp cmp x1 x3) as res.
+      destruct_err_ub_oom res; inv H5.
+
+      exists (ret (fin_to_inf_dvalue x1)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; cbn; eauto.
+      right.
+
+      intros a H3; subst.
+      exists (ret (fin_to_inf_dvalue x3)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; cbn; eauto.
+      right.
+
+      intros a H3; subst.
+      eapply eval_icmp_ub_fin_inf; eauto.
     - (* UVALUE_FBinop *)
-      admit.
+      unfold_uvalue_refine_strict_in REF.
+      repeat break_match_hyp_inv.
+
+      repeat red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      repeat red in UB.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
+
+      repeat red in UB.
+      destruct UB as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H0.
+      { (* UB when concretizing first operand *)
+        eapply IHuv_inf1 in H; eauto.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      (* No UB on first operand. *)
+      destruct H1 as [[] | H1].
+      specialize (H1 x1).
+      forward H1; [cbn; auto|].
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      rewrite <- H1 in H3.
+      destruct_err_ub_oom x; inv H3.
+
+      { (* UB in second operand *)
+        eapply IHuv_inf2 in H0; eauto.
+        repeat red.
+        exists (ret (fin_to_inf_dvalue x1)).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+        eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+        split; eauto.
+        right.
+        intros a H3.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      (* UB in evaluating operation? *)
+      destruct H2 as [[] | H2].
+      specialize (H2 x3).
+      forward H2; [cbn; auto|].
+      rewrite <- H2 in H5.
+
+      remember (eval_fop fop x1 x3) as res.
+      destruct_err_ub_oom res; inv H5.
+
+      exists (ret (fin_to_inf_dvalue x1)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; cbn; eauto.
+      right.
+
+      intros a H3; subst.
+      exists (ret (fin_to_inf_dvalue x3)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; cbn; eauto.
+      right.
+
+      intros a H3; subst.
+      eapply eval_fop_ub_fin_inf; eauto.
     - (* UVALUE_FCmp *)
-      admit.
+      unfold_uvalue_refine_strict_in REF.
+      repeat break_match_hyp_inv.
+
+      repeat red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      repeat red in UB.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
+
+      repeat red in UB.
+      destruct UB as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H0.
+      { (* UB when concretizing first operand *)
+        eapply IHuv_inf1 in H; eauto.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      (* No UB on first operand. *)
+      destruct H1 as [[] | H1].
+      specialize (H1 x1).
+      forward H1; [cbn; auto|].
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      rewrite <- H1 in H3.
+      destruct_err_ub_oom x; inv H3.
+
+      { (* UB in second operand *)
+        eapply IHuv_inf2 in H0; eauto.
+        repeat red.
+        exists (ret (fin_to_inf_dvalue x1)).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+        eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+        split; eauto.
+        right.
+        intros a H3.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      (* UB in evaluating operation? *)
+      destruct H2 as [[] | H2].
+      specialize (H2 x3).
+      forward H2; [cbn; auto|].
+      rewrite <- H2 in H5.
+
+      remember (eval_fcmp cmp x1 x3) as res.
+      destruct_err_ub_oom res; inv H5.
+
+      exists (ret (fin_to_inf_dvalue x1)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; cbn; eauto.
+      right.
+
+      intros a H3; subst.
+      exists (ret (fin_to_inf_dvalue x3)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; cbn; eauto.
+      right.
+
+      intros a H3; subst.
+      eapply eval_fcmp_ub_fin_inf; eauto.
     - (* UVALUE_Conversion *)
-      admit.
+      unfold_uvalue_refine_strict_in REF.
+      repeat break_match_hyp_inv.
+
+      repeat red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      repeat red in UB.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
+
+      repeat red in UB.
+      destruct UB as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H0.
+      { (* UB when concretizing uv *)
+        eapply IHuv_inf in H; eauto.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      (* No UB on concretizing uv. *)
+      destruct H1 as [[] | H1].
+      specialize (H1 x1).
+      forward H1; [cbn; auto|].
+
+      exists (ret (fin_to_inf_dvalue x1)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; cbn; eauto.
+      right.
+      intros a H0; subst.
+      break_match_hyp.
+
+      { (* Pure *)
+        cbn in H1.
+        rewrite <- H1 in H3; inv H3.
+      }
+
+      { (* ItoP *)
+        break_match_hyp;
+        cbn in H1;
+        rewrite <- H1 in H3; inv H3.
+      }
+
+      { (* PtoI *)
+        exfalso.
+        repeat break_match_hyp;
+        cbn in H1;
+          rewrite <- H1 in H3; inv H3.
+        repeat break_match_hyp_inv.
+        repeat break_match_hyp_inv.
+        unfold lift_OOM in Heqe.
+        repeat break_match_hyp_inv; inv Heqs.
+      }
+
+      { (* Illegal *)
+        rewrite <- H1 in H3; inv H3.
+      }
     - (* UVALUE_GetElementPtr *)
       admit.
     - (* UVALUE_ExtractElement *)
