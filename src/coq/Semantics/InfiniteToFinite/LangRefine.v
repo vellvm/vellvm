@@ -14620,7 +14620,123 @@ Qed.
         rewrite <- H1 in H3; inv H3.
       }
     - (* UVALUE_GetElementPtr *)
-      admit.
+      unfold_uvalue_refine_strict_in REF.
+      repeat break_match_hyp_inv.
+
+      repeat red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      repeat red in UB.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
+
+      repeat red in UB.
+      destruct UB as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H1.
+      { (* UB when concretizing base address *)
+        eapply IHuv_inf in H0; eauto.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      (* No UB on base address. *)
+      destruct H2 as [[] | H2].
+      specialize (H2 x1).
+      exists (ret (fin_to_inf_dvalue x1)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; cbn; eauto.
+      right.
+      intros a ?; subst.
+      repeat red.
+
+      forward H2; [cbn; auto|].
+      repeat red in H2.
+      destruct H2 as (?&?&?&?&?).
+      rewrite <- H2 in H4.
+      destruct_err_ub_oom x; inv H4.
+
+      { (* UB in concretization of indices *)
+        generalize dependent l.
+        induction idxs; intros l H1 Heqo0.
+        - inv Heqo0. cbn in H1. inv H1.
+        - forward IHidxs.
+          { intros idx H4 uv_fin ub_msg0 REF UB.
+            eapply H; eauto.
+            right; auto.
+          }
+          rewrite map_monad_unfold in Heqo0.
+          cbn in Heqo0.
+          repeat break_match_hyp_inv.
+          rewrite map_monad_unfold in H1.
+          cbn in H1.
+          repeat red in H1.
+          destruct H1 as (?&?&?&?&?).
+          destruct_err_ub_oom x; inv H4.
+          + (* UB in first index *)
+            exists (UB_unERR_UB_OOM ub_msg).
+            exists (fun _ => UB_unERR_UB_OOM ub_msg).
+            split.
+            * rewrite map_monad_unfold.
+              cbn.
+              exists (UB_unERR_UB_OOM ub_msg).
+              exists (fun _ => UB_unERR_UB_OOM ub_msg).
+              split.
+              eapply H; cbn; eauto.
+              split; cbn; eauto.
+            * split; cbn; eauto.
+          + (* No UB on first index *)
+            destruct H5 as [[] | H5].
+            specialize (H5 x4).
+            forward H5; [cbn; auto|].
+            repeat red in H5.
+            destruct H5 as (?&?&?&?&?).
+            rewrite <- H5 in H7.
+
+            rewrite map_monad_unfold.
+            exists (UB_unERR_UB_OOM ub_msg).
+            exists (fun _ => UB_unERR_UB_OOM ub_msg).
+            split; cbn; eauto.
+
+            exists (ret (fin_to_inf_dvalue x4)).
+            exists (fun _ => UB_unERR_UB_OOM ub_msg).
+            split; cbn; eauto.
+            eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+            split; cbn; eauto.
+            right.
+            intros a0 H8; subst.
+            destruct_err_ub_oom x; inv H7.
+            * (* UB in map *)
+              specialize (IHidxs l0 H4 eq_refl).
+              destruct IHidxs as (?&?&?&?&?).
+              destruct_err_ub_oom x; inv H8.
+              { exists (UB_unERR_UB_OOM ub_msg).
+                exists (fun _ => UB_unERR_UB_OOM ub_msg).
+                split; cbn; eauto.
+              }
+              destruct H9 as [[] | H9].
+              specialize (H9 x7).
+              forward H9; [cbn; auto|].
+              destruct (IS1.LLVM.MEM.MP.GEP.handle_gep t (fin_to_inf_dvalue x1) x7);
+                try rewrite <- H9 in H11; try inv H11.
+              destruct o;
+                rewrite <- H9 in H10; inv H10.
+            * destruct H6 as [[] | H6].
+              specialize (H6 x6).
+              forward H6; [cbn; auto|].
+              rewrite <- H6 in H9.
+              inv H9.
+      }
+
+      (* No UB when concretizing indices... *)
+      exfalso.
+      destruct H3 as [[] | H3].
+      specialize (H3 x3).
+      forward H3; [cbn; auto|].
+      repeat break_match_hyp;
+        rewrite <- H3 in H6; inv H6.
     - (* UVALUE_ExtractElement *)
       admit.
     - (* UVALUE_InsertElement *)
