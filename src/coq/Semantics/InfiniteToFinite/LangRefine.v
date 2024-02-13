@@ -10177,6 +10177,21 @@ Qed.
         reflexivity.
   Qed.
 
+  Lemma index_into_str_dv_loop_no_ub_fin_inf :
+    forall {elts i ub_msg},
+      (fix loop elts i : err_ub_oom dvalue :=
+         match elts with
+         | [] => raise_error "index_into_str_dv: index out of bounds"
+         | h :: tl =>
+             if (i =? 0)%Z then ret h else loop tl (i-1)%Z
+         end) elts i = UB_unERR_UB_OOM ub_msg -> False.
+  Proof.
+    induction elts;
+      intros i res LOOP; inv LOOP.
+    - break_match_hyp; inv H0.
+      eapply IHelts; eauto.
+  Qed.
+
   Lemma index_into_str_dv_fin_inf :
     forall {v idx} {res : err_ub_oom dvalue},
       index_into_str_dv v idx = res ->
@@ -10203,6 +10218,16 @@ Qed.
     - (* Array *)
       rewrite fin_to_inf_dvalue_array.
       apply index_into_str_dv_loop_fin_inf; auto.
+  Qed.
+
+  Lemma index_into_str_dv_no_ub_fin_inf :
+    forall {v idx ub_msg},
+      @index_into_str_dv err_ub_oom _ _ v idx = UB_unERR_UB_OOM ub_msg -> False.
+  Proof.
+    intros v idx ub_msg H.
+    unfold index_into_str_dv in *.
+    break_match_hyp; inv H;
+      eapply index_into_str_dv_loop_no_ub_fin_inf; eauto.
   Qed.
 
   Lemma extract_value_loop_fin_inf_succeeds :
@@ -14970,12 +14995,175 @@ Qed.
       symmetry in Heqres.
       eapply insert_into_vec_dv_no_ub_fin_inf in Heqres; contradiction.
     - (* UVALUE_ExtractValue *)
-      admit.
+      unfold_uvalue_refine_strict_in REF.
+      repeat break_match_hyp_inv.
+
+      repeat red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      repeat red in UB.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
+
+      repeat red in UB.
+      destruct UB as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H0.
+      { (* UB when concretizing first operand *)
+        eapply IHuv_inf in H; eauto.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      exists (ret (fin_to_inf_dvalue x1)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; eauto.
+      right.
+      intros a H0.
+      inv H0.
+
+      (* No UB on first operand. *)
+      destruct H1 as [[] | H1].
+      specialize (H1 x1).
+      forward H1; [cbn; auto|].
+      rewrite <- H1 in H3.
+      remember (((fix loop (str : dvalue) (idxs : list LLVMAst.int) {struct idxs} :
+                        err_ub_oom dvalue :=
+                      match idxs with
+                      | [] => ret str
+                      | i :: tl => v <- index_into_str_dv str i;; loop v tl
+                      end) x1 idxs)) as res.
+      destruct_err_ub_oom res; inv H3.
+      (* Here's should be a contradiction --- no way to get UB *)
+      clear - Heqres.
+      symmetry in Heqres.
+      exfalso.
+
+      generalize dependent x1.
+      induction idxs; intros x1 CONTRA.
+      + inv CONTRA.
+      + remember (index_into_str_dv x1 a) as init.
+        remember (fix loop (str : dvalue) (idxs : list LLVMAst.int) {struct idxs} : err_ub_oom dvalue :=
+                    match idxs with
+                    | [] => ret str
+                    | i :: tl => v0 <- index_into_str_dv str i;; loop v0 tl
+                    end) as loop.
+        clear Heqloop.
+
+        destruct_err_ub_oom init; try solve [inv CONTRA].
+        * (* UB in index_into_str_dv *)
+          eapply index_into_str_dv_no_ub_fin_inf; eauto.
+        * cbn in CONTRA.
+          remember (loop init0 idxs) as res.
+          destruct_err_ub_oom res; inv CONTRA.
+          eapply IHidxs; eauto.
     - (* UVALUE_InsertValue *)
       admit.
     - (* UVALUE_Select *)
       admit.
     - (* UVALUE_ConcatBytes *)
+      unfold_uvalue_refine_strict_in REF.
+      repeat break_match_hyp_inv.
+
+      repeat red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      repeat red in UB.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
+
+      erewrite map_monad_oom_length; eauto.
+      erewrite sizeof_dtyp_fin_inf; eauto.
+      erewrite all_extract_bytes_from_uvalue_fin_inf; eauto.
+      break_match_hyp.
+      2: {
+        
+      }
+      pose proof (map_monad_oom_length _ _ _ Heqo) as LEN.
+
+      repeat red in UB.
+      destruct UB as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H0.
+      { (* UB when concretizing first operand *)
+        eapply IHuv_inf1 in H; eauto.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      exists (ret (fin_to_inf_dvalue x1)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; eauto.
+      right.
+      intros a H0.
+      inv H0.
+
+      (* No UB on first operand. *)
+      destruct H1 as [[] | H1].
+      specialize (H1 x1).
+      forward H1; [cbn; auto|].
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      rewrite <- H1 in H3.
+      destruct_err_ub_oom x; inv H3.
+
+      { (* UB uv_inf3 *)
+        eapply IHuv_inf3 in H0; eauto.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      (* No UB on uv_inf3 *)
+      exists (ret (fin_to_inf_dvalue x3)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; eauto.
+      right.
+      intros a ?.
+      inv H3.
+
+      destruct H2 as [[] | H2].
+      specialize (H2 x3).
+      forward H2; [cbn; auto|].
+      repeat red in H2.
+      destruct H2 as (?&?&?&?&?).
+      rewrite <- H3 in H5.
+      destruct_err_ub_oom x; inv H5.
+
+      { (* UB in uv_inf2 *)
+        eapply IHuv_inf2 in H2; eauto.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      (* No UB on uv_inf2 *)
+      exists (ret (fin_to_inf_dvalue x5)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; eauto.
+      right.
+      intros a ?.
+      inv H5.
+
+      (* UB in evaluating... *)
+      destruct H4 as [[] | H4].
+      specialize (H4 x5).
+      forward H4; [cbn; auto|].
+      rewrite <- H4 in H7.
+      remember (insert_into_vec_dv t x1 x5 x3) as res.
+      destruct_err_ub_oom res; inv H7.
+      symmetry in Heqres.
+      eapply insert_into_vec_dv_no_ub_fin_inf in Heqres; contradiction.
       admit.
   Admitted.
 
