@@ -8673,7 +8673,7 @@ Qed.
            rest <- go dts0 rest_bytes;;
            @ret ErrOOMPoison
              (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-                (@Monad_OomableT Poisonable MonadPoisonable)) (list dvalue) 
+                (@Monad_OomableT Poisonable MonadPoisonable)) (list dvalue)
              (f :: rest)
        end) as res.
       destruct_err_oom_poison res; inv CONTRA; cbn; auto.
@@ -8764,7 +8764,7 @@ Qed.
            rest <- go dts0 rest_bytes;;
            @ret ErrOOMPoison
              (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-                (@Monad_OomableT Poisonable MonadPoisonable)) (list dvalue) 
+                (@Monad_OomableT Poisonable MonadPoisonable)) (list dvalue)
              (f :: rest)
        end) as res.
       destruct_err_oom_poison res; inv CONTRA; cbn; auto.
@@ -13565,7 +13565,7 @@ Qed.
         unfold vec_loop.
         rewrite IHZIP; reflexivity.
       }
-      
+
 
       clear IHZIP.
       remember (f_fin x y) as fin.
@@ -14416,7 +14416,7 @@ Qed.
       (UB: concretize_u uv_fin (UB_unERR_UB_OOM ub_msg)),
       IS1.LLVM.MEM.CP.CONC.concretize_u uv_inf (UB_unERR_UB_OOM ub_msg).
   Proof.
-    induction uv_inf;
+    induction uv_inf using DV1.uvalue_strong_ind;
       intros uv_fin ub_msg REF UB;
       try
         solve
@@ -14426,6 +14426,17 @@ Qed.
           repeat red in UB;
           rewrite CONC.concretize_uvalueM_equation in UB; inv UB
         ].
+
+    destruct uv_inf;
+      try
+        solve
+        [ unfold_uvalue_refine_strict;
+          try inv REF;
+          repeat break_match_hyp_inv;
+          repeat red in UB;
+          rewrite CONC.concretize_uvalueM_equation in UB; inv UB
+        ].
+
     - (* Structs *)
       unfold_uvalue_refine_strict_in REF.
       break_match_hyp_inv.
@@ -14449,7 +14460,10 @@ Qed.
           destruct H0 as (?&?&?&?&?).
           destruct_err_ub_oom x1; inv H2.
           { clear H3.
-            pose proof (H x (or_introl eq_refl) y ub_msg H1 H0).
+            pose proof (H x).
+            forward H2.
+            repeat constructor.
+            specialize (H2 y ub_msg H1 H0).
             rewrite map_monad_unfold.
             repeat red.
             exists (UB_unERR_UB_OOM ub_msg).
@@ -14503,6 +14517,18 @@ Qed.
           forward IHHeqo.
           intros u H5 uv_fin ub_msg0 REF UB.
           eapply H; try right; eauto.
+          { clear - H5.
+            dependent induction H5.
+            - inv H.
+              constructor.
+              constructor.
+              right; auto.
+            - specialize (IHclos_trans2 l eq_refl).
+              eapply t_trans.
+              apply H5_.
+              apply IHclos_trans2.
+          }
+
           forward IHHeqo; eauto.
           repeat red in IHHeqo.
           destruct IHHeqo as (?&?&?&?&?).
@@ -14545,7 +14571,11 @@ Qed.
           destruct H0 as (?&?&?&?&?).
           destruct_err_ub_oom x1; inv H2.
           { clear H3.
-            pose proof (H x (or_introl eq_refl) y ub_msg H1 H0).
+            pose proof (H x).
+            forward H2.
+            repeat constructor.
+            specialize (H2 y ub_msg H1 H0).
+
             rewrite map_monad_unfold.
             repeat red.
             exists (UB_unERR_UB_OOM ub_msg).
@@ -14599,6 +14629,18 @@ Qed.
           forward IHHeqo.
           intros u H5 uv_fin ub_msg0 REF UB.
           eapply H; try right; eauto.
+          { clear - H5.
+            dependent induction H5.
+            - inv H.
+              constructor.
+              constructor.
+              right; auto.
+            - specialize (IHclos_trans2 l eq_refl).
+              eapply t_trans.
+              apply H5_.
+              apply IHclos_trans2.
+          }
+
           forward IHHeqo; eauto.
           repeat red in IHHeqo.
           destruct IHHeqo as (?&?&?&?&?).
@@ -14641,7 +14683,10 @@ Qed.
           destruct H0 as (?&?&?&?&?).
           destruct_err_ub_oom x1; inv H2.
           { clear H3.
-            pose proof (H x (or_introl eq_refl) y ub_msg H1 H0).
+            pose proof (H x).
+            forward H2.
+            repeat constructor.
+            specialize (H2 y ub_msg H1 H0).
             rewrite map_monad_unfold.
             repeat red.
             exists (UB_unERR_UB_OOM ub_msg).
@@ -14695,6 +14740,17 @@ Qed.
           forward IHHeqo.
           intros u H5 uv_fin ub_msg0 REF UB.
           eapply H; try right; eauto.
+          { clear - H5.
+            dependent induction H5.
+            - inv H.
+              constructor.
+              constructor.
+              right; auto.
+            - specialize (IHclos_trans2 l eq_refl).
+              eapply t_trans.
+              apply H5_.
+              apply IHclos_trans2.
+          }
           forward IHHeqo; eauto.
           repeat red in IHHeqo.
           destruct IHHeqo as (?&?&?&?&?).
@@ -14737,7 +14793,10 @@ Qed.
           destruct H0 as (?&?&?&?&?).
           destruct_err_ub_oom x1; inv H2.
           { clear H3.
-            pose proof (H x (or_introl eq_refl) y ub_msg H1 H0).
+            pose proof (H x).
+            forward H2.
+            repeat constructor.
+            specialize (H2 y ub_msg H1 H0).
             rewrite map_monad_unfold.
             repeat red.
             exists (UB_unERR_UB_OOM ub_msg).
@@ -14791,6 +14850,17 @@ Qed.
           forward IHHeqo.
           intros u H5 uv_fin ub_msg0 REF UB.
           eapply H; try right; eauto.
+          { clear - H5.
+            dependent induction H5.
+            - inv H.
+              constructor.
+              constructor.
+              right; auto.
+            - specialize (IHclos_trans2 l eq_refl).
+              eapply t_trans.
+              apply H5_.
+              apply IHclos_trans2.
+          }
           forward IHHeqo; eauto.
           repeat red in IHHeqo.
           destruct IHHeqo as (?&?&?&?&?).
@@ -14811,6 +14881,7 @@ Qed.
       rewrite <- H2 in H4.
       cbn in H4. inv H4.
     - (* UVALUE_ICmp *)
+      rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
@@ -14824,11 +14895,12 @@ Qed.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
-        eapply IHuv_inf1 in H; eauto.
+        eapply IH in H; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* No UB on first operand. *)
@@ -14841,7 +14913,7 @@ Qed.
       destruct_err_ub_oom x; inv H3.
 
       { (* UB in second operand *)
-        eapply IHuv_inf2 in H0; eauto.
+        eapply IH in H0; eauto.
         repeat red.
         exists (ret (fin_to_inf_dvalue x1)).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -14854,6 +14926,7 @@ Qed.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* UB in evaluating operation? *)
@@ -14885,6 +14958,7 @@ Qed.
       intros a H3; subst.
       eapply eval_iop_ub_fin_inf; eauto.
     - (* UVALUE_ICmp *)
+      rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
@@ -14898,11 +14972,12 @@ Qed.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
-        eapply IHuv_inf1 in H; eauto.
+        eapply IH in H; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* No UB on first operand. *)
@@ -14915,7 +14990,7 @@ Qed.
       destruct_err_ub_oom x; inv H3.
 
       { (* UB in second operand *)
-        eapply IHuv_inf2 in H0; eauto.
+        eapply IH in H0; eauto.
         repeat red.
         exists (ret (fin_to_inf_dvalue x1)).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -14928,6 +15003,7 @@ Qed.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* UB in evaluating operation? *)
@@ -14959,6 +15035,7 @@ Qed.
       intros a H3; subst.
       eapply eval_icmp_ub_fin_inf; eauto.
     - (* UVALUE_FBinop *)
+      rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
@@ -14972,11 +15049,12 @@ Qed.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
-        eapply IHuv_inf1 in H; eauto.
+        eapply IH in H; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* No UB on first operand. *)
@@ -14989,7 +15067,7 @@ Qed.
       destruct_err_ub_oom x; inv H3.
 
       { (* UB in second operand *)
-        eapply IHuv_inf2 in H0; eauto.
+        eapply IH in H0; eauto.
         repeat red.
         exists (ret (fin_to_inf_dvalue x1)).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -15002,6 +15080,7 @@ Qed.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* UB in evaluating operation? *)
@@ -15033,6 +15112,7 @@ Qed.
       intros a H3; subst.
       eapply eval_fop_ub_fin_inf; eauto.
     - (* UVALUE_FCmp *)
+      rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
@@ -15046,11 +15126,12 @@ Qed.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
-        eapply IHuv_inf1 in H; eauto.
+        eapply IH in H; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* No UB on first operand. *)
@@ -15063,7 +15144,7 @@ Qed.
       destruct_err_ub_oom x; inv H3.
 
       { (* UB in second operand *)
-        eapply IHuv_inf2 in H0; eauto.
+        eapply IH in H0; eauto.
         repeat red.
         exists (ret (fin_to_inf_dvalue x1)).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -15076,6 +15157,7 @@ Qed.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* UB in evaluating operation? *)
@@ -15107,6 +15189,7 @@ Qed.
       intros a H3; subst.
       eapply eval_fcmp_ub_fin_inf; eauto.
     - (* UVALUE_Conversion *)
+      rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
@@ -15120,11 +15203,12 @@ Qed.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing uv *)
-        eapply IHuv_inf in H; eauto.
+        eapply IH in H; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* No UB on concretizing uv. *)
@@ -15167,6 +15251,7 @@ Qed.
         rewrite <- H1 in H3; inv H3.
       }
     - (* UVALUE_GetElementPtr *)
+      rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
@@ -15178,18 +15263,19 @@ Qed.
 
       repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; inv H1.
+      destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing base address *)
-        eapply IHuv_inf in H0; eauto.
+        eapply IH in H; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* No UB on base address. *)
-      destruct H2 as [[] | H2].
-      specialize (H2 x1).
+      destruct H1 as [[] | H1].
+      specialize (H1 x1).
       exists (ret (fin_to_inf_dvalue x1)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
       split; eauto.
@@ -15199,29 +15285,41 @@ Qed.
       intros a ?; subst.
       repeat red.
 
-      forward H2; [cbn; auto|].
-      repeat red in H2.
-      destruct H2 as (?&?&?&?&?).
-      rewrite <- H2 in H4.
-      destruct_err_ub_oom x; inv H4.
+      forward H1; [cbn; auto|].
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      rewrite <- H1 in H3.
+      destruct_err_ub_oom x; inv H3.
 
       { (* UB in concretization of indices *)
         generalize dependent l.
-        induction idxs; intros l H1 Heqo0.
-        - inv Heqo0. cbn in H1. inv H1.
+        induction idxs; intros l H3 Heqo0.
+        - inv Heqo0. cbn in H3. inv H3.
         - forward IHidxs.
           { intros idx H4 uv_fin ub_msg0 REF UB.
-            eapply H; eauto.
-            right; auto.
+            eapply IH; eauto.
+            { clear - H4.
+              dependent induction H4.
+              - inv H.
+                constructor.
+                constructor.
+                constructor.
+                constructor.
+                right; auto.
+              - specialize (IHclos_trans2 _ _ _ eq_refl).
+                eapply t_trans.
+                apply H4_.
+                apply IHclos_trans2.
+            }
           }
           rewrite map_monad_unfold in Heqo0.
           cbn in Heqo0.
           repeat break_match_hyp_inv.
-          rewrite map_monad_unfold in H1.
-          cbn in H1.
-          repeat red in H1.
-          destruct H1 as (?&?&?&?&?).
-          destruct_err_ub_oom x; inv H4.
+          rewrite map_monad_unfold in H3.
+          cbn in H3.
+          repeat red in H3.
+          destruct H3 as (?&?&?&?&?).
+          destruct_err_ub_oom x; inv H3.
           + (* UB in first index *)
             exists (UB_unERR_UB_OOM ub_msg).
             exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -15231,16 +15329,17 @@ Qed.
               exists (UB_unERR_UB_OOM ub_msg).
               exists (fun _ => UB_unERR_UB_OOM ub_msg).
               split.
-              eapply H; cbn; eauto.
+              eapply IH; cbn; eauto.
+              repeat constructor.
               split; cbn; eauto.
             * split; cbn; eauto.
           + (* No UB on first index *)
-            destruct H5 as [[] | H5].
-            specialize (H5 x4).
-            forward H5; [cbn; auto|].
-            repeat red in H5.
-            destruct H5 as (?&?&?&?&?).
-            rewrite <- H5 in H7.
+            destruct H4 as [[] | H4].
+            specialize (H4 x4).
+            forward H4; [cbn; auto|].
+            repeat red in H4.
+            destruct H4 as (?&?&?&?&?).
+            rewrite <- H4 in H6.
 
             rewrite map_monad_unfold.
             exists (UB_unERR_UB_OOM ub_msg).
@@ -15254,37 +15353,38 @@ Qed.
             split; cbn; eauto.
             right.
             intros a0 H8; subst.
-            destruct_err_ub_oom x; inv H7.
+            destruct_err_ub_oom x; inv H6.
             * (* UB in map *)
-              specialize (IHidxs l0 H4 eq_refl).
+              specialize (IHidxs l0 H3 eq_refl).
               destruct IHidxs as (?&?&?&?&?).
-              destruct_err_ub_oom x; inv H8.
+              destruct_err_ub_oom x; inv H7.
               { exists (UB_unERR_UB_OOM ub_msg).
                 exists (fun _ => UB_unERR_UB_OOM ub_msg).
                 split; cbn; eauto.
               }
-              destruct H9 as [[] | H9].
-              specialize (H9 x7).
-              forward H9; [cbn; auto|].
+              destruct H8 as [[] | H8].
+              specialize (H8 x7).
+              forward H8; [cbn; auto|].
               destruct (IS1.LLVM.MEM.MP.GEP.handle_gep t (fin_to_inf_dvalue x1) x7);
-                try rewrite <- H9 in H11; try inv H11.
+                try rewrite <- H8 in H10; try inv H10.
               destruct o;
-                rewrite <- H9 in H10; inv H10.
-            * destruct H6 as [[] | H6].
-              specialize (H6 x6).
-              forward H6; [cbn; auto|].
-              rewrite <- H6 in H9.
-              inv H9.
+                rewrite <- H8 in H9; inv H9.
+            * destruct H5 as [[] | H5].
+              specialize (H5 x6).
+              forward H5; [cbn; auto|].
+              rewrite <- H5 in H8.
+              inv H8.
       }
 
       (* No UB when concretizing indices... *)
       exfalso.
-      destruct H3 as [[] | H3].
-      specialize (H3 x3).
-      forward H3; [cbn; auto|].
+      destruct H2 as [[] | H2].
+      specialize (H2 x3).
+      forward H2; [cbn; auto|].
       repeat break_match_hyp;
-        rewrite <- H3 in H6; inv H6.
+        rewrite <- H2 in H5; inv H5.
     - (* UVALUE_ExtractElement *)
+      rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
@@ -15298,11 +15398,12 @@ Qed.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
-        eapply IHuv_inf1 in H; eauto.
+        eapply IH in H; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* No UB on first operand. *)
@@ -15315,7 +15416,7 @@ Qed.
       destruct_err_ub_oom x; inv H3.
 
       { (* UB in second operand *)
-        eapply IHuv_inf2 in H0; eauto.
+        eapply IH in H0; eauto.
         repeat red.
         exists (ret (fin_to_inf_dvalue x1)).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -15328,6 +15429,7 @@ Qed.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* UB in evaluating operation? *)
@@ -15337,17 +15439,18 @@ Qed.
       repeat red in H2.
       destruct H2 as (?&?&?&?&?).
       rewrite <- H3 in H5.
-      destruct t; inv H2; inv H5.
+      destruct vec_typ; inv H2; inv H5.
 
       destruct H4 as [[] | H4].
-      specialize (H4 t).
+      specialize (H4 vec_typ).
       forward H4; [cbn; auto|].
-      remember (index_into_vec_dv t x1 x3) as res.
+      remember (index_into_vec_dv vec_typ x1 x3) as res.
       rewrite <- H4 in H6.
       destruct_err_ub_oom res; inv H6.
       symmetry in Heqres.
       eapply index_into_vec_dv_no_ub in Heqres; contradiction.
     - (* UVALUE_InsertElement *)
+      rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
@@ -15361,11 +15464,12 @@ Qed.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
-        eapply IHuv_inf1 in H; eauto.
+        eapply IH in H; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       exists (ret (fin_to_inf_dvalue x1)).
@@ -15387,11 +15491,12 @@ Qed.
       destruct_err_ub_oom x; inv H3.
 
       { (* UB uv_inf3 *)
-        eapply IHuv_inf3 in H0; eauto.
+        eapply IH in H0; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* No UB on uv_inf3 *)
@@ -15413,11 +15518,12 @@ Qed.
       destruct_err_ub_oom x; inv H5.
 
       { (* UB in uv_inf2 *)
-        eapply IHuv_inf2 in H2; eauto.
+        eapply IH in H2; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* No UB on uv_inf2 *)
@@ -15435,11 +15541,12 @@ Qed.
       specialize (H4 x5).
       forward H4; [cbn; auto|].
       rewrite <- H4 in H7.
-      remember (insert_into_vec_dv t x1 x5 x3) as res.
+      remember (insert_into_vec_dv vec_typ x1 x5 x3) as res.
       destruct_err_ub_oom res; inv H7.
       symmetry in Heqres.
       eapply insert_into_vec_dv_no_ub_fin_inf in Heqres; contradiction.
     - (* UVALUE_ExtractValue *)
+      rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
@@ -15453,11 +15560,12 @@ Qed.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
-        eapply IHuv_inf in H; eauto.
+        eapply IH in H; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       exists (ret (fin_to_inf_dvalue x1)).
@@ -15505,6 +15613,7 @@ Qed.
           destruct_err_ub_oom res; inv CONTRA.
           eapply IHidxs; eauto.
     - (* UVALUE_InsertValue *)
+      rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
@@ -15518,11 +15627,12 @@ Qed.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
-        eapply IHuv_inf1 in H; eauto.
+        eapply IH in H; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* No UB on first operand. *)
@@ -15544,11 +15654,12 @@ Qed.
       destruct_err_ub_oom x; inv H3.
 
       { (* UB in second operand *)
-        eapply IHuv_inf2 in H0; eauto.
+        eapply IH in H0; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       (* No UB on second operand. *)
@@ -15576,6 +15687,7 @@ Qed.
       destruct_err_ub_oom res; inv H5.
       reflexivity.
     - (* UVALUE_Select *)
+      rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
@@ -15589,11 +15701,12 @@ Qed.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
-        eapply IHuv_inf1 in H; eauto.
+        eapply IH in H; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
+        repeat constructor.
       }
 
       exists (ret (fin_to_inf_dvalue x1)).
@@ -15610,9 +15723,18 @@ Qed.
       specialize (H1 x1).
       forward H1; [cbn; auto|].
       eapply eval_select_ub_fin_inf; eauto.
+      { intros ? ?.
+        eapply IH; eauto.
+        repeat constructor.
+      }
+      { intros ? ?.
+        eapply IH; eauto.
+        repeat constructor.
+      }
       remember (x0 x1) as res.
       destruct_err_ub_oom res; inv H3; eauto.
     - (* UVALUE_ConcatBytes *)
+      rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
@@ -15627,94 +15749,63 @@ Qed.
       erewrite all_extract_bytes_from_uvalue_fin_inf; eauto.
       break_match_hyp.
       2: {
-        
+        eapply extractbytes_to_dvalue_ub_fin_inf; eauto.
+        intros u H0 uv_fin H1 ub_msg0 H2.
+        eapply IH; eauto.
+        eapply DV1.uvalue_concat_bytes_strict_subterm; eauto.
       }
       pose proof (map_monad_oom_length _ _ _ Heqo) as LEN.
 
-      repeat red in UB.
-      destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; inv H0.
+      break_match_hyp.
       { (* UB when concretizing first operand *)
-        eapply IHuv_inf1 in H; eauto.
-        repeat red.
-        exists (UB_unERR_UB_OOM ub_msg).
-        exists (fun _ => UB_unERR_UB_OOM ub_msg).
-        split; cbn; eauto.
+        destruct uvs.
+        { inv Heqo.
+          cbn in Heqo0; inv Heqo0.
+        }
+        rewrite map_monad_unfold in Heqo.
+        cbn in Heqo.
+        repeat break_match_hyp_inv.
+        destruct u1; inv Heqo0.
+        repeat break_match_hyp_inv.
+        unfold OptionUtil.guard_opt in *.
+        repeat break_match_hyp_inv.
+        apply dtyp_eqb_eq in Heqb4; subst.
+        rewrite H1; cbn.
+        eapply IH; eauto.
+        2: eapply fin_to_inf_uvalue_refine_strict.
+        eapply IS1.MEM.ByteM.all_extract_bytes_from_uvalue_helper_strict_subterm.
+        2: {
+          erewrite all_extract_bytes_from_uvalue_helper_fin_inf.
+          2: eapply fin_to_inf_uvalue_refine_strict.
+          2: {
+            rewrite map_monad_unfold.
+            cbn.
+            rewrite Heqo1.
+            rewrite Heqo.
+            reflexivity.
+          }
+          cbn.
+          rewrite Heqb3, Heqb2, Heqb1, Heqb0.
+          cbn.
+          rewrite H1.
+          reflexivity.
+        }
+
+        assert (uvalue_refine_strict u0 (DV2.UVALUE_ExtractByte u1 dt0 idx sid)) as REF.
+        apply Heqo1.
+        uvalue_refine_strict_inv REF.
+        erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+        eapply t_trans with (y:=(DV1.UVALUE_ExtractByte x dt0 idx sid)).
+        repeat constructor.
+        repeat constructor.
       }
 
-      exists (ret (fin_to_inf_dvalue x1)).
-      exists (fun _ => UB_unERR_UB_OOM ub_msg).
-      split; eauto.
-      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
-      split; eauto.
-      right.
-      intros a H0.
-      inv H0.
-
-      (* No UB on first operand. *)
-      destruct H1 as [[] | H1].
-      specialize (H1 x1).
-      forward H1; [cbn; auto|].
-      repeat red in H1.
-      destruct H1 as (?&?&?&?&?).
-      rewrite <- H1 in H3.
-      destruct_err_ub_oom x; inv H3.
-
-      { (* UB uv_inf3 *)
-        eapply IHuv_inf3 in H0; eauto.
-        repeat red.
-        exists (UB_unERR_UB_OOM ub_msg).
-        exists (fun _ => UB_unERR_UB_OOM ub_msg).
-        split; cbn; eauto.
-      }
-
-      (* No UB on uv_inf3 *)
-      exists (ret (fin_to_inf_dvalue x3)).
-      exists (fun _ => UB_unERR_UB_OOM ub_msg).
-      split; eauto.
-      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
-      split; eauto.
-      right.
-      intros a ?.
-      inv H3.
-
-      destruct H2 as [[] | H2].
-      specialize (H2 x3).
-      forward H2; [cbn; auto|].
-      repeat red in H2.
-      destruct H2 as (?&?&?&?&?).
-      rewrite <- H3 in H5.
-      destruct_err_ub_oom x; inv H5.
-
-      { (* UB in uv_inf2 *)
-        eapply IHuv_inf2 in H2; eauto.
-        repeat red.
-        exists (UB_unERR_UB_OOM ub_msg).
-        exists (fun _ => UB_unERR_UB_OOM ub_msg).
-        split; cbn; eauto.
-      }
-
-      (* No UB on uv_inf2 *)
-      exists (ret (fin_to_inf_dvalue x5)).
-      exists (fun _ => UB_unERR_UB_OOM ub_msg).
-      split; eauto.
-      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
-      split; eauto.
-      right.
-      intros a ?.
-      inv H5.
-
-      (* UB in evaluating... *)
-      destruct H4 as [[] | H4].
-      specialize (H4 x5).
-      forward H4; [cbn; auto|].
-      rewrite <- H4 in H7.
-      remember (insert_into_vec_dv t x1 x5 x3) as res.
-      destruct_err_ub_oom res; inv H7.
-      symmetry in Heqres.
-      eapply insert_into_vec_dv_no_ub_fin_inf in Heqres; contradiction.
-      admit.
-  Admitted.
+      cbn.
+      eapply extractbytes_to_dvalue_ub_fin_inf; eauto.
+      intros u H uv_fin H0 ub_msg0 H1.
+      eapply IH; eauto.
+      eapply DV1.uvalue_concat_bytes_strict_subterm; eauto.
+  Qed.
 
   Lemma concretize_no_ub_inf_fin :
     forall uv_inf uv_fin
