@@ -13965,6 +13965,163 @@ Qed.
     repeat break_match_hyp_inv.
   Qed.
 
+  Lemma eval_select_ub_fin_inf :
+    forall cond uv1_fin uv2_fin uv1_inf uv2_inf ub_msg
+      (IH1 : forall ub_msg,
+          IS2.MEM.CP.CONC.concretize_u uv1_fin (UB_unERR_UB_OOM ub_msg) ->
+          IS1.MEM.CP.CONC.concretize_u uv1_inf (UB_unERR_UB_OOM ub_msg))
+      (IH2 : forall ub_msg,
+          IS2.MEM.CP.CONC.concretize_u uv2_fin (UB_unERR_UB_OOM ub_msg) ->
+          IS1.MEM.CP.CONC.concretize_u uv2_inf (UB_unERR_UB_OOM ub_msg)),
+      uvalue_refine_strict uv1_inf uv1_fin ->
+      uvalue_refine_strict uv2_inf uv2_fin ->
+      @eval_select ErrUbOomProp Monad_ErrUbOomProp
+        (fun (dt : dtyp) (edv : err_ub_oom dvalue) =>
+           match unERR_UB_OOM edv with
+           | {|
+               EitherMonad.unEitherT :=
+                 {|
+                   EitherMonad.unEitherT :=
+                     {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
+                 |}
+             |} => dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
+           | _ => False
+           end) err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (fun (A : Type) (x ue : err_ub_oom A) => x = ue) cond uv1_fin uv2_fin (UB_unERR_UB_OOM ub_msg) ->
+      @IS1.MEM.CP.CONC.eval_select ErrUbOomProp Monad_ErrUbOomProp
+        (fun (dt : dtyp) (edv : err_ub_oom DVCrev.DV2.dvalue) =>
+           match unERR_UB_OOM edv with
+           | {|
+               EitherMonad.unEitherT :=
+                 {|
+                   EitherMonad.unEitherT :=
+                     {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
+                 |}
+             |} => E1.DV.dvalue_has_dtyp dv dt /\ dv <> E1.DV.DVALUE_Poison dt
+           | _ => False
+           end) err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        (fun (A : Type) (x ue : err_ub_oom A) => x = ue) (fin_to_inf_dvalue cond) uv1_inf uv2_inf (UB_unERR_UB_OOM ub_msg).
+  Proof.
+    intros cond uv1_fin uv2_fin uv1_inf uv2_inf ub_msg IH1 IH2 REF1 REF2 EVAL.
+    destruct cond.
+    { unfold fin_to_inf_dvalue at 1.
+      break_match_goal; clear Heqs; destruct p; clear e0;
+      cbn in e; break_match_hyp_inv;
+        cbn in *; subst; cbn in *; auto; inv EVAL.
+    }
+
+    { (* i1 conditional *)
+      rewrite eval_select_equation in *.
+      rewrite IS1.MEM.CP.CONC.eval_select_equation.
+      rewrite fin_to_inf_dvalue_i1.
+
+      break_match.
+      - eapply IH1; eauto.
+      - eapply IH2; eauto.
+    }
+
+    14: { (* Vector conditional *)
+      rewrite eval_select_equation in *.
+      rewrite IS1.MEM.CP.CONC.eval_select_equation.
+
+      rewrite_fin_to_inf_dvalue.
+      repeat red.
+
+      repeat red in EVAL.
+      destruct EVAL as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H0.
+      { clear H1.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+        eapply IH1; eauto.
+      }
+
+      exists (ret (fin_to_inf_dvalue x1)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; cbn; eauto.
+      right.
+      intros a ?; subst.
+      repeat red.
+
+      destruct H1 as [[] | H1].
+      specialize (H1 _ eq_refl).
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      rewrite <- H1 in H3.
+      destruct_err_ub_oom x; inv H3.
+
+      { clear H2.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+        eapply IH2; eauto.
+      }
+
+      exists (ret (fin_to_inf_dvalue x3)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; cbn; eauto.
+      right.
+      intros a ?; subst.
+
+      destruct H2 as [[] | H2].
+      specialize (H2 _ eq_refl).
+
+      destruct x1;
+        try (rewrite <- H2 in H5; inv H5).
+
+      destruct x3;
+        try (rewrite <- H2 in H5; inv H5).
+      rewrite_fin_to_inf_dvalue.
+
+      repeat red in H2.
+      repeat red.
+
+      destruct H2 as (?&?&?&?&?).
+      rewrite <- H3 in H5.
+      destruct_err_ub_oom x; inv H5.
+      { exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+        pose proof eval_select_loop_fin_inf elts elts0 elts1 (UB_unERR_UB_OOM ub_msg) as LOOP.
+        specialize (LOOP H2).
+        auto.
+      }
+
+      destruct H4 as [[] | H4].
+      specialize (H4 _ eq_refl).
+      cbn in H4.
+      rewrite <- H4 in H7; inv H7.
+    }
+
+    all: try solve
+           [ unfold fin_to_inf_dvalue at 1;
+             break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e;
+             cbn in *; subst; cbn in *; inv EVAL; auto
+           | unfold fin_to_inf_dvalue at 1;
+             break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e;
+             cbn in *; subst; cbn in *; reflexivity
+           | unfold fin_to_inf_dvalue at 1;
+             break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; break_match_hyp_inv;
+             cbn in *; subst; cbn in *; auto; inv EVAL
+           ].
+  Qed.
+
   Lemma concretize_ub_fin_inf :
     forall uv_inf uv_fin ub_msg
       (REF : uvalue_refine_strict uv_inf uv_fin)
@@ -15131,6 +15288,98 @@ Qed.
       destruct_err_ub_oom res; inv H5.
       reflexivity.
     - (* UVALUE_Select *)
+      unfold_uvalue_refine_strict_in REF.
+      repeat break_match_hyp_inv.
+
+      repeat red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      repeat red in UB.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
+
+      repeat red in UB.
+      destruct UB as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H0.
+      { (* UB when concretizing first operand *)
+        eapply IHuv_inf1 in H; eauto.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      exists (ret (fin_to_inf_dvalue x1)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; eauto.
+      right.
+      intros a H0.
+      inv H0.
+
+      (* No UB on first operand. *)
+      destruct H1 as [[] | H1].
+      specialize (H1 x1).
+      forward H1; [cbn; auto|].
+      eapply eval_select_fin_inf in H1.
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      rewrite <- H1 in H3.
+      destruct_err_ub_oom x; inv H3.
+
+      { (* UB uv_inf3 *)
+        eapply IHuv_inf3 in H0; eauto.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      (* No UB on uv_inf3 *)
+      exists (ret (fin_to_inf_dvalue x3)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; eauto.
+      right.
+      intros a ?.
+      inv H3.
+
+      destruct H2 as [[] | H2].
+      specialize (H2 x3).
+      forward H2; [cbn; auto|].
+      repeat red in H2.
+      destruct H2 as (?&?&?&?&?).
+      rewrite <- H3 in H5.
+      destruct_err_ub_oom x; inv H5.
+
+      { (* UB in uv_inf2 *)
+        eapply IHuv_inf2 in H2; eauto.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+      }
+
+      (* No UB on uv_inf2 *)
+      exists (ret (fin_to_inf_dvalue x5)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; eauto.
+      right.
+      intros a ?.
+      inv H5.
+
+      (* UB in evaluating... *)
+      destruct H4 as [[] | H4].
+      specialize (H4 x5).
+      forward H4; [cbn; auto|].
+      rewrite <- H4 in H7.
+      remember (insert_into_vec_dv t x1 x5 x3) as res.
+      destruct_err_ub_oom res; inv H7.
+      symmetry in Heqres.
+      eapply insert_into_vec_dv_no_ub_fin_inf in Heqres; contradiction.
       admit.
     - (* UVALUE_ConcatBytes *)
       unfold_uvalue_refine_strict_in REF.
