@@ -14291,6 +14291,44 @@ Qed.
     eapply concretization_map_refine_empty.
   Qed.
 
+  Lemma dvalue_bytes_to_dvalue_ub_fin_inf :
+    forall τ dvbs_inf dvbs_fin ub_msg,
+      dvalue_bytes_refine dvbs_inf dvbs_fin ->
+      @ErrOOMPoison_handle_poison_and_oom (err_ub_oom_T IdentityMonad.ident)
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident) dvalue
+        DVALUE_Poison (DVALUE_BYTES.dvalue_bytes_to_dvalue dvbs_fin τ) = UB_unERR_UB_OOM ub_msg ->
+      @ErrOOMPoison_handle_poison_and_oom (err_ub_oom_T IdentityMonad.ident)
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        IS1.LP.Events.DV.dvalue IS1.LP.Events.DV.DVALUE_Poison (IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_bytes_to_dvalue dvbs_inf τ) = UB_unERR_UB_OOM ub_msg.
+  Proof.
+    intros τ dvbs_inf dvbs_fin ub_msg H H0.
+    remember (@DVALUE_BYTES.dvalue_bytes_to_dvalue ErrOOMPoison
+            (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+               (@Monad_OomableT Poisonable MonadPoisonable))
+            (@RAISE_ERROR_MonadExc ErrOOMPoison
+               (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+                  (@Monad_OomableT Poisonable MonadPoisonable)))
+            (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+               (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                  (@Monad_OomableT Poisonable MonadPoisonable))
+               (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
+                  RAISE_POISON_Poisonable))
+            (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
+               (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                  (@Monad_OomableT Poisonable MonadPoisonable))
+               (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) dvbs_fin τ).
+    destruct e.
+    destruct unEitherT.
+    destruct unMkOomableT; inv H0.
+    destruct o; inv H2.
+    destruct s; inv H1.
+    destruct e; inv H2.
+  Qed.
+
   Lemma extractbytes_to_dvalue_ub_fin_inf :
     forall uvs l ub_msg dt
       (Heqo : map_monad uvalue_convert_strict uvs = NoOom l)
@@ -14344,9 +14382,10 @@ Qed.
     { exists (UB_unERR_UB_OOM ub_msg).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
       split; cbn; eauto.
-      eapply IH.
-
+      eapply concretize_uvalue_bytes_ub_fin_inf; eauto.
+      eapply map_monad_oom_Forall2; eauto.
     }
+
     destruct H1 as [[] | H1].
     specialize (H1 x1).
     forward H1; [cbn; auto|].
@@ -14354,16 +14393,20 @@ Qed.
     destruct_err_ub_oom x0x1; inv H3.
 
     eapply concretize_uvalue_bytes_fin_inf in H; eauto.
-    2: eapply map_monad_oom_Forall2; eauto.
+    3: eapply map_monad_oom_Forall2; eauto.
+    2: {
+      intros u H0 uv_fin H2 dv_fin H3.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+    }
 
     exists (ret (fin_to_inf_dvalue_bytes x1)).
-    exists (fun _ => ret (fin_to_inf_dvalue dv_fin)).
+    exists (fun _ => UB_unERR_UB_OOM ub_msg).
     split; eauto.
     split; eauto.
     right.
     intros a RETa.
     inv RETa.
-    eapply dvalue_bytes_to_dvalue_fin_inf; eauto.
+    eapply dvalue_bytes_to_dvalue_ub_fin_inf; eauto.
     apply dvalue_bytes_refine_fin_to_inf_dvalue_bytes.
   Qed.
 
