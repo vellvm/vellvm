@@ -17328,6 +17328,98 @@ Qed.
     eauto.
   Qed.
 
+  Lemma index_into_vec_dv_err_fin_inf:
+    forall (t : dtyp) (vec idx : dvalue) err_msg,
+      index_into_vec_dv t vec idx = ERR_unERR_UB_OOM err_msg ->
+      IS1.LP.Events.DV.index_into_vec_dv t (fin_to_inf_dvalue vec) (fin_to_inf_dvalue idx) = ERR_unERR_UB_OOM err_msg.
+  Proof.
+    intros t vec idx err_msg INDEX.
+    unfold index_into_vec_dv in INDEX.
+    unfold IS1.LP.Events.DV.index_into_vec_dv.
+
+    break_match_hyp_inv; rewrite_fin_to_inf_dvalue; auto.
+    { (* Arrays *)
+      break_match_hyp_inv; rewrite_fin_to_inf_dvalue; auto.
+      { (* i32 index *)
+        cbn in *.
+        break_match_hyp_inv; auto.
+        - remember (0%Z) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + rewrite Z.eqb_refl in H0. inv H0.
+        - remember (Z.pos p) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + cbn.
+            break_match_hyp_inv.
+            rewrite IHelts; eauto.
+      }
+
+      { (* i64 index *)
+        cbn in *.
+        break_match_hyp_inv; auto.
+        - remember (0%Z) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + rewrite Z.eqb_refl in H0. inv H0.
+        - remember (Z.pos p) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + cbn.
+            break_match_hyp_inv.
+            rewrite IHelts; eauto.
+      }
+    }
+
+    { (* Vectors *)
+      break_match_hyp_inv; rewrite_fin_to_inf_dvalue; auto.
+      { (* i32 index *)
+        cbn in *.
+        break_match_hyp_inv; auto.
+        - remember (0%Z) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + rewrite Z.eqb_refl in H0. inv H0.
+        - remember (Z.pos p) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + cbn.
+            break_match_hyp_inv.
+            rewrite IHelts; eauto.
+      }
+
+      { (* i64 index *)
+        cbn in *.
+        break_match_hyp_inv; auto.
+        - remember (0%Z) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + rewrite Z.eqb_refl in H0. inv H0.
+        - remember (Z.pos p) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + cbn.
+            break_match_hyp_inv.
+            rewrite IHelts; eauto.
+      }
+    }
+  Qed.
   Lemma concretize_err_fin_inf :
     forall uv_inf uv_fin err_msg
       (REF : uvalue_refine_strict uv_inf uv_fin)
@@ -18415,6 +18507,15 @@ Qed.
         repeat constructor.
       }
 
+      exists (ret (fin_to_inf_dvalue x1)).
+      exists (fun _ => ERR_unERR_UB_OOM err_msg).
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; eauto.
+      right.
+      intros a ?; subst.
+      repeat red.
+
       (* No ERR on first operand. *)
       destruct H1 as [[] | H1].
       specialize (H1 x1).
@@ -18426,20 +18527,20 @@ Qed.
 
       { (* ERR in second operand *)
         eapply IH in H0; eauto.
-        repeat red.
-        exists (ret (fin_to_inf_dvalue x1)).
-        exists (fun _ => ERR_unERR_UB_OOM err_msg).
-        split; cbn; eauto.
-        eapply uvalue_concretize_strict_concretize_inclusion; eauto.
-        split; eauto.
-        right.
-        intros a H3.
-        repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
         split; cbn; eauto.
         repeat constructor.
       }
+
+      exists (ret (fin_to_inf_dvalue x3)).
+      exists (fun _ => ERR_unERR_UB_OOM err_msg).
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; eauto.
+      right.
+      intros a ?; subst.
+      repeat red.
 
       (* ERR in evaluating operation? *)
       destruct H2 as [[] | H2].
@@ -18448,16 +18549,29 @@ Qed.
       repeat red in H2.
       destruct H2 as (?&?&?&?&?).
       rewrite <- H3 in H5.
-      destruct vec_typ; inv H2; inv H5.
+      destruct_err_ub_oom x; inv H5.
+      { (* non-vector type... *)
+        exists (ERR_unERR_UB_OOM err_msg).
+        exists (fun _ => ERR_unERR_UB_OOM err_msg).
+        split; cbn; eauto.
+      }
+
+      exists (ret x5).
+      exists (fun _ => ERR_unERR_UB_OOM err_msg).
+      split; cbn; eauto.
+      split; eauto.
+      right.
+      intros ? ?; subst. 
 
       destruct H4 as [[] | H4].
-      specialize (H4 vec_typ).
+      specialize (H4 a).
       forward H4; [cbn; auto|].
-      remember (index_into_vec_dv vec_typ x1 x3) as res.
-      rewrite <- H4 in H6.
-      destruct_err_ub_oom res; inv H6.
+      cbn in H3.
+      remember (index_into_vec_dv a x1 x3) as res.
+      rewrite <- H4 in H7.
+      destruct_err_ub_oom res; inv H7.
       symmetry in Heqres.
-      eapply index_into_vec_dv_no_ub in Heqres; contradiction.
+      eapply index_into_vec_dv_err_fin_inf in Heqres; eauto.
     - (* UVALUE_InsertElement *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
