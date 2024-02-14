@@ -17420,6 +17420,105 @@ Qed.
       }
     }
   Qed.
+
+  Lemma insert_into_vec_dv_err_fin_inf :
+    forall dv1_fin dv2_fin dv3_fin msg dv1_inf dv2_inf dv3_inf t,
+      @insert_into_vec_dv err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        t dv1_fin dv2_fin dv3_fin = ERR_unERR_UB_OOM msg ->
+      fin_to_inf_dvalue dv1_fin = dv1_inf ->
+      fin_to_inf_dvalue dv2_fin = dv2_inf ->
+      fin_to_inf_dvalue dv3_fin = dv3_inf ->
+      @IS1.LP.Events.DV.insert_into_vec_dv err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        t dv1_inf dv2_inf dv3_inf = ERR_unERR_UB_OOM msg.
+  Proof.
+    intros dv1_fin dv2_fin dv3_fin msg dv1_inf dv2_inf dv3_inf t INSERT LIFT1 LIFT2 LIFT3.
+    subst.
+    unfold insert_into_vec_dv in INSERT.
+    unfold IS1.LP.Events.DV.insert_into_vec_dv.
+
+    break_match_hyp_inv; rewrite_fin_to_inf_dvalue; auto.
+    { (* Arrays *)
+      break_match_hyp_inv; rewrite_fin_to_inf_dvalue; auto; cbn.
+      { (* i32 index *)
+        cbn in *.
+        break_match_hyp_inv; auto.
+        - remember (0%Z) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + rewrite Z.eqb_refl in H0. inv H0.
+        - remember (Z.pos p) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + cbn.
+            break_match_hyp_inv.
+      }
+
+      { (* i64 index *)
+        cbn in *.
+        break_match_hyp_inv; auto.
+        - remember (0%Z) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + rewrite Z.eqb_refl in H0. inv H0.
+        - remember (Z.pos p) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + cbn.
+            break_match_hyp_inv.
+      }
+    }
+
+    { (* Vectors *)
+      break_match_hyp_inv; rewrite_fin_to_inf_dvalue; auto; cbn.
+      { (* i32 index *)
+        cbn in *.
+        break_match_hyp_inv; auto.
+        - remember (0%Z) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + rewrite Z.eqb_refl in H0. inv H0.
+        - remember (Z.pos p) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + cbn.
+            break_match_hyp_inv.
+      }
+
+      { (* i64 index *)
+        cbn in *.
+        break_match_hyp_inv; auto.
+        - remember (0%Z) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + rewrite Z.eqb_refl in H0. inv H0.
+        - remember (Z.pos p) as n.
+          clear Heqn Heqz.
+          generalize dependent n.
+          induction elts; intros n H0.
+          + inv H0.
+          + cbn.
+            break_match_hyp_inv.
+      }
+    }
+  Qed.
+
   Lemma concretize_err_fin_inf :
     forall uv_inf uv_fin err_msg
       (REF : uvalue_refine_strict uv_inf uv_fin)
@@ -18667,7 +18766,7 @@ Qed.
       remember (insert_into_vec_dv vec_typ x1 x5 x3) as res.
       destruct_err_ub_oom res; inv H7.
       symmetry in Heqres.
-      eapply insert_into_vec_dv_no_ub_fin_inf in Heqres; contradiction.
+      eapply insert_into_vec_dv_err_fin_inf in Heqres; eauto.
     - (* UVALUE_ExtractValue *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
