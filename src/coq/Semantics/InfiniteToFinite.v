@@ -2368,8 +2368,6 @@ Lemma lift_memory_convert_mem_byte :
     Transparent convert_Heap.
   Qed.
 
-  Print Assumptions MemState_fin_to_inf_to_fin.
-
   (* TODO: Need a MemState_refine_prop that takes all of the predicates
       like write_byte_all_preserved and bundles them in one place
       between memories. Should use this for these lemmas... *)
@@ -32358,7 +32356,6 @@ cofix CIH
            ].
   Qed.
 
-  Print Assumptions model_E1E2_23_orutt_strict.
   (* Extra stuff from the proof of the above lemma that needs to get cleaned up... But there's some other stuff in here that I need to not accidentally delete *)
 
   Lemma model_E1E2_L3_orutt_strict_sound
@@ -35503,143 +35500,6 @@ cofix CIH
       destruct s; reflexivity.
       repeat change (fun x => ?h x) with h.
       reflexivity.
-  Qed.
-    
-  Lemma concretize_u_fin_inf :
-    forall uv_inf uv_fin res,
-      DVCInfFin.uvalue_refine_strict uv_inf uv_fin ->
-      FinLLVM.MEM.CP.CONC.concretize_u uv_fin res ->
-      InfLLVM.MEM.CP.CONC.concretize_u uv_inf (fmap fin_to_inf_dvalue res).
-  Proof.    
-    induction uv_inf;
-      intros uv_fin msg REF CONC;
-      try solve
-        [ rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
-          first [ break_match_hyp_inv | inv REF ];
-          cbn in CONC; inversion CONC; try subst;
-          cbn;
-          unfold fin_to_inf_dvalue;
-          break_match_goal; clear Heqs;
-          destruct p;
-          cbn in *;
-          repeat (cbn in *; break_match_hyp_inv);
-          inv e;
-          reflexivity
-        ].
-
-    - (* Addr *)
-      rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
-        first [ break_match_hyp_inv | inv REF ];
-        cbn in CONC; inversion CONC; try subst;
-        cbn;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; clear Heqs;
-        destruct p;
-        cbn in *;
-        repeat (cbn in *; break_match_hyp_inv).
-      pose proof InfToFinAddrConvert.addr_convert_injective _ _ _ Heqo Heqo1; subst.
-      reflexivity.
-    - (* Iptr *)
-      rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
-        first [ break_match_hyp_inv | inv REF ];
-        cbn in CONC; inversion CONC; try subst;
-        cbn;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; clear Heqs;
-        destruct p;
-        cbn in *;
-        repeat (cbn in *; break_match_hyp_inv).
-      inv e.
-      cbn in e0.
-      break_match_hyp_inv.
-      cbn in Heqo0.
-      unfold InterpreterStackBigIntptr.LP.IP.to_Z in *.
-      pose proof IP64Bit.from_Z_injective _ _ _ Heqo Heqo0; subst.
-      reflexivity.
-    - (* Undef *)
-      rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
-        first [ break_match_hyp_inv | inv REF ].
-      cbn in CONC.
-      destruct_err_ub_oom msg; cbn in CONC; try contradiction.
-      destruct CONC.
-      subst.
-      cbn.
-      split; eauto.
-      eapply dvalue_has_dtyp_fin_to_inf_dvalue; eauto.
-      eapply fin_to_inf_dvalue_not_poison; eauto.
-    - (* Struct *)
-      rewrite DVCInfFin.uvalue_refine_strict_equation in REF; cbn in REF;
-        first [ break_match_hyp_inv | inv REF ].
-      induction fields.
-      + cbn in Heqo; inv Heqo.
-        cbn in CONC. red in CONC.
-        destruct CONC as (ma&k'&?&?&?).
-        destruct_err_ub_oom ma; inv H0.
-        destruct H2 as [CONTRA | K'].
-        { cbn in CONTRA; try contradiction.
-        }
-
-        cbn.
-        red.
-        exists (ret []).
-        cbn.
-        exists (fun _ => fmap fin_to_inf_dvalue (k' [])).
-
-        split; eauto.
-        specialize (K' []).
-        forward K'; cbn; auto.
-        rewrite <- K'.
-        cbn.
-
-        split; eauto.
-        right.
-        intros a H0; subst.
-        unfold fin_to_inf_dvalue.
-        break_match_goal; clear Heqs.
-        destruct p.
-        cbn in e, e0.
-        inv e.
-        reflexivity.
-      + cbn in Heqo.
-        break_match_hyp_inv.
-        break_match_hyp_inv.
-        repeat red in CONC.
-        red in CONC.
-        rewrite Memory64BitIntptr.CP.CONCBASE.concretize_uvalueM_equation in CONC.
-        rewrite map_monad_unfold in CONC.
-
-        cbn.
-        repeat red.
-        red in CONC.
-
-      cbn in CONC.
-      destruct_err_ub_oom msg; cbn in CONC; try contradiction.
-      (* TODO: CHECK LANGREFINE THIS SEEMS TO BE DUPLICATED THERE SOMEWHAT. *)
-      admit.
-      admit.
-      admit.
-      admit.
-  Admitted.
-
-  (* TODO: Move this, prove this *)
-  Lemma concretize_ub_fin_inf :
-    forall uv_inf uv_fin msg,
-      DVCInfFin.uvalue_refine_strict uv_inf uv_fin ->
-      FinLLVM.MEM.CP.CONC.concretize_u uv_fin (UB_unERR_UB_OOM msg) ->
-      InfLLVM.MEM.CP.CONC.concretize_u uv_inf (UB_unERR_UB_OOM msg).
-  Proof.
-    intros uv_inf uv_fin msg H H0.
-    eapply concretize_u_fin_inf in H0; eauto.
-  Qed.
-
-  Lemma concretize_err_fin_inf :
-    forall uv_inf uv_fin msg,
-      DVCInfFin.uvalue_refine_strict uv_inf uv_fin ->
-      FinLLVM.MEM.CP.CONC.concretize_u uv_fin (ERR_unERR_UB_OOM msg) ->
-      InfLLVM.MEM.CP.CONC.concretize_u uv_inf (ERR_unERR_UB_OOM msg).
-  Proof.
-    intros uv_inf uv_fin msg H H0.
-    eapply concretize_u_fin_inf in H0; eauto.
   Qed.
 
   Lemma model_undef_h_fin_inf :
@@ -39392,6 +39252,4 @@ cofix CIH
   Proof.
     apply model_E1E2_56_orutt_strict; apply model_E1E2_L5_orutt_strict_sound.
   Qed.
-
-  Print Assumptions model_E1E2_L6_orutt_strict_sound.
 End InfiniteToFinite.
