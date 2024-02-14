@@ -14,6 +14,7 @@ open Result
 
 (* open Assert *)
 open DynamicValues
+open VellvmIntegers
 
 open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 
