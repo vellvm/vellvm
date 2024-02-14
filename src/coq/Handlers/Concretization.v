@@ -218,7 +218,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                  let dv_conv := ErrOOMPoison_handle_poison_and_oom DVALUE_Poison (@dvalue_bytes_to_dvalue ErrOOMPoison _ _ _ _ bytes t2) in
                  match unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM dv_conv)))) with
                  | inl (OOM_message oom) =>
-                     Conv_Illegal ("Bitcast OOM: " ++ oom)
+                     Conv_Oom ("Bitcast OOM: " ++ oom)
                  | inr (inl (UB_message ub)) =>
                      Conv_Illegal ("Bitcast UB: " ++ ub)
                  | inr (inr (inl (ERR_message err))) =>
@@ -388,8 +388,9 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                 | DTYPE_IPTR => lift_ue dvalue (coerce_integer_to_int None (ptr_to_int addr))
                 | _ => lift_ue dvalue (raise_error "Invalid PTOI conversion")
                 end
+            | Conv_PtoI _ => lift_ue dvalue (raise_error "Invalid PTOI conversion")
+            | Conv_Oom s => lift_ue dvalue (raise_oom s)
             | Conv_Illegal s => lift_ue dvalue (raise_error s)
-            | _ => lift_ue dvalue (raise_error "Invalid PTOI conversion")
             end
         | UVALUE_GetElementPtr t ua uvs =>
             da <- concretize_uvalueM M undef_handler ERR_M lift_ue ua;;
@@ -838,7 +839,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                  let dv_conv := ErrOOMPoison_handle_poison_and_oom DVALUE_Poison (@dvalue_bytes_to_dvalue ErrOOMPoison _ _ _ _ bytes t2) in
                  match unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM dv_conv)))) with
                  | inl (OOM_message oom) =>
-                     Conv_Illegal ("Bitcast OOM: " ++ oom)
+                     Conv_Oom ("Bitcast OOM: " ++ oom)
                  | inr (inl (UB_message ub)) =>
                      Conv_Illegal ("Bitcast UB: " ++ ub)
                  | inr (inr (inl (ERR_message err))) =>
@@ -1103,6 +1104,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                     lift_ue (raise_oom ("concretize_uvalueM OOM in Conv_ItoP: " ++ msg))
                 end
             | Conv_Pure x => ret x
+            | Conv_Oom s => lift_ue (raise_oom s)
             | Conv_Illegal s => lift_ue (raise_error s)
             end
 
@@ -1337,6 +1339,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                         lift_ue (raise_oom ("concretize_uvalueM OOM in Conv_ItoP: " ++ msg))
                     end
                 | Conv_Pure x => ret x
+                | Conv_Oom s => lift_ue (raise_oom s)
                 | Conv_Illegal s => lift_ue (raise_error s)
                 end
 
