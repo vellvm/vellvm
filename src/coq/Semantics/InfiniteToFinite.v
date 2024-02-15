@@ -2954,7 +2954,9 @@ Lemma lift_memory_convert_mem_byte :
       convert_MemState ms_inf = NoOom ms_fin ->
       MemState_refine_prop ms_inf ms_fin.
   Proof.
+    (* Only used in unused lemmas. Not worth proving right now. *)
     intros ms_inf ms_fin CONV.
+    split; [| split; [| split; [| split; [| split; [| split]]]]].
   Admitted.
 
   Unset Implicit Arguments.
@@ -19438,111 +19440,111 @@ cofix CIH
     reflexivity.
   Qed.
 
-  Lemma re_sid_ubytes_helper_fin_inf :
-    forall {ixbytes_fin ixbytes_inf ms_fin_start ms_fin_final ms_inf_start init_map_fin init_map_inf byte_map_fin},
-      MemState_refine_prop ms_inf_start ms_fin_start ->
-      Forall2 (fun '(ix1, b1) '(ix2, b2) => ix1 = ix2 /\ sbyte_refine b1 b2) ixbytes_inf ixbytes_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes_helper (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) ixbytes_fin
-        init_map_fin ms_fin_start (ret (ms_fin_final, byte_map_fin)) ->
-      exists byte_map_inf ms_inf_final,
-        MemoryBigIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes_helper (M:=MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) ixbytes_inf
-          init_map_inf ms_inf_start (ret (ms_inf_final, byte_map_inf)) /\
-          exists bytes_inf, NMaps.NM_find_many (Nseq 0 (Datatypes.length ixbytes_inf)) byte_map_inf = Some bytes_inf.
-  Proof.
-    (* TODO: Ugh... Need to do a really complicated and nasty induction for this.
+  (* Lemma re_sid_ubytes_helper_fin_inf : *)
+  (*   forall {ixbytes_fin ixbytes_inf ms_fin_start ms_fin_final ms_inf_start init_map_fin init_map_inf byte_map_fin}, *)
+  (*     MemState_refine_prop ms_inf_start ms_fin_start -> *)
+  (*     Forall2 (fun '(ix1, b1) '(ix2, b2) => ix1 = ix2 /\ sbyte_refine b1 b2) ixbytes_inf ixbytes_fin -> *)
+  (*     Memory64BitIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes_helper (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) ixbytes_fin *)
+  (*       init_map_fin ms_fin_start (ret (ms_fin_final, byte_map_fin)) -> *)
+  (*     exists byte_map_inf ms_inf_final, *)
+  (*       MemoryBigIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes_helper (M:=MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) ixbytes_inf *)
+  (*         init_map_inf ms_inf_start (ret (ms_inf_final, byte_map_inf)) /\ *)
+  (*         exists bytes_inf, NMaps.NM_find_many (Nseq 0 (Datatypes.length ixbytes_inf)) byte_map_inf = Some bytes_inf. *)
+  (* Proof. *)
+  (*   (* TODO: Ugh... Need to do a really complicated and nasty induction for this. *)
 
-           Need to induct over the filtered sid bytes...
-     *)
-    induction ixbytes_fin using length_strong_ind; intros ixbytes_inf ms_fin_start ms_fin_final ms_inf_start init_map_fin init_map_inf byte_map_fin MSR IXBYTES RESID.
-    - cbn in RESID.
-      destruct RESID; subst.
-      inv IXBYTES.
-      cbn.
-      exists init_map_inf.
-      exists ms_inf_start.
-      split; auto.
-      exists [].
-      auto.
-    - rename H into IH.
-      rename H0 into LEN.
-      destruct ixbytes_fin; inv LEN.
+  (*          Need to induct over the filtered sid bytes... *)
+  (*    *) *)
+  (*   induction ixbytes_fin using length_strong_ind; intros ixbytes_inf ms_fin_start ms_fin_final ms_inf_start init_map_fin init_map_inf byte_map_fin MSR IXBYTES RESID. *)
+  (*   - cbn in RESID. *)
+  (*     destruct RESID; subst. *)
+  (*     inv IXBYTES. *)
+  (*     cbn. *)
+  (*     exists init_map_inf. *)
+  (*     exists ms_inf_start. *)
+  (*     split; auto. *)
+  (*     exists []. *)
+  (*     auto. *)
+  (*   - rename H into IH. *)
+  (*     rename H0 into LEN. *)
+  (*     destruct ixbytes_fin; inv LEN. *)
 
-      inv IXBYTES.
-      destruct p, x.
-      destruct H2; subst.
+  (*     inv IXBYTES. *)
+  (*     destruct p, x. *)
+  (*     destruct H2; subst. *)
 
-      rename H0 into BYTE_REF.
-      rename H3 into IXBYTES.
-      rename l into ixbytes_inf.
+  (*     rename H0 into BYTE_REF. *)
+  (*     rename H3 into IXBYTES. *)
+  (*     rename l into ixbytes_inf. *)
 
-      rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes_helper_equation in RESID.
-      break_match_hyp.
-      1-29,31: contradiction.
+  (*     rewrite Memory64BitIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes_helper_equation in RESID. *)
+  (*     break_match_hyp. *)
+  (*     1-29,31: contradiction. *)
 
-      break_match_hyp.
-      repeat red in RESID.
-      destruct RESID as (ms_fin_fresh & sid' & FRESH & RESID).
+  (*     break_match_hyp. *)
+  (*     repeat red in RESID. *)
+  (*     destruct RESID as (ms_fin_fresh & sid' & FRESH & RESID). *)
 
-      eapply fresh_sid_fin_inf in FRESH; eauto.
-      destruct FRESH as (?&?&?&?&?).
-      subst.
-      rename x0 into ms_inf_fresh.
+  (*     eapply fresh_sid_fin_inf in FRESH; eauto. *)
+  (*     destruct FRESH as (?&?&?&?&?). *)
+  (*     subst. *)
+  (*     rename x0 into ms_inf_fresh. *)
 
-      remember (MemoryBigIntptr.MMEP.MemSpec.MemHelpers.filter_sid_matches s0 ixbytes_inf).
-      destruct p.
+  (*     remember (MemoryBigIntptr.MMEP.MemSpec.MemHelpers.filter_sid_matches s0 ixbytes_inf). *)
+  (*     destruct p. *)
 
-      eapply IH.
-      4: eauto.
+  (*     eapply IH. *)
+  (*     4: eauto. *)
 
-      eapply filter_sid_matches_length_r_le; eauto.
-      eapply MemoryBigIntptr.MMEP.MemSpec.fresh_sid_MemState_eqv in H.
-      admit.
-  Admitted.
+  (*     eapply filter_sid_matches_length_r_le; eauto. *)
+  (*     eapply MemoryBigIntptr.MMEP.MemSpec.fresh_sid_MemState_eqv in H. *)
+  (*     admit. *)
+  (* Admitted. *)
 
-  (* TODO: move this to where re_sid_ubytes is defined *)
-  Lemma re_sid_ubytes_fin_inf :
-    forall {bytes_fin bytes_fin' bytes_inf ms_fin_start ms_fin_final ms_inf_start},
-      MemState_refine_prop ms_inf_start ms_fin_start ->
-      sbytes_refine bytes_inf bytes_fin ->
-      Memory64BitIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) bytes_fin ms_fin_start (ret (ms_fin_final, bytes_fin')) ->
-      exists bytes_inf' ms_inf_final,
-        MemoryBigIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes (M:=MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) bytes_inf ms_inf_start (ret (ms_inf_final, bytes_inf')) /\
-          sbytes_refine bytes_inf' bytes_fin' /\
-          MemState_refine_prop ms_inf_final ms_fin_final.
-  Proof.
-    intros bytes_fin bytes_fin' bytes_inf ms_fin_start ms_fin_final ms_inf_start MSR BYTES_REF RESID.
-    unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes in RESID.
-    unfold MemoryBigIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes.
+  (* (* TODO: move this to where re_sid_ubytes is defined *) *)
+  (* Lemma re_sid_ubytes_fin_inf : *)
+  (*   forall {bytes_fin bytes_fin' bytes_inf ms_fin_start ms_fin_final ms_inf_start}, *)
+  (*     MemState_refine_prop ms_inf_start ms_fin_start -> *)
+  (*     sbytes_refine bytes_inf bytes_fin -> *)
+  (*     Memory64BitIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes (M:=MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) bytes_fin ms_fin_start (ret (ms_fin_final, bytes_fin')) -> *)
+  (*     exists bytes_inf' ms_inf_final, *)
+  (*       MemoryBigIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes (M:=MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) bytes_inf ms_inf_start (ret (ms_inf_final, bytes_inf')) /\ *)
+  (*         sbytes_refine bytes_inf' bytes_fin' /\ *)
+  (*         MemState_refine_prop ms_inf_final ms_fin_final. *)
+  (* Proof. *)
+  (*   intros bytes_fin bytes_fin' bytes_inf ms_fin_start ms_fin_final ms_inf_start MSR BYTES_REF RESID. *)
+  (*   unfold Memory64BitIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes in RESID. *)
+  (*   unfold MemoryBigIntptr.MMEP.MemSpec.MemHelpers.re_sid_ubytes. *)
 
-    repeat red in RESID.
-    destruct RESID as (?&?&?&?).
-    cbn in H0.
-    red in H0.
-    break_match_hyp_inv.
-    eapply @re_sid_ubytes_helper_fin_inf
-      with (init_map_inf:=NMaps.NM.empty MemoryBigIntptr.MP.BYTE_IMPL.SByte)
-           (ixbytes_inf:=zip (Nseq 0 (Datatypes.length bytes_inf)) bytes_inf)
-      in H; eauto.
-    2: {
-      admit.
-    }
+  (*   repeat red in RESID. *)
+  (*   destruct RESID as (?&?&?&?). *)
+  (*   cbn in H0. *)
+  (*   red in H0. *)
+  (*   break_match_hyp_inv. *)
+  (*   eapply @re_sid_ubytes_helper_fin_inf *)
+  (*     with (init_map_inf:=NMaps.NM.empty MemoryBigIntptr.MP.BYTE_IMPL.SByte) *)
+  (*          (ixbytes_inf:=zip (Nseq 0 (Datatypes.length bytes_inf)) bytes_inf) *)
+  (*     in H; eauto. *)
+  (*   2: { *)
+  (*     admit. *)
+  (*   } *)
 
-    destruct H as (?&?&?&?&?).
+  (*   destruct H as (?&?&?&?&?). *)
 
-    (* exists x3. exists x2. *)
-    (* repeat red. *)
-    (* exists x2. exists x1. *)
-    (* split. *)
-    (* - apply H. *)
-    (* - red. *)
-    (*   assert (Datatypes.length (zip (Nseq 0 (Datatypes.length bytes_inf)) bytes_inf) = Datatypes.length bytes_inf) as LEN. *)
-    (*   { admit. (* TODO: probably not that hard, but bleh *) *)
-    (*   } *)
-    (*   rewrite LEN in H0. *)
-    (*   rewrite H0. *)
-    (*   cbn. *)
-    (*   split; auto. *)
-  Admitted.
+  (*   (* exists x3. exists x2. *) *)
+  (*   (* repeat red. *) *)
+  (*   (* exists x2. exists x1. *) *)
+  (*   (* split. *) *)
+  (*   (* - apply H. *) *)
+  (*   (* - red. *) *)
+  (*   (*   assert (Datatypes.length (zip (Nseq 0 (Datatypes.length bytes_inf)) bytes_inf) = Datatypes.length bytes_inf) as LEN. *) *)
+  (*   (*   { admit. (* TODO: probably not that hard, but bleh *) *) *)
+  (*   (*   } *) *)
+  (*   (*   rewrite LEN in H0. *) *)
+  (*   (*   rewrite H0. *) *)
+  (*   (*   cbn. *) *)
+  (*   (*   split; auto. *) *)
+  (* Admitted. *)
 
   (* TODO: move this. Should hold for fin / inf *)
   (* SAZ: UNNEEDED? *)
@@ -21332,22 +21334,6 @@ cofix CIH
 
   Opaque MemoryBigIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
   Opaque Memory64BitIntptr.MMEP.MMSP.MemByte.all_bytes_from_uvalue_helper.
-
-  Lemma sbyte_to_extract_byte_inversion1 :
-    forall {x s u_inf1 dt u_inf2 sid},
-      sbyte_refine x s ->
-      MemoryBigIntptr.MP.BYTE_IMPL.sbyte_to_extractbyte x =
-        LLVMParamsBigIntptr.Events.DV.UVALUE_ExtractByte u_inf1 dt u_inf2 sid ->
-      exists u_fin1 u_fin2,
-        Memory64BitIntptr.MP.BYTE_IMPL.sbyte_to_extractbyte s =
-          LLVMParams64BitIntptr.Events.DV.UVALUE_ExtractByte u_fin1 dt u_fin2 sid.
-  Proof.
-    intros x s u_inf1 dt u_inf2 sid BYTES EQ.
-    destruct x.
-    rewrite <- InterpreterStackBigIntptr.LLVM.MEM.Byte.sbyte_to_extractbyte_of_uvalue_sbyte in EQ.
-    inversion BYTES.
-    repeat break_match_hyp_inv.
-  Admitted.
 
   Lemma all_bytes_from_uvalue_fin_inf_helper_None :
     forall {bytes_fin : list Memory64BitIntptr.MP.BYTE_IMPL.SByte}
@@ -39252,4 +39238,5 @@ cofix CIH
   Proof.
     apply model_E1E2_56_orutt_strict; apply model_E1E2_L5_orutt_strict_sound.
   Qed.
+
 End InfiniteToFinite.

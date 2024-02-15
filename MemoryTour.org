@@ -112,17 +112,17 @@ this is contained within [[file:src/coq/Semantics/InfiniteToFinite.v]]
 and there are [[Refinement Relations between Memory Model
 Instances][some more notes on this file here.]]
 
-**** model_E1E2_L6_sound
+**** model_E1E2_L6_orutt_strict_sound
 
-An important adequacy theorem is [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma model_E1E2_L6_sound :][model_E1E2_L6_sound]]:
+An important adequacy theorem is [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma model_E1E2_L6_orutt_strict_sound][model_E1E2_L6_orutt_strict_sound]]:
 
 #+begin_src coq
-  Theorem model_E1E2_L6_sound :
-    forall (p : list
-             (LLVMAst.toplevel_entity
-                LLVMAst.typ
-                (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))),
-      model_E1E2_L6 p p.
+  Lemma model_E1E2_L6_orutt_strict_sound
+    (p : list
+           (LLVMAst.toplevel_entity
+              LLVMAst.typ
+              (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) :
+    model_E1E2_L6_orutt_strict p p.
 #+end_src
 
 This theorem specifies that when any program ~p~ is interpreted in the finite
@@ -130,20 +130,27 @@ memory model, we get a refinement of the behaviors of the program when
 it's interpreted in the infinite memory model. This depends on these definitions as well:
 
 #+begin_src coq
-  Definition refine_E1E2_L6 (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
-    := refine_L6 (L4_convert_PropT res_L4_convert_unsafe srcs) tgts.
-
-  Definition model_E1E2_L6
-    (p1 p2 : list
-               (LLVMAst.toplevel_entity
-                  LLVMAst.typ
-                  (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
+  Definition L6_E1E2_orutt_strict
+    (t1 : PropT InfLP.Events.L6 (InfMemMMSP.MemState *
+                                   (MemPropT.store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue)))))
+    t2
     : Prop :=
-    refine_E1E2_L6 (LLVM1.model p1) (LLVM2.model p2).
+    forall t', t2 t' ->
+          (exists t, t1 t /\
+                  orutt
+                    L4_refine_strict
+                    L4_res_refine_strict
+                    (MemState_refine_prop × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict))))
+                    t t' (OOM:=OOME)) \/
+            (exists ub, t1 ub /\ ContainsUB.contains_UB ub).
 
+  Definition model_E1E2_L6_orutt_strict p1 p2 :=
+    L6_E1E2_orutt_strict
+      (TopLevelBigIntptr.model_oom_L6 TLR_INF.R.refine_res2 TLR_INF.R.refine_res3 eq p1)
+      (TopLevel64BitIntptr.model_oom_L6 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 eq p2).
 #+end_src
 
-Where [[file:src/coq/Theory/Refinement.v::Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)][~refine_L6~]] is the refinement relation in our interpreter stack that handles out-of-memory events.
+[[file:src/coq/Semantics/InfiniteToFinite.v::Definition L6_E1E2_orutt_strict][L6_E1E2_orutt_strict]] is roughly related to [[file:src/coq/Theory/Refinement.v::Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)][~refine_L6~]] (the refinement relation for out-of-memory events for a single version of LLVM).
 
 #+begin_src coq
   Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)
@@ -151,11 +158,6 @@ Where [[file:src/coq/Theory/Refinement.v::Definition refine_L6 : relation ((itre
          forall t', ts' t' ->
                exists t, ts t /\ refine_OOM_h refine_res3 t t'.
 #+end_src
-
-[[file:src/coq/Theory/Refinement.v::Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)][refine_L6]] guarantees to that the behaviors of the finite memory
-program are contained within the set of behaviors in the infinite
-memory program, while allowing the finite memory programs to run out
-of memory at any point, instead of continuing execution.
 
 [[file:src/coq/Semantics/InfiniteToFinite.v::Definition refine_E1E2_L6 (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop][refine_E1E2_L6]] is essentially just [[file:src/coq/Theory/Refinement.v::Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)][refine_L6]], but it performs a
 conversion between the event types of the source and target
