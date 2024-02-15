@@ -2,7 +2,9 @@ From Coq Require Import
   String
   List
   Lia
-  ZArith.
+  ZArith
+  Program
+  Program.Wf.
 
 Require Import Coq.Logic.ProofIrrelevance.
 
@@ -18,6 +20,8 @@ From ExtLib Require Import
 
 Import ListNotations.
 Import MonadNotation.
+
+Require Import Recdef.
 
 Section FINDOPTION.
   Context {A B:Type}.
@@ -673,23 +677,91 @@ Proof.
   lia.
 Qed.
 
-Program Fixpoint split_every_pos {A} (n : positive) (xs : list A) {measure (length xs)} : list (list A)
+Function split_every_pos {A} (n : positive) (xs : list A) { measure length xs }: list (list A)
   := match xs with
      | [] => []
-     | _ =>
-         take (Npos n) xs :: split_every_pos n (drop (Npos n) xs)
+     | (_::_) =>
+         @take A (Npos n) xs :: split_every_pos n (@drop A (Npos n)%N xs)
      end.
-Next Obligation.
-  destruct xs; try contradiction.
-  apply drop_length_lt; auto; lia.
+Proof.
+intros. apply drop_length_lt. lia.
+intros D. inversion D.
+Defined.
+
+Lemma split_every_pos_empty_equiv : forall {A} l p,
+    split_every_pos A p l = [] <-> l = [].
+Proof using.
+  split.
+  - intros. rewrite split_every_pos_equation in H.
+    induction l.
+    + reflexivity.
+    + discriminate.
+  - intros; subst. reflexivity.
+Qed.
+
+Lemma list_take_drop : forall {A} (l : list A) n,
+    l <> [] -> l = (take n l) ++ drop n l.
+Proof using.
+  intros.
+  generalize dependent n.
+  induction l.
+  - destruct H. reflexivity.
+  - induction l.
+    + intros n. induction n.
+      ++ reflexivity.
+      ++ reflexivity.
+    + intros n. induction n.
+      ++ reflexivity.
+      ++ simpl. f_equal.
+         apply IHl.
+         intros D. discriminate.
+Qed.
+
+Lemma split_every_pos_nonempty_equiv : forall {A} (l : list A) p,
+    split_every_pos A p l = take (N.pos p) l :: split_every_pos A p (drop (N.pos p) l)<-> l <> [].
+Proof using.
+  split.
+  - intros. induction l.
+    + discriminate.
+    + intros D. discriminate.
+  - intros. induction l.
+    + destruct H; reflexivity.
+    + rewrite split_every_pos_equation at 1.
+      reflexivity.
+Qed.
+
+Lemma split_every_pos_nonempty_take_drop : forall {A} (l : list A) xs xss p,
+    split_every_pos A p l = xs :: xss ->
+      xs = take (N.pos p) l /\ xss = split_every_pos A p (drop (N.pos p) l).
+Proof using.
+  intros. rewrite split_every_pos_equation in H. induction l; try discriminate.
+  injection H. intros; subst. auto.
+Qed.
+
+Lemma split_every_pos_nonempty_inv : forall {A} (l : list A) xs xss p,
+    split_every_pos A p l = xs :: xss -> l <> [].
+Proof using.
+  intros A l.
+  induction l.
+  - discriminate.
+  - intros. intros D. discriminate.
 Qed.
 
 Definition split_every {A} (n : N) (xs : list A) : err (list (list A))
   := match n with
      | N0 => failwith "split_every: called with n = 0."
      | Npos n =>
-         inr (split_every_pos n xs)
+         inr (split_every_pos A n xs)
      end.
+
+Lemma split_every_empty :
+  forall {A} n,
+    n <> 0%N ->
+    split_every n [] = inr ([]: list (list A)).
+Proof using.
+  intros. destruct n; try contradiction.
+  unfold split_every. f_equal.
+Qed.
 
 Lemma fold_sum_acc :
   forall {A} (dts : list A) n (f : A -> N),
@@ -2038,6 +2110,17 @@ Proof.
       exists z. split; auto. right; auto.
 Qed.
 
+Lemma list_nonempty_equiv : forall {A} (l : list A),
+    l <> [] <-> exists x xs, l = x::xs.
+Proof using.
+  split.
+  - intros. induction l.
+    + destruct H. reflexivity.
+    + exists a. exists l. reflexivity.
+  - intros. destruct H as (x&xs&H).
+    subst. discriminate.
+Qed.
+
 Lemma split_every_Forall2 :
   forall {A B} (P : A -> B -> Prop) xs ys xs' ys' n,
     Forall2 P xs ys ->
@@ -2046,7 +2129,48 @@ Lemma split_every_Forall2 :
     Forall2 (Forall2 P) xs' ys'.
 Proof.
   intros A B P xs ys xs' ys' n ALL SPLITX SPLITY.
-Admitted.
+  generalize dependent xs'.
+  generalize dependent ys'.
+  induction n.
+  - intros. discriminate.
+  - intros. unfold split_every in *. injection SPLITX. injection SPLITY.
+    intros. clear SPLITX; clear SPLITY.
+    rename H into SPLITY.
+    rename H0 into SPLITX.
+    generalize dependent ys.
+    generalize dependent ys'.
+    generalize dependent SPLITX.
+    generalize dependent xs.
+    generalize dependent p.
+    induction xs'.
+    + intros.
+      apply split_every_pos_empty_equiv in SPLITX.
+      subst. inversion ALL. constructor.
+    + intros.
+      generalize dependent xs.
+      generalize dependent SPLITY.
+      generalize dependent ys.
+      generalize dependent p.
+      induction ys'.
+      ++
+        intros.
+        apply split_every_pos_empty_equiv in SPLITY.
+        apply split_every_pos_nonempty_inv in SPLITX.
+        apply list_nonempty_equiv in SPLITX.
+        destruct SPLITX as (c&cs&SPLITX).
+        subst. inversion ALL.
+      ++ intros.
+         apply split_every_pos_nonempty_take_drop in SPLITX; destruct SPLITX.
+         apply split_every_pos_nonempty_take_drop in SPLITY; destruct SPLITY.
+         subst.
+         simpl in *.
+         constructor.
+         +++ apply Forall2_take. auto.
+         +++ assert (H : split_every_pos A p (drop (N.pos p) xs) = split_every_pos A p (drop (N.pos p) xs)) by reflexivity.
+             apply (IHxs' p (drop (N.pos p) xs) H (split_every_pos B p (drop (N.pos p) ys)) (drop (N.pos p) ys)).
+             { apply Forall2_drop. auto. }
+             { reflexivity. }
+Qed.
 
 Lemma split_every_n_succeeds :
   forall {A B} (xs : list A) (ys : list B) n xs',
