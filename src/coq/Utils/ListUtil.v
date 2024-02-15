@@ -744,6 +744,14 @@ Proof using.
       reflexivity.
 Qed.
 
+Lemma split_every_pos_nonempty_take_drop : forall {A} (l : list A) xs xss p,
+    split_every_pos A p l = xs :: xss ->
+      xs = take (N.pos p) l /\ xss = split_every_pos A p (drop (N.pos p) l).
+Proof using.
+  intros. rewrite split_every_pos_equation in H. induction l; try discriminate.
+  injection H. intros; subst. auto.
+Qed.
+
 Lemma split_every_pos_nonempty_inv : forall {A} (l : list A) xs xss p,
     split_every_pos A p l = xs :: xss -> l <> [].
 Proof using.
@@ -2388,6 +2396,16 @@ Proof using.
 (* Lemma list_take_drop : forall {A} l n, *)
 (*     l <> [] -> *)
 (*     l = take n *)
+Lemma list_non_empty : forall {A} (l : list A),
+    l <> [] <-> exists x xs, l = x::xs.
+Proof using.
+  split.
+  - intros. induction l.
+    + destruct H. reflexivity.
+    + exists a. exists l. reflexivity.
+  - intros. destruct H as (x&xs&H).
+    subst. discriminate.
+Qed.
 
 Lemma split_every_Forall2 :
   forall {A B} (P : A -> B -> Prop) xs ys xs' ys' n,
@@ -2402,23 +2420,70 @@ Proof.
   induction n.
   - intros. discriminate.
   - intros. unfold split_every in *. injection SPLITX. injection SPLITY.
-    intros. clear SPLITX; clear SPLITY. generalize dependent ys.
-    remember (split_every_pos A p xs).
-    induction l.
-    + intros. symmetry in Heql.
-      apply split_every_pos_empty_equiv in Heql. 
-      remember (split_every_pos B p ys).
-      induction l.
-      ++ symmetry in Heql0.
-         apply split_every_pos_empty_equiv in Heql0.
-         subst. constructor.
-      ++ subst.
-         symmetry in Heql0.
-         apply split_every_pos_nonempty_inv in Heql0.
-         destruct ys.
-         { destruct Heql0. reflexivity. }
-         { inversion ALL. }
-    + admit.
+    intros. clear SPLITX; clear SPLITY.
+    rename H into SPLITY.
+    rename H0 into SPLITX.
+    generalize dependent ys.
+    generalize dependent ys'.
+    generalize dependent SPLITX.
+    generalize dependent xs.
+    generalize dependent p.
+    induction xs'.
+    + intros.
+      apply split_every_pos_empty_equiv in SPLITX.
+      subst. inversion ALL. constructor.
+    + intros.
+      generalize dependent xs.
+      generalize dependent SPLITY.
+      generalize dependent ys.
+      generalize dependent p.
+      induction ys'.
+      ++
+        intros.
+        apply split_every_pos_empty_equiv in SPLITY.
+        apply split_every_pos_nonempty_inv in SPLITX.
+        apply list_non_empty in SPLITX.
+        destruct SPLITX as (c&cs&SPLITX).
+        subst. inversion ALL.
+      ++ intros.
+         apply split_every_pos_nonempty_take_drop in SPLITX; destruct SPLITX.
+         apply split_every_pos_nonempty_take_drop in SPLITY; destruct SPLITY.
+         subst.
+         simpl in *.
+         constructor.
+         +++ apply Forall2_take. auto.
+         +++ assert (H : split_every_pos A p (drop (N.pos p) xs) = split_every_pos A p (drop (N.pos p) xs)) by reflexivity.
+             apply (IHxs' p (drop (N.pos p) xs) H (split_every_pos B p (drop (N.pos p) ys)) (drop (N.pos p) ys)).
+             { apply Forall2_drop. auto. }
+             { reflexivity. }
+Qed.
+        
+    (* remember (split_every_pos A p xs). *)
+    (* induction l. *)
+    (* + intros. symmetry in Heql. *)
+    (*   apply split_every_pos_empty_equiv in Heql.  *)
+    (*   subst. inversion ALL. constructor. *)
+    (* + intros. *)
+    (*   assert (a :: xs' <> xs'). *)
+    (*   { apply list_cons_neq. } *)
+      
+
+
+
+      (* remember (split_every_pos B p ys). *)
+
+      (* induction l0. *)
+      (* ++ subst. *)
+      (*    symmetry in Heql0. *)
+      (*    apply split_every_pos_empty_equiv in Heql0. *)
+      (*    subst. *)
+      (*    symmetry in Heql. *)
+      (*    apply split_every_pos_nonempty_inv in Heql. *)
+      (*    destruct xs. *)
+      (*    { destruct Heql. reflexivity. } *)
+      (*    { inversion ALL. } *)
+      (* ++                        (* Ideally get IHl to work with split_every_pos drop,then *) *)
+         
 Admitted.
          
          
