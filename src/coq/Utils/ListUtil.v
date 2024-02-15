@@ -691,6 +691,7 @@ Qed.
 (*   (* apply drop_length_lt; auto; lia. *) *)
 (* Qed. *)
 
+(* Use function since it gives some nice rewrite lemmas *)
 Function split_every_pos {A} (n : positive) (xs : list A) { measure length xs }: list (list A)
   := match xs with
      | [] => []
@@ -760,11 +761,6 @@ Proof using.
   - discriminate.
   - intros. intros D. discriminate.
 Qed.
-(* Equations split_every_pos'' {A} (n : positive) (xs : list A) : list (list A) := *)
-(*   split_every_pos'' n [] := []; *)
-(*   split_every_pos'' n _ :=  *)
-(*          @take A (Npos n) xs :: split_every_pos' n (@drop A (Npos n)%N xs). *)
-
 
 Definition split_every {A} (n : N) (xs : list A) : err (list (list A))
   := match n with
@@ -773,201 +769,14 @@ Definition split_every {A} (n : N) (xs : list A) : err (list (list A))
          inr (split_every_pos A n xs)
      end.
 
-Program Fixpoint bla_list {A} (l : list A) {measure (length l)} :=
-  match l with
-  | [] => []
-  | x::xs => x :: bla_list xs
-  end.
-
-Lemma obvious_list: forall {A : Type} l, @bla_list A l = l.
+Lemma split_every_empty :
+  forall {A} n,
+    n <> 0%N ->
+    split_every n [] = inr ([]: list (list A)).
 Proof using.
-  intros A l; induction l.
-  - reflexivity.
-  - unfold bla_list in *.
-    unfold bla_list_func in *.
-    simpl in *.
-    rewrite fix_sub_eq.
-    fold (bla_list_func).
-    fold (bla_list_func) in IHl.
-    + program_simplify. f_equal. assumption.
-    + intros. program_simplify. induction X; program_simplify.
-      ++ reflexivity.
-      ++ f_equal. apply H.
+  intros. destruct n; try contradiction.
+  unfold split_every. f_equal.
 Qed.
-
-
-Program Fixpoint bla (n:nat) {measure n} :=
-match n with
-| 0 => 0
-| S n' => S (bla n')
-end.
-
-Lemma obvious: forall n, bla n = n.
-Proof.
-  intros n; induction n.
-  reflexivity.
-  unfold bla. rewrite fix_sub_eq.
-  simpl. fold (bla n).
-  rewrite IHn. reflexivity.
-
-  intros x f g Heq.
-  destruct x.
-  - reflexivity.
-  - f_equal. apply Heq.
-Qed.
-
-(* Lemma list_list_empty_l : forall {A : Type} xss, *)
-(*     xss = ([]::xss : list (list A)). *)
-(* Proof using. *)
-(*   intros. simpl. induction  *)
-
-(* Lemma split_every_unfold_take : forall {A : Type} l p x xs, *)
-(*     split_every_pos p l = x :: xs -> *)
-(*     x = @take A (Npos p) l. *)
-(* Proof using. *)
-(*   intros. induction l. *)
-(*   - unfold split_every_pos in *. *)
-(*     unfold split_every_pos_func in *. *)
-(*     rewrite fix_sub_eq in H. *)
-(*     simpl in H. *)
-(*     + discriminate. *)
-(*     + intros. *)
-(*       destruct x0. *)
-(*       ++ f_equal. apply Heq. *)
-    
-    
-(* Program Fixpoint bla_list {A} (l : list A) {measure (length l)} := *)
-(*   match l with *)
-(*   | [] => [] *)
-(*   | x::xs => x :: bla_list xs *)
-(*   end. *)
-
-(* Lemma obvious_list: forall {A : Type} l, @bla_list A l = l. *)
-(* Proof using. *)
-(*   intros A l; induction l. *)
-(*   - reflexivity. *)
-(*   - unfold bla_list in *. *)
-(*     unfold bla_list_func in *. *)
-(*     simpl in *. *)
-(*     rewrite fix_sub_eq. *)
-(*     fold (bla_list_func). *)
-(*     fold (bla_list_func) in IHl. *)
-(*     + program_simplify. f_equal. assumption. *)
-(*     + intros. program_simplify. induction X; program_simplify. *)
-(*       ++ reflexivity. *)
-(*       ++ f_equal. apply H. *)
-(* Qed. *)
-
-(* Lemma split_every_unfold' : forall {A : Type} x xs p, *)
-(*     split_every_pos' A p (x :: xs) = @take A (Npos p) (x :: xs) :: split_every_pos' A p (drop (Npos p) (x :: xs)). *)
-(* Proof. *)
-(*   intros A x xs p. *)
-(*   rewrite split_every_pos'_equation. reflexivity. *)
-(* Qed. *)
-  
-
-
-(* Lemma dum : forall f g, f = g -> *)
-(*   (fun (A : Type) (l : list A) => f l) = (fun (B : Type) (l : list B) => g l). *)
-(* Proof. *)
-  
-  
-  
-(* Lemma split_every_unfold : forall {A : Type} x xs p, *)
-(*     split_every_pos p (x :: xs) = @take A (Npos p) (x :: xs) :: split_every_pos p (drop (Npos p) (x :: xs)). *)
-(* Proof using. *)
-(*   intros A x xs p. *)
-(*   unfold split_every_pos. *)
-(*   unfold split_every_pos_func. *)
-(*   (* fold (@drop A (Npos p) (x :: xs)). *) *)
-(*   rewrite fix_sub_eq. *)
-(*   program_simplify. *)
-(*   - reflexivity. *)
-(*   - intros x0 f g Heq. *)
-(*     induction x0. program_simplify. *)
-(*     induction X; program_simplify. *)
-(*     + reflexivity. *)
-(*     + simpl in IHX. f_equal. *)
-(*       destruct X. *)
-(*       ++ program_simplify. rewrite Heq. f_equal. *)
-(*          +++ intros HE. admit. *)
-(*          +++ Search exist. apply eq_exist_uncurried.  *)
-(*              esplit. Search eq_rect. erewrite <- Eqdep.Eq_rect_eq.eq_rect_eq. *)
-(*              f_equal.  *)
-
-(*              Admitted. *)
-
-
-
-
-
-
-      (* simpl in IHX. rewrite Heq. assert ( *)
-      (*     (exist (fun recarg' : {A0 : Type & {_ : positive & list A0}} => Datatypes.length (projT2 (projT2 recarg')) < S (Datatypes.length X)) *)
-      (*  (existT (fun A0 : Type => {_ : positive & list A0}) x0 (existT (fun _ : positive => list x0) p0 (drop (Pos.pred_N p0) X))) *)
-      (*  (split_every_pos_func_obligation_1 x0 p0 (a :: X) *)
-      (*     (fun (A0 : Type) (n : positive) (xs0 : list A0) (recproof : Datatypes.length xs0 < S (Datatypes.length X)) => *)
-      (*      f *)
-      (*        (exist (fun recarg' : {A1 : Type & {_ : positive & list A1}} => Datatypes.length (projT2 (projT2 recarg')) < S (Datatypes.length X)) *)
-      (*           (existT (fun A1 : Type => {_ : positive & list A1}) A0 (existT (fun _ : positive => list A0) n xs0)) recproof)) a X eq_refl)) = (exist (fun recarg' : {A0 : Type & {_ : positive & list A0}} => Datatypes.length (projT2 (projT2 recarg')) < S (Datatypes.length X)) *)
-      (*  (existT (fun A0 : Type => {_ : positive & list A0}) x0 (existT (fun _ : positive => list x0) p0 (drop (Pos.pred_N p0) X))) *)
-      (*  (split_every_pos_func_obligation_1 x0 p0 (a :: X) *)
-      (*     (fun (A0 : Type) (n : positive) (xs0 : list A0) (recproof : Datatypes.length xs0 < S (Datatypes.length X)) => *)
-      (*      g *)
-      (*        (exist (fun recarg' : {A1 : Type & {_ : positive & list A1}} => Datatypes.length (projT2 (projT2 recarg')) < S (Datatypes.length X)) *)
-      (*           (existT (fun A1 : Type => {_ : positive & list A1}) A0 (existT (fun _ : positive => list A0) n xs0)) recproof)) a X eq_refl)) *)
-
-      (*   ). *)
-      (* { f_equal. f_equal. *)
-      (*   eapply functional_extensionality.  *)
-      (* } *)
-
-      (* rewrite Fix_eq at 1. *)
-  (* - simpl. reflexivity. *)
-  (* - intros x0 f g Heq. *)
-  (*   destruct x0. simpl. *)
-  (*   destruct s. simpl. *)
-  (*   destruct l. *)
-  (*   + reflexivity. *)
-  (*   + f_equal. f_equal.  *)
-  (*     ++ intros HEX. admit. *)
-  (*     ++ f_equal. f_equal. simpl. admit. *)
-  (*        Admitted.  *)
-      
-      (* assert ((fun (A0 : Type) (n : positive) (xs0 : list A0) (recproof : Datatypes.length xs0 < Datatypes.length (x2 :: l)) => *)
-      (*      f *)
-      (*        (exist (fun recarg' : {A1 : Type & {_ : positive & list A1}} => Datatypes.length (projT2 (projT2 recarg')) < Datatypes.length (x2 :: l)) *)
-      (*           (existT (fun A1 : Type => {_ : positive & list A1}) A0 (existT (fun _ : positive => list A0) n xs0)) recproof)) x2 l eq_refl = (fun (A0 : Type) (n : positive) (xs0 : list A0) (recproof : Datatypes.length xs0 < Datatypes.length (x2 :: l)) => *)
-      (*      g *)
-      (*        (exist (fun recarg' : {A1 : Type & {_ : positive & list A1}} => Datatypes.length (projT2 (projT2 recarg')) < Datatypes.length (x2 :: l)) *)
-      (*           (existT (fun A1 : Type => {_ : positive & list A1}) A0 (existT (fun _ : positive => list A0) n xs0)) recproof)) x2 l eq_refl). *)
-
-
-      
-(*       assert ((fun (A0 : Type) (n : positive) (xs0 : list A0) (recproof : Datatypes.length xs0 < Datatypes.length (x2 :: l)) => *)
-(*            f *)
-(*              (exist (fun recarg' : {A1 : Type & {_ : positive & list A1}} => Datatypes.length (projT2 (projT2 recarg')) < Datatypes.length (x2 :: l)) *)
-(*                 (existT (fun A1 : Type => {_ : positive & list A1}) A0 (existT (fun _ : positive => list A0) n xs0)) recproof)) = (fun (A0 : Type) (n : positive) (xs0 : list A0) (recproof : Datatypes.length xs0 < Datatypes.length (x2 :: l)) => *)
-(*            g *)
-(*              (exist (fun recarg' : {A1 : Type & {_ : positive & list A1}} => Datatypes.length (projT2 (projT2 recarg')) < Datatypes.length (x2 :: l)) *)
-(*                 (existT (fun A1 : Type => {_ : positive & list A1}) A0 (existT (fun _ : positive => list A0) n xs0)) recproof))). *)
-(*       {  simpl. setoid_rewrite Heq. *)
-(*       assert (f *)
-(*              (exist (fun recarg' : {A1 : Type & {_ : positive & list A1}} => Datatypes.length (projT2 (projT2 recarg')) < Datatypes.length (x2 :: l)) *)
-(*                 (existT (fun A1 : Type => {_ : positive & list A1}) A0 (existT (fun _ : positive => list A0) n xs0)) recproof) = g *)
-(*              (exist (fun recarg' : {A1 : Type & {_ : positive & list A1}} => Datatypes.length (projT2 (projT2 recarg')) < Datatypes.length (x2 :: l)) *)
-(*                 (existT (fun A1 : Type => {_ : positive & list A1}) A0 (existT (fun _ : positive => list A0) n xs0)) recproof)). *)
-
-
-
-(*     intros x0 f g Heq. *)
-(*     simpl. *)
-(*     destruct x0. *)
-(*     + simpl. *)
-(*       destruct (projT2 s). *)
-(*       (* Should be true. Don't know how to prove it though. Theoretically you want to use Heq *) *)
-(*       admit. *)
-(* Admitted. *)
 
 Lemma fold_sum_acc :
   forall {A} (dts : list A) n (f : A -> N),
@@ -2316,87 +2125,7 @@ Proof.
       exists z. split; auto. right; auto.
 Qed.
 
-Lemma split_every_empty :
-  forall {A} n,
-    n <> 0%N ->
-    split_every n [] = inr ([]: list (list A)).
-Proof using.
-  intros. destruct n; try contradiction.
-  unfold split_every. f_equal.
-Qed.
-
-Lemma take_more :
-  forall {A : Type} n xs,
-    length xs < N.to_nat n ->
-    (split_every n xs : err (list (list A))) = inr ([xs]).
-Proof using.
-  intros. destruct n.
-  - apply Nat.nlt_0_r in H. contradiction.
-  - simpl. unfold split_every_pos.
-    Admitted.
-
-(* Lemma split_every_take : forall {A} xs n x, *)
-(*     0 < N.to_nat n -> *)
-(*     split_every n xs = take  *)
-
-(* Search Fix_sub. *)
-
-
-(* Lemma list_list_empty_l : forall {A : Type} xss, *)
-(*     xss = ([]::xss : list (list A)). *)
-(* Proof using. *)
-(*   intros. simpl. induction  *)
-
-(* Lemma split_every_unfold_take : forall {A : Type} l p x xs, *)
-(*     split_every_pos p l = x :: xs -> *)
-(*     x = @take A (Npos p) l. *)
-(* Proof using. *)
-(*   intros. induction l. *)
-(*   - unfold split_every_pos in *. *)
-(*     unfold split_every_pos_func in *. *)
-(*     rewrite fix_sub_eq in H. *)
-(*     simpl in H. *)
-(*     + discriminate. *)
-(*     + intros. *)
-(*       destruct x0. *)
-(*       ++ f_equal. apply Heq. *)
-    
-    
-
-(* Lemma split_every_unfold : forall {A : Type} x xs p, *)
-(*     split_every_pos p (x :: xs) = @take A (Npos p) (x :: xs) :: split_every_pos p (drop (Npos p) (x :: xs)). *)
-(* Proof using. *)
-(*   (* intros A l. induction l; intros. *) *)
-(*   (* - program_simpl. *) *)
-(*   intros A x xs p. *)
-(*   unfold split_every_pos.  *)
-(*   unfold split_every_pos_func. *)
-(*   rewrite Fix_eq at 1. *)
-(*   - simpl. reflexivity. *)
-(*   - intros x0 f g Heq. *)
-(*     simpl. *)
-(*     destruct x0. *)
-(*     + simpl. *)
-(*       destruct (projT2 s). *)
-(*       (* Should be true. Don't know how to prove it though. Theoretically you want to use Heq *) *)
-(*       admit. *)
-(* Admitted. *)
-
-(* Lemma split_every_unfold' : forall {A : Type} x xs p, *)
-(*     exists xss,  *)
-(*     split_every_pos p (x :: xs) = @take A (Npos p) (x :: xs) :: xss. *)
-(* Proof using. *)
-(* Admitted. *)
-
-(* Lemma split_every_fixpoint: forall {A : Type} x xs p l, *)
-(*     l = x :: xs -> *)
-(*     exists xss, split_every (N.pos p) l = inr (@take A (N.pos p) l::xss). *)
-(* Proof. *)
-(*   intros. *)
-(* Lemma list_take_drop : forall {A} l n, *)
-(*     l <> [] -> *)
-(*     l = take n *)
-Lemma list_non_empty : forall {A} (l : list A),
+Lemma list_nonempty_equiv : forall {A} (l : list A),
     l <> [] <-> exists x xs, l = x::xs.
 Proof using.
   split.
@@ -2442,7 +2171,7 @@ Proof.
         intros.
         apply split_every_pos_empty_equiv in SPLITY.
         apply split_every_pos_nonempty_inv in SPLITX.
-        apply list_non_empty in SPLITX.
+        apply list_nonempty_equiv in SPLITX.
         destruct SPLITX as (c&cs&SPLITX).
         subst. inversion ALL.
       ++ intros.
@@ -2457,154 +2186,6 @@ Proof.
              { apply Forall2_drop. auto. }
              { reflexivity. }
 Qed.
-        
-    (* remember (split_every_pos A p xs). *)
-    (* induction l. *)
-    (* + intros. symmetry in Heql. *)
-    (*   apply split_every_pos_empty_equiv in Heql.  *)
-    (*   subst. inversion ALL. constructor. *)
-    (* + intros. *)
-    (*   assert (a :: xs' <> xs'). *)
-    (*   { apply list_cons_neq. } *)
-      
-
-
-
-      (* remember (split_every_pos B p ys). *)
-
-      (* induction l0. *)
-      (* ++ subst. *)
-      (*    symmetry in Heql0. *)
-      (*    apply split_every_pos_empty_equiv in Heql0. *)
-      (*    subst. *)
-      (*    symmetry in Heql. *)
-      (*    apply split_every_pos_nonempty_inv in Heql. *)
-      (*    destruct xs. *)
-      (*    { destruct Heql. reflexivity. } *)
-      (*    { inversion ALL. } *)
-      (* ++                        (* Ideally get IHl to work with split_every_pos drop,then *) *)
-         
-Admitted.
-         
-         
-    
-  (* intros A B P xs ys xs' ys' n ALL. *)
-
-  (* generalize dependent xs'. *)
-  (* generalize dependent ys'. *)
-  (* generalize dependent n. *)
-  (* induction ALL. *)
-  (* - intros. unfold split_every in *. *)
-  (*   induction n. *)
-  (*   + discriminate. *)
-  (*   + injection H. injection H0. intros; subst. constructor. *)
-  (* - intros. induction n. *)
-  (*   + discriminate. *)
-  (*   + unfold split_every in H0. unfold split_every in H1. *)
-  (*     injection H0. injection H1. intros. *)
-      
-
-
-
-
-
-  
-  (* generalize dependent xs'. *)
-  (* generalize dependent ys'. *)
-  (* induction n. *)
-  - intros. discriminate.
-  - intros ys' xs' ys xs ALL SPLITX SPLITY.
-    unfold split_every in *.
-    injection SPLITX; injection SPLITY; intros.
-    clear SPLITX. clear SPLITY.
-    generalize dependent H0. generalize dependent H.
-    generalize dependent xs'.
-    generalize dependent ys'.
-    induction ALL; intros ys' xs' SPLITY SPLITX.
-    + subst. repeat rewrite split_every_pos_equation. constructor.
-    + rewrite split_every_pos_equation in *.
-      subst. constructor.
-      ++ apply Forall2_take. constructor; auto.
-      ++ 
-  (* - intros ys' xs' ys xs ALL. *)
-  (* (* - intros ys' xs' ys xs ALL SPLITX SPLITY. *) *)
-  (* (*   unfold split_every in *. *) *)
-  (* (*   injection SPLITX. injection SPLITY. intros. *) *)
-  (* (*   induction split_every_pos. *) *)
-  (* (*   + induction split_every_pos. *) *)
-  (* (*     ++ subst. auto. *) *)
-  (* (*     ++ subst. *) *)
-  (*   generalize dependent xs'. *)
-  (*   generalize dependent ys'. *)
-  (*   induction ALL. *)
-  (*   + unfold split_every. *)
-  (*     intros ys' xs' SPLITX SPLITY. *)
-  (*     injection SPLITX; injection SPLITY. *)
-  (*     intros. *)
-  (*     cbv in H. *)
-  (*     cbv in H0. *)
-  (*     subst. auto. *)
-  (*   + unfold split_every in *. *)
-  (*     intros ys' xs' SPLITX SPLITY. *)
-  (*     injection SPLITX; injection SPLITY. *)
-  (*     intros. *)
-  (*     rewrite split_every_unfold in H0. *)
-  (*     rewrite split_every_unfold in H1. *)
-  (*     subst. *)
-  (*     constructor. *)
-  (*     ++ apply Forall2_take. *)
-  (*        constructor; auto. *)
-  (*     ++  *)
-  (*       apply IHALL. *)
-         (* This case is impossible. Ideally rely on some IH *)
-
-
-  (*   unfold split_every in *. *)
-  (*   injection SPLITX; injection SPLITY; intros. *)
-  (*   induction ALL. *)
-  (*   +   *)
-  (*     cbv in H. *)
-  (*     cbv in H0. *)
-  (*     subst. auto. *)
-  (*   + rewrite split_every_unfold in H. *)
-  (*     rewrite split_every_unfold in H0. *)
-  (*     subst. *)
-  (*     constructor. *)
-  (*     ++ apply Forall2_take. *)
-  (*        constructor; auto. *)
-  (*     ++  *)
-  (*   + unfold split_every_pos in H. unfold split_every_pos_func in H. cbv in H. *)
-  (*     fold (@drop A) in H. *)
-
-
-
-  (*   induction ALL. *)
-  (*   + rewrite split_every_empty in SPLITX;  *)
-  (*       rewrite split_every_empty in SPLITY; *)
-  (*       injection SPLITX; injection SPLITY; intros; subst; auto; *)
-  (*     try (apply N.neq_0_r; exists (Pos.pred_N p)%N; symmetry; apply N.succ_pos_pred). *)
-  (*   +  *)
-
-  (*   (* simpl in *. injection SPLITY; injection SPLITX; intros. *) *)
-
-
-
-
-
-  
-  (* induction ALL; subst. *)
-  (* - destruct n. *)
-  (*   + discriminate. *)
-  (*   + rewrite split_every_empty in SPLITX;  *)
-  (*       rewrite split_every_empty in SPLITY; *)
-  (*       injection SPLITX; injection SPLITY; intros; subst; auto; *)
-  (*     try (apply N.neq_0_r; exists (Pos.pred_N p)%N; symmetry; apply N.succ_pos_pred). *)
-  (* - destruct n. *)
-  (*   + discriminate. *)
-  (*   +  *)
-                                                     
-      
-Admitted.
 
 Lemma split_every_n_succeeds :
   forall A B (xs : list A) (ys : list B) n xs',
