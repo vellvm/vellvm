@@ -744,6 +744,14 @@ Proof using.
       reflexivity.
 Qed.
 
+Lemma split_every_pos_nonempty_inv : forall {A} (l : list A) xs xss p,
+    split_every_pos A p l = xs :: xss -> l <> [].
+Proof using.
+  intros A l.
+  induction l.
+  - discriminate.
+  - intros. intros D. discriminate.
+Qed.
 (* Equations split_every_pos'' {A} (n : positive) (xs : list A) : list (list A) := *)
 (*   split_every_pos'' n [] := []; *)
 (*   split_every_pos'' n _ :=  *)
@@ -2381,17 +2389,6 @@ Proof using.
 (*     l <> [] -> *)
 (*     l = take n *)
 
-Lemma split_every_pos_empty_equiv : forall {A} l p,
-    split_every_pos A p l = [] <-> l = [].
-Proof using.
-  split.
-  - intros. rewrite split_every_pos_equation in H.
-    induction l.
-    + reflexivity.
-    + discriminate.
-  - intros; subst. reflexivity.
-Qed.
-  
 Lemma split_every_Forall2 :
   forall {A B} (P : A -> B -> Prop) xs ys xs' ys' n,
     Forall2 P xs ys ->
@@ -2408,7 +2405,23 @@ Proof.
     intros. clear SPLITX; clear SPLITY. generalize dependent ys.
     remember (split_every_pos A p xs).
     induction l.
-    + 
+    + intros. symmetry in Heql.
+      apply split_every_pos_empty_equiv in Heql. 
+      remember (split_every_pos B p ys).
+      induction l.
+      ++ symmetry in Heql0.
+         apply split_every_pos_empty_equiv in Heql0.
+         subst. constructor.
+      ++ subst.
+         symmetry in Heql0.
+         apply split_every_pos_nonempty_inv in Heql0.
+         destruct ys.
+         { destruct Heql0. reflexivity. }
+         { inversion ALL. }
+    + admit.
+Admitted.
+         
+         
     
   (* intros A B P xs ys xs' ys' n ALL. *)
 
