@@ -731,15 +731,18 @@ Proof using.
          intros D. discriminate.
 Qed.
 
-Lemma split_every_pos_nonempty_equiv : forall {A} l p,
-    (exists xs xss,split_every_pos A p l = xs :: xss) <-> l <> [].
+Lemma split_every_pos_nonempty_equiv : forall {A} (l : list A) p,
+    split_every_pos A p l = take (N.pos p) l :: split_every_pos A p (drop (N.pos p) l)<-> l <> [].
 Proof using.
   split.
-  - admit.
-  - intros H.
-    induction l.
+  - intros. induction l.
+    + discriminate.
+    + intros D. discriminate.
+  - intros. induction l.
     + destruct H; reflexivity.
-    + 
+    + rewrite split_every_pos_equation at 1.
+      reflexivity.
+Qed.
 
 (* Equations split_every_pos'' {A} (n : positive) (xs : list A) : list (list A) := *)
 (*   split_every_pos'' n [] := []; *)
