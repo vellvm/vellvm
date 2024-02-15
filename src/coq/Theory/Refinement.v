@@ -46,7 +46,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   (* Definition 5.6 UValue refinement *)
   Variant refine_uvalue: uvalue -> uvalue -> Prop :=
     | UndefPoison: forall dt uv uv1, concretize uv1 (DVALUE_Poison dt) -> uvalue_has_dtyp uv dt -> refine_uvalue uv1 uv
-    | RefineConcrete: forall uv1 uv2, (forall (dv:dvalue), concretize uv2 dv -> concretize uv1 dv) -> refine_uvalue uv1 uv2
+    | RefineConcrete: forall uv1 uv2 (* dt *), (* uvalue_has_dtyp uv1 dt -> uvalue_has_dtyp uv2 dt -> *) (forall (dv:dvalue), concretize uv2 dv -> concretize uv1 dv) -> refine_uvalue uv1 uv2
   .
   #[export] Hint Constructors refine_uvalue : core.
 
@@ -65,6 +65,39 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     split; reflexivity.
   Qed.
 
+  (* Search concretize_u. *)
+  Lemma concretize_UVALUE_Addr : forall a dv,
+      concretize (UVALUE_Addr a) dv ->
+      dv = DVALUE_Addr a.
+  Proof using.
+    intros a dv CON. rewrite concretize_equation in *.
+    unfold concretize_u in *.
+    rewrite concretize_uvalueM_equation in *.
+    cbn in *.
+    injection CON; intros.
+    auto.
+  Qed.
+
+  Lemma concretize_DVALUE_Addr : forall (uv : uvalue) a,
+      concretize (uv) (DVALUE_Addr a) ->
+      uv = UVALUE_Addr a.
+  Proof using.
+    intros uv. 
+    Admitted.
+  
+  Lemma refine_uvalue_UVALUE_addr : forall a uv,
+      refine_uvalue (UVALUE_Addr a) uv ->
+      (UVALUE_Addr a) = uv.
+  Proof.
+    intros a uv REF. inversion REF.
+    - rewrite concretize_equation in H.
+      unfold concretize_u in *.
+      rewrite concretize_uvalueM_equation in H.
+      cbn in H.
+      injection H; intros; discriminate.
+    - subst.
+      Admitted.
+  
   (* SAZ: THIS LOOKS IMPORTANT - is it needed? *)
   Lemma refine_uvalue_dtyp :
     forall uv1 uv2 dt,
@@ -73,10 +106,94 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
       uvalue_has_dtyp uv2 dt.
   Proof.
     intros uv1 uv2 dt DTYP REF.
-    induction DTYP.
+    generalize dependent uv2.
+    induction DTYP; intros uv2 REF. 
     - inversion REF; subst.
-  Admitted.
+      + rewrite concretize_equation in H.
+        unfold concretize_u in *.
+        rewrite concretize_uvalueM_equation in H.
+        cbn in H.
+        injection H; intros; discriminate.
+      + Print refine_uvalue.
+        
 
+        specialize (H (DVALUE_Addr a)).
+        repeat rewrite concretize_equation in H.
+        unfold concretize_u in H.
+        rewrite concretize_uvalueM_equation in H.
+        cbn in H.
+    (* inversion DTYP; subst; intros uv2 REF. *)
+    (* - inversion REF; subst. *)
+    (*   + rewrite concretize_equation in H. *)
+    (*     unfold concretize_u in *. *)
+    (*     rewrite concretize_uvalueM_equation in H. *)
+    (*     cbn in H. *)
+    (*     injection H; intros; discriminate. *)
+    (*   + *)
+    (*     Search uvalue_has_dtyp. *)
+
+    (*     admit. *)
+    (* - *)
+
+        (* assert (concretize uv2 ()) *)
+
+    (* - induction uv2. *)
+    (*   + constructor. *)
+    (*   + inversion REF; subst. *)
+    (*     ++ rewrite concretize_equation in H. *)
+    (*        unfold concretize_u in *. *)
+    (*        rewrite concretize_uvalueM_equation in H. *)
+    (*        cbn in H. *)
+    (*        injection H; intros; discriminate. *)
+    (*     ++ Search concretize. *)
+    - Search uvalue_has_dtyp.
+
+
+      inversion REF; subst.
+      + rewrite concretize_equation in H.
+        unfold concretize_u in *.
+        rewrite concretize_uvalueM_equation in H.
+        cbn in H.
+        injection H; intros; discriminate.
+      + Print uvalue_has_dtyp.
+        (* assert (H2 : uv2 = (UVALUE_Addr a)). *)
+
+
+
+
+      
+    (* induction DTYP; intros uv2 REF. *)
+    (* - inversion REF; subst. *)
+    (*   + subst. *)
+    (*     Print concretize_u. *)
+
+
+
+
+
+        
+        Admitted.
+        (* Search concretize. *)
+        (* Print concretize_u. *)
+  (*   intros uv1 uv2 dt DTYP REF. *)
+  (*   induction DTYP. *)
+  (*   - inversion REF; subst. *)
+  (* Admitted. *)
+
+  Lemma concretize_UVALUE_Addr_injective : forall uv dv a,
+      concretize (UVALUE_Addr a) dv ->
+      concretize uv dv ->
+      uv = (UVALUE_Addr a) \/ exists dt, uv = UVALUE_Undef dt.
+  Proof.
+    intros.
+    rewrite concretize_equation in *.
+    unfold concretize_u in *.
+    rewrite concretize_uvalueM_equation in H.
+    cbn in H. injection H; intros; subst.
+    induction uv; try (rewrite concretize_uvalueM_equation in H0; cbn in H0; injection H0; intros; try (subst; auto); try discriminate).
+    - right. eexists; auto.
+    - rewrite concretize_uvalueM_equation in H0. cbn in H0.
+  
   #[global] Instance refine_uvalue_Transitive : Transitive refine_uvalue.
   Proof.
     repeat intro.

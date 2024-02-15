@@ -678,31 +678,68 @@ Proof.
   lia.
 Qed.
 
-Program Fixpoint split_every_pos {A} (n : positive) (xs : list A) {measure (length xs)} : list (list A)
-  := match xs with
-     | [] => []
-     | (_::_) =>
-         @take A (Npos n) xs :: split_every_pos n (@drop A (Npos n) xs)
-     end.
-Next Obligation.
-  apply drop_length_lt. lia.
-  intros D. inversion D.
-  (* destruct xs; try contradiction. *)
-  (* apply drop_length_lt; auto; lia. *)
-Qed.
+(* Program Fixpoint split_every_pos {A} (n : positive) (xs : list A) {measure (length xs)} : list (list A) *)
+(*   := match xs with *)
+(*      | [] => [] *)
+(*      | (_::_) => *)
+(*          @take A (Npos n) xs :: split_every_pos n (@drop A (Npos n) xs) *)
+(*      end. *)
+(* Next Obligation. *)
+(*   apply drop_length_lt. lia. *)
+(*   intros D. inversion D. *)
+(*   (* destruct xs; try contradiction. *) *)
+(*   (* apply drop_length_lt; auto; lia. *) *)
+(* Qed. *)
 
-Function split_every_pos' {A} (n : positive) (xs : list A) { measure length xs }: list (list A)
+Function split_every_pos {A} (n : positive) (xs : list A) { measure length xs }: list (list A)
   := match xs with
      | [] => []
      | (_::_) =>
-         @take A (Npos n) xs :: split_every_pos' n (@drop A (Npos n)%N xs)
+         @take A (Npos n) xs :: split_every_pos n (@drop A (Npos n)%N xs)
      end.
 Proof.
 intros. apply drop_length_lt. lia.
 intros D. inversion D.
 Defined.
 
-Search split_every_pos'.
+Lemma split_every_pos_empty_equiv : forall {A} l p,
+    split_every_pos A p l = [] <-> l = [].
+Proof using.
+  split.
+  - intros. rewrite split_every_pos_equation in H.
+    induction l.
+    + reflexivity.
+    + discriminate.
+  - intros; subst. reflexivity.
+Qed.
+
+Lemma list_take_drop : forall {A} (l : list A) n,
+    l <> [] -> l = (take n l) ++ drop n l.
+Proof using.
+  intros.
+  generalize dependent n.
+  induction l.
+  - destruct H. reflexivity.
+  - induction l.
+    + intros n. induction n.
+      ++ reflexivity.
+      ++ reflexivity.
+    + intros n. induction n.
+      ++ reflexivity.
+      ++ simpl. f_equal.
+         apply IHl.
+         intros D. discriminate.
+Qed.
+
+Lemma split_every_pos_nonempty_equiv : forall {A} l p,
+    (exists xs xss,split_every_pos A p l = xs :: xss) <-> l <> [].
+Proof using.
+  split.
+  - admit.
+  - intros H.
+    induction l.
+    + destruct H; reflexivity.
+    + 
 
 (* Equations split_every_pos'' {A} (n : positive) (xs : list A) : list (list A) := *)
 (*   split_every_pos'' n [] := []; *)
@@ -714,7 +751,7 @@ Definition split_every {A} (n : N) (xs : list A) : err (list (list A))
   := match n with
      | N0 => failwith "split_every: called with n = 0."
      | Npos n =>
-         inr (split_every_pos n xs)
+         inr (split_every_pos A n xs)
      end.
 
 Program Fixpoint bla_list {A} (l : list A) {measure (length l)} :=
@@ -806,10 +843,8 @@ Qed.
 (*     split_every_pos' A p (x :: xs) = @take A (Npos p) (x :: xs) :: split_every_pos' A p (drop (Npos p) (x :: xs)). *)
 (* Proof. *)
 (*   intros A x xs p. *)
-(*   unfold split_every_pos'. *)
-(*   program_simplify. *)
-(*   unfold split_every_pos'_terminate. *)
-(*   program_simplify. *)
+(*   rewrite split_every_pos'_equation. reflexivity. *)
+(* Qed. *)
   
 
 
@@ -819,29 +854,29 @@ Qed.
   
   
   
-Lemma split_every_unfold : forall {A : Type} x xs p,
-    split_every_pos p (x :: xs) = @take A (Npos p) (x :: xs) :: split_every_pos p (drop (Npos p) (x :: xs)).
-Proof using.
-  intros A x xs p.
-  unfold split_every_pos.
-  unfold split_every_pos_func.
-  (* fold (@drop A (Npos p) (x :: xs)). *)
-  rewrite fix_sub_eq.
-  program_simplify.
-  - reflexivity.
-  - intros x0 f g Heq.
-    induction x0. program_simplify.
-    induction X; program_simplify.
-    + reflexivity.
-    + simpl in IHX. f_equal.
-      destruct X.
-      ++ program_simplify. rewrite Heq. f_equal.
-         +++ intros HE. admit.
-         +++ Search exist. apply eq_exist_uncurried. 
-             esplit. Search eq_rect. erewrite <- Eqdep.Eq_rect_eq.eq_rect_eq.
-             f_equal. 
+(* Lemma split_every_unfold : forall {A : Type} x xs p, *)
+(*     split_every_pos p (x :: xs) = @take A (Npos p) (x :: xs) :: split_every_pos p (drop (Npos p) (x :: xs)). *)
+(* Proof using. *)
+(*   intros A x xs p. *)
+(*   unfold split_every_pos. *)
+(*   unfold split_every_pos_func. *)
+(*   (* fold (@drop A (Npos p) (x :: xs)). *) *)
+(*   rewrite fix_sub_eq. *)
+(*   program_simplify. *)
+(*   - reflexivity. *)
+(*   - intros x0 f g Heq. *)
+(*     induction x0. program_simplify. *)
+(*     induction X; program_simplify. *)
+(*     + reflexivity. *)
+(*     + simpl in IHX. f_equal. *)
+(*       destruct X. *)
+(*       ++ program_simplify. rewrite Heq. f_equal. *)
+(*          +++ intros HE. admit. *)
+(*          +++ Search exist. apply eq_exist_uncurried.  *)
+(*              esplit. Search eq_rect. erewrite <- Eqdep.Eq_rect_eq.eq_rect_eq. *)
+(*              f_equal.  *)
 
-             Admitted.
+(*              Admitted. *)
 
 
 
@@ -2328,17 +2363,31 @@ Proof using.
 (*       admit. *)
 (* Admitted. *)
 
-Lemma split_every_unfold' : forall {A : Type} x xs p,
-    exists xss, 
-    split_every_pos p (x :: xs) = @take A (Npos p) (x :: xs) :: xss.
-Proof using.
-Admitted.
+(* Lemma split_every_unfold' : forall {A : Type} x xs p, *)
+(*     exists xss,  *)
+(*     split_every_pos p (x :: xs) = @take A (Npos p) (x :: xs) :: xss. *)
+(* Proof using. *)
+(* Admitted. *)
 
 (* Lemma split_every_fixpoint: forall {A : Type} x xs p l, *)
 (*     l = x :: xs -> *)
 (*     exists xss, split_every (N.pos p) l = inr (@take A (N.pos p) l::xss). *)
 (* Proof. *)
 (*   intros. *)
+(* Lemma list_take_drop : forall {A} l n, *)
+(*     l <> [] -> *)
+(*     l = take n *)
+
+Lemma split_every_pos_empty_equiv : forall {A} l p,
+    split_every_pos A p l = [] <-> l = [].
+Proof using.
+  split.
+  - intros. rewrite split_every_pos_equation in H.
+    induction l.
+    + reflexivity.
+    + discriminate.
+  - intros; subst. reflexivity.
+Qed.
   
 Lemma split_every_Forall2 :
   forall {A B} (P : A -> B -> Prop) xs ys xs' ys' n,
@@ -2347,14 +2396,55 @@ Lemma split_every_Forall2 :
     split_every n ys = inr ys' ->
     Forall2 (Forall2 P) xs' ys'.
 Proof.
-  intros A B P xs ys xs' ys' n.
-  generalize dependent xs.
-  generalize dependent ys.
+  intros A B P xs ys xs' ys' n ALL SPLITX SPLITY.
   generalize dependent xs'.
   generalize dependent ys'.
   induction n.
   - intros. discriminate.
+  - intros. unfold split_every in *. injection SPLITX. injection SPLITY.
+    intros. clear SPLITX; clear SPLITY. generalize dependent ys.
+    remember (split_every_pos A p xs).
+    induction l.
+    + 
+    
+  (* intros A B P xs ys xs' ys' n ALL. *)
+
+  (* generalize dependent xs'. *)
+  (* generalize dependent ys'. *)
+  (* generalize dependent n. *)
+  (* induction ALL. *)
+  (* - intros. unfold split_every in *. *)
+  (*   induction n. *)
+  (*   + discriminate. *)
+  (*   + injection H. injection H0. intros; subst. constructor. *)
+  (* - intros. induction n. *)
+  (*   + discriminate. *)
+  (*   + unfold split_every in H0. unfold split_every in H1. *)
+  (*     injection H0. injection H1. intros. *)
+      
+
+
+
+
+
+  
+  (* generalize dependent xs'. *)
+  (* generalize dependent ys'. *)
+  (* induction n. *)
+  - intros. discriminate.
   - intros ys' xs' ys xs ALL SPLITX SPLITY.
+    unfold split_every in *.
+    injection SPLITX; injection SPLITY; intros.
+    clear SPLITX. clear SPLITY.
+    generalize dependent H0. generalize dependent H.
+    generalize dependent xs'.
+    generalize dependent ys'.
+    induction ALL; intros ys' xs' SPLITY SPLITX.
+    + subst. repeat rewrite split_every_pos_equation. constructor.
+    + rewrite split_every_pos_equation in *.
+      subst. constructor.
+      ++ apply Forall2_take. constructor; auto.
+      ++ 
   (* - intros ys' xs' ys xs ALL. *)
   (* (* - intros ys' xs' ys xs ALL SPLITX SPLITY. *) *)
   (* (*   unfold split_every in *. *) *)
@@ -2436,7 +2526,7 @@ Proof.
 Admitted.
 
 Lemma split_every_n_succeeds :
-  forall {A B} (xs : list A) (ys : list B) n xs',
+  forall A B (xs : list A) (ys : list B) n xs',
     split_every n xs = inr xs' ->
     exists ys', split_every n ys = inr ys'.
 Proof.
