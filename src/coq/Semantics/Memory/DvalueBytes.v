@@ -312,8 +312,8 @@ Module Type DvalueByte (LP : LLVMParams).
           end
       end.
   Proof.
-    induction dv.
-    1-12: cbn; reflexivity.
+    unfold dvalue_extract_byte,
+      dvalue_extract_byte_func at 1.
   Admitted.
 
   (* Taking a byte out of a dvalue...

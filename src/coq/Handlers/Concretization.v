@@ -534,7 +534,7 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
                       | mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr dv)))))) =>
                           (* As long as the dvalue has the same type, it's a refinement *)
                           dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-                      | _ => False
+                      | _ => True
                       end).
     }
 
@@ -554,7 +554,7 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
                       | mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr dv)))))) =>
                           (* As long as the dvalue has the same type, it's a refinement *)
                           dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-                      | _ => False
+                      | _ => True
                       end).
     }
 
@@ -1043,6 +1043,15 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                NM.add sid [(uv, dv)] acc
            end.
 
+      (* Take a UVALUE_ExtractByte, and replace the uvalue with a given dvalue...
+       *)
+      Definition uvalue_byte_replace_with_dvalue_byte (uv : uvalue) (dv : dvalue) : M dvalue_byte
+      := match uv with
+         | UVALUE_ExtractByte uv dt idx sid =>
+             ret (DVALUE_ExtractByte dv dt idx)
+         | _ => lift_ue (raise_error "uvalue_byte_replace_with_dvalue_byte called with non-UVALUE_ExtractByte value.")
+         end.
+
       (* TODO: satisfy the termination checker here. *)
       (* M will be err_or_ub / MPropT err_or_ub? *)
       (* Define a sum type f a, g b.... a + b. Mutual recursive
@@ -1174,16 +1183,6 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
 
       with
 
-      (* Take a UVALUE_ExtractByte, and replace the uvalue with a given dvalue...
-       *)
-      uvalue_byte_replace_with_dvalue_byte (uv : uvalue) (dv : dvalue) {struct uv} : M dvalue_byte
-      := match uv with
-         | UVALUE_ExtractByte uv dt idx sid =>
-             ret (DVALUE_ExtractByte dv dt idx)
-         | _ => lift_ue (raise_error "uvalue_byte_replace_with_dvalue_byte called with non-UVALUE_ExtractByte value.")
-         end
-
-      with
       (* Concretize the uvalues in a list of UVALUE_ExtractBytes...
 
        *)

@@ -123,7 +123,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
         (Conc : concretize_u x res),
         non_poison_prop x ->
         t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
-        PickUvalue_handler (@pickNonPoison _ _ (fun _ _ => True) x) t                           
+        PickUvalue_handler (@pickNonPoison _ _ (fun _ _ => True) x) t
     | PickUV_Ret :
       forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True})
         (Conc : concretize_u x res),
@@ -184,8 +184,58 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
     Import MonadNotation.
 
     Transparent map_monad.
+
+    (* TODO: Move these *)
+    Lemma default_dvalue_of_dtyp_i_not_poison :
+      forall sz d t,
+        default_dvalue_of_dtyp_i sz = inr d ->
+        d <> DVALUE_Poison t.
+    Proof.
+      intros sz d t H.
+      unfold default_dvalue_of_dtyp_i in *.
+      repeat break_match_hyp_inv; discriminate.
+    Qed.
+
+    Lemma default_dvalue_of_dtyp_not_poison :
+      forall t d t',
+        default_dvalue_of_dtyp t = inr d ->
+        d <> DVALUE_Poison t'.
+    Proof.
+      intros t d t' H.
+      destruct t; cbn in *; inv H;
+        try break_match_hyp_inv; try discriminate.
+      - eapply default_dvalue_of_dtyp_i_not_poison; eauto.
+      - break_match_hyp_inv; discriminate.
+    Qed.
+
     Lemma concretize_u_concretize_uvalue : forall u, concretize_u u (concretize_uvalue u).
     Proof using.
+      unfold concretize_u, concretize_uvalue.
+      induction u using uvalue_strong_ind;
+        try reflexivity.
+
+      - (* Undef *)
+        remember (concretize_uvalueM err_ub_oom
+       (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
+       err_ub_oom (fun (A : Type) (x : err_ub_oom A) => x)
+       (UVALUE_Undef t)) as concuvalue.
+        cbn.
+        destruct (default_dvalue_of_dtyp t) eqn:DEF.
+        + (* t could be unimplemented or void... *)
+          cbn in *.
+          subst.
+          rewrite DEF.
+          cbn in *; auto.
+        + subst.
+          cbn in *.
+          rewrite DEF.
+          cbn.
+          split.
+          eapply dvalue_default; eauto.
+          eapply default_dvalue_of_dtyp_not_poison; eauto.
+      - destruct u;
+          try reflexivity.
+
       (* intros u. *)
       (* induction u; try do_it. *)
       (* - (* cbn. *) (* destruct (default_dvalue_of_dtyp t) eqn: EQ. *) *)

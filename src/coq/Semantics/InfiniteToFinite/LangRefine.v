@@ -10776,7 +10776,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-           | _ => False
+           | _ => True
            end) err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -10793,7 +10793,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => E1.DV.dvalue_has_dtyp dv dt /\ dv <> E1.DV.DVALUE_Poison dt
-           | _ => False
+           | _ => True
            end) err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -11284,7 +11284,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -11300,7 +11300,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => IS1.LP.Events.DV.dvalue_has_dtyp dv dt0 /\ dv <> IS1.LP.Events.DV.DVALUE_Poison dt0
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -11418,7 +11418,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -11434,7 +11434,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => IS1.LP.Events.DV.dvalue_has_dtyp dv dt0 /\ dv <> IS1.LP.Events.DV.DVALUE_Poison dt0
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -11468,7 +11468,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -11484,7 +11484,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => IS1.LP.Events.DV.dvalue_has_dtyp dv dt0 /\ dv <> IS1.LP.Events.DV.DVALUE_Poison dt0
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -15005,7 +15005,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-           | _ => False
+           | _ => True
            end) err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -15022,7 +15022,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => E1.DV.dvalue_has_dtyp dv dt /\ dv <> E1.DV.DVALUE_Poison dt
-           | _ => False
+           | _ => True
            end) err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -15163,7 +15163,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -15179,7 +15179,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => IS1.LP.Events.DV.dvalue_has_dtyp dv dt0 /\ dv <> IS1.LP.Events.DV.DVALUE_Poison dt0
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -15281,7 +15281,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -15297,7 +15297,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => IS1.LP.Events.DV.dvalue_has_dtyp dv dt0 /\ dv <> IS1.LP.Events.DV.DVALUE_Poison dt0
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -15369,7 +15369,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -15385,7 +15385,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => IS1.LP.Events.DV.dvalue_has_dtyp dv dt0 /\ dv <> IS1.LP.Events.DV.DVALUE_Poison dt0
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -15445,6 +15445,7 @@ Qed.
           repeat break_match_hyp_inv;
           repeat red in UB;
           rewrite CONC.concretize_uvalueM_equation in UB; inv UB
+        | cbn; auto
         ].
 
     destruct uv_inf;
@@ -15455,6 +15456,7 @@ Qed.
           repeat break_match_hyp_inv;
           repeat red in UB;
           rewrite CONC.concretize_uvalueM_equation in UB; inv UB
+        | cbn; auto
         ].
 
     - (* Structs *)
@@ -17249,7 +17251,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-           | _ => False
+           | _ => True
            end) err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -17266,7 +17268,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => E1.DV.dvalue_has_dtyp dv dt /\ dv <> E1.DV.DVALUE_Poison dt
-           | _ => False
+           | _ => True
            end) err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -17408,7 +17410,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -17424,7 +17426,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => IS1.LP.Events.DV.dvalue_has_dtyp dv dt0 /\ dv <> IS1.LP.Events.DV.DVALUE_Poison dt0
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -17526,7 +17528,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -17542,7 +17544,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => IS1.LP.Events.DV.dvalue_has_dtyp dv dt0 /\ dv <> IS1.LP.Events.DV.DVALUE_Poison dt0
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -17576,7 +17578,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -17592,7 +17594,7 @@ Qed.
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
              |} => IS1.LP.Events.DV.dvalue_has_dtyp dv dt0 /\ dv <> IS1.LP.Events.DV.DVALUE_Poison dt0
-           | _ => False
+           | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -17652,6 +17654,7 @@ Qed.
           repeat break_match_hyp_inv;
           repeat red in ERR;
           rewrite CONC.concretize_uvalueM_equation in ERR; inv ERR
+        | cbn; auto
         ].
 
     destruct uv_inf;
@@ -17662,6 +17665,7 @@ Qed.
           repeat break_match_hyp_inv;
           repeat red in ERR;
           rewrite CONC.concretize_uvalueM_equation in ERR; inv ERR
+        | cbn; auto
         ].
 
     - (* Structs *)
