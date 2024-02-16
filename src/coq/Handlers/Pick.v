@@ -519,6 +519,1088 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
       destruct_err_ub_oom y; reflexivity.
     Qed.
 
+    Lemma eval_select_loop_eval_select_loop :
+      forall elts elts0 elts1,
+        ((fix loop (conds xs ys : list dvalue) {struct conds} : ErrUbOomProp (list dvalue) :=
+            match conds with
+            | nil =>
+                match xs with
+                | nil =>
+                    fun ys0 : list dvalue =>
+                      match ys0 with
+                      | nil => fun y0 : err_ub_oom (list dvalue) => success_unERR_UB_OOM (@nil dvalue) = y0
+                      | _ :: _ =>
+                          fun ue : err_ub_oom (list dvalue) =>
+                            ERR_unERR_UB_OOM "concretize_uvalueM: ill-typed vector select, length mismatch." =
+                              ue
+                      end
+                | _ :: _ =>
+                    fun (_ : list dvalue) (ue : err_ub_oom (list dvalue)) =>
+                      ERR_unERR_UB_OOM "concretize_uvalueM: ill-typed vector select, length mismatch." = ue
+                end ys
+            | c :: conds0 =>
+                match xs with
+                | nil =>
+                    fun ue : err_ub_oom (list dvalue) =>
+                      ERR_unERR_UB_OOM "concretize_uvalueM: ill-typed vector select, length mismatch." = ue
+                | x0 :: xs0 =>
+                    match ys with
+                    | nil =>
+                        fun ue : err_ub_oom (list dvalue) =>
+                          ERR_unERR_UB_OOM "concretize_uvalueM: ill-typed vector select, length mismatch." =
+                            ue
+                    | y0 :: ys0 =>
+                        @bind_ErrUbOomProp dvalue (list dvalue)
+                          match c with
+                          | DVALUE_I1 i =>
+                              if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                              then fun y1 : err_ub_oom dvalue => success_unERR_UB_OOM x0 = y1
+                              else fun y1 : err_ub_oom dvalue => success_unERR_UB_OOM y0 = y1
+                          | DVALUE_Poison t =>
+                              fun y1 : err_ub_oom dvalue => success_unERR_UB_OOM (DVALUE_Poison t) = y1
+                          | _ =>
+                              fun ue : err_ub_oom dvalue =>
+                                ERR_unERR_UB_OOM
+                                  "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1." =
+                                  ue
+                          end
+                          (fun selected : dvalue =>
+                             @bind_ErrUbOomProp (list dvalue) (list dvalue) (loop conds0 xs0 ys0)
+                               (fun (rest : list dvalue) (y1 : err_ub_oom (list dvalue)) =>
+                                  success_unERR_UB_OOM (selected :: rest) = y1))
+                    end
+                end
+            end) elts elts0 elts1)
+          ((fix loop (conds xs ys : list dvalue) {struct conds} :
+             err_ub_oom (list dvalue) :=
+              match conds with
+              | nil =>
+                  match xs with
+                  | nil =>
+                      fun ys0 : list dvalue =>
+                        match ys0 with
+                        | nil => success_unERR_UB_OOM (@nil dvalue)
+                        | _ :: _ =>
+                            ERR_unERR_UB_OOM
+                              "concretize_uvalueM: ill-typed vector select, length mismatch."
+                        end
+                  | _ :: _ =>
+                      fun _ : list dvalue =>
+                        ERR_unERR_UB_OOM
+                          "concretize_uvalueM: ill-typed vector select, length mismatch."
+                  end ys
+              | c :: conds0 =>
+                  match xs with
+                  | nil =>
+                      ERR_unERR_UB_OOM
+                        "concretize_uvalueM: ill-typed vector select, length mismatch."
+                  | x0 :: xs0 =>
+                      match ys with
+                      | nil =>
+                          ERR_unERR_UB_OOM
+                            "concretize_uvalueM: ill-typed vector select, length mismatch."
+                      | y0 :: ys0 =>
+                          match
+                            match c with
+                            | DVALUE_I1 i =>
+                                if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                                then success_unERR_UB_OOM x0
+                                else success_unERR_UB_OOM y0
+                            | DVALUE_Poison t =>
+                                success_unERR_UB_OOM (DVALUE_Poison t)
+                            | _ =>
+                                ERR_unERR_UB_OOM
+                                  "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1."
+                            end
+                          with
+                          | {| unERR_UB_OOM := ma |} =>
+                              {|
+                                unERR_UB_OOM :=
+                                  {|
+                                    unEitherT :=
+                                      {|
+                                        unEitherT :=
+                                          {|
+                                            unEitherT :=
+                                              match
+                                                @unIdent
+                                                  (OOM_MESSAGE + UB (ERR dvalue))
+                                                  (@unEitherT OOM_MESSAGE ident
+                                                     (UB (ERR dvalue))
+                                                     (@unEitherT UB_MESSAGE
+                                                        (eitherT OOM_MESSAGE ident)
+                                                        (ERR dvalue)
+                                                        (@unEitherT ERR_MESSAGE
+                                                           (eitherT UB_MESSAGE
+                                                              (eitherT OOM_MESSAGE ident))
+                                                           dvalue ma)))
+                                              with
+                                              | inl x1 =>
+                                                  {|
+                                                    unIdent :=
+                                                      @inl OOM_MESSAGE
+                                                        (UB (ERR (list dvalue))) x1
+                                                  |}
+                                              | inr x1 =>
+                                                  @unEitherT OOM_MESSAGE ident
+                                                    (UB (ERR (list dvalue)))
+                                                    match x1 with
+                                                    | inl x2 =>
+                                                        {|
+                                                          unEitherT :=
+                                                            {|
+                                                              unIdent :=
+                                                                @inr OOM_MESSAGE
+                                                                  (UB (ERR (list dvalue)))
+                                                                  (@inl UB_MESSAGE
+                                                                     (ERR (list dvalue)) x2)
+                                                            |}
+                                                        |}
+                                                    | inr x2 =>
+                                                        @unEitherT UB_MESSAGE
+                                                          (eitherT OOM_MESSAGE ident)
+                                                          (ERR (list dvalue))
+                                                          match x2 with
+                                                          | inl x3 =>
+                                                              {|
+                                                                unEitherT :=
+                                                                  {|
+                                                                    unEitherT :=
+                                                                      {|
+                                                                        unIdent :=
+                                                                          @inr OOM_MESSAGE
+                                                                            (UB (ERR (list dvalue)))
+                                                                            (@inr UB_MESSAGE
+                                                                               (ERR (list dvalue))
+                                                                               (@inl ERR_MESSAGE
+                                                                                  (list dvalue) x3))
+                                                                      |}
+                                                                  |}
+                                                              |}
+                                                          | inr x3 =>
+                                                              @unEitherT ERR_MESSAGE
+                                                                (eitherT UB_MESSAGE
+                                                                   (eitherT OOM_MESSAGE ident))
+                                                                (list dvalue)
+                                                                (@unERR_UB_OOM ident
+                                                                   (list dvalue)
+                                                                   match
+                                                                     loop conds0 xs0 ys0
+                                                                   with
+                                                                   | {| unERR_UB_OOM := ma0 |} =>
+                                                                       {|
+                                                                         unERR_UB_OOM :=
+                                                                           {|
+                                                                             unEitherT :=
+                                                                               {|
+                                                                                 unEitherT :=
+                                                                                   {|
+                                                                                     unEitherT :=
+                                                                                       match
+                                                                                         @unIdent
+                                                                                           (OOM_MESSAGE +
+                                                                                              UB (ERR (list dvalue)))
+                                                                                           (@unEitherT OOM_MESSAGE ident
+                                                                                              (UB (ERR (list dvalue)))
+                                                                                              (@unEitherT UB_MESSAGE
+                                                                                                 (eitherT OOM_MESSAGE ident)
+                                                                                                 (ERR (list dvalue))
+                                                                                                 (@unEitherT ERR_MESSAGE
+                                                                                                    (eitherT UB_MESSAGE
+                                                                                                       (eitherT OOM_MESSAGE ident))
+                                                                                                    (list dvalue) ma0)))
+                                                                                       with
+                                                                                       | inl x4 =>
+                                                                                           {|
+                                                                                             unIdent :=
+                                                                                               @inl OOM_MESSAGE
+                                                                                                 (UB (ERR (list dvalue))) x4
+                                                                                           |}
+                                                                                       | inr x4 =>
+                                                                                           @unEitherT OOM_MESSAGE ident
+                                                                                             (UB (ERR (list dvalue)))
+                                                                                             match x4 with
+                                                                                             | inl x5 =>
+                                                                                                 {|
+                                                                                                   unEitherT :=
+                                                                                                     {|
+                                                                                                       unIdent :=
+                                                                                                         @inr OOM_MESSAGE
+                                                                                                           (UB (ERR (list dvalue)))
+                                                                                                           (@inl UB_MESSAGE
+                                                                                                              (ERR (list dvalue)) x5)
+                                                                                                     |}
+                                                                                                 |}
+                                                                                             | inr x5 =>
+                                                                                                 @unEitherT UB_MESSAGE
+                                                                                                   (eitherT OOM_MESSAGE ident)
+                                                                                                   (ERR (list dvalue))
+                                                                                                   match x5 with
+                                                                                                   | inl x6 =>
+                                                                                                       {|
+                                                                                                         unEitherT :=
+                                                                                                           {|
+                                                                                                             unEitherT :=
+                                                                                                               {|
+                                                                                                                 unIdent :=
+                                                                                                                   @inr OOM_MESSAGE
+                                                                                                                     (UB (ERR (list dvalue)))
+                                                                                                                     (@inr UB_MESSAGE
+                                                                                                                        (ERR (list dvalue))
+                                                                                                                        (@inl ERR_MESSAGE
+                                                                                                                           (list dvalue) x6))
+                                                                                                               |}
+                                                                                                           |}
+                                                                                                       |}
+                                                                                                   | inr x6 =>
+                                                                                                       {|
+                                                                                                         unEitherT :=
+                                                                                                           {|
+                                                                                                             unEitherT :=
+                                                                                                               {|
+                                                                                                                 unIdent :=
+                                                                                                                   @inr OOM_MESSAGE
+                                                                                                                     (UB (ERR (list dvalue)))
+                                                                                                                     (@inr UB_MESSAGE
+                                                                                                                        (ERR (list dvalue))
+                                                                                                                        (@inr ERR_MESSAGE
+                                                                                                                           (list dvalue) 
+                                                                                                                           (x3 :: x6)))
+                                                                                                               |}
+                                                                                                           |}
+                                                                                                       |}
+                                                                                                   end
+                                                                                             end
+                                                                                       end
+                                                                                   |}
+                                                                               |}
+                                                                           |}
+                                                                       |}
+                                                                   end)
+                                                          end
+                                                    end
+                                              end
+                                          |}
+                                      |}
+                                  |}
+                              |}
+                          end
+                      end
+                  end
+              end) elts elts0 elts1).
+    Proof.
+      intros conds.
+      induction conds;
+        intros xs ys;
+        cbn in *; subst; auto;
+        try reflexivity;
+        destruct xs, ys; try reflexivity.
+
+      match goal with
+      | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+          exists (match a with
+             | DVALUE_I1 i =>
+                 if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                 then success_unERR_UB_OOM d
+                 else success_unERR_UB_OOM d0
+             | DVALUE_Poison t => success_unERR_UB_OOM (DVALUE_Poison t)
+             | _ =>
+                 ERR_unERR_UB_OOM
+                   "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1."
+             end);
+          exists (fun _ => res)
+      end.
+      split.
+      { destruct a; try reflexivity.
+        break_match; reflexivity.
+      }
+
+      split.
+      { destruct a; try reflexivity.
+        break_match; reflexivity.
+      }
+
+      { destruct a; try reflexivity; cbn; auto.
+        - right.
+          intros a H.
+          break_match_hyp_inv.
+          + specialize (IHconds xs ys).
+            remember ((fix loop (conds xs ys : list dvalue) {struct conds} : err_ub_oom (list dvalue) :=
+                         match conds with
+                         | nil =>
+                             match xs with
+                             | nil =>
+                                 fun ys0 : list dvalue =>
+                                   match ys0 with
+                                   | nil => success_unERR_UB_OOM (@nil dvalue)
+                                   | _ :: _ =>
+                                       ERR_unERR_UB_OOM
+                                         "concretize_uvalueM: ill-typed vector select, length mismatch."
+                                   end
+                             | _ :: _ =>
+                                 fun _ : list dvalue =>
+                                   ERR_unERR_UB_OOM
+                                     "concretize_uvalueM: ill-typed vector select, length mismatch."
+                             end ys
+                         | c :: conds0 =>
+                             match xs with
+                             | nil =>
+                                 ERR_unERR_UB_OOM
+                                   "concretize_uvalueM: ill-typed vector select, length mismatch."
+                             | x0 :: xs0 =>
+                                 match ys with
+                                 | nil =>
+                                     ERR_unERR_UB_OOM
+                                       "concretize_uvalueM: ill-typed vector select, length mismatch."
+                                 | y0 :: ys0 =>
+                                     match
+                                       match c with
+                                       | DVALUE_I1 i =>
+                                           if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                                           then success_unERR_UB_OOM x0
+                                           else success_unERR_UB_OOM y0
+                                       | DVALUE_Poison t => success_unERR_UB_OOM (DVALUE_Poison t)
+                                       | _ =>
+                                           ERR_unERR_UB_OOM
+                                             "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1."
+                                       end
+                                     with
+                                     | {| unERR_UB_OOM := ma |} =>
+                                         {|
+                                           unERR_UB_OOM :=
+                                             {|
+                                               unEitherT :=
+                                                 {|
+                                                   unEitherT :=
+                                                     {|
+                                                       unEitherT :=
+                                                         match
+                                                           @unIdent (OOM_MESSAGE + UB (ERR dvalue))
+                                                             (@unEitherT OOM_MESSAGE ident 
+                                                                (UB (ERR dvalue))
+                                                                (@unEitherT UB_MESSAGE
+                                                                   (eitherT OOM_MESSAGE ident) 
+                                                                   (ERR dvalue)
+                                                                   (@unEitherT ERR_MESSAGE
+                                                                      (eitherT UB_MESSAGE
+                                                                         (eitherT OOM_MESSAGE ident)) dvalue
+                                                                      ma)))
+                                                         with
+                                                         | inl x1 =>
+                                                             {|
+                                                               unIdent :=
+                                                                 @inl OOM_MESSAGE (UB (ERR (list dvalue))) x1
+                                                             |}
+                                                         | inr x1 =>
+                                                             @unEitherT OOM_MESSAGE ident
+                                                               (UB (ERR (list dvalue)))
+                                                               match x1 with
+                                                               | inl x2 =>
+                                                                   {|
+                                                                     unEitherT :=
+                                                                       {|
+                                                                         unIdent :=
+                                                                           @inr OOM_MESSAGE
+                                                                             (UB (ERR (list dvalue)))
+                                                                             (@inl UB_MESSAGE
+                                                                                (ERR (list dvalue)) x2)
+                                                                       |}
+                                                                   |}
+                                                               | inr x2 =>
+                                                                   @unEitherT UB_MESSAGE
+                                                                     (eitherT OOM_MESSAGE ident)
+                                                                     (ERR (list dvalue))
+                                                                     match x2 with
+                                                                     | inl x3 =>
+                                                                         {|
+                                                                           unEitherT :=
+                                                                             {|
+                                                                               unEitherT :=
+                                                                                 {|
+                                                                                   unIdent :=
+                                                                                     @inr OOM_MESSAGE
+                                                                                       (UB (ERR (list dvalue)))
+                                                                                       (@inr UB_MESSAGE
+                                                                                          (ERR (list dvalue))
+                                                                                          (@inl ERR_MESSAGE
+                                                                                             (list dvalue) x3))
+                                                                                 |}
+                                                                             |}
+                                                                         |}
+                                                                     | inr x3 =>
+                                                                         @unEitherT ERR_MESSAGE
+                                                                           (eitherT UB_MESSAGE
+                                                                              (eitherT OOM_MESSAGE ident))
+                                                                           (list dvalue)
+                                                                           (@unERR_UB_OOM ident 
+                                                                              (list dvalue)
+                                                                              match loop conds0 xs0 ys0 with
+                                                                              | {| unERR_UB_OOM := ma0 |} =>
+                                                                                  {|
+                                                                                    unERR_UB_OOM :=
+                                                                                      {|
+                                                                                        unEitherT :=
+                                                                                          {|
+                                                                                            unEitherT :=
+                                                                                              {|
+                                                                                                unEitherT :=
+                                                                                                  match
+                                                                                                    @unIdent
+                                                                                                      (OOM_MESSAGE +
+                                                                                                         UB (ERR (list dvalue)))
+                                                                                                      (@unEitherT OOM_MESSAGE ident
+                                                                                                         (UB (ERR (list dvalue)))
+                                                                                                         (@unEitherT UB_MESSAGE
+                                                                                                            (eitherT OOM_MESSAGE ident)
+                                                                                                            (ERR (list dvalue))
+                                                                                                            (@unEitherT ERR_MESSAGE
+                                                                                                               (eitherT UB_MESSAGE
+                                                                                                                  (eitherT OOM_MESSAGE ident))
+                                                                                                               (list dvalue) ma0)))
+                                                                                                  with
+                                                                                                  | inl x4 =>
+                                                                                                      {|
+                                                                                                        unIdent :=
+                                                                                                          @inl OOM_MESSAGE
+                                                                                                            (UB (ERR (list dvalue))) x4
+                                                                                                      |}
+                                                                                                  | inr x4 =>
+                                                                                                      @unEitherT OOM_MESSAGE ident
+                                                                                                        (UB (ERR (list dvalue)))
+                                                                                                        match x4 with
+                                                                                                        | inl x5 =>
+                                                                                                            {|
+                                                                                                              unEitherT :=
+                                                                                                                {|
+                                                                                                                  unIdent :=
+                                                                                                                    @inr OOM_MESSAGE
+                                                                                                                      (UB (ERR (list dvalue)))
+                                                                                                                      (@inl UB_MESSAGE
+                                                                                                                         (ERR (list dvalue)) x5)
+                                                                                                                |}
+                                                                                                            |}
+                                                                                                        | inr x5 =>
+                                                                                                            @unEitherT UB_MESSAGE
+                                                                                                              (eitherT OOM_MESSAGE ident)
+                                                                                                              (ERR (list dvalue))
+                                                                                                              match x5 with
+                                                                                                              | inl x6 =>
+                                                                                                                  {|
+                                                                                                                    unEitherT :=
+                                                                                                                      {|
+                                                                                                                        unEitherT :=
+                                                                                                                          {|
+                                                                                                                            unIdent :=
+                                                                                                                              @inr OOM_MESSAGE
+                                                                                                                                (UB (ERR (list dvalue)))
+                                                                                                                                (@inr UB_MESSAGE
+                                                                                                                                   (ERR (list dvalue))
+                                                                                                                                   (@inl ERR_MESSAGE
+                                                                                                                                      (list dvalue) x6))
+                                                                                                                          |}
+                                                                                                                      |}
+                                                                                                                  |}
+                                                                                                              | inr x6 =>
+                                                                                                                  {|
+                                                                                                                    unEitherT :=
+                                                                                                                      {|
+                                                                                                                        unEitherT :=
+                                                                                                                          {|
+                                                                                                                            unIdent :=
+                                                                                                                              @inr OOM_MESSAGE
+                                                                                                                                (UB (ERR (list dvalue)))
+                                                                                                                                (@inr UB_MESSAGE
+                                                                                                                                   (ERR (list dvalue))
+                                                                                                                                   (@inr ERR_MESSAGE
+                                                                                                                                      (list dvalue) 
+                                                                                                                                      (x3 :: x6)))
+                                                                                                                          |}
+                                                                                                                      |}
+                                                                                                                  |}
+                                                                                                              end
+                                                                                                        end
+                                                                                                  end
+                                                                                              |}
+                                                                                          |}
+                                                                                      |}
+                                                                                  |}
+                                                                              end)
+                                                                     end
+                                                               end
+                                                         end
+                                                     |}
+                                                 |}
+                                             |}
+                                         |}
+                                     end
+                                 end
+                             end
+                         end) conds xs ys).
+            match goal with
+            | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+                exists e;
+                exists (fun _ => res)
+            end.
+            split; auto.
+            split.
+            { destruct_err_ub_oom e; cbn; auto.
+            }
+
+            destruct_err_ub_oom e; cbn; auto.
+            right.
+            intros ? ?; subst; auto.
+          + specialize (IHconds xs ys).
+            remember ((fix loop (conds xs ys : list dvalue) {struct conds} : err_ub_oom (list dvalue) :=
+                         match conds with
+                         | nil =>
+                             match xs with
+                             | nil =>
+                                 fun ys0 : list dvalue =>
+                                   match ys0 with
+                                   | nil => success_unERR_UB_OOM (@nil dvalue)
+                                   | _ :: _ =>
+                                       ERR_unERR_UB_OOM
+                                         "concretize_uvalueM: ill-typed vector select, length mismatch."
+                                   end
+                             | _ :: _ =>
+                                 fun _ : list dvalue =>
+                                   ERR_unERR_UB_OOM
+                                     "concretize_uvalueM: ill-typed vector select, length mismatch."
+                             end ys
+                         | c :: conds0 =>
+                             match xs with
+                             | nil =>
+                                 ERR_unERR_UB_OOM
+                                   "concretize_uvalueM: ill-typed vector select, length mismatch."
+                             | x0 :: xs0 =>
+                                 match ys with
+                                 | nil =>
+                                     ERR_unERR_UB_OOM
+                                       "concretize_uvalueM: ill-typed vector select, length mismatch."
+                                 | y0 :: ys0 =>
+                                     match
+                                       match c with
+                                       | DVALUE_I1 i =>
+                                           if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                                           then success_unERR_UB_OOM x0
+                                           else success_unERR_UB_OOM y0
+                                       | DVALUE_Poison t => success_unERR_UB_OOM (DVALUE_Poison t)
+                                       | _ =>
+                                           ERR_unERR_UB_OOM
+                                             "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1."
+                                       end
+                                     with
+                                     | {| unERR_UB_OOM := ma |} =>
+                                         {|
+                                           unERR_UB_OOM :=
+                                             {|
+                                               unEitherT :=
+                                                 {|
+                                                   unEitherT :=
+                                                     {|
+                                                       unEitherT :=
+                                                         match
+                                                           @unIdent (OOM_MESSAGE + UB (ERR dvalue))
+                                                             (@unEitherT OOM_MESSAGE ident 
+                                                                (UB (ERR dvalue))
+                                                                (@unEitherT UB_MESSAGE
+                                                                   (eitherT OOM_MESSAGE ident) 
+                                                                   (ERR dvalue)
+                                                                   (@unEitherT ERR_MESSAGE
+                                                                      (eitherT UB_MESSAGE
+                                                                         (eitherT OOM_MESSAGE ident)) dvalue
+                                                                      ma)))
+                                                         with
+                                                         | inl x1 =>
+                                                             {|
+                                                               unIdent :=
+                                                                 @inl OOM_MESSAGE (UB (ERR (list dvalue))) x1
+                                                             |}
+                                                         | inr x1 =>
+                                                             @unEitherT OOM_MESSAGE ident
+                                                               (UB (ERR (list dvalue)))
+                                                               match x1 with
+                                                               | inl x2 =>
+                                                                   {|
+                                                                     unEitherT :=
+                                                                       {|
+                                                                         unIdent :=
+                                                                           @inr OOM_MESSAGE
+                                                                             (UB (ERR (list dvalue)))
+                                                                             (@inl UB_MESSAGE
+                                                                                (ERR (list dvalue)) x2)
+                                                                       |}
+                                                                   |}
+                                                               | inr x2 =>
+                                                                   @unEitherT UB_MESSAGE
+                                                                     (eitherT OOM_MESSAGE ident)
+                                                                     (ERR (list dvalue))
+                                                                     match x2 with
+                                                                     | inl x3 =>
+                                                                         {|
+                                                                           unEitherT :=
+                                                                             {|
+                                                                               unEitherT :=
+                                                                                 {|
+                                                                                   unIdent :=
+                                                                                     @inr OOM_MESSAGE
+                                                                                       (UB (ERR (list dvalue)))
+                                                                                       (@inr UB_MESSAGE
+                                                                                          (ERR (list dvalue))
+                                                                                          (@inl ERR_MESSAGE
+                                                                                             (list dvalue) x3))
+                                                                                 |}
+                                                                             |}
+                                                                         |}
+                                                                     | inr x3 =>
+                                                                         @unEitherT ERR_MESSAGE
+                                                                           (eitherT UB_MESSAGE
+                                                                              (eitherT OOM_MESSAGE ident))
+                                                                           (list dvalue)
+                                                                           (@unERR_UB_OOM ident 
+                                                                              (list dvalue)
+                                                                              match loop conds0 xs0 ys0 with
+                                                                              | {| unERR_UB_OOM := ma0 |} =>
+                                                                                  {|
+                                                                                    unERR_UB_OOM :=
+                                                                                      {|
+                                                                                        unEitherT :=
+                                                                                          {|
+                                                                                            unEitherT :=
+                                                                                              {|
+                                                                                                unEitherT :=
+                                                                                                  match
+                                                                                                    @unIdent
+                                                                                                      (OOM_MESSAGE +
+                                                                                                         UB (ERR (list dvalue)))
+                                                                                                      (@unEitherT OOM_MESSAGE ident
+                                                                                                         (UB (ERR (list dvalue)))
+                                                                                                         (@unEitherT UB_MESSAGE
+                                                                                                            (eitherT OOM_MESSAGE ident)
+                                                                                                            (ERR (list dvalue))
+                                                                                                            (@unEitherT ERR_MESSAGE
+                                                                                                               (eitherT UB_MESSAGE
+                                                                                                                  (eitherT OOM_MESSAGE ident))
+                                                                                                               (list dvalue) ma0)))
+                                                                                                  with
+                                                                                                  | inl x4 =>
+                                                                                                      {|
+                                                                                                        unIdent :=
+                                                                                                          @inl OOM_MESSAGE
+                                                                                                            (UB (ERR (list dvalue))) x4
+                                                                                                      |}
+                                                                                                  | inr x4 =>
+                                                                                                      @unEitherT OOM_MESSAGE ident
+                                                                                                        (UB (ERR (list dvalue)))
+                                                                                                        match x4 with
+                                                                                                        | inl x5 =>
+                                                                                                            {|
+                                                                                                              unEitherT :=
+                                                                                                                {|
+                                                                                                                  unIdent :=
+                                                                                                                    @inr OOM_MESSAGE
+                                                                                                                      (UB (ERR (list dvalue)))
+                                                                                                                      (@inl UB_MESSAGE
+                                                                                                                         (ERR (list dvalue)) x5)
+                                                                                                                |}
+                                                                                                            |}
+                                                                                                        | inr x5 =>
+                                                                                                            @unEitherT UB_MESSAGE
+                                                                                                              (eitherT OOM_MESSAGE ident)
+                                                                                                              (ERR (list dvalue))
+                                                                                                              match x5 with
+                                                                                                              | inl x6 =>
+                                                                                                                  {|
+                                                                                                                    unEitherT :=
+                                                                                                                      {|
+                                                                                                                        unEitherT :=
+                                                                                                                          {|
+                                                                                                                            unIdent :=
+                                                                                                                              @inr OOM_MESSAGE
+                                                                                                                                (UB (ERR (list dvalue)))
+                                                                                                                                (@inr UB_MESSAGE
+                                                                                                                                   (ERR (list dvalue))
+                                                                                                                                   (@inl ERR_MESSAGE
+                                                                                                                                      (list dvalue) x6))
+                                                                                                                          |}
+                                                                                                                      |}
+                                                                                                                  |}
+                                                                                                              | inr x6 =>
+                                                                                                                  {|
+                                                                                                                    unEitherT :=
+                                                                                                                      {|
+                                                                                                                        unEitherT :=
+                                                                                                                          {|
+                                                                                                                            unIdent :=
+                                                                                                                              @inr OOM_MESSAGE
+                                                                                                                                (UB (ERR (list dvalue)))
+                                                                                                                                (@inr UB_MESSAGE
+                                                                                                                                   (ERR (list dvalue))
+                                                                                                                                   (@inr ERR_MESSAGE
+                                                                                                                                      (list dvalue) 
+                                                                                                                                      (x3 :: x6)))
+                                                                                                                          |}
+                                                                                                                      |}
+                                                                                                                  |}
+                                                                                                              end
+                                                                                                        end
+                                                                                                  end
+                                                                                              |}
+                                                                                          |}
+                                                                                      |}
+                                                                                  |}
+                                                                              end)
+                                                                     end
+                                                               end
+                                                         end
+                                                     |}
+                                                 |}
+                                             |}
+                                         |}
+                                     end
+                                 end
+                             end
+                         end) conds xs ys).
+            match goal with
+            | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+                exists e;
+                exists (fun _ => res)
+            end.
+            split; auto.
+            split.
+            { destruct_err_ub_oom e; cbn; auto.
+            }
+
+            destruct_err_ub_oom e; cbn; auto.
+            right.
+            intros ? ?; subst; auto.
+        - right.
+          intros a H; subst; cbn.
+          specialize (IHconds xs ys).
+          remember ((fix loop (conds xs ys : list dvalue) {struct conds} : err_ub_oom (list dvalue) :=
+                       match conds with
+                       | nil =>
+                           match xs with
+                           | nil =>
+                               fun ys0 : list dvalue =>
+                                 match ys0 with
+                                 | nil => success_unERR_UB_OOM (@nil dvalue)
+                                 | _ :: _ =>
+                                     ERR_unERR_UB_OOM
+                                       "concretize_uvalueM: ill-typed vector select, length mismatch."
+                                 end
+                           | _ :: _ =>
+                               fun _ : list dvalue =>
+                                 ERR_unERR_UB_OOM
+                                   "concretize_uvalueM: ill-typed vector select, length mismatch."
+                           end ys
+                       | c :: conds0 =>
+                           match xs with
+                           | nil =>
+                               ERR_unERR_UB_OOM
+                                 "concretize_uvalueM: ill-typed vector select, length mismatch."
+                           | x0 :: xs0 =>
+                               match ys with
+                               | nil =>
+                                   ERR_unERR_UB_OOM
+                                     "concretize_uvalueM: ill-typed vector select, length mismatch."
+                               | y0 :: ys0 =>
+                                   match
+                                     match c with
+                                     | DVALUE_I1 i =>
+                                         if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                                         then success_unERR_UB_OOM x0
+                                         else success_unERR_UB_OOM y0
+                                     | DVALUE_Poison t => success_unERR_UB_OOM (DVALUE_Poison t)
+                                     | _ =>
+                                         ERR_unERR_UB_OOM
+                                           "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1."
+                                     end
+                                   with
+                                   | {| unERR_UB_OOM := ma |} =>
+                                       {|
+                                         unERR_UB_OOM :=
+                                           {|
+                                             unEitherT :=
+                                               {|
+                                                 unEitherT :=
+                                                   {|
+                                                     unEitherT :=
+                                                       match
+                                                         @unIdent (OOM_MESSAGE + UB (ERR dvalue))
+                                                           (@unEitherT OOM_MESSAGE ident 
+                                                              (UB (ERR dvalue))
+                                                              (@unEitherT UB_MESSAGE
+                                                                 (eitherT OOM_MESSAGE ident) 
+                                                                 (ERR dvalue)
+                                                                 (@unEitherT ERR_MESSAGE
+                                                                    (eitherT UB_MESSAGE
+                                                                       (eitherT OOM_MESSAGE ident)) dvalue
+                                                                    ma)))
+                                                       with
+                                                       | inl x1 =>
+                                                           {|
+                                                             unIdent :=
+                                                               @inl OOM_MESSAGE (UB (ERR (list dvalue))) x1
+                                                           |}
+                                                       | inr x1 =>
+                                                           @unEitherT OOM_MESSAGE ident
+                                                             (UB (ERR (list dvalue)))
+                                                             match x1 with
+                                                             | inl x2 =>
+                                                                 {|
+                                                                   unEitherT :=
+                                                                     {|
+                                                                       unIdent :=
+                                                                         @inr OOM_MESSAGE
+                                                                           (UB (ERR (list dvalue)))
+                                                                           (@inl UB_MESSAGE
+                                                                              (ERR (list dvalue)) x2)
+                                                                     |}
+                                                                 |}
+                                                             | inr x2 =>
+                                                                 @unEitherT UB_MESSAGE
+                                                                   (eitherT OOM_MESSAGE ident)
+                                                                   (ERR (list dvalue))
+                                                                   match x2 with
+                                                                   | inl x3 =>
+                                                                       {|
+                                                                         unEitherT :=
+                                                                           {|
+                                                                             unEitherT :=
+                                                                               {|
+                                                                                 unIdent :=
+                                                                                   @inr OOM_MESSAGE
+                                                                                     (UB (ERR (list dvalue)))
+                                                                                     (@inr UB_MESSAGE
+                                                                                        (ERR (list dvalue))
+                                                                                        (@inl ERR_MESSAGE
+                                                                                           (list dvalue) x3))
+                                                                               |}
+                                                                           |}
+                                                                       |}
+                                                                   | inr x3 =>
+                                                                       @unEitherT ERR_MESSAGE
+                                                                         (eitherT UB_MESSAGE
+                                                                            (eitherT OOM_MESSAGE ident))
+                                                                         (list dvalue)
+                                                                         (@unERR_UB_OOM ident 
+                                                                            (list dvalue)
+                                                                            match loop conds0 xs0 ys0 with
+                                                                            | {| unERR_UB_OOM := ma0 |} =>
+                                                                                {|
+                                                                                  unERR_UB_OOM :=
+                                                                                    {|
+                                                                                      unEitherT :=
+                                                                                        {|
+                                                                                          unEitherT :=
+                                                                                            {|
+                                                                                              unEitherT :=
+                                                                                                match
+                                                                                                  @unIdent
+                                                                                                    (OOM_MESSAGE +
+                                                                                                       UB (ERR (list dvalue)))
+                                                                                                    (@unEitherT OOM_MESSAGE ident
+                                                                                                       (UB (ERR (list dvalue)))
+                                                                                                       (@unEitherT UB_MESSAGE
+                                                                                                          (eitherT OOM_MESSAGE ident)
+                                                                                                          (ERR (list dvalue))
+                                                                                                          (@unEitherT ERR_MESSAGE
+                                                                                                             (eitherT UB_MESSAGE
+                                                                                                                (eitherT OOM_MESSAGE ident))
+                                                                                                             (list dvalue) ma0)))
+                                                                                                with
+                                                                                                | inl x4 =>
+                                                                                                    {|
+                                                                                                      unIdent :=
+                                                                                                        @inl OOM_MESSAGE
+                                                                                                          (UB (ERR (list dvalue))) x4
+                                                                                                    |}
+                                                                                                | inr x4 =>
+                                                                                                    @unEitherT OOM_MESSAGE ident
+                                                                                                      (UB (ERR (list dvalue)))
+                                                                                                      match x4 with
+                                                                                                      | inl x5 =>
+                                                                                                          {|
+                                                                                                            unEitherT :=
+                                                                                                              {|
+                                                                                                                unIdent :=
+                                                                                                                  @inr OOM_MESSAGE
+                                                                                                                    (UB (ERR (list dvalue)))
+                                                                                                                    (@inl UB_MESSAGE
+                                                                                                                       (ERR (list dvalue)) x5)
+                                                                                                              |}
+                                                                                                          |}
+                                                                                                      | inr x5 =>
+                                                                                                          @unEitherT UB_MESSAGE
+                                                                                                            (eitherT OOM_MESSAGE ident)
+                                                                                                            (ERR (list dvalue))
+                                                                                                            match x5 with
+                                                                                                            | inl x6 =>
+                                                                                                                {|
+                                                                                                                  unEitherT :=
+                                                                                                                    {|
+                                                                                                                      unEitherT :=
+                                                                                                                        {|
+                                                                                                                          unIdent :=
+                                                                                                                            @inr OOM_MESSAGE
+                                                                                                                              (UB (ERR (list dvalue)))
+                                                                                                                              (@inr UB_MESSAGE
+                                                                                                                                 (ERR (list dvalue))
+                                                                                                                                 (@inl ERR_MESSAGE
+                                                                                                                                    (list dvalue) x6))
+                                                                                                                        |}
+                                                                                                                    |}
+                                                                                                                |}
+                                                                                                            | inr x6 =>
+                                                                                                                {|
+                                                                                                                  unEitherT :=
+                                                                                                                    {|
+                                                                                                                      unEitherT :=
+                                                                                                                        {|
+                                                                                                                          unIdent :=
+                                                                                                                            @inr OOM_MESSAGE
+                                                                                                                              (UB (ERR (list dvalue)))
+                                                                                                                              (@inr UB_MESSAGE
+                                                                                                                                 (ERR (list dvalue))
+                                                                                                                                 (@inr ERR_MESSAGE
+                                                                                                                                    (list dvalue) 
+                                                                                                                                    (x3 :: x6)))
+                                                                                                                        |}
+                                                                                                                    |}
+                                                                                                                |}
+                                                                                                            end
+                                                                                                      end
+                                                                                                end
+                                                                                            |}
+                                                                                        |}
+                                                                                    |}
+                                                                                |}
+                                                                            end)
+                                                                   end
+                                                             end
+                                                       end
+                                                   |}
+                                               |}
+                                           |}
+                                       |}
+                                   end
+                               end
+                           end
+                       end) conds xs ys).
+          match goal with
+          | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+              exists e;
+              exists (fun _ => res)
+          end.
+          split; auto.
+          split.
+          { destruct_err_ub_oom e; cbn; auto.
+          }
+
+          destruct_err_ub_oom e; cbn; auto.
+          right.
+          intros ? ?; subst; auto.
+      }
+    Qed.
+
+    Lemma eval_select_eval_select :
+      forall cnd x y
+        (X : concretize_u x (concretize_uvalue x))
+        (Y : concretize_u y (concretize_uvalue y)),
+        @eval_select ErrUbOomProp Monad_ErrUbOomProp
+          (fun (dt : dtyp) (edv : err_ub_oom dvalue) =>
+             match @unERR_UB_OOM ident dvalue edv with
+             | {| unEitherT := {| unEitherT := {| unEitherT := {| unIdent := inr (inr (inr dv)) |} |} |} |} =>
+                 dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
+             | _ => True
+             end) err_ub_oom (@Monad_err_ub_oom ident Monad_ident) (@RAISE_ERROR_err_ub_oom ident Monad_ident)
+          (@RAISE_UB_err_ub_oom_T ident Monad_ident) (@RAISE_OOM_err_ub_oom_T ident Monad_ident)
+          (fun (A : Type) (x ue : err_ub_oom A) => x = ue) cnd x y
+          (@eval_select err_ub_oom (@Monad_err_ub_oom ident Monad_ident)
+             (fun dt : dtyp =>
+                @lift_err_RAISE_ERROR dvalue err_ub_oom
+                  (@Monad_err_ub_oom ident Monad_ident)
+                  (@RAISE_ERROR_err_ub_oom ident Monad_ident)
+                  (default_dvalue_of_dtyp dt)) err_ub_oom
+             (@Monad_err_ub_oom ident Monad_ident)
+             (@RAISE_ERROR_err_ub_oom ident Monad_ident)
+             (@RAISE_UB_err_ub_oom_T ident Monad_ident)
+             (@RAISE_OOM_err_ub_oom_T ident Monad_ident)
+             (fun (A : Type) (x : err_ub_oom A) => x) cnd x y).
+    Proof.
+      intros cnd x y X Y.
+      rewrite eval_select_equation.
+      rewrite (@eval_select_equation err_ub_oom).
+      destruct cnd; try reflexivity.
+      - break_match.
+        + apply X.
+        + apply Y.
+      - cbn.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists (concretize_uvalue x);
+            exists (fun _ => res)
+        end.
+        split; auto.
+
+        unfold concretize_uvalue.
+        remember
+          (concretize_uvalueM err_ub_oom (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
+             err_ub_oom (fun (A : Type) (x0 : err_ub_oom A) => x0) x).
+        split; cbn; eauto.
+        + destruct_err_ub_oom e; try reflexivity.
+        + destruct_err_ub_oom e; cbn; eauto.
+          right.
+          intros ? ?; subst.
+          match goal with
+          | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+              exists (concretize_uvalue y);
+              exists (fun _ => res)
+          end.
+          split; auto.
+
+          unfold concretize_uvalue.
+          remember
+            (concretize_uvalueM err_ub_oom (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
+               err_ub_oom (fun (A : Type) (x0 : err_ub_oom A) => x0) y).
+          split; cbn; eauto.
+          -- destruct_err_ub_oom e; try reflexivity.
+          -- destruct_err_ub_oom e; cbn; eauto.
+             right.
+             intros ? ?; subst.
+             destruct a; try reflexivity.
+             destruct a0; try reflexivity.
+
+             match goal with
+             | [ |- context [ match ?X with _ => _ end ] ] =>
+                 remember X
+             end.
+             match goal with
+             | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+                 exists e; exists (fun _ => res)
+             end.
+
+             split; auto.
+             subst; apply eval_select_loop_eval_select_loop.
+
+             split; subst; cbn; eauto.
+             match goal with
+             | [ |- context [ match ?X with _ => _ end ] ] =>
+                 remember X
+             end.
+             destruct_err_ub_oom e; cbn; try reflexivity.
+             match goal with
+             | [ |- context [ match ?X with _ => _ end ] ] =>
+                 remember X
+             end.
+             destruct_err_ub_oom e; cbn; try reflexivity; auto.
+
+             right.
+             intros ? ?; subst.
+             reflexivity.
+    Qed.
+
     Lemma concretize_u_concretize_uvalue : forall u, concretize_u u (concretize_uvalue u).
     Proof using.
       unfold concretize_u, concretize_uvalue.
@@ -1047,7 +2129,39 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
       }
 
       { (* Select *)
-        admit.
+        rewrite concretize_uvalueM_equation.
+        rewrite (@concretize_uvalueM_equation err_ub_oom).
+        cbn.
+        remember
+          (concretize_uvalueM err_ub_oom
+             (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) err_ub_oom
+             (fun (A : Type) (x : err_ub_oom A) => x) u1) as e.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros a H0; subst.
+
+        pose proof eval_select_eval_select a u2 u3.
+        forward H0.
+        eapply H.
+        repeat constructor.
+        forward H0.
+        eapply H.
+        repeat constructor.
+
+        remember (eval_select err_ub_oom
+                                  (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
+                                  err_ub_oom (fun (A : Type) (x : err_ub_oom A) => x) a u2 u3).
+        destruct_err_ub_oom e; cbn in *; auto.
       }
 
       { (* ConcatBytes *)
@@ -1066,7 +2180,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
         apply H.
         apply uvalue_concat_bytes_strict_subterm; auto.
       }
-    Admitted.
+    Qed.
 
     Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : PickUvalueE ~> itree E :=
       fun T p =>
