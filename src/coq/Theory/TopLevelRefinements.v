@@ -1277,9 +1277,96 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         destruct_err_ub_oom r; reflexivity.
     Qed.
 
+    Lemma eval_select_loop_err_ub_oom_to_itree :
+      forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E}
+        (conds xs ys : list dvalue),
+        (fix loop conds xs ys {struct conds} : itree E (list dvalue) :=
+           match conds, xs, ys with
+           | [], [], [] => @ret _ _ _ []
+           | (c::conds), (x::xs), (y::ys) =>
+               @bind _ _ _ _
+                 (match c with
+                  | DVALUE_Poison t =>
+                      (* TODO: Should be the type of the result of the select... *)
+                      @ret _ _ _ (DVALUE_Poison t)
+                  | DVALUE_I1 i =>
+                      if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                      then @ret _ _ _ x
+                      else @ret _ _ _ y
+                  | _ =>
+                      raise "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1."
+                  end)
+                 (fun selected =>
+                    @bind _ _ _ _
+                      (loop conds xs ys)
+                      (fun rest =>
+                         @ret _ _ _ (selected :: rest)))
+           | _, _, _ =>
+               raise "concretize_uvalueM: ill-typed vector select, length mismatch."
+           end) conds xs ys ≈
+          match (fix loop conds xs ys {struct conds} : err_ub_oom (list dvalue) :=
+                   match conds, xs, ys with
+                   | [], [], [] => @ret err_ub_oom _ _ []
+                   | (c::conds), (x::xs), (y::ys) =>
+                       @bind err_ub_oom _ _ _
+                         (match c with
+                          | DVALUE_Poison t =>
+                              (* TODO: Should be the type of the result of the select... *)
+                              @ret err_ub_oom _ _ (DVALUE_Poison t)
+                          | DVALUE_I1 i =>
+                              if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                              then @ret _ _ _ x
+                              else @ret _ _ _ y
+                          | _ =>
+                              raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1."
+                          end)
+                         (fun selected =>
+                            @bind err_ub_oom _ _ _
+                              (loop conds xs ys)
+                              (fun rest =>
+                                 @ret _ _ _ (selected :: rest)))
+                   | _, _, _ =>
+                       raise_error "concretize_uvalueM: ill-typed vector select, length mismatch."
+                   end) conds xs ys
+          with
+           | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
+               match m with
+               | inl (OOM_message x) => raiseOOM x
+               | inr (inl (UB_message x)) => raiseUB x
+               | inr (inr (inl (ERR_message x))) => raise x
+               | inr (inr (inr x)) => ret x
+               end
+           end.
+    Proof.
+      intros E H H0 H1 conds xs ys.
+      induction conds, xs, ys;
+        cbn in *; subst; auto;
+        try reflexivity.
+    Admitted.
+
     Lemma eval_select_err_ub_oom_to_itree :
       forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E}
         cnd x y,
+        ((@concretize_uvalue (itree E) _ _ _ _ x) ≈
+           match concretize_uvalue x with
+           | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
+               match m with
+               | inl (OOM_message x) => raiseOOM x
+               | inr (inl (UB_message x)) => raiseUB x
+               | inr (inr (inl (ERR_message x))) => raise x
+               | inr (inr (inr x)) => ret x
+               end
+           end) ->
+        ((@concretize_uvalue (itree E) _ _ _ _ y) ≈
+           match concretize_uvalue y with
+           | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
+               match m with
+               | inl (OOM_message x) => raiseOOM x
+               | inr (inl (UB_message x)) => raiseUB x
+               | inr (inr (inl (ERR_message x))) => raise x
+               | inr (inr (inr x)) => ret x
+               end
+           end) ->
         eval_select (itree E) (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) 
           (itree E) (fun (A : Type) (x : itree E A) => x) cnd x y ≈
           match
@@ -1296,16 +1383,83 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
               end
           end.
     Proof.
-      intros E H H0 H1 cnd x y.
+      intros E H H0 H1 cnd x y X Y.
       destruct cnd; try reflexivity.
       - (* i1 *)
         repeat rewrite eval_select_equation.
-        break_match.
+        break_match; eauto.
+      - (* Vector *)
+        setoid_rewrite eval_select_equation.
         cbn.
-        admit.
-        admit.
-      - admit.
-    Admitted.
+        setoid_rewrite X.
+        setoid_rewrite Y.
+        cbn.
+        unfold concretize_uvalue.
+        remember (concretize_uvalueM (err_ub_oom_T ident)
+                    (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) 
+                    (err_ub_oom_T ident) (fun (A : Type) (x0 : err_ub_oom_T ident A) => x0) x) as xr.
+        remember (concretize_uvalueM (err_ub_oom_T ident)
+                    (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) 
+                    (err_ub_oom_T ident) (fun (A : Type) (x0 : err_ub_oom_T ident A) => x0) y) as yr.
+
+        destruct_err_ub_oom xr; cbn;
+          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+          repeat setoid_rewrite Raise.raiseUB_bind_itree;
+          repeat setoid_rewrite Raise.raise_bind_itree;
+          repeat rewrite bind_ret_l; try reflexivity.
+
+        destruct_err_ub_oom yr; cbn;
+          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+          repeat setoid_rewrite Raise.raiseUB_bind_itree;
+          repeat setoid_rewrite Raise.raise_bind_itree;
+          repeat rewrite bind_ret_l; try reflexivity.
+
+        destruct xr0; try reflexivity.
+        destruct yr0; try reflexivity.
+
+        setoid_rewrite eval_select_loop_err_ub_oom_to_itree.
+
+        remember ((fix loop (conds xs ys : list dvalue) {struct conds} : err_ub_oom (list dvalue) :=
+         match conds with
+         | [] =>
+             match xs with
+             | [] =>
+                 fun ys0 : list dvalue =>
+                 match ys0 with
+                 | [] => ret []
+                 | _ :: _ =>
+                     raise_error "concretize_uvalueM: ill-typed vector select, length mismatch."
+                 end
+             | _ :: _ =>
+                 fun _ : list dvalue =>
+                 raise_error "concretize_uvalueM: ill-typed vector select, length mismatch."
+             end ys
+         | c :: conds0 =>
+             match xs with
+             | [] => raise_error "concretize_uvalueM: ill-typed vector select, length mismatch."
+             | x0 :: xs0 =>
+                 match ys with
+                 | [] => raise_error "concretize_uvalueM: ill-typed vector select, length mismatch."
+                 | y0 :: ys0 =>
+                     selected <-
+                     match c with
+                     | DVALUE_I1 i =>
+                         if (VellvmIntegers.Int1.unsigned i =? 1)%Z then ret x0 else ret y0
+                     | DVALUE_Poison t => ret (DVALUE_Poison t)
+                     | _ =>
+                         raise_error
+                           "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1."
+                     end;; rest <- loop conds0 xs0 ys0;; ret (selected :: rest)
+                 end
+             end
+         end) elts elts0 elts1) as r.
+        setoid_rewrite <- Heqr.
+        destruct_err_ub_oom r; cbn;
+          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+          repeat setoid_rewrite Raise.raiseUB_bind_itree;
+          repeat setoid_rewrite Raise.raise_bind_itree;
+          repeat rewrite bind_ret_l; try reflexivity.
+    Qed.
 
     Lemma extractbytes_to_dvalue_err_ub_oom_to_itree :
       forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E} uvs dt,
