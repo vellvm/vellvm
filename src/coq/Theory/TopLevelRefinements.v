@@ -1338,11 +1338,68 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                end
            end.
     Proof.
-      intros E H H0 H1 conds xs ys.
-      induction conds, xs, ys;
+      intros E H H0 H1 conds.
+      induction conds;
+        intros xs ys;
         cbn in *; subst; auto;
-        try reflexivity.
-    Admitted.
+        try reflexivity;
+        destruct xs, ys; try reflexivity.
+
+      destruct a; cbn;
+        repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+        repeat setoid_rewrite Raise.raiseUB_bind_itree;
+        repeat setoid_rewrite Raise.raise_bind_itree;
+        repeat rewrite bind_ret_l; try reflexivity.
+
+      { break_match; cbn;
+          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+          repeat setoid_rewrite Raise.raiseUB_bind_itree;
+          repeat setoid_rewrite Raise.raise_bind_itree;
+          repeat rewrite bind_ret_l; try reflexivity.
+
+        - setoid_rewrite IHconds.
+          match goal with
+          | [ |- context [ match ?X with _ => _ end ] ] =>
+              remember X
+          end.
+
+          destruct_err_ub_oom e; cbn;
+            repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+            repeat setoid_rewrite Raise.raiseUB_bind_itree;
+            repeat setoid_rewrite Raise.raise_bind_itree;
+            repeat rewrite bind_ret_l; try reflexivity.
+        - setoid_rewrite IHconds.
+          match goal with
+          | [ |- context [ match ?X with _ => _ end ] ] =>
+              remember X
+          end.
+
+          destruct_err_ub_oom e; cbn;
+            repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+            repeat setoid_rewrite Raise.raiseUB_bind_itree;
+            repeat setoid_rewrite Raise.raise_bind_itree;
+            repeat rewrite bind_ret_l; try reflexivity.
+      }
+
+      { cbn;
+          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+          repeat setoid_rewrite Raise.raiseUB_bind_itree;
+          repeat setoid_rewrite Raise.raise_bind_itree;
+          repeat rewrite bind_ret_l; try reflexivity.
+
+        - setoid_rewrite IHconds.
+          match goal with
+          | [ |- context [ match ?X with _ => _ end ] ] =>
+              remember X
+          end.
+
+          destruct_err_ub_oom e; cbn;
+            repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+            repeat setoid_rewrite Raise.raiseUB_bind_itree;
+            repeat setoid_rewrite Raise.raise_bind_itree;
+            repeat rewrite bind_ret_l; try reflexivity.
+      }
+    Qed.
 
     Lemma eval_select_err_ub_oom_to_itree :
       forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E}
