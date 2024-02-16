@@ -1780,7 +1780,13 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           (* I believe I have a lemma for this in LangRefine... *)
           eapply ByteM.all_extract_bytes_from_uvalue_strict_subterm; eauto.
           apply extractbytes_to_dvalue_err_ub_oom_to_itree.
+          intros u H0.
+          eapply H.
+          eapply uvalue_concat_bytes_strict_subterm; auto.
         - apply extractbytes_to_dvalue_err_ub_oom_to_itree.
+          intros u H0.
+          eapply H.
+          eapply uvalue_concat_bytes_strict_subterm; auto.
       }
 
       - cbn.
