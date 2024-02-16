@@ -208,13 +208,324 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
       - break_match_hyp_inv; discriminate.
     Qed.
 
+    Lemma map_monad_concretize_u_concretize_uvalue :
+      forall uvs
+        (IH : forall u,
+            Exists (uvalue_subterm u) uvs ->
+            concretize_u u (concretize_uvalue u)),
+        @map_monad ErrUbOomProp Monad_ErrUbOomProp _ _ concretize_u uvs (map_monad concretize_uvalue uvs).
+    Proof.
+      induction uvs; intros IH; try reflexivity.
+
+      Import MapMonadExtra.
+      repeat rewrite map_monad_unfold.
+      cbn.
+
+      unfold concretize_u, concretize_uvalue in *.
+      match goal with
+      | [ |- context [ match ?X with _ => _ end ] ] =>
+          remember X
+      end.
+
+      exists e.
+      exists (fun e0 =>
+           match
+             map_monad
+               (fun x0 : uvalue =>
+                  concretize_uvalueM err_ub_oom
+                    (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
+                    err_ub_oom (fun (A : Type) (x : err_ub_oom A) => x) x0) uvs
+           with
+           | {| unERR_UB_OOM := ma |} =>
+               {|
+                 unERR_UB_OOM :=
+                   {|
+                     unEitherT :=
+                       {|
+                         unEitherT :=
+                           {|
+                             unEitherT :=
+                               match
+                                 unIdent (unEitherT (unEitherT (unEitherT ma)))
+                               with
+                               | inl x => {| unIdent := inl x |}
+                               | inr x =>
+                                   unEitherT
+                                     match x with
+                                     | inl x0 =>
+                                         {|
+                                           unEitherT :=
+                                             {| unIdent := inr (inl x0) |}
+                                         |}
+                                     | inr x0 =>
+                                         unEitherT
+                                           match x0 with
+                                           | inl x1 =>
+                                               {|
+                                                 unEitherT :=
+                                                   {|
+                                                     unEitherT :=
+                                                       {|
+                                                         unIdent := inr (inr (inl x1))
+                                                       |}
+                                                   |}
+                                               |}
+                                           | inr x1 =>
+                                               {|
+                                                 unEitherT :=
+                                                   {|
+                                                     unEitherT :=
+                                                       {|
+                                                         unIdent :=
+                                                           inr (inr (inr (e0 :: x1)))
+                                                       |}
+                                                   |}
+                                               |}
+                                           end
+                                     end
+                               end
+                           |}
+                       |}
+                   |}
+               |}
+           end).
+      split.
+      { subst.
+        apply IH.
+        constructor.
+        apply rt_refl.
+      }
+
+      destruct_err_ub_oom e; cbn; split; eauto.
+      right.
+      intros; subst.
+
+      match goal with
+      | [ |- context [ match ?X with _ => _ end ] ] =>
+          remember X
+      end.
+      exists e.
+      exists (fun _ => match e with
+               | {| unERR_UB_OOM := ma |} =>
+                   {|
+                     unERR_UB_OOM :=
+                       {|
+                         unEitherT :=
+                           {|
+                             unEitherT :=
+                               {|
+                                 unEitherT :=
+                                   match unIdent (unEitherT (unEitherT (unEitherT ma))) with
+                                   | inl x => {| unIdent := inl x |}
+                                   | inr x =>
+                                       unEitherT
+                                         match x with
+                                         | inl x0 => {| unEitherT := {| unIdent := inr (inl x0) |} |}
+                                         | inr x0 =>
+                                             unEitherT
+                                               match x0 with
+                                               | inl x1 =>
+                                                   {|
+                                                     unEitherT :=
+                                                       {| unEitherT := {| unIdent := inr (inr (inl x1)) |} |}
+                                                   |}
+                                               | inr x1 =>
+                                                   {|
+                                                     unEitherT :=
+                                                       {|
+                                                         unEitherT := {| unIdent := inr (inr (inr (a0 :: x1))) |}
+                                                       |}
+                                                   |}
+                                               end
+                                         end
+                                   end
+                               |}
+                           |}
+                       |}
+                   |}
+               end).
+      split; cbn; eauto.          
+      destruct_err_ub_oom e; cbn; try reflexivity; split; auto.
+
+      right.
+      intros; subst.
+      reflexivity.
+    Qed.
+
+    Lemma concretize_uvalue_bytes_helper_concretize_uvalue_bytes_helper :
+      forall uvs acc
+        (IH : forall u,
+            Exists (uvalue_subterm u) uvs ->
+            concretize_u u (concretize_uvalue u)),
+        @CONCBASE.concretize_uvalue_bytes_helper ErrUbOomProp Monad_ErrUbOomProp
+          (fun (dt0 : dtyp) (edv : err_ub_oom dvalue) =>
+             match @unERR_UB_OOM ident dvalue edv with
+             | {| unEitherT := {| unEitherT := {| unEitherT := {| unIdent := inr (inr (inr dv)) |} |} |} |} =>
+                 dvalue_has_dtyp dv dt0 /\ dv <> DVALUE_Poison dt0
+             | _ => True
+             end) err_ub_oom (@Monad_err_ub_oom ident Monad_ident) (@RAISE_ERROR_err_ub_oom ident Monad_ident)
+          (@RAISE_UB_err_ub_oom_T ident Monad_ident) (@RAISE_OOM_err_ub_oom_T ident Monad_ident)
+          (fun (A : Type) (x ue : err_ub_oom A) => x = ue) acc uvs
+          (@CONCBASE.concretize_uvalue_bytes_helper err_ub_oom (@Monad_err_ub_oom ident Monad_ident)
+             (fun dt0 : dtyp =>
+                @lift_err_RAISE_ERROR dvalue err_ub_oom (@Monad_err_ub_oom ident Monad_ident)
+                  (@RAISE_ERROR_err_ub_oom ident Monad_ident) (default_dvalue_of_dtyp dt0)) err_ub_oom
+             (@Monad_err_ub_oom ident Monad_ident) (@RAISE_ERROR_err_ub_oom ident Monad_ident)
+             (@RAISE_UB_err_ub_oom_T ident Monad_ident) (@RAISE_OOM_err_ub_oom_T ident Monad_ident)
+             (fun (A : Type) (x : err_ub_oom A) => x) acc uvs).
+    Proof.
+      induction uvs;
+        intros acc IH; try reflexivity.
+      setoid_rewrite CONCBASE.concretize_uvalue_bytes_helper_equation.
+      rewrite (@CONCBASE.concretize_uvalue_bytes_helper_equation ErrUbOomProp).
+      destruct a; try reflexivity.
+      break_match.
+      - (* Pare-concretization exists *)
+        cbn.
+        exists (CONCBASE.concretize_uvalue_bytes_helper err_ub_oom
+             (fun dt0 : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt0)) err_ub_oom
+             (fun (A : Type) (x : err_ub_oom A) => x) acc uvs).
+        exists (fun e0 => success_unERR_UB_OOM (DVALUE_BYTES.DVALUE_ExtractByte d dt idx :: e0)).
+        split.
+        { apply IHuvs.
+          intros u H.
+          eapply IH.
+          right.
+          auto.
+        }
+
+        split; cbn; eauto.
+      - (* No pre-concretization exists *)
+        cbn.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists (CONCBASE.concretize_uvalueM err_ub_oom
+                 (fun dt0 : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt0)) err_ub_oom
+                 (fun (A : Type) (x : err_ub_oom A) => x) a);
+            exists (fun _ => res)
+        end.
+        split.
+
+        { eapply IH.
+          repeat constructor.
+        }
+
+        remember
+          (CONCBASE.concretize_uvalueM err_ub_oom
+             (fun dt0 : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt0)) err_ub_oom
+             (fun (A : Type) (x : err_ub_oom A) => x) a).
+        destruct_err_ub_oom e;
+          split; cbn; eauto;
+          try reflexivity.
+
+        right.
+        intros ? ?; subst.
+
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists (CONCBASE.concretize_uvalue_bytes_helper err_ub_oom
+                 (fun dt0 : dtyp =>
+                    lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt0)) err_ub_oom
+                 (fun (A : Type) (x : err_ub_oom A) => x)
+                 (CONCBASE.new_concretized_byte acc a a0 sid) uvs);
+            exists (fun _ => res)
+        end.
+        split; subst.
+
+        { eapply IHuvs; eauto.
+        }
+
+        remember (CONCBASE.concretize_uvalue_bytes_helper err_ub_oom
+                    (fun dt0 : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt0)) err_ub_oom
+                    (fun (A : Type) (x : err_ub_oom A) => x) (CONCBASE.new_concretized_byte acc a a0 sid) uvs).
+        destruct_err_ub_oom e; cbn; auto.
+        split; eauto.
+
+        right.
+        intros a1 H; subst.
+        reflexivity.
+    Qed.
+
+    Lemma concretize_uvalue_bytes_concretize_uvalue_bytes :
+      forall uvs
+        (IH : forall u,
+            Exists (uvalue_subterm u) uvs ->
+            concretize_u u (concretize_uvalue u)),
+        @CONCBASE.concretize_uvalue_bytes ErrUbOomProp Monad_ErrUbOomProp
+          (fun (dt0 : dtyp) (edv : err_ub_oom dvalue) =>
+             match @unERR_UB_OOM ident dvalue edv with
+             | {| unEitherT := {| unEitherT := {| unEitherT := {| unIdent := inr (inr (inr dv)) |} |} |} |} =>
+                 dvalue_has_dtyp dv dt0 /\ dv <> DVALUE_Poison dt0
+             | _ => True
+             end) err_ub_oom (@Monad_err_ub_oom ident Monad_ident) (@RAISE_ERROR_err_ub_oom ident Monad_ident)
+          (@RAISE_UB_err_ub_oom_T ident Monad_ident) (@RAISE_OOM_err_ub_oom_T ident Monad_ident)
+          (fun (A : Type) (x ue : err_ub_oom A) => x = ue) uvs
+          (@CONCBASE.concretize_uvalue_bytes err_ub_oom (@Monad_err_ub_oom ident Monad_ident)
+             (fun dt0 : dtyp =>
+                @lift_err_RAISE_ERROR dvalue err_ub_oom (@Monad_err_ub_oom ident Monad_ident)
+                  (@RAISE_ERROR_err_ub_oom ident Monad_ident) (default_dvalue_of_dtyp dt0)) err_ub_oom
+             (@Monad_err_ub_oom ident Monad_ident) (@RAISE_ERROR_err_ub_oom ident Monad_ident)
+             (@RAISE_UB_err_ub_oom_T ident Monad_ident) (@RAISE_OOM_err_ub_oom_T ident Monad_ident)
+             (fun (A : Type) (x : err_ub_oom A) => x) uvs).
+    Proof.
+      intros uvs IH.
+      repeat rewrite CONCBASE.concretize_uvalue_bytes_equation.
+      apply concretize_uvalue_bytes_helper_concretize_uvalue_bytes_helper; auto.
+    Qed.
+
+    Lemma extractbytes_to_dvalue_extractbytes_to_dvalue :
+      forall uvs dt
+        (IH : forall u,
+            Exists (uvalue_subterm u) uvs ->
+            concretize_u u (concretize_uvalue u)),
+        @CONCBASE.extractbytes_to_dvalue ErrUbOomProp Monad_ErrUbOomProp
+          (fun (dt0 : dtyp) (edv : err_ub_oom dvalue) =>
+             match @unERR_UB_OOM ident dvalue edv with
+             | {| unEitherT := {| unEitherT := {| unEitherT := {| unIdent := inr (inr (inr dv)) |} |} |} |} =>
+                 dvalue_has_dtyp dv dt0 /\ dv <> DVALUE_Poison dt0
+             | _ => True
+             end) err_ub_oom (@Monad_err_ub_oom ident Monad_ident) (@RAISE_ERROR_err_ub_oom ident Monad_ident)
+          (@RAISE_UB_err_ub_oom_T ident Monad_ident) (@RAISE_OOM_err_ub_oom_T ident Monad_ident)
+          (fun (A : Type) (x ue : err_ub_oom A) => x = ue) uvs dt
+          (@CONCBASE.extractbytes_to_dvalue err_ub_oom (@Monad_err_ub_oom ident Monad_ident)
+             (fun dt0 : dtyp =>
+                @lift_err_RAISE_ERROR dvalue err_ub_oom (@Monad_err_ub_oom ident Monad_ident)
+                  (@RAISE_ERROR_err_ub_oom ident Monad_ident) (default_dvalue_of_dtyp dt0)) err_ub_oom
+             (@Monad_err_ub_oom ident Monad_ident) (@RAISE_ERROR_err_ub_oom ident Monad_ident)
+             (@RAISE_UB_err_ub_oom_T ident Monad_ident) (@RAISE_OOM_err_ub_oom_T ident Monad_ident)
+             (fun (A : Type) (x : err_ub_oom A) => x) uvs dt).
+    Proof.
+      intros uvs dt IH.
+      repeat rewrite CONCBASE.extractbytes_to_dvalue_equation.
+      remember
+        (CONCBASE.concretize_uvalue_bytes err_ub_oom
+           (fun dt0 : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt0)) err_ub_oom
+           (fun (A : Type) (x : err_ub_oom A) => x) uvs).
+      cbn.
+      match goal with
+      | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+          exists e; exists (fun _ => res)
+      end.
+      split.
+
+      subst.
+      apply concretize_uvalue_bytes_concretize_uvalue_bytes; auto.
+
+      destruct_err_ub_oom e; cbn; split; auto.
+      right.
+      intros ? ?; subst.
+      remember ((ErrOomPoison.ErrOOMPoison_handle_poison_and_oom DVALUE_Poison
+                   (DVALUE_BYTES.dvalue_bytes_to_dvalue a dt))).
+      destruct_err_ub_oom y; reflexivity.
+    Qed.
+
     Lemma concretize_u_concretize_uvalue : forall u, concretize_u u (concretize_uvalue u).
     Proof using.
       unfold concretize_u, concretize_uvalue.
       induction u using uvalue_strong_ind;
         try reflexivity.
 
-      - (* Undef *)
+      { (* Undef *)
         remember (concretize_uvalueM err_ub_oom
        (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
        err_ub_oom (fun (A : Type) (x : err_ub_oom A) => x)
@@ -233,76 +544,528 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
           split.
           eapply dvalue_default; eauto.
           eapply default_dvalue_of_dtyp_not_poison; eauto.
-      - destruct u;
-          try reflexivity.
+      }
 
-      (* intros u. *)
-      (* induction u; try do_it. *)
-      (* - (* cbn. *) (* destruct (default_dvalue_of_dtyp t) eqn: EQ. *) *)
-      (*     econstructor. Unshelve. 3 : { exact DVALUE_None. } *)
-      (*     intro. inv H. *)
-      (*     apply Concretize_Undef. apply dvalue_default. symmetry. auto. *)
-      (*   - cbn. induction fields. *)
-      (*     + cbn. constructor. auto. *)
-      (*     + rewrite list_cons_app. rewrite map_monad_app. cbn. *)
-      (*       assert (IN: forall u : uvalue, In u fields -> concretize_u u (concretize_uvalue u)). *)
-      (*       { intros. apply H. apply in_cons; auto. } specialize (IHfields IN). *)
-      (*       specialize (H a). assert (In a (a :: fields)) by apply in_eq. specialize (H H0). *)
-      (*       pose proof Concretize_Struct_Cons as CONS. *)
-      (*       specialize (CONS _ _ _ _ H IHfields). cbn in CONS. *)
-      (*       * destruct (unEitherT (concretize_uvalue a)). *)
-      (*         -- auto. *)
-      (*         -- destruct s; auto. *)
-      (*            destruct (unEitherT (map_monad concretize_uvalue fields)); auto. *)
-      (*            destruct s; auto. *)
-      (*   - cbn. induction fields. *)
-      (*     + cbn. constructor. auto. *)
-      (*     + rewrite list_cons_app. rewrite map_monad_app. cbn. *)
-      (*       assert (IN: forall u : uvalue, In u fields -> concretize_u u (concretize_uvalue u)). *)
-      (*       { intros. apply H. apply in_cons; auto. } specialize (IHfields IN). *)
-      (*       specialize (H a). assert (In a (a :: fields)) by apply in_eq. specialize (H H0). *)
-      (*       pose proof Concretize_Packed_struct_Cons as CONS. *)
-      (*       specialize (CONS _ _ _ _ H IHfields). cbn in CONS. *)
-      (*       * destruct (unEitherT (concretize_uvalue a)). *)
-      (*         -- auto. *)
-      (*         -- destruct s; auto. *)
-      (*            destruct (unEitherT (map_monad concretize_uvalue fields)); auto. *)
-      (*            destruct s; auto. *)
-      (*   - cbn. induction elts. *)
-      (*     + cbn. constructor. auto. *)
-      (*     + rewrite list_cons_app. rewrite map_monad_app. cbn. *)
-      (*       assert (IN: forall u : uvalue, In u elts -> concretize_u u (concretize_uvalue u)). *)
-      (*       { intros. apply H. apply in_cons; auto. } specialize (IHelts IN). *)
-      (*       specialize (H a). assert (In a (a :: elts)) by apply in_eq. specialize (H H0). *)
-      (*       pose proof Concretize_Array_Cons as CONS. *)
-      (*       specialize (CONS _ _ _ _ H IHelts). cbn in CONS. *)
-      (*       * destruct (unEitherT (concretize_uvalue a)). *)
-      (*         -- auto. *)
-      (*         -- destruct s; auto. *)
-      (*            destruct (unEitherT (map_monad concretize_uvalue elts)); auto. *)
-      (*            destruct s; auto. *)
-      (*   - cbn. induction elts. *)
-      (*     + cbn. constructor. auto. *)
-      (*     + rewrite list_cons_app. rewrite map_monad_app. cbn. *)
-      (*       assert (IN: forall u : uvalue, In u elts -> concretize_u u (concretize_uvalue u)). *)
-      (*       { intros. apply H. apply in_cons; auto. } specialize (IHelts IN). *)
-      (*       specialize (H a). assert (In a (a :: elts)) by apply in_eq. specialize (H H0). *)
-      (*       pose proof Concretize_Vector_Cons as CONS. *)
-      (*       specialize (CONS _ _ _ _ H IHelts). cbn in CONS. *)
-      (*       * destruct (unEitherT (concretize_uvalue a)). *)
-      (*         -- auto. *)
-      (*         -- destruct s; auto. *)
-      (*            destruct (unEitherT (map_monad concretize_uvalue elts)); auto. *)
-      (*            destruct s; auto. *)
-      (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
-      (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
-      (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
-      (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
-      (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
-      (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
-      (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
-      (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
-      (* Qed. *)
+      destruct u;
+        try reflexivity.
+
+      { (* Undef *)
+          cbn.
+          destruct (default_dvalue_of_dtyp t) eqn:DEF; cbn; auto.
+          split.
+          eapply dvalue_default; eauto.
+          eapply default_dvalue_of_dtyp_not_poison; eauto.
+      }
+
+      { (* Structs *)
+        cbn.
+        pose proof @map_monad_concretize_u_concretize_uvalue fields.
+        forward H0.
+        { intros u H1.
+          eapply H.
+          eapply uvalue_struct_strict_subterm; auto.          
+        }
+
+        unfold concretize_u, concretize_uvalue in *.
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        exists e.
+        exists (fun a => ret (DVALUE_Struct a)).
+        split; auto.
+      }
+
+      { (* Packed structs *)
+        cbn.
+        pose proof @map_monad_concretize_u_concretize_uvalue fields.
+        forward H0.
+        { intros u H1.
+          eapply H.
+          eapply uvalue_packed_struct_strict_subterm; auto.          
+        }
+
+        unfold concretize_u, concretize_uvalue in *.
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        exists e.
+        exists (fun a => ret (DVALUE_Packed_struct a)).
+        split; auto.
+      }
+
+      { (* Array *)
+        cbn.
+        pose proof @map_monad_concretize_u_concretize_uvalue elts.
+        forward H0.
+        { intros u H1.
+          eapply H.
+          eapply uvalue_array_strict_subterm; auto.          
+        }
+
+        unfold concretize_u, concretize_uvalue in *.
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        exists e.
+        exists (fun a => ret (DVALUE_Array a)).
+        split; auto.
+      }
+
+      { (* Vector *)
+        cbn.
+        pose proof @map_monad_concretize_u_concretize_uvalue elts.
+        forward H0.
+        { intros u H1.
+          eapply H.
+          eapply uvalue_vector_strict_subterm; auto.          
+        }
+
+        unfold concretize_u, concretize_uvalue in *.
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        exists e.
+        exists (fun a => ret (DVALUE_Vector a)).
+        split; auto.
+      }
+
+      { (* IBinop *)
+        cbn.
+        unfold concretize_u, concretize_uvalue in *.
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros a H0; subst.
+
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros ? ?; subst.
+        remember (eval_iop iop a a0).
+        destruct_err_ub_oom y; reflexivity.
+      }
+
+      { (* ICmp *)
+        cbn.
+        unfold concretize_u, concretize_uvalue in *.
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros a H0; subst.
+
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros ? ?; subst.
+        remember (eval_icmp cmp a a0).
+        destruct_err_ub_oom y; reflexivity.
+      }
+
+      { (* FBinop *)
+        cbn.
+        unfold concretize_u, concretize_uvalue in *.
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros a H0; subst.
+
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros ? ?; subst.
+        remember (eval_fop fop a a0).
+        destruct_err_ub_oom y; reflexivity.
+      }
+
+      { (* FCmp *)
+        cbn.
+        unfold concretize_u, concretize_uvalue in *.
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros a H0; subst.
+
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros ? ?; subst.
+        remember (eval_fcmp cmp a a0).
+        destruct_err_ub_oom y; reflexivity.
+      }
+
+      { (* Conversion *)
+        cbn.
+        unfold concretize_u, concretize_uvalue in *.
+        remember (concretize_uvalueM err_ub_oom
+                    (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) err_ub_oom
+                    (fun (A : Type) (x : err_ub_oom A) => x) u) as e.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros a H0; subst.
+
+        repeat (break_match; try reflexivity).
+      }
+
+      { (* GEP *)
+        cbn.
+        pose proof @map_monad_concretize_u_concretize_uvalue idxs.
+        forward H0.
+        { intros u0 H1.
+          eapply H.
+          eapply uvalue_getelementptr_strict_subterm; auto.          
+        }
+
+        unfold concretize_u, concretize_uvalue in *.
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros ? ?; subst.
+
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split; auto.
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros ? ?; subst.
+
+        repeat (break_match; try reflexivity).
+      }
+
+      { (* ExtractElement *)
+        cbn.
+        unfold concretize_u, concretize_uvalue in *.
+        remember
+          (concretize_uvalueM err_ub_oom
+             (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) err_ub_oom
+             (fun (A : Type) (x : err_ub_oom A) => x) u1) as e.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros a H0; subst.
+
+        remember
+          (concretize_uvalueM err_ub_oom
+             (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
+             err_ub_oom (fun (A : Type) (x : err_ub_oom A) => x) u2) as e.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros ? ?; subst.
+        exists (match vec_typ with
+           | DTYPE_Vector _ t => success_unERR_UB_OOM t
+           | _ => ERR_unERR_UB_OOM "Invalid vector type for ExtractElement"
+           end).
+        exists (fun a1 => index_into_vec_dv a1 a a0).
+        destruct vec_typ; split; cbn; eauto.
+      }
+
+      { (* InsertElement *)
+        cbn.
+        unfold concretize_u, concretize_uvalue in *.
+        remember
+          (concretize_uvalueM err_ub_oom
+             (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) err_ub_oom
+             (fun (A : Type) (x : err_ub_oom A) => x) u1) as e.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros a H0; subst.
+
+        remember
+          (concretize_uvalueM err_ub_oom
+             (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
+             err_ub_oom (fun (A : Type) (x : err_ub_oom A) => x) u3) as e.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros ? ?; subst.
+        remember
+          (concretize_uvalueM err_ub_oom
+             (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
+             err_ub_oom (fun (A : Type) (x : err_ub_oom A) => x) u2) as e.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros ? ?; subst.
+        remember (insert_into_vec_dv vec_typ a a1 a0).
+        destruct_err_ub_oom y; reflexivity.
+      }
+
+      { (* ExtractValue *)
+        cbn.
+        unfold concretize_u, concretize_uvalue in *.
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros ? ?; subst.
+
+        induction idxs; try reflexivity.
+        remember (index_into_str_dv a a0).
+        destruct_err_ub_oom y; reflexivity.
+      }
+
+      { (* InsertValue *)
+        cbn.
+        unfold concretize_u, concretize_uvalue in *.
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros ? ?; subst.
+
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros ? ?; subst.
+
+        induction idxs; try reflexivity.
+        destruct idxs.
+        - remember (insert_into_str a a0 a1).
+          destruct_err_ub_oom y; reflexivity.
+        - remember (index_into_str_dv a a1).
+          destruct_err_ub_oom y; reflexivity.
+      }
+
+      { (* Select *)
+        admit.
+      }
+
+      { (* ConcatBytes *)
+        repeat rewrite CONCBASE.concretize_uvalueM_equation.
+        break_match.
+        { break_match.
+          eapply H.
+          eapply Byte.all_extract_bytes_from_uvalue_strict_subterm; auto.
+          eapply extractbytes_to_dvalue_extractbytes_to_dvalue.
+          intros u H0.
+          apply H.
+          apply uvalue_concat_bytes_strict_subterm; auto.
+        }
+        eapply extractbytes_to_dvalue_extractbytes_to_dvalue.
+        intros.
+        apply H.
+        apply uvalue_concat_bytes_strict_subterm; auto.
+      }
     Admitted.
 
     Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : PickUvalueE ~> itree E :=

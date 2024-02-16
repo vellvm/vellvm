@@ -820,6 +820,94 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     }
   Qed.
 
+  Lemma uvalue_struct_strict_subterm :
+    forall u uvs,
+      Exists (uvalue_subterm u) uvs ->
+      uvalue_strict_subterm u (UVALUE_Struct uvs).
+  Proof using.
+    intros u uvs H.
+    induction H.
+    { unfold uvalue_subterm in H. unfold uvalue_strict_subterm.
+      (* The idea here: if uvalue_direct_subterm is refl, then clos_trans is transitive with x and x is *)
+      intros.
+      eapply clos_rt_t.
+      - apply H.
+      - apply t_step; constructor; apply in_eq. }
+    { apply Exists_In in H.
+      destruct H as (a&H1&H2).
+      unfold uvalue_subterm in H2. unfold uvalue_strict_subterm.
+      eapply clos_rt_t.
+      apply H2.
+      apply t_step. constructor. simpl. right. assumption.
+    }
+  Qed.
+
+  Lemma uvalue_packed_struct_strict_subterm :
+    forall u uvs,
+      Exists (uvalue_subterm u) uvs ->
+      uvalue_strict_subterm u (UVALUE_Packed_struct uvs).
+  Proof using.
+    intros u uvs H.
+    induction H.
+    { unfold uvalue_subterm in H. unfold uvalue_strict_subterm.
+      (* The idea here: if uvalue_direct_subterm is refl, then clos_trans is transitive with x and x is *)
+      intros.
+      eapply clos_rt_t.
+      - apply H.
+      - apply t_step; constructor; apply in_eq. }
+    { apply Exists_In in H.
+      destruct H as (a&H1&H2).
+      unfold uvalue_subterm in H2. unfold uvalue_strict_subterm.
+      eapply clos_rt_t.
+      apply H2.
+      apply t_step. constructor. simpl. right. assumption.
+    }
+  Qed.
+
+  Lemma uvalue_array_strict_subterm :
+    forall u uvs,
+      Exists (uvalue_subterm u) uvs ->
+      uvalue_strict_subterm u (UVALUE_Array uvs).
+  Proof using.
+    intros u uvs H.
+    induction H.
+    { unfold uvalue_subterm in H. unfold uvalue_strict_subterm.
+      (* The idea here: if uvalue_direct_subterm is refl, then clos_trans is transitive with x and x is *)
+      intros.
+      eapply clos_rt_t.
+      - apply H.
+      - apply t_step; constructor; apply in_eq. }
+    { apply Exists_In in H.
+      destruct H as (a&H1&H2).
+      unfold uvalue_subterm in H2. unfold uvalue_strict_subterm.
+      eapply clos_rt_t.
+      apply H2.
+      apply t_step. constructor. simpl. right. assumption.
+    }
+  Qed.
+
+  Lemma uvalue_vector_strict_subterm :
+    forall u uvs,
+      Exists (uvalue_subterm u) uvs ->
+      uvalue_strict_subterm u (UVALUE_Vector uvs).
+  Proof using.
+    intros u uvs H.
+    induction H.
+    { unfold uvalue_subterm in H. unfold uvalue_strict_subterm.
+      (* The idea here: if uvalue_direct_subterm is refl, then clos_trans is transitive with x and x is *)
+      intros.
+      eapply clos_rt_t.
+      - apply H.
+      - apply t_step; constructor; apply in_eq. }
+    { apply Exists_In in H.
+      destruct H as (a&H1&H2).
+      unfold uvalue_subterm in H2. unfold uvalue_strict_subterm.
+      eapply clos_rt_t.
+      apply H2.
+      apply t_step. constructor. simpl. right. assumption.
+    }
+  Qed.
+
   Lemma uvalue_direct_subterm_uvalue_measure :
     forall s e,
       uvalue_direct_subterm s e ->
