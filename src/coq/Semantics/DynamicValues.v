@@ -797,6 +797,29 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     }
   Qed.
 
+  Lemma uvalue_getelementptr_strict_subterm :
+    forall u idxs addr t,
+      Exists (uvalue_subterm u) idxs ->
+      uvalue_strict_subterm u (UVALUE_GetElementPtr t addr idxs).
+  Proof using.
+    intros u idxs addr t H.
+    generalize dependent t.
+    induction H.
+    { unfold uvalue_subterm in H. unfold uvalue_strict_subterm.
+      (* The idea here: if uvalue_direct_subterm is refl, then clos_trans is transitive with x and x is *)
+      intros.
+      eapply clos_rt_t.
+      - apply H.
+      - apply t_step; constructor; apply in_eq. }
+    { intros dt. apply Exists_In in H.
+      destruct H as (a&H1&H2).
+      unfold uvalue_subterm in H2. unfold uvalue_strict_subterm.
+      eapply clos_rt_t.
+      apply H2.
+      apply t_step. constructor. simpl. right. assumption.
+    }
+  Qed.
+
   Lemma uvalue_direct_subterm_uvalue_measure :
     forall s e,
       uvalue_direct_subterm s e ->

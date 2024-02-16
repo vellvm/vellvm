@@ -1720,6 +1720,78 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         repeat rewrite bind_ret_l; try reflexivity.
     Qed.
 
+    Lemma map_monad_concretize_uvalueM_err_ub_oom_to_itree :
+      forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E}
+        idxs
+        (IH : forall (u : uvalue),
+            Exists (uvalue_subterm u) idxs ->
+            (@concretize_uvalue (itree E) _ _ _ _ u) ≈
+              match concretize_uvalue u with
+              | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
+                  match m with
+                  | inl (OOM_message x) => raiseOOM x
+                  | inr (inl (UB_message x)) => raiseUB x
+                  | inr (inr (inl (ERR_message x))) => raise x
+                  | inr (inr (inr x)) => ret x
+                  end
+              end),
+        (map_monad
+           (concretize_uvalueM (itree E)
+              (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) 
+              (itree E) (fun (A : Type) (x : itree E A) => x)) idxs) ≈
+          match
+            map_monad
+              (concretize_uvalueM (err_ub_oom_T ident)
+                 (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
+                 (err_ub_oom_T ident) (fun (A : Type) (x : err_ub_oom_T ident A) => x)) idxs
+          with
+          | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
+              match m with
+              | inl (OOM_message x) => raiseOOM x
+              | inr (inl (UB_message x)) => raiseUB x
+              | inr (inr (inl (ERR_message x))) => raise x
+              | inr (inr (inr x)) => ret x
+              end
+          end.
+    Proof.
+      intros E H H0 H1 idxs.
+      induction idxs; intros IH; try reflexivity.
+
+      setoid_rewrite map_monad_unfold.
+      setoid_rewrite (IH a).
+      2: {
+        constructor.
+        apply rt_refl.
+      }
+
+      unfold concretize_uvalue.
+
+      match goal with
+      | [ |- context [ match ?X with _ => _ end ] ] =>
+          remember X
+      end.
+
+      destruct_err_ub_oom e; cbn;
+        repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+        repeat setoid_rewrite Raise.raiseUB_bind_itree;
+        repeat setoid_rewrite Raise.raise_bind_itree;
+        repeat rewrite bind_ret_l; try reflexivity.
+
+      rewrite IHidxs.
+
+      match goal with
+      | [ |- context [ match ?X with _ => _ end ] ] =>
+          remember X
+      end.
+
+      destruct_err_ub_oom e1; cbn;
+        repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+        repeat setoid_rewrite Raise.raiseUB_bind_itree;
+        repeat setoid_rewrite Raise.raise_bind_itree;
+        repeat rewrite bind_ret_l; try reflexivity.
+      auto.
+    Qed.
+
     Lemma concretize_uvalue_err_ub_oom_to_itree :
       forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E} u,
         (@concretize_uvalue (itree E) _ _ _ _ u) ≈
@@ -2159,16 +2231,41 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           repeat setoid_rewrite Raise.raise_bind_itree;
           repeat rewrite bind_ret_l; try reflexivity.
 
-        induction idxs.
-        + cbn.
-          rewrite bind_ret_l.
-          cbn.
-          break_match; try reflexivity.
-          break_match; try reflexivity.
-        + repeat rewrite map_monad_unfold.
-          forward IHidxs.
-          admit.
-          admit.
+        rewrite map_monad_concretize_uvalueM_err_ub_oom_to_itree.
+
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+
+        destruct_err_ub_oom e; cbn;
+          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+          repeat setoid_rewrite Raise.raiseUB_bind_itree;
+          repeat setoid_rewrite Raise.raise_bind_itree;
+          repeat rewrite bind_ret_l; try reflexivity.
+
+        2: {
+          intros u0 H0.
+          eapply H.
+          eapply uvalue_getelementptr_strict_subterm; auto.
+        }
+
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+
+        destruct s; cbn;
+          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+          repeat setoid_rewrite Raise.raiseUB_bind_itree;
+          repeat setoid_rewrite Raise.raise_bind_itree;
+          repeat rewrite bind_ret_l; try reflexivity.
+
+        destruct o; cbn;
+          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+          repeat setoid_rewrite Raise.raiseUB_bind_itree;
+          repeat setoid_rewrite Raise.raise_bind_itree;
+          repeat rewrite bind_ret_l; try reflexivity.
       - (* ExtractElement *)
         unfold concretize_uvalue.
         rewrite concretize_uvalueM_equation.
@@ -2335,7 +2432,10 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                     (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
                     (err_ub_oom_T ident) (fun (A : Type) (x : err_ub_oom_T ident A) => x) u1r0 u2 u3) as res.
         destruct_err_ub_oom res; reflexivity.
-    Admitted.
+
+        eapply H. repeat constructor.
+        eapply H. repeat constructor.
+    Qed.
 
     Lemma PickUvalue_handler_correct :
       forall E `{FailureE -< E} `{UBE -< E} `{OOME -< E},
