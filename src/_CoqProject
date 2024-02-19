@@ -51,6 +51,7 @@
 ./coq/Semantics/Denotation.v
 ./coq/Semantics/DynamicValues.v
 ./coq/Semantics/GepM.v
+./coq/Semantics/StoreId.v
 ./coq/Semantics/InfiniteToFinite.v
 ./coq/Semantics/InfiniteToFinite/Conversions/BaseConversions.v
 ./coq/Semantics/InfiniteToFinite/Conversions/DvalueConversions.v

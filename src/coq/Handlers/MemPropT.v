@@ -25,14 +25,12 @@ From Vellvm.Handlers.MemoryModules Require Import
      Within.
 
 From Vellvm.Semantics Require Import
-     LLVMEvents.
+  StoreId
+  LLVMEvents.
 
 Import Basics.Basics.Monads.
 Import MonadNotation.
 Open Scope monad_scope.
-
-(* Move this ? *)
-Definition store_id := N.
 
 Class MonadStoreId (M : Type -> Type) : Type :=
   { fresh_sid : M store_id;

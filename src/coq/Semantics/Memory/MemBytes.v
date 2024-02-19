@@ -8,6 +8,7 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
      Semantics.LLVMEvents
+     Semantics.StoreId
      Utils.Monads
      Utils.OptionUtil
      Utils.ListUtil

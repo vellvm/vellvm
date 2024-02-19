@@ -22,7 +22,8 @@ From Vellvm.Semantics Require Import
      Memory.MemBytes
      Memory.ErrSID
      GepM
-     VellvmIntegers.
+     VellvmIntegers
+     StoreId.
 
 From Vellvm.Utils Require Import
      Error

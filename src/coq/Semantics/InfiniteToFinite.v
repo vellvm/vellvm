@@ -15,6 +15,7 @@ From Vellvm Require Import
   Semantics.MemoryAddress
   Semantics.Memory.Sizeof
   Semantics.Lang
+  Semantics.StoreId
   Semantics.InterpretationStack
   Semantics.TopLevel
   Semantics.DynamicValues
@@ -2381,9 +2382,9 @@ Lemma lift_memory_convert_mem_byte :
 
   (** More refinement relations *)
   Definition L3_E1E2_orutt_strict (t1 : PropT InfLP.Events.L3 (InfMemMMSP.MemState *
-                                                                 (MemPropT.store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue)))))
+                                                                 (store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue)))))
     (t2 : PropT FinLP.Events.L3 (FinMemMMSP.MemState *
-                                   (MemPropT.store_id * (FinLLVM.Local.local_env * FinLLVM.Stack.lstack * (FinLLVM.Global.global_env * FinLP.Events.DV.dvalue)))))
+                                   (store_id * (FinLLVM.Local.local_env * FinLLVM.Stack.lstack * (FinLLVM.Global.global_env * FinLP.Events.DV.dvalue)))))
     : Prop :=
     forall t', t2 t' ->
                exists t, t1 t /\
@@ -2962,7 +2963,7 @@ Lemma lift_memory_convert_mem_byte :
   Unset Implicit Arguments.
   Unset Contextual Implicit.
   Definition get_inf_tree' :
-    forall (t_fin2 : itree L3 (FinMem.MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack local_env * res_L1)))), itree InfLP.Events.L3 TopLevelBigIntptr.res_L6.
+    forall (t_fin2 : itree L3 (FinMem.MMEP.MMSP.MemState * (store_id * (local_env * @stack local_env * res_L1)))), itree InfLP.Events.L3 TopLevelBigIntptr.res_L6.
   Proof.
     cofix CIH.
     intros t_fin2.
@@ -3121,15 +3122,15 @@ Lemma lift_memory_convert_mem_byte :
   Unset Printing All.
   Unset Printing Implicit.
   Definition get_inf_tree :
-    forall (t_fin2 : itree L3 (FinMem.MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack local_env * res_L1)))), itree InfLP.Events.L3 TopLevelBigIntptr.res_L6 :=
+    forall (t_fin2 : itree L3 (FinMem.MMEP.MMSP.MemState * (store_id * (local_env * @stack local_env * res_L1)))), itree InfLP.Events.L3 TopLevelBigIntptr.res_L6 :=
 cofix CIH
   (t_fin2 : itree L3
               (prod FinMem.MMEP.MMSP.MemState
-                 (prod MemPropT.store_id
+                 (prod store_id
                     (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) :
     itree InfLP.Events.L3
       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-         (prod MemPropT.store_id
+         (prod store_id
             (prod
                (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                   InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3138,18 +3139,18 @@ cofix CIH
   (fun
      _observe : itreeF L3
                   (prod FinMem.MMEP.MMSP.MemState
-                     (prod MemPropT.store_id
+                     (prod store_id
                         (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))
                   (itree L3
                      (prod FinMem.MMEP.MMSP.MemState
-                        (prod MemPropT.store_id
+                        (prod store_id
                            (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) =>
    match
      _observe
      return
        (itree InfLP.Events.L3
           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-             (prod MemPropT.store_id
+             (prod store_id
                 (prod
                    (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                       InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3159,11 +3160,11 @@ cofix CIH
    | RetF r =>
        (fun
           r0 : prod FinMem.MMEP.MMSP.MemState
-                 (prod MemPropT.store_id
+                 (prod store_id
                     (prod (prod local_env (@stack local_env)) (prod global_env dvalue))) =>
         @ret (itree InfLP.Events.L3) (@Monad_itree InfLP.Events.L3)
           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-             (prod MemPropT.store_id
+             (prod store_id
                 (prod
                    (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                       InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3173,7 +3174,7 @@ cofix CIH
             r0
             return
               (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                 (prod MemPropT.store_id
+                 (prod store_id
                     (prod
                        (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                           InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3182,13 +3183,13 @@ cofix CIH
           with
           | pair a b =>
               (fun (ms : FinMem.MMEP.MMSP.MemState)
-                 (p : prod MemPropT.store_id
+                 (p : prod store_id
                         (prod (prod local_env (@stack local_env)) (prod global_env dvalue))) =>
                match
                  p
                  return
                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                      (prod MemPropT.store_id
+                      (prod store_id
                          (prod
                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3196,13 +3197,13 @@ cofix CIH
                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                with
                | pair a0 b0 =>
-                   (fun (sid : MemPropT.store_id)
+                   (fun (sid : store_id)
                       (p0 : prod (prod local_env (@stack local_env)) (prod global_env dvalue)) =>
                     match
                       p0
                       return
                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                           (prod MemPropT.store_id
+                           (prod store_id
                               (prod
                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3216,7 +3217,7 @@ cofix CIH
                            return
                              (forall _ : prod global_env dvalue,
                               prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3230,7 +3231,7 @@ cofix CIH
                                 p2
                                 return
                                   (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                     (prod MemPropT.store_id
+                                     (prod store_id
                                         (prod
                                            (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                               InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3240,14 +3241,14 @@ cofix CIH
                               | pair a3 b3 =>
                                   (fun (genv : global_env) (res : dvalue) =>
                                    @pair InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                     (prod MemPropT.store_id
+                                     (prod store_id
                                         (prod
                                            (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                               InterpreterStackBigIntptr.LLVM.Stack.lstack)
                                            (prod InterpreterStackBigIntptr.LLVM.Global.global_env
                                               InterpreterStackBigIntptr.LP.Events.DV.dvalue)))
                                      (lift_MemState ms)
-                                     (@pair MemPropT.store_id
+                                     (@pair store_id
                                         (prod
                                            (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                               InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3273,11 +3274,11 @@ cofix CIH
        (fun
           t0 : itree L3
                  (prod FinMem.MMEP.MMSP.MemState
-                    (prod MemPropT.store_id
+                    (prod store_id
                        (prod (prod local_env (@stack local_env)) (prod global_env dvalue)))) =>
         @go InfLP.Events.L3
           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-             (prod MemPropT.store_id
+             (prod store_id
                 (prod
                    (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                       InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3285,7 +3286,7 @@ cofix CIH
                       InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
           (@TauF InfLP.Events.L3
              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                (prod MemPropT.store_id
+                (prod store_id
                    (prod
                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3293,7 +3294,7 @@ cofix CIH
                          InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
              (itree InfLP.Events.L3
                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                   (prod MemPropT.store_id
+                   (prod store_id
                       (prod
                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3305,12 +3306,12 @@ cofix CIH
           (k0 : forall _ : X0,
                 itree L3
                   (prod FinMem.MMEP.MMSP.MemState
-                     (prod MemPropT.store_id
+                     (prod store_id
                         (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) =>
         let X1 :
           itree InfLP.Events.L3
             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-               (prod MemPropT.store_id
+               (prod store_id
                   (prod
                      (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                         InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3321,7 +3322,7 @@ cofix CIH
             return
               (itree InfLP.Events.L3
                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                    (prod MemPropT.store_id
+                    (prod store_id
                        (prod
                           (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                              InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3335,7 +3336,7 @@ cofix CIH
                   forall _ : @eq Type X0 X0,
                   itree InfLP.Events.L3
                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                       (prod MemPropT.store_id
+                       (prod store_id
                           (prod
                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3347,7 +3348,7 @@ cofix CIH
                       (forall _ : @eq Type T X0,
                        itree InfLP.Events.L3
                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                            (prod MemPropT.store_id
+                            (prod store_id
                                (prod
                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3364,7 +3365,7 @@ cofix CIH
                            forall (_ : dtyp) (_ : uvalue) (_ : list dvalue),
                            itree InfLP.Events.L3
                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3377,13 +3378,13 @@ cofix CIH
                                 (_ : forall _ : X1,
                                      itree L3
                                        (prod FinMem.MMEP.MMSP.MemState
-                                          (prod MemPropT.store_id
+                                          (prod store_id
                                              (prod (prod local_env (@stack local_env))
                                                 (prod global_env dvalue))))) 
                                 (_ : ExternalCallE X1),
                               itree InfLP.Events.L3
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3393,13 +3394,13 @@ cofix CIH
                                 (k1 : forall _ : dvalue,
                                       itree L3
                                         (prod FinMem.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod (prod local_env (@stack local_env))
                                                  (prod global_env dvalue)))))
                                 (_ : ExternalCallE dvalue) =>
                               @go InfLP.Events.L3
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3407,7 +3408,7 @@ cofix CIH
                                             InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                 (@VisF InfLP.Events.L3
                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                      (prod MemPropT.store_id
+                                      (prod store_id
                                          (prod
                                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3415,7 +3416,7 @@ cofix CIH
                                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                    (itree InfLP.Events.L3
                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                         (prod MemPropT.store_id
+                                         (prod store_id
                                             (prod
                                                (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                   InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3441,7 +3442,7 @@ cofix CIH
                                          return
                                            (itree L3
                                               (prod FinMem.MMEP.MMSP.MemState
-                                                 (prod MemPropT.store_id
+                                                 (prod store_id
                                                     (prod (prod local_env (@stack local_env))
                                                        (prod global_env dvalue)))))
                                        with
@@ -3464,7 +3465,7 @@ cofix CIH
                                                        (@ReSum_id (forall _ : Type, Type) IFun Id_IFun
                                                           OOME))))
                                               (prod FinMem.MMEP.MMSP.MemState
-                                                 (prod MemPropT.store_id
+                                                 (prod store_id
                                                     (prod (prod local_env (@stack local_env))
                                                        (prod global_env dvalue)))) s0) s
                                        end)))) X0 H2 k0 H0) X0 H3) H1 t0 f0 args0) t f args
@@ -3477,7 +3478,7 @@ cofix CIH
                            forall _ : list int8,
                            itree InfLP.Events.L3
                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3490,13 +3491,13 @@ cofix CIH
                                 (_ : forall _ : X1,
                                      itree L3
                                        (prod FinMem.MMEP.MMSP.MemState
-                                          (prod MemPropT.store_id
+                                          (prod store_id
                                              (prod (prod local_env (@stack local_env))
                                                 (prod global_env dvalue))))) 
                                 (_ : ExternalCallE X1),
                               itree InfLP.Events.L3
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3506,13 +3507,13 @@ cofix CIH
                                 (k1 : forall _ : unit,
                                       itree L3
                                         (prod FinMem.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod (prod local_env (@stack local_env))
                                                  (prod global_env dvalue))))) 
                                 (_ : ExternalCallE unit) =>
                               @go InfLP.Events.L3
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3520,7 +3521,7 @@ cofix CIH
                                             InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                 (@VisF InfLP.Events.L3
                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                      (prod MemPropT.store_id
+                                      (prod store_id
                                          (prod
                                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3528,7 +3529,7 @@ cofix CIH
                                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                    (itree InfLP.Events.L3
                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                         (prod MemPropT.store_id
+                                         (prod store_id
                                             (prod
                                                (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                   InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3549,7 +3550,7 @@ cofix CIH
                                       return
                                         (itree InfLP.Events.L3
                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                              (prod MemPropT.store_id
+                                              (prod store_id
                                                  (prod
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -3569,7 +3570,7 @@ cofix CIH
                            forall _ : list int8,
                            itree InfLP.Events.L3
                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3582,13 +3583,13 @@ cofix CIH
                                 (_ : forall _ : X1,
                                      itree L3
                                        (prod FinMem.MMEP.MMSP.MemState
-                                          (prod MemPropT.store_id
+                                          (prod store_id
                                              (prod (prod local_env (@stack local_env))
                                                 (prod global_env dvalue))))) 
                                 (_ : ExternalCallE X1),
                               itree InfLP.Events.L3
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3598,13 +3599,13 @@ cofix CIH
                                 (k1 : forall _ : unit,
                                       itree L3
                                         (prod FinMem.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod (prod local_env (@stack local_env))
                                                  (prod global_env dvalue))))) 
                                 (_ : ExternalCallE unit) =>
                               @go InfLP.Events.L3
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3612,7 +3613,7 @@ cofix CIH
                                             InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                 (@VisF InfLP.Events.L3
                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                      (prod MemPropT.store_id
+                                      (prod store_id
                                          (prod
                                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3620,7 +3621,7 @@ cofix CIH
                                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                    (itree InfLP.Events.L3
                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                         (prod MemPropT.store_id
+                                         (prod store_id
                                             (prod
                                                (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                   InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3641,7 +3642,7 @@ cofix CIH
                                       return
                                         (itree InfLP.Events.L3
                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                              (prod MemPropT.store_id
+                                              (prod store_id
                                                  (prod
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -3660,7 +3661,7 @@ cofix CIH
                 let X1 :
                   itree InfLP.Events.L3
                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                       (prod MemPropT.store_id
+                       (prod store_id
                           (prod
                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3671,7 +3672,7 @@ cofix CIH
                     return
                       (itree InfLP.Events.L3
                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                            (prod MemPropT.store_id
+                            (prod store_id
                                (prod
                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3685,7 +3686,7 @@ cofix CIH
                           forall _ : @eq Type X0 X0,
                           itree InfLP.Events.L3
                             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                               (prod MemPropT.store_id
+                               (prod store_id
                                   (prod
                                      (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                         InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3697,7 +3698,7 @@ cofix CIH
                               (forall _ : @eq Type T X0,
                                itree InfLP.Events.L3
                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                    (prod MemPropT.store_id
+                                    (prod store_id
                                        (prod
                                           (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                              InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3714,7 +3715,7 @@ cofix CIH
                                    forall _ : uvalue,
                                    itree InfLP.Events.L3
                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                        (prod MemPropT.store_id
+                                        (prod store_id
                                            (prod
                                               (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                  InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3727,13 +3728,13 @@ cofix CIH
                                         (_ : forall _ : X1,
                                              itree L3
                                                (prod FinMem.MMEP.MMSP.MemState
-                                                  (prod MemPropT.store_id
+                                                  (prod store_id
                                                      (prod (prod local_env (@stack local_env))
                                                         (prod global_env dvalue)))))
                                         (_ : PickUvalueE X1),
                                       itree InfLP.Events.L3
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3744,13 +3745,13 @@ cofix CIH
                                         (k1 : forall _ : @sig dvalue (fun _ : dvalue => True),
                                               itree L3
                                                 (prod FinMem.MMEP.MMSP.MemState
-                                                   (prod MemPropT.store_id
+                                                   (prod store_id
                                                       (prod (prod local_env (@stack local_env))
                                                          (prod global_env dvalue)))))
                                         (_ : PickUvalueE (@sig dvalue (fun _ : dvalue => True))) =>
                                       @go InfLP.Events.L3
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3759,7 +3760,7 @@ cofix CIH
                                                     InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                         (@VisF InfLP.Events.L3
                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                              (prod MemPropT.store_id
+                                              (prod store_id
                                                  (prod
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -3770,7 +3771,7 @@ cofix CIH
                                            (itree InfLP.Events.L3
                                               (prod
                                                  InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                 (prod MemPropT.store_id
+                                                 (prod store_id
                                                     (prod
                                                        (prod
                                                           InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -3820,7 +3821,7 @@ cofix CIH
                                                 (itree InfLP.Events.L3
                                                    (prod
                                                       InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                      (prod MemPropT.store_id
+                                                      (prod store_id
                                                          (prod
                                                             (prod
                                                                InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -3839,7 +3840,7 @@ cofix CIH
                                                       return
                                                         (itree L3
                                                            (prod FinMem.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id
+                                                              (prod store_id
                                                                  (prod
                                                                     (prod local_env (@stack local_env))
                                                                     (prod global_env dvalue)))))
@@ -3872,7 +3873,7 @@ cofix CIH
                                                                        (forall _ : Type, Type) IFun
                                                                        Id_IFun OOME))))
                                                            (prod FinMem.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id
+                                                              (prod store_id
                                                                  (prod
                                                                     (prod local_env (@stack local_env))
                                                                     (prod global_env dvalue)))) s0) s
@@ -3888,7 +3889,7 @@ cofix CIH
                                    forall _ : uvalue,
                                    itree InfLP.Events.L3
                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                        (prod MemPropT.store_id
+                                        (prod store_id
                                            (prod
                                               (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                  InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3901,13 +3902,13 @@ cofix CIH
                                         (_ : forall _ : X1,
                                              itree L3
                                                (prod FinMem.MMEP.MMSP.MemState
-                                                  (prod MemPropT.store_id
+                                                  (prod store_id
                                                      (prod (prod local_env (@stack local_env))
                                                         (prod global_env dvalue)))))
                                         (_ : PickUvalueE X1),
                                       itree InfLP.Events.L3
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3918,13 +3919,13 @@ cofix CIH
                                         (k1 : forall _ : @sig dvalue (fun _ : dvalue => True),
                                               itree L3
                                                 (prod FinMem.MMEP.MMSP.MemState
-                                                   (prod MemPropT.store_id
+                                                   (prod store_id
                                                       (prod (prod local_env (@stack local_env))
                                                          (prod global_env dvalue)))))
                                         (_ : PickUvalueE (@sig dvalue (fun _ : dvalue => True))) =>
                                       @go InfLP.Events.L3
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -3933,7 +3934,7 @@ cofix CIH
                                                     InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                         (@VisF InfLP.Events.L3
                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                              (prod MemPropT.store_id
+                                              (prod store_id
                                                  (prod
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -3944,7 +3945,7 @@ cofix CIH
                                            (itree InfLP.Events.L3
                                               (prod
                                                  InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                 (prod MemPropT.store_id
+                                                 (prod store_id
                                                     (prod
                                                        (prod
                                                           InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -3994,7 +3995,7 @@ cofix CIH
                                                 (itree InfLP.Events.L3
                                                    (prod
                                                       InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                      (prod MemPropT.store_id
+                                                      (prod store_id
                                                          (prod
                                                             (prod
                                                                InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4013,7 +4014,7 @@ cofix CIH
                                                       return
                                                         (itree L3
                                                            (prod FinMem.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id
+                                                              (prod store_id
                                                                  (prod
                                                                     (prod local_env (@stack local_env))
                                                                     (prod global_env dvalue)))))
@@ -4046,7 +4047,7 @@ cofix CIH
                                                                        (forall _ : Type, Type) IFun
                                                                        Id_IFun OOME))))
                                                            (prod FinMem.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id
+                                                              (prod store_id
                                                                  (prod
                                                                     (prod local_env (@stack local_env))
                                                                     (prod global_env dvalue)))) s0) s
@@ -4062,7 +4063,7 @@ cofix CIH
                                    forall _ : uvalue,
                                    itree InfLP.Events.L3
                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                        (prod MemPropT.store_id
+                                        (prod store_id
                                            (prod
                                               (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                  InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4075,13 +4076,13 @@ cofix CIH
                                         (_ : forall _ : X1,
                                              itree L3
                                                (prod FinMem.MMEP.MMSP.MemState
-                                                  (prod MemPropT.store_id
+                                                  (prod store_id
                                                      (prod (prod local_env (@stack local_env))
                                                         (prod global_env dvalue)))))
                                         (_ : PickUvalueE X1),
                                       itree InfLP.Events.L3
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4092,13 +4093,13 @@ cofix CIH
                                         (k1 : forall _ : @sig dvalue (fun _ : dvalue => True),
                                               itree L3
                                                 (prod FinMem.MMEP.MMSP.MemState
-                                                   (prod MemPropT.store_id
+                                                   (prod store_id
                                                       (prod (prod local_env (@stack local_env))
                                                          (prod global_env dvalue)))))
                                         (_ : PickUvalueE (@sig dvalue (fun _ : dvalue => True))) =>
                                       @go InfLP.Events.L3
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4107,7 +4108,7 @@ cofix CIH
                                                     InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                         (@VisF InfLP.Events.L3
                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                              (prod MemPropT.store_id
+                                              (prod store_id
                                                  (prod
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4118,7 +4119,7 @@ cofix CIH
                                            (itree InfLP.Events.L3
                                               (prod
                                                  InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                 (prod MemPropT.store_id
+                                                 (prod store_id
                                                     (prod
                                                        (prod
                                                           InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4167,7 +4168,7 @@ cofix CIH
                                                 (itree InfLP.Events.L3
                                                    (prod
                                                       InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                      (prod MemPropT.store_id
+                                                      (prod store_id
                                                          (prod
                                                             (prod
                                                                InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4186,7 +4187,7 @@ cofix CIH
                                                       return
                                                         (itree L3
                                                            (prod FinMem.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id
+                                                              (prod store_id
                                                                  (prod
                                                                     (prod local_env (@stack local_env))
                                                                     (prod global_env dvalue)))))
@@ -4219,7 +4220,7 @@ cofix CIH
                                                                        (forall _ : Type, Type) IFun
                                                                        Id_IFun OOME))))
                                                            (prod FinMem.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id
+                                                              (prod store_id
                                                                  (prod
                                                                     (prod local_env (@stack local_env))
                                                                     (prod global_env dvalue)))) s0) s
@@ -4233,7 +4234,7 @@ cofix CIH
                         let X1 :
                           itree InfLP.Events.L3
                             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                               (prod MemPropT.store_id
+                               (prod store_id
                                   (prod
                                      (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                         InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4244,7 +4245,7 @@ cofix CIH
                             return
                               (itree InfLP.Events.L3
                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                    (prod MemPropT.store_id
+                                    (prod store_id
                                        (prod
                                           (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                              InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4258,7 +4259,7 @@ cofix CIH
                                   forall _ : @eq Type X0 X0,
                                   itree InfLP.Events.L3
                                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                       (prod MemPropT.store_id
+                                       (prod store_id
                                           (prod
                                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4270,7 +4271,7 @@ cofix CIH
                                       (forall _ : @eq Type T X0,
                                        itree InfLP.Events.L3
                                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                            (prod MemPropT.store_id
+                                            (prod store_id
                                                (prod
                                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4288,7 +4289,7 @@ cofix CIH
                                            itree InfLP.Events.L3
                                              (prod
                                                 InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                (prod MemPropT.store_id
+                                                (prod store_id
                                                    (prod
                                                       (prod
                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4303,14 +4304,14 @@ cofix CIH
                                                 (_ : forall _ : X1,
                                                      itree L3
                                                        (prod FinMem.MMEP.MMSP.MemState
-                                                          (prod MemPropT.store_id
+                                                          (prod store_id
                                                              (prod (prod local_env (@stack local_env))
                                                                 (prod global_env dvalue)))))
                                                 (_ : OOME X1),
                                               itree InfLP.Events.L3
                                                 (prod
                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                   (prod MemPropT.store_id
+                                                   (prod store_id
                                                       (prod
                                                          (prod
                                                             InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4322,7 +4323,7 @@ cofix CIH
                                                 (_ : forall _ : Empty_set,
                                                      itree L3
                                                        (prod FinMem.MMEP.MMSP.MemState
-                                                          (prod MemPropT.store_id
+                                                          (prod store_id
                                                              (prod (prod local_env (@stack local_env))
                                                                 (prod global_env dvalue)))))
                                                 (_ : OOME Empty_set) =>
@@ -4343,7 +4344,7 @@ cofix CIH
                                                             Id_IFun OOME))))
                                                 (prod
                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                   (prod MemPropT.store_id
+                                                   (prod store_id
                                                       (prod
                                                          (prod
                                                             InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4360,7 +4361,7 @@ cofix CIH
                                 let X1 :
                                   itree InfLP.Events.L3
                                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                       (prod MemPropT.store_id
+                                       (prod store_id
                                           (prod
                                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4371,7 +4372,7 @@ cofix CIH
                                     return
                                       (itree InfLP.Events.L3
                                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                            (prod MemPropT.store_id
+                                            (prod store_id
                                                (prod
                                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4387,7 +4388,7 @@ cofix CIH
                                           itree InfLP.Events.L3
                                             (prod
                                                InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                               (prod MemPropT.store_id
+                                               (prod store_id
                                                   (prod
                                                      (prod
                                                         InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4402,7 +4403,7 @@ cofix CIH
                                                itree InfLP.Events.L3
                                                  (prod
                                                     InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                    (prod MemPropT.store_id
+                                                    (prod store_id
                                                        (prod
                                                           (prod
                                                              InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4421,7 +4422,7 @@ cofix CIH
                                                    itree InfLP.Events.L3
                                                      (prod
                                                         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                        (prod MemPropT.store_id
+                                                        (prod store_id
                                                            (prod
                                                               (prod
                                                                  InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4436,7 +4437,7 @@ cofix CIH
                                                         (_ : forall _ : X1,
                                                              itree L3
                                                                (prod FinMem.MMEP.MMSP.MemState
-                                                                  (prod MemPropT.store_id
+                                                                  (prod store_id
                                                                      (prod
                                                                         (prod local_env
                                                                          (@stack local_env))
@@ -4445,7 +4446,7 @@ cofix CIH
                                                       itree InfLP.Events.L3
                                                         (prod
                                                            InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                           (prod MemPropT.store_id
+                                                           (prod store_id
                                                               (prod
                                                                  (prod
                                                                     InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4457,7 +4458,7 @@ cofix CIH
                                                         (_ : forall _ : Empty_set,
                                                              itree L3
                                                                (prod FinMem.MMEP.MMSP.MemState
-                                                                  (prod MemPropT.store_id
+                                                                  (prod store_id
                                                                      (prod
                                                                         (prod local_env
                                                                          (@stack local_env))
@@ -4489,7 +4490,7 @@ cofix CIH
                                                                        Id_IFun UBE)))))
                                                         (prod
                                                            InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                           (prod MemPropT.store_id
+                                                           (prod store_id
                                                               (prod
                                                                  (prod
                                                                     InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4507,7 +4508,7 @@ cofix CIH
                                           itree InfLP.Events.L3
                                             (prod
                                                InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                               (prod MemPropT.store_id
+                                               (prod store_id
                                                   (prod
                                                      (prod
                                                         InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4521,7 +4522,7 @@ cofix CIH
                                               (itree InfLP.Events.L3
                                                  (prod
                                                     InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                    (prod MemPropT.store_id
+                                                    (prod store_id
                                                        (prod
                                                           (prod
                                                              InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4538,7 +4539,7 @@ cofix CIH
                                                   itree InfLP.Events.L3
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                       (prod MemPropT.store_id
+                                                       (prod store_id
                                                           (prod
                                                              (prod
                                                                 InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4553,7 +4554,7 @@ cofix CIH
                                                        itree InfLP.Events.L3
                                                          (prod
                                                             InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                            (prod MemPropT.store_id
+                                                            (prod store_id
                                                                (prod
                                                                   (prod
                                                                      InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4572,7 +4573,7 @@ cofix CIH
                                                            itree InfLP.Events.L3
                                                              (prod
                                                                 InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                (prod MemPropT.store_id
+                                                                (prod store_id
                                                                    (prod
                                                                       (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4587,7 +4588,7 @@ cofix CIH
                                                                 (_ : forall _ : X1,
                                                                      itree L3
                                                                        (prod FinMem.MMEP.MMSP.MemState
-                                                                         (prod MemPropT.store_id
+                                                                         (prod store_id
                                                                          (prod
                                                                          (prod local_env
                                                                          (@stack local_env))
@@ -4596,7 +4597,7 @@ cofix CIH
                                                               itree InfLP.Events.L3
                                                                 (prod
                                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                   (prod MemPropT.store_id
+                                                                   (prod store_id
                                                                       (prod
                                                                          (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4609,7 +4610,7 @@ cofix CIH
                                                                       itree L3
                                                                         (prod
                                                                          FinMem.MMEP.MMSP.MemState
-                                                                         (prod MemPropT.store_id
+                                                                         (prod store_id
                                                                          (prod
                                                                          (prod local_env
                                                                          (@stack local_env))
@@ -4618,7 +4619,7 @@ cofix CIH
                                                               @go InfLP.Events.L3
                                                                 (prod
                                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                   (prod MemPropT.store_id
+                                                                   (prod store_id
                                                                       (prod
                                                                          (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4629,7 +4630,7 @@ cofix CIH
                                                                 (@VisF InfLP.Events.L3
                                                                    (prod
                                                                       InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                      (prod MemPropT.store_id
+                                                                      (prod store_id
                                                                          (prod
                                                                          (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4640,7 +4641,7 @@ cofix CIH
                                                                    (itree InfLP.Events.L3
                                                                       (prod
                                                                          InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                         (prod MemPropT.store_id
+                                                                         (prod store_id
                                                                          (prod
                                                                          (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4695,7 +4696,7 @@ cofix CIH
                                                   itree InfLP.Events.L3
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                       (prod MemPropT.store_id
+                                                       (prod store_id
                                                           (prod
                                                              (prod
                                                                 InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4710,7 +4711,7 @@ cofix CIH
                                                        itree InfLP.Events.L3
                                                          (prod
                                                             InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                            (prod MemPropT.store_id
+                                                            (prod store_id
                                                                (prod
                                                                   (prod
                                                                      InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4730,7 +4731,7 @@ cofix CIH
                                                            itree InfLP.Events.L3
                                                              (prod
                                                                 InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                (prod MemPropT.store_id
+                                                                (prod store_id
                                                                    (prod
                                                                       (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4745,7 +4746,7 @@ cofix CIH
                                                                 (_ : forall _ : X1,
                                                                      itree L3
                                                                        (prod FinMem.MMEP.MMSP.MemState
-                                                                         (prod MemPropT.store_id
+                                                                         (prod store_id
                                                                          (prod
                                                                          (prod local_env
                                                                          (@stack local_env))
@@ -4754,7 +4755,7 @@ cofix CIH
                                                               itree InfLP.Events.L3
                                                                 (prod
                                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                   (prod MemPropT.store_id
+                                                                   (prod store_id
                                                                       (prod
                                                                          (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4766,7 +4767,7 @@ cofix CIH
                                                                 (_ : forall _ : Empty_set,
                                                                      itree L3
                                                                        (prod FinMem.MMEP.MMSP.MemState
-                                                                         (prod MemPropT.store_id
+                                                                         (prod store_id
                                                                          (prod
                                                                          (prod local_env
                                                                          (@stack local_env))
@@ -4775,7 +4776,7 @@ cofix CIH
                                                               @LLVMEvents.raise InfLP.Events.L3
                                                                 (prod
                                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                   (prod MemPropT.store_id
+                                                                   (prod store_id
                                                                       (prod
                                                                          (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -4832,16 +4833,16 @@ cofix CIH
         X1) X e k
    end) (@_observe _ _ t_fin2).
 
-  Definition _get_inf_tree (t_fin2 : itree' L3 (FinMem.MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack local_env * res_L1)))) : itree InfLP.Events.L3 TopLevelBigIntptr.res_L6 :=
+  Definition _get_inf_tree (t_fin2 : itree' L3 (FinMem.MMEP.MMSP.MemState * (store_id * (local_env * @stack local_env * res_L1)))) : itree InfLP.Events.L3 TopLevelBigIntptr.res_L6 :=
    match t_fin2 with
    | RetF r =>
        (fun
           r0 : prod FinMem.MMEP.MMSP.MemState
-                 (prod MemPropT.store_id
+                 (prod store_id
                     (prod (prod local_env (@stack local_env)) (prod global_env dvalue))) =>
         @ret (itree InfLP.Events.L3) (@Monad_itree InfLP.Events.L3)
           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-             (prod MemPropT.store_id
+             (prod store_id
                 (prod
                    (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                       InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4851,7 +4852,7 @@ cofix CIH
             r0
             return
               (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                 (prod MemPropT.store_id
+                 (prod store_id
                     (prod
                        (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                           InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4860,13 +4861,13 @@ cofix CIH
           with
           | pair a b =>
               (fun (ms : FinMem.MMEP.MMSP.MemState)
-                 (p : prod MemPropT.store_id
+                 (p : prod store_id
                         (prod (prod local_env (@stack local_env)) (prod global_env dvalue))) =>
                match
                  p
                  return
                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                      (prod MemPropT.store_id
+                      (prod store_id
                          (prod
                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4874,13 +4875,13 @@ cofix CIH
                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                with
                | pair a0 b0 =>
-                   (fun (sid : MemPropT.store_id)
+                   (fun (sid : store_id)
                       (p0 : prod (prod local_env (@stack local_env)) (prod global_env dvalue)) =>
                     match
                       p0
                       return
                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                           (prod MemPropT.store_id
+                           (prod store_id
                               (prod
                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4894,7 +4895,7 @@ cofix CIH
                            return
                              (forall _ : prod global_env dvalue,
                               prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4908,7 +4909,7 @@ cofix CIH
                                 p2
                                 return
                                   (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                     (prod MemPropT.store_id
+                                     (prod store_id
                                         (prod
                                            (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                               InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4918,14 +4919,14 @@ cofix CIH
                               | pair a3 b3 =>
                                   (fun (genv : global_env) (res : dvalue) =>
                                    @pair InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                     (prod MemPropT.store_id
+                                     (prod store_id
                                         (prod
                                            (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                               InterpreterStackBigIntptr.LLVM.Stack.lstack)
                                            (prod InterpreterStackBigIntptr.LLVM.Global.global_env
                                               InterpreterStackBigIntptr.LP.Events.DV.dvalue)))
                                      (lift_MemState ms)
-                                     (@pair MemPropT.store_id
+                                     (@pair store_id
                                         (prod
                                            (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                               InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4951,11 +4952,11 @@ cofix CIH
        (fun
           t0 : itree L3
                  (prod FinMem.MMEP.MMSP.MemState
-                    (prod MemPropT.store_id
+                    (prod store_id
                        (prod (prod local_env (@stack local_env)) (prod global_env dvalue)))) =>
         @go InfLP.Events.L3
           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-             (prod MemPropT.store_id
+             (prod store_id
                 (prod
                    (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                       InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4963,7 +4964,7 @@ cofix CIH
                       InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
           (@TauF InfLP.Events.L3
              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                (prod MemPropT.store_id
+                (prod store_id
                    (prod
                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4971,7 +4972,7 @@ cofix CIH
                          InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
              (itree InfLP.Events.L3
                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                   (prod MemPropT.store_id
+                   (prod store_id
                       (prod
                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4983,12 +4984,12 @@ cofix CIH
           (k0 : forall _ : X0,
                 itree L3
                   (prod FinMem.MMEP.MMSP.MemState
-                     (prod MemPropT.store_id
+                     (prod store_id
                         (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) =>
         let X1 :
           itree InfLP.Events.L3
             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-               (prod MemPropT.store_id
+               (prod store_id
                   (prod
                      (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                         InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -4999,7 +5000,7 @@ cofix CIH
             return
               (itree InfLP.Events.L3
                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                    (prod MemPropT.store_id
+                    (prod store_id
                        (prod
                           (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                              InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5013,7 +5014,7 @@ cofix CIH
                   forall _ : @eq Type X0 X0,
                   itree InfLP.Events.L3
                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                       (prod MemPropT.store_id
+                       (prod store_id
                           (prod
                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5025,7 +5026,7 @@ cofix CIH
                       (forall _ : @eq Type T X0,
                        itree InfLP.Events.L3
                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                            (prod MemPropT.store_id
+                            (prod store_id
                                (prod
                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5042,7 +5043,7 @@ cofix CIH
                            forall (_ : dtyp) (_ : uvalue) (_ : list dvalue),
                            itree InfLP.Events.L3
                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5055,13 +5056,13 @@ cofix CIH
                                 (_ : forall _ : X1,
                                      itree L3
                                        (prod FinMem.MMEP.MMSP.MemState
-                                          (prod MemPropT.store_id
+                                          (prod store_id
                                              (prod (prod local_env (@stack local_env))
                                                 (prod global_env dvalue))))) 
                                 (_ : ExternalCallE X1),
                               itree InfLP.Events.L3
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5071,13 +5072,13 @@ cofix CIH
                                 (k1 : forall _ : dvalue,
                                       itree L3
                                         (prod FinMem.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod (prod local_env (@stack local_env))
                                                  (prod global_env dvalue)))))
                                 (_ : ExternalCallE dvalue) =>
                               @go InfLP.Events.L3
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5085,7 +5086,7 @@ cofix CIH
                                             InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                 (@VisF InfLP.Events.L3
                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                      (prod MemPropT.store_id
+                                      (prod store_id
                                          (prod
                                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5093,7 +5094,7 @@ cofix CIH
                                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                    (itree InfLP.Events.L3
                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                         (prod MemPropT.store_id
+                                         (prod store_id
                                             (prod
                                                (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                   InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5119,7 +5120,7 @@ cofix CIH
                                          return
                                            (itree L3
                                               (prod FinMem.MMEP.MMSP.MemState
-                                                 (prod MemPropT.store_id
+                                                 (prod store_id
                                                     (prod (prod local_env (@stack local_env))
                                                        (prod global_env dvalue)))))
                                        with
@@ -5142,7 +5143,7 @@ cofix CIH
                                                        (@ReSum_id (forall _ : Type, Type) IFun Id_IFun
                                                           OOME))))
                                               (prod FinMem.MMEP.MMSP.MemState
-                                                 (prod MemPropT.store_id
+                                                 (prod store_id
                                                     (prod (prod local_env (@stack local_env))
                                                        (prod global_env dvalue)))) s0) s
                                        end)))) X0 H2 k0 H0) X0 H3) H1 t0 f0 args0) t f args
@@ -5155,7 +5156,7 @@ cofix CIH
                            forall _ : list int8,
                            itree InfLP.Events.L3
                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5168,13 +5169,13 @@ cofix CIH
                                 (_ : forall _ : X1,
                                      itree L3
                                        (prod FinMem.MMEP.MMSP.MemState
-                                          (prod MemPropT.store_id
+                                          (prod store_id
                                              (prod (prod local_env (@stack local_env))
                                                 (prod global_env dvalue))))) 
                                 (_ : ExternalCallE X1),
                               itree InfLP.Events.L3
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5184,13 +5185,13 @@ cofix CIH
                                 (k1 : forall _ : unit,
                                       itree L3
                                         (prod FinMem.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod (prod local_env (@stack local_env))
                                                  (prod global_env dvalue))))) 
                                 (_ : ExternalCallE unit) =>
                               @go InfLP.Events.L3
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5198,7 +5199,7 @@ cofix CIH
                                             InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                 (@VisF InfLP.Events.L3
                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                      (prod MemPropT.store_id
+                                      (prod store_id
                                          (prod
                                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5206,7 +5207,7 @@ cofix CIH
                                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                    (itree InfLP.Events.L3
                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                         (prod MemPropT.store_id
+                                         (prod store_id
                                             (prod
                                                (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                   InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5227,7 +5228,7 @@ cofix CIH
                                       return
                                         (itree InfLP.Events.L3
                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                              (prod MemPropT.store_id
+                                              (prod store_id
                                                  (prod
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -5247,7 +5248,7 @@ cofix CIH
                            forall _ : list int8,
                            itree InfLP.Events.L3
                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5260,13 +5261,13 @@ cofix CIH
                                 (_ : forall _ : X1,
                                      itree L3
                                        (prod FinMem.MMEP.MMSP.MemState
-                                          (prod MemPropT.store_id
+                                          (prod store_id
                                              (prod (prod local_env (@stack local_env))
                                                 (prod global_env dvalue))))) 
                                 (_ : ExternalCallE X1),
                               itree InfLP.Events.L3
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5276,13 +5277,13 @@ cofix CIH
                                 (k1 : forall _ : unit,
                                       itree L3
                                         (prod FinMem.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod (prod local_env (@stack local_env))
                                                  (prod global_env dvalue))))) 
                                 (_ : ExternalCallE unit) =>
                               @go InfLP.Events.L3
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5290,7 +5291,7 @@ cofix CIH
                                             InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                 (@VisF InfLP.Events.L3
                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                      (prod MemPropT.store_id
+                                      (prod store_id
                                          (prod
                                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5298,7 +5299,7 @@ cofix CIH
                                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                    (itree InfLP.Events.L3
                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                         (prod MemPropT.store_id
+                                         (prod store_id
                                             (prod
                                                (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                   InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5319,7 +5320,7 @@ cofix CIH
                                       return
                                         (itree InfLP.Events.L3
                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                              (prod MemPropT.store_id
+                                              (prod store_id
                                                  (prod
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -5338,7 +5339,7 @@ cofix CIH
                 let X1 :
                   itree InfLP.Events.L3
                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                       (prod MemPropT.store_id
+                       (prod store_id
                           (prod
                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5349,7 +5350,7 @@ cofix CIH
                     return
                       (itree InfLP.Events.L3
                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                            (prod MemPropT.store_id
+                            (prod store_id
                                (prod
                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5363,7 +5364,7 @@ cofix CIH
                           forall _ : @eq Type X0 X0,
                           itree InfLP.Events.L3
                             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                               (prod MemPropT.store_id
+                               (prod store_id
                                   (prod
                                      (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                         InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5375,7 +5376,7 @@ cofix CIH
                               (forall _ : @eq Type T X0,
                                itree InfLP.Events.L3
                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                    (prod MemPropT.store_id
+                                    (prod store_id
                                        (prod
                                           (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                              InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5392,7 +5393,7 @@ cofix CIH
                                    forall _ : uvalue,
                                    itree InfLP.Events.L3
                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                        (prod MemPropT.store_id
+                                        (prod store_id
                                            (prod
                                               (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                  InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5405,13 +5406,13 @@ cofix CIH
                                         (_ : forall _ : X1,
                                              itree L3
                                                (prod FinMem.MMEP.MMSP.MemState
-                                                  (prod MemPropT.store_id
+                                                  (prod store_id
                                                      (prod (prod local_env (@stack local_env))
                                                         (prod global_env dvalue)))))
                                         (_ : PickUvalueE X1),
                                       itree InfLP.Events.L3
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5422,13 +5423,13 @@ cofix CIH
                                         (k1 : forall _ : @sig dvalue (fun _ : dvalue => True),
                                               itree L3
                                                 (prod FinMem.MMEP.MMSP.MemState
-                                                   (prod MemPropT.store_id
+                                                   (prod store_id
                                                       (prod (prod local_env (@stack local_env))
                                                          (prod global_env dvalue)))))
                                         (_ : PickUvalueE (@sig dvalue (fun _ : dvalue => True))) =>
                                       @go InfLP.Events.L3
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5437,7 +5438,7 @@ cofix CIH
                                                     InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                         (@VisF InfLP.Events.L3
                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                              (prod MemPropT.store_id
+                                              (prod store_id
                                                  (prod
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -5448,7 +5449,7 @@ cofix CIH
                                            (itree InfLP.Events.L3
                                               (prod
                                                  InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                 (prod MemPropT.store_id
+                                                 (prod store_id
                                                     (prod
                                                        (prod
                                                           InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -5498,7 +5499,7 @@ cofix CIH
                                                 (itree InfLP.Events.L3
                                                    (prod
                                                       InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                      (prod MemPropT.store_id
+                                                      (prod store_id
                                                          (prod
                                                             (prod
                                                                InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -5517,7 +5518,7 @@ cofix CIH
                                                       return
                                                         (itree L3
                                                            (prod FinMem.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id
+                                                              (prod store_id
                                                                  (prod
                                                                     (prod local_env (@stack local_env))
                                                                     (prod global_env dvalue)))))
@@ -5550,7 +5551,7 @@ cofix CIH
                                                                        (forall _ : Type, Type) IFun
                                                                        Id_IFun OOME))))
                                                            (prod FinMem.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id
+                                                              (prod store_id
                                                                  (prod
                                                                     (prod local_env (@stack local_env))
                                                                     (prod global_env dvalue)))) s0) s
@@ -5566,7 +5567,7 @@ cofix CIH
                                    forall _ : uvalue,
                                    itree InfLP.Events.L3
                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                        (prod MemPropT.store_id
+                                        (prod store_id
                                            (prod
                                               (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                  InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5579,13 +5580,13 @@ cofix CIH
                                         (_ : forall _ : X1,
                                              itree L3
                                                (prod FinMem.MMEP.MMSP.MemState
-                                                  (prod MemPropT.store_id
+                                                  (prod store_id
                                                      (prod (prod local_env (@stack local_env))
                                                         (prod global_env dvalue)))))
                                         (_ : PickUvalueE X1),
                                       itree InfLP.Events.L3
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5596,13 +5597,13 @@ cofix CIH
                                         (k1 : forall _ : @sig dvalue (fun _ : dvalue => True),
                                               itree L3
                                                 (prod FinMem.MMEP.MMSP.MemState
-                                                   (prod MemPropT.store_id
+                                                   (prod store_id
                                                       (prod (prod local_env (@stack local_env))
                                                          (prod global_env dvalue)))))
                                         (_ : PickUvalueE (@sig dvalue (fun _ : dvalue => True))) =>
                                       @go InfLP.Events.L3
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5611,7 +5612,7 @@ cofix CIH
                                                     InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                         (@VisF InfLP.Events.L3
                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                              (prod MemPropT.store_id
+                                              (prod store_id
                                                  (prod
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -5622,7 +5623,7 @@ cofix CIH
                                            (itree InfLP.Events.L3
                                               (prod
                                                  InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                 (prod MemPropT.store_id
+                                                 (prod store_id
                                                     (prod
                                                        (prod
                                                           InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -5672,7 +5673,7 @@ cofix CIH
                                                 (itree InfLP.Events.L3
                                                    (prod
                                                       InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                      (prod MemPropT.store_id
+                                                      (prod store_id
                                                          (prod
                                                             (prod
                                                                InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -5691,7 +5692,7 @@ cofix CIH
                                                       return
                                                         (itree L3
                                                            (prod FinMem.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id
+                                                              (prod store_id
                                                                  (prod
                                                                     (prod local_env (@stack local_env))
                                                                     (prod global_env dvalue)))))
@@ -5724,7 +5725,7 @@ cofix CIH
                                                                        (forall _ : Type, Type) IFun
                                                                        Id_IFun OOME))))
                                                            (prod FinMem.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id
+                                                              (prod store_id
                                                                  (prod
                                                                     (prod local_env (@stack local_env))
                                                                     (prod global_env dvalue)))) s0) s
@@ -5740,7 +5741,7 @@ cofix CIH
                                    forall _ : uvalue,
                                    itree InfLP.Events.L3
                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                        (prod MemPropT.store_id
+                                        (prod store_id
                                            (prod
                                               (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                  InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5753,13 +5754,13 @@ cofix CIH
                                         (_ : forall _ : X1,
                                              itree L3
                                                (prod FinMem.MMEP.MMSP.MemState
-                                                  (prod MemPropT.store_id
+                                                  (prod store_id
                                                      (prod (prod local_env (@stack local_env))
                                                         (prod global_env dvalue)))))
                                         (_ : PickUvalueE X1),
                                       itree InfLP.Events.L3
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5770,13 +5771,13 @@ cofix CIH
                                         (k1 : forall _ : @sig dvalue (fun _ : dvalue => True),
                                               itree L3
                                                 (prod FinMem.MMEP.MMSP.MemState
-                                                   (prod MemPropT.store_id
+                                                   (prod store_id
                                                       (prod (prod local_env (@stack local_env))
                                                          (prod global_env dvalue)))))
                                         (_ : PickUvalueE (@sig dvalue (fun _ : dvalue => True))) =>
                                       @go InfLP.Events.L3
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5785,7 +5786,7 @@ cofix CIH
                                                     InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                         (@VisF InfLP.Events.L3
                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                              (prod MemPropT.store_id
+                                              (prod store_id
                                                  (prod
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -5796,7 +5797,7 @@ cofix CIH
                                            (itree InfLP.Events.L3
                                               (prod
                                                  InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                 (prod MemPropT.store_id
+                                                 (prod store_id
                                                     (prod
                                                        (prod
                                                           InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -5845,7 +5846,7 @@ cofix CIH
                                                 (itree InfLP.Events.L3
                                                    (prod
                                                       InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                      (prod MemPropT.store_id
+                                                      (prod store_id
                                                          (prod
                                                             (prod
                                                                InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -5864,7 +5865,7 @@ cofix CIH
                                                       return
                                                         (itree L3
                                                            (prod FinMem.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id
+                                                              (prod store_id
                                                                  (prod
                                                                     (prod local_env (@stack local_env))
                                                                     (prod global_env dvalue)))))
@@ -5897,7 +5898,7 @@ cofix CIH
                                                                        (forall _ : Type, Type) IFun
                                                                        Id_IFun OOME))))
                                                            (prod FinMem.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id
+                                                              (prod store_id
                                                                  (prod
                                                                     (prod local_env (@stack local_env))
                                                                     (prod global_env dvalue)))) s0) s
@@ -5911,7 +5912,7 @@ cofix CIH
                         let X1 :
                           itree InfLP.Events.L3
                             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                               (prod MemPropT.store_id
+                               (prod store_id
                                   (prod
                                      (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                         InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5922,7 +5923,7 @@ cofix CIH
                             return
                               (itree InfLP.Events.L3
                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                    (prod MemPropT.store_id
+                                    (prod store_id
                                        (prod
                                           (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                              InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5936,7 +5937,7 @@ cofix CIH
                                   forall _ : @eq Type X0 X0,
                                   itree InfLP.Events.L3
                                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                       (prod MemPropT.store_id
+                                       (prod store_id
                                           (prod
                                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5948,7 +5949,7 @@ cofix CIH
                                       (forall _ : @eq Type T X0,
                                        itree InfLP.Events.L3
                                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                            (prod MemPropT.store_id
+                                            (prod store_id
                                                (prod
                                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -5966,7 +5967,7 @@ cofix CIH
                                            itree InfLP.Events.L3
                                              (prod
                                                 InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                (prod MemPropT.store_id
+                                                (prod store_id
                                                    (prod
                                                       (prod
                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -5981,14 +5982,14 @@ cofix CIH
                                                 (_ : forall _ : X1,
                                                      itree L3
                                                        (prod FinMem.MMEP.MMSP.MemState
-                                                          (prod MemPropT.store_id
+                                                          (prod store_id
                                                              (prod (prod local_env (@stack local_env))
                                                                 (prod global_env dvalue)))))
                                                 (_ : OOME X1),
                                               itree InfLP.Events.L3
                                                 (prod
                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                   (prod MemPropT.store_id
+                                                   (prod store_id
                                                       (prod
                                                          (prod
                                                             InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6000,7 +6001,7 @@ cofix CIH
                                                 (_ : forall _ : Empty_set,
                                                      itree L3
                                                        (prod FinMem.MMEP.MMSP.MemState
-                                                          (prod MemPropT.store_id
+                                                          (prod store_id
                                                              (prod (prod local_env (@stack local_env))
                                                                 (prod global_env dvalue)))))
                                                 (_ : OOME Empty_set) =>
@@ -6021,7 +6022,7 @@ cofix CIH
                                                             Id_IFun OOME))))
                                                 (prod
                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                   (prod MemPropT.store_id
+                                                   (prod store_id
                                                       (prod
                                                          (prod
                                                             InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6038,7 +6039,7 @@ cofix CIH
                                 let X1 :
                                   itree InfLP.Events.L3
                                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                       (prod MemPropT.store_id
+                                       (prod store_id
                                           (prod
                                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -6049,7 +6050,7 @@ cofix CIH
                                     return
                                       (itree InfLP.Events.L3
                                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                            (prod MemPropT.store_id
+                                            (prod store_id
                                                (prod
                                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -6065,7 +6066,7 @@ cofix CIH
                                           itree InfLP.Events.L3
                                             (prod
                                                InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                               (prod MemPropT.store_id
+                                               (prod store_id
                                                   (prod
                                                      (prod
                                                         InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6080,7 +6081,7 @@ cofix CIH
                                                itree InfLP.Events.L3
                                                  (prod
                                                     InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                    (prod MemPropT.store_id
+                                                    (prod store_id
                                                        (prod
                                                           (prod
                                                              InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6099,7 +6100,7 @@ cofix CIH
                                                    itree InfLP.Events.L3
                                                      (prod
                                                         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                        (prod MemPropT.store_id
+                                                        (prod store_id
                                                            (prod
                                                               (prod
                                                                  InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6114,7 +6115,7 @@ cofix CIH
                                                         (_ : forall _ : X1,
                                                              itree L3
                                                                (prod FinMem.MMEP.MMSP.MemState
-                                                                  (prod MemPropT.store_id
+                                                                  (prod store_id
                                                                      (prod
                                                                         (prod local_env
                                                                          (@stack local_env))
@@ -6123,7 +6124,7 @@ cofix CIH
                                                       itree InfLP.Events.L3
                                                         (prod
                                                            InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                           (prod MemPropT.store_id
+                                                           (prod store_id
                                                               (prod
                                                                  (prod
                                                                     InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6135,7 +6136,7 @@ cofix CIH
                                                         (_ : forall _ : Empty_set,
                                                              itree L3
                                                                (prod FinMem.MMEP.MMSP.MemState
-                                                                  (prod MemPropT.store_id
+                                                                  (prod store_id
                                                                      (prod
                                                                         (prod local_env
                                                                          (@stack local_env))
@@ -6167,7 +6168,7 @@ cofix CIH
                                                                        Id_IFun UBE)))))
                                                         (prod
                                                            InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                           (prod MemPropT.store_id
+                                                           (prod store_id
                                                               (prod
                                                                  (prod
                                                                     InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6185,7 +6186,7 @@ cofix CIH
                                           itree InfLP.Events.L3
                                             (prod
                                                InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                               (prod MemPropT.store_id
+                                               (prod store_id
                                                   (prod
                                                      (prod
                                                         InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6199,7 +6200,7 @@ cofix CIH
                                               (itree InfLP.Events.L3
                                                  (prod
                                                     InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                    (prod MemPropT.store_id
+                                                    (prod store_id
                                                        (prod
                                                           (prod
                                                              InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6216,7 +6217,7 @@ cofix CIH
                                                   itree InfLP.Events.L3
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                       (prod MemPropT.store_id
+                                                       (prod store_id
                                                           (prod
                                                              (prod
                                                                 InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6231,7 +6232,7 @@ cofix CIH
                                                        itree InfLP.Events.L3
                                                          (prod
                                                             InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                            (prod MemPropT.store_id
+                                                            (prod store_id
                                                                (prod
                                                                   (prod
                                                                      InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6250,7 +6251,7 @@ cofix CIH
                                                            itree InfLP.Events.L3
                                                              (prod
                                                                 InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                (prod MemPropT.store_id
+                                                                (prod store_id
                                                                    (prod
                                                                       (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6265,7 +6266,7 @@ cofix CIH
                                                                 (_ : forall _ : X1,
                                                                      itree L3
                                                                        (prod FinMem.MMEP.MMSP.MemState
-                                                                         (prod MemPropT.store_id
+                                                                         (prod store_id
                                                                          (prod
                                                                          (prod local_env
                                                                          (@stack local_env))
@@ -6274,7 +6275,7 @@ cofix CIH
                                                               itree InfLP.Events.L3
                                                                 (prod
                                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                   (prod MemPropT.store_id
+                                                                   (prod store_id
                                                                       (prod
                                                                          (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6287,7 +6288,7 @@ cofix CIH
                                                                       itree L3
                                                                         (prod
                                                                          FinMem.MMEP.MMSP.MemState
-                                                                         (prod MemPropT.store_id
+                                                                         (prod store_id
                                                                          (prod
                                                                          (prod local_env
                                                                          (@stack local_env))
@@ -6296,7 +6297,7 @@ cofix CIH
                                                               @go InfLP.Events.L3
                                                                 (prod
                                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                   (prod MemPropT.store_id
+                                                                   (prod store_id
                                                                       (prod
                                                                          (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6307,7 +6308,7 @@ cofix CIH
                                                                 (@VisF InfLP.Events.L3
                                                                    (prod
                                                                       InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                      (prod MemPropT.store_id
+                                                                      (prod store_id
                                                                          (prod
                                                                          (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6318,7 +6319,7 @@ cofix CIH
                                                                    (itree InfLP.Events.L3
                                                                       (prod
                                                                          InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                         (prod MemPropT.store_id
+                                                                         (prod store_id
                                                                          (prod
                                                                          (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6373,7 +6374,7 @@ cofix CIH
                                                   itree InfLP.Events.L3
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                       (prod MemPropT.store_id
+                                                       (prod store_id
                                                           (prod
                                                              (prod
                                                                 InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6388,7 +6389,7 @@ cofix CIH
                                                        itree InfLP.Events.L3
                                                          (prod
                                                             InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                            (prod MemPropT.store_id
+                                                            (prod store_id
                                                                (prod
                                                                   (prod
                                                                      InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6408,7 +6409,7 @@ cofix CIH
                                                            itree InfLP.Events.L3
                                                              (prod
                                                                 InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                (prod MemPropT.store_id
+                                                                (prod store_id
                                                                    (prod
                                                                       (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6423,7 +6424,7 @@ cofix CIH
                                                                 (_ : forall _ : X1,
                                                                      itree L3
                                                                        (prod FinMem.MMEP.MMSP.MemState
-                                                                         (prod MemPropT.store_id
+                                                                         (prod store_id
                                                                          (prod
                                                                          (prod local_env
                                                                          (@stack local_env))
@@ -6432,7 +6433,7 @@ cofix CIH
                                                               itree InfLP.Events.L3
                                                                 (prod
                                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                   (prod MemPropT.store_id
+                                                                   (prod store_id
                                                                       (prod
                                                                          (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -6444,7 +6445,7 @@ cofix CIH
                                                                 (_ : forall _ : Empty_set,
                                                                      itree L3
                                                                        (prod FinMem.MMEP.MMSP.MemState
-                                                                         (prod MemPropT.store_id
+                                                                         (prod store_id
                                                                          (prod
                                                                          (prod local_env
                                                                          (@stack local_env))
@@ -6453,7 +6454,7 @@ cofix CIH
                                                               @LLVMEvents.raise InfLP.Events.L3
                                                                 (prod
                                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                   (prod MemPropT.store_id
+                                                                   (prod store_id
                                                                       (prod
                                                                          (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -14661,7 +14662,7 @@ cofix CIH
 
   Lemma fresh_sid_fin_inf :
     forall (ms_inf : MemoryBigIntptr.MMEP.MMSP.MemState)
-      (ms_fin ms_fin' : Memory64BitIntptr.MMEP.MMSP.MemState) (sid_fin : MemPropT.store_id),
+      (ms_fin ms_fin' : Memory64BitIntptr.MMEP.MMSP.MemState) (sid_fin : store_id),
       MemState_refine_prop ms_inf ms_fin ->
       fresh_sid ms_fin (ret (ms_fin', sid_fin)) ->
       exists sid_inf ms_inf',
@@ -24720,7 +24721,7 @@ cofix CIH
                       REL0 : forall v : dvalue,
                           id (upaco2 (eqit_ eq true true id) bot2) (k5 v) (k2 (s2, (s1, v)))
 
-                      HK : forall (a : dvalue) (b : Memory64BitIntptr.MMEP.MMSP.MemState * (MemPropT.store_id * dvalue)),
+                      HK : forall (a : dvalue) (b : Memory64BitIntptr.MMEP.MMSP.MemState * (store_id * dvalue)),
                         Returns a (trigger (inl1 (ExternalCall t f args))) ->
                         Returns b ta ->
                         a = snd (snd b) ->
@@ -25095,7 +25096,7 @@ cofix CIH
                                            (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
                                                                                                  LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                            (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                              (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                              (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                                       with
                                       end)).
 
@@ -25156,7 +25157,7 @@ cofix CIH
                                            (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
                                                                                                  LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                            (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                              (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                              (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                                       with
                                       end)).
 
@@ -25282,7 +25283,7 @@ cofix CIH
                                            (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
                                                                                                  LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                            (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                              (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                              (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                                       with
                                       end)).
 
@@ -25343,7 +25344,7 @@ cofix CIH
                                            (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
                                                                                                  LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                            (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                              (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                              (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                                       with
                                       end)).
 
@@ -25469,7 +25470,7 @@ cofix CIH
                                            (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
                                                                                                  LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                            (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                              (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                              (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                                       with
                                       end)).
 
@@ -25531,7 +25532,7 @@ cofix CIH
                                            (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
                                                                                                  LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                            (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                              (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                              (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                                       with
                                       end)).
 
@@ -26325,7 +26326,7 @@ cofix CIH
                                                                        (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
                                                                                                                              LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                                                        (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                                                          (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                                                          (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                                                                   with
                                                                   end))
                       .
@@ -28883,7 +28884,7 @@ cofix CIH
                                    (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
                                                                                          LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                    (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                      (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                      (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                               with
                               end)).
 
@@ -28931,7 +28932,7 @@ cofix CIH
                                    (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
                                                                                          LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                    (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                      (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                      (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                               with
                               end)).
 
@@ -29058,7 +29059,7 @@ cofix CIH
                                    (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
                                                                                          LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                    (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                      (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                      (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                               with
                               end)).
 
@@ -29106,7 +29107,7 @@ cofix CIH
                                    (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
                                                                                          LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                    (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                      (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                      (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                               with
                               end)).
 
@@ -29233,7 +29234,7 @@ cofix CIH
                                    (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
                                                                                          LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                    (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                      (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                      (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                               with
                               end)).
 
@@ -29282,7 +29283,7 @@ cofix CIH
                                    (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
                                                                                          LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                    (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                      (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                      (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                               with
                               end)).
 
@@ -30080,7 +30081,7 @@ cofix CIH
                                                                (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
                                                                                                                      LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
                                                                (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                                                  (MemPropT.store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
+                                                                  (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
                                                           with
                                                           end)).
 
@@ -32359,9 +32360,9 @@ cofix CIH
 
   Definition L4_E1E2_orutt_strict
     (t1 : PropT InfLP.Events.L4 (InfMemMMSP.MemState *
-                                   (MemPropT.store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue)))))
+                                   (store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue)))))
     (t2 : PropT FinLP.Events.L4 (FinMemMMSP.MemState *
-                                   (MemPropT.store_id * (FinLLVM.Local.local_env * FinLLVM.Stack.lstack * (FinLLVM.Global.global_env * FinLP.Events.DV.dvalue)))))
+                                   (store_id * (FinLLVM.Local.local_env * FinLLVM.Stack.lstack * (FinLLVM.Global.global_env * FinLP.Events.DV.dvalue)))))
     : Prop :=
     forall t', t2 t' ->
                exists t, t1 t /\
@@ -32377,7 +32378,7 @@ cofix CIH
       (TopLevel64BitIntptr.model_oom_L4 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 p2).
 
   Definition get_inf_tree_L4' :
-    forall (t_fin2 : itree L4 (FinMem.MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack local_env * res_L1)))), itree InfLP.Events.L4 TopLevelBigIntptr.res_L4.
+    forall (t_fin2 : itree L4 (FinMem.MMEP.MMSP.MemState * (store_id * (local_env * @stack local_env * res_L1)))), itree InfLP.Events.L4 TopLevelBigIntptr.res_L4.
   Proof.
     cofix CIH.
     intros t_fin2.
@@ -32479,15 +32480,15 @@ cofix CIH
   Unset Printing All.
   Unset Printing Implicit.
   Definition get_inf_tree_L4 :
-    forall (t_fin2 : itree L4 (FinMem.MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack local_env * res_L1)))), itree InfLP.Events.L4 TopLevelBigIntptr.res_L4 :=
+    forall (t_fin2 : itree L4 (FinMem.MMEP.MMSP.MemState * (store_id * (local_env * @stack local_env * res_L1)))), itree InfLP.Events.L4 TopLevelBigIntptr.res_L4 :=
 cofix CIH
   (t_fin2 : itree L4
               (prod FinMem.MMEP.MMSP.MemState
-                 (prod MemPropT.store_id
+                 (prod store_id
                     (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) :
     itree InfLP.Events.L4
       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-         (prod MemPropT.store_id
+         (prod store_id
             (prod
                (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                   InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32496,18 +32497,18 @@ cofix CIH
   (fun
      _observe : itreeF L4
                   (prod FinMem.MMEP.MMSP.MemState
-                     (prod MemPropT.store_id
+                     (prod store_id
                         (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))
                   (itree L4
                      (prod FinMem.MMEP.MMSP.MemState
-                        (prod MemPropT.store_id
+                        (prod store_id
                            (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) =>
    match
      _observe
      return
        (itree InfLP.Events.L4
           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-             (prod MemPropT.store_id
+             (prod store_id
                 (prod
                    (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                       InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32517,11 +32518,11 @@ cofix CIH
    | RetF r =>
        (fun
           r0 : prod FinMem.MMEP.MMSP.MemState
-                 (prod MemPropT.store_id
+                 (prod store_id
                     (prod (prod local_env (@stack local_env)) (prod global_env dvalue))) =>
         @ret (itree InfLP.Events.L4) (@Monad_itree InfLP.Events.L4)
           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-             (prod MemPropT.store_id
+             (prod store_id
                 (prod
                    (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                       InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32531,7 +32532,7 @@ cofix CIH
             r0
             return
               (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                 (prod MemPropT.store_id
+                 (prod store_id
                     (prod
                        (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                           InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32540,13 +32541,13 @@ cofix CIH
           with
           | pair a b =>
               (fun (ms : FinMem.MMEP.MMSP.MemState)
-                 (p : prod MemPropT.store_id
+                 (p : prod store_id
                         (prod (prod local_env (@stack local_env)) (prod global_env dvalue))) =>
                match
                  p
                  return
                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                      (prod MemPropT.store_id
+                      (prod store_id
                          (prod
                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32554,13 +32555,13 @@ cofix CIH
                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                with
                | pair a0 b0 =>
-                   (fun (sid : MemPropT.store_id)
+                   (fun (sid : store_id)
                       (p0 : prod (prod local_env (@stack local_env)) (prod global_env dvalue)) =>
                     match
                       p0
                       return
                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                           (prod MemPropT.store_id
+                           (prod store_id
                               (prod
                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32574,7 +32575,7 @@ cofix CIH
                            return
                              (forall _ : prod global_env dvalue,
                               prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32588,7 +32589,7 @@ cofix CIH
                                 p2
                                 return
                                   (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                     (prod MemPropT.store_id
+                                     (prod store_id
                                         (prod
                                            (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                               InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32598,14 +32599,14 @@ cofix CIH
                               | pair a3 b3 =>
                                   (fun (genv : global_env) (res : dvalue) =>
                                    @pair InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                     (prod MemPropT.store_id
+                                     (prod store_id
                                         (prod
                                            (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                               InterpreterStackBigIntptr.LLVM.Stack.lstack)
                                            (prod InterpreterStackBigIntptr.LLVM.Global.global_env
                                               InterpreterStackBigIntptr.LP.Events.DV.dvalue)))
                                      (lift_MemState ms)
-                                     (@pair MemPropT.store_id
+                                     (@pair store_id
                                         (prod
                                            (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                               InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32631,11 +32632,11 @@ cofix CIH
        (fun
           t0 : itree L4
                  (prod FinMem.MMEP.MMSP.MemState
-                    (prod MemPropT.store_id
+                    (prod store_id
                        (prod (prod local_env (@stack local_env)) (prod global_env dvalue)))) =>
         @go InfLP.Events.L4
           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-             (prod MemPropT.store_id
+             (prod store_id
                 (prod
                    (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                       InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32643,7 +32644,7 @@ cofix CIH
                       InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
           (@TauF InfLP.Events.L4
              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                (prod MemPropT.store_id
+                (prod store_id
                    (prod
                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32651,7 +32652,7 @@ cofix CIH
                          InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
              (itree InfLP.Events.L4
                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                   (prod MemPropT.store_id
+                   (prod store_id
                       (prod
                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32663,12 +32664,12 @@ cofix CIH
           (k0 : forall _ : X0,
                 itree L4
                   (prod FinMem.MMEP.MMSP.MemState
-                     (prod MemPropT.store_id
+                     (prod store_id
                         (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) =>
         let X1 :
           itree InfLP.Events.L4
             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-               (prod MemPropT.store_id
+               (prod store_id
                   (prod
                      (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                         InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32679,7 +32680,7 @@ cofix CIH
             return
               (itree InfLP.Events.L4
                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                    (prod MemPropT.store_id
+                    (prod store_id
                        (prod
                           (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                              InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32693,7 +32694,7 @@ cofix CIH
                   forall _ : @eq Type X0 X0,
                   itree InfLP.Events.L4
                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                       (prod MemPropT.store_id
+                       (prod store_id
                           (prod
                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32705,7 +32706,7 @@ cofix CIH
                       (forall _ : @eq Type T X0,
                        itree InfLP.Events.L4
                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                            (prod MemPropT.store_id
+                            (prod store_id
                                (prod
                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32722,7 +32723,7 @@ cofix CIH
                            forall (_ : dtyp) (_ : uvalue) (_ : list dvalue),
                            itree InfLP.Events.L4
                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32735,13 +32736,13 @@ cofix CIH
                                 (_ : forall _ : X1,
                                      itree L4
                                        (prod FinMem.MMEP.MMSP.MemState
-                                          (prod MemPropT.store_id
+                                          (prod store_id
                                              (prod (prod local_env (@stack local_env))
                                                 (prod global_env dvalue))))) 
                                 (_ : ExternalCallE X1),
                               itree InfLP.Events.L4
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32751,13 +32752,13 @@ cofix CIH
                                 (k1 : forall _ : dvalue,
                                       itree L4
                                         (prod FinMem.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod (prod local_env (@stack local_env))
                                                  (prod global_env dvalue)))))
                                 (_ : ExternalCallE dvalue) =>
                               @go InfLP.Events.L4
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32765,7 +32766,7 @@ cofix CIH
                                             InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                 (@VisF InfLP.Events.L4
                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                      (prod MemPropT.store_id
+                                      (prod store_id
                                          (prod
                                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32773,7 +32774,7 @@ cofix CIH
                                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                    (itree InfLP.Events.L4
                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                         (prod MemPropT.store_id
+                                         (prod store_id
                                             (prod
                                                (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                   InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32798,7 +32799,7 @@ cofix CIH
                                          return
                                            (itree L4
                                               (prod FinMem.MMEP.MMSP.MemState
-                                                 (prod MemPropT.store_id
+                                                 (prod store_id
                                                     (prod (prod local_env (@stack local_env))
                                                        (prod global_env dvalue)))))
                                        with
@@ -32816,7 +32817,7 @@ cofix CIH
                                                     (@ReSum_id (forall _ : Type, Type) IFun Id_IFun
                                                        OOME)))
                                               (prod FinMem.MMEP.MMSP.MemState
-                                                 (prod MemPropT.store_id
+                                                 (prod store_id
                                                     (prod (prod local_env (@stack local_env))
                                                        (prod global_env dvalue)))) s0) s
                                        end)))) X0 H2 k0 H0) X0 H3) H1 t0 f0 args0) t f args
@@ -32829,7 +32830,7 @@ cofix CIH
                            forall _ : list int8,
                            itree InfLP.Events.L4
                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32842,13 +32843,13 @@ cofix CIH
                                 (_ : forall _ : X1,
                                      itree L4
                                        (prod FinMem.MMEP.MMSP.MemState
-                                          (prod MemPropT.store_id
+                                          (prod store_id
                                              (prod (prod local_env (@stack local_env))
                                                 (prod global_env dvalue))))) 
                                 (_ : ExternalCallE X1),
                               itree InfLP.Events.L4
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32858,13 +32859,13 @@ cofix CIH
                                 (k1 : forall _ : unit,
                                       itree L4
                                         (prod FinMem.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod (prod local_env (@stack local_env))
                                                  (prod global_env dvalue))))) 
                                 (_ : ExternalCallE unit) =>
                               @go InfLP.Events.L4
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32872,7 +32873,7 @@ cofix CIH
                                             InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                 (@VisF InfLP.Events.L4
                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                      (prod MemPropT.store_id
+                                      (prod store_id
                                          (prod
                                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32880,7 +32881,7 @@ cofix CIH
                                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                    (itree InfLP.Events.L4
                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                         (prod MemPropT.store_id
+                                         (prod store_id
                                             (prod
                                                (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                   InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32900,7 +32901,7 @@ cofix CIH
                                       return
                                         (itree InfLP.Events.L4
                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                              (prod MemPropT.store_id
+                                              (prod store_id
                                                  (prod
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -32920,7 +32921,7 @@ cofix CIH
                            forall _ : list int8,
                            itree InfLP.Events.L4
                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32933,13 +32934,13 @@ cofix CIH
                                 (_ : forall _ : X1,
                                      itree L4
                                        (prod FinMem.MMEP.MMSP.MemState
-                                          (prod MemPropT.store_id
+                                          (prod store_id
                                              (prod (prod local_env (@stack local_env))
                                                 (prod global_env dvalue))))) 
                                 (_ : ExternalCallE X1),
                               itree InfLP.Events.L4
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32949,13 +32950,13 @@ cofix CIH
                                 (k1 : forall _ : unit,
                                       itree L4
                                         (prod FinMem.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod (prod local_env (@stack local_env))
                                                  (prod global_env dvalue))))) 
                                 (_ : ExternalCallE unit) =>
                               @go InfLP.Events.L4
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32963,7 +32964,7 @@ cofix CIH
                                             InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                 (@VisF InfLP.Events.L4
                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                      (prod MemPropT.store_id
+                                      (prod store_id
                                          (prod
                                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32971,7 +32972,7 @@ cofix CIH
                                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                    (itree InfLP.Events.L4
                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                         (prod MemPropT.store_id
+                                         (prod store_id
                                             (prod
                                                (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                   InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -32991,7 +32992,7 @@ cofix CIH
                                       return
                                         (itree InfLP.Events.L4
                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                              (prod MemPropT.store_id
+                                              (prod store_id
                                                  (prod
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33010,7 +33011,7 @@ cofix CIH
                 let X1 :
                   itree InfLP.Events.L4
                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                       (prod MemPropT.store_id
+                       (prod store_id
                           (prod
                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33021,7 +33022,7 @@ cofix CIH
                     return
                       (itree InfLP.Events.L4
                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                            (prod MemPropT.store_id
+                            (prod store_id
                                (prod
                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33035,7 +33036,7 @@ cofix CIH
                           forall _ : @eq Type X0 X0,
                           itree InfLP.Events.L4
                             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                               (prod MemPropT.store_id
+                               (prod store_id
                                   (prod
                                      (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                         InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33047,7 +33048,7 @@ cofix CIH
                               (forall _ : @eq Type T X0,
                                itree InfLP.Events.L4
                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                    (prod MemPropT.store_id
+                                    (prod store_id
                                        (prod
                                           (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                              InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33063,7 +33064,7 @@ cofix CIH
                                    forall _ : unit,
                                    itree InfLP.Events.L4
                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                        (prod MemPropT.store_id
+                                        (prod store_id
                                            (prod
                                               (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                  InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33076,13 +33077,13 @@ cofix CIH
                                         (_ : forall _ : X1,
                                              itree L4
                                                (prod FinMem.MMEP.MMSP.MemState
-                                                  (prod MemPropT.store_id
+                                                  (prod store_id
                                                      (prod (prod local_env (@stack local_env))
                                                         (prod global_env dvalue))))) 
                                         (_ : OOME X1),
                                       itree InfLP.Events.L4
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33093,7 +33094,7 @@ cofix CIH
                                         (_ : forall _ : Empty_set,
                                              itree L4
                                                (prod FinMem.MMEP.MMSP.MemState
-                                                  (prod MemPropT.store_id
+                                                  (prod store_id
                                                      (prod (prod local_env (@stack local_env))
                                                         (prod global_env dvalue)))))
                                         (_ : OOME Empty_set) =>
@@ -33105,7 +33106,7 @@ cofix CIH
                                               Inl_sum1 OOME OOME (sum1 UBE (sum1 DebugE FailureE))
                                               (@ReSum_id (forall _ : Type, Type) IFun Id_IFun OOME)))
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33121,7 +33122,7 @@ cofix CIH
                         let X1 :
                           itree InfLP.Events.L4
                             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                               (prod MemPropT.store_id
+                               (prod store_id
                                   (prod
                                      (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                         InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33132,7 +33133,7 @@ cofix CIH
                             return
                               (itree InfLP.Events.L4
                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                    (prod MemPropT.store_id
+                                    (prod store_id
                                        (prod
                                           (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                              InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33146,7 +33147,7 @@ cofix CIH
                                   forall _ : @eq Type X0 X0,
                                   itree InfLP.Events.L4
                                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                       (prod MemPropT.store_id
+                                       (prod store_id
                                           (prod
                                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33158,7 +33159,7 @@ cofix CIH
                                       (forall _ : @eq Type T X0,
                                        itree InfLP.Events.L4
                                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                            (prod MemPropT.store_id
+                                            (prod store_id
                                                (prod
                                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33176,7 +33177,7 @@ cofix CIH
                                            itree InfLP.Events.L4
                                              (prod
                                                 InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                (prod MemPropT.store_id
+                                                (prod store_id
                                                    (prod
                                                       (prod
                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33191,14 +33192,14 @@ cofix CIH
                                                 (_ : forall _ : X1,
                                                      itree L4
                                                        (prod FinMem.MMEP.MMSP.MemState
-                                                          (prod MemPropT.store_id
+                                                          (prod store_id
                                                              (prod (prod local_env (@stack local_env))
                                                                 (prod global_env dvalue)))))
                                                 (_ : UBE X1),
                                               itree InfLP.Events.L4
                                                 (prod
                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                   (prod MemPropT.store_id
+                                                   (prod store_id
                                                       (prod
                                                          (prod
                                                             InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33210,7 +33211,7 @@ cofix CIH
                                                 (_ : forall _ : Empty_set,
                                                      itree L4
                                                        (prod FinMem.MMEP.MMSP.MemState
-                                                          (prod MemPropT.store_id
+                                                          (prod store_id
                                                              (prod (prod local_env (@stack local_env))
                                                                 (prod global_env dvalue)))))
                                                 (_ : UBE Empty_set) =>
@@ -33229,7 +33230,7 @@ cofix CIH
                                                             Id_IFun UBE))))
                                                 (prod
                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                   (prod MemPropT.store_id
+                                                   (prod store_id
                                                       (prod
                                                          (prod
                                                             InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33246,7 +33247,7 @@ cofix CIH
                                 let X1 :
                                   itree InfLP.Events.L4
                                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                       (prod MemPropT.store_id
+                                       (prod store_id
                                           (prod
                                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33257,7 +33258,7 @@ cofix CIH
                                     return
                                       (itree InfLP.Events.L4
                                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                            (prod MemPropT.store_id
+                                            (prod store_id
                                                (prod
                                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33273,7 +33274,7 @@ cofix CIH
                                           itree InfLP.Events.L4
                                             (prod
                                                InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                               (prod MemPropT.store_id
+                                               (prod store_id
                                                   (prod
                                                      (prod
                                                         InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33288,7 +33289,7 @@ cofix CIH
                                                itree InfLP.Events.L4
                                                  (prod
                                                     InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                    (prod MemPropT.store_id
+                                                    (prod store_id
                                                        (prod
                                                           (prod
                                                              InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33307,7 +33308,7 @@ cofix CIH
                                                    itree InfLP.Events.L4
                                                      (prod
                                                         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                        (prod MemPropT.store_id
+                                                        (prod store_id
                                                            (prod
                                                               (prod
                                                                  InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33322,7 +33323,7 @@ cofix CIH
                                                         (_ : forall _ : X1,
                                                              itree L4
                                                                (prod FinMem.MMEP.MMSP.MemState
-                                                                  (prod MemPropT.store_id
+                                                                  (prod store_id
                                                                      (prod
                                                                         (prod local_env
                                                                          (@stack local_env))
@@ -33331,7 +33332,7 @@ cofix CIH
                                                       itree InfLP.Events.L4
                                                         (prod
                                                            InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                           (prod MemPropT.store_id
+                                                           (prod store_id
                                                               (prod
                                                                  (prod
                                                                     InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33343,7 +33344,7 @@ cofix CIH
                                                         (k1 : forall _ : unit,
                                                               itree L4
                                                                 (prod FinMem.MMEP.MMSP.MemState
-                                                                   (prod MemPropT.store_id
+                                                                   (prod store_id
                                                                       (prod
                                                                          (prod local_env
                                                                          (@stack local_env))
@@ -33352,7 +33353,7 @@ cofix CIH
                                                       @go InfLP.Events.L4
                                                         (prod
                                                            InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                           (prod MemPropT.store_id
+                                                           (prod store_id
                                                               (prod
                                                                  (prod
                                                                     InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33363,7 +33364,7 @@ cofix CIH
                                                         (@VisF InfLP.Events.L4
                                                            (prod
                                                               InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id
+                                                              (prod store_id
                                                                  (prod
                                                                     (prod
                                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33374,7 +33375,7 @@ cofix CIH
                                                            (itree InfLP.Events.L4
                                                               (prod
                                                                  InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                 (prod MemPropT.store_id
+                                                                 (prod store_id
                                                                     (prod
                                                                        (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33419,7 +33420,7 @@ cofix CIH
                                           itree InfLP.Events.L4
                                             (prod
                                                InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                               (prod MemPropT.store_id
+                                               (prod store_id
                                                   (prod
                                                      (prod
                                                         InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33434,7 +33435,7 @@ cofix CIH
                                                itree InfLP.Events.L4
                                                  (prod
                                                     InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                    (prod MemPropT.store_id
+                                                    (prod store_id
                                                        (prod
                                                           (prod
                                                              InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33453,7 +33454,7 @@ cofix CIH
                                                    itree InfLP.Events.L4
                                                      (prod
                                                         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                        (prod MemPropT.store_id
+                                                        (prod store_id
                                                            (prod
                                                               (prod
                                                                  InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33468,7 +33469,7 @@ cofix CIH
                                                         (_ : forall _ : X1,
                                                              itree L4
                                                                (prod FinMem.MMEP.MMSP.MemState
-                                                                  (prod MemPropT.store_id
+                                                                  (prod store_id
                                                                      (prod
                                                                         (prod local_env
                                                                          (@stack local_env))
@@ -33477,7 +33478,7 @@ cofix CIH
                                                       itree InfLP.Events.L4
                                                         (prod
                                                            InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                           (prod MemPropT.store_id
+                                                           (prod store_id
                                                               (prod
                                                                  (prod
                                                                     InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33489,7 +33490,7 @@ cofix CIH
                                                         (_ : forall _ : Empty_set,
                                                              itree L4
                                                                (prod FinMem.MMEP.MMSP.MemState
-                                                                  (prod MemPropT.store_id
+                                                                  (prod store_id
                                                                      (prod
                                                                         (prod local_env
                                                                          (@stack local_env))
@@ -33498,7 +33499,7 @@ cofix CIH
                                                       @LLVMEvents.raise InfLP.Events.L4
                                                         (prod
                                                            InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                           (prod MemPropT.store_id
+                                                           (prod store_id
                                                               (prod
                                                                  (prod
                                                                     InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33538,13 +33539,13 @@ cofix CIH
         X1) X e k
    end) (@_observe _ _ t_fin2).
 
-  Definition _get_inf_tree_L4 (t_fin2 : itree' L4 (FinMem.MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack local_env * res_L1)))) : itree InfLP.Events.L4 TopLevelBigIntptr.res_L4 :=
+  Definition _get_inf_tree_L4 (t_fin2 : itree' L4 (FinMem.MMEP.MMSP.MemState * (store_id * (local_env * @stack local_env * res_L1)))) : itree InfLP.Events.L4 TopLevelBigIntptr.res_L4 :=
     match
       t_fin2
      return
        (itree InfLP.Events.L4
           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-             (prod MemPropT.store_id
+             (prod store_id
                 (prod
                    (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                       InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33554,11 +33555,11 @@ cofix CIH
    | RetF r =>
        (fun
           r0 : prod FinMem.MMEP.MMSP.MemState
-                 (prod MemPropT.store_id
+                 (prod store_id
                     (prod (prod local_env (@stack local_env)) (prod global_env dvalue))) =>
         @ret (itree InfLP.Events.L4) (@Monad_itree InfLP.Events.L4)
           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-             (prod MemPropT.store_id
+             (prod store_id
                 (prod
                    (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                       InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33568,7 +33569,7 @@ cofix CIH
             r0
             return
               (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                 (prod MemPropT.store_id
+                 (prod store_id
                     (prod
                        (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                           InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33577,13 +33578,13 @@ cofix CIH
           with
           | pair a b =>
               (fun (ms : FinMem.MMEP.MMSP.MemState)
-                 (p : prod MemPropT.store_id
+                 (p : prod store_id
                         (prod (prod local_env (@stack local_env)) (prod global_env dvalue))) =>
                match
                  p
                  return
                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                      (prod MemPropT.store_id
+                      (prod store_id
                          (prod
                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33591,13 +33592,13 @@ cofix CIH
                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                with
                | pair a0 b0 =>
-                   (fun (sid : MemPropT.store_id)
+                   (fun (sid : store_id)
                       (p0 : prod (prod local_env (@stack local_env)) (prod global_env dvalue)) =>
                     match
                       p0
                       return
                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                           (prod MemPropT.store_id
+                           (prod store_id
                               (prod
                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33611,7 +33612,7 @@ cofix CIH
                            return
                              (forall _ : prod global_env dvalue,
                               prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33625,7 +33626,7 @@ cofix CIH
                                 p2
                                 return
                                   (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                     (prod MemPropT.store_id
+                                     (prod store_id
                                         (prod
                                            (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                               InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33635,14 +33636,14 @@ cofix CIH
                               | pair a3 b3 =>
                                   (fun (genv : global_env) (res : dvalue) =>
                                    @pair InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                     (prod MemPropT.store_id
+                                     (prod store_id
                                         (prod
                                            (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                               InterpreterStackBigIntptr.LLVM.Stack.lstack)
                                            (prod InterpreterStackBigIntptr.LLVM.Global.global_env
                                               InterpreterStackBigIntptr.LP.Events.DV.dvalue)))
                                      (lift_MemState ms)
-                                     (@pair MemPropT.store_id
+                                     (@pair store_id
                                         (prod
                                            (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                               InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33668,11 +33669,11 @@ cofix CIH
        (fun
           t0 : itree L4
                  (prod FinMem.MMEP.MMSP.MemState
-                    (prod MemPropT.store_id
+                    (prod store_id
                        (prod (prod local_env (@stack local_env)) (prod global_env dvalue)))) =>
         @go InfLP.Events.L4
           (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-             (prod MemPropT.store_id
+             (prod store_id
                 (prod
                    (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                       InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33680,7 +33681,7 @@ cofix CIH
                       InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
           (@TauF InfLP.Events.L4
              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                (prod MemPropT.store_id
+                (prod store_id
                    (prod
                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33688,7 +33689,7 @@ cofix CIH
                          InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
              (itree InfLP.Events.L4
                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                   (prod MemPropT.store_id
+                   (prod store_id
                       (prod
                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33700,12 +33701,12 @@ cofix CIH
           (k0 : forall _ : X0,
                 itree L4
                   (prod FinMem.MMEP.MMSP.MemState
-                     (prod MemPropT.store_id
+                     (prod store_id
                         (prod (prod local_env (@stack local_env)) (prod global_env dvalue))))) =>
         let X1 :
           itree InfLP.Events.L4
             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-               (prod MemPropT.store_id
+               (prod store_id
                   (prod
                      (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                         InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33716,7 +33717,7 @@ cofix CIH
             return
               (itree InfLP.Events.L4
                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                    (prod MemPropT.store_id
+                    (prod store_id
                        (prod
                           (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                              InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33730,7 +33731,7 @@ cofix CIH
                   forall _ : @eq Type X0 X0,
                   itree InfLP.Events.L4
                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                       (prod MemPropT.store_id
+                       (prod store_id
                           (prod
                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33742,7 +33743,7 @@ cofix CIH
                       (forall _ : @eq Type T X0,
                        itree InfLP.Events.L4
                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                            (prod MemPropT.store_id
+                            (prod store_id
                                (prod
                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33759,7 +33760,7 @@ cofix CIH
                            forall (_ : dtyp) (_ : uvalue) (_ : list dvalue),
                            itree InfLP.Events.L4
                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33772,13 +33773,13 @@ cofix CIH
                                 (_ : forall _ : X1,
                                      itree L4
                                        (prod FinMem.MMEP.MMSP.MemState
-                                          (prod MemPropT.store_id
+                                          (prod store_id
                                              (prod (prod local_env (@stack local_env))
                                                 (prod global_env dvalue))))) 
                                 (_ : ExternalCallE X1),
                               itree InfLP.Events.L4
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33788,13 +33789,13 @@ cofix CIH
                                 (k1 : forall _ : dvalue,
                                       itree L4
                                         (prod FinMem.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod (prod local_env (@stack local_env))
                                                  (prod global_env dvalue)))))
                                 (_ : ExternalCallE dvalue) =>
                               @go InfLP.Events.L4
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33802,7 +33803,7 @@ cofix CIH
                                             InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                 (@VisF InfLP.Events.L4
                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                      (prod MemPropT.store_id
+                                      (prod store_id
                                          (prod
                                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33810,7 +33811,7 @@ cofix CIH
                                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                    (itree InfLP.Events.L4
                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                         (prod MemPropT.store_id
+                                         (prod store_id
                                             (prod
                                                (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                   InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33835,7 +33836,7 @@ cofix CIH
                                          return
                                            (itree L4
                                               (prod FinMem.MMEP.MMSP.MemState
-                                                 (prod MemPropT.store_id
+                                                 (prod store_id
                                                     (prod (prod local_env (@stack local_env))
                                                        (prod global_env dvalue)))))
                                        with
@@ -33853,7 +33854,7 @@ cofix CIH
                                                     (@ReSum_id (forall _ : Type, Type) IFun Id_IFun
                                                        OOME)))
                                               (prod FinMem.MMEP.MMSP.MemState
-                                                 (prod MemPropT.store_id
+                                                 (prod store_id
                                                     (prod (prod local_env (@stack local_env))
                                                        (prod global_env dvalue)))) s0) s
                                        end)))) X0 H2 k0 H0) X0 H3) H1 t0 f0 args0) t f args
@@ -33866,7 +33867,7 @@ cofix CIH
                            forall _ : list int8,
                            itree InfLP.Events.L4
                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33879,13 +33880,13 @@ cofix CIH
                                 (_ : forall _ : X1,
                                      itree L4
                                        (prod FinMem.MMEP.MMSP.MemState
-                                          (prod MemPropT.store_id
+                                          (prod store_id
                                              (prod (prod local_env (@stack local_env))
                                                 (prod global_env dvalue))))) 
                                 (_ : ExternalCallE X1),
                               itree InfLP.Events.L4
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33895,13 +33896,13 @@ cofix CIH
                                 (k1 : forall _ : unit,
                                       itree L4
                                         (prod FinMem.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod (prod local_env (@stack local_env))
                                                  (prod global_env dvalue))))) 
                                 (_ : ExternalCallE unit) =>
                               @go InfLP.Events.L4
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33909,7 +33910,7 @@ cofix CIH
                                             InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                 (@VisF InfLP.Events.L4
                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                      (prod MemPropT.store_id
+                                      (prod store_id
                                          (prod
                                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33917,7 +33918,7 @@ cofix CIH
                                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                    (itree InfLP.Events.L4
                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                         (prod MemPropT.store_id
+                                         (prod store_id
                                             (prod
                                                (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                   InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33937,7 +33938,7 @@ cofix CIH
                                       return
                                         (itree InfLP.Events.L4
                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                              (prod MemPropT.store_id
+                                              (prod store_id
                                                  (prod
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -33957,7 +33958,7 @@ cofix CIH
                            forall _ : list int8,
                            itree InfLP.Events.L4
                              (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                (prod MemPropT.store_id
+                                (prod store_id
                                    (prod
                                       (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                          InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33970,13 +33971,13 @@ cofix CIH
                                 (_ : forall _ : X1,
                                      itree L4
                                        (prod FinMem.MMEP.MMSP.MemState
-                                          (prod MemPropT.store_id
+                                          (prod store_id
                                              (prod (prod local_env (@stack local_env))
                                                 (prod global_env dvalue))))) 
                                 (_ : ExternalCallE X1),
                               itree InfLP.Events.L4
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -33986,13 +33987,13 @@ cofix CIH
                                 (k1 : forall _ : unit,
                                       itree L4
                                         (prod FinMem.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod (prod local_env (@stack local_env))
                                                  (prod global_env dvalue))))) 
                                 (_ : ExternalCallE unit) =>
                               @go InfLP.Events.L4
                                 (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                   (prod MemPropT.store_id
+                                   (prod store_id
                                       (prod
                                          (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                             InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34000,7 +34001,7 @@ cofix CIH
                                             InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                 (@VisF InfLP.Events.L4
                                    (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                      (prod MemPropT.store_id
+                                      (prod store_id
                                          (prod
                                             (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34008,7 +34009,7 @@ cofix CIH
                                                InterpreterStackBigIntptr.LP.Events.DV.dvalue))))
                                    (itree InfLP.Events.L4
                                       (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                         (prod MemPropT.store_id
+                                         (prod store_id
                                             (prod
                                                (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                   InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34028,7 +34029,7 @@ cofix CIH
                                       return
                                         (itree InfLP.Events.L4
                                            (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                              (prod MemPropT.store_id
+                                              (prod store_id
                                                  (prod
                                                     (prod
                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -34047,7 +34048,7 @@ cofix CIH
                 let X1 :
                   itree InfLP.Events.L4
                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                       (prod MemPropT.store_id
+                       (prod store_id
                           (prod
                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34058,7 +34059,7 @@ cofix CIH
                     return
                       (itree InfLP.Events.L4
                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                            (prod MemPropT.store_id
+                            (prod store_id
                                (prod
                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34072,7 +34073,7 @@ cofix CIH
                           forall _ : @eq Type X0 X0,
                           itree InfLP.Events.L4
                             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                               (prod MemPropT.store_id
+                               (prod store_id
                                   (prod
                                      (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                         InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34084,7 +34085,7 @@ cofix CIH
                               (forall _ : @eq Type T X0,
                                itree InfLP.Events.L4
                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                    (prod MemPropT.store_id
+                                    (prod store_id
                                        (prod
                                           (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                              InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34100,7 +34101,7 @@ cofix CIH
                                    forall _ : unit,
                                    itree InfLP.Events.L4
                                      (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                        (prod MemPropT.store_id
+                                        (prod store_id
                                            (prod
                                               (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                  InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34113,13 +34114,13 @@ cofix CIH
                                         (_ : forall _ : X1,
                                              itree L4
                                                (prod FinMem.MMEP.MMSP.MemState
-                                                  (prod MemPropT.store_id
+                                                  (prod store_id
                                                      (prod (prod local_env (@stack local_env))
                                                         (prod global_env dvalue))))) 
                                         (_ : OOME X1),
                                       itree InfLP.Events.L4
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34130,7 +34131,7 @@ cofix CIH
                                         (_ : forall _ : Empty_set,
                                              itree L4
                                                (prod FinMem.MMEP.MMSP.MemState
-                                                  (prod MemPropT.store_id
+                                                  (prod store_id
                                                      (prod (prod local_env (@stack local_env))
                                                         (prod global_env dvalue)))))
                                         (_ : OOME Empty_set) =>
@@ -34142,7 +34143,7 @@ cofix CIH
                                               Inl_sum1 OOME OOME (sum1 UBE (sum1 DebugE FailureE))
                                               (@ReSum_id (forall _ : Type, Type) IFun Id_IFun OOME)))
                                         (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                           (prod MemPropT.store_id
+                                           (prod store_id
                                               (prod
                                                  (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                     InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34158,7 +34159,7 @@ cofix CIH
                         let X1 :
                           itree InfLP.Events.L4
                             (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                               (prod MemPropT.store_id
+                               (prod store_id
                                   (prod
                                      (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                         InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34169,7 +34170,7 @@ cofix CIH
                             return
                               (itree InfLP.Events.L4
                                  (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                    (prod MemPropT.store_id
+                                    (prod store_id
                                        (prod
                                           (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                              InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34183,7 +34184,7 @@ cofix CIH
                                   forall _ : @eq Type X0 X0,
                                   itree InfLP.Events.L4
                                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                       (prod MemPropT.store_id
+                                       (prod store_id
                                           (prod
                                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34195,7 +34196,7 @@ cofix CIH
                                       (forall _ : @eq Type T X0,
                                        itree InfLP.Events.L4
                                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                            (prod MemPropT.store_id
+                                            (prod store_id
                                                (prod
                                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34213,7 +34214,7 @@ cofix CIH
                                            itree InfLP.Events.L4
                                              (prod
                                                 InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                (prod MemPropT.store_id
+                                                (prod store_id
                                                    (prod
                                                       (prod
                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -34228,14 +34229,14 @@ cofix CIH
                                                 (_ : forall _ : X1,
                                                      itree L4
                                                        (prod FinMem.MMEP.MMSP.MemState
-                                                          (prod MemPropT.store_id
+                                                          (prod store_id
                                                              (prod (prod local_env (@stack local_env))
                                                                 (prod global_env dvalue)))))
                                                 (_ : UBE X1),
                                               itree InfLP.Events.L4
                                                 (prod
                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                   (prod MemPropT.store_id
+                                                   (prod store_id
                                                       (prod
                                                          (prod
                                                             InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -34247,7 +34248,7 @@ cofix CIH
                                                 (_ : forall _ : Empty_set,
                                                      itree L4
                                                        (prod FinMem.MMEP.MMSP.MemState
-                                                          (prod MemPropT.store_id
+                                                          (prod store_id
                                                              (prod (prod local_env (@stack local_env))
                                                                 (prod global_env dvalue)))))
                                                 (_ : UBE Empty_set) =>
@@ -34266,7 +34267,7 @@ cofix CIH
                                                             Id_IFun UBE))))
                                                 (prod
                                                    InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                   (prod MemPropT.store_id
+                                                   (prod store_id
                                                       (prod
                                                          (prod
                                                             InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -34283,7 +34284,7 @@ cofix CIH
                                 let X1 :
                                   itree InfLP.Events.L4
                                     (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                       (prod MemPropT.store_id
+                                       (prod store_id
                                           (prod
                                              (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                 InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34294,7 +34295,7 @@ cofix CIH
                                     return
                                       (itree InfLP.Events.L4
                                          (prod InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                            (prod MemPropT.store_id
+                                            (prod store_id
                                                (prod
                                                   (prod InterpreterStackBigIntptr.LLVM.Local.local_env
                                                      InterpreterStackBigIntptr.LLVM.Stack.lstack)
@@ -34310,7 +34311,7 @@ cofix CIH
                                           itree InfLP.Events.L4
                                             (prod
                                                InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                               (prod MemPropT.store_id
+                                               (prod store_id
                                                   (prod
                                                      (prod
                                                         InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -34325,7 +34326,7 @@ cofix CIH
                                                itree InfLP.Events.L4
                                                  (prod
                                                     InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                    (prod MemPropT.store_id
+                                                    (prod store_id
                                                        (prod
                                                           (prod
                                                              InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -34344,7 +34345,7 @@ cofix CIH
                                                    itree InfLP.Events.L4
                                                      (prod
                                                         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                        (prod MemPropT.store_id
+                                                        (prod store_id
                                                            (prod
                                                               (prod
                                                                  InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -34359,7 +34360,7 @@ cofix CIH
                                                         (_ : forall _ : X1,
                                                              itree L4
                                                                (prod FinMem.MMEP.MMSP.MemState
-                                                                  (prod MemPropT.store_id
+                                                                  (prod store_id
                                                                      (prod
                                                                         (prod local_env
                                                                          (@stack local_env))
@@ -34368,7 +34369,7 @@ cofix CIH
                                                       itree InfLP.Events.L4
                                                         (prod
                                                            InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                           (prod MemPropT.store_id
+                                                           (prod store_id
                                                               (prod
                                                                  (prod
                                                                     InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -34380,7 +34381,7 @@ cofix CIH
                                                         (k1 : forall _ : unit,
                                                               itree L4
                                                                 (prod FinMem.MMEP.MMSP.MemState
-                                                                   (prod MemPropT.store_id
+                                                                   (prod store_id
                                                                       (prod
                                                                          (prod local_env
                                                                          (@stack local_env))
@@ -34389,7 +34390,7 @@ cofix CIH
                                                       @go InfLP.Events.L4
                                                         (prod
                                                            InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                           (prod MemPropT.store_id
+                                                           (prod store_id
                                                               (prod
                                                                  (prod
                                                                     InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -34400,7 +34401,7 @@ cofix CIH
                                                         (@VisF InfLP.Events.L4
                                                            (prod
                                                               InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                              (prod MemPropT.store_id
+                                                              (prod store_id
                                                                  (prod
                                                                     (prod
                                                                        InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -34411,7 +34412,7 @@ cofix CIH
                                                            (itree InfLP.Events.L4
                                                               (prod
                                                                  InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                                 (prod MemPropT.store_id
+                                                                 (prod store_id
                                                                     (prod
                                                                        (prod
                                                                          InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -34456,7 +34457,7 @@ cofix CIH
                                           itree InfLP.Events.L4
                                             (prod
                                                InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                               (prod MemPropT.store_id
+                                               (prod store_id
                                                   (prod
                                                      (prod
                                                         InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -34471,7 +34472,7 @@ cofix CIH
                                                itree InfLP.Events.L4
                                                  (prod
                                                     InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                    (prod MemPropT.store_id
+                                                    (prod store_id
                                                        (prod
                                                           (prod
                                                              InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -34490,7 +34491,7 @@ cofix CIH
                                                    itree InfLP.Events.L4
                                                      (prod
                                                         InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                        (prod MemPropT.store_id
+                                                        (prod store_id
                                                            (prod
                                                               (prod
                                                                  InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -34505,7 +34506,7 @@ cofix CIH
                                                         (_ : forall _ : X1,
                                                              itree L4
                                                                (prod FinMem.MMEP.MMSP.MemState
-                                                                  (prod MemPropT.store_id
+                                                                  (prod store_id
                                                                      (prod
                                                                         (prod local_env
                                                                          (@stack local_env))
@@ -34514,7 +34515,7 @@ cofix CIH
                                                       itree InfLP.Events.L4
                                                         (prod
                                                            InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                           (prod MemPropT.store_id
+                                                           (prod store_id
                                                               (prod
                                                                  (prod
                                                                     InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -34526,7 +34527,7 @@ cofix CIH
                                                         (_ : forall _ : Empty_set,
                                                              itree L4
                                                                (prod FinMem.MMEP.MMSP.MemState
-                                                                  (prod MemPropT.store_id
+                                                                  (prod store_id
                                                                      (prod
                                                                         (prod local_env
                                                                          (@stack local_env))
@@ -34535,7 +34536,7 @@ cofix CIH
                                                       @LLVMEvents.raise InfLP.Events.L4
                                                         (prod
                                                            InterpreterStackBigIntptr.LLVM.MEM.MMEP.MMSP.MemState
-                                                           (prod MemPropT.store_id
+                                                           (prod store_id
                                                               (prod
                                                                  (prod
                                                                     InterpreterStackBigIntptr.LLVM.Local.local_env
@@ -35490,9 +35491,9 @@ cofix CIH
 
   Lemma model_undef_h_fin_inf :
     forall (t_fin : itree (FinLP.Events.ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-                 (MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack (list (LLVMAst.raw_id * uvalue)) * res_L1))))
+                 (MMEP.MMSP.MemState * (store_id * (local_env * @stack (list (LLVMAst.raw_id * uvalue)) * res_L1))))
       (t_inf : itree InfLP.Events.L3 TopLevelBigIntptr.res_L6)
-      (t_fin' : itree L4 (FinMem.MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * @stack (list (LLVMAst.raw_id * uvalue)) * res_L1))))
+      (t_fin' : itree L4 (FinMem.MMEP.MMSP.MemState * (store_id * (local_env * @stack (list (LLVMAst.raw_id * uvalue)) * res_L1))))
       (REL: orutt (OOM:=OOME) L3_refine_strict L3_res_refine_strict
               (MemState_refine_prop
                  × (eq
@@ -38587,9 +38588,9 @@ cofix CIH
 
   Definition L5_E1E2_orutt_strict
     (t1 : PropT InfLP.Events.L5 (InfMemMMSP.MemState *
-                                   (MemPropT.store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue)))))
+                                   (store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue)))))
     (t2 : PropT FinLP.Events.L5 (FinMemMMSP.MemState *
-                                   (MemPropT.store_id * (FinLLVM.Local.local_env * FinLLVM.Stack.lstack * (FinLLVM.Global.global_env * FinLP.Events.DV.dvalue)))))
+                                   (store_id * (FinLLVM.Local.local_env * FinLLVM.Stack.lstack * (FinLLVM.Global.global_env * FinLP.Events.DV.dvalue)))))
     : Prop :=
     forall t', t2 t' ->
           (exists t, t1 t /\
@@ -38847,7 +38848,7 @@ cofix CIH
 
   Definition L6_E1E2_orutt_strict
     (t1 : PropT InfLP.Events.L6 (InfMemMMSP.MemState *
-                                   (MemPropT.store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue)))))
+                                   (store_id * (InfLLVM.Local.local_env * InfLLVM.Stack.lstack * (InfLLVM.Global.global_env * InfLP.Events.DV.dvalue)))))
     t2
     : Prop :=
     forall t', t2 t' ->
@@ -38868,9 +38869,9 @@ cofix CIH
     forall
       (t : itree InterpreterStackBigIntptr.LP.Events.L4
              (InfMem.MMEP.MMSP.MemState *
-                (MemPropT.store_id *
+                (store_id *
                    (InterpreterStackBigIntptr.LLVM.Local.local_env * stack * TopLevelBigIntptr.res_L1))))
-      (t1 t2 : itree L4 (MMEP.MMSP.MemState * (MemPropT.store_id * (local_env * stack * res_L1)))),
+      (t1 t2 : itree L4 (MMEP.MMSP.MemState * (store_id * (local_env * stack * res_L1)))),
       refine_OOM_h eq t1 t2 ->
       orutt (OOM:=OOME) L4_refine_strict L4_res_refine_strict
         (MemState_refine_prop

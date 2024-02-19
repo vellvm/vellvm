@@ -35,6 +35,7 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
      Semantics.VellvmIntegers
+     Semantics.StoreId
      Utils.MapMonadExtra
      Utils.MonadEq1Laws
      Utils.MonadReturnsLaws
@@ -55,8 +56,6 @@ Set Contextual Implicit.
 
 Open Scope N_scope.
 (* end hide *)
-
-Definition store_id := N.
 
 (** * Dynamic values
     Definition of the dynamic values manipulated by VIR.

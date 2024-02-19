@@ -25,7 +25,8 @@ From Vellvm.Semantics Require Import
      Memory.MemBytes
      Memory.ErrSID
      GepM
-     VellvmIntegers.
+     VellvmIntegers
+     StoreId.
 
 From Vellvm.Utils Require Import
      Util
@@ -96,8 +97,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* Context `{MonadStoreID MemM}. *)
     (* Context `{MonadMemState MemState MemM}. *)
     (* Context `{RAISE_ERROR MemM} `{RAISE_UB MemM} `{RAISE_OOM MemM}. *)
-    Context {ExtraState : Type}.
-    Context `{MemMonad ExtraState MemM (itree Eff)}.
+    Context `{MemMonad MemM (itree Eff)}.
 
     (*** Data types *)
 
@@ -128,7 +128,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     (*** Primitives on memory *)
     (** Reads *)
-    Definition read_byte `{MemMonad ExtraState MemM (itree Eff)} (ptr : addr) : MemM SByte :=
+    Definition read_byte `{MemMonad MemM (itree Eff)} (ptr : addr) : MemM SByte :=
       let addr := ptr_to_int ptr in
       let pr := address_provenance ptr in
       ms <- get_mem_state;;
@@ -147,7 +147,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       end.
 
     (** Writes *)
-    Definition write_byte `{MemMonad ExtraState MemM (itree Eff)} (ptr : addr) (byte : SByte) : MemM unit :=
+    Definition write_byte `{MemMonad MemM (itree Eff)} (ptr : addr) (byte : SByte) : MemM unit :=
       let addr := ptr_to_int ptr in
       let pr := address_provenance ptr in
       ms <- get_mem_state;;
@@ -170,7 +170,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       end.
 
     (** Allocations *)
-    Definition addr_allocated `{MemMonad ExtraState MemM (itree Eff)} (ptr : addr) (aid : AllocationId) : MemM bool :=
+    Definition addr_allocated `{MemMonad MemM (itree Eff)} (ptr : addr) (aid : AllocationId) : MemM bool :=
       ms <- get_mem_state;;
       match read_byte_raw (mem_state_memory ms) (ptr_to_int ptr) with
       | None => ret false
@@ -1917,7 +1917,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     #[global] Opaque add_all_to_heap.
     #[global] Opaque next_memory_key.
 
-    Definition get_free_block `{MemMonad ExtraState MemM (itree Eff)} (len : nat) (pr : Provenance) : MemM (addr * list addr)%type :=
+    Definition get_free_block `{MemMonad MemM (itree Eff)} (len : nat) (pr : Provenance) : MemM (addr * list addr)%type :=
       ms <- get_mem_state;;
       let mem_stack := ms_memory_stack ms in
       let addr := next_memory_key mem_stack in
@@ -1931,7 +1931,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       map (fun b => (b, aid)) bytes.
 
     (** Add block to memory with a given allocation id *)
-    Definition add_block `{MemMonad ExtraState MemM (itree Eff)} (aid : AllocationId) (ptr : addr) (ptrs : list addr) (init_bytes : list SByte) : MemM unit :=
+    Definition add_block `{MemMonad MemM (itree Eff)} (aid : AllocationId) (ptr : addr) (ptrs : list addr) (init_bytes : list SByte) : MemM unit :=
       let mem_bytes := sbytes_to_mem_bytes aid init_bytes in
       ms <- get_mem_state;;
       let '(mkMemoryStack mem fs h) := mem_state_memory_stack ms in
@@ -1941,14 +1941,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       put_mem_state (MemState_put_memory (mkMemoryStack mem' fs h) ms).
 
     (** Add pointers to the stack frame *)
-    Definition add_ptrs_to_frame `{MemMonad ExtraState MemM (itree Eff)} (ptrs : list addr) : MemM unit :=
+    Definition add_ptrs_to_frame `{MemMonad MemM (itree Eff)} (ptrs : list addr) : MemM unit :=
       modify_mem_state
         (fun ms =>
            let mem := MemState_get_memory ms in
            MemState_put_memory (add_all_to_frame mem ptrs) ms);;
       ret tt.
 
-    Definition add_ptrs_to_heap `{MemMonad ExtraState MemM (itree Eff)} (ptrs : list addr) : MemM unit :=
+    Definition add_ptrs_to_heap `{MemMonad MemM (itree Eff)} (ptrs : list addr) : MemM unit :=
       modify_mem_state
         (fun ms =>
            let mem := MemState_get_memory ms in
@@ -1956,17 +1956,17 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       ret tt.
 
     (** Add a block of bytes to memory, and register it in the current stack frame. *)
-    Definition add_block_to_stack `{MemMonad ExtraState MemM (itree Eff)} (aid : AllocationId) (ptr : addr) (ptrs : list addr) (init_bytes : list SByte) : MemM unit :=
+    Definition add_block_to_stack `{MemMonad MemM (itree Eff)} (aid : AllocationId) (ptr : addr) (ptrs : list addr) (init_bytes : list SByte) : MemM unit :=
       add_block aid ptr ptrs init_bytes;;
       add_ptrs_to_frame ptrs.
 
     (** Add a block of bytes to memory, and register it in the heap. *)
     (* Should we make sure ptr (the root) is added even if ptrs is empty? *)
-    Definition add_block_to_heap `{MemMonad ExtraState MemM (itree Eff)} (aid : AllocationId) (ptr : addr) (ptrs : list addr) (init_bytes : list SByte) : MemM unit :=
+    Definition add_block_to_heap `{MemMonad MemM (itree Eff)} (aid : AllocationId) (ptr : addr) (ptrs : list addr) (init_bytes : list SByte) : MemM unit :=
       add_block aid ptr ptrs init_bytes;;
       add_ptrs_to_heap ptrs.
 
-    Definition allocate_bytes_with_pr `{MemMonad ExtraState MemM (itree Eff)}
+    Definition allocate_bytes_with_pr `{MemMonad MemM (itree Eff)}
       (init_bytes : list SByte) (pr : Provenance)
       : MemM addr
       := let len := length init_bytes in
@@ -1975,20 +1975,20 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
          add_block_to_stack aid ptr ptrs init_bytes;;
          ret ptr.
 
-    Definition allocate_bytes `{MemMonad ExtraState MemM (itree Eff)}
+    Definition allocate_bytes `{MemMonad MemM (itree Eff)}
       (init_bytes : list SByte) : MemM addr :=
       pr <- fresh_provenance;;
       allocate_bytes_with_pr init_bytes pr.
 
     (** Heap allocation *)
-    Definition malloc_bytes_with_pr `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) (pr : Provenance) : MemM addr :=
+    Definition malloc_bytes_with_pr `{MemMonad MemM (itree Eff)} (init_bytes : list SByte) (pr : Provenance) : MemM addr :=
       let len := length init_bytes in
       '(ptr, ptrs) <- get_free_block len pr;;
       let aid := provenance_to_allocation_id pr in
       add_block_to_heap aid ptr ptrs init_bytes;;
       ret ptr.
 
-    Definition malloc_bytes `{MemMonad ExtraState MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
+    Definition malloc_bytes `{MemMonad MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
       pr <- fresh_provenance;;
       malloc_bytes_with_pr init_bytes pr.
 
@@ -2105,7 +2105,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       auto.
     Qed.
 
-    Definition mempush `{MemMonad ExtraState MemM (itree Eff)} : MemM unit :=
+    Definition mempush `{MemMonad MemM (itree Eff)} : MemM unit :=
       ms <- get_mem_state;;
       let fs := mem_state_frame_stack ms in
       let fs' := push_frame_stack fs initial_frame in
@@ -2124,7 +2124,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       fold_left (fun m key => free_byte (ptr_to_int key) m) block m.
 
     (** Stack free *)
-    Definition mempop `{MemMonad ExtraState MemM (itree Eff)} : MemM unit :=
+    Definition mempop `{MemMonad MemM (itree Eff)} : MemM unit :=
       ms <- get_mem_state;;
       let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
       let f := peek_frame_stack fs in
@@ -2135,7 +2135,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       put_mem_state ms'.
 
     (** Free from heap *)
-    Definition free `{MemMonad ExtraState MemM (itree Eff)} (ptr : addr) : MemM unit :=
+    Definition free `{MemMonad MemM (itree Eff)} (ptr : addr) : MemM unit :=
       ms <- get_mem_state;;
       let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
       let raw_addr := ptr_to_int ptr in
@@ -3056,8 +3056,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       (* Context `{MonadStoreID MemM}. *)
       (* Context `{MonadMemState MemState MemM}. *)
       (* Context `{RAISE_ERROR MemM} `{RAISE_UB MemM} `{RAISE_OOM MemM}. *)
-      Context {ExtraState : Type}.
-      Context `{MemMonad ExtraState MemM (itree Eff)}.
+      Context `{MemMonad MemM (itree Eff)}.
 
     (* TODO: add to solve_read_byte_allowed *)
     Lemma read_byte_allowed_set_frame_stack :
@@ -3291,26 +3290,26 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     (* TODO: move this? *)
     Lemma MemMonad_run_get_consecutive_ptrs:
-      forall {ExtraState : Type} {M RunM : Type -> Type} {MM : Monad M} {MRun : Monad RunM}
+      forall {M RunM : Type -> Type} {MM : Monad M} {MRun : Monad RunM}
         {MPROV : MonadProvenance Provenance M} {MSID : MonadStoreId M} {MMS : MonadMemState MemState M}
         {MERR : RAISE_ERROR M} {MUB : RAISE_UB M} {MOOM : RAISE_OOM M} {RunERR : RAISE_ERROR RunM}
         {RunUB : RAISE_UB RunM} {RunOOM : RAISE_OOM RunM}
         `{EQM : Eq1 M} `{EQRI : @Eq1_ret_inv M EQM MM} `{MLAWS : @MonadLawsE M EQM MM}
-        {MemMonad : MemMonad ExtraState M RunM}
-        `{EQV : @Eq1Equivalence RunM MRun (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad)}
-        `{LAWS: @MonadLawsE RunM (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad) MRun}
-        `{RAISEOOM : @RaiseBindM RunM MRun (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad) string (@raise_oom RunM RunOOM)}
-        `{RAISEERR : @RaiseBindM RunM MRun (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad) string (@raise_error RunM RunERR)}
-        (ms : MemState) ptr len (st : ExtraState),
+        {MemMonad : MemMonad M RunM}
+        `{EQV : @Eq1Equivalence RunM MRun (@MemMonad_eq1_runm M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad)}
+        `{LAWS: @MonadLawsE RunM (@MemMonad_eq1_runm M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad) MRun}
+        `{RAISEOOM : @RaiseBindM RunM MRun (@MemMonad_eq1_runm M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad) string (@raise_oom RunM RunOOM)}
+        `{RAISEERR : @RaiseBindM RunM MRun (@MemMonad_eq1_runm M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad) string (@raise_error RunM RunERR)}
+        (ms : MemState) ptr len (st : store_id),
         (@eq1 RunM
-              (@MemMonad_eq1_runm ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad)
-              (prod ExtraState (prod MemState (list addr)))
+              (@MemMonad_eq1_runm M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad)
+              (prod store_id (prod MemState (list addr)))
               (@MemMonad_run
-           ExtraState M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad (list addr)
+           M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad (list addr)
            (@get_consecutive_ptrs M MM MOOM MERR ptr len) ms st)
               (fmap (fun ptrs => (st, (ms, ptrs))) (@get_consecutive_ptrs RunM MRun RunOOM RunERR ptr len)))%monad.
     Proof using.
-      intros ExtraState0 M RunM MM0 MRun0 MPROV0 MSID0 MMS0 MERR0 MUB0 MOOM0 RunERR0 RunUB0 RunOOM0 MemMonad0 EQM' EQRI' MLAWS' EQV
+      intros M RunM MM0 MRun0 MPROV0 MSID0 MMS0 MERR0 MUB0 MOOM0 RunERR0 RunUB0 RunOOM0 MemMonad0 EQM' EQRI' MLAWS' EQV
              LAWS RAISE RAISEERR ms ptr len st.
       Opaque handle_gep_addr.
 
@@ -3453,7 +3452,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
       match goal with
       | _ : _ |- context [@get_consecutive_ptrs ?MemM ?MM ?OOM ?ERR ?ptr ?len] =>
-          epose proof (@get_consecutive_ptrs_inv (itree Eff) MRun RunOOM RunERR (@MemMonad_eq1_runm ExtraState MemM (itree Eff) MM MRun MPROV MSID MMS MERR MUB MOOM RunERR
+          epose proof (@get_consecutive_ptrs_inv (itree Eff) MRun RunOOM RunERR (@MemMonad_eq1_runm MemM (itree Eff) MM MRun MPROV MSID MMS MERR MUB MOOM RunERR
                                                                                                     RunUB RunOOM _ _ _ H) _ _ _ ptr len)
           as [[oom_msg CONSEC_OOM] | [ptrs CONSEC_RET]]
       end.

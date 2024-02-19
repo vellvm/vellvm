@@ -27,6 +27,7 @@ From Vellvm Require Import
      Semantics.MemoryParams
      Semantics.LLVMEvents
      Semantics.LLVMParams
+     Semantics.StoreId
      Handlers.MemoryModel.
 
 From ExtLib Require Import
@@ -42,7 +43,7 @@ Import ListNotations.
 Import MonadNotation.
 
 (* TODO: Move this *)
-#[global] Instance MonadStoreId_stateT {M} `{HM: Monad M} : MemPropT.MonadStoreId (stateT MemPropT.store_id M).
+#[global] Instance MonadStoreId_stateT {M} `{HM: Monad M} : MemPropT.MonadStoreId (stateT store_id M).
 Proof.
   split.
   eapply (sid <- get;;

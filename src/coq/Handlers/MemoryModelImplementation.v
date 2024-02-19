@@ -251,7 +251,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Proof using.
     intros ms len pr.
     pose proof @find_free_block_correct as GET_FREE.
-    specialize (GET_FREE (MemStateFreshT (itree Eff)) Eff MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    specialize (GET_FREE (MemStateFreshT (itree Eff)) Eff _ _ _ _ _ _ _ _ _ _ _ _ _ _
                   MemStateFreshT_MemMonad len pr (fun _ _ => True)).
     red in GET_FREE.
     specialize (GET_FREE ms 0%N).
@@ -666,8 +666,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     (* Context `{MonadStoreID MemM}. *)
     (* Context `{MonadMemState MemState MemM}. *)
     (* Context `{RAISE_ERROR MemM} `{RAISE_UB MemM} `{RAISE_OOM MemM}. *)
-    Context {ExtraState : Type}.
-    Context `{MemMonad ExtraState MemM (itree Eff)}.
+    Context `{MemMonad MemM (itree Eff)}.
 
     (* Lemma find_free_block_always_succeeds : *)
     (*   forall sz prov ms (st : ExtraState), *)

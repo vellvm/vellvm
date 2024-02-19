@@ -18,6 +18,7 @@ From Vellvm Require Import
   Semantics.Memory.MemBytes
   Semantics.LLVMParams
   Semantics.Lang
+  Semantics.StoreId
   Theory.ContainsUB
   Handlers.OOM.
 

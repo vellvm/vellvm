@@ -113,7 +113,7 @@ let rec step
     (m :
       ( 'a coq_L4
       , MMEP.MMSP.coq_MemState
-        * ( MemPropT.store_id
+        * ( StoreId.store_id
           * ((local_env * lstack) * (global_env * DV.dvalue)) ) )
       itree ) : (DV.dvalue, exit_condition) result =
   let open ITreeDefinition in

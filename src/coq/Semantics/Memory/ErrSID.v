@@ -16,6 +16,7 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Semantics.Memory.FiniteProvenance
      Semantics.Memory.Sizeof
+     Semantics.StoreId
      Utils.StateMonads
      Utils.Monads
      Utils.MonadExcLaws

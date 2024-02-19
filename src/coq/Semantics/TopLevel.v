@@ -24,7 +24,8 @@ From Vellvm Require Import
      Semantics.Denotation
      Semantics.IntrinsicsDefinitions
      Semantics.InterpretationStack
-     Semantics.VellvmIntegers.
+     Semantics.VellvmIntegers
+     Semantics.StoreId.
 
 Import MonadNotation.
 Import ListNotations.

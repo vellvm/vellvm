@@ -13,7 +13,8 @@ From Vellvm.Semantics Require Import
      DynamicValues
      LLVMEvents
      Memory.MemBytes
-     Memory.Sizeof.
+     Memory.Sizeof
+     StoreId.
 
 Module FinSizeof : Sizeof.
   (* TODO: make parameter? *)

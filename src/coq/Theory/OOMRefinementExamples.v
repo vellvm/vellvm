@@ -16,7 +16,8 @@ From Vellvm Require Import
      Theory.DenotationTheory
      Theory.InterpreterMCFG
      Theory.ContainsUBExtra
-     Handlers.MemoryModelImplementation.
+     Handlers.MemoryModelImplementation
+     Semantics.StoreId.
 
 From ITree Require Import
      ITree

@@ -9,7 +9,8 @@ From Vellvm Require Import
      Utilities
      Semantics.LLVMEvents
      Semantics.Lang
-     Semantics.LLVMParams.
+     Semantics.LLVMParams
+     Semantics.StoreId.
 
 From Vellvm.Handlers Require Export
      Global
@@ -46,8 +47,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
 
   Section InterpreterMCFG.
     Context {MemM : Type -> Type}.
-    Context {ExtraState : Type}.
-    Context `{MemMonad ExtraState MemM}.
+    Context `{MemMonad MemM}.
 
     (**
    Partial interpretations of the trees produced by the denotation of _VIR_ programs.
@@ -121,8 +121,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
 
   Section InterpreterCFG.
     Context {MemM : Type -> Type}.
-    Context {ExtraState : Type}.
-    Context `{MemMonad ExtraState MemM}.
+    Context `{MemMonad MemM}.
 
     (**
    Partial interpretations of the trees produced by the
