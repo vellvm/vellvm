@@ -119,7 +119,9 @@ Module Type DvalueByte (LP : LLVMParams).
        end.
 
   Definition extract_field_byte {M} `{Monad M} `{RAISE_ERROR M} (fields : list dtyp) (byte_idx : N) : M (dtyp * (N * N))%type
-    := extract_field_byte_helper fields 0 byte_idx.  Fixpoint concat_bytes_vint {I} `{VInt I} (bytes : list I) : I
+    := extract_field_byte_helper fields 0 byte_idx.
+
+  Fixpoint concat_bytes_vint {I} `{VInt I} (bytes : list I) : I
     := match bytes with
        | [] => repr 0
        | (byte::bytes) =>
@@ -132,9 +134,34 @@ Module Type DvalueByte (LP : LLVMParams).
          It's not possible to use the dvalue alone, as DVALUE_Poison's
          size depends on the type.
    *)
-  Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | solve_dvalue_measure].
-  Program Fixpoint dvalue_extract_byte {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOMABLE M} (dv : dvalue) (dt : dtyp) (idx : Z) {measure (dvalue_measure dv)} : M Z
-    := match dv with
+(*  Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | solve_dvalue_measure]. *)
+  
+  Fixpoint dvalue_extract_byte {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOMABLE M} (dv : dvalue) (dt : dtyp) (idx : Z) {struct dv} : M Z
+    :=
+    let dvalue_extract_struct_bytes :=
+      fix loop fields types (idx : Z) {struct fields}  :=
+        match fields, types with
+        | [], [] => raise_error "No fields left for byte-indexing..."
+        | f::fs, dt::dts =>
+            let sz := Z.of_N (sizeof_dtyp dt) in
+            if Z.ltb idx sz
+            then dvalue_extract_byte f dt idx
+            else loop fs dts (idx - sz)%Z
+        | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
+        end
+    in
+    let dvalue_extract_array_bytes :=
+      fix loop elts dt (idx : Z) {struct elts}  :=
+        match elts with
+        | [] => raise_error "No fields left for byte-indexing..."
+        | e::es =>
+            let sz := Z.of_N (sizeof_dtyp dt) in
+            if Z.ltb idx sz
+            then dvalue_extract_byte e dt idx
+            else loop es dt (idx - sz)%Z
+        end
+    in
+    match dv with
        | DVALUE_I1 x
        | DVALUE_I8 x
        | DVALUE_I16 x
@@ -160,46 +187,21 @@ Module Type DvalueByte (LP : LLVMParams).
        | DVALUE_Struct fields =>
            match dt with
            | DTYPE_Struct dts =>
-               (* Step to field which contains the byte we want *)
-               '(fdt, (field_idx, byte_idx)) <- extract_field_byte dts (Z.to_N idx);;
-               match List.nth_error fields (N.to_nat field_idx) with
-               | Some f =>
-                   (* call dvalue_extract_byte recursively on the field *)
-                   dvalue_extract_byte f fdt (Z.of_N byte_idx )
-               | None =>
-                   raise_error "dvalue_extract_byte: more fields in DVALUE_Struct than in dtyp."
-               end
+               dvalue_extract_struct_bytes fields dts idx 
            | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Struct."
            end
 
        | DVALUE_Packed_struct fields =>
            match dt with
            | DTYPE_Packed_struct dts =>
-               (* Step to field which contains the byte we want *)
-               '(fdt, (field_idx, byte_idx)) <- extract_field_byte dts (Z.to_N idx);;
-               match List.nth_error fields (N.to_nat field_idx) with
-               | Some f =>
-                   (* call dvalue_extract_byte recursively on the field *)
-                   dvalue_extract_byte f fdt (Z.of_N byte_idx )
-               | None =>
-                   raise_error "dvalue_extract_byte: more fields in DVALUE_Packed_struct than in dtyp."
-               end
+               dvalue_extract_struct_bytes fields dts idx
            | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
            end
 
        | DVALUE_Array elts =>
            match dt with
            | DTYPE_Array sz dt =>
-               let elmt_sz  := sizeof_dtyp dt in
-               let elmt_idx := N.div (Z.to_N idx) elmt_sz in
-               let byte_idx := (Z.to_N idx) mod elmt_sz in
-               match List.nth_error elts (N.to_nat elmt_idx) with
-               | Some elmt =>
-                   (* call dvalue_extract_byte recursively on the field *)
-                   dvalue_extract_byte elmt dt (Z.of_N byte_idx)
-               | None =>
-                   raise_error "dvalue_extract_byte: more fields in dvalue than in dtyp."
-               end
+               dvalue_extract_array_bytes elts dt idx
            | _ =>
                raise_error "dvalue_extract_byte: type mismatch on DVALUE_Array."
            end
@@ -207,16 +209,7 @@ Module Type DvalueByte (LP : LLVMParams).
        | DVALUE_Vector elts =>
            match dt with
            | DTYPE_Vector sz dt =>
-               let elmt_sz  := sizeof_dtyp dt in
-               let elmt_idx := N.div (Z.to_N idx) elmt_sz in
-               let byte_idx := (Z.to_N idx) mod elmt_sz in
-               match List.nth_error elts (N.to_nat elmt_idx) with
-               | Some elmt =>
-                   (* call dvalue_extract_byte recursively on the field *)
-                   dvalue_extract_byte elmt dt (Z.of_N byte_idx)
-               | None =>
-                   raise_error "dvalue_extract_byte: more fields in dvalue than in dtyp."
-               end
+               dvalue_extract_array_bytes elts dt idx
            | _ =>
                raise_error "dvalue_extract_byte: type mismatch on DVALUE_Vector."
            end
@@ -224,97 +217,86 @@ Module Type DvalueByte (LP : LLVMParams).
 
   Lemma dvalue_extract_byte_equation {M} `{HM: Monad M} `{RE: RAISE_ERROR M} `{RP: RAISE_POISON M} `{RO: RAISE_OOMABLE M} (dv : dvalue) (dt : dtyp) (idx : Z) :
     @dvalue_extract_byte M HM RE RP RO dv dt idx =
-      match dv with
-      | DVALUE_I1 x
-      | DVALUE_I8 x
-      | DVALUE_I16 x
-      | DVALUE_I32 x
-      | DVALUE_I64 x =>
-          ret (extract_byte_vint x idx)
-      | DVALUE_IPTR x =>
-          ret (extract_byte_Z (IP.to_Z x) idx)
-      | DVALUE_Addr addr =>
-          (* Note: this throws away provenance *)
-          ret (extract_byte_Z (ptr_to_int addr) idx)
-      | DVALUE_Float f =>
-          ret (extract_byte_Z (unsigned (Float32.to_bits f)) idx)
-      | DVALUE_Double d =>
-          ret (extract_byte_Z (unsigned (Float.to_bits d)) idx)
-      | DVALUE_Poison dt => raise_poison dt
-      | DVALUE_Oom dt => raise_oomable dt
-      | DVALUE_None =>
-          (* TODO: Not sure if this should be an error, poison, or what. *)
-          raise_error "dvalue_extract_byte on DVALUE_None"
+    let dvalue_extract_struct_bytes :=
+      fix loop fields types (idx : Z) {struct fields}  :=
+        match fields, types with
+        | [], [] => raise_error "No fields left for byte-indexing..."
+        | f::fs, dt::dts =>
+            let sz := Z.of_N (sizeof_dtyp dt) in
+            if Z.ltb idx sz
+            then dvalue_extract_byte f dt idx
+            else loop fs dts (idx - sz)%Z
+        | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
+        end
+    in
+    let dvalue_extract_array_bytes :=
+      fix loop elts dt (idx : Z) {struct elts}  :=
+        match elts with
+        | [] => raise_error "No fields left for byte-indexing..."
+        | e::es =>
+            let sz := Z.of_N (sizeof_dtyp dt) in
+            if Z.ltb idx sz
+            then dvalue_extract_byte e dt idx
+            else loop es dt (idx - sz)%Z
+        end
+    in
+    match dv with
+       | DVALUE_I1 x
+       | DVALUE_I8 x
+       | DVALUE_I16 x
+       | DVALUE_I32 x
+       | DVALUE_I64 x =>
+           ret (extract_byte_vint x idx)
+       | DVALUE_IPTR x =>
+           ret (extract_byte_Z (IP.to_Z x) idx)
+       | DVALUE_Addr addr =>
+           (* Note: this throws away provenance *)
+           ret (extract_byte_Z (ptr_to_int addr) idx)
+       | DVALUE_Float f =>
+           ret (extract_byte_Z (unsigned (Float32.to_bits f)) idx)
+       | DVALUE_Double d =>
+           ret (extract_byte_Z (unsigned (Float.to_bits d)) idx)
+       | DVALUE_Poison dt => raise_poison dt
+       | DVALUE_Oom dt => raise_oomable dt
+       | DVALUE_None =>
+           (* TODO: Not sure if this should be an error, poison, or what. *)
+           raise_error "dvalue_extract_byte on DVALUE_None"
 
-      (* TODO: Take padding into account. *)
-      | DVALUE_Struct fields =>
-          match dt with
-          | DTYPE_Struct dts =>
-              (* Step to field which contains the byte we want *)
-              '(fdt, (field_idx, byte_idx)) <- extract_field_byte dts (Z.to_N idx);;
-              match List.nth_error fields (N.to_nat field_idx) with
-              | Some f =>
-                  (* call dvalue_extract_byte recursively on the field *)
-                  dvalue_extract_byte f fdt (Z.of_N byte_idx )
-              | None =>
-                  raise_error "dvalue_extract_byte: more fields in DVALUE_Struct than in dtyp."
-              end
-          | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Struct."
-          end
+       (* TODO: Take padding into account. *)
+       | DVALUE_Struct fields =>
+           match dt with
+           | DTYPE_Struct dts =>
+               dvalue_extract_struct_bytes fields dts idx 
+           | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Struct."
+           end
 
-      | DVALUE_Packed_struct fields =>
-          match dt with
-          | DTYPE_Packed_struct dts =>
-              (* Step to field which contains the byte we want *)
-              '(fdt, (field_idx, byte_idx)) <- extract_field_byte dts (Z.to_N idx);;
-              match List.nth_error fields (N.to_nat field_idx) with
-              | Some f =>
-                  (* call dvalue_extract_byte recursively on the field *)
-                  dvalue_extract_byte f fdt (Z.of_N byte_idx )
-              | None =>
-                  raise_error "dvalue_extract_byte: more fields in DVALUE_Packed_struct than in dtyp."
-              end
-          | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
-          end
+       | DVALUE_Packed_struct fields =>
+           match dt with
+           | DTYPE_Packed_struct dts =>
+               dvalue_extract_struct_bytes fields dts idx
+           | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
+           end
 
-      | DVALUE_Array elts =>
-          match dt with
-          | DTYPE_Array sz dt =>
-              let elmt_sz  := sizeof_dtyp dt in
-              let elmt_idx := N.div (Z.to_N idx) elmt_sz in
-              let byte_idx := (Z.to_N idx) mod elmt_sz in
-              match List.nth_error elts (N.to_nat elmt_idx) with
-              | Some elmt =>
-                  (* call dvalue_extract_byte recursively on the field *)
-                  dvalue_extract_byte elmt dt (Z.of_N byte_idx)
-              | None =>
-                  raise_error "dvalue_extract_byte: more fields in dvalue than in dtyp."
-              end
-          | _ =>
-              raise_error "dvalue_extract_byte: type mismatch on DVALUE_Array."
-          end
+       | DVALUE_Array elts =>
+           match dt with
+           | DTYPE_Array sz dt =>
+               dvalue_extract_array_bytes elts dt idx
+           | _ =>
+               raise_error "dvalue_extract_byte: type mismatch on DVALUE_Array."
+           end
 
-      | DVALUE_Vector elts =>
-          match dt with
-          | DTYPE_Vector sz dt =>
-              let elmt_sz  := sizeof_dtyp dt in
-              let elmt_idx := N.div (Z.to_N idx) elmt_sz in
-              let byte_idx := (Z.to_N idx) mod elmt_sz in
-              match List.nth_error elts (N.to_nat elmt_idx) with
-              | Some elmt =>
-                  (* call dvalue_extract_byte recursively on the field *)
-                  dvalue_extract_byte elmt dt (Z.of_N byte_idx)
-              | None =>
-                  raise_error "dvalue_extract_byte: more fields in dvalue than in dtyp."
-              end
-          | _ =>
-              raise_error "dvalue_extract_byte: type mismatch on DVALUE_Vector."
-          end
-      end.
+       | DVALUE_Vector elts =>
+           match dt with
+           | DTYPE_Vector sz dt =>
+               dvalue_extract_array_bytes elts dt idx
+           | _ =>
+               raise_error "dvalue_extract_byte: type mismatch on DVALUE_Vector."
+           end
+       end.
   Proof.
-    unfold dvalue_extract_byte,
-      dvalue_extract_byte_func at 1.
-  Admitted.
+    unfold dvalue_extract_byte at 1.
+    destruct dv; try reflexivity.
+  Qed.
 
   (* Taking a byte out of a dvalue...
 

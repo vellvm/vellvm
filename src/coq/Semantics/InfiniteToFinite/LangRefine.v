@@ -8046,7 +8046,7 @@ Qed.
   Proof.
     Opaque dvalue_extract_byte.
     Opaque IS1.LLVM.MEM.DVALUE_BYTE.dvalue_extract_byte.
-    induction dv_fin using dvalue_strong_ind;
+    induction dv_fin;
       intros dv_inf dt idx REF;
       rewrite dvalue_extract_byte_equation,
       IS1.LLVM.MEM.DVALUE_BYTE.dvalue_extract_byte_equation;
@@ -8060,118 +8060,89 @@ Qed.
             | erewrite IP.from_Z_to_Z; eauto
             ]
         ].
-    - destruct dv_fin;
-        try solve
-          [ dvalue_refine_strict_inv REF;
-            unfold extract_byte_Z in *;
-            try inv H0;
-            solve
-              [ reflexivity
-              | erewrite AC1.addr_convert_ptoi; eauto
-              | erewrite IP.from_Z_to_Z; eauto
-              ]
-          ].
+    
+    (* - destruct dv_fin; *)
+    (*     try solve *)
+    (*       [ dvalue_refine_strict_inv REF; *)
+    (*         unfold extract_byte_Z in *; *)
+    (*         try inv H0; *)
+    (*         solve *)
+    (*           [ reflexivity *)
+    (*           | erewrite AC1.addr_convert_ptoi; eauto *)
+    (*           | erewrite IP.from_Z_to_Z; eauto *)
+    (*           ] *)
+    (*       ]. *)
 
       { (* Structs *)
         destruct dt;
         dvalue_refine_strict_inv REF; auto.
-        rewrite extract_field_byte_fin_inf.
-        remember (extract_field_byte fields0 (Z.to_N idx)) eqn:FIELD.
-        destruct_err_oom_poison y; cbn; auto.
-        destruct y0 as (?&?&?).
-        cbn in *.
-        destruct (nth_error fields (N.to_nat n)) eqn:NTH;
-          cbn; auto.
-        - eapply map_monad_oom_Forall2 in H1.
-          pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ NTH H1.
-          destruct H0 as (?&?&?).
-          rewrite H0.
-          erewrite H; eauto.
-          repeat constructor.
-          eapply Util.Nth_In; eauto.
-        - cbn.
-          destruct (nth_error x (N.to_nat n)) eqn:NTH'.
-          { eapply map_monad_oom_Forall2 in H1.
-            pose proof @Util.Forall2_Nth_left _ _ _ _ _ _ _ NTH' H1.
-            destruct H0 as (?&?&?).
-            rewrite H0 in NTH.
-            inv NTH.
-          }
-
+        rename fields0 into dts.
+        revert dts idx.
+        eapply map_monad_oom_Forall2 in H1.
+        revert x H1.
+        induction fields; intros; inversion H1; subst.
+        - reflexivity.
+        - destruct dts; try reflexivity.
           cbn.
-          reflexivity.
-      }
+          rewrite sizeof_dtyp_fin_inf.
+          destruct (idx <? Z.of_N (SIZEOF.sizeof_dtyp d))%Z.
+          + apply H. repeat constructor. apply H4.
+          + apply IHfields; intros; auto.
+            apply H; auto.
+            right. assumption.
+      } 
 
       { (* Packed Structs *)
         destruct dt;
         dvalue_refine_strict_inv REF; auto.
-        rewrite extract_field_byte_fin_inf.
-        remember (extract_field_byte fields0 (Z.to_N idx)) eqn:FIELD.
-        destruct_err_oom_poison y; cbn; auto.
-        destruct y0 as (?&?&?).
-        cbn in *.
-        destruct (nth_error fields (N.to_nat n)) eqn:NTH;
-          cbn; auto.
-        - eapply map_monad_oom_Forall2 in H1.
-          pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ NTH H1.
-          destruct H0 as (?&?&?).
-          rewrite H0.
-          erewrite H; eauto.
-          repeat constructor.
-          eapply Util.Nth_In; eauto.
-        - cbn.
-          destruct (nth_error x (N.to_nat n)) eqn:NTH'.
-          { eapply map_monad_oom_Forall2 in H1.
-            pose proof @Util.Forall2_Nth_left _ _ _ _ _ _ _ NTH' H1.
-            destruct H0 as (?&?&?).
-            rewrite H0 in NTH.
-            inv NTH.
-          }
-
+        rename fields0 into dts.
+        revert dts idx.
+        eapply map_monad_oom_Forall2 in H1.
+        revert x H1.
+        induction fields; intros; inversion H1; subst.
+        - reflexivity.
+        - destruct dts; try reflexivity.
           cbn.
-          reflexivity.
+          rewrite sizeof_dtyp_fin_inf.
+          destruct (idx <? Z.of_N (SIZEOF.sizeof_dtyp d))%Z.
+          + apply H. repeat constructor. apply H4.
+          + apply IHfields; intros; auto.
+            apply H; auto.
+            right. assumption.
       }
 
       { (* Arrays *)
         destruct dt;
         dvalue_refine_strict_inv REF; auto.
-        rewrite sizeof_dtyp_fin_inf.
-        cbn.
+        revert idx.
         eapply map_monad_oom_Forall2 in H1.
-        break_match_goal.
-        - pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ Heqo H1.
-          destruct H0 as (?&?&?).
-          rewrite H0.
-
-          erewrite H; eauto.
-          repeat constructor.
-          eapply Util.Nth_In; eauto.
-        - break_match_goal; cbn; auto.
-          pose proof @Util.Forall2_Nth_left _ _ _ _ _ _ _ Heqo0 H1.
-          destruct H0 as (?&?&?).
-          rewrite H0 in Heqo.
-          inv Heqo.
+        revert x H1.
+        induction elts; intros; inversion H1; subst.
+        - reflexivity.
+        - cbn.
+          rewrite sizeof_dtyp_fin_inf.
+          destruct (idx <? Z.of_N (SIZEOF.sizeof_dtyp dt))%Z.
+          + apply H. repeat constructor. apply H4.
+          + apply IHelts; intros; auto.
+            apply H; auto.
+            right. assumption.
       }
 
       { (* Vectors *)
         destruct dt;
         dvalue_refine_strict_inv REF; auto.
-        rewrite sizeof_dtyp_fin_inf.
-        cbn.
+        revert idx.
         eapply map_monad_oom_Forall2 in H1.
-        break_match_goal.
-        - pose proof @Util.Forall2_Nth_right _ _ _ _ _ _ _ Heqo H1.
-          destruct H0 as (?&?&?).
-          rewrite H0.
-
-          erewrite H; eauto.
-          repeat constructor.
-          eapply Util.Nth_In; eauto.
-        - break_match_goal; cbn; auto.
-          pose proof @Util.Forall2_Nth_left _ _ _ _ _ _ _ Heqo0 H1.
-          destruct H0 as (?&?&?).
-          rewrite H0 in Heqo.
-          inv Heqo.
+        revert x H1.
+        induction elts; intros; inversion H1; subst.
+        - reflexivity.
+        - cbn.
+          rewrite sizeof_dtyp_fin_inf.
+          destruct (idx <? Z.of_N (SIZEOF.sizeof_dtyp dt))%Z.
+          + apply H. repeat constructor. apply H4.
+          + apply IHelts; intros; auto.
+            apply H; auto.
+            right. assumption.
       }
   Qed.
 
