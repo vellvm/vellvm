@@ -551,28 +551,3 @@ Proof.
                t ≈ (ret (ms', x)) /\
                spec ms (ret (ms', x)))).
 Defined.
-
-(* Should line up with exec_correct *)
-Definition MemPropT_lift_PropT_fresh {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (spec : MemPropT MemState X) :
-  stateT store_id (stateT MemState (PropT E)) X.
-Proof.
-  unfold PropT, MemPropT, stateT in *.
-
-  refine
-    (fun st ms t =>
-       (* UB *)
-       (exists msg_spec,
-           spec ms (raise_ub msg_spec)) \/
-         (* Error *)
-         ((exists msg,
-              t ≈ (raise_error msg) /\
-              exists msg_spec, spec ms (raise_error msg_spec))) \/
-           (* OOM *)
-           (exists msg,
-               t ≈ (raise_oom msg) /\
-               exists msg_spec, spec ms (raise_oom msg_spec)) \/
-           (* Success *)
-           (exists st' ms' x,
-               t ≈ (ret (ms', (st', x))) /\
-               spec ms (ret (ms', x)))).
-Defined.

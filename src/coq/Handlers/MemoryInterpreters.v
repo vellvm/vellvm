@@ -155,10 +155,6 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       apply (s', (ms', x)).
     Defined.
 
-    Definition MemStateFreshT_valid_state (ms : MemState) (st : MemStateFreshT_State) : Prop
-      := let sid := st in
-         (forall sid', used_store_id ms sid' -> (sid' < sid)%N).
-
   Definition within_MemStateFreshT_itree
     {Eff}
     {A} (msf : MemStateFreshT (itree Eff) A) (pre : MemStateFreshT_State * MemState) (t : itree Eff A) (post : MemStateFreshT_State * MemState) : Prop :=
@@ -244,8 +240,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       MemMonad (MemStateFreshT (itree F)) (itree F).
     Proof using.
       esplit with
-        (MemMonad_run := fun A => @MemStateFreshT_run A F)
-        (MemMonad_valid_state := MemStateFreshT_valid_state); try solve [typeclasses eauto].
+        (MemMonad_run := fun A => @MemStateFreshT_run A F); try solve [typeclasses eauto].
       13-18:intros; raise_abs.
 
       - (* run bind *)
@@ -316,13 +311,12 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
 
         split; [|split].
         + reflexivity.
-        + unfold MemStateFreshT_valid_state in *; auto.
+        + unfold MemMonad_valid_state in *; auto.
           unfold used_store_id, used_store_id_prop in *. cbn in *.
           unfold used_store_id, used_store_id_prop in *. cbn in *.
           unfold read_byte_prop.
           apply mem_state_fresh_provenance_fresh in HFRESH as [MEM [NUSED USED]].
           rewrite <- MEM.
-
           auto.
         + unfold used_provenance.
           apply mem_state_fresh_provenance_fresh; auto.
@@ -370,6 +364,32 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Definition F_trigger : forall R, F R -> (MemStateFreshT (PropT Effout) R) :=
       fun R e sid m => fun t => t ≈ r <- trigger e;; ret (m, (sid, r)).
 
+    (* Should line up with exec_correct *)
+    Definition MemPropT_lift_PropT_fresh {X} {EFF} `{UBE -< EFF} `{OOME -< EFF} `{FailureE -< EFF} (spec : MemPropT MemState X) :
+      stateT store_id (stateT MemState (PropT EFF)) X.
+    Proof.
+      unfold PropT, MemPropT, stateT in *.
+
+      refine
+        (fun st ms t =>
+           (* UB *)
+           (exists msg_spec,
+               spec ms (raise_ub msg_spec)) \/
+             (* Error *)
+             ((exists msg,
+                  t ≈ (raise_error msg) /\
+                    exists msg_spec, spec ms (raise_error msg_spec))) \/
+             (* OOM *)
+             (exists msg,
+                 t ≈ (raise_oom msg) /\
+                   exists msg_spec, spec ms (raise_oom msg_spec)) \/
+             (* Success *)
+             (exists st' ms' x,
+                 t ≈ (ret (ms', (st', x))) /\
+                   spec ms (ret (ms', x)) /\
+                   (MemMonad_valid_state ms' st'))).
+    Defined.
+
     (* TODO: get rid of this silly hack. *)
     Definition my_handle_memory_prop' :
       forall T : Type, MemoryE T -> MemStateT (PropT Effout) T.
@@ -399,6 +419,10 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       forall T : Type, IntrinsicE T -> MemStateFreshT (PropT Effout) T.
     Proof using.
       intros T IntE.
+      unfold MemStateFreshT.
+      unfold MemStateT.
+      unfold PropT.
+      unfold stateT.
       eapply MemPropT_lift_PropT_fresh.
       eapply handle_intrinsic_prop; auto.
     Defined.
@@ -451,10 +475,10 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       typeclasses eauto.
     Qed.
 
-    Definition interp_memory_prop_h : forall T, Effin T -> MemStateFreshT (PropT Effout) T
+    Definition interp_memory_spec_h : forall T, Effin T -> MemStateFreshT (PropT Effout) T
       := case_ E_trigger (case_ my_handle_intrinsic_prop (case_ my_handle_memory_prop F_trigger)).
 
-    #[global] Instance memory_k_spec_WF : @k_spec_WF store_id MemState _ _ interp_memory_prop_h (@memory_k_spec).
+    #[global] Instance memory_k_spec_WF : @k_spec_WF store_id MemState _ _ interp_memory_spec_h (@memory_k_spec).
     Proof using.
       split.
       - (* k_spec_Proper *)
@@ -468,10 +492,10 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         reflexivity.
     Qed.
 
-    Definition interp_memory_prop {R1 R2} (RR : R1 -> R2 -> Prop) :
+    Definition interp_memory_spec {R1 R2} (RR : R1 -> R2 -> Prop) :
       itree Effin R1 -> MemStateFreshT (PropT Effout) R2 :=
       fun (t : itree Effin R1) (sid : store_id) (ms : MemState) (t' : itree Effout (MemState * (store_id * R2))) =>
-        interp_memory_prop (OOM:=OOME) interp_memory_prop_h (fun x '(_, (_, y)) => RR x y) (@memory_k_spec) t t'.
+        interp_memory_prop (OOM:=OOME) interp_memory_spec_h (fun x '(ms', (sid', y)) => RR x y) (@memory_k_spec) t t'.
 
   End Interpreters.
 End MemorySpecInterpreter.
@@ -567,16 +591,11 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       apply (s', (ms', x)).
     Defined.
 
-    Definition MemStateFreshT_valid_state (ms : MemState) (st : MemStateFreshT_State) : Prop
-      := let sid := st in
-         (forall sid', used_store_id ms sid' -> (sid' < sid)%N).
-
     #[global] Instance MemStateFreshT_MemMonad :
       MemMonad (MemStateFreshT (itree Effout)) (itree Effout).
     Proof using.
       esplit with
-        (MemMonad_run := fun A => @MemStateFreshT_run A Effout _ _ _)
-        (MemMonad_valid_state := MemStateFreshT_valid_state); try solve [typeclasses eauto].
+        (MemMonad_run := fun A => @MemStateFreshT_run A Effout _ _ _); try solve [typeclasses eauto].
       13-18: intros; raise_abs.
 
       (* TODO: didn't need valid for ret / bind laws... *)
@@ -648,7 +667,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
         split; [|split].
         + reflexivity.
-        + unfold MemStateFreshT_valid_state in *; auto.
+        + unfold MemMonad_valid_state in *; auto.
           unfold used_store_id, used_store_id_prop in *. cbn in *.
           unfold used_store_id, used_store_id_prop in *. cbn in *.
           unfold read_byte_prop.
@@ -699,10 +718,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
     (* TODO: get rid of this silly hack. *)
     Definition my_handle_memory : MemoryE ~> MemStateFreshT (itree Effout) :=
-      @handle_memory (MemStateFreshT (itree Effout)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+      @handle_memory (MemStateFreshT (itree Effout)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
     Definition my_handle_intrinsic : IntrinsicE ~> MemStateFreshT (itree Effout) :=
-      @handle_intrinsic (MemStateFreshT (itree Effout)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+      @handle_intrinsic (MemStateFreshT (itree Effout)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
     Definition interp_memory_h : Effin ~> MemStateFreshT (itree Effout)
       := case_ E_trigger (case_ my_handle_intrinsic (case_ my_handle_memory F_trigger)).
@@ -758,7 +777,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       rewrite unfold_interp_memory; reflexivity.
     Qed.
 
-    Lemma my_handle_intrinsic_prop_correct {T} i sid ms :
+    Lemma my_handle_intrinsic_prop_correct {T} i sid ms (VALID: MemMonad_valid_state ms sid) :
       my_handle_intrinsic_prop i sid ms (my_handle_intrinsic (T := T) i sid ms).
     Proof using.
       unfold my_handle_intrinsic_prop, my_handle_intrinsic.
@@ -767,12 +786,14 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       (* TODO: probably an easier more general lemma about
          [exec_correct] and [MemPropT_lift_PropT_fresh] *)
       epose proof @handle_intrinsic_correct (MemStateFreshT (itree Effout)) Effout
-        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T i (fun _ _ => True) as HANDLE_CORRECT.
+        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T i (fun _ _ => True) as HANDLE_CORRECT.
 
       red in HANDLE_CORRECT.
       specialize (HANDLE_CORRECT ms sid).
       forward HANDLE_CORRECT.
-      admit. (* TODO: MemMonad_valid_state *)
+      { auto.
+      }
+
       specialize (HANDLE_CORRECT I).
 
       destruct HANDLE_CORRECT as [[ms' [ub_msg UB]] | HANDLE_CORRECT].
@@ -844,10 +865,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         do 3 eexists.
         split; eauto.
       }
-    Admitted.
+    Qed.
 
     (* TODO: Import result from [handle_memory_correct]*)
-    Lemma my_handle_memory_prop_correct {T} m sid ms :
+    Lemma my_handle_memory_prop_correct {T} m sid ms (VALID: MemMonad_valid_state ms sid) :
       my_handle_memory_prop m sid ms (my_handle_memory (T := T) m sid ms).
       unfold my_handle_memory_prop, my_handle_memory.
       cbn.
@@ -855,12 +876,11 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       (* TODO: probably an easier more general lemma about
          [exec_correct] and [MemPropT_lift_PropT_fresh] *)      
       epose proof @handle_memory_correct (MemStateFreshT (itree Effout)) Effout
-        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T m (fun _ _ => True) as HANDLE_CORRECT.
+        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T m (fun _ _ => True) as HANDLE_CORRECT.
 
       red in HANDLE_CORRECT.
       specialize (HANDLE_CORRECT ms sid).
-      forward HANDLE_CORRECT.
-      admit. (* TODO: MemMonad_valid_state *)
+      forward HANDLE_CORRECT; auto.
       specialize (HANDLE_CORRECT I).
 
       destruct HANDLE_CORRECT as [[ms' [ub_msg UB]] | HANDLE_CORRECT].
@@ -932,7 +952,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         do 3 eexists.
         split; eauto.
       }
-    Admitted.
+    Qed.
 
     (* fmap throws away extra sid / provenance from state
        handler. This is fine because interp_memory_prop should include
@@ -940,12 +960,13 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
        necessary.
      *)
     Lemma interp_memory_correct :
-      forall {T} t (ms : MemState) (sid : store_id),
-        interp_memory_prop eq t sid ms (@interp_memory T t sid ms).
+      forall {T} t (ms : MemState) (sid : store_id)
+        (VALID: MemMonad_valid_state ms sid),
+        interp_memory_spec eq t sid ms (@interp_memory T t sid ms).
     Proof using.
-      intros T t ms sid.
+      intros T t ms sid VALID.
       red.
-      unfold interp_memory_prop.
+      unfold interp_memory_spec.
       unfold interp_memory.
       cbn.
       match goal with
@@ -957,75 +978,380 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       rename H into EQ.
 
       revert t i EQ.
-      revert ms sid.
+      revert ms sid VALID.
       pcofix CIH.
       intros.
       pstep.
       red.
 
       unfold State.interp_state in EQ.
-      punfold EQ; red in EQ.
       force_rewrite: (itree_eta t) in EQ.
-      assert (HT: t ≅ t) by reflexivity.
-      punfold HT; red in HT.
-
-      hinduction HT before CIH; intros; subst; try inv CHECK.
+      force_rewrite: (itree_eta i) in EQ.
+      genobs t ot.
+      genobs i oi.
+      clear t i Heqot Heqoi.
+      hinduction ot before CIH; intros; subst.
       - force_rewrite: @interp_memory_ret in EQ.
-        assert (i = Ret (ms, (sid, r2))). apply bisimulation_is_eq; pstep; auto.
-        rewrite H.
+        apply eqitree_inv_Ret_r in EQ.
+        cbn in EQ; subst.
         constructor; auto.
-
       - pclearbot.
         force_rewrite: @interp_memory_tau in EQ. subst.
-        match goal with
-        | [ H : eqitF _ _ _ _ _ _ (observe (Tau ?l)) |- _] => remember l
-        end.
-
-        assert (i = Tau i0).
-        apply bisimulation_is_eq; pstep; red; auto.
-        subst.
-        constructor; auto. right; eapply CIH; reflexivity.
-
+        apply eqitree_inv_Tau_r in EQ.
+        destruct EQ as (?&?&?).
+        cbn in H; subst.
+        constructor.
+        right.
+        eapply CIH; eauto.
       - pclearbot.
-        match goal with
-        | [ H : eqitF _ _ _ _ _ _ (observe ?l) |- _] => remember l
-        end.
-        force_rewrite: @interp_memory_vis in Heqi0. subst.
-        match goal with
-        | [ H : eqitF _ _ _ _ _ _ (observe ?l) |- _] => remember l
-        end.
+        force_rewrite: @interp_memory_vis in EQ.
+        cbn in *.
+        symmetry in EQ.
+        rewrite itree_eta'.
+        remember ({| _observe := oi |}) as oi'.
+        clear oi Heqoi'.
+        (* I should only need `MemMonad_valid_state m s` in the successful cases...
+           Not in the cases where UB / OOM / Error occurs...
 
-        assert (i = i0).
-        apply bisimulation_is_eq; pstep; red; auto.
-        subst.
-        eapply Interp_Memory_PropT_Vis; eauto.
-
-        { intros. right. destruct b, p. subst. eapply CIH.
-          Unshelve.
-          5 : exact (fun '(m, (s, a)) => State.interp_state interp_memory_h (k2 a) s m).
+           If UB / OOM / Error occurs, do I need CIH?
+         *)
+        destruct e.
+        { (* Abstract E events that don't touch ms / sid *)
           cbn in *.
-          2 : { eapply (interp_memory_h e sid ms). }
-          2 : exact sid. 2 : exact ms.
-          reflexivity.
-        }
+          eapply Interp_Memory_PropT_Vis
+            with (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
+          2: {
+            cbn.
+            red.
+            reflexivity.
+          }
+          2: {
+            repeat red.
+            right.
+            rewrite <- EQ.
+            cbn.
+            eapply eutt_clo_bind.
+            reflexivity.
+            intros ? ? ?; subst.
+            destruct u2.
+            rewrite tau_eutt.
+            reflexivity.
+          }
 
-        { (* interp_memory_prop_h *)
-          red. unfold case_, case_, Case_sum1, case_sum1.
-          destruct e as [ | [ | [ | ]]]; cbn.
-          1,4 : red; tau_steps; apply eqit_Vis; intros;
-            tau_steps; reflexivity.
-          - eapply my_handle_intrinsic_prop_correct.
-          - eapply my_handle_memory_prop_correct.
-        }
-
-        { (* memory_k_spec *)
-          red.
+          intros a b H H0 H1.
+          apply Returns_bind_inversion in H0.
+          destruct H0 as (?&?&?).
+          apply Returns_ret_inv in H2; inv H2; auto.
           right.
-          eapply eutt_clo_bind; [ reflexivity | intros; subst ].
-          destruct u2, p. cbn.
-          rewrite tau_eutt.
+          cbn.
+          eapply CIH; eauto.
           reflexivity.
         }
+
+        destruct s.
+        { (* Intrinsics *)
+          cbn in *.
+          pose proof (@my_handle_intrinsic_prop_correct _ i _ _ VALID) as CORRECT.
+          repeat red in CORRECT.
+          destruct CORRECT.
+          { (* UB case *)
+            destruct H as (ub_msg & UB).
+            eapply Interp_Memory_PropT_Vis
+              with (ta:=(raise_ub ub_msg)).
+            2: {
+              repeat red.
+              left.
+              exists ub_msg.
+              apply UB.
+            }
+            2: {
+              repeat red.
+              left.
+              eapply FindUB.
+              pstep; red; cbn.
+              constructor.
+              intros [].
+            }
+
+            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
+            unfold raiseUB in RETb.
+            rewrite bind_trigger in RETb.
+
+            eapply Returns_vis_inversion in RETb.
+            destruct RETb as [[] _].
+          }
+          destruct H.
+          { (* Error case *)
+            destruct H as (err_msg & ERR).
+            eapply Interp_Memory_PropT_Vis
+              with (ta:=(raise_error err_msg))
+                   (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
+            2: {
+              repeat red.
+              right. left.
+              exists err_msg.
+              split.
+              reflexivity.
+              apply ERR.
+            }
+            2: {
+              repeat red.
+              right.
+              rewrite <- EQ.
+              eapply eutt_clo_bind.
+              apply ERR.
+              intros ? ? ?; subst.
+              destruct u2 as (?&?&?).
+              cbn.
+              rewrite tau_eutt.
+              reflexivity.
+            }
+
+            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
+            unfold LLVMEvents.raise in RETb.
+            rewrite bind_trigger in RETb.
+
+            eapply Returns_vis_inversion in RETb.
+            destruct RETb as [[] _].
+          }
+
+          destruct H.
+          { (* OOM case *)
+            destruct H as (oom_msg & OOM).
+            eapply Interp_Memory_PropT_Vis
+              with (ta:=(raise_oom oom_msg))
+                   (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
+            2: {
+              repeat red.
+              right. right. left.
+              exists oom_msg.
+              split.
+              reflexivity.
+              apply OOM.
+            }
+            2: {
+              repeat red.
+              right.
+              rewrite <- EQ.
+              eapply eutt_clo_bind.
+              apply OOM.
+              intros ? ? ?; subst.
+              destruct u2 as (?&?&?).
+              cbn.
+              rewrite tau_eutt.
+              reflexivity.
+            }
+
+            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
+            unfold raiseOOM in RETb.
+            rewrite bind_trigger in RETb.
+
+            eapply Returns_vis_inversion in RETb.
+            destruct RETb as [[] _].
+          }
+
+          { (* Success case *)
+            destruct H as (sid' & ms' & x & EXEC & SPEC & VALID').
+            eapply Interp_Memory_PropT_Vis
+              with (ta:=ret (ms', (sid', x)))
+                   (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
+            2: {
+              repeat red.
+              right. right. right.
+              exists sid', ms', x.
+              split; eauto; reflexivity.
+            }
+            2: {
+              repeat red.
+              right.
+              rewrite <- EQ.
+              eapply eutt_clo_bind.
+              apply EXEC.
+              intros ? ? ?; subst.
+              destruct u2 as (?&?&?).
+              cbn.
+              rewrite tau_eutt.
+              reflexivity.
+            }
+
+            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
+            apply Returns_ret_inv in RETb.
+            inv RETb.
+            right.
+            eapply CIH; eauto; reflexivity.
+          }
+        }
+
+        destruct s.
+        { (* Memory events *)
+          cbn in *.
+          pose proof (@my_handle_memory_prop_correct _ m _ _ VALID) as CORRECT.
+          repeat red in CORRECT.
+          destruct CORRECT.
+          { (* UB case *)
+            destruct H as (ub_msg & UB).
+            eapply Interp_Memory_PropT_Vis
+              with (ta:=(raise_ub ub_msg)).
+            2: {
+              repeat red.
+              left.
+              exists ub_msg.
+              apply UB.
+            }
+            2: {
+              repeat red.
+              left.
+              eapply FindUB.
+              pstep; red; cbn.
+              constructor.
+              intros [].
+            }
+
+            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
+            unfold raiseUB in RETb.
+            rewrite bind_trigger in RETb.
+
+            eapply Returns_vis_inversion in RETb.
+            destruct RETb as [[] _].
+          }
+          destruct H.
+          { (* Error case *)
+            destruct H as (err_msg & ERR).
+            eapply Interp_Memory_PropT_Vis
+              with (ta:=(raise_error err_msg))
+                   (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
+            2: {
+              repeat red.
+              right. left.
+              exists err_msg.
+              split.
+              reflexivity.
+              apply ERR.
+            }
+            2: {
+              repeat red.
+              right.
+              rewrite <- EQ.
+              eapply eutt_clo_bind.
+              apply ERR.
+              intros ? ? ?; subst.
+              destruct u2 as (?&?&?).
+              cbn.
+              rewrite tau_eutt.
+              reflexivity.
+            }
+
+            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
+            unfold LLVMEvents.raise in RETb.
+            rewrite bind_trigger in RETb.
+
+            eapply Returns_vis_inversion in RETb.
+            destruct RETb as [[] _].
+          }
+
+          destruct H.
+          { (* OOM case *)
+            destruct H as (oom_msg & OOM).
+            eapply Interp_Memory_PropT_Vis
+              with (ta:=(raise_oom oom_msg))
+                   (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
+            2: {
+              repeat red.
+              right. right. left.
+              exists oom_msg.
+              split.
+              reflexivity.
+              apply OOM.
+            }
+            2: {
+              repeat red.
+              right.
+              rewrite <- EQ.
+              eapply eutt_clo_bind.
+              apply OOM.
+              intros ? ? ?; subst.
+              destruct u2 as (?&?&?).
+              cbn.
+              rewrite tau_eutt.
+              reflexivity.
+            }
+
+            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
+            unfold raiseOOM in RETb.
+            rewrite bind_trigger in RETb.
+
+            eapply Returns_vis_inversion in RETb.
+            destruct RETb as [[] _].
+          }
+
+          { (* Success case *)
+            destruct H as (sid' & ms' & x & EXEC & SPEC & VALID').
+            eapply Interp_Memory_PropT_Vis
+              with (ta:=ret (ms', (sid', x)))
+                   (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
+            2: {
+              repeat red.
+              right. right. right.
+              exists sid', ms', x.
+              split; eauto; reflexivity.
+            }
+            2: {
+              repeat red.
+              right.
+              rewrite <- EQ.
+              eapply eutt_clo_bind.
+              apply EXEC.
+              intros ? ? ?; subst.
+              destruct u2 as (?&?&?).
+              cbn.
+              rewrite tau_eutt.
+              reflexivity.
+            }
+
+            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
+            apply Returns_ret_inv in RETb.
+            inv RETb.
+            right.
+            eapply CIH; eauto; reflexivity.
+          }
+        }
+
+        { (* Abstract F events that don't touch ms / sid *)
+          cbn in *.
+          eapply Interp_Memory_PropT_Vis
+            with (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
+          2: {
+            cbn.
+            red.
+            reflexivity.
+          }
+          2: {
+            repeat red.
+            right.
+            rewrite <- EQ.
+            cbn.
+            eapply eutt_clo_bind.
+            reflexivity.
+            intros ? ? ?; subst.
+            destruct u2.
+            rewrite tau_eutt.
+            reflexivity.
+          }
+
+          intros a b H H0 H1.
+          apply Returns_bind_inversion in H0.
+          destruct H0 as (?&?&?).
+          apply Returns_ret_inv in H2; inv H2; auto.
+          right.
+          cbn.
+          eapply CIH; eauto.
+          reflexivity.
+        }
+
+        Unshelve.
+        all: eauto.
+        intros [].
+        intros [].
     Qed.
 
   End Interpreters.
