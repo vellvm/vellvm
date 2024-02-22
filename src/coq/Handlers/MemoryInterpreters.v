@@ -718,10 +718,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
     (* TODO: get rid of this silly hack. *)
     Definition my_handle_memory : MemoryE ~> MemStateFreshT (itree Effout) :=
-      @handle_memory (MemStateFreshT (itree Effout)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+      @handle_memory (MemStateFreshT (itree Effout)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
     Definition my_handle_intrinsic : IntrinsicE ~> MemStateFreshT (itree Effout) :=
-      @handle_intrinsic (MemStateFreshT (itree Effout)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+      @handle_intrinsic (MemStateFreshT (itree Effout)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
     Definition interp_memory_h : Effin ~> MemStateFreshT (itree Effout)
       := case_ E_trigger (case_ my_handle_intrinsic (case_ my_handle_memory F_trigger)).
@@ -786,7 +786,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       (* TODO: probably an easier more general lemma about
          [exec_correct] and [MemPropT_lift_PropT_fresh] *)
       epose proof @handle_intrinsic_correct (MemStateFreshT (itree Effout)) Effout
-        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T i (fun _ _ => True) as HANDLE_CORRECT.
+        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T i (fun _ _ => True) as HANDLE_CORRECT.
 
       red in HANDLE_CORRECT.
       specialize (HANDLE_CORRECT ms sid).
@@ -876,7 +876,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       (* TODO: probably an easier more general lemma about
          [exec_correct] and [MemPropT_lift_PropT_fresh] *)      
       epose proof @handle_memory_correct (MemStateFreshT (itree Effout)) Effout
-        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T m (fun _ _ => True) as HANDLE_CORRECT.
+        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T m (fun _ _ => True) as HANDLE_CORRECT.
 
       red in HANDLE_CORRECT.
       specialize (HANDLE_CORRECT ms sid).

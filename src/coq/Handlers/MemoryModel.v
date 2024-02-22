@@ -4141,13 +4141,12 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   Require Import Within.
 
-  Definition MemMonad_valid_state `{SID_FRESH : StoreIdFreshness MemState} (ms : MemState) (st : store_id) : Prop
+  Definition MemMonad_valid_state (ms : MemState) (st : store_id) : Prop
     := let sid := st in
-       (forall sid', used_store_id ms sid' -> (sid' < sid)%N).
+       (forall sid', used_store_id_prop ms sid' -> (sid' < sid)%N).
 
   Class MemMonad (M : Type -> Type) (RunM : Type -> Type)
         `{MM : Monad M} `{MRun: Monad RunM}
-        `{SID_FRESH : StoreIdFreshness MemState}
         `{MPROV : MonadProvenance Provenance M} `{MSID : MonadStoreId M} `{MMS: MonadMemState MemState M}
         `{MERR : RAISE_ERROR M} `{MUB : RAISE_UB M} `{MOOM :RAISE_OOM M}
         `{RunERR : RAISE_ERROR RunM} `{RunUB : RAISE_UB RunM} `{RunOOM :RAISE_OOM RunM}
@@ -4212,6 +4211,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     exists st' sid',
       eq1 (MemMonad_run (fresh_sid) ms st) (ret (st', (ms, sid'))) /\
         MemMonad_valid_state ms st' /\
+        sid' < st' /\
         ~ used_store_id_prop ms sid';
 
     (** Fresh provenance property *)
@@ -4282,7 +4282,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     let '(st2, ms2) := post in
     let t := MemMonad_run memm ms1 st1 in
     let run := a <- runm;; ret (st2, (ms2, a)) : RunM (store_id * (MemState * A))%type in
-    let eqi := (@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) in
+    let eqi := (@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) in
     eqi _ t run.
 
   Lemma within_eq1_Proper_RunM_MemMonad {MemM RunM} `{MM: MemMonad MemM RunM} {A} :
@@ -4446,7 +4446,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
                  well, and if the executable returns successfully it
                  gives a valid store_id / MemState pair.
               *)
-             let WEM := (Within_err_ub_oom_MemM (EQI:=(@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) (EQV:=(@MemMonad_eq1_runm_equiv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM))) in
+             let WEM := (Within_err_ub_oom_MemM (EQI:=(@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) (EQV:=(@MemMonad_eq1_runm_equiv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM))) in
              (@within MemM _ err_ub_oom (store_id * MemState)%type (store_id * MemState)%type WEM X exec (st, ms) e (st', ms')) /\
                (e {{ms}} ∈ {{ms'}} spec) /\ ((exists x, e = ret x) -> (MemMonad_valid_state ms' st'))).
 
@@ -4467,7 +4467,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       exec_correct weak_pre exec spec ->
       exec_correct pre exec spec.
   Proof.
-    intros MemM Eff MM MRun SID_FRESH MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MEMM A pre weak_pre exec spec WEAK EXEC.
+    intros MemM Eff MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MEMM A pre weak_pre exec spec WEAK EXEC.
     unfold exec_correct in *.
     intros ms st VALID PRE.
     apply WEAK in PRE.
@@ -4504,14 +4504,18 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
              + Should be covered by `exec_correct m_exec m_spec` assumption.
        *)
       (forall a ms_init ms_after_m st_init st_after_m,
-          ((@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MEMM)) _
+          MemMonad_valid_state ms_after_m st_after_m ->
+          ((@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MEMM)) _
                                                                                 (MemMonad_run m_exec ms_init st_init)
                                                                                 (ret (st_after_m, (ms_after_m, a))))%monad ->
           (* ms_k is a MemState after evaluating m *)
-          exec_correct (fun ms_k st_k => pre ms_init st_init /\ m_spec ms_init (ret (ms_k, a))) (k_exec a) (k_spec a)) ->
+let WEM := (Within_err_ub_oom_MemM (EQI:=(@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MEMM)) (EQV:=(@MemMonad_eq1_runm_equiv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MEMM))) in
+exec_correct (fun ms_k st_k => pre ms_init st_init /\
+                              (@within MemM _ err_ub_oom (store_id * MemState)%type (store_id * MemState)%type WEM _ m_exec (st_init, ms_init) (ret a) (st_k, ms_k))
+                            /\ m_spec ms_init (ret (ms_k, a))) (k_exec a) (k_spec a)) ->
       exec_correct pre (a <- m_exec;; k_exec a) (a <- m_spec;; k_spec a).
   Proof.
-    intros MemM Eff MM MRun SID_FRESH MPROV MSID MMS
+    intros MemM Eff MM MRun MPROV MSID MMS
       MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
       MLAWS MEMM A B pre m_exec k_exec m_spec
       k_spec M_CORRECT K_CORRECT.
@@ -4609,6 +4613,11 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       rename e' into a.
       specialize (K_CORRECT a ms ms' st st').
       forward K_CORRECT.
+      { eapply M_POST.
+        exists a; eauto.
+      }
+
+      forward K_CORRECT.
       { cbn in M_EXEC_CORRECT.
         red in M_EXEC_CORRECT.
         destruct M_EXEC_CORRECT as [m2 [SUCC EXEC]].
@@ -4687,7 +4696,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       {X} pre (x : X),
       exec_correct pre (ret x) (ret x).
   Proof.
-    intros MemM Eff MM MRun SID_FRESH MPROV MSID MMS
+    intros MemM Eff MM MRun MPROV MSID MMS
       MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
       MLAWS H X pre x.
     intros ms st VALID PRE.
@@ -4726,10 +4735,10 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       rewrite map_monad_unfold.
 
       eapply exec_correct_bind; eauto.
-      intros * RUN.
+      intros * VALID RUN.
 
       eapply exec_correct_bind; eauto.
-      intros * RUN2.
+      intros * VALID2 RUN2.
 
       apply exec_correct_ret.
   Qed.
@@ -4747,7 +4756,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       MLAWS H A B xs m_exec m_spec H0 pre.
     apply exec_correct_bind.
     eapply exec_correct_map_monad; auto.
-    intros * RUN.
+    intros * VALID RUN.
     apply exec_correct_ret.
   Qed.
 
@@ -4766,10 +4775,10 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       rewrite map_monad_In_unfold.
 
       eapply exec_correct_bind; eauto.
-      intros * RUN1.
+      intros * VALID1 RUN1.
 
       eapply exec_correct_bind; eauto.
-      intros * RUN2.
+      intros * VALID2 RUN2.
 
       apply exec_correct_ret.
   Qed.
@@ -4779,7 +4788,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       {A} (msg : string),
     forall pre, exec_correct pre (raise_oom msg) (raise_oom msg : MemPropT MemState A).
   Proof.
-    intros MemM Eff MM MRun SID_FRESH MPROV MSID MMS
+    intros MemM Eff MM MRun MPROV MSID MMS
       MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
       MLAWS H A msg pre.
     red.
@@ -4807,7 +4816,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       {A} (msg1 msg2 : string),
     forall pre, exec_correct pre (raise_error msg1) (raise_error msg2 : MemPropT MemState A).
   Proof.
-    intros MemM Eff MM MRun SID_FRESH MPROV MSID MMS
+    intros MemM Eff MM MRun MPROV MSID MMS
       MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
       MLAWS H A msg1 msg2 pre.
     red.
@@ -4835,7 +4844,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       {A} (msg1 msg2 : string),
     forall pre, exec_correct pre (raise_ub msg1) (raise_ub msg2 : MemPropT MemState A).
   Proof.
-    intros MemM Eff MM MRun SID_FRESH MPROV MSID MMS
+    intros MemM Eff MM MRun MPROV MSID MMS
       MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
       MLAWS H A msg1 msg2 pre.
 
@@ -4852,7 +4861,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       {A} (m : OOM A),
     forall pre, exec_correct pre (lift_OOM m) (lift_OOM m).
   Proof.
-    intros MemM Eff MM MRun SID_FRESH MPROV MSID MMS
+    intros MemM Eff MM MRun MPROV MSID MMS
       MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
       MLAWS H A [NOOM | OOM] pre.
     - apply exec_correct_ret.
@@ -4864,7 +4873,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       {A} (m : err A),
     forall pre, exec_correct pre (lift_err_RAISE_ERROR m) (lift_err_RAISE_ERROR m).
   Proof.
-    intros MemM Eff MM MRun SID_FRESH MPROV MSID MMS
+    intros MemM Eff MM MRun MPROV MSID MMS
       MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
       MLAWS H A [ERR | NOERR] pre.
     - apply exec_correct_raise_error.
@@ -4876,7 +4885,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       {A} (m : ERR A),
     forall pre, exec_correct pre (lift_ERR_RAISE_ERROR m) (lift_ERR_RAISE_ERROR m).
   Proof.
-    intros MemM Eff MM MRun SID_FRESH MPROV MSID MMS
+    intros MemM Eff MM MRun MPROV MSID MMS
       MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
       MLAWS H A [[ERR] | NOERR] pre.
     - apply exec_correct_raise_error.
@@ -4888,19 +4897,18 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       len ptr,
     forall pre, exec_correct pre (get_consecutive_ptrs ptr len) (get_consecutive_ptrs ptr len).
   Proof.
-    intros MemM Eff MM MRun SID_FRESH MPROV MSID MMS
+    intros MemM Eff MM MRun MPROV MSID MMS
       MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
       MLAWS H len ptr pre.
     unfold get_consecutive_ptrs.
     eapply exec_correct_bind.
     apply exec_correct_lift_OOM.
 
-    intros * RUN.
+    intros * VALID RUN.
     eapply exec_correct_bind.
     apply exec_correct_lift_err_RAISE_ERROR.
 
-    intros a0 ms_init0 ms_after_m0 st_init0 st_after_m0
-      H0.
+    intros * VALID2 RUN2.
     apply exec_correct_lift_OOM.
   Qed.
 
@@ -4909,11 +4917,11 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       exec_correct pre fresh_sid fresh_sid.
   Proof.
     red.
-    intros MemM Eff MM MRun SID_FRESH MPROV MSID MMS
+    intros MemM Eff MM MRun MPROV MSID MMS
       MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
       MLAWS H pre ms st H0 PRE.
     right.
-    eapply (@MemMonad_run_fresh_sid MemM) in H0 as [st' [sid [EUTT [VALID FRESH]]]].
+    eapply (@MemMonad_run_fresh_sid MemM) in H0 as [st' [sid [EUTT [VALID [LT FRESH]]]]].
     exists (ret sid), st', ms.
     split; [| split]; auto.
     { cbn.
@@ -5197,11 +5205,30 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
       forall ptr pre, exec_correct pre (read_byte ptr) (read_byte_spec_MemPropT ptr).
 
     Parameter write_byte_correct :
-      forall ptr byte pre, exec_correct pre (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
+      forall ptr byte,
+        exec_correct
+          (fun ms st => exists s, sbyte_sid byte = inr s /\ (s < st)%N)
+          (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
+
+    Parameter write_byte_preserves_store_id :
+      forall st ms a b st' ms' res,
+        @within MemM EQM err_ub_oom (prod store_id MemState) (prod store_id MemState)
+          (@Within_err_ub_oom_MemM MemM Eff
+             (@MemMonad_eq1_runm MemM (itree Eff) MM0 MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB
+                RunOOM EQM EQRI MLAWS MM) MRun
+             (@MemMonad_eq1_runm_equiv MemM (itree Eff) MM0 MRun MPROV MSID MMS MERR MUB MOOM RunERR
+                RunUB RunOOM EQM EQRI MLAWS MM) RunERR RunUB RunOOM MM0 MRun MPROV MSID MMS MERR MUB
+             MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MM) unit
+          (write_byte a b) (@pair store_id MemState st ms)
+          (@ret err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) unit res)
+          (@pair store_id MemState st' ms') ->
+        st = st'.
 
     Parameter allocate_bytes_with_pr_correct :
-      forall init_bytes pr pre,
-        exec_correct pre
+      forall init_bytes pr,
+        exec_correct
+          (fun ms st =>
+             Forall (fun b : SByte => exists s : store_id, sbyte_sid b = inr s /\ (s < st)%N) init_bytes)
           (allocate_bytes_with_pr init_bytes pr)
           (allocate_bytes_with_pr_spec_MemPropT init_bytes pr).
 
@@ -5213,8 +5240,11 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
       forall pre, exec_correct pre mempop mempop_spec_MemPropT.
 
     Parameter malloc_bytes_with_pr_correct :
-      forall init_bytes pr pre,
-        exec_correct pre (malloc_bytes_with_pr init_bytes pr) (malloc_bytes_with_pr_spec_MemPropT init_bytes pr).
+      forall init_bytes pr,
+        exec_correct
+          (fun ms st =>
+             Forall (fun b : SByte => exists s : store_id, sbyte_sid b = inr s /\ (s < st)%N) init_bytes)
+          (malloc_bytes_with_pr init_bytes pr) (malloc_bytes_with_pr_spec_MemPropT init_bytes pr).
 
     Parameter free_correct :
       forall ptr pre,
@@ -5530,7 +5560,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         break_match_goal; auto with EXEC_CORRECT.
         apply exec_correct_bind; auto with EXEC_CORRECT.
         intros a0.
-        intros ms_init ms_after_m st_init st_after_m RUN_FRESH_SID.
+        intros ms_init ms_after_m st_init st_after_m VALID_FRESH RUN_FRESH_SID.
         apply H.
         subst.
 
@@ -5692,7 +5722,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       eapply exec_correct_bind.
       apply exec_correct_get_consecutive_pointers.
 
-      intros * RUN.
+      intros * VALID RUN.
       eapply exec_correct_map_monad.
       intros ptr'.
       apply read_byte_correct.
@@ -5705,21 +5735,349 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       intros dt ptr pre.
       eapply exec_correct_bind.
       apply read_bytes_correct.
-      intros * RUN.
+      intros * VALID RUN.
       apply exec_correct_lift_err_RAISE_ERROR.
     Qed.
 
+    (* TODO: move this? *)
+    Import MP.
+    Import LP.
+    Import GEP.
+    Lemma MemMonad_run_get_consecutive_ptrs:
+      forall {M RunM : Type -> Type} {MM : Monad M} {MRun : Monad RunM}
+        {MPROV : MonadProvenance LP.PROV.Provenance M} {MSID : MonadStoreId M} {MMS : MonadMemState MemState M}
+        {MERR : RAISE_ERROR M} {MUB : RAISE_UB M} {MOOM : RAISE_OOM M} {RunERR : RAISE_ERROR RunM}
+        {RunUB : RAISE_UB RunM} {RunOOM : RAISE_OOM RunM}
+        `{EQM : Eq1 M} `{EQRI : @Eq1_ret_inv M EQM MM} `{MLAWS : @MonadLawsE M EQM MM}
+        {MemMonad : MemMonad M RunM}
+        `{EQV : @Eq1Equivalence RunM MRun (@MemMonad_eq1_runm M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad)}
+        `{LAWS: @MonadLawsE RunM (@MemMonad_eq1_runm M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad) MRun}
+        `{RAISEOOM : @RaiseBindM RunM MRun (@MemMonad_eq1_runm M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad) string (@raise_oom RunM RunOOM)}
+        `{RAISEERR : @RaiseBindM RunM MRun (@MemMonad_eq1_runm M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad) string (@raise_error RunM RunERR)}
+        (ms : MemState) ptr len (st : store_id),
+        (@eq1 RunM
+              (@MemMonad_eq1_runm M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad)
+              (prod store_id (prod MemState (list LP.ADDR.addr)))
+              (@MemMonad_run
+           M RunM MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM _ _ _ MemMonad (list LP.ADDR.addr)
+           (@get_consecutive_ptrs M MM MOOM MERR ptr len) ms st)
+              (fmap (fun ptrs => (st, (ms, ptrs))) (@get_consecutive_ptrs RunM MRun RunOOM RunERR ptr len)))%monad.
+    Proof using.
+      intros M RunM MM1 MRun0 MPROV0 MSID0 MMS0
+        MERR0 MUB0 MOOM0 RunERR0 RunUB0 RunOOM0 EQM' EQRI' MLAWS' MemMonad0
+        EQV LAWS RAISEOOM RAISEERR ms ptr len st.
+      Opaque handle_gep_addr.
+
+      unfold get_consecutive_ptrs.
+      destruct (intptr_seq 0 len) as [NOOM_seq | OOM_seq] eqn:HSEQ.
+      - cbn.
+        rewrite MemMonad_run_bind.
+        rewrite MemMonad_run_ret.
+        unfold liftM.
+        repeat rewrite bind_ret_l.
+
+        destruct
+          (map_monad
+             (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix])
+             NOOM_seq) eqn:HMAPM.
+        + cbn.
+          rewrite MemMonad_run_bind.
+          rewrite rbm_raise_bind; [|typeclasses eauto].
+
+          rewrite MemMonad_run_raise_error.
+          rewrite rbm_raise_bind; eauto.
+          rewrite rbm_raise_bind; eauto.
+          reflexivity.
+        + cbn.
+          rewrite MemMonad_run_bind.
+          rewrite MemMonad_run_ret.
+          rewrite bind_ret_l.
+          rewrite bind_ret_l.
+          destruct (Monads.sequence l) eqn:HSEQUENCE.
+          * cbn; rewrite bind_ret_l.
+            rewrite MemMonad_run_ret.
+            reflexivity.
+          * cbn.
+            rewrite rbm_raise_bind; [|typeclasses eauto].
+            rewrite MemMonad_run_raise_oom.
+            reflexivity.
+      - cbn.
+        rewrite MemMonad_run_bind.
+        unfold liftM.
+        rewrite MemMonad_run_raise_oom.
+        rewrite bind_bind.
+        rewrite rbm_raise_bind; eauto.
+        rewrite rbm_raise_bind; eauto.
+        reflexivity.
+    Qed.
+
+    Lemma exec_correct_step_map_monad_In :
+      forall {A B}
+        xs
+        (m_exec : forall (x : A), In x xs -> MemM B) (m_spec : forall (x : A), In x xs -> MemPropT MemState B)
+        (pre : MemState -> store_id -> Prop)
+        (STEP :
+          forall ms_init st_init,
+            pre ms_init st_init ->
+            forall (ms : MemState) (st : store_id) a (IN : In a xs) res,
+              (@within MemM EQM err_ub_oom (prod store_id MemState) (prod store_id MemState)
+                 (@Within_err_ub_oom_MemM MemM Eff
+                    (@MemMonad_eq1_runm MemM (itree Eff) MM0 MRun MPROV MSID MMS MERR MUB MOOM RunERR
+                       RunUB RunOOM EQM EQRI MLAWS MM) MRun
+                    (@MemMonad_eq1_runm_equiv MemM (itree Eff) MM0 MRun MPROV MSID MMS MERR MUB MOOM
+                       RunERR RunUB RunOOM EQM EQRI MLAWS MM) RunERR RunUB RunOOM MM0 MRun MPROV MSID
+                    MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MM) B 
+                 (m_exec a IN) (@pair store_id MemState st_init ms_init)
+                 (@ret err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) B
+                    res) (@pair store_id MemState st ms)) /\
+                m_spec a IN ms_init (ret (ms, res)) ->
+              pre ms st),
+        (forall a (IN : In a xs), exec_correct pre (m_exec a IN) (m_spec a IN)) ->
+        exec_correct pre (map_monad_In xs m_exec) (map_monad_In xs m_spec).
+    Proof.
+      induction xs;
+        intros m_exec m_spec pre STEP HM.
+
+      - unfold map_monad.
+        apply exec_correct_ret.
+      - rewrite map_monad_In_unfold.
+        rewrite map_monad_In_unfold.
+
+        eapply exec_correct_bind; eauto.
+
+        intros * VALID RUN.
+        eapply exec_correct_bind.
+        2: {
+          intros * VALID2 RUN2.
+          apply exec_correct_ret.
+        }
+
+        eapply exec_correct_weaken_pre with (weak_pre:=pre).
+        { intros ms st H.
+          eapply STEP.
+          apply H.
+          apply H.
+        }
+
+        eapply IHxs.
+        { intros ms_init0 st_init0 H ms st a1 IN res (?&?).
+          eapply STEP.
+          apply H.
+          split.
+          apply H0.
+          apply H1.
+        }
+
+        intros a1 IN.
+        apply HM.
+    Qed.
+
+    Lemma exec_correct_step_map_monad :
+      forall {A B}
+        xs
+        (m_exec : A -> MemM B) (m_spec : A -> MemPropT MemState B)
+        (pre : MemState -> store_id -> Prop)
+        (STEP :
+          forall ms_init st_init,
+            pre ms_init st_init ->
+            forall (ms : MemState) (st : store_id) a res,
+              (@within MemM EQM err_ub_oom (prod store_id MemState) (prod store_id MemState)
+                 (@Within_err_ub_oom_MemM MemM Eff
+                    (@MemMonad_eq1_runm MemM (itree Eff) MM0 MRun MPROV MSID MMS MERR MUB MOOM RunERR
+                       RunUB RunOOM EQM EQRI MLAWS MM) MRun
+                    (@MemMonad_eq1_runm_equiv MemM (itree Eff) MM0 MRun MPROV MSID MMS MERR MUB MOOM
+                       RunERR RunUB RunOOM EQM EQRI MLAWS MM) RunERR RunUB RunOOM MM0 MRun MPROV MSID
+                    MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MM) B 
+                 (m_exec a) (@pair store_id MemState st_init ms_init)
+                 (@ret err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) B
+                    res) (@pair store_id MemState st ms)) /\
+                m_spec a ms_init (ret (ms, res)) ->
+              pre ms st),
+        (forall a, exec_correct pre (m_exec a) (m_spec a)) ->
+        exec_correct pre (map_monad m_exec xs) (map_monad m_spec xs).
+    Proof.
+      induction xs;
+        intros m_exec m_spec pre STEP HM.
+
+      - unfold map_monad.
+        apply exec_correct_ret.
+      - rewrite map_monad_unfold.
+        rewrite map_monad_unfold.
+
+        eapply exec_correct_bind; eauto.
+
+        intros * VALID RUN.
+        eapply exec_correct_bind.
+        2: {
+          intros * VALID2 RUN2.
+          apply exec_correct_ret.
+        }
+
+        eapply exec_correct_weaken_pre with (weak_pre:=pre).
+        { intros ms st H.
+          eapply STEP.
+          apply H.
+          apply H.
+        }
+
+        eapply IHxs.
+        { apply STEP. }
+        apply HM.
+    Qed.
+
+    Lemma exec_correct_step_map_monad_ :
+      forall {A B}
+        xs
+        (m_exec : A -> MemM B) (m_spec : A -> MemPropT MemState B)
+        (pre : MemState -> store_id -> Prop)
+        (STEP :
+          forall ms_init st_init,
+            pre ms_init st_init ->
+            forall (ms : MemState) (st : store_id) a res,
+              (@within MemM EQM err_ub_oom (prod store_id MemState) (prod store_id MemState)
+                 (@Within_err_ub_oom_MemM MemM Eff
+                    (@MemMonad_eq1_runm MemM (itree Eff) MM0 MRun MPROV MSID MMS MERR MUB MOOM RunERR
+                       RunUB RunOOM EQM EQRI MLAWS MM) MRun
+                    (@MemMonad_eq1_runm_equiv MemM (itree Eff) MM0 MRun MPROV MSID MMS MERR MUB MOOM
+                       RunERR RunUB RunOOM EQM EQRI MLAWS MM) RunERR RunUB RunOOM MM0 MRun MPROV MSID
+                    MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MM) B 
+                 (m_exec a) (@pair store_id MemState st_init ms_init)
+                 (@ret err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) B
+                    res) (@pair store_id MemState st ms)) /\
+                m_spec a ms_init (ret (ms, res)) ->
+              pre ms st),
+        (forall a, exec_correct pre (m_exec a) (m_spec a)) ->
+        exec_correct pre (map_monad_ m_exec xs) (map_monad_ m_spec xs).
+    Proof.
+      intros A B xs m_exec m_spec pre STEP HM.
+      unfold map_monad_.
+      apply exec_correct_bind.
+      apply exec_correct_step_map_monad; auto.
+
+      intros a ms_init ms_after_m st_init st_after_m H WEM.
+      apply exec_correct_ret.
+    Qed.
+
+    Lemma get_consecutive_ptrs_preserves_state :
+      forall st ms st' ms' ptr bytes a,
+        @within MemM EQM err_ub_oom (prod store_id MemState) (prod store_id MemState)
+          (@Within_err_ub_oom_MemM MemM Eff
+             (@MemMonad_eq1_runm MemM (itree Eff) MM0 MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB
+                RunOOM EQM EQRI MLAWS MM) MRun
+             (@MemMonad_eq1_runm_equiv MemM (itree Eff) MM0 MRun MPROV MSID MMS MERR MUB MOOM RunERR
+                RunUB RunOOM EQM EQRI MLAWS MM) RunERR RunUB RunOOM MM0 MRun MPROV MSID MMS MERR MUB
+             MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MM) (list ADDR.addr)
+          (@get_consecutive_ptrs MemM MM0 MOOM MERR ptr (@Datatypes.length BYTE_IMPL.SByte bytes))
+          (@pair store_id MemState st ms)
+          (@ret err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+             (list ADDR.addr) a) (@pair store_id MemState st' ms') ->
+        (ms, st) = (ms', st').
+    Proof.
+      intros st ms st' ms' ptr bytes a H.
+      cbn in H.
+      repeat red in H.
+      destruct H as (?&?&?).
+      cbn in H, H0.
+      rewrite H in H0.
+      rewrite bind_ret_l in H0.
+      rewrite MemMonad_run_get_consecutive_ptrs in H0.
+      unfold fmap in H0.
+      cbn in H0.
+      unfold liftM in H0.
+      pose proof get_consecutive_ptrs_inv ptr (Datatypes.length bytes).
+      destruct H1 as [[msg OOM] | [ptrs GCP]].
+      { rewrite OOM in H0.
+        rewrite rbm_raise_bind in H0; try typeclasses eauto.
+        symmetry in H0.
+        apply MemMonad_eq1_raise_oom_inv in H0; contradiction.
+      }
+
+      rewrite GCP in H0.
+      repeat rewrite bind_ret_l in H0.
+      eapply eq1_ret_ret in H0; try typeclasses eauto.
+      inv H0.
+      auto.              
+    Qed.
+
     Lemma write_bytes_correct :
-      forall ptr bytes pre,
-        exec_correct pre (write_bytes ptr bytes) (write_bytes_spec ptr bytes).
+      forall ptr bytes,
+        exec_correct
+          (fun ms st => Forall (fun byte => exists s, MemByte.sbyte_sid byte = inr s /\ (s < st)%N) bytes)
+          (write_bytes ptr bytes) (write_bytes_spec ptr bytes).
     Proof using Type.
-      intros ptr bytes pre.
+      intros ptr bytes.
       apply exec_correct_bind.
       apply exec_correct_get_consecutive_pointers.
-      intros * RUN.
-      apply exec_correct_map_monad_.
-      intros [a' b] PRE.
-      apply write_byte_correct.
+      intros * VALID RUN.
+      unfold map_monad_.
+      eapply exec_correct_bind.
+      { repeat rewrite map_monad_map_monad_In.
+        eapply exec_correct_weaken_pre with
+          (weak_pre := fun (ms : MemState) (st : store_id) =>
+                         Forall
+                           (fun byte : BYTE_IMPL.SByte => exists s : store_id, MemByte.sbyte_sid byte = inr s /\ s < st_init)
+                           bytes /\ st_init <= st).
+        { intros ms st H.
+          split.
+          apply H.
+
+          (* In this case I know st_init = st *)
+          destruct H as (_&GCP&_).
+          apply get_consecutive_ptrs_preserves_state in GCP.
+          inv GCP; lia.
+        }
+
+        apply exec_correct_step_map_monad_In.
+        { intros ms_init0 st_init0 (?&?) ms st [a' b] IN res (?&?).
+          (* Will need the fact that write_byte doesn't change st *)
+          assert (st = st_init0).
+          { eapply write_byte_preserves_store_id in H1.
+            auto.
+          }
+          subst.
+          split; auto.
+        }
+
+        intros [a' b] IN ms st VALID' (PRE&LT).
+        apply write_byte_correct; auto.
+        apply zip_In_both in IN.
+        destruct IN as (_&IN).
+
+        assert (exists s : store_id, MemByte.sbyte_sid b = inr s /\ s < st_init).
+        { eapply Forall_forall in PRE; eauto.
+        }
+
+        destruct H as (s&?&?).
+        exists s.
+        split; auto; lia.
+      }
+
+      intros.
+      apply exec_correct_ret.
+    Qed.
+
+    Lemma to_ubytes_sids_bounded :
+      forall uv dt sid st,
+        sid < st ->
+        Forall (fun byte : BYTE_IMPL.SByte => exists s : store_id, MemByte.sbyte_sid byte = inr s /\ s < st)
+          (MemByte.to_ubytes uv dt sid).
+    Proof.
+      intros uv dt sid st H.
+      apply Forall_map.
+      remember (N.to_nat (SIZEOF.sizeof_dtyp dt)) as n.
+      clear Heqn.
+      remember 0 as start.
+      clear Heqstart.
+      revert start.
+      induction n; intros start.
+      - cbn.
+        constructor.
+      - cbn.
+        constructor.
+        + unfold MemByte.sbyte_sid.
+          rewrite BYTE_IMPL.sbyte_to_extractbyte_of_uvalue_sbyte.
+          exists sid; auto.
+        + apply IHn.
     Qed.
 
     Lemma write_uvalue_correct :
@@ -5729,8 +6087,36 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       intros dt ptr uv pre.
       apply exec_correct_bind.
       apply exec_correct_serialize_sbytes.
-      intros * RUN.
-      apply write_bytes_correct.
+      intros * VALID RUN.
+      eapply exec_correct_weaken_pre.
+      2: apply write_bytes_correct.
+
+      intros ms st (?&?&?).
+      rename a into bytes.
+
+      assert (MemMonad_valid_state ms_init st_init) as VALID'.
+      { red.
+        intros sid' H2.
+        repeat red in H0.
+        admit.
+      }
+
+      (* TODO: separate into lemma *)
+      repeat red in H0.
+      repeat red in H1.
+      destruct H0 as (?&?&?).
+      cbn in H0, H2.
+      unfold serialize_sbytes in *.
+      rewrite MemMonad_run_bind in H2.
+      pose proof @MemMonad_run_fresh_sid MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ VALID.
+      destruct H3 as (?&?&?&?&?&?).
+      rewrite H3 in H2.
+      rewrite H0 in H2.
+      repeat rewrite bind_ret_l in H2.
+      rewrite MemMonad_run_ret in H2.
+      eapply eq1_ret_ret in H2; try typeclasses eauto.
+      inv H2.
+      apply to_ubytes_sids_bounded; auto.
     Qed.
 
     Lemma allocate_bytes_correct :
@@ -5847,7 +6233,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         intros pre0.
         apply exec_correct_lift_OOM.
       }
-      intros * RUN2.
+      intros * VALID2 RUN2.
       apply allocate_bytes_correct.
     Qed.
 
@@ -5864,7 +6250,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
       apply exec_correct_bind.
       apply read_bytes_correct.
-      intros * RUN.
+      intros * VALID RUN.
       apply write_bytes_correct.
     Qed.
 
@@ -5878,7 +6264,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       eapply exec_correct_bind; eauto with EXEC_CORRECT.
       eapply exec_correct_get_consecutive_pointers.
 
-      intros * RUN.
+      intros * VALID RUN.
       eapply exec_correct_map_monad_.
       intros a0 pre0.
       destruct a0.
@@ -5902,7 +6288,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         unfold handle_memory_prop.
         apply exec_correct_bind.
         apply allocate_dtyp_correct.
-        intros * RUN.
+        intros * VALID RUN.
         apply exec_correct_ret.
       - (* Load *)
         unfold handle_memory, handle_memory_prop.
@@ -5989,7 +6375,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       { (* Memcpy *)
         apply exec_correct_bind.
         apply handle_memcpy_correct.
-        intros * RUN.
+        intros * VALID RUN.
         apply exec_correct_ret.
       }
 
@@ -5997,7 +6383,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       { (* Memset *)
         apply exec_correct_bind.
         apply handle_memset_correct.
-        intros * RUN.
+        intros * VALID RUN.
         apply exec_correct_ret.
       }
 
