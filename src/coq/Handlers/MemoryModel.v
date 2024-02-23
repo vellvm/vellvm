@@ -6808,6 +6808,63 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         reflexivity.
     Qed.
 
+    Lemma generate_undef_bytes_bounded :
+      forall sid st dt bytes,
+        sid < st ->
+        generate_undef_bytes dt sid = NoOom bytes ->
+        Forall (fun b : BYTE_IMPL.SByte => exists s : store_id, MemByte.sbyte_sid b = inr s /\ s < st) bytes.
+    Proof.
+      intros sid st dt bytes LT GEN.
+      unfold generate_undef_bytes in GEN.
+      unfold generate_num_undef_bytes in GEN.
+      remember (SIZEOF.sizeof_dtyp dt) as n.
+      clear Heqn.
+      remember 0%N as start_idx.
+      clear Heqstart_idx.
+      revert start_idx bytes GEN.
+      induction n using N.peano_ind;
+        intros start_idx bytes GEN.
+      - cbn in *.
+        inv GEN.
+        constructor.
+      - unfold generate_num_undef_bytes_h in GEN.
+        pose proof @N.recursion_succ (N -> OOM (list BYTE_IMPL.SByte)) eq (fun _ : N => ret [])
+          (fun (_ : N) (mf : N -> OOM (list BYTE_IMPL.SByte)) (x : N) =>
+             rest_bytes <- mf (N.succ x);;
+             ret (BYTE_IMPL.uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes))
+          eq_refl.
+        forward H.
+        { unfold Proper, respectful.
+          intros x y H0 x0 y0 H1; subst.
+          reflexivity.
+        }
+        specialize (H n).
+        rewrite H in GEN.
+        clear H.
+
+        destruct
+          (N.recursion (fun _ : N => ret [])
+             (fun (_ : N) (mf : N -> OOM (list BYTE_IMPL.SByte)) (x : N) =>
+                rest_bytes <- mf (N.succ x);;
+                ret (BYTE_IMPL.uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes)) n
+             (N.succ start_idx)) eqn:HREC.
+        + (* No OOM *)
+          cbn in GEN.
+          inv GEN.
+          constructor.
+          { exists sid.
+            unfold MemByte.sbyte_sid.
+            rewrite BYTE_IMPL.sbyte_to_extractbyte_of_uvalue_sbyte.
+            auto.
+          }
+          eapply IHn.
+          unfold generate_num_undef_bytes_h.
+          apply HREC.
+        + (* OOM *)
+          cbn in GEN.
+          inv GEN.
+    Qed.
+
     Lemma allocate_dtyp_correct :
       forall dt num_elements pre,
         exec_correct pre (allocate_dtyp dt num_elements) (allocate_dtyp_spec dt num_elements)
@@ -6875,14 +6932,6 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           destruct H3; subst.
           split; eauto.
 
-          Set Nested Proofs Allowed.
-          Lemma generate_undef_bytes_bounded :
-            forall sid st dt bytes,
-              sid < st ->
-              generate_undef_bytes dt sid = NoOom bytes ->
-              Forall (fun b : BYTE_IMPL.SByte => exists s : store_id, MemByte.sbyte_sid b = inr s /\ s < st) bytes.
-          Proof.
-          Admitted.
           eapply generate_undef_bytes_bounded; eauto.
           destruct POST1 as (?&?&?); subst.
           auto.
