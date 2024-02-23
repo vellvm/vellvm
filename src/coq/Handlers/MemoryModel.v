@@ -6834,18 +6834,15 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         reflexivity.
     Qed.
 
-    Lemma generate_undef_bytes_bounded :
-      forall sid st dt bytes,
+    Lemma generate_num_undef_bytes_bounded :
+      forall sid st dt bytes n,
         sid < st ->
-        generate_undef_bytes dt sid = NoOom bytes ->
+        generate_num_undef_bytes n dt sid = NoOom bytes ->
         Forall (fun b : BYTE_IMPL.SByte => exists s : store_id, MemByte.sbyte_sid b = inr s /\ s < st) bytes.
     Proof.
-      intros sid st dt bytes LT GEN.
-      unfold generate_undef_bytes in GEN.
+      intros sid st dt bytes n LT GEN.
       unfold generate_num_undef_bytes in GEN.
-      remember (SIZEOF.sizeof_dtyp dt) as n.
-      clear Heqn.
-      remember 0%N as start_idx.
+      remember 0 as start_idx.
       clear Heqstart_idx.
       revert start_idx bytes GEN.
       induction n using N.peano_ind;
@@ -6889,6 +6886,17 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         + (* OOM *)
           cbn in GEN.
           inv GEN.
+    Qed.
+
+    Lemma generate_undef_bytes_bounded :
+      forall sid st dt bytes,
+        sid < st ->
+        generate_undef_bytes dt sid = NoOom bytes ->
+        Forall (fun b : BYTE_IMPL.SByte => exists s : store_id, MemByte.sbyte_sid b = inr s /\ s < st) bytes.
+    Proof.
+      intros sid st dt bytes LT GEN.
+      unfold generate_undef_bytes in GEN.
+      eapply generate_num_undef_bytes_bounded; eauto.
     Qed.
 
     Lemma allocate_dtyp_correct :
@@ -7095,26 +7103,66 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       }
     Qed.
 
+    (* TODO: Move to listutils *)
+    Lemma Forall_repeatN:
+      forall (A : Type) (f : A -> Prop) (n : N) (x : A), f x -> Forall (fun y : A => f y) (repeatN n x).
+    Proof.
+    Admitted.
+
     Lemma memset_correct :
-      forall dst val len sid volatile pre,
-        exec_correct pre (memset dst val len sid volatile) (memset_spec dst val len sid volatile).
+      forall dst val len sid volatile,
+        exec_correct
+          (fun ms st => sid < st)
+          (memset dst val len sid volatile) (memset_spec dst val len sid volatile)
+          (@exec_correct_post_bind (list ADDR.addr) unit
+             (@exec_correct_post_bind (list IP.intptr) (list ADDR.addr)
+                (@lift_OOM exec_correct_post Monad_exec_correct_post RAISE_OOM_exec_correct_post
+                   (list IP.intptr)
+                   (intptr_seq 0
+                      (@Datatypes.length BYTE_IMPL.SByte
+                         (@repeatN BYTE_IMPL.SByte (Z.to_N len)
+                            (BYTE_IMPL.uvalue_sbyte (UVALUE_I8 val) (DTYPE_I 8) 0 sid)))))
+                (fun ixs : list IP.intptr =>
+                   @exec_correct_post_bind (list (OOM ADDR.addr)) (list ADDR.addr)
+                     (@lift_err_RAISE_ERROR (list (OOM ADDR.addr)) exec_correct_post Monad_exec_correct_post
+                        RAISE_ERROR_exec_correct_post
+                        (@map_monad err (EitherMonad.Monad_either string) IP.intptr (OOM ADDR.addr)
+                           (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) dst [DVALUE_IPTR ix]) ixs))
+                     (fun addrs : list (OOM ADDR.addr) =>
+                        @lift_OOM exec_correct_post Monad_exec_correct_post RAISE_OOM_exec_correct_post
+                          (list ADDR.addr) (@sequence OOM MonadOOM ADDR.addr addrs))))
+             (fun a0 : list ADDR.addr =>
+                @exec_correct_post_bind (list unit) unit
+                  (@map_monad_In exec_correct_post Monad_exec_correct_post (ADDR.addr * BYTE_IMPL.SByte) unit
+                     (@zip ADDR.addr BYTE_IMPL.SByte a0
+                        (@repeatN BYTE_IMPL.SByte (Z.to_N len)
+                           (BYTE_IMPL.uvalue_sbyte (UVALUE_I8 val) (DTYPE_I 8) 0 sid)))
+                     (fun (H : ADDR.addr * BYTE_IMPL.SByte)
+                        (_ : @In (ADDR.addr * BYTE_IMPL.SByte) H
+                               (@zip ADDR.addr BYTE_IMPL.SByte a0
+                                  (@repeatN BYTE_IMPL.SByte (Z.to_N len)
+                                     (BYTE_IMPL.uvalue_sbyte (UVALUE_I8 val) (DTYPE_I 8) 0 sid)))) 
+                        (_ : MemState) (st0 : store_id) (_ : unit) (_ : MemState) (st'0 : store_id) => 
+                        st0 = st'0)) (fun _ : list unit => @exec_correct_post_ret unit tt))).
     Proof using Type.
-      intros dst val len sid volatile pre.
+      intros dst val len sid volatile.
       unfold memset, memset_spec.
       break_match; [apply exec_correct_raise_ub|].
-      eapply exec_correct_bind; eauto with EXEC_CORRECT.
-      eapply exec_correct_get_consecutive_pointers.
-
-      intros * VALID RUN.
-      eapply exec_correct_map_monad_.
-      intros a0 pre0.
-      destruct a0.
-      apply write_byte_correct.
+      eapply exec_correct_weaken_pre; cycle 1.
+      eapply write_bytes_correct.
+      { intros ms st H.
+        cbn.
+        apply Forall_repeatN.
+        exists sid.
+        unfold MemByte.sbyte_sid.
+        rewrite BYTE_IMPL.sbyte_to_extractbyte_of_uvalue_sbyte.
+        auto.
+      }
     Qed.
 
     Lemma handle_memory_correct :
       forall T (m : MemoryE T) pre,
-        exec_correct pre (handle_memory T m) (handle_memory_prop T m).
+        exec_correct pre (handle_memory T m) (handle_memory_prop T m) exec_correct_id_post.
     Proof using Type.
       intros T m pre.
       destruct m.
@@ -7127,119 +7175,444 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       - (* Alloca *)
         unfold handle_memory.
         unfold handle_memory_prop.
-        apply exec_correct_bind.
-        apply allocate_dtyp_correct.
-        intros * VALID RUN.
-        apply exec_correct_ret.
+        eapply exec_correct_strengthen_post; cycle 1.
+        { apply exec_correct_bind.
+          apply allocate_dtyp_correct.
+          intros * VALID POST RUN.
+          apply exec_correct_ret.
+        }
+
+        intros ms st a ms' st' H H0.
+        auto.
       - (* Load *)
         unfold handle_memory, handle_memory_prop.
         destruct a; try apply exec_correct_raise_ub.
+        eapply exec_correct_strengthen_post; cycle 1.
         apply read_uvalue_correct.
+        intros ms st a0 ms' st' H H0.
+        auto.
       - (* Store *)
         unfold handle_memory, handle_memory_prop.
         destruct a; try apply exec_correct_raise_ub.
+        eapply exec_correct_strengthen_post; cycle 1.
         apply write_uvalue_correct.
+        intros ms st a0 ms' st' H H0.
+        auto.
     Qed.
 
     Lemma handle_memcpy_correct:
       forall args pre,
-        exec_correct pre (handle_memcpy args) (handle_memcpy_prop args).
+        exec_correct pre (handle_memcpy args) (handle_memcpy_prop args) exec_correct_id_post.
     Proof using Type.
-      intros args.
+      intros args pre.
       unfold handle_memcpy, handle_memcpy_prop.
-      repeat (break_match; try apply exec_correct_raise_error).
-      all: apply memcpy_correct.
+      repeat (break_match; try eapply exec_correct_strengthen_post; try apply exec_correct_raise_error; eauto).
+      all: eapply exec_correct_strengthen_post; cycle 1; [apply memcpy_correct|auto].
     Qed.
 
     Lemma handle_memset_correct:
       forall args pre,
-        exec_correct pre (handle_memset args) (handle_memset_prop args).
+        exec_correct pre (handle_memset args) (handle_memset_prop args) exec_correct_id_post.
     Proof using Type.
-      intros args.
+      intros args pre.
       unfold handle_memset, handle_memset_prop.
-      repeat (break_match; try apply exec_correct_raise_error).
-      { intros pre.
-        apply exec_correct_bind.
-        apply exec_correct_fresh_sid; eauto.
-        intros a0 ms_init ms_after_m st_init st_after_m H.
-        apply memset_correct.
+      repeat (break_match;
+              try solve
+                [ eapply exec_correct_strengthen_post; cycle 1;
+                  [apply exec_correct_raise_error|eauto]]).
+      { eapply exec_correct_strengthen_post; cycle 1.
+        { apply exec_correct_bind.
+          apply exec_correct_fresh_sid; eauto.
+          intros a0 ms_init ms_after_m st_init st_after_m H H0 H1 WEM.
+          eapply exec_correct_weaken_pre; cycle 1.
+          apply memset_correct.
+          intros ms st (?&?&?).
+          cbn in *.
+          repeat red in H3.
+          destruct H3 as (?&?&?).
+          cbn in *.
+          rewrite H3, bind_ret_l, H1 in H5.
+          eapply eq1_ret_ret in H5; try typeclasses eauto.
+          inv H5.
+          lia.
+        }
+        auto.
       }
-      { intros pre.
-        apply exec_correct_bind.
-        apply exec_correct_fresh_sid; eauto.
-        intros a0 ms_init ms_after_m st_init st_after_m H.
-        apply memset_correct.
+      { eapply exec_correct_strengthen_post; cycle 1.
+        { apply exec_correct_bind.
+          apply exec_correct_fresh_sid; eauto.
+          intros a0 ms_init ms_after_m st_init st_after_m H H0 H1 WEM.
+          eapply exec_correct_weaken_pre; cycle 1.
+          apply memset_correct.
+          intros ms st (?&?&?).
+          cbn in *.
+          repeat red in H3.
+          destruct H3 as (?&?&?).
+          cbn in *.
+          rewrite H3, bind_ret_l, H1 in H5.
+          eapply eq1_ret_ret in H5; try typeclasses eauto.
+          inv H5.
+          lia.
+        }
+        auto.
       }
     Qed.
 
     Lemma malloc_bytes_correct :
-      forall bytes pre,
-        exec_correct pre (malloc_bytes bytes) (malloc_bytes_spec_MemPropT bytes).
+      forall bytes,
+        exec_correct
+          (fun ms st => Forall (fun b : BYTE_IMPL.SByte => exists s : store_id, MemByte.sbyte_sid b = inr s /\ s < st) bytes)
+          (malloc_bytes bytes) (malloc_bytes_spec_MemPropT bytes) exec_correct_id_post.
     Proof using Type.
-      intros bytes pre.
-      apply exec_correct_bind.
-      apply exec_correct_fresh_provenance.
-      intros a ms_init ms_after_m st_init st_after_m RUN0.
-      apply malloc_bytes_with_pr_correct.
+      intros bytes.
+      eapply exec_correct_strengthen_post; cycle 1.
+      { apply exec_correct_bind.
+        apply exec_correct_fresh_provenance.
+        intros a ms_init ms_after_m st_init st_after_m H H0 H1 WEM.
+        eapply exec_correct_weaken_pre; cycle 1.
+        apply malloc_bytes_with_pr_correct.
+
+        intros ms st (?&?&?).
+        cbn in H3.
+        repeat red in H3.
+        destruct H3 as (?&?&?).
+        cbn in H3.
+        cbn in H5.
+        rewrite H3, bind_ret_l, H1 in H5.
+        eapply eq1_ret_ret in H5; try typeclasses eauto.
+        inv H5.
+        auto.
+        destruct H0 as (?&?&?&?).
+        subst.
+        auto.
+      }
+      auto.
     Qed.
 
     Hint Resolve malloc_bytes_correct : EXEC_CORRECT.
 
     Lemma handle_malloc_correct:
       forall args pre,
-        exec_correct pre (handle_malloc args) (handle_malloc_prop args).
+        exec_correct pre (handle_malloc args) (handle_malloc_prop args) exec_correct_id_post.
     Proof using Type.
-      intros args.
+      intros args pre.
       unfold handle_malloc, handle_malloc_prop.
-      repeat (break_match; try apply exec_correct_raise_error).
-      all: eauto with EXEC_CORRECT.
+      repeat (break_match;
+              try solve
+                [ eapply exec_correct_strengthen_post; cycle 1;
+                  [apply exec_correct_raise_error|eauto]]).
+
+      { eapply exec_correct_weaken_pre; cycle 1.
+        eapply exec_correct_strengthen_post; cycle 1.
+        { eapply exec_correct_bind;
+            eauto with EXEC_CORRECT.
+          intros * VALID POST RUN.
+          eapply exec_correct_bind;
+            eauto with EXEC_CORRECT.
+          intros * VALID' POST' RUN'.
+          eapply exec_correct_weaken_pre; cycle 1.
+          eapply malloc_bytes_correct.
+          intros ms st H.
+          cbn.
+          unfold lift_OOM in POST'.
+          break_match_hyp_inv.
+          eapply generate_num_undef_bytes_bounded; eauto.
+          destruct POST as (?&?&?); subst.
+          destruct H as (?&?&?&?); subst.
+          destruct H1; subst.
+          destruct H as (?&?&?).
+          repeat red in H3.
+          destruct H3 as (?&?&?).
+          cbn in H3.
+          cbn in H6.
+          rewrite H3 in H6.
+          rewrite MemMonad_run_ret, bind_ret_l in H6.
+          eapply eq1_ret_ret in H6; try typeclasses eauto.
+          inv H6.
+          cbn in H1.
+          repeat red in H1.
+          destruct H1 as (?&?&?).
+          cbn in *.
+          rewrite H1, bind_ret_l in H6.
+          rewrite RUN in H6.
+          eapply eq1_ret_ret in H6; try typeclasses eauto.
+          inv H6.
+          auto.
+        }
+        
+        eauto with EXEC_CORRECT.
+        eauto with EXEC_CORRECT.
+      }
+      { eapply exec_correct_weaken_pre; cycle 1.
+        eapply exec_correct_strengthen_post; cycle 1.
+        { eapply exec_correct_bind;
+            eauto with EXEC_CORRECT.
+          intros * VALID POST RUN.
+          eapply exec_correct_bind;
+            eauto with EXEC_CORRECT.
+          intros * VALID' POST' RUN'.
+          eapply exec_correct_weaken_pre; cycle 1.
+          eapply malloc_bytes_correct.
+          intros ms st H.
+          cbn.
+          unfold lift_OOM in POST'.
+          break_match_hyp_inv.
+          eapply generate_num_undef_bytes_bounded; eauto.
+          destruct POST as (?&?&?); subst.
+          destruct H as (?&?&?&?); subst.
+          destruct H1; subst.
+          destruct H as (?&?&?).
+          repeat red in H3.
+          destruct H3 as (?&?&?).
+          cbn in H3.
+          cbn in H6.
+          rewrite H3 in H6.
+          rewrite MemMonad_run_ret, bind_ret_l in H6.
+          eapply eq1_ret_ret in H6; try typeclasses eauto.
+          inv H6.
+          cbn in H1.
+          repeat red in H1.
+          destruct H1 as (?&?&?).
+          cbn in *.
+          rewrite H1, bind_ret_l in H6.
+          rewrite RUN in H6.
+          eapply eq1_ret_ret in H6; try typeclasses eauto.
+          inv H6.
+          auto.
+        }
+        
+        eauto with EXEC_CORRECT.
+        eauto with EXEC_CORRECT.
+      }
+      { eapply exec_correct_weaken_pre; cycle 1.
+        eapply exec_correct_strengthen_post; cycle 1.
+        { eapply exec_correct_bind;
+            eauto with EXEC_CORRECT.
+          intros * VALID POST RUN.
+          eapply exec_correct_bind;
+            eauto with EXEC_CORRECT.
+          intros * VALID' POST' RUN'.
+          eapply exec_correct_weaken_pre; cycle 1.
+          eapply malloc_bytes_correct.
+          intros ms st H.
+          cbn.
+          unfold lift_OOM in POST'.
+          break_match_hyp_inv.
+          eapply generate_num_undef_bytes_bounded; eauto.
+          destruct POST as (?&?&?); subst.
+          destruct H as (?&?&?&?); subst.
+          destruct H1; subst.
+          destruct H as (?&?&?).
+          repeat red in H3.
+          destruct H3 as (?&?&?).
+          cbn in H3.
+          cbn in H6.
+          rewrite H3 in H6.
+          rewrite MemMonad_run_ret, bind_ret_l in H6.
+          eapply eq1_ret_ret in H6; try typeclasses eauto.
+          inv H6.
+          cbn in H1.
+          repeat red in H1.
+          destruct H1 as (?&?&?).
+          cbn in *.
+          rewrite H1, bind_ret_l in H6.
+          rewrite RUN in H6.
+          eapply eq1_ret_ret in H6; try typeclasses eauto.
+          inv H6.
+          auto.
+        }
+        
+        eauto with EXEC_CORRECT.
+        eauto with EXEC_CORRECT.
+      }
+      { eapply exec_correct_weaken_pre; cycle 1.
+        eapply exec_correct_strengthen_post; cycle 1.
+        { eapply exec_correct_bind;
+            eauto with EXEC_CORRECT.
+          intros * VALID POST RUN.
+          eapply exec_correct_bind;
+            eauto with EXEC_CORRECT.
+          intros * VALID' POST' RUN'.
+          eapply exec_correct_weaken_pre; cycle 1.
+          eapply malloc_bytes_correct.
+          intros ms st H.
+          cbn.
+          unfold lift_OOM in POST'.
+          break_match_hyp_inv.
+          eapply generate_num_undef_bytes_bounded; eauto.
+          destruct POST as (?&?&?); subst.
+          destruct H as (?&?&?&?); subst.
+          destruct H1; subst.
+          destruct H as (?&?&?).
+          repeat red in H3.
+          destruct H3 as (?&?&?).
+          cbn in H3.
+          cbn in H6.
+          rewrite H3 in H6.
+          rewrite MemMonad_run_ret, bind_ret_l in H6.
+          eapply eq1_ret_ret in H6; try typeclasses eauto.
+          inv H6.
+          cbn in H1.
+          repeat red in H1.
+          destruct H1 as (?&?&?).
+          cbn in *.
+          rewrite H1, bind_ret_l in H6.
+          rewrite RUN in H6.
+          eapply eq1_ret_ret in H6; try typeclasses eauto.
+          inv H6.
+          auto.
+        }
+        
+        eauto with EXEC_CORRECT.
+        eauto with EXEC_CORRECT.
+      }
+      { eapply exec_correct_weaken_pre; cycle 1.
+        eapply exec_correct_strengthen_post; cycle 1.
+        { eapply exec_correct_bind;
+            eauto with EXEC_CORRECT.
+          intros * VALID POST RUN.
+          eapply exec_correct_bind;
+            eauto with EXEC_CORRECT.
+          intros * VALID' POST' RUN'.
+          eapply exec_correct_weaken_pre; cycle 1.
+          eapply malloc_bytes_correct.
+          intros ms st H.
+          cbn.
+          unfold lift_OOM in POST'.
+          break_match_hyp_inv.
+          eapply generate_num_undef_bytes_bounded; eauto.
+          destruct POST as (?&?&?); subst.
+          destruct H as (?&?&?&?); subst.
+          destruct H1; subst.
+          destruct H as (?&?&?).
+          repeat red in H3.
+          destruct H3 as (?&?&?).
+          cbn in H3.
+          cbn in H6.
+          rewrite H3 in H6.
+          rewrite MemMonad_run_ret, bind_ret_l in H6.
+          eapply eq1_ret_ret in H6; try typeclasses eauto.
+          inv H6.
+          cbn in H1.
+          repeat red in H1.
+          destruct H1 as (?&?&?).
+          cbn in *.
+          rewrite H1, bind_ret_l in H6.
+          rewrite RUN in H6.
+          eapply eq1_ret_ret in H6; try typeclasses eauto.
+          inv H6.
+          auto.
+        }
+        
+        eauto with EXEC_CORRECT.
+        eauto with EXEC_CORRECT.
+      }
+      { eapply exec_correct_weaken_pre; cycle 1.
+        eapply exec_correct_strengthen_post; cycle 1.
+        { eapply exec_correct_bind;
+            eauto with EXEC_CORRECT.
+          intros * VALID POST RUN.
+          eapply exec_correct_bind;
+            eauto with EXEC_CORRECT.
+          intros * VALID' POST' RUN'.
+          eapply exec_correct_weaken_pre; cycle 1.
+          eapply malloc_bytes_correct.
+          intros ms st H.
+          cbn.
+          unfold lift_OOM in POST'.
+          break_match_hyp_inv.
+          eapply generate_num_undef_bytes_bounded; eauto.
+          destruct POST as (?&?&?); subst.
+          destruct H as (?&?&?&?); subst.
+          destruct H1; subst.
+          destruct H as (?&?&?).
+          repeat red in H3.
+          destruct H3 as (?&?&?).
+          cbn in H3.
+          cbn in H6.
+          rewrite H3 in H6.
+          rewrite MemMonad_run_ret, bind_ret_l in H6.
+          eapply eq1_ret_ret in H6; try typeclasses eauto.
+          inv H6.
+          cbn in H1.
+          repeat red in H1.
+          destruct H1 as (?&?&?).
+          cbn in *.
+          rewrite H1, bind_ret_l in H6.
+          rewrite RUN in H6.
+          eapply eq1_ret_ret in H6; try typeclasses eauto.
+          inv H6.
+          auto.
+        }
+        
+        eauto with EXEC_CORRECT.
+        eauto with EXEC_CORRECT.
+      }
     Qed.
 
     Lemma handle_free_correct:
       forall args pre,
-        exec_correct pre (handle_free args) (handle_free_prop args).
+        exec_correct pre (handle_free args) (handle_free_prop args) exec_correct_id_post.
     Proof using Type.
       intros args pre.
       unfold handle_free, handle_free_prop.
-      repeat (break_match; try apply exec_correct_raise_error).
+      repeat (break_match;
+              try solve
+                [ eapply exec_correct_strengthen_post; cycle 1;
+                  [apply exec_correct_raise_error|eauto]]).
+      subst.
       all: apply free_correct.
     Qed.
 
     Lemma handle_intrinsic_correct:
       forall T (e : IntrinsicE T) pre,
-        exec_correct pre (handle_intrinsic T e) (handle_intrinsic_prop T e).
+        exec_correct pre (handle_intrinsic T e) (handle_intrinsic_prop T e) exec_correct_id_post.
     Proof using Type.
       intros T e pre.
       unfold handle_intrinsic, handle_intrinsic_prop.
       break_match.
       break_match.
       { (* Memcpy *)
-        apply exec_correct_bind.
-        apply handle_memcpy_correct.
-        intros * VALID RUN.
-        apply exec_correct_ret.
+        eapply exec_correct_strengthen_post; cycle 1.
+        { apply exec_correct_bind.
+          apply handle_memcpy_correct.
+          intros * VALID POST RUN.
+          apply exec_correct_ret.
+        }
+        auto.
       }
 
       break_match.
       { (* Memset *)
-        apply exec_correct_bind.
-        apply handle_memset_correct.
-        intros * VALID RUN.
-        apply exec_correct_ret.
+        eapply exec_correct_strengthen_post; cycle 1.
+        { apply exec_correct_bind.
+          apply handle_memset_correct.
+          intros * VALID POST RUN.
+          apply exec_correct_ret.
+        }
+        auto.
       }
 
       break_match.
       { (* Malloc *)
-        apply exec_correct_bind.
-        apply handle_malloc_correct.
-        eauto with EXEC_CORRECT.
+        eapply exec_correct_strengthen_post; cycle 1.
+        { apply exec_correct_bind.
+          apply handle_malloc_correct.
+          intros * VALID POST RUN.
+          eapply exec_correct_ret.
+        }
+        auto.
       }
 
       break_match.
       { (* Free *)
-        apply exec_correct_bind.
-        apply handle_free_correct.
-        eauto with EXEC_CORRECT.
+        eapply exec_correct_strengthen_post; cycle 1.
+        { apply exec_correct_bind.
+          apply handle_free_correct.
+          intros * VALID POST RUN.
+          eapply exec_correct_ret.
+        }
+        auto.
       }
 
       apply exec_correct_raise_error.
