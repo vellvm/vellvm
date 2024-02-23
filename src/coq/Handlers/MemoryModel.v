@@ -5538,7 +5538,8 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     (** Correctness of the main operations on memory *)
     Parameter read_byte_correct :
       forall ptr pre,
-        exec_correct pre (read_byte ptr) (read_byte_spec_MemPropT ptr) exec_correct_id_post.
+        exec_correct pre (read_byte ptr) (read_byte_spec_MemPropT ptr)
+          (fun ms st byte ms' st' => (exists s, MemByte.sbyte_sid byte = inr s /\ s < st) /\ ms = ms' /\ st = st').
 
     Parameter write_byte_correct :
       forall ptr byte,
@@ -6056,8 +6057,9 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Lemma read_bytes_correct :
       forall len ptr pre,
         exec_correct pre (read_bytes ptr len) (read_bytes_spec ptr len)
-          (a0 <- get_consecutive_ptrs ptr len;;
-           (fun a1 : list LP.ADDR.addr => map_monad (fun _ : LP.ADDR.addr => exec_correct_id_post) a1) a0).
+          (@get_consecutive_ptrs exec_correct_post Monad_exec_correct_post RAISE_OOM_exec_correct_post RAISE_ERROR_exec_correct_post ptr len;;
+           (fun ms st bytes ms' st' =>
+              (Forall (fun byte => exists s, MemByte.sbyte_sid byte = inr s /\ s < st) bytes /\ ms = ms' /\ st = st'))).
     Proof using Type.
       unfold read_bytes.
       unfold read_bytes_spec.
@@ -6066,17 +6068,41 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       eapply exec_correct_get_consecutive_pointers.
 
       intros * VALID POST RUN.
+      eapply exec_correct_strengthen_post; cycle 1.
       eapply exec_correct_map_monad.
       intros ptr'.
       apply read_byte_correct.
+
+      clear.
+      intros ms st a0 ms' st' _ MAP.
+      generalize dependent a0.
+      revert ms st ms' st'.
+      induction a; intros ms st ms' st' bytes MAP.
+      - cbn in *.
+        destruct MAP as (?&?&?); subst.
+        split; auto.
+      - rewrite map_monad_unfold in MAP.
+        destruct MAP as (?&?&?&?&?&?&?&?&?).
+        cbn in *.
+        red in H1.
+        destruct H1 as (?&?&?); subst.
+        destruct H as (?&?&?); subst.
+        eapply IHa in H0.
+        destruct H0 as (?&?&?); subst.
+        split; auto.
     Qed.
 
     Lemma read_uvalue_correct :
       forall dt ptr pre,
         exec_correct pre (read_uvalue dt ptr) (read_uvalue_spec dt ptr)
           (a0 <-
-             (a0 <- get_consecutive_ptrs ptr (N.to_nat (LP.SIZEOF.sizeof_dtyp dt));;
-              map_monad (fun _ : LP.ADDR.addr => exec_correct_id_post) a0);;
+             (_ <- get_consecutive_ptrs ptr (N.to_nat (LP.SIZEOF.sizeof_dtyp dt));;
+              (fun (ms0 : MemState) (st0 : store_id) (bytes : list MP.BYTE_IMPL.SByte) 
+                 (ms'0 : MemState) (st'0 : store_id) =>
+                 Forall
+                   (fun byte : MP.BYTE_IMPL.SByte =>
+                      exists s : store_id, MemByte.sbyte_sid byte = inr s /\ s < st0) bytes /\
+                   ms0 = ms'0 /\ st0 = st'0));;
            (fun a1 : list MP.BYTE_IMPL.SByte => lift_err_RAISE_ERROR (deserialize_sbytes a1 dt)) a0).
     Proof using Type.
       intros dt ptr pre.
@@ -6989,7 +7015,40 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
     Lemma memcpy_correct :
       forall src dst len volatile pre,
-        exec_correct pre (memcpy src dst len volatile) (memcpy_spec src dst len volatile) exec_correct_id_post.
+        exec_correct pre (memcpy src dst len volatile) (memcpy_spec src dst len volatile)
+          (a0 <-
+             (_ <-
+                @get_consecutive_ptrs exec_correct_post Monad_exec_correct_post RAISE_OOM_exec_correct_post
+                  RAISE_ERROR_exec_correct_post src (Z.to_nat len);;
+              (fun (ms0 : MemState) (st0 : store_id) (bytes : list BYTE_IMPL.SByte) 
+                 (ms'0 : MemState) (st'0 : store_id) =>
+                 @Forall BYTE_IMPL.SByte
+                   (fun byte : BYTE_IMPL.SByte =>
+                      exists s : store_id, MemByte.sbyte_sid byte = @inr string store_id s /\ s < st0) bytes /\
+                   ms0 = ms'0 /\ st0 = st'0));;
+           (fun a1 : list BYTE_IMPL.SByte =>
+              @exec_correct_post_bind (list ADDR.addr) unit
+                (@exec_correct_post_bind (list IP.intptr) (list ADDR.addr)
+                   (@lift_OOM exec_correct_post Monad_exec_correct_post RAISE_OOM_exec_correct_post
+                      (list IP.intptr) (intptr_seq 0 (@Datatypes.length BYTE_IMPL.SByte a1)))
+                   (fun ixs : list IP.intptr =>
+                      @exec_correct_post_bind (list (OOM ADDR.addr)) (list ADDR.addr)
+                        (@lift_err_RAISE_ERROR (list (OOM ADDR.addr)) exec_correct_post Monad_exec_correct_post
+                           RAISE_ERROR_exec_correct_post
+                           (@map_monad err (EitherMonad.Monad_either string) IP.intptr 
+                              (OOM ADDR.addr)
+                              (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) dst [DVALUE_IPTR ix]) ixs))
+                        (fun addrs : list (OOM ADDR.addr) =>
+                           @lift_OOM exec_correct_post Monad_exec_correct_post RAISE_OOM_exec_correct_post
+                             (list ADDR.addr) (@sequence OOM MonadOOM ADDR.addr addrs))))
+                (fun a2 : list ADDR.addr =>
+                   @exec_correct_post_bind (list unit) unit
+                     (@map_monad_In exec_correct_post Monad_exec_correct_post (ADDR.addr * BYTE_IMPL.SByte) unit
+                        (@zip ADDR.addr BYTE_IMPL.SByte a2 a1)
+                        (fun (H : ADDR.addr * BYTE_IMPL.SByte)
+                           (_ : @In (ADDR.addr * BYTE_IMPL.SByte) H (@zip ADDR.addr BYTE_IMPL.SByte a2 a1))
+                           (_ : MemState) (st0 : store_id) (_ : unit) (_ : MemState) (st'0 : store_id) =>
+                           st0 = st'0)) (fun _ : list unit => @exec_correct_post_ret unit tt))) a0).
     Proof using Type.
       intros src dst len volatile pre.
       unfold memcpy, memcpy_spec.
@@ -6998,7 +7057,6 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       unfold OVER_H.no_overlap, OVER.overlaps.
       break_match; [|apply exec_correct_raise_ub].
 
-      eapply exec_correct_strengthen_post; cycle 1.
       { apply exec_correct_bind.
         apply read_bytes_correct.
         intros * VALID POST RUN.
@@ -7011,37 +7069,30 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         repeat red in H1.
         destruct H1 as (?&?&?&?).
         assert (x = ms_init).
-        admit.
-        subst.
-        clear - H2.
-        revert ms_init st ms a H2.
-        induction x0; intros ms_init st ms bytes H2.
-        - cbn in H2.
-          destruct H2; subst.
-          constructor.
-        - cbn in H2.
-          destruct H2 as (?&?&?&?&?&?&?&?); subst.
-          destruct H; subst.
-          eapply IHx0 in H0; eauto.
-          constructor; eauto.
-          destruct H1.
-          unfold read_byte_prop, read_byte_allowed in *.
-          destruct read_byte_allowed_spec0 as (?&?&?).
-          repeat red in H.
-          unfold MemByte.sbyte_sid.
-          unfold addr_allocated_prop_memory in *.
+        { red in H1.
+          cbn in H1.
+          destruct H1 as (?&?&?&?&?&?&?).
+          unfold lift_OOM in *.
+          unfold lift_err_RAISE_ERROR in *.
+          repeat break_match_hyp_inv.
+          auto.
+        }
 
-          unfold read_byte_spec in *.
-
-          eapply IHx0.
-
-        cbn in H0.
+        destruct POST as (?&?&?&?&?&?&?); subst.
+        destruct H4 as (?&?&?&?&?&?&?&?&?).
+        unfold lift_OOM in *.
+        repeat break_match_hyp_inv.
+        destruct H8, H7; subst.
+        unfold lift_err_RAISE_ERROR in H4.
         repeat red in H0.
         destruct H0 as (?&?&?).
-        cbn in H0, H2.
-
+        cbn in H0, H3.
+        rewrite H0, bind_ret_l in H3.
+        rewrite RUN in H3.
+        eapply eq1_ret_ret in H3; try typeclasses eauto.
+        inv H3.
+        auto.
       }
-
     Qed.
 
     Lemma memset_correct :
