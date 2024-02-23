@@ -104,7 +104,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       apply (sid <- get;;
              let sid' := BinNatDef.N.succ sid in
              put sid';;
-             ret sid').
+             ret sid).
     Defined.
 
     #[global] Instance MemStateFreshT_MonadMemState M `{Monad M} : MonadMemState MemState (MemStateFreshT M).
@@ -288,11 +288,13 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         cbn.
         split; [reflexivity|].
 
-        split.
+        split; [|split; [|split]].
         + red.
           intros sid' USED.
           apply VALID_SID in USED.
           lia.
+        + lia.
+        + lia.
         + intros USED.
           apply VALID_SID in USED.
           lia.
@@ -546,7 +548,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       apply (sid <- get;;
              let sid' := BinNatDef.N.succ sid in
              put sid';;
-             ret sid').
+             ret sid).
     Defined.
 
     #[global] Instance MemStateFreshT_MonadMemState M `{Monad M} : MonadMemState MemState (MemStateFreshT M).
@@ -644,7 +646,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         cbn.
         split; [reflexivity|].
 
-        split.
+        split; [|split; [|split]]; try lia.
         + red.
           intros sid' USED.
           apply VALID_SID in USED.
@@ -864,6 +866,9 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         right; right; right.
         do 3 eexists.
         split; eauto.
+        split; eauto.
+        apply POST.
+        exists exec_res0. reflexivity.
       }
     Qed.
 
@@ -951,6 +956,9 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         right; right; right.
         do 3 eexists.
         split; eauto.
+        split; eauto.
+        apply POST.
+        eexists; reflexivity.
       }
     Qed.
 

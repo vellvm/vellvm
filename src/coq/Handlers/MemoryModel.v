@@ -4211,7 +4211,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     exists st' sid',
       eq1 (MemMonad_run (fresh_sid) ms st) (ret (st', (ms, sid'))) /\
         MemMonad_valid_state ms st' /\
-        sid' < st' /\ st < st' /\
+        sid' <= st /\ st < st' /\
         ~ used_store_id_prop ms sid';
 
     (** Fresh provenance property *)
@@ -4457,7 +4457,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   #[global] Instance MonadStoreId_exec_correct_post : MonadStoreId exec_correct_post.
   split.
   refine (fun ms st sid ms' st' =>
-            sid < st' /\ st < st' /\ ms = ms').
+            sid <= st /\ st < st' /\ ms = ms').
   Defined.
 
   #[global] Instance MonadProvenance_exec_correct_post : MonadProvenance Provenance exec_correct_post.
@@ -6288,6 +6288,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
                  (m_exec a) (@pair store_id MemState st_init ms_init)
                  (@ret err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) B
                     res) (@pair store_id MemState st ms)) /\
+                (post_b a) ms_init st_init res ms st /\
                 m_spec a ms_init (ret (ms, res)) ->
               pre ms st),
         (forall a, exec_correct pre (m_exec a) (m_spec a) (post_b a)) ->
@@ -6318,7 +6319,17 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           intros ms st H.
           eapply STEP.
           apply H.
+          split.
           apply H.
+          split; [| apply H].
+          destruct H as (?&?&?).
+          cbn in H0.
+          repeat red in H0.
+          destruct H0 as (?&?&?).
+          cbn in *.
+          rewrite H0 in H2.
+          rewrite bind_ret_l in H2.
+          eapply POST_STEP; eauto.
         }
 
         intros * VALID2 POST2 RUN2.
@@ -6352,6 +6363,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
                  (m_exec a) (@pair store_id MemState st_init ms_init)
                  (@ret err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) B
                     res) (@pair store_id MemState st ms)) /\
+                (post_b a) ms_init st_init res ms st /\
                 m_spec a ms_init (ret (ms, res)) ->
               pre ms st),
         (forall a, exec_correct pre (m_exec a) (m_spec a) (post_b a)) ->
@@ -6482,6 +6494,8 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           }
           {
             intros ms_init st_init [a' b] [] ms st IN H.
+            unfold lift_OOM in *; break_match_hyp_inv.
+            destruct H3; subst.
             eapply write_byte_preserves_store_id.
             cbn.
             repeat red.
@@ -6968,7 +6982,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
           eapply generate_undef_bytes_bounded; eauto.
           destruct POST1 as (?&?&?); subst.
-          auto.
+          lia.
         }
 
         intros * VALID2 POST2 RUN2.
@@ -7337,7 +7351,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           rewrite RUN in H6.
           eapply eq1_ret_ret in H6; try typeclasses eauto.
           inv H6.
-          auto.
+          lia.
         }
         
         eauto with EXEC_CORRECT.
@@ -7378,7 +7392,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           rewrite RUN in H6.
           eapply eq1_ret_ret in H6; try typeclasses eauto.
           inv H6.
-          auto.
+          lia.
         }
         
         eauto with EXEC_CORRECT.
@@ -7419,7 +7433,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           rewrite RUN in H6.
           eapply eq1_ret_ret in H6; try typeclasses eauto.
           inv H6.
-          auto.
+          lia.
         }
         
         eauto with EXEC_CORRECT.
@@ -7460,7 +7474,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           rewrite RUN in H6.
           eapply eq1_ret_ret in H6; try typeclasses eauto.
           inv H6.
-          auto.
+          lia.
         }
         
         eauto with EXEC_CORRECT.
@@ -7501,7 +7515,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           rewrite RUN in H6.
           eapply eq1_ret_ret in H6; try typeclasses eauto.
           inv H6.
-          auto.
+          lia.
         }
         
         eauto with EXEC_CORRECT.
@@ -7542,7 +7556,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           rewrite RUN in H6.
           eapply eq1_ret_ret in H6; try typeclasses eauto.
           inv H6.
-          auto.
+          lia.
         }
         
         eauto with EXEC_CORRECT.

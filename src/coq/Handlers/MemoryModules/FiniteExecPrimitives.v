@@ -3099,7 +3099,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     (** Correctness of the main operations on memory *)
     Lemma read_byte_correct :
-      forall ptr pre, exec_correct pre (read_byte ptr) (read_byte_spec_MemPropT ptr).
+      forall ptr pre,
+        exec_correct pre (read_byte ptr) (read_byte_spec_MemPropT ptr)
+          (fun ms st byte ms' st' => (exists s, MemByte.sbyte_sid byte = inr s /\ (s < st)%N) /\ ms = ms' /\ st = st').
     Proof using.
       unfold exec_correct.
       intros ptr pre ms st VALID.
@@ -3138,6 +3140,25 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           - unfold mem_state_memory in *.
             solve_read_byte_prop.
         }
+
+        intros H1.
+        destruct H1; inv H1.
+        split; eauto.
+        eexists; split; eauto.
+        split; eauto.
+        red in VALID.
+        pose proof sbyte_to_extractbyte_inv x as (?&?&?&?&?).
+        unfold sbyte_sid.
+        rewrite H1.
+        exists x3.
+        split; eauto.
+        eapply VALID.
+        repeat red.
+        exists ptr. exists x.
+        unfold sbyte_sid.
+        rewrite H1.
+        split; auto.
+        eapply read_byte_raw_read_byte_prop; eauto.
       - (* UB from provenance mismatch *)
         left.
         unfold read_byte_spec_MemPropT.
@@ -3166,9 +3187,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Qed.
 
     Lemma write_byte_correct :
-      forall ptr byte, exec_correct
-                    (fun ms st => exists s, sbyte_sid byte = inr s /\ (s < st)%N)
-                    (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
+      forall ptr byte,
+        exec_correct
+          (fun ms st => exists s, sbyte_sid byte = inr s /\ (s < st)%N)
+          (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte)
+          (fun _ st _ _ st' => st = st').
     Proof using.
       unfold exec_correct.
       intros ptr byte ms st VALID.
@@ -3215,6 +3238,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         }
 
         intros _.
+        split; eauto.
         repeat red in VALID.
         repeat red.
         intros sid' USED.
@@ -3269,6 +3293,52 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         repeat red in ALLOC.
         rewrite READ in ALLOC.
         auto.
+    Qed.
+
+    Lemma write_byte_preserves_store_id :
+      forall st ms a b st' ms' res,
+        @within MemM EQM err_ub_oom (prod store_id MemState) (prod store_id MemState)
+          (@Within_err_ub_oom_MemM MemM Eff
+             (@MemMonad_eq1_runm MemM (itree Eff) MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB
+                RunOOM EQM EQRI MLAWS H) MRun
+             (@MemMonad_eq1_runm_equiv MemM (itree Eff) MM MRun MPROV MSID MMS MERR MUB MOOM RunERR
+                RunUB RunOOM EQM EQRI MLAWS H) RunERR RunUB RunOOM MM MRun MPROV MSID MMS MERR MUB
+             MOOM RunERR RunUB RunOOM EQM EQRI MLAWS H) unit
+          (write_byte a b) (@pair store_id MemState st ms)
+          (@ret err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) unit res)
+          (@pair store_id MemState st' ms') ->
+        st = st'.
+    Proof.
+      intros st ms a b st' ms' res WRITE.
+      repeat red in WRITE.
+      destruct WRITE as (?&?&?).
+      cbn in *.
+      rewrite H0, bind_ret_l in H1.
+      unfold write_byte in *.
+      rewrite MemMonad_run_bind in H1.
+      rewrite MemMonad_get_mem_state, bind_ret_l in H1.
+      break_match_hyp.
+      { (* Byte read from memory *)
+        destruct m.
+        break_match_hyp.
+        { (* Access allowed *)
+          rewrite MemMonad_put_mem_state in H1.
+          eapply eq1_ret_ret in H1; try typeclasses eauto.
+          inv H1; auto.
+        }
+
+        { (* Access not allowed *)
+          symmetry in H1.
+          rewrite MemMonad_run_raise_ub in H1.
+          eapply MemMonad_eq1_raise_ub_inv in H1; try contradiction.
+        }
+      }
+
+      { (* No byte in memory *)
+        symmetry in H1.
+        rewrite MemMonad_run_raise_ub in H1.
+        eapply MemMonad_eq1_raise_ub_inv in H1; try contradiction.
+      }
     Qed.
 
     (* TODO: move this? *)
@@ -3387,7 +3457,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma find_free_block_correct :
       forall len pr pre,
-        exec_correct pre (get_free_block len pr) (find_free_block len pr).
+        exec_correct pre (get_free_block len pr) (find_free_block len pr) exec_correct_id_post.
     Proof using.
       unfold exec_correct.
       intros len pr pre ms st VALID.
@@ -3599,6 +3669,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           erewrite ptr_to_int_int_to_ptr in CONSEC_RET; eauto.
           rewrite next_memory_key_next_key in CONSEC_RET.
           lia.
+        + intros [[a' addrs'] ADDRS]; inv ADDRS.
+          split; eauto.
+          eexists; split; eauto.
+          reflexivity.
     Qed.
 
     Hint Resolve find_free_block_correct : EXEC_CORRECT.
@@ -4840,7 +4914,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
              (Forall (fun (b : SByte) => exists (s : store_id), sbyte_sid b = inr s /\ (s < st)%N) init_bytes) /\
                (ret (ptr, ptrs) {{ms_init}} ∈ {{ms_k}} find_free_block (Datatypes.length init_bytes) pr))
           (_ <- add_block_to_stack (provenance_to_allocation_id pr) ptr ptrs init_bytes;; ret ptr)
-          (_ <- allocate_bytes_post_conditions_MemPropT init_bytes pr ptr ptrs;; ret ptr).
+          (_ <- allocate_bytes_post_conditions_MemPropT init_bytes pr ptr ptrs;; ret ptr)
+          exec_correct_id_post.
     Proof using.
       intros pr ms_init ptr ptrs init_bytes.
       unfold exec_correct.
@@ -4900,6 +4975,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         rename x into ptr.
 
         clear PRE2.
+        split; eauto.
         apply add_all_to_frame_valid_state.
         apply add_all_index_valid_state; auto.
     Qed.
@@ -5021,7 +5097,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
              (Forall (fun (b : SByte) => exists (s : store_id), sbyte_sid b = inr s /\ (s < st)%N) init_bytes) /\
                (ret (ptr, ptrs) {{ms_init}} ∈ {{ms_k}} find_free_block (Datatypes.length init_bytes) pr))
           (_ <- add_block_to_heap (provenance_to_allocation_id pr) ptr ptrs init_bytes;; ret ptr)
-          (_ <- malloc_bytes_post_conditions_MemPropT init_bytes pr ptr ptrs;; ret ptr).
+          (_ <- malloc_bytes_post_conditions_MemPropT init_bytes pr ptr ptrs;; ret ptr)
+          exec_correct_id_post.
     Proof using.
       intros pr ms_init ptr ptrs init_bytes.
       unfold exec_correct.
@@ -5080,6 +5157,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         destruct PRE as (PRE&PRE2).
         inv H0.
         rename x into ptr.
+        split; eauto.
         apply add_all_to_heap_valid_state; eauto.
         apply add_all_index_valid_state; auto.
     Qed.
@@ -5089,67 +5167,75 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         exec_correct
           (fun ms st =>
              Forall (fun b : SByte => exists s : store_id, sbyte_sid b = inr s /\ (s < st)%N) init_bytes)
-          (allocate_bytes_with_pr init_bytes pr) (allocate_bytes_with_pr_spec_MemPropT init_bytes pr).
+          (allocate_bytes_with_pr init_bytes pr) (allocate_bytes_with_pr_spec_MemPropT init_bytes pr)
+          exec_correct_id_post.
     Proof using.
       Opaque exec_correct.
       intros init_bytes pr.
 
       unfold allocate_bytes_with_pr, allocate_bytes_with_pr_spec_MemPropT.
-      apply exec_correct_bind; eauto with EXEC_CORRECT.
-      intros [ptr ptrs] ms' ms_find_free st'' st_find_free GET_FREE.
-      eapply exec_correct_weaken_pre; auto.
-      2: apply add_block_to_stack_correct.
+      eapply exec_correct_strengthen_post; cycle 1.
+      { apply exec_correct_bind with (post_b:=fun _ => exec_correct_id_post); eauto with EXEC_CORRECT.
+        intros [ptr ptrs] ms' ms_find_free st'' st_find_free VALID POST GET_FREE.
+        eapply exec_correct_weaken_pre; auto.
+        2: {
+          eapply exec_correct_strengthen_post; cycle 1.
+          apply add_block_to_stack_correct; auto.
+          auto.
+        }
 
-      cbn.
-      intros ms st H0.
-      destruct H0 as (?&?&?&?); subst.
-      split; eauto.
-      repeat red in H1.
-      destruct H1 as (?&?&?).
-      cbn in *.
-      unfold get_free_block in H2.
-      rewrite MemMonad_run_bind in H2.
-      rewrite MemMonad_get_mem_state in H2.
-      rewrite bind_ret_l in H2.
-      destruct ms; cbn in *.
-      destruct ms_memory_stack0; cbn in *.
-      rewrite MemMonad_run_bind in H2.
-      rewrite H1 in H2.
-      destruct (int_to_ptr
-                  (next_memory_key
-                     {|
-                       memory_stack_memory := memory_stack_memory0;
-                       memory_stack_frame_stack := memory_stack_frame_stack0;
-                       memory_stack_heap := memory_stack_heap0
-                     |}) (allocation_id_to_prov (provenance_to_allocation_id pr))) eqn:ITP;
+        cbn.
+        intros ms st H0.
+        destruct H0 as (?&?&?&?); subst.
+        split; eauto.
+        repeat red in H1.
+        destruct H1 as (?&?&?).
         cbn in *.
-      - rewrite MemMonad_run_ret in H2.
-        rewrite bind_ret_l in H2.
+        unfold get_free_block in H2.
         rewrite MemMonad_run_bind in H2.
-        rewrite MemMonad_run_get_consecutive_ptrs in H2.
+        rewrite MemMonad_get_mem_state in H2.
         rewrite bind_ret_l in H2.
-        pose proof get_consecutive_ptrs_inv a (Datatypes.length init_bytes)
-          as [[msg OOM] | [ptrs' GCP]].
-        + rewrite OOM in H2.
-          cbn in H2.
-          unfold liftM in *.
-          do 2 rewrite rbm_raise_bind in H2; try typeclasses eauto.
+        destruct ms; cbn in *.
+        destruct ms_memory_stack0; cbn in *.
+        rewrite MemMonad_run_bind in H2.
+        rewrite H1 in H2.
+        destruct (int_to_ptr
+                    (next_memory_key
+                       {|
+                         memory_stack_memory := memory_stack_memory0;
+                         memory_stack_frame_stack := memory_stack_frame_stack0;
+                         memory_stack_heap := memory_stack_heap0
+                       |}) (allocation_id_to_prov (provenance_to_allocation_id pr))) eqn:ITP;
+          cbn in *.
+        - rewrite MemMonad_run_ret in H2.
+          rewrite bind_ret_l in H2.
+          rewrite MemMonad_run_bind in H2.
+          rewrite MemMonad_run_get_consecutive_ptrs in H2.
+          rewrite bind_ret_l in H2.
+          pose proof get_consecutive_ptrs_inv a (Datatypes.length init_bytes)
+            as [[msg OOM] | [ptrs' GCP]].
+          + rewrite OOM in H2.
+            cbn in H2.
+            unfold liftM in *.
+            do 2 rewrite rbm_raise_bind in H2; try typeclasses eauto.
+            symmetry in H2.
+            apply MemMonad_eq1_raise_oom_inv in H2; contradiction.
+          + rewrite GCP in H2.
+            cbn in H2.
+            unfold liftM in H2.
+            repeat rewrite bind_ret_l in H2.
+            rewrite MemMonad_run_ret in H2.
+            cbn in H2.
+            eapply eq1_ret_ret in H2; try typeclasses eauto.
+            inv H2.
+            auto.
+        - rewrite MemMonad_run_raise_oom in H2.
+          rewrite rbm_raise_bind in H2; try typeclasses eauto.
+          rewrite bind_ret_l in H2.
           symmetry in H2.
           apply MemMonad_eq1_raise_oom_inv in H2; contradiction.
-        + rewrite GCP in H2.
-          cbn in H2.
-          unfold liftM in H2.
-          repeat rewrite bind_ret_l in H2.
-          rewrite MemMonad_run_ret in H2.
-          cbn in H2.
-          eapply eq1_ret_ret in H2; try typeclasses eauto.
-          inv H2.
-          auto.
-      - rewrite MemMonad_run_raise_oom in H2.
-        rewrite rbm_raise_bind in H2; try typeclasses eauto.
-        rewrite bind_ret_l in H2.
-        symmetry in H2.
-        apply MemMonad_eq1_raise_oom_inv in H2; contradiction.
+      }
+      auto.
     Qed.
 
     (* TODO: move and add to solve_read_byte_allowed *)
@@ -5243,72 +5329,76 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         exec_correct
           (fun ms st =>
              Forall (fun b : SByte => exists s : store_id, sbyte_sid b = inr s /\ (s < st)%N) init_bytes)
-          (malloc_bytes_with_pr init_bytes pr) (malloc_bytes_with_pr_spec_MemPropT init_bytes pr).
+          (malloc_bytes_with_pr init_bytes pr) (malloc_bytes_with_pr_spec_MemPropT init_bytes pr)
+          exec_correct_id_post.
     Proof using.
       intros init_bytes pr.
 
       unfold malloc_bytes_with_pr.
-      apply exec_correct_bind; eauto with EXEC_CORRECT.
-      intros [ptr ptrs] ms' ms_find_free st'' st_find_free GET_FREE.
+      eapply exec_correct_strengthen_post; cycle 1.
+      { apply exec_correct_bind with (post_b:=fun _ => exec_correct_id_post); eauto with EXEC_CORRECT.
+        intros [ptr ptrs] ms' ms_find_free st'' st_find_free VALID POST GET_FREE.
 
-      eapply exec_correct_weaken_pre; auto.
-      2: apply add_block_to_heap_correct.
+        eapply exec_correct_weaken_pre; auto.
+        2: apply add_block_to_heap_correct.
 
-      cbn.
-      intros ms st H0.
-      destruct H0 as (?&?&?&?); subst.
-      split; eauto.
-      repeat red in H1.
-      destruct H1 as (?&?&?).
-      cbn in *.
-      unfold get_free_block in H2.
-      rewrite MemMonad_run_bind in H2.
-      rewrite MemMonad_get_mem_state in H2.
-      rewrite bind_ret_l in H2.
-      destruct ms; cbn in *.
-      destruct ms_memory_stack0; cbn in *.
-      rewrite MemMonad_run_bind in H2.
-      rewrite H1 in H2.
-      destruct (int_to_ptr
-                  (next_memory_key
-                     {|
-                       memory_stack_memory := memory_stack_memory0;
-                       memory_stack_frame_stack := memory_stack_frame_stack0;
-                       memory_stack_heap := memory_stack_heap0
-                     |}) (allocation_id_to_prov (provenance_to_allocation_id pr))) eqn:ITP;
+        cbn.
+        intros ms st H0.
+        destruct H0 as (?&?&?&?); subst.
+        split; eauto.
+        repeat red in H1.
+        destruct H1 as (?&?&?).
         cbn in *.
-      - rewrite MemMonad_run_ret in H2.
-        rewrite bind_ret_l in H2.
+        unfold get_free_block in H2.
         rewrite MemMonad_run_bind in H2.
-        rewrite MemMonad_run_get_consecutive_ptrs in H2.
+        rewrite MemMonad_get_mem_state in H2.
         rewrite bind_ret_l in H2.
-        pose proof get_consecutive_ptrs_inv a (Datatypes.length init_bytes)
-          as [[msg OOM] | [ptrs' GCP]].
-        + rewrite OOM in H2.
-          cbn in H2.
-          unfold liftM in *.
-          do 2 rewrite rbm_raise_bind in H2; try typeclasses eauto.
+        destruct ms; cbn in *.
+        destruct ms_memory_stack0; cbn in *.
+        rewrite MemMonad_run_bind in H2.
+        rewrite H1 in H2.
+        destruct (int_to_ptr
+                    (next_memory_key
+                       {|
+                         memory_stack_memory := memory_stack_memory0;
+                         memory_stack_frame_stack := memory_stack_frame_stack0;
+                         memory_stack_heap := memory_stack_heap0
+                       |}) (allocation_id_to_prov (provenance_to_allocation_id pr))) eqn:ITP;
+          cbn in *.
+        - rewrite MemMonad_run_ret in H2.
+          rewrite bind_ret_l in H2.
+          rewrite MemMonad_run_bind in H2.
+          rewrite MemMonad_run_get_consecutive_ptrs in H2.
+          rewrite bind_ret_l in H2.
+          pose proof get_consecutive_ptrs_inv a (Datatypes.length init_bytes)
+            as [[msg OOM] | [ptrs' GCP]].
+          + rewrite OOM in H2.
+            cbn in H2.
+            unfold liftM in *.
+            do 2 rewrite rbm_raise_bind in H2; try typeclasses eauto.
+            symmetry in H2.
+            apply MemMonad_eq1_raise_oom_inv in H2; contradiction.
+          + rewrite GCP in H2.
+            cbn in H2.
+            unfold liftM in H2.
+            repeat rewrite bind_ret_l in H2.
+            rewrite MemMonad_run_ret in H2.
+            cbn in H2.
+            eapply eq1_ret_ret in H2; try typeclasses eauto.
+            inv H2.
+            auto.
+        - rewrite MemMonad_run_raise_oom in H2.
+          rewrite rbm_raise_bind in H2; try typeclasses eauto.
+          rewrite bind_ret_l in H2.
           symmetry in H2.
           apply MemMonad_eq1_raise_oom_inv in H2; contradiction.
-        + rewrite GCP in H2.
-          cbn in H2.
-          unfold liftM in H2.
-          repeat rewrite bind_ret_l in H2.
-          rewrite MemMonad_run_ret in H2.
-          cbn in H2.
-          eapply eq1_ret_ret in H2; try typeclasses eauto.
-          inv H2.
-          auto.
-      - rewrite MemMonad_run_raise_oom in H2.
-        rewrite rbm_raise_bind in H2; try typeclasses eauto.
-        rewrite bind_ret_l in H2.
-        symmetry in H2.
-        apply MemMonad_eq1_raise_oom_inv in H2; contradiction.
+      }
+      auto.
     Qed.
 
     (** Correctness of frame stack operations *)
     Lemma mempush_correct :
-      forall pre, exec_correct pre mempush mempush_spec_MemPropT.
+      forall pre, exec_correct pre mempush mempush_spec_MemPropT exec_correct_id_post.
     Proof using.
       Transparent exec_correct.
       unfold exec_correct.
@@ -5392,8 +5482,18 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               red.
               reflexivity.
         + (* MemMonad_valid_state *)
-          admit.
-    Admitted.
+          intros _.
+          split.
+          { (* TODO: pull this out into lemma *)
+            red.
+            intros sid' USED.
+            eapply VALID.
+            destruct ms as [[mem fs heap] pr'] eqn:Hms.
+            auto.
+          }
+
+          exists tt; split; eauto.
+    Qed.
 
     (* TODO: move *)
     Lemma read_byte_raw_memory_empty :
@@ -6016,7 +6116,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Qed.
 
     Lemma mempop_correct :
-      forall pre, exec_correct pre mempop mempop_spec_MemPropT.
+      forall pre, exec_correct pre mempop mempop_spec_MemPropT exec_correct_id_post.
     Proof using.
       unfold exec_correct.
       intros pre ms st VALID PRE.
@@ -6359,7 +6459,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     Lemma free_correct :
       forall ptr pre,
-        exec_correct pre (free ptr) (free_spec_MemPropT ptr).
+        exec_correct pre (free ptr) (free_spec_MemPropT ptr) exec_correct_id_post.
     Proof using.
       unfold exec_correct.
       intros ptr pre ms st VALID PRE.
