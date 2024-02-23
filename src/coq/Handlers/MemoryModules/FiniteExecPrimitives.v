@@ -6272,9 +6272,48 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               --- (* heap preserved *)
                 solve_heap_preserved.
           -- (* MemMonad_valid_state *)
-            admit.
+            intros _.
+            split.
+            { (* TODO: pull this out into lemma *)
+              red.
+              intros sid' USED.
+              repeat red in USED.
+              destruct USED as (?&?&?&?).
+              repeat red in H0.
+              cbn in H0.
+              repeat (break_match_hyp; try contradiction).
+              subst.
+              erewrite free_frame_memory_read_byte_raw_disjoint in Heqo; try reflexivity.
+              2: {
+                intros CONTRA.
+                erewrite free_frame_memory_read_byte_raw in Heqo; try discriminate; eauto.
+              }
+              eapply VALID.
+              red.
+              exists x, (fst m).
+              split; eauto.
+              repeat red.
+              cbn.
+              rewrite Heqo.
+              rewrite Heqb.
+              reflexivity.
+            }
+
+            exists tt; split; eauto.
         }
-    Admitted.
+
+        Unshelve.
+        apply st.
+        apply ({|
+              ms_memory_stack :=
+                {|
+                  memory_stack_memory := mem;
+                  memory_stack_frame_stack := Singleton f;
+                  memory_stack_heap := h
+                |};
+              ms_provenance := pr
+            |}).
+    Qed.
 
     Lemma byte_not_allocated_dec :
       forall ms ptr,
@@ -6744,8 +6783,35 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       }
 
       (* MemMonad_valid_state *)
-      admit.
-    Admitted.
+      intros _.
+      split.
+      { (* TODO: pull this out into lemma *)
+        red.
+        intros sid' USED.
+        repeat red in USED.
+        destruct USED as (?&?&?&?).
+        repeat red in H0.
+        cbn in H0.
+        repeat (break_match_hyp; try contradiction).
+        subst.
+        erewrite free_frame_memory_read_byte_raw_disjoint in Heqo; try reflexivity.
+        2: {
+          intros CONTRA.
+          erewrite free_frame_memory_read_byte_raw in Heqo; try discriminate; eauto.
+        }
+        eapply VALID.
+        red.
+        exists x, (fst m).
+        split; eauto.
+        repeat red.
+        cbn.
+        rewrite Heqo.
+        rewrite Heqb.
+        reflexivity.
+      }
+
+      exists tt; split; eauto.
+    Qed.
 
     (*** Initial memory state *)
     Record initial_memory_state_prop : Prop :=
