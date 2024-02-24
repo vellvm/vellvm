@@ -387,8 +387,10 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
                    exists msg_spec, spec ms (raise_oom msg_spec)) \/
              (* Success *)
              (exists st' ms' x,
+                 MemMonad_valid_state ms st ->
                  t ≈ (ret (ms', (st', x))) /\
-                   spec ms (ret (ms', x)))).
+                   spec ms (ret (ms', x)) /\
+                   MemMonad_valid_state ms' st')).
     Defined.
 
     (* TODO: get rid of this silly hack. *)
@@ -865,6 +867,9 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         right; right; right.
         do 3 eexists.
         split; eauto.
+        split; eauto.
+        eapply POST.
+        eauto.
       }
     Qed.
 
@@ -952,6 +957,8 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         right; right; right.
         do 3 eexists.
         split; eauto.
+        split; eauto.
+        eapply POST; eauto.
       }
     Qed.
 
@@ -1152,7 +1159,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
           }
 
           { (* Success case *)
-            destruct H as (sid' & ms' & x & EXEC & SPEC).
+            destruct H as (sid' & ms' & x & EXEC & SPEC); auto.
             eapply Interp_Memory_PropT_Vis
               with (ta:=ret (ms', (sid', x)))
                    (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
@@ -1182,11 +1189,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
             eapply CIH.
             2: reflexivity.
 
-            destruct i.
-            unfold my_handle_intrinsic, handle_intrinsic in *.
-            break_match_hyp.
-            - 
-            reflexivity.
+            eapply SPEC.
           }
         }
 
@@ -1293,7 +1296,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
           }
 
           { (* Success case *)
-            destruct H as (sid' & ms' & x & EXEC & SPEC & VALID').
+            destruct H as (sid' & ms' & x & EXEC & SPEC & VALID'); auto.
             eapply Interp_Memory_PropT_Vis
               with (ta:=ret (ms', (sid', x)))
                    (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).

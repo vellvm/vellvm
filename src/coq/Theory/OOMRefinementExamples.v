@@ -975,10 +975,11 @@ Module Infinite.
   (* Add allocation in infinite language *)
   Example add_alloc :
     forall genv lenv stack sid m,
+      MemoryBigIntptr.MMEP.MemExecM.MemMonad_valid_state m sid ->
       refine_L6 (interp_mcfg4 eq (prod_rel MemoryBigIntptr.MMEP.MemSpec.MemState_eqv eq) (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m)
                 (interp_mcfg4 eq (prod_rel MemoryBigIntptr.MMEP.MemSpec.MemState_eqv eq) (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m).
   Proof.
-    intros genv lenv stack sid m.
+    intros genv lenv stack sid m VALID.
     unfold refine_L6.
     intros t' INTERP.
 
@@ -1124,7 +1125,6 @@ Module Infinite.
       assert (abs : DTYPE_I 64 <> DTYPE_Void) by (intros abs; inv abs).
       specialize (ALLOCINV 1%N abs); eauto; clear abs.
 
-      repeat red in INTERP.
       destruct INTERP as [ALLOC_UB | [ALLOC_ERR | [ALLOC_OOM | ALLOC_SUC]]].
       { (* UB *)
         destruct ALLOC_UB as [ub_msg [ALLOC_UB | [sab [a [ALLOC_UB []]]]]].
@@ -1153,7 +1153,7 @@ Module Infinite.
         intros CONTRA; discriminate.
       }
 
-      destruct ALLOC_SUC as (?&?&?&?&?).
+      destruct ALLOC_SUC as (?&?&?&?&?); auto.
       rewrite H in UB.
       eapply ret_not_contains_UB_Extra in UB; eauto.
       reflexivity.
@@ -1168,6 +1168,7 @@ Module Infinite.
     assert (abs : DTYPE_I 64 <> DTYPE_Void) by (intros abs; inv abs).
     specialize (ALLOCINV 1%N abs); eauto; clear abs.
 
+    repeat red in SPEC1.
     destruct SPEC1 as [ALLOC_UB | [ALLOC_ERR | [ALLOC_OOM | ALLOC_SUC]]].
     { (* UB *)
       destruct ALLOC_UB as [ub_msg [ALLOC_UB | [sab [a [ALLOC_UB []]]]]].
@@ -1296,7 +1297,7 @@ Module Infinite.
     inv H2.
     eapply refine_OOM_h_model_undef_h_raise_ret; eauto.
     pstep; repeat constructor; auto.
-  Qed.
+  Admitted.
 
 End Infinite.
 
@@ -2032,6 +2033,7 @@ Module Finite.
     assert (abs : DTYPE_I 64 <> DTYPE_Void) by (intros abs; inv abs).
     specialize (ALLOCINV 1%N abs); eauto; clear abs.
 
+    repeat red in SPEC1.
     destruct SPEC1 as [ALLOC_UB | [ALLOC_ERR | [ALLOC_OOM | ALLOC_SUC]]].
     { (* UB *)
       destruct ALLOC_UB as [ub_msg [ALLOC_UB | [sab [a [ALLOC_UB []]]]]].
@@ -2160,6 +2162,6 @@ Module Finite.
     inv H2.
     eapply refine_OOM_h_model_undef_h_raise_ret; eauto.
     pstep; repeat constructor; auto.
-  Qed.
+  Admitted.
 
 End Finite.

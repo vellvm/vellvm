@@ -25051,8 +25051,6 @@ cofix CIH
 
                   { (* Intrinsic *)
                     destruct EV_REL as (T&F&ARGS); subst.
-                    red in HSPEC.
-                    red in HSPEC.
                     destruct HSPEC as [UB | [ERR | [OOM | HSPEC]]].
 
                     { (* Handler raises UB *)
@@ -25244,13 +25242,13 @@ cofix CIH
                           all: eauto with FinInf.
 
                           2: {
-                            intros msg H.
+                            intros msg ?.
                             eapply fin_inf_read_bytes_spec_ub'; eauto.
                             apply lift_MemState_refine_prop.
                           }
 
                           2: {
-                            intros ms_inf ms_fin a_fin a_inf msg H H7 H9 H11.
+                            intros ms_inf ms_fin a_fin a_inf msg ?H H7 H9 H11.
                             eapply fin_inf_write_bytes_spec_ub; eauto.
                           }
 
@@ -25431,13 +25429,13 @@ cofix CIH
                           all: eauto with FinInf.
 
                           2: {
-                            intros msg H.
+                            intros msg ?H.
                             eapply fin_inf_read_bytes_spec_ub'; eauto.
                             apply lift_MemState_refine_prop.
                           }
 
                           2: {
-                            intros ms_inf ms_fin a_fin a_inf msg H H7 H9 H11.
+                            intros ms_inf ms_fin a_fin a_inf msg ?H H7 H9 H11.
                             eapply fin_inf_write_bytes_spec_ub; eauto.
                           }
 
@@ -25623,7 +25621,7 @@ cofix CIH
                           all: eauto with FinInf.
 
                           2: {
-                            intros msg H.
+                            intros msg ?H.
                             erewrite IP.from_Z_to_Z in H; eauto.
                             eapply fin_inf_read_bytes_spec_ub'; eauto.
                             apply lift_MemState_refine_prop.
