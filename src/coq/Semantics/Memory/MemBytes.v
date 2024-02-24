@@ -44,8 +44,7 @@ Module Type ByteImpl(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents: LLVM_IN
 
   Parameter sbyte_to_extractbyte_inv  :
     forall (b : SByte),
-    exists uv dt idx sid,
-      sbyte_to_extractbyte b = UVALUE_ExtractByte uv dt idx sid.
+      {uv & {dt & {idx & {sid & sbyte_to_extractbyte b = UVALUE_ExtractByte uv dt idx sid}}}}.
 
   Parameter sbyte_to_extractbyte_of_uvalue_sbyte :
     forall uv dt idx sid,

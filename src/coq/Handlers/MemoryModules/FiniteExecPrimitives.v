@@ -3149,14 +3149,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         red in VALID.
         pose proof sbyte_to_extractbyte_inv x as (?&?&?&?&?).
         unfold sbyte_sid.
-        rewrite H1.
+        rewrite e.
         exists x3.
         split; eauto.
         eapply VALID.
         repeat red.
         exists ptr. exists x.
         unfold sbyte_sid.
-        rewrite H1.
+        rewrite e.
         split; auto.
         eapply read_byte_raw_read_byte_prop; eauto.
       - (* UB from provenance mismatch *)

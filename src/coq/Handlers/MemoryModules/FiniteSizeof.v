@@ -141,8 +141,7 @@ with  Definition uvalue_sbyte := mkUByte LLVMEvents.DV.uvalue.
 
   Lemma sbyte_to_extractbyte_inv :
     forall (b : SByte),
-    exists uv dt idx sid,
-      sbyte_to_extractbyte b = UVALUE_ExtractByte uv dt idx sid.
+      {uv & {dt & {idx & {sid & sbyte_to_extractbyte b = UVALUE_ExtractByte uv dt idx sid}}}}.
   Proof.
     intros b. destruct b.
     cbn; eauto.

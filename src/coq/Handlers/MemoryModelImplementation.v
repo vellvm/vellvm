@@ -244,6 +244,112 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Import LLVMParamsBigIntptr.
   Import PROV.
 
+  (* TODO: Move this? *)
+  Definition list_maxN := fun l : list N => fold_right N.max 0%N l.
+  Definition sbyte_sid_succeeds (s : SByte) : StoreId.store_id.
+    remember (ByteM.sbyte_sid s).
+    pose proof Byte.sbyte_to_extractbyte_inv s.
+    destruct H as (?&?&?&?&?).
+    unfold ByteM.sbyte_sid in *.
+    rewrite e in Heqs0.
+    apply x2.
+  Defined.
+
+  (* TODO: Move this? *)
+  Definition largest_sbyte_sid (bytes : list SByte) : StoreId.store_id :=
+    list_maxN (map sbyte_sid_succeeds bytes).
+
+  Definition find_largest_sid_in_memory (m : memory) : StoreId.store_id
+    := largest_sbyte_sid (map (fun '(_, (b, _)) => b) (IM.elements m)).
+
+  Lemma largest_sbyte_sid_le :
+    forall bytes,
+      Forall (fun b : SByte => exists s : StoreId.store_id, MemByte.sbyte_sid b = inr s /\ (s <= largest_sbyte_sid bytes)%N) bytes.
+  Proof.
+    induction bytes.
+    - cbn.
+      constructor.
+    - constructor.
+      + cbn.
+        pose proof Byte.sbyte_to_extractbyte_inv a as (?&?&?&?&?).
+        unfold MemByte.sbyte_sid.
+        rewrite e.
+        exists x2.
+        split; eauto.
+        unfold sbyte_sid_succeeds.
+        break_match.
+        clear Heqs.
+        destruct s as (?&?&?&?).
+        rewrite e in e0.
+        inv e0.
+        lia.
+      + eapply Forall_forall.
+        intros x H.
+        eapply Forall_forall in IHbytes; eauto.
+        destruct IHbytes as (?&?&?).
+        exists x0.
+        split; eauto.
+        unfold largest_sbyte_sid, list_maxN in *.
+        cbn.
+        lia.
+  Qed.
+
+  Lemma MemMonad_valid_state_exists :
+    forall ms,
+    exists st, MemMonad_valid_state ms st.
+  Proof.
+    intros ms.
+    destruct ms as [[mem fs heap] pr'] eqn:Hms.
+    unfold MemMonad_valid_state.
+    destruct ms.
+    unfold MemSpec.used_store_id_prop.
+    unfold MemSpec.read_byte_prop.
+    unfold read_byte_prop_memory.
+    cbn.
+    exists (N.succ (find_largest_sid_in_memory mem)).
+    intros sid' (?&?&?&?).
+    pose proof Byte.sbyte_to_extractbyte_inv x0 as (?&?&?&?&?).
+    unfold MemByte.sbyte_sid in *.
+    rewrite e in H0.
+    inv H0.
+    break_match_hyp; try contradiction.
+    break_match_hyp; try contradiction.
+
+    Transparent read_byte_raw.
+    unfold read_byte_raw in *.
+    Opaque read_byte_raw.
+
+    rewrite IP.F.elements_o in Heqo.
+    unfold find_largest_sid_in_memory.
+    remember (IM.elements (elt:=mem_byte) mem) as l.
+    clear Heql.
+    induction l.
+    - cbn in *; inv Heqo.
+    - cbn in *.
+      destruct a.
+      break_match_hyp_inv.
+    (*   + destruct m. *)
+    (*     unfold N.max. *)
+    (*     break_match. *)
+    (*     3: eapply IHl; eauto. *)
+    (*   + destruct m0. *)
+    (*     unfold N.max. *)
+    (*     break_match. *)
+    (*     eapply IHl; eauto. *)
+    (*     eapply IHl; eauto. *)
+    (*     apply N.compare_gt_iff in Heqc. *)
+    (*     lia. *)
+    (*     unfold sbyte_sid_succeeds. *)
+    (*     break_match. *)
+    (*     destruct s0 as (?&?&?&?). *)
+    (*     clear Heqs0. *)
+        
+    (* repeat red in Heqo. *)
+
+    (* pose proof IM.elements. *)
+    (*     unfold MemSpec.read_byte_prop. *)
+  Admitted.
+
   Lemma find_free_block_can_always_succeed :
     forall ms (len : nat) (pr : Provenance),
     exists ptr ptrs,
@@ -254,16 +360,9 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     specialize (GET_FREE (MemStateFreshT (itree Eff)) Eff _ _ _ _ _ _ _ _ _ _ _ _ _ _
                   MemStateFreshT_MemMonad len pr (fun _ _ => True)).
     red in GET_FREE.
-    specialize (GET_FREE ms 0%N).
-    forward GET_FREE.
-    { (* TODO:
-
-         May not be true, but should be able to find an st where it is
-         true... At least when `ms` is finite. *)
-      admit.
-    }
-
-    specialize (GET_FREE I).
+    pose proof MemMonad_valid_state_exists ms as (st & VALID).
+    pose proof MemState_eqv'_read_byte_allowed_all_preserved.
+    specialize (GET_FREE _ _ VALID I).
     destruct GET_FREE as [UB | GET_FREE].
 
     { (* UB in find_free_block *)
@@ -427,7 +526,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
 
       tauto.
     }
-  Admitted.
+  Qed.
 
   Lemma allocate_bytes_post_conditions_can_always_be_satisfied :
     forall (ms_init : MemState) bytes pr,
@@ -438,22 +537,33 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     intros ms_init bytes pr.
 
     Opaque find_free_block.
+    pose proof MemMonad_valid_state_exists ms_init as (st_mem & VALID_MEM).
+    remember (N.max (N.succ (largest_sbyte_sid bytes)) st_mem) as st.
+    assert (MemMonad_valid_state ms_init st) as VALID.
+    { red.
+      intros sid' H.
+      eapply VALID_MEM in H.
+      lia.
+    }
+
     (* Memory state pre allocation *)
     destruct ms_init as [mstack mprov] eqn:MSINIT.
     destruct mstack as [mem fs h] eqn:MSTACK.
 
-    pose proof (allocate_bytes_with_pr_correct bytes pr (fun _ _ => True) (Eff := Eff) (MemM:=MemStateFreshT (itree Eff))) as ALLOC.
+    pose proof (allocate_bytes_with_pr_correct bytes pr (Eff := Eff) (MemM:=MemStateFreshT (itree Eff))) as ALLOC.
     red in ALLOC.
-    specialize (ALLOC ms_init 0%N).
+    specialize (ALLOC _ _ VALID).
     forward ALLOC.
-    { (* TODO:
-
-         May not be true, but should be able to find an st where it is
-         true... At least when `ms` is finite. *)
-      admit.
+    { clear - Heqst.
+      pose proof largest_sbyte_sid_le bytes.
+      eapply Forall_forall.
+      intros x IN.
+      eapply Forall_forall in H; eauto.
+      destruct H as (?&?&?).
+      exists x0.
+      split; eauto.
+      lia.
     }
-
-    specialize (ALLOC I).
 
     destruct ALLOC as [UB | ALLOC].
 
@@ -485,7 +595,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
     cbn in ALLOC_EXEC.
 
-    rewrite MSINIT in ALLOC_EXEC.
+    (*rewrite MSINIT in ALLOC_EXEC. *)
     cbn in ALLOC_EXEC.
     repeat setoid_rewrite bind_ret_l in ALLOC_EXEC.
     cbn in ALLOC_EXEC.
@@ -656,7 +766,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
 
         eauto.
     }
-  Admitted.
+  Qed.
 
   Section MemoryPrimitives.
     Context {MemM : Type -> Type}.
