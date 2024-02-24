@@ -164,7 +164,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Qed.
 
     Lemma refine_23 : forall t1 t2 sid m,
-        refine_L2 t1 t2 -> refine_L3 (interp_memory_prop refine_res2 t1 sid m) (interp_memory_prop refine_res2 t2 sid m).
+        refine_L2 t1 t2 -> refine_L3 (interp_memory_spec refine_res2 t1 sid m) (interp_memory_spec refine_res2 t2 sid m).
     Proof using.
       intros t1 t2 sid ms REF t Ht.
       exists t; split.
@@ -2580,6 +2580,20 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Definition build_singleton {A} : A -> A -> Prop := eq.
 
+
+    Lemma MemMonad_valid_state_initial :
+      forall st,
+        MemExecM.MemMonad_valid_state initial_memory_state st.
+    Proof.
+      intros st.
+      red.
+      intros sid' H.
+      repeat red in H.
+      destruct H as (?&?&?&?).
+      pose proof initial_memory_state_correct.
+      eapply initial_memory_read_ub in H; eauto; contradiction.
+    Qed.
+
     (**
    Theorem 5.8: We prove that the interpreter belongs to the model.
      *)
@@ -2595,6 +2609,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         unfold interpreter_gen.
         apply refine_undef; auto.
         apply interp_memory_correct.
+        apply MemMonad_valid_state_initial.
       - apply eutt_refine_oom_h; try typeclasses eauto.
         reflexivity.
     Qed.
@@ -2630,7 +2645,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     let uvalue_trace   := interp_intrinsics trace in
     let L1_trace       := interp_global uvalue_trace g in
     let L2_trace       := interp_local L1_trace l in
-    let L3_trace       := interp_memory_prop eq L2_trace sid m in
+    let L3_trace       := interp_memory_spec eq L2_trace sid m in
     let L4_trace       := model_undef eq L3_trace in
     L4_trace.
 

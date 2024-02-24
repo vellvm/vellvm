@@ -73,7 +73,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory_prop RR L2_trace sid m in
+      let L3_trace       := interp_memory_spec RR L2_trace sid m in
       L3_trace.
 
     Definition interp_mcfg3_exec {R} (t: itree L0 R) g l sid m : itree L3 (MemState * (store_id * (local_env * stack * (global_env * R)))) :=
@@ -87,7 +87,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory_prop RR_mem L2_trace sid m in
+      let L3_trace       := interp_memory_spec RR_mem L2_trace sid m in
       let L4_trace       := model_undef RR_pick L3_trace in
       L4_trace.
 
@@ -103,7 +103,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory_prop RR_mem L2_trace sid m in
+      let L3_trace       := interp_memory_spec RR_mem L2_trace sid m in
       let L4_trace       := model_undef RR_pick L3_trace in
       let L5_trace       := model_UB L4_trace in
       L5_trace.
@@ -112,7 +112,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory_prop RR_mem L2_trace sid m in
+      let L3_trace       := interp_memory_spec RR_mem L2_trace sid m in
       let L4_trace       := model_undef RR_pick L3_trace in
       let L5_trace       := model_UB L4_trace in
       let L6_trace       := refine_OOM RR_oom L5_trace in
@@ -152,7 +152,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
-      let L3_trace       := interp_memory_prop RR L2_trace sid m in
+      let L3_trace       := interp_memory_spec RR L2_trace sid m in
       L3_trace.
 
     Definition interp_cfg3_exec {R} (t: itree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : itree (CallE +' PickE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) :=
@@ -166,7 +166,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
-      let L3_trace       := interp_memory_prop RR_mem L2_trace sid m in
+      let L3_trace       := interp_memory_spec RR_mem L2_trace sid m in
       let L4_trace       := model_undef RR_pick L3_trace in
       L4_trace.
 
@@ -182,7 +182,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
-      let L3_trace       := interp_memory_prop RR_mem L2_trace sid m in
+      let L3_trace       := interp_memory_spec RR_mem L2_trace sid m in
       let L4_trace       := model_undef RR_pick L3_trace in
       let L5_trace       := model_UB L4_trace in
       L5_trace.
@@ -191,7 +191,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
-      let L3_trace       := interp_memory_prop RR_mem L2_trace sid m in
+      let L3_trace       := interp_memory_spec RR_mem L2_trace sid m in
       let L4_trace       := model_undef RR_pick L3_trace in
       let L5_trace       := model_UB L4_trace in
       let L6_trace       := refine_OOM
