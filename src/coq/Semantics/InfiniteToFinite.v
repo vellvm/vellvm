@@ -14664,9 +14664,9 @@ cofix CIH
     forall (ms_inf : MemoryBigIntptr.MMEP.MMSP.MemState)
       (ms_fin ms_fin' : Memory64BitIntptr.MMEP.MMSP.MemState) (sid_fin : store_id),
       MemState_refine_prop ms_inf ms_fin ->
-      fresh_sid ms_fin (ret (ms_fin', sid_fin)) ->
+      @fresh_sid (MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) _ ms_fin (ret (ms_fin', sid_fin)) ->
       exists sid_inf ms_inf',
-        @fresh_sid (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) _  ms_inf (ret (ms_inf', sid_inf)) /\
+        @fresh_sid (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) _ ms_inf (ret (ms_inf', sid_inf)) /\
           sid_inf = sid_fin /\
           MemState_refine_prop ms_inf' ms_fin'.
   Proof.
@@ -14732,9 +14732,9 @@ cofix CIH
     forall (ms_inf : MemoryBigIntptr.MMEP.MMSP.MemState)
       (ms_fin ms_fin' : Memory64BitIntptr.MMEP.MMSP.MemState) (pr_fin : LLVMParamsBigIntptr.PROV.Provenance),
       MemState_refine_prop ms_inf ms_fin ->
-      fresh_provenance ms_fin (ret (ms_fin', pr_fin)) ->
+      @fresh_provenance _ (MemPropT Memory64BitIntptr.MMEP.MMSP.MemState) _ ms_fin (ret (ms_fin', pr_fin)) ->
       exists pr_inf ms_inf',
-        @fresh_provenance _ (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) _  ms_inf (ret (ms_inf', pr_inf)) /\
+        @fresh_provenance _ (MemPropT MemoryBigIntptr.MMEP.MMSP.MemState) _ ms_inf (ret (ms_inf', pr_inf)) /\
           pr_inf = pr_fin /\
           MemState_refine_prop ms_inf' ms_fin'.
   Proof.
@@ -24354,9 +24354,11 @@ cofix CIH
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
       MemState_refine_prop ms1 ms2 ->
-      L3_E1E2_orutt_strict (InfMemInterp.interp_memory_prop TLR_INF.R.refine_res2 t_inf sid ms1) (FinMemInterp.interp_memory_prop TLR_FIN.R.refine_res2 t_fin sid ms2).
+      InfMem.MMEP.MemExecM.MemMonad_valid_state ms1 sid ->
+      FinMem.MMEP.MemExecM.MemMonad_valid_state ms2 sid ->
+      L3_E1E2_orutt_strict (InfMemInterp.interp_memory_spec TLR_INF.R.refine_res2 t_inf sid ms1) (FinMemInterp.interp_memory_spec TLR_FIN.R.refine_res2 t_fin sid ms2).
   Proof.
-    intros t_inf t_fin sid ms1 ms2 REL MSR.
+    intros t_inf t_fin sid ms1 ms2 REL MSR VALID_INF VALID_FIN.
     red.
     red in REL.
     (* red in REL. *)
@@ -24726,7 +24728,7 @@ cofix CIH
                         Returns b ta ->
                         a = snd (snd b) ->
                         upaco2
-                          (interp_memory_PropT_ FinMemInterp.interp_memory_prop_h
+                          (interp_memory_PropT_ FinMemInterp.interp_memory_spec_h
                           (fun (x : res_L2) '(_, (_, y)) => TLR_FIN.R.refine_res2 x y) true true) bot2
                           (k1 a) (k2 b)
 
@@ -26407,7 +26409,7 @@ cofix CIH
                     }
 
                     (* Handler succeeds *)
-                    destruct HSPEC as (st1&ms'&d&TA&INTRINSIC).
+                    destruct HSPEC as (st1&ms'&d&TA&INTRINSIC&VALID).
                     rewrite TA in VIS_HANDLED.
 
                     destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
@@ -26435,6 +26437,7 @@ cofix CIH
                         exists dv_inf.
                         split; eauto.
                         reflexivity.
+                        split; eauto.
                       }
 
                       2: {
@@ -28674,7 +28677,7 @@ cofix CIH
              (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME
                 (OOME +' UBE +' DebugE +' FailureE) LLVMParamsBigIntptr.Events.PickUvalueE
                 (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
-                   (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME))))) InfMemInterp.interp_memory_prop_h
+                   (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME))))) InfMemInterp.interp_memory_spec_h
                            (fun (x : TopLevelBigIntptr.res_L2) '(_, (_, y)) => TLR_INF.R.refine_res2 x y)
                            (@InfMemInterp.memory_k_spec InterpreterStackBigIntptr.LP.Events.ExternalCallE) true
                            true) r (Vis (inl1 (InterpreterStackBigIntptr.LP.Events.IO_stdout str0)) k1)
@@ -28822,7 +28825,7 @@ cofix CIH
              (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 OOME
                 (OOME +' UBE +' DebugE +' FailureE) LLVMParamsBigIntptr.Events.PickUvalueE
                 (@ReSum_inl (Type -> Type) IFun sum1 Cat_IFun Inl_sum1 OOME OOME
-                   (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME))))) InfMemInterp.interp_memory_prop_h
+                   (UBE +' DebugE +' FailureE) (@ReSum_id (Type -> Type) IFun Id_IFun OOME))))) InfMemInterp.interp_memory_spec_h
                            (fun (x : TopLevelBigIntptr.res_L2) '(_, (_, y)) => TLR_INF.R.refine_res2 x y)
                            (@InfMemInterp.memory_k_spec InterpreterStackBigIntptr.LP.Events.ExternalCallE) true
                            true) r (Vis (inl1 (InterpreterStackBigIntptr.LP.Events.IO_stderr str0)) k1)

@@ -131,10 +131,10 @@ Module Infinite.
   #[global] Instance interp_mem_prop_Proper3 :
   forall {E}
       {R} (RR : R -> R -> Prop),
-      Proper (eutt eq ==> eq ==> eq ==> eq ==> iff) (@interp_memory_prop E R R RR).
+      Proper (eutt eq ==> eq ==> eq ==> eq ==> iff) (@interp_memory_spec E R R RR).
   Proof.
     intros E R RR.
-    unfold interp_memory_prop.
+    unfold interp_memory_spec.
     unfold Proper, respectful.
     intros.
     subst.
@@ -230,7 +230,7 @@ Module Infinite.
     setoid_rewrite interp_global_ret.
     unfold interp_local_stack.
     setoid_rewrite interp_state_ret.
-    unfold interp_memory_prop.
+    unfold interp_memory_spec.
     cbn.
     eexists (ret _).
     split.
@@ -253,7 +253,7 @@ Module Infinite.
     setoid_rewrite interp_global_ret in H.
     unfold interp_local_stack in H.
     rewrite interp_state_ret in H.
-    unfold interp_memory_prop in H.
+    unfold interp_memory_spec in H.
     apply interp_memory_prop_ret_inv in H.
     destruct H as [(?&?&?) | (A&e&k&?)].
     { destruct x1 as (?&?&?).
@@ -462,9 +462,9 @@ Module Infinite.
   (* Few remarks about [L3_trace] used in [interp_mcfg4] *)
   Remark L3_trace_MemoryE:
     forall R X g l sid m (e : MemoryE X) (k : X -> itree L0 R) t,
-      interp_memory_prop eq
+      interp_memory_spec eq
         (vis e (fun x : X => interp_local_stack (interp_global (interp_intrinsics (k x)) g) l)) sid m t <->
-      interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (vis e k)) g) l) sid m t.
+      interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (vis e k)) g) l) sid m t.
   Proof.
     intros.
     rewrite interp_intrinsics_vis.
@@ -482,9 +482,9 @@ Module Infinite.
 
   Remark L3_trace_LocalWrite:
     forall R g l s sid m (k : unit -> itree L0 R) t id dv,
-      interp_memory_prop eq
+      interp_memory_spec eq
         (interp_local_stack (interp_global (interp_intrinsics (k tt)) g) (FMapAList.alist_add id dv l, s)) sid m t <->
-      interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (vis (LocalWrite id dv) k)) g) (l, s)) sid m t.
+      interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (vis (LocalWrite id dv) k)) g) (l, s)) sid m t.
   Proof.
     intros.
     rewrite interp_intrinsics_vis.
@@ -506,9 +506,9 @@ Module Infinite.
   Remark L3_trace_LocalRead:
     forall R g l s sid m (k: _ -> itree L0 R) t id x,
       FMapAList.alist_find id l = ret x ->
-      (interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (k (snd (l, s, x)))) g) (fst (l, s, x)))
+      (interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (k (snd (l, s, x)))) g) (fst (l, s, x)))
         sid m t <->
-      interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (vis (LocalRead id) k)) g) (l, s)) sid m t).
+      interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (vis (LocalRead id) k)) g) (l, s)) sid m t).
   Proof.
     intros.
     rewrite interp_intrinsics_vis.
@@ -531,8 +531,8 @@ Module Infinite.
     forall R g l sid m r
       (t : itree (ExternalCallE +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
             (_ * (store_id * (FMapAList.alist raw_id uvalue * Stack.stack * (FMapAList.alist raw_id dvalue * R))))),
-      interp_memory_prop eq (Ret2 g l r) sid m t <->
-      interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (ret r)) g) l) sid m t.
+      interp_memory_spec eq (Ret2 g l r) sid m t <->
+      interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (ret r)) g) l) sid m t.
   Proof.
     intros.
     setoid_rewrite interp_intrinsics_ret.
@@ -619,7 +619,7 @@ Module Infinite.
     2 : exact (ms_provenance m). 2,3 : shelve.
     2 : shelve.
 
-    eexists (Ret5 genv (_, stack) sid ms_final _).
+    eexists (Ret5 genv ((FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv), stack) sid ms_final _).
     split; cycle 1.
     { do 2 red.
       eapply interp_prop_oom_l_eutt_Proper; try typeclasses eauto.
@@ -649,6 +649,7 @@ Module Infinite.
       7 : exact (ms_final, (sid, DVALUE_Addr addr)).
       split; [ red; reflexivity |].
       6 : exact m. cbn in *.
+      split.
       exists ms_final, addr. tauto.
       all:shelve. }
 
@@ -746,7 +747,10 @@ Module Infinite.
     2 : exact (ms_provenance m). 2,3 : shelve.
     2 : shelve.
 
-    eexists (Ret5 genv (_, stack) sid ms_final _).
+    eexists (Ret5 genv (FMapAList.alist_add (Name "i")
+     (UVALUE_Conversion Ptrtoint DTYPE_Pointer
+        (snd (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv, stack, UVALUE_Addr addr))
+        DTYPE_IPTR) (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv), stack) sid ms_final _).
     split; cycle 1.
     { do 2 red.
       eapply interp_prop_oom_l_eutt_Proper; try typeclasses eauto.
@@ -775,6 +779,7 @@ Module Infinite.
       7 : exact (ms_final, (sid, DVALUE_Addr addr)).
       split; [ red; reflexivity |].
       6 : exact m. cbn in *.
+      split.
       exists ms_final, addr. tauto.
       all:shelve. }
 
@@ -797,20 +802,20 @@ Module Infinite.
   (* Remaining proof obligations are related to broken [MemMonad_valid_state] *)
   Admitted.
 
-  Lemma interp_memory_prop_vis_inv:
+  Lemma interp_memory_spec_vis_inv:
     forall E R X
       (e : (E +' LLVMParamsBigIntptr.Events.IntrinsicE +' LLVMParamsBigIntptr.Events.MemoryE +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X)
       k sid m t,
-      interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m t ->
+      interp_memory_spec (E:=E) (R2 := R) eq (Vis e k) sid m t ->
       ((exists ta k2 s1 s2 ,
            eutt (MMEP.MemSpec.MemState_eqv × eq) t (a <- ta;; k2 a) /\
-             interp_memory_prop_h e s1 s2 ta /\
+             interp_memory_spec_h e s1 s2 ta /\
              (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
                  @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X a (trigger e) ->
                  @Returns (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
                  a = snd (snd b) ->
-                 interp_memory_prop (E := E) eq (k a) sid m (k2 b))) \/
-         (exists ta s1 s2, interp_memory_prop_h e s1 s2 ta /\ contains_UB_Extra ta)%type \/
+                 interp_memory_spec (E := E) eq (k a) sid m (k2 b))) \/
+         (exists ta s1 s2, interp_memory_spec_h e s1 s2 ta /\ contains_UB_Extra ta)%type \/
          (exists A (e : OOME A) k, t ≈ (vis e k)%type)).
   Proof.
     intros.
@@ -983,7 +988,7 @@ Module Infinite.
     apply L3_trace_MemoryE in H.
 
     (* Given `H`, what can `x` be? *)
-    apply interp_memory_prop_vis_inv in H.
+    apply interp_memory_spec_vis_inv in H.
     destruct H as [(alloc_t&k1&s1&ms1&EQ1&SPEC1&HK) | [(ta&s1&s2&INTERP&UB) | (A&e&k&EUTT)]].
     3: { (* OOM *)
       exists t'.
@@ -1414,10 +1419,10 @@ Module Finite.
   #[global] Instance interp_mem_prop_Proper3 :
   forall {E}
       {R} (RR : R -> R -> Prop),
-      Proper (eutt eq ==> eq ==> eq ==> eq ==> iff) (@interp_memory_prop E R R RR).
+      Proper (eutt eq ==> eq ==> eq ==> eq ==> iff) (@interp_memory_spec E R R RR).
   Proof.
     intros E R RR.
-    unfold interp_memory_prop.
+    unfold interp_memory_spec.
     unfold Proper, respectful.
     intros.
     subst.
@@ -1549,9 +1554,9 @@ Module Finite.
   (* Few remarks about [L3_trace] used in [interp_mcfg4] *)
   Remark L3_trace_MemoryE:
     forall R X g l sid m (e : MemoryE X) (k : X -> itree L0 R) t,
-      interp_memory_prop eq
+      interp_memory_spec eq
             (vis e (fun x : X => interp_local_stack (interp_global (interp_intrinsics (k x)) g) l)) sid m t <->
-      interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (vis e k)) g) l) sid m t.
+      interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (vis e k)) g) l) sid m t.
   Proof.
     intros.
     rewrite interp_intrinsics_vis.
@@ -1569,9 +1574,9 @@ Module Finite.
 
   Remark L3_trace_LocalWrite:
     forall R g l s sid m (k : unit -> itree L0 R) t id dv,
-      interp_memory_prop eq
+      interp_memory_spec eq
         (interp_local_stack (interp_global (interp_intrinsics (k tt)) g) (FMapAList.alist_add id dv l, s)) sid m t <->
-      interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (vis (LocalWrite id dv) k)) g) (l, s)) sid m t.
+      interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (vis (LocalWrite id dv) k)) g) (l, s)) sid m t.
   Proof.
     intros.
     rewrite interp_intrinsics_vis.
@@ -1593,9 +1598,9 @@ Module Finite.
   Remark L3_trace_LocalRead:
     forall R g l s sid m (k: _ -> itree L0 R) t id x,
       FMapAList.alist_find id l = ret x ->
-      (interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (k (snd (l, s, x)))) g) (fst (l, s, x)))
+      (interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (k (snd (l, s, x)))) g) (fst (l, s, x)))
         sid m t <->
-      interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (vis (LocalRead id) k)) g) (l, s)) sid m t).
+      interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (vis (LocalRead id) k)) g) (l, s)) sid m t).
   Proof.
     intros.
     rewrite interp_intrinsics_vis.
@@ -1619,8 +1624,8 @@ Module Finite.
        (t : itree (ExternalCallE +' LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
          (MMEP.MMSP.MemState *
           (store_id * (FMapAList.alist raw_id uvalue * Stack.stack * (FMapAList.alist raw_id dvalue * R))))),
-      interp_memory_prop eq (Ret2 g l r) sid m t <->
-      interp_memory_prop eq (interp_local_stack (interp_global (interp_intrinsics (ret r)) g) l) sid m t.
+      interp_memory_spec eq (Ret2 g l r) sid m t <->
+      interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (ret r)) g) l) sid m t.
   Proof.
     intros.
     setoid_rewrite interp_intrinsics_ret.
@@ -1628,20 +1633,20 @@ Module Finite.
     setoid_rewrite interp_local_stack_ret. reflexivity.
   Qed.
 
-  Lemma interp_memory_prop_vis_inv:
+  Lemma interp_memory_spec_vis_inv:
     forall E R X
       (e : (E +' LLVMParams64BitIntptr.Events.IntrinsicE +' LLVMParams64BitIntptr.Events.MemoryE +' LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X)
       k sid m t,
-      interp_memory_prop (E:=E) (R2 := R) eq (Vis e k) sid m t ->
+      interp_memory_spec (E:=E) (R2 := R) eq (Vis e k) sid m t ->
       ((exists ta k2 s1 s2 ,
            eutt (MMEP.MemSpec.MemState_eqv × eq) t (a <- ta;; k2 a) /\
-             interp_memory_prop_h e s1 s2 ta /\
+             interp_memory_spec_h e s1 s2 ta /\
              (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
                  @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) X a (trigger e) ->
                  @Returns (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
                  a = snd (snd b) ->
-                 interp_memory_prop (E := E) eq (k a) sid m (k2 b))) \/
-         (exists ta s1 s2, interp_memory_prop_h e s1 s2 ta /\ contains_UB_Extra ta)%type \/
+                 interp_memory_spec (E := E) eq (k a) sid m (k2 b))) \/
+         (exists ta s1 s2, interp_memory_spec_h e s1 s2 ta /\ contains_UB_Extra ta)%type \/
          (exists A (e : OOME A) k, t ≈ (vis e k)%type)).
   Proof.
     intros.
@@ -1738,7 +1743,7 @@ Module Finite.
     setoid_rewrite interp_global_ret.
     unfold interp_local_stack.
     setoid_rewrite interp_state_ret.
-    unfold interp_memory_prop.
+    unfold interp_memory_spec.
     cbn.
     eexists (ret _).
     split.
@@ -1761,7 +1766,7 @@ Module Finite.
     setoid_rewrite interp_global_ret in H.
     unfold interp_local_stack in H.
     rewrite interp_state_ret in H.
-    unfold interp_memory_prop in H.
+    unfold interp_memory_spec in H.
     apply interp_memory_prop_ret_inv in H.
     destruct H as [(?&?&?) | (A&e&k&?)].
     { destruct x1 as (?&?&?).
@@ -1847,7 +1852,7 @@ Module Finite.
     apply L3_trace_MemoryE in H.
 
     (* Given `H`, what can `x` be? *)
-    apply interp_memory_prop_vis_inv in H.
+    apply interp_memory_spec_vis_inv in H.
     destruct H as [(alloc_t&k1&s1&ms1&EQ1&SPEC1&HK) | [(ta&s1&s2&INTERP&UB) | (A&e&k&EUTT)]].
     3: { (* OOM *)
       exists t'.
