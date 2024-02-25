@@ -24350,6 +24350,19 @@ cofix CIH
       punfold IHEQ.
   Qed.
 
+  Lemma MemMonad_valid_state_fin_inf :
+    forall ms_inf ms_fin st,
+      MemState_refine_prop ms_inf ms_fin ->
+      Memory64BitIntptr.MMEP.MemExecM.MemMonad_valid_state ms_fin st ->
+      MemoryBigIntptr.MMEP.MemExecM.MemMonad_valid_state ms_inf st.
+  Proof.
+    intros ms_inf ms_fin st REF VALID_FIN.
+    red; red in VALID_FIN.
+    intros sid' USED.
+    eapply VALID_FIN.
+    eapply used_store_id_fin_inf; eauto.
+  Qed.
+
   Lemma model_E1E2_23_orutt_strict :
     forall t_inf t_fin sid ms1 ms2,
       L2_E1E2_orutt_strict t_inf t_fin ->
@@ -26434,15 +26447,6 @@ cofix CIH
                         exists ms_inf'.
                         exists dv_inf.
                         split; eauto.
-                        (* TODO: Move and prove *)
-                        Set Nested Proofs Allowed.
-                        Lemma MemMonad_valid_state_fin_inf :
-                          forall ms_inf ms_fin st,
-                            MemState_refine_prop ms_inf ms_fin ->
-                            Memory64BitIntptr.MMEP.MemExecM.MemMonad_valid_state ms_fin st ->
-                            MemoryBigIntptr.MMEP.MemExecM.MemMonad_valid_state ms_inf st.
-                        Proof.
-                        Admitted.
                         eapply MemMonad_valid_state_fin_inf; eauto.
                         apply lift_MemState_refine_prop.
 
