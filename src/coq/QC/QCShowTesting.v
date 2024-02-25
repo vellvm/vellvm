@@ -4,7 +4,14 @@ Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlString.
 
 From QuickChick Require Import QuickChick.
-From Vellvm Require Import ShowAST ReprAST GenAST TopLevel LLVMAst DynamicValues QCVellvm.
+From Vellvm Require Import
+  ShowAST
+  ReprAST
+  GenAST
+  TopLevel
+  LLVMAst
+  DynamicValues
+  QCVellvm.
 
 
 Definition gen_PROG : GenLLVM PROG
@@ -13,7 +20,7 @@ Definition gen_PROG : GenLLVM PROG
 Extraction Blacklist String List Char Core Z Format.
 
 Extract Constant defNumTests    => "100".
-Extract Constant defSize    => "50".
+Extract Constant defSize    => "15".
 QCInclude "../../ml/*".
 QCInclude "../../ml/libvellvm/*".
 

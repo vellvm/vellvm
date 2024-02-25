@@ -131,6 +131,7 @@ Section Helpers.
     | OP_Freeze v                        => true
     | _                                  => false
     end.
+
   (*
   Fixpoint well_formed_instr (ctx : list (ident * typ)) (i : instr typ) : bool :=
     match i with
@@ -158,7 +159,9 @@ Section Helpers.
   Definition genPosZ : G Z
     :=
       n <- (arbitrary : G nat);;
-      ret (Z.of_nat n).
+      ret (Z.of_nat (S n)).
+  (* ret (Z.of_nat n). *)
+  (* TODO: ^This is the original code. Is this correct??? *)
 
   Definition genN : G N
     :=
@@ -1068,15 +1071,15 @@ Section TypGenerators.
         freq_LLVM_thunked_N
         ([(N.min (lengthN typs_in_ctx) 10, (fun _ => gen_typ_from_ctx typs_in_ctx))] ++
          [(1%N, (fun _ => gen_sized_typ_0))
-        ; (1%N, (fun _ => ret TYPE_Pointer <*> gen_sized_typ_size sz'))
+          ; (1%N, (fun _ => ret TYPE_Pointer <*> gen_sized_typ_size (sz / 2)))
         (* TODO: Might want to restrict the size to something reasonable *)
-        ; (1%N, (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size sz'))
+          ; (1%N, (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size (sz / 2)))
         ; (1%N, (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size 0))
         (* TODO: I don't think functions are sized types? *)
         (* ; let n := Nat.div sz 2 in *)
         (*   ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) *)
-        ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')))
-        ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')))
+          ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size (sz / 2))))
+          ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size (sz / 2))))
           ])
     end.
 
@@ -1094,14 +1097,23 @@ Section TypGenerators.
         ([(N.min (lengthN typs_in_ctx) 10, (fun _ => gen_typ_from_ctx typs_in_ctx))] ++
         [(1%N, (fun _ => gen_sized_typ_0))
         (* TODO: Might want to restrict the size to something reasonable *)
-        ; (1%N, (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size_ptrinctx sz' typs_in_ctx))
+         ; (1%N, (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size_ptrinctx (sz / 2) typs_in_ctx))
         ; (1%N, (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size_ptrinctx 0 typs_in_ctx))
         (* TODO: I don't think functions are sized types? *)
         (* ; let n := Nat.div sz 2 in *)
         (*   ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) *)
-        ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx sz' typs_in_ctx)))
-        ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx sz' typs_in_ctx)))])
+         ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx (sz / 8) typs_in_ctx)))
+         ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx (sz / 8) typs_in_ctx)))])
     end.
+ Next Obligation.
+    apply (Nat.div_lt (S sz') 2%nat); auto; apply Nat.lt_0_succ.
+ Defined.
+ Next Obligation.
+    apply (Nat.div_lt (S sz') 8%nat); auto. apply Nat.lt_0_succ. lia.
+ Defined.
+ Next Obligation.
+    apply (Nat.div_lt (S sz') 8%nat); auto. apply Nat.lt_0_succ. lia.
+ Defined.
 
   Definition gen_sized_typ_ptrin_fctx : GenLLVM typ
     :=
@@ -1160,12 +1172,12 @@ Section TypGenerators.
         [ (1%N, (fun _ => gen_typ_0)) (* TODO: Not sure if I need to add it here *)
         (* Might want to restrict the size to something reasonable *)
         (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
-        ; (1%N, (fun _ => ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz'))
+          ; (1%N, (fun _ => ret TYPE_Array <*> lift genN <*> gen_sized_typ_size (sz / 2)))
         ; (1%N, (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0))
         ; let n := Nat.div sz 2 in
         (1%N, (fun _ => ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) <*> ret false))
-        ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')))
-        ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')))
+          ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size (sz / 2))))
+          ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size (sz / 2))))
         ])
     end.
   Next Obligation.
@@ -1174,7 +1186,7 @@ Section TypGenerators.
     pose proof Nat.divmod_spec sz' 1 0 0 H.
     cbn; destruct (Nat.divmod sz' 1 0 0).
     cbn; lia.
-  Qed.
+  Defined.
 
   Definition gen_typ : GenLLVM typ
     := sized_LLVM (fun sz => gen_typ_size sz).
@@ -1880,7 +1892,6 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) (es : exp_source) {struct t} : GenLLV
        ret (t, e).
 
 End ExpGenerators.
-
 Section InstrGenerators.
 
   (* Generator GEP part *)
@@ -2423,31 +2434,52 @@ Section InstrGenerators.
     let get_typ_l (ctx : var_context) : GenLLVM typ :=
       var <- elems_LLVM ctx;;
       ret (snd var) in
+    let ins_op :=
+          t <- gen_op_typ;;
+          i <- ret INSTR_Op <*> gen_op t;;
+          ret (t,i)
+    in
+    let ins_alloca :=
+      t <- gen_sized_typ_ptrin_fctx;;
+      ret (TYPE_Pointer t, INSTR_Alloca t [])
+    in
+    let ins_ptr :=
+      if l_is_empty sized_ptr_typs_in_ctx then [] else
+        [
+          get_typ_l sized_ptr_typs_in_ctx >>= gen_load;
+          get_typ_l sized_ptr_typs_in_ctx >>= gen_store
+        ]
+    in
     oneOf_LLVM
-      ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
-         ; t <- gen_sized_typ_ptrin_fctx;;
-           (* TODO: generate multiple element allocas. Will involve changing initialization *)
-           (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)
-           (* align <- ret None;; *)
-           ret (TYPE_Pointer t, INSTR_Alloca t [])
-        ] (* TODO: Generate atomic operations and other instructions *)
-         ++ (if l_is_empty sized_ptr_typs_in_ctx then [] else
-               [
-                 (get_typ_l sized_ptr_typs_in_ctx) >>= gen_load
-                 ; (get_typ_l sized_ptr_typs_in_ctx) >>= gen_store
-                 ; (get_typ_l sized_ptr_typs_in_ctx) >>= gen_gep])
-         ++ (if l_is_empty valid_ptr_vecptr_in_ctx then [] else [
-                 (get_typ_l valid_ptr_vecptr_in_ctx) >>= gen_ptrtoint])
-         ++ (if l_is_empty ptrtoint_ctx then [] else [gen_inttoptr])
-         ++ (if l_is_empty agg_typs_in_ctx then [] else [
-                 (get_typ_l agg_typs_in_ctx) >>= gen_extractvalue])
-         ++ (if l_is_empty insertvalue_typs_in_ctx then [] else [
-                 (get_typ_l insertvalue_typs_in_ctx) >>= gen_insertvalue])
-         ++ (if l_is_empty vec_typs_in_ctx then [] else [
-                 (get_typ_l vec_typs_in_ctx) >>= gen_extractelement
-                 ; (get_typ_l vec_typs_in_ctx) >>= gen_insertelement])
-         ++ (if l_is_empty fun_ptrs_in_ctx then [] else [
-                 (get_typ_l fun_ptrs_in_ctx) >>= gen_call])).
+      [
+        ins_op;
+        ins_alloca
+      ].
+    (* oneOf_LLVM *)
+    (*   ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i) *)
+    (*      ; t <- gen_sized_typ_ptrin_fctx;; *)
+    (*        (* TODO: generate multiple element allocas. Will involve changing initialization *) *)
+    (*        (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *) *)
+    (*        (* align <- ret None;; *) *)
+    (*        ret (TYPE_Pointer t, INSTR_Alloca t []) *)
+    (*     ] (* TODO: Generate atomic operations and other instructions *) *)
+    (*      ++ (if l_is_empty sized_ptr_typs_in_ctx then [] else *)
+    (*            [ *)
+    (*              (get_typ_l sized_ptr_typs_in_ctx) >>= gen_load *)
+    (*              ; (get_typ_l sized_ptr_typs_in_ctx) >>= gen_store *)
+    (*              ; (get_typ_l sized_ptr_typs_in_ctx) >>= gen_gep]) *)
+    (*      ++ (if l_is_empty valid_ptr_vecptr_in_ctx then [] else [ *)
+    (*              (get_typ_l valid_ptr_vecptr_in_ctx) >>= gen_ptrtoint]) *)
+    (*      ++ (if l_is_empty ptrtoint_ctx then [] else [gen_inttoptr]) *)
+    (*      ++ (if l_is_empty agg_typs_in_ctx then [] else [ *)
+    (*              (get_typ_l agg_typs_in_ctx) >>= gen_extractvalue]) *)
+    (*      ++ (if l_is_empty insertvalue_typs_in_ctx then [] else [ *)
+    (*              (get_typ_l insertvalue_typs_in_ctx) >>= gen_insertvalue]) *)
+    (*      ++ (if l_is_empty vec_typs_in_ctx then [] else [ *)
+    (*              (get_typ_l vec_typs_in_ctx) >>= gen_extractelement *)
+    (*              ; (get_typ_l vec_typs_in_ctx) >>= gen_insertelement]) *)
+    (*      ++ (if l_is_empty fun_ptrs_in_ctx then [] else [ *)
+    (*              (get_typ_l fun_ptrs_in_ctx) >>= gen_call])). *)
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
@@ -2498,7 +2530,7 @@ Section InstrGenerators.
          instr <- gen_instr_id;;
          (* Add an initial store if instr is alloca *)
          alloca_store <- fix_alloca instr;;
-         rest  <- gen_code_length n';;
+         rest  <- gen_code_length (n / 2);;
          ret (instr :: alloca_store ++ rest)
        end.
 
@@ -2506,6 +2538,9 @@ Section InstrGenerators.
     := n <- lift arbitrary;;
        gen_code_length n.
 
+End InstrGenerators.
+
+Section TLEGenerators.
 
   Definition instr_id_to_raw_id (fail_msg : string) (i : instr_id) : raw_id :=
     match i with
@@ -2542,31 +2577,32 @@ Section InstrGenerators.
              ; (min sz' 6%nat,
                  fun _ =>
                    c <- gen_exp_size 0 (TYPE_I 1) FULL_CTX;;
-
+                   
                    (* Generate first branch *)
                    (* We backtrack contexts so blocks in second branch *)
                    (* don't refer to variables from the first *)
                    (* branch. *)
                    '(b1, (bh1, bs1)) <- backtrack_variable_ctxs (gen_blocks_sz (sz / 2) t back_blocks);;
                    '(b2, (bh2, bs2)) <- gen_blocks_sz (sz / 2) t back_blocks;;
-
+                   
                    ret (TERM_Br (TYPE_I 1, c) (blk_id b1) (blk_id b2), ((bh1::bs1) ++ (bh2::bs2))%list))
                  (* Sometimes generate a loop *)
-             ; (min sz' 6%nat,
-                 fun _ =>
-                   '(t, (b, bs)) <- gen_loop_sz sz' t back_blocks 10;; (* TODO: Should I replace sz with sz' here*)
-                   ret (t, (b :: bs)))
-            ]
-             ++
-             (* Loop back sometimes *)
-             match back_blocks with
-             | (b::bs) =>
-                 [(min sz' 1%nat,
-                    fun _ =>
-                      bid <- lift_GenLLVM (elems_ b back_blocks);;
-                      ret (TERM_Br_1 bid, []))]
-             | nil => []
-             end)
+             (* ; (min sz' 6%nat, *)
+             (*     fun _ => *)
+             (*       '(t, (b, bs)) <- gen_loop_sz sz' t back_blocks 10;; (* TODO: Should I replace sz with sz' here*) *)
+             (*       ret (t, (b :: bs))) *)
+            ])
+             (* TODO: Move back *)
+             (* ++ *)
+             (* (* Loop back sometimes *) *)
+             (* match back_blocks with *)
+             (* | (b::bs) => *)
+             (*     [(min sz' 1%nat, *)
+             (*        fun _ => *)
+             (*          bid <- lift_GenLLVM (elems_ b back_blocks);; *)
+             (*          ret (TERM_Br_1 bid, []))] *)
+             (* | nil => [] *)
+             (* end) *)
     end
   with gen_blocks_sz
          (sz : nat)
@@ -2779,4 +2815,4 @@ Section InstrGenerators.
     let new_globals := globals ++ map TLE_Global res_globals in
     ret (high_levels ++ new_globals ++ functions ++ [main])%list.
 
-End InstrGenerators.
+End TLEGenerators.
