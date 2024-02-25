@@ -14492,7 +14492,13 @@ cofix CIH
   Proof.
     intros byte uv dt idx sid H.
     unfold FinMem.MP.BYTE_IMPL.sbyte_to_extractbyte in H.
-  Admitted.
+    unfold lift_SByte.
+    destruct byte.
+    rewrite Memory64BitIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte in H.
+    inv H.
+    rewrite MemoryBigIntptr.Byte.sbyte_to_extractbyte_of_uvalue_sbyte.
+    reflexivity.
+  Qed.
 
   (* TODO: Move *)
   Lemma lift_SByte_sbyte_sid :
