@@ -481,7 +481,8 @@ Module Type DvalueByte (LP : LLVMParams).
            raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Opaque."
        end.
   Proof.
-  Admitted.
+    destruct dt; try reflexivity.
+  Qed.
 
 End DvalueByte.
 
