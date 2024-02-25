@@ -7117,12 +7117,6 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       }
     Qed.
 
-    (* TODO: Move to listutils *)
-    Lemma Forall_repeatN:
-      forall (A : Type) (f : A -> Prop) (n : N) (x : A), f x -> Forall (fun y : A => f y) (repeatN n x).
-    Proof.
-    Admitted.
-
     Lemma memset_correct :
       forall dst val len sid volatile,
         exec_correct

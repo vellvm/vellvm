@@ -2182,3 +2182,12 @@ Proof.
   destruct n; inv H.
   eexists; reflexivity.
 Qed.
+
+Lemma Forall_repeatN:
+  forall (A : Type) (f : A -> Prop) (n : N) (x : A), f x -> Forall (fun y : A => f y) (repeatN n x).
+Proof.
+  intros. induction n using N.peano_ind.
+  - cbn. constructor.
+  - rewrite repeatN_succ.
+    constructor. auto. apply IHn.
+Qed.
