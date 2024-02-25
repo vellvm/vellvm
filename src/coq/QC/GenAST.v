@@ -1097,7 +1097,7 @@ Section TypGenerators.
         ([(N.min (lengthN typs_in_ctx) 10, (fun _ => gen_typ_from_ctx typs_in_ctx))] ++
         [(1%N, (fun _ => gen_sized_typ_0))
         (* TODO: Might want to restrict the size to something reasonable *)
-         ; (1%N, (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size_ptrinctx (sz / 2) typs_in_ctx))
+         ; (1%N, (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size_ptrinctx (sz / 8) typs_in_ctx))
         ; (1%N, (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size_ptrinctx 0 typs_in_ctx))
         (* TODO: I don't think functions are sized types? *)
         (* ; let n := Nat.div sz 2 in *)
@@ -1106,7 +1106,7 @@ Section TypGenerators.
          ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx (sz / 8) typs_in_ctx)))])
     end.
  Next Obligation.
-    apply (Nat.div_lt (S sz') 2%nat); auto; apply Nat.lt_0_succ.
+    apply (Nat.div_lt (S sz') 8%nat); auto. apply Nat.lt_0_succ. lia.
  Defined.
  Next Obligation.
     apply (Nat.div_lt (S sz') 8%nat); auto. apply Nat.lt_0_succ. lia.
