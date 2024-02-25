@@ -7,6 +7,7 @@ MEMORYFILES=("MemoryModelImplementation.mli")
 BYTEPATCHFILES=("Pick.mli" "Pick.ml" "Denotation.mli" "Denotation.ml")
 GENMLIFILES=("GenAlive2.mli")
 GENFILES=("GenAlive2.ml" "RandomQC.ml")
+EXECPOSTFILES=("InterpretationStack.ml" "InterpretationStack.mli" "Lang.ml" "Lang.mli" "MemoryModel.ml" "MemoryModel.mli" "MemoryInterpreters.ml" "MemoryInterpreters.mli" "FiniteExecPrimitives.ml" "FiniteExecPrimitives.mli" "MemoryModelImplementation.ml" "MemoryModelImplementation.mli")
 
 function replace () {
     perl -i.bak -p0777ne "$1" $EXTRACT_DIR/$2
@@ -63,6 +64,15 @@ done
 for f in "${BYTEPATCHFILES[@]}"
 do
     replace "s/Byte.int/Integers.Byte.int/g" $f
+done
+
+for f in "${EXECPOSTFILES[@]}"
+do
+    replace "s/\s*let\N*exec_correct_post\s*=\s*\n\s*Obj.magic __//gm" $f
+    replace "s/\s*val\N*coq_MonadProvenance_exec_correct_post\s*:\s*\n\N*\n\s*coq_MonadProvenance//gm" $f
+    replace "s/\s*let\s*coq_Monad_exec_correct_post\s*=\s*\n\s*{\N*}\s*\n//gm" $f
+    replace "s/\s*let\s*\N*_exec_correct_post\s*=\s*\n\s*__\s*\n//gm" $f
+    replace "s/.*exec_correct_post.*//g" $f
 done
 
 join_strings() {

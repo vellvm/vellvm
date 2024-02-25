@@ -4421,7 +4421,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Defined.
 
   (*** Correctness *)
-  Definition exec_correct_post X := MemState -> store_id -> X -> MemState -> store_id -> Prop.
+  Definition exec_correct_post (X : Type) : Type := MemState -> store_id -> X -> MemState -> store_id -> Prop.
   Definition exec_correct_id_post {X} : exec_correct_post X :=
     fun _ _ _ _ _ => True.
   #[global] Hint Unfold exec_correct_id_post : core.
