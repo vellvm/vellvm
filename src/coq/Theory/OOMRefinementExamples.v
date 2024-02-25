@@ -616,8 +616,9 @@ Module Infinite.
     epose proof allocate_dtyp_spec_can_always_succeed m m
      (mkMemState (ms_memory_stack m) (InfiniteAddresses.InfPROV.next_provenance (ms_provenance m)))
      (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
+    pose proof MemMonad_valid_state_exists ms_final as (sid_final&VALID_FINAL).
     Unshelve. 6 : intro H0; inv H0.
-    2 : exact (ms_provenance m). 2,3 : shelve.
+    2 : exact (PROV.next_provenance (ms_provenance m)). 2,3 : shelve.
     2 : shelve.
 
     repeat red in ALLOC.
@@ -646,17 +647,47 @@ Module Infinite.
     { cbn. unfold my_handle_memory_prop.
       unfold MemPropT_lift_PropT_fresh.
       right; right; right.
-      exists sid, ms_final, (DVALUE_Addr addr).
+      exists sid_final, ms_final, (DVALUE_Addr addr).
       split.
       apply VALID.
       Unshelve.
-      5 : exact (ms_final, (sid, DVALUE_Addr addr)).
+      5 : exact (ms_final, (sid_final, DVALUE_Addr addr)).
       split; [ red; reflexivity |].
       2: exact sid.
       cbn in *.
       split.
       exists ms_final, addr. tauto.
-      all:shelve. }
+      auto.
+
+      - cbn.
+        split.
+        { red.
+          intros USED.
+          apply VALID in USED.
+          apply N.lt_irrefl in USED; auto.
+        }
+        repeat (split; try reflexivity).
+      - cbn.
+        split; [|split; [|split; [|split; [|split; [|split]]]]]; try solve [red; reflexivity].
+        + red.
+          split; [|split].
+          * intros pr H0.
+            red; red in H0.
+            cbn.
+            unfold mem_state_provenance in *.
+            etransitivity.
+            apply H0.
+            eapply PROV.provenance_lt_next_provenance.
+          * intros CONTRA.
+            red in CONTRA.
+            unfold mem_state_provenance in *.
+            apply PROV.provenance_lt_nrefl in CONTRA; auto.
+          * red.
+            cbn.
+            apply PROV.provenance_lt_next_provenance.
+        + red.
+          split; red; reflexivity.
+    }
 
     intros. apply Returns_ret_inv in H0.
     destruct b as (?&?&?). inv H0; subst. cbn in *.
@@ -671,9 +702,7 @@ Module Infinite.
 
     Unshelve.
     all : eauto.
-
-  (* Remaining proof obligations are related to broken [MemMonad_valid_state] *)
-  Admitted.
+  Qed.
 
   Example remove_alloc_ptoi_block :
     forall genv lenv stack sid m,
@@ -749,8 +778,9 @@ Module Infinite.
     epose proof allocate_dtyp_spec_can_always_succeed m m
      (mkMemState (ms_memory_stack m) (InfiniteAddresses.InfPROV.next_provenance (ms_provenance m)))
      (DTYPE_I 64) 1 _ _ _ _ _ as (ms_final & addr & ALLOC).
+    pose proof MemMonad_valid_state_exists ms_final as (sid_final&VALID_FINAL).
     Unshelve. 6 : intro H0; inv H0.
-    2 : exact (ms_provenance m). 2,3 : shelve.
+    2 : exact (PROV.next_provenance (ms_provenance m)). 2,3 : shelve.
     2 : shelve.
 
     eexists (Ret5 genv (FMapAList.alist_add (Name "i")
@@ -780,17 +810,47 @@ Module Infinite.
     { cbn. unfold my_handle_memory_prop.
       unfold MemPropT_lift_PropT_fresh.
       right; right; right.
-      exists sid, ms_final, (DVALUE_Addr addr).
-      Unshelve.
-      7 : exact (ms_final, (sid, DVALUE_Addr addr)).
-      split; eauto.
-      split; [ red; reflexivity |].
+      exists sid_final, ms_final, (DVALUE_Addr addr).
       split.
-      exists ms_final, addr.
-      split; eauto.
-      repeat red.
-      tauto.
-      all:shelve. }
+      apply VALID.
+      Unshelve.
+      5 : exact (ms_final, (sid_final, DVALUE_Addr addr)).
+      split; [ red; reflexivity |].
+      2: exact sid.
+      cbn in *.
+      split.
+      exists ms_final, addr. tauto.
+      auto.
+
+      - cbn.
+        split.
+        { red.
+          intros USED.
+          apply VALID in USED.
+          apply N.lt_irrefl in USED; auto.
+        }
+        repeat (split; try reflexivity).
+      - cbn.
+        split; [|split; [|split; [|split; [|split; [|split]]]]]; try solve [red; reflexivity].
+        + red.
+          split; [|split].
+          * intros pr H0.
+            red; red in H0.
+            cbn.
+            unfold mem_state_provenance in *.
+            etransitivity.
+            apply H0.
+            eapply PROV.provenance_lt_next_provenance.
+          * intros CONTRA.
+            red in CONTRA.
+            unfold mem_state_provenance in *.
+            apply PROV.provenance_lt_nrefl in CONTRA; auto.
+          * red.
+            cbn.
+            apply PROV.provenance_lt_next_provenance.
+        + red.
+          split; red; reflexivity.
+    }
 
     intros. apply Returns_ret_inv in H0.
     destruct b as (?&?&?). inv H0; subst. cbn in *.
@@ -807,9 +867,7 @@ Module Infinite.
 
     Unshelve.
     all : eauto.
-
-  (* Remaining proof obligations are related to broken [MemMonad_valid_state] *)
-  Admitted.
+  Qed.
 
   Lemma interp_memory_spec_vis_inv:
     forall E R X
@@ -852,7 +910,7 @@ Module Infinite.
         (* UB *)
         right. left.
         exists x. exists x0. exists x1.
-        auto.        
+        auto.
       }
 
       left.
@@ -1306,7 +1364,10 @@ Module Infinite.
     inv H2.
     eapply refine_OOM_h_model_undef_h_raise_ret; eauto.
     pstep; repeat constructor; auto.
-  Admitted.
+    cbn.
+    inv H4.
+    auto.
+  Qed.
 
 End Infinite.
 
@@ -1684,7 +1745,7 @@ Module Finite.
         (* UB *)
         right. left.
         exists x. exists x0. exists x1.
-        auto.        
+        auto.
       }
 
       left.
@@ -2171,6 +2232,9 @@ Module Finite.
     inv H2.
     eapply refine_OOM_h_model_undef_h_raise_ret; eauto.
     pstep; repeat constructor; auto.
-  Admitted.
+    cbn.
+    inv H4.
+    auto.
+  Qed.
 
 End Finite.
