@@ -545,10 +545,11 @@ Module Infinite.
   (* remove allocation in infinite language *)
   Example remove_alloc_block :
     forall genv lenv stack sid m,
+      MMEP.MemExecM.MemMonad_valid_state m sid ->
       refine_L6 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ alloc_tree) genv (lenv, stack) sid m)
                 (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m).
   Proof.
-    intros genv lenv stack sid m.
+    intros genv lenv stack sid m VALID.
     unfold refine_L6.
     intros t' INTERP.
 
@@ -619,6 +620,7 @@ Module Infinite.
     2 : exact (ms_provenance m). 2,3 : shelve.
     2 : shelve.
 
+    repeat red in ALLOC.
     eexists (Ret5 genv ((FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv), stack) sid ms_final _).
     split; cycle 1.
     { do 2 red.
@@ -645,10 +647,13 @@ Module Infinite.
       unfold MemPropT_lift_PropT_fresh.
       right; right; right.
       exists sid, ms_final, (DVALUE_Addr addr).
+      split.
+      apply VALID.
       Unshelve.
-      7 : exact (ms_final, (sid, DVALUE_Addr addr)).
+      5 : exact (ms_final, (sid, DVALUE_Addr addr)).
       split; [ red; reflexivity |].
-      6 : exact m. cbn in *.
+      2: exact sid.
+      cbn in *.
       split.
       exists ms_final, addr. tauto.
       all:shelve. }

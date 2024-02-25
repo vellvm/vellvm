@@ -26407,7 +26407,7 @@ cofix CIH
                     }
 
                     (* Handler succeeds *)
-                    destruct HSPEC as (st1&ms'&d&TA&INTRINSIC&VALID).
+                    destruct HSPEC as (st1&ms'&d&VALID_START&TA&INTRINSIC&VALID); auto.
                     rewrite TA in VIS_HANDLED.
 
                     destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
@@ -26430,12 +26430,26 @@ cofix CIH
                       2: {
                         cbn. red. red.
                         repeat right.
-                        exists s1.
+                        exists st1.
                         exists ms_inf'.
                         exists dv_inf.
                         split; eauto.
+                        (* TODO: Move and prove *)
+                        Set Nested Proofs Allowed.
+                        Lemma MemMonad_valid_state_fin_inf :
+                          forall ms_inf ms_fin st,
+                            MemState_refine_prop ms_inf ms_fin ->
+                            Memory64BitIntptr.MMEP.MemExecM.MemMonad_valid_state ms_fin st ->
+                            MemoryBigIntptr.MMEP.MemExecM.MemMonad_valid_state ms_inf st.
+                        Proof.
+                        Admitted.
+                        eapply MemMonad_valid_state_fin_inf; eauto.
+                        apply lift_MemState_refine_prop.
+
+                        split.
                         reflexivity.
                         split; eauto.
+                        eapply MemMonad_valid_state_fin_inf; eauto.
                       }
 
                       2: {
@@ -26533,7 +26547,7 @@ cofix CIH
                     }
 
                     (* Handler succeeds *)
-                    destruct HSPEC as [st' [ms_push [[] [TA PUSH_HANDLER]]]].
+                    destruct HSPEC as [st' [ms_push [[] [VALID_START [TA [PUSH_HANDLER VALID_PUSH]]]]]].
                     cbn in PUSH_HANDLER.
 
                     rewrite TA in VIS_HANDLED.
@@ -26565,11 +26579,17 @@ cofix CIH
                       2: {
                         cbn. red. red.
                         repeat right.
-                        exists s1.
+                        exists st'.
                         exists (lift_MemState ms_push).
                         exists tt.
                         split; try reflexivity.
                         cbn; auto.
+                        eapply MemMonad_valid_state_fin_inf; eauto.
+                        apply lift_MemState_refine_prop.
+                        split; try reflexivity.
+                        split; eauto.
+                        eapply MemMonad_valid_state_fin_inf; eauto.
+                        apply lift_MemState_refine_prop.
                       }
 
                       2: {
@@ -26727,7 +26747,7 @@ cofix CIH
                     }
 
                     (* Handler succeeds *)
-                    destruct HSPEC as [st' [ms_pop [[] [TA POP_HANDLER]]]].
+                    destruct HSPEC as [st' [ms_pop [[] [VALID_START [TA [VALID_POP POP_HANDLER]]]]]].
                     cbn in POP_HANDLER.
 
                     rewrite TA in VIS_HANDLED.
@@ -26755,13 +26775,21 @@ cofix CIH
                       2: {
                         cbn. red. red.
                         repeat right.
-                        exists s1.
+                        exists st'.
                         exists (lift_MemState ms_pop).
                         exists tt.
+                        split.
+                        eapply MemMonad_valid_state_fin_inf; eauto.
+                        eapply lift_MemState_refine_prop.
                         split; try reflexivity.
-                        cbn.
-
-                        eapply mem_pop_spec_fin_inf; eauto; apply lift_MemState_refine_prop.
+                        split; eauto.
+                        { eapply mem_pop_spec_fin_inf; eauto.
+                          apply lift_MemState_refine_prop.
+                          apply lift_MemState_refine_prop.
+                          eauto.
+                        }
+                        eapply MemMonad_valid_state_fin_inf; eauto.
+                        eapply lift_MemState_refine_prop.
                       }
 
                       2: {
@@ -26898,7 +26926,7 @@ cofix CIH
                     }
 
                     (* Handler succeeds *)
-                    destruct HSPEC as [st' [ms_alloca [d [TA ALLOCA_HANDLER]]]].
+                    destruct HSPEC as [st' [ms_alloca [d [VALID_START [TA [ALLOCA_HANDLER VALID_ALLOCA]]]]]].
 
                     rewrite TA in VIS_HANDLED.
                     cbn in VIS_HANDLED.
@@ -26921,10 +26949,17 @@ cofix CIH
                       2: {
                         cbn. red. red.
                         repeat right.
-                        exists s1.
+                        exists st'.
                         exists ms_inf'.
                         exists dv_inf.
-                        split; auto; reflexivity.
+                        split.
+                        eapply MemMonad_valid_state_fin_inf; eauto.
+                        eapply lift_MemState_refine_prop.
+
+                        split.
+                        reflexivity.
+                        split; eauto.
+                        eapply MemMonad_valid_state_fin_inf; eauto.
                       }
 
                       2: {
@@ -27206,7 +27241,7 @@ cofix CIH
                     }
 
                     (* Handler succeeds *)
-                    destruct HSPEC as [st' [ms_load [uv_fin [TA LOAD_HANDLER]]]].
+                    destruct HSPEC as [st' [ms_load [uv_fin [VALID_START [TA [LOAD_HANDLER VALID_LOAD]]]]]].
 
                     rewrite TA in VIS_HANDLED.
                     cbn in VIS_HANDLED.
@@ -27229,10 +27264,18 @@ cofix CIH
                       2: {
                         cbn. red. red.
                         repeat right.
-                        exists s1.
+                        exists st'.
                         exists ms_inf'.
                         exists uv_inf.
-                        split; auto; reflexivity.
+                        split.
+                        eapply MemMonad_valid_state_fin_inf; eauto.
+                        eapply lift_MemState_refine_prop.
+
+                        split.
+                        reflexivity.
+
+                        split; eauto.
+                        eapply MemMonad_valid_state_fin_inf; eauto.
                       }
 
                       2: {
@@ -27473,7 +27516,7 @@ cofix CIH
                     }
 
                     (* Handler succeeds *)
-                    destruct HSPEC as [st' [ms_store [[] [TA STORE_HANDLER]]]].
+                    destruct HSPEC as [st' [ms_store [[] [VALID_START [TA [STORE_HANDLER VALID_STORE]]]]]].
 
                     rewrite TA in VIS_HANDLED.
                     cbn in VIS_HANDLED.
@@ -27496,10 +27539,18 @@ cofix CIH
                       2: {
                         cbn. red. red.
                         repeat right.
-                        exists s1.
+                        exists st'.
                         exists ms_inf'.
                         exists tt.
-                        split; auto; reflexivity.
+                        split.
+                        eapply MemMonad_valid_state_fin_inf; eauto.
+                        eapply lift_MemState_refine_prop.
+
+                        split.
+                        reflexivity.
+
+                        split; eauto.
+                        eapply MemMonad_valid_state_fin_inf; eauto.
                       }
 
                       2: {
@@ -28347,7 +28398,7 @@ cofix CIH
           pstep; red; cbn.
           constructor; auto.
 
-          specialize (IHRUN k1 e1 _ e2 k2 H H0 H1 (observe t2) CIH MSR).
+          specialize (IHRUN k1 e1 _ e2 k2 H H0 H1 (observe t2) CIH VALID_FIN VALID_INF MSR).
           repeat (forward IHRUN; auto).
           punfold IHRUN.
         + (* VisOOM *)
@@ -30179,7 +30230,7 @@ cofix CIH
             }
 
             (* Handler succeeds *)
-            destruct HANDLER as (st1&ms'&d&TA&INTRINSIC).
+            destruct HANDLER as (st1&ms'&d&VALID_START&TA&INTRINSIC&VALID_AFTER).
             rewrite TA in VIS_HANDLED.
             setoid_rewrite bind_ret_l in VIS_HANDLED.
             destruct VIS_HANDLED as [VIS_HANDLED | VIS_HANDLED].
@@ -30201,11 +30252,19 @@ cofix CIH
               2: {
                 cbn. red. red.
                 repeat right.
-                exists s1.
+                exists st1.
                 exists ms_inf'.
                 exists dv_inf.
-                split; eauto.
+
+                split.
+                eapply MemMonad_valid_state_fin_inf; eauto.
+                eapply lift_MemState_refine_prop.
+
+                split.
                 reflexivity.
+
+                split; eauto.
+                eapply MemMonad_valid_state_fin_inf; eauto.
               }
 
               2: {
@@ -30329,7 +30388,7 @@ cofix CIH
             }
 
             (* Handler succeeds *)
-            destruct HANDLER as [st' [ms_push [[] [TA PUSH_HANDLER]]]].
+            destruct HANDLER as [st' [ms_push [[] [VALID_START [TA [PUSH_HANDLER VALID_PUSH]]]]]].
             cbn in PUSH_HANDLER.
 
             rewrite TA in VIS_HANDLED.
@@ -30356,11 +30415,20 @@ cofix CIH
               2: {
                 cbn. red. red.
                 repeat right.
-                exists s1.
+                exists st'.
                 exists (lift_MemState ms_push).
                 exists tt.
-                split; try reflexivity.
-                cbn; auto.
+
+                split.
+                eapply MemMonad_valid_state_fin_inf; eauto.
+                eapply lift_MemState_refine_prop.
+
+                split.
+                reflexivity.
+
+                split; eauto.
+                eapply MemMonad_valid_state_fin_inf; eauto.
+                eapply lift_MemState_refine_prop.
               }
 
               2: {
@@ -30538,7 +30606,7 @@ cofix CIH
             }
 
             (* Handler succeeds *)
-            destruct HANDLER as [st' [ms_pop [[] [TA POP_HANDLER]]]].
+            destruct HANDLER as [st' [ms_pop [[] [VALID_START [TA [POP_HANDLER VALID_POP]]]]]].
             cbn in POP_HANDLER.
 
             rewrite TA in VIS_HANDLED.
@@ -30561,13 +30629,22 @@ cofix CIH
               2: {
                 cbn. red. red.
                 repeat right.
-                exists s1.
+                exists st'.
                 exists (lift_MemState ms_pop).
                 exists tt.
-                split; try reflexivity.
-                cbn.
 
-                eapply mem_pop_spec_fin_inf; eauto; apply lift_MemState_refine_prop.
+                split.
+                eapply MemMonad_valid_state_fin_inf; eauto.
+                eapply lift_MemState_refine_prop.
+
+                split.
+                reflexivity.
+
+                split; eauto.
+                { eapply mem_pop_spec_fin_inf; eauto; apply lift_MemState_refine_prop. }
+
+                eapply MemMonad_valid_state_fin_inf; eauto.
+                apply lift_MemState_refine_prop.
               }
 
               2: {
@@ -30731,7 +30808,7 @@ cofix CIH
             }
 
             (* Handler succeeds *)
-            destruct HANDLER as [st' [ms_alloca [d [TA ALLOCA_HANDLER]]]].
+            destruct HANDLER as [st' [ms_alloca [d [VALID_START [TA [ALLOCA_HANDLER VALID_AFTER]]]]]].
 
             rewrite TA in VIS_HANDLED.
             cbn in VIS_HANDLED.
@@ -30756,10 +30833,18 @@ cofix CIH
               2: {
                 cbn. red. red.
                 repeat right.
-                exists s1.
+                exists st'.
                 exists ms_inf'.
                 exists dv_inf.
-                split; auto; reflexivity.
+                split.
+                eapply MemMonad_valid_state_fin_inf; eauto.
+                eapply lift_MemState_refine_prop.
+
+                split.
+                reflexivity.
+
+                split; eauto.
+                eapply MemMonad_valid_state_fin_inf; eauto.
               }
 
               2: {
@@ -31070,7 +31155,7 @@ cofix CIH
             }
 
             (* Handler succeeds *)
-            destruct HANDLER as [st' [ms_load [uv_fin [TA LOAD_HANDLER]]]].
+            destruct HANDLER as [st' [ms_load [uv_fin [VALID_START [TA [LOAD_HANDLER VALID_AFTER]]]]]].
 
             rewrite TA in VIS_HANDLED.
             cbn in VIS_HANDLED.
@@ -31095,10 +31180,19 @@ cofix CIH
               2: {
                 cbn. red. red.
                 repeat right.
-                exists s1.
+                exists st'.
                 exists ms_inf'.
                 exists uv_inf.
-                split; auto; reflexivity.
+
+                split.
+                eapply MemMonad_valid_state_fin_inf; eauto.
+                eapply lift_MemState_refine_prop.
+
+                split.
+                reflexivity.
+
+                split; eauto.
+                eapply MemMonad_valid_state_fin_inf; eauto.
               }
 
               2: {
@@ -31411,7 +31505,7 @@ cofix CIH
             }
 
             { (* Handler succeeds *)
-            destruct HANDLER as [st' [ms_store [[] [TA STORE_HANDLER]]]].
+            destruct HANDLER as [st' [ms_store [[] [VALID_START [TA [STORE_HANDLER VALID_STORE]]]]]].
 
             rewrite TA in VIS_HANDLED.
             cbn in VIS_HANDLED.
@@ -31435,10 +31529,19 @@ cofix CIH
               2: {
                 cbn. red. red.
                 repeat right.
-                exists s1.
+                exists st'.
                 exists ms_inf'.
                 exists tt.
-                split; auto; reflexivity.
+
+                split.
+                eapply MemMonad_valid_state_fin_inf; eauto.
+                eapply lift_MemState_refine_prop.
+
+                split.
+                reflexivity.
+
+                split; eauto.
+                eapply MemMonad_valid_state_fin_inf; eauto.
               }
 
               2: {
@@ -32223,7 +32326,7 @@ cofix CIH
           pstep; red; cbn.
           constructor; auto.
 
-          specialize (IHRUN (observe t2) u k2).
+          specialize (IHRUN VALID_INF VALID_FIN (observe t2) u k2).
           repeat (forward IHRUN; auto).
 
           punfold IHRUN.
@@ -32356,6 +32459,8 @@ cofix CIH
     eapply model_E1E2_23_orutt_strict;
       [ apply model_E1E2_L2_orutt_strict_sound
       | apply MemState_refine_prop_initial
+      | apply TLR_INF.MemMonad_valid_state_initial
+      | apply TLR_FIN.MemMonad_valid_state_initial
       ].
   Qed.
 
