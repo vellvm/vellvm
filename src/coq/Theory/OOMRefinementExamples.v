@@ -677,11 +677,12 @@ Module Infinite.
 
   Example remove_alloc_ptoi_block :
     forall genv lenv stack sid m,
+      MMEP.MemExecM.MemMonad_valid_state m sid ->
       refine_L6
         (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ptoi_tree) genv (lenv, stack) sid m)
         (interp_mcfg4 eq eq (interp_instr_E_to_L0 _ ret_tree) genv (lenv, stack) sid m).
   Proof.
-    intros genv lenv stack sid m.
+    intros genv lenv stack sid m VALID.
     unfold refine_L6.
     intros t' INTERP.
 
@@ -782,10 +783,13 @@ Module Infinite.
       exists sid, ms_final, (DVALUE_Addr addr).
       Unshelve.
       7 : exact (ms_final, (sid, DVALUE_Addr addr)).
+      split; eauto.
       split; [ red; reflexivity |].
-      6 : exact m. cbn in *.
       split.
-      exists ms_final, addr. tauto.
+      exists ms_final, addr.
+      split; eauto.
+      repeat red.
+      tauto.
       all:shelve. }
 
     intros. apply Returns_ret_inv in H0.
@@ -1158,8 +1162,8 @@ Module Infinite.
         intros CONTRA; discriminate.
       }
 
-      destruct ALLOC_SUC as (?&?&?&?&?); auto.
-      rewrite H in UB.
+      destruct ALLOC_SUC as (?&?&?&?&?&?&?); auto.
+      rewrite H1 in UB.
       eapply ret_not_contains_UB_Extra in UB; eauto.
       reflexivity.
     }
@@ -1203,8 +1207,8 @@ Module Infinite.
 
     clear ALLOCINV.
     exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 Int1.one)).
-    destruct ALLOC_SUC as (?&?&?&?&?).
-    rewrite H in H0; setoid_rewrite bind_ret_l in H0.
+    destruct ALLOC_SUC as (?&?&?&?&?&?&?).
+    rewrite H1 in H0; setoid_rewrite bind_ret_l in H0.
     split.
     { unfold interp_instr_E_to_L0. unfold ret_tree. cbn.
       force_go. cbn. force_go.
@@ -1223,7 +1227,7 @@ Module Infinite.
       Unshelve. eapply ReturnsRet. reflexivity. }
 
     assert (alloc_t_returns : Returns (x0, (x, x1)) alloc_t).
-    { rewrite H; apply ReturnsRet; reflexivity. }
+    { rewrite H1; apply ReturnsRet; reflexivity. }
 
     specialize (HK _ _ (alloca_returns x1) alloc_t_returns eq_refl).
     clear alloca_returns alloc_t_returns.
@@ -1296,8 +1300,8 @@ Module Infinite.
       eapply Interp_Prop_OomT_Vis_OOM_L with (e:=(resum IFun A e)); auto.
       reflexivity.
     }
-    destruct x2 as (?&?&?&?).
-    rewrite H3 in H0.
+    destruct x2 as (?&?&?&?&?).
+    rewrite H5 in H0.
 
     inv H2.
     eapply refine_OOM_h_model_undef_h_raise_ret; eauto.
@@ -2023,8 +2027,8 @@ Module Finite.
         intros CONTRA; discriminate.
       }
 
-      destruct ALLOC_SUC as (?&?&?&?&?).
-      rewrite H in UB.
+      destruct ALLOC_SUC as (?&?&?&?&?&?&?).
+      rewrite H1 in UB.
       eapply ret_not_contains_UB_Extra in UB; eauto.
       reflexivity.
     }
@@ -2068,8 +2072,8 @@ Module Finite.
 
     clear ALLOCINV.
     exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 Int1.one)).
-    destruct ALLOC_SUC as (?&?&?&?&?).
-    rewrite H in H0; setoid_rewrite bind_ret_l in H0.
+    destruct ALLOC_SUC as (?&?&?&?&?&?&?).
+    rewrite H1 in H0; setoid_rewrite bind_ret_l in H0.
     split.
     { unfold interp_instr_E_to_L0. unfold ret_tree. cbn.
       force_go. cbn. force_go.
@@ -2088,7 +2092,7 @@ Module Finite.
       Unshelve. eapply ReturnsRet. reflexivity. }
 
     assert (alloc_t_returns : Returns (x0, (x, x1)) alloc_t).
-    { rewrite H; apply ReturnsRet; reflexivity. }
+    { rewrite H1; apply ReturnsRet; reflexivity. }
 
     specialize (HK _ _ (alloca_returns x1) alloc_t_returns eq_refl).
     clear alloca_returns alloc_t_returns.
@@ -2161,8 +2165,8 @@ Module Finite.
       eapply Interp_Prop_OomT_Vis_OOM_L with (e:=(resum IFun A e)); auto.
       reflexivity.
     }
-    destruct x2 as (?&?&?&?).
-    rewrite H3 in H0.
+    destruct x2 as (?&?&?&?&?).
+    rewrite H5 in H0.
 
     inv H2.
     eapply refine_OOM_h_model_undef_h_raise_ret; eauto.
