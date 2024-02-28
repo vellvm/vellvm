@@ -664,7 +664,6 @@ Context {RR: R1 -> R2 -> Prop}.
 Context (REv : forall (A B : Type), E A -> E B -> Prop).
 Context (RAns : forall (A B : Type), E A -> A -> E B -> B -> Prop).
 
-(* Admittedly scuffed *)
 Context (REv_reflexive: forall U, Reflexive (REv U U)).
 Context (RAns_in_reflexive: forall U e u1 u2, RAns U U e u1 e u2 -> u1 = u2).
 Arguments RAns_in_reflexive {U e u1 u2}.
