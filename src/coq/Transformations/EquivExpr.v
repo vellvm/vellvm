@@ -518,11 +518,6 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
   (* This is the analog of the "norm" tactic from the Softare Foundations RIP tutorial. *)
   Ltac norm := autorewrite with opt.
 
-  (* Induction on u *)
-  Lemma uvalue_poison_cases : forall u, exists dt,
-      (concretize u (DVALUE_Poison dt)) \/ (~ concretize u (DVALUE_Poison dt)).
-  Proof. Admitted.
-
   Section MonadContext.
 
     Context (M: Type -> Type).
@@ -621,28 +616,6 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
 
     End MonadContext.
 
-  Lemma uvalue_dvalue_to_uvalue : forall (d : dvalue) d',
-      concretize (dvalue_to_uvalue d) d' -> d = d'.
-  Proof.
-    (* clean attempt *)
-    intros. induction d.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - unfold concretize in H.
-      unfold concretize_u in H.
-      rewrite concretize_uvalueM_equation in H.
-      simpl in H. unfold eq1 in H.
-      Admitted.
-
-
   Lemma add_zero : forall b1 b2 (e:exp dtyp),
     (OP_IBinop (Add b1 b2) (DTYPE_I 32) (EXP_Integer (0)%Z) e) ≐ [DTYPE_I 32] e.
   Proof.
@@ -670,20 +643,5 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
 
   (** * Commutative expressions *)
   (*  *)
-
-
-  Lemma add_commutative : forall b1 b2 τ e1 e2,
-      ( OP_IBinop (Add b1 b2) τ e1 e2 )  ≐ [τ] ( OP_IBinop (Add b1 b2) τ e2 e1 ).
-  Proof.
-    unfold eq_l2.
-    intros.
-    cbn.
-    norm.
-    (* To prove this, we need some lemma about the purity of e1 and e2 - it should be the case
-       that they evaluate to [Ret u1] and [Ret u2] so that we can make progress.  If it is _not_
-       the case that they are pure, e.g., if [e1] divides by 0, then this commutativity result
-       does not hold in general, and we'd have to add some assumptions about when it is OK. *)
-
-  Admitted.
 
 End EquivExpr.

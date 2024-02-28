@@ -1082,63 +1082,6 @@ Definition trigger_prop' {F} : F ~> PropT F :=
 Definition is_singleton {E X} (ts : PropT E X) (t : itree E X) : Prop :=
   forall u, ts u -> u ≈ t.
 
-(*
-  Initially : E is UB (non det stuff)
-              F is other effects.
-we have E +' F
-E gets interepreted into a non-deterministic computation : PropT ??
-F gets "preserved" 
- *)
-
-(* Lemma deterministic_is_singleton :  *)
-(*   forall {E F X} (RX : relation X) *)
-(*     (t : itree (E +' F) X) *)
-(*     (h : E ~> PropT F), *)
-(*     no_event_l t ->  *)
-(*     is_singleton *)
-(*       (interp_prop (case_ h trigger_prop') X RX t) *)
-(*       (elim_l t). *)
-(* Proof using. *)
-
-(* Admitted. *)
-
-(* t --pick> {t} --UB> {t} *)
-
-(* Definition interp_from_prop {E F} T (RR: T -> T -> Prop) (h : E ~> PropT F) : PropT (E +' F) T -> PropT F T := *)
-(*   fun Pt (t : itree F T) => *)
-(*     exists (t' : itree (E +' F) T) , *)
-(*       Pt t' /\ *)
-(*       (interp_prop (case_ h trigger_prop') _ RR t' t). *)
-
-Section DeterministicSingleton.
-
-  (* Lemma deterministic_is_singleton' :  *)
-  (*   forall {E F X} (RX : relation X) *)
-  (*     (ts : PropT (E +' F) X) *)
-  (*     (t : itree (E +' F) X) *)
-  (*     (h : E ~> PropT F), *)
-  (*     is_singleton ts t -> *)
-  (*     no_event_l t ->  *)
-  (*     is_singleton (interp_from_prop RX h ts) (elim_l t). *)
-  (* Proof using. *)
-  (* Admitted. *)
-
-    (*
-  (* Definition deterministic_vellvm *)
-  Lemma deterministc_llvm_is_singleton : forall R RR t g sl mem,
-      deterministic_vellvm t -> 
-      is_singleton (interp_mcfg5 (R := R) RR t g sl mem) (remove_pick_ub (interp_mcfg3 (R := R) t g sl mem)).
-
-  (*
-    Then the same statement on llvm syntax by applying it with (t := denote_llvm p)
-    Then on the helix side:
-    - we know that there is (t: itree void1 X),
-    "inject (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) t ≈ interp_mcfg3 (denote_llvm p)"
-   *)
-  Proof using. Admitted.
-*)
-End DeterministicSingleton.
-
 Require Import MemoryAddress.
 Require Import Sizeof.
 

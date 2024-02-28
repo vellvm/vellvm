@@ -106,20 +106,6 @@ Section EitherT.
 
   Open Scope monad_scope.
 
-
-
-  (* Instance proper_eq1_mkEitherT : forall {A}, Proper (@eq1 M EQM (E + A) ==> @eq1 (eitherT E M) _ A) mkEitherT. *)
-  (* Proof using. *)
-  (*   intros A. *)
-  (*   unfold Proper. *)
-  (*   unfold respectful. *)
-  (*   unfold eq1. *)
-  (*   unfold Eq1_eitherT. *)
-  (*   intros x y H. *)
-  (* Admitted. *)
-
-
-
   Lemma raise_bind_eitherT :
     forall A B (f : A -> eitherT E M B) (x : E),
       bind (raise x) f ≈ raise x.

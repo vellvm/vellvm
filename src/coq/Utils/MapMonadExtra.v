@@ -1236,14 +1236,6 @@ Proof using.
     auto.
 Qed.
 
-
-Lemma map_monad_err_forall2_HIn:
-  forall {A B : Type} (f : A -> err B) (l : list A) (res : list B),
-    map_monad f l = inr res <->
-      Forall2_HIn l res (fun (a : A) (b : B) (INA : In a l) (INB : In b res) => f a = inr b).
-Proof using.
-Admitted.
-
 Lemma map_monad_err_length :
   forall {A B} l (f : A -> err B) res,
     map_monad f l = inr res ->
