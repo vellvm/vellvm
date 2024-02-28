@@ -322,33 +322,37 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     rewrite IP.F.elements_o in Heqo.
     unfold find_largest_sid_in_memory.
     remember (IM.elements (elt:=mem_byte) mem) as l.
+
+    pose proof largest_sbyte_sid_le (map (fun '(_, (b, _)) => b) l).
     clear Heql.
     induction l.
     - cbn in *; inv Heqo.
     - cbn in *.
-      destruct a.
+      inv H0.
+      destruct a, m0.
       break_match_hyp_inv.
-    (*   + destruct m. *)
-    (*     unfold N.max. *)
-    (*     break_match. *)
-    (*     3: eapply IHl; eauto. *)
-    (*   + destruct m0. *)
-    (*     unfold N.max. *)
-    (*     break_match. *)
-    (*     eapply IHl; eauto. *)
-    (*     eapply IHl; eauto. *)
-    (*     apply N.compare_gt_iff in Heqc. *)
-    (*     lia. *)
-    (*     unfold sbyte_sid_succeeds. *)
-    (*     break_match. *)
-    (*     destruct s0 as (?&?&?&?). *)
-    (*     clear Heqs0. *)
-        
-    (* repeat red in Heqo. *)
-
-    (* pose proof IM.elements. *)
-    (*     unfold MemSpec.read_byte_prop. *)
-  Admitted.
+      + cbn in *.
+        destruct H3 as (?&?&?).
+        unfold MemByte.sbyte_sid in H.
+        rewrite e in H; inv H.
+        lia.
+      + destruct H3 as (?&?&?).
+        unfold MemByte.sbyte_sid in H.
+        rewrite Forall_forall in H4.
+        specialize (H4 (fst m)).
+        forward H4.
+        { clear - H0.
+          induction l.
+          - inv H0.
+          - cbn in *.
+            destruct a, m0.
+            break_match_hyp_inv; cbn; auto.
+        }
+        destruct H4 as (?&?&?).
+        unfold MemByte.sbyte_sid in H2.
+        rewrite e in H2; inv H2.
+        lia.
+  Qed.
 
   Lemma find_free_block_can_always_succeed :
     forall ms (len : nat) (pr : Provenance),
