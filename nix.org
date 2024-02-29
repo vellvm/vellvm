@@ -1,12 +1,12 @@
 * Introduction
 
-Vellvm can be installed with the nix package manager, and it can also be used to set up a development environment.
+Our project can be installed with the nix package manager, and it can also be used to set up a development environment.
 
 * Nix installation
 
 Follow instructions here: https://nixos.org/download.html
 
-Vellvm relies upon nix flakes, an experimental feature that allows
+We rely upon nix flakes, an experimental feature that allows
 dependencies to be pinned declaratively. This feature must be enabled:
 
 #+begin_src sh
@@ -39,7 +39,7 @@ After that you should be good to go :).
 
 ** Building locally
 
-This should be sufficient to get you a development environment and build vellvm locally:
+This should be sufficient to get you a development environment and build locally:
 
 #+begin_src sh
 nix develop .
