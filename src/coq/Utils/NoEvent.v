@@ -1034,9 +1034,6 @@ Qed.
 
 (** * Other discussions  *)
 
-(* YZ TODO: This file should not depend on VIR, this section should be eventually moved 
-   somewhere in [Theory/]
-*)
 (* We want to express that a tree contains no [pickE] events,
    and that if so that entails that the interpretation by the pick handlers
    leads to the singleton predicate containing the elimination of the pick event.
