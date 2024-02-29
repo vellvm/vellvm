@@ -14,51 +14,6 @@ After generating a large test case with QC clang encounters a
 segfault. This is likely due to the really large structure type
 generated for this program.
 
-The error from clang:
-
-#+begin_example
-PLEASE submit a bug report to https://bugs.llvm.org/ and include the crash backtrace, preprocessed source, and associated run script.
-Stack dump:
-0.      Program arguments: /nix/store/jv4yilzgjj4ycizjjidlgx36flh1nzw0-clang-13.0.1/bin/clang-13 -cc1 -triple x86_64-unknown-linux-gnu -emit-obj --mrelax-relocations -disable-free -disable-llvm-verifier -discard-value-names -main-file-name temporary_vellvm.ll -mrelocation-model pic -pic-level 2 -fhalf-no-semantic-interposition -mframe-pointer=none -fmath-errno -fno-rounding-math -mconstructor-aliases -munwind-tables -target-cpu x86-64 -tune-cpu generic -debugger-tuning=gdb -fcoverage-compilation-dir=/home/calvin/git/vellvm-worktrees/diff-lists/src -nostdsysteminc -resource-dir /nix/store/9y9448zgd4fwqdwa3rgr7lcfrfnvh0bp-clang-wrapper-13.0.1/resource-root -O2 -Wformat -Wformat-security -Werror=format-security -fdebug-compilation-dir=/home/calvin/git/vellvm-worktrees/diff-lists/src -ferror-limit 19 -fwrapv -stack-protector 2 -stack-protector-buffer-size 4 -fgnuc-version=4.2.1 -fcolor-diagnostics -vectorize-loops -vectorize-slp -faddrsig -D__GCC_HAVE_DWARF2_CFI_ASM=1 -o /tmp/temporary_vellvm-c10807.o -x ir /tmp/temporary_vellvm.ll
-1.      Code generation
-2.      Running pass 'Function Pass Manager' on module '/tmp/temporary_vellvm.ll'.
-3.      Running pass 'X86 DAG->DAG Instruction Selection' on function '@g8'
- #0 0x00007f37f17297f1 PrintStackTraceSignalHandler(void*) (//nix/store/r4p3qdpxzdr8mcs2j3bpysvqxp72kfl6-llvm-13.0.1-lib/lib/libLLVM-13.so+0xd297f1)
- #1 0x00007f37f172705e SignalHandler(int) (//nix/store/r4p3qdpxzdr8mcs2j3bpysvqxp72kfl6-llvm-13.0.1-lib/lib/libLLVM-13.so+0xd2705e)
- #2 0x00007f37f023dbf0 __restore_rt (/nix/store/ynn1by1qdl16q6qwwh2h7zkgrn36c6i8-glibc-2.35-163/lib/libc.so.6+0x3dbf0)
- #3 0x00007f37f2069d36 llvm::SelectionDAG::ReplaceAllUsesWith(llvm::SDNode*, llvm::SDValue const*) (//nix/store/r4p3qdpxzdr8mcs2j3bpysvqxp72kfl6-llvm-13.0.1-lib/lib/libLLVM-13.so+0x1669d36)
- #4 0x00007f37f1eda8d4 (anonymous namespace)::DAGCombiner::visit(llvm::SDNode*) (//nix/store/r4p3qdpxzdr8mcs2j3bpysvqxp72kfl6-llvm-13.0.1-lib/lib/libLLVM-13.so+0x14da8d4)
- #5 0x00007f37f1edbdb5 (anonymous namespace)::DAGCombiner::combine(llvm::SDNode*) (//nix/store/r4p3qdpxzdr8mcs2j3bpysvqxp72kfl6-llvm-13.0.1-lib/lib/libLLVM-13.so+0x14dbdb5)
- #6 0x00007f37f1edd254 llvm::SelectionDAG::Combine(llvm::CombineLevel, llvm::AAResults*, llvm::CodeGenOpt::Level) (//nix/store/r4p3qdpxzdr8mcs2j3bpysvqxp72kfl6-llvm-13.0.1-lib/lib/libLLVM-13.so+0x14dd254)
- #7 0x00007f37f2082b4e llvm::SelectionDAGISel::CodeGenAndEmitDAG() (//nix/store/r4p3qdpxzdr8mcs2j3bpysvqxp72kfl6-llvm-13.0.1-lib/lib/libLLVM-13.so+0x1682b4e)
- #8 0x00007f37f20859b7 llvm::SelectionDAGISel::SelectAllBasicBlocks(llvm::Function const&) (//nix/store/r4p3qdpxzdr8mcs2j3bpysvqxp72kfl6-llvm-13.0.1-lib/lib/libLLVM-13.so+0x16859b7)
- #9 0x00007f37f2088162 llvm::SelectionDAGISel::runOnMachineFunction(llvm::MachineFunction&) (.part.0) (//nix/store/r4p3qdpxzdr8mcs2j3bpysvqxp72kfl6-llvm-13.0.1-lib/lib/libLLVM-13.so+0x1688162)
-#10 0x00007f37f4772c19 (anonymous namespace)::X86DAGToDAGISel::runOnMachineFunction(llvm::MachineFunction&) (//nix/store/r4p3qdpxzdr8mcs2j3bpysvqxp72kfl6-llvm-13.0.1-lib/lib/libLLVM-13.so+0x3d72c19)
-#11 0x00007f37f1b46a17 llvm::MachineFunctionPass::runOnFunction(llvm::Function&) (//nix/store/r4p3qdpxzdr8mcs2j3bpysvqxp72kfl6-llvm-13.0.1-lib/lib/libLLVM-13.so+0x1146a17)
-#12 0x00007f37f1888e40 llvm::FPPassManager::runOnFunction(llvm::Function&) (//nix/store/r4p3qdpxzdr8mcs2j3bpysvqxp72kfl6-llvm-13.0.1-lib/lib/libLLVM-13.so+0xe88e40)
-#13 0x00007f37f1888fac llvm::FPPassManager::runOnModule(llvm::Module&) (//nix/store/r4p3qdpxzdr8mcs2j3bpysvqxp72kfl6-llvm-13.0.1-lib/lib/libLLVM-13.so+0xe88fac)
-#14 0x00007f37f188a7a4 llvm::legacy::PassManagerImpl::run(llvm::Module&) (//nix/store/r4p3qdpxzdr8mcs2j3bpysvqxp72kfl6-llvm-13.0.1-lib/lib/libLLVM-13.so+0xe8a7a4)
-#15 0x00007f37f920d721 (anonymous namespace)::EmitAssemblyHelper::EmitAssemblyWithNewPassManager(clang::BackendAction, std::unique_ptr<llvm::raw_pwrite_stream, std::default_delete<llvm::raw_pwrite_stream> >) (.constprop.0) (/nix/store/1hbv1j48x902mjkvy62g7ihp5dlyb52p-clang-13.0.1-lib/lib/libclang-cpp.so.13+0x1c0d721)
-#16 0x00007f37f9211cd7 clang::EmitBackendOutput(clang::DiagnosticsEngine&, clang::HeaderSearchOptions const&, clang::CodeGenOptions const&, clang::TargetOptions const&, clang::LangOptions const&, llvm::StringRef, llvm::Module*, clang::BackendAction, std::unique_ptr<llvm::raw_pwrite_stream, std::default_delete<llvm::raw_pwrite_stream> >) (/nix/store/1hbv1j48x902mjkvy62g7ihp5dlyb52p-clang-13.0.1-lib/lib/libclang-cpp.so.13+0x1c11cd7)
-#17 0x00007f37f95d7da1 clang::CodeGenAction::ExecuteAction() (/nix/store/1hbv1j48x902mjkvy62g7ihp5dlyb52p-clang-13.0.1-lib/lib/libclang-cpp.so.13+0x1fd7da1)
-#18 0x00007f37f9d632f9 clang::FrontendAction::Execute() (/nix/store/1hbv1j48x902mjkvy62g7ihp5dlyb52p-clang-13.0.1-lib/lib/libclang-cpp.so.13+0x27632f9)
-#19 0x00007f37f9ceedd9 clang::CompilerInstance::ExecuteAction(clang::FrontendAction&) (/nix/store/1hbv1j48x902mjkvy62g7ihp5dlyb52p-clang-13.0.1-lib/lib/libclang-cpp.so.13+0x26eedd9)
-#20 0x00007f37f9de22b8 clang::ExecuteCompilerInvocation(clang::CompilerInstance*) (/nix/store/1hbv1j48x902mjkvy62g7ihp5dlyb52p-clang-13.0.1-lib/lib/libclang-cpp.so.13+0x27e22b8)
-#21 0x000000000041630e cc1_main(llvm::ArrayRef<char const*>, char const*, void*) (/nix/store/jv4yilzgjj4ycizjjidlgx36flh1nzw0-clang-13.0.1/bin/clang-13+0x41630e)
-#22 0x0000000000413765 ExecuteCC1Tool(llvm::SmallVectorImpl<char const*>&) (/nix/store/jv4yilzgjj4ycizjjidlgx36flh1nzw0-clang-13.0.1/bin/clang-13+0x413765)
-#23 0x000000000040ffca main (/nix/store/jv4yilzgjj4ycizjjidlgx36flh1nzw0-clang-13.0.1/bin/clang-13+0x40ffca)
-#24 0x00007f37f022924e __libc_start_call_main (/nix/store/ynn1by1qdl16q6qwwh2h7zkgrn36c6i8-glibc-2.35-163/lib/libc.so.6+0x2924e)
-#25 0x00007f37f0229309 __libc_start_main@GLIBC_2.2.5 (/nix/store/ynn1by1qdl16q6qwwh2h7zkgrn36c6i8-glibc-2.35-163/lib/libc.so.6+0x29309)
-#26 0x00000000004130f5 _start (/nix/store/jv4yilzgjj4ycizjjidlgx36flh1nzw0-clang-13.0.1/bin/clang-13+0x4130f5)
-clang-13: error: unable to execute command: Segmentation fault (core dumped)
-clang-13: error: clang frontend command failed due to signal (use -v to see invocation)
-clang version 13.0.1
-Target: x86_64-unknown-linux-gnu
-Thread model: posix
-InstalledDir: /nix/store/jv4yilzgjj4ycizjjidlgx36flh1nzw0-clang-13.0.1/bin
-clang-13: note: diagnostic msg: Error generating preprocessed source(s) - no preprocessable inputs.
-#+end_example
-
 ** Generator issues
 *** use-after-free
 
