@@ -9,7 +9,7 @@ From ITree Require Import
   KTreeFacts
   Eq.Eqit.
 
-From Vellvm Require Import
+From TwoPhase Require Import
   Utilities
   Utils.VellvmRelations
   Syntax
@@ -543,7 +543,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Qed.
 
     Lemma eval_int_op_err_ub_oom_to_itree :
-      forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E} {I} `{VMI : VellvmIntegers.VMemInt I} `{DVI : ToDvalue I}
+      forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E} {I} `{VMI : TwoPhaseIntegers.VMemInt I} `{DVI : ToDvalue I}
         x y iop,
         (@eval_int_op (itree E) I _ _ _ _ _ _ iop x y) ≈
           match eval_int_op iop x y with
@@ -1290,7 +1290,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                       (* TODO: Should be the type of the result of the select... *)
                       @ret _ _ _ (DVALUE_Poison t)
                   | DVALUE_I1 i =>
-                      if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                      if (TwoPhaseIntegers.Int1.unsigned i =? 1)%Z
                       then @ret _ _ _ x
                       else @ret _ _ _ y
                   | _ =>
@@ -1314,7 +1314,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                               (* TODO: Should be the type of the result of the select... *)
                               @ret err_ub_oom _ _ (DVALUE_Poison t)
                           | DVALUE_I1 i =>
-                              if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                              if (TwoPhaseIntegers.Int1.unsigned i =? 1)%Z
                               then @ret _ _ _ x
                               else @ret _ _ _ y
                           | _ =>
@@ -1501,7 +1501,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                      selected <-
                      match c with
                      | DVALUE_I1 i =>
-                         if (VellvmIntegers.Int1.unsigned i =? 1)%Z then ret x0 else ret y0
+                         if (TwoPhaseIntegers.Int1.unsigned i =? 1)%Z then ret x0 else ret y0
                      | DVALUE_Poison t => ret (DVALUE_Poison t)
                      | _ =>
                          raise_error

@@ -4,7 +4,7 @@ From Coq Require Import
      List
      String
      ZArith.
-From Vellvm Require Import
+From TwoPhase Require Import
      Utilities.
 
 Import ListNotations.

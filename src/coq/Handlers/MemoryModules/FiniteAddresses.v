@@ -2,14 +2,14 @@ From Coq Require Import
   Lia
   Morphisms.
 
-From Vellvm Require Import
+From TwoPhase Require Import
   Numeric.Coqlib
   Utils.Error.
 
-From Vellvm.Semantics Require Import
+From TwoPhase.Semantics Require Import
   MemoryAddress
   Memory.FiniteProvenance
-  VellvmIntegers.
+  TwoPhaseIntegers.
 
 From QuickChick Require Import Show.
 

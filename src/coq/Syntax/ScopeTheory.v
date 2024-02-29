@@ -3,7 +3,7 @@ From Coq Require Import
      List.
 Import ListNotations.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Numeric.Coqlib
      Utilities
      Syntax.

@@ -2,7 +2,7 @@
 From Coq Require Import List ZArith String.
 Import ListNotations.
 Open Scope Z.
-From Vellvm Require Import
+From TwoPhase Require Import
      Syntax.LLVMAst
      Syntax.CFG
      Syntax.DynamicTypes.

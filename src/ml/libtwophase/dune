@@ -12,8 +12,8 @@
 (ocamllex llvm_lexer)
 
 (library
-  (name libvellvm)
+  (name libtwophase)
   (wrapped false)
   (libraries extracted str)
-  (synopsis "Vellvm library")
+  (synopsis "TwoPhase library")
   )

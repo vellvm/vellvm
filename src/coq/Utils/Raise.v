@@ -11,7 +11,7 @@ From ITree Require Import
      Eq
      ITree.
 
-From Vellvm Require Import 
+From TwoPhase Require Import 
   Semantics.LLVMEvents
   Utils.Tactics.
 

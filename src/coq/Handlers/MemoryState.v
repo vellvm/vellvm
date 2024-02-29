@@ -1,6 +1,6 @@
 Require Import Vellvm.Syntax.DynamicTypes.
 
-From Vellvm.Semantics Require Import
+From TwoPhase.Semantics Require Import
      LLVMParams
      LLVMEvents
      DynamicValues
@@ -9,7 +9,7 @@ From Vellvm.Semantics Require Import
      Memory.Sizeof
      Memory.Overlaps.
 
-From Vellvm.Utils Require Import
+From TwoPhase.Utils Require Import
      Error.
 
 From ExtLib Require Import

@@ -4,7 +4,7 @@
     program should give you a string that can be read by clang.
  *)
 
-From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG DynamicTypes DList.
+From TwoPhase Require Import LLVMAst Utilities AstLib Syntax.CFG DynamicTypes DList.
 
 Require Import Integers Floats.
 

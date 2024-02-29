@@ -8,7 +8,7 @@ From Coq Require Import
 
 Require Import Coq.Logic.ProofIrrelevance.
 
-From Vellvm Require Import
+From TwoPhase Require Import
   Semantics.InterpretationStack
   Semantics.LLVMEvents
   Semantics.Denotation
@@ -19,7 +19,7 @@ From Vellvm Require Import
   Semantics.InterpretationStack
   Semantics.TopLevel
   Semantics.DynamicValues
-  Semantics.VellvmIntegers
+  Semantics.TwoPhaseIntegers
   Semantics.LLVMParams
   Semantics.InfiniteToFinite.Conversions.BaseConversions
   Semantics.InfiniteToFinite.Conversions.DvalueConversions
@@ -74,7 +74,7 @@ Module InfiniteToFinite.
   (* Import FinInfLangRefine. (* Just planning on using this for L4_convert from finite to infinite events. *) *)
   Import InfFinLangRefine.
 
-  From Vellvm Require Import InterpreterMCFG.
+  From TwoPhase Require Import InterpreterMCFG.
 
   Import MCFGTheoryBigIntptr.
   Import MCFGTheory64BitIntptr.
@@ -16302,7 +16302,7 @@ cofix CIH
       DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I1 x_fin) ->
       exists x_inf,
         v_inf = DVC1.DV1.DVALUE_I1 x_inf /\
-          VellvmIntegers.unsigned x_inf = VellvmIntegers.unsigned x_fin.
+          TwoPhaseIntegers.unsigned x_inf = TwoPhaseIntegers.unsigned x_fin.
   Proof.
     intros v_inf x_fin REF.
     rewrite DVC1.dvalue_refine_strict_equation in REF.
@@ -16316,7 +16316,7 @@ cofix CIH
       DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I8 x_fin) ->
       exists x_inf,
         v_inf = DVC1.DV1.DVALUE_I8 x_inf /\
-          VellvmIntegers.unsigned x_inf = VellvmIntegers.unsigned x_fin.
+          TwoPhaseIntegers.unsigned x_inf = TwoPhaseIntegers.unsigned x_fin.
   Proof.
     intros v_inf x_fin REF.
     rewrite DVC1.dvalue_refine_strict_equation in REF.
@@ -16330,7 +16330,7 @@ cofix CIH
       DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I16 x_fin) ->
       exists x_inf,
         v_inf = DVC1.DV1.DVALUE_I16 x_inf /\
-          VellvmIntegers.unsigned x_inf = VellvmIntegers.unsigned x_fin.
+          TwoPhaseIntegers.unsigned x_inf = TwoPhaseIntegers.unsigned x_fin.
   Proof.
     intros v_inf x_fin REF.
     rewrite DVC1.dvalue_refine_strict_equation in REF.
@@ -16344,7 +16344,7 @@ cofix CIH
       DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I32 x_fin) ->
       exists x_inf,
         v_inf = DVC1.DV1.DVALUE_I32 x_inf /\
-          VellvmIntegers.unsigned x_inf = VellvmIntegers.unsigned x_fin.
+          TwoPhaseIntegers.unsigned x_inf = TwoPhaseIntegers.unsigned x_fin.
   Proof.
     intros v_inf x_fin REF.
     rewrite DVC1.dvalue_refine_strict_equation in REF.
@@ -16358,7 +16358,7 @@ cofix CIH
       DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I64 x_fin) ->
       exists x_inf,
         v_inf = DVC1.DV1.DVALUE_I64 x_inf /\
-          VellvmIntegers.unsigned x_inf = VellvmIntegers.unsigned x_fin.
+          TwoPhaseIntegers.unsigned x_inf = TwoPhaseIntegers.unsigned x_fin.
   Proof.
     intros v_inf x_fin REF.
     rewrite DVC1.dvalue_refine_strict_equation in REF.
@@ -16806,9 +16806,9 @@ cofix CIH
     forall {ms_fin_start ms_fin_final ms_inf_start a a_inf val
          val_inf len len_inf volatile volatile_inf sid res_fin},
       addr_refine a_inf a ->
-      VellvmIntegers.unsigned volatile_inf = VellvmIntegers.unsigned volatile ->
-      VellvmIntegers.unsigned val_inf = VellvmIntegers.unsigned val ->
-      VellvmIntegers.unsigned len_inf = VellvmIntegers.unsigned len ->
+      TwoPhaseIntegers.unsigned volatile_inf = TwoPhaseIntegers.unsigned volatile ->
+      TwoPhaseIntegers.unsigned val_inf = TwoPhaseIntegers.unsigned val ->
+      TwoPhaseIntegers.unsigned len_inf = TwoPhaseIntegers.unsigned len ->
       MemState_refine_prop ms_inf_start ms_fin_start ->
       Memory64BitIntptr.MMEP.MemSpec.memset_spec a val (Int32.unsigned len) sid
         (Int1.eq volatile Int1.one) ms_fin_start (success_unERR_UB_OOM (ms_fin_final, res_fin)) ->
@@ -16825,7 +16825,7 @@ cofix CIH
     unfold Memory64BitIntptr.MMEP.MemSpec.memset_spec in HANDLE.
     break_match_hyp.
     - inv HANDLE.
-    - unfold VellvmIntegers.unsigned in *.
+    - unfold TwoPhaseIntegers.unsigned in *.
       cbn in LEN, VAL, VOL.
       rewrite <- LEN in Heqb. rewrite Heqb.
       eapply fin_inf_write_bytes_spec; eauto.
@@ -16845,9 +16845,9 @@ cofix CIH
     forall {ms_fin_start ms_fin_final ms_inf_start a a_inf val
          val_inf len len_inf volatile volatile_inf sid res_fin},
       addr_refine a_inf a ->
-      VellvmIntegers.unsigned volatile_inf = VellvmIntegers.unsigned volatile ->
-      VellvmIntegers.unsigned val_inf = VellvmIntegers.unsigned val ->
-      VellvmIntegers.unsigned len_inf = VellvmIntegers.unsigned len ->
+      TwoPhaseIntegers.unsigned volatile_inf = TwoPhaseIntegers.unsigned volatile ->
+      TwoPhaseIntegers.unsigned val_inf = TwoPhaseIntegers.unsigned val ->
+      TwoPhaseIntegers.unsigned len_inf = TwoPhaseIntegers.unsigned len ->
       MemState_refine_prop ms_inf_start ms_fin_start ->
       Memory64BitIntptr.MMEP.MemSpec.memset_spec a val (Int64.unsigned len) sid
         (Int1.eq volatile Int1.one) ms_fin_start (success_unERR_UB_OOM (ms_fin_final, res_fin)) ->
@@ -16864,7 +16864,7 @@ cofix CIH
     unfold Memory64BitIntptr.MMEP.MemSpec.memset_spec in HANDLE.
     break_match_hyp.
     - inv HANDLE.
-    - unfold VellvmIntegers.unsigned in *.
+    - unfold TwoPhaseIntegers.unsigned in *.
       cbn in LEN, VAL, VOL.
       rewrite <- LEN in Heqb. rewrite Heqb.
       eapply fin_inf_write_bytes_spec; eauto.
@@ -20091,9 +20091,9 @@ cofix CIH
       do 2 red in HANDLER.
       break_match_hyp; try contradiction.
       break_match_hyp; try contradiction.
-      unfold VellvmIntegers.unsigned in Heqb, Heqb0.
+      unfold TwoPhaseIntegers.unsigned in Heqb, Heqb0.
       cbn in Heqb, Heqb0.
-      unfold VellvmIntegers.unsigned.
+      unfold TwoPhaseIntegers.unsigned.
       unfold VInt32.
       erewrite <- fin_inf_no_overlap; eauto.
       repeat erewrite <- fin_inf_ptoi; eauto.
@@ -20122,9 +20122,9 @@ cofix CIH
       do 2 red in HANDLER.
       break_match_hyp; try contradiction.
       break_match_hyp; try contradiction.
-      unfold VellvmIntegers.unsigned in Heqb, Heqb0.
+      unfold TwoPhaseIntegers.unsigned in Heqb, Heqb0.
       cbn in Heqb, Heqb0.
-      unfold VellvmIntegers.unsigned.
+      unfold TwoPhaseIntegers.unsigned.
       unfold VInt64.
       erewrite <- fin_inf_no_overlap; eauto.
       repeat erewrite <- fin_inf_ptoi; eauto.
@@ -20153,7 +20153,7 @@ cofix CIH
       do 2 red in HANDLER.
       break_match_hyp; try contradiction.
       break_match_hyp; try contradiction.
-      unfold VellvmIntegers.unsigned in Heqb, Heqb0.
+      unfold TwoPhaseIntegers.unsigned in Heqb, Heqb0.
       cbn in Heqb, Heqb0.
       rename i into i0.
       assert (LLVMParams64BitIntptr.IP.to_Z i0 = LLVMParamsBigIntptr.IP.to_Z x) as X.
@@ -20419,9 +20419,9 @@ cofix CIH
     forall {ms_fin_start ms_inf_start a a_inf val
          val_inf len len_inf volatile volatile_inf sid msg},
       addr_refine a_inf a ->
-      VellvmIntegers.unsigned volatile_inf = VellvmIntegers.unsigned volatile ->
-      VellvmIntegers.unsigned val_inf = VellvmIntegers.unsigned val ->
-      VellvmIntegers.unsigned len_inf = VellvmIntegers.unsigned len ->
+      TwoPhaseIntegers.unsigned volatile_inf = TwoPhaseIntegers.unsigned volatile ->
+      TwoPhaseIntegers.unsigned val_inf = TwoPhaseIntegers.unsigned val ->
+      TwoPhaseIntegers.unsigned len_inf = TwoPhaseIntegers.unsigned len ->
       MemState_refine_prop ms_inf_start ms_fin_start ->
       Memory64BitIntptr.MMEP.MemSpec.memset_spec a val (Int32.unsigned len) sid
         (Int1.eq volatile Int1.one) ms_fin_start (raise_error msg) ->
@@ -20434,7 +20434,7 @@ cofix CIH
     unfold Memory64BitIntptr.MMEP.MemSpec.memset_spec in HANDLE.
     break_match_hyp.
     - inv HANDLE.
-    - unfold VellvmIntegers.unsigned in *.
+    - unfold TwoPhaseIntegers.unsigned in *.
       cbn in LEN, VAL, VOL.
       rewrite <- LEN in Heqb. rewrite Heqb.
       eapply fin_inf_write_bytes_spec_error; eauto.
@@ -20454,9 +20454,9 @@ cofix CIH
     forall {ms_fin_start ms_inf_start a a_inf val
          val_inf len len_inf volatile volatile_inf sid msg},
       addr_refine a_inf a ->
-      VellvmIntegers.unsigned volatile_inf = VellvmIntegers.unsigned volatile ->
-      VellvmIntegers.unsigned val_inf = VellvmIntegers.unsigned val ->
-      VellvmIntegers.unsigned len_inf = VellvmIntegers.unsigned len ->
+      TwoPhaseIntegers.unsigned volatile_inf = TwoPhaseIntegers.unsigned volatile ->
+      TwoPhaseIntegers.unsigned val_inf = TwoPhaseIntegers.unsigned val ->
+      TwoPhaseIntegers.unsigned len_inf = TwoPhaseIntegers.unsigned len ->
       MemState_refine_prop ms_inf_start ms_fin_start ->
       Memory64BitIntptr.MMEP.MemSpec.memset_spec a val (Int64.unsigned len) sid
         (Int1.eq volatile Int1.one) ms_fin_start (raise_error msg) ->
@@ -20469,7 +20469,7 @@ cofix CIH
     unfold Memory64BitIntptr.MMEP.MemSpec.memset_spec in HANDLE.
     break_match_hyp.
     - inv HANDLE.
-    - unfold VellvmIntegers.unsigned in *.
+    - unfold TwoPhaseIntegers.unsigned in *.
       cbn in LEN, VAL, VOL.
       rewrite <- LEN in Heqb. rewrite Heqb.
       eapply fin_inf_write_bytes_spec_error; eauto.
@@ -32534,7 +32534,7 @@ cofix CIH
   Qed.
 
   (* TODO: Move this import *)
-  From Vellvm Require Import Utils.InterpPropOOM.
+  From TwoPhase Require Import Utils.InterpPropOOM.
 
   (* TODO: Move this *)
   Lemma interp_prop_oom_raiseOOM :

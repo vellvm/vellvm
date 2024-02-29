@@ -22,7 +22,7 @@ From ITree Require Import
 
 (* From QuickChick Require Import QuickChick. *)
 From QuickChick Require Import Show Checker Generators Producer Test.
-From Vellvm Require Import ShowAST ReprAST GenAST TopLevel LLVMAst DynamicValues.
+From TwoPhase Require Import ShowAST ReprAST GenAST TopLevel LLVMAst DynamicValues.
 
 Extraction Blacklist String List Char Core Z Format.
 

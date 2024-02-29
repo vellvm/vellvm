@@ -8,7 +8,7 @@ From Coq Require Import
 
 Require Import Coq.Logic.ProofIrrelevance.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Semantics.InterpretationStack
      Semantics.LLVMEvents
      Semantics.Denotation

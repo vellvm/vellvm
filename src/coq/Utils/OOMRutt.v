@@ -14,7 +14,7 @@ From ITree Require Import
 
 From Paco Require Import paco.
 
-From Vellvm Require Import
+From TwoPhase Require Import
   Utils.PropT.
 
 Import Monads.

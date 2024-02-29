@@ -4,7 +4,7 @@ From ExtLib Require Import
      Core.RelDec
      Structures.Monads.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.Util
      Utils.Tactics
      Utils.ListUtil
@@ -281,7 +281,7 @@ Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
         ].
   Qed.
 
-  From Vellvm.Utils Require Import Monads MonadExcLaws MonadEq1Laws.
+  From TwoPhase.Utils Require Import Monads MonadExcLaws MonadEq1Laws.
   From ITree Require Import
        Basics.Monad.
 
@@ -367,7 +367,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
     (*   + solve_bind_res. *)
     (*   + solve_bind_res. *)
     (*   + repeat break_match_goal; *)
-    (*       solve [ destruct (VellvmIntegers.mmul x x0); cbn in *; inversion EVAL; *)
+    (*       solve [ destruct (TwoPhaseIntegers.mmul x x0); cbn in *; inversion EVAL; *)
     (*               apply to_dvalue_OOM_NoOom *)
     (*             | unfold lift_OOM; break_match_goal; cbn in *; inversion EVAL; *)
     (*               rewrite bind_ret_l; repeat break_match_goal; inversion EVAL; *)

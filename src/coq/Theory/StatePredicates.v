@@ -1,5 +1,5 @@
 (* begin hide *)
-From Vellvm Require Import
+From TwoPhase Require Import
      Semantics.LLVMParams
      Semantics.Lang.
 (* end hide *)

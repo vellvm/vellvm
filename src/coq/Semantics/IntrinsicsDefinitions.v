@@ -7,7 +7,7 @@ From ExtLib Require Import
      Programming.Eqv
      Data.String.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utilities
      Syntax
      Semantics.LLVMEvents

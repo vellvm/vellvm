@@ -4,9 +4,9 @@ From ExtLib Require Import
      Structures.Monad
      Structures.Functor.
 
-From Vellvm Require Import
+From TwoPhase Require Import
   DynamicTypes
-  VellvmIntegers
+  TwoPhaseIntegers
   LLVMEvents
   Semantics.MemoryAddress
   Semantics.Memory.Sizeof

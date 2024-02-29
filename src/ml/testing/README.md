@@ -1,6 +1,6 @@
-# Vellvm Testing Infrastructure
+# Twophase Testing Infrastructure
 
-This code provides a means to add Vellvm semantics tests as `.ll` files with
+This code provides a means to add Twophase semantics tests as `.ll` files with
 some markup in the comments.  A single file might contain several tests so
 that a single function might be called more than once or multiple similar
 functions might be run.
@@ -23,7 +23,7 @@ This represents a test case asserting that the result of calling function
 `@function_name` with the given inputs yields the answer `lit`.  Here `T` and
 `typ_1` ... `typ_n` are LLVM IR types (that do not mention names or pointers).
 The `lit` and `lit_1` ... `lit_n` are LLVM IR literal values.  The legal LLVM IR
-literals that can appear in the assertions correspond to a subset of Vellvm
+literals that can appear in the assertions correspond to a subset of Twophase
 UVALUEs that can be interpreted without needing any program context
 (i.e. variables, globals, or pointers).
 

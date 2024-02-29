@@ -29,12 +29,12 @@ From ExtLib Require Import
      Data.Nat
      Data.List.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utilities
      Syntax
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
-     Semantics.VellvmIntegers
+     Semantics.TwoPhaseIntegers
      Semantics.StoreId
      Utils.MapMonadExtra
      Utils.MonadEq1Laws

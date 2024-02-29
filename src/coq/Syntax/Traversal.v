@@ -5,7 +5,7 @@ Import ListNotations.
 From ITree Require Import
      ITree.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Syntax.CFG
      Syntax.LLVMAst.
 (* end hide *)

@@ -1,4 +1,4 @@
-From Vellvm Require Import
+From TwoPhase Require Import
      TopLevel
      TopLevelRefinements
      Refinement
@@ -36,7 +36,7 @@ From ExtLib Require Import
 Import MonadNotation.
 Import DynamicTypes.
 Import DynamicValues.
-Import VellvmIntegers.
+Import TwoPhaseIntegers.
 Import TranslateFacts.
 Import StateFacts.
 Import InterpFacts.

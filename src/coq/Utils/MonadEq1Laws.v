@@ -9,7 +9,7 @@ From ITree Require Import
 From ExtLib Require Import
      Data.Monads.IdentityMonad.
 
-From Vellvm.Utils Require Import Monads MonadExcLaws.
+From TwoPhase.Utils Require Import Monads MonadExcLaws.
 
 Section Laws.
 

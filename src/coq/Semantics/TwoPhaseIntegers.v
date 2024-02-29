@@ -4,7 +4,7 @@ From Coq Require Import
 
 From ExtLib Require Import Monad.
 
-From Vellvm Require Import Numeric.Integers Syntax.DynamicTypes Utils.Error.
+From TwoPhase Require Import Numeric.Integers Syntax.DynamicTypes Utils.Error.
 
 (* Integers that can run out of memory... Necessary for handling
      finite memory compilation. *)

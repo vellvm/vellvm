@@ -2,7 +2,7 @@ From Coq Require Import
      List
      ZArith.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.NonEmpty
      Utils.Default
      Utils.NMaps.

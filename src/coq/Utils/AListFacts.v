@@ -4,7 +4,7 @@ From ExtLib Require Import
   Data.Map.FMapAList
   Structures.Maps.
 
-From Vellvm Require Import
+From TwoPhase Require Import
   Utils.Tactics
   Utils.Util
   Utils.OptionUtil.

@@ -15,12 +15,12 @@ From ITree Require Import
      Interp.Recursion
      Events.Exception.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Numeric.Integers
      Numeric.Floats
      Utilities
      Syntax
-     Semantics.VellvmIntegers
+     Semantics.TwoPhaseIntegers
      Semantics.LLVMEvents
      Semantics.LLVMParams
      Semantics.MemoryParams
@@ -121,10 +121,10 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   (* Predicate testing whether a [dvalue] is equal to zero at its type *)
   Definition dvalue_is_zero (dv : dvalue) : Prop :=
     match dv with
-    | DVALUE_I1 x     => x = VellvmIntegers.zero
-    | DVALUE_I8 x     => x = VellvmIntegers.zero
-    | DVALUE_I32 x    => x = VellvmIntegers.zero
-    | DVALUE_I64 x    => x = VellvmIntegers.zero
+    | DVALUE_I1 x     => x = TwoPhaseIntegers.zero
+    | DVALUE_I8 x     => x = TwoPhaseIntegers.zero
+    | DVALUE_I32 x    => x = TwoPhaseIntegers.zero
+    | DVALUE_I64 x    => x = TwoPhaseIntegers.zero
     | DVALUE_Double x => x = Float.zero
     | DVALUE_Float x  => x = Float32.zero
     | _               => False
@@ -210,8 +210,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     | EXP_Bool b =>
       match b with
-      | true  => ret (UVALUE_I1 VellvmIntegers.one)
-      | false => ret (UVALUE_I1 VellvmIntegers.zero)
+      | true  => ret (UVALUE_I1 TwoPhaseIntegers.one)
+      | false => ret (UVALUE_I1 TwoPhaseIntegers.zero)
       end
 
     | EXP_Null => ret (UVALUE_Addr ADDR.null)
@@ -437,7 +437,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       | DVALUE_I8 i1, DVALUE_I8 i2
       | DVALUE_I32 i1, DVALUE_I32 i2
       | DVALUE_I64 i1, DVALUE_I64 i2
-        => if VellvmIntegers.cmp Ceq i1 i2
+        => if TwoPhaseIntegers.cmp Ceq i1 i2
            then ret id
            else select_switch value default_dest switches
       | _,_ => failwith "Ill-typed switch."

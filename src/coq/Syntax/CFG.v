@@ -3,7 +3,7 @@ Require Import Equalities.
 
 From Coq Require Import ZArith List String.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utilities
      Syntax.LLVMAst
      Syntax.AstLib.

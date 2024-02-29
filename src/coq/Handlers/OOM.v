@@ -9,7 +9,7 @@ From Coq Require Import
 From ExtLib Require Import
      Structures.Monads.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.RefineProp
      Utils.InterpPropOOM
      Utils.Error
@@ -35,7 +35,7 @@ Open Scope monad_scope.
   Definition of the propositional and executable handlers for out of memory (abort).
 *)
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.PropT.
 
 (* TODO: Move and use in interp_prop_oom / interp_memory_prop *)

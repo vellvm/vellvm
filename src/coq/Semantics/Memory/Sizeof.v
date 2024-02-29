@@ -2,7 +2,7 @@ From Coq Require Import
          ZArith
          List.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      DynamicTypes.
 
 

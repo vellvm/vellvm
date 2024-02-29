@@ -1,6 +1,6 @@
 Require Import Strings.String.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Syntax.LLVMAst.
 Open Scope string_scope.
 

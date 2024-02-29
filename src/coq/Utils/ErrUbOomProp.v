@@ -1,6 +1,6 @@
 From Coq Require Import String.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.Util
      Utils.Error
      Utils.Tactics

@@ -11,7 +11,7 @@ From ITree Require Import
      Basics.Monad
      Eq.Eqit.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Semantics.
 
 Import ITreeNotations.

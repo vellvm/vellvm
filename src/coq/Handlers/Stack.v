@@ -13,7 +13,7 @@ From ITree Require Import
      Eq.Eqit
      Events.State.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.Util
      Utils.Error
      Utils.Tactics

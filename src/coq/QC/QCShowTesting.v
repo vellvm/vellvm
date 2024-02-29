@@ -4,7 +4,7 @@ Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlString.
 
 From QuickChick Require Import QuickChick.
-From Vellvm Require Import ShowAST ReprAST GenAST TopLevel LLVMAst DynamicValues QCVellvm.
+From TwoPhase Require Import ShowAST ReprAST GenAST TopLevel LLVMAst DynamicValues QCVellvm.
 
 
 Definition gen_PROG : GenLLVM PROG

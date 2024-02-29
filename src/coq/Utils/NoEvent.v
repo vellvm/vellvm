@@ -1042,7 +1042,7 @@ Qed.
    forall t', model_pick t t' -> t' ≈ elim_pick t
  *)
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.Tactics
      Utils.Util
      Utils.PropT

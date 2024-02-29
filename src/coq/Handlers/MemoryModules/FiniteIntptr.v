@@ -3,22 +3,22 @@ From Coq Require Import
      List
      Lia.
 
-From Vellvm.Numeric Require Import
+From TwoPhase.Numeric Require Import
      Coqlib
      Integers.
 
-From Vellvm.Utils Require Import
+From TwoPhase.Utils Require Import
      Error
      Tactics.
 
-From Vellvm.Syntax Require Import
+From TwoPhase.Syntax Require Import
      DynamicTypes.
 
-From Vellvm.Semantics Require Import
+From TwoPhase.Semantics Require Import
      MemoryAddress
      Memory.FiniteProvenance
      DynamicValues
-     VellvmIntegers.
+     TwoPhaseIntegers.
 
 From ExtLib Require Import
      Structures.Monads.

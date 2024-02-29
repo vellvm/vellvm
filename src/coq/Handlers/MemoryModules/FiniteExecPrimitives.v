@@ -7,14 +7,14 @@ From Coq Require Import
      RelationClasses
      Morphisms.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Numeric.Coqlib
      Numeric.Integers.
 
-From Vellvm.Syntax Require Import
+From TwoPhase.Syntax Require Import
      DynamicTypes.
 
-From Vellvm.Semantics Require Import
+From TwoPhase.Semantics Require Import
      MemoryAddress
      MemoryParams
      LLVMParams
@@ -25,10 +25,10 @@ From Vellvm.Semantics Require Import
      Memory.MemBytes
      Memory.ErrSID
      GepM
-     VellvmIntegers
+     TwoPhaseIntegers
      StoreId.
 
-From Vellvm.Utils Require Import
+From TwoPhase.Utils Require Import
      Util
      Error
      PropT
@@ -41,12 +41,12 @@ From Vellvm.Utils Require Import
      MapMonadExtra
      Raise.
 
-From Vellvm.Handlers Require Import
+From TwoPhase.Handlers Require Import
      MemPropT
      MemoryModel
      MemoryInterpreters.
 
-From Vellvm.Handlers.MemoryModules Require Import
+From TwoPhase.Handlers.MemoryModules Require Import
      FiniteAddresses
      FiniteIntptr
      FiniteSizeof

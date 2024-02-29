@@ -4,13 +4,13 @@ From Coq Require Import
   String
   Lia.
 
-From Vellvm Require Import
+From TwoPhase Require Import
   Numeric.Floats
   Utils.Monads
   LLVMParams
   Error
   DynamicTypes
-  VellvmIntegers
+  TwoPhaseIntegers
   Utils.ErrUbOomProp
   Utils.Oomable
   Utils.Poisonable

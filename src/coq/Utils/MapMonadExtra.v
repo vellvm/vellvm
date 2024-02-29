@@ -8,7 +8,7 @@ Require Import Coq.Logic.ProofIrrelevance.
 From ITree Require Import
   Basics.Monad.
 
-From Vellvm Require Import
+From TwoPhase Require Import
   Utils.Util
   Utils.ListUtil
   Utils.Error

@@ -1,4 +1,4 @@
-From Vellvm Require Import
+From TwoPhase Require Import
   Utilities
   AstLib
   Semantics.Memory.Sizeof
@@ -8,7 +8,7 @@ From Vellvm Require Import
   QC.Generators
   Handlers
   QC.DList
-  VellvmIntegers.
+  TwoPhaseIntegers.
 (* Maybe also import InterpretationStack *)
 
 From ExtLib.Structures Require Export

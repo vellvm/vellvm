@@ -100,7 +100,7 @@ do
 done
 
 
-# GEN_OPEN_MODULES=("open LLVMAst" "open Bits" "open Binary" "open BinNums" "open BinPos" "open BinNat" "open Floats" "open Integers" "open VellvmIntegers" "open EitherMonad" "open DynamicValues" "open DynamicTypes" "open CeresS" "open Error" "open Datatypes" "open Decimal" "open Nat" "open CeresString" "open AstLib" "open ShowAST")
+# GEN_OPEN_MODULES=("open LLVMAst" "open Bits" "open Binary" "open BinNums" "open BinPos" "open BinNat" "open Floats" "open Integers" "open TwophaseIntegers" "open EitherMonad" "open DynamicValues" "open DynamicTypes" "open CeresS" "open Error" "open Datatypes" "open Decimal" "open Nat" "open CeresString" "open AstLib" "open ShowAST")
 # GEN_MODULES_DECLARATION=$(join_strings "\n" "${GEN_OPEN_MODULES[@]}")
 # # for string in "${GEN_OPEN_MODULESS[@]}"; do
 # #     echo "$string"
@@ -116,7 +116,7 @@ done
 #     # sed -i "1s/^/open DynamicTypes\n/" $EXTRACT_DIR/$f
 #     # sed -i "1s/^/open DynamicValues\n/" $EXTRACT_DIR/$f
 #     # sed -i "1s/^/open EitherMonad\n/" $EXTRACT_DIR/$f
-#     # sed -i "1s/^/open VellvmIntegers\n/" $EXTRACT_DIR/$f
+#     # sed -i "1s/^/open TwophaseIntegers\n/" $EXTRACT_DIR/$f
 #     # sed -i "1s/^/open BinNums\n/" $EXTRACT_DIR/$f
 #     # sed -i "1s/^/open BinPos\n/" $EXTRACT_DIR/$f
 #     # sed -i "1s/^/open BinNat\n/" $EXTRACT_DIR/$f
@@ -168,8 +168,8 @@ done
 #     # DynamicTypes replacement
 #     sed -i "/^type dtyp =/,/^$/c\type dtyp = DynamicTypes.dtyp\n" $EXTRACT_DIR/$f
 
-#     # VellvmIntegers
-#     sed -i "/^type 'i vMemInt/,/^$/c\type 'i vMemInt = 'i VellvmIntegers.coq_VMemInt\n" $EXTRACT_DIR/$f
+#     # TwophaseIntegers
+#     sed -i "/^type 'i vMemInt/,/^$/c\type 'i vMemInt = 'i TwophaseIntegers.coq_VMemInt\n" $EXTRACT_DIR/$f
 
 #     # Error
 #     sed -i "/^type 'a oOM/,/^$/c\type 'a oOM = 'a Error.coq_OOM\n" $EXTRACT_DIR/$f
@@ -227,7 +227,7 @@ done
 #     # sed -i "1s/^/open DynamicTypes\n/" $EXTRACT_DIR/$f
 #     # sed -i "1s/^/open DynamicValues\n/" $EXTRACT_DIR/$f
 #     # sed -i "1s/^/open EitherMonad\n/" $EXTRACT_DIR/$f
-#     # sed -i "1s/^/open VellvmIntegers\n/" $EXTRACT_DIR/$f
+#     # sed -i "1s/^/open TwophaseIntegers\n/" $EXTRACT_DIR/$f
 #     # sed -i "1s/^/open BinNums\n/" $EXTRACT_DIR/$f
 #     # sed -i "1s/^/open BinPos\n/" $EXTRACT_DIR/$f
 #     # sed -i "1s/^/open BinNat\n/" $EXTRACT_DIR/$f
@@ -290,8 +290,8 @@ done
 #     # DynamicTypes replacement
 #     sed -i "/^type dtyp =/,/^$/c\type dtyp = DynamicTypes.dtyp\n" $EXTRACT_DIR/$f
 
-#     # VellvmIntegers
-#     sed -i "/^type 'i vMemInt/,/^$/c\type 'i vMemInt = 'i VellvmIntegers.coq_VMemInt\n" $EXTRACT_DIR/$f
+#     # TwophaseIntegers
+#     sed -i "/^type 'i vMemInt/,/^$/c\type 'i vMemInt = 'i TwophaseIntegers.coq_VMemInt\n" $EXTRACT_DIR/$f
 
 #     # Error
 #     sed -i "/^type 'a oOM/,/^$/c\type 'a oOM = 'a Error.coq_OOM\n" $EXTRACT_DIR/$f

@@ -1,4 +1,4 @@
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.Tactics.
 
 Require Coqlib.
@@ -1446,7 +1446,7 @@ Tactic Notation "inv_bind" hyp(H) :=
       destruct o eqn:hy; [|discriminate]; simpl in H
     end.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Numeric.Coqlib.
  
 Infix "⊍" := list_disjoint (at level 60).

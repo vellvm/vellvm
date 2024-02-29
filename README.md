@@ -49,11 +49,11 @@ with coq 8.19:
 Compilation takes a long time, and it is picky about dependencies. If
 you have used nix before consider looking at `nix.org` for details.
 
-# Running Vellvm
+# Running TwoPhase
 
-The executable `vellvm` will be found in `src/`.
-Do `src/vellvm -help` from the command line to see all available options.
+The executable `twophase` will be found in `src/`.
+Do `src/twophase -help` from the command line to see all available options.
 In particular:
-- `src/vellvm -interpret tests/ll/factorial.ll` to run the interpreter on a given file.
-- `cd src && ./vellvm -test` to run the test suite against clang
-- `src/vellvm -test-file tests/ll/gep2.ll` to test a specific file using inlined assertions
+- `src/twophase -interpret tests/ll/factorial.ll` to run the interpreter on a given file.
+- `cd src && ./twophase -test` to run the test suite against clang
+- `src/twophase -test-file tests/ll/gep2.ll` to test a specific file using inlined assertions

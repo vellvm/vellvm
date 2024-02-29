@@ -4,9 +4,9 @@ Require Import OrderedType OrderedTypeEx.
 Require Import ZArith.
 Require Import Coqlib.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Syntax.DynamicTypes
-     Semantics.VellvmIntegers
+     Semantics.TwoPhaseIntegers
      Utils.Error.
 
 From ExtLib Require Import

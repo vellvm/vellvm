@@ -4,7 +4,7 @@ From Coq Require Import
      Lia.
 
 (* Fake dependency due to [eutt_iter'']. To remove once the lemma is moved to the itree library *)
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.Tactics
      Utils.PropT.
 

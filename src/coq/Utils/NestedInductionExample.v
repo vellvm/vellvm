@@ -228,7 +228,7 @@ From ExtLib Require Import
      Data.Monads.EitherMonad.
 
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utilities
      Utils.MapMonadExtra
      Utils.MonadEq1Laws

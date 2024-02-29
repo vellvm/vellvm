@@ -4,7 +4,7 @@
 
 Require Import Coq.Program.Equality.
 Require Import Equalities.
-From Vellvm Require Import
+From TwoPhase Require Import
      Analysis.Dom
      Analysis.Kildall.
 Require Import FSets.

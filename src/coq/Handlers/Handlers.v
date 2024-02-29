@@ -18,7 +18,7 @@
    [bind], [vis] and [trigger], as well as the proof that they respect [eutt].
  *)
 
-From Vellvm.Handlers Require Export
+From TwoPhase.Handlers Require Export
      Global
      Local
      Stack
@@ -29,7 +29,7 @@ From Vellvm.Handlers Require Export
      OOM
      Concretization.
 
-From Vellvm.Semantics Require Import Memory.Sizeof Memory.MemBytes GepM.
+From TwoPhase.Semantics Require Import Memory.Sizeof Memory.MemBytes GepM.
 
 (* Handlers get instantiated over the domain of addresses provided by the memory model *)
 Module LLVMEvents64 := LLVMEvents.Make(MemoryModelImplementation.FinAddr)(MemoryModelImplementation.IP64Bit)(MemoryModelImplementation.FinSizeof).

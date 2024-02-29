@@ -12,7 +12,7 @@ From ExtLib Require Import
 From ITree Require Import
      ITree.
 
-From Vellvm.Utils Require Import
+From TwoPhase.Utils Require Import
      MonadReturnsLaws
      MonadEq1Laws
      Tactics.

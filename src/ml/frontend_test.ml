@@ -16,7 +16,7 @@ let parse_pp_test path =
       let _ = clang_parse vll_file dot_s in
       ()
     with
-    PlatformError _ -> failwith (Printf.sprintf "vellvm output bad file: %s" vll_file)
+    PlatformError _ -> failwith (Printf.sprintf "twophase output bad file: %s" vll_file)
   with
     PlatformError _ -> ()
 

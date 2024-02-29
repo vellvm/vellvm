@@ -2,7 +2,7 @@ From Coq Require Import String List ZArith.
 
 From ExtLib Require Import Structures.Monads.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Syntax.DynamicTypes
      Semantics.DynamicValues
      Semantics.MemoryAddress

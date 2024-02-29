@@ -15,7 +15,7 @@ From ITree Require Import
   Eq.Rutt
   Props.Leaf.
 
-From Vellvm Require Import
+From TwoPhase Require Import
   Utils.OOMRutt.
 
 (* Extra construction lemmas *)
@@ -556,7 +556,7 @@ Proof using.
   eauto with paco itree.
 Qed.
 
-From Vellvm Require Import
+From TwoPhase Require Import
   LLVMEvents
   Utils.Error.
 

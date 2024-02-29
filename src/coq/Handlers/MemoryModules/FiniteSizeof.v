@@ -3,13 +3,13 @@ From Coq Require Import
      Lia
      ZArith.
 
-From Vellvm.Utils Require Import
+From TwoPhase.Utils Require Import
      ListUtil.
 
-From Vellvm.Syntax Require Import
+From TwoPhase.Syntax Require Import
      DynamicTypes.
 
-From Vellvm.Semantics Require Import
+From TwoPhase.Semantics Require Import
      DynamicValues
      LLVMEvents
      Memory.MemBytes

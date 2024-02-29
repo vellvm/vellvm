@@ -17,7 +17,7 @@ From ITree Require Import
   Eq.Eqit
   Events.State.
 
-From Vellvm Require Import
+From TwoPhase Require Import
   Utilities
   Syntax.LLVMAst
   Syntax.AstLib
@@ -36,7 +36,7 @@ From Vellvm Require Import
   Handlers.Concretization
   ErrUbOomProp.
 
-From Vellvm.Utils Require Import
+From TwoPhase.Utils Require Import
   InterpPropOOM.
 
 From ExtLib Require Import
@@ -553,7 +553,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                         @bind_ErrUbOomProp dvalue (list dvalue)
                           match c with
                           | DVALUE_I1 i =>
-                              if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                              if (TwoPhaseIntegers.Int1.unsigned i =? 1)%Z
                               then fun y1 : err_ub_oom dvalue => success_unERR_UB_OOM x0 = y1
                               else fun y1 : err_ub_oom dvalue => success_unERR_UB_OOM y0 = y1
                           | DVALUE_Poison t =>
@@ -603,7 +603,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                           match
                             match c with
                             | DVALUE_I1 i =>
-                                if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                                if (TwoPhaseIntegers.Int1.unsigned i =? 1)%Z
                                 then success_unERR_UB_OOM x0
                                 else success_unERR_UB_OOM y0
                             | DVALUE_Poison t =>
@@ -800,7 +800,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
       | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
           exists (match a with
              | DVALUE_I1 i =>
-                 if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                 if (TwoPhaseIntegers.Int1.unsigned i =? 1)%Z
                  then success_unERR_UB_OOM d
                  else success_unERR_UB_OOM d0
              | DVALUE_Poison t => success_unERR_UB_OOM (DVALUE_Poison t)
@@ -856,7 +856,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                      match
                                        match c with
                                        | DVALUE_I1 i =>
-                                           if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                                           if (TwoPhaseIntegers.Int1.unsigned i =? 1)%Z
                                            then success_unERR_UB_OOM x0
                                            else success_unERR_UB_OOM y0
                                        | DVALUE_Poison t => success_unERR_UB_OOM (DVALUE_Poison t)
@@ -1081,7 +1081,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                      match
                                        match c with
                                        | DVALUE_I1 i =>
-                                           if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                                           if (TwoPhaseIntegers.Int1.unsigned i =? 1)%Z
                                            then success_unERR_UB_OOM x0
                                            else success_unERR_UB_OOM y0
                                        | DVALUE_Poison t => success_unERR_UB_OOM (DVALUE_Poison t)
@@ -1308,7 +1308,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                    match
                                      match c with
                                      | DVALUE_I1 i =>
-                                         if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                                         if (TwoPhaseIntegers.Int1.unsigned i =? 1)%Z
                                          then success_unERR_UB_OOM x0
                                          else success_unERR_UB_OOM y0
                                      | DVALUE_Poison t => success_unERR_UB_OOM (DVALUE_Poison t)

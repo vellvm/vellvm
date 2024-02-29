@@ -11,8 +11,8 @@ From ExtLib.Structures Require Export
 
 Require Import ExtLib.Data.Monads.StateMonad.
 
-From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG.
-From Vellvm Require Import Semantics.DynamicValues.
+From TwoPhase Require Import LLVMAst Util AstLib Syntax.CFG.
+From TwoPhase Require Import Semantics.DynamicValues.
 
 
 Require Import List.

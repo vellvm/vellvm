@@ -4,11 +4,11 @@ open Result
 
 (* open Assert *)
 open DynamicValues
-open VellvmIntegers
+open TwoPhaseIntegers
 
 open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 
-(* Vellvm test cases
+(* Twophase test cases
    -------------------------------------------------------- *)
 
 let parse_pp_test path =
@@ -25,7 +25,7 @@ let parse_pp_test path =
       let _ = clang_parse vll_file dot_s in
       ()
     with PlatformError _ ->
-      failwith (Printf.sprintf "vellvm output bad file: %s" vll_file)
+      failwith (Printf.sprintf "twophase output bad file: %s" vll_file)
   with PlatformError _ -> ()
 
 let ll_files_of_dir path : string list =

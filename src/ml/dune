@@ -6,15 +6,15 @@
 (library
  (name base)
  (modules assert platform IO result)
- (libraries libvellvm unix str testing))
+ (libraries libtwophase unix str testing))
 
 (executables
  (names frontend)
  (modules frontend frontend_test)
- (libraries base extracted libvellvm unix str))
+ (libraries base extracted libtwophase unix str))
 
 (executables
  (names main)
  (modes byte exe)
  (modules main driver interpreter test tester)
- (libraries base extracted libvellvm testing unix str))
+ (libraries base extracted libtwophase testing unix str))

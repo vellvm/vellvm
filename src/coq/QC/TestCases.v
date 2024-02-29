@@ -2,7 +2,7 @@
     and some lemmas related to them.
  *)
 From QuickChick Require Import QuickChick.
-From Vellvm Require Import ShowAST ReprAST GenAST QCVellvm TopLevel LLVMAst DynamicValues.
+From TwoPhase Require Import ShowAST ReprAST GenAST QCVellvm TopLevel LLVMAst DynamicValues.
 Require Import Semantics.LLVMEvents.
 Require Import Semantics.InterpretationStack.
 Require Import Handlers.Handlers.
@@ -180,7 +180,7 @@ From ITree Require Import
      Eq.Eqit
      TranslateFacts.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.Tactics
      Syntax.LLVMAst
      Syntax.CFG
@@ -207,7 +207,7 @@ Ltac vred_r :=
 Check interp_cfg3.
 
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utilities
      Syntax
      Semantics.LLVMEvents

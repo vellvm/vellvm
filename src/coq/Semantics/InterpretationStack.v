@@ -5,14 +5,14 @@ From ITree Require Import
      Events.StateFacts
      Eq.Eqit.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utilities
      Semantics.LLVMEvents
      Semantics.Lang
      Semantics.LLVMParams
      Semantics.StoreId.
 
-From Vellvm.Handlers Require Export
+From TwoPhase.Handlers Require Export
      Global
      Local
      Stack

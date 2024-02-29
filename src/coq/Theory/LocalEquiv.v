@@ -9,7 +9,7 @@ From ITree Require Import
      TranslateFacts
      Events.State.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utilities
      Syntax
      Semantics

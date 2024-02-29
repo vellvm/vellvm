@@ -76,10 +76,10 @@ let args =
 
 let files = ref []
 let _ =
-  Printf.printf "(* -------- Vellvm Test Harness -------- *)\n%!";
+  Printf.printf "(* -------- Twophase Test Harness -------- *)\n%!";
   try
     Arg.parse args (fun filename -> files := filename :: !files)
-      "USAGE: ./vellvm [options] <files>\n";
+      "USAGE: ./twophase [options] <files>\n";
     Platform.configure ();
     process_files !files
 

@@ -18,13 +18,13 @@ From ITree Require Import
      Events.State
      Events.StateFacts.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utilities
      Syntax
      Semantics
      Theory.StatePredicates
      Theory.InterpreterCFG
-     VellvmIntegers.
+     TwoPhaseIntegers.
 
 Open Scope itree_scope.
 Import ITreeNotations.

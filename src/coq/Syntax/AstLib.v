@@ -3,7 +3,7 @@ From Coq Require Import
      ZArith.ZArith
      String.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utilities
      Syntax.LLVMAst.
 

@@ -32,7 +32,7 @@ Require Import Equalities Orders.
 Require Import FMaps.
 
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Analysis.Iteration
      Analysis.Dom.
 

@@ -7,7 +7,7 @@ From Coq Require Import
      List
      Lia.
 
-From Vellvm Require Import
+From TwoPhase Require Import
   Utils.Monads
   Utils.Tactics
   ListUtil.

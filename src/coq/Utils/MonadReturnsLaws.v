@@ -8,7 +8,7 @@ From ExtLib Require Import
      Data.Monads.IdentityMonad
      Structures.Monads.
 
-From Vellvm.Utils Require Import MonadExcLaws PropT Monads Inhabited.
+From TwoPhase.Utils Require Import MonadExcLaws PropT Monads Inhabited.
 
 Local Open Scope monad_scope.
 
@@ -696,7 +696,7 @@ Section StateT.
 
   Import Monads.
 
-  From Vellvm Require Import Utils.StateMonads.
+  From TwoPhase Require Import Utils.StateMonads.
 
   Context {S : Type}.
   Context {SINHAB : Inhabited S}.

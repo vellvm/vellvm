@@ -1,4 +1,4 @@
-From Vellvm Require Import QC.Generators.
+From TwoPhase Require Import QC.Generators.
 Require Import Flocq.IEEE754.Binary Bool.Bool.
 From QuickChick Require Import QuickChick.
 

@@ -12,19 +12,19 @@ From ITree Require Import
      Events.StateFacts
      Events.State.
 
-From Vellvm Require Import Error.
+From TwoPhase Require Import Error.
 
-From Vellvm.Utils Require Import
+From TwoPhase.Utils Require Import
      MonadEq1Laws
      PropT
      Raise
      Tactics
      Inhabited.
 
-From Vellvm.Handlers.MemoryModules Require Import
+From TwoPhase.Handlers.MemoryModules Require Import
      Within.
 
-From Vellvm.Semantics Require Import
+From TwoPhase.Semantics Require Import
   StoreId
   LLVMEvents.
 

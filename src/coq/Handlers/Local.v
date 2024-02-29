@@ -12,7 +12,7 @@ From ITree Require Import
      Events.State
      Events.StateFacts.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.Util
      Utils.Error
      Utils.Tactics
@@ -160,7 +160,7 @@ Section Locals.
 End Locals.
 
 
-From Vellvm Require Import
+From TwoPhase Require Import
      LLVMAst
      MemoryAddress.
 

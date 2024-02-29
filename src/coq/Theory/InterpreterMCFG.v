@@ -8,7 +8,7 @@ From ITree Require Import
      Events.StateFacts
      Eq.Eqit.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Semantics.
 
 Import ITreeNotations.

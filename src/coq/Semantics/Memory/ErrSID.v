@@ -8,7 +8,7 @@ From ExtLib Require Import
      Data.Monads.StateMonad
      Data.Monads.IdentityMonad.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.Error
      Utils.UBAndErrors
      Semantics.MemoryAddress

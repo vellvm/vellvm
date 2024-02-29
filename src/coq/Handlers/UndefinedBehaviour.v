@@ -2,7 +2,7 @@
 From ITree Require Import
      ITree.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.PropT
      Semantics.LLVMEvents
      Theory.ContainsUB.

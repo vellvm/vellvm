@@ -14,7 +14,7 @@ From ITree Require Import
      Events.StateKleisli
      Events.StateFacts.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      PropT
      Error
      Util

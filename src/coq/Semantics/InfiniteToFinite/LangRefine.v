@@ -8,7 +8,7 @@ From Coq Require Import
 
 Require Import Coq.Logic.ProofIrrelevance.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Semantics.InterpretationStack
      Semantics.LLVMEvents
      Semantics.Denotation
@@ -18,7 +18,7 @@ From Vellvm Require Import
      Semantics.InterpretationStack
      Semantics.TopLevel
      Semantics.DynamicValues
-     Semantics.VellvmIntegers
+     Semantics.TwoPhaseIntegers
      Semantics.LLVMParams
      Semantics.InfiniteToFinite.Conversions.BaseConversions
      Semantics.InfiniteToFinite.Conversions.DvalueConversions
@@ -164,7 +164,7 @@ Proof.
       constructor; eauto.
 Qed.
 
-Import VellvmIntegers.
+Import TwoPhaseIntegers.
 
 (* TODO: Move this (FiniteIntptr.v) *)
 Module Type VMemInt_Intptr_Properties (IP : INTPTR).
@@ -7400,7 +7400,7 @@ Qed.
   Qed.
 
   Lemma eval_int_icmp_fin_inf :
-    forall {Int} {VMInt : VellvmIntegers.VMemInt Int} icmp a b res_fin,
+    forall {Int} {VMInt : TwoPhaseIntegers.VMemInt Int} icmp a b res_fin,
       @eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt icmp a b = ret res_fin  ->
@@ -14237,7 +14237,7 @@ Qed.
   Hint Resolve eval_iop_err_fin_inf : EVAL_INT_FIN_INF.
 
   Lemma eval_int_icmp_ub_fin_inf :
-    forall {Int} {VMInt : VellvmIntegers.VMemInt Int} icmp a b ub_msg,
+    forall {Int} {VMInt : TwoPhaseIntegers.VMemInt Int} icmp a b ub_msg,
       @eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt icmp a b = UB_unERR_UB_OOM ub_msg  ->
@@ -14395,7 +14395,7 @@ Qed.
   Qed.
 
   Lemma eval_int_icmp_err_fin_inf :
-    forall {Int} {VMInt : VellvmIntegers.VMemInt Int} icmp a b err_msg,
+    forall {Int} {VMInt : TwoPhaseIntegers.VMemInt Int} icmp a b err_msg,
       @eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt icmp a b = ERR_unERR_UB_OOM err_msg  ->

@@ -10,7 +10,7 @@ From Coq Require Import
      Classes.RelationClasses
      Program.Wf.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utilities
      Syntax.LLVMAst.
 

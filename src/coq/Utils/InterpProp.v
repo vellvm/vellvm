@@ -27,7 +27,7 @@ From ITree Require Import
      Basics.Monad
      Eq.EqAxiom.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.PropT.
 Require Import Paco.paco.
 

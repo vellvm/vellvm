@@ -8,7 +8,7 @@ From Coq Require Import
 
 Require Import Coq.Logic.ProofIrrelevance.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Semantics.InterpretationStack
      Semantics.LLVMEvents
      Semantics.Denotation
@@ -18,7 +18,7 @@ From Vellvm Require Import
      Semantics.InterpretationStack
      Semantics.TopLevel
      Semantics.DynamicValues
-     Semantics.VellvmIntegers
+     Semantics.TwoPhaseIntegers
      Semantics.LLVMParams
      Syntax.DynamicTypes
      Theory.TopLevelRefinements

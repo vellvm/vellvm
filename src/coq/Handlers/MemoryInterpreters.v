@@ -4,25 +4,25 @@ From Coq Require Import
      Lia
      Program.Equality.
 
-From Vellvm.Semantics Require Import
+From TwoPhase.Semantics Require Import
      MemoryParams
      Memory.ErrSID
      LLVMParams
      LLVMEvents
      StoreId.
 
-From Vellvm.Handlers Require Import
+From TwoPhase.Handlers Require Import
      MemoryModel
      MemPropT
      MemoryModules.Within.
 
-From Vellvm.Utils Require Import
+From TwoPhase.Utils Require Import
      Tactics
      InterpProp
      VellvmRelations
      StateMonads Raise Tactics ITreeMap.
 
-From Vellvm.Theory Require Import
+From TwoPhase.Theory Require Import
   ContainsUBExtra.
 
 From ITree Require Import
@@ -38,7 +38,7 @@ From ExtLib Require Import
      Structures.Monads.
 
 (* Needs to be after ITree.Events.State *)
-From Vellvm.Utils Require Import
+From TwoPhase.Utils Require Import
      PropT InterpMemoryProp.
 
 Require Import Paco.paco.

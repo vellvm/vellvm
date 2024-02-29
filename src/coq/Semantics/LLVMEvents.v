@@ -18,12 +18,12 @@ From ITree Require Import
      ITree
      Events.Exception.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utilities
      Syntax
      Semantics.Memory.Sizeof
      Semantics.DynamicValues
-     Semantics.VellvmIntegers.
+     Semantics.TwoPhaseIntegers.
 
 Import ITreeNotations.
 (* end hide *)

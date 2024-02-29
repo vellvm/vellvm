@@ -14,7 +14,7 @@ From ITree Require Import
      Events.StateFacts
      InterpFacts.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.Util
      Utils.Error
      Utils.Tactics
@@ -174,7 +174,7 @@ Section Globals.
 End Globals.
 
 
-From Vellvm Require Import
+From TwoPhase Require Import
      LLVMAst
      MemoryAddress.
 

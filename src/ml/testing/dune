@@ -7,6 +7,6 @@
 (library
   (name testing)
   (wrapped false)
-  (libraries extracted libvellvm str qcheck)
-  (synopsis "Vellvm Testing Library")
+  (libraries extracted libtwophase str qcheck)
+  (synopsis "Twophase Testing Library")
   )

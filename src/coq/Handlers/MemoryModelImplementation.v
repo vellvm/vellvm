@@ -1,8 +1,8 @@
-From Vellvm.Syntax Require Import
+From TwoPhase.Syntax Require Import
      DataLayout
      DynamicTypes.
 
-From Vellvm.Semantics Require Import
+From TwoPhase.Semantics Require Import
      MemoryAddress
      MemoryParams
      LLVMParams
@@ -14,17 +14,17 @@ From Vellvm.Semantics Require Import
      Memory.DvalueBytes
      Memory.ErrSID
      GepM
-     VellvmIntegers.
+     TwoPhaseIntegers.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Numeric.Coqlib
      Numeric.Integers.
 
-From Vellvm.Handlers Require Import
+From TwoPhase.Handlers Require Import
      MemPropT
      MemoryInterpreters.
 
-From Vellvm.Utils Require Import
+From TwoPhase.Utils Require Import
      Util
      Error
      PropT
@@ -62,10 +62,10 @@ Import Utils.Monads.
 Import MonadNotation.
 Open Scope monad_scope.
 
-From Vellvm.Handlers Require Import
+From TwoPhase.Handlers Require Import
      MemoryModel.
 
-From Vellvm.Handlers.MemoryModules Require Import
+From TwoPhase.Handlers.MemoryModules Require Import
   FiniteAddresses
   InfiniteAddresses
   FiniteIntptr

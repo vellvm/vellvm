@@ -15,7 +15,7 @@ From ExtLib Require Import
      Structures.Monads
      Data.Map.FMapAList.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utilities
      Syntax
      Syntax.LLVMAst
@@ -24,7 +24,7 @@ From Vellvm Require Import
      Semantics.Denotation
      Semantics.IntrinsicsDefinitions
      Semantics.InterpretationStack
-     Semantics.VellvmIntegers
+     Semantics.TwoPhaseIntegers
      Semantics.StoreId.
 
 Import MonadNotation.

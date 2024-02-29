@@ -10,7 +10,7 @@ From ITree Require Import
      Events.State
      Events.Exception.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.Error
      Utils.Raise
      Utils.MonadReturnsLaws

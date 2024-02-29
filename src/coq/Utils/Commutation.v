@@ -3,7 +3,7 @@ From Coq Require Import
      RelationClasses
      Morphisms.
 
-From Vellvm Require Import Utils.NoEvent.
+From TwoPhase Require Import Utils.NoEvent.
 
 From Paco Require Import paco.
 
@@ -97,7 +97,7 @@ Proof.
   intros; apply trivial_commut_gen; intros; reflexivity.
 Qed.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utils.PostConditions.
 
 Lemma eutt_post_bind_het :

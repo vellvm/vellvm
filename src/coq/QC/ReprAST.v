@@ -8,7 +8,7 @@
     into a format that it can be imported into Coq for debugging.
 *)
 
-From Vellvm Require Import LLVMAst ShowAST Utilities DynamicTypes.
+From TwoPhase Require Import LLVMAst ShowAST Utilities DynamicTypes.
 
 
 Require Import List.

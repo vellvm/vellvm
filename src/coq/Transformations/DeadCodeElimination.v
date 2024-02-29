@@ -13,7 +13,7 @@ From ITree Require Import
      ITree
      Basics.Monad.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utilities
      Syntax
      Semantics

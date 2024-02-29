@@ -1,4 +1,4 @@
-From Vellvm Require Import
+From TwoPhase Require Import
      Numeric.Coqlib
      Numeric.Integers
      Numeric.Floats
@@ -18,7 +18,7 @@ From Vellvm Require Import
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Syntax.DataLayout
-     Semantics.VellvmIntegers
+     Semantics.TwoPhaseIntegers
      Semantics.DynamicValues
      Semantics.MemoryAddress
      Semantics.GepM

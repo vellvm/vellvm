@@ -1,10 +1,10 @@
-From Vellvm.Syntax Require Import
+From TwoPhase.Syntax Require Import
      DataLayout
      DynamicTypes.
 
-From Vellvm.Semantics Require Import
+From TwoPhase.Semantics Require Import
   DynamicValues
-  VellvmIntegers
+  TwoPhaseIntegers
   StoreId
   MemoryAddress
   MemoryParams
@@ -15,11 +15,11 @@ From Vellvm.Semantics Require Import
 
 Require Import MemBytes.
 
-From Vellvm.Handlers Require Import
+From TwoPhase.Handlers Require Import
   MemPropT
   MemoryModules.Within.
 
-From Vellvm.Utils Require Import
+From TwoPhase.Utils Require Import
      Error
      PropT
      Util
@@ -33,7 +33,7 @@ From Vellvm.Utils Require Import
      MonadExcLaws
      Inhabited.
 
-From Vellvm.Numeric Require Import
+From TwoPhase.Numeric Require Import
      Integers.
 
 From ExtLib Require Import
@@ -3503,17 +3503,17 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
                     DVALUE_Addr src ::
                     DVALUE_I32 len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (unsigned len) (equ volatile VellvmIntegers.one)
+          memcpy_spec src dst (unsigned len) (equ volatile TwoPhaseIntegers.one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_I64 len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (unsigned len) (equ volatile VellvmIntegers.one)
+          memcpy_spec src dst (unsigned len) (equ volatile TwoPhaseIntegers.one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_IPTR len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (IP.to_Z len) (equ volatile VellvmIntegers.one)
+          memcpy_spec src dst (IP.to_Z len) (equ volatile TwoPhaseIntegers.one)
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
@@ -3524,13 +3524,13 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
           DVALUE_I32 len ::
           DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
           sid <- fresh_sid;;
-          memset_spec dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
+          memset_spec dst val (unsigned len) sid (equ volatile TwoPhaseIntegers.one)
       | DVALUE_Addr dst ::
           DVALUE_I8 val ::
           DVALUE_I64 len ::
           DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
           sid <- fresh_sid;;
-          memset_spec dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
+          memset_spec dst val (unsigned len) sid (equ volatile TwoPhaseIntegers.one)
       | _ => raise_error "Unsupported arguments to memset."
       end.
 
@@ -3973,7 +3973,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Import EitherMonad.
   Import Monad.
   Require Import Morphisms.
-  From Vellvm Require Import
+  From TwoPhase Require Import
        MonadEq1Laws
        Raise.
 
@@ -5610,17 +5610,17 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
                     DVALUE_Addr src ::
                     DVALUE_I32 len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (unsigned len) (equ volatile VellvmIntegers.one)
+          memcpy src dst (unsigned len) (equ volatile TwoPhaseIntegers.one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_I64 len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (unsigned len) (equ volatile VellvmIntegers.one)
+          memcpy src dst (unsigned len) (equ volatile TwoPhaseIntegers.one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_IPTR len ::
                     DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (IP.to_Z len) (equ volatile VellvmIntegers.one)
+          memcpy src dst (IP.to_Z len) (equ volatile TwoPhaseIntegers.one)
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
@@ -5631,13 +5631,13 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
           DVALUE_I32 len ::
           DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
           sid <- fresh_sid;;
-          memset dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
+          memset dst val (unsigned len) sid (equ volatile TwoPhaseIntegers.one)
       | DVALUE_Addr dst ::
           DVALUE_I8 val ::
           DVALUE_I64 len ::
           DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
           sid <- fresh_sid;;
-          memset dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
+          memset dst val (unsigned len) sid (equ volatile TwoPhaseIntegers.one)
       | _ => raise_error "Unsupported arguments to memset."
       end.
 
