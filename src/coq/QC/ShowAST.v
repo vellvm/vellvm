@@ -1,6 +1,6 @@
 (**
     Show instances for TwoPhase. These serialize TwoPhase.ASTs into the
-    standard format for .ll files. The result of show on a Vellvm
+    standard format for .ll files. The result of show on a Twophase
     program should give you a string that can be read by clang.
  *)
 

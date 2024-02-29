@@ -8,7 +8,7 @@
     Currently programs are rather simple, only generating integer
     types and simple loops, but we hope to expand this soon.
 
-    See vellvm-quickchick-overview.org in the root of the project for
+    See twophase-quickchick-overview.org in the root of the project for
     more details. *)
 Require Import Ceres.Ceres.
 

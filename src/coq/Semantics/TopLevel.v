@@ -159,7 +159,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   (* Command-line arguments----------------------------------------------------------------------- *)
 
   (* To support command-line arguments we convert a list of Coq strings into a preamble of 
-     global declarations with a form illustrated in tests/io/args_vellvm.ll.  Given N strings
+     global declarations with a form illustrated in tests/io/args_twophase.ll.  Given N strings
      s_arg0, s_arg1, ..., s_argN.
 
      Arguments are parsed from the command line as (list (list Z)) where each Z is an i8.
@@ -360,7 +360,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
      *  %ans = call ret_typ entry (args)
      *  ret ret_typ %ans
      *)
-  Definition denote_vellvm
+  Definition denote_twophase
              (ret_typ : dtyp)
              (entry : string)
              (args : list uvalue)
@@ -373,7 +373,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     dv_pred <- trigger (pickNonPoison rv);;
     ret (proj1_sig dv_pred).
 
-  (* main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them
+  (* main_args and denote_twophase_main may not be needed anymore, but I'm keeping them
      For backwards compatibility.
    *)
   (* (for now) assume that [main (i64 argc, i8** argv)]
@@ -386,8 +386,8 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
                            DV.UVALUE_Addr null
     ].
 
-  Definition denote_vellvm_main (mcfg : CFG.mcfg dtyp) : itree L0 dvalue :=
-    denote_vellvm (DTYPE_I (32)%N) "main" main_args mcfg.
+  Definition denote_twophase_main (mcfg : CFG.mcfg dtyp) : itree L0 dvalue :=
+    denote_twophase (DTYPE_I (32)%N) "main" main_args mcfg.
 
   (**
      Now that we know how to denote a whole llvm program, we can _interpret_
@@ -399,7 +399,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (args : list uvalue)
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : itree L4 res_L4 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_twophase ret_typ entry args (convert_types (mcfg_of_tle prog)) in
     interp_mcfg4_exec t [] ([],[]) 0 initial_memory_state.
 
   (**
@@ -411,7 +411,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     := interpreter_gen (DTYPE_I 32%N) "main" main_args prog.
 
   (**
-     We now turn to the definition of our _model_ of vellvm's semantics. The
+     We now turn to the definition of our _model_ of twophase's semantics. The
      process is extremely similar to the one for defining the executable
      semantics, except that we use, where relevant, the handlers capturing
      all allowed behaviors into the [Prop] monad.
@@ -427,7 +427,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (args : list uvalue)
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : PropT L4 res_L4 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_twophase ret_typ entry args (convert_types (mcfg_of_tle prog)) in
     ℑs eq eq t [] ([],[]) 0 initial_memory_state.
 
   Definition model_gen_oom
@@ -436,7 +436,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (args : list uvalue)
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : PropT L4 res_L4 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_twophase ret_typ entry args (convert_types (mcfg_of_tle prog)) in
     ℑs6 eq eq eq t [] ([],[]) 0 initial_memory_state.
 
   Definition model_gen_oom_L1
@@ -445,7 +445,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (args : list uvalue)
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : itree L1 res_L1 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_twophase ret_typ entry args (convert_types (mcfg_of_tle prog)) in
     ℑs1 t [].
 
   Definition model_gen_oom_L2
@@ -454,7 +454,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (args : list uvalue)
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : itree L2 res_L2 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_twophase ret_typ entry args (convert_types (mcfg_of_tle prog)) in
     ℑs2 t [] ([], []).
 
   Definition model_gen_oom_L3
@@ -464,7 +464,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     (args : list uvalue)
     (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : PropT L3 res_L3 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_twophase ret_typ entry args (convert_types (mcfg_of_tle prog)) in
     ℑs3 RR t [] ([], []) 0 initial_memory_state.
 
   Definition model_gen_oom_L4
@@ -475,7 +475,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     (args : list uvalue)
     (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : PropT L4 res_L4 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_twophase ret_typ entry args (convert_types (mcfg_of_tle prog)) in
     ℑs4 RR_mem RR_pick t [] ([], []) 0 initial_memory_state.
 
   Definition model_gen_oom_L5
@@ -486,7 +486,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     (args : list uvalue)
     (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : PropT L5 res_L5 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_twophase ret_typ entry args (convert_types (mcfg_of_tle prog)) in
     ℑs5 RR_mem RR_pick t [] ([], []) 0 initial_memory_state.
 
   Definition model_gen_oom_L6
@@ -498,7 +498,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     (args : list uvalue)
     (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : PropT L6 res_L6 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_twophase ret_typ entry args (convert_types (mcfg_of_tle prog)) in
     ℑs6 RR_mem RR_pick RR_oom t [] ([], []) 0 initial_memory_state.
 
   (**

@@ -2986,8 +2986,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Definition model_E1E2_L0_orutt_strict p1 p2 :=
     L0_E1E2_orutt_strict
-      (LLVM1.denote_vellvm (DTYPE_I 32%N) "main" LLVM1.main_args (convert_types (mcfg_of_tle p1)))
-      (LLVM2.denote_vellvm (DTYPE_I 32%N) "main" LLVM2.main_args (convert_types (mcfg_of_tle p2))).
+      (LLVM1.denote_twophase (DTYPE_I 32%N) "main" LLVM1.main_args (convert_types (mcfg_of_tle p1)))
+      (LLVM2.denote_twophase (DTYPE_I 32%N) "main" LLVM2.main_args (convert_types (mcfg_of_tle p2))).
 
   Definition model_E1E2_L1_orutt_strict p1 p2 :=
     L1_E1E2_orutt_strict
@@ -22201,8 +22201,8 @@ Qed.
   Proof.
     red.
 
-    unfold denote_vellvm.
-    unfold LLVM1.denote_vellvm.
+    unfold denote_twophase.
+    unfold LLVM1.denote_twophase.
     eapply orutt_bind; [apply build_global_environment_E1E2_orutt_strict_sound|].
 
     intros [] [] _.

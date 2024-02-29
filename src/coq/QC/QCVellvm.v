@@ -1,4 +1,4 @@
- (** Framework for running QC vellvm tests.
+ (** Framework for running QC twophase tests.
 
     This sets up a step function which mimics the step function in
     interpreter.ml in Coq. This function may not terminate (e.g., when
@@ -26,7 +26,7 @@ From TwoPhase Require Import ShowAST ReprAST GenAST TopLevel LLVMAst DynamicValu
 
 Extraction Blacklist String List Char Core Z Format.
 
-(* TODO: Use the existing vellvm version of this? Might actually just be ocaml result type. *)
+(* TODO: Use the existing twophase version of this? Might actually just be ocaml result type. *)
 Inductive MlResult a e :=
 | MlOk : a -> MlResult a e
 | MlError : e -> MlResult a e.
@@ -135,14 +135,14 @@ Extract Inlined Constant waitpid => "Unix.waitpid".
 Axiom exit : forall {A}, oint -> A.
 Extract Inlined Constant exit => "exit".
 
-(** Write our LLVM program to a file ("temporary_vellvm.ll"), and then
+(** Write our LLVM program to a file ("temporary_twophase.ll"), and then
     use clang to compile this file to an executable, which we then run in
     order to get the return code. *)
 Axiom llc_command_ocaml : string -> oint.
 Extract Constant llc_command_ocaml =>
           "fun prog ->
-              let llvm_file_name = Filename.(concat (get_temp_dir_name ()) ""temporary_vellvm.ll"") in
-              let test_binary = Filename.(concat (get_temp_dir_name ()) ""vellvmqc"") in
+              let llvm_file_name = Filename.(concat (get_temp_dir_name ()) ""temporary_twophase.ll"") in
+              let test_binary = Filename.(concat (get_temp_dir_name ()) ""twophaseqc"") in
               let f = open_out llvm_file_name in
                 Printf.fprintf f ""%s"" prog;
                 close_out f;
@@ -152,8 +152,8 @@ Extract Constant llc_command_ocaml =>
 Definition llc_command (prog : string) : int
   := oint_to_Z (llc_command_ocaml prog).
 
-Axiom vellvm_print_ll : list (toplevel_entity typ (block typ * list (block typ))) -> string.
-Extract Constant vellvm_print_ll => "fun prog -> Llvm_printer.toplevel_entities Format.str_formatter prog; Format.flush_str_formatter".
+Axiom twophase_print_ll : list (toplevel_entity typ (block typ * list (block typ))) -> string.
+Extract Constant twophase_print_ll => "fun prog -> Llvm_printer.toplevel_entities Format.str_formatter prog; Format.flush_str_formatter".
 
 (** Use the *llc_command* Axiom to run a TwoPhase.program with clang,
     and wrap up the exit code as a uvalue. *)
@@ -171,7 +171,7 @@ Inductive PROG :=
 
 (** Basic property to make sure that TwoPhase.and Clang agree when they
     both produce values *)
-Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
+Definition twophase_agrees_with_clang_parallel (p : PROG) : Checker
   :=
   (* collect (show prog) *)
   let '(Prog prog) := p in
@@ -180,9 +180,9 @@ Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
   then (* Child *)
     exit (llc_command_ocaml (to_caml_str (show prog)))
   else (* Parent *)
-    let vellvm_res := interpret prog in
+    let twophase_res := interpret prog in
     let clang_res := snd (waitpid nil pid) in
-    match vellvm_res, clang_res with
+    match twophase_res, clang_res with
     | MlOk _ _ (DVALUE_I8 x), (WEXITED ocaml_y) =>
         let y := repr (oint_to_Z ocaml_y) in
         if equ x y
@@ -193,7 +193,7 @@ Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
     | _, (WSTOPPED ocaml_y) =>
         whenFail ("clang process stopped") false
     | _, _ =>
-        whenFail ("Something else went wrong... TwoPhase. " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
+        whenFail ("Something else went wrong... TwoPhase. " ++ show twophase_res ++ " | Clang: " ++ show clang_res) false
     end.
 
 #[global] Instance Show_sum {A B} `{Show A} `{Show B} : Show (A + B) :=
@@ -205,7 +205,7 @@ Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
 
 (** Basic property to make sure that TwoPhase.and Clang agree when they
     both produce values *)
-Definition vellvm_agrees_with_clang (p : string + PROG) : Checker
+Definition twophase_agrees_with_clang (p : string + PROG) : Checker
   :=
   match p with
   | inl msg => checker false
@@ -213,21 +213,21 @@ Definition vellvm_agrees_with_clang (p : string + PROG) : Checker
       (* collect (show prog) *)
       let '(Prog prog) := p in
       let clang_res := run_llc prog in
-      let vellvm_res := interpret prog in
-      match clang_res, vellvm_res with
+      let twophase_res := interpret prog in
+      match clang_res, twophase_res with
       | DVALUE_I8 y, MlOk _ _ (DVALUE_I8 x) =>
           if equ x y
           then checker true
           else whenFail ("TwoPhase. " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
       | _, _ =>
-          whenFail ("Something else went wrong... TwoPhase. " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
+          whenFail ("Something else went wrong... TwoPhase. " ++ show twophase_res ++ " | Clang: " ++ show clang_res) false
       end
   end.
 
 Definition gen_PROG : GenLLVM PROG
   := fmap Prog gen_llvm.
 
-(* Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang). *)
+(* Definition agrees := (forAll (run_GenLLVM gen_llvm) twophase_agrees_with_clang). *)
 
 Extract Constant defNumTests    => "1000".
 
@@ -235,12 +235,12 @@ Extract Constant defNumTests    => "1000".
    For invoking `make qc-tests` from the `/src` directory, we need these:
 *)
 QCInclude "ml/*".
-QCInclude "ml/libvellvm/*".
+QCInclude "ml/libtwophase/*".
 
 
-(* QCInclude "../../ml/libvellvm/llvm_printer.ml". *)
-(* QCInclude "../../ml/libvellvm/Camlcoq.ml". *)
+(* QCInclude "../../ml/libtwophase/llvm_printer.ml". *)
+(* QCInclude "../../ml/libtwophase/Camlcoq.ml". *)
 (* QCInclude "../../ml/extracted/*ml". *)
 Extract Inlined Constant Error.failwith => "(fun _ -> raise)".
-QuickChick (forAll (run_GenLLVM gen_PROG) vellvm_agrees_with_clang).
+QuickChick (forAll (run_GenLLVM gen_PROG) twophase_agrees_with_clang).
 (*! QuickChick agrees. *)

@@ -3049,7 +3049,7 @@ Module DVALUE(A:TwoPhase.Semantics.MemoryAddress.ADDRESS)(IP:TwoPhase.Semantics.
 
     (* Evaluate integer opererations to get a dvalue.
 
-     These operations are between VInts, which are "vellvm"
+     These operations are between VInts, which are "twophase"
      integers. This is a typeclass that wraps all of the integer
      operations that we use for integer types with different bitwidths.
 

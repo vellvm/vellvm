@@ -27,9 +27,9 @@ Import ListNotations.
 
 (* There seems to be an issue with how QuickChick is running the test cases.
 
-   QC sometimes reports that vellvm disagrees with clang. However,
-   when the test case is run with `./vellvm -interpret`, we see that
-   vellvm does actually agree with clang.
+   QC sometimes reports that twophase disagrees with clang. However,
+   when the test case is run with `./twophase -interpret`, we see that
+   twophase does actually agree with clang.
 
    Initially we thought the issue might have to do with how we are
    serializing the TwoPhase.AST to a LLVM file, or parsing it in,
@@ -39,7 +39,7 @@ Import ListNotations.
    Below is an example of a program where this problem occurs.
 
    - repr_prog is the representation returned by ReprAST.
-   - parsed_prog is what we get from `./vellvm -print-ast`.
+   - parsed_prog is what we get from `./twophase -print-ast`.
 
    Both of these programs should be equivalent, and they
    are... However, when generated and run through the interpreter in
@@ -117,9 +117,9 @@ Extract Constant defNumTests    => "1".
 
 (* For some reason both of these programs disagree with clang when run
    through QC, even though they both agree when run with
-   `./vellvm -interpret`. *)
-QuickChick (vellvm_agrees_with_clang repr_prog).
-QuickChick (vellvm_agrees_with_clang parsed_prog).
+   `./twophase -interpret`. *)
+QuickChick (twophase_agrees_with_clang repr_prog).
+QuickChick (twophase_agrees_with_clang parsed_prog).
 
 (** This is a simpler program, that is shrunk from the above that exhibits the same problem.
 
@@ -128,7 +128,7 @@ QuickChick (vellvm_agrees_with_clang parsed_prog).
     but the problem goes away.
 
     Similarly, it shouldn't be the case the Ule is implemented incorrectly, because
-    `./vellvm -interpret` does the correct thing, and it runs Ule in the exact same fashion.
+    `./twophase -interpret` does the correct thing, and it runs Ule in the exact same fashion.
  *)
 Definition shrunk_program : list (toplevel_entity typ (block typ * list (block typ))) :=
   [TLE_Definition {|
@@ -172,7 +172,7 @@ Definition shrunk_program : list (toplevel_entity typ (block typ * list (block t
                    |}])
      |}].
 
-QuickChick (vellvm_agrees_with_clang shrunk_program).
+QuickChick (twophase_agrees_with_clang shrunk_program).
 
 
 From ITree Require Import

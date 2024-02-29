@@ -15,7 +15,7 @@ Extraction Blacklist String List Char Core Z Format.
 Extract Constant defNumTests    => "100".
 Extract Constant defSize    => "50".
 QCInclude "../../ml/*".
-QCInclude "../../ml/libvellvm/*".
+QCInclude "../../ml/libtwophase/*".
 
 Extract Inlined Constant Error.failwith => "(fun _ -> raise)".
-QuickChick (forAll (run_GenLLVM gen_PROG) vellvm_agrees_with_clang).
+QuickChick (forAll (run_GenLLVM gen_PROG) twophase_agrees_with_clang).

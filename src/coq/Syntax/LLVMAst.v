@@ -22,7 +22,7 @@ Open Scope list_scope.
 
     All changes to this file must naturally be mirrored in:
     - the parser:
-       "/src/ml/libvellvm/llvm_parser.mly"
+       "/src/ml/libtwophase/llvm_parser.mly"
     - the Coq Representation
        "/src/coq/QC/ReprAST.v"
     - the prettyprinter

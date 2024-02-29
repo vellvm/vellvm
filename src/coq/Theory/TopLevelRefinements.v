@@ -223,7 +223,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Variable entry : string.
     Variable args : list uvalue.
 
-    Definition denote_vellvm_init := denote_vellvm ret_typ entry args.
+    Definition denote_twophase_init := denote_twophase ret_typ entry args.
 
     (**
    In particular, we can therefore define top-level models
@@ -231,23 +231,23 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
      *)
 
     Definition model_to_L1  (prog: mcfg dtyp) :=
-      let L0_trace := denote_vellvm_init prog in
+      let L0_trace := denote_twophase_init prog in
       ℑs1 L0_trace [].
 
     Definition model_to_L2 (prog: mcfg dtyp) :=
-      let L0_trace := denote_vellvm_init prog in
+      let L0_trace := denote_twophase_init prog in
       ℑs2 L0_trace [] ([],[]).
 
     Definition model_to_L3 (prog: mcfg dtyp) :=
-      let L0_trace := denote_vellvm_init prog in
+      let L0_trace := denote_twophase_init prog in
       ℑs3 (refine_res2) L0_trace [] ([],[]) 0 initial_memory_state.
 
     Definition model_to_L4 (prog: mcfg dtyp) :=
-      let L0_trace := denote_vellvm_init prog in
+      let L0_trace := denote_twophase_init prog in
       ℑs4 (refine_res2) (refine_res3) L0_trace [] ([],[]) 0 initial_memory_state.
 
     Definition model_to_L5 (prog: mcfg dtyp) :=
-      let L0_trace := denote_vellvm_init prog in
+      let L0_trace := denote_twophase_init prog in
       ℑs5 (refine_res2) (refine_res3) L0_trace [] ([],[]) 0 initial_memory_state.
 
     (**
