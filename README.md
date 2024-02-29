@@ -1,236 +1,218 @@
-# Vellvm
-[![Opam build for vellvm](https://github.com/vellvm/vellvm/actions/workflows/vellvm.yml/badge.svg)](https://github.com/vellvm/vellvm/actions/workflows/vellvm.yml)
-[![Nix build for vellvm](https://github.com/vellvm/vellvm/actions/workflows/test.yml/badge.svg)](https://github.com/vellvm/vellvm/actions/workflows/test.yml)
+# Introduction
 
-Vellvm is an ongoing project aiming at the formal verification in the Coq proof
-assistant of a compilation infrastructure inspired by the LLVM compiler.
+This is the implementation of our memory model and LLVM semantics. The
+relevant theorems and definitions are linked to in the
+`paper-theorems.org` file.
 
-The central piece of Vellvm is the Verified IR (VIR), a Coq formalization of the
-semantics of (a subset of) the [LLVM IR](https://www.llvm.org/) that is intended for _formal
-verification_ of LLVM-based software.
+## Build Dependencies
 
-## LLVM Compatibility
+**NOTE:** The VM for the artifact already contains all of the
+dependencies. This section **can be skipped** if you are using the VM.
 
- Vellvm covers most features of the core *sequential* fragment of LLVM IR 14.0.0 as per its informal specification in [LangRef](https://llvm.org/docs/LangRef.html), including: 
- - basic operations on 1-, 8-, 32-, and 64-bit integers
- - doubles, floats, structs, arrays, pointers
- - casts
- - `undef` and `poison` 
- - SSA-structured control-flow-graphs
- - global data
- - mutually-recursive functions
- - some intrinsics (in a user-extensible)
+The project is *picky* about dependencies. If you have used nix before
+consider looking at `nix.org` for details. For opam the following
+should give you the appropriate versions of all of the dependencies:
 
- The main features that are currently unsupported are: 
- - some block terminators (`switch`, `resume`, indirect branching, `invoke`), 
- - the `landing_pad` and `va_arg` instructions
- - architecture-specific floats
- - opaque types
+```
+opam pin add coq 8.19.0
+opam repo add coq-released https://coq.inria.fr/opam/released
+opam install . --only-deps
+```
 
- Vellvm does not yet provide support for many C standard library functions (such
- as `printf`), but does support `puts` and `malloc`. From a semantics perspective, the main
- limitations have to do with concurrency.
+The following versions of things should be used to compile the project
+with coq 8.19. If the project does not compile it is likely that you
+have an incompatible set of dependencies, and you should install the
+versions below:
+
+>     - install   ocamlbuild             0.14.3
+>     - install   conf-g++               1.0
+>     - install   conf-bash              1             [required by base]
+>     - install   coq-ext-lib            0.12.0
+>     - install   menhirSdk              20231231
+>     - install   easy-format            1.3.4
+>     - install   menhirLib              20231231
+>     - install   coq-ceres              0.4.1
+>     - install   re                     1.11.0
+>     - install   menhirCST              20231231
+>     - install   ounit2                 2.2.7
+>     - install   coq-paco               4.2.0
+>     - install   qcheck-core            0.21.3
+>     - install   camlp-streams          5.0.1
+>     - install   coq-flocq              4.1.4
+>     - recompile base                   v0.16.3       [upstream or system changes]
+>     - install   coq-simple-io          1.8.0
+>     - install   menhir                 20231231
+>     - install   coq-itree              5.1.2
+>     - install   qcheck-ounit           0.21.3
+>     - install   biniou                 1.2.2
+>     - recompile ppx_sexp_conv          v0.16.0       [uses base]
+>     - recompile ppx_compare            v0.16.0       [uses base]
+>     - install   atd                    2.15.0
+>     - install   qcheck                 0.21.3
+>     - install   atdgen-runtime         2.15.0
+>     - recompile ppx_hash               v0.16.0       [uses base]
+>     - install   atdts                  2.15.0
+>     - install   atdgen                 2.15.0
+>     - recompile coq-serapi             8.19.0+0.19.0 [uses ppx_compare, ppx_sexp_conv]
+>     - install   elpi                   1.18.2
+>     - install   coq-elpi               2.0.2
+>     - install   coq-hierarchy-builder  1.7.0
+>     - install   coq-mathcomp-ssreflect 2.2.0
+>     - install   coq-quickchick         2.0.2
+
+Additionally, some of the tests use `clang` for comparison. The
+`clang` version that we compare against is `13.0.1`. The LLVM IR is a
+rapidly evolving language, so comparing against a different version of
+`clang` may result in more failed tests than expected, for instance
+due to changes in the syntax of the language.
+
+## Compilation:
+
+Compilation takes a long time (maybe an hour or so) and a fair amount
+of RAM (you should have 16GB available). With the dependencies
+installed you should be able to build the project by simply running
+the following commands:
+
+```
+cd src/
+make
+```
+
+# Running Vellvm
+
+After compiling the project the executable `vellvm` will be found in `src/`.
+Do `src/vellvm -help` from the command line to see all available options.
+
+In particular:
+- `src/vellvm -interpret tests/ll/factorial.ll` to run the interpreter on a given file.
+- `src/vellvm -test-file tests/ll/gep2.ll` to test a specific file using inlined assertions
+
+## Test Suites
+
+From the `src` directory we can run the test suites. The basic unit test suite can be run with:
+
+```
+./vellvm -test-suite
+```
+
+Which should run a suite of 152 unit tests for the interpreter which
+should all pass. Additionally
+
+```
+./vellvm -test
+```
+
+Runs a larger suite of assertion based tests from the `../tests/`
+directory, as well as pretty printer / parser tests.
+
+The assertions are `.ll` files which contain a comment with an `ASSERT
+EQ` statement that specifies the expected return value of a function
+when called with specific arguments.
+
+The pretty printer is tested by first running clang on the `.ll` file
+to make sure it's a valid LLVM file according to clang (if not we
+ignore these, and consider the test a pass, tests may involve
+additional vellvm-specific syntax like the `iptr` type we've
+added). If it's a valid LLVM file we parse it with vellvm, pretty
+print the parsed LLVM AST into an LLVM IR file, and then run `clang`
+on it again to ensure that `clang` still recognizes the file.
+
+**NOTE: clang version 13.0.1 is expected for the comparison. Other versions may fail.**
+
+The following error messages from `clang` are expected to show up when
+running the pretty-printer test cases:
+
+```
+$ ./vellvm -test 
+(* -------- Vellvm Test Harness -------- *)
+../tests/iptr/iptr.ll:2:15: error: expected type
+  %p = alloca iptr
+              ^
+1 error generated.
+../tests/must-fail/float-literal-size.ll:2:14: error: floating point constant invalid for type
+  ret float  127.900000000000005684341886080801486968994140625
+             ^
+1 error generated.
+```
+
+The first one is from a test file with the `iptr` syntax we've added,
+and the latter is a test case which is expected to fail because of an
+invalid floating point literal.
+
+Even more tests from the alive2 test-suite can be run as
+follows:
+
+```
+./vellvm -enable-srctgt-tests -test
+```
+
+(**note**: the order of the flags matters)
+
+Some of these alive2 tests are currently **expected to fail**. The
+alive2 test suite compares a `src` function to a `tgt` function, where
+the `tgt` function is expected to be a refinement of the `src`
+function. We execute these tests by randomly generating arguments to
+the `src` and `tgt` functions and then comparing their outputs. This
+approach is, unfortunately, not valid for the alive2 test cases which
+are not executable --- for instance there are test cases where the
+`src` functions contain `undef` and the `tgt` function returns a
+completely arbitrary value, our executable implementation will not
+explore all possible choices for the `undef` value, so we cannot
+determine that `tgt`is a refinement of `src` automatically. We have
+already disabled some of these alive2 tests, as well as some which use
+datatypes, operations, and datalayouts (e.g., big endian layouts) that
+are unsupported in vellvm. Furthermore, our test-case generator is
+under active development and currently does not handle some tricky
+cases fully, like pointer arguments to `src` and `tgt`, so test cases
+are expected to fail as a result of this as well. The number of
+failing tests varies for each run due to the random generation, but
+roughly 50 tests are expected to fail.
 
 # Structure of the development
 
-The development is organized as follows.
+The `paper-theorems.org`file maps the theorems in the paper to the
+theorems in the development, but for the curious this section will
+describe the overall structure of the project.
 
-## Interaction Trees
+Within the `src/` directory the main important directories are
 
-Vellvm heavily relies on the [Interaction Trees](https://github.com/DeepSpec/InteractionTrees). Its development is hence 
-tied to contributions to the itree libraries. Temporary itree contributions not yet ready for merge are stored in the `src/coq/Utils` 
-folder.
+- `src/coq/`
+- `src/ml/`
 
-## Coq formalization
+The `src/coq/` directory contains the bulk of the development as well
+as the lemmas presented in the paper along with their proofs. The
+`src/ml/` directory contains the `ocaml` portion of the executable
+interpreter. The executable interpreter itself is extracted from the
+Coq development, but the `ocaml` code is used to implement the command
+line executable, LLVM IR parser, and the test framework is implemented
+in the `ocaml` code as well.
 
-The core of the project is encompassed by the Coq formalization of LLVM IR and the proof of its metatheory. 
-This formalization is entirely contained in the `src/coq` folder. 
+## The Coq development
 
-More specifically, the following selection of files are among the most important to understand the development:
+The Coq development itself is broken up into a few important files and directories.
 
 Syntax, in `src/coq/Syntax/`
 - `LLVMAst.v` the front VIR internal AST. Our parser of native llvm syntax returns an element of this AST.
-- `CFG.v`     the VIR internal AST as used for the semantics. 
+- `CFG.v`     the VIR internal AST as used for the semantics.
 
 Semantics, in `src/coq/Semantics/`:
-- `DynamicValues.v` definition of the dynamic values and underdefined values.
-- `LLVMEvents.v`    inventory of all events.
-- `Denotation.v`    definitions of the representation of VIR programs as ITrees.
-- `Handlers/`       includes the code for all of the handlers. They are broken up into files based on the nature of the event handled, each file hence corresponding to a subsection.
-- `TopLevel.v`      provides the full model and the full interpreter, by plugging all components together.
+- `DynamicValues.v` definition of the dynamic values and underdefined values **ARTIFACT** discussed in Section 2.2.
+- `LLVMEvents.v`    inventory of all events **ARTIFACT** as described in Section 4.1.
+- `Denotation.v`    definitions of the representation of VIR programs as ITrees **ARTIFACT** as described in Section 4.2.
+- `Handlers/`       includes the code for all of the handlers **ARTIFACT** described in Section 4.3. They are broken up into files based on the nature of the eve
+nt handled, each file hence corresponding to a subsection.
+- `TopLevel.v`      provides the full model and the full interpreter, by plugging all components together, **ARTIFACT** i.e. the final result of Section 4.4.
 
 Theory, in `src/coq/Theory/`:
 - `src/coq/Utils/PropT.v` metatheory required to reason about sets of itrees, i.e. about the propositional monad transformer.
-- `InterpreterMCFG.v`     the layers of interpretation and some of their metatheory
+- `InterpreterMCFG.v`     the layers of interpretation **ARTIFACT** shown in Figure 6 and some of their metatheory
 - `InterpreterCFG.v`      the same layers of interpretation and metatheory, but when reasoning about single functions (i.e. single cfg)
-- `Refinement.v`          definition of the refinement relations between layers of interpretations 
+- `Refinement.v`          definition of the refinement relations between layers of interpretations **ARTIFACT** mentioned in Section 5.4
 - `TopLevelRefinements.v` proof of inclusion of the refinement relations between layers of interpretations; proof of soundness of the interpreter as described in Section 5
 - `DenotationTheory`      Equational theory to reason directly about the structure of vir programs; in particular, reasoning principles about open control-flow-graphs.
-
-## OCaml front-end and driver for execution and testing
-
-On the OCaml side, we provide a parser for legal LLVM IR syntax as well as an
-infrastructure to run differential tests between our interpreter and llc.
-These unverified parts of the development live in the `src/ml` folder.
-
-- `extracted/Extract.v`    instructions for the extraction of the development to OCaml
-- `libvellvm/interpreter.ml`  OCaml driver for running the interpreter; the `step` function walks over the ITree that remains after complete interpretation of the denotation of a program
-- `libvellvm/llvm_parser.mly` the parser, adapted from Vellvm, 
-- `testing/assertion.ml`   custom annotations of llvm programs as comments used to define our tests.
-- `main.ml`                top-level from which our executable is obtained.
 
 ## Test suite
 
 Our current test-suite of LLVM programs for which we compare our semantics against llc is stored in `tests/`
 
 - `tests/` directory containing the test suite of LLVM IR programs discussed in Section 6
-
-# Installing / Compiling Vellvm
-
-## Assumes: 
-  - OCaml 4.14.1 (typically installed via `opam`, see below)
-  - Coq 8.19.1
-  - opam  2.0.0+
-  - Clang 14.0.1+ (available for Mac OSX in XCode 4.2+, or installed via, e.g. `sudo apt-get install clang`)
-  - `gnu-sed` 
-     + `sed` defaults to `gnu-sed` on linux. 
-	 + for Mac OS X with [homebrew](https://brew.sh/), do `brew install gnu-sed` and then create a symlink from `sed` to the `gsed` executable in your path.)
-
-## Compilation:
-
-1. Clone the vellvm git repo with the `--recurse-submodule` option
-   - If you forgot to clone recursively, run `git submodule update --init --recursive` to fetch the extra libraries in `lib/`
-3. Install all external dependencies
-   - Note: you should be able to install all of the opam libraries  with `make opam` in the `src/` directory.
-4. Run `make` in the `src/` directory: it will produce the OCaml executable called `vellvm`
-
-## opam, Coq, and opam dependencies
-
-`opam` is available via [homebrew](https://brew.sh/) on Mac, and most system's package managers on Linux, e.g. `sudo apt-get install opam`.
-
-If this is the first time you are using opam you need to initialize it: 
-  - On Linux: `opam init`
-  - On Mac:  `opam init --disable-sandboxing` (sandboxing needs to be disabled due to a known [issue](https://github.com/ocaml/opam-repository/issues/12973)).
-
-Then:
-
-1. Add the Coq package repository:
-    `opam repo add coq-released https://coq.inria.fr/opam/released`.
-
-2. Create an opam vellvm development *switch* with:
-    `opam switch create vellvm ocaml-base-compiler.4.14.1`.
-
-3. Install Coq:
-   `opam pin add coq 8.19.1`
-
-4. Add External Coq libraries: 
-    * ext-lib    (installed via, e.g. `opam install coq-ext-lib`)
-    * paco       (installed via, e.g. `opam install coq-paco`)
-    * itrees     (installed via, e.g. `opam install coq-itree`)
-    * flocq      (installed via, e.g. `opam install coq-flocq`) 
-    * ceres      (installed via, e.g. `opam install coq-ceres`)
-    * mathcomp   (installed via, e.g. `opam install coq-mathcomp-ssreflect`)
-    * simple-io  (installed via, e.g. `opam install coq-simple-io`)
-	* quickchick (installed via, e.g. `opam install coq-quickchick`)
-
-5. Add opam ocaml packages: 
-    * ocamlbuild (installed via, e.g. `opam install ocamlbuild`)
-    * dune       (installed via, e.g. `opam install dune`)
-    * menhir     (installed via, e.g. `opam install menhir`)
-    * qcheck     (installed via, e.g. `opam install qcheck`)
-
-Steps 3-5 above can be achieved after cloning the Vellvm git repo by doing:
-    `cd src && make pin-coq && make opam`
-
-## Using nix:
-
-If you are a nix user, another way to install / compile Vellvm is with nix. Instructions can be found [here](nix.org).
-
-# Running Vellvm
-
-The executable `vellvm` will be found in `src/`.
-Do `src/vellvm -help` from the command line to see all available options.
-In particular:
-- `src/vellvm -interpret tests/ll/factorial.ll` to run the interpreter on a given file.
-- `cd src && ./vellvm -test` to run the test suite against clang
-- `src/vellvm -test-file tests/ll/gep2.ll` to test a specific file using inlined assertions
-
-
-# Adding a new test case
-
-One way to create new test cases for Vellvm is to compile a C program using `clang` and then add assertions to turn it in to an executable for adding assertions.  The steps below illustrate this process:
-
-1. Create a C program (e.g. in the directory `tests/c`), for instance, `example.c`.
-
- - The C program should not use C libraries (yet!), which are not part of the LLVM IR standard, but the program should be able to use general C language features.
-
-For example: the following C program contains a simple function called `foo` that multiplies its input by 3:
-
-```
-int foo(int x) {
-  return 3*x;
-}
-```
-
-2. Compile the C program using `clang` with the `-emit-llvm` and `-S` flags to generate an LLVM `.ll` version.
-
-```
-~/vellvm/tests/c> clang -S -emit-llvm example.c
-```
-
-3. The resulting `.ll` file should look something like this:
-```
-~/vellvm/tests/c> cat example.ll
-; ModuleID = 'example.c'
-source_filename = "example.c"
-target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
-target triple = "x86_64-apple-macosx10.15.0"
-
-; Function Attrs: noinline nounwind optnone ssp uwtable
-define i32 @foo(i32) #0 {
-  %2 = alloca i32, align 4
-  store i32 %0, i32* %2, align 4
-  %3 = load i32, i32* %2, align 4
-  %4 = mul nsw i32 3, %3
-  ret i32 %4
-}
-
-attributes #0 = { noinline nounwind optnone ssp uwtable "correctly-rounded-divide-sqrt-fp-math"="false" "darwin-stkchk-strong-link" "disable-tail-calls"="false" "less-precise-fpmad"="false" "min-legal-vector-width"="0" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "no-trapping-math"="false" "probe-stack"="___chkstk_darwin" "stack-protector-buffer-size"="8" "target-cpu"="penryn" "target-features"="+cx16,+fxsr,+mmx,+sahf,+sse,+sse2,+sse3,+sse4.1,+ssse3,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
-
-!llvm.module.flags = !{!0, !1, !2}
-!llvm.ident = !{!3}
-
-!0 = !{i32 2, !"SDK Version", [2 x i32] [i32 10, i32 15]}
-!1 = !{i32 1, !"wchar_size", i32 4}
-!2 = !{i32 7, !"PIC Level", i32 2}
-!3 = !{!"Apple clang version 11.0.0 (clang-1100.0.33.16)"}
-```
-
-4. Edit the `.ll` file to add some assertions about the behavior of the program.  For example, we could add the following three assertions (the last of which is actually incorrect):
-
- - The syntax for each assertion is a comment of the form: `; ASSERT EQ: <typ> <val> = call <typ> @<fun>(<typ1> arg1, ..., <typN> argN)`
-
-
-```
-; ASSERT EQ: i32 0 = call i32 @foo(i32 0)
-; ASSERT EQ: i32 3 = call i32 @foo(i32 1)
-; ASSERT EQ: i32 5 = call i32 @foo(i32 2)
-```
-
-5. Run vellvm with the `-test-file example.ll` flags to see the results of running the test cases:
-
-```
-~/vellvm/tests/c> ../../src/vellvm -test-file example.ll
-(* -------- Vellvm Test Harness -------- *)
-
-example:
-  passed - UVALUE_I32(0) = foo(UVALUE_I32(0))
-  passed - UVALUE_I32(3) = foo(UVALUE_I32(1))
-  failed - UVALUE_I32(5) = foo(UVALUE_I32(2))
-	   ERROR: not equal
-(*-------------------------------------- *)
-Passed: 2/3
-Failed: 1/3
-```
-
-6. The command `vellvm -test-dir <dir>` will run the `ASSERT`s found in all the `.ll` files in directory `<dir>`.
