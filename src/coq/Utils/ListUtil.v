@@ -1238,10 +1238,6 @@ Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B
       l <- combine_lists_err xs ys ;;
       ret ((x,y)::l)
   | _, _ =>
-      (* YZ: This should be a failure, but we first need to have a proper
-          story to handle main arguments since at the moment we expect exactly
-          argc and argv, and feed default values to them *)
-      (* failwith "combine_lists_err: different length lists" *)
       ret []
   end.
 
