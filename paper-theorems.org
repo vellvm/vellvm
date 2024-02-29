@@ -1,9 +1,185 @@
-* Section 3.5.2
+* Introduction
 
-** InfiniteToFinite.v
+This file maps some of the important definitions and lemmas to the
+actual development. It is worth noting that some of the names have
+changed in the paper for clarity, and some of the definitions have
+been simplified and specialized within the paper as well.
 
-- [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma inf_fin_read_byte_spec :][inf_fin_read_byte_spec]]
-- [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma inf_fin_read_byte_spec_exists :][inf_fin_read_byte_spec_exists]]
+The bulk of the memory model itself is contained within:
+
+- [[file:src/coq/Handlers/MemoryModel.v]]
+- [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v]]
+- [[file:src/coq/Handlers/MemoryModules/FiniteSpecPrimitives.v]]
+- [[file:src/coq/Handlers/MemoryModelImplementation.v]]
+
+The refinement relations between infinite and finite memory models are contained in:
+
+- [[file:src/coq/Semantics/InfiniteToFinite/Conversions/BaseConversions.v]]
+- [[file:src/coq/Semantics/InfiniteToFinite/Conversions/DvalueConversions.v]]
+- [[file:src/coq/Semantics/InfiniteToFinite/Conversions/EventConversions.v]]
+- [[file:src/coq/Semantics/InfiniteToFinite/Conversions/TreeConversions.v]]
+- [[file:src/coq/Semantics/InfiniteToFinite/LangRefine.v]]
+- [[file:src/coq/Semantics/InfiniteToFinite.v]]
+
+Top level refinements and interpreter soundness:
+
+- [[file:src/coq/Theory/Refinement.v]]
+- [[file:src/coq/Theory/TopLevelRefinements.v]]
+
+Values and semantics:
+
+- [[file:src/coq/Syntax/DynamicTypes.v]]
+- [[file:src/coq/Semantics/DynamicValues.v]]
+- [[file:src/coq/Handlers/MemoryModules/FiniteSizeof.v]]
+- [[file:src/coq/Semantics/LLVMEvents.v]]
+- [[file:src/coq/Semantics/Denotation.v]]
+- [[file:src/coq/Handlers/Concretization.v]]
+- [[file:src/coq/Semantics/TopLevel.v]]
+
+* Section 3
+
+Memory configurations are defined by ~MemState~ in
+[[file:src/coq/Handlers/MemoryModules/FiniteSpecPrimitives.v]]. It
+consists of a high watermark to keep track of the provenance and a
+~memory_stack~ which contains the actual state of memory.
+
+- [[file:src/coq/Handlers/MemoryModules/FiniteSpecPrimitives.v::Record MemState' :=][MemState]]
+- [[file:src/coq/Handlers/MemoryModules/FiniteSpecPrimitives.v::Record memory_stack' : Type :=][memory_stack]]
+
+The memory itself is represented as a finite IntMap of symbolic bytes
+associated with a provenance. The ~memory_stack~ also contains a stack
+and a heap.
+
+** Operations
+
+- find_bk
+  + [[file:src/coq/Handlers/MemoryModel.v::Definition find_free_block (len : nat) (pr : Provenance) : MemPropT MemState (addr * list addr)%type][find_free_block]]
+- read_b
+  + [[file:src/coq/Handlers/MemoryModel.v::Definition read_byte_spec_MemPropT (ptr : addr) : MemPropT MemState SByte :=][read_byte_spec_MemPropT]]
+- write_b
+  + [[file:src/coq/Handlers/MemoryModel.v::Definition write_byte_spec_MemPropT (ptr : addr) (byte : SByte) : MemPropT MemState unit][write_byte_spec_MemPropT]]
+- alloca_post
+  + [[file:src/coq/Handlers/MemoryModel.v::Record allocate_bytes_post_conditions][allocate_bytes_post_conditions]]
+- malloc_post
+  + [[file:src/coq/Handlers/MemoryModel.v::Record malloc_bytes_post_conditions (m1 : MemState) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=][malloc_bytes_post_conditions]]
+- free
+  + [[file:src/coq/Handlers/MemoryModel.v::Definition free_spec_MemPropT (root : addr) : MemPropT MemState unit :=][free_spec_MemPropT]]
+- pushf
+  + [[file:src/coq/Handlers/MemoryModel.v::Definition mempush_spec_MemPropT : MemPropT MemState unit :=][mempush_spec_MemPropT]]
+- popf
+  + [[file:src/coq/Handlers/MemoryModel.v::Definition mempop_spec_MemPropT : MemPropT MemState unit :=][mempop_spec_MemPropT]]
+- fresh is called fresh_provenance in the development and is a
+  parameter of the memory model
+
+** Infinite to finite refinement
+
+This is slightly more involved in the development because the memory
+model is parameterized by a memory monad, instead of just using the
+Result type directly like in the paper.
+
+- lifting symbolic bytes
+  + [[file:src/coq/Semantics/InfiniteToFinite.v::Definition lift_SByte (sb1 : Memory64BitIntptr.MP.BYTE_IMPL.SByte) : MemoryBigIntptr.MP.BYTE_IMPL.SByte.][lift_SByte]]
+- lifting pointers
+  +[[file:src/coq/Semantics/InfiniteToFinite/LangRefine.v::Definition fin_to_inf_addr (a : addr) : IS1.LP.ADDR.addr.][fin_to_inf_addr]]
+- lifting memory configurations
+  + [[file:src/coq/Semantics/InfiniteToFinite.v::Definition lift_MemState (m1 : FinMem.MMEP.MMSP.MemState) : InfMem.MMEP.MMSP.MemState.][lift_MemState]]
+- Lemma 3.1 read_byte_spec refinement
+  + [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma fin_inf_read_byte_spec :][fin_inf_read_byte_spec]]
+
+* Section 4
+
+- Events
+  + [[file:src/coq/Semantics/LLVMEvents.v]]
+- Interpreter levels
++ [[file:src/coq/Theory/Refinement.v]]
+- Values
++ [[file:src/coq/Semantics/DynamicValues.v]]
+- Symbolic Bytes
+  + [[file:src/coq/Handlers/MemoryModules/FiniteSizeof.v::Inductive UByte (uvalue : Type) :=][Symbolic Bytes]]
+- Serialization
+  + [[file:src/coq/Handlers/MemoryModel.v::Definition serialize_sbytes {M} `{Monad M} `{MonadStoreId M}][serialize_sbytes]]
+- Deserialization
+  + [[file:src/coq/Handlers/MemoryModel.v::Definition deserialize_sbytes (bytes : list SByte) (dt : dtyp) : err uvalue :=][deserialize_sbytes]]
+
+** Section 4.3
+
+Concretization is implemented using a generic monadic function,
+allowing it to be used in both the specification and the executable
+interpreter.
+
+- Concretization
+  + [[file:src/coq/Handlers/Concretization.v::Fixpoint concretize_uvalueM (u : uvalue) {struct u} : M dvalue :=][concretize_uvalueM]]
+
+** Section 4.4
+
+- Refinement between itrees at the second level of interpretation
+  + [[file:src/coq/Theory/Refinement.v::Definition refine_L2 : relation (itree L2 (local_env * stack * (global_env * dvalue)))][refine_L2]]
+- Refinement between itrees at the fourth level of interpretation,
+  after handling memory and pick events
+  + [[file:src/coq/Theory/Refinement.v::Definition refine_L4 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)][refine_L4]]
+- Refinement after the final level of interpretation of VIR, incorporating OOM and UB.
+  + [[file:src/coq/Theory/Refinement.v::Definition refine_L6 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)][refine_L6]]
+- hasUB
+  + [[file:src/coq/Theory/ContainsUBOriginal.v::Inductive contains_UB {R} : itree Eff R -> Prop :=][contains_UB]]
+- eutt_oom
+  + [[file:src/coq/Handlers/OOM.v::Definition refine_OOM_h {T} (RR : relation T) (source target : itree Effout T) : Prop][refine_OOM_h]]
+- Theorem 4.1, refinement between levels
+  + [[file:src/coq/Theory/TopLevelRefinements.v::Lemma refine_01: forall t1 t2 g,][refine_01]]
+- Theorem 4.2, transitivity of refinement
+  + [[file:src/coq/Theory/Refinement.v::Instance Transitive_refine_L6 : Transitive refine_L6.][Transitive_refine_L6]]
+
+** Section 4.5
+
+- Infinite to finite refinement relation
+  + [[file:src/coq/Semantics/InfiniteToFinite/LangRefine.v::Definition L0_E1E2_orutt_strict t1 t2][L0_E1E2_orutt_strict]]
+  + [[file:src/coq/Semantics/InfiniteToFinite/LangRefine.v::Definition L1_E1E2_orutt_strict t1 t2][L1_E1E2_orutt_strict]]
+  + [[file:src/coq/Semantics/InfiniteToFinite/LangRefine.v::Definition L2_E1E2_orutt_strict t1 t2][L2_E1E2_orutt_strict]]
+  + [[file:src/coq/Semantics/InfiniteToFinite.v::Definition L6_E1E2_orutt_strict][L6_E1E2_orutt_strict]]
+- orutt
+  + [[file:src/coq/Utils/OOMRutt.v::Inductive oruttF (sim : itree E1 R1 -> itree E2 R2 -> Prop) : itree' E1 R1 -> itree' E2 R2 -> Prop :=][oruttF]]
+- Theorem 4.3 infinite-to-finite top-level refinement
+  + [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma model_E1E2_L6_orutt_strict_sound][model_E1E2_L6_orutt_strict_sound]]
+
+The names of some of these lemmas is a bit more generic in the
+development, as opposed to the paper. The ~E1E2~ part of these lemmas
+is in reference to the different event types for the itrees in the
+different instantiations of the language. For the purposes of this
+paper these will be the infinite / finite instances of the language.
+
+* Section 5
+
+- optimization examples
+  + [[file:src/coq/Theory/OOMRefinementExamples.v]]
+
+* Section 6
+
+- read_b^run
+  + [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Definition read_byte `{MemMonad MemM (itree Eff)} (ptr : addr) : MemM SByte :=][read_byte]]
+- write_b^run
+  + [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Definition write_byte `{MemMonad MemM (itree Eff)} (ptr : addr) (byte : SByte) : MemM unit :=][write_byte]]
+- pushf^run
+  + [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Definition mempush `{MemMonad MemM (itree Eff)} : MemM unit :=][mempush]]
+- popf^run
+  +[[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Definition mempop `{MemMonad MemM (itree Eff)} : MemM unit :=][mempop]]
+- alloca^run
+  + [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Definition allocate_bytes `{MemMonad MemM (itree Eff)}][allocate_bytes]]
+- malloc^run
+  + [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Definition malloc_bytes `{MemMonad MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=][malloc_bytes]]
+- free^run
+  + [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Definition free `{MemMonad MemM (itree Eff)} (ptr : addr) : MemM unit :=][free]]
+- Executable correctness lemmas
+  + [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Lemma read_byte_correct :][read_byte_correct]]
+
+** Section 6.2
+
+- Theorem 6.1: Interpreter soundness
+  + [[file:src/coq/Theory/TopLevelRefinements.v::Theorem interpreter_sound: forall p,][interpreter_sound]]
+
+* Handler correctness
+
+Proofs that handlers for finite LLVM memory events and intrinsics
+refine the infinite versions.
+
 - [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma handle_load_fin_inf :][handle_load_fin_inf]]
 - [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma handle_load_fin_inf_ub :][handle_load_fin_inf_ub]]
 - [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma handle_store_fin_inf :][handle_store_fin_inf]]
@@ -12,40 +188,43 @@
 - [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma handle_malloc_fin_inf :][handle_malloc_fin_inf]]
 - [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma handle_free_spec_fin_inf :][handle_free_spec_fin_inf]]
 - [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma handle_free_fin_inf :][handle_free_fin_inf]]
-- [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma inf_fin_free_spec :][inf_fin_free_spec]]
 - [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma handle_intrinsic_fin_inf :][handle_intrinsic_fin_inf]]
 - [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma handle_memcpy_fin_inf :][handle_memcpy_fin_inf]]
 
-* Section 5.4
+* Notes on differences from the paper
 
-** Refinement.v
+The presentation in the paper has been cleaned up and definitions have
+been made more consistent for readability reasons. Some noteworthy
+changes include:
 
-- [[file:src/coq/Theory/Refinement.v::Definition refine_L3 : relation (itree L3 (MemState * (store_id * (local_env * stack * (global_env * dvalue)))) -> Prop)][refine_L3]]
-- [[file:src/coq/Theory/Refinement.v::Definition refine_L4 : relation ((itree L4 (MemState * (store_id * (local_env * stack * (global_env * dvalue))))) -> Prop)][refine_L4]]
+- The paper is more consistent about the terms "pointer" and "address"
+  + In the paper Figure 2 defines a pointer ~Ptr~ as an address ~Addr~
+    paired with a provenance ~Prov~. The ~Addr~ type is the type of
+    the physical addresses in memory, and will be instantiated with
+    either the ~Z~ type for the infinite memory model, or the ~int64~ type
+    for the finite memory model.
+  + In the development the ~Ptr~ type is actually called ~addr~ instead.
+- Definitions have been simplified and specialized within the body of the paper.
+  + The development provides quite abstract interfaces allowing most
+    data structures in memory to be swapped out with other potential
+    implementations, as long as they satisfy some properties. For
+    instance, Figure 2 defines ~Memory~ as a finite map from physical
+    addresses to bytes (and their associated provenance), the
+    development leaves this abstract and gives axiomatic
+    specifications for the effects of different operations in the
+    ~MemoryModelSpecPrimitives~, allowing for a variety of
+    implementations. In the executable implementation, however,
+    ~memory~ is defined using finite integer maps in Coq.
+- The implementation makes a distinction between AllocationIds and provenances
+  + The concept behind each of these is the same, we just allow for
+    different representations in case, for instance, a pointer might
+    have additional permissions associated with it.
 
-** TopLevelRefinements.v
+* Axioms in the development
 
-- [[file:src/coq/Theory/TopLevelRefinements.v::Theorem interpreter_sound: forall p,][interpreter_sound]]
+* Description of the structure of the project as a whole
 
-* Section 5.5
+Check artifact of icfp21
 
-** OOMRutt.v
-
-- [[file:src/coq/Utils/OOMRutt.v::Inductive oruttF (sim : itree E1 R1 -> itree E2 R2 -> Prop) : itree' E1 R1 -> itree' E2 R2 -> Prop :=][oruttF]]
-
-** LangRefine.v
-
-- [[file:src/coq/Semantics/InfiniteToFinite/LangRefine.v::Definition L0_E1E2_orutt_strict t1 t2][L0_E1E2_orutt_strict]]
-- [[file:src/coq/Semantics/InfiniteToFinite/LangRefine.v::Definition L1_E1E2_orutt_strict t1 t2][L1_E1E2_orutt_strict]]
-- [[file:src/coq/Semantics/InfiniteToFinite/LangRefine.v::Definition L2_E1E2_orutt_strict t1 t2][L2_E1E2_orutt_strict]]
-- [[file:src/coq/Semantics/InfiniteToFinite/LangRefine.v::Definition L3_E1E2_orutt_strict t1 t2][L3_E1E2_orutt_strict]]
-- [[file:src/coq/Semantics/InfiniteToFinite/LangRefine.v::Definition L6_E1E2_orutt_strict t1 t2][L6_E1E2_orutt_strict]]
-
-** InfiniteToFinite.v
-
-- [[file:src/coq/Semantics/InfiniteToFinite.v::Definition model_E1E2_L6_orutt_strict p1 p2 :=][model_E1E2_L6_orutt_strict]]
-- [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma model_E1E2_L6_orutt_strict_sound][model_E1E2_L6_orutt_strict_sound]]
-
-* Section 6
-
-Everything is in [[file:src/coq/Theory/OOMRefinementExamples.v::From Vellvm Require Import][OOMRefinementExamples.v]]
+- ml folder
+- coq folder
