@@ -1,7 +1,3 @@
-(*  ------------------------------------------------------------------------- *)
-(* Adapted for use in Vellvm by Steve Zdancewic (c) 2017                      *)
-(*  ------------------------------------------------------------------------- *)
-
 let toplevel_entities (fmt : Format.formatter) (tles: (LLVMAst.typ , (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities) : unit =
   List.iter
     (fun tle ->
