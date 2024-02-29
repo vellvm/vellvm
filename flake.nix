@@ -1,5 +1,5 @@
 {
-  description = "Vellvm, a formal specification and interpreter for LLVM";
+  description = "A formal specification and interpreter for LLVM";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/master";
