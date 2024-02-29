@@ -19,7 +19,7 @@ COQLIBDIR = ../lib
 MLDIR = ml
 EXTRACTDIR = ml/extracted
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Twophase) -R $(EXTRACTDIR) Extract
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) TwoPhase) -R $(EXTRACTDIR) Extract
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source

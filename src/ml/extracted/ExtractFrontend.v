@@ -6,7 +6,7 @@ Import ListNotations.
 Require Import ZArith.
 Import ZArith.BinInt.
 
-From Vellvm Require
+From TwoPhase Require
      Utils.ParserHelper
      QC.ShowAST
      QC.ReprAST

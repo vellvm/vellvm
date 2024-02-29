@@ -12,7 +12,7 @@ From ITree Require Import
      Basics.Monad
      Eq.Eqit.
 
-From Vellvm Require Import
+From TwoPhase Require Import
      Utilities
      Syntax
      Semantics
@@ -23,7 +23,7 @@ Import ITreeNotations.
 
 Import ListNotations.
 
-From Vellvm Require
+From TwoPhase Require
      Semantics.TopLevel
      Transformations.Transform
      Utils.ParserHelper
@@ -35,7 +35,7 @@ Set Extraction AccessOpaque.
 
 From QuickChick Require Import RandomQC.
                            
-From Vellvm Require QC.GenAlive2.
+From TwoPhase Require QC.GenAlive2.
 
 Require ExtrOcamlBasic.
 Require ExtrOcamlString.
