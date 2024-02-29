@@ -1,4 +1,4 @@
--R coq Vellvm
+-R coq TwoPhase
 
 -arg -w -arg -masking-absolute-name
 -arg -w -arg -deprecated-hint-without-locality
@@ -76,7 +76,7 @@
 ./coq/Semantics/MemoryParams.v
 ./coq/Semantics/RuttProps.v
 ./coq/Semantics/TopLevel.v
-./coq/Semantics/VellvmIntegers.v
+./coq/Semantics/TwoPhaseIntegers.v
 ./coq/Syntax.v
 ./coq/Syntax/AstLib.v
 ./coq/Syntax/CFG.v
@@ -144,7 +144,7 @@
 ./coq/Utils/ErrOomPoison.v
 ./coq/Utils/Oomable.v
 ./coq/Utils/Poisonable.v
-./coq/Utils/VellvmRelations.v
+./coq/Utils/TwoPhaseRelations.v
 ./coq/Utils/RuttPropsExtra.v
 ./coq/Utils/StateMonads.v
 ./coq/Utils/TFor.v

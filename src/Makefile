@@ -1,4 +1,4 @@
-## Vellvm Project Makefile
+## Twophase Project Makefile
 
 ## Follows the model suggested by:
 ## https://coq.inria.fr/refman/practical-tools/utilities.html#building-a-coq-project-with-coq-makefile
@@ -19,7 +19,7 @@ COQLIBDIR = ../lib
 MLDIR = ml
 EXTRACTDIR = ml/extracted
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Twophase) -R $(EXTRACTDIR) Extract
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
@@ -27,9 +27,9 @@ COQMAKEFILE="$(COQBIN)coq_makefile"
 MENHIR=menhir
 CP=cp
 
-######## The full vellvm executable
-VELLVM_EXE=_build/default/ml/main.exe
-VELLVM_BC =_build/default/ml/main.bc
+######## The full twophase executable
+TWOPHASE_EXE=_build/default/ml/main.exe
+TWOPHASE_BC =_build/default/ml/main.bc
 
 ######## The "frontend" is only the parser/pretty-printer 
 FRONTEND_EXE=_build/default/ml/frontend.exe
@@ -40,7 +40,7 @@ FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
 
 ######## targets not in this "KNOWNTARGETS" list will be forwarded to CoqMakefile via invoke-coqmakefile
 ######## WARNING - every target of *this* Makefile must be listed here
-KNOWNTARGETS := CoqMakefile invoke-coqmakefile coq extracted $(EXTRACTDIR)/STAMP $(VELLVM_EXE) vellvm vellvmbc test check qc-tests yarpgen-tests rm-qc-test-vo clean extractedclean clean-coqmakefile doc/coq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-coq opam print-opam print-includes
+KNOWNTARGETS := CoqMakefile invoke-coqmakefile coq extracted $(EXTRACTDIR)/STAMP $(TWOPHASE_EXE) twophase twophasebc test check qc-tests yarpgen-tests rm-qc-test-vo clean extractedclean clean-coqmakefile doc/coq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-coq opam print-opam print-includes
 
 KNOWNFILES := Makefile _CoqProject
 
@@ -61,7 +61,7 @@ endif
 endif
 
 .PHONY: all $(KNOWNFILES)
-all: vellvm
+all: twophase
 
 .PHONY: coq
 coq: real-all
@@ -79,29 +79,29 @@ $(EXTRACTDIR)/STAMP: $(VFILES) $(VOFILES) $(EXTRACTDIR)/Extract.v
 	bash fix-extraction.sh
 	touch $(EXTRACTDIR)/STAMP
 
-$(VELLVM_EXE): extracted ml/dune ml/extracted/dune ml/testing/dune
-	@echo "Compiling Vellvm"
+$(TWOPHASE_EXE): extracted ml/dune ml/extracted/dune ml/testing/dune
+	@echo "Compiling Twophase"
 	dune build ml/main.exe
 
-vellvm: $(VELLVM_EXE)
-	cp $(VELLVM_EXE) vellvm
-	chmod u+w vellvm
+twophase: $(TWOPHASE_EXE)
+	cp $(TWOPHASE_EXE) twophase
+	chmod u+w twophase
 
-.PHONY: vellvmbc
-vellvmbc: $(VELLVM_BC)
+.PHONY: twophasebc
+twophasebc: $(TWOPHASE_BC)
 	@echo "Something"
-	cp $(VELLVM_BC) vellvmbc
-	chmod u+w vellvmbc
+	cp $(TWOPHASE_BC) twophasebc
+	chmod u+w twophasebc
 
-$(VELLVM_BC): extracted ml/dune ml/extracted/dune ml/testing/dune
+$(TWOPHASE_BC): extracted ml/dune ml/extracted/dune ml/testing/dune
 	dune build ml/main.bc
 
 
-######## testing the Vellvm interperter
+######## testing the Twophase interperter
 
 .PHONY: test
-test: vellvm
-	./vellvm -test
+test: twophase
+	./twophase -test-suite
 
 .PHONY: check
 check: test
@@ -109,17 +109,17 @@ check: test
 ####### Yarpgen testing targets
 .PHONY: yarpgen-tests
 yarpgen-tests: rm-qc-test-vo coq
-	$(COQEXEC) coq/QC/QCVellvm.v
+	$(COQEXEC) coq/QC/QCTwophase.v
 
 ######## QuickChick testing targets
 
 .PHONY: qc-tests
 qc-tests: rm-qc-test-vo coq
-	$(COQEXEC) coq/QC/QCVellvm.v
+	$(COQEXEC) coq/QC/QCTwophase.v
 
 .PHONY: rm-qc-test-vo
 rm-qc-test-vo:
-	rm -f coq/QC/QCVellvm.vo
+	rm -f coq/QC/QCTwophase.vo
 
 
 ######## cleaning the project
@@ -128,7 +128,7 @@ rm-qc-test-vo:
 clean: extractedclean clean-coqmakefile
 	rm -rf doc/html doc/*.glob
 	rm -rf output
-	rm -f vellvm
+	rm -f twophase
 	rm -f frontend
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
 	dune clean
@@ -171,7 +171,7 @@ $(EXTRACTDIR)/FRONTEND_STAMP: $(FRONTEND_VOFILES) $(EXTRACTDIR)/ExtractFrontend.
 
 .PHONY: $(FRONTEND_EXE)
 $(FRONTEND_EXE): $(EXTRACTDIR)/FRONTEND_STAMP ml/dune ml/extracted/dune ml/testing/dune ml/frontend.ml ml/IO.ml
-	@echo "Compiling Vellvm (Frontend Only)"
+	@echo "Compiling Twophase (Frontend Only)"
 	dune build ml/frontend.exe
 
 .PHONY: frontend
@@ -193,7 +193,7 @@ frontend_exe:
 pin-coq:
 	opam pin add coq $(COQ_VERSION) -y
 
-######## opam packages (except for Coq) that Vellvm depends on
+######## opam packages (except for Coq) that Twophase depends on
 ########    use `make opam` to install these
 ########    also used by .travis ci to configure the build process
 OPAMPKGS= coq-ext-lib\

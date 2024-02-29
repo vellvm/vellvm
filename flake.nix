@@ -16,10 +16,10 @@
         ocamlPkgs = coq.ocamlPackages;
         coqPkgs = pkgs.coqPackages_8_19;
 
-        version = "vellvm:master";
+        version = "twophase:master";
       in rec {
         packages = {
-          default = (pkgs.callPackage ./release.nix (ocamlPkgs // coqPkgs // { nix-filter = nix-filter.lib; perl = pkgs.perl; inherit coq version; })).vellvm;
+          default = (pkgs.callPackage ./release.nix (ocamlPkgs // coqPkgs // { nix-filter = nix-filter.lib; perl = pkgs.perl; inherit coq version; })).twophase;
         };
 
         defaultPackage = packages.default;
@@ -28,17 +28,17 @@
 
         checks = {
           
-          vellvm-test-suite =
+          twophase-test-suite =
             pkgs.stdenv.mkDerivation {
-              name = "vellvm-test-suite";
+              name = "twophase-test-suite";
               src = ./.;
               meta = {
-                description = "Run the simple suite of vellvm tests";
+                description = "Run the simple suite of twophase tests";
               };
               buildInputs = [packages.default];
               installPhase = ''
               cd src
-              ${packages.default}/bin/vellvm -test-suite
+              ${packages.default}/bin/twophase -test-suite
               if [[ $? == 0 ]]; then
                 mkdir $out
               fi

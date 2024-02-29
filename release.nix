@@ -16,11 +16,11 @@
   QuickChick,
   mathcomp, mathcomp-ssreflect, coq-ext-lib, paco, ITree, flocq, ceres, simple-io, zarith, ... }:
 
-{ vellvm =
+{ twophase =
     mkCoqDerivation {
       namePrefix = [ "coq" ];
-      pname = "vellvm";
-      owner = "vellvm";
+      pname = "twophase";
+      owner = "twophase";
 
       inherit version;
 
@@ -104,14 +104,14 @@
       installPhase = ''
   runHook preInstall
   mkdir -p $out/bin
-  install src/vellvm $out/bin/vellvm
+  install src/twophase $out/bin/twophase
   install src/frontend $out/bin/frontend
   COQLIBINSTALL=$out/lib/coq/${coq.coq-version}/user-contrib make -C src/ install
   runHook postInstall
   '';
 
       meta = {
-        description = "Vellvm, a formal specification and interpreter for LLVM";
+        description = "Twophase, a formal specification and interpreter for LLVM";
         license = lib.licenses.gpl3Only;
       };
     };
