@@ -597,7 +597,7 @@ Section hiding_notation.
              | FTrue => "ftrue"
              end)%string.
 
-  (* I need show_ZVellvm here because Ceres segfaults on extraction for
+  (* I need show_ZTwoPhase.here because Ceres segfaults on extraction for
   showing integers for some reason *)
   Fixpoint serialize_typ' typ: sexp :=
     match typ with

@@ -234,7 +234,7 @@ Qed.
     Front-ends and optimizations generate code containing static types.
     Since the semantics always acts upon dynamic types, in order to reason
     about the sub-components of code produce, we need to be able to convert
-    types of any syntactic substructure of Vellvm.
+    types of any syntactic substructure of TwoPhase.
 
     We leverage the parameterized [Tfmap] typeclass to do this in a fairly lightway.
  *)

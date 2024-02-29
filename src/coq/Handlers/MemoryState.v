@@ -1,4 +1,4 @@
-Require Import Vellvm.Syntax.DynamicTypes.
+Require Import TwoPhase.Syntax.DynamicTypes.
 
 From TwoPhase.Semantics Require Import
      LLVMParams

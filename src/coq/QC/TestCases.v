@@ -2,7 +2,7 @@
     and some lemmas related to them.
  *)
 From QuickChick Require Import QuickChick.
-From TwoPhase Require Import ShowAST ReprAST GenAST QCVellvm TopLevel LLVMAst DynamicValues.
+From TwoPhase Require Import ShowAST ReprAST GenAST QCTwoPhase.TopLevel LLVMAst DynamicValues.
 Require Import Semantics.LLVMEvents.
 Require Import Semantics.InterpretationStack.
 Require Import Handlers.Handlers.
@@ -32,7 +32,7 @@ Import ListNotations.
    vellvm does actually agree with clang.
 
    Initially we thought the issue might have to do with how we are
-   serializing the Vellvm AST to a LLVM file, or parsing it in,
+   serializing the TwoPhase.AST to a LLVM file, or parsing it in,
    however, I am confident at this point that this is *NOT* the
    problem.
 

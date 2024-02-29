@@ -30,7 +30,7 @@ Import ITreeNotations.
 
 (****************************** LLVM Events *******************************)
 (**
-   Vellvm's semantics relies on _Interaction Trees_, a generic data-structure allowing to model
+   TwoPhase.s semantics relies on _Interaction Trees_, a generic data-structure allowing to model
    effectful computations.
    This file defined the interface provided to the interaction trees, that is the set of
    events that a LLVM program can trigger.

@@ -1,6 +1,6 @@
 Require Import ZArith List String Omega.
-Require Import  Vellvm.LLVMAst Vellvm.Util.
-Require Import Vellvm.StepSemantics.
+Require Import  TwoPhase.LLVMAst TwoPhase.Util.
+Require Import TwoPhase.StepSemantics.
 Import ListNotations.
 
 Set Implicit Arguments.
@@ -11,7 +11,7 @@ Inductive Addr :=
 | Ptr (n:nat)
 .
 
-Module A : Vellvm.LLVMIO.ADDR with Definition addr := Addr.
+Module A : TwoPhase.LLVMIO.ADDR with Definition addr := Addr.
   Definition addr := Addr.
   Definition null := Null.
 End A.

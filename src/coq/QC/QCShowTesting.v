@@ -1,10 +1,10 @@
-(** Testing show instances for Vellvm. Currently the show instances
+(** Testing show instances for TwoPhase. Currently the show instances
     seem to be causing stack overflows for larger programs. *)
 Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlString.
 
 From QuickChick Require Import QuickChick.
-From TwoPhase Require Import ShowAST ReprAST GenAST TopLevel LLVMAst DynamicValues QCVellvm.
+From TwoPhase Require Import ShowAST ReprAST GenAST TopLevel LLVMAst DynamicValues QCTwoPhase.
 
 
 Definition gen_PROG : GenLLVM PROG

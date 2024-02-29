@@ -42,7 +42,7 @@ From TwoPhase Require Import
      QC.ShowAST.
 
 Require Import Coq.Program.Equality.
-Require Import Vellvm.Utils.VellvmRelations.
+Require Import TwoPhase.Utils.TwoPhaseRelations.
 
 (* TODO: when/if we cut ties to QC, change this import *)
 From QuickChick Require Import Show.
@@ -189,7 +189,7 @@ Definition ll_double := Floats.float.
 
 
 (* Sizeof is needed for for ConcatBytes case *)
-Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.MemoryAddress.INTPTR)(SIZEOF:Sizeof).
+Module DVALUE(A:TwoPhase.Semantics.MemoryAddress.ADDRESS)(IP:TwoPhase.Semantics.MemoryAddress.INTPTR)(SIZEOF:Sizeof).
 
   Import SIZEOF.
   Import IP.

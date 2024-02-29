@@ -20,7 +20,7 @@ Import ListNotations.
  Generic facts about the association list datatype [alist] provided by ExtLib.
  These facts should probably be moved to ExtLib eventually.
 
- Association lists are currently used in Vellvm to map block identifiers to blocks
+ Association lists are currently used in TwoPhase.to map block identifiers to blocks
  in control flow graphs.
  **)
 

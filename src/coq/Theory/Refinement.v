@@ -9,7 +9,7 @@ From ITree Require Import
 
 From TwoPhase Require Import
   Utilities
-  Utils.VellvmRelations
+  Utils.TwoPhaseRelations
   Syntax
   Semantics
   Semantics.MemoryAddress

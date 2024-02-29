@@ -1,4 +1,4 @@
-(** * Plugging the pieces together: executable and propositional semantics for Vellvm *)
+(** * Plugging the pieces together: executable and propositional semantics for TwoPhase.*)
 
 (* begin hide *)
 From Coq Require Import
@@ -35,10 +35,10 @@ Open Scope string_scope.
 (* end hide *)
 
 (** * Top Level
-   This file ties things together to concretely defines the semantics of a [Vellvm]
+   This file ties things together to concretely defines the semantics of a [TwoPhase.
    program. It covers two main tasks to do so: to initialize the memory, and to
    chain together the successive interpreters.
-   As such, the raw denotation of a [Vellvm] program in terms of an [itree] is
+   As such, the raw denotation of a [TwoPhase. program in terms of an [itree] is
    progressively stripped out of its events.
    We provide two such chains of interpretations: a model, that handles the
    internal non-determinism due to under-defined values into the non-determinism
@@ -79,7 +79,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
    *)
 
   (** A semantic function to read an i8 value at [strptr + index] from the memory. 
-      Propagates all memory failures and raises a Vellvm "Failure" if the 
+      Propagates all memory failures and raises a TwoPhase."Failure" if the 
       value read does not concretize to a DVALUE_I8.
    *)
   Definition i8_str_index (strptr : addr) (index : Z) : itree L0' Int8.int :=
@@ -243,7 +243,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   (** * Initialization
 
     The initialization phase allocates and initializes globals, and allocates
-   function pointers. This initialization phase is internalizedin [Vellvm], it
+   function pointers. This initialization phase is internalizedin [TwoPhase., it
    is an [itree] as any other.  *)
 
   (** Allocate space for a global *)
@@ -347,7 +347,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Notation res_L6 := (MemState * (store_id * (local_env * lstack * (global_env * dvalue))))%type.
 
   (**
-     Full denotation of a Vellvm program as an interaction tree:
+     Full denotation of a TwoPhase.program as an interaction tree:
      * initialize the global environment;
      * pointwise denote each function (and builtin)
      * retrieve the address of the entry point function;
@@ -380,7 +380,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     pass in 0 and null as the arguments to main
     Note: this isn't compliant with standard C semantics, but integrating the actual
     inputs from the command line is nontrivial since we have martial C-level strings
-    into the Vellvm memory.  
+    into the TwoPhase.memory.  
    *)
   Definition main_args := [DV.UVALUE_I32 (Int32.zero);
                            DV.UVALUE_Addr null

@@ -19,7 +19,7 @@ From TwoPhase.Handlers Require Import
 From TwoPhase.Utils Require Import
      Tactics
      InterpProp
-     VellvmRelations
+     TwoPhaseRelations
      StateMonads Raise Tactics ITreeMap.
 
 From TwoPhase.Theory Require Import

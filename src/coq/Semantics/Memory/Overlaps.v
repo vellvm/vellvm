@@ -1,7 +1,7 @@
 Require Import ZArith.
 
-Require Import Vellvm.Semantics.MemoryAddress.
-Require Import Vellvm.Semantics.Memory.Sizeof.
+Require Import TwoPhase.Semantics.MemoryAddress.
+Require Import TwoPhase.Semantics.Memory.Sizeof.
 From TwoPhase Require Import DynamicTypes.
 
 Module Type Overlaps (Addr:MemoryAddress.ADDRESS).

@@ -10,7 +10,7 @@ From TwoPhase Require Import
      Syntax.LLVMAst.
 (* end hide *)
 
-(** ** Definition of generic transformations on Vellvm's abstract syntax.
+(** ** Definition of generic transformations on TwoPhase.s abstract syntax.
     The general idea is to define two functions, an endofunction and an fmap
     over each syntactic construct in the ast.
     The additional trick is to parameterize all instances explicitly by

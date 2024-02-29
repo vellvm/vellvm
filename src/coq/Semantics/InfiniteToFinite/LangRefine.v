@@ -41,7 +41,7 @@ From TwoPhase Require Import
      Utils.OOMRuttProps
      Utils.RuttPropsExtra
      Utils.AListFacts
-     Utils.VellvmRelations
+     Utils.TwoPhaseRelations
      Utils.ErrUbOomProp
      Utils.ErrOomPoison
      Utils.Oomable

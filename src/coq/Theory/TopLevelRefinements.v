@@ -11,7 +11,7 @@ From ITree Require Import
 
 From TwoPhase Require Import
   Utilities
-  Utils.VellvmRelations
+  Utils.TwoPhaseRelations
   Syntax
   Semantics
   Theory.Refinement
@@ -66,7 +66,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
    **)
 
   (** The module _Refinement.Make_ defines a series of refinements between
-    [itree]s at the various signatures of events a Vellvm goes through during
+    [itree]s at the various signatures of events a TwoPhase.goes through during
     the chain of interpretations leading to the definition of the model.
     These refinements state set inclusion of the concretization of the
     returned under-defined values, but impose no constraints on the states.

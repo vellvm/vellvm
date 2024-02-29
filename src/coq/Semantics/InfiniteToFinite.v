@@ -95,8 +95,8 @@ Module InfiniteToFinite.
   #[local] Notation E2 := (E2.ExternalCallE +' OOME +' UBE +' DebugE +' FailureE).
   #[local] Notation OOM_h := (refine_OOM_handler).
 
-  Module InfLLVM := Vellvm.Semantics.InterpretationStack.InterpreterStackBigIntptr.LLVM.
-  Module FinLLVM := Vellvm.Semantics.InterpretationStack.InterpreterStack64BitIntptr.LLVM.
+  Module InfLLVM := TwoPhase.Semantics.InterpretationStack.InterpreterStackBigIntptr.LLVM.
+  Module FinLLVM := TwoPhase.Semantics.InterpretationStack.InterpreterStack64BitIntptr.LLVM.
 
   Module EC1 := ECInfFin.
   Module DVC1 := DVCInfFin.

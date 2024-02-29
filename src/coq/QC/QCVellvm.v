@@ -155,7 +155,7 @@ Definition llc_command (prog : string) : int
 Axiom vellvm_print_ll : list (toplevel_entity typ (block typ * list (block typ))) -> string.
 Extract Constant vellvm_print_ll => "fun prog -> Llvm_printer.toplevel_entities Format.str_formatter prog; Format.flush_str_formatter".
 
-(** Use the *llc_command* Axiom to run a Vellvm program with clang,
+(** Use the *llc_command* Axiom to run a TwoPhase.program with clang,
     and wrap up the exit code as a uvalue. *)
 Definition run_llc (prog : list (toplevel_entity typ (block typ * list (block typ)))) : dvalue
   := DVALUE_I8 (repr (llc_command (to_caml_str (show prog)))).
@@ -169,7 +169,7 @@ Inductive PROG :=
   { show p := "" (* PROG: avoiding inefficient printing in QC, see #253 *) }.
 
 
-(** Basic property to make sure that Vellvm and Clang agree when they
+(** Basic property to make sure that TwoPhase.and Clang agree when they
     both produce values *)
 Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
   :=
@@ -187,13 +187,13 @@ Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
         let y := repr (oint_to_Z ocaml_y) in
         if equ x y
         then checker true
-        else whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
+        else whenFail ("TwoPhase. " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
     | _, (WSIGNALED ocaml_y) =>
         whenFail ("clang process signaled") false
     | _, (WSTOPPED ocaml_y) =>
         whenFail ("clang process stopped") false
     | _, _ =>
-        whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
+        whenFail ("Something else went wrong... TwoPhase. " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
     end.
 
 #[global] Instance Show_sum {A B} `{Show A} `{Show B} : Show (A + B) :=
@@ -203,7 +203,7 @@ Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
     | inr b => ("inr " ++ show b)%string 
     end) }.
 
-(** Basic property to make sure that Vellvm and Clang agree when they
+(** Basic property to make sure that TwoPhase.and Clang agree when they
     both produce values *)
 Definition vellvm_agrees_with_clang (p : string + PROG) : Checker
   :=
@@ -218,9 +218,9 @@ Definition vellvm_agrees_with_clang (p : string + PROG) : Checker
       | DVALUE_I8 y, MlOk _ _ (DVALUE_I8 x) =>
           if equ x y
           then checker true
-          else whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
+          else whenFail ("TwoPhase. " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
       | _, _ =>
-          whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
+          whenFail ("Something else went wrong... TwoPhase. " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
       end
   end.
 

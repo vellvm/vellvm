@@ -1,5 +1,5 @@
 (**
-    Show instances for Vellvm. These serialize Vellvm ASTs into the
+    Show instances for TwoPhase. These serialize TwoPhase.ASTs into the
     standard format for .ll files. The result of show on a Vellvm
     program should give you a string that can be read by clang.
  *)

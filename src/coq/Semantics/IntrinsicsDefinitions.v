@@ -176,7 +176,7 @@ Definition defined_intrinsics_decls :=
   [ fabs_32_decl; fabs_64_decl; maxnum_32_decl ; maxnum_64_decl; minimum_32_decl; minimum_64_decl; memcpy_8_32_decl; memcpy_8_64_decl; memset_8_32_decl; memset_8_64_decl; malloc_decl; free_decl ].
 
 (* This functor module provides a way to (extensibly) add the semantic behavior
-   for intrinsics defined outside of the core Vellvm operational semantics.
+   for intrinsics defined outside of the core TwoPhase.operational semantics.
 
    Internally, invocation of an intrinsic looks no different than that of an
    external function call, so each LLVM intrinsic instruction should produce
@@ -289,7 +289,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
       | _ => failwith "llvm_minimum_f32 got incorrect / ill-typed intputs"
       end.
 
-  (* Clients of Vellvm can register the names of their own intrinsics
+  (* Clients of TwoPhase.can register the names of their own intrinsics
      definitions here. *)
   Definition defined_intrinsics : intrinsic_definitions :=
     [ (fabs_32_decl, llvm_fabs_f32) ;

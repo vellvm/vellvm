@@ -1,5 +1,5 @@
 (**
-    These "Repr" instances for Vellvm should serialize Vellvm ASTs
+    These "Repr" instances for TwoPhase.should serialize TwoPhase.ASTs
     into a Coq string which represents the AST, allowing ASTs to be
     serialized and read back into Coq later.
 
