@@ -25,6 +25,6 @@ jobs:
       - name: Compiling Vellvm
         uses: coq-community/docker-coq-action@v1
         with:
-          opam_file: 'coq-vellvm.opam'
+          opam_file: 'coq-twophase.opam'
           coq_version: ${{ matrix.coq_version }}
           ocaml_version: ${{ matrix.ocaml_version }}
