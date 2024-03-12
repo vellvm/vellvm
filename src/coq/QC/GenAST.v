@@ -1165,19 +1165,23 @@ Section TypGenerators.
     match sz with
     | 0%nat => gen_typ_0
     | (S sz') =>
+        typ_ctx <- get_typ_ctx;;
         ctx <- get_ctx;;
+
         (* not filter sized types for this one *)
         freq_LLVM_thunked_N
-        ([(N.min (lengthN ctx) 10, (fun _ => gen_typ_from_ctx ctx))] ++
-        [ (1%N, (fun _ => gen_typ_0)) (* TODO: Not sure if I need to add it here *)
-        (* Might want to restrict the size to something reasonable *)
-        (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
-          ; (1%N, (fun _ => ret TYPE_Array <*> lift genN <*> gen_sized_typ_size (sz / 2)))
-        ; (1%N, (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0))
-        ; let n := Nat.div sz 2 in
-        (1%N, (fun _ => ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) <*> ret false))
-          ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size (sz / 2))))
-          ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size (sz / 2))))
+          ([
+              (* (N.min (lengthN ctx) 10, (fun _ => ret TYPE_Identified <*> (gen_ident_from_ctx typ_ctx))); *)
+              (N.min (lengthN ctx) 10, (fun _ => gen_typ_from_ctx ctx));
+              (1%N, (fun _ => gen_typ_0)) (* TODO: Not sure if I need to add it here *)
+              (* Might want to restrict the size to something reasonable *)
+              (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
+              ; (1%N, (fun _ => ret TYPE_Array <*> lift genN <*> gen_sized_typ_size (sz / 2)))
+              ; (1%N, (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;;ret (n + 1)%N) <*> gen_sized_typ_size 0))
+              ; let n := Nat.div sz 2 in
+                (1%N, (fun _ => ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) <*> ret false))
+              ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size (sz / 2))))
+              ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size (sz / 2))))
         ])
     end.
   Next Obligation.
@@ -1892,6 +1896,20 @@ Fixpoint gen_exp_size (sz : nat) (t : typ) (es : exp_source) {struct t} : GenLLV
        ret (t, e).
 
 End ExpGenerators.
+
+Require Import Semantics.LLVMEvents.
+Require Import Semantics.InterpretationStack.
+Require Import Handlers.Handlers.
+From ITree Require Import
+  ITree
+  Interp.Recursion
+  Events.Exception.
+
+Import TopLevel64BitIntptr.
+Import DV.
+Import MemoryModelImplementation.LLVMParams64BitIntptr.Events.
+               
+
 Section InstrGenerators.
 
   (* Generator GEP part *)
@@ -2419,7 +2437,7 @@ Section InstrGenerators.
      The type is sometimes void for instructions that don't really
      compute a value, like void function calls, stores, etc.
    *)
-  
+
   Definition gen_instr : GenLLVM (typ * instr typ) :=
     typ_ctx <- get_typ_ctx;;
     ctx <- get_ctx;;
@@ -2434,52 +2452,31 @@ Section InstrGenerators.
     let get_typ_l (ctx : var_context) : GenLLVM typ :=
       var <- elems_LLVM ctx;;
       ret (snd var) in
-    let ins_op :=
-          t <- gen_op_typ;;
-          i <- ret INSTR_Op <*> gen_op t;;
-          ret (t,i)
-    in
-    let ins_alloca :=
-      t <- gen_sized_typ_ptrin_fctx;;
-      ret (TYPE_Pointer t, INSTR_Alloca t [])
-    in
-    let ins_ptr :=
-      if l_is_empty sized_ptr_typs_in_ctx then [] else
-        [
-          get_typ_l sized_ptr_typs_in_ctx >>= gen_load;
-          get_typ_l sized_ptr_typs_in_ctx >>= gen_store
-        ]
-    in
     oneOf_LLVM
-      [
-        ins_op;
-        ins_alloca
-      ].
-    (* oneOf_LLVM *)
-    (*   ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i) *)
-    (*      ; t <- gen_sized_typ_ptrin_fctx;; *)
-    (*        (* TODO: generate multiple element allocas. Will involve changing initialization *) *)
-    (*        (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *) *)
-    (*        (* align <- ret None;; *) *)
-    (*        ret (TYPE_Pointer t, INSTR_Alloca t []) *)
-    (*     ] (* TODO: Generate atomic operations and other instructions *) *)
-    (*      ++ (if l_is_empty sized_ptr_typs_in_ctx then [] else *)
-    (*            [ *)
-    (*              (get_typ_l sized_ptr_typs_in_ctx) >>= gen_load *)
-    (*              ; (get_typ_l sized_ptr_typs_in_ctx) >>= gen_store *)
-    (*              ; (get_typ_l sized_ptr_typs_in_ctx) >>= gen_gep]) *)
-    (*      ++ (if l_is_empty valid_ptr_vecptr_in_ctx then [] else [ *)
-    (*              (get_typ_l valid_ptr_vecptr_in_ctx) >>= gen_ptrtoint]) *)
-    (*      ++ (if l_is_empty ptrtoint_ctx then [] else [gen_inttoptr]) *)
-    (*      ++ (if l_is_empty agg_typs_in_ctx then [] else [ *)
-    (*              (get_typ_l agg_typs_in_ctx) >>= gen_extractvalue]) *)
-    (*      ++ (if l_is_empty insertvalue_typs_in_ctx then [] else [ *)
-    (*              (get_typ_l insertvalue_typs_in_ctx) >>= gen_insertvalue]) *)
-    (*      ++ (if l_is_empty vec_typs_in_ctx then [] else [ *)
-    (*              (get_typ_l vec_typs_in_ctx) >>= gen_extractelement *)
-    (*              ; (get_typ_l vec_typs_in_ctx) >>= gen_insertelement]) *)
-    (*      ++ (if l_is_empty fun_ptrs_in_ctx then [] else [ *)
-    (*              (get_typ_l fun_ptrs_in_ctx) >>= gen_call])). *)
+      ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
+         ; t <- gen_sized_typ_ptrin_fctx;;
+           (* TODO: generate multiple element allocas. Will involve changing initialization *)
+           (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)
+           (* align <- ret None;; *)
+           ret (TYPE_Pointer t, INSTR_Alloca t [])
+        ] (* TODO: Generate atomic operations and other instructions *)
+         ++ (if l_is_empty sized_ptr_typs_in_ctx then [] else
+               [
+                 (get_typ_l sized_ptr_typs_in_ctx) >>= gen_load
+                 ; (get_typ_l sized_ptr_typs_in_ctx) >>= gen_store
+                 ; (get_typ_l sized_ptr_typs_in_ctx) >>= gen_gep])
+         ++ (if l_is_empty valid_ptr_vecptr_in_ctx then [] else [
+                 (get_typ_l valid_ptr_vecptr_in_ctx) >>= gen_ptrtoint])
+         ++ (if l_is_empty ptrtoint_ctx then [] else [gen_inttoptr])
+         ++ (if l_is_empty agg_typs_in_ctx then [] else [
+                 (get_typ_l agg_typs_in_ctx) >>= gen_extractvalue])
+         ++ (if l_is_empty insertvalue_typs_in_ctx then [] else [
+                 (get_typ_l insertvalue_typs_in_ctx) >>= gen_insertvalue])
+         ++ (if l_is_empty vec_typs_in_ctx then [] else [
+                 (get_typ_l vec_typs_in_ctx) >>= gen_extractelement
+                 ; (get_typ_l vec_typs_in_ctx) >>= gen_insertelement])
+         ++ (if l_is_empty fun_ptrs_in_ctx then [] else [
+                 (get_typ_l fun_ptrs_in_ctx) >>= gen_call])).
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
@@ -2772,9 +2769,20 @@ Section TLEGenerators.
   Definition gen_main_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
     := ret TLE_Definition <*> gen_main.
 
-  Definition gen_global_var : GenLLVM (global typ)
-    :=
+  Definition gen_typ_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
+    := 
+    name <- new_raw_id;;
+    inner_typs <- listOf_LLVM gen_typ;; 
+    let id := ID_Local name in
+    let named_ty := TYPE_Struct inner_typs in
+    add_to_typ_ctx (id, named_ty);;
+    ret (TLE_Type_decl id (TYPE_Struct inner_typs)).
 
+  Definition gen_typ_tle_multiple : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
+    := listOf_LLVM gen_typ_tle.
+  
+  Definition gen_global_var : GenLLVM (global typ)
+    := 
     name <- new_global_id;;
     t <- hide_ctx gen_sized_typ_ptrin_fctx;;
     (* annotate_debug ("--Generate: Global: @" ++ show name ++ " " ++ show t);; *)
@@ -2808,11 +2816,12 @@ Section TLEGenerators.
   Definition gen_llvm : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     :=
     high_levels <- gen_list_high_level_tle;;
+    defined_typs <- gen_typ_tle_multiple;;
     globals <- gen_global_tle_multiple;;
     functions <- gen_helper_function_tle_multiple;;
     main <- gen_main_tle;;
     res_globals <- get_global_memo;;
-    let new_globals := globals ++ map TLE_Global res_globals in
-    ret (high_levels ++ new_globals ++ functions ++ [main])%list.
+    let new_globals := (globals ++ map TLE_Global res_globals)%list in
+    ret (high_levels ++ defined_typs ++ new_globals ++ functions ++ [main])%list.
 
 End TLEGenerators.
