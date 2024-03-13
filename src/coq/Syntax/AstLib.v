@@ -11,7 +11,7 @@ From Vellvm Require Import
 From QuickChick Require Import Show.
 
 Require Import Equalities OrderedType OrderedTypeEx Compare_dec.
-Require Import ExtLib.Core.RelDec ExtLib.Data.Z.
+Require Import ExtLib.Core.RelDec ExtLib.Data.Z ExtLib.Data.List ExtLib.Data.String.
 Require Import ExtLib.Programming.Eqv.
 Require Import Ascii.
 Import ListNotations.
@@ -19,6 +19,76 @@ Import ListNotations.
 Import EqvNotation.
 
 (* end hide *)
+
+(* Equalities over function attributes -------------------------------------- *)
+
+Definition eqb_fn_attr (x y : fn_attr) : bool :=
+  match x, y with
+  | FNATTR_Alignstack z1, FNATTR_Alignstack z2 => rel_dec z1 z2
+  | FNATTR_Allocsize l1, FNATTR_Allocsize l2 => rel_dec l1 l2
+  | FNATTR_Alwaysinline, FNATTR_Alwaysinline
+  | FNATTR_Builtin, FNATTR_Builtin
+  | FNATTR_Cold, FNATTR_Cold
+  | FNATTR_Convergent, FNATTR_Convergent
+  | FNATTR_Hot, FNATTR_Hot
+  | FNATTR_Inaccessiblememonly, FNATTR_Inaccessiblememonly
+  | FNATTR_Inaccessiblemem_or_argmemonly, FNATTR_Inaccessiblemem_or_argmemonly
+  | FNATTR_Inlinehint, FNATTR_Inlinehint
+  | FNATTR_Jumptable, FNATTR_Jumptable
+  | FNATTR_Minsize, FNATTR_Minsize
+  | FNATTR_Naked, FNATTR_Naked
+  | FNATTR_No_jump_tables, FNATTR_No_jump_tables
+  | FNATTR_Nobuiltin, FNATTR_Nobuiltin
+  | FNATTR_Noduplicate, FNATTR_Noduplicate
+  | FNATTR_Nofree, FNATTR_Nofree
+  | FNATTR_Noimplicitfloat, FNATTR_Noimplicitfloat
+  | FNATTR_Noinline, FNATTR_Noinline
+  | FNATTR_Nomerge, FNATTR_Nomerge
+  | FNATTR_Nonlazybind, FNATTR_Nonlazybind
+  | FNATTR_Noredzone, FNATTR_Noredzone
+  | FNATTR_Indirect_tls_seg_refs, FNATTR_Indirect_tls_seg_refs
+  | FNATTR_Noreturn, FNATTR_Noreturn
+  | FNATTR_Norecurse, FNATTR_Norecurse
+  | FNATTR_Willreturn, FNATTR_Willreturn
+  | FNATTR_Nosync, FNATTR_Nosync
+  | FNATTR_Nounwind, FNATTR_Nounwind
+  | FNATTR_Null_pointer_is_valid, FNATTR_Null_pointer_is_valid
+  | FNATTR_Optforfuzzing, FNATTR_Optforfuzzing
+  | FNATTR_Optnone, FNATTR_Optnone
+  | FNATTR_Optsize, FNATTR_Optsize
+  | FNATTR_Readnone, FNATTR_Readnone
+  | FNATTR_Readonly, FNATTR_Readonly
+  | FNATTR_Writeonly, FNATTR_Writeonly
+  | FNATTR_Argmemonly, FNATTR_Argmemonly
+  | FNATTR_Returns_twice, FNATTR_Returns_twice
+  | FNATTR_Safestack, FNATTR_Safestack
+  | FNATTR_Sanitize_address, FNATTR_Sanitize_address
+  | FNATTR_Sanitize_memory, FNATTR_Sanitize_memory
+  | FNATTR_Sanitize_thread, FNATTR_Sanitize_thread
+  | FNATTR_Sanitize_hwaddress, FNATTR_Sanitize_hwaddress
+  | FNATTR_Sanitize_memtag, FNATTR_Sanitize_memtag
+  | FNATTR_Speculative_load_hardening, FNATTR_Speculative_load_hardening
+  | FNATTR_Speculatable, FNATTR_Speculatable
+  | FNATTR_Ssp, FNATTR_Ssp
+  | FNATTR_Sspreq, FNATTR_Sspreq
+  | FNATTR_Sspstrong, FNATTR_Sspstrong
+  | FNATTR_Strictfp, FNATTR_Strictfp
+  | FNATTR_Uwtable, FNATTR_Uwtable
+  | FNATTR_Nocf_check, FNATTR_Nocf_check
+  | FNATTR_Shadowcallstack, FNATTR_Shadowcallstack
+  | FNATTR_Mustprogress, FNATTR_Mustprogress
+  | FNATTR_Internal, FNATTR_Internal
+  | FNATTR_External, FNATTR_External => true
+  | FNATTR_Key_value (k1, v1), FNATTR_Key_value (k2, v2) =>
+      rel_dec k1 k2 && rel_dec v1 v2
+  | FNATTR_String s1, FNATTR_String s2  => rel_dec s1 s2
+  | FNATTR_Attr_grp z1, FNATTR_Attr_grp z2 => rel_dec z1 z2
+  | _, _ => false
+  end.
+
+#[global] Instance eq_dec_fn_attr : RelDec (@eq fn_attr) :=
+  {| rel_dec := eqb_fn_attr |}.
+#[global] Instance eqv_fn_attr : Eqv fn_attr := (@eq fn_attr).
 
 (* Equalities --------------------------------------------------------------- *)
 #[global] Instance eq_dec_int : RelDec (@eq int) := Data.Z.RelDec_zeq.

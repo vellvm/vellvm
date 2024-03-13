@@ -15,6 +15,7 @@ From Coq Require Import
      Bool.Bool.
 
 From ExtLib Require Import
+     Core.RelDec
      Structures.Monads
      Structures.Functor
      Eqv.
@@ -727,7 +728,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                  | Call dt fv args attr =>
                    match (lookup_defn fv fundefs) with
                    | Some f_den => (* If the call is internal *)
-                     denote_function (f_den) args
+                       if rel_dec (dc_attrs (df_prototype f_den)) attr then
+                         denote_function (f_den) args
+                       else raise "Function was invoked with wrong attributes"
                    | None =>
                      dargs <- map_monad (fun uv => pickUnique uv) args ;;
                      trigger (ExternalCall dt fv (map dvalue_to_uvalue dargs) (remove_tag attr))
