@@ -164,6 +164,24 @@ Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_I
     constructor; constructor.
   Qed.
 
+  Lemma all_extract_bytes_from_uvalue_success_inv :
+    forall uvs dt u,
+      all_extract_bytes_from_uvalue dt uvs = Some u ->
+      exists sid uvs', uvs = (UVALUE_ExtractByte u dt 0 sid :: uvs').
+  Proof.
+    induction uvs; intros dt u EXTRACT.
+    - cbn in EXTRACT; inv EXTRACT.
+    - cbn in EXTRACT.
+      destruct a; inv EXTRACT.
+      unfold guard_opt in *.
+      repeat break_match_hyp_inv.
+      apply all_extract_bytes_from_uvalue_helper_some in H1; subst.
+      eapply dtyp_eqb_eq in Heqb3; subst.
+      apply N.eqb_eq in Heqb2; subst.
+      exists sid, uvs.
+      reflexivity.
+  Qed.
+
   Definition from_ubytes (bytes : list SByte) (dt : dtyp) : uvalue
     :=
       match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_bytes_from_uvalue dt bytes with

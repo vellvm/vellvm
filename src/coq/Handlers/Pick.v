@@ -446,78 +446,78 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
         reflexivity.
     Qed.
 
-    Lemma concretize_uvalue_bytes_concretize_uvalue_bytes :
-      forall uvs
-        (IH : forall u,
-            Exists (uvalue_subterm u) uvs ->
-            concretize_u u (concretize_uvalue u)),
-        @CONCBASE.concretize_uvalue_bytes ErrUbOomProp Monad_ErrUbOomProp
-          (fun (dt0 : dtyp) (edv : err_ub_oom dvalue) =>
-             match @unERR_UB_OOM ident dvalue edv with
-             | {| unEitherT := {| unEitherT := {| unEitherT := {| unIdent := inr (inr (inr dv)) |} |} |} |} =>
-                 dvalue_has_dtyp dv dt0 /\ dv <> DVALUE_Poison dt0
-             | _ => True
-             end) err_ub_oom (@Monad_err_ub_oom ident Monad_ident) (@RAISE_ERROR_err_ub_oom ident Monad_ident)
-          (@RAISE_UB_err_ub_oom_T ident Monad_ident) (@RAISE_OOM_err_ub_oom_T ident Monad_ident)
-          (fun (A : Type) (x ue : err_ub_oom A) => x = ue) uvs
-          (@CONCBASE.concretize_uvalue_bytes err_ub_oom (@Monad_err_ub_oom ident Monad_ident)
-             (fun dt0 : dtyp =>
-                @lift_err_RAISE_ERROR dvalue err_ub_oom (@Monad_err_ub_oom ident Monad_ident)
-                  (@RAISE_ERROR_err_ub_oom ident Monad_ident) (default_dvalue_of_dtyp dt0)) err_ub_oom
-             (@Monad_err_ub_oom ident Monad_ident) (@RAISE_ERROR_err_ub_oom ident Monad_ident)
-             (@RAISE_UB_err_ub_oom_T ident Monad_ident) (@RAISE_OOM_err_ub_oom_T ident Monad_ident)
-             (fun (A : Type) (x : err_ub_oom A) => x) uvs).
-    Proof.
-      intros uvs IH.
-      repeat rewrite CONCBASE.concretize_uvalue_bytes_equation.
-      apply concretize_uvalue_bytes_helper_concretize_uvalue_bytes_helper; auto.
-    Qed.
+    (* Lemma concretize_uvalue_bytes_concretize_uvalue_bytes : *)
+    (*   forall uvs *)
+    (*     (IH : forall u, *)
+    (*         Exists (uvalue_subterm u) uvs -> *)
+    (*         concretize_u u (concretize_uvalue u)), *)
+    (*     @CONCBASE.concretize_uvalue_bytes ErrUbOomProp Monad_ErrUbOomProp *)
+    (*       (fun (dt0 : dtyp) (edv : err_ub_oom dvalue) => *)
+    (*          match @unERR_UB_OOM ident dvalue edv with *)
+    (*          | {| unEitherT := {| unEitherT := {| unEitherT := {| unIdent := inr (inr (inr dv)) |} |} |} |} => *)
+    (*              dvalue_has_dtyp dv dt0 /\ dv <> DVALUE_Poison dt0 *)
+    (*          | _ => True *)
+    (*          end) err_ub_oom (@Monad_err_ub_oom ident Monad_ident) (@RAISE_ERROR_err_ub_oom ident Monad_ident) *)
+    (*       (@RAISE_UB_err_ub_oom_T ident Monad_ident) (@RAISE_OOM_err_ub_oom_T ident Monad_ident) *)
+    (*       (fun (A : Type) (x ue : err_ub_oom A) => x = ue) uvs *)
+    (*       (@CONCBASE.concretize_uvalue_bytes err_ub_oom (@Monad_err_ub_oom ident Monad_ident) *)
+    (*          (fun dt0 : dtyp => *)
+    (*             @lift_err_RAISE_ERROR dvalue err_ub_oom (@Monad_err_ub_oom ident Monad_ident) *)
+    (*               (@RAISE_ERROR_err_ub_oom ident Monad_ident) (default_dvalue_of_dtyp dt0)) err_ub_oom *)
+    (*          (@Monad_err_ub_oom ident Monad_ident) (@RAISE_ERROR_err_ub_oom ident Monad_ident) *)
+    (*          (@RAISE_UB_err_ub_oom_T ident Monad_ident) (@RAISE_OOM_err_ub_oom_T ident Monad_ident) *)
+    (*          (fun (A : Type) (x : err_ub_oom A) => x) uvs). *)
+    (* Proof. *)
+    (*   intros uvs IH. *)
+    (*   repeat rewrite CONCBASE.concretize_uvalue_bytes_equation. *)
+    (*   apply concretize_uvalue_bytes_helper_concretize_uvalue_bytes_helper; auto. *)
+    (* Qed. *)
 
-    Lemma extractbytes_to_dvalue_extractbytes_to_dvalue :
-      forall uvs dt
-        (IH : forall u,
-            Exists (uvalue_subterm u) uvs ->
-            concretize_u u (concretize_uvalue u)),
-        @CONCBASE.extractbytes_to_dvalue ErrUbOomProp Monad_ErrUbOomProp
-          (fun (dt0 : dtyp) (edv : err_ub_oom dvalue) =>
-             match @unERR_UB_OOM ident dvalue edv with
-             | {| unEitherT := {| unEitherT := {| unEitherT := {| unIdent := inr (inr (inr dv)) |} |} |} |} =>
-                 dvalue_has_dtyp dv dt0 /\ dv <> DVALUE_Poison dt0
-             | _ => True
-             end) err_ub_oom (@Monad_err_ub_oom ident Monad_ident) (@RAISE_ERROR_err_ub_oom ident Monad_ident)
-          (@RAISE_UB_err_ub_oom_T ident Monad_ident) (@RAISE_OOM_err_ub_oom_T ident Monad_ident)
-          (fun (A : Type) (x ue : err_ub_oom A) => x = ue) uvs dt
-          (@CONCBASE.extractbytes_to_dvalue err_ub_oom (@Monad_err_ub_oom ident Monad_ident)
-             (fun dt0 : dtyp =>
-                @lift_err_RAISE_ERROR dvalue err_ub_oom (@Monad_err_ub_oom ident Monad_ident)
-                  (@RAISE_ERROR_err_ub_oom ident Monad_ident) (default_dvalue_of_dtyp dt0)) err_ub_oom
-             (@Monad_err_ub_oom ident Monad_ident) (@RAISE_ERROR_err_ub_oom ident Monad_ident)
-             (@RAISE_UB_err_ub_oom_T ident Monad_ident) (@RAISE_OOM_err_ub_oom_T ident Monad_ident)
-             (fun (A : Type) (x : err_ub_oom A) => x) uvs dt).
-    Proof.
-      intros uvs dt IH.
-      repeat rewrite CONCBASE.extractbytes_to_dvalue_equation.
-      remember
-        (CONCBASE.concretize_uvalue_bytes err_ub_oom
-           (fun dt0 : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt0)) err_ub_oom
-           (fun (A : Type) (x : err_ub_oom A) => x) uvs).
-      cbn.
-      match goal with
-      | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
-          exists e; exists (fun _ => res)
-      end.
-      split.
+    (* Lemma extractbytes_to_dvalue_extractbytes_to_dvalue : *)
+    (*   forall uvs dt *)
+    (*     (IH : forall u, *)
+    (*         Exists (uvalue_subterm u) uvs -> *)
+    (*         concretize_u u (concretize_uvalue u)), *)
+    (*     @CONCBASE.extractbytes_to_dvalue ErrUbOomProp Monad_ErrUbOomProp *)
+    (*       (fun (dt0 : dtyp) (edv : err_ub_oom dvalue) => *)
+    (*          match @unERR_UB_OOM ident dvalue edv with *)
+    (*          | {| unEitherT := {| unEitherT := {| unEitherT := {| unIdent := inr (inr (inr dv)) |} |} |} |} => *)
+    (*              dvalue_has_dtyp dv dt0 /\ dv <> DVALUE_Poison dt0 *)
+    (*          | _ => True *)
+    (*          end) err_ub_oom (@Monad_err_ub_oom ident Monad_ident) (@RAISE_ERROR_err_ub_oom ident Monad_ident) *)
+    (*       (@RAISE_UB_err_ub_oom_T ident Monad_ident) (@RAISE_OOM_err_ub_oom_T ident Monad_ident) *)
+    (*       (fun (A : Type) (x ue : err_ub_oom A) => x = ue) uvs dt *)
+    (*       (@CONCBASE.extractbytes_to_dvalue err_ub_oom (@Monad_err_ub_oom ident Monad_ident) *)
+    (*          (fun dt0 : dtyp => *)
+    (*             @lift_err_RAISE_ERROR dvalue err_ub_oom (@Monad_err_ub_oom ident Monad_ident) *)
+    (*               (@RAISE_ERROR_err_ub_oom ident Monad_ident) (default_dvalue_of_dtyp dt0)) err_ub_oom *)
+    (*          (@Monad_err_ub_oom ident Monad_ident) (@RAISE_ERROR_err_ub_oom ident Monad_ident) *)
+    (*          (@RAISE_UB_err_ub_oom_T ident Monad_ident) (@RAISE_OOM_err_ub_oom_T ident Monad_ident) *)
+    (*          (fun (A : Type) (x : err_ub_oom A) => x) uvs dt). *)
+    (* Proof. *)
+    (*   intros uvs dt IH. *)
+    (*   repeat rewrite CONCBASE.extractbytes_to_dvalue_equation. *)
+    (*   remember *)
+    (*     (CONCBASE.concretize_uvalue_bytes err_ub_oom *)
+    (*        (fun dt0 : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt0)) err_ub_oom *)
+    (*        (fun (A : Type) (x : err_ub_oom A) => x) uvs). *)
+    (*   cbn. *)
+    (*   match goal with *)
+    (*   | H : _ |- bind_ErrUbOomProp ?ma ?k ?res => *)
+    (*       exists e; exists (fun _ => res) *)
+    (*   end. *)
+    (*   split. *)
 
-      subst.
-      apply concretize_uvalue_bytes_concretize_uvalue_bytes; auto.
+    (*   subst. *)
+    (*   apply concretize_uvalue_bytes_concretize_uvalue_bytes; auto. *)
 
-      destruct_err_ub_oom e; cbn; split; auto.
-      right.
-      intros ? ?; subst.
-      remember ((ErrOomPoison.ErrOOMPoison_handle_poison_and_oom DVALUE_Poison
-                   (DVALUE_BYTES.dvalue_bytes_to_dvalue a dt))).
-      destruct_err_ub_oom y; reflexivity.
-    Qed.
+    (*   destruct_err_ub_oom e; cbn; split; auto. *)
+    (*   right. *)
+    (*   intros ? ?; subst. *)
+    (*   remember ((ErrOomPoison.ErrOOMPoison_handle_poison_and_oom DVALUE_Poison *)
+    (*                (DVALUE_BYTES.dvalue_bytes_to_dvalue a dt))). *)
+    (*   destruct_err_ub_oom y; reflexivity. *)
+    (* Qed. *)
 
     Lemma eval_select_loop_eval_select_loop :
       forall elts elts0 elts1,
@@ -764,7 +764,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                                                                                                      (@inr UB_MESSAGE
                                                                                                                         (ERR (list dvalue))
                                                                                                                         (@inr ERR_MESSAGE
-                                                                                                                           (list dvalue) 
+                                                                                                                           (list dvalue)
                                                                                                                            (x3 :: x6)))
                                                                                                                |}
                                                                                                            |}
@@ -876,10 +876,10 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                                        unEitherT :=
                                                          match
                                                            @unIdent (OOM_MESSAGE + UB (ERR dvalue))
-                                                             (@unEitherT OOM_MESSAGE ident 
+                                                             (@unEitherT OOM_MESSAGE ident
                                                                 (UB (ERR dvalue))
                                                                 (@unEitherT UB_MESSAGE
-                                                                   (eitherT OOM_MESSAGE ident) 
+                                                                   (eitherT OOM_MESSAGE ident)
                                                                    (ERR dvalue)
                                                                    (@unEitherT ERR_MESSAGE
                                                                       (eitherT UB_MESSAGE
@@ -932,7 +932,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                                                            (eitherT UB_MESSAGE
                                                                               (eitherT OOM_MESSAGE ident))
                                                                            (list dvalue)
-                                                                           (@unERR_UB_OOM ident 
+                                                                           (@unERR_UB_OOM ident
                                                                               (list dvalue)
                                                                               match loop conds0 xs0 ys0 with
                                                                               | {| unERR_UB_OOM := ma0 |} =>
@@ -1012,7 +1012,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                                                                                                                 (@inr UB_MESSAGE
                                                                                                                                    (ERR (list dvalue))
                                                                                                                                    (@inr ERR_MESSAGE
-                                                                                                                                      (list dvalue) 
+                                                                                                                                      (list dvalue)
                                                                                                                                       (x3 :: x6)))
                                                                                                                           |}
                                                                                                                       |}
@@ -1101,10 +1101,10 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                                        unEitherT :=
                                                          match
                                                            @unIdent (OOM_MESSAGE + UB (ERR dvalue))
-                                                             (@unEitherT OOM_MESSAGE ident 
+                                                             (@unEitherT OOM_MESSAGE ident
                                                                 (UB (ERR dvalue))
                                                                 (@unEitherT UB_MESSAGE
-                                                                   (eitherT OOM_MESSAGE ident) 
+                                                                   (eitherT OOM_MESSAGE ident)
                                                                    (ERR dvalue)
                                                                    (@unEitherT ERR_MESSAGE
                                                                       (eitherT UB_MESSAGE
@@ -1157,7 +1157,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                                                            (eitherT UB_MESSAGE
                                                                               (eitherT OOM_MESSAGE ident))
                                                                            (list dvalue)
-                                                                           (@unERR_UB_OOM ident 
+                                                                           (@unERR_UB_OOM ident
                                                                               (list dvalue)
                                                                               match loop conds0 xs0 ys0 with
                                                                               | {| unERR_UB_OOM := ma0 |} =>
@@ -1237,7 +1237,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                                                                                                                 (@inr UB_MESSAGE
                                                                                                                                    (ERR (list dvalue))
                                                                                                                                    (@inr ERR_MESSAGE
-                                                                                                                                      (list dvalue) 
+                                                                                                                                      (list dvalue)
                                                                                                                                       (x3 :: x6)))
                                                                                                                           |}
                                                                                                                       |}
@@ -1328,10 +1328,10 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                                      unEitherT :=
                                                        match
                                                          @unIdent (OOM_MESSAGE + UB (ERR dvalue))
-                                                           (@unEitherT OOM_MESSAGE ident 
+                                                           (@unEitherT OOM_MESSAGE ident
                                                               (UB (ERR dvalue))
                                                               (@unEitherT UB_MESSAGE
-                                                                 (eitherT OOM_MESSAGE ident) 
+                                                                 (eitherT OOM_MESSAGE ident)
                                                                  (ERR dvalue)
                                                                  (@unEitherT ERR_MESSAGE
                                                                     (eitherT UB_MESSAGE
@@ -1384,7 +1384,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                                                          (eitherT UB_MESSAGE
                                                                             (eitherT OOM_MESSAGE ident))
                                                                          (list dvalue)
-                                                                         (@unERR_UB_OOM ident 
+                                                                         (@unERR_UB_OOM ident
                                                                             (list dvalue)
                                                                             match loop conds0 xs0 ys0 with
                                                                             | {| unERR_UB_OOM := ma0 |} =>
@@ -1464,7 +1464,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                                                                                                               (@inr UB_MESSAGE
                                                                                                                                  (ERR (list dvalue))
                                                                                                                                  (@inr ERR_MESSAGE
-                                                                                                                                    (list dvalue) 
+                                                                                                                                    (list dvalue)
                                                                                                                                     (x3 :: x6)))
                                                                                                                         |}
                                                                                                                     |}
@@ -2132,6 +2132,8 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
         rewrite concretize_uvalueM_equation.
         rewrite (@concretize_uvalueM_equation err_ub_oom).
         cbn.
+
+        (* Evaluate the condition *)
         remember
           (concretize_uvalueM err_ub_oom
              (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) err_ub_oom
@@ -2150,35 +2152,205 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
         right.
         intros a H0; subst.
 
-        pose proof eval_select_eval_select a u2 u3.
-        forward H0.
-        eapply H.
-        repeat constructor.
-        forward H0.
-        eapply H.
-        repeat constructor.
+        destruct a; auto.
+        - (* i1 condition *)
+          break_match_goal;
+            match goal with
+            | _ : _ |- context [ concretize_uvalueM err_ub_oom _ _ _ ?u ] =>
+                specialize (H u);
+                forward H; [solve [ repeat constructor ] |]
+            end;
+            match goal with
+            | H: concretize_uvalueM _ _ _ _ _ ?u |- _ =>
+                remember u as e
+            end;
+            destruct_err_ub_oom e; auto.
+        - (* Vector condition *)
+          (* Evaluate the first branch *)
+          remember
+            (concretize_uvalueM err_ub_oom
+               (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) err_ub_oom
+               (fun (A : Type) (x : err_ub_oom A) => x) u2) as e.
+          match goal with
+          | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+              exists e; exists (fun _ => res)
+          end.
+          split.
 
-        remember (eval_select err_ub_oom
-                                  (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
-                                  err_ub_oom (fun (A : Type) (x : err_ub_oom A) => x) a u2 u3).
-        destruct_err_ub_oom e; cbn in *; auto.
+          subst.
+          apply H.
+          repeat constructor.
+
+          destruct_err_ub_oom e; cbn; split; auto.
+          right.
+          intros a H0; subst.
+
+          (* Evaluate the second branch *)
+          remember
+            (concretize_uvalueM err_ub_oom
+               (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) err_ub_oom
+               (fun (A : Type) (x : err_ub_oom A) => x) u3) as e.
+          match goal with
+          | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+              exists e; exists (fun _ => res)
+          end.
+          split.
+
+          subst.
+          apply H.
+          repeat constructor.
+
+          destruct_err_ub_oom e; cbn; split; auto.
+          right.
+          intros ? ?; subst.
+
+          destruct a, a0; try reflexivity.
+          (* Vector / Vector loop case *)
+          match goal with
+          | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+              eexists; exists (fun _ => res)
+          end.
+          split; auto.
+          eapply eval_select_loop_eval_select_loop.
+          split; subst; cbn; eauto.
+          { match goal with
+            | [ |- context [ match ?X with _ => _ end ] ] =>
+                remember X
+            end.
+            destruct_err_ub_oom e; cbn;
+              setoid_rewrite <- Heqe2; cbn;
+              try reflexivity.
+          }
+
+          match goal with
+          | [ |- context [ match ?X with _ => _ end ] ] =>
+              remember X
+          end.
+          destruct_err_ub_oom e; cbn;
+            setoid_rewrite <- Heqe2; cbn;
+            auto.
+
+          right.
+          intros ? ?; subst.
+          reflexivity.
       }
 
       { (* ConcatBytes *)
         repeat rewrite CONCBASE.concretize_uvalueM_equation.
         break_match.
-        { break_match.
+        { break_match; cbn.
+          pose proof Heqo.
+          apply Byte.all_extract_bytes_from_uvalue_success_inv in H0 as (?&?&?); subst.
           eapply H.
           eapply Byte.all_extract_bytes_from_uvalue_strict_subterm; auto.
-          eapply extractbytes_to_dvalue_extractbytes_to_dvalue.
-          intros u H0.
-          apply H.
-          apply uvalue_concat_bytes_strict_subterm; auto.
+
+          remember
+            ((fix concretize_uvalue_bytes_helper (acc : NMaps.NMap (list (uvalue * dvalue))) (uvs : list uvalue) {struct uvs} : err_ub_oom (list DVALUE_BYTES.dvalue_byte)
+              := match uvs with
+                 | nil => ret nil
+                 | (uv::uvs) =>
+                     match uv with
+                     | UVALUE_ExtractByte byte_uv dt idx sid =>
+                         (* Check if this uvalue has been concretized already *)
+                         match pre_concretized acc byte_uv sid with
+                         | Some dv =>
+                             (* Use the pre_concretized value *)
+                             let dv_byte := DVALUE_BYTES.DVALUE_ExtractByte dv dt idx in
+                             (* Concretize the rest of the bytes *)
+                             rest <- concretize_uvalue_bytes_helper acc uvs;;
+                             ret (dv_byte :: rest)
+                         | None =>
+                             (* Concretize the uvalue *)
+                             dv <- concretize_uvalueM err_ub_oom (fun dt => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) _ (fun _ x => x) byte_uv;;
+                             let dv_byte := DVALUE_BYTES.DVALUE_ExtractByte dv dt idx in
+                             let acc := new_concretized_byte acc byte_uv dv sid in
+                             (* Concretize the rest of the bytes *)
+                             rest <- concretize_uvalue_bytes_helper acc uvs;;
+                             ret (dv_byte :: rest)
+                         end
+                     | _ =>
+                         (ERR_unERR_UB_OOM "concretize_uvalue_bytes_helper: non-byte in uvs.")
+                     end
+                 end) (NMaps.NM.empty (list (uvalue * dvalue))) uvs).
+
+          match goal with
+          | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+              exists e; exists (fun _ => res)
+          end.
+          split.
+
+          subst.
+          apply concretize_uvalue_bytes_helper_concretize_uvalue_bytes_helper; auto.
+          { intros u H0.
+            apply H.
+            apply uvalue_concat_bytes_strict_subterm; auto.
+          }
+
+          cbn in *;
+          setoid_rewrite <- Heqe.
+          destruct_err_ub_oom e; cbn; split; auto.
+          setoid_rewrite <- Heqe. cbn; auto.
+          right.
+          intros ? ?; subst.
+          remember ((ErrOomPoison.ErrOOMPoison_handle_poison_and_oom DVALUE_Poison
+                       (DVALUE_BYTES.dvalue_bytes_to_dvalue a dt))).
+          destruct_err_ub_oom y; reflexivity.
         }
-        eapply extractbytes_to_dvalue_extractbytes_to_dvalue.
-        intros.
-        apply H.
-        apply uvalue_concat_bytes_strict_subterm; auto.
+
+        { cbn.
+
+          remember
+            ((fix concretize_uvalue_bytes_helper (acc : NMaps.NMap (list (uvalue * dvalue))) (uvs : list uvalue) {struct uvs} : err_ub_oom (list DVALUE_BYTES.dvalue_byte)
+              := match uvs with
+                 | nil => ret nil
+                 | (uv::uvs) =>
+                     match uv with
+                     | UVALUE_ExtractByte byte_uv dt idx sid =>
+                         (* Check if this uvalue has been concretized already *)
+                         match pre_concretized acc byte_uv sid with
+                         | Some dv =>
+                             (* Use the pre_concretized value *)
+                             let dv_byte := DVALUE_BYTES.DVALUE_ExtractByte dv dt idx in
+                             (* Concretize the rest of the bytes *)
+                             rest <- concretize_uvalue_bytes_helper acc uvs;;
+                             ret (dv_byte :: rest)
+                         | None =>
+                             (* Concretize the uvalue *)
+                             dv <- concretize_uvalueM err_ub_oom (fun dt => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) _ (fun _ x => x) byte_uv;;
+                             let dv_byte := DVALUE_BYTES.DVALUE_ExtractByte dv dt idx in
+                             let acc := new_concretized_byte acc byte_uv dv sid in
+                             (* Concretize the rest of the bytes *)
+                             rest <- concretize_uvalue_bytes_helper acc uvs;;
+                             ret (dv_byte :: rest)
+                         end
+                     | _ =>
+                         (ERR_unERR_UB_OOM "concretize_uvalue_bytes_helper: non-byte in uvs.")
+                     end
+                 end) (NMaps.NM.empty (list (uvalue * dvalue))) uvs).
+
+          match goal with
+          | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+              exists e; exists (fun _ => res)
+          end.
+          split.
+
+          subst.
+          apply concretize_uvalue_bytes_helper_concretize_uvalue_bytes_helper; auto.
+          { intros u H0.
+            apply H.
+            apply uvalue_concat_bytes_strict_subterm; auto.
+          }
+
+          cbn in *;
+          setoid_rewrite <- Heqe.
+          destruct_err_ub_oom e; cbn; split; auto.
+          setoid_rewrite <- Heqe. cbn; auto.
+          right.
+          intros ? ?; subst.
+          remember ((ErrOomPoison.ErrOOMPoison_handle_poison_and_oom DVALUE_Poison
+                       (DVALUE_BYTES.dvalue_bytes_to_dvalue a dt))).
+          destruct_err_ub_oom y; reflexivity.
+        }
       }
     Qed.
 
