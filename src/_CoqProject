@@ -26,7 +26,7 @@
 ./coq/Handlers/MemoryModules/FiniteIntptr.v
 ./coq/Handlers/MemoryModules/FiniteSizeof.v
 ./coq/Handlers/MemoryModules/FiniteSpecPrimitives.v
-./coq/Handlers/MemoryModules/rnfiniteAddresses.v
+./coq/Handlers/MemoryModules/InfiniteAddresses.v
 ./coq/Handlers/MemoryModules/Within.v
 ./coq/Handlers/OOM.v
 ./coq/Handlers/Pick.v
