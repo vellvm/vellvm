@@ -191,9 +191,11 @@ End Helpers.
 
 Section GenerationState.
 
-  Definition type_context := IM.Raw.t typ.
-  Definition var_context := IM.Raw.t unit.
-  Definition ptr_to_int_context := IM.Raw.t Ent.
+  Definition VariableMetadata := Metadata FieldOf.
+  Definition VariableMetadataMap := IM.Raw.t VariableMetadata.
+  Definition type_context := VariableMetadataMap.
+  Definition var_context := VariableMetadataMap.
+  Definition ptr_to_int_context := VariableMetadataMap.
   Definition all_local_var_contexts := (var_context * ptr_to_int_context)%type.
   Definition all_var_contexts := (var_context * var_context * ptr_to_int_context)%type.
   Definition ContextMetadata s := Metadata s.

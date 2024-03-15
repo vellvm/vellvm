@@ -619,7 +619,9 @@ Definition newEntity {w} {m} `{Monad m} : SystemT w m Ent
      ret (mkEnt i).
 
 Definition deleteEntity {w} {m} `{Monad m} `{@MetadataStore m Metadata (SystemState w m)} (e : Ent) : SystemT w m unit
-  := (metadata .@ entl e) _ _ .= def;;
+  := let eid := unEnt e in
+     (metadata .@ entl e) _ _ .= def;;
+     entities _ _ %= (fun ents => IS.remove eid ents);;
      ret tt.
 
 Definition runSystemT {m} `{Monad m} {a} (w : Metadata (WorldOf m)) (sys : SystemT Metadata m a) : m a
