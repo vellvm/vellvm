@@ -12,7 +12,24 @@
     more details. *)
 Require Import Ceres.Ceres.
 
-From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils QC.Generators Handlers.Handlers DList.
+From Vellvm Require Import
+  LLVMAst
+  Utilities
+  AstLib
+  Syntax.CFG
+  Syntax.TypeUtil
+  Syntax.TypToDtyp
+  DynamicTypes
+  Semantics.TopLevel
+  QC.Utils
+  QC.Generators
+  Handlers.Handlers
+  DList
+  QC.ECS
+  QC.Lens
+  Utils.Default
+  IntMaps.
+
 Require Import Integers.
 
 
@@ -30,6 +47,8 @@ Import ListNotations.
 
 Import ListNotations.
 Import MonadNotation.
+Import FunctorNotation.
+Import LensNotations.
 Import ApplicativeNotation.
 
 From Coq Require Import
@@ -42,6 +61,7 @@ Set Warnings "-extraction-opaque-accessed,-extraction".
 From ExtLib.Structures Require Export
      Functor.
 Open Scope Z_scope.
+Open Scope lens.
 
 (* Disable guard checking. This file is only used for generating test
     cases. Some of our generation functions terminate in non-trivial
@@ -171,149 +191,157 @@ End Helpers.
 
 Section GenerationState.
 
-  Definition type_context := list (ident * typ).
-  Definition var_context := list (ident * typ).
-  Definition ptr_to_int_context := list (typ * ident * typ).
+  Definition type_context := IM.Raw.t typ.
+  Definition var_context := IM.Raw.t unit.
+  Definition ptr_to_int_context := IM.Raw.t Ent.
   Definition all_local_var_contexts := (var_context * ptr_to_int_context)%type.
   Definition all_var_contexts := (var_context * var_context * ptr_to_int_context)%type.
+  Definition ContextMetadata s := Metadata s.
 
-
-  Record GenState :=
+  Record GenState s :=
     mkGenState
     { num_void : N
     ; num_raw  : N
     ; num_global : N
     ; num_blocks : N
-    (* Types of values *)
-    ; gen_local_ctx : var_context
-    ; gen_global_ctx : var_context
-    (* Type aliases *)
-    ; gen_typ_ctx : type_context
-    ; gen_ptrtoint_ctx : ptr_to_int_context
+    ; context : ContextMetadata s
     ; global_memo : list (global typ)
+    ; debug : list string
     }.
 
-  Definition init_GenState : GenState
-    := {| num_void   := 0
-        ; num_raw    := 0
-        ; num_global := 0
-        ; num_blocks := 0
-        ; gen_local_ctx  := [] 
-        ; gen_global_ctx := []
-        ; gen_typ_ctx    := []
-        ; gen_ptrtoint_ctx := []
-        ; global_memo := []
-       |}.
+  Instance Default_GenState {s} : Default (GenState s)
+    :=
+    { def := {| num_void   := 0
+             ; num_raw    := 0
+             ; num_global := 0
+             ; num_blocks := 0
+             ; context := def
+             ; global_memo := []
+             ; debug := []
+             |}
+    }.
 
-  Definition increment_raw (gs : GenState) : GenState
-    := {| num_void    := gs.(num_void)
-        ; num_raw     := N.succ gs.(num_raw)
-        ; num_global  := gs.(num_global)
-        ; num_blocks  := gs.(num_blocks)
-        ; gen_local_ctx     := gs.(gen_local_ctx)
-        ; gen_global_ctx := gs.(gen_global_ctx)
-        ; gen_typ_ctx := gs.(gen_typ_ctx)
-        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
-        ; global_memo := gs.(global_memo)
-       |}.
+  Definition num_void' {s} : Lens' (GenState s) N.
+    red.
+    intros f F afa gs.
+    refine ((fun x => _) <$> afa (_ gs)); try typeclasses eauto.
+    - apply mkGenState;
+        [ apply x
+        | apply (num_raw s)
+        | apply (num_global s)
+        | apply (num_blocks s)
+        | apply (context s)
+        | apply (global_memo s)
+        | apply (debug s)
+        ]; apply gs.
+    - apply num_void.
+  Defined.
 
-  Definition increment_global (gs : GenState) : GenState
-    := {| num_void    := gs.(num_void)
-        ; num_raw     := gs.(num_raw)
-        ; num_global  := N.succ gs.(num_global)
-        ; num_blocks  := gs.(num_blocks)
-        ; gen_local_ctx     := gs.(gen_local_ctx)
-        ; gen_global_ctx := gs.(gen_global_ctx)
-        ; gen_typ_ctx := gs.(gen_typ_ctx)
-        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
-        ; global_memo := gs.(global_memo)
-       |}.
+  Definition num_raw' {s} : Lens' (GenState s) N.
+    red.
+    intros f F afa gs.
+    refine ((fun x => _) <$> afa (_ gs)); try typeclasses eauto.
+    - apply mkGenState;
+        [ apply (num_void s)
+        | apply x
+        | apply (num_global s)
+        | apply (num_blocks s)
+        | apply (context s)
+        | apply (global_memo s)
+        | apply (debug s)
+        ]; apply gs.
+    - apply num_raw.
+  Defined.
 
-  Definition increment_void (gs : GenState) : GenState
-    := {| num_void    := N.succ gs.(num_void)
-        ; num_raw     := gs.(num_raw)
-        ; num_global  := gs.(num_global)
-        ; num_blocks  := gs.(num_blocks)
-        ; gen_local_ctx     := gs.(gen_local_ctx)
-        ; gen_global_ctx := gs.(gen_global_ctx)
-        ; gen_typ_ctx := gs.(gen_typ_ctx)
-        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
-        ; global_memo := gs.(global_memo)
-       |}.
+  Definition num_global' {s} : Lens' (GenState s) N.
+    red.
+    intros f F afa gs.
+    refine ((fun x => _) <$> afa (_ gs)); try typeclasses eauto.
+    - apply mkGenState;
+        [ apply (num_void s)
+        | apply (num_raw s)
+        | apply x
+        | apply (num_blocks s)
+        | apply (context s)
+        | apply (global_memo s)
+        | apply (debug s)
+        ]; apply gs.
+    - apply num_global.
+  Defined.
 
-  Definition increment_blocks (gs : GenState) : GenState
-    := {| num_void    := gs.(num_void)
-        ; num_raw     := gs.(num_raw)
-        ; num_global  := gs.(num_global)
-        ; num_blocks  := N.succ gs.(num_blocks)
-        ; gen_local_ctx     := gs.(gen_local_ctx)
-        ; gen_global_ctx := gs.(gen_global_ctx)
-        ; gen_typ_ctx := gs.(gen_typ_ctx)
-        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
-        ; global_memo := gs.(global_memo)
-       |}.
+  Definition num_blocks' {s} : Lens' (GenState s) N.
+    red.
+    intros f F afa gs.
+    refine ((fun x => _) <$> afa (_ gs)); try typeclasses eauto.
+    - apply mkGenState;
+        [ apply (num_void s)
+        | apply (num_raw s)
+        | apply (num_global s)
+        | apply x
+        | apply (context s)
+        | apply (global_memo s)
+        | apply (debug s)
+        ]; apply gs.
+    - apply num_blocks.
+  Defined.
 
-  Definition replace_local_ctx (ctx : var_context) (gs : GenState) : GenState
-    := {| num_void    := gs.(num_void)
-        ; num_raw     := gs.(num_raw)
-        ; num_global  := gs.(num_global)
-        ; num_blocks  := gs.(num_blocks)
-        ; gen_local_ctx     := ctx
-        ; gen_global_ctx := gs.(gen_global_ctx)
-        ; gen_typ_ctx := gs.(gen_typ_ctx)
-        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
-        ; global_memo := gs.(global_memo)
-       |}.
+  Definition context' {s} : Lens' (GenState s) (ContextMetadata s).
+    red.
+    intros f F afa gs.
+    refine ((fun x => _) <$> afa (_ gs)); try typeclasses eauto.
+    - apply mkGenState;
+        [ apply (num_void s)
+        | apply (num_raw s)
+        | apply (num_global s)
+        | apply (num_blocks s)
+        | apply x
+        | apply (global_memo s)
+        | apply (debug s)
+        ]; apply gs.
+    - apply context.
+  Defined.
 
-  Definition replace_global_ctx (ctx : var_context) (gs : GenState) : GenState
-    := {| num_void    := gs.(num_void)
-        ; num_raw     := gs.(num_raw)
-        ; num_global  := gs.(num_global)
-        ; num_blocks  := gs.(num_blocks)
-        ; gen_local_ctx     := gs.(gen_local_ctx)
-        ; gen_global_ctx := ctx
-        ; gen_typ_ctx := gs.(gen_typ_ctx)
-        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
-        ; global_memo := gs.(global_memo)
-       |}.
+  Definition global_memo' {s} : Lens' (GenState s) (list (global typ)).
+    red.
+    intros f F afa gs.
+    refine ((fun x => _) <$> afa (_ gs)); try typeclasses eauto.
+    - apply mkGenState;
+        [ apply (num_void s)
+        | apply (num_raw s)
+        | apply (num_global s)
+        | apply (num_blocks s)
+        | apply (context s)
+        | apply x
+        | apply (debug s)
+        ]; apply gs.
+    - apply global_memo.
+  Defined.
 
-  Definition replace_typ_ctx (typ_ctx : list (ident * typ)) (gs : GenState) : GenState
-    := {| num_void    := gs.(num_void)
-        ; num_raw     := gs.(num_raw)
-        ; num_global  := gs.(num_global)
-        ; num_blocks  := gs.(num_blocks)
-        ; gen_local_ctx     := gs.(gen_local_ctx)
-        ; gen_global_ctx := gs.(gen_global_ctx)
-        ; gen_typ_ctx := typ_ctx
-        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
-        ; global_memo := gs.(global_memo)
-       |}.
+  Definition increment_raw {s} (gs : GenState s) : GenState s
+    := gs & num_raw' _ _ %~ N.succ.
 
-  Definition replace_ptrtoint_ctx (ptrtoint_ctx : list (typ * ident * typ)) (gs: GenState) : GenState
-    := {| num_void    := gs.(num_void)
-        ; num_raw     := gs.(num_raw)
-        ; num_global  := gs.(num_global)
-        ; num_blocks  := gs.(num_blocks)
-        ; gen_local_ctx     := gs.(gen_local_ctx)
-        ; gen_global_ctx := gs.(gen_global_ctx)
-        ; gen_typ_ctx := gs.(gen_typ_ctx)
-        ; gen_ptrtoint_ctx := ptrtoint_ctx
-        ; global_memo := gs.(global_memo)
-       |}.
+  Definition increment_global {s} (gs : GenState s) : GenState s
+    := gs & num_global' _ _ %~ N.succ.
 
-  Definition replace_global_memo (global_memo : list (global typ)) (gs : GenState) : GenState
-    := {| num_void    := gs.(num_void)
-        ; num_raw     := gs.(num_raw)
-        ; num_global  := gs.(num_global)
-        ; num_blocks  := gs.(num_blocks)
-        ; gen_local_ctx     := gs.(gen_local_ctx)
-        ; gen_global_ctx := gs.(gen_global_ctx)
-        ; gen_typ_ctx := gs.(gen_typ_ctx)
-        ; gen_ptrtoint_ctx := gs.(gen_ptrtoint_ctx)
-        ; global_memo := global_memo
-       |}.
+  Definition increment_void {s} (gs : GenState s) : GenState s
+    := gs & num_void' _ _ %~ N.succ.
 
-  Definition GenLLVM := (eitherT string (stateT (list string) (stateT GenState G))).
+  Definition increment_blocks {s} (gs : GenState s) : GenState s
+    := gs & num_blocks' _ _ %~ N.succ.
+
+  Definition replace_local_ctx {s} (ctx : Component s Field unit) (gs : GenState s) : GenState s
+    := gs & (context' .@  is_local') _ _ .~ ctx.
+
+  Definition replace_typ_ctx {s} (typ_ctx : Component s Field typ) (gs : GenState s) : GenState s
+    := gs & (context' .@ type_alias') _ _ .~ typ_ctx.
+
+  Definition replace_ptrtoint_ctx {s} (ptrtoint_ctx : Component s Field Ent) (gs: GenState s) : GenState s
+    := gs & (context' .@ from_pointer') _ _ .~ ptrtoint_ctx.
+
+  Definition replace_global_memo {s} (global_memo : list (global typ)) (gs : GenState s) : GenState s
+    := gs & global_memo' _ _ .~ global_memo.
+
+  Definition GenLLVM := (eitherT string (SystemT GenState G)).
   
   (* Need this because extlib doesn't declare this instance as global :|. *)
   #[global] Instance monad_stateT {s m} `{Monad m} : Monad (stateT s m).
@@ -322,54 +350,62 @@ Section GenerationState.
       typeclasses eauto.
   Defined.
 
-  Definition get_raw (gs : GenState) : N
-    := gs.(num_raw).
+  #[global] Instance MonadState_GenLLVM : MonadState (SystemState GenState G) GenLLVM.
+  unfold SystemT.
+  try typeclasses eauto.
+  Defined.
 
-  Definition get_global (gs : GenState) : N
-    := gs.(num_global).
+  Definition gen_context' : Lens' (SystemState GenState G) (ContextMetadata _)
+    := (metadata .@ context').
 
-  Definition get_void (gs : GenState) : N
-    := gs.(num_void).
+  Definition get_raw {s} (gs : GenState s) : N
+    := gs .^ num_raw'.
 
-  Definition get_blocks (gs : GenState) : N
-    := gs.(num_blocks).
+  Definition get_global {s} (gs : GenState s) : N
+    := gs .^ num_global'.
+
+  Definition get_void {s} (gs : GenState s) : N
+    := gs .^ num_void'.
+
+  Definition get_blocks {s} (gs : GenState s) : N
+    := gs .^ num_blocks'.
+
+  Definition new_id {ID} (id_lens : forall {s : StorageType}, Lens' (GenState s) N) (id_gen : N -> ID) : GenLLVM ID
+    := n <- use (metadata .@ num_raw');;
+       (metadata .@ num_raw') _ _ %= N.succ;;
+       ret (id_gen n).
 
   Definition new_raw_id : GenLLVM raw_id
-    := n <- gets get_raw;;
-       modify increment_raw;;
-       ret (Name ("v" ++ show n)).
+    := new_id (@num_raw') (fun n => Name ("v" ++ show n)).
 
   Definition new_global_id : GenLLVM raw_id
-    := n <- gets get_global;;
-       modify increment_global;;
-       ret (Name ("g" ++ show n)).
+    := new_id (@num_raw') (fun n => Name ("g" ++ show n)).
 
   Definition new_void_id : GenLLVM instr_id
-    := n <- gets get_void;;
-       modify increment_void;;
-       ret (IVoid (Z.of_N n)).
+    := new_id (@num_void') (fun n => IVoid (Z.of_N n)).
 
   Definition new_block_id : GenLLVM block_id
-    := n <- gets get_blocks;;
-       modify increment_blocks;;
-       ret (Name ("b" ++ show n)).
+    := new_id (@num_blocks') (fun n => Name ("b" ++ show n)).
 
   Definition get_local_ctx : GenLLVM var_context
-    := gets (fun gs => gs.(gen_local_ctx)).
+    := use (gen_context' .@ is_local').
   
   Definition get_global_ctx : GenLLVM var_context
-    := gets (fun gs => gs.(gen_global_ctx)).
+    := use (gen_context' .@ is_local').
+
+  Definition merge_var_context (c1 : var_context) (c2 : var_context) : var_context
+    := IM.Raw.merge c1 c2.
 
   Definition get_ctx : GenLLVM var_context
     := lctx <- get_local_ctx;;
        gctx <- get_global_ctx;;
-       ret (gctx ++ lctx).
+       ret (merge_var_context gctx lctx).
 
   Definition get_typ_ctx : GenLLVM type_context
-    := gets (fun gs => gs.(gen_typ_ctx)).
+    := use (gen_context' .@ type_alias').
 
   Definition get_ptrtoint_ctx : GenLLVM ptr_to_int_context
-    := gets (fun gs => gs.(gen_ptrtoint_ctx)).
+    := use (gen_context' .@ from_pointer').
 
   (* Get all variable contexts that might need to be saved *)
   Definition get_variable_ctxs : GenLLVM all_var_contexts
@@ -379,18 +415,18 @@ Section GenerationState.
        ret (local_ctx, global_ctx, ptoi_ctx).
 
   Definition get_global_memo : GenLLVM (list (global typ))
-    := gets (fun gs => gs.(global_memo)).
+    := use (metadata .@ global_memo').
 
   Definition set_local_ctx (ctx : var_context) : GenLLVM unit
-    := modify (replace_local_ctx ctx);;
+    := (gen_context' .@ is_local') _ _ .= ctx;;
        ret tt.
 
   Definition set_global_ctx (ctx : var_context) : GenLLVM unit
-    := modify (replace_global_ctx ctx);;
+    := (gen_context' .@ is_global') _ _ .= ctx;;
        ret tt.
 
   Definition set_ptrtoint_ctx (ptoi_ctx : ptr_to_int_context) : GenLLVM unit
-    := modify (replace_ptrtoint_ctx ptoi_ctx);;
+    := (gen_context' .@ from_pointer') _ _ .= ptoi_ctx;;
        ret tt.
 
   Definition set_global_memo (memo : list (global typ)) : GenLLVM unit

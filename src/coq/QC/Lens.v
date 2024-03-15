@@ -22,6 +22,7 @@ apply (mkConst getConst0).
 Defined.
 
 Definition ASetter s t a b := (a -> IdentityMonad.ident b) -> s -> IdentityMonad.ident t.
+Definition ASetter' s a := (a -> IdentityMonad.ident a) -> s -> IdentityMonad.ident s.
 Definition LensLike (f : Type -> Type) s t a b := (a -> f b) -> s -> f t.
 Definition Lens s t a b := forall {f} `{F: Functor f}, (a -> f b) -> s -> f t.
 Definition Lens' s a := forall {f} `{F: Functor f}, (a -> f a) -> s -> f s.

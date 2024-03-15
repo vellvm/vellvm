@@ -18,7 +18,9 @@ Require Import ExtLib.Structures.Monads.
 Require Import ExtLib.Structures.Functor.
 Require Import ExtLib.Structures.Applicative.
 Require Import ExtLib.Structures.Traversable.
+Require Import ExtLib.Structures.MonadPlus.
 Import MonadNotation.
+Import MonadPlusNotation.
 Import ApplicativeNotation.
 Import FunctorNotation.
 Import ListNotations.
@@ -39,7 +41,7 @@ Variant Update (a : Type) :=
   | Unset
   | SetValue : a -> Update a.
 
-Instance Functor_Update : Functor Update.
+#[global] Instance Functor_Update : Functor Update.
 split.
 intros A B f ua.
 destruct ua eqn:Hua.
@@ -49,7 +51,7 @@ destruct ua eqn:Hua.
 Defined.
 
 (* TODO: Move to intmap library *)
-Instance Functor_IntMap : Functor IntMap.
+#[global] Instance Functor_IntMap : Functor IntMap.
 split.
 intros A B f ma.
 eapply IntMaps.IM.map. apply f.
@@ -57,7 +59,7 @@ apply ma.
 Defined.
 
 (* TODO: Move to intmap library *)
-Instance Functor_IntMapRaw : Functor IM.Raw.t.
+#[global] Instance Functor_IntMapRaw : Functor IM.Raw.t.
 split.
 intros A B f ma.
 eapply IM.Raw.map. apply f.
@@ -78,7 +80,7 @@ Definition Component (s : StorageType) (c : ComponentType) (a : Type) : Type :=
       end
   end.
 
-Instance Functor_Component {s c} : Functor (Component s c).
+#[global] Instance Functor_Component {s c} : Functor (Component s c).
 split.
 intros A B f.
 destruct s.
@@ -105,9 +107,22 @@ Record Metadata s :=
     ; from_pointer : Component s Field Ent
     }.
 
-Instance Default_Metadata {m} : Default (Metadata (WorldOf m)).
+Definition blankSetter : (Metadata SetterOf).
+  constructor.
+  all: apply Keep.
+Defined.
+
+Definition defFields : (Metadata FieldOf).
+  constructor.
+  all: apply None.
+Defined.
+
+#[global] Instance Default_Metadata {s} : Default (Metadata s).
 split.
-apply mkMetadata; apply IM.empty.
+destruct s.
+- apply defFields.
+- apply mkMetadata; apply IM.empty.
+- apply blankSetter.
 Defined.
 
 Record SystemState w m :=
@@ -117,10 +132,10 @@ Record SystemState w m :=
   ; systemStateMetadata : w (WorldOf m)
   }.
 
-Instance Default_IntSet : Default IS.t
+#[global] Instance Default_IntSet : Default IS.t
   := { def := IS.empty }.
 
-Instance Default_SystemState {w m} `{Default (w (WorldOf m))} : Default (SystemState w m)
+#[global] Instance Default_SystemState {w m} `{Default (w (WorldOf m))} : Default (SystemState w m)
   := { def := mkSystemState w m def def def }.
 
 Definition nextEnt {w m} : Lens' (SystemState w m) Z.
@@ -181,17 +196,17 @@ Definition metadata {w m} : Lens' (SystemState w m) (w (WorldOf m)).
 Defined.
 
 Definition SystemT W M A := stateT (SystemState W M) M A.
-Instance Monad_SystemT {w} {m} `{Monad m} : Monad (SystemT w m).
+#[global] Instance Monad_SystemT {w} {m} `{Monad m} : Monad (SystemT w m).
 unfold SystemT.
 apply Monad_stateT; auto.
 Defined.
 
-Instance MonadState_SystemT {w} {m} `{Monad m} : MonadState (SystemState w m) (SystemT w m).
+#[global] Instance MonadState_SystemT {w} {m} `{Monad m} : MonadState (SystemState w m) (SystemT w m).
 unfold SystemT.
 apply MonadState_stateT; auto.
 Defined.
 
-Instance MonadT_SystemT {w} {m} `{Monad m} : MonadT (SystemT w m) m.
+#[global] Instance MonadT_SystemT {w} {m} `{Monad m} : MonadT (SystemT w m) m.
 unfold SystemT.
 apply MonadT_stateT; auto.
 Defined.
@@ -240,16 +255,6 @@ Definition updateIntMapRaw {a} (u : Update a) k (m : IM.Raw.t a) : IM.Raw.t a
      | SetValue x => IM.Raw.add k x m
      end.
 
-Definition blankSetter : (Metadata SetterOf).
-  constructor.
-  all: apply Keep.
-Defined.
-
-Definition defFields : (Metadata FieldOf).
-  constructor.
-  all: apply None.
-Defined.
-
 Definition setEntity
   {m} `{Monad m} (entity : Ent) (setter : Metadata SetterOf) : SystemT Metadata m unit.
   refine
@@ -297,37 +302,191 @@ Definition is_global' {s : StorageType} : Lens' (Metadata s) (Component s Field 
   - apply is_global.
 Defined.
 
+Definition is_local' {s : StorageType} : Lens' (Metadata s) (Component s Field unit).
+  red.
+  intros f F afa w.
+  refine open_constr:((fun x => _) <$> afa (_ w)); try typeclasses_eauto.
+  - apply mkMetadata;
+      Control.dispatch
+        [ (fun _ => apply name)
+          ; (fun _ => apply type_alias)
+          ; (fun _ => apply variable_type)
+          ; (fun _ => apply x)
+          ; (fun _ => apply is_global)
+          ; (fun _ => apply is_non_deterministic)
+          ; (fun _ => apply from_pointer)
+        ];
+      apply w.
+  - apply is_local.
+Defined.
+
+Definition type_alias' {s : StorageType} : Lens' (Metadata s) (Component s Field typ).
+  red.
+  intros f F afa w.
+  refine open_constr:((fun x => _) <$> afa (_ w)); try typeclasses_eauto.
+  - apply mkMetadata;
+      Control.dispatch
+        [ (fun _ => apply name)
+          ; (fun _ => apply x)
+          ; (fun _ => apply variable_type)
+          ; (fun _ => apply is_local)
+          ; (fun _ => apply is_global)
+          ; (fun _ => apply is_non_deterministic)
+          ; (fun _ => apply from_pointer)
+        ];
+      apply w.
+  - apply type_alias.
+Defined.
+
+Definition variable_type' {s : StorageType} : Lens' (Metadata s) (Component s Field typ).
+  red.
+  intros f F afa w.
+  refine open_constr:((fun x => _) <$> afa (_ w)); try typeclasses_eauto.
+  - apply mkMetadata;
+      Control.dispatch
+        [ (fun _ => apply name)
+          ; (fun _ => apply type_alias)
+          ; (fun _ => apply x)
+          ; (fun _ => apply is_local)
+          ; (fun _ => apply is_global)
+          ; (fun _ => apply is_non_deterministic)
+          ; (fun _ => apply from_pointer)
+        ];
+      apply w.
+  - apply type_alias.
+Defined.
+
+Definition is_non_deterministic' {s : StorageType} : Lens' (Metadata s) (Component s Field unit).
+  red.
+  intros f F afa w.
+  refine open_constr:((fun x => _) <$> afa (_ w)); try typeclasses_eauto.
+  - apply mkMetadata;
+      Control.dispatch
+        [ (fun _ => apply name)
+          ; (fun _ => apply type_alias)
+          ; (fun _ => apply variable_type)
+          ; (fun _ => apply is_local)
+          ; (fun _ => apply is_global)
+          ; (fun _ => apply x)
+          ; (fun _ => apply from_pointer)
+        ];
+      apply w.
+  - apply is_non_deterministic.
+Defined.
+
+Definition from_pointer' {s : StorageType} : Lens' (Metadata s) (Component s Field Ent).
+  red.
+  intros f F afa w.
+  refine open_constr:((fun x => _) <$> afa (_ w)); try typeclasses_eauto.
+  - apply mkMetadata;
+      Control.dispatch
+        [ (fun _ => apply name)
+          ; (fun _ => apply type_alias)
+          ; (fun _ => apply variable_type)
+          ; (fun _ => apply is_local)
+          ; (fun _ => apply is_global)
+          ; (fun _ => apply is_non_deterministic)
+          ; (fun _ => apply x)
+        ];
+      apply w.
+  - apply from_pointer.
+Defined.
+
 Definition ident_to_raw_id (i : ident) :=
   match i with
   | ID_Global id => id
   | ID_Local id => id
   end.
 
-(* Virtual lens for setting global identifiers *)
-Definition global' {s : StorageType} : Lens' (Metadata s) (Component s Field raw_id).
-  red.
-  intros f F afa w.
-  refine open_constr:((fun x => _) <$> afa (_ w)); try typeclasses_eauto.
-  - apply mkMetadata;
-      Control.dispatch
-        [ (fun _ => apply (fmap ID_Global x))
-          ; (fun _ => apply type_alias)
-          ; (fun _ => apply variable_type)
-          ; (fun _ => apply is_local)
-          ; (fun _ => apply (fmap (fun _ => tt) x))
-          ; (fun _ => apply is_non_deterministic)
-          ; (fun _ => apply from_pointer)
-        ];
-      apply w.
-  - intros w'.
-    apply (fmap ident_to_raw_id (name _ w')).
-Defined.
+(* Merge taking the latter arguments' values if duplicates.
+   Unclear if IM.Raw.merge would have this property.
+ *)
+Definition IM_merge {a} (m1 : IM.Raw.t a) (m2 : IM.Raw.t a) : IM.Raw.t a
+  := IM.Raw.fold (IM.Raw.add (elt:=a)) m2 m1.
 
-Definition globals' {m} (w : Metadata (WorldOf m)) : list Ent.
-  apply is_global in w.
-  red in w.
-  apply (fmap (fun e => mkEnt (fst e)) (IM.Raw.elements w)).
-Defined.
+(* (* Virtual lens for setting global identifiers *) *)
+(* Definition global' {s : StorageType} : Lens' (Metadata s) (Component s Field Ent). *)
+(*   red. *)
+(*   intros f F afa w. *)
+(*   refine open_constr:((fun x => _) <$> afa (_ w)); try typeclasses_eauto. *)
+(*   - apply mkMetadata; *)
+(*       Control.dispatch *)
+(*         [ (fun _ => apply name) *)
+(*           ; (fun _ => apply type_alias) *)
+(*           ; (fun _ => apply variable_type) *)
+(*           ; (fun _ => apply is_local) *)
+(*           ; (fun _ => apply (fmap (fun _ => tt) x)) *)
+(*           ; (fun _ => apply is_non_deterministic) *)
+(*           ; (fun _ => apply from_pointer) *)
+(*         ]; *)
+(*       apply w. *)
+(*   - intros w'. *)
+(*     apply (global _ w). *)
+(*     apply (fmap ident_to_raw_id (name _ w')). *)
+(* Defined. *)
+
+(* Definition globals' {m} (w : Metadata (WorldOf m)) : list Ent. *)
+(*   apply is_global in w. *)
+(*   red in w. *)
+(*   apply (fmap (fun e => mkEnt (fst e)) (IM.Raw.elements w)). *)
+(* Defined. *)
+
+(* Definition local' {m} : Lens' (Metadata (WorldOf m)) (Component (WorldOf m) Field raw_id). *)
+(*   red. *)
+(*   intros f F afa w. *)
+(*   refine open_constr:((fun x => _) <$> afa (_ w)); try typeclasses_eauto. *)
+(*   - apply mkMetadata; *)
+(*       Control.dispatch *)
+(*         [ (fun _ => apply (IM.Raw.fold (IM.Raw.add (elt:=ident)) (fmap (fun g => ID_Local g) x) (name _ w))) *)
+(*           ; (fun _ => apply type_alias) *)
+(*           ; (fun _ => apply variable_type) *)
+(*           ; (fun _ => apply (fmap (fun _ => tt) x)) *)
+(*           ; (fun _ => apply is_global) *)
+(*           ; (fun _ => apply is_non_deterministic) *)
+(*           ; (fun _ => apply from_pointer) *)
+(*         ]; *)
+(*       apply w. *)
+(*   - intros w'. *)
+(*     apply (fmap ident_to_raw_id (name _ w')). *)
+(* Defined. *)
+
+(* Definition type_alias' {m} : Lens' (Metadata (WorldOf m)) (Component (WorldOf m) Field raw_id * Component (WorldOf m) Field typ). *)
+(*   red. *)
+(*   intros f F afa w. *)
+(*   refine open_constr:((fun x => _) <$> afa (_ w)); try typeclasses_eauto. *)
+(*   - apply mkMetadata; *)
+(*       Control.dispatch *)
+(*         [ (fun _ => apply (IM.Raw.fold (IM.Raw.add (elt:=ident)) (fmap (fun g => ID_Global g) (fst x)) (name _ w))) *)
+(*           ; (fun _ => apply (snd x)) *)
+(*           ; (fun _ => apply variable_type) *)
+(*           ; (fun _ => apply is_local) *)
+(*           ; (fun _ => apply is_global) *)
+(*           ; (fun _ => apply is_non_deterministic) *)
+(*           ; (fun _ => apply from_pointer) *)
+(*         ]; *)
+(*       apply w. *)
+(*   - intros w'. *)
+(*     apply (fmap ident_to_raw_id (name _ w'), (type_alias _ w')). *)
+(* Defined. *)
+
+(* Definition from_pointer' {m} : Lens' (Metadata (WorldOf m)) (Component (WorldOf m) Field Ent). *)
+(*   red. *)
+(*   intros f F afa w. *)
+(*   refine open_constr:((fun x => _) <$> afa (_ w)); try typeclasses_eauto. *)
+(*   - apply mkMetadata; *)
+(*       Control.dispatch *)
+(*         [ (fun _ => apply name) *)
+(*           ; (fun _ => apply type_alias) *)
+(*           ; (fun _ => apply variable_type) *)
+(*           ; (fun _ => apply is_local) *)
+(*           ; (fun _ => apply is_global) *)
+(*           ; (fun _ => apply is_non_deterministic) *)
+(*           ; (fun _ => apply (IM.Raw.fold (IM.Raw.add (elt:=Ent)) x (from_pointer _ w))) *)
+(*         ]; *)
+(*       apply w. *)
+(*   - intros w'. *)
+(*     apply (from_pointer _ w'). *)
+(* Defined. *)
 
 Definition traverseWithKeyRaw {t} `{Applicative t} {a b} (f : IM.Raw.key -> a -> t b) (m : IM.Raw.t a) : t (IM.Raw.t b)
   :=
@@ -342,7 +501,7 @@ Definition traverseWithKeyRaw {t} `{Applicative t} {a b} (f : IM.Raw.key -> a ->
   in
   go m.
 
-Instance Traversable_RawIntMap : Traversable IM.Raw.t.
+#[global] Instance Traversable_RawIntMap : Traversable IM.Raw.t.
 split.
 intros F Ap A B X X0.
 eapply traverseWithKeyRaw.
@@ -364,7 +523,7 @@ Definition traverseWithKey {t} `{Applicative t} {a b} (f : IM.key -> a -> t b) (
     apply (IM.add k).
 Defined.
 
-Instance Traversable_IntMap : Traversable IntMap.
+#[global] Instance Traversable_IntMap : Traversable IntMap.
 split.
 intros F Ap A B X X0.
 eapply traverseWithKey.
@@ -373,7 +532,7 @@ apply X.
 apply X0.
 Defined.
 
-Instance Traversable_option : Traversable option.
+#[global] Instance Traversable_option : Traversable option.
 split.
 intros F Ap A B X X0.
 destruct X0 eqn:Hx.
@@ -381,7 +540,7 @@ destruct X0 eqn:Hx.
 - apply (pure None).
 Defined.
 
-Instance Traversable_Update : Traversable Update.
+#[global] Instance Traversable_Update : Traversable Update.
 split.
 intros F Ap A B X X0.
 destruct X0 eqn:Hx.
@@ -390,7 +549,7 @@ destruct X0 eqn:Hx.
 - apply (SetValue _ <$> X a).
 Defined.
 
-Instance Traversable_Component {s c} : Traversable (Component s c).
+#[global] Instance Traversable_Component {s c} : Traversable (Component s c).
 split.
 intros F Ap A B X X0.
 destruct s; cbn in *.
@@ -443,12 +602,24 @@ Definition newEntity {m} `{Monad m} : SystemT Metadata m Ent
 Definition runSystemT {m} `{Monad m} {a} (w : Metadata (WorldOf m)) (sys : SystemT Metadata m a) : m a
   := evalStateT sys def.
 
+Definition add_global {m} `{Monad m} (name : string) : SystemT Metadata m _
+  := e <- newEntity;;
+     (metadata .@ entl e .@ is_global') _ _ .= ret tt;;
+     (metadata .@ entl e .@ name') _ _ .= ret (ID_Global (Name name));;
+     ret e.
+
+Definition add_local {m} `{Monad m} (name : string) : SystemT Metadata m _
+  := e <- newEntity;;
+     (metadata .@ entl e .@ is_local') _ _ .= ret tt;;
+     (metadata .@ entl e .@ name') _ _ .= ret (ID_Local (Name name));;
+     ret e.
+
 Definition test_system {m} `{HM: Monad m} : SystemT Metadata m _
   := e <- newEntity;;
      e2 <- newEntity;;
-     (metadata .@ entl e .@ global') _ _ .= ret (Name "blah");;
-     ent <- use (metadata .@ entl e);;
-     ret ent.
+     add_global "blah";;
+     add_local "foo";;
+     get.
 
 Definition ecs_test :=
   IdentityMonad.unIdent (runSystemT def test_system).
@@ -481,101 +652,17 @@ Defined.
 
 Eval compute in (over (ixs [1; 4] _ _) (fun x => 2 * x) [1; 2; 3; 4; 5]).
 Eval compute in (over (firstAndThird _ _) length ("one", 2, "three")).
-Goal Lens (string * nat * string) (nat * nat * nat) string nat.
-  red.
-  intros f F X H.
-  eapply firstAndThird.
-  assert open_constr:(over _ length ("one", 2, "three") = (3, 2, 5)).
-  red.
-  intros f F X H.
 
-  eapply firstAndThird; try typeclasses_eauto.
-  pose open_constr:(over _ _ firstAndThird length ("one", 2, "three")).
-Eval compute in .
-
-Definition names'' {m} : Traversal (Metadata (WorldOf m)) (Metadata (WorldOf m)) (list ident) (list ident).
+Definition names'' {m} : Traversal (Metadata (WorldOf m)) (Metadata (WorldOf m)) (Component (WorldOf m) Field ident) (Component (WorldOf m) Field ident).
   red.
   intros f F focus meta.
-  cbn in *.
-  remember meta.
-  clear Heqm0.
-  apply name in m0.
-  red in m0.
-  eapply mapT in m0.
-  2: intros x; apply (focus [x]).
-  eapply fmap.
-  2: apply m0.
-  intros ?.
-  eapply ap.
-
-    
-  eapply mapT in m0.
-  2: apply pure.
-  eapply ap.
-  2: apply m0.
-  eapply (@fmap f _ _ _ _).
-  apply m0.
-  Unshelve.
-  
-  
-  eapply mapT in focus.
-  eapply fmap.
-  2: apply focus.
-  eapply ap.
-  2: apply focus.
-  2: apply (name _ meta).
-  eapply fmap.
-  2: apply (pure tt).
-  intros H X.
-  apply meta.
-Defined.
-
-  
-  destruct s.
-  admit.
-  2: admit.
-  remember meta.
-  destruct meta.
-  cbn in *.
-  eapply ap.
-  2: apply focus.
-  2: apply name0.
-  eapply fmap.
-  intros X X0.
-  apply m.
-  apply (pure tt).
-
-  2: apply pure.
-  2: eapply mapT.
-  2: eapply fmap. mapT.
-  2: apply focus.
-  eapply fmap.
-  
-  2: intros; apply focus.
-  a
-  2: {
-
-  }
-  destruct meta.
-  destruct s; cbn in *.
-
-Definition globals'' {s : StorageType} : Traversal (Metadata s) (Metadata s) (Component s Field Ent) (Component s Field Ent).
-  red.
-  intros f F.
-  apply traversal.
-  intros focus meta.
-  destruct meta.
-  destruct s; cbn in *.
-  - 
-  eapply mapT in is_global0.
-  
-  destruct s.
-  cbn in *.
-  
-  Check @mapT list _ f F _ _ focus.
-  
-Check mapT.
-
-  eapply mapT.
-  refine open_constr:((fun x => _) <$> afa (_ w)); try typeclasses_eauto.
+  refine open_constr:(pure (mkMetadata (WorldOf m)) <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _);
+    try typeclasses_eauto.
+  - apply (focus (name _ meta)).
+  - apply (pure (type_alias _ meta)).
+  - apply (pure (variable_type _ meta)).
+  - apply (pure (is_local _ meta)).
+  - apply (pure (is_global _ meta)).
+  - apply (pure (is_non_deterministic _ meta)).
+  - apply (pure (from_pointer _ meta)).
 Defined.
