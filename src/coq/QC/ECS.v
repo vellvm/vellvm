@@ -135,10 +135,18 @@ Record SystemState w m :=
 #[global] Instance Default_IntSet : Default IS.t
   := { def := IS.empty }.
 
+#[global] Instance Default_IntMapRaw {e} : Default (@IM.Raw.t e)
+  := { def := IM.Raw.empty _ }.
+
 #[global] Instance Default_SystemState {w m} `{Default (w (WorldOf m))} : Default (SystemState w m)
   := { def := mkSystemState w m def def def }.
 
-Definition nextEnt {w m} : Lens' (SystemState w m) Z.
+Class EntityStore (Store : Type) : Type := 
+  { nextEnt : Lens' Store Z
+  ; entities : Lens' Store IS.t
+  }.
+
+Definition nextEntSystem {w m} : Lens' (SystemState w m) Z.
   red.
   intros f F afa w'.
 
@@ -157,7 +165,7 @@ Definition nextEnt {w m} : Lens' (SystemState w m) Z.
     apply systemStateNextEnt0.
 Defined.
 
-Definition entities {w m} : Lens' (SystemState w m) IS.t.
+Definition entitiesSystem {w m} : Lens' (SystemState w m) IS.t.
   red.
   intros f F afa w'.
 
@@ -176,23 +184,34 @@ Definition entities {w m} : Lens' (SystemState w m) IS.t.
     apply systemStateEntities0.
 Defined.
 
-Definition metadata {w m} : Lens' (SystemState w m) (w (WorldOf m)).
-  red.
-  intros f F afa w'.
+#[global] Instance EntityStore_SystemState {w m} : EntityStore (SystemState w m).
+split.
+apply nextEntSystem.
+apply entitiesSystem.
+Defined.
 
-  refine
-    open_constr:
-      ((fun x => _) <$> afa (_ w')); try typeclasses_eauto.
-  - constructor;
-      Control.dispatch
-        [ (fun _ => eapply systemStateNextEnt)
-          ; (fun _ => eapply systemStateEntities)
-          ; (fun _ => eapply x)
-        ];
-      apply w'.
-  - intros w''.
-    destruct w''.
-    apply systemStateMetadata0.
+Class MetadataStore {m} (Meta : _) (Store : Type) : Type :=
+  { metadata : Lens' Store (Meta (WorldOf m))
+  }.
+
+#[global] Instance MetadataStore_SystemState {w m} : @MetadataStore m w (SystemState w m).
+split.
+red.
+intros f F afa w'.
+
+refine
+  open_constr:
+    ((fun x => _) <$> afa (_ w')); try typeclasses_eauto.
+- constructor;
+    Control.dispatch
+      [ (fun _ => eapply systemStateNextEnt)
+        ; (fun _ => eapply systemStateEntities)
+        ; (fun _ => eapply x)
+      ];
+    apply w'.
+- intros w''.
+  destruct w''.
+  apply systemStateMetadata0.
 Defined.
 
 Definition SystemT W M A := stateT (SystemState W M) M A.
@@ -593,11 +612,15 @@ Definition entl {m} `{HM: Monad m} (e : Ent) : Lens' (Metadata (WorldOf m)) (Met
       Control.dispatch metadataConstructors.
 Defined.
 
-Definition newEntity {m} `{Monad m} : SystemT Metadata m Ent
+Definition newEntity {w} {m} `{Monad m} : SystemT w m Ent
   := i <- use nextEnt;;
      nextEnt _ _ .= Z.succ i;;
      entities _ _ %= (fun ents => IS.add i ents);;
      ret (mkEnt i).
+
+Definition deleteEntity {w} {m} `{Monad m} `{@MetadataStore m Metadata (SystemState w m)} (e : Ent) : SystemT w m unit
+  := (metadata .@ entl e) _ _ .= def;;
+     ret tt.
 
 Definition runSystemT {m} `{Monad m} {a} (w : Metadata (WorldOf m)) (sys : SystemT Metadata m a) : m a
   := evalStateT sys def.

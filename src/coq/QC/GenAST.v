@@ -206,7 +206,7 @@ Section GenerationState.
     ; num_blocks : N
     ; context : ContextMetadata s
     ; global_memo : list (global typ)
-    ; debug : list string
+    ; debug_stack : list string
     }.
 
   Instance Default_GenState {s} : Default (GenState s)
@@ -217,7 +217,7 @@ Section GenerationState.
              ; num_blocks := 0
              ; context := def
              ; global_memo := []
-             ; debug := []
+             ; debug_stack := []
              |}
     }.
 
@@ -232,7 +232,7 @@ Section GenerationState.
         | apply (num_blocks s)
         | apply (context s)
         | apply (global_memo s)
-        | apply (debug s)
+        | apply (debug_stack s)
         ]; apply gs.
     - apply num_void.
   Defined.
@@ -248,7 +248,7 @@ Section GenerationState.
         | apply (num_blocks s)
         | apply (context s)
         | apply (global_memo s)
-        | apply (debug s)
+        | apply (debug_stack s)
         ]; apply gs.
     - apply num_raw.
   Defined.
@@ -264,7 +264,7 @@ Section GenerationState.
         | apply (num_blocks s)
         | apply (context s)
         | apply (global_memo s)
-        | apply (debug s)
+        | apply (debug_stack s)
         ]; apply gs.
     - apply num_global.
   Defined.
@@ -280,7 +280,7 @@ Section GenerationState.
         | apply x
         | apply (context s)
         | apply (global_memo s)
-        | apply (debug s)
+        | apply (debug_stack s)
         ]; apply gs.
     - apply num_blocks.
   Defined.
@@ -296,7 +296,7 @@ Section GenerationState.
         | apply (num_blocks s)
         | apply x
         | apply (global_memo s)
-        | apply (debug s)
+        | apply (debug_stack s)
         ]; apply gs.
     - apply context.
   Defined.
@@ -312,10 +312,27 @@ Section GenerationState.
         | apply (num_blocks s)
         | apply (context s)
         | apply x
-        | apply (debug s)
+        | apply (debug_stack s)
         ]; apply gs.
     - apply global_memo.
   Defined.
+
+  Definition debug_stack' {s} : Lens' (GenState s) (list string).
+    red.
+    intros f F afa gs.
+    refine ((fun x => _) <$> afa (_ gs)); try typeclasses eauto.
+    - apply mkGenState;
+        [ apply (num_void s)
+        | apply (num_raw s)
+        | apply (num_global s)
+        | apply (num_blocks s)
+        | apply (context s)
+        | apply (global_memo s)
+        | apply x
+        ]; apply gs.
+    - apply debug_stack.
+  Defined.
+
 
   Definition increment_raw {s} (gs : GenState s) : GenState s
     := gs & num_raw' _ _ %~ N.succ.
@@ -331,6 +348,9 @@ Section GenerationState.
 
   Definition replace_local_ctx {s} (ctx : Component s Field unit) (gs : GenState s) : GenState s
     := gs & (context' .@  is_local') _ _ .~ ctx.
+
+  Definition replace_global_ctx {s} (ctx : Component s Field unit) (gs : GenState s) : GenState s
+    := gs & (context' .@  is_global') _ _ .~ ctx.
 
   Definition replace_typ_ctx {s} (typ_ctx : Component s Field typ) (gs : GenState s) : GenState s
     := gs & (context' .@ type_alias') _ _ .~ typ_ctx.
@@ -430,7 +450,11 @@ Section GenerationState.
        ret tt.
 
   Definition set_global_memo (memo : list (global typ)) : GenLLVM unit
-    := modify (replace_global_memo memo);;
+    := (metadata .@ global_memo') _ _ .= memo;;
+       ret tt.
+
+  Definition add_to_global_memo (x : (global typ)) : GenLLVM unit
+    := (metadata .@ global_memo') _ _ %= (fun memo => x :: memo);;
        ret tt.
 
   Definition restore_variable_ctxs (ctxs : all_var_contexts) : GenLLVM unit
@@ -448,10 +472,10 @@ Section GenerationState.
            set_ptrtoint_ctx ptoi_ctx
        end.
   
-  #[global] Instance STGST : Monad (stateT GenState G).
-  apply Monad_stateT.
-  typeclasses eauto.
-  Defined.
+  (* #[global] Instance STGST : Monad (stateT GenState G). *)
+  (* apply Monad_stateT. *)
+  (* typeclasses eauto. *)
+  (* Defined. *)
 
   #[global] Instance MGEN : Monad GenLLVM.
   unfold GenLLVM.
@@ -468,16 +492,27 @@ Section GenerationState.
     apply mkEitherT.
     apply mkStateT.
     (* intros. *)
-    refine (fun stack => _).
-    apply mkStateT.
-    refine (fun st => a <- g ;; ret _).
-    exact (inr a, stack, st).
+    refine (fun st => _).
+    refine (a <- g ;; ret _).
+    exact (inr a, st).
   Defined.
   
   #[global] Instance MGENT: MonadT GenLLVM G.
   unfold GenLLVM.
   constructor.
   exact @lift_GenLLVM.
+  Defined.
+
+  Definition lift_system_GenLLVM {A} (system : SystemT GenState G A) : GenLLVM A.
+    unfold GenLLVM.
+    apply mkEitherT.
+    apply (fmap ret system).
+  Defined.
+
+  #[global] Instance MGENTSYSTEM: MonadT GenLLVM (SystemT GenState G).
+  unfold GenLLVM.
+  constructor.
+  exact @lift_system_GenLLVM.
   Defined.
   
   (* SAZ: 
@@ -494,64 +529,12 @@ Section GenerationState.
     exact (ret (inl (s), stack)).
   Defined.
 
-  (* Definition popStack {A : Type} (g:GenLLVM A) : stateT (list string) (stateT GenState G) A. *)
-  
-  
-  (* Definition debugGen {A:Type} (g :GenLLVM A) : GenLLVM A. *)
-  (*   unfold GenLLVM. *)
-  (*   apply mkEitherT. *)
-  (*   apply mkStateT. *)
-  (*   refine (fun stack => _). *)
-  (*   apply mkStateT. *)
-  (*   refine (fun st => a <- g ;; ret _). *)
-
-  (* Definition annotate {A : Type} (s:string) (g : GenLLVM A) : GenLLVM A := *)
-  (*   mkEitherT *)
-  (*     (mkStateT (fun stack => *)
-  (*                  (mkStateT (fun st => *)
-  (*                               let opt := unEitherT g in *)
-  (*                               let ann := runStateT opt (s::stack) in *)
-  (*                               let ans := runStateT ann st in ans *)
-  (*                  )) *)
-  (*     )). *)
-  
-  Definition annotate {A:Type} (s:string) (g : GenLLVM A) : GenLLVM A.
-    apply mkEitherT.
-    apply mkStateT.
-    refine (fun stack => _).
-    apply mkStateT.
-    refine (fun s => _).
-    (* refine (let opt := unEitherT g in _). *)
-    (* refine (let ann := runStateT opt (s0::stack) in _). *)
-    (* refine (let ans := runStateT ann s in _). *)
-    (* refine ans. *)
-    refine (let opt := unEitherT g in
-            let ann := runStateT opt (s0::stack) in
-            let ans := runStateT ann s in
-            ans
-           ).
-  Defined.
+  Definition annotate {A:Type} (s:string) (g : GenLLVM A) : GenLLVM A
+    := (metadata .@ debug_stack') _ _ %= (fun stack => s :: stack);;
+       g.
 
   Definition annotate_debug (s : string) : GenLLVM unit :=
     annotate s (ret tt).
-
-  (* Definition pre_annotate {A:Type} (s:string) (g : GenLLVM A) : GenLLVM A. *)
-  (*   apply mkEitherT. *)
-  (*   apply mkStateT. *)
-  (*   refine (fun stack => _). *)
-  (*   apply mkStateT. *)
-  (*   refine (fun s => _). *)
-  (*   (* refine (let opt := unEitherT g in _). *) *)
-  (*   (* refine (let ann := runStateT opt (s0::stack) in _). *) *)
-  (*   (* refine (let ans := runStateT ann s in _). *) *)
-  (*   (* refine ans. *) *)
-  (*   refine (let stack' := s0::stack in *)
-  (*           let opt := unEitherT g in *)
-  (*           let ann := runStateT opt (stack') in *)
-  (*           let ans := runStateT ann s in *)
-  (*           ans *)
-  (*          ). *)
-  (* Defined. *)
 
   Definition dup_string_wrt_nat (s : string) (n : nat) :=
     let fix dup_string_wrt_nat_tail_recur (acc : string) (n : nat):=
@@ -560,120 +543,92 @@ Section GenerationState.
       | S z => dup_string_wrt_nat_tail_recur (s ++ acc)%string z
       end in dup_string_wrt_nat_tail_recur "" n.
 
-  (* Definition gen_annotate {A: Type} (placement s : string) (g : GenLLVM A) : GenLLVM A := *)
-  (*   _ <- annotate *)
-  (*     (placement ++ "Generate :" ++ s) *)
-  (*     ( *)
-  (*       ret nil *)
-  (*     );; *)
-  (*   annotate (placement ++ "FinishGN : " ++ s) *)
-  (*     (g) *)
-  (* . *)
-  
-  
-  (* Definition flush {A : Type} (g : GenLLVM A) : GenLLVM A. *)
-  (*   unfold GenLLVM. *)
-  (*   apply mkEitherT. *)
-  (*   apply mkStateT. *)
-  (*   refine (fun stack => _). *)
-  (*   refine (let debug := fold_right (fun m gen_msg => (m ++ "\n" ++ gen_msg)%string) EmptyString stack in _). *)
-  (*   refine (ret _). *)
-
-  (* TODO: Do we need this? *)
-  Definition filter_global_from_variable_ctxs (ctxs : all_var_contexts) : (var_context * ptr_to_int_context)
-    := let is_global_id (id: ident) :=
-         match id with
-         | ID_Global _ => true
-         | ID_Local _ => false
-         end in
-       match ctxs with
-       | (local_ctx, global_ctx, ptoi_ctx) =>
-           let globals_in_ptoi_ctx := filter (fun '(_, id, _) => is_global_id id) ptoi_ctx in
-           (global_ctx, globals_in_ptoi_ctx)
-       end.
-
   Definition add_to_local_ctx (x : (ident * typ)) : GenLLVM unit
-    := local_ctx <- get_local_ctx;;
-       let new_ctx := x :: local_ctx in
-       modify (replace_local_ctx new_ctx);;
+    := e <- lift newEntity;;
+       (gen_context' .@ entl e .@ is_local') _ _ .= ret tt;;
+       (gen_context' .@ entl e .@ name') _ _ .= ret (fst x);;
+       (gen_context' .@ entl e .@ variable_type') _ _ .= ret (snd x);;
        ret tt.
 
   Definition add_to_global_ctx (x : (ident * typ)) : GenLLVM unit
-    := global_ctx <- get_global_ctx;;
-       let new_ctx := x :: global_ctx in
-       modify (replace_global_ctx new_ctx);;
+    := e <- lift newEntity;;
+       (gen_context' .@ entl e .@ is_global') _ _ .= ret tt;;
+       (gen_context' .@ entl e .@ name') _ _ .= ret (fst x);;
+       (gen_context' .@ entl e .@ variable_type') _ _ .= ret (snd x);;
        ret tt.
 
   Definition add_to_typ_ctx (x : (ident * typ)) : GenLLVM unit
-    := ctx <- get_typ_ctx;;
-       let new_ctx := x :: ctx in
-       modify (replace_typ_ctx new_ctx);;
+    := e <- lift newEntity;;
+       (gen_context' .@ entl e .@ name') _ _ .= ret (fst x);;
+       (gen_context' .@ entl e .@ type_alias') _ _ .= ret (snd x);;
        ret tt.
 
-  Definition add_to_ptrtoint_ctx (x : (typ * ident * typ)) : GenLLVM unit
-    := ctx <- get_ptrtoint_ctx;;
-       let new_ctx := x :: ctx in
-       modify (replace_ptrtoint_ctx new_ctx);;
+  (* Should this be a local? *)
+  Definition add_to_ptrtoint_ctx (x : (typ * ident * Ent)) : GenLLVM unit
+    := let '(t, name, ptr) := x in
+       e <- lift newEntity;;
+       (gen_context' .@ entl e .@ name') _ _ .= ret name;;
+       (gen_context' .@ entl e .@ is_local') _ _ .= ret tt;;
+       (gen_context' .@ entl e .@ from_pointer') _ _ .= ret ptr;;
        ret tt.
 
-  Definition add_to_global_memo (x : (global typ)) : GenLLVM unit
-    := memo <- get_global_memo;;
-       let new_memo := x :: memo in
-       modify (replace_global_memo new_memo);;
-       ret tt.
+  (* Definition append_to_local_ctx (vars :list (ident * typ)) : GenLLVM unit *)
+  (*   := local_ctx <- get_local_ctx;; *)
+  (*      let new_ctx := vars ++ local_ctx in *)
+  (*      modify (replace_local_ctx new_ctx);; *)
+  (*      ret tt. *)
 
-  Definition append_to_local_ctx (vars :list (ident * typ)) : GenLLVM unit
-    := local_ctx <- get_local_ctx;;
-       let new_ctx := vars ++ local_ctx in
-       modify (replace_local_ctx new_ctx);;
-       ret tt.
+  (* Definition append_to_global_ctx (vars : list (ident * typ)) : GenLLVM unit *)
+  (*   := global_ctx <- get_global_ctx;; *)
+  (*      let new_ctx := vars ++ global_ctx in *)
+  (*      modify (replace_global_ctx new_ctx);; *)
+  (*      ret tt. *)
 
-  Definition append_to_global_ctx (vars : list (ident * typ)) : GenLLVM unit
-    := global_ctx <- get_global_ctx;;
-       let new_ctx := vars ++ global_ctx in
-       modify (replace_global_ctx new_ctx);;
-       ret tt.
+  (* Definition append_to_typ_ctx (aliases : list (ident * typ)) : GenLLVM unit *)
+  (*   := ctx <- get_typ_ctx;; *)
+  (*      let new_ctx := (aliases ++ ctx)%list in *)
+  (*      modify (replace_typ_ctx new_ctx);; *)
+  (*      ret tt. *)
 
-  Definition append_to_typ_ctx (aliases : list (ident * typ)) : GenLLVM unit
-    := ctx <- get_typ_ctx;;
-       let new_ctx := (aliases ++ ctx)%list in
-       modify (replace_typ_ctx new_ctx);;
-       ret tt.
+  (* Definition append_to_ptrtoint_ctx (aliases : list (typ * ident * typ)) : GenLLVM unit *)
+  (*   := ctx <- get_ptrtoint_ctx;; *)
+  (*      let new_ctx := (aliases ++ ctx)%list in *)
+  (*      modify (replace_ptrtoint_ctx new_ctx);; *)
+  (*      ret tt. *)
 
-  Definition append_to_ptrtoint_ctx (aliases : list (typ * ident * typ)) : GenLLVM unit
-    := ctx <- get_ptrtoint_ctx;;
-       let new_ctx := (aliases ++ ctx)%list in
-       modify (replace_ptrtoint_ctx new_ctx);;
-       ret tt.
-
-  Definition append_to_global_memo (vars : list (global typ)) : GenLLVM unit
-    := memo <- get_global_memo;;
-       let new_memo := vars ++ memo in
-       modify (replace_global_memo new_memo);;
-       ret tt.
+  (* Definition append_to_global_memo (vars : list (global typ)) : GenLLVM unit *)
+  (*   := memo <- get_global_memo;; *)
+  (*      let new_memo := vars ++ memo in *)
+  (*      modify (replace_global_memo new_memo);; *)
+  (*      ret tt. *)
 
   Definition reset_local_ctx : GenLLVM unit
-    := modify (replace_local_ctx []);; ret tt.
+    := (gen_context' .@ is_local') _ _ .= def;;
+       ret tt.
 
   Definition reset_global_ctx : GenLLVM unit
-    := modify (replace_global_ctx []);; ret tt.
+    := (gen_context' .@ is_global') _ _ .= def;;
+       ret tt.
   
   Definition reset_ctx : GenLLVM unit
     := reset_local_ctx;;
        reset_global_ctx.
 
   Definition reset_typ_ctx : GenLLVM unit
-    := modify (replace_typ_ctx []);; ret tt.
+    := (gen_context' .@ type_alias') _ _ .= def;;
+       ret tt.
 
+  (* I don't think this does the right thing. I need to remove the
+     entities associated with a ptoi cast, otherwise I'm effectively
+     just losing the tag and could use the variables in the wrong
+     place.
+   *)
   Definition reset_ptrtoint_ctx : GenLLVM unit
-    := modify (replace_ptrtoint_ctx []);; ret tt.
+    := (gen_context' .@ from_pointer') _ _ .= def;;
+       ret tt.
 
   Definition reset_global_memo : GenLLVM unit
-    := modify (replace_global_memo []);; ret tt.
-
-  Definition rev_global_ctx : GenLLVM unit
-    := global_ctx <- get_global_ctx;;
-       modify (replace_global_ctx (rev global_ctx));;
+    := (metadata .@ global_memo') _ _ .= def;;
        ret tt.
   
   Definition hide_local_ctx {A} (g : GenLLVM A) : GenLLVM A
