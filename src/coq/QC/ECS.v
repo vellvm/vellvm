@@ -111,7 +111,22 @@ Record Metadata s :=
     ; is_local : Component s Field unit
     ; is_global : Component s Field unit
     ; is_non_deterministic : Component s Field unit
+    (* Whether the variable is the result of a pointer cast *)
     ; from_pointer : Component s Field Ent
+    (* Whether the variable has a pointer type *)
+    ; is_pointer : Component s Field unit
+    (* Whether the variable is a pointer to sized type *)
+    ; is_sized_pointer : Component s Field unit
+    (* Whether the variable is of a sized type *)
+    ; is_sized : Component s Field unit
+    (* Whether the variable is an aggregate type *)
+    ; is_aggregate : Component s Field unit
+    (* Whether the variable is a vector type *)
+    ; is_vector : Component s Field unit
+    (* Whether the variable is an array type *)
+    ; is_array : Component s Field unit
+    (* Whether the variable is a structure type *)
+    ; is_struct : Component s Field unit
     }.
 
 Definition blankSetter : (Metadata SetterOf).
@@ -245,6 +260,13 @@ Ltac2 metadataConstructors :=
   ; (fun _ => apply is_global)
   ; (fun _ => apply is_non_deterministic)
   ; (fun _ => apply from_pointer)
+  ; (fun _ => apply is_pointer)
+  ; (fun _ => apply is_sized_pointer)
+  ; (fun _ => apply is_sized)
+  ; (fun _ => apply is_aggregate)
+  ; (fun _ => apply is_vector)
+  ; (fun _ => apply is_array)
+  ; (fun _ => apply is_struct)
   ].
 
 Ltac2 applyMetadataConstructors (tac : unit -> unit) :=
@@ -256,6 +278,13 @@ Ltac2 applyMetadataConstructors (tac : unit -> unit) :=
       ; (fun _ => tac (); apply is_global)
       ; (fun _ => tac (); apply is_non_deterministic)
       ; (fun _ => tac (); apply from_pointer)
+      ; (fun _ => tac (); apply is_pointer)
+      ; (fun _ => tac (); apply is_sized_pointer)
+      ; (fun _ => tac (); apply is_sized)
+      ; (fun _ => tac (); apply is_aggregate)
+      ; (fun _ => tac (); apply is_vector)
+      ; (fun _ => tac (); apply is_array)
+      ; (fun _ => tac (); apply is_struct)
     ].  
 
 Definition getEntity {w m} `{Monad m} `{@MetadataStore m Metadata (SystemState w m)}
@@ -325,6 +354,13 @@ Definition name' {s : StorageType} : Lens' (Metadata s) (Component s Field ident
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
           ; (fun _ => apply from_pointer)
+          ; (fun _ => apply is_pointer)
+          ; (fun _ => apply is_sized_pointer)
+          ; (fun _ => apply is_sized)
+          ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_vector)
+          ; (fun _ => apply is_array)
+          ; (fun _ => apply is_struct)
         ];
       apply w.
   - apply name.
@@ -343,6 +379,13 @@ Definition is_global' {s : StorageType} : Lens' (Metadata s) (Component s Field 
           ; (fun _ => apply x)
           ; (fun _ => apply is_non_deterministic)
           ; (fun _ => apply from_pointer)
+          ; (fun _ => apply is_pointer)
+          ; (fun _ => apply is_sized_pointer)
+          ; (fun _ => apply is_sized)
+          ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_vector)
+          ; (fun _ => apply is_array)
+          ; (fun _ => apply is_struct)
         ];
       apply w.
   - apply is_global.
@@ -361,6 +404,13 @@ Definition is_local' {s : StorageType} : Lens' (Metadata s) (Component s Field u
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
           ; (fun _ => apply from_pointer)
+          ; (fun _ => apply is_pointer)
+          ; (fun _ => apply is_sized_pointer)
+          ; (fun _ => apply is_sized)
+          ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_vector)
+          ; (fun _ => apply is_array)
+          ; (fun _ => apply is_struct)
         ];
       apply w.
   - apply is_local.
@@ -379,6 +429,13 @@ Definition type_alias' {s : StorageType} : Lens' (Metadata s) (Component s Field
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
           ; (fun _ => apply from_pointer)
+          ; (fun _ => apply is_pointer)
+          ; (fun _ => apply is_sized_pointer)
+          ; (fun _ => apply is_sized)
+          ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_vector)
+          ; (fun _ => apply is_array)
+          ; (fun _ => apply is_struct)
         ];
       apply w.
   - apply type_alias.
@@ -397,6 +454,13 @@ Definition variable_type' {s : StorageType} : Lens' (Metadata s) (Component s Fi
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
           ; (fun _ => apply from_pointer)
+          ; (fun _ => apply is_pointer)
+          ; (fun _ => apply is_sized_pointer)
+          ; (fun _ => apply is_sized)
+          ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_vector)
+          ; (fun _ => apply is_array)
+          ; (fun _ => apply is_struct)
         ];
       apply w.
   - apply type_alias.
@@ -415,6 +479,13 @@ Definition is_non_deterministic' {s : StorageType} : Lens' (Metadata s) (Compone
           ; (fun _ => apply is_global)
           ; (fun _ => apply x)
           ; (fun _ => apply from_pointer)
+          ; (fun _ => apply is_pointer)
+          ; (fun _ => apply is_sized_pointer)
+          ; (fun _ => apply is_sized)
+          ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_vector)
+          ; (fun _ => apply is_array)
+          ; (fun _ => apply is_struct)
         ];
       apply w.
   - apply is_non_deterministic.
@@ -433,6 +504,13 @@ Definition from_pointer' {s : StorageType} : Lens' (Metadata s) (Component s Fie
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
           ; (fun _ => apply x)
+          ; (fun _ => apply is_pointer)
+          ; (fun _ => apply is_sized_pointer)
+          ; (fun _ => apply is_sized)
+          ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_vector)
+          ; (fun _ => apply is_array)
+          ; (fun _ => apply is_struct)
         ];
       apply w.
   - apply from_pointer.
@@ -679,7 +757,8 @@ Defined.
 Definition names'' {m} : Traversal (Metadata (WorldOf m)) (Metadata (WorldOf m)) (Component (WorldOf m) Field ident) (Component (WorldOf m) Field ident).
   red.
   intros f F focus meta.
-  refine open_constr:(pure (mkMetadata (WorldOf m)) <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _);
+  refine open_constr:(pure (mkMetadata (WorldOf m)) <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _
+                     <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _);
     try typeclasses_eauto.
   - apply (focus (name _ meta)).
   - apply (pure (type_alias _ meta)).
@@ -688,6 +767,13 @@ Definition names'' {m} : Traversal (Metadata (WorldOf m)) (Metadata (WorldOf m))
   - apply (pure (is_global _ meta)).
   - apply (pure (is_non_deterministic _ meta)).
   - apply (pure (from_pointer _ meta)).
+  - apply (pure (is_pointer _ meta)).
+  - apply (pure (is_sized_pointer _ meta)).
+  - apply (pure (is_sized _ meta)).
+  - apply (pure (is_aggregate _ meta)).
+  - apply (pure (is_vector _ meta)).
+  - apply (pure (is_array _ meta)).
+  - apply (pure (is_struct _ meta)).
 Defined.
 
 Record QueryT w m a : Type :=
