@@ -66,6 +66,20 @@ Defined.
 Definition traversal {f s t a b} (tr : (a -> f b) -> s -> f t) : LensLike f s t a b
   := tr.
 
+Definition lens_to_asetter {s t a b} : Lens s t a b -> ASetter s t a b.
+  intros l.
+  specialize (l IdentityMonad.ident _).
+  red. apply l.
+Defined.
+
+Definition lens'_to_lens {s a} : Lens' s a -> Lens s s a a.
+  intros l.
+  apply l.
+Defined.
+
+#[global] Coercion lens_to_asetter : Lens >-> ASetter.
+#[global] Coercion lens'_to_lens : Lens' >-> Lens.
+
 Module LensNotations.
   Declare Scope lens_scope.
   Delimit Scope lens_scope with lens.

@@ -337,31 +337,31 @@ Section GenerationState.
 
 
   Definition increment_raw {s} (gs : GenState s) : GenState s
-    := gs & num_raw' _ _ %~ N.succ.
+    := gs & num_raw' %~ N.succ.
 
   Definition increment_global {s} (gs : GenState s) : GenState s
-    := gs & num_global' _ _ %~ N.succ.
+    := gs & num_global' %~ N.succ.
 
   Definition increment_void {s} (gs : GenState s) : GenState s
-    := gs & num_void' _ _ %~ N.succ.
+    := gs & num_void' %~ N.succ.
 
   Definition increment_blocks {s} (gs : GenState s) : GenState s
-    := gs & num_blocks' _ _ %~ N.succ.
+    := gs & num_blocks' %~ N.succ.
 
   Definition replace_local_ctx {s} (ctx : Component s Field unit) (gs : GenState s) : GenState s
-    := gs & (context' .@  is_local') _ _ .~ ctx.
+    := gs & (context' .@  is_local') .~ ctx.
 
   Definition replace_global_ctx {s} (ctx : Component s Field unit) (gs : GenState s) : GenState s
-    := gs & (context' .@  is_global') _ _ .~ ctx.
+    := gs & (context' .@  is_global') .~ ctx.
 
   Definition replace_typ_ctx {s} (typ_ctx : Component s Field typ) (gs : GenState s) : GenState s
-    := gs & (context' .@ type_alias') _ _ .~ typ_ctx.
+    := gs & (context' .@ type_alias') .~ typ_ctx.
 
   Definition replace_ptrtoint_ctx {s} (ptrtoint_ctx : Component s Field Ent) (gs: GenState s) : GenState s
-    := gs & (context' .@ from_pointer') _ _ .~ ptrtoint_ctx.
+    := gs & (context' .@ from_pointer') .~ ptrtoint_ctx.
 
   Definition replace_global_memo {s} (global_memo : list (global typ)) (gs : GenState s) : GenState s
-    := gs & global_memo' _ _ .~ global_memo.
+    := gs & global_memo' .~ global_memo.
 
   Definition GenLLVM := (eitherT string (SystemT GenState G)).
   
@@ -394,7 +394,7 @@ Section GenerationState.
 
   Definition new_id {ID} (id_lens : forall {s : StorageType}, Lens' (GenState s) N) (id_gen : N -> ID) : GenLLVM ID
     := n <- use (metadata .@ num_raw');;
-       (metadata .@ num_raw') _ _ %= N.succ;;
+       metadata .@ num_raw' %= N.succ;;
        ret (id_gen n).
 
   Definition new_raw_id : GenLLVM raw_id
@@ -408,71 +408,6 @@ Section GenerationState.
 
   Definition new_block_id : GenLLVM block_id
     := new_id (@num_blocks') (fun n => Name ("b" ++ show n)).
-
-  Definition get_local_ctx : GenLLVM var_context
-    := use (gen_context' .@ is_local').
-  
-  Definition get_global_ctx : GenLLVM var_context
-    := use (gen_context' .@ is_local').
-
-  Definition merge_var_context (c1 : var_context) (c2 : var_context) : var_context
-    := IM.Raw.merge c1 c2.
-
-  Definition get_ctx : GenLLVM var_context
-    := lctx <- get_local_ctx;;
-       gctx <- get_global_ctx;;
-       ret (merge_var_context gctx lctx).
-
-  Definition get_typ_ctx : GenLLVM type_context
-    := use (gen_context' .@ type_alias').
-
-  Definition get_ptrtoint_ctx : GenLLVM ptr_to_int_context
-    := use (gen_context' .@ from_pointer').
-
-  (* Get all variable contexts that might need to be saved *)
-  Definition get_variable_ctxs : GenLLVM all_var_contexts
-    := local_ctx <- get_local_ctx;;
-       global_ctx <- get_global_ctx;;
-       ptoi_ctx <- get_ptrtoint_ctx;;
-       ret (local_ctx, global_ctx, ptoi_ctx).
-
-  Definition get_global_memo : GenLLVM (list (global typ))
-    := use (metadata .@ global_memo').
-
-  Definition set_local_ctx (ctx : var_context) : GenLLVM unit
-    := (gen_context' .@ is_local') _ _ .= ctx;;
-       ret tt.
-
-  Definition set_global_ctx (ctx : var_context) : GenLLVM unit
-    := (gen_context' .@ is_global') _ _ .= ctx;;
-       ret tt.
-
-  Definition set_ptrtoint_ctx (ptoi_ctx : ptr_to_int_context) : GenLLVM unit
-    := (gen_context' .@ from_pointer') _ _ .= ptoi_ctx;;
-       ret tt.
-
-  Definition set_global_memo (memo : list (global typ)) : GenLLVM unit
-    := (metadata .@ global_memo') _ _ .= memo;;
-       ret tt.
-
-  Definition add_to_global_memo (x : (global typ)) : GenLLVM unit
-    := (metadata .@ global_memo') _ _ %= (fun memo => x :: memo);;
-       ret tt.
-
-  Definition restore_variable_ctxs (ctxs : all_var_contexts) : GenLLVM unit
-    := match ctxs with
-       | (local_ctx, global_ctx, ptoi_ctx) =>
-           set_local_ctx local_ctx;;
-           set_global_ctx global_ctx;;
-           set_ptrtoint_ctx ptoi_ctx
-       end.
-
-  Definition restore_local_variable_ctxs (ctxs : all_local_var_contexts) : GenLLVM unit
-    := match ctxs with
-       | (local_ctx, ptoi_ctx) =>
-           set_local_ctx local_ctx;;
-           set_ptrtoint_ctx ptoi_ctx
-       end.
   
   (* #[global] Instance STGST : Monad (stateT GenState G). *)
   (* apply Monad_stateT. *)
@@ -532,7 +467,7 @@ Section GenerationState.
   Defined.
 
   Definition annotate {A:Type} (s:string) (g : GenLLVM A) : GenLLVM A
-    := (metadata .@ debug_stack') _ _ %= (fun stack => s :: stack);;
+    := metadata .@ debug_stack' %= (fun stack => s :: stack);;
        g.
 
   Definition annotate_debug (s : string) : GenLLVM unit :=
@@ -547,92 +482,145 @@ Section GenerationState.
 
   Definition add_to_local_ctx (x : (ident * typ)) : GenLLVM unit
     := e <- lift newEntity;;
-       (gen_context' .@ entl e .@ is_local') _ _ .= ret tt;;
-       (gen_context' .@ entl e .@ name') _ _ .= ret (fst x);;
-       (gen_context' .@ entl e .@ variable_type') _ _ .= ret (snd x);;
+       (gen_context' .@ entl e .@ is_local') .= ret tt;;
+       (gen_context' .@ entl e .@ name') .= ret (fst x);;
+       (gen_context' .@ entl e .@ variable_type') .= ret (snd x);;
        ret tt.
 
   Definition add_to_global_ctx (x : (ident * typ)) : GenLLVM unit
     := e <- lift newEntity;;
-       (gen_context' .@ entl e .@ is_global') _ _ .= ret tt;;
-       (gen_context' .@ entl e .@ name') _ _ .= ret (fst x);;
-       (gen_context' .@ entl e .@ variable_type') _ _ .= ret (snd x);;
+       (gen_context' .@ entl e .@ is_global') .= ret tt;;
+       (gen_context' .@ entl e .@ name') .= ret (fst x);;
+       (gen_context' .@ entl e .@ variable_type') .= ret (snd x);;
        ret tt.
 
   Definition add_to_typ_ctx (x : (ident * typ)) : GenLLVM unit
     := e <- lift newEntity;;
-       (gen_context' .@ entl e .@ name') _ _ .= ret (fst x);;
-       (gen_context' .@ entl e .@ type_alias') _ _ .= ret (snd x);;
+       (gen_context' .@ entl e .@ name') .= ret (fst x);;
+       (gen_context' .@ entl e .@ type_alias') .= ret (snd x);;
        ret tt.
 
   (* Should this be a local? *)
   Definition add_to_ptrtoint_ctx (x : (typ * ident * Ent)) : GenLLVM unit
     := let '(t, name, ptr) := x in
        e <- lift newEntity;;
-       (gen_context' .@ entl e .@ name') _ _ .= ret name;;
-       (gen_context' .@ entl e .@ is_local') _ _ .= ret tt;;
-       (gen_context' .@ entl e .@ from_pointer') _ _ .= ret ptr;;
+       (gen_context' .@ entl e .@ name') .= ret name;;
+       (gen_context' .@ entl e .@ is_local') .= ret tt;;
+       (gen_context' .@ entl e .@ from_pointer') .= ret ptr;;
        ret tt.
 
-  (* Definition append_to_local_ctx (vars :list (ident * typ)) : GenLLVM unit *)
-  (*   := local_ctx <- get_local_ctx;; *)
-  (*      let new_ctx := vars ++ local_ctx in *)
-  (*      modify (replace_local_ctx new_ctx);; *)
-  (*      ret tt. *)
+  #[global] Instance MetadataStore_GenState : @MetadataStore G Metadata (SystemState GenState G).
+  split.
+  apply gen_context'.
+  Defined.
 
-  (* Definition append_to_global_ctx (vars : list (ident * typ)) : GenLLVM unit *)
-  (*   := global_ctx <- get_global_ctx;; *)
-  (*      let new_ctx := vars ++ global_ctx in *)
-  (*      modify (replace_global_ctx new_ctx);; *)
-  (*      ret tt. *)
+  Definition contextFromMap {a} (m : IM.Raw.t a) : GenLLVM var_context
+    := IM.Raw.fold
+         (fun (k : Z) _ (acc : GenLLVM var_context) =>
+            e <- lift_system_GenLLVM (getEntity (mkEnt k));;
+            ctx <- acc;;
+            ret (IM.Raw.add k e ctx)
+         ) m (ret (IM.Raw.empty _)).
 
-  (* Definition append_to_typ_ctx (aliases : list (ident * typ)) : GenLLVM unit *)
-  (*   := ctx <- get_typ_ctx;; *)
-  (*      let new_ctx := (aliases ++ ctx)%list in *)
-  (*      modify (replace_typ_ctx new_ctx);; *)
-  (*      ret tt. *)
+  Definition get_local_ctx : GenLLVM var_context
+    := locals <- use (gen_context' .@ is_local');;
+       contextFromMap locals.
 
-  (* Definition append_to_ptrtoint_ctx (aliases : list (typ * ident * typ)) : GenLLVM unit *)
-  (*   := ctx <- get_ptrtoint_ctx;; *)
-  (*      let new_ctx := (aliases ++ ctx)%list in *)
-  (*      modify (replace_ptrtoint_ctx new_ctx);; *)
-  (*      ret tt. *)
+  Definition get_global_ctx : GenLLVM var_context
+    := globals <- use (gen_context' .@ is_global');;
+       contextFromMap globals.
 
-  (* Definition append_to_global_memo (vars : list (global typ)) : GenLLVM unit *)
-  (*   := memo <- get_global_memo;; *)
-  (*      let new_memo := vars ++ memo in *)
-  (*      modify (replace_global_memo new_memo);; *)
-  (*      ret tt. *)
+  Definition merge_var_context (c1 : var_context) (c2 : var_context) : var_context
+    := IM.Raw.merge c1 c2.
+
+  Definition get_ctx : GenLLVM var_context
+    := locals <- use (gen_context' .@ is_local');;
+       globals <- use (gen_context' .@ is_global');;
+       contextFromMap (IM.Raw.merge globals locals).
+
+  Definition get_typ_ctx : GenLLVM type_context
+    := types <- use (gen_context' .@ type_alias');;
+       contextFromMap types.
+
+  Definition get_ptrtoint_ctx : GenLLVM ptr_to_int_context
+    := ptois <- use (gen_context' .@ from_pointer');;
+       contextFromMap ptois.
+
+  (* Get all variable contexts that might need to be saved *)
+  Definition get_variable_ctxs : GenLLVM all_var_contexts
+    := local_ctx <- get_local_ctx;;
+       global_ctx <- get_global_ctx;;
+       ptoi_ctx <- get_ptrtoint_ctx;;
+       ret (local_ctx, global_ctx, ptoi_ctx).
+
+  Definition get_global_memo : GenLLVM (list (global typ))
+    := use (metadata .@ global_memo').
+
+  Definition set_local_ctx (ctx : var_context) : GenLLVM unit
+    := lift (setEntities ctx).
+
+  Definition set_global_ctx (ctx : var_context) : GenLLVM unit
+    := lift (setEntities ctx).
+
+  Definition set_ptrtoint_ctx (ptoi_ctx : ptr_to_int_context) : GenLLVM unit
+    := lift (setEntities ptoi_ctx).
+
+  Definition set_global_memo (memo : list (global typ)) : GenLLVM unit
+    := (metadata .@ global_memo') .= memo;;
+       ret tt.
+
+  Definition add_to_global_memo (x : (global typ)) : GenLLVM unit
+    := (metadata .@ global_memo') %= (fun memo => x :: memo);;
+       ret tt.
+
+  Definition restore_variable_ctxs (ctxs : all_var_contexts) : GenLLVM unit
+    := match ctxs with
+       | (local_ctx, global_ctx, ptoi_ctx) =>
+           set_local_ctx local_ctx;;
+           set_global_ctx global_ctx;;
+           set_ptrtoint_ctx ptoi_ctx
+       end.
+
+  Definition restore_local_variable_ctxs (ctxs : all_local_var_contexts) : GenLLVM unit
+    := match ctxs with
+       | (local_ctx, ptoi_ctx) =>
+           set_local_ctx local_ctx;;
+           set_ptrtoint_ctx ptoi_ctx
+       end.
+
+  Definition append_ctx (vars :var_context) : GenLLVM unit
+    := lift (setEntities vars).
+
+  Definition backtrackMetadata {A} (g : GenLLVM A) : GenLLVM A
+    := m <- use gen_context';;
+       a <- g;;
+       gen_context' .= m;;
+       ret a.
 
   Definition reset_local_ctx : GenLLVM unit
-    := (gen_context' .@ is_local') _ _ .= def;;
-       ret tt.
+    := locals <- use (gen_context' .@ is_local');;
+       lift (deleteEntities locals).
 
   Definition reset_global_ctx : GenLLVM unit
-    := (gen_context' .@ is_global') _ _ .= def;;
-       ret tt.
+    := globals <- use (gen_context' .@ is_global');;
+       lift (deleteEntities globals).
   
   Definition reset_ctx : GenLLVM unit
     := reset_local_ctx;;
        reset_global_ctx.
 
   Definition reset_typ_ctx : GenLLVM unit
-    := (gen_context' .@ type_alias') _ _ .= def;;
-       ret tt.
+    := types <- use (gen_context' .@ type_alias');;
+       lift (deleteEntities types).
 
-  (* I don't think this does the right thing. I need to remove the
-     entities associated with a ptoi cast, otherwise I'm effectively
-     just losing the tag and could use the variables in the wrong
-     place.
-   *)
   Definition reset_ptrtoint_ctx : GenLLVM unit
-    := (gen_context' .@ from_pointer') _ _ .= def;;
-       ret tt.
+    := ptrs <- use (gen_context' .@ from_pointer');;
+       lift (deleteEntities ptrs).
 
   Definition reset_global_memo : GenLLVM unit
-    := (metadata .@ global_memo') _ _ .= def;;
+    := metadata .@ global_memo' .= def;;
        ret tt.
-  
+
   Definition hide_local_ctx {A} (g : GenLLVM A) : GenLLVM A
     := saved_local_ctx <- get_local_ctx;;
        reset_local_ctx;;
@@ -654,7 +642,7 @@ Section GenerationState.
     := saved_ctx <- get_ptrtoint_ctx;;
        reset_ptrtoint_ctx;;
        a <- g;;
-       append_to_ptrtoint_ctx saved_ctx;;
+       append_ctx saved_ctx;;
        ret a.
 
   Definition hide_variable_ctxs {A} (g: GenLLVM A) : GenLLVM A
@@ -681,12 +669,6 @@ Section GenerationState.
     := saved_ctx <- get_ptrtoint_ctx;;
        a <- g;;
        set_ptrtoint_ctx saved_ctx;;
-       ret a.
-
-  Definition flip_global_ctx {A} (g : GenLLVM A) : GenLLVM A
-    := rev_global_ctx;;
-       a <- g;;
-       rev_global_ctx;;
        ret a.
   
   (** Restore all variable contexts after running a generator. *)
@@ -881,13 +863,10 @@ Section GenerationState.
   Definition sized_LLVM {A : Type} (gn : nat -> GenLLVM A) : GenLLVM A.
     apply mkEitherT.
     apply mkStateT.
-    refine (fun stack => _).
-    apply mkStateT.
     refine (fun st => sized _).
     refine (fun n => _).
     refine (let opt := unEitherT (gn n) in _).
-    refine (let ann := runStateT opt stack in _).
-    refine (let ans := runStateT ann st in ans).
+    refine (let ann := runStateT opt st in ann).
     Defined.
   
   (* Definition sized_LLVM {A : Type} (gn : nat -> GenLLVM A) : GenLLVM A *)
@@ -897,12 +876,9 @@ Section GenerationState.
   Definition resize_LLVM {A : Type} (sz : nat) (g : GenLLVM A) : GenLLVM A.
     apply mkEitherT.
     apply mkStateT.
-    refine (fun stack => _).
-    apply mkStateT.
     refine (fun st => _).
     refine (let opt := unEitherT g in _).
-    refine (let ann := runStateT opt stack in _).
-    refine (let ans := runStateT ann st in _).
+    refine (let ans := runStateT opt st in _).
     refine (resize sz ans).
     Defined.
   
@@ -921,22 +897,10 @@ Section GenerationState.
                      k <- lift (choose (1, n)%nat);;
                      vectorOf_LLVM k g).
   
-  (* Definition flush_ERR {A} (g : GenLLVM A) : GenLLVM A. *)
-  (*   apply mkEitherT. *)
-  (*   apply mkStateT. *)
-  (*   refine (fun stack => _). *)
-  (*   apply mkStateT. *)
-  (*   refine (fun st => _). *)
-  (*   refine (let debug := fold_right (fun op ops => (op ++ "\n" ++ ops)%string) "" stack in _). *)
-  (*   refine (let opt := unEitherT g in _). *)
-  (*   refine (let ann := runStateT opt [] in _). *)
-  (*   refine (let ans := runStateT ann st in _). *)
-  (*   refine (a <- ans;; _). *)
-  (*   refine (let t := fmap fst a in _). *)
-  (* GC : Maybe need to check the definition a little bit *)
   Definition run_GenLLVM {A} (g: GenLLVM A) : G (string + A) :=
-    let ran := runStateT (runStateT (unEitherT g) []) init_GenState in
-    '(err_a,stack) <- fmap fst ran;;
+    let ran := runStateT (unEitherT g) def in
+    '(err_a,st) <- ran;;
+    let stack := st .^ metadata .@ debug_stack' in
     let debug : string := fold_right (fun d1 drest => (d1 ++ newline ++ drest)%string) "" (rev stack) in
     let flushed_err :=
       match err_a with
@@ -944,16 +908,6 @@ Section GenerationState.
       | inr _ => err_a
       end in
     ret flushed_err.
-    
-  (* Definition run_GenLLVM {A} (g : GenLLVM A) : G (string + A). *)
-  (*   refine (let opt := unEitherT g in _). *)
-  (*   refine (let ann := runStateT opt [] in _). *)
-  (*   refine (let ans := runStateT ann init_GenState in _). *)
-  (*   refine (fmap fst (fmap fst ans)). *)
-  (*   Defined. *)
-  
-  (* Definition run_GenLLVM {A} (g : GenLLVM A) : G (string + A) *)
-  (*   := fmap fst (runStateT (unEitherT g) init_GenState). *)
 
 End GenerationState.
 

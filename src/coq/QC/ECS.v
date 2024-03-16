@@ -14,6 +14,8 @@ Import LensNotations.
 Local Open Scope lens.
 
 Require Import ExtLib.Data.Monads.StateMonad.
+Require Import ExtLib.Data.Monads.OptionMonad.
+Require Import ExtLib.Data.Monads.ReaderMonad.
 Require Import ExtLib.Structures.Monads.
 Require Import ExtLib.Structures.Functor.
 Require Import ExtLib.Structures.Applicative.
@@ -40,6 +42,11 @@ Variant Update (a : Type) :=
   | Keep
   | Unset
   | SetValue : a -> Update a.
+
+#[global] Instance Default_Update {a} : Default (Update a).
+split.
+apply Keep.
+Defined.
 
 #[global] Instance Functor_Update : Functor Update.
 split.
@@ -251,7 +258,8 @@ Ltac2 applyMetadataConstructors (tac : unit -> unit) :=
       ; (fun _ => tac (); apply from_pointer)
     ].  
 
-Definition getEntity {m} `{Monad m} (entity : Ent) : SystemT Metadata m (Metadata FieldOf).
+Definition getEntity {w m} `{Monad m} `{@MetadataStore m Metadata (SystemState w m)}
+  (entity : Ent) : SystemT w m (Metadata FieldOf).
   refine open_constr:(let entity_id := unEnt entity in
                       storage <- use metadata;;
                       ret (_)); try typeclasses_eauto.
@@ -274,16 +282,35 @@ Definition updateIntMapRaw {a} (u : Update a) k (m : IM.Raw.t a) : IM.Raw.t a
      | SetValue x => IM.Raw.add k x m
      end.
 
+Definition optionToUpdate {a} (v : option a) : Update a :=
+  match v with
+  | Some x => SetValue _ x
+  | None => Keep _
+  end.
+
+Definition setterOfFields (vals : Metadata FieldOf) : Metadata SetterOf.
+  constructor;
+    applyMetadataConstructors (fun _ => refine open_constr:(optionToUpdate (_ vals))).
+Defined.
+
 Definition setEntity
-  {m} `{Monad m} (entity : Ent) (setter : Metadata SetterOf) : SystemT Metadata m unit.
+  {w m} `{Monad m} `{@MetadataStore m Metadata (SystemState w m)}
+  (entity : Ent) (setter : Metadata SetterOf) : SystemT w m unit.
   refine
     open_constr:(let entity_id := unEnt entity in
                  metadata _ _ %= (fun storage => _);;
+                 entities %= (fun ents => IS.add entity_id ents);;
                  ret tt);
     try typeclasses_eauto.
   apply (mkMetadata (WorldOf m));
     applyMetadataConstructors (fun _ => refine open_constr:(updateIntMapRaw (_ setter) entity_id (_ storage))).
 Defined.
+
+Definition setEntities
+  {w : StorageType -> Type} {m : Type -> Type}
+  `{Monad m} `{@MetadataStore m Metadata (SystemState w m)}
+  (es : IM.Raw.t (Metadata FieldOf)) : SystemT w m unit
+  := IM.Raw.fold (fun k fs acc => setEntity (mkEnt k) (setterOfFields fs);; acc) es (ret tt).
 
 Definition name' {s : StorageType} : Lens' (Metadata s) (Component s Field ident).
   red.
@@ -614,50 +641,24 @@ Defined.
 
 Definition newEntity {w} {m} `{Monad m} : SystemT w m Ent
   := i <- use nextEnt;;
-     nextEnt _ _ .= Z.succ i;;
-     entities _ _ %= (fun ents => IS.add i ents);;
+     nextEnt .= Z.succ i;;
+     entities %= (fun ents => IS.add i ents);;
      ret (mkEnt i).
 
 Definition deleteEntity {w} {m} `{Monad m} `{@MetadataStore m Metadata (SystemState w m)} (e : Ent) : SystemT w m unit
   := let eid := unEnt e in
-     (metadata .@ entl e) _ _ .= def;;
-     entities _ _ %= (fun ents => IS.remove eid ents);;
+     metadata .@ entl e .= def;;
+     entities %= (fun ents => IS.remove eid ents);;
      ret tt.
+
+Definition deleteEntities
+  {w : StorageType -> Type} {m : Type -> Type}
+  `{Monad m} `{@MetadataStore m Metadata (SystemState w m)} {A}
+  (es : IM.Raw.t A) : SystemT w m unit
+  := IM.Raw.fold (fun k _ acc => deleteEntity (mkEnt k);; acc) es (ret tt).
 
 Definition runSystemT {m} `{Monad m} {a} (w : Metadata (WorldOf m)) (sys : SystemT Metadata m a) : m a
   := evalStateT sys def.
-
-Definition add_global {m} `{Monad m} (name : string) : SystemT Metadata m _
-  := e <- newEntity;;
-     (metadata .@ entl e .@ is_global') _ _ .= ret tt;;
-     (metadata .@ entl e .@ name') _ _ .= ret (ID_Global (Name name));;
-     ret e.
-
-Definition add_local {m} `{Monad m} (name : string) : SystemT Metadata m _
-  := e <- newEntity;;
-     (metadata .@ entl e .@ is_local') _ _ .= ret tt;;
-     (metadata .@ entl e .@ name') _ _ .= ret (ID_Local (Name name));;
-     ret e.
-
-Definition test_system {m} `{HM: Monad m} : SystemT Metadata m _
-  := e <- newEntity;;
-     e2 <- newEntity;;
-     add_global "blah";;
-     add_local "foo";;
-     get.
-
-Definition ecs_test :=
-  IdentityMonad.unIdent (runSystemT def test_system).
-
-(* What if I want to find an entity that's not in the set? *)
-Eval compute in ecs_test.
-
-Definition firstAndThird {a x b} : Traversal (a * x * a) (b * x * b) a b.
-  red.
-  intros f F focus X0.
-  destruct X0 as [[a' b'] c'].
-  apply (pure (fun a b c => (a, b, c)) <*> focus a' <*> pure b' <*> focus c').
-Defined.
 
 Definition ixs {a} `{Default a} (ns : list nat) : Traversal (list a) (list a) a a.
   red.
@@ -675,9 +676,6 @@ Definition ixs {a} `{Default a} (ns : list nat) : Traversal (list a) (list a) a 
           go 0 ns xs).
 Defined.
 
-Eval compute in (over (ixs [1; 4] _ _) (fun x => 2 * x) [1; 2; 3; 4; 5]).
-Eval compute in (over (firstAndThird _ _) length ("one", 2, "three")).
-
 Definition names'' {m} : Traversal (Metadata (WorldOf m)) (Metadata (WorldOf m)) (Component (WorldOf m) Field ident) (Component (WorldOf m) Field ident).
   red.
   intros f F focus meta.
@@ -691,3 +689,103 @@ Definition names'' {m} : Traversal (Metadata (WorldOf m)) (Metadata (WorldOf m))
   - apply (pure (is_non_deterministic _ meta)).
   - apply (pure (from_pointer _ meta)).
 Defined.
+
+Record QueryT w m a : Type :=
+  mkQueryT
+  { runQueryT' :: readerT (Ent * w FieldOf) (optionT m) a
+  }.
+
+Arguments runQueryT' {_ _ _}.
+
+#[global] Instance Monad_QueryT {w m} `{Monad m} : Monad (QueryT w m).
+split.
+- intros t X.
+  apply mkQueryT.
+  apply (ret X).
+- intros A B qa k.
+  apply mkQueryT.
+  eapply bind.
+  apply qa.
+  apply k.
+Defined.
+
+#[global] Instance MonadZero_QueryT {w m} `{Monad m} : MonadZero (QueryT w m).
+split.
+intros T.
+apply mkQueryT.
+apply mzero.
+Defined.
+
+Definition unQueryT {w m a} (q : QueryT w m a)  (e : Ent) (meta : w FieldOf) : m (option a)
+  := unOptionT (runReaderT (runQueryT' q) (e, meta)).
+
+Definition query {world a m} `{Monad m} (f : world FieldOf -> option a) : QueryT world m a
+  := e <- @mkQueryT world m _ (asks snd);;
+     match f e with
+     | None => mzero
+     | Some x => ret x
+     end.
+
+Definition withq {world a m} `{Monad m} (f : world FieldOf -> option a) : QueryT world m unit
+  := query f;;
+     ret tt.
+
+Definition without {world a m} `{MonadZero m} `{Monad m} (f : world FieldOf -> option a) : QueryT world m unit
+  := e <- @mkQueryT world m _ (asks snd);;
+     match f e with
+     | None => ret tt
+     | Some x => mzero
+     end.
+
+Definition EntTarget w m := SystemT w m IS.t.
+
+Definition allEnts {w m} `{Monad m} : EntTarget w m
+  := use entities.
+
+Definition emap
+  {w m} `{Monad m} `{@MetadataStore m Metadata (SystemState w m)}
+ (t : EntTarget w m) (q : QueryT Metadata m (Metadata SetterOf)) : SystemT w m unit
+  := es <- t;;
+     IS.fold
+       (fun (k : Z) (acc : SystemT w m unit) =>
+          let e := mkEnt k in
+          meta <- getEntity e;;
+          sets <- lift (unQueryT q e meta);;
+          match sets with
+          | None =>
+              acc
+          | Some s =>
+              setEntity e s;;
+              acc
+          end
+       ) es (ret tt).
+
+Definition add_global {m} `{Monad m} (name : string) : SystemT Metadata m _
+  := e <- newEntity;;
+     metadata .@ entl e .@ is_global' .= ret tt;;
+     metadata .@ entl e .@ name' .= ret (ID_Global (Name name));;
+     ret e.
+
+Definition add_local {m} `{Monad m} (name : string) : SystemT Metadata m _
+  := e <- newEntity;;
+     metadata .@ entl e .@ is_local' .= ret tt;;
+     metadata .@ entl e .@ name' .= ret (ID_Local (Name name));;
+     ret e.
+
+Definition test_system {m} `{HM: Monad m} : SystemT Metadata m _
+  := e <- newEntity;;
+     e2 <- newEntity;;
+     add_global "blah";;
+     add_global "wee";;
+     add_local "foo";;
+     emap allEnts
+       (n <- query (name FieldOf);;
+        withq (is_global FieldOf);;
+        ret (def & @name' SetterOf .~ SetValue _ (ID_Global (Name "ueoaue"))));;
+     get.
+
+Definition ecs_test :=
+  IdentityMonad.unIdent (runSystemT def test_system).
+
+(* What if I want to find an entity that's not in the set? *)
+Eval compute in ecs_test.
