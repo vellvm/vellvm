@@ -33,314 +33,322 @@
 
   exception Lex_error_unterminated_string of Lexing.position
 
+
   (* TODO: Replace this function with a hash table, which should be a lot more efficient. *)
-  let kw = function
-  | "target"                       -> KW_TARGET
-  | "datalayout"                   -> KW_DATALAYOUT
-  | "source_filename"              -> KW_SOURCE_FILENAME
-  | "triple"                       -> KW_TRIPLE
-  | "define"                       -> KW_DEFINE
-  | "declare"                      -> KW_DECLARE
+  let reserved_words = [
+  ("target"                       , KW_TARGET);
+  ("datalayout"                   , KW_DATALAYOUT);
+  ("source_filename"              , KW_SOURCE_FILENAME);
+  ("triple"                       , KW_TRIPLE);
+  ("define"                       , KW_DEFINE);
+  ("declare"                      , KW_DECLARE);
 
   (* Linkage *)
-  | "private"                      -> KW_PRIVATE
-  | "internal"                     -> KW_INTERNAL
-  | "available_externally"         -> KW_AVAILABLE_EXTERNALLY
-  | "linkonce"                     -> KW_LINKONCE
-  | "weak"                         -> KW_WEAK
-  | "common"                       -> KW_COMMON
-  | "appending"                    -> KW_APPENDING
-  | "extern_weak"                  -> KW_EXTERN_WEAK
-  | "linkonce_odr"                 -> KW_LINKONCE_ODR
-  | "weak_odr"                     -> KW_WEAK_ODR
-  | "external"                     -> KW_EXTERNAL
+  ("private"                      , KW_PRIVATE);
+  ("internal"                     , KW_INTERNAL);
+  ("available_externally"         , KW_AVAILABLE_EXTERNALLY);
+  ("linkonce"                     , KW_LINKONCE);
+  ("weak"                         , KW_WEAK);
+  ("common"                       , KW_COMMON);
+  ("appending"                    , KW_APPENDING);
+  ("extern_weak"                  , KW_EXTERN_WEAK);
+  ("linkonce_odr"                 , KW_LINKONCE_ODR);
+  ("weak_odr"                     , KW_WEAK_ODR);
+  ("external"                     , KW_EXTERNAL);
 
   (* DLL storage *)
-  | "dllimport"                    -> KW_DLLIMPORT
-  | "dllexport"                    -> KW_DLLEXPORT
+  ("dllimport"                    , KW_DLLIMPORT);
+  ("dllexport"                    , KW_DLLEXPORT);
 
   (* Visibility *)
-  | "default"                      -> KW_DEFAULT
-  | "hidden"                       -> KW_HIDDEN
-  | "protected"                    -> KW_PROTECTED
+  ("default"                      , KW_DEFAULT);
+  ("hidden"                       , KW_HIDDEN);
+  ("protected"                    , KW_PROTECTED);
 
   (* Calling Conventions cconv *)
-  | "ccc"                          -> KW_CCC
-  | "fastcc"                       -> KW_FASTCC
-  | "coldcc"                       -> KW_COLDCC
-  | "cc"                           -> KW_CC
-  | "webkit_jscc"                  -> KW_WEBKIT_JSCC
-  | "anyregcc"                     -> KW_ANYREGCC
-  | "preserve_mostcc"              -> KW_PRESERVE_MOSTCC
-  | "preserve_allcc"               -> KW_PRESERVE_ALLCC
-  | "cxx_fast_tlscc"               -> KW_CXX_FAST_TLSCC
-  | "tailcc"                       -> KW_TAILCC
-  | "swiftcc"                      -> KW_SWIFTCC
-  | "swifttailcc"                  -> KW_SWIFTTAILCC
-  | "cfguard_checkcc"              -> KW_CFGUARD_CHECKCC
+  ("ccc"                          , KW_CCC);
+  ("fastcc"                       , KW_FASTCC);
+  ("coldcc"                       , KW_COLDCC);
+  ("cc"                           , KW_CC);
+  ("webkit_jscc"                  , KW_WEBKIT_JSCC);
+  ("anyregcc"                     , KW_ANYREGCC);
+  ("preserve_mostcc"              , KW_PRESERVE_MOSTCC);
+  ("preserve_allcc"               , KW_PRESERVE_ALLCC);
+  ("cxx_fast_tlscc"               , KW_CXX_FAST_TLSCC);
+  ("tailcc"                       , KW_TAILCC);
+  ("swiftcc"                      , KW_SWIFTCC);
+  ("swifttailcc"                  , KW_SWIFTTAILCC);
+  ("cfguard_checkcc"              , KW_CFGUARD_CHECKCC);
 
 
-  | "unnamed_addr"                 -> KW_UNNAMED_ADDR
-  | "local_unnamed_addr"           -> KW_LOCAL_UNNAMED_ADDR
+  ("unnamed_addr"                 , KW_UNNAMED_ADDR);
+  ("local_unnamed_addr"           , KW_LOCAL_UNNAMED_ADDR);
 
-  | "type"                         -> KW_TYPE
-  | "opaque"                       -> KW_OPAQUE
-  | "global"                       -> KW_GLOBAL
-  | "addrspace"                    -> KW_ADDRSPACE
-  | "externally_initialized"       -> KW_EXTERNALLY_INITIALIZED
-  | "constant"                     -> KW_CONSTANT
-  | "section"                      -> KW_SECTION
-  | "comdat"                       -> KW_COMDAT
-  | "partition"                    -> KW_PARTITION
-  | "thread_local"                 -> KW_THREAD_LOCAL
-  | "localdynamic"                 -> KW_LOCALDYNAMIC
-  | "initialexec"                  -> KW_INITIALEXEC
-  | "localexec"                    -> KW_LOCALEXEC
+  ("type"                         , KW_TYPE);
+  ("opaque"                       , KW_OPAQUE);
+  ("global"                       , KW_GLOBAL);
+  ("addrspace"                    , KW_ADDRSPACE);
+  ("externally_initialized"       , KW_EXTERNALLY_INITIALIZED);
+  ("constant"                     , KW_CONSTANT);
+  ("section"                      , KW_SECTION);
+  ("comdat"                       , KW_COMDAT);
+  ("partition"                    , KW_PARTITION);
+  ("thread_local"                 , KW_THREAD_LOCAL);
+  ("localdynamic"                 , KW_LOCALDYNAMIC);
+  ("initialexec"                  , KW_INITIALEXEC);
+  ("localexec"                    , KW_LOCALEXEC);
 
   (* Parameter Attributes param_attr *)
-  | "zeroext"                      -> KW_ZEROEXT
-  | "signext"                      -> KW_SIGNEXT
-  | "inreg"                        -> KW_INREG
-  | "byval"                        -> KW_BYVAL
-  | "byref"                        -> KW_BYREF
-  | "preallocated"                 -> KW_PREALLOCATED
-  | "inalloca"                     -> KW_INALLOCA
-  | "sret"                         -> KW_SRET
-  | "elementtype"                  -> KW_ELEMENTTYPE
-(* | "align"                        -> KW_ALIGN   (* align is used multiple ways *) *)
-  | "noalias"                      -> KW_NOALIAS
-  | "nocapture"                    -> KW_NOCAPTURE
-  | "readonly"                     -> KW_READONLY
-  | "nofree"                       -> KW_NOFREE
-  | "nest"                         -> KW_NEST
-  | "returned"                     -> KW_RETURNED
-  | "nonnull"                      -> KW_NONNULL
-  | "dereferenceable"              -> KW_DEREFERENCEABLE
-  | "dereferenceable_or_null"      -> KW_DEREFERENCEABLE_OR_NULL
-  | "swiftself"                    -> KW_SWIFTSELF
-  | "swiftasync"                   -> KW_SWIFTASYNC
-  | "swifterror"                   -> KW_SWIFTERROR
-  | "immarg"                       -> KW_IMMARG
-  | "noundef"                      -> KW_NOUNDEF
-  | "alignstack"                   -> KW_ALIGNSTACK
-  | "allocalign"                   -> KW_ALLOCALIGN
-  | "allocptr"                     -> KW_ALLOCPTR
+  ("zeroext"                      , KW_ZEROEXT);
+  ("signext"                      , KW_SIGNEXT);
+  ("inreg"                        , KW_INREG);
+  ("byval"                        , KW_BYVAL);
+  ("byref"                        , KW_BYREF);
+  ("preallocated"                 , KW_PREALLOCATED);
+  ("inalloca"                     , KW_INALLOCA);
+  ("sret"                         , KW_SRET);
+  ("elementtype"                  , KW_ELEMENTTYPE);
+
+  ("noalias"                      , KW_NOALIAS);
+  ("nocapture"                    , KW_NOCAPTURE);
+  ("readonly"                     , KW_READONLY);
+  ("nofree"                       , KW_NOFREE);
+  ("nest"                         , KW_NEST);
+  ("returned"                     , KW_RETURNED);
+  ("nonnull"                      , KW_NONNULL);
+  ("dereferenceable"              , KW_DEREFERENCEABLE);
+  ("dereferenceable_or_null"      , KW_DEREFERENCEABLE_OR_NULL);
+  ("swiftself"                    , KW_SWIFTSELF);
+  ("swiftasync"                   , KW_SWIFTASYNC);
+  ("swifterror"                   , KW_SWIFTERROR);
+  ("immarg"                       , KW_IMMARG);
+  ("noundef"                      , KW_NOUNDEF);
+  ("alignstack"                   , KW_ALIGNSTACK);
+  ("allocalign"                   , KW_ALLOCALIGN);
+  ("allocptr"                     , KW_ALLOCPTR);
 
 (* Function Attributes *)
-  | "allockind"                    -> KW_ALLOCKIND
-  | "allocsize"                    -> KW_ALLOCSIZE
-  | "alwaysinline"                 -> KW_ALWAYSINLINE
-  | "builtin"                      -> KW_BUILTIN
-  | "cold"                         -> KW_COLD
-  | "convergent"                   -> KW_CONVERGENT
-  | "disable_sanitizer_instrumentation" -> KW_DISABLE_SANITIZER_INSTRUMENTATION
-  | "fn_ret_thunk_extern"          -> KW_FN_RET_THUNK_EXTERN
-  | "hot"                          -> KW_HOT
-  | "inaccessiblememonly"          -> KW_INACCESSIBLEMEMONLY
-  | "inaccessiblemem_or_argmemeonly" -> KW_INACCESSIBLEMEM_OR_ARGMEMONLY
-  | "inlinehint"                   -> KW_INLINEHINT
-  | "jumptable"                    -> KW_JUMPTABLE
-  | "minsize"                      -> KW_MINSIZE
-  | "naked"                        -> KW_NAKED
-  | "no_jump_tables"               -> KW_NO_JUMP_TABLES
-  | "nobuiltin"                    -> KW_NOBUILTIN
-  | "noduplicate"                  -> KW_NODUPLICATE
-  | "noimplicitfloat"              -> KW_NOIMPLICITFLOAT
-  | "noinline"                     -> KW_NOINLINE
-  | "nomerge"                      -> KW_NOMERGE
-  | "nonlazybind"                  -> KW_NONLAZYBIND
-  | "noredzone"                    -> KW_NOREDZONE
-  | "indirect-tls-seg-refs"        -> KW_INDIRECT_TLS_SEG_REFS
-  | "noreturn"                     -> KW_NORETURN
-  | "norecurse"                    -> KW_NORECURSE
-  | "willreturn"                   -> KW_WILLRETURN
-  | "nosync"                       -> KW_NOSYNC
-  | "nounwind"                     -> KW_NOUNWIND
-  | "nosantitize_bounds"           -> KW_NOSANITIZE_BOUNDS
-  | "nosantitize_coverage"         -> KW_NOSANITIZE_COVERAGE
-  | "null_pointer_is_valid"        -> KW_NULL_POINTER_IS_VALID
-  | "optforfuzzing"                -> KW_OPTFORFUZZING
-  | "optnone"                      -> KW_OPTNONE
-  | "optsize"                      -> KW_OPTSIZE
-  | "readnone"                     -> KW_READNONE
-  | "writeonly"                    -> KW_WRITEONLY
-  | "argmemonly"                   -> KW_ARGMEMONLY
-  | "returns_twice"                -> KW_RETURNS_TWICE
-  | "safestack"                    -> KW_SAFESTACK
-  | "sanitize_address"             -> KW_SANITIZE_ADDRESS
-  | "no_sanitize"                  -> KW_NO_SANITIZE
-  | "no_sanitize_address"          -> KW_NO_SANITIZE_ADDRESS
-  | "no_sanitize_hwaddress"        -> KW_NO_SANITIZE_HWADDRESS
-  | "sanitize_address_dyninit"     -> KW_SANITIZE_ADDRESS_DYNINIT
-  | "sanitize_memory"              -> KW_SANITIZE_MEMORY
-  | "sanitize_thread"              -> KW_SANITIZE_THREAD
-  | "sanitize_hwaddress"           -> KW_SANITIZE_HWADDRESS
-  | "sanitize_memtag"              -> KW_SANITIZE_MEMTAG
-  | "speculative_load_hardening"   -> KW_SPECULATIVE_LOAD_HARDENING
-  | "speculatable"                 -> KW_SPECULATABLE
-  | "ssp"                          -> KW_SSP
-  | "sspreq"                       -> KW_SSPREQ
-  | "sspstrong"                    -> KW_SSPSTRONG
-  | "strictfp"                     -> KW_STRICTFP
-  | "uwtable"                      -> KW_UWTABLE
-  | "sync"                         -> KW_SYNC
-  | "async"                        -> KW_ASYNC
-  | "nocf_check"                   -> KW_NOCF_CHECK
-  | "shadowcallstack"              -> KW_SHADOWCALLSTACK
-  | "mustprogress"                 -> KW_MUSTPROGRESS
-  | "vscale_range"                 -> KW_VSCALE_RANGE
+  ("allockind"                    , KW_ALLOCKIND);
+  ("allocsize"                    , KW_ALLOCSIZE);
+  ("alwaysinline"                 , KW_ALWAYSINLINE);
+  ("builtin"                      , KW_BUILTIN);
+  ("cold"                         , KW_COLD);
+  ("convergent"                   , KW_CONVERGENT);
+  ("disable_sanitizer_instrumentation" , KW_DISABLE_SANITIZER_INSTRUMENTATION);
+  ("fn_ret_thunk_extern"          , KW_FN_RET_THUNK_EXTERN);
+  ("hot"                          , KW_HOT);
+  ("inaccessiblememonly"          , KW_INACCESSIBLEMEMONLY);
+  ("inaccessiblemem_or_argmemeonly" , KW_INACCESSIBLEMEM_OR_ARGMEMONLY);
+  ("inlinehint"                   , KW_INLINEHINT);
+  ("jumptable"                    , KW_JUMPTABLE);
+  ("minsize"                      , KW_MINSIZE);
+  ("naked"                        , KW_NAKED);
+  ("no_jump_tables"               , KW_NO_JUMP_TABLES);
+  ("nobuiltin"                    , KW_NOBUILTIN);
+  ("noduplicate"                  , KW_NODUPLICATE);
+  ("noimplicitfloat"              , KW_NOIMPLICITFLOAT);
+  ("noinline"                     , KW_NOINLINE);
+  ("nomerge"                      , KW_NOMERGE);
+  ("nonlazybind"                  , KW_NONLAZYBIND);
+  ("noredzone"                    , KW_NOREDZONE);
+  ("indirect-tls-seg-refs"        , KW_INDIRECT_TLS_SEG_REFS);
+  ("noreturn"                     , KW_NORETURN);
+  ("norecurse"                    , KW_NORECURSE);
+  ("willreturn"                   , KW_WILLRETURN);
+  ("nosync"                       , KW_NOSYNC);
+  ("nounwind"                     , KW_NOUNWIND);
+  ("nosantitize_bounds"           , KW_NOSANITIZE_BOUNDS);
+  ("nosantitize_coverage"         , KW_NOSANITIZE_COVERAGE);
+  ("null_pointer_is_valid"        , KW_NULL_POINTER_IS_VALID);
+  ("optforfuzzing"                , KW_OPTFORFUZZING);
+  ("optnone"                      , KW_OPTNONE);
+  ("optsize"                      , KW_OPTSIZE);
+  ("readnone"                     , KW_READNONE);
+  ("writeonly"                    , KW_WRITEONLY);
+  ("argmemonly"                   , KW_ARGMEMONLY);
+  ("returns_twice"                , KW_RETURNS_TWICE);
+  ("safestack"                    , KW_SAFESTACK);
+  ("sanitize_address"             , KW_SANITIZE_ADDRESS);
+  ("no_sanitize"                  , KW_NO_SANITIZE);
+  ("no_sanitize_address"          , KW_NO_SANITIZE_ADDRESS);
+  ("no_sanitize_hwaddress"        , KW_NO_SANITIZE_HWADDRESS);
+  ("sanitize_address_dyninit"     , KW_SANITIZE_ADDRESS_DYNINIT);
+  ("sanitize_memory"              , KW_SANITIZE_MEMORY);
+  ("sanitize_thread"              , KW_SANITIZE_THREAD);
+  ("sanitize_hwaddress"           , KW_SANITIZE_HWADDRESS);
+  ("sanitize_memtag"              , KW_SANITIZE_MEMTAG);
+  ("speculative_load_hardening"   , KW_SPECULATIVE_LOAD_HARDENING);
+  ("speculatable"                 , KW_SPECULATABLE);
+  ("ssp"                          , KW_SSP);
+  ("sspreq"                       , KW_SSPREQ);
+  ("sspstrong"                    , KW_SSPSTRONG);
+  ("strictfp"                     , KW_STRICTFP);
+  ("uwtable"                      , KW_UWTABLE);
+  ("sync"                         , KW_SYNC);
+  ("async"                        , KW_ASYNC);
+  ("nocf_check"                   , KW_NOCF_CHECK);
+  ("shadowcallstack"              , KW_SHADOWCALLSTACK);
+  ("mustprogress"                 , KW_MUSTPROGRESS);
+  ("vscale_range"                 , KW_VSCALE_RANGE);
 
-  | "align"                        -> KW_ALIGN
+  ("align"                        , KW_ALIGN);
 
-  | "prefix"                       -> KW_PREFIX
-  | "prologue"                     -> KW_PROLOGUE
-  | "personality"                  -> KW_PERSONALITY
-  | "gc"                           -> KW_GC
-  | "to"                           -> KW_TO
-  | "unwind"                       -> KW_UNWIND
-  | "tail"                         -> KW_TAIL
-  | "musttail"                     -> KW_MUSTTAIL
-  | "notail"                       -> KW_NOTAIL
-  | "volatile"                     -> KW_VOLATILE
+  ("prefix"                       , KW_PREFIX);
+  ("prologue"                     , KW_PROLOGUE);
+  ("personality"                  , KW_PERSONALITY);
+  ("gc"                           , KW_GC);
+  ("to"                           , KW_TO);
+  ("unwind"                       , KW_UNWIND);
+  ("tail"                         , KW_TAIL);
+  ("musttail"                     , KW_MUSTTAIL);
+  ("notail"                       , KW_NOTAIL);
+  ("volatile"                     , KW_VOLATILE);
 
   (* instrs *)
-  | "add"            -> KW_ADD
-  | "fadd"           -> KW_FADD
-  | "sub"            -> KW_SUB
-  | "fsub"           -> KW_FSUB
-  | "mul"            -> KW_MUL
-  | "fmul"           -> KW_FMUL
-  | "udiv"           -> KW_UDIV
-  | "sdiv"           -> KW_SDIV
-  | "fdiv"           -> KW_FDIV
-  | "urem"           -> KW_UREM
-  | "srem"           -> KW_SREM
-  | "frem"           -> KW_FREM
-  | "shl"            -> KW_SHL
-  | "lshr"           -> KW_LSHR
-  | "ashr"           -> KW_ASHR
-  | "and"            -> KW_AND
-  | "or"             -> KW_OR
-  | "xor"            -> KW_XOR
-  | "icmp"           -> KW_ICMP
-  | "fcmp"           -> KW_FCMP
-  | "phi"            -> KW_PHI
-  | "call"           -> KW_CALL
-  | "trunc"          -> KW_TRUNC
-  | "zext"           -> KW_ZEXT
-  | "sext"           -> KW_SEXT
-  | "fptrunc"        -> KW_FPTRUNC
-  | "fpext"          -> KW_FPEXT
-  | "uitofp"         -> KW_UITOFP
-  | "sitofp"         -> KW_SITOFP
-  | "fptoui"         -> KW_FPTOUI
-  | "fptosi"         -> KW_FPTOSI
-  | "inttoptr"       -> KW_INTTOPTR
-  | "ptrtoint"       -> KW_PTRTOINT
-  | "bitcast"        -> KW_BITCAST
-  | "select"         -> KW_SELECT
-  | "freeze"         -> KW_FREEZE
-  | "va_arg"         -> KW_VAARG
-  | "ret"            -> KW_RET
-  | "br"             -> KW_BR
-  | "switch"         -> KW_SWITCH
-  | "indirectbr"     -> KW_INDIRECTBR
-  | "invoke"         -> KW_INVOKE
-  | "resume"         -> KW_RESUME
-  | "unreachable"    -> KW_UNREACHABLE
-  | "alloca"         -> KW_ALLOCA
-  | "load"           -> KW_LOAD
-  | "store"          -> KW_STORE
-  | "cmpxchg"        -> KW_ATOMICCMPXCHG
-  | "atomicrmw"      -> KW_ATOMICRMW
-  | "fence"          -> KW_FENCE
-  | "getelementptr"  -> KW_GETELEMENTPTR
-  | "inbounds"       -> KW_INBOUNDS
-  | "extractelement" -> KW_EXTRACTELEMENT
-  | "insertelement"  -> KW_INSERTELEMENT
-  | "shufflevector"  -> KW_SHUFFLEVECTOR
-  | "extractvalue"   -> KW_EXTRACTVALUE
-  | "insertvalue"    -> KW_INSERTVALUE
-  | "landingpad"     -> KW_LANDINGPAD
+  ("add"            , KW_ADD);
+  ("fadd"           , KW_FADD);
+  ("sub"            , KW_SUB);
+  ("fsub"           , KW_FSUB);
+  ("mul"            , KW_MUL);
+  ("fmul"           , KW_FMUL);
+  ("udiv"           , KW_UDIV);
+  ("sdiv"           , KW_SDIV);
+  ("fdiv"           , KW_FDIV);
+  ("urem"           , KW_UREM);
+  ("srem"           , KW_SREM);
+  ("frem"           , KW_FREM);
+  ("shl"            , KW_SHL);
+  ("lshr"           , KW_LSHR);
+  ("ashr"           , KW_ASHR);
+  ("and"            , KW_AND);
+  ("or"             , KW_OR);
+  ("xor"            , KW_XOR);
+  ("icmp"           , KW_ICMP);
+  ("fcmp"           , KW_FCMP);
+  ("phi"            , KW_PHI);
+  ("call"           , KW_CALL);
+  ("trunc"          , KW_TRUNC);
+  ("zext"           , KW_ZEXT);
+  ("sext"           , KW_SEXT);
+  ("fptrunc"        , KW_FPTRUNC);
+  ("fpext"          , KW_FPEXT);
+  ("uitofp"         , KW_UITOFP);
+  ("sitofp"         , KW_SITOFP);
+  ("fptoui"         , KW_FPTOUI);
+  ("fptosi"         , KW_FPTOSI);
+  ("inttoptr"       , KW_INTTOPTR);
+  ("ptrtoint"       , KW_PTRTOINT);
+  ("bitcast"        , KW_BITCAST);
+  ("select"         , KW_SELECT);
+  ("freeze"         , KW_FREEZE);
+  ("va_arg"         , KW_VAARG);
+  ("ret"            , KW_RET);
+  ("br"             , KW_BR);
+  ("switch"         , KW_SWITCH);
+  ("indirectbr"     , KW_INDIRECTBR);
+  ("invoke"         , KW_INVOKE);
+  ("resume"         , KW_RESUME);
+  ("unreachable"    , KW_UNREACHABLE);
+  ("alloca"         , KW_ALLOCA);
+  ("load"           , KW_LOAD);
+  ("store"          , KW_STORE);
+  ("cmpxchg"        , KW_ATOMICCMPXCHG);
+  ("atomicrmw"      , KW_ATOMICRMW);
+  ("fence"          , KW_FENCE);
+  ("getelementptr"  , KW_GETELEMENTPTR);
+  ("inbounds"       , KW_INBOUNDS);
+  ("extractelement" , KW_EXTRACTELEMENT);
+  ("insertelement"  , KW_INSERTELEMENT);
+  ("shufflevector"  , KW_SHUFFLEVECTOR);
+  ("extractvalue"   , KW_EXTRACTVALUE);
+  ("insertvalue"    , KW_INSERTVALUE);
+  ("landingpad"     , KW_LANDINGPAD);
 
-  | "dso_preemptable" -> KW_DSO_PREEMPTABLE
-  | "dso_local"       -> KW_DSO_LOCAL
+  ("dso_preemptable" , KW_DSO_PREEMPTABLE);
+  ("dso_local"       , KW_DSO_LOCAL);
 
   (* icmp *)
-  | "nuw"            -> KW_NUW
-  | "nsw"            -> KW_NSW
-  | "exact"          -> KW_EXACT
-  | "eq"             -> KW_EQ
-  | "ne"             -> KW_NE
-  | "ugt"            -> KW_UGT
-  | "uge"            -> KW_UGE
-  | "ult"            -> KW_ULT
-  | "ule"            -> KW_ULE
-  | "sgt"            -> KW_SGT
-  | "sge"            -> KW_SGE
-  | "slt"            -> KW_SLT
-  | "sle"            -> KW_SLE
+  ("nuw"            , KW_NUW);
+  ("nsw"            , KW_NSW);
+  ("exact"          , KW_EXACT);
+  ("eq"             , KW_EQ);
+  ("ne"             , KW_NE);
+  ("ugt"            , KW_UGT);
+  ("uge"            , KW_UGE);
+  ("ult"            , KW_ULT);
+  ("ule"            , KW_ULE);
+  ("sgt"            , KW_SGT);
+  ("sge"            , KW_SGE);
+  ("slt"            , KW_SLT);
+  ("sle"            , KW_SLE);
 
   (* fcmp. true and false are already handled later.
    * some are already handled in icmp *)
-  | "oeq"            -> KW_OEQ
-  | "ogt"            -> KW_OGT
-  | "oge"            -> KW_OGE
-  | "olt"            -> KW_OLT
-  | "ole"            -> KW_OLE
-  | "one"            -> KW_ONE
-  | "ord"            -> KW_ORD
-  | "uno"            -> KW_UNO
-  | "ueq"            -> KW_UEQ
-  | "une"            -> KW_UNE
+  ("oeq"            , KW_OEQ);
+  ("ogt"            , KW_OGT);
+  ("oge"            , KW_OGE);
+  ("olt"            , KW_OLT);
+  ("ole"            , KW_OLE);
+  ("one"            , KW_ONE);
+  ("ord"            , KW_ORD);
+  ("uno"            , KW_UNO);
+  ("ueq"            , KW_UEQ);
+  ("une"            , KW_UNE);
 
   (* fast math flags *)
-  | "nnan"           -> KW_NNAN
-  | "ninf"           -> KW_NINF
-  | "nsz"            -> KW_NSZ
-  | "arcp"           -> KW_ARCP
-  | "contract"       -> KW_CONTRACT
-  | "afn"            -> KW_AFN
-  | "reassoc"        -> KW_REASSOC
-  | "fast"           -> KW_FAST
+  ("nnan"           , KW_NNAN);
+  ("ninf"           , KW_NINF);
+  ("nsz"            , KW_NSZ);
+  ("arcp"           , KW_ARCP);
+  ("contract"       , KW_CONTRACT);
+  ("afn"            , KW_AFN);
+  ("reassoc"        , KW_REASSOC);
+  ("fast"           , KW_FAST);
 
   (* synchronization *)
-  | "syncscope"      -> KW_SYNCSCOPE
-  | "unordered"      -> KW_UNORDERED
-  | "monotonic"      -> KW_MONOTONIC
-  | "acquire"        -> KW_ACQUIRE
-  | "release"        -> KW_RELEASE
-  | "acq_rel"        -> KW_ACQ_REL
-  | "seq_cst"        -> KW_SEQ_CST
+  ("syncscope"      , KW_SYNCSCOPE);
+  ("unordered"      , KW_UNORDERED);
+  ("monotonic"      , KW_MONOTONIC);
+  ("acquire"        , KW_ACQUIRE);
+  ("release"        , KW_RELEASE);
+  ("acq_rel"        , KW_ACQ_REL);
+  ("seq_cst"        , KW_SEQ_CST);
 
   (*types*)
-  | "iptr"      -> KW_IPTR
-  | "void"      -> KW_VOID
-  | "half"      -> KW_HALF
-  | "float"     -> KW_FLOAT
-  | "double"    -> KW_DOUBLE
-  | "x86_fp80"  -> KW_X86_FP80
-  | "fp128"     -> KW_FP128
-  | "ppc_fp128" -> KW_PPC_FP128
-  | "label"     -> KW_LABEL
-  | "metadata"  -> KW_METADATA
-  | "x86_mmx"   -> KW_X86_MMX
+  ("iptr"      , KW_IPTR);
+  ("void"      , KW_VOID);
+  ("half"      , KW_HALF);
+  ("float"     , KW_FLOAT);
+  ("double"    , KW_DOUBLE);
+  ("x86_fp80"  , KW_X86_FP80);
+  ("fp128"     , KW_FP128);
+  ("ppc_fp128" , KW_PPC_FP128);
+  ("label"     , KW_LABEL);
+  ("metadata"  , KW_METADATA);
+  ("x86_mmx"   , KW_X86_MMX);
 
-  | "attributes" -> KW_ATTRIBUTES
+  ("attributes" , KW_ATTRIBUTES);
 
   (*constants*)
-  | "true"  -> KW_TRUE
-  | "false" -> KW_FALSE
-  | "null"  -> KW_NULL
-  | "undef" -> KW_UNDEF
-  | "zeroinitializer" -> KW_ZEROINITIALIZER
-  | "c" -> KW_C
+  ("true"  , KW_TRUE);
+  ("false" , KW_FALSE);
+  ("null"  , KW_NULL);
+  ("undef" , KW_UNDEF);
+  ("zeroinitializer" , KW_ZEROINITIALIZER);
+  ("c" , KW_C);
 
   (* misc *)
-  | "x" -> KW_X
+  ("x" , KW_X);
+]
 
-  (* catch_all *)
-  | s -> failwith ("Unknown or unsupported keyword: " ^ s)
+
+  let (symbol_table : (string, Llvm_parser.token) Hashtbl.t) = Hashtbl.create 1024
+  let _ =
+      List.iter (fun (str,t) -> Hashtbl.add symbol_table str t) reserved_words
+
+  let create_token str =
+    try (Hashtbl.find symbol_table str) 
+    with _ -> failwith ("Unknown or unsupported keyword: " ^ str)
 
   type ident_type = Named | NamedString | Unnamed
 
@@ -425,7 +433,7 @@ rule token = parse
   | '*' { STAR }
 
   (* keywords *)
-  | kwletter+ as a { kw a }
+  | kwletter+ as a { create_token a }
 
 and comment = parse
   | eol { Lexing.new_line lexbuf; EOL }
