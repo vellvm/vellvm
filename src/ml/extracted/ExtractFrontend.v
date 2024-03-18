@@ -55,5 +55,7 @@ Extract Constant randomRInt  =>
   "(fun (x,y) r -> let yint = coqZ2Int y in let xint = coqZ2Int x in if (yint < xint) then failwith ""choose called with unordered arguments"" else (int2CoqZ (xint + (Random.State.int r (yint - xint + 1))), r))".
 Extract Constant randomRN =>
   "(fun (x,y) r -> let yint = coqN2Int y in let xint = coqN2Int x in if yint < xint then failwith ""choose called with unordered arguments"" else  (int2CoqN (xint + (Random.State.int r (yint - xint + 1))), r))".
+Extract Constant randomRNat =>
+  "(fun (x,y) r -> let yint = ExtrOcamlIntConv.int_of_nat y in let xint = ExtrOcamlIntConv.int_of_nat x in if yint < xint then failwith ""choose called with unordered arguments"" else  (ExtrOcamlIntConv.nat_of_int (xint + (Random.State.int r (yint - xint + 1))), r))".
 
 Separate Extraction LLVMAst AstLib TopLevel InterpretationStack ExtrOcamlIntConv ParserHelper ShowAST ReprAST GenAlive2.
