@@ -341,13 +341,17 @@
   ("x" , KW_X);
 ]
 
+  let histogram : (string, int) Hashtbl.t = Hashtbl.create 1024
 
   let (symbol_table : (string, Llvm_parser.token) Hashtbl.t) = Hashtbl.create 1024
   let _ =
       List.iter (fun (str,t) -> Hashtbl.add symbol_table str t) reserved_words
 
   let create_token str =
-    try (Hashtbl.find symbol_table str) 
+    try
+      let token = Hashtbl.find symbol_table str in
+      let _ = Histogram.record histogram str in
+      token
     with _ -> failwith ("Unknown or unsupported keyword: " ^ str)
 
   type ident_type = Named | NamedString | Unnamed

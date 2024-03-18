@@ -25,21 +25,36 @@ let test_pp_dir dir =
   raise (Ran_tests (successful outcome))
 
 
+let output_histogram oc =
+  Format.pp_print_string oc (Histogram.to_string Llvm_lexer.histogram);
+  Format.pp_force_newline oc ()
+
 (* Ugly duplication. TODO: reuse more existing facility *)
 let ast_pp_file_inner path =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
   let file, ext = Platform.path_to_basename_ext path in
+  let perm = [Open_append; Open_creat] in
   begin match ext with
     | "ll" ->
+      (* Reset lexer token histogram data *)
+      let _ = Hashtbl.clear (Llvm_lexer.histogram) in
+
+      (* Parse the file *)
       let ll_ast = IO.parse_file path in
       let vast_file = Platform.gen_name !Platform.output_path file ".v.ast" in
 
+      (* Output histogram data *)
+      let hist_file = Platform.gen_name !Platform.output_path file ".hist" in
+      let hist_channel = open_out_gen perm 0o640 hist_file in
+      let hoc = (Format.formatter_of_out_channel hist_channel) in
+      let _ = output_histogram hoc in
+      let _ = close_out hist_channel in
+      
       (* Prints the original llvm program *)
       let _ = IO.output_file vast_file ll_ast in
       let _ = Printf.printf "pretty-printed version of %s:\n\n" path in
       let _ = IO.print_ast ll_ast in
 
-      let perm = [Open_append; Open_creat] in
       let channel = open_out_gen perm 0o640 vast_file in
       let oc = (Format.formatter_of_out_channel channel) in
 
@@ -50,10 +65,13 @@ let ast_pp_file_inner path =
       Format.pp_force_newline oc ();
       Format.pp_force_newline oc ();
       let _ = IO.output_ast ll_ast oc in
-
+      Format.pp_force_newline oc ();
+      Format.pp_force_newline oc ();
       close_out channel
     | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
   end
+
+
 
 let ast_pp_file path =
   Platform.configure();
