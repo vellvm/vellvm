@@ -1276,6 +1276,12 @@ intros m M conv l.
 apply (fold_left (fun acc x => monoid_plus M (conv x) acc) l (monoid_unit M)).
 Defined.
 
+#[global] Instance Foldable_option {a} : Foldable (option a) a.
+split.
+intros m M conv oa.
+apply (match oa with | Some a => conv a | None => (monoid_unit M) end).
+Defined.
+
 Definition EntTarget {es E} `{ToEnt E} `{Foldable es E} w m := SystemT w m es.
 
 Definition allEnts {w m} `{Monad m} : EntTarget w m (es:=IS.t)
@@ -1320,6 +1326,29 @@ Next Obligation.
     try typeclasses_eauto.
 Defined.
 
+Program Definition efind
+  {w m a} `{Monad m} `{@MetadataStore m Metadata (SystemState w m)}
+  {es E} `{ToEnt E} `{Foldable es E}
+  (t : EntTarget w m (E:=E))
+  (q : QueryT Metadata m a) : SystemT w m (option a)
+  := es <- t;;
+     _.
+Next Obligation.
+  refine
+    open_constr:
+      (fold _
+         (fun (k : E) (acc : SystemT w m (option a)) =>
+            let e := toEnt k in
+            meta <- getEntity e;;
+            qres <- lift (unQueryT q e meta);;
+            match qres with
+            | Some _ => ret qres
+            | None => acc
+            end
+         ) (ret None) es);
+    try typeclasses_eauto.
+Defined.
+
 Definition add_global {m} `{Monad m} (name : string) : SystemT Metadata m _
   := e <- newEntity;;
      metadata .@ entl e .@ is_global' .= ret tt;;
@@ -1332,6 +1361,7 @@ Definition add_local {m} `{Monad m} (name : string) : SystemT Metadata m _
      metadata .@ entl e .@ name' .= ret (ID_Local (Name name));;
      ret e.
 
+Require Import AstLib.
 Definition test_system {m} `{HM: Monad m} : SystemT Metadata m _
   := e <- newEntity;;
      e2 <- newEntity;;
@@ -1339,10 +1369,12 @@ Definition test_system {m} `{HM: Monad m} : SystemT Metadata m _
      add_global "wee";;
      add_local "foo";;
      emap allEnts
-       (n <- query (name FieldOf);;
-        withq (is_global FieldOf);;
+       (n <- queryl name';;
+        withl is_global';;
         ret (def & @name' SetterOf .~ SetValue _ (ID_Global (Name "ueoaue"))));;
-     get.
+     wee <- efind allEnts (withl is_global';; queryl name');;
+     foo <- get;;
+     ret (foo, wee).
 
 Definition ecs_test :=
   IdentityMonad.unIdent (runSystemT def test_system).
