@@ -920,7 +920,9 @@ Section TypGenerators.
     := if cnd then SetValue _ tt else Unset _.
 
   Definition typ_metadata_setter (typ_ctx : list (ident * typ)) (τ : typ) : Metadata SetterOf :=
+    let normalized := normalize_type typ_ctx τ in
     def
+    & (@normalized_type' SetterOf .~ SetValue _ normalized)
     & (@is_sized' SetterOf .~ bool_setter (is_sized_type typ_ctx τ))
     & (@is_pointer' SetterOf .~ bool_setter (match τ with | TYPE_Pointer _ => true | _ => false end))
     & (@is_sized_pointer' SetterOf .~
@@ -931,7 +933,7 @@ Section TypGenerators.
           end))
     & (@is_aggregate' SetterOf .~
          bool_setter
-         (match normalize_type typ_ctx τ with
+         (match normalized with
           | TYPE_Array sz _ => N.ltb 0 sz
           | TYPE_Struct l
           | TYPE_Packed_struct l => negb (l_is_empty l)
@@ -939,26 +941,26 @@ Section TypGenerators.
           end))
     & (@is_non_void' SetterOf .~
          bool_setter
-         (match normalize_type typ_ctx τ with
+         (match normalized with
           | TYPE_Void => false
           | _ => true
           end))
     & (@is_vector' SetterOf .~
          bool_setter
-         (match normalize_type typ_ctx τ with
+         (match normalized with
           | TYPE_Vector _ _ => true
           | _ => false
           end))
     & (@is_ptr_vector' SetterOf .~
          bool_setter
-         (match normalize_type typ_ctx τ with
+         (match normalized with
           | TYPE_Pointer _ => true
           | TYPE_Vector _ (TYPE_Pointer _) => true
           | _ => false
           end))
     & (@is_sized_ptr_vector' SetterOf .~
          bool_setter
-         (match normalize_type typ_ctx τ with
+         (match normalized with
           | TYPE_Pointer t => is_sized_type typ_ctx t
           | TYPE_Vector _ (TYPE_Pointer t) => is_sized_type typ_ctx t
           | _ => false
@@ -1696,8 +1698,9 @@ Section ExpGenerators.
     | _ => false
     end.
 
-  Definition filter_function_pointers (typ_ctx : type_context) (ctx : var_context) : var_context :=
-    filter (fun '(_, t) => is_function_pointer typ_ctx t) ctx.
+  (* TODO: remove this *)
+  (* Definition filter_function_pointers (typ_ctx : type_context) (ctx : var_context) : var_context := *)
+  (*   filter (fun '(_, t) => is_function_pointer typ_ctx t) ctx. *)
 
   (* Can't use choose for these functions because it gets extracted to
      ocaml's Random.State.int function which has small bounds. *)

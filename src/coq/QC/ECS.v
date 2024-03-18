@@ -109,6 +109,7 @@ Record Metadata s :=
     { name : Component s Field ident
     ; type_alias : Component s Field typ
     ; variable_type : Component s Field typ
+    ; normalized_type : Component s Field typ
     ; is_local : Component s Field unit
     ; is_global : Component s Field unit
     ; is_non_deterministic : Component s Field unit
@@ -265,6 +266,7 @@ Ltac2 metadataConstructors :=
   [ (fun _ => apply name)
   ; (fun _ => apply type_alias)
   ; (fun _ => apply variable_type)
+  ; (fun _ => apply normalized_type)
   ; (fun _ => apply is_local)
   ; (fun _ => apply is_global)
   ; (fun _ => apply is_non_deterministic)
@@ -287,6 +289,7 @@ Ltac2 applyMetadataConstructors (tac : unit -> unit) :=
     [ (fun _ => tac (); apply name)
       ; (fun _ => tac (); apply type_alias)
       ; (fun _ => tac (); apply variable_type)
+      ; (fun _ => tac (); apply normalized_type)
       ; (fun _ => tac (); apply is_local)
       ; (fun _ => tac (); apply is_global)
       ; (fun _ => tac (); apply is_non_deterministic)
@@ -367,6 +370,7 @@ Definition name' {s : StorageType} : Lens' (Metadata s) (Component s Field ident
         [ (fun _ => apply x)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -396,6 +400,7 @@ Definition is_global' {s : StorageType} : Lens' (Metadata s) (Component s Field 
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply x)
           ; (fun _ => apply is_non_deterministic)
@@ -425,6 +430,7 @@ Definition is_local' {s : StorageType} : Lens' (Metadata s) (Component s Field u
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply x)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -454,6 +460,7 @@ Definition type_alias' {s : StorageType} : Lens' (Metadata s) (Component s Field
         [ (fun _ => apply name)
           ; (fun _ => apply x)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -483,6 +490,7 @@ Definition variable_type' {s : StorageType} : Lens' (Metadata s) (Component s Fi
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply x)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -500,7 +508,37 @@ Definition variable_type' {s : StorageType} : Lens' (Metadata s) (Component s Fi
           ; (fun _ => apply is_sized_type_alias)
         ];
       apply w.
-  - apply type_alias.
+  - apply variable_type.
+Defined.
+
+Definition normalized_type' {s : StorageType} : Lens' (Metadata s) (Component s Field typ).
+  red.
+  intros f F afa w.
+  refine open_constr:((fun x => _) <$> afa (_ w)); try typeclasses_eauto.
+  - apply mkMetadata;
+      Control.dispatch
+        [ (fun _ => apply name)
+          ; (fun _ => apply type_alias)
+          ; (fun _ => apply variable_type)
+          ; (fun _ => apply x)
+          ; (fun _ => apply is_local)
+          ; (fun _ => apply is_global)
+          ; (fun _ => apply is_non_deterministic)
+          ; (fun _ => apply from_pointer)
+          ; (fun _ => apply is_pointer)
+          ; (fun _ => apply is_sized_pointer)
+          ; (fun _ => apply is_sized)
+          ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_vector)
+          ; (fun _ => apply is_array)
+          ; (fun _ => apply is_struct)
+          ; (fun _ => apply is_non_void)
+          ; (fun _ => apply is_ptr_vector)
+          ; (fun _ => apply is_sized_ptr_vector)
+          ; (fun _ => apply is_sized_type_alias)
+        ];
+      apply w.
+  - apply normalized_type.
 Defined.
 
 Definition is_non_deterministic' {s : StorageType} : Lens' (Metadata s) (Component s Field unit).
@@ -512,6 +550,7 @@ Definition is_non_deterministic' {s : StorageType} : Lens' (Metadata s) (Compone
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply x)
@@ -541,6 +580,7 @@ Definition from_pointer' {s : StorageType} : Lens' (Metadata s) (Component s Fie
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -570,6 +610,7 @@ Definition is_pointer' {s : StorageType} : Lens' (Metadata s) (Component s Field
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -599,6 +640,7 @@ Definition is_sized_pointer' {s : StorageType} : Lens' (Metadata s) (Component s
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -628,6 +670,7 @@ Definition is_sized' {s : StorageType} : Lens' (Metadata s) (Component s Field u
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -657,6 +700,7 @@ Definition is_aggregate' {s : StorageType} : Lens' (Metadata s) (Component s Fie
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -686,6 +730,7 @@ Definition is_vector' {s : StorageType} : Lens' (Metadata s) (Component s Field 
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -715,6 +760,7 @@ Definition is_array' {s : StorageType} : Lens' (Metadata s) (Component s Field u
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -744,6 +790,7 @@ Definition is_struct' {s : StorageType} : Lens' (Metadata s) (Component s Field 
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -773,6 +820,7 @@ Definition is_non_void' {s : StorageType} : Lens' (Metadata s) (Component s Fiel
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -802,6 +850,7 @@ Definition is_ptr_vector' {s : StorageType} : Lens' (Metadata s) (Component s Fi
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -831,6 +880,7 @@ Definition is_sized_ptr_vector' {s : StorageType} : Lens' (Metadata s) (Componen
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -860,6 +910,7 @@ Definition is_sized_type_alias' {s : StorageType} : Lens' (Metadata s) (Componen
         [ (fun _ => apply name)
           ; (fun _ => apply type_alias)
           ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
           ; (fun _ => apply is_local)
           ; (fun _ => apply is_global)
           ; (fun _ => apply is_non_deterministic)
@@ -1122,11 +1173,12 @@ Definition names'' {m} : Traversal (Metadata (WorldOf m)) (Metadata (WorldOf m))
   red.
   intros f F focus meta.
   refine open_constr:(pure (mkMetadata (WorldOf m)) <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _
-                     <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _);
+                     <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _);
     try typeclasses_eauto.
   - apply (focus (name _ meta)).
   - apply (pure (type_alias _ meta)).
   - apply (pure (variable_type _ meta)).
+  - apply (pure (normalized_type _ meta)).
   - apply (pure (is_local _ meta)).
   - apply (pure (is_global _ meta)).
   - apply (pure (is_non_deterministic _ meta)).
