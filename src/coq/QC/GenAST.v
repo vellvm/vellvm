@@ -1018,10 +1018,26 @@ Section TypGenerators.
   (*             | _ => false *)
   (*             end) ctx. *)
 
-  Definition gen_IntMapRaw_key_filter {a} (m : IM.Raw.t a) (filter : Z -> GenLLVM bool) : GenLLVM (option Z)
+  Definition GenQuery' m := QueryT Metadata m.
+  Definition runGenQuery {m A E}
+    `{TE : ToEnt E}
+    `{Monad m}
+    `{MS: MetadataStore m Metadata (SystemState GenState m)}
+    `{MT: MonadT (SystemT GenState m) m}
+    (q : GenQuery' m A) (k : E) : SystemT GenState m (option A):=
+    let e := toEnt k in
+    meta <- getEntity e;;
+    lift (unQueryT q e meta).
+  Definition GenQuery := GenQuery' G.
+
+  Definition runGenQueryLLVM {A E} `{TE : ToEnt E}
+    (q : GenQuery A) (k : E) : GenLLVM (option A):=
+    lift (runGenQuery q k).
+
+  Definition gen_IntMapRaw_key_filter {a b} (m : IM.Raw.t a) (filter : GenQuery b) : GenLLVM (option Z)
     := '(g, _) <- (IM.Raw.fold
                     (fun key _ (grest : GenLLVM (option Z * N)) =>
-                       cnd <- filter key;;
+                       cnd <- is_some <$> runGenQueryLLVM filter key;;
                        '(gacc, k) <- grest;;
                        swap <- lift (fmap (N.eqb 0) (choose (0%N, k)));;
                        let k' := if cnd then (k+1)%N else k in
@@ -1032,37 +1048,27 @@ Section TypGenerators.
                          ret (gacc, k'))
                     m (ret (@None Z, 0%N)));;
        ret g.
+  
+  Definition gen_IntMapRaw_key {a} (m : IM.Raw.t a) : GenLLVM (option Z)
+    := gen_IntMapRaw_key_filter m (ret tt).
 
-  Definition gen_IntMapRaw_key {a} (m : IM.Raw.t a) : GenLLVM Z
-    := fst (IM.Raw.fold
-              (fun key _ '(gacc, k) =>
-                 let gen' :=
-                   swap <- lift (fmap (N.eqb 0) (choose (0%N, k)));;
-                   if swap
-                   then (* swap *)
-                     ret key
-                   else (* No swap *)
-                     gacc
-                 in (gen', (k+1)%N))
-              m (failGen "gen_IntMapRaw_key", 0%N)).
+  Definition gen_IntMapRaw_ent {a} (m : IM.Raw.t a) : GenLLVM (option Ent)
+    := fmap (fmap mkEnt) (gen_IntMapRaw_key m).
 
-  Definition gen_IntMapRaw_ent {a} (m : IM.Raw.t a) : GenLLVM Ent
-    := fmap mkEnt (gen_IntMapRaw_key m).
-
-  Definition gen_IntMapRaw_ent_filter {a} (m : IM.Raw.t a) (filter : Z -> GenLLVM bool) : GenLLVM (option Ent)
+  Definition gen_IntMapRaw_ent_filter {a b} (m : IM.Raw.t a) (filter : GenQuery b) : GenLLVM (option Ent)
     := fmap (fmap mkEnt) (gen_IntMapRaw_key_filter m filter).
- 
 
-  Definition gen_sized_type_alias : GenLLVM ident
+  Definition gen_sized_type_alias : GenLLVM (option ident)
     := es <- use (gen_context' .@ is_sized_type_alias');;
        var <- gen_IntMapRaw_ent es;;
-       mident <- use (gen_context' .@ entl var .@ name');;
-       match mident with
-       | Some id => ret id
-       | None => failGen "gen_sized_type_alias, couldn't find entity... Shouldn't happen"
-       end.
+       match var with
+       | Some var =>
+           id <- use (gen_context' .@ entl var .@ name');;
+           ret id
+       | None => ret None
+       end.       
 
-  Definition gen_entity_with {a} (focus : Lens' (SystemState GenState G) (IM.Raw.t a)): GenLLVM Ent
+  Definition gen_entity_with {a} (focus : Lens' (SystemState GenState G) (IM.Raw.t a)): GenLLVM (option Ent)
     := es <- use focus;;
        gen_IntMapRaw_ent es.
 
@@ -1073,9 +1079,9 @@ Section TypGenerators.
        | None => ret false
        end.       
 
-  Definition gen_entity_with_filter {a}
+  Definition gen_entity_with_filter {a b}
     (focus : Lens' (SystemState GenState G) (IM.Raw.t a))
-    (filter : Z -> GenLLVM bool)
+    (filter : GenQuery b)
     : GenLLVM (option Ent)
     := es <- use focus;;
        gen_IntMapRaw_ent_filter es filter.
@@ -1097,11 +1103,15 @@ Section TypGenerators.
   (* Generate a type that matches one of the type aliases *)
   Definition gen_sized_type_of_alias {a} (focus : Lens' (SystemState GenState G) (IM.Raw.t a)) : GenLLVM typ
     := var <- gen_entity_with focus;;
-       get_type_from_alias var.
+       match var with
+       | Some var =>
+           get_type_from_alias var
+       | None => failGen "gen_sized_type_of_alias, couldn't find entity... Shouldn't happen"
+       end.
 
-  Definition gen_sized_type_of_alias_filter {a}
+  Definition gen_sized_type_of_alias_filter {a b}
     (focus : Lens' (SystemState GenState G) (IM.Raw.t a))
-    (filter : Z -> GenLLVM bool)
+    (filter : GenQuery b)
     : GenLLVM (option typ)
     := var <- gen_entity_with_filter focus filter;;
        match var with
@@ -1110,14 +1120,9 @@ Section TypGenerators.
        end.
 
   (* Generate a type that matches one of the variables *)
-  Definition gen_sized_type_of_variable {a} (focus : Lens' (SystemState GenState G) (IM.Raw.t a)) : GenLLVM typ
-    := var <- gen_entity_with focus;;
-       get_type_of_variable var.
-
-  (* Generate a type that matches one of the variables *)
-  Definition gen_sized_type_of_variable_filter {a}
+  Definition gen_type_of_variable_filter {a b}
     (focus : Lens' (SystemState GenState G) (IM.Raw.t a))
-    (filter : Z -> GenLLVM bool)
+    (filter : GenQuery b)
     : GenLLVM (option typ)
     := var <- gen_entity_with_filter focus filter;;
        match var with
@@ -1127,12 +1132,13 @@ Section TypGenerators.
 
   (* Not sized in the QuickChick sense, sized in the LLVM sense. *)
   Definition gen_sized_typ_0 : GenLLVM typ :=
-    sized_aliases <- use (gen_context' .@ is_sized_type_alias');;
+    oid <- gen_sized_type_alias;;
     let ident_gen :=
-        (* Don't want to fail if there are no identifiers *)
-        if (IM.Raw.is_empty sized_aliases)%nat
-        then []
-        else [TYPE_Identified <$> gen_sized_type_alias] in
+      match oid with
+      | None => []
+      | Some id => [ret (TYPE_Identified id)]
+      end
+    in
     oneOf_LLVM
            (ident_gen ++
            (map ret
@@ -1164,25 +1170,40 @@ Section TypGenerators.
   (* Definition gen_ident_from_ctx (ctx : var_context) : GenLLVM ident *)
   (*   := fmap fst (elems_LLVM ctx). *)
 
-  Definition gen_type_matching_alias_focus {a} (focus : Lens' (SystemState GenState G) (IM.Raw.t a)) : GenLLVM (N * (unit -> GenLLVM typ))
+  Definition def_option_GenLLVM {a} (def : GenLLVM a) (gopt : GenLLVM (option a)) : GenLLVM a
+    := o <- gopt;;
+       match o with
+       | Some a => ret a
+       | None => def
+       end.
+
+  Definition gen_type_matching_alias_focus {a b}
+    (focus : Lens' (SystemState GenState G) (IM.Raw.t a)) (filter : GenQuery b)
+    : GenLLVM (N * (unit -> GenLLVM typ))
     := focused <- use focus;;
-       ret (N.min (N.of_nat (IM.Raw.cardinal focused)) 10, (fun _ => gen_sized_type_of_alias focus)).
+       let sz := IM.Raw.cardinal focused in
+       ret (N.min (N.of_nat sz) 10,
+           (fun _ => def_option_GenLLVM (failGen "gen_type_matching_alias_focus: shouldn't happen!") (gen_sized_type_of_alias_filter focus filter))).
 
-  Definition gen_type_matching_variable_focus {a} (focus : Lens' (SystemState GenState G) (IM.Raw.t a)) : GenLLVM (N * (unit -> GenLLVM typ))
+  Definition gen_type_matching_variable_focus {a b}
+    (focus : Lens' (SystemState GenState G) (IM.Raw.t a)) (filter : GenQuery b)
+    : GenLLVM (N * (unit -> GenLLVM typ))
     := focused <- use focus;;
-       ret (N.min (N.of_nat (IM.Raw.cardinal focused)) 10, (fun _ => gen_sized_type_of_variable focus)).
+       let sz := IM.Raw.cardinal focused in
+       ret (N.min (N.of_nat sz) 10,
+           (fun _ => def_option_GenLLVM (failGen "gen_type_matching_variable_focus: shouldn't happen!") (gen_type_of_variable_filter focus filter))).
 
-  Definition gen_type_matching_alias : GenLLVM (N * (unit -> GenLLVM typ))
-    := gen_type_matching_alias_focus (gen_context' .@ is_sized_type_alias').
+  Definition gen_type_matching_alias {b} (filter : GenQuery b) : GenLLVM (N * (unit -> GenLLVM typ))
+    := gen_type_matching_alias_focus (gen_context' .@ is_sized_type_alias') filter.
 
-  Definition gen_type_matching_local : GenLLVM (N * (unit -> GenLLVM typ))
-    := gen_type_matching_variable_focus (gen_context' .@ is_local').
+  Definition gen_type_matching_local {b} (filter : GenQuery b) : GenLLVM (N * (unit -> GenLLVM typ))
+    := gen_type_matching_variable_focus (gen_context' .@ is_local') filter.
 
-  Definition gen_type_matching_global : GenLLVM (N * (unit -> GenLLVM typ))
-    := gen_type_matching_variable_focus (gen_context' .@ is_global').
+  Definition gen_type_matching_global {b} (filter : GenQuery b) : GenLLVM (N * (unit -> GenLLVM typ))
+    := gen_type_matching_variable_focus (gen_context' .@ is_global') filter.
 
-  Definition gen_type_matching_locals_and_globals : GenLLVM (N * (unit -> GenLLVM typ))
-    := gen_type_matching_variable_focus (gen_context' .@ variable_type').
+  Definition gen_type_matching_locals_and_globals {b} (filter : GenQuery b) : GenLLVM (N * (unit -> GenLLVM typ))
+    := gen_type_matching_variable_focus (gen_context' .@ variable_type') filter.
 
   Program Fixpoint gen_sized_typ_size' (from_context : GenLLVM (N * (unit -> GenLLVM typ))) (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
@@ -1190,54 +1211,66 @@ Section TypGenerators.
     | (S sz') =>
         fc <- from_context;;
         freq_LLVM_thunked_N
-        ([fc] ++
-         [(1%N, (fun _ => gen_sized_typ_0))
-          ; (1%N, (fun _ => ret TYPE_Pointer <*> gen_sized_typ_size' from_context (sz / 2)))
-        (* TODO: Might want to restrict the size to something reasonable *)
-        ; (1%N, (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size' from_context sz'))
-        ; (1%N, (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size' from_context 0))
-        (* TODO: I don't think functions are sized types? *)
-        (* ; let n := Nat.div sz 2 in *)
-        (*   ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) *)
-        ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size' from_context (sz / 2))))
-        ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size' from_context (sz / 2))))
-        ])
+          [ fc
+            ; (1%N, (fun _ => gen_sized_typ_0))
+            ; (1%N, (fun _ => ret TYPE_Pointer <*> gen_sized_typ_size' from_context (sz / 2)))
+                (* TODO: Might want to restrict the size to something reasonable *)
+            ; (1%N, (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size' from_context sz'))
+            ; (1%N, (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size' from_context 0))
+                (* TODO: I don't think functions are sized types? *)
+                (* ; let n := Nat.div sz 2 in *)
+                (*   ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) *)
+            ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size' from_context (sz / 2))))
+            ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size' from_context (sz / 2))))
+          ]
     end.
-
-  Definition gen_sized_typ_size := gen_sized_typ_size' gen_type_matching_alias.
+  
+  Definition gen_sized_typ_size := gen_sized_typ_size' (gen_type_matching_alias (withl is_sized')).
 
   Definition gen_sized_typ' (from_context : GenLLVM (N * (unit -> GenLLVM typ))) : GenLLVM typ
     := sized_LLVM (fun sz => gen_sized_typ_size' from_context sz).
 
   Definition gen_sized_typ  : GenLLVM typ
-    := gen_sized_typ' gen_type_matching_alias.
+    := sized_LLVM (fun sz => gen_sized_typ_size sz).
 
-  (* Want to be able to use gen_sized_typ' to do this...
-     But I did not notice this wants only sized types from the contexts.
-     Need to be able to filter focused entities to only the ones with the sized type tags... Should be doable.
-   *)
-  Definition gen_sized_typ_ptrin_fctx : GenLLVM typ
-    := gen_sized_typ_size' 
-    ctx <- get_ctx;;
-    aliases <- get_typ_ctx;;
-    let typs_in_ctx := filter_sized_typs aliases ctx in
-    sized_LLVM (fun sz => gen_sized_typ_size_ptrinctx sz typs_in_ctx).
+(*   (* Want to be able to use gen_sized_typ' to do this... *)
+(*      But I did not notice this wants only sized types from the contexts. *)
+(*      Need to be able to filter focused entities to only the ones with the sized type tags... Should be doable. *)
+(*    *) *)
+(*   Definition gen_sized_typ_ptrin_fctx : GenLLVM typ *)
+(*     := gen_typ_size' ( *)
+(*     ctx <- get_ctx;; *)
+(*     aliases <- get_typ_ctx;; *)
+(*     let typs_in_ctx := filter_sized_typs aliases ctx in *)
+(*     sized_LLVM (fun sz => gen_sized_typ_size_ptrinctx sz typs_in_ctx). *)
 
-  Definition gen_sized_typ_ptrin_gctx : GenLLVM typ
-    :=
-    gctx <- get_global_ctx;;
-    aliases <- get_typ_ctx;;
-    let typs_in_ctx := filter_sized_typs aliases gctx in
-    sized_LLVM (fun sz => gen_sized_typ_size_ptrinctx sz typs_in_ctx).
+(* gen_sized_typ_ptrin_fctx seems to grab a  *)
+
+(*   Definition gen_sized_typ_ptrin_gctx : GenLLVM typ *)
+(*     := *)
+(*     gctx <- get_global_ctx;; *)
+(*     aliases <- get_typ_ctx;; *)
+(*     let typs_in_ctx := filter_sized_typs aliases gctx in *)
+(*     sized_LLVM (fun sz => gen_sized_typ_size_ptrinctx sz typs_in_ctx). *)
+
+  Definition gen_type_alias_ident : GenLLVM (option ident)
+    := es <- use (gen_context' .@ type_alias');;
+       var <- gen_IntMapRaw_ent es;;
+       match var with
+       | Some var =>
+           id <- use (gen_context' .@ entl var .@ name');;
+           ret id
+       | None => ret None
+       end.       
 
   (* Generate a type of size 0 *)
   Definition gen_typ_0 : GenLLVM typ :=
-    aliases <- get_typ_ctx;;
-    let identified :=
-        match aliases with
-        | [] => []
-        | _  => [(ret TYPE_Identified <*> gen_ident_from_ctx aliases)]
-        end
+    oid <- gen_sized_type_alias;;
+    let ident_gen :=
+      match oid with
+      | None => []
+      | Some id => [ret (TYPE_Identified id)]
+      end
     in
     oneOf_LLVM
           ((* identified ++ *)

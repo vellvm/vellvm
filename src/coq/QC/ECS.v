@@ -1180,9 +1180,15 @@ Definition query {world a m} `{Monad m} (f : world FieldOf -> option a) : QueryT
      | Some x => ret x
      end.
 
+Definition queryl {world a m} `{Monad m} (l : Lens' (world FieldOf) (Component FieldOf Field a)) : QueryT world m a
+  := query (view l).
+
 Definition withq {world a m} `{Monad m} (f : world FieldOf -> option a) : QueryT world m unit
   := query f;;
      ret tt.
+
+Definition withl {world a m} `{Monad m} (l : Lens' (world FieldOf) (Component FieldOf Field a)) : QueryT world m unit
+  := withq (view l).
 
 Definition without {world a m} `{MonadZero m} `{Monad m} (f : world FieldOf -> option a) : QueryT world m unit
   := e <- @mkQueryT world m _ (asks snd);;
@@ -1190,6 +1196,9 @@ Definition without {world a m} `{MonadZero m} `{Monad m} (f : world FieldOf -> o
      | None => ret tt
      | Some x => mzero
      end.
+
+Definition withoutl {world a m} `{MonadZero m} `{Monad m} (l : Lens' (world FieldOf) (Component FieldOf Field a)) : QueryT world m unit
+  := without (view l).
 
 (* I want to be able to use `IS.t` and `IM.Raw.t unit` and maybe `list Z` and `list Ent` as targets... What do I need from an EntTarget? *)
 Class ToEnt T :=
