@@ -912,71 +912,227 @@ Section GenerationState.
 End GenerationState.
 
 Section TypGenerators.
-  (*filter all the (ident, typ) in ctx such that typ is a ptr*)
-  Definition filter_ptr_typs (typ_ctx : type_context) (ctx : var_context) : var_context :=
-    filter (fun '(_, t) => match normalize_type typ_ctx t with
-                        | TYPE_Pointer _ => true
-                        | _ => false
-                        end) ctx.
+  Definition assign_if {m : Type -> Type} {s a b : Type} `{HM : Monad m} `{ST : @MonadState s m}
+    (cnd : bool) (l : ASetter s s a b) (v : b) : m unit
+    := if cnd then l .= v;; ret tt else ret tt.
 
-  Definition filter_sized_ptr_typs (typ_ctx : type_context) (ctx : var_context) : var_context :=
-    filter (fun '(_, t) => match normalize_type typ_ctx t with
-                        | TYPE_Pointer t => is_sized_type typ_ctx t
-                        | _ => false
-                        end) ctx.
+  Definition bool_setter (cnd : bool) : Update unit
+    := if cnd then SetValue _ tt else Unset _.
 
-  Definition filter_sized_typs (typ_ctx: type_context) (ctx : var_context) : var_context :=
-    filter (fun '(_, t) => is_sized_type typ_ctx t) ctx.
+  Definition typ_metadata_setter (typ_ctx : list (ident * typ)) (τ : typ) : Metadata SetterOf :=
+    def
+    & (@is_sized' SetterOf .~ bool_setter (is_sized_type typ_ctx τ))
+    & (@is_pointer' SetterOf .~ bool_setter (match τ with | TYPE_Pointer _ => true | _ => false end))
+    & (@is_sized_pointer' SetterOf .~
+         bool_setter
+         (match τ with
+          | TYPE_Pointer τ' => is_sized_type typ_ctx τ
+          | _ => false
+          end))
+    & (@is_aggregate' SetterOf .~
+         bool_setter
+         (match normalize_type typ_ctx τ with
+          | TYPE_Array sz _ => N.ltb 0 sz
+          | TYPE_Struct l
+          | TYPE_Packed_struct l => negb (l_is_empty l)
+          | _ => false
+          end))
+    & (@is_non_void' SetterOf .~
+         bool_setter
+         (match normalize_type typ_ctx τ with
+          | TYPE_Void => false
+          | _ => true
+          end))
+    & (@is_vector' SetterOf .~
+         bool_setter
+         (match normalize_type typ_ctx τ with
+          | TYPE_Vector _ _ => true
+          | _ => false
+          end))
+    & (@is_ptr_vector' SetterOf .~
+         bool_setter
+         (match normalize_type typ_ctx τ with
+          | TYPE_Pointer _ => true
+          | TYPE_Vector _ (TYPE_Pointer _) => true
+          | _ => false
+          end))
+    & (@is_sized_ptr_vector' SetterOf .~
+         bool_setter
+         (match normalize_type typ_ctx τ with
+          | TYPE_Pointer t => is_sized_type typ_ctx t
+          | TYPE_Vector _ (TYPE_Pointer t) => is_sized_type typ_ctx t
+          | _ => false
+          end)).
+  
+  (* (*filter all the (ident, typ) in ctx such that typ is a ptr*) *)
+  (* Definition filter_ptr_typs (typ_ctx : type_context) (ctx : var_context) : var_context := *)
+  (*   filter (fun '(_, t) => match normalize_type typ_ctx t with *)
+  (*                       | TYPE_Pointer _ => true *)
+  (*                       | _ => false *)
+  (*                       end) ctx. *)
 
-  Definition filter_non_void_typs (typ_ctx : type_context) (ctx : var_context) : var_context :=
-    filter (fun '(_, t) => match normalize_type typ_ctx t with
-                        | TYPE_Void => false
-                        | _ => true
-                        end) ctx.
+  (* Definition filter_sized_ptr_typs (typ_ctx : type_context) (ctx : var_context) : var_context := *)
+  (*   filter (fun '(_, t) => match normalize_type typ_ctx t with *)
+  (*                       | TYPE_Pointer t => is_sized_type typ_ctx t *)
+  (*                       | _ => false *)
+  (*                       end) ctx. *)
 
-  Definition filter_agg_typs (typ_ctx : type_context) (ctx: var_context) : var_context :=
-    filter (fun '(_, t) =>
-              match normalize_type typ_ctx t with
-              | TYPE_Array sz _ => N.ltb 0 sz
-              | TYPE_Struct l
-              | TYPE_Packed_struct l => negb (l_is_empty l)
-              | _ => false
-              end ) ctx.
+  (* Definition filter_sized_typs (typ_ctx: type_context) (ctx : var_context) : var_context := *)
+  (*   filter (fun '(_, t) => is_sized_type typ_ctx t) ctx. *)
 
-  Definition filter_vec_typs (typ_ctx : type_context) (ctx: var_context) : var_context :=
-    filter (fun '(_, t) =>
-              match normalize_type typ_ctx t with
-              | TYPE_Vector _ _ => true
-              | _ => false
-              end) ctx.
+  (* Definition filter_non_void_typs (typ_ctx : type_context) (ctx : var_context) : var_context := *)
+  (*   filter (fun '(_, t) => match normalize_type typ_ctx t with *)
+  (*                       | TYPE_Void => false *)
+  (*                       | _ => true *)
+  (*                       end) ctx. *)
 
-  Definition filter_ptr_vecptr_typs (typ_ctx : type_context) (ctx: var_context) : var_context :=
-    filter (fun '(_, t) =>
-              match normalize_type typ_ctx t with
-              | TYPE_Pointer _ => true
-              | TYPE_Vector _ (TYPE_Pointer _) => true
-              | _ => false
-              end) ctx.
+  (* Definition filter_agg_typs (typ_ctx : type_context) (ctx: var_context) : var_context := *)
+  (*   filter (fun '(_, t) => *)
+  (*             match normalize_type typ_ctx t with *)
+  (*             | TYPE_Array sz _ => N.ltb 0 sz *)
+  (*             | TYPE_Struct l *)
+  (*             | TYPE_Packed_struct l => negb (l_is_empty l) *)
+  (*             | _ => false *)
+  (*             end ) ctx. *)
 
-  Definition filter_sized_ptr_vecptr_typs (typ_ctx : type_context) (ctx: var_context) : var_context :=
-    filter (fun '(_, t) =>
-              match normalize_type typ_ctx t with
-              | TYPE_Pointer t => is_sized_type typ_ctx t
-              | TYPE_Vector _ (TYPE_Pointer t) => is_sized_type typ_ctx t
-              | _ => false
-              end) ctx.
+  (* Definition filter_vec_typs (typ_ctx : type_context) (ctx: var_context) : var_context := *)
+  (*   filter (fun '(_, t) => *)
+  (*             match normalize_type typ_ctx t with *)
+  (*             | TYPE_Vector _ _ => true *)
+  (*             | _ => false *)
+  (*             end) ctx. *)
 
-  (* TODO: These currently don't generate pointer types either. *)
+  (* Definition filter_ptr_vecptr_typs (typ_ctx : type_context) (ctx: var_context) : var_context := *)
+  (*   filter (fun '(_, t) => *)
+  (*             match normalize_type typ_ctx t with *)
+  (*             | TYPE_Pointer _ => true *)
+  (*             | TYPE_Vector _ (TYPE_Pointer _) => true *)
+  (*             | _ => false *)
+  (*             end) ctx. *)
+
+  (* Definition filter_sized_ptr_vecptr_typs (typ_ctx : type_context) (ctx: var_context) : var_context := *)
+  (*   filter (fun '(_, t) => *)
+  (*             match normalize_type typ_ctx t with *)
+  (*             | TYPE_Pointer t => is_sized_type typ_ctx t *)
+  (*             | TYPE_Vector _ (TYPE_Pointer t) => is_sized_type typ_ctx t *)
+  (*             | _ => false *)
+  (*             end) ctx. *)
+
+  Definition gen_IntMapRaw_key_filter {a} (m : IM.Raw.t a) (filter : Z -> GenLLVM bool) : GenLLVM (option Z)
+    := '(g, _) <- (IM.Raw.fold
+                    (fun key _ (grest : GenLLVM (option Z * N)) =>
+                       cnd <- filter key;;
+                       '(gacc, k) <- grest;;
+                       swap <- lift (fmap (N.eqb 0) (choose (0%N, k)));;
+                       let k' := if cnd then (k+1)%N else k in
+                       if swap && cnd
+                       then (* swap *)
+                         ret (Some key, k')
+                       else (* No swap *)
+                         ret (gacc, k'))
+                    m (ret (@None Z, 0%N)));;
+       ret g.
+
+  Definition gen_IntMapRaw_key {a} (m : IM.Raw.t a) : GenLLVM Z
+    := fst (IM.Raw.fold
+              (fun key _ '(gacc, k) =>
+                 let gen' :=
+                   swap <- lift (fmap (N.eqb 0) (choose (0%N, k)));;
+                   if swap
+                   then (* swap *)
+                     ret key
+                   else (* No swap *)
+                     gacc
+                 in (gen', (k+1)%N))
+              m (failGen "gen_IntMapRaw_key", 0%N)).
+
+  Definition gen_IntMapRaw_ent {a} (m : IM.Raw.t a) : GenLLVM Ent
+    := fmap mkEnt (gen_IntMapRaw_key m).
+
+  Definition gen_IntMapRaw_ent_filter {a} (m : IM.Raw.t a) (filter : Z -> GenLLVM bool) : GenLLVM (option Ent)
+    := fmap (fmap mkEnt) (gen_IntMapRaw_key_filter m filter).
+ 
+
+  Definition gen_sized_type_alias : GenLLVM ident
+    := es <- use (gen_context' .@ is_sized_type_alias');;
+       var <- gen_IntMapRaw_ent es;;
+       mident <- use (gen_context' .@ entl var .@ name');;
+       match mident with
+       | Some id => ret id
+       | None => failGen "gen_sized_type_alias, couldn't find entity... Shouldn't happen"
+       end.
+
+  Definition gen_entity_with {a} (focus : Lens' (SystemState GenState G) (IM.Raw.t a)): GenLLVM Ent
+    := es <- use focus;;
+       gen_IntMapRaw_ent es.
+
+  Definition is_sized_filter (k : Z) : GenLLVM bool
+    := q <- use (gen_context' .@ entl (mkEnt k) .@ is_sized');;
+       match q with
+       | Some _ => ret true
+       | None => ret false
+       end.       
+
+  Definition gen_entity_with_filter {a}
+    (focus : Lens' (SystemState GenState G) (IM.Raw.t a))
+    (filter : Z -> GenLLVM bool)
+    : GenLLVM (option Ent)
+    := es <- use focus;;
+       gen_IntMapRaw_ent_filter es filter.
+
+  Definition get_type_from_alias (var : Ent) : GenLLVM typ
+    := mident <- use (gen_context' .@ entl var .@ type_alias');;
+       match mident with
+       | Some id => ret id
+       | None => failGen "gen_sized_type_alias, couldn't find entity... Shouldn't happen"
+       end.
+
+  Definition get_type_of_variable (var : Ent) : GenLLVM typ
+    := mident <- use (gen_context' .@ entl var .@ variable_type');;
+       match mident with
+       | Some id => ret id
+       | None => failGen "gen_sized_type_alias, couldn't find entity... Shouldn't happen"
+       end.
+
+  (* Generate a type that matches one of the type aliases *)
+  Definition gen_sized_type_of_alias {a} (focus : Lens' (SystemState GenState G) (IM.Raw.t a)) : GenLLVM typ
+    := var <- gen_entity_with focus;;
+       get_type_from_alias var.
+
+  Definition gen_sized_type_of_alias_filter {a}
+    (focus : Lens' (SystemState GenState G) (IM.Raw.t a))
+    (filter : Z -> GenLLVM bool)
+    : GenLLVM (option typ)
+    := var <- gen_entity_with_filter focus filter;;
+       match var with
+       | Some var => fmap Some (get_type_from_alias var)
+       | None => ret None
+       end.
+
+  (* Generate a type that matches one of the variables *)
+  Definition gen_sized_type_of_variable {a} (focus : Lens' (SystemState GenState G) (IM.Raw.t a)) : GenLLVM typ
+    := var <- gen_entity_with focus;;
+       get_type_of_variable var.
+
+  (* Generate a type that matches one of the variables *)
+  Definition gen_sized_type_of_variable_filter {a}
+    (focus : Lens' (SystemState GenState G) (IM.Raw.t a))
+    (filter : Z -> GenLLVM bool)
+    : GenLLVM (option typ)
+    := var <- gen_entity_with_filter focus filter;;
+       match var with
+       | Some var => fmap Some (get_type_of_variable var)
+       | None => ret None
+       end.
 
   (* Not sized in the QuickChick sense, sized in the LLVM sense. *)
   Definition gen_sized_typ_0 : GenLLVM typ :=
-    aliases <- get_typ_ctx;;
-    let sized_aliases := filter (fun '(i,t) => is_sized_type aliases t) aliases in
+    sized_aliases <- use (gen_context' .@ is_sized_type_alias');;
     let ident_gen :=
         (* Don't want to fail if there are no identifiers *)
-        if (List.length sized_aliases =? 0)%nat
+        if (IM.Raw.is_empty sized_aliases)%nat
         then []
-        else [ret TYPE_Identified <*> fmap (fun '(i, _) => i) (elems_LLVM sized_aliases)] in
+        else [TYPE_Identified <$> gen_sized_type_alias] in
     oneOf_LLVM
            (ident_gen ++
            (map ret
@@ -1002,68 +1158,66 @@ Section TypGenerators.
   Definition lengthN {X} (xs : list X) : N :=
     fold_left (fun acc x => (acc + 1)%N) xs 0%N.
 
-  Definition gen_typ_from_ctx (ctx : var_context) : GenLLVM typ
-    := fmap snd (elems_LLVM ctx).
+  (* Definition gen_typ_from_ctx (ctx : var_context) : GenLLVM typ *)
+  (*   := fmap snd (elems_LLVM ctx). *)
 
-  Definition gen_ident_from_ctx (ctx : var_context) : GenLLVM ident
-    := fmap fst (elems_LLVM ctx).
+  (* Definition gen_ident_from_ctx (ctx : var_context) : GenLLVM ident *)
+  (*   := fmap fst (elems_LLVM ctx). *)
 
-  Fixpoint gen_sized_typ_size (sz : nat) : GenLLVM typ :=
+  Definition gen_type_matching_alias_focus {a} (focus : Lens' (SystemState GenState G) (IM.Raw.t a)) : GenLLVM (N * (unit -> GenLLVM typ))
+    := focused <- use focus;;
+       ret (N.min (N.of_nat (IM.Raw.cardinal focused)) 10, (fun _ => gen_sized_type_of_alias focus)).
+
+  Definition gen_type_matching_variable_focus {a} (focus : Lens' (SystemState GenState G) (IM.Raw.t a)) : GenLLVM (N * (unit -> GenLLVM typ))
+    := focused <- use focus;;
+       ret (N.min (N.of_nat (IM.Raw.cardinal focused)) 10, (fun _ => gen_sized_type_of_variable focus)).
+
+  Definition gen_type_matching_alias : GenLLVM (N * (unit -> GenLLVM typ))
+    := gen_type_matching_alias_focus (gen_context' .@ is_sized_type_alias').
+
+  Definition gen_type_matching_local : GenLLVM (N * (unit -> GenLLVM typ))
+    := gen_type_matching_variable_focus (gen_context' .@ is_local').
+
+  Definition gen_type_matching_global : GenLLVM (N * (unit -> GenLLVM typ))
+    := gen_type_matching_variable_focus (gen_context' .@ is_global').
+
+  Definition gen_type_matching_locals_and_globals : GenLLVM (N * (unit -> GenLLVM typ))
+    := gen_type_matching_variable_focus (gen_context' .@ variable_type').
+
+  Program Fixpoint gen_sized_typ_size' (from_context : GenLLVM (N * (unit -> GenLLVM typ))) (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
     | O => gen_sized_typ_0
     | (S sz') =>
-        ctx <- get_ctx;;
-        aliases <- get_typ_ctx;;
-        let typs_in_ctx := filter_sized_typs aliases ctx in
+        fc <- from_context;;
         freq_LLVM_thunked_N
-        ([(N.min (lengthN typs_in_ctx) 10, (fun _ => gen_typ_from_ctx typs_in_ctx))] ++
+        ([fc] ++
          [(1%N, (fun _ => gen_sized_typ_0))
-          ; (1%N, (fun _ => ret TYPE_Pointer <*> gen_sized_typ_size (sz / 2)))
+          ; (1%N, (fun _ => ret TYPE_Pointer <*> gen_sized_typ_size' from_context (sz / 2)))
         (* TODO: Might want to restrict the size to something reasonable *)
-          ; (1%N, (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size (sz / 2)))
-        ; (1%N, (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size 0))
+        ; (1%N, (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size' from_context sz'))
+        ; (1%N, (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size' from_context 0))
         (* TODO: I don't think functions are sized types? *)
         (* ; let n := Nat.div sz 2 in *)
         (*   ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) *)
-          ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size (sz / 2))))
-          ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size (sz / 2))))
-          ])
+        ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size' from_context (sz / 2))))
+        ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size' from_context (sz / 2))))
+        ])
     end.
 
-  Definition gen_sized_typ : GenLLVM typ
-    := sized_LLVM (fun sz => gen_sized_typ_size sz).
+  Definition gen_sized_typ_size := gen_sized_typ_size' gen_type_matching_alias.
 
- Program Fixpoint gen_sized_typ_size_ptrinctx (sz : nat) (typs_in_ctx : var_context)  {measure sz} : GenLLVM typ :=
-    match sz with
-    | 0%nat => gen_sized_typ_0
-    | (S sz') =>
-        (* ctx <- get_ctx;; *)
-        (* aliases <- get_typ_ctx;; *)
-        (* let typs_in_ctx := filter_sized_typs aliases ctx in *)
-        freq_LLVM_thunked_N
-        ([(N.min (lengthN typs_in_ctx) 10, (fun _ => gen_typ_from_ctx typs_in_ctx))] ++
-        [(1%N, (fun _ => gen_sized_typ_0))
-        (* TODO: Might want to restrict the size to something reasonable *)
-         ; (1%N, (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> gen_sized_typ_size_ptrinctx (sz / 8) typs_in_ctx))
-        ; (1%N, (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_sized_typ_size_ptrinctx 0 typs_in_ctx))
-        (* TODO: I don't think functions are sized types? *)
-        (* ; let n := Nat.div sz 2 in *)
-        (*   ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n) *)
-         ; (1%N, (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx (sz / 8) typs_in_ctx)))
-         ; (1%N, (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size_ptrinctx (sz / 8) typs_in_ctx)))])
-    end.
- Next Obligation.
-    apply (Nat.div_lt (S sz') 8%nat); auto. apply Nat.lt_0_succ. lia.
- Defined.
- Next Obligation.
-    apply (Nat.div_lt (S sz') 8%nat); auto. apply Nat.lt_0_succ. lia.
- Defined.
- Next Obligation.
-    apply (Nat.div_lt (S sz') 8%nat); auto. apply Nat.lt_0_succ. lia.
- Defined.
+  Definition gen_sized_typ' (from_context : GenLLVM (N * (unit -> GenLLVM typ))) : GenLLVM typ
+    := sized_LLVM (fun sz => gen_sized_typ_size' from_context sz).
 
+  Definition gen_sized_typ  : GenLLVM typ
+    := gen_sized_typ' gen_type_matching_alias.
+
+  (* Want to be able to use gen_sized_typ' to do this...
+     But I did not notice this wants only sized types from the contexts.
+     Need to be able to filter focused entities to only the ones with the sized type tags... Should be doable.
+   *)
   Definition gen_sized_typ_ptrin_fctx : GenLLVM typ
-    :=
+    := gen_sized_typ_size' 
     ctx <- get_ctx;;
     aliases <- get_typ_ctx;;
     let typs_in_ctx := filter_sized_typs aliases ctx in

@@ -20,6 +20,7 @@ Require Import ExtLib.Structures.Monads.
 Require Import ExtLib.Structures.Functor.
 Require Import ExtLib.Structures.Applicative.
 Require Import ExtLib.Structures.Traversable.
+Require Import ExtLib.Structures.Foldable.
 Require Import ExtLib.Structures.MonadPlus.
 Import MonadNotation.
 Import MonadPlusNotation.
@@ -1190,18 +1191,43 @@ Definition without {world a m} `{MonadZero m} `{Monad m} (f : world FieldOf -> o
      | Some x => mzero
      end.
 
-Definition EntTarget w m := SystemT w m IS.t.
+(* I want to be able to use `IS.t` and `IM.Raw.t unit` and maybe `list Z` and `list Ent` as targets... What do I need from an EntTarget? *)
+Class ToEnt T :=
+  { toEnt : T -> Ent
+  }.
 
-Definition allEnts {w m} `{Monad m} : EntTarget w m
+#[global] Instance ToEnt_Z : ToEnt Z :=
+  { toEnt := mkEnt }.
+
+#[global] Instance ToEnt_Ent : ToEnt Ent :=
+  { toEnt := id }.
+
+Import Monoid.
+#[global] Instance Foldable_IS : Foldable IS.t Z.
+split.
+intros m M conv s.
+apply (IS.fold (fun k acc => monoid_plus M (conv k) acc) s (monoid_unit M)).
+Defined.
+
+#[global] Instance Foldable_list {a} : Foldable (list a) a.
+split.
+intros m M conv l.
+apply (fold_left (fun acc x => monoid_plus M (conv x) acc) l (monoid_unit M)).
+Defined.
+
+Definition EntTarget {es E} `{ToEnt E} `{Foldable es E} w m := SystemT w m es.
+
+Definition allEnts {w m} `{Monad m} : EntTarget w m (es:=IS.t)
   := use entities.
 
 Definition emap
   {w m} `{Monad m} `{@MetadataStore m Metadata (SystemState w m)}
- (t : EntTarget w m) (q : QueryT Metadata m (Metadata SetterOf)) : SystemT w m unit
+  {es E} `{ToEnt E} `{Foldable es E}
+  (t : EntTarget w m (E:=E)) (q : QueryT Metadata m (Metadata SetterOf)) : SystemT w m unit
   := es <- t;;
-     IS.fold
-       (fun (k : Z) (acc : SystemT w m unit) =>
-          let e := mkEnt k in
+     fold _
+       (fun (k : E) (acc : SystemT w m unit) =>
+          let e := toEnt k in
           meta <- getEntity e;;
           sets <- lift (unQueryT q e meta);;
           match sets with
@@ -1211,7 +1237,27 @@ Definition emap
               setEntity e s;;
               acc
           end
-       ) es (ret tt).
+       ) (ret tt) es.
+
+(* Filter out Nones from a set of options *)
+Class FilterNone T :=
+  { filterNone : forall {a}, T (option a) -> T a }.
+
+#[global] Instance FilterNone_list : FilterNone list :=
+  { filterNone _ l := fold_right (fun x acc => match x with | None => acc | Some x => x :: acc end) [] l }.
+
+Program Definition efor
+  {w m} `{Monad m} `{@MetadataStore m Metadata (SystemState w m)}
+  {a}
+  (t : @EntTarget (list Ent) Ent _ _ w m) (q : QueryT Metadata m a) : SystemT w m (list a)
+  := es <- t;;
+     _.
+Next Obligation.
+  refine open_constr:(fmap filterNone _);
+    try typeclasses_eauto.
+  refine open_constr:((fun a b => mapT b a) es (fun e => cs <- getEntity (toEnt e);; lift (unQueryT q e cs)));
+    try typeclasses_eauto.
+Defined.
 
 Definition add_global {m} `{Monad m} (name : string) : SystemT Metadata m _
   := e <- newEntity;;
