@@ -2230,7 +2230,7 @@ Section InstrGenerators.
 
   (* ExtractElement *)
   Definition gen_extractelement (tvec : typ): GenLLVM (typ * instr typ) :=
-    evec <- gen_exp_size 0 tvec FULL_CTX;;
+    evec <- gen_exp_size (gen_context' .@ variable_type') 0 tvec;;
     let get_size_ty (vType: typ) :=
       match tvec with
       | TYPE_Vector sz ty => (sz, ty)
@@ -2241,19 +2241,19 @@ Section InstrGenerators.
     ret (t_in_vec, INSTR_Op (OP_ExtractElement (tvec, evec) (TYPE_I 32%N, EXP_Integer index_for_extractelement))).
 
   Definition gen_insertelement (tvec : typ) : GenLLVM (typ * instr typ) :=
-    evec <- gen_exp_size 0 tvec FULL_CTX;;
+    evec <- gen_exp_size (gen_context' .@ variable_type') 0 tvec;;
     let get_size_ty (vType: typ) :=
       match tvec with
       | TYPE_Vector sz ty => (sz, ty)
       | _ => (0%N, TYPE_Void)
       end in
     let '(sz, t_in_vec) := get_size_ty tvec in
-    value <- gen_exp_size 0 t_in_vec FULL_CTX;;
+    value <- gen_exp_size (gen_context' .@ variable_type') 0 t_in_vec;;
     index <- lift_GenLLVM (choose (0, Z.of_N (sz - 1)));;
     ret (tvec, INSTR_Op (OP_InsertElement (tvec, evec) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
 
   Definition gen_ptrtoint (tptr : typ): GenLLVM (typ * instr typ) :=
-    eptr <- gen_exp_size 0 tptr FULL_CTX;;
+    eptr <- gen_exp_size (gen_context' .@ variable_type') 0 tptr;;
     let gen_typ_in_ptr (tptr : typ) :=
       match tptr with
       | TYPE_Pointer t =>
@@ -2373,31 +2373,50 @@ Section InstrGenerators.
     | _ => false
     end.
 
-  Definition gen_inttoptr : GenLLVM (typ * instr typ) :=
-    ctx <- get_ptrtoint_ctx;;
-    typ_ctx <- get_typ_ctx;;
-    '(old_tptr, id, typ_from_cast) <- elems_LLVM ctx;;
-    (* In the following case, we will check whether there are double pointers in the old pointer type, we will not cast if the data structure has double pointer *)
-    (* TODO: Better identify the pointer inside and cast without changing their location *)
-    new_tptr <-
-      match old_tptr with
-      | TYPE_Pointer old_typ =>
-          if typ_contains_pointer old_typ || is_function_type typ_ctx old_typ
-          then
-            ret old_tptr
-          else
-            x <- gen_typ_le_size (get_size_from_typ old_typ);;
-            ret (TYPE_Pointer x)
-      | TYPE_Vector sz (TYPE_Pointer old_typ) =>
-          if typ_contains_pointer old_typ || is_function_type typ_ctx old_typ
-          then
-            ret old_tptr
-          else
-            x <- gen_typ_le_size (get_size_from_typ old_typ);;
-            ret (TYPE_Pointer x)
-      | _ => ret (TYPE_Void) (* Won't reach here... Hopefully *)
-      end;;
-    ret (new_tptr, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr)).
+  (* Try to find a variable that's the result of a cast from a pointer *)
+  Definition gen_ptr_casted_var : GenLLVM (option Ent)
+    := gen_entity_with (gen_context' .@ from_pointer').
+
+  (* TODO: old_tptr checks for vectors of pointers...
+     I don't think we will find those with the new generator queries?
+   *)
+  Definition gen_inttoptr : GenLLVM (option (typ * instr typ)) :=
+    ovar <- genFind
+             (use (gen_context' .@ from_pointer'))
+             (ptr <- queryl from_pointer';;
+              t <- queryl variable_type';;
+              n <- queryl name';;
+              ret (ptr, n, t));;
+    match ovar with
+    | None => ret None
+    | Some (ptrEnt, id, typ_from_cast) =>
+        opt <- use (gen_context' .@ entl ptrEnt .@ normalized_type');;
+        match opt with
+        | None => ret None
+        | Some old_tptr =>
+            (* In the following case, we will check whether there are double pointers in the old pointer type, we will not cast if the data structure has double pointer *)
+            (* TODO: Better identify the pointer inside and cast without changing their location *)
+            new_tptr <-
+              match old_tptr with
+              | TYPE_Pointer old_typ =>
+                  if typ_contains_pointer old_typ || is_function_type_h old_typ
+                  then
+                    ret old_tptr
+                  else
+                    x <- gen_typ_le_size (get_size_from_typ old_typ);;
+                    ret (TYPE_Pointer x)
+              | TYPE_Vector sz (TYPE_Pointer old_typ) =>
+                  if typ_contains_pointer old_typ || is_function_type_h old_typ
+                  then
+                    ret old_tptr
+                  else
+                    x <- gen_typ_le_size (get_size_from_typ old_typ);;
+                    ret (TYPE_Pointer x)
+              | _ => ret (TYPE_Void) (* Won't reach here... Hopefully *)
+              end;;
+            ret (Some (new_tptr, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr)))
+        end
+    end.
 
   Definition filter_first_class_typs (ctx : var_context) : var_context :=
     filter (fun '(_, t) =>
