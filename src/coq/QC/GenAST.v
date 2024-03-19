@@ -1903,7 +1903,14 @@ Section ExpGenerators.
               ret (EXP_Packed_struct tes)
 
           | TYPE_Identified id        =>
-              t <- def_option_GenLLVM (failGen "gen_exp_size TYPE_Identified") (genFind (use focus) (withl variable_type';; queryl normalized_type'));;
+              t <- def_option_GenLLVM (failGen "gen_exp_size TYPE_Identified")
+                    (genFind
+                       (use focus)
+                       (withl variable_type';;
+                        n <- queryl name';;
+                        if Ident.eq_dec id n
+                        then queryl normalized_type'
+                        else mzero));;
               gen_exp_size focus 0%nat t
           (* Not generating these types for now *)
           | TYPE_Half                 => failGen "gen_exp_size TYPE_Half"
@@ -1965,7 +1972,14 @@ Section ExpGenerators.
           | TYPE_Metadata          => [failGen "gen_exp_size TYPE_Metadata list"]
           | TYPE_X86_mmx           => [failGen "gen_exp_size TYPE_X86_mmx list"]
           | TYPE_Identified id     =>
-              [ t <- def_option_GenLLVM (failGen "gen_exp_size TYPE_Identified") (genFind (use focus) (withl variable_type';; queryl normalized_type'));;
+              [ t <- def_option_GenLLVM (failGen "gen_exp_size TYPE_Identified")
+                      (genFind
+                         (use focus)
+                         (withl variable_type';;
+                          n <- queryl name';;
+                          if Ident.eq_dec id n
+                          then queryl normalized_type'
+                          else mzero));;
                 gen_exp_size focus sz t
               ]
           end
@@ -2126,35 +2140,51 @@ Section InstrGenerators.
     tl (DList_paths_to_list_paths (get_index_paths_agg_aux t_from DList_empty)).
   
   (* Index path without getting into vector *)
-  Fixpoint get_index_paths_insertvalue_aux (t_from : typ) (pre_path : DList Z) (ctx : list (ident * typ)) {struct t_from}: bool * DList (typ * DList (Z)) :=
+  (* t_from should already be normalized *)
+  Fixpoint get_index_paths_insertvalue_aux (t_from : typ) (pre_path : DList Z) {struct t_from}: GenLLVM (bool * DList (typ * DList (Z))) :=
     match t_from with
     | TYPE_Array sz t =>
-        let '(has_subpaths, sub_paths) := get_index_paths_insertvalue_aux t DList_empty ctx in (* Get index path from the first element*)
+        '(has_subpaths, sub_paths) <- get_index_paths_insertvalue_aux t DList_empty;; (* Get index path from the first element*)
         if has_subpaths
-        then (true, DList_cons (t_from, pre_path) (get_index_paths_from_AoV sz t pre_path sub_paths))
-        else (false, DList_empty)
+        then ret (true, DList_cons (t_from, pre_path) (get_index_paths_from_AoV sz t pre_path sub_paths))
+        else ret (false, DList_empty)
     | TYPE_Struct fields
     | TYPE_Packed_struct fields =>
-        let '(has_reach, reaches) := (get_index_paths_insertvalue_from_struct pre_path fields ctx) in
+        '(has_reach, reaches) <- get_index_paths_insertvalue_from_struct pre_path fields;;
         if has_reach
-        then (true, DList_cons (t_from, pre_path) reaches)
-        else (false, DList_empty)
-    | TYPE_Pointer t => if l_is_empty (filter_type t_from ctx) then (false, DList_empty) else (true, DList_singleton (t_from, pre_path))
+        then ret (true, DList_cons (t_from, pre_path) reaches)
+        else ret (false, DList_empty)
+    | TYPE_Pointer t =>
+        in_ctx <- fmap is_some (genFind
+                                 (use (gen_context' .@ variable_type'))
+                                 (nt <- queryl normalized_type';;
+                                  if (normalized_typ_eq t_from nt)
+                                  then ret tt
+                                  else mzero));;
+        if in_ctx
+        then ret (true, DList_singleton (t_from, pre_path))
+        else ret (false, DList_empty)
     | TYPE_Vector _ t =>
-        let '(has_subpaths, sub_paths) := get_index_paths_insertvalue_aux t DList_empty ctx in (* Get index path from the first element*)
-        if has_subpaths then (true, DList_singleton (t_from, pre_path)) else (false, DList_empty)
-    | _ => (true, DList_singleton (t_from, pre_path))
+        '(has_subpaths, sub_paths) <- get_index_paths_insertvalue_aux t DList_empty;; (* Get index path from the first element*)
+        if has_subpaths
+        then ret (true, DList_singleton (t_from, pre_path))
+        else ret (false, DList_empty)
+    | _ => ret (true, DList_singleton (t_from, pre_path))
     end with
-  get_index_paths_insertvalue_from_struct (pre_path: DList Z) (fields: list typ) (ctx: list (ident * typ)) {struct fields}: bool * DList (typ * DList Z) :=
-    snd (fold_left
-           (fun '(ix, (b, paths)) (fld_typ : typ) =>
-              (ix + 1,
-                (let '(has_reach, reach) := get_index_paths_insertvalue_aux fld_typ (DList_append pre_path (DList_singleton ix)) ctx in
-                 (orb has_reach b, DList_append reach paths))))
-           fields (0%Z, (false, DList_empty : DList (typ * DList Z)))).
+  get_index_paths_insertvalue_from_struct (pre_path: DList Z) (fields: list typ) {struct fields}: GenLLVM (bool * DList (typ * DList Z)) :=
+    fmap snd (fold_left
+           (fun acc (fld_typ : typ) =>
+              '(ix, (b, paths)) <- acc;;
+              '(has_reach, reach) <- get_index_paths_insertvalue_aux fld_typ (DList_append pre_path (DList_singleton ix));;
+              ret (ix + 1, (orb has_reach b, DList_append reach paths)))
+           fields (ret (0%Z, (false, DList_empty : DList (typ * DList Z))))).
 
-  Definition get_index_paths_insertvalue (t_from : typ) (ctx : list (ident * typ)): list (typ * list (Z)) :=
-    tl (DList_paths_to_list_paths (snd (get_index_paths_insertvalue_aux t_from DList_empty ctx))).
+  Definition get_index_paths_insertvalue
+    (t_from : typ)
+    : GenLLVM (list (typ * list (Z)))
+    :=
+    paths <- get_index_paths_insertvalue_aux t_from DList_empty;;
+    ret (tl (DList_paths_to_list_paths (snd paths))).
 
   Fixpoint has_paths_insertvalue_aux (t_from : typ) (ctx : list (ident * typ)) {struct t_from}: bool :=
     match t_from with
@@ -2191,10 +2221,10 @@ Section InstrGenerators.
   Definition gen_insertvalue (tagg: typ): GenLLVM (typ * instr typ) :=
     eagg <- gen_exp_size (gen_context' .@ variable_type') 0 tagg;;
     ctx <- get_ctx;;
-    let paths_in_agg := get_index_paths_insertvalue tagg ctx in
+    paths_in_agg <- get_index_paths_insertvalue tagg;;
     '(tsub, path_for_insertvalue) <- elems_LLVM paths_in_agg;;
     (* GC: THIS IS FALSE and will cause trouble because maybe the type we want is not in the context!!! NEED TO CHANGE TO SOMETHING ELSE*)
-    esub <- hide_ctx (gen_exp_size 0 tsub FULL_CTX);;
+    esub <- hide_ctx (gen_exp_size (gen_context' .@ variable_type') 0 tsub);;
     (* Generate all of the type*)
     ret (tagg, INSTR_Op (OP_InsertValue (tagg, eagg) (tsub, esub) path_for_insertvalue)).
 
