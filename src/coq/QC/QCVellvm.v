@@ -149,7 +149,7 @@ Extract Constant llc_command_ocaml =>
                 Sys.command (""clang -lm -Wno-everything "" ^ llvm_file_name ^ "" -o "" ^ test_binary ^ "" && "" ^ test_binary)".
 
 
-Definition llc_command (prog : string) : int
+Definition llc_command (prog : string) : int_ast
   := oint_to_Z (llc_command_ocaml prog).
 
 Axiom vellvm_print_ll : list (toplevel_entity typ (block typ * list (block typ))) -> string.

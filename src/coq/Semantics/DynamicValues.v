@@ -528,8 +528,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_ExtractElement   (vec_typ : dtyp) (vec: uvalue) (idx: uvalue)
   | UVALUE_InsertElement    (vec_typ : dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue)
   | UVALUE_ShuffleVector    (vec_typ : dtyp) (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue)
-  | UVALUE_ExtractValue     (vec_typ : dtyp) (vec:uvalue) (idxs:list LLVMAst.int)
-  | UVALUE_InsertValue      (vec_typ : dtyp) (vec:uvalue) (elt_typ : dtyp) (elt:uvalue) (idxs:list LLVMAst.int)
+  | UVALUE_ExtractValue     (vec_typ : dtyp) (vec:uvalue) (idxs:list LLVMAst.int_ast)
+  | UVALUE_InsertValue      (vec_typ : dtyp) (vec:uvalue) (elt_typ : dtyp) (elt:uvalue) (idxs:list LLVMAst.int_ast)
   | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
   (* Extract the `idx` byte from a uvalue `uv`, which was stored with
    type `dt`. `idx` 0 is the least significant byte. `sid` is the "store
@@ -708,8 +708,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_ExtractElement : forall (t:dtyp) (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement t vec idx).
     Hypothesis IH_InsertElement  : forall (t:dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement t vec elt idx).
     Hypothesis IH_ShuffleVector  : forall (t:dtyp) (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector t vec1 vec2 idxmask).
-    Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue t vec idxs).
-    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (et:dtyp) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec et elt idxs).
+    Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int_ast), P vec -> P (UVALUE_ExtractValue t vec idxs).
+    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (et:dtyp) (elt:uvalue) (idxs:list LLVMAst.int_ast), P vec -> P elt -> P (UVALUE_InsertValue t vec et elt idxs).
     Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
     Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : N) (sid : N), P uv -> P (UVALUE_ExtractByte uv dt idx sid).
     Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue),
@@ -1627,8 +1627,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_ExtractElement : forall (t:dtyp) (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement t vec idx).
     Hypothesis IH_InsertElement  : forall (t:dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement t vec elt idx).
     Hypothesis IH_ShuffleVector  : forall (t:dtyp) (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector t vec1 vec2 idxmask).
-    Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue t vec idxs).
-    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (et:dtyp) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec et elt idxs).
+    Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int_ast), P vec -> P (UVALUE_ExtractValue t vec idxs).
+    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (et:dtyp) (elt:uvalue) (idxs:list LLVMAst.int_ast), P vec -> P elt -> P (UVALUE_InsertValue t vec et elt idxs).
     Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
     Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : N) (sid : N), P uv -> P (UVALUE_ExtractByte uv dt idx sid).
     Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue),
@@ -1806,8 +1806,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_ExtractElement : forall (t:dtyp) (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement t vec idx).
     Hypothesis IH_InsertElement  : forall (t:dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement t vec elt idx).
     Hypothesis IH_ShuffleVector  : forall (t:dtyp) (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector t vec1 vec2 idxmask).
-    Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue t vec idxs).
-    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (et:dtyp) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec et elt idxs).
+    Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int_ast), P vec -> P (UVALUE_ExtractValue t vec idxs).
+    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (et:dtyp) (elt:uvalue) (idxs:list LLVMAst.int_ast), P vec -> P elt -> P (UVALUE_InsertValue t vec et elt idxs).
     Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
     Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : N) (sid : N), P uv -> P (UVALUE_ExtractByte uv dt idx sid).
     Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue),
@@ -2094,8 +2094,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_ExtractElement : forall (t:dtyp) (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement t vec idx).
     Hypothesis IH_InsertElement  : forall (t:dtyp) (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement t vec elt idx).
     Hypothesis IH_ShuffleVector  : forall (t:dtyp) (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector t vec1 vec2 idxmask).
-    Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue t vec idxs).
-    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (et:dtyp) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue t vec et elt idxs).
+    Hypothesis IH_ExtractValue   : forall (t:dtyp) (vec:uvalue) (idxs:list LLVMAst.int_ast), P vec -> P (UVALUE_ExtractValue t vec idxs).
+    Hypothesis IH_InsertValue    : forall (t:dtyp) (vec:uvalue) (et:dtyp) (elt:uvalue) (idxs:list LLVMAst.int_ast), P vec -> P elt -> P (UVALUE_InsertValue t vec et elt idxs).
     Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
     Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : N) (sid : N), P uv -> P (UVALUE_ExtractByte uv dt idx sid).
     Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue),
@@ -3431,7 +3431,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
   (* Helper function for indexing into a structured datatype
      for extractvalue and insertvalue *)
-  Definition index_into_str {M} `{Monad M} `{RAISE_ERROR M} (v:uvalue) (idx:LLVMAst.int) : M uvalue :=
+  Definition index_into_str {M} `{Monad M} `{RAISE_ERROR M} (v:uvalue) (idx:LLVMAst.int_ast) : M uvalue :=
     let fix loop elts i :=
         match elts with
         | [] => raise_error "index_into_str: index out of bounds"
@@ -3448,7 +3448,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
   (* Helper function for indexing into a structured datatype
      for extractvalue and insertvalue *)
-  Definition index_into_str_dv {M} `{Monad M} `{RAISE_ERROR M} (v:dvalue) (idx:LLVMAst.int) : M dvalue :=
+  Definition index_into_str_dv {M} `{Monad M} `{RAISE_ERROR M} (v:dvalue) (idx:LLVMAst.int_ast) : M dvalue :=
     let fix loop elts i :=
         match elts with
         | [] => raise_error "index_into_str_dv: index out of bounds"
@@ -3464,8 +3464,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Arguments index_into_str_dv _ _ : simpl nomatch.
 
   (* Helper function for inserting into a structured datatype for insertvalue *)
-  Definition insert_into_str {M} `{Monad M} `{RAISE_ERROR M} (str:dvalue) (v:dvalue) (idx:LLVMAst.int) : M dvalue :=
-    let fix loop (acc elts:list dvalue) (i:LLVMAst.int) :=
+  Definition insert_into_str {M} `{Monad M} `{RAISE_ERROR M} (str:dvalue) (v:dvalue) (idx:LLVMAst.int_ast) : M dvalue :=
+    let fix loop (acc elts:list dvalue) (i:LLVMAst.int_ast) :=
         match elts with
         | [] => raise_error "insert_into_str: index out of bounds"
         | h :: tl =>
@@ -3515,7 +3515,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Arguments index_into_vec_dv _ _ : simpl nomatch.
 
   Definition insert_into_vec_dv {M} `{Monad M} `{RAISE_ERROR M} (vec_typ : dtyp) (vec:dvalue) (v:dvalue) (idx:dvalue) : M dvalue :=
-    let fix loop (acc elts:list dvalue) (i:LLVMAst.int) :=
+    let fix loop (acc elts:list dvalue) (i:LLVMAst.int_ast) :=
         match elts with
         | [] => None (* LangRef: if idx exceeds the length of val for a fixed-length vector, the result is a poison value *)
         | h :: tl =>

@@ -1083,7 +1083,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         repeat setoid_rewrite Raise.raise_bind_itree;
         repeat rewrite bind_ret_l; try reflexivity.
       rewrite IHidxs.
-      remember ((fix loop (str0 : dvalue) (idxs0 : list int) {struct idxs0} : err_ub_oom dvalue :=
+      remember ((fix loop (str0 : dvalue) (idxs0 : list int_ast) {struct idxs0} : err_ub_oom dvalue :=
                    match idxs0 with
                    | [] => ret str0
                    | i :: tl => v <- index_into_str_dv str0 i;; loop v tl
@@ -1095,7 +1095,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Lemma insert_into_str_loop_err_ub_oom_to_itree :
       forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E}
         elts acc v i,
-        (fix loop (acc elts:list dvalue) (i:LLVMAst.int) : itree E (list dvalue) :=
+        (fix loop (acc elts:list dvalue) (i:LLVMAst.int_ast) : itree E (list dvalue) :=
            match elts with
            | [] => raise "insert_into_str: index out of bounds"
            | h :: tl =>
@@ -1103,7 +1103,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                 else loop (acc ++ [h]) tl (i-1))%Z
            end%list) acc elts i ≈
           match
-            (fix loop (acc elts:list dvalue) (i:LLVMAst.int) : err_ub_oom (list dvalue) :=
+            (fix loop (acc elts:list dvalue) (i:LLVMAst.int_ast) : err_ub_oom (list dvalue) :=
                match elts with
                | [] => raise_error "insert_into_str: index out of bounds"
                | h :: tl =>
@@ -1141,7 +1141,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         unfold insert_into_str.
         setoid_rewrite insert_into_str_loop_err_ub_oom_to_itree.
         cbn.
-        remember ((fix loop (acc elts : list dvalue) (i : int) {struct elts} :
+        remember ((fix loop (acc elts : list dvalue) (i : int_ast) {struct elts} :
                     err_ub_oom_T ident (list dvalue) :=
                      match elts with
                      | [] => ERR_unERR_UB_OOM "insert_into_str: index out of bounds"
@@ -1160,7 +1160,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         unfold insert_into_str.
         setoid_rewrite insert_into_str_loop_err_ub_oom_to_itree.
         cbn.
-        remember ((fix loop (acc elts : list dvalue) (i : int) {struct elts} :
+        remember ((fix loop (acc elts : list dvalue) (i : int_ast) {struct elts} :
                     err_ub_oom_T ident (list dvalue) :=
                      match elts with
                      | [] => ERR_unERR_UB_OOM "insert_into_str: index out of bounds"
@@ -1179,7 +1179,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         unfold insert_into_str.
         setoid_rewrite insert_into_str_loop_err_ub_oom_to_itree.
         cbn.
-        remember ((fix loop (acc elts : list dvalue) (i : int) {struct elts} :
+        remember ((fix loop (acc elts : list dvalue) (i : int_ast) {struct elts} :
                     err_ub_oom_T ident (list dvalue) :=
                      match elts with
                      | [] => ERR_unERR_UB_OOM "insert_into_str: index out of bounds"
@@ -1256,7 +1256,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                   | _ :: _ =>
                       subfield0 <- index_into_str_dv ar0 i;;
                       modified_subfield <-
-                        (fix loop (str0 : dvalue) (idxs0 : list int) {struct idxs0} : err_ub_oom dvalue :=
+                        (fix loop (str0 : dvalue) (idxs0 : list int_ast) {struct idxs0} : err_ub_oom dvalue :=
                            match idxs0 with
                            | [] => raise_error "Index was not provided"
                            | [i1] => v <- insert_into_str str0 elt i1;; ret v
@@ -2335,7 +2335,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           repeat rewrite bind_ret_l; try reflexivity.
 
         setoid_rewrite extract_value_loop_err_ub_oom_to_itree.
-        remember ((fix loop (str : dvalue) (idxs0 : list int) {struct idxs0} : err_ub_oom dvalue :=
+        remember ((fix loop (str : dvalue) (idxs0 : list int_ast) {struct idxs0} : err_ub_oom dvalue :=
                      match idxs0 with
                      | [] => ret str
                      | i :: tl => v <- index_into_str_dv str i;; loop v tl
@@ -2370,7 +2370,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           repeat rewrite bind_ret_l; try reflexivity.
 
         setoid_rewrite insert_value_loop_err_ub_oom_to_itree.
-        remember ((fix loop (str : dvalue) (idxs0 : list int) {struct idxs0} : err_ub_oom dvalue :=
+        remember ((fix loop (str : dvalue) (idxs0 : list int_ast) {struct idxs0} : err_ub_oom dvalue :=
                      match idxs0 with
                      | [] => raise_error "Index was not provided"
                      | [i] => v <- insert_into_str str u2r0 i;; ret v

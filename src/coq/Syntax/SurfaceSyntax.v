@@ -24,7 +24,7 @@ Module VIR_Notations.
   Notation "'%' x" := (ID_Local x)  (only printing, at level 5, format "'%' x").
   Notation "'@' x" := (ID_Global x) (only printing, at level 5, format "'@' x").
   Coercion Name : string >-> raw_id.
-  Coercion Anon : int >-> raw_id.
+  Coercion Anon : int_ast >-> raw_id.
 
   (** * Expressions *)
 

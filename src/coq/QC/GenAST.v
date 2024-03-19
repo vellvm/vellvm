@@ -2887,7 +2887,7 @@ Section InstrGenerators.
          (sz : nat)
          (t : typ)
          (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
-         (bound : LLVMAst.int) {struct t} : GenLLVM (terminator typ * (block typ * list (block typ)))
+         (bound : LLVMAst.int_ast) {struct t} : GenLLVM (terminator typ * (block typ * list (block typ)))
        :=
          bid_entry <- new_block_id;;
          (* TODO: make it so I can generate constant expressions *)

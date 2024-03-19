@@ -30,15 +30,15 @@ Open Scope list_scope.
 
  *)
 
-Definition int := Z.
+Definition int_ast := Z.
 Definition float := Floats.float.  (* 64-bit floating point value *)
 Definition float32 := Floats.float32.
 
 
 Variant raw_id : Set :=
 | Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)
-| Anon (n:int)        (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
-| Raw  (n:int)        (* Used for code generation -- serializes as %_RAW_0 %_RAW_1 etc. *)
+| Anon (n:int_ast)        (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
+| Raw  (n:int_ast)        (* Used for code generation -- serializes as %_RAW_0 %_RAW_1 etc. *)
 .
 
 Variant ident : Set :=
@@ -109,7 +109,7 @@ Variant cconv : Set :=
 | CC_Ccc
 | CC_Fastcc
 | CC_Coldcc
-| CC_Cc (cc:int)
+| CC_Cc (cc:int_ast)
 | CC_Webkit_jscc
 | CC_Anyregcc
 | CC_Preserve_mostcc
@@ -131,7 +131,7 @@ Variant param_attr : Set :=
 | PARAMATTR_Inalloca (t : typ)
 | PARAMATTR_Sret (t : typ)
 | PARAMATTR_Elementtype (t : typ)
-| PARAMATTR_Align (a:int)
+| PARAMATTR_Align (a:int_ast)
 | PARAMATTR_Noalias
 | PARAMATTR_Nocapture
 | PARAMATTR_Readonly   (* NOTE: The status of this one is ambiguous - it was definitely
@@ -140,14 +140,14 @@ Variant param_attr : Set :=
 | PARAMATTR_Nest
 | PARAMATTR_Returned
 | PARAMATTR_Nonnull
-| PARAMATTR_Dereferenceable (a:int)
-| PARAMATTR_Dereferenceable_or_null (a : int)
+| PARAMATTR_Dereferenceable (a:int_ast)
+| PARAMATTR_Dereferenceable_or_null (a : int_ast)
 | PARAMATTR_Swiftself
 | PARAMATTR_Swiftasync
 | PARAMATTR_Swifterror
 | PARAMATTR_Immarg
 | PARAMATTR_Noundef
-| PARAMATTR_Alignstack (a : int)
+| PARAMATTR_Alignstack (a : int_ast)
 | PARAMATTR_Allocalign
 | PARAMATTR_Allocptr
 | PARAMATTR_Writeonly      
@@ -160,10 +160,10 @@ Variant frame_pointer_val : Set :=
 .
 
 Variant fn_attr : Set :=
-| FNATTR_Alignstack (a:int)
+| FNATTR_Alignstack (a:int_ast)
 (* | FNATTR_Alloc_family (fam : string) - FNATTR_KeyValue *)
 | FNATTR_Allockind (kind : string)
-| FNATTR_Allocsize (a1 : int) (a2 : option int)
+| FNATTR_Allocsize (a1 : int_ast) (a2 : option int_ast)
 | FNATTR_Alwaysinline
 | FNATTR_Builtin
 | FNATTR_Cold
@@ -233,11 +233,11 @@ Variant fn_attr : Set :=
 | FNATTR_Shadowcallstack
 | FNATTR_Mustprogress
 (* | FNATTR_Warn_stack_size (th : int) - FNATTR_KeyValue *)
-| FNATTR_Vscale_range (min : int) (max : option int)
-(* | FNATTR_Min_legal_vector_width  (size : int) - FNATTR_KeyValue *)
+| FNATTR_Vscale_range (min : int_ast) (max : option int_ast)
+(* | FNATTR_Min_legal_vector_width  (size : int_ast) - FNATTR_KeyValue *)
 | FNATTR_String (s:string)   (* See the comments above for cases covered by FNATTR_String *)
 | FNATTR_Key_value (kv : string * string) (* See the comments above for cases covered by FNATTR_KeyValue *)
-| FNATTR_Attr_grp (g:int)
+| FNATTR_Attr_grp (g:int_ast)
 .
 
 Variant thread_local_storage : Set :=
@@ -330,7 +330,7 @@ Unset Elimination Schemes.
 
 Inductive exp : Set :=
 | EXP_Ident   (id:ident)
-| EXP_Integer (x:int)
+| EXP_Integer (x:int_ast)
 | EXP_Float   (f:float32)  (* 32-bit floating point values *)
 | EXP_Double  (f:float)    (* 64-bit floating point values *)
 | EXP_Hex     (f:float)    (* See LLVM documentation about hex float constants. *)
@@ -357,8 +357,8 @@ Inductive exp : Set :=
 | OP_ExtractElement   (vec:(T * exp)) (idx:(T * exp))
 | OP_InsertElement    (vec:(T * exp)) (elt:(T * exp)) (idx:(T * exp))
 | OP_ShuffleVector    (vec1:(T * exp)) (vec2:(T * exp)) (idxmask:(T * exp))
-| OP_ExtractValue     (vec:(T * exp)) (idxs:list int)
-| OP_InsertValue      (vec:(T * exp)) (elt:(T * exp)) (idxs:list int)
+| OP_ExtractValue     (vec:(T * exp)) (idxs:list int_ast)
+| OP_InsertValue      (vec:(T * exp)) (elt:(T * exp)) (idxs:list int_ast)
 | OP_Select           (cnd:(T * exp)) (v1:(T * exp)) (v2:(T * exp)) (* if * then * else *)
 | OP_Freeze           (v:(T * exp))
 .
@@ -387,11 +387,11 @@ Inductive metadata : Set :=
 
 (* Used in switch branches which insist on integer literals *)
 Variant tint_literal : Set :=
-  | TInt_Literal (sz:N) (x:int).
+  | TInt_Literal (sz:N) (x:int_ast).
 
 Variant instr_id : Set :=
   | IId   (id:raw_id)    (* "Anonymous" or explicitly named instructions *)
-  | IVoid (n:int)        (* "Void" return type, for "store",  "void call", and terminators.
+  | IVoid (n:int_ast)        (* "Void" return type, for "store",  "void call", and terminators.
                             Each with unique number (NOTE: these are distinct from Anon raw_id) *)
 .
 
@@ -419,7 +419,7 @@ Record cmpxchg : Set :=
       c_syncscope            : option string;
       c_success_ordering     : ordering;
       c_failure_ordering     : ordering;
-      c_align                : option int;
+      c_align                : option int_ast;
     }.
 
 Variant atomic_rmw_operation : Set :=
@@ -446,7 +446,7 @@ Record atomicrmw : Set :=
       a_val                  : texp;
       a_syncscope            : option string;
       a_ordering             : ordering;
-      a_align                : option int;
+      a_align                : option int_ast;
       a_type                 : T;
     }.
 
@@ -477,11 +477,11 @@ Variant annotation : Set :=
   | ANN_dll_storage (d:dll_storage)
   | ANN_thread_local_storage (t:thread_local_storage)
   | ANN_unnamed_addr (u:unnamed_addr)
-  | ANN_addrspace (n:int)
+  | ANN_addrspace (n:int_ast)
   | ANN_section (s:string)
   | ANN_partition (s:string)
   | ANN_comdat (l:local_id)
-  | ANN_align (n:int)
+  | ANN_align (n:int_ast)
   | ANN_no_sanitize
   | ANN_no_sanitize_address
   | ANN_no_sanitize_hwaddress
@@ -537,7 +537,7 @@ Definition ann_unnamed_addr (a:annotation) : option unnamed_addr :=
   | _ => None
   end.
 
-Definition ann_addrspace (a:annotation) : option int :=
+Definition ann_addrspace (a:annotation) : option int_ast :=
   match a with
   | ANN_addrspace a => Some a
   | _ => None
@@ -561,7 +561,7 @@ Definition ann_comdat (a:annotation) : option local_id :=
   | _ => None
   end.
 
-Definition ann_align (a:annotation) : option int :=
+Definition ann_align (a:annotation) : option int_ast :=
   match a with
   | ANN_align n => Some n
   | _ => None
@@ -723,7 +723,7 @@ Definition g_thread_local_storage (g:global) : option thread_local_storage :=
 Definition g_unnamed_addr (g:global) : option unnamed_addr :=
   find_option ann_unnamed_addr (g_annotations g).
 
-Definition g_addrspace (g:global) : option int :=
+Definition g_addrspace (g:global) : option int_ast :=
   find_option ann_addrspace (g_annotations g).
 
 Definition g_section (g:global) : option string :=
@@ -735,7 +735,7 @@ Definition g_partition (g:global) : option string :=
 Definition g_comdat (g:global) : option local_id :=
   find_option ann_comdat (g_annotations g).
 
-Definition g_align (g:global) : option int :=
+Definition g_align (g:global) : option int_ast :=
   find_option ann_align (g_annotations g).
 
 Definition g_no_sanitize (g:global) : option unit :=
@@ -778,7 +778,7 @@ Definition dc_thread_local_storage (d:declaration) : option thread_local_storage
 Definition dc_unnamed_addr (d:declaration) : option unnamed_addr :=
   find_option ann_unnamed_addr (dc_annotations d).
 
-Definition dc_addrspace (d:declaration) : option int :=
+Definition dc_addrspace (d:declaration) : option int_ast :=
   find_option ann_addrspace (dc_annotations d).
 
 Definition dc_section (d:declaration) : option string :=
@@ -790,7 +790,7 @@ Definition dc_partition (d:declaration) : option string :=
 Definition dc_comdat (d:declaration) : option local_id :=
   find_option ann_comdat (dc_annotations d).
 
-Definition dc_align (d:declaration) : option int :=
+Definition dc_align (d:declaration) : option int_ast :=
   find_option ann_align (dc_annotations d).
 
 Definition dc_cconv (d:declaration) : option cconv :=
@@ -843,7 +843,7 @@ Variant toplevel_entity {FnBody:Set} : Set :=
 | TLE_Source_filename (s:string)
 | TLE_Global          (g:global)
 | TLE_Metadata        (id:raw_id) (md:metadata)
-| TLE_Attribute_group (i:int) (attrs:list fn_attr)
+| TLE_Attribute_group (i:int_ast) (attrs:list fn_attr)
 .
 
 Definition toplevel_entities (FnBody:Set) : Set := list (@toplevel_entity FnBody).

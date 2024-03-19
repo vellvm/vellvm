@@ -10016,14 +10016,14 @@ Qed.
 
   Lemma insert_into_vec_dv_loop_fin_inf_succeeds :
     forall elts acc idx v res,
-      (fix loop (acc elts : list dvalue) (i : LLVMAst.int) {struct elts} :
+      (fix loop (acc elts : list dvalue) (i : LLVMAst.int_ast) {struct elts} :
         option (list dvalue) :=
          match elts with
          | [] => None
          | h :: tl =>
              if (i =? 0)%Z then Some (acc ++ v :: tl) else loop (acc ++ [h]) tl (i - 1)%Z
          end) acc elts idx = ret res ->
-      (fix loop (acc elts : list DVCrev.DV2.dvalue) (i : LLVMAst.int) {struct elts} :
+      (fix loop (acc elts : list DVCrev.DV2.dvalue) (i : LLVMAst.int_ast) {struct elts} :
         option (list DVCrev.DV2.dvalue) :=
          match elts with
          | [] => None
@@ -10057,14 +10057,14 @@ Qed.
 
   Lemma insert_into_vec_dv_loop_fin_inf_fails :
     forall elts acc idx v,
-      (fix loop (acc elts : list dvalue) (i : LLVMAst.int) {struct elts} :
+      (fix loop (acc elts : list dvalue) (i : LLVMAst.int_ast) {struct elts} :
         option (list dvalue) :=
          match elts with
          | [] => None
          | h :: tl =>
              if (i =? 0)%Z then Some (acc ++ v :: tl) else loop (acc ++ [h]) tl (i - 1)%Z
          end) acc elts idx = None ->
-      (fix loop (acc elts : list DVCrev.DV2.dvalue) (i : LLVMAst.int) {struct elts} :
+      (fix loop (acc elts : list DVCrev.DV2.dvalue) (i : LLVMAst.int_ast) {struct elts} :
         option (list DVCrev.DV2.dvalue) :=
          match elts with
          | [] => None
@@ -10339,14 +10339,14 @@ Qed.
 
   Lemma insert_into_str_loop_fin_inf :
     forall {elts acc v i} {res : err_ub_oom (list dvalue)},
-      (fix loop (acc elts:list dvalue) (i:LLVMAst.int) :=
+      (fix loop (acc elts:list dvalue) (i:LLVMAst.int_ast) :=
         match elts with
         | [] => raise_error "insert_into_str: index out of bounds"
         | h :: tl =>
           (if i =? 0 then ret (acc ++ (v :: tl))
           else loop (acc ++ [h]) tl (i-1))%Z
         end%list) acc elts i = res ->
-      (fix loop (acc elts:list DVCrev.DV2.dvalue) (i:LLVMAst.int) :=
+      (fix loop (acc elts:list DVCrev.DV2.dvalue) (i:LLVMAst.int_ast) :=
         match elts with
         | [] => raise_error "insert_into_str: index out of bounds"
         | h :: tl =>
@@ -16514,7 +16514,7 @@ Qed.
       specialize (H1 x1).
       forward H1; [cbn; auto|].
       rewrite <- H1 in H3.
-      remember (((fix loop (str : dvalue) (idxs : list LLVMAst.int) {struct idxs} :
+      remember (((fix loop (str : dvalue) (idxs : list LLVMAst.int_ast) {struct idxs} :
                         err_ub_oom dvalue :=
                       match idxs with
                       | [] => ret str
@@ -16530,7 +16530,7 @@ Qed.
       induction idxs; intros x1 CONTRA.
       + inv CONTRA.
       + remember (index_into_str_dv x1 a) as init.
-        remember (fix loop (str : dvalue) (idxs : list LLVMAst.int) {struct idxs} : err_ub_oom dvalue :=
+        remember (fix loop (str : dvalue) (idxs : list LLVMAst.int_ast) {struct idxs} : err_ub_oom dvalue :=
                     match idxs with
                     | [] => ret str
                     | i :: tl => v0 <- index_into_str_dv str i;; loop v0 tl

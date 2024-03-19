@@ -36,7 +36,7 @@ Section ReprInstances.
     }.
 
   #[global]
-   Instance reprInt : Repr LLVMAst.int :=
+   Instance reprInt : Repr LLVMAst.int_ast :=
     {
       repr i := ("(" ++ show i ++ ")%Z")%string
     }.
