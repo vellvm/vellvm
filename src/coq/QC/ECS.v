@@ -1270,6 +1270,12 @@ intros m M conv s.
 apply (IS.fold (fun k acc => monoid_plus M (conv k) acc) s (monoid_unit M)).
 Defined.
 
+#[global] Instance Foldable_IM_Raw {a} : Foldable (IM.Raw.t a) Z.
+split.
+intros m M conv s.
+apply (IM.Raw.fold (fun k _ acc => monoid_plus M (conv k) acc) s (monoid_unit M)).
+Defined.
+
 #[global] Instance Foldable_list {a} : Foldable (list a) a.
 split.
 intros m M conv l.
