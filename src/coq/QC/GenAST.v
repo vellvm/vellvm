@@ -127,9 +127,6 @@ Section Helpers.
        | _ => false
        end.
 
-  Definition is_function_pointer (typ_ctx : list (ident * typ)) (t : typ) : bool
-    := is_function_pointer_h (normalize_type typ_ctx t).
-
   (* TODO: incomplete. Should typecheck *)
   Definition well_formed_op (typ_ctx : list (ident * typ)) (op : exp typ) : bool :=
     match op with
@@ -903,6 +900,9 @@ Section TypGenerators.
     (q : GenQuery A) (k : E) : GenLLVM (option A):=
     lift (runGenQuery q k).
 
+  (* Attempt to find a matching entity in the context...
+     Note: this is not a random selection, the first thing found is returned.
+   *)
   Definition genFind {a es E}
     `{ToEnt E} `{Foldable es E}
     (focus : @EntTarget es E _ _ GenState G)
@@ -1022,7 +1022,9 @@ Section TypGenerators.
                | TYPE_Array _ _ => false
                | TYPE_Pointer (TYPE_Function _ _ _) => false
                | _ => true
-               end))).
+               end))
+         & (@is_function_pointer' SetterOf .~
+              bool_setter (is_function_pointer_h normalized))).
 
   Definition set_typ_metadata (e : Ent) (τ : typ) : GenLLVM unit
     := setter <- typ_metadata_setter τ;;
