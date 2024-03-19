@@ -2992,24 +2992,11 @@ Section InstrGenerators.
        end.
   (* Don't want to generate CFGs, actually. Want to generated TLEs *)
 
-  Definition gen_definition (name : global_id) (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
+  Definition gen_definition_h (name : global_id) (ret_t : typ) (args_t : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
-    ctxs <- get_variable_ctxs;;
-
-
-    (* Add arguments to context *)
-    args <- map_monad
-              (fun t =>
-                 i <- new_raw_id;;
-                 ret (i, t))
-              args;;
-    let args_ctx := map (fun '(i, t) => (ID_Local i, t)) args in
-    append_to_local_ctx args_ctx;;
-
-    let args_t := map snd args in
+    (* Generate argument variables *)
+    args <- map_monad genLocal args_t;;
     let f_type := TYPE_Function ret_t args_t false in
-    (* annotate_debug ("--Generate: @" ++ show name ++ " " ++ show f_type);; *)
-    
     let param_attr_slots := map (fun t => []) args in
     let prototype :=
       mk_declaration name f_type
@@ -3019,11 +3006,14 @@ Section InstrGenerators.
     in
 
     bs <- gen_blocks ret_t;;
+    ret (mk_definition (block typ * list (block typ)) prototype (map ident_to_raw_id args) bs).
 
-    (* Reset context *)
-    let '(lctx, gctx, ptoi_ctx) := ctxs in
-    restore_variable_ctxs (lctx, (ID_Global name, TYPE_Pointer f_type)::gctx, ptoi_ctx);;
-    ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
+
+  Definition gen_definition (name : global_id) (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
+    :=
+    dfn <- backtrackMetadata (gen_definition_h name ret_t args);;
+    add_to_global_ctx (ID_Global name, dfn.(df_prototype).(dc_type));;
+    ret dfn.
 
   Definition gen_new_definition (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
