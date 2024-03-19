@@ -2750,6 +2750,15 @@ Section InstrGenerators.
          (use (gen_context' .@ is_sized'))
          (queryl variable_type').
 
+  Definition gen_op_instr_of_typ (τ : typ) : GenLLVM (instr_id * instr typ)
+    := i <- ret INSTR_Op <*> gen_op τ;;
+       id <- genInstrId τ;;
+       ret (id, i).
+
+  Definition gen_op_instr : GenLLVM (instr_id * instr typ)
+    := τ <- gen_op_typ;;
+       gen_op_instr_of_typ τ.
+
   (* Generate basic instructions.
      Note: this function returns a list because when we generate an alloca we must initialize it...
 
@@ -2765,10 +2774,8 @@ Section InstrGenerators.
     ofun_ptr_typ <- gen_function_pointer_type;;
     osized_typ <- gen_sized_typ_in_context;;
     oneOf_LLVM
-      ([ t <- gen_op_typ;;
-         i <- ret INSTR_Op <*> gen_op t;;
-         id <- genInstrId t;;
-         ret [(id, i)] ]
+      ([ op <- gen_op_instr;; t <- gen_op_typ;;
+         ret [op] ]
          ++ (* TODO: generate multiple element allocas. Will involve changing initialization *)
            (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)
          (* align <- ret None;; *)
@@ -2806,20 +2813,27 @@ Section InstrGenerators.
   (* Returns a terminator and a list of new blocks that it reaches *)
   (* Need to make returns more likely than branches so we don't get an
      endless tree of blocks *)
+
+  Variable gen_loop_sz : forall
+         (sz : nat)
+         (t : typ)
+         (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
+         (bound : LLVMAst.int), GenLLVM (terminator typ * (block typ * list (block typ))).
+
   Fixpoint gen_terminator_sz
     (sz : nat)
     (t : typ) (* Return type *)
     (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
     {struct t} : GenLLVM (terminator typ * list (block typ))
     :=
-    ctx <- get_ctx;;
+    nt <- normalize_type_GenLLVM t;;
     match sz with
     | 0%nat =>
         (* Only returns allowed *)
-        match (typ_to_dtyp ctx t) with
-        | DTYPE_Void => ret (TERM_Ret_void, [])
+        match nt with
+        | TYPE_Void => ret (TERM_Ret_void, [])
         | _ =>
-            e <- gen_exp_size 0 t FULL_CTX;;
+            e <- gen_exp_size (gen_context' .@ variable_type') 0%nat t;;
             ret (TERM_Ret (t, e), [])
         end
     | S sz' =>
@@ -2831,8 +2845,8 @@ Section InstrGenerators.
                  (* Conditional branch, with no backloops *)
              ; (min sz' 6%nat,
                  fun _ =>
-                   c <- gen_exp_size 0 (TYPE_I 1) FULL_CTX;;
-                   
+                   c <- gen_exp_size (gen_context' .@ variable_type') 0 (TYPE_I 1);;
+
                    (* Generate first branch *)
                    (* We backtrack contexts so blocks in second branch *)
                    (* don't refer to variables from the first *)
@@ -2883,20 +2897,28 @@ Section InstrGenerators.
        :=
          bid_entry <- new_block_id;;
          (* TODO: make it so I can generate constant expressions *)
-         loop_init <- ret INSTR_Op <*> gen_op (TYPE_I 32 (* TODO: big ints *));; (* gen_exp_size sz (TYPE_I 64);; *)
-         bound' <- lift_GenLLVM (choose (0, bound));;
-         '(loop_init_instr_id, loop_init_instr) <- add_id_to_instr (TYPE_I 32 (* TODO: big ints *), loop_init);;
+         '(loop_init_instr_id, loop_init_instr) <- gen_op_instr_of_typ (TYPE_I 32) (* TODO: big ints *);;
          let loop_init_instr_raw_id := instr_id_to_raw_id "loop init id" loop_init_instr_id in
-         '(loop_cmp_id, loop_cmp) <- add_id_to_instr (TYPE_I 1, INSTR_Op (OP_ICmp Ule (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local loop_init_instr_raw_id)) (EXP_Integer bound')));;
+         bound' <- lift_GenLLVM (choose (0, bound));;
+         let gen_icmp (τ : typ) : GenLLVM (instr_id * instr) :=
+           iid <- genInstrId τ;;
+           ret (iid, INSTR_Op (OP_ICmp Ule τ (EXP_Ident (ID_Local loop_init_instr_raw_id)) (EXP_Integer bound')))
+         in
+         '(loop_cmp_id, loop_cmp) <- gen_icmp (TYPE_I 32);; (* TODO: big ints *)
          let loop_cmp_raw_id := instr_id_to_raw_id "loop_cmp_id" loop_cmp_id in
-         let lower_exp := OP_Select (TYPE_I 1, (EXP_Ident (ID_Local loop_cmp_raw_id)))
-                            (TYPE_I 32 (* TODO: big ints *), (EXP_Ident (ID_Local loop_init_instr_raw_id)))
-                            (TYPE_I 32 (* TODO: big ints *), EXP_Integer bound') in
-         '(select_id, select_instr) <- add_id_to_instr (TYPE_I 32 (* TODO: big ints *), INSTR_Op lower_exp);;
+         let gen_select (τ : typ) : GenLLVM (instr_id * instr) :=
+           let lower_exp := OP_Select (TYPE_I 1, (EXP_Ident (ID_Local loop_cmp_raw_id)))
+                              (τ, (EXP_Ident (ID_Local loop_init_instr_raw_id)))
+                              (τ, EXP_Integer bound') in
+           iid <- genInstrId τ;;
+           ret (iid, INSTR_Op lower_exp)
+         in
+         '(select_id, select_instr) <- gen_select (TYPE_I 32);;
          let loop_final_init_id_raw := instr_id_to_raw_id "loop iterator id" select_id in
-
-         let loop_cond_exp := INSTR_Op (OP_ICmp Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local loop_final_init_id_raw)) (EXP_Integer 0)) in
-         '(loop_cond_id, loop_cond) <- add_id_to_instr (TYPE_I 1, loop_cond_exp);;
+         '(loop_cond_id, loop_cond) <-                    
+           (let loop_cond_exp := INSTR_Op (OP_ICmp Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local loop_final_init_id_raw)) (EXP_Integer 0)) in
+           iid <- genInstrId (TYPE_I 1);;
+           ret (iid, loop_cond_exp));;
 
          let entry_code : list (instr_id * instr typ) := [(loop_init_instr_id, loop_init_instr); (loop_cmp_id, loop_cmp); (select_id, select_instr); (loop_cond_id, loop_cond)] in
 
@@ -2911,11 +2933,16 @@ Section InstrGenerators.
          phi_id <- new_raw_id;;
 
          (* Block for controlling the next iteration of the loop *)
-         let next_exp := OP_IBinop (Sub false false) (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local phi_id)) (EXP_Integer 1) in
-         '(next_instr_id, next_instr) <- add_id_to_instr (TYPE_I 32 (* TODO: big ints *), INSTR_Op next_exp);;
+         '(next_instr_id, next_instr) <-
+           (let next_exp := OP_IBinop (Sub false false) (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local phi_id)) (EXP_Integer 1) in
+            iid <- genInstrId (TYPE_I 32);;
+            ret (iid, next_exp));;
          let next_instr_raw_id := instr_id_to_raw_id "next_exp" next_instr_id in
-         let next_cond_exp := OP_ICmp Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local next_instr_raw_id)) (EXP_Integer 0) in
-         '(next_cond_id, next_cond) <- add_id_to_instr (TYPE_I 1, INSTR_Op next_cond_exp);;
+
+         '(next_cond_id, next_cond) <-
+           (let next_cond_exp := OP_ICmp Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local next_instr_raw_id)) (EXP_Integer 0) in
+            iid <- genInstrId (TYPE_I 1);;
+            ret (iid, INSTR_Op next_cond_exp));;
          let next_cond_raw_id := instr_id_to_raw_id "next_cond_exp" next_cond_id in
 
          let next_code := [(next_instr_id, next_instr); (next_cond_id, next_cond)] in
