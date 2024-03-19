@@ -137,6 +137,8 @@ Record Metadata s :=
     ; is_sized_ptr_vector : Component s Field unit
     (* Whether a type alias is to a sized type *)
     ; is_sized_type_alias : Component s Field unit
+    (* Whether a variable / type alias has a first class type *)
+    ; is_first_class_type : Component s Field unit
     }.
 
 Definition blankSetter : (Metadata SetterOf).
@@ -282,6 +284,7 @@ Ltac2 metadataConstructors :=
   ; (fun _ => apply is_ptr_vector)
   ; (fun _ => apply is_sized_ptr_vector)
   ; (fun _ => apply is_sized_type_alias)
+  ; (fun _ => apply is_first_class_type)
   ].
 
 Ltac2 applyMetadataConstructors (tac : unit -> unit) :=
@@ -305,6 +308,7 @@ Ltac2 applyMetadataConstructors (tac : unit -> unit) :=
       ; (fun _ => tac (); apply is_ptr_vector)
       ; (fun _ => tac (); apply is_sized_ptr_vector)
       ; (fun _ => tac (); apply is_sized_type_alias)
+      ; (fun _ => tac (); apply is_first_class_type)
     ].
 
 Definition getEntity {w m} `{Monad m} `{@MetadataStore m Metadata (SystemState w m)}
@@ -386,6 +390,7 @@ Definition name' {s : StorageType} : Lens' (Metadata s) (Component s Field ident
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply name.
@@ -416,6 +421,7 @@ Definition is_global' {s : StorageType} : Lens' (Metadata s) (Component s Field 
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply is_global.
@@ -446,6 +452,7 @@ Definition is_local' {s : StorageType} : Lens' (Metadata s) (Component s Field u
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply is_local.
@@ -476,6 +483,7 @@ Definition type_alias' {s : StorageType} : Lens' (Metadata s) (Component s Field
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply type_alias.
@@ -506,6 +514,7 @@ Definition variable_type' {s : StorageType} : Lens' (Metadata s) (Component s Fi
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply variable_type.
@@ -536,6 +545,7 @@ Definition normalized_type' {s : StorageType} : Lens' (Metadata s) (Component s 
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply normalized_type.
@@ -566,6 +576,7 @@ Definition is_non_deterministic' {s : StorageType} : Lens' (Metadata s) (Compone
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply is_non_deterministic.
@@ -596,6 +607,7 @@ Definition from_pointer' {s : StorageType} : Lens' (Metadata s) (Component s Fie
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply from_pointer.
@@ -626,6 +638,7 @@ Definition is_pointer' {s : StorageType} : Lens' (Metadata s) (Component s Field
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply is_pointer.
@@ -656,6 +669,7 @@ Definition is_sized_pointer' {s : StorageType} : Lens' (Metadata s) (Component s
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply is_sized_pointer.
@@ -686,6 +700,7 @@ Definition is_sized' {s : StorageType} : Lens' (Metadata s) (Component s Field u
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply is_sized.
@@ -716,6 +731,7 @@ Definition is_aggregate' {s : StorageType} : Lens' (Metadata s) (Component s Fie
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply is_aggregate.
@@ -746,6 +762,7 @@ Definition is_vector' {s : StorageType} : Lens' (Metadata s) (Component s Field 
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply is_vector.
@@ -776,6 +793,7 @@ Definition is_array' {s : StorageType} : Lens' (Metadata s) (Component s Field u
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply is_array.
@@ -806,6 +824,7 @@ Definition is_struct' {s : StorageType} : Lens' (Metadata s) (Component s Field 
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply is_struct.
@@ -836,6 +855,7 @@ Definition is_non_void' {s : StorageType} : Lens' (Metadata s) (Component s Fiel
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply is_non_void.
@@ -866,6 +886,7 @@ Definition is_ptr_vector' {s : StorageType} : Lens' (Metadata s) (Component s Fi
           ; (fun _ => apply x)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply is_ptr_vector.
@@ -896,6 +917,7 @@ Definition is_sized_ptr_vector' {s : StorageType} : Lens' (Metadata s) (Componen
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply x)
           ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply is_sized_ptr_vector.
@@ -926,9 +948,41 @@ Definition is_sized_type_alias' {s : StorageType} : Lens' (Metadata s) (Componen
           ; (fun _ => apply is_ptr_vector)
           ; (fun _ => apply is_sized_ptr_vector)
           ; (fun _ => apply x)
+          ; (fun _ => apply is_first_class_type)
         ];
       apply w.
   - apply is_sized_type_alias.
+Defined.
+
+Definition is_first_class_type' {s : StorageType} : Lens' (Metadata s) (Component s Field unit).
+  red.
+  intros f F afa w.
+  refine open_constr:((fun x => _) <$> afa (_ w)); try typeclasses_eauto.
+  - apply mkMetadata;
+      Control.dispatch
+        [ (fun _ => apply name)
+          ; (fun _ => apply type_alias)
+          ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
+          ; (fun _ => apply is_local)
+          ; (fun _ => apply is_global)
+          ; (fun _ => apply is_non_deterministic)
+          ; (fun _ => apply from_pointer)
+          ; (fun _ => apply is_pointer)
+          ; (fun _ => apply is_sized_pointer)
+          ; (fun _ => apply is_sized)
+          ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_vector)
+          ; (fun _ => apply is_array)
+          ; (fun _ => apply is_struct)
+          ; (fun _ => apply is_non_void)
+          ; (fun _ => apply is_ptr_vector)
+          ; (fun _ => apply is_sized_ptr_vector)
+          ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply x)
+        ];
+      apply w.
+  - apply is_first_class_type.
 Defined.
 
 Definition ident_to_raw_id (i : ident) :=
@@ -1173,7 +1227,7 @@ Definition names'' {m} : Traversal (Metadata (WorldOf m)) (Metadata (WorldOf m))
   red.
   intros f F focus meta.
   refine open_constr:(pure (mkMetadata (WorldOf m)) <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _
-                     <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _);
+                     <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _);
     try typeclasses_eauto.
   - apply (focus (name _ meta)).
   - apply (pure (type_alias _ meta)).
@@ -1194,6 +1248,7 @@ Definition names'' {m} : Traversal (Metadata (WorldOf m)) (Metadata (WorldOf m))
   - apply (pure (is_ptr_vector _ meta)).
   - apply (pure (is_sized_ptr_vector _ meta)).
   - apply (pure (is_sized_type_alias _ meta)).
+  - apply (pure (is_first_class_type _ meta)).
 Defined.
 
 Record QueryT w m a : Type :=
