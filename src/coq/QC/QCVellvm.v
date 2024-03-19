@@ -22,7 +22,7 @@ From ITree Require Import
 
 (* From QuickChick Require Import QuickChick. *)
 From QuickChick Require Import Show Checker Generators Producer Test.
-From Vellvm Require Import ShowAST ReprAST GenAST TopLevel LLVMAst DynamicValues.
+From Vellvm Require Import ShowAST ReprAST GenAST TopLevel LLVMAst DynamicValues VellvmIntegers.
 
 Extraction Blacklist String List Char Core Z Format.
 
@@ -57,7 +57,7 @@ Proof.
 Defined.
 
 Unset Guard Checking.
-Fixpoint step (t : ITreeDefinition.itree L4 res_L4) : MlResult dvalue string
+CoFixpoint step (t : ITreeDefinition.itree L4 res_L4) : MlResult dvalue string
   := match observe t with
      | RetF (_,(_,(_,(_,x)))) => MlOk _ string x
      | TauF t => step t
@@ -158,7 +158,7 @@ Extract Constant vellvm_print_ll => "fun prog -> Llvm_printer.toplevel_entities 
 (** Use the *llc_command* Axiom to run a Vellvm program with clang,
     and wrap up the exit code as a uvalue. *)
 Definition run_llc (prog : list (toplevel_entity typ (block typ * list (block typ)))) : dvalue
-  := DVALUE_I8 (repr (llc_command (to_caml_str (show prog)))).
+  := DVALUE_I8 (VellvmIntegers.repr (llc_command (to_caml_str (show prog)))).
 
 (* Hide show instance... *)
 Inductive PROG :=
