@@ -2814,12 +2814,6 @@ Section InstrGenerators.
   (* Need to make returns more likely than branches so we don't get an
      endless tree of blocks *)
 
-  Variable gen_loop_sz : forall
-         (sz : nat)
-         (t : typ)
-         (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
-         (bound : LLVMAst.int), GenLLVM (terminator typ * (block typ * list (block typ))).
-
   Fixpoint gen_terminator_sz
     (sz : nat)
     (t : typ) (* Return type *)
@@ -2900,13 +2894,13 @@ Section InstrGenerators.
          '(loop_init_instr_id, loop_init_instr) <- gen_op_instr_of_typ (TYPE_I 32) (* TODO: big ints *);;
          let loop_init_instr_raw_id := instr_id_to_raw_id "loop init id" loop_init_instr_id in
          bound' <- lift_GenLLVM (choose (0, bound));;
-         let gen_icmp (τ : typ) : GenLLVM (instr_id * instr) :=
+         let gen_icmp (τ : typ) : GenLLVM (instr_id * instr typ) :=
            iid <- genInstrId τ;;
            ret (iid, INSTR_Op (OP_ICmp Ule τ (EXP_Ident (ID_Local loop_init_instr_raw_id)) (EXP_Integer bound')))
          in
          '(loop_cmp_id, loop_cmp) <- gen_icmp (TYPE_I 32);; (* TODO: big ints *)
          let loop_cmp_raw_id := instr_id_to_raw_id "loop_cmp_id" loop_cmp_id in
-         let gen_select (τ : typ) : GenLLVM (instr_id * instr) :=
+         let gen_select (τ : typ) : GenLLVM (instr_id * instr typ) :=
            let lower_exp := OP_Select (TYPE_I 1, (EXP_Ident (ID_Local loop_cmp_raw_id)))
                               (τ, (EXP_Ident (ID_Local loop_init_instr_raw_id)))
                               (τ, EXP_Integer bound') in
@@ -2930,13 +2924,12 @@ Section InstrGenerators.
 
          bid_next <- new_block_id;;
          loop_bid <- new_block_id;;
-         phi_id <- new_raw_id;;
 
          (* Block for controlling the next iteration of the loop *)
          '(next_instr_id, next_instr) <-
-           (let next_exp := OP_IBinop (Sub false false) (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local phi_id)) (EXP_Integer 1) in
-            iid <- genInstrId (TYPE_I 32);;
-            ret (iid, next_exp));;
+           (phi_id <- genLocal (TYPE_I 32);;
+            let next_exp := OP_IBinop (Sub false false) (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident phi_id) (EXP_Integer 1) in
+            ret (IId (ident_to_raw_id phi_id), INSTR_Op next_exp));;
          let next_instr_raw_id := instr_id_to_raw_id "next_exp" next_instr_id in
 
          '(next_cond_id, next_cond) <-
@@ -2944,6 +2937,7 @@ Section InstrGenerators.
             iid <- genInstrId (TYPE_I 1);;
             ret (iid, INSTR_Op next_cond_exp));;
          let next_cond_raw_id := instr_id_to_raw_id "next_cond_exp" next_cond_id in
+         let phi_id := next_cond_raw_id in
 
          let next_code := [(next_instr_id, next_instr); (next_cond_id, next_cond)] in
          let next_block := {| blk_id   := bid_next
