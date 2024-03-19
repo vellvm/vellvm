@@ -1395,7 +1395,7 @@ Section TypGenerators.
     end.
   
   Definition gen_sized_typ_size :=
-    gen_typ_size' gen_sized_typ_0 sized_aggregate_typ_gens (gen_type_matching_alias (withl is_sized_type_alias')).
+    gen_typ_size' gen_sized_typ_0 sized_aggregate_typ_gens (gen_type_matching_variable (withl is_sized')).
 
   Definition gen_sized_typ  : GenLLVM typ
     := sized_LLVM (fun sz => gen_sized_typ_size sz).
@@ -3022,8 +3022,8 @@ Section InstrGenerators.
 
   Definition gen_helper_function: GenLLVM (definition typ (block typ * list (block typ)))
     :=
-    ret_t <- hide_ctx gen_sized_typ_ptrin_fctx;;
-    args  <- listOf_LLVM (hide_ctx gen_sized_typ_ptrin_fctx);;
+    ret_t <- hide_ctx gen_sized_typ;;
+    args  <- listOf_LLVM (hide_ctx gen_sized_typ);;
     gen_new_definition ret_t args.
 
   Definition gen_helper_function_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
@@ -3053,9 +3053,9 @@ Section InstrGenerators.
   Definition gen_global_var : GenLLVM (global typ)
     := 
     name <- new_global_id;;
-    t <- hide_ctx gen_sized_typ_ptrin_fctx;;
+    t <- hide_ctx gen_sized_typ;;
     (* annotate_debug ("--Generate: Global: @" ++ show name ++ " " ++ show t);; *)
-    opt_exp <- fmap Some (hide_ctx (gen_exp_size 0 t FULL_CTX));;
+    opt_exp <- fmap Some (hide_ctx (gen_exp_size (gen_context' .@ variable_type') 0 t));;
     add_to_global_ctx (ID_Global name, TYPE_Pointer t);;
     let ann_linkage : list (annotation typ) :=
       match opt_exp with
