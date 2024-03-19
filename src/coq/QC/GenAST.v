@@ -2924,12 +2924,13 @@ Section InstrGenerators.
 
          bid_next <- new_block_id;;
          loop_bid <- new_block_id;;
+         phi_id <- new_local_id;;
 
          (* Block for controlling the next iteration of the loop *)
          '(next_instr_id, next_instr) <-
-           (phi_id <- genLocal (TYPE_I 32);;
-            let next_exp := OP_IBinop (Sub false false) (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident phi_id) (EXP_Integer 1) in
-            ret (IId (ident_to_raw_id phi_id), INSTR_Op next_exp));;
+           (iid <- genLocal (TYPE_I 32);;
+            let next_exp := OP_IBinop (Sub false false) (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local phi_id)) (EXP_Integer 1) in
+            ret (IId (ident_to_raw_id iid), INSTR_Op next_exp));;
          let next_instr_raw_id := instr_id_to_raw_id "next_exp" next_instr_id in
 
          '(next_cond_id, next_cond) <-
@@ -2937,7 +2938,6 @@ Section InstrGenerators.
             iid <- genInstrId (TYPE_I 1);;
             ret (iid, INSTR_Op next_cond_exp));;
          let next_cond_raw_id := instr_id_to_raw_id "next_cond_exp" next_cond_id in
-         let phi_id := next_cond_raw_id in
 
          let next_code := [(next_instr_id, next_instr); (next_cond_id, next_cond)] in
          let next_block := {| blk_id   := bid_next
