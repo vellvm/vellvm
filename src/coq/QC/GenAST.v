@@ -477,36 +477,6 @@ Section GenerationState.
       | S z => dup_string_wrt_nat_tail_recur (s ++ acc)%string z
       end in dup_string_wrt_nat_tail_recur "" n.
 
-  (* TODO: ADD TYPE METADATA *)
-  Definition add_to_local_ctx (x : (ident * typ)) : GenLLVM unit
-    := e <- lift newEntity;;
-       (gen_context' .@ entl e .@ is_local') .= ret tt;;
-       (gen_context' .@ entl e .@ name') .= ret (fst x);;
-       (gen_context' .@ entl e .@ variable_type') .= ret (snd x);;
-       ret tt.
-
-  Definition add_to_global_ctx (x : (ident * typ)) : GenLLVM unit
-    := e <- lift newEntity;;
-       (gen_context' .@ entl e .@ is_global') .= ret tt;;
-       (gen_context' .@ entl e .@ name') .= ret (fst x);;
-       (gen_context' .@ entl e .@ variable_type') .= ret (snd x);;
-       ret tt.
-
-  Definition add_to_typ_ctx (x : (ident * typ)) : GenLLVM unit
-    := e <- lift newEntity;;
-       (gen_context' .@ entl e .@ name') .= ret (fst x);;
-       (gen_context' .@ entl e .@ type_alias') .= ret (snd x);;
-       ret tt.
-
-  (* Should this be a local? *)
-  Definition add_to_ptrtoint_ctx (x : (typ * ident * Ent)) : GenLLVM unit
-    := let '(t, name, ptr) := x in
-       e <- lift newEntity;;
-       (gen_context' .@ entl e .@ name') .= ret name;;
-       (gen_context' .@ entl e .@ is_local') .= ret tt;;
-       (gen_context' .@ entl e .@ from_pointer') .= ret ptr;;
-       ret tt.
-
   #[global] Instance MetadataStore_GenState : @MetadataStore G Metadata (SystemState GenState G).
   split.
   apply gen_context'.
@@ -1043,7 +1013,57 @@ Section TypGenerators.
                | TYPE_Pointer t => st
                | TYPE_Vector _ (TYPE_Pointer t) => st
                | _ => false
+               end))
+         & (@is_first_class_type' SetterOf .~
+              bool_setter
+              (match normalized with
+               | TYPE_Struct _
+               | TYPE_Packed_struct _ => false
+               | TYPE_Array _ _ => false
+               | TYPE_Pointer (TYPE_Function _ _ _) => false
+               | _ => true
                end))).
+
+  Definition set_typ_metadata (e : Ent) (τ : typ) : GenLLVM unit
+    := setter <- typ_metadata_setter τ;;
+       lift (setEntity e setter).
+
+  Definition add_to_local_ctx (x : (ident * typ)) : GenLLVM unit
+    := let '(n, t) := x in
+       e <- lift newEntity;;
+       (gen_context' .@ entl e .@ is_local') .= ret tt;;
+       (gen_context' .@ entl e .@ name') .= ret n;;
+       (gen_context' .@ entl e .@ variable_type') .= ret t;;
+       set_typ_metadata e t;;
+       ret tt.
+
+  Definition add_to_global_ctx (x : (ident * typ)) : GenLLVM unit
+    := let '(n, t) := x in
+       e <- lift newEntity;;
+       (gen_context' .@ entl e .@ is_global') .= ret tt;;
+       (gen_context' .@ entl e .@ name') .= ret n;;
+       (gen_context' .@ entl e .@ variable_type') .= ret t;;
+       set_typ_metadata e t;;
+       ret tt.
+
+  Definition add_to_typ_ctx (x : (ident * typ)) : GenLLVM unit
+    := let '(n, t) := x in
+       e <- lift newEntity;;
+       (gen_context' .@ entl e .@ name') .= ret n;;
+       (gen_context' .@ entl e .@ type_alias') .= ret t;;
+       set_typ_metadata e t;;
+       ret tt.
+
+  (* Should this be a local? *)
+  Definition add_to_ptrtoint_ctx (x : (typ * ident * Ent)) : GenLLVM unit
+    := let '(t, name, ptr) := x in
+       e <- lift newEntity;;
+       (gen_context' .@ entl e .@ name') .= ret name;;
+       (gen_context' .@ entl e .@ is_local') .= ret tt;;
+       (gen_context' .@ entl e .@ from_pointer') .= ret ptr;;
+       set_typ_metadata e t;;
+       ret tt.
+
   
   (* (*filter all the (ident, typ) in ctx such that typ is a ptr*) *)
   (* Definition filter_ptr_typs (typ_ctx : type_context) (ctx : var_context) : var_context := *)
