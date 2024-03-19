@@ -2438,16 +2438,6 @@ Section InstrGenerators.
         end
     end.
 
-  Definition filter_first_class_typs (ctx : var_context) : var_context :=
-    filter (fun '(_, t) =>
-              match t with
-              | TYPE_Struct _
-              | TYPE_Packed_struct _ => false
-              | TYPE_Array _ _ => false
-              | TYPE_Pointer (TYPE_Function _ _ _) => false
-              | _ => true
-              end) ctx.
-
   Fixpoint gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
     let gen_typ_list :=
       match t_from with
@@ -2496,13 +2486,27 @@ Section InstrGenerators.
         else set_add_h dec t (prev ++ [hd]) tl
     end%list.
 
+  Definition gen_trivial_typ : GenLLVM typ :=
+    oneOf_LLVM [ret (TYPE_I 1)
+                ; ret (TYPE_I 8)
+                ; ret (TYPE_I 32)
+                ; ret (TYPE_I 64)
+                ; ret (TYPE_Float)
+                ; ret (TYPE_Double)
+                ; ret TYPE_Vector <*> lift_GenLLVM genN <*> gen_typ_non_void_0].
+
+  Definition gen_first_class_typ_from_context : GenLLVM (option typ)
+    := gen_type_matching_variable (withl is_first_class_type').
+
+  Definition gen_first_class_type_size : nat -> GenLLVM typ
+    := gen_typ_size' gen_trivial_typ (fun subg sz => [fun _ => subg sz]) gen_first_class_typ_from_context.
+
+  Definition gen_first_class_type : GenLLVM typ
+    := sized_LLVM gen_first_class_type_size.
+
   Definition gen_bitcast : GenLLVM (typ * instr typ) :=
-    ctx <- get_ctx;;
-    let first_class_typs_in_ctx := filter_first_class_typs ctx in
-    trivial_typ <- oneOf_LLVM [ret (TYPE_I 1); ret (TYPE_I 8); ret (TYPE_I 32); ret (TYPE_I 64); ret (TYPE_Float); ret (TYPE_Double); ret TYPE_Vector <*> lift_GenLLVM genN <*> gen_typ_non_void_0];;
-    let gen_first_class_typs := (ret trivial_typ)::(map (fun '(_, t) => ret t) first_class_typs_in_ctx) in
-    tfc <- oneOf_LLVM gen_first_class_typs;;
-    efc <- gen_exp_size 0 tfc FULL_CTX;;
+    tfc <- gen_first_class_type;;
+    efc <- gen_exp_size (gen_context' .@ variable_type') 0 tfc;;
     new_typ <- gen_bitcast_typ tfc;;
     ret (new_typ, INSTR_Op (OP_Conversion Bitcast tfc efc new_typ)).
 
