@@ -2895,7 +2895,7 @@ Section InstrGenerators.
          let loop_init_instr_raw_id := instr_id_to_raw_id "loop init id" loop_init_instr_id in
          bound' <- lift_GenLLVM (choose (0, bound));;
          let gen_icmp (τ : typ) : GenLLVM (instr_id * instr typ) :=
-           iid <- genInstrId τ;;
+           iid <- genInstrId (TYPE_I 1);;
            ret (iid, INSTR_Op (OP_ICmp Ule τ (EXP_Ident (ID_Local loop_init_instr_raw_id)) (EXP_Integer bound')))
          in
          '(loop_cmp_id, loop_cmp) <- gen_icmp (TYPE_I 32);; (* TODO: big ints *)
