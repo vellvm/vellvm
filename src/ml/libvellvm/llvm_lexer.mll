@@ -30,6 +30,20 @@
   let coq_of_int = Camlcoq.Z.of_sint
   let coq_of_int64 = Camlcoq.Z.of_sint64
   let coqfloat_of_float f = Floats.Float.of_bits(Camlcoq.coqint_of_camlint64(Int64.bits_of_float f))
+  let rec p_of_ocaml_Z n =
+  if Z.logand n (Z.of_int 1) = (Z.of_int 0) then
+    if n = (Z.of_int 0)
+    then assert false
+    else Camlcoq.P.Coq_xO (p_of_ocaml_Z (Z.shift_right_trunc n 1))
+  else
+    if n = (Z.of_int 1)
+    then Camlcoq.P.Coq_xH
+    else Camlcoq.P.Coq_xI (p_of_ocaml_Z (Z.shift_right_trunc n 1))
+
+  let z_of_ocaml_Z n =
+    if n = (Z.of_int 0) then Camlcoq.Z.Z0 else
+    if n > (Z.of_int 0) then Camlcoq.Z.Zpos (p_of_ocaml_Z n)
+    else Camlcoq.Z.Zneg (p_of_ocaml_Z (Z.neg n))
 
   exception Lex_error_unterminated_string of Lexing.position
 
@@ -426,7 +440,7 @@ rule token = parse
   | '#' (digit+ as i) { ATTR_GRP_ID (coq_of_int (int_of_string i)) }
 
   (* constants *)
-  | ('-'? digit+) as d            { INTEGER (coq_of_int64 (Int64.of_string d)) }
+  | ('-'? digit+) as d            { INTEGER (z_of_ocaml_Z (Z.of_string d)) }
   | ('-'? digit* '.' digit*) as d { FLOAT d }
   | ('-'? digit ('.' digit*)? 'e' ('+'|'-') digit+) as d { FLOAT d }
   | ('0''x' hexdigit+) as d     { HEXCONSTANT (coqfloat_of_float (Int64.float_of_bits (Int64.of_string d))) }
