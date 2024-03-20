@@ -1316,8 +1316,7 @@ Section TypGenerators.
                 [ TYPE_I 1
                 ; TYPE_I 8
                 ; TYPE_I 32
-                (* TODO: big ints *)
-                (* ; TYPE_I 64 *)
+                ; TYPE_I 64
                 (* TODO: Generate floats and stuff *)
                 ; TYPE_Float
                 (* ; TYPE_Double *)
@@ -1453,8 +1452,7 @@ Section TypGenerators.
                 [ TYPE_I 1
                 ; TYPE_I 8
                 ; TYPE_I 32
-                (* TODO: big ints*)
-               (* ; TYPE_I 64 *)
+                ; TYPE_I 64
                 ; TYPE_Void
                 (* TODO: Generate floats and stuff *)
                 ; TYPE_Float
@@ -1504,8 +1502,7 @@ Section TypGenerators.
                 [ TYPE_I 1
                 ; TYPE_I 8
                 ; TYPE_I 32
-                (* TODO: big ints *)
-                (* ; TYPE_I 64 *)
+                ; TYPE_I 64
                 (* TODO: Generate floats and stuff *)
                 ; TYPE_Float
                 (* ; TYPE_Double *)
@@ -1533,8 +1530,7 @@ Section TypGenerators.
                 [ TYPE_I 1
                 ; TYPE_I 8
                 ; TYPE_I 32
-                (* TODO: big ints *)
-                (* ; TYPE_I 64 *)
+                ; TYPE_I 64
                 (* TODO: Generate floats and stuff *)
                 ; TYPE_Float
                 (* ; TYPE_Double *)
@@ -1554,8 +1550,7 @@ Section TypGenerators.
         ; TYPE_I 8
         ; TYPE_I 16
         ; TYPE_I 32
-      (* TODO: big ints *)
-      (* ; TYPE_I 64 *)
+        ; TYPE_I 64
       ].
 
   (* TODO: IPTR not implemented *)
@@ -2594,7 +2589,7 @@ Section InstrGenerators.
     oneOf_LLVM [ret (TYPE_I 1)
                 ; ret (TYPE_I 8)
                 ; ret (TYPE_I 32)
-                (* ; ret (TYPE_I 64) *)
+                ; ret (TYPE_I 64)
                 ; ret (TYPE_Float)
                 ; ret (TYPE_Double)
                 ; ret TYPE_Vector <*> lift_GenLLVM genN <*> gen_typ_non_void_0].
