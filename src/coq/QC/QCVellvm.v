@@ -280,7 +280,7 @@ Definition gen_PROG : GenLLVM PROG
 
 Extract Constant defNumTests    => "1000".
 
-(* SAZ: These paths are relative to where the coqc command that runs the extraction is executed. 
+(* SAZ: These paths are relative to where the coqc command that runs the extraction is executed.
    For invoking `make qc-tests` from the `/src` directory, we need these:
 *)
 QCInclude "ml/*".
