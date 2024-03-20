@@ -556,6 +556,7 @@ Section GenerationState.
   Definition append_ctx (vars :var_context) : GenLLVM unit
     := lift (setEntities vars).
 
+  (* This is very aggressive and will reset entities / entity counter *)
   Definition backtrackMetadata {A} (g : GenLLVM A) : GenLLVM A
     := m <- use gen_context';;
        a <- g;;
@@ -617,12 +618,14 @@ Section GenerationState.
   Definition backtrack_local_ctx {A} (g: GenLLVM A) : GenLLVM A
     := saved_local_ctx <- get_local_ctx;;
        a <- g;;
+       reset_local_ctx;;
        set_local_ctx saved_local_ctx;;
        ret a.
 
   Definition backtrack_global_ctx {A} (g: GenLLVM A) : GenLLVM A
     := saved_global_ctx <- get_global_ctx;;
        a <- g;;
+       reset_global_ctx;;
        set_global_ctx saved_global_ctx;;
        ret a.
 
@@ -633,6 +636,7 @@ Section GenerationState.
   Definition backtrack_ptrtoint_ctx {A} (g: GenLLVM A) : GenLLVM A
     := saved_ctx <- get_ptrtoint_ctx;;
        a <- g;;
+       reset_global_ctx;;
        set_ptrtoint_ctx saved_ctx;;
        ret a.
   
@@ -2923,38 +2927,38 @@ Section InstrGenerators.
          let entry_code : list (instr_id * instr typ) := [(loop_init_instr_id, loop_init_instr); (loop_cmp_id, loop_cmp); (select_id, select_instr); (loop_cond_id, loop_cond)] in
 
          (* Generate end blocks *)
-         ctxs <- get_variable_ctxs;;
-         '(_, (end_b, end_bs)) <- gen_blocks_sz (sz / 2) t back_blocks;;
-         let end_blocks := end_b :: end_bs in
-         let end_bid := blk_id end_b in
+         '(loop_bid, phi_id, bid_entry, bid_next, next_instr_raw_id, next_block, end_bid, end_blocks) <- backtrack_variable_ctxs
+                  ('(_, (end_b, end_bs)) <- gen_blocks_sz (sz / 2) t back_blocks;;
+                   let end_blocks := end_b :: end_bs in
+                   let end_bid := blk_id end_b in
 
-         bid_next <- new_block_id;;
-         loop_bid <- new_block_id;;
-         phi_id <- new_local_id;;
+                   bid_next <- new_block_id;;
+                   loop_bid <- new_block_id;;
+                   phi_id <- new_local_id;;
 
-         (* Block for controlling the next iteration of the loop *)
-         '(next_instr_id, next_instr) <-
-           (iid <- genLocal (TYPE_I 32);;
-            let next_exp := OP_IBinop (Sub false false) (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local phi_id)) (EXP_Integer 1) in
-            ret (IId (ident_to_raw_id iid), INSTR_Op next_exp));;
-         let next_instr_raw_id := instr_id_to_raw_id "next_exp" next_instr_id in
+                   (* Block for controlling the next iteration of the loop *)
+                   '(next_instr_id, next_instr) <-
+                     (iid <- genLocal (TYPE_I 32);;
+                      let next_exp := OP_IBinop (Sub false false) (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local phi_id)) (EXP_Integer 1) in
+                      ret (IId (ident_to_raw_id iid), INSTR_Op next_exp));;
+                   let next_instr_raw_id := instr_id_to_raw_id "next_exp" next_instr_id in
 
-         '(next_cond_id, next_cond) <-
-           (let next_cond_exp := OP_ICmp Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local next_instr_raw_id)) (EXP_Integer 0) in
-            iid <- genInstrId (TYPE_I 1);;
-            ret (iid, INSTR_Op next_cond_exp));;
-         let next_cond_raw_id := instr_id_to_raw_id "next_cond_exp" next_cond_id in
+                   '(next_cond_id, next_cond) <-
+                     (let next_cond_exp := OP_ICmp Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local next_instr_raw_id)) (EXP_Integer 0) in
+                      iid <- genInstrId (TYPE_I 1);;
+                      ret (iid, INSTR_Op next_cond_exp));;
+                   let next_cond_raw_id := instr_id_to_raw_id "next_cond_exp" next_cond_id in
 
-         let next_code := [(next_instr_id, next_instr); (next_cond_id, next_cond)] in
-         let next_block := {| blk_id   := bid_next
-                           ; blk_phis := []
-                           ; blk_code := next_code
-                           ; blk_term := TERM_Br (TYPE_I 1, (EXP_Ident (ID_Local next_cond_raw_id))) loop_bid end_bid
-                           ; blk_comments := None
-                           |} in
+                   let next_code := [(next_instr_id, next_instr); (next_cond_id, next_cond)] in
+                   let next_block := {| blk_id   := bid_next
+                                     ; blk_phis := []
+                                     ; blk_code := next_code
+                                     ; blk_term := TERM_Br (TYPE_I 1, (EXP_Ident (ID_Local next_cond_raw_id))) loop_bid end_bid
+                                     ; blk_comments := None
+                                     |} in
+                   ret (loop_bid, phi_id, bid_entry, bid_next, next_instr_raw_id, next_block, end_bid, end_blocks));;
 
          (* Generate loop blocks *)
-         restore_variable_ctxs ctxs;;
          '(loop_b, loop_bs) <- gen_loop_entry_sz (sz / 2) t loop_bid phi_id bid_entry bid_next (EXP_Ident (ID_Local loop_final_init_id_raw)) (EXP_Ident (ID_Local next_instr_raw_id)) back_blocks;;
          let loop_blocks := loop_b :: loop_bs in
          let loop_bid := blk_id loop_b in
