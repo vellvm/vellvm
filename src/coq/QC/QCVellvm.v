@@ -148,17 +148,38 @@ Extract Constant llc_command_ocaml =>
                 close_out f;
                 Sys.command (""clang -lm -Wno-everything "" ^ llvm_file_name ^ "" -o "" ^ test_binary ^ "" && "" ^ test_binary)".
 
+(** Write our LLVM program to a file ("temporary_vellvm.ll"), and then
+    use the vellvm binary in the path to interpret this file in order
+    to get the return code. *)
+Axiom vellvm_binary_command_ocaml : string -> oint.
+Extract Constant vellvm_binary_command_ocaml =>
+          "fun prog ->
+              let llvm_file_name = Filename.(concat (get_temp_dir_name ()) ""temporary_vellvm.ll"") in
+              let test_binary = Filename.(concat (get_temp_dir_name ()) ""vellvmqc"") in
+              let f = open_out llvm_file_name in
+                Printf.fprintf f ""%s"" prog;
+                close_out f;
+                Sys.command (""vellvm -interpret "" ^ llvm_file_name ^ "" | grep terminated | awk '{ exit $NF }'"")".
 
 Definition llc_command (prog : string) : int_ast
   := oint_to_Z (llc_command_ocaml prog).
+
+Definition vellvm_binary_command (prog : string) : int_ast
+  := oint_to_Z (vellvm_binary_command_ocaml prog).
 
 Axiom vellvm_print_ll : list (toplevel_entity typ (block typ * list (block typ))) -> string.
 Extract Constant vellvm_print_ll => "fun prog -> Llvm_printer.toplevel_entities Format.str_formatter prog; Format.flush_str_formatter".
 
 (** Use the *llc_command* Axiom to run a Vellvm program with clang,
-    and wrap up the exit code as a uvalue. *)
+    and wrap up the exit code as a dvalue. *)
 Definition run_llc (prog : list (toplevel_entity typ (block typ * list (block typ)))) : dvalue
   := DVALUE_I8 (VellvmIntegers.repr (llc_command (to_caml_str (show prog)))).
+
+(** Use the *vellvm_binary_command* Axiom to run a Vellvm program with
+    the vellvm interpreter in the user's path, and wrap up the exit
+    code as a dvalue. *)
+Definition run_vellvm_binary (prog : list (toplevel_entity typ (block typ * list (block typ)))) : dvalue
+  := DVALUE_I8 (VellvmIntegers.repr (vellvm_binary_command (to_caml_str (show prog)))).
 
 (* Hide show instance... *)
 Inductive PROG :=
@@ -200,7 +221,7 @@ Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
   { show :=  (fun x =>
     match x with
     | inl a => ("inl " ++ show a)%string
-    | inr b => ("inr " ++ show b)%string 
+    | inr b => ("inr " ++ show b)%string
     end) }.
 
 (** Basic property to make sure that Vellvm and Clang agree when they
@@ -209,13 +230,41 @@ Definition vellvm_agrees_with_clang (p : string + PROG) : Checker
   :=
   match p with
   | inl msg => checker false
-  | inr p => 
+  | inr p =>
       (* collect (show prog) *)
       let '(Prog prog) := p in
       let clang_res := run_llc prog in
       let vellvm_res := interpret prog in
       match clang_res, vellvm_res with
       | DVALUE_I8 y, MlOk _ _ (DVALUE_I8 x) =>
+          if equ x y
+          then checker true
+          else whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
+      | _, _ =>
+          whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
+      end
+  end.
+
+(** This version runs the vellvm binary in your path instead...  This
+    will be slower (has to read and parse a file), and will not
+    guarantee you're running the tests with same version of vellvm, but
+    this can be helpful for testing the parser (note the more direct
+    vellvm_agrees_with_clang is also helpful in that it bypasses the
+    parser for vellvm, but clang parses the file so it can detect bugs
+    in the pretty printer for LLVM ASTs), and this can also be helpful
+    for skirting around extraction bugs which are easier to patch up
+    outside of QC. *)
+Definition vellvm_binary_agrees_with_clang (p : string + PROG) : Checker
+  :=
+  match p with
+  | inl msg => checker false
+  | inr p =>
+      (* collect (show prog) *)
+      let '(Prog prog) := p in
+      let clang_res := run_llc prog in
+      let vellvm_res := run_vellvm_binary prog in
+      match clang_res, vellvm_res with
+      | DVALUE_I8 y, DVALUE_I8 x =>
           if equ x y
           then checker true
           else whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
