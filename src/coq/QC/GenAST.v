@@ -1104,6 +1104,10 @@ Section TypGenerators.
        (gen_context' .@ entl e .@ name') .= ret name;;
        (gen_context' .@ entl e .@ is_local') .= ret tt;;
        (gen_context' .@ entl e .@ from_pointer') .= ret ptr;;
+       (* non-deterministic if the pointer is (could have
+          deterministic pointers like null) *)
+       nd <- use (gen_context' .@ entl ptr .@ is_non_deterministic');;
+       (gen_context' .@ entl e .@ is_non_deterministic') .= nd;;
        set_typ_metadata e t;;
        ret tt.
 
@@ -2779,9 +2783,11 @@ Section InstrGenerators.
          ++ (* TODO: generate multiple element allocas. Will involve changing initialization *)
            (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)
          (* align <- ret None;; *)
-         maybe [] (fun t => [id <- genLocal (TYPE_Pointer t);;
+         maybe [] (fun t => ['(id, e) <- genLocalEnt (TYPE_Pointer t);;
+                          (* Allocas are non-deterministic *)
+                          gen_context' .@ entl e .@ is_non_deterministic' .= ret tt;;
                           store <- gen_store_to (TYPE_Pointer t, EXP_Ident id);;
-                          ret [(IId (ident_to_raw_id id), INSTR_Alloca t [])]]) osized_typ
+                          ret [(IId (ident_to_raw_id id), INSTR_Alloca t []); store]]) osized_typ
          ++ maybe [] (fun t => fmap (fun x => [x]) <$> [gen_load t; gen_store t; gen_gep t]) osized_ptr_typ
          ++ maybe [] (fun t => [(fun x => [x]) <$> gen_ptrtoint t]) ovalid_ptr_vecptr
          ++ maybe [] (fun itp => [@ret GenLLVM _ _ [itp]]) ointtoptr
