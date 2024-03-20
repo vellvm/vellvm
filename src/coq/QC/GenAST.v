@@ -1516,11 +1516,17 @@ Section TypGenerators.
           ])).
 
   Definition gen_typ_non_void_size : nat -> GenLLVM typ :=
-    gen_typ_size' gen_typ_0 aggregate_typ_gens (gen_type_matching_variable (withl is_non_void')).
+    gen_typ_size' gen_typ_non_void_0 aggregate_typ_gens (gen_type_matching_variable (withl is_non_void')).
+
+  Definition gen_typ_non_void : GenLLVM typ :=
+    sized_LLVM gen_typ_non_void_size.
 
   (* Non-void, non-function types *)
   Definition gen_typ_non_void_size_wo_fn : nat -> GenLLVM typ :=
-    gen_typ_size' gen_typ_0 sized_aggregate_typ_gens (gen_type_matching_variable (withl is_non_void')).
+    gen_typ_size' gen_typ_non_void_0 sized_aggregate_typ_gens (gen_type_matching_variable (withl is_non_void')).
+
+  Definition gen_typ_non_void_wo_fn : GenLLVM typ :=
+    sized_LLVM gen_typ_non_void_size_wo_fn.
 
   (* TODO: look up identifiers *)
   (* Types for operation expressions *)
@@ -2802,7 +2808,7 @@ Section InstrGenerators.
        | S n' =>
            instr <- gen_instr;;
            rest  <- gen_code_length n';;
-           ret (instr ++ rest)
+           ret (instr ++ rest)%list
        end.
 
   Definition gen_code : GenLLVM (code typ)
@@ -3045,8 +3051,8 @@ Section InstrGenerators.
 
   Definition gen_typ_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
     :=
-    name <- new_raw_id;;
-    inner_typs <- listOf_LLVM gen_typ;;
+    name <- new_local_id;;
+    inner_typs <- listOf_LLVM gen_typ_non_void;;
     let id := ID_Local name in
     let named_ty := TYPE_Struct inner_typs in
     add_to_typ_ctx (id, named_ty);;
@@ -3098,4 +3104,4 @@ Section InstrGenerators.
     let new_globals := (globals ++ map TLE_Global res_globals)%list in
     ret (high_levels ++ defined_typs ++ new_globals ++ functions ++ [main])%list.
 
-End TLEGenerators.
+End InstrGenerators.
