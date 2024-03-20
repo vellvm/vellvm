@@ -2594,7 +2594,7 @@ Section InstrGenerators.
     oneOf_LLVM [ret (TYPE_I 1)
                 ; ret (TYPE_I 8)
                 ; ret (TYPE_I 32)
-                ; ret (TYPE_I 64)
+                (* ; ret (TYPE_I 64) *)
                 ; ret (TYPE_Float)
                 ; ret (TYPE_Double)
                 ; ret TYPE_Vector <*> lift_GenLLVM genN <*> gen_typ_non_void_0].
