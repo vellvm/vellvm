@@ -1099,6 +1099,8 @@ Section TypGenerators.
        (gen_context' .@ entl e .@ name') .= ret n;;
        (gen_context' .@ entl e .@ type_alias') .= ret t;;
        set_typ_metadata e t;;
+       st <- use (gen_context' .@ entl e .@ is_sized_type_alias');;
+       (gen_context' .@ entl e .@ is_sized_type_alias') .= st;;
        ret tt.
 
   (* Should this be a local? *)
