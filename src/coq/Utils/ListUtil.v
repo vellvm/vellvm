@@ -16,6 +16,7 @@ From Vellvm.Utils Require Import
 
 From ExtLib Require Import
   Structures.Monads
+  Structures.Foldable
   Data.List.
 
 Import ListNotations.
@@ -2191,3 +2192,10 @@ Proof.
   - rewrite repeatN_succ.
     constructor. auto. apply IHn.
 Qed.
+
+Import Monoid.
+#[global] Instance Foldable_list {a} : Foldable (list a) a.
+split.
+intros m M conv l.
+apply (fold_left (fun acc x => monoid_plus M (conv x) acc) l (monoid_unit M)).
+Defined.

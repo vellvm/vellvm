@@ -40,6 +40,7 @@
 ./coq/Numeric/Integers.v
 ./coq/Numeric/Zbits.v
 ./coq/QC/GenAST.v
+./coq/QC/GenMetadata.v
 ./coq/QC/ECS.v
 ./coq/QC/Lens.v
 ./coq/QC/GenAlive2.v

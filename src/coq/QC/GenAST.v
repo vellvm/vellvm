@@ -12,23 +12,32 @@
     more details. *)
 Require Import Ceres.Ceres.
 
+From Vellvm.Syntax Require Import
+  CFG
+  TypeUtil
+  TypToDtyp.
+
+From Vellvm.Handlers Require Import
+  Handlers.
+
+From Vellvm.Semantics Require Import
+  TopLevel.
+
 From Vellvm Require Import
   LLVMAst
   Utilities
   AstLib
-  Syntax.CFG
-  Syntax.TypeUtil
-  Syntax.TypToDtyp
   DynamicTypes
-  Semantics.TopLevel
-  QC.Utils
-  QC.Generators
-  Handlers.Handlers
   DList
-  QC.ECS
-  QC.Lens
-  Utils.Default
-  IntMaps.
+  IntMaps
+  Utils.Default.
+
+From Vellvm.QC Require Import
+  Utils
+  Generators
+  ECS
+  Lens
+  GenMetadata.
 
 Require Import Integers.
 
@@ -63,6 +72,7 @@ From ExtLib.Structures Require Export
      Functor.
 Open Scope Z_scope.
 Open Scope lens.
+Open Scope string.
 
 (* Disable guard checking. This file is only used for generating test
     cases. Some of our generation functions terminate in non-trivial
@@ -1040,6 +1050,8 @@ Section TypGenerators.
        (gen_context' .@ entl e .@ is_local') .= ret tt;;
        (gen_context' .@ entl e .@ name') .= ret n;;
        (gen_context' .@ entl e .@ variable_type') .= ret t;;
+       (* Default to deterministic *)
+       (gen_context' .@ entl e .@ deterministic') .= true;;
        set_typ_metadata e t;;
        ret e.
 
@@ -1057,6 +1069,8 @@ Section TypGenerators.
        (gen_context' .@ entl e .@ is_global') .= ret tt;;
        (gen_context' .@ entl e .@ name') .= ret n;;
        (gen_context' .@ entl e .@ variable_type') .= ret t;;
+       (* Default to deterministic *)
+       (gen_context' .@ entl e .@ deterministic') .= true;;
        set_typ_metadata e t;;
        ret e.
 
@@ -1112,8 +1126,8 @@ Section TypGenerators.
        (gen_context' .@ entl e .@ from_pointer') .= ret ptr;;
        (* non-deterministic if the pointer is (could have
           deterministic pointers like null) *)
-       nd <- use (gen_context' .@ entl ptr .@ is_non_deterministic');;
-       (gen_context' .@ entl e .@ is_non_deterministic') .= nd;;
+       d <- use (gen_context' .@ entl ptr .@ deterministic');;
+       (gen_context' .@ entl e .@ deterministic') .= d;;
        set_typ_metadata e t;;
        ret tt.
 
@@ -2698,13 +2712,6 @@ Section InstrGenerators.
     ptr_typ <- get_typ_in_ptr tptr;;
     gen_store_to(tptr, eptr).
 
-  (* TODO: Move this *)
-  Definition maybe {a b} (def : b) (f : a -> b) (oa : option a) : b
-    := match oa with
-       | Some a => f a
-       | None => def
-       end.
-
   (* Generate an instruction, as well as its type...
 
      The type is sometimes void for instructions that don't really
@@ -2792,7 +2799,7 @@ Section InstrGenerators.
          (* align <- ret None;; *)
          maybe [] (fun t => ['(id, e) <- genLocalEnt (TYPE_Pointer t);;
                           (* Allocas are non-deterministic *)
-                          gen_context' .@ entl e .@ is_non_deterministic' .= ret tt;;
+                          gen_context' .@ entl e .@ deterministic' .= false;;
                           store <- gen_store_to (TYPE_Pointer t, EXP_Ident id);;
                           ret [(IId (ident_to_raw_id id), INSTR_Alloca t []); store]]) osized_typ
          ++ maybe [] (fun t => fmap (fun x => [x]) <$> [gen_load t; gen_store t; gen_gep t]) osized_ptr_typ

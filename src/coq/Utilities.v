@@ -11,6 +11,7 @@ From Vellvm Require Export
      Utils.Util
      Utils.AListFacts
      Utils.ListUtil
+     Utils.OptionUtil
      Utils.Error
      Utils.PropT
      Utils.Monads

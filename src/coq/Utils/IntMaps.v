@@ -14,12 +14,18 @@ From Vellvm Require Import
      ListUtil.
 
 From ExtLib Require Import
-     Structures.Monads
-     Programming.Eqv.
+  Structures.Monads
+  Structures.Functor
+  Structures.Applicative
+  Structures.Traversable
+  Structures.Foldable
+  Programming.Eqv.
 
 Import EqvNotation.
 Import ListNotations.
 Import MonadNotation.
+Import FunctorNotation.
+Import ApplicativeNotation.
 
 #[local] Open Scope Z_scope.
 
@@ -575,5 +581,67 @@ Section Map_Operations.
          ret (elt :: elts)
        end.
 
+  (* Merge taking the latter arguments' values if duplicates.
+   Unclear if IM.Raw.merge would have this property.
+   *)
+  Definition IM_merge {a} (m1 : IM.Raw.t a) (m2 : IM.Raw.t a) : IM.Raw.t a
+    := IM.Raw.fold (IM.Raw.add (elt:=a)) m2 m1.
+
 End Map_Operations.
 
+Definition traverseWithKeyRaw {t} `{Applicative t} {a b} (f : IM.Raw.key -> a -> t b) (m : IM.Raw.t a) : t (IM.Raw.t b)
+  :=
+  let fix go x :=
+    match x with
+    | IM.Raw.Leaf => pure (IM.Raw.Leaf _)
+    | IM.Raw.Node l k v r h =>
+        if Z.eqb 1%Z h
+        then (fun v' => IM.Raw.Node (IM.Raw.Leaf _) k v' (IM.Raw.Leaf _) 1%Z) <$> f k v
+        else (fun l' v' r' => IM.Raw.Node l' k v' r' h) <$> go l <*> f k v <*> go r
+    end
+  in
+  go m.
+
+#[global] Instance Traversable_RawIntMap : Traversable IM.Raw.t.
+split.
+intros F Ap A B X X0.
+eapply traverseWithKeyRaw.
+intros k.
+apply X.
+apply X0.
+Defined.
+
+Definition traverseWithKey {t} `{Applicative t} {a b} (f : IM.key -> a -> t b) (m : IM.t a) : t (IM.t b).
+  eapply @IM.fold.
+  3: apply (pure (IM.empty _)).
+  2: apply m.
+  - intros k e acc.
+    refine (let res := f k e in _).
+    eapply ap.
+    2: apply acc.
+    eapply fmap.
+    2: apply res.
+    apply (IM.add k).
+Defined.
+
+#[global] Instance Traversable_IntMap : Traversable IntMap.
+split.
+intros F Ap A B X X0.
+eapply traverseWithKey.
+intros k.
+apply X.
+apply X0.
+Defined.
+
+Import Monoid.
+#[global] Instance Foldable_IS : Foldable IS.t Z.
+split.
+intros m M conv s.
+apply (IS.fold (fun k acc => monoid_plus M (conv k) acc) s (monoid_unit M)).
+Defined.
+
+#[global] Instance Foldable_IM_Raw {a} : Foldable (IM.Raw.t a) Z.
+split.
+intros m M conv s.
+apply (IM.Raw.fold (fun k _ acc => monoid_plus M (conv k) acc) s (monoid_unit M)).
+Defined.
