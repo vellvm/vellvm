@@ -33,7 +33,8 @@ VELLVM_BC =_build/default/ml/main.bc
 
 ######## The "frontend" is only the parser/pretty-printer
 FRONTEND_EXE=_build/default/ml/frontend.exe
-COQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper Semantics/TopLevel Semantics/InterpretationStack QC/GenAlive2 Syntax/LLVMAst Syntax/AstLib
+AGGREGATE_EXE=_build/default/ml/aggregate.exe
+COQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib
 FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
 
 .DEFAULT_GOAL := all
@@ -137,6 +138,7 @@ clean: extractedclean clean-coqmakefile
 	rm -rf output
 	rm -f vellvm
 	rm -f frontend
+	rm -f aggregate
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
 	dune clean
 
@@ -169,10 +171,6 @@ $(EXTRACTDIR)/FRONTEND_STAMP: $(FRONTEND_VOFILES) $(EXTRACTDIR)/ExtractFrontend.
 	@echo "Extracting Frontend"
 	rm -f $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
 	$(COQEXEC) $(EXTRACTDIR)/ExtractFrontend.v
-	# patch -p0 < CRelationClasses.mli.patch
-	# patch -p0 < GenAlive2.ml.patch
-	@echo "Fixing Extraction"
-	bash fix-extraction.sh
 	touch $(EXTRACTDIR)/FRONTEND_STAMP
 	rm -f $(EXTRACTDIR)/STAMP   # invalidate "normal" extraction
 
@@ -180,6 +178,7 @@ $(EXTRACTDIR)/FRONTEND_STAMP: $(FRONTEND_VOFILES) $(EXTRACTDIR)/ExtractFrontend.
 $(FRONTEND_EXE): $(EXTRACTDIR)/FRONTEND_STAMP ml/dune ml/extracted/dune ml/testing/dune ml/frontend.ml ml/IO.ml
 	@echo "Compiling Vellvm (Frontend Only)"
 	dune build ml/frontend.exe
+
 
 .PHONY: frontend
 frontend:
