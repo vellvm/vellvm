@@ -39,8 +39,6 @@ FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
 
 .DEFAULT_GOAL := all
 
-QCTEMPDIR := $(shell cat ./temp_dir)
-
 ######## targets not in this "KNOWNTARGETS" list will be forwarded to CoqMakefile via invoke-coqmakefile
 ######## WARNING - every target of *this* Makefile must be listed here
 KNOWNTARGETS := CoqMakefile invoke-coqmakefile coq extracted $(EXTRACTDIR)/STAMP $(VELLVM_EXE) vellvm vellvmbc test check qc-tests yarpgen-tests rm-qc-test-vo clean extractedclean clean-coqmakefile doc/coq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-coq opam print-opam print-includes
@@ -90,16 +88,6 @@ vellvm: $(VELLVM_EXE)
 	cp $(VELLVM_EXE) vellvm
 	chmod u+w vellvm
 
-.PHONY: vellvmbc
-vellvmbc: $(VELLVM_BC)
-	@echo "Something"
-	cp $(VELLVM_BC) vellvmbc
-	chmod u+w vellvmbc
-
-$(VELLVM_BC): extracted ml/dune ml/extracted/dune ml/testing/dune
-	dune build ml/main.bc
-
-
 ######## testing the Vellvm interperter
 
 .PHONY: test
@@ -123,12 +111,6 @@ qc-tests: rm-qc-test-vo coq
 .PHONY: rm-qc-test-vo
 rm-qc-test-vo:
 	rm -f coq/QC/QCVellvm.vo
-
-
-.PHONY: qc-tests-eval
-qc-tests-eval:
-	echo $(QCTEMPDIR)
-	find $(QCTEMPDIR) -maxdepth 1 -mindepth 1 -type d -exec stat -f '%m %N' {} \; | sort -nr | head -n 1 | awk '{print $2}'
 
 ######## cleaning the project
 
