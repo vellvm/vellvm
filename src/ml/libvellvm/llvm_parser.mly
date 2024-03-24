@@ -340,6 +340,7 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_PPC_FP128
 %token KW_LABEL
 %token KW_METADATA
+%token KW_DISTINCT
 %token KW_X86_MMX
 
 %token KW_UNWIND
@@ -424,7 +425,7 @@ toplevel_entity:
    *)
   | i=lident EQ KW_TYPE t=typ           { TLE_Type_decl (ID_Local i, t)  }
   | g=global_decl                       { TLE_Global g                   }
-  | i=METADATA_ID EQ m=tle_metadata     { TLE_Metadata (i, m)            }
+  | i=METADATA_ID EQ KW_DISTINCT? m=tle_metadata     { TLE_Metadata (i, m)            }
   | KW_ATTRIBUTES i=ATTR_GRP_ID EQ LCURLY a=fn_attr* RCURLY
                                         { TLE_Attribute_group (i, a)     }
 
@@ -944,10 +945,13 @@ phi_table_entry:
 block:
   blk_id   = block_label
   body     = block_phis_and_instrs
-  blk_term = terminated(terminator, EOL+)
+  blk_term = terminator instr_metadata? EOL+
     {
 	(blk_id, body, blk_term)
     }
+
+instr_metadata:
+  | COMMA list(metadata_value) { }
 
 
 df_blocks:

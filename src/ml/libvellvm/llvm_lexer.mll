@@ -339,6 +339,7 @@
   ("ppc_fp128" , KW_PPC_FP128);
   ("label"     , KW_LABEL);
   ("metadata"  , KW_METADATA);
+  ("distinct"  , KW_DISTINCT);
   ("x86_mmx"   , KW_X86_MMX);
 
   ("attributes" , KW_ATTRIBUTES);
