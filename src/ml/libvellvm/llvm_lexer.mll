@@ -179,6 +179,8 @@
   ("optsize"                      , KW_OPTSIZE);
   ("readnone"                     , KW_READNONE);
   ("writeonly"                    , KW_WRITEONLY);
+  ("writable"                     , KW_WRITABLE);
+  ("dead_on_unwind"               , KW_DEADONUNWIND);    
   ("argmemonly"                   , KW_ARGMEMONLY);
   ("returns_twice"                , KW_RETURNS_TWICE);
   ("safestack"                    , KW_SAFESTACK);

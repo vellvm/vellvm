@@ -221,6 +221,8 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 (* %token KW_STACK_PROBE_SIZE (* quoted "stack-probe-size" *) *)
 (* %token KW_NO_STACK_ARG_PROBE (* quoted "no-stack-arg-probe " *) *)
 %token KW_WRITEONLY
+%token KW_WRITABLE
+%token KW_DEADONUNWIND
 %token KW_ARGMEMONLY
 %token KW_RETURNS_TWICE
 %token KW_SAFESTACK
@@ -1001,7 +1003,6 @@ param_attr:
   | KW_NOCAPTURE                         { PARAMATTR_Nocapture                 }
   | KW_NOFREE                            { PARAMATTR_Nofree                    }
   | KW_NEST                              { PARAMATTR_Nest                      }
-  | KW_READONLY                          { PARAMATTR_Readonly                  }
   | KW_RETURNED                          { PARAMATTR_Returned                  }
   | KW_NONNULL                           { PARAMATTR_Nonnull                   }
   | KW_DEREFERENCEABLE LPAREN n=INTEGER RPAREN
@@ -1017,7 +1018,11 @@ param_attr:
                                          { PARAMATTR_Alignstack n              }
   | KW_ALLOCALIGN                        { PARAMATTR_Allocalign                }
   | KW_ALLOCPTR                          { PARAMATTR_Allocptr                  }
+  | KW_READNONE                          { PARAMATTR_Readnone                  }
+  | KW_READONLY                          { PARAMATTR_Readonly                  }
   | KW_WRITEONLY                         { PARAMATTR_Writeonly                 }
+  | KW_WRITABLE                          { PARAMATTR_Writable                  }
+  | KW_DEADONUNWIND                      { PARAMATTR_Dead_on_unwind            }
 
 call_arg: t=typ ra=list(param_attr) i=exp
     { ((t, i t), ra) }

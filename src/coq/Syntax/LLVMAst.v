@@ -134,8 +134,6 @@ Variant param_attr : Set :=
 | PARAMATTR_Align (a:int_ast)
 | PARAMATTR_Noalias
 | PARAMATTR_Nocapture
-| PARAMATTR_Readonly   (* NOTE: The status of this one is ambiguous - it was definitely
-                          supported in some version of LLVM IR, but isn't listed in LangRef *)
 | PARAMATTR_Nofree
 | PARAMATTR_Nest
 | PARAMATTR_Returned
@@ -147,10 +145,16 @@ Variant param_attr : Set :=
 | PARAMATTR_Swifterror
 | PARAMATTR_Immarg
 | PARAMATTR_Noundef
+(* | PARAMATTR_Nofpclass (* MISSING: floating point class *) *) 
 | PARAMATTR_Alignstack (a : int_ast)
 | PARAMATTR_Allocalign
 | PARAMATTR_Allocptr
-| PARAMATTR_Writeonly      
+| PARAMATTR_Readnone      
+| PARAMATTR_Readonly  
+| PARAMATTR_Writeonly
+| PARAMATTR_Writable
+| PARAMATTR_Dead_on_unwind      
+(* | PARAMATTR_Range (t : typ) a b (* MISSING: range qualifiers *) *)    
 .
 
 Variant frame_pointer_val : Set :=

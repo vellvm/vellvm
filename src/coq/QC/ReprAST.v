@@ -348,7 +348,7 @@ Section ReprInstances.
     | PARAMATTR_Align a => "(PARAMATTR_Align " ++ repr a ++ ")"
     | PARAMATTR_Noalias => "PARAMATTR_Noalias"
     | PARAMATTR_Nocapture => "PARAMATTR_Nocapture"
-    | PARAMATTR_Readonly => "PARAMATTR_Readonly"
+    | PARAMATTR_Nofree => "PARAMATTR_Nofree"
     | PARAMATTR_Nest => "PARAMATTR_Nest"
     | PARAMATTR_Returned => "PARAMATTR_Returned"
     | PARAMATTR_Nonnull => "PARAMATTR_Nonnull"
@@ -362,8 +362,11 @@ Section ReprInstances.
     | PARAMATTR_Alignstack (a) => "PARAMATTR_Alignstack" ++ repr a
     | PARAMATTR_Allocalign =>  "PARAMATTR_Allocalign"
     | PARAMATTR_Allocptr => "PARAMATTR_Allocptr"
-    | PARAMATTR_Nofree => "PARAMATTR_Nofree"
-    | PARAMATTR_Writeonly=> "PARAMATTR_Writeonly"
+    | PARAMATTR_Readnone => "PARAMATTR_Readnone"
+    | PARAMATTR_Readonly => "PARAMATTR_Readonly"
+    | PARAMATTR_Writeonly => "PARAMATTR_Writeonly"
+    | PARAMATTR_Writable => "PARAMATTR_Writable"
+    | PARAMATTR_Dead_on_unwind => "PARAMATTR_Dead_on_unwind"
     end.
 
   #[global]

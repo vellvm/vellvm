@@ -222,7 +222,6 @@ Section ShowInstances.
     | PARAMATTR_Align a => string_to_DString "align " @@ string_to_DString (show a)
     | PARAMATTR_Noalias => string_to_DString "noalias"
     | PARAMATTR_Nocapture => string_to_DString "nocapture"
-    | PARAMATTR_Readonly => string_to_DString "readonly"
     | PARAMATTR_Nofree => string_to_DString "nofree"
     | PARAMATTR_Nest => string_to_DString "nest"
     | PARAMATTR_Returned => string_to_DString "returned"
@@ -239,7 +238,11 @@ Section ShowInstances.
     | PARAMATTR_Alignstack a => string_to_DString "alignstack(" @@ string_to_DString (show a)  @@ string_to_DString ")"
     | PARAMATTR_Allocalign => string_to_DString "allocalign"
     | PARAMATTR_Allocptr => string_to_DString "allocptr"
+    | PARAMATTR_Readnone => string_to_DString "readnone"
+    | PARAMATTR_Readonly => string_to_DString "readonly"
     | PARAMATTR_Writeonly => string_to_DString "writeonly"
+    | PARAMATTR_Writable => string_to_DString "writable"
+    | PARAMATTR_Dead_on_unwind => string_to_DString "dead_on_unwind"
     end.
 
   #[global] Instance dshowParamAttr : DShow param_attr
