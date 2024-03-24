@@ -54,11 +54,10 @@ let ast_pp_file_inner path =
       let _ = IO.output_file vast_file ll_ast in
       let _ = Printf.printf "pretty-printed version of %s:\n\n" path in
       let _ = IO.print_ast ll_ast in
-
-      let channel = open_out_gen perm 0o640 vast_file in
-      let oc = (Format.formatter_of_out_channel channel) in
-
+      ()
       (* Prints the internal representation of the llvm program *)
+      (* let channel = open_out_gen perm 0o640 vast_file in *)
+      (* let oc = (Format.formatter_of_out_channel channel) in *)
       (* Format.pp_force_newline oc (); *)
       (* Format.pp_force_newline oc (); *)
       (* Format.pp_print_string oc "Internal Coq representation of the ast:"; *)
@@ -67,7 +66,7 @@ let ast_pp_file_inner path =
       (* let _ = IO.output_ast ll_ast oc in *)
       (* Format.pp_force_newline oc (); *)
       (* Format.pp_force_newline oc (); *)
-      close_out channel
+      (* close_out channel *)
     | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
   end
 

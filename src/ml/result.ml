@@ -1,7 +1,4 @@
-type ast =
-  (LLVMAst.typ, Generate.GA.runnable_blocks) LLVMAst.toplevel_entity list
-
-type 'a test = Test of string * (string * 'a) list
+;; open Assert
 
 type src_tgt_error_side = Src | Tgt
 
@@ -183,6 +180,50 @@ let get_stats (rs : result_sum) =
   List.map
     (fun elem -> (string_of_test_result (fst elem), List.length (snd elem)))
     res
+
+(* Another version of result, which contains more information for
+   statistics*)
+
+type outcome' = result_sum
+
+type assertion' = unit -> outcome'
+
+type suite' = assertion' test list
+
+module ResultMap = ResultMap
+
+(* This function will process the assertion and output a singleton map
+   object *)
+let run_assertion' (name : string) (test_case : string) (f : assertion') :
+    result_sum =
+  try f () with
+  | Failure m ->
+      let msg = Printf.sprintf "%s\n\t%s" test_case m in
+      make_singleton UNSOLVED name (ERR_MSG msg)
+  | e ->
+      let msg =
+        Printf.sprintf "%s\n\t%s" test_case
+          ("test threw\n   exception: " ^ Printexc.to_string e)
+      in
+      make_singleton UNSOLVED name (ERR_MSG msg)
+
+(* Test is file name * string (test case) * assertion *)
+let run_test' (t : assertion' test) : outcome' =
+  let run_case name (cn, f) = run_assertion' name cn f in
+  match t with
+  | Test (name, cases) ->
+      if List.length cases == 0 then
+        Result.make_singleton NOASSERT name NO_ASSERT
+      else
+        List.fold_right
+          (fun case acc -> merge_result_outcome (run_case name case) acc)
+          cases Result.empty
+
+let run_suite' (s : suite') : outcome' =
+  List.fold_right
+    (fun x acc -> merge_result_outcome (run_test' x) acc)
+    s empty
+
 
 (* let string_of_result_sum (rs : result_sum) : string = let ls =
    ResultMap.bindings rs in failwith "TODO: unimplemented" *)

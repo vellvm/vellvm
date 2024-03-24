@@ -10,11 +10,9 @@
 (* An assertion is just a unit->unit function that either *)
 (* succeeds silently or throws an Failure exception.       *)
 
-open Result
-
 type assertion = unit -> unit
 
-type 'a test = 'a Result.test
+type 'a test = Test of string * (string * 'a) list
 
 type suite = assertion test list
 
@@ -53,49 +51,6 @@ let successful (o : outcome) : bool =
   List.for_all
     (fun (Test (_, cases)) -> List.for_all (fun (_, r) -> r = Pass) cases)
     o
-
-(* Another version of result, which contains more information for
-   statistics*)
-
-type outcome' = result_sum
-
-type assertion' = unit -> outcome'
-
-type suite' = assertion' test list
-
-module ResultMap = Result.ResultMap
-
-(* This function will process the assertion and output a singleton map
-   object *)
-let run_assertion' (name : string) (test_case : string) (f : assertion') :
-    result_sum =
-  try f () with
-  | Failure m ->
-      let msg = Printf.sprintf "%s\n\t%s" test_case m in
-      Result.make_singleton UNSOLVED name (ERR_MSG msg)
-  | e ->
-      let msg =
-        Printf.sprintf "%s\n\t%s" test_case
-          ("test threw\n   exception: " ^ Printexc.to_string e)
-      in
-      Result.make_singleton UNSOLVED name (ERR_MSG msg)
-
-(* Test is file name * string (test case) * assertion *)
-let run_test' (t : assertion' test) : outcome' =
-  let run_case name (cn, f) = run_assertion' name cn f in
-  match t with
-  | Test (name, cases) ->
-      if List.length cases == 0 then
-        Result.make_singleton NOASSERT name NO_ASSERT
-      else
-        List.fold_right
-          (fun case acc -> merge_result_outcome (run_case name case) acc)
-          cases Result.empty
-
-let run_suite' (s : suite') : outcome' =
-  List.fold_right
-    (fun x acc -> merge_result_outcome (run_test' x) acc)
-    s Result.empty
 
 (***********************)
 (* Reporting functions *)
@@ -151,5 +106,3 @@ let outcome_to_string (o : outcome) : string =
   in
   let p, f, tot, str = List.fold_left helper (0, 0, 0, "") o in
   str ^ sep ^ Printf.sprintf "Passed: %d/%d\nFailed: %d/%d\n" p tot f tot
-
-let outcome'2outcome (_ : outcome') : outcome = failwith "unimplemented"

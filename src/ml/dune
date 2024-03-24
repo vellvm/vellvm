@@ -5,8 +5,8 @@
 
 (library
  (name base)
- (modules assert platform IO result)
- (libraries libvellvm unix str testing))
+ (modules assert platform IO)
+ (libraries libvellvm unix str))
 
 (executables
  (names frontend)
@@ -16,5 +16,5 @@
 (executables
  (names main)
  (modes byte exe)
- (modules main driver interpreter test tester)
+ (modules main driver result interpreter test tester)
  (libraries base extracted libvellvm testing unix str))

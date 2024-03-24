@@ -13,10 +13,10 @@ open Driver
 open Result
 
 (* open Assert *)
-open DynamicValues
-open VellvmIntegers
+(* open DynamicValues *)
+(* open VellvmIntegers *)
 
-open InterpretationStack.InterpreterStackBigIntptr.LP.Events
+(* open InterpretationStack.InterpreterStackBigIntptr.LP.Events *)
 
 (* Vellvm test cases
    -------------------------------------------------------- *)

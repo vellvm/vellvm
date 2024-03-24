@@ -1,7 +1,6 @@
 ;; open Base.Assert
 ;; open Base.Platform
 ;; open Base.IO
-;; open Base.Result
 
 let parse_pp_test path =
   let _ = verb @@ Printf.sprintf "* processing file: %s\n" path in
