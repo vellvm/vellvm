@@ -263,7 +263,7 @@ Section Endo.
       : Endo (annotation T) | 50 :=
       fun a =>
         match a with
-        | ANN_metadata m l => ANN_metadata (endo m) (endo l)
+        | ANN_metadata l => ANN_metadata (endo l)
         | ANN_prefix t => ANN_prefix (endo t)
         | ANN_prologue t => ANN_prologue (endo t)
         | ANN_personality t => ANN_personality (endo t)
@@ -661,7 +661,7 @@ Section TFunctor.
         | ANN_no_sanitize_address => ANN_no_sanitize_address
         | ANN_no_sanitize_hwaddress => ANN_no_sanitize_hwaddress
         | ANN_sanitize_address_dyninit => ANN_sanitize_address_dyninit
-        | ANN_metadata m l => ANN_metadata (tfmap f m) (tfmap f l)
+        | ANN_metadata l => ANN_metadata  (tfmap f l)
         | ANN_cconv c => ANN_cconv c
         | ANN_gc s => ANN_gc s
         | ANN_prefix t => ANN_prefix (tfmap f t)

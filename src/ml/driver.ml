@@ -73,7 +73,7 @@ let process_ll_file path file =
       match Interpreter.interpret ll_ast with
       | Ok dv ->
           Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv)
-      | Error e -> failwith (Base.Result.string_of_exit_condition e)
+      | Error e -> failwith (Result.string_of_exit_condition e)
   in
   let ll_ast' = transform ll_ast in
   let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in
@@ -92,7 +92,7 @@ let process_files files = List.iter process_file files
 (* file running ---------------------------------------------------------- *)
 (* Parses and runs the ll file at the given path, returning the dvalue
    produced. *)
-let run_ll_file path : (DV.dvalue, Base.Result.exit_condition) result =
+let run_ll_file path : (DV.dvalue, Result.exit_condition) result =
   let _ = Platform.verb @@ Printf.sprintf "* running file: %s\n" path in
   let ll_ast = IO.parse_file path in
   Interpreter.interpret ll_ast

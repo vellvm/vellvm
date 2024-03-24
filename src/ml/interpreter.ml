@@ -20,7 +20,7 @@ open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 
 open Format
 open ITreeDefinition
-open Base.Result
+open Result
 
 (* TODO: probably should be part of ADDRESS module interface*)
 let pp_addr :

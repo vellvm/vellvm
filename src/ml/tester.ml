@@ -2,7 +2,6 @@
 open Arg
 open Base
 open Result
-open Assert
 open Driver
 
 module DV = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV

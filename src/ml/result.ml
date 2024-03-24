@@ -1,4 +1,8 @@
-;; open Assert
+type ast =
+  (LLVMAst.typ, Generate.GA.runnable_blocks) LLVMAst.toplevel_entity list
+
+type 'a test = Test of string * (string * 'a) list
+
 
 type src_tgt_error_side = Src | Tgt
 
@@ -190,8 +194,6 @@ type assertion' = unit -> outcome'
 
 type suite' = assertion' test list
 
-module ResultMap = ResultMap
-
 (* This function will process the assertion and output a singleton map
    object *)
 let run_assertion' (name : string) (test_case : string) (f : assertion') :
@@ -213,11 +215,11 @@ let run_test' (t : assertion' test) : outcome' =
   match t with
   | Test (name, cases) ->
       if List.length cases == 0 then
-        Result.make_singleton NOASSERT name NO_ASSERT
+        make_singleton NOASSERT name NO_ASSERT
       else
         List.fold_right
           (fun case acc -> merge_result_outcome (run_case name case) acc)
-          cases Result.empty
+          cases empty
 
 let run_suite' (s : suite') : outcome' =
   List.fold_right

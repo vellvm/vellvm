@@ -10,13 +10,11 @@
 
 open Base
 open Driver
-open Result
 
-(* open Assert *)
-(* open DynamicValues *)
-(* open VellvmIntegers *)
+open Assert
+open VellvmIntegers
 
-(* open InterpretationStack.InterpreterStackBigIntptr.LP.Events *)
+open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 
 (* Vellvm test cases
    -------------------------------------------------------- *)
@@ -65,7 +63,7 @@ let pp_test_of_dir dir =
 let run_dvalue_test (test : DV.dvalue -> bool) path =
   let res, msg =
     match run_ll_file path with
-    | Error e -> (false, Base.Result.string_of_exit_condition e)
+    | Error e -> (false, Result.string_of_exit_condition e)
     | Ok dv -> (test dv, "")
   in
   if not res then failwith (path ^ " test failed: " ^ msg) ;
