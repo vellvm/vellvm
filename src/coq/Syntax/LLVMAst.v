@@ -490,7 +490,7 @@ Variant annotation : Set :=
   | ANN_no_sanitize_address
   | ANN_no_sanitize_hwaddress
   | ANN_sanitize_address_dyninit
-  | ANN_metadata (id:metadata) (v:metadata)  (* Invariant (?): id is not null or a node *)
+  | ANN_metadata (l: list metadata)  
   | ANN_cconv (c:cconv) (* declaration / definitions only *)
   | ANN_gc (s:string) (* declaration / definitions only *)
   | ANN_prefix (t:texp) (* declaration / definitions only *)
@@ -595,9 +595,9 @@ Definition ann_sanitize_address_dynint (a:annotation) : option unit :=
   | _ => None
   end.
 
-Definition ann_metadata (a:annotation) : option (metadata * metadata) :=
+Definition ann_metadata (a:annotation) : option (list metadata) :=
   match a with
-  | ANN_metadata id m => Some (id, m)
+  | ANN_metadata l => Some l
   | _ => None
   end.
 
@@ -754,7 +754,7 @@ Definition g_no_sanitize_hwaddress (g:global) : option unit :=
 Definition g_sanitize_address_dyninit (g:global) : option unit :=
   find_option ann_sanitize_address_dynint (g_annotations g).
 
-Definition g_metadata (g:global) : (list (metadata * metadata)) :=
+Definition g_metadata (g:global) : (list (list metadata)) :=
   filter_option ann_metadata (g_annotations g).
 
 Record declaration : Set :=
@@ -812,7 +812,7 @@ Definition dc_prologue (d:declaration) : option texp :=
 Definition dc_personality (d:declaration) : option texp :=
   find_option ann_personality (dc_annotations d).
 
-Definition dc_metadata (d:declaration) : list (metadata * metadata) :=
+Definition dc_metadata (d:declaration) : list (list metadata) :=
   filter_option ann_metadata (dc_annotations d).
 
 

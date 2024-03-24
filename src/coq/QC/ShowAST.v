@@ -925,6 +925,10 @@ tes on cstring on LLVMAst.v *)
   #[global] Instance dshowCallArg : DShow (texp T * list param_attr) :=
     { dshow := show_call_arg }.
 
+  Definition dshow_metadata_list (ml : list (metadata T)) := 
+    concat_DString (string_to_DString " ") (map dshow_metadata ml).
+    
+  
   Definition dshow_instr (i : instr T) : DString
     := match i with
        | INSTR_Comment s => string_to_DString "; " @@  string_to_DString s
@@ -972,10 +976,9 @@ tes on cstring on LLVMAst.v *)
            in
            let align := find_option ann_align anns in
            let meta := filter_option ann_metadata anns in
-           let meta_str := DList_join (map (fun '(m1, m2) =>
+           let meta_str := DList_join (map (fun 'ml =>
                                                   string_to_DString ", "
-                                                    @@ dshow_metadata m1 @@ string_to_DString " " @@
-                                                    dshow_metadata m2)  meta)
+                                                    @@ dshow_metadata_list ml)  meta)
            in
            list_to_DString ["load "; volatile] @@ dshow t @@ string_to_DString ", " @@ dshow_texp ptr @@
            string_to_DString (show_opt_prefix ", align " align) @@
@@ -989,10 +992,9 @@ tes on cstring on LLVMAst.v *)
            in
            let align := find_option ann_align anns in
            let meta := filter_option ann_metadata anns in
-           let meta_str := DList_join (map (fun '(m1, m2) =>
+           let meta_str := DList_join (map (fun 'ml =>
                                                   string_to_DString ", "
-                                                    @@ dshow_metadata m1 @@ string_to_DString " " @@
-                                                    dshow_metadata m2) meta)
+                                                    @@ dshow_metadata_list ml) meta)
            in
            string_to_DString "store " @@ string_to_DString volatile @@ dshow_texp tval @@
            string_to_DString ", " @@ dshow_texp ptr @@ string_to_DString (show_opt_prefix ", align " align)

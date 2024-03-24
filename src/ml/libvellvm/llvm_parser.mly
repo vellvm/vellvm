@@ -408,7 +408,6 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %start<(LLVMAst.typ * LLVMAst.typ LLVMAst.exp)> texp
 
 
-
 %%
 
 toplevel_entities:
@@ -583,7 +582,7 @@ c_sanitize_address_dyninit:
   | l=c_global_metadata { l }
 
 c_global_metadata:
- |  csep m1=metadata_id m2=metadata_value l=c_global_metadata { (ANN_metadata(m1, m2)) :: l }
+ |  csep m1=metadata_id m2=metadata_value l=c_global_metadata { (ANN_metadata [m1; m2]) :: l }
  | (* empty *) { [] }
 
 global_post_annotations:
@@ -655,7 +654,7 @@ align_ann:
 
 
 global_metadata:
- |  m1=metadata_id m2=metadata_value l=c_global_metadata { (ANN_metadata(m1, m2)) :: l }
+ |  m1=metadata_id m2=metadata_value l=c_global_metadata { (ANN_metadata [m1; m2]) :: l }
  | (* empty *) { [] }
 
 %inline
@@ -1331,57 +1330,67 @@ alloca_anns:
 
 l_nontemporal:
   | csep META_NONTEMPORAL m=metadata_value l=l_invariant_load
-     { (ANN_metadata (METADATA_Nontemporal, m)) :: l }
+     { (ANN_metadata [METADATA_Nontemporal; m]) :: l }
   | l=l_invariant_load { l }
 
 l_invariant_load:
   | csep META_INVARIANT_LOAD m=metadata_value l=l_invariant_group
-    { (ANN_metadata (METADATA_Invariant_load, m)) :: l }
+    { (ANN_metadata [METADATA_Invariant_load; m]) :: l }
   | l=l_invariant_group { l }
 
 l_invariant_group:
   | csep META_INVARIANT_GROUP m=metadata_value l=l_nonnull
-    { (ANN_metadata (METADATA_Invariant_group, m)) :: l }
+    { (ANN_metadata [METADATA_Invariant_group; m]) :: l }
   | l=l_nonnull { l }
 
 l_nonnull:
   | csep META_NONNULL m=metadata_value l=l_dereferenceable
-    { (ANN_metadata (METADATA_Nonnull, m)) :: l }
+    { (ANN_metadata [METADATA_Nonnull; m]) :: l }
   | l=l_dereferenceable { l }
 
 l_dereferenceable:
   | csep META_DEREFERENCEABLE m=metadata_value l=l_dereferenceable_or_null
-    { (ANN_metadata (METADATA_Dereferenceable, m)) :: l }
+    { (ANN_metadata [METADATA_Dereferenceable; m]) :: l }
   | l=l_dereferenceable_or_null { l }
 
 l_dereferenceable_or_null:
   | csep META_DEREFERENCEABLE_OR_NULL m=metadata_value l=l_align
-    { (ANN_metadata (METADATA_Dereferenceable_or_null, m)) :: l }
+    { (ANN_metadata [METADATA_Dereferenceable_or_null; m]) :: l }
   | l=l_align { l }
 
 l_align:
   | csep META_ALIGN m=metadata_value l=l_noundef
-    { (ANN_metadata (METADATA_Align, m)) :: l }
+    { (ANN_metadata [METADATA_Align; m]) :: l }
   | l=l_noundef { l }
 
 l_noundef:
   | csep META_NOUNDEF m=metadata_value
-    { (ANN_metadata (METADATA_Noundef, m)) :: [] }
+    { (ANN_metadata [METADATA_Noundef; m]) :: [] }
+  | l=l_other { l }
+
+l_other:
+  | csep l=separated_list(csep, m_pair) { l }
   | (* empty *) { [] }
 
 load_anns:
   | csep a=align l=l_nontemporal {  a::l }
   | anns=l_nontemporal { anns }
 
+m_pair:
+  | m1=m_other m2=m_other { ANN_metadata([m1; m2]) }
+
+m_other:
+  | m=METADATA_STRING { METADATA_String (str m) }
+  | m=METADATA_ID { METADATA_Id m }
 
 s_nontemporal:
   | csep META_NONTEMPORAL m=metadata_value l=s_invariant_group
-     { (ANN_metadata (METADATA_Nontemporal, m)) :: l }
+     { (ANN_metadata [METADATA_Nontemporal; m]) :: l }
   | l=s_invariant_group { l }
 
 s_invariant_group:
   | csep META_INVARIANT_GROUP m=metadata_value
-    { (ANN_metadata (METADATA_Invariant_group, m)) :: [] }
+    { (ANN_metadata [METADATA_Invariant_group; m]) :: [] }
   | (* empty *) { [] }
 
 store_anns:

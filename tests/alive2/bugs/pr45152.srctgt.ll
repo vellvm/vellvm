@@ -16,8 +16,6 @@ end:
   store i64 %phi, i64* %p, align 8
   %cast = bitcast i64 %phi to double
   ret double %cast
-
-  uselistorder i64 %phi, { 1, 0 }
 }
 
 define double @tgt(i1 %c, i64* %p) {

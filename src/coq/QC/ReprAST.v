@@ -427,7 +427,7 @@ Section ReprInstances.
     | CC_Swiftcc => "CC_Swiftcc"
     | CC_Swifttailcc => "CC_Swifttailcc"
     | CC_cfguard_checkcc => "CC_cfguard_checkcc"
-    | CC_Preserve_mostc => "CC_Preserve_mostc"
+    | CC_Preserve_mostcc => "CC_Preserve_mostcc"
     end.
 
   #[global]
@@ -625,7 +625,7 @@ Section ReprInstances.
     | ANN_no_sanitize_address => "ANN_no_sanitize_address"
     | ANN_no_sanitize_hwaddress => "ANN_no_sanitize_hwaddress"
     | ANN_sanitize_address_dyninit => "ANN_sanitize_address_dyninit"
-    | ANN_metadata m n => "ANN_metadata " ++ (repr m) ++ " " ++ (repr n)
+    | ANN_metadata m => "ANN_metadata " ++ (repr m)
     | ANN_cconv c => "ANN_cconv " ++ (repr c)
     | ANN_gc s => "ANN_gc " ++ (repr s)
     | ANN_prefix t => "ANN_prefix " ++ (repr t)
