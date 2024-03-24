@@ -59,14 +59,14 @@ let ast_pp_file_inner path =
       let oc = (Format.formatter_of_out_channel channel) in
 
       (* Prints the internal representation of the llvm program *)
-      Format.pp_force_newline oc ();
-      Format.pp_force_newline oc ();
-      Format.pp_print_string oc "Internal Coq representation of the ast:";
-      Format.pp_force_newline oc ();
-      Format.pp_force_newline oc ();
-      let _ = IO.output_ast ll_ast oc in
-      Format.pp_force_newline oc ();
-      Format.pp_force_newline oc ();
+      (* Format.pp_force_newline oc (); *)
+      (* Format.pp_force_newline oc (); *)
+      (* Format.pp_print_string oc "Internal Coq representation of the ast:"; *)
+      (* Format.pp_force_newline oc (); *)
+      (* Format.pp_force_newline oc (); *)
+      (* let _ = IO.output_ast ll_ast oc in *)
+      (* Format.pp_force_newline oc (); *)
+      (* Format.pp_force_newline oc (); *)
       close_out channel
     | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
   end
