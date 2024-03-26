@@ -557,8 +557,7 @@ Section ShowInstances.
     | EXP_Bool b =>     false
     | EXP_Null =>      false
     | EXP_Zero_initializer =>    false
-    (* see no
-tes on cstring on LLVMAst.v *)
+    (* see notes on cstring on LLVMAst.v *)
     (* I'm using string_of_list_ascii bc I couldn't find any other function that converted asciis to strings  *)
     | EXP_Cstring elts =>     false
     | EXP_Undef =>         false
@@ -685,12 +684,8 @@ tes on cstring on LLVMAst.v *)
   #[global] Instance dshowExp : DShow (exp T) :=
     {| dshow := dshow_exp false |}.
 
-  #[global] Instance dshowTEXP : DShow (texp T) :=
-    {| dshow te := let '(t, e) := te in dshow t @@ string_to_DString " "
-                              @@ dshow e |}.
-
-  #[global] Instance dshowTExp : DShow (texp T)
-    := {| dshow te := let '(t, e) := te in dshow t @@ string_to_DString " " @@ dshow e |}.
+  #[global] Instance dshowTExp : DShow (texp T) :=
+    {| dshow te := let '(t, e) := te in dshow t @@ string_to_DString " " @@ dshow e |}.
 
   Definition show_phi_block (p : block_id * exp T) : DString :=
     let '(bid, e) := p in
@@ -1295,7 +1290,11 @@ Definition dshow_global (g : global typ) : DString :=
   let visibility := maybe_show (g_visibility g) in
   let dll_storage := maybe_show (g_dll_storage g) in
   let thread_local := maybe_show (g_thread_local_storage g) in
-  let g_exp := maybe_dshow g.(g_exp) in
+  let g_exp := match g.(g_exp) with
+               | None => string_to_DString ""
+               | Some e => dshow_exp true e
+               end
+  in
   let unnamed_addr := maybe_show (g_unnamed_addr g) in
   let addrspace := maybe_show (g_addrspace g) in
   let externally_initialized := if g.(g_externally_initialized) then "external " else "" in
