@@ -1391,7 +1391,7 @@ s_nontemporal:
 s_invariant_group:
   | csep META_INVARIANT_GROUP m=metadata_value
     { (ANN_metadata [METADATA_Invariant_group; m]) :: [] }
-  | (* empty *) { [] }
+  | l=l_other { l }
 
 store_anns:
   | csep a=align l=s_nontemporal {  a::l }
