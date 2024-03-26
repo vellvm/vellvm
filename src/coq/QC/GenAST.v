@@ -1575,6 +1575,13 @@ Section TypGenerators.
         ; TYPE_I 64
       ].
 
+  (* TODO: look up identifiers *)
+  Definition gen_float_typ : GenLLVM typ :=
+    elems_LLVM
+      [ TYPE_Float
+        (* ; TYPE_Double *)
+      ].
+
   (* TODO: IPTR not implemented *)
   Definition gen_int_typ_for_ptr_cast : GenLLVM typ :=
     ret (TYPE_I 64).
@@ -2002,7 +2009,7 @@ Section ExpGenerators.
         let gen_idents : list (nat * GenLLVM (exp typ)) :=
           match i with
           | None => []
-          | Some ident => [(16%nat, fmap (fun i => EXP_Ident i) (@ret GenLLVM _ _ ident))]
+          | Some ident => [(160%nat, fmap (fun i => EXP_Ident i) (@ret GenLLVM _ _ ident))]
           end in
         let fix gen_size_0 (t: typ) :=
           match t with
@@ -2072,16 +2079,23 @@ Section ExpGenerators.
         (* freq_LLVM ((* (1%nat, ret EXP_Undef) :: *) gen_idents) *)
         (* TODO: Add some retroactive global generation *)
         | _ => freq_LLVM
-                ((1%nat, gen_size_0 t) :: gen_idents)
+                ((10%nat, gen_size_0 t) :: (1%nat, ret EXP_Zero_initializer) :: gen_idents)
         end
     | (S sz') =>
         let gens :=
           match t with
           | TYPE_I isz =>
-              (* TODO: If I1 also allow ICmp and FCmp *)
-              [gen_ibinop_exp gen_global_of_typ gen_ident_of_typ isz]
+              if N.eqb isz 1%N
+              then
+                [ gen_ibinop_exp gen_global_of_typ gen_ident_of_typ isz
+                  ; τ <- gen_int_typ;;
+                    gen_icmp_exp_typ gen_global_of_typ gen_ident_of_typ τ
+                  ; τ <- gen_float_typ;;
+                    gen_fcmp_exp_typ gen_global_of_typ gen_ident_of_typ τ
+                ]
+              else
+                [ gen_ibinop_exp gen_global_of_typ gen_ident_of_typ isz ]
           | TYPE_IPTR =>
-              (* TODO: If I1 also allow ICmp and FCmp *)
               [gen_ibinop_exp_typ gen_global_of_typ gen_ident_of_typ TYPE_IPTR]
           | TYPE_Pointer t         => [] (* GEP? *)
 
@@ -2160,7 +2174,23 @@ Section ExpGenerators.
                     then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty
                     else ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty
     | _ => failGen "gen_fbinop_exp"
-    end.
+    end
+  with
+  gen_icmp_exp_typ (gen_global_of_typ : typ -> GenLLVM (option ident)) (gen_ident_of_typ : typ -> GenLLVM (option ident)) (t : typ) {struct t} : GenLLVM (exp typ)
+  := cmp <- lift gen_icmp;;
+     ret (OP_ICmp cmp) <*> ret t <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat t <*> gen_non_zero_exp_size 0%nat t
+  with
+  gen_fcmp_exp_typ (gen_global_of_typ : typ -> GenLLVM (option ident)) (gen_ident_of_typ : typ -> GenLLVM (option ident)) (t : typ) {struct t} : GenLLVM (exp typ)
+  := cmp <- lift gen_fcmp;;
+     ret (OP_FCmp cmp) <*> ret t <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat t <*> gen_non_zero_exp_size 0%nat t.
+
+  Definition gen_icmp_exp (gen_global_of_typ : typ -> GenLLVM (option ident)) (gen_ident_of_typ : typ -> GenLLVM (option ident)) : GenLLVM (exp typ)
+    := τ <- gen_int_typ;;
+       gen_icmp_exp_typ gen_global_of_typ gen_ident_of_typ τ.
+
+  Definition gen_fcmp_exp (gen_global_of_typ : typ -> GenLLVM (option ident)) (gen_ident_of_typ : typ -> GenLLVM (option ident)) : GenLLVM (exp typ)
+    := τ <- gen_float_typ;;
+       gen_fcmp_exp_typ gen_global_of_typ gen_ident_of_typ τ.
 
   Definition gen_deterministic_global_ident :=
     gen_var_of_typ_ident (gen_context' .@ is_global') (withl is_deterministic').
@@ -2192,8 +2222,16 @@ Section ExpGenerators.
          (fun sz =>
             match t with
             | TYPE_I isz =>
-                (* TODO: If I1 also allow ICmp and FCmp *)
-                gen_ibinop_exp gen_deterministic_global_ident gen_deterministic_ident isz
+                if N.eqb isz 1%N
+                then
+                  (* If I1 also allow ICmp and FCmp *)
+                  oneOf_LLVM
+                    [ gen_ibinop_exp gen_deterministic_global_ident gen_deterministic_ident isz
+                      ; gen_icmp_exp gen_deterministic_global_ident gen_deterministic_ident
+                      ; gen_fcmp_exp gen_deterministic_global_ident gen_deterministic_ident
+                    ]
+                else
+                  gen_ibinop_exp gen_deterministic_global_ident gen_deterministic_ident isz
             | TYPE_Float => gen_fbinop_exp gen_deterministic_global_ident gen_deterministic_ident TYPE_Float
             | TYPE_Double => gen_fbinop_exp gen_deterministic_global_ident gen_deterministic_ident TYPE_Double
             | _ => failGen "gen_op"
@@ -2645,7 +2683,6 @@ Section InstrGenerators.
     ret (id, INSTR_Op (OP_Conversion Bitcast tfc efc new_typ)).
 
   Definition gen_call (tfun : typ) : GenLLVM (instr_id * instr typ) :=
-    efun <- gen_exp_sz0 tfun;;
     match tfun with
     | TYPE_Pointer (TYPE_Function ret_t args varargs) =>
         args_texp <- map_monad
@@ -2654,6 +2691,7 @@ Section InstrGenerators.
                          ret (arg_typ, arg_exp))
                       args;;
         let args_with_params := map (fun arg => (arg, [])) args_texp in
+        efun <- gen_exp_sz0 tfun;;
         id <- genInstrId ret_t;;
         ret (id, INSTR_Call (TYPE_Function ret_t args varargs, efun) args_with_params [])
     | _ => failGen "gen_call"
