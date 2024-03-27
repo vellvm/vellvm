@@ -464,51 +464,64 @@ Module Infinite.
       - force_go. cbn.
         setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
         remember (concretize_uvalue u1) as conc.
-        Import Monad ITreeMonad.
         destruct_err_ub_oom conc.
         + setoid_rewrite raiseOOM_bind_itree.
-          setoid_rewrite interp_trigger.
-          rewrite interp_translate.
           unfold raiseOOM.
           setoid_rewrite bind_trigger.
           force_go; cbn.
-          setoid_rewrite bind_trigger; cbn.
+          setoid_rewrite bind_vis; cbn.
           eapply eqit_Vis.
           intros [].
         + setoid_rewrite raiseUB_bind_itree.
-          rewrite interp_translate.
           unfold raiseUB.
           setoid_rewrite bind_trigger.
           force_go; cbn.
-          setoid_rewrite bind_trigger; cbn.
+          setoid_rewrite bind_vis; cbn.
           eapply eqit_Vis.
           intros [].
         + setoid_rewrite raise_bind_itree.
-          rewrite interp_translate.
           unfold raise.
-          setoid_rewrite bind_trigger.
           force_go; cbn.
-          setoid_rewrite bind_trigger; cbn.
+          setoid_rewrite bind_vis; cbn.
           eapply eqit_Vis.
           intros [].
         + cbn. go.
-          rewrite translate_bind.
+          rewrite interp_ret.
+          setoid_rewrite Eqit.bind_ret_l.
           rewrite interp_bind.
-          setoid_rewrite translate_ret.
-          setoid_rewrite interp_ret.
-          rewrite interp_translate.
-          cbn.
           eapply eqit_bind'.
-          { rewrite interp_trigger_h.
-          }
-    }
-    eapply eqit_clos_bind.
-    rewrite bind_trigger.
+          { assert (eqit eq true true
+                      (interp (fun (T : Type) (e : exp_E T) => ITree.trigger (resum IFun T e))
+                         (@raise exp_E dvalue _ "Invalid PTOI conversion")) (@raise L0 dvalue _ "Invalid PTOI conversion")).
+            { unfold raise.
+              setoid_rewrite bind_trigger.
+              rewrite interp_vis.
+              rewrite bind_trigger.
+              eapply eqit_Vis.
+              intros [].
+            }
 
-    eapply eqit_Vis.
-    intros. force_go.
-    rewrite bind_tau. go. rewrite tau_eutt.
-    force_go. cbn. reflexivity.
+            destruct conc0; eauto.
+            setoid_rewrite Eqit.bind_ret_l.
+            rewrite interp_ret.
+            reflexivity.
+          }
+
+          intros ? ? ?; subst.
+          force_go.
+          reflexivity.
+    }
+    intros ? ? ?; subst.
+    force_go.
+    cbn.
+    rewrite bind_trigger.
+    apply eqit_Vis.
+    intros [].
+    force_go.
+    rewrite tau_eutt.
+    go.
+    rewrite interp_ret.
+    reflexivity.
   Qed.
 
   (* Few remarks about [L3_trace] used in [interp_mcfg4] *)
@@ -533,12 +546,14 @@ Module Infinite.
   Qed.
 
   Remark L3_trace_LocalWrite:
-    forall R g l s sid m (k : unit -> itree L0 R) t id dv,
+    forall R g l s sid m (k : itree L0 R) t id dv,
       interp_memory_spec eq
-        (interp_local_stack (interp_global (interp_intrinsics (k tt)) g) (FMapAList.alist_add id dv l, s)) sid m t <->
-      interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (vis (LocalWrite id dv) k)) g) (l, s)) sid m t.
+        (interp_local_stack (interp_global (interp_intrinsics k) g) (FMapAList.alist_add id dv l, s)) sid m t <->
+      interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (trigger (LocalWrite id dv);; k)) g) (l, s)) sid m t.
   Proof.
     intros.
+    setoid_rewrite bind_trigger.
+    cbn.
     rewrite interp_intrinsics_vis.
     cbn. rewrite interp_global_bind.
     rewrite interp_local_stack_bind.
@@ -748,6 +763,7 @@ Module Infinite.
     apply Returns_ret_inv in H. subst.
 
     go.
+    rewrite <- bind_trigger.
     eapply L3_trace_LocalWrite.
     eapply L3_trace_ret.
     pstep; constructor; eauto.
@@ -836,9 +852,8 @@ Module Infinite.
     2 : shelve.
 
     eexists (Ret5 genv (FMapAList.alist_add (Name "i")
-     (UVALUE_Conversion Ptrtoint DTYPE_Pointer
-        (snd (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv, stack, UVALUE_Addr addr))
-        DTYPE_IPTR) (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv), stack) sid ms_final _).
+                          (UVALUE_IPTR (PTOI.ptr_to_int addr))
+                          (FMapAList.alist_add (Name "ptr") (UVALUE_Addr addr) lenv), stack) sid ms_final _).
     split; cycle 1.
     { do 2 red.
       eapply interp_prop_oom_l_eutt_Proper; try typeclasses eauto.
@@ -911,9 +926,13 @@ Module Infinite.
     apply Returns_ret_inv in H. subst.
 
     go.
+    rewrite <- bind_trigger.
     eapply L3_trace_LocalWrite.
     eapply L3_trace_LocalRead; [ reflexivity | ].
-    eapply L3_trace_LocalWrite.
+    cbn.
+    repeat rewrite bind_ret_l.
+    rewrite <- bind_trigger.
+    apply -> L3_trace_LocalWrite.
     eapply L3_trace_ret.
     pstep; constructor; eauto.
 
@@ -1313,6 +1332,8 @@ Module Infinite.
         eapply refine_oom_h_raise_oom; typeclasses eauto. }
       { unfold interp_instr_E_to_L0. unfold ret_tree. cbn.
         force_go. cbn. force_go.
+        cbn.
+        force_go.
         apply interp_mcfg4_ret. } }
 
     clear ALLOCINV.
@@ -1322,6 +1343,7 @@ Module Infinite.
     split.
     { unfold interp_instr_E_to_L0. unfold ret_tree. cbn.
       force_go. cbn. force_go.
+      cbn. force_go. cbn.
       apply interp_mcfg4_ret. }
 
     assert (alloca_returns:
@@ -1342,6 +1364,7 @@ Module Infinite.
     specialize (HK _ _ (alloca_returns x1) alloc_t_returns eq_refl).
     clear alloca_returns alloc_t_returns.
 
+    rewrite <- bind_trigger in HK.
     eapply L3_trace_LocalWrite in HK.
     eapply L3_trace_ret in HK.
     apply interp_memory_prop_ret_inv in HK.
@@ -2184,6 +2207,7 @@ Module Finite.
         eapply refine_oom_h_raise_oom; typeclasses eauto. }
       { unfold interp_instr_E_to_L0. unfold ret_tree. cbn.
         force_go. cbn. force_go.
+        cbn. force_go.
         apply interp_mcfg4_ret. } }
 
     clear ALLOCINV.
@@ -2193,6 +2217,7 @@ Module Finite.
     split.
     { unfold interp_instr_E_to_L0. unfold ret_tree. cbn.
       force_go. cbn. force_go.
+      cbn. force_go.
       apply interp_mcfg4_ret. }
 
     assert (alloca_returns:
