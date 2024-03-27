@@ -428,8 +428,9 @@ Module Infinite.
           Vis (subevent _ (Alloca (DTYPE_I 64) 1 None))
           (fun u => Vis (subevent _ (LocalWrite (Name "ptr") (dvalue_to_uvalue u)))
                       (fun x => Vis (subevent _ (LocalRead (Name "ptr")))
-                                (fun u1 => Vis (subevent _ (LocalWrite (Name "i") (UVALUE_Conversion Ptrtoint DTYPE_Pointer u1 DTYPE_IPTR)))
-                                            (fun _ => Ret (DVALUE_I1 Int1.one))))).
+                               (fun u1 => u <- concretize_if_no_undef_or_poison (UVALUE_Conversion Ptrtoint DTYPE_Pointer u1 DTYPE_IPTR);;
+                                       Vis (subevent _ (LocalWrite (Name "i") u))
+                                         (fun _ => Ret (DVALUE_I1 Int1.one))))).
   Proof.
     unfold interp_instr_E_to_L0.
     unfold ptoi_tree. cbn. go. cbn. go.
@@ -451,7 +452,58 @@ Module Infinite.
     eapply eqit_Vis.
     intros. force_go.
     rewrite bind_tau. go. rewrite tau_eutt.
-    force_go. cbn. rewrite bind_trigger.
+    force_go. cbn.
+    rewrite interp_translate.
+    eapply eqit_bind'.
+    { (* TODO: Make this a lemma *)
+      cbn.
+      unfold concretize_if_no_undef_or_poison.
+      cbn.
+      break_match.
+      - force_go. reflexivity.
+      - force_go. cbn.
+        setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
+        remember (concretize_uvalue u1) as conc.
+        Import Monad ITreeMonad.
+        destruct_err_ub_oom conc.
+        + setoid_rewrite raiseOOM_bind_itree.
+          setoid_rewrite interp_trigger.
+          rewrite interp_translate.
+          unfold raiseOOM.
+          setoid_rewrite bind_trigger.
+          force_go; cbn.
+          setoid_rewrite bind_trigger; cbn.
+          eapply eqit_Vis.
+          intros [].
+        + setoid_rewrite raiseUB_bind_itree.
+          rewrite interp_translate.
+          unfold raiseUB.
+          setoid_rewrite bind_trigger.
+          force_go; cbn.
+          setoid_rewrite bind_trigger; cbn.
+          eapply eqit_Vis.
+          intros [].
+        + setoid_rewrite raise_bind_itree.
+          rewrite interp_translate.
+          unfold raise.
+          setoid_rewrite bind_trigger.
+          force_go; cbn.
+          setoid_rewrite bind_trigger; cbn.
+          eapply eqit_Vis.
+          intros [].
+        + cbn. go.
+          rewrite translate_bind.
+          rewrite interp_bind.
+          setoid_rewrite translate_ret.
+          setoid_rewrite interp_ret.
+          rewrite interp_translate.
+          cbn.
+          eapply eqit_bind'.
+          { rewrite interp_trigger_h.
+          }
+    }
+    eapply eqit_clos_bind.
+    rewrite bind_trigger.
 
     eapply eqit_Vis.
     intros. force_go.

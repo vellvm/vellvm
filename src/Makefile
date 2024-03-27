@@ -35,7 +35,10 @@ VELLVM_BC =_build/default/ml/main.bc
 FRONTEND_EXE=_build/default/ml/frontend.exe
 AGGREGATE_EXE=_build/default/ml/aggregate.exe
 COQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib
+COQFILES_EXEC := QC/ShowAST QC/ReprAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib Semantics/TopLevel Transformations/Transform Handlers/Handlers Theory/Refinement Utilities
 FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
+EXEC_VFILES := $(COQFILES_FRONTEND:%=coq/%.v)
+EXEC_VOFILES := $(COQFILES_EXEC:%=coq/%.vo)
 
 .DEFAULT_GOAL := all
 
@@ -70,7 +73,7 @@ coq: real-all
 .PHONY: extracted
 extracted: $(EXTRACTDIR)/STAMP
 
-$(EXTRACTDIR)/STAMP: $(VFILES) $(VOFILES) $(EXTRACTDIR)/Extract.v
+$(EXTRACTDIR)/STAMP: $(EXEC_VOFILES) $(EXTRACTDIR)/Extract.v
 	@echo "Extracting"
 	$(COQEXEC) $(EXTRACTDIR)/Extract.v
 	@echo "Patching extraction"
