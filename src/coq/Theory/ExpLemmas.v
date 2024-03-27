@@ -183,7 +183,144 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   Import ExpTactics.
 
+  (* TODO: This section is kind of duplicated, but I don't know where it should live *)
+  Section uvalue_dvalue_to_uvalue_M.
+    (* TODO: Move this *)
+    Lemma map_monad_map_itree :
+      forall {E} A B C
+        (f : B -> itree E C)
+        (g : A -> B)
+        (xs : list A),
+        eq_itree eq (map_monad f (map g xs)) (map_monad (fun x => f (g x)) xs).
+    Proof.
+      intros. induction xs.
+      - simpl. reflexivity.
+      - simpl.
+        setoid_rewrite IHxs.
+        reflexivity.
+    Qed.
+
+    (* TODO: Move this *)
+    Lemma bind_helper_itree :
+      forall {E} A B (m : itree E A) (f : A -> itree E B),
+        eq_itree eq (bind m f) ((bind (bind m ret) f)).
+    Proof.
+      intros.
+      setoid_rewrite Eqit.bind_ret_r.
+      reflexivity.
+    Qed.
+
+    (* TODO: Move this *)
+    Lemma map_monad_g_itree :
+      forall {E} A B C (f : A -> itree E B) (g : list B -> C) (xs:list A) (zs : list B)
+        (EQ2 : eq_itree eq (bind (map_monad f xs) (fun ys => ret ys)) (ret (zs))),
+        eq_itree eq (bind (map_monad f xs) (fun ys => ret (g ys))) (ret (g zs)).
+    Proof.
+      intros.
+      rewrite bind_helper_itree.
+      rewrite EQ2.
+      setoid_rewrite Eqit.bind_ret_l.
+      reflexivity.
+    Qed.
+
+    Lemma map_monad_cons_ret_itree :
+      forall {E} A B (f : A -> itree E B) (a:A) (xs:list A) (z : B) (zs : list B)
+        (EQ2 : eq_itree eq (bind (map_monad f xs) (fun ys => ret ys)) (ret (zs))),
+        eq_itree eq (bind (map_monad f xs) (fun ys => ret (z::ys))) (ret ((z::zs))).
+    Proof.
+      intros.
+      apply map_monad_g_itree with (g := (fun ys => z::ys)).
+      assumption.
+    Qed.
+
+    (* TODO: this is duplicated from EquivExpr *)
+    Lemma uvalue_dvalue_to_uvalue_M :
+      forall {E} `{O: OOME -< E} `{F: FailureE -< E} `{U: UBE -< E} d,
+        eq_itree eq (concretize_uvalueM (itree E) (fun dt : dtyp =>
+        @lift_err_RAISE_ERROR dvalue (itree E) (@Monad_itree E) (@RAISE_ERR_ITREE_FAILUREE E F)
+          (default_dvalue_of_dtyp dt)) _ (fun (A : Type) (x : itree E A) => x) (dvalue_to_uvalue d)) (ret d).
+    Proof.
+      intros.
+      induction d; simpl; try reflexivity.
+      - rewrite map_monad_map_itree.
+        apply map_monad_g_itree;
+        induction fields; simpl; auto.
+       + rewrite bind_ret_l.
+         reflexivity.
+       + rewrite H.
+          setoid_rewrite bind_ret_l.
+          rewrite bind_bind.
+          setoid_rewrite bind_ret_l.
+          apply map_monad_cons_ret_itree.
+          exact a.
+          apply IHfields.
+          intros. apply H. apply in_cons. assumption.
+          apply in_eq.
+
+       (* TODO: automate this *)
+      -  rewrite map_monad_map_itree;
+          apply map_monad_g_itree;
+          induction fields; simpl.
+        + rewrite bind_ret_l.
+          reflexivity.
+        + rewrite H.
+          setoid_rewrite bind_ret_l.
+          rewrite bind_bind.
+          setoid_rewrite bind_ret_l.
+          apply map_monad_cons_ret_itree.
+          exact a.
+          apply IHfields.
+          intros. apply H. apply in_cons. assumption.
+          apply in_eq.
+
+
+      - rewrite map_monad_map_itree;
+          apply map_monad_g_itree;
+          induction elts; simpl.
+        + rewrite bind_ret_l.
+          reflexivity.
+        + rewrite H.
+          setoid_rewrite bind_ret_l.
+          rewrite bind_bind.
+          setoid_rewrite bind_ret_l.
+          apply map_monad_cons_ret_itree.
+          exact a.
+          apply IHelts.
+          intros. apply H. apply in_cons. assumption.
+          apply in_eq.
+
+
+      - rewrite map_monad_map_itree;
+          apply map_monad_g_itree;
+          induction elts; simpl.
+        + rewrite bind_ret_l.
+          reflexivity.
+        + rewrite H.
+          setoid_rewrite bind_ret_l.
+          rewrite bind_bind.
+          setoid_rewrite bind_ret_l.
+          apply map_monad_cons_ret_itree.
+          exact a.
+          apply IHelts.
+          intros. apply H. apply in_cons. assumption.
+          apply in_eq.
+    Qed.
+  End uvalue_dvalue_to_uvalue_M.
+
   Section ExpLemmas.
+    (* TODO: Does this lemma belong here? *)
+    Lemma concretize_if_no_undef_or_poison_dvalue_to_uvalue :
+      forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E} v,
+        @eq_itree E _ _ eq (concretize_if_no_undef_or_poison (dvalue_to_uvalue v)) (ret (dvalue_to_uvalue v)).
+    Proof.
+      intros E O F U v.
+      unfold concretize_if_no_undef_or_poison.
+      break_match; try reflexivity.
+      unfold concretize_uvalue.
+      rewrite uvalue_dvalue_to_uvalue_M.
+      setoid_rewrite bind_ret_l.
+      reflexivity.
+    Qed.
 
     Lemma denote_exp_GR :forall g l id v τ,
         Maps.lookup id g = Some v ->
@@ -195,19 +332,33 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       go.
       step.
       go.
+      rewrite concretize_if_no_undef_or_poison_dvalue_to_uvalue.
+      go.
+      cbn.
+      rewrite translate_ret.
+      go.
       reflexivity.
     Qed.
 
-    Lemma denote_exp_LR :forall g l id v τ,
-        Maps.lookup id l = Some v ->
-        ⟦ EXP_Ident (ID_Local id) at τ ⟧e2 g l ≈ Ret (l,(g,v)).
-    Proof using.
-      intros; cbn.
-      go.
-      step.
-      go.
-      reflexivity.
-    Qed.
+    (* This doesn't necessarily hold because we don't know if `v` was
+       concretized eagerly. We should know that `v` is equivalent to
+       the value on the left-hand-side, though.
+     *)
+    (* Lemma denote_exp_LR :forall g l id v τ, *)
+    (*     Maps.lookup id l = Some v -> *)
+    (*     ⟦ EXP_Ident (ID_Local id) at τ ⟧e2 g l ≈ Ret (l,(g,v)). *)
+    (* Proof using. *)
+    (*   intros; cbn. *)
+    (*   go. *)
+    (*   step. *)
+    (*   go. *)
+    (*   rewrite concretize_if_no_undef_or_poison_dvalue_to_uvalue. *)
+    (*   go. *)
+    (*   cbn. *)
+    (*   rewrite translate_ret. *)
+    (*   go. *)
+    (*   reflexivity. *)
+    (* Qed. *)
 
     Lemma denote_exp_i64 :forall t g l,
         ⟦ EXP_Integer (Integers.Int64.intval t) at (DTYPE_I 64) ⟧e2 g l
@@ -218,6 +369,11 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       go.
       rewrite repr_intval.
       rewrite map_ret.
+      go.
+      rewrite concretize_if_no_undef_or_poison_dvalue_to_uvalue.
+      go.
+      cbn.
+      rewrite translate_ret.
       go.
       reflexivity.
     Qed.
@@ -231,6 +387,11 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       go.
       rewrite map_ret.
       go.
+      rewrite concretize_if_no_undef_or_poison_dvalue_to_uvalue.
+      go.
+      cbn.
+      rewrite translate_ret.
+      go.
       reflexivity.
     Qed.
 
@@ -241,6 +402,9 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Proof using.
       intros; cbn.
       go.
+      cbn.
+      go.
+      cbn.
       reflexivity.
     Qed.
 
