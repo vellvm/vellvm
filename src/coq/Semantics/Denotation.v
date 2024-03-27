@@ -36,7 +36,8 @@ From Vellvm Require Import
      Semantics.Memory.MemBytes
      Semantics.ConcretizationParams
      Utils.ListUtil
-     DynamicValues.
+     DynamicValues
+     Handlers.Concretization.
 
 Require Import Ceres.Ceres.
 
@@ -158,9 +159,21 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     end.
 
   Definition pickUnique {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue
-    :=     if is_concrete uv
+    :=
+    if is_concrete uv
     then lift_err ret (uvalue_to_dvalue uv)
     else dv <- trigger (pick_unique_uvalue uv);; ret (proj1_sig dv).
+
+  (* Concretize values that are trivially deterministic *)
+  Definition concretize_if_no_undef_or_poison {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} (uv : uvalue) : M uvalue
+    := if contains_undef_or_poison uv
+       then ret uv
+       else
+         (* Since this `uvalue` is deterministic it should not matter
+            that we'll just pick a default uvalue for undef /
+            poison... No non-determinism will be lost. *)
+         dv <- concretize_uvalue uv;;
+         ret (dvalue_to_uvalue dv).
 
   (** ** Denotation of expressions
       [denote_exp top o] is the main entry point for evaluating itree expressions.
@@ -177,9 +190,9 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
      Expressions are denoted as itrees that return a [uvalue].
    *)
 
-  Fixpoint denote_exp
+  Fixpoint denote_exp'
            (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
-    let eval_texp '(dt,ex) := denote_exp (Some dt) ex
+    let eval_texp '(dt,ex) := denote_exp' (Some dt) ex
     in
     match o with
 
@@ -271,71 +284,75 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
            depends on whether it may raise UB, and how.
      *)
     | OP_IBinop iop dt op1 op2 =>
-      v1 <- denote_exp (Some dt) op1 ;;
-      v2 <- denote_exp (Some dt) op2 ;;
+      v1 <- denote_exp' (Some dt) op1 ;;
+      v2 <- denote_exp' (Some dt) op2 ;;
       ret (UVALUE_IBinop iop v1 v2)
 
     | OP_ICmp cmp dt op1 op2 =>
-      v1 <- denote_exp (Some dt) op1 ;;
-      v2 <- denote_exp (Some dt) op2 ;;
+      v1 <- denote_exp' (Some dt) op1 ;;
+      v2 <- denote_exp' (Some dt) op2 ;;
       ret (UVALUE_ICmp cmp v1 v2)
 
     | OP_FBinop fop fm dt op1 op2 =>
-      v1 <- denote_exp (Some dt) op1 ;;
-      v2 <- denote_exp (Some dt) op2 ;;
+      v1 <- denote_exp' (Some dt) op1 ;;
+      v2 <- denote_exp' (Some dt) op2 ;;
       ret (UVALUE_FBinop fop fm v1 v2)
 
     | OP_FCmp fcmp dt op1 op2 =>
-      v1 <- denote_exp (Some dt) op1 ;;
-      v2 <- denote_exp (Some dt) op2 ;;
+      v1 <- denote_exp' (Some dt) op1 ;;
+      v2 <- denote_exp' (Some dt) op2 ;;
       ret (UVALUE_FCmp fcmp v1 v2)
 
     | OP_Conversion conv dt_from op dt_to =>
-      v <- denote_exp (Some dt_from) op ;;
+      v <- denote_exp' (Some dt_from) op ;;
       ret (UVALUE_Conversion conv dt_from v dt_to)
 
     | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
-      vptr <- denote_exp (Some dt2) ptrval ;;
-      vs <- map_monad (fun '(dt, index) => denote_exp (Some dt) index) idxs ;;
+      vptr <- denote_exp' (Some dt2) ptrval ;;
+      vs <- map_monad (fun '(dt, index) => denote_exp' (Some dt) index) idxs ;;
       ret (UVALUE_GetElementPtr dt1 vptr vs)
 
     | OP_ExtractElement (dt_vec, vecop) (dt_idx, idx) =>
-        vec <- denote_exp (Some dt_vec) vecop ;;
-        idx <- denote_exp (Some dt_idx) idx ;;
+        vec <- denote_exp' (Some dt_vec) vecop ;;
+        idx <- denote_exp' (Some dt_idx) idx ;;
         ret (UVALUE_ExtractElement dt_vec vec idx)
 
     | OP_InsertElement (dt_vec, vecop) (dt_elt, eltop) (dt_idx, idx) =>
-        vec <- denote_exp (Some dt_vec) vecop ;;
-        elt <- denote_exp (Some dt_elt) eltop ;;
-        idx <- denote_exp (Some dt_idx) idx ;;
+        vec <- denote_exp' (Some dt_vec) vecop ;;
+        elt <- denote_exp' (Some dt_elt) eltop ;;
+        idx <- denote_exp' (Some dt_idx) idx ;;
         ret (UVALUE_InsertElement dt_vec vec elt idx)
 
     | OP_ShuffleVector (dt_vec1, vecop1) (dt_vec2, vecop2) (dt_mask, idxmask) =>
-        vec1 <- denote_exp (Some dt_vec1) vecop1 ;;
-        vec2 <- denote_exp (Some dt_vec2) vecop2 ;;
-        idxmask <- denote_exp (Some dt_mask) idxmask;;
+        vec1 <- denote_exp' (Some dt_vec1) vecop1 ;;
+        vec2 <- denote_exp' (Some dt_vec2) vecop2 ;;
+        idxmask <- denote_exp' (Some dt_mask) idxmask;;
         ret (UVALUE_ShuffleVector dt_vec1 vec1 vec2 idxmask)
 
     | OP_ExtractValue (dt, str) idxs =>
-        str <- denote_exp (Some dt) str ;;
+        str <- denote_exp' (Some dt) str ;;
         ret (UVALUE_ExtractValue dt str idxs)
 
     | OP_InsertValue (dt_str, strop) (dt_elt, eltop) idxs =>
-        str <- denote_exp (Some dt_str) strop ;;
-        elt <- denote_exp (Some dt_elt) eltop ;;
+        str <- denote_exp' (Some dt_str) strop ;;
+        elt <- denote_exp' (Some dt_elt) eltop ;;
         ret (UVALUE_InsertValue dt_str str dt_elt elt idxs)
 
     | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
-        cnd <- denote_exp (Some dt) cnd ;;
-        v1  <- denote_exp (Some dt1) op1 ;;
-        v2  <- denote_exp (Some dt2) op2 ;;
+        cnd <- denote_exp' (Some dt) cnd ;;
+        v1  <- denote_exp' (Some dt1) op1 ;;
+        v2  <- denote_exp' (Some dt2) op2 ;;
         ret (UVALUE_Select cnd v1 v2)
 
     | OP_Freeze (dt, e) =>
-      uv <- denote_exp (Some dt) e ;;
+      uv <- denote_exp' (Some dt) e ;;
       dv <- pick_your_poison uv;;
       ret (dvalue_to_uvalue dv)
     end.
+
+  Definition denote_exp (top:option dtyp) (o:exp dtyp) : itree exp_E uvalue
+    := uv <- denote_exp' top o;;
+       concretize_if_no_undef_or_poison uv.
 
   Arguments denote_exp _ : simpl nomatch.
 

@@ -2397,6 +2397,50 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | _ => false
     end.
 
+  (* Check if a uvalue contains any instances of `undef` or `poison` *)
+  Fixpoint contains_undef_or_poison (uv : uvalue) : bool :=
+    match uv with
+    | UVALUE_Struct fields
+    | UVALUE_Packed_struct fields =>
+        anyb contains_undef_or_poison fields
+    | UVALUE_Array elts
+    | UVALUE_Vector elts =>
+        anyb contains_undef_or_poison elts
+    | UVALUE_IBinop iop v1 v2 =>
+        contains_undef_or_poison v1 || contains_undef_or_poison v2
+    | UVALUE_ICmp cmp v1 v2 =>
+        contains_undef_or_poison v1 || contains_undef_or_poison v2
+    | UVALUE_FBinop fop fm v1 v2 =>
+        contains_undef_or_poison v1 || contains_undef_or_poison v2
+    | UVALUE_FCmp cmp v1 v2 =>
+        contains_undef_or_poison v1 || contains_undef_or_poison v2
+    | UVALUE_Conversion conv t_from v t_to =>
+        contains_undef_or_poison v
+    | UVALUE_GetElementPtr t ptrval idxs =>
+        contains_undef_or_poison ptrval || anyb contains_undef_or_poison idxs
+    | UVALUE_ExtractElement vec_typ vec idx =>
+        contains_undef_or_poison vec || contains_undef_or_poison idx
+    | UVALUE_InsertElement vec_typ vec elt idx =>
+        contains_undef_or_poison vec || contains_undef_or_poison elt || contains_undef_or_poison idx
+    | UVALUE_ShuffleVector vec_typ vec1 vec2 idxmask =>
+        contains_undef_or_poison vec1 || contains_undef_or_poison vec2 || contains_undef_or_poison idxmask
+    | UVALUE_ExtractValue vec_typ vec idxs =>
+        contains_undef_or_poison vec
+    | UVALUE_InsertValue vec_typ vec elt_typ elt idxs =>
+        contains_undef_or_poison vec || contains_undef_or_poison elt
+    | UVALUE_Select cnd v1 v2 =>
+        contains_undef_or_poison cnd || contains_undef_or_poison v1 || contains_undef_or_poison v2
+    | UVALUE_ExtractByte uv dt idx sid =>
+        contains_undef_or_poison uv
+    | UVALUE_ConcatBytes uvs dt =>
+        anyb contains_undef_or_poison uvs
+    | UVALUE_Poison _
+    | UVALUE_Undef _ =>
+        true
+    | _ =>
+        false
+    end.
+
   (* If both operands are concrete, uvalue_to_dvalue them and run them through
    opd, else run the abstract ones through opu *)
   Definition uvalue_to_dvalue_binop {A : Type}
