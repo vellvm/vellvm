@@ -172,7 +172,9 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
               induction args as [| a args IH]; intros; [reflexivity |].
               cbn.
               rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
-              destruct a; destruct t; cbn; rewrite opt_correct; reflexivity.
+              destruct a; destruct t; cbn;
+                setoid_rewrite opt_correct at 1;
+                reflexivity.
               intro2.
               rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq); [apply IH |].
               intro2.
@@ -193,7 +195,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
               induction args as [| a args IH]; intros; [reflexivity |].
               cbn.
               rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
-              destruct a; destruct t; cbn; rewrite opt_correct; reflexivity.
+              destruct a; destruct t; cbn; setoid_rewrite opt_correct at 1; reflexivity.
               intro2.
               rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq); [apply IH |].
               intro2.
@@ -213,7 +215,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
         - destruct x; cbn; try reflexivity.
           destruct ptr; cbn.
           rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
-          rewrite opt_correct; reflexivity.
+          setoid_rewrite opt_correct at 1; reflexivity.
           intro2.
           rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
           reflexivity.
@@ -225,10 +227,10 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
         - destruct x; cbn; try reflexivity.
           destruct ptr, val; cbn.
           rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
-          rewrite opt_correct; reflexivity.
+          setoid_rewrite opt_correct at 1; reflexivity.
           intro2.
           rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
-          rewrite opt_correct; reflexivity.
+          setoid_rewrite opt_correct at 1; reflexivity.
           intro2.
           rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
           reflexivity.
@@ -236,6 +238,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
           reflexivity.
       Qed.
 
+      Opaque denote_exp.
       Lemma exp_optim_correct_term : forall t g l,
           ⟦ t ⟧t2 g l ≈ ⟦ endo t ⟧t2 g l.
       Proof using opt_correct.
@@ -244,7 +247,10 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
         - destruct v.
           cbn.
           rewrite !translate_bind, !interp_cfg2_bind.
-          rewrite opt_correct; apply eutt_eq_bind.
+          rewrite opt_correct.
+          cbn.
+
+          apply eutt_eq_bind.
           intro2; reflexivity.
         - destruct v; cbn.
           rewrite !translate_bind, !interp_cfg2_bind.
