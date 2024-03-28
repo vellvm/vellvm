@@ -20536,7 +20536,537 @@ Qed.
           apply orutt_raise.
           intros ? ? CONTRA. inv CONTRA.
           cbn; auto.
-      + (*
+      + (* GetElementPtr *)
+        cbn.
+        eapply orutt_bind;
+          [ eapply H; eauto; repeat constructor | ].
+        intros ? ? REF.
+
+        (* TODO: Move this *)
+        Lemma uvalue_strict_subterm_gep_cons :
+          forall τ1 τ2 u uv_addr uv_idx uv_idxs,
+            uvalue_strict_subterm u (UVALUE_GetElementPtr τ1 uv_addr uv_idxs) ->
+            uvalue_strict_subterm u (UVALUE_GetElementPtr τ2 uv_addr (uv_idx :: uv_idxs)).
+        Proof.
+          intros τ1 τ2 u uv_addr uv_idx uv_idxs H.
+          dependent induction H.
+          - inv H.
+            repeat constructor.
+            eapply uvalue_getelementptr_strict_subterm.
+            apply Exists_In.
+            exists x.
+            split; cbn; auto.
+            apply rt_refl.
+          - specialize (IHclos_trans2 τ1 uv_addr uv_idxs eq_refl).
+            eapply t_trans.
+            apply H.
+            apply IHclos_trans2.
+        Qed.
+
+        eapply map_monad_oom_Forall2 in H2.
+        assert (Forall2 (fun (a : DV1.uvalue) (b : DV2.uvalue) => uvalue_convert_strict a = NoOom b /\ DV2.uvalue_strict_subterm b (DV2.UVALUE_GetElementPtr t u2 idxs)) x0 idxs).
+        { induction H2; cbn; auto.
+          constructor.
+          - split; eauto.
+            repeat constructor.
+          - forward IHForall2.
+            { intros ? ? ? ?.
+              apply H; eauto.
+              eapply uvalue_strict_subterm_gep_cons; eauto.
+            }
+
+            eapply Forall2_impl; eauto.
+            intros a b P.
+            cbn in P.
+            destruct P.
+            split; eauto.
+            eapply uvalue_strict_subterm_gep_cons; eauto.
+        }
+
+        eapply orutt_bind with (RR:=Forall2 dvalue_refine_strict).
+        { eapply map_monad_orutt2.
+          apply H0.
+
+          intros ? ? ?; cbn in *.
+          destruct H3 as (?&?).
+          eapply H; eauto.
+        }
+
+        intros ? ? ?.
+        unfold GEP.handle_gep,
+          IS1.LLVM.MEM.MP.GEP.handle_gep.
+        destruct r2;
+          dvalue_refine_strict_inv REF;
+          try solve
+            [ apply orutt_raise;
+              [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]
+            ].
+
+        remember (GEP.handle_gep_addr t a r3) as res.
+        destruct res as [res_err | [res | res_oom]];
+          symmetry in Heqres.
+        * eapply handle_gep_addr_err_fin_inf with (base_addr_inf:=x1) in Heqres; eauto.
+          2: {
+            (* TODO: Move this *)
+            Lemma addr_convert_safe_reverse :
+            forall a1 a2,
+              AC1.addr_convert a1 = NoOom a2 ->
+              AC2.addr_convert a2 = NoOom a1.
+            Proof.
+              intros a1 a2 H.
+              pose proof addr_refine_fin_to_inf_addr a2 as REF.
+              red in REF.
+              unfold fin_to_inf_addr in REF.
+              break_match_hyp.
+              clear Heqs.
+              rewrite e.
+              pose proof (AC1.addr_convert_injective _ _ _ H REF); subst; auto.
+            Qed.
+
+            apply addr_convert_safe_reverse; auto.
+          }
+
+          Lemma dvalue_refine_strict_map_fin_to_inf_dvalue :
+            forall a b,
+              Forall2 dvalue_refine_strict a b ->
+              a = map fin_to_inf_dvalue b.
+          Proof.
+            intros a b H.
+            induction H; cbn; auto.
+
+            subst.
+            unfold fin_to_inf_dvalue at 2.
+            break_match; clear Heqs.
+            destruct p.
+            red in H.
+            pose proof dvalue_refine_strict_R2_injective x y x0 y H e0 as (_&?).
+            rewrite H1; auto.
+          Qed.
+
+          erewrite <- dvalue_refine_strict_map_fin_to_inf_dvalue in Heqres; eauto.
+          rewrite Heqres.
+          cbn.
+          apply orutt_raise;
+            [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+        * eapply handle_gep_addr_fin_inf
+            with (base_addr_inf:=x1) (res_addr_inf:=fin_to_inf_addr res)
+            in Heqres; eauto.
+          2: apply addr_convert_safe_reverse; auto.
+          2: apply addr_convert_safe_reverse; auto; apply addr_refine_fin_to_inf_addr.
+
+          erewrite <- dvalue_refine_strict_map_fin_to_inf_dvalue in Heqres; eauto.
+          rewrite Heqres.
+          cbn.
+          apply orutt_Ret.
+          rewrite dvalue_refine_strict_equation.
+          cbn.
+          rewrite addr_refine_fin_to_inf_addr; reflexivity.
+        * cbn.
+          apply orutt_raiseOOM.
+      + (* ExtractElement *)
+        cbn.
+        eapply orutt_bind;
+          [ eapply H; eauto; repeat constructor | ].
+        intros ? ? REF.
+
+        eapply orutt_bind;
+          [ eapply H; eauto; repeat constructor | ].
+        intros ? ? REF2.
+
+        eapply orutt_bind with (RR:=eq).
+        { destruct vec_typ;
+            try solve
+              [ apply orutt_raise;
+                [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]
+              ].
+          apply orutt_Ret; auto.
+        }
+
+        intros ? ? ?; subst.
+
+        (* TODO: Move this *)
+        Lemma orutt_index_into_vec_dv :
+          forall τ dv1_1 dv2_1 dv1_2 dv2_2,
+            dvalue_refine_strict dv1_1 dv1_2 ->
+            dvalue_refine_strict dv2_1 dv2_2 ->
+            orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
+              (IS1.LP.Events.DV.index_into_vec_dv τ dv1_1 dv2_1) (index_into_vec_dv τ dv1_2 dv2_2)
+              (OOM:=OOME).
+        Proof.
+          intros τ dv1_1 dv2_1 dv1_2 dv2_2 REF1 REF2.
+          rewrite TLR1.index_into_vec_dv_err_ub_oom_to_itree,
+            TLR2.index_into_vec_dv_err_ub_oom_to_itree.
+
+          erewrite (fin_to_inf_dvalue_refine_strict' dv1_1); eauto.
+          erewrite (fin_to_inf_dvalue_refine_strict' dv2_1); eauto.
+
+          remember (index_into_vec_dv τ dv1_2 dv2_2) as res.
+          destruct_err_ub_oom res;
+            symmetry in Heqres.
+          - apply orutt_raiseOOM.
+          - apply index_into_vec_dv_no_ub in Heqres; contradiction.
+          - erewrite index_into_vec_dv_err_fin_inf; eauto.
+            apply orutt_raise;
+              [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+          - erewrite index_into_vec_dv_fin_inf; cbn; eauto.
+            apply orutt_Ret.
+            apply fin_to_inf_dvalue_refine_strict.
+        Qed.
+
+        apply orutt_index_into_vec_dv; auto.
+      + (* InsertElement *)
+        cbn.
+        eapply orutt_bind;
+          [ eapply H; eauto; repeat constructor | ].
+        intros ? ? REF.
+
+        eapply orutt_bind;
+          [ eapply H; eauto; repeat constructor | ].
+        intros ? ? REF2.
+
+        eapply orutt_bind;
+          [ eapply H; eauto; repeat constructor | ].
+        intros ? ? REF3.
+
+        (* TODO: Move this *)
+        Lemma orutt_insert_into_vec_dv :
+          forall τ dv1_1 dv2_1 dv3_1 dv1_2 dv2_2 dv3_2,
+            dvalue_refine_strict dv1_1 dv1_2 ->
+            dvalue_refine_strict dv2_1 dv2_2 ->
+            dvalue_refine_strict dv3_1 dv3_2 ->
+            orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
+              (IS1.LP.Events.DV.insert_into_vec_dv τ dv1_1 dv2_1 dv3_1) (insert_into_vec_dv τ dv1_2 dv2_2 dv3_2)
+              (OOM:=OOME).
+        Proof.
+          intros τ dv1_1 dv2_1 dv3_1 dv1_2 dv2_2 dv3_2 REF1 REF2 REF3.
+          rewrite TLR1.insert_into_vec_dv_err_ub_oom_to_itree,
+            TLR2.insert_into_vec_dv_err_ub_oom_to_itree.
+
+          erewrite (fin_to_inf_dvalue_refine_strict' dv1_1); eauto.
+          erewrite (fin_to_inf_dvalue_refine_strict' dv2_1); eauto.
+          erewrite (fin_to_inf_dvalue_refine_strict' dv3_1); eauto.
+
+          remember (insert_into_vec_dv τ dv1_2 dv2_2 dv3_2) as res.
+          destruct_err_ub_oom res;
+            symmetry in Heqres.
+          - apply orutt_raiseOOM.
+          - apply insert_into_vec_dv_no_ub_fin_inf in Heqres; contradiction.
+          - erewrite insert_into_vec_dv_err_fin_inf; eauto.
+            apply orutt_raise;
+              [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+          - erewrite insert_into_vec_dv_fin_inf; cbn; eauto.
+            apply orutt_Ret.
+            apply fin_to_inf_dvalue_refine_strict.
+        Qed.
+
+        apply orutt_insert_into_vec_dv; auto.
+      + (* ShuffleVector *)
+        cbn.
+        (* Currently unimplemented, but will be similar to insert case above *)
+        apply orutt_raise;
+          [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+      + (* ExtractValue *)
+        cbn.
+        eapply orutt_bind;
+          [ eapply H; eauto; repeat constructor | ].
+        intros ? ? REF.
+
+        (* TODO: Move this *)
+        Lemma extract_value_loop_fin_inf_no_ub :
+          forall idxs str msg,
+            (fix loop str idxs {struct idxs} : err_ub_oom dvalue :=
+               match idxs with
+               | [] => ret str
+               | i :: tl =>
+                   v <- index_into_str_dv str i ;;
+                   loop v tl
+               end) str idxs = UB_unERR_UB_OOM msg -> False.
+        Proof.
+          induction idxs;
+            intros str res LOOP.
+          - inv LOOP; auto.
+          - cbn in LOOP.
+            repeat break_match_hyp_inv.
+            destruct unERR_UB_OOM, unEitherT, unEitherT, unEitherT, unIdent;
+              inv Heqs.
+            + apply index_into_str_dv_no_ub_fin_inf in Heqe; auto.
+            + match goal with
+              | H: EitherMonad.unEitherT
+                     (EitherMonad.unEitherT
+                        (EitherMonad.unEitherT
+                           (Error.unERR_UB_OOM
+                              (?L)))) = _ |- _ =>
+                  remember L as LOOP
+              end.
+
+            destruct_err_ub_oom LOOP; inv H1.
+            symmetry in HeqLOOP.
+            apply IHidxs in HeqLOOP; auto.
+        Qed.
+
+        (* TODO: Move this *)
+        Lemma orutt_extractvalue_loop :
+          forall dv1 dv2 idxs,
+            dvalue_refine_strict dv1 dv2 ->
+            orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
+              ((fix loop (str : IS1.LP.Events.DV.dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} :
+                 itree IS1.LP.Events.exp_E IS1.LP.Events.DV.dvalue :=
+                  match idxs0 with
+                  | [] => Ret str
+                  | i :: tl =>
+                      ITree.bind (IS1.LP.Events.DV.index_into_str_dv str i)
+                        (fun v : IS1.LP.Events.DV.dvalue => loop v tl)
+                  end) dv1 idxs)
+              ((fix loop (str : dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} : itree exp_E dvalue :=
+                  match idxs0 with
+                  | [] => Ret str
+                  | i :: tl => ITree.bind (index_into_str_dv str i) (fun v : dvalue => loop v tl)
+                  end) dv2 idxs)
+              (OOM:=OOME).
+        Proof.
+          intros dv1 dv2 idxs REF.
+          setoid_rewrite TLR1.extract_value_loop_err_ub_oom_to_itree;
+            setoid_rewrite TLR2.extract_value_loop_err_ub_oom_to_itree.
+
+          erewrite (fin_to_inf_dvalue_refine_strict' dv1); eauto.
+
+          remember
+            ((fix loop (str : dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} : err_ub_oom dvalue :=
+                match idxs0 with
+                | [] => ret str
+                | i :: tl => v <- index_into_str_dv str i;; loop v tl
+                end) dv2 idxs) as res.
+          destruct_err_ub_oom res;
+            symmetry in Heqres.
+          - apply orutt_raiseOOM.
+          - apply extract_value_loop_fin_inf_no_ub in Heqres; contradiction.
+          - erewrite extract_value_loop_fin_inf_err; eauto.
+            apply orutt_raise;
+              [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+          - erewrite extract_value_loop_fin_inf_succeeds; cbn; eauto.
+            apply orutt_Ret.
+            apply fin_to_inf_dvalue_refine_strict.
+        Qed.
+
+        apply orutt_extractvalue_loop; auto.
+      + (* InsertValue *)
+        cbn.
+        eapply orutt_bind;
+          [ eapply H; eauto; repeat constructor | ].
+        intros ? ? REF.
+
+        eapply orutt_bind;
+          [ eapply H; eauto; repeat constructor | ].
+        intros ? ? REF2.
+
+        Lemma orutt_insert_value_loop :
+          forall dv1 dv2 dv1' dv2' idxs,
+            dvalue_refine_strict dv1 dv2 ->
+            dvalue_refine_strict dv1' dv2' ->
+            orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
+              ((fix loop (str : IS1.LP.Events.DV.dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} :
+                 itree IS1.LP.Events.exp_E IS1.LP.Events.DV.dvalue :=
+                  match idxs0 with
+                  | [] => LLVMEvents.raise "Index was not provided"
+                  | [i] =>
+                      ITree.bind (IS1.LP.Events.DV.insert_into_str str dv1' i)
+                        (fun v : IS1.LP.Events.DV.dvalue => Ret v)
+                  | i :: (_ :: _) as tl =>
+                      ITree.bind (IS1.LP.Events.DV.index_into_str_dv str i)
+                        (fun subfield : IS1.LP.Events.DV.dvalue =>
+                           ITree.bind (loop subfield tl)
+                             (fun modified_subfield : IS1.LP.Events.DV.dvalue =>
+                                IS1.LP.Events.DV.insert_into_str str modified_subfield i))
+                  end) dv1 idxs)
+              ((fix loop (str : dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} : itree exp_E dvalue :=
+                  match idxs0 with
+                  | [] => LLVMEvents.raise "Index was not provided"
+                  | [i] => ITree.bind (insert_into_str str dv2' i) (fun v : dvalue => Ret v)
+                  | i :: (_ :: _) as tl =>
+                      ITree.bind (index_into_str_dv str i)
+                        (fun subfield : dvalue =>
+                           ITree.bind (loop subfield tl)
+                             (fun modified_subfield : dvalue => insert_into_str str modified_subfield i))
+                  end) dv2 idxs)
+              (OOM:=OOME).
+        Proof.
+          intros dv1 dv2 dv1' dv2' idxs REF1 REF2.
+          setoid_rewrite TLR1.insert_value_loop_err_ub_oom_to_itree;
+            setoid_rewrite TLR2.insert_value_loop_err_ub_oom_to_itree.
+
+          erewrite (fin_to_inf_dvalue_refine_strict' dv1); eauto.
+          erewrite (fin_to_inf_dvalue_refine_strict' dv1'); eauto.
+
+          erewrite insert_value_loop_fin_inf_succeeds; eauto.
+          remember
+            ((fix loop (str : dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} : err_ub_oom dvalue :=
+                match idxs0 with
+                | [] => raise_error "Index was not provided"
+                | [i] => v <- insert_into_str str dv2' i;; ret v
+                | i :: (_ :: _) as tl =>
+                    subfield <- index_into_str_dv str i;;
+                    modified_subfield <- loop subfield tl;; insert_into_str str modified_subfield i
+                end) dv2 idxs) as res.
+          destruct_err_ub_oom res;
+            symmetry in Heqres; cbn.
+          - apply orutt_raiseOOM.
+          - apply orutt_raiseUB;
+              [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+          - apply orutt_raise;
+              [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+          - apply orutt_Ret.
+            apply fin_to_inf_dvalue_refine_strict.
+        Qed.
+
+        apply orutt_insert_value_loop; auto.
+      + 
+
+
+        eapply orutt_bind with (RR:=eq).
+        { destruct vec_typ;
+            try solve
+              [ apply orutt_raise;
+                [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]
+              ].
+          apply orutt_Ret; auto.
+        }
+
+        intros ? ? ?; subst.
+
+        (* TODO: Move this *)
+        Lemma orutt_index_into_vec_dv :
+          forall τ dv1_1 dv2_1 dv1_2 dv2_2,
+            dvalue_refine_strict dv1_1 dv1_2 ->
+            dvalue_refine_strict dv2_1 dv2_2 ->
+            orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
+              (IS1.LP.Events.DV.index_into_vec_dv τ dv1_1 dv2_1) (index_into_vec_dv τ dv1_2 dv2_2)
+              (OOM:=OOME).
+        Proof.
+          intros τ dv1_1 dv2_1 dv1_2 dv2_2 REF1 REF2.
+          rewrite TLR1.index_into_vec_dv_err_ub_oom_to_itree,
+            TLR2.index_into_vec_dv_err_ub_oom_to_itree.
+
+          erewrite (fin_to_inf_dvalue_refine_strict' dv1_1); eauto.
+          erewrite (fin_to_inf_dvalue_refine_strict' dv2_1); eauto.
+
+          remember (index_into_vec_dv τ dv1_2 dv2_2) as res.
+          destruct_err_ub_oom res;
+            symmetry in Heqres.
+          - apply orutt_raiseOOM.
+          - apply index_into_vec_dv_no_ub in Heqres; contradiction.
+          - erewrite index_into_vec_dv_err_fin_inf; eauto.
+            apply orutt_raise;
+              [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+          - erewrite index_into_vec_dv_fin_inf; cbn; eauto.
+            apply orutt_Ret.
+            apply fin_to_inf_dvalue_refine_strict.
+        Qed.
+
+        apply orutt_index_into_vec_dv; auto. 
+
+
+        eapply map_monad_oom_Forall2 in H2.
+        assert (Forall2 (fun (a : DV1.uvalue) (b : DV2.uvalue) => uvalue_convert_strict a = NoOom b /\ DV2.uvalue_strict_subterm b (DV2.UVALUE_GetElementPtr t u2 idxs)) x0 idxs).
+        { induction H2; cbn; auto.
+          constructor.
+          - split; eauto.
+            repeat constructor.
+          - forward IHForall2.
+            { intros ? ? ? ?.
+              apply H; eauto.
+              eapply uvalue_strict_subterm_gep_cons; eauto.
+            }
+
+            eapply Forall2_impl; eauto.
+            intros a b P.
+            cbn in P.
+            destruct P.
+            split; eauto.
+            eapply uvalue_strict_subterm_gep_cons; eauto.
+        }
+
+        eapply orutt_bind with (RR:=Forall2 dvalue_refine_strict).
+        { eapply map_monad_orutt2.
+          apply H0.
+
+          intros ? ? ?; cbn in *.
+          destruct H3 as (?&?).
+          eapply H; eauto.
+        }
+
+        intros ? ? ?.
+        unfold GEP.handle_gep,
+          IS1.LLVM.MEM.MP.GEP.handle_gep.
+        destruct r2;
+          dvalue_refine_strict_inv REF;
+          try solve
+            [ apply orutt_raise;
+              [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]
+            ].
+
+        remember (GEP.handle_gep_addr t a r3) as res.
+        destruct res as [res_err | [res | res_oom]];
+          symmetry in Heqres.
+        * eapply handle_gep_addr_err_fin_inf with (base_addr_inf:=x1) in Heqres; eauto.
+          2: {
+            (* TODO: Move this *)
+            Lemma addr_convert_safe_reverse :
+            forall a1 a2,
+              AC1.addr_convert a1 = NoOom a2 ->
+              AC2.addr_convert a2 = NoOom a1.
+            Proof.
+              intros a1 a2 H.
+              pose proof addr_refine_fin_to_inf_addr a2 as REF.
+              red in REF.
+              unfold fin_to_inf_addr in REF.
+              break_match_hyp.
+              clear Heqs.
+              rewrite e.
+              pose proof (AC1.addr_convert_injective _ _ _ H REF); subst; auto.
+            Qed.
+
+            apply addr_convert_safe_reverse; auto.
+          }
+
+          Lemma dvalue_refine_strict_map_fin_to_inf_dvalue :
+            forall a b,
+              Forall2 dvalue_refine_strict a b ->
+              a = map fin_to_inf_dvalue b.
+          Proof.
+            intros a b H.
+            induction H; cbn; auto.
+
+            subst.
+            unfold fin_to_inf_dvalue at 2.
+            break_match; clear Heqs.
+            destruct p.
+            red in H.
+            pose proof dvalue_refine_strict_R2_injective x y x0 y H e0 as (_&?).
+            rewrite H1; auto.
+          Qed.
+
+          erewrite <- dvalue_refine_strict_map_fin_to_inf_dvalue in Heqres; eauto.
+          rewrite Heqres.
+          cbn.
+          apply orutt_raise;
+            [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+        * eapply handle_gep_addr_fin_inf
+            with (base_addr_inf:=x1) (res_addr_inf:=fin_to_inf_addr res)
+            in Heqres; eauto.
+          2: apply addr_convert_safe_reverse; auto.
+          2: apply addr_convert_safe_reverse; auto; apply addr_refine_fin_to_inf_addr.
+
+          erewrite <- dvalue_refine_strict_map_fin_to_inf_dvalue in Heqres; eauto.
+          rewrite Heqres.
+          cbn.
+          apply orutt_Ret.
+          rewrite dvalue_refine_strict_equation.
+          cbn.
+          rewrite addr_refine_fin_to_inf_addr; reflexivity.
+        * cbn.
+          apply orutt_raiseOOM.
+        
+        
 
           
           remember (ITOP.int_to_ptr (dvalue_int_unsigned x0) PROV.wildcard_prov) as p.
