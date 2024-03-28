@@ -230,8 +230,6 @@ with Definition access_allowed := fun (pr : Prov) (aid : AllocationId)
     destruct H; subst; auto.
     right.
     intros CONTRA. inv CONTRA; contradiction.
-    right; intros CONTRA; inv CONTRA.
-    right; intros CONTRA; inv CONTRA.
   Qed.
 
   Lemma aid_eq_dec_refl :

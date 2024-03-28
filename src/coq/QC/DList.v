@@ -23,7 +23,7 @@ Section DList.
 
   Definition DList_from_list {A} (l : list A) : DList A
     := fold_left (fun x s => DList_append x (DList_singleton s)) l DList_empty.
-  
+
   Definition DList_map {A B} (f : A -> B) (dl : DList A) : DList B
     := fold_right (fun a => DList_cons (f a)) (@DList_empty B) (DList_to_list dl).
 

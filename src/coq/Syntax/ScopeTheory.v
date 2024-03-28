@@ -7,8 +7,7 @@ From Vellvm Require Import
      Numeric.Coqlib
      Utilities
      Syntax.
-
-From ExtLib Require Import List.
+From stdpp Require Import base fin_maps fin_map_dom.
 
 Set Implicit Arguments.
 Set Strict Implicit.
@@ -26,37 +25,41 @@ Section LABELS_THEORY.
   Context {T : Set}.
 
   Lemma inputs_app: forall (l l' : ocfg T),
-      @inputs T (l ++ l') = inputs l ++ inputs l'.
+      @inputs T (l ∪ l') = inputs l ∪ inputs l'.
   Proof using.
     intros.
-    unfold inputs at 1.
-    rewrite map_app; auto.
+    unfold inputs.
+    (* Is this good style? *)
+    unfold_leibniz.
+    apply dom_union.
   Qed.
 
-  Lemma inputs_cons: forall b (l : ocfg T),
-      @inputs T (b :: l) = blk_id b :: inputs l.
-  Proof using.
-    intros.
-    rewrite list_cons_app, inputs_app; reflexivity.
-  Qed.
+  (* Lemma inputs_cons: forall b (l : ocfg T), *)
+  (*     @inputs T (b :: l) = blk_id b :: inputs l. *)
+  (* Proof using. *)
+  (*   intros. *)
+  (*   rewrite list_cons_app, inputs_app; reflexivity. *)
+  (* Qed. *)
 
-  Lemma outputs_acc: forall (bks: ocfg T) acc,
-      fold_left (fun acc bk => acc ++ successors bk) bks acc =
-      acc ++ fold_left (fun acc bk => acc ++ successors bk) bks [].
-  Proof using.
-    induction bks using list_rev_ind; intros; cbn.
-    - rewrite app_nil_r; reflexivity.
-    - rewrite 2 fold_left_app, IHbks.
-      cbn.
-      rewrite app_assoc.
-      reflexivity.
-  Qed.
+  (* Lemma outputs_acc: forall (bks: ocfg T) acc, *)
+  (*     fold_left (fun acc bk => acc ++ successors bk) bks acc = *)
+  (*     acc ++ fold_left (fun acc bk => acc ++ successors bk) bks []. *)
+  (* Proof using. *)
+  (*   induction bks using list_rev_ind; intros; cbn. *)
+  (*   - rewrite app_nil_r; reflexivity. *)
+  (*   - rewrite 2 fold_left_app, IHbks. *)
+  (*     cbn. *)
+  (*     rewrite app_assoc. *)
+  (*     reflexivity. *)
+  (* Qed. *)
 
   Lemma outputs_app: forall (l l' : ocfg T),
-      @outputs T (l ++ l') = outputs l ++ outputs l'.
+      @outputs T (l ∪ l') = outputs l ∪ outputs l'.
   Proof using.
-    intros.
+    intros l.
+    
     unfold outputs at 1.
+    unfold_leibniz.
     rewrite fold_left_app, outputs_acc.
     reflexivity.
   Qed.

@@ -3,6 +3,7 @@
     standard format for .ll files. The result of show on a Vellvm
     program should give you a string that can be read by clang.
  *)
+From stdpp Require Import base strings.
 
 From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG DynamicTypes DList.
 
@@ -694,10 +695,10 @@ tes on cstring on LLVMAst.v *)
     string_to_DString "[ " @@ dshow_exp true e @@ list_to_DString [", "; "%"] @@ dshow bid @@ string_to_DString " ]".
 
   Definition intersperse (sep : string) (l : list string) : string
-    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else acc ++ sep ++ s) l "".
+    := fold_left (fun acc s => if "" =d acc then s else acc ++ sep ++ s) l "".
 
   Definition dintersperse (sep : DString) (l : list DString) : DString
-    := fold_left (fun acc s => if StringOrdFacts.eqb "" (DString_to_string acc) then s else acc @@ sep @@ s) l (string_to_DString "").
+    := fold_left (fun acc s => if "" =d DString_to_string acc then s else acc @@ sep @@ s) l (string_to_DString "").
 
   Fixpoint dconcat (sep : DString) (ls : list DString) :=
     match ls with
@@ -1096,8 +1097,9 @@ tes on cstring on LLVMAst.v *)
                               (blk_phis b)) in
     let code   := dshow_code indent (blk_code b) in
     let term   := DList_join [ind ; dshow (blk_term b) ; dnewline] in
-    DList_join [dshow (blk_id b); string_to_DString ":"; dnewline]
-         @@ phis
+    (* DList_join [dshow (blk_id b); string_to_DString ":"; dnewline] *)
+         (* @@ *)
+         phis
          @@ code
          @@ term.
 
@@ -1134,7 +1136,7 @@ tes on cstring on LLVMAst.v *)
     let arg_str := concat_DString (string_to_DString ", ") (map dshow args)
     in
     string_to_DString "(" @@ arg_str @@ vararg_str @@ string_to_DString ")".
-  
+
 End ShowInstances.
 
 (* TODO: REALLY?!? *)

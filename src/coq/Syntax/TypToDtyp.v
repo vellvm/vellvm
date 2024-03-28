@@ -1,15 +1,16 @@
 (* begin hide *)
-
+From stdpp Require Import base fin_maps gmap.
 
 From Vellvm Require Import
-     Utils.Util
-     Utils.ListUtil
-     Utils.Tactics
-     Syntax.LLVMAst
-     Syntax.AstLib
-     Syntax.CFG
-     Syntax.Traversal
-     Syntax.DynamicTypes.
+  Utilities
+  Utils.Util
+  Utils.ListUtil
+  Utils.Tactics
+  Syntax.LLVMAst
+  Syntax.AstLib
+  Syntax.CFG
+  Syntax.Traversal
+  Syntax.DynamicTypes.
 
 Require Import Coqlib.
 
@@ -75,7 +76,7 @@ Ltac destruct_prod :=
 Ltac destruct_eq_dec :=
   match goal with
   | [ eq: forall x y : ?A , {x = y} + {x <> y} |- context[eq ?a ?b] ] => destruct (eq a b) eqn:?; simpl
-  | [ |- context[Ident.eq_dec ?a ?b] ] => destruct (Ident.eq_dec a b) eqn:?; simpl
+  | [ |- context[?a =d ?b] ] => destruct (a =? b) eqn:?; simpl
   end.
 
 Lemma remove_key_in :
@@ -120,10 +121,10 @@ Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List
     DTYPE_Vector sz nt
 
   | TYPE_Identified id =>
-    let opt := find (fun a => Ident.eq_dec id (fst a)) env in
+    let opt := find (fun a => id =d fst a) env in
     match opt with
     | None => DTYPE_Void   (* TODO: should this be None? *)
-    | Some (_, t) => typ_to_dtyp (remove_key Ident.eq_dec id env) t
+    | Some (_, t) => typ_to_dtyp (remove_key (fun x y => base.decide (x = y)) id env) t
     end
 
   | TYPE_I sz => DTYPE_I sz
@@ -144,7 +145,7 @@ Next Obligation.
   left.
   symmetry in Heq_opt. apply find_some in Heq_opt. destruct Heq_opt as [Hin Heqb_ident].
   simpl in Heqb_ident.
-  destruct (Ident.eq_dec id wildcard'). subst. eapply remove_key_in. apply Hin.
+  destruct (id =d wildcard'). subst. eapply remove_key_in. apply Hin.
   inversion Heqb_ident.
 Defined.
 
@@ -171,10 +172,10 @@ Lemma typ_to_dtyp_equation  : forall env t,
       DTYPE_Vector sz nt
 
     | TYPE_Identified id =>
-      let opt := find (fun a => Ident.eq_dec id (fst a)) env in
+      let opt := find (fun a => id =d fst a) env in
       match opt with
       | None => DTYPE_Void   (* TODO: should this be None? *)
-      | Some (_, t) => typ_to_dtyp (remove_key Ident.eq_dec id env) t
+      | Some (_, t) => typ_to_dtyp (remove_key (fun x y => decide (x = y)) id env) t
       end
 
     | TYPE_I sz => DTYPE_I sz
@@ -197,7 +198,7 @@ Proof using.
   unfold typ_to_dtyp_func at 1.
   rewrite Wf.WfExtensionality.fix_sub_eq_ext.
   destruct t; try reflexivity. simpl.
-  destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) env).
+  destruct (find (fun a : ident * typ => id =d fst a) env).
   destruct p; simpl; eauto.
   reflexivity.
 Defined.
@@ -263,7 +264,10 @@ Section ConvertTyp.
 
   #[global] Instance ConvertTyp_declaration : ConvertTyp declaration :=
     fun env => tfmap (typ_to_dtyp env).
-  
+
+  #[global] Instance ConvertTyp_ocfg : ConvertTyp ocfg :=
+    fun env => tfmap (typ_to_dtyp env).
+
   #[global] Instance ConvertTyp_cfg : ConvertTyp cfg :=
     fun env => tfmap (typ_to_dtyp env).
 
@@ -291,9 +295,11 @@ Qed.
 Definition convert_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
   convert_typ (m_type_defs CFG) CFG.
 
-Lemma convert_typ_ocfg_app : forall (a b : ocfg typ) env, (convert_typ env (a ++ b) = convert_typ env a ++ convert_typ env b)%list.
+Lemma convert_typ_ocfg_app : forall (a b : ocfg typ) env, (convert_typ env (a ∪ b) = convert_typ env a ∪ convert_typ env b)%list.
 Proof using.
-  intros; rewrite convert_typ_list_app; reflexivity.
+  intros.
+  unfold convert_typ, ConvertTyp_ocfg, tfmap, TFunctor_ocfg.
+  rewrite map_fmap_union; reflexivity.
 Qed.
 
 Lemma convert_typ_code_app : forall (a b : code typ) env, (convert_typ env (a ++ b) = convert_typ env a ++ convert_typ env b)%list.

@@ -56,8 +56,7 @@ Section Helpers.
     | [] => true
     | _ => false
     end.
-                                                
-  
+
   Fixpoint is_sized_type_h (t : typ) : bool
     := match t with
        | TYPE_I sz => true
@@ -195,7 +194,7 @@ Section GenerationState.
         ; num_raw    := 0
         ; num_global := 0
         ; num_blocks := 0
-        ; gen_local_ctx  := [] 
+        ; gen_local_ctx  := []
         ; gen_global_ctx := []
         ; gen_typ_ctx    := []
         ; gen_ptrtoint_ctx := []
@@ -311,7 +310,7 @@ Section GenerationState.
        |}.
 
   Definition GenLLVM := (eitherT string (stateT (list string) (stateT GenState G))).
-  
+
   (* Need this because extlib doesn't declare this instance as global :|. *)
   #[global] Instance monad_stateT {s m} `{Monad m} : Monad (stateT s m).
   Proof.
@@ -353,7 +352,7 @@ Section GenerationState.
 
   Definition get_local_ctx : GenLLVM var_context
     := gets (fun gs => gs.(gen_local_ctx)).
-  
+
   Definition get_global_ctx : GenLLVM var_context
     := gets (fun gs => gs.(gen_global_ctx)).
 
@@ -408,7 +407,7 @@ Section GenerationState.
            set_local_ctx local_ctx;;
            set_ptrtoint_ctx ptoi_ctx
        end.
-  
+
   #[global] Instance STGST : Monad (stateT GenState G).
   apply Monad_stateT.
   typeclasses eauto.
@@ -423,7 +422,7 @@ Section GenerationState.
   (* GC: For following, I will leave pieces defined in another way so I can learn more about how to use monad *)
   (* Definition lift_GenLLVM {A} (g : G A) : GenLLVM A := *)
   (* mkEitherT (mkStateT (fun stack => mkStateT (fun st => a <- g;; ret (inr a, stack, st)))). *)
-  
+
   Definition lift_GenLLVM {A} (g : G A) : GenLLVM A.
     unfold GenLLVM.
     apply mkEitherT.
@@ -434,20 +433,20 @@ Section GenerationState.
     refine (fun st => a <- g ;; ret _).
     exact (inr a, stack, st).
   Defined.
-  
+
   #[global] Instance MGENT: MonadT GenLLVM G.
   unfold GenLLVM.
   constructor.
   exact @lift_GenLLVM.
   Defined.
-  
-  (* SAZ: 
+
+  (* SAZ:
      [failGen] was the one piece of the backtracking variant of QuickChick we
-     needed.  
+     needed.
    *)
   (* Definition failGen {A:Type} (s:string) : GenLLVM A := *)
   (* mkEitherT (mkStateT (fun stack => ret (inl s, stack))). *)
-  
+
   Definition failGen {A:Type} (s:string) : GenLLVM A.
     apply mkEitherT.
     apply mkStateT.
@@ -456,8 +455,8 @@ Section GenerationState.
   Defined.
 
   (* Definition popStack {A : Type} (g:GenLLVM A) : stateT (list string) (stateT GenState G) A. *)
-  
-  
+
+
   (* Definition debugGen {A:Type} (g :GenLLVM A) : GenLLVM A. *)
   (*   unfold GenLLVM. *)
   (*   apply mkEitherT. *)
@@ -475,7 +474,7 @@ Section GenerationState.
   (*                               let ans := runStateT ann st in ans *)
   (*                  )) *)
   (*     )). *)
-  
+
   Definition annotate {A:Type} (s:string) (g : GenLLVM A) : GenLLVM A.
     apply mkEitherT.
     apply mkStateT.
@@ -530,8 +529,8 @@ Section GenerationState.
   (*   annotate (placement ++ "FinishGN : " ++ s) *)
   (*     (g) *)
   (* . *)
-  
-  
+
+
   (* Definition flush {A : Type} (g : GenLLVM A) : GenLLVM A. *)
   (*   unfold GenLLVM. *)
   (*   apply mkEitherT. *)
@@ -618,7 +617,7 @@ Section GenerationState.
 
   Definition reset_global_ctx : GenLLVM unit
     := modify (replace_global_ctx []);; ret tt.
-  
+
   Definition reset_ctx : GenLLVM unit
     := reset_local_ctx;;
        reset_global_ctx.
@@ -636,7 +635,7 @@ Section GenerationState.
     := global_ctx <- get_global_ctx;;
        modify (replace_global_ctx (rev global_ctx));;
        ret tt.
-  
+
   Definition hide_local_ctx {A} (g : GenLLVM A) : GenLLVM A
     := saved_local_ctx <- get_local_ctx;;
        reset_local_ctx;;
@@ -692,11 +691,11 @@ Section GenerationState.
        a <- g;;
        rev_global_ctx;;
        ret a.
-  
+
   (** Restore all variable contexts after running a generator. *)
   Definition backtrack_variable_ctxs {A} (g: GenLLVM A) : GenLLVM A
     := backtrack_ctx (backtrack_ptrtoint_ctx g).
-  
+
   (* Elems implemented with reservoir sampling *)
   Definition elems_res {A} (def : G A) (l : list A) : G A
     := fst
@@ -711,7 +710,7 @@ Section GenerationState.
                    gacc
                in (gen', (k+1)%N))
             l (def, 0%N)).
-  
+
   Definition oneOf_LLVM {A} (gs : list (GenLLVM A)) : GenLLVM A
     := fst
          (fold_left
@@ -796,7 +795,7 @@ Section GenerationState.
         mkStateT
           (fun st => freq_ failGen (fmap (fun '(n, g) => (n, runStateT g st)) gs)).
    *)
-    
+
 
   Definition thunkGen_LLVM {A} (thunk : unit -> GenLLVM A) : GenLLVM A
     := u <- ret tt;;
@@ -893,7 +892,7 @@ Section GenerationState.
     refine (let ann := runStateT opt stack in _).
     refine (let ans := runStateT ann st in ans).
     Defined.
-  
+
   (* Definition sized_LLVM {A : Type} (gn : nat -> GenLLVM A) : GenLLVM A *)
   (*   := mkEitherT (mkStateT *)
   (*                   (fun st => sized (fun n => runStateT (unEitherT (gn n)) st))). *)
@@ -909,7 +908,7 @@ Section GenerationState.
     refine (let ans := runStateT ann st in _).
     refine (resize sz ans).
     Defined.
-  
+
   (* Definition resize_LLVM {A : Type} (sz : nat) (g : GenLLVM A) : GenLLVM A *)
   (*   := mkEitherT (mkStateT *)
   (*                   (fun st => resize sz (runStateT (unEitherT g) st))). *)
@@ -924,7 +923,7 @@ Section GenerationState.
     := sized_LLVM (fun n =>
                      k <- lift (choose (1, n)%nat);;
                      vectorOf_LLVM k g).
-  
+
   (* Definition flush_ERR {A} (g : GenLLVM A) : GenLLVM A. *)
   (*   apply mkEitherT. *)
   (*   apply mkStateT. *)
@@ -948,14 +947,14 @@ Section GenerationState.
       | inr _ => err_a
       end in
     ret flushed_err.
-    
+
   (* Definition run_GenLLVM {A} (g : GenLLVM A) : G (string + A). *)
   (*   refine (let opt := unEitherT g in _). *)
   (*   refine (let ann := runStateT opt [] in _). *)
   (*   refine (let ans := runStateT ann init_GenState in _). *)
   (*   refine (fmap fst (fmap fst ans)). *)
   (*   Defined. *)
-  
+
   (* Definition run_GenLLVM {A} (g : GenLLVM A) : G (string + A) *)
   (*   := fmap fst (runStateT (unEitherT g) init_GenState). *)
 
@@ -1286,9 +1285,9 @@ End TypGenerators.
 
 Section ExpGenerators.
 
-  (* SAZ: Here there were old uses of [failGen] that I replaced (arbitrarily) with the 
+  (* SAZ: Here there were old uses of [failGen] that I replaced (arbitrarily) with the
      last element of the non-empty list. *)
-  
+
   Definition gen_ibinop : G ibinop :=
      oneOf_ (ret Xor) (* SAZ: This default case is a hack *)
            [ ret LLVMAst.Add <*> ret false <*> ret false
@@ -1952,7 +1951,7 @@ Section InstrGenerators.
     typ_ctx <- get_typ_ctx;;
     ctx <- get_ctx;;
     ret (filter_sized_ptr_typs typ_ctx ctx).
-  
+
   (* Index path without getting into vector *)
   Fixpoint get_index_paths_insertvalue_aux (t_from : typ) (pre_path : DList Z) (ctx : list (ident * typ)) {struct t_from}: bool * DList (typ * DList (Z)) :=
     match t_from with
@@ -2353,7 +2352,7 @@ Section InstrGenerators.
                                    ret (opt_err_add_state st opt)
                       ))
          )).
-  
+
   (* Definition gen_opt_LLVM {A} (g : GenLLVM A) : GenLLVM (option A) *)
   (*   := mkEitherT (mkStateT *)
   (*        (fun st => *)
@@ -2398,17 +2397,17 @@ Section InstrGenerators.
   (*     (fun '(id, typ) => *)
   (*        match typ with *)
   (*        | TYPE_Pointer (TYPE_Function _ params _) => *)
-             
+
   (*        | _ => false *)
 
   (*     ) *)
-  
+
   (* Generate an instruction, as well as its type...
 
      The type is sometimes void for instructions that don't really
      compute a value, like void function calls, stores, etc.
    *)
-  
+
   Definition gen_instr : GenLLVM (typ * instr typ) :=
     typ_ctx <- get_typ_ctx;;
     ctx <- get_ctx;;
@@ -2697,7 +2696,7 @@ Section InstrGenerators.
       let args_t := map snd args in
       let f_type := TYPE_Function ret_t args_t false in
       (* annotate_debug ("--Generate: @" ++ show name ++ " " ++ show f_type);; *)
-      
+
       let param_attr_slots := map (fun t => []) args in
       let prototype :=
           mk_declaration name f_type
@@ -2707,7 +2706,7 @@ Section InstrGenerators.
       in
 
       bs <- gen_blocks ret_t;;
-      
+
       (* Reset context *)
       let '(lctx, gctx, ptoi_ctx) := ctxs in
       restore_variable_ctxs (lctx, (ID_Global name, TYPE_Pointer f_type)::gctx, ptoi_ctx);;

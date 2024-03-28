@@ -817,12 +817,14 @@ Definition code := list (instr_id * instr).
 Record block : Set :=
   mk_block
     {
-      blk_id    : block_id;
+      (* blk_id    : block_id; *)
       blk_phis  : list (local_id * phi);
       blk_code  : code;
       blk_term  : terminator;
       blk_comments : option (list string)
     }.
+
+Definition blockID := (block_id * block)%type.
 
 Record definition {FnBody:Set} :=
   mk_definition
@@ -854,6 +856,7 @@ Arguments exp: clear implicits.
 Arguments cmpxchg : clear implicits.
 Arguments atomicrmw : clear implicits.
 Arguments block: clear implicits.
+Arguments blockID: clear implicits.
 Arguments texp: clear implicits.
 Arguments phi: clear implicits.
 Arguments instr: clear implicits.

@@ -15,3 +15,7 @@ From Vellvm Require Export
      Utils.PropT
      Utils.Monads
      Utils.InterpProp.
+
+From stdpp Require Import base.
+
+Notation "x =d y" := (decide (x = y)) (at level 70, no associativity, only parsing).

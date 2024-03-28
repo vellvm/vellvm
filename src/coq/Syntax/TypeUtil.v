@@ -3,6 +3,7 @@
     The current version uses a notion of dynamic types instead and a conversion function [TypToDtyp.typ_to_dtyp].
     The content of this file is however likely to be useful for static analyses in the future.
 *)
+(*
 
 From Coq Require Import
      List
@@ -12,6 +13,8 @@ From Coq Require Import
 From Vellvm Require Import
      Syntax.LLVMAst
      Syntax.AstLib.
+
+From stdpp Require Import base decidable.
 
 Require Import Coqlib.
 
@@ -183,7 +186,7 @@ Inductive guarded_typ : ident -> list (ident * typ) -> typ -> Prop :=
 | guarded_typ_Identified_Some :
     forall (id : ident) (env : list (ident * typ)) (id' : ident) (t : typ),
       id <> id' ->
-      Some (id', t) = find (fun a => Ident.eq_dec id' (fst a)) env ->
+      Some (id', t) = find (fun a => id' ?=? fst a) env ->
       guarded_typ id env t ->
       guarded_typ id' env t ->
       guarded_typ id env (TYPE_Identified id')
@@ -191,7 +194,7 @@ Inductive guarded_typ : ident -> list (ident * typ) -> typ -> Prop :=
 | guarded_typ_Identified_None :
     forall (id : ident) (env : list (ident * typ)) (id' : ident),
       id <> id' ->
-      None = find (fun a => Ident.eq_dec id' (fst a)) env ->
+      None = find (fun a => id' ?=? fst a) env ->
       guarded_typ id env (TYPE_Identified id')
 .
 
@@ -215,7 +218,6 @@ Inductive first_class_typ : typ -> Prop :=
 | first_class_Vector : forall sz t, first_class_typ (TYPE_Vector sz t)
 | first_class_Identified : forall id, first_class_typ (TYPE_Identified id)
 .
-
 
 Definition function_ret_typ (t : typ) : Prop :=
   first_class_typ t /\ t <> TYPE_Metadata.
@@ -586,7 +588,6 @@ Proof.
     + intros x H. apply (f x). simpl. auto.
 Defined.
 
-
 Fixpoint remove_key {A B : Type} (eq_dec : (forall (x y : A), {x = y} + {x <> y})) (a : A) (l : list (A * B)) : list (A * B) :=
   match l with
   | nil => nil
@@ -596,7 +597,6 @@ Fixpoint remove_key {A B : Type} (eq_dec : (forall (x y : A), {x = y} + {x <> y}
     | right _ => (h, b) :: remove_key eq_dec a t
     end
   end.
-
 
 Fixpoint remove_keys {A B : Type} (eq_dec : (forall (x y : A), {x = y} + {x <> y})) (keys : list A) (l : list (A * B)) : list (A * B) :=
   match keys with
@@ -615,9 +615,8 @@ Ltac destruct_prod :=
 Ltac destruct_eq_dec :=
   match goal with
   | [ eq: forall x y : ?A , {x = y} + {x <> y} |- context[eq ?a ?b] ] => destruct (eq a b) eqn:?; simpl
-  | [ |- context[Ident.eq_dec ?a ?b] ] => destruct (Ident.eq_dec a b) eqn:?; simpl
+  | [ |- context[?a ?=? ?b] ] => destruct (a ?=? b) eqn:?; simpl
   end.
-
 
 Lemma remove_key_in :
   forall (A B : Type) (a : A)  (b : B) eq_dec l,
@@ -635,7 +634,6 @@ Proof.
       * inversion H. subst. contradiction.
       * assumption.
 Qed.
-
 
 Lemma remove_key_not_in :
   forall (A B : Type) (a : A) eq_dec (l : list (A * B)),
@@ -1308,3 +1306,4 @@ Proof.
       simpl in Hfind. destruct (Ident.eq_dec id id).
       inversion Hfind. contradiction.
 Qed.
+*)

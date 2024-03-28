@@ -14,8 +14,6 @@ From Vellvm Require Import
      Utilities
      Syntax.LLVMAst.
 
-Require Import Ceres.Ceres.
-
 Set Implicit Arguments.
 Set Contextual Implicit.
 (* end hide *)
@@ -291,37 +289,6 @@ Proof using.
   destruct t; cbn; auto.
   all: apply Nat.lt_0_succ.
 Qed.
-
-Section hiding_notation.
-  #[local] Open Scope sexp_scope.
-
-  Fixpoint serialize_dtyp' (dt:dtyp): sexp :=
-    match dt with
-    | DTYPE_I sz     => Atom ("i" ++ to_string sz)%string
-    | DTYPE_IPTR     => Atom ("iptr")%string
-    | DTYPE_Pointer  => Atom "ptr"
-    | DTYPE_Void     => Atom "dvoid"
-    | DTYPE_Half     => Atom "half"
-    | DTYPE_Float    => Atom "float"
-    | DTYPE_Double   => Atom "double"
-    | DTYPE_X86_fp80 => Atom "x86_fp80"
-    | DTYPE_Fp128    => Atom "fp128"
-    | DTYPE_Ppc_fp128 => Atom "ppc_fp128"
-    | DTYPE_Metadata  => Atom "metadata"
-    | DTYPE_X86_mmx   => Atom "x86_mmx"
-    | DTYPE_Array sz t
-      => [Atom ("[" ++ to_string sz) ; Atom "x" ; serialize_dtyp' t ; Atom "]"]%string
-    | DTYPE_Struct fields
-      => [Atom "{" ; to_sexp (List.map (fun x => [serialize_dtyp' x ; Atom ","]) fields) ; Atom "}"]
-    | DTYPE_Packed_struct fields
-      => [Atom "packed{" ; to_sexp (List.map (fun x => [serialize_dtyp' x ; Atom ","]) fields) ; Atom "}"]
-    | DTYPE_Opaque => Atom "opaque"
-    | DTYPE_Vector sz t
-      => [Atom ("<" ++ to_string sz) ; Atom "x" ; serialize_dtyp' t ; Atom ">"]%string  (* TODO: right notation? *)
-    end.
-
-  #[global] Instance serialize_dtyp : Serialize dtyp := serialize_dtyp'.
-End hiding_notation.
 
 Inductive IX_supported : N -> Prop :=
 | I1_Supported : IX_supported 1

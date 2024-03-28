@@ -424,7 +424,7 @@ Section ReprInstances.
     | CC_Swiftcc => "CC_Swiftcc"
     | CC_Swifttailcc => "CC_Swifttailcc"
     | CC_cfguard_checkcc => "CC_cfguard_checkcc"
-    | CC_Preserve_mostc => "CC_Preserve_mostc"
+    | CC_Preserve_mostcc => "CC_Preserve_mostcc"
     end.
 
   #[global]
@@ -765,8 +765,8 @@ Section ReprInstances.
   Definition repr_block (b : block typ) : string
     :=
       match b with
-      | mk_block blk_id blk_phis blk_code blk_term blk_comments =>
-        "(mk_block " ++ repr blk_id ++ " " ++ repr blk_phis ++ " " ++ repr blk_code ++ " " ++ repr blk_term ++ " " ++ repr blk_comments ++ ")"
+      | mk_block blk_phis blk_code blk_term blk_comments =>
+        "(mk_block " ++ " " ++ repr blk_phis ++ " " ++ repr blk_code ++ " " ++ repr blk_term ++ " " ++ repr blk_comments ++ ")"
       end.
 
   #[global]
@@ -774,7 +774,6 @@ Section ReprInstances.
     {|
     repr := repr_block
     |}.
-
 
   Definition repr_declaration (dec : declaration typ) : string
     := match dec with

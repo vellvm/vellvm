@@ -1,7 +1,7 @@
 (* begin hide *)
 From Coq Require Import List ZArith String.
 Import ListNotations.
-
+From stdpp Require Import base.
 From ITree Require Import
      ITree.
 
@@ -247,8 +247,7 @@ Section Endo.
            `{Endo (phi T)}
       : Endo (block T) | 50 :=
       fun b =>
-        mk_block (endo (blk_id b))
-                 (endo (blk_phis b))
+        mk_block (endo (blk_phis b))
                  (endo (blk_code b))
                  (endo (blk_term b))
                  (blk_comments b).
@@ -270,7 +269,6 @@ Section Endo.
         | _ => a
         end
         .
-
 
     #[global] Instance Endo_global
            `{Endo raw_id}
@@ -305,8 +303,7 @@ Section Endo.
               (endo (dc_type d))
               (endo (dc_param_attrs d))
               (endo (dc_attrs d))
-              (endo (dc_annotations d))
-    .
+              (endo (dc_annotations d)).
 
     #[global] Instance Endo_definition
            {FnBody:Set}
@@ -365,6 +362,11 @@ Section Endo.
                  (endo (m_globals m))
                  (endo (m_declarations m))
                  (endo (m_definitions m)).
+
+    #[global] Instance Endo_ocfg
+      `{Endo (block T)}
+      : Endo (ocfg T) | 50 :=
+      fmap endo.
 
     #[global] Instance Endo_cfg
            `{Endo raw_id}
@@ -607,8 +609,7 @@ Section TFunctor.
            `{TFunctor phi}
       : TFunctor block | 50  :=
       fun U V f b =>
-        mk_block (endo (blk_id b))
-                 (tfmap (fun '(id,phi) => (endo id, tfmap f phi)) (blk_phis b))
+        mk_block (tfmap (fun '(id,phi) => (endo id, tfmap f phi)) (blk_phis b))
                  (tfmap f (blk_code b))
                  (tfmap f (blk_term b))
                  (blk_comments b).
@@ -635,7 +636,6 @@ Section TFunctor.
         | METADATA_Named strs => METADATA_Named (endo strs)
         | METADATA_Node mds => METADATA_Node (tfmap endo_metadata mds)
         end.
-
 
     (* SAZ: Not as parameterized as it could be - how often do we want to change annnotations? *)
     #[global] Instance TFunctor_annotation
@@ -715,7 +715,6 @@ Section TFunctor.
                        (tfmap f (dc_annotations d))
           .
 
-
     #[global] Instance TFunctor_definition
            {FnBody:Set -> Set}
            `{TFunctor declaration}
@@ -770,6 +769,11 @@ Section TFunctor.
                  (tfmap f (m_declarations m))
                  (tfmap f (m_definitions m)).
 
+    #[global] Instance TFunctor_ocfg
+           `{TFunctor block}
+      : TFunctor (fun T => gmap.gmap block_id (block T)) | 50 :=
+      fun U V f m => fmap (tfmap (T := block) f) m.
+
     #[global] Instance TFunctor_cfg
            `{Endo raw_id}
            `{TFunctor block}
@@ -807,11 +811,6 @@ Proof using.
   rewrite IH; reflexivity.
 Qed.
 
-From ExtLib Require Import
-     Programming.Eqv.
-
-Import EqvNotation.
-
 Section Examples.
 
   Section SubstId.
@@ -824,8 +823,8 @@ Section Examples.
 
     (* We define the swapping over [raw_id] *)
     Definition swap_raw_id (id:raw_id) : raw_id :=
-      if id ~=? x then y else
-        if id ~=? y then x else
+      if decide (id = x) then y else
+        if decide (id = y) then x else
           id.
 
     (* The default instance of [Endo raw_id] that would get picked would be [endo_id]. We locally hijack this choice with our swapping function *)
@@ -863,7 +862,7 @@ Section Examples.
     (* Note: this assumes the new function shares the exact same prototype. *)
     Instance subst_cfg_endo_cfg: Endo (definition T (cfg T)) :=
       fun f =>
-        if (dc_name (df_prototype f)) ~=? fid
+        if decide ((dc_name (df_prototype f)) = fid)
         then {| df_prototype := df_prototype f; df_args := df_args f ; df_instrs := new_f |}
         else f.
 

@@ -29,7 +29,7 @@ Definition alist_In {K R RD_K V} k m v :=
   @alist_find K R RD_K V k m = Some v.
 
 (** * Freshness predicate: [alist_fresh k m] if [k] is a fresh key in [m] *)
-Definition alist_fresh {K R RD_K V} (k : K) (m : alist K V) := 
+Definition alist_fresh {K R RD_K V} (k : K) (m : alist K V) :=
   @alist_find K R RD_K V k m = None.
 
 (** * Order on [alist]s
@@ -47,7 +47,7 @@ Definition alist_extend {K R RD_K V} (l1 l2 : alist K V) : Prop :=
 
 Arguments alist_find {_ _ _ _}.
 Arguments alist_add {_ _ _ _}.
-Arguments alist_remove {_ _ _ _}. 
+Arguments alist_remove {_ _ _ _}.
 
 Module AlistNotations.
   Notation "m '⊑' m'" := (alist_le m m') (at level 45).
@@ -71,7 +71,7 @@ Section alistFacts.
       forall k v (m: alist K V),
         alist_In k (alist_add k v m) v.
     Proof using K RR RRC V.
-      intros; unfold alist_add, alist_In; simpl; flatten_goal; [reflexivity | rewrite <- neg_rel_dec_correct in Heq; tauto]. 
+      intros; unfold alist_add, alist_In; simpl; flatten_goal; [reflexivity | rewrite <- neg_rel_dec_correct in Heq; tauto].
     Qed.
 
     (* A removed key is not contained in the resulting map *)
@@ -80,13 +80,13 @@ Section alistFacts.
         ~ alist_In k (alist_remove k m) v.
     Proof using K RR RRC V.
       induction m as [| [k1 v1] m IH]; intros.
-      - simpl; intros abs; inv abs. 
+      - simpl; intros abs; inv abs.
       - simpl; flatten_goal.
         + unfold alist_In; simpl.
           rewrite Bool.negb_true_iff in Heq; rewrite Heq.
           intros abs; eapply IH; eassumption.
         + rewrite Bool.negb_false_iff, rel_dec_correct in Heq; subst.
-          intros abs; eapply IH; eauto. 
+          intros abs; eapply IH; eauto.
     Qed.
 
     (* Removing a key does not alter other keys *)
@@ -105,7 +105,7 @@ Section alistFacts.
       - unfold alist_In in *; simpl in *.
         rewrite Bool.negb_false_iff, rel_dec_correct in Heq; subst.
         flatten_hyp IN; [rewrite rel_dec_correct in Heq; subst; tauto | eapply IH; eauto].
-    Qed.       
+    Qed.
 
     (* Keys that are present in a map after a remove were present before the remove *)
     Lemma In_remove_In_ineq:
@@ -119,11 +119,11 @@ Section alistFacts.
         flatten_all; auto.
         eapply IH; eauto.
       -rewrite Bool.negb_false_iff, rel_dec_correct in Heq; subst.
-       unfold alist_In; simpl. 
+       unfold alist_In; simpl.
        flatten_goal; [rewrite rel_dec_correct in Heq; subst |].
        exfalso; eapply not_In_remove; eauto.
        eapply IH; eauto.
-    Qed.       
+    Qed.
 
     (* Keys are present in a map after a remove over a different key iff they were present before the remove *)
     Lemma In_remove_In_ineq_iff:
@@ -133,7 +133,7 @@ Section alistFacts.
           alist_In k m v.
     Proof using K RR RRC V.
       intros; split; eauto using In_In_remove_ineq, In_remove_In_ineq.
-    Qed.       
+    Qed.
 
     (* Adding a value to a key does not alter other keys *)
     Lemma In_In_add_ineq:
@@ -152,7 +152,7 @@ Section alistFacts.
       forall k v k' v' (m: alist K V),
         k <> k' ->
         alist_In k (alist_add k' v' m) v ->
-        alist_In k m v. 
+        alist_In k m v.
     Proof using K RR RRC V.
       intros k v k' v' m ineq IN.
       unfold alist_In in IN; simpl in IN; flatten_hyp IN; [rewrite rel_dec_correct in Heq; subst; tauto |].
@@ -160,7 +160,7 @@ Section alistFacts.
     Qed.
 
     (* Keys are present in a map after an add over a different key iff they were present before the add *)
-    Lemma In_add_ineq_iff: 
+    Lemma In_add_ineq_iff:
       forall m (v v' : V) (k k' : K),
         k <> k' ->
         alist_In k m v <-> alist_In k (alist_add k' v' m) v.
@@ -223,10 +223,10 @@ Section alistFacts.
       intros.
       destruct (l @ id) eqn:EQ.
       - destruct (rel_dec v v0) eqn:H.
-        rewrite rel_dec_correct in H; subst; auto. 
+        rewrite rel_dec_correct in H; subst; auto.
         rewrite <- neg_rel_dec_correct in H.
         right; intros abs; red in abs; rewrite EQ in abs; inv abs; auto.
-      - right; intros abs; red in abs; rewrite EQ in abs; inv abs. 
+      - right; intros abs; red in abs; rewrite EQ in abs; inv abs.
     Qed.
 
   End Alist_In.
@@ -265,18 +265,18 @@ Section alistFacts.
         (forall v, ~ In (k,v) m) <-> alist_find k m = None.
     Proof using K RR RRC V.
       induction m as [| [k1 v1] m IH]; [simpl; easy |].
-      simpl; split; intros H. 
+      simpl; split; intros H.
       - flatten_goal; [rewrite rel_dec_correct in Heq; subst; exfalso | rewrite <- neg_rel_dec_correct in Heq].
         apply (H v1); left; reflexivity.
         apply IH; intros v abs; apply (H v); right; assumption.
       - intros v; flatten_hyp H; [inv H | rewrite <- IH in H].
-        intros [EQ | abs]; [inv EQ; rewrite <- neg_rel_dec_correct in Heq; tauto | apply (H v); assumption]. 
+        intros [EQ | abs]; [inv EQ; rewrite <- neg_rel_dec_correct in Heq; tauto | apply (H v); assumption].
     Qed.
 
     Lemma alist_find_remove_none:
-      forall (m : list (K*V)) (k1 k2 : K), 
-        k2 <> k1 -> 
-        alist_find k1 (alist_remove k2 m) = None -> 
+      forall (m : list (K*V)) (k1 k2 : K),
+        k2 <> k1 ->
+        alist_find k1 (alist_remove k2 m) = None ->
         alist_find k1 m = None.
     Proof using K RR RRC V.
       induction m as [| [? ?] m IH]; intros ?k1 ?k2 ineq HF; simpl in *.
@@ -291,9 +291,9 @@ Section alistFacts.
           eapply rel_dec_neq_false in n0; eauto. rewrite n0 in HF. simpl in HF.
           eapply rel_dec_neq_false in n; eauto. rewrite n in *. eapply IH. apply ineq. assumption.
     Qed.
-    
+
     Lemma alist_find_add_none:
-      forall m (k r :K) (v:V), 
+      forall m (k r :K) (v:V),
         alist_find k (alist_add r v m) = None ->
         alist_find k m = None.
     Proof using K RR RRC V.
@@ -313,7 +313,7 @@ Section alistFacts.
         apply (alist_find_remove_none _ k r); auto.
         rewrite rel_dec_sym in Heqx; eauto.
         apply neg_rel_dec_correct. symmetry in Heqx. assumption.
-    Qed.      
+    Qed.
 
     Lemma alist_find_neq : forall m (k r:K) (v:V), k <> r -> alist_find k (alist_add r v m) = alist_find k m.
     Proof using K RR RRC V.
@@ -357,7 +357,7 @@ Section alistFacts.
         congruence.
     Qed.
 
-    Lemma alist_find_eq_dec : 
+    Lemma alist_find_eq_dec :
       forall {RDV:RelDec (@Logic.eq V)} {RDCV:RelDec_Correct RDV}
         k (m1 m2 : alist K V),
         {m2 @ k = m1 @ k} + {m2 @ k <> m1 @ k}.
@@ -365,14 +365,14 @@ Section alistFacts.
       intros.
       destruct (m2 @ k) eqn:EQ2, (m1 @ k) eqn:EQ1.
       - destruct (rel_dec v v0) eqn:H.
-        rewrite rel_dec_correct in H; subst; auto. 
+        rewrite rel_dec_correct in H; subst; auto.
         rewrite <- neg_rel_dec_correct in H; right; intros abs; apply H; inv abs; auto.
       - right; intros abs; inv abs.
       - right; intros abs; inv abs.
       - left; auto.
     Qed.
 
-    Lemma alist_find_add_eq : 
+    Lemma alist_find_add_eq :
       forall {K V : Type} {RD:RelDec (@Logic.eq K)} {RDC:RelDec_Correct RD}
         k v (m : alist K V),
         (alist_add k v m) @ k = Some v.

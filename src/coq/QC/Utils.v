@@ -1,6 +1,4 @@
 (** Some utility functions and lemmas for QC. *)
-Require Import Ceres.Ceres.
-
 (* From QuickChick Require Import QuickChick. *)
 From QuickChick Require Import Generators Producer.
 Open Scope qc_scope.

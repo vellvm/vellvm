@@ -258,9 +258,8 @@ Section SurfaceSyntaxTest.
                                                              dc_annotations := []
                                                            |};
                                            df_args := [(Name "argc"); (Name "arcv")];
-                                           df_instrs := (
+                                           df_instrs := (Anon 0%Z,
                                                          {|
-                                                           blk_id := (Anon 0%Z);
                                                            blk_phis := [];
                                                            blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%N) (EXP_Integer (5)%Z) (EXP_Integer (9)%Z))));
                                                                         (IId (Anon 2%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%N) (EXP_Ident (ID_Local (Anon 1%Z))) (EXP_Integer (15)%Z))))];

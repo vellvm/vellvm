@@ -1,22 +1,24 @@
 (* begin hide *)
-Require Import Equalities.
+(* Require Import Equalities. *)
 
 From Coq Require Import ZArith List String.
+
+From stdpp Require Import base fin_maps gmap strings.
 
 From Vellvm Require Import
      Utilities
      Syntax.LLVMAst
      Syntax.AstLib.
 
-From ExtLib Require Import
-     Programming.Eqv
-     Structures.Monads.
-
+(* From ExtLib Require Import *)
+(*      Programming.Eqv *)
+(*      Structures.Monads. *)
 
 
 Import ListNotations.
-Import EqvNotation.
-Import MonadNotation.
+(* Import EqvNotation. *)
+(* Import MonadNotation. *)
+Open Scope positive.
 Open Scope list.
 Open Scope monad_scope.
 (* end hide *)
@@ -46,7 +48,7 @@ Section CFG.
   (** * Open cfg
       A potentially open cfg ([ocfg]) is simply a list of blocks.
    *)
-  Definition ocfg := list (block T).
+  Notation ocfg := (gmap block_id (block T)).
 
   (** * cfg
       Each function definition corresponds to a control-flow graph
@@ -196,16 +198,19 @@ Section CFG.
     ++ tle_of_definitions (m_definitions m)
   .
 
-  Definition init_of_definition (d : definition T (block T * list (block T))) : block_id :=
-    blk_id (fst (df_instrs d)).
+  Definition init_of_definition (d : definition T (blockID T * list (blockID T))) : block_id :=
+    (df_instrs d).1.1.
 
-  Definition cfg_of_definition (d : definition T (block T * list (block T))) : cfg :=
+  Definition ocfg_of_definition (d : definition T (blockID T * list (blockID T))) : ocfg :=
+    list_to_map ((df_instrs d).1 :: (df_instrs d).2).
+
+  Definition cfg_of_definition (d : definition T (blockID T * list (blockID T))) : cfg :=
     {| init := init_of_definition d;
-       blks := fst (df_instrs d) :: snd (df_instrs d);
+       blks := ocfg_of_definition d;
        args := df_args d;
     |}.
 
-  Definition mcfg_of_modul (m : @modul (block T * list (block T))) : mcfg :=
+  Definition mcfg_of_modul (m : @modul (blockID T * list (blockID T))) : mcfg :=
     let defns := map (fun d => {|
                           df_prototype := df_prototype d;
                           df_args := df_args d;
@@ -223,28 +228,45 @@ Section CFG.
     |}.
 
   (* Utility to lookup by id a block from a list of blocks *)
-  Definition find_block (bs: list (block T)) block_id : option (block T) :=
-    find (fun b => if (blk_id b) ~=? block_id then true else false) bs.
+  (* Definition find_block (bs: list (block T)) block_id : option (block T) := *)
+  (*   find (fun b => if (blk_id b) ~=? block_id then true else false) bs. *)
 
-  Fixpoint modul_defns_of_mcfg_defns (ds: list (definition T cfg)): option (list (definition T (block T * list (block T)))) :=
-    match ds with
-    | [] => Some []
-    | d::ds => match blks (df_instrs d) with
-              | [] => None
-              | x::xs => match modul_defns_of_mcfg_defns ds with
-                        | None => None
-                        | Some l => Some (
-                                       {|
-                                         df_prototype := df_prototype d;
-                                         df_args := df_args d;
-                                         df_instrs := (x, xs)
-                                       |}
-                                         ::l)
-                        end
-              end
+
+  Definition modul_defns_of_defns (d : definition T cfg) : option (definition T (blockID T * list (blockID T))) :=
+    match map_to_list (blks (df_instrs d)) with
+    | [] => None
+    | x::xs => Some
+               {|
+                 df_prototype := df_prototype d;
+                 df_args := df_args d;
+                 df_instrs := (x,xs)
+               |}
     end.
 
-  Definition modul_of_mcfg (m: mcfg): option (@modul (block T * list (block T))) :=
+  Definition modul_defns_of_mcfg_defns (ds: list (definition T cfg)): option (list (definition T (blockID T * list (blockID T)))) :=
+        foldl
+          (fun acc d => xs ← acc ;
+           x ← modul_defns_of_defns d ;
+           mret (x :: xs)
+          )
+          (Some [])
+          ds
+  .
+
+  (* Definition modul_defns_of_mcfg_defns (ds: list (definition T cfg)): option (list (definition T (blockID T * list (blockID T)))) := *)
+  (*   match ds with *)
+  (*   | [] => Some [] *)
+  (*   | d::ds => *)
+  (*       foldl *)
+  (*         (fun acc d => xs ← acc ; *)
+  (*          x ← modul_defns_of_defns d ; *)
+  (*          mret (x :: xs) *)
+  (*         ) *)
+  (*         ((fun x => [x]) <$> modul_defns_of_defns d) *)
+  (*         ds *)
+  (*   end. *)
+
+  Definition modul_of_mcfg (m: mcfg): option (@modul (blockID T * list (blockID T))) :=
     match modul_defns_of_mcfg_defns (m_definitions m) with
     | None => None
     | Some defns => Some
@@ -261,13 +283,16 @@ Section CFG.
 
 End CFG.
 
+Notation ocfg := (fun T => gmap block_id (block T)).
+(* Notation ocfg T := (gmap block_id (block T)). *)
 Arguments modul_of_toplevel_entities {T X}.
 Arguments mcfg_of_modul {T}.
 Arguments modul_of_mcfg {T}.
 Arguments modul_defns_of_mcfg_defns {T}.
+Arguments modul_defns_of_defns {T}.
 
 (* Conversion of the output of the parser to the [mcfg] structure manipulated internally *)
-Definition mcfg_of_tle (p : toplevel_entities typ (block typ * list (block typ))) :=
+Definition mcfg_of_tle (p : toplevel_entities typ (blockID typ * list (blockID typ))) :=
   mcfg_of_modul (modul_of_toplevel_entities p).
 
 Arguments modul {_} _.
@@ -280,37 +305,66 @@ Arguments m_globals {_ _}.
 Arguments m_declarations {_ _}.
 Arguments m_definitions {_ _}.
 Arguments mkCFG {_}.
-Arguments find_block {_}.
+(* Arguments find_block {_}. *)
 Arguments blks {_}.
 Arguments init {_}.
 Arguments args {_}.
 
+Notation tle T := (list (definition T (blockID T * list (blockID T)))).
+
 Section TLE_To_Modul.
 
-  Lemma modul_defns_of_mcfg_defns_map_cfg_of_definition:
-    forall {T} (l: list (definition T (block T * list (block T)))),
-      modul_defns_of_mcfg_defns (map (fun d => {|
-                                          df_prototype := df_prototype d;
-                                          df_args := df_args d;
-                                          df_instrs := cfg_of_definition T d
-                                        |}) l) = Some l.
-  Proof using.
-    induction l; simpl; auto.
-    rewrite IHl. repeat f_equal.
-    destruct a; simpl; f_equal.
-    destruct df_instrs; simpl; auto.
-  Qed.
+(*   Lemma modul_defns_of_mcfg_defns_map_cfg_of_definition: *)
+(*     forall {T} (l: tle T), *)
+(*       modul_defns_of_mcfg_defns (map (fun d => {| *)
+(*                                           df_prototype := df_prototype d; *)
+(*                                           df_args := df_args d; *)
+(*                                           df_instrs := cfg_of_definition T d *)
+(*                                         |}) l) = Some l. *)
+(*   Proof using. *)
+(*     unfold modul_defns_of_mcfg_defns. *)
+(*     intros. match goal with |- context[foldl ?f _ _] => set (g := f) end. *)
+(*     cut (forall x, foldl g (Some x) (map (λ d : definition T (blockID T * list (blockID T)), {| df_prototype := df_prototype d; df_args := df_args d; df_instrs := cfg_of_definition T d |}) l) = Some (l ++ x)). *)
+(*     admit. *)
+(*     induction l; [cbn; auto | intros x]. *)
+(*     cbn. *)
+(* assert (forall d, modul_defns_of_defns {| df_prototype := df_prototype d; df_args := df_args d; df_instrs := cfg_of_definition T d |} = Some d). *)
 
-  Lemma modul_of_mcfg_of_modul:
-    forall {T} (m: @modul T _),
-      modul_of_mcfg (mcfg_of_modul m) = Some m.
-  Proof using.
-    destruct m.
-    unfold mcfg_of_modul; simpl.
-    unfold modul_of_mcfg; simpl.
-    rewrite modul_defns_of_mcfg_defns_map_cfg_of_definition.
-    reflexivity.
-  Qed.
+(* { *)
+(*   intros [? ? []]; cbn. *)
+(*   unfold modul_defns_of_defns. *)
+(*   cbn. *)
+(*   (* Unset Printing Notations. Set *) *)
+(*     (* Printing All. *) *)
+(*   (* Set Printing Implicit. *) *)
+(*   (* pose proof @map_to_list_insert _ (gmap block_id) _ _ _ _ _ _ _ _ _ . *) *)
+(*   match goal with *)
+(*     |- context[insert ?a ?b ?c] => *)
+(*       pose proof map_to_list_insert c a b *)
+(*   end. *)
+(*   Unset Printing Notations. *)
+(*   unfold ocfg. rewrite map_to_list_insert. simplify_map_eq. *)
+
+
+(*    ≫= λ x0 : definition T (blockID T * list (blockID T)), mret (x0 :: x)) *)
+
+(*     rewrite IHl. *)
+(*   (*   rewrite IHl. repeat f_equal. *) *)
+(*   (*   destruct a; simpl; f_equal. *) *)
+(*   (*   destruct df_instrs; simpl; auto. *) *)
+(*   (* Qed. *) *)
+(* Admitted. *)
+
+(*   Lemma modul_of_mcfg_of_modul: *)
+(*     forall {T} (m: @modul T _), *)
+(*       modul_of_mcfg (mcfg_of_modul m) = Some m. *)
+(*   Proof using. *)
+(*     destruct m. *)
+(*     unfold mcfg_of_modul; simpl. *)
+(*     unfold modul_of_mcfg; simpl. *)
+(*     rewrite modul_defns_of_mcfg_defns_map_cfg_of_definition. *)
+(*     reflexivity. *)
+(*   Qed. *)
 
   Definition opt_first {T: Type} (o1 o2: option T): option T :=
     match o1 with | Some x => Some x | None => o2 end.
@@ -334,7 +388,7 @@ Section TLE_To_Modul.
   Proof using.
     intros.
     unfold modul_of_toplevel_entities; cbn; f_equal;
-      try ((break_match_goal; reflexivity) || (rewrite <- !app_nil_end; reflexivity)).
+      try ((break_match_goal; reflexivity) || (rewrite !app_nil_r; reflexivity)).
   Qed.
 
   Lemma modul_of_toplevel_entities_app:
@@ -344,7 +398,7 @@ Section TLE_To_Modul.
     induction tle1 as [| tle tle1 IH]; intros; cbn; [reflexivity |].
     rewrite modul_of_toplevel_entities_cons, IH; cbn.
     f_equal;
-      try ((break_match_goal; reflexivity) || (rewrite <- !app_nil_end, app_assoc; reflexivity)).
+      try ((break_match_goal; reflexivity) || (rewrite !app_nil_r, app_assoc; reflexivity)).
   Qed.
 
   Infix "@@" := (modul_app) (at level 60).
