@@ -35,16 +35,16 @@ VELLVM_BC =_build/default/ml/main.bc
 FRONTEND_EXE=_build/default/ml/frontend.exe
 AGGREGATE_EXE=_build/default/ml/aggregate.exe
 COQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib
-COQFILES_EXEC := QC/ShowAST QC/ReprAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib Semantics/TopLevel Transformations/Transform Handlers/Handlers Theory/Refinement Utilities
+COQFILES_EXEC := QC/ShowAST QC/ReprAST QC/GenAlive2 Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib Semantics/TopLevel Transformations/Transform Handlers/Handlers Theory/Refinement Utilities
 FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
-EXEC_VFILES := $(COQFILES_FRONTEND:%=coq/%.v)
+EXEC_VFILES := $(COQFILES_EXEC:%=coq/%.v)
 EXEC_VOFILES := $(COQFILES_EXEC:%=coq/%.vo)
 
 .DEFAULT_GOAL := all
 
 ######## targets not in this "KNOWNTARGETS" list will be forwarded to CoqMakefile via invoke-coqmakefile
 ######## WARNING - every target of *this* Makefile must be listed here
-KNOWNTARGETS := CoqMakefile invoke-coqmakefile coq extracted $(EXTRACTDIR)/STAMP $(VELLVM_EXE) vellvm vellvmbc test check qc-tests yarpgen-tests rm-qc-test-vo clean extractedclean clean-coqmakefile doc/coq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-coq opam print-opam print-includes
+KNOWNTARGETS := CoqMakefile invoke-coqmakefile coq extracted $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/Extract.v $(VELLVM_EXE) vellvm vellvmbc test check qc-tests yarpgen-tests rm-qc-test-vo clean extractedclean clean-coqmakefile doc/coq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-coq opam print-opam print-includes
 
 KNOWNFILES := Makefile _CoqProject
 
@@ -73,7 +73,8 @@ coq: real-all
 .PHONY: extracted
 extracted: $(EXTRACTDIR)/STAMP
 
-$(EXTRACTDIR)/STAMP: $(EXEC_VOFILES) $(EXTRACTDIR)/Extract.v
+$(EXTRACTDIR)/STAMP: $(EXEC_VFILES) $(EXEC_VOFILES) $(EXTRACTDIR)/Extract.v
+	make $(EXEC_VOFILES)
 	@echo "Extracting"
 	$(COQEXEC) $(EXTRACTDIR)/Extract.v
 	@echo "Patching extraction"
