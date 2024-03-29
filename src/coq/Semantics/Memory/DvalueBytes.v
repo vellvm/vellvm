@@ -382,13 +382,21 @@ Module Type DvalueByte (LP : LLVMParams).
        | DTYPE_X86_mmx =>
            raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_mmx."
        | DTYPE_Array sz t =>
-           let sz := sizeof_dtyp t in
-           elt_bytes <- lift_err_RAISE_ERROR (split_every sz dbs);;
+           let sz' := sizeof_dtyp t in
+           let elt_bytes :=
+             if N.eqb sz' 0
+             then repeatN sz []
+             else split_every_nil sz' dbs
+           in
            elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
            ret (DVALUE_Array elts)
        | DTYPE_Vector sz t =>
-           let sz := sizeof_dtyp t in
-           elt_bytes <- lift_err_RAISE_ERROR (split_every sz dbs);;
+           let sz' := sizeof_dtyp t in
+           let elt_bytes :=
+             if N.eqb sz' 0
+             then repeatN sz []
+             else split_every_nil sz' dbs
+           in
            elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
            ret (DVALUE_Vector elts)
        | DTYPE_Struct fields =>
@@ -464,13 +472,21 @@ Module Type DvalueByte (LP : LLVMParams).
        | DTYPE_X86_mmx =>
            raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_mmx."
        | DTYPE_Array sz t =>
-           let sz := sizeof_dtyp t in
-           elt_bytes <- lift_err_RAISE_ERROR (split_every sz dbs);;
+           let sz' := sizeof_dtyp t in
+           let elt_bytes :=
+             if N.eqb sz' 0
+             then repeatN sz []
+             else split_every_nil sz' dbs
+           in
            elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
            ret (DVALUE_Array elts)
        | DTYPE_Vector sz t =>
-           let sz := sizeof_dtyp t in
-           elt_bytes <- lift_err_RAISE_ERROR (split_every sz dbs);;
+           let sz' := sizeof_dtyp t in
+           let elt_bytes :=
+             if N.eqb sz' 0
+             then repeatN sz []
+             else split_every_nil sz' dbs
+           in
            elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
            ret (DVALUE_Vector elts)
        | DTYPE_Struct fields =>

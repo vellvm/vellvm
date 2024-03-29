@@ -7866,18 +7866,66 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       Opaque IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue
         dvalue_bytes_to_dvalue.
       cbn in *.
-      destruct (split_every (SIZEOF.sizeof_dtyp dt) dvbs_fin) eqn:SPLIT.
-      { unfold split_every in SPLIT.
-        move SPLIT after NOOM.
-        break_match_hyp_inv.
-        cbn in *; auto.
+      destruct ((SIZEOF.sizeof_dtyp dt =? 0)%N) eqn:HSIZE.
+      { clear - IHdt NOOM.
+        induction sz using N.peano_ind.
+        - cbn.
+          rewrite_fin_to_inf_dvalue.
+          reflexivity.
+        - setoid_rewrite repeatN_succ.
+          cbn.
+          repeat rewrite_fin_to_inf_dvalue.
+          remember (dvalue_bytes_to_dvalue [] dt) as res.
+          symmetry in Heqres.
+          pose proof (IHdt nil nil res).
+          forward H; [constructor|].
+          destruct_err_oom_poison res; cbn in *;
+            try solve [setoid_rewrite H; cbn; eauto; try discriminate].
+          + (* Success *)
+            setoid_rewrite H; cbn; eauto; try discriminate.
+            forward IHsz.
+            { intros x CONTRA.
+              eapply NOOM.
+              rewrite repeatN_succ.
+              cbn.
+              rewrite Heqres.
+              cbn.
+              remember (map_monad (fun es : list dvalue_byte => dvalue_bytes_to_dvalue es dt)
+                          (repeatN sz [])) as m.
+              destruct_err_oom_poison m; cbn in *; try discriminate; eauto.
+            }
+
+            remember (map_monad
+                      (fun es : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte =>
+                       IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue es dt) 
+                      (repeatN sz [])) as m1.
+            remember (map_monad (fun es : list dvalue_byte => dvalue_bytes_to_dvalue es dt)
+               (repeatN sz [])) as m2.
+            destruct_err_oom_poison m1;
+              destruct_err_oom_poison m2; cbn in *; try discriminate; eauto.
+            rewrite_fin_to_inf_dvalue.
+            cbn.
+            inv IHsz.
+            rewrite fin_to_inf_dvalue_array in H1.
+            inv H1.
+            auto.
+          + (* OOM *)
+            exfalso.
+            clear H IHdt.
+            eapply NOOM.
+            rewrite repeatN_succ.
+            cbn.
+            rewrite Heqres.
+            cbn.
+            reflexivity.
       }
-      pose proof (Util.Forall2_length REF) as LEN.
-      pose proof split_every_n_succeeds _ dvbs_inf _ _ SPLIT as (y&SPLIT').
-      rewrite SPLIT'.
-      cbn in *.
-      pose proof split_every_Forall2 _ _ _ _ _ _ REF SPLIT' SPLIT as ALL.
-      clear SPLIT SPLIT'.
+
+      remember (split_every_nil (SIZEOF.sizeof_dtyp dt) dvbs_fin) as split_fin.
+      remember (split_every_nil (SIZEOF.sizeof_dtyp dt) dvbs_inf) as split_inf.
+      symmetry in Heqsplit_fin, Heqsplit_inf.
+
+      pose proof split_every_nil_Forall2 _ _ _ _ _ _ REF Heqsplit_inf Heqsplit_fin as ALL.
+      subst.
       induction ALL.
       - cbn.
         rewrite_fin_to_inf_dvalue; reflexivity.
@@ -8128,18 +8176,66 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       Opaque IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue
         dvalue_bytes_to_dvalue.
       cbn in *.
-      destruct (split_every (SIZEOF.sizeof_dtyp dt) dvbs_fin) eqn:SPLIT.
-      { unfold split_every in SPLIT.
-        move SPLIT after NOOM.
-        break_match_hyp_inv.
-        cbn in *; auto.
+      destruct ((SIZEOF.sizeof_dtyp dt =? 0)%N) eqn:HSIZE.
+      { clear - IHdt NOOM.
+        induction sz using N.peano_ind.
+        - cbn.
+          rewrite_fin_to_inf_dvalue.
+          reflexivity.
+        - setoid_rewrite repeatN_succ.
+          cbn.
+          repeat rewrite_fin_to_inf_dvalue.
+          remember (dvalue_bytes_to_dvalue [] dt) as res.
+          symmetry in Heqres.
+          pose proof (IHdt nil nil res).
+          forward H; [constructor|].
+          destruct_err_oom_poison res; cbn in *;
+            try solve [setoid_rewrite H; cbn; eauto; try discriminate].
+          + (* Success *)
+            setoid_rewrite H; cbn; eauto; try discriminate.
+            forward IHsz.
+            { intros x CONTRA.
+              eapply NOOM.
+              rewrite repeatN_succ.
+              cbn.
+              rewrite Heqres.
+              cbn.
+              remember (map_monad (fun es : list dvalue_byte => dvalue_bytes_to_dvalue es dt)
+                          (repeatN sz [])) as m.
+              destruct_err_oom_poison m; cbn in *; try discriminate; eauto.
+            }
+
+            remember (map_monad
+                      (fun es : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte =>
+                       IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue es dt) 
+                      (repeatN sz [])) as m1.
+            remember (map_monad (fun es : list dvalue_byte => dvalue_bytes_to_dvalue es dt)
+               (repeatN sz [])) as m2.
+            destruct_err_oom_poison m1;
+              destruct_err_oom_poison m2; cbn in *; try discriminate; eauto.
+            rewrite_fin_to_inf_dvalue.
+            cbn.
+            inv IHsz.
+            rewrite fin_to_inf_dvalue_vector in H1.
+            inv H1.
+            auto.
+          + (* OOM *)
+            exfalso.
+            clear H IHdt.
+            eapply NOOM.
+            rewrite repeatN_succ.
+            cbn.
+            rewrite Heqres.
+            cbn.
+            reflexivity.
       }
-      pose proof (Util.Forall2_length REF) as LEN.
-      pose proof split_every_n_succeeds _ dvbs_inf _ _ SPLIT as (y&SPLIT').
-      rewrite SPLIT'.
-      cbn in *.
-      pose proof split_every_Forall2 _ _ _ _ _ _ REF SPLIT' SPLIT as ALL.
-      clear SPLIT SPLIT'.
+
+      remember (split_every_nil (SIZEOF.sizeof_dtyp dt) dvbs_fin) as split_fin.
+      remember (split_every_nil (SIZEOF.sizeof_dtyp dt) dvbs_inf) as split_inf.
+      symmetry in Heqsplit_fin, Heqsplit_inf.
+
+      pose proof split_every_nil_Forall2 _ _ _ _ _ _ REF Heqsplit_inf Heqsplit_fin as ALL.
+      subst.
       induction ALL.
       - cbn.
         rewrite_fin_to_inf_dvalue; reflexivity.

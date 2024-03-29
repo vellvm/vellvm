@@ -755,6 +755,14 @@ Definition split_every {A} (n : N) (xs : list A) : err (list (list A))
          inr (split_every_pos A n xs)
      end.
 
+(* Like split_every, but default to the empty list in the n=0 case *)
+Definition split_every_nil {A} (n : N) (xs : list A) : list (list A)
+  := match n with
+     | N0 => []
+     | Npos n =>
+         split_every_pos A n xs
+     end.
+
 Lemma split_every_empty :
   forall {A} n,
     n <> 0%N ->
@@ -762,6 +770,13 @@ Lemma split_every_empty :
 Proof using.
   intros. destruct n; try contradiction.
   unfold split_every. f_equal.
+Qed.
+
+Lemma split_every_nil_empty :
+  forall {A} n,
+    split_every_nil n [] = ([]: list (list A)).
+Proof using.
+  intros. destruct n; auto.
 Qed.
 
 Lemma fold_sum_acc :
@@ -2138,6 +2153,57 @@ Proof.
     intros. clear SPLITX; clear SPLITY.
     rename H into SPLITY.
     rename H0 into SPLITX.
+    generalize dependent ys.
+    generalize dependent ys'.
+    generalize dependent SPLITX.
+    generalize dependent xs.
+    generalize dependent p.
+    induction xs'.
+    + intros.
+      apply split_every_pos_empty_equiv in SPLITX.
+      subst. inversion ALL. constructor.
+    + intros.
+      generalize dependent xs.
+      generalize dependent SPLITY.
+      generalize dependent ys.
+      generalize dependent p.
+      induction ys'.
+      ++
+        intros.
+        apply split_every_pos_empty_equiv in SPLITY.
+        apply split_every_pos_nonempty_inv in SPLITX.
+        apply list_nonempty_equiv in SPLITX.
+        destruct SPLITX as (c&cs&SPLITX).
+        subst. inversion ALL.
+      ++ intros.
+         apply split_every_pos_nonempty_take_drop in SPLITX; destruct SPLITX.
+         apply split_every_pos_nonempty_take_drop in SPLITY; destruct SPLITY.
+         subst.
+         simpl in *.
+         constructor.
+         +++ apply Forall2_take. auto.
+         +++ assert (H : split_every_pos A p (drop (N.pos p) xs) = split_every_pos A p (drop (N.pos p) xs)) by reflexivity.
+             apply (IHxs' p (drop (N.pos p) xs) H (split_every_pos B p (drop (N.pos p) ys)) (drop (N.pos p) ys)).
+             { apply Forall2_drop. auto. }
+             { reflexivity. }
+Qed.
+
+Lemma split_every_nil_Forall2 :
+  forall {A B} (P : A -> B -> Prop) xs ys xs' ys' n,
+    Forall2 P xs ys ->
+    split_every_nil n xs = xs' ->
+    split_every_nil n ys = ys' ->
+    Forall2 (Forall2 P) xs' ys'.
+Proof.
+  intros A B P xs ys xs' ys' n ALL SPLITX SPLITY.
+  generalize dependent xs'.
+  generalize dependent ys'.
+  induction n.
+  - intros.
+    cbn in *.
+    subst.
+    constructor.
+  - intros. unfold split_every in *.
     generalize dependent ys.
     generalize dependent ys'.
     generalize dependent SPLITX.
