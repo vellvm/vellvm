@@ -118,10 +118,16 @@ custom QuickChick libraries.
 
 ** Cachix
 
-Vellvm has a [[https://www.cachix.org/][cachix]] binary cache. You can use it after installing cachix:
+Vellvm has a [[https://www.cachix.org/][cachix]] binary cache, which you can use in conjunction
+with nix to get pre-built versions of vellvm (vellvm takes a long time
+to build, so this is extremely useful). You can use the cache by
+[[https://docs.cachix.org/installation][installing cachix]], and then running the following command to enable
+the vellvm cache:
 
 #+begin_src sh
 cachix use vellvm
 #+end_src
 
-This will let you fetch prebuilt dependencies and binaries for vellvm in nix.
+This will let you fetch prebuilt dependencies and binaries for vellvm
+in nix. There should be Linux and MacOS builds available, but only the
+most recent builds of vellvm will be cached by default.

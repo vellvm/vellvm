@@ -20182,6 +20182,585 @@ Qed.
       apply fin_to_inf_dvalue_refine_strict.
   Qed.
 
+  Lemma fin_to_inf_dvalue_dvalue_int_unsigned :
+    forall dv,
+      IS1.LP.Events.DV.dvalue_int_unsigned (fin_to_inf_dvalue dv) = dvalue_int_unsigned dv.
+  Proof.
+    intros dv.
+    destruct dv; cbn;
+      rewrite_fin_to_inf_dvalue;
+      cbn;
+      auto.
+
+    unfold intptr_fin_inf.
+    break_match; clear Heqs.
+    apply IS1.LP.IP.from_Z_to_Z in e.
+    rewrite <- IP.to_Z_to_unsigned.
+    rewrite <- IS1.LP.IP.to_Z_to_unsigned.
+    auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma uvalue_strict_subterm_gep_cons :
+    forall τ1 τ2 u uv_addr uv_idx uv_idxs,
+      uvalue_strict_subterm u (UVALUE_GetElementPtr τ1 uv_addr uv_idxs) ->
+      uvalue_strict_subterm u (UVALUE_GetElementPtr τ2 uv_addr (uv_idx :: uv_idxs)).
+  Proof.
+    intros τ1 τ2 u uv_addr uv_idx uv_idxs H.
+    dependent induction H.
+    - inv H.
+      repeat constructor.
+      eapply uvalue_getelementptr_strict_subterm.
+      apply Exists_In.
+      exists x.
+      split; cbn; auto.
+      apply rt_refl.
+    - specialize (IHclos_trans2 τ1 uv_addr uv_idxs eq_refl).
+      eapply t_trans.
+      apply H.
+      apply IHclos_trans2.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma addr_convert_safe_reverse :
+    forall a1 a2,
+      AC1.addr_convert a1 = NoOom a2 ->
+      AC2.addr_convert a2 = NoOom a1.
+  Proof.
+    intros a1 a2 H.
+    pose proof addr_refine_fin_to_inf_addr a2 as REF.
+    red in REF.
+    unfold fin_to_inf_addr in REF.
+    break_match_hyp.
+    clear Heqs.
+    rewrite e.
+    pose proof (AC1.addr_convert_injective _ _ _ H REF); subst; auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma orutt_index_into_vec_dv :
+    forall τ dv1_1 dv2_1 dv1_2 dv2_2,
+      dvalue_refine_strict dv1_1 dv1_2 ->
+      dvalue_refine_strict dv2_1 dv2_2 ->
+      orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
+        (IS1.LP.Events.DV.index_into_vec_dv τ dv1_1 dv2_1) (index_into_vec_dv τ dv1_2 dv2_2)
+        (OOM:=OOME).
+  Proof.
+    intros τ dv1_1 dv2_1 dv1_2 dv2_2 REF1 REF2.
+    rewrite TLR1.index_into_vec_dv_err_ub_oom_to_itree,
+      TLR2.index_into_vec_dv_err_ub_oom_to_itree.
+
+    erewrite (fin_to_inf_dvalue_refine_strict' dv1_1); eauto.
+    erewrite (fin_to_inf_dvalue_refine_strict' dv2_1); eauto.
+
+    remember (index_into_vec_dv τ dv1_2 dv2_2) as res.
+    destruct_err_ub_oom res;
+      symmetry in Heqres.
+    - apply orutt_raiseOOM.
+    - apply index_into_vec_dv_no_ub in Heqres; contradiction.
+    - erewrite index_into_vec_dv_err_fin_inf; eauto.
+      apply orutt_raise;
+        [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+    - erewrite index_into_vec_dv_fin_inf; cbn; eauto.
+      apply orutt_Ret.
+      apply fin_to_inf_dvalue_refine_strict.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma orutt_insert_into_vec_dv :
+    forall τ dv1_1 dv2_1 dv3_1 dv1_2 dv2_2 dv3_2,
+      dvalue_refine_strict dv1_1 dv1_2 ->
+      dvalue_refine_strict dv2_1 dv2_2 ->
+      dvalue_refine_strict dv3_1 dv3_2 ->
+      orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
+        (IS1.LP.Events.DV.insert_into_vec_dv τ dv1_1 dv2_1 dv3_1) (insert_into_vec_dv τ dv1_2 dv2_2 dv3_2)
+        (OOM:=OOME).
+  Proof.
+    intros τ dv1_1 dv2_1 dv3_1 dv1_2 dv2_2 dv3_2 REF1 REF2 REF3.
+    rewrite TLR1.insert_into_vec_dv_err_ub_oom_to_itree,
+      TLR2.insert_into_vec_dv_err_ub_oom_to_itree.
+
+    erewrite (fin_to_inf_dvalue_refine_strict' dv1_1); eauto.
+    erewrite (fin_to_inf_dvalue_refine_strict' dv2_1); eauto.
+    erewrite (fin_to_inf_dvalue_refine_strict' dv3_1); eauto.
+
+    remember (insert_into_vec_dv τ dv1_2 dv2_2 dv3_2) as res.
+    destruct_err_ub_oom res;
+      symmetry in Heqres.
+    - apply orutt_raiseOOM.
+    - apply insert_into_vec_dv_no_ub_fin_inf in Heqres; contradiction.
+    - erewrite insert_into_vec_dv_err_fin_inf; eauto.
+      apply orutt_raise;
+        [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+    - erewrite insert_into_vec_dv_fin_inf; cbn; eauto.
+      apply orutt_Ret.
+      apply fin_to_inf_dvalue_refine_strict.
+  Qed.
+
+  Lemma dvalue_refine_strict_map_fin_to_inf_dvalue :
+    forall a b,
+      Forall2 dvalue_refine_strict a b ->
+      a = map fin_to_inf_dvalue b.
+  Proof.
+    intros a b H.
+    induction H; cbn; auto.
+
+    subst.
+    unfold fin_to_inf_dvalue at 2.
+    break_match; clear Heqs.
+    destruct p.
+    red in H.
+    pose proof dvalue_refine_strict_R2_injective x y x0 y H e0 as (_&?).
+    rewrite H1; auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma extract_value_loop_fin_inf_no_ub :
+    forall idxs str msg,
+      (fix loop str idxs {struct idxs} : err_ub_oom dvalue :=
+         match idxs with
+         | [] => ret str
+         | i :: tl =>
+             v <- index_into_str_dv str i ;;
+             loop v tl
+         end) str idxs = UB_unERR_UB_OOM msg -> False.
+  Proof.
+    induction idxs;
+      intros str res LOOP.
+    - inv LOOP; auto.
+    - cbn in LOOP.
+      repeat break_match_hyp_inv.
+      destruct unERR_UB_OOM, unEitherT, unEitherT, unEitherT, unIdent;
+        inv Heqs.
+      + apply index_into_str_dv_no_ub_fin_inf in Heqe; auto.
+      + match goal with
+        | H: EitherMonad.unEitherT
+               (EitherMonad.unEitherT
+                  (EitherMonad.unEitherT
+                     (Error.unERR_UB_OOM
+                        (?L)))) = _ |- _ =>
+            remember L as LOOP
+        end.
+
+        destruct_err_ub_oom LOOP; inv H1.
+        symmetry in HeqLOOP.
+        apply IHidxs in HeqLOOP; auto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma orutt_extractvalue_loop :
+    forall dv1 dv2 idxs,
+      dvalue_refine_strict dv1 dv2 ->
+      orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
+        ((fix loop (str : IS1.LP.Events.DV.dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} :
+           itree IS1.LP.Events.exp_E IS1.LP.Events.DV.dvalue :=
+            match idxs0 with
+            | [] => Ret str
+            | i :: tl =>
+                ITree.bind (IS1.LP.Events.DV.index_into_str_dv str i)
+                  (fun v : IS1.LP.Events.DV.dvalue => loop v tl)
+            end) dv1 idxs)
+        ((fix loop (str : dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} : itree exp_E dvalue :=
+            match idxs0 with
+            | [] => Ret str
+            | i :: tl => ITree.bind (index_into_str_dv str i) (fun v : dvalue => loop v tl)
+            end) dv2 idxs)
+        (OOM:=OOME).
+  Proof.
+    intros dv1 dv2 idxs REF.
+    setoid_rewrite TLR1.extract_value_loop_err_ub_oom_to_itree;
+      setoid_rewrite TLR2.extract_value_loop_err_ub_oom_to_itree.
+
+    erewrite (fin_to_inf_dvalue_refine_strict' dv1); eauto.
+
+    remember
+      ((fix loop (str : dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} : err_ub_oom dvalue :=
+          match idxs0 with
+          | [] => ret str
+          | i :: tl => v <- index_into_str_dv str i;; loop v tl
+          end) dv2 idxs) as res.
+    destruct_err_ub_oom res;
+      symmetry in Heqres.
+    - apply orutt_raiseOOM.
+    - apply extract_value_loop_fin_inf_no_ub in Heqres; contradiction.
+    - erewrite extract_value_loop_fin_inf_err; eauto.
+      apply orutt_raise;
+        [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+    - erewrite extract_value_loop_fin_inf_succeeds; cbn; eauto.
+      apply orutt_Ret.
+      apply fin_to_inf_dvalue_refine_strict.
+  Qed.
+
+  Lemma orutt_insert_value_loop :
+    forall dv1 dv2 dv1' dv2' idxs,
+      dvalue_refine_strict dv1 dv2 ->
+      dvalue_refine_strict dv1' dv2' ->
+      orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
+        ((fix loop (str : IS1.LP.Events.DV.dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} :
+           itree IS1.LP.Events.exp_E IS1.LP.Events.DV.dvalue :=
+            match idxs0 with
+            | [] => LLVMEvents.raise "Index was not provided"
+            | [i] =>
+                ITree.bind (IS1.LP.Events.DV.insert_into_str str dv1' i)
+                  (fun v : IS1.LP.Events.DV.dvalue => Ret v)
+            | i :: (_ :: _) as tl =>
+                ITree.bind (IS1.LP.Events.DV.index_into_str_dv str i)
+                  (fun subfield : IS1.LP.Events.DV.dvalue =>
+                     ITree.bind (loop subfield tl)
+                       (fun modified_subfield : IS1.LP.Events.DV.dvalue =>
+                          IS1.LP.Events.DV.insert_into_str str modified_subfield i))
+            end) dv1 idxs)
+        ((fix loop (str : dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} : itree exp_E dvalue :=
+            match idxs0 with
+            | [] => LLVMEvents.raise "Index was not provided"
+            | [i] => ITree.bind (insert_into_str str dv2' i) (fun v : dvalue => Ret v)
+            | i :: (_ :: _) as tl =>
+                ITree.bind (index_into_str_dv str i)
+                  (fun subfield : dvalue =>
+                     ITree.bind (loop subfield tl)
+                       (fun modified_subfield : dvalue => insert_into_str str modified_subfield i))
+            end) dv2 idxs)
+        (OOM:=OOME).
+  Proof.
+    intros dv1 dv2 dv1' dv2' idxs REF1 REF2.
+    setoid_rewrite TLR1.insert_value_loop_err_ub_oom_to_itree;
+      setoid_rewrite TLR2.insert_value_loop_err_ub_oom_to_itree.
+
+    erewrite (fin_to_inf_dvalue_refine_strict' dv1); eauto.
+    erewrite (fin_to_inf_dvalue_refine_strict' dv1'); eauto.
+
+    erewrite insert_value_loop_fin_inf_succeeds; eauto.
+    remember
+      ((fix loop (str : dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} : err_ub_oom dvalue :=
+          match idxs0 with
+          | [] => raise_error "Index was not provided"
+          | [i] => v <- insert_into_str str dv2' i;; ret v
+          | i :: (_ :: _) as tl =>
+              subfield <- index_into_str_dv str i;;
+              modified_subfield <- loop subfield tl;; insert_into_str str modified_subfield i
+          end) dv2 idxs) as res.
+    destruct_err_ub_oom res;
+      symmetry in Heqres; cbn.
+    - apply orutt_raiseOOM.
+    - apply orutt_raiseUB;
+        [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+    - apply orutt_raise;
+        [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+    - apply orutt_Ret.
+      apply fin_to_inf_dvalue_refine_strict.
+  Qed.
+
+  Lemma orutt_dvalue_bytes_to_dvalue :
+    forall dt (r1 : list IS1.MEM.DVALUE_BYTE.dvalue_byte) (r2 : list dvalue_byte),
+      dvalue_bytes_refine r1 r2 ->
+      orutt (OOM:=OOME) exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
+        (ErrOOMPoison_handle_poison_and_oom IS1.LP.Events.DV.DVALUE_Poison
+           (IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_bytes_to_dvalue r1 dt))
+        (ErrOOMPoison_handle_poison_and_oom DVALUE_Poison (DVALUE_BYTES.dvalue_bytes_to_dvalue r2 dt)).
+  Proof.
+    intros ? ? ? ?.
+    rewrite TLR1.handle_poison_and_oom_dvalue_bytes_to_dvalue_err_ub_oom_to_itree,
+      TLR2.handle_poison_and_oom_dvalue_bytes_to_dvalue_err_ub_oom_to_itree.
+    remember (ErrOOMPoison_handle_poison_and_oom DVALUE_Poison (DVALUE_BYTES.dvalue_bytes_to_dvalue r2 dt)) as res.
+    destruct_err_ub_oom res; symmetry in Heqres.
+    - apply orutt_raiseOOM.
+    - erewrite dvalue_bytes_to_dvalue_ub_fin_inf; eauto.
+      apply orutt_raiseUB;
+        [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+    - erewrite dvalue_bytes_to_dvalue_err_fin_inf; eauto.
+      apply orutt_raise;
+        [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+    - erewrite dvalue_bytes_to_dvalue_fin_inf; eauto.
+      apply orutt_Ret.
+      apply fin_to_inf_dvalue_refine_strict.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma orutt_eval_select_loop :
+    forall cnds1 xs1 ys1 cnds2 xs2 ys2,
+      map_monad dvalue_convert_strict cnds1 = NoOom cnds2 ->
+      map_monad dvalue_convert_strict xs1 = NoOom xs2 ->
+      map_monad dvalue_convert_strict ys1 = NoOom ys2 ->
+      orutt (OOM:=OOME) exp_E_refine_strict exp_E_res_refine_strict (Forall2 dvalue_refine_strict)
+        ((fix loop (conds xs ys : list IS1.LP.Events.DV.dvalue) {struct conds} :
+           itree IS1.LP.Events.exp_E (list IS1.LP.Events.DV.dvalue) :=
+            match conds with
+            | [] =>
+                match xs with
+                | [] =>
+                    fun ys0 : list IS1.LP.Events.DV.dvalue =>
+                      match ys0 with
+                      | [] => Ret []
+                      | _ :: _ =>
+                          LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
+                      end
+                | _ :: _ =>
+                    fun _ : list IS1.LP.Events.DV.dvalue =>
+                      LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
+                end ys
+            | c :: conds0 =>
+                match xs with
+                | [] => LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
+                | x5 :: xs0 =>
+                    match ys with
+                    | [] =>
+                        LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
+                    | y :: ys0 =>
+                        ITree.bind
+                          match c with
+                          | IS1.LP.Events.DV.DVALUE_I1 i =>
+                              if (Int1.unsigned i =? 1)%Z then Ret x5 else Ret y
+                          | IS1.LP.Events.DV.DVALUE_Poison t => Ret (IS1.LP.Events.DV.DVALUE_Poison t)
+                          | _ =>
+                              LLVMEvents.raise
+                                "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1."
+                          end
+                          (fun selected : IS1.LP.Events.DV.dvalue =>
+                             ITree.bind (loop conds0 xs0 ys0)
+                               (fun rest : list IS1.LP.Events.DV.dvalue => Ret (selected :: rest)))
+                    end
+                end
+            end) cnds1 xs1 ys1)
+        ((fix loop (conds xs ys : list dvalue) {struct conds} : itree exp_E (list dvalue) :=
+            match conds with
+            | [] =>
+                match xs with
+                | [] =>
+                    fun ys0 : list dvalue =>
+                      match ys0 with
+                      | [] => Ret []
+                      | _ :: _ =>
+                          LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
+                      end
+                | _ :: _ =>
+                    fun _ : list dvalue =>
+                      LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
+                end ys
+            | c :: conds0 =>
+                match xs with
+                | [] => LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
+                | x5 :: xs0 =>
+                    match ys with
+                    | [] =>
+                        LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
+                    | y :: ys0 =>
+                        ITree.bind
+                          match c with
+                          | DVALUE_I1 i => if (Int1.unsigned i =? 1)%Z then Ret x5 else Ret y
+                          | DVALUE_Poison t => Ret (DVALUE_Poison t)
+                          | _ =>
+                              LLVMEvents.raise
+                                "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1."
+                          end
+                          (fun selected : dvalue =>
+                             ITree.bind (loop conds0 xs0 ys0)
+                               (fun rest : list dvalue => Ret (selected :: rest)))
+                    end
+                end
+            end) cnds2 xs2 ys2).
+  Proof.
+    intros cnds1.
+
+    induction cnds1, xs1, ys1;
+      intros cnds2 xs2 ys2 REF_CNDS REF_XS REF_YS;
+      cbn in *; subst; inv REF_CNDS; inv REF_XS; inv REF_YS;
+      repeat break_match_hyp_inv; cbn;
+      try solve
+        [ apply orutt_raise;
+          [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]
+        ].
+
+    apply orutt_Ret; constructor.
+
+    specialize (IHcnds1 xs1 ys1 l1 l0 l eq_refl Heqo2 Heqo0).
+    eapply orutt_bind with (RR:=dvalue_refine_strict).
+    { destruct d3;
+        dvalue_convert_strict_inv Heqo3; cbn;
+        try solve
+          [ apply orutt_raise;
+            [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]
+          ].
+      - break_match;
+          apply orutt_Ret; eauto.
+      - apply orutt_Ret; eauto.
+        solve_dvalue_refine_strict.
+    }
+
+    intros ? ? ?.
+    eapply orutt_bind with (RR:=Forall2 dvalue_refine_strict); eauto.
+    intros ? ? ?.
+    eapply orutt_Ret.
+    apply Forall2_cons; eauto.
+  Qed.
+
+  Lemma orutt_concretize_uvalue_bytes_helper :
+    forall uvs1 uvs2 acc1 acc2
+      (IH : forall (uv_fin : DV2.uvalue),
+          Exists (DV2.uvalue_subterm uv_fin) uvs2 ->
+          forall u : DV1.uvalue,
+            uvalue_refine_strict u uv_fin ->
+            orutt (OOM:=OOME) exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
+              (IS1.LLVM.MEM.CP.CONC.concretize_uvalue u) (concretize_uvalue uv_fin)),
+      Forall2 uvalue_refine_strict uvs1 uvs2 ->
+      concretization_map_refine acc1 acc2 ->
+      orutt (OOM:=OOME) exp_E_refine_strict exp_E_res_refine_strict dvalue_bytes_refine
+        ((fix concretize_uvalue_bytes_helper
+            (acc : NMap (list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)))
+            (uvs0 : list IS1.LP.Events.DV.uvalue) {struct uvs0} :
+           itree IS1.LP.Events.exp_E (list IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_byte) :=
+            match uvs0 with
+            | [] => Ret []
+            | IS1.LP.Events.DV.UVALUE_ExtractByte byte_uv dt0 idx sid :: uvs1 =>
+                match
+                  match
+                    NM.find (elt:=list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)) sid acc
+                  with
+                  | Some v => Util.assoc byte_uv v
+                  | None => None
+                  end
+                with
+                | Some dv =>
+                    ITree.bind (concretize_uvalue_bytes_helper acc uvs1)
+                      (fun rest : list IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_byte =>
+                         Ret (IS1.LLVM.MEM.MP.DVALUE_BYTES.DVALUE_ExtractByte dv dt0 idx :: rest))
+                | None =>
+                    ITree.bind
+                      (IS1.LLVM.MEM.CP.CONC.concretize_uvalueM (itree IS1.LP.Events.exp_E)
+                         (fun dt1 : dtyp =>
+                            lift_err_RAISE_ERROR (IS1.LP.Events.DV.default_dvalue_of_dtyp dt1))
+                         (itree IS1.LP.Events.exp_E)
+                         (fun (A : Type) (x0 : itree IS1.LP.Events.exp_E A) => x0) byte_uv)
+                      (fun dv : IS1.LP.Events.DV.dvalue =>
+                         ITree.bind
+                           (concretize_uvalue_bytes_helper
+                              (IS1.LLVM.MEM.CP.CONCBASE.new_concretized_byte acc byte_uv dv sid) uvs1)
+                           (fun rest : list IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_byte =>
+                              Ret (IS1.LLVM.MEM.MP.DVALUE_BYTES.DVALUE_ExtractByte dv dt0 idx :: rest)))
+                end
+            | _ => LLVMEvents.raise "concretize_uvalue_bytes_helper: non-byte in uvs."
+            end) acc1 uvs1)
+        ((fix concretize_uvalue_bytes_helper
+            (acc : NMap (list (uvalue * dvalue))) (uvs0 : list uvalue) {struct uvs0} :
+           itree exp_E (list DVALUE_BYTES.dvalue_byte) :=
+            match uvs0 with
+            | [] => Ret []
+            | UVALUE_ExtractByte byte_uv dt0 idx sid :: uvs1 =>
+                match
+                  match NM.find (elt:=list (uvalue * dvalue)) sid acc with
+                  | Some v => Util.assoc byte_uv v
+                  | None => None
+                  end
+                with
+                | Some dv =>
+                    ITree.bind (concretize_uvalue_bytes_helper acc uvs1)
+                      (fun rest : list DVALUE_BYTES.dvalue_byte =>
+                         Ret (DVALUE_BYTES.DVALUE_ExtractByte dv dt0 idx :: rest))
+                | None =>
+                    ITree.bind
+                      (CONC.concretize_uvalueM (itree exp_E)
+                         (fun dt1 : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt1))
+                         (itree exp_E) (fun (A : Type) (x0 : itree exp_E A) => x0) byte_uv)
+                      (fun dv : dvalue =>
+                         ITree.bind
+                           (concretize_uvalue_bytes_helper (new_concretized_byte acc byte_uv dv sid) uvs1)
+                           (fun rest : list DVALUE_BYTES.dvalue_byte =>
+                              Ret (DVALUE_BYTES.DVALUE_ExtractByte dv dt0 idx :: rest)))
+                end
+            | _ => LLVMEvents.raise "concretize_uvalue_bytes_helper: non-byte in uvs."
+            end) acc2 uvs2).
+  Proof.
+    intros uvs1 uvs2 acc1 acc2 IH REF ACC_REF.
+    revert acc1 acc2 ACC_REF.
+    induction REF; intros acc1 acc2 ACC_REF.
+    - apply orutt_Ret.
+      constructor.
+    - destruct y; uvalue_refine_strict_inv H;
+        try solve
+          [ apply orutt_raise;
+            [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]
+          ].
+      cbn.
+      cbn.
+
+      pose proof ACC_REF as (?&?).
+      break_inner_match.
+      2: {
+        destruct (NM.find (elt:=list (uvalue * dvalue)) sid acc2) eqn:FIND2.
+        { exfalso.
+          apply NM_find_not_In in Heqo.
+          apply Heqo.
+          apply H.
+          eapply NM_find_In; eauto.
+        }
+
+        eapply orutt_bind with (RR:=dvalue_refine_strict).
+        { apply IH; auto.
+          repeat constructor.
+        }
+
+        intros ? ? ?.
+        eapply orutt_bind with (RR:=dvalue_bytes_refine).
+        eapply IHREF; eauto.
+        apply concretize_map_refine_new_concretized_byte_fin_inf; eauto.
+
+        intros ? ? ?.
+        apply orutt_Ret.
+        red.
+        constructor; cbn; eauto.
+      }
+
+      eapply concretize_map_refine_find_some_inf_fin in Heqo; eauto.
+      destruct Heqo as (?&?&?).
+      rewrite H2.
+      break_match.
+      { eapply assoc_similar_lookup in Heqo.
+        2: apply uvalue_refine_strict_R2_injective.
+        2: apply H3.
+
+        destruct Heqo as (?&?&?&?&?&?).
+        pose proof (Util.Forall2_Nth H5 H6 H3).
+        destruct H7.
+        cbn in *.
+        red in fst_rel.
+        setoid_rewrite H0 in fst_rel.
+        inv fst_rel.
+
+        subst.
+        rewrite H4.
+
+        eapply orutt_bind with (RR:=dvalue_bytes_refine).
+        eapply IHREF; auto.
+
+        intros ? ? ?.
+        apply orutt_Ret.
+        red.
+        constructor; cbn; eauto.
+      }
+
+      { eapply (assoc_similar_no_lookup uvalue_refine_strict dvalue_refine_strict l0 x) in Heqo.
+        2: apply uvalue_refine_strict_R2_injective.
+        2: apply H3.
+        2: eauto.
+
+        rewrite Heqo.
+
+        eapply orutt_bind with (RR:=dvalue_refine_strict).
+        { apply IH; auto.
+          repeat constructor.
+        }
+
+        intros ? ? ?.
+        eapply orutt_bind with (RR:=dvalue_bytes_refine).
+        eapply IHREF; eauto.
+        apply concretize_map_refine_new_concretized_byte_fin_inf; eauto.
+
+        intros ? ? ?.
+        apply orutt_Ret.
+        red.
+        constructor; cbn; eauto.
+      }
+  Qed.
+
   Lemma orutt_concretize_uvalue :
     forall u2 u1,
       uvalue_refine_strict u1 u2 ->
@@ -20436,25 +21015,6 @@ Qed.
             red.
             cbn.
             rewrite addr_convert_fin_to_inf_addr; reflexivity.
-
-            Set Nested Proofs Allowed.
-            Lemma fin_to_inf_dvalue_dvalue_int_unsigned :
-              forall dv,
-                IS1.LP.Events.DV.dvalue_int_unsigned (fin_to_inf_dvalue dv) = dvalue_int_unsigned dv.
-            Proof.
-              intros dv.
-              destruct dv; cbn;
-                rewrite_fin_to_inf_dvalue;
-                cbn;
-                auto.
-
-              unfold intptr_fin_inf.
-              break_match; clear Heqs.
-              apply IS1.LP.IP.from_Z_to_Z in e.
-              rewrite <- IP.to_Z_to_unsigned.
-              rewrite <- IS1.LP.IP.to_Z_to_unsigned.
-              auto.
-            Qed.
             rewrite fin_to_inf_dvalue_dvalue_int_unsigned; auto.
           }
 
@@ -20542,27 +21102,6 @@ Qed.
           [ eapply H; eauto; repeat constructor | ].
         intros ? ? REF.
 
-        (* TODO: Move this *)
-        Lemma uvalue_strict_subterm_gep_cons :
-          forall τ1 τ2 u uv_addr uv_idx uv_idxs,
-            uvalue_strict_subterm u (UVALUE_GetElementPtr τ1 uv_addr uv_idxs) ->
-            uvalue_strict_subterm u (UVALUE_GetElementPtr τ2 uv_addr (uv_idx :: uv_idxs)).
-        Proof.
-          intros τ1 τ2 u uv_addr uv_idx uv_idxs H.
-          dependent induction H.
-          - inv H.
-            repeat constructor.
-            eapply uvalue_getelementptr_strict_subterm.
-            apply Exists_In.
-            exists x.
-            split; cbn; auto.
-            apply rt_refl.
-          - specialize (IHclos_trans2 τ1 uv_addr uv_idxs eq_refl).
-            eapply t_trans.
-            apply H.
-            apply IHclos_trans2.
-        Qed.
-
         eapply map_monad_oom_Forall2 in H2.
         assert (Forall2 (fun (a : DV1.uvalue) (b : DV2.uvalue) => uvalue_convert_strict a = NoOom b /\ DV2.uvalue_strict_subterm b (DV2.UVALUE_GetElementPtr t u2 idxs)) x0 idxs).
         { induction H2; cbn; auto.
@@ -20607,41 +21146,8 @@ Qed.
           symmetry in Heqres.
         * eapply handle_gep_addr_err_fin_inf with (base_addr_inf:=x1) in Heqres; eauto.
           2: {
-            (* TODO: Move this *)
-            Lemma addr_convert_safe_reverse :
-            forall a1 a2,
-              AC1.addr_convert a1 = NoOom a2 ->
-              AC2.addr_convert a2 = NoOom a1.
-            Proof.
-              intros a1 a2 H.
-              pose proof addr_refine_fin_to_inf_addr a2 as REF.
-              red in REF.
-              unfold fin_to_inf_addr in REF.
-              break_match_hyp.
-              clear Heqs.
-              rewrite e.
-              pose proof (AC1.addr_convert_injective _ _ _ H REF); subst; auto.
-            Qed.
-
             apply addr_convert_safe_reverse; auto.
           }
-
-          Lemma dvalue_refine_strict_map_fin_to_inf_dvalue :
-            forall a b,
-              Forall2 dvalue_refine_strict a b ->
-              a = map fin_to_inf_dvalue b.
-          Proof.
-            intros a b H.
-            induction H; cbn; auto.
-
-            subst.
-            unfold fin_to_inf_dvalue at 2.
-            break_match; clear Heqs.
-            destruct p.
-            red in H.
-            pose proof dvalue_refine_strict_R2_injective x y x0 y H e0 as (_&?).
-            rewrite H1; auto.
-          Qed.
 
           erewrite <- dvalue_refine_strict_map_fin_to_inf_dvalue in Heqres; eauto.
           rewrite Heqres.
@@ -20683,36 +21189,6 @@ Qed.
         }
 
         intros ? ? ?; subst.
-
-        (* TODO: Move this *)
-        Lemma orutt_index_into_vec_dv :
-          forall τ dv1_1 dv2_1 dv1_2 dv2_2,
-            dvalue_refine_strict dv1_1 dv1_2 ->
-            dvalue_refine_strict dv2_1 dv2_2 ->
-            orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
-              (IS1.LP.Events.DV.index_into_vec_dv τ dv1_1 dv2_1) (index_into_vec_dv τ dv1_2 dv2_2)
-              (OOM:=OOME).
-        Proof.
-          intros τ dv1_1 dv2_1 dv1_2 dv2_2 REF1 REF2.
-          rewrite TLR1.index_into_vec_dv_err_ub_oom_to_itree,
-            TLR2.index_into_vec_dv_err_ub_oom_to_itree.
-
-          erewrite (fin_to_inf_dvalue_refine_strict' dv1_1); eauto.
-          erewrite (fin_to_inf_dvalue_refine_strict' dv2_1); eauto.
-
-          remember (index_into_vec_dv τ dv1_2 dv2_2) as res.
-          destruct_err_ub_oom res;
-            symmetry in Heqres.
-          - apply orutt_raiseOOM.
-          - apply index_into_vec_dv_no_ub in Heqres; contradiction.
-          - erewrite index_into_vec_dv_err_fin_inf; eauto.
-            apply orutt_raise;
-              [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
-          - erewrite index_into_vec_dv_fin_inf; cbn; eauto.
-            apply orutt_Ret.
-            apply fin_to_inf_dvalue_refine_strict.
-        Qed.
-
         apply orutt_index_into_vec_dv; auto.
       + (* InsertElement *)
         cbn.
@@ -20728,37 +21204,6 @@ Qed.
           [ eapply H; eauto; repeat constructor | ].
         intros ? ? REF3.
 
-        (* TODO: Move this *)
-        Lemma orutt_insert_into_vec_dv :
-          forall τ dv1_1 dv2_1 dv3_1 dv1_2 dv2_2 dv3_2,
-            dvalue_refine_strict dv1_1 dv1_2 ->
-            dvalue_refine_strict dv2_1 dv2_2 ->
-            dvalue_refine_strict dv3_1 dv3_2 ->
-            orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
-              (IS1.LP.Events.DV.insert_into_vec_dv τ dv1_1 dv2_1 dv3_1) (insert_into_vec_dv τ dv1_2 dv2_2 dv3_2)
-              (OOM:=OOME).
-        Proof.
-          intros τ dv1_1 dv2_1 dv3_1 dv1_2 dv2_2 dv3_2 REF1 REF2 REF3.
-          rewrite TLR1.insert_into_vec_dv_err_ub_oom_to_itree,
-            TLR2.insert_into_vec_dv_err_ub_oom_to_itree.
-
-          erewrite (fin_to_inf_dvalue_refine_strict' dv1_1); eauto.
-          erewrite (fin_to_inf_dvalue_refine_strict' dv2_1); eauto.
-          erewrite (fin_to_inf_dvalue_refine_strict' dv3_1); eauto.
-
-          remember (insert_into_vec_dv τ dv1_2 dv2_2 dv3_2) as res.
-          destruct_err_ub_oom res;
-            symmetry in Heqres.
-          - apply orutt_raiseOOM.
-          - apply insert_into_vec_dv_no_ub_fin_inf in Heqres; contradiction.
-          - erewrite insert_into_vec_dv_err_fin_inf; eauto.
-            apply orutt_raise;
-              [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
-          - erewrite insert_into_vec_dv_fin_inf; cbn; eauto.
-            apply orutt_Ret.
-            apply fin_to_inf_dvalue_refine_strict.
-        Qed.
-
         apply orutt_insert_into_vec_dv; auto.
       + (* ShuffleVector *)
         cbn.
@@ -20770,84 +21215,6 @@ Qed.
         eapply orutt_bind;
           [ eapply H; eauto; repeat constructor | ].
         intros ? ? REF.
-
-        (* TODO: Move this *)
-        Lemma extract_value_loop_fin_inf_no_ub :
-          forall idxs str msg,
-            (fix loop str idxs {struct idxs} : err_ub_oom dvalue :=
-               match idxs with
-               | [] => ret str
-               | i :: tl =>
-                   v <- index_into_str_dv str i ;;
-                   loop v tl
-               end) str idxs = UB_unERR_UB_OOM msg -> False.
-        Proof.
-          induction idxs;
-            intros str res LOOP.
-          - inv LOOP; auto.
-          - cbn in LOOP.
-            repeat break_match_hyp_inv.
-            destruct unERR_UB_OOM, unEitherT, unEitherT, unEitherT, unIdent;
-              inv Heqs.
-            + apply index_into_str_dv_no_ub_fin_inf in Heqe; auto.
-            + match goal with
-              | H: EitherMonad.unEitherT
-                     (EitherMonad.unEitherT
-                        (EitherMonad.unEitherT
-                           (Error.unERR_UB_OOM
-                              (?L)))) = _ |- _ =>
-                  remember L as LOOP
-              end.
-
-            destruct_err_ub_oom LOOP; inv H1.
-            symmetry in HeqLOOP.
-            apply IHidxs in HeqLOOP; auto.
-        Qed.
-
-        (* TODO: Move this *)
-        Lemma orutt_extractvalue_loop :
-          forall dv1 dv2 idxs,
-            dvalue_refine_strict dv1 dv2 ->
-            orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
-              ((fix loop (str : IS1.LP.Events.DV.dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} :
-                 itree IS1.LP.Events.exp_E IS1.LP.Events.DV.dvalue :=
-                  match idxs0 with
-                  | [] => Ret str
-                  | i :: tl =>
-                      ITree.bind (IS1.LP.Events.DV.index_into_str_dv str i)
-                        (fun v : IS1.LP.Events.DV.dvalue => loop v tl)
-                  end) dv1 idxs)
-              ((fix loop (str : dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} : itree exp_E dvalue :=
-                  match idxs0 with
-                  | [] => Ret str
-                  | i :: tl => ITree.bind (index_into_str_dv str i) (fun v : dvalue => loop v tl)
-                  end) dv2 idxs)
-              (OOM:=OOME).
-        Proof.
-          intros dv1 dv2 idxs REF.
-          setoid_rewrite TLR1.extract_value_loop_err_ub_oom_to_itree;
-            setoid_rewrite TLR2.extract_value_loop_err_ub_oom_to_itree.
-
-          erewrite (fin_to_inf_dvalue_refine_strict' dv1); eauto.
-
-          remember
-            ((fix loop (str : dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} : err_ub_oom dvalue :=
-                match idxs0 with
-                | [] => ret str
-                | i :: tl => v <- index_into_str_dv str i;; loop v tl
-                end) dv2 idxs) as res.
-          destruct_err_ub_oom res;
-            symmetry in Heqres.
-          - apply orutt_raiseOOM.
-          - apply extract_value_loop_fin_inf_no_ub in Heqres; contradiction.
-          - erewrite extract_value_loop_fin_inf_err; eauto.
-            apply orutt_raise;
-              [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
-          - erewrite extract_value_loop_fin_inf_succeeds; cbn; eauto.
-            apply orutt_Ret.
-            apply fin_to_inf_dvalue_refine_strict.
-        Qed.
-
         apply orutt_extractvalue_loop; auto.
       + (* InsertValue *)
         cbn.
@@ -20858,66 +21225,6 @@ Qed.
         eapply orutt_bind;
           [ eapply H; eauto; repeat constructor | ].
         intros ? ? REF2.
-
-        Lemma orutt_insert_value_loop :
-          forall dv1 dv2 dv1' dv2' idxs,
-            dvalue_refine_strict dv1 dv2 ->
-            dvalue_refine_strict dv1' dv2' ->
-            orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
-              ((fix loop (str : IS1.LP.Events.DV.dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} :
-                 itree IS1.LP.Events.exp_E IS1.LP.Events.DV.dvalue :=
-                  match idxs0 with
-                  | [] => LLVMEvents.raise "Index was not provided"
-                  | [i] =>
-                      ITree.bind (IS1.LP.Events.DV.insert_into_str str dv1' i)
-                        (fun v : IS1.LP.Events.DV.dvalue => Ret v)
-                  | i :: (_ :: _) as tl =>
-                      ITree.bind (IS1.LP.Events.DV.index_into_str_dv str i)
-                        (fun subfield : IS1.LP.Events.DV.dvalue =>
-                           ITree.bind (loop subfield tl)
-                             (fun modified_subfield : IS1.LP.Events.DV.dvalue =>
-                                IS1.LP.Events.DV.insert_into_str str modified_subfield i))
-                  end) dv1 idxs)
-              ((fix loop (str : dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} : itree exp_E dvalue :=
-                  match idxs0 with
-                  | [] => LLVMEvents.raise "Index was not provided"
-                  | [i] => ITree.bind (insert_into_str str dv2' i) (fun v : dvalue => Ret v)
-                  | i :: (_ :: _) as tl =>
-                      ITree.bind (index_into_str_dv str i)
-                        (fun subfield : dvalue =>
-                           ITree.bind (loop subfield tl)
-                             (fun modified_subfield : dvalue => insert_into_str str modified_subfield i))
-                  end) dv2 idxs)
-              (OOM:=OOME).
-        Proof.
-          intros dv1 dv2 dv1' dv2' idxs REF1 REF2.
-          setoid_rewrite TLR1.insert_value_loop_err_ub_oom_to_itree;
-            setoid_rewrite TLR2.insert_value_loop_err_ub_oom_to_itree.
-
-          erewrite (fin_to_inf_dvalue_refine_strict' dv1); eauto.
-          erewrite (fin_to_inf_dvalue_refine_strict' dv1'); eauto.
-
-          erewrite insert_value_loop_fin_inf_succeeds; eauto.
-          remember
-            ((fix loop (str : dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} : err_ub_oom dvalue :=
-                match idxs0 with
-                | [] => raise_error "Index was not provided"
-                | [i] => v <- insert_into_str str dv2' i;; ret v
-                | i :: (_ :: _) as tl =>
-                    subfield <- index_into_str_dv str i;;
-                    modified_subfield <- loop subfield tl;; insert_into_str str modified_subfield i
-                end) dv2 idxs) as res.
-          destruct_err_ub_oom res;
-            symmetry in Heqres; cbn.
-          - apply orutt_raiseOOM.
-          - apply orutt_raiseUB;
-              [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
-          - apply orutt_raise;
-              [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
-          - apply orutt_Ret.
-            apply fin_to_inf_dvalue_refine_strict.
-        Qed.
-
         apply orutt_insert_value_loop; auto.
       + (* Select *)
         cbn.
@@ -20973,119 +21280,6 @@ Qed.
 
           eapply orutt_bind with (RR:=Forall2 dvalue_refine_strict).
           {
-            (* TODO: Move this *)
-            Lemma orutt_eval_select_loop :
-              forall x2 x3 x4 elts elts0 elts1,
-                map_monad dvalue_convert_strict x2 = NoOom elts ->
-                map_monad dvalue_convert_strict x3 = NoOom elts0 ->
-                map_monad dvalue_convert_strict x4 = NoOom elts1 ->
-              orutt (OOM:=OOME) exp_E_refine_strict exp_E_res_refine_strict (Forall2 dvalue_refine_strict)
-                ((fix loop (conds xs ys : list IS1.LP.Events.DV.dvalue) {struct conds} :
-                   itree IS1.LP.Events.exp_E (list IS1.LP.Events.DV.dvalue) :=
-                    match conds with
-                    | [] =>
-                        match xs with
-                        | [] =>
-                            fun ys0 : list IS1.LP.Events.DV.dvalue =>
-                              match ys0 with
-                              | [] => Ret []
-                              | _ :: _ =>
-                                  LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
-                              end
-                        | _ :: _ =>
-                            fun _ : list IS1.LP.Events.DV.dvalue =>
-                              LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
-                        end ys
-                    | c :: conds0 =>
-                        match xs with
-                        | [] => LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
-                        | x5 :: xs0 =>
-                            match ys with
-                            | [] =>
-                                LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
-                            | y :: ys0 =>
-                                ITree.bind
-                                  match c with
-                                  | IS1.LP.Events.DV.DVALUE_I1 i =>
-                                      if (Int1.unsigned i =? 1)%Z then Ret x5 else Ret y
-                                  | IS1.LP.Events.DV.DVALUE_Poison t => Ret (IS1.LP.Events.DV.DVALUE_Poison t)
-                                  | _ =>
-                                      LLVMEvents.raise
-                                        "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1."
-                                  end
-                                  (fun selected : IS1.LP.Events.DV.dvalue =>
-                                     ITree.bind (loop conds0 xs0 ys0)
-                                       (fun rest : list IS1.LP.Events.DV.dvalue => Ret (selected :: rest)))
-                            end
-                        end
-                    end) x2 x3 x4)
-                ((fix loop (conds xs ys : list dvalue) {struct conds} : itree exp_E (list dvalue) :=
-                    match conds with
-                    | [] =>
-                        match xs with
-                        | [] =>
-                            fun ys0 : list dvalue =>
-                              match ys0 with
-                              | [] => Ret []
-                              | _ :: _ =>
-                                  LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
-                              end
-                        | _ :: _ =>
-                            fun _ : list dvalue =>
-                              LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
-                        end ys
-                    | c :: conds0 =>
-                        match xs with
-                        | [] => LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
-                        | x5 :: xs0 =>
-                            match ys with
-                            | [] =>
-                                LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
-                            | y :: ys0 =>
-                                ITree.bind
-                                  match c with
-                                  | DVALUE_I1 i => if (Int1.unsigned i =? 1)%Z then Ret x5 else Ret y
-                                  | DVALUE_Poison t => Ret (DVALUE_Poison t)
-                                  | _ =>
-                                      LLVMEvents.raise
-                                        "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1."
-                                  end
-                                  (fun selected : dvalue =>
-                                     ITree.bind (loop conds0 xs0 ys0)
-                                       (fun rest : list dvalue => Ret (selected :: rest)))
-                            end
-                        end
-                    end) elts elts0 elts1).
-            Proof.
-              intros x2 x3 x4.
-              setoid_rewrite TLR1.eval_select_loop_err_ub_oom_to_itree.
-              setoid_rewrite TLR2.eval_select_loop_err_ub_oom_to_itree.
-
-              induction x2, x3, x4;
-                intros elts elts0 elts1 H H0 H1;
-                cbn in *; subst; inv H; inv H0; inv H1;
-                repeat break_match_hyp_inv; cbn;
-                try solve
-                  [ apply orutt_raise;
-                    [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]
-                  ].
-
-              apply orutt_Ret; constructor.
-              specialize (IHx2 _ _ _ eq_refl eq_refl eq_refl).
-              cbn in IHx2.
-              destruct d3;
-                dvalue_convert_strict_inv Heqo3; cbn;
-                try solve
-                  [ apply orutt_raise;
-                    [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]
-                  ].
-
-              - destruct (Int1.unsigned x =? 1)%Z; cbn.
-                + admit.
-                + admit.
-              - admit.
-            Admitted.
-
             apply orutt_eval_select_loop; auto.
           }
 
@@ -21122,122 +21316,14 @@ Qed.
             apply H; auto.
             eapply uvalue_concat_bytes_strict_subterm.
             repeat constructor.
-          -
-            Lemma orutt_dvalue_bytes_to_dvalue :
-              forall dt (r1 : list IS1.MEM.DVALUE_BYTE.dvalue_byte) (r2 : list dvalue_byte),
-                dvalue_bytes_refine r1 r2 ->
-                orutt (OOM:=OOME) exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
-                  (ErrOOMPoison_handle_poison_and_oom IS1.LP.Events.DV.DVALUE_Poison
-                     (IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_bytes_to_dvalue r1 dt))
-                  (ErrOOMPoison_handle_poison_and_oom DVALUE_Poison (DVALUE_BYTES.dvalue_bytes_to_dvalue r2 dt)).
-            Proof.
-              intros ? ? ? ?.
-              rewrite TLR1.handle_poison_and_oom_dvalue_bytes_to_dvalue_err_ub_oom_to_itree,
-                TLR2.handle_poison_and_oom_dvalue_bytes_to_dvalue_err_ub_oom_to_itree.
-              remember (ErrOOMPoison_handle_poison_and_oom DVALUE_Poison (DVALUE_BYTES.dvalue_bytes_to_dvalue r2 dt)) as res.
-              destruct_err_ub_oom res; symmetry in Heqres.
-              - apply orutt_raiseOOM.
-              - erewrite dvalue_bytes_to_dvalue_ub_fin_inf; eauto.
-                apply orutt_raiseUB;
-                  [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
-              - erewrite dvalue_bytes_to_dvalue_err_fin_inf; eauto.
-                apply orutt_raise;
-                  [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
-              - erewrite dvalue_bytes_to_dvalue_fin_inf; eauto.
-                apply orutt_Ret.
-                apply fin_to_inf_dvalue_refine_strict.
-            Qed.
-
-            eapply orutt_bind with (RR:=dvalue_bytes_refine).
+          - eapply orutt_bind with (RR:=dvalue_bytes_refine).
             2: apply orutt_dvalue_bytes_to_dvalue.
 
-            Lemma orutt_concretize_uvalue_bytes_helper :
-              forall uvs1 uvs2 acc1 acc2,
-                Forall2 uvalue_refine_strict uvs1 uvs2 ->
-                concretization_map_refine acc1 acc2 ->
-                orutt (OOM:=OOME) exp_E_refine_strict exp_E_res_refine_strict dvalue_bytes_refine
-                  ((fix concretize_uvalue_bytes_helper
-                      (acc : NMap (list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)))
-                      (uvs0 : list IS1.LP.Events.DV.uvalue) {struct uvs0} :
-                     itree IS1.LP.Events.exp_E (list IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_byte) :=
-                      match uvs0 with
-                      | [] => Ret []
-                      | IS1.LP.Events.DV.UVALUE_ExtractByte byte_uv dt0 idx sid :: uvs1 =>
-                          match
-                            match
-                              NM.find (elt:=list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)) sid acc
-                            with
-                            | Some v => Util.assoc byte_uv v
-                            | None => None
-                            end
-                          with
-                          | Some dv =>
-                              ITree.bind (concretize_uvalue_bytes_helper acc uvs1)
-                                (fun rest : list IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_byte =>
-                                   Ret (IS1.LLVM.MEM.MP.DVALUE_BYTES.DVALUE_ExtractByte dv dt0 idx :: rest))
-                          | None =>
-                              ITree.bind
-                                (IS1.LLVM.MEM.CP.CONC.concretize_uvalueM (itree IS1.LP.Events.exp_E)
-                                   (fun dt1 : dtyp =>
-                                      lift_err_RAISE_ERROR (IS1.LP.Events.DV.default_dvalue_of_dtyp dt1))
-                                   (itree IS1.LP.Events.exp_E)
-                                   (fun (A : Type) (x0 : itree IS1.LP.Events.exp_E A) => x0) byte_uv)
-                                (fun dv : IS1.LP.Events.DV.dvalue =>
-                                   ITree.bind
-                                     (concretize_uvalue_bytes_helper
-                                        (IS1.LLVM.MEM.CP.CONCBASE.new_concretized_byte acc byte_uv dv sid) uvs1)
-                                     (fun rest : list IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_byte =>
-                                        Ret (IS1.LLVM.MEM.MP.DVALUE_BYTES.DVALUE_ExtractByte dv dt0 idx :: rest)))
-                          end
-                      | _ => LLVMEvents.raise "concretize_uvalue_bytes_helper: non-byte in uvs."
-                      end) acc1 uvs1)
-                  ((fix concretize_uvalue_bytes_helper
-                      (acc : NMap (list (uvalue * dvalue))) (uvs0 : list uvalue) {struct uvs0} :
-                     itree exp_E (list DVALUE_BYTES.dvalue_byte) :=
-                      match uvs0 with
-                      | [] => Ret []
-                      | UVALUE_ExtractByte byte_uv dt0 idx sid :: uvs1 =>
-                          match
-                            match NM.find (elt:=list (uvalue * dvalue)) sid acc with
-                            | Some v => Util.assoc byte_uv v
-                            | None => None
-                            end
-                          with
-                          | Some dv =>
-                              ITree.bind (concretize_uvalue_bytes_helper acc uvs1)
-                                (fun rest : list DVALUE_BYTES.dvalue_byte =>
-                                   Ret (DVALUE_BYTES.DVALUE_ExtractByte dv dt0 idx :: rest))
-                          | None =>
-                              ITree.bind
-                                (CONC.concretize_uvalueM (itree exp_E)
-                                   (fun dt1 : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt1))
-                                   (itree exp_E) (fun (A : Type) (x0 : itree exp_E A) => x0) byte_uv)
-                                (fun dv : dvalue =>
-                                   ITree.bind
-                                     (concretize_uvalue_bytes_helper (new_concretized_byte acc byte_uv dv sid) uvs1)
-                                     (fun rest : list DVALUE_BYTES.dvalue_byte =>
-                                        Ret (DVALUE_BYTES.DVALUE_ExtractByte dv dt0 idx :: rest)))
-                          end
-                      | _ => LLVMEvents.raise "concretize_uvalue_bytes_helper: non-byte in uvs."
-                      end) acc2 uvs2).
-            Proof.
-              intros uvs1 uvs2 acc1 acc2 REF ACC_REF.
-              revert acc1 acc2 ACC_REF.
-              induction REF; intros acc1 acc2 ACC_REF.
-              - apply orutt_Ret.
-                constructor.
-              - destruct y; uvalue_refine_strict_inv H;
-                  try solve
-                    [ apply orutt_raise;
-                      [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]
-                    ].
-                cbn.
-                cbn.
-
-                pose proof ACC_REF as (?&?).
-            Admitted.
-            
             apply orutt_concretize_uvalue_bytes_helper.
+            { intros u H0 uv_fin H2.
+              apply H; auto.
+              eapply uvalue_concat_bytes_strict_subterm; auto.
+            }
             apply map_monad_oom_Forall2; auto.
             apply concretization_map_refine_empty.
         }
@@ -21246,10 +21332,17 @@ Qed.
           eapply orutt_bind with (RR:=dvalue_bytes_refine).
           2: apply orutt_dvalue_bytes_to_dvalue.
           apply orutt_concretize_uvalue_bytes_helper.
+          { intros u H0 uv_fin H2.
+            apply H; auto.
+            eapply uvalue_concat_bytes_strict_subterm; auto.
+          }
           apply map_monad_oom_Forall2; auto.
           apply concretization_map_refine_empty.
         }
-  Admitted.
+
+        Unshelve.
+        eapply intptr_fin_inf; eauto.
+  Qed.
 
   Lemma orutt_denote_exp_concretize_if_no_undef_or_poison :
     forall u1 u2,
