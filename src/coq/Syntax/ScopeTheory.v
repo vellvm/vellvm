@@ -3,11 +3,11 @@ From Coq Require Import
      List.
 Import ListNotations.
 
+From stdpp Require Import base gmap fin_maps fin_map_dom.
 From Vellvm Require Import
      Numeric.Coqlib
      Utilities
      Syntax.
-From stdpp Require Import base fin_maps fin_map_dom.
 
 Set Implicit Arguments.
 Set Strict Implicit.
@@ -34,277 +34,253 @@ Section LABELS_THEORY.
     apply dom_union.
   Qed.
 
-  (* Lemma inputs_cons: forall b (l : ocfg T), *)
-  (*     @inputs T (b :: l) = blk_id b :: inputs l. *)
+  Lemma outputs_acc_comm:
+    ∀ (i : block_id) (bk : block T) (g : gmap block_id (block T)) (j1 j2 : block_id)
+      (z1 z2 : block T) (y : gset block_id),
+      j1 ≠ j2 →
+      <[i:=bk]> g !! j1 = Some z1 →
+      <[i:=bk]> g !! j2 = Some z2 →
+      outputs_acc j1 z1 (outputs_acc j2 z2 y) = outputs_acc j2 z2 (outputs_acc j1 z1 y).
+  Proof.
+    set_solver.
+  Qed.
+
+  (* TODO: the lib lemma is weirdly specialized, todo ask/PR stdpp *)
+Lemma map_fold_comm_acc
+  {K : Type} {M : Type → Type} `{FMap M, ∀ A : Type, Lookup K A (M A), ∀ A : Type, Empty (M A), ∀ A : Type, PartialAlter K A (M A),  OMap M, Merge M, ∀ A : Type, MapFold K A (M A), EqDecision K,
+  FinMap K M}
+  {A B} (f : K → A → B → B) (g : B → B) (x : B) (m : M A) :
+  (∀ j1 j2 z1 z2 y, f j1 z1 (f j2 z2 y) = f j2 z2 (f j1 z1 y)) →
+  (∀ j z y, f j z (g y) = g (f j z y)) →
+  map_fold f (g x) m = g (map_fold f x m).
+Proof.
+  intros. apply (map_fold_comm_acc_strong _); [solve_proper|solve_proper|done..].
+Qed.
+
+  Lemma outputs_acc_union_acc : forall (g g' : ocfg T),
+      g ##ₘ g' ->
+      map_fold outputs_acc ∅ (g ∪ g') =
+      map_fold outputs_acc (map_fold outputs_acc ∅ g) g'.
+  Proof.
+    induction g as [|i bk g ? IH] using (map_ind (M := gmap block_id)).
+    - intros * _.
+      now rewrite map_empty_union.
+      Undo.
+      now rewrite (left_id ∅ _).
+    - intros ? DISJ.
+      rewrite <- insert_union_l.
+
+      do 2 (rewrite map_fold_insert_L;
+        [| apply outputs_acc_comm |
+           (auto || apply lookup_union_None; now simplify_map_eq)]).
+      rewrite IH.
+      2: eapply map_disjoint_insert_l; eauto.
+      symmetry; apply map_fold_comm_acc.
+      intros; set_solver.
+      intros; set_solver.
+  Qed.
+
+  Lemma outputs_acc_union : forall i (b : block T) g g',
+    outputs_acc i b (g ∪ g') = outputs_acc i b g ∪ g'.
+  Proof.
+    set_solver.
+  Qed.
+
+  Lemma outputs_empty : outputs (T := T) ∅ = ∅.
+  Proof.
+    set_solver.
+  Qed.
+
+  Lemma outputs_union: forall (g g' : ocfg T),
+      g ##ₘ g' ->
+      outputs (g ∪ g') = outputs g ∪ outputs g'.
+  Proof.
+    induction g as [|i bk g ? IH] using (map_ind (M := gmap block_id)).
+    - intros * _.
+      rewrite outputs_empty, map_empty_union.
+      set_solver.
+    - intros ? DISJ.
+      rewrite <- insert_union_l.
+      unfold outputs.
+      do 2 (rewrite map_fold_insert_L;
+        [| apply outputs_acc_comm |
+           (auto || apply lookup_union_None; now simplify_map_eq)]).
+      unfold outputs at 1 in IH.
+      rewrite IH.
+      2: solve_map_disjoint.
+      apply outputs_acc_union.
+  Qed.
+
+  Lemma outputs_singleton: forall i (bk : block T),
+      outputs {[ i := bk]} = successors bk.
+  Proof.
+    intros.
+    unfold outputs.
+    rewrite map_fold_singleton.
+    set_solver.
+  Qed.
+
+  Lemma outputs_insert: forall i bk (g : ocfg T),
+      g !! i = None ->
+      outputs (<[ i := bk]> g) = successors bk ∪ outputs g.
+  Proof using.
+    intros.
+    rewrite insert_union_singleton_l.
+    rewrite outputs_union.
+    now rewrite outputs_singleton.
+    solve_map_disjoint.
+  Qed.
+
+  (* (* TODO: Show symmetric case *) *)
+  (* Lemma wf_ocfg_bid_app_not_in_l : *)
+  (*   forall id (bs bs' : ocfg T), *)
+  (*     In id (inputs bs) -> *)
+  (*     wf_ocfg_bid (bs' ++ bs) -> *)
+  (*     not (In id (inputs bs')). *)
   (* Proof using. *)
-  (*   intros. *)
-  (*   rewrite list_cons_app, inputs_app; reflexivity. *)
+  (*   intros. destruct bs. *)
+  (*   inversion H. *)
+  (*   inv H. *)
+  (*   apply wf_ocfg_bid_cons_not_in. *)
+  (*   unfold wf_ocfg_bid in *. *)
+  (*   rewrite inputs_app in H0. *)
+  (*   rewrite inputs_cons. rewrite inputs_cons in H0. *)
+  (*   rewrite list_cons_app in H0. *)
+  (*   rewrite app_assoc in H0. *)
+  (*   apply list_norepet_append_left in H0. *)
+  (*   rewrite list_cons_app. *)
+  (*   rewrite list_norepet_app in *. *)
+  (*   intuition. apply list_disjoint_sym. auto. *)
+  (*   unfold wf_ocfg_bid in H0. *)
+  (*   rewrite inputs_app in H0. rewrite inputs_cons in H0. rewrite list_cons_app in H0. *)
+  (*   apply list_norepet_append_commut in H0. rewrite <- app_assoc in H0. *)
+  (*   apply list_norepet_append_right in H0. *)
+  (*   rewrite list_norepet_app in H0. *)
+  (*   destruct H0 as (? & ? & ?). *)
+  (*   red in H2. intro. eapply H2; eauto. *)
   (* Qed. *)
 
-  (* Lemma outputs_acc: forall (bks: ocfg T) acc, *)
-  (*     fold_left (fun acc bk => acc ++ successors bk) bks acc = *)
-  (*     acc ++ fold_left (fun acc bk => acc ++ successors bk) bks []. *)
+  (* (* TODO: Show symmetric case *) *)
+  (* Lemma wf_ocfg_app_not_in_r : *)
+  (*   forall id (bs bs' : ocfg T), *)
+  (*     In id (inputs bs) -> *)
+  (*     wf_ocfg_bid (bs' ++ bs) -> *)
+  (*     not (In id (inputs bs')). *)
   (* Proof using. *)
-  (*   induction bks using list_rev_ind; intros; cbn. *)
-  (*   - rewrite app_nil_r; reflexivity. *)
-  (*   - rewrite 2 fold_left_app, IHbks. *)
-  (*     cbn. *)
-  (*     rewrite app_assoc. *)
-  (*     reflexivity. *)
+  (*   intros. destruct bs. *)
+  (*   inversion H. *)
+  (*   inv H. *)
+  (*   apply wf_ocfg_bid_cons_not_in. *)
+  (*   unfold wf_ocfg_bid in *. *)
+  (*   rewrite inputs_app in H0. *)
+  (*   rewrite inputs_cons. rewrite inputs_cons in H0. *)
+  (*   rewrite list_cons_app in H0. *)
+  (*   rewrite app_assoc in H0. *)
+  (*   apply list_norepet_append_left in H0. *)
+  (*   rewrite list_cons_app. *)
+  (*   rewrite list_norepet_app in *. *)
+  (*   intuition. apply list_disjoint_sym. auto. *)
+  (*   unfold wf_ocfg_bid in H0. *)
+  (*   rewrite inputs_app in H0. rewrite inputs_cons in H0. rewrite list_cons_app in H0. *)
+  (*   apply list_norepet_append_commut in H0. rewrite <- app_assoc in H0. *)
+  (*   apply list_norepet_append_right in H0. *)
+  (*   rewrite list_norepet_app in H0. *)
+  (*   destruct H0 as (? & ? & ?). *)
+  (*   red in H2. intro. eapply H2; eauto. *)
   (* Qed. *)
 
-  Lemma outputs_app: forall (l l' : ocfg T),
-      @outputs T (l ∪ l') = outputs l ∪ outputs l'.
-  Proof using.
-    intros l.
-    
-    unfold outputs at 1.
-    unfold_leibniz.
-    rewrite fold_left_app, outputs_acc.
-    reflexivity.
+  (* Useful tactics:
+    - set_solver
+    - solve_map_disjoint
+    - simplify_map_eq
+ *)
+
+  Lemma successors_outputs: forall i b (g : ocfg T),
+      g !! i = Some b ->
+      successors b ⊆ outputs g.
+  Proof.
+    intros * Lu.
+    rewrite <- (insert_delete _ _ _ Lu).
+    rewrite outputs_insert.
+    2: now simplify_map_eq.
+    set_solver.
   Qed.
 
-  Lemma outputs_cons: forall b (l : ocfg T),
-      @outputs T (b :: l) = successors b ++ outputs l.
+  Lemma successor_outputs: forall i j (b: block T) (g : ocfg T),
+      j ∈ successors b ->
+      g !! i = Some b ->
+      j ∈ outputs g.
   Proof using.
-    intros.
-    rewrite list_cons_app, outputs_app; reflexivity.
-  Qed.
-
-  Lemma wf_ocfg_bid_nil:
-    wf_ocfg_bid (T := T) [].
-  Proof using.
-    intros; apply list_norepet_nil.
-  Qed.
-
-  Lemma wf_ocfg_bid_cons :
-    forall (b : block T) (bs : ocfg T),
-      wf_ocfg_bid (b :: bs) ->
-      wf_ocfg_bid bs.
-  Proof using.
-    intros * NOREP; inv NOREP; eauto.
-  Qed.
-
-  Lemma wf_ocfg_bid_cons_not_in :
-    forall (b : block T) (bs : ocfg T),
-      wf_ocfg_bid (b :: bs) ->
-      not (In (blk_id b) (inputs bs)).
-  Proof using.
-    intros * NOREP; inv NOREP; eauto.
-  Qed.
-
-  Lemma wf_ocfg_bid_app_r :
-    forall (bs1 bs2 : ocfg T),
-      wf_ocfg_bid (bs1 ++ bs2) ->
-      wf_ocfg_bid bs2.
-  Proof using.
-    intros * NR.
-    eapply list_norepet_append_right.
-    unfold wf_ocfg_bid in NR.
-    rewrite inputs_app in NR.
-    eauto.
-  Qed.
-
-  Lemma wf_ocfg_bid_app_l :
-    forall (bs1 bs2 : ocfg T),
-      wf_ocfg_bid (bs1 ++ bs2) ->
-      wf_ocfg_bid bs1.
-  Proof using.
-    intros * NR.
-    eapply list_norepet_append_left.
-    unfold wf_ocfg_bid in NR.
-    rewrite inputs_app in NR.
-    eauto.
-  Qed.
-
-  Lemma wf_ocfg_commut :
-    forall (G G' : ocfg T),
-      wf_ocfg_bid (G ++ G') ->
-      wf_ocfg_bid (G' ++ G).
-  Proof using.
-    intros.
-    red; rewrite inputs_app; apply Coqlib.list_norepet_append_commut; rewrite <- inputs_app; apply H.
-  Qed.
-
-  Lemma wf_ocfg_commut_hd :
-    forall (bk bk' : block T) G,
-      wf_ocfg_bid (bk::bk'::G) ->
-      wf_ocfg_bid (bk'::bk::G).
-  Proof using.
-    intros * WF.
-    inv WF.
-    inv H2.
-    constructor.
-    2: constructor; auto.
-    - intros [EQ | IN]; auto.
-      apply H1; left; auto.
-    - intros IN; auto.
-      eapply H1; right; auto.
-  Qed.
-
-  Lemma wf_ocfg_map : forall (f : block T -> block T) (G : ocfg T),
-      (forall bk, blk_id (f bk) = blk_id bk) ->
-      wf_ocfg_bid G <-> wf_ocfg_bid (map f G).
-  Proof using.
-    intros.
-    unfold wf_ocfg_bid, inputs.
-    rewrite List.map_map.
-    replace (map (fun x : block T => blk_id (f x)) G) with (map blk_id G); [reflexivity |].
-    apply map_ext.
-    intros; rewrite H; auto.
-  Qed.
-
-  Lemma blk_id_convert_typ :
-    forall env b,
-      blk_id (convert_typ env b) = blk_id b.
-  Proof using.
-    intros ? []; reflexivity.
-  Qed.
-
-  (* TODO: Show symmetric case *)
-  Lemma wf_ocfg_bid_app_not_in_l :
-    forall id (bs bs' : ocfg T),
-      In id (inputs bs) ->
-      wf_ocfg_bid (bs' ++ bs) ->
-      not (In id (inputs bs')).
-  Proof using.
-    intros. destruct bs.
-    inversion H.
-    inv H.
-    apply wf_ocfg_bid_cons_not_in.
-    unfold wf_ocfg_bid in *.
-    rewrite inputs_app in H0.
-    rewrite inputs_cons. rewrite inputs_cons in H0.
-    rewrite list_cons_app in H0.
-    rewrite app_assoc in H0.
-    apply list_norepet_append_left in H0.
-    rewrite list_cons_app.
-    rewrite list_norepet_app in *.
-    intuition. apply list_disjoint_sym. auto.
-    unfold wf_ocfg_bid in H0.
-    rewrite inputs_app in H0. rewrite inputs_cons in H0. rewrite list_cons_app in H0.
-    apply list_norepet_append_commut in H0. rewrite <- app_assoc in H0.
-    apply list_norepet_append_right in H0.
-    rewrite list_norepet_app in H0.
-    destruct H0 as (? & ? & ?).
-    red in H2. intro. eapply H2; eauto.
-  Qed.
-
-  (* TODO: Show symmetric case *)
-  Lemma wf_ocfg_app_not_in_r :
-    forall id (bs bs' : ocfg T),
-      In id (inputs bs) ->
-      wf_ocfg_bid (bs' ++ bs) ->
-      not (In id (inputs bs')).
-  Proof using.
-    intros. destruct bs.
-    inversion H.
-    inv H.
-    apply wf_ocfg_bid_cons_not_in.
-    unfold wf_ocfg_bid in *.
-    rewrite inputs_app in H0.
-    rewrite inputs_cons. rewrite inputs_cons in H0.
-    rewrite list_cons_app in H0.
-    rewrite app_assoc in H0.
-    apply list_norepet_append_left in H0.
-    rewrite list_cons_app.
-    rewrite list_norepet_app in *.
-    intuition. apply list_disjoint_sym. auto.
-    unfold wf_ocfg_bid in H0.
-    rewrite inputs_app in H0. rewrite inputs_cons in H0. rewrite list_cons_app in H0.
-    apply list_norepet_append_commut in H0. rewrite <- app_assoc in H0.
-    apply list_norepet_append_right in H0.
-    rewrite list_norepet_app in H0.
-    destruct H0 as (? & ? & ?).
-    red in H2. intro. eapply H2; eauto.
-  Qed.
-
-  Lemma In_bk_outputs: forall bid br (b: block T) (l : ocfg T),
-      In br (successors b) ->
-      find_block l bid = Some b ->
-      In br (outputs l).
-  Proof using.
-    induction l as [| ? l IH].
-    - cbn; intros ? abs; inv abs.
-    - intros IN FIND.
-      cbn in FIND.
-      flatten_hyp FIND; inv FIND.
-      + flatten_hyp Heq; inv Heq.
-        rewrite outputs_cons.
-        apply in_or_app; left; auto.
-      + flatten_hyp Heq; inv Heq.
-        rewrite outputs_cons.
-        apply in_or_app; right.
-        auto.
+    intros * In Lu.
+    pose proof successors_outputs _ _ Lu.
+    set_solver.
   Qed.
 
   Lemma find_block_in_inputs :
-    forall to (bks : ocfg T),
-      In to (inputs bks) ->
-      exists bk, find_block bks to = Some bk.
+    forall i (g : ocfg T),
+      i ∈ inputs g ->
+      is_Some (g !! i).
   Proof using.
-    induction bks as [| id ocfg IH]; cbn; intros IN; [inv IN |].
-    flatten_goal; flatten_hyp Heq; intuition; eauto.
+    intros; now apply elem_of_dom.
   Qed.
 
-  Lemma no_reentrance_not_in (bks1 bks2 : ocfg T) :
-    no_reentrance bks1 bks2 ->
-    forall x, In x (outputs bks2) -> ~ In x (inputs bks1).
-  Proof using.
-    intros; eauto using Coqlib.list_disjoint_notin.
+  Lemma no_reentrance_not_in (g1 g2 : ocfg T) :
+    no_reentrance g1 g2 ->
+    forall i, i ∈ outputs g2 -> i ∉ inputs g1.
+  Proof.
+    set_solver.
   Qed.
 
   Lemma no_reentrance_app_l :
-    forall (bks1 bks1' bks2 : ocfg T),
-      no_reentrance (bks1 ++ bks1') bks2 <->
-      no_reentrance bks1 bks2 /\ no_reentrance bks1' bks2.
-  Proof using.
-    intros; unfold no_reentrance; split; [intros H | intros [H1 H2]].
-    - rewrite inputs_app, list_disjoint_app_r in H; auto.
-    - rewrite inputs_app, list_disjoint_app_r; auto.
+    forall (g1 g1' g2 : ocfg T),
+      no_reentrance (g1 ∪ g1') g2 <->
+      no_reentrance g1 g2 /\ no_reentrance g1' g2.
+  Proof.
+    set_solver.
   Qed.
 
   Lemma no_reentrance_app_r :
-    forall (bks1 bks2 bks2' : ocfg T),
-      no_reentrance bks1 (bks2 ++ bks2')%list <->
-      no_reentrance bks1 bks2 /\ no_reentrance bks1 bks2'.
-  Proof using.
-    intros; unfold no_reentrance; split; [intros H | intros [H1 H2]].
-    - rewrite outputs_app,list_disjoint_app_l in H; auto.
-    - rewrite outputs_app, list_disjoint_app_l; auto.
+    forall (g1 g2 g2' : ocfg T),
+      g2 ##ₘ g2' ->
+      no_reentrance g1 (g2 ∪ g2') <->
+      no_reentrance g1 g2 /\ no_reentrance g1 g2'.
+  Proof.
+    intros * DISJ; unfold no_reentrance; split; [intros H | intros [H1 H2]].
+    - rewrite outputs_union in H; set_solver.
+    - rewrite outputs_union; set_solver.
   Qed.
 
-  Lemma no_duplicate_bid_not_in_l (bks1 bks2 : ocfg T) :
-    no_duplicate_bid bks1 bks2 ->
-    forall x, In x (inputs bks2) -> ~ In x (inputs bks1).
-  Proof using.
-    intros; eauto using Coqlib.list_disjoint_notin, Coqlib.list_disjoint_sym.
-  Qed.
-
-  Lemma no_duplicate_bid_not_in_r (bks1 bks2 : ocfg T) :
-    no_duplicate_bid bks1 bks2 ->
-    forall x, In x (inputs bks1) -> ~ In x (inputs bks2).
+  Lemma no_duplicate_bid_not_in_l (g1 g2 : ocfg T) :
+    no_duplicate_bid g1 g2 ->
+    forall x, In x (inputs g2) -> ~ In x (inputs g1).
   Proof using.
     intros; eauto using Coqlib.list_disjoint_notin, Coqlib.list_disjoint_sym.
   Qed.
 
-  Lemma independent_flows_no_reentrance_l (bks1 bks2 : ocfg T):
-    independent_flows bks1 bks2 ->
-    no_reentrance bks1 bks2.
+  Lemma no_duplicate_bid_not_in_r (g1 g2 : ocfg T) :
+    no_duplicate_bid g1 g2 ->
+    forall x, In x (inputs g1) -> ~ In x (inputs g2).
+  Proof using.
+    intros; eauto using Coqlib.list_disjoint_notin, Coqlib.list_disjoint_sym.
+  Qed.
+
+  Lemma independent_flows_no_reentrance_l (g1 g2 : ocfg T):
+    independent_flows g1 g2 ->
+    no_reentrance g1 g2.
   Proof using.
     intros INDEP; apply INDEP; auto.
   Qed.
 
-  Lemma independent_flows_no_reentrance_r (bks1 bks2 : ocfg T):
-    independent_flows bks1 bks2 ->
-    no_reentrance bks2 bks1.
+  Lemma independent_flows_no_reentrance_r (g1 g2 : ocfg T):
+    independent_flows g1 g2 ->
+    no_reentrance g2 g1.
   Proof using.
     intros INDEP; apply INDEP; auto.
   Qed.
 
-  Lemma independent_flows_no_duplicate_bid (bks1 bks2 : ocfg T):
-    independent_flows bks1 bks2 ->
-    no_duplicate_bid bks1 bks2.
+  Lemma independent_flows_no_duplicate_bid (g1 g2 : ocfg T):
+    independent_flows g1 g2 ->
+    no_duplicate_bid g1 g2.
   Proof using.
     intros INDEP; apply INDEP; auto.
   Qed.
@@ -335,10 +311,10 @@ Section LABELS_THEORY.
     eapply list_norepet_nil.
   Qed.
 
-  Lemma wf_ocfg_bid_cons' : forall (b : _ T) (bks : ocfg T),
-      not (In (blk_id b) (inputs bks)) ->
-      wf_ocfg_bid bks ->
-      wf_ocfg_bid (b :: bks).
+  Lemma wf_ocfg_bid_cons' : forall (b : _ T) (g : ocfg T),
+      not (In (blk_id b) (inputs g)) ->
+      wf_ocfg_bid g ->
+      wf_ocfg_bid (b :: g).
   Proof using.
     intros.
     eapply list_norepet_cons; eauto.
@@ -353,9 +329,9 @@ Section LABELS_THEORY.
     destruct (Eqv.eqv_dec_p (blk_id b) id); [rewrite e; auto | right; auto].
   Qed.
 
-  Lemma free_in_cfg_app : forall (bks1 bks2 : ocfg T) b,
-      free_in_cfg (bks1 ++ bks2) b <->
-      (free_in_cfg bks1 b /\ free_in_cfg bks2 b).
+  Lemma free_in_cfg_app : forall (g1 g2 : ocfg T) b,
+      free_in_cfg (g1 ++ g2) b <->
+      (free_in_cfg g1 b /\ free_in_cfg g2 b).
   Proof using.
     intros; split; unfold free_in_cfg; intro FREE.
     - split; intros abs; eapply FREE; rewrite inputs_app; eauto using in_or_app.
@@ -363,10 +339,10 @@ Section LABELS_THEORY.
   Qed.
 
   Lemma wf_ocfg_bid_distinct_labels :
-    forall (bks1 bks2 : ocfg T) b1 b2,
-      wf_ocfg_bid (bks1 ++ bks2) ->
-      In b1 (inputs bks1) ->
-      In b2 (inputs bks2) ->
+    forall (g1 g2 : ocfg T) b1 b2,
+      wf_ocfg_bid (g1 ++ g2) ->
+      In b1 (inputs g1) ->
+      In b2 (inputs g2) ->
       b1 <> b2.
   Proof using.
     intros * WF IN1 IN2.
@@ -377,10 +353,10 @@ Section LABELS_THEORY.
   Qed.
 
   Lemma predecessors_app :
-    forall (bks bks' : ocfg T) f,
-      predecessors f (bks ++ bks') = predecessors f bks' ++ predecessors f bks.
+    forall (g g' : ocfg T) f,
+      predecessors f (g ++ g') = predecessors f g' ++ predecessors f g.
   Proof using.
-    induction bks' as [| bk bks' IH] using rev_ind.
+    induction g' as [| bk g' IH] using rev_ind.
     - intros; cbn; rewrite !app_nil_r; reflexivity.
     - intros.
       unfold predecessors.
@@ -394,8 +370,8 @@ Section LABELS_THEORY.
   Qed.
 
   Lemma predecessors_cons :
-    forall (bks : ocfg T) bk f,
-      predecessors f (bk :: bks) = predecessors f bks ++ predecessors f [bk].
+    forall (g : ocfg T) bk f,
+      predecessors f (bk :: g) = predecessors f g ++ predecessors f [bk].
   Proof using.
     intros.
     rewrite list_cons_app, predecessors_app.
@@ -499,12 +475,12 @@ Section LABELS_THEORY.
   Qed.
 
   Lemma wf_ocfg_bid_In_is_found :
-    forall (bks : ocfg T) bk,
-      wf_ocfg_bid bks ->
-      In bk bks ->
-      find_block bks bk.(blk_id) = Some bk.
+    forall (g : ocfg T) bk,
+      wf_ocfg_bid g ->
+      In bk g ->
+      find_block g bk.(blk_id) = Some bk.
   Proof using.
-    induction bks as [| x bks IH]; intros * WF IN; [inv IN |].
+    induction g as [| x g IH]; intros * WF IN; [inv IN |].
     destruct (Eqv.eqv_dec_p x.(blk_id) bk.(blk_id)).
     - rewrite find_block_eq; auto.
       destruct IN as [-> | IN]; auto.
@@ -595,26 +571,26 @@ Section LABELS_THEORY.
   Qed.
 
   Lemma find_block_none_app:
-    forall (bks1 bks2 : ocfg T) bid,
-      find_block bks1 bid = None ->
-      find_block (bks1 ++ bks2) bid = find_block bks2 bid.
+    forall (g1 g2 : ocfg T) bid,
+      find_block g1 bid = None ->
+      find_block (g1 ++ g2) bid = find_block g2 bid.
   Proof using.
     intros; apply find_none_app; auto.
   Qed.
 
   Lemma find_block_some_app:
-    forall (bks1 bks2 : ocfg T) (bk : block T) bid,
-      find_block bks1 bid = Some bk ->
-      find_block (bks1 ++ bks2) bid = Some bk.
+    forall (g1 g2 : ocfg T) (bk : block T) bid,
+      find_block g1 bid = Some bk ->
+      find_block (g1 ++ g2) bid = Some bk.
   Proof using.
     intros; apply find_some_app; auto.
   Qed.
 
-  Lemma find_block_Some_In_inputs : forall (bks : ocfg T) b bk,
-      find_block bks b = Some bk ->
-      In b (inputs bks).
+  Lemma find_block_Some_In_inputs : forall (g : ocfg T) b bk,
+      find_block g b = Some bk ->
+      In b (inputs g).
   Proof using.
-    induction bks as [| hd bks IH].
+    induction g as [| hd g IH].
     - intros * H; inv H.
     - intros * FIND.
       destruct (Eqv.eqv_dec_p (blk_id hd) b).
@@ -624,12 +600,12 @@ Section LABELS_THEORY.
   Qed.
 
   Lemma wf_ocfg_bid_find_None_app_l :
-    forall (bks1 bks2 : ocfg T) b bk,
-      wf_ocfg_bid (bks1 ++ bks2)%list ->
-      find_block bks2 b = Some bk ->
-      find_block bks1 b = None.
+    forall (g1 g2 : ocfg T) b bk,
+      wf_ocfg_bid (g1 ++ g2)%list ->
+      find_block g2 b = Some bk ->
+      find_block g1 b = None.
   Proof using.
-    induction bks1 as [| b bks1 IH]; intros * WF FIND.
+    induction g1 as [| b g1 IH]; intros * WF FIND.
     reflexivity.
     destruct (Eqv.eqv_dec_p (blk_id b) b0).
     - exfalso.
@@ -684,13 +660,13 @@ Section LABELS_THEORY.
   Qed.
 
   Lemma wf_ocfg_bid_find_block_unique :
-    forall (bks : ocfg T) bk1 b1 bk2,
-      wf_ocfg_bid bks ->
-      find_block bks b1 = Some bk1 ->
-      find_block bks b1 = Some bk2 ->
+    forall (g : ocfg T) bk1 b1 bk2,
+      wf_ocfg_bid g ->
+      find_block g b1 = Some bk1 ->
+      find_block g b1 = Some bk2 ->
       bk1 = bk2.
   Proof using.
-    induction bks as [| bk bks IH]; intros * WF FIND1 FIND2; [inv FIND1 |].
+    induction g as [| bk g IH]; intros * WF FIND1 FIND2; [inv FIND1 |].
     cbn in *.
     break_match_hyp.
     inv FIND1; inv FIND2; auto.
@@ -728,11 +704,11 @@ Section LABELS_THEORY.
   Qed.
 
   Lemma In_find_block :
-    forall (bks : ocfg T) bk,
-      In bk bks ->
-      exists bk', find_block bks bk.(blk_id) = Some bk'.
+    forall (g : ocfg T) bk,
+      In bk g ->
+      exists bk', find_block g bk.(blk_id) = Some bk'.
   Proof using.
-    induction bks as [| x bks IH]; intros * IN; [inv IN | ].
+    induction g as [| x g IH]; intros * IN; [inv IN | ].
     destruct (Eqv.eqv_dec_p x.(blk_id) bk.(blk_id)).
     - do 2 red in e; exists x; rewrite find_block_eq; auto.
     - rewrite find_block_ineq; [| auto].
@@ -787,10 +763,10 @@ Section DTyp.
     - induction brs; cbn; auto; f_equal; auto.
   Qed.
 
-  Lemma convert_typ_outputs : forall (bks : ocfg typ),
-      outputs (convert_typ [] bks) = outputs bks.
+  Lemma convert_typ_outputs : forall (g : ocfg typ),
+      outputs (convert_typ [] g) = outputs g.
   Proof using.
-    induction bks as [| bk bks IH]; [reflexivity |].
+    induction g as [| bk g IH]; [reflexivity |].
     unfold convert_typ.
     simpl ConvertTyp_list.
     rewrite !outputs_cons, <- IH.

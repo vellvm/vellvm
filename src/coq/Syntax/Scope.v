@@ -60,8 +60,9 @@ Section LABELS_OPERATIONS.
   Definition successors (bk : block T) : gset block_id :=
     terminator_outputs (blk_term bk).
 
+  Definition outputs_acc : block_id -> block T -> gset block_id -> gset block_id := fun _ bk acc => acc ∪ successors bk.
   Definition outputs (bks : ocfg T) : gset block_id
-    := map_fold (fun _ bk acc => acc ∪ successors bk) ∅ bks.
+    := map_fold outputs_acc ∅ bks.
 
   (* Definition raw_id_in := elem_of_list_dec (A := raw_id). *)
 

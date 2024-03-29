@@ -68,25 +68,25 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   (* SAZ: Is there a better location to put this information? It depends on many of the
      modules that are in scope at this point.
   *)
-  (** * puts 
+  (** * puts
       [int  puts(const char *s);]
       The function puts() writes the string s, and a terminating newline character, to the stream stdout.
       The functions fputs() and puts() return a nonnegative integer on success and EOF on error.
 
-      SAZ: it isn't clear what kinds of errors count as "errors" for puts. Our implementation 
+      SAZ: it isn't clear what kinds of errors count as "errors" for puts. Our implementation
       will never explicitly return EOF (since that seems to be a stdout stream error.  It will
       only ever raise "semantic" errors.
    *)
 
-  (** A semantic function to read an i8 value at [strptr + index] from the memory. 
-      Propagates all memory failures and raises a Vellvm "Failure" if the 
+  (** A semantic function to read an i8 value at [strptr + index] from the memory.
+      Propagates all memory failures and raises a Vellvm "Failure" if the
       value read does not concretize to a DVALUE_I8.
    *)
   Definition i8_str_index (strptr : addr) (index : Z) : itree L0' Int8.int :=
     iptr <- (@lift_OOM (itree L0') _ _ _ (LP.IP.from_Z index)) ;;
     addr <-
       match handle_gep_addr (DTYPE_I 8) strptr [DVALUE_IPTR iptr] with
-            | inl msg => raise msg 
+            | inl msg => raise msg
             | inr c => @lift_OOM (itree L0') _ _ _ c
             end ;;
     u_byte <- trigger (Load (DTYPE_I 8) (DVALUE_Addr addr)) ;;
@@ -96,7 +96,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     | _ => raise "i8_str_index failed with non-DVALUE_I8"
     end.
 
-  
+
   (** Semantic function that treats [u_strptr] as a C-style string pointer:
       - reads i8 values from memory until it encounters a null-terminator (i8 0)
       - triggers an IO_stdout event with the bytes plus a newline
@@ -107,13 +107,13 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       match dv with
       | DVALUE_Addr strptr =>
           char <- i8_str_index strptr 0%Z ;;
-          bytes <- 
+          bytes <-
             ITree.iter
               (fun '(c, bytes, offset) =>
                  if Int8.eq c (Int8.zero) then
                    (* null terminated string so end the iteration, add the newline *)
                    ret (inr ((Int8.repr 10) :: bytes))
-                 else 
+                 else
                    next_char <- i8_str_index strptr offset ;;
                    ret (inl (next_char, c::bytes, (offset + 1)%Z))
               )
@@ -123,7 +123,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       | _ => raiseUB "puts got non-address argument"
       end
     in
-    
+
     fun (args : list uvalue) =>
       match args with
       | strptr::[] => puts_body strptr
@@ -143,7 +143,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
 
       For example, to use the C [<stdio.h> puts] function, one would include the
       following declaration as part of the ll file:
-      [declare i32 puts(i8* %str)] 
+      [declare i32 puts(i8* %str)]
       See /tests/io for some examples.
    *)
 
@@ -154,21 +154,21 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     | None => []
     end.
 
-  
+
   (* SAZ: commenting this out for now, since it's trickier than we wanted *)
   (* Command-line arguments----------------------------------------------------------------------- *)
 
-  (* To support command-line arguments we convert a list of Coq strings into a preamble of 
+  (* To support command-line arguments we convert a list of Coq strings into a preamble of
      global declarations with a form illustrated in tests/io/args_vellvm.ll.  Given N strings
      s_arg0, s_arg1, ..., s_argN.
 
      Arguments are parsed from the command line as (list (list Z)) where each Z is an i8.
-     
+
      Note:
-     - following C-style conventions, s_arg0 is the _name_ of the executable, so the 
+     - following C-style conventions, s_arg0 is the _name_ of the executable, so the
        (list (list Z)) should never be non-empty
      - we name the array of arguments argv itself [arg_gid (N+1)]
-     Therefore, after initializing everything, we call main with 
+     Therefore, after initializing everything, we call main with
         UValue_r N) and whatever pointer we get from doing [u <- Load argv]
    *)
 (*
@@ -176,8 +176,8 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Definition zi8s_to_EXP_Cstring (zi8s:list Z) :=
     EXP_Cstring (List.map (fun z => (DTYPE_I 8, zi8_to_exp z)) zi8s).
 
-  (* These assume that [arg] is a list _including_ the 0 null terminator. *) 
-  Definition cstring_typ (arg:list Z) := DTYPE_Array (N.of_nat(List.length arg)) (DTYPE_I 8).               
+  (* These assume that [arg] is a list _including_ the 0 null terminator. *)
+  Definition cstring_typ (arg:list Z) := DTYPE_Array (N.of_nat(List.length arg)) (DTYPE_I 8).
   Definition arg_global gid (arg:list Z) :=
       mk_global gid (cstring_typ arg) true (Some (zi8s_to_EXP_Cstring arg)) false [].
 
@@ -190,8 +190,8 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
 
   (* SAZ: TODO: do we use "Raw" anywhere else in the semantics?  I chose to use them here
      because the global declarations associated with these identifiers aren't really present
-     statically; they are allocated by the "runtime".  We need to be able to generate 
-     N+1 fresh global identifiers to hold the storage space for command-line arugments. 
+     statically; they are allocated by the "runtime".  We need to be able to generate
+     N+1 fresh global identifiers to hold the storage space for command-line arugments.
    *)
   Definition arg_raw_id (n:N) := (Raw (Z.of_N n)).
   Definition arg_gid (n:N) := ID_Global (arg_raw_id n).
@@ -204,7 +204,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
         [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, EXP_Integer 0%Z)]).
 
   Definition argv_type (argc:N) := DTYPE_Array argc DTYPE_Pointer.
-  
+
   Definition argv_array_global (args : list (list Z)) :=
     let argc : N := N.of_nat (List.length args) in
     mk_global
@@ -214,19 +214,19 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       (Some (EXP_Array (mapi arg_gep_ref args)))
       false
       [].
-      
-    
+
+
   Definition argc_array_tle (args : list (list Z)) : toplevel_entity dtyp (CFG.cfg dtyp) :=
     TLE_Global (argv_array_global args).
 
-  (* TODO: 
+  (* TODO:
       The staging of these arguments is a bit tricky.  We want to inject these new TLEs into
       the semantics, but we also need to "call" the main function with some arguments that
-      depend on them: i.e. 
-          argc = EXP_Integer N and 
+      depend on them: i.e.
+          argc = EXP_Integer N and
           argv = [bitcast ([3 x i8*]* @_RAW_argv to i8** )])
 
-     It is probably cleaner to maintain the syntactic/semantic phase distinction and 
+     It is probably cleaner to maintain the syntactic/semantic phase distinction and
      just "close" the program at the syntax level and then treat the argv strings as
      part of the global environment where we want to interpret main_args like:
 
@@ -236,10 +236,10 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
          argv <- trigger (GlobalRead (g_ident (arg_raw_id (1+argc)))) ;;
          trigger (Call "main" [UVALUE_I32 N; argv])
    *)
-   *)  
-  
+   *)
+
   (* TOPLEVEL Semantics  ------------------------------------------------------------------------- *)
-  
+
   (** * Initialization
 
     The initialization phase allocates and initializes globals, and allocates
@@ -254,11 +254,11 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
     map_monad_ allocate_global gs.
 
-  (* Who is in charge of allocating the addresses for external functions declared in this mcfg? 
-     - For now we assume that there is only one mcfg, so we allocate addresses for all declared 
+  (* Who is in charge of allocating the addresses for external functions declared in this mcfg?
+     - For now we assume that there is only one mcfg, so we allocate addresses for all declared
        and defined functions.
      - If we ever do some kind of "linking" we may need to revisit this, but it presumably
-       would be resolved by an operation of type [link : mcfg -> mcfg -> mcfg] that 
+       would be resolved by an operation of type [link : mcfg -> mcfg -> mcfg] that
        combines two mcfgs coherently
    *)
 
@@ -282,7 +282,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     map_monad_ allocate_declaration ds.
 
   (* We have to initialize the global definitions after allocating them because they
-     might be mutually recursive.  It is possible to declare cyclic data structures 
+     might be mutually recursive.  It is possible to declare cyclic data structures
      statically at the global level in LLVM.
    *)
   Definition initialize_global (g:global dtyp) : itree exp_E unit :=
@@ -321,14 +321,14 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     ret (fv, ⟦ df ⟧f).
 
   (**
-   Denotes a builtin function 
+   Denotes a builtin function
    *)
-  Definition address_one_builtin_function (builtin : function_id * function_denotation) 
+  Definition address_one_builtin_function (builtin : function_id * function_denotation)
     : itree L0 (dvalue * function_denotation) :=
-    let (fid, den) := builtin in 
+    let (fid, den) := builtin in
     fv <- trigger (GlobalRead fid) ;;
     ret (fv, den).
-  
+
   (**
    We are now ready to define our semantics. Guided by the events and handlers,
    we work in layers: the first layer is defined as the uninterpreted [itree]
@@ -380,7 +380,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     pass in 0 and null as the arguments to main
     Note: this isn't compliant with standard C semantics, but integrating the actual
     inputs from the command line is nontrivial since we have martial C-level strings
-    into the Vellvm memory.  
+    into the Vellvm memory.
    *)
   Definition main_args := [DV.UVALUE_I32 (Int32.zero);
                            DV.UVALUE_Addr null
