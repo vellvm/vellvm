@@ -348,6 +348,7 @@ Inductive exp : Set :=
                       *)
 
 | EXP_Undef
+| EXP_Poison
 | EXP_Struct          (fields: list (T * exp))
 | EXP_Packed_struct   (fields: list (T * exp))
 | EXP_Array           (elts: list (T * exp))

@@ -75,6 +75,7 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token<Floats.float> HEXCONSTANT
 %token KW_NULL
 %token KW_UNDEF
+%token KW_POISON
 %token KW_TRUE
 %token KW_FALSE
 %token KW_ZEROINITIALIZER
@@ -1302,6 +1303,7 @@ expr_val:
   | KW_FALSE                                          { fun _ -> EXP_Bool false       }
   | KW_NULL                                           { fun _ -> EXP_Null             }
   | KW_UNDEF                                          { fun _ -> EXP_Undef            }
+  | KW_POISON                                         { fun _ -> EXP_Poison           }
   | KW_ZEROINITIALIZER                                { fun _ -> EXP_Zero_initializer }
   | LCURLY l=separated_list(csep, tconst) RCURLY      { fun _ -> EXP_Struct l         }
   | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { fun _ -> EXP_Packed_struct l  }

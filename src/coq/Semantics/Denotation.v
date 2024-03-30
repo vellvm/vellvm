@@ -254,6 +254,12 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       | Some t => ret (UVALUE_Undef t)
       end
 
+    | EXP_Poison =>
+      match top with
+      | None   => raise "denote_exp given untyped EXP_Poison"
+      | Some t => ret (UVALUE_Poison t)
+      end
+
     (* Question: should we do any typechecking for aggregate types here? *)
     (* Option 1: do no typechecking: *)
     | EXP_Struct es =>

@@ -233,6 +233,7 @@ Section REGISTER_OPERATIONS.
                       | EXP_Zero_initializer
                       | EXP_Cstring _
                       | EXP_Undef
+                      | EXP_Poison
                         => []
 
                       | OP_Conversion _ _ e _
