@@ -101,7 +101,8 @@ Section Endo.
         | EXP_Bool    _
         | EXP_Null
         | EXP_Zero_initializer
-        | EXP_Undef => e
+        | EXP_Undef
+        | EXP_Poison => e
         | EXP_Cstring elts =>
           EXP_Cstring (List.map (fun '(t,e) => (endo t, f_exp e)) elts)
         | EXP_Struct fields =>
@@ -475,6 +476,7 @@ Section TFunctor.
         | EXP_Zero_initializer               => EXP_Zero_initializer
         | EXP_Cstring elts                   => EXP_Cstring (tfmap ftexp elts)
         | EXP_Undef                          => EXP_Undef
+        | EXP_Poison                         => EXP_Poison
         | EXP_Struct fields                  => EXP_Struct (tfmap ftexp fields)
         | EXP_Packed_struct fields           => EXP_Packed_struct (tfmap ftexp fields)
         | EXP_Array elts                     => EXP_Array (tfmap ftexp elts)

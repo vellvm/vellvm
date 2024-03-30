@@ -587,6 +587,7 @@ Section ShowInstances.
                            DList_join (map (fun '(ty, ex) => (dshow_c_string ex)) elts) @@ string_to_DString  """"
 
     | EXP_Undef => string_to_DString "undef"
+    | EXP_Poison => string_to_DString "poison"
 
     | EXP_Struct fields =>
         string_to_DString "{" @@

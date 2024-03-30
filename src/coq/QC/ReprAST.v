@@ -275,6 +275,7 @@ Section ReprInstances.
     | EXP_Zero_initializer => "EXP_Zero_initializer"
     | EXP_Cstring s => "(EXP_Cstring [" ++ (contents id (List.map texp s)) ++ "])"
     | EXP_Undef => "EXP_Undef"
+    | EXP_Poison => "EXP_Poison"
     | EXP_Struct fields => "(EXP_Struct [" ++ (contents id (List.map texp fields)) ++ "])"
     | EXP_Packed_struct fields => "(EXP_Packed_struct [" ++ (contents id (List.map texp fields)) ++ "])"
     | EXP_Array fields => "(EXP_Array [" ++ (contents id (List.map texp fields)) ++ "])"

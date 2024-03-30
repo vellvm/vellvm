@@ -420,6 +420,7 @@ Section ExpInd.
   Hypothesis IH_Zero_initializer : P ((EXP_Zero_initializer)).
   Hypothesis IH_Cstring : forall (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Cstring elts)).
   Hypothesis IH_Undef   : P ((EXP_Undef)).
+  Hypothesis IH_Poison  : P ((EXP_Poison)).
   Hypothesis IH_Struct  : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Struct fields)).
   Hypothesis IH_Packed_struct : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Packed_struct fields)).
   Hypothesis IH_Array   : forall (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Array elts)).
@@ -459,6 +460,7 @@ Section ExpInd.
       }
 
     - apply IH_Undef.
+    - apply IH_Poison.
     - apply IH_Struct.
       { revert fields.
         fix IHfields 1. intros [|u fields']. intros. inversion H.

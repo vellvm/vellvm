@@ -351,6 +351,7 @@
   ("false" , KW_FALSE);
   ("null"  , KW_NULL);
   ("undef" , KW_UNDEF);
+  ("poison", KW_POISON);
   ("zeroinitializer" , KW_ZEROINITIALIZER);
   ("c" , KW_C);
 
