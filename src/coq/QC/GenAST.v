@@ -3081,7 +3081,7 @@ Section InstrGenerators.
   Definition gen_definition (name : global_id) (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
     dfn <- backtrackMetadata (gen_definition_h name ret_t args);;
-    add_to_global_ctx (ID_Global name, dfn.(df_prototype).(dc_type));;
+    add_to_global_ctx (ID_Global name, TYPE_Pointer (dfn.(df_prototype).(dc_type)));;
     ret dfn.
 
   Definition gen_new_definition (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
