@@ -1420,8 +1420,10 @@ Section TypGenerators.
   Definition gen_sized_typ_size :=
     gen_typ_size' gen_sized_typ_0 sized_aggregate_typ_gens (gen_type_matching_variable (withl is_sized')).
 
+  Definition max_typ_size : nat := 4.
+
   Definition gen_sized_typ  : GenLLVM typ
-    := sized_LLVM (fun sz => gen_sized_typ_size sz).
+    := sized_LLVM (fun sz => gen_sized_typ_size (min sz max_typ_size)).
 
 (*   (* Want to be able to use gen_sized_typ' to do this... *)
 (*      But I did not notice this wants only sized types from the contexts. *)
@@ -1502,7 +1504,7 @@ Section TypGenerators.
     gen_typ_size' gen_typ_0 aggregate_typ_gens (gen_type_matching_variable (ret tt)).
 
   Definition gen_typ : GenLLVM typ
-    := sized_LLVM (fun sz => gen_typ_size sz).
+    := sized_LLVM (fun sz => gen_typ_size (min sz max_typ_size)).
 
   Definition gen_typ_non_void_0 : GenLLVM typ :=
     oid <- gen_sized_type_alias;;
@@ -1535,14 +1537,14 @@ Section TypGenerators.
     gen_typ_size' gen_typ_non_void_0 aggregate_typ_gens (gen_type_matching_variable (withl is_non_void')).
 
   Definition gen_typ_non_void : GenLLVM typ :=
-    sized_LLVM gen_typ_non_void_size.
+    sized_LLVM (fun sz => gen_typ_non_void_size (min sz max_typ_size)).
 
   (* Non-void, non-function types *)
   Definition gen_typ_non_void_size_wo_fn : nat -> GenLLVM typ :=
     gen_typ_size' gen_typ_non_void_0 sized_aggregate_typ_gens (gen_type_matching_variable (withl is_non_void')).
 
   Definition gen_typ_non_void_wo_fn : GenLLVM typ :=
-    sized_LLVM gen_typ_non_void_size_wo_fn.
+    sized_LLVM (fun sz => gen_typ_non_void_size_wo_fn (min sz max_typ_size)).
 
   (* TODO: look up identifiers *)
   (* Types for operation expressions *)
@@ -2673,7 +2675,7 @@ Section InstrGenerators.
     := gen_typ_size' gen_trivial_typ (fun subg sz => [fun _ => subg sz]) gen_first_class_typ_from_context.
 
   Definition gen_first_class_type : GenLLVM typ
-    := sized_LLVM gen_first_class_type_size.
+    := sized_LLVM (fun sz => gen_first_class_type_size (min sz max_typ_size)).
 
   Definition gen_bitcast : GenLLVM (instr_id * instr typ) :=
     tfc <- gen_first_class_type;;
