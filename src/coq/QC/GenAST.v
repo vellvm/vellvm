@@ -1616,7 +1616,7 @@ Section ExpGenerators.
             ; ret FSub
             ; ret FMul
             ; ret FDiv
-            ; ret FRem
+            (* ; ret FRem *) (* Disable FRem because vellvm doesn't support it yet *)
             ].
 
   Definition gen_icmp : G icmp :=
@@ -2079,7 +2079,7 @@ Section ExpGenerators.
         (* freq_LLVM ((* (1%nat, ret EXP_Undef) :: *) gen_idents) *)
         (* TODO: Add some retroactive global generation *)
         | _ => freq_LLVM
-                ((10%nat, gen_size_0 t) :: (1%nat, ret EXP_Zero_initializer) :: gen_idents)
+                ((10%nat, gen_size_0 t) :: (* (1%nat, ret EXP_Zero_initializer) :: *) gen_idents)
         end
     | (S sz') =>
         let gens :=
@@ -2920,22 +2920,21 @@ Section InstrGenerators.
 
                    ret (TERM_Br (TYPE_I 1, c) (blk_id b1) (blk_id b2), ((bh1::bs1) ++ (bh2::bs2))%list))
                  (* Sometimes generate a loop *)
-             (* ; (min sz' 6%nat, *)
-             (*     fun _ => *)
-             (*       '(t, (b, bs)) <- gen_loop_sz sz' t back_blocks 10;; (* TODO: Should I replace sz with sz' here*) *)
-             (*       ret (t, (b :: bs))) *)
-            ])
-             (* TODO: Move back *)
-             (* ++ *)
-             (* (* Loop back sometimes *) *)
-             (* match back_blocks with *)
-             (* | (b::bs) => *)
-             (*     [(min sz' 1%nat, *)
-             (*        fun _ => *)
-             (*          bid <- lift_GenLLVM (elems_ b back_blocks);; *)
-             (*          ret (TERM_Br_1 bid, []))] *)
-             (* | nil => [] *)
-             (* end) *)
+             ; (min sz' 6%nat,
+                 fun _ =>
+                   '(t, (b, bs)) <- gen_loop_sz sz' t back_blocks 10;; (* TODO: Should I replace sz with sz' here*)
+                   ret (t, (b :: bs)))
+            ]
+             ++
+             (* Loop back sometimes *)
+             match back_blocks with
+             | (b::bs) =>
+                 [(min sz' 1%nat,
+                    fun _ =>
+                      bid <- lift_GenLLVM (elems_ b back_blocks);;
+                      ret (TERM_Br_1 bid, []))]
+             | nil => []
+             end)
     end
   with gen_blocks_sz
          (sz : nat)
