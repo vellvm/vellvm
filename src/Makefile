@@ -39,6 +39,7 @@ COQFILES_EXEC := QC/ShowAST QC/ReprAST QC/GenAlive2 Utils/ParserHelper Syntax/LL
 FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
 EXEC_VFILES := $(COQFILES_EXEC:%=coq/%.v)
 EXEC_VOFILES := $(COQFILES_EXEC:%=coq/%.vo)
+VFILES := $(shell find coq -name "*.v")
 
 .DEFAULT_GOAL := all
 
@@ -137,19 +138,11 @@ clean-coqmakefile: CoqMakefile
 
 ######## documentation
 
-doc/coq2html:
-	make -C ../lib/coq2html
-	cp ../lib/coq2html doc/coq2html
-	chmod +x doc/coq2html
-
 .PHONY: documentation
-documentation: doc/coq2html $(VFILES)
+documentation: $(VFILES)
 	mkdir -p doc/html
 	rm -f doc/html/*.html
-	doc/coq2html -d doc/html doc/*.glob \
-          $(filter-out doc/coq2html cparser/Parser.v, $^)
-	cp ../lib/coq2html/coq2html.css ../lib/coq2html/coq2html.js doc/html/
-
+	coq2html -d doc/html $^
 
 ####### Facilities for building only the frontend - parser and pretty printer
 

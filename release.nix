@@ -3,6 +3,7 @@
   mkCoqDerivation,
   version ? null,
   coq,
+  coq2html,
   dune_3,
   perl,
   # All of these ocaml packages should probably come from the coq
@@ -26,6 +27,7 @@
 
       buildInputs =
         [ coq
+          coq2html
           dune_3
           perl
         ] ++

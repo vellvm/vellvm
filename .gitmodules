@@ -1,3 +1,0 @@
-[submodule "lib/coq2html"]
-	path = lib/coq2html
-	url = https://github.com/xavierleroy/coq2html.git
