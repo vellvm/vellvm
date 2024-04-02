@@ -1970,7 +1970,7 @@ Section ExpGenerators.
        | TYPE_I n => ret EXP_Integer <*> lift (gen_non_zero (Some n))
        | TYPE_IPTR => ret EXP_Integer <*> lift (gen_non_zero None)
        | TYPE_Float => ret EXP_Float <*> lift fing32 (* TODO: is this actually non-zero...? *)
-       | TYPE_Double => failGen "gen_non_zero_exp_size TYPE_Double"(*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
+       | TYPE_Double => ret EXP_Double <*> lift fing64 (*TODO : Fix generator for double*)
        | _ => failGen "gen_non_zero_exp_size"
        end.
 
@@ -2084,7 +2084,7 @@ Section ExpGenerators.
           (* Not generating these types for now *)
           | TYPE_Half                 => failGen "gen_exp_size TYPE_Half"
           | TYPE_Float                => ret EXP_Float <*> lift fing32(* referred to genarators in flocq-quickchick*)
-          | TYPE_Double               => failGen "gen_exp_size TYPE_Double" (*ret EXP_Double <*> lift fing64*) (* TODO: Fix generator for double*)
+          | TYPE_Double               => ret EXP_Double <*> lift fing64 (* TODO: Fix generator for double*)
           | TYPE_X86_fp80             => failGen "gen_exp_size TYPE_X86_fp80"
           | TYPE_Fp128                => failGen "gen_exp_size TYPE_Fp128"
           | TYPE_Ppc_fp128            => failGen "gen_exp_size TYPE_Ppc_fp128"
@@ -2141,7 +2141,7 @@ Section ExpGenerators.
           | TYPE_Opaque            => [failGen "gen_exp_size TYPE_Opaque list"] (* TODO: not sure what these should be... *)
           | TYPE_Half              => [failGen "gen_exp_size TYPE_Half list" ]
           | TYPE_Float             => [gen_fbinop_exp gen_global_of_typ gen_ident_of_typ TYPE_Float]
-          | TYPE_Double            => [(*gen_fbinop_exp TYPE_Double*)failGen "gen_exp_size TYPE_Double list"]
+          | TYPE_Double            => [gen_fbinop_exp gen_global_of_typ gen_ident_of_typ TYPE_Double]
           | TYPE_X86_fp80          => [failGen "gen_exp_size TYPE_X86_fp80 list"]
           | TYPE_Fp128             => [failGen "gen_exp_size TYPE_Fp128 list"]
           | TYPE_Ppc_fp128         => [failGen "gen_exp_size TYPE_Ppc_fp128 list"]
@@ -2508,13 +2508,13 @@ Section InstrGenerators.
   Definition get_prim_typ_le_size (max_byte_sz: N) : list (GenLLVM typ) :=
     (if (1 <=? max_byte_sz)%N then [ret (TYPE_I 1); ret (TYPE_I 8)] else []) ++
       (if (4 <=? max_byte_sz)%N then [ret (TYPE_I 32); ret TYPE_Float] else []) ++
-      (if (8 <=? max_byte_sz)%N then [ret (TYPE_I 64); ret TYPE_Double] else []).
+      (if (8 <=? max_byte_sz)%N then [ret (TYPE_I 64) (* ; ret TYPE_Double *)] else []).
 
   (* Version without problematic i1 type *)
   Definition get_prim_vector_typ_le_size (max_byte_sz: N) : list (GenLLVM typ) :=
     (if (1 <=? max_byte_sz)%N then [ret (TYPE_I 8)] else []) ++
       (if (4 <=? max_byte_sz)%N then [ret (TYPE_I 32); ret TYPE_Float] else []) ++
-      (if (8 <=? max_byte_sz)%N then [ret (TYPE_I 64); ret TYPE_Double] else []).
+      (if (8 <=? max_byte_sz)%N then [ret (TYPE_I 64) (* ; ret TYPE_Double *)] else []).
 
   (* Main method, it will generate based on the max_byte_sz
   Currently we support, int (1,8,32,64), float, double
@@ -2637,7 +2637,7 @@ Section InstrGenerators.
           ret [TYPE_I 32; TYPE_Float; TYPE_Vector 4 (TYPE_I 8); TYPE_Vector 32 (TYPE_I 1)]
       | TYPE_I 64
       | TYPE_Double =>
-          ret [TYPE_I 64; TYPE_Double; TYPE_Vector 2 (TYPE_I 32); TYPE_Vector 2 (TYPE_Float); TYPE_Vector 8 (TYPE_I 8); TYPE_Vector 64 (TYPE_I 1)]
+          ret [TYPE_I 64; (* TYPE_Double; *) TYPE_Vector 2 (TYPE_I 32); TYPE_Vector 2 (TYPE_Float); TYPE_Vector 8 (TYPE_I 8); TYPE_Vector 64 (TYPE_I 1)]
       | TYPE_Vector sz subtyp =>
           match subtyp with
           | TYPE_Pointer _ =>
@@ -2645,7 +2645,7 @@ Section InstrGenerators.
               (* new_subtyp <- gen_bitcast_typ subtyp;; *)
               ret [TYPE_Vector sz subtyp]
           | subtyp =>
-              let trivial_typs := [(1%N, TYPE_I 1); (8%N, TYPE_I 8); (32%N, TYPE_I 32); (32%N, TYPE_Float); (64%N, TYPE_I 64); (64%N, TYPE_Double)] in
+              let trivial_typs := [(1%N, TYPE_I 1); (8%N, TYPE_I 8); (32%N, TYPE_I 32); (32%N, TYPE_Float); (64%N, TYPE_I 64) (* ; (64%N, TYPE_Double) *)] in
               let size_of_vec := get_bit_size_from_typ t_from in
               let choices := fold_left (fun acc '(s,t) => let sz' := (size_of_vec / s)%N in
                                                           if (sz' =? 0)%N then acc else (acc ++ [TYPE_Vector sz' t])%list) trivial_typs [] in
