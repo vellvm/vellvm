@@ -2872,8 +2872,10 @@ Section InstrGenerators.
            ret (instr ++ rest)%list
        end.
 
+  Definition block_size : nat := 20.
+
   Definition gen_code : GenLLVM (code typ)
-    := n <- lift arbitrary;;
+    := n <- lift (resize block_size arbitrary);;
        gen_code_length n.
 
   Definition instr_id_to_raw_id (fail_msg : string) (i : instr_id) : raw_id :=
@@ -3112,11 +3114,15 @@ Section InstrGenerators.
   Definition gen_typ_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
     :=
     name <- new_local_id;;
-    inner_typs <- listOf_LLVM gen_typ_non_void;;
     let id := ID_Local name in
-    let named_ty := TYPE_Struct inner_typs in
-    add_to_typ_ctx (id, named_ty);;
-    ret (TLE_Type_decl id (TYPE_Struct inner_typs)).
+    τ <- oneOf_LLVM_thunked
+          [ (fun _ => ret TYPE_Struct <*> (k <- lift (choose (0, 5)%nat);;
+                                        vectorOf_LLVM k gen_typ_non_void))
+            ; (fun _ => ret TYPE_Packed_struct <*> (k <- lift (choose (0, 5)%nat);;
+                                        vectorOf_LLVM k gen_typ_non_void))
+          ];;
+    add_to_typ_ctx (id, τ);;
+    ret (TLE_Type_decl id τ).
 
   Definition gen_typ_tle_multiple : GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     := listOf_LLVM gen_typ_tle.
