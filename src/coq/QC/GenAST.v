@@ -2582,46 +2582,47 @@ Section InstrGenerators.
   Definition gen_ptr_casted_var : GenLLVM (option Ent)
     := gen_entity_with (gen_context' .@ from_pointer').
 
+  (* Generate an identity and type for a variable that was cast from a pointer, also grab the pointer entity *)
+  Definition gen_inttoptr_info : GenLLVM (option (Ent * ident * typ))
+    := genMatch
+         (use (gen_context' .@ from_pointer'))
+         (ptr <- queryl from_pointer';;
+          t <- queryl variable_type';;
+          n <- queryl name';;
+          ret (ptr, n, t)).
+
   (* TODO: old_tptr checks for vectors of pointers...
      I don't think we will find those with the new generator queries?
    *)
-  Definition gen_inttoptr : GenLLVM (option (instr_id * instr typ)) :=
-    ovar <- genMatch
-             (use (gen_context' .@ from_pointer'))
-             (ptr <- queryl from_pointer';;
-              t <- queryl variable_type';;
-              n <- queryl name';;
-              ret (ptr, n, t));;
-    match ovar with
-    | None => ret None
-    | Some (ptrEnt, id, typ_from_cast) =>
-        opt <- use (gen_context' .@ entl ptrEnt .@ normalized_type');;
-        match opt with
-        | None => ret None
-        | Some old_tptr =>
-            (* In the following case, we will check whether there are double pointers in the old pointer type, we will not cast if the data structure has double pointer *)
-            (* TODO: Better identify the pointer inside and cast without changing their location *)
-            new_tptr <-
-              match old_tptr with
-              | TYPE_Pointer old_typ =>
-                  if typ_contains_pointer old_typ || is_function_type_h old_typ
-                  then
-                    ret old_tptr
-                  else
-                    x <- gen_typ_le_size (get_size_from_typ old_typ);;
-                    ret (TYPE_Pointer x)
-              | TYPE_Vector sz (TYPE_Pointer old_typ) =>
-                  if typ_contains_pointer old_typ || is_function_type_h old_typ
-                  then
-                    ret old_tptr
-                  else
-                    x <- gen_typ_le_size (get_size_from_typ old_typ);;
-                    ret (TYPE_Pointer x)
-              | _ => ret (TYPE_Void) (* Won't reach here... Hopefully *)
-              end;;
-            iid <- genInstrId new_tptr;;
-            ret (Some (iid, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr)))
-        end
+  Definition gen_inttoptr (ptrEnt : Ent) (id : ident) (typ_from_cast : typ) : GenLLVM (instr_id * instr typ) :=
+    opt <- use (gen_context' .@ entl ptrEnt .@ normalized_type');;
+    match opt with
+    | None => failGen "gen_inttoptr: Pointer entity missing normalized type."
+    | Some old_tptr =>
+        (* In the following case, we will check whether there are double pointers in the old pointer type, we will not cast if the data structure has double pointer *)
+        (* TODO: Better identify the pointer inside and cast without changing their location *)
+        new_tptr <-
+          match old_tptr with
+          | TYPE_Pointer old_typ =>
+              if typ_contains_pointer old_typ || is_function_type_h old_typ
+              then
+                ret old_tptr
+              else
+                x <- gen_typ_le_size (get_size_from_typ old_typ);;
+                ret (TYPE_Pointer x)
+          | TYPE_Vector sz (TYPE_Pointer old_typ) =>
+              if typ_contains_pointer old_typ || is_function_type_h old_typ
+              then
+                ret old_tptr
+              else
+                x <- gen_typ_le_size (get_size_from_typ old_typ);;
+                ret (TYPE_Pointer x)
+          | _ => ret (TYPE_Void) (* Won't reach here... Hopefully *)
+          end;;
+        '(iid, e) <- genInstrIdEnt new_tptr;;
+        d <- use (gen_context' .@ entl ptrEnt .@ deterministic');;
+        (gen_context' .@ entl e .@ deterministic') .= d;;
+        ret (iid, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr))
     end.
 
   Fixpoint gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
@@ -2678,7 +2679,7 @@ Section InstrGenerators.
                 ; ret (TYPE_I 32)
                 ; ret (TYPE_I 64)
                 ; ret (TYPE_Float)
-                ; ret (TYPE_Double)
+                (* ; ret (TYPE_Double) *)
                 ; ret TYPE_Vector <*> lift_GenLLVM genN <*> gen_typ_non_void_0].
 
   Definition gen_first_class_typ_from_context : GenLLVM (option typ)
@@ -2885,7 +2886,7 @@ Section InstrGenerators.
      TODO: don't initialize alloca and flag it as non-deterministic?
    *)
   Definition gen_instr : GenLLVM (list (instr_id * instr typ)) :=
-    ointtoptr <- gen_inttoptr;;
+    ointtoptr_info <- gen_inttoptr_info;;
     osized_ptr_typ <- gen_sized_ptr_type;;
     ovalid_ptr_vecptr <- gen_valid_ptr_vecptr_ent;;
     oagg_typ <- gen_aggregate_type;;
@@ -2896,7 +2897,7 @@ Section InstrGenerators.
     oneOf_LLVM
       ([ op <- gen_op_instr;; t <- gen_op_typ;;
          ret [op]
-         ; fmap ret gen_bitcast
+         (* ; fmap ret gen_bitcast *)
         ]
          ++ (* TODO: generate multiple element allocas. Will involve changing initialization *)
            (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)
@@ -2908,7 +2909,7 @@ Section InstrGenerators.
                           ret [(IId (ident_to_raw_id id), INSTR_Alloca t []); store]]) osized_typ
          ++ maybe [] (fun t => fmap (fun x => [x]) <$> [gen_load t; gen_store t; gen_gep t]) osized_ptr_typ
          ++ maybe [] (fun '(e, t) => [(fun x => [x]) <$> gen_ptrtoint e t]) ovalid_ptr_vecptr
-         ++ maybe [] (fun itp => [@ret GenLLVM _ _ [itp]]) ointtoptr
+         ++ maybe [] (fun '(e, id, t) => [(fun x => [x]) <$> gen_inttoptr e id t]) ointtoptr_info
          ++ maybe [] (fun t => [(fun x => [x]) <$> gen_extractvalue t]) oagg_typ
          ++ maybe [] (fun t => [(fun x => [x]) <$> gen_insertvalue t]) oinsertvalue_typ
          ++ maybe [] (fun t => fmap (fun x => [x]) <$> [gen_extractelement t; gen_insertelement t]) ovec_typ
