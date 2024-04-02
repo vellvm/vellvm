@@ -1248,10 +1248,10 @@ Section TypGenerators.
        gen_IntMapRaw_ent_filter es filter.
 
   (* Randomly select from all matching entities in the context *)
-  Definition gen_foldable_filter {b es E} `{ToEnt E} `{Foldable es E}
-    (m : es) (filter : GenQuery b) : GenLLVM (option b)
+  Definition gen_foldable_filter_ent {b es E} `{ToEnt E} `{Foldable es E}
+    (m : es) (filter : GenQuery b) : GenLLVM (option (Ent * b))
     := '(g, _) <- (fold _
-                    (fun key (grest : GenLLVM (option b * N)) =>
+                    (fun key (grest : GenLLVM (option (Ent * b) * N)) =>
                        qres <- runGenQueryLLVM filter key;;
                        let cnd := is_some qres in
                        '(gacc, k) <- grest;;
@@ -1259,11 +1259,23 @@ Section TypGenerators.
                        let k' := if cnd then (k+1)%N else k in
                        if swap && cnd
                        then (* swap *)
-                         ret (qres, k')
+                         ret (fmap (fun x => (toEnt key, x)) qres, k')
                        else (* No swap *)
                          ret (gacc, k'))
-                    (ret (@None b, 0%N))) m;;
+                    (ret (@None (Ent * b), 0%N))) m;;
        ret g.
+
+  Definition gen_foldable_filter {b es E} `{ToEnt E} `{Foldable es E}
+    (m : es) (filter : GenQuery b) : GenLLVM (option b)
+    := fmap snd <$> gen_foldable_filter_ent m filter.
+
+  Definition genMatchEnt {a es E}
+    `{ToEnt E} `{Foldable es E}
+    (focus : @EntTarget es E _ _ GenState G)
+    (filter : GenQuery a)
+    : GenLLVM (option (Ent * a))
+    := es <- lift focus;;
+       gen_foldable_filter_ent es filter.
 
   Definition genMatch {a es E}
     `{ToEnt E} `{Foldable es E}
@@ -1982,14 +1994,31 @@ Section ExpGenerators.
     | FULL_CTX
     | GLOBAL_CTX.
 
+  (* Generate an entity to a variable *)
+  Definition gen_var_ent {a b}
+    (focus : Lens' (SystemState GenState G) (IM.Raw.t a)) (filter : GenQuery b) : GenLLVM (option Ent)
+    := focused <- use focus;;
+       gen_IntMapRaw_ent_filter focused filter.
+
   Definition gen_var_ident {a b}
     (focus : Lens' (SystemState GenState G) (IM.Raw.t a)) (filter : GenQuery b) : GenLLVM (option ident)
-    := focused <- use focus;;
-       e <- gen_IntMapRaw_ent_filter focused filter;;
-       match e with
+    := oe <- gen_var_ent focus filter;;
+       match oe with
        | None => ret None
        | Some e => use (gen_context' .@ entl e .@ name')
        end.
+
+  (* Generate an entity for a variable of a given typ *)
+  (* t should already be normalized *)
+  Definition gen_var_of_typ_ent {a b}
+    (focus : Lens' (SystemState GenState G) (IM.Raw.t a))
+    (filter : GenQuery b)
+    (t : typ) : GenLLVM (option Ent)
+    := gen_var_ent focus
+         (vt <- queryl normalized_type';;
+          if (normalized_typ_eq t vt)
+          then filter
+          else mzero).
 
   (* Generate an ident for a variable of a given typ *)
   (* t should already be normalized *)
@@ -2443,22 +2472,6 @@ Section InstrGenerators.
     id <- genInstrId tvec;;
     ret (id, INSTR_Op (OP_InsertElement (tvec, evec) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
 
-  Definition gen_ptrtoint (tptr : typ): GenLLVM (instr_id * instr typ) :=
-    eptr <- gen_exp_sz0 tptr;;
-    let gen_typ_in_ptr (tptr : typ) :=
-      match tptr with
-      | TYPE_Pointer t =>
-          gen_int_typ_for_ptr_cast (* TODO: Wait till IPTR is implemented *)
-      | TYPE_Vector sz ty =>
-          x <- gen_int_typ_for_ptr_cast;;
-          ret (TYPE_Vector sz x)
-      | _ =>
-          ret (TYPE_Void) (* Won't get into this case *)
-      end in
-    typ_from_cast <- gen_typ_in_ptr tptr;;
-    id <- genInstrId typ_from_cast;;
-    ret (id, INSTR_Op (OP_Conversion Ptrtoint tptr eptr typ_from_cast)).
-
   Definition round_up_to_eight (n : N) : N :=
     if N.eqb 0 n
     then 0
@@ -2794,6 +2807,15 @@ Section InstrGenerators.
           then ret t
           else mzero).
 
+  Definition gen_valid_ptr_vecptr_ent : GenLLVM (option (Ent * typ))
+    := genMatchEnt
+         (use (gen_context' .@ is_ptr_vector'))
+         (t <- queryl variable_type';;
+          nt <- queryl normalized_type';;
+          if negb (contains_typ nt (TYPE_Struct []) soft)
+          then ret t
+          else mzero).
+
   Definition gen_vec_type : GenLLVM (option typ)
     := genMatch
          (use (gen_context' .@ is_vector'))
@@ -2829,6 +2851,34 @@ Section InstrGenerators.
     := τ <- gen_op_typ;;
        gen_op_instr_of_typ τ.
 
+  Definition gen_ptr_or_vector_ptr (τ : typ) : GenLLVM (option Ent) :=
+    gen_var_of_typ_ent (gen_context' .@ is_ptr_vector') (ret true) τ.
+
+  Definition gen_ptrtoint (ptr_ent : Ent) (tptr : typ) : GenLLVM (instr_id * instr typ) :=
+    let gen_typ_in_ptr (tptr : typ) :=
+      match tptr with
+      | TYPE_Pointer t =>
+          gen_int_typ_for_ptr_cast (* TODO: Wait till IPTR is implemented *)
+      | TYPE_Vector sz ty =>
+          x <- gen_int_typ_for_ptr_cast;;
+          ret (TYPE_Vector sz x)
+      | _ =>
+          ret (TYPE_Void) (* Won't get into this case *)
+      end in
+    typ_from_cast <- gen_typ_in_ptr tptr;;
+    '(id, e) <- genInstrIdEnt typ_from_cast;;
+    ptr_name <- use (gen_context' .@ entl ptr_ent .@ name');;
+    match ptr_name with
+    | None => failGen "gen_ptrtoint: unnamed pointer, shouldn't happen."
+    | Some ptr_name =>
+        let ptr_exp := EXP_Ident ptr_name in
+        (* TODO: Copy whether the pointer is deterministic *)
+        d <- use (gen_context' .@ entl ptr_ent .@ deterministic');;
+        (gen_context' .@ entl e .@ deterministic') .= d;;
+        (gen_context' .@ entl e .@ from_pointer') .= ret ptr_ent;;
+        ret (id, INSTR_Op (OP_Conversion Ptrtoint tptr ptr_exp typ_from_cast))
+    end.
+
   (* Generate basic instructions.
      Note: this function returns a list because when we generate an alloca we must initialize it...
 
@@ -2837,7 +2887,7 @@ Section InstrGenerators.
   Definition gen_instr : GenLLVM (list (instr_id * instr typ)) :=
     ointtoptr <- gen_inttoptr;;
     osized_ptr_typ <- gen_sized_ptr_type;;
-    ovalid_ptr_vecptr <- gen_valid_ptr_vecptr_type;;
+    ovalid_ptr_vecptr <- gen_valid_ptr_vecptr_ent;;
     oagg_typ <- gen_aggregate_type;;
     ovec_typ <- gen_vec_type;;
     oinsertvalue_typ <- gen_insertvalue_type;;
@@ -2845,7 +2895,9 @@ Section InstrGenerators.
     osized_typ <- gen_sized_typ_in_context;;
     oneOf_LLVM
       ([ op <- gen_op_instr;; t <- gen_op_typ;;
-         ret [op] ]
+         ret [op]
+         ; fmap ret gen_bitcast
+        ]
          ++ (* TODO: generate multiple element allocas. Will involve changing initialization *)
            (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)
          (* align <- ret None;; *)
@@ -2855,7 +2907,7 @@ Section InstrGenerators.
                           store <- gen_store_to (TYPE_Pointer t, EXP_Ident id);;
                           ret [(IId (ident_to_raw_id id), INSTR_Alloca t []); store]]) osized_typ
          ++ maybe [] (fun t => fmap (fun x => [x]) <$> [gen_load t; gen_store t; gen_gep t]) osized_ptr_typ
-         ++ maybe [] (fun t => [(fun x => [x]) <$> gen_ptrtoint t]) ovalid_ptr_vecptr
+         ++ maybe [] (fun '(e, t) => [(fun x => [x]) <$> gen_ptrtoint e t]) ovalid_ptr_vecptr
          ++ maybe [] (fun itp => [@ret GenLLVM _ _ [itp]]) ointtoptr
          ++ maybe [] (fun t => [(fun x => [x]) <$> gen_extractvalue t]) oagg_typ
          ++ maybe [] (fun t => [(fun x => [x]) <$> gen_insertvalue t]) oinsertvalue_typ
