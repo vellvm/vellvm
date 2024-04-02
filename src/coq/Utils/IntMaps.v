@@ -10,6 +10,7 @@ From Coq Require Import
 From Vellvm Require Import
      Utils.Tactics
      Utils.Monads
+     Utils.VellvmRelations
      Numeric.Coqlib
      ListUtil.
 
@@ -586,6 +587,83 @@ Section Map_Operations.
    *)
   Definition IM_merge {a} (m1 : IM.Raw.t a) (m2 : IM.Raw.t a) : IM.Raw.t a
     := IM.Raw.fold (IM.Raw.add (elt:=a)) m2 m1.
+
+  Definition IM_Refine {a b} (R : a -> b -> Prop) : IntMap a -> IntMap b -> Prop :=
+    fun m m' =>
+      (forall k, member k m <-> member k m') /\
+        (forall k e e', lookup k m = Some e -> lookup k m' = Some e' -> R e e').
+
+  Lemma IM_Refine_empty :
+    forall {R1 R2} (R1R2 : R1 -> R2 -> Prop),
+      IM_Refine R1R2 (IM.empty R1) (IM.empty R2).
+  Proof.
+    intros R1 R2 R1R2.
+    split.
+    - intros k.
+      split; intros MEM;
+        inv MEM.
+    - intros k e e' L1 L2.
+      inv L1.
+  Qed.
+
+  Lemma IM_Refine_add :
+    forall {R1 R2} (R1R2 : R1 -> R2 -> Prop) m1 m2 k x y
+      (REF : IM_Refine R1R2 m1 m2)
+      (RXY : R1R2 x y),
+      IM_Refine R1R2 (add k x m1) (add k y m2).
+  Proof.
+    intros R1 R2 R1R2 m1 m2 k x y REF RXY.
+    split.
+    - intros k0.
+      destruct (Z.eq_dec k k0) eqn:K; subst.
+      + split; intros MEM; apply member_add_eq.
+      + split; intros MEM; apply member_add_ineq;
+          apply member_add_ineq in MEM; eauto;
+          apply REF; auto.
+    - intros k0 e e' L L'.
+      destruct (Z.eq_dec k k0) eqn:K; subst.
+      + rewrite lookup_add_eq in L.
+        rewrite lookup_add_eq in L'.
+        inv L; inv L'; auto.
+      + rewrite lookup_add_ineq in L; eauto.
+        rewrite lookup_add_ineq in L'; eauto.
+        eapply REF; eauto.
+  Qed.
+
+  Lemma IM_Refine_Forall2 :
+    forall {R1 R2} (r1 : list (Z * R1)) (r2 : list (Z * R2)) R1R2
+      (ALL : Forall2 (eq × R1R2) r1 r2),
+      IM_Refine R1R2 (IP.of_list r1) (IP.of_list r2).
+  Proof.
+    intros R1 R2 r1 r2 R1R2 ALL.
+    induction ALL.
+    - cbn.
+      apply IM_Refine_empty.
+    - cbn.
+      destruct x, y.
+      inv H.
+      cbn in *; subst.
+      unfold IP.uncurry; cbn.
+      apply IM_Refine_add; auto.
+  Qed.
+
+  Lemma IM_Refine_of_list_app :
+    forall {R1 R2} (R1R2 : R1 -> R2 -> Prop) r1 r1' r2 r2'
+      (REF1 : Forall2 (eq × R1R2) r1' r2')
+      (REF2 : Forall2 (eq × R1R2) r1 r2),
+      IM_Refine R1R2 (IP.of_list (r1' ++ r1)) (IP.of_list (r2' ++ r2)).
+  Proof.
+    intros R1 R2 R1R2 r1 r1' r2 r2' REF1 REF2.
+    induction REF1.
+    - cbn.
+      apply IM_Refine_Forall2; auto.
+    - cbn.
+      destruct x, y.
+      inv H.
+      cbn in *; subst.
+      unfold IP.uncurry; cbn.
+      apply IM_Refine_add; auto.
+  Qed.
 
 End Map_Operations.
 

@@ -47,6 +47,7 @@ From Vellvm Require Import
      Utils.Oomable
      Utils.Poisonable
      Utils.NMaps
+     Utils.IntMaps
      Handlers.MemoryModules.FiniteAddresses
      Handlers.MemoryModules.InfiniteAddresses
      Handlers.MemoryModelImplementation
@@ -22728,7 +22729,7 @@ Qed.
 
   Lemma address_one_function_E1E2_orutt :
     forall dfn,
-      orutt event_refine_strict event_res_refine_strict (dvalue_refine_strict × function_denotation_refine_strict)
+      orutt event_refine_strict event_res_refine_strict (eq × function_denotation_refine_strict)
         (LLVM1.address_one_function dfn)
         (LLVM2.address_one_function dfn)
         (OOM:=OOME).
@@ -22740,10 +22741,14 @@ Qed.
     solve_dec_oom.
 
     intros r1 r2 R1R2.
+    destruct r2;
+      dvalue_refine_strict_inv R1R2;
+      try solve_orutt_raise.
     apply orutt_Ret.
 
     constructor.
     - cbn; auto.
+      erewrite AC1.addr_convert_ptoi; eauto.
     - cbn.
       red.
       intros args1 args2 ARGS.
@@ -22785,8 +22790,8 @@ Qed.
             apply Util.Forall2_forall.
             split; auto.
 
-            intros i a b NTHl NTHl0.
-            destruct a as [a1 a2].
+            intros i a' b NTHl NTHl0.
+            destruct a' as [a1 a2].
             destruct b as [b1 b2].
             epose proof (combine_lists_err_Nth_inv _ _ _ _ _ _ NTHl HARGS1) as [AARGS AARGS1].
             epose proof (combine_lists_err_Nth_inv _ _ _ _ _ _ NTHl0 HARGS2) as [BARGS BARGS1].
@@ -22827,9 +22832,9 @@ Qed.
           induction PARAMS.
           + constructor; cbn.
             apply local_refine_strict_empty.
-          + destruct x as [xid xuv].
+          + destruct x0 as [xid xuv].
             destruct y as [yid yuv].
-            inv H.
+            inv H0.
             cbn in fst_rel, snd_rel. subst.
             constructor; cbn.
             inv IHPARAMS; subst_existT.
@@ -22850,9 +22855,9 @@ Qed.
           apply denote_ocfg_orutt_strict.
         }
 
-        intros r0 r3 H.
-        inv H.
-        - inv H0.
+        intros r0 r3 H0.
+        inv H0.
+        - inv H1.
           destruct a1, a2.
           cbn in *.
           subst.
@@ -22898,7 +22903,7 @@ Qed.
   Lemma address_one_functions_E1E2_orutt :
     forall dfns,
       orutt event_refine_strict event_res_refine_strict
-        (Forall2 (dvalue_refine_strict × function_denotation_refine_strict))
+        (Forall2 (eq × function_denotation_refine_strict))
         (map_monad LLVM1.address_one_function dfns)
         (map_monad address_one_function dfns)
         (OOM:=OOME).
@@ -22911,78 +22916,60 @@ Qed.
 
   Lemma lookup_defn_some_refine_strict :
     forall dfns1 dfns2 r1 r2 f_den1,
-      Forall2 (dvalue_refine_strict × function_denotation_refine_strict) dfns1 dfns2 ->
+      IM_Refine function_denotation_refine_strict dfns1 dfns2 ->
       dvalue_refine_strict r1 r2 ->
       IS1.LLVM.D.lookup_defn r1 dfns1 = Some f_den1 ->
       exists f_den2,
         IS2.LLVM.D.lookup_defn r2 dfns2 = Some f_den2 /\
           function_denotation_refine_strict f_den1 f_den2.
   Proof.
-    intros dfns1 dfns2 r1 r2 f_den1 DFNS R1R2 LUP.
+    intros dfns1 dfns2 r1 r2 f_den1 [MEM DFNS] R1R2 LUP.
 
-    pose proof DFNS as NTH.
-    apply Util.Forall2_forall in NTH as [LEN NTH].
+    unfold IS1.LLVM.D.lookup_defn in LUP.
 
-    pose proof LUP as LUP'.
-    eapply assoc_similar_lookup with
-      (xs:=dfns1) (ys:=dfns2) (a:=r1) (b:=f_den1) in LUP';
-      eauto.
-    2: {
-      apply dvalue_refine_strict_R2_injective.
-    }
+    destruct r2;
+      dvalue_refine_strict_inv R1R2; cbn in *;
+      try discriminate.
 
-    destruct LUP' as [c [d [i [ASSOC [NTH1 NTH2]]]]].
-    exists d.
-
-    pose proof (NTH i (r1, f_den1) (c, d) NTH1 NTH2).
-    inv H; cbn in *.
-    split; auto.
-
-    assert (c = r2) as CR2.
-    { eapply dvalue_refine_strict_R2_injective; eauto.
-    }
-
-    subst.
-    auto.
+    pose proof LUP as M.
+    apply lookup_member in M.
+    apply MEM in M.
+    apply member_lookup in M.
+    destruct M as (?&?).
+    eapply DFNS in LUP; eauto.
+    exists x0; split; eauto.
+    erewrite <- AC1.addr_convert_ptoi; eauto.
   Qed.
 
   (* May not be true with new dvalue_refine *)
   Lemma lookup_defn_none_strict :
     forall dfns1 dfns2 r1 r2,
-      Forall2 (dvalue_refine_strict × function_denotation_refine_strict) dfns1 dfns2 ->
+      IM_Refine function_denotation_refine_strict dfns1 dfns2 ->
       dvalue_refine_strict r1 r2 ->
       IS1.LLVM.D.lookup_defn r1 dfns1 = None ->
       IS2.LLVM.D.lookup_defn r2 dfns2 = None.
   Proof.
-    intros dfns1 dfns2 r1 r2 ALL.
-    revert r1. revert r2.
-    induction ALL; intros r2 r1 REF LUP;
-      cbn in *; auto.
+    intros dfns1 dfns2 r1 r2 [MEM LUP] REF L.
+    unfold IS1.LLVM.D.lookup_defn in L.
 
-    destruct x, y.
-    cbn in *.
+    destruct r2;
+      dvalue_refine_strict_inv REF; cbn in *;
+      try auto.
 
-    inv H.
-    cbn in *.
+    destruct (lookup (PTOI.ptr_to_int a) dfns2) eqn:L';
+      auto.
 
-    break_match_hyp; inv LUP.
-    eapply RelDec.neg_rel_dec_correct in Heqb.
-    pose proof dvalue_refine_strict_R2_injective _ _ _ _ REF fst_rel.
-    assert (d0 <> r2).
-    { intros D0R2.
-      apply H in D0R2; auto.
-    }
-    { assert (r2 <> d0) by auto.
-      apply RelDec.neg_rel_dec_correct in H2.
-      rewrite H2.
-      eapply assoc_similar_no_lookup with (xs:=l) (RAC:=dvalue_refine_strict); eauto.
-      apply dvalue_refine_strict_R2_injective.
-    }
+    apply lookup_member in L'.
+    apply MEM in L'.
+    apply member_lookup in L' as (v&L').
+    erewrite <- AC1.addr_convert_ptoi in L'; eauto.
+    rewrite L in L'.
+    discriminate.
   Qed.
 
   Lemma denote_mcfg_E1E2_orutt' :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
-      (Forall2 (dvalue_refine_strict × function_denotation_refine_strict) dfns1 dfns2) ->
+      IM_Refine function_denotation_refine_strict dfns1 dfns2 ->
       (uvalue_refine_strict f1 f2) ->
       (Forall2 uvalue_refine_strict args1 args2) ->
       call_refine_strict IS1.LP.Events.DV.uvalue IS2.LP.Events.DV.uvalue (IS1.LP.Events.Call dt f1 args1) (Call dt f2 args2) ->
@@ -23155,7 +23142,7 @@ Qed.
 
   Lemma denote_mcfg_E1E2_orutt :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
-      (Forall2 (dvalue_refine_strict × function_denotation_refine_strict) dfns1 dfns2) ->
+      IM_Refine function_denotation_refine_strict dfns1 dfns2 ->
       (uvalue_refine_strict f1 f2) ->
       (Forall2 uvalue_refine_strict args1 args2) ->
       orutt event_refine_strict event_res_refine_strict uvalue_refine_strict
@@ -23487,7 +23474,7 @@ Qed.
     forall dfns1 dfns2,
       Forall2 (eq × function_denotation_refine_strict) dfns1 dfns2 ->
       orutt event_refine_strict event_res_refine_strict
-        (Forall2 (dvalue_refine_strict × function_denotation_refine_strict))
+        (Forall2 (eq × function_denotation_refine_strict))
         (map_monad LLVM1.address_one_builtin_function dfns1)
         (map_monad address_one_builtin_function dfns2)
         (OOM:=OOME).
@@ -23505,8 +23492,13 @@ Qed.
     }
 
     intros r1 r2 H.
+    destruct r2;
+      dvalue_refine_strict_inv H; cbn in *;
+      try solve_orutt_raise.
     eapply orutt_Ret.
     constructor; eauto.
+    cbn.
+    erewrite <- AC1.addr_convert_ptoi; eauto.
   Qed.
 
   Lemma builtins_refine_strict :
@@ -23554,7 +23546,7 @@ Qed.
     eapply orutt_bind.
 
     { apply denote_mcfg_E1E2_orutt; auto.
-      - apply Forall2_app; auto.
+      - apply IM_Refine_of_list_app; eauto.
       - apply dvalue_refine_strict_dvalue_to_uvalue; auto.
       - (* TODO: fold into main_args lemma probably *)
         unfold main_args.

@@ -16,16 +16,17 @@ From ExtLib Require Import
      Data.Map.FMapAList.
 
 From Vellvm Require Import
-     Utilities
-     Syntax
-     Syntax.LLVMAst
-     Syntax.AstLib
-     Semantics.LLVMEvents
-     Semantics.Denotation
-     Semantics.IntrinsicsDefinitions
-     Semantics.InterpretationStack
-     Semantics.VellvmIntegers
-     Semantics.StoreId.
+  Utilities
+  Utils.IntMaps
+  Syntax
+  Syntax.LLVMAst
+  Syntax.AstLib
+  Semantics.LLVMEvents
+  Semantics.Denotation
+  Semantics.IntrinsicsDefinitions
+  Semantics.InterpretationStack
+  Semantics.VellvmIntegers
+  Semantics.StoreId.
 
 Import MonadNotation.
 Import ListNotations.
@@ -315,19 +316,27 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
    *)
 
   Definition address_one_function (df : definition dtyp (CFG.cfg dtyp))
-    : itree L0 (dvalue * function_denotation) :=
+    : itree L0 (Z * function_denotation) :=
     let fid := (dc_name (df_prototype df)) in
     fv <- trigger (GlobalRead fid) ;;
-    ret (fv, ⟦ df ⟧f).
+    match fv with
+    | DVALUE_Addr addr =>        
+        ret (LP.PTOI.ptr_to_int addr, ⟦ df ⟧f)
+    | _ => raise "address_one_function: invalid address, should not happen."
+    end.
 
   (**
    Denotes a builtin function 
    *)
   Definition address_one_builtin_function (builtin : function_id * function_denotation) 
-    : itree L0 (dvalue * function_denotation) :=
+    : itree L0 (Z * function_denotation) :=
     let (fid, den) := builtin in 
     fv <- trigger (GlobalRead fid) ;;
-    ret (fv, den).
+    match fv with
+    | DVALUE_Addr addr =>        
+        ret (LP.PTOI.ptr_to_int addr, den)
+    | _ => raise "address_one_builtin_function: invalid address, should not happen."
+    end.
   
   (**
    We are now ready to define our semantics. Guided by the events and handlers,
@@ -369,7 +378,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
     'builtins <- map_monad address_one_builtin_function (built_in_functions (m_declarations mcfg));;
     'addr <- trigger (GlobalRead (Name entry)) ;;
-    'rv <- denote_mcfg (defns ++ builtins) ret_typ (dvalue_to_uvalue addr) args ;;
+    'rv <- denote_mcfg (IP.of_list (defns ++ builtins)) ret_typ (dvalue_to_uvalue addr) args ;;
     dv_pred <- trigger (pickNonPoison rv);;
     ret (proj1_sig dv_pred).
 

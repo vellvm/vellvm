@@ -214,7 +214,9 @@ let calling_convention_tests =
   ; ("../tests/ll/call3.ll", 34)
   ; ("../tests/ll/call4.ll", 34)
   ; ("../tests/ll/call5.ll", 24)
-  ; ("../tests/ll/call6.ll", 26) ]
+  ; ("../tests/ll/call6.ll", 26)
+  ; ("../tests/ll/call-cast.ll", 3)
+  ]
 
 let memory_tests =
   [ ("../tests/ll/alloca1.ll", 17)
