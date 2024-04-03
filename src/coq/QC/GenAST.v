@@ -1357,6 +1357,7 @@ Section TypGenerators.
            (map ret
                 [ TYPE_I 1
                 ; TYPE_I 8
+                ; TYPE_I 16
                 ; TYPE_I 32
                 ; TYPE_I 64
                 (* TODO: Generate floats and stuff *)
@@ -1502,6 +1503,7 @@ Section TypGenerators.
            (map ret
                 [ TYPE_I 1
                 ; TYPE_I 8
+                ; TYPE_I 16
                 ; TYPE_I 32
                 ; TYPE_I 64
                 ; TYPE_Void
@@ -1552,6 +1554,7 @@ Section TypGenerators.
            (map ret
                 [ TYPE_I 1
                 ; TYPE_I 8
+                ; TYPE_I 16
                 ; TYPE_I 32
                 ; TYPE_I 64
                 (* TODO: Generate floats and stuff *)
@@ -1586,6 +1589,7 @@ Section TypGenerators.
            (map ret
                 [ TYPE_I 1
                 ; TYPE_I 8
+                ; TYPE_I 16
                 ; TYPE_I 32
                 ; TYPE_I 64
                 (* TODO: Generate floats and stuff *)

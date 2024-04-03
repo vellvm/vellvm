@@ -341,6 +341,8 @@ Module Type DvalueByte (LP : LLVMParams).
                ret (DVALUE_I1 (concat_bytes_Z_vint zs))
            | 8 =>
                ret (DVALUE_I8 (concat_bytes_Z_vint zs))
+           | 16 =>
+               ret (DVALUE_I16 (concat_bytes_Z_vint zs))
            | 32 =>
                ret (DVALUE_I32 (concat_bytes_Z_vint zs))
            | 64 =>
@@ -431,6 +433,8 @@ Module Type DvalueByte (LP : LLVMParams).
                ret (DVALUE_I1 (concat_bytes_Z_vint zs))
            | 8 =>
                ret (DVALUE_I8 (concat_bytes_Z_vint zs))
+           | 16 =>
+               ret (DVALUE_I16 (concat_bytes_Z_vint zs))
            | 32 =>
                ret (DVALUE_I32 (concat_bytes_Z_vint zs))
            | 64 =>
