@@ -47,6 +47,8 @@ Record Metadata s :=
     ; is_sized : Component s Field unit
     (* Whether the variable is an aggregate type *)
     ; is_aggregate : Component s Field unit
+    (* Whether the variable is an aggregate type with values (e.g., not an array of 0 elements) *)
+    ; is_indexable : Component s Field unit
     (* Whether the variable is a vector type *)
     ; is_vector : Component s Field unit
     (* Whether the variable is an array type *)
@@ -99,6 +101,7 @@ Ltac2 metadataConstructors :=
   ; (fun _ => apply is_sized_pointer)
   ; (fun _ => apply is_sized)
   ; (fun _ => apply is_aggregate)
+  ; (fun _ => apply is_indexable)
   ; (fun _ => apply is_vector)
   ; (fun _ => apply is_array)
   ; (fun _ => apply is_struct)
@@ -125,6 +128,7 @@ Ltac2 applyMetadataConstructors (tac : unit -> unit) :=
       ; (fun _ => tac (); apply is_sized_pointer)
       ; (fun _ => tac (); apply is_sized)
       ; (fun _ => tac (); apply is_aggregate)
+      ; (fun _ => tac (); apply is_indexable)
       ; (fun _ => tac (); apply is_vector)
       ; (fun _ => tac (); apply is_array)
       ; (fun _ => tac (); apply is_struct)
@@ -189,6 +193,7 @@ Definition name' {s : StorageType} : Lens' (Metadata s) (Component s Field ident
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -222,6 +227,7 @@ Definition is_global' {s : StorageType} : Lens' (Metadata s) (Component s Field 
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -255,6 +261,7 @@ Definition is_local' {s : StorageType} : Lens' (Metadata s) (Component s Field u
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -288,6 +295,7 @@ Definition type_alias' {s : StorageType} : Lens' (Metadata s) (Component s Field
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -321,6 +329,7 @@ Definition variable_type' {s : StorageType} : Lens' (Metadata s) (Component s Fi
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -354,6 +363,7 @@ Definition normalized_type' {s : StorageType} : Lens' (Metadata s) (Component s 
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -387,6 +397,7 @@ Definition is_deterministic' {s : StorageType} : Lens' (Metadata s) (Component s
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -420,6 +431,7 @@ Definition is_non_deterministic' {s : StorageType} : Lens' (Metadata s) (Compone
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -476,6 +488,7 @@ Definition from_pointer' {s : StorageType} : Lens' (Metadata s) (Component s Fie
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -509,6 +522,7 @@ Definition is_pointer' {s : StorageType} : Lens' (Metadata s) (Component s Field
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -542,6 +556,7 @@ Definition is_sized_pointer' {s : StorageType} : Lens' (Metadata s) (Component s
           ; (fun _ => apply x)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -575,6 +590,7 @@ Definition is_sized' {s : StorageType} : Lens' (Metadata s) (Component s Field u
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply x)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -608,6 +624,7 @@ Definition is_aggregate' {s : StorageType} : Lens' (Metadata s) (Component s Fie
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply x)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -620,6 +637,40 @@ Definition is_aggregate' {s : StorageType} : Lens' (Metadata s) (Component s Fie
         ];
       apply w.
   - apply is_aggregate.
+Defined.
+
+Definition is_indexable' {s : StorageType} : Lens' (Metadata s) (Component s Field unit).
+  red.
+  intros f F afa w.
+  refine open_constr:((fun x => _) <$> afa (_ w)); try typeclasses_eauto.
+  - apply mkMetadata;
+      Control.dispatch
+        [ (fun _ => apply name)
+          ; (fun _ => apply type_alias)
+          ; (fun _ => apply variable_type)
+          ; (fun _ => apply normalized_type)
+          ; (fun _ => apply is_local)
+          ; (fun _ => apply is_global)
+          ; (fun _ => apply is_deterministic)
+          ; (fun _ => apply is_non_deterministic)
+          ; (fun _ => apply from_pointer)
+          ; (fun _ => apply is_pointer)
+          ; (fun _ => apply is_sized_pointer)
+          ; (fun _ => apply is_sized)
+          ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply x)
+          ; (fun _ => apply is_vector)
+          ; (fun _ => apply is_array)
+          ; (fun _ => apply is_struct)
+          ; (fun _ => apply is_non_void)
+          ; (fun _ => apply is_ptr_vector)
+          ; (fun _ => apply is_sized_ptr_vector)
+          ; (fun _ => apply is_sized_type_alias)
+          ; (fun _ => apply is_first_class_type)
+          ; (fun _ => apply is_function_pointer)
+        ];
+      apply w.
+  - apply is_indexable.
 Defined.
 
 Definition is_vector' {s : StorageType} : Lens' (Metadata s) (Component s Field unit).
@@ -641,6 +692,7 @@ Definition is_vector' {s : StorageType} : Lens' (Metadata s) (Component s Field 
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply x)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -674,6 +726,7 @@ Definition is_array' {s : StorageType} : Lens' (Metadata s) (Component s Field u
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply x)
           ; (fun _ => apply is_struct)
@@ -707,6 +760,7 @@ Definition is_struct' {s : StorageType} : Lens' (Metadata s) (Component s Field 
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply x)
@@ -740,6 +794,7 @@ Definition is_non_void' {s : StorageType} : Lens' (Metadata s) (Component s Fiel
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -773,6 +828,7 @@ Definition is_ptr_vector' {s : StorageType} : Lens' (Metadata s) (Component s Fi
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -806,6 +862,7 @@ Definition is_sized_ptr_vector' {s : StorageType} : Lens' (Metadata s) (Componen
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -839,6 +896,7 @@ Definition is_sized_type_alias' {s : StorageType} : Lens' (Metadata s) (Componen
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -872,6 +930,7 @@ Definition is_first_class_type' {s : StorageType} : Lens' (Metadata s) (Componen
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -905,6 +964,7 @@ Definition is_function_pointer' {s : StorageType} : Lens' (Metadata s) (Componen
           ; (fun _ => apply is_sized_pointer)
           ; (fun _ => apply is_sized)
           ; (fun _ => apply is_aggregate)
+          ; (fun _ => apply is_indexable)
           ; (fun _ => apply is_vector)
           ; (fun _ => apply is_array)
           ; (fun _ => apply is_struct)
@@ -958,7 +1018,7 @@ Definition names'' {m} : Traversal (Metadata (WorldOf m)) (Metadata (WorldOf m))
   intros f F focus meta.
   refine open_constr:(pure (mkMetadata (WorldOf m)) <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _
                         <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _
-                        <*> _ <*> _ <*> _ <*> _);
+                        <*> _ <*> _ <*> _ <*> _ <*> _);
     try typeclasses_eauto.
   - apply (focus (name _ meta)).
   - apply (pure (type_alias _ meta)).
@@ -973,6 +1033,7 @@ Definition names'' {m} : Traversal (Metadata (WorldOf m)) (Metadata (WorldOf m))
   - apply (pure (is_sized_pointer _ meta)).
   - apply (pure (is_sized _ meta)).
   - apply (pure (is_aggregate _ meta)).
+  - apply (pure (is_indexable _ meta)).
   - apply (pure (is_vector _ meta)).
   - apply (pure (is_array _ meta)).
   - apply (pure (is_struct _ meta)).

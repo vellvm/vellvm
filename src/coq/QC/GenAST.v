@@ -191,6 +191,11 @@ Section Helpers.
     :=
       n <- (arbitrary : G nat);;
       ret (N.of_nat n).
+
+  Definition genPosN : G N
+    :=
+      n <- (arbitrary : G nat);;
+      ret (N.of_nat (S n)).
 End Helpers.
 
 Section GenerationState.
@@ -997,6 +1002,14 @@ Section TypGenerators.
          & (@is_aggregate' SetterOf .~
               bool_setter
               (match normalized with
+               | TYPE_Array _ _
+               | TYPE_Struct _
+               | TYPE_Packed_struct _ => true
+               | _ => false
+               end))
+         & (@is_indexable' SetterOf .~
+              bool_setter
+              (match normalized with
                | TYPE_Array sz _ => N.ltb 0 sz
                | TYPE_Struct l
                | TYPE_Packed_struct l => negb (l_is_empty l)
@@ -1113,8 +1126,9 @@ Section TypGenerators.
        (gen_context' .@ entl e .@ name') .= ret n;;
        (gen_context' .@ entl e .@ type_alias') .= ret t;;
        set_typ_metadata e t;;
-       st <- use (gen_context' .@ entl e .@ is_sized_type_alias');;
-       (gen_context' .@ entl e .@ is_sized_type_alias') .= st;;
+       st <- use (gen_context' .@ entl e .@ is_sized');;
+       (* (gen_context' .@ entl e .@ is_sized_type_alias') .= st;; *)
+       (* (gen_context' .@ entl e .@ is_sized') .= None;; *)
        ret tt.
 
   (* Should this be a local? *)
@@ -1378,14 +1392,12 @@ Section TypGenerators.
   Definition gen_type_matching_alias_focus {a b}
     (focus : Lens' (SystemState GenState G) (IM.Raw.t a)) (filter : GenQuery b)
     : GenLLVM (option typ)
-    := focused <- use focus;;
-       gen_sized_type_of_alias_filter focus filter.
+    := gen_sized_type_of_alias_filter focus filter.
 
   Definition gen_type_matching_variable_focus {a b}
     (focus : Lens' (SystemState GenState G) (IM.Raw.t a)) (filter : GenQuery b)
     : GenLLVM (option typ)
-    := focused <- use focus;;
-       gen_type_of_variable_filter focus filter.
+    := gen_type_of_variable_filter focus filter.
 
   Definition gen_type_matching_alias {b} (filter : GenQuery b) : GenLLVM (option typ)
     := gen_type_matching_alias_focus (gen_context' .@ is_sized_type_alias') filter.
@@ -1399,12 +1411,21 @@ Section TypGenerators.
   Definition gen_type_matching_variable {b} (filter : GenQuery b) : GenLLVM (option typ)
     := gen_type_matching_variable_focus (gen_context' .@ variable_type') filter.
 
+  Definition gen_primitive_typ : GenLLVM typ :=
+    oneOf_LLVM [ret (TYPE_I 1)
+                ; ret (TYPE_I 8)
+                ; ret (TYPE_I 16)
+                ; ret (TYPE_I 32)
+                ; ret (TYPE_I 64)
+                ; ret (TYPE_Float)
+                (* ; ret (TYPE_Double) *)].
+
   Definition sized_aggregate_typ_gens (subg : nat -> GenLLVM typ) (sz : nat) :  list (unit -> GenLLVM typ)
     := [ (fun _ => gen_sized_typ_0)
        ; (fun _ => ret TYPE_Pointer <*> subg sz)
        (* TODO: Might want to restrict the size to something reasonable *)
        ; (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> subg sz)
-       ; (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> subg 0%nat)
+       ; (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_primitive_typ)
        ; (fun _ => ret TYPE_Struct <*> nonemptyListOf_LLVM (subg sz))
        ; (fun _ => ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (subg sz))
     ].
@@ -1502,7 +1523,7 @@ Section TypGenerators.
        ; (fun _ => ret TYPE_Pointer <*> subg sz)
        (* TODO: Might want to restrict the size to something reasonable *)
        ; (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> subg sz)
-       ; (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> subg 0%nat)
+       ; (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_primitive_typ)
        ; (fun _ =>
           let n := Nat.div (S sz) 2 in
           ret TYPE_Function <*> subg n <*> listOf_LLVM (gen_sized_typ_size n) <*> ret false)
@@ -2631,13 +2652,15 @@ Section InstrGenerators.
       | TYPE_I 1 =>
           ret [TYPE_I 1]
       | TYPE_I 8 =>
-          ret [TYPE_I 8; TYPE_Vector 8 (TYPE_I 1)]
+          ret [TYPE_I 8 (* ; TYPE_Vector 8 (TYPE_I 1) *)]
+      | TYPE_I 16 =>
+          ret [TYPE_I 16; TYPE_Vector 2 (TYPE_I 8) (* ; TYPE_Vector 8 (TYPE_I 1) *)]
       | TYPE_I 32
       | TYPE_Float =>
-          ret [TYPE_I 32; TYPE_Float; TYPE_Vector 4 (TYPE_I 8); TYPE_Vector 32 (TYPE_I 1)]
+          ret [TYPE_I 32; TYPE_Float; TYPE_Vector 4 (TYPE_I 8); TYPE_Vector 2 (TYPE_I 16); TYPE_Vector 1 (TYPE_I 32); TYPE_Vector 1 TYPE_Float (* ; TYPE_Vector 32 (TYPE_I 1) *)]
       | TYPE_I 64
       | TYPE_Double =>
-          ret [TYPE_I 64; (* TYPE_Double; *) TYPE_Vector 2 (TYPE_I 32); TYPE_Vector 2 (TYPE_Float); TYPE_Vector 8 (TYPE_I 8); TYPE_Vector 64 (TYPE_I 1)]
+          ret [TYPE_I 64; (* TYPE_Double; *) TYPE_Vector 8 (TYPE_I 8); TYPE_Vector 4 (TYPE_I 16); TYPE_Vector 2 (TYPE_I 32); TYPE_Vector 2 (TYPE_Float); TYPE_Vector 64 (TYPE_I 1)]
       | TYPE_Vector sz subtyp =>
           match subtyp with
           | TYPE_Pointer _ =>
@@ -2645,11 +2668,11 @@ Section InstrGenerators.
               (* new_subtyp <- gen_bitcast_typ subtyp;; *)
               ret [TYPE_Vector sz subtyp]
           | subtyp =>
-              let trivial_typs := [(1%N, TYPE_I 1); (8%N, TYPE_I 8); (32%N, TYPE_I 32); (32%N, TYPE_Float); (64%N, TYPE_I 64) (* ; (64%N, TYPE_Double) *)] in
+              let trivial_typs := [(* (1%N, TYPE_I 1); *) (8%N, TYPE_I 8); (32%N, TYPE_I 32); (32%N, TYPE_Float); (64%N, TYPE_I 64) (* ; (64%N, TYPE_Double) *)] in
               let size_of_vec := get_bit_size_from_typ t_from in
               let choices := fold_left (fun acc '(s,t) => let sz' := (size_of_vec / s)%N in
-                                                          if (sz' =? 0)%N then acc else (acc ++ [TYPE_Vector sz' t])%list) trivial_typs [] in
-              ret choices
+                                                          if (sz' =? 0)%N then acc else ((TYPE_Vector sz' t) :: acc)%list) trivial_typs [] in
+              ret (t_from :: choices) (* I think adding t_from here slightly biases the generator sometimes *)
           end
       | TYPE_Pointer subtyp =>
           (* TODO: Clean up. Figure out what can subtyp of pointer be *)
@@ -2676,23 +2699,33 @@ Section InstrGenerators.
   Definition gen_trivial_typ : GenLLVM typ :=
     oneOf_LLVM [ret (TYPE_I 1)
                 ; ret (TYPE_I 8)
+                ; ret (TYPE_I 16)
                 ; ret (TYPE_I 32)
                 ; ret (TYPE_I 64)
                 ; ret (TYPE_Float)
                 (* ; ret (TYPE_Double) *)
-                ; ret TYPE_Vector <*> lift_GenLLVM genN <*> gen_typ_non_void_0].
+                ; ret TYPE_Vector <*> lift_GenLLVM genPosN <*> gen_primitive_typ].
 
   Definition gen_first_class_typ_from_context : GenLLVM (option typ)
     := gen_type_matching_variable (withl is_first_class_type').
 
+  Definition gen_non_aggregate_first_class_typ_from_context : GenLLVM (option typ)
+    := gen_type_matching_variable (withl is_first_class_type';; withoutl is_aggregate').
+
   Definition gen_first_class_type_size : nat -> GenLLVM typ
     := gen_typ_size' gen_trivial_typ (fun subg sz => [fun _ => subg sz]) gen_first_class_typ_from_context.
+
+  Definition gen_non_aggregate_first_class_type_size : nat -> GenLLVM typ
+    := gen_typ_size' gen_trivial_typ (fun subg sz => [fun _ => subg sz]) gen_non_aggregate_first_class_typ_from_context.
 
   Definition gen_first_class_type : GenLLVM typ
     := sized_LLVM (fun sz => gen_first_class_type_size (min sz max_typ_size)).
 
+  Definition gen_non_aggregate_first_class_type : GenLLVM typ
+    := sized_LLVM (fun sz => gen_non_aggregate_first_class_type_size (min sz max_typ_size)).
+
   Definition gen_bitcast : GenLLVM (instr_id * instr typ) :=
-    tfc <- gen_first_class_type;;
+    tfc <- gen_trivial_typ;;
     efc <- gen_exp_sz0 tfc;;
     new_typ <- gen_bitcast_typ tfc;;
     id <- genInstrId new_typ;;
@@ -2794,6 +2827,11 @@ Section InstrGenerators.
          (use (gen_context' .@ is_aggregate'))
          (queryl variable_type').
 
+  Definition gen_indexable_type : GenLLVM (option typ)
+    := genMatch
+         (use (gen_context' .@ is_indexable'))
+         (queryl variable_type').
+
   Definition gen_ptr_vecptr_type : GenLLVM (option typ)
     := genMatch
          (use (gen_context' .@ is_ptr_vector'))
@@ -2829,7 +2867,7 @@ Section InstrGenerators.
 
   Definition gen_insertvalue_type : GenLLVM (option typ)
     := genMatch
-         (use (gen_context' .@ is_aggregate'))
+         (use (gen_context' .@ is_indexable'))
          (t <- queryl variable_type';;
           nt <- queryl normalized_type';;
           cnd <- has_paths_insertvalue_aux nt;;
@@ -2889,7 +2927,7 @@ Section InstrGenerators.
     ointtoptr_info <- gen_inttoptr_info;;
     osized_ptr_typ <- gen_sized_ptr_type;;
     ovalid_ptr_vecptr <- gen_valid_ptr_vecptr_ent;;
-    oagg_typ <- gen_aggregate_type;;
+    oagg_typ <- gen_indexable_type;;
     ovec_typ <- gen_vec_type;;
     oinsertvalue_typ <- gen_insertvalue_type;;
     ofun_ptr_typ <- gen_function_pointer_type;;
@@ -2897,7 +2935,7 @@ Section InstrGenerators.
     oneOf_LLVM
       ([ op <- gen_op_instr;; t <- gen_op_typ;;
          ret [op]
-         (* ; fmap ret gen_bitcast *)
+        ; fmap ret gen_bitcast
         ]
          ++ (* TODO: generate multiple element allocas. Will involve changing initialization *)
            (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)
