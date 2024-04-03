@@ -47,7 +47,7 @@ Require Import Vellvm.Utils.VellvmRelations.
 (* TODO: when/if we cut ties to QC, change this import *)
 From QuickChick Require Import Show.
 Import Monad.
-Import EqvNotation.
+(* Import EqvNotation. *)
 Import MonadNotation.
 Import ListNotations.
 
@@ -235,6 +235,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Array elts => "["  ++ String.concat ", " (map show_dvalue elts) ++ "]"
     | DVALUE_Vector elts => "<"  ++ String.concat ", " (map show_dvalue elts) ++ ">"
     end.
+
+  #[global] Instance showdvalue : Show dvalue
+    := {| show := show_dvalue |}.
 
   Fixpoint dvalue_measure (dv : dvalue) : nat :=
     match dv with
@@ -3352,11 +3355,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         else ret (DVALUE_Poison t)
     | _, _                               =>
         raise_error ("ill_typed-fop: " ++
-                       (to_string fop) ++
+                       (show fop) ++
                        " " ++
-                       (to_string v1) ++
+                       (show v1) ++
                        " " ++
-                       (to_string v2))
+                       (show v2))
     end.
 
   Definition not_nan32 (f:ll_float) : bool :=

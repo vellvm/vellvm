@@ -60,9 +60,8 @@ Ltac raise_abs :=
   do 2 red in H; unfold subevent in H; red in H;
   punfold H; inversion H; subst;
   match goal with
-  | [ H : existT _ _ _ = existT _ _ _ |- _] => dependent destruction H
+  | [ H : existT _ _ = existT _ _ |- _] => dependent destruction H
   end.
-
 
 Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MM : MemoryModelSpec LP MP MMSP) (MemExecM : MemoryExecMonad LP MP MMSP MM).
   Import MM.
@@ -241,6 +240,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Proof using.
       esplit with
         (MemMonad_run := fun A => @MemStateFreshT_run A F); try solve [typeclasses eauto].
+
       13-18:intros; raise_abs.
 
       - (* run bind *)
@@ -280,13 +280,10 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         intros ms sid VALID_SID.
         do 2 eexists.
         cbn.
-        rewrite map_bind.
-        rewrite bind_ret_l.
-        rewrite map_bind.
-        rewrite bind_ret_l.
-        rewrite map_ret.
+        split.
+        rewrite map_bind, bind_ret_l, map_bind, bind_ret_l, map_ret.
+        reflexivity.
         cbn.
-        split; [reflexivity|].
 
         split; [|split; [|split]].
         + red.
@@ -303,16 +300,15 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
 
         destruct (mem_state_fresh_provenance ms) as [pr' ms'] eqn:HFRESH.
         exists ms'. exists pr'.
-        cbn.
+        cbn; split.
         rewrite map_bind.
         repeat setoid_rewrite bind_ret_l.
         cbn.
         rewrite HFRESH.
         repeat setoid_rewrite bind_ret_l.
         cbn.
-
-        split; [|split].
-        + reflexivity.
+        reflexivity.
+        split.
         + unfold MemMonad_valid_state in *; auto.
           unfold used_store_id, used_store_id_prop in *. cbn in *.
           unfold used_store_id, used_store_id_prop in *. cbn in *.
@@ -639,13 +635,14 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         intros ms sid VALID_SID.
         do 2 eexists.
         cbn.
+        split.
         rewrite map_bind.
         rewrite bind_ret_l.
         rewrite map_bind.
         rewrite bind_ret_l.
         rewrite map_ret.
         cbn.
-        split; [reflexivity|].
+        reflexivity.
 
         split; [|split; [|split]]; try lia.
         + red.
@@ -660,16 +657,14 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
         destruct (mem_state_fresh_provenance ms) as [pr' ms'] eqn:HFRESH.
         exists ms'. exists pr'.
-        cbn.
+        cbn; split.
         rewrite map_bind.
         repeat setoid_rewrite bind_ret_l.
         cbn.
         rewrite HFRESH.
         repeat setoid_rewrite bind_ret_l.
         cbn.
-
-        split; [|split].
-        + reflexivity.
+        reflexivity; split.
         + unfold MemMonad_valid_state in *; auto.
           unfold used_store_id, used_store_id_prop in *. cbn in *.
           unfold used_store_id, used_store_id_prop in *. cbn in *.
@@ -678,8 +673,6 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
           rewrite <- MEM.
 
           auto.
-        + unfold used_provenance.
-          apply mem_state_fresh_provenance_fresh; auto.
       - (* raise_oom *)
         intros A ms oom_msg sid.
         cbn.

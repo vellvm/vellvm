@@ -1,6 +1,7 @@
 Require Import List.
 Import ListNotations.
 
+From stdpp Require Import base gmap.
 From Vellvm Require Import
      Syntax.CFG
      Syntax.DynamicTypes
@@ -17,30 +18,30 @@ From Vellvm Require Import
 (** * GRAPH instance for dominance calculation *)
 
 Definition mem_id (g:cfg dtyp) (u: block_id): Prop :=
-  match find_block (blks g) u with
+  match blks g !! u with
   | Some _ => True
   | _ => False
   end.
 
 Definition succ_id (g:cfg dtyp) (u: block_id) (v: block_id) : Prop :=
-  match find_block (blks g) u with
+  match blks g !! u with
   | None => False
-  | Some i => In v (successors i)
+  | Some i => v ∈ (successors i)
   end.
 
 Definition succ_id_cmp (g:cfg dtyp) (u: block_id): list block_id :=
-  match find_block (blks g) u with
+  match blks g !! u with
   | None => []
-  | Some i => successors i
+  | Some i => elements (successors i)
   end.
 
 Definition inputs_cfg (g : cfg dtyp) : list block_id :=
-  inputs g.(blks).
+  elements (inputs g.(blks)).
 
 Module idGraph <: GRAPH.
   Definition t := cfg dtyp.
   Definition V := block_id.
-  Definition eq_dec_V := raw_id_eq_dec.
+  Definition eq_dec_V := fun (a b : block_id) => decide (a = b).
   Definition entry (g : cfg dtyp) := init g.
   Definition edge := succ_id.
   Definition mem := mem_id.
@@ -53,4 +54,4 @@ End idGraphCmp.
 
 (** Instantiate the dominance spec for this graph *)
 Module Export Dominance := Dom.Spec idGraph.
-Module Export Kildall := AlgdomKildall AstLib.RawIDOrd idGraph idGraphCmp.
+(* Module Export Kildall := AlgdomKildall AstLib.RawIDOrd idGraph idGraphCmp. *)

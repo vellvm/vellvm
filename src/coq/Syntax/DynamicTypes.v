@@ -322,7 +322,7 @@ Proof using.
                  inversion X; subst; contradiction.
 Qed.
 
-Fixpoint ALL_IX_SUPPORTED (dt : dtyp) : Prop := 
+Fixpoint ALL_IX_SUPPORTED (dt : dtyp) : Prop :=
   match dt with
   | DTYPE_I sz =>
       IX_supported sz
@@ -342,7 +342,7 @@ Fixpoint ALL_IX_SUPPORTED (dt : dtyp) : Prop :=
   | DTYPE_Vector sz t
   | DTYPE_Array sz t =>
       ALL_IX_SUPPORTED t
-  | DTYPE_Struct dts 
+  | DTYPE_Struct dts
   | DTYPE_Packed_struct dts => FORALL ALL_IX_SUPPORTED dts
   end.
 
@@ -359,7 +359,7 @@ Proof using.
     try solve [left; cbn; auto | right; cbn; auto].
 
   - apply IX_supported_dec.
-  
+
   - cbn.
     apply FORALL_dec. assumption.
   - cbn.
@@ -406,7 +406,7 @@ Lemma ALL_IX_SUPPORTED_Packed_struct_cons :
     ALL_IX_SUPPORTED (DTYPE_Packed_struct dts).
 Proof using.
   intros dt dts H.
-  cbn in *.  
+  cbn in *.
   intuition.
 Qed.
 
@@ -488,7 +488,7 @@ Proof using.
   cbn in *.
   intuition.
 Qed.
-  
+
 Lemma NO_VOID_Packed_struct_cons :
   forall dt dts,
     NO_VOID (DTYPE_Packed_struct (dt :: dts)) ->
@@ -513,7 +513,7 @@ Proof using.
     try rewrite NO_VOID_equation;
     try solve [left; cbn; auto | right; cbn; auto].
 
-  all: cbn; apply FORALL_dec; assumption.  
+  all: cbn; apply FORALL_dec; assumption.
 Qed.
 
 Lemma NO_VOID_neq_dtyp :

@@ -683,10 +683,6 @@ tes on cstring on LLVMAst.v *)
   #[global] Instance dshowExp : DShow (exp T) :=
     {| dshow := dshow_exp false |}.
 
-  #[global] Instance dshowTEXP : DShow (texp T) :=
-    {| dshow te := let '(t, e) := te in dshow t @@ string_to_DString " "
-                              @@ dshow e |}.
-
   #[global] Instance dshowTExp : DShow (texp T)
     := {| dshow te := let '(t, e) := te in dshow t @@ string_to_DString " " @@ dshow e |}.
 

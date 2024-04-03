@@ -253,6 +253,8 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     reflexivity.
   Qed.
 
+  Arguments Z.of_nat !_.
+
   Lemma intptr_seq_nth :
     forall start len seq ix ixip,
       intptr_seq start len = NoOom seq ->
@@ -2343,7 +2345,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
          trywith_error "re_sid_ubytes: missing indices." (NM_find_many (Nseq 0 len) byte_map).
 
     Definition sigT_of_prod {A B : Type} (p : A * B) : {_ : A & B} :=
-      let (a, b) := p in existT (fun _ : A => B) a b.
+      let (a, b) := p in existT a b.
 
     Definition uvalue_measure_rel (uv1 uv2 : uvalue) : Prop :=
       (uvalue_measure uv1 < uvalue_measure uv2)%nat.
@@ -6097,7 +6099,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         exec_correct pre (read_uvalue dt ptr) (read_uvalue_spec dt ptr)
           (a0 <-
              (_ <- get_consecutive_ptrs ptr (N.to_nat (LP.SIZEOF.sizeof_dtyp dt));;
-              (fun (ms0 : MemState) (st0 : store_id) (bytes : list MP.BYTE_IMPL.SByte) 
+              (fun (ms0 : MemState) (st0 : store_id) (bytes : list MP.BYTE_IMPL.SByte)
                  (ms'0 : MemState) (st'0 : store_id) =>
                  Forall
                    (fun byte : MP.BYTE_IMPL.SByte =>
@@ -6473,7 +6475,6 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           { intros ms st (?&?&?).
             eapply get_consecutive_ptrs_preserves_state in H2; inv H2.
             split; eauto.
-            lia.
           }
 
           eapply exec_correct_step_map_monad_In
@@ -7042,7 +7043,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
              (_ <-
                 @get_consecutive_ptrs exec_correct_post Monad_exec_correct_post RAISE_OOM_exec_correct_post
                   RAISE_ERROR_exec_correct_post src (Z.to_nat len);;
-              (fun (ms0 : MemState) (st0 : store_id) (bytes : list BYTE_IMPL.SByte) 
+              (fun (ms0 : MemState) (st0 : store_id) (bytes : list BYTE_IMPL.SByte)
                  (ms'0 : MemState) (st'0 : store_id) =>
                  @Forall BYTE_IMPL.SByte
                    (fun byte : BYTE_IMPL.SByte =>
@@ -7057,7 +7058,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
                       @exec_correct_post_bind (list (OOM ADDR.addr)) (list ADDR.addr)
                         (@lift_err_RAISE_ERROR (list (OOM ADDR.addr)) exec_correct_post Monad_exec_correct_post
                            RAISE_ERROR_exec_correct_post
-                           (@map_monad err (EitherMonad.Monad_either string) IP.intptr 
+                           (@map_monad err (EitherMonad.Monad_either string) IP.intptr
                               (OOM ADDR.addr)
                               (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) dst [DVALUE_IPTR ix]) ixs))
                         (fun addrs : list (OOM ADDR.addr) =>
@@ -7149,8 +7150,8 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
                         (_ : @In (ADDR.addr * BYTE_IMPL.SByte) H
                                (@zip ADDR.addr BYTE_IMPL.SByte a0
                                   (@repeatN BYTE_IMPL.SByte (Z.to_N len)
-                                     (BYTE_IMPL.uvalue_sbyte (UVALUE_I8 val) (DTYPE_I 8) 0 sid)))) 
-                        (_ : MemState) (st0 : store_id) (_ : unit) (_ : MemState) (st'0 : store_id) => 
+                                     (BYTE_IMPL.uvalue_sbyte (UVALUE_I8 val) (DTYPE_I 8) 0 sid))))
+                        (_ : MemState) (st0 : store_id) (_ : unit) (_ : MemState) (st'0 : store_id) =>
                         st0 = st'0)) (fun _ : list unit => @exec_correct_post_ret unit tt))).
     Proof using Type.
       intros dst val len sid volatile.
@@ -7347,7 +7348,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           inv H6.
           lia.
         }
-        
+
         eauto with EXEC_CORRECT.
         eauto with EXEC_CORRECT.
       }
@@ -7388,7 +7389,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           inv H6.
           lia.
         }
-        
+
         eauto with EXEC_CORRECT.
         eauto with EXEC_CORRECT.
       }
@@ -7429,7 +7430,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           inv H6.
           lia.
         }
-        
+
         eauto with EXEC_CORRECT.
         eauto with EXEC_CORRECT.
       }
@@ -7470,7 +7471,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           inv H6.
           lia.
         }
-        
+
         eauto with EXEC_CORRECT.
         eauto with EXEC_CORRECT.
       }
@@ -7511,7 +7512,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           inv H6.
           lia.
         }
-        
+
         eauto with EXEC_CORRECT.
         eauto with EXEC_CORRECT.
       }
@@ -7552,7 +7553,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           inv H6.
           lia.
         }
-        
+
         eauto with EXEC_CORRECT.
         eauto with EXEC_CORRECT.
       }

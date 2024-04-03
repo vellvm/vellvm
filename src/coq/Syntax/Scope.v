@@ -14,15 +14,14 @@ From Vellvm Require Import
 (* end hide *)
 
 (** * Scoping
-    We define through this file several functions and predicates having to do with the scope
-    of VIR programs, w.r.t. both block identifiers and local variables.
-    We unfortunately inherit from LLVM IR a fully named representation of variables, forcing
-    on us fairly heavy sanity checks.
-    - [inputs]: input labels of an [ocfg]
-    - [outputs]: output labels of an [ocfg]
-    - [wf_ocfg_bid]: no duplicate block identifiers
-    - [uses]: use sites of pieces of syntax
-    - [def_sites]: definition sites of pieces of syntax
+    We define through this file several functions and predicates having to do with the scope of VIR programs, w.r.t. both block identifiers and local variables.
+    Using metavariables [i] for block ids, [b] for blocks and [g] for ocfgs:
+    - [inputs g]         : input labels of an [g]
+    - [outputs g]        : output labels of an [g]
+    - [successors b]     : succesors of [b]
+    - [predecessors i g] : predecessors of [i] in [g]
+    - [uses]             : use sites of pieces of syntax
+    - [def_sites]        : definition sites of pieces of syntax
  *)
 
 (** * Well-formedness w.r.t. block identifiers
@@ -60,9 +59,16 @@ Section LABELS_OPERATIONS.
   Definition successors (bk : block T) : gset block_id :=
     terminator_outputs (blk_term bk).
 
-  Definition outputs_acc : block_id -> block T -> gset block_id -> gset block_id := fun _ bk acc => acc ∪ successors bk.
+  Definition gset_bk_acc f : block_id -> block T -> gset block_id -> gset block_id :=
+    fun i bk acc => acc ∪ (f i bk).
+
+  Notation fold_bk_acc f := (map_fold (gset_bk_acc f) ∅).
+
+  Definition outputs_acc : block_id -> block T -> gset block_id :=
+    fun _ bk => successors bk.
+
   Definition outputs (bks : ocfg T) : gset block_id
-    := map_fold outputs_acc ∅ bks.
+    := fold_bk_acc outputs_acc bks.
 
   (* Definition raw_id_in := elem_of_list_dec (A := raw_id). *)
 
@@ -75,8 +81,10 @@ Section LABELS_OPERATIONS.
   (* Computes the set of predecessors of [b] in [G].
    *)
 
-  Definition predecessors (b : block_id) (bks : ocfg T) : list block_id :=
-    map_fold (fun k bk acc => if is_predecessor b bk then k :: acc else acc) [] bks.
+  Definition predecessors_acc b : block_id -> block T -> gset block_id :=
+    fun k bk => if is_predecessor b bk then {[k]} else ∅.
+  Definition predecessors (b : block_id) (bks : ocfg T) : gset block_id :=
+    fold_bk_acc (predecessors_acc b) bks.
 
   (* Now by construction since we represent graphs as finmaps *)
   (*
@@ -106,12 +114,12 @@ Section LABELS_OPERATIONS.
   Definition no_reentrance (bks1 bks2 : ocfg T) : Prop :=
     outputs bks2 ## inputs bks1.
 
-  (** * no_duplicate_bid
+  (** * disjoint_bid
       Checks that the inputs of two sub-graphs are disjoint. This condition ensures
       that the well formedness of the two computations entails the one of their join.
    *)
-  Definition no_duplicate_bid (bks1 bks2 : ocfg T) : Prop :=
-    inputs bks1 ## inputs bks2.
+  Definition disjoint_bid (bks1 bks2 : ocfg T) : Prop :=
+    bks1 ##ₘ bks2.
 
   (** * independent
       While [no_reentrance] captures two sequential computations,
@@ -122,10 +130,7 @@ Section LABELS_OPERATIONS.
   Definition independent_flows (bks1 bks2 : ocfg T) : Prop :=
     no_reentrance bks1 bks2 /\
     no_reentrance bks2 bks1 /\
-    no_duplicate_bid bks1 bks2.
-
-  Definition free_in_cfg (cfg : ocfg T ) (id : block_id) : Prop :=
-    ~ (elem_of id (inputs cfg)).
+    disjoint_bid bks1 bks2.
 
   Definition phi_sources (φ : phi T) : gset block_id :=
     let '(Phi _ l) := φ in list_to_set (map fst l).
@@ -334,3 +339,7 @@ Section REGISTER_OPERATIONS.
   End Uses.
 
 End REGISTER_OPERATIONS.
+
+#[global] Notation fold_bk_acc f := (map_fold (gset_bk_acc f) ∅).
+#[global] Notation "i 'free' 'in' g" := (i ∉ inputs g) (at level 0).
+

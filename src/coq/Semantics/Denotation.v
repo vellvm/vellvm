@@ -177,6 +177,9 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
      Expressions are denoted as itrees that return a [uvalue].
    *)
 
+(* TODO: show instance for dtyp and push this up *)
+From Vellvm Require Import ShowAST.
+Print Instances DShow.
   Fixpoint denote_exp
            (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
     let eval_texp '(dt,ex) := denote_exp (Some dt) ex
@@ -192,7 +195,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       | None                => raise "denote_exp given untyped EXP_Integer"
       | Some (DTYPE_I bits) => fmap dvalue_to_uvalue (coerce_integer_to_int (Some bits) x)
       | Some DTYPE_IPTR     => fmap dvalue_to_uvalue (coerce_integer_to_int None x)
-      | Some typ            => raise ("bad type for constant int: " ++ to_string typ)
+      | Some typ            => raise ("bad type for constant int: " ++ show typ)
       end
 
     | EXP_Float x =>
@@ -559,7 +562,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   Definition denote_cfg (f: cfg dtyp) : itree instr_E uvalue :=
     r <- denote_ocfg (blks f) (init f,init f) ;;
     match r with
-    | inl bid => raise ("Can't find block in denote_cfg " ++ to_string (snd bid))
+    | inl bid => raise ("Can't find block in denote_cfg " ++ show (snd bid))
     | inr uv  => ret uv
     end.
 

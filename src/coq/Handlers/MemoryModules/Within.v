@@ -14,9 +14,7 @@ Require Import MonadEq1Laws.
 Import String.
 
 Import Monad.
-Import MonadNotation.
 Open Scope monad_scope.
-
 (* Whether a monadic computation M contains something in B *)
 Class Within (M : Type -> Type) `{EQM : Eq1 M} (B : Type -> Type) (PreState PostState : Type) : Type :=
   { within {A} (m : M A) (pre : PreState) (b : B A) (post : PostState) : Prop;
@@ -24,8 +22,8 @@ Class Within (M : Type -> Type) `{EQM : Eq1 M} (B : Type -> Type) (PreState Post
       Proper (@eq1 M EQM A ==> eq ==> eq ==> eq ==> iff) within;
   }.
 
-Notation "b ∈ m" := (exists pre post, within m pre b post) (at level 99).
-Notation "b ∉ m" := (~ (exists pre post, within m pre b post)) (at level 99).
+Notation "b ∈ m" := (exists pre post, within m pre b post) (at level 70).
+Notation "b ∉ m" := (~ (exists pre post, within m pre b post)) (at level 80).
 Notation "b ⦉ pre ⦊ ∈ ⦉ post ⦊ m" := (within m pre b post) (at level 99).
 Notation "b ⦉ pre ⦊ ∉ ⦉ post ⦊ m" := (~ (within m pre b post)) (at level 99).
 Notation "b {{ pre }} ∈ {{ post }} m" := (within m pre b post) (at level 99).
