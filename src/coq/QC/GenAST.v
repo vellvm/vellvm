@@ -2128,7 +2128,8 @@ Section ExpGenerators.
               in_exp <- gen_exp_size' gen_global_of_typ gen_global_of_typ 0%nat t;;
               name <- new_global_id;;
               add_to_global_memo (mk_global name t false (Some in_exp) false []);;
-              add_to_global_ctx (ID_Global name, TYPE_Pointer t);;
+              e <- add_to_global_ctx (ID_Global name, TYPE_Pointer t);;
+              (gen_context' .@ entl e .@ deterministic') .= false;;
               ret (EXP_Ident (ID_Global name))
             else freq_LLVM (gen_idents)
 
@@ -2664,7 +2665,7 @@ Section InstrGenerators.
           ret [TYPE_I 32; TYPE_Float; TYPE_Vector 4 (TYPE_I 8); TYPE_Vector 2 (TYPE_I 16); TYPE_Vector 1 (TYPE_I 32); TYPE_Vector 1 TYPE_Float (* ; TYPE_Vector 32 (TYPE_I 1) *)]
       | TYPE_I 64
       | TYPE_Double =>
-          ret [TYPE_I 64; (* TYPE_Double; *) TYPE_Vector 8 (TYPE_I 8); TYPE_Vector 4 (TYPE_I 16); TYPE_Vector 2 (TYPE_I 32); TYPE_Vector 2 (TYPE_Float); TYPE_Vector 64 (TYPE_I 1)]
+          ret [TYPE_I 64; (* TYPE_Double; *) TYPE_Vector 8 (TYPE_I 8); TYPE_Vector 4 (TYPE_I 16); TYPE_Vector 2 (TYPE_I 32); TYPE_Vector 2 (TYPE_Float) (* ; TYPE_Vector 64 (TYPE_I 1) *)]
       | TYPE_Vector sz subtyp =>
           match subtyp with
           | TYPE_Pointer _ =>
@@ -3181,7 +3182,8 @@ Section InstrGenerators.
   Definition gen_definition (name : global_id) (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
     dfn <- backtrackMetadata (gen_definition_h name ret_t args);;
-    add_to_global_ctx (ID_Global name, TYPE_Pointer (dfn.(df_prototype).(dc_type)));;
+    e <- add_to_global_ctx (ID_Global name, TYPE_Pointer (dfn.(df_prototype).(dc_type)));;
+    (gen_context' .@ entl e .@ deterministic') .= false;;
     ret dfn.
 
   Definition gen_new_definition (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
@@ -3229,7 +3231,8 @@ Section InstrGenerators.
     t <- hide_ctx gen_sized_typ;;
     (* annotate_debug ("--Generate: Global: @" ++ show name ++ " " ++ show t);; *)
     opt_exp <- fmap Some (hide_ctx (gen_exp_sz0 t));;
-    add_to_global_ctx (ID_Global name, TYPE_Pointer t);;
+    e <- add_to_global_ctx (ID_Global name, TYPE_Pointer t);;
+    (gen_context' .@ entl e .@ deterministic') .= false;;
     let ann_linkage : list (annotation typ) :=
       match opt_exp with
       | None => [ANN_linkage (LINKAGE_External)]
