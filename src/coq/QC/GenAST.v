@@ -105,8 +105,9 @@ Section Helpers.
        | TYPE_X86_mmx => true
        | TYPE_Array sz t => is_sized_type_h t
        | TYPE_Function ret args vararg => false
-       | TYPE_Struct fields => true
-       | TYPE_Packed_struct fields => true
+       | TYPE_Struct fields
+       | TYPE_Packed_struct fields =>
+           forallb is_sized_type_h fields
        | TYPE_Opaque => false
        | TYPE_Vector sz t => is_sized_type_h t
        | TYPE_Identified id => false
@@ -476,8 +477,11 @@ Section GenerationState.
   Defined.
 
   Definition annotate {A:Type} (s:string) (g : GenLLVM A) : GenLLVM A
-    := metadata .@ debug_stack' %= (fun stack => s :: stack);;
-       g.
+    := old_stack <- use (metadata .@ debug_stack');;
+       metadata .@ debug_stack' %= (fun stack => s :: stack);;
+       a <- g;;
+       metadata .@ debug_stack' .= old_stack;;
+       ret a.
 
   Definition annotate_debug (s : string) : GenLLVM unit :=
     annotate s (ret tt).
@@ -968,7 +972,9 @@ Section TypGenerators.
         end
     | TYPE_I sz => ret t
     | TYPE_IPTR => ret t
-    | TYPE_Pointer t' => ret t
+    | TYPE_Pointer t' =>
+        pt <- normalize_type_GenLLVM t';;
+        ret (TYPE_Pointer pt)
     | TYPE_Void => ret t
     | TYPE_Half => ret t
     | TYPE_Float => ret t
@@ -1127,8 +1133,11 @@ Section TypGenerators.
        (gen_context' .@ entl e .@ type_alias') .= ret t;;
        set_typ_metadata e t;;
        st <- use (gen_context' .@ entl e .@ is_sized');;
-       (* (gen_context' .@ entl e .@ is_sized_type_alias') .= st;; *)
-       (* (gen_context' .@ entl e .@ is_sized') .= None;; *)
+       (gen_context' .@ entl e .@ is_sized_type_alias') .= st;;
+       (gen_context' .@ entl e .@ is_sized') .= None;;
+       (* Disable type alias usage for now. See https://github.com/vellvm/vellvm/issues/361 *)
+       (gen_context' .@ entl e .@ type_alias') .= None;;
+       (gen_context' .@ entl e .@ is_sized_type_alias') .= None;;
        ret tt.
 
   (* Should this be a local? *)
@@ -1242,7 +1251,7 @@ Section TypGenerators.
 
   Definition gen_sized_type_alias : GenLLVM (option ident)
     := es <- use (gen_context' .@ is_sized_type_alias');;
-       var <- gen_IntMapRaw_ent es;;
+       var <- gen_IntMapRaw_ent_filter es (withoutl is_function_pointer');;
        match var with
        | Some var =>
            id <- use (gen_context' .@ entl var .@ name');;
@@ -1840,7 +1849,14 @@ Section ExpGenerators.
            else false
          | _ => false
          end
-       | TYPE_Identified id => false
+       | TYPE_Identified id =>
+           match b with
+           | TYPE_Identified id' =>
+               if Ident.eq_dec id id'
+               then true
+               else false
+           | _ => false
+           end
        end.
 
   (* This needs to use normalized_typ_eq, instead of dtyp_eq because of pointer types...
@@ -2008,13 +2024,6 @@ Section ExpGenerators.
        | _ => failGen "gen_gt_zero_exp_size"
        end.
 
-  Definition genTypHelper (n: nat): G (string + typ) :=
-    run_GenLLVM (gen_typ_non_void_size n).
-
-  Definition genType: G (string + typ) :=
-    sized genTypHelper.
-
-
   Variant exp_source :=
     | FULL_CTX
     | GLOBAL_CTX.
@@ -2040,7 +2049,7 @@ Section ExpGenerators.
     (filter : GenQuery b)
     (t : typ) : GenLLVM (option Ent)
     := gen_var_ent focus
-         (vt <- queryl normalized_type';;
+         (vt <- queryl variable_type';;
           if (normalized_typ_eq t vt)
           then filter
           else mzero).
@@ -2052,7 +2061,7 @@ Section ExpGenerators.
     (filter : GenQuery b)
     (t : typ) : GenLLVM (option ident)
     := gen_var_ident focus
-         (vt <- queryl normalized_type';;
+         (vt <- queryl variable_type';;
           if (normalized_typ_eq t vt)
           then filter
           else mzero).
@@ -2103,7 +2112,7 @@ Section ExpGenerators.
                        (use (gen_context' .@ type_alias'))
                        (n <- queryl name';;
                         if Ident.eq_dec id n
-                        then queryl normalized_type'
+                        then queryl type_alias'
                         else mzero));;
               gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat t
           (* Not generating these types for now *)
@@ -2125,12 +2134,13 @@ Section ExpGenerators.
               (* 0. Flip the global context if we are at the first level *)
               (* 1. Generate a global id, *)
               (* 2. recursively define the receiving types *)
-              in_exp <- gen_exp_size' gen_global_of_typ gen_global_of_typ 0%nat t;;
-              name <- new_global_id;;
-              add_to_global_memo (mk_global name t false (Some in_exp) false []);;
-              e <- add_to_global_ctx (ID_Global name, TYPE_Pointer t);;
-              (gen_context' .@ entl e .@ deterministic') .= false;;
-              ret (EXP_Ident (ID_Global name))
+              annotate "retroactive global pointer"
+                (in_exp <- gen_exp_size' gen_global_of_typ gen_global_of_typ 0%nat t;;
+                 name <- new_global_id;;
+                 add_to_global_memo (mk_global name t false (Some in_exp) false []);;
+                 e <- add_to_global_ctx (ID_Global name, TYPE_Pointer t);;
+                 (gen_context' .@ entl e .@ deterministic') .= false;;
+                 ret (EXP_Ident (ID_Global name)))
             else freq_LLVM (gen_idents)
 
         (* freq_LLVM ((* (1%nat, ret EXP_Undef) :: *) gen_idents) *)
@@ -2179,7 +2189,7 @@ Section ExpGenerators.
                          (use (gen_context' .@ type_alias'))
                          (n <- queryl name';;
                           if Ident.eq_dec id n
-                          then queryl normalized_type'
+                          then queryl type_alias'
                           else mzero));;
                 gen_exp_size' gen_global_of_typ gen_ident_of_typ sz t
               ]
@@ -2252,27 +2262,46 @@ Section ExpGenerators.
   Definition gen_deterministic_global_ident :=
     gen_var_of_typ_ident (gen_context' .@ is_global') (withl is_deterministic').
 
+  Definition gen_global_ident :=
+    gen_var_of_typ_ident (gen_context' .@ is_global') (ret tt).
+
   Definition gen_deterministic_ident :=
     gen_var_of_typ_ident (gen_context' .@ variable_type') (withl is_deterministic').
+
+  Definition gen_ident :=
+    gen_var_of_typ_ident (gen_context' .@ variable_type') (ret tt).
 
   Definition gen_exp_size :=
     gen_exp_size' gen_deterministic_global_ident.
 
+  Definition gen_exp_possibly_non_deterministic_size :=
+    gen_exp_size' gen_global_ident.
+
   Definition gen_exp (t : typ) : GenLLVM (exp typ)
-    := sized_LLVM (fun sz => gen_exp_size gen_deterministic_ident sz t).
+    := annotate ("gen_exp: " ++ show t)
+         (sized_LLVM (fun sz => gen_exp_size gen_deterministic_ident sz t)).
+
+  Definition gen_exp_possibly_non_deterministic (t : typ) : GenLLVM (exp typ)
+    := annotate ("gen_exp_possibly_non_deterministic: " ++ show t)
+         (sized_LLVM (fun sz => gen_exp_possibly_non_deterministic_size gen_ident sz t)).
 
   Definition gen_exp_sz0 (t : typ) : GenLLVM (exp typ)
-    := resize_LLVM 0 (gen_exp t).
+    := annotate "gen_exp_sz0" (resize_LLVM 0 (gen_exp t)).
+
+  Definition gen_exp_possibly_non_deterministic_sz0 (t : typ) : GenLLVM (exp typ)
+    := annotate "gen_exp_possibly_non_deterministic_sz0" (resize_LLVM 0 (gen_exp_possibly_non_deterministic t)).
 
   Definition gen_texp : GenLLVM (texp typ)
-    := t <- gen_typ;;
-       e <- gen_exp t;;
-       ret (t, e).
+    := annotate "gen_texp"
+         (t <- gen_typ;;
+          e <- gen_exp t;;
+          ret (t, e)).
 
   Definition gen_sized_texp : GenLLVM (texp typ)
-    := t <- gen_sized_typ;;
-       e <- gen_exp t;;
-       ret (t, e).
+    := annotate "gen_sized_texp"
+         (t <- gen_sized_typ;;
+          e <- gen_exp t;;
+          ret (t, e)).
 
   Definition gen_op (t : typ) : GenLLVM (exp typ)
     := sized_LLVM
@@ -2446,57 +2475,64 @@ Section InstrGenerators.
       | TYPE_Pointer t => ret t
       | _ => failGen "gen_gep"
       end in
-    t_in_ptr <- get_typ_in_ptr tptr;;
-    eptr <- gen_exp_sz0 tptr;;
-    let paths_in_ptr := get_index_paths_ptr t_in_ptr in (* Inner paths: Paths after removing the outer pointer *)
-    '(ret_t, path) <- elems_LLVM paths_in_ptr;; (* Select one path from the paths *)
-    let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer (x))) path in (* Turning the path to integer *)
-    id <- genInstrId (TYPE_Pointer ret_t);;
-    ret (id, INSTR_Op (OP_GetElementPtr t_in_ptr (TYPE_Pointer t_in_ptr, eptr) path_for_gep)).
+    annotate "gen_gep"
+      (t_in_ptr <- get_typ_in_ptr tptr;;
+       eptr <- gen_exp_sz0 tptr;;
+       let paths_in_ptr := get_index_paths_ptr t_in_ptr in (* Inner paths: Paths after removing the outer pointer *)
+       '(ret_t, path) <- elems_LLVM paths_in_ptr;; (* Select one path from the paths *)
+       let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer (x))) path in (* Turning the path to integer *)
+       id <- genInstrId (TYPE_Pointer ret_t);;
+       ret (id, INSTR_Op (OP_GetElementPtr t_in_ptr (TYPE_Pointer t_in_ptr, eptr) path_for_gep))).
 
   Definition gen_extractvalue (tagg : typ): GenLLVM (instr_id * instr typ) :=
-    eagg <- gen_exp_sz0 tagg;;
-    let paths_in_agg := get_index_paths_agg tagg in
-    '(t, path_for_extractvalue) <- elems_LLVM paths_in_agg;;
-    id <- genInstrId t;;
-    ret (id, INSTR_Op (OP_ExtractValue (tagg, eagg) path_for_extractvalue)).
+    annotate ("gen_extractvalue: " ++ show tagg)
+      (eagg <- gen_exp_sz0 tagg;;
+       ntagg <- normalize_type_GenLLVM tagg;;
+       let paths_in_agg := get_index_paths_agg ntagg in
+       '(t, path_for_extractvalue) <- elems_LLVM paths_in_agg;;
+       id <- genInstrId t;;
+       ret (id, INSTR_Op (OP_ExtractValue (tagg, eagg) path_for_extractvalue))).
 
   Definition gen_insertvalue (tagg: typ): GenLLVM (instr_id * instr typ) :=
-    eagg <- gen_exp_sz0 tagg;;
-    ctx <- get_ctx;;
-    paths_in_agg <- get_index_paths_insertvalue tagg;;
-    '(tsub, path_for_insertvalue) <- elems_LLVM paths_in_agg;;
-    (* GC: THIS IS FALSE and will cause trouble because maybe the type we want is not in the context!!! NEED TO CHANGE TO SOMETHING ELSE*)
-    esub <- hide_ctx (gen_exp_sz0 tsub);;
-    (* Generate all of the type*)
-    id <- genInstrId tagg;;
-    ret (id, INSTR_Op (OP_InsertValue (tagg, eagg) (tsub, esub) path_for_insertvalue)).
+    annotate "gen_insertvalue"
+      (eagg <- gen_exp_sz0 tagg;;
+       ctx <- get_ctx;;
+       ntagg <- normalize_type_GenLLVM tagg;;
+       paths_in_agg <- get_index_paths_insertvalue ntagg;;
+       '(tsub, path_for_insertvalue) <- elems_LLVM paths_in_agg;;
+       (* GC: THIS IS FALSE and will cause trouble because maybe the type we want is not in the context!!! NEED TO CHANGE TO SOMETHING ELSE*)
+       esub <- hide_ctx (gen_exp_sz0 tsub);;
+       (* Generate all of the type*)
+       id <- genInstrId tagg;;
+       ret (id, INSTR_Op (OP_InsertValue (tagg, eagg) (tsub, esub) path_for_insertvalue))).
 
   (* ExtractElement *)
   Definition gen_extractelement (tvec : typ): GenLLVM (instr_id * instr typ) :=
-    evec <- gen_exp_sz0 tvec;;
-    let get_size_ty (vType: typ) :=
-      match tvec with
-      | TYPE_Vector sz ty => (sz, ty)
-      | _ => (0%N, TYPE_Void)
-      end in
-    let '(sz, t_in_vec) := get_size_ty tvec in
-    index_for_extractelement <- lift_GenLLVM (choose (0, Z.of_N sz - 1)%Z);;
-    id <- genInstrId t_in_vec;;
-    ret (id, INSTR_Op (OP_ExtractElement (tvec, evec) (TYPE_I 32%N, EXP_Integer index_for_extractelement))).
+    annotate "gen_extractelement"
+      (evec <- gen_exp_sz0 tvec;;
+       let get_size_ty (vType: typ) :=
+         match tvec with
+         | TYPE_Vector sz ty => (sz, ty)
+         | _ => (0%N, TYPE_Void)
+         end in
+       let '(sz, t_in_vec) := get_size_ty tvec in
+       index_for_extractelement <- lift_GenLLVM (choose (0, Z.of_N sz - 1)%Z);;
+       id <- genInstrId t_in_vec;;
+       ret (id, INSTR_Op (OP_ExtractElement (tvec, evec) (TYPE_I 32%N, EXP_Integer index_for_extractelement)))).
 
   Definition gen_insertelement (tvec : typ) : GenLLVM (instr_id * instr typ) :=
-    evec <- gen_exp_sz0 tvec;;
-    let get_size_ty (vType: typ) :=
-      match tvec with
-      | TYPE_Vector sz ty => (sz, ty)
-      | _ => (0%N, TYPE_Void)
-      end in
-    let '(sz, t_in_vec) := get_size_ty tvec in
-    value <- gen_exp_sz0 t_in_vec;;
-    index <- lift_GenLLVM (choose (0, Z.of_N (sz - 1)));;
-    id <- genInstrId tvec;;
-    ret (id, INSTR_Op (OP_InsertElement (tvec, evec) (t_in_vec, value) (TYPE_I 32, EXP_Integer index))).
+    annotate "gen_insertelement"
+      (evec <- gen_exp_sz0 tvec;;
+       let get_size_ty (vType: typ) :=
+         match tvec with
+         | TYPE_Vector sz ty => (sz, ty)
+         | _ => (0%N, TYPE_Void)
+         end in
+       let '(sz, t_in_vec) := get_size_ty tvec in
+       value <- gen_exp_sz0 t_in_vec;;
+       index <- lift_GenLLVM (choose (0, Z.of_N (sz - 1)));;
+       id <- genInstrId tvec;;
+       ret (id, INSTR_Op (OP_InsertElement (tvec, evec) (t_in_vec, value) (TYPE_I 32, EXP_Integer index)))).
 
   Definition round_up_to_eight (n : N) : N :=
     if N.eqb 0 n
@@ -2621,35 +2657,36 @@ Section InstrGenerators.
      I don't think we will find those with the new generator queries?
    *)
   Definition gen_inttoptr (ptrEnt : Ent) (id : ident) (typ_from_cast : typ) : GenLLVM (instr_id * instr typ) :=
-    opt <- use (gen_context' .@ entl ptrEnt .@ normalized_type');;
-    match opt with
-    | None => failGen "gen_inttoptr: Pointer entity missing normalized type."
-    | Some old_tptr =>
-        (* In the following case, we will check whether there are double pointers in the old pointer type, we will not cast if the data structure has double pointer *)
-        (* TODO: Better identify the pointer inside and cast without changing their location *)
-        new_tptr <-
-          match old_tptr with
-          | TYPE_Pointer old_typ =>
-              if typ_contains_pointer old_typ || is_function_type_h old_typ
-              then
-                ret old_tptr
-              else
-                x <- gen_typ_le_size (get_size_from_typ old_typ);;
-                ret (TYPE_Pointer x)
-          | TYPE_Vector sz (TYPE_Pointer old_typ) =>
-              if typ_contains_pointer old_typ || is_function_type_h old_typ
-              then
-                ret old_tptr
-              else
-                x <- gen_typ_le_size (get_size_from_typ old_typ);;
-                ret (TYPE_Pointer x)
-          | _ => ret (TYPE_Void) (* Won't reach here... Hopefully *)
-          end;;
-        '(iid, e) <- genInstrIdEnt new_tptr;;
-        d <- use (gen_context' .@ entl ptrEnt .@ deterministic');;
-        (gen_context' .@ entl e .@ deterministic') .= d;;
-        ret (iid, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr))
-    end.
+    annotate "gen_inttoptr"
+      (opt <- use (gen_context' .@ entl ptrEnt .@ normalized_type');;
+       match opt with
+       | None => failGen "gen_inttoptr: Pointer entity missing normalized type."
+       | Some old_tptr =>
+           (* In the following case, we will check whether there are double pointers in the old pointer type, we will not cast if the data structure has double pointer *)
+           (* TODO: Better identify the pointer inside and cast without changing their location *)
+           new_tptr <-
+             match old_tptr with
+             | TYPE_Pointer old_typ =>
+                 if typ_contains_pointer old_typ || is_function_type_h old_typ
+                 then
+                   ret old_tptr
+                 else
+                   x <- gen_typ_le_size (get_size_from_typ old_typ);;
+                   ret (TYPE_Pointer x)
+             | TYPE_Vector sz (TYPE_Pointer old_typ) =>
+                 if typ_contains_pointer old_typ || is_function_type_h old_typ
+                 then
+                   ret old_tptr
+                 else
+                   x <- gen_typ_le_size (get_size_from_typ old_typ);;
+                   ret (TYPE_Pointer x)
+             | _ => ret (TYPE_Void) (* Won't reach here... Hopefully *)
+             end;;
+           '(iid, e) <- genInstrIdEnt new_tptr;;
+           d <- use (gen_context' .@ entl ptrEnt .@ deterministic');;
+           (gen_context' .@ entl e .@ deterministic') .= d;;
+           ret (iid, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr))
+       end).
 
   Fixpoint gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
     let gen_typ_list :=
@@ -2731,26 +2768,31 @@ Section InstrGenerators.
     := sized_LLVM (fun sz => gen_non_aggregate_first_class_type_size (min sz max_typ_size)).
 
   Definition gen_bitcast : GenLLVM (instr_id * instr typ) :=
-    tfc <- gen_trivial_typ;;
-    efc <- gen_exp_sz0 tfc;;
-    new_typ <- gen_bitcast_typ tfc;;
-    id <- genInstrId new_typ;;
-    ret (id, INSTR_Op (OP_Conversion Bitcast tfc efc new_typ)).
+    annotate "gen_bitcast"
+      (tfc <- gen_trivial_typ;;
+       efc <- gen_exp_sz0 tfc;;
+       new_typ <- gen_bitcast_typ tfc;;
+       id <- genInstrId new_typ;;
+       ret (id, INSTR_Op (OP_Conversion Bitcast tfc efc new_typ))).
 
   Definition gen_call (tfun : typ) : GenLLVM (instr_id * instr typ) :=
-    match tfun with
-    | TYPE_Pointer (TYPE_Function ret_t args varargs) =>
-        args_texp <- map_monad
-                      (fun (arg_typ:typ) =>
-                         arg_exp <- gen_exp_sz0 arg_typ;;
-                         ret (arg_typ, arg_exp))
-                      args;;
-        let args_with_params := map (fun arg => (arg, [])) args_texp in
-        efun <- gen_exp_sz0 tfun;;
-        id <- genInstrId ret_t;;
-        ret (id, INSTR_Call (TYPE_Function ret_t args varargs, efun) args_with_params [])
-    | _ => failGen "gen_call"
-    end.
+    ctx <- use (gen_context' .@ @variable_type' (WorldOf _));;
+    let blah := IM.Raw.elements ctx in
+    annotate ("gen_call: " ++ show blah)
+      match tfun with
+      | TYPE_Pointer (TYPE_Function ret_t args varargs) =>
+          args_texp <- map_monad
+                        (fun (arg_typ:typ) =>
+                           arg_exp <- gen_exp_sz0 arg_typ;;
+                           ret (arg_typ, arg_exp))
+                        args;;
+          let args_with_params := map (fun arg => (arg, [])) args_texp in
+          (* Otherwise we won't find function pointers *)
+          efun <- gen_exp_possibly_non_deterministic_sz0 tfun;;
+          id <- genInstrId ret_t;;
+          ret (id, INSTR_Call (TYPE_Function ret_t args varargs, efun) args_with_params [])
+      | _ => failGen "gen_call"
+      end.
 
   (* TODO: move this *)
   Definition genInt : G int
@@ -2801,21 +2843,23 @@ Section InstrGenerators.
 
   Definition gen_store_to (ptr : texp typ) : GenLLVM (instr_id * instr typ)
     :=
-    match ptr with
-    | (TYPE_Pointer t, pexp) =>
-        ctx <- get_ctx;;
-        e <- (gen_exp_sz0 t);;
-        let val := (t, e) in
-        id <- genVoid;;
-        ret (id, INSTR_Store val ptr [ANN_align 1])
-    | _ => failGen "gen_store_to"
-    end.
+    annotate "gen_store_to"
+      match ptr with
+      | (TYPE_Pointer t, pexp) =>
+          ctx <- get_ctx;;
+          e <- (gen_exp_sz0 t);;
+          let val := (t, e) in
+          id <- genVoid;;
+          ret (id, INSTR_Store val ptr [ANN_align 1])
+      | _ => failGen "gen_store_to"
+      end.
 
   Definition gen_store (tptr : typ) : GenLLVM (instr_id * instr typ)
     :=
-    eptr <- gen_exp_sz0 tptr;;
-    ptr_typ <- get_typ_in_ptr tptr;;
-    gen_store_to(tptr, eptr).
+    annotate "gen_store"
+      (eptr <- gen_exp_sz0 tptr;;
+       ptr_typ <- get_typ_in_ptr tptr;;
+       gen_store_to(tptr, eptr)).
 
   (* Generate an instruction, as well as its type...
 
@@ -2900,29 +2944,30 @@ Section InstrGenerators.
     gen_var_of_typ_ent (gen_context' .@ is_ptr_vector') (ret true) τ.
 
   Definition gen_ptrtoint (ptr_ent : Ent) (tptr : typ) : GenLLVM (instr_id * instr typ) :=
-    let gen_typ_in_ptr (tptr : typ) :=
-      match tptr with
-      | TYPE_Pointer t =>
-          gen_int_typ_for_ptr_cast (* TODO: Wait till IPTR is implemented *)
-      | TYPE_Vector sz ty =>
-          x <- gen_int_typ_for_ptr_cast;;
-          ret (TYPE_Vector sz x)
-      | _ =>
-          ret (TYPE_Void) (* Won't get into this case *)
-      end in
-    typ_from_cast <- gen_typ_in_ptr tptr;;
-    '(id, e) <- genInstrIdEnt typ_from_cast;;
-    ptr_name <- use (gen_context' .@ entl ptr_ent .@ name');;
-    match ptr_name with
-    | None => failGen "gen_ptrtoint: unnamed pointer, shouldn't happen."
-    | Some ptr_name =>
-        let ptr_exp := EXP_Ident ptr_name in
-        (* TODO: Copy whether the pointer is deterministic *)
-        d <- use (gen_context' .@ entl ptr_ent .@ deterministic');;
-        (gen_context' .@ entl e .@ deterministic') .= d;;
-        (gen_context' .@ entl e .@ from_pointer') .= ret ptr_ent;;
-        ret (id, INSTR_Op (OP_Conversion Ptrtoint tptr ptr_exp typ_from_cast))
-    end.
+    annotate "gen_ptrtoint"
+      (let gen_typ_in_ptr (tptr : typ) :=
+         match tptr with
+         | TYPE_Pointer t =>
+             gen_int_typ_for_ptr_cast (* TODO: Wait till IPTR is implemented *)
+         | TYPE_Vector sz ty =>
+             x <- gen_int_typ_for_ptr_cast;;
+             ret (TYPE_Vector sz x)
+         | _ =>
+             ret (TYPE_Void) (* Won't get into this case *)
+         end in
+       typ_from_cast <- gen_typ_in_ptr tptr;;
+       '(id, e) <- genInstrIdEnt typ_from_cast;;
+       ptr_name <- use (gen_context' .@ entl ptr_ent .@ name');;
+       match ptr_name with
+       | None => failGen "gen_ptrtoint: unnamed pointer, shouldn't happen."
+       | Some ptr_name =>
+           let ptr_exp := EXP_Ident ptr_name in
+           (* TODO: Copy whether the pointer is deterministic *)
+           d <- use (gen_context' .@ entl ptr_ent .@ deterministic');;
+           (gen_context' .@ entl e .@ deterministic') .= d;;
+           (gen_context' .@ entl e .@ from_pointer') .= ret ptr_ent;;
+           ret (id, INSTR_Op (OP_Conversion Ptrtoint tptr ptr_exp typ_from_cast))
+       end).
 
   (* Generate basic instructions.
      Note: this function returns a list because when we generate an alloca we must initialize it...
@@ -2930,35 +2975,36 @@ Section InstrGenerators.
      TODO: don't initialize alloca and flag it as non-deterministic?
    *)
   Definition gen_instr : GenLLVM (list (instr_id * instr typ)) :=
-    ointtoptr_info <- gen_inttoptr_info;;
-    osized_ptr_typ <- gen_sized_ptr_type;;
-    ovalid_ptr_vecptr <- gen_valid_ptr_vecptr_ent;;
-    oagg_typ <- gen_indexable_type;;
-    ovec_typ <- gen_vec_type;;
-    oinsertvalue_typ <- gen_insertvalue_type;;
-    ofun_ptr_typ <- gen_function_pointer_type;;
-    osized_typ <- gen_sized_typ_in_context;;
-    oneOf_LLVM
-      ([ op <- gen_op_instr;; t <- gen_op_typ;;
-         ret [op]
-        ; fmap ret gen_bitcast
-        ]
-         ++ (* TODO: generate multiple element allocas. Will involve changing initialization *)
-           (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)
-         (* align <- ret None;; *)
-         maybe [] (fun t => ['(id, e) <- genLocalEnt (TYPE_Pointer t);;
-                          (* Allocas are non-deterministic *)
-                          gen_context' .@ entl e .@ deterministic' .= false;;
-                          store <- gen_store_to (TYPE_Pointer t, EXP_Ident id);;
-                          ret [(IId (ident_to_raw_id id), INSTR_Alloca t []); store]]) osized_typ
-         ++ maybe [] (fun t => fmap (fun x => [x]) <$> [gen_load t; gen_store t; gen_gep t]) osized_ptr_typ
-         ++ maybe [] (fun '(e, t) => [(fun x => [x]) <$> gen_ptrtoint e t]) ovalid_ptr_vecptr
-         ++ maybe [] (fun '(e, id, t) => [(fun x => [x]) <$> gen_inttoptr e id t]) ointtoptr_info
-         ++ maybe [] (fun t => [(fun x => [x]) <$> gen_extractvalue t]) oagg_typ
-         ++ maybe [] (fun t => [(fun x => [x]) <$> gen_insertvalue t]) oinsertvalue_typ
-         ++ maybe [] (fun t => fmap (fun x => [x]) <$> [gen_extractelement t; gen_insertelement t]) ovec_typ
-         ++ maybe [] (fun t => [(fun x => [x]) <$> gen_call t]) ofun_ptr_typ
-      ).
+    annotate "gen_instr"
+      (ointtoptr_info <- gen_inttoptr_info;;
+       osized_ptr_typ <- gen_sized_ptr_type;;
+       ovalid_ptr_vecptr <- gen_valid_ptr_vecptr_ent;;
+       oagg_typ <- gen_indexable_type;;
+       ovec_typ <- gen_vec_type;;
+       oinsertvalue_typ <- gen_insertvalue_type;;
+       ofun_ptr_typ <- gen_function_pointer_type;;
+       osized_typ <- gen_sized_typ_in_context;;
+       oneOf_LLVM
+         ([ op <- gen_op_instr;; t <- gen_op_typ;;
+            ret [op]
+                (* ; fmap ret gen_bitcast *)
+           ]
+            ++ (* TODO: generate multiple element allocas. Will involve changing initialization *)
+            (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)
+            (* align <- ret None;; *)
+            maybe [] (fun t => ['(id, e) <- genLocalEnt (TYPE_Pointer t);;
+                             (* Allocas are non-deterministic *)
+                             gen_context' .@ entl e .@ deterministic' .= false;;
+                             store <- gen_store_to (TYPE_Pointer t, EXP_Ident id);;
+                             ret [(IId (ident_to_raw_id id), INSTR_Alloca t []); store]]) osized_typ
+            ++ maybe [] (fun t => fmap (fun x => [x]) <$> [gen_load t; gen_store t; gen_gep t]) osized_ptr_typ
+            ++ maybe [] (fun '(e, t) => [(fun x => [x]) <$> gen_ptrtoint e t]) ovalid_ptr_vecptr
+            ++ maybe [] (fun '(e, id, t) => [(fun x => [x]) <$> gen_inttoptr e id t]) ointtoptr_info
+            ++ maybe [] (fun t => [(fun x => [x]) <$> gen_extractvalue t]) oagg_typ
+            ++ maybe [] (fun t => [(fun x => [x]) <$> gen_insertvalue t]) oinsertvalue_typ
+            ++ maybe [] (fun t => fmap (fun x => [x]) <$> [gen_extractelement t; gen_insertelement t]) ovec_typ
+            ++ maybe [] (fun t => [(fun x => [x]) <$> gen_call t]) ofun_ptr_typ
+         )).
 
   Fixpoint gen_code_length (n : nat) : GenLLVM (code typ)
     := match n with
@@ -2972,8 +3018,9 @@ Section InstrGenerators.
   Definition block_size : nat := 20.
 
   Definition gen_code : GenLLVM (code typ)
-    := n <- lift (resize block_size arbitrary);;
-       gen_code_length n.
+    := annotate "gen_code"
+         (n <- lift (resize block_size arbitrary);;
+          gen_code_length n).
 
   Definition instr_id_to_raw_id (fail_msg : string) (i : instr_id) : raw_id :=
     match i with
@@ -3181,10 +3228,11 @@ Section InstrGenerators.
 
   Definition gen_definition (name : global_id) (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
-    dfn <- backtrackMetadata (gen_definition_h name ret_t args);;
-    e <- add_to_global_ctx (ID_Global name, TYPE_Pointer (dfn.(df_prototype).(dc_type)));;
-    (gen_context' .@ entl e .@ deterministic') .= false;;
-    ret dfn.
+    annotate "gen_definition"
+      (dfn <- backtrackMetadata (gen_definition_h name ret_t args);;
+       e <- add_to_global_ctx (ID_Global name, TYPE_Pointer (dfn.(df_prototype).(dc_type)));;
+       (gen_context' .@ entl e .@ deterministic') .= false;;
+       ret dfn).
 
   Definition gen_new_definition (ret_t : typ) (args : list typ) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
@@ -3215,9 +3263,9 @@ Section InstrGenerators.
     let id := ID_Local name in
     τ <- oneOf_LLVM_thunked
           [ (fun _ => ret TYPE_Struct <*> (k <- lift (choose (0, 5)%nat);;
-                                        vectorOf_LLVM k gen_typ_non_void))
+                                        vectorOf_LLVM k gen_typ_non_void_wo_fn))
             ; (fun _ => ret TYPE_Packed_struct <*> (k <- lift (choose (0, 5)%nat);;
-                                        vectorOf_LLVM k gen_typ_non_void))
+                                        vectorOf_LLVM k gen_typ_non_void_wo_fn))
           ];;
     add_to_typ_ctx (id, τ);;
     ret (TLE_Type_decl id τ).
