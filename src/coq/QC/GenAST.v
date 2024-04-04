@@ -2481,7 +2481,9 @@ Section InstrGenerators.
        let paths_in_ptr := get_index_paths_ptr t_in_ptr in (* Inner paths: Paths after removing the outer pointer *)
        '(ret_t, path) <- elems_LLVM paths_in_ptr;; (* Select one path from the paths *)
        let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer (x))) path in (* Turning the path to integer *)
-       id <- genInstrId (TYPE_Pointer ret_t);;
+       '(id, e) <- genInstrIdEnt (TYPE_Pointer ret_t);;
+       (* Default to non-deterministic for now. Need a way to look up whether the base pointer was deterministic *)
+       (gen_context' .@ entl e .@ deterministic') .= false;;
        ret (id, INSTR_Op (OP_GetElementPtr t_in_ptr (TYPE_Pointer t_in_ptr, eptr) path_for_gep))).
 
   Definition gen_extractvalue (tagg : typ): GenLLVM (instr_id * instr typ) :=
