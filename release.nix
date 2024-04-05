@@ -98,7 +98,7 @@
 
       buildPhase = ''
   runHook preBuild
-  make -C src/
+  make -C src/ vellvm
   make -C src/ frontend
   runHook postBuild
   '';

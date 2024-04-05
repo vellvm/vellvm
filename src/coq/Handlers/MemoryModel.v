@@ -2036,7 +2036,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       contradiction.
   Qed.
 
-  Definition generate_num_undef_bytes_h (start_ix : N) (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+  Definition generate_num_undef_bytes_h_old (start_ix : N) (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
     N.recursion
       (fun (x : N) => ret [])
       (fun n mf x =>
@@ -2045,69 +2045,65 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
          ret (byte :: rest_bytes))
       num start_ix.
 
-  Definition generate_num_undef_bytes (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
-    generate_num_undef_bytes_h 0 num dt sid.
+  Definition generate_num_undef_bytes_h (acc : list SByte) (num : N) (dt : dtyp) (sid : store_id) : list SByte :=
+    @N.recursion (list SByte -> list SByte)
+      (fun acc => acc)
+      (fun n mf acc =>
+         let byte := uvalue_sbyte (UVALUE_Undef dt) dt n sid in
+         mf (byte::acc)) num acc.
 
-  Definition generate_undef_bytes (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+  Definition generate_num_undef_bytes (num : N) (dt : dtyp) (sid : store_id) : list SByte :=
+    generate_num_undef_bytes_h [] num dt sid.
+
+  Definition generate_undef_bytes (dt : dtyp) (sid : store_id) : list SByte :=
     generate_num_undef_bytes (sizeof_dtyp dt) dt sid.
 
   Lemma generate_num_undef_bytes_h_length :
-    forall num start_ix dt sid bytes,
-      generate_num_undef_bytes_h start_ix num dt sid = NoOom bytes ->
-      num = N.of_nat (length bytes).
+    forall num acc dt sid bytes,
+      generate_num_undef_bytes_h acc num dt sid = bytes ->
+      num + N.of_nat (length acc) = N.of_nat (length bytes).
   Proof.
     intros num.
-    induction num using N.peano_rect; intros start_ix dt sid bytes GEN.
+    induction num using N.peano_rect; intros acc dt sid bytes GEN.
     - cbn in *.
       inv GEN.
       reflexivity.
     - unfold generate_num_undef_bytes_h in GEN.
-      pose proof @N.recursion_succ (N -> OOM (list SByte)) eq (fun _ : N => ret [])
-           (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
-           rest_bytes <- mf (N.succ x);;
-           ret (uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes))
-           eq_refl.
+      pose proof @N.recursion_succ (list SByte -> list SByte) eq (fun acc : list SByte => acc)
+        (fun (n : N) (mf : list SByte -> list SByte) (acc : list SByte) =>
+           let byte := uvalue_sbyte (UVALUE_Undef dt) dt n sid in
+           mf (byte::acc)) eq_refl.
       forward H.
       { unfold Proper, respectful.
         intros x y H0 x0 y0 H1; subst.
         reflexivity.
       }
       specialize (H num).
+      cbn in *.
       rewrite H in GEN.
       clear H.
 
-      destruct
-        (N.recursion (fun _ : N => ret [])
-                     (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
-                        rest_bytes <- mf (N.succ x);;
-                        ret (uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes)) num
-                     (N.succ start_ix)) eqn:HREC.
-      + (* No OOM *)
-        cbn in GEN.
-        inv GEN.
-        cbn.
-
-        unfold generate_num_undef_bytes_h in IHnum.
-        pose proof (IHnum (N.succ start_ix) dt sid l HREC) as IH.
-        lia.
-      + (* OOM *)
-        cbn in GEN.
-        inv GEN.
+      specialize (IHnum (uvalue_sbyte (UVALUE_Undef dt) dt num sid :: acc) dt sid bytes).
+      apply IHnum in GEN.
+      cbn in *.
+      lia.
   Qed.
 
   Lemma generate_num_undef_bytes_length :
     forall num dt sid bytes,
-      generate_num_undef_bytes num dt sid = NoOom bytes ->
+      generate_num_undef_bytes num dt sid = bytes ->
       num = N.of_nat (length bytes).
   Proof.
     intros num dt sid bytes GEN.
     unfold generate_num_undef_bytes in *.
-    eapply generate_num_undef_bytes_h_length; eauto.
+    eapply generate_num_undef_bytes_h_length in GEN.
+    cbn in *.
+    lia.
   Qed.
 
   Lemma generate_undef_bytes_length :
     forall dt sid bytes,
-      generate_undef_bytes dt sid = ret bytes ->
+      generate_undef_bytes dt sid = bytes ->
       sizeof_dtyp dt = N.of_nat (length bytes).
   Proof.
     intros dt sid bytes GEN_UNDEF.
@@ -3593,7 +3589,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Definition allocate_dtyp_spec (dt : dtyp) (num_elements : N) : MemPropT MemState addr :=
     MemPropT_assert_pre (dt <> DTYPE_Void);;
     sid <- fresh_sid;;
-    element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
+    let element_bytes := repeatN num_elements (generate_undef_bytes dt sid) in
     let bytes := concat element_bytes in
     allocate_bytes_spec_MemPropT bytes.
 
@@ -3698,11 +3694,11 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       | [DVALUE_I32 sz]
       | [DVALUE_I64 sz] =>
           sid <- fresh_sid;;
-          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8) sid);;
+          let bytes := generate_num_undef_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8) sid in
           malloc_bytes_spec_MemPropT bytes
       | [DVALUE_IPTR sz] =>
           sid <- fresh_sid;;
-          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (IP.to_unsigned sz)) (DTYPE_I 8) sid);;
+          let bytes := generate_num_undef_bytes (Z.to_N (IP.to_unsigned sz)) (DTYPE_I 8) sid in
           malloc_bytes_spec_MemPropT bytes
       | _ => raise_error "Malloc: invalid arguments."
       end.
@@ -5694,7 +5690,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       if dtyp_eqb dt DTYPE_Void
       then raise_ub "allocating void type"
       else sid <- fresh_sid;;
-           element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
+           let element_bytes := repeatN num_elements (generate_undef_bytes dt sid) in
            let bytes := concat element_bytes in
            allocate_bytes bytes.
 
@@ -5805,11 +5801,11 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       | [DVALUE_I32 sz]
       | [DVALUE_I64 sz] =>
           sid <- fresh_sid;;
-          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8) sid);;
+          let bytes := generate_num_undef_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8) sid in
           malloc_bytes bytes
       | [DVALUE_IPTR sz] =>
           sid <- fresh_sid;;
-          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (IP.to_unsigned sz)) (DTYPE_I 8) sid);;
+          let bytes := generate_num_undef_bytes (Z.to_N (IP.to_unsigned sz)) (DTYPE_I 8) sid in
           malloc_bytes bytes
       | _ => raise_error "Malloc: invalid arguments."
       end.
@@ -6848,64 +6844,58 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         reflexivity.
     Qed.
 
-    Lemma generate_num_undef_bytes_bounded :
-      forall sid st dt bytes n,
+    Lemma generate_num_undef_bytes_h_bounded :
+      forall acc sid st dt bytes n,
         sid < st ->
-        generate_num_undef_bytes n dt sid = NoOom bytes ->
+        Forall (fun b : BYTE_IMPL.SByte => exists s : store_id, MemByte.sbyte_sid b = inr s /\ s < st) acc ->
+        generate_num_undef_bytes_h acc n dt sid = bytes ->
         Forall (fun b : BYTE_IMPL.SByte => exists s : store_id, MemByte.sbyte_sid b = inr s /\ s < st) bytes.
     Proof.
-      intros sid st dt bytes n LT GEN.
-      unfold generate_num_undef_bytes in GEN.
-      remember 0 as start_idx.
-      clear Heqstart_idx.
-      revert start_idx bytes GEN.
+      intros acc sid st dt bytes n LT BOUND GEN.
+      unfold generate_num_undef_bytes_h in GEN.
+      revert acc bytes BOUND GEN.
       induction n using N.peano_ind;
-        intros start_idx bytes GEN.
+        intros acc bytes BOUND GEN.
       - cbn in *.
         inv GEN.
-        constructor.
+        auto.
       - unfold generate_num_undef_bytes_h in GEN.
-        pose proof @N.recursion_succ (N -> OOM (list BYTE_IMPL.SByte)) eq (fun _ : N => ret [])
-          (fun (_ : N) (mf : N -> OOM (list BYTE_IMPL.SByte)) (x : N) =>
-             rest_bytes <- mf (N.succ x);;
-             ret (BYTE_IMPL.uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes))
-          eq_refl.
+        pose proof @N.recursion_succ (list BYTE_IMPL.SByte -> list BYTE_IMPL.SByte) eq (fun acc : list BYTE_IMPL.SByte => acc)
+          (fun (n : N) (mf : list BYTE_IMPL.SByte -> list BYTE_IMPL.SByte) (acc : list BYTE_IMPL.SByte) =>
+             let byte := BYTE_IMPL.uvalue_sbyte (UVALUE_Undef dt) dt n sid in
+             mf (byte::acc)) eq_refl.
         forward H.
         { unfold Proper, respectful.
           intros x y H0 x0 y0 H1; subst.
           reflexivity.
         }
         specialize (H n).
+        cbn in H.
         rewrite H in GEN.
         clear H.
 
-        destruct
-          (N.recursion (fun _ : N => ret [])
-             (fun (_ : N) (mf : N -> OOM (list BYTE_IMPL.SByte)) (x : N) =>
-                rest_bytes <- mf (N.succ x);;
-                ret (BYTE_IMPL.uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes)) n
-             (N.succ start_idx)) eqn:HREC.
-        + (* No OOM *)
-          cbn in GEN.
-          inv GEN.
-          constructor.
-          { exists sid.
-            unfold MemByte.sbyte_sid.
-            rewrite BYTE_IMPL.sbyte_to_extractbyte_of_uvalue_sbyte.
-            auto.
-          }
-          eapply IHn.
-          unfold generate_num_undef_bytes_h.
-          apply HREC.
-        + (* OOM *)
-          cbn in GEN.
-          inv GEN.
+        eapply IHn in GEN; eauto.
+        constructor; eauto.
+        exists sid.
+        unfold MemByte.sbyte_sid.
+        rewrite BYTE_IMPL.sbyte_to_extractbyte_of_uvalue_sbyte.
+        auto.
+    Qed.
+
+    Lemma generate_num_undef_bytes_bounded :
+      forall sid st dt bytes n,
+        sid < st ->
+        generate_num_undef_bytes n dt sid = bytes ->
+        Forall (fun b : BYTE_IMPL.SByte => exists s : store_id, MemByte.sbyte_sid b = inr s /\ s < st) bytes.
+    Proof.
+      intros sid st dt bytes n H H0.
+      eapply generate_num_undef_bytes_h_bounded; eauto.
     Qed.
 
     Lemma generate_undef_bytes_bounded :
       forall sid st dt bytes,
         sid < st ->
-        generate_undef_bytes dt sid = NoOom bytes ->
+        generate_undef_bytes dt sid = bytes ->
         Forall (fun b : BYTE_IMPL.SByte => exists s : store_id, MemByte.sbyte_sid b = inr s /\ s < st) bytes.
     Proof.
       intros sid st dt bytes LT GEN.
@@ -6961,76 +6951,35 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       { apply exec_correct_bind.
         apply exec_correct_fresh_sid.
         intros * VALID1 POST1 RUN1.
-        apply exec_correct_bind.
-        { eapply exec_correct_repeatMN_Forall_simple.
-          eapply exec_correct_strengthen_post; cycle 1.
-          apply exec_correct_lift_OOM.
-          intros ms st a0 ms' st' PRE POST.
-          destruct PRE as (?&?&?).
-          cbn in H0, H1.
-          repeat red in H0.
-          destruct H0 as (?&?&?).
-          cbn in H0, H2.
-          rewrite H0, bind_ret_l in H2.
-          rewrite RUN1 in H2.
-          eapply eq1_ret_ret in H2; try typeclasses eauto.
-          inv H2.
-          unfold lift_OOM in POST.
-          break_match_hyp_inv.
-          destruct H3; subst.
-          split; eauto.
-
-          eapply generate_undef_bytes_bounded; eauto.
-          destruct POST1 as (?&?&?); subst.
-          lia.
-        }
-
-        intros * VALID2 POST2 RUN2.
         eapply exec_correct_weaken_pre; cycle 1.
-        apply allocate_bytes_correct.
-        { intros ms st (?&?&?).
-          destruct H as (?&?&?).
-          destruct POST2 as (?&?&?).
-          apply Forall_concat.
-          subst.
-          destruct H0 as (?&?&?).
+        eapply exec_correct_strengthen_post; cycle 1.
+        eapply allocate_bytes_correct.
+        { (* Post *)
+          intros ms st a0 ms' st' H H0.
+          cbn.
+          red.
           cbn in *.
+          eexists.
+          exists ms.
+          exists st.
+          eauto.
+        }
+        { (* Pre *)
+          intros ms st PRE.
+          cbn in *.
+          apply Forall_concat.
+          apply Forall_repeatN.
+          destruct POST1 as (?&?&?); subst.
+          destruct PRE as (?&?&?&?).
           repeat red in H2.
           destruct H2 as (?&?&?).
           cbn in *.
-          rewrite H2, bind_ret_l in H6.
-          destruct POST1 as (?&?&?); subst.
-          rewrite RUN1 in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          rewrite H0, bind_ret_l in H5.
+          rewrite H2, bind_ret_l in H5.
+          rewrite RUN1 in H5.
+          eapply eq1_ret_ret in H5; try typeclasses eauto.
+          inv H5.
 
-          unfold lift_OOM in *.
-          break_match_hyp.
-          2: {
-            induction num_elements using N.peano_ind.
-            - cbn in *.
-              rewrite MemMonad_run_ret in RUN2.
-              eapply eq1_ret_ret in RUN2; try typeclasses eauto.
-              inv RUN2.
-              constructor.
-            - clear - RUN2.
-              rewrite repeatMN_succ in RUN2.
-              rewrite MemMonad_run_bind in RUN2.
-              rewrite MemMonad_run_raise_oom in RUN2.
-              rewrite rbm_raise_bind in RUN2; try typeclasses eauto.
-              symmetry in RUN2.
-              eapply MemMonad_eq1_raise_oom_inv in RUN2; contradiction.
-          }
-
-          assert (st_after_m0 = st).
-          { clear - H5.
-            rewrite MemMonad_repeatMN_repeatN in H5.
-            eapply eq1_ret_ret in H5; try typeclasses eauto.
-            inv H5; auto.
-          }
-          subst.
-          auto.
+          eapply generate_undef_bytes_bounded; auto; lia.
         }
       }
     Qed.
@@ -7310,251 +7259,154 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
                 [ eapply exec_correct_strengthen_post; cycle 1;
                   [apply exec_correct_raise_error|eauto]]).
 
-      { eapply exec_correct_weaken_pre; cycle 1.
-        eapply exec_correct_strengthen_post; cycle 1.
-        { eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID POST RUN.
-          eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID' POST' RUN'.
+      { eapply exec_correct_strengthen_post; cycle 1.
+        eapply exec_correct_bind;
+          eauto with EXEC_CORRECT.
+        { intros * VALID POST RUN.
           eapply exec_correct_weaken_pre; cycle 1.
           eapply malloc_bytes_correct.
+
           intros ms st H.
-          cbn.
-          unfold lift_OOM in POST'.
-          break_match_hyp_inv.
-          eapply generate_num_undef_bytes_bounded; eauto.
+          repeat red in POST.
           destruct POST as (?&?&?); subst.
           destruct H as (?&?&?&?); subst.
-          destruct H1; subst.
-          destruct H as (?&?&?).
-          repeat red in H3.
-          destruct H3 as (?&?&?).
-          cbn in H3.
-          cbn in H6.
-          rewrite H3 in H6.
-          rewrite MemMonad_run_ret, bind_ret_l in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          cbn in H1.
-          repeat red in H1.
-          destruct H1 as (?&?&?).
+          repeat red in H2.
+          destruct H2 as (?&?&?).
           cbn in *.
-          rewrite H1, bind_ret_l in H6.
-          rewrite RUN in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          lia.
+          rewrite H2 in H5.
+          rewrite RUN in H5.
+          rewrite bind_ret_l in H5.
+          eapply eq1_ret_ret in H5; try typeclasses eauto.
+          inv H5.
+          eapply generate_num_undef_bytes_bounded; auto; try lia.
         }
-        
-        eauto with EXEC_CORRECT.
-        eauto with EXEC_CORRECT.
+
+        auto.
       }
-      { eapply exec_correct_weaken_pre; cycle 1.
-        eapply exec_correct_strengthen_post; cycle 1.
-        { eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID POST RUN.
-          eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID' POST' RUN'.
+
+      { eapply exec_correct_strengthen_post; cycle 1.
+        eapply exec_correct_bind;
+          eauto with EXEC_CORRECT.
+        { intros * VALID POST RUN.
           eapply exec_correct_weaken_pre; cycle 1.
           eapply malloc_bytes_correct.
+
           intros ms st H.
-          cbn.
-          unfold lift_OOM in POST'.
-          break_match_hyp_inv.
-          eapply generate_num_undef_bytes_bounded; eauto.
+          repeat red in POST.
           destruct POST as (?&?&?); subst.
           destruct H as (?&?&?&?); subst.
-          destruct H1; subst.
-          destruct H as (?&?&?).
-          repeat red in H3.
-          destruct H3 as (?&?&?).
-          cbn in H3.
-          cbn in H6.
-          rewrite H3 in H6.
-          rewrite MemMonad_run_ret, bind_ret_l in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          cbn in H1.
-          repeat red in H1.
-          destruct H1 as (?&?&?).
+          repeat red in H2.
+          destruct H2 as (?&?&?).
           cbn in *.
-          rewrite H1, bind_ret_l in H6.
-          rewrite RUN in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          lia.
+          rewrite H2 in H5.
+          rewrite RUN in H5.
+          rewrite bind_ret_l in H5.
+          eapply eq1_ret_ret in H5; try typeclasses eauto.
+          inv H5.
+          eapply generate_num_undef_bytes_bounded; auto; try lia.
         }
-        
-        eauto with EXEC_CORRECT.
-        eauto with EXEC_CORRECT.
+
+        auto.
       }
-      { eapply exec_correct_weaken_pre; cycle 1.
-        eapply exec_correct_strengthen_post; cycle 1.
-        { eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID POST RUN.
-          eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID' POST' RUN'.
+
+      { eapply exec_correct_strengthen_post; cycle 1.
+        eapply exec_correct_bind;
+          eauto with EXEC_CORRECT.
+        { intros * VALID POST RUN.
           eapply exec_correct_weaken_pre; cycle 1.
           eapply malloc_bytes_correct.
+
           intros ms st H.
-          cbn.
-          unfold lift_OOM in POST'.
-          break_match_hyp_inv.
-          eapply generate_num_undef_bytes_bounded; eauto.
+          repeat red in POST.
           destruct POST as (?&?&?); subst.
           destruct H as (?&?&?&?); subst.
-          destruct H1; subst.
-          destruct H as (?&?&?).
-          repeat red in H3.
-          destruct H3 as (?&?&?).
-          cbn in H3.
-          cbn in H6.
-          rewrite H3 in H6.
-          rewrite MemMonad_run_ret, bind_ret_l in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          cbn in H1.
-          repeat red in H1.
-          destruct H1 as (?&?&?).
+          repeat red in H2.
+          destruct H2 as (?&?&?).
           cbn in *.
-          rewrite H1, bind_ret_l in H6.
-          rewrite RUN in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          lia.
+          rewrite H2 in H5.
+          rewrite RUN in H5.
+          rewrite bind_ret_l in H5.
+          eapply eq1_ret_ret in H5; try typeclasses eauto.
+          inv H5.
+          eapply generate_num_undef_bytes_bounded; auto; try lia.
         }
-        
-        eauto with EXEC_CORRECT.
-        eauto with EXEC_CORRECT.
+
+        auto.
       }
-      { eapply exec_correct_weaken_pre; cycle 1.
-        eapply exec_correct_strengthen_post; cycle 1.
-        { eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID POST RUN.
-          eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID' POST' RUN'.
+
+      { eapply exec_correct_strengthen_post; cycle 1.
+        eapply exec_correct_bind;
+          eauto with EXEC_CORRECT.
+        { intros * VALID POST RUN.
           eapply exec_correct_weaken_pre; cycle 1.
           eapply malloc_bytes_correct.
+
           intros ms st H.
-          cbn.
-          unfold lift_OOM in POST'.
-          break_match_hyp_inv.
-          eapply generate_num_undef_bytes_bounded; eauto.
+          repeat red in POST.
           destruct POST as (?&?&?); subst.
           destruct H as (?&?&?&?); subst.
-          destruct H1; subst.
-          destruct H as (?&?&?).
-          repeat red in H3.
-          destruct H3 as (?&?&?).
-          cbn in H3.
-          cbn in H6.
-          rewrite H3 in H6.
-          rewrite MemMonad_run_ret, bind_ret_l in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          cbn in H1.
-          repeat red in H1.
-          destruct H1 as (?&?&?).
+          repeat red in H2.
+          destruct H2 as (?&?&?).
           cbn in *.
-          rewrite H1, bind_ret_l in H6.
-          rewrite RUN in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          lia.
+          rewrite H2 in H5.
+          rewrite RUN in H5.
+          rewrite bind_ret_l in H5.
+          eapply eq1_ret_ret in H5; try typeclasses eauto.
+          inv H5.
+          eapply generate_num_undef_bytes_bounded; auto; try lia.
         }
-        
-        eauto with EXEC_CORRECT.
-        eauto with EXEC_CORRECT.
+
+        auto.
       }
-      { eapply exec_correct_weaken_pre; cycle 1.
-        eapply exec_correct_strengthen_post; cycle 1.
-        { eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID POST RUN.
-          eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID' POST' RUN'.
+
+      { eapply exec_correct_strengthen_post; cycle 1.
+        eapply exec_correct_bind;
+          eauto with EXEC_CORRECT.
+        { intros * VALID POST RUN.
           eapply exec_correct_weaken_pre; cycle 1.
           eapply malloc_bytes_correct.
+
           intros ms st H.
-          cbn.
-          unfold lift_OOM in POST'.
-          break_match_hyp_inv.
-          eapply generate_num_undef_bytes_bounded; eauto.
+          repeat red in POST.
           destruct POST as (?&?&?); subst.
           destruct H as (?&?&?&?); subst.
-          destruct H1; subst.
-          destruct H as (?&?&?).
-          repeat red in H3.
-          destruct H3 as (?&?&?).
-          cbn in H3.
-          cbn in H6.
-          rewrite H3 in H6.
-          rewrite MemMonad_run_ret, bind_ret_l in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          cbn in H1.
-          repeat red in H1.
-          destruct H1 as (?&?&?).
+          repeat red in H2.
+          destruct H2 as (?&?&?).
           cbn in *.
-          rewrite H1, bind_ret_l in H6.
-          rewrite RUN in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          lia.
+          rewrite H2 in H5.
+          rewrite RUN in H5.
+          rewrite bind_ret_l in H5.
+          eapply eq1_ret_ret in H5; try typeclasses eauto.
+          inv H5.
+          eapply generate_num_undef_bytes_bounded; auto; try lia.
         }
-        
-        eauto with EXEC_CORRECT.
-        eauto with EXEC_CORRECT.
+
+        auto.
       }
-      { eapply exec_correct_weaken_pre; cycle 1.
-        eapply exec_correct_strengthen_post; cycle 1.
-        { eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID POST RUN.
-          eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID' POST' RUN'.
+
+      { eapply exec_correct_strengthen_post; cycle 1.
+        eapply exec_correct_bind;
+          eauto with EXEC_CORRECT.
+        { intros * VALID POST RUN.
           eapply exec_correct_weaken_pre; cycle 1.
           eapply malloc_bytes_correct.
+
           intros ms st H.
-          cbn.
-          unfold lift_OOM in POST'.
-          break_match_hyp_inv.
-          eapply generate_num_undef_bytes_bounded; eauto.
+          repeat red in POST.
           destruct POST as (?&?&?); subst.
           destruct H as (?&?&?&?); subst.
-          destruct H1; subst.
-          destruct H as (?&?&?).
-          repeat red in H3.
-          destruct H3 as (?&?&?).
-          cbn in H3.
-          cbn in H6.
-          rewrite H3 in H6.
-          rewrite MemMonad_run_ret, bind_ret_l in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          cbn in H1.
-          repeat red in H1.
-          destruct H1 as (?&?&?).
+          repeat red in H2.
+          destruct H2 as (?&?&?).
           cbn in *.
-          rewrite H1, bind_ret_l in H6.
-          rewrite RUN in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          lia.
+          rewrite H2 in H5.
+          rewrite RUN in H5.
+          rewrite bind_ret_l in H5.
+          eapply eq1_ret_ret in H5; try typeclasses eauto.
+          inv H5.
+          eapply generate_num_undef_bytes_bounded; auto; try lia.
         }
-        
-        eauto with EXEC_CORRECT.
-        eauto with EXEC_CORRECT.
+
+        auto.
       }
     Qed.
 
@@ -7770,110 +7622,28 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     - (* OOM *)
       right. eexists; reflexivity.
     - (* UB *)
+      exfalso.
       destruct ALLOC as [UB | ALLOC]; try contradiction.
       destruct ALLOC as [ms' [[] [[MS NVOID] [UB | ALLOC]]]]; try contradiction.
       symmetry in MS; subst.
-      destruct ALLOC as [ms' [sid [FRESH [GEN | ALLOC]]]].
-      { induction num_elements using N.peano_rect; [cbn in *; contradiction|].
-        rewrite repeatMN_succ in GEN.
-        destruct (generate_undef_bytes dt sid); cbn in *.
-        + destruct GEN as [[] | [ms'' [l' [[MEQ LEQ] GEN]]]]; subst.
-          destruct GEN as [GEN | [ms'' [l' [GEN []]]]]; eauto.
-        + destruct GEN as [[] | [ms'' [l' [[] GEN]]]].
-      }
-
-      destruct ALLOC as [ms'' [bytes [GEN ALLOC]]].
-      destruct (generate_undef_bytes dt sid) eqn:HGEN; cbn in *.
-      { assert (length bytes = N.to_nat num_elements) as LBYTES.
-        { eapply repeatMN_MemPropT_length.
-          eapply GEN.
-        }
-
-        assert (forall bs, In bs bytes -> length bs = N.to_nat (sizeof_dtyp dt)) as LBS.
-        { apply generate_undef_bytes_length in HGEN.
-          intros bs IN.
-          clear - HGEN GEN IN.
-          revert bytes GEN bs IN.
-          induction num_elements using N.peano_rect; intros bytes GEN bs IN.
-          - cbn in GEN.
-            destruct GEN as [MEQ BYTES]; subst.
-            inversion IN.
-          - rewrite repeatMN_succ in GEN.
-            cbn in GEN.
-            destruct GEN as [ms''' [l' [[MEQ LEQ] GEN]]]; subst.
-            destruct GEN as [ms''' [l' [GEN [MEQ LEQ]]]]; subst.
-            destruct IN as [IN | IN]; subst; eauto; lia.
-        }
-
-        assert (length (concat bytes) = N.to_nat (sizeof_dtyp dt * num_elements)%N) as LCONCAT.
-        { erewrite concat_length; eauto.
-          lia.
-        }
-
-        clear - ALLOC NON_VOID GEN LCONCAT.
-        Transparent allocate_bytes_spec_MemPropT.
-        unfold allocate_bytes_spec_MemPropT in *.
-        cbn in *.
-        destruct ALLOC as [[] | [ms''' [pr [FRESH_PR [[] | ALLOC]]]]].
-        destruct ALLOC as [ms'''' [[ptr ptrs] ALLOC]].
-        destruct ALLOC as [[MEQ BLOCK_FREE] [UB | [_ [_ [_ []]]]]]; contradiction.
-      }
-
-      { induction num_elements using N.peano_rect.
-        + cbn in GEN.
-          destruct GEN as [MEQ BYTES]; subst.
-          cbn in ALLOC.
-          Transparent allocate_bytes_spec_MemPropT.
-          unfold allocate_bytes_spec_MemPropT in *.
-          cbn in *.
-          destruct ALLOC as [[] | [ms'' [pr [FRESH_PR [[] | ALLOC]]]]].
-          destruct ALLOC as [ms''' [[ptr ptrs] ALLOC]].
-          destruct ALLOC as [[MEQ BLOCK_FREE] [UB | [_ [_ [_ []]]]]]; contradiction.
-          Opaque allocate_bytes_spec_MemPropT.
-        + rewrite repeatMN_succ in GEN.
-          cbn in GEN.
-          destruct GEN as [ms''' [a [[] _]]].
-      }
+      destruct ALLOC as [ms' [sid [MEQV ALLOC]]].
+      apply allocate_bytes_spec_MemPropT_inv in ALLOC.
+      destruct ALLOC.
+      destruct H as (?&?&?).
+      inv H.
+      destruct H as (?&?).
+      inv H.
     - (* Error *)
       destruct ALLOC as [UB | ALLOC]; try contradiction.
       destruct ALLOC as [ms' [[] [[MS NVOID] [UB | ALLOC]]]]; try contradiction.
       symmetry in MS; subst.
-      destruct ALLOC as [ms' [sid [FRESH [GEN | ALLOC]]]].
-      { induction num_elements using N.peano_rect; [cbn in *; contradiction|].
-        rewrite repeatMN_succ in GEN.
-        destruct (generate_undef_bytes dt sid); cbn in *.
-        + destruct GEN as [[] | [ms'' [l' [[MEQ LEQ] GEN]]]]; subst.
-          destruct GEN as [GEN | [ms'' [l' [GEN []]]]]; eauto.
-        + destruct GEN as [[] | [ms'' [l' [[] GEN]]]].
-      }
-
-      destruct ALLOC as [ms'' [bytes [GEN ALLOC]]].
-      destruct (generate_undef_bytes dt sid) eqn:HGEN; cbn in *.
-      { cbn in ALLOC.
-        Transparent allocate_bytes_spec_MemPropT.
-        unfold allocate_bytes_spec_MemPropT in *.
-        cbn in *.
-        destruct ALLOC as [[] | [ms''' [pr [FRESH_PR [[] | ALLOC]]]]].
-        destruct ALLOC as [ms'''' [[ptr ptrs] ALLOC]].
-        destruct ALLOC as [[MEQ BLOCK_FREE] [[] | [_ [_ [_ []]]]]].
-        Opaque allocate_bytes_spec_MemPropT.
-      }
-
-      { induction num_elements using N.peano_rect.
-        + cbn in GEN.
-          destruct GEN as [MEQ BYTES]; subst.
-          cbn in ALLOC.
-          Transparent allocate_bytes_spec_MemPropT.
-          unfold allocate_bytes_spec_MemPropT in *.
-          cbn in *.
-          destruct ALLOC as [[] | [ms'' [pr [FRESH_PR [[] | ALLOC]]]]].
-          destruct ALLOC as [ms''' [[ptr ptrs] ALLOC]].
-          destruct ALLOC as [[MEQ BLOCK_FREE] [[] | [_ [_ [_ []]]]]].
-          Opaque allocate_bytes_spec_MemPropT.
-        + rewrite repeatMN_succ in GEN.
-          cbn in GEN.
-          destruct GEN as [ms''' [a [[] _]]].
-      }
+      destruct ALLOC as [ms' [sid [MEQV ALLOC]]].
+      apply allocate_bytes_spec_MemPropT_inv in ALLOC.
+      destruct ALLOC.
+      destruct H as (?&?&?).
+      inv H.
+      destruct H as (?&?).
+      inv H.
     - (* Success *)
       destruct res' as [ms a].
       subst.
@@ -8106,83 +7876,6 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
     split; auto.
   Qed.
 
-  (* TODO: should this be here? *)
-  Lemma generate_num_undef_bytes_h_cons :
-    forall dt len sid start bytes,
-      generate_num_undef_bytes_h (N.succ start) len dt sid = NoOom bytes ->
-      generate_num_undef_bytes_h start (N.succ len) dt sid =
-        b <- generate_num_undef_bytes_h start 1 dt sid;;
-        rest <- generate_num_undef_bytes_h (N.succ start) len dt sid;;
-        NoOom (b ++ rest).
-  Proof.
-    intros dt len sid start bytes NOOM.
-    cbn.
-    unfold generate_num_undef_bytes_h in *.
-    match goal with
-    | H: _ |- N.recursion ?a ?f _ _ = _ =>
-        pose proof
-          (@N.recursion_succ (N -> OOM (list SByte)) eq
-             a
-             f
-          ) as S
-    end.
-    forward S.
-    reflexivity.
-    forward S.
-    { unfold Proper, respectful.
-      intros x y H0 x0 y0 H1; subst.
-      reflexivity.
-    }
-
-    specialize (S len).
-    cbn in *.
-    rewrite S.
-
-    break_match; auto.
-  Qed.
-
-  (* TODO: should this be here? *)
-  Lemma generate_num_undef_bytes_h_succeeds :
-    forall dt sid start,
-    exists bytes : list SByte, generate_num_undef_bytes_h start (sizeof_dtyp dt) dt sid = ret bytes.
-  Proof.
-    intros dt.
-    induction (sizeof_dtyp dt) using N.peano_ind;
-      intros sid start.
-
-    - cbn; eexists; auto.
-    - specialize (IHn sid (N.succ start)).
-      destruct IHn as [bytes IHn].
-      pose proof (from_Z_safe (Z.of_N start)).
-      break_match_hyp; [|contradiction].
-
-      eexists.
-      erewrite generate_num_undef_bytes_h_cons; eauto.
-      rewrite IHn.
-      cbn.
-      reflexivity.
-  Qed.
-
-
-  (* TODO: should this be here? *)
-  Lemma generate_num_undef_bytes_succeeds :
-    forall dt sid,
-    exists bytes : list SByte, generate_num_undef_bytes (sizeof_dtyp dt) dt sid = ret bytes.
-  Proof.
-    intros dt sid.
-    eapply generate_num_undef_bytes_h_succeeds.
-  Qed.
-
-  (* TODO: should this be here? *)
-  Lemma generate_undef_bytes_succeeds :
-    forall dt sid,
-    exists bytes, generate_undef_bytes dt sid = ret bytes.
-  Proof.
-    intros dt sid.
-    unfold generate_undef_bytes.
-    apply generate_num_undef_bytes_succeeds.
-  Qed.
-
   Lemma repeatMN_MemPropT_length :
     forall {A} n (ma : MemPropT MemState A) ms ms' a,
       repeatMN n ma ms (ret (ms', a)) -> length a = N.to_nat n.
@@ -8212,49 +7905,13 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
 
     unfold allocate_dtyp_spec.
 
-    pose proof generate_undef_bytes_succeeds dt sid as (bytes_dt & UNDEF_BYTES).
+    remember (generate_undef_bytes dt sid) as bytes_dt eqn:UNDEF_BYTES.
+    symmetry in UNDEF_BYTES.
     pose proof generate_undef_bytes_length dt sid bytes_dt UNDEF_BYTES as BYTES_SIZE.
-    assert (exists bytes, repeatMN num_elements (@ret (MemPropT MemState) _ _ bytes_dt) ms_fresh_sid (ret (ms_fresh_sid, bytes))) as (bytes & BYTES).
-    { exists (repeatN num_elements bytes_dt).
-      induction num_elements using N.peano_rect.
-      - cbn; split; auto.
-      - rewrite repeatMN_succ.
-        cbn.
-        repeat eexists.
-        + cbn in *; eauto.
-        + rewrite repeatN_succ.
-          auto.
-    }
-
-    assert (length bytes = N.to_nat num_elements) as LBYTES.
-    { eapply repeatMN_MemPropT_length with (ma:=ret bytes_dt); eauto.
-    }
-
-    assert (forall bs, In bs bytes -> length bs = length bytes_dt) as LBS.
-    {
-      clear - BYTES_SIZE BYTES.
-      revert bytes BYTES.
-      induction num_elements using N.peano_rect; intros bytes BYTES bs IN.
-      - cbn in *.
-        destruct BYTES as [MEQ BYTES]; subst.
-        inversion IN.
-      - rewrite repeatMN_succ in BYTES.
-        cbn in BYTES.
-        destruct BYTES as [ms''' [l' [[MEQ LEQ] GEN]]]; subst.
-        destruct GEN as [ms''' [l' [GEN [MEQ LEQ]]]]; subst.
-        destruct IN as [IN | IN]; subst; eauto.
-        eapply IHnum_elements; cbn; eauto.
-    }
-
-    assert (length (concat bytes) = N.to_nat (sizeof_dtyp dt * num_elements)%N) as LCONCAT.
-    { erewrite concat_length with (len:=length bytes_dt); eauto.
-      lia.
-    }
-
-    assert ((sizeof_dtyp dt * num_elements)%N = N.of_nat (Datatypes.length (concat bytes))) as SIZE by lia.
+    subst.
 
     pose proof allocate_bytes_spec_MemPropT_can_always_succeed
-         ms_fresh_sid ms_fresh_pr (concat bytes) pr FRESH_PR
+         ms_fresh_sid ms_fresh_pr (concat (repeatN num_elements (generate_undef_bytes dt sid))) pr FRESH_PR
       as (ms_final & ptr & ALLOC_SUCCESS).
 
     exists ms_final, ptr.
@@ -8265,13 +7922,5 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
       split; eauto.
     }
     exists ms_fresh_sid, sid; split; auto.
-
-    rewrite UNDEF_BYTES.
-    Opaque allocate_bytes_spec_MemPropT.
-    cbn.
-    Transparent allocate_bytes_spec_MemPropT.
-
-    exists ms_fresh_sid, bytes.
-    tauto.
   Qed.
 End MemoryModelInfiniteSpecHelpers.
