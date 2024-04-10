@@ -3,7 +3,15 @@
 gen_yarpgen() {
     echo "Generating program: $1"
     mkdir ./data/c/test$1
-    ./yarpgen --out-dir=./data/c/test$1 --std=c99
+    while :
+    do
+	  timeout 10m ./yarpgen --out-dir=./data/c/test$1 --std=c99
+	  if [ $? -eq 0 ]; then
+	      break
+	  else
+	      echo "Generate $1 for more than 10 minutes, regenerate"
+	  fi
+    done
     # mv driver.c ./data/c/test$1/driver.c
     # mv func.c ./data/c/test$1/func.c
     # mv init.h ./data/c/test$1/init.h
@@ -30,7 +38,7 @@ gen_yarpgen() {
 
 # Run the function in parallel for arguments 1 to 1000
 max=1000
-for i in $(seq 1 $max); do
+for i in $(seq 1 10000); do
     gen_yarpgen $i &
 done
 
