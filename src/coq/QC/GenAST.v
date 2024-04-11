@@ -3034,22 +3034,25 @@ Section InstrGenerators.
   (* Need to make returns more likely than branches so we don't get an
      endless tree of blocks *)
 
+  Definition gen_ret (τ : typ) : GenLLVM (terminator typ)
+    := nt <- normalize_type_GenLLVM τ;;
+       match nt with
+       | TYPE_Void => ret TERM_Ret_void
+       | _ =>
+           e <- gen_exp_sz0%nat τ;;
+           ret (TERM_Ret (τ, e))
+       end.
+
   Fixpoint gen_terminator_sz
     (sz : nat)
     (t : typ) (* Return type *)
     (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
     {struct t} : GenLLVM (terminator typ * list (block typ))
     :=
-    nt <- normalize_type_GenLLVM t;;
     match sz with
     | 0%nat =>
-        (* Only returns allowed *)
-        match nt with
-        | TYPE_Void => ret (TERM_Ret_void, [])
-        | _ =>
-            e <- gen_exp_sz0%nat t;;
-            ret (TERM_Ret (t, e), [])
-        end
+        term <- gen_ret t;;
+        ret (term, [])
     | S sz' =>
         (* Need to lift oneOf to GenLLVM ...*)
         freq_LLVM_thunked
