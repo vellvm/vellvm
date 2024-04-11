@@ -1956,9 +1956,19 @@ Section ExpGenerators.
   (* Can't use choose for these functions because it gets extracted to
      ocaml's Random.State.int function which has small bounds. *)
 
+  Definition gen_bitZ : G Z :=
+    b <- bool_gen;;
+    if b then ret 1 else ret 0.
+
+  Fixpoint gen_unsigned_bitwidth_h (acc : Z) (bitwidth : N) {struct bitwidth} : G Z :=
+    if N.eqb bitwidth 0
+    then ret acc
+    else
+      bit <- gen_bitZ;;
+      gen_unsigned_bitwidth_h (2 * acc + bit)%Z (bitwidth-1).
+
   Definition gen_unsigned_bitwidth (bitwidth : N) : G Z :=
-    z <- (arbitrary : G Z);;
-    ret (Z.modulo z (2^(Z.of_N bitwidth))).
+    gen_unsigned_bitwidth_h 0 bitwidth.
 
   Definition gen_signed_bitwidth (bitwidth : N) : G Z :=
     let zbitwidth := Z.of_N bitwidth in
@@ -1976,11 +1986,11 @@ Section ExpGenerators.
     := match bitwidth with
        | None =>
            (* Unbounded *)
-           n <- (arbitrary : G N);;
-           ret (Z.of_N (N.succ n))
+           n <- gen_unsigned_bitwidth 64;;
+           ret (1 + Z.modulo n (2^64 - 1))
        | Some bitwidth =>
-           n <- (arbitrary : G N);;
-           ret (1 + Z.modulo (Z.of_N n) (2^(Z.of_N bitwidth) - 1))
+           n <- gen_unsigned_bitwidth bitwidth;;
+           ret (1 + Z.modulo n (2^(Z.of_N bitwidth) - 1))
        end.
 
   Definition gen_non_zero (bitwidth : option N) : G Z
@@ -1991,6 +2001,7 @@ Section ExpGenerators.
            elems_ x [x; -x]
        | Some bitwidth =>
            let zbitwidth := Z.of_N bitwidth in
+           let half := (bitwidth - 1)%N in
            let zhalf := zbitwidth - 1 in
            if Z.eqb zhalf 0
            then ret (-1)
@@ -1998,11 +2009,11 @@ Section ExpGenerators.
              negative <- (arbitrary : G bool);;
              if (negative : bool)
              then
-               n <- (arbitrary : G N);;
-               ret (-(1 + Z.modulo (Z.of_N n) (2^zhalf)))
+               n <- gen_unsigned_bitwidth half;;
+               ret (-(1 + Z.modulo n (2^zhalf)))
              else
-               n <- (arbitrary : G N);;
-               ret (1 + Z.modulo (Z.of_N n) (2^zhalf - 1))
+               n <- gen_unsigned_bitwidth half;;
+               ret (1 + Z.modulo n (2^zhalf - 1))
        end.
 
   (* TODO: make this more complex using metadata *)
@@ -2074,7 +2085,7 @@ Section ExpGenerators.
         let gen_idents : list (nat * GenLLVM (exp typ)) :=
           match i with
           | None => []
-          | Some ident => [(160%nat, fmap (fun i => EXP_Ident i) (@ret GenLLVM _ _ ident))]
+          | Some ident => [(320%nat, fmap (fun i => EXP_Ident i) (@ret GenLLVM _ _ ident))]
           end in
         let fix gen_size_0 (t: typ) :=
           match t with
