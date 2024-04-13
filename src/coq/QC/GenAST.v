@@ -3000,7 +3000,7 @@ Section InstrGenerators.
        oneOf_LLVM
          ([ op <- gen_op_instr;; t <- gen_op_typ;;
             ret [op]
-                (* ; fmap ret gen_bitcast *)
+            ; fmap ret gen_bitcast
            ]
             ++ (* TODO: generate multiple element allocas. Will involve changing initialization *)
             (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)
