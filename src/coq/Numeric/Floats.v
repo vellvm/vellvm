@@ -15,6 +15,8 @@
 (*                                                                     *)
 (* *********************************************************************)
 
+Set Warnings "-intuition-auto-with-star".
+
 (** Formalization of floating-point numbers, using the Flocq library. *)
 
 Require Import Psatz.

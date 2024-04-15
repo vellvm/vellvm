@@ -169,7 +169,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
     Variant CallE : Type -> Type :=
     | Call        : forall (t:dtyp) (f:uvalue) (args:list uvalue), CallE uvalue.
 
-    (* ExternalCallE values are the "observable" events by which one should compare the 
+    (* ExternalCallE values are the "observable" events by which one should compare the
        equivalence of two LLVM IR programs.  These should never be interpreted away
        by the Coq semantics. However, for practicality, we _do_ interpet some calls that
        generate outputs to [stdout] (SAZ: and eventuall[stderr]).  The stream of bytes
@@ -184,9 +184,9 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
     Variant ExternalCallE : Type -> Type :=
       | ExternalCall        : forall (t:dtyp) (f:uvalue) (args:list dvalue), ExternalCallE dvalue
 
-      (* This event corresponds to writing to the [stdout] channel. ] *)                              
+      (* This event corresponds to writing to the [stdout] channel. ] *)
       | IO_stdout : forall (str : list int8), ExternalCallE unit
-      (* This event corresponds to writing to the [stderr] channel. ] *)                              
+      (* This event corresponds to writing to the [stderr] channel. ] *)
       | IO_stderr : forall (str : list int8), ExternalCallE unit.
 
     (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)

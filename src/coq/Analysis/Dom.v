@@ -1,11 +1,10 @@
 (** Reasoning about dominators in a graph. *)
+Set Warnings "-intuition-auto-with-star".
 
 Require Import List Equalities Orders RelationClasses Lia.
 Require Import FSets.
 
 Import ListNotations.
-
-
 
 Module Type LATTICE.
   Include EqLe'.

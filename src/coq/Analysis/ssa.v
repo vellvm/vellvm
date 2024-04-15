@@ -6,52 +6,53 @@ From Vellvm Require Import
      Syntax.Scope
      Analysis.Dom.
 (* end hide *)
+From stdpp Require Import fin_maps.
 
-  Lemma instr_id_eq_dec : forall (x y : instr_id), {x = y} + {x <> y}.
-  Proof.
-    intros. destruct (Eqv.eqv_dec_p x y); auto.
-  Qed.
+Lemma instr_id_eq_dec : forall (x y : instr_id), {x = y} + {x <> y}.
+Proof.
+  intros. repeat decide equality.
+Qed.
 
-  Definition def_sites_phis (phis : list (local_id * phi dtyp)) : list instr_id :=
-    List.map (fun '(x,_) => IId x) phis.
+Definition def_sites_phis (phis : list (local_id * phi dtyp)) : list instr_id :=
+  List.map (fun '(x,_) => IId x) phis.
 
-  Definition pc : Type := block_id * option (nat * instr_id).
+Definition pc : Type := block_id * option (nat * instr_id).
 
-  Lemma pc_eq_dec : forall (x y : pc), {x = y} + {x <> y}.
-  Proof.
-    repeat decide equality.
-  Qed.
+Lemma pc_eq_dec : forall (x y : pc), {x = y} + {x <> y}.
+Proof.
+  repeat decide equality.
+Qed.
 
-  Definition opt_succ (mn : option (nat * instr_id)) : nat :=
-    match mn with | Some (n,_) => S n | None => 0 end.
+Definition opt_succ (mn : option (nat * instr_id)) : nat :=
+  match mn with | Some (n,_) => S n | None => 0 end.
 
-  Definition succ_instr (c : cfg dtyp) (v v' : pc) : Prop :=
-    let '(bid,mx) := v in
-    match find_block c.(blks) bid with
-    | Some bk =>
+Definition succ_instr (c : cfg dtyp) (v v' : pc) : Prop :=
+  let '(bid,mx) := v in
+  match c.(blks) !! bid with
+  | Some bk =>
       match List.nth_error
               (def_sites_phis bk.(blk_phis) ++ List.map fst bk.(blk_code)) (opt_succ mx) with
-      | None => exists bid', List.In bid' (successors bk) /\ v' = (bid',None)
+      | None => exists bid', bid' ∈ (successors bk) /\ v' = (bid',None)
       | Some iid => v' = (bid, Some (opt_succ mx, iid))
       end
-    | None => False
-    end.
+  | None => False
+  end.
 
-  Definition mem_instr (c : cfg dtyp) (p : pc) : Prop :=
-    let '(bid,mx) := p in
-    match find_block c.(blks) bid with
-    | Some bk =>
+Definition mem_instr (c : cfg dtyp) (p : pc) : Prop :=
+  let '(bid,mx) := p in
+  match c.(blks) !! bid with
+  | Some bk =>
       match mx with
       | None => True
       | Some (offset,x) =>
-        match List.nth_error
-                (def_sites_phis bk.(blk_phis) ++ List.map fst bk.(blk_code)) offset with
-        | None => False
-        | Some iid => x = iid
-        end
+          match List.nth_error
+                  (def_sites_phis bk.(blk_phis) ++ List.map fst bk.(blk_code)) offset with
+          | None => False
+          | Some iid => x = iid
+          end
       end
-    | None => False
-    end.
+  | None => False
+  end.
 
 (**  ------------------------------------------------------------------------- *)
 (** * GRAPH instance for dominance calculation *)

@@ -1,8 +1,7 @@
 From Vellvm Require Import
      Semantics.LLVMParams
      Semantics.MemoryParams
-     Semantics.Memory.MemBytes
-     Handlers.Concretization.
+     Semantics.Memory.MemBytes.
 
 Module Type ConcretizationParams (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL).
   Module CONCBASE := Concretization.MakeBase LP MP Byte.

@@ -14,56 +14,6 @@ Import ListNotations.
 
 (* end hide *)
 
-(* Equalities --------------------------------------------------------------- *)
-
-#[global] Instance EqDecision_raw_id : EqDecision raw_id.
-solve_decision.
-Defined.
-
-Definition Countable_raw_id_obligation :
-  ∀ x : raw_id,
-    match
-      match x with
-      | Name s => (encode s)~0~0
-      | Anon i => (encode i)~0~1
-      | Raw i => (encode i)~1~0
-      end
-    with
-    | p~0~1 => Anon <$> decode p
-    | p~1~0 => Raw <$> decode p
-    | p~0~0 => Name <$> decode p
-    | _ => None
-    end = Some x.
-Proof. now intros []; cbn; rewrite decode_encode. Qed.
-
-#[global] Instance Countable_raw_id : Countable raw_id :=
-  {|
-    encode id := match id with
-                 | Name s => (encode s)~0~0%positive
-                 | Anon i => (encode i)~0~1%positive
-                 | Raw  i => (encode i)~1~0%positive
-                 end;
-    decode p := match p with
-                | p~0~0 => Name <$> decode p
-                | p~0~1 => Anon <$> decode p
-                | p~1~0 => Raw  <$> decode p
-                | _     => None
-                end;
-    decode_encode := Countable_raw_id_obligation
-  |}.
-
-#[global] Instance EqDecision_block_id : EqDecision block_id.
-solve_decision.
-Defined.
-
-#[global] Instance EqDecision_instr_id : EqDecision instr_id.
-solve_decision.
-Defined.
-
-#[global] Instance EqDecision_ident : EqDecision ident.
-solve_decision.
-Defined.
-
 (* Scheme Induction seems to still be too stupid to derive this automatically, fails to handle the nested lists  *)
 Section TypInd.
 

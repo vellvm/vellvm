@@ -7,7 +7,7 @@
     QuickChick. It may be worthwhile to serialize a counterexample
     into a format that it can be imported into Coq for debugging.
 *)
-
+From stdpp Require Import gmap.
 From Vellvm Require Import LLVMAst ShowAST Utilities DynamicTypes.
 
 
@@ -33,6 +33,18 @@ Section ReprInstances.
    Instance reprList (A : Type) `{Repr A} : Repr (list A) :=
     {
       repr l := ("[" ++ contents repr l ++ "]")%string
+    }.
+
+  #[global]
+   Instance reprProd (A B : Type) `{Repr A, Repr B} : Repr (A * B) :=
+    {
+      repr '(a,b) := ("(" ++ repr a ++ "," ++ repr b ++ ")")%string
+    }.
+
+  #[global]
+   Instance reprGmap (K V : Type) `{EqDecision K, Countable K, Repr K, Repr V} : Repr (gmap K V) :=
+    {
+      repr m := repr (A := list (K * V)) (map_to_list m)
     }.
 
   #[global]

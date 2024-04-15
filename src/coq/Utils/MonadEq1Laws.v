@@ -83,9 +83,10 @@ Section EitherT.
 
 End EitherT.
 
+Require Import ITree.Core.ITreeMonad.
+
 Section ITree.
   Variable E : Type -> Type.
-  Require Import ITree.Core.ITreeMonad.
 
   Lemma eq1_ret_ret_itree :
     forall {A} (x y : A), (ret x : itree E A) ≈ ret y -> x = y.

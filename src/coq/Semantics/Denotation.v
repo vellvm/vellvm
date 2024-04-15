@@ -14,10 +14,12 @@ From Coq Require Import
      FSets.FMapWeakList
      Bool.Bool.
 
+From stdpp Require Import base list fin_maps.
+Print Instances FinMap.
+
 From ExtLib Require Import
      Structures.Monads
-     Structures.Functor
-     Eqv.
+     Structures.Functor.
 
 From ITree Require Import
      ITree
@@ -32,18 +34,31 @@ From Vellvm Require Import
      Semantics.VellvmIntegers
      Semantics.LLVMEvents
      Semantics.LLVMParams
-     Semantics.MemoryParams
-     Semantics.Memory.MemBytes
-     Semantics.ConcretizationParams
-     Utils.ListUtil
-     DynamicValues.
-
-Require Import Ceres.Ceres.
+     DynamicValues
+     QC.ShowAST.
 
 Import Sum.
 Import Subevent.
-Import EqvNotation.
-Import ListNotations.
+
+Module MonadNotation.
+
+  Delimit Scope monad_scope with monad.
+
+  Notation "c >>= f" := (@bind _ _ _ _ c f) (at level 58, left associativity) : monad_scope.
+
+  Notation "e1 ;; e2" := (@bind _ _ _ _ e1%monad (fun _ => e2%monad))%monad: monad_scope.
+
+  Notation "x <- c1 ; c2" := (@bind _ _ _ _ c1 (fun x => c2))
+               (at level 20, c1 at level 100, c2 at level 200, right associativity) : monad_scope.
+    (* (at level 60, c1 at next level, right associativity) : monad_scope. *)
+
+  Notation "' pat <- c1 ; c2" :=
+    (@bind _ _ _ _ c1 (fun x => match x with pat => c2 end))
+               (at level 20, pat pattern, c1 at level 100, c2 at level 200, right associativity) : monad_scope.
+    (* (at level 60, pat pattern, c1 at next level, right associativity) : monad_scope. *)
+
+End MonadNotation.
+
 Import MonadNotation.
 
 Set Implicit Arguments.
@@ -105,15 +120,14 @@ Open Scope N_scope.
     itrees in the second phase.
  *)
 
-Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP Byte).
-  Import CP.
-  Import CONC.
-  Import MP.
+Module Denotation (LP : LLVMParams).
   Import LP.
   Import Events.
 
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
     default_dvalue_of_dtyp t.
+
+  Notation Ecfg := instr_E.
 
   (** ** Ident lookups
       Look-ups depend on the nature of the [ident], that may be local or global.
@@ -121,9 +135,9 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       Note: global maps contain [dvalue]s, while local maps contain [uvalue]s.
       We perform the conversion here.
    *)
-  Definition lookup_id (i:ident) : itree lookup_E uvalue :=
+  Definition lookup_id (i:ident) : itree Ecfg uvalue :=
     match i with
-    | ID_Global x => dv <- trigger (GlobalRead x);; ret (dvalue_to_uvalue dv)
+    | ID_Global x => dv <- trigger (GlobalRead x); ret (dvalue_to_uvalue dv)
     | ID_Local x  => trigger (LocalRead x)
     end.
 
@@ -141,13 +155,19 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
   Definition dvalue_not_zero dv := ~ (dvalue_is_zero dv).
 
+  Definition pick_uvalue (uv : uvalue) : PickUvalueE {dv : dvalue | True}
+    := pick uv.
+  (* TODO: should the post condition be concretize uv dv ? *)
+  Definition pick_unique_uvalue (uv : uvalue) : PickUvalueE {dv : dvalue | True}
+    := pickUnique uv.
+
   (* A trivially concrete [uvalue] does not need to go through a pick event to get concretize.
      This function therefore either trigger [pick], or perform a direct cast.
      The value of this "optimization" is debatable. *)
   Definition concretize_or_pick {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue :=
     if is_concrete uv
     then lift_err ret (uvalue_to_dvalue uv)
-    else dv <- trigger (pick_uvalue uv);; ret (proj1_sig dv).
+    else dv <- trigger (pick_uvalue uv); ret (proj1_sig dv).
 
   (* Pick a possibly poison value, treating poison as nondeterminism.
      This is used for freeze. *)
@@ -160,7 +180,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   Definition pickUnique {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue
     :=     if is_concrete uv
     then lift_err ret (uvalue_to_dvalue uv)
-    else dv <- trigger (pick_unique_uvalue uv);; ret (proj1_sig dv).
+    else dv <- trigger (pick_unique_uvalue uv); ret (proj1_sig dv).
 
   (** ** Denotation of expressions
       [denote_exp top o] is the main entry point for evaluating itree expressions.
@@ -177,18 +197,14 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
      Expressions are denoted as itrees that return a [uvalue].
    *)
 
-(* TODO: show instance for dtyp and push this up *)
-From Vellvm Require Import ShowAST.
-Print Instances DShow.
   Fixpoint denote_exp
-           (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
+           (top:option dtyp) (o:exp dtyp) {struct o} : itree Ecfg uvalue :=
     let eval_texp '(dt,ex) := denote_exp (Some dt) ex
     in
     match o with
 
     (* The translation injects the [lookup_E] interface used by [lookup_id] to the ambient one *)
-    | EXP_Ident i =>
-      translate LU_to_exp (lookup_id i)
+    | EXP_Ident i => lookup_id i
 
     | EXP_Integer x =>
       match top with
@@ -235,7 +251,7 @@ Print Instances DShow.
       end
 
     | EXP_Cstring es =>
-      vs <- map_monad eval_texp es ;;
+      vs <- map_monad eval_texp es ;
       ret (UVALUE_Array vs)
 
     | EXP_Undef =>
@@ -247,7 +263,7 @@ Print Instances DShow.
     (* Question: should we do any typechecking for aggregate types here? *)
     (* Option 1: do no typechecking: *)
     | EXP_Struct es =>
-      vs <- map_monad eval_texp es ;;
+      vs <- map_monad eval_texp es ;
       ret (UVALUE_Struct vs)
 
     (* Option 2: do a little bit of typechecking *)
@@ -255,17 +271,17 @@ Print Instances DShow.
       match top with
       | None => raise "denote_exp given untyped EXP_Struct"
       | Some (DTYPE_Packed_struct _) =>
-        vs <- map_monad eval_texp es ;;
+        vs <- map_monad eval_texp es ;
         ret (UVALUE_Packed_struct vs)
       | _ => raise "bad type for VALUE_Packed_struct"
       end
 
     | EXP_Array es =>
-      vs <- map_monad eval_texp es ;;
+      vs <- map_monad eval_texp es ;
       ret (UVALUE_Array vs)
 
     | EXP_Vector es =>
-      vs <- map_monad eval_texp es ;;
+      vs <- map_monad eval_texp es ;
       ret (UVALUE_Vector vs)
 
     (* The semantics of operators is complicated by both uvalues and
@@ -274,86 +290,86 @@ Print Instances DShow.
            depends on whether it may raise UB, and how.
      *)
     | OP_IBinop iop dt op1 op2 =>
-      v1 <- denote_exp (Some dt) op1 ;;
-      v2 <- denote_exp (Some dt) op2 ;;
+      v1 <- denote_exp (Some dt) op1 ;
+      v2 <- denote_exp (Some dt) op2 ;
       ret (UVALUE_IBinop iop v1 v2)
 
     | OP_ICmp cmp dt op1 op2 =>
-      v1 <- denote_exp (Some dt) op1 ;;
-      v2 <- denote_exp (Some dt) op2 ;;
+      v1 <- denote_exp (Some dt) op1 ;
+      v2 <- denote_exp (Some dt) op2 ;
       ret (UVALUE_ICmp cmp v1 v2)
 
     | OP_FBinop fop fm dt op1 op2 =>
-      v1 <- denote_exp (Some dt) op1 ;;
-      v2 <- denote_exp (Some dt) op2 ;;
+      v1 <- denote_exp (Some dt) op1 ;
+      v2 <- denote_exp (Some dt) op2 ;
       ret (UVALUE_FBinop fop fm v1 v2)
 
     | OP_FCmp fcmp dt op1 op2 =>
-      v1 <- denote_exp (Some dt) op1 ;;
-      v2 <- denote_exp (Some dt) op2 ;;
+      v1 <- denote_exp (Some dt) op1 ;
+      v2 <- denote_exp (Some dt) op2 ;
       ret (UVALUE_FCmp fcmp v1 v2)
 
     | OP_Conversion conv dt_from op dt_to =>
-      v <- denote_exp (Some dt_from) op ;;
+      v <- denote_exp (Some dt_from) op ;
       ret (UVALUE_Conversion conv dt_from v dt_to)
 
     | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
-      vptr <- denote_exp (Some dt2) ptrval ;;
-      vs <- map_monad (fun '(dt, index) => denote_exp (Some dt) index) idxs ;;
+      vptr <- denote_exp (Some dt2) ptrval ;
+      vs <- map_monad (fun '(dt, index) => denote_exp (Some dt) index) idxs ;
       ret (UVALUE_GetElementPtr dt1 vptr vs)
 
     | OP_ExtractElement (dt_vec, vecop) (dt_idx, idx) =>
-        vec <- denote_exp (Some dt_vec) vecop ;;
-        idx <- denote_exp (Some dt_idx) idx ;;
+        vec <- denote_exp (Some dt_vec) vecop ;
+        idx <- denote_exp (Some dt_idx) idx ;
         ret (UVALUE_ExtractElement dt_vec vec idx)
 
     | OP_InsertElement (dt_vec, vecop) (dt_elt, eltop) (dt_idx, idx) =>
-        vec <- denote_exp (Some dt_vec) vecop ;;
-        elt <- denote_exp (Some dt_elt) eltop ;;
-        idx <- denote_exp (Some dt_idx) idx ;;
+        vec <- denote_exp (Some dt_vec) vecop ;
+        elt <- denote_exp (Some dt_elt) eltop ;
+        idx <- denote_exp (Some dt_idx) idx ;
         ret (UVALUE_InsertElement dt_vec vec elt idx)
 
     | OP_ShuffleVector (dt_vec1, vecop1) (dt_vec2, vecop2) (dt_mask, idxmask) =>
-        vec1 <- denote_exp (Some dt_vec1) vecop1 ;;
-        vec2 <- denote_exp (Some dt_vec2) vecop2 ;;
-        idxmask <- denote_exp (Some dt_mask) idxmask;;
+        vec1 <- denote_exp (Some dt_vec1) vecop1 ;
+        vec2 <- denote_exp (Some dt_vec2) vecop2 ;
+        idxmask <- denote_exp (Some dt_mask) idxmask;
         ret (UVALUE_ShuffleVector dt_vec1 vec1 vec2 idxmask)
 
     | OP_ExtractValue (dt, str) idxs =>
-        str <- denote_exp (Some dt) str ;;
+        str <- denote_exp (Some dt) str ;
         ret (UVALUE_ExtractValue dt str idxs)
 
     | OP_InsertValue (dt_str, strop) (dt_elt, eltop) idxs =>
-        str <- denote_exp (Some dt_str) strop ;;
-        elt <- denote_exp (Some dt_elt) eltop ;;
+        str <- denote_exp (Some dt_str) strop ;
+        elt <- denote_exp (Some dt_elt) eltop ;
         ret (UVALUE_InsertValue dt_str str dt_elt elt idxs)
 
     | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
-        cnd <- denote_exp (Some dt) cnd ;;
-        v1  <- denote_exp (Some dt1) op1 ;;
-        v2  <- denote_exp (Some dt2) op2 ;;
+        cnd <- denote_exp (Some dt) cnd ;
+        v1  <- denote_exp (Some dt1) op1 ;
+        v2  <- denote_exp (Some dt2) op2 ;
         ret (UVALUE_Select cnd v1 v2)
 
     | OP_Freeze (dt, e) =>
-      uv <- denote_exp (Some dt) e ;;
-      dv <- pick_your_poison uv;;
+      uv <- denote_exp (Some dt) e ;
+      dv <- pick_your_poison uv;
       ret (dvalue_to_uvalue dv)
     end.
 
   Arguments denote_exp _ : simpl nomatch.
 
-  Definition denote_op (o:exp dtyp) : itree exp_E uvalue :=
+  Definition denote_op (o:exp dtyp) : itree Ecfg uvalue :=
     denote_exp None o.
   Arguments denote_op _ : simpl nomatch.
 
   (* An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
-    (i: (instr_id * instr dtyp)): itree instr_E unit :=
+    (i: (instr_id * instr dtyp)): itree Ecfg unit :=
     match i with
     (* Pure operations *)
 
     | (IId id, INSTR_Op op) =>
-        uv <- translate exp_to_instr (denote_op op) ;;
+        uv <- denote_op op ;
         trigger (LocalWrite id uv)
 
     (* Allocation *)
@@ -376,28 +392,28 @@ Print Instances DShow.
         in
         match num_elements with
         | None =>
-            dv <- trigger (Alloca dt 1 align);;
+            dv <- trigger (Alloca dt 1 align);
             trigger (LocalWrite id (dvalue_to_uvalue dv))
         | Some (t, num_exp) =>
-            un <- translate exp_to_instr (denote_exp (Some t) num_exp);;
-            n <- pickUnique un;;
-            dv <- trigger (Alloca dt (Z.to_N (dvalue_int_unsigned n)) align);;
+            un <- denote_exp (Some t) num_exp;
+            n <- pickUnique un;
+            dv <- trigger (Alloca dt (Z.to_N (dvalue_int_unsigned n)) align);
             trigger (LocalWrite id (dvalue_to_uvalue dv))
         end
     (* Load *)
     | (IId id, INSTR_Load dt (du,ptr) _) =>
-      ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
+      ua <- denote_exp (Some du) ptr ;
       (* Load addresses must be unique *)
-      da <- pickUnique ua;;
-      uv <- trigger (Load dt da);;
+      da <- pickUnique ua;
+      uv <- trigger (Load dt da);
       trigger (LocalWrite id uv)
 
     (* Store *)
     | (IVoid _, INSTR_Store (dt, val) (du, ptr) _) =>
-      uv <- translate exp_to_instr (denote_exp (Some dt) val) ;;
-      ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
+      uv <- denote_exp (Some dt) val ;
+      ua <- denote_exp (Some du) ptr ;
       (* Store addresses must be unique *)
-      da <- pickUnique ua ;;
+      da <- pickUnique ua ;
       match da with
       | DVALUE_Poison dt => raiseUB "Store to poisoned address."
       | _ => trigger (Store dt da uv)
@@ -407,17 +423,17 @@ Print Instances DShow.
 
     (* Call *)
     | (pt, INSTR_Call (dt, f) args _) =>
-      uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) (List.map fst args) ;;
+      uvs <- map_monad (fun '(t, op) => (denote_exp (Some t) op)) (List.map fst args) ;
       returned_value <-
       match intrinsic_exp f with
       | Some s =>
-        dvs <- map_monad (fun uv => pickUnique uv) uvs ;;
+        dvs <- map_monad (fun uv => pickUnique uv) uvs ;
         fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
       | None =>
-        fv <- translate exp_to_instr (denote_exp None f) ;;
+        fv <- denote_exp None f ;
         trigger (Call dt fv uvs)
       end
-      ;;
+      ;
       match pt with
       | IVoid _ => ret tt
       | IId id  => trigger (LocalWrite id returned_value)
@@ -458,19 +474,19 @@ Print Instances DShow.
 
   (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
-  Definition denote_terminator (t: terminator dtyp): itree exp_E (block_id + uvalue) :=
+  Definition denote_terminator (t: terminator dtyp): itree Ecfg (block_id + uvalue) :=
     match t with
 
     | TERM_Ret (dt, op) =>
-      dv <- denote_exp (Some dt) op ;;
+      dv <- denote_exp (Some dt) op ;
       ret (inr dv)
 
     | TERM_Ret_void =>
       ret (inr UVALUE_None)
 
     | TERM_Br (dt,op) br1 br2 =>
-      uv <- denote_exp (Some dt) op ;;
-      dv <- concretize_or_pick uv;;
+      uv <- denote_exp (Some dt) op ;
+      dv <- concretize_or_pick uv;
       match dv with
       | DVALUE_I1 comparison_bit =>
         if equ comparison_bit one then
@@ -484,17 +500,17 @@ Print Instances DShow.
     | TERM_Br_1 br => ret (inl br)
 
     | TERM_Switch (dt,e) default_br dests =>
-      uselector <- denote_exp (Some dt) e;;
+      uselector <- denote_exp (Some dt) e;
       (* Selection on [undef] is UB *)
-      selector <- pickUnique uselector;;
+      selector <- pickUnique uselector;
       if dvalue_is_poison selector
       then raiseUB "Switching on poison."
       else (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
         switches <- map_monad
                      (fun '((TInt_Literal sz x),id) =>
-                        s <- (coerce_integer_to_int (Some sz) x);;
+                        s <- (coerce_integer_to_int (Some sz) x);
                         ret (s,id))
-                     dests;;
+                     dests;
         lift_err (fun b => ret (inl b)) (select_switch selector default_br switches)
 
     | TERM_Unreachable => raiseUB "IMPOSSIBLE: unreachable in reachable position"
@@ -506,31 +522,31 @@ Print Instances DShow.
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
-  Definition denote_code (c: code dtyp): itree instr_E unit :=
+  Definition denote_code (c: code dtyp): itree Ecfg unit :=
     map_monad_ denote_instr c.
 
-  Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp) : itree exp_E (local_id * uvalue) :=
+  Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp) : itree Ecfg (local_id * uvalue) :=
     let '(id, Phi dt args) := id_p in
-    match assoc bid_from args with
+    match args !! bid_from with
     | Some op =>
-      uv <- denote_exp (Some dt) op ;;
-      ret (id,uv)
+        uv <- denote_exp (Some dt) op ;
+        ret (id,uv)
     | None => raise ("jump: phi node doesn't include block ")
     end.
 
-  Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp)): itree instr_E unit :=
+  Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp)): itree Ecfg unit :=
     dvs <- map_monad
-             (fun x => translate exp_to_instr (denote_phi bid_from x))
-             phis;;
+             (fun x => denote_phi bid_from x)
+             phis;
     map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
     ret tt.
 
   (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-  Definition denote_block (b: block dtyp) (bid_from : block_id) : itree instr_E (block_id + uvalue) :=
+  Definition denote_block (b: block dtyp) (bid_from : block_id) : itree Ecfg (block_id + uvalue) :=
     denote_phis bid_from (blk_phis b);;
     denote_code (blk_code b);;
-    translate exp_to_instr (denote_terminator (blk_term b)).
+    denote_terminator (blk_term b).
 
   (* Our denotation currently contains two kinds of indirections: jumps to labels, internal to
          a cfg, and calls to functions, that jump from a cfg to another.
@@ -546,21 +562,21 @@ Print Instances DShow.
          If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
    *)
   Definition denote_ocfg (bks: ocfg dtyp)
-    : (block_id * block_id) -> itree instr_E ((block_id * block_id) + uvalue) :=
+    : (block_id * block_id) -> itree Ecfg ((block_id * block_id) + uvalue) :=
     iter (C := ktree _) (bif := sum)
          (fun '((bid_from,bid_src) : block_id * block_id) =>
-            match find_block bks bid_src with
+            match bks !! bid_src with
             | None => ret (inr (inl (bid_from,bid_src)))
             | Some block_src =>
-              bd <- denote_block block_src bid_from;;
+              bd <- denote_block block_src bid_from;
               match bd with
               | inr dv => ret (inr (inr dv))
               | inl bid_target => ret (inl (bid_src,bid_target))
               end
             end).
 
-  Definition denote_cfg (f: cfg dtyp) : itree instr_E uvalue :=
-    r <- denote_ocfg (blks f) (init f,init f) ;;
+  Definition denote_cfg (f: cfg dtyp) : itree Ecfg uvalue :=
+    r <- denote_ocfg (blks f) (init f,init f) ;
     match r with
     | inl bid => raise ("Can't find block in denote_cfg " ++ show (snd bid))
     | inr uv  => ret uv
@@ -574,11 +590,11 @@ Print Instances DShow.
   Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
     fun (args : list uvalue) =>
       (* We match the arguments variables to the inputs *)
-      bs <- lift_err ret (combine_lists_err (df_args df) args) ;;
+      bs <- lift_err ret (combine_lists_err (df_args df) args) ;
       (* generate the corresponding writes to the local stack frame *)
       trigger MemPush ;;
-      trigger (StackPush bs) ;;
-      rv <- translate instr_to_L0' (denote_cfg (df_instrs df)) ;;
+      trigger (StackPush (map (fun '(k,v) => (k, v)) bs)) ;;
+      rv <- translate instr_to_L0' (denote_cfg (df_instrs df)) ;
       trigger StackPop ;;
       trigger MemPop ;;
       ret rv.
@@ -606,14 +622,33 @@ Print Instances DShow.
           (fun T call =>
              match call with
              | Call dt fv args =>
-               dfv <- concretize_or_pick fv;;
+               dfv <- concretize_or_pick fv;
                match (lookup_defn dfv fundefs) with
                | Some f_den => (* If the call is internal *)
                  f_den args
                | None =>
-                 dargs <- map_monad (fun uv => pickUnique uv) args ;;
+                 dargs <- map_monad (fun uv => pickUnique uv) args ;
                  fmap dvalue_to_uvalue (trigger (ExternalCall dt fv dargs))
                end
              end)
           _ (Call dt f_value args).
+
+
+  Module SemNotations.
+
+    Notation "⟦ e 'at?' t '⟧e'" :=  (denote_exp t e).
+    Notation "⟦ e 'at' t '⟧e'" :=   (denote_exp (Some t) e).
+    Notation "⟦ e '⟧e'" :=          (denote_exp None e).
+    Notation "⟦ i '⟧i'" :=        (denote_instr i).
+    Notation "⟦ c '⟧c'" :=          (denote_code c).
+    Notation "⟦ t '⟧t'" :=        (denote_terminator t).
+    Notation "⟦ phi '⟧Φ' from"  := (denote_phi from phi) (at level 0, from at next level).
+    Notation "⟦ phis '⟧Φs' from"  := (denote_phis from phis) (at level 0, from at next level).
+    Notation "⟦ bk '⟧b'" :=  (denote_block bk).
+    Notation "⟦ bks '⟧bs'"  := (denote_ocfg bks).
+    Notation "⟦ f '⟧cfg'"  := (denote_cfg f).
+    Notation "⟦ f '⟧f'"  := (denote_function f).
+
+  End SemNotations.
+
 End Denotation.

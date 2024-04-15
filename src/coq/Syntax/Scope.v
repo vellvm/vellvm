@@ -133,7 +133,7 @@ Section LABELS_OPERATIONS.
     disjoint_bid bks1 bks2.
 
   Definition phi_sources (φ : phi T) : gset block_id :=
-    let '(Phi _ l) := φ in list_to_set (map fst l).
+    let '(Phi _ l) := φ in dom l.
 
   (* Over a closed graph, phi nodes should expect exactly jumps from their predecessors:
      - For any block [bk] in the graph
@@ -322,13 +322,14 @@ Section REGISTER_OPERATIONS.
       |}.
 
     #[global] Instance phi_use_sites {T} : Use_sites (phi T) :=
-      {| use_sites := fun '(Phi _ l) => set_flat_map_list (fun x => use_sites (snd x)) l |}.
+      {| use_sites := fun '(Phi _ l) =>
+                        map_fold (fun _ x acc => use_sites x ∪ acc) ∅ l
+      |}.
 
     #[global] Instance block_use_sites {T} : Use_sites (block T) :=
       {| use_sites bk :=
-          set_flat_map_list (fun x => use_sites (snd x)) bk.(blk_phis)
-        ∪ use_sites bk.(blk_code)
-        ∪ use_sites bk.(blk_term) |}.
+          set_flat_map_list (fun x => use_sites (snd x))
+            bk.(blk_phis) ∪ use_sites bk.(blk_code) ∪ use_sites bk.(blk_term) |}.
 
     #[global] Instance ocfg_use_sites {T} : Use_sites (ocfg T) :=
       {| use_sites := map_fold (fun k bk acc => use_sites bk ∪ acc) ∅ |}.

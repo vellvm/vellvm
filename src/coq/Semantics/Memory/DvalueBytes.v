@@ -317,7 +317,7 @@ Module Type DvalueByte (LP : LLVMParams).
          (fun idx => (DVALUE_ExtractByte dv dt idx))
          (Nseq 0 (N.to_nat (sizeof_dtyp dt))).
 
-  Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia].
+  #[local] Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia].
   Fixpoint dvalue_bytes_to_dvalue {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOMABLE M} (dbs : list dvalue_byte) (dt : dtyp) : M dvalue
     :=
     let list_dvalue_bytes_to_dvalue :=

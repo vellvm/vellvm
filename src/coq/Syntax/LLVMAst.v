@@ -7,6 +7,8 @@ From Coq Require Import
 From Vellvm Require Import
      Utilities.
 
+From stdpp Require Import gmap strings.
+
 Import ListNotations.
 Open Scope string_scope.
 Open Scope list_scope.
@@ -45,7 +47,6 @@ Variant ident : Set :=
 | ID_Global (id:raw_id)   (* @id *)
 | ID_Local  (id:raw_id)   (* %id *)
 .
-
 
 Unset Elimination Schemes.
 Inductive typ : Set :=
@@ -150,7 +151,7 @@ Variant param_attr : Set :=
 | PARAMATTR_Alignstack (a : int)
 | PARAMATTR_Allocalign
 | PARAMATTR_Allocptr
-| PARAMATTR_Writeonly      
+| PARAMATTR_Writeonly
 .
 
 Variant frame_pointer_val : Set :=
@@ -251,7 +252,63 @@ Definition local_id  := raw_id.
 Definition global_id := raw_id.
 Definition block_id := raw_id.
 Definition function_id := global_id.
+Variant instr_id : Set :=
+  | IId   (id:raw_id)    (* "Anonymous" or explicitly named instructions *)
+  | IVoid (n:int)        (* "Void" return type, for "store",  "void call", and terminators.
+                            Each with unique number (NOTE: these are distinct from Anon raw_id) *)
+.
 
+(* Equalities --------------------------------------------------------------- *)
+
+#[global] Instance EqDecision_raw_id : EqDecision raw_id.
+solve_decision.
+Defined.
+
+Definition Countable_raw_id_obligation :
+  ∀ x : raw_id,
+    match
+      match x with
+      | Name s => (encode s)~0~0%positive
+      | Anon i => (encode i)~0~1%positive
+      | Raw i => (encode i)~1~0%positive
+      end
+    with
+    | p~0~1%positive => Anon <$> decode p
+    | p~1~0%positive => Raw <$> decode p
+    | p~0~0%positive => Name <$> decode p
+    | _ => None
+    end = Some x.
+Proof. now intros []; cbn; rewrite decode_encode. Qed.
+
+#[global] Instance Countable_raw_id : Countable raw_id :=
+  {|
+    encode id := match id with
+                 | Name s => (encode s)~0~0%positive
+                 | Anon i => (encode i)~0~1%positive
+                 | Raw  i => (encode i)~1~0%positive
+                 end;
+    decode p := match p with
+                | p~0~0%positive => Name <$> decode p
+                | p~0~1%positive => Anon <$> decode p
+                | p~1~0%positive => Raw  <$> decode p
+                | _     => None
+                end;
+    decode_encode := Countable_raw_id_obligation
+  |}.
+
+#[global] Instance EqDecision_local_id : EqDecision local_id := EqDecision_raw_id.
+#[global] Instance Countable_local_id : Countable local_id := Countable_raw_id.
+
+#[global] Instance EqDecision_block_id : EqDecision block_id := EqDecision_raw_id.
+#[global] Instance Countable_block_id : Countable block_id := Countable_raw_id.
+
+#[global] Instance EqDecision_instr_id : EqDecision instr_id.
+solve_decision.
+Defined.
+
+#[global] Instance EqDecision_ident : EqDecision ident.
+solve_decision.
+Defined.
 
 (* NOTE:
    We could separate return types from types, but that needs mutually recursive types.
@@ -389,14 +446,8 @@ Inductive metadata : Set :=
 Variant tint_literal : Set :=
   | TInt_Literal (sz:N) (x:int).
 
-Variant instr_id : Set :=
-  | IId   (id:raw_id)    (* "Anonymous" or explicitly named instructions *)
-  | IVoid (n:int)        (* "Void" return type, for "store",  "void call", and terminators.
-                            Each with unique number (NOTE: these are distinct from Anon raw_id) *)
-.
-
 Variant phi : Set :=
-  | Phi  (t:T) (args:list (block_id * exp))
+  | Phi  (t:T) (args: gmap block_id exp)
 .
 
 Variant ordering : Set :=

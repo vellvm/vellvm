@@ -1,4 +1,6 @@
 (* begin hide *)
+From stdpp Require Import base gmap fin_maps tactics.
+(* ssreflect. *)
 
 From Coq Require Import
      String
@@ -12,10 +14,12 @@ From ITree Require Import
 From Vellvm Require Import
      Utilities
      Syntax
-     Semantics
+     Semantics.LLVMParams
+     Semantics.Denotation
      Syntax.ScopeTheory
      Utils.PostConditions
      Utils.ITreeRaise.
+Import LLVMEvents.
 
 #[export] Remove Hints Eqv.EqvWF_Build : typeclass_instances.
 
@@ -26,12 +30,47 @@ Import MonadNotation.
 Open Scope list_scope.
 Open Scope monad_scope.
 Open Scope itree.
-Import ITreeNotations.
-Import EitherMonad.
-Import IdentityMonad.
+(* Import ITreeNotations. *)
+(* Import EitherMonad. *)
+(* Import IdentityMonad. *)
 Import ListNotations.
 
 (* end hide *)
+
+(* TO MOVE *)
+Lemma eq_itree_eq_bind : forall E R1 R2 RR U (t: itree E U) (k1: U -> itree E R1) (k2: U -> itree E R2),
+    (forall u, eq_itree RR (k1 u) (k2 u)) -> eq_itree RR (ITree.bind t k1) (ITree.bind t k2).
+Proof.
+  intros.
+  apply eq_itree_clo_bind with (UU := Logic.eq); [reflexivity |].
+  intros ? ? ->; apply H.
+Qed.
+
+Lemma euttge_clo_bind {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop) {U1 U2 UU} t1 t2 k1 k2
+      (EQT: @euttge E U1 U2 UU t1 t2)
+      (EQK: forall u1 u2, UU u1 u2 -> euttge RR (k1 u1) (k2 u2)):
+  euttge RR (ITree.bind t1 k1) (ITree.bind t2 k2).
+Proof.
+  eapply eqit_bind'; eauto.
+Qed.
+
+Lemma euttge_eq_bind : forall E R1 R2 RR U (t: itree E U) (k1: U -> itree E R1) (k2: U -> itree E R2),
+    (forall u, euttge RR (k1 u) (k2 u)) -> euttge RR (ITree.bind t k1) (ITree.bind t k2).
+Proof.
+  intros.
+  apply euttge_clo_bind with (UU := Logic.eq); [reflexivity |].
+  intros ? ? ->; apply H.
+Qed.
+
+Tactic Notation "ibind" := (eapply eutt_clo_bind || eapply eq_itree_clo_bind || eapply euttge_clo_bind).
+Tactic Notation "ibind=" :=
+  (apply eutt_eq_bind || eapply eq_itree_eq_bind || eapply euttge_eq_bind).
+Tactic Notation "ibind" "with" uconstr(R) :=
+  (eapply eutt_clo_bind with (UU := R)
+ || eapply eq_itree_clo_bind with (UU := R)
+ || eapply euttge_clo_bind with (UU := R)).
+
+(* END TO MOVE *)
 
 (** * Structural equations at the representation level
 
@@ -45,10 +84,10 @@ In particular, notice that since [interp] is a iterative-monad morphism that res
 [eutt eq], these equations get transported at all levels of interpretations.
 
 *)
-Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
-  Export TOP.
-  Export IS.
-  Export IS.LLVM.
+Module Type DenotationTheory (LP : LLVMParams).
+  Module D := Denotation LP.
+  Import D.
+  Import LP.
 
   Import SemNotations.
 
@@ -62,246 +101,316 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Hint Rewrite @translate_bind : rwexp.
     Hint Rewrite @translate_trigger : rwexp.
 
-    Ltac go := autorewrite with rwexp.
+    Ltac go :=
+      (match goal with
+      |- eutt _ ?t ?u =>
+        let fresh := fresh in
+        remember t as fresh;
+        autorewrite with rwexp;
+        subst fresh;
+        remember u as fresh;
+        autorewrite with rwexp;
+        subst fresh
+      end) ||
+      (match goal with
+      |- eq_itree _ ?t ?u =>
+        let fresh := fresh in
+        remember t as fresh;
+        autorewrite with rwexp;
+        subst fresh;
+        remember u as fresh;
+        autorewrite with rwexp;
+        subst fresh
+      end) ||
+      (match goal with
+        |- eqit _ _ _ ?t ?u =>
+        let fresh := fresh in
+        remember t as fresh;
+        autorewrite with rwexp;
+        subst fresh;
+        remember u as fresh;
+        autorewrite with rwexp;
+        subst fresh
+      end) ||
+    autorewrite with rwexp.
+    Tactic Notation "go*" := cbn; go.
+    Tactic Notation "go**" := repeat (cbn; go).
 
   End DenoteTactics.
   Import DenoteTactics.
 
-  (** [denote_code] *)
+  (** [denote_code]
+     - ⟦ [] ⟧c     ≈ Ret tt               [denote_code_nil]
+     - ⟦ [i] ⟧c    ≈ ⟦ i ⟧i               [denote_code_singleton]
+     - ⟦ i :: c ⟧c ≈ (⟦ i ⟧i ;; ⟦ c ⟧c)   [denote_code_cons]
+     - ⟦ a ++ b ⟧c ≈ (⟦ a ⟧c ;; ⟦ b ⟧c)   [denote_code_app]
+   *)
 
   Lemma denote_code_nil :
     ⟦ [] ⟧c ≈ Ret tt.
-  Proof using.
-    intros.
-    cbn.
-    go.
-    reflexivity.
-  Qed.
-
-  Lemma denote_code_app :
-    forall a b,
-      ⟦ a ++ b ⟧c ≈ ⟦ a ⟧c;;  ⟦ b ⟧c.
-  Proof using.
-    induction a; intros b.
-    - cbn; go; reflexivity.
-    - cbn in *.
-      go.
-      apply eutt_eq_bind; intros ().
-      go.
-      setoid_rewrite bind_ret_l.
-      rewrite IHa.
-      go.
-      reflexivity.
+  Proof.
+    by go*.
   Qed.
 
   Lemma denote_code_app_eq_itree :
     forall a b,
-      ⟦ a ++ b ⟧c ≅ ITree.bind ⟦ a ⟧c (fun _ => ⟦ b ⟧c).
-  Proof using.
+      ⟦ a ++ b ⟧c ≅ (⟦ a ⟧c ;; ⟦ b ⟧c).
+  Proof.
     induction a; intros b.
-    - cbn.
-      go.
-      eapply eq_itree_clo_bind with (UU := eq); [reflexivity | intros ? ? ->; reflexivity].
+    - by cbn; go.
     - cbn in *.
       go.
-      eapply eq_itree_clo_bind with (UU := eq); [reflexivity | intros ? ? ->].
-      setoid_rewrite bind_ret_l.
-      setoid_rewrite bind_bind.
+      ibind=; intros [].
+      go.
       setoid_rewrite bind_ret_l.
       rewrite IHa.
-      setoid_rewrite bind_bind.
-      eapply eq_itree_clo_bind with (UU := eq); [reflexivity | intros ? ? ->].
-      setoid_rewrite bind_ret_l.
-      eapply eq_itree_clo_bind with (UU := eq); [reflexivity | intros ? ? ->].
-      reflexivity.
+      by go.
+  Qed.
+
+  Lemma denote_code_app :
+    forall a b,
+      ⟦ a ++ b ⟧c ≈ (⟦ a ⟧c ;; ⟦ b ⟧c).
+  Proof.
+    intros; by rewrite denote_code_app_eq_itree.
   Qed.
 
   Lemma denote_code_cons :
     forall i c,
-      ⟦ i::c ⟧c ≈  ⟦ i ⟧i;; ⟦ c ⟧c.
-  Proof using.
+      ⟦ i :: c ⟧c ≈ (⟦ i ⟧i ;; ⟦ c ⟧c).
+  Proof.
     intros.
-    cbn.
-    go.
-    apply eutt_eq_bind; intros ().
-    go.
-    setoid_rewrite bind_ret_l.
-    reflexivity.
+    go*.
+    ibind=; intros [].
+    go*.
+    by setoid_rewrite bind_ret_l.
   Qed.
 
   Lemma denote_code_singleton :
     forall i,
       ⟦ [i] ⟧c ≈ ⟦ i ⟧i.
-  Proof using.
+  Proof.
     intros a.
-    cbn.
-    go.
+    rewrite denote_code_cons.
     bind_ret_r2.
-    apply eutt_eq_bind; intros [].
-    go.
-    reflexivity.
+    ibind=; intros [].
+    apply denote_code_nil.
   Qed.
 
-  (** [denote_phi] *)
-  (* TODO: make a choice about it and move *)
-  Opaque assoc.
-  Lemma denote_phi_hd : forall bid e id τ tl,
-      ⟦ (id, Phi τ ((bid,e)::tl)) ⟧Φ bid ≈ uv <- ⟦ e at τ ⟧e;; Ret (id,uv).
-  Proof using.
+  (** [denote_phi]
+      - ⟦ (x, Phi τ ({[bid := e]} ∪ tl)) ⟧Φ bid ≈ (uv <- ⟦ e at τ ⟧e; Ret (x,uv)).
+   *)
+
+  Lemma denote_phi_in : forall bid e x τ args,
+      args !! bid = Some e ->
+      ⟦ (x, Phi τ args) ⟧Φ bid ≈ (uv <- ⟦ e at τ ⟧e; Ret (x,uv)).
+  Proof.
     intros; cbn.
-    rewrite assoc_hd; reflexivity.
+    by simplify_map_eq.
   Qed.
 
-  Lemma denote_phi_tl : forall bid bid' e id τ tl,
+  Lemma denote_phi_cup_l : forall bid x τ args args',
+      args !! bid = None ->
+      ⟦ (x, Phi τ (args ∪ args')) ⟧Φ bid ≈ ⟦ (x, Phi τ args') ⟧Φ bid.
+  Proof.
+    intros; cbn.
+    by rewrite lookup_union_r.
+  Qed.
+
+  Lemma denote_phi_cup_r : forall bid x τ args args',
+      args' !! bid = None ->
+      ⟦ (x, Phi τ (args ∪ args')) ⟧Φ bid ≈ ⟦ (x, Phi τ args) ⟧Φ bid.
+  Proof.
+    intros; cbn.
+    by rewrite lookup_union_l.
+  Qed.
+
+  Lemma denote_phi_add : forall bid e x τ tl,
+      ⟦ (x, Phi τ ({[bid := e]} ∪ tl)) ⟧Φ bid ≈ (uv <- ⟦ e at τ ⟧e; Ret (x,uv)).
+  Proof.
+    intros; cbn.
+    by simplify_map_eq.
+  Qed.
+
+  Lemma denote_phi_add_ne : forall bid bid' e x τ tl,
       bid <> bid' ->
-      ⟦ (id, Phi τ ((bid',e)::tl)) ⟧Φ bid ≈ ⟦ (id, Phi τ tl) ⟧Φ bid.
-  Proof using.
+      ⟦ (x, Phi τ ({[bid' := e ]} ∪ tl)) ⟧Φ bid ≈ ⟦ (x, Phi τ tl) ⟧Φ bid.
+  Proof.
     intros; cbn.
-    rewrite assoc_tl; auto; reflexivity.
+    rewrite lookup_union_r; [done | by simplify_map_eq].
   Qed.
 
-  Lemma denote_no_phis : forall x,
+  (** [denote_phis]
+   *)
+
+  Lemma denote_phis_nil : forall x,
       ⟦ [] ⟧Φs x ≈ Ret tt.
-  Proof using.
+  Proof.
     intros.
-    cbn. go.
-    cbn; go.
-    unfold denote_phis; cbn.
-    reflexivity.
+    go*.
+    by go*.
   Qed.
+
+  (* This only holds after interpretation: we can't justify the commutation of writes at this level
+  Lemma denote_phis_cons : forall b φ φs,
+      ⟦φ :: φs⟧Φs b ≈
+     (v <- ⟦φ⟧Φ b;
+      ⟦φs⟧Φs b;;
+      trigger (LocalWrite (fst v) (snd v)))
+  .
+  Proof.
+    intros ???; revert φ; induction φs as [| φhd φs IH].
+    - intros [? []].
+      go*.
+      ibind=; intros []; go*.
+      go**.
+      bind_ret_r2.
+      by ibind=; intros []; go*.
+    - intros [? []].
+      cbn.
+      rewrite bind_bind.
+      ibind=; intros [].
+      specialize (IH φhd); cbn in IH.
+      rewrite IH.
+      go**.
+      ibind=; intros []; go*.
+      ibind=; intros vs; go**.
+      repeat setoid_rewrite bind_bind.
+      repeat setoid_rewrite bind_ret_l.
+      cbn.
+      cbn in IH.
+
+      match goal with
+        |- context[raise ?s] => generalize s
+      end.
+      intros s.
+      cbn.
+      match goal with
+        |- context[raise ?s] => generalize s
+      end.
+      intros s'.
+      rewrite ?bind_bind.
+      apply eutt_eq_bind.
+      intros [].
+      rewrite ?bind_bind, ?bind_ret_l.
+      cbn.
+      cbn in IH.
+  Admitted.
+ *)
+
 
   (** [denote_block] *)
   Lemma denote_block_unfold_cont :
-    forall {R} id phis c t s origin (k : _ -> itree _ R),
-      ⟦ mk_block id phis c t s ⟧b origin >>= k
-                                ≈
-                                ⟦ phis ⟧Φs origin;;
+    forall {R} phis c t s origin (k : _ -> itree _ R),
+      ⟦ mk_block phis c t s ⟧b origin >>= k
+    ≈
+     (⟦ phis ⟧Φs origin;;
       ⟦ c ⟧c;;
-      translate exp_to_instr ⟦ t ⟧t >>= k.
-  Proof using.
-    intros; cbn; repeat setoid_rewrite bind_bind.
-    reflexivity.
+      ⟦ t ⟧t >>= k).
+  Proof.
+    by intros; cbn; repeat setoid_rewrite bind_bind.
   Qed.
 
   Lemma denote_block_unfold :
-    forall id phis c t s origin,
-      ⟦ mk_block id phis c t s ⟧b origin ≈
-                                ⟦ phis ⟧Φs origin;;
+    forall phis c t s origin,
+      ⟦ mk_block phis c t s ⟧b origin ≈
+     (⟦ phis ⟧Φs origin;;
       ⟦ c ⟧c;;
-      translate exp_to_instr ⟦ t ⟧t.
-  Proof using.
-    intros; cbn; reflexivity.
+      ⟦ t ⟧t).
+  Proof.
+    done.
   Qed.
 
   (** [denote_ocfg] *)
-  Lemma denote_ocfg_nil: forall s, ⟦ [] ⟧bs s ≈ Ret (inl s).
-  Proof using.
+  Lemma denote_ocfg_empty: forall s, ⟦ ∅ ⟧bs s ≈ Ret (inl s).
+  Proof.
     intros []; unfold denote_ocfg.
-    match goal with
-    | |- CategoryOps.iter (C := ktree _) ?body ?s ≈ _ =>
-        rewrite (unfold_iter body s)
-    end.
-    cbn; go.
-    reflexivity.
+    setoid_rewrite unfold_iter.
+    simplify_map_eq.
+    by go*.
   Qed.
 
-  Lemma denote_ocfg_unfold_in: forall bks bid_from bid_src bk,
-      find_block bks bid_src = Some bk ->
-      ⟦ bks ⟧bs (bid_from, bid_src) ≈
-             vob <- ⟦ bk ⟧b bid_from ;;
-      match vob with
-      | inr v => Ret (inr v)
-      | inl bid_target => ⟦ bks ⟧bs (bid_src, bid_target)
-      end.
-  Proof using.
-    intros * GET_BK.
-    cbn. unfold denote_ocfg at 1.
-    rewrite KTreeFacts.unfold_iter_ktree. cbn.
-    rewrite GET_BK.
-    repeat setoid_rewrite bind_bind.
-    repeat (apply eutt_eq_bind; intros ?).
-    break_sum; rewrite bind_ret_l; [|reflexivity].
-    rewrite tau_eutt; reflexivity.
-  Qed.
-
-  Lemma denote_ocfg_unfold_not_in: forall bks bid_from bid_src,
-      find_block bks bid_src = None ->
-      ⟦ bks ⟧bs (bid_from, bid_src) ≈ Ret (inl (bid_from,bid_src)).
-  Proof using.
-    intros * GET_BK.
-    unfold denote_ocfg.
-    rewrite KTreeFacts.unfold_iter_ktree.
-    rewrite GET_BK; cbn.
-    rewrite bind_ret_l.
-    reflexivity.
-  Qed.
-
-  Lemma denote_ocfg_unfold_in_euttge: forall bks bid_from bid_src bk,
-      find_block bks bid_src = Some bk ->
-      ⟦ bks ⟧bs (bid_from, bid_src) ≳
-             vob <- ⟦ bk ⟧b bid_from ;;
-      match vob with
-      | inr v => Ret (inr v)
-      | inl bid_target => ⟦ bks ⟧bs (bid_src, bid_target)
-      end.
-  Proof using.
-    intros * GET_BK.
-    cbn. unfold denote_ocfg at 1.
-    rewrite KTreeFacts.unfold_iter_ktree. cbn.
-    rewrite GET_BK.
-    repeat setoid_rewrite bind_bind.
-    repeat (eapply eqit_bind; [reflexivity | intros ?]).
-    break_sum; rewrite bind_ret_l; [|reflexivity].
-    rewrite tau_euttge; reflexivity.
-  Qed.
-
-  Lemma denote_ocfg_unfold_in_eq_itree: forall bks bid_from bid_src bk,
-      find_block bks bid_src = Some bk ->
+  Lemma denote_ocfg_in_eq_itree: forall bks bid_from bid_src bk,
+      bks !! bid_src = Some bk ->
       ⟦ bks ⟧bs (bid_from, bid_src) ≅
-             vob <- ⟦ bk ⟧b bid_from ;;
+     (vob <- ⟦ bk ⟧b bid_from ;
       match vob with
       | inr v => Ret (inr v)
       | inl bid_target => Tau (⟦ bks ⟧bs (bid_src, bid_target))
-      end.
-  Proof using.
-    intros * GET_BK.
+      end).
+  Proof.
+    intros * lu.
     cbn. unfold denote_ocfg at 1.
-    rewrite KTreeFacts.unfold_iter_ktree. cbn.
-    rewrite GET_BK.
-    repeat setoid_rewrite bind_bind.
-    repeat (eapply eqit_bind; [reflexivity | intros ?]).
-    break_sum; rewrite bind_ret_l; [|reflexivity].
-    apply eqit_Tau.
-    reflexivity.
+    setoid_rewrite unfold_iter_ktree.
+    rewrite lu.
+    go*.
+    repeat (ibind=; intros ?).
+    break_sum; go*; [| done].
+    by apply eqit_Tau.
   Qed.
 
-  Lemma denote_ocfg_unfold_not_in_eq_itree: forall bks bid_from bid_src,
-      find_block bks bid_src = None ->
+  Lemma denote_ocfg_in_euttge: forall bks bid_from bid_src bk,
+      bks !! bid_src = Some bk ->
+      ⟦ bks ⟧bs (bid_from, bid_src) ≳
+     (vob <- ⟦ bk ⟧b bid_from ;
+      match vob with
+      | inr v => Ret (inr v)
+      | inl bid_target => ⟦ bks ⟧bs (bid_src, bid_target)
+      end).
+  Proof.
+    intros * lu.
+    rewrite denote_ocfg_in_eq_itree; eauto.
+    ibind=; intros ?.
+    break_sum; go*; [| done].
+    by rewrite tau_euttge.
+  Qed.
+
+  Lemma denote_ocfg_in: forall bks bid_from bid_src bk,
+      bks !! bid_src = Some bk ->
+      ⟦ bks ⟧bs (bid_from, bid_src)
+     ≈
+     (vob <- ⟦ bk ⟧b bid_from ;
+      match vob with
+      | inr v => Ret (inr v)
+      | inl bid_target => ⟦ bks ⟧bs (bid_src, bid_target)
+      end).
+  Proof.
+    intros * lu.
+    by rewrite denote_ocfg_in_euttge.
+  Qed.
+
+  Lemma denote_ocfg_nin_eq_itree: forall bks bid_from bid_src,
+      bks !! bid_src = None ->
       ⟦ bks ⟧bs (bid_from, bid_src) ≅ Ret (inl (bid_from,bid_src)).
-  Proof using.
-    intros * GET_BK.
+  Proof.
+    intros * lu.
     unfold denote_ocfg.
-    rewrite KTreeFacts.unfold_iter_ktree.
-    rewrite GET_BK; cbn.
-    rewrite bind_ret_l.
-    reflexivity.
+    rewrite unfold_iter_ktree, lu.
+    by go*.
   Qed.
 
-  Lemma denote_ocfg_unfold_eq_itree: forall bks bid_from bid_src,
+  Lemma denote_ocfg_nin: forall bks bid_from bid_src,
+      bks !! bid_src = None ->
+      ⟦ bks ⟧bs (bid_from, bid_src) ≈ Ret (inl (bid_from,bid_src)).
+  Proof.
+    intros * lu.
+    by rewrite denote_ocfg_nin_eq_itree.
+  Qed.
+
+  Lemma denote_ocfg_unfold: forall bks bid_from bid_src,
       ⟦ bks ⟧bs (bid_from, bid_src) ≅
-             match find_block bks bid_src with
-             | Some bk => vob <- ⟦ bk ⟧b bid_from ;;
-                          match vob with
-                          | inr v => Ret (inr v)
-                          | inl bid_target => Tau (⟦ bks ⟧bs (bid_src, bid_target))
-                          end
-             | None => Ret (inl (bid_from,bid_src))
-             end.
-  Proof using.
+    (match bks !! bid_src with
+      | Some bk => vob <- ⟦ bk ⟧b bid_from ;
+                  match vob with
+                  | inr v => Ret (inr v)
+                  | inl bid_target => Tau (⟦ bks ⟧bs (bid_src, bid_target))
+                  end
+      | None => Ret (inl (bid_from,bid_src))
+      end).
+  Proof.
     intros *.
     break_match_goal.
-    - rewrite denote_ocfg_unfold_in_eq_itree; eauto; reflexivity.
-    - rewrite denote_ocfg_unfold_not_in_eq_itree; eauto; reflexivity.
+    - by rewrite denote_ocfg_in_eq_itree.
+    - by rewrite denote_ocfg_nin_eq_itree.
   Qed.
 
   Section Outputs.
@@ -310,37 +419,38 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Lemma raise_has_all_posts : forall {E X} `{FailureE -< E} s Q,
         @raise E X _ s ⤳ Q.
-    Proof using.
+    Proof.
       unfold raise; intros.
       apply has_post_bind; intros [].
     Qed.
 
     Lemma raiseUB_has_all_posts : forall {E X} `{UBE -< E} s Q,
         @raiseUB E _ X s ⤳ Q.
-    Proof using.
+    Proof.
       unfold raise; intros.
       apply has_post_bind; intros [].
     Qed.
 
-    Lemma unEither_eta : forall {T m A} (x : eitherT T m A), {|unEitherT := unEitherT x|} = x.
-    Proof using.
+    Lemma raise_has_all_posts_cont : forall {E X Y} `{FailureE -< E} s (k : X -> itree E Y) Q,
+         (x <- @raise E X _ s; k x) ⤳ Q.
+    Proof.
       intros.
-      destruct x.
-      f_equal.
+      rewrite raise_bind_itree.
+      apply raise_has_all_posts.
     Qed.
-
-    Lemma unIdent_eta : forall {A} (x : ident A), {|unIdent := unIdent x|} = x.
-    Proof using.
+    Lemma raiseUB_has_all_posts_cont : forall {E X Y} `{UBE -< E} s (k : X -> itree E Y) Q,
+         (x <- @raiseUB E _ X s; k x) ⤳ Q.
+    Proof.
       intros.
-      destruct x.
-      f_equal.
+      rewrite raiseUB_bind_itree.
+      apply raiseUB_has_all_posts.
     Qed.
 
     Lemma select_switch_in :
       forall x default_dest brs id,
         select_switch x default_dest brs = inr id ->
         id = default_dest \/ In id (List.map snd brs).
-    Proof using.
+    Proof.
       intros x default_dest brs id SELECT.
       induction brs.
       - inversion SELECT; auto.
@@ -352,110 +462,100 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           break_match_hyp; inversion SELECT; subst; cbn; tauto.
     Qed.
 
+    Ltac hpbind  := apply has_post_bind; intros ?.
+    Ltac ehpbind := eapply has_post_bind_strong.
+    Ltac uehpbind := unshelve eapply has_post_bind_strong.
+    Tactic Notation "hpbind" "with" uconstr(t) := apply has_post_bind_strong with t.
+    Ltac hpret  := apply eutt_Ret.
+    Ltac hpabs  :=
+       try (apply raise_has_all_posts || apply raiseUB_has_all_posts ||
+             apply raise_has_all_posts_cont || apply raiseUB_has_all_posts_cont
+        ).
+
+    Lemma has_post_map_monad :
+      forall {E} {A B} (f : A -> itree E B) (P : B -> Prop) (l : list A),
+        (forall x, List.In x l -> f x ⤳ P) ->
+        map_monad f l ⤳ Forall P.
+    Proof.
+      intros * IH'.
+      induction l as [| t l IH].
+      - by hpret.
+      - go*.
+        hpbind with P; [apply IH'; by left | ].
+        intros ? HP.
+        hpbind with (Forall P); [apply IH; intros; apply IH'; right; auto | ].
+        intros ? HP'; hpret.
+        by apply Forall_cons.
+    Qed.
+
+    Ltac hpmap  := apply has_post_map_monad.
+
+    Tactic Notation "break_err" "as" ident(H) :=
+      match goal with
+        |- context[lift_err _ ?x] => destruct x eqn:H; cbn [lift_err]
+      end .
+    Ltac break_err := let H := fresh in break_err as H.
+
+    Tactic Notation "hperr" "as" ident(H) := break_err as H; [hpabs |].
+    Tactic Notation "hperr" := let H := fresh in hperr as H.
+
+    Import ITree.
+    Import Events.DV.
+
     Lemma denote_terminator_exits_in_outputs :
       forall term,
-        ⟦ term ⟧t ⤳ sum_pred (fun id => In id (terminator_outputs term)) TT.
-    Proof using.
-      intros term; destruct term eqn:Hterm; cbn; try (apply raise_has_all_posts || apply eutt_Ret; cbn; eauto).
+        ⟦ term ⟧t ⤳ sum_pred (fun id => id ∈ terminator_outputs term) TT.
+    Proof with set_solver.
+      intros term; destruct term eqn:Hterm; cbn; try (hpabs || hpret; set_solver).
       - destruct v.
-        apply has_post_bind; intros ?.
-        apply eutt_Ret; cbn; eauto.
+        hpbind.
+        hpret...
       - destruct v; cbn.
-        apply has_post_bind; intros ?.
-        apply has_post_bind; intros ?.
-        break_match_goal; try (apply raise_has_all_posts || apply raiseUB_has_all_posts).
-        break_match_goal; apply eutt_Ret; cbn; eauto.
+        hpbind.
+        hpbind.
+        break_match_goal; hpabs.
+        break_match_goal; hpret...
       - destruct v; cbn.
-        apply has_post_bind; intros ?.
-        apply has_post_bind; intros ?.
-        break_match_goal;
-          try (apply raise_has_all_posts || apply raiseUB_has_all_posts).
+        hpbind.
+        hpbind.
+        break_match_goal; hpabs.
+        clear Hterm term.
 
-        clear Hterm.
-        clear term.
-
-        eapply has_post_bind_strong with
-          (S := fun switches =>
-                  Forall
-                    (fun id => In id (List.map snd brs))
-                    (List.map snd switches)).
-
-        + induction brs; cbn.
-          * apply eutt_Ret. cbn.
-            apply Forall_nil.
-          * break_match_goal; subst.
-            break_match_goal; subst.
-
-            repeat break_match_goal;
-              try (cbn; go; setoid_rewrite raise_bind_itree; apply raise_has_all_posts).
-
-            -- (* 64 *)
-              go.
-              eapply eutt_clo_bind; eauto.
-              intros u1 u2 H.
-              apply eutt_Ret.
-              cbn.
-              cbn in H.
-              apply Forall_cons; eauto.
-              apply Forall_impl with (P := fun id => In id (List.map snd brs)); eauto.
-            --
-              go.
-              eapply eutt_clo_bind; eauto.
-              intros u1 u2 H.
-              apply eutt_Ret.
-              cbn.
-              cbn in H.
-              apply Forall_cons; eauto.
-              apply Forall_impl with (P := fun id => In id (List.map snd brs)); eauto.
-            --
-              go.
-              eapply eutt_clo_bind; eauto.
-              intros u1 u2 H.
-              apply eutt_Ret.
-              cbn.
-              cbn in H.
-              apply Forall_cons; eauto.
-              apply Forall_impl with (P := fun id => In id (List.map snd brs)); eauto.
-            --
-              go.
-              eapply eutt_clo_bind; eauto.
-              intros u1 u2 H.
-              apply eutt_Ret.
-              cbn.
-              cbn in H.
-              apply Forall_cons; eauto.
-              apply Forall_impl with (P := fun id => In id (List.map snd brs)); eauto.
-            --
-              go.
-              eapply eutt_clo_bind; eauto.
-              intros u1 u2 H.
-              apply eutt_Ret.
-              cbn.
-              cbn in H.
-              apply Forall_cons; eauto.
-              apply Forall_impl with (P := fun id => In id (List.map snd brs)); eauto.
-        + intros x1 H.
-          destruct (select_switch x0 default_dest x1) eqn:HSwitch; cbn.
-          apply raise_has_all_posts.
-          apply select_switch_in in HSwitch.
-          apply eutt_Ret; cbn.
-          destruct HSwitch; auto; right.
-          eapply Forall_forall in H; eauto.
-      - apply raiseUB_has_all_posts.
+        hpbind with (Forall (fun id => In (snd id) (List.map snd brs))).
+        + hpmap.
+          intros [[] ?] ?.
+          case_match; hpabs.
+          case_match; go; hpret.
+          subst.
+          all: by apply in_map with (f := snd) in H.
+        + intros ? FORALL.
+          hperr as Hswitch.
+          hpret; cbn.
+          apply select_switch_in in Hswitch.
+          destruct_or?.
+          set_solver.
+          (* The remaining of this proof should not be so messy. Why [gset_semi_set] is not visible earlier? *)
+          apply Coqlib.list_in_map_inv in Hswitch as ([? ?] & -> & IN).
+          rewrite Forall_forall in FORALL.
+          apply FORALL in IN.
+          cbn in *.
+          apply elem_of_list_In in IN.
+          eapply elem_of_list_to_set in IN.
+          apply elem_of_union_r.
+          apply IN.
+          Unshelve.
+          apply gset_semi_set.
     Qed.
 
     Definition exits_in_outputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
-      sum_pred (fun fto => In (snd fto) (@outputs t ocfg)) TT.
+      sum_pred (fun fto => snd fto ∈ @outputs t ocfg) TT.
 
     Lemma denote_bk_exits_in_outputs :
       forall b from,
-        ⟦ b ⟧b from ⤳ sum_pred (fun id => In id (successors b)) TT.
-    Proof using.
-      intros.
-      cbn.
-      apply has_post_bind; intros [].
-      apply has_post_bind; intros [].
-      apply has_post_translate.
+        ⟦ b ⟧b from ⤳ sum_pred (fun id => id ∈ successors b) TT.
+    Proof.
+      intros; cbn.
+      repeat hpbind.
       apply denote_terminator_exits_in_outputs.
     Qed.
 
@@ -469,10 +569,10 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         (INIT : Qb fto)
         (IND : forall fto (b : block dtyp),
             Qb fto ->
-            find_block bks (snd fto) = Some b ->
+            bks !! snd fto = Some b ->
             ⟦ b ⟧b (fst fto) ⤳ sum_pred (fun to => Qb (snd fto, to)) Qv),
         ⟦ bks ⟧bs fto ⤳ sum_pred Qb Qv.
-    Proof using.
+    Proof.
       intros * INIT IND.
       eapply has_post_iter_strong; eauto.
       intros [f to] PRE.
@@ -490,14 +590,14 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
      *)
     Lemma denote_ocfg_has_post :
       forall (bks : ocfg _) fto (Qb : block_id -> Prop) (Qv : uvalue -> Prop)
-        (ENTER : In (snd fto) (inputs bks))
+        (ENTER : snd fto ∈ inputs bks)
         (IND : forall fto (b : block dtyp),
-            find_block bks (snd fto) = Some b ->
+            bks !! snd fto = Some b ->
             ⟦ b ⟧b (fst fto) ⤳ sum_pred Qb Qv),
         ⟦ bks ⟧bs fto ⤳ sum_pred (prod_pred TT Qb) Qv.
-    Proof using.
+    Proof.
       intros * IN IND.
-      apply has_post_iter_strong with (Inv := fun x => In (snd x) (inputs bks) \/ Qb (snd x))
+      apply has_post_iter_strong with (Inv := fun x => snd x ∈ inputs bks \/ Qb (snd x))
       ; eauto.
       intros [f to] HYP.
       flatten_goal.
@@ -512,109 +612,90 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Lemma denote_ocfg_exits_in_outputs :
       forall bks fto,
-        In (snd fto) (inputs bks) ->
+        snd fto ∈ inputs bks ->
         ⟦ bks ⟧bs fto ⤳ exits_in_outputs bks.
-    Proof using.
+    Proof.
       intros * IN.
-      apply has_post_weaken with (P := sum_pred (prod_pred TT (fun b => In b (outputs bks))) TT).
+      apply has_post_weaken with (P := sum_pred (prod_pred TT (fun b => b ∈ outputs bks)) TT).
       2: intros [[]|] ?; cbn in *; intuition.
       apply denote_ocfg_has_post; eauto.
       intros.
       eapply has_post_weaken.
       eapply denote_bk_exits_in_outputs.
       intros []; cbn; intuition.
-      eapply In_bk_outputs; eauto.
+      by eapply outputs_elem_of.
     Qed.
 
   End Outputs.
 
   (** * denote_ocfg  *)
 
-  Lemma denote_ocfg_app_no_edges :
+  Lemma denote_ocfg_union_no_edges :
     forall (bks1 bks2 : ocfg _) fto,
-      find_block bks1 (snd fto) = None ->
+      bks1 !! snd fto = None ->
       no_reentrance bks1 bks2 ->
-      ⟦ bks1 ++ bks2 ⟧bs fto ≈ ⟦ bks2 ⟧bs fto.
-  Proof using.
+      ⟦ bks1 ∪ bks2 ⟧bs fto ≈ ⟦ bks2 ⟧bs fto.
+  Proof.
     intros bks1 bks2 [f to] FIND NOBACK.
-    apply (@KTreeFacts.eutt_iter_gen _ _ _ (fun fto fto' => fto' = fto /\ find_block bks1 (snd fto) = None)); auto.
+    apply (@KTreeFacts.eutt_iter_gen _ _ _ (fun fto fto' => fto' = fto /\ bks1 !! snd fto = None)); auto.
     clear f to FIND; intros fto fto' [-> FIND]; destruct fto as [f to] .
     cbn in *.
-    epose proof (find_block_none_app _ bks2 _ FIND) as FIND_L1L2.
-    rewrite FIND_L1L2.
-    destruct (find_block bks2 to) eqn:FIND_L2.
+    rewrite lookup_union_r; auto.
+    case_match eqn:FIND_L2.
     - eapply eutt_post_bind.
       apply denote_bk_exits_in_outputs.
       intros [id | v] ?; cbn; apply eutt_Ret; eauto.
       eapply inl_morphism; split; auto.
-      eapply find_block_not_in_inputs,no_reentrance_not_in; eauto.
-      eapply In_bk_outputs; eauto.
-
+      cbn. cbn in *.
+      eapply free_out_of_inputs,no_reentrance_not_in; eauto.
+      eapply outputs_elem_of; eauto.
     - apply eutt_Ret; right; auto.
   Qed.
 
-  Lemma denote_ocfg_app :
+  Lemma denote_ocfg_union :
     forall bks1 bks2 fto,
       no_reentrance bks1 bks2 ->
-      ⟦ bks1 ++ bks2 ⟧bs fto ≈
-                      'x <- ⟦ bks1 ⟧bs fto;;
+      ⟦ bks1 ∪ bks2 ⟧bs fto ≈
+     ('x <- ⟦ bks1 ⟧bs fto;
       match x with
       | inl fto2 => ⟦ bks2 ⟧bs fto2
       | inr v => Ret (inr v)
-      end.
-  Proof using.
+      end).
+  Proof.
     intros * NOBACK.
     revert fto.
     einit.
     ecofix CIH.
     intros [f to].
-    destruct (find_block bks1 to) eqn:FIND.
-    - unfold denote_ocfg.
-      unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree.
-      match goal with
-        |- euttG _ _ _ _ _ ?t _ => remember t; rewrite unfold_iter; subst
-      end.
-      rewrite unfold_iter; cbn.
-      match_rewrite.
-      rewrite !bind_bind.
-      pose proof find_block_some_app bks1 bks2 to FIND as FIND_APP.
-      rewrite FIND_APP.
-      cbn.
-      rewrite !bind_bind.
-      match goal with
-        |- euttG _ _ _ _ _ ?t _ => remember t
-      end.
-      subst; ebind; econstructor; [reflexivity | intros ? ? <-].
-      ebind; econstructor; [reflexivity | intros ? ? <-].
-      ebind; econstructor; [reflexivity | intros ? ? <-].
-      destruct u2 as [bid | v].
-      + rewrite !bind_ret_l.
-        rewrite bind_tau.
-        etau.
-      + rewrite !bind_ret_l.
-        eret.
+    case (bks1 !! to) eqn:FIND.
+    - rewrite 2 denote_ocfg_unfold.
+      simplify_map_eq.
+      go.
+      ebind; econstructor; [reflexivity | intros ??<-].
+      case_match.
+      rewrite bind_tau; etau.
+      by go.
     - efinal.
-      rewrite denote_ocfg_app_no_edges; auto.
-      rewrite denote_ocfg_unfold_not_in with (bks := bks1); auto.
-      rewrite bind_ret_l; reflexivity.
+      rewrite denote_ocfg_union_no_edges; auto.
+      by rewrite (denote_ocfg_nin bks1); auto; go*.
   Qed.
 
   Lemma denote_ocfg_flow_left :
     forall ocfg1 ocfg2 fto,
       independent_flows ocfg1 ocfg2 ->
-      In (snd fto) (inputs ocfg1) ->
-      ⟦ ocfg1 ++ ocfg2 ⟧bs fto ≈
-                        ⟦ ocfg1 ⟧bs fto.
-  Proof using.
+      snd fto ∈ inputs ocfg1 ->
+      ⟦ ocfg1 ∪ ocfg2 ⟧bs fto ≈
+      ⟦ ocfg1 ⟧bs fto.
+  Proof.
     intros * INDEP IN.
-    rewrite denote_ocfg_app; [| auto using independent_flows_no_reentrance_l].
+    rewrite denote_ocfg_union; [| auto using independent_flows_no_reentrance_l].
     bind_ret_r2.
 
     eapply eutt_post_bind; [apply denote_ocfg_exits_in_outputs; eauto |].
     intros [[f to] | ?] EXIT; [| reflexivity].
-    rewrite denote_ocfg_unfold_not_in; [reflexivity |].
+    rewrite denote_ocfg_nin; [reflexivity |].
     cbn in *.
-    apply find_block_not_in_inputs.
+    apply free_out_of_inputs.
     eapply no_reentrance_not_in; eauto.
     apply INDEP.
   Qed.
@@ -625,7 +706,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       In (snd fto) (inputs ocfg2) ->
       ⟦ ocfg1 ++ ocfg2 ⟧bs fto ≈
                         ⟦ ocfg2 ⟧bs fto.
-  Proof using.
+  Proof.
     intros * INDEP IN.
     rewrite denote_ocfg_app; [| auto using independent_flows_no_reentrance_l].
     destruct fto as [f to]; cbn in *.
@@ -646,7 +727,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       | inr x => Ret (inr x)
       end
   .
-  Proof using.
+  Proof.
     intros * ->; revert from to.
     einit.
     ecofix CIH.
@@ -676,6 +757,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
   Transparent denote_block.
 End DenotationTheory.
+
 
 Module Make (IS : InterpreterStack) (TOP : LLVMTopLevel IS) : DenotationTheory IS TOP.
   Include DenotationTheory IS TOP.

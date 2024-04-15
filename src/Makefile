@@ -20,7 +20,7 @@ MLDIR = ml
 EXTRACTDIR = ml/extracted
 
 COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract
-COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
+COQC="$(COQBIN)coqc" -time-file "./profiling" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 COQMAKEFILE="$(COQBIN)coq_makefile"

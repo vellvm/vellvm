@@ -1,3 +1,5 @@
+Set Warnings "-intuition-auto-with-star".
+
 From Coq Require Import
   String
   List

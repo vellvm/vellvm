@@ -10,8 +10,6 @@
 
     See vellvm-quickchick-overview.org in the root of the project for
     more details. *)
-Require Import Ceres.Ceres.
-
 From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils QC.Generators Handlers.Handlers DList.
 Require Import Integers.
 

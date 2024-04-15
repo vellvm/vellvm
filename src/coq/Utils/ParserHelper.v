@@ -16,7 +16,7 @@ Definition BFloat := Flocq.Core.Defs.Float radix2.
 Definition inc_e (f : bfloat) (de : positive) : option bfloat :=
   let '(m, e) := (Fnum f, Fexp f) in
   let rm := two_power_pos de in
-  if (Zmod m rm =? 0)
+  if (Z.modulo m rm =? 0)
   then Some (BFloat (m / two_power_pos de) (e + Z.pos de))
   else None.
 
@@ -442,7 +442,7 @@ Section Correctness.
     all: subst.
     all: try lia.
     assert (m mod 2 ^ Z.pos d < 2 ^ Z.pos d); try lia.
-    apply Zmod_pos_bound.
+    apply Z.mod_pos_bound.
     apply Z.pow_pos_nonneg; lia.
     rewrite two_power_pos_equiv; generalize (Z.pow_pos_nonneg 2 (Z.pos d)); lia.
   Qed.

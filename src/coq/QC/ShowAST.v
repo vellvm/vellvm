@@ -18,7 +18,7 @@ Import DList.
 From Coq Require Import
      ZArith String Bool.Bool Numbers.HexadecimalString
      Strings.Ascii.
-From QuickChick Require Import Show.
+From QuickChick Require Export Show.
 (* Import QcDefaultNotation. Open Scope qc_scope. *)
 Set Warnings "-extraction-opaque-accessed,-extraction".
 
@@ -141,6 +141,9 @@ Section ShowInstances.
        | DTYPE_Opaque               => "Opaque"
        | DTYPE_Vector sz t          => "Vector"
        end.
+
+  #[global] Instance showDtyp : Show dtyp :=
+    {| show := show_dtyp |}.
 
   Definition show_linkage (l : linkage) : string :=
     match l with
@@ -707,7 +710,7 @@ tes on cstring on LLVMAst.v *)
     := {| dshow p :=
          let '(Phi t phis) := p in
          DList_join [string_to_DString "phi " ; dshow t ; string_to_DString " "] @@
-           concat_DString (string_to_DString ", ") (map show_phi_block phis)
+           concat_DString (string_to_DString ", ") (map show_phi_block (fin_maps.map_to_list phis))
        |}.
 
   Definition show_opt_prefix {A} `{Show A} (prefix : string) (ma : option A) : string

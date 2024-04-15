@@ -26,7 +26,7 @@ Section nat_Show.
     let acc' := get_last_digit n ++ acc in
     match n / 10 with
     | 0 => acc'
-    | n' => string_of_nat_aux acc' n'
+    | _n' => string_of_nat_aux acc' _n'
     end.
   intros _ n m ineq.
   unfold id; simpl.
@@ -61,9 +61,9 @@ Section nat_Show.
     subst.
     exfalso.
     destruct n8.
-    2: generalize (Nat.mod_upper_bound n 10 (ltac:(auto))); intros EQ; rewrite Heq in EQ; lia. 
+    2: generalize (Nat.mod_upper_bound n 10 (ltac:(auto))); intros EQ; rewrite Heq in EQ; lia.
     destruct n9.
-    2: generalize (Nat.mod_upper_bound m 10 (ltac:(auto))); intros EQ; rewrite Heq0 in EQ; lia. 
+    2: generalize (Nat.mod_upper_bound m 10 (ltac:(auto))); intros EQ; rewrite Heq0 in EQ; lia.
     exfalso; apply ineq,(mod_div_eq n m 10); lia.
   Qed.
 
@@ -101,7 +101,7 @@ Section nat_Show.
       s1 = s1'.
   Proof using.
     induction s2 as [| c s2 IH].
-    - intros s1 s1' H; rewrite 2 append_EmptyString in H; auto. 
+    - intros s1 s1' H; rewrite 2 append_EmptyString in H; auto.
     - intros s1 s1' H.
       rewrite append_String in H.
       rewrite (append_String s1' c s2) in H.
@@ -174,7 +174,7 @@ Section nat_Show.
       s1 = s1'.
   Proof using.
     induction s1 as [| c1 s1 IH]; simpl; intros.
-    - destruct s1'; [reflexivity | inv H0]. 
+    - destruct s1'; [reflexivity | inv H0].
     - destruct s1' as [| c1' s1']; [inv H0 |].
       simpl in *.
       inv H0.
@@ -193,12 +193,12 @@ Section nat_Show.
     assert (String.length s1 = String.length s1').
     { generalize (length_append s1 s2).
       intros ?.
-      rewrite H0,H, length_append in H1. 
+      rewrite H0,H, length_append in H1.
       lia.
     }
     eapply append_same_length_eq_l in H1; eauto.
     subst.
-    eapply append_simplify_l; eauto. 
+    eapply append_simplify_l; eauto.
   Qed.
 
   Ltac eq_fun H f :=
@@ -233,8 +233,8 @@ Section nat_Show.
       + intros abs.
         apply (get_last_digit_inj n m); try lia.
         apply append_simplify_r in abs; auto.
-      + destruct (string_of_nat_aux_prepends (S n0) (get_last_digit m ++ acc)) as (hd & nonnil & ->). 
-        intros abs. 
+      + destruct (string_of_nat_aux_prepends (S n0) (get_last_digit m ++ acc)) as (hd & nonnil & ->).
+        intros abs.
         match type of abs with
         | ?s1 = ?s2 => assert (abs':String.length s1 = String.length s2) by (rewrite abs; reflexivity)
         end.
@@ -243,8 +243,8 @@ Section nat_Show.
         apply length_nonEmpty in nonnil; simpl in *.
         lia.
     - flatten_goal.
-      + destruct (string_of_nat_aux_prepends (S n0) (get_last_digit n ++ acc)) as (hd & nonnil & ->). 
-        intros abs. 
+      + destruct (string_of_nat_aux_prepends (S n0) (get_last_digit n ++ acc)) as (hd & nonnil & ->).
+        intros abs.
         match type of abs with
         | ?s1 = ?s2 => assert (abs':String.length s1 = String.length s2) by (rewrite abs; reflexivity)
         end.
@@ -265,7 +265,7 @@ Section nat_Show.
           auto with arith.
           auto.
         * destruct (string_of_nat_aux_prepends (S n0) (get_last_digit n ++ acc)) as (hd & nonnil & ->).
-          destruct (string_of_nat_aux_prepends (S n1) (get_last_digit m ++ acc)) as (hd' & nonnil' & ->). 
+          destruct (string_of_nat_aux_prepends (S n1) (get_last_digit m ++ acc)) as (hd' & nonnil' & ->).
           intros abs.
           rewrite 2 append_assoc in abs.
           apply append_simplify_r in abs.
@@ -274,12 +274,12 @@ Section nat_Show.
           unfold get_last_digit in abs.
           apply H0; clear H0.
           do 9 (flatten_all; [do 9 (flatten_all; try easy) |]).
-          do 9 (flatten_all; try easy).         
+          do 9 (flatten_all; try easy).
           subst.
           assert (tmp:10 <> 0) by lia.
           destruct n8; [| generalize (Nat.mod_upper_bound n 10 tmp); intros ineq; rewrite Heq in ineq; lia].
           destruct n17; [easy| generalize (Nat.mod_upper_bound m 10 tmp); intros ineq; rewrite Heq8 in ineq; lia].
-  Qed.          
+  Qed.
 
   Lemma string_of_nat_inj: forall n m,
       n <> m ->
@@ -315,14 +315,14 @@ Section nat_Show.
       flatten_hyp H.
       + rewrite append_EmptyString in H.
         rewrite get_last_digit_0_iff in H.
-        generalize (Nat.mod_eq (S n) 10 (ltac:(lia))).
+        generalize (Nat.Div0.mod_eq (S n) 10).
         rewrite H, Heq; simpl; intros abs; inv abs.
-      + rewrite append_EmptyString in H; destruct (string_of_nat_aux_prepends (S n0) (get_last_digit (S n))) as (hd & eq & eq'). 
+      + rewrite append_EmptyString in H; destruct (string_of_nat_aux_prepends (S n0) (get_last_digit (S n))) as (hd & eq & eq').
         rewrite H in eq'.
         replace "0" with ("" ++ "0") in eq' by reflexivity.
         apply append_same_length_eq_r' in eq' ; [| rewrite get_last_digit_len1; reflexivity].
         subst; tauto.
-    - subst; reflexivity. 
+    - subst; reflexivity.
   Qed.
 
   Lemma pos_to_nat_inj:
@@ -330,7 +330,7 @@ Section nat_Show.
       p <> p' ->
       Pos.to_nat p <> Pos.to_nat p'.
   Proof using.
-    intros; intro abs; apply Pos2Nat.inj in abs; easy. 
+    intros; intro abs; apply Pos2Nat.inj in abs; easy.
   Qed.
 
   Lemma string_of_nat_aux_hd_get_last_digit:
@@ -461,9 +461,9 @@ Lemma Forall2_impl : forall {A B} (P Q : A -> B -> Prop) l1 l2
 Proof using. intros; induction H; auto. Qed.
 
 Lemma Forall2_impl' : forall {A B} (P Q : A -> B -> Prop) l1 l2
-  (Himpl : forall a b, In a l1 -> P a b -> Q a b), 
+  (Himpl : forall a b, In a l1 -> P a b -> Q a b),
   Forall2 P l1 l2 -> Forall2 Q l1 l2.
-Proof using. 
+Proof using.
   intros; induction H; auto.
   constructor.
   - apply Himpl; simpl; auto.
@@ -475,7 +475,7 @@ Lemma Forall2_length : forall {A B} (P : A -> B -> Prop) l1 l2,
 Proof using. intros; induction H; simpl; auto. Qed.
 
 
-Inductive Forall3 (A B C : Type) (R : A -> B -> C -> Prop) 
+Inductive Forall3 (A B C : Type) (R : A -> B -> C -> Prop)
   : list A -> list B -> list C -> Prop :=
   | Forall3_nil : Forall3 R [] [] []
   | Forall3_cons : forall x y z l m n,
@@ -491,12 +491,12 @@ Definition forall2b {A B} (f : A -> B ->bool) (l:list A) (m:list B) : bool :=
 
 Definition Nth {A:Type} (l:list A) (n:nat) (a:A) : Prop := nth_error l n = Some a.
 
-Arguments Nth _ _ _ _ /. 
+Arguments Nth _ _ _ _ /.
 
 Lemma not_Nth_nil : forall X n (x:X),
   ~ Nth [] n x.
 Proof using.
-  destruct n; discriminate. 
+  destruct n; discriminate.
 Qed.
 
 #[export] Hint Resolve not_Nth_nil : core.
@@ -517,7 +517,7 @@ Lemma Nth_map : forall (A B:Type) (f:A -> B) l n a b
 Proof using.
   induction l; intros; subst.
   destruct n; inversion Hnth.
-  destruct n. inversion Hnth. simpl; auto. 
+  destruct n. inversion Hnth. simpl; auto.
   inversion Hnth; eapply IHl; eauto.
 Qed.
 
@@ -547,7 +547,7 @@ Proof using.
   destruct l. inversion H0.
   inversion H; eauto.
 Qed.
-  
+
 Lemma Nth_Forall2_Nth : forall n (A B:Type) l1 l2 P (b:B),
   Nth l2 n b ->
   Forall2 P l1 l2 ->
@@ -676,7 +676,7 @@ Qed.
 
 (* Intervals ---------------------------------------------------------------- *)
 
-Fixpoint interval n m := 
+Fixpoint interval n m :=
   match m with
   | O => []
   | S j => if le_lt_dec n j then interval n j ++ [j] else []
@@ -714,7 +714,7 @@ Proof using.
   destruct (le_lt_dec (S n) n); auto; lia.
 Qed.
 
-Lemma interval_alt : forall m n, interval n m = 
+Lemma interval_alt : forall m n, interval n m =
   if lt_dec n m then n :: interval (S n) m else [].
 Proof using.
   induction m; auto; intro.
@@ -735,7 +735,7 @@ Proof using.
   - rewrite app_length, IHm; simpl.
     destruct n; lia.
   - destruct n; simpl; lia.
-Qed.        
+Qed.
 
 Lemma nth_error_nil : forall A n, nth_error ([] : list A) n = None.
 Proof using.
@@ -744,7 +744,7 @@ Qed.
 
 Lemma nth_error_In : forall {A} l n (a : A), nth_error l n = Some a -> In a l.
 Proof using.
-  induction l; intros; destruct n; simpl in *; inversion H; eauto.      
+  induction l; intros; destruct n; simpl in *; inversion H; eauto.
 Qed.
 
 Lemma in_nth_error : forall A (x : A) l, In x l ->
@@ -799,7 +799,7 @@ Proof using.
   destruct Hdistinct; split; eauto; intro Hin'.
   rewrite in_app_iff in *; simpl in *; destruct Hin' as [? | [? | ?]];
     auto.
-Qed.      
+Qed.
 
 Lemma interval_distinct : forall m n, distinct (interval n m).
 Proof using.
@@ -811,7 +811,7 @@ Proof using.
 Qed.
 
 
-Lemma Nth_app1 : forall {A} l n (a : A) (Hnth : Nth l n a) l', 
+Lemma Nth_app1 : forall {A} l n (a : A) (Hnth : Nth l n a) l',
   Nth (l ++ l') n a.
 Proof using.
   induction l; simpl; intros; destruct n; unfold Nth in *; simpl in *;
@@ -883,14 +883,14 @@ Proof using.
       * destruct n; lia.
 Qed.
 
-    
+
 Lemma Forall2_forall : forall {A B} (P : A -> B -> Prop) al bl,
-  Forall2 P al bl <-> (length al = length bl /\ 
+  Forall2 P al bl <-> (length al = length bl /\
                        forall i a b, Nth al i a -> Nth bl i b -> P a b).
 Proof using.
   induction al; simpl; intros.
   - split; [intro H; inversion H; subst | intros [H ?]].
-    + split; auto; intros ? ? ? Hnth ?; destruct i; simpl in Hnth; 
+    + split; auto; intros ? ? ? Hnth ?; destruct i; simpl in Hnth;
       inversion Hnth.
     + destruct bl; inversion H; auto.
   - destruct bl; simpl; [split; [intro H | intros [H ?]]; inversion H|].
@@ -902,7 +902,7 @@ Proof using.
       * specialize (H0 0); simpl in *; eauto.
       * rewrite IHal; split; auto; intros.
         specialize (H0 (S i)); simpl in H0; auto.
-Qed.  
+Qed.
 
 Opaque minus.
 Lemma interval_shift : forall j i k, k <= i -> interval i j =
@@ -999,7 +999,7 @@ Proof using.
     + simpl. destruct (dec y a); subst; auto.
       right. apply IHl; auto.
 Qed.
-  
+
 Lemma remove_length_le : forall l x,
   length (remove dec x l) <= length l.
 Proof using.
@@ -1014,11 +1014,11 @@ Lemma remove_length : forall l x,
 Proof using.
   induction l; intros.
   - inversion H.
-  - inversion H. 
+  - inversion H.
     + subst. simpl. destruct (dec x x) as [_ | contra].
       unfold Peano.lt. eapply le_n_S. apply remove_length_le.
       contradict contra; auto.
-    + simpl. specialize (IHl x H0). 
+    + simpl. specialize (IHl x H0).
       destruct (dec x a); subst; simpl; lia.
 Qed.
 
@@ -1043,7 +1043,7 @@ Proof using.
   - destruct n; inversion H.
   - destruct n; inversion H; subst.
     eexists; intuition eauto.
-    ecase IHl as [? [? ?]]; eauto. 
+    ecase IHl as [? [? ?]]; eauto.
 Qed.
 
 
@@ -1070,7 +1070,7 @@ Lemma nth_f_nth_error : forall A B (d:B) (f:A->B) l n,
                  end.
 Proof using.
   induction l; intros; destruct n; simpl; auto.
-Qed.    
+Qed.
 
 
 (* to appease termination checker *)
@@ -1135,7 +1135,7 @@ Section With_Eqv_Rel_Dec.
     rewrite eq_dec_eq; reflexivity.
   Qed.
 
-  Lemma assoc_tl : forall (a c:A) (b:B) l 
+  Lemma assoc_tl : forall (a c:A) (b:B) l
                      (Hneq : a <> c),
       assoc a ((c,b)::l) =
       assoc a l.
@@ -1155,7 +1155,7 @@ Section With_Eqv_Rel_Dec.
   (*   left. inversion Hl. tauto. *)
   (*   right. tauto. *)
   (* Qed.     *)
-  
+
   (* Lemma assoc_In_snd : forall A B (l:list (A * B)) eq_dec a b, *)
   (*     assoc eq_dec a l = Some b -> *)
   (*     In b (map (@snd _ _) l). *)
@@ -1191,7 +1191,7 @@ Section With_Eqv_Rel_Dec.
 
 End With_Eqv_Rel_Dec.
 
-#[global] Instance string_eqv_dec : Eqv string := eq. 
+#[global] Instance string_eqv_dec : Eqv string := eq.
 
 
 (*
@@ -1215,7 +1215,7 @@ Proof using.
   - destruct n; auto.
   - destruct n. inversion H.
     simpl. apply IHl; auto.
-Qed.  
+Qed.
 
 Lemma nth_error_out:
   forall A (l : list A) (n : nat),
@@ -1227,11 +1227,11 @@ Proof using.
 Qed.
 
 Lemma map_ext_in : forall A B (f g : A -> B) l,
-  (forall a, In a l -> f a = g a) -> 
+  (forall a, In a l -> f a = g a) ->
   map f l = map g l.
 Proof using.
   induction l; auto. intros Heq.
-  simpl. f_equal. apply Heq. simpl; auto. 
+  simpl. f_equal. apply Heq. simpl; auto.
   apply IHl. intros ? Hin. apply Heq. simpl; auto.
 Qed.
 
@@ -1271,7 +1271,7 @@ Proof using.
   - destruct (f (g a)).
     +  rewrite IHl. reflexivity.
     + reflexivity.
-Qed.      
+Qed.
 
 Lemma map_option_nth : forall A B (f : A -> option B) l l',
   map_option f l = Some l' ->
@@ -1376,7 +1376,7 @@ Definition option_bind2 {A B C} (m: option (A * B)) (f: A -> B -> option C) : op
 
 Module OptionNotations.
 
-  Notation "'do' x <- m ; f" := (option_bind m (fun x => f)) 
+  Notation "'do' x <- m ; f" := (option_bind m (fun x => f))
     (at level 200, x name, m at level 100, f at level 200).
 
   Notation "'do' x , y <- m ; f" := (option_bind2 m (fun x y => f))
@@ -1397,7 +1397,7 @@ Definition map_prod {A B C D} (p:A * B) (f:A -> C) (g:B -> D) : (C * D) :=
 Definition flip := @Basics.flip.
 Definition comp := @Basics.compose.
 
-Notation "g `o` f" := (Basics.compose g f) 
+Notation "g `o` f" := (Basics.compose g f)
   (at level 40, left associativity).
 
 Lemma map_prod_distr_comp : forall A B C D E F
@@ -1441,28 +1441,28 @@ Qed.
 Tactic Notation "inv_bind" hyp(H) :=
   repeat rewrite option_bind_assoc in H;
     match type of H with
-    | option_bind ?o ?p = Some ?b => 
+    | option_bind ?o ?p = Some ?b =>
       let hy := fresh H in
       destruct o eqn:hy; [|discriminate]; simpl in H
     end.
 
 From Vellvm Require Import
      Numeric.Coqlib.
- 
+
 Infix "⊍" := list_disjoint (at level 60).
 
 Lemma not_in_app_l : forall {A} (l1 l2 : list A) x,
     not (In x (l1 ++ l2)) ->
     not (In x l1).
 Proof using.
-  intros * NIN abs; eapply NIN, in_or_app; auto. 
+  intros * NIN abs; eapply NIN, in_or_app; auto.
 Qed.
 
 Lemma not_in_app_r : forall {A} (l1 l2 : list A) x,
     not (In x (l1 ++ l2)) ->
     not (In x l2).
 Proof using.
-  intros * NIN abs; eapply NIN, in_or_app; auto. 
+  intros * NIN abs; eapply NIN, in_or_app; auto.
 Qed.
 
 Section DisjointLists.
@@ -1487,7 +1487,7 @@ Section DisjointLists.
     split; intros H.
     - split; [eapply list_disjoint_cons_left; eauto |].
       intros abs; eapply H; eauto; constructor; reflexivity.
-    - apply list_disjoint_cons_l; apply H. 
+    - apply list_disjoint_cons_l; apply H.
   Qed.
 
   Lemma list_disjoint_singleton_left : forall {A} (l : list A) (x : A),
@@ -1512,15 +1512,15 @@ Section DisjointLists.
   Proof using.
     intros; induction l1 as [| hd l1 IH]; cbn.
     - split; intros H.
-      + split; auto using list_disjoint_nil_l. 
+      + split; auto using list_disjoint_nil_l.
       + apply H.
     - split; intros H.
       + apply list_disjoint_cons_l_iff in H as [H1 H2].
         apply IH in H1 as [? ?].
-        split; auto. 
-        apply list_disjoint_cons_l; auto. 
+        split; auto.
+        apply list_disjoint_cons_l; auto.
       + destruct H as [H1 H2].
-        apply list_disjoint_cons_l_iff in H1 as [? ?]. 
+        apply list_disjoint_cons_l_iff in H1 as [? ?].
         eapply list_disjoint_cons_l.
         apply IH; auto.
         auto.
@@ -1532,8 +1532,8 @@ Section DisjointLists.
   Proof using.
     intros; induction l1 as [| hd l1 IH]; cbn.
     - split; intros H.
-      + split; auto using list_disjoint_nil_l. 
-      + auto using list_disjoint_nil_l. 
+      + split; auto using list_disjoint_nil_l.
+      + auto using list_disjoint_nil_l.
     - split; intros H.
       + apply list_disjoint_cons_l_iff in H as [H1 H2].
         apply IH in H1 as [? ?].
@@ -1544,7 +1544,7 @@ Section DisjointLists.
         eapply not_in_app_r; eauto.
       + destruct H as [H1 H2].
         apply list_disjoint_cons_l_iff in H1 as [? ?].
-        apply list_disjoint_cons_l_iff in H2 as [? ?]. 
+        apply list_disjoint_cons_l_iff in H2 as [? ?].
         eapply list_disjoint_cons_l.
         apply IH; auto.
         intros abs; apply in_app_or in abs as [|]; eauto.

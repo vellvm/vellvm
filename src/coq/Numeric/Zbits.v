@@ -13,6 +13,8 @@
 (*                                                                     *)
 (* *********************************************************************)
 
+Set Warnings "-intuition-auto-with-star".
+
 (** Additional operations and proofs about binary integers,
     on top of the ZArith standard library. *)
 

@@ -8,9 +8,9 @@
  *)
 
 From Vellvm Require Export
-     Handlers.Handlers
+     (* Handlers.Handlers *)
      Semantics.Denotation
-     Semantics.TopLevel
+     (* Semantics.TopLevel *)
      Semantics.DynamicValues
-     Semantics.InterpretationStack
+     (* Semantics.InterpretationStack *)
      Semantics.LLVMEvents.

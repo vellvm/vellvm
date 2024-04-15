@@ -69,12 +69,12 @@ Section ExtraLaws.
 
   (* Won't work when a refinement can fail and not return something *)
   Class MonadReturnsProper :=
-    { MReturns_Proper :> forall {A} (a : A),
+    { MReturns_Proper :: forall {A} (a : A),
           Proper ((fun x y => eq1 y x) ==> Basics.impl) (MReturns a)
     }.
 
   Class MFailsProper :=
-    { MFails_Proper :> forall A, Proper (eq1 (A:=A) ==> Basics.impl) MFails }.
+    { MFails_Proper :: forall A, Proper (eq1 (A:=A) ==> Basics.impl) MFails }.
 
   (* These won't work with UB / Error refinement relations *)
   Class MonadReturnsFails :=
@@ -105,7 +105,7 @@ Section MReturns_ProperFlip.
   Context {MRET : @MonadReturns M Monad Eq1}.
 
   Class MonadReturns_ProperFlip :=
-    { MReturns_ProperFlip :> forall {A} (a : A),
+    { MReturns_ProperFlip :: forall {A} (a : A),
         Proper (eq1 ==> Basics.impl) (MReturns a)
     }.
 
@@ -119,7 +119,7 @@ Section MonadReturnsInv.
   Context {Eq1 : @Eq1 M}.
   Context {MRET : @MonadReturns M Monad Eq1}.
   Class MonadReturns_Proper_inv :=
-    { MReturns_Proper_inv :> forall {A} (a: A),
+    { MReturns_Proper_inv :: forall {A} (a: A),
         Proper ((fun (x y : M A) => MReturns a x <-> MReturns a y) ==> Monad.eq1) (fun x => x) }.
 End MonadReturnsInv.
 
@@ -333,8 +333,8 @@ Section Sum.
   Qed.
 End Sum.
 
+Import IdentityMonad.
 Section Ident.
-  Import IdentityMonad.
 
   Definition IdentReturns {A} (a : A) (ma : ident A) : Prop
     := match ma with
@@ -499,8 +499,8 @@ Section Ident.
   Qed.
 End Ident.
 
+Import EitherMonad.
 Section EitherT.
-  Import EitherMonad.
 
   Context {E : Type}.
   Context {M : Type -> Type}.
@@ -690,14 +690,14 @@ Section EitherT.
 
 End EitherT.
 
+From ITree Require Import
+  ITree.
+
+Import Monads.
+
+From Vellvm Require Import Utils.StateMonads.
+
 Section StateT.
-  From ITree Require Import
-       ITree.
-
-  Import Monads.
-
-  From Vellvm Require Import Utils.StateMonads.
-
   Context {S : Type}.
   Context {SINHAB : Inhabited S}.
   Context {M : Type -> Type}.

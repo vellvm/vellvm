@@ -11,8 +11,6 @@ From Coq Require Import
 
 Import BinInt.
 
-(* Require Import Ceres.Ceres. *)
-
 Require Import Integers Floats.
 
 From Flocq.IEEE754 Require Import
@@ -70,16 +68,6 @@ Open Scope N_scope.
 
 (* Floating-point rounding mode *)
 Definition FT_Rounding:mode := mode_NE.
-
-Definition inttyp (x:N) : Type :=
-  match x with
-  | 1 => int1
-  | 8 => int8
-  | 16 => int16
-  | 32 => int32
-  | 64 => int64
-  | _ => False
-  end.
 
 (* TODO: This probably should live somewhere else... *)
 #[refine]#[local] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
@@ -3211,34 +3199,37 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       end.
     Arguments eval_int_op _ _ _ : simpl nomatch.
 
-  (* Evaluate the given iop on the given arguments according to the bitsize *)
-  Definition integer_op {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} (bits:N) (iop:ibinop) (x y:inttyp bits) : M dvalue :=
-    match bits, x, y with
-    | 1, x, y  => eval_int_op iop x y
-    | 8, x, y  => eval_int_op iop x y
-    | 16, x, y => eval_int_op iop x y
-    | 32, x, y => eval_int_op iop x y
-    | 64, x, y => eval_int_op iop x y
-    | _, _, _  => raise_error "unsupported bitsize"
-    end.
-  Arguments integer_op _ _ _ _ : simpl nomatch.
+    Variant int_size : Set := | sz1 | sz8 | sz16 | sz32 | sz64.
 
-  (* Convert written integer constant to corresponding integer with bitsize bits.
+    Definition get_size : N -> option int_size :=
+      fun bits => match bits with
+               | 1 => Some sz1
+               | 8 => Some sz8
+               | 16 => Some sz16
+               | 32 => Some sz32
+               | 64 => Some sz64
+               | _  => None
+               end
+    .
+
+    (* Convert written integer constant to corresponding integer with bitsize bits.
      Takes the integer modulo 2^bits. *)
-  Definition coerce_integer_to_int {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} (bits:option N) (i:Z) : M dvalue :=
-    match bits with
-    | Some 1  => ret (DVALUE_I1 (repr i))
-    | Some 8  => ret (DVALUE_I8 (repr i))
-    | Some 16 => ret (DVALUE_I16 (repr i))
-    | Some 32 => ret (DVALUE_I32 (repr i))
-    | Some 64 => ret (DVALUE_I64 (repr i))
-    | None    =>
-        i' <- lift_OOM (mrepr i);;
-        ret (DVALUE_IPTR i')
-    | _       =>
-        raise_error "unsupported integer size"
-    end.
-  Arguments coerce_integer_to_int _ _ : simpl nomatch.
+    Definition coerce_integer_to_int {M} `{Monad M, RAISE_ERROR M, RAISE_UB M, RAISE_OOM M}
+      (bits:option N) (i:Z) : M dvalue :=
+      match bits with
+      | None    =>
+          i' <- lift_OOM (mrepr i);;
+          ret (DVALUE_IPTR i')
+      | Some sz => match get_size sz with
+                  | Some sz1  => ret (DVALUE_I1 (repr i))
+                  | Some sz8  => ret (DVALUE_I8 (repr i))
+                  | Some sz16 => ret (DVALUE_I16 (repr i))
+                  | Some sz32 => ret (DVALUE_I32 (repr i))
+                  | Some sz64 => ret (DVALUE_I64 (repr i))
+                  | None       => raise_error "unsupported integer size"
+                  end
+      end.
+    Arguments coerce_integer_to_int _ _ : simpl nomatch.
 
   (* Helper for looping 2 argument evaluation over vectors, producing a vector *)
 
