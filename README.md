@@ -1,5 +1,6 @@
 # Vellvm
-[![Build vellvm](https://github.com/vellvm/vellvm/actions/workflows/test.yml/badge.svg?branch=finite-memory)](https://github.com/vellvm/vellvm/actions/workflows/test.yml)
+[![Opam build for vellvm](https://github.com/vellvm/vellvm/actions/workflows/vellvm.yml/badge.svg)](https://github.com/vellvm/vellvm/actions/workflows/vellvm.yml)
+[![Nix build for vellvm](https://github.com/vellvm/vellvm/actions/workflows/test.yml/badge.svg)](https://github.com/vellvm/vellvm/actions/workflows/test.yml)
 
 Vellvm is an ongoing project aiming at the formal verification in the Coq proof
 assistant of a compilation infrastructure inspired by the LLVM compiler.
