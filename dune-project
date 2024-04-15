@@ -6,3 +6,5 @@
  (name coq-vellvm)
  (synopsis "Vellvm")
 )
+
+(generate_opam_files true)

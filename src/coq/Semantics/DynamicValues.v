@@ -33,7 +33,6 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
      Semantics.VellvmIntegers
-     Semantics.StoreId
      Utils.MapMonadExtra
      Utils.MonadEq1Laws
      Utils.MonadReturnsLaws
@@ -52,6 +51,7 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
+Definition store_id := N.
 Open Scope N_scope.
 (* end hide *)
 

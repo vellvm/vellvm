@@ -1,4 +1,0 @@
-define i8 @main(i8 %argc, i8** %arcv) {
-  %1 = mul i8 5, 9
-  ret i8 %1
-}
