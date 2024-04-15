@@ -1,4 +1,6 @@
 opam-version: "2.0"
+name: "coq-vellvm"
+version: "dev"
 maintainer: "stevez@cis.upenn.edu"
 synopsis: "Coq library implementing (executable) semantics for LLVM IR"
 
@@ -48,7 +50,3 @@ tags: [
 
   "logpath:Vellvm"
 ]
-url {
-  http: ""
-  checksum: ""
-}
