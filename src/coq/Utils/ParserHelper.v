@@ -147,6 +147,7 @@ Section Correctness.
   Proof using.
     unfold FLX.Prec_gt_0, bounded, canonical_mantissa, fexp, emin in *.
     rewrite Bool.andb_true_iff, Z.leb_le, <-Zeq_is_eq_bool, digits2_pos_digits.
+    unfold FLT.FLT_exp.
     remember (3 - emax - prec) as emin.
     split; intro.
     all: destruct (Z_lt_le_dec (digits m + e - prec) emin).

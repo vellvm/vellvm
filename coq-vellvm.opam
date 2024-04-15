@@ -32,7 +32,7 @@ depends: [
   "coq-mathcomp-ssreflect" 
   "coq-simple-io"
   "coq-itree" {>= "5.1.2" & < "5.2~"}
-  "coq-quickchick" {>= "2.0.2" & < "2.1~"}
+  "coq-quickchick" {>= "2.0.2" & < "2.0.3"}
 ]
 
 tags: [

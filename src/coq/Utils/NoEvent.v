@@ -236,17 +236,17 @@ Section eqit_closure.
     econstructor.
     pmonauto.
     intros.
-    inv PR.
+    inversion PR.
     punfold EQVl.
     unfold_eqit.
     unfold no_event_lF_ in *.
     induction EQVl; auto.
-    - inv REL.
+    - inversion REL.
       constructor.
       pclearbot.
       gclo; econstructor; cycle -1; eauto with paco.
     - destruct e.
-      + inv REL.
+      + inversion REL.
       + constructor.
         dependent induction REL.
         pclearbot; intros; gclo; econstructor; cycle -1; eauto with paco.
@@ -967,7 +967,7 @@ Proof using.
   rewrite itree_eta in NEV.
   red in NEV.
   punfold NEV.
-  inv NEV.
+  inversion NEV.
   - rewrite translate_ret.
     gstep.
     constructor.
@@ -993,7 +993,7 @@ Proof using.
   rewrite itree_eta in NEV.
   red in NEV.
   punfold NEV.
-  inv NEV.
+  inversion NEV.
   - unfold inject_l; rewrite translate_ret.
     gstep.
     constructor.
@@ -1019,7 +1019,7 @@ Lemma no_event_inject_r :
   rewrite itree_eta in NEV.
   red in NEV.
   punfold NEV.
-  inv NEV.
+  inversion NEV.
   - unfold inject_r; rewrite translate_ret.
     gstep.
     constructor.

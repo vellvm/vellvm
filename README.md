@@ -136,8 +136,8 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 # Installing / Compiling Vellvm
 
 ## Assumes: 
-  - OCaml 4.14.0 (typically installed via `opam`, see below)
-  - Coq 8.15.2 
+  - OCaml 4.14.1 (typically installed via `opam`, see below)
+  - Coq 8.19.1
   - opam  2.0.0+
   - Clang 14.0.1+ (available for Mac OSX in XCode 4.2+, or installed via, e.g. `sudo apt-get install clang`)
   - `gnu-sed` 
@@ -166,10 +166,10 @@ Then:
     `opam repo add coq-released https://coq.inria.fr/opam/released`.
 
 2. Create an opam vellvm development *switch* with:
-    `opam switch create vellvm ocaml-base-compiler.4.14.0`.
+    `opam switch create vellvm ocaml-base-compiler.4.14.1`.
 
 3. Install Coq:
-   `opam pin add coq 8.15.2`
+   `opam pin add coq 8.19.1`
 
 4. Add External Coq libraries: 
     * ext-lib    (installed via, e.g. `opam install coq-ext-lib`)
@@ -189,7 +189,6 @@ Then:
 
 Steps 3-5 above can be achieved after cloning the Vellvm git repo by doing:
     `cd src && make pin-coq && make opam`
-
 
 ## Using nix:
 

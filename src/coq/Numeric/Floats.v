@@ -856,7 +856,7 @@ Theorem of_longu_of_long_1:
 Proof.
   unfold of_longu, of_long, Int64.signed, Int64.ltu; intro.
   change (Int64.unsigned (Int64.repr Int64.half_modulus)) with Int64.half_modulus.
-  destruct (zlt (Int64.unsigned x) Int64.half_modulus); now intuition.
+  destruct (zlt (Int64.unsigned x) Int64.half_modulus); now intuition auto with *.
 Qed.
 
 Theorem of_longu_of_long_2:

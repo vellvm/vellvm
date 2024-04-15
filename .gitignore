@@ -30,10 +30,8 @@ src/frontend
 *.ml~
 examples.mli
 *.gz
-src/ml/extracted
-src/ml/extracted/*.ml
-src/ml/extracted/*.mli
-src/ml/extracted/STAMP
+src/ml/extracted/*
+!src/ml/extracted/Extract.v
 src/.depend
 output
 src/ml/extracted/.merlin

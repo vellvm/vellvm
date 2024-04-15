@@ -1,3 +1,5 @@
+(* Heavily inspired by https://reasonablypolymorphic.com/blog/why-take-ecstasy/index.html *)
+
 From Coq Require Import List.
 From Ltac2 Require Import Ltac2.
 Require Import ZArith String.
@@ -298,7 +300,7 @@ Defined.
 
 Record QueryT w m a : Type :=
   mkQueryT
-  { runQueryT' :: readerT (Ent * w FieldOf) (optionT m) a
+  { runQueryT' : readerT (Ent * w FieldOf) (optionT m) a
   }.
 
 Arguments runQueryT' {_ _ _}.
