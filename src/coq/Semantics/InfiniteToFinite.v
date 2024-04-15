@@ -32671,8 +32671,6 @@ cofix CIH
         inversion H0; subst.
         exact (LLVMEvents.raise "").
       }
-
-      Show Proof.
   Defined.
 
   (* This is used to construct get_inf_tree_L4 *)
