@@ -703,65 +703,55 @@ Module Type DenotationTheory (LP : LLVMParams).
   Lemma denote_ocfg_flow_right :
     forall ocfg1 ocfg2 fto,
       independent_flows ocfg1 ocfg2 ->
-      In (snd fto) (inputs ocfg2) ->
-      ⟦ ocfg1 ++ ocfg2 ⟧bs fto ≈
-                        ⟦ ocfg2 ⟧bs fto.
+      snd fto ∈ inputs ocfg2 ->
+      ⟦ ocfg1 ∪ ocfg2 ⟧bs fto ≈ ⟦ ocfg2 ⟧bs fto.
   Proof.
     intros * INDEP IN.
-    rewrite denote_ocfg_app; [| auto using independent_flows_no_reentrance_l].
+    rewrite denote_ocfg_union; [| auto using independent_flows_no_reentrance_l].
     destruct fto as [f to]; cbn in *.
-    rewrite denote_ocfg_unfold_not_in.
-    rewrite bind_ret_l; reflexivity.
-    eapply find_block_not_in_inputs, no_duplicate_bid_not_in_l; eauto using independent_flows_no_duplicate_bid.
+    rewrite denote_ocfg_nin.
+    by go.
+    eapply free_out_of_inputs, disjoint_inputs_l; eauto using independent_flows_disjoint.
   Qed.
 
   Opaque denote_block.
   Lemma denote_ocfg_prefix :
     forall (prefix bks' postfix bks : ocfg dtyp) (from to: block_id),
-      bks = (prefix ++ bks' ++ postfix) ->
-      wf_ocfg_bid bks ->
+      bks = (prefix ∪ bks' ∪ postfix) ->
+      prefix ##ₘ bks' ->
       ⟦ bks ⟧bs (from, to) ≈
-             'x <- ⟦ bks' ⟧bs (from, to);;
+     ('x <- ⟦ bks' ⟧bs (from, to);
       match x with
       | inl x => ⟦ bks ⟧bs x
       | inr x => Ret (inr x)
-      end
+      end)
   .
   Proof.
     intros * ->; revert from to.
     einit.
     ecofix CIH.
     clear CIHH.
-    intros * WF.
-    destruct (find_block bks' to) as [bk |] eqn:EQ.
+    intros * DISJ.
+    case (bks' !! to) as [bk |] eqn:EQ.
     - unfold denote_ocfg at 1 3.
       setoid_rewrite KTreeFacts.unfold_iter_ktree.
-      cbn; rewrite !bind_bind.
-      assert (find_block (prefix ++ bks' ++ postfix) to = Some bk).
-      {
-        erewrite find_block_app_r_wf; eauto.
-        erewrite find_block_app_l_wf; eauto.
-        eapply wf_ocfg_bid_app_r; eauto.
-      }
-      do 2 match_rewrite.
-      rewrite !bind_bind.
+      go**.
+      assert (EQ': (prefix ∪ bks' ∪ postfix) !! to = Some bk) by (by simplify_map_eq).
+      rewrite EQ, EQ'; go**.
       eapply euttG_bind; econstructor; [reflexivity | intros [] ? <-].
-      + rewrite !bind_ret_l; cbn.
+      + go*.
         rewrite bind_tau; etau.
-      + rewrite !bind_ret_l.
-        reflexivity.
+      + by go.
     - edrop.
-      rewrite (denote_ocfg_unfold_not_in bks'); auto.
-      rewrite bind_ret_l.
-      reflexivity.
+      rewrite (denote_ocfg_nin bks'); auto.
+      by go*.
   Qed.
   Transparent denote_block.
 End DenotationTheory.
 
-
-Module Make (IS : InterpreterStack) (TOP : LLVMTopLevel IS) : DenotationTheory IS TOP.
-  Include DenotationTheory IS TOP.
+Module Make (LP : LLVMParams) : DenotationTheory LP.
+  Include DenotationTheory LP.
 End Make.
 
-Module DenotationTheoryBigIntptr := Make InterpreterStackBigIntptr TopLevelBigIntptr.
-Module DenotationTheory64BitIntptr := Make InterpreterStack64BitIntptr TopLevel64BitIntptr.
+(* Module DenotationTheoryBigIntptr := Make LLVMParamsBigIntptr. InterpreterStackBigIntptr TopLevelBigIntptr. *)
+(* Module DenotationTheory64BitIntptr := Make InterpreterStack64BitIntptr TopLevel64BitIntptr. *)
