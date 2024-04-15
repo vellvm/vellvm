@@ -51,5 +51,7 @@
 ./coq/Theory/StatePredicates.v
 ./coq/Theory/TopLevelRefinements.v
 ./coq/Transformations/EquivExpr.v
-
-
+./coq/Transformations/BlockFusion.v
+./coq/Transformations/DeadCodeElimination.v
+./coq/Transformations/Peephole.v
+./coq/Transformations/Transform.v

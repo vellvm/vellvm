@@ -1,4 +1,5 @@
 (* begin hide *)
+From stdpp Require Import base gmap fin_maps tactics.
 From Coq Require Import
      Lia
      String
@@ -22,8 +23,8 @@ From Vellvm Require Import
      Theory
      Utils.PostConditions.
 
-Opaque append.
-Import ListSet.
+(* Opaque append. *)
+(* Import ListSet. *)
 
 #[export] Remove Hints Eqv.EqvWF_Build : typeclass_instances.
 

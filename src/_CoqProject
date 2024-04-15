@@ -50,10 +50,6 @@
 ./coq/Theory.v
 ./coq/Theory/DenotationTheory.v
 ./coq/Theory/SymbolicInterpreter.v
-./coq/Transformations/BlockFusion.v
-./coq/Transformations/DeadCodeElimination.v
-./coq/Transformations/Peephole.v
-./coq/Transformations/Transform.v
 ./coq/Utilities.v
 ./coq/Utils/AListFacts.v
 ./coq/Utils/Commutation.v

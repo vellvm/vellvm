@@ -3,24 +3,12 @@
 ## Follows the model suggested by:
 ## https://coq.inria.fr/refman/practical-tools/utilities.html#building-a-coq-project-with-coq-makefile
 
-#### Build Configuration Information
-
-######## Tested/Recommended versions of Coq and OCaml
-########    If these are changed, update .travis.yml too
-COQ_VERSION=8.15.2
-OCAML_VERSION=4.14.0
-
-## Project Source Locations
-# Coq sources
-COQDIR = coq
-COQLIBDIR = ../lib
-
 # OCaml sources
 MLDIR = ml
 EXTRACTDIR = ml/extracted
 
 COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract
-COQC="$(COQBIN)coqc" -time-file "./profiling" -q $(COQINCLUDES) $(COQCOPTS)
+COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 COQMAKEFILE="$(COQBIN)coq_makefile"
@@ -61,7 +49,7 @@ endif
 endif
 
 .PHONY: all $(KNOWNFILES)
-all: vellvm
+all:%
 
 .PHONY: coq
 coq: real-all
