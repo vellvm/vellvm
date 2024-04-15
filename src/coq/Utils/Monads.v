@@ -99,7 +99,7 @@ Global Instance EqM_sum {E} : Monad.Eq1 (sum E) :=
 
 
 Global Instance EqMProps_sum {E} : Monad.Eq1Equivalence (sum E).
-constructor; intuition.
+constructor; intuition auto with *.
 Defined.
 
 
@@ -122,7 +122,7 @@ Global Instance Eq1Equivalence_eitherT :
   forall {M : Type -> Type} {H : Monad M} {H0 : Monad.Eq1 M} E,
     Monad.Eq1Equivalence M -> Monad.Eq1Equivalence (eitherT E M).
 Proof using.
-  constructor; intuition;
+  constructor; intuition auto with *;
   repeat intro.
   - unfold Monad.eq1, EqM_eitherT.
     reflexivity.

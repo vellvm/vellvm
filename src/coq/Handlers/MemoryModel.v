@@ -2,6 +2,14 @@ From Vellvm.Syntax Require Import
      DataLayout
      DynamicTypes.
 
+From ITree Require Import
+     ITree
+     Basics.Basics
+     Events.Exception
+     Eq.Eqit
+     Events.StateFacts
+     Events.State.
+
 From Vellvm.Semantics Require Import
   DynamicValues
   VellvmIntegers
@@ -59,7 +67,10 @@ Import Utils.Monads.
 Import Basics.Basics.Monads.
 Import MonadNotation.
 
+Import Monad.
+Import EitherMonad.
 
+From Coq Require Import FunctionalExtensionality.
 
 Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   Import LP.Events.
@@ -378,9 +389,6 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       reflexivity.
   Qed.
 
-  Require Import MonadReturnsLaws.
-  Import Monad.
-
   Lemma intptr_seq_nil_len :
     forall start len,
       intptr_seq start len = NoOom [] ->
@@ -582,7 +590,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           erewrite IP.from_Z_to_Z in YEQ; eauto.
           replace (1 + Z.of_nat (S len') - 1)%Z with (Z.of_nat (S len'))%Z in YEQ by lia.
           auto.
-      + assert (eq1 (NoOom (l ++ [x])) (map_monad (fun ip : IP.intptr => IP.from_Z (IP.to_Z ip + 1)) (l_shifted ++ [y]))) as EQ.
+      + assert (Monad.eq1 (NoOom (l ++ [x])) (map_monad (fun ip : IP.intptr => IP.from_Z (IP.to_Z ip + 1)) (l_shifted ++ [y]))) as EQ.
         { rewrite map_monad_app.
           cbn.
           rewrite <- MAP_SHIFTED.
@@ -665,9 +673,9 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       {Pre Post : Type}
       {B} `{MB : Monad B}
       `{WM : @Within M EQM B Pre Post}
-      `{EQV : @Eq1Equivalence M HM EQM}
+      `{EQV : @Monad.Eq1Equivalence M HM EQM}
       `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
-      `{MLAWS : @MonadLawsE M EQM HM}
+      `{MLAWS : @Monad.MonadLawsE M EQM HM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       `{RBMERR : @RaiseBindM M HM EQM string (@raise_error M ERR)}
@@ -684,7 +692,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     destruct (intptr_seq 0 len) eqn:SEQ.
     - (* No OOM *)
       cbn in *.
-      setoid_rewrite bind_ret_l in CONSEC.
+      setoid_rewrite Monad.bind_ret_l in CONSEC.
 
       (* rewrite bind_ret_l in CONSEC. *)
       destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix]) l) eqn:HMAPM.
@@ -696,7 +704,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         eapply rw_ret_nin_raise in CONSEC; [contradiction | auto].
       + cbn in CONSEC.
         convert_to_ret_hyp.
-        setoid_rewrite bind_ret_l in CONSEC.
+        setoid_rewrite Monad.bind_ret_l in CONSEC.
         destruct (sequence l0) eqn:HSEQUENCE.
         { cbn in CONSEC.
           apply within_ret_ret in CONSEC; auto.
@@ -722,14 +730,14 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Qed.
 
   Lemma get_consecutive_ptrs_covers_range :
-    forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Eq1 M}
+    forall {M} `{HM : Monad M} `{OOM : RAISE_OOM M} `{ERR : RAISE_ERROR M} `{EQM : Monad.Eq1 M}
       {Pre Post : Type}
       {B} `{MB : Monad B}
       `{WM : @Within M EQM B Pre Post}
-      `{EQV : @Eq1Equivalence M HM EQM}
+      `{EQV : @Monad.Eq1Equivalence M HM EQM}
       `{EQRET : @Eq1_ret_inv M EQM HM}
       `{WRET : @Within_ret_inv M B Pre Post HM _ EQM WM}
-      `{LAWS : @MonadLawsE M EQM HM}
+      `{LAWS : @Monad.MonadLawsE M EQM HM}
       `{RBMOOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       `{RBMERR : @RaiseBindM M  HM EQM string (@raise_error M ERR)}
       `{RWOOM : @RaiseWithin M B _ _ _ EQM WM string (@raise_oom M OOM)}
@@ -758,7 +766,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         setoid_rewrite rbm_raise_bind in CONSEC; auto.
         eapply rw_ret_nin_raise in CONSEC; [contradiction | try typeclasses eauto].
       + cbn in CONSEC.
-        setoid_rewrite bind_ret_l in CONSEC.
+        setoid_rewrite Monad.bind_ret_l in CONSEC.
         rename l0 into addrs.
         destruct (sequence addrs) eqn:HSEQUENCE.
         { apply within_ret_ret in CONSEC; eauto.
@@ -2274,8 +2282,6 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       lia.
     Defined.
 
-    From Coq Require Import FunctionalExtensionality.
-
     Lemma re_sid_ubytes_helper_equation {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M}
           (bytes : list (N * SByte)) (acc : NMap SByte) :
       re_sid_ubytes_helper bytes acc =
@@ -2667,16 +2673,6 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
   End Serialization.
 End MemoryHelpers.
-
-
-From ITree Require Import
-     ITree
-     Basics.Basics
-     Events.Exception
-     Eq.Eqit
-     Events.StateFacts
-     Events.State.
-
 
 Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP).
   Import LP.
@@ -4125,21 +4121,11 @@ Module MakeMemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Memo
 End MakeMemoryModelSpec.
 
 Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
-  (* TODO: move these imports *)
-  Import EitherMonad.
-  Import Monad.
-  Require Import Morphisms.
-  From Vellvm Require Import
-       MonadEq1Laws
-       Raise.
-
   Import LP.
+  Import MMS.
   Import PROV.
   Import MMSP.
-  Import MMS.
   Import MemHelpers.
-
-  Require Import Within.
 
   Definition MemMonad_valid_state (ms : MemState) (st : store_id) : Prop
     := let sid := st in
@@ -4153,22 +4139,22 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         `{EQM : Eq1 M} `{EQRI : @Eq1_ret_inv M EQM MM} `{MLAWS : @MonadLawsE M EQM MM}
     : Type
     :=
-    { MemMonad_eq1_runm :> Eq1 RunM;
-      MemMonad_runm_monadlaws :> MonadLawsE RunM;
-      MemMonad_eq1_runm_equiv :> Eq1Equivalence RunM;
-      MemMonad_eq1_runm_eq1laws :> Eq1_ret_inv RunM;
-      MemMonad_raisebindm_ub :> RaiseBindM RunM string (@raise_ub RunM RunUB);
-      MemMonad_raisebindm_oom :> RaiseBindM RunM string (@raise_oom RunM RunOOM);
-      MemMonad_raisebindm_err :> RaiseBindM RunM string (@raise_error RunM RunERR);
-      MemMonad_within :> @Within M EQM RunM (store_id * MemState)%type (store_id * MemState)%type;
+    { #[global] MemMonad_eq1_runm :: Eq1 RunM;
+      #[global] MemMonad_runm_monadlaws :: MonadLawsE RunM;
+      #[global] MemMonad_eq1_runm_equiv :: Eq1Equivalence RunM;
+      #[global] MemMonad_eq1_runm_eq1laws :: Eq1_ret_inv RunM;
+      #[global] MemMonad_raisebindm_ub :: RaiseBindM RunM string (@raise_ub RunM RunUB);
+      #[global] MemMonad_raisebindm_oom :: RaiseBindM RunM string (@raise_oom RunM RunOOM);
+      #[global] MemMonad_raisebindm_err :: RaiseBindM RunM string (@raise_error RunM RunERR);
+      #[global] MemMonad_within :: @Within M EQM RunM (store_id * MemState)%type (store_id * MemState)%type;
 
-      MemMonad_eq1_runm_proper :>
+      #[global] MemMonad_eq1_runm_proper ::
                                (forall A, Proper ((@eq1 _ MemMonad_eq1_runm) A ==> (@eq1 _ MemMonad_eq1_runm) A ==> iff) ((@eq1 _ MemMonad_eq1_runm) A));
 
       MemMonad_run {A} (ma : M A) (ms : MemState) (st : store_id)
       : RunM (store_id * (MemState * A))%type;
 
-      MemMonad_run_proper :>
+      #[global] MemMonad_run_proper ::
         (forall A, Proper (@eq1 _ EQM A ==> eq ==> eq ==> @eq1 _ MemMonad_eq1_runm (store_id * (MemState * A))) MemMonad_run);
 
       (** Some lemmas about valid states *)
@@ -4622,10 +4608,6 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
              let WEM := (Within_err_ub_oom_MemM (EQI:=(@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) (EQV:=(@MemMonad_eq1_runm_equiv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM))) in
              (@within MemM _ err_ub_oom (store_id * MemState)%type (store_id * MemState)%type WEM X exec (st, ms) e (st', ms')) /\
                (e {{ms}} ∈ {{ms'}} spec) /\ ((exists x, e = ret x) -> (MemMonad_valid_state ms' st' /\ (exists x, e = ret x /\ post ms st x ms' st')))).
-
-  Require Import Error.
-  Require Import MonadReturnsLaws.
-
 
   (* TODO: Move this *)
   Lemma exec_correct_weaken_pre :
@@ -7934,7 +7916,6 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
 
       destruct IHl as (ips & IHl).
       exists (i :: ips).
-      Require Import FunctionalExtensionality.
       setoid_rewrite functional_extensionality.
       rewrite IHl.
       reflexivity.

@@ -44,6 +44,8 @@ From ExtLib Require Import
   Data.Monads.IdentityMonad
   Structures.Functor.
 
+Require Import ContainsUB.
+
 Set Implicit Arguments.
 Set Contextual Implicit.
 
@@ -139,7 +141,6 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
       Definition F_trigger_prop : F ~> PropT (E +' F) :=
         fun R e => fun t => t ≈ r <- trigger e ;; ret r.
 
-      Require Import ContainsUB.
       Definition model_undef_k_spec
         `{UB: UBE -< E +' F}
         {T R : Type}

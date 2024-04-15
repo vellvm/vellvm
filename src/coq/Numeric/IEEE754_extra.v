@@ -431,7 +431,7 @@ Proof.
     apply integer_representable_2p. auto.
     apply (Zpower_gt_0 radix2).
     lia.
-- assert (IZR x <> 0%R) by (apply (IZR_neq _ _ n)).
+- assert (IZR x <> 0%R) by (apply (eq_IZR_contrapositive _ _ n)).
   destruct (BofZ_finite x H) as (A & B & C).
   destruct (BofZ_representable (2^p)) as (D & E & F).
     apply integer_representable_2p. auto.
@@ -1036,7 +1036,7 @@ Proof with (try discriminate).
   rewrite <- ! bpow_plus.
   replace (prec - 1 + e') with (- (prec - 1 + e)) by (unfold e'; lia).
   rewrite bpow_opp. unfold cond_Ropp; destruct s; auto.
-  rewrite Ropp_inv_permute. auto. apply Rgt_not_eq. apply bpow_gt_0.
+  rewrite Rinv_opp. auto.
   split. simpl. apply F2R_neq_0. destruct s; simpl in H; discriminate.
   auto.
 Qed.

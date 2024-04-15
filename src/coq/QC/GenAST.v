@@ -2576,7 +2576,7 @@ Section InstrGenerators.
     | TYPE_Identified id => 0
     end.
 
-  Fixpoint get_size_from_typ (t: typ) : N :=
+  Definition get_size_from_typ (t: typ) : N :=
     round_up_to_eight (get_bit_size_from_typ t) / 8.
 
   (* Assuming max_byte_sz for this function is greater than 0 *)
@@ -2701,7 +2701,7 @@ Section InstrGenerators.
            ret (iid, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr))
        end).
 
-  Fixpoint gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
+  Definition gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
     let gen_typ_list :=
       match t_from with
       | TYPE_I 1 =>
@@ -3219,7 +3219,7 @@ Section InstrGenerators.
 
   Definition is_main (name : global_id)
     := match name with
-       | Name sname => String.string_dec sname "main"%string
+       | Name sname => String.eqb sname "main"%string
        | Anon _
        | Raw _ => false
        end.

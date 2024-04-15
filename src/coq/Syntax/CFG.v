@@ -334,7 +334,7 @@ Section TLE_To_Modul.
   Proof using.
     intros.
     unfold modul_of_toplevel_entities; cbn; f_equal;
-      try ((break_match_goal; reflexivity) || (rewrite <- !app_nil_end; reflexivity)).
+      try ((break_match_goal; reflexivity) || (rewrite !app_nil_r; reflexivity)).
   Qed.
 
   Lemma modul_of_toplevel_entities_app:
@@ -344,7 +344,7 @@ Section TLE_To_Modul.
     induction tle1 as [| tle tle1 IH]; intros; cbn; [reflexivity |].
     rewrite modul_of_toplevel_entities_cons, IH; cbn.
     f_equal;
-      try ((break_match_goal; reflexivity) || (rewrite <- !app_nil_end, app_assoc; reflexivity)).
+      try ((break_match_goal; reflexivity) || (rewrite !app_nil_r, app_assoc; reflexivity)).
   Qed.
 
   Infix "@@" := (modul_app) (at level 60).

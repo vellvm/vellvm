@@ -1679,7 +1679,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         induction uvs; try reflexivity.
       Qed.
 
-      Fixpoint eval_select
+      Definition eval_select
         (cnd : dvalue) (v1 v2 : uvalue) : M dvalue
         := match cnd with
            | DVALUE_Poison t =>

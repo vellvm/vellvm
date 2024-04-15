@@ -425,9 +425,9 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
             ret (OP_FBinop (LLVMAst.FAdd) []) <*> ret t <*> gen_exp_size 0 t <*> ret (EXP_Double Float.zero)
         | _ => failGen "Unimplemented"
         end
-    end
-  with
-  gen_exp_ident (t : typ): GenALIVE2 (exp typ) :=
+    end.
+
+  Definition gen_exp_ident (t : typ): GenALIVE2 (exp typ) :=
     (* Remove from local ctx *)
     local_ctx <- get_local_ctx;;
     let ts := filter_type t local_ctx in

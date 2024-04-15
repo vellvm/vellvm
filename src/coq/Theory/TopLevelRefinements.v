@@ -34,6 +34,8 @@ From Coq Require Import
 
 Require Import Paco.paco.
 
+From Coq Require Import Program.Equality.
+
 Import ListNotations.
 Import ITree.Basics.Basics.Monads.
 
@@ -352,8 +354,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       | h: context[match ?x with | _ => _ end] |- _ => let Heq := fresh "Heq" in destruct x eqn:Heq
       | |- context[match ?x with | _ => _ end] => let Heq := fresh "Heq" in destruct x eqn:Heq
       end.
-
-    From Coq Require Import Program.Equality.
 
     #[global] Instance Proper_E_trigger_prop E F T : Proper (eq ==> (eutt eq) ==> iff) (@E_trigger_prop E F T).
     Proof using.

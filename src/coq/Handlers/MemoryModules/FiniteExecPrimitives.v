@@ -62,6 +62,8 @@ From ITree Require Import
      ITree
      Eq.Eqit.
 
+Require Import Error.
+
 Import ListNotations.
 
 Import MonadNotation.
@@ -3690,8 +3692,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
       solve_fresh_provenance_invariants.
     Qed.
-
-    Require Import Error.
 
     Lemma byte_allocated_add_all_index :
       forall (ms : MemState) (mem : memory) (bytes : list mem_byte) (ix : Z) (aid : AllocationId),

@@ -645,8 +645,8 @@ Proof.
   induction l; intros H.
   - reflexivity.
   - simpl in *. destruct_prod; destruct_eq_dec.
-    + intuition.
-    + rewrite IHl; intuition.
+    + intuition auto with *.
+    + rewrite IHl; intuition auto with *.
 Qed.
 
 
@@ -672,7 +672,7 @@ Ltac subst_eq :=
 Ltac solve_eq_dec :=
   repeat destruct_prod; simpl in *;
   repeat (destruct_eq_dec; simpl in *; subst; simpl; try contra; auto; repeat (solve_eq_dec_if; simpl); auto);
-  intuition; try congruence.
+  intuition auto with *; try congruence.
 
 
 Lemma remove_key_commutes :
@@ -826,7 +826,7 @@ Proof.
   induction env as [| [id' t'] env IHenv].
   - contradiction.
   - destruct Hin as [Hin | Hin]; try inversion Hin; subst.
-    + simpl. destruct_eq_dec; intuition.
+    + simpl. destruct_eq_dec; intuition auto with *.
     + simpl. destruct_eq_dec.
       * inversion Hdup. subst. apply in_map with (f:=fst) in Hin. simpl in *.
         contradiction.
@@ -863,7 +863,7 @@ Proof.
   induction ids.
   - reflexivity.
   - rewrite <- remove_key_keys.
-    rewrite <- find_different_key_from_removed with (id:=a); intuition; subst; intuition.
+    rewrite <- find_different_key_from_removed with (id:=a); intuition auto with *; subst; intuition auto with *.
 Qed.
 
 
@@ -895,7 +895,7 @@ Ltac solve_in :=
     let Hfind := fresh in
     apply find_some in H as [? Hfind];
     simpl in Hfind;
-    destruct (Ident.eq_dec id i) eqn:?; subst; intuition
+    destruct (Ident.eq_dec id i) eqn:?; subst; intuition auto with *
   end.
 
 
@@ -1010,7 +1010,7 @@ Proof.
   - simpl in *. destruct H.
     + exists a. split; auto.
     + apply IHl in H as [t [Hin Hftx]].
-      exists t. intuition.
+      exists t. intuition auto with *.
 Qed.
 
 
@@ -1022,8 +1022,8 @@ Proof.
   intros A B x l f g H.
   induction l as [| a l IHl]; simpl; auto.
   pose proof (H a) as Ha.
-  rewrite Ha; intuition.
-  rewrite IHl; intuition.
+  rewrite Ha; intuition auto with *.
+  rewrite IHl; intuition auto with *.
 Qed.
 
 
@@ -1129,7 +1129,7 @@ Proof.
   apply find_some in Hfind as [Hin Hfind].
   simpl in Hfind.
 
-  destruct (Ident.eq_dec id i) eqn:Hidi; subst; intuition.
+  destruct (Ident.eq_dec id i) eqn:Hidi; subst; intuition auto with *.
 
   repeat (simpl_remove_keys;
           repeat match goal with

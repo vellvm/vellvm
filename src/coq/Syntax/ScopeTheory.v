@@ -177,7 +177,7 @@ Section LABELS_THEORY.
     apply list_norepet_append_left in H0.
     rewrite list_cons_app.
     rewrite list_norepet_app in *.
-    intuition. apply list_disjoint_sym. auto.
+    intuition auto with *. apply list_disjoint_sym. auto.
     unfold wf_ocfg_bid in H0.
     rewrite inputs_app in H0. rewrite inputs_cons in H0. rewrite list_cons_app in H0.
     apply list_norepet_append_commut in H0. rewrite <- app_assoc in H0.
@@ -206,7 +206,7 @@ Section LABELS_THEORY.
     apply list_norepet_append_left in H0.
     rewrite list_cons_app.
     rewrite list_norepet_app in *.
-    intuition. apply list_disjoint_sym. auto.
+    intuition auto with *. apply list_disjoint_sym. auto.
     unfold wf_ocfg_bid in H0.
     rewrite inputs_app in H0. rewrite inputs_cons in H0. rewrite list_cons_app in H0.
     apply list_norepet_append_commut in H0. rewrite <- app_assoc in H0.
@@ -241,7 +241,7 @@ Section LABELS_THEORY.
       exists bk, find_block bks to = Some bk.
   Proof using.
     induction bks as [| id ocfg IH]; cbn; intros IN; [inv IN |].
-    flatten_goal; flatten_hyp Heq; intuition; eauto.
+    flatten_goal; flatten_hyp Heq; intuition auto with *; eauto.
   Qed.
 
   Lemma no_reentrance_not_in (bks1 bks2 : ocfg T) :
@@ -429,7 +429,7 @@ Section LABELS_THEORY.
         unfold is_predecessor.
         break_match_goal.
         left; auto.
-        break_match_hyp; intuition.
+        break_match_hyp; intuition auto with *.
       + rewrite predecessors_cons.
         apply in_or_app; left.
         apply IH; auto.
@@ -448,11 +448,11 @@ Section LABELS_THEORY.
     break_match_hyp.
     - edestruct IH as [INACC | (bk' & INbk & -> & PRED)]; eauto.
       + destruct INACC as [<- | ?]; [| left; auto].
-        right; exists bk; intuition.
+        right; exists bk; intuition auto with *.
       + right.
-        exists bk'; intuition.
+        exists bk'; intuition auto with *.
     - edestruct IH as [INACC | (bk' & INbk & -> & PRED)]; eauto.
-      right; exists bk'; intuition.
+      right; exists bk'; intuition auto with *.
   Qed.
 
   Lemma In_predecessors_is_predecessor :
@@ -491,7 +491,7 @@ Section LABELS_THEORY.
   Proof using.
     intros; cbn.
     destruct (Eqv.eqv_dec_p (blk_id b)) as [EQ | INEQ].
-    unfold Eqv.eqv, AstLib.eqv_raw_id in *; intuition.
+    unfold Eqv.eqv, AstLib.eqv_raw_id in *; intuition auto with *.
     reflexivity.
   Qed.
 
@@ -528,7 +528,7 @@ Section LABELS_THEORY.
     apply wf_ocfg_bid_In_is_found in IN'; auto.
     rewrite FIND in IN'; inv IN'.
     unfold is_predecessor in ISPRED.
-    break_match_hyp; intuition.
+    break_match_hyp; intuition auto with *.
   Qed.
 
   Lemma find_block_app_r_wf :
@@ -546,7 +546,7 @@ Section LABELS_THEORY.
         apply find_some in FIND as [FIND EQ].
         clear - FIND EQ.
         rewrite inputs_app; eapply in_or_app; right.
-        break_match; [| intuition].
+        break_match; [| intuition auto with *].
         rewrite <- e.
         eapply in_map; auto.
       + cbn in NOREP; apply wf_ocfg_bid_cons in NOREP.
@@ -649,7 +649,7 @@ Section LABELS_THEORY.
     - intros * LU.
       cbn in LU.
       break_match_hyp.
-      + inv LU; break_match_hyp; intuition.
+      + inv LU; break_match_hyp; intuition auto with *.
       + apply IH.
         apply LU.
   Qed.
@@ -663,7 +663,7 @@ Section LABELS_THEORY.
     intros * ID; induction G as [| hd G IH]; intros FIND ; [inv FIND |].
     cbn in *.
     rewrite ID.
-    break_match_goal; break_match_hyp; intuition.
+    break_match_goal; break_match_hyp; intuition auto with *.
     inv FIND; auto.
   Qed.
 
@@ -676,7 +676,7 @@ Section LABELS_THEORY.
     intros * ID; induction G as [| hd G IH]; intros FIND; [reflexivity |].
     cbn in *.
     rewrite ID.
-    break_match_goal; break_match_hyp; intuition.
+    break_match_goal; break_match_hyp; intuition auto with *.
     inv FIND; auto.
   Qed.
 
@@ -691,7 +691,7 @@ Section LABELS_THEORY.
     cbn in *.
     break_match_hyp.
     inv FIND1; inv FIND2; auto.
-    break_match_hyp; intuition.
+    break_match_hyp; intuition auto with *.
     eapply IH; eauto.
     eapply wf_ocfg_bid_cons; eauto.
   Qed.
@@ -710,7 +710,7 @@ Section LABELS_THEORY.
   Proof using.
     induction G as [| x G IH]; intros; [reflexivity |].
     cbn; break_match_goal.
-    - break_match_hyp; intuition.
+    - break_match_hyp; intuition auto with *.
       do 2 red in e.
       exfalso; clear Heqb.
       red in H.
@@ -718,7 +718,7 @@ Section LABELS_THEORY.
       rewrite e in H.
       inv H.
       eapply H2; left; reflexivity.
-    - break_match_hyp; intuition.
+    - break_match_hyp; intuition auto with *.
       apply IH.
       apply wf_ocfg_commut_hd in H.
       eapply wf_ocfg_bid_cons; eauto.
@@ -766,7 +766,7 @@ Proof using.
     destruct abs.
     + cbn in H; unfold Traversal.endo, Traversal.Endo_id in H; cbn in H.
       exfalso; apply n; rewrite H; reflexivity.
-    + apply IH in H; intuition.
+    + apply IH in H; intuition auto with *.
       eapply free_in_cfg_cons; eauto.
 Qed.
 

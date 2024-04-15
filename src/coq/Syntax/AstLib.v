@@ -184,7 +184,7 @@ Module RawIDOrd <: UsualOrderedType.
 
   Lemma lt_trans : forall a b c : t, lt a b -> lt b c -> lt a c.
   Proof using.
-    destruct a; destruct b; destruct c; simpl; intros H1 H2; intuition.
+    destruct a; destruct b; destruct c; simpl; intros H1 H2; intuition auto with *.
     - eapply StringOrd.lt_trans; eauto.
   Qed.
 

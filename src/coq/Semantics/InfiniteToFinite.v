@@ -3113,6 +3113,8 @@ Lemma lift_memory_convert_mem_byte :
       (* Show Proof. *)
   Defined.
 
+  (* This was used to create get_inf_tree... *)
+  (*
   Set Printing All.
   Set Printing Implicit.
   Set Printing Depth 1000.
@@ -3121,6 +3123,8 @@ Lemma lift_memory_convert_mem_byte :
 
   Unset Printing All.
   Unset Printing Implicit.
+   *)
+
   Definition get_inf_tree :
     forall (t_fin2 : itree L3 (FinMem.MMEP.MMSP.MemState * (store_id * (local_env * @stack local_env * res_L1)))), itree InfLP.Events.L3 TopLevelBigIntptr.res_L6 :=
 cofix CIH
@@ -32671,14 +32675,16 @@ cofix CIH
       Show Proof.
   Defined.
 
-  Set Printing All.
-  Set Printing Implicit.
-  Set Printing Depth 1000.
-  Print get_inf_tree_L4'.
+  (* This is used to construct get_inf_tree_L4 *)
+  (* Set Printing All. *)
+  (* Set Printing Implicit. *)
+  (* Set Printing Depth 1000. *)
+  (* Print get_inf_tree_L4'. *)
 
 
-  Unset Printing All.
-  Unset Printing Implicit.
+  (* Unset Printing All. *)
+  (* Unset Printing Implicit. *)
+
   Definition get_inf_tree_L4 :
     forall (t_fin2 : itree L4 (FinMem.MMEP.MMSP.MemState * (store_id * (local_env * @stack local_env * res_L1)))), itree InfLP.Events.L4 TopLevelBigIntptr.res_L4 :=
 cofix CIH

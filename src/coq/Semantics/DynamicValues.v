@@ -2478,7 +2478,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Proof using.
     induction fields; intros H ALL.
     - exists nil. reflexivity.
-    - assert (List.In a (a :: fields)) as IN by intuition.
+    - assert (List.In a (a :: fields)) as IN by intuition auto with *.
 
       change (a :: fields) with ([a] ++ fields)%list in ALL.
       rewrite forallb_app in ALL.
@@ -2491,7 +2491,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       assert (forall u : uvalue,
                  List.In u fields -> is_concrete u = true -> exists dv : dvalue, uvalue_to_dvalue u = inr dv) as HCONV.
       { intros u INFS CONCU.
-        apply H; intuition.
+        apply H; intuition auto with *.
       }
 
       pose proof (IHfields HCONV CONC_FIELDS) as (dfields & CONV_DFIELDS).
@@ -4101,7 +4101,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Proof using.
     intros.
     destruct from_dt; simpl in *; try inversion H.
-    - apply IX_supported_ltb_supported in H. intuition.
+    - apply IX_supported_ltb_supported in H. intuition auto with *.
     - break_match_hyp; [auto|inversion H].
   Qed.
 
@@ -4111,7 +4111,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     intros.
     destruct from_dt; simpl in *; try inversion H.
     - break_match_hyp; auto; try solve [inversion H1].
-      apply IX_supported_ltb_supported in H. intuition.
+      apply IX_supported_ltb_supported in H. intuition auto with *.
     - break_match_hyp; auto; try solve [inversion H1].
       break_match_hyp; auto. inversion H.
   Qed.
@@ -4121,7 +4121,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Proof using.
     intros.
     destruct from_dt; simpl in *; try inversion H.
-    apply IX_supported_ltb_supported in H. intuition.
+    apply IX_supported_ltb_supported in H. intuition auto with *.
   Qed.
 
   Lemma ext_base_okb_ALL_IX_SUPPORTED :
@@ -4130,7 +4130,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     intros.
     destruct from_dt; simpl in *; try inversion H.
     - break_match_hyp; cbn; try solve [inversion H1]; auto.
-      apply IX_supported_ltb_supported in H. intuition.
+      apply IX_supported_ltb_supported in H. intuition auto with *.
   Qed.
 
   Lemma conversion_okb_supported :
@@ -5675,7 +5675,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         try solve [
             apply forall_repeat_true;eapply IHt; eauto
           | rewrite repeat_length; auto
-          | unfold vector_dtyp; intuition
+          | unfold vector_dtyp; intuition auto with *
           ].
       + apply IHt in Heqs. apply dvalue_has_dtyp_ALL_IX_SUPPORTED in Heqs.
         cbn in Heqs. assumption.

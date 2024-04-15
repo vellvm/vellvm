@@ -1942,14 +1942,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { destruct e1 as [e1_msg ?].
-      destruct e2 as [e2_msg ?].
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
       exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { destruct e1 as [e1_msg ?].
-      destruct e2 as [e2_msg ?].
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
       exact (e1_msg = e2_msg).
     }
   Defined.
@@ -2607,14 +2607,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
 
     (* DebugE *)
-    { destruct e1 as [e1_msg ?].
-      destruct e2 as [e2_msg ?].
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
       exact (e1_msg = e2_msg).
     }
 
     (* FailureE *)
-    { destruct e1 as [e1_msg ?].
-      destruct e2 as [e2_msg ?].
+    { destruct e1 as [e1_msg].
+      destruct e2 as [e2_msg].
       exact (e1_msg = e2_msg).
     }
   Defined.
@@ -9410,7 +9410,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn. rewrite Heqb.
         rewrite map_app, map_cons.
         reflexivity.
-      + destruct elts as [(b&elts)|]; try discriminate.
+      + destruct elts as [|b elts]; try discriminate.
         cbn. rewrite Heqb.
         break_match_hyp; inv H0.
         -- rewrite map_app, map_cons.

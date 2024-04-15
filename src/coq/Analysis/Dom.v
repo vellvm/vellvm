@@ -52,17 +52,17 @@ Module BoundedSet(Import S:FSetInterface.WS) <: LATTICE.
   #[global] Instance eq_equiv : Equivalence eq.
   Proof.
     constructor.
-    red. destruct x; simpl; intuition.
-    red. destruct x, y; simpl; intros; intuition.
-    red. destruct x, y, z; simpl; intros; intuition.
+    red. destruct x; simpl; intuition auto with *.
+    red. destruct x, y; simpl; intros; intuition auto with *.
+    red. destruct x, y, z; simpl; intros; intuition auto with *.
     transitivity t1; auto.
   Qed.
 
   #[global] Instance le_preorder : PreOrder le.
   Proof.
     constructor.
-    red. destruct x; simpl; intuition.
-    red. destruct x, y, z; simpl; intros; intuition.
+    red. destruct x; simpl; intuition auto with *.
+    red. destruct x, y, z; simpl; intros; intuition auto with *.
     transitivity t1; auto.
   Qed.
 
@@ -70,16 +70,16 @@ Module BoundedSet(Import S:FSetInterface.WS) <: LATTICE.
   Proof.
     constructor.
     intro. repeat red. split.
-    destruct x, x0; simpl in *; intuition.
+    destruct x, x0; simpl in *; intuition auto with *.
     unfold Subset. intros. rewrite H; auto.
-    red. destruct x, x0; simpl in *; intuition.
+    red. destruct x, x0; simpl in *; intuition auto with *.
     unfold Subset. intros. rewrite <- H. auto.
 
     destruct x, x0; simpl;
       intros H; repeat red in H; simpl in H;
-      intuition.
+      intuition auto with *.
     repeat red in H1. repeat red in H0.
-    red; intuition.
+    red; intuition auto with *.
   Qed.
 
   Definition eq_dec : forall x y, {x == y} + {x ~= y}.
@@ -300,7 +300,7 @@ Module Spec (Import G:GRAPH).
     mem g v2 -> edge g v1 v2 -> forall v', SDom g v' v2 -> Dom g v' v1.
   Proof.
     unfold SDom, Dom. intros g v1 v2 Hmem Hsucc v' [Hneq Hdom] p Hp.
-    cut (In v' (v2::p)). inversion 1; subst; intuition.
+    cut (In v' (v2::p)). inversion 1; subst; intuition auto with *.
     apply Hdom. eapply path_cons; eauto.
   Qed.
 
@@ -345,7 +345,7 @@ Module AlgdomProperties (Import G:GRAPH) (Import A : Algdom G).
     destruct (sdom (entry g)); try contradiction; simpl in *.
       exfalso. rewrite H2 in H0. eapply L.SFacts.empty_iff. eauto.
 
-    right. destruct (E.eq_dec v2 n1). subst. inversion H1; intuition.
+    right. destruct (E.eq_dec v2 n1). subst. inversion H1; intuition auto with *.
     apply IHPath; auto.
 
     destruct (sdom v2) eqn:Heqv2; simpl in *; auto.

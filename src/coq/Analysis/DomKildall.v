@@ -99,7 +99,7 @@ Module AlgdomKildall (PC:UsualDecidableType) (Import G: GRAPH with Definition V 
     assert (In n1 (enum_vs g) \/ NM.In n1 (NM.empty L.t))
            as Hin by exact (or_introl H0).
     generalize (enum_vs g) (NM.empty L.t) Hin.
-    induction l; simpl. intuition.
+    induction l; simpl. intuition auto with *.
     intros to Hin'. destruct Hin' as [[? | ?] | ?]; subst; auto.
     apply FMF.add_in_iff; auto.
     destruct (N.eq_dec a n1).

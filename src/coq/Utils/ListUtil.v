@@ -65,10 +65,10 @@ Proof.
   induction xs, ys;
     intros x y H; inversion H.
   - inversion H0; subst.
-    intuition.
+    intuition auto with *.
   - clear H.
     specialize (IHxs _ _ _ H0).
-    intuition.
+    intuition auto with *.
 Qed.
 
 Lemma Nth_map_iff :
@@ -805,7 +805,7 @@ Proof.
   induction sz using N.peano_ind; intros x; auto.
   unfold repeatN.
   rewrite N.recursion_succ; eauto.
-  intuition.
+  intuition auto with *.
 Qed.
 
 Lemma In_repeatN :
@@ -1875,8 +1875,8 @@ Proof.
     destruct H.
     destruct (IHl HX).
     + left; auto.
-    + right. intros C. apply n. intuition.
-    + right. intros C. apply n. intuition.
+    + right. intros C. apply n. intuition auto with *.
+    + right. intros C. apply n. intuition auto with *.
 Qed.
 
 

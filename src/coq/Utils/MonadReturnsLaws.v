@@ -10,6 +10,13 @@ From ExtLib Require Import
 
 From Vellvm.Utils Require Import MonadExcLaws PropT Monads Inhabited.
 
+From ITree Require Import
+  ITree.
+
+Import Monads.
+
+From Vellvm Require Import Utils.StateMonads.
+
 Local Open Scope monad_scope.
 
 Set Primitive Projections.
@@ -69,12 +76,12 @@ Section ExtraLaws.
 
   (* Won't work when a refinement can fail and not return something *)
   Class MonadReturnsProper :=
-    { MReturns_Proper :> forall {A} (a : A),
+    { #[global] MReturns_Proper :: forall {A} (a : A),
           Proper ((fun x y => eq1 y x) ==> Basics.impl) (MReturns a)
     }.
 
   Class MFailsProper :=
-    { MFails_Proper :> forall A, Proper (eq1 (A:=A) ==> Basics.impl) MFails }.
+    { #[global] MFails_Proper :: forall A, Proper (eq1 (A:=A) ==> Basics.impl) MFails }.
 
   (* These won't work with UB / Error refinement relations *)
   Class MonadReturnsFails :=
@@ -105,7 +112,7 @@ Section MReturns_ProperFlip.
   Context {MRET : @MonadReturns M Monad Eq1}.
 
   Class MonadReturns_ProperFlip :=
-    { MReturns_ProperFlip :> forall {A} (a : A),
+    { #[global] MReturns_ProperFlip :: forall {A} (a : A),
         Proper (eq1 ==> Basics.impl) (MReturns a)
     }.
 
@@ -119,7 +126,7 @@ Section MonadReturnsInv.
   Context {Eq1 : @Eq1 M}.
   Context {MRET : @MonadReturns M Monad Eq1}.
   Class MonadReturns_Proper_inv :=
-    { MReturns_Proper_inv :> forall {A} (a: A),
+    { #[global] MReturns_Proper_inv :: forall {A} (a: A),
         Proper ((fun (x y : M A) => MReturns a x <-> MReturns a y) ==> Monad.eq1) (fun x => x) }.
 End MonadReturnsInv.
 
@@ -691,13 +698,6 @@ Section EitherT.
 End EitherT.
 
 Section StateT.
-  From ITree Require Import
-       ITree.
-
-  Import Monads.
-
-  From Vellvm Require Import Utils.StateMonads.
-
   Context {S : Type}.
   Context {SINHAB : Inhabited S}.
   Context {M : Type -> Type}.

@@ -1,4 +1,4 @@
-name: "Build vellvm"
+name: "Nix build for vellvm"
 on:
   pull_request:
   push:

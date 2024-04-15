@@ -468,7 +468,7 @@ Theorem of_intu_of_int_1:
 Proof.
   unfold of_intu, of_int, Int.signed, Int.ltu; intro.
   change (Int.unsigned ox8000_0000) with Int.half_modulus.
-  destruct (zlt (Int.unsigned x) Int.half_modulus); now intuition.
+  destruct (zlt (Int.unsigned x) Int.half_modulus); now intuition auto with *.
 Qed.
 
 Theorem of_intu_of_int_2:

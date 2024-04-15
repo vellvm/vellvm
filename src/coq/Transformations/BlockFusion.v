@@ -68,13 +68,13 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
       intros WF.
       simpl remove_block.
       break_match_goal.
-      break_match_hyp; intuition.
+      break_match_hyp; intuition auto with *.
       subst.
       eapply wf_ocfg_cons_not_in_tail; eauto.
       cbn.
       break_match_goal.
-      break_match_hyp; intuition.
-      break_match_hyp; intuition.
+      break_match_hyp; intuition auto with *.
+      break_match_hyp; intuition auto with *.
       apply IH.
       eapply wf_ocfg_bid_cons; eauto.
     Qed.
@@ -88,9 +88,9 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
       intros INEQ.
       simpl remove_block.
       break_match_goal.
-      break_match_hyp; intuition.
+      break_match_hyp; intuition auto with *.
       subst; rewrite find_block_ineq; auto.
-      break_match_hyp; intuition.
+      break_match_hyp; intuition auto with *.
       cbn; break_match_goal; auto.
     Qed.
 
@@ -311,8 +311,8 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
             cbn.
             unfold is_predecessor, successors.
             rewrite Heqt; cbn.
-            break_match_goal; intuition.
-            break_match_hyp; intuition.
+            break_match_goal; intuition auto with *.
+            break_match_hyp; intuition auto with *.
           }
           rewrite !app_length, EQ1 in SINGLEPRED.
           cbn in SINGLEPRED.
@@ -332,19 +332,19 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
           rewrite predecessors_app,EQ3, app_nil_r in IN.
           rewrite predecessors_cons, EQ2, app_nil_l in IN.
           rewrite EQ1 in IN.
-          inv IN; intuition.
+          inv IN; intuition auto with *.
 
         + auto.
 
         + cbn.
           break_match_goal; auto.
-          break_match_hyp; intuition.
+          break_match_hyp; intuition auto with *.
 
         + rename bk into src, b into tgt.
           cbn.
           unfold Eqv.neg_eqv_dec in INEQ.
           break_match_goal.
-          { break_match_hyp; intuition.
+          { break_match_hyp; intuition auto with *.
             do 2 red in e; subst.
             apply Bool.negb_true_iff in INEQ.
             apply RelDec.neg_rel_dec_correct in INEQ.
@@ -359,8 +359,8 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
         + intros f bk' INEQ1 INEQ2 FIND.
           cbn.
           break_match_goal.
-          * break_match_hyp; intuition.
-          * break_match_hyp; intuition.
+          * break_match_hyp; intuition auto with *.
+          * break_match_hyp; intuition auto with *.
             match goal with
               |- ?x = _ => replace x with (find_block (map (update_provenance_block f2 (blk_id bk)) (((pre ++ bk :: bks) ∖ blk_id bk) ∖ f2)) f) by reflexivity
             end.
@@ -373,8 +373,8 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
         + intros f INEQ1 INEQ2 FIND.
           cbn.
           break_match_goal.
-          * break_match_hyp; intuition.
-          * break_match_hyp; intuition.
+          * break_match_hyp; intuition auto with *.
+          * break_match_hyp; intuition auto with *.
             match goal with
               |- ?x = _ => replace x with (find_block (map (update_provenance_block f2 (blk_id bk)) (((pre ++ bk :: bks) ∖ blk_id bk) ∖ f2)) f) by reflexivity
             end.
@@ -459,7 +459,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
       intros.
       unfold update_provenance.
       break_match_goal; auto.
-      unfold Eqv.eqv_dec,RelDec.rel_dec in Heqb; cbn in *; break_match_hyp; intuition.
+      unfold Eqv.eqv_dec,RelDec.rel_dec in Heqb; cbn in *; break_match_hyp; intuition auto with *.
     Qed.
 
     Lemma update_provenance_ineq : forall old new to,
@@ -469,7 +469,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
       intros.
       unfold update_provenance.
       break_match_goal; auto.
-      unfold Eqv.eqv_dec,RelDec.rel_dec in Heqb; cbn in *; break_match_hyp; intuition.
+      unfold Eqv.eqv_dec,RelDec.rel_dec in Heqb; cbn in *; break_match_hyp; intuition auto with *.
     Qed.
 
     Lemma assoc_update_provenance :
@@ -733,7 +733,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
       subst tgt.
       rewrite wf_ocfg_bid_In_is_found in LU2; auto; inv LU2.
       unfold has_no_phi in NOPHI.
-      break_match_hyp; intuition.
+      break_match_hyp; intuition auto with *.
     Qed.
 
     Arguments denote_block : simpl never.

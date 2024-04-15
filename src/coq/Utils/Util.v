@@ -315,7 +315,7 @@ Section nat_Show.
       flatten_hyp H.
       + rewrite append_EmptyString in H.
         rewrite get_last_digit_0_iff in H.
-        generalize (Nat.mod_eq (S n) 10 (ltac:(lia))).
+        generalize (Nat.Div0.mod_eq (S n) 10).
         rewrite H, Heq; simpl; intros abs; inv abs.
       + rewrite append_EmptyString in H; destruct (string_of_nat_aux_prepends (S n0) (get_last_digit (S n))) as (hd & eq & eq'). 
         rewrite H in eq'.
@@ -839,17 +839,17 @@ Qed.
 
 Lemma Nth_In :
   forall {X} (xs : list X) i (x : X),
-    Util.Nth xs i x ->
+    Nth xs i x ->
     In x xs.
 Proof using.
   intros X xs i x NTH.
-  unfold Util.Nth in *.
+  unfold Nth in *.
   eapply nth_error_In; eauto.
 Qed.
 
 Lemma Nth_list_nth_z :
   forall {X} (ix : nat) (xs : list X) (x : X),
-    Util.Nth xs ix x ->
+    Nth xs ix x ->
     Coqlib.list_nth_z xs (Z.of_nat ix) = Some x.
 Proof using.
   intros X ix xs.
