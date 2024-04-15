@@ -1,0 +1,7 @@
+(coq.theory
+ (name Vellvm)
+ (package coq-vellvm)
+ (theories Flocq QuickChick Paco ExtLib ITree stdpp)
+)
+
+(include_subdirs qualified)
