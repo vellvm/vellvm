@@ -10,11 +10,6 @@ From Vellvm Require Import
      Syntax.LLVMAst
      Syntax.AstLib.
 
-(* From ExtLib Require Import *)
-(*      Programming.Eqv *)
-(*      Structures.Monads. *)
-
-
 Import ListNotations.
 (* Import EqvNotation. *)
 (* Import MonadNotation. *)
