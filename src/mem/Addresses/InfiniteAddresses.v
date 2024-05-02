@@ -6,9 +6,9 @@ From Vellvm Require Import
   Numeric.Rocqlib
   Utils.Error.
 
-From Vellvm.Semantics Require Import
-  MemoryAddress
-  Memory.FiniteProvenance.
+From Mem Require Import
+  Addresses.MemoryAddress
+  Memory.Provenance.
 
 From QuickChick Require Import Show.
 
@@ -200,7 +200,7 @@ with Definition access_allowed := fun (pr : Prov) (aid : AllocationId)
       {pr = pr'} + {pr <> pr'}.
   Proof.
     unfold Provenance.
-    unfold FiniteProvenance.Provenance.
+    unfold Provenance.Provenance.
     intros pr pr'.
     apply N.eq_dec.
   Defined.

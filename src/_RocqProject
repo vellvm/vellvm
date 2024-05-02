@@ -1,10 +1,40 @@
 -R rocq Vellvm
+-R llvm-mem LLVM_Memory
+-R mem Mem
 
 -arg -w -arg -masking-absolute-name
 -arg -w -arg -deprecated-hint-without-locality
 -arg -w -arg -deprecated-hint-rewrite-without-locality
 -arg -w -arg -require-in-module
 
+./mem/MemPropT.v
+./mem/MemoryInterpreters.v
+./mem/MemoryModel.v
+./mem/MemoryModelImplementation.v
+./mem/SByte.v
+./mem/MemoryModules/FiniteExecPrimitives.v
+./mem/MemoryModules/FiniteSpecPrimitives.v
+./mem/MemoryModules/Within.v
+./mem/OOM.v
+./mem/PointerArithmetic.v
+./mem/Semantics/Memory/ErrSID.v
+./mem/Semantics/Memory/Provenance.v
+./mem/Semantics/Memory/Overlaps.v
+./mem/Semantics/Memory/StoreId.v
+./mem/Addresses/MemoryAddress.v
+./mem/Addresses/FiniteAddresses.v
+./mem/Addresses/InfiniteAddresses.v
+
+./llvm-mem/Sizeof.v
+./llvm-mem/FiniteSizeof.v
+./llvm-mem/MemBytes.v
+./llvm-mem/DvalueBytes.v
+./llvm-mem/GepM.v
+./llvm-mem/Intptr.v
+./llvm-mem/FiniteIntptr.v
+./llvm-mem/OverlapsLemmas.v
+./llvm-mem/MemoryLLVM.v
+./llvm-mem/MemPropT_LLVM.v
 
 ./rocq/Analysis/Dom.v
 ./rocq/Analysis/DomId.v
@@ -17,18 +47,6 @@
 ./rocq/Handlers/Handlers.v
 ./rocq/Handlers/Intrinsics.v
 ./rocq/Handlers/Local.v
-./rocq/Handlers/MemPropT.v
-./rocq/Handlers/MemoryInterpreters.v
-./rocq/Handlers/MemoryModel.v
-./rocq/Handlers/MemoryModelImplementation.v
-./rocq/Handlers/MemoryModules/FiniteAddresses.v
-./rocq/Handlers/MemoryModules/FiniteExecPrimitives.v
-./rocq/Handlers/MemoryModules/FiniteIntptr.v
-./rocq/Handlers/MemoryModules/FiniteSizeof.v
-./rocq/Handlers/MemoryModules/FiniteSpecPrimitives.v
-./rocq/Handlers/MemoryModules/InfiniteAddresses.v
-./rocq/Handlers/MemoryModules/Within.v
-./rocq/Handlers/OOM.v
 ./rocq/Handlers/Pick.v
 ./rocq/Handlers/SerializationTheory.v
 ./rocq/Handlers/Stack.v
@@ -53,8 +71,6 @@
 ./rocq/Semantics/ConcretizationParams.v
 ./rocq/Semantics/Denotation.v
 ./rocq/Semantics/DynamicValues.v
-./rocq/Semantics/GepM.v
-./rocq/Semantics/StoreId.v
 ./rocq/Semantics/InfiniteToFinite.v
 ./rocq/Semantics/InfiniteToFinite/Conversions/BaseConversions.v
 ./rocq/Semantics/InfiniteToFinite/Conversions/DvalueConversions.v
@@ -68,14 +84,6 @@
 ./rocq/Semantics/LLVMEvents.v
 ./rocq/Semantics/LLVMParams.v
 ./rocq/Semantics/Lang.v
-./rocq/Semantics/Memory/ErrSID.v
-./rocq/Semantics/Memory/FiniteProvenance.v
-./rocq/Semantics/Memory/MemBytes.v
-./rocq/Semantics/Memory/DvalueBytes.v
-./rocq/Semantics/Memory/Overlaps.v
-./rocq/Semantics/Memory/Sizeof.v
-./rocq/Semantics/Memory/StoreId.v
-./rocq/Semantics/MemoryAddress.v
 ./rocq/Semantics/MemoryParams.v
 ./rocq/Semantics/RuttProps.v
 ./rocq/Semantics/Printfdefn.v
@@ -143,6 +151,7 @@
 ./rocq/Utils/PostConditions.v
 ./rocq/Utils/PropT.v
 ./rocq/Utils/Raise.v
+./rocq/Utils/RaiseLLVM.v
 ./rocq/Utils/RefineProp.v
 ./rocq/Utils/ErrUbOomProp.v
 ./rocq/Utils/ErrOomPoison.v

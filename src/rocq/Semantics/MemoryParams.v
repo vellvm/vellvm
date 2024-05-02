@@ -1,8 +1,10 @@
 From Vellvm Require Import
-     Semantics.LLVMParams
-     Semantics.GepM
-     Semantics.Memory.MemBytes
-     Semantics.Memory.DvalueBytes.
+  Semantics.LLVMParams.
+
+From LLVM_Memory Require Import
+  GepM
+  MemBytes
+  DvalueBytes.
 
 Module Type MemoryParams (LP : LLVMParams).
   Declare Module GEP : GEPM LP.ADDR LP.PTOI LP.PROV LP.ITOP LP.IP LP.SIZEOF LP.Events.

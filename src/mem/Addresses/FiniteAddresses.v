@@ -6,9 +6,11 @@ From Vellvm Require Import
   Numeric.Rocqlib
   Utils.Error.
 
+From Mem Require Import
+  Addresses.MemoryAddress
+  Memory.Provenance.
+
 From Vellvm.Semantics Require Import
-  MemoryAddress
-  Memory.FiniteProvenance
   VellvmIntegers.
 
 From QuickChick Require Import Show.
@@ -30,15 +32,12 @@ Definition Prov := option (list Provenance). (* Provenance *)
 Definition wildcard_prov : Prov := None.
 Definition nil_prov : Prov := Some [].
 
-(* TODO: If Prov is an NSet, I get a universe inconsistency here... *)
-Module FinAddr : MemoryAddress.ADDRESS
-with Definition addr := (Iptr * Prov) % type
-with Definition null := (@Integers.zero 64, nil_prov)%Z.
-  Definition addr := (Iptr * Prov) % type.
-  Definition null : addr := (@Integers.zero 64, nil_prov)%Z.
+Module FinAddrType <: ABSTRACT_ADDRESS.
+  Definition t := (Iptr * Prov) % type.
+  Definition eq := @Logic.eq t.
 
   (* TODO: is this what we should be using for equality on pointers? Probably *NOT* because of provenance. *)
-  Lemma eq_dec : forall (a b : addr), {a = b} + {a <> b}.
+  Lemma eq_dec : forall (a b : t), {a = b} + {a <> b}.
   Proof.
     intros [a1 a2] [b1 b2].
 
@@ -50,32 +49,20 @@ with Definition null := (@Integers.zero 64, nil_prov)%Z.
     - right. intros H. inversion H; subst. apply n. reflexivity.
   Qed.
 
-  Lemma different_addrs :
-    forall (a : addr), exists (b : addr), a <> b.
-  Proof.
-    intros a.
-    destruct a.
-    destruct i.
-    destruct intval.
-    - exists (@Integers.one 64, p).
-      intros CONTRA; inversion CONTRA.
-    - exists (@Integers.zero 64, p).
-      intros CONTRA; inversion CONTRA.
-    - exists (@Integers.one 64, p).
-      intros CONTRA; inversion CONTRA.
-  Qed.
+  #[global] Instance eq_equiv : Equivalence eq.
+  typeclasses eauto.
+  Defined.
+End FinAddrType.
 
-  Definition show_addr (a : addr) :=
-    match a with
-    | (i, p) =>
-        Show.show (unsigned i, p)
-    end.
-End FinAddr.
+Module FinNull <: HAS_NULL FinAddrType.
+  Definition null := (Int64.zero, nil_prov)%Z.
+End FinNull.
 
-Module FinPTOI : PTOI(FinAddr)
-with Definition ptr_to_int := fun (ptr : FinAddr.addr) => Integers.unsigned (fst ptr).
-  Definition ptr_to_int := fun (ptr : FinAddr.addr) => Integers.unsigned (fst ptr).
+Module FinPTOI <: HAS_PTOI FinAddrType.
+  Definition ptr_to_int := fun (ptr : FinAddrType.t) => Int64.unsigned (fst ptr).
 End FinPTOI.
+
+Module FinAddr <: ADDRESS := FinAddrType <+ FinNull <+ FinPTOI.
 
 Module FinPROV <: PROVENANCE(FinAddr)
 with Definition Prov := Prov
@@ -206,7 +193,7 @@ with Definition access_allowed := fun (pr : Prov) (aid : AllocationId)
       {pr = pr'} + {pr <> pr'}.
   Proof.
     unfold Provenance.
-    unfold FiniteProvenance.Provenance.
+    unfold Provenance.Provenance.
     intros pr pr'.
     apply N.eq_dec.
   Defined.

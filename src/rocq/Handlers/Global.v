@@ -19,7 +19,14 @@ From Vellvm Require Import
      Utils.Error
      Utils.Tactics
      Semantics.LLVMEvents
-     Semantics.Memory.Sizeof.
+     LLVMAst.
+
+From Mem Require Import
+  Addresses.MemoryAddress.
+
+From LLVM_Memory Require Import
+  Sizeof
+  Intptr.
 
 Require Import Ceres.Ceres.
 
@@ -172,11 +179,6 @@ Section Globals.
   End PARAMS.
 
 End Globals.
-
-
-From Vellvm Require Import
-     LLVMAst
-     MemoryAddress.
 
 (* YZ TODO : Undecided about the status of this over-generalization of these events over domains of keys and values.
    The interface needs to be specialized anyway in [LLVMEvents].
