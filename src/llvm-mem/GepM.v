@@ -8,22 +8,22 @@ From Vellvm Require Import
   DynamicTypes
   VellvmIntegers
   LLVMEvents
-  Semantics.MemoryAddress
-  Semantics.Memory.Sizeof
   Utils.Error
   Utils.Tactics.
+
+From Mem Require Import
+  Addresses.MemoryAddress.
+
+From LLVM_Memory Require Import
+  Sizeof
+  Intptr.
 
 Import ListNotations.
 Import MonadNotation.
 
-Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITOP : ITOP Addr PROV PTOI) (IP:INTPTR) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
-  Import LLVMEvents.
-  Import DV.
-  Import PROV.
+Module Type GEPM (Addr:ADDRESS) (ITOP : ITOP Addr) (SIZEOF:Sizeof).
   Import Addr.
-  Import PTOI.
   Import ITOP.
-  Import IP.
   Import SIZEOF.
 
   (** ** Get Element Pointer

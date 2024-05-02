@@ -1,10 +1,40 @@
 -R coq Vellvm
+-R llvm-mem LLVM_Memory
+-R mem Mem
 
 -arg -w -arg -masking-absolute-name
 -arg -w -arg -deprecated-hint-without-locality
 -arg -w -arg -deprecated-hint-rewrite-without-locality
 -arg -w -arg -require-in-module
 
+./mem/MemPropT.v
+./mem/MemoryInterpreters.v
+./mem/MemoryModel.v
+./mem/MemoryModelImplementation.v
+./mem/SByte.v
+./mem/MemoryModules/FiniteExecPrimitives.v
+./mem/MemoryModules/FiniteSpecPrimitives.v
+./mem/MemoryModules/Within.v
+./mem/OOM.v
+./mem/PointerArithmetic.v
+./mem/Semantics/Memory/ErrSID.v
+./mem/Semantics/Memory/Provenance.v
+./mem/Semantics/Memory/Overlaps.v
+./mem/Semantics/Memory/StoreId.v
+./mem/Addresses/MemoryAddress.v
+./mem/Addresses/FiniteAddresses.v
+./mem/Addresses/InfiniteAddresses.v
+
+./llvm-mem/Sizeof.v
+./llvm-mem/FiniteSizeof.v
+./llvm-mem/MemBytes.v
+./llvm-mem/DvalueBytes.v
+./llvm-mem/GepM.v
+./llvm-mem/Intptr.v
+./llvm-mem/FiniteIntptr.v
+./llvm-mem/OverlapsLemmas.v
+./llvm-mem/MemoryLLVM.v
+./llvm-mem/MemPropT_LLVM.v
 
 ./coq/Analysis/Dom.v
 ./coq/Analysis/DomId.v
@@ -17,18 +47,6 @@
 ./coq/Handlers/Handlers.v
 ./coq/Handlers/Intrinsics.v
 ./coq/Handlers/Local.v
-./coq/Handlers/MemPropT.v
-./coq/Handlers/MemoryInterpreters.v
-./coq/Handlers/MemoryModel.v
-./coq/Handlers/MemoryModelImplementation.v
-./coq/Handlers/MemoryModules/FiniteAddresses.v
-./coq/Handlers/MemoryModules/FiniteExecPrimitives.v
-./coq/Handlers/MemoryModules/FiniteIntptr.v
-./coq/Handlers/MemoryModules/FiniteSizeof.v
-./coq/Handlers/MemoryModules/FiniteSpecPrimitives.v
-./coq/Handlers/MemoryModules/InfiniteAddresses.v
-./coq/Handlers/MemoryModules/Within.v
-./coq/Handlers/OOM.v
 ./coq/Handlers/Pick.v
 ./coq/Handlers/SerializationTheory.v
 ./coq/Handlers/Stack.v
@@ -53,8 +71,6 @@
 ./coq/Semantics/ConcretizationParams.v
 ./coq/Semantics/Denotation.v
 ./coq/Semantics/DynamicValues.v
-./coq/Semantics/GepM.v
-./coq/Semantics/StoreId.v
 ./coq/Semantics/InfiniteToFinite.v
 ./coq/Semantics/InfiniteToFinite/Conversions/BaseConversions.v
 ./coq/Semantics/InfiniteToFinite/Conversions/DvalueConversions.v
@@ -68,14 +84,6 @@
 ./coq/Semantics/LLVMEvents.v
 ./coq/Semantics/LLVMParams.v
 ./coq/Semantics/Lang.v
-./coq/Semantics/Memory/ErrSID.v
-./coq/Semantics/Memory/FiniteProvenance.v
-./coq/Semantics/Memory/MemBytes.v
-./coq/Semantics/Memory/DvalueBytes.v
-./coq/Semantics/Memory/Overlaps.v
-./coq/Semantics/Memory/Sizeof.v
-./coq/Semantics/Memory/StoreId.v
-./coq/Semantics/MemoryAddress.v
 ./coq/Semantics/MemoryParams.v
 ./coq/Semantics/RuttProps.v
 ./coq/Semantics/Printfdefn.v
@@ -143,6 +151,7 @@
 ./coq/Utils/PostConditions.v
 ./coq/Utils/PropT.v
 ./coq/Utils/Raise.v
+./coq/Utils/RaiseLLVM.v
 ./coq/Utils/RefineProp.v
 ./coq/Utils/ErrUbOomProp.v
 ./coq/Utils/ErrOomPoison.v

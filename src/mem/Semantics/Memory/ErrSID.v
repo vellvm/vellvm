@@ -11,17 +11,22 @@ From ExtLib Require Import
 From Vellvm Require Import
      Utils.Error
      Utils.UBAndErrors
-     Semantics.MemoryAddress
      Semantics.DynamicValues
      Semantics.LLVMEvents
-     Semantics.Memory.FiniteProvenance
-     Semantics.Memory.Sizeof
-     Semantics.StoreId
      Utils.StateMonads
      Utils.Monads
      Utils.MonadExcLaws
      Utils.MonadReturnsLaws
      Utils.Raise.
+
+From Mem Require Import
+  Addresses.MemoryAddress
+  StoreId
+  Provenance.
+
+From LLVM_Memory Require Import
+  Sizeof
+  Intptr.
 
 Import Morphisms.
 

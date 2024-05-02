@@ -5,10 +5,8 @@ From ExtLib Require Import Structures.Monads.
 From Vellvm Require Import
      Syntax.DynamicTypes
      Semantics.DynamicValues
-     Semantics.MemoryAddress
-     Semantics.Memory.Sizeof
      Semantics.LLVMEvents
-     Semantics.StoreId
+
      Utils.Monads
      Utils.OptionUtil
      Utils.ListUtil
@@ -16,6 +14,14 @@ From Vellvm Require Import
      Utils.MonadReturnsLaws
      Utils.MapMonadExtra
      Utils.Tactics.
+
+From Mem Require Import
+  StoreId
+  Addresses.MemoryAddress.
+
+From LLVM_Memory Require Import
+  Sizeof
+  Intptr.
 
 Import Basics.Basics.Monads.
 
