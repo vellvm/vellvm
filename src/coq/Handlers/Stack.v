@@ -5,7 +5,8 @@ From Coq Require Import
 
 From ExtLib Require Import
      Structures.Monads
-     Structures.Maps.
+     Structures.Maps
+     Data.Map.FMapAList.
 
 From ITree Require Import
      ITree
@@ -19,11 +20,16 @@ From Vellvm Require Import
      Utils.Tactics
      Syntax.LLVMAst
      Syntax.AstLib
-     Semantics.MemoryAddress
-     Semantics.Memory.Sizeof
      Semantics.DynamicValues
      Semantics.LLVMEvents
      Handlers.Local.
+
+From Mem Require Import
+  Addresses.MemoryAddress.
+
+From LLVM_Memory Require Import
+  Sizeof
+  Intptr.
 
 Require Import Ceres.Ceres.
 
@@ -151,10 +157,6 @@ Section StackMap.
   End PARAMS.
 
 End StackMap.
-
-From ExtLib Require Import
-     Data.Map.FMapAList.
-
 
 (* Undecided about the status of this over-generalization of these events over domains of keys and values.
    The interface needs to be specialized anyway in [LLVMEvents].

@@ -4,26 +4,19 @@ From ExtLib Require Import
      Structures.Monad
      Structures.Functor.
 
-From Vellvm Require Import
-  DynamicTypes
-  VellvmIntegers
-  LLVMEvents
-  Semantics.MemoryAddress
-  Semantics.Memory.Sizeof
-  Utils.Error
-  Utils.Tactics.
+From Mem Require Import
+  Addresses.MemoryAddress.
+
+From LLVM_Memory Require Import
+  Sizeof
+  Intptr.
 
 Import ListNotations.
 Import MonadNotation.
-
-Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITOP : ITOP Addr PROV PTOI) (IP:INTPTR) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
-  Import LLVMEvents.
-  Import DV.
-  Import PROV.
+    
+Module Type GEPM (Addr:ADDRESS) (ITOP : ITOP Addr) (SIZEOF:Sizeof).
   Import Addr.
-  Import PTOI.
   Import ITOP.
-  Import IP.
   Import SIZEOF.
 
   (** ** Get Element Pointer
@@ -39,57 +32,49 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
     match vs with
     | v :: vs' =>
       match v with
-      | @DVALUE_I 8 i =>
-        let k := signed i in
+      | DVALUE_I8 i =>
+        let k := unsigned i in
         let n := BinIntDef.Z.to_nat k in
         match t with
-        | DTYPE_Array _ ta
-        | DTYPE_Vector _ ta =>
-            handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+        | DTYPE_Vector _ ta
+        | DTYPE_Array _ ta =>
+          handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
         | _ => failwith ("non-i8-indexable type")
         end
-      | @DVALUE_I 32 i =>
+      | DVALUE_I32 i =>
         let k := unsigned i in
-        let ks := signed i in
         let n := BinIntDef.Z.to_nat k in
         match t with
-        | DTYPE_Array _ ta
-        | DTYPE_Vector _ ta =>
-            handle_gep_h ta (off + ks * (Z.of_N (sizeof_dtyp ta))) vs'
-        | DTYPE_Struct ts =>
-            let offset := fold_left (fun acc t => pad_to_align (dtyp_alignment t) acc + sizeof_dtyp t)%N
-                            (firstn n ts) 0%N in
-            match nth_error ts n with
-            | None => failwith "overflow"
-            | Some t' =>
-                handle_gep_h t' (off + Z.of_N offset) vs'
-            end
-        | DTYPE_Packed_struct ts =>
-          let offset := fold_left (fun acc t => acc + sizeof_dtyp t)%N
-                                  (firstn n ts) 0%N in
+        | DTYPE_Vector _ ta
+        | DTYPE_Array _ ta =>
+          handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+        | DTYPE_Struct ts
+        | DTYPE_Packed_struct ts => (* Handle these differently in future *)
+          let offset := fold_left (fun acc t => (acc + (Z.of_N (sizeof_dtyp t))))%Z
+                                  (firstn n ts) 0%Z in
           match nth_error ts n with
           | None => failwith "overflow"
           | Some t' =>
-            handle_gep_h t' (off + Z.of_N offset) vs'
+            handle_gep_h t' (off + offset) vs'
           end
         | _ => failwith ("non-i32-indexable type")
         end
-      | @DVALUE_I 64 i =>
-        let k := signed i in
+      | DVALUE_I64 i =>
+        let k := unsigned i in
         let n := BinIntDef.Z.to_nat k in
         match t with
-        | DTYPE_Array _ ta
-        | DTYPE_Vector _ ta =>
-            handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+        | DTYPE_Vector _ ta
+        | DTYPE_Array _ ta =>
+          handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
         | _ => failwith ("non-i64-indexable type")
         end
       | DVALUE_IPTR i =>
         let k := IP.to_Z i in
         let n := BinIntDef.Z.to_nat k in
         match t with
-        | DTYPE_Array _ ta
-        | DTYPE_Vector _ ta =>
-            handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+        | DTYPE_Vector _ ta
+        | DTYPE_Array _ ta =>
+          handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
         | _ => failwith ("non-iptr-indexable type")
         end
       | _ => failwith "handle_gep_h: unsupported index type"
@@ -100,19 +85,18 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
   (* At the toplevel, GEP takes a [dvalue] as an argument that must contain a pointer, but no other pointer can be recursively followed.
      The pointer set the block into which we look, and the initial offset. The first index value add to the initial offset passed to [handle_gep_h] for the actual access to structured data.
    *)
-  (* TODO: This should take into account padding too... May break get_consecutive_ptrs and friends. *)
   Definition handle_gep_addr (t:dtyp) (a:addr) (vs:list dvalue) : err (OOM addr) :=
     let ptr := ptr_to_int a in
     let prov := address_provenance a in
     match vs with
-    | @DVALUE_I 8 i :: vs' =>
-      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
+    | DVALUE_I8 i :: vs' =>
+      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (unsigned i)) vs' ;;
       ret (int_to_ptr ptr' prov)
-    | @DVALUE_I 32 i :: vs' =>
-      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
+    | DVALUE_I32 i :: vs' =>
+      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (unsigned i)) vs' ;;
       ret (int_to_ptr ptr' prov)
-    | @DVALUE_I 64 i :: vs' =>
-      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
+    | DVALUE_I64 i :: vs' =>
+      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (unsigned i)) vs' ;;
       ret (int_to_ptr ptr' prov)
     | DVALUE_IPTR i :: vs' =>
       ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (IP.to_Z i)) vs' ;;
@@ -298,9 +282,19 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
       [inversion GEP|].
 
     cbn in GEP.
-    repeat break_match_hyp_inv;
-      cbn in *;
-      symmetry;
+    destruct a; inversion GEP.
+    - break_match_hyp; inv GEP.
+      cbn in *.
+      symmetry.
+      eapply int_to_ptr_provenance; eauto.
+    - break_match_hyp; inv GEP.
+      symmetry.
+      eapply int_to_ptr_provenance; eauto.
+    - break_match_hyp; inv GEP.
+      symmetry.
+      eapply int_to_ptr_provenance; eauto.
+    - break_match_hyp; inv GEP.
+      symmetry.
       eapply int_to_ptr_provenance; eauto.
   Qed.
 
