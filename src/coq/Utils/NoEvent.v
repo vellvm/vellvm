@@ -1139,8 +1139,8 @@ Section DeterministicSingleton.
 *)
 End DeterministicSingleton.
 
-Require Import MemoryAddress.
-Require Import Sizeof.
+Require Import Mem.MemoryAddress.
+Require Import LLVM_Memory.Sizeof.
 
 Module PICK_REMOVE (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERACTIONS ADDR IP SIZE).
   Import Events.

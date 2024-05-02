@@ -32,14 +32,19 @@ From ExtLib Require Import
 From Vellvm Require Import
      Utilities
      Syntax
-     Semantics.MemoryAddress
-     Semantics.Memory.Sizeof
      Semantics.VellvmIntegers
-     Semantics.StoreId
      Utils.MapMonadExtra
      Utils.MonadEq1Laws
      Utils.MonadReturnsLaws
      QC.ShowAST.
+
+From Mem Require Import
+  Semantics.Memory.StoreId
+  Addresses.MemoryAddress.
+
+From LLVM_Memory Require Import
+  Sizeof
+  Intptr.
 
 Require Import Coq.Program.Equality.
 Require Import Vellvm.Utils.VellvmRelations.
@@ -189,7 +194,7 @@ Definition ll_double := Floats.float.
 
 
 (* Sizeof is needed for for ConcatBytes case *)
-Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.MemoryAddress.INTPTR)(SIZEOF:Sizeof).
+Module DVALUE(A:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof).
 
   Import SIZEOF.
   Import IP.

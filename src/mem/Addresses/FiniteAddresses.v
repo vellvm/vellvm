@@ -6,9 +6,12 @@ From Vellvm Require Import
   Numeric.Coqlib
   Utils.Error.
 
+From Mem Require Import
+  Addresses.MemoryAddress
+  Memory.Provenance.
+
 From Vellvm.Semantics Require Import
-  MemoryAddress
-  Memory.FiniteProvenance.
+  VellvmIntegers.
 
 From QuickChick Require Import Show.
 
@@ -21,7 +24,7 @@ Import ListNotations.
 (** ** Type of pointers
     Implementation of the notion of pointer used: an address and an offset.
  *)
-Definition Iptr := Z. (* Integer pointer type (physical addresses) *)
+Definition Iptr := int64. (* Integer pointer type (physical addresses) *)
 
 (* TODO: Should probably make this an NSet, but it gives universe inconsistency with Module addr *)
 Definition Prov := option (list Provenance). (* Provenance *)
@@ -29,19 +32,16 @@ Definition Prov := option (list Provenance). (* Provenance *)
 Definition wildcard_prov : Prov := None.
 Definition nil_prov : Prov := Some [].
 
-(* TODO: If Prov is an NSet, I get a universe inconsistency here... *)
-Module InfAddr : MemoryAddress.ADDRESS
-with Definition addr := (Iptr * Prov) % type
-with Definition null := (0, nil_prov)%Z.
-  Definition addr := (Iptr * Prov) % type.
-  Definition null : addr := (0, nil_prov)%Z.
+Module FinAddrType <: ABSTRACT_ADDRESS.
+  Definition t := (Iptr * Prov) % type.
+  Definition eq := @Logic.eq t.
 
   (* TODO: is this what we should be using for equality on pointers? Probably *NOT* because of provenance. *)
-  Lemma eq_dec : forall (a b : addr), {a = b} + {a <> b}.
+  Lemma eq_dec : forall (a b : t), {a = b} + {a <> b}.
   Proof.
     intros [a1 a2] [b1 b2].
 
-    destruct (Z.eq_dec a1 b1);
+    destruct (Int64.eq_dec a1 b1);
       destruct (option_eq (fun x y => list_eq_dec N.eq_dec x y) a2 b2); subst.
     - left; reflexivity.
     - right. intros H. inversion H; subst. apply n. reflexivity.
@@ -49,32 +49,25 @@ with Definition null := (0, nil_prov)%Z.
     - right. intros H. inversion H; subst. apply n. reflexivity.
   Qed.
 
-  Lemma different_addrs :
-    forall (a : addr), exists (b : addr), a <> b.
-  Proof.
-    intros a.
-    destruct a.
-    destruct i.
-    - exists (Z.pos 1, p).
-      intros CONTRA; inversion CONTRA.
-    - exists (0, p).
-      intros CONTRA; inversion CONTRA.
-    - exists (Z.pos 1, p).
-      intros CONTRA; inversion CONTRA.
-  Qed.
+  #[global] Instance eq_equiv : Equivalence eq.
+  typeclasses eauto.
+  Defined.
+End FinAddrType.
 
-  Definition show_addr (a : addr) := Show.show a.
-End InfAddr.
+Module FinNull <: HAS_NULL FinAddrType.
+  Definition null := (Int64.zero, nil_prov)%Z.
+End FinNull.
 
-Module InfPTOI : PTOI(InfAddr)
-with Definition ptr_to_int := fun (ptr : InfAddr.addr) => fst ptr.
-  Definition ptr_to_int (ptr : InfAddr.addr) := fst ptr.
-End InfPTOI.
+Module FinPTOI <: HAS_PTOI FinAddrType.
+  Definition ptr_to_int := fun (ptr : FinAddrType.t) => Int64.unsigned (fst ptr).
+End FinPTOI.
 
-Module InfPROV <: PROVENANCE(InfAddr)
+Module FinAddr <: ADDRESS := FinAddrType <+ FinNull <+ FinPTOI.
+
+Module FinPROV <: PROVENANCE(FinAddr)
 with Definition Prov := Prov
 with Definition address_provenance
-    := fun (a : InfAddr.addr) => snd a
+    := fun (a : FinAddr.addr) => snd a
 with Definition Provenance := Provenance
 with Definition AllocationId := AllocationId
 with Definition wildcard_prov := wildcard_prov
@@ -90,14 +83,14 @@ with Definition access_allowed := fun (pr : Prov) (aid : AllocationId)
          | Some aid =>
            existsb (N.eqb aid) prset
          end
-       end.
+       end.  
 
   Definition Provenance := Provenance.
   Definition AllocationId := AllocationId.
   Definition Prov := Prov.
   Definition wildcard_prov : Prov := wildcard_prov.
   Definition nil_prov : Prov := nil_prov.
-  Definition address_provenance (a : InfAddr.addr) : Prov
+  Definition address_provenance (a : FinAddr.addr) : Prov
     := snd a.
 
   (* Does the provenance set pr allow for access to aid? *)
@@ -200,7 +193,7 @@ with Definition access_allowed := fun (pr : Prov) (aid : AllocationId)
       {pr = pr'} + {pr <> pr'}.
   Proof.
     unfold Provenance.
-    unfold FiniteProvenance.Provenance.
+    unfold Provenance.Provenance.
     intros pr pr'.
     apply N.eq_dec.
   Defined.
@@ -325,26 +318,32 @@ with Definition access_allowed := fun (pr : Prov) (aid : AllocationId)
   Definition show_prov (pr : Prov) := Show.show pr.
   Definition show_provenance (pr : Provenance) := Show.show pr.
   Definition show_allocation_id (aid : AllocationId) := Show.show aid.
-End InfPROV.
+End FinPROV.
 
-Module InfITOP : ITOP InfAddr InfPROV InfPTOI
-with Definition int_to_ptr := fun (i : Z) (pr : Prov) => @ret OOM _ _ (i, pr).
+Module FinITOP : ITOP(FinAddr)(FinPROV)(FinPTOI)
+with Definition int_to_ptr :=
+  fun (i : Z) (pr : Prov) =>
+    if (i <? 0)%Z || (i >=? Int64.modulus)%Z
+    then Oom ("FinITOP.int_to_ptr: out of range (" ++ show i ++ ").")
+    else NoOom (Int64.repr i, pr).
 
-  Import InfAddr.
-  Import InfPROV.
-  Import InfPTOI.
+  Import FinAddr.
+  Import FinPROV.
+  Import FinPTOI.
 
   Definition int_to_ptr (i : Z) (pr : Prov) : OOM addr
-    := ret (i, pr).
+    := if (i <? 0)%Z || (i >=? Int64.modulus)%Z
+       then Oom ("FinITOP.int_to_ptr: out of range (" ++ show i ++ ").")
+       else NoOom (Int64.repr i, pr).
 
   Lemma int_to_ptr_provenance :
     forall (x : Z) (p : Prov) (a : addr),
       int_to_ptr x p = ret a ->
-      InfPROV.address_provenance a = p.
+      FinPROV.address_provenance a = p.
   Proof.
     intros x p a IP.
-    cbn in IP; inv IP.
-    reflexivity.
+    unfold int_to_ptr in *.
+    destruct ((x <? 0)%Z || (x >=? Int64.modulus)); inv IP; auto.
   Qed.
 
   Lemma int_to_ptr_ptr_to_int :
@@ -356,6 +355,9 @@ with Definition int_to_ptr := fun (i : Z) (pr : Prov) => @ret OOM _ _ (i, pr).
     unfold int_to_ptr.
     unfold ptr_to_int.
     destruct a; cbn.
+    pose proof Int64.unsigned_range i as R.
+    destruct ((Int64.unsigned i <? 0)%Z || (Int64.unsigned i >=? Int64.modulus)) eqn:RANGE; [lia|].
+    rewrite Int64.repr_unsigned.
     inv PROV; cbn; auto.
   Qed.
 
@@ -369,6 +371,16 @@ with Definition int_to_ptr := fun (i : Z) (pr : Prov) => @ret OOM _ _ (i, pr).
     intros [a prov] p.
     exists (a, p).
     split; auto.
+    unfold int_to_ptr, ptr_to_int.
+    cbn in *.
+    destruct ((Int64.unsigned a <? 0)%Z || (Int64.unsigned a >=? Int64.modulus)) eqn:BOUNDS.
+    - (* Out of bounds *)
+      exfalso.
+      destruct a.
+      cbn in *.
+      lia.
+    - rewrite Int64.repr_unsigned.
+      reflexivity.
   Qed.
 
   Lemma ptr_to_int_int_to_ptr :
@@ -377,24 +389,11 @@ with Definition int_to_ptr := fun (i : Z) (pr : Prov) => @ret OOM _ _ (i, pr).
       ptr_to_int a = x.
   Proof.
     intros x p a IP.
-    inv IP.
-    reflexivity.
+    unfold int_to_ptr in *.
+    destruct ((x <? 0)%Z || (x >=? Int64.modulus)) eqn:RANGE; inv IP; auto.
+    unfold ptr_to_int. cbn.
+    rewrite Int64.unsigned_repr; auto.
+    unfold Int64.max_unsigned.
+    lia.
   Qed.
-End InfITOP.
-
-Module InfITOP_BIG : MemoryAddress.ITOP_BIG InfAddr InfPROV InfPTOI InfITOP.
-  Import InfITOP.
-
-  Lemma int_to_ptr_safe :
-    forall z pr,
-      match int_to_ptr z pr with
-      | NoOom _ => True
-      | Oom _ => False
-      end.
-  Proof.
-    intros z pr.
-    unfold int_to_ptr.
-    cbn.
-    auto.
-  Qed.
-End InfITOP_BIG.
+End FinITOP.

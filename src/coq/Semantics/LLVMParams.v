@@ -1,7 +1,12 @@
 From Vellvm Require Import
-     Semantics.LLVMEvents
-     Semantics.MemoryAddress
-     Semantics.Memory.Sizeof.
+     Semantics.LLVMEvents.
+
+From Mem Require Import
+  Addresses.MemoryAddress.
+
+From LLVM_Memory Require Import
+  Sizeof
+  Intptr.
 
 (** Parameters for LLVM instances. *)
 Module Type LLVMParams.

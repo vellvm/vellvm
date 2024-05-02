@@ -1,39 +1,44 @@
 From Vellvm Require Import
-     Numeric.Coqlib
-     Numeric.Integers
-     Numeric.Floats
-     Utils.Tactics
-     Utils.Util
-     Utils.OptionUtil
-     Utils.Error
-     Utils.ListUtil
-     Utils.NonEmpty
-     Utils.NMaps
-     Utils.Monads
-     Utils.MonadReturnsLaws
-     Utils.ErrUbOomProp
-     Utils.Oomable
-     Utils.Poisonable
-     Utils.ErrOomPoison
-     Syntax.LLVMAst
-     Syntax.DynamicTypes
-     Syntax.DataLayout
-     Semantics.VellvmIntegers
-     Semantics.DynamicValues
-     Semantics.MemoryAddress
-     Semantics.GepM
-     Semantics.Memory.Sizeof
-     Semantics.Memory.MemBytes
-     Semantics.MemoryParams
-     Semantics.LLVMEvents
-     Semantics.LLVMParams
-     Semantics.StoreId
-     Handlers.MemoryModel.
+  Numeric.Coqlib
+  Numeric.Integers
+  Numeric.Floats
+  Utils.Tactics
+  Utils.Util
+  Utils.OptionUtil
+  Utils.Error
+  Utils.ListUtil
+  Utils.NonEmpty
+  Utils.NMaps
+  Utils.Monads
+  Utils.MonadReturnsLaws
+  Utils.ErrUbOomProp
+  Utils.Oomable
+  Utils.Poisonable
+  Utils.ErrOomPoison
+  Syntax.LLVMAst
+  Syntax.DynamicTypes
+  Syntax.DataLayout
+  Semantics.VellvmIntegers
+  Semantics.DynamicValues
+  Semantics.MemoryParams
+  Semantics.LLVMEvents
+  Semantics.LLVMParams.
+
+From Mem Require Import
+  Addresses.MemoryAddress
+  Semantics.Memory.StoreId
+  MemoryModel.
+
+From LLVM_Memory Require Import
+  Sizeof
+  Intptr
+  GepM
+  MemBytes.
 
 From ExtLib Require Import
-     Structures.Monads
-     Data.Monads.EitherMonad
-     StateMonad.
+  Structures.Monads
+  Data.Monads.EitherMonad
+  StateMonad.
 
 Require Import Lia.
 
@@ -107,108 +112,108 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
     Definition get_conv_case conv (t1:dtyp) (x:dvalue) (t2:dtyp) : conv_case :=
       match conv with
       | Trunc =>
-        match t1, x, t2 with
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 1
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 1
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 1
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 1 =>
-          Conv_Pure (DVALUE_I1 (repr (unsigned i1)))
+          match t1, x, t2 with
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 1
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 1
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 1
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 1 =>
+              Conv_Pure (DVALUE_I1 (repr (unsigned i1)))
 
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 8
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 8
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 8
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 8
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 8 =>
+              Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
 
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 16
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 16 =>
-          Conv_Pure (DVALUE_I16 (repr (unsigned i1)))
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 16
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 16 =>
+              Conv_Pure (DVALUE_I16 (repr (unsigned i1)))
 
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 32 =>
+              Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
 
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_Poison t)
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 1
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 1
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 8
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 1
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 8
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 16
+          | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 1
+          | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 8
+          | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 32 =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed conv"
+          end
 
       | Zext =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+          match t1, x, t2 with
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
+              Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 16 =>
-          Conv_Pure (DVALUE_I16 (repr (unsigned i1)))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 16
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 16 =>
+              Conv_Pure (DVALUE_I16 (repr (unsigned i1)))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 32 =>
+              Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_I64 (repr (unsigned i1)))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 64
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
+              Conv_Pure (DVALUE_I64 (repr (unsigned i1)))
 
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_Poison t)
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 16
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 16
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 32
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 64
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed conv"
+          end
 
       | Sext =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (signed i1)))
+          match t1, x, t2 with
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
+              Conv_Pure (DVALUE_I8 (repr (signed i1)))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 16 =>
-          Conv_Pure (DVALUE_I16 (repr (signed i1)))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 16
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 16 =>
+              Conv_Pure (DVALUE_I16 (repr (signed i1)))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (signed i1)))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 32 =>
+              Conv_Pure (DVALUE_I32 (repr (signed i1)))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_I64 (repr (signed i1)))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 64
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
+              Conv_Pure (DVALUE_I64 (repr (signed i1)))
 
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_Poison t)
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 16
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 16
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 32
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 64
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed conv"
+          end
 
       | Bitcast =>
           if dtyp_eqb t1 t2
@@ -230,79 +235,79 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                else Conv_Illegal "unequal bitsize in cast"
 
       | Uitofp =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Float
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+          match t1, x, t2 with
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Float
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
+              Conv_Pure (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Double
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Double
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
+              Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
 
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
-          Conv_Pure (DVALUE_Poison t)
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | _, _, _ => Conv_Illegal "ill-typed Uitofp"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed Uitofp"
+          end
 
       | Sitofp =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Float
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+          match t1, x, t2 with
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Float
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
+              Conv_Pure (DVALUE_Float (Float32.of_intu (repr (signed i1))))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Double
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Double
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
+              Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
 
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
-          Conv_Pure (DVALUE_Poison t)
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | _, _, _ => Conv_Illegal "ill-typed Sitofp"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed Sitofp"
+          end
 
       | Inttoptr =>
-        match t1, t2 with
-        | DTYPE_I _, DTYPE_Pointer => Conv_ItoP x
-        | DTYPE_IPTR , DTYPE_Pointer => Conv_ItoP x
-        | _, _ => Conv_Illegal "ERROR: Inttoptr got illegal arguments"
-        end
+          match t1, t2 with
+          | DTYPE_I _, DTYPE_Pointer => Conv_ItoP x
+          | DTYPE_IPTR , DTYPE_Pointer => Conv_ItoP x
+          | _, _ => Conv_Illegal "ERROR: Inttoptr got illegal arguments"
+          end
       | Ptrtoint =>
-        match t1, t2 with
-        | DTYPE_Pointer, DTYPE_I _ => Conv_PtoI x
-        | DTYPE_Pointer, DTYPE_IPTR => Conv_PtoI x
-        | _, _ => Conv_Illegal "ERROR: Ptrtoint got illegal arguments"
-        end
+          match t1, t2 with
+          | DTYPE_Pointer, DTYPE_I _ => Conv_PtoI x
+          | DTYPE_Pointer, DTYPE_IPTR => Conv_PtoI x
+          | _, _ => Conv_Illegal "ERROR: Ptrtoint got illegal arguments"
+          end
 
       | Fptoui
       | Fptosi
@@ -319,14 +324,14 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
   Parameter endianess : Endianess.
   Parameter concretize_uvalueM :
     forall (M : Type -> Type) `{Monad M} (handler : dtyp -> M dvalue)
-      (ERR_M : Type -> Type) `{Monad ERR_M} `{RAISE_ERROR ERR_M} `{RAISE_UB ERR_M} `{RAISE_OOM ERR_M},
+           (ERR_M : Type -> Type) `{Monad ERR_M} `{RAISE_ERROR ERR_M} `{RAISE_UB ERR_M} `{RAISE_OOM ERR_M},
       (forall A : Type, ERR_M A -> M A) -> uvalue -> M dvalue.
 
   Parameter eval_select :
     forall (M : Type -> Type) `{Monad M} (handler : dtyp -> M dvalue)
-      (ERR_M : Type -> Type) `{Monad ERR_M} `{RAISE_ERROR ERR_M} `{RAISE_UB ERR_M} `{RAISE_OOM ERR_M}
-      (lift_ue : forall A : Type, ERR_M A -> M A)
-      (cnd : dvalue) (v1 v2 : uvalue), M dvalue.
+           (ERR_M : Type -> Type) `{Monad ERR_M} `{RAISE_ERROR ERR_M} `{RAISE_UB ERR_M} `{RAISE_OOM ERR_M}
+           (lift_ue : forall A : Type, ERR_M A -> M A)
+           (cnd : dvalue) (v1 v2 : uvalue), M dvalue.
 
   Definition pre_concretized (acc : NMap (list (uvalue * dvalue))) (uv : uvalue) (sid : store_id) : option dvalue
     := vs <- NM.find sid acc;;
@@ -348,8 +353,8 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
   (* Equations *)
   Parameter concretize_uvalueM_equation :
     forall (M : Type -> Type) {HM : Monad M} (undef_handler : dtyp -> M dvalue)
-      (ERR_M : Type -> Type) {HM_ERR : Monad ERR_M} {ERR : RAISE_ERROR ERR_M} {UB : RAISE_UB ERR_M}
-      {OOM : RAISE_OOM ERR_M} (lift_ue : forall A : Type, ERR_M A -> M A) (u : uvalue),
+           (ERR_M : Type -> Type) {HM_ERR : Monad ERR_M} {ERR : RAISE_ERROR ERR_M} {UB : RAISE_UB ERR_M}
+           {OOM : RAISE_OOM ERR_M} (lift_ue : forall A : Type, ERR_M A -> M A) (u : uvalue),
       concretize_uvalueM M undef_handler ERR_M lift_ue u =
         let
           eval_select
@@ -368,17 +373,17 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                    | [], [], [] => ret []
                    | (c::conds), (x::xs), (y::ys) =>
                        selected <- match c with
-                                  | DVALUE_Poison t =>
-                                      (* TODO: Should be the type of the result of the select... *)
-                                      ret (DVALUE_Poison t)
-                                  | DVALUE_I1 i =>
-                                      if (Int1.unsigned i =? 1)%Z
-                                      then ret x
-                                      else ret y
-                                  | _ =>
-                                      lift_ue _
-                                        (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
-                                  end;;
+                                   | DVALUE_Poison t =>
+                                       (* TODO: Should be the type of the result of the select... *)
+                                       ret (DVALUE_Poison t)
+                                   | DVALUE_I1 i =>
+                                       if (Int1.unsigned i =? 1)%Z
+                                       then ret x
+                                       else ret y
+                                   | _ =>
+                                       lift_ue _
+                                         (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
+                                   end;;
                        rest <- loop conds xs ys;;
                        ret (selected :: rest)
                    | _, _, _ =>
@@ -404,49 +409,49 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
              | _ => lift_ue _ (raise_error "concretize_uvalueM: ill-typed select.")
              end
         in
-      (* Concretize the uvalues in a list of UVALUE_ExtractBytes...
+        (* Concretize the uvalues in a list of UVALUE_ExtractBytes...
 
-       *)
-      (* Pick out uvalue bytes that are the same + have same sid
+         *)
+        (* Pick out uvalue bytes that are the same + have same sid
 
          Concretize these identical uvalues...
-       *)
-      let fix concretize_uvalue_bytes_helper (acc : NMap (list (uvalue * dvalue))) (uvs : list uvalue) {struct uvs} : M (list dvalue_byte)
-      := match uvs with
-         | [] => ret []
-         | (uv::uvs) =>
-             match uv with
-             | UVALUE_ExtractByte byte_uv dt idx sid =>
-                 (* Check if this uvalue has been concretized already *)
-                 match pre_concretized acc byte_uv sid with
-                 | Some dv =>
-                     (* Use the pre_concretized value *)
-                     let dv_byte := DVALUE_ExtractByte dv dt idx in
-                     (* Concretize the rest of the bytes *)
-                     rest <- concretize_uvalue_bytes_helper acc uvs;;
-                     ret (dv_byte :: rest)
-                 | None =>
-                     (* Concretize the uvalue *)
-                     dv <- concretize_uvalueM M undef_handler ERR_M lift_ue byte_uv;;
-                     let dv_byte := DVALUE_ExtractByte dv dt idx in
-                     let acc := new_concretized_byte acc byte_uv dv sid in
-                     (* Concretize the rest of the bytes *)
-                     rest <- concretize_uvalue_bytes_helper acc uvs;;
-                     ret (dv_byte :: rest)
+         *)
+        let fix concretize_uvalue_bytes_helper (acc : NMap (list (uvalue * dvalue))) (uvs : list uvalue) {struct uvs} : M (list dvalue_byte)
+          := match uvs with
+             | [] => ret []
+             | (uv::uvs) =>
+                 match uv with
+                 | UVALUE_ExtractByte byte_uv dt idx sid =>
+                     (* Check if this uvalue has been concretized already *)
+                     match pre_concretized acc byte_uv sid with
+                     | Some dv =>
+                         (* Use the pre_concretized value *)
+                         let dv_byte := DVALUE_ExtractByte dv dt idx in
+                         (* Concretize the rest of the bytes *)
+                         rest <- concretize_uvalue_bytes_helper acc uvs;;
+                         ret (dv_byte :: rest)
+                     | None =>
+                         (* Concretize the uvalue *)
+                         dv <- concretize_uvalueM M undef_handler ERR_M lift_ue byte_uv;;
+                         let dv_byte := DVALUE_ExtractByte dv dt idx in
+                         let acc := new_concretized_byte acc byte_uv dv sid in
+                         (* Concretize the rest of the bytes *)
+                         rest <- concretize_uvalue_bytes_helper acc uvs;;
+                         ret (dv_byte :: rest)
+                     end
+                 | _ =>
+                     lift_ue _ (raise_error "concretize_uvalue_bytes_helper: non-byte in uvs.")
                  end
-             | _ =>
-                 lift_ue _ (raise_error "concretize_uvalue_bytes_helper: non-byte in uvs.")
-             end
-         end in
+             end in
 
-      let concretize_uvalue_bytes (uvs : list uvalue) : M (list dvalue_byte)
-      := concretize_uvalue_bytes_helper (@NM.empty _) uvs in
+        let concretize_uvalue_bytes (uvs : list uvalue) : M (list dvalue_byte)
+          := concretize_uvalue_bytes_helper (@NM.empty _) uvs in
 
-      let extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) : M dvalue
-      := dvbs <- concretize_uvalue_bytes uvs;;
-         lift_ue _ (ErrOOMPoison_handle_poison_and_oom DVALUE_Poison (dvalue_bytes_to_dvalue dvbs dt))
-      in
-      match u with
+        let extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) : M dvalue
+          := dvbs <- concretize_uvalue_bytes uvs;;
+             lift_ue _ (ErrOOMPoison_handle_poison_and_oom DVALUE_Poison (dvalue_bytes_to_dvalue dvbs dt))
+        in
+        match u with
         | UVALUE_Addr a                          => ret (DVALUE_Addr a)
         | UVALUE_I1 x                            => ret (DVALUE_I1 x)
         | UVALUE_I8 x                            => ret (DVALUE_I8 x)
@@ -551,9 +556,9 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                   v <- insert_into_str str elt i;;
                   ret v
               | i :: tl =>
-                      subfield <- index_into_str_dv str i;;
-                      modified_subfield <- loop subfield tl;;
-                      insert_into_str str modified_subfield i
+                  subfield <- index_into_str_dv str i;;
+                  modified_subfield <- loop subfield tl;;
+                  insert_into_str str modified_subfield i
               end in
             lift_ue _ (loop str idxs)
         | UVALUE_ExtractElement vec_typ vec idx =>
@@ -572,61 +577,61 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         | _ => lift_ue _ (raise_error ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u))
         end.
 
-      Parameter eval_select_equation :
-        forall (M : Type -> Type) {HM : Monad M} (undef_handler : dtyp -> M dvalue)
-          (ERR_M : Type -> Type) {HM_ERR : Monad ERR_M} {ERR : RAISE_ERROR ERR_M} {UB : RAISE_UB ERR_M}
-          {OOM : RAISE_OOM ERR_M} (lift_ue : forall A : Type, ERR_M A -> M A)
-          (cnd : dvalue) (v1 v2 : uvalue),
-          eval_select M undef_handler ERR_M lift_ue cnd v1 v2 =
-            match cnd with
-            | DVALUE_Poison t =>
-                (* TODO: Should be the type of the result of the select... *)
-                ret (DVALUE_Poison t)
-            | DVALUE_I1 i =>
-                if (Int1.unsigned i =? 1)%Z
-                then concretize_uvalueM M undef_handler ERR_M lift_ue v1
-                else concretize_uvalueM M undef_handler ERR_M lift_ue v2
-            | DVALUE_Vector conds =>
-                let fix loop conds xs ys : M (list dvalue) :=
-                  match conds, xs, ys with
-                  | [], [], [] => ret []
-                  | (c::conds), (x::xs), (y::ys) =>
-                      selected <- match c with
-                                 | DVALUE_Poison t =>
-                                     (* TODO: Should be the type of the result of the select... *)
-                                     ret (DVALUE_Poison t)
-                                 | DVALUE_I1 i =>
-                                     if (Int1.unsigned i =? 1)%Z
-                                     then ret x
-                                     else ret y
-                                 | _ =>
-                                     lift_ue dvalue
-                                       (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
-                                 end;;
-                      rest <- loop conds xs ys;;
-                      ret (selected :: rest)
-                  | _, _, _ =>
-                      lift_ue (list dvalue) (raise_error "concretize_uvalueM: ill-typed vector select, length mismatch.")
-                  end in
-                (* TODO: lazily concretize these vectors to avoid
+  Parameter eval_select_equation :
+    forall (M : Type -> Type) {HM : Monad M} (undef_handler : dtyp -> M dvalue)
+           (ERR_M : Type -> Type) {HM_ERR : Monad ERR_M} {ERR : RAISE_ERROR ERR_M} {UB : RAISE_UB ERR_M}
+           {OOM : RAISE_OOM ERR_M} (lift_ue : forall A : Type, ERR_M A -> M A)
+           (cnd : dvalue) (v1 v2 : uvalue),
+      eval_select M undef_handler ERR_M lift_ue cnd v1 v2 =
+        match cnd with
+        | DVALUE_Poison t =>
+            (* TODO: Should be the type of the result of the select... *)
+            ret (DVALUE_Poison t)
+        | DVALUE_I1 i =>
+            if (Int1.unsigned i =? 1)%Z
+            then concretize_uvalueM M undef_handler ERR_M lift_ue v1
+            else concretize_uvalueM M undef_handler ERR_M lift_ue v2
+        | DVALUE_Vector conds =>
+            let fix loop conds xs ys : M (list dvalue) :=
+              match conds, xs, ys with
+              | [], [], [] => ret []
+              | (c::conds), (x::xs), (y::ys) =>
+                  selected <- match c with
+                              | DVALUE_Poison t =>
+                                  (* TODO: Should be the type of the result of the select... *)
+                                  ret (DVALUE_Poison t)
+                              | DVALUE_I1 i =>
+                                  if (Int1.unsigned i =? 1)%Z
+                                  then ret x
+                                  else ret y
+                              | _ =>
+                                  lift_ue dvalue
+                                    (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
+                              end;;
+                  rest <- loop conds xs ys;;
+                  ret (selected :: rest)
+              | _, _, _ =>
+                  lift_ue (list dvalue) (raise_error "concretize_uvalueM: ill-typed vector select, length mismatch.")
+              end in
+            (* TODO: lazily concretize these vectors to avoid
                    evaluating elements that aren't chosen? *)
-                dv1 <- concretize_uvalueM M undef_handler ERR_M lift_ue v1;;
-                dv2 <- concretize_uvalueM M undef_handler ERR_M lift_ue v2;;
-                match dv1, dv2 with
-                | DVALUE_Poison t, _ =>
-                    (* TODO: Should we make sure t is a vector type...? *)
-                    ret (DVALUE_Poison t)
-                | DVALUE_Vector _, DVALUE_Poison t =>
-                    (* TODO: Should we make sure t is a vector type...? *)
-                    ret (DVALUE_Poison t)
-                | DVALUE_Vector xs, DVALUE_Vector ys =>
-                    selected <- loop conds xs ys;;
-                    ret (DVALUE_Vector selected)
-                | _, _ =>
-                    lift_ue dvalue (raise_error "concretize_uvalueM: ill-typed vector select, non-vector arguments")
-                end
-            | _ => lift_ue dvalue (raise_error "concretize_uvalueM: ill-typed select.")
-            end.
+            dv1 <- concretize_uvalueM M undef_handler ERR_M lift_ue v1;;
+            dv2 <- concretize_uvalueM M undef_handler ERR_M lift_ue v2;;
+            match dv1, dv2 with
+            | DVALUE_Poison t, _ =>
+                (* TODO: Should we make sure t is a vector type...? *)
+                ret (DVALUE_Poison t)
+            | DVALUE_Vector _, DVALUE_Poison t =>
+                (* TODO: Should we make sure t is a vector type...? *)
+                ret (DVALUE_Poison t)
+            | DVALUE_Vector xs, DVALUE_Vector ys =>
+                selected <- loop conds xs ys;;
+                ret (DVALUE_Vector selected)
+            | _, _ =>
+                lift_ue dvalue (raise_error "concretize_uvalueM: ill-typed vector select, non-vector arguments")
+            end
+        | _ => lift_ue dvalue (raise_error "concretize_uvalueM: ill-typed select.")
+        end.
 
 End ConcretizationBase.
 
@@ -637,7 +642,7 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
   Import Events.
 
   Definition concretize_uvalue {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M}
-             (uv : uvalue) : M dvalue
+    (uv : uvalue) : M dvalue
     := concretize_uvalueM M (fun dt => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) M (fun _ x => x) uv.
 
   Definition concretize_u (uv : uvalue) : ErrUbOomProp dvalue.
@@ -646,11 +651,11 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
     (* Undef handler *)
     { unfold ErrUbOomProp.
       refine (fun edv => match unERR_UB_OOM edv with
-                      | mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr dv)))))) =>
-                          (* As long as the dvalue has the same type, it's a refinement *)
-                          dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-                      | _ => True
-                      end).
+                         | mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr dv)))))) =>
+                             (* As long as the dvalue has the same type, it's a refinement *)
+                             dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
+                         | _ => True
+                         end).
     }
 
     (* lift_ue *)
@@ -666,11 +671,11 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
     (* Undef handler *)
     { unfold ErrUbOomProp.
       refine (fun edv => match unERR_UB_OOM edv with
-                      | mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr dv)))))) =>
-                          (* As long as the dvalue has the same type, it's a refinement *)
-                          dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
-                      | _ => True
-                      end).
+                         | mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr dv)))))) =>
+                             (* As long as the dvalue has the same type, it's a refinement *)
+                             dvalue_has_dtyp dv dt /\ dv <> DVALUE_Poison dt
+                         | _ => True
+                         end).
     }
 
     (* lift_ue *)
@@ -726,9 +731,9 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
       concretize_u uv1 e1 ->
       concretize_u uv2 e2 ->
       concretize_u (UVALUE_IBinop iop uv1 uv2)
-                   (dv1 <- e1 ;;
-                    dv2 <- e2 ;;
-                    (eval_iop iop dv1 dv2)).
+        (dv1 <- e1 ;;
+         dv2 <- e2 ;;
+         (eval_iop iop dv1 dv2)).
   Proof.
     intros iop uv1 e1 uv2 e2 C1 C2.
     unfold concretize_u in *.
@@ -742,11 +747,11 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
 
     eexists.
     exists (fun x => match unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM e2)))) with
-             | inl (OOM_message oom) => raise_oom oom
-             | inr (inl (UB_message ub)) => raise_ub ub
-             | inr (inr (inl (ERR_message err))) => raise_error err
-             | inr (inr (inr x0)) => eval_iop iop x x0
-             end).
+                     | inl (OOM_message oom) => raise_oom oom
+                     | inr (inl (UB_message ub)) => raise_ub ub
+                     | inr (inr (inl (ERR_message err))) => raise_error err
+                     | inr (inr (inr x0)) => eval_iop iop x x0
+                     end).
     split; eauto.
     split; eauto.
 
@@ -842,108 +847,108 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
     Definition get_conv_case conv (t1:dtyp) (x:dvalue) (t2:dtyp) : conv_case :=
       match conv with
       | Trunc =>
-        match t1, x, t2 with
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 1
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 1
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 1
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 1 =>
-          Conv_Pure (DVALUE_I1 (repr (unsigned i1)))
+          match t1, x, t2 with
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 1
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 1
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 1
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 1 =>
+              Conv_Pure (DVALUE_I1 (repr (unsigned i1)))
 
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 8
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 8
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 8
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 8
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 8 =>
+              Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
 
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 16
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 16 =>
-          Conv_Pure (DVALUE_I16 (repr (unsigned i1)))
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 16
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 16 =>
+              Conv_Pure (DVALUE_I16 (repr (unsigned i1)))
 
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 32 =>
+              Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
 
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_Poison t)
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 1
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 1
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 8
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 1
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 8
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 16
+          | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 1
+          | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 8
+          | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 32 =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed conv"
+          end
 
       | Zext =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+          match t1, x, t2 with
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
+              Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 16 =>
-          Conv_Pure (DVALUE_I16 (repr (unsigned i1)))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 16
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 16 =>
+              Conv_Pure (DVALUE_I16 (repr (unsigned i1)))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 32 =>
+              Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_I64 (repr (unsigned i1)))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 64
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
+              Conv_Pure (DVALUE_I64 (repr (unsigned i1)))
 
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_Poison t)
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 16
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 16
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 32
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 64
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed conv"
+          end
 
       | Sext =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (signed i1)))
+          match t1, x, t2 with
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
+              Conv_Pure (DVALUE_I8 (repr (signed i1)))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 16 =>
-          Conv_Pure (DVALUE_I16 (repr (signed i1)))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 16
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 16 =>
+              Conv_Pure (DVALUE_I16 (repr (signed i1)))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (signed i1)))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 32 =>
+              Conv_Pure (DVALUE_I32 (repr (signed i1)))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_I64 (repr (signed i1)))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 64
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
+              Conv_Pure (DVALUE_I64 (repr (signed i1)))
 
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_Poison t)
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 16
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 16
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 32
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 64
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed conv"
+          end
 
       | Bitcast =>
           if dtyp_eqb t1 t2
@@ -965,79 +970,79 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                else Conv_Illegal "unequal bitsize in cast"
 
       | Uitofp =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Float
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+          match t1, x, t2 with
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Float
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
+              Conv_Pure (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Double
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Double
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
+              Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
 
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
-          Conv_Pure (DVALUE_Poison t)
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | _, _, _ => Conv_Illegal "ill-typed Uitofp"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed Uitofp"
+          end
 
       | Sitofp =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Float
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+          match t1, x, t2 with
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Float
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
+              Conv_Pure (DVALUE_Float (Float32.of_intu (repr (signed i1))))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Double
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
+          | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
+          | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
+          | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Double
+          | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
+          | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
+              Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
 
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
-          Conv_Pure (DVALUE_Poison t)
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 16, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
+          | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | _, _, _ => Conv_Illegal "ill-typed Sitofp"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed Sitofp"
+          end
 
       | Inttoptr =>
-        match t1, t2 with
-        | DTYPE_I _, DTYPE_Pointer => Conv_ItoP x
-        | DTYPE_IPTR , DTYPE_Pointer => Conv_ItoP x
-        | _, _ => Conv_Illegal "ERROR: Inttoptr got illegal arguments"
-        end
+          match t1, t2 with
+          | DTYPE_I _, DTYPE_Pointer => Conv_ItoP x
+          | DTYPE_IPTR , DTYPE_Pointer => Conv_ItoP x
+          | _, _ => Conv_Illegal "ERROR: Inttoptr got illegal arguments"
+          end
       | Ptrtoint =>
-        match t1, t2 with
-        | DTYPE_Pointer, DTYPE_I _ => Conv_PtoI x
-        | DTYPE_Pointer, DTYPE_IPTR => Conv_PtoI x
-        | _, _ => Conv_Illegal "ERROR: Ptrtoint got illegal arguments"
-        end
+          match t1, t2 with
+          | DTYPE_Pointer, DTYPE_I _ => Conv_PtoI x
+          | DTYPE_Pointer, DTYPE_IPTR => Conv_PtoI x
+          | _, _ => Conv_Illegal "ERROR: Ptrtoint got illegal arguments"
+          end
 
       | Fptoui
       | Fptosi
@@ -1159,11 +1164,11 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
       (* Take a UVALUE_ExtractByte, and replace the uvalue with a given dvalue...
        *)
       Definition uvalue_byte_replace_with_dvalue_byte (uv : uvalue) (dv : dvalue) : M dvalue_byte
-      := match uv with
-         | UVALUE_ExtractByte uv dt idx sid =>
-             ret (DVALUE_ExtractByte dv dt idx)
-         | _ => lift_ue (raise_error "uvalue_byte_replace_with_dvalue_byte called with non-UVALUE_ExtractByte value.")
-         end.
+        := match uv with
+           | UVALUE_ExtractByte uv dt idx sid =>
+               ret (DVALUE_ExtractByte dv dt idx)
+           | _ => lift_ue (raise_error "uvalue_byte_replace_with_dvalue_byte called with non-UVALUE_ExtractByte value.")
+           end.
 
       (* M will be err_or_ub / MPropT err_or_ub? *)
       (* Define a sum type f a, g b.... a + b. Mutual recursive
@@ -1187,17 +1192,17 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                    | [], [], [] => ret []
                    | (c::conds), (x::xs), (y::ys) =>
                        selected <- match c with
-                                  | DVALUE_Poison t =>
-                                      (* TODO: Should be the type of the result of the select... *)
-                                      ret (DVALUE_Poison t)
-                                  | DVALUE_I1 i =>
-                                      if (Int1.unsigned i =? 1)%Z
-                                      then ret x
-                                      else ret y
-                                  | _ =>
-                                      lift_ue
-                                        (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
-                                  end;;
+                                   | DVALUE_Poison t =>
+                                       (* TODO: Should be the type of the result of the select... *)
+                                       ret (DVALUE_Poison t)
+                                   | DVALUE_I1 i =>
+                                       if (Int1.unsigned i =? 1)%Z
+                                       then ret x
+                                       else ret y
+                                   | _ =>
+                                       lift_ue
+                                         (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
+                                   end;;
                        rest <- loop conds xs ys;;
                        ret (selected :: rest)
                    | _, _, _ =>
@@ -1223,49 +1228,49 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
              | _ => lift_ue (raise_error "concretize_uvalueM: ill-typed select.")
              end
         in
-      (* Concretize the uvalues in a list of UVALUE_ExtractBytes...
+        (* Concretize the uvalues in a list of UVALUE_ExtractBytes...
 
-       *)
-      (* Pick out uvalue bytes that are the same + have same sid
+         *)
+        (* Pick out uvalue bytes that are the same + have same sid
 
          Concretize these identical uvalues...
-       *)
-      let fix concretize_uvalue_bytes_helper (acc : NMap (list (uvalue * dvalue))) (uvs : list uvalue) {struct uvs} : M (list dvalue_byte)
-      := match uvs with
-         | [] => ret []
-         | (uv::uvs) =>
-             match uv with
-             | UVALUE_ExtractByte byte_uv dt idx sid =>
-                 (* Check if this uvalue has been concretized already *)
-                 match pre_concretized acc byte_uv sid with
-                 | Some dv =>
-                     (* Use the pre_concretized value *)
-                     let dv_byte := DVALUE_ExtractByte dv dt idx in
-                     (* Concretize the rest of the bytes *)
-                     rest <- concretize_uvalue_bytes_helper acc uvs;;
-                     ret (dv_byte :: rest)
-                 | None =>
-                     (* Concretize the uvalue *)
-                     dv <- concretize_uvalueM byte_uv;;
-                     let dv_byte := DVALUE_ExtractByte dv dt idx in
-                     let acc := new_concretized_byte acc byte_uv dv sid in
-                     (* Concretize the rest of the bytes *)
-                     rest <- concretize_uvalue_bytes_helper acc uvs;;
-                     ret (dv_byte :: rest)
+         *)
+        let fix concretize_uvalue_bytes_helper (acc : NMap (list (uvalue * dvalue))) (uvs : list uvalue) {struct uvs} : M (list dvalue_byte)
+          := match uvs with
+             | [] => ret []
+             | (uv::uvs) =>
+                 match uv with
+                 | UVALUE_ExtractByte byte_uv dt idx sid =>
+                     (* Check if this uvalue has been concretized already *)
+                     match pre_concretized acc byte_uv sid with
+                     | Some dv =>
+                         (* Use the pre_concretized value *)
+                         let dv_byte := DVALUE_ExtractByte dv dt idx in
+                         (* Concretize the rest of the bytes *)
+                         rest <- concretize_uvalue_bytes_helper acc uvs;;
+                         ret (dv_byte :: rest)
+                     | None =>
+                         (* Concretize the uvalue *)
+                         dv <- concretize_uvalueM byte_uv;;
+                         let dv_byte := DVALUE_ExtractByte dv dt idx in
+                         let acc := new_concretized_byte acc byte_uv dv sid in
+                         (* Concretize the rest of the bytes *)
+                         rest <- concretize_uvalue_bytes_helper acc uvs;;
+                         ret (dv_byte :: rest)
+                     end
+                 | _ =>
+                     lift_ue (raise_error "concretize_uvalue_bytes_helper: non-byte in uvs.")
                  end
-             | _ =>
-                 lift_ue (raise_error "concretize_uvalue_bytes_helper: non-byte in uvs.")
-             end
-         end in
+             end in
 
-      let concretize_uvalue_bytes (uvs : list uvalue) : M (list dvalue_byte)
-      := concretize_uvalue_bytes_helper (@NM.empty _) uvs in
+        let concretize_uvalue_bytes (uvs : list uvalue) : M (list dvalue_byte)
+          := concretize_uvalue_bytes_helper (@NM.empty _) uvs in
 
-      let extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) : M dvalue
-      := dvbs <- concretize_uvalue_bytes uvs;;
-         lift_ue (ErrOOMPoison_handle_poison_and_oom DVALUE_Poison (dvalue_bytes_to_dvalue dvbs dt))
-      in
-      match u with
+        let extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) : M dvalue
+          := dvbs <- concretize_uvalue_bytes uvs;;
+             lift_ue (ErrOOMPoison_handle_poison_and_oom DVALUE_Poison (dvalue_bytes_to_dvalue dvbs dt))
+        in
+        match u with
         | UVALUE_Addr a                          => ret (DVALUE_Addr a)
         | UVALUE_I1 x                            => ret (DVALUE_I1 x)
         | UVALUE_I8 x                            => ret (DVALUE_I8 x)
@@ -1370,9 +1375,9 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                   v <- insert_into_str str elt i;;
                   ret v
               | i :: tl =>
-                      subfield <- index_into_str_dv str i;;
-                      modified_subfield <- loop subfield tl;;
-                      insert_into_str str modified_subfield i
+                  subfield <- index_into_str_dv str i;;
+                  modified_subfield <- loop subfield tl;;
+                  insert_into_str str modified_subfield i
               end in
             lift_ue (loop str idxs)
         | UVALUE_ExtractElement vec_typ vec idx =>
@@ -1390,7 +1395,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
             lift_ue (insert_into_vec_dv vec_typ dvec delt didx)
         | _ => lift_ue (raise_error ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u))
 
-      end.
+        end.
 
       Lemma concretize_uvalueM_equation :
         forall (u : uvalue),
@@ -1412,17 +1417,17 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                        | [], [], [] => ret []
                        | (c::conds), (x::xs), (y::ys) =>
                            selected <- match c with
-                                      | DVALUE_Poison t =>
-                                          (* TODO: Should be the type of the result of the select... *)
-                                          ret (DVALUE_Poison t)
-                                      | DVALUE_I1 i =>
-                                          if (Int1.unsigned i =? 1)%Z
-                                          then ret x
-                                          else ret y
-                                      | _ =>
-                                          lift_ue
-                                            (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
-                                      end;;
+                                       | DVALUE_Poison t =>
+                                           (* TODO: Should be the type of the result of the select... *)
+                                           ret (DVALUE_Poison t)
+                                       | DVALUE_I1 i =>
+                                           if (Int1.unsigned i =? 1)%Z
+                                           then ret x
+                                           else ret y
+                                       | _ =>
+                                           lift_ue
+                                             (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
+                                       end;;
                            rest <- loop conds xs ys;;
                            ret (selected :: rest)
                        | _, _, _ =>
@@ -1505,25 +1510,25 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
             | UVALUE_Oom t                           => ret (DVALUE_Oom t)
             | UVALUE_None                            => ret DVALUE_None
             | UVALUE_Struct fields                   => 'dfields <- map_monad (concretize_uvalueM) fields ;;
-                                                       ret (DVALUE_Struct dfields)
+                                                        ret (DVALUE_Struct dfields)
             | UVALUE_Packed_struct fields            => 'dfields <- map_monad (concretize_uvalueM) fields ;;
-                                                       ret (DVALUE_Packed_struct dfields)
+                                                        ret (DVALUE_Packed_struct dfields)
             | UVALUE_Array elts                      => 'delts <- map_monad (concretize_uvalueM) elts ;;
-                                                       ret (DVALUE_Array delts)
+                                                        ret (DVALUE_Array delts)
             | UVALUE_Vector elts                     => 'delts <- map_monad (concretize_uvalueM) elts ;;
-                                                       ret (DVALUE_Vector delts)
+                                                        ret (DVALUE_Vector delts)
             | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalueM v1 ;;
-                                                       dv2 <- concretize_uvalueM v2 ;;
-                                                       lift_ue (eval_iop iop dv1 dv2)
+                                                        dv2 <- concretize_uvalueM v2 ;;
+                                                        lift_ue (eval_iop iop dv1 dv2)
             | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
-                                                       dv2 <- concretize_uvalueM v2 ;;
-                                                       lift_ue (eval_icmp cmp dv1 dv2)
+                                                        dv2 <- concretize_uvalueM v2 ;;
+                                                        lift_ue (eval_icmp cmp dv1 dv2)
             | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalueM v1 ;;
-                                                       dv2 <- concretize_uvalueM v2 ;;
-                                                       lift_ue (eval_fop fop dv1 dv2)
+                                                        dv2 <- concretize_uvalueM v2 ;;
+                                                        lift_ue (eval_fop fop dv1 dv2)
             | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
-                                                       dv2 <- concretize_uvalueM v2 ;;
-                                                       lift_ue (eval_fcmp cmp dv1 dv2)
+                                                        dv2 <- concretize_uvalueM v2 ;;
+                                                        lift_ue (eval_fcmp cmp dv1 dv2)
 
             | UVALUE_Conversion conv t_from v t_to    =>
                 dv <- concretize_uvalueM v ;;
@@ -1604,9 +1609,9 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                 dvec <- concretize_uvalueM vec;;
                 didx <- concretize_uvalueM idx;;
                 elt_typ <- match vec_typ with
-                          | DTYPE_Vector _ t => ret t
-                          | _ => lift_ue (raise_error "Invalid vector type for ExtractElement")
-                          end;;
+                           | DTYPE_Vector _ t => ret t
+                           | _ => lift_ue (raise_error "Invalid vector type for ExtractElement")
+                           end;;
                 lift_ue (index_into_vec_dv elt_typ dvec didx)
             | UVALUE_InsertElement vec_typ vec elt idx =>
                 dvec <- concretize_uvalueM vec;;
@@ -1620,36 +1625,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
       Qed.
 
       Fixpoint concretize_uvalue_bytes_helper (acc : NMap (list (uvalue * dvalue))) (uvs : list uvalue) : M (list dvalue_byte)
-      := match uvs with
-         | [] => ret []
-         | (uv::uvs) =>
-             match uv with
-             | UVALUE_ExtractByte byte_uv dt idx sid =>
-                 (* Check if this uvalue has been concretized already *)
-                 match pre_concretized acc byte_uv sid with
-                 | Some dv =>
-                     (* Use the pre_concretized value *)
-                     let dv_byte := DVALUE_ExtractByte dv dt idx in
-                     (* Concretize the rest of the bytes *)
-                     rest <- concretize_uvalue_bytes_helper acc uvs;;
-                     ret (dv_byte :: rest)
-                 | None =>
-                     (* Concretize the uvalue *)
-                     dv <- concretize_uvalueM byte_uv;;
-                     let dv_byte := DVALUE_ExtractByte dv dt idx in
-                     let acc := new_concretized_byte acc byte_uv dv sid in
-                     (* Concretize the rest of the bytes *)
-                     rest <- concretize_uvalue_bytes_helper acc uvs;;
-                     ret (dv_byte :: rest)
-                 end
-             | _ =>
-                 lift_ue (raise_error "concretize_uvalue_bytes_helper: non-byte in uvs.")
-             end
-         end.
-
-      Lemma concretize_uvalue_bytes_helper_equation (acc : NMap (list (uvalue * dvalue))) (uvs : list uvalue) :
-        concretize_uvalue_bytes_helper acc uvs
-        = match uvs with
+        := match uvs with
            | [] => ret []
            | (uv::uvs) =>
                match uv with
@@ -1674,6 +1650,35 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                | _ =>
                    lift_ue (raise_error "concretize_uvalue_bytes_helper: non-byte in uvs.")
                end
+           end.
+
+      Lemma concretize_uvalue_bytes_helper_equation (acc : NMap (list (uvalue * dvalue))) (uvs : list uvalue) :
+        concretize_uvalue_bytes_helper acc uvs
+        = match uvs with
+          | [] => ret []
+          | (uv::uvs) =>
+              match uv with
+              | UVALUE_ExtractByte byte_uv dt idx sid =>
+                  (* Check if this uvalue has been concretized already *)
+                  match pre_concretized acc byte_uv sid with
+                  | Some dv =>
+                      (* Use the pre_concretized value *)
+                      let dv_byte := DVALUE_ExtractByte dv dt idx in
+                      (* Concretize the rest of the bytes *)
+                      rest <- concretize_uvalue_bytes_helper acc uvs;;
+                      ret (dv_byte :: rest)
+                  | None =>
+                      (* Concretize the uvalue *)
+                      dv <- concretize_uvalueM byte_uv;;
+                      let dv_byte := DVALUE_ExtractByte dv dt idx in
+                      let acc := new_concretized_byte acc byte_uv dv sid in
+                      (* Concretize the rest of the bytes *)
+                      rest <- concretize_uvalue_bytes_helper acc uvs;;
+                      ret (dv_byte :: rest)
+                  end
+              | _ =>
+                  lift_ue (raise_error "concretize_uvalue_bytes_helper: non-byte in uvs.")
+              end
           end.
       Proof.
         induction uvs; try reflexivity.
@@ -1695,17 +1700,17 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                  | [], [], [] => ret []
                  | (c::conds), (x::xs), (y::ys) =>
                      selected <- match c with
-                                | DVALUE_Poison t =>
-                                    (* TODO: Should be the type of the result of the select... *)
-                                    ret (DVALUE_Poison t)
-                                | DVALUE_I1 i =>
-                                    if (Int1.unsigned i =? 1)%Z
-                                    then ret x
-                                    else ret y
-                                | _ =>
-                                    lift_ue
-                                      (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
-                                end;;
+                                 | DVALUE_Poison t =>
+                                     (* TODO: Should be the type of the result of the select... *)
+                                     ret (DVALUE_Poison t)
+                                 | DVALUE_I1 i =>
+                                     if (Int1.unsigned i =? 1)%Z
+                                     then ret x
+                                     else ret y
+                                 | _ =>
+                                     lift_ue
+                                       (raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1.")
+                                 end;;
                      rest <- loop conds xs ys;;
                      ret (selected :: rest)
                  | _, _, _ =>

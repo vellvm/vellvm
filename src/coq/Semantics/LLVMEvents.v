@@ -28,10 +28,16 @@ From ITree Require Import
      ITree
      Events.Exception.
 
+From Mem Require Import
+  Addresses.MemoryAddress.
+
+From LLVM_Memory Require Import
+  Sizeof
+  Intptr.
+
 From Vellvm Require Import
      Utilities
      Syntax
-     Semantics.Memory.Sizeof
      Semantics.DynamicValues
      Semantics.VellvmIntegers.
 
@@ -154,7 +160,7 @@ Set Contextual Implicit.
 
 
 (* TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism not functors. *)
-Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZEOF : Sizeof).
+Module Type LLVM_INTERACTIONS (ADDR : ADDRESS) (IP:INTPTR) (SIZEOF : Sizeof).
 
   #[global] Instance eq_dec_addr : RelDec (@eq ADDR.addr) := RelDec_from_dec _ ADDR.eq_dec.
   #[global] Instance Eqv_addr : Eqv ADDR.addr := (@eq ADDR.addr).
@@ -320,6 +326,6 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
 
 End LLVM_INTERACTIONS.
 
-Module Make(ADDR : MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF : Sizeof) <: LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF).
+Module Make(ADDR : ADDRESS)(IP:INTPTR)(SIZEOF : Sizeof) <: LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF).
 Include LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF).
 End Make.

@@ -7,8 +7,10 @@ From ITree Require Import
 From Vellvm Require Import
      Utilities
      Syntax
-     Semantics.LLVMEvents
-     Handlers.OOM.
+     Semantics.LLVMEvents.
+
+From Mem Require Import
+     OOM.
 
 From ExtLib Require Import
      Structures.Monads

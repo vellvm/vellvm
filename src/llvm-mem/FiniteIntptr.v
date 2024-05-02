@@ -15,10 +15,15 @@ From Vellvm.Syntax Require Import
      DynamicTypes.
 
 From Vellvm.Semantics Require Import
-     MemoryAddress
-     Memory.FiniteProvenance
      DynamicValues
      VellvmIntegers.
+
+From Mem Require Import
+     Addresses.MemoryAddress
+     Memory.Provenance.
+
+From LLVM_Memory Require Import
+  Intptr.
 
 From ExtLib Require Import
      Structures.Monads.
@@ -30,7 +35,7 @@ Open Scope monad_scope.
 #[local] Open Scope Z_scope.
 
 
-Module BigIP : MemoryAddress.INTPTR with
+Module BigIP : INTPTR with
 Definition intptr := Z with
   Definition zero := 0%Z with
 Definition from_Z := (fun (x : Z) => ret x : OOM Z) with
@@ -146,7 +151,7 @@ Definition VMemInt_intptr := VMemInt_Z.
 
 End BigIP.
 
-Module BigIP_BIG : MemoryAddress.INTPTR_BIG BigIP.
+Module BigIP_BIG : INTPTR_BIG BigIP.
   Import BigIP.
 
   Lemma from_Z_safe :
@@ -237,7 +242,7 @@ Instance VMemInt_intptr_i64 : VMemInt int64
     mdtyp_of_int := DTYPE_IPTR
   }.
 
-Module IP64Bit : MemoryAddress.INTPTR with
+Module IP64Bit : INTPTR with
 Definition intptr := int64 with
 Definition zero := Int64.zero with
 Definition from_Z := from_Z_64 with

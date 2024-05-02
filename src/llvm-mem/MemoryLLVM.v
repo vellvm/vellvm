@@ -2,6 +2,10 @@ From Vellvm.Syntax Require Import
      DataLayout
      DynamicTypes.
 
+From Mem Require Import
+  Addresses.MemoryAddress
+  Addresses.Provenance.
+
 From ITree Require Import
      ITree
      Basics.Basics
@@ -10,30 +14,12 @@ From ITree Require Import
      Events.StateFacts
      Events.State.
 
-From Vellvm.Semantics Require Import
-  DynamicValues
-  VellvmIntegers
-  StoreId
-  MemoryAddress
-  MemoryParams
-  Memory.Overlaps
-  LLVMParams
-  LLVMEvents
-  ItreeRaiseMReturns.
-
-Require Import MemBytes.
-
-From Vellvm.Handlers Require Import
-  MemPropT
-  MemoryModules.Within.
-
 From Vellvm.Utils Require Import
      Error
      PropT
      Util
      NMaps
      Tactics
-     Raise
      Monads
      MapMonadExtra
      MonadReturnsLaws
@@ -48,7 +34,6 @@ From ExtLib Require Import
      Structures.Monads
      Structures.Functor.
 
-
 From Coq Require Import
      ZArith
      Strings.String
@@ -56,7 +41,8 @@ From Coq Require Import
      Lia
      Relations
      RelationClasses
-     Wellfounded.
+     Wellfounded
+     Structures.Equalities.
 
 Require Import Morphisms.
 
@@ -71,166 +57,6 @@ Import Monad.
 Import EitherMonad.
 
 From Coq Require Import FunctionalExtensionality.
-
-Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
-  Import LP.Events.
-  Import LP.ADDR.
-  Import LP.SIZEOF.
-  Import LP.PROV.
-
-  Import MemBytes.
-  Module MemByte := Byte LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL.
-  Import MemByte.
-  Import LP.SIZEOF.
-
-  (*** Internal state of memory *)
-  Parameter MemState : Type.
-  Parameter memory_stack : Type.
-  Parameter initial_memory_state : MemState.
-  Parameter MemState_get_memory : MemState -> memory_stack.
-  Parameter MemState_get_provenance : MemState -> Provenance.
-  Parameter MemState_put_memory : memory_stack -> MemState -> MemState.
-
-  (* Type for frames and frame stacks *)
-  Parameter Frame : Type.
-  Parameter FrameStack : Type.
-
-  (* Heaps *)
-  Parameter Heap : Type.
-
-  (* TODO: Should DataLayout be here?
-
-     It might make sense to move DataLayout to another module, some of
-     the parameters in the DataLayout may be relevant to other
-     modules, and we could enforce that everything agrees.
-
-     For instance alignment may impact Sizeof, and there's also some
-     stuff about pointer sizes in the DataLayout structure.
-   *)
-  (* Parameter datalayout : DataLayout. *)
-
-  (*** Primitives on memory *)
-
-  (** Reads *)
-  Parameter read_byte_prop_memory : addr -> memory_stack -> SByte -> Prop.
-
-  (** Allocations *)
-  (* Holds if a byte is allocated with a given AllocationId *)
-  Parameter addr_allocated_prop_memory : addr -> AllocationId -> memory_stack -> Prop.
-
-  (** Frame stacks *)
-  (* Check if an address is allocated in a frame *)
-  Parameter ptr_in_frame_prop : Frame -> addr -> Prop.
-
-  (* Check for the current frame *)
-  Parameter peek_frame_stack_prop : FrameStack -> Frame -> Prop.
-  Parameter pop_frame_stack_prop : FrameStack -> FrameStack -> Prop.
-
-  Parameter memory_stack_frame_stack_prop : memory_stack -> FrameStack -> Prop.
-
-  Definition frame_eqv (f f' : Frame) : Prop :=
-    forall ptr, ptr_in_frame_prop f ptr <-> ptr_in_frame_prop f' ptr.
-
-  #[global] Instance frame_eqv_Equivalence : Equivalence frame_eqv.
-  Proof.
-    split.
-    - intros f ptr.
-      reflexivity.
-    - intros f1 f2 EQV.
-      unfold frame_eqv in *.
-      firstorder.
-    - intros x y z XY YZ.
-      firstorder.
-  Qed.
-
-  Parameter frame_stack_eqv : FrameStack -> FrameStack -> Prop.
-  #[global] Parameter frame_stack_eqv_Equivalence : Equivalence frame_stack_eqv.
-
-  (** Heaps *)
-
-  Parameter root_in_heap_prop : Heap -> addr -> Prop.
-
-  (* 1) heap
-     2) root pointer
-     3) pointer
-
-     The root pointer is the reference to a block that will be freed.
-   *)
-  Parameter ptr_in_heap_prop : Heap -> addr -> addr -> Prop.
-
-  (* Memory stack's heap *)
-  Parameter memory_stack_heap_prop : memory_stack -> Heap -> Prop.
-
-  Record heap_eqv (h h' : Heap) : Prop :=
-    {
-      heap_roots_eqv : forall root, root_in_heap_prop h root <-> root_in_heap_prop h' root;
-      heap_ptrs_eqv : forall root ptr, ptr_in_heap_prop h root ptr <-> ptr_in_heap_prop h' root ptr;
-    }.
-
-  #[global] Instance root_in_heap_prop_Proper :
-    Proper (heap_eqv ==> eq ==> iff) root_in_heap_prop.
-  Proof.
-    intros h h' HEAPEQ ptr ptr' PTREQ; subst.
-    inv HEAPEQ.
-    eauto.
-  Qed.
-
-  #[global] Instance ptr_in_heap_prop_Proper :
-    Proper (heap_eqv ==> eq ==> eq ==> iff) ptr_in_heap_prop.
-  Proof.
-    intros h h' HEAPEQ root root' ROOTEQ ptr ptr' PTREQ; subst.
-    inv HEAPEQ.
-    eauto.
-  Qed.
-
-  #[global] Instance heap_Equivalence : Equivalence heap_eqv.
-  Proof.
-    split.
-    - intros h; split.
-      + intros root.
-        reflexivity.
-      + intros root ptr.
-        reflexivity.
-    - intros h1 h2 EQV.
-      firstorder.
-    - intros x y z XY YZ.
-      split.
-      + intros root.
-        rewrite XY, YZ.
-        reflexivity.
-      + intros root ptr.
-        rewrite XY, YZ.
-        reflexivity.
-  Qed.
-
-  (** Provenances *)
-  Parameter used_provenance_prop : MemState -> Provenance -> Prop. (* Has a provenance *ever* been used. *)
-
-  (* Allocate a new fresh provenance *)
-  Parameter mem_state_fresh_provenance : MemState -> (Provenance * MemState)%type.
-  Parameter mem_state_fresh_provenance_fresh :
-    forall (ms ms' : MemState) (pr : Provenance),
-      mem_state_fresh_provenance ms = (pr, ms') ->
-      MemState_get_memory ms = MemState_get_memory ms' /\
-        (forall pr, used_provenance_prop ms pr -> used_provenance_prop ms' pr) /\
-      ~ used_provenance_prop ms pr /\ used_provenance_prop ms' pr.
-
-  (** Lemmas about MemState *)
-  Parameter MemState_get_put_memory :
-    forall ms mem,
-      MemState_get_memory (MemState_put_memory mem ms) = mem.
-
-  #[global] Instance MemState_memory_MemStateMem : MemStateMem MemState memory_stack :=
-    {| ms_get_memory := MemState_get_memory;
-      ms_put_memory := MemState_put_memory;
-      ms_get_put_memory := MemState_get_put_memory;
-    |}.
-
-  #[global] Instance Inhabited_MemState : Inhabited MemState :=
-    { inhabitant := initial_memory_state
-    }.
-
-End MemoryModelSpecPrimitives.
 
 Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL).
   (*** Other helpers *)
