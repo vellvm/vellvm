@@ -714,7 +714,41 @@ Module Type DenotationTheory (LP : LLVMParams).
     eapply free_out_of_inputs, disjoint_inputs_l; eauto using independent_flows_disjoint.
   Qed.
 
+
+  From Paco Require Import paco.
   Opaque denote_block.
+  Lemma denote_ocfg_prefix_eq_itree:
+    forall (prefix bks' postfix : ocfg dtyp) [bks : ocfg dtyp] (from to : block_id),
+      bks = prefix ∪ bks' ∪ postfix ->
+      prefix ##ₘ bks' ->
+      ⟦ bks ⟧bs (from, to) ≅
+        x_ <- ⟦ bks' ⟧bs (from, to);
+  match x_ with
+  | inl x => ⟦ bks ⟧bs x
+  | inr x => Ret (inr x)
+  end.
+  Proof.
+    intros * ->; revert from to.
+    ginit.
+    gcofix CIH.
+    intros * DISJ.
+    case (bks' !! to) as [bk |] eqn:EQ.
+    - unfold denote_ocfg at 1 3.
+      setoid_rewrite KTreeFacts.unfold_iter_ktree.
+      go**.
+      assert (EQ': (prefix ∪ bks' ∪ postfix) !! to = Some bk) by (by simplify_map_eq).
+      rewrite EQ, EQ'; go**.
+      guclo eqit_clo_bind.
+      econstructor; [reflexivity | intros [] ? <-].
+      + go*.
+        rewrite bind_tau; gstep; constructor; eauto with paco.
+      + go; gstep; constructor; eauto with paco.
+    - rewrite (denote_ocfg_nin_eq_itree bks'); auto.
+      go*.
+      apply Reflexive_eqit_gen_eq.
+  Qed.
+  Transparent denote_block.
+
   Lemma denote_ocfg_prefix :
     forall (prefix bks' postfix bks : ocfg dtyp) (from to: block_id),
       bks = (prefix ∪ bks' ∪ postfix) ->
@@ -727,26 +761,11 @@ Module Type DenotationTheory (LP : LLVMParams).
       end)
   .
   Proof.
-    intros * ->; revert from to.
-    einit.
-    ecofix CIH.
-    clear CIHH.
-    intros * DISJ.
-    case (bks' !! to) as [bk |] eqn:EQ.
-    - unfold denote_ocfg at 1 3.
-      setoid_rewrite KTreeFacts.unfold_iter_ktree.
-      go**.
-      assert (EQ': (prefix ∪ bks' ∪ postfix) !! to = Some bk) by (by simplify_map_eq).
-      rewrite EQ, EQ'; go**.
-      eapply euttG_bind; econstructor; [reflexivity | intros [] ? <-].
-      + go*.
-        rewrite bind_tau; etau.
-      + by go.
-    - edrop.
-      rewrite (denote_ocfg_nin bks'); auto.
-      by go*.
+    intros.
+    rewrite denote_ocfg_prefix_eq_itree; eauto.
+    reflexivity.
   Qed.
-  Transparent denote_block.
+
 End DenotationTheory.
 
 Module Make (LP : LLVMParams) : DenotationTheory LP.
