@@ -16,6 +16,10 @@ From Coq Require Import
 
 From stdpp Require Import base list fin_maps.
 
+From ExtLib Require Import
+  Structures.Functor
+     Structures.Monads.
+
 From ITree Require Import
      ITree
      Interp.Recursion
@@ -360,7 +364,7 @@ Module Denotation (LP : LLVMParams).
     (i: (instr_id * instr dtyp)): itree Ecfg unit :=
     match i with
     (* Pure operations *)
-      
+
     | (IId id, INSTR_Op op) =>
         uv <- denote_op op ;
         trigger (LocalWrite id uv)
