@@ -23,6 +23,8 @@ Import LLVMEvents.
 
 #[export] Remove Hints Eqv.EqvWF_Build : typeclass_instances.
 
+From Paco Require Import paco.
+
 Set Implicit Arguments.
 Set Strict Implicit.
 
@@ -438,6 +440,7 @@ Module Type DenotationTheory (LP : LLVMParams).
       rewrite raise_bind_itree.
       apply raise_has_all_posts.
     Qed.
+
     Lemma raiseUB_has_all_posts_cont : forall {E X Y} `{UBE -< E} s (k : X -> itree E Y) Q,
          (x <- @raiseUB E _ X s; k x) ⤳ Q.
     Proof.
@@ -550,6 +553,9 @@ Module Type DenotationTheory (LP : LLVMParams).
     Definition exits_in_outputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
       sum_pred (fun fto => snd fto ∈ @outputs t ocfg) TT.
 
+    Definition exits_nin_inputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
+      sum_pred (fun fto => snd fto ∉ @inputs t ocfg) TT.
+
     Lemma denote_bk_exits_in_outputs :
       forall b from,
         ⟦ b ⟧b from ⤳ sum_pred (fun id => id ∈ successors b) TT.
@@ -610,6 +616,21 @@ Module Type DenotationTheory (LP : LLVMParams).
         apply find_block_in_inputs in abs as [? abs]; cbn in abs; rewrite abs in Heq; inv Heq.
     Qed.
 
+    Lemma denote_ocfg_exits_nin_inputs :
+      forall bks fto,
+        snd fto ∈ inputs bks ->
+        ⟦ bks ⟧bs fto ⤳ exits_nin_inputs bks.
+    Proof.
+      intros * IN.
+      eapply has_post_iter_strong with TT; auto.
+      intros [] _.
+      case_match.
+      hpbind.
+      case_match; by hpret.
+      hpret.
+      by apply not_elem_of_dom_2.
+    Qed.
+
     Lemma denote_ocfg_exits_in_outputs :
       forall bks fto,
         snd fto ∈ inputs bks ->
@@ -625,6 +646,15 @@ Module Type DenotationTheory (LP : LLVMParams).
       intros []; cbn; intuition.
       by eapply outputs_elem_of.
     Qed.
+
+    Lemma denote_ocfg_exits_all :
+      forall bks fto,
+        snd fto ∈ inputs bks ->
+        ⟦ bks ⟧bs fto ⤳ ((exits_in_outputs bks) /1\ (exits_nin_inputs bks)).
+    Proof.
+      intros * IN.
+      apply has_post_conj; auto using denote_ocfg_exits_in_outputs, denote_ocfg_exits_nin_inputs.
+   Qed.
 
   End Outputs.
 
@@ -715,7 +745,6 @@ Module Type DenotationTheory (LP : LLVMParams).
   Qed.
 
 
-  From Paco Require Import paco.
   Opaque denote_block.
   Lemma denote_ocfg_prefix_eq_itree:
     forall (prefix bks' postfix : ocfg dtyp) [bks : ocfg dtyp] (from to : block_id),
