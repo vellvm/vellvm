@@ -553,6 +553,9 @@ Module Type DenotationTheory (LP : LLVMParams).
     Definition exits_in_outputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
       sum_pred (fun fto => snd fto ∈ @outputs t ocfg) TT.
 
+    Definition exits_from_inputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
+      sum_pred (fun fto => fst fto ∈ @inputs t ocfg) TT.
+
     Definition exits_nin_inputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
       sum_pred (fun fto => snd fto ∉ @inputs t ocfg) TT.
 
@@ -600,18 +603,19 @@ Module Type DenotationTheory (LP : LLVMParams).
         (IND : forall fto (b : block dtyp),
             bks !! snd fto = Some b ->
             ⟦ b ⟧b (fst fto) ⤳ sum_pred Qb Qv),
-        ⟦ bks ⟧bs fto ⤳ sum_pred (prod_pred TT Qb) Qv.
+        ⟦ bks ⟧bs fto ⤳ sum_pred (prod_pred (fun b => b ∈ inputs bks) Qb) Qv.
     Proof.
       intros * IN IND.
-      apply has_post_iter_strong with (Inv := fun x => snd x ∈ inputs bks \/ Qb (snd x))
+      apply has_post_iter_strong with (Inv := fun x => snd x ∈ inputs bks \/ (fst x ∈ inputs bks /\ Qb (snd x)))
       ; eauto.
       intros [f to] HYP.
       flatten_goal.
       - specialize (IND (f,to) b).
         eapply eutt_post_bind; [apply IND |]; auto.
         intros [id | v]; cbn; intros ?; apply eutt_Ret; cbn; auto.
+        right; split; auto.
+        by apply elem_of_dom.
       - apply eutt_Ret.
-        split; auto.
         destruct HYP as [abs | POST]; auto.
         apply find_block_in_inputs in abs as [? abs]; cbn in abs; rewrite abs in Heq; inv Heq.
     Qed.
@@ -631,13 +635,13 @@ Module Type DenotationTheory (LP : LLVMParams).
       by apply not_elem_of_dom_2.
     Qed.
 
-    Lemma denote_ocfg_exits_in_outputs :
+    Lemma denote_ocfg_exits_in_outputs_from_inputs :
       forall bks fto,
         snd fto ∈ inputs bks ->
-        ⟦ bks ⟧bs fto ⤳ exits_in_outputs bks.
+        ⟦ bks ⟧bs fto ⤳ (exits_in_outputs bks /1\ exits_from_inputs bks).
     Proof.
       intros * IN.
-      apply has_post_weaken with (P := sum_pred (prod_pred TT (fun b => b ∈ outputs bks)) TT).
+      apply has_post_weaken with (P := sum_pred (prod_pred (fun b => b ∈ inputs bks) (fun b => b ∈ outputs bks)) TT).
       2: intros [[]|] ?; cbn in *; intuition.
       apply denote_ocfg_has_post; eauto.
       intros.
@@ -647,14 +651,34 @@ Module Type DenotationTheory (LP : LLVMParams).
       by eapply outputs_elem_of.
     Qed.
 
+    Lemma denote_ocfg_exits_in_outputs :
+      forall bks fto,
+        snd fto ∈ inputs bks ->
+        ⟦ bks ⟧bs fto ⤳ exits_in_outputs bks.
+    Proof.
+      intros * IN.
+      eapply has_post_weaken; [apply denote_ocfg_exits_in_outputs_from_inputs |]; auto.
+      by intros * [? _].
+   Qed.
+
+    Lemma denote_ocfg_exits_from_inputs :
+      forall bks fto,
+        snd fto ∈ inputs bks ->
+        ⟦ bks ⟧bs fto ⤳ exits_from_inputs bks.
+    Proof.
+      intros * IN.
+      eapply has_post_weaken; [apply denote_ocfg_exits_in_outputs_from_inputs |]; auto.
+      by intros * [_ ?].
+   Qed.
+
     Lemma denote_ocfg_exits_all :
       forall bks fto,
         snd fto ∈ inputs bks ->
-        ⟦ bks ⟧bs fto ⤳ ((exits_in_outputs bks) /1\ (exits_nin_inputs bks)).
+        ⟦ bks ⟧bs fto ⤳ ((exits_in_outputs bks) /1\ (exits_from_inputs bks) /1\ (exits_nin_inputs bks)).
     Proof.
       intros * IN.
-      apply has_post_conj; auto using denote_ocfg_exits_in_outputs, denote_ocfg_exits_nin_inputs.
-   Qed.
+      apply has_post_conj; auto using denote_ocfg_exits_in_outputs_from_inputs, denote_ocfg_exits_nin_inputs.
+    Qed.
 
   End Outputs.
 
