@@ -15,11 +15,6 @@ From Coq Require Import
      Bool.Bool.
 
 From stdpp Require Import base list fin_maps.
-Print Instances FinMap.
-
-From ExtLib Require Import
-     Structures.Monads
-     Structures.Functor.
 
 From ITree Require Import
      ITree
@@ -50,12 +45,10 @@ Module MonadNotation.
 
   Notation "x <- c1 ; c2" := (@bind _ _ _ _ c1 (fun x => c2))
                (at level 20, c1 at level 100, c2 at level 200, right associativity) : monad_scope.
-    (* (at level 60, c1 at next level, right associativity) : monad_scope. *)
 
   Notation "' pat <- c1 ; c2" :=
     (@bind _ _ _ _ c1 (fun x => match x with pat => c2 end))
                (at level 20, pat pattern, c1 at level 100, c2 at level 200, right associativity) : monad_scope.
-    (* (at level 60, pat pattern, c1 at next level, right associativity) : monad_scope. *)
 
 End MonadNotation.
 
@@ -367,7 +360,7 @@ Module Denotation (LP : LLVMParams).
     (i: (instr_id * instr dtyp)): itree Ecfg unit :=
     match i with
     (* Pure operations *)
-
+      
     | (IId id, INSTR_Op op) =>
         uv <- denote_op op ;
         trigger (LocalWrite id uv)
