@@ -63,6 +63,124 @@ Import EitherMonad.
 
 From Coq Require Import FunctionalExtensionality.
 
+Class ND (M : Type -> Type) `{HM : Monad M} : Type :=
+  { contains : forall A, A -> M A -> Prop
+  }.
+
+(*** The core memory model *)
+Module Type CORE_MEMORY_MODEL
+  (Import ADDR : CORE_ADDRESS)
+  (Import SB : SBYTE).
+
+  Parameter Memory : Type.
+  Parameter initial_memory : Memory.
+
+  (** Primitive byte reads *)
+  Parameter read_byte : Memory -> addr -> SByte -> Prop.
+End CORE_MEMORY_MODEL.
+
+Module Type MEMORY_READ_ACCESS
+  (Import ADDR : CORE_ADDRESS)
+  (Import SB : SBYTE)
+  (Import MEM : CORE_MEMORY_MODEL ADDR SB).
+
+  (**
+     Whether a pointer can be used to read a byte at the location in
+     memory.
+   *)
+  Parameter read_byte_allowed : Memory -> addr -> Prop.
+
+  Parameter read_byte_allowed_spec :
+    forall (m : Memory) (ptr : addr),
+    (exists (b : SByte),
+        read_byte m ptr b) ->
+    read_byte_allowed m ptr.
+End MEMORY_READ_ACCESS.
+
+Module Type READABLE_MEMORY (ADDR : CORE_ADDRESS) (SB : SBYTE) := CORE_MEMORY_MODEL ADDR SB <+ MEMORY_READ_ACCESS ADDR SB.
+
+Module Type MEMORY_WRITE_ACCESS
+  (Import ADDR : CORE_ADDRESS)
+  (Import SB : SBYTE)
+  (Import MEM : CORE_MEMORY_MODEL ADDR SB).
+
+  (**
+     Whether a pointer can be used to write a byte at the location in
+     memory.
+   *)
+  Parameter write_byte_allowed : Memory -> addr -> Prop.
+End MEMORY_WRITE_ACCESS.
+
+Module Type READ_WRITE_MEMORY (ADDR : CORE_ADDRESS) (SB : SBYTE) := READABLE_MEMORY ADDR SB <+ MEMORY_WRITE_ACCESS ADDR SB.
+
+Module MEMORY_WRITES
+  (Import ADDR : ADDRESS)
+  (Import SB : SBYTE)
+  (Import MEM : READ_WRITE_MEMORY ADDR SB).
+
+  (* TODO: This does not belong here *)
+  Definition disjoint_ptr_byte (a b : addr) :=
+    ptr_to_int a <> ptr_to_int b.
+
+  (* TODO: Is the old write_byte_spec the implementation of this?
+
+     In the version from the paper, we describe write_byte in terms of
+     its effect on reads, and describe it as preserving other
+     properties (like the allocations, stack frames, heap, allocation
+     ids, and permissions... write_byte_spec was _derived_ from the
+     properties of the memory model, it was not a parameter. Why has
+     this changed?
+
+     1. The modular memory model may not have a write operation at all.
+   *)
+  (** The raw write_byte operation *)
+  Parameter write_byte : Memory -> addr -> SByte -> Memory -> Prop.
+
+  (** We can look up a new value after writing it to memory *)
+  Parameter write_byte_new_lu :
+    forall (m1 : Memory) (ptr : addr) (byte : SByte) (m2 : Memory),
+      write_byte m1 ptr byte m2 ->
+      read_byte m2 ptr byte.
+
+  (** We can look up old values after writing to a disjoint location in memory *)
+  Parameter write_byte
+
+  Record set_byte_memory (m1 : Memory) (ptr : addr) (byte : SByte) (m2 : Memory) : Prop :=
+    {
+      new_lu : read_byte m2 ptr byte;
+      old_lu : forall ptr',
+        disjoint_ptr_byte ptr ptr' ->
+        (forall byte', read_byte_spec m1 ptr' byte' <-> read_byte_spec m2 ptr' byte');
+    }.
+
+  Record write_byte_operation_invariants (m1 m2 : MemState) : Prop :=
+    {
+      write_byte_op_preserves_allocations : allocations_preserved m1 m2;
+      write_byte_op_preserves_frame_stack : frame_stack_preserved m1 m2;
+      write_byte_op_preserves_heap : heap_preserved m1 m2;
+      write_byte_op_read_allowed : read_byte_allowed_all_preserved m1 m2;
+      write_byte_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
+      write_byte_op_free_allowed : free_byte_allowed_all_preserved m1 m2;
+      write_byte_op_allocation_ids : preserve_allocation_ids m1 m2;
+    }.
+
+  Record write_byte_spec (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
+    {
+      byte_write_succeeds : write_byte_allowed m1 ptr;
+      byte_written : set_byte_memory m1 ptr byte m2;
+
+      write_byte_invariants : write_byte_operation_invariants m1 m2;
+    }.
+
+  Definition write_byte_spec_MemPropT (ptr : addr) (byte : SByte) : MemPropT MemState unit
+    :=
+    lift_spec_to_MemPropT
+      (fun m1 _ m2 =>
+         write_byte_spec m1 ptr byte m2)
+      (fun m1 => ~ write_byte_allowed m1 ptr).
+End MEMORY_WRITES.
+
+
 Module Type MemoryModelSpecPrimitives (ADDR : ADDRESS) (SB : SBYTE).
   Import ADDR.
   Import SB.
@@ -94,10 +212,6 @@ Module Type MemoryModelSpecPrimitives (ADDR : ADDRESS) (SB : SBYTE).
   (* Parameter datalayout : DataLayout. *)
 
   (*** Primitives on memory *)
-
-  (** Reads *)
-  Parameter read_byte_prop_memory : addr -> memory_stack -> SByte -> Prop.
-
   (** Allocations *)
   (* Holds if a byte is allocated with a given AllocationId *)
   Parameter addr_allocated_prop_memory : addr -> AllocationId -> memory_stack -> Prop.
