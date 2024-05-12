@@ -16,7 +16,6 @@
 ./mem/MemoryModules/FiniteSpecPrimitives.v
 ./mem/MemoryModules/Within.v
 ./mem/OOM.v
-./mem/PointerArithmetic.v
 ./mem/Semantics/Memory/ErrSID.v
 ./mem/Semantics/Memory/Provenance.v
 ./mem/Semantics/Memory/Overlaps.v
@@ -24,6 +23,8 @@
 ./mem/Addresses/MemoryAddress.v
 ./mem/Addresses/FiniteAddresses.v
 ./mem/Addresses/InfiniteAddresses.v
+./mem/Addresses/PointerArithmetic.v
+./mem/Addresses/Provenance.v
 
 ./llvm-mem/Sizeof.v
 ./llvm-mem/FiniteSizeof.v
