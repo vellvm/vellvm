@@ -63,8 +63,17 @@ Import EitherMonad.
 
 From Coq Require Import FunctionalExtensionality.
 
-Class ND (M : Type -> Type) `{HM : Monad M} : Type :=
-  { contains : forall A, A -> M A -> Prop
+Class SpecM (M : Type -> Type) : Type :=
+  { contains : forall {A}, A -> M A -> Prop;
+    empty_spec : forall {A}, M A;
+    empty_spec_spec : forall {A} (a : A), ~ contains a (@empty_spec A);
+  }.
+
+Definition is_empty {A M} `{SM : SpecM M} (spec : M A) : Prop
+  := forall a, ~ contains a spec.
+
+Class ExecM (M : Type -> Type) : Type :=
+  { run : forall {A}, M A -> A;
   }.
 
 (*** The core memory model *)
@@ -76,7 +85,7 @@ Module Type CORE_MEMORY_MODEL
   Parameter initial_memory : Memory.
 
   (** Primitive byte reads *)
-  Parameter read_byte : Memory -> addr -> SByte -> Prop.
+  Parameter read_byte : forall {M} `{HM : Monad M} `{SM : SpecM M}, Memory -> addr -> M SByte.
 End CORE_MEMORY_MODEL.
 
 Module Type MEMORY_READ_ACCESS
@@ -91,32 +100,40 @@ Module Type MEMORY_READ_ACCESS
   Parameter read_byte_allowed : Memory -> addr -> Prop.
 
   Parameter read_byte_allowed_spec :
-    forall (m : Memory) (ptr : addr),
-    (exists (b : SByte),
-        read_byte m ptr b) ->
-    read_byte_allowed m ptr.
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      (m : Memory) (ptr : addr),
+      ~ read_byte_allowed m ptr ->
+      is_empty (read_byte m ptr).
 End MEMORY_READ_ACCESS.
 
 Module Type READABLE_MEMORY (ADDR : CORE_ADDRESS) (SB : SBYTE) := CORE_MEMORY_MODEL ADDR SB <+ MEMORY_READ_ACCESS ADDR SB.
 
-Module Type MEMORY_WRITE_ACCESS
+Module ALL_READS_PRESERVED
   (Import ADDR : CORE_ADDRESS)
   (Import SB : SBYTE)
   (Import MEM : CORE_MEMORY_MODEL ADDR SB).
 
-  (**
-     Whether a pointer can be used to write a byte at the location in
-     memory.
-   *)
-  Parameter write_byte_allowed : Memory -> addr -> Prop.
-End MEMORY_WRITE_ACCESS.
+  Definition read_bytes_preserved {M} `{HM : Monad M} `{SM : SpecM M}
+    (m1 m2 : Memory) : Prop
+    := forall ptr b,
+      contains b (read_byte m1 ptr) <-> contains b (read_byte m2 ptr).
+End ALL_READS_PRESERVED.
 
-Module Type READ_WRITE_MEMORY (ADDR : CORE_ADDRESS) (SB : SBYTE) := READABLE_MEMORY ADDR SB <+ MEMORY_WRITE_ACCESS ADDR SB.
+Module ALL_READ_ACCESS_PRESERVED
+  (Import ADDR : CORE_ADDRESS)
+  (Import SB : SBYTE)
+  (Import MEM : READABLE_MEMORY ADDR SB).
 
-Module MEMORY_WRITES
+  Definition read_byte_allowed_preserved {M} `{HM : Monad M} `{SM : SpecM M}
+    (m1 m2 : Memory) : Prop
+    := forall ptr,
+      read_byte_allowed m1 ptr <-> read_byte_allowed m2 ptr.
+End ALL_READ_ACCESS_PRESERVED.
+
+Module Type MEMORY_WRITES
   (Import ADDR : ADDRESS)
   (Import SB : SBYTE)
-  (Import MEM : READ_WRITE_MEMORY ADDR SB).
+  (Import MEM : READABLE_MEMORY ADDR SB).
 
   (* TODO: This does not belong here *)
   Definition disjoint_ptr_byte (a b : addr) :=
@@ -134,24 +151,318 @@ Module MEMORY_WRITES
      1. The modular memory model may not have a write operation at all.
    *)
   (** The raw write_byte operation *)
-  Parameter write_byte : Memory -> addr -> SByte -> Memory -> Prop.
+  Parameter write_byte : forall {M} `{HM : Monad M} `{SM : SpecM M}, Memory -> addr -> SByte -> M Memory.
 
   (** We can look up a new value after writing it to memory *)
   Parameter write_byte_new_lu :
-    forall (m1 : Memory) (ptr : addr) (byte : SByte) (m2 : Memory),
-      write_byte m1 ptr byte m2 ->
-      read_byte m2 ptr byte.
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      (m1 : Memory) (ptr : addr) (byte : SByte) (m2 : Memory),
+      contains m2 (write_byte m1 ptr byte) ->
+      contains byte (read_byte m2 ptr).
 
   (** We can look up old values after writing to a disjoint location in memory *)
-  Parameter write_byte
-
-  Record set_byte_memory (m1 : Memory) (ptr : addr) (byte : SByte) (m2 : Memory) : Prop :=
-    {
-      new_lu : read_byte m2 ptr byte;
-      old_lu : forall ptr',
+  Parameter write_byte_old_lu :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      (m1 : Memory) (ptr : addr) (byte : SByte) (m2 : Memory),
+      contains m2 (write_byte m1 ptr byte) ->
+      forall ptr',
         disjoint_ptr_byte ptr ptr' ->
-        (forall byte', read_byte_spec m1 ptr' byte' <-> read_byte_spec m2 ptr' byte');
-    }.
+        (forall byte', contains byte' (read_byte m1 ptr') <-> contains byte' (read_byte m2 ptr')).
+End MEMORY_WRITES.
+
+Module Type WRITEABLE_MEMORY_HELPER (ADDR : ADDRESS) (SB : SBYTE) := READABLE_MEMORY ADDR SB <+ MEMORY_WRITES ADDR SB.
+
+Module Type MEMORY_WRITE_ACCESS
+  (Import ADDR : ADDRESS)
+  (Import SB : SBYTE)
+  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB).
+
+  (**
+     Whether a pointer can be used to write a byte at the location in
+     memory.
+   *)
+  Parameter write_byte_allowed : Memory -> addr -> Prop.
+
+  Parameter write_byte_allowed_spec :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      (m : Memory) (ptr : addr),
+      ~ write_byte_allowed m ptr ->
+      forall b, is_empty (write_byte m ptr b).
+End MEMORY_WRITE_ACCESS.
+
+Module ALL_WRITE_ACCESS_PRESERVED
+  (Import ADDR : ADDRESS)
+  (Import SB : SBYTE)
+  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
+  (Import WRITE_ACCESS : MEMORY_WRITE_ACCESS ADDR SB MEM).
+
+  Definition write_byte_allowed_preserved {M} `{HM : Monad M} `{SM : SpecM M}
+    (m1 m2 : Memory) : Prop
+    := forall ptr,
+      write_byte_allowed m1 ptr <-> write_byte_allowed m2 ptr.
+End ALL_WRITE_ACCESS_PRESERVED.
+
+Module Type WRITES_PRESERVES_READ_ACCESS
+  (Import ADDR : ADDRESS)
+  (Import SB : SBYTE)
+  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB).
+
+  Include (ALL_READ_ACCESS_PRESERVED ADDR SB MEM).
+  Parameter write_byte_preserves_read_byte_allowed :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 ptr b m2,
+      contains m2 (write_byte m1 ptr b) ->
+      read_byte_allowed_preserved m1 m2.
+End WRITES_PRESERVES_READ_ACCESS.
+
+Module Type WRITES_PRESERVES_WRITE_ACCESS
+  (Import ADDR : ADDRESS)
+  (Import SB : SBYTE)
+  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
+  (Import WRITE_ACCESS : MEMORY_WRITE_ACCESS ADDR SB MEM).
+
+  Include (ALL_WRITE_ACCESS_PRESERVED ADDR SB MEM WRITE_ACCESS).
+  Parameter write_byte_preserves_read_byte_allowed :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 ptr b m2,
+      contains m2 (write_byte m1 ptr b) ->
+      write_byte_allowed_preserved m1 m2.
+End WRITES_PRESERVES_WRITE_ACCESS.
+
+(*** Allocation helpers. Finding free blocks *)
+
+(** Memory where bytes may or may not be allocated *)
+Module Type MEMORY_ALLOCATED_CORE
+  (Import ADDR : CORE_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import MEM : CORE_MEMORY_MODEL ADDR SB).
+
+  (** Whether an address is allocated with a given AllocationId *)
+  Parameter addr_allocated : Memory -> addr -> AllocationId -> Prop.
+  Definition addr_not_allocated (m : Memory) (ptr : addr) :=
+    forall aid, ~ addr_allocated m ptr aid.
+
+  Parameter read_byte_allocated_spec :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      (m : Memory) (ptr : addr),
+      addr_not_allocated m ptr ->
+      is_empty (read_byte m ptr).
+End MEMORY_ALLOCATED_CORE.
+
+Module ALL_ALLOCATED_PRESERVED
+  (Import ADDR : ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import MEM : CORE_MEMORY_MODEL ADDR SB)
+  (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM).
+
+  Definition all_allocated_preserved {M} `{HM : Monad M} `{SM : SpecM M}
+    (m1 m2 : Memory) : Prop
+    := forall ptr aid,
+      addr_allocated m1 ptr aid <-> addr_allocated m2 ptr aid.
+
+  Definition all_not_allocated_preserved {M} `{HM : Monad M} `{SM : SpecM M}
+    (m1 m2 : Memory) : Prop
+    := forall ptr,
+      addr_not_allocated m1 ptr <-> addr_not_allocated m2 ptr.
+End ALL_ALLOCATED_PRESERVED.
+
+Module Type WRITES_PRESERVES_ALLOCATED
+  (Import ADDR : ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
+  (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM).
+
+  Include (ALL_ALLOCATED_PRESERVED ADDR SB AID MEM ALLOC).
+  Parameter write_byte_preserves_allocated :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 ptr b m2,
+      contains m2 (write_byte m1 ptr b) ->
+      all_allocated_preserved m1 m2.
+End WRITES_PRESERVES_ALLOCATED.
+
+Module Type MEMORY_FIND_FREE
+  (Import ADDR : ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import MEM : CORE_MEMORY_MODEL ADDR SB)
+  (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM).
+
+  Parameter find_free_block :
+    forall {M} `{HM : Monad M} `{SM : SpecM M},
+      Memory -> nat -> M (list addr).
+
+  Parameter find_free_block_is_free :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m len ptrs,
+      contains ptrs (find_free_block m len) ->
+      Forall (addr_not_allocated m) ptrs.
+
+  Parameter find_free_block_length :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m len ptrs,
+      contains ptrs (find_free_block m len) ->
+      length ptrs = len.
+
+  Parameter find_free_block_consecutive :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m len ptrs,
+      contains ptrs (find_free_block m len) ->    
+      consecutive_ptrs ptrs = true.
+End MEMORY_FIND_FREE.
+
+Module Type MEMORY_ALLOCATE
+  (Import ADDR : ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
+  (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
+  (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC).
+
+  Parameter allocate_block :
+    forall {M} `{HM : Monad M} `{SM : SpecM M},
+      Memory -> list SByte -> AllocationId -> M (Memory * list addr)%type.
+
+  Parameter allocate_block_free :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (allocate_block m1 bytes aid) ->
+      contains ptrs (find_free_block m1 (length bytes)).
+
+  Parameter allocate_block_reads :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (allocate_block m1 bytes aid) ->
+      Forall2 (fun b ptr => contains b (read_byte m2 ptr)) bytes ptrs.
+
+  Parameter allocate_block_allocated :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (allocate_block m1 bytes aid) ->
+      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
+End MEMORY_ALLOCATE.
+
+(*** Stack allocations *)
+Module Type CORE_FRAME
+  (Import ADDR : CORE_ADDRESS) <: Typ.
+  Parameter t : Type.
+  Parameter ptr_in_frame : t -> addr -> Prop.
+  Parameter empty_frame : t.
+
+  Parameter empty_frame_spec :
+    forall ptr,
+      ~ ptr_in_frame empty_frame ptr.
+End CORE_FRAME.
+
+Module Type FRAME_NOTATIONS
+  (Import ADDR : CORE_ADDRESS)
+  (Import F : CORE_FRAME ADDR).
+  Notation Frame := F.t.
+End FRAME_NOTATIONS.
+
+Module Type FRAME_EQV
+  (Import ADDR : CORE_ADDRESS)
+  (Import F : CORE_FRAME ADDR)
+  (Import FN : FRAME_NOTATIONS ADDR F).
+  Definition frame_eqv (f f' : Frame) : Prop :=
+    forall ptr, ptr_in_frame f ptr <-> ptr_in_frame f' ptr.
+
+  #[global] Instance frame_eqv_Equivalence : Equivalence frame_eqv.
+  Proof.
+    split.
+    - intros f ptr.
+      reflexivity.
+    - intros f1 f2 EQV.
+      unfold frame_eqv in *.
+      firstorder.
+    - intros x y z XY YZ.
+      firstorder.
+  Qed.
+End FRAME_EQV.
+
+Module Type FRAME (ADDR : CORE_ADDRESS) := CORE_FRAME ADDR <+ FRAME_NOTATIONS ADDR <+ FRAME_EQV ADDR.
+
+Module Type CORE_FRAME_STACK
+  (Import ADDR : CORE_ADDRESS)
+  (Import F : CORE_FRAME ADDR) <: Typ.
+  Parameter t : Type.
+  Parameter initial_frame_stack : t.
+  
+  Parameter peek : t -> F.t -> Prop.
+  Parameter pop : t -> t -> Prop.
+  Parameter push : t -> F.t -> t -> Prop.
+
+  Parameter push_peek :
+    forall fs1 f fs2,
+      push fs1 f fs2 ->
+      peek fs2 f.
+
+  Parameter push_pop :
+    forall fs1 f fs2,
+      push fs1 f fs2 ->
+      pop fs2 fs1.
+End CORE_FRAME_STACK.
+
+Module Type FRAME_STACK_NOTATIONS
+  (Import ADDR : CORE_ADDRESS)
+  (Import F : CORE_FRAME ADDR)
+  (Import FS : CORE_FRAME_STACK ADDR F).
+  Notation FrameStack := FS.t.
+End FRAME_STACK_NOTATIONS.
+
+Module Type MEMORY_FRAME_STACK
+  (Import ADDR : CORE_ADDRESS)
+  (Import SB : SBYTE)
+  (Import F : FRAME ADDR)
+  (Import FN : FRAME_NOTATIONS ADDR F)
+  (Import FS : CORE_FRAME_STACK ADDR F)
+  (Import FSN : FRAME_STACK_NOTATIONS ADDR F FS)
+  (Import MEM : CORE_MEMORY_MODEL ADDR SB).
+
+  Parameter Memory_frame_stack :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}, Memory -> M FrameStack.
+
+  Parameter Memory_frame_modify :
+    forall {M} `{HM : Monad M} `{SM : SpecM M},
+      Memory -> (Frame -> Frame) -> M Memory.
+
+  Parameter Memory_frame_modify :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}, Memory -> M Memory.
+
+  
+End MEMORY_FRAME_STACK.
+
+Module Type        
+
+Module FRAME_LIST_CORE
+  (Import ADDR : CORE_ADDRESS)
+  (Import PTOI : HAS_PTOI ADDR) <: CORE_FRAME ADDR.
+  Definition t := list Z.
+  Definition ptr_in_frame (f : t) (p : addr) :=
+    In (ptr_to_int p) f.
+End FRAME_LIST_CORE.
+
+Module Type FRAME_LIST (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) := FRAME_LIST_CORE ADDR PTOI <+ FRAME_NOTATIONS ADDR <+ FRAME_EQV ADDR.
+
+  Include (FRAME_NOTATIONS ADDR).
+  Include (FRAME_EQV ADDR).
+End FRAME_LIST.
+  Parameter t : Type.
+  Notation Frame := t.
+
+  Parameter ptr_in_frame : Frame -> addr -> Prop.
+  Definition frame_eqv (f f' : Frame) : Prop :=
+    forall ptr, ptr_in_frame f ptr <-> ptr_in_frame f' ptr.
+End FRAME.
+
+  
+Module Type WRITEABLE_MEMORY.
+
+(** Find free blocks for allocation *)
+Module Type MEMORY_FIND_FREE :
+  
 
   Record write_byte_operation_invariants (m1 m2 : MemState) : Prop :=
     {
@@ -179,6 +490,32 @@ Module MEMORY_WRITES
          write_byte_spec m1 ptr byte m2)
       (fun m1 => ~ write_byte_allowed m1 ptr).
 End MEMORY_WRITES.
+
+
+Module NAT_SBYTE <: SBYTE.
+  Definition SByte := (nat * N)%type.
+  Definition sbyte_sid (b : SByte) := snd b.
+End NAT_SBYTE.
+
+Module Z_ADDR <: CORE_ADDRESS.
+  Include BinInt.Z.
+  Notation addr := t.
+End Z_ADDR.
+
+Module CORE_INT_MEM <: CORE_MEMORY_MODEL Z_ADDR NAT_SBYTE.
+  Import Z_ADDR.
+  Import NAT_SBYTE.
+  Require Import IntMaps.
+  Definition Memory := IntMap SByte.
+  Definition initial_memory := @IM.empty SByte.
+
+  Definition read_byte {M} `{HM : Monad M} `{SM : SpecM M}
+    (m : Memory) (ptr : addr) : M SByte :=
+    match IM.find ptr m with
+    | None => empty_spec
+    | Some b => ret b
+    end.
+End CORE_INT_MEM.
 
 
 Module Type MemoryModelSpecPrimitives (ADDR : ADDRESS) (SB : SBYTE).

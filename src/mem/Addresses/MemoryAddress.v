@@ -15,7 +15,8 @@ Require Import ZArith.
 Require Import Coqlib.
 
 From Vellvm Require Import
-     Utils.Error.
+  Utils.Error
+  Utils.Monads.
 
 From ExtLib Require Import
   Structures.Monads.
@@ -52,12 +53,48 @@ Module Type HAS_PTOI (Import Addr:CORE_ADDRESS).
   Parameter ptr_to_int : addr -> Z.
 End HAS_PTOI.
 
-Module Type HAS_POINTER_ARITHMETIC (Import Addr:CORE_ADDRESS).
+Module Type HAS_POINTER_ARITHMETIC_CORE (Import Addr:CORE_ADDRESS).
   (** Pointer addition. May error if the result cannot be represented
       as a pointer, e.g., if it would be out of bounds.
    *)
   Parameter ptr_add : addr -> Z -> err addr.
-End HAS_POINTER_ARITHMETIC.
+  Parameter ptr_add_0 :
+    forall ptr,
+      ptr_add ptr 0 = inr ptr.
+End HAS_POINTER_ARITHMETIC_CORE.
+
+Module Type HAS_POINTER_ARITHMETIC_HELPERS
+  (Import Addr:CORE_ADDRESS)
+  (Import ARITH:HAS_POINTER_ARITHMETIC_CORE Addr).
+
+  Definition get_consecutive_ptrs (ptr : addr) (len : nat) : err (list addr) :=
+    let ixs := seq 0 len in
+    map_monad
+      (fun ix => ptr_add ptr (Z.of_nat ix))
+      ixs (m:=err).
+
+  Fixpoint consecutive_ptrs_h (start : addr) (ptrs : list addr) : bool :=
+    match ptrs with
+    | nil => true
+    | cons ptr ptrs =>
+        match (ptr_add ptr 1) with
+        | inl _ => false
+        | inr ptr' =>
+            proj_sumbool (eq_dec ptr ptr') &&
+              consecutive_ptrs_h ptr ptrs
+        end
+    end.
+
+  Definition consecutive_ptrs (ptrs : list addr) : bool :=
+    match ptrs with
+    | nil => true
+    | cons ptr ptrs => consecutive_ptrs_h ptr ptrs
+    end.
+    
+End HAS_POINTER_ARITHMETIC_HELPERS.
+
+Module Type HAS_POINTER_ARITHMETIC (ADDR : CORE_ADDRESS)
+  := HAS_POINTER_ARITHMETIC_CORE ADDR <+ HAS_POINTER_ARITHMETIC_HELPERS ADDR.
 
 Module Type PTOI_ARITH_EXTRAS (Import Addr:CORE_ADDRESS) (Import PTOI : HAS_PTOI Addr) (Import HPA : HAS_POINTER_ARITHMETIC Addr).
   Parameter ptr_to_int_ptr_add :
