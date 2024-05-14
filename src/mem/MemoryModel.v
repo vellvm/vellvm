@@ -331,11 +331,17 @@ Module Type MEMORY_ALLOCATE
       contains (m2, ptrs) (allocate_block m1 bytes aid) ->
       contains ptrs (find_free_block m1 (length bytes)).
 
-  Parameter allocate_block_reads :
+  Parameter allocate_block_new_reads :
     forall {M} `{HM : Monad M} `{SM : SpecM M}
       m1 bytes aid m2 ptrs,
       contains (m2, ptrs) (allocate_block m1 bytes aid) ->
       Forall2 (fun b ptr => contains b (read_byte m2 ptr)) bytes ptrs.
+
+  Parameter allocate_block_old_reads :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (allocate_block m1 bytes aid) ->
+      forall b ptr, contains b (read_byte m1 ptr) -> contains b (read_byte m2 ptr).
 
   Parameter allocate_block_allocated :
     forall {M} `{HM : Monad M} `{SM : SpecM M}
@@ -348,12 +354,25 @@ End MEMORY_ALLOCATE.
 Module Type CORE_FRAME
   (Import ADDR : CORE_ADDRESS) <: Typ.
   Parameter t : Type.
-  Parameter ptr_in_frame : t -> addr -> Prop.
+  Parameter ptr_in_frame : t -> addr -> bool.
+  Parameter add_to_frame : t -> addr -> t.
   Parameter empty_frame : t.
 
   Parameter empty_frame_spec :
     forall ptr,
-      ~ ptr_in_frame empty_frame ptr.
+      ptr_in_frame empty_frame ptr = false.
+
+  Parameter add_to_frame_new :
+    forall ptr f,
+      ptr_in_frame (add_to_frame f ptr) ptr = true.
+
+  (* May not hold for `ptr_in_frame f p = false`, because we may
+     consider different pointers with the same provenance to be in a
+     frame if they share a physical address *)
+  Parameter add_to_frame_old :
+    forall ptr p f,
+      ptr_in_frame f p = true ->
+      ptr_in_frame (add_to_frame f ptr) p = true.
 End CORE_FRAME.
 
 Module Type FRAME_NOTATIONS
@@ -367,7 +386,7 @@ Module Type FRAME_EQV
   (Import F : CORE_FRAME ADDR)
   (Import FN : FRAME_NOTATIONS ADDR F).
   Definition frame_eqv (f f' : Frame) : Prop :=
-    forall ptr, ptr_in_frame f ptr <-> ptr_in_frame f' ptr.
+    forall ptr, ptr_in_frame f ptr = ptr_in_frame f' ptr.
 
   #[global] Instance frame_eqv_Equivalence : Equivalence frame_eqv.
   Proof.
@@ -378,11 +397,21 @@ Module Type FRAME_EQV
       unfold frame_eqv in *.
       firstorder.
     - intros x y z XY YZ.
-      firstorder.
+      unfold frame_eqv in *.
+      congruence.
   Qed.
 End FRAME_EQV.
 
-Module Type FRAME (ADDR : CORE_ADDRESS) := CORE_FRAME ADDR <+ FRAME_NOTATIONS ADDR <+ FRAME_EQV ADDR.
+Module Type FRAME_EXTRAS
+  (Import ADDR : CORE_ADDRESS)
+  (Import F : CORE_FRAME ADDR)
+  (Import FN : FRAME_NOTATIONS ADDR F).
+
+  Definition add_all_to_frame (f : Frame) (ptrs : list addr) : Frame
+    := fold_left add_to_frame ptrs f.
+End FRAME_EXTRAS.
+
+Module Type FRAME (ADDR : CORE_ADDRESS) := CORE_FRAME ADDR <+ FRAME_NOTATIONS ADDR <+ FRAME_EQV ADDR <+ FRAME_EXTRAS ADDR.
 
 Module Type CORE_FRAME_STACK
   (Import ADDR : CORE_ADDRESS)
@@ -412,53 +441,313 @@ Module Type FRAME_STACK_NOTATIONS
   Notation FrameStack := FS.t.
 End FRAME_STACK_NOTATIONS.
 
+Module Type FRAME_STACK (ADDR : CORE_ADDRESS) (F : CORE_FRAME ADDR) := CORE_FRAME_STACK ADDR F <+ FRAME_STACK_NOTATIONS ADDR F.
+
 Module Type MEMORY_FRAME_STACK
   (Import ADDR : CORE_ADDRESS)
   (Import SB : SBYTE)
   (Import F : FRAME ADDR)
-  (Import FN : FRAME_NOTATIONS ADDR F)
-  (Import FS : CORE_FRAME_STACK ADDR F)
-  (Import FSN : FRAME_STACK_NOTATIONS ADDR F FS)
+  (Import FS : FRAME_STACK ADDR F)
   (Import MEM : CORE_MEMORY_MODEL ADDR SB).
 
   Parameter Memory_frame_stack :
     forall {M} `{HM : Monad M} `{SM : SpecM M}, Memory -> M FrameStack.
 
-  Parameter Memory_frame_modify :
+  Parameter Memory_frame_stack_modify :
     forall {M} `{HM : Monad M} `{SM : SpecM M},
-      Memory -> (Frame -> Frame) -> M Memory.
+      Memory -> (FrameStack -> FrameStack) -> M Memory.
 
-  Parameter Memory_frame_modify :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}, Memory -> M Memory.
-
-  
+  Parameter Memory_frame_stack_modify_spec :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      (m1 m2 : Memory) (f : FrameStack -> FrameStack) (fs1 fs2 : FrameStack),
+      contains fs1 (Memory_frame_stack m1) ->
+      contains m2 (Memory_frame_stack_modify m1 f) ->
+      contains fs2 (Memory_frame_stack m2) ->
+      fs2 = f fs1.    
 End MEMORY_FRAME_STACK.
 
-Module Type        
+Module Type MEMORY_STACK_ALLOCATE
+  (Import ADDR : ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
+  (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
+  (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC)
+  (Import F : FRAME ADDR)
+  (Import FS : FRAME_STACK ADDR F)
+  (Import MFS : MEMORY_FRAME_STACK ADDR SB F FS MEM).
+
+  Parameter stack_allocate_block :
+    forall {M} `{HM : Monad M} `{SM : SpecM M},
+      Memory -> list SByte -> AllocationId -> M (Memory * list addr)%type.
+ 
+  Parameter stack_allocate_block_free :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (stack_allocate_block m1 bytes aid) ->
+      contains ptrs (find_free_block m1 (length bytes)).
+
+  Parameter stack_allocate_block_new_reads :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (stack_allocate_block m1 bytes aid) ->
+      Forall2 (fun b ptr => contains b (read_byte m2 ptr)) bytes ptrs.
+
+  Parameter stack_allocate_block_old_reads :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (stack_allocate_block m1 bytes aid) ->
+      forall b ptr, contains b (read_byte m1 ptr) -> contains b (read_byte m2 ptr).
+
+  Parameter stack_allocate_block_allocated :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (stack_allocate_block m1 bytes aid) ->
+      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
+
+  Parameter stack_allocate_block_new_frame :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs fs1 fs2,
+      contains (m2, ptrs) (stack_allocate_block m1 bytes aid) ->
+      contains fs2 (Memory_frame_stack m2) ->
+      contains fs1 (Memory_frame_stack m1) ->
+      push fs1 (add_all_to_frame empty_frame ptrs) fs2.
+End MEMORY_STACK_ALLOCATE.
+
 
 Module FRAME_LIST_CORE
   (Import ADDR : CORE_ADDRESS)
   (Import PTOI : HAS_PTOI ADDR) <: CORE_FRAME ADDR.
   Definition t := list Z.
-  Definition ptr_in_frame (f : t) (p : addr) :=
-    In (ptr_to_int p) f.
+  Definition ptr_in_frame (f : t) (p : addr) : bool :=
+    existsb (fun z => Z.eqb (ptr_to_int p) z) f.
+  Definition empty_frame : t := [].
+
+  Definition add_to_frame (f : t) (p : addr) : t :=
+    cons (ptr_to_int p) f.
+
+  Lemma empty_frame_spec :
+    forall ptr,
+      ptr_in_frame empty_frame ptr = false.
+  Proof.
+    intros ptr.
+    cbn. reflexivity.
+  Qed.
+
+  Lemma add_to_frame_new :
+    forall ptr f,
+      ptr_in_frame (add_to_frame f ptr) ptr = true.
+  Proof.
+    intros ptr f.
+    cbn.
+    lia.
+  Qed.
+
+  (* May not hold for `ptr_in_frame f p = false`, because we may
+     consider different pointers with the same provenance to be in a
+     frame if they share a physical address *)
+  Parameter add_to_frame_old :
+    forall ptr p f,
+      ptr_in_frame f p = true ->
+      ptr_in_frame (add_to_frame f ptr) p = true.
 End FRAME_LIST_CORE.
 
 Module Type FRAME_LIST (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) := FRAME_LIST_CORE ADDR PTOI <+ FRAME_NOTATIONS ADDR <+ FRAME_EQV ADDR.
 
-  Include (FRAME_NOTATIONS ADDR).
-  Include (FRAME_EQV ADDR).
-End FRAME_LIST.
+(*** Heap allocations *)
+Module Type CORE_HEAP
+  (Import ADDR : CORE_ADDRESS) <: Typ.
   Parameter t : Type.
-  Notation Frame := t.
+  Parameter empty_heap : t.
 
-  Parameter ptr_in_frame : Frame -> addr -> Prop.
-  Definition frame_eqv (f f' : Frame) : Prop :=
-    forall ptr, ptr_in_frame f ptr <-> ptr_in_frame f' ptr.
-End FRAME.
+  (*** Heap operations *)
 
-  
-Module Type WRITEABLE_MEMORY.
+  (** Is a pointer a root pointer of the heap *)
+  Parameter root_ptr_in_heap : t -> addr -> bool.
+
+  (** Is a pointer allocated in the heap under a root pointer *)
+  Parameter ptr_in_heap : t -> addr -> addr -> bool.
+
+  (** Add a pointer to the heap under a root pointer *)
+  Parameter add_ptr_to_heap : t -> addr -> addr -> t.
+
+  (*** Heap properties *)
+
+  Parameter empty_heap_ptr_spec :
+    forall root ptr,
+      ptr_in_heap empty_heap root ptr = false.
+
+  Parameter empty_heap_root_spec :
+    forall ptr,
+      root_ptr_in_heap empty_heap ptr = false.
+
+  Parameter add_ptr_to_heap_ptr_in_heap_new :
+    forall h root ptr,
+      ptr_in_heap (add_ptr_to_heap h root ptr) root ptr = true.
+
+  (* May not hold for `ptr_in_heap h ptr = false`, because we may
+     consider different pointers with the same provenance to be in a
+     heap if they share a physical address *)
+  Parameter add_ptr_to_heap_ptr_in_heap_old :
+    forall h root ptr root_old ptr_old,
+      ptr_in_heap h root_old ptr_old = true ->
+      ptr_in_heap (add_ptr_to_heap h root ptr) root_old ptr_old = true.
+
+  Parameter add_ptr_to_heap_root_ptr_in_heap_new :
+    forall h root ptr,
+      root_ptr_in_heap (add_ptr_to_heap h root ptr) root = true.
+
+  (* May not hold for `root_ptr_in_heap h root = false`, because we may
+     consider different pointers with the same provenance to be in a
+     heap if they share a physical address *)
+  Parameter add_ptr_to_heap_root_ptr_in_heap_old :
+    forall h root ptr root_old,
+      root_ptr_in_heap h root_old = true ->
+      root_ptr_in_heap (add_ptr_to_heap h root ptr) root_old = true.
+End CORE_HEAP.
+
+Module Type HEAP_NOTATIONS
+  (Import ADDR : CORE_ADDRESS)
+  (Import H : CORE_HEAP ADDR).
+  Notation Heap := H.t.
+End HEAP_NOTATIONS.
+
+Module Type HEAP_EQV
+  (Import ADDR : CORE_ADDRESS)
+  (Import H : CORE_HEAP ADDR)
+  (Import HN : HEAP_NOTATIONS ADDR H).
+
+  Record heap_eqv (h h' : Heap) : Prop :=
+    {
+      heap_roots_eqv : forall root, root_ptr_in_heap h root = root_ptr_in_heap h' root;
+      heap_ptrs_eqv : forall root ptr, ptr_in_heap h root ptr = ptr_in_heap h' root ptr;
+    }.
+
+  #[global] Instance root_in_heap_prop_Proper :
+    Proper (heap_eqv ==> @Logic.eq addr  ==> @Logic.eq bool) root_ptr_in_heap.
+  Proof.
+    intros h h' HEAPEQ ptr ptr' PTREQ; subst.
+    inv HEAPEQ.
+    eauto.
+  Qed.
+
+  #[global] Instance ptr_in_heap_prop_Proper :
+    Proper (heap_eqv ==> @Logic.eq addr ==> @Logic.eq addr ==> @Logic.eq bool) ptr_in_heap.
+  Proof.
+    intros h h' HEAPEQ root root' ROOTEQ ptr ptr' PTREQ; subst.
+    inv HEAPEQ.
+    eauto.
+  Qed.
+
+  #[global] Instance heap_Equivalence : Equivalence heap_eqv.
+  Proof.
+    split.
+    - intros h; split.
+      + intros root.
+        reflexivity.
+      + intros root ptr.
+        reflexivity.
+    - intros h1 h2 EQV.
+      firstorder.
+    - intros x y z XY YZ.
+      split.
+      + intros root.
+        rewrite XY, YZ.
+        reflexivity.
+      + intros root ptr.
+        rewrite XY, YZ.
+        reflexivity.
+  Qed.
+End HEAP_EQV.
+
+Module Type HEAP_EXTRAS
+  (Import ADDR : CORE_ADDRESS)
+  (Import F : CORE_HEAP ADDR)
+  (Import FN : HEAP_NOTATIONS ADDR F).
+
+  Definition add_ptrs_to_heap' (h : Heap) (root : addr) (ptrs : list addr) : Heap :=
+    fold_left (fun h' ptr => add_ptr_to_heap h' root ptr) ptrs h.
+
+  Definition add_ptrs_to_heap (h : Heap) (ptrs : list addr) : Heap :=
+    match ptrs with
+    | nil => h
+    | (root :: _) =>
+        add_ptrs_to_heap' h root ptrs
+    end.
+End HEAP_EXTRAS.
+
+Module Type HEAP (ADDR : CORE_ADDRESS) := CORE_HEAP ADDR <+ HEAP_NOTATIONS ADDR <+ HEAP_EQV ADDR <+ HEAP_EXTRAS ADDR.
+
+Module Type MEMORY_HEAP
+  (Import ADDR : CORE_ADDRESS)
+  (Import SB : SBYTE)
+  (Import H : HEAP ADDR)
+  (Import MEM : CORE_MEMORY_MODEL ADDR SB).
+
+  Parameter Memory_heap : Memory -> Heap.
+
+  Parameter Memory_heap_modify :
+      Memory -> (Heap -> Heap) -> Memory.
+
+  Parameter Memory_heap_modify_spec :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      (m1 m2 : Memory) (f : Heap -> Heap) (h1 h2 : Heap),
+      h1 = Memory_heap m1 ->
+      m2 = Memory_heap_modify m1 f ->
+      h2 = Memory_heap m2 ->
+      h2 = f h1.    
+End MEMORY_HEAP.
+
+Module Type MEMORY_HEAP_ALLOCATE
+  (Import ADDR : ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
+  (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
+  (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC)
+  (Import H : HEAP ADDR)
+  (Import MH : MEMORY_HEAP ADDR SB H MEM).
+
+  Parameter heap_allocate_block :
+    forall {M} `{HM : Monad M} `{SM : SpecM M},
+      Memory -> list SByte -> AllocationId -> M (Memory * list addr)%type.
+ 
+  Parameter heap_allocate_block_free :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (heap_allocate_block m1 bytes aid) ->
+      contains ptrs (find_free_block m1 (length bytes)).
+
+  Parameter heap_allocate_block_null :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (heap_allocate_block m1 bytes aid) ->
+      Forall (fun p => is_null p = false) ptrs.
+
+  Parameter heap_allocate_block_new_reads :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (heap_allocate_block m1 bytes aid) ->
+      Forall2 (fun b ptr => contains b (read_byte m2 ptr)) bytes ptrs.
+
+  Parameter heap_allocate_block_old_reads :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (heap_allocate_block m1 bytes aid) ->
+      forall b ptr, contains b (read_byte m1 ptr) -> contains b (read_byte m2 ptr).
+
+  Parameter heap_allocate_block_allocated :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (heap_allocate_block m1 bytes aid) ->
+      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
+
+  Parameter heap_allocate_block_new_heap :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (heap_allocate_block m1 bytes aid) ->
+      Memory_heap m2 = add_ptrs_to_heap (Memory_heap m1) ptrs.
+End MEMORY_HEAP_ALLOCATE.
 
 (** Find free blocks for allocation *)
 Module Type MEMORY_FIND_FREE :
