@@ -46,6 +46,17 @@ Module Type CORE_ADDRESS := DecidableType <+ ADDRESS_TYPE_NOTATION.
 (** Addresses which have null pointers *)
 Module Type HAS_NULL (Import Addr:CORE_ADDRESS).
   Parameter null : addr.
+
+  (** Check if a pointer is null. The `null` value above is guaranteed
+      to be "null", but there may be pointers that don't equal the above
+      value that count as "null" in certain memory models. For instance,
+      there may be null pointers with different provenances associated
+      with them.
+   *)
+  Parameter is_null : addr -> bool.
+
+  Parameter null_is_null :
+    is_null null = true.
 End HAS_NULL.
 
 (** Address types which can be converted to integers *)
