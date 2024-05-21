@@ -230,7 +230,7 @@ Proof.
   go.
 
   destruct (dvalue_eq_dec (d1:=DVALUE_Addr a) (d2:=DVALUE_Poison)); try inversion e.
-  step.
+  step. go.
   reflexivity. inversion WRITE.
 Qed.
 
@@ -264,7 +264,7 @@ Proof.
 
   cbn. go.
   rewrite TRIGGER; cbn.
-  rewrite bind_ret_l.
+  rewrite bind_ret_l. go.
   step; reflexivity.
 Qed.
 

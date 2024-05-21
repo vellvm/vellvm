@@ -472,31 +472,27 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     denote_exp None o.
   Arguments denote_op _ : simpl nomatch.
 
-      (* An instruction has only side-effects, it therefore returns [unit] *)
-      Definition denote_instr
-                 (i: (instr_id * instr dtyp)): itree instr_E unit :=
+      Definition denote_instr_exp (i: instr dtyp): itree instr_E uvalue :=
         match i with
         (* Pure operations *)
-        | (IId id, INSTR_Op op) =>
-          dv <- translate exp_to_instr (denote_op op) ;;
-          trigger (LocalWrite id dv)
+        | INSTR_Op op =>
+            translate exp_to_instr (denote_op op)
 
         (* Allocation *)
-        | (IId id, INSTR_Alloca dt _ _) =>
+        | INSTR_Alloca dt _ _ =>
           dv <- trigger (Alloca dt);;
-          trigger (LocalWrite id (dvalue_to_uvalue dv))
+          Ret (dvalue_to_uvalue dv)
 
         (* Load *)
-        | (IId id, INSTR_Load _ dt (du,ptr) _) =>
+        | INSTR_Load _ dt (du,ptr) _ =>
           ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
           da <- concretize_or_pick ua True ;;
           if (@dvalue_eq_dec da DVALUE_Poison)
           then raiseUB "Load from poisoned address."
-          else dv <- trigger (Load dt da);;
-                trigger (LocalWrite id dv)
+          else trigger (Load dt da)
 
         (* Store *)
-        | (IVoid _, INSTR_Store _ (dt, val) (DTYPE_Pointer, ptr) _) =>
+        | INSTR_Store _ (dt, val) (DTYPE_Pointer, ptr) _ =>
           uv <- translate exp_to_instr (denote_exp (Some dt) val) ;;
           dv <- concretize_or_pick uv True ;;
           if (dvalue_has_dtyp_fun dv dt) then
@@ -505,33 +501,45 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             da <- pickUnique ua ;;
             if (@dvalue_eq_dec da DVALUE_Poison)
             then raiseUB "Store to poisoned address."
-            else trigger (Store da dv))
+            else trigger (Store da dv)) ;; ret UVALUE_None
           else
             raise "Ill-typed store instruction"
 
-        | (_, INSTR_Store _ _ _ _) =>
-            raise "ILL-FORMED itree ERROR: Store to non-void ID or
-                    Ill-typed Store"
+        | INSTR_Store _ _ _ _ =>
+            raise "Ill-typed store instruction"
 
         (* Call *)
-        | (pt, INSTR_Call (dt, f) args attrs) =>
+        | INSTR_Call (dt, f) args attrs =>
           uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) args ;;
           fv <- translate exp_to_instr (denote_exp None f) ;;
           fv <- concretize_or_pick fv True ;;
-          returned_value <- trigger (Call dt fv uvs attrs) ;;
-          match pt with
-          | IVoid _ => ret tt
-          | IId id  => trigger (LocalWrite id returned_value)
-          end
+          trigger (Call dt fv uvs attrs)
 
-        | (IVoid _, INSTR_Comment _) => ret tt
+        | INSTR_Comment _ => ret UVALUE_None
 
         (* Currently unhandled itree instructions *)
-        | (_, INSTR_Fence)
-        | (_, INSTR_AtomicCmpXchg)
-        | (_, INSTR_AtomicRMW)
-        | (_, INSTR_VAArg)
-        | (_, INSTR_LandingPad) => raise "Unsupported VIR instruction"
+        | INSTR_Fence
+        | INSTR_AtomicCmpXchg
+        | INSTR_AtomicRMW
+        | INSTR_VAArg
+        | INSTR_LandingPad => raise "Unsupported VIR instruction"
+
+        end.
+
+      (* An instruction has only side-effects, it therefore returns [unit] *)
+      Definition denote_instr
+                 (i: (instr_id * instr dtyp)): itree instr_E unit :=
+        match i with
+        (* Store to local env *)
+        | (IId id, e) =>
+          dv <- denote_instr_exp e ;;
+          trigger (LocalWrite id dv)
+
+        (* Do not store to local env *)
+        | (IVoid _, INSTR_Store _ _ (DTYPE_Pointer, _) _)
+        | (IVoid _, INSTR_Comment _)
+        | (IVoid _, INSTR_Call _ _ _) =>
+            denote_instr_exp (snd i) ;; ret tt
 
         (* Error states *)
         | (_, _) => raise "ID / Instr mismatch void/non-void"
@@ -719,23 +727,24 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                       | _ => true
                       end).
 
+      Definition denote_mfun fundefs : forall T : Type, CallE T -> itree _ T :=
+        (fun T call =>
+          match call with
+          | Call dt fv args attr =>
+            match (lookup_defn fv fundefs) with
+            | Some f_den => (* If the call is internal *)
+                if rel_dec (dc_attrs (df_prototype f_den)) (remove_tag attr) then
+                  denote_function (f_den) args
+                else raise "Function was invoked with wrong attributes"
+            | None =>
+              dargs <- map_monad (fun uv => pickUnique uv) args ;;
+              trigger (ExternalCall dt fv (map dvalue_to_uvalue dargs) (remove_tag attr))
+            end
+          end).
+
       Definition denote_mcfg
                  (fundefs:list (dvalue * definition dtyp (cfg dtyp))) (dt : dtyp)
                  (f_value : dvalue) (args : list uvalue) : itree L0 uvalue :=
-        @mrec CallE (ExternalCallE +' _)
-              (fun T call =>
-                 match call with
-                 | Call dt fv args attr =>
-                   match (lookup_defn fv fundefs) with
-                   | Some f_den => (* If the call is internal *)
-                       if rel_dec (dc_attrs (df_prototype f_den)) attr then
-                         denote_function (f_den) args
-                       else raise "Function was invoked with wrong attributes"
-                   | None =>
-                     dargs <- map_monad (fun uv => pickUnique uv) args ;;
-                     trigger (ExternalCall dt fv (map dvalue_to_uvalue dargs) (remove_tag attr))
-                   end
-                 end)
-              _ (Call dt f_value args []).
+        mrec (denote_mfun fundefs) (Call dt f_value args []).
 
 End Denotation.
