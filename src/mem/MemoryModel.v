@@ -63,17 +63,120 @@ Import EitherMonad.
 
 From Coq Require Import FunctionalExtensionality.
 
-Class SpecM (M : Type -> Type) : Type :=
-  { contains : forall {A}, A -> M A -> Prop;
+
+(* What is a spec?
+
+   A spec of an operation should tell me how the operation behaves in
+   a given context. I.e., for a given precondition on the initial state,
+   the specification should give me the allowed final states and
+   resulting values from running an operation.
+
+   For a completely pure operation, a specification will essentially
+   just be a set of return values from the function... If the function
+   returns a value of type A this can be represented by A -> Prop.
+
+   a <- f;; g a
+
+   Would give me the set of values returned by `g`... I.e.,
+
+   b ∈ (a <- f;; g a) ⇔ ∃ a, a ∈ f ∧ b ∈ g a
+
+   How do pre / post conditions impact this?
+
+   {{pre}} spec {{post}}
+
+   Given the precondition, any value in the spec should abide by the
+   postcondition. This does *not* guarantee that the spec is
+   inhabited.
+
+   pre ->
+   (∀ a, spec a -> post a)
+
+   So if I write...
+
+   a {{pre}} ∈ {{post}} spec
+
+   What I mean is...
+
+   pre ->
+   (∃ a, spec a) ∧ (∀ a, spec a -> post a)
+ *)
+Class ContainsM (M : Type -> Type) `{HM: Monad M} :=
+  { contains : forall {A}, M A -> A -> Prop;
     empty_spec : forall {A}, M A;
-    empty_spec_spec : forall {A} (a : A), ~ contains a (@empty_spec A);
+    empty_spec_spec :
+    forall {A} (a : A),
+      ~ (contains (@empty_spec A) a);
+
+    contains_bind :
+    forall {A B} (ma : M A) (k : A -> M B) b,
+      (exists a, contains ma a /\ contains (k a) b) ->
+      contains (a <- ma;; k a) b;
   }.
 
-Definition is_empty {A M} `{SM : SpecM M} (spec : M A) : Prop
-  := forall a, ~ contains a spec.
+Notation "b ∈ m" := (contains m b) (at level 99).
 
-Class ExecM (M : Type -> Type) : Type :=
-  { run : forall {A}, M A -> A;
+Definition within {M A} `{ContainsM M} (pre : Prop) (a : A) (spec : M A) (post : A -> Prop) : Prop
+  := pre ->
+     (exists a, a ∈ spec) /\ (forall a, a ∈ spec -> post a).
+
+Notation "b {{ pre }} ∈ {{ post }} m" := (within pre m post) (at level 99).
+
+Lemma within_bind  :
+  forall {A B} {M} `{CM : ContainsM M} (ma : M A) (k : A -> M B) b pre post,
+    b {{pre}} ∈ {{post}} (a <- ma;; k a).
+  
+
+Class SpecM (M : Type -> Type) `{HM : Monad M}: Type :=
+  { within : forall {A}, Prop -> M A -> (A -> Prop) -> Prop;
+    empty_spec : forall {A}, M A;
+    empty_spec_spec :
+    forall {A} (a : A) pre post,
+      ~ (within pre (@empty_spec A) post);
+
+    within_spec :
+    forall {A} pre (ma : M A) post,
+      within pre ma post ->
+      pre ->
+    
+
+    spec_bind :
+    forall {A B} (ma : M A) (k : A -> M B) (pre : Prop) (post_a : A -> Prop) (post_b : B -> Prop),
+      spec pre ma post_a ->
+      (forall a, post_a a ->
+            spec True (k a) post_b) ->
+      within pre (bind ma k) post_b;
+  }.
+
+    contains_ret :
+    forall {A} (a : A),
+      contains True a (ret a) (fun _ => True);
+
+    contains_strengthen_pre :
+    forall {A} (ma : M A) (a : A) (pre : Prop) (pre_strong : Prop) (post : A -> Prop),
+      (pre_strong -> pre) ->
+      contains pre_strong a ma post ->
+      contains pre a ma post;
+
+    contains_weaken_post :
+    forall {A} (ma : M A) (a : A) (pre : Prop) (post : A -> Prop) (post_weak : A -> Prop),
+      (forall apost
+      contains pre a ma post ->
+      contains pre a ma post_weak;
+  }.
+
+Notation "b ∈ m" := (contains True b m (fun _ => True)) (at level 99).
+Notation "b ∉ m" := (~ (exists pre post, contains pre b m post)) (at level 99).
+Notation "b ⦉ pre ⦊ ∈ ⦉ post ⦊ m" := (contains pre b m post) (at level 99).
+Notation "b ⦉ pre ⦊ ∉ ⦉ post ⦊ m" := (~ (contains pre b m post)) (at level 99).
+Notation "b {{ pre }} ∈ {{ post }} m" := (contains pre b m post) (at level 99).
+Notation "b {{ pre }} ∉ {{ post }} m" := (~ (contains pre b m post)) (at level 99).
+
+Definition is_empty {A M} `{SM : SpecM M} (spec : M A) : Prop
+  := forall a, a ∉ spec.
+
+Class ExecM (M : Type -> Type) (Result : Type -> Type) : Type :=
+  { run : forall {A}, M A -> Result A;
   }.
 
 (*** The core memory model *)
@@ -116,7 +219,7 @@ Module ALL_READS_PRESERVED
   Definition read_bytes_preserved {M} `{HM : Monad M} `{SM : SpecM M}
     (m1 m2 : Memory) : Prop
     := forall ptr b,
-      contains b (read_byte m1 ptr) <-> contains b (read_byte m2 ptr).
+      (b ∈ (read_byte m1 ptr)) <-> (b ∈ (read_byte m2 ptr)).
 End ALL_READS_PRESERVED.
 
 Module ALL_READ_ACCESS_PRESERVED
@@ -157,8 +260,7 @@ Module Type MEMORY_WRITES
   Parameter write_byte_new_lu :
     forall {M} `{HM : Monad M} `{SM : SpecM M}
       (m1 : Memory) (ptr : addr) (byte : SByte) (m2 : Memory),
-      contains m2 (write_byte m1 ptr byte) ->
-      contains byte (read_byte m2 ptr).
+      m2 {{True}} ∈ {{fun m2 => byte ∈ read_byte m2 ptr}} (write_byte m1 ptr byte).
 
   (** We can look up old values after writing to a disjoint location in memory *)
   Parameter write_byte_old_lu :
@@ -419,19 +521,22 @@ Module Type CORE_FRAME_STACK
   Parameter t : Type.
   Parameter initial_frame_stack : t.
   
-  Parameter peek : t -> F.t -> Prop.
-  Parameter pop : t -> t -> Prop.
-  Parameter push : t -> F.t -> t -> Prop.
+  Parameter peek : t -> F.t.
+  Parameter pop : t -> option (F.t * t).
+  Parameter push : t -> F.t -> t.
 
   Parameter push_peek :
     forall fs1 f fs2,
-      push fs1 f fs2 ->
-      peek fs2 f.
+      fs2 = push fs1 f ->
+      f = peek fs2.
 
   Parameter push_pop :
     forall fs1 f fs2,
-      push fs1 f fs2 ->
-      pop fs2 fs1.
+      fs2 = push fs1 f ->
+      Some (f, fs1) = pop fs2.
+
+  Parameter pop_empty :
+    None = pop initial_frame_stack.
 End CORE_FRAME_STACK.
 
 Module Type FRAME_STACK_NOTATIONS
@@ -441,7 +546,22 @@ Module Type FRAME_STACK_NOTATIONS
   Notation FrameStack := FS.t.
 End FRAME_STACK_NOTATIONS.
 
-Module Type FRAME_STACK (ADDR : CORE_ADDRESS) (F : CORE_FRAME ADDR) := CORE_FRAME_STACK ADDR F <+ FRAME_STACK_NOTATIONS ADDR F.
+Module Type FRAME_STACK_EXTRAS
+  (Import ADDR : CORE_ADDRESS)
+  (Import F : FRAME ADDR)
+  (Import FN : FRAME_NOTATIONS ADDR F)
+  (Import FS : CORE_FRAME_STACK ADDR F)
+  (Import FSN : FRAME_STACK_NOTATIONS ADDR F FS).
+
+  Definition modify_current_frame (fs : FrameStack) (g : Frame -> Frame) : option FrameStack
+    := '(f, fs') <- pop fs;;
+       ret (push fs' (g f)).
+
+  Definition add_all_to_current_frame (fs : FrameStack) (ptrs : list addr) : option FrameStack
+    := modify_current_frame fs (fun f => add_all_to_frame f ptrs).
+End FRAME_STACK_EXTRAS.
+
+Module Type FRAME_STACK (ADDR : CORE_ADDRESS) (F : FRAME ADDR) := CORE_FRAME_STACK ADDR F <+ FRAME_STACK_NOTATIONS ADDR F <+ FRAME_STACK_EXTRAS ADDR F.
 
 Module Type MEMORY_FRAME_STACK
   (Import ADDR : CORE_ADDRESS)
@@ -451,19 +571,18 @@ Module Type MEMORY_FRAME_STACK
   (Import MEM : CORE_MEMORY_MODEL ADDR SB).
 
   Parameter Memory_frame_stack :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}, Memory -> M FrameStack.
+    Memory -> FrameStack.
 
   Parameter Memory_frame_stack_modify :
-    forall {M} `{HM : Monad M} `{SM : SpecM M},
-      Memory -> (FrameStack -> FrameStack) -> M Memory.
+      Memory -> (FrameStack -> FrameStack) -> Memory.
 
   Parameter Memory_frame_stack_modify_spec :
     forall {M} `{HM : Monad M} `{SM : SpecM M}
       (m1 m2 : Memory) (f : FrameStack -> FrameStack) (fs1 fs2 : FrameStack),
-      contains fs1 (Memory_frame_stack m1) ->
-      contains m2 (Memory_frame_stack_modify m1 f) ->
-      contains fs2 (Memory_frame_stack m2) ->
-      fs2 = f fs1.    
+      fs1 = Memory_frame_stack m1 ->
+      m2 = Memory_frame_stack_modify m1 f ->
+      fs2 = Memory_frame_stack m2 ->
+      fs2 = f fs1.
 End MEMORY_FRAME_STACK.
 
 Module Type MEMORY_STACK_ALLOCATE
@@ -473,19 +592,30 @@ Module Type MEMORY_STACK_ALLOCATE
   (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
   (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
   (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC)
+  (Import ALLOCATE : MEMORY_ALLOCATE ADDR SB AID MEM ALLOC FIND_FREE)
   (Import F : FRAME ADDR)
   (Import FS : FRAME_STACK ADDR F)
   (Import MFS : MEMORY_FRAME_STACK ADDR SB F FS MEM).
 
-  Parameter stack_allocate_block :
-    forall {M} `{HM : Monad M} `{SM : SpecM M},
-      Memory -> list SByte -> AllocationId -> M (Memory * list addr)%type.
+  Definition stack_allocate_block
+    {M} `{HM : Monad M} `{SM : SpecM M}
+    (m : Memory) (bytes : list SByte) (aid : AllocationId) : M (Memory * list addr)%type :=
+    '(m', ptrs) <- allocate_block m bytes aid;;
+    match add_all_to_current_frame (Memory_frame_stack m') ptrs with
+    | None => empty_spec
+    | Some fs =>
+        ret (Memory_frame_stack_modify m' (fun _ => fs), ptrs)
+    end.
  
-  Parameter stack_allocate_block_free :
+  Lemma stack_allocate_block_free :
     forall {M} `{HM : Monad M} `{SM : SpecM M}
       m1 bytes aid m2 ptrs,
       contains (m2, ptrs) (stack_allocate_block m1 bytes aid) ->
       contains ptrs (find_free_block m1 (length bytes)).
+  Proof.
+    intros M HM SM m1 bytes aid m2 ptrs ALLOC.
+    unfold stack_allocate_block in *.
+  Qed.
 
   Parameter stack_allocate_block_new_reads :
     forall {M} `{HM : Monad M} `{SM : SpecM M}
@@ -514,6 +644,54 @@ Module Type MEMORY_STACK_ALLOCATE
       push fs1 (add_all_to_frame empty_frame ptrs) fs2.
 End MEMORY_STACK_ALLOCATE.
 
+Module Type MEMORY_STACK_POP
+  (Import ADDR : ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
+  (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
+  (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC)
+  (Import F : FRAME ADDR)
+  (Import FS : FRAME_STACK ADDR F)
+  (Import MFS : MEMORY_FRAME_STACK ADDR SB F FS MEM).
+
+  Parameter stack_pop :
+    forall {M} `{HM : Monad M} `{SM : SpecM M},
+      Memory -> M Memory.
+
+  Parameter stack_pop_stack_spec :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains m2 (stack_pop m1) ->
+      contains fs1 (Memory_frame_stack
+      contains ptrs (find_free_block m1 (length bytes)).
+
+  Parameter stack_allocate_block_new_reads :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (stack_allocate_block m1 bytes aid) ->
+      Forall2 (fun b ptr => contains b (read_byte m2 ptr)) bytes ptrs.
+
+  Parameter stack_allocate_block_old_reads :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (stack_allocate_block m1 bytes aid) ->
+      forall b ptr, contains b (read_byte m1 ptr) -> contains b (read_byte m2 ptr).
+
+  Parameter stack_allocate_block_allocated :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs,
+      contains (m2, ptrs) (stack_allocate_block m1 bytes aid) ->
+      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
+
+  Parameter stack_allocate_block_new_frame :
+    forall {M} `{HM : Monad M} `{SM : SpecM M}
+      m1 bytes aid m2 ptrs fs1 fs2,
+      contains (m2, ptrs) (stack_allocate_block m1 bytes aid) ->
+      contains fs2 (Memory_frame_stack m2) ->
+      contains fs1 (Memory_frame_stack m1) ->
+      push fs1 (add_all_to_frame empty_frame ptrs) fs2.
+End MEMORY_STACK_ALLOCATE.
 
 Module FRAME_LIST_CORE
   (Import ADDR : CORE_ADDRESS)
