@@ -178,28 +178,17 @@ let link (mods : string list) (out_fn : string) (opt_level : string) : unit =
        (List.fold_left (fun s l -> s ^ " -l" ^ l) "" !libs) )
     raise_error
 
-let result_dir_configure () : unit =
-  try mkdir !result_dir_path 0o755 with
-  | Unix_error (EEXIST, _, _) ->
-      (* Directory already exists, clear results*)
-      print_endline "Result directory already exists" ;
-      ()
-  | Unix_error (e, fstr, pstr) ->
-      failwith (Printf.sprintf "%s : %s : %s" (error_message e) fstr pstr)
-
-let dir_configure (path : string) () : unit =
+let dir_configure (path : string) : unit =
   try mkdir path 0o755 with
   | Unix_error (EEXIST, _, _) ->
       (* Directory already exists, clear results*)
-      print_endline "Result directory already exists" ;
-      ()
+      print_endline (Printf.sprintf "Result directory %s already exists" path) 
+
   | Unix_error (e, fstr, pstr) ->
       failwith (Printf.sprintf "%s : %s : %s" (error_message e) fstr pstr)
-(* let configure () = if os <> "Unix" then failwith "Windows not supported"
-   else let _ = if !linux then ( verb "platform = linux\n" ; clang_flags :=
-   "" ) else verb "platform = OS X\n" in try ignore (stat !output_path) with
-   Unix_error (ENOENT, _, _) -> verb @@ Printf.sprintf "creating output
-   directory: %s\n" !output_path ; mkdir !output_path 0o755 *)
+
+let result_dir_configure () : unit =
+  dir_configure !result_dir_path 
 
 (* Configure directory. Assume that base is already created *)
 let rec rec_dir_configure (base : string) (l : string list) () : unit =
@@ -207,7 +196,7 @@ let rec rec_dir_configure (base : string) (l : string list) () : unit =
   | [] -> ()
   | x :: xs ->
       let subpath = String.concat "/" [base; x] in
-      dir_configure subpath () ;
+      dir_configure subpath;
       rec_dir_configure subpath xs ()
 
 let append_loc : string -> string -> string = Printf.sprintf "%s/%s"

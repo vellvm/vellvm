@@ -257,8 +257,8 @@ let output_asts (rs : result_sum) () : unit =
     Platform.rec_dir_configure !Platform.result_dir_path
       (List.append test_folder_path_list [test_file_name])
       () ;
-    Platform.dir_configure correct_folder_loc () ;
-    Platform.dir_configure incorrect_folder_loc () ;
+    Platform.dir_configure correct_folder_loc ;
+    Platform.dir_configure incorrect_folder_loc ;
     let count = (0, 0) in
     let write_res_to_file (correct_folder_loc : string)
         (incorrect_folder_loc : string) (test_file_name : string)
