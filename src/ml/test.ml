@@ -19,7 +19,9 @@ open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 (* Vellvm test cases
    -------------------------------------------------------- *)
 
-let parse_pp_test path =
+(* Test cycle property: parse -> print -> parse is ok *)
+(* TODO: Potentially uses GenLLVM *)
+let parse_pp_test (path : string) : unit =
   let open Platform in
   let _ = verb @@ Printf.sprintf "* processing file: %s\n" path in
   let filename, _ = path_to_basename_ext path in
@@ -53,10 +55,11 @@ let ll_files_of_dir path : string list =
   let () = sh rm_cmd raise_error in
   ans
 
-let pp_test_of_dir dir =
+let pp_test_of_dir (dir : string) =
   Test
     ( "Parsing files in: " ^ dir
     , List.map
+        (* Run the pretty printing test *)
         (fun f -> (f, fun () -> parse_pp_test f))
         (ll_files_of_dir dir) )
 
