@@ -14,7 +14,6 @@ open Base
 open Result
 open Assert
 open Driver
-open ShowAST
 
 module DV = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV
 
@@ -271,50 +270,6 @@ let test_all () =
   let b3 = try test_dir !test_directory with Ran_tests b -> b in
   raise (Ran_tests (b1 && b2 && b3))
 
-let test_all' () =
-  let _ =
-    Printf.printf "============== RUNNING TEST SUITE ==============\n"
-  in
-  let b1 = try exec_tests () with Ran_tests b -> b in
-  let b2 = try test_pp_dir !test_directory with Ran_tests b -> b in
-  let b4 = try test_dir !test_directory with Ran_tests b -> b in
-  let b3 = try Tester.test_dir !test_directory with Ran_tests b -> b in
-  raise (Ran_tests (b1 && b2 && b3 && b4))
-
-let test_genAlive2 () =
-  let _ =
-    Printf.printf "============== RUNNING GENALIVE2 ==============\n"
-  in
-  let es = Generate.sample_exp 10 in
-  let output_charlist : char list =
-    (coq_DShowShow (coq_DShowList (dshow_exp dshow_typ false))) es
-  in
-  let buf = Buffer.create 16 in
-  List.iter (Buffer.add_char buf) output_charlist ;
-  Printf.printf "%s\n" (Buffer.contents buf)
-(* () *)
-
-let get_csmith_dir_name () = "generators/csmith/"
-
-let runCSmith () =
-  let c_file_name : string =
-    Filename.(concat (get_csmith_dir_name ()) "temporary_csmith.c")
-  in
-  let llvm_file_name : string =
-    Filename.(concat (get_csmith_dir_name ()) "temporary_csmith.ll")
-  in
-  let command1 : string = "./generators/csmith/csmith > " ^ c_file_name in
-  let command2 =
-    "clang -emit-llvm -S -I./generators/csmith/runtime -O0 -std=c99 "
-    ^ c_file_name ^ " -o " ^ llvm_file_name
-  in
-  let _ = Sys.command (command1 ^ "; " ^ command2) in
-  (* let _ = Sys.command command2 in *)
-  let res = Driver.run_ll_file llvm_file_name in
-  match res with
-  | Ok dval -> Printf.printf "%s\n" (string_of_dvalue dval)
-  | Error exit_cond ->
-      Printf.printf "%s\n" (Result.string_of_exit_condition exit_cond)
 
 let args =
   [ ( "-set-test-dir"
@@ -332,9 +287,6 @@ let args =
     , "run the test suite, ignoring later inputs" )
   ; ("-test-file", String test_file, "run the assertions in a given file")
   ; ("-test-dir", String test_dir, "run all .ll files in the given directory")
-  ; ( "-test-dir2"
-    , String Tester.test_dir
-    , "run all .ll files in the given directory and aggregate stats" )
   ; ( "-test-pp-dir"
     , String test_pp_dir
     , "run the parsing/pretty-printing tests on all .ll files in the given \
@@ -354,15 +306,12 @@ let args =
   ; ( "-interpret"
     , Set Driver.interpret
     , "interpret ll program starting from 'main'" )
-  ; ("-csmith", Unit runCSmith, "Run CSmith and run Vellvm")
   ; ( "-i"
     , Set Driver.interpret
     , "interpret ll program starting from 'main' (same as -interpret)" )
   ; ("-debug", Set Interpreter.debug_flag, "enable debugging trace output")
   ; ("-v", Set Platform.verbose, "enables more verbose compilation output")
-  ; ( "-genalive2"
-    , Unit test_genAlive2
-    , "Run the alive 2 generator and get some sample" ) ]
+ ]
 
 let files = ref []
 
