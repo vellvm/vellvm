@@ -178,20 +178,11 @@ let link (mods : string list) (out_fn : string) (opt_level : string) : unit =
        (List.fold_left (fun s l -> s ^ " -l" ^ l) "" !libs) )
     raise_error
 
-let result_dir_configure () : unit =
-  try mkdir !result_dir_path 0o755 with
-  | Unix_error (EEXIST, _, _) ->
-      (* Directory already exists, clear results*)
-      print_endline "Result directory already exists" ;
-      ()
-  | Unix_error (e, fstr, pstr) ->
-      failwith (Printf.sprintf "%s : %s : %s" (error_message e) fstr pstr)
-
-let dir_configure (path : string) () : unit =
+let dir_configure (path : string) : unit =
   try mkdir path 0o755 with
   | Unix_error (EEXIST, _, _) ->
       (* Directory already exists, clear results*)
-      print_endline "Result directory already exists" ;
-      ()
+      print_endline (Printf.sprintf "Result directory %s already exists" path) 
+
   | Unix_error (e, fstr, pstr) ->
       failwith (Printf.sprintf "%s : %s : %s" (error_message e) fstr pstr)

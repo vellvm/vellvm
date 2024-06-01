@@ -1216,7 +1216,7 @@ Definition dshow_definition (defn : definition typ (block typ * list (block typ)
 
         let align :=
           maybe_to_string
-            (fun a => concatStr ["align "; show a; " "])
+            (fun a => concatStr [", align "; show a; " "])
             (dc_align defn.(df_prototype)) in
 
         let gc := maybe_show (dc_gc defn.(df_prototype)) in
@@ -1252,7 +1252,7 @@ Definition dshow_declaration (decl: declaration typ) : DString :=
 
       let align :=
         maybe_to_string
-          (fun a => concatStr ["align "; show a; " "])
+          (fun a => concatStr [", align "; show a; " "])
           (dc_align decl) in
 
       let gc := maybe_show (dc_gc decl) in
@@ -1308,7 +1308,7 @@ Definition dshow_global (g : global typ) : DString :=
 
   let align :=
     maybe_to_string
-      (fun a => concatStr ["align "; show a; " "])
+      (fun a => concatStr [", align "; show a; " "])
       (g_align g) in
 
   DList_join
