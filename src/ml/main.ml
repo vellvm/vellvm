@@ -321,7 +321,7 @@ let args =
     , Set_string test_directory
     , "set the path to the tests directory [default='../tests']" )
   ; ( "-test"
-    , Unit test_all'
+    , Unit test_all
     , "run comprehensive test case:\n\
        \tequivalent to running three times with\n\
        \t -test-suite, then\n\
