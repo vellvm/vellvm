@@ -45,10 +45,20 @@ Class DShow (A : Type) := { dshow : A -> DString }.
   dshow p := match p with (a,b) => string_to_DString "(" @@ dshow a @@ string_to_DString "," @@ dshow b @@ string_to_DString ")" end
 |}.
 
-#[global] Instance DShowShow {A} `{DShow A} : Show A :=
+#[global] Instance ShowDShow {A} `{DShow A} : Show A :=
 {|
   show a := DString_to_string (dshow a);
 |}.
+
+#[global] Instance DShowString : DShow DString :=
+  {|
+    dshow := id
+  |}.
+
+(* #[global] Instance DShowShow {A} `{Show A} : DShow A := *)
+(*   {| *)
+(*     dshow a := string_to_DString (show a) *)
+(*   |}. *)
 
 Section ShowInstances.
   Local Open Scope string.
@@ -519,27 +529,26 @@ Section ShowInstances.
     | _ => 0%Z (* This is arbitrary, it's never going to hit this case anyway *)
     end.
 
-  Definition show_c_string (ex : exp T) : string :=
-    let n : nat := ex_to_nat ex in
-    let x : Z := ex_to_int ex in
-    if ((n <? 32) || (126 <? n))%nat then (
-        let conversion :=  NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N  x)) in
-        if ((length (conversion)) =? (Z.to_nat 1))%nat then  "\0" ++ conversion
-        else "\" ++ conversion
-      )
-    (*Special case for decimal 34/hex 22*)
-    else if (n =? 34)%nat then "\22"
-    (*Special case for decimal 92/hex 5C*)
-    else if (n =? 92)%nat then "\\"
-         else (string_of_list_ascii ((ascii_of_nat n) :: [])).
+  (* Definition show_c_string (ex : exp T) : string := *)
+  (*   let n : nat := ex_to_nat ex in *)
+  (*   let x : Z := ex_to_int ex in *)
+  (*   if ((n <? 32) || (126 <? n))%nat then ( *)
+  (*       let conversion :=  NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N  x)) in *)
+  (*       if ((length (conversion)) =? (Z.to_nat 1))%nat then  "\0" ++ conversion *)
+  (*       else "\" ++ conversion *)
+  (*     ) *)
+  (*   (*Special case for decimal 34/hex 22*) *)
+  (*   else if (n =? 34)%nat then "\22" *)
+  (*   (*Special case for decimal 92/hex 5C*) *)
+  (*   else if (n =? 92)%nat then "\\" *)
+  (*        else (string_of_list_ascii ((ascii_of_nat n) :: [])). *)
 
   Definition dshow_c_string (ex : exp T) : DString :=
     let n : nat := ex_to_nat ex in
     let x : Z := ex_to_int ex in
     if ((n <? 32) || (126 <? n))%nat then (
-        let conversion_str := NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N x)) in
         let conversion := NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N x)) in
-        if ((length conversion_str) =? (Z.to_nat 1))%nat then string_to_DString "\0" @@ string_to_DString conversion
+        if ((length conversion) =? (Z.to_nat 1))%nat then string_to_DString "\0" @@ string_to_DString conversion
         else string_to_DString "\" @@ string_to_DString conversion
       )
     (*Special case for decimal 34/hex 22*)
@@ -547,6 +556,10 @@ Section ShowInstances.
     (*Special case for decimal 92/hex 5C*)
     else if (n =? 92)%nat then string_to_DString "\\"
          else DList_cons (ascii_of_nat n) DList_empty.
+
+  Definition show_c_string (ex : exp T) : string :=
+    let dcstr := dshow_c_string ex in
+    show dcstr.
 
   Definition is_op (e : exp T) : bool :=
     match e with
@@ -576,7 +589,7 @@ Section ShowInstances.
     | EXP_Ident id => dshow id
     | EXP_Integer x => string_to_DString (show x)
     | EXP_Float f => string_to_DString (show f)
-    | EXP_Double f => string_to_DString (show f)
+    | EXP_Double f =>  string_to_DString (show f)
     | EXP_Hex f => string_to_DString (double_to_hex_string f)
     | EXP_Bool b => string_to_DString (show b)
     | EXP_Null => string_to_DString "null"

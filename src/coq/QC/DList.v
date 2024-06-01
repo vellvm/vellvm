@@ -1,4 +1,4 @@
-From ExtLib Require Export Functor.
+From ExtLib Require Export Functor Monad Applicative.
 From Coq Require Import List String.
 Import ListNotations Ascii.
 Local Open Scope string_scope.
@@ -27,12 +27,48 @@ Section DList.
   Definition DList_map {A B} (f : A -> B) (dl : DList A) : DList B
     := fold_right (fun a => DList_cons (f a)) (@DList_empty B) (DList_to_list dl).
 
-  #[global] Instance DList_Functor : Functor DList.
+  #[global] Instance Functor_DList : Functor DList.
   Proof.
     split.
     intros A B X X0.
     eapply DList_map; eauto.
   Defined.
+
+  Definition DList_fold_right {A B} (f : A -> B -> B) (z: B) (dl : DList A) : B
+    := List.fold_right f z (DList_to_list dl).
+
+  Definition DList_fold_left {A B} (f : B -> A -> B) (dl : DList A) (z : B) : B
+    := List.fold_left f (DList_to_list dl) z.
+
+
+
+  #[global] Instance Monad_DList : Monad DList.
+  Proof.
+    split.
+    intros T t. eapply DList_singleton; eauto.
+    intros T U ts f.
+    apply (@DList_fold_right T).
+    - refine (fun t => _).
+      apply DList_append.
+      exact (f t).
+    - apply DList_empty.
+    - apply ts.
+  Defined.
+
+  #[global] Instance Applicative_DList : Applicative DList.
+  Proof.
+    split.
+    intros T t. eapply DList_singleton; eauto.
+    intros T U dlab dla.
+    eapply bind.
+    - apply dlab.
+    - intros f.
+      eapply bind.
+      + apply dla.
+      + intros t.
+        apply ret.
+        exact (f t).
+  Defined. 
 
   Definition DString := DList ascii.
 
