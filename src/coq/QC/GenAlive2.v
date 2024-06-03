@@ -520,7 +520,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         e_src <- gen_exp_ident tgt;;
         e_input <- gen_exp_size 0 t';;
         let ins := INSTR_Store (t', e_input) (tgt, e_src) [] in
-        add_id_to_instr (tgt, ins)
+        add_id_to_instr (TYPE_Void, ins)
     | _ => failGen "Unimplemented"
     end.
 
