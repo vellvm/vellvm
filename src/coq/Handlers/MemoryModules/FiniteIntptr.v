@@ -226,6 +226,7 @@ Instance VMemInt_intptr_i64 : VMemInt int64
     (* Bounds *)
     mmin_signed := ret Int64.min_signed;
     mmax_signed := ret Int64.max_signed;
+    mmax_unsigned := ret Int64.max_unsigned;
 
     (* Conversion *)
     munsigned := Int64.unsigned;
