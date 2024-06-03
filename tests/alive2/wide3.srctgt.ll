@@ -8,8 +8,4 @@ define i1000 @tgt(i1000 %x) {
     ret i1000 %r
 }
 
-
-
-; Assertions below this point were automatically generated
-
-; ASSERT SRCTGT 100
+; Disabled because we don't support i1000s

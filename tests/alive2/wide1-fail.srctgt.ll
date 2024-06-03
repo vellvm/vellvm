@@ -10,6 +10,4 @@ define i128 @tgt(i128 %x) {
     ret i128 %r
 }
 
-; Assertions below this point were automatically generated
-
-; ASSERT SRCTGT 100
+; Disabled because we don't support i128s

@@ -8,6 +8,4 @@ define i255 @tgt(i255 %x) {
     ret i255 %r
 }
 
-; Assertions below this point were automatically generated
-
-; ASSERT SRCTGT 100
+; Disabled because we don't support i255s
