@@ -1,5 +1,7 @@
 ; Global variables
 @D = global [3 x double] [double 1.0, double 2.0, double 3.0], align 16
+@.before = private unnamed_addr constant [7 x i8] c"before\00", align 1
+@.after = private unnamed_addr constant [6 x i8] c"after\00", align 1
 ; Prototypes for intrinsics we use
 declare float @llvm.fabs.f32(float)
 declare double @llvm.fabs.f64(double)
@@ -120,7 +122,9 @@ IMapLoopBody38:
   %l85 = getelementptr [1 x double], [1 x double]* %a83, i64 0, i64 %IMap_i84
   %l87 = load double, double* %l85, align 8
   %l88 = getelementptr [1 x double], [1 x double]* %Y, i64 0, i64 %Loop_i71
+  %before = call i32 @puts(i8* noundef getelementptr inbounds ([4 x i8], [4 x i8]* @.before, i64 0, i64 0))
   %l89 = load double, double* %l88, align 8
+  %after = call i32 @puts(i8* noundef getelementptr inbounds ([4 x i8], [4 x i8]* @.after, i64 0, i64 0))
   %l90 = fmul double %l87, %l89
   %l86 = getelementptr [1 x double], [1 x double]* %a66, i64 0, i64 %IMap_i84
   ; void instr 45
@@ -377,5 +381,7 @@ define i32 @main(i64 %argc, i8** %arcv) {
   call void @dynwin64([5 x double]* @IN, [1 x double]* @OUT)
   ret i32 0
 }
+
+declare i32 @puts(i8* noundef) #1
 
 ; ASSERT EQ: double 0.0 = call double @test()

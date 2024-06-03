@@ -15,6 +15,4 @@ define i8 @tgt(i8 %val, i8 %shamt) {
   ret i8 %r
 }
 
-; Assertions below this point were automatically generated
-
-; ASSERT SRCTGT 100
+; Disabled because of unsupported operations

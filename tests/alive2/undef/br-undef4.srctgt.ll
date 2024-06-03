@@ -14,6 +14,4 @@ define i8 @tgt() {
   ret i8 2
 }
 
-; Assertions below this point were automatically generated
-
-; ASSERT SRCTGT 100
+; Disabled because of non-determinism

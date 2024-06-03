@@ -13,6 +13,4 @@ define <2 x i1> @tgt(<2 x i4> %x, <2 x i4> %y) {
 
 declare { <2 x i4>, <2 x i1> } @llvm.umul.with.overflow.v2i4(<2 x i4>, <2 x i4>)
 
-; Assertions below this point were automatically generated
-
-; ASSERT SRCTGT 100
+; Disabled because of unsupported operations

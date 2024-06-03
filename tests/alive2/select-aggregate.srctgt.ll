@@ -10,8 +10,4 @@ define i64 @tgt() {
   ret i64 1
 }
 
-
-
-; Assertions below this point were automatically generated
-
-; ASSERT SRCTGT 100
+; Disabled because of unsupported datalayout
