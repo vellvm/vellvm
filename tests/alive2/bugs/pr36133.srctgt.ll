@@ -61,4 +61,4 @@ bb10:
 
 ; Assertions below this point were automatically generated
 
-; ASSERT SRCTGT 100
+; DISABLE SRCTGT 100

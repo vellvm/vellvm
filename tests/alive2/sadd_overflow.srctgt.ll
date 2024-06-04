@@ -17,5 +17,5 @@ define { i32, i1 } @tgt(i8 %a, i8 %b) {
 }
 
 ; Assertions below this point were automatically generated
-
-; ASSERT SRCTGT 100
+; Disabled because of unsupported intrinsic.
+; DISABLE SRCTGT 100

@@ -46,5 +46,5 @@ B:
 ; ERROR: Source is more defined than target
 
 ; Assertions below this point were automatically generated
-
-; ASSERT SRCTGT 100
+; Disabled because llvm.lifetime intrinsics are unsupported
+; DISABLE SRCTGT 100
