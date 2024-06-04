@@ -962,7 +962,7 @@ Section ShowInstances.
              list_to_DString (show_opt_list addrspace) 
 
              @@ string_to_DString " " @@
-             dshow fn @@ string_to_DString "(" @@
+             dshow_texp fn @@ string_to_DString "(" @@
              concat_DString (string_to_DString ", ") (map show_call_arg args) @@
              string_to_DString ") " @@
              concat_DString (string_to_DString " ") (map (fun x => string_to_DString (show_fn_attr x)) fn_attrs)

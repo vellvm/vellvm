@@ -51,6 +51,7 @@ Class VMemInt I : Type :=
     (* Bounds, possibly unbounded *)
     mmin_signed : option Z;
     mmax_signed : option Z;
+    mmax_unsigned : option Z;
 
     (* Conversion *)
     munsigned : I -> Z;
@@ -124,6 +125,7 @@ Definition mcmpu_Z (c : Numeric.Integers.comparison) (x y : Z) : bool :=
 
     mmin_signed := None;
     mmax_signed := None;
+    mmax_unsigned := None;
 
     munsigned := fun x => x;
     msigned := fun x => x;
@@ -200,6 +202,7 @@ Class VInt I : Type :=
     (* Bounds *)
     min_signed : Z;
     max_signed : Z;
+    max_unsigned : Z;
 
     (* Conversion *)
     unsigned : I -> Z;
@@ -251,6 +254,7 @@ Class VInt I : Type :=
     (* Bounds *)
     min_signed := Int32.min_signed;
     max_signed := Int32.max_signed;
+    max_unsigned := Int32.max_unsigned;
 
     (* Conversion *)
     unsigned := Int32.unsigned;
@@ -302,6 +306,7 @@ Class VInt I : Type :=
     (* Bounds *)
     min_signed := Int1.min_signed;
     max_signed := Int1.max_signed;
+    max_unsigned := Int1.max_unsigned;
 
     (* Conversion *)
     unsigned := Int1.unsigned;
@@ -353,6 +358,7 @@ Class VInt I : Type :=
     (* Bounds *)
     min_signed := Int8.min_signed;
     max_signed := Int8.max_signed;
+    max_unsigned := Int8.max_unsigned;
 
     (* Conversion *)
     unsigned := Int8.unsigned;
@@ -404,6 +410,7 @@ Class VInt I : Type :=
     (* Bounds *)
     min_signed := Int16.min_signed;
     max_signed := Int16.max_signed;
+    max_unsigned := Int16.max_unsigned;
 
     (* Conversion *)
     unsigned := Int16.unsigned;
@@ -455,6 +462,7 @@ Class VInt I : Type :=
     (* Bounds, possibly unbounded *)
     mmin_signed := ret (min_signed);
     mmax_signed := ret (max_signed);
+    mmax_unsigned := ret (max_unsigned);
 
     (* Conversion *)
     munsigned := unsigned;
@@ -509,6 +517,7 @@ Class VInt I : Type :=
     (* Bounds *)
     min_signed := Int64.min_signed;
     max_signed := Int64.max_signed;
+    max_unsigned := Int64.max_unsigned;
 
     (* Conversion *)
     unsigned := Int64.unsigned;

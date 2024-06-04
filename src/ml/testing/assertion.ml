@@ -119,7 +119,7 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
               \t %s %s" (string_of_typ typ) (string_of_exp exp) ) )
   | TYPE_Float, EXP_Float f -> DVALUE_Float f
   | TYPE_Double, EXP_Double f -> DVALUE_Double f
-  | TYPE_Double, EXP_Hex f -> DVALUE_Float f
+  | TYPE_Double, EXP_Hex f -> DVALUE_Double f
   | TYPE_Array _, EXP_Array elts ->
       DVALUE_Array (List.map texp_to_dvalue elts)
   | TYPE_Struct _, EXP_Struct elts ->
@@ -152,6 +152,7 @@ let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
               \t %s %s" (string_of_typ typ) (string_of_exp exp) ) )
   | TYPE_Float, EXP_Float f -> UVALUE_Float f
   | TYPE_Double, EXP_Double f -> UVALUE_Double f
+  | TYPE_Double, EXP_Hex f -> UVALUE_Double f
   | TYPE_Array _, EXP_Array elts ->
       UVALUE_Array (List.map texp_to_uvalue elts)
   | TYPE_Struct _, EXP_Struct elts ->

@@ -24684,6 +24684,636 @@ Qed.
         reflexivity.
       Qed.
 
+      Lemma llvm_ushl_sat_1_agrees_success :
+        forall args1 args2 d1,
+          Forall2 dvalue_refine_strict args1 args2 ->
+          IS1.LLVM.Intrinsics.llvm_ushl_sat_1 args1 = inr d1 ->
+          exists d2,
+            IS2.LLVM.Intrinsics.llvm_ushl_sat_1 args2 = inr d2 /\
+              dvalue_refine_strict d1 d2.
+      Proof.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          dvalue_refine_strict_inv H0; subst; try congruence.
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        dvalue_refine_strict_inv H.
+        inv H.
+        break_match; inv EXEC.
+        { eexists; split; eauto.
+          solve_dvalue_refine_strict.
+        }
+
+        break_match_hyp; inv H0.
+        { eexists; split; eauto.
+          solve_dvalue_refine_strict.
+        }
+
+        eexists; split; eauto.
+        solve_dvalue_refine_strict.
+      Qed.
+
+      Lemma llvm_ushl_sat_8_agrees_success :
+        forall args1 args2 d1,
+          Forall2 dvalue_refine_strict args1 args2 ->
+          IS1.LLVM.Intrinsics.llvm_ushl_sat_8 args1 = inr d1 ->
+          exists d2,
+            IS2.LLVM.Intrinsics.llvm_ushl_sat_8 args2 = inr d2 /\
+              dvalue_refine_strict d1 d2.
+      Proof.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          dvalue_refine_strict_inv H0; subst; try congruence.
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        dvalue_refine_strict_inv H.
+        inv H.
+        break_match; inv EXEC.
+        { eexists; split; eauto.
+          solve_dvalue_refine_strict.
+        }
+
+        break_match_hyp; inv H0.
+        { eexists; split; eauto.
+          solve_dvalue_refine_strict.
+        }
+
+        eexists; split; eauto.
+        solve_dvalue_refine_strict.
+      Qed.
+
+      Lemma llvm_ushl_sat_16_agrees_success :
+        forall args1 args2 d1,
+          Forall2 dvalue_refine_strict args1 args2 ->
+          IS1.LLVM.Intrinsics.llvm_ushl_sat_16 args1 = inr d1 ->
+          exists d2,
+            IS2.LLVM.Intrinsics.llvm_ushl_sat_16 args2 = inr d2 /\
+              dvalue_refine_strict d1 d2.
+      Proof.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          dvalue_refine_strict_inv H0; subst; try congruence.
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        dvalue_refine_strict_inv H.
+        inv H.
+        break_match; inv EXEC.
+        { eexists; split; eauto.
+          solve_dvalue_refine_strict.
+        }
+
+        break_match_hyp; inv H0.
+        { eexists; split; eauto.
+          solve_dvalue_refine_strict.
+        }
+
+        eexists; split; eauto.
+        solve_dvalue_refine_strict.
+      Qed.
+
+      Lemma llvm_ushl_sat_32_agrees_success :
+        forall args1 args2 d1,
+          Forall2 dvalue_refine_strict args1 args2 ->
+          IS1.LLVM.Intrinsics.llvm_ushl_sat_32 args1 = inr d1 ->
+          exists d2,
+            IS2.LLVM.Intrinsics.llvm_ushl_sat_32 args2 = inr d2 /\
+              dvalue_refine_strict d1 d2.
+      Proof.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          dvalue_refine_strict_inv H0; subst; try congruence.
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        dvalue_refine_strict_inv H.
+        inv H.
+        break_match; inv EXEC.
+        { eexists; split; eauto.
+          solve_dvalue_refine_strict.
+        }
+
+        break_match_hyp; inv H0.
+        { eexists; split; eauto.
+          solve_dvalue_refine_strict.
+        }
+
+        eexists; split; eauto.
+        solve_dvalue_refine_strict.
+      Qed.
+
+      Lemma llvm_ushl_sat_64_agrees_success :
+        forall args1 args2 d1,
+          Forall2 dvalue_refine_strict args1 args2 ->
+          IS1.LLVM.Intrinsics.llvm_ushl_sat_64 args1 = inr d1 ->
+          exists d2,
+            IS2.LLVM.Intrinsics.llvm_ushl_sat_64 args2 = inr d2 /\
+              dvalue_refine_strict d1 d2.
+      Proof.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          dvalue_refine_strict_inv H0; subst; try congruence.
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        dvalue_refine_strict_inv H.
+        inv H.
+        break_match; inv EXEC.
+        { eexists; split; eauto.
+          solve_dvalue_refine_strict.
+        }
+
+        break_match_hyp; inv H0.
+        { eexists; split; eauto.
+          solve_dvalue_refine_strict.
+        }
+
+        eexists; split; eauto.
+        solve_dvalue_refine_strict.
+      Qed.
+
+      Lemma llvm_ushl_sat_1_agrees_fail :
+        forall args1 args2 s,
+          Forall2 dvalue_refine_strict args1 args2 ->
+          IS1.LLVM.Intrinsics.llvm_ushl_sat_1 args1 = inl s ->
+          IS2.LLVM.Intrinsics.llvm_ushl_sat_1 args2 = inl s.
+      Proof.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          dvalue_refine_strict_inv H0; subst; try congruence.
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        dvalue_refine_strict_inv H.
+        inv H.
+        break_match; inv EXEC.
+        break_match; inv H0.
+      Qed.
+
+      Lemma llvm_ushl_sat_8_agrees_fail :
+        forall args1 args2 s,
+          Forall2 dvalue_refine_strict args1 args2 ->
+          IS1.LLVM.Intrinsics.llvm_ushl_sat_8 args1 = inl s ->
+          IS2.LLVM.Intrinsics.llvm_ushl_sat_8 args2 = inl s.
+      Proof.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          dvalue_refine_strict_inv H0; subst; try congruence.
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        dvalue_refine_strict_inv H.
+        inv H.
+        break_match; inv EXEC.
+        break_match; inv H0.
+      Qed.
+
+      Lemma llvm_ushl_sat_16_agrees_fail :
+        forall args1 args2 s,
+          Forall2 dvalue_refine_strict args1 args2 ->
+          IS1.LLVM.Intrinsics.llvm_ushl_sat_16 args1 = inl s ->
+          IS2.LLVM.Intrinsics.llvm_ushl_sat_16 args2 = inl s.
+      Proof.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          dvalue_refine_strict_inv H0; subst; try congruence.
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        dvalue_refine_strict_inv H.
+        inv H.
+        break_match; inv EXEC.
+        break_match; inv H0.
+      Qed.
+
+      Lemma llvm_ushl_sat_32_agrees_fail :
+        forall args1 args2 s,
+          Forall2 dvalue_refine_strict args1 args2 ->
+          IS1.LLVM.Intrinsics.llvm_ushl_sat_32 args1 = inl s ->
+          IS2.LLVM.Intrinsics.llvm_ushl_sat_32 args2 = inl s.
+      Proof.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          dvalue_refine_strict_inv H0; subst; try congruence.
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        dvalue_refine_strict_inv H.
+        inv H.
+        break_match; inv EXEC.
+        break_match; inv H0.
+      Qed.
+
+      Lemma llvm_ushl_sat_64_agrees_fail :
+        forall args1 args2 s,
+          Forall2 dvalue_refine_strict args1 args2 ->
+          IS1.LLVM.Intrinsics.llvm_ushl_sat_64 args1 = inl s ->
+          IS2.LLVM.Intrinsics.llvm_ushl_sat_64 args2 = inl s.
+      Proof.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence.
+        destruct x;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        destruct y;
+          dvalue_refine_strict_inv H0; subst; try congruence.
+
+        destruct ARGS; cbn in *;
+          try
+            solve
+            [ unfold_dvalue_refine_strict_in H;
+              cbn in *;
+              try break_match_hyp_inv;
+              try inv H;
+              try congruence
+            ].
+
+        dvalue_refine_strict_inv H.
+        inv H.
+        break_match; inv EXEC.
+        break_match; inv H0.
+      Qed.
+
       all:
         try solve
           [ pose proof (llvm_fabs_f32_agrees_fail _ _ _ REFARGS Heqs) as CONTRA;
@@ -24703,6 +25333,21 @@ Qed.
           |
             pose proof (llvm_minimum_f64_agrees_fail _ _ _ REFARGS Heqs) as CONTRA;
             rewrite Heqs0 in CONTRA; inv CONTRA
+          |
+            pose proof (llvm_ushl_sat_1_agrees_fail _ _ _ REFARGS Heqs) as CONTRA;
+            rewrite Heqs0 in CONTRA; inv CONTRA
+          |
+            pose proof (llvm_ushl_sat_8_agrees_fail _ _ _ REFARGS Heqs) as CONTRA;
+            rewrite Heqs0 in CONTRA; inv CONTRA
+          |
+            pose proof (llvm_ushl_sat_16_agrees_fail _ _ _ REFARGS Heqs) as CONTRA;
+            rewrite Heqs0 in CONTRA; inv CONTRA
+          |
+            pose proof (llvm_ushl_sat_32_agrees_fail _ _ _ REFARGS Heqs) as CONTRA;
+            rewrite Heqs0 in CONTRA; inv CONTRA
+          |
+            pose proof (llvm_ushl_sat_64_agrees_fail _ _ _ REFARGS Heqs) as CONTRA;
+            rewrite Heqs0 in CONTRA; inv CONTRA
           ].
 
       all:
@@ -24718,6 +25363,16 @@ Qed.
           | pose proof (llvm_minimum_f32_agrees_success _ _ _ REFARGS Heqs) as [d2 [CONTRA REF]];
             rewrite Heqs0 in CONTRA; inv CONTRA; eauto using orutt_Ret
           | pose proof (llvm_minimum_f64_agrees_success _ _ _ REFARGS Heqs) as [d2 [CONTRA REF]];
+            rewrite Heqs0 in CONTRA; inv CONTRA; eauto using orutt_Ret
+          | pose proof (llvm_ushl_sat_1_agrees_success _ _ _ REFARGS Heqs) as [d2 [CONTRA REF]];
+            rewrite Heqs0 in CONTRA; inv CONTRA; eauto using orutt_Ret
+          | pose proof (llvm_ushl_sat_8_agrees_success _ _ _ REFARGS Heqs) as [d2 [CONTRA REF]];
+            rewrite Heqs0 in CONTRA; inv CONTRA; eauto using orutt_Ret
+          | pose proof (llvm_ushl_sat_16_agrees_success _ _ _ REFARGS Heqs) as [d2 [CONTRA REF]];
+            rewrite Heqs0 in CONTRA; inv CONTRA; eauto using orutt_Ret
+          | pose proof (llvm_ushl_sat_32_agrees_success _ _ _ REFARGS Heqs) as [d2 [CONTRA REF]];
+            rewrite Heqs0 in CONTRA; inv CONTRA; eauto using orutt_Ret
+          | pose proof (llvm_ushl_sat_64_agrees_success _ _ _ REFARGS Heqs) as [d2 [CONTRA REF]];
             rewrite Heqs0 in CONTRA; inv CONTRA; eauto using orutt_Ret
           ].
 

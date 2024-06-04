@@ -178,12 +178,60 @@ Definition minimum_32_decl: declaration typ :=
     dc_annotations  := []
   |}.
 
+(* Saturated arithmetic: https://llvm.org/docs/LangRef.html#saturation-arithmetic-intrinsics *)
+Definition ushl_sat_1_decl: declaration typ :=
+  {|
+    dc_name        := Name "llvm.ushl.sat.i1";
+    dc_type        := TYPE_Function (TYPE_I 1) [TYPE_I 1 ;TYPE_I 1] false;
+    dc_param_attrs := ([], [[];[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
+Definition ushl_sat_8_decl: declaration typ :=
+  {|
+    dc_name        := Name "llvm.ushl.sat.i8";
+    dc_type        := TYPE_Function (TYPE_I 8) [TYPE_I 8 ;TYPE_I 8] false;
+    dc_param_attrs := ([], [[];[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
+Definition ushl_sat_16_decl: declaration typ :=
+  {|
+    dc_name        := Name "llvm.ushl.sat.i16";
+    dc_type        := TYPE_Function (TYPE_I 16) [TYPE_I 16 ;TYPE_I 16] false;
+    dc_param_attrs := ([], [[];[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
+Definition ushl_sat_32_decl: declaration typ :=
+  {|
+    dc_name        := Name "llvm.ushl.sat.i32";
+    dc_type        := TYPE_Function (TYPE_I 32) [TYPE_I 32 ;TYPE_I 32] false;
+    dc_param_attrs := ([], [[];[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
+Definition ushl_sat_64_decl: declaration typ :=
+  {|
+    dc_name        := Name "llvm.ushl.sat.i64";
+    dc_type        := TYPE_Function (TYPE_I 64) [TYPE_I 64 ;TYPE_I 64] false;
+    dc_param_attrs := ([], [[];[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
 (* This may seem to overlap with `defined_intrinsics`, but there are few differences:
    1. This one is defined outside of the module and could be used at the LLVM AST generation stage without yet specifying memory model.
    2. It includes declarations for built-in memory-dependent intrinisics such as `memcpy`.
  *)
 Definition defined_intrinsics_decls :=
-  [ fabs_32_decl; fabs_64_decl; maxnum_32_decl ; maxnum_64_decl; minimum_32_decl; minimum_64_decl; memcpy_8_32_decl; memcpy_8_64_decl; memset_8_32_decl; memset_8_64_decl; malloc_decl; free_decl ].
+  [ fabs_32_decl; fabs_64_decl; maxnum_32_decl ; maxnum_64_decl; minimum_32_decl; minimum_64_decl;
+    ushl_sat_1_decl; ushl_sat_8_decl; ushl_sat_16_decl; ushl_sat_32_decl; ushl_sat_64_decl;
+    memcpy_8_32_decl; memcpy_8_64_decl; memset_8_32_decl; memset_8_64_decl; malloc_decl; free_decl ].
 
 (* This functor module provides a way to (extensibly) add the semantic behavior
    for intrinsics defined outside of the core Vellvm operational semantics.
@@ -208,6 +256,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
 
   Import LLVMIO.
   Import DV.
+  Import VellvmIntegers.
 
   (* Each (pure) intrinsic is defined by a function of the following type.
 
@@ -232,7 +281,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
     fun args =>
       match args with
       | [DVALUE_Float d] => ret (DVALUE_Float (b32_abs d))
-      | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed intputs"
+      | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed inputs"
       end.
 
   (* Abosulute value for Doubles. *)
@@ -240,7 +289,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
     fun args =>
       match args with
       | [DVALUE_Double d] => ret (DVALUE_Double (b64_abs d))
-      | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed intputs"
+      | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed inputs"
       end.
 
   Definition Float_maxnum (a b: float): float :=
@@ -261,14 +310,14 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
     fun args =>
       match args with
       | [DVALUE_Double a; DVALUE_Double b] => ret (DVALUE_Double (Float_maxnum a b))
-      | _ => failwith "llvm_maxnum_f64 got incorrect / ill-typed intputs"
+      | _ => failwith "llvm_maxnum_f64 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_maxnum_f32 : semantic_function :=
     fun args =>
       match args with
       | [DVALUE_Float a; DVALUE_Float b] => ret (DVALUE_Float (Float32_maxnum a b))
-      | _ => failwith "llvm_maxnum_f32 got incorrect / ill-typed intputs"
+      | _ => failwith "llvm_maxnum_f32 got incorrect / ill-typed inputs"
       end.
 
   Definition Float_minimum (a b: float): float :=
@@ -289,25 +338,91 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
     fun args =>
       match args with
       | [DVALUE_Double a; DVALUE_Double b] => ret (DVALUE_Double (Float_minimum a b))
-      | _ => failwith "llvm_minimum_f64 got incorrect / ill-typed intputs"
+      | _ => failwith "llvm_minimum_f64 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_minimum_f32 : semantic_function :=
     fun args =>
       match args with
       | [DVALUE_Float a; DVALUE_Float b] => ret (DVALUE_Float (Float32_minimum a b))
-      | _ => failwith "llvm_minimum_f32 got incorrect / ill-typed intputs"
+      | _ => failwith "llvm_minimum_f32 got incorrect / ill-typed inputs"
+      end.
+
+  (* Saturated arithmetic: https://llvm.org/docs/LangRef.html#saturation-arithmetic-intrinsics *)
+  Definition ushl_sat {I : Type} `{TDI : ToDvalue I} `{VMI : VMemInt I} (x y : I) : err dvalue
+    := match mshl x y with
+       | Oom msg => failwith ("ushl_sat oom: " ++ msg) (* This probably shouldn't happen? *)
+       | NoOom res =>
+           let res_u := munsigned res in
+           let res_u' := Z.shiftl (munsigned x) (munsigned y) in
+           if option_pred (fun bw => munsigned y >=? Z.of_nat bw) (@mbitwidth I VMI)
+           then ret (DVALUE_Poison (@mdtyp_of_int I VMI))
+           else
+             if (res_u' >? res_u)
+             then
+               match (@mmax_unsigned I VMI) with
+               | None =>
+                   failwith "ushl_sat issue with unbounded integer type."
+               | Some m =>
+                   match mrepr m with
+                   | Oom _ =>
+                       failwith "ushl_sat: cannot represent maximum value in type... Should not happen."
+                   | NoOom m =>
+                       inr (to_dvalue m)
+                   end
+               end
+             else inr (to_dvalue res)
+       end.
+
+  Definition llvm_ushl_sat_1: semantic_function :=
+    fun args =>
+      match args with
+      | [DVALUE_I1 a; DVALUE_I1 b] => ushl_sat a b
+      | _ => failwith "llvm_ushl_sat_1 got incorrect / ill-typed inputs"
+      end.
+
+  Definition llvm_ushl_sat_8: semantic_function :=
+    fun args =>
+      match args with
+      | [DVALUE_I8 a; DVALUE_I8 b] => ushl_sat a b
+      | _ => failwith "llvm_ushl_sat_8 got incorrect / ill-typed inputs"
+      end.
+
+  Definition llvm_ushl_sat_16: semantic_function :=
+    fun args =>
+      match args with
+      | [DVALUE_I16 a; DVALUE_I16 b] => ushl_sat a b
+      | _ => failwith "llvm_ushl_sat_16 got incorrect / ill-typed inputs"
+      end.
+
+  Definition llvm_ushl_sat_32: semantic_function :=
+    fun args =>
+      match args with
+      | [DVALUE_I32 a; DVALUE_I32 b] => ushl_sat a b
+      | _ => failwith "llvm_ushl_sat_32 got incorrect / ill-typed inputs"
+      end.
+
+  Definition llvm_ushl_sat_64: semantic_function :=
+    fun args =>
+      match args with
+      | [DVALUE_I64 a; DVALUE_I64 b] => ushl_sat a b
+      | _ => failwith "llvm_ushl_sat_64 got incorrect / ill-typed inputs"
       end.
 
   (* Clients of Vellvm can register the names of their own intrinsics
      definitions here. *)
   Definition defined_intrinsics : intrinsic_definitions :=
     [ (fabs_32_decl, llvm_fabs_f32) ;
-    (fabs_64_decl, llvm_fabs_f64) ;
-    (maxnum_32_decl , llvm_maxnum_f32) ;
-    (maxnum_64_decl , llvm_maxnum_f64);
-    (minimum_32_decl, llvm_minimum_f32);
-    (minimum_64_decl, llvm_minimum_f64)
+      (fabs_64_decl, llvm_fabs_f64) ;
+      (maxnum_32_decl , llvm_maxnum_f32) ;
+      (maxnum_64_decl , llvm_maxnum_f64);
+      (minimum_32_decl, llvm_minimum_f32);
+      (minimum_64_decl, llvm_minimum_f64);
+      (ushl_sat_1_decl, llvm_ushl_sat_1);
+      (ushl_sat_8_decl, llvm_ushl_sat_8);
+      (ushl_sat_16_decl, llvm_ushl_sat_16);
+      (ushl_sat_32_decl, llvm_ushl_sat_32);
+      (ushl_sat_64_decl, llvm_ushl_sat_64)
     ].
 
 

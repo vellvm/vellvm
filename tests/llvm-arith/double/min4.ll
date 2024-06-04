@@ -7,4 +7,3 @@ define double @main(i8 %argc, i8** %arcv) {
 }
 
 ; ASSERT EQ: double 0x7FF0000000000001 = call double @main(i64 0, i8** null)
-

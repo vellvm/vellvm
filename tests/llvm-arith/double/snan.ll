@@ -3,5 +3,5 @@ define double @main(i8 %argc, i8** %arcv) {
   ret double %1
 }
 
-; ASSERT EQ: double 0x7FF0000000000000 = call double @main(i64 0, i8** null)
+; ASSERT EQ: double 0x7FF0000000000001 = call double @main(i64 0, i8** null)
 
