@@ -24,6 +24,9 @@ exception Ran_tests of bool
 
 let suite = ref Test.suite
 
+let poison_test_flag = ref false
+let srctgt_test_flag = ref false
+
 let exec_tests () =
   Platform.configure () ;
   let outcome = run_suite !suite in
@@ -63,7 +66,7 @@ let compare_tgt_for_poison src tgt : unit =
 
 (* TODO: This could be reformated to make it cleaner - move some of it to
    assertion.ml?. *)
-let make_test name ll_ast t : string * assertion =
+let make_test name ll_ast t : (string * assertion) option =
   let open Format in
   (* TODO: ll_ast is of type list (toplevel_entity typ (block typ * list
      (block typ))) *)
@@ -93,25 +96,29 @@ let make_test name ll_ast t : string * assertion =
         Printf.sprintf "%s = %s(%s)" expected_str entry args_str
       in
       let result = run_to_value dtyp entry args ll_ast in
-      (str, dvalue_eq_assertion name result (fun () -> expected))
+      Some (str, dvalue_eq_assertion name result (fun () -> expected))
   | Assertion.POISONTest (dtyp, entry, args) ->
-      let expected =
-        InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV
-        .DVALUE_Poison
-          dtyp
-      in
-      let str =
-        let expected_str = string_of_dvalue expected in
-        let args_str =
-          pp_print_list
-            ~pp_sep:(fun f () -> pp_print_string f ", ")
-            Interpreter.pp_uvalue str_formatter args ;
-          flush_str_formatter ()
-        in
-        Printf.sprintf "%s = %s(%s)" expected_str entry args_str
-      in
-      let result = run_to_value dtyp entry args ll_ast in
-      (str, dvalue_eq_assertion name result (fun () -> expected))
+     if !poison_test_flag
+     then
+       let expected =
+         InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV
+           .DVALUE_Poison
+           dtyp
+       in
+       let str =
+         let expected_str = string_of_dvalue expected in
+         let args_str =
+           pp_print_list
+             ~pp_sep:(fun f () -> pp_print_string f ", ")
+             Interpreter.pp_uvalue str_formatter args ;
+           flush_str_formatter ()
+         in
+         Printf.sprintf "%s = %s(%s)" expected_str entry args_str
+       in
+       let result = run_to_value dtyp entry args ll_ast in
+       Some (str, dvalue_eq_assertion name result (fun () -> expected))
+     else
+       None
   | Assertion.SRCTGTTest (mode, expected_rett, generated_args) ->
       let v_args, src_fn_str, tgt_fn_str, sum_ast =
         match generated_args with
@@ -161,16 +168,19 @@ let make_test name ll_ast t : string * assertion =
               (Printf.sprintf "tgt - %s"
                  (Result.string_of_exit_condition e) )
       in
-      let str =
-        let args_str : doc =
-          pp_print_list
-            ~pp_sep:(fun f () -> pp_print_string f ", ")
-            Interpreter.pp_uvalue str_formatter v_args ;
-          flush_str_formatter ()
+      if !srctgt_test_flag
+      then
+        let str =
+          let args_str : doc =
+            pp_print_list
+              ~pp_sep:(fun f () -> pp_print_string f ", ")
+              Interpreter.pp_uvalue str_formatter v_args ;
+            flush_str_formatter ()
+          in
+          Printf.sprintf "src = tgt on generated input (%s)" args_str
         in
-        Printf.sprintf "src = tgt on generated input (%s)" args_str
-      in
-      (str, assertion)
+        Some (str, assertion)
+      else None
 
 let test_pp_dir dir =
   let _ = Printf.printf "===> RUNNING PRETTY PRINTING TESTS IN: %s\n" dir in
@@ -223,7 +233,7 @@ let test_file path =
       let _ = Printf.printf "Parsed successfully\n" in
       let ll_ast = IO.parse_file path in
       let _ = Printf.printf "AST retrieved successfully\n" in
-      let suite = Test (path, List.map (make_test path ll_ast) tests) in
+      let suite = Test (path, List.filter_map (make_test path ll_ast) tests) in
       let outcome = run_suite [suite] in
       Printf.printf "%s\n" (outcome_to_string outcome) ;
       raise (Ran_tests (successful outcome))
@@ -253,7 +263,7 @@ let test_dir dir =
   let suite =
     List.map
       (fun (file, ast, tests) ->
-        Test (file, List.map (make_test file ast) tests) )
+        Test (file, List.filter_map (make_test file ast) tests) )
       files
   in
   let outcome = run_suite suite in
@@ -327,6 +337,8 @@ let args =
        \t -test-suite, then\n\
        \t -test-pp-dir ../tests, then\n\
        \t -test-dir ../tests" )
+  ; ("-enable-poison-tests", Set poison_test_flag, "enable poison test cases")
+  ; ("-enable-srctgt-tests", Set srctgt_test_flag, "enable non-deterministic srctgt alive2 test cases")
   ; ( "-test-suite"
     , Unit exec_tests
     , "run the test suite, ignoring later inputs" )
