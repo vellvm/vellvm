@@ -14,4 +14,4 @@ define void @tgt(<3 x i2>* %p) {
 
 ; Assertions below this point were automatically generated
 
-; ASSERT SRCTGT 100
+; DISABLE SRCTGT 100

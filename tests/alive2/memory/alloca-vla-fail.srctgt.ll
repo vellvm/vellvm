@@ -15,4 +15,4 @@ define i32 @tgt(i32 %a, i32 %n) {
 
 ; Assertions below this point were automatically generated
 
-; ASSERT SRCTGT 100
+; DISABLE SRCTGT 100

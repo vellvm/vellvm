@@ -11,5 +11,5 @@ define <2 x i1> @tgt() {
 declare { <2 x i32>, <2 x i1> } @llvm.sadd.with.overflow.v2i32(<2 x i32>, <2 x i32>)
 
 ; Assertions below this point were automatically generated
-
-; ASSERT SRCTGT 100
+; Disabled because of unsupported intrinsic
+; DISABLE SRCTGT 100

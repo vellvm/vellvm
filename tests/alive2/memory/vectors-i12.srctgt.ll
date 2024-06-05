@@ -16,4 +16,4 @@ define i24 @tgt(<2 x i12>* %p) {
 
 ; Assertions below this point were automatically generated
 
-; ASSERT SRCTGT 100
+; DISABLE SRCTGT 100

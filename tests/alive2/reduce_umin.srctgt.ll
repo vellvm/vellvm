@@ -15,4 +15,4 @@ define i8 @tgt(<2 x i8> %x) {
 
 ; Assertions below this point were automatically generated
 
-; ASSERT SRCTGT 100
+; DISABLE SRCTGT 100

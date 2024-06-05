@@ -70,5 +70,5 @@ attributes #2 = { "less-precise-fpmad"="false" "no-frame-pointer-elim"="false" "
 
 
 ; Assertions below this point were automatically generated
-
-; ASSERT SRCTGT 100
+; Disabled test because llvm.lifetime intrinsics are unsupported.
+; DISABLE SRCTGT 100

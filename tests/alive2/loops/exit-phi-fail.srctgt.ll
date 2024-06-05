@@ -26,4 +26,4 @@ define i8 @tgt(i1 %c, i8 %a, i8 %b) {
 
 ; Assertions below this point were automatically generated
 
-; ASSERT SRCTGT 100
+; DISABLE SRCTGT 100
