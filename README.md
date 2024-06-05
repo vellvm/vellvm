@@ -8,7 +8,12 @@ content).
 ## Build Dependencies
 
 **NOTE:** The VM for the artifact already contains all of the
-dependencies. This section **can be skipped** if you are using the VM.
+dependencies. This section **can be skipped** if you are using the
+VM. The VM uses nix to handle the dependencies, and nix-direnv is set
+up to automatically include dependencies in your shell's path when you
+enter the artifact directory. `nix develop .` can be used to
+explicitly drop you into a shell with all of the dependencies if
+desired, but this shouldn't be necessary.
 
 The project is *picky* about dependencies. If you have used nix before
 consider looking at `nix.org` for details. For opam the following
