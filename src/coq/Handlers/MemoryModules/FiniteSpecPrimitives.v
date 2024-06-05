@@ -99,6 +99,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (** ** Memory stack
       The full notion of state manipulated by the monad is a pair of a [memory] and a [mem_stack].
      *)
+    (* Figure 2 *)
     Record memory_stack' : Type :=
       mkMemoryStack
         { memory_stack_memory : memory;
@@ -250,6 +251,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   #[global] Opaque read_byte_raw.
 
 
+  (* Figure 2: configuration. Heap and FrameStack are part of memory_stack *)
   Record MemState' :=
     mkMemState
       { ms_memory_stack : memory_stack;

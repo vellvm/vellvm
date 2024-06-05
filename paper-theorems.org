@@ -38,7 +38,7 @@ Values and semantics:
 
 * Section 3
 
-Memory configurations are defined by ~MemState~ in
+Memory configurations from Figure 2 are defined by ~MemState~ in
 [[file:src/coq/Handlers/MemoryModules/FiniteSpecPrimitives.v]]. It
 consists of a high watermark to keep track of the provenance and a
 ~memory_stack~ which contains the actual state of memory.
@@ -51,6 +51,8 @@ associated with a provenance. The ~memory_stack~ also contains a stack
 and a heap.
 
 ** Operations
+
+The operations described in Figure 5 are mapped as follows:
 
 - find_bk
   + [[file:src/coq/Handlers/MemoryModel.v::Definition find_free_block (len : nat) (pr : Provenance) : MemPropT MemState (addr * list addr)%type][find_free_block]]
@@ -77,11 +79,11 @@ This is slightly more involved in the development because the memory
 model is parameterized by a memory monad, instead of just using the
 Result type directly like in the paper.
 
-- lifting symbolic bytes
+- lifting symbolic bytes from Figure 7
   + [[file:src/coq/Semantics/InfiniteToFinite.v::Definition lift_SByte (sb1 : Memory64BitIntptr.MP.BYTE_IMPL.SByte) : MemoryBigIntptr.MP.BYTE_IMPL.SByte.][lift_SByte]]
-- lifting pointers
+- lifting pointers from Figure 7
   +[[file:src/coq/Semantics/InfiniteToFinite/LangRefine.v::Definition fin_to_inf_addr (a : addr) : IS1.LP.ADDR.addr.][fin_to_inf_addr]]
-- lifting memory configurations
+- lifting memory configurations from Figure 7
   + [[file:src/coq/Semantics/InfiniteToFinite.v::Definition lift_MemState (m1 : FinMem.MMEP.MMSP.MemState) : InfMem.MMEP.MMSP.MemState.][lift_MemState]]
 - Lemma 3.1 read_byte_spec refinement
   + [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma fin_inf_read_byte_spec :][fin_inf_read_byte_spec]]
@@ -90,12 +92,13 @@ Result type directly like in the paper.
 
 - Events
   + [[file:src/coq/Semantics/LLVMEvents.v]]
-- Interpreter levels
-+ [[file:src/coq/Theory/Refinement.v]]
+- Interpreter levels (Figure 8)
+- [[file:src/coq/Theory/Refinement.v]]
 - Values
-+ [[file:src/coq/Semantics/DynamicValues.v]]
+  + [[file:src/coq/Semantics/DynamicValues.v::Inductive dvalue : Set :=][Dynamic values (Section 4.2)]]
+  + [[file:src/coq/Semantics/DynamicValues.v::Inductive uvalue : Type :=][Undef values (Section 4.2.2)]]
 - Symbolic Bytes
-  + [[file:src/coq/Handlers/MemoryModules/FiniteSizeof.v::Inductive UByte (uvalue : Type) :=][Symbolic Bytes]]
+  + [[file:src/coq/Handlers/MemoryModules/FiniteSizeof.v::Inductive UByte (uvalue : Type) :=][Symbolic Bytes (Section 4.2.2)]]
 - Serialization
   + [[file:src/coq/Handlers/MemoryModel.v::Definition serialize_sbytes {M} `{Monad M} `{MonadStoreId M}][serialize_sbytes]]
 - Deserialization
@@ -153,21 +156,21 @@ paper these will be the infinite / finite instances of the language.
 
 * Section 6
 
-- read_b^run
+- read_b^run (Figure 11)
   + [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Definition read_byte `{MemMonad MemM (itree Eff)} (ptr : addr) : MemM SByte :=][read_byte]]
-- write_b^run
+- write_b^run (Figure 11)
   + [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Definition write_byte `{MemMonad MemM (itree Eff)} (ptr : addr) (byte : SByte) : MemM unit :=][write_byte]]
-- pushf^run
+- pushf^run (Figure 11)
   + [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Definition mempush `{MemMonad MemM (itree Eff)} : MemM unit :=][mempush]]
-- popf^run
+- popf^run (Figure 11)
   +[[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Definition mempop `{MemMonad MemM (itree Eff)} : MemM unit :=][mempop]]
-- alloca^run
+- alloca^run (Figure 11)
   + [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Definition allocate_bytes `{MemMonad MemM (itree Eff)}][allocate_bytes]]
-- malloc^run
+- malloc^run (Figure 11)
   + [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Definition malloc_bytes `{MemMonad MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=][malloc_bytes]]
-- free^run
+- free^run (Figure 11)
   + [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Definition free `{MemMonad MemM (itree Eff)} (ptr : addr) : MemM unit :=][free]]
-- Executable correctness lemmas
+- Executable correctness lemma example (Section 6.1.1)
   + [[file:src/coq/Handlers/MemoryModules/FiniteExecPrimitives.v::Lemma read_byte_correct :][read_byte_correct]]
 
 ** Section 6.2

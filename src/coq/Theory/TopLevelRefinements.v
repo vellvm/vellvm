@@ -146,8 +146,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     refinement at level [i+1] after running the [i+1] level of interpretation
      *)
 
-    (* Lemma 5.7
-     See the related definition of [refine_L0] in Refinement.v. (Search for Lemma 5.7)
+    (* Theorem 4.1
+     See the related definition of [refine_L0] in Refinement.v. (Search for Theorem 4.1)
 
      The similar results mentioned in the paper are listed below.
      *)
@@ -2631,7 +2631,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Qed.
 
     (**
-   Theorem 5.8: We prove that the interpreter belongs to the model.
+       Theorem 6.1: We prove that the interpreter belongs to the model.
      *)
     Theorem interpreter_sound: forall p,
         refine_L6 (model p) (build_singleton (interpreter p)).

@@ -2423,6 +2423,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           ret (to_ubytes (CTR dt) dt sid)
       end.
 
+    (* Section 4.2.2: serialize *)
     Definition serialize_sbytes {M} `{Monad M} `{MonadStoreId M}
       (uv : uvalue) (dt : dtyp) : M (list SByte)
       := sid <- fresh_sid;;
@@ -2498,6 +2499,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
             + if [dt] is not aggregate, return a UVALUE_ConcatBytes with too many bytes
      *)
 
+    (* Section 4.2.2: deserialize *)
     Definition deserialize_sbytes (bytes : list SByte) (dt : dtyp) : err uvalue :=
       match dt with
       | DTYPE_Void =>
@@ -2864,6 +2866,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       read_byte_value : read_byte_prop ms ptr byte;
     }.
 
+  (* Figure 5: read_b *)
   Definition read_byte_spec_MemPropT (ptr : addr) : MemPropT MemState SByte :=
     lift_spec_to_MemPropT
       (fun m1 byte m2 =>
@@ -2922,6 +2925,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       mempush_operation_invariants m1 m2;
     }.
 
+  (* Figure 5: pushf *)
   Definition mempush_spec_MemPropT : MemPropT MemState unit :=
     lift_spec_to_MemPropT
       (fun m1 _ m2 =>
@@ -2971,6 +2975,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       memory_stack_frame_stack_prop (MemState_get_memory ms) fs1 ->
       ~ pop_frame_stack_prop fs1 fs2.
 
+  (* Figure 5: popf *)
   Definition mempop_spec_MemPropT : MemPropT MemState unit :=
     fun m1 res =>
       match run_err_ub_oom res with
@@ -3098,6 +3103,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       write_byte_invariants : write_byte_operation_invariants m1 m2;
     }.
 
+  (* Figure 5: write_b *)
   Definition write_byte_spec_MemPropT (ptr : addr) (byte : SByte) : MemPropT MemState unit
     :=
     lift_spec_to_MemPropT
@@ -3115,6 +3121,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       block_is_free_bytes_are_free : forall ptr, In ptr ptrs -> byte_not_allocated m1 ptr;
     }.
 
+  (* Figure 5: find_bk *)
   Definition find_free_block (len : nat) (pr : Provenance) : MemPropT MemState (addr * list addr)%type
     := fun m1 res =>
          match run_err_ub_oom res with
@@ -3201,6 +3208,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   (*** Allocating bytes on the stack *)
   (* Post conditions for actually reserving bytes in memory and allocating them in the current stack frame *)
+  (* Figure 5: alloca_post *)
   Record allocate_bytes_post_conditions
     (m1 : MemState) (init_bytes : list SByte)
     (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr)
@@ -3259,6 +3267,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
        allocate_bytes_with_pr_spec_MemPropT init_bytes prov.
 
   (*** Allocating bytes in the heap *)
+  (* Figure 5: malloc_post *)
   Record malloc_bytes_post_conditions (m1 : MemState) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
     { (* Provenance *)
       malloc_bytes_provenances_preserved :
@@ -3395,6 +3404,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       free_invariants : free_operation_invariants m1 m2;
     }.
 
+  (* Figure 5: free *)
   Definition free_spec_MemPropT (root : addr) : MemPropT MemState unit :=
     lift_spec_to_MemPropT
       (fun m1 _ m2 =>

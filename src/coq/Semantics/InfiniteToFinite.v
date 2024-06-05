@@ -182,6 +182,7 @@ Module InfiniteToFinite.
             ret (FiniteSizeof.mkUByte LLVMParams64BitIntptr.Events.DV.uvalue uv' dt idx sid)).
   Defined.
 
+  (* Figure 7: lift_sbyte *)
   Definition lift_SByte (sb1 : Memory64BitIntptr.MP.BYTE_IMPL.SByte) : MemoryBigIntptr.MP.BYTE_IMPL.SByte.
     destruct sb1.
     exact (FiniteSizeof.mkUByte DVC2.DV2.uvalue (fin_to_inf_uvalue uv) dt idx sid).
@@ -1263,6 +1264,7 @@ Module InfiniteToFinite.
     constructor; auto.
   Defined.
 
+  (* Figure 7: lifting memory configurations *)
   Definition lift_MemState (m1 : FinMem.MMEP.MMSP.MemState) : InfMem.MMEP.MMSP.MemState.
     destruct m1 as [ms pr].
     refine (let ms' := lift_memory_stack ms in
@@ -9696,6 +9698,7 @@ cofix CIH
     eapply inf_fin_read_byte_prop_memory; eauto.
   Qed.
 
+  (* Lemma 3.1: read_byte_spec refinement *)
   Lemma fin_inf_read_byte_spec :
     forall {addr_fin addr_inf ms_fin ms_inf byte_inf byte_fin},
       MemState_refine_prop ms_inf ms_fin ->
@@ -36493,6 +36496,7 @@ cofix CIH
     reflexivity.
   Qed.
 
+  (* Theorem 4.3 *)
   Lemma model_E1E2_L6_orutt_strict_sound
     (p : list
            (LLVMAst.toplevel_entity

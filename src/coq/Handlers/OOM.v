@@ -96,6 +96,7 @@ Section PARAMS_MODEL.
 
   Arguments refine_OOM_h_flip /.
 
+  (* eutt_oom *)
   Definition refine_OOM_h {T} (RR : relation T) (source target : itree Effout T) : Prop
     := refine_OOM_h_flip (flip RR) target source.
 

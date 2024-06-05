@@ -4669,6 +4669,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Definition addr_refine addr_inf (addr_fin : addr) := AC1.addr_convert addr_inf = NoOom addr_fin.
 
   (* TODO: Should we move this? *)
+  (* Figure 7: lifting pointers *)
   Definition fin_to_inf_addr (a : addr) : IS1.LP.ADDR.addr.
     unfold FinAddr.addr in a.
     unfold FiniteAddresses.Iptr in a.

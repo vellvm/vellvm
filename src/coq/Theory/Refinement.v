@@ -44,7 +44,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Import PROV.
 
   (* Refinement relation for uvalues *)
-  (* Definition 5.6 UValue refinement *)
   Variant refine_uvalue: uvalue -> uvalue -> Prop :=
     | UndefPoison: forall dt uv uv1, concretize uv1 (DVALUE_Poison dt) -> uvalue_has_dtyp uv dt -> refine_uvalue uv1 uv
     | RefineConcrete: forall uv1 uv2, (forall (dv:dvalue), concretize uv2 dv -> concretize uv1 dv) -> refine_uvalue uv1 uv2
@@ -105,8 +104,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Ltac invert_concretize H :=
     red_concretize_in H; cbn in H; subst; inversion H; subst; auto.
 
-  (* Lemma 5.7 - uses this definition of refinement
-   note that refine_uvalue is the basic Uvalue refinement given by Definition 5.6 *)
+  (* Theorem 4.1 - uses this definition of refinement *)
   (* Refinement of uninterpreted mcfg *)
   Definition refine_L0: relation (itree L0 dvalue) := eutt eq.
 
@@ -162,6 +160,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     rewrite XY. eauto.
   Qed.
 
+  (* Theorem 4.2 *)
   Instance Transitive_refine_L6 : Transitive refine_L6.
   Proof.
     unfold Transitive.

@@ -130,6 +130,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     (*** Primitives on memory *)
     (** Reads *)
+    (* Figure 11: read_b^run *)
     Definition read_byte `{MemMonad MemM (itree Eff)} (ptr : addr) : MemM SByte :=
       let addr := ptr_to_int ptr in
       let pr := address_provenance ptr in
@@ -149,6 +150,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       end.
 
     (** Writes *)
+    (* Figure 11: write_b^run *)
     Definition write_byte `{MemMonad MemM (itree Eff)} (ptr : addr) (byte : SByte) : MemM unit :=
       let addr := ptr_to_int ptr in
       let pr := address_provenance ptr in
@@ -1977,6 +1979,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
          add_block_to_stack aid ptr ptrs init_bytes;;
          ret ptr.
 
+    (* Figure 11: alloca^run *)
     Definition allocate_bytes `{MemMonad MemM (itree Eff)}
       (init_bytes : list SByte) : MemM addr :=
       pr <- fresh_provenance;;
@@ -1990,6 +1993,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       add_block_to_heap aid ptr ptrs init_bytes;;
       ret ptr.
 
+    (* Figure 11: malloc^run *)
     Definition malloc_bytes `{MemMonad MemM (itree Eff)} (init_bytes : list SByte) : MemM addr :=
       pr <- fresh_provenance;;
       malloc_bytes_with_pr init_bytes pr.
@@ -2107,6 +2111,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       auto.
     Qed.
 
+    (* Figure 11: mempush *)
     Definition mempush `{MemMonad MemM (itree Eff)} : MemM unit :=
       ms <- get_mem_state;;
       let fs := mem_state_frame_stack ms in
@@ -2126,6 +2131,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       fold_left (fun m key => free_byte (ptr_to_int key) m) block m.
 
     (** Stack free *)
+    (* Figure 11: mempop *)
     Definition mempop `{MemMonad MemM (itree Eff)} : MemM unit :=
       ms <- get_mem_state;;
       let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
@@ -2137,6 +2143,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       put_mem_state ms'.
 
     (** Free from heap *)
+    (* Figure 11: free^run *)
     Definition free `{MemMonad MemM (itree Eff)} (ptr : addr) : MemM unit :=
       ms <- get_mem_state;;
       let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
@@ -3100,6 +3107,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Qed.
 
     (** Correctness of the main operations on memory *)
+    (* Section 6.1.1: executable correctness lemma example *)
     Lemma read_byte_correct :
       forall ptr pre,
         exec_correct pre (read_byte ptr) (read_byte_spec_MemPropT ptr)
