@@ -222,9 +222,60 @@ changes include:
 
 * Axioms in the development
 
-* Description of the structure of the project as a whole
+The proofs of the lemmas rely upon certain classical axioms, proof
+irrelevance, and also the `bisimulation_is_eq` axiom from the itrees
+library. Here we list the assumptions for some of the important
+theorems in the development.
 
-Check artifact of icfp21
+** Theorem 4.3: [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma model_E1E2_L6_orutt_strict_sound][model_E1E2_L6_orutt_strict_sound]]
 
-- ml folder
-- coq folder
+#+begin_src coq
+  Axioms:
+  ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+  ClassicalDedekindReals.sig_forall_dec : forall P : nat -> Prop, (forall n : nat, {P n} + {~ P n}) -> {n : nat | ~ P n} + {forall n : nat, P n}
+  ProofIrrelevance.proof_irrelevance : forall (P : Prop) (p1 p2 : P), p1 = p2
+  FunctionalExtensionality.functional_extensionality_dep : forall (A : Type) (B : A -> Type) (f g : forall x : A, B x), (forall x : A, f x = g x) -> f = g
+  Eqdep.Eq_rect_eq.eq_rect_eq : forall (U : Type) (p : U) (Q : U -> Type) (x : Q p) (h : p = p), x = eq_rect p Q x p h
+  Classical_Prop.classic : forall P : Prop, P \/ ~ P
+  EqAxiom.bisimulation_is_eq : forall (E : Type -> Type) (R : Type) (t1 t2 : ITreeDefinition.itree E R), Eqit.eq_itree eq t1 t2 -> t1 = t2
+#+end_src
+
+** Theorem 6.1: [[file:src/coq/Theory/TopLevelRefinements.v::Theorem interpreter_sound: forall p,][interpreter_sound]]
+
+#+begin_src coq
+  Axioms:
+  ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+  ClassicalDedekindReals.sig_forall_dec
+    : forall P : nat -> Prop,
+      (forall n : nat, {P n} + {~ P n}) ->
+      {n : nat | ~ P n} + {forall n : nat, P n}
+  FunctionalExtensionality.functional_extensionality_dep
+    : forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+      (forall x : A, f x = g x) -> f = g
+  Eqdep.Eq_rect_eq.eq_rect_eq
+    : forall (U : Type) (p : U) (Q : U -> Type) (x : Q p) (h : p = p),
+      x = eq_rect p Q x p h
+  Classical_Prop.classic : forall P : Prop, P \/ ~ P
+  EqAxiom.bisimulation_is_eq
+    : forall (E : Type -> Type) (R : Type) (t1 t2 : ITreeDefinition.itree E R),
+      Eqit.eq_itree eq t1 t2 -> t1 = t2
+#+end_src
+
+** Lemma 3.1: [[file:src/coq/Semantics/InfiniteToFinite.v::Lemma fin_inf_read_byte_spec :][fin_inf_read_byte_spec]]
+
+#+begin_src coq
+  Axioms:
+  ProofIrrelevance.proof_irrelevance : forall (P : Prop) (p1 p2 : P), p1 = p2
+#+end_src
+
+** Theorem 4.2: [[file:src/coq/Theory/Refinement.v::Instance Transitive_refine_L6 : Transitive refine_L6.][Transitive_refine_L6]]
+
+#+begin_src coq
+  Axioms:
+  Eqdep.Eq_rect_eq.eq_rect_eq
+    : forall (U : Type) (p : U) (Q : U -> Type) (x : Q p) (h : p = p),
+      x = eq_rect p Q x p h
+  EqAxiom.bisimulation_is_eq
+    : forall (E : Type -> Type) (R : Type) (t1 t2 : ITreeDefinition.itree E R),
+      Eqit.eq_itree eq t1 t2 -> t1 = t2
+#+end_src
