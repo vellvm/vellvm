@@ -18,14 +18,25 @@ Section DList.
   Definition DList_cons {A} (a : A) (dl : DList A) : DList A
     := DList_append (DList_singleton a) dl.
 
+  Definition DList_snoc {A} (a : A) (dl : DList A) : DList A
+    := DList_append dl (DList_singleton a).
+
   Definition DList_empty {A} : DList A
     := fun xs => xs.
 
+  (* TODO: I think the original version (commented out) is O(n) runtime due to the use of fold_left *)
   Definition DList_from_list {A} (l : list A) : DList A
-    := fold_left (fun x s => DList_append x (DList_singleton s)) l DList_empty.
-  
+    (* := fold_left (fun x s => DList_append x (DList_singleton s)) l DList_empty. *)
+    := fun l2 => (l ++ l2)%list.
+
   Definition DList_map {A B} (f : A -> B) (dl : DList A) : DList B
     := fold_right (fun a => DList_cons (f a)) (@DList_empty B) (DList_to_list dl).
+
+  Definition concat {A} : list (DList A) -> DList A
+    := fold_right DList_append DList_empty.
+
+  Definition replicate {A} (n : nat) (a : A) : DList A
+    := fold_right DList_cons DList_empty (repeat a n).
 
   #[global] Instance Functor_DList : Functor DList.
   Proof.
@@ -40,7 +51,8 @@ Section DList.
   Definition DList_fold_left {A B} (f : B -> A -> B) (dl : DList A) (z : B) : B
     := List.fold_left f (DList_to_list dl) z.
 
-
+  Definition DList_join {A} (ls : list (DList A)) :=
+    fold_left DList_append ls DList_empty.
 
   #[global] Instance Monad_DList : Monad DList.
   Proof.
@@ -69,6 +81,51 @@ Section DList.
         apply ret.
         exact (f t).
   Defined. 
+
+End DList.
+
+Section Lemmas.
+  Definition wf_DList {A} (dl : DList A) :=
+    exists l, dl l = (dl [] ++ l)%list.
+  
+  Lemma DList_to_from_list {A} : forall (l : list A),
+      DList_to_list (DList_from_list l) = l.
+  Proof.
+    intros l; unfold DList_from_list, DList_to_list. cbn. apply app_nil_r.
+  Qed.
+
+  (* Lemma DList_from_to_list {A} : forall (dl : DList A) (l : list A), *)
+  (*     DList_from_list (DList_to_list dl) l = dl l. *)
+  (* Proof. *)
+  (*   intros dl l; unfold DList_from_list, DList_to_list, DList in *; cbn. *)
+
+  Lemma DList_empty_list {A : Type} :
+    @DList_empty A [] = [].
+  Proof.
+    unfold DList_empty; auto.
+  Qed.
+
+  Lemma DList_singleton_eq {A : Type} : forall (a : A),
+      DList_to_list (DList_singleton a) = [a].
+  Proof.
+    intros a; unfold DList_to_list, DList_singleton; auto.
+  Qed.
+
+  Lemma DList_cons_eq {A} : forall (dl : DList A) (a : A),
+      DList_to_list (DList_cons a dl)  = a :: (DList_to_list dl).
+  Proof.
+    intros dl a; unfold DList_to_list, DList_cons, DList_append, DList_singleton; auto.
+  Qed.
+
+  Lemma DList_append_eq {A} : forall (dl : DList A) (dl2 : DList A),
+      DList_to_list (DList_append dl dl2) = dl (DList_to_list dl2).
+  Proof.
+    intros dl dl2. unfold DList_to_list, DList_append; auto.
+  Qed.
+
+End Lemmas.
+
+Section DString.
 
   Definition DString := DList ascii.
 
@@ -110,9 +167,4 @@ Section DList.
     | cons x xs => DList_append (DList_append x sep) (concat_DString sep xs)
     end.
 
-  Definition DList_join {A} (ls : list (DList A)) :=
-    fold_left DList_append ls DList_empty.
-
-End DList.
-
-Definition example1 : DList nat := DList_cons 1 DList_empty.
+End DString.
