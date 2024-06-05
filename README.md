@@ -166,7 +166,7 @@ under active development and currently does not handle some tricky
 cases fully, like pointer arguments to `src` and `tgt`, so test cases
 are expected to fail as a result of this as well. The number of
 failing tests varies for each run due to the random generation, but
-roughly 50 tests are expected to fail.
+roughly 52 tests are expected to fail.
 
 # Structure of the development
 
@@ -196,20 +196,12 @@ Syntax, in `src/coq/Syntax/`
 - `CFG.v`     the VIR internal AST as used for the semantics.
 
 Semantics, in `src/coq/Semantics/`:
-- `DynamicValues.v` definition of the dynamic values and underdefined values **ARTIFACT** discussed in Section 2.2.
-- `LLVMEvents.v`    inventory of all events **ARTIFACT** as described in Section 4.1.
-- `Denotation.v`    definitions of the representation of VIR programs as ITrees **ARTIFACT** as described in Section 4.2.
-- `Handlers/`       includes the code for all of the handlers **ARTIFACT** described in Section 4.3. They are broken up into files based on the nature of the eve
-nt handled, each file hence corresponding to a subsection.
-- `TopLevel.v`      provides the full model and the full interpreter, by plugging all components together, **ARTIFACT** i.e. the final result of Section 4.4.
-
-Theory, in `src/coq/Theory/`:
-- `src/coq/Utils/PropT.v` metatheory required to reason about sets of itrees, i.e. about the propositional monad transformer.
-- `InterpreterMCFG.v`     the layers of interpretation **ARTIFACT** shown in Figure 6 and some of their metatheory
-- `InterpreterCFG.v`      the same layers of interpretation and metatheory, but when reasoning about single functions (i.e. single cfg)
-- `Refinement.v`          definition of the refinement relations between layers of interpretations **ARTIFACT** mentioned in Section 5.4
-- `TopLevelRefinements.v` proof of inclusion of the refinement relations between layers of interpretations; proof of soundness of the interpreter as described in Section 5
-- `DenotationTheory`      Equational theory to reason directly about the structure of vir programs; in particular, reasoning principles about open control-flow-graphs.
+- `DynamicValues.v` definition of the dynamic values and underdefined values.
+- `LLVMEvents.v`       inventory of all events.
+- `Denotation.v`      definitions of the representation of VIR programs as ITrees.
+- `Handlers/`            includes the code for all of the handlers.
+- `Handlers/MemoryModules` contains some of the modules for the memory model.
+- `TopLevel.v`      provides the full model and the full interpreter, by plugging all components together.
 
 ## Test suite
 
