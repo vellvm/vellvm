@@ -2,7 +2,8 @@
 
 This is the implementation of our memory model and LLVM semantics. The
 relevant theorems and definitions are linked to in the
-`paper-theorems.org` file.
+`paper-theorems.org` file (or `paper-theorems.md`, which has the same
+content).
 
 ## Build Dependencies
 
