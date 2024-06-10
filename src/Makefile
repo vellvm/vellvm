@@ -7,8 +7,8 @@
 
 ######## Tested/Recommended versions of Coq and OCaml
 ########    If these are changed, update .travis.yml too
-COQ_VERSION=8.15.2
-OCAML_VERSION=4.14.0
+COQ_VERSION=8.19.1
+OCAML_VERSION=4.14.1
 
 ## Project Source Locations
 # Coq sources
