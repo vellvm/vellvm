@@ -10,23 +10,23 @@ semantics of (a subset of) the [LLVM IR](https://www.llvm.org/) that is intended
 verification_ of LLVM-based software.
 It is being developed at the University of Pennsylvania as part of the [DeepSpec](https://www.deepspec.org) project.
 
-After VIR, the second component whose development is reaching maturity is the verification of 
+After VIR, the second component whose development is reaching maturity is the verification of
 a verified front-end for the [Helix](https://github.com/vzaliva/helix) chain of compilation.
 
 ## LLVM Compatibility
 
- Vellvm covers most features of the core *sequential* fragment of LLVM IR 14.0.0 as per its informal specification in [LangRef](https://llvm.org/docs/LangRef.html), including: 
+ Vellvm covers most features of the core *sequential* fragment of LLVM IR 14.0.0 as per its informal specification in [LangRef](https://llvm.org/docs/LangRef.html), including:
  - basic operations on 1-, 8-, 32-, and 64-bit integers
  - doubles, floats, structs, arrays, pointers
  - casts
- - `undef` and `poison` 
+ - `undef` and `poison`
  - SSA-structured control-flow-graphs
  - global data
  - mutually-recursive functions
  - some intrinsics (in a user-extensible)
 
- The main features that are currently unsupported are: 
- - some block terminators (`switch`, `resume`, indirect branching, `invoke`), 
+ The main features that are currently unsupported are:
+ - some block terminators (`switch`, `resume`, indirect branching, `invoke`),
  - the `landing_pad` and `va_arg` instructions
  - architecture-specific floats
  - opaque types
@@ -47,37 +47,37 @@ a verified front-end for the [Helix](https://github.com/vzaliva/helix) chain of 
  - Calvin Beck
  - Irene Yoon
  - Gary (Hanxi) Chen
- 
+
 ## Past Contributors
- - Vivien Durey 
- - Dmitri Garbuzov 
+ - Vivien Durey
+ - Dmitri Garbuzov
  - Eduardo Gonzalez
  - Olek Gierczak
  - William Mansky
  - Milo Martin
- - Santosh Nagarakatte 
- - Emmett Neyman 
- - Christine Rizkallah 
+ - Santosh Nagarakatte
+ - Emmett Neyman
+ - Christine Rizkallah
  - Zak Sines
  - Nathan Sobotka
  - Robert Zajac
  - Ilia Zaichuk
  - Vadim Zaliva
- - Richard Zhang 
- - Jianzhou Zhao 
+ - Richard Zhang
+ - Jianzhou Zhao
 
-### Recent Related Publications: 
+### Recent Related Publications:
  - "Modular, Compositional, and Executable Formal Semantics for LLVM IR" ([ICFP'21](https://icfp21.sigplan.org/details/icfp-2021-papers/6/Modular-Compositional-and-Executable-Formal-Semantics-for-LLVM-IR)),
     Yannick Zakowski, Calvin Beck, Irene Yoon, Ilia Zaichuk, Vadim Zaliva, Steve Zdancewic
  - "Formal Reasoning About Layered Monadic Interpreters" ([ICFP'22](http://www.cis.upenn.edu/~stevez/papers/YZZ22.pdf)), Irene Yoon, Yannick Zakowski, and Steve Zdancewic.
- - "Interaction Trees" ([POPL'20](http://www.cis.upenn.edu/~stevez/papers/XZHH+20.pdf))	Li-yao Xia, Yannick Zakowski, Paul He, Chung-Kil Hur, Gregory Malecha, Benjamin C. Pierce, and Steve Zdancewic. 
+ - "Interaction Trees" ([POPL'20](http://www.cis.upenn.edu/~stevez/papers/XZHH+20.pdf))	Li-yao Xia, Yannick Zakowski, Paul He, Chung-Kil Hur, Gregory Malecha, Benjamin C. Pierce, and Steve Zdancewic.
 
 ### Older Vellvm-related papers:
- - "A Formal C Memory Model Supporting Integer-Pointer Casts" ([PLDI'15](http://www.cis.upenn.edu/~stevez/papers/KHM+15.pdf)), Jeehoon Kang, Chung-Kil Hur, William Mansky, Dmitri Garbuzov, Steve Zdancewic, and Viktor Vafeiadis. 
- - "Formal Verification of SSA-Based Optimizations for LLVM" ([PLDI'13](http://www.cis.upenn.edu/~stevez/papers/ZNMZ13.pdf)), Jianzhou Zhao, Santosh Nagarakatte, Milo M. K. Martin, and Steve Zdancewic. 
- - "Formalizing the LLVM Intermediate Representation for Verified Program Transformations" ([POPL'12](http://www.cis.upenn.edu/~stevez/papers/ZNMZ12.pdf)), Jianzhou Zhao, Santosh Nagarakatte, Milo M. K. Martin, and Steve Zdancewic. 
- - "Mechanized Verification of Computing Dominators for Formalizing Compilers" ([CPP'12](http://www.cis.upenn.edu/~stevez/papers/ZZ12.pdf)), Jianzhou Zhao and Steve Zdancewic. 
- 
+ - "A Formal C Memory Model Supporting Integer-Pointer Casts" ([PLDI'15](http://www.cis.upenn.edu/~stevez/papers/KHM+15.pdf)), Jeehoon Kang, Chung-Kil Hur, William Mansky, Dmitri Garbuzov, Steve Zdancewic, and Viktor Vafeiadis.
+ - "Formal Verification of SSA-Based Optimizations for LLVM" ([PLDI'13](http://www.cis.upenn.edu/~stevez/papers/ZNMZ13.pdf)), Jianzhou Zhao, Santosh Nagarakatte, Milo M. K. Martin, and Steve Zdancewic.
+ - "Formalizing the LLVM Intermediate Representation for Verified Program Transformations" ([POPL'12](http://www.cis.upenn.edu/~stevez/papers/ZNMZ12.pdf)), Jianzhou Zhao, Santosh Nagarakatte, Milo M. K. Martin, and Steve Zdancewic.
+ - "Mechanized Verification of Computing Dominators for Formalizing Compilers" ([CPP'12](http://www.cis.upenn.edu/~stevez/papers/ZZ12.pdf)), Jianzhou Zhao and Steve Zdancewic.
+
 ---
 
 # Structure of the development
@@ -86,20 +86,20 @@ The development is organized as follows.
 
 ## Interaction Trees
 
-Vellvm heavily relies on the [Interaction Trees](https://github.com/DeepSpec/InteractionTrees). Its development is hence 
-tied to contributions to the itree libraries. Temporary itree contributions not yet ready for merge are stored in the `src/coq/Utils` 
+Vellvm heavily relies on the [Interaction Trees](https://github.com/DeepSpec/InteractionTrees). Its development is hence
+tied to contributions to the itree libraries. Temporary itree contributions not yet ready for merge are stored in the `src/coq/Utils`
 folder.
 
 ## Coq formalization
 
-The core of the project is encompassed by the Coq formalization of LLVM IR and the proof of its metatheory. 
-This formalization is entirely contained in the `src/coq` folder. 
+The core of the project is encompassed by the Coq formalization of LLVM IR and the proof of its metatheory.
+This formalization is entirely contained in the `src/coq` folder.
 
 More specifically, the following selection of files are among the most important to understand the development:
 
 Syntax, in `src/coq/Syntax/`
 - `LLVMAst.v` the front VIR internal AST. Our parser of native llvm syntax returns an element of this AST.
-- `CFG.v`     the VIR internal AST as used for the semantics. 
+- `CFG.v`     the VIR internal AST as used for the semantics.
 
 Semantics, in `src/coq/Semantics/`:
 - `DynamicValues.v` definition of the dynamic values and underdefined values.
@@ -112,7 +112,7 @@ Theory, in `src/coq/Theory/`:
 - `src/coq/Utils/PropT.v` metatheory required to reason about sets of itrees, i.e. about the propositional monad transformer.
 - `InterpreterMCFG.v`     the layers of interpretation and some of their metatheory
 - `InterpreterCFG.v`      the same layers of interpretation and metatheory, but when reasoning about single functions (i.e. single cfg)
-- `Refinement.v`          definition of the refinement relations between layers of interpretations 
+- `Refinement.v`          definition of the refinement relations between layers of interpretations
 - `TopLevelRefinements.v` proof of inclusion of the refinement relations between layers of interpretations; proof of soundness of the interpreter as described in Section 5
 - `DenotationTheory`      Equational theory to reason directly about the structure of vir programs; in particular, reasoning principles about open control-flow-graphs.
 
@@ -124,7 +124,7 @@ These unverified parts of the development live in the `src/ml` folder.
 
 - `extracted/Extract.v`    instructions for the extraction of the development to OCaml
 - `libvellvm/interpreter.ml`  OCaml driver for running the interpreter; the `step` function walks over the ITree that remains after complete interpretation of the denotation of a program
-- `libvellvm/llvm_parser.mly` the parser, adapted from Vellvm, 
+- `libvellvm/llvm_parser.mly` the parser, adapted from Vellvm,
 - `testing/assertion.ml`   custom annotations of llvm programs as comments used to define our tests.
 - `main.ml`                top-level from which our executable is obtained.
 
@@ -136,13 +136,13 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 
 # Installing / Compiling Vellvm
 
-## Assumes: 
+## Assumes:
   - OCaml 4.14.1 (typically installed via `opam`, see below)
   - Coq 8.19.1
   - opam  2.0.0+
   - Clang 14.0.1+ (available for Mac OSX in XCode 4.2+, or installed via, e.g. `sudo apt-get install clang`)
-  - `gnu-sed` 
-     + `sed` defaults to `gnu-sed` on linux. 
+  - `gnu-sed`
+     + `sed` defaults to `gnu-sed` on linux.
 	 + for Mac OS X with [homebrew](https://brew.sh/), do `brew install gnu-sed` and then create a symlink from `sed` to the `gsed` executable in your path.)
 
 ## Compilation:
@@ -157,7 +157,7 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 
 `opam` is available via [homebrew](https://brew.sh/) on Mac, and most system's package managers on Linux, e.g. `sudo apt-get install opam`.
 
-If this is the first time you are using opam you need to initialize it: 
+If this is the first time you are using opam you need to initialize it:
   - On Linux: `opam init`
   - On Mac:  `opam init --disable-sandboxing` (sandboxing needs to be disabled due to a known [issue](https://github.com/ocaml/opam-repository/issues/12973)).
 
@@ -172,24 +172,15 @@ Then:
 3. Install Coq:
    `opam pin add coq 8.19.1`
 
-4. Add External Coq libraries: 
-    * ext-lib    (installed via, e.g. `opam install coq-ext-lib`)
-    * paco       (installed via, e.g. `opam install coq-paco`)
-    * itrees     (installed via, e.g. `opam install coq-itree`)
-    * flocq      (installed via, e.g. `opam install coq-flocq`) 
-    * ceres      (installed via, e.g. `opam install coq-ceres`)
-    * mathcomp   (installed via, e.g. `opam install coq-mathcomp-ssreflect`)
-    * simple-io  (installed via, e.g. `opam install coq-simple-io`)
-	* quickchick (installed via, e.g. `opam install coq-quickchick`)
+4. Install opam dependencies (run in the root directory of the project):
+   `opam install . --only-deps`
 
-5. Add opam ocaml packages: 
-    * ocamlbuild (installed via, e.g. `opam install ocamlbuild`)
-    * dune       (installed via, e.g. `opam install dune`)
-    * menhir     (installed via, e.g. `opam install menhir`)
-    * qcheck     (installed via, e.g. `opam install qcheck`)
-
-Steps 3-5 above can be achieved after cloning the Vellvm git repo by doing:
-    `cd src && make pin-coq && make opam`
+Note: the dependency constraints in the opam file should be sufficient
+for installing `vellvm`, however if you are having compilation
+problems [checking the logs from CI may give you the appropriate
+versions](https://github.com/vellvm/vellvm/actions/workflows/vellvm.yml),
+as shown
+[here](https://github.com/vellvm/vellvm/issues/364#issuecomment-2113331499).
 
 ## Using nix:
 
