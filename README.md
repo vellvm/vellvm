@@ -22,7 +22,7 @@ should give you the appropriate versions of all of the dependencies:
 ```
 opam pin add coq 8.19.0
 opam repo add coq-released https://coq.inria.fr/opam/released
-opam install . --only-deps
+opam install . --deps-only
 ```
 
 The following versions of things should be used to compile the project
