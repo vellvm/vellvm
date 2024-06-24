@@ -173,7 +173,7 @@ Then:
    `opam pin add coq 8.19.1`
 
 4. Install opam dependencies (run in the root directory of the project):
-   `opam install . --only-deps`
+   `opam install . --deps-only`
 
 Note: the dependency constraints in the opam file should be sufficient
 for installing `vellvm`, however if you are having compilation
