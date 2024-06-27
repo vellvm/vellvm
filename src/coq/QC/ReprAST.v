@@ -709,7 +709,7 @@ Section ReprInstances.
        | INSTR_Comment s => "(INSTR_Comment " ++ s ++ ")"
        | INSTR_Op e => "(INSTR_Op " ++ repr e ++ ")"
        | INSTR_Call e params annotations =>
-           "INSTR_Call " ++ repr e ++ " " ++ repr params ++ " " ++ repr annotations ++ ")"
+           "(INSTR_Call " ++ repr e ++ " " ++ repr params ++ " " ++ repr annotations ++ ")"
        | INSTR_Alloca t anns =>
          "(INSTR_Alloca " ++ repr t ++ " " ++ repr anns ++ ")"
        | INSTR_Load t ptr anns =>
@@ -787,7 +787,7 @@ Section ReprInstances.
                             ++ repr dc_type ++ " "
                             ++ repr dc_param_attrs ++ " "
                             ++ repr dc_attrs ++ " "
-                            ++ repr dc_annotations
+                            ++ repr dc_annotations ++ ")"
 
        end.
 
