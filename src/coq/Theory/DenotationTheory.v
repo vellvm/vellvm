@@ -69,8 +69,8 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (** [denote_code] *)
 
-  Lemma denote_code_nil :
-    ⟦ [] ⟧c ≈ Ret tt.
+  Lemma denote_code_nil vararg :
+    ⟦ [] ⟧c vararg ≈ Ret tt.
   Proof using.
     intros.
     cbn.
@@ -79,9 +79,10 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Lemma denote_code_app :
-    forall a b,
-      ⟦ a ++ b ⟧c ≈ ⟦ a ⟧c;;  ⟦ b ⟧c.
+    forall vararg a b,
+      ⟦ a ++ b ⟧c vararg ≈ ⟦ a ⟧c vararg;;  ⟦ b ⟧c vararg.
   Proof using.
+    intros vararg.
     induction a; intros b.
     - cbn; go; reflexivity.
     - cbn in *.
@@ -95,8 +96,8 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Lemma denote_code_app_eq_itree :
-    forall a b,
-      ⟦ a ++ b ⟧c ≅ ITree.bind ⟦ a ⟧c (fun _ => ⟦ b ⟧c).
+    forall vararg a b,
+      ⟦ a ++ b ⟧c vararg ≅ ITree.bind (⟦ a ⟧c vararg) (fun _ => ⟦ b ⟧c vararg).
   Proof using.
     induction a; intros b.
     - cbn.
@@ -117,8 +118,8 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Lemma denote_code_cons :
-    forall i c,
-      ⟦ i::c ⟧c ≈  ⟦ i ⟧i;; ⟦ c ⟧c.
+    forall vararg i c,
+      ⟦ i::c ⟧c vararg ≈  ⟦ i ⟧i vararg;; ⟦ c ⟧c vararg.
   Proof using.
     intros.
     cbn.
@@ -130,10 +131,10 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Lemma denote_code_singleton :
-    forall i,
-      ⟦ [i] ⟧c ≈ ⟦ i ⟧i.
+    forall vararg i,
+      ⟦ [i] ⟧c vararg ≈ ⟦ i ⟧i vararg.
   Proof using.
-    intros a.
+    intros vararg a.
     cbn.
     go.
     bind_ret_r2.
@@ -172,11 +173,11 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (** [denote_block] *)
   Lemma denote_block_unfold_cont :
-    forall {R} id phis c t s origin (k : _ -> itree _ R),
-      ⟦ mk_block id phis c t s ⟧b origin >>= k
+    forall {R} vararg id phis c t s origin (k : _ -> itree _ R),
+      ⟦ mk_block id phis c t s ⟧b origin vararg >>= k
                                 ≈
                                 ⟦ phis ⟧Φs origin;;
-      ⟦ c ⟧c;;
+      ⟦ c ⟧c vararg ;;
       translate exp_to_instr ⟦ t ⟧t >>= k.
   Proof using.
     intros; cbn; repeat setoid_rewrite bind_bind.
@@ -184,19 +185,19 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Lemma denote_block_unfold :
-    forall id phis c t s origin,
-      ⟦ mk_block id phis c t s ⟧b origin ≈
+    forall vararg id phis c t s origin,
+      ⟦ mk_block id phis c t s ⟧b origin vararg ≈
                                 ⟦ phis ⟧Φs origin;;
-      ⟦ c ⟧c;;
+      ⟦ c ⟧c vararg;;
       translate exp_to_instr ⟦ t ⟧t.
   Proof using.
     intros; cbn; reflexivity.
   Qed.
 
   (** [denote_ocfg] *)
-  Lemma denote_ocfg_nil: forall s, ⟦ [] ⟧bs s ≈ Ret (inl s).
+  Lemma denote_ocfg_nil: forall vararg s, ⟦ [] ⟧bs vararg s ≈ Ret (inl s).
   Proof using.
-    intros []; unfold denote_ocfg.
+    intros vararg []; unfold denote_ocfg.
     match goal with
     | |- CategoryOps.iter (C := ktree _) ?body ?s ≈ _ =>
         rewrite (unfold_iter body s)
@@ -205,13 +206,13 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     reflexivity.
   Qed.
 
-  Lemma denote_ocfg_unfold_in: forall bks bid_from bid_src bk,
+  Lemma denote_ocfg_unfold_in: forall vararg bks bid_from bid_src bk,
       find_block bks bid_src = Some bk ->
-      ⟦ bks ⟧bs (bid_from, bid_src) ≈
-             vob <- ⟦ bk ⟧b bid_from ;;
+      ⟦ bks ⟧bs vararg (bid_from, bid_src) ≈
+             vob <- ⟦ bk ⟧b bid_from vararg ;;
       match vob with
       | inr v => Ret (inr v)
-      | inl bid_target => ⟦ bks ⟧bs (bid_src, bid_target)
+      | inl bid_target => ⟦ bks ⟧bs vararg (bid_src, bid_target)
       end.
   Proof using.
     intros * GET_BK.
@@ -224,9 +225,9 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     rewrite tau_eutt; reflexivity.
   Qed.
 
-  Lemma denote_ocfg_unfold_not_in: forall bks bid_from bid_src,
+  Lemma denote_ocfg_unfold_not_in: forall vararg bks bid_from bid_src,
       find_block bks bid_src = None ->
-      ⟦ bks ⟧bs (bid_from, bid_src) ≈ Ret (inl (bid_from,bid_src)).
+      ⟦ bks ⟧bs vararg (bid_from, bid_src) ≈ Ret (inl (bid_from,bid_src)).
   Proof using.
     intros * GET_BK.
     unfold denote_ocfg.
@@ -236,13 +237,13 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     reflexivity.
   Qed.
 
-  Lemma denote_ocfg_unfold_in_euttge: forall bks bid_from bid_src bk,
+  Lemma denote_ocfg_unfold_in_euttge: forall vararg bks bid_from bid_src bk,
       find_block bks bid_src = Some bk ->
-      ⟦ bks ⟧bs (bid_from, bid_src) ≳
-             vob <- ⟦ bk ⟧b bid_from ;;
+      ⟦ bks ⟧bs vararg (bid_from, bid_src) ≳
+             vob <- ⟦ bk ⟧b bid_from vararg ;;
       match vob with
       | inr v => Ret (inr v)
-      | inl bid_target => ⟦ bks ⟧bs (bid_src, bid_target)
+      | inl bid_target => ⟦ bks ⟧bs vararg (bid_src, bid_target)
       end.
   Proof using.
     intros * GET_BK.
@@ -255,13 +256,13 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     rewrite tau_euttge; reflexivity.
   Qed.
 
-  Lemma denote_ocfg_unfold_in_eq_itree: forall bks bid_from bid_src bk,
+  Lemma denote_ocfg_unfold_in_eq_itree: forall vararg bks bid_from bid_src bk,
       find_block bks bid_src = Some bk ->
-      ⟦ bks ⟧bs (bid_from, bid_src) ≅
-             vob <- ⟦ bk ⟧b bid_from ;;
+      ⟦ bks ⟧bs vararg (bid_from, bid_src) ≅
+             vob <- ⟦ bk ⟧b bid_from vararg ;;
       match vob with
       | inr v => Ret (inr v)
-      | inl bid_target => Tau (⟦ bks ⟧bs (bid_src, bid_target))
+      | inl bid_target => Tau (⟦ bks ⟧bs vararg (bid_src, bid_target))
       end.
   Proof using.
     intros * GET_BK.
@@ -275,9 +276,9 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     reflexivity.
   Qed.
 
-  Lemma denote_ocfg_unfold_not_in_eq_itree: forall bks bid_from bid_src,
+  Lemma denote_ocfg_unfold_not_in_eq_itree: forall vararg bks bid_from bid_src,
       find_block bks bid_src = None ->
-      ⟦ bks ⟧bs (bid_from, bid_src) ≅ Ret (inl (bid_from,bid_src)).
+      ⟦ bks ⟧bs vararg (bid_from, bid_src) ≅ Ret (inl (bid_from,bid_src)).
   Proof using.
     intros * GET_BK.
     unfold denote_ocfg.
@@ -287,13 +288,13 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     reflexivity.
   Qed.
 
-  Lemma denote_ocfg_unfold_eq_itree: forall bks bid_from bid_src,
-      ⟦ bks ⟧bs (bid_from, bid_src) ≅
+  Lemma denote_ocfg_unfold_eq_itree: forall vararg bks bid_from bid_src,
+      ⟦ bks ⟧bs vararg (bid_from, bid_src) ≅
              match find_block bks bid_src with
-             | Some bk => vob <- ⟦ bk ⟧b bid_from ;;
+             | Some bk => vob <- ⟦ bk ⟧b bid_from vararg ;;
                           match vob with
                           | inr v => Ret (inr v)
-                          | inl bid_target => Tau (⟦ bks ⟧bs (bid_src, bid_target))
+                          | inl bid_target => Tau (⟦ bks ⟧bs vararg (bid_src, bid_target))
                           end
              | None => Ret (inl (bid_from,bid_src))
              end.
@@ -448,8 +449,8 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       sum_pred (fun fto => In (snd fto) (@outputs t ocfg)) TT.
 
     Lemma denote_bk_exits_in_outputs :
-      forall b from,
-        ⟦ b ⟧b from ⤳ sum_pred (fun id => In id (successors b)) TT.
+      forall vararg b from,
+        ⟦ b ⟧b from vararg ⤳ sum_pred (fun id => In id (successors b)) TT.
     Proof using.
       intros.
       cbn.
@@ -465,13 +466,13 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
    - [Qb] and [Qv] are preserved by the denotation of any blocks in the open cfg, assuming [Qb]
      *)
     Lemma denote_ocfg_has_post_strong :
-      forall (bks : ocfg _) fto (Qb : block_id * block_id -> Prop) (Qv : uvalue -> Prop)
+      forall vararg (bks : ocfg _) fto (Qb : block_id * block_id -> Prop) (Qv : uvalue -> Prop)
         (INIT : Qb fto)
         (IND : forall fto (b : block dtyp),
             Qb fto ->
             find_block bks (snd fto) = Some b ->
-            ⟦ b ⟧b (fst fto) ⤳ sum_pred (fun to => Qb (snd fto, to)) Qv),
-        ⟦ bks ⟧bs fto ⤳ sum_pred Qb Qv.
+            ⟦ b ⟧b (fst fto) vararg ⤳ sum_pred (fun to => Qb (snd fto, to)) Qv),
+        ⟦ bks ⟧bs vararg fto ⤳ sum_pred Qb Qv.
     Proof using.
       intros * INIT IND.
       eapply has_post_iter_strong; eauto.
@@ -489,12 +490,12 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
    then we get [Qb/Qv], and ignore the origin of the jump.
      *)
     Lemma denote_ocfg_has_post :
-      forall (bks : ocfg _) fto (Qb : block_id -> Prop) (Qv : uvalue -> Prop)
+      forall vararg (bks : ocfg _) fto (Qb : block_id -> Prop) (Qv : uvalue -> Prop)
         (ENTER : In (snd fto) (inputs bks))
         (IND : forall fto (b : block dtyp),
             find_block bks (snd fto) = Some b ->
-            ⟦ b ⟧b (fst fto) ⤳ sum_pred Qb Qv),
-        ⟦ bks ⟧bs fto ⤳ sum_pred (prod_pred TT Qb) Qv.
+            ⟦ b ⟧b (fst fto) vararg ⤳ sum_pred Qb Qv),
+        ⟦ bks ⟧bs vararg fto ⤳ sum_pred (prod_pred TT Qb) Qv.
     Proof using.
       intros * IN IND.
       apply has_post_iter_strong with (Inv := fun x => In (snd x) (inputs bks) \/ Qb (snd x))
@@ -511,9 +512,9 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Qed.
 
     Lemma denote_ocfg_exits_in_outputs :
-      forall bks fto,
+      forall vararg bks fto,
         In (snd fto) (inputs bks) ->
-        ⟦ bks ⟧bs fto ⤳ exits_in_outputs bks.
+        ⟦ bks ⟧bs vararg fto ⤳ exits_in_outputs bks.
     Proof using.
       intros * IN.
       apply has_post_weaken with (P := sum_pred (prod_pred TT (fun b => In b (outputs bks))) TT).
@@ -531,12 +532,12 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (** * denote_ocfg  *)
 
   Lemma denote_ocfg_app_no_edges :
-    forall (bks1 bks2 : ocfg _) fto,
+    forall vararg (bks1 bks2 : ocfg _) fto,
       find_block bks1 (snd fto) = None ->
       no_reentrance bks1 bks2 ->
-      ⟦ bks1 ++ bks2 ⟧bs fto ≈ ⟦ bks2 ⟧bs fto.
+      ⟦ bks1 ++ bks2 ⟧bs vararg fto ≈ ⟦ bks2 ⟧bs vararg fto.
   Proof using.
-    intros bks1 bks2 [f to] FIND NOBACK.
+    intros vararg bks1 bks2 [f to] FIND NOBACK.
     apply (@KTreeFacts.eutt_iter_gen _ _ _ (fun fto fto' => fto' = fto /\ find_block bks1 (snd fto) = None)); auto.
     clear f to FIND; intros fto fto' [-> FIND]; destruct fto as [f to] .
     cbn in *.
@@ -554,12 +555,12 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Lemma denote_ocfg_app :
-    forall bks1 bks2 fto,
+    forall vararg bks1 bks2 fto,
       no_reentrance bks1 bks2 ->
-      ⟦ bks1 ++ bks2 ⟧bs fto ≈
-                      'x <- ⟦ bks1 ⟧bs fto;;
+      ⟦ bks1 ++ bks2 ⟧bs vararg fto ≈
+                      'x <- ⟦ bks1 ⟧bs vararg fto;;
       match x with
-      | inl fto2 => ⟦ bks2 ⟧bs fto2
+      | inl fto2 => ⟦ bks2 ⟧bs vararg fto2
       | inr v => Ret (inr v)
       end.
   Proof using.
@@ -600,11 +601,11 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Lemma denote_ocfg_flow_left :
-    forall ocfg1 ocfg2 fto,
+    forall vararg ocfg1 ocfg2 fto,
       independent_flows ocfg1 ocfg2 ->
       In (snd fto) (inputs ocfg1) ->
-      ⟦ ocfg1 ++ ocfg2 ⟧bs fto ≈
-                        ⟦ ocfg1 ⟧bs fto.
+      ⟦ ocfg1 ++ ocfg2 ⟧bs vararg fto ≈
+                        ⟦ ocfg1 ⟧bs vararg fto.
   Proof using.
     intros * INDEP IN.
     rewrite denote_ocfg_app; [| auto using independent_flows_no_reentrance_l].
@@ -620,11 +621,11 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Lemma denote_ocfg_flow_right :
-    forall ocfg1 ocfg2 fto,
+    forall vararg ocfg1 ocfg2 fto,
       independent_flows ocfg1 ocfg2 ->
       In (snd fto) (inputs ocfg2) ->
-      ⟦ ocfg1 ++ ocfg2 ⟧bs fto ≈
-                        ⟦ ocfg2 ⟧bs fto.
+      ⟦ ocfg1 ++ ocfg2 ⟧bs vararg fto ≈
+                        ⟦ ocfg2 ⟧bs vararg fto.
   Proof using.
     intros * INDEP IN.
     rewrite denote_ocfg_app; [| auto using independent_flows_no_reentrance_l].
@@ -636,13 +637,13 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   Opaque denote_block.
   Lemma denote_ocfg_prefix :
-    forall (prefix bks' postfix bks : ocfg dtyp) (from to: block_id),
+    forall vararg (prefix bks' postfix bks : ocfg dtyp) (from to: block_id),
       bks = (prefix ++ bks' ++ postfix) ->
       wf_ocfg_bid bks ->
-      ⟦ bks ⟧bs (from, to) ≈
-             'x <- ⟦ bks' ⟧bs (from, to);;
+      ⟦ bks ⟧bs vararg (from, to) ≈
+             'x <- ⟦ bks' ⟧bs vararg (from, to);;
       match x with
-      | inl x => ⟦ bks ⟧bs x
+      | inl x => ⟦ bks ⟧bs vararg x
       | inr x => Ret (inr x)
       end
   .
@@ -670,7 +671,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       + rewrite !bind_ret_l.
         reflexivity.
     - edrop.
-      rewrite (denote_ocfg_unfold_not_in bks'); auto.
+      rewrite (denote_ocfg_unfold_not_in vararg bks'); auto.
       rewrite bind_ret_l.
       reflexivity.
   Qed.

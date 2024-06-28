@@ -241,14 +241,14 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
     Notation "⟦ e '⟧e3'" :=         (ℑ3 (translate exp_to_instr ⟦ e ⟧e )).
 
     Notation "⟦ i '⟧i'" :=        (denote_instr i).
-    Notation "⟦ i '⟧i1'" :=       (ℑ1 ⟦ i ⟧i).
-    Notation "⟦ i '⟧i2'" :=       (ℑ2 ⟦ i ⟧i).
-    Notation "⟦ i '⟧i3'" :=       (ℑ3 ⟦ i ⟧i).
+    Notation "⟦ i 'at' v '⟧i1'" :=       (ℑ1 (⟦ i ⟧i v)).
+    Notation "⟦ i 'at' v '⟧i2'" :=       (ℑ2 (⟦ i ⟧i v)).
+    Notation "⟦ i 'at' v '⟧i3'" :=       (ℑ3 (⟦ i ⟧i v)).
 
     Notation "⟦ c '⟧c'" :=          (denote_code c).
-    Notation "⟦ c '⟧c1'" :=         (ℑ1 ⟦ c ⟧c).
-    Notation "⟦ c '⟧c2'" :=         (ℑ2 ⟦ c ⟧c).
-    Notation "⟦ c '⟧c3'" :=         (ℑ3 ⟦ c ⟧c).
+    Notation "⟦ c 'at' v '⟧c1'" :=         (ℑ1 (⟦ c ⟧c v)).
+    Notation "⟦ c 'at' v '⟧c2'" :=         (ℑ2 (⟦ c ⟧c v)).
+    Notation "⟦ c 'at' v '⟧c3'" :=         (ℑ3 (⟦ c ⟧c v)).
 
     Notation "⟦ t '⟧t'" :=        (denote_terminator t).
     Notation "⟦ t '⟧t1'" :=       (ℑ1 (translate exp_to_instr ⟦ t ⟧t)).
@@ -266,19 +266,19 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
     Notation "⟦ phis '⟧Φs3' from" := (ℑ3 (denote_phis from phis)) (at level 0, from at next level).
 
     Notation "⟦ bk '⟧b'" :=  (denote_block bk).
-    Notation "⟦ bk '⟧b1' id" := (ℑ1 (⟦ bk ⟧b id)) (at level 0, id at next level).
-    Notation "⟦ bk '⟧b2' id" := (ℑ2 (⟦ bk ⟧b id)) (at level 0, id at next level).
-    Notation "⟦ bk '⟧b3' id" := (ℑ3 (⟦ bk ⟧b id)) (at level 0, id at next level).
+    Notation "⟦ bk '⟧b1' id id2" := (ℑ1 (⟦ bk ⟧b id id2)) (at level 0, id at next level, id2 at next level).
+    Notation "⟦ bk '⟧b2' id id2" := (ℑ2 (⟦ bk ⟧b id id2)) (at level 0, id at next level, id2 at next level).
+    Notation "⟦ bk '⟧b3' id id2" := (ℑ3 (⟦ bk ⟧b id id2)) (at level 0, id at next level, id2 at next level).
 
     Notation "⟦ bks '⟧bs'"  := (denote_ocfg bks).
-    Notation "⟦ bks '⟧bs1' ids" := (ℑ1 (denote_ocfg bks ids)) (at level 0, ids at next level).
-    Notation "⟦ bks '⟧bs2' ids" := (ℑ2 (denote_ocfg bks ids)) (at level 0, ids at next level).
-    Notation "⟦ bks '⟧bs3' ids" := (ℑ3 (denote_ocfg bks ids)) (at level 0, ids at next level).
+    Notation "⟦ bks '⟧bs1' ids id2" := (ℑ1 (denote_ocfg bks ids id2)) (at level 0, ids at next level, id2 at next level).
+    Notation "⟦ bks '⟧bs2' ids id2" := (ℑ2 (denote_ocfg bks ids id2)) (at level 0, ids at next level, id2 at next level).
+    Notation "⟦ bks '⟧bs3' ids id2" := (ℑ3 (denote_ocfg bks ids id2)) (at level 0, ids at next level, id2 at next level).
 
     Notation "⟦ f '⟧cfg'"  := (denote_cfg f).
-    Notation "⟦ f '⟧cfg1'" := (ℑ1 (denote_cfg f)).
-    Notation "⟦ f '⟧cfg2'" := (ℑ2 (denote_cfg f)).
-    Notation "⟦ f '⟧cfg3'" := (ℑ3 (denote_cfg f)).
+    Notation "⟦ f '⟧cfg1' v" := (ℑ1 (denote_cfg f v)) (at level 0, v at next level).
+    Notation "⟦ f '⟧cfg2' v" := (ℑ2 (denote_cfg f v)) (at level 0, v at next level).
+    Notation "⟦ f '⟧cfg3' v" := (ℑ3 (denote_cfg f v)) (at level 0, v at next level).
 
     Notation "⟦ f '⟧f'"  := (denote_function f).
 

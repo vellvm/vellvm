@@ -2685,8 +2685,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     let L4_trace       := model_undef eq L3_trace in
     L4_trace.
 
-  Definition model_to_L4_cfg (prog: cfg dtyp) :=
-    let trace := denote_cfg prog in
+  Definition model_to_L4_cfg (prog: cfg dtyp) (varargs : option addr) :=
+    let trace := denote_cfg prog varargs in
     interp_cfg trace [] [] 0 initial_memory_state.
 
   Definition refine_cfg_ret: relation (PropT L5 (MemState * (local_env * (global_env * uvalue)))) :=

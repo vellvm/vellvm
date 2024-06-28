@@ -375,7 +375,7 @@ Module Infinite.
     end.
 
   Definition denote_program prog :=
-    block_to_dvalue (denote_block prog (Name "blk")).
+    block_to_dvalue (denote_block prog (Name "blk") None).
 
   Definition alloc_tree : itree instr_E dvalue :=
     denote_program alloc_block.
@@ -1533,7 +1533,7 @@ Module Finite.
     end.
 
   Definition denote_program prog :=
-    block_to_dvalue (denote_block prog (Name "blk")).
+    block_to_dvalue (denote_block prog (Name "blk") None).
 
   Definition alloc_tree : itree instr_E dvalue :=
     denote_program alloc_block.

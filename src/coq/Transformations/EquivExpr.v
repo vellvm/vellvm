@@ -154,8 +154,8 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Ltac intro2 := first [intros (? & ? & ?) ? <- | intros (? & ? & ?)].
       Ltac intro3 := first [intros (? & ? & ? & ?) ? <- | intros (? & ? & ? & ?)].
 
-      Lemma exp_optim_correct_instr : forall x i g l,
-          ⟦ (x,i) ⟧i2 g l ≈ ⟦ (x, endo i) ⟧i2 g l.
+      Lemma exp_optim_correct_instr : forall varargs x i g l,
+          ⟦ (x,i) at varargs ⟧i2 g l ≈ ⟦ (x, endo i) at varargs ⟧i2 g l.
       Proof using opt_correct opt_respect_int.
         intros *.
         destruct i; try reflexivity.
@@ -183,7 +183,15 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
               rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
               rewrite opt_respect_int.
               unfold endo, opt_exp_endo_exp.
-              break_match_goal; [reflexivity |].
+              break_match_goal.
+              { break_match_goal; try reflexivity.
+                Opaque denote_exp.
+                repeat (break_match_goal; cbn; try reflexivity).
+                rewrite !interp_cfg2_bind, opt_correct.
+                eapply eutt_clo_bind; try reflexivity.
+                intros; subst.
+                reflexivity.
+              }
               rewrite !interp_cfg2_bind, opt_correct; reflexivity.
               intro2.
               reflexivity.
@@ -204,7 +212,15 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
               rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
               rewrite opt_respect_int.
               unfold endo, opt_exp_endo_exp.
-              break_match_goal; [reflexivity |].
+              break_match_goal.
+              { break_match_goal; try reflexivity.
+                Opaque denote_exp.
+                repeat (break_match_goal; cbn; try reflexivity).
+                rewrite !interp_cfg2_bind, opt_correct.
+                eapply eutt_clo_bind; try reflexivity.
+                intros; subst.
+                reflexivity.
+              }
               rewrite !interp_cfg2_bind, opt_correct; reflexivity.
               intro2.
               reflexivity.
@@ -276,8 +292,8 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
           reflexivity.
       Qed.
 
-      Lemma exp_optim_correct_code : forall c g l,
-          ⟦ c ⟧c2 g l ≈ ⟦ endo c ⟧c2 g l.
+      Lemma exp_optim_correct_code : forall varargs c g l,
+          ⟦ c at varargs ⟧c2 g l ≈ ⟦ endo c at varargs ⟧c2 g l.
       Proof using opt_correct opt_respect_int.
         induction c as [| i c IH]; intros; [reflexivity |].
         unfold endo; simpl.
@@ -359,8 +375,8 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Qed.
 
       Arguments denote_block : simpl never.
-      Lemma exp_optim_correct_block : forall bk f g l,
-          ⟦ bk ⟧b2 f g l ≈ ⟦ endo bk ⟧b2 f g l.
+      Lemma exp_optim_correct_block : forall varargs bk f g l,
+          ⟦ bk ⟧b2 f varargs g l ≈ ⟦ endo bk ⟧b2 f varargs g l.
       Proof using opt_correct opt_respect_int.
         intros *.
         destruct bk; unfold endo, Endo_block; cbn.
@@ -416,13 +432,13 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Qed.
 
       Lemma denote_ocfg_proper :
-        forall bks1 bks2 fto g l,
+        forall varargs bks1 bks2 fto g l,
           (forall b, find_block bks1 b = None <-> find_block bks2 b = None) ->
           (forall f g l b bk1 bk2,
               find_block bks1 b = Some bk1 ->
               find_block bks2 b = Some bk2 ->
-              ⟦ bk1 ⟧b2 f g l ≈ ⟦ bk2 ⟧b2 f g l) ->
-          ⟦ bks1 ⟧bs2 fto g l ≈ ⟦ bks2 ⟧bs2 fto g l.
+              ⟦ bk1 ⟧b2 f varargs g l ≈ ⟦ bk2 ⟧b2 f varargs g l) ->
+          ⟦ bks1 ⟧bs2 varargs fto g l ≈ ⟦ bks2 ⟧bs2 varargs fto g l.
       Proof using Type.
         intros * BIJ EQ.
         einit.
@@ -448,7 +464,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Qed.
 
       Lemma exp_optim_correct :
-        forall G g l, ⟦ G ⟧cfg2 g l ≈ ⟦ opt_exp_cfg G ⟧cfg2 g l.
+        forall G varargs g l, ⟦ G ⟧cfg2 varargs g l ≈ ⟦ opt_exp_cfg G ⟧cfg2 varargs g l.
       Proof using opt_correct opt_respect_int.
         intros.
         unfold denote_cfg.

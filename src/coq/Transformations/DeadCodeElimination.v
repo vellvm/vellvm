@@ -35,10 +35,10 @@ Module DeadCodeElimination (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT :
   Import SemNotations.
 
   Lemma remove_predecessorless_correct :
-    forall (bks : ocfg dtyp) dead,
+    forall varargs (bks : ocfg dtyp) dead,
       predecessors dead bks = [] ->
       forall f to, to <> dead ->
-              ⟦ bks ⟧bs (f,to) ≈ ⟦ bks ∖ dead ⟧bs (f,to).
+              ⟦ bks ⟧bs varargs (f,to) ≈ ⟦ bks ∖ dead ⟧bs varargs (f,to).
   Proof.
     intros * DEAD.
     einit; ecofix CIH.
@@ -48,7 +48,7 @@ Module DeadCodeElimination (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT :
     break_match_goal; [| reflexivity].
     ebind; econstructor.
     - (* YZ TODO: exploiting the strong version of HasPost should be painless, maybe the default. *)
-      pose proof denote_bk_exits_in_outputs b f.
+      pose proof denote_bk_exits_in_outputs varargs b f.
       apply has_post_post_strong in H.
       apply H.
     - intros ? ? [<- SUCC].

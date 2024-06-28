@@ -369,7 +369,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
   (* An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
-    (i: (instr_id * instr dtyp)): itree instr_E unit :=
+    (i: (instr_id * instr dtyp)) (varargs : option ADDR.addr) : itree instr_E unit :=
     match i with
     (* Pure operations *)
 
@@ -432,8 +432,22 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       returned_value <-
       match intrinsic_exp f with
       | Some s =>
-        dvs <- map_monad (fun uv => pickUnique uv) uvs ;;
-        fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
+          if String.eqb s "llvm.va_start.p0"
+          then
+            match args, varargs with
+            | [ ((t, e), _) ], Some varargs =>
+                ua <- translate exp_to_instr (denote_exp (Some t) e);;
+                da <- pickUnique ua;;
+                match da with
+                | DVALUE_Poison dt => raiseUB "Store to poisoned address."
+                | _ => trigger (Store DTYPE_Pointer da (UVALUE_Addr varargs));;
+                      ret UVALUE_None
+                end
+            | _, _ => raise "va_start invalid arguments"
+            end
+          else
+            dvs <- map_monad (fun uv => pickUnique uv) uvs ;;
+            fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
       | None =>
         fv <- translate exp_to_instr (denote_exp None f) ;;
         trigger (Call dt fv uvs)
@@ -527,8 +541,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
-  Definition denote_code (c: code dtyp): itree instr_E unit :=
-    map_monad_ denote_instr c.
+  Definition denote_code (c: code dtyp) (varargs : option ADDR.addr) : itree instr_E unit :=
+    map_monad_ (fun i => denote_instr i varargs) c.
 
   Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp) : itree exp_E (local_id * uvalue) :=
     let '(id, Phi dt args) := id_p in
@@ -548,9 +562,9 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
   (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-  Definition denote_block (b: block dtyp) (bid_from : block_id) : itree instr_E (block_id + uvalue) :=
+  Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option ADDR.addr) : itree instr_E (block_id + uvalue) :=
     denote_phis bid_from (blk_phis b);;
-    denote_code (blk_code b);;
+    denote_code (blk_code b) varargs;;
     translate exp_to_instr (denote_terminator (blk_term b)).
 
   (* Our denotation currently contains two kinds of indirections: jumps to labels, internal to
@@ -566,22 +580,22 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
          As long as the computation returns a new label to jump to, we feed it back to the loop.
          If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
    *)
-  Definition denote_ocfg (bks: ocfg dtyp)
+  Definition denote_ocfg (bks: ocfg dtyp) (varargs : option ADDR.addr)
     : (block_id * block_id) -> itree instr_E ((block_id * block_id) + uvalue) :=
     iter (C := ktree _) (bif := sum)
          (fun '((bid_from,bid_src) : block_id * block_id) =>
             match find_block bks bid_src with
             | None => ret (inr (inl (bid_from,bid_src)))
             | Some block_src =>
-              bd <- denote_block block_src bid_from;;
+              bd <- denote_block block_src bid_from varargs;;
               match bd with
               | inr dv => ret (inr (inr dv))
               | inl bid_target => ret (inl (bid_src,bid_target))
               end
             end).
 
-  Definition denote_cfg (f: cfg dtyp) : itree instr_E uvalue :=
-    r <- denote_ocfg (blks f) (init f,init f) ;;
+  Definition denote_cfg (f: cfg dtyp) (varargs : option ADDR.addr) : itree instr_E uvalue :=
+    r <- denote_ocfg (blks f) varargs (init f,init f) ;;
     match r with
     | inl bid => raise ("Can't find block in denote_cfg " ++ to_string (snd bid))
     | inr uv  => ret uv
@@ -599,7 +613,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       (* generate the corresponding writes to the local stack frame *)
       trigger MemPush ;;
       trigger (StackPush bs) ;;
-      rv <- translate instr_to_L0' (denote_cfg (df_instrs df)) ;;
+      rv <- translate instr_to_L0' (denote_cfg (df_instrs df) None) ;;
       trigger StackPop ;;
       trigger MemPop ;;
       ret rv.

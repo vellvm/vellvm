@@ -22205,14 +22205,34 @@ Qed.
     apply denote_exp'_E1E2_orutt.
   Qed.
 
+  (* TODO: Move this *)
+  Lemma orutt_map {E1 E2 OOM OOME R1 R2 T1 T2}
+    (REv: forall A B, E1 A -> E2 B -> Prop)
+    (RAns: forall A B, E1 A -> A -> E2 B -> B -> Prop)
+    (RR: R1 -> R2 -> Prop) (RT: T1 -> T2 -> Prop) t1 t2 (f1 : R1 -> T1) (f2 : R2 -> T2) :
+    @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1 t2 ->
+    (forall r1 r2,
+        RR r1 r2 ->
+        RT (f1 r1) (f2 r2)) ->
+    @orutt E1 E2 OOM OOME T1 T2 REv RAns RT (ITree.map f1 t1) (ITree.map f2 t2).
+  Proof using.
+    intros H H0.
+    eapply orutt_bind.
+    apply H.
+    intros r1 r2 H1.
+    apply orutt_Ret; auto.
+  Qed.
+
   Lemma denote_instr_orutt_strict :
-    forall instr,
+    forall instr varg1 varg2,
+      OptionUtil.option_rel2 addr_refine varg1 varg2 ->
       orutt instr_E_refine_strict instr_E_res_refine_strict eq
-        (IS1.LLVM.D.denote_instr instr)
-        (denote_instr instr)
+        (IS1.LLVM.D.denote_instr instr varg1)
+        (denote_instr instr varg2)
         (OOM:=OOME).
   Proof.
-    intros [[id | id] instr].
+    Opaque denote_exp.
+    intros [[id | id] instr] varg1 varg2 VARG.
     { cbn.
       destruct instr; try solve_orutt_raise.
       - apply orutt_raise; cbn; auto.
@@ -22241,31 +22261,77 @@ Qed.
         }
 
         intros r1 r2 H.
-        apply orutt_bind with (RR:=uvalue_refine_strict).
-        { break_match.
-          - apply orutt_bind with (RR:=Forall2 dvalue_refine_strict).
-            + eapply map_monad_orutt2; eauto.
-              intros e1 e2 H0.
-              apply pickUnique_instr_E_orutt_strict; auto.
-            + intros r0 r3 H0.
-              unfold ITree.map.
-              eapply orutt_bind with (RR:=dvalue_refine_strict).
-              { eapply orutt_trigger; cbn; try tauto.
-                intros o CONTRA.
-                inv CONTRA.
-              }
-
-              intros r4 r5 H1.
-              eapply orutt_Ret.
-              eapply dvalue_refine_strict_dvalue_to_uvalue; eauto.
+        break_match_goal.
+        { break_match_goal.
           - eapply orutt_bind with (RR:=uvalue_refine_strict).
-            { apply translate_exp_to_instr_E1E2_orutt_strict.
-              apply denote_op_orutt_strict.
-            }
+            + destruct args; try solve_orutt_raise.
+              destruct p, t.
+              destruct args; try solve_orutt_raise.
+              destruct varg1, varg2; inv VARG; try solve_orutt_raise.
 
+              eapply orutt_bind with (RR:=uvalue_refine_strict).
+              * apply translate_exp_to_instr_E1E2_orutt_strict.
+                apply denote_exp_E1E2_orutt.
+              * intros r0 r3 H0.
+                eapply orutt_bind with (RR:=dvalue_refine_strict).
+                eapply pickUnique_instr_E_orutt_strict; eauto.
+                intros ? ? ?.
+                destruct r5; dvalue_refine_strict_inv H2; try solve_orutt_raiseUB.
+                all: try (apply orutt_bind with (RR:=Logic.eq);
+                     [ apply orutt_trigger; cbn; eauto;
+                       [ repeat split;
+                         solve [ red; cbn;
+                                 rewrite H2; auto
+                               | red; cbn;
+                                 rewrite H1; auto
+                               | red; cbn;
+                                 rewrite H3; auto
+                               | eauto
+                           ]
+                       | intros [] [] ?; auto
+                       | intros o CONTRA; inv CONTRA
+                       ]
+                     | intros ? ? ?;
+                         apply orutt_Ret;
+                       solve_uvalue_refine_strict
+                       ]).
+            + intros ? ? ?.
+              apply orutt_trigger; cbn; auto.
+              intros [] [] ?; auto.
+              intros o CONTRA; unfold subevent in CONTRA; inv CONTRA.
+          - eapply orutt_bind with (RR:=uvalue_refine_strict).
+            + eapply orutt_bind with (RR:=Forall2 dvalue_refine_strict).
+              * eapply map_monad_orutt2; eauto.
+                intros * ?.
+                eapply pickUnique_instr_E_orutt_strict; eauto.
+              * intros r0 r3 H0.
+                eapply orutt_map.
+                -- apply orutt_trigger; cbn; eauto.
+                   ++ intros * ?.
+                      apply H1.
+                   ++ intros ? CONTRA.
+                      inv CONTRA.
+                -- intros r4 r5 H1.
+                   cbn in *.
+                   apply dvalue_refine_strict_dvalue_to_uvalue; eauto.
+                   apply H1.
+            + intros r0 r3 H0.
+              eapply orutt_trigger; cbn; eauto.
+              * intros [] [] ?; auto.
+              * intros o CONTRA.
+                inv CONTRA.
+        }
+
+        apply orutt_bind with (RR:=uvalue_refine_strict).
+        { - eapply orutt_bind with (RR:=uvalue_refine_strict).
+            { apply translate_exp_to_instr_E1E2_orutt_strict.
+              apply denote_exp_E1E2_orutt.
+            }
             intros r0 r3 H0.
+
             eapply orutt_trigger; cbn; try tauto.
             intros o CONTRA.
+            unfold subevent in CONTRA.
             inv CONTRA.
         }
 
@@ -22376,44 +22442,77 @@ Qed.
         }
 
         intros r1 r2 H.
+        break_match_goal.
+        { break_match_goal.
+          - eapply orutt_bind with (RR:=uvalue_refine_strict).
+            + destruct args; try solve_orutt_raise.
+              destruct p, t.
+              destruct args; try solve_orutt_raise.
+              destruct varg1, varg2; inv VARG; try solve_orutt_raise.
+
+              eapply orutt_bind with (RR:=uvalue_refine_strict).
+              * apply translate_exp_to_instr_E1E2_orutt_strict.
+                apply denote_exp_E1E2_orutt.
+              * intros r0 r3 H0.
+                eapply orutt_bind with (RR:=dvalue_refine_strict).
+                eapply pickUnique_instr_E_orutt_strict; eauto.
+                intros ? ? ?.
+                destruct r5; dvalue_refine_strict_inv H2; try solve_orutt_raiseUB.
+                all: try (apply orutt_bind with (RR:=Logic.eq);
+                     [ apply orutt_trigger; cbn; eauto;
+                       [ repeat split;
+                         solve [ red; cbn;
+                                 rewrite H2; auto
+                               | red; cbn;
+                                 rewrite H1; auto
+                               | red; cbn;
+                                 rewrite H3; auto
+                               | eauto
+                           ]
+                       | intros [] [] ?; auto
+                       | intros o CONTRA; inv CONTRA
+                       ]
+                     | intros ? ? ?;
+                         apply orutt_Ret;
+                       solve_uvalue_refine_strict
+                       ]).
+            + intros ? ? ?.
+              apply orutt_Ret; eauto.
+          - eapply orutt_bind with (RR:=uvalue_refine_strict).
+            + eapply orutt_bind with (RR:=Forall2 dvalue_refine_strict).
+              * eapply map_monad_orutt2; eauto.
+                intros * ?.
+                eapply pickUnique_instr_E_orutt_strict; eauto.
+              * intros r0 r3 H0.
+                eapply orutt_map.
+                -- apply orutt_trigger; cbn; eauto.
+                   ++ intros * ?.
+                      apply H1.
+                   ++ intros ? CONTRA.
+                      inv CONTRA.
+                -- intros r4 r5 H1.
+                   cbn in *.
+                   apply dvalue_refine_strict_dvalue_to_uvalue; eauto.
+                   apply H1.
+            + intros r0 r3 H0.
+              eapply orutt_Ret; eauto.
+        }
+
         apply orutt_bind with (RR:=uvalue_refine_strict).
-        { break_match.
-          { apply orutt_bind with (RR:=Forall2 dvalue_refine_strict).
-            { eapply map_monad_orutt2; eauto.
-              intros e1 e2 H0.
-              apply pickUnique_instr_E_orutt_strict; auto.
-            }
-
-            intros r0 r3 H0.
-            apply orutt_bind with (RR:=dvalue_refine_strict).
-            { apply orutt_trigger; cbn; auto.
-              intros t1 t2 H1.
-              apply H1.
-
-              intros o CONTRA; inv CONTRA.
-            }
-
-            intros r4 r5 H1.
-            apply orutt_Ret.
-            apply dvalue_refine_strict_dvalue_to_uvalue; auto.
-          }
-
-          { apply orutt_bind with (RR:=uvalue_refine_strict).
+        { - eapply orutt_bind with (RR:=uvalue_refine_strict).
             { apply translate_exp_to_instr_E1E2_orutt_strict.
               apply denote_exp_E1E2_orutt.
             }
-
             intros r0 r3 H0.
-            apply orutt_trigger; cbn; auto.
-            intros t1 t2 H1.
-            apply H1.
 
-            intros o CONTRA; inv CONTRA.
-          }
+            eapply orutt_trigger; cbn; try tauto.
+            intros o CONTRA.
+            unfold subevent in CONTRA.
+            inv CONTRA.
         }
 
         intros r0 r3 H0.
-        apply orutt_Ret; auto.
+        apply orutt_Ret; eauto.
       - destruct val, ptr.
         apply orutt_bind with (RR:=uvalue_refine_strict).
         { apply translate_exp_to_instr_E1E2_orutt_strict.
@@ -22645,13 +22744,14 @@ Qed.
   Qed.
 
   Lemma denote_block_orutt_strict :
-    forall block bid,
+    forall block bid varg1 varg2,
+      OptionUtil.option_rel2 addr_refine varg1 varg2 ->
       orutt instr_E_refine_strict instr_E_res_refine_strict (sum_rel eq uvalue_refine_strict)
-        (IS1.LLVM.D.denote_block block bid)
-        (denote_block block bid)
+        (IS1.LLVM.D.denote_block block bid varg1)
+        (denote_block block bid varg2)
         (OOM:=OOME).
   Proof.
-    intros block bid.
+    intros block bid varg1 varg2 VARG.
     cbn.
     apply orutt_bind with (RR:=eq).
     { apply denote_phis_orutt_strict. }
@@ -22660,7 +22760,8 @@ Qed.
     apply orutt_bind with (RR:=eq).
     { apply orutt_bind with (RR:=Forall2 eq).
       { eapply map_monad_orutt.
-        eapply denote_instr_orutt_strict.
+        intros e.
+        eapply denote_instr_orutt_strict; auto.
       }
 
       intros r1 r2 H.
@@ -22674,13 +22775,14 @@ Qed.
   Qed.
 
   Lemma denote_ocfg_orutt_strict :
-    forall cfg bids,
+    forall cfg bids varg1 varg2,
+      OptionUtil.option_rel2 addr_refine varg1 varg2 ->
       orutt instr_E_refine_strict instr_E_res_refine_strict (sum_rel (eq × eq) uvalue_refine_strict)
-        (IS1.LLVM.D.denote_ocfg cfg bids)
-        (denote_ocfg cfg bids)
+        (IS1.LLVM.D.denote_ocfg cfg varg1 bids)
+        (denote_ocfg cfg varg2 bids)
         (OOM:=OOME).
   Proof.
-    intros cfg [bid_from bid_src].
+    intros cfg [bid_from bid_src] varg1 varg2 VARG.
     Opaque denote_phis denote_phi.
     Opaque IS1.LLVM.D.denote_phis IS1.LLVM.D.denote_phi.
     unfold denote_ocfg, IS1.LLVM.D.denote_ocfg.
@@ -22701,7 +22803,7 @@ Qed.
         { eapply orutt_bind with (RR:=Forall2 eq).
           { eapply map_monad_orutt.
             intros e.
-            eapply denote_instr_orutt_strict.
+            eapply denote_instr_orutt_strict; auto.
           }
 
           intros r1 r2 H.
@@ -22853,6 +22955,7 @@ Qed.
         { (* ocfg stuff *)
           apply translate_instr_to_L0'_E1E2_orutt_strict.
           apply denote_ocfg_orutt_strict.
+          constructor.
         }
 
         intros r0 r3 H0.
