@@ -555,10 +555,10 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
 
     Arguments denote_phis : simpl never.
     Lemma update_provenance_block_eq_itree :
-      forall bk old new f,
+      forall vararg bk old new f,
         f <> new ->
         block_phis_block_id_not_in new bk ->
-        ⟦ bk ⟧b f ≅ ⟦ update_provenance_block old new bk ⟧b (update_provenance old new f).
+        ⟦ bk ⟧b f vararg  ≅ ⟦ update_provenance_block old new bk ⟧b (update_provenance old new f) vararg.
     Proof.
       intros.
       unfold denote_block.
@@ -582,7 +582,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
     Qed.
 
     Lemma block_fusion_correct_some :
-      forall G G' f to b1 b2,
+      forall vararg G G' f to b1 b2,
         wf_ocfg_bid G ->                       (* All label ids in G are unique *)
         ocfg_phis_not_id b1 G ->               (* No phi node should refer to b1 since it won't jump anywhere but b2 *)
         block_fusion G = (G', Some (b1,b2)) -> (* Two blocks are indeed fused *)
@@ -595,8 +595,8 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
                 | _, _ => False
                 end
              )
-             (⟦ G ⟧bs (f,to))
-             (⟦ G' ⟧bs (update_provenance b2 b1 f,to)).
+             (⟦ G ⟧bs vararg (f,to))
+             (⟦ G' ⟧bs vararg (update_provenance b2 b1 f,to)).
     Proof.
       intros * WF PHIS FUSED; revert f to.
       apply block_fusion_some in FUSED; auto; destruct FUSED as (INEQ & bk1 & bk2 & LU1 & TERM & LU2 & PRED & NOPHI & LU3 & LU4 & LU5).
@@ -680,7 +680,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
         rewrite H0; auto.
         break_match_goal; cbn.
         +
-          pose proof denote_bk_exits_in_outputs b f as EXIT;
+          pose proof denote_bk_exits_in_outputs vararg b f as EXIT;
             apply has_post_post_strong in EXIT.
           ebind; econstructor; [| clear EXIT].
           { rewrite <- update_provenance_block_eq_itree; auto.
@@ -706,9 +706,9 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
     Qed.
 
     Lemma block_fusion_correct_none :
-      forall G G' f to,
+      forall vararg G G' f to,
         block_fusion G = (G',None) ->
-        ⟦ G ⟧bs (f,to) ≈ ⟦ G' ⟧bs (f,to).
+        ⟦ G ⟧bs vararg (f,to) ≈ ⟦ G' ⟧bs vararg (f,to).
     Proof.
       intros * FUSE.
       pose proof block_fusion_none_id G FUSE; subst.
@@ -740,11 +740,11 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
     Arguments append : simpl never.
 
     Theorem block_fusion_cfg_correct :
-      forall (G : cfg dtyp),
+      forall vararg (G : cfg dtyp),
         wf_cfg G ->
-        ⟦ G ⟧cfg ≈ ⟦ block_fusion_cfg G ⟧cfg.
+        ⟦ G ⟧cfg vararg ≈ ⟦ block_fusion_cfg G ⟧cfg vararg.
     Proof.
-      intros G [WF1 WF2].
+      intros vararg G [WF1 WF2].
       unfold denote_cfg.
       simpl bind.
       unfold block_fusion_cfg.

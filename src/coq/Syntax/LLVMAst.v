@@ -684,7 +684,7 @@ Variant instr : Set :=
 | INSTR_Fence (syncscope:option string) (o:ordering)
 | INSTR_AtomicCmpXchg (c : cmpxchg)
 | INSTR_AtomicRMW (a :atomicrmw )
-| INSTR_VAArg (va_list_and_arg_list : texp) (t: typ) (* arg_list isn't actually a list, this is just the name of the argument  *)
+| INSTR_VAArg (va_list_and_arg_list : texp) (t: T) (* arg_list isn't actually a list, this is just the name of the argument  *)
 | INSTR_LandingPad
 .
 

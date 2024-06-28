@@ -369,7 +369,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
   (* An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
-    (i: (instr_id * instr dtyp)): itree instr_E unit :=
+    (i: (instr_id * instr dtyp)) (varargs : option ADDR.addr) : itree instr_E unit :=
     match i with
     (* Pure operations *)
 
@@ -432,8 +432,38 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       returned_value <-
       match intrinsic_exp f with
       | Some s =>
-        dvs <- map_monad (fun uv => pickUnique uv) uvs ;;
-        fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
+          if String.eqb s "llvm.va_start"
+          then
+            match args, varargs with
+            | [ ((t, e), _) ], Some varargs =>
+                ua <- translate exp_to_instr (denote_exp (Some t) e);;
+                da <- pickUnique ua;;
+                match da with
+                | DVALUE_Poison dt => raiseUB "Store to poisoned address."
+                | _ => trigger (Store DTYPE_Pointer da (UVALUE_Addr varargs));;
+                      ret UVALUE_None
+                end
+            | _, _ => raise "va_start invalid arguments"
+            end
+          else
+            if String.eqb s "llvm.va_copy"
+            then
+              match args with
+              | [((DTYPE_Pointer, exp_dest), _); ((DTYPE_Pointer, exp_src), _)] =>
+                  usrc <- translate exp_to_instr (denote_exp (Some DTYPE_Pointer) exp_src);;
+                  dsrc <- pickUnique usrc;;
+                  udest <- translate exp_to_instr (denote_exp (Some DTYPE_Pointer) exp_dest);;
+                  ddest <- pickUnique udest;;
+                  vargs <- trigger (Load DTYPE_Pointer dsrc);;
+                  trigger (Store DTYPE_Pointer ddest vargs);;
+                  ret UVALUE_None
+              | _ => raise "va_copy invalid arguments"
+              end
+            else
+              if String.eqb s "llvm.va_end"
+              then ret UVALUE_None
+              else dvs <- map_monad (fun uv => pickUnique uv) uvs ;;
+                   fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
       | None =>
         fv <- translate exp_to_instr (denote_exp None f) ;;
         trigger (Call dt fv uvs)
@@ -445,12 +475,23 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       end
 
     | (IVoid _, INSTR_Comment _) => ret tt
-
+    | (pt, INSTR_VAArg (t, ptr_to_args_exp) argty) =>
+        uptr_to_args <- translate exp_to_instr (denote_exp (Some DTYPE_Pointer) ptr_to_args_exp);;
+        ptr_to_args <- pickUnique uptr_to_args;;
+        uargs <- trigger (Load DTYPE_Pointer ptr_to_args);;
+        args <- pickUnique uargs;;
+        retv <- trigger (Load argty args);;
+        ix <- lift_OOM (IP.from_Z 1);;
+        args' <- lift_err_oom_RAISE_ERROR_OOM (GEP.handle_gep argty args [DVALUE_IPTR ix]);;
+        trigger (Store DTYPE_Pointer ptr_to_args (dvalue_to_uvalue args'));;
+        match pt with
+        | IVoid _ => ret tt
+        | IId id  => trigger (LocalWrite id retv)
+        end
     (* Currently unhandled itree instructions *)
     | (_, INSTR_Fence _ _)
     | (_, INSTR_AtomicCmpXchg _)
     | (_, INSTR_AtomicRMW _)
-    | (_, INSTR_VAArg _ _)
     | (_, INSTR_LandingPad) => raise "Unsupported VIR instruction"
 
     (* Error states *)
@@ -527,8 +568,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
-  Definition denote_code (c: code dtyp): itree instr_E unit :=
-    map_monad_ denote_instr c.
+  Definition denote_code (c: code dtyp) (varargs : option ADDR.addr) : itree instr_E unit :=
+    map_monad_ (fun i => denote_instr i varargs) c.
 
   Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp) : itree exp_E (local_id * uvalue) :=
     let '(id, Phi dt args) := id_p in
@@ -548,9 +589,9 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
   (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-  Definition denote_block (b: block dtyp) (bid_from : block_id) : itree instr_E (block_id + uvalue) :=
+  Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option ADDR.addr) : itree instr_E (block_id + uvalue) :=
     denote_phis bid_from (blk_phis b);;
-    denote_code (blk_code b);;
+    denote_code (blk_code b) varargs;;
     translate exp_to_instr (denote_terminator (blk_term b)).
 
   (* Our denotation currently contains two kinds of indirections: jumps to labels, internal to
@@ -566,22 +607,22 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
          As long as the computation returns a new label to jump to, we feed it back to the loop.
          If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
    *)
-  Definition denote_ocfg (bks: ocfg dtyp)
+  Definition denote_ocfg (bks: ocfg dtyp) (varargs : option ADDR.addr)
     : (block_id * block_id) -> itree instr_E ((block_id * block_id) + uvalue) :=
     iter (C := ktree _) (bif := sum)
          (fun '((bid_from,bid_src) : block_id * block_id) =>
             match find_block bks bid_src with
             | None => ret (inr (inl (bid_from,bid_src)))
             | Some block_src =>
-              bd <- denote_block block_src bid_from;;
+              bd <- denote_block block_src bid_from varargs;;
               match bd with
               | inr dv => ret (inr (inr dv))
               | inl bid_target => ret (inl (bid_src,bid_target))
               end
             end).
 
-  Definition denote_cfg (f: cfg dtyp) : itree instr_E uvalue :=
-    r <- denote_ocfg (blks f) (init f,init f) ;;
+  Definition denote_cfg (f: cfg dtyp) (varargs : option ADDR.addr) : itree instr_E uvalue :=
+    r <- denote_ocfg (blks f) varargs (init f,init f) ;;
     match r with
     | inl bid => raise ("Can't find block in denote_cfg " ++ to_string (snd bid))
     | inr uv  => ret uv
@@ -592,17 +633,37 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   Definition function_denotation : Type :=
     list uvalue -> itree L0' uvalue.
 
+  Fixpoint combine_lists_varargs {A B:Type} (l1:list A) (l2:list B) : err (list (A * B) * list B) :=
+    match l1, l2 with
+    | [], [] => ret ([], [])
+    | x::xs, y::ys =>
+        '(l, vargs) <- combine_lists_varargs xs ys ;;
+        ret ((x,y)::l, vargs)
+    | _, [] =>
+        failwith "combine_lists_varargs: too few arguments"
+    | [], vargs =>
+        ret ([], vargs)
+    end.
+
   Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
     fun (args : list uvalue) =>
       (* We match the arguments variables to the inputs *)
-      bs <- lift_err ret (combine_lists_err (df_args df) args) ;;
-      (* generate the corresponding writes to the local stack frame *)
+      '(bs, vs) <- lift_err ret (combine_lists_varargs (df_args df) args) ;;
+      dts <- lift_err ret (map_monad dtyp_of_uvalue_fun vs);;
+      let dt := DTYPE_Packed_struct dts in
+        (* generate the corresponding writes to the local stack frame *)
       trigger MemPush ;;
       trigger (StackPush bs) ;;
-      rv <- translate instr_to_L0' (denote_cfg (df_instrs df)) ;;
-      trigger StackPop ;;
-      trigger MemPop ;;
-      ret rv.
+      varargs <- trigger (Alloca dt 1 None);;
+      trigger (Store dt varargs (UVALUE_Packed_struct vs));;
+      match varargs with
+      | DVALUE_Addr varg =>
+          rv <- translate instr_to_L0' (denote_cfg (df_instrs df) (Some varg)) ;;
+          trigger StackPop ;;
+          trigger MemPop ;;
+          ret rv
+      | _ => raise "Non-address returned from alloca in denote_function"
+      end.      
 
   (* We now turn to the second knot to be tied: a top-level itree program is a set
          of mutually recursively defined functions, i.e. [cfg]s. We hence need to

@@ -560,7 +560,7 @@ Section TFunctor.
         | INSTR_Fence syncscope o => INSTR_Fence syncscope o
         | INSTR_AtomicCmpXchg c => INSTR_AtomicCmpXchg (tfmap f c)
         | INSTR_AtomicRMW a => INSTR_AtomicRMW (tfmap f a)
-        | INSTR_VAArg va t => INSTR_VAArg (tfmap f va) t
+        | INSTR_VAArg va t => INSTR_VAArg (tfmap f va) (f t)
         | INSTR_LandingPad => INSTR_LandingPad
         end.
 

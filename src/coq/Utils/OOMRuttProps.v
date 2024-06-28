@@ -662,3 +662,20 @@ Proof.
   intros OOME E1 E2 OOM A B1 B2 R S pre post body1 body2 EQ_BODY x y Hxy.
   eapply orutt_iter'; eauto.
 Qed.
+
+Lemma orutt_map {E1 E2 OOM OOME R1 R2 T1 T2}
+  (REv: forall A B, E1 A -> E2 B -> Prop)
+  (RAns: forall A B, E1 A -> A -> E2 B -> B -> Prop)
+  (RR: R1 -> R2 -> Prop) (RT: T1 -> T2 -> Prop) t1 t2 (f1 : R1 -> T1) (f2 : R2 -> T2) :
+  @orutt E1 E2 OOM OOME R1 R2 REv RAns RR t1 t2 ->
+  (forall r1 r2,
+      RR r1 r2 ->
+      RT (f1 r1) (f2 r2)) ->
+  @orutt E1 E2 OOM OOME T1 T2 REv RAns RT (ITree.map f1 t1) (ITree.map f2 t2).
+Proof using.
+  intros H H0.
+  eapply orutt_bind.
+  apply H.
+  intros r1 r2 H1.
+  apply orutt_Ret; auto.
+Qed.
