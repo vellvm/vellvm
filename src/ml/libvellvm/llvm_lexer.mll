@@ -482,7 +482,10 @@ and lexed_id = parse
                        (Lexing.lexeme lexbuf)
 		       msg
 		       (Printexc.get_backtrace ())
-      in failwith msg
+      in 
+      let () = print "LEXBUF IS:" Lexing.lexeme lexbuf in 
+      
+      failwith msg
 
   let parse lexbuf =
     try Llvm_parser.toplevel_entities token lexbuf
