@@ -483,8 +483,6 @@ and lexed_id = parse
 		       msg
 		       (Printexc.get_backtrace ())
       in 
-      let () = print "LEXBUF IS:" Lexing.lexeme lexbuf in 
-      
       failwith msg
 
   let parse lexbuf =
