@@ -230,6 +230,7 @@
   ("udiv"           , KW_UDIV);
   ("sdiv"           , KW_SDIV);
   ("fdiv"           , KW_FDIV);
+  ("fneg"           , KW_FNEG);
   ("urem"           , KW_UREM);
   ("srem"           , KW_SREM);
   ("frem"           , KW_FREM);
@@ -482,8 +483,7 @@ and lexed_id = parse
                        (Lexing.lexeme lexbuf)
 		       msg
 		       (Printexc.get_backtrace ())
-      in 
-      failwith msg
+      in failwith msg
 
   let parse lexbuf =
     try Llvm_parser.toplevel_entities token lexbuf
