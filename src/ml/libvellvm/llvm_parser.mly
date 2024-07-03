@@ -274,6 +274,7 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_UDIV
 %token KW_SDIV
 %token KW_FDIV
+%token KW_FNEG
 %token KW_UREM
 %token KW_SREM
 %token KW_FREM
@@ -1221,6 +1222,10 @@ instr_op:
   | op=fbinop f=fast_math* t=typ o1=exp COMMA o2=exp
     { OP_FBinop (op, f, t, o1 t, o2 t) }
 
+    // special case, coerced to fsub
+  | KW_FNEG f=fast_math* t=typ o=exp
+     { OP_FBinop (FSub, f, t, EXP_Double Floats.Float32.zero, o t) }
+
   | KW_FCMP op=fcmp t=typ o1=exp COMMA o2=exp
     { OP_FCmp (op, t, o1 t, o2 t) }
 
@@ -1263,6 +1268,10 @@ expr_op:
 
   | op=fbinop f=fast_math* LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
     { OP_FBinop (op, f, t, o1 t, o2 t) }
+
+  // special case, coerced to fsub
+  | KW_FNEG f=fast_math* t=typ o=exp
+     { OP_FBinop (FSub, f, t, EXP_Double Floats.Float32.zero, o t) }
 
   | KW_FCMP op=fcmp LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
     { OP_FCmp (op, t, o1 t, o2 t) }
@@ -1438,8 +1447,8 @@ exp:
       INSTR_Load (t, tv, v@anns) }
 
 
-  | KW_VAARG  { failwith"INSTR_VAArg"  }
-  | KW_LANDINGPAD    { failwith"INSTR_LandingPad"    }
+  | KW_VAARG tv=texp COMMA t=typ { INSTR_VAArg (tv, t)  }
+  // | KW_LANDINGPAD    { failwith"INSTR_LandingPad"    }
 
   | KW_STORE vol=KW_VOLATILE? all=texp COMMA ptr=texp anns=store_anns
     { let v = match vol with Some _ -> [ANN_volatile] | None -> [] in
