@@ -1448,7 +1448,7 @@ exp:
 
 
   | KW_VAARG tv=texp COMMA t=typ { INSTR_VAArg (tv, t)  }
-  | KW_LANDINGPAD    { failwith"INSTR_LandingPad"    }
+  // | KW_LANDINGPAD    { failwith"INSTR_LandingPad"    }
 
   | KW_STORE vol=KW_VOLATILE? all=texp COMMA ptr=texp anns=store_anns
     { let v = match vol with Some _ -> [ANN_volatile] | None -> [] in
