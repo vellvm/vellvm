@@ -90,6 +90,7 @@
             (nix-filter.matchExt "md")
             (nix-filter.matchExt "txt")
             (nix-filter.matchExt "yml")
+            (nix-filter.matchExt "cff")
             (nix-filter.matchName "README")
             ./.gitignore
             ./.git
