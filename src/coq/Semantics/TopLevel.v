@@ -241,6 +241,66 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   
   (* TOPLEVEL Semantics  ------------------------------------------------------------------------- *)
   
+
+  (** * Linking 
+
+    We first need to link external definitions. Currently, these definitions are
+   only functions we hard-code into the environment for their usefulness-- 
+   most notably `printf`. Linking occurs at the `toplevel_definition` level. *)
+
+  Definition ll_toplevel_entity := (toplevel_entity typ (block typ * list (block typ))).
+
+  Definition ll_toplevel_entities := toplevel_entities typ 
+                                                 (block typ * list (block typ)). 
+
+  Definition PREDEFINED_FUNCTIONS : ll_toplevel_entities := []. 
+  (* NEXT: Fill with `printf`'s definition and others. *)
+
+
+  (* checks if `userdecl_n` is a name of a definition in `predefs`. *)
+  Definition userdecl_defined_in (userdecl_n : string) 
+                                 (predefs    : ll_toplevel_entities) : bool := 
+    existsb (fun predef =>
+    match predef with 
+          TLE_Definition  {| df_prototype := {| dc_name := Name predef_n |}|}
+             => userdecl_n =? predef_n
+      | _    => false
+    end) predefs. 
+
+  Definition decl_defined_in (user_tle : ll_toplevel_entity) 
+                             (predefs  : ll_toplevel_entities) : bool := 
+    match user_tle with 
+      | TLE_Declaration {| dc_name := Name n |} => userdecl_defined_in n predefs
+      | _ => false 
+    end. 
+
+  Definition defines_decl : 
+    ll_toplevel_entities -> ll_toplevel_entity -> bool := 
+    (flip decl_defined_in).
+
+  (** Importantly, the linker _removes any declaration_ from the user's
+     program that shares a name with a definition in `predefs` 
+     before joining the two programs. 
+     This is so that we can enforce our handcrafted declaration 
+     is the one referenced by their program. 
+  *)
+  Definition link  (predefs  : ll_toplevel_entities)
+                   (userprog : ll_toplevel_entities) : ll_toplevel_entities := 
+      let predefined     := (defines_decl predefs) in
+      let userprog'      := filter (negb ∘ predefined) userprog 
+        in List.app predefs userprog'. 
+
+   (* Worth a proof that linking preserves structure when there are no 
+      duplicates + upholds the linking removal postcondition?
+   
+   Lemma linking_postcondition :  
+    forall (p1 p2 : ll_toplevel_entities), 
+      not exists tl in (link p1 p2), tl' in p1 s.t. 
+      (tl is a Definition with name n /\ tl' is a Declaration with name n)
+   
+      Will write tomorrow if so.  *)
+
+
   (** * Initialization
 
     The initialization phase allocates and initializes globals, and allocates
@@ -360,7 +420,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
      * initialize the global environment;
      * pointwise denote each function (and builtin)
      * retrieve the address of the entry point function;
-     * tie the mutually recursive know and run it starting from the
+     * tie the mutually recursive knot and run it starting from the
      * entry point
      *
      * This code should be semantically equivalent to running the following
@@ -388,7 +448,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   (* (for now) assume that [main (i64 argc, i8** argv)]
     pass in 0 and null as the arguments to main
     Note: this isn't compliant with standard C semantics, but integrating the actual
-    inputs from the command line is nontrivial since we have martial C-level strings
+    inputs from the command line is nontrivial since we have to martial C-level strings
     into the Vellvm memory.  
    *)
   Definition main_args := [DV.UVALUE_I32 (Int32.zero);
@@ -398,6 +458,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Definition denote_vellvm_main (mcfg : CFG.mcfg dtyp) : itree L0 dvalue :=
     denote_vellvm (DTYPE_I (32)%N) "main" main_args mcfg.
 
+
   (**
      Now that we know how to denote a whole llvm program, we can _interpret_
      the resulting [itree].
@@ -406,9 +467,10 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (ret_typ : dtyp)
              (entry : string)
              (args : list uvalue)
-             (prog: list (toplevel_entity typ (block typ * list (block typ))))
+             (prog: ll_toplevel_entities)
     : itree L4 res_L4 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_vellvm ret_typ entry args 
+              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
     interp_mcfg4_exec t [] ([],[]) 0 initial_memory_state.
 
   (**
@@ -416,7 +478,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
      from "main" using bogus initial inputs.
    *)
   Definition interpreter
-             (prog : list (toplevel_entity typ (block typ * list (block typ)))) : itree L4 res_L4
+             (prog : ll_toplevel_entities) : itree L4 res_L4
     := interpreter_gen (DTYPE_I 32%N) "main" main_args prog.
 
   (**
@@ -434,36 +496,40 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (ret_typ : dtyp)
              (entry : string)
              (args : list uvalue)
-             (prog: list (toplevel_entity typ (block typ * list (block typ))))
+             (prog: ll_toplevel_entities)
     : PropT L4 res_L4 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_vellvm ret_typ entry args 
+              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
     ℑs eq eq t [] ([],[]) 0 initial_memory_state.
 
   Definition model_gen_oom
              (ret_typ : dtyp)
              (entry : string)
              (args : list uvalue)
-             (prog: list (toplevel_entity typ (block typ * list (block typ))))
+             (prog: ll_toplevel_entities)
     : PropT L4 res_L4 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_vellvm ret_typ entry args 
+              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
     ℑs6 eq eq eq t [] ([],[]) 0 initial_memory_state.
 
   Definition model_gen_oom_L1
              (ret_typ : dtyp)
              (entry : string)
              (args : list uvalue)
-             (prog: list (toplevel_entity typ (block typ * list (block typ))))
+             (prog: ll_toplevel_entities)
     : itree L1 res_L1 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_vellvm ret_typ entry args 
+              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
     ℑs1 t [].
 
   Definition model_gen_oom_L2
              (ret_typ : dtyp)
              (entry : string)
              (args : list uvalue)
-             (prog: list (toplevel_entity typ (block typ * list (block typ))))
+             (prog: ll_toplevel_entities)
     : itree L2 res_L2 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_vellvm ret_typ entry args 
+              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
     ℑs2 t [] ([], []).
 
   Definition model_gen_oom_L3
@@ -471,9 +537,10 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     (ret_typ : dtyp)
     (entry : string)
     (args : list uvalue)
-    (prog: list (toplevel_entity typ (block typ * list (block typ))))
+    (prog: ll_toplevel_entities)
     : PropT L3 res_L3 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_vellvm ret_typ entry args 
+              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
     ℑs3 RR t [] ([], []) 0 initial_memory_state.
 
   Definition model_gen_oom_L4
@@ -482,9 +549,10 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     (ret_typ : dtyp)
     (entry : string)
     (args : list uvalue)
-    (prog: list (toplevel_entity typ (block typ * list (block typ))))
+    (prog: ll_toplevel_entities)
     : PropT L4 res_L4 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_vellvm ret_typ entry args 
+              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
     ℑs4 RR_mem RR_pick t [] ([], []) 0 initial_memory_state.
 
   Definition model_gen_oom_L5
@@ -493,9 +561,10 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     (ret_typ : dtyp)
     (entry : string)
     (args : list uvalue)
-    (prog: list (toplevel_entity typ (block typ * list (block typ))))
+    (prog: ll_toplevel_entities)
     : PropT L5 res_L5 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_vellvm ret_typ entry args 
+              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
     ℑs5 RR_mem RR_pick t [] ([], []) 0 initial_memory_state.
 
   Definition model_gen_oom_L6
@@ -505,9 +574,10 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     (ret_typ : dtyp)
     (entry : string)
     (args : list uvalue)
-    (prog: list (toplevel_entity typ (block typ * list (block typ))))
+    (prog: ll_toplevel_entities)
     : PropT L6 res_L6 :=
-    let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
+    let t := denote_vellvm ret_typ entry args 
+              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
     ℑs6 RR_mem RR_pick RR_oom t [] ([], []) 0 initial_memory_state.
 
   (**
