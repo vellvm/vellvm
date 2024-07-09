@@ -117,7 +117,7 @@ Section ReprInstances.
     | TYPE_Function ret args varargs
       => "(TYPE_Function (" ++ repr_typ ret ++ ")
         [" ++ (contents id (List.map repr_typ args)) ++ "]"
-        ++ if varargs then "true" else "false" ++ ")"
+        ++ " " ++ (if varargs then "true" else "false") ++ ")"
     | TYPE_Struct fields        => "(TYPE_Struct [" ++ (contents id (List.map repr_typ fields)) ++ "])"
     | TYPE_Packed_struct fields => "(TYPE_Packed_struct [" ++ (contents id (List.map repr_typ fields)) ++ "])"
     | TYPE_Opaque               => "TYPE_Opaque"
