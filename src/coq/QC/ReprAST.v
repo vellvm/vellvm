@@ -96,7 +96,7 @@ Section ReprInstances.
     | DTYPE_Struct fields => "(DTYPE_Struct [" ++ (contents id (List.map repr_dtyp fields)) ++ "])"
     | DTYPE_Packed_struct fields => "(DTYPE_Packed_struct [" ++ (contents id (List.map repr_dtyp fields)) ++ "])"
     | DTYPE_Opaque => "DTYPE_Opaque"
-    | DTYPE_Vector sz t => "(DTYPE_Vector (" ++ repr sz ++ ") (" ++ repr_dtyp t ++ ")"
+    | DTYPE_Vector sz t => "(DTYPE_Vector (" ++ repr sz ++ ") (" ++ repr_dtyp t ++ "))"
     end.
 
   Fixpoint repr_typ (t : typ) : string :=
@@ -121,7 +121,7 @@ Section ReprInstances.
     | TYPE_Struct fields        => "(TYPE_Struct [" ++ (contents id (List.map repr_typ fields)) ++ "])"
     | TYPE_Packed_struct fields => "(TYPE_Packed_struct [" ++ (contents id (List.map repr_typ fields)) ++ "])"
     | TYPE_Opaque               => "TYPE_Opaque"
-    | TYPE_Vector sz t          => "(TYPE_Vector (" ++ repr sz ++ ") (" ++ repr_typ t ++ ")"
+    | TYPE_Vector sz t          => "(TYPE_Vector (" ++ repr sz ++ ") (" ++ repr_typ t ++ "))"
     | TYPE_Identified id        => "(TYPE_Identified " ++ repr id ++ ")"
     end.
 
