@@ -1408,21 +1408,105 @@ Inductive nlist (A: Type) : Type :=
   | nbase: A -> nlist A
   | ncons: A -> nlist A -> nlist A.
 
+Notation "x :.: l" := (ncons x l)
+                      (at level 60, right associativity).
+
+Notation "[ x .; y ]" := (ncons x (nbase y)).
+
+(* Currently not working *)
+(* Notation "[ x .; y .; .. .; z ]" := (ncons x .. (ncons y (nbase z)) ..). *)
+
 Definition nfirst {A: Type} (l: nlist A) :=
-  match l with nbase a => a | ncons a l' => a end.
+  match l with nbase a => a | a :.: l' => a end.
 
 Fixpoint nlast {A: Type} (l: nlist A) :=
-  match l with nbase a => a | ncons a l' => nlast l' end.
+  match l with nbase a => a | a :.: l' => nlast l' end.
 
 Fixpoint nIn {A: Type} (x: A) (l: nlist A) : Prop :=
   match l with
-  | nbase a => a = x
-  | ncons a l => a = x \/ nIn x l
+  | nbase a    => a = x
+  | a :.: l' => a = x \/ nIn x l'
   end.
+
+Fixpoint nmap {A B : Type} (f : A -> B) (l : nlist A) : nlist B :=
+  match l with 
+    | nbase a   => nbase (f a)
+    | a :.: l' => (f a) :.: (nmap f l')
+    end.
+
+Fixpoint nfoldl {A B : Type} (f : A -> B -> A) (l : nlist B) (acc : A ) : A :=
+  match l with 
+    | nbase b    => f acc b
+    | b :.: l' => nfoldl f l' (f acc b)
+  end. 
+
+Fixpoint nlen {A : Type} (l : nlist A) : nat := 
+  match l with 
+    | nbase _    => 1 
+    | _ :.: l' => 1 + nlen l'
+  end. 
+
+Fixpoint nnth_error {A : Type} (l : nlist A) (n : nat) : option A := 
+  match n, l with
+    | O, _ => Some (nfirst l)
+    | S x, nbase _ => None 
+    | S x, _ :.: l' => nnth_error l' x
+  end. 
+
+(* does not make clear sense to have `filter`, `remove`, `take`, `drop`. *)
+
+Definition nexists {A : Type} (f : A -> bool) (l : nlist A) : bool :=
+  nfoldl (fun acc b => f b || acc) l false. 
+
+Definition nall {A : Type} (f : A -> bool) (l : nlist A) : bool :=
+  nfoldl (fun acc b => f b && acc) l true. 
+
+Definition napp {A : Type} (l1 l2 : nlist A) : nlist A := 
+  let fix napp_ k xs ys := 
+    match xs with 
+      | nbase a     => k (a :.: ys)
+      | a :.: xs' => napp_ (fun zs => (a :.: zs)) xs' ys
+    end
+  in napp_ id l1 l2. 
+
+Notation "x +.+ y" := (napp x y)
+                      (right associativity, at level 60).
+
+(* this one was fun *)
+Definition nrev {A : Type} (l : nlist A) : nlist A := 
+  let fix revacc acc xs := 
+    match xs with 
+      | nbase a     => ncons a acc 
+      | ncons a xs' => revacc (ncons a acc) xs'
+    end 
+  in match l with 
+      | nbase a    => nbase a 
+      | ncons a l' => revacc (nbase a) l'
+  end. 
+
+Lemma first_never_fails_nlists : forall (A : Type) (l : nlist A), 
+  exists (a : A), nfirst l = a.
+Proof. 
+  intros. destruct l. 
+    exists a. reflexivity. 
+    exists a. reflexivity. 
+Qed.
+
+Lemma last_never_fails_nlists : forall (A : Type) (l : nlist A), 
+  exists (a : A), nlast l = a.
+Proof. 
+  intros. induction l. 
+    exists a. reflexivity. 
+    simpl. apply IHl.  
+Qed.
+
+
+(* potential proofs : nrev invol, nrev nlen, nmap nexists *)
+
 
 Inductive nlist_forall2 {A B: Type} (R: A -> B -> Prop) : nlist A -> nlist B -> Prop :=
   | nbase_forall2: forall a b, R a b -> nlist_forall2 R (nbase a) (nbase b)
-  | ncons_forall2: forall a l b m, R a b -> nlist_forall2 R l m -> nlist_forall2 R (ncons a l) (ncons b m).
+  | ncons_forall2: forall a l b m, R a b -> nlist_forall2 R l m -> nlist_forall2 R (a :.: l) (b :.: m).
 
 Lemma nlist_forall2_imply:
   forall (A B: Type) (P1: A -> B -> Prop) (l1: nlist A) (l2: nlist B),
