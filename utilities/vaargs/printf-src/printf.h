@@ -54,11 +54,12 @@ void _putchar(char character);
  * You have to implement _putchar if you use printf()
  * To avoid conflicts with the regular printf() API it is overridden by macro defines
  * and internal underscore-appended functions like printf_() are used
+ * UPDATED: Now they are named normally, and stripped by vellvm.  
  * \param format A string that specifies the format of the output
  * \return The number of characters that are written into the array, not counting the terminating null character
  */
-#define printf printf_
-int printf_(const char* format, ...);
+// #define printf printf_
+int printf(const char* format, ...);
 
 
 /**
@@ -68,8 +69,8 @@ int printf_(const char* format, ...);
  * \param format A string that specifies the format of the output
  * \return The number of characters that are WRITTEN into the buffer, not counting the terminating null character
  */
-#define sprintf sprintf_
-int sprintf_(char* buffer, const char* format, ...);
+// #define sprintf sprintf_
+int sprintf(char* buffer, const char* format, ...);
 
 
 /**
@@ -82,10 +83,10 @@ int sprintf_(char* buffer, const char* format, ...);
  *         null character. A value equal or larger than count indicates truncation. Only when the returned value
  *         is non-negative and less than count, the string has been completely written.
  */
-#define snprintf  snprintf_
-#define vsnprintf vsnprintf_
-int  snprintf_(char* buffer, size_t count, const char* format, ...);
-int vsnprintf_(char* buffer, size_t count, const char* format, va_list va);
+// #define snprintf  snprintf_
+// #define vsnprintf vsnprintf_
+int  snprintf(char* buffer, size_t count, const char* format, ...);
+int vsnprintf(char* buffer, size_t count, const char* format, va_list va);
 
 
 /**
@@ -94,8 +95,8 @@ int vsnprintf_(char* buffer, size_t count, const char* format, va_list va);
  * \param va A value identifying a variable arguments list
  * \return The number of characters that are WRITTEN into the buffer, not counting the terminating null character
  */
-#define vprintf vprintf_
-int vprintf_(const char* format, va_list va);
+// #define vprintf vprintf_
+int vprintf(const char* format, va_list va);
 
 
 /**
