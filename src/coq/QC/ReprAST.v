@@ -340,12 +340,12 @@ Section ReprInstances.
     | PARAMATTR_Zeroext => "PARAMATTR_Zeroext"
     | PARAMATTR_Signext => "PARAMATTR_Signext"
     | PARAMATTR_Inreg => "PARAMATTR_Inreg"
-    | PARAMATTR_Byval t => "PARAMATTR_Byval" ++ repr t
-    | PARAMATTR_Byref (t) => "PARAMATTR_Byref" ++ repr t
-    | PARAMATTR_Preallocated (t) => "PARAMATTR_Preallocated" ++ repr t
-    | PARAMATTR_Inalloca t => "PARAMATTR_Inalloca" ++ repr t
-    | PARAMATTR_Sret t => "PARAMATTR_Sret" ++ repr t
-    | PARAMATTR_Elementtype (t) => "PARAMATTR_Elementtype" ++ repr t
+    | PARAMATTR_Byval t => "PARAMATTR_Byval " ++ repr t
+    | PARAMATTR_Byref (t) => "PARAMATTR_Byref " ++ repr t
+    | PARAMATTR_Preallocated (t) => "PARAMATTR_Preallocated " ++ repr t
+    | PARAMATTR_Inalloca t => "PARAMATTR_Inalloca " ++ repr t
+    | PARAMATTR_Sret t => "PARAMATTR_Sret " ++ repr t
+    | PARAMATTR_Elementtype (t) => "PARAMATTR_Elementtype " ++ repr t
     | PARAMATTR_Align a => "(PARAMATTR_Align " ++ repr a ++ ")"
     | PARAMATTR_Noalias => "PARAMATTR_Noalias"
     | PARAMATTR_Nocapture => "PARAMATTR_Nocapture"
@@ -360,7 +360,7 @@ Section ReprInstances.
     | PARAMATTR_Swifterror => "PARAMATTR_Swifterror"
     | PARAMATTR_Immarg => "PARAMATTR_Immarg"
     | PARAMATTR_Noundef => "PARAMATTR_Noundef"
-    | PARAMATTR_Alignstack (a) => "PARAMATTR_Alignstack" ++ repr a
+    | PARAMATTR_Alignstack (a) => "PARAMATTR_Alignstack " ++ repr a
     | PARAMATTR_Allocalign =>  "PARAMATTR_Allocalign"
     | PARAMATTR_Allocptr => "PARAMATTR_Allocptr"
     | PARAMATTR_Readnone => "PARAMATTR_Readnone"
@@ -438,8 +438,8 @@ Section ReprInstances.
   Definition repr_fn_attr (fa : fn_attr) : string :=
     match fa with
     | FNATTR_Alignstack a => "(FNATTR_Alignstack " ++ repr a ++ ")"
-    (* | FNATTR_Alloc_family (fam) => "(FNATTR_Alloc_family" ++ repr fam ++ ")" *)
-    | FNATTR_Allockind (kind) => "(FNATTR_Allockind" ++ repr kind ++ ")"
+    (* | FNATTR_Alloc_family (fam) => "(FNATTR_Alloc_family " ++ repr fam ++ ")" *)
+    | FNATTR_Allockind (kind) => "(FNATTR_Allockind " ++ repr kind ++ ")"
     | FNATTR_Allocsize l l2 => let printable_l2 := match l2 with
                                                  |None => ""
                                                  |Some s => repr s
@@ -517,21 +517,21 @@ Section ReprInstances.
     (*                         |None => ""         *)
     (*                         |Some s => repr s             *)
     (*                         end in                       *)
-    (*      "(FNATTR_Denormal_fp_math32" ++ repr s1 ++ printable_sw ++ ")" *)
+    (*      "(FNATTR_Denormal_fp_math32 " ++ repr s1 ++ printable_sw ++ ")" *)
     (* | FNATTR_Thunk => "FNATTR_Thunk" *)
     | FNATTR_Tls_load_hoist => "FNATTR_Tls_load_hoist"
-    | FNATTR_Uwtable sync => "FNATTR_Uwtable" ++ repr sync
+    | FNATTR_Uwtable sync => "FNATTR_Uwtable " ++ repr sync
     | FNATTR_Nocf_check => "FNATTR_Nocf_check"
     | FNATTR_Shadowcallstack => "FNATTR_Shadowcallstack"
     | FNATTR_Mustprogress => "FNATTR_Mustprogress"
-    (* | FNATTR_Warn_stack_size (th) => "FNATTR_Warn_stack_size" ++ repr th   *)
+    (* | FNATTR_Warn_stack_size (th) => "FNATTR_Warn_stack_size " ++ repr th   *)
     | FNATTR_Vscale_range (min) (max) =>
          let printable_max := match max with
                             |None => ""
                             |Some s => repr s
                             end in
-         "(FNATTR_Denormal_fp_math32" ++ repr min ++ printable_max ++ ")"
-    (* | FNATTR_Min_legal_vector_width  (size) => "FNATTR_Min_legal_vector_width" ++ repr size  *)
+         "(FNATTR_Denormal_fp_math32 " ++ repr min ++ printable_max ++ ")"
+    (* | FNATTR_Min_legal_vector_width  (size) => "FNATTR_Min_legal_vector_width " ++ repr size  *)
     | FNATTR_String s => "(FNATTR_String " ++ repr s ++ ")"
     | FNATTR_Key_value kv => "(FNATTR_Key_value " ++ repr kv ++ ")"
     | FNATTR_Attr_grp g => "(FNATTR_Attr_grp " ++ repr g ++ ")"
