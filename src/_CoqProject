@@ -78,6 +78,7 @@
 ./coq/Semantics/MemoryAddress.v
 ./coq/Semantics/MemoryParams.v
 ./coq/Semantics/RuttProps.v
+./coq/Semantics/Printfdefn.v
 ./coq/Semantics/TopLevel.v
 ./coq/Semantics/VellvmIntegers.v
 ./coq/Syntax.v
