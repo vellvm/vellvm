@@ -267,9 +267,9 @@ Section ReprInstances.
     match v with
     | EXP_Ident id => "(EXP_Ident " ++ repr id ++ ")"
     | EXP_Integer x => "(EXP_Integer " ++ repr x ++ ")"
-    | EXP_Float f => "(EXP_Float " ++ show f ++ ")"
-    | EXP_Double f => "(EXP_Double " ++ show f ++ ")"
-    | EXP_Hex f => "(EXP_Hex " ++ show f ++ ")"
+    | EXP_Float f  => "(EXP_Float  (Float.of_bits (Int32.repr " ++ show f ++ ")))"
+    | EXP_Double f => "(EXP_Double (Float.of_bits (Int64.repr " ++ show f ++ ")))"
+    | EXP_Hex f => "(EXP_Hex (Float.of_bits (Int64.repr " ++ show f ++ ")))"
     | EXP_Bool b => "(EXP_Bool " ++ repr b ++ ")"
     | EXP_Null => "EXP_Null"
     | EXP_Zero_initializer => "EXP_Zero_initializer"
