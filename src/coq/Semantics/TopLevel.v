@@ -5,7 +5,7 @@ From Coq Require Import
      Ensembles List String ZArith
      Lists.ListSet
      Relations.
-
+ 
 From ITree Require Import
      ITree
      Events.State.
@@ -26,8 +26,8 @@ From Vellvm Require Import
   Semantics.IntrinsicsDefinitions
   Semantics.InterpretationStack
   Semantics.VellvmIntegers
-  Semantics.StoreId.
-
+  Semantics.StoreId
+  Semantics.Printfdefn. 
 Import MonadNotation.
 Import ListNotations.
 Import Monads.
@@ -70,9 +70,9 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
      modules that are in scope at this point.
   *)
   (** * puts 
-      [int  puts(const char *s);]
-      The function puts() writes the string s, and a terminating newline character, to the stream stdout.
-      The functions fputs() and puts() return a nonnegative integer on success and EOF on error.
+        [int  puts(const char *s);] 
+        The function puts() writes the string s, and a terminating newline character, to the stream stdout. 
+        The functions fputs() and puts() return a nonnegative integer on success and EOF on error.
 
       * putchar 
       [int putchar (int c);] 
@@ -129,7 +129,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     | bad => raise ("i8_str_index failed with non-DVALUE_I8 " ++ show_dvalue bad)
     end.
 
-  
+
   (** Semantic function that treats [u_strptr] as a C-style string pointer:
       - reads i8 values from memory until it encounters a null-terminator (i8 0)
       - triggers an IO_stdout event with the bytes plus a newline
@@ -298,9 +298,10 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Definition ll_toplevel_entities := toplevel_entities typ 
                                                  (block typ * list (block typ)). 
 
-  Definition PREDEFINED_FUNCTIONS : ll_toplevel_entities := []. 
-  (* NEXT: Fill with `printf`'s definition and others. *)
+  Definition PREDEFINED_FUNCTIONS : ll_toplevel_entities := List.concat [printf_definition]. 
 
+  Example ensure_functions_defined : negb (Nat.eqb (List.length PREDEFINED_FUNCTIONS) O) . 
+  Proof. reflexivity. Qed.  
 
   (* checks if `userdecl_n` is a name of a definition in `predefs`. *)
   Definition userdecl_defined_in (userdecl_n : string) 
@@ -308,7 +309,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     existsb (fun predef =>
     match predef with 
           TLE_Definition  {| df_prototype := {| dc_name := Name predef_n |}|}
-             => userdecl_n =? predef_n
+             => String.eqb userdecl_n predef_n
       | _    => false
     end) predefs. 
 
