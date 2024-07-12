@@ -741,6 +741,15 @@ Section ReprInstances.
             end
        |}.
 
+  #[global]
+  Instance reprTintLiteral : Repr tint_literal 
+    := {| repr tl := 
+          match tl with 
+            |  TInt_Literal sz x => 
+                ("(TInt_Literal " ++ repr sz ++ " " ++ repr x ++ ")")%string
+          end
+       |}.
+
   Definition repr_terminator (t : terminator typ) : string
     := match t with
        | TERM_Ret v => "(TERM_Ret " ++ repr v ++ ")"
@@ -748,7 +757,15 @@ Section ReprInstances.
        | TERM_Br te b1 b2 =>
          "(TERM_Br " ++ repr te ++ " " ++ repr b1 ++ " " ++ repr b2 ++ ")"
        | TERM_Br_1 b => "(TERM_Br_1 " ++ repr b ++ ")"
-       | _ => "repr_terminator todo"
+       | TERM_Switch v dest brs  => 
+          "(TERM_Switch " ++ repr v ++ " " ++ repr dest ++ repr brs ++ ")"
+      | TERM_IndirectBr v brs  => 
+          "(TERM_IndirectBr " ++ repr v ++ " " ++ repr brs ++ ")" 
+      | TERM_Resume v  => "(TERM_Resume " ++ repr v ++ ")"
+      | TERM_Invoke fnptrval args to_label unwind_label  =>
+          "(TERM_Invoke " ++ repr fnptrval ++ " " ++ repr args 
+          ++ " " ++ repr to_label ++ " " ++ repr unwind_label ++ ")"
+      | TERM_Unreachable => "TERM_Unreachable"
        end.
 
   #[global]
