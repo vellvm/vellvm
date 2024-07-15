@@ -23984,6 +23984,99 @@ Qed.
       rewrite uvalue_refine_strict_equation; cbn; eauto.
   Qed.
 
+  Lemma putchar_denotation_refine_strict :
+    function_denotation_refine_strict LLVM1.putchar_denotation LLVM2.putchar_denotation.
+  Proof.
+    red.
+    intros args1 args2 ARGS.
+    induction ARGS.
+    - cbn.
+      apply orutt_raise.
+      + intros [] o CONTRA.
+        inv CONTRA.
+      + repeat red.
+        constructor.
+        cbn; auto.
+    - destruct ARGS.
+      2: {
+        cbn.
+        apply orutt_raise.
+        + intros [] o CONTRA.
+          inv CONTRA.
+        + repeat red.
+          constructor.
+          cbn; auto.
+      }
+
+      destruct y; uvalue_refine_strict_inv H.
+      all:
+        try solve [ cbn;
+                    setoid_rewrite bind_ret_l;
+                    eapply orutt_raiseUB; [intros * CONTRA; inv CONTRA | constructor; constructor]
+                  | cbn;
+                    eapply orutt_bind;
+                    [ eapply concretize_or_pick_L0'_orutt_strict;
+                      rewrite uvalue_refine_strict_equation; cbn; rewrite H0; reflexivity
+                    | intros r1 r2 REF;
+                      destruct r2; dvalue_refine_strict_inv REF;
+                      try solve [eapply orutt_raiseUB; [intros * CONTRA; inv CONTRA | constructor; constructor]];
+                      eapply orutt_bind;
+                      [ apply orutt_trigger;
+                        [ solve [repeat constructor]
+                        | intros [] [] ?; reflexivity
+                        | intros ? CONTRA; inv CONTRA
+                        ]
+                      | intros [] [] ?; eapply orutt_Ret; eauto; solve_uvalue_refine_strict
+                      ]
+                    ]
+                  | cbn;
+                    eapply orutt_bind with (RR:=dvalue_refine_strict);
+                    [ eapply orutt_bind with (RR:=fun r1 r2 => dvalue_refine_strict (proj1_sig r1) (proj1_sig r2));
+                      [ apply orutt_trigger;
+                        [ repeat constructor; cbn;
+                          rewrite uvalue_refine_strict_equation; cbn;
+                          try rewrite H0; try rewrite H1; try rewrite H2; reflexivity
+                        | intros [dv1 []] [dv2 []] REF;
+                          inv REF; subst_existT; cbn;
+                          match goal with
+                          | H: event_res_refine_strict _ _ _ _ _ _ |- _ =>
+                              apply H
+                          end
+                        | intros ? CONTRA; inv CONTRA
+                        ]
+                      | intros [dv1 []] [dv2 []] REF;
+                        eapply orutt_Ret; eauto; solve_uvalue_refine_strict
+                      ]
+                    | intros r1 r2 REF;
+                      destruct r2; dvalue_refine_strict_inv REF;
+                      try solve [eapply orutt_raiseUB; [intros * CONTRA; inv CONTRA | constructor; constructor]];
+                      eapply orutt_bind;
+                      [ apply orutt_trigger;
+                        [ solve [repeat constructor]
+                        | intros [] [] ?; reflexivity
+                        | intros ? CONTRA; inv CONTRA
+                        ]
+                      | intros [] [] ?; eapply orutt_Ret; eauto; solve_uvalue_refine_strict
+                      ]
+                    ]
+          ].
+
+      cbn.
+      repeat rewrite bind_ret_l.
+
+      eapply orutt_bind with (RR:=eq).
+      { apply orutt_trigger;
+          [ solve [repeat constructor]
+          | intros [] [] ?; reflexivity
+          | intros ? CONTRA; inv CONTRA
+          ].
+      }
+
+      intros [] [] _.
+      apply orutt_Ret.
+      solve_uvalue_refine_strict.
+  Qed.
+
   Lemma address_one_builtin_functions_E1E2_orutt :
     forall dfns1 dfns2,
       Forall2 (eq × function_denotation_refine_strict) dfns1 dfns2 ->
@@ -24026,10 +24119,22 @@ Qed.
     - cbn; constructor.
     - unfold built_in_functions.
       unfold LLVM1.built_in_functions.
-      break_match_goal; constructor; eauto.
+      cbn.
+
+      (* puts *)
+      break_match_goal; try constructor; eauto.
+      constructor; cbn; auto.
+      apply puts_denotation_refine_strict.
+
+      (* putchar *)
+      break_match_goal; try constructor; eauto.
+      constructor; cbn; auto.
+      apply putchar_denotation_refine_strict.
+
+      break_match_goal; try constructor; eauto.
       constructor; eauto.
       cbn.
-      apply puts_denotation_refine_strict.
+      apply putchar_denotation_refine_strict.
   Qed.
 
   Lemma model_E1E2_L0_orutt_strict_sound
