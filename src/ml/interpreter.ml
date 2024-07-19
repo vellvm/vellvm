@@ -124,9 +124,11 @@ let rec step
   (* We finished the computation *)
   | RetF (_, (_, (_, (_, v)))) -> Ok v
   (* The ExternalCallE effect *)
-  | VisF (Sum.Coq_inl1 (ExternalCall (_, _, _)), _) ->
-      Error (UninterpretedCall "Uninterpreted Call")
-  (* TODO: More informative message *)
+  | VisF (Sum.Coq_inl1 (ExternalCall (t, _, dvs)), _) ->
+      Error (UninterpretedCall ("Call with return type " 
+       ^ (Camlcoq.camlstring_of_coqstring (ReprAST.repr_dtyp t))
+       ^ ", " ^ (string_of_int (List.length dvs)) ^ " dvalues."))
+  (* Still TODO: Integrate 2nd argument *)
   (* The IO_stdout effect *)
   | VisF (Sum.Coq_inl1 (IO_stdout bytes), k) ->
       let str = string_of_bytes bytes in

@@ -8,3 +8,7 @@ void printf_fortminor() {
 \n%d%% percent pain \
 \nAnd %d%% reason to remember the name.\n", 10, 20, 15, 5, 50, 100);
 }
+
+int main() {
+    printf_fortminor();
+}

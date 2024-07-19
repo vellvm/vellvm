@@ -13,7 +13,7 @@ target triple = "arm64-apple-macosx14.0.0"
 @.str.3 = private unnamed_addr constant [4 x i8] c"fni\00", align 1
 
 ; Function Attrs: noinline nounwind optnone ssp uwtable
-define i32 @printf(i8* noundef %0, ...) #0 {
+define i32 @printf_(i8* noundef %0, ...) #0 {
   %2 = alloca i8*, align 8
   %3 = alloca i8*, align 8
   %4 = alloca [1 x i8], align 1
@@ -1239,15 +1239,14 @@ define internal void @_out_char(i8 noundef signext %0, i8* noundef %1, i64 nound
   %11 = load i64, i64* %8, align 8
   %12 = load i8, i8* %5, align 1
   %13 = icmp ne i8 %12, 0
-  br i1 %13, label %14, label %18
+  br i1 %13, label %14, label %16
 
 14:                                               ; preds = %4
   %15 = load i8, i8* %5, align 1
-  %16 = sext i8 %15 to i32
-  %17 = call i32 @putchar(i32 noundef %16)
-  br label %18
+  call void @_putchar(i8 noundef signext %15)
+  br label %16
 
-18:                                               ; preds = %14, %4
+16:                                               ; preds = %14, %4
   ret void
 }
 
@@ -1255,7 +1254,7 @@ define internal void @_out_char(i8 noundef signext %0, i8* noundef %1, i64 nound
 declare void @llvm.va_end(i8*) #1
 
 ; Function Attrs: noinline nounwind optnone ssp uwtable
-define i32 @sprintf(i8* noundef %0, i8* noundef %1, ...) #0 {
+define i32 @sprintf_(i8* noundef %0, i8* noundef %1, ...) #0 {
   %3 = alloca i8*, align 8
   %4 = alloca i8*, align 8
   %5 = alloca i8*, align 8
@@ -1303,7 +1302,7 @@ define internal void @_out_buffer(i8 noundef signext %0, i8* noundef %1, i64 nou
 }
 
 ; Function Attrs: noinline nounwind optnone ssp uwtable
-define i32 @snprintf(i8* noundef %0, i64 noundef %1, i8* noundef %2, ...) #0 {
+define i32 @snprintf_(i8* noundef %0, i64 noundef %1, i8* noundef %2, ...) #0 {
   %4 = alloca i8*, align 8
   %5 = alloca i64, align 8
   %6 = alloca i8*, align 8
@@ -1327,7 +1326,7 @@ define i32 @snprintf(i8* noundef %0, i64 noundef %1, i8* noundef %2, ...) #0 {
 }
 
 ; Function Attrs: noinline nounwind optnone ssp uwtable
-define i32 @vprintf(i8* noundef %0, i8* noundef %1) #0 {
+define i32 @vprintf_(i8* noundef %0, i8* noundef %1) #0 {
   %3 = alloca i8*, align 8
   %4 = alloca i8*, align 8
   %5 = alloca [1 x i8], align 1
@@ -1341,7 +1340,7 @@ define i32 @vprintf(i8* noundef %0, i8* noundef %1) #0 {
 }
 
 ; Function Attrs: noinline nounwind optnone ssp uwtable
-define i32 @vsnprintf(i8* noundef %0, i64 noundef %1, i8* noundef %2, i8* noundef %3) #0 {
+define i32 @vsnprintf_(i8* noundef %0, i64 noundef %1, i8* noundef %2, i8* noundef %3) #0 {
   %5 = alloca i8*, align 8
   %6 = alloca i64, align 8
   %7 = alloca i8*, align 8
@@ -3193,7 +3192,7 @@ define internal i64 @_out_rev(void (i8, i8*, i64, i64)* noundef %0, i8* noundef 
 ; Function Attrs: nofree nosync nounwind readnone speculatable willreturn
 declare double @llvm.fmuladd.f64(double, double, double) #2
 
-declare i32 @putchar(i32 noundef) #3
+declare void @_putchar(i8 noundef signext) #3
 
 attributes #0 = { noinline nounwind optnone ssp uwtable "frame-pointer"="non-leaf" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="apple-m1" "target-features"="+aes,+crc,+crypto,+dotprod,+fp-armv8,+fp16fml,+fullfp16,+lse,+neon,+ras,+rcpc,+rdm,+sha2,+v8.5a,+zcm,+zcz" }
 attributes #1 = { nofree nosync nounwind willreturn }

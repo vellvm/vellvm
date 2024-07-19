@@ -5,7 +5,7 @@ From Coq Require Import
      Ensembles List String ZArith
      Lists.ListSet
      Relations.
-
+ 
 From ITree Require Import
      ITree
      Events.State.
@@ -26,8 +26,8 @@ From Vellvm Require Import
   Semantics.IntrinsicsDefinitions
   Semantics.InterpretationStack
   Semantics.VellvmIntegers
-  Semantics.StoreId.
-
+  Semantics.StoreId
+  Semantics.Printfdefn. 
 Import MonadNotation.
 Import ListNotations.
 Import Monads.
@@ -70,14 +70,46 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
      modules that are in scope at this point.
   *)
   (** * puts 
-      [int  puts(const char *s);]
-      The function puts() writes the string s, and a terminating newline character, to the stream stdout.
-      The functions fputs() and puts() return a nonnegative integer on success and EOF on error.
+        [int  puts(const char *s);] 
+        The function puts() writes the string s, and a terminating newline character, to the stream stdout. 
+        The functions fputs() and puts() return a nonnegative integer on success and EOF on error.
 
-      SAZ: it isn't clear what kinds of errors count as "errors" for puts. Our implementation 
-      will never explicitly return EOF (since that seems to be a stdout stream error.  It will
-      only ever raise "semantic" errors.
+      * putchar 
+      [int putchar (int c);] 
+      The function putchar() writes the character c to the stream stdout. 
+      The functions fputc() and putc() return the value written on success and EOF on error. 
+
+      SAZ/RAB: it isn't clear what kinds of errors count as "errors" for puts and
+      putchar. Our implementation will never explicitly return EOF (since that
+      seems to be a stdout stream error.  It will only ever raise "semantic"
+      errors.
    *)
+
+(** Semantic function that triggers a single IO_stdout event to print 
+    the passed-in character.
+    the character comes in as an i32, so the function truncates to an i8
+    to match types with IO_stdout. *)
+
+  Definition putchar_denotation : function_denotation := 
+    let putchar_body (u_char:uvalue) : itree L0' uvalue :=
+      dv <- concretize_or_pick u_char ;; 
+      match dv with 
+        | DVALUE_I32 x32 => 
+          match get_conv_case Trunc (DTYPE_I 32) dv (DTYPE_I 8) with 
+            | Conv_Pure (DVALUE_I8 x8) => trigger (IO_stdout [x8])
+            | _ => raise "conversion from i32 to i8 in putchar gave unexpected conversion type"
+          end ;;
+          ret (dvalue_to_uvalue dv)
+        | bad => raiseUB ("putc got non-i32 argument " ++ show_dvalue bad)
+      end
+    in 
+
+    fun (args : list uvalue) =>
+      match args with
+      | char::[] => putchar_body char
+      | _ => raise "putc called with zero or more than one arguments"
+      end.
+ 
 
   (** A semantic function to read an i8 value at [strptr + index] from the memory. 
       Propagates all memory failures and raises a Vellvm "Failure" if the 
@@ -94,10 +126,10 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     d_byte <- concretize_or_pick u_byte;;
     match d_byte with
     | DVALUE_I8 b => ret b
-    | _ => raise "i8_str_index failed with non-DVALUE_I8"
+    | bad => raise ("i8_str_index failed with non-DVALUE_I8 " ++ show_dvalue bad)
     end.
 
-  
+
   (** Semantic function that treats [u_strptr] as a C-style string pointer:
       - reads i8 values from memory until it encounters a null-terminator (i8 0)
       - triggers an IO_stdout event with the bytes plus a newline
@@ -121,7 +153,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
               (char, [], 1%Z) ;;
           v <- trigger (IO_stdout (DList.rev_tail_rec bytes)) ;;
           ret (UVALUE_I8 (Int8.zero))
-      | _ => raiseUB "puts got non-address argument"
+      | bad => raiseUB ("puts got non-address argument " ++ show_dvalue bad)
       end
     in
     
@@ -130,6 +162,18 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       | strptr::[] => puts_body strptr
       | _ => raise "puts called with zero or more than one arguments"
       end.
+
+  (* *********DO NOT USE DIRECTLY*********
+  Program should ONLY use `built_in_functions`, defined below, which filters
+  out unused functions from _BUILTINS.   
+
+  Lists all functions built-in by default. As vellvm gains more, they should
+  go into this list. 
+*)
+
+  Definition _BUILTINS : list (function_id * function_denotation) :=
+    [(Name "puts", puts_denotation); 
+     (Name "putchar", putchar_denotation)].
 
   (** * [built_in_functions]
 
@@ -149,11 +193,12 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
    *)
 
   Definition built_in_functions (decls : list (declaration dtyp)) : list (function_id * function_denotation) :=
-    match List.find (fun s => (Coqlib.proj_sumbool (Syntax.AstLib.RawIDOrd.eq_dec s (Name "puts"))))
-            (List.map (@dc_name dtyp) decls) with
-    | Some _ => [(Name "puts", puts_denotation)]
-    | None => []
-    end.
+  filter  (fun '(n, d) => existsb (fun s => Coqlib.proj_sumbool (Syntax.AstLib.RawIDOrd.eq_dec s n)) 
+                                  (List.map (@dc_name dtyp) decls))
+                                  (* if we have many builtins, 
+                                     pull out this List.map to a let-bind
+                                     for explicit optimization *)
+          _BUILTINS. 
 
   
   (* SAZ: commenting this out for now, since it's trickier than we wanted *)
@@ -253,9 +298,10 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Definition ll_toplevel_entities := toplevel_entities typ 
                                                  (block typ * list (block typ)). 
 
-  Definition PREDEFINED_FUNCTIONS : ll_toplevel_entities := []. 
-  (* NEXT: Fill with `printf`'s definition and others. *)
+  Definition PREDEFINED_FUNCTIONS : ll_toplevel_entities := List.concat [printf_definition]. 
 
+  Example ensure_functions_defined : negb (Nat.eqb (List.length PREDEFINED_FUNCTIONS) O) . 
+  Proof. reflexivity. Qed.  
 
   (* checks if `userdecl_n` is a name of a definition in `predefs`. *)
   Definition userdecl_defined_in (userdecl_n : string) 
@@ -263,7 +309,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     existsb (fun predef =>
     match predef with 
           TLE_Definition  {| df_prototype := {| dc_name := Name predef_n |}|}
-             => userdecl_n =? predef_n
+             => String.eqb userdecl_n predef_n
       | _    => false
     end) predefs. 
 
