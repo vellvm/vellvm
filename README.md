@@ -47,6 +47,7 @@ a verified front-end for the [Helix](https://github.com/vzaliva/helix) chain of 
  - Calvin Beck
  - Irene Yoon
  - Gary (Hanxi) Chen
+ - Roger Burtonpatel
 
 ## Past Contributors
  - Vivien Durey
