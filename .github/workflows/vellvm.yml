@@ -14,7 +14,7 @@ jobs:
         coq_version:
           - 8.19.2
         ocaml_version:
-          - 4.14.1-flambda
+          - 4.14.2-flambda
 
     runs-on: ${{ matrix.os }}
 
