@@ -70,7 +70,7 @@ a verified front-end for the [Helix](https://github.com/vzaliva/helix) chain of 
 ### Recent Related Publications:
  - "Modular, Compositional, and Executable Formal Semantics for LLVM IR" ([ICFP'21](https://icfp21.sigplan.org/details/icfp-2021-papers/6/Modular-Compositional-and-Executable-Formal-Semantics-for-LLVM-IR)),
     Yannick Zakowski, Calvin Beck, Irene Yoon, Ilia Zaichuk, Vadim Zaliva, Steve Zdancewic
- - "Formal Reasoning About Layered Monadic Interpreters" ([ICFP'22](http://www.cis.upenn.edu/~stevez/papers/YZZ22.pdf)), Irene Yoon, Yannick Zakowski, and Steve Zdancewic.
+ - "Formal Reasoning About Layered Monadic Interpreters" ([ICFP'22](https://doi.org/10.1145/3547630)), Irene Yoon, Yannick Zakowski, and Steve Zdancewic.
  - "Interaction Trees" ([POPL'20](http://www.cis.upenn.edu/~stevez/papers/XZHH+20.pdf))	Li-yao Xia, Yannick Zakowski, Paul He, Chung-Kil Hur, Gregory Malecha, Benjamin C. Pierce, and Steve Zdancewic.
 
 ### Older Vellvm-related papers:
