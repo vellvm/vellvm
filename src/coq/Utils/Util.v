@@ -1397,13 +1397,13 @@ Definition map_prod {A B C D} (p:A * B) (f:A -> C) (g:B -> D) : (C * D) :=
 Definition flip := @Basics.flip.
 Definition comp := @Basics.compose.
 
-Notation "g `o` f" := (Basics.compose g f) 
+Notation "g ∘ f" := (Basics.compose g f) 
   (at level 40, left associativity).
 
 Lemma map_prod_distr_comp : forall A B C D E F
   (p:A * B) (f1:A -> C) (f2:B -> D) (g1:C -> E) (g2:D -> F),
   map_prod (map_prod p f1 f2) g1 g2 =
-  map_prod p (g1 `o` f1) (g2 `o` f2).
+  map_prod p (g1 ∘ f1) (g2 ∘ f2).
 Proof using.
   unfold map_prod, Basics.compose. auto.
 Qed.

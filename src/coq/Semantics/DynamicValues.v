@@ -4194,6 +4194,40 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           end
     end.
 
+  Fixpoint fetch_extract_path l dt_src : err dtyp :=
+    match l with
+    | [] => failwith "fetch_extract_path: no path"
+    | [idx] =>
+        if (Z.ltb idx 0) then failwith "fetch_extract_path: negative index"
+        else
+          match dt_src with
+          | DTYPE_Array len t =>
+              if (N.ltb (Z.to_N idx) len) then ret t
+              else failwith "fetch_extract_path: array out of bounds"
+          | DTYPE_Struct fts
+          | DTYPE_Packed_struct fts =>
+              if Nat.ltb (Z.to_nat idx) (length fts)
+              then ret (List.nth (Z.to_nat idx) fts DTYPE_Void)
+              else failwith "fetch_extract_path: struct out of bounds"
+          | _ => failwith "fetch_extract_path: invalid type"
+          end
+    | idx::idxs =>
+        if (Z.ltb idx 0) then failwith "fetch_extract_path: negative index"
+        else
+          match dt_src with
+          | DTYPE_Array len t =>
+              if (N.ltb (Z.to_N idx) len)
+              then fetch_extract_path idxs t
+              else failwith "fetch_extract_path: array out of bounds"
+          | DTYPE_Struct fts
+          | DTYPE_Packed_struct fts =>
+              if Nat.ltb (Z.to_nat idx) (length fts)
+              then let nth_ft := List.nth (Z.to_nat idx) fts DTYPE_Void in
+                   fetch_extract_path idxs nth_ft
+              else failwith "fetch_extract_path: struct out of bounds"
+          | _ => failwith "fetch_extract_path: invalid type"
+          end
+    end.
 
   Unset Elimination Schemes.
   Inductive uvalue_has_dtyp : uvalue -> dtyp -> Prop :=
@@ -5143,6 +5177,114 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       subst; reflexivity.
   Qed.
 
+  (* May be odd on size 0 types and ill-typed uvalues *)
+  Fixpoint dtyp_of_uvalue_fun (uv:uvalue) : err dtyp :=
+    let list_dtyps :=
+      fix go (uvs : list uvalue) : err (list dtyp) :=
+        match uvs with
+        | [] => inr []
+        | uv::utl =>
+            dt <- dtyp_of_uvalue_fun uv;;
+            dts <- go utl;;
+            ret (dt :: dts)
+        end
+    in
+
+    match uv with
+    | UVALUE_Addr a => ret DTYPE_Pointer  
+    | UVALUE_I1 x => ret (DTYPE_I 1)
+    | UVALUE_I8 x => ret (DTYPE_I 8)
+    | UVALUE_I16 x => ret (DTYPE_I 16)
+    | UVALUE_I32 x => ret (DTYPE_I 32)
+    | UVALUE_I64 x => ret (DTYPE_I 64)
+    | UVALUE_IPTR x => ret DTYPE_IPTR
+    | UVALUE_Double x => ret DTYPE_Double
+    | UVALUE_Float x => ret DTYPE_Float
+    | UVALUE_Undef t
+    | UVALUE_Poison t
+    | UVALUE_Oom t =>
+        (* May be problems if 't' is unsupported somehow. E.g., if 't'
+           is void or a DTYPE_I X where X isn't supported... *)
+        ret t
+    | UVALUE_None => ret DTYPE_Void
+    | UVALUE_Struct fields =>
+        dts <- list_dtyps fields;;
+        ret (DTYPE_Struct dts)
+    | UVALUE_Packed_struct fields =>
+        dts <- list_dtyps fields;;
+        ret (DTYPE_Packed_struct dts)
+    | UVALUE_Array elts =>
+        (* Could be odd cases where element types don't line up, or
+           unsupported types *)
+        (* Unclear what type should be for empty array... In some
+           sense it shouldn't matter because it's a size 0 type
+           regardless... *)
+        match elts with
+        | [] => ret (DTYPE_Array 0 (DTYPE_I 8)) (* Just pick a default... *)
+        | (e::elts') =>
+            dt <- dtyp_of_uvalue_fun e;;
+            ret (DTYPE_Array (N.of_nat (length elts)) dt)
+        end
+    | UVALUE_Vector elts =>
+        match elts with
+        | [] => ret (DTYPE_Vector 0 (DTYPE_I 8)) (* Just pick a default... *)
+        | (e::elts') =>
+            dt <- dtyp_of_uvalue_fun e;;
+            ret (DTYPE_Vector (N.of_nat (length elts)) dt)
+        end
+
+    | UVALUE_IBinop iop x y =>
+        dtyp_of_uvalue_fun x
+
+    | UVALUE_ICmp op x y =>
+        match dtyp_of_uvalue_fun x with
+        | inr (DTYPE_Vector vsz _) =>
+            ret (DTYPE_Vector vsz (DTYPE_I 1))
+        | inr _ =>
+            ret (DTYPE_I 1)
+        | f =>
+            f
+        end
+
+    | UVALUE_FBinop op fms x y =>
+        dtyp_of_uvalue_fun x
+
+    | UVALUE_FCmp op x y =>
+        ret (DTYPE_I 1)
+
+    | UVALUE_Conversion conv from_dt value to_dt =>
+        ret to_dt
+
+    | UVALUE_GetElementPtr agg_dt uv idxs =>
+        ret DTYPE_Pointer
+
+    | UVALUE_ExtractElement (DTYPE_Vector n t) vect idx =>
+        ret t
+
+    | UVALUE_InsertElement (DTYPE_Vector n t) vect val idx =>
+        ret (DTYPE_Vector n t)
+
+    | UVALUE_ShuffleVector (DTYPE_Vector n t) v1 v2 idxs =>
+        match dtyp_of_uvalue_fun idxs with
+        | inr (DTYPE_Vector m _)  =>
+            ret (DTYPE_Vector m t)
+        | _ => failwith "dtyp_of_uvalue_fun: invalid shufflevector"
+        end
+
+    | UVALUE_ExtractValue dt_agg uv path =>
+        fetch_extract_path path dt_agg
+
+    | UVALUE_InsertValue dt_agg uv dt_elt elt path =>
+        ret dt_agg
+
+    | UVALUE_Select cond x y =>
+        dtyp_of_uvalue_fun x
+
+    | UVALUE_ConcatBytes bytes t =>
+        ret t
+
+    | _ => failwith "dtyp_of_uvalue_fun: missing case"
+    end.
 
   Lemma uvalue_has_dtyp_dec :
     forall uv dt,

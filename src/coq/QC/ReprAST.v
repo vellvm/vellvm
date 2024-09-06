@@ -96,7 +96,7 @@ Section ReprInstances.
     | DTYPE_Struct fields => "(DTYPE_Struct [" ++ (contents id (List.map repr_dtyp fields)) ++ "])"
     | DTYPE_Packed_struct fields => "(DTYPE_Packed_struct [" ++ (contents id (List.map repr_dtyp fields)) ++ "])"
     | DTYPE_Opaque => "DTYPE_Opaque"
-    | DTYPE_Vector sz t => "(DTYPE_Vector (" ++ repr sz ++ ") (" ++ repr_dtyp t ++ ")"
+    | DTYPE_Vector sz t => "(DTYPE_Vector (" ++ repr sz ++ ") (" ++ repr_dtyp t ++ "))"
     end.
 
   Fixpoint repr_typ (t : typ) : string :=
@@ -117,11 +117,11 @@ Section ReprInstances.
     | TYPE_Function ret args varargs
       => "(TYPE_Function (" ++ repr_typ ret ++ ")
         [" ++ (contents id (List.map repr_typ args)) ++ "]"
-        ++ if varargs then "true" else "false" ++ ")"
+        ++ " " ++ (if varargs then "true" else "false") ++ ")"
     | TYPE_Struct fields        => "(TYPE_Struct [" ++ (contents id (List.map repr_typ fields)) ++ "])"
     | TYPE_Packed_struct fields => "(TYPE_Packed_struct [" ++ (contents id (List.map repr_typ fields)) ++ "])"
     | TYPE_Opaque               => "TYPE_Opaque"
-    | TYPE_Vector sz t          => "(TYPE_Vector (" ++ repr sz ++ ") (" ++ repr_typ t ++ ")"
+    | TYPE_Vector sz t          => "(TYPE_Vector (" ++ repr sz ++ ") (" ++ repr_typ t ++ "))"
     | TYPE_Identified id        => "(TYPE_Identified " ++ repr id ++ ")"
     end.
 
@@ -267,9 +267,9 @@ Section ReprInstances.
     match v with
     | EXP_Ident id => "(EXP_Ident " ++ repr id ++ ")"
     | EXP_Integer x => "(EXP_Integer " ++ repr x ++ ")"
-    | EXP_Float f => "(EXP_Float " ++ show f ++ ")"
-    | EXP_Double f => "(EXP_Double " ++ show f ++ ")"
-    | EXP_Hex f => "(EXP_Hex " ++ show f ++ ")"
+    | EXP_Float f  => "(EXP_Float  (Float.of_bits (Int32.repr " ++ show f ++ ")))"
+    | EXP_Double f => "(EXP_Double (Float.of_bits (Int64.repr " ++ show f ++ ")))"
+    | EXP_Hex f => "(EXP_Hex (Float.of_bits (Int64.repr " ++ show f ++ ")))"
     | EXP_Bool b => "(EXP_Bool " ++ repr b ++ ")"
     | EXP_Null => "EXP_Null"
     | EXP_Zero_initializer => "EXP_Zero_initializer"
@@ -340,12 +340,12 @@ Section ReprInstances.
     | PARAMATTR_Zeroext => "PARAMATTR_Zeroext"
     | PARAMATTR_Signext => "PARAMATTR_Signext"
     | PARAMATTR_Inreg => "PARAMATTR_Inreg"
-    | PARAMATTR_Byval t => "PARAMATTR_Byval" ++ repr t
-    | PARAMATTR_Byref (t) => "PARAMATTR_Byref" ++ repr t
-    | PARAMATTR_Preallocated (t) => "PARAMATTR_Preallocated" ++ repr t
-    | PARAMATTR_Inalloca t => "PARAMATTR_Inalloca" ++ repr t
-    | PARAMATTR_Sret t => "PARAMATTR_Sret" ++ repr t
-    | PARAMATTR_Elementtype (t) => "PARAMATTR_Elementtype" ++ repr t
+    | PARAMATTR_Byval t => "PARAMATTR_Byval " ++ repr t
+    | PARAMATTR_Byref (t) => "PARAMATTR_Byref " ++ repr t
+    | PARAMATTR_Preallocated (t) => "PARAMATTR_Preallocated " ++ repr t
+    | PARAMATTR_Inalloca t => "PARAMATTR_Inalloca " ++ repr t
+    | PARAMATTR_Sret t => "PARAMATTR_Sret " ++ repr t
+    | PARAMATTR_Elementtype (t) => "PARAMATTR_Elementtype " ++ repr t
     | PARAMATTR_Align a => "(PARAMATTR_Align " ++ repr a ++ ")"
     | PARAMATTR_Noalias => "PARAMATTR_Noalias"
     | PARAMATTR_Nocapture => "PARAMATTR_Nocapture"
@@ -360,7 +360,7 @@ Section ReprInstances.
     | PARAMATTR_Swifterror => "PARAMATTR_Swifterror"
     | PARAMATTR_Immarg => "PARAMATTR_Immarg"
     | PARAMATTR_Noundef => "PARAMATTR_Noundef"
-    | PARAMATTR_Alignstack (a) => "PARAMATTR_Alignstack" ++ repr a
+    | PARAMATTR_Alignstack (a) => "PARAMATTR_Alignstack " ++ repr a
     | PARAMATTR_Allocalign =>  "PARAMATTR_Allocalign"
     | PARAMATTR_Allocptr => "PARAMATTR_Allocptr"
     | PARAMATTR_Readnone => "PARAMATTR_Readnone"
@@ -438,8 +438,8 @@ Section ReprInstances.
   Definition repr_fn_attr (fa : fn_attr) : string :=
     match fa with
     | FNATTR_Alignstack a => "(FNATTR_Alignstack " ++ repr a ++ ")"
-    (* | FNATTR_Alloc_family (fam) => "(FNATTR_Alloc_family" ++ repr fam ++ ")" *)
-    | FNATTR_Allockind (kind) => "(FNATTR_Allockind" ++ repr kind ++ ")"
+    (* | FNATTR_Alloc_family (fam) => "(FNATTR_Alloc_family " ++ repr fam ++ ")" *)
+    | FNATTR_Allockind (kind) => "(FNATTR_Allockind " ++ repr kind ++ ")"
     | FNATTR_Allocsize l l2 => let printable_l2 := match l2 with
                                                  |None => ""
                                                  |Some s => repr s
@@ -517,21 +517,21 @@ Section ReprInstances.
     (*                         |None => ""         *)
     (*                         |Some s => repr s             *)
     (*                         end in                       *)
-    (*      "(FNATTR_Denormal_fp_math32" ++ repr s1 ++ printable_sw ++ ")" *)
+    (*      "(FNATTR_Denormal_fp_math32 " ++ repr s1 ++ printable_sw ++ ")" *)
     (* | FNATTR_Thunk => "FNATTR_Thunk" *)
     | FNATTR_Tls_load_hoist => "FNATTR_Tls_load_hoist"
-    | FNATTR_Uwtable sync => "FNATTR_Uwtable" ++ repr sync
+    | FNATTR_Uwtable sync => "FNATTR_Uwtable " ++ repr sync
     | FNATTR_Nocf_check => "FNATTR_Nocf_check"
     | FNATTR_Shadowcallstack => "FNATTR_Shadowcallstack"
     | FNATTR_Mustprogress => "FNATTR_Mustprogress"
-    (* | FNATTR_Warn_stack_size (th) => "FNATTR_Warn_stack_size" ++ repr th   *)
+    (* | FNATTR_Warn_stack_size (th) => "FNATTR_Warn_stack_size " ++ repr th   *)
     | FNATTR_Vscale_range (min) (max) =>
          let printable_max := match max with
                             |None => ""
                             |Some s => repr s
                             end in
-         "(FNATTR_Denormal_fp_math32" ++ repr min ++ printable_max ++ ")"
-    (* | FNATTR_Min_legal_vector_width  (size) => "FNATTR_Min_legal_vector_width" ++ repr size  *)
+         "(FNATTR_Denormal_fp_math32 " ++ repr min ++ printable_max ++ ")"
+    (* | FNATTR_Min_legal_vector_width  (size) => "FNATTR_Min_legal_vector_width " ++ repr size  *)
     | FNATTR_String s => "(FNATTR_String " ++ repr s ++ ")"
     | FNATTR_Key_value kv => "(FNATTR_Key_value " ++ repr kv ++ ")"
     | FNATTR_Attr_grp g => "(FNATTR_Attr_grp " ++ repr g ++ ")"
@@ -709,7 +709,7 @@ Section ReprInstances.
        | INSTR_Comment s => "(INSTR_Comment " ++ s ++ ")"
        | INSTR_Op e => "(INSTR_Op " ++ repr e ++ ")"
        | INSTR_Call e params annotations =>
-           "INSTR_Call " ++ repr e ++ " " ++ repr params ++ " " ++ repr annotations ++ ")"
+           "(INSTR_Call " ++ repr e ++ " " ++ repr params ++ " " ++ repr annotations ++ ")"
        | INSTR_Alloca t anns =>
          "(INSTR_Alloca " ++ repr t ++ " " ++ repr anns ++ ")"
        | INSTR_Load t ptr anns =>
@@ -741,6 +741,15 @@ Section ReprInstances.
             end
        |}.
 
+  #[global]
+  Instance reprTintLiteral : Repr tint_literal 
+    := {| repr tl := 
+          match tl with 
+            |  TInt_Literal sz x => 
+                ("(TInt_Literal " ++ repr sz ++ " " ++ repr x ++ ")")%string
+          end
+       |}.
+
   Definition repr_terminator (t : terminator typ) : string
     := match t with
        | TERM_Ret v => "(TERM_Ret " ++ repr v ++ ")"
@@ -748,7 +757,15 @@ Section ReprInstances.
        | TERM_Br te b1 b2 =>
          "(TERM_Br " ++ repr te ++ " " ++ repr b1 ++ " " ++ repr b2 ++ ")"
        | TERM_Br_1 b => "(TERM_Br_1 " ++ repr b ++ ")"
-       | _ => "repr_terminator todo"
+       | TERM_Switch v dest brs  => 
+          "(TERM_Switch " ++ repr v ++ " " ++ repr dest ++ repr brs ++ ")"
+      | TERM_IndirectBr v brs  => 
+          "(TERM_IndirectBr " ++ repr v ++ " " ++ repr brs ++ ")" 
+      | TERM_Resume v  => "(TERM_Resume " ++ repr v ++ ")"
+      | TERM_Invoke fnptrval args to_label unwind_label  =>
+          "(TERM_Invoke " ++ repr fnptrval ++ " " ++ repr args 
+          ++ " " ++ repr to_label ++ " " ++ repr unwind_label ++ ")"
+      | TERM_Unreachable => "TERM_Unreachable"
        end.
 
   #[global]
@@ -787,7 +804,7 @@ Section ReprInstances.
                             ++ repr dc_type ++ " "
                             ++ repr dc_param_attrs ++ " "
                             ++ repr dc_attrs ++ " "
-                            ++ repr dc_annotations
+                            ++ repr dc_annotations ++ ")"
 
        end.
 

@@ -230,6 +230,7 @@
   ("udiv"           , KW_UDIV);
   ("sdiv"           , KW_SDIV);
   ("fdiv"           , KW_FDIV);
+  ("fneg"           , KW_FNEG);
   ("urem"           , KW_UREM);
   ("srem"           , KW_SREM);
   ("frem"           , KW_FREM);

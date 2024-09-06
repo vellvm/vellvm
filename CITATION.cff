@@ -1,0 +1,50 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Vellvm
+url: "https://github.com/vellvm/vellvm"
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Steve
+    family-names: Zdancewic
+    affiliation: University of Pennsylvania
+    orcid: 'https://orcid.org/0000-0002-3516-1512'
+  - given-names: Yannick
+    family-names: Zakowsky
+    affiliation: Inria
+    orcid: 'https://orcid.org/0000-0003-4585-6470'
+  - given-names: Calvin
+    family-names: Beck
+    email: hobbes@seas.upenn.edu
+    affiliation: University of Pennsylvania
+    orcid: 'https://orcid.org/0000-0002-3469-7219'
+  - given-names: Irene
+    family-names: Yoon
+    affiliation: Inria
+    orcid: 'https://orcid.org/0000-0003-3388-1257'
+  - given-names: Hanxi
+    family-names: Chen
+    affiliation: University of Pennsylvania
+    orcid: 'https://orcid.org/0009-0006-4486-7222'
+abstract: >-
+  Vellvm is an ongoing project aiming at the formal
+  verification in the Coq proof assistant of a compilation
+  infrastructure inspired by the LLVM compiler.
+
+
+  The central piece of Vellvm is the Verified IR (VIR), a
+  Coq formalization of the semantics of (a subset of) the
+  LLVM IR that is intended for formal verification of
+  LLVM-based software. It is being developed at the
+  University of Pennsylvania as part of the DeepSpec
+  project.
+keywords:
+  - LLVM
+  - Coq
+  - Compilers
+  - Semantics
+license: GPL-3.0

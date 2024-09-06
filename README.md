@@ -47,6 +47,7 @@ a verified front-end for the [Helix](https://github.com/vzaliva/helix) chain of 
  - Calvin Beck
  - Irene Yoon
  - Gary (Hanxi) Chen
+ - Roger Burtonpatel
 
 ## Past Contributors
  - Vivien Durey
@@ -67,9 +68,10 @@ a verified front-end for the [Helix](https://github.com/vzaliva/helix) chain of 
  - Jianzhou Zhao
 
 ### Recent Related Publications:
+ - "A Two-Phase Infinite/Finite Low-Level Memory Model" ([ICFP'24](https://icfp24.sigplan.org/details/icfp-2024-papers/28/A-Two-Phase-Infinite-Finite-Low-Level-Memory-Model-Reconciling-Integer-Pointer-Casts)), Calvin Beck, Irene Yoon, Hanxi Chen, Yannick Zakowski, Steve Zdancewic
  - "Modular, Compositional, and Executable Formal Semantics for LLVM IR" ([ICFP'21](https://icfp21.sigplan.org/details/icfp-2021-papers/6/Modular-Compositional-and-Executable-Formal-Semantics-for-LLVM-IR)),
     Yannick Zakowski, Calvin Beck, Irene Yoon, Ilia Zaichuk, Vadim Zaliva, Steve Zdancewic
- - "Formal Reasoning About Layered Monadic Interpreters" ([ICFP'22](http://www.cis.upenn.edu/~stevez/papers/YZZ22.pdf)), Irene Yoon, Yannick Zakowski, and Steve Zdancewic.
+ - "Formal Reasoning About Layered Monadic Interpreters" ([ICFP'22](https://doi.org/10.1145/3547630)), Irene Yoon, Yannick Zakowski, and Steve Zdancewic.
  - "Interaction Trees" ([POPL'20](http://www.cis.upenn.edu/~stevez/papers/XZHH+20.pdf))	Li-yao Xia, Yannick Zakowski, Paul He, Chung-Kil Hur, Gregory Malecha, Benjamin C. Pierce, and Steve Zdancewic.
 
 ### Older Vellvm-related papers:
@@ -173,7 +175,7 @@ Then:
    `opam pin add coq 8.19.1`
 
 4. Install opam dependencies (run in the root directory of the project):
-   `opam install . --only-deps`
+   `opam install . --deps-only`
 
 Note: the dependency constraints in the opam file should be sufficient
 for installing `vellvm`, however if you are having compilation
