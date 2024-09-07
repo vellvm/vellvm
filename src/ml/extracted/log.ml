@@ -5,7 +5,7 @@ open DList
 
 type log_entry =
   | Instr of instr_id * dtyp instr
-  | Phi_node of dtyp phi
+  | Phi_node of local_id * dtyp phi
   | Ret of dtyp terminator
 
 type log_stream = log_entry list
@@ -21,7 +21,7 @@ let dshow_log_entry (le : log_entry) : DList.coq_DString =
   match le with
   | Instr (uid, ins) ->
     ShowAST.dshow_instr_id ShowAST.dshow_dtyp (uid, ins)
-  | Phi_node phi ->
+  | Phi_node (uid, phi) ->
     ShowAST.dshowPhi ShowAST.dshow_dtyp phi
   | Ret term ->
     ShowAST.dshowTerminator ShowAST.dshow_dtyp term
