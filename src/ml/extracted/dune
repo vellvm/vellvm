@@ -12,4 +12,6 @@
  (synopsis "ML code extracted from Coq")
  (libraries zarith)
  (instrumentation
-  (backend bisect_ppx)))
+  (backend bisect_ppx))
+ (flags (:standard -I ../trace))
+)

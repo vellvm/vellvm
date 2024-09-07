@@ -131,7 +131,8 @@ clean: extractedclean clean-coqmakefile
 
 .PHONY: extractedclean
 extractedclean:
-	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/FRONTEND_STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli $(EXTRACTDIR)/\#* $(EXTRACTDIR)/.!*
+	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/FRONTEND_STAMP $(EXTRACTDIR)/*.mli $(EXTRACTDIR)/\#* $(EXTRACTDIR)/.!*
+	@find $(EXTRACTDIR) -maxdepth 1 -name '*.ml' ! -name 'log.ml' -exec rm -f {} +
 
 clean-coqmakefile: CoqMakefile
 	$(MAKE) -j --no-print-directory -f CoqMakefile clean
