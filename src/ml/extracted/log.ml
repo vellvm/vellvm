@@ -5,8 +5,8 @@ open DList
 
 type log_entry =
   | Instr of instr_id * dtyp instr
-  | Phi_node of local_id * dtyp phi
-  | Ret of dtyp terminator
+  | Phi_node of local_id * dtyp phi * block_id
+  | Ret of dtyp texp 
 
 type log_stream = log_entry list
 
@@ -21,10 +21,14 @@ let dshow_log_entry (le : log_entry) : DList.coq_DString =
   match le with
   | Instr (uid, ins) ->
     ShowAST.dshow_instr_id ShowAST.dshow_dtyp (uid, ins)
-  | Phi_node (uid, phi) ->
-    ShowAST.dshowPhi ShowAST.dshow_dtyp phi
+  | Phi_node (uid, phi, bid) ->
+    DList.coq_DList_join
+      [
+      ShowAST.dshow_raw_id bid;
+      ShowAST.dshow_phi_id ShowAST.dshow_dtyp (uid, phi)
+    ]
   | Ret term ->
-    ShowAST.dshowTerminator ShowAST.dshow_dtyp term
+    ShowAST.dshowTerminator ShowAST.dshow_dtyp (TERM_Ret term)
 
 let dstring_of_log_stream (log_stream : log_stream) : DList.coq_DString =
   List.rev log_stream |> List.map dshow_log_entry |> ShowAST.dintersperse (string_to_DString ('\n' :: []))
