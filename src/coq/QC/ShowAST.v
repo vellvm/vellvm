@@ -1130,18 +1130,24 @@ Section ShowInstances.
 
   Definition dnewline := string_to_DString newline.
 
+  Definition dshow_local_id (lid : local_id) : DString := DList_join [string_to_DString "%"; dshow lid].
+  
+  Definition dshow_phi_id (phi_ins : local_id * phi T) : DString
+    :=
+    let '(lid, p) := phi_ins in
+    DList_join
+      [dshow_local_id lid;
+       string_to_DString " = ";
+       dshow p;
+       dnewline
+      ].
+  
   Definition dshow_block (indent : string) (b : block T) : DString
     :=
     let ind := string_to_DString indent in
-    let phis := DList_join (map (fun '(l, p) =>
+    let phis := DList_join (map (fun lp =>
                                    ind @@
-                                     DList_join
-                                     [string_to_DString "%" ;
-                                      dshow l ;
-                                      string_to_DString " = " ;
-                                      dshow p ;
-                                      dnewline
-                              ])
+                                     dshow_phi_id lp)
                               (blk_phis b)) in
     let code   := dshow_code indent (blk_code b) in
     let term   := DList_join [ind ; dshow (blk_term b) ; dnewline] in
