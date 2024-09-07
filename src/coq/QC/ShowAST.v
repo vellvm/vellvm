@@ -129,6 +129,38 @@ Section ShowInstances.
 
   #[global] Instance dshowTyp : DShow typ :=
     {| dshow := dshow_typ |}.
+  
+  Fixpoint dshow_dtyp (t : dtyp) : DString  :=
+    match t with
+    | DTYPE_I sz                 => string_to_DString "i" @@
+                                    string_to_DString (show sz)
+    | DTYPE_IPTR                 => string_to_DString "iptr"
+    | DTYPE_Pointer            => (* dshow_typ t @@  *)string_to_DString "*"
+    | DTYPE_Void                 => string_to_DString "void"
+    | DTYPE_Half                 => string_to_DString "half"
+    | DTYPE_Float                => string_to_DString "float"
+    | DTYPE_Double               => string_to_DString "double"
+    | DTYPE_X86_fp80             => string_to_DString "x86_fp80"
+    | DTYPE_Fp128                => string_to_DString "fp128"
+    | DTYPE_Ppc_fp128            => string_to_DString "ppc_fp128"
+    | DTYPE_Metadata             => string_to_DString "metadata"
+    | DTYPE_X86_mmx              => string_to_DString "x86_mmx"
+    | DTYPE_Array sz t           =>
+        list_to_DString ["["; show sz; " x "] @@ dshow_dtyp t @@
+        string_to_DString "]"
+    | DTYPE_Struct fields        => string_to_DString "{" @@
+                                   concat_DString (string_to_DString ", ") (map dshow_dtyp fields) @@
+                                   string_to_DString "}"
+    | DTYPE_Packed_struct fields =>
+        string_to_DString "<{" @@ concat_DString (string_to_DString ", ") (map dshow_dtyp fields) @@
+        string_to_DString "}>"
+
+    | DTYPE_Opaque               => string_to_DString "opaque"
+    | DTYPE_Vector sz t          => string_to_DString "<" @@
+                                   string_to_DString (show sz) @@
+                                   string_to_DString " x " @@ dshow_dtyp t @@
+                                   string_to_DString ">"
+    end.
 
   Definition show_dtyp (t : dtyp) : string
     := match t with
@@ -150,6 +182,9 @@ Section ShowInstances.
        | DTYPE_Opaque               => "Opaque"
        | DTYPE_Vector sz t          => "Vector"
        end.
+  
+  #[global] Instance dshowDtyp : DShow dtyp :=
+    {| dshow := dshow_dtyp |}.
 
   Definition show_linkage (l : linkage) : string :=
     match l with
