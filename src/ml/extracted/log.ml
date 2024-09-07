@@ -32,4 +32,7 @@ let dstring_of_log_stream (log_stream : log_stream) : DList.coq_DString =
 let clear_log : unit = log := []
 
 let write_log_entry (le : log_entry) : unit =
-    log := !log >:: le
+  log := !log >:: le
+
+let get_log_stream () : log_stream =
+  List.rev !log

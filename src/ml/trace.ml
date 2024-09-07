@@ -3,8 +3,12 @@ open Denotation
 open ShowAST
 open LLVMAst
 open OrderedType
+open DynamicTypes
+open CFG
 
 (** Modules **)
+type raw_id = LLVMAst.raw_id
+
 module type OrdPrintT =
   sig
     type t
@@ -39,8 +43,9 @@ sig
   val printer : (key -> 'a -> string) -> Format.formatter -> 'a t -> unit
 end
 
-module RawidOrdPrint : OrdPrintT = struct
-  type t = AstLib.RawIDOrd.t
+
+module RawidOrdPrint : OrdPrintT with type t = raw_id = struct
+  type t = raw_id
 
   let compare (t1 : t) (t2 : t) =
     match AstLib.RawIDOrd.compare t1 t2 with
@@ -107,8 +112,30 @@ end
 module RawidM = MakeMap(RawidOrdPrint)
 
 (** Substitution **)
+(* The goal of these functions is to turn the file into an execution trace.
+   ml/extracted/log.ml file has already turned the interpretation trace into logs
+   This file will need to normalize the trace to make it well-formed
+*)
 
 
+(* Substitution r2 using r1 *)
+let subst (m : raw_id RawidM.t) (s : raw_id) =
+  match RawidM.find_opt s m with
+  | Some v -> v
+  | None -> s
+
+type dblk = dtyp LLVMAst.block
+
+(* Algorithm is as follows:
+   If getting a ret, return by one level and get the previous context
+   if getting an instruction, case analysis
+      If the instruction is call. save the cfg and go for one level (a recursive call)
+   if  getting phi node. need to know where did it came from
+      
+   
+*)
+let normalize_log (mcfg : DynamicTypes.dtyp CFG.mcfg) (dblk : dblk) (stack : log_stream) =
+  failwith "unimplemented"
   
 (** Printing trace **)
 let output_channel = ref stdout
