@@ -10,6 +10,7 @@
 
 open Printf
 open Base
+open Trace
 
 open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 
@@ -72,8 +73,11 @@ let process_ll_file path file =
     if !interpret then
       match Interpreter.interpret ll_ast with
       | Ok dv ->
-          Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv)
-      | Error e -> failwith (Result.string_of_exit_condition e)
+        Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv);
+        Trace.print_log ()
+      | Error e ->
+        Trace.print_log ();
+        failwith (Result.string_of_exit_condition e)
   in
   let ll_ast' = transform ll_ast in
   let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in

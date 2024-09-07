@@ -17,7 +17,7 @@ let ( >:: ) x y = y :: x
 
 let output_channel = ref stdout
 
-let dstring_of_log_entry (le : log_entry) : DList.coq_DString =
+let dshow_log_entry (le : log_entry) : DList.coq_DString =
   match le with
   | Instr (uid, ins) ->
     ShowAST.dshow_instr_id ShowAST.dshow_dtyp (uid, ins)
@@ -26,5 +26,10 @@ let dstring_of_log_entry (le : log_entry) : DList.coq_DString =
   | Ret term ->
     ShowAST.dshowTerminator ShowAST.dshow_dtyp term
 
-let write_entry (le : log_entry) : unit =
+let dstring_of_log_stream (log_stream : log_stream) : DList.coq_DString =
+  List.rev log_stream |> List.map dshow_log_entry |> ShowAST.dintersperse (string_to_DString ('\n' :: []))
+
+let clear_log : unit = log := []
+
+let write_log_entry (le : log_entry) : unit =
     log := !log >:: le
