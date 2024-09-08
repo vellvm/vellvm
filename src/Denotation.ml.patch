@@ -1,0 +1,38 @@
+--- ml/extracted/Denotation.ml	2024-09-08 00:09:44.000000000 -0400
++++ ml/extracted/Denotation1.ml	2024-09-08 00:10:57.000000000 -0400
+@@ -33,6 +33,7 @@
+ open Subevent
+ open Util
+ open VellvmIntegers
++open Log
+ 
+ type __ = Obj.t
+ let __ = let rec f _ = Obj.repr f in Obj.repr f
+@@ -1157,6 +1158,7 @@
+ 
+   let denote_instr i varargs =
+     let (pt, i0) = i in
++    let () = write_log_entry (Instr (pt, i0)) in
+     (match pt with
+      | IId id ->
+        (match i0 with
+@@ -5824,8 +5826,9 @@
+       sum) itree **)
+ 
+   let denote_terminator = function
+-  | TERM_Ret v ->
+-    let (dt, op) = v in
++    | TERM_Ret v ->
++      let (dt, op) = v in
++      let () = Log.write_log_entry (Ret v) in
+     bind (Obj.magic coq_Monad_itree) (Obj.magic denote_exp (Some dt) op)
+       (fun dv -> ret (Obj.magic coq_Monad_itree) (Coq_inr dv))
+   | TERM_Ret_void ->
+@@ -6093,6 +6096,7 @@
+ 
+   let denote_phi bid_from = function
+   | (id, p) ->
++    let () = write_log_entry (Phi_node (id, p, bid_from)) in
+     let Phi (dt, args) = p in
+     (match assoc eq_dec_raw_id bid_from args with
+      | Some op ->

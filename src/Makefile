@@ -81,6 +81,7 @@ $(EXTRACTDIR)/STAMP: $(EXEC_VFILES) $(EXEC_VOFILES) $(EXTRACTDIR)/Extract.v
 	@echo "Patching extraction"
 	# patch -p0 < CRelationClasses.mli.patch
 	# patch -u $(EXTRACTDIR)/GenAlive2.ml -i GenAlive2.ml.patch
+	patch -p0 < Denotation.ml.patch
 	@echo "Fixing Extraction"
 	bash fix-extraction.sh
 	touch $(EXTRACTDIR)/STAMP
