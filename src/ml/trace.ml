@@ -308,9 +308,26 @@ let normalize_definition ctx (mcfg : DynamicTypes.dtyp CFG.mcfg) (f : dtyp exp) 
       | Some def ->
         let args = List.map (fun (_, arg) -> subst_exp ctx arg) targs in
         let ctx' = List.combine def.df_args args |> RawidM.of_list in
-        Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx');
+        (* Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx'); *)
         Some ctx'
         (* Need to zip local_id with raw_id, If the length is the same will proceed the above, otherwise error *)
+    end
+  | EXP_Ident (ID_Local id) ->
+    (* Function pointer. Substitute it in, and then check if there is a name equal to that *)
+    let id' = subst_raw_id_opt ctx id (EXP_Ident (ID_Local id)) in
+    begin match id' with
+      | EXP_Ident (ID_Global id) ->
+        begin match List.find_opt (fun x -> RawidOrdPrint.compare x.df_prototype.dc_name id == 0) mcfg.m_definitions with
+          | None ->
+            None
+          | Some def ->
+            let args = List.map (fun (_, arg) -> subst_exp ctx arg) targs in
+            let ctx' = List.combine def.df_args args |> RawidM.of_list in
+            (* Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx'); *)
+            Some ctx'
+            (* Need to zip local_id with raw_id, If the length is the same will proceed the above, otherwise error *)
+        end
+      | _ -> None
     end
   | _ -> None
 
@@ -323,7 +340,7 @@ let rec normalize_log
   | [] ->
     ctx, [], dblk, None
   | log::stack' ->
-    print_log_entry log;
+    (* print_log_entry log; *)
     begin match log with
       | Phi_node (lid, phi, bid) ->
         let ctx'= normalize_phi ctx lid phi bid in
@@ -358,10 +375,10 @@ let rec normalize_log
             *)
 
             begin match id, AstLib.intrinsic_exp f with
-              | IVoid _, Some s ->
+              | IVoid _, Some _ ->
                 let dblk' = add_code dblk [(id, ins)] in
                 normalize_log ctx mcfg dblk' stack'
-              | IId id, Some s->
+              | IId id, Some _ ->
                 let id' = gensym_raw_id id in
                 let dblk' = add_code dblk [(IId id', ins)] in
                 let exp = EXP_Ident (ID_Global id') in
@@ -378,6 +395,7 @@ let rec normalize_log
                     failwith "Function mismatch"
                 end
               | IId id, None ->
+                (* Printf.printf "%s\n" (ShowAST.dshowExp ShowAST.dshowDtyp f |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring); *)
                 let args = List.map (fun (arg, _) -> arg) targs in
                 begin match normalize_definition ctx mcfg f args with
                   | Some ctx' ->
@@ -385,9 +403,9 @@ let rec normalize_log
                     begin match texp with
                       | Some (_, exp) -> 
                         let ctx2 = RawidM.update_or exp (fun _ -> exp) id ctx in
-                        Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx);
-                        Printf.printf "ctx': %s\n" (RawidM.to_string ctx_unit_to_string ctx');
-                        Printf.printf "ctx2: %s\n" (RawidM.to_string ctx_unit_to_string ctx2);
+                        (* Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx); *)
+                        (* Printf.printf "ctx': %s\n" (RawidM.to_string ctx_unit_to_string ctx'); *)
+                        (* Printf.printf "ctx2: %s\n" (RawidM.to_string ctx_unit_to_string ctx2); *)
                         normalize_log ctx2 mcfg dblk2 stack2
                       | None ->
                         failwith "Should return something"
@@ -522,8 +540,3 @@ let print_normalized_log ll_ast =
   let mcfg = get_mcfg ll_ast in
   let dblk = normalize_code mcfg (List.rev !Log.log) in
   print_dblk dblk
-
-
-
-
-  

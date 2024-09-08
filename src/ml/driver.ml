@@ -74,7 +74,9 @@ let process_ll_file path file =
       match Interpreter.interpret ll_ast with
       | Ok dv ->
         Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv);
-        Trace.print_log ()
+        Trace.print_log ();
+        Printf.printf "\nNormalizing\n";
+        Trace.print_normalized_log ll_ast
       | Error e ->
         Trace.print_log ();
         failwith (Result.string_of_exit_condition e)
