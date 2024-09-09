@@ -626,7 +626,7 @@ let rec normalize_log
           | Some (TERM_Ret texp') ->
             let texp2 = subst_texp ctx texp' in
             let tblk' = add_term tblk (TERM_Ret texp2) in
-            ctx, stack', tblk', Some texp'
+            ctx, stack', tblk', Some texp2
           | _ -> failwith "normalize_log: cannot find phi"
         end
       | Instr (id, ins) ->
