@@ -138,6 +138,18 @@ Module BoundedSet(Import S:FSetInterface.WS) <: LATTICE.
       | None => True
     end.
 
+  Definition cardinal (s : t) : nat :=
+    match s with 
+      | None    => 0 
+      | Some s' => S.cardinal s'
+    end.
+
+  (* Example singleton_size : forall e : S.elt, size (singleton e) = 1.
+  Proof.
+    intros. simpl. rewrite cardinal_1.
+    assert (elements (S.singleton e) = [e]). 
+     *)
+
 End BoundedSet.
 
 
@@ -155,7 +167,9 @@ Module Type GRAPH.
   Parameter Inline entry : t -> V.
   Parameter Inline edge : t -> V -> V -> Prop.
   Parameter Inline mem : t -> V -> Prop.
+  
 End GRAPH.
+
 
 (** ** Specification of Dominators *)
 
