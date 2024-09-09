@@ -19,6 +19,8 @@ let string_of_dvalue (d : DV.dvalue) = of_str (DV.show_dvalue d)
 
 let interpret = ref false
 
+let trace = ref false
+
 let transform
     (prog :
       ( LLVMAst.typ
@@ -76,17 +78,7 @@ let process_ll_file path file =
       | Error e ->
         Trace.print_log ();
         failwith (Result.string_of_exit_condition e)
-  in
-  let ll_ast' = transform ll_ast in
-  let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in
-  let _ = IO.output_file vll_file ll_ast' in
-  ()
-
-let gen_trace_file path file =
-  let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
-  let ll_ast = IO.parse_file path in
-  let _ =
-    if !interpret then
+    else if !trace then
       match Interpreter.interpret ll_ast with
       | Ok dv ->
         Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv);
@@ -102,7 +94,6 @@ let gen_trace_file path file =
   let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in
   let _ = IO.output_file vll_file ll_ast' in
   ()
-  
 
 let process_file path =
   let _ = Printf.printf "Processing: %s\n" path in

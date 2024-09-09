@@ -322,6 +322,10 @@ let args =
   ; ( "-i"
     , Set Driver.interpret
     , "interpret ll program starting from 'main' (same as -interpret)" )
+  ; ( "-t"
+    , Set Driver.trace
+    , "interpret ll program starting from 'main' (same as -interpret) and generate .trace.ll file"
+    )
   ; ("-debug", Set Interpreter.debug_flag, "enable debugging trace output")
   ; ("-v", Set Platform.verbose, "enables more verbose compilation output")
  ]
