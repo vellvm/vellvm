@@ -73,13 +73,6 @@ let process_ll_file path file =
       match Interpreter.interpret ll_ast with
       | Ok dv ->
         Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv);
-        (* let ll_ast_trace = gen_executable_trace ll_ast in *)
-        (* let ll_ast_trace' = transform ll_ast_trace in *)
-        (* let vll_file = Platform.gen_name !Platform.output_path file ".trace.ll" in *)
-        (* IO.output_file vll_file ll_ast_trace' *)
-        Trace.print_log ();
-        Printf.printf "\nNormalizing\n";
-        Trace.print_normalized_log ll_ast
       | Error e ->
         Trace.print_log ();
         failwith (Result.string_of_exit_condition e)
@@ -89,6 +82,28 @@ let process_ll_file path file =
   let _ = IO.output_file vll_file ll_ast' in
   ()
 
+let gen_trace_file path file =
+  let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
+  let ll_ast = IO.parse_file path in
+  let _ =
+    if !interpret then
+      match Interpreter.interpret ll_ast with
+      | Ok dv ->
+        Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv);
+        let ll_ast_trace = Trace.gen_executable_trace ll_ast in
+        let ll_ast_trace' = transform ll_ast_trace in
+        let tracell_file = Platform.gen_name !Platform.output_path file ".trace.ll" in
+        IO.output_file tracell_file ll_ast_trace'
+      | Error e ->
+        Trace.print_log ();
+        failwith (Result.string_of_exit_condition e)
+  in
+  let ll_ast' = transform ll_ast in
+  let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in
+  let _ = IO.output_file vll_file ll_ast' in
+  ()
+  
+
 let process_file path =
   let _ = Printf.printf "Processing: %s\n" path in
   let basename, ext = Platform.path_to_basename_ext path in
@@ -97,6 +112,7 @@ let process_file path =
   | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
 
 let process_files files = List.iter process_file files
+
 
 (* file running ---------------------------------------------------------- *)
 (* Parses and runs the ll file at the given path, returning the dvalue
