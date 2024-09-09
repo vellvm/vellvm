@@ -1,12 +1,9 @@
 open Log
-open Denotation
-open ShowAST
 open LLVMAst
 open OrderedType
 open DynamicTypes
 open CFG
 open TypToDtyp
-open TopLevel
 
 let todo s = failwith (Printf.sprintf "%s:unimplemented\n" s)
 
@@ -864,7 +861,7 @@ let gen_executable_trace ll_ast : (typ, typ block * typ block list) toplevel_ent
          df_args=f_def.df_args;
          df_instrs=tblk,[]
         } in
-      TLE_Definition f_def' :: r_tles
+       r_tles @ [TLE_Definition f_def']
     | _ -> failwith "gen_executable_trace: main function is not definition"
     end
   | _ -> failwith "gen_executable_trace: failed to get main function"
