@@ -616,7 +616,6 @@ let rec normalize_log
   | [] ->
     ctx, [], tblk, None
   | log::stack' ->
-    print_log_entry log;
     begin match log with
       | Phi_node (id, _, bid) ->
         begin match get_phi_from_def f_def id with
@@ -812,10 +811,10 @@ let normalize_code
   | Some f_def -> 
     let ctx = RawidM.empty in
     (* Printf.printf "%s" (Log.dstring_of_log_stream stack |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring); *)
-    let tblk : typ block = {blk_id=Name (['0']);
+    let tblk : typ block = {blk_id= f_def.df_instrs.init;
                             blk_phis=[];
                             blk_code=[];
-                            blk_term=(TERM_Ret (TYPE_Void, EXP_Undef));
+                            blk_term=(TERM_Ret (TYPE_I (Camlcoq.N.of_int 8), EXP_Integer (Camlcoq.Z.of_sint 1)));
                             blk_comments= None
                            } in
     let (_, _ , tblk', _) = normalize_log ctx f_def mcfg tblk stack in
@@ -826,8 +825,6 @@ let normalize_code
      blk_comments=tblk'.blk_comments
     }
 (* IO.output_file *)
-
-
 
 
 (** Printing trace **)
@@ -841,3 +838,34 @@ let print_normalized_log ll_ast =
   (* print_tlog code; *)
   let tblk = normalize_code main_f_id mcfg code in
   print_tblk tblk
+
+(** Generate an ll_ast for output **)
+let get_f_def_from_ast
+    (f_exp : typ exp)
+    (ll_ast: (typ, typ block * typ block list) toplevel_entities)
+  : ((typ, typ block * typ block list) toplevel_entity list) * ((typ, typ block * typ block list) toplevel_entity list) =
+  let find_aux : (typ, typ block * typ block list) toplevel_entity -> bool  = function
+    | TLE_Definition f_def ->
+      exp_eq typ_eq (EXP_Ident (ID_Global f_def.df_prototype.dc_name)) f_exp
+    | _ -> false in
+  List.partition find_aux ll_ast
+
+let gen_executable_trace ll_ast : (typ, typ block * typ block list) toplevel_entities =
+  let mcfg = get_mcfg ll_ast in
+  let main_f_id = (Name (Camlcoq.coqstring_of_camlstring "main")) in
+  let code = List.rev !Log.log in
+  let tblk = normalize_code main_f_id mcfg code in
+  match get_f_def_from_ast (EXP_Ident (ID_Global main_f_id)) ll_ast with
+  | [f_tle], r_tles ->
+    begin match f_tle with
+    | TLE_Definition f_def ->
+      let f_def' =
+        {df_prototype=f_def.df_prototype;
+         df_args=f_def.df_args;
+         df_instrs=tblk,[]
+        } in
+      TLE_Definition f_def' :: r_tles
+    | _ -> failwith "gen_executable_trace: main function is not definition"
+    end
+  | _ -> failwith "gen_executable_trace: failed to get main function"
+
