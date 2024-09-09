@@ -5,15 +5,290 @@ open LLVMAst
 open OrderedType
 open DynamicTypes
 open CFG
+open TypToDtyp
+open TopLevel
 
-let print_dblk dblk : unit =
-  Printf.printf "%s" (ShowAST.dshowBlock ShowAST.dshowDtyp (dblk) |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
+let todo s = failwith (Printf.sprintf "%s:unimplemented\n" s)
+
+(** Printing Helper Function **)
+let print_tblk tblk : unit =
+  Printf.printf "%s" (ShowAST.dshowBlock ShowAST.dshowTyp (tblk) |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
 
 let print_log_entry (le : log_entry) =
-  Printf.printf "%s" (Log.dshow_log_entry le |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
+  Printf.printf "%s\n" (Log.dshow_log_entry le |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
 
 let print_log () : unit =
   Printf.printf "%s\n" (Log.dstring_of_log_stream !Log.log |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
+    
+let get_mcfg ll_ast =
+  (mcfg_of_tle (TopLevel.TopLevelBigIntptr.link TopLevel.TopLevelBigIntptr.coq_PREDEFINED_FUNCTIONS ll_ast))
+
+(** dtyp -> typ mcfg helper function **)
+type tlog_entry =
+  | TInstr of instr_id * typ instr
+  | TPhi of local_id * typ phi * block_id
+  | TRet of typ texp
+
+type tlog_stream = tlog_entry list
+
+let dshow_tlog_entry (le : tlog_entry) : DList.coq_DString =
+  match le with
+  | TInstr (uid, ins) ->
+    ShowAST.dshow_instr_id ShowAST.dshowTyp (uid, ins)
+  | TPhi (uid, phi, bid) ->
+    DList.coq_DList_join
+      [
+      ShowAST.dshow_raw_id bid;
+      ShowAST.dshow_phi_id ShowAST.dshowTyp (uid, phi)
+    ]
+  | TRet term ->
+    ShowAST.dshowTerminator ShowAST.dshowTyp (TERM_Ret term)
+
+let dstring_of_tlog_stream (tlog_stream : tlog_stream) : DList.coq_DString =
+  List.map dshow_tlog_entry tlog_stream |> ShowAST.dintersperse (DList.string_to_DString ('\n' :: []))
+
+let print_tlog (code : tlog_stream) : unit =
+  Printf.printf "%s\n" (dstring_of_tlog_stream code |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
+
+(* Prior to running through normalization.
+   transform dtyp to typ based on matching ssa id.
+*)
+
+(* TODO: This seems to be slow, can optimize by pre-storing the data structure *)
+let get_instr_from_def
+    (f_def : (LLVMAst.typ, LLVMAst.typ cfg) definition)
+    (id : instr_id) : (instr_id * typ instr) option =
+  let blocks = f_def.df_instrs.blks in
+  let codes = List.flatten (List.map (fun x -> x.blk_code) blocks) in
+  List.find_opt (fun x -> AstLib.InstrIDDec.eq_dec (fst x) id) codes
+
+let get_phi_from_def
+    (f_def : (LLVMAst.typ, LLVMAst.typ cfg) definition)
+    (id : local_id) : (local_id * typ phi) option =
+  let blocks = f_def.df_instrs.blks in
+  let phis = List.flatten (List.map (fun x -> x.blk_phis) blocks) in
+  List.find_opt (fun x -> AstLib.RawIDOrd.eq_dec (fst x) id) phis
+
+  (* let interpreter_gen ret_typ entry args prog = *)
+  (*   let t = *)
+  (*     denote_vellvm ret_typ entry args *)
+(*       (convert_types (mcfg_of_tle (link coq_PREDEFINED_FUNCTIONS prog))) *)
+
+(* TODO: This is a little bit hand-waiving because I'm using OCaml equality
+   Maybe need to define own equality that equates both terms / expressions
+*)
+let rec exp_eq (f : 'a -> 'a -> bool) (exp1 : 'a exp) (exp2 : 'a exp) : bool =
+  match exp1, exp2 with
+  | EXP_Ident ident1, EXP_Ident ident2 ->
+    AstLib.eq_dec_ident ident1 ident2
+  | EXP_Integer i1, EXP_Integer i2 ->
+    Camlcoq.Z.eq i1 i2
+  | EXP_Float float1, EXP_Float float2 ->
+    Floats.Float32.eq_dec float1 float2
+  | EXP_Double float1, EXP_Double float2 ->
+    Floats.Float.eq_dec float1 float2
+  | EXP_Hex float1, EXP_Hex float2 ->
+    Floats.Float.eq_dec float1 float2 
+  | EXP_Bool b1, EXP_Bool b2 ->
+    Bool.eqb b1 b2
+  | EXP_Null, EXP_Null ->
+    true
+  | EXP_Zero_initializer, EXP_Zero_initializer ->
+    true
+  | EXP_Cstring texps1, EXP_Cstring texps2 ->
+    List.equal (fun (t1, exp1) (t2, exp2) -> f t1 t2 && exp_eq f exp1 exp2) texps1 texps2
+  | EXP_Undef, EXP_Undef ->
+    true
+  | EXP_Poison, EXP_Poison ->
+    true
+  | EXP_Struct texps1, EXP_Struct texps2 -> 
+    List.equal (fun (t1, exp1) (t2, exp2) -> f t1 t2 && exp_eq f exp1 exp2) texps1 texps2
+  | EXP_Packed_struct texps1, EXP_Packed_struct texps2 -> 
+    List.equal (fun (t1, exp1) (t2, exp2) -> f t1 t2 && exp_eq f exp1 exp2) texps1 texps2
+  | EXP_Array texps1, EXP_Array texps2 ->
+    List.equal (fun (t1, exp1) (t2, exp2) -> f t1 t2 && exp_eq f exp1 exp2) texps1 texps2
+  | EXP_Vector texps1, EXP_Vector texps2 ->
+    List.equal (fun (t1, exp1) (t2, exp2) -> f t1 t2 && exp_eq f exp1 exp2) texps1 texps2
+  | OP_IBinop (ibinop1, t1, exp11, exp12), OP_IBinop (ibinop2, t2, exp21, exp22) ->
+    ibinop1 == ibinop2 && f t1 t2 && exp_eq f exp11 exp21 && exp_eq f exp12 exp22
+  | OP_ICmp (icmp1, t1, exp11, exp12), OP_ICmp (icmp2, t2, exp21, exp22) -> 
+    icmp1 == icmp2 && f t1 t2 && exp_eq f exp11 exp21 && exp_eq f exp12 exp22
+  | OP_FBinop (fbinop1, _, t1, exp11, exp12), OP_FBinop (fbinop2, _, t2, exp21, exp22) ->
+    fbinop1 == fbinop2 && f t1 t2 && exp_eq f exp11 exp21 && exp_eq f exp12 exp22
+  | OP_FCmp (fcmp1, t1, exp11, exp12), OP_FCmp (fcmp2, t2, exp21, exp22) -> 
+    fcmp1 == fcmp2 && f t1 t2 && exp_eq f exp11 exp21 && exp_eq f exp12 exp22
+  | OP_Conversion _, OP_Conversion _ -> todo "OP_Conversion"
+  | OP_GetElementPtr _, OP_GetElementPtr _ -> todo "OP_GetElementPtr"
+  | OP_ExtractElement _, OP_ExtractElement _ -> todo "OP_ExtractElement"
+  | OP_InsertElement _, OP_InsertElement _ -> todo "OP_InsertElement"
+  | OP_ShuffleVector _, OP_ShuffleVector _ -> todo "OP_ShuffleVector"
+  | OP_ExtractValue _, OP_ExtractValue _ -> todo "OP_ExtractValue"
+  | OP_InsertValue _, OP_InsertValue _ -> todo "OP_InsertValue"
+  | OP_Select _, OP_Select _ -> todo "OP_Select"
+  | OP_Freeze _, OP_Freeze _ -> todo "OP_Freeze"
+  | _ -> failwith "exp_eq unimplemented"                   (* OP part is never used *)
+
+let texp_eq (f : 'a -> 'a -> bool) (texp1 : 'a * 'a exp) (texp2 : 'a * 'a exp) : bool =
+  let (t1, exp1) = texp1 in
+  let (t2, exp2) = texp2 in
+  f t1 t2 && exp_eq f exp1 exp2
+
+let term_eq (f : 'a -> 'a -> bool) (term1 : 'a terminator) (term2 : 'a terminator) : bool =
+  match term1, term2 with
+  | TERM_Ret (t1, exp1), TERM_Ret (t2, exp2) ->
+    f t1 t2 && exp_eq f exp1 exp2
+  | TERM_Ret_void, TERM_Ret_void ->
+    true
+  | TERM_Br (texp1, b11, b12), TERM_Br (texp2, b21, b22) ->
+    texp_eq f texp1 texp2 && AstLib.RawIDOrd.eq_dec b11 b21 && AstLib.RawIDOrd.eq_dec b12 b22
+  | TERM_Br_1 b1, TERM_Br_1 b2 ->
+    AstLib.RawIDOrd.eq_dec b1 b2
+  | TERM_Switch _, TERM_Switch _ -> false (* TODO: Finish this *)
+  | TERM_IndirectBr (texp1, bs1), TERM_IndirectBr (texp2, bs2) ->
+    texp_eq f texp1 texp2 && List.equal AstLib.RawIDOrd.eq_dec bs1 bs2
+  | TERM_Resume texp1, TERM_Resume texp2 ->
+    texp_eq f texp1 texp2
+  | TERM_Invoke _, TERM_Invoke _ -> false (* TODO: Finish this *)
+  | TERM_Unreachable, TERM_Unreachable -> true 
+  | _ -> false
+
+let rec typ_eq (typ1 : LLVMAst.typ) (typ2 : LLVMAst.typ) =
+  match typ1, typ2 with
+  | TYPE_I i1, TYPE_I i2 ->
+    Camlcoq.N.eq i1 i2
+  | TYPE_Pointer t1, TYPE_Pointer t2 ->
+    typ_eq t1 t2
+  | TYPE_IPTR, TYPE_IPTR 
+  | TYPE_Void, TYPE_Void
+  | TYPE_Half, TYPE_Half 
+  | TYPE_Float, TYPE_Float 
+  | TYPE_Double, TYPE_Double 
+  | TYPE_X86_fp80, TYPE_X86_fp80
+  | TYPE_Fp128, TYPE_Fp128
+  | TYPE_Ppc_fp128, TYPE_Ppc_fp128
+  | TYPE_Metadata, TYPE_Metadata
+  | TYPE_X86_mmx, TYPE_X86_mmx
+  | TYPE_Opaque, TYPE_Opaque -> 
+    true
+  | TYPE_Array (n1, t1), TYPE_Array (n2, t2) ->
+    Camlcoq.N.eq n1 n2 && typ_eq t1 t2
+  | TYPE_Function (t1, targs1, b1), TYPE_Function (t2, targs2, b2) ->
+    typ_eq t1 t2 && List.equal typ_eq targs1 targs2 && b1 == b2
+  | TYPE_Struct targs1, TYPE_Struct targs2 ->
+    List.equal typ_eq targs1 targs2
+  | TYPE_Packed_struct targs1, TYPE_Packed_struct targs2 ->
+    List.equal typ_eq targs1 targs2
+  | TYPE_Vector (n1, t1), TYPE_Vector (n2, t2) ->
+    Camlcoq.N.eq n1 n2 && typ_eq t1 t2
+  | TYPE_Identified id1, TYPE_Identified id2 ->
+    AstLib.eq_dec_ident id1 id2
+  | _ ->  false
+
+let get_term_from_def
+    (f_def : (LLVMAst.typ, LLVMAst.typ cfg) definition)
+    (mcfg : typ mcfg)
+    (term : dtyp terminator): typ terminator option =
+  let blocks = f_def.df_instrs.blks in
+  let terms = List.map (fun x -> x.blk_term) blocks in
+  let convert_dtyp_term : typ terminator -> dtyp terminator = fun (x : typ terminator) -> convert_typ (Obj.magic coq_ConvertTyp_term) mcfg.m_type_defs (Obj.magic x) in
+  let find_aux : typ terminator -> bool = fun (x : typ terminator) -> term_eq dtyp_eqb (convert_dtyp_term x) term in
+  List.find_opt find_aux terms
+
+let get_f_def_from_mcfg
+    (f_exp : LLVMAst.typ LLVMAst.exp)
+    (mcfg : typ mcfg) : (LLVMAst.typ, LLVMAst.typ cfg) definition option =
+  let defs = mcfg.m_definitions in
+  let find_aux  = fun x -> exp_eq typ_eq (EXP_Ident (ID_Global x.df_prototype.dc_name)) f_exp in
+  List.find_opt find_aux defs
+
+let rec transform_dtyp_to_typ_log'
+    (stack : log_stream)
+    (f_def : (LLVMAst.typ, LLVMAst.typ cfg) definition)
+    (mcfg : LLVMAst.typ mcfg)
+    (code : tlog_stream)
+  : tlog_stream * log_stream =
+  match stack with
+  | [] -> code, []
+  | log::stack' ->
+    (* print_log_entry log; *)
+    begin match log with
+      | Instr (id, ins) ->
+        let ins'o = get_instr_from_def f_def id in
+        begin match ins, ins'o with
+        | INSTR_Comment c, Some (_, INSTR_Comment _) ->
+          let code' = code >:: TInstr (id, INSTR_Comment c) in
+          transform_dtyp_to_typ_log' stack' f_def mcfg code'
+        | INSTR_Op _, Some (_, INSTR_Op exp')->
+          let code' = code >:: TInstr (id, INSTR_Op exp') in
+          transform_dtyp_to_typ_log' stack' f_def mcfg code'
+        | INSTR_Call (_, _, _), Some (_, INSTR_Call ((f_t, f_exp'), args', anns')) ->
+          let code' = code >:: TInstr (id, INSTR_Call ((f_t, f_exp'), args', anns')) in
+          begin match AstLib.intrinsic_exp f_exp' with
+            | Some _ -> 
+              transform_dtyp_to_typ_log' stack' f_def mcfg code'
+            | None ->           (* Not customized function *)
+               begin match get_f_def_from_mcfg f_exp' mcfg with
+                 | Some f_def' -> 
+                   let code2, stack2 = transform_dtyp_to_typ_log' stack' f_def' mcfg code' in
+                   transform_dtyp_to_typ_log' stack2 f_def mcfg code2
+                 | None -> failwith "Cannot find the new definition"
+               end
+          end
+          (* Pick the new function *)
+        | INSTR_Alloca (_, _), Some (_, INSTR_Alloca (dt', anns')) ->
+          let code' = code >:: TInstr (id, INSTR_Alloca (dt', anns')) in
+          transform_dtyp_to_typ_log' stack' f_def mcfg code'
+        | INSTR_Load (_, _, _), Some (_, INSTR_Load (dt', exp', anns'))->
+          let code' = code >:: TInstr (id, INSTR_Load (dt', exp', anns')) in
+          transform_dtyp_to_typ_log' stack' f_def mcfg code'
+        | INSTR_Store (_, _, _), Some (_, INSTR_Store (texp1', texp2', anns')) ->
+          let code' = code >:: TInstr (id, INSTR_Store (texp1', texp2', anns')) in
+          transform_dtyp_to_typ_log' stack' f_def mcfg code'
+        | INSTR_Fence (co, o), Some (_, INSTR_Fence _) ->
+          let code' = code >:: TInstr (id, INSTR_Fence (co, o)) in
+          transform_dtyp_to_typ_log' stack' f_def mcfg code'
+        | INSTR_AtomicCmpXchg _, Some (_, INSTR_AtomicCmpXchg cmpxchg') ->
+          let code' = code >:: TInstr (id, INSTR_AtomicCmpXchg cmpxchg') in
+          transform_dtyp_to_typ_log' stack' f_def mcfg code'
+        | INSTR_AtomicRMW _, Some (_, INSTR_AtomicRMW atomicrmw') ->
+          let code' = code >:: TInstr (id, INSTR_AtomicRMW atomicrmw') in
+          transform_dtyp_to_typ_log' stack' f_def mcfg code'
+        | INSTR_VAArg (_, _), Some (_, INSTR_VAArg (texp', t')) -> 
+          let code' = code >:: TInstr (id, INSTR_VAArg (texp', t')) in
+          transform_dtyp_to_typ_log' stack' f_def mcfg code'
+        | INSTR_LandingPad, Some (_, INSTR_LandingPad) ->
+          let code' = code >:: TInstr (id, INSTR_LandingPad) in
+          transform_dtyp_to_typ_log' stack' f_def mcfg code'
+        | _ -> failwith "transform_dtyp_to_typ_log: Cannot find instr"
+        end
+      | Phi_node (id, _, bid) ->
+        let phi'o = get_phi_from_def f_def id in
+        begin match phi'o with
+          | Some (_, phi') ->
+            let code' = code >:: TPhi (id, phi', bid) in
+            transform_dtyp_to_typ_log' stack' f_def mcfg code'
+          | None -> failwith "transform_dtyp_to_typ_log: Cannot find phi"
+        end
+      | Ret texp ->
+        let term' = get_term_from_def f_def mcfg (TERM_Ret texp) in
+        begin match term' with
+          | Some (TERM_Ret texp') ->
+            let code' = code >:: TRet texp' in
+            code', stack'
+          | _ -> failwith "transform_dtyp_to_typ_log: Cannot find terminator"
+        end
+    end
+
+
+(* TODO: Currently hard-coded specific module. *)
+let transform_dtyp_to_typ_log
+    (stack : log_stream)
+    (f_id : function_id)
+    (mcfg : LLVMAst.typ mcfg) : tlog_stream =
+  match get_f_def_from_mcfg (EXP_Ident (ID_Global f_id)) mcfg with
+  | None -> failwith (Printf.sprintf "Cannot found definition %s" (ShowAST.dshow_raw_id f_id |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring))
+  | Some f_def -> transform_dtyp_to_typ_log' stack f_def mcfg [] |> fst
+
 (** Modules **)
 
 type raw_id = LLVMAst.raw_id
@@ -129,9 +404,9 @@ module RawidM = MakeMap(RawidOrdPrint)
    This file will need to normalize the trace to make it well-formed
 *)
 
-type ctx = dtyp exp RawidM.t
+type ctx = typ exp RawidM.t
 
-type code = (instr_id * dtyp instr) list
+type code = (instr_id * typ instr) list
 
 let gensym : string -> string =
   let c = ref 0 in
@@ -162,29 +437,29 @@ let gensym_raw_id : raw_id -> raw_id = function
     (* let id' = Campcoq.camlstring_of_coqstring "raw" |> gensym |> Camlcoq.coqstring_of_camlstring in *)
 
 (* Substitution r2 using r1 *)
-let subst_raw_id_opt (ctx : ctx) (s : raw_id) (d : dtyp exp) =
+let subst_raw_id_opt (ctx : ctx) (s : raw_id) (d : typ exp) =
   match RawidM.find_opt s ctx with
   | Some v -> v
   | None -> d
 
-let subst_ident_opt (ctx : ctx) (s : ident) (d : dtyp exp) =
+let subst_ident_opt (ctx : ctx) (s : ident) (d : typ exp) =
   match s with
   | ID_Global r | ID_Local r -> subst_raw_id_opt ctx r d
 
-let subst_exp (ctx : ctx) (s : dtyp exp) : dtyp exp =
+let subst_exp (ctx : ctx) (s : typ exp) : typ exp =
   match s with
   | EXP_Ident ident ->
     subst_ident_opt ctx ident s
   | _ -> s
 
-let subst_texp (ctx : ctx) (s : dtyp texp) : dtyp texp =
+let subst_texp (ctx : ctx) (s : typ texp) : typ texp =
   let (t, exp) = s in
   t, subst_exp ctx exp
 
-let subst_texps (ctx : ctx) (ss : dtyp texp list) : dtyp texp list =
+let subst_texps (ctx : ctx) (ss : typ texp list) : typ texp list =
   List.map (subst_texp ctx) ss
 
-type dblk = dtyp LLVMAst.block
+type tblk = typ LLVMAst.block
 
 
 (* Algorithm is as follows:
@@ -193,26 +468,26 @@ type dblk = dtyp LLVMAst.block
       If the instruction is call. save the cfg and go for one level (a recursive call)
    if  getting phi node. need to know where did it came from (bid). Then find the right node and substitute the values into the map
 *)
-let add_code dblk (code : code) : dblk =
-  let code' = dblk.blk_code >@ code in
-  {blk_id = dblk.blk_id;
-   blk_phis = dblk.blk_phis;
+let add_code tblk (code : code) : tblk =
+  let code' = tblk.blk_code >@ code in
+  {blk_id = tblk.blk_id;
+   blk_phis = tblk.blk_phis;
    blk_code = code';
-   blk_term = dblk.blk_term;
-   blk_comments = dblk.blk_comments
+   blk_term = tblk.blk_term;
+   blk_comments = tblk.blk_comments
   }
 
-let add_term dblk (term : dtyp terminator) : dblk =
-  {blk_id = dblk.blk_id;
-   blk_phis = dblk.blk_phis;
-   blk_code = dblk.blk_code;
+let add_term tblk (term : typ terminator) : tblk =
+  {blk_id = tblk.blk_id;
+   blk_phis = tblk.blk_phis;
+   blk_code = tblk.blk_code;
    blk_term = term;
-   blk_comments = dblk.blk_comments
+   blk_comments = tblk.blk_comments
   }
 (* TODO: How to deal with rightmost terminator when it is not well-formed *)
 
 (* TODO: Substitution needed *)
-let normalize_exp (ctx : ctx) (op : dtyp exp) : dtyp exp =
+let normalize_exp (ctx : ctx) (op : typ exp) : typ exp =
   match op with
   | OP_IBinop (ibinop, t, exp1, exp2) ->
     let exp1' = subst_exp ctx exp1 in
@@ -278,11 +553,11 @@ let normalize_exp (ctx : ctx) (op : dtyp exp) : dtyp exp =
     (* let exp = EXP_Ident (ID_Local lid') in *)
     op
 
-let ctx_unit_to_string (r : raw_id) (d : dtyp exp) : string =
+let ctx_unit_to_string (r : raw_id) (d : typ exp) : string =
   Printf.sprintf "%s->%s" (ShowAST.dshow_raw_id r |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
-    (ShowAST.dshowExp ShowAST.dshowDtyp d |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
+    (ShowAST.dshowExp ShowAST.dshowTyp d |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
 
-let normalize_phi (ctx : ctx) (id : raw_id) (phi : dtyp phi) (bid_from : raw_id) : ctx =
+let normalize_phi (ctx : ctx) (id : raw_id) (phi : typ phi) (bid_from : raw_id) : ctx =
   match phi with
   | Phi (_, args) -> 
     match Util.assoc AstLib.eq_dec_raw_id bid_from args with
@@ -299,7 +574,7 @@ let normalize_phi (ctx : ctx) (id : raw_id) (phi : dtyp phi) (bid_from : raw_id)
 let list_to_map l1 l2 =
   List.fold_left (fun acc (key, value) -> RawidM.add key value acc) RawidM.empty @@ List.combine l1 l2
 
-let normalize_definition ctx (mcfg : DynamicTypes.dtyp CFG.mcfg) (f : dtyp exp) (targs : dtyp texp list) : ctx option =
+let normalize_definition ctx (mcfg : LLVMAst.typ CFG.mcfg) (f : typ exp) (targs : typ texp list) : ctx option =
   match f with
   | EXP_Ident (ID_Global id) ->
     begin match List.find_opt (fun x -> RawidOrdPrint.compare x.df_prototype.dc_name id == 0) mcfg.m_definitions with
@@ -333,99 +608,118 @@ let normalize_definition ctx (mcfg : DynamicTypes.dtyp CFG.mcfg) (f : dtyp exp) 
 
 let rec normalize_log
     (ctx : ctx)
-    (mcfg : DynamicTypes.dtyp CFG.mcfg)
-    (dblk : dblk)
-    (stack : log_stream) : ctx * log_stream * dblk * dtyp texp option =
+    (f_def : (LLVMAst.typ, LLVMAst.typ cfg) definition)
+    (mcfg : typ CFG.mcfg)
+    (tblk : tblk)
+    (stack : log_stream) : ctx * log_stream * tblk * typ texp option =
   match stack with
   | [] ->
-    ctx, [], dblk, None
+    ctx, [], tblk, None
   | log::stack' ->
-    (* print_log_entry log; *)
+    print_log_entry log;
     begin match log with
-      | Phi_node (lid, phi, bid) ->
-        let ctx'= normalize_phi ctx lid phi bid in
-        normalize_log ctx' mcfg dblk stack'
+      | Phi_node (id, _, bid) ->
+        begin match get_phi_from_def f_def id with
+          | Some (_, phi') ->
+            let ctx'= normalize_phi ctx id phi' bid in
+            normalize_log ctx' f_def mcfg tblk stack'
+          | None -> failwith "normalize_log: cannot find phi"
+        end
       | Ret texp ->
-        let texp' = subst_texp ctx texp in
-        let dblk' = add_term dblk (TERM_Ret texp') in
-        ctx, stack', dblk', Some texp' 
+        begin match get_term_from_def f_def mcfg (TERM_Ret texp) with
+          | Some (TERM_Ret texp') ->
+            let texp2 = subst_texp ctx texp' in
+            let tblk' = add_term tblk (TERM_Ret texp2) in
+            ctx, stack', tblk', Some texp'
+          | _ -> failwith "normalize_log: cannot find phi"
+        end
       | Instr (id, ins) ->
-        begin match ins with
-          | INSTR_Comment _ ->
-            let dblk' = add_code dblk [(id, ins)] in
-            normalize_log ctx mcfg dblk' stack'
-          | INSTR_Op exp ->
+        begin match ins, get_instr_from_def f_def id with
+          | INSTR_Comment _, Some (_, INSTR_Comment c) ->
+            let tblk' = add_code tblk [(id, INSTR_Comment c)] in
+            normalize_log ctx f_def mcfg tblk' stack'
+          | INSTR_Op _, Some (_, INSTR_Op exp)->
             let exp' = normalize_exp ctx exp in
             begin match id with
             | IVoid _ ->
-              let dblk' = add_code dblk [(id, INSTR_Op exp')] in
-              normalize_log ctx mcfg dblk' stack'
+              let tblk' = add_code tblk [(id, INSTR_Op exp')] in
+              normalize_log ctx f_def mcfg tblk' stack'
             | IId id ->
               let id' = gensym_raw_id id in
               let e = EXP_Ident (ID_Local id') in
               let ctx' = RawidM.update_or e (fun _ -> e) id ctx in
-              let dblk' = add_code dblk [(IId id', INSTR_Op exp')] in
-              normalize_log ctx' mcfg dblk' stack'
+              let tblk' = add_code tblk [(IId id', INSTR_Op exp')] in
+              normalize_log ctx' f_def mcfg tblk' stack'
             end
-          | INSTR_Call ((_, f), targs, _) ->
+          | INSTR_Call (_, _, _), Some (_, INSTR_Call ((f_t, f_exp), targs, anns)) ->
         
             (* 1. Need to analyze the targs. Match them with the function signatures from mcfg
                2. Recursively call normalize_log
                3. continue with the rest of the stack
             *)
 
-            begin match id, AstLib.intrinsic_exp f with
+            begin match id, AstLib.intrinsic_exp f_exp with
               | IVoid _, Some _ ->
-                let dblk' = add_code dblk [(id, ins)] in
-                normalize_log ctx mcfg dblk' stack'
+                let tblk' = add_code tblk [(id, INSTR_Call ((f_t, f_exp), targs, anns))] in
+                normalize_log ctx f_def mcfg tblk' stack'
               | IId id, Some _ ->
                 let id' = gensym_raw_id id in
-                let dblk' = add_code dblk [(IId id', ins)] in
+                let tblk' = add_code tblk [(IId id', INSTR_Call ((f_t, f_exp), targs, anns))] in
                 let exp = EXP_Ident (ID_Global id') in
                 let ctx' = RawidM.update_or exp (fun _ -> exp) id ctx in
-                normalize_log ctx' mcfg dblk' stack'
+                normalize_log ctx' f_def mcfg tblk' stack'
               | IVoid _, None ->
                 let args = List.map (fun (arg, _) -> arg) targs in
-                begin match normalize_definition ctx mcfg f args with
+                let f_exp' = subst_exp ctx f_exp in
+                begin match normalize_definition ctx mcfg f_exp' args with
                   | Some ctx' ->
-                    let (_, stack2, dblk2, _) = normalize_log ctx' mcfg dblk stack' in
-                    normalize_log ctx mcfg dblk2 stack2
+                    begin match get_f_def_from_mcfg f_exp' mcfg with
+                      | Some f_def' -> 
+                        let (_, stack2, tblk2, _) = normalize_log ctx' f_def' mcfg tblk stack' in
+                        normalize_log ctx f_def mcfg tblk2 stack2
+                      | None ->  failwith "Cannot find the new definition"
+                    end
                   | None -> 
                     (* Local functions *)
                     failwith "Function mismatch"
                 end
               | IId id, None ->
-                (* Printf.printf "%s\n" (ShowAST.dshowExp ShowAST.dshowDtyp f |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring); *)
+                (* Printf.printf "%s\n" (ShowAST.dshowExp ShowAST.dshowTyp f |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring); *)
                 let args = List.map (fun (arg, _) -> arg) targs in
-                begin match normalize_definition ctx mcfg f args with
+                let f_exp' = subst_exp ctx f_exp in
+                begin match normalize_definition ctx mcfg f_exp' args with
                   | Some ctx' ->
-                    let (_, stack2, dblk2, texp) = normalize_log ctx' mcfg dblk stack' in
-                    begin match texp with
-                      | Some (_, exp) -> 
-                        let ctx2 = RawidM.update_or exp (fun _ -> exp) id ctx in
-                        (* Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx); *)
-                        (* Printf.printf "ctx': %s\n" (RawidM.to_string ctx_unit_to_string ctx'); *)
-                        (* Printf.printf "ctx2: %s\n" (RawidM.to_string ctx_unit_to_string ctx2); *)
-                        normalize_log ctx2 mcfg dblk2 stack2
-                      | None ->
-                        failwith "Should return something"
+                    begin match get_f_def_from_mcfg f_exp' mcfg with
+                      | Some f_def' -> 
+                        let (_, stack2, tblk2, texp) = normalize_log ctx' f_def' mcfg tblk stack' in
+                        begin match texp with
+                          | Some (_, exp) -> 
+                            let ctx2 = RawidM.update_or exp (fun _ -> exp) id ctx in
+                            (* Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx); *)
+                            (* Printf.printf "ctx': %s\n" (RawidM.to_string ctx_unit_to_string ctx'); *)
+                            (* Printf.printf "ctx2: %s\n" (RawidM.to_string ctx_unit_to_string ctx2); *)
+                            normalize_log ctx2 f_def mcfg tblk2 stack2
+                          | None ->
+                            failwith "Should return something"
+                        end
+                      | None -> failwith "normalize_log: Cannot find the new definition"
                     end
                   | None ->
-                    print_dblk dblk;
+                    print_tblk tblk;
                     failwith "function takes in no parameter?"
                 end
             end
-          | INSTR_Alloca (t, tann) ->
+          | INSTR_Alloca _, Some (_, INSTR_Alloca (dt, anns)) ->
             begin match id with
               | IVoid _ -> failwith "Alloca must have id"
               | IId id ->
                 let id' = gensym_raw_id id in
                 let exp = EXP_Ident (ID_Local id') in
                 let ctx' = RawidM.update_or exp (fun _ -> exp) id ctx in
-                let dblk' = add_code dblk [(IId id', INSTR_Alloca (t, tann))] in
-                normalize_log ctx' mcfg dblk' stack'
+                let tblk' = add_code tblk [(IId id', INSTR_Alloca (dt, anns))] in
+                normalize_log ctx' f_def mcfg tblk' stack'
             end
-          | INSTR_Load (t, texp, tann) ->
+          | INSTR_Load _, Some (_, INSTR_Load (dt, texp, anns)) ->
             begin match id with
               | IVoid _ -> failwith "Load must have id"
               | IId id ->
@@ -433,18 +727,18 @@ let rec normalize_log
                 let id' = gensym_raw_id id in
                 let exp = EXP_Ident (ID_Local id') in
                 let ctx' = RawidM.update_or exp (fun _ -> exp) id ctx in
-                let dblk' = add_code dblk [(IId id', INSTR_Load (t, texp', tann))] in
-                normalize_log ctx' mcfg dblk' stack'
+                let tblk' = add_code tblk [(IId id', INSTR_Load (dt, texp', anns))] in
+                normalize_log ctx' f_def mcfg tblk' stack'
             end
-          | INSTR_Store (texp1, texp2, tann) ->
+          | INSTR_Store _, Some (_, INSTR_Store (texp1, texp2, anns)) ->
             let texp1' = subst_texp ctx texp1 in
             let texp2' = subst_texp ctx texp2 in
-            let dblk' = add_code dblk [(id, INSTR_Store (texp1', texp2', tann))] in
-            normalize_log ctx mcfg dblk' stack'
-          | INSTR_Fence (co, o) ->
-            let dblk' = add_code dblk [(id, INSTR_Fence (co, o))] in
-            normalize_log ctx mcfg dblk' stack'
-          | INSTR_AtomicCmpXchg cmpxchg ->
+            let tblk' = add_code tblk [(id, INSTR_Store (texp1', texp2', anns))] in
+            normalize_log ctx f_def mcfg tblk' stack'
+          | INSTR_Fence _, Some (_, INSTR_Fence (co, o)) ->
+            let tblk' = add_code tblk [(id, INSTR_Fence (co, o))] in
+            normalize_log ctx f_def mcfg tblk' stack'
+          | INSTR_AtomicCmpXchg _, Some (_, INSTR_AtomicCmpXchg cmpxchg) ->
             let cmpxchg' = {c_weak=cmpxchg.c_weak;
                             c_volatile=cmpxchg.c_volatile;
                             c_ptr=subst_texp ctx cmpxchg.c_ptr;
@@ -462,10 +756,10 @@ let rec normalize_log
                 let id' = gensym_raw_id id in
                 let exp = EXP_Ident (ID_Local id') in
                 let ctx' = RawidM.update_or exp (fun _ -> exp) id ctx in
-                let dblk' = add_code dblk [(IId id', INSTR_AtomicCmpXchg (cmpxchg'))] in
-                normalize_log ctx' mcfg dblk' stack'
+                let tblk' = add_code tblk [(IId id', INSTR_AtomicCmpXchg (cmpxchg'))] in
+                normalize_log ctx' f_def mcfg tblk' stack'
             end
-          | INSTR_AtomicRMW atomicrmw ->
+          | INSTR_AtomicRMW _, Some (_, INSTR_AtomicRMW atomicrmw) ->
             let atomicrmw' = {a_volatile=atomicrmw.a_volatile;
                               a_operation=atomicrmw.a_operation;
                               a_ptr=subst_texp ctx atomicrmw.a_ptr;
@@ -481,10 +775,10 @@ let rec normalize_log
                 let id' = gensym_raw_id id in
                 let exp = EXP_Ident (ID_Local id') in
                 let ctx' = RawidM.update_or exp (fun _ -> exp) id ctx in
-                let dblk' = add_code dblk [(IId id', INSTR_AtomicRMW (atomicrmw'))] in
-                normalize_log ctx' mcfg dblk' stack'
+                let tblk' = add_code tblk [(IId id', INSTR_AtomicRMW (atomicrmw'))] in
+                normalize_log ctx' f_def mcfg tblk' stack'
             end
-          | INSTR_VAArg (texp, t) ->
+          | INSTR_VAArg _, Some (_, INSTR_VAArg (texp, t)) ->
             let texp' = subst_texp ctx texp in
             begin match id with
               | IVoid _ -> failwith "va_arg must have id"
@@ -492,51 +786,58 @@ let rec normalize_log
                 let id' = gensym_raw_id id in
                 let exp = EXP_Ident (ID_Local id') in
                 let ctx' = RawidM.update_or exp (fun _ -> exp) id ctx in
-                let dblk' = add_code dblk [(IId id', INSTR_VAArg (texp', t))] in
-                normalize_log ctx' mcfg dblk' stack'
+                let tblk' = add_code tblk [(IId id', INSTR_VAArg (texp', t))] in
+                normalize_log ctx' f_def mcfg tblk' stack'
             end
-          | INSTR_LandingPad ->
+          | INSTR_LandingPad, Some (_, INSTR_LandingPad) ->
             begin match id with
               | IVoid _ -> failwith "va_arg must have id"
               | IId id ->
                 let id' = gensym_raw_id id in
                 let exp = EXP_Ident (ID_Local id') in
                 let ctx' = RawidM.update_or exp (fun _ -> exp) id ctx in
-                let dblk' = add_code dblk [(IId id', INSTR_LandingPad)] in
-                normalize_log ctx' mcfg dblk' stack'
+                let tblk' = add_code tblk [(IId id', INSTR_LandingPad)] in
+                normalize_log ctx' f_def mcfg tblk' stack'
             end
+          | _ -> failwith "normalize_log: no match"
         end
     end
 
-let normalize_code 
-    (mcfg : DynamicTypes.dtyp CFG.mcfg)
-    (stack : log_stream) : dblk =
-  let ctx = RawidM.empty in
-  (* Printf.printf "%s" (Log.dstring_of_log_stream stack |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring); *)
-  let dblk : dtyp block = {blk_id=Name (['0']);
-              blk_phis=[];
-              blk_code=[];
-              blk_term=(TERM_Ret (DTYPE_Void, EXP_Undef));
-              blk_comments= None
-             } in
-  let (_, _ , dblk', _) = normalize_log ctx mcfg dblk stack in
-  {blk_id=dblk'.blk_id;
-   blk_phis=dblk'.blk_phis;
-   blk_code=List.rev dblk'.blk_code;
-   blk_term=dblk'.blk_term;
-   blk_comments=dblk'.blk_comments
-  }
+let normalize_code
+    (f_id : function_id)
+    (mcfg : typ CFG.mcfg)
+    (stack : log_stream) : tblk =
+  match get_f_def_from_mcfg (EXP_Ident (ID_Global f_id)) mcfg with
+  | None -> failwith (Printf.sprintf "Cannot found definition %s" (ShowAST.dshow_raw_id f_id |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring))
+  | Some f_def -> 
+    let ctx = RawidM.empty in
+    (* Printf.printf "%s" (Log.dstring_of_log_stream stack |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring); *)
+    let tblk : typ block = {blk_id=Name (['0']);
+                            blk_phis=[];
+                            blk_code=[];
+                            blk_term=(TERM_Ret (TYPE_Void, EXP_Undef));
+                            blk_comments= None
+                           } in
+    let (_, _ , tblk', _) = normalize_log ctx f_def mcfg tblk stack in
+    {blk_id=tblk'.blk_id;
+     blk_phis=tblk'.blk_phis;
+     blk_code=List.rev tblk'.blk_code;
+     blk_term=tblk'.blk_term;
+     blk_comments=tblk'.blk_comments
+    }
+(* IO.output_file *)
 
-let get_mcfg ll_ast =
-  (TypToDtyp.convert_types (mcfg_of_tle (TopLevel.TopLevelBigIntptr.link TopLevel.TopLevelBigIntptr.coq_PREDEFINED_FUNCTIONS ll_ast)))
 
 
 
 (** Printing trace **)
 let output_channel = ref stdout
 
-
 let print_normalized_log ll_ast =
   let mcfg = get_mcfg ll_ast in
-  let dblk = normalize_code mcfg (List.rev !Log.log) in
-  print_dblk dblk
+  let main_f_id = (Name (Camlcoq.coqstring_of_camlstring "main")) in
+  let code = List.rev !Log.log in
+  (* let code = transform_dtyp_to_typ_log (List.rev !Log.log) main_f_id mcfg |> List.rev in *)
+  (* print_tlog code; *)
+  let tblk = normalize_code main_f_id mcfg code in
+  print_tblk tblk
