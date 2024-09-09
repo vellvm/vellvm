@@ -10,7 +10,6 @@
 
 open Printf
 open Base
-open Trace
 
 open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 
@@ -74,6 +73,10 @@ let process_ll_file path file =
       match Interpreter.interpret ll_ast with
       | Ok dv ->
         Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv);
+        (* let ll_ast_trace = gen_executable_trace ll_ast in *)
+        (* let ll_ast_trace' = transform ll_ast_trace in *)
+        (* let vll_file = Platform.gen_name !Platform.output_path file ".trace.ll" in *)
+        (* IO.output_file vll_file ll_ast_trace' *)
         Trace.print_log ();
         Printf.printf "\nNormalizing\n";
         Trace.print_normalized_log ll_ast
