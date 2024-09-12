@@ -74,6 +74,38 @@ let get_phi_from_def
 (* TODO: This is a little bit hand-waiving because I'm using OCaml equality
    Maybe need to define own equality that equates both terms / expressions
 *)
+let rec typ_eq (typ1 : LLVMAst.typ) (typ2 : LLVMAst.typ) =
+  match typ1, typ2 with
+  | TYPE_I i1, TYPE_I i2 ->
+    Camlcoq.N.eq i1 i2
+  | TYPE_Pointer t1, TYPE_Pointer t2 ->
+    typ_eq t1 t2
+  | TYPE_IPTR, TYPE_IPTR 
+  | TYPE_Void, TYPE_Void
+  | TYPE_Half, TYPE_Half 
+  | TYPE_Float, TYPE_Float 
+  | TYPE_Double, TYPE_Double 
+  | TYPE_X86_fp80, TYPE_X86_fp80
+  | TYPE_Fp128, TYPE_Fp128
+  | TYPE_Ppc_fp128, TYPE_Ppc_fp128
+  | TYPE_Metadata, TYPE_Metadata
+  | TYPE_X86_mmx, TYPE_X86_mmx
+  | TYPE_Opaque, TYPE_Opaque -> 
+    true
+  | TYPE_Array (n1, t1), TYPE_Array (n2, t2) ->
+    Camlcoq.N.eq n1 n2 && typ_eq t1 t2
+  | TYPE_Function (t1, targs1, b1), TYPE_Function (t2, targs2, b2) ->
+    typ_eq t1 t2 && List.equal typ_eq targs1 targs2 && b1 == b2
+  | TYPE_Struct targs1, TYPE_Struct targs2 ->
+    List.equal typ_eq targs1 targs2
+  | TYPE_Packed_struct targs1, TYPE_Packed_struct targs2 ->
+    List.equal typ_eq targs1 targs2
+  | TYPE_Vector (n1, t1), TYPE_Vector (n2, t2) ->
+    Camlcoq.N.eq n1 n2 && typ_eq t1 t2
+  | TYPE_Identified id1, TYPE_Identified id2 ->
+    AstLib.eq_dec_ident id1 id2
+  | _ ->  false
+
 let rec exp_eq (f : 'a -> 'a -> bool) (exp1 : 'a exp) (exp2 : 'a exp) : bool =
   match exp1, exp2 with
   | EXP_Ident ident1, EXP_Ident ident2 ->
@@ -114,16 +146,18 @@ let rec exp_eq (f : 'a -> 'a -> bool) (exp1 : 'a exp) (exp2 : 'a exp) : bool =
     fbinop1 == fbinop2 && f t1 t2 && exp_eq f exp11 exp21 && exp_eq f exp12 exp22
   | OP_FCmp (fcmp1, t1, exp11, exp12), OP_FCmp (fcmp2, t2, exp21, exp22) -> 
     fcmp1 == fcmp2 && f t1 t2 && exp_eq f exp11 exp21 && exp_eq f exp12 exp22
-  | OP_Conversion _, OP_Conversion _ -> todo "OP_Conversion"
+  | OP_Conversion (conv1, t11, exp1, t12), OP_Conversion (conv2, t21, exp2, t22) ->
+    conv1 == conv2 && f t11 t21 && exp_eq f exp1 exp2 && f t12 t22
   | OP_GetElementPtr _, OP_GetElementPtr _ -> todo "OP_GetElementPtr"
-  | OP_ExtractElement _, OP_ExtractElement _ -> todo "OP_ExtractElement"
-  | OP_InsertElement _, OP_InsertElement _ -> todo "OP_InsertElement"
+  | OP_ExtractElement ((t11, exp11), (t12, exp12)), OP_ExtractElement ((t21, exp21), (t22, exp22)) ->
+    f t11 t21 && f t12 t22 && exp_eq f exp11 exp21 && exp_eq f exp12 exp22
+  | OP_InsertElement _ , OP_InsertElement _ -> todo "OP_InsertElement"
   | OP_ShuffleVector _, OP_ShuffleVector _ -> todo "OP_ShuffleVector"
   | OP_ExtractValue _, OP_ExtractValue _ -> todo "OP_ExtractValue"
   | OP_InsertValue _, OP_InsertValue _ -> todo "OP_InsertValue"
   | OP_Select _, OP_Select _ -> todo "OP_Select"
   | OP_Freeze _, OP_Freeze _ -> todo "OP_Freeze"
-  | _ -> failwith "exp_eq unimplemented"                   (* OP part is never used *)
+  | _ -> false                   (* OP part is never used *)
 
 let texp_eq (f : 'a -> 'a -> bool) (texp1 : 'a * 'a exp) (texp2 : 'a * 'a exp) : bool =
   let (t1, exp1) = texp1 in
@@ -148,38 +182,6 @@ let term_eq (f : 'a -> 'a -> bool) (term1 : 'a terminator) (term2 : 'a terminato
   | TERM_Invoke _, TERM_Invoke _ -> false (* TODO: Finish this *)
   | TERM_Unreachable, TERM_Unreachable -> true 
   | _ -> false
-
-let rec typ_eq (typ1 : LLVMAst.typ) (typ2 : LLVMAst.typ) =
-  match typ1, typ2 with
-  | TYPE_I i1, TYPE_I i2 ->
-    Camlcoq.N.eq i1 i2
-  | TYPE_Pointer t1, TYPE_Pointer t2 ->
-    typ_eq t1 t2
-  | TYPE_IPTR, TYPE_IPTR 
-  | TYPE_Void, TYPE_Void
-  | TYPE_Half, TYPE_Half 
-  | TYPE_Float, TYPE_Float 
-  | TYPE_Double, TYPE_Double 
-  | TYPE_X86_fp80, TYPE_X86_fp80
-  | TYPE_Fp128, TYPE_Fp128
-  | TYPE_Ppc_fp128, TYPE_Ppc_fp128
-  | TYPE_Metadata, TYPE_Metadata
-  | TYPE_X86_mmx, TYPE_X86_mmx
-  | TYPE_Opaque, TYPE_Opaque -> 
-    true
-  | TYPE_Array (n1, t1), TYPE_Array (n2, t2) ->
-    Camlcoq.N.eq n1 n2 && typ_eq t1 t2
-  | TYPE_Function (t1, targs1, b1), TYPE_Function (t2, targs2, b2) ->
-    typ_eq t1 t2 && List.equal typ_eq targs1 targs2 && b1 == b2
-  | TYPE_Struct targs1, TYPE_Struct targs2 ->
-    List.equal typ_eq targs1 targs2
-  | TYPE_Packed_struct targs1, TYPE_Packed_struct targs2 ->
-    List.equal typ_eq targs1 targs2
-  | TYPE_Vector (n1, t1), TYPE_Vector (n2, t2) ->
-    Camlcoq.N.eq n1 n2 && typ_eq t1 t2
-  | TYPE_Identified id1, TYPE_Identified id2 ->
-    AstLib.eq_dec_ident id1 id2
-  | _ ->  false
 
 let get_term_from_def
     (f_def : (LLVMAst.typ, LLVMAst.typ cfg) definition)
@@ -625,9 +627,11 @@ let rec normalize_log
         begin match get_term_from_def f_def mcfg (TERM_Ret texp) with
           | Some (TERM_Ret texp') ->
             let texp2 = subst_texp ctx texp' in
-            let tblk' = add_term tblk (TERM_Ret texp2) in
-            ctx, stack', tblk', Some texp2
-          | _ -> failwith "normalize_log: cannot find phi"
+            (* let tblk' = add_term tblk (TERM_Ret texp2) in *)
+            (* ctx, stack', tblk', Some texp2 *)
+            ctx, stack', tblk, Some texp2
+          | _ ->
+            failwith "normalize_log: cannot find phi"
         end
       | Instr (id, ins) ->
         begin match ins, get_instr_from_def f_def id with
@@ -799,6 +803,10 @@ let rec normalize_log
         end
     end
 
+(* TODO: don't modify terminator in the function
+   Use the substitution to glue afterward
+   factrect.ll should be checked
+*)
 let normalize_code
     (f_id : function_id)
     (mcfg : typ CFG.mcfg)
@@ -814,13 +822,22 @@ let normalize_code
                             blk_term=(TERM_Ret (TYPE_I (Camlcoq.N.of_int 8), EXP_Integer (Camlcoq.Z.of_sint 1)));
                             blk_comments= None
                            } in
-    let (_, _ , tblk', _) = normalize_log ctx f_def mcfg tblk stack in
-    {blk_id=tblk'.blk_id;
-     blk_phis=tblk'.blk_phis;
-     blk_code=List.rev tblk'.blk_code;
-     blk_term=tblk'.blk_term;
-     blk_comments=tblk'.blk_comments
-    }
+    let (_, _ , tblk', ret_texp_o) = normalize_log ctx f_def mcfg tblk stack in
+    match ret_texp_o with
+    | Some ret_texp ->
+      {blk_id=tblk'.blk_id;
+       blk_phis=tblk'.blk_phis;
+       blk_code=List.rev tblk'.blk_code;
+       blk_term=(TERM_Ret ret_texp);
+       blk_comments=tblk'.blk_comments
+      }
+    | None ->                   (* The branch when there is no return value *)
+      {blk_id=tblk'.blk_id;
+       blk_phis=tblk'.blk_phis;
+       blk_code=List.rev tblk'.blk_code;
+       blk_term=tblk.blk_term;
+       blk_comments=tblk'.blk_comments
+      }
 (* IO.output_file *)
 
 
