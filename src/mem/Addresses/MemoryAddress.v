@@ -191,14 +191,14 @@ End HAS_PROVENANCE_TO_HAS_METADATA.
 Module Type NULLABLE_ADDRESSES := CORE_ADDRESS <+ HAS_NULL.
 
 (** Addresses with the batteries included *)
-Module Type ADDRESS :=
+Module Type ADDRESS (PS : PROV_SET) :=
   CORE_ADDRESS <+ HAS_NULL <+ HAS_POINTER_ARITHMETIC <+
-    HAS_PROVENANCE <+ HAS_PROVENANCE_TO_HAS_METADATA <+
-    HAS_PTOI <+ HAS_ITOP <+ PTOI_ITOP_EXTRA <+ PTOI_ARITH_EXTRAS.
+    HAS_PROVENANCE PS <+ HAS_PROVENANCE_TO_HAS_METADATA PS <+
+    HAS_PTOI <+ HAS_ITOP PS <+ PTOI_ITOP_EXTRA PS <+ PTOI_ARITH_EXTRAS.
 
 (** Infinite addresses with the batteries included *)
-Module Type INFINITE_ADDRESS :=
-  ADDRESS <+ ITOP_BIG.
+Module Type INFINITE_ADDRESS (PS : PROV_SET) :=
+  ADDRESS PS <+ ITOP_BIG PS.
 
 (* TODO: Move this to a show utility file? *)
 Module Type SHOWABLE (Import T:Typ).

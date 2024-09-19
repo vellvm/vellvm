@@ -122,62 +122,57 @@ Definition within {M A} `{ContainsM M} (pre : Prop) (a : A) (spec : M A) (post :
 
 Notation "b {{ pre }} ∈ {{ post }} m" := (within pre m post) (at level 99).
 
-Lemma within_bind  :
-  forall {A B} {M} `{CM : ContainsM M} (ma : M A) (k : A -> M B) b pre post,
-    b {{pre}} ∈ {{post}} (a <- ma;; k a).
-  
+(* Class SpecM (M : Type -> Type) `{HM : Monad M}: Type := *)
+(*   { within : forall {A}, Prop -> M A -> (A -> Prop) -> Prop; *)
+(*     empty_spec : forall {A}, M A; *)
+(*     empty_spec_spec : *)
+(*     forall {A} (a : A) pre post, *)
+(*       ~ (within pre (@empty_spec A) post); *)
 
-Class SpecM (M : Type -> Type) `{HM : Monad M}: Type :=
-  { within : forall {A}, Prop -> M A -> (A -> Prop) -> Prop;
-    empty_spec : forall {A}, M A;
-    empty_spec_spec :
-    forall {A} (a : A) pre post,
-      ~ (within pre (@empty_spec A) post);
+(*     within_spec : *)
+(*     forall {A} pre (ma : M A) post, *)
+(*       within pre ma post -> *)
+(*       pre -> *)
 
-    within_spec :
-    forall {A} pre (ma : M A) post,
-      within pre ma post ->
-      pre ->
-    
 
-    spec_bind :
-    forall {A B} (ma : M A) (k : A -> M B) (pre : Prop) (post_a : A -> Prop) (post_b : B -> Prop),
-      spec pre ma post_a ->
-      (forall a, post_a a ->
-            spec True (k a) post_b) ->
-      within pre (bind ma k) post_b;
-  }.
+(*     spec_bind : *)
+(*     forall {A B} (ma : M A) (k : A -> M B) (pre : Prop) (post_a : A -> Prop) (post_b : B -> Prop), *)
+(*       spec pre ma post_a -> *)
+(*       (forall a, post_a a -> *)
+(*             spec True (k a) post_b) -> *)
+(*       within pre (bind ma k) post_b; *)
+(*   }. *)
 
-    contains_ret :
-    forall {A} (a : A),
-      contains True a (ret a) (fun _ => True);
+(*     contains_ret : *)
+(*     forall {A} (a : A), *)
+(*       contains True a (ret a) (fun _ => True); *)
 
-    contains_strengthen_pre :
-    forall {A} (ma : M A) (a : A) (pre : Prop) (pre_strong : Prop) (post : A -> Prop),
-      (pre_strong -> pre) ->
-      contains pre_strong a ma post ->
-      contains pre a ma post;
+(*     contains_strengthen_pre : *)
+(*     forall {A} (ma : M A) (a : A) (pre : Prop) (pre_strong : Prop) (post : A -> Prop), *)
+(*       (pre_strong -> pre) -> *)
+(*       contains pre_strong a ma post -> *)
+(*       contains pre a ma post; *)
 
-    contains_weaken_post :
-    forall {A} (ma : M A) (a : A) (pre : Prop) (post : A -> Prop) (post_weak : A -> Prop),
-      (forall apost
-      contains pre a ma post ->
-      contains pre a ma post_weak;
-  }.
+(*     contains_weaken_post : *)
+(*     forall {A} (ma : M A) (a : A) (pre : Prop) (post : A -> Prop) (post_weak : A -> Prop), *)
+(*       (forall apost *)
+(*       contains pre a ma post -> *)
+(*       contains pre a ma post_weak; *)
+(*   }. *)
 
-Notation "b ∈ m" := (contains True b m (fun _ => True)) (at level 99).
-Notation "b ∉ m" := (~ (exists pre post, contains pre b m post)) (at level 99).
-Notation "b ⦉ pre ⦊ ∈ ⦉ post ⦊ m" := (contains pre b m post) (at level 99).
-Notation "b ⦉ pre ⦊ ∉ ⦉ post ⦊ m" := (~ (contains pre b m post)) (at level 99).
-Notation "b {{ pre }} ∈ {{ post }} m" := (contains pre b m post) (at level 99).
-Notation "b {{ pre }} ∉ {{ post }} m" := (~ (contains pre b m post)) (at level 99).
+(* Notation "b ∈ m" := (contains True b m (fun _ => True)) (at level 99). *)
+(* Notation "b ∉ m" := (~ (exists pre post, contains pre b m post)) (at level 99). *)
+(* Notation "b ⦉ pre ⦊ ∈ ⦉ post ⦊ m" := (contains pre b m post) (at level 99). *)
+(* Notation "b ⦉ pre ⦊ ∉ ⦉ post ⦊ m" := (~ (contains pre b m post)) (at level 99). *)
+(* Notation "b {{ pre }} ∈ {{ post }} m" := (contains pre b m post) (at level 99). *)
+(* Notation "b {{ pre }} ∉ {{ post }} m" := (~ (contains pre b m post)) (at level 99). *)
 
-Definition is_empty {A M} `{SM : SpecM M} (spec : M A) : Prop
-  := forall a, a ∉ spec.
+(* Definition is_empty {A M} `{SM : SpecM M} (spec : M A) : Prop *)
+(*   := forall a, a ∉ spec. *)
 
-Class ExecM (M : Type -> Type) (Result : Type -> Type) : Type :=
-  { run : forall {A}, M A -> Result A;
-  }.
+(* Class ExecM (M : Type -> Type) (Result : Type -> Type) : Type := *)
+(*   { run : forall {A}, M A -> Result A; *)
+(*   }. *)
 
 (*** The core memory model *)
 Module Type CORE_MEMORY_MODEL
@@ -188,7 +183,7 @@ Module Type CORE_MEMORY_MODEL
   Parameter initial_memory : Memory.
 
   (** Primitive byte reads *)
-  Parameter read_byte : forall {M} `{HM : Monad M} `{SM : SpecM M}, Memory -> addr -> M SByte.
+  Parameter read_byte : Memory -> addr -> SByte -> Prop.
 End CORE_MEMORY_MODEL.
 
 Module Type MEMORY_READ_ACCESS
@@ -203,10 +198,9 @@ Module Type MEMORY_READ_ACCESS
   Parameter read_byte_allowed : Memory -> addr -> Prop.
 
   Parameter read_byte_allowed_spec :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      (m : Memory) (ptr : addr),
+    forall (m : Memory) (ptr : addr),
       ~ read_byte_allowed m ptr ->
-      is_empty (read_byte m ptr).
+      forall b, ~ read_byte m ptr b.
 End MEMORY_READ_ACCESS.
 
 Module Type READABLE_MEMORY (ADDR : CORE_ADDRESS) (SB : SBYTE) := CORE_MEMORY_MODEL ADDR SB <+ MEMORY_READ_ACCESS ADDR SB.
@@ -216,10 +210,10 @@ Module ALL_READS_PRESERVED
   (Import SB : SBYTE)
   (Import MEM : CORE_MEMORY_MODEL ADDR SB).
 
-  Definition read_bytes_preserved {M} `{HM : Monad M} `{SM : SpecM M}
+  Definition read_bytes_preserved
     (m1 m2 : Memory) : Prop
     := forall ptr b,
-      (b ∈ (read_byte m1 ptr)) <-> (b ∈ (read_byte m2 ptr)).
+      (read_byte m1 ptr b) <-> (read_byte m2 ptr b).
 End ALL_READS_PRESERVED.
 
 Module ALL_READ_ACCESS_PRESERVED
@@ -227,7 +221,7 @@ Module ALL_READ_ACCESS_PRESERVED
   (Import SB : SBYTE)
   (Import MEM : READABLE_MEMORY ADDR SB).
 
-  Definition read_byte_allowed_preserved {M} `{HM : Monad M} `{SM : SpecM M}
+  Definition read_byte_allowed_preserved
     (m1 m2 : Memory) : Prop
     := forall ptr,
       read_byte_allowed m1 ptr <-> read_byte_allowed m2 ptr.
@@ -254,22 +248,21 @@ Module Type MEMORY_WRITES
      1. The modular memory model may not have a write operation at all.
    *)
   (** The raw write_byte operation *)
-  Parameter write_byte : forall {M} `{HM : Monad M} `{SM : SpecM M}, Memory -> addr -> SByte -> M Memory.
+  Parameter write_byte : Memory -> addr -> SByte -> Memory -> Prop.
 
   (** We can look up a new value after writing it to memory *)
   Parameter write_byte_new_lu :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      (m1 : Memory) (ptr : addr) (byte : SByte) (m2 : Memory),
-      m2 {{True}} ∈ {{fun m2 => byte ∈ read_byte m2 ptr}} (write_byte m1 ptr byte).
+    forall (m1 : Memory) (ptr : addr) (byte : SByte) (m2 : Memory),
+      write_byte m1 ptr byte m2 ->
+      read_byte m2 ptr byte.
 
   (** We can look up old values after writing to a disjoint location in memory *)
   Parameter write_byte_old_lu :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      (m1 : Memory) (ptr : addr) (byte : SByte) (m2 : Memory),
-      contains m2 (write_byte m1 ptr byte) ->
+    forall (m1 : Memory) (ptr : addr) (byte : SByte) (m2 : Memory),
+      write_byte m1 ptr byte m2 ->
       forall ptr',
         disjoint_ptr_byte ptr ptr' ->
-        (forall byte', contains byte' (read_byte m1 ptr') <-> contains byte' (read_byte m2 ptr')).
+        (forall byte', read_byte m1 ptr' byte' <-> read_byte m2 ptr' byte').
 End MEMORY_WRITES.
 
 Module Type WRITEABLE_MEMORY_HELPER (ADDR : ADDRESS) (SB : SBYTE) := READABLE_MEMORY ADDR SB <+ MEMORY_WRITES ADDR SB.
@@ -286,10 +279,9 @@ Module Type MEMORY_WRITE_ACCESS
   Parameter write_byte_allowed : Memory -> addr -> Prop.
 
   Parameter write_byte_allowed_spec :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      (m : Memory) (ptr : addr),
+    forall (m : Memory) (ptr : addr),
       ~ write_byte_allowed m ptr ->
-      forall b, is_empty (write_byte m ptr b).
+      forall b m2, ~ write_byte m ptr b m2.
 End MEMORY_WRITE_ACCESS.
 
 Module ALL_WRITE_ACCESS_PRESERVED
@@ -298,7 +290,7 @@ Module ALL_WRITE_ACCESS_PRESERVED
   (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
   (Import WRITE_ACCESS : MEMORY_WRITE_ACCESS ADDR SB MEM).
 
-  Definition write_byte_allowed_preserved {M} `{HM : Monad M} `{SM : SpecM M}
+  Definition write_byte_allowed_preserved
     (m1 m2 : Memory) : Prop
     := forall ptr,
       write_byte_allowed m1 ptr <-> write_byte_allowed m2 ptr.
@@ -311,9 +303,8 @@ Module Type WRITES_PRESERVES_READ_ACCESS
 
   Include (ALL_READ_ACCESS_PRESERVED ADDR SB MEM).
   Parameter write_byte_preserves_read_byte_allowed :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      m1 ptr b m2,
-      contains m2 (write_byte m1 ptr b) ->
+    forall m1 ptr b m2,
+      write_byte m1 ptr b m2 ->
       read_byte_allowed_preserved m1 m2.
 End WRITES_PRESERVES_READ_ACCESS.
 
@@ -325,9 +316,8 @@ Module Type WRITES_PRESERVES_WRITE_ACCESS
 
   Include (ALL_WRITE_ACCESS_PRESERVED ADDR SB MEM WRITE_ACCESS).
   Parameter write_byte_preserves_read_byte_allowed :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      m1 ptr b m2,
-      contains m2 (write_byte m1 ptr b) ->
+    forall m1 ptr b m2,
+      write_byte m1 ptr b m2 ->
       write_byte_allowed_preserved m1 m2.
 End WRITES_PRESERVES_WRITE_ACCESS.
 
@@ -346,10 +336,9 @@ Module Type MEMORY_ALLOCATED_CORE
     forall aid, ~ addr_allocated m ptr aid.
 
   Parameter read_byte_allocated_spec :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      (m : Memory) (ptr : addr),
+    forall (m : Memory) (ptr : addr),
       addr_not_allocated m ptr ->
-      is_empty (read_byte m ptr).
+      forall b, ~ read_byte m ptr b.
 End MEMORY_ALLOCATED_CORE.
 
 Module ALL_ALLOCATED_PRESERVED
@@ -359,12 +348,12 @@ Module ALL_ALLOCATED_PRESERVED
   (Import MEM : CORE_MEMORY_MODEL ADDR SB)
   (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM).
 
-  Definition all_allocated_preserved {M} `{HM : Monad M} `{SM : SpecM M}
+  Definition all_allocated_preserved
     (m1 m2 : Memory) : Prop
     := forall ptr aid,
       addr_allocated m1 ptr aid <-> addr_allocated m2 ptr aid.
 
-  Definition all_not_allocated_preserved {M} `{HM : Monad M} `{SM : SpecM M}
+  Definition all_not_allocated_preserved
     (m1 m2 : Memory) : Prop
     := forall ptr,
       addr_not_allocated m1 ptr <-> addr_not_allocated m2 ptr.
@@ -379,9 +368,8 @@ Module Type WRITES_PRESERVES_ALLOCATED
 
   Include (ALL_ALLOCATED_PRESERVED ADDR SB AID MEM ALLOC).
   Parameter write_byte_preserves_allocated :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      m1 ptr b m2,
-      contains m2 (write_byte m1 ptr b) ->
+    forall m1 ptr b m2,
+      write_byte m1 ptr b m2 ->
       all_allocated_preserved m1 m2.
 End WRITES_PRESERVES_ALLOCATED.
 
@@ -393,25 +381,21 @@ Module Type MEMORY_FIND_FREE
   (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM).
 
   Parameter find_free_block :
-    forall {M} `{HM : Monad M} `{SM : SpecM M},
-      Memory -> nat -> M (list addr).
+      Memory -> nat -> list addr -> Prop.
 
   Parameter find_free_block_is_free :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      m len ptrs,
-      contains ptrs (find_free_block m len) ->
+    forall m len ptrs,
+      find_free_block m len ptrs ->
       Forall (addr_not_allocated m) ptrs.
 
   Parameter find_free_block_length :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      m len ptrs,
-      contains ptrs (find_free_block m len) ->
+    forall m len ptrs,
+      find_free_block m len ptrs ->
       length ptrs = len.
 
   Parameter find_free_block_consecutive :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      m len ptrs,
-      contains ptrs (find_free_block m len) ->    
+    forall m len ptrs,
+      find_free_block m len ptrs ->
       consecutive_ptrs ptrs = true.
 End MEMORY_FIND_FREE.
 
@@ -424,31 +408,26 @@ Module Type MEMORY_ALLOCATE
   (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC).
 
   Parameter allocate_block :
-    forall {M} `{HM : Monad M} `{SM : SpecM M},
-      Memory -> list SByte -> AllocationId -> M (Memory * list addr)%type.
+      Memory -> list SByte -> AllocationId -> (Memory * list addr)%type -> Prop.
 
   Parameter allocate_block_free :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      m1 bytes aid m2 ptrs,
-      contains (m2, ptrs) (allocate_block m1 bytes aid) ->
-      contains ptrs (find_free_block m1 (length bytes)).
+    forall m1 bytes aid m2 ptrs,
+      allocate_block m1 bytes aid (m2, ptrs) ->
+      find_free_block m1 (length bytes) ptrs.
 
   Parameter allocate_block_new_reads :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      m1 bytes aid m2 ptrs,
-      contains (m2, ptrs) (allocate_block m1 bytes aid) ->
-      Forall2 (fun b ptr => contains b (read_byte m2 ptr)) bytes ptrs.
+    forall m1 bytes aid m2 ptrs,
+      allocate_block m1 bytes aid (m2, ptrs) ->
+      Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs.
 
   Parameter allocate_block_old_reads :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      m1 bytes aid m2 ptrs,
-      contains (m2, ptrs) (allocate_block m1 bytes aid) ->
-      forall b ptr, contains b (read_byte m1 ptr) -> contains b (read_byte m2 ptr).
+    forall m1 bytes aid m2 ptrs,
+      allocate_block m1 bytes aid (m2, ptrs) ->
+      forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b.
 
   Parameter allocate_block_allocated :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      m1 bytes aid m2 ptrs,
-      contains (m2, ptrs) (allocate_block m1 bytes aid) ->
+    forall m1 bytes aid m2 ptrs,
+      allocate_block m1 bytes aid (m2, ptrs) ->
       Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
 End MEMORY_ALLOCATE.
 
@@ -520,7 +499,7 @@ Module Type CORE_FRAME_STACK
   (Import F : CORE_FRAME ADDR) <: Typ.
   Parameter t : Type.
   Parameter initial_frame_stack : t.
-  
+
   Parameter peek : t -> F.t.
   Parameter pop : t -> option (F.t * t).
   Parameter push : t -> F.t -> t.
@@ -577,8 +556,7 @@ Module Type MEMORY_FRAME_STACK
       Memory -> (FrameStack -> FrameStack) -> Memory.
 
   Parameter Memory_frame_stack_modify_spec :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      (m1 m2 : Memory) (f : FrameStack -> FrameStack) (fs1 fs2 : FrameStack),
+    forall (m1 m2 : Memory) (f : FrameStack -> FrameStack) (fs1 fs2 : FrameStack),
       fs1 = Memory_frame_stack m1 ->
       m2 = Memory_frame_stack_modify m1 f ->
       fs2 = Memory_frame_stack m2 ->
@@ -598,50 +576,47 @@ Module Type MEMORY_STACK_ALLOCATE
   (Import MFS : MEMORY_FRAME_STACK ADDR SB F FS MEM).
 
   Definition stack_allocate_block
-    {M} `{HM : Monad M} `{SM : SpecM M}
-    (m : Memory) (bytes : list SByte) (aid : AllocationId) : M (Memory * list addr)%type :=
-    '(m', ptrs) <- allocate_block m bytes aid;;
-    match add_all_to_current_frame (Memory_frame_stack m') ptrs with
-    | None => empty_spec
-    | Some fs =>
-        ret (Memory_frame_stack_modify m' (fun _ => fs), ptrs)
-    end.
- 
+    (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : Memory * list addr) : Prop :=
+    exists m' ptrs,
+      allocate_block m bytes aid (m', ptrs) /\
+        match add_all_to_current_frame (Memory_frame_stack m') ptrs with
+        | None => False
+        | Some fs =>
+            res = (Memory_frame_stack_modify m' (fun _ => fs), ptrs)
+        end.
+
   Lemma stack_allocate_block_free :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      m1 bytes aid m2 ptrs,
-      contains (m2, ptrs) (stack_allocate_block m1 bytes aid) ->
-      contains ptrs (find_free_block m1 (length bytes)).
+    forall m1 bytes aid m2 ptrs,
+      stack_allocate_block m1 bytes aid (m2, ptrs) ->
+      find_free_block m1 (length bytes) ptrs.
   Proof.
-    intros M HM SM m1 bytes aid m2 ptrs ALLOC.
-    unfold stack_allocate_block in *.
+    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
+    break_match_hyp_inv.
+    eapply allocate_block_free; eauto.
   Qed.
 
   Parameter stack_allocate_block_new_reads :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      m1 bytes aid m2 ptrs,
-      contains (m2, ptrs) (stack_allocate_block m1 bytes aid) ->
-      Forall2 (fun b ptr => contains b (read_byte m2 ptr)) bytes ptrs.
+    forall m1 bytes aid m2 ptrs,
+      stack_allocate_block m1 bytes aid (m2, ptrs) ->
+      Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs.
 
   Parameter stack_allocate_block_old_reads :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      m1 bytes aid m2 ptrs,
-      contains (m2, ptrs) (stack_allocate_block m1 bytes aid) ->
-      forall b ptr, contains b (read_byte m1 ptr) -> contains b (read_byte m2 ptr).
+    forall m1 bytes aid m2 ptrs,
+      stack_allocate_block m1 bytes aid (m2, ptrs) ->
+      forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b.
 
   Parameter stack_allocate_block_allocated :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      m1 bytes aid m2 ptrs,
-      contains (m2, ptrs) (stack_allocate_block m1 bytes aid) ->
+    forall m1 bytes aid m2 ptrs,
+      stack_allocate_block m1 bytes aid (m2, ptrs)->
       Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
 
+  (*
   Parameter stack_allocate_block_new_frame :
-    forall {M} `{HM : Monad M} `{SM : SpecM M}
-      m1 bytes aid m2 ptrs fs1 fs2,
-      contains (m2, ptrs) (stack_allocate_block m1 bytes aid) ->
-      contains fs2 (Memory_frame_stack m2) ->
-      contains fs1 (Memory_frame_stack m1) ->
-      push fs1 (add_all_to_frame empty_frame ptrs) fs2.
+    forall m1 bytes aid m2 ptrs fs1 fs2,
+      stack_allocate_block m1 bytes aid (m2, ptrs)->
+      fs2 = Memory_frame_stack m2 ->
+      fs1 = Memory_frame_stack m1 ->
+      push fs1 (add_all_to_current_frame empty_frame ptrs) = fs2. *)
 End MEMORY_STACK_ALLOCATE.
 
 Module Type MEMORY_STACK_POP
@@ -656,14 +631,13 @@ Module Type MEMORY_STACK_POP
   (Import MFS : MEMORY_FRAME_STACK ADDR SB F FS MEM).
 
   Parameter stack_pop :
-    forall {M} `{HM : Monad M} `{SM : SpecM M},
-      Memory -> M Memory.
+      Memory -> Memory -> Prop.
 
   Parameter stack_pop_stack_spec :
     forall {M} `{HM : Monad M} `{SM : SpecM M}
       m1 bytes aid m2 ptrs,
-      contains m2 (stack_pop m1) ->
-      contains fs1 (Memory_frame_stack
+      stack_pop m1 m2 ->
+      Memory_frame_stack m1 fs1 ->
       contains ptrs (find_free_block m1 (length bytes)).
 
   Parameter stack_allocate_block_new_reads :
@@ -873,7 +847,7 @@ Module Type MEMORY_HEAP
       h1 = Memory_heap m1 ->
       m2 = Memory_heap_modify m1 f ->
       h2 = Memory_heap m2 ->
-      h2 = f h1.    
+      h2 = f h1.
 End MEMORY_HEAP.
 
 Module Type MEMORY_HEAP_ALLOCATE
@@ -889,7 +863,7 @@ Module Type MEMORY_HEAP_ALLOCATE
   Parameter heap_allocate_block :
     forall {M} `{HM : Monad M} `{SM : SpecM M},
       Memory -> list SByte -> AllocationId -> M (Memory * list addr)%type.
- 
+
   Parameter heap_allocate_block_free :
     forall {M} `{HM : Monad M} `{SM : SpecM M}
       m1 bytes aid m2 ptrs,
@@ -929,7 +903,7 @@ End MEMORY_HEAP_ALLOCATE.
 
 (** Find free blocks for allocation *)
 Module Type MEMORY_FIND_FREE :
-  
+
 
   Record write_byte_operation_invariants (m1 m2 : MemState) : Prop :=
     {
@@ -4526,7 +4500,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         exec_correct pre (read_uvalue dt ptr) (read_uvalue_spec dt ptr)
           (a0 <-
              (_ <- get_consecutive_ptrs ptr (N.to_nat (LP.SIZEOF.sizeof_dtyp dt));;
-              (fun (ms0 : MemState) (st0 : store_id) (bytes : list MP.BYTE_IMPL.SByte) 
+              (fun (ms0 : MemState) (st0 : store_id) (bytes : list MP.BYTE_IMPL.SByte)
                  (ms'0 : MemState) (st'0 : store_id) =>
                  Forall
                    (fun byte : MP.BYTE_IMPL.SByte =>
@@ -5471,7 +5445,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
              (_ <-
                 @get_consecutive_ptrs exec_correct_post Monad_exec_correct_post RAISE_OOM_exec_correct_post
                   RAISE_ERROR_exec_correct_post src (Z.to_nat len);;
-              (fun (ms0 : MemState) (st0 : store_id) (bytes : list BYTE_IMPL.SByte) 
+              (fun (ms0 : MemState) (st0 : store_id) (bytes : list BYTE_IMPL.SByte)
                  (ms'0 : MemState) (st'0 : store_id) =>
                  @Forall BYTE_IMPL.SByte
                    (fun byte : BYTE_IMPL.SByte =>
@@ -5486,7 +5460,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
                       @exec_correct_post_bind (list (OOM ADDR.addr)) (list ADDR.addr)
                         (@lift_err_RAISE_ERROR (list (OOM ADDR.addr)) exec_correct_post Monad_exec_correct_post
                            RAISE_ERROR_exec_correct_post
-                           (@map_monad err (EitherMonad.Monad_either string) IP.intptr 
+                           (@map_monad err (EitherMonad.Monad_either string) IP.intptr
                               (OOM ADDR.addr)
                               (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) dst [DVALUE_IPTR ix]) ixs))
                         (fun addrs : list (OOM ADDR.addr) =>
@@ -5578,8 +5552,8 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
                         (_ : @In (ADDR.addr * BYTE_IMPL.SByte) H
                                (@zip ADDR.addr BYTE_IMPL.SByte a0
                                   (@repeatN BYTE_IMPL.SByte (Z.to_N len)
-                                     (BYTE_IMPL.uvalue_sbyte (UVALUE_I8 val) (DTYPE_I 8) 0 sid)))) 
-                        (_ : MemState) (st0 : store_id) (_ : unit) (_ : MemState) (st'0 : store_id) => 
+                                     (BYTE_IMPL.uvalue_sbyte (UVALUE_I8 val) (DTYPE_I 8) 0 sid))))
+                        (_ : MemState) (st0 : store_id) (_ : unit) (_ : MemState) (st'0 : store_id) =>
                         st0 = st'0)) (fun _ : list unit => @exec_correct_post_ret unit tt))).
     Proof using Type.
       intros dst val len sid volatile.
@@ -5776,7 +5750,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           inv H6.
           lia.
         }
-        
+
         eauto with EXEC_CORRECT.
         eauto with EXEC_CORRECT.
       }
@@ -5817,7 +5791,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           inv H6.
           lia.
         }
-        
+
         eauto with EXEC_CORRECT.
         eauto with EXEC_CORRECT.
       }
@@ -5858,7 +5832,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           inv H6.
           lia.
         }
-        
+
         eauto with EXEC_CORRECT.
         eauto with EXEC_CORRECT.
       }
@@ -5899,7 +5873,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           inv H6.
           lia.
         }
-        
+
         eauto with EXEC_CORRECT.
         eauto with EXEC_CORRECT.
       }
@@ -5940,7 +5914,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           inv H6.
           lia.
         }
-        
+
         eauto with EXEC_CORRECT.
         eauto with EXEC_CORRECT.
       }
@@ -5981,7 +5955,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           inv H6.
           lia.
         }
-        
+
         eauto with EXEC_CORRECT.
         eauto with EXEC_CORRECT.
       }
