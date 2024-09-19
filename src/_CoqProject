@@ -35,7 +35,6 @@
 ./llvm-mem/FiniteIntptr.v
 ./llvm-mem/OverlapsLemmas.v
 ./llvm-mem/MemoryLLVM.v
-./llvm-mem/MemPropT_LLVM.v
 
 ./coq/Analysis/Dom.v
 ./coq/Analysis/DomId.v
@@ -152,7 +151,6 @@
 ./coq/Utils/PostConditions.v
 ./coq/Utils/PropT.v
 ./coq/Utils/Raise.v
-./coq/Utils/RaiseLLVM.v
 ./coq/Utils/RefineProp.v
 ./coq/Utils/ErrUbOomProp.v
 ./coq/Utils/ErrOomPoison.v

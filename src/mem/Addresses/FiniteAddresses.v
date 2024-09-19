@@ -8,6 +8,7 @@ From Vellvm Require Import
 
 From Mem Require Import
   Addresses.MemoryAddress
+  Addresses.Provenance
   Memory.Provenance.
 
 From Vellvm.Semantics Require Import
@@ -18,6 +19,10 @@ From QuickChick Require Import Show.
 From ExtLib Require Import
   Structures.Functor
   Structures.Monads.
+
+From Coq Require Import
+  Structures.Equalities
+  Structures.Orders.
 
 Import ListNotations.
 
@@ -32,7 +37,7 @@ Definition Prov := option (list Provenance). (* Provenance *)
 Definition wildcard_prov : Prov := None.
 Definition nil_prov : Prov := Some [].
 
-Module FinAddrType <: ABSTRACT_ADDRESS.
+Module FinAddrType <: CORE_ADDRESS.
   Definition t := (Iptr * Prov) % type.
   Definition eq := @Logic.eq t.
 
@@ -56,13 +61,51 @@ End FinAddrType.
 
 Module FinNull <: HAS_NULL FinAddrType.
   Definition null := (Int64.zero, nil_prov)%Z.
+
+  Definition is_null (a : FinAddrType.t) :=
+    Int64.eq (fst null) (fst a).
+
+  Lemma null_is_null :
+    is_null null = true.
+  Proof.
+    reflexivity.
+  Qed.
 End FinNull.
 
 Module FinPTOI <: HAS_PTOI FinAddrType.
   Definition ptr_to_int := fun (ptr : FinAddrType.t) => Int64.unsigned (fst ptr).
 End FinPTOI.
 
-Module FinAddr <: ADDRESS := FinAddrType <+ FinNull <+ FinPTOI.
+Module Type Fin_HAS_POINTER_ARITHMETIC_CORE <: HAS_POINTER_ARITHMETIC_CORE FinAddrType.
+  (** Pointer addition. May error if the result cannot be represented
+      as a pointer, e.g., if it would be out of bounds.
+   *)
+  Definition ptr_add (a : FinAddrType.t) (i : Z) : err FinAddrType.t
+    := match a with
+       | (ptr, pr) =>
+           let res := Int64.unsigned ptr + i in
+           if (res >? Int64.max_unsigned) || (res <? 0)
+           then inl "ptr_add: out of bounds."%string
+           else ret (Int64.repr res, pr)
+       end.
+
+  Lemma ptr_add_0 :
+    forall ptr,
+      ptr_add ptr 0 = inr ptr.
+  Proof.
+    intros ptr.
+    unfold ptr_add.
+    destruct ptr.
+    rewrite Z.add_0_r in *.
+    destruct ((Int64.unsigned i >? Int64.max_unsigned) || (Int64.unsigned i <? 0)) eqn:bounds.
+    - (* Contradiction *)
+      exfalso.
+      pose proof Int64.unsigned_range_2 i.
+      lia.
+    - setoid_rewrite Int64.repr_unsigned.
+      reflexivity.
+  Qed.
+End Fin_HAS_POINTER_ARITHMETIC_CORE.
 
 Module FinPROV <: PROVENANCE(FinAddr)
 with Definition Prov := Prov
@@ -319,6 +362,13 @@ with Definition access_allowed := fun (pr : Prov) (aid : AllocationId)
   Definition show_provenance (pr : Provenance) := Show.show pr.
   Definition show_allocation_id (aid : AllocationId) := Show.show aid.
 End FinPROV.
+
+Module Type FinPROV <: HAS_PROVENANCE FinAddrType.
+  Definition address_provenance (a : FinAddrType.t) ProvSet.
+End FinPROV.
+
+Module FinAddr <: ADDRESS := FinAddrType <+ FinNull <+ FinPTOI <+ Fin_HAS_POINTER_ARITHMETIC_CORE <+ HAS_POINTER_ARITHMETIC_HELPERS.
+
 
 Module FinITOP : ITOP(FinAddr)(FinPROV)(FinPTOI)
 with Definition int_to_ptr :=
