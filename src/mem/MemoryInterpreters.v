@@ -8,8 +8,10 @@ From Vellvm.Semantics Require Import
      MemoryParams
      Memory.ErrSID
      LLVMParams
-     LLVMEvents
-     StoreId.
+     LLVMEvents.
+
+From Mem.Semantics Require Import
+  Memory.StoreId.
 
 From Vellvm.Handlers Require Import
      MemoryModel

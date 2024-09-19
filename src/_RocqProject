@@ -35,7 +35,6 @@
 ./llvm-mem/FiniteIntptr.v
 ./llvm-mem/OverlapsLemmas.v
 ./llvm-mem/MemoryLLVM.v
-./llvm-mem/MemPropT_LLVM.v
 
 ./rocq/Analysis/Dom.v
 ./rocq/Analysis/DomId.v
@@ -152,7 +151,6 @@
 ./rocq/Utils/PostConditions.v
 ./rocq/Utils/PropT.v
 ./rocq/Utils/Raise.v
-./rocq/Utils/RaiseLLVM.v
 ./rocq/Utils/RefineProp.v
 ./rocq/Utils/ErrUbOomProp.v
 ./rocq/Utils/ErrOomPoison.v

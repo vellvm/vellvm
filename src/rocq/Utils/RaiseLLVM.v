@@ -1,3 +1,23 @@
+From Stdlib Require Import
+     String
+     Morphisms.
+
+From ExtLib Require Import
+     Structures.Monads.
+
+From ITree Require Import
+     Basics.Basics
+     Basics.Monad
+     Eq
+     ITree.
+
+From Vellvm Require Import 
+  Utils.Tactics.
+
+Require Import Stdlib.Program.Equality.
+
+Require Import Paco.paco.
+
 Section Failure.
   Variable E : Type -> Type.
   Context {FAIL : FailureE -< E}.

@@ -1,4 +1,4 @@
-From Coq Require Import ZArith.
+From Stdlib Require Import ZArith.
 From Mem Require Import Overlaps.
 From LLVM_Memory Require Import Sizeof.
 From Vellvm Require Import DynamicTypes.
