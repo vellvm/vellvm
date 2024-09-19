@@ -1,6 +1,8 @@
 From Coq Require Import
   Structures.Equalities
-  Structures.Orders.
+  Structures.Orders
+  NArith
+  Lia.
 
 (* TODO: Should provenance just be a typeclass? *)
 (* Monad class *)
@@ -58,6 +60,8 @@ End HAS_WILD_PROV.
 Module Type HAS_NIL_PROV (Import PS : PROV_SET).
   Parameter nil_prov : ProvSet.
 End HAS_NIL_PROV.
+
+Module Type FULL_PROV_SET := PROV_SET <+ HAS_WILD_PROV <+ HAS_NIL_PROV.
 
 (** Access controls to memory based on pointer provenance and the
     AllocationId of the byte being accessed in memory.
@@ -162,3 +166,32 @@ End ACCESS.
 (*     auto. *)
 (*   Qed. *)
 (* End PROV_FUNCS. *)
+
+(* TODO: Move this *)
+Module N_Core_Provenance <: CORE_PROVENANCE_TYPE N.
+  Import N.
+
+  Definition initial_provenance := 0%N.
+  Definition next_provenance := N.succ.
+
+  Lemma provenance_lt_next_provenance :
+    forall pr,
+      lt pr (next_provenance pr).
+  Proof.
+    intros pr.
+    unfold next_provenance.
+    lia.
+  Qed.
+End N_Core_Provenance.
+
+Module N_Provenance <: PROVENANCE_TYPE := N <+ N_Core_Provenance.
+
+Module Type LIST_PROV_SET (Import PR:PROVENANCE_TYPE) <: FULL_PROV_SET.
+  Definition t := option (list PR.t).
+  Definition wildcard_prov : t := None.
+  Definition nil_prov : t := Some nil.
+End LIST_PROV_SET.
+
+Module N_ProvSet <: LIST_PROV_SET N_Provenance.
+  Include (LIST_PROV_SET N_Provenance).
+End N_ProvSet.
