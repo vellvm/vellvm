@@ -120,6 +120,14 @@ Module Type HAS_METADATA (METADATA : Typ) (Import T:Typ).
   Parameter extract_metadata : t -> METADATA.t.
 End HAS_METADATA.
 
+(** Metadata types with provenance *)
+Module Type METADATA_PROVENANCE (Import PS : PROV_SET) (METADATA : Typ).
+  (** Access the provenance for an address *)
+  Parameter metadata_provenance : METADATA.t -> ProvSet.
+End METADATA_PROVENANCE.
+
+Module Type METADATA_WITH_PROVENANCE (PS : PROV_SET) := Typ <+ METADATA_PROVENANCE PS.
+
 (** Address types which support casts from integers
 
     METADATA is a type representing any extra metadata that might be
@@ -176,29 +184,37 @@ Module Type PTOI_ITOP_EXTRA (METADATA : Typ) (Import Addr:CORE_ADDRESS) (Import 
       ptr_to_int a = x.
 End PTOI_ITOP_EXTRA.
 
-(** Address types with an associated provenance *)
-Module Type HAS_PROVENANCE (Import PS : PROV_SET) (Import Addr:CORE_ADDRESS).
-  (** Access the provenance for an address *)
-  Parameter address_provenance : addr -> ProvSet.
-End HAS_PROVENANCE.
-
-Module HAS_PROVENANCE_TO_HAS_METADATA (Import PS : PROV_SET) (Import Addr:CORE_ADDRESS) (Import HP : HAS_PROVENANCE PS Addr) <: HAS_METADATA PS Addr.
-  Definition extract_metadata := address_provenance.
-End HAS_PROVENANCE_TO_HAS_METADATA.
-
 (*** Address module types *)
 (** Addresses that can be null *)
 Module Type NULLABLE_ADDRESSES := CORE_ADDRESS <+ HAS_NULL.
 
-(** Addresses with the batteries included *)
-Module Type ADDRESS (PS : PROV_SET) :=
-  CORE_ADDRESS <+ HAS_NULL <+ HAS_POINTER_ARITHMETIC <+
-    HAS_PROVENANCE PS <+ HAS_PROVENANCE_TO_HAS_METADATA PS <+
-    HAS_PTOI <+ HAS_ITOP PS <+ PTOI_ITOP_EXTRA PS <+ PTOI_ARITH_EXTRAS.
+(** Addresses without metadata *)
+Module Type BASIC_ADDRESS :=
+  CORE_ADDRESS <+ HAS_NULL <+ HAS_POINTER_ARITHMETIC <+ HAS_PTOI <+ PTOI_ARITH_EXTRAS.
+
+(** Addresses with metadata *)
+Module Type METADATA_ADDRESS (MD : Typ) :=
+  BASIC_ADDRESS <+ HAS_METADATA MD.
+
+(** Addresses with provenance metadata *)
+Module Type BASE_PROVENANCE_ADDRESS (MD : Typ) (PS : PROV_SET) :=
+  METADATA_ADDRESS MD <+ METADATA_PROVENANCE PS MD.
+
+Module HAS_PROVENANCE (MD : Typ) (PS : PROV_SET) (Import Addr:BASE_PROVENANCE_ADDRESS MD PS).
+    Definition address_provenance (a : Addr.t) : PS.ProvSet :=
+      metadata_provenance (extract_metadata a).
+End HAS_PROVENANCE.
+
+Module Type PROVENANCE_ADDRESS (MD : Typ) (PS : PROV_SET) :=
+  BASE_PROVENANCE_ADDRESS MD PS <+ HAS_PROVENANCE MD PS.
+
+(** Basic addresses with the batteries and metadata included *)
+Module Type ADDRESS (MD : Typ) (PS : PROV_SET) :=
+  PROVENANCE_ADDRESS MD PS <+ HAS_ITOP MD <+ PTOI_ITOP_EXTRA MD.
 
 (** Infinite addresses with the batteries included *)
-Module Type INFINITE_ADDRESS (PS : PROV_SET) :=
-  ADDRESS PS <+ ITOP_BIG PS.
+Module Type INFINITE_ADDRESS (MD : Typ) (PS : PROV_SET) :=
+  ADDRESS MD PS <+ ITOP_BIG MD.
 
 (* TODO: Move this to a show utility file? *)
 Module Type SHOWABLE (Import T:Typ).
