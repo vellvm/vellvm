@@ -21,6 +21,8 @@
 ./mem/Semantics/Memory/Overlaps.v
 ./mem/Semantics/Memory/StoreId.v
 ./mem/Addresses/MemoryAddress.v
+./mem/Addresses/TypeModules.v
+./mem/Addresses/ZAddresses.v
 ./mem/Addresses/FiniteAddresses.v
 ./mem/Addresses/InfiniteAddresses.v
 ./mem/Addresses/PointerArithmetic.v
