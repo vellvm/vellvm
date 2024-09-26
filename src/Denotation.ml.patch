@@ -1,5 +1,5 @@
---- ml/extracted/Denotation.ml	2024-09-08 00:09:44.000000000 -0400
-+++ ml/extracted/Denotation1.ml	2024-09-08 00:10:57.000000000 -0400
+--- ml/extracted/Denotation.ml	2024-09-26 19:50:25.000000000 -0400
++++ ml/extracted/Denotation.ml	2024-09-26 19:46:46.000000000 -0400
 @@ -33,6 +33,7 @@
  open Subevent
  open Util
@@ -36,3 +36,11 @@
      let Phi (dt, args) = p in
      (match assoc eq_dec_raw_id bid_from args with
       | Some op ->
+@@ -6270,6 +6274,7 @@
+         (ret (Obj.magic coq_Monad_itree))
+         (combine_lists_varargs df.df_args args)) (fun x ->
+       let (bs, vs) = x in
++      write_log_entry (F_args (df.df_prototype.dc_name, (List.map fst bs)));
+       bind (Obj.magic coq_Monad_itree)
+         (lift_err
+           (coq_ReSum_inr (Obj.magic __) (fun _ _ _ x0 x1 _ ->

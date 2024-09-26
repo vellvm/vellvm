@@ -2,11 +2,13 @@ open LLVMAst
 open DynamicTypes
 open ShowAST
 open DList
+open CFG
 
 type log_entry =
   | Instr of instr_id * dtyp instr
   | Phi_node of local_id * dtyp phi * block_id
-  | Ret of dtyp texp 
+  | Ret of dtyp texp
+  | F_args of (function_id) * local_id list
 
 type log_stream = log_entry list
 
@@ -29,6 +31,9 @@ let dshow_log_entry (le : log_entry) : DList.coq_DString =
     ]
   | Ret term ->
     ShowAST.dshowTerminator ShowAST.dshow_dtyp (TERM_Ret term)
+  | F_args (def, args) ->
+    (* List.fold_right (fun x acc -> coq_DList_append (ShowAST.dshowRawId x) acc) args (DList.coq_EmptyDString) *)
+    ShowAST.dshowRawId def
 
 let dstring_of_log_stream (log_stream : log_stream) : DList.coq_DString =
   List.rev log_stream |> List.map dshow_log_entry |> ShowAST.dintersperse (string_to_DString ('\n' :: []))

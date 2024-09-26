@@ -200,93 +200,93 @@ let get_f_def_from_mcfg
   let find_aux  = fun x -> exp_eq typ_eq (EXP_Ident (ID_Global x.df_prototype.dc_name)) f_exp in
   List.find_opt find_aux defs
 
-let rec transform_dtyp_to_typ_log'
-    (stack : log_stream)
-    (f_def : (LLVMAst.typ, LLVMAst.typ cfg) definition)
-    (mcfg : LLVMAst.typ mcfg)
-    (code : tlog_stream)
-  : tlog_stream * log_stream =
-  match stack with
-  | [] -> code, []
-  | log::stack' ->
-    (* print_log_entry log; *)
-    begin match log with
-      | Instr (id, ins) ->
-        let ins'o = get_instr_from_def f_def id in
-        begin match ins, ins'o with
-        | INSTR_Comment c, Some (_, INSTR_Comment _) ->
-          let code' = code >:: TInstr (id, INSTR_Comment c) in
-          transform_dtyp_to_typ_log' stack' f_def mcfg code'
-        | INSTR_Op _, Some (_, INSTR_Op exp')->
-          let code' = code >:: TInstr (id, INSTR_Op exp') in
-          transform_dtyp_to_typ_log' stack' f_def mcfg code'
-        | INSTR_Call (_, _, _), Some (_, INSTR_Call ((f_t, f_exp'), args', anns')) ->
-          let code' = code >:: TInstr (id, INSTR_Call ((f_t, f_exp'), args', anns')) in
-          begin match AstLib.intrinsic_exp f_exp' with
-            | Some _ -> 
-              transform_dtyp_to_typ_log' stack' f_def mcfg code'
-            | None ->           (* Not customized function *)
-               begin match get_f_def_from_mcfg f_exp' mcfg with
-                 | Some f_def' -> 
-                   let code2, stack2 = transform_dtyp_to_typ_log' stack' f_def' mcfg code' in
-                   transform_dtyp_to_typ_log' stack2 f_def mcfg code2
-                 | None -> failwith "Cannot find the new definition"
-               end
-          end
-          (* Pick the new function *)
-        | INSTR_Alloca (_, _), Some (_, INSTR_Alloca (dt', anns')) ->
-          let code' = code >:: TInstr (id, INSTR_Alloca (dt', anns')) in
-          transform_dtyp_to_typ_log' stack' f_def mcfg code'
-        | INSTR_Load (_, _, _), Some (_, INSTR_Load (dt', exp', anns'))->
-          let code' = code >:: TInstr (id, INSTR_Load (dt', exp', anns')) in
-          transform_dtyp_to_typ_log' stack' f_def mcfg code'
-        | INSTR_Store (_, _, _), Some (_, INSTR_Store (texp1', texp2', anns')) ->
-          let code' = code >:: TInstr (id, INSTR_Store (texp1', texp2', anns')) in
-          transform_dtyp_to_typ_log' stack' f_def mcfg code'
-        | INSTR_Fence (co, o), Some (_, INSTR_Fence _) ->
-          let code' = code >:: TInstr (id, INSTR_Fence (co, o)) in
-          transform_dtyp_to_typ_log' stack' f_def mcfg code'
-        | INSTR_AtomicCmpXchg _, Some (_, INSTR_AtomicCmpXchg cmpxchg') ->
-          let code' = code >:: TInstr (id, INSTR_AtomicCmpXchg cmpxchg') in
-          transform_dtyp_to_typ_log' stack' f_def mcfg code'
-        | INSTR_AtomicRMW _, Some (_, INSTR_AtomicRMW atomicrmw') ->
-          let code' = code >:: TInstr (id, INSTR_AtomicRMW atomicrmw') in
-          transform_dtyp_to_typ_log' stack' f_def mcfg code'
-        | INSTR_VAArg (_, _), Some (_, INSTR_VAArg (texp', t')) -> 
-          let code' = code >:: TInstr (id, INSTR_VAArg (texp', t')) in
-          transform_dtyp_to_typ_log' stack' f_def mcfg code'
-        | INSTR_LandingPad, Some (_, INSTR_LandingPad) ->
-          let code' = code >:: TInstr (id, INSTR_LandingPad) in
-          transform_dtyp_to_typ_log' stack' f_def mcfg code'
-        | _ -> failwith "transform_dtyp_to_typ_log: Cannot find instr"
-        end
-      | Phi_node (id, _, bid) ->
-        let phi'o = get_phi_from_def f_def id in
-        begin match phi'o with
-          | Some (_, phi') ->
-            let code' = code >:: TPhi (id, phi', bid) in
-            transform_dtyp_to_typ_log' stack' f_def mcfg code'
-          | None -> failwith "transform_dtyp_to_typ_log: Cannot find phi"
-        end
-      | Ret texp ->
-        let term' = get_term_from_def f_def mcfg (TERM_Ret texp) in
-        begin match term' with
-          | Some (TERM_Ret texp') ->
-            let code' = code >:: TRet texp' in
-            code', stack'
-          | _ -> failwith "transform_dtyp_to_typ_log: Cannot find terminator"
-        end
-    end
+(* let rec transform_dtyp_to_typ_log' *)
+(*     (stack : log_stream) *)
+(*     (f_def : (LLVMAst.typ, LLVMAst.typ cfg) definition) *)
+(*     (mcfg : LLVMAst.typ mcfg) *)
+(*     (code : tlog_stream) *)
+(*   : tlog_stream * log_stream = *)
+(*   match stack with *)
+(*   | [] -> code, [] *)
+(*   | log::stack' -> *)
+(*     (\* print_log_entry log; *\) *)
+(*     begin match log with *)
+(*       | Instr (id, ins) -> *)
+(*         let ins'o = get_instr_from_def f_def id in *)
+(*         begin match ins, ins'o with *)
+(*         | INSTR_Comment c, Some (_, INSTR_Comment _) -> *)
+(*           let code' = code >:: TInstr (id, INSTR_Comment c) in *)
+(*           transform_dtyp_to_typ_log' stack' f_def mcfg code' *)
+(*         | INSTR_Op _, Some (_, INSTR_Op exp')-> *)
+(*           let code' = code >:: TInstr (id, INSTR_Op exp') in *)
+(*           transform_dtyp_to_typ_log' stack' f_def mcfg code' *)
+(*         | INSTR_Call (_, _, _), Some (_, INSTR_Call ((f_t, f_exp'), args', anns')) -> *)
+(*           let code' = code >:: TInstr (id, INSTR_Call ((f_t, f_exp'), args', anns')) in *)
+(*           begin match AstLib.intrinsic_exp f_exp' with *)
+(*             | Some _ ->  *)
+(*               transform_dtyp_to_typ_log' stack' f_def mcfg code' *)
+(*             | None ->           (\* Not customized function *\) *)
+(*                begin match get_f_def_from_mcfg f_exp' mcfg with *)
+(*                  | Some f_def' ->  *)
+(*                    let code2, stack2 = transform_dtyp_to_typ_log' stack' f_def' mcfg code' in *)
+(*                    transform_dtyp_to_typ_log' stack2 f_def mcfg code2 *)
+(*                  | None -> failwith "Cannot find the new definition" *)
+(*                end *)
+(*           end *)
+(*           (\* Pick the new function *\) *)
+(*         | INSTR_Alloca (_, _), Some (_, INSTR_Alloca (dt', anns')) -> *)
+(*           let code' = code >:: TInstr (id, INSTR_Alloca (dt', anns')) in *)
+(*           transform_dtyp_to_typ_log' stack' f_def mcfg code' *)
+(*         | INSTR_Load (_, _, _), Some (_, INSTR_Load (dt', exp', anns'))-> *)
+(*           let code' = code >:: TInstr (id, INSTR_Load (dt', exp', anns')) in *)
+(*           transform_dtyp_to_typ_log' stack' f_def mcfg code' *)
+(*         | INSTR_Store (_, _, _), Some (_, INSTR_Store (texp1', texp2', anns')) -> *)
+(*           let code' = code >:: TInstr (id, INSTR_Store (texp1', texp2', anns')) in *)
+(*           transform_dtyp_to_typ_log' stack' f_def mcfg code' *)
+(*         | INSTR_Fence (co, o), Some (_, INSTR_Fence _) -> *)
+(*           let code' = code >:: TInstr (id, INSTR_Fence (co, o)) in *)
+(*           transform_dtyp_to_typ_log' stack' f_def mcfg code' *)
+(*         | INSTR_AtomicCmpXchg _, Some (_, INSTR_AtomicCmpXchg cmpxchg') -> *)
+(*           let code' = code >:: TInstr (id, INSTR_AtomicCmpXchg cmpxchg') in *)
+(*           transform_dtyp_to_typ_log' stack' f_def mcfg code' *)
+(*         | INSTR_AtomicRMW _, Some (_, INSTR_AtomicRMW atomicrmw') -> *)
+(*           let code' = code >:: TInstr (id, INSTR_AtomicRMW atomicrmw') in *)
+(*           transform_dtyp_to_typ_log' stack' f_def mcfg code' *)
+(*         | INSTR_VAArg (_, _), Some (_, INSTR_VAArg (texp', t')) ->  *)
+(*           let code' = code >:: TInstr (id, INSTR_VAArg (texp', t')) in *)
+(*           transform_dtyp_to_typ_log' stack' f_def mcfg code' *)
+(*         | INSTR_LandingPad, Some (_, INSTR_LandingPad) -> *)
+(*           let code' = code >:: TInstr (id, INSTR_LandingPad) in *)
+(*           transform_dtyp_to_typ_log' stack' f_def mcfg code' *)
+(*         | _ -> failwith "transform_dtyp_to_typ_log: Cannot find instr" *)
+(*         end *)
+(*       | Phi_node (id, _, bid) -> *)
+(*         let phi'o = get_phi_from_def f_def id in *)
+(*         begin match phi'o with *)
+(*           | Some (_, phi') -> *)
+(*             let code' = code >:: TPhi (id, phi', bid) in *)
+(*             transform_dtyp_to_typ_log' stack' f_def mcfg code' *)
+(*           | None -> failwith "transform_dtyp_to_typ_log: Cannot find phi" *)
+(*         end *)
+(*       | Ret texp -> *)
+(*         let term' = get_term_from_def f_def mcfg (TERM_Ret texp) in *)
+(*         begin match term' with *)
+(*           | Some (TERM_Ret texp') -> *)
+(*             let code' = code >:: TRet texp' in *)
+(*             code', stack' *)
+(*           | _ -> failwith "transform_dtyp_to_typ_log: Cannot find terminator" *)
+(*         end *)
+(*     end *)
 
 
 (* TODO: Currently hard-coded specific module. *)
-let transform_dtyp_to_typ_log
-    (stack : log_stream)
-    (f_id : function_id)
-    (mcfg : LLVMAst.typ mcfg) : tlog_stream =
-  match get_f_def_from_mcfg (EXP_Ident (ID_Global f_id)) mcfg with
-  | None -> failwith (Printf.sprintf "Cannot found definition %s" (ShowAST.dshow_raw_id f_id |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring))
-  | Some f_def -> transform_dtyp_to_typ_log' stack f_def mcfg [] |> fst
+(* let transform_dtyp_to_typ_log *)
+(*     (stack : log_stream) *)
+(*     (f_id : function_id) *)
+(*     (mcfg : LLVMAst.typ mcfg) : tlog_stream = *)
+(*   match get_f_def_from_mcfg (EXP_Ident (ID_Global f_id)) mcfg with *)
+(*   | None -> failwith (Printf.sprintf "Cannot found definition %s" (ShowAST.dshow_raw_id f_id |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)) *)
+(*   | Some f_def -> transform_dtyp_to_typ_log' stack f_def mcfg [] |> fst *)
 
 (** Modules **)
 
@@ -573,7 +573,10 @@ let normalize_phi (ctx : ctx) (id : raw_id) (phi : typ phi) (bid_from : raw_id) 
 let list_to_map l1 l2 =
   List.fold_left (fun acc (key, value) -> RawidM.add key value acc) RawidM.empty @@ List.combine l1 l2
 
-let normalize_definition ctx (mcfg : LLVMAst.typ CFG.mcfg) (f : typ exp) (targs : typ texp list) : ctx option =
+(*
+   This function will take in a ctx, a mcfg, a function expression, and a arguments, to try to return a ctx with that function's name on it
+*)
+let rec normalize_definition ctx (mcfg : LLVMAst.typ CFG.mcfg) (f : typ exp) (targs : typ texp list) : ctx option =
   match f with
   | EXP_Ident (ID_Global id) ->
     begin match List.find_opt (fun x -> RawidOrdPrint.compare x.df_prototype.dc_name id == 0) mcfg.m_definitions with
@@ -588,22 +591,34 @@ let normalize_definition ctx (mcfg : LLVMAst.typ CFG.mcfg) (f : typ exp) (targs 
     end
   | EXP_Ident (ID_Local id) ->
     (* Function pointer. Substitute it in, and then check if there is a name equal to that *)
-    let id' = subst_raw_id_opt ctx id (EXP_Ident (ID_Local id)) in
-    begin match id' with
-      | EXP_Ident (ID_Global id) ->
-        begin match List.find_opt (fun x -> RawidOrdPrint.compare x.df_prototype.dc_name id == 0) mcfg.m_definitions with
-          | None ->
-            None
-          | Some def ->
-            let args = List.map (fun (_, arg) -> subst_exp ctx arg) targs in
-            let ctx' = List.combine def.df_args args |> RawidM.of_list in
-            (* Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx'); *)
-            Some ctx'
-            (* Need to zip local_id with raw_id, If the length is the same will proceed the above, otherwise error *)
-        end
+    let f' = subst_raw_id_opt ctx id f in
+    begin match f' with
+      | EXP_Ident (ID_Local id') ->
+        if id == id' then None else
+          normalize_definition ctx mcfg f' targs
+      | EXP_Ident (ID_Global _)->
+        normalize_definition ctx mcfg f' targs
       | _ -> None
+      (* let id' = subst_raw_id_opt ctx id (EXP_Ident (ID_Local id)) in *)
+    (* begin match id' with *)
+    (*   | EXP_Ident (ID_Global id) -> *)
+    (*     begin match List.find_opt (fun x -> RawidOrdPrint.compare x.df_prototype.dc_name id == 0) mcfg.m_definitions with *)
+    (*       | None -> *)
+    (*         None *)
+    (*       | Some def -> *)
+    (*         let args = List.map (fun (_, arg) -> subst_exp ctx arg) targs in *)
+    (*         let ctx' = List.combine def.df_args args |> RawidM.of_list in *)
+    (*         (\* Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx'); *\) *)
+    (*         Some ctx' *)
+    (*         (\* Need to zip local_id with raw_id, If the length is the same will proceed the above, otherwise error *\) *)
+    (*     end *)
+    (*   | _ -> None *)
     end
   | _ -> None
+
+let normalize_definition' ctx (targs : typ texp list) (params : function_id list) : ctx =
+  let args = List.map(fun (_, arg) -> subst_exp ctx arg) targs in
+  List.combine params args |> RawidM.of_list
 
 let rec normalize_log
     (ctx : ctx)
@@ -651,62 +666,53 @@ let rec normalize_log
               let tblk' = add_code tblk [(IId id', INSTR_Op exp')] in
               normalize_log ctx' f_def mcfg tblk' stack'
             end
-          | INSTR_Call (_, _, _), Some (_, INSTR_Call ((f_t, f_exp), targs, anns)) ->
+          | INSTR_Call (_, _, _), Some (_, INSTR_Call ((f_t, f_exp), taargs, anns)) ->
         
             (* 1. Need to analyze the targs. Match them with the function signatures from mcfg
                2. Recursively call normalize_log
                3. continue with the rest of the stack
             *)
-
             begin match id, AstLib.intrinsic_exp f_exp with
               | IVoid _, Some _ ->
-                let tblk' = add_code tblk [(id, INSTR_Call ((f_t, f_exp), targs, anns))] in
-                normalize_log ctx f_def mcfg tblk' stack'
+                let tblk' = add_code tblk [(id, INSTR_Call ((f_t, f_exp), taargs, anns))] in
+                normalize_log ctx f_def mcfg tblk' (List.tl stack')
               | IId id, Some _ ->
                 let id' = gensym_raw_id id in
-                let tblk' = add_code tblk [(IId id', INSTR_Call ((f_t, f_exp), targs, anns))] in
+                let tblk' = add_code tblk [(IId id', INSTR_Call ((f_t, f_exp), taargs, anns))] in
                 let exp = EXP_Ident (ID_Global id') in
                 let ctx' = RawidM.update_or exp (fun _ -> exp) id ctx in
-                normalize_log ctx' f_def mcfg tblk' stack'
+                normalize_log ctx' f_def mcfg tblk' (List.tl stack')
               | IVoid _, None ->
-                let args = List.map (fun (arg, _) -> arg) targs in
-                let f_exp' = subst_exp ctx f_exp in
-                begin match normalize_definition ctx mcfg f_exp' args with
-                  | Some ctx' ->
-                    begin match get_f_def_from_mcfg f_exp' mcfg with
-                      | Some f_def' -> 
-                        let (_, stack2, tblk2, _) = normalize_log ctx' f_def' mcfg tblk stack' in
+                begin match stack' with
+                  | F_args (f_id, params)::stack'' ->
+                    let targs = List.map fst taargs in
+                    let ctx' = normalize_definition' ctx targs params in
+                    (* TODO: can simplify get_f_def_from_mcfg *)
+                    begin match get_f_def_from_mcfg (EXP_Ident (ID_Global f_id)) mcfg with
+                      | Some f_def' ->
+                        let (_, stack2, tblk2, _) = normalize_log ctx' f_def' mcfg tblk stack'' in
                         normalize_log ctx f_def mcfg tblk2 stack2
-                      | None ->  failwith "Cannot find the new definition"
+                      | None -> failwith "normalize_log: function not found"
                     end
-                  | None -> 
-                    (* Local functions *)
-                    failwith "Function mismatch"
+                  | _ -> failwith "normalize_log: logging error on call"
                 end
               | IId id, None ->
-                (* Printf.printf "%s\n" (ShowAST.dshowExp ShowAST.dshowTyp f |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring); *)
-                let args = List.map (fun (arg, _) -> arg) targs in
-                let f_exp' = subst_exp ctx f_exp in
-                begin match normalize_definition ctx mcfg f_exp' args with
-                  | Some ctx' ->
-                    begin match get_f_def_from_mcfg f_exp' mcfg with
-                      | Some f_def' -> 
-                        let (_, stack2, tblk2, texp) = normalize_log ctx' f_def' mcfg tblk stack' in
+                begin match stack' with
+                  | F_args (f_id, params)::stack'' ->
+                    let targs = List.map fst taargs in
+                    let ctx' = normalize_definition' ctx targs params in
+                    begin match get_f_def_from_mcfg (EXP_Ident (ID_Global f_id)) mcfg with
+                      | Some f_def' ->
+                        let (_, stack2, tblk2, texp) = normalize_log ctx' f_def' mcfg tblk stack'' in
                         begin match texp with
-                          | Some (_, exp) -> 
+                          | Some (_, exp) ->
                             let ctx2 = RawidM.update_or exp (fun _ -> exp) id ctx in
-                            (* Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx); *)
-                            (* Printf.printf "ctx': %s\n" (RawidM.to_string ctx_unit_to_string ctx'); *)
-                            (* Printf.printf "ctx2: %s\n" (RawidM.to_string ctx_unit_to_string ctx2); *)
                             normalize_log ctx2 f_def mcfg tblk2 stack2
-                          | None ->
-                            failwith "Should return something"
+                          | None -> failwith "normalize_log: call should return some value"
                         end
-                      | None -> failwith "normalize_log: Cannot find the new definition"
+                      | None -> failwith "normalize_log: function not found"
                     end
-                  | None ->
-                    print_tblk tblk;
-                    failwith "function takes in no parameter?"
+                  | _ -> failwith "normalize_log: logging error on call"
                 end
             end
           | INSTR_Alloca _, Some (_, INSTR_Alloca (dt, anns)) ->
@@ -801,6 +807,7 @@ let rec normalize_log
             end
           | _ -> failwith "normalize_log: no match"
         end
+      | _ ->  failwith "normalize_log has a standalone f_args not processed"
     end
 
 (* TODO: don't modify terminator in the function
@@ -822,7 +829,7 @@ let normalize_code
                             blk_term=(TERM_Ret (TYPE_I (Camlcoq.N.of_int 8), EXP_Integer (Camlcoq.Z.of_sint 1)));
                             blk_comments= None
                            } in
-    let (_, _ , tblk', ret_texp_o) = normalize_log ctx f_def mcfg tblk stack in
+    let (_, _ , tblk', ret_texp_o) = normalize_log ctx f_def mcfg tblk (List.tl stack) in
     match ret_texp_o with
     | Some ret_texp ->
       {blk_id=tblk'.blk_id;
