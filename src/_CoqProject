@@ -25,7 +25,6 @@
 ./mem/Addresses/ZAddresses.v
 ./mem/Addresses/FiniteAddresses.v
 ./mem/Addresses/InfiniteAddresses.v
-./mem/Addresses/PointerArithmetic.v
 ./mem/Addresses/Provenance.v
 
 ./llvm-mem/Sizeof.v
