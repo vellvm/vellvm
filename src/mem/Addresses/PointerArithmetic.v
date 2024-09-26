@@ -1,4 +1,4 @@
-Require Import ZArith String List Lia.
+From Stdlib Require Import ZArith String List Lia.
 
 From ExtLib Require Import
      Structures.Monad

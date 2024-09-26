@@ -9,9 +9,9 @@
  ---------------------------------------------------------------------------- *)
 
 (* begin hide *)
-Require Import String.
-Require Import OrderedType OrderedTypeEx.
-Require Import ZArith.
+From Stdlib Require Import String.
+From Stdlib Require Import OrderedType OrderedTypeEx.
+From Stdlib Require Import ZArith.
 Require Import Rocqlib.
 
 From Vellvm Require Import

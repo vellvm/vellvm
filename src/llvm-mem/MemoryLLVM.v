@@ -34,12 +34,7 @@ From ExtLib Require Import
      Structures.Monads
      Structures.Functor.
 
-<<<<<<<< HEAD:src/rocq/Handlers/MemoryModel.v
-
 From Stdlib Require Import
-========
-From Coq Require Import
->>>>>>>> aa3b652e (Moving memory files into their own directory for #363.):src/llvm-mem/MemoryLLVM.v
      ZArith
      Strings.String
      List
