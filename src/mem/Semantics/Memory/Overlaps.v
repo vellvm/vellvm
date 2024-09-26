@@ -2,7 +2,7 @@ Require Import ZArith.
 
 Require Import Mem.Addresses.MemoryAddress.
 
-Module Type Overlaps (Addr:MemoryAddress.ADDRESS).
+Module Type Overlaps (Addr:CORE_ADDRESS).
   Import Addr.
 
   (** Do two memory regions overlap each other?
@@ -18,7 +18,7 @@ Module Type Overlaps (Addr:MemoryAddress.ADDRESS).
 End Overlaps.
 
 (* Define overlapping of memory addresses when PTOI is defined. *)
-Module PTOIOverlaps (Addr:MemoryAddress.ADDRESS) (PTOI:HAS_PTOI(Addr)).
+Module PTOIOverlaps (Addr:CORE_ADDRESS) (PTOI:HAS_PTOI(Addr)) <: Overlaps Addr.
   Import Addr.
   Import PTOI.
 

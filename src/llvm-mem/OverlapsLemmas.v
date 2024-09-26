@@ -2,8 +2,9 @@ From Coq Require Import ZArith.
 From Mem Require Import Overlaps.
 From LLVM_Memory Require Import Sizeof.
 From Vellvm Require Import DynamicTypes.
+Require Import Mem.Addresses.MemoryAddress.
 
-Module OverlapHelpers (Addr : MemoryAddress.ADDRESS) (Size : Sizeof) (Over : Overlaps Addr).
+Module OverlapHelpers (Addr : CORE_ADDRESS) (Size : Sizeof) (Over : Overlaps Addr).
   Import Addr.
   Import Over.
   Import Size.
