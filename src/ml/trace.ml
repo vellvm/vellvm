@@ -573,6 +573,13 @@ let normalize_phi (ctx : ctx) (id : raw_id) (phi : typ phi) (bid_from : raw_id) 
 let list_to_map l1 l2 =
   List.fold_left (fun acc (key, value) -> RawidM.add key value acc) RawidM.empty @@ List.combine l1 l2
 
+  let is_variadic (def : (typ, typ cfg) definition) = 
+    match def.df_prototype.dc_type 
+      with TYPE_Function (_, _, is_variadic) -> is_variadic
+         | _ -> 
+          failwith ("Misuse of is_variadic: called on non-function with id \"" 
+                    ^ RawidOrdPrint.to_string def.df_prototype.dc_name ^ "\"")
+
 let normalize_definition ctx (mcfg : LLVMAst.typ CFG.mcfg) (f : typ exp) (targs : typ texp list) : ctx option =
   match f with
   | EXP_Ident (ID_Global id) ->
@@ -580,12 +587,23 @@ let normalize_definition ctx (mcfg : LLVMAst.typ CFG.mcfg) (f : typ exp) (targs 
       | None ->
         None
       | Some def ->
+        let _ = if is_variadic def then () in 
         let args = List.map (fun (_, arg) -> subst_exp ctx arg) targs in
-        let ctx' = List.combine def.df_args args |> RawidM.of_list in
-        (* Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx'); *)
+        try
+          let ctx' = 
+            (List.combine def.df_args args |> RawidM.of_list) in
         Some ctx'
+      with Invalid_argument _ -> 
+        let () = print_endline ("len 1: " ^ (List.length def.df_args |> string_of_int)) in
+        let () = print_endline ("len 2: " ^ (List.length args |> string_of_int)) in
+        let () = print_endline ("function name " ^ (RawidOrdPrint.to_string def.df_prototype.dc_name)) in
+        failwith "died at combine" 
+      end 
+        (* Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx'); *)
+        (* Some ctx' *)
         (* Need to zip local_id with raw_id, If the length is the same will proceed the above, otherwise error *)
-    end
+        (* end *)
+    
   | EXP_Ident (ID_Local id) ->
     (* Function pointer. Substitute it in, and then check if there is a name equal to that *)
     let id' = subst_raw_id_opt ctx id (EXP_Ident (ID_Local id)) in
@@ -596,6 +614,8 @@ let normalize_definition ctx (mcfg : LLVMAst.typ CFG.mcfg) (f : typ exp) (targs 
             None
           | Some def ->
             let args = List.map (fun (_, arg) -> subst_exp ctx arg) targs in
+            let () = print_endline ("len' 1: " ^ (List.length def.df_args |> string_of_int)) in
+            let () = print_endline ("len' 2: " ^ (List.length args |> string_of_int)) in
             let ctx' = List.combine def.df_args args |> RawidM.of_list in
             (* Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx'); *)
             Some ctx'
