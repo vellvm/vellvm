@@ -329,7 +329,7 @@ Section ShowInstances.
         end
     | FNATTR_Nocf_check => "nocf_check"
     | FNATTR_Shadowcallstack => "shadowcallstack"
-    | FNATTR_Mustprogress => "mustprogeress"
+    | FNATTR_Mustprogress => "mustprogress"
     (* | FNATTR_Warn_stack_size th  => - FNATTR_KeyValue *)
     | FNATTR_Vscale_range min max  =>
         match max with
