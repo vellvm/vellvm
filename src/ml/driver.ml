@@ -79,7 +79,6 @@ let process_ll_file path file =
         Trace.print_log ();
         failwith (Result.string_of_exit_condition e)
     else if !trace then
-      let () = print_endline "MODE:TRACING" in 
       match Interpreter.interpret ll_ast with
       | Ok dv ->
         Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv);

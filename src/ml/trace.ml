@@ -589,15 +589,9 @@ let normalize_definition ctx (mcfg : LLVMAst.typ CFG.mcfg) (f : typ exp) (targs 
       | Some def ->
         let _ = if is_variadic def then () in 
         let args = List.map (fun (_, arg) -> subst_exp ctx arg) targs in
-        try
           let ctx' = 
             (List.combine def.df_args args |> RawidM.of_list) in
         Some ctx'
-      with Invalid_argument _ -> 
-        let () = print_endline ("len 1: " ^ (List.length def.df_args |> string_of_int)) in
-        let () = print_endline ("len 2: " ^ (List.length args |> string_of_int)) in
-        let () = print_endline ("function name " ^ (RawidOrdPrint.to_string def.df_prototype.dc_name)) in
-        failwith "died at combine" 
       end 
         (* Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx'); *)
         (* Some ctx' *)
@@ -614,8 +608,6 @@ let normalize_definition ctx (mcfg : LLVMAst.typ CFG.mcfg) (f : typ exp) (targs 
             None
           | Some def ->
             let args = List.map (fun (_, arg) -> subst_exp ctx arg) targs in
-            let () = print_endline ("len' 1: " ^ (List.length def.df_args |> string_of_int)) in
-            let () = print_endline ("len' 2: " ^ (List.length args |> string_of_int)) in
             let ctx' = List.combine def.df_args args |> RawidM.of_list in
             (* Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx'); *)
             Some ctx'
