@@ -186,11 +186,15 @@ End PTOI_ITOP_EXTRA.
 
 (*** Address module types *)
 (** Addresses that can be null *)
-Module Type NULLABLE_ADDRESSES := CORE_ADDRESS <+ HAS_NULL.
+Module Type NULLABLE_ADDRESS := CORE_ADDRESS <+ HAS_NULL.
+
+(** Addresses with pointer to integer casts and pointer arithmetic *)
+Module Type PTOI_ADDRESS :=
+  CORE_ADDRESS <+ HAS_POINTER_ARITHMETIC <+ HAS_PTOI <+ PTOI_ARITH_EXTRAS.
 
 (** Addresses without metadata *)
 Module Type BASIC_ADDRESS :=
-  CORE_ADDRESS <+ HAS_NULL <+ HAS_POINTER_ARITHMETIC <+ HAS_PTOI <+ PTOI_ARITH_EXTRAS.
+  PTOI_ADDRESS <+ HAS_NULL.
 
 (** Addresses with metadata *)
 Module Type METADATA_ADDRESS (MD : Typ) :=
