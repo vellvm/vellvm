@@ -580,52 +580,7 @@ let list_to_map l1 l2 =
           failwith ("Misuse of is_variadic: called on non-function with id \"" 
                     ^ RawidOrdPrint.to_string def.df_prototype.dc_name ^ "\"")
 
-(* let normalize_definition ctx (mcfg : LLVMAst.typ CFG.mcfg) (f : typ exp) (targs : typ texp list) : ctx option = *)
-(*   match f with *)
-(*   | EXP_Ident (ID_Global id) -> *)
-(*     begin match List.find_opt (fun x -> RawidOrdPrint.compare x.df_prototype.dc_name id == 0) mcfg.m_definitions with *)
-(*       | None -> *)
-(*         None *)
-(*       | Some def -> *)
-(*         let _ = if is_variadic def then () in  *)
-(*         let args = List.map (fun (_, arg) -> subst_exp ctx arg) targs in *)
-(*           let ctx' =  *)
-(*             (List.combine def.df_args args |> RawidM.of_list) in *)
-(*         Some ctx' *)
-(*       end  *)
-(*         (\* Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx'); *\) *)
-(*         (\* Some ctx' *\) *)
-(*         (\* Need to zip local_id with raw_id, If the length is the same will proceed the above, otherwise error *\) *)
-(*         (\* end *\) *)
-    
-(*   | EXP_Ident (ID_Local id) -> *)
-(*     (\* Function pointer. Substitute it in, and then check if there is a name equal to that *\) *)
-(*     let f' = subst_raw_id_opt ctx id f in *)
-(*     begin match f' with *)
-(*       | EXP_Ident (ID_Local id') -> *)
-(*         if id == id' then None else *)
-(*           normalize_definition ctx mcfg f' targs *)
-(*       | EXP_Ident (ID_Global _)-> *)
-(*         normalize_definition ctx mcfg f' targs *)
-(*       | _ -> None *)
-(*       (\* let id' = subst_raw_id_opt ctx id (EXP_Ident (ID_Local id)) in *\) *)
-(*     (\* begin match id' with *\) *)
-(*     (\*   | EXP_Ident (ID_Global id) -> *\) *)
-(*     (\*     begin match List.find_opt (fun x -> RawidOrdPrint.compare x.df_prototype.dc_name id == 0) mcfg.m_definitions with *\) *)
-(*     (\*       | None -> *\) *)
-(*     (\*         None *\) *)
-(*     (\*       | Some def -> *\) *)
-(*     (\*         let args = List.map (fun (_, arg) -> subst_exp ctx arg) targs in *\) *)
-(*     (\*         let ctx' = List.combine def.df_args args |> RawidM.of_list in *\) *)
-(*     (\*         (\\* Printf.printf "ctx: %s\n" (RawidM.to_string ctx_unit_to_string ctx'); *\\) *\) *)
-(*     (\*         Some ctx' *\) *)
-(*     (\*         (\\* Need to zip local_id with raw_id, If the length is the same will proceed the above, otherwise error *\\) *\) *)
-(*     (\*     end *\) *)
-(*     (\*   | _ -> None *\) *)
-(*     end *)
-(*   | _ -> None *)
-
-let normalize_definition' ctx (targs : typ texp list) (params : function_id list) : ctx =
+let normalize_definition ctx (targs : typ texp list) (params : function_id list) : ctx =
   let args = List.map(fun (_, arg) -> subst_exp ctx arg) targs in
   List.combine params args |> RawidM.of_list
 
@@ -695,7 +650,7 @@ let rec normalize_log
                 begin match stack' with
                   | F_args (f_id, params)::stack'' ->
                     let targs = List.map fst taargs in
-                    let ctx' = normalize_definition' ctx targs params in
+                    let ctx' = normalize_definition ctx targs params in
                     (* TODO: can simplify get_f_def_from_mcfg *)
                     begin match get_f_def_from_mcfg (EXP_Ident (ID_Global f_id)) mcfg with
                       | Some f_def' ->
@@ -709,7 +664,7 @@ let rec normalize_log
                 begin match stack' with
                   | F_args (f_id, params)::stack'' ->
                     let targs = List.map fst taargs in
-                    let ctx' = normalize_definition' ctx targs params in
+                    let ctx' = normalize_definition ctx targs params in
                     begin match get_f_def_from_mcfg (EXP_Ident (ID_Global f_id)) mcfg with
                       | Some f_def' ->
                         let (_, stack2, tblk2, texp) = normalize_log ctx' f_def' mcfg tblk stack'' in
