@@ -32,6 +32,7 @@ examples.mli
 *.gz
 src/ml/extracted/*
 !src/ml/extracted/Extract.v
+!src/ml/extracted/log.ml
 src/.depend
 output
 src/ml/extracted/.merlin
