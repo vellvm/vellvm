@@ -71,6 +71,7 @@ let process_ll_file path file =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
   let ll_ast = IO.parse_file path in
   let _ =
+    Log.clear_log;
     if !interpret then
       match Interpreter.interpret ll_ast with
       | Ok dv ->
@@ -79,6 +80,7 @@ let process_ll_file path file =
         Trace.print_log ();
         failwith (Result.string_of_exit_condition e)
     else if !trace then
+
       match Interpreter.interpret ll_ast with
       | Ok dv ->
         Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv);
