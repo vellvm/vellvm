@@ -315,11 +315,13 @@ Module Type WRITES_PRESERVES_WRITE_ACCESS
   (Import WRITE_ACCESS : MEMORY_WRITE_ACCESS ADDR SB MEM).
 
   Include (ALL_WRITE_ACCESS_PRESERVED ADDR SB MEM WRITE_ACCESS).
-  Parameter write_byte_preserves_read_byte_allowed :
+  Parameter write_byte_preserves_write_byte_allowed :
     forall m1 ptr b m2,
       write_byte m1 ptr b m2 ->
       write_byte_allowed_preserved m1 m2.
 End WRITES_PRESERVES_WRITE_ACCESS.
+
+Module Type WRITEABLE_MEMORY (ADDR : BASIC_ADDRESS) (SB : SBYTE) := WRITEABLE_MEMORY_HELPER ADDR SB <+ MEMORY_WRITE_ACCESS ADDR SB <+ WRITES_PRESERVES_READ_ACCESS ADDR SB <+ WRITES_PRESERVES_WRITE_ACCESS ADDR SB.
 
 (*** Allocation helpers. Finding free blocks *)
 
@@ -901,6 +903,9 @@ Module Type MEMORY_HEAP_ALLOCATE
       Memory_heap m2 = add_ptrs_to_heap (Memory_heap m1) ptrs.
 End MEMORY_HEAP_ALLOCATE.
 
+Module Type FULL_MEMORY_MODEL (MD : Typ) (PR : PROV_SET) (ADDR : ADDRESS MD PR) (SB : SBYTE) :=
+  WRITEABLE_MEMORY.
+
 (*** Implementations of memory models *)
 (* TODO: Should this be in its own file? *)
 Require Import IntMaps.
@@ -921,16 +926,31 @@ Module INTMAP_MEMORY_MODEL_CORE (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) (SB
 End INTMAP_MEMORY_MODEL_CORE.
 
 (** Memory models based on integer maps  with allocation ids *)
-Module INTMAP_AID_MEMORY_MODEL_CORE
+Module INTMAP_AID_MEMORY_MODEL
   (MD : Typ)
   (PS : PROV_SET)
   (Import ADDR : PROVENANCE_ADDRESS MD PS)
   (Import AID : ALLOCATION_ID)
   (Import A : ACCESS PS AID)
-  (Import SB : SBYTE) <: CORE_MEMORY_MODEL ADDR SB.
+  (Import SB : SBYTE) <: WRITEABLE_MEMORY ADDR SB.
 
   Definition Memory := IntMap (SByte * AllocationId)%type.
   Definition initial_memory := @IM.empty (SByte * AllocationId)%type.
+
+  (*** MEMORY_ALLOCATED_CORE *)
+  (** Whether an address is allocated with a given AllocationId *)
+  Definition addr_allocated (m : Memory) (ptr : addr) (aid : AllocationId) : Prop :=
+    match IM.find (ptr_to_int ptr) m with
+    | None => False
+    | Some (_, aid') => AID.eq aid aid'
+    end.
+
+  Definition addr_not_allocated (m : Memory) (ptr : addr) :=
+    forall aid, ~ addr_allocated m ptr aid.
+
+  (*** READABLE_MEMORY *)
+  Definition read_byte_allowed (m : Memory) (ptr : addr) : Prop :=
+    exists aid, addr_allocated m ptr aid /\ access_allowed (address_provenance ptr) aid = true.
 
   Definition read_byte (m : Memory) (ptr : addr) (b : SByte) : Prop :=
     match IM.find (ptr_to_int ptr) m with
@@ -938,43 +958,142 @@ Module INTMAP_AID_MEMORY_MODEL_CORE
     | Some (b', aid) => b = b' /\ access_allowed (address_provenance ptr) aid
     end.
 
-  (** Whether an address is allocated with a given AllocationId *)
-  Definition addr_allocated (m : Memory) (ptr : addr) (aid : AllocationId) : Prop :=
-    match IM.find (ptr_to_int ptr) m with
-    | None => False
-    | Some (_, aid') => AID.eq aid aid'
-    end.
-
-  Definition addr_not_allocated (m : Memory) (ptr : addr) :=
-    forall aid, ~ addr_allocated m ptr aid.
-End INTMAP_AID_MEMORY_MODEL_CORE.
-
-Module INTMAP_AID_MEMORY_ALLOCATED_CORE
-  (Import ADDR : CORE_ADDRESS)
-  (Import PTOI : HAS_PTOI ADDR)
-  (Import SB : SBYTE)
-  (Import AID : ALLOCATION_ID)  <: MEMORY_ALLOCATED_CORE ADDR SB AID MEM.
-
-  (** Whether an address is allocated with a given AllocationId *)
-  Definition addr_allocated (m : Memory) (ptr : addr) (aid : AllocationId) : Prop :=
-    match IM.find (ptr_to_int ptr) m with
-    | None => False
-    | Some (_, aid') => AID.eq aid aid'
-    end.
-
-  Definition addr_not_allocated (m : Memory) (ptr : addr) :=
-    forall aid, ~ addr_allocated m ptr aid.
-
-  Parameter read_byte_allocated_spec :
+  Lemma read_byte_allowed_spec :
     forall (m : Memory) (ptr : addr),
-      addr_not_allocated m ptr ->
+      ~ read_byte_allowed m ptr ->
       forall b, ~ read_byte m ptr b.
-End INTMAP_MEMORY_ALLOCATED_CORE.
+  Proof.
+    intros m ptr NRBA b RB.
+    apply NRBA.
+    red; red in RB.
+    break_match_hyp; [|contradiction].
+    destruct p, RB; subst.
+    exists t0.
+    split; auto.
+    red.
+    rewrite Heqo.
+    reflexivity.
+  Qed.
 
-Module PROVENANCE_MEMORY_READ_ACCESS (MD : Typ) (PS : PROV_SET) (ADDR : BASE_PROVENANCE_ADDRESS MD PS) (SB : SBYTE) (MEM : CORE_MEMORY_MODEL ADDR SB) <: MEMORY_READ_ACCESS ADDR SB MEM.
-  
-End PROVENANCE_MEMORY_READ_ACCESS.
+  (*** WRITEABLE_MEMORY *)
+  Definition disjoint_ptr_byte (a b : addr) :=
+    ptr_to_int a <> ptr_to_int b.
 
+  Definition write_byte_allowed (m : Memory) (ptr : addr) : Prop :=
+    exists aid, addr_allocated m ptr aid /\ access_allowed (address_provenance ptr) aid = true.
+
+  Definition write_byte (m1 : Memory) (ptr : addr) (b : SByte) (m2 : Memory) : Prop :=
+    let phys_addr := ptr_to_int ptr in
+    let pr := address_provenance ptr in
+    match IM.find phys_addr m1 with
+    | None => False (* "Writing to unallocated memory" *)
+    | Some (_, aid) =>
+        if access_allowed pr aid
+        then m2 = IM.add phys_addr (b, aid) m1
+        else False (* Invalid access *)
+    end.
+
+  (** We can look up a new value after writing it to memory *)
+  Lemma write_byte_new_lu :
+    forall (m1 : Memory) (ptr : addr) (byte : SByte) (m2 : Memory),
+      write_byte m1 ptr byte m2 ->
+      read_byte m2 ptr byte.
+  Proof.
+    intros m1 ptr byte m2 WB.
+    red in WB; red.
+    repeat (break_match_hyp; try contradiction); subst.
+    rewrite IP.F.add_eq_o; auto.
+  Qed.
+
+  (** We can look up old values after writing to a disjoint location in memory *)
+  Lemma write_byte_old_lu :
+    forall (m1 : Memory) (ptr : addr) (byte : SByte) (m2 : Memory),
+      write_byte m1 ptr byte m2 ->
+      forall ptr',
+        disjoint_ptr_byte ptr ptr' ->
+        (forall byte', read_byte m1 ptr' byte' <-> read_byte m2 ptr' byte').
+  Proof.
+    intros m1 ptr byte m2 WB ptr' DISJOINT byte'.
+    red in WB.
+    repeat (break_match_hyp; try contradiction); subst.
+    split; intros RB; red; red in RB;
+      repeat (break_match_hyp; try contradiction); destruct RB; subst.
+    { rewrite IP.F.add_neq_o; auto.
+      rewrite Heqo0; auto.
+    }
+    { rewrite IP.F.add_neq_o in Heqo0; auto.
+      rewrite Heqo0; auto.
+    }
+  Qed.
+
+  Lemma write_byte_allowed_spec :
+    forall (m : Memory) (ptr : addr),
+      ~ write_byte_allowed m ptr ->
+      forall b m2, ~ write_byte m ptr b m2.
+  Proof.
+    intros m ptr NWBA b m2 WB.
+    apply NWBA.
+    red; red in WB.
+    repeat break_match_hyp; try contradiction; subst.
+    exists t0.
+    split; auto.
+    red.
+    rewrite Heqo.
+    reflexivity.
+  Qed.
+
+  Definition read_byte_allowed_preserved
+    (m1 m2 : Memory) : Prop
+    := forall ptr,
+      read_byte_allowed m1 ptr <-> read_byte_allowed m2 ptr.
+
+  Lemma write_byte_preserves_read_byte_allowed :
+    forall m1 ptr b m2,
+      write_byte m1 ptr b m2 ->
+      read_byte_allowed_preserved m1 m2.
+  Proof.
+    intros m1 ptr b m2 WB.
+    red; red in WB.
+    repeat break_match_hyp; try contradiction; subst.
+    intros ptr'.
+    pose proof (Z.eq_dec (ptr_to_int ptr) (ptr_to_int ptr')) as [EQ | NEQ].
+
+    { (* Pointers overlap *)
+      split; intros RBA; red; red in RBA;
+        destruct RBA as (aid & ALLOCATED & ACCESS);
+        exists aid; cbn; split; auto.
+      - red. rewrite IP.F.add_eq_o; auto.
+        red in ALLOCATED.
+        rewrite EQ in Heqo.
+        rewrite Heqo in ALLOCATED; auto.
+      - red; red in ALLOCATED.
+        rewrite EQ in Heqo.
+        rewrite Heqo.
+        rewrite IP.F.add_eq_o in ALLOCATED; auto.
+    }
+
+    { (* Pointers don't overlap *)
+      split; intros RBA; red; red in RBA;
+        destruct RBA as (aid & ALLOCATED & ACCESS);
+        exists aid; cbn; split; auto.
+      - red. rewrite IP.F.add_neq_o; auto.
+      - red in ALLOCATED; red. rewrite IP.F.add_neq_o in ALLOCATED; auto.
+    }
+  Qed.
+
+  Definition write_byte_allowed_preserved
+    (m1 m2 : Memory) : Prop
+    := forall ptr,
+      write_byte_allowed m1 ptr <-> write_byte_allowed m2 ptr.
+
+  Lemma write_byte_preserves_write_byte_allowed :
+    forall m1 ptr b m2,
+      write_byte m1 ptr b m2 ->
+      write_byte_allowed_preserved m1 m2.
+  Proof.
+    apply write_byte_preserves_read_byte_allowed.
+  Qed.
+End INTMAP_AID_MEMORY_MODEL.
 
 (* Module NAT_SBYTE <: SBYTE. *)
 (*   Definition SByte := (nat * N)%type. *)
