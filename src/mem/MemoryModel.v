@@ -433,6 +433,11 @@ Module Type MEMORY_ALLOCATE
       Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
 End MEMORY_ALLOCATE.
 
+Module Type ALLOCATABLE_MEMORY (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) :=
+  WRITEABLE_MEMORY ADDR SB <+ MEMORY_ALLOCATED_CORE ADDR SB AID <+
+    WRITES_PRESERVES_ALLOCATED ADDR SB AID <+ MEMORY_FIND_FREE ADDR SB AID <+
+    MEMORY_ALLOCATE ADDR SB AID.
+
 (*** Stack allocations *)
 Module Type CORE_FRAME
   (Import ADDR : CORE_ADDRESS) <: Typ.
@@ -584,12 +589,12 @@ Module Type MEMORY_STACK_ALLOCATE
   (Import ADDR : BASIC_ADDRESS)
   (Import SB : SBYTE)
   (Import AID : ALLOCATION_ID)
+  (Import F : FRAME ADDR)
+  (Import FS : FRAME_STACK ADDR F)
   (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
   (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
   (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC)
   (Import ALLOCATE : MEMORY_ALLOCATE ADDR SB AID MEM ALLOC FIND_FREE)
-  (Import F : FRAME ADDR)
-  (Import FS : FRAME_STACK ADDR F)
   (Import MFS : MEMORY_FRAME_STACK ADDR SB F FS MEM).
 
   Definition stack_allocate_block
@@ -611,6 +616,12 @@ Module Type MEMORY_STACK_ALLOCATE
     break_match_hyp_inv.
     eapply allocate_block_free; eauto.
   Qed.
+
+  Parameter stack_allocate_block_non_null :
+    forall m1 bytes aid m2 ptrs,
+      length bytes > 0 ->
+      stack_allocate_block m1 bytes aid (m2, ptrs) ->
+      Forall (fun ptr => is_null ptr = false) ptrs.
 
   Parameter stack_allocate_block_new_reads :
     forall m1 bytes aid m2 ptrs,
@@ -640,11 +651,11 @@ Module Type MEMORY_STACK_POP_BASE
   (Import ADDR : BASIC_ADDRESS)
   (Import SB : SBYTE)
   (Import AID : ALLOCATION_ID)
+  (Import F : FRAME ADDR)
+  (Import FS : FRAME_STACK ADDR F)
   (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
   (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
   (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC)
-  (Import F : FRAME ADDR)
-  (Import FS : FRAME_STACK ADDR F)
   (Import MFS : MEMORY_FRAME_STACK ADDR SB F FS MEM).
 
   Parameter stack_pop :
@@ -678,6 +689,9 @@ Module Type MEMORY_STACK_POP_BASE
         ptr_in_current_frame m1 ptr = false ->
         read_byte m1 ptr byte <-> read_byte m2 ptr byte.
 End MEMORY_STACK_POP_BASE.
+
+Module Type FULL_STACK_MEMORY (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) :=
+  ALLOCATABLE_MEMORY ADDR SB AID <+ MEMORY_FRAME_STACK ADDR SB F FS <+ MEMORY_STACK_ALLOCATE ADDR SB AID F FS <+ MEMORY_STACK_POP_BASE ADDR SB AID F FS.
 
 Module FRAME_LIST_CORE
   (Import ADDR : CORE_ADDRESS)
@@ -863,10 +877,10 @@ Module Type MEMORY_HEAP_ALLOCATE
   (Import ADDR : BASIC_ADDRESS)
   (Import SB : SBYTE)
   (Import AID : ALLOCATION_ID)
+  (Import H : HEAP ADDR)
   (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
   (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
   (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC)
-  (Import H : HEAP ADDR)
   (Import MH : MEMORY_HEAP ADDR SB H MEM).
 
   Parameter heap_allocate_block :
@@ -879,6 +893,7 @@ Module Type MEMORY_HEAP_ALLOCATE
 
   Parameter heap_allocate_block_non_null :
     forall m1 bytes aid m2 ptrs,
+      length bytes > 0 ->
       heap_allocate_block m1 bytes aid (m2, ptrs) ->
       Forall (fun p => is_null p = false) ptrs.
 
@@ -902,9 +917,6 @@ Module Type MEMORY_HEAP_ALLOCATE
       heap_allocate_block m1 bytes aid (m2, ptrs) ->
       Memory_heap m2 = add_ptrs_to_heap (Memory_heap m1) ptrs.
 End MEMORY_HEAP_ALLOCATE.
-
-Module Type FULL_MEMORY_MODEL (MD : Typ) (PR : PROV_SET) (ADDR : ADDRESS MD PR) (SB : SBYTE) :=
-  WRITEABLE_MEMORY.
 
 (*** Implementations of memory models *)
 (* TODO: Should this be in its own file? *)
