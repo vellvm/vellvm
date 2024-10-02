@@ -410,26 +410,26 @@ Module Type MEMORY_ALLOCATE
   (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC).
 
   Parameter allocate_block :
-      Memory -> list SByte -> AllocationId -> (Memory * list addr)%type -> Prop.
+      Memory -> list SByte -> AllocationId -> Memory -> list addr -> Prop.
 
   Parameter allocate_block_free :
     forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid (m2, ptrs) ->
+      allocate_block m1 bytes aid m2 ptrs ->
       find_free_block m1 (length bytes) ptrs.
 
   Parameter allocate_block_new_reads :
     forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid (m2, ptrs) ->
+      allocate_block m1 bytes aid m2 ptrs ->
       Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs.
 
   Parameter allocate_block_old_reads :
     forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid (m2, ptrs) ->
+      allocate_block m1 bytes aid m2 ptrs ->
       forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b.
 
   Parameter allocate_block_allocated :
     forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid (m2, ptrs) ->
+      allocate_block m1 bytes aid m2 ptrs ->
       Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
 End MEMORY_ALLOCATE.
 
@@ -577,9 +577,12 @@ Module Type MEMORY_FRAME_STACK_EXTRAS
   (Import FS : FRAME_STACK ADDR F)
   (Import MEM : CORE_MEMORY_MODEL ADDR SB)
   (Import MFS : CORE_MEMORY_FRAME_STACK ADDR SB F FS MEM).
-  
+
   Definition ptr_in_current_frame (m : Memory) (ptr : addr) : bool
     := ptr_in_frame (peek (Memory_frame_stack m)) ptr.
+
+  Definition frame_stack_preserved (m1 m2 : Memory) : Prop
+    := Memory_frame_stack m1 = Memory_frame_stack m2.
 End MEMORY_FRAME_STACK_EXTRAS.
 
 Module Type MEMORY_FRAME_STACK (ADDR : CORE_ADDRESS) (SB : SBYTE) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MEM : CORE_MEMORY_MODEL ADDR SB)
@@ -600,7 +603,7 @@ Module Type MEMORY_STACK_ALLOCATE
   Definition stack_allocate_block
     (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : Memory * list addr) : Prop :=
     exists m' ptrs,
-      allocate_block m bytes aid (m', ptrs) /\
+      allocate_block m bytes aid m' ptrs /\
         match add_all_to_current_frame (Memory_frame_stack m') ptrs with
         | None => False
         | Some fs =>
@@ -871,6 +874,12 @@ Module Type MEMORY_HEAP
     forall (m1 m2 : Memory) (f : Heap -> Heap),
       m2 = Memory_heap_modify m1 f ->
       Memory_heap m2 = f (Memory_heap m1).
+
+  Definition ptr_in_memory_heap (m : Memory) (root ptr : addr) : bool :=
+    ptr_in_heap (Memory_heap m) root ptr.
+
+  Definition root_ptr_in_memory_heap (m : Memory) (root : addr) : bool :=
+    root_ptr_in_heap (Memory_heap m) root.
 End MEMORY_HEAP.
 
 Module Type MEMORY_HEAP_ALLOCATE
@@ -918,6 +927,110 @@ Module Type MEMORY_HEAP_ALLOCATE
       Memory_heap m2 = add_ptrs_to_heap (Memory_heap m1) ptrs.
 End MEMORY_HEAP_ALLOCATE.
 
+Module Type MEMORY_HEAP_FREE
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import H : HEAP ADDR)
+  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
+  (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
+  (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC)
+  (Import MH : MEMORY_HEAP ADDR SB H MEM)
+  (Import MHA : MEMORY_HEAP_ALLOCATE ADDR SB AID H MEM ALLOC FIND_FREE MH).
+
+  Parameter heap_free :
+    Memory -> addr -> Memory -> Prop.
+
+  Record free_preconditions (m1 : Memory) (root : addr) : Prop :=
+    { (* ptr being freed was a root *)
+      free_was_root :
+      root_ptr_in_memory_heap m1 root = true;
+
+      (* root being freed was allocated *)
+      free_was_allocated :
+      exists aid, addr_allocated m1 root aid;
+
+      (* ptrs in block were allocated *)
+      free_block_allocated :
+      forall ptr,
+        ptr_in_memory_heap m1 root ptr = true ->
+        exists aid, addr_allocated m1 ptr aid;
+
+      (* root is allowed to be freed *)
+      (* TODO: add this back. #312 / #313 *)
+      (* Running into problems with exec_correct_free because of the
+         implementation with size 0 allocations / frees *)
+      (* free_root_allowed :
+         free_byte_allowed m1 root; *)
+    }.
+
+  Record free_block_prop (h1 : Heap) (root : addr) (h2 : Heap) : Prop :=
+    { free_block_ptrs_freed :
+      forall ptr,
+        ptr_in_heap h1 root ptr = true ->
+        ptr_in_heap h2 root ptr = false;
+
+      free_block_root_freed :
+      root_ptr_in_heap h2 root = false;
+
+      (* TODO: make sure there's no weirdness about multiple roots *)
+      free_block_disjoint_preserved :
+      forall ptr root',
+        disjoint_ptr_byte root root' ->
+        ptr_in_heap h1 root' ptr = ptr_in_heap h2 root' ptr;
+
+      free_block_disjoint_roots :
+      forall root',
+        disjoint_ptr_byte root root' ->
+        root_ptr_in_heap h1 root' = root_ptr_in_heap h2 root';
+    }.
+
+  (** If the free proconditions aren't met then heap_free can't proceed *)
+  Parameter heap_free_no_preconditions_ub :
+    forall (m1 : Memory) (root : addr) (m2 : Memory),
+      ~ free_preconditions m1 root ->
+      ~ heap_free m1 root m2.
+
+  (** all bytes in block are freed. *)
+  Parameter free_bytes_freed :
+    forall (m1 : Memory) (root : addr) (m2 : Memory),
+      heap_free m1 root m2 ->
+      forall ptr,
+        ptr_in_memory_heap m1 root ptr = true ->
+        addr_not_allocated m2 ptr.
+
+  (** Bytes not allocated in the block have the same allocation status as before *)
+  Parameter free_non_block_bytes_preserved :
+    forall (m1 : Memory) (root : addr) (m2 : Memory),
+      heap_free m1 root m2 ->
+      forall ptr aid,
+        ptr_in_memory_heap m1 root ptr = false ->
+        addr_allocated m1 ptr aid <-> addr_allocated m2 ptr aid.
+
+  (** Bytes not allocated in the freed block are the same when read *)
+  Parameter free_non_frame_bytes_read :
+    forall (m1 : Memory) (root : addr) (m2 : Memory),
+      heap_free m1 root m2 ->
+      forall ptr byte,
+        ptr_in_memory_heap m1 root ptr = false ->
+        read_byte m1 ptr byte <-> read_byte m2 ptr byte.
+
+  (** Set new heap *)
+  Parameter free_block :
+    forall (m1 : Memory) (root : addr) (m2 : Memory),
+      heap_free m1 root m2 ->
+      free_block_prop (Memory_heap m1) root (Memory_heap m2).
+End MEMORY_HEAP_FREE.
+
+Module Type FULL_HEAP_MEMORY (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID: ALLOCATION_ID) (H : HEAP ADDR) :=
+  ALLOCATABLE_MEMORY ADDR SB AID <+ MEMORY_HEAP ADDR SB H <+ MEMORY_HEAP_ALLOCATE ADDR SB AID H <+ MEMORY_HEAP_FREE ADDR SB AID H.
+
+(** Memory with reads, writes, stack allocations, and heap allocations *)
+Module Type FULL_MEMORY_MODEL (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F)
+  := ALLOCATABLE_MEMORY ADDR SB AID <+
+       MEMORY_FRAME_STACK ADDR SB F FS <+ MEMORY_STACK_ALLOCATE ADDR SB AID F FS <+ MEMORY_STACK_POP_BASE ADDR SB AID F FS <+
+       MEMORY_HEAP ADDR SB H <+ MEMORY_HEAP_ALLOCATE ADDR SB AID H <+ MEMORY_HEAP_FREE ADDR SB AID H.
+
 (*** Implementations of memory models *)
 (* TODO: Should this be in its own file? *)
 Require Import IntMaps.
@@ -944,7 +1057,7 @@ Module INTMAP_AID_MEMORY_MODEL
   (Import ADDR : PROVENANCE_ADDRESS MD PS)
   (Import AID : ALLOCATION_ID)
   (Import A : ACCESS PS AID)
-  (Import SB : SBYTE) <: WRITEABLE_MEMORY ADDR SB.
+  (Import SB : SBYTE) <: ALLOCATABLE_MEMORY ADDR SB AID.
 
   Definition Memory := IntMap (SByte * AllocationId)%type.
   Definition initial_memory := @IM.empty (SByte * AllocationId)%type.
@@ -1104,6 +1217,116 @@ Module INTMAP_AID_MEMORY_MODEL
       write_byte_allowed_preserved m1 m2.
   Proof.
     apply write_byte_preserves_read_byte_allowed.
+  Qed.
+
+  Lemma read_byte_allocated_spec :
+    forall (m : Memory) (ptr : addr),
+      addr_not_allocated m ptr ->
+      forall b, ~ read_byte m ptr b.
+  Proof.
+    intros m ptr NALLOC b READ.
+    red in NALLOC, READ.
+    repeat (break_match_hyp; try contradiction);
+      subst.
+    destruct READ; subst.
+    apply (NALLOC t0).
+    red.
+    rewrite Heqo.
+    reflexivity.
+  Qed.
+
+  Include (ALL_ALLOCATED_PRESERVED ADDR SB AID).
+
+  Lemma write_byte_preserves_allocated :
+    forall m1 ptr b m2,
+      write_byte m1 ptr b m2 ->
+      all_allocated_preserved m1 m2.
+  Proof.
+    intros m1 ptr b m2 WB.
+    red; red in WB.
+    repeat break_match_hyp; try contradiction; subst.
+    intros ptr' aid'.
+    unfold addr_allocated.
+    pose proof (Z.eq_dec (ptr_to_int ptr) (ptr_to_int ptr')) as [EQ | NEQ].
+
+    { (* Pointers overlap *)
+      rewrite <- EQ.
+      rewrite Heqo.
+      rewrite IP.F.add_eq_o; auto.
+      reflexivity.
+    }
+
+    { (* Pointers don't overlap *)
+      rewrite IP.F.add_neq_o; auto.
+      reflexivity.
+    }
+  Qed.
+
+  (** FIND_FREE *)
+  Definition find_free_block (m : Memory) (len : nat) (ptrs : list addr) : Prop :=
+    length ptrs = len /\ Forall (addr_not_allocated m) ptrs /\ consecutive_ptrs ptrs = true.
+
+  Lemma find_free_block_is_free :
+    forall m len ptrs,
+      find_free_block m len ptrs ->
+      Forall (addr_not_allocated m) ptrs.
+  Proof.
+    intros * H; apply H.
+  Qed.
+
+  Lemma find_free_block_length :
+    forall m len ptrs,
+      find_free_block m len ptrs ->
+      length ptrs = len.
+  Proof.
+    intros * H; apply H.
+  Qed.
+
+  Lemma find_free_block_consecutive :
+    forall m len ptrs,
+      find_free_block m len ptrs ->
+      consecutive_ptrs ptrs = true.
+  Proof.
+    intros * H; apply H.
+  Qed.
+
+  (** MEMORY_ALLOCATE *)
+  Definition allocate_block (m1 : Memory) (bytes : list SByte) (aid : AID.t) (m2 : Memory) (ptrs : list addr) : Prop :=
+    find_free_block m1 (length bytes) ptrs /\
+      Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs /\
+      (forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b) /\
+      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
+
+  Lemma allocate_block_free :
+    forall m1 bytes aid m2 ptrs,
+      allocate_block m1 bytes aid m2 ptrs ->
+      find_free_block m1 (length bytes) ptrs.
+  Proof.
+    intros * H; apply H.
+  Qed.
+
+  Lemma allocate_block_new_reads :
+    forall m1 bytes aid m2 ptrs,
+      allocate_block m1 bytes aid m2 ptrs ->
+      Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs.
+  Proof.
+    intros * H; apply H.
+  Qed.
+
+  Lemma allocate_block_old_reads :
+    forall m1 bytes aid m2 ptrs,
+      allocate_block m1 bytes aid m2 ptrs ->
+      forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b.
+  Proof.
+    intros * H; apply H.
+  Qed.
+
+  Lemma allocate_block_allocated :
+    forall m1 bytes aid m2 ptrs,
+      allocate_block m1 bytes aid m2 ptrs ->
+      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
+  Proof.
+    intros * H; apply H.
   Qed.
 End INTMAP_AID_MEMORY_MODEL.
 
