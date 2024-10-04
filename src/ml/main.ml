@@ -326,6 +326,7 @@ let args =
     , Set Driver.trace
     , "interpret ll program starting from 'main' (same as -interpret) and generate .trace.ll file"
     )
+    ; ("-link", Set Driver.link, "links passed-in ll files in order and runs the final output (rather than interpreting each argument one at a time)")
   ; ("-debug", Set Interpreter.debug_flag, "enable debugging trace output")
   ; ("-v", Set Platform.verbose, "enables more verbose compilation output")
  ]

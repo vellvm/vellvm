@@ -21,6 +21,8 @@ let interpret = ref false
 
 let trace = ref false
 
+let link = ref false 
+
 let transform
     (prog :
       ( LLVMAst.typ
@@ -67,18 +69,30 @@ let link_files : string list ref = ref []
 
 let add_link_file path = link_files := path :: !link_files
 
-let process_ll_file path file =
-  let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
-  let ll_ast = IO.parse_file path in
+let assert_max_one_main_fn ast file = 
+  ignore (
+    List.fold_left (fun main_found user_tle -> 
+    match (user_tle, main_found) with 
+      (LLVMAst.TLE_Definition { df_prototype = { dc_name = Name ['m'; 'a'; 'i'; 'n'] ; _ } ; _}, true)  -> 
+        failwith ("More than one main function found in " ^ file ^ ".ll!")
+    | (LLVMAst.TLE_Definition { df_prototype = { dc_name = Name ['m'; 'a'; 'i'; 'n'] ; _ } ; _}, false) -> 
+        true
+    | _ -> main_found
+    ) false ast
+  )
+
+
+let process_ast ll_ast file = 
   let _ =
     Log.clear_log;
     if !interpret then
+      (assert_max_one_main_fn ll_ast file;
       match Interpreter.interpret ll_ast with
       | Ok dv ->
         Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv);
       | Error e ->
         Trace.print_log ();
-        failwith (Result.string_of_exit_condition e)
+        failwith (Result.string_of_exit_condition e))
     else if !trace then
 
       match Interpreter.interpret ll_ast with
@@ -97,14 +111,58 @@ let process_ll_file path file =
   let _ = IO.output_file vll_file ll_ast' in
   ()
 
-let process_file path =
+let process_ll_file path file =
+  let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
+  let ll_ast = IO.parse_file path in
+  process_ast ll_ast file 
+
+let process_file f path =
   let _ = Printf.printf "Processing: %s\n" path in
   let basename, ext = Platform.path_to_basename_ext path in
   match ext with
-  | "ll" -> process_ll_file path basename
+  | "ll" -> f path basename
   | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
 
-let process_files files = List.iter process_file files
+
+(* wishing for normal function composition here *)
+let last xs =  List.rev xs |> List.hd
+
+(* Here is where we can build extra checks: definition/declaration alignment, so on. *)
+let link_asts = List.concat
+
+(* let cons_uniq xs x = if List.mem x xs then xs else x :: xs
+
+let remove_from_left xs = List.rev (List.fold_left cons_uniq [] xs)
+(* RAB: credit https://stackoverflow.com/questions/30634119/ocaml-removing-duplicates-from-a-list-while-maintaining-order-from-the-right 
+  for aiding my laziness*)
+let validate_ssa = 
+  let remove_redundant_metadata ast =  *)
+
+
+
+(* links many files to produce a single AST. returns the AST and the name it 
+  will carry at runtime. *)
+let link_files files = 
+  begin
+    (* use existing machinery to validate files & add them to link_files *)
+    List.iter (process_file (fun p _ -> add_link_file p)) files; 
+    (* simple: build one ast and run it *)
+    let linked_ast = link_asts (List.map IO.parse_file !link_files) in
+    let last_file, _ = Platform.path_to_basename_ext (last !link_files) in
+    let final_name = 
+      if String.starts_with ~prefix:"linked-" last_file then last_file else 
+      "linked-" ^ last_file in 
+     (linked_ast, final_name)
+  end
+
+let uncurry f (x, y) = f x y
+
+let process_files files = 
+  (* length check validates use of `last` (which calls `hd`) *)
+  if !link && List.length files >= 2 then
+    uncurry process_ast (link_files files)
+  else List.iter (process_file process_ll_file) files
+
 
 
 (* file running ---------------------------------------------------------- *)
