@@ -5,13 +5,12 @@
 -arg -w -arg -deprecated-hint-rewrite-without-locality
 -arg -w -arg -require-in-module
 
-
-./coq/Analysis/Dom.v
-./coq/Analysis/DomId.v
-./coq/Analysis/DomKildall.v
+./coq/Analysis/Lattice.v
+./coq/Analysis/Dominator.v
+./coq/Analysis/Graph.v
+./coq/Analysis/CFGs.v
 ./coq/Analysis/Iteration.v
 ./coq/Analysis/Kildall.v
-./coq/Analysis/ssa.v
 ./coq/Handlers/Concretization.v
 ./coq/Handlers/Global.v
 ./coq/Handlers/Handlers.v

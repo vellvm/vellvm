@@ -175,11 +175,17 @@ Ltac bind_ret_r2 :=
                      rewrite <- (bind_ret_r s); subst x
   end.
 
-Ltac forward H :=
+Ltac forward_impl H Tac :=
   let H' := fresh in
   match type of H with
-  | ?P -> _ => assert P as H'; [| specialize (H H'); clear H']
+  | ?P -> _ => assert P as H'; [Tac | specialize (H H'); clear H']
+  | _ => idtac
   end.
+
+Tactic Notation "forward" constr(H) := forward_impl H idtac.
+Tactic Notation "forward" constr(H) "by" tactic(t) := forward_impl H t.
+Tactic Notation "fforward" constr(H) := repeat (forward_impl H idtac).
+Tactic Notation "fforward" constr(H) "by" tactic(T) := repeat (forward_impl H T).
 
 (* Simple specialization of [eqit_Ret] to [eutt] so that users of the library do not need to know about [eqit] *)
 Ltac ret_bind_l_left v :=

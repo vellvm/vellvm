@@ -2265,3 +2265,15 @@ split.
 intros m M conv l.
 apply (fold_left (fun acc x => monoid_plus M (conv x) acc) l (monoid_unit M)).
 Defined.
+
+Lemma cons_to_app {T: Type}: forall (h: T) t, h :: t = [h] ++ t.
+Proof. reflexivity. Qed.
+
+Lemma appcons_to_appapp {T: Type}: forall l1 (h: T) l2, l1 ++ (h :: l2) = (l1 ++ [h]) ++ l2.
+Proof. intros. rewrite -> cons_to_app. rewrite -> app_assoc. reflexivity. Qed.
+
+Lemma NoDup_app {A: Type}: forall (l1 l2: list A), List.NoDup (l1 ++ l2) -> List.NoDup l1 /\ List.NoDup l2.
+Proof. intros l1 l2 H. split. - apply List.NoDup_app_remove_r with (1 := H). - apply List.NoDup_app_remove_l with (1 := H). Qed.
+
+Lemma not_in_app {A: Type}: forall a (l1 l2: list A), ~List.In a (l1 ++ l2) -> ~List.In a l1 /\ ~List.In a l2.
+Proof. intros a l1 l2 H. split. - apply not_in_app_l with (1 := H). - apply not_in_app_r with (1 := H). Qed.
