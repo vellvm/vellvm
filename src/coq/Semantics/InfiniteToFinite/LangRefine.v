@@ -1036,6 +1036,9 @@ Module Type Sizeof_Refine (SZ_INF : Sizeof) (SZ_FIN : Sizeof).
   Parameter sizeof_dtyp_fin_inf :
     forall t,
       SZ_INF.sizeof_dtyp t = SZ_FIN.sizeof_dtyp t.
+
+  Parameter padding_fin_inf :
+    SZ_INF.padding = SZ_FIN.padding.
 End Sizeof_Refine.
 
 Module Sizeof_Refine_InfFin : Sizeof_Refine InterpreterStackBigIntptr.LP.SIZEOF InterpreterStack64BitIntptr.LP.SIZEOF.
@@ -1051,6 +1054,12 @@ Module Sizeof_Refine_InfFin : Sizeof_Refine InterpreterStackBigIntptr.LP.SIZEOF 
   Lemma sizeof_dtyp_fin_inf :
     forall t,
       InterpreterStackBigIntptr.LP.SIZEOF.sizeof_dtyp t = InterpreterStack64BitIntptr.LP.SIZEOF.sizeof_dtyp t.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Lemma padding_fin_inf :
+    InterpreterStackBigIntptr.LP.SIZEOF.padding = InterpreterStack64BitIntptr.LP.SIZEOF.padding.
   Proof.
     reflexivity.
   Qed.
@@ -8795,7 +8804,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                     eapply IHidxs_fin in H1; eauto;
                     rewrite sizeof_dtyp_fin_inf;
                     rewrite H1;
-                    auto].
+                    auto
+                  | cbn;
+                    rewrite H1;
+                    rewrite_fin_to_inf_dvalue;
+                    rewrite sizeof_dtyp_fin_inf;
+                    rewrite padding_fin_inf;
+                    eapply IHidxs_fin in H1; eauto;
+                    rewrite H1;
+                    auto
+          ].
 
       { (* Structs *)
         cbn; rewrite_fin_to_inf_dvalue.
@@ -8803,14 +8821,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         rewrite H0.
         erewrite IHidxs_fin; eauto.
         cbn.
-        replace (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (IS1.LP.SIZEOF.sizeof_dtyp t))%Z) with
-          (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (SIZEOF.sizeof_dtyp t))%Z); eauto.
+        replace (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (pad_to IS1.LP.SIZEOF.padding (IS1.LP.SIZEOF.sizeof_dtyp t)))%Z) with
+          (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (pad_to SIZEOF.padding (SIZEOF.sizeof_dtyp t)))%Z); eauto.
 
         apply FunctionalExtensionality.functional_extensionality.
         intros.
         apply FunctionalExtensionality.functional_extensionality.
         intros.
         rewrite sizeof_dtyp_fin_inf.
+        rewrite padding_fin_inf.
         auto.
       }
 
@@ -8836,6 +8855,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         rewrite H1.
         erewrite IHidxs_fin; eauto.
         rewrite sizeof_dtyp_fin_inf; eauto.
+        rewrite padding_fin_inf; eauto.
         unfold intptr_fin_inf; break_match_goal; clear Heqs.
         rewrite <- (IS1.LP.IP.from_Z_injective _ _ _ e (IS1.LP.IP.to_Z_from_Z x0)).
         auto.
@@ -16273,30 +16293,81 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn;
         rewrite_fin_to_inf_dvalue;
         auto.
+
+      all: rewrite H0.
+
       all:
         try solve [break_match_hyp_inv; auto;
-                   erewrite IHidxs_fin; eauto; rewrite sizeof_dtyp_fin_inf; eauto].
+                   erewrite IHidxs_fin; eauto;
+                   repeat rewrite sizeof_dtyp_fin_inf;
+                   repeat rewrite padded_fin_inf;
+                   eauto
+          ].
 
       + break_match_hyp_inv; auto;
           try solve [erewrite IHidxs_fin; eauto; rewrite sizeof_dtyp_fin_inf; eauto
                     | break_match_hyp_inv; auto;
                       erewrite IHidxs_fin; eauto;
-                      replace (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (IS1.LP.SIZEOF.sizeof_dtyp t))%Z) with
-                        (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (SIZEOF.sizeof_dtyp t))%Z); eauto;
+                      replace (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (pad_to IS1.LP.SIZEOF.padding (IS1.LP.SIZEOF.sizeof_dtyp t))))%Z) with
+                        (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (pad_to SIZEOF.padding (SIZEOF.sizeof_dtyp t))))%Z); eauto;
                       apply FunctionalExtensionality.functional_extensionality;
                       intros;
                       apply FunctionalExtensionality.functional_extensionality;
                       intros;
-                      rewrite sizeof_dtyp_fin_inf;
+                      repeat setoid_rewrite sizeof_dtyp_fin_inf;
+                      repeat setoid_rewrite padding_fin_inf;
                       auto
             ].
 
-      + break_match_hyp_inv; auto;
-          erewrite IHidxs_fin; eauto;
-          rewrite sizeof_dtyp_fin_inf; eauto;
-          unfold intptr_fin_inf; break_match_goal; clear Heqs;
-          rewrite <- (IS1.LP.IP.from_Z_injective _ _ _ e (IS1.LP.IP.to_Z_from_Z x0));
+        repeat setoid_rewrite sizeof_dtyp_fin_inf;
+          repeat setoid_rewrite padding_fin_inf; eauto.
+        rewrite H1.
+        eauto.
+      + break_match_hyp_inv; eauto;
+          repeat setoid_rewrite sizeof_dtyp_fin_inf;
+          repeat setoid_rewrite padding_fin_inf;
+          try erewrite IHidxs_fin; eauto;
+          break_match_hyp_inv; eauto.
+
+        all: rewrite H0.
+
+        replace (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (pad_to IS1.LP.SIZEOF.padding (IS1.LP.SIZEOF.sizeof_dtyp t))))%Z) with
+          (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (pad_to SIZEOF.padding (SIZEOF.sizeof_dtyp t))))%Z); eauto;
+          apply FunctionalExtensionality.functional_extensionality;
+          intros;
+          apply FunctionalExtensionality.functional_extensionality;
+          intros;
+          repeat setoid_rewrite sizeof_dtyp_fin_inf;
+          repeat setoid_rewrite padding_fin_inf;
           auto.
+
+        replace (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (IS1.LP.SIZEOF.sizeof_dtyp t)))%Z) with
+          (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (SIZEOF.sizeof_dtyp t)))%Z); eauto;
+          apply FunctionalExtensionality.functional_extensionality;
+          intros;
+          apply FunctionalExtensionality.functional_extensionality;
+          intros;
+          repeat setoid_rewrite sizeof_dtyp_fin_inf;
+          repeat setoid_rewrite padding_fin_inf;
+          auto.
+
+      + break_match_hyp_inv; eauto;
+          repeat setoid_rewrite sizeof_dtyp_fin_inf;
+          repeat setoid_rewrite padding_fin_inf;
+          try erewrite IHidxs_fin; eauto;
+          break_match_hyp_inv; eauto.
+      + break_match_hyp_inv; eauto;
+          repeat setoid_rewrite sizeof_dtyp_fin_inf;
+          repeat setoid_rewrite padding_fin_inf;
+          try erewrite IHidxs_fin; eauto.
+
+        unfold intptr_fin_inf; break_inner_match_goal; clear Heqs.
+        rewrite <- (IS1.LP.IP.from_Z_injective _ _ _ e (IS1.LP.IP.to_Z_from_Z x0)).
+        eauto.
+
+        unfold intptr_fin_inf; break_inner_match_goal; clear Heqs.
+        rewrite <- (IS1.LP.IP.from_Z_injective _ _ _ e (IS1.LP.IP.to_Z_from_Z x0)).
+        eauto.
   Qed.
 
   Lemma handle_gep_addr_err_fin_inf :

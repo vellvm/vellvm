@@ -5,6 +5,8 @@ From Coq Require Import
 From Vellvm Require Import
      DynamicTypes.
 
+Definition pad_to (pad_amount : N) (sz : N) :=
+  (sz + ((pad_amount - (sz mod pad_amount)) mod pad_amount))%N.
 
 Module Type Sizeof.
   (** ** Size of a dynamic type in bits *)
@@ -19,10 +21,12 @@ Module Type Sizeof.
     forall dt,
       (0 <= sizeof_dtyp dt)%N.
 
+  Parameter padding : N.
+
   (* Should take padding into account *)
   Parameter sizeof_dtyp_Struct :
     forall dts,
-      sizeof_dtyp (DTYPE_Struct dts) = List.fold_left (fun acc dt => N.add acc (sizeof_dtyp dt)) dts 0%N.
+      sizeof_dtyp (DTYPE_Struct dts) = List.fold_left (fun acc dt => N.add acc (pad_to padding (sizeof_dtyp dt))) dts 0%N.
 
   Parameter sizeof_dtyp_Packed_struct :
     forall dts,
@@ -30,7 +34,7 @@ Module Type Sizeof.
 
   Parameter sizeof_dtyp_array :
     forall sz t,
-      sizeof_dtyp (DTYPE_Array sz t) = (sz * sizeof_dtyp t)%N.
+      sizeof_dtyp (DTYPE_Array sz t) = (sz * (pad_to padding (sizeof_dtyp t)))%N.
 
   Parameter sizeof_dtyp_vector :
     forall sz t,
