@@ -152,7 +152,7 @@
   ("fn_ret_thunk_extern"          , KW_FN_RET_THUNK_EXTERN);
   ("hot"                          , KW_HOT);
   ("inaccessiblememonly"          , KW_INACCESSIBLEMEMONLY);
-  ("inaccessiblemem_or_argmemeonly" , KW_INACCESSIBLEMEM_OR_ARGMEMONLY);
+  ("inaccessiblemem_or_argmemonly" , KW_INACCESSIBLEMEM_OR_ARGMEMONLY);
   ("inlinehint"                   , KW_INLINEHINT);
   ("jumptable"                    , KW_JUMPTABLE);
   ("minsize"                      , KW_MINSIZE);
