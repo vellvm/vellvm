@@ -19,6 +19,7 @@ From Vellvm.Semantics Require Import
 Module FinSizeof : Sizeof.
   (* TODO: make parameter? *)
   Definition ptr_size : nat := 8.
+  Definition padding : N := 8.
 
   Definition round_up_to_eight (n : N) : N :=
     if N.eqb 0 n
@@ -58,9 +59,11 @@ Module FinSizeof : Sizeof.
     | DTYPE_IPTR         => N.of_nat ptr_size
     | DTYPE_Pointer      => N.of_nat ptr_size
     | DTYPE_Packed_struct l
-    | DTYPE_Struct l     => fold_left (fun acc x => (acc + sizeof_dtyp x)%N) l 0%N
-    | DTYPE_Vector sz ty'
-    | DTYPE_Array sz ty' => sz * sizeof_dtyp ty'
+      => fold_left (fun acc x => (acc + sizeof_dtyp x)%N) l 0%N
+    | DTYPE_Struct l
+      => fold_left (fun acc x => (acc + pad_to padding (sizeof_dtyp x))%N) l 0%N
+    | DTYPE_Vector sz ty' => sz * (sizeof_dtyp ty')
+    | DTYPE_Array sz ty' => sz * (pad_to padding (sizeof_dtyp ty'))
     | DTYPE_Float        => 4
     | DTYPE_Double       => 8
     | DTYPE_Half         => 4
@@ -88,7 +91,7 @@ Module FinSizeof : Sizeof.
   (* Should take padding into account *)
   Lemma sizeof_dtyp_Struct :
     forall dts,
-      sizeof_dtyp (DTYPE_Struct dts) = List.fold_left (fun acc dt => N.add acc (sizeof_dtyp dt)) dts 0%N.
+      sizeof_dtyp (DTYPE_Struct dts) = List.fold_left (fun acc dt => N.add acc (pad_to padding (sizeof_dtyp dt))) dts 0%N.
   Proof.
     reflexivity.
   Qed.
@@ -102,7 +105,7 @@ Module FinSizeof : Sizeof.
 
   Lemma sizeof_dtyp_array :
     forall sz t,
-      sizeof_dtyp (DTYPE_Array sz t) = (sz * sizeof_dtyp t)%N.
+      sizeof_dtyp (DTYPE_Array sz t) = (sz * pad_to padding (sizeof_dtyp t))%N.
   Proof.
     reflexivity.
   Qed.
