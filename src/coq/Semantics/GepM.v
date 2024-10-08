@@ -40,7 +40,7 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
     | v :: vs' =>
       match v with
       | DVALUE_I8 i =>
-        let k := unsigned i in
+        let k := signed i in
         let n := BinIntDef.Z.to_nat k in
         match t with
         | DTYPE_Vector _ ta =>
@@ -51,12 +51,13 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
         end
       | DVALUE_I32 i =>
         let k := unsigned i in
+        let ks := signed i in
         let n := BinIntDef.Z.to_nat k in
         match t with
         | DTYPE_Vector _ ta =>
-            handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+            handle_gep_h ta (off + ks * (Z.of_N (sizeof_dtyp ta))) vs'
         | DTYPE_Array _ ta =>
-            handle_gep_h ta (off + k * (Z.of_N (pad_to padding (sizeof_dtyp ta)))) vs'
+            handle_gep_h ta (off + ks * (Z.of_N (pad_to padding (sizeof_dtyp ta)))) vs'
         | DTYPE_Struct ts =>
             let offset := fold_left (fun acc t => (acc + (Z.of_N (pad_to padding (sizeof_dtyp t)))))%Z
                             (firstn n ts) 0%Z in
@@ -76,7 +77,7 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
         | _ => failwith ("non-i32-indexable type")
         end
       | DVALUE_I64 i =>
-        let k := unsigned i in
+        let k := signed i in
         let n := BinIntDef.Z.to_nat k in
         match t with
         | DTYPE_Vector _ ta =>
@@ -109,13 +110,13 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
     let prov := address_provenance a in
     match vs with
     | DVALUE_I8 i :: vs' =>
-      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (unsigned i)) vs' ;;
+      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
       ret (int_to_ptr ptr' prov)
     | DVALUE_I32 i :: vs' =>
-      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (unsigned i)) vs' ;;
+      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
       ret (int_to_ptr ptr' prov)
     | DVALUE_I64 i :: vs' =>
-      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (unsigned i)) vs' ;;
+      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
       ret (int_to_ptr ptr' prov)
     | DVALUE_IPTR i :: vs' =>
       ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (IP.to_Z i)) vs' ;;
