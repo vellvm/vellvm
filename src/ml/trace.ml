@@ -1,3 +1,4 @@
+open Base
 open Log
 open LLVMAst
 open OrderedType
@@ -19,6 +20,9 @@ let print_log () : unit =
     
 let get_mcfg ll_ast =
   (mcfg_of_tle (TopLevel.TopLevelBigIntptr.link TopLevel.TopLevelBigIntptr.coq_PREDEFINED_FUNCTIONS ll_ast))
+
+let camlstring_of_dstring (dstr : DList.coq_DString) =
+  dstr |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring
 
 (** dtyp -> typ mcfg helper function **)
 type tlog_entry =
@@ -581,37 +585,44 @@ let list_to_map l1 l2 =
                     ^ RawidOrdPrint.to_string def.df_prototype.dc_name ^ "\"")
 
 let normalize_definition ctx (targs : typ texp list) (params : function_id list) : ctx =
-  let args = List.map(fun (_, arg) -> subst_exp ctx arg) targs in
+  let args = List.map (fun (_, arg) -> subst_exp ctx arg) targs in
+  (* print_endline "Here are the targs"; *)
+  (* List.iter (fun s -> Printf.printf "%s\n" (ShowAST.dshowTExp ShowAST.dshowTyp s |> camlstring_of_dstring)) targs; *)
+  (* print_endline "Here are the params:"; *)
+  (* List.iter (fun s -> Printf.printf "%s\n" (ShowAST.dshow_raw_id s |> camlstring_of_dstring)) params; *)
   List.combine params args |> RawidM.of_list
+
+let ( let* ) x f = Stdlib.Result.bind x f
 
 let rec normalize_log
     (ctx : ctx)
     (f_def : (LLVMAst.typ, LLVMAst.typ cfg) definition)
     (mcfg : typ CFG.mcfg)
     (tblk : tblk)
-    (stack : log_stream) : ctx * log_stream * tblk * typ texp option =
+    (stack : log_stream) : (ctx * log_stream * tblk * typ texp option, string) result =
   match stack with
   | [] ->
-    ctx, [], tblk, None
+    Ok (ctx, [], tblk, None)
   | log::stack' ->
+    (* print_log_entry log; *)
     begin match log with
       | Phi_node (id, _, bid) ->
         begin match get_phi_from_def f_def id with
           | Some (_, phi') ->
             let ctx'= normalize_phi ctx id phi' bid in
             normalize_log ctx' f_def mcfg tblk stack'
-          | None -> failwith "normalize_log: cannot find phi"
+          | None -> Error "normalize_log: cannot find phi"
         end
       | Ret texp ->
         begin match get_term_from_def f_def mcfg (TERM_Ret texp) with
           | Some (TERM_Ret texp') ->
             let texp2 = subst_texp ctx texp' in
-            (* let tblk' = add_term tblk (TERM_Ret texp2) in *)
-            (* ctx, stack', tblk', Some texp2 *)
-            ctx, stack', tblk, Some texp2
+            Ok (ctx, stack', tblk, Some texp2)
           | _ ->
-            failwith "normalize_log: cannot find phi"
+            Error "normalize_log: cannot find terminator"
         end
+      | Ret_void ->
+        Ok (ctx, stack', tblk, None)
       | Instr (id, ins) ->
         begin match ins, get_instr_from_def f_def id with
           | INSTR_Comment _, Some (_, INSTR_Comment c) ->
@@ -623,11 +634,12 @@ let rec normalize_log
             | IVoid _ ->
               let tblk' = add_code tblk [(id, INSTR_Op exp')] in
               normalize_log ctx f_def mcfg tblk' stack'
-            | IId id ->
-              let id' = gensym_raw_id id in
-              let e = EXP_Ident (ID_Local id') in
-              let ctx' = RawidM.update_or e (fun _ -> e) id ctx in
-              let tblk' = add_code tblk [(IId id', INSTR_Op exp')] in
+            | IId iid ->
+              let iid' = gensym_raw_id iid in
+              let e = EXP_Ident (ID_Local iid') in
+              let ctx' = RawidM.update_or e (fun _ -> e) iid ctx in
+              let tblk' = add_code tblk [(IId iid', INSTR_Op exp')] in
+              (* Printf.printf "Adding following OP into block:%s\n" (ShowAST.dshowInstrWithId ShowAST.dshowTyp (IId iid', INSTR_Op exp') |> camlstring_of_dstring); *)
               normalize_log ctx' f_def mcfg tblk' stack'
             end
           | INSTR_Call (_, _, _), Some (_, INSTR_Call ((f_t, f_exp), taargs, anns)) ->
@@ -638,14 +650,16 @@ let rec normalize_log
             *)
             begin match id, AstLib.intrinsic_exp f_exp with
               | IVoid _, Some _ ->
-                let tblk' = add_code tblk [(id, INSTR_Call ((f_t, f_exp), taargs, anns))] in
-                normalize_log ctx f_def mcfg tblk' (List.tl stack')
-              | IId id, Some _ ->
-                let id' = gensym_raw_id id in
-                let tblk' = add_code tblk [(IId id', INSTR_Call ((f_t, f_exp), taargs, anns))] in
-                let exp = EXP_Ident (ID_Global id') in
-                let ctx' = RawidM.update_or exp (fun _ -> exp) id ctx in
-                normalize_log ctx' f_def mcfg tblk' (List.tl stack')
+                let taargs' = List.map (fun (texp, params) -> (subst_texp ctx texp, params)) taargs in
+                let tblk' = add_code tblk [(id, INSTR_Call ((f_t, f_exp), taargs', anns))] in
+                normalize_log ctx f_def mcfg tblk' stack'
+              | IId iid, Some _ ->
+                let iid' = gensym_raw_id iid in
+                let taargs' = List.map (fun (texp, params) -> (subst_texp ctx texp, params)) taargs in
+                let tblk' = add_code tblk [(IId iid', INSTR_Call ((f_t, f_exp), taargs', anns))] in
+                let exp = EXP_Ident (ID_Local iid') in
+                let ctx' = RawidM.update_or exp (fun _ -> exp) iid ctx in
+                normalize_log ctx' f_def mcfg tblk' stack'
               | IVoid _, None ->
                 begin match stack' with
                   | F_args (f_id, params)::stack'' ->
@@ -654,34 +668,47 @@ let rec normalize_log
                     (* TODO: can simplify get_f_def_from_mcfg *)
                     begin match get_f_def_from_mcfg (EXP_Ident (ID_Global f_id)) mcfg with
                       | Some f_def' ->
-                        let (_, stack2, tblk2, _) = normalize_log ctx' f_def' mcfg tblk stack'' in
+                        let* (_, stack2, tblk2, _) = normalize_log ctx' f_def' mcfg tblk stack'' in
+                        (* let (_, stack2, tblk2, _) = normalize_log ctx' f_def' mcfg tblk stack'' in *)
                         normalize_log ctx f_def mcfg tblk2 stack2
-                      | None -> failwith "normalize_log: function not found"
+                      | None -> Error "normalize_log: function not found"
                     end
-                  | _ -> failwith "normalize_log: logging error on call"
+                  | _ ->
+                    let taargs' = List.map (fun (texp, params) -> (subst_texp ctx texp, params)) taargs in
+                    let tblk' = add_code tblk [(id, INSTR_Call ((f_t, f_exp), taargs', anns))] in
+                    normalize_log ctx f_def mcfg tblk' stack'
+                    (* Error "normalize_log: logging error on call" *)
                 end
-              | IId id, None ->
+              | IId iid, None ->
                 begin match stack' with
                   | F_args (f_id, params)::stack'' ->
                     let targs = List.map fst taargs in
                     let ctx' = normalize_definition ctx targs params in
                     begin match get_f_def_from_mcfg (EXP_Ident (ID_Global f_id)) mcfg with
                       | Some f_def' ->
-                        let (_, stack2, tblk2, texp) = normalize_log ctx' f_def' mcfg tblk stack'' in
+                        let* (_, stack2, tblk2, texp) = normalize_log ctx' f_def' mcfg tblk stack'' in
                         begin match texp with
                           | Some (_, exp) ->
-                            let ctx2 = RawidM.update_or exp (fun _ -> exp) id ctx in
+                            let ctx2 = RawidM.update_or exp (fun _ -> exp) iid ctx in
                             normalize_log ctx2 f_def mcfg tblk2 stack2
-                          | None -> failwith "normalize_log: call should return some value"
+                          | None ->
+                            Error "normalize_log: call should return some value"
                         end
-                      | None -> failwith "normalize_log: function not found"
+                      | None -> Error "normalize_log: function not found"
                     end
-                  | _ -> failwith "normalize_log: logging error on call"
+                  | _ ->
+                    let iid' = gensym_raw_id iid in
+                    let taargs' = List.map (fun (texp, params) -> (subst_texp ctx texp, params)) taargs in
+                    let tblk' = add_code tblk [(IId iid', INSTR_Call ((f_t, f_exp), taargs', anns))] in
+                    let exp = EXP_Ident (ID_Local iid') in
+                    let ctx' = RawidM.update_or exp (fun _ -> exp) iid ctx in
+                    normalize_log ctx' f_def mcfg tblk' stack'
+                    (* Error "normalize_log: logging error on call" *)
                 end
             end
           | INSTR_Alloca _, Some (_, INSTR_Alloca (dt, anns)) ->
             begin match id with
-              | IVoid _ -> failwith "Alloca must have id"
+              | IVoid _ -> Error "normalize_log: Alloca must have id"
               | IId id ->
                 let id' = gensym_raw_id id in
                 let exp = EXP_Ident (ID_Local id') in
@@ -691,7 +718,7 @@ let rec normalize_log
             end
           | INSTR_Load _, Some (_, INSTR_Load (dt, texp, anns)) ->
             begin match id with
-              | IVoid _ -> failwith "Load must have id"
+              | IVoid _ -> Error "normalize_log: Load must have id"
               | IId id ->
                 let texp' = subst_texp ctx texp in
                 let id' = gensym_raw_id id in
@@ -721,7 +748,7 @@ let rec normalize_log
                             c_align=cmpxchg.c_align
                            } in
             begin match id with
-              | IVoid _ -> failwith "cmpxchg must have id"
+              | IVoid _ -> Error "normalize_log: cmpxchg must have id"
               | IId id -> 
                 let id' = gensym_raw_id id in
                 let exp = EXP_Ident (ID_Local id') in
@@ -740,7 +767,7 @@ let rec normalize_log
                               a_type=atomicrmw.a_type
                              } in
             begin match id with
-              | IVoid _ -> failwith "atomicrmw must have id"
+              | IVoid _ -> Error "normalize_log: atomicrmw must have id"
               | IId id -> 
                 let id' = gensym_raw_id id in
                 let exp = EXP_Ident (ID_Local id') in
@@ -751,7 +778,7 @@ let rec normalize_log
           | INSTR_VAArg _, Some (_, INSTR_VAArg (texp, t)) ->
             let texp' = subst_texp ctx texp in
             begin match id with
-              | IVoid _ -> failwith "va_arg must have id"
+              | IVoid _ -> Error "normalize_log: va_arg must have id"
               | IId id ->
                 let id' = gensym_raw_id id in
                 let exp = EXP_Ident (ID_Local id') in
@@ -761,7 +788,7 @@ let rec normalize_log
             end
           | INSTR_LandingPad, Some (_, INSTR_LandingPad) ->
             begin match id with
-              | IVoid _ -> failwith "va_arg must have id"
+              | IVoid _ -> Error "normalize_log: va_arg must have id"
               | IId id ->
                 let id' = gensym_raw_id id in
                 let exp = EXP_Ident (ID_Local id') in
@@ -769,9 +796,12 @@ let rec normalize_log
                 let tblk' = add_code tblk [(IId id', INSTR_LandingPad)] in
                 normalize_log ctx' f_def mcfg tblk' stack'
             end
-          | _ -> failwith "normalize_log: no match"
+          | _ ->
+            Printf.printf "The line with no match is: %s\n" (ShowAST.dshowInstrWithId ShowAST.dshowDtyp (id, ins) |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring);
+            Printf.printf "The function this tracer is currently in:\n%s\n" (ShowAST.dshowDeclaration (f_def.df_prototype) |> camlstring_of_dstring);
+            Error "normalize_log: no match"
         end
-      | _ ->  failwith "normalize_log has a standalone f_args not processed"
+      | _ ->  Error "normalize_log has a standalone f_args not processed"
     end
 
 (* TODO: don't modify terminator in the function
@@ -781,9 +811,9 @@ let rec normalize_log
 let normalize_code
     (f_id : function_id)
     (mcfg : typ CFG.mcfg)
-    (stack : log_stream) : tblk =
+    (stack : log_stream) =
   match get_f_def_from_mcfg (EXP_Ident (ID_Global f_id)) mcfg with
-  | None -> failwith (Printf.sprintf "Cannot found definition %s" (ShowAST.dshow_raw_id f_id |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring))
+  | None -> Error (Printf.sprintf "Cannot found definition %s" (ShowAST.dshow_raw_id f_id |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring))
   | Some f_def -> 
     let ctx = RawidM.empty in
     (* Printf.printf "%s" (Log.dstring_of_log_stream stack |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring); *)
@@ -793,23 +823,22 @@ let normalize_code
                             blk_term=(TERM_Ret (TYPE_I (Camlcoq.N.of_int 8), EXP_Integer (Camlcoq.Z.of_sint 1)));
                             blk_comments= None
                            } in
-    let (_, _ , tblk', ret_texp_o) = normalize_log ctx f_def mcfg tblk (List.tl stack) in
+    let* (_, _ , tblk', ret_texp_o) = normalize_log ctx f_def mcfg tblk (List.tl stack) in
     match ret_texp_o with
     | Some ret_texp ->
-      {blk_id=tblk'.blk_id;
+      Ok {blk_id=tblk'.blk_id;
        blk_phis=tblk'.blk_phis;
        blk_code=List.rev tblk'.blk_code;
        blk_term=(TERM_Ret ret_texp);
        blk_comments=tblk'.blk_comments
       }
     | None ->                   (* The branch when there is no return value *)
-      {blk_id=tblk'.blk_id;
+      Ok {blk_id=tblk'.blk_id;
        blk_phis=tblk'.blk_phis;
        blk_code=List.rev tblk'.blk_code;
        blk_term=tblk.blk_term;
        blk_comments=tblk'.blk_comments
       }
-(* IO.output_file *)
 
 
 (** Printing trace **)
@@ -821,8 +850,10 @@ let print_normalized_log ll_ast =
   let code = List.rev !Log.log in
   (* let code = transform_dtyp_to_typ_log (List.rev !Log.log) main_f_id mcfg |> List.rev in *)
   (* print_tlog code; *)
-  let tblk = normalize_code main_f_id mcfg code in
-  print_tblk tblk
+  match normalize_code main_f_id mcfg code with
+  | Ok tblk -> 
+    print_tblk tblk
+  | Error s -> failwith s
 
 (** Generate an ll_ast for output **)
 let get_f_def_from_ast
@@ -835,11 +866,11 @@ let get_f_def_from_ast
     | _ -> false in
   List.partition find_aux ll_ast
 
-let gen_executable_trace ll_ast : (typ, typ block * typ block list) toplevel_entities =
+let gen_executable_trace ll_ast =
   let mcfg = get_mcfg ll_ast in
   let main_f_id = (Name (Camlcoq.coqstring_of_camlstring "main")) in
   let code = List.rev !Log.log in
-  let tblk = normalize_code main_f_id mcfg code in
+  let* tblk = normalize_code main_f_id mcfg code in
   match get_f_def_from_ast (EXP_Ident (ID_Global main_f_id)) ll_ast with
   | [f_tle], r_tles ->
     begin match f_tle with
@@ -849,8 +880,8 @@ let gen_executable_trace ll_ast : (typ, typ block * typ block list) toplevel_ent
          df_args=f_def.df_args;
          df_instrs=tblk,[]
         } in
-       r_tles @ [TLE_Definition f_def']
-    | _ -> failwith "gen_executable_trace: main function is not definition"
+       Ok (r_tles @ [TLE_Definition f_def'])
+    | _ -> Error "gen_executable_trace: main function is not definition"
     end
-  | _ -> failwith "gen_executable_trace: failed to get main function"
+  | _ -> Error "gen_executable_trace: failed to get main function"
 

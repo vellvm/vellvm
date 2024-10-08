@@ -1,5 +1,5 @@
---- ml/extracted/Denotation.ml	2024-09-26 19:50:25.000000000 -0400
-+++ ml/extracted/Denotation.ml	2024-09-26 19:46:46.000000000 -0400
+--- ml/extracted/Denotation.ml	2024-10-07 21:43:53.000000000 -0400
++++ ml/extracted/Denotation.ml	2024-10-07 20:12:35.000000000 -0400
 @@ -33,6 +33,7 @@
  open Subevent
  open Util
@@ -16,7 +16,7 @@
      (match pt with
       | IId id ->
         (match i0 with
-@@ -5824,8 +5826,9 @@
+@@ -5824,11 +5826,13 @@
        sum) itree **)
  
    let denote_terminator = function
@@ -28,7 +28,11 @@
      bind (Obj.magic coq_Monad_itree) (Obj.magic denote_exp (Some dt) op)
        (fun dv -> ret (Obj.magic coq_Monad_itree) (Coq_inr dv))
    | TERM_Ret_void ->
-@@ -6093,6 +6096,7 @@
++    let () = Log.write_log_entry (Ret_void) in
+     ret (Obj.magic coq_Monad_itree) (Coq_inr LP.Events.DV.UVALUE_None)
+   | TERM_Br (v, br1, br2) ->
+     let (dt, op) = v in
+@@ -6093,6 +6097,7 @@
  
    let denote_phi bid_from = function
    | (id, p) ->
@@ -36,7 +40,7 @@
      let Phi (dt, args) = p in
      (match assoc eq_dec_raw_id bid_from args with
       | Some op ->
-@@ -6270,6 +6274,7 @@
+@@ -6270,6 +6275,7 @@
          (ret (Obj.magic coq_Monad_itree))
          (combine_lists_varargs df.df_args args)) (fun x ->
        let (bs, vs) = x in
