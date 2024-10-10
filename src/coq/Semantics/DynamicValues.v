@@ -7,6 +7,7 @@ From Coq Require Import
      String
      Bool.Bool
      Lia
+     Equalities
      Program.Wf.
 
 Import BinInt.
@@ -40,7 +41,8 @@ From Vellvm Require Import
 
 From Mem Require Import
   Semantics.Memory.StoreId
-  Addresses.MemoryAddress.
+  Addresses.MemoryAddress
+  Addresses.Provenance.
 
 From LLVM_Memory Require Import
   Sizeof
@@ -118,14 +120,14 @@ Definition ll_double := Floats.float.
 
 
 (* Sizeof is needed for for ConcatBytes case *)
-Module DVALUE(A:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof).
+Module DVALUE (ADDRESS_METADATA : Typ) (PS : PROV_SET) (A:ADDRESS ADDRESS_METADATA PS) (IP:INTPTR) (SIZEOF:Sizeof).
 
   Import SIZEOF.
   Import IP.
 
   (* The set of dynamic values manipulated by an LLVM program. *)
   Unset Elimination Schemes.
-  Inductive dvalue : Set :=
+  Inductive dvalue : Type :=
   | DVALUE_Addr (a:A.addr)
   | DVALUE_I (sz : positive) (x:@int sz)
   | DVALUE_IPTR (x:intptr)
@@ -3320,14 +3322,14 @@ Module DVALUE(A:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof).
       the composition of a huge case analysis that builds a value of [conv_case], and a function
       with only four cases to actually build the tree.
      *)
-    Variant conv_case : Set :=
+    Variant conv_case : Type :=
     | Conv_Pure    (x : dvalue)
     | Conv_ItoP    (x : dvalue)
     | Conv_PtoI    (x : dvalue)
     | Conv_Oom     (s: string)
     | Conv_Illegal (s: string).
 
-    Variant ptr_conv_cases : Set :=
+    Variant ptr_conv_cases : Type :=
     | PtrConv_ItoP
     | PtrConv_PtoI
     | PtrConv_Neither.

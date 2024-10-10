@@ -39,7 +39,7 @@ End ADDRESS_TYPE_NOTATION.
 (** The core abstract address type, which essentially just has
     decidable equality.
  *)
-Module Type CORE_ADDRESS := DecidableType <+ ADDRESS_TYPE_NOTATION.
+Module Type CORE_ADDRESS := UsualDecidableType <+ ADDRESS_TYPE_NOTATION.
 
 (*** Address functors *)
 
