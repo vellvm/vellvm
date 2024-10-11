@@ -162,11 +162,7 @@ Module Type DvalueByte (LP : LLVMParams).
         end
     in
     match dv with
-       | DVALUE_I1 x
-       | DVALUE_I8 x
-       | DVALUE_I16 x
-       | DVALUE_I32 x
-       | DVALUE_I64 x =>
+       | @DVALUE_I sz x =>
            ret (extract_byte_vint x idx)
        | DVALUE_IPTR x =>
            ret (extract_byte_Z (IP.to_Z x) idx)
@@ -198,7 +194,7 @@ Module Type DvalueByte (LP : LLVMParams).
            | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
            end
 
-       | DVALUE_Array elts =>
+       | DVALUE_Array _ elts =>
            match dt with
            | DTYPE_Array sz dt =>
                dvalue_extract_array_bytes elts dt idx
@@ -206,7 +202,7 @@ Module Type DvalueByte (LP : LLVMParams).
                raise_error "dvalue_extract_byte: type mismatch on DVALUE_Array."
            end
 
-       | DVALUE_Vector elts =>
+       | DVALUE_Vector _ elts =>
            match dt with
            | DTYPE_Vector sz dt =>
                dvalue_extract_array_bytes elts dt idx
@@ -241,11 +237,7 @@ Module Type DvalueByte (LP : LLVMParams).
         end
     in
     match dv with
-       | DVALUE_I1 x
-       | DVALUE_I8 x
-       | DVALUE_I16 x
-       | DVALUE_I32 x
-       | DVALUE_I64 x =>
+       | @DVALUE_I sz x =>
            ret (extract_byte_vint x idx)
        | DVALUE_IPTR x =>
            ret (extract_byte_Z (IP.to_Z x) idx)
@@ -277,7 +269,7 @@ Module Type DvalueByte (LP : LLVMParams).
            | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
            end
 
-       | DVALUE_Array elts =>
+       | DVALUE_Array _ elts =>
            match dt with
            | DTYPE_Array sz dt =>
                dvalue_extract_array_bytes elts dt idx
@@ -285,7 +277,7 @@ Module Type DvalueByte (LP : LLVMParams).
                raise_error "dvalue_extract_byte: type mismatch on DVALUE_Array."
            end
 
-       | DVALUE_Vector elts =>
+       | DVALUE_Vector _ elts =>
            match dt with
            | DTYPE_Vector sz dt =>
                dvalue_extract_array_bytes elts dt idx
@@ -336,19 +328,7 @@ Module Type DvalueByte (LP : LLVMParams).
     match dt with
        | DTYPE_I sz =>
            zs <- map_monad dvalue_byte_value dbs;;
-           match sz with
-           | 1 =>
-               ret (DVALUE_I1 (concat_bytes_Z_vint zs))
-           | 8 =>
-               ret (DVALUE_I8 (concat_bytes_Z_vint zs))
-           | 16 =>
-               ret (DVALUE_I16 (concat_bytes_Z_vint zs))
-           | 32 =>
-               ret (DVALUE_I32 (concat_bytes_Z_vint zs))
-           | 64 =>
-               ret (DVALUE_I64 (concat_bytes_Z_vint zs))
-           | _ => raise_error "Unsupported integer size."
-           end
+           ret (@DVALUE_I sz (concat_bytes_Z_vint zs))
        | DTYPE_IPTR =>
            zs <- map_monad dvalue_byte_value dbs;;
            val <- lift_OOMABLE DTYPE_IPTR (IP.from_Z (concat_bytes_Z zs));;
@@ -391,7 +371,7 @@ Module Type DvalueByte (LP : LLVMParams).
              else split_every_nil sz' dbs
            in
            elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
-           ret (DVALUE_Array elts)
+           ret (DVALUE_Array t elts)
        | DTYPE_Vector sz t =>
            let sz' := sizeof_dtyp t in
            let elt_bytes :=
@@ -400,7 +380,7 @@ Module Type DvalueByte (LP : LLVMParams).
              else split_every_nil sz' dbs
            in
            elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
-           ret (DVALUE_Vector elts)
+           ret (DVALUE_Vector t elts)
        | DTYPE_Struct fields =>
            Functor.fmap DVALUE_Struct (list_dvalue_bytes_to_dvalue fields dbs)
        | DTYPE_Packed_struct fields =>
@@ -428,19 +408,7 @@ Module Type DvalueByte (LP : LLVMParams).
     match dt with
        | DTYPE_I sz =>
            zs <- map_monad dvalue_byte_value dbs;;
-           match sz with
-           | 1 =>
-               ret (DVALUE_I1 (concat_bytes_Z_vint zs))
-           | 8 =>
-               ret (DVALUE_I8 (concat_bytes_Z_vint zs))
-           | 16 =>
-               ret (DVALUE_I16 (concat_bytes_Z_vint zs))
-           | 32 =>
-               ret (DVALUE_I32 (concat_bytes_Z_vint zs))
-           | 64 =>
-               ret (DVALUE_I64 (concat_bytes_Z_vint zs))
-           | _ => raise_error "Unsupported integer size."
-           end
+           ret (@DVALUE_I sz (concat_bytes_Z_vint zs))
        | DTYPE_IPTR =>
            zs <- map_monad dvalue_byte_value dbs;;
            val <- lift_OOMABLE DTYPE_IPTR (IP.from_Z (concat_bytes_Z zs));;
@@ -483,7 +451,7 @@ Module Type DvalueByte (LP : LLVMParams).
              else split_every_nil sz' dbs
            in
            elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
-           ret (DVALUE_Array elts)
+           ret (DVALUE_Array t elts)
        | DTYPE_Vector sz t =>
            let sz' := sizeof_dtyp t in
            let elt_bytes :=
@@ -492,7 +460,7 @@ Module Type DvalueByte (LP : LLVMParams).
              else split_every_nil sz' dbs
            in
            elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
-           ret (DVALUE_Vector elts)
+           ret (DVALUE_Vector t elts)
        | DTYPE_Struct fields =>
            Functor.fmap DVALUE_Struct (list_dvalue_bytes_to_dvalue fields dbs)
        | DTYPE_Packed_struct fields =>

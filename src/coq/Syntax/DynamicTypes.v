@@ -33,7 +33,7 @@ Set Contextual Implicit.
 
 Unset Elimination Schemes.
 Inductive dtyp : Set :=
-| DTYPE_I (sz:N)
+| DTYPE_I (sz:positive)
 | DTYPE_IPTR
 | DTYPE_Pointer
 | DTYPE_Void
@@ -84,7 +84,7 @@ Lemma dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
             | DTYPE_Vector n t, DTYPE_Vector m t' => _
             | _, _ => _
             end); try (ltac:(dec_dtyp); fail).
-  - destruct (N.eq_dec n m).
+  - destruct (Pos.eq_dec n m).
     * left; subst; reflexivity.
     * right; intros H; inversion H. contradiction.
   - destruct (N.eq_dec n m).
@@ -297,7 +297,7 @@ Section hiding_notation.
 
   Fixpoint serialize_dtyp' (dt:dtyp): sexp :=
     match dt with
-    | DTYPE_I sz     => Atom ("i" ++ to_string sz)%string
+    | DTYPE_I sz     => Atom ("i" ++ to_string (Npos sz))%string
     | DTYPE_IPTR     => Atom ("iptr")%string
     | DTYPE_Pointer  => Atom "ptr"
     | DTYPE_Void     => Atom "dvoid"
@@ -323,146 +323,11 @@ Section hiding_notation.
   #[global] Instance serialize_dtyp : Serialize dtyp := serialize_dtyp'.
 End hiding_notation.
 
-Inductive IX_supported : N -> Prop :=
-| I1_Supported : IX_supported 1
-| I8_Supported : IX_supported 8
-| I16_Supported : IX_supported 16
-| I32_Supported : IX_supported 32
-| I64_Supported : IX_supported 64
-.
-
 (* TODO: This probably should live somewhere else... *)
 #[refine]#[local] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
     Decidable_witness := N.eqb x y
   }.
 apply N.eqb_eq.
-Qed.
-
-Lemma IX_supported_dec : forall (sz:N), {IX_supported sz} + {~IX_supported sz}.
-Proof using.
-  intros sz.
-  - decide (sz = 1)%N.
-    + left. subst. constructor.
-    + decide (sz = 8)%N.
-      * left. subst. constructor.
-      * decide (sz = 16)%N.
-        -- left. subst. constructor.
-        -- decide (sz = 32)%N.
-           ++ left. subst. constructor.
-           ++ decide (sz = 64)%N.
-              ** left. subst. constructor.
-              ** right. intro X.
-                 inversion X; subst; contradiction.
-Qed.
-
-Fixpoint ALL_IX_SUPPORTED (dt : dtyp) : Prop := 
-  match dt with
-  | DTYPE_I sz =>
-      IX_supported sz
-  | DTYPE_IPTR
-  | DTYPE_Pointer
-  | DTYPE_Half
-  | DTYPE_Float
-  | DTYPE_Double
-  | DTYPE_X86_fp80
-  | DTYPE_Fp128
-  | DTYPE_Ppc_fp128
-  | DTYPE_Metadata
-  | DTYPE_X86_mmx
-  | DTYPE_Void
-  | DTYPE_Opaque =>
-      True
-  | DTYPE_Vector sz t
-  | DTYPE_Array sz t =>
-      ALL_IX_SUPPORTED t
-  | DTYPE_Struct dts 
-  | DTYPE_Packed_struct dts => FORALL ALL_IX_SUPPORTED dts
-  end.
-
-Lemma ALL_IX_SUPPORTED_dec :
-  forall dt,
-    {ALL_IX_SUPPORTED dt} + {~ ALL_IX_SUPPORTED dt}.
-Proof using.
-  intros dt.
-  induction dt;
-    try match goal with
-      | IX : {ALL_IX_SUPPORTED _} + {~ ALL_IX_SUPPORTED _} |- _ =>
-          destruct IX
-      end;
-    try solve [left; cbn; auto | right; cbn; auto].
-
-  - apply IX_supported_dec.
-  
-  - cbn.
-    apply FORALL_dec. assumption.
-  - cbn.
-    apply FORALL_dec. assumption.
-Qed.
-
-Lemma ALL_IX_SUPPORTED_Struct_fields :
-  forall dts,
-    ALL_IX_SUPPORTED (DTYPE_Struct dts) ->
-    (forall dt, In dt dts -> ALL_IX_SUPPORTED dt).
-Proof using.
-  intros dts NV dt IN.
-  cbn in NV.
-  rewrite FORALL_forall in NV.
-  rewrite Forall_forall in NV.
-  apply NV; auto.
-Qed.
-
-Lemma ALL_IX_SUPPORTED_Packed_struct_fields :
-  forall dts,
-    ALL_IX_SUPPORTED (DTYPE_Packed_struct dts) ->
-    (forall dt, In dt dts -> ALL_IX_SUPPORTED dt).
-Proof using.
-  intros dts NV dt IN.
-  cbn in NV.
-  rewrite FORALL_forall in NV.
-  rewrite Forall_forall in NV.
-  apply NV; auto.
-Qed.
-
-Lemma ALL_IX_SUPPORTED_Struct_cons :
-  forall dt dts,
-    ALL_IX_SUPPORTED (DTYPE_Struct (dt :: dts)) ->
-    ALL_IX_SUPPORTED (DTYPE_Struct dts).
-Proof using.
-  intros dt dts H.
-  cbn in *.
-  intuition.
-Qed.
-
-Lemma ALL_IX_SUPPORTED_Packed_struct_cons :
-  forall dt dts,
-    ALL_IX_SUPPORTED (DTYPE_Packed_struct (dt :: dts)) ->
-    ALL_IX_SUPPORTED (DTYPE_Packed_struct dts).
-Proof using.
-  intros dt dts H.
-  cbn in *.  
-  intuition.
-Qed.
-
-Lemma ALL_IX_SUPPORTED_Struct_cons_inv :
-  forall dt dts,
-    ALL_IX_SUPPORTED dt ->
-    ALL_IX_SUPPORTED (DTYPE_Struct dts) ->
-    ALL_IX_SUPPORTED (DTYPE_Struct (dt :: dts)).
-Proof using.
-  intros dt dts NVdt NVdts.
-  cbn in *.
-  intuition.
-Qed.
-
-Lemma ALL_IX_SUPPORTED_Packed_struct_cons_inv :
-  forall dt dts,
-    ALL_IX_SUPPORTED dt ->
-    ALL_IX_SUPPORTED (DTYPE_Packed_struct dts) ->
-    ALL_IX_SUPPORTED (DTYPE_Packed_struct (dt :: dts)).
-Proof using.
-  intros dt dts NVdt NVdts.
-  cbn in *.
-  intuition.
 Qed.
 
 Fixpoint NO_VOID (dt : dtyp) : Prop
@@ -602,11 +467,3 @@ Ltac solve_no_void :=
       end
     | cbn; solve_no_void
     ].
-
-#[global] Hint Constructors IX_supported : IX_SUPPORTED.
-#[global] Hint Resolve ALL_IX_SUPPORTED_Packed_struct_cons_inv : IX_SUPPORTED.
-#[global] Hint Resolve ALL_IX_SUPPORTED_Struct_cons_inv : IX_SUPPORTED.
-
-Ltac solve_ALL_IX_SUPPORTED :=
-  solve [ auto with IX_SUPPORTED
-        | cbn; auto with IX_SUPPORTED].

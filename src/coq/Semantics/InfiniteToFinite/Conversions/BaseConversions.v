@@ -98,20 +98,20 @@ Qed.
 
 
 (* SAZ: Move outside of this module? Replace Iptr with Z? *)
-Lemma Int64_mod_eq:
-  forall i i0 : Iptr,
-    ((i <? 0)%Z || (i >=? Int64.modulus)%Z)%bool = false ->
-    ((i0 <? 0)%Z || (i0 >=? Int64.modulus)%Z)%bool = false ->
-    Int64.Z_mod_modulus i = Int64.Z_mod_modulus i0 -> i = i0.
+Lemma Int_mod_eq:
+  forall {sz} (i i0 : Iptr),
+    ((i <? 0)%Z || (i >=? @Integers.modulus sz)%Z)%bool = false ->
+    ((i0 <? 0)%Z || (i0 >=? @Integers.modulus sz)%Z)%bool = false ->
+    @Integers.Z_mod_modulus sz i = @Integers.Z_mod_modulus sz i0 -> i = i0.
 Proof.
-  intros i i0 H1 H2 EQ.
+  intros sz i i0 H1 H2 EQ.
   apply Bool.orb_false_elim in H1.
   apply Bool.orb_false_elim in H2.
   destruct H1.
   destruct H2.
-  assert (0 <= i < Integers.Int64.modulus)%Z by lia.
-  assert (0 <= i0 < Integers.Int64.modulus)%Z by lia.
-  do 2 rewrite Integers.Int64.Z_mod_modulus_eq in EQ.
+  assert (0 <= i < @Integers.modulus sz)%Z by lia.
+  assert (0 <= i0 < @Integers.modulus sz)%Z by lia.
+  do 2 rewrite Integers.Z_mod_modulus_eq in EQ.
   do 2 rewrite Zmod_small in EQ; auto.
 Qed.
 
@@ -128,10 +128,10 @@ Proof.
   destruct c.
   break_match_hyp; inv BC.
   break_match_hyp; inv AC.
-  Transparent Int64.repr.
+  Transparent Integers.repr.
   cbn in H0.
-  Opaque Int64.repr.
-  assert (i = i0) by (apply Int64_mod_eq; auto).
+  Opaque Integers.repr.
+  assert (i = i0) by (eapply Int_mod_eq; eauto).
   subst.
   reflexivity.
 Qed.
@@ -155,13 +155,13 @@ with Definition addr_convert :=
   fun a =>
     match a with
     | (ix, pr) =>
-        InfITOP.int_to_ptr (Int64.unsigned ix) pr
+        InfITOP.int_to_ptr (@Integers.unsigned 64 ix) pr
     end.
 
 Definition addr_convert (a : FinAddr.addr) : OOM InfAddr.addr :=
   match a with
   | (ix, pr) =>
-      InfITOP.int_to_ptr (Int64.unsigned ix) pr
+      InfITOP.int_to_ptr (@Integers.unsigned 64 ix) pr
   end.
 
 Lemma addr_convert_null :
@@ -182,7 +182,7 @@ Proof.
   unfold addr_convert in *.
   destruct a, b.
   inv AC. inv BC.
-  unfold Int64.unsigned in *.
+  unfold Integers.unsigned in *.
   destruct i0, i.
   cbn in *.
   inv H0.
@@ -257,12 +257,12 @@ Module FinToInfAddrConvertSafe : AddrConvertSafe FinAddr FinPTOI InfAddr InfPTOI
     unfold FiniteAddresses.Iptr in *.
     unfold InfToFinAddrConvert.addr_convert.
     unfold FinITOP.int_to_ptr.
-    pose proof (Int64.unsigned_range i) as RANGE.
-    assert (((Int64.unsigned i <? 0)%Z || (Int64.unsigned i >=? Int64.modulus)%Z)%bool = false)
+    pose proof (Integers.unsigned_range i) as RANGE.
+    assert (((Integers.unsigned i <? 0)%Z || (Integers.unsigned i >=? @Integers.modulus 64)%Z)%bool = false)
       as COND by lia.
 
     rewrite COND.
-    rewrite Int64.repr_unsigned.
+    rewrite Integers.repr_unsigned.
     reflexivity.
   Qed.
 End FinToInfAddrConvertSafe.

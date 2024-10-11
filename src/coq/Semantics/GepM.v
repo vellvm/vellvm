@@ -39,7 +39,7 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
     match vs with
     | v :: vs' =>
       match v with
-      | DVALUE_I8 i =>
+      | @DVALUE_I 8 i =>
         let k := signed i in
         let n := BinIntDef.Z.to_nat k in
         match t with
@@ -49,7 +49,7 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
           handle_gep_h ta (off + k * (Z.of_N (pad_to padding (sizeof_dtyp ta)))) vs'
         | _ => failwith ("non-i8-indexable type")
         end
-      | DVALUE_I32 i =>
+      | @DVALUE_I 32 i =>
         let k := unsigned i in
         let ks := signed i in
         let n := BinIntDef.Z.to_nat k in
@@ -76,7 +76,7 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
           end
         | _ => failwith ("non-i32-indexable type")
         end
-      | DVALUE_I64 i =>
+      | @DVALUE_I 64 i =>
         let k := signed i in
         let n := BinIntDef.Z.to_nat k in
         match t with
@@ -109,13 +109,13 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
     let ptr := ptr_to_int a in
     let prov := address_provenance a in
     match vs with
-    | DVALUE_I8 i :: vs' =>
+    | @DVALUE_I 8 i :: vs' =>
       ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
       ret (int_to_ptr ptr' prov)
-    | DVALUE_I32 i :: vs' =>
+    | @DVALUE_I 32 i :: vs' =>
       ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
       ret (int_to_ptr ptr' prov)
-    | DVALUE_I64 i :: vs' =>
+    | @DVALUE_I 64 i :: vs' =>
       ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
       ret (int_to_ptr ptr' prov)
     | DVALUE_IPTR i :: vs' =>
@@ -302,19 +302,9 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
       [inversion GEP|].
 
     cbn in GEP.
-    destruct a; inversion GEP.
-    - break_match_hyp; inv GEP.
-      cbn in *.
-      symmetry.
-      eapply int_to_ptr_provenance; eauto.
-    - break_match_hyp; inv GEP.
-      symmetry.
-      eapply int_to_ptr_provenance; eauto.
-    - break_match_hyp; inv GEP.
-      symmetry.
-      eapply int_to_ptr_provenance; eauto.
-    - break_match_hyp; inv GEP.
-      symmetry.
+    repeat break_match_hyp_inv;
+      cbn in *;
+      symmetry;
       eapply int_to_ptr_provenance; eauto.
   Qed.
 

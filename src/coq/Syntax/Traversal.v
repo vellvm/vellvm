@@ -109,10 +109,10 @@ Section Endo.
           EXP_Struct (List.map (fun '(t,e) => (endo t, f_exp e)) fields)
         | EXP_Packed_struct fields =>
           EXP_Packed_struct (List.map (fun '(t,e) => (endo t, f_exp e)) fields)
-        | EXP_Array elts =>
-          EXP_Array (List.map (fun '(t,e) => (endo t, f_exp e)) elts)
-        | EXP_Vector elts =>
-          EXP_Vector (List.map (fun '(t,e) => (endo t, f_exp e)) elts)
+        | EXP_Array t elts =>
+          EXP_Array (endo t) (List.map (fun '(t,e) => (endo t, f_exp e)) elts)
+        | EXP_Vector t elts =>
+          EXP_Vector (endo t) (List.map (fun '(t,e) => (endo t, f_exp e)) elts)
         | OP_IBinop iop t v1 v2 =>
           OP_IBinop (endo iop) (endo t) (f_exp v1) (f_exp v2)
         | OP_ICmp cmp t v1 v2 =>
@@ -479,8 +479,8 @@ Section TFunctor.
         | EXP_Poison                         => EXP_Poison
         | EXP_Struct fields                  => EXP_Struct (tfmap ftexp fields)
         | EXP_Packed_struct fields           => EXP_Packed_struct (tfmap ftexp fields)
-        | EXP_Array elts                     => EXP_Array (tfmap ftexp elts)
-        | EXP_Vector elts                    => EXP_Vector (tfmap ftexp elts)
+        | EXP_Array t elts                   => EXP_Array (f t) (tfmap ftexp elts)
+        | EXP_Vector t elts                  => EXP_Vector (f t) (tfmap ftexp elts)
         | OP_IBinop iop t v1 v2              => OP_IBinop (endo iop) (f t) (f_exp v1) (f_exp v2)
         | OP_ICmp cmp t v1 v2                => OP_ICmp (endo cmp) (f t) (f_exp v1) (f_exp v2)
         | OP_FBinop fop fm t v1 v2           => OP_FBinop (endo fop) fm (f t) (f_exp v1) (f_exp v2)

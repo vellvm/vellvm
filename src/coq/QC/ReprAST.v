@@ -76,6 +76,10 @@ Section ReprInstances.
    Instance reprN : Repr N
     := {| repr := show |}.
 
+  #[global]
+   Instance reprPos : Repr positive
+    := {| repr := show |}.
+
   Local Open Scope string.
 
   Fixpoint repr_dtyp (t : dtyp) : string :=
@@ -267,9 +271,9 @@ Section ReprInstances.
     match v with
     | EXP_Ident id => "(EXP_Ident " ++ repr id ++ ")"
     | EXP_Integer x => "(EXP_Integer " ++ repr x ++ ")"
-    | EXP_Float f  => "(EXP_Float  (Float.of_bits (Int32.repr " ++ show f ++ ")))"
-    | EXP_Double f => "(EXP_Double (Float.of_bits (Int64.repr " ++ show f ++ ")))"
-    | EXP_Hex f => "(EXP_Hex (Float.of_bits (Int64.repr " ++ show f ++ ")))"
+    | EXP_Float f  => "(EXP_Float  (Float.of_bits (@Integers.repr 32 " ++ show f ++ ")))"
+    | EXP_Double f => "(EXP_Double (Float.of_bits (@Integers.repr 64 " ++ show f ++ ")))"
+    | EXP_Hex f => "(EXP_Hex (Float.of_bits (@Integers.repr 64 " ++ show f ++ ")))"
     | EXP_Bool b => "(EXP_Bool " ++ repr b ++ ")"
     | EXP_Null => "EXP_Null"
     | EXP_Zero_initializer => "EXP_Zero_initializer"
@@ -278,8 +282,8 @@ Section ReprInstances.
     | EXP_Poison => "EXP_Poison"
     | EXP_Struct fields => "(EXP_Struct [" ++ (contents id (List.map texp fields)) ++ "])"
     | EXP_Packed_struct fields => "(EXP_Packed_struct [" ++ (contents id (List.map texp fields)) ++ "])"
-    | EXP_Array fields => "(EXP_Array [" ++ (contents id (List.map texp fields)) ++ "])"
-    | EXP_Vector fields => "(EXP_vector [" ++ (contents id (List.map texp fields)) ++ "])"
+    | EXP_Array t fields => "(EXP_Array (" ++ repr t ++ ")" ++ " [" ++ (contents id (List.map texp fields)) ++ "])"
+    | EXP_Vector t fields => "(EXP_vector (" ++ repr t ++ ")" ++ " [" ++ (contents id (List.map texp fields)) ++ "])"
     | OP_IBinop iop t v1 v2 =>
       "(OP_IBinop " ++ repr iop ++ " " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
     | OP_ICmp cmp t v1 v2 =>

@@ -75,23 +75,25 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
   Module MemHelpers := MemoryHelpers LP MP Byte.
   Import MemHelpers.
 
-  Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} icmp v1 v2 : M dvalue :=
-    match v1, v2 with
-    | DVALUE_I1 i1, DVALUE_I1 i2
-    | DVALUE_I8 i1, DVALUE_I8 i2
-    | DVALUE_I16 i1, DVALUE_I16 i2
-    | DVALUE_I32 i1, DVALUE_I32 i2
-    | DVALUE_I64 i1, DVALUE_I64 i2
-    | DVALUE_IPTR i1, DVALUE_IPTR i2 => eval_int_icmp icmp i1 i2
-    | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
-    | DVALUE_Poison t, _ => if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
-    | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
-    | DVALUE_Addr a1, DVALUE_Addr a2 =>
-        let i1 := ptr_to_int a1 in
-        let i2 := ptr_to_int a2 in
-        eval_int_icmp icmp i1 i2
-    | _, _ => raise_error ("ill_typed-icmp: " ++ show_dvalue v1 ++ ", " ++ show_dvalue v2)
-    end.
+  Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} (icmp : icmp) (v1 v2 : dvalue) : M dvalue.
+    refine
+      (match v1, v2 with
+       | @DVALUE_I sz1 i1, @DVALUE_I sz2 i2 =>
+           _
+       | DVALUE_IPTR i1, DVALUE_IPTR i2 => eval_int_icmp icmp i1 i2
+       | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
+       | DVALUE_Poison t, _ => if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
+       | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
+       | DVALUE_Addr a1, DVALUE_Addr a2 =>
+           let i1 := ptr_to_int a1 in
+           let i2 := ptr_to_int a2 in
+           eval_int_icmp icmp i1 i2
+       | _, _ => raise_error ("ill_typed-icmp: " ++ show_dvalue v1 ++ ", " ++ show_dvalue v2)
+       end).
+    destruct (Pos.eq_dec sz1 sz2); subst.
+    - apply (eval_int_icmp icmp i1 i2).
+    - apply (raise_error ("ill_typed-icmp: " ++ show_dvalue v1 ++ ", " ++ show_dvalue v2)).
+  Defined.
   Arguments eval_icmp _ _ _ : simpl nomatch.
 
   Section CONVERSIONS.
@@ -104,111 +106,46 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         as would be natural, due to the [Int2Ptr] and [Ptr2Int] cases. At those types, the conversion
         needs to cast between integers and pointers, which depends on the memory model.
      *)
-    Definition get_conv_case conv (t1:dtyp) (x:dvalue) (t2:dtyp) : conv_case :=
+    Definition get_conv_case (conv : conversion_type) (t1:dtyp) (x:dvalue) (t2:dtyp) : conv_case :=
       match conv with
       | Trunc =>
-        match t1, x, t2 with
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 1
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 1
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 1
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 1 =>
-          Conv_Pure (DVALUE_I1 (repr (unsigned i1)))
+          match t1, x, t2 with
+          | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_I sz_to =>
+              if Pos.eqb sz_t sz_from && (sz_to <? sz_from)%positive
+              then Conv_Pure (@DVALUE_I sz_to (repr (unsigned i1)))
+              else Conv_Illegal "ill-typed Trunc"
 
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 8
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 8
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+          | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 16
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 16 =>
-          Conv_Pure (DVALUE_I16 (repr (unsigned i1)))
-
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
-
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_Poison t)
-
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed Trunc"
+          end
 
       | Zext =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+          match t1, x, t2 with
+          | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_I sz_to =>
+              if Pos.eqb sz_t sz_from && (sz_from <? sz_to)%positive
+              then Conv_Pure (@DVALUE_I sz_to (repr (unsigned i1)))
+              else Conv_Illegal "ill-typed Zext"
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 16 =>
-          Conv_Pure (DVALUE_I16 (repr (unsigned i1)))
+          | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
-
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_I64 (repr (unsigned i1)))
-
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_Poison t)
-
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed Zext"
+          end
 
       | Sext =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (signed i1)))
+          match t1, x, t2 with
+          | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_I sz_to =>
+              if Pos.eqb sz_t sz_from && (sz_from <? sz_to)%positive
+              then Conv_Pure (@DVALUE_I sz_to (repr (signed i1)))
+              else Conv_Illegal "ill-typed Sext"
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 16 =>
-          Conv_Pure (DVALUE_I16 (repr (signed i1)))
+          | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (signed i1)))
-
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_I64 (repr (signed i1)))
-
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_Poison t)
-
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed Sext"
+          end
 
       | Bitcast =>
           if dtyp_eqb t1 t2
@@ -223,86 +160,62 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                  | inr (inl (UB_message ub)) =>
                      Conv_Illegal ("Bitcast UB: " ++ ub)
                  | inr (inr (inl (ERR_message err))) =>
-                     Conv_Illegal ("Bitcast Error: " ++ err)
+                     Conv_Illegal ("Bitcast failure: " ++ err)
                  | inr (inr (inr dv)) =>
                      Conv_Pure dv
                  end
                else Conv_Illegal "unequal bitsize in cast"
 
       | Uitofp =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Float
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+          match t1, x, t2 with
+          | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_Float =>
+              if Pos.eqb sz_t sz_from
+              then Conv_Pure (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+              else Conv_Illegal "ill-typed Uitofp"
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Double
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+          | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_Double =>
+              if Pos.eqb sz_t sz_from
+              then Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+              else Conv_Illegal "ill-typed Uitofp"
 
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
-          Conv_Pure (DVALUE_Poison t)
+          | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_Double =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | _, _, _ => Conv_Illegal "ill-typed Uitofp"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed Uitofp"
+          end
 
       | Sitofp =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Float
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+          match t1, x, t2 with
+          | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_Float =>
+              if Pos.eqb sz_t sz_from
+              then Conv_Pure (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+              else Conv_Illegal "ill-typed Sitofp"
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Double
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
+          | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_Double =>
+              if Pos.eqb sz_t sz_from
+              then Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
+              else Conv_Illegal "ill-typed Sitofp"
 
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
-          Conv_Pure (DVALUE_Poison t)
+          | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_Double =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | _, _, _ => Conv_Illegal "ill-typed Sitofp"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed Sitofp"
+          end
 
       | Inttoptr =>
-        match t1, t2 with
-        | DTYPE_I _, DTYPE_Pointer => Conv_ItoP x
-        | DTYPE_IPTR , DTYPE_Pointer => Conv_ItoP x
-        | _, _ => Conv_Illegal "ERROR: Inttoptr got illegal arguments"
-        end
+          match t1, t2 with
+          | DTYPE_I _, DTYPE_Pointer => Conv_ItoP x
+          | DTYPE_IPTR , DTYPE_Pointer => Conv_ItoP x
+          | _, _ => Conv_Illegal "Inttoptr got illegal arguments"
+          end
       | Ptrtoint =>
-        match t1, t2 with
-        | DTYPE_Pointer, DTYPE_I _ => Conv_PtoI x
-        | DTYPE_Pointer, DTYPE_IPTR => Conv_PtoI x
-        | _, _ => Conv_Illegal "ERROR: Ptrtoint got illegal arguments"
-        end
+          match t1, t2 with
+          | DTYPE_Pointer, DTYPE_I _ => Conv_PtoI x
+          | DTYPE_Pointer, DTYPE_IPTR => Conv_PtoI x
+          | _, _ => Conv_Illegal "Ptrtoint got illegal arguments"
+          end
 
       | Fptoui
       | Fptosi
@@ -313,6 +226,228 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
       end.
     Arguments get_conv_case _ _ _ _ : simpl nomatch.
 
+    Lemma get_conv_case_equation :
+      forall (conv : conversion_type) (t1:dtyp) (x:dvalue) (t2:dtyp),
+        get_conv_case conv t1 x t2 =
+          (match conv with
+           | @Trunc =>
+               match t1 with
+               | @DTYPE_I sz_t =>
+                   match x with
+                   | @DVALUE_I sz_from i1 =>
+                       match t2 with
+                       | @DTYPE_I sz_to =>
+                           if (sz_t =? sz_from)%positive && (sz_to <? sz_from)%positive
+                           then
+                             Conv_Pure
+                               (@DVALUE_I sz_to
+                                  (@repr (@int sz_to) (VInt_Bounded sz_to)
+                                     (@unsigned (@int sz_from) (VInt_Bounded sz_from) i1)))
+                           else Conv_Illegal "ill-typed Trunc"
+                       | _ => Conv_Illegal "ill-typed Trunc"
+                       end
+                   | @DVALUE_Poison t =>
+                       match t2 with
+                       | @DTYPE_I _ => Conv_Pure (DVALUE_Poison t)
+                       | _ => Conv_Illegal "ill-typed Trunc"
+                       end
+                   | _ => Conv_Illegal "ill-typed Trunc"
+                   end
+               | _ => Conv_Illegal "ill-typed Trunc"
+               end
+           | @Zext =>
+               match t1 with
+               | @DTYPE_I sz_t =>
+                   match x with
+                   | @DVALUE_I sz_from i1 =>
+                       match t2 with
+                       | @DTYPE_I sz_to =>
+                           if (sz_t =? sz_from)%positive && (sz_from <? sz_to)%positive
+                           then
+                             Conv_Pure
+                               (@DVALUE_I sz_to
+                                  (@repr (@int sz_to) (VInt_Bounded sz_to)
+                                     (@unsigned (@int sz_from) (VInt_Bounded sz_from) i1)))
+                           else Conv_Illegal "ill-typed Zext"
+                       | _ => Conv_Illegal "ill-typed Zext"
+                       end
+                   | @DVALUE_Poison t =>
+                       match t2 with
+                       | @DTYPE_I _ => Conv_Pure (DVALUE_Poison t)
+                       | _ => Conv_Illegal "ill-typed Zext"
+                       end
+                   | _ => Conv_Illegal "ill-typed Zext"
+                   end
+               | _ => Conv_Illegal "ill-typed Zext"
+               end
+           | @Sext =>
+               match t1 with
+               | @DTYPE_I sz_t =>
+                   match x with
+                   | @DVALUE_I sz_from i1 =>
+                       match t2 with
+                       | @DTYPE_I sz_to =>
+                           if (sz_t =? sz_from)%positive && (sz_from <? sz_to)%positive
+                           then
+                             Conv_Pure
+                               (@DVALUE_I sz_to
+                                  (@repr (@int sz_to) (VInt_Bounded sz_to)
+                                     (@signed (@int sz_from) (VInt_Bounded sz_from) i1)))
+                           else Conv_Illegal "ill-typed Sext"
+                       | _ => Conv_Illegal "ill-typed Sext"
+                       end
+                   | @DVALUE_Poison t =>
+                       match t2 with
+                       | @DTYPE_I _ => Conv_Pure (DVALUE_Poison t)
+                       | _ => Conv_Illegal "ill-typed Sext"
+                       end
+                   | _ => Conv_Illegal "ill-typed Sext"
+                   end
+               | _ => Conv_Illegal "ill-typed Sext"
+               end
+           | @Uitofp =>
+               match t1 with
+               | @DTYPE_I sz_t =>
+                   match x with
+                   | @DVALUE_I sz_from i1 =>
+                       match t2 with
+                       | @DTYPE_Float =>
+                           if (sz_t =? sz_from)%positive
+                           then
+                             Conv_Pure
+                               (DVALUE_Float
+                                  (Float32.of_intu
+                                     (@repr (@int 32) (VInt_Bounded 32)
+                                        (@unsigned (@int sz_from)
+                                           (VInt_Bounded sz_from) i1))))
+                           else Conv_Illegal "ill-typed Uitofp"
+                       | @DTYPE_Double =>
+                           if (sz_t =? sz_from)%positive
+                           then
+                             Conv_Pure
+                               (DVALUE_Double
+                                  (Float.of_longu
+                                     (@repr (@int 64) (VInt_Bounded 64)
+                                        (@unsigned (@int sz_from)
+                                           (VInt_Bounded sz_from) i1))))
+                           else Conv_Illegal "ill-typed Uitofp"
+                       | _ => Conv_Illegal "ill-typed Uitofp"
+                       end
+                   | @DVALUE_Poison t =>
+                       match t2 with
+                       | @DTYPE_Float | @DTYPE_Double => Conv_Pure (DVALUE_Poison t)
+                       | _ => Conv_Illegal "ill-typed Uitofp"
+                       end
+                   | _ => Conv_Illegal "ill-typed Uitofp"
+                   end
+               | _ => Conv_Illegal "ill-typed Uitofp"
+               end
+           | @Sitofp =>
+               match t1 with
+               | @DTYPE_I sz_t =>
+                   match x with
+                   | @DVALUE_I sz_from i1 =>
+                       match t2 with
+                       | @DTYPE_Float =>
+                           if (sz_t =? sz_from)%positive
+                           then
+                             Conv_Pure
+                               (DVALUE_Float
+                                  (Float32.of_intu
+                                     (@repr (@int 32) (VInt_Bounded 32)
+                                        (@signed (@int sz_from) (VInt_Bounded sz_from) i1))))
+                           else Conv_Illegal "ill-typed Sitofp"
+                       | @DTYPE_Double =>
+                           if (sz_t =? sz_from)%positive
+                           then
+                             Conv_Pure
+                               (DVALUE_Double
+                                  (Float.of_longu
+                                     (@repr (@int 64) (VInt_Bounded 64)
+                                        (@signed (@int sz_from) (VInt_Bounded sz_from) i1))))
+                           else Conv_Illegal "ill-typed Sitofp"
+                       | _ => Conv_Illegal "ill-typed Sitofp"
+                       end
+                   | @DVALUE_Poison t =>
+                       match t2 with
+                       | @DTYPE_Float | @DTYPE_Double => Conv_Pure (DVALUE_Poison t)
+                       | _ => Conv_Illegal "ill-typed Sitofp"
+                       end
+                   | _ => Conv_Illegal "ill-typed Sitofp"
+                   end
+               | _ => Conv_Illegal "ill-typed Sitofp"
+               end
+           | @Inttoptr =>
+               match t1 with
+               | @DTYPE_I _ | @DTYPE_IPTR =>
+                                match t2 with
+                                | @DTYPE_Pointer => Conv_ItoP x
+                                | _ => Conv_Illegal "Inttoptr got illegal arguments"
+                                end
+               | _ => Conv_Illegal "Inttoptr got illegal arguments"
+               end
+           | @Ptrtoint =>
+               match t1 with
+               | @DTYPE_Pointer =>
+                   match t2 with
+                   | @DTYPE_I _ | @DTYPE_IPTR => Conv_PtoI x
+                   | _ => Conv_Illegal "Ptrtoint got illegal arguments"
+                   end
+               | _ => Conv_Illegal "Ptrtoint got illegal arguments"
+               end
+           | @Bitcast =>
+               if dtyp_eqb t1 t2
+               then Conv_Pure x
+               else
+                 if bit_sizeof_dtyp t1 =? bit_sizeof_dtyp t2
+                 then
+                   let bytes := dvalue_to_dvalue_bytes x t1 in
+                   let dv_conv :=
+                     @ErrOOMPoison_handle_poison_and_oom (err_ub_oom_T ident)
+                       (@Monad_err_ub_oom ident Monad_ident)
+                       (@RAISE_ERROR_err_ub_oom ident Monad_ident)
+                       (@RAISE_OOM_err_ub_oom_T ident Monad_ident) dvalue DVALUE_Poison
+                       (@dvalue_bytes_to_dvalue ErrOOMPoison
+                          (@Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+                             (@Monad_OomableT Poisonable MonadPoisonable))
+                          (@RAISE_ERROR_MonadExc ErrOOMPoison
+                             (@Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+                                (@Monad_OomableT Poisonable MonadPoisonable)))
+                          (@RAISE_POISON_E_MT (OomableT Poisonable)
+                             (eitherT ERR_MESSAGE)
+                             (@MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                                (@Monad_OomableT Poisonable MonadPoisonable))
+                             (@RAISE_POISON_E_MT Poisonable OomableT
+                                (@MonadT_OomableT Poisonable MonadPoisonable)
+                                RAISE_POISON_Poisonable))
+                          (@RAISE_OOMABLE_E_MT (OomableT Poisonable)
+                             (eitherT ERR_MESSAGE)
+                             (@MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                                (@Monad_OomableT Poisonable MonadPoisonable))
+                             (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) bytes
+                          t2) in
+                   match
+                     @unIdent (OOM_MESSAGE + UB (ERR dvalue))
+                       (@unEitherT OOM_MESSAGE ident (UB (ERR dvalue))
+                          (@unEitherT UB_MESSAGE (eitherT OOM_MESSAGE ident)
+                             (ERR dvalue)
+                             (@unEitherT ERR_MESSAGE
+                                (eitherT UB_MESSAGE (eitherT OOM_MESSAGE ident)) dvalue
+                                (@unERR_UB_OOM ident dvalue dv_conv))))
+                   with
+                   | @inl _ _ (@OOM_message oom) => Conv_Oom ("Bitcast OOM: " ++ oom)
+                   | @inr _ _ (@inl _ _ (@UB_message ub)) =>
+                       Conv_Illegal ("Bitcast UB: " ++ ub)
+                   | @inr _ _ (@inr _ _ (@inl _ _ (@ERR_message err))) =>
+                       Conv_Illegal ("Bitcast failure: " ++ err)
+                   | @inr _ _ (@inr _ _ (@inr _ _ dv)) => Conv_Pure dv
+                   end
+                 else Conv_Illegal "unequal bitsize in cast"
+           | _ => Conv_Illegal "TODO: unimplemented numeric conversion"
+           end).
+    Proof.
+      cbn; reflexivity.
+    Qed.
   End CONVERSIONS.
 
   Parameter ptr_size : nat.
@@ -358,11 +493,11 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
              | DVALUE_Poison t =>
                  (* TODO: Should be the type of the result of the select... *)
                  ret (DVALUE_Poison t)
-             | DVALUE_I1 i =>
-                 if (Int1.unsigned i =? 1)%Z
+             | @DVALUE_I 1 i =>
+                 if (@Integers.unsigned 1 i =? 1)%Z
                  then concretize_uvalueM M undef_handler ERR_M lift_ue v1
                  else concretize_uvalueM M undef_handler ERR_M lift_ue v2
-             | DVALUE_Vector conds =>
+             | DVALUE_Vector _ conds =>
                  let fix loop conds xs ys : M (list dvalue) :=
                    match conds, xs, ys with
                    | [], [], [] => ret []
@@ -371,8 +506,8 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                                   | DVALUE_Poison t =>
                                       (* TODO: Should be the type of the result of the select... *)
                                       ret (DVALUE_Poison t)
-                                  | DVALUE_I1 i =>
-                                      if (Int1.unsigned i =? 1)%Z
+                                  | @DVALUE_I 1 i =>
+                                      if (@Integers.unsigned 1 i =? 1)%Z
                                       then ret x
                                       else ret y
                                   | _ =>
@@ -392,12 +527,12 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                  | DVALUE_Poison t, _ =>
                      (* TODO: Should we make sure t is a vector type...? *)
                      @ret M _ _ (DVALUE_Poison t)
-                 | DVALUE_Vector _, DVALUE_Poison t =>
+                 | DVALUE_Vector _ _, DVALUE_Poison t =>
                      (* TODO: Should we make sure t is a vector type...? *)
                      @ret M _ _ (DVALUE_Poison t)
-                 | DVALUE_Vector xs, DVALUE_Vector ys =>
+                 | DVALUE_Vector t xs, DVALUE_Vector _ ys =>
                      selected <- loop conds xs ys;;
-                     @ret M _ _ (DVALUE_Vector selected)
+                     @ret M _ _ (DVALUE_Vector t selected)
                  | _, _ =>
                      lift_ue _ (raise_error "concretize_uvalueM: ill-typed vector select, non-vector arguments")
                  end
@@ -448,11 +583,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
       in
       match u with
         | UVALUE_Addr a                          => ret (DVALUE_Addr a)
-        | UVALUE_I1 x                            => ret (DVALUE_I1 x)
-        | UVALUE_I8 x                            => ret (DVALUE_I8 x)
-        | UVALUE_I16 x                           => ret (DVALUE_I16 x)
-        | UVALUE_I32 x                           => ret (DVALUE_I32 x)
-        | UVALUE_I64 x                           => ret (DVALUE_I64 x)
+        | @UVALUE_I sz x                         => ret (@DVALUE_I sz x)
         | UVALUE_IPTR x                          => ret (DVALUE_IPTR x)
         | UVALUE_Double x                        => ret (DVALUE_Double x)
         | UVALUE_Float x                         => ret (DVALUE_Float x)
@@ -464,10 +595,10 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                                                     ret (DVALUE_Struct dfields)
         | UVALUE_Packed_struct fields            => 'dfields <- map_monad (concretize_uvalueM M undef_handler ERR_M lift_ue) fields ;;
                                                     ret (DVALUE_Packed_struct dfields)
-        | UVALUE_Array elts                      => 'delts <- map_monad (concretize_uvalueM M undef_handler ERR_M lift_ue) elts ;;
-                                                    ret (DVALUE_Array delts)
-        | UVALUE_Vector elts                     => 'delts <- map_monad (concretize_uvalueM M undef_handler ERR_M lift_ue) elts ;;
-                                                    ret (DVALUE_Vector delts)
+        | UVALUE_Array t elts                    => 'delts <- map_monad (concretize_uvalueM M undef_handler ERR_M lift_ue) elts ;;
+                                                    ret (DVALUE_Array t delts)
+        | UVALUE_Vector t elts                   => 'delts <- map_monad (concretize_uvalueM M undef_handler ERR_M lift_ue) elts ;;
+                                                    ret (DVALUE_Vector t delts)
         | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalueM M undef_handler ERR_M lift_ue v1 ;;
                                                     dv2 <- concretize_uvalueM M undef_handler ERR_M lift_ue v2 ;;
                                                     lift_ue _ (eval_iop iop dv1 dv2)
@@ -582,11 +713,11 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
             | DVALUE_Poison t =>
                 (* TODO: Should be the type of the result of the select... *)
                 ret (DVALUE_Poison t)
-            | DVALUE_I1 i =>
-                if (Int1.unsigned i =? 1)%Z
+            | @DVALUE_I 1 i =>
+                if (@Integers.unsigned 1 i =? 1)%Z
                 then concretize_uvalueM M undef_handler ERR_M lift_ue v1
                 else concretize_uvalueM M undef_handler ERR_M lift_ue v2
-            | DVALUE_Vector conds =>
+            | DVALUE_Vector _ conds =>
                 let fix loop conds xs ys : M (list dvalue) :=
                   match conds, xs, ys with
                   | [], [], [] => ret []
@@ -595,8 +726,8 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                                  | DVALUE_Poison t =>
                                      (* TODO: Should be the type of the result of the select... *)
                                      ret (DVALUE_Poison t)
-                                 | DVALUE_I1 i =>
-                                     if (Int1.unsigned i =? 1)%Z
+                                 | @DVALUE_I 1 i =>
+                                     if (@Integers.unsigned 1 i =? 1)%Z
                                      then ret x
                                      else ret y
                                  | _ =>
@@ -616,12 +747,12 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                 | DVALUE_Poison t, _ =>
                     (* TODO: Should we make sure t is a vector type...? *)
                     ret (DVALUE_Poison t)
-                | DVALUE_Vector _, DVALUE_Poison t =>
+                | DVALUE_Vector _ _, DVALUE_Poison t =>
                     (* TODO: Should we make sure t is a vector type...? *)
                     ret (DVALUE_Poison t)
-                | DVALUE_Vector xs, DVALUE_Vector ys =>
+                | DVALUE_Vector t xs, DVALUE_Vector _ ys =>
                     selected <- loop conds xs ys;;
-                    ret (DVALUE_Vector selected)
+                    ret (DVALUE_Vector t selected)
                 | _, _ =>
                     lift_ue dvalue (raise_error "concretize_uvalueM: ill-typed vector select, non-vector arguments")
                 end
@@ -799,23 +930,25 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
   Module MemHelpers := MemoryHelpers LP MP Byte.
   Import MemHelpers.
 
-  Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} icmp v1 v2 : M dvalue :=
-    match v1, v2 with
-    | DVALUE_I1 i1, DVALUE_I1 i2
-    | DVALUE_I8 i1, DVALUE_I8 i2
-    | DVALUE_I16 i1, DVALUE_I16 i2
-    | DVALUE_I32 i1, DVALUE_I32 i2
-    | DVALUE_I64 i1, DVALUE_I64 i2
-    | DVALUE_IPTR i1, DVALUE_IPTR i2 => eval_int_icmp icmp i1 i2
-    | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
-    | DVALUE_Poison t, _ => if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
-    | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
-    | DVALUE_Addr a1, DVALUE_Addr a2 =>
-        let i1 := ptr_to_int a1 in
-        let i2 := ptr_to_int a2 in
-        eval_int_icmp icmp i1 i2
-    | _, _ => raise_error ("ill_typed-icmp: " ++ show_dvalue v1 ++ ", " ++ show_dvalue v2)
-    end.
+  Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} (icmp : icmp) (v1 v2 : dvalue) : M dvalue.
+    refine
+      (match v1, v2 with
+       | @DVALUE_I sz1 i1, @DVALUE_I sz2 i2 =>
+           _
+       | DVALUE_IPTR i1, DVALUE_IPTR i2 => eval_int_icmp icmp i1 i2
+       | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
+       | DVALUE_Poison t, _ => if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
+       | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
+       | DVALUE_Addr a1, DVALUE_Addr a2 =>
+           let i1 := ptr_to_int a1 in
+           let i2 := ptr_to_int a2 in
+           eval_int_icmp icmp i1 i2
+       | _, _ => raise_error ("ill_typed-icmp: " ++ show_dvalue v1 ++ ", " ++ show_dvalue v2)
+       end).
+    destruct (Pos.eq_dec sz1 sz2); subst.
+    - exact (eval_int_icmp icmp i1 i2).
+    - exact (raise_error ("ill_typed-icmp: " ++ show_dvalue v1 ++ ", " ++ show_dvalue v2)).
+  Defined.
   Arguments eval_icmp _ _ _ : simpl nomatch.
 
   Section CONVERSIONS.
@@ -838,112 +971,46 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
       the composition of a huge case analysis that builds a value of [conv_case], and a function
       with only four cases to actually build the tree.
      *)
-
-    Definition get_conv_case conv (t1:dtyp) (x:dvalue) (t2:dtyp) : conv_case :=
+    Definition get_conv_case (conv : conversion_type) (t1:dtyp) (x:dvalue) (t2:dtyp) : conv_case :=
       match conv with
       | Trunc =>
-        match t1, x, t2 with
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 1
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 1
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 1
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 1 =>
-          Conv_Pure (DVALUE_I1 (repr (unsigned i1)))
+          match t1, x, t2 with
+          | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_I sz_to =>
+              if Pos.eqb sz_t sz_from && (sz_to <? sz_from)%positive
+              then Conv_Pure (@DVALUE_I sz_to (repr (unsigned i1)))
+              else Conv_Illegal "ill-typed Trunc"
 
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 8
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 8
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+          | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 16
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 16 =>
-          Conv_Pure (DVALUE_I16 (repr (unsigned i1)))
-
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
-
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 1
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_Poison t)
-
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed Trunc"
+          end
 
       | Zext =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+          match t1, x, t2 with
+          | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_I sz_to =>
+              if Pos.eqb sz_t sz_from && (sz_from <? sz_to)%positive
+              then Conv_Pure (@DVALUE_I sz_to (repr (unsigned i1)))
+              else Conv_Illegal "ill-typed Zext"
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 16 =>
-          Conv_Pure (DVALUE_I16 (repr (unsigned i1)))
+          | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
-
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_I64 (repr (unsigned i1)))
-
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_Poison t)
-
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed Zext"
+          end
 
       | Sext =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (signed i1)))
+          match t1, x, t2 with
+          | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_I sz_to =>
+              if Pos.eqb sz_t sz_from && (sz_from <? sz_to)%positive
+              then Conv_Pure (@DVALUE_I sz_to (repr (signed i1)))
+              else Conv_Illegal "ill-typed Sext"
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 16 =>
-          Conv_Pure (DVALUE_I16 (repr (signed i1)))
+          | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (signed i1)))
-
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_I64 (repr (signed i1)))
-
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 16
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 32
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_Poison t)
-
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed Sext"
+          end
 
       | Bitcast =>
           if dtyp_eqb t1 t2
@@ -958,86 +1025,62 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                  | inr (inl (UB_message ub)) =>
                      Conv_Illegal ("Bitcast UB: " ++ ub)
                  | inr (inr (inl (ERR_message err))) =>
-                     Conv_Illegal ("Bitcast Error: " ++ err)
+                     Conv_Illegal ("Bitcast failure: " ++ err)
                  | inr (inr (inr dv)) =>
                      Conv_Pure dv
                  end
                else Conv_Illegal "unequal bitsize in cast"
 
       | Uitofp =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Float
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+          match t1, x, t2 with
+          | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_Float =>
+              if Pos.eqb sz_t sz_from
+              then Conv_Pure (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+              else Conv_Illegal "ill-typed Uitofp"
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Double
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+          | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_Double =>
+              if Pos.eqb sz_t sz_from
+              then Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+              else Conv_Illegal "ill-typed Uitofp"
 
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
-          Conv_Pure (DVALUE_Poison t)
+          | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_Double =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | _, _, _ => Conv_Illegal "ill-typed Uitofp"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed Uitofp"
+          end
 
       | Sitofp =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Float
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+          match t1, x, t2 with
+          | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_Float =>
+              if Pos.eqb sz_t sz_from
+              then Conv_Pure (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+              else Conv_Illegal "ill-typed Sitofp"
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
-        | DTYPE_I 16, DVALUE_I16 i1, DTYPE_Double
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
+          | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_Double =>
+              if Pos.eqb sz_t sz_from
+              then Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
+              else Conv_Illegal "ill-typed Sitofp"
 
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float
-        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 16, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
-        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
-          Conv_Pure (DVALUE_Poison t)
+          | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_Float
+          | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_Double =>
+              Conv_Pure (DVALUE_Poison t)
 
-        | _, _, _ => Conv_Illegal "ill-typed Sitofp"
-        end
+          | _, _, _ => Conv_Illegal "ill-typed Sitofp"
+          end
 
       | Inttoptr =>
-        match t1, t2 with
-        | DTYPE_I _, DTYPE_Pointer => Conv_ItoP x
-        | DTYPE_IPTR , DTYPE_Pointer => Conv_ItoP x
-        | _, _ => Conv_Illegal "ERROR: Inttoptr got illegal arguments"
-        end
+          match t1, t2 with
+          | DTYPE_I _, DTYPE_Pointer => Conv_ItoP x
+          | DTYPE_IPTR , DTYPE_Pointer => Conv_ItoP x
+          | _, _ => Conv_Illegal "Inttoptr got illegal arguments"
+          end
       | Ptrtoint =>
-        match t1, t2 with
-        | DTYPE_Pointer, DTYPE_I _ => Conv_PtoI x
-        | DTYPE_Pointer, DTYPE_IPTR => Conv_PtoI x
-        | _, _ => Conv_Illegal "ERROR: Ptrtoint got illegal arguments"
-        end
+          match t1, t2 with
+          | DTYPE_Pointer, DTYPE_I _ => Conv_PtoI x
+          | DTYPE_Pointer, DTYPE_IPTR => Conv_PtoI x
+          | _, _ => Conv_Illegal "Ptrtoint got illegal arguments"
+          end
 
       | Fptoui
       | Fptosi
@@ -1048,6 +1091,228 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
       end.
     Arguments get_conv_case _ _ _ _ : simpl nomatch.
 
+    Lemma get_conv_case_equation :
+      forall (conv : conversion_type) (t1:dtyp) (x:dvalue) (t2:dtyp),
+        get_conv_case conv t1 x t2 =
+          (match conv with
+           | @Trunc =>
+               match t1 with
+               | @DTYPE_I sz_t =>
+                   match x with
+                   | @DVALUE_I sz_from i1 =>
+                       match t2 with
+                       | @DTYPE_I sz_to =>
+                           if (sz_t =? sz_from)%positive && (sz_to <? sz_from)%positive
+                           then
+                             Conv_Pure
+                               (@DVALUE_I sz_to
+                                  (@repr (@int sz_to) (VInt_Bounded sz_to)
+                                     (@unsigned (@int sz_from) (VInt_Bounded sz_from) i1)))
+                           else Conv_Illegal "ill-typed Trunc"
+                       | _ => Conv_Illegal "ill-typed Trunc"
+                       end
+                   | @DVALUE_Poison t =>
+                       match t2 with
+                       | @DTYPE_I _ => Conv_Pure (DVALUE_Poison t)
+                       | _ => Conv_Illegal "ill-typed Trunc"
+                       end
+                   | _ => Conv_Illegal "ill-typed Trunc"
+                   end
+               | _ => Conv_Illegal "ill-typed Trunc"
+               end
+           | @Zext =>
+               match t1 with
+               | @DTYPE_I sz_t =>
+                   match x with
+                   | @DVALUE_I sz_from i1 =>
+                       match t2 with
+                       | @DTYPE_I sz_to =>
+                           if (sz_t =? sz_from)%positive && (sz_from <? sz_to)%positive
+                           then
+                             Conv_Pure
+                               (@DVALUE_I sz_to
+                                  (@repr (@int sz_to) (VInt_Bounded sz_to)
+                                     (@unsigned (@int sz_from) (VInt_Bounded sz_from) i1)))
+                           else Conv_Illegal "ill-typed Zext"
+                       | _ => Conv_Illegal "ill-typed Zext"
+                       end
+                   | @DVALUE_Poison t =>
+                       match t2 with
+                       | @DTYPE_I _ => Conv_Pure (DVALUE_Poison t)
+                       | _ => Conv_Illegal "ill-typed Zext"
+                       end
+                   | _ => Conv_Illegal "ill-typed Zext"
+                   end
+               | _ => Conv_Illegal "ill-typed Zext"
+               end
+           | @Sext =>
+               match t1 with
+               | @DTYPE_I sz_t =>
+                   match x with
+                   | @DVALUE_I sz_from i1 =>
+                       match t2 with
+                       | @DTYPE_I sz_to =>
+                           if (sz_t =? sz_from)%positive && (sz_from <? sz_to)%positive
+                           then
+                             Conv_Pure
+                               (@DVALUE_I sz_to
+                                  (@repr (@int sz_to) (VInt_Bounded sz_to)
+                                     (@signed (@int sz_from) (VInt_Bounded sz_from) i1)))
+                           else Conv_Illegal "ill-typed Sext"
+                       | _ => Conv_Illegal "ill-typed Sext"
+                       end
+                   | @DVALUE_Poison t =>
+                       match t2 with
+                       | @DTYPE_I _ => Conv_Pure (DVALUE_Poison t)
+                       | _ => Conv_Illegal "ill-typed Sext"
+                       end
+                   | _ => Conv_Illegal "ill-typed Sext"
+                   end
+               | _ => Conv_Illegal "ill-typed Sext"
+               end
+           | @Uitofp =>
+               match t1 with
+               | @DTYPE_I sz_t =>
+                   match x with
+                   | @DVALUE_I sz_from i1 =>
+                       match t2 with
+                       | @DTYPE_Float =>
+                           if (sz_t =? sz_from)%positive
+                           then
+                             Conv_Pure
+                               (DVALUE_Float
+                                  (Float32.of_intu
+                                     (@repr (@int 32) (VInt_Bounded 32)
+                                        (@unsigned (@int sz_from)
+                                           (VInt_Bounded sz_from) i1))))
+                           else Conv_Illegal "ill-typed Uitofp"
+                       | @DTYPE_Double =>
+                           if (sz_t =? sz_from)%positive
+                           then
+                             Conv_Pure
+                               (DVALUE_Double
+                                  (Float.of_longu
+                                     (@repr (@int 64) (VInt_Bounded 64)
+                                        (@unsigned (@int sz_from)
+                                           (VInt_Bounded sz_from) i1))))
+                           else Conv_Illegal "ill-typed Uitofp"
+                       | _ => Conv_Illegal "ill-typed Uitofp"
+                       end
+                   | @DVALUE_Poison t =>
+                       match t2 with
+                       | @DTYPE_Float | @DTYPE_Double => Conv_Pure (DVALUE_Poison t)
+                       | _ => Conv_Illegal "ill-typed Uitofp"
+                       end
+                   | _ => Conv_Illegal "ill-typed Uitofp"
+                   end
+               | _ => Conv_Illegal "ill-typed Uitofp"
+               end
+           | @Sitofp =>
+               match t1 with
+               | @DTYPE_I sz_t =>
+                   match x with
+                   | @DVALUE_I sz_from i1 =>
+                       match t2 with
+                       | @DTYPE_Float =>
+                           if (sz_t =? sz_from)%positive
+                           then
+                             Conv_Pure
+                               (DVALUE_Float
+                                  (Float32.of_intu
+                                     (@repr (@int 32) (VInt_Bounded 32)
+                                        (@signed (@int sz_from) (VInt_Bounded sz_from) i1))))
+                           else Conv_Illegal "ill-typed Sitofp"
+                       | @DTYPE_Double =>
+                           if (sz_t =? sz_from)%positive
+                           then
+                             Conv_Pure
+                               (DVALUE_Double
+                                  (Float.of_longu
+                                     (@repr (@int 64) (VInt_Bounded 64)
+                                        (@signed (@int sz_from) (VInt_Bounded sz_from) i1))))
+                           else Conv_Illegal "ill-typed Sitofp"
+                       | _ => Conv_Illegal "ill-typed Sitofp"
+                       end
+                   | @DVALUE_Poison t =>
+                       match t2 with
+                       | @DTYPE_Float | @DTYPE_Double => Conv_Pure (DVALUE_Poison t)
+                       | _ => Conv_Illegal "ill-typed Sitofp"
+                       end
+                   | _ => Conv_Illegal "ill-typed Sitofp"
+                   end
+               | _ => Conv_Illegal "ill-typed Sitofp"
+               end
+           | @Inttoptr =>
+               match t1 with
+               | @DTYPE_I _ | @DTYPE_IPTR =>
+                                match t2 with
+                                | @DTYPE_Pointer => Conv_ItoP x
+                                | _ => Conv_Illegal "Inttoptr got illegal arguments"
+                                end
+               | _ => Conv_Illegal "Inttoptr got illegal arguments"
+               end
+           | @Ptrtoint =>
+               match t1 with
+               | @DTYPE_Pointer =>
+                   match t2 with
+                   | @DTYPE_I _ | @DTYPE_IPTR => Conv_PtoI x
+                   | _ => Conv_Illegal "Ptrtoint got illegal arguments"
+                   end
+               | _ => Conv_Illegal "Ptrtoint got illegal arguments"
+               end
+           | @Bitcast =>
+               if dtyp_eqb t1 t2
+               then Conv_Pure x
+               else
+                 if bit_sizeof_dtyp t1 =? bit_sizeof_dtyp t2
+                 then
+                   let bytes := dvalue_to_dvalue_bytes x t1 in
+                   let dv_conv :=
+                     @ErrOOMPoison_handle_poison_and_oom (err_ub_oom_T ident)
+                       (@Monad_err_ub_oom ident Monad_ident)
+                       (@RAISE_ERROR_err_ub_oom ident Monad_ident)
+                       (@RAISE_OOM_err_ub_oom_T ident Monad_ident) dvalue DVALUE_Poison
+                       (@dvalue_bytes_to_dvalue ErrOOMPoison
+                          (@Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
+                             (@Monad_OomableT Poisonable MonadPoisonable))
+                          (@RAISE_ERROR_MonadExc ErrOOMPoison
+                             (@Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
+                                (@Monad_OomableT Poisonable MonadPoisonable)))
+                          (@RAISE_POISON_E_MT (OomableT Poisonable)
+                             (eitherT ERR_MESSAGE)
+                             (@MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                                (@Monad_OomableT Poisonable MonadPoisonable))
+                             (@RAISE_POISON_E_MT Poisonable OomableT
+                                (@MonadT_OomableT Poisonable MonadPoisonable)
+                                RAISE_POISON_Poisonable))
+                          (@RAISE_OOMABLE_E_MT (OomableT Poisonable)
+                             (eitherT ERR_MESSAGE)
+                             (@MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
+                                (@Monad_OomableT Poisonable MonadPoisonable))
+                             (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) bytes
+                          t2) in
+                   match
+                     @unIdent (OOM_MESSAGE + UB (ERR dvalue))
+                       (@unEitherT OOM_MESSAGE ident (UB (ERR dvalue))
+                          (@unEitherT UB_MESSAGE (eitherT OOM_MESSAGE ident)
+                             (ERR dvalue)
+                             (@unEitherT ERR_MESSAGE
+                                (eitherT UB_MESSAGE (eitherT OOM_MESSAGE ident)) dvalue
+                                (@unERR_UB_OOM ident dvalue dv_conv))))
+                   with
+                   | @inl _ _ (@OOM_message oom) => Conv_Oom ("Bitcast OOM: " ++ oom)
+                   | @inr _ _ (@inl _ _ (@UB_message ub)) =>
+                       Conv_Illegal ("Bitcast UB: " ++ ub)
+                   | @inr _ _ (@inr _ _ (@inl _ _ (@ERR_message err))) =>
+                       Conv_Illegal ("Bitcast failure: " ++ err)
+                   | @inr _ _ (@inr _ _ (@inr _ _ dv)) => Conv_Pure dv
+                   end
+                 else Conv_Illegal "unequal bitsize in cast"
+           | _ => Conv_Illegal "TODO: unimplemented numeric conversion"
+           end).
+    Proof.
+      cbn; reflexivity.
+    Qed.
   End CONVERSIONS.
 
   (* Variable ptr_size : nat. *)
@@ -1177,11 +1442,11 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
              | DVALUE_Poison t =>
                  (* TODO: Should be the type of the result of the select... *)
                  ret (DVALUE_Poison t)
-             | DVALUE_I1 i =>
-                 if (Int1.unsigned i =? 1)%Z
+             | @DVALUE_I 1 i =>
+                 if (@Integers.unsigned 1 i =? 1)%Z
                  then concretize_uvalueM v1
                  else concretize_uvalueM v2
-             | DVALUE_Vector conds =>
+             | DVALUE_Vector _ conds =>
                  let fix loop conds xs ys : M (list dvalue) :=
                    match conds, xs, ys with
                    | [], [], [] => ret []
@@ -1190,8 +1455,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                                   | DVALUE_Poison t =>
                                       (* TODO: Should be the type of the result of the select... *)
                                       ret (DVALUE_Poison t)
-                                  | DVALUE_I1 i =>
-                                      if (Int1.unsigned i =? 1)%Z
+                                  | @DVALUE_I 1 i =>
+                                      if (@Integers.unsigned 1 i =? 1)%Z
                                       then ret x
                                       else ret y
                                   | _ =>
@@ -1211,12 +1476,12 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                  | DVALUE_Poison t, _ =>
                      (* TODO: Should we make sure t is a vector type...? *)
                      ret (DVALUE_Poison t)
-                 | DVALUE_Vector _, DVALUE_Poison t =>
+                 | DVALUE_Vector _ _, DVALUE_Poison t =>
                      (* TODO: Should we make sure t is a vector type...? *)
                      ret (DVALUE_Poison t)
-                 | DVALUE_Vector xs, DVALUE_Vector ys =>
+                 | DVALUE_Vector t xs, DVALUE_Vector _ ys =>
                      selected <- loop conds xs ys;;
-                     ret (DVALUE_Vector selected)
+                     ret (DVALUE_Vector t selected)
                  | _, _ =>
                      lift_ue (raise_error "concretize_uvalueM: ill-typed vector select, non-vector arguments")
                  end
@@ -1267,11 +1532,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
       in
       match u with
         | UVALUE_Addr a                          => ret (DVALUE_Addr a)
-        | UVALUE_I1 x                            => ret (DVALUE_I1 x)
-        | UVALUE_I8 x                            => ret (DVALUE_I8 x)
-        | UVALUE_I16 x                           => ret (DVALUE_I16 x)
-        | UVALUE_I32 x                           => ret (DVALUE_I32 x)
-        | UVALUE_I64 x                           => ret (DVALUE_I64 x)
+        | @UVALUE_I sz x                         => ret (@DVALUE_I sz x)
         | UVALUE_IPTR x                          => ret (DVALUE_IPTR x)
         | UVALUE_Double x                        => ret (DVALUE_Double x)
         | UVALUE_Float x                         => ret (DVALUE_Float x)
@@ -1283,10 +1544,10 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                                                     ret (DVALUE_Struct dfields)
         | UVALUE_Packed_struct fields            => 'dfields <- map_monad concretize_uvalueM fields ;;
                                                     ret (DVALUE_Packed_struct dfields)
-        | UVALUE_Array elts                      => 'delts <- map_monad concretize_uvalueM elts ;;
-                                                    ret (DVALUE_Array delts)
-        | UVALUE_Vector elts                     => 'delts <- map_monad concretize_uvalueM elts ;;
-                                                    ret (DVALUE_Vector delts)
+        | UVALUE_Array t elts                    => 'delts <- map_monad concretize_uvalueM elts ;;
+                                                    ret (DVALUE_Array t delts)
+        | UVALUE_Vector t elts                   => 'delts <- map_monad concretize_uvalueM elts ;;
+                                                    ret (DVALUE_Vector t delts)
         | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalueM v1 ;;
                                                     dv2 <- concretize_uvalueM v2 ;;
                                                     lift_ue (eval_iop iop dv1 dv2)
@@ -1402,11 +1663,11 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                  | DVALUE_Poison t =>
                      (* TODO: Should be the type of the result of the select... *)
                      ret (DVALUE_Poison t)
-                 | DVALUE_I1 i =>
-                     if (Int1.unsigned i =? 1)%Z
+                 | @DVALUE_I 1 i =>
+                     if (@Integers.unsigned 1 i =? 1)%Z
                      then concretize_uvalueM v1
                      else concretize_uvalueM v2
-                 | DVALUE_Vector conds =>
+                 | DVALUE_Vector _ conds =>
                      let fix loop conds xs ys : M (list dvalue) :=
                        match conds, xs, ys with
                        | [], [], [] => ret []
@@ -1415,8 +1676,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                                       | DVALUE_Poison t =>
                                           (* TODO: Should be the type of the result of the select... *)
                                           ret (DVALUE_Poison t)
-                                      | DVALUE_I1 i =>
-                                          if (Int1.unsigned i =? 1)%Z
+                                      | @DVALUE_I 1 i =>
+                                          if (@Integers.unsigned 1 i =? 1)%Z
                                           then ret x
                                           else ret y
                                       | _ =>
@@ -1436,12 +1697,12 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                      | DVALUE_Poison t, _ =>
                          (* TODO: Should we make sure t is a vector type...? *)
                          @ret M _ _ (DVALUE_Poison t)
-                     | DVALUE_Vector _, DVALUE_Poison t =>
+                     | DVALUE_Vector _ _, DVALUE_Poison t =>
                          (* TODO: Should we make sure t is a vector type...? *)
                          @ret M _ _ (DVALUE_Poison t)
-                     | DVALUE_Vector xs, DVALUE_Vector ys =>
+                     | DVALUE_Vector t xs, DVALUE_Vector _ ys =>
                          selected <- loop conds xs ys;;
-                         @ret M _ _ (DVALUE_Vector selected)
+                         @ret M _ _ (DVALUE_Vector t selected)
                      | _, _ =>
                          lift_ue (raise_error "concretize_uvalueM: ill-typed vector select, non-vector arguments")
                      end
@@ -1492,11 +1753,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
             in
             match u with
             | UVALUE_Addr a                          => ret (DVALUE_Addr a)
-            | UVALUE_I1 x                            => ret (DVALUE_I1 x)
-            | UVALUE_I8 x                            => ret (DVALUE_I8 x)
-            | UVALUE_I16 x                           => ret (DVALUE_I16 x)
-            | UVALUE_I32 x                           => ret (DVALUE_I32 x)
-            | UVALUE_I64 x                           => ret (DVALUE_I64 x)
+            | @UVALUE_I sz x                         => ret (@DVALUE_I sz x)
             | UVALUE_IPTR x                          => ret (DVALUE_IPTR x)
             | UVALUE_Double x                        => ret (DVALUE_Double x)
             | UVALUE_Float x                         => ret (DVALUE_Float x)
@@ -1508,10 +1765,10 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                                                        ret (DVALUE_Struct dfields)
             | UVALUE_Packed_struct fields            => 'dfields <- map_monad (concretize_uvalueM) fields ;;
                                                        ret (DVALUE_Packed_struct dfields)
-            | UVALUE_Array elts                      => 'delts <- map_monad (concretize_uvalueM) elts ;;
-                                                       ret (DVALUE_Array delts)
-            | UVALUE_Vector elts                     => 'delts <- map_monad (concretize_uvalueM) elts ;;
-                                                       ret (DVALUE_Vector delts)
+            | UVALUE_Array t elts                    => 'delts <- map_monad (concretize_uvalueM) elts ;;
+                                                       ret (DVALUE_Array t delts)
+            | UVALUE_Vector t elts                   => 'delts <- map_monad (concretize_uvalueM) elts ;;
+                                                       ret (DVALUE_Vector t delts)
             | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalueM v1 ;;
                                                        dv2 <- concretize_uvalueM v2 ;;
                                                        lift_ue (eval_iop iop dv1 dv2)
@@ -1685,11 +1942,11 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
            | DVALUE_Poison t =>
                (* TODO: Should be the type of the result of the select... *)
                ret (DVALUE_Poison t)
-           | DVALUE_I1 i =>
-               if (Int1.unsigned i =? 1)%Z
+           | @DVALUE_I 1 i =>
+               if (@Integers.unsigned 1 i =? 1)%Z
                then concretize_uvalueM v1
                else concretize_uvalueM v2
-           | DVALUE_Vector conds =>
+           | DVALUE_Vector _ conds =>
                let fix loop conds xs ys : M (list dvalue) :=
                  match conds, xs, ys with
                  | [], [], [] => ret []
@@ -1698,8 +1955,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                                 | DVALUE_Poison t =>
                                     (* TODO: Should be the type of the result of the select... *)
                                     ret (DVALUE_Poison t)
-                                | DVALUE_I1 i =>
-                                    if (Int1.unsigned i =? 1)%Z
+                                | @DVALUE_I 1 i =>
+                                    if (@Integers.unsigned 1 i =? 1)%Z
                                     then ret x
                                     else ret y
                                 | _ =>
@@ -1719,12 +1976,12 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                | DVALUE_Poison t, _ =>
                    (* TODO: Should we make sure t is a vector type...? *)
                    @ret M _ _ (DVALUE_Poison t)
-               | DVALUE_Vector _, DVALUE_Poison t =>
+               | DVALUE_Vector _ _, DVALUE_Poison t =>
                    (* TODO: Should we make sure t is a vector type...? *)
                    @ret M _ _ (DVALUE_Poison t)
-               | DVALUE_Vector xs, DVALUE_Vector ys =>
+               | DVALUE_Vector t xs, DVALUE_Vector _ ys =>
                    selected <- loop conds xs ys;;
-                   @ret M _ _ (DVALUE_Vector selected)
+                   @ret M _ _ (DVALUE_Vector t selected)
                | _, _ =>
                    lift_ue (raise_error "concretize_uvalueM: ill-typed vector select, non-vector arguments")
                end
@@ -1737,11 +1994,11 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
           | DVALUE_Poison t =>
               (* TODO: Should be the type of the result of the select... *)
               ret (DVALUE_Poison t)
-          | DVALUE_I1 i =>
-              if (Int1.unsigned i =? 1)%Z
+          | @DVALUE_I 1 i =>
+              if (@Integers.unsigned 1 i =? 1)%Z
               then concretize_uvalueM v1
               else concretize_uvalueM v2
-          | DVALUE_Vector conds =>
+          | DVALUE_Vector _ conds =>
               let fix loop conds xs ys : M (list dvalue) :=
                 match conds, xs, ys with
                 | [], [], [] => ret []
@@ -1750,8 +2007,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                                | DVALUE_Poison t =>
                                    (* TODO: Should be the type of the result of the select... *)
                                    ret (DVALUE_Poison t)
-                               | DVALUE_I1 i =>
-                                   if (Int1.unsigned i =? 1)%Z
+                               | @DVALUE_I 1 i =>
+                                   if (@Integers.unsigned 1 i =? 1)%Z
                                    then ret x
                                    else ret y
                                | _ =>
@@ -1771,12 +2028,12 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
               | DVALUE_Poison t, _ =>
                   (* TODO: Should we make sure t is a vector type...? *)
                   @ret M _ _ (DVALUE_Poison t)
-              | DVALUE_Vector _, DVALUE_Poison t =>
+              | DVALUE_Vector _ _, DVALUE_Poison t =>
                   (* TODO: Should we make sure t is a vector type...? *)
                   @ret M _ _ (DVALUE_Poison t)
-              | DVALUE_Vector xs, DVALUE_Vector ys =>
+              | DVALUE_Vector t xs, DVALUE_Vector _ ys =>
                   selected <- loop conds xs ys;;
-                  @ret M _ _ (DVALUE_Vector selected)
+                  @ret M _ _ (DVALUE_Vector t selected)
               | _, _ =>
                   lift_ue (raise_error "concretize_uvalueM: ill-typed vector select, non-vector arguments")
               end

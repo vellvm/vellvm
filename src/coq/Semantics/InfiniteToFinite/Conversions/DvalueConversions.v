@@ -453,11 +453,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
        | DV1.DVALUE_Addr a =>
            a' <- addr_convert a;;
            ret (DV2.DVALUE_Addr a')
-       | DV1.DVALUE_I1 x  => ret (DV2.DVALUE_I1 x)
-       | DV1.DVALUE_I8 x  => ret (DV2.DVALUE_I8 x)
-       | DV1.DVALUE_I16 x => ret (DV2.DVALUE_I16 x)
-       | DV1.DVALUE_I32 x => ret (DV2.DVALUE_I32 x)
-       | DV1.DVALUE_I64 x => ret (DV2.DVALUE_I64 x)
+       | @DV1.DVALUE_I sz x  => ret (@DV2.DVALUE_I sz x)
        | DV1.DVALUE_IPTR x =>
            let xz := LP1.IP.to_Z x in
            x' <- LP2.IP.from_Z xz;;
@@ -473,12 +469,12 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
        | DV1.DVALUE_Packed_struct fields =>
            fields' <- map_monad dvalue_convert_strict fields;;
            ret (DV2.DVALUE_Packed_struct fields')
-       | DV1.DVALUE_Array elts =>
+       | DV1.DVALUE_Array t elts =>
            elts' <- map_monad dvalue_convert_strict elts;;
-           ret (DV2.DVALUE_Array elts')
-       | DV1.DVALUE_Vector elts =>
+           ret (DV2.DVALUE_Array t elts')
+       | DV1.DVALUE_Vector t elts =>
            elts' <- map_monad dvalue_convert_strict elts;;
-           ret (DV2.DVALUE_Vector elts')
+           ret (DV2.DVALUE_Vector t elts')
        end.
 
 
@@ -487,11 +483,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
        | DV1.UVALUE_Addr a =>
            a' <- addr_convert a;;
            ret (DV2.UVALUE_Addr a')
-       | DV1.UVALUE_I1 x  => ret (DV2.UVALUE_I1 x)
-       | DV1.UVALUE_I8 x  => ret (DV2.UVALUE_I8 x)
-       | DV1.UVALUE_I16 x => ret (DV2.UVALUE_I16 x)
-       | DV1.UVALUE_I32 x => ret (DV2.UVALUE_I32 x)
-       | DV1.UVALUE_I64 x => ret (DV2.UVALUE_I64 x)
+       | @DV1.UVALUE_I sz x  => ret (@DV2.UVALUE_I sz x)
        | DV1.UVALUE_IPTR x =>
            let xz := LP1.IP.to_Z x in
            x' <- LP2.IP.from_Z xz;;
@@ -507,12 +499,12 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
        | DV1.UVALUE_Packed_struct fields =>
            fields' <- map_monad uvalue_convert_strict fields;;
            ret (DV2.UVALUE_Packed_struct fields')
-       | DV1.UVALUE_Array elts =>
+       | DV1.UVALUE_Array t elts =>
            elts' <- map_monad uvalue_convert_strict elts;;
-           ret (DV2.UVALUE_Array elts')
-       | DV1.UVALUE_Vector elts =>
+           ret (DV2.UVALUE_Array t elts')
+       | DV1.UVALUE_Vector t elts =>
            elts' <- map_monad uvalue_convert_strict elts;;
-           ret (DV2.UVALUE_Vector elts')
+           ret (DV2.UVALUE_Vector t elts')
        | DV1.UVALUE_Undef dt =>
            (* Could be a bit odd with intptr *)
            ret (DV2.UVALUE_Undef dt)
@@ -658,23 +650,17 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
 
   (** Lemmas about default dvalues *)
 
-  (* TODO: Does this one belong here? *)
-  Parameter default_dvalue_of_dtyp_i_dv1_dv2_same_error :
-    forall sz s,
-      DV1.default_dvalue_of_dtyp_i sz = inl s <->
-        DV2.default_dvalue_of_dtyp_i sz = inl s.
-
   Parameter default_dvalue_of_dtyp_i_dv1_dv2_equiv :
     forall sz v1,
-      DV1.default_dvalue_of_dtyp_i sz = inr v1 ->
+      DV1.default_dvalue_of_dtyp_i sz = v1 ->
       exists v2,
-        DV2.default_dvalue_of_dtyp_i sz = inr v2 /\ dvalue_refine_strict v1 v2.
+        DV2.default_dvalue_of_dtyp_i sz = v2 /\ dvalue_refine_strict v1 v2.
 
   Parameter default_dvalue_of_dtyp_i_dv1_dv2_equiv' :
     forall sz v2,
-      DV2.default_dvalue_of_dtyp_i sz = inr v2 ->
+      DV2.default_dvalue_of_dtyp_i sz = v2 ->
       exists v1,
-        DV1.default_dvalue_of_dtyp_i sz = inr v1 /\ dvalue_refine_strict v1 v2.
+        DV1.default_dvalue_of_dtyp_i sz = v1 /\ dvalue_refine_strict v1 v2.
 
   Parameter default_dvalue_of_dtyp_dv1_dv2_equiv :
     forall dt v1,
@@ -718,30 +704,10 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         LP2.IP.from_Z (LP1.IP.to_Z n') = NoOom n /\
           x = DV1.DVALUE_IPTR n'.
 
-  Parameter dvalue_convert_strict_i1_inv :
-    forall x n,
-      dvalue_convert_strict x = NoOom (DV2.DVALUE_I1 n) ->
-      x = DV1.DVALUE_I1 n.
-
-  Parameter dvalue_convert_strict_i8_inv :
-    forall x n,
-      dvalue_convert_strict x = NoOom (DV2.DVALUE_I8 n) ->
-      x = DV1.DVALUE_I8 n.
-
-  Parameter dvalue_convert_strict_i16_inv :
-    forall x n,
-      dvalue_convert_strict x = NoOom (DV2.DVALUE_I16 n) ->
-      x = DV1.DVALUE_I16 n.
-
-  Parameter dvalue_convert_strict_i32_inv :
-    forall x n,
-      dvalue_convert_strict x = NoOom (DV2.DVALUE_I32 n) ->
-      x = DV1.DVALUE_I32 n.
-
-  Parameter dvalue_convert_strict_i64_inv :
-    forall x n,
-      dvalue_convert_strict x = NoOom (DV2.DVALUE_I64 n) ->
-      x = DV1.DVALUE_I64 n.
+  Parameter dvalue_convert_strict_ix_inv :
+    forall sz x n,
+      dvalue_convert_strict x = NoOom (@DV2.DVALUE_I sz n) ->
+      x = @DV1.DVALUE_I sz n.
 
   Parameter dvalue_convert_strict_double_inv :
     forall x v,
@@ -783,26 +749,22 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
           map_monad dvalue_convert_strict fields' = NoOom fields.
 
   Parameter dvalue_convert_strict_array_inv :
-    forall x elts,
-      dvalue_convert_strict x = NoOom (DV2.DVALUE_Array elts) ->
+    forall x elts t,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Array t elts) ->
       exists elts',
-        x = DV1.DVALUE_Array elts' /\
+        x = DV1.DVALUE_Array t elts' /\
           map_monad dvalue_convert_strict elts' = NoOom elts.
 
   Parameter dvalue_convert_strict_vector_inv :
-    forall x elts,
-      dvalue_convert_strict x = NoOom (DV2.DVALUE_Vector elts) ->
+    forall x elts t,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Vector t elts) ->
       exists elts',
-        x = DV1.DVALUE_Vector elts' /\
+        x = DV1.DVALUE_Vector t elts' /\
           map_monad dvalue_convert_strict elts' = NoOom elts.
 
   Ltac dvalue_convert_strict_inv H :=
     first
-      [ apply dvalue_convert_strict_i1_inv in H
-      | apply dvalue_convert_strict_i8_inv in H
-      | apply dvalue_convert_strict_i16_inv in H
-      | apply dvalue_convert_strict_i32_inv in H
-      | apply dvalue_convert_strict_i64_inv in H
+      [ apply dvalue_convert_strict_ix_inv in H
       | apply dvalue_convert_strict_iptr_inv in H
       | apply dvalue_convert_strict_addr_inv in H
       | apply dvalue_convert_strict_double_inv in H
@@ -837,30 +799,10 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
         LP2.IP.from_Z (LP1.IP.to_Z n') = NoOom n /\
           x = DV1.UVALUE_IPTR n'.
 
-  Parameter uvalue_convert_strict_i1_inv :
-    forall x n,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_I1 n) ->
-      x = DV1.UVALUE_I1 n.
-
-  Parameter uvalue_convert_strict_i8_inv :
-    forall x n,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_I8 n) ->
-      x = DV1.UVALUE_I8 n.
-
-  Parameter uvalue_convert_strict_i16_inv :
-    forall x n,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_I16 n) ->
-      x = DV1.UVALUE_I16 n.
-
-  Parameter uvalue_convert_strict_i32_inv :
-    forall x n,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_I32 n) ->
-      x = DV1.UVALUE_I32 n.
-
-  Parameter uvalue_convert_strict_i64_inv :
-    forall x n,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_I64 n) ->
-      x = DV1.UVALUE_I64 n.
+  Parameter uvalue_convert_strict_ix_inv :
+    forall sz x n,
+      uvalue_convert_strict x = NoOom (@DV2.UVALUE_I sz n) ->
+      x = @DV1.UVALUE_I sz n.
 
   Parameter uvalue_convert_strict_double_inv :
     forall x v,
@@ -907,17 +849,17 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
           map_monad uvalue_convert_strict fields' = NoOom fields.
 
   Parameter uvalue_convert_strict_array_inv :
-    forall x elts,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_Array elts) ->
+    forall x elts t,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Array t elts) ->
       exists elts',
-        x = DV1.UVALUE_Array elts' /\
+        x = DV1.UVALUE_Array t elts' /\
           map_monad uvalue_convert_strict elts' = NoOom elts.
 
   Parameter uvalue_convert_strict_vector_inv :
-    forall x elts,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_Vector elts) ->
+    forall x elts t,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Vector t elts) ->
       exists elts',
-        x = DV1.UVALUE_Vector elts' /\
+        x = DV1.UVALUE_Vector t elts' /\
           map_monad uvalue_convert_strict elts' = NoOom elts.
 
   Parameter uvalue_convert_strict_ibinop_inv :
@@ -1033,11 +975,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
 
   Ltac uvalue_convert_strict_inv H :=
     first
-      [ apply uvalue_convert_strict_i1_inv in H
-      | apply uvalue_convert_strict_i8_inv in H
-      | apply uvalue_convert_strict_i16_inv in H
-      | apply uvalue_convert_strict_i32_inv in H
-      | apply uvalue_convert_strict_i64_inv in H
+      [ apply uvalue_convert_strict_ix_inv in H
       | apply uvalue_convert_strict_iptr_inv in H
       | apply uvalue_convert_strict_addr_inv in H
       | apply uvalue_convert_strict_double_inv in H
@@ -1879,11 +1817,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
        | DV1.DVALUE_Addr a =>
            a' <- addr_convert a;;
            ret (DV2.DVALUE_Addr a')
-       | DV1.DVALUE_I1 x  => ret (DV2.DVALUE_I1 x)
-       | DV1.DVALUE_I8 x  => ret (DV2.DVALUE_I8 x)
-       | DV1.DVALUE_I16 x => ret (DV2.DVALUE_I16 x)
-       | DV1.DVALUE_I32 x => ret (DV2.DVALUE_I32 x)
-       | DV1.DVALUE_I64 x => ret (DV2.DVALUE_I64 x)
+       | @DV1.DVALUE_I sz x  => ret (@DV2.DVALUE_I sz x)
        | DV1.DVALUE_IPTR x =>
            let xz := LP1.IP.to_Z x in
            x' <- LP2.IP.from_Z xz;;
@@ -1899,12 +1833,12 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
        | DV1.DVALUE_Packed_struct fields =>
            fields' <- map_monad dvalue_convert_strict fields;;
            ret (DV2.DVALUE_Packed_struct fields')
-       | DV1.DVALUE_Array elts =>
+       | DV1.DVALUE_Array t elts =>
            elts' <- map_monad dvalue_convert_strict elts;;
-           ret (DV2.DVALUE_Array elts')
-       | DV1.DVALUE_Vector elts =>
+           ret (DV2.DVALUE_Array t elts')
+       | DV1.DVALUE_Vector t elts =>
            elts' <- map_monad dvalue_convert_strict elts;;
-           ret (DV2.DVALUE_Vector elts')
+           ret (DV2.DVALUE_Vector t elts')
        end.
 
 
@@ -1913,11 +1847,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
        | DV1.UVALUE_Addr a =>
            a' <- addr_convert a;;
            ret (DV2.UVALUE_Addr a')
-       | DV1.UVALUE_I1 x  => ret (DV2.UVALUE_I1 x)
-       | DV1.UVALUE_I8 x  => ret (DV2.UVALUE_I8 x)
-       | DV1.UVALUE_I16 x => ret (DV2.UVALUE_I16 x)
-       | DV1.UVALUE_I32 x => ret (DV2.UVALUE_I32 x)
-       | DV1.UVALUE_I64 x => ret (DV2.UVALUE_I64 x)
+       | @DV1.UVALUE_I sz x  => ret (@DV2.UVALUE_I sz x)
        | DV1.UVALUE_IPTR x =>
            let xz := LP1.IP.to_Z x in
            x' <- LP2.IP.from_Z xz;;
@@ -1933,12 +1863,12 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
        | DV1.UVALUE_Packed_struct fields =>
            fields' <- map_monad uvalue_convert_strict fields;;
            ret (DV2.UVALUE_Packed_struct fields')
-       | DV1.UVALUE_Array elts =>
+       | DV1.UVALUE_Array t elts =>
            elts' <- map_monad uvalue_convert_strict elts;;
-           ret (DV2.UVALUE_Array elts')
-       | DV1.UVALUE_Vector elts =>
+           ret (DV2.UVALUE_Array t elts')
+       | DV1.UVALUE_Vector t elts =>
            elts' <- map_monad uvalue_convert_strict elts;;
-           ret (DV2.UVALUE_Vector elts')
+           ret (DV2.UVALUE_Vector t elts')
        | DV1.UVALUE_Undef dt =>
            (* Could be a bit odd with intptr *)
            ret (DV2.UVALUE_Undef dt)
@@ -2987,7 +2917,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       apply map_monad_err_Forall2 in Heqs.
       revert H l Heqs.
       induction Heqo; intros; inversion Heqs; subst.
-      + exists (DV2.DVALUE_Array []).
+      + exists (DV2.DVALUE_Array t []).
         auto.
       + forward IHHeqo.
         { intros. eapply H0; auto. right. apply H1. auto. auto. }
@@ -2997,7 +2927,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         assert (In x (x::l)) by (left; auto).
         specialize (H0 x H1 _ _ H H3).
         destruct H0 as [dv1 [HDV HCV]].
-        exists (DV2.DVALUE_Array (dv1 :: l0)).
+        exists (DV2.DVALUE_Array t (dv1 :: l0)).
         split; cbn.
         rewrite HDV. rewrite Heqs0. reflexivity.
         rewrite HCV. rewrite Heqo0. reflexivity.
@@ -3010,7 +2940,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       apply map_monad_err_Forall2 in Heqs.
       revert H l Heqs.
       induction Heqo; intros; inversion Heqs; subst.
-      + exists (DV2.DVALUE_Vector []).
+      + exists (DV2.DVALUE_Vector t []).
         auto.
       + forward IHHeqo.
         { intros. eapply H0; auto. right. apply H1. auto. auto. }
@@ -3020,7 +2950,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
         assert (In x (x::l)) by (left; auto).
         specialize (H0 x H1 _ _ H H3).
         destruct H0 as [dv1 [HDV HCV]].
-        exists (DV2.DVALUE_Vector (dv1 :: l0)).
+        exists (DV2.DVALUE_Vector t (dv1 :: l0)).
         split; cbn.
         rewrite HDV. rewrite Heqs0. reflexivity.
         rewrite HCV. rewrite Heqo0. reflexivity.
@@ -3140,106 +3070,26 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
 
   (** Lemmas about default dvalues *)
 
-  (* TODO: Does this one belong here? *)
-  Lemma default_dvalue_of_dtyp_i_dv1_dv2_same_error :
-    forall sz s,
-      DV1.default_dvalue_of_dtyp_i sz = inl s <->
-        DV2.default_dvalue_of_dtyp_i sz = inl s.
-  Proof.
-    intros sz s.
-    split; intros S.
-    { pose proof (@IX_supported_dec sz) as [SUPPORTED | NSUPPORTED].
-      * inv SUPPORTED; cbn in *; inv S.
-      * unfold DV2.default_dvalue_of_dtyp_i, DV1.default_dvalue_of_dtyp_i in *.
-        assert (sz <> 1)%N by
-          (intros CONTRA; subst; apply NSUPPORTED; constructor).
-        assert (sz <> 8)%N by
-          (intros CONTRA; subst; apply NSUPPORTED; constructor).
-        assert (sz <> 16)%N by
-          (intros CONTRA; subst; apply NSUPPORTED; constructor).
-        assert (sz <> 32)%N by
-          (intros CONTRA; subst; apply NSUPPORTED; constructor).
-        assert (sz <> 64)%N by
-          (intros CONTRA; subst; apply NSUPPORTED; constructor).
-
-        apply N.eqb_neq in H, H0, H1, H2, H3.
-        rewrite H, H0, H1, H2, H3 in S.
-        rewrite H, H0, H1, H2, H3.
-        inv S. auto.
-    }
-    { pose proof (@IX_supported_dec sz) as [SUPPORTED | NSUPPORTED].
-      * inv SUPPORTED; cbn in *; inv S.
-      * unfold DV2.default_dvalue_of_dtyp_i, DV1.default_dvalue_of_dtyp_i in *.
-        assert (sz <> 1)%N by
-          (intros CONTRA; subst; apply NSUPPORTED; constructor).
-        assert (sz <> 8)%N by
-          (intros CONTRA; subst; apply NSUPPORTED; constructor).
-        assert (sz <> 16)%N by
-          (intros CONTRA; subst; apply NSUPPORTED; constructor).
-        assert (sz <> 32)%N by
-          (intros CONTRA; subst; apply NSUPPORTED; constructor).
-        assert (sz <> 64)%N by
-          (intros CONTRA; subst; apply NSUPPORTED; constructor).
-
-        apply N.eqb_neq in H, H0, H1, H2, H3.
-        rewrite H, H0, H1, H2, H3 in S.
-        rewrite H, H0, H1, H2, H3.
-        inv S. auto.
-    }
-  Qed.
-
   Lemma default_dvalue_of_dtyp_i_dv1_dv2_equiv :
     forall sz v1,
-      DV1.default_dvalue_of_dtyp_i sz = inr v1 ->
+      DV1.default_dvalue_of_dtyp_i sz = v1 ->
       exists v2,
-        DV2.default_dvalue_of_dtyp_i sz = inr v2 /\ dvalue_refine_strict v1 v2.
+        DV2.default_dvalue_of_dtyp_i sz = v2 /\ dvalue_refine_strict v1 v2.
   Proof.
     intros sz v1 V1.
-    pose proof (@IX_supported_dec sz) as [SUPPORTED | NSUPPORTED].
-    - inv SUPPORTED; cbn in *; inv V1;
-        (eexists; split; [eauto | unfold dvalue_refine_strict; auto]).
-    - unfold DV2.default_dvalue_of_dtyp_i, DV1.default_dvalue_of_dtyp_i in *.
-      assert (sz <> 1)%N by
-        (intros CONTRA; subst; apply NSUPPORTED; constructor).
-      assert (sz <> 8)%N by
-        (intros CONTRA; subst; apply NSUPPORTED; constructor).
-      assert (sz <> 16)%N by
-        (intros CONTRA; subst; apply NSUPPORTED; constructor).
-      assert (sz <> 32)%N by
-        (intros CONTRA; subst; apply NSUPPORTED; constructor).
-      assert (sz <> 64)%N by
-        (intros CONTRA; subst; apply NSUPPORTED; constructor).
-
-      apply N.eqb_neq in H, H0, H1, H2, H3.
-      rewrite H, H0, H1, H2, H3 in V1.
-      inv V1.
+    cbn in *; inv V1;
+      (eexists; split; [eauto | unfold dvalue_refine_strict; auto]).
   Qed.
 
   Lemma default_dvalue_of_dtyp_i_dv1_dv2_equiv' :
     forall sz v2,
-      DV2.default_dvalue_of_dtyp_i sz = inr v2 ->
+      DV2.default_dvalue_of_dtyp_i sz = v2 ->
       exists v1,
-        DV1.default_dvalue_of_dtyp_i sz = inr v1 /\ dvalue_refine_strict v1 v2.
+        DV1.default_dvalue_of_dtyp_i sz = v1 /\ dvalue_refine_strict v1 v2.
   Proof.
     intros sz v2 V2.
-    pose proof (@IX_supported_dec sz) as [SUPPORTED | NSUPPORTED].
-    - inv SUPPORTED; cbn in *; inv V2;
-        (eexists; split; [eauto | unfold dvalue_refine_strict; auto]).
-    - unfold DV2.default_dvalue_of_dtyp_i, DV1.default_dvalue_of_dtyp_i in *.
-      assert (sz <> 1)%N by
-        (intros CONTRA; subst; apply NSUPPORTED; constructor).
-      assert (sz <> 8)%N by
-        (intros CONTRA; subst; apply NSUPPORTED; constructor).
-      assert (sz <> 16)%N by
-        (intros CONTRA; subst; apply NSUPPORTED; constructor).
-      assert (sz <> 32)%N by
-        (intros CONTRA; subst; apply NSUPPORTED; constructor).
-      assert (sz <> 64)%N by
-        (intros CONTRA; subst; apply NSUPPORTED; constructor).
-
-      apply N.eqb_neq in H, H0, H1, H2, H3.
-      rewrite H, H0, H1, H2, H3 in V2.
-      inv V2.
+    cbn in *; inv V2;
+      (eexists; split; [eauto | unfold dvalue_refine_strict; auto]).
   Qed.
 
   Lemma default_dvalue_of_dtyp_dv1_dv2_equiv :
@@ -3256,7 +3106,6 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           cbn;
           auto
         ].
-    - apply default_dvalue_of_dtyp_i_dv1_dv2_equiv; auto.
     - cbn in *; inv V1;
         eexists; split; eauto.
       cbn.
@@ -3329,9 +3178,9 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     - (* Vectors *)
       cbn in V1.
       repeat break_match_hyp_inv; cbn in *.
-      + specialize (IHdt _ Heqs).
+      + specialize (IHdt _ eq_refl).
         destruct IHdt as [dv2 [EQ1 EQ2]].
-        rewrite EQ1.
+        inv EQ1.
         break_match_goal.
         2: {
           apply map_monad_OOM_fail in Heqo.
@@ -3341,13 +3190,36 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           inv CONVa.
         }
         apply map_monad_oom_Forall2 in Heqo.
-        eapply Forall2_repeat_OOM with (b:=dv2) in Heqo; auto.
+        eapply Forall2_repeat_OOM with (b:=(DV2.default_dvalue_of_dtyp_i sz0)) in Heqo; auto.
         rewrite Heqo.
         eexists; eauto.
       + cbn in *.
+        specialize (IHdt (DV1.DVALUE_IPTR LP1.IP.zero) eq_refl).
+        destruct IHdt as [dv2 [EQ1 EQ2]].
+        exists (DV2.DVALUE_Vector (DTYPE_Vector sz DTYPE_IPTR) (repeat (DV2.DVALUE_IPTR LP2.IP.zero) (N.to_nat sz))).
+        split; auto.
+        break_match_goal.
+        2 : {
+          apply map_monad_OOM_fail in Heqo.
+          destruct Heqo as [a [IN CONVa]].
+          apply repeat_spec in IN; subst.
+          cbn in CONVa.
+          break_match_hyp_inv.
+          cbn in EQ2.
+          break_match_hyp_inv.
+          inversion Heqo.
+        }
+        apply map_monad_oom_Forall2 in Heqo.
+        eapply Forall2_repeat_OOM with (b:=dv2) in Heqo; auto.
+        rewrite Heqo.
+        cbn in EQ2.
+        break_match_hyp_inv.
+        inversion EQ1.
+        auto.
+      + cbn in *.
         specialize (IHdt (DV1.DVALUE_Addr LP1.ADDR.null) eq_refl).
         destruct IHdt as [dv2 [EQ1 EQ2]].
-        exists (DV2.DVALUE_Vector (repeat (DV2.DVALUE_Addr LP2.ADDR.null) (N.to_nat sz))).
+        exists (DV2.DVALUE_Vector (DTYPE_Vector sz DTYPE_Pointer) (repeat (DV2.DVALUE_Addr LP2.ADDR.null) (N.to_nat sz))).
         split; auto.
         break_match_goal.
         2 : {
@@ -3419,7 +3291,6 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           cbn;
           auto
         ].
-    - apply default_dvalue_of_dtyp_i_dv1_dv2_equiv'; auto.
     - cbn in *; inv V2;
         eexists; split; eauto.
       cbn.
@@ -3496,23 +3367,43 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
 
     - cbn in V2.
       repeat break_match_hyp_inv; cbn in *.
-      + specialize (IHdt _ Heqs).
+      + specialize (IHdt _ eq_refl).
         destruct IHdt as [dv2 [EQ1 EQ2]].
-        rewrite EQ1.
+        inv EQ1.
         eexists; split; [reflexivity|].
         cbn in *.
+        inv EQ2.
         break_match_goal.
         2: {
           apply map_monad_OOM_fail in Heqo.
           destruct Heqo as [a [IN CONVa]].
           apply repeat_spec in IN; subst.
-          rewrite EQ2 in CONVa.
           inv CONVa.
         }
         apply map_monad_oom_Forall2 in Heqo.
-        eapply Forall2_repeat_OOM with (b:=d) in Heqo; auto.
+        eapply Forall2_repeat_OOM with (b:=(DV2.default_dvalue_of_dtyp_i sz0)) in Heqo; auto.
         rewrite Heqo.
         eexists; eauto.
+
+      + specialize (IHdt _ eq_refl).
+        destruct IHdt as [dv2 [EQ1 EQ2]].
+        inv EQ1.
+        eexists; split; [reflexivity|].
+        cbn in *.
+        inv EQ2.
+        break_match_goal.
+        2: {
+          apply map_monad_OOM_fail in Heqo.
+          destruct Heqo as [a [IN CONVa]].
+          apply repeat_spec in IN; subst.
+          inv CONVa.
+          rewrite H0 in H1; inv H1.
+        }
+        apply map_monad_oom_Forall2 in Heqo.
+        eapply Forall2_repeat_OOM in Heqo; auto.
+        rewrite Heqo.
+        eexists; eauto.
+        cbn; rewrite H0; auto.
       + cbn in *.
         specialize (IHdt (DV2.DVALUE_Addr LP2.ADDR.null) eq_refl).
         destruct IHdt as [dv2 [EQ1 EQ2]].
@@ -3587,7 +3478,6 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     split; intros S.
     { induction dt; cbn in *;
         try solve [inv S; auto].
-      - apply default_dvalue_of_dtyp_i_dv1_dv2_same_error; auto.
       - rewrite IHdt; auto.
         break_match_hyp; inv S; auto.
       - (* Structs *)
@@ -3634,15 +3524,10 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           auto.
       - (* Vectors *)
         destruct dt; inv S; auto.
-        break_match_hyp; inv H0.
-        apply default_dvalue_of_dtyp_i_dv1_dv2_same_error in Heqs0.
-        rewrite Heqs0.
-        auto.
     }
 
     { induction dt; cbn in *;
         try solve [inv S; auto].
-      - apply default_dvalue_of_dtyp_i_dv1_dv2_same_error; auto.
       - rewrite IHdt; auto.
         break_match_hyp; inv S; auto.
       - (* Structs *)
@@ -3689,26 +3574,8 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           auto.
       - (* Vectors *)
         destruct dt; inv S; auto.
-        break_match_hyp; inv H0.
-        apply default_dvalue_of_dtyp_i_dv1_dv2_same_error in Heqs0.
-        rewrite Heqs0.
-        auto.
     }
   Qed.
-
-  (*
-  Lemma dvalue_converted_lazy_R2_deterministic :
-    R2_deterministic dvalue_converted_lazy.
-  Proof.
-    red.
-    intros r1 r2 a b R1R2 AB.
-    unfold dvalue_converted_lazy in *.
-    intros EQ; subst; auto.
-  Qed.
- *)
-
-
-
 
   Lemma dvalue_refine_strict_R2_injective :
     R2_injective dvalue_refine_strict.
@@ -3923,56 +3790,12 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     exists x; auto.
   Qed.
 
-  Lemma dvalue_convert_strict_i1_inv :
-    forall x n,
-      dvalue_convert_strict x = NoOom (DV2.DVALUE_I1 n) ->
-      x = DV1.DVALUE_I1 n.
+  Lemma dvalue_convert_strict_ix_inv :
+    forall sz x n,
+      dvalue_convert_strict x = NoOom (@DV2.DVALUE_I sz n) ->
+      x = @DV1.DVALUE_I sz n.
   Proof.
-    intros x n H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    subst.
-    auto.
-  Qed.
-
-  Lemma dvalue_convert_strict_i8_inv :
-    forall x n,
-      dvalue_convert_strict x = NoOom (DV2.DVALUE_I8 n) ->
-      x = DV1.DVALUE_I8 n.
-  Proof.
-    intros x n H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    subst.
-    auto.
-  Qed.
-
-  Lemma dvalue_convert_strict_i16_inv :
-    forall x n,
-      dvalue_convert_strict x = NoOom (DV2.DVALUE_I16 n) ->
-      x = DV1.DVALUE_I16 n.
-  Proof.
-    intros x n H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    subst.
-    auto.
-  Qed.
-
-  Lemma dvalue_convert_strict_i32_inv :
-    forall x n,
-      dvalue_convert_strict x = NoOom (DV2.DVALUE_I32 n) ->
-      x = DV1.DVALUE_I32 n.
-  Proof.
-    intros x n H.
-    destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
-    subst.
-    auto.
-  Qed.
-
-  Lemma dvalue_convert_strict_i64_inv :
-    forall x n,
-      dvalue_convert_strict x = NoOom (DV2.DVALUE_I64 n) ->
-      x = DV1.DVALUE_I64 n.
-  Proof.
-    intros x n H.
+    intros sz x n H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     subst.
     auto.
@@ -4062,13 +3885,13 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
   Qed.
 
   Lemma dvalue_convert_strict_array_inv :
-    forall x elts,
-      dvalue_convert_strict x = NoOom (DV2.DVALUE_Array elts) ->
+    forall x elts t,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Array t elts) ->
       exists elts',
-        x = DV1.DVALUE_Array elts' /\
+        x = DV1.DVALUE_Array t elts' /\
           map_monad dvalue_convert_strict elts' = NoOom elts.
   Proof.
-    intros x elts H.
+    intros x elts t H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     break_match_hyp; inv H1.
     exists elts0.
@@ -4076,13 +3899,13 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
   Qed.
 
   Lemma dvalue_convert_strict_vector_inv :
-    forall x elts,
-      dvalue_convert_strict x = NoOom (DV2.DVALUE_Vector elts) ->
+    forall x elts t,
+      dvalue_convert_strict x = NoOom (DV2.DVALUE_Vector t elts) ->
       exists elts',
-        x = DV1.DVALUE_Vector elts' /\
+        x = DV1.DVALUE_Vector t elts' /\
           map_monad dvalue_convert_strict elts' = NoOom elts.
   Proof.
-    intros x elts H.
+    intros x elts t H.
     destruct x; inversion H; try solve [ break_match_hyp; inv H1 ].
     break_match_hyp; inv H1.
     exists elts0.
@@ -4091,11 +3914,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
 
   Ltac dvalue_convert_strict_inv H :=
     first
-      [ apply dvalue_convert_strict_i1_inv in H
-      | apply dvalue_convert_strict_i8_inv in H
-      | apply dvalue_convert_strict_i16_inv in H
-      | apply dvalue_convert_strict_i32_inv in H
-      | apply dvalue_convert_strict_i64_inv in H
+      [ apply dvalue_convert_strict_ix_inv in H
       | apply dvalue_convert_strict_iptr_inv in H
       | apply dvalue_convert_strict_addr_inv in H
       | apply dvalue_convert_strict_double_inv in H
@@ -4146,64 +3965,12 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       eauto.
   Qed.
 
-  Lemma uvalue_convert_strict_i1_inv :
-    forall x n,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_I1 n) ->
-      x = DV1.UVALUE_I1 n.
+  Lemma uvalue_convert_strict_ix_inv :
+    forall sz x n,
+      uvalue_convert_strict x = NoOom (@DV2.UVALUE_I sz n) ->
+      x = @DV1.UVALUE_I sz n.
   Proof.
-    intros x a H.
-    induction x;
-      repeat red in H; cbn in H;
-      repeat break_match_hyp_inv;
-      try inv H;
-      eauto.
-  Qed.
-
-  Lemma uvalue_convert_strict_i8_inv :
-    forall x n,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_I8 n) ->
-      x = DV1.UVALUE_I8 n.
-  Proof.
-    intros x a H.
-    induction x;
-      repeat red in H; cbn in H;
-      repeat break_match_hyp_inv;
-      try inv H;
-      eauto.
-  Qed.
-
-  Lemma uvalue_convert_strict_i16_inv :
-    forall x n,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_I16 n) ->
-      x = DV1.UVALUE_I16 n.
-  Proof.
-    intros x a H.
-    induction x;
-      repeat red in H; cbn in H;
-      repeat break_match_hyp_inv;
-      try inv H;
-      eauto.
-  Qed.
-
-  Lemma uvalue_convert_strict_i32_inv :
-    forall x n,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_I32 n) ->
-      x = DV1.UVALUE_I32 n.
-  Proof.
-    intros x a H.
-    induction x;
-      repeat red in H; cbn in H;
-      repeat break_match_hyp_inv;
-      try inv H;
-      eauto.
-  Qed.
-
-  Lemma uvalue_convert_strict_i64_inv :
-    forall x n,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_I64 n) ->
-      x = DV1.UVALUE_I64 n.
-  Proof.
-    intros x a H.
+    intros sz x a H.
     induction x;
       repeat red in H; cbn in H;
       repeat break_match_hyp_inv;
@@ -4320,13 +4087,13 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
   Qed.
 
   Lemma uvalue_convert_strict_array_inv :
-    forall x elts,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_Array elts) ->
+    forall x elts t,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Array t elts) ->
       exists elts',
-        x = DV1.UVALUE_Array elts' /\
+        x = DV1.UVALUE_Array t elts' /\
           map_monad uvalue_convert_strict elts' = NoOom elts.
   Proof.
-    intros x a H.
+    intros x a t H.
     induction x;
       repeat red in H; cbn in H;
       repeat break_match_hyp_inv;
@@ -4335,13 +4102,13 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
   Qed.
 
   Lemma uvalue_convert_strict_vector_inv :
-    forall x elts,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_Vector elts) ->
+    forall x elts t,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Vector t elts) ->
       exists elts',
-        x = DV1.UVALUE_Vector elts' /\
+        x = DV1.UVALUE_Vector t elts' /\
           map_monad uvalue_convert_strict elts' = NoOom elts.
   Proof.
-    intros x a H.
+    intros x a t H.
     induction x;
       repeat red in H; cbn in H;
       repeat break_match_hyp_inv;
@@ -4574,11 +4341,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
 
   Ltac uvalue_convert_strict_inv H :=
     first
-      [ apply uvalue_convert_strict_i1_inv in H
-      | apply uvalue_convert_strict_i8_inv in H
-      | apply uvalue_convert_strict_i16_inv in H
-      | apply uvalue_convert_strict_i32_inv in H
-      | apply uvalue_convert_strict_i64_inv in H
+      [ apply uvalue_convert_strict_ix_inv in H
       | apply uvalue_convert_strict_iptr_inv in H
       | apply uvalue_convert_strict_addr_inv in H
       | apply uvalue_convert_strict_double_inv in H

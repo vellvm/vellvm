@@ -308,20 +308,8 @@ let test_dirs =
 
 let poison_test = function DV.DVALUE_Poison _ -> true | _ -> false
 
-let i1_test (i1 : int1) = function
-  | DV.DVALUE_I1 i2 -> Int1.eq i1 i2
-  | _ -> false
-
-let i8_test (i1 : int8) = function
-  | DV.DVALUE_I1 i2 -> Int8.eq i1 i2
-  | _ -> false
-
-let i32_test (i1 : int32) = function
-  | DV.DVALUE_I32 i2 -> Int32.eq i1 i2
-  | _ -> false
-
-let i64_test (i1 : int64) = function
-  | DV.DVALUE_I64 i2 -> Int64.eq i1 i2
+let i_test (i1 : Integers.int) = function
+  | DV.DVALUE_I (sz, i2) -> Integers.eq sz i1 i2
   | _ -> false
 
 (* NOTE: OCaml's floats are actually 64-bit doubles, but contain 32-bit
@@ -334,13 +322,13 @@ let double_test (i1 : float) = function
   | DV.DVALUE_Double i2 -> compare i1 (Camlcoq.camlfloat_of_coqfloat i2) = 0
   | _ -> false
 
-let i1_of_int i = Int1.repr (Camlcoq.Z.of_sint i)
+let i_of_int sz i = Integers.repr sz (Camlcoq.Z.of_sint i)
 
-let i8_of_int i = Int8.repr (Camlcoq.Z.of_sint i)
-
-let i32_of_int i = Int32.repr (Camlcoq.Z.of_sint i)
-
-let i64_of_int i = Int64.repr (Camlcoq.Z.of_sint i)
+let i1_of_int i = i_of_int (Camlcoq.P.of_int 1) i
+let i8_of_int i = i_of_int (Camlcoq.P.of_int 8) i
+let i16_of_int i = i_of_int (Camlcoq.P.of_int 16) i
+let i32_of_int i = i_of_int (Camlcoq.P.of_int 32) i
+let i64_of_int i = i_of_int (Camlcoq.P.of_int 64) i
 
 let suite =
   [ Test
@@ -352,25 +340,25 @@ let suite =
       ( "I1-arith"
       , List.map
           (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i1_test (i1_of_int i)) f) )
+            (f, fun () -> run_dvalue_test (i_test (i1_of_int i)) f) )
           i1_tests )
   ; Test
       ( "I8-arith"
       , List.map
           (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i8_test (i8_of_int i)) f) )
+            (f, fun () -> run_dvalue_test (i_test (i8_of_int i)) f) )
           i1_tests )
   ; Test
       ( "I32-arith"
       , List.map
           (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i32_test (i32_of_int i)) f) )
+            (f, fun () -> run_dvalue_test (i_test (i32_of_int i)) f) )
           i32_tests )
   ; Test
       ( "I64-arith"
       , List.map
           (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i64_test (i64_of_int i)) f) )
+            (f, fun () -> run_dvalue_test (i_test (i64_of_int i)) f) )
           i64_tests )
   ; Test
       ( "Float-arith"
@@ -386,25 +374,25 @@ let suite =
       ( "Other Tests"
       , List.map
           (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i64_test (i64_of_int i)) f) )
+            (f, fun () -> run_dvalue_test (i_test (i64_of_int i)) f) )
           other_tests )
   ; Test
       ( "Larger Tests"
       , List.map
           (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i64_test (i64_of_int i)) f) )
+            (f, fun () -> run_dvalue_test (i_test (i64_of_int i)) f) )
           (larger_tests @ large_tests) )
   ; Test
       ( "Memory Tests"
       , List.map
           (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i64_test (i64_of_int i)) f) )
+            (f, fun () -> run_dvalue_test (i_test (i64_of_int i)) f) )
           larger_memory_tests )
   ; Test
       ( "C Tests"
       , List.map
           (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i32_test (i32_of_int i)) f) )
+            (f, fun () -> run_dvalue_test (i_test (i32_of_int i)) f) )
           c_tests )
   ; (* Test ("Parsing-Must-fail",
      *       List.map (fun (f, p) ->

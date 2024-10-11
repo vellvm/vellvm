@@ -12,9 +12,9 @@
       let
         pkgs = import nixpkgs { inherit system; };
         lib = pkgs.lib;
-        coq = pkgs.coq_8_19;
+        coq = pkgs.coq_8_20;
         ocamlPkgs = coq.ocamlPackages;
-        coqPkgs = pkgs.coqPackages_8_19;
+        coqPkgs = pkgs.coqPackages_8_20;
 
         version = "vellvm:master";
       in rec {

@@ -251,7 +251,7 @@ Section SurfaceSyntaxTest.
 
   Definition add_twice := mcfg_of_tle [TLE_Definition {|
                                            df_prototype := {|dc_name := (Name "main");
-                                                             dc_type := (TYPE_Function (TYPE_I 32%N) [(TYPE_I 32%N); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%N)))] false);
+                                                             dc_type := (TYPE_Function (TYPE_I 32%positive) [(TYPE_I 32%positive); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%positive)))] false);
                                                              dc_param_attrs := ([], [
                                                                                ]);
                                                              dc_attrs := [];
@@ -262,9 +262,9 @@ Section SurfaceSyntaxTest.
                                                          {|
                                                            blk_id := (Anon 0%Z);
                                                            blk_phis := [];
-                                                           blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%N) (EXP_Integer (5)%Z) (EXP_Integer (9)%Z))));
-                                                                        (IId (Anon 2%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%N) (EXP_Ident (ID_Local (Anon 1%Z))) (EXP_Integer (15)%Z))))];
-                                                           blk_term := TERM_Ret ((TYPE_I 32%N), (EXP_Ident (ID_Local (Anon 2%Z))));
+                                                           blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%positive) (EXP_Integer (5)%Z) (EXP_Integer (9)%Z))));
+                                                                        (IId (Anon 2%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%positive) (EXP_Ident (ID_Local (Anon 1%Z))) (EXP_Integer (15)%Z))))];
+                                                           blk_term := TERM_Ret ((TYPE_I 32%positive), (EXP_Ident (ID_Local (Anon 2%Z))));
                                                            blk_comments := None
                                                          |}
                                                          ,[])
@@ -359,7 +359,7 @@ Section SurfaceSyntaxTest.
                      {|
                        blk_id := (Anon 0%Z);
                        blk_phis := [];
-                       blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_GetElementPtr (TYPE_Identified (ID_Local (Name "struct.Node"))) ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Local (Name "root")))) [((TYPE_I 32%N),(EXP_Integer (0)%Z)); ((TYPE_I 32%N),(EXP_Integer (2)%Z))])));
+                       blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_GetElementPtr (TYPE_Identified (ID_Local (Name "struct.Node"))) ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Local (Name "root")))) [((TYPE_I 32%positive),(EXP_Integer (0)%Z)); ((TYPE_I 32%positive),(EXP_Integer (2)%Z))])));
                                    (IId (Anon 2%Z), (INSTR_Load (TYPE_I 64%N) ((TYPE_Pointer (TYPE_I 64%N)), (EXP_Ident (ID_Local (Anon 1%Z)))) []));
                                    (IId (Anon 3%Z), (INSTR_Op (OP_ICmp Eq (TYPE_I 64%N) (EXP_Ident (ID_Local (Anon 2%Z))) (EXP_Ident (ID_Local (Name "value"))))))];
                        blk_term := TERM_Br ((TYPE_I 1%N), (EXP_Ident (ID_Local (Anon 3%Z)))) (Name "equal") (Name "notequal");
@@ -382,7 +382,7 @@ Section SurfaceSyntaxTest.
                    {|
                      blk_id := (Name "left");
                      blk_phis := [];
-                     blk_code := [(IId (Anon 5%Z), (INSTR_Op (OP_GetElementPtr (TYPE_Identified (ID_Local (Name "struct.Node"))) ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Local (Name "root")))) [((TYPE_I 32%N),(EXP_Integer (0)%Z)); ((TYPE_I 32%N),(EXP_Integer (0)%Z))])));
+                     blk_code := [(IId (Anon 5%Z), (INSTR_Op (OP_GetElementPtr (TYPE_Identified (ID_Local (Name "struct.Node"))) ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Local (Name "root")))) [((TYPE_I 32%positive),(EXP_Integer (0)%Z)); ((TYPE_I 32%positive),(EXP_Integer (0)%Z))])));
                                  (IId (Anon 6%Z), (INSTR_Load (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))) ((TYPE_Pointer (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node"))))), (EXP_Ident (ID_Local (Anon 5%Z)))) []));
                                  (IId (Anon 7%Z), (INSTR_Op (OP_ICmp Eq (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))) (EXP_Ident (ID_Local (Anon 6%Z))) EXP_Null)))];
                      blk_term := TERM_Br ((TYPE_I 1%N), (EXP_Ident (ID_Local (Anon 7%Z)))) (Name "none") (Name "left_next");
@@ -398,7 +398,7 @@ Section SurfaceSyntaxTest.
                    {|
                      blk_id := (Name "right");
                      blk_phis := [];
-                     blk_code := [(IId (Anon 9%Z), (INSTR_Op (OP_GetElementPtr (TYPE_Identified (ID_Local (Name "struct.Node"))) ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Local (Name "root")))) [((TYPE_I 32%N),(EXP_Integer (0)%Z)); ((TYPE_I 32%N),(EXP_Integer (1)%Z))])));
+                     blk_code := [(IId (Anon 9%Z), (INSTR_Op (OP_GetElementPtr (TYPE_Identified (ID_Local (Name "struct.Node"))) ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Local (Name "root")))) [((TYPE_I 32%positive),(EXP_Integer (0)%Z)); ((TYPE_I 32%positive),(EXP_Integer (1)%Z))])));
                                  (IId (Anon 10%Z), (INSTR_Load false (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))) ((TYPE_Pointer (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node"))))), (EXP_Ident (ID_Local (Anon 9%Z)))) None));
                                  (IId (Anon 11%Z), (INSTR_Op (OP_ICmp Eq (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))) (EXP_Ident (ID_Local (Anon 10%Z))) EXP_Null)))];
                      blk_term := TERM_Br ((TYPE_I 1%N), (EXP_Ident (ID_Local (Anon 11%Z)))) (Name "none") (Name "right_next");
@@ -421,7 +421,7 @@ Section SurfaceSyntaxTest.
      |};
    TLE_Definition {|
        df_prototype := {|dc_name := (Name "main");
-                         dc_type := (TYPE_Function (TYPE_I 64%N) [(TYPE_I 64%N); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%N)))] false);
+                         dc_type := (TYPE_Function (TYPE_I 64%N) [(TYPE_I 64%N); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%positive)))] false);
                          dc_param_attrs := ([], [
                                            ]);
                          dc_attrs := [];

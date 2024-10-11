@@ -117,17 +117,17 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (* TO MOVE *)
 
-  Lemma repr_intval (i: int64):
-    Int64.repr (Int64.intval i) = i.
+  Lemma repr_intval {sz : positive} (i: @Integers.int sz):
+    @Integers.repr sz (@Integers.intval sz i) = i.
   Proof using.
-    replace (Int64.intval i) with (Int64.unsigned i).
-    - apply Int64.repr_unsigned.
+    replace (Integers.intval i) with (Integers.unsigned i).
+    - apply Integers.repr_unsigned.
     - destruct i.
       reflexivity.
   Qed.
 
   Lemma intval_to_from_nat_id:
-    forall n, (Z.of_nat (Z.to_nat (Int64.intval n))) = Int64.intval n.
+    forall {sz : positive} n, (Z.of_nat (Z.to_nat (@Integers.intval sz n))) = @Integers.intval sz n.
   Proof using.
     intros.
     destruct n.
@@ -360,10 +360,10 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     (*   reflexivity. *)
     (* Qed. *)
 
-    Lemma denote_exp_i64 :forall t g l,
-        ⟦ EXP_Integer (Integers.Int64.intval t) at (DTYPE_I 64) ⟧e2 g l
+    Lemma denote_exp_ix :forall {sz : positive} t g l,
+        ⟦ EXP_Integer (@Integers.intval sz t) at (DTYPE_I sz) ⟧e2 g l
                                                                  ≈
-                                                                 Ret (l, (g, UVALUE_I64 t)).
+                                                                 Ret (l, (g, @UVALUE_I sz t)).
     Proof using.
       intros; cbn.
       go.
@@ -378,10 +378,10 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       reflexivity.
     Qed.
 
-    Lemma denote_exp_i64_repr :forall t g l,
-        ⟦ EXP_Integer t at (DTYPE_I 64) ⟧e2 g l
+    Lemma denote_exp_ix_repr :forall {sz} t g l,
+        ⟦ EXP_Integer t at (DTYPE_I sz) ⟧e2 g l
                                          ≈
-                                         Ret (l, (g, UVALUE_I64 (repr t))).
+                                         Ret (l, (g, @UVALUE_I sz (repr t))).
     Proof using.
       intros; cbn.
       go.

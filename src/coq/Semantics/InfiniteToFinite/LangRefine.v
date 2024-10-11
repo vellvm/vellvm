@@ -466,20 +466,19 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     break_match_hyp_inv.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
-    rewrite Int64.add_unsigned.
+    rewrite Integers.add_unsigned.
     rewrite X, Y.
-    rewrite Int64.unsigned_repr; eauto.
+    rewrite Integers.unsigned_repr; eauto.
 
     (* TODO: Separate this into lemma? *)
-    unfold Int64.add_carry in Heqb.
+    unfold Integers.add_carry in Heqb.
     cbn in Heqb.
     break_match_hyp; cbn in Heqb; try discriminate.
 
     subst.
-    unfold Int64.max_unsigned.
-    rewrite Integers.Int64.unsigned_zero in l.
-    pose proof Int64.unsigned_range x_fin.
-    pose proof Int64.unsigned_range y_fin.
+    unfold Integers.max_unsigned.
+    pose proof Integers.unsigned_range x_fin.
+    pose proof Integers.unsigned_range y_fin.
     lia.
   Qed.
 
@@ -499,13 +498,13 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
 
     cbn in SUB.
     break_match_hyp_inv.
-    unfold Int64.sub.
+    unfold Integers.sub.
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
     subst.
-    rewrite Int64.unsigned_repr; eauto.
-    unfold Int64.max_unsigned.
-    pose proof Int64.unsigned_range x_fin.
-    pose proof Int64.unsigned_range y_fin.
+    rewrite Integers.unsigned_repr; eauto.
+    unfold Integers.max_unsigned.
+    pose proof Integers.unsigned_range x_fin.
+    pose proof Integers.unsigned_range y_fin.
     lia.
   Qed.
 
@@ -523,15 +522,15 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     exists (x_inf * y_inf)%Z.
     split; auto.
 
-    Opaque Int64.modulus.
+    Opaque Integers.modulus.
     cbn in MUL.
     break_match_hyp_inv.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
     subst.
-    pose proof Int64.unsigned_range x_fin.
-    pose proof Int64.unsigned_range y_fin.
-    rewrite Int64.unsigned_repr; eauto.
+    pose proof Integers.unsigned_range x_fin.
+    pose proof Integers.unsigned_range y_fin.
+    rewrite Integers.unsigned_repr; eauto.
     2: lia.
     split; auto.
     unfold munsigned.
@@ -558,10 +557,10 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
     subst.
-    pose proof Int64.unsigned_range x_fin.
-    pose proof Int64.unsigned_range y_fin.
-    rewrite Int64.unsigned_repr; eauto.
-    unfold Int64.max_unsigned in *.
+    pose proof Integers.unsigned_range x_fin.
+    pose proof Integers.unsigned_range y_fin.
+    rewrite Integers.unsigned_repr; eauto.
+    unfold Integers.max_unsigned in *.
     split; try lia.
     apply Z.shiftl_nonneg; lia.
   Qed.
@@ -585,19 +584,19 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
     subst.
-    pose proof Int64.unsigned_range x_fin.
-    pose proof Int64.unsigned_range y_fin.
-    unfold Int64.divu.
-    rewrite Int64.unsigned_repr; auto.
+    pose proof Integers.unsigned_range x_fin.
+    pose proof Integers.unsigned_range y_fin.
+    unfold Integers.divu.
+    rewrite Integers.unsigned_repr; auto.
     split; try lia.
     apply Z_div_nonneg_nonneg; try lia.
-    unfold Int64.max_unsigned.
-    pose proof Z.div_lt (Int64.unsigned x_fin) (Int64.unsigned y_fin).
-    assert (Int64.unsigned x_fin = 0 \/ 0 < Int64.unsigned x_fin)%Z as [X_FIN | X_FIN] by lia.
+    unfold Integers.max_unsigned.
+    pose proof Z.div_lt (Integers.unsigned x_fin) (Integers.unsigned y_fin).
+    assert (Integers.unsigned x_fin = 0 \/ 0 < Integers.unsigned x_fin)%Z as [X_FIN | X_FIN] by lia.
     - rewrite X_FIN.
       cbn. lia.
     - forward H1; try lia.
-      assert (Int64.unsigned y_fin = 0 \/ Int64.unsigned y_fin = 1 \/ 1 < Int64.unsigned y_fin)%Z as [Y_FIN | [Y_FIN | Y_FIN]] by lia.
+      assert (Integers.unsigned y_fin = 0 \/ Integers.unsigned y_fin = 1 \/ 1 < Integers.unsigned y_fin)%Z as [Y_FIN | [Y_FIN | Y_FIN]] by lia.
       + rewrite Y_FIN.
         rewrite Zdiv_0_r.
         lia.
@@ -639,20 +638,20 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
     subst.
-    pose proof Int64.unsigned_range x_fin.
-    pose proof Int64.unsigned_range y_fin.
-    unfold Int64.shru.
-    rewrite Int64.unsigned_repr; auto.
-    unfold Int64.max_unsigned.
+    pose proof Integers.unsigned_range x_fin.
+    pose proof Integers.unsigned_range y_fin.
+    unfold Integers.shru.
+    rewrite Integers.unsigned_repr; auto.
+    unfold Integers.max_unsigned.
     split.
     - apply Z.shiftr_nonneg; lia.
-    - rewrite Int64.Zshiftr_div_two_p; try lia.
-    pose proof Z.div_lt (Int64.unsigned x_fin) (Int64.unsigned y_fin).
-    assert (Int64.unsigned x_fin = 0 \/ 0 < Int64.unsigned x_fin)%Z as [X_FIN | X_FIN] by lia.
+    - rewrite Integers.Zshiftr_div_two_p; try lia.
+    pose proof Z.div_lt (Integers.unsigned x_fin) (Integers.unsigned y_fin).
+    assert (Integers.unsigned x_fin = 0 \/ 0 < Integers.unsigned x_fin)%Z as [X_FIN | X_FIN] by lia.
     -- rewrite X_FIN.
       cbn. lia.
     -- forward H1; try lia.
-      assert (Int64.unsigned y_fin = 0 \/ Int64.unsigned y_fin = 1 \/ 1 < Int64.unsigned y_fin)%Z as [Y_FIN | [Y_FIN | Y_FIN]] by lia.
+      assert (Integers.unsigned y_fin = 0 \/ Integers.unsigned y_fin = 1 \/ 1 < Integers.unsigned y_fin)%Z as [Y_FIN | [Y_FIN | Y_FIN]] by lia.
       + rewrite Y_FIN.
         cbn.
         rewrite Z.div_1_r.
@@ -663,13 +662,13 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
           rewrite two_power_pos_correct. lia.
         }
         rewrite H2.
-        pose proof Z.div_le_upper_bound (Int64.unsigned x_fin) 2 (Int64.modulus - 1).
+        pose proof Z.div_le_upper_bound (Integers.unsigned x_fin) 2 (@Integers.modulus 64 - 1).
         forward H3; [lia|].
         forward H3; [lia|].
         auto.
       + forward H1.
         lia.
-        pose proof Z.div_le_upper_bound (Int64.unsigned x_fin) (two_p (Int64.unsigned y_fin)) (Int64.modulus - 1).
+        pose proof Z.div_le_upper_bound (Integers.unsigned x_fin) (two_p (Integers.unsigned y_fin)) (@Integers.modulus 64 - 1).
         forward H2.
         { unfold two_p.
           break_match_goal; try lia.
@@ -682,7 +681,7 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
           assert (1 <= Z.pow_pos 2 p)%Z.
           { lia.
           }
-          pose proof Z.mul_le_mono_nonneg_r 1 (Z.pow_pos 2 p) (Int64.modulus - 1).
+          pose proof Z.mul_le_mono_nonneg_r 1 (Z.pow_pos 2 p) (@Integers.modulus 64 - 1).
           forward H4; [lia|].
           forward H4; [lia|].
           lia.
@@ -722,20 +721,20 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
     subst.
-    unfold Int64.modu.
-    rewrite Int64.unsigned_repr; try lia.
-    unfold Int64.max_unsigned.
+    unfold Integers.modu.
+    rewrite Integers.unsigned_repr; try lia.
+    unfold Integers.max_unsigned.
 
-    pose proof Int64.unsigned_range x_fin.
-    pose proof Int64.unsigned_range y_fin.
-    destruct (Z.eq_dec (Int64.unsigned y_fin) 0%Z).
+    pose proof Integers.unsigned_range x_fin.
+    pose proof Integers.unsigned_range y_fin.
+    destruct (Z.eq_dec (Integers.unsigned y_fin) 0%Z).
     { (* y_fin = 0 *)
       rewrite e.
       rewrite Zmod_0_r.
       lia.
     }
 
-    pose proof Z.mod_bound_or (Int64.unsigned x_fin) (Int64.unsigned y_fin).
+    pose proof Z.mod_bound_or (Integers.unsigned x_fin) (Integers.unsigned y_fin).
     forward H1; auto.
     lia.
   Qed.
@@ -865,22 +864,24 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     split; auto.
 
     cbn in AND.
-    unfold Int64.and in AND.
+    unfold Integers.and in AND.
     subst.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
     subst.
-    pose proof Int64.unsigned_range x_fin.
-    pose proof Int64.unsigned_range y_fin.
-    rewrite Int64.unsigned_repr; auto.
-    unfold Int64.max_unsigned.
-    pose proof Z.log2_land (Int64.unsigned x_fin) (Int64.unsigned y_fin).
+    pose proof Integers.unsigned_range x_fin.
+    pose proof Integers.unsigned_range y_fin.
+    rewrite Integers.unsigned_repr; auto.
+    unfold Integers.max_unsigned.
+    pose proof Z.log2_land (Integers.unsigned x_fin) (Integers.unsigned y_fin).
     repeat (forward H1; [lia|]).
 
+    Transparent Integers.modulus.
+    unfold Integers.modulus in *.
+    rewrite two_power_pos_nat in H, H0.
+    rewrite two_power_pos_nat.
     pose proof Zland_range _ _ _ H H0.
-    Transparent Int64.modulus.
-    unfold Int64.modulus in *.
-    Opaque Int64.modulus.
+    Opaque Integers.modulus.
     lia.
   Qed.
 
@@ -899,22 +900,24 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     split; auto.
 
     cbn in OR.
-    unfold Int64.or in OR.
+    unfold Integers.or in OR.
     subst.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
     subst.
-    pose proof Int64.unsigned_range x_fin.
-    pose proof Int64.unsigned_range y_fin.
-    rewrite Int64.unsigned_repr; auto.
-    unfold Int64.max_unsigned.
-    pose proof Z.log2_lor (Int64.unsigned x_fin) (Int64.unsigned y_fin).
+    pose proof Integers.unsigned_range x_fin.
+    pose proof Integers.unsigned_range y_fin.
+    rewrite Integers.unsigned_repr; auto.
+    unfold Integers.max_unsigned.
+    pose proof Z.log2_lor (Integers.unsigned x_fin) (Integers.unsigned y_fin).
     repeat (forward H1; [lia|]).
 
+    Transparent Integers.modulus.
+    unfold Integers.modulus in *.
+    rewrite two_power_pos_nat in H, H0.
+    rewrite two_power_pos_nat.
     pose proof Zlor_range _ _ _ H H0.
-    Transparent Int64.modulus.
-    unfold Int64.modulus in *.
-    Opaque Int64.modulus.
+    Opaque Integers.modulus.
     lia.
   Qed.
 
@@ -933,22 +936,24 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     split; auto.
 
     cbn in XOR.
-    unfold Int64.xor in XOR.
+    unfold Integers.xor in XOR.
     subst.
 
     unfold InterpreterStack64BitIntptr.LP.IP.to_Z, InterpreterStackBigIntptr.LP.IP.to_Z in *.
     subst.
-    pose proof Int64.unsigned_range x_fin.
-    pose proof Int64.unsigned_range y_fin.
-    rewrite Int64.unsigned_repr; auto.
-    unfold Int64.max_unsigned.
-    pose proof Z.log2_lxor (Int64.unsigned x_fin) (Int64.unsigned y_fin).
+    pose proof Integers.unsigned_range x_fin.
+    pose proof Integers.unsigned_range y_fin.
+    rewrite Integers.unsigned_repr; auto.
+    unfold Integers.max_unsigned.
+    pose proof Z.log2_lxor (Integers.unsigned x_fin) (Integers.unsigned y_fin).
     repeat (forward H1; [lia|]).
 
+    Transparent Integers.modulus.
+    unfold Integers.modulus in *.
+    rewrite two_power_pos_nat in H, H0.
+    rewrite two_power_pos_nat.
     pose proof Zlxor_range _ _ _ H H0.
-    Transparent Int64.modulus.
-    unfold Int64.modulus in *.
-    Opaque Int64.modulus.
+    Opaque Integers.modulus.
     lia.
   Qed.
 
@@ -991,38 +996,38 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     destruct icmp;
       cbn in *.
     - (* eq *)
-      pose proof Integers.Int64.eq_spec x_fin y_fin.
+      pose proof Integers.eq_spec x_fin y_fin.
       break_match_hyp; subst.
       + rewrite Z.eqb_refl; auto.
       + symmetry; apply Z.eqb_neq.
         intros CONTRA.
         destruct x_fin, y_fin.
         cbn in *; subst.
-        unfold Integers.Int64.eq in Heqb.
+        unfold Integers.eq in Heqb.
         cbn in *.
         rewrite Coqlib.zeq_true in Heqb; inv Heqb.
     - (* ne *)
-      pose proof Integers.Int64.eq_spec x_fin y_fin.
+      pose proof Integers.eq_spec x_fin y_fin.
       break_match_hyp; subst; cbn;
         unfold Zneq_bool.
       + rewrite Z.compare_refl; auto.
       + break_match_goal; auto.
         apply Z.compare_eq in Heqc.
         destruct x_fin, y_fin; cbn in *; subst; cbn in *.
-        unfold Integers.Int64.eq in Heqb.
+        unfold Integers.eq in Heqb.
         cbn in *.
         rewrite Coqlib.zeq_true in Heqb; inv Heqb.
     - (* lt *)
-      unfold Int64.ltu.
+      unfold Integers.ltu.
       break_match_goal; lia.
     - (* le *)
-      unfold Int64.ltu.
+      unfold Integers.ltu.
       break_match_goal; lia.
     - (* gt *)
-      unfold Int64.ltu.
+      unfold Integers.ltu.
       break_match_goal; lia.
     - (* ge *)
-      unfold Int64.ltu.
+      unfold Integers.ltu.
       break_match_goal; lia.
   Qed.
 
@@ -1102,17 +1107,13 @@ Module ItoP_Refine_InfFin : ItoP_Refine InterpreterStackBigIntptr InterpreterSta
     unfold FinToInfAddrConvert.addr_convert in *.
     cbn in *.
     inv CONV_RES.
-    cbn.
-    rewrite Int64.unsigned_repr.
-    2: {
-      unfold Int64.max_unsigned.
-      lia.
-    }
 
     unfold InterpreterStackBigIntptr.LP.PROV.address_provenance.
     unfold InterpreterStack64BitIntptr.LP.PROV.address_provenance.
     destruct base_addr_fin; inv CONV_BASE; cbn.
-    reflexivity.
+
+    rewrite Integers.Z_mod_modulus_eq.
+    rewrite Coqlib.Zmod_small; try lia; auto.
   Qed.
 
   Lemma int_to_ptr_fin_inf :
@@ -1128,9 +1129,9 @@ Module ItoP_Refine_InfFin : ItoP_Refine InterpreterStackBigIntptr InterpreterSta
     cbn in *.
     unfold InterpreterStack64BitIntptr.LP.ITOP.int_to_ptr in ITP.
     break_match_hyp_inv.
-    rewrite Int64.unsigned_repr.
+    rewrite Integers.unsigned_repr.
     2: {
-      unfold Int64.max_unsigned.
+      unfold Integers.max_unsigned.
       lia.
     }
     auto.
@@ -1148,9 +1149,9 @@ Module ItoP_Refine_InfFin : ItoP_Refine InterpreterStackBigIntptr InterpreterSta
     cbn in *.
     unfold InterpreterStack64BitIntptr.LP.ITOP.int_to_ptr in ITP.
     break_match_hyp_inv.
-    rewrite Int64.unsigned_repr.
+    rewrite Integers.unsigned_repr.
     2: {
-      unfold Int64.max_unsigned.
+      unfold Integers.max_unsigned.
       lia.
     }
     auto.
@@ -2996,8 +2997,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Definition model_E1E2_L0_orutt_strict p1 p2 :=
     L0_E1E2_orutt_strict
-      (LLVM1.denote_vellvm (DTYPE_I 32%N) "main" LLVM1.main_args (convert_types (mcfg_of_tle p1)))
-      (LLVM2.denote_vellvm (DTYPE_I 32%N) "main" LLVM2.main_args (convert_types (mcfg_of_tle p2))).
+      (LLVM1.denote_vellvm (DTYPE_I 32%positive) "main" LLVM1.main_args (convert_types (mcfg_of_tle p1)))
+      (LLVM2.denote_vellvm (DTYPE_I 32%positive) "main" LLVM2.main_args (convert_types (mcfg_of_tle p2))).
 
   Definition model_E1E2_L1_orutt_strict p1 p2 :=
     L1_E1E2_orutt_strict
@@ -4534,7 +4535,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         rewrite Heqo.
         reflexivity.
     - induction elts.
-      + exists (DVCrev.DV2.DVALUE_Array []).
+      + exists (DVCrev.DV2.DVALUE_Array t []).
         cbn.
         reflexivity.
       + forward IHelts.
@@ -4550,14 +4551,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         pose proof (X a).
         forward X0; cbn; auto.
         destruct X0 as (a'&A).
-        exists (DVCrev.DV2.DVALUE_Array (a' :: l)).
+        exists (DVCrev.DV2.DVALUE_Array t (a' :: l)).
 
         cbn.
         rewrite A.
         rewrite Heqo.
         reflexivity.
     - induction elts.
-      + exists (DVCrev.DV2.DVALUE_Vector []).
+      + exists (DVCrev.DV2.DVALUE_Vector t []).
         cbn.
         reflexivity.
       + forward IHelts.
@@ -4573,7 +4574,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         pose proof (X a).
         forward X0; cbn; auto.
         destruct X0 as (a'&A).
-        exists (DVCrev.DV2.DVALUE_Vector (a' :: l)).
+        exists (DVCrev.DV2.DVALUE_Vector t (a' :: l)).
 
         cbn.
         rewrite A.
@@ -4587,60 +4588,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     apply dvi.
   Defined.
 
-  Lemma fin_to_inf_dvalue_i1 :
-    forall x,
-      fin_to_inf_dvalue (DVALUE_I1 x) =
-        DVCrev.DV2.DVALUE_I1 x.
+  Lemma fin_to_inf_dvalue_ix :
+    forall sz x,
+      fin_to_inf_dvalue (@DVALUE_I sz x) =
+        @DVCrev.DV2.DVALUE_I sz x.
   Proof.
-    intros x.
-    unfold fin_to_inf_dvalue.
-    break_match_goal; clear Heqs; destruct p; clear e0;
-      cbn in e; subst; inv e.
-    auto.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_i8 :
-    forall x,
-      fin_to_inf_dvalue (DVALUE_I8 x) =
-        DVCrev.DV2.DVALUE_I8 x.
-  Proof.
-    intros x.
-    unfold fin_to_inf_dvalue.
-    break_match_goal; clear Heqs; destruct p; clear e0;
-      cbn in e; subst; inv e.
-    auto.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_i16 :
-    forall x,
-      fin_to_inf_dvalue (DVALUE_I16 x) =
-        DVCrev.DV2.DVALUE_I16 x.
-  Proof.
-    intros x.
-    unfold fin_to_inf_dvalue.
-    break_match_goal; clear Heqs; destruct p; clear e0;
-      cbn in e; subst; inv e.
-    auto.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_i32 :
-    forall x,
-      fin_to_inf_dvalue (DVALUE_I32 x) =
-        DVCrev.DV2.DVALUE_I32 x.
-  Proof.
-    intros x.
-    unfold fin_to_inf_dvalue.
-    break_match_goal; clear Heqs; destruct p; clear e0;
-      cbn in e; subst; inv e.
-    auto.
-  Qed.
-
-  Lemma fin_to_inf_dvalue_i64 :
-    forall x,
-      fin_to_inf_dvalue (DVALUE_I64 x) =
-        DVCrev.DV2.DVALUE_I64 x.
-  Proof.
-    intros x.
+    intros sz x.
     unfold fin_to_inf_dvalue.
     break_match_goal; clear Heqs; destruct p; clear e0;
       cbn in e; subst; inv e.
@@ -4848,11 +4801,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Lemma fin_to_inf_dvalue_array :
-    forall elts,
-      fin_to_inf_dvalue (DVALUE_Array elts) =
-        DVCrev.DV2.DVALUE_Array (map fin_to_inf_dvalue elts).
+    forall elts t,
+      fin_to_inf_dvalue (DVALUE_Array t elts) =
+        DVCrev.DV2.DVALUE_Array t (map fin_to_inf_dvalue elts).
   Proof.
-    induction elts.
+    induction elts; intros t.
     - cbn.
       unfold fin_to_inf_dvalue.
       break_match_goal; clear Heqs; destruct p; clear e0;
@@ -4865,6 +4818,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       break_match_hyp_inv.
       break_match_hyp_inv.
       rewrite map_cons.
+
+      specialize (IHelts t).
 
       break_match_hyp_inv; clear Heqs; destruct p; clear e0.
       cbn in e; subst; inv e.
@@ -4879,11 +4834,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Lemma fin_to_inf_dvalue_vector :
-    forall elts,
-      fin_to_inf_dvalue (DVALUE_Vector elts) =
-        DVCrev.DV2.DVALUE_Vector (map fin_to_inf_dvalue elts).
+    forall elts t,
+      fin_to_inf_dvalue (DVALUE_Vector t elts) =
+        DVCrev.DV2.DVALUE_Vector t (map fin_to_inf_dvalue elts).
   Proof.
-    induction elts.
+    induction elts; intros t.
     - cbn.
       unfold fin_to_inf_dvalue.
       break_match_goal; clear Heqs; destruct p; clear e0;
@@ -4896,6 +4851,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       break_match_hyp_inv.
       break_match_hyp_inv.
       rewrite map_cons.
+
+      specialize (IHelts t).
 
       break_match_hyp_inv; clear Heqs; destruct p; clear e0.
       cbn in e; subst; inv e.
@@ -4913,11 +4870,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Ltac rewrite_fin_to_inf_dvalue :=
     repeat
       first
-      [ rewrite fin_to_inf_dvalue_i1
-      | rewrite fin_to_inf_dvalue_i8
-      | rewrite fin_to_inf_dvalue_i16
-      | rewrite fin_to_inf_dvalue_i32
-      | rewrite fin_to_inf_dvalue_i64
+      [ rewrite fin_to_inf_dvalue_ix
       | rewrite fin_to_inf_dvalue_iptr
       | rewrite fin_to_inf_dvalue_addr
       | rewrite fin_to_inf_dvalue_float
@@ -4963,7 +4916,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         eauto.
       }
 
-      rewrite map_length.
+      rewrite length_map.
       auto.
     - (* Vectors *)
       constructor; eauto.
@@ -4974,7 +4927,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         eauto.
       }
 
-      rewrite map_length.
+      rewrite length_map.
       auto.
   Qed.
 
@@ -5618,11 +5571,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   (* TODO: Move this *)
   Lemma dvalue_convert_strict_array_map :
-    forall fields_fin res,
-      DVCrev.dvalue_convert_strict (DVALUE_Array fields_fin) = NoOom res ->
-      res = (IS1.LP.Events.DV.DVALUE_Array (map fin_to_inf_dvalue fields_fin)).
+    forall fields_fin res t,
+      DVCrev.dvalue_convert_strict (DVALUE_Array t fields_fin) = NoOom res ->
+      res = (IS1.LP.Events.DV.DVALUE_Array t (map fin_to_inf_dvalue fields_fin)).
   Proof.
-    intros fields_fin res CONV.
+    intros fields_fin res t CONV.
     cbn in CONV.
     break_match_hyp_inv.
     apply map_monad_oom_Forall2 in Heqo.
@@ -5637,11 +5590,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   (* TODO: Move this *)
   Lemma dvalue_convert_strict_vector_map :
-    forall fields_fin res,
-      DVCrev.dvalue_convert_strict (DVALUE_Vector fields_fin) = NoOom res ->
-      res = (IS1.LP.Events.DV.DVALUE_Vector (map fin_to_inf_dvalue fields_fin)).
+    forall fields_fin res t,
+      DVCrev.dvalue_convert_strict (DVALUE_Vector t fields_fin) = NoOom res ->
+      res = (IS1.LP.Events.DV.DVALUE_Vector t (map fin_to_inf_dvalue fields_fin)).
   Proof.
-    intros fields_fin res CONV.
+    intros fields_fin res t CONV.
     cbn in CONV.
     break_match_hyp_inv.
     apply map_monad_oom_Forall2 in Heqo.
@@ -5892,24 +5845,24 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Defined.
 
   (* TODO: Move this *)
-  Lemma eval_int_op_i64_fin_inf :
-    forall v1 v2 iop res_fin res_inf,
-      @eval_int_op err_ub_oom int64 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+  Lemma eval_int_op_ix_fin_inf :
+    forall sz v1 v2 iop res_fin res_inf,
+      @eval_int_op err_ub_oom (@Integers.int sz) (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int64 VInt64) ToDvalue_Int64
+        (@VIntVMemInt (@Integers.int sz) (@VInt_Bounded sz)) (@ToDvalue_Int sz)
         iop v1 v2 = success_unERR_UB_OOM res_fin ->
       DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom int64
+      @IS1.LP.Events.DV.eval_int_op err_ub_oom (@Integers.int sz)
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int64 VInt64) IS1.LP.Events.DV.ToDvalue_Int64
+        (@VIntVMemInt (@Integers.int sz) (@VInt_Bounded sz)) (@IS1.LP.Events.DV.ToDvalue_Int sz)
         iop v1 v2 = success_unERR_UB_OOM res_inf.
   Proof.
-    intros v1 v2 iop res_fin res_inf EVAL CONV.
+    intros sz v1 v2 iop res_fin res_inf EVAL CONV.
     destruct iop.
     1-3:
       try solve
@@ -5950,221 +5903,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
              cbn in CONV; inv CONV;
              cbn in *; reflexivity
            ].
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma eval_int_op_i16_fin_inf :
-    forall v1 v2 iop res_fin res_inf,
-      @eval_int_op err_ub_oom int16 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int16 VInt16) ToDvalue_Int16
-        iop v1 v2 = success_unERR_UB_OOM res_fin ->
-      DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom int16
-        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int16 VInt16) IS1.LP.Events.DV.ToDvalue_Int16
-        iop v1 v2 = success_unERR_UB_OOM res_inf.
-  Proof.
-    intros v1 v2 iop res_fin res_inf EVAL CONV.
-    destruct iop.
-    1-3:
-      try solve
-        [ cbn in *;
-          repeat break_match_hyp_inv; cbn in *;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        ].
-
-    { cbn in *.
-      break_match_hyp_inv.
-      cbn in CONV; inv CONV; cbn; auto.
-      break_match_hyp_inv.
-      cbn in CONV; inv CONV; cbn; auto.
-      destruct nsw.
-      2: {
-        cbn in H1; inv H1; cbn.
-        cbn in CONV;
-          inv CONV; cbn; auto.
-      }
-
-      break_match_hyp;
-        cbn in H1; inv H1; cbn;
-        cbn in CONV;
-        inv CONV; cbn; auto.
-    }
-
-    all: try solve
-           [ cbn in *;
-             repeat break_match_hyp_inv; cbn in *;
-             cbn in CONV; inv CONV;
-             cbn in *; reflexivity
-           ].
-
-    all: try solve
-           [ cbn in *;
-             repeat break_match_hyp_inv; cbn in *; inv EVAL;
-             cbn in CONV; inv CONV;
-             cbn in *; reflexivity
-           ].
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma eval_int_op_i32_fin_inf :
-    forall v1 v2 iop res_fin res_inf,
-      @eval_int_op err_ub_oom int32 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int32 VInt32) ToDvalue_Int32
-        iop v1 v2 = success_unERR_UB_OOM res_fin ->
-      DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom int32
-        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int32 VInt32) IS1.LP.Events.DV.ToDvalue_Int32
-        iop v1 v2 = success_unERR_UB_OOM res_inf.
-  Proof.
-    intros v1 v2 iop res_fin res_inf EVAL CONV.
-    destruct iop.
-    1-3:
-      try solve
-        [ cbn in *;
-          repeat break_match_hyp_inv; cbn in *;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        ].
-
-    { cbn in *.
-      break_match_hyp_inv.
-      cbn in CONV; inv CONV; cbn; auto.
-      break_match_hyp_inv.
-      cbn in CONV; inv CONV; cbn; auto.
-      destruct nsw.
-      2: {
-        cbn in H1; inv H1; cbn.
-        cbn in CONV;
-          inv CONV; cbn; auto.
-      }
-
-      break_match_hyp;
-        cbn in H1; inv H1; cbn;
-        cbn in CONV;
-        inv CONV; cbn; auto.
-    }
-
-    all: try solve
-           [ cbn in *;
-             repeat break_match_hyp_inv; cbn in *;
-             cbn in CONV; inv CONV;
-             cbn in *; reflexivity
-           ].
-
-    all: try solve
-           [ cbn in *;
-             repeat break_match_hyp_inv; cbn in *; inv EVAL;
-             cbn in CONV; inv CONV;
-             cbn in *; reflexivity
-           ].
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma eval_int_op_i8_fin_inf :
-    forall v1 v2 iop res_fin res_inf,
-      @eval_int_op err_ub_oom int8 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int8 VInt8) ToDvalue_Int8
-        iop v1 v2 = success_unERR_UB_OOM res_fin ->
-      DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom int8
-        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int8 VInt8) IS1.LP.Events.DV.ToDvalue_Int8
-        iop v1 v2 = success_unERR_UB_OOM res_inf.
-  Proof.
-    intros v1 v2 iop res_fin res_inf EVAL CONV.
-    destruct iop.
-    1-3:
-      try solve
-        [ cbn in *;
-          repeat break_match_hyp_inv; cbn in *;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        ].
-
-    { cbn in *.
-      break_match_hyp_inv.
-      cbn in CONV; inv CONV; cbn; auto.
-      break_match_hyp_inv.
-      cbn in CONV; inv CONV; cbn; auto.
-      destruct nsw.
-      2: {
-        cbn in H1; inv H1; cbn.
-        cbn in CONV;
-          inv CONV; cbn; auto.
-      }
-
-      break_match_hyp;
-        cbn in H1; inv H1; cbn;
-        cbn in CONV;
-        inv CONV; cbn; auto.
-    }
-
-    all: try solve
-           [ cbn in *;
-             repeat break_match_hyp_inv; cbn in *;
-             cbn in CONV; inv CONV;
-             cbn in *; reflexivity
-           ].
-
-    all: try solve
-           [ cbn in *;
-             repeat break_match_hyp_inv; cbn in *; inv EVAL;
-             cbn in CONV; inv CONV;
-             cbn in *; reflexivity
-           ].
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma eval_int_op_i1_fin_inf :
-    forall v1 v2 iop res_fin res_inf,
-      @eval_int_op err_ub_oom int1 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int1 VInt1) ToDvalue_Int1
-        iop v1 v2 = success_unERR_UB_OOM res_fin ->
-      DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom int1
-        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int1 VInt1) IS1.LP.Events.DV.ToDvalue_Int1
-        iop v1 v2 = success_unERR_UB_OOM res_inf.
-  Proof.
-    intros v1 v2 iop res_fin res_inf EVAL CONV.
-    destruct iop;
-      try solve
-        [ cbn in *;
-          repeat break_match_hyp_inv; cbn in *;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; cbn in *; inv EVAL;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        ].
   Qed.
 
   (* TODO: Move this *)
@@ -6285,7 +6023,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
         cbn in CONV.
         move CONV after Heqb.
-        break_match_hyp_inv.
+        repeat break_match_hyp_inv.
 
         epose proof VMEM_REF.mmul_refine _ _ _ v1_inf v2_inf V1 V2 HMUL as (?&?&?&?).
         rewrite H0 in Heqo.
@@ -6297,7 +6035,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         setoid_rewrite dtyp_eqb_refl.
         break_match_goal; try reflexivity.
 
-        setoid_rewrite Heqb1 in H1.
+        setoid_rewrite Heqb0 in H1.
         inv H1.
       }
 
@@ -6500,11 +6238,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Hint Resolve
-    eval_int_op_i1_fin_inf
-    eval_int_op_i8_fin_inf
-    eval_int_op_i16_fin_inf
-    eval_int_op_i32_fin_inf
-    eval_int_op_i64_fin_inf
+    eval_int_op_ix_fin_inf
     eval_int_op_iptr_fin_inf
     dvalue_convert_strict_fin_inf_succeeds_fin_to_inf_dvalue'
     : EVAL_INT_FIN_INF.
@@ -6531,8 +6265,19 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     (* Nasty case analysis... *)
     repeat break_match_hyp_inv;
       rewrite_fin_to_inf_dvalue;
-      cbn;
-      try setoid_rewrite Heqb; eauto with EVAL_INT_FIN_INF.
+      cbn in *;
+      try setoid_rewrite Heqb; cbn; eauto with EVAL_INT_FIN_INF.
+
+    { (* dv1: ix *)
+      break_match_goal; cbn in *; subst; try contradiction.
+      dependent destruction e; cbn.
+      unfold fin_to_inf_dvalue.
+      break_match_goal; clear Heqs.
+      destruct p; clear e0.
+      unfold intptr_fin_inf.
+      repeat break_match_goal.
+      eapply eval_int_op_ix_fin_inf; eauto.
+    }
 
     { (* dv1: iptr *)
       unfold fin_to_inf_dvalue.
@@ -6647,6 +6392,17 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       rewrite_fin_to_inf_dvalue;
       cbn;
       try setoid_rewrite Heqb; eauto with EVAL_INT_FIN_INF.
+
+    { (* dv1: ix *)
+      unfold fin_to_inf_dvalue.
+      break_match_goal; try contradiction.
+      dependent destruction e.
+      break_match_goal; clear Heqs.
+      destruct p; clear e0.
+      unfold intptr_fin_inf.
+      repeat break_match_goal.
+      eapply eval_int_op_ix_fin_inf; eauto.
+    }
 
     { (* dv1: iptr *)
       unfold fin_to_inf_dvalue.
@@ -6786,6 +6542,21 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       eapply eval_int_icmp_fin_inf in H1.
       repeat rewrite ptr_to_int_fin_to_inf_addr.
       auto.
+    }
+
+    { (* dv1: ix *)
+      break_match_hyp_inv.
+      - break_match_hyp_inv; try contradiction; cbn in *; subst.
+        repeat rewrite_fin_to_inf_dvalue.
+        cbn.
+        unfold intptr_fin_inf.
+        eapply eval_int_icmp_fin_inf in H0; eauto.
+        unfold IS1.MEM.CP.CONC.eval_icmp.
+        break_match_goal; try contradiction.
+        dependent destruction e; cbn; auto.
+      - repeat rewrite_fin_to_inf_dvalue.
+        cbn.
+        unfold intptr_fin_inf; auto.
     }
 
     { (* dv1: iptr *)
@@ -8445,9 +8216,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         unfold fin_to_inf_uvalue;
         break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
         cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
+        try (inv H0; subst_existT; try rewrite Heqb; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+             cbn in e; inv e; reflexivity).
     }
 
     { cbn in *;
@@ -8456,9 +8226,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         unfold fin_to_inf_uvalue;
         break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
         cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
+        try (inv H0; subst_existT; try rewrite Heqb; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+             cbn in e; inv e; reflexivity).
     }
 
     { cbn in *;
@@ -8467,9 +8236,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         unfold fin_to_inf_uvalue;
         break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
         cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
+        try (inv H0; subst_existT; try rewrite Heqb; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+             cbn in e; inv e; reflexivity).
     }
 
     { cbn in *;
@@ -8488,9 +8256,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         unfold fin_to_inf_uvalue;
         break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
         cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
+        try (inv H0; subst_existT; try rewrite Heqb; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+             cbn in e; inv e; reflexivity).
     }
 
     { cbn in *;
@@ -8499,9 +8266,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         unfold fin_to_inf_uvalue;
         break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
         cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
+        try (inv H0; subst_existT; try rewrite Heqb; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+             cbn in e; inv e; reflexivity).
     }
 
     { cbn in *;
@@ -8815,39 +8581,37 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                     auto
           ].
 
-      { (* Structs *)
+      { (* ix *)
         cbn; rewrite_fin_to_inf_dvalue.
-        break_match_hyp_inv.
-        rewrite H0.
-        erewrite IHidxs_fin; eauto.
-        cbn.
-        replace (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (pad_to IS1.LP.SIZEOF.padding (IS1.LP.SIZEOF.sizeof_dtyp t)))%Z) with
+        repeat break_match_hyp_inv;
+          try
+            (try rewrite H0;
+             try rewrite H1;
+             try erewrite IHidxs_fin; eauto;
+             try setoid_rewrite sizeof_dtyp_fin_inf;
+             try setoid_rewrite padding_fin_inf;
+             auto).
+
+        - rewrite padding_fin_inf.
+          replace (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (pad_to SIZEOF.padding (IS1.LP.SIZEOF.sizeof_dtyp t)))%Z) with
           (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (pad_to SIZEOF.padding (SIZEOF.sizeof_dtyp t)))%Z); eauto.
 
-        apply FunctionalExtensionality.functional_extensionality.
-        intros.
-        apply FunctionalExtensionality.functional_extensionality.
-        intros.
-        rewrite sizeof_dtyp_fin_inf.
-        rewrite padding_fin_inf.
-        auto.
-      }
+          apply FunctionalExtensionality.functional_extensionality.
+          intros.
+          apply FunctionalExtensionality.functional_extensionality.
+          intros.
+          rewrite sizeof_dtyp_fin_inf.
+          auto.
+        - replace
+            (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (IS1.LP.SIZEOF.sizeof_dtyp t))%Z) with
+            (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (SIZEOF.sizeof_dtyp t))%Z); eauto.
 
-      { (* Packed structs *)
-        cbn; rewrite_fin_to_inf_dvalue.
-        break_match_hyp_inv.
-        rewrite H0.
-        erewrite IHidxs_fin; eauto.
-        cbn.
-        replace (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (IS1.LP.SIZEOF.sizeof_dtyp t))%Z) with
-          (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (SIZEOF.sizeof_dtyp t))%Z); eauto.
-
-        apply FunctionalExtensionality.functional_extensionality.
-        intros.
-        apply FunctionalExtensionality.functional_extensionality.
-        intros.
-        rewrite sizeof_dtyp_fin_inf.
-        auto.
+          apply FunctionalExtensionality.functional_extensionality.
+          intros.
+          apply FunctionalExtensionality.functional_extensionality.
+          intros.
+          rewrite sizeof_dtyp_fin_inf.
+          auto.
       }
 
       { (* Arrays iptr *)
@@ -8887,8 +8651,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     destruct idxs_fin.
     - cbn in *; subst; inv GEP.
     - cbn in *; subst; cbn.
-      break_match_hyp_inv; rewrite_fin_to_inf_dvalue;
-        break_match_hyp_inv;
+      break_inner_match_hyp; inv GEP;
+        repeat break_match_hyp_inv;
+        rewrite_fin_to_inf_dvalue;
         rewrite sizeof_dtyp_fin_inf;
         erewrite AC2.addr_convert_ptoi in Heqs; eauto;
         eapply handle_gep_h_fin_inf in Heqs; eauto;
@@ -8919,7 +8684,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     break_match_hyp_inv.
     { (* Arrays *)
       break_match_hyp_inv.
-      { (* i32 index *)
+      { (* ix index *)
         generalize dependent res.
         generalize dependent x.
         induction elts; intros x res H0.
@@ -8985,23 +8750,26 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             break_match_hyp_inv.
             cbn.
 
-            assert (exists x1, Int32.signed x1 = Z.pred (Z.pos p')) as (x1 & X1).
+            subst_existT.
+            assert (exists x1, @Integers.signed sz0 x1 = Z.pred (Z.pos p')) as (x1' & X1').
             { exists (repr (Z.pred (Z.pos p'))).
-              pose proof Int32.min_signed_neg.
-              rewrite Int32.signed_repr; eauto.
-              pose proof Int32.signed_range x0.
-              lia.
+              pose proof (@Integers.min_signed_neg sz0).
+              unfold repr.
+              cbn.
+              rewrite (@Integers.signed_repr sz0); eauto.
+              pose proof Integers.signed_range x0.
+              break_match_goal; lia.
             }
 
-            specialize (IHelts x1 res).
+            specialize (IHelts x1' res).
             forward IHelts.
-            { rewrite X1.
+            { rewrite X1'.
               cbn.
               destruct p'; cbn; auto.
             }
 
             unfold fin_to_inf_dvalue in IHelts.
-            move IHelts after X1.
+            move IHelts after X1'.
             break_match_hyp_inv.
             { move Heqd0 after H0.
               break_match_hyp_inv; clear Heqs; destruct p; clear e1;
@@ -9015,19 +8783,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
                 destruct (dvalue_convert_strict_fin_inf_succeeds res).
                 rewrite e in e0; inv e0.
-                inv H3;
-                rewrite X1 in H2.
-                rewrite X1.
+                inv H3; subst_existT;
+                rewrite X1' in H2.
+                rewrite X1'.
 
                 cbn in H2.
                 inv Heqo.
                 destruct p'; cbn in *; eauto.
-              }
-
-              { move Heqd0 after H2.
-                break_match_hyp_inv; clear Heqs; destruct p; clear e1;
-                  cbn in e0; inv e0.
-                inv H3.
               }
             }
 
@@ -9036,133 +8798,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 cbn in e0;
                 break_match_hyp_inv.
               inv H3.
-            }
-      }
-
-      { (* i64 index *)
-        generalize dependent res.
-        generalize dependent x.
-        induction elts; intros x res H0.
-        - break_match_hyp_inv;
-            unfold fin_to_inf_dvalue;
-            try rename p into p';
-
-            break_match_goal;
-            break_match_hyp; clear Heqs; destruct p; clear e0;
-            cbn in e; inv e; inv H0;
-
-            break_match_goal;
-            break_match_hyp; clear Heqs; destruct p; clear e0;
-            cbn in e; inv e; inv H0;
-
-            cbn;
-            rewrite Heqz;
-
-            break_match_goal; clear Heqs; destruct p; clear e0;
-            cbn in e; inv e;
-
-            auto.
-        - cbn in H0.
-          break_match_hyp_inv.
-          + (* Index 0 *)
-            clear IHelts.
-            unfold fin_to_inf_dvalue.
-
-            break_match_goal;
-              break_match_hyp; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e;
-              break_match_hyp_inv.
-
-            break_match_goal;
-              break_match_hyp; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; inv H0.
-
-            destruct (dvalue_convert_strict_fin_inf_succeeds res).
-            rewrite e in Heqo.
-            cbn.
-            rewrite Heqz.
-            break_match_hyp_inv.
-            cbn.
-            break_match_goal; clear Heqs; destruct p.
-            rewrite e in e0.
-            inv e0.
-            auto.
-          + (* Index positive *)
-            unfold fin_to_inf_dvalue.
-            rename p into p'.
-
-            break_match_goal;
-              break_match_hyp; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e;
-              break_match_hyp_inv.
-
-            break_match_goal;
-              break_match_hyp; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; inv H0.
-
-            destruct (dvalue_convert_strict_fin_inf_succeeds res).
-            break_match_hyp_inv.
-            cbn; rewrite Heqz.
-            break_match_hyp_inv.
-            cbn.
-
-            assert (exists x1, Int64.signed x1 = Z.pred (Z.pos p')) as (x1 & X1).
-            { exists (repr (Z.pred (Z.pos p'))).
-              pose proof Int64.min_signed_neg.
-              rewrite Int64.signed_repr; eauto.
-              pose proof Int64.signed_range x0.
-              lia.
-            }
-
-            specialize (IHelts x1 res).
-            forward IHelts.
-            { rewrite X1.
-              cbn.
-              destruct p'; cbn; auto.
-            }
-
-            unfold fin_to_inf_dvalue in IHelts.
-            move IHelts after X1.
-            break_match_hyp_inv.
-            { move Heqd0 after H0.
-              break_match_hyp_inv; clear Heqs; destruct p; clear e1;
-                cbn in e0; inv e0.
-              break_match_hyp_inv.
-
-              break_match_hyp_inv.
-              { move Heqd0 after H2.
-                break_match_hyp_inv; clear Heqs; destruct p; clear e1;
-                  cbn in e0; inv e0;
-                  inv H3.
-              }
-
-              { move Heqd0 after H2.
-                break_match_hyp_inv; clear Heqs; destruct p; clear e1;
-                  cbn in e0; inv e0;
-                  inv H3.
-
-                destruct (dvalue_convert_strict_fin_inf_succeeds res).
-                rewrite e in e0; inv e0.
-                rewrite X1 in H2.
-                rewrite X1.
-
-                cbn in H2.
-                inv Heqo.
-                destruct p'; cbn in *; eauto.
-              }
-            }
-
-            { move Heqd0 after H0;
-                break_match_hyp_inv; clear Heqs; destruct p; clear e1;
-                cbn in e0;
-                break_match_hyp_inv; inv H3.
             }
       }
     }
 
     { (* Vectors *)
       break_match_hyp_inv.
-      { (* i32 index *)
+      { (* ix index *)
         generalize dependent res.
         generalize dependent x.
         induction elts; intros x res H0.
@@ -9228,23 +8870,26 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             break_match_hyp_inv.
             cbn.
 
-            assert (exists x1, Int32.signed x1 = Z.pred (Z.pos p')) as (x1 & X1).
+            subst_existT.
+            assert (exists x1, @Integers.signed sz0 x1 = Z.pred (Z.pos p')) as (x1' & X1').
             { exists (repr (Z.pred (Z.pos p'))).
-              pose proof Int32.min_signed_neg.
-              rewrite Int32.signed_repr; eauto.
-              pose proof Int32.signed_range x0.
-              lia.
+              pose proof (@Integers.min_signed_neg sz0).
+              unfold repr.
+              cbn.
+              rewrite (@Integers.signed_repr sz0); eauto.
+              pose proof Integers.signed_range x0.
+              break_match_goal; lia.
             }
 
-            specialize (IHelts x1 res).
+            specialize (IHelts x1' res).
             forward IHelts.
-            { rewrite X1.
+            { rewrite X1'.
               cbn.
               destruct p'; cbn; auto.
             }
 
             unfold fin_to_inf_dvalue in IHelts.
-            move IHelts after X1.
+            move IHelts after X1'.
             break_match_hyp_inv.
 
             { move Heqd0 after H0;
@@ -9266,136 +8911,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
                 destruct (dvalue_convert_strict_fin_inf_succeeds res).
                 rewrite e in e0; inv e0.
-                inv H3;
-                rewrite X1 in H2.
-                rewrite X1.
-
-                cbn in H2.
-                inv Heqo.
-                destruct p'; cbn in *; eauto.
-              }
-
-              { move Heqd0 after H2.
-                break_match_hyp_inv; clear Heqs; destruct p; clear e1;
-                  cbn in e0; inv e0.
-                inv H3.
-              }
-            }
-      }
-
-      { (* i64 index *)
-        generalize dependent res.
-        generalize dependent x.
-        induction elts; intros x res H0.
-        - break_match_hyp_inv;
-            unfold fin_to_inf_dvalue;
-            try rename p into p';
-
-            break_match_goal;
-            break_match_hyp; clear Heqs; destruct p; clear e0;
-            cbn in e; inv e; inv H0;
-
-            break_match_goal;
-            break_match_hyp; clear Heqs; destruct p; clear e0;
-            cbn in e; inv e; inv H0;
-
-            cbn;
-            rewrite Heqz;
-
-            break_match_goal; clear Heqs; destruct p; clear e0;
-            cbn in e; inv e;
-
-            auto.
-        - cbn in H0.
-          break_match_hyp_inv.
-          + (* Index 0 *)
-            clear IHelts.
-            unfold fin_to_inf_dvalue.
-
-            break_match_goal;
-              break_match_hyp; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e;
-              break_match_hyp_inv.
-
-            break_match_goal;
-              break_match_hyp; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; inv H0.
-
-            destruct (dvalue_convert_strict_fin_inf_succeeds res).
-            rewrite e in Heqo.
-            cbn.
-            rewrite Heqz.
-            break_match_hyp_inv.
-            cbn.
-            break_match_goal; clear Heqs; destruct p.
-            rewrite e in e0.
-            inv e0.
-            auto.
-          + (* Index positive *)
-            unfold fin_to_inf_dvalue.
-            rename p into p'.
-
-            break_match_goal;
-              break_match_hyp; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e;
-              break_match_hyp_inv.
-
-            break_match_goal;
-              break_match_hyp; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; inv H0.
-
-            destruct (dvalue_convert_strict_fin_inf_succeeds res).
-            break_match_hyp_inv.
-            cbn; rewrite Heqz.
-            break_match_hyp_inv.
-            cbn.
-
-            assert (exists x1, Int64.signed x1 = Z.pred (Z.pos p')) as (x1 & X1).
-            { exists (repr (Z.pred (Z.pos p'))).
-              pose proof Int64.min_signed_neg.
-              rewrite Int64.signed_repr; eauto.
-              pose proof Int64.signed_range x0.
-              lia.
-            }
-
-            specialize (IHelts x1 res).
-            forward IHelts.
-            { rewrite X1.
-              cbn.
-              destruct p'; cbn; auto.
-            }
-
-            unfold fin_to_inf_dvalue in IHelts.
-            move IHelts after X1.
-            break_match_hyp_inv.
-
-            { move Heqd0 after H0;
-                break_match_hyp_inv; clear Heqs; destruct p; clear e1;
-                cbn in e0;
-                break_match_hyp_inv; inv H3.
-            }
-
-            { move Heqd0 after H0.
-              break_match_hyp_inv; clear Heqs; destruct p; clear e1;
-                cbn in e0; inv e0.
-              break_match_hyp_inv.
-
-              break_match_hyp_inv.
-              { move Heqd0 after H2.
-                break_match_hyp_inv; clear Heqs; destruct p; clear e1;
-                  cbn in e0; inv e0;
-                  inv H3.
-              }
-
-              { move Heqd0 after H2.
-                break_match_hyp_inv; clear Heqs; destruct p; clear e1;
-                  cbn in e0; inv e0;
-                  inv H3.
-
-                destruct (dvalue_convert_strict_fin_inf_succeeds res).
-                rewrite e in e0; inv e0.
-                rewrite X1 in H2.
-                rewrite X1.
+                inv H3; subst_existT;
+                rewrite X1' in H2.
+                rewrite X1'.
 
                 cbn in H2.
                 inv Heqo.
@@ -9498,34 +9016,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     break_match_hyp_inv.
     { (* Arrays *)
       break_match_hyp_inv.
-      { (* i32 index *)
+      { (* ix index *)
         rewrite fin_to_inf_dvalue_array.
-        rewrite fin_to_inf_dvalue_i32.
-        cbn.
-        break_match_hyp_inv.
-        - (* Index 0 *)
-          break_match_hyp_inv.
-          + apply insert_into_vec_dv_loop_fin_inf_succeeds in Heqo.
-            setoid_rewrite Heqo; cbn.
-            rewrite fin_to_inf_dvalue_array.
-            auto.
-          + apply insert_into_vec_dv_loop_fin_inf_fails in Heqo.
-            setoid_rewrite Heqo; cbn.
-            rewrite fin_to_inf_dvalue_poison; auto.
-        - (* Index positive *)
-          break_match_hyp_inv.
-          + apply insert_into_vec_dv_loop_fin_inf_succeeds in Heqo.
-            setoid_rewrite Heqo; cbn.
-            rewrite fin_to_inf_dvalue_array.
-            auto.
-          + apply insert_into_vec_dv_loop_fin_inf_fails in Heqo.
-            setoid_rewrite Heqo; cbn.
-            rewrite fin_to_inf_dvalue_poison; auto.
-      }
-
-      { (* i64 index *)
-        rewrite fin_to_inf_dvalue_array.
-        rewrite fin_to_inf_dvalue_i64.
+        rewrite fin_to_inf_dvalue_ix.
         cbn.
         break_match_hyp_inv.
         - (* Index 0 *)
@@ -9551,34 +9044,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     { (* Vectors *)
       break_match_hyp_inv.
-      { (* i32 index *)
+      { (* ix index *)
         rewrite fin_to_inf_dvalue_vector.
-        rewrite fin_to_inf_dvalue_i32.
-        cbn.
-        break_match_hyp_inv.
-        - (* Index 0 *)
-          break_match_hyp_inv.
-          + apply insert_into_vec_dv_loop_fin_inf_succeeds in Heqo.
-            setoid_rewrite Heqo; cbn.
-            rewrite fin_to_inf_dvalue_vector.
-            auto.
-          + apply insert_into_vec_dv_loop_fin_inf_fails in Heqo.
-            setoid_rewrite Heqo; cbn.
-            rewrite fin_to_inf_dvalue_poison; auto.
-        - (* Index positive *)
-          break_match_hyp_inv.
-          + apply insert_into_vec_dv_loop_fin_inf_succeeds in Heqo.
-            setoid_rewrite Heqo; cbn.
-            rewrite fin_to_inf_dvalue_vector.
-            auto.
-          + apply insert_into_vec_dv_loop_fin_inf_fails in Heqo.
-            setoid_rewrite Heqo; cbn.
-            rewrite fin_to_inf_dvalue_poison; auto.
-      }
-
-      { (* i64 index *)
-        rewrite fin_to_inf_dvalue_vector.
-        rewrite fin_to_inf_dvalue_i64.
+        rewrite fin_to_inf_dvalue_ix.
         cbn.
         break_match_hyp_inv.
         - (* Index 0 *)
@@ -9924,8 +9392,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma eval_select_cond_fin_inf :
     forall a d d0 x,
       match a with
-      | DVALUE_I1 i =>
-          if (Int1.unsigned i =? 1)%Z
+      | @DVALUE_I 1 i =>
+          if (@Integers.unsigned 1 i =? 1)%Z
           then fun y : err_ub_oom dvalue => success_unERR_UB_OOM d = y
           else fun y : err_ub_oom dvalue => success_unERR_UB_OOM d0 = y
       | DVALUE_Poison t => fun y : err_ub_oom dvalue => success_unERR_UB_OOM (DVALUE_Poison t) = y
@@ -9935,8 +9403,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1." = ue
       end x ->
       match fin_to_inf_dvalue a with
-      | E1.DV.DVALUE_I1 i =>
-          if (Int1.unsigned i =? 1)%Z
+      | @E1.DV.DVALUE_I 1 i =>
+          if (@Integers.unsigned 1 i =? 1)%Z
           then fun y : err_ub_oom DVCrev.DV2.dvalue => success_unERR_UB_OOM (fin_to_inf_dvalue d) = y
           else fun y : err_ub_oom DVCrev.DV2.dvalue => success_unERR_UB_OOM (fin_to_inf_dvalue d0) = y
       | E1.DV.DVALUE_Poison t => fun y : err_ub_oom DVCrev.DV2.dvalue => success_unERR_UB_OOM (E1.DV.DVALUE_Poison t) = y
@@ -9962,6 +9430,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { (* i1 *)
       rewrite_fin_to_inf_dvalue.
       break_match_hyp; subst; cbn; auto.
+      break_match_hyp; subst; cbn; auto.
     }
 
     { (* Poison *)
@@ -9983,8 +9452,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 | DVALUE_Poison t =>
                     (* TODO: Should be the type of the result of the select... *)
                     @ret ErrUbOomProp Monad_ErrUbOomProp _ (DVALUE_Poison t)
-                | DVALUE_I1 i =>
-                    if (Int1.unsigned i =? 1)%Z
+                | @DVALUE_I 1 i =>
+                    if (@Integers.unsigned 1 i =? 1)%Z
                     then @ret ErrUbOomProp Monad_ErrUbOomProp _ x
                     else @ret ErrUbOomProp Monad_ErrUbOomProp _ y
                 | _ =>
@@ -10008,8 +9477,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 | IS1.LP.Events.DV.DVALUE_Poison t =>
                     (* TODO: Should be the type of the result of the select... *)
                     @ret ErrUbOomProp Monad_ErrUbOomProp _ (IS1.LP.Events.DV.DVALUE_Poison t)
-                | IS1.LP.Events.DV.DVALUE_I1 i =>
-                    if (Int1.unsigned i =? 1)%Z
+                | @IS1.LP.Events.DV.DVALUE_I 1 i =>
+                    if (@Integers.unsigned 1 i =? 1)%Z
                     then @ret ErrUbOomProp Monad_ErrUbOomProp _ x
                     else @ret ErrUbOomProp Monad_ErrUbOomProp _ y
                 | _ =>
@@ -10174,14 +9643,37 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { (* i1 conditional *)
       rewrite eval_select_equation in *.
       rewrite IS1.MEM.CP.CONC.eval_select_equation.
-      rewrite fin_to_inf_dvalue_i1.
+      rewrite fin_to_inf_dvalue_ix.
 
+      break_match; try inv EVAL.
       break_match.
       - eapply IH1; eauto.
       - eapply IH2; eauto.
     }
 
-    14: { (* Vector conditional *)
+    all: try solve
+           [ unfold fin_to_inf_dvalue at 1;
+             break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e;
+             cbn in *; subst; cbn in *; inv EVAL; auto
+           | unfold fin_to_inf_dvalue at 1;
+             break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e;
+             cbn in *; subst; cbn in *; reflexivity
+           | unfold fin_to_inf_dvalue at 1;
+             break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; break_match_hyp_inv;
+             cbn in *; subst; cbn in *; auto; inv EVAL
+           ].
+
+    { (* Poison *)
+      rewrite fin_to_inf_dvalue_poison.
+      cbn in *; subst; cbn; inv EVAL.
+      rewrite fin_to_inf_dvalue_poison.
+      reflexivity.
+    }
+
+    { (* Vector conditional *)
       rewrite eval_select_equation in *.
       rewrite IS1.MEM.CP.CONC.eval_select_equation.
 
@@ -10205,8 +9697,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn.
         repeat red.
 
-        exists (ret (fin_to_inf_dvalue (DVALUE_Poison t))).
-        exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 (DVALUE_Poison t)))).
+        exists (ret (fin_to_inf_dvalue (DVALUE_Poison t0))).
+        exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 (DVALUE_Poison t0)))).
 
         split.
         eapply IH1; eauto.
@@ -10243,8 +9735,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn.
         repeat red.
 
-        exists (ret (fin_to_inf_dvalue (DVALUE_Vector elts0))).
-        exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 (DVALUE_Vector elts0)))).
+        exists (ret (fin_to_inf_dvalue (DVALUE_Vector t0 elts0))).
+        exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 (DVALUE_Vector t0 elts0)))).
 
         split.
         eapply IH1; eauto.
@@ -10260,8 +9752,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn in H1.
         subst.
 
-        exists (ret (fin_to_inf_dvalue (DVALUE_Poison t))).
-        exists (fun dv_inf => (fmap fin_to_inf_dvalue (x2 (DVALUE_Poison t)))).
+        exists (ret (fin_to_inf_dvalue (DVALUE_Poison t1))).
+        exists (fun dv_inf => (fmap fin_to_inf_dvalue (x2 (DVALUE_Poison t1)))).
 
         split.
         eapply IH2; eauto.
@@ -10288,21 +9780,21 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       pose proof (IH2 _ H0) as IHelts2.
 
       cbn in H1.
-      remember (x2 (DVALUE_Vector elts2_fin)) as x2elts.
+      remember (x2 (DVALUE_Vector t1 elts2_fin)) as x2elts.
       destruct_err_ub_oom x2elts; inv H5.
       cbn in H1.
 
       repeat red.
-      exists (ret (fin_to_inf_dvalue (DVALUE_Vector elts1_fin))).
-      exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 (DVALUE_Vector elts1_fin)))).
+      exists (ret (fin_to_inf_dvalue (DVALUE_Vector t0 elts1_fin))).
+      exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 (DVALUE_Vector t0 elts1_fin)))).
       cbn; rewrite <- H1; cbn.
       split; eauto.
       split; eauto.
 
       right; intros a ?; subst.
       repeat red.
-      exists (ret (fin_to_inf_dvalue (DVALUE_Vector elts2_fin))).
-      exists (fun dv_inf => (fmap fin_to_inf_dvalue (x2 (DVALUE_Vector elts2_fin)))).
+      exists (ret (fin_to_inf_dvalue (DVALUE_Vector t1 elts2_fin))).
+      exists (fun dv_inf => (fmap fin_to_inf_dvalue (x2 (DVALUE_Vector t1 elts2_fin)))).
       cbn; rewrite <- Heqx2elts; cbn.
       split; eauto.
       split; eauto.
@@ -10311,7 +9803,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       do 2 rewrite fin_to_inf_dvalue_vector.
       repeat red.
       exists (fmap (map fin_to_inf_dvalue) x).
-      exists (fun elts => ret (IS1.LP.Events.DV.DVALUE_Vector elts)).
+      exists (fun elts => ret (IS1.LP.Events.DV.DVALUE_Vector t0 elts)).
       split; eauto.
       split; eauto.
 
@@ -10322,28 +9814,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv H6.
       cbn.
       rewrite fin_to_inf_dvalue_vector.
-      reflexivity.
-    }
-
-    all: try solve
-           [ unfold fin_to_inf_dvalue at 1;
-             break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e;
-             cbn in *; subst; cbn in *; inv EVAL; auto
-           | unfold fin_to_inf_dvalue at 1;
-             break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e;
-             cbn in *; subst; cbn in *; reflexivity
-           | unfold fin_to_inf_dvalue at 1;
-             break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; break_match_hyp_inv;
-             cbn in *; subst; cbn in *; auto; inv EVAL
-           ].
-
-    { (* Poison *)
-      rewrite fin_to_inf_dvalue_poison.
-      cbn in *; subst; cbn; inv EVAL.
-      rewrite fin_to_inf_dvalue_poison.
       reflexivity.
     }
   Qed.
@@ -11125,7 +10595,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           { eapply map_monad_ErrUbOomProp_forall2.
             apply Util.Forall2_forall.
             split.
-            - rewrite map_length.
+            - rewrite length_map.
 
               apply map_monad_ErrUbOomProp_length in MAP.
               apply Util.Forall2_length in Heqo.
@@ -11199,7 +10669,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           { eapply map_monad_ErrUbOomProp_forall2.
             apply Util.Forall2_forall.
             split.
-            - rewrite map_length.
+            - rewrite length_map.
 
               apply map_monad_ErrUbOomProp_length in MAP.
               apply Util.Forall2_length in Heqo.
@@ -11268,12 +10738,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       repeat red.
       exists (ret (map fin_to_inf_dvalue x1)).
-      exists (fun fields => ret (IS1.LP.Events.DV.DVALUE_Array fields)).
+      exists (fun fields => ret (IS1.LP.Events.DV.DVALUE_Array t fields)).
       split.
       { eapply map_monad_ErrUbOomProp_forall2.
         apply Util.Forall2_forall.
         split.
-        - rewrite map_length.
+        - rewrite length_map.
 
           apply map_monad_ErrUbOomProp_length in MAP.
           apply Util.Forall2_length in Heqo.
@@ -11342,12 +10812,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       repeat red.
       exists (ret (map fin_to_inf_dvalue x1)).
-      exists (fun fields => ret (IS1.LP.Events.DV.DVALUE_Vector fields)).
+      exists (fun fields => ret (IS1.LP.Events.DV.DVALUE_Vector t fields)).
       split.
       { eapply map_monad_ErrUbOomProp_forall2.
         apply Util.Forall2_forall.
         split.
-        - rewrite map_length.
+        - rewrite length_map.
 
           apply map_monad_ErrUbOomProp_length in MAP.
           apply Util.Forall2_length in Heqo.
@@ -12322,35 +11792,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       break_match_hyp_inv; clear Heqs; destruct p; clear e1.
       cbn in e.
       inv e.
-      eapply DVCrev.dvalue_convert_strict_i1_inv in e0.
-      subst; auto.
-    - unfold fin_to_inf_dvalue in *.
-      break_match_hyp; clear Heqs; destruct p; clear e0.
-      break_match_hyp_inv; clear Heqs; destruct p; clear e1.
-      cbn in e.
-      inv e.
-      eapply DVCrev.dvalue_convert_strict_i8_inv in e0.
-      subst; auto.
-    - unfold fin_to_inf_dvalue in *.
-      break_match_hyp; clear Heqs; destruct p; clear e0.
-      break_match_hyp_inv; clear Heqs; destruct p; clear e1.
-      cbn in e.
-      inv e.
-      eapply DVCrev.dvalue_convert_strict_i16_inv in e0.
-      subst; auto.
-    - unfold fin_to_inf_dvalue in *.
-      break_match_hyp; clear Heqs; destruct p; clear e0.
-      break_match_hyp_inv; clear Heqs; destruct p; clear e1.
-      cbn in e.
-      inv e.
-      eapply DVCrev.dvalue_convert_strict_i32_inv in e0.
-      subst; auto.
-    - unfold fin_to_inf_dvalue in *.
-      break_match_hyp; clear Heqs; destruct p; clear e0.
-      break_match_hyp_inv; clear Heqs; destruct p; clear e1.
-      cbn in e.
-      inv e.
-      eapply DVCrev.dvalue_convert_strict_i64_inv in e0.
+      eapply DVCrev.dvalue_convert_strict_ix_inv in e0.
       subst; auto.
     - unfold fin_to_inf_dvalue in *.
       break_match_hyp; clear Heqs; destruct p; clear e0.
@@ -12563,155 +12005,23 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   (* TODO: Move this *)
-  Lemma eval_int_op_i1_ub_fin_inf :
-    forall v1 v2 iop ub_msg,
-      @eval_int_op err_ub_oom int1 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+  Lemma eval_int_op_ix_ub_fin_inf :
+    forall sz v1 v2 iop ub_msg,
+      @eval_int_op err_ub_oom (@Integers.int sz) (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int1 VInt1) ToDvalue_Int1
+        (@VIntVMemInt (@Integers.int sz) (@VInt_Bounded sz)) (@ToDvalue_Int sz)
         iop v1 v2 = UB_unERR_UB_OOM ub_msg ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom int1
+      @IS1.LP.Events.DV.eval_int_op err_ub_oom (@Integers.int sz)
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int1 VInt1) IS1.LP.Events.DV.ToDvalue_Int1
+        (@VIntVMemInt (@Integers.int sz) (@VInt_Bounded sz)) (@IS1.LP.Events.DV.ToDvalue_Int sz)
         iop v1 v2 = UB_unERR_UB_OOM ub_msg.
   Proof.
-    intros v1 v2 iop ub_msg EVAL.
-    destruct iop;
-      try solve
-        [ cbn in *;
-          repeat break_match_hyp_inv; cbn in *;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; cbn in *; inv EVAL;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; auto
-        ].
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma eval_int_op_i8_ub_fin_inf :
-    forall v1 v2 iop ub_msg,
-      @eval_int_op err_ub_oom int8 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int8 VInt8) ToDvalue_Int8
-        iop v1 v2 = UB_unERR_UB_OOM ub_msg ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom int8
-        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int8 VInt8) IS1.LP.Events.DV.ToDvalue_Int8
-        iop v1 v2 = UB_unERR_UB_OOM ub_msg.
-  Proof.
-    intros v1 v2 iop ub_msg EVAL.
-    destruct iop;
-      try solve
-        [ cbn in *;
-          repeat break_match_hyp_inv; cbn in *;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; cbn in *; inv EVAL;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; auto
-        ].
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma eval_int_op_i16_ub_fin_inf :
-    forall v1 v2 iop ub_msg,
-      @eval_int_op err_ub_oom int16 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int16 VInt16) ToDvalue_Int16
-        iop v1 v2 = UB_unERR_UB_OOM ub_msg ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom int16
-        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int16 VInt16) IS1.LP.Events.DV.ToDvalue_Int16
-        iop v1 v2 = UB_unERR_UB_OOM ub_msg.
-  Proof.
-    intros v1 v2 iop ub_msg EVAL.
-    destruct iop;
-      try solve
-        [ cbn in *;
-          repeat break_match_hyp_inv; cbn in *;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; cbn in *; inv EVAL;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; auto
-        ].
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma eval_int_op_i32_ub_fin_inf :
-    forall v1 v2 iop ub_msg,
-      @eval_int_op err_ub_oom int32 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int32 VInt32) ToDvalue_Int32
-        iop v1 v2 = UB_unERR_UB_OOM ub_msg ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom int32
-        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int32 VInt32) IS1.LP.Events.DV.ToDvalue_Int32
-        iop v1 v2 = UB_unERR_UB_OOM ub_msg.
-  Proof.
-    intros v1 v2 iop ub_msg EVAL.
-    destruct iop;
-      try solve
-        [ cbn in *;
-          repeat break_match_hyp_inv; cbn in *;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; cbn in *; inv EVAL;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; auto
-        ].
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma eval_int_op_i64_ub_fin_inf :
-    forall v1 v2 iop ub_msg,
-      @eval_int_op err_ub_oom int64 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int64 VInt64) ToDvalue_Int64
-        iop v1 v2 = UB_unERR_UB_OOM ub_msg ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom int64
-        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int64 VInt64) IS1.LP.Events.DV.ToDvalue_Int64
-        iop v1 v2 = UB_unERR_UB_OOM ub_msg.
-  Proof.
-    intros v1 v2 iop ub_msg EVAL.
+    intros sz v1 v2 iop ub_msg EVAL.
     destruct iop;
       try solve
         [ cbn in *;
@@ -12908,164 +12218,28 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Hint Resolve
-    eval_int_op_i1_ub_fin_inf
-    eval_int_op_i8_ub_fin_inf
-    eval_int_op_i16_ub_fin_inf
-    eval_int_op_i32_ub_fin_inf
-    eval_int_op_i64_ub_fin_inf
+    eval_int_op_ix_ub_fin_inf
     eval_int_op_iptr_ub_fin_inf
     : EVAL_INT_FIN_INF.
 
   (* TODO: Move this *)
-  Lemma eval_int_op_i1_err_fin_inf :
-    forall v1 v2 iop err_msg,
-      @eval_int_op err_ub_oom int1 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+  Lemma eval_int_op_ix_err_fin_inf :
+    forall sz v1 v2 iop err_msg,
+      @eval_int_op err_ub_oom (@Integers.int sz) (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int1 VInt1) ToDvalue_Int1
+        (@VIntVMemInt (@Integers.int sz) (@VInt_Bounded sz)) (@ToDvalue_Int sz)
         iop v1 v2 = ERR_unERR_UB_OOM err_msg ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom int1
+      @IS1.LP.Events.DV.eval_int_op err_ub_oom (@Integers.int sz)
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int1 VInt1) IS1.LP.Events.DV.ToDvalue_Int1
+        (@VIntVMemInt (@Integers.int sz) (@VInt_Bounded sz)) (@IS1.LP.Events.DV.ToDvalue_Int sz)
         iop v1 v2 = ERR_unERR_UB_OOM err_msg.
   Proof.
-    intros v1 v2 iop ub_msg EVAL.
-    destruct iop;
-      try solve
-        [ cbn in *;
-          repeat break_match_hyp_inv; cbn in *;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; cbn in *; inv EVAL;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; auto
-        ].
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma eval_int_op_i8_err_fin_inf :
-    forall v1 v2 iop err_msg,
-      @eval_int_op err_ub_oom int8 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int8 VInt8) ToDvalue_Int8
-        iop v1 v2 = ERR_unERR_UB_OOM err_msg ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom int8
-        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int8 VInt8) IS1.LP.Events.DV.ToDvalue_Int8
-        iop v1 v2 = ERR_unERR_UB_OOM err_msg.
-  Proof.
-    intros v1 v2 iop err_msg EVAL.
-    destruct iop;
-      try solve
-        [ cbn in *;
-          repeat break_match_hyp_inv; cbn in *;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; cbn in *; inv EVAL;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; auto
-        ].
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma eval_int_op_i16_err_fin_inf :
-    forall v1 v2 iop err_msg,
-      @eval_int_op err_ub_oom int16 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int16 VInt16) ToDvalue_Int16
-        iop v1 v2 = ERR_unERR_UB_OOM err_msg ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom int16
-        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int16 VInt16) IS1.LP.Events.DV.ToDvalue_Int16
-        iop v1 v2 = ERR_unERR_UB_OOM err_msg.
-  Proof.
-    intros v1 v2 iop err_msg EVAL.
-    destruct iop;
-      try solve
-        [ cbn in *;
-          repeat break_match_hyp_inv; cbn in *;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; cbn in *; inv EVAL;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; auto
-        ].
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma eval_int_op_i32_err_fin_inf :
-    forall v1 v2 iop err_msg,
-      @eval_int_op err_ub_oom int32 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int32 VInt32) ToDvalue_Int32
-        iop v1 v2 = ERR_unERR_UB_OOM err_msg ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom int32
-        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int32 VInt32) IS1.LP.Events.DV.ToDvalue_Int32
-        iop v1 v2 = ERR_unERR_UB_OOM err_msg.
-  Proof.
-    intros v1 v2 iop err_msg EVAL.
-    destruct iop;
-      try solve
-        [ cbn in *;
-          repeat break_match_hyp_inv; cbn in *;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; cbn in *; inv EVAL;
-          cbn in CONV; inv CONV;
-          cbn in *; reflexivity
-        | cbn in *;
-          repeat break_match_hyp_inv; auto
-        ].
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma eval_int_op_i64_err_fin_inf :
-    forall v1 v2 iop err_msg,
-      @eval_int_op err_ub_oom int64 (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int64 VInt64) ToDvalue_Int64
-        iop v1 v2 = ERR_unERR_UB_OOM err_msg ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom int64
-        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt int64 VInt64) IS1.LP.Events.DV.ToDvalue_Int64
-        iop v1 v2 = ERR_unERR_UB_OOM err_msg.
-  Proof.
-    intros v1 v2 iop err_msg EVAL.
+    intros sz v1 v2 iop ub_msg EVAL.
     destruct iop;
       try solve
         [ cbn in *;
@@ -13269,11 +12443,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Hint Resolve
-    eval_int_op_i1_err_fin_inf
-    eval_int_op_i8_err_fin_inf
-    eval_int_op_i16_err_fin_inf
-    eval_int_op_i32_err_fin_inf
-    eval_int_op_i64_err_fin_inf
+    eval_int_op_ix_err_fin_inf
     eval_int_op_iptr_err_fin_inf
     : EVAL_INT_FIN_INF.
 
@@ -13418,6 +12588,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn;
       try setoid_rewrite Heqb; eauto with EVAL_INT_FIN_INF.
 
+    { (* dv1: ix *)
+      unfold intptr_fin_inf.
+      repeat break_match_goal; try contradiction.
+      dependent destruction e; cbn in *; subst.
+      eapply eval_int_op_ix_ub_fin_inf; eauto.
+    }
+
     { (* dv1: iptr *)
       unfold intptr_fin_inf.
       repeat break_match_goal.
@@ -13453,6 +12630,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn;
       try setoid_rewrite Heqb; eauto with EVAL_INT_FIN_INF.
 
+    { (* dv1: ix *)
+      unfold intptr_fin_inf.
+      repeat break_match_goal; try contradiction.
+      dependent destruction e; cbn in *; subst.
+      eapply eval_int_op_ix_err_fin_inf; eauto.
+    }
+
+    { (* dv1: ix *)
+      unfold intptr_fin_inf.
+      repeat break_match_goal; try contradiction; auto.
+    }
+
     { (* dv1: iptr *)
       unfold intptr_fin_inf.
       repeat break_match_goal.
@@ -13487,6 +12676,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       rewrite_fin_to_inf_dvalue;
       cbn;
       try setoid_rewrite Heqb; eauto with EVAL_INT_FIN_INF.
+
+    { (* dv1: ix *)
+      unfold intptr_fin_inf.
+      repeat break_match_goal; try contradiction.
+      dependent destruction e; cbn in *; subst.
+      eapply eval_int_op_ix_ub_fin_inf; eauto.
+    }
 
     { (* dv1: iptr *)
       unfold fin_to_inf_dvalue.
@@ -13536,6 +12732,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       rewrite_fin_to_inf_dvalue;
       cbn;
       try setoid_rewrite Heqb; eauto with EVAL_INT_FIN_INF.
+
+    { (* dv1: ix *)
+      unfold intptr_fin_inf.
+      repeat break_match_goal; try contradiction.
+      dependent destruction e; cbn in *; subst.
+      eapply eval_int_op_ix_err_fin_inf; eauto.
+    }
+
+    { (* dv1: ix *)
+      unfold intptr_fin_inf.
+      repeat break_match_goal; try contradiction; auto.
+    }
 
     { (* dv1: iptr *)
       unfold fin_to_inf_dvalue.
@@ -13711,6 +12919,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       auto.
     }
 
+    { (* dv1: ix *)
+      unfold intptr_fin_inf.
+      repeat break_match_hyp_inv; try contradiction; cbn in *; subst.
+      repeat rewrite_fin_to_inf_dvalue; cbn.
+      unfold IS1.MEM.CP.CONC.eval_icmp.
+      break_match_goal; try contradiction.
+      dependent destruction e; cbn.
+      eapply eval_int_icmp_ub_fin_inf; eauto.
+    }
+
     { (* dv1: iptr *)
       break_match_hyp_inv.
       repeat rewrite_fin_to_inf_dvalue.
@@ -13823,6 +13041,22 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         eapply eval_int_icmp_err_fin_inf in H1;
         repeat rewrite ptr_to_int_fin_to_inf_addr;
         auto.
+    }
+
+    { (* dv1: ix *)
+      break_match_hyp_inv;
+        try repeat setoid_rewrite <- show_dvalue_fin_inf;
+        repeat rewrite_fin_to_inf_dvalue;
+        cbn;
+        repeat rewrite show_dvalue_fin_inf;
+        repeat rewrite_fin_to_inf_dvalue;
+        try reflexivity;
+        repeat rewrite_fin_to_inf_dvalue.
+      cbn.
+      unfold intptr_fin_inf.
+      unfold IS1.MEM.CP.CONC.eval_icmp.
+      break_match_hyp_inv; cbn in *; try contradiction; try reflexivity.
+      eapply eval_int_icmp_err_fin_inf in H0; eauto.
     }
 
     { (* dv1: iptr *)
@@ -14059,7 +13293,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           constructor.
           constructor.
           right; auto.
-        - specialize (IHclos_trans2 _ eq_refl).
+        - specialize (IHclos_trans2 t _ eq_refl).
           eapply t_trans.
           apply H0_.
           apply IHclos_trans2.        
@@ -14094,7 +13328,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           constructor.
           constructor.
           right; auto.
-        - specialize (IHclos_trans2 _ eq_refl).
+        - specialize (IHclos_trans2 t _ eq_refl).
           eapply t_trans.
           apply H0_.
           apply IHclos_trans2.        
@@ -14217,19 +13451,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     break_match_hyp_inv.
     { (* Arrays *)
       break_match_hyp_inv.
-      { (* i32 index *)
-        repeat break_match_hyp_inv.
-        - induction elts; cbn in *; inv H0.
-        - clear Heqz.
-          remember (Z.pos p) as z.
-          clear Heqz p.
-          generalize dependent z.
-          induction elts; intros z CONTRA; cbn in *; inv CONTRA.
-          break_match_hyp_inv.
-          eapply IHelts in H1; auto.
-      }
-
-      { (* i64 index *)
+      { (* ix index *)
         repeat break_match_hyp_inv.
         - induction elts; cbn in *; inv H0.
         - clear Heqz.
@@ -14244,19 +13466,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     { (* Vectors *)
       break_match_hyp_inv.
-      { (* i32 index *)
-        repeat break_match_hyp_inv.
-        - induction elts; cbn in *; inv H0.
-        - clear Heqz.
-          remember (Z.pos p) as z.
-          clear Heqz p.
-          generalize dependent z.
-          induction elts; intros z CONTRA; cbn in *; inv CONTRA.
-          break_match_hyp_inv.
-          eapply IHelts in H1; auto.
-      }
-
-      { (* i64 index *)
+      { (* ix index *)
         repeat break_match_hyp_inv.
         - induction elts; cbn in *; inv H0.
         - clear Heqz.
@@ -14339,14 +13549,30 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { (* i1 conditional *)
       rewrite eval_select_equation in *.
       rewrite IS1.MEM.CP.CONC.eval_select_equation.
-      rewrite fin_to_inf_dvalue_i1.
+      rewrite fin_to_inf_dvalue_ix.
 
+      break_match; try inv EVAL.
       break_match.
       - eapply IH1; eauto.
       - eapply IH2; eauto.
     }
 
-    14: { (* Vector conditional *)
+    all: try solve
+           [ unfold fin_to_inf_dvalue at 1;
+             break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e;
+             cbn in *; subst; cbn in *; inv EVAL; auto
+           | unfold fin_to_inf_dvalue at 1;
+             break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e;
+             cbn in *; subst; cbn in *; reflexivity
+           | unfold fin_to_inf_dvalue at 1;
+             break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; break_match_hyp_inv;
+             cbn in *; subst; cbn in *; auto; inv EVAL
+           ].
+
+    { (* Vector conditional *)
       rewrite eval_select_equation in *.
       rewrite IS1.MEM.CP.CONC.eval_select_equation.
 
@@ -14423,21 +13649,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn in H4.
       rewrite <- H4 in H7; inv H7.
     }
-
-    all: try solve
-           [ unfold fin_to_inf_dvalue at 1;
-             break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e;
-             cbn in *; subst; cbn in *; inv EVAL; auto
-           | unfold fin_to_inf_dvalue at 1;
-             break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e;
-             cbn in *; subst; cbn in *; reflexivity
-           | unfold fin_to_inf_dvalue at 1;
-             break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; break_match_hyp_inv;
-             cbn in *; subst; cbn in *; auto; inv EVAL
-           ].
   Qed.
 
   Lemma concretize_uvalue_bytes_helper_ub_fin_inf :
@@ -15066,7 +14277,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               constructor.
               constructor.
               right; auto.
-            - specialize (IHclos_trans2 l eq_refl).
+            - specialize (IHclos_trans2 t l eq_refl).
               eapply t_trans.
               apply H5_.
               apply IHclos_trans2.
@@ -15176,7 +14387,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               constructor.
               constructor.
               right; auto.
-            - specialize (IHclos_trans2 l eq_refl).
+            - specialize (IHclos_trans2 t l eq_refl).
               eapply t_trans.
               apply H5_.
               apply IHclos_trans2.
@@ -16239,23 +15450,17 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     inv Heqe.
   Qed.
 
-  (* TODO: Move this *)
-  Lemma get_conv_case_illegal_fin_inf:
-    forall conv t_from dv t_to msg,
-      get_conv_case conv t_from dv t_to = Conv_Illegal msg ->
-      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = IS1.LP.Events.DV.Conv_Illegal msg.
+  Lemma get_conv_case_bitcast_illegal_fin_inf :
+    forall (t_from : dtyp)
+      (dv : dvalue)
+      (t_to : dtyp)
+      (msg : string)
+      (CONV : get_conv_case LLVMAst.Bitcast t_from dv t_to = Conv_Illegal msg),
+      IS1.LLVM.MEM.CP.CONC.get_conv_case LLVMAst.Bitcast t_from (fin_to_inf_dvalue dv) t_to =
+        IS1.LP.Events.DV.Conv_Illegal msg.
   Proof.
-    intros conv t_from dv t_to msg CONV.
-    destruct conv;
-      try solve
-        [ cbn in *;
-          repeat break_match_hyp_inv;
-          auto;
-          rewrite_fin_to_inf_dvalue;
-          reflexivity
-        ].
-
-    all: cbn in *; inv CONV; auto.
+    intros t_from dv t_to msg CONV.
+    cbn in *; inv CONV; auto.
 
     unfold MemHelpers.dtyp_eqb,
       IS1.LLVM.MEM.CP.CONC.MemHelpers.dtyp_eqb in *.
@@ -16276,6 +15481,26 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       rewrite dvalue_to_dvalue_bytes_fin_to_inf_dvalue.
       apply dvalue_bytes_refine_fin_to_inf_dvalue_bytes.
     }
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma get_conv_case_illegal_fin_inf:
+    forall conv t_from dv t_to msg,
+      get_conv_case conv t_from dv t_to = Conv_Illegal msg ->
+      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = IS1.LP.Events.DV.Conv_Illegal msg.
+  Proof.
+    intros conv t_from dv t_to msg CONV.
+    destruct conv;
+      try solve
+        [ cbn in *;
+          try inv CONV; try reflexivity;
+          repeat break_match_hyp_inv;
+          auto;
+          rewrite_fin_to_inf_dvalue;
+          auto;
+          try rewrite Heqb; auto
+        ].
+    - apply get_conv_case_bitcast_illegal_fin_inf; auto.
   Qed.
 
   Lemma handle_gep_h_err_fin_inf :
@@ -16304,32 +15529,30 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                    eauto
           ].
 
-      + break_match_hyp_inv; auto;
-          try solve [erewrite IHidxs_fin; eauto; rewrite sizeof_dtyp_fin_inf; eauto
-                    | break_match_hyp_inv; auto;
-                      erewrite IHidxs_fin; eauto;
-                      replace (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (pad_to IS1.LP.SIZEOF.padding (IS1.LP.SIZEOF.sizeof_dtyp t))))%Z) with
-                        (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (pad_to SIZEOF.padding (SIZEOF.sizeof_dtyp t))))%Z); eauto;
-                      apply FunctionalExtensionality.functional_extensionality;
-                      intros;
-                      apply FunctionalExtensionality.functional_extensionality;
-                      intros;
-                      repeat setoid_rewrite sizeof_dtyp_fin_inf;
-                      repeat setoid_rewrite padding_fin_inf;
-                      auto
+      + break_match_hyp_inv; auto.
+        try solve [erewrite IHidxs_fin; eauto;
+                   repeat setoid_rewrite sizeof_dtyp_fin_inf;
+                   repeat setoid_rewrite padding_fin_inf; eauto
+                  | break_match_hyp_inv; auto;
+                    erewrite IHidxs_fin; eauto;
+                    replace (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (pad_to IS1.LP.SIZEOF.padding (IS1.LP.SIZEOF.sizeof_dtyp t))))%Z) with
+                      (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (pad_to SIZEOF.padding (SIZEOF.sizeof_dtyp t))))%Z); eauto;
+                    apply FunctionalExtensionality.functional_extensionality;
+                    intros;
+                    apply FunctionalExtensionality.functional_extensionality;
+                    intros;
+                    repeat setoid_rewrite sizeof_dtyp_fin_inf;
+                    repeat setoid_rewrite padding_fin_inf;
+                    auto
+
             ].
 
-        repeat setoid_rewrite sizeof_dtyp_fin_inf;
-          repeat setoid_rewrite padding_fin_inf; eauto.
-        rewrite H1.
-        eauto.
-      + break_match_hyp_inv; eauto;
+        repeat break_match_hyp_inv;
+          try rewrite H1;
+          try rewrite H0;
           repeat setoid_rewrite sizeof_dtyp_fin_inf;
           repeat setoid_rewrite padding_fin_inf;
-          try erewrite IHidxs_fin; eauto;
-          break_match_hyp_inv; eauto.
-
-        all: rewrite H0.
+          eauto.
 
         replace (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (pad_to IS1.LP.SIZEOF.padding (IS1.LP.SIZEOF.sizeof_dtyp t))))%Z) with
           (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (pad_to SIZEOF.padding (SIZEOF.sizeof_dtyp t))))%Z); eauto;
@@ -16350,16 +15573,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           repeat setoid_rewrite sizeof_dtyp_fin_inf;
           repeat setoid_rewrite padding_fin_inf;
           auto.
-
       + break_match_hyp_inv; eauto;
           repeat setoid_rewrite sizeof_dtyp_fin_inf;
           repeat setoid_rewrite padding_fin_inf;
-          try erewrite IHidxs_fin; eauto;
-          break_match_hyp_inv; eauto.
-      + break_match_hyp_inv; eauto;
-          repeat setoid_rewrite sizeof_dtyp_fin_inf;
-          repeat setoid_rewrite padding_fin_inf;
-          try erewrite IHidxs_fin; eauto.
+          rewrite H1;
+          erewrite IHidxs_fin;
+          eauto.
 
         unfold intptr_fin_inf; break_inner_match_goal; clear Heqs.
         rewrite <- (IS1.LP.IP.from_Z_injective _ _ _ e (IS1.LP.IP.to_Z_from_Z x0)).
@@ -16382,15 +15601,30 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       msg GEP IDXS BASE_ADDR.
 
     destruct idxs_fin; cbn in *; subst; inv GEP; auto.
-    destruct d; rewrite_fin_to_inf_dvalue; cbn in *; inv H0; auto;
-      break_match_hyp_inv;
-      erewrite handle_gep_h_err_fin_inf; eauto;
-      rewrite sizeof_dtyp_fin_inf; eauto;
-      erewrite AC2.addr_convert_ptoi in Heqs; eauto.
+    destruct d; rewrite_fin_to_inf_dvalue; cbn in *; inv H0; auto.
+    { repeat break_match_goal; try solve [try inv H0; try inv H1; auto];
+        break_match_hyp_inv;
+        erewrite handle_gep_h_err_fin_inf in Heqs;
+          erewrite AC2.addr_convert_ptoi in Heqs0; eauto;
+          try rewrite sizeof_dtyp_fin_inf; eauto;
+          inv Heqs; auto.
+    }
 
-    unfold intptr_fin_inf; break_inner_match_goal; clear Heqs0.
-    rewrite <- (IS1.LP.IP.from_Z_injective _ _ _ e (IS1.LP.IP.to_Z_from_Z x0)).
-    eauto.
+    { repeat break_match_goal; try solve [try inv H0; try inv H1; auto];
+        break_match_hyp_inv;
+        erewrite handle_gep_h_err_fin_inf in Heqs;
+          erewrite AC2.addr_convert_ptoi in Heqs0; eauto;
+          try rewrite sizeof_dtyp_fin_inf; eauto;
+          inv Heqs; auto.
+
+      unfold intptr_fin_inf; break_inner_match_goal; clear Heqs1.
+      rewrite <- (IS1.LP.IP.from_Z_injective _ _ _ e (IS1.LP.IP.to_Z_from_Z x0)).
+      eauto.
+
+      unfold intptr_fin_inf; break_inner_match_goal; clear Heqs.
+      rewrite <- (IS1.LP.IP.from_Z_injective _ _ _ e (IS1.LP.IP.to_Z_from_Z x0)).
+      eauto.
+    }
   Qed.
 
   Lemma index_into_vec_dv_err_fin_inf:
@@ -16405,26 +15639,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     break_match_hyp_inv; rewrite_fin_to_inf_dvalue; auto.
     { (* Arrays *)
       break_match_hyp_inv; rewrite_fin_to_inf_dvalue; auto.
-      { (* i32 index *)
-        cbn in *.
-        break_match_hyp_inv; auto.
-        - remember (0%Z) as n.
-          clear Heqn Heqz.
-          generalize dependent n.
-          induction elts; intros n H0.
-          + inv H0.
-          + rewrite Z.eqb_refl in H0. inv H0.
-        - remember (Z.pos p) as n.
-          clear Heqn Heqz.
-          generalize dependent n.
-          induction elts; intros n H0.
-          + inv H0.
-          + cbn.
-            break_match_hyp_inv.
-            rewrite IHelts; eauto.
-      }
-
-      { (* i64 index *)
+      { (* ix index *)
         cbn in *.
         break_match_hyp_inv; auto.
         - remember (0%Z) as n.
@@ -16446,26 +15661,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     { (* Vectors *)
       break_match_hyp_inv; rewrite_fin_to_inf_dvalue; auto.
-      { (* i32 index *)
-        cbn in *.
-        break_match_hyp_inv; auto.
-        - remember (0%Z) as n.
-          clear Heqn Heqz.
-          generalize dependent n.
-          induction elts; intros n H0.
-          + inv H0.
-          + rewrite Z.eqb_refl in H0. inv H0.
-        - remember (Z.pos p) as n.
-          clear Heqn Heqz.
-          generalize dependent n.
-          induction elts; intros n H0.
-          + inv H0.
-          + cbn.
-            break_match_hyp_inv.
-            rewrite IHelts; eauto.
-      }
-
-      { (* i64 index *)
+      { (* ix index *)
         cbn in *.
         break_match_hyp_inv; auto.
         - remember (0%Z) as n.
@@ -16507,25 +15703,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     break_match_hyp_inv; rewrite_fin_to_inf_dvalue; auto.
     { (* Arrays *)
       break_match_hyp_inv; rewrite_fin_to_inf_dvalue; auto; cbn.
-      { (* i32 index *)
-        cbn in *.
-        break_match_hyp_inv; auto.
-        - remember (0%Z) as n.
-          clear Heqn Heqz.
-          generalize dependent n.
-          induction elts; intros n H0.
-          + inv H0.
-          + rewrite Z.eqb_refl in H0. inv H0.
-        - remember (Z.pos p) as n.
-          clear Heqn Heqz.
-          generalize dependent n.
-          induction elts; intros n H0.
-          + inv H0.
-          + cbn.
-            break_match_hyp_inv.
-      }
-
-      { (* i64 index *)
+      { (* ix index *)
         cbn in *.
         break_match_hyp_inv; auto.
         - remember (0%Z) as n.
@@ -16546,25 +15724,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     { (* Vectors *)
       break_match_hyp_inv; rewrite_fin_to_inf_dvalue; auto; cbn.
-      { (* i32 index *)
-        cbn in *.
-        break_match_hyp_inv; auto.
-        - remember (0%Z) as n.
-          clear Heqn Heqz.
-          generalize dependent n.
-          induction elts; intros n H0.
-          + inv H0.
-          + rewrite Z.eqb_refl in H0. inv H0.
-        - remember (Z.pos p) as n.
-          clear Heqn Heqz.
-          generalize dependent n.
-          induction elts; intros n H0.
-          + inv H0.
-          + cbn.
-            break_match_hyp_inv.
-      }
-
-      { (* i64 index *)
+      { (* ix index *)
         cbn in *.
         break_match_hyp_inv; auto.
         - remember (0%Z) as n.
@@ -16687,17 +15847,33 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn in *; subst; cbn in *; auto; inv EVAL; auto.
     }
 
-    { (* i1 conditional *)
+    { (* integer conditional *)
       rewrite eval_select_equation in *.
       rewrite IS1.MEM.CP.CONC.eval_select_equation.
-      rewrite fin_to_inf_dvalue_i1.
+      rewrite fin_to_inf_dvalue_ix.
 
-      break_match.
+      repeat break_match_hyp; cbn in *;
+        try inv EVAL; auto.
       - eapply IH1; eauto.
       - eapply IH2; eauto.
     }
 
-    14: { (* Vector conditional *)
+    all: try solve
+           [ unfold fin_to_inf_dvalue at 1;
+             break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e;
+             cbn in *; subst; cbn in *; inv EVAL; auto
+           | unfold fin_to_inf_dvalue at 1;
+             break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; inv e;
+             cbn in *; subst; cbn in *; reflexivity
+           | unfold fin_to_inf_dvalue at 1;
+             break_match_goal; clear Heqs; destruct p; clear e0;
+              cbn in e; break_match_hyp_inv;
+             cbn in *; subst; cbn in *; auto; inv EVAL; auto
+           ].
+
+    { (* Vector conditional *)
       rewrite eval_select_equation in *.
       rewrite IS1.MEM.CP.CONC.eval_select_equation.
 
@@ -16775,21 +15951,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn in H4.
       rewrite <- H4 in H7; inv H7.
     }
-
-    all: try solve
-           [ unfold fin_to_inf_dvalue at 1;
-             break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e;
-             cbn in *; subst; cbn in *; inv EVAL; auto
-           | unfold fin_to_inf_dvalue at 1;
-             break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e;
-             cbn in *; subst; cbn in *; reflexivity
-           | unfold fin_to_inf_dvalue at 1;
-             break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; break_match_hyp_inv;
-             cbn in *; subst; cbn in *; auto; inv EVAL; auto
-           ].
   Qed.
 
   Lemma concretize_uvalue_bytes_helper_err_fin_inf :
@@ -17249,7 +16410,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               constructor.
               constructor.
               right; auto.
-            - specialize (IHclos_trans2 l eq_refl).
+            - specialize (IHclos_trans2 t l eq_refl).
               eapply t_trans.
               apply H5_.
               apply IHclos_trans2.
@@ -17359,7 +16520,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               constructor.
               constructor.
               right; auto.
-            - specialize (IHclos_trans2 l eq_refl).
+            - specialize (IHclos_trans2 t l eq_refl).
               eapply t_trans.
               apply H5_.
               apply IHclos_trans2.
@@ -17746,7 +16907,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           cbn in H1;
           rewrite <- H1 in H3; inv H3;
           rewrite_fin_to_inf_dvalue; auto.
-        - repeat break_match_hyp_inv; auto.
         - erewrite ptr_to_int_fin_to_inf_addr; eauto.
           unfold lift_OOM in *.
           break_inner_match_hyp;
@@ -18721,7 +17881,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn in *.
       break_match_hyp_inv.
 
-      assert (uvalue_refine_strict (DV1.UVALUE_Array elts) (DV2.UVALUE_Array l)) as REF.
+      assert (uvalue_refine_strict (DV1.UVALUE_Array t elts) (DV2.UVALUE_Array t l)) as REF.
       { unfold uvalue_refine_strict.
         cbn.
         rewrite Heqo.
@@ -18777,7 +17937,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn in *.
       break_match_hyp_inv.
 
-      assert (uvalue_refine_strict (DV1.UVALUE_Array elts) (DV2.UVALUE_Array l)) as REF.
+      assert (uvalue_refine_strict (DV1.UVALUE_Array t elts) (DV2.UVALUE_Array t l)) as REF.
       { unfold uvalue_refine_strict.
         cbn.
         rewrite Heqo.
@@ -19006,7 +18166,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn in *.
       break_match_hyp_inv.
 
-      assert (uvalue_refine_strict (DV1.UVALUE_Array elts) (DV2.UVALUE_Array l)) as REF.
+      assert (uvalue_refine_strict (DV1.UVALUE_Array t elts) (DV2.UVALUE_Array t l)) as REF.
       { unfold uvalue_refine_strict.
         cbn.
         rewrite Heqo.
@@ -19072,7 +18232,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn in *.
       break_match_hyp_inv.
 
-      assert (uvalue_refine_strict (DV1.UVALUE_Array elts) (DV2.UVALUE_Array l)) as REF.
+      assert (uvalue_refine_strict (DV1.UVALUE_Array t elts) (DV2.UVALUE_Array t l)) as REF.
       { unfold uvalue_refine_strict.
         cbn.
         rewrite Heqo.
@@ -19336,7 +18496,7 @@ Qed.
       cbn in *.
       break_match_hyp; inv H.
 
-      assert (uvalue_refine_strict (DV1.UVALUE_Array elts) (DV2.UVALUE_Array l)) as REF.
+      assert (uvalue_refine_strict (DV1.UVALUE_Array t elts) (DV2.UVALUE_Array t l)) as REF.
       { unfold_uvalue_refine_strict.
         cbn.
         rewrite Heqo.
@@ -19401,7 +18561,7 @@ Qed.
       cbn in *.
       break_match_hyp; inv H.
 
-      assert (uvalue_refine_strict (DV1.UVALUE_Array elts) (DV2.UVALUE_Array l)) as REF.
+      assert (uvalue_refine_strict (DV1.UVALUE_Array t elts) (DV2.UVALUE_Array t l)) as REF.
       { unfold_uvalue_refine_strict.
         cbn.
         rewrite Heqo.
@@ -19665,7 +18825,7 @@ Qed.
       cbn in *.
       break_match_hyp; inv H.
 
-      assert (uvalue_refine_strict (DV1.UVALUE_Array elts) (DV2.UVALUE_Array l)) as REF.
+      assert (uvalue_refine_strict (DV1.UVALUE_Array t elts) (DV2.UVALUE_Array t l)) as REF.
       { unfold_uvalue_refine_strict.
         cbn.
         rewrite Heqo.
@@ -19730,7 +18890,7 @@ Qed.
       cbn in *.
       break_match_hyp; inv H.
 
-      assert (uvalue_refine_strict (DV1.UVALUE_Array elts) (DV2.UVALUE_Array l)) as REF.
+      assert (uvalue_refine_strict (DV1.UVALUE_Array t elts) (DV2.UVALUE_Array t l)) as REF.
       { unfold_uvalue_refine_strict.
         cbn.
         rewrite Heqo.
@@ -19994,7 +19154,7 @@ Qed.
       cbn in *.
       break_match_hyp; inv H.
 
-      assert (uvalue_refine_strict (DV1.UVALUE_Array elts) (DV2.UVALUE_Array l)) as REF.
+      assert (uvalue_refine_strict (DV1.UVALUE_Array t elts) (DV2.UVALUE_Array t l)) as REF.
       { unfold_uvalue_refine_strict.
         cbn.
         rewrite Heqo.
@@ -20059,7 +19219,7 @@ Qed.
       cbn in *.
       break_match_hyp; inv H.
 
-      assert (uvalue_refine_strict (DV1.UVALUE_Array elts) (DV2.UVALUE_Array l)) as REF.
+      assert (uvalue_refine_strict (DV1.UVALUE_Array t elts) (DV2.UVALUE_Array t l)) as REF.
       { unfold_uvalue_refine_strict.
         cbn.
         rewrite Heqo.
@@ -20676,8 +19836,8 @@ Qed.
                     | y :: ys0 =>
                         ITree.bind
                           match c with
-                          | IS1.LP.Events.DV.DVALUE_I1 i =>
-                              if (Int1.unsigned i =? 1)%Z then Ret x5 else Ret y
+                          | @IS1.LP.Events.DV.DVALUE_I 1 i =>
+                              if (@Integers.unsigned 1 i =? 1)%Z then Ret x5 else Ret y
                           | IS1.LP.Events.DV.DVALUE_Poison t => Ret (IS1.LP.Events.DV.DVALUE_Poison t)
                           | _ =>
                               LLVMEvents.raise
@@ -20714,7 +19874,7 @@ Qed.
                     | y :: ys0 =>
                         ITree.bind
                           match c with
-                          | DVALUE_I1 i => if (Int1.unsigned i =? 1)%Z then Ret x5 else Ret y
+                          | @DVALUE_I 1 i => if (@Integers.unsigned 1 i =? 1)%Z then Ret x5 else Ret y
                           | DVALUE_Poison t => Ret (DVALUE_Poison t)
                           | _ =>
                               LLVMEvents.raise
@@ -20745,10 +19905,11 @@ Qed.
     { destruct d3;
         dvalue_convert_strict_inv Heqo3; cbn;
         try solve
-          [ apply orutt_raise;
-            [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]
+          [ repeat break_match; (apply orutt_raise;
+            [ intros ? ? CONTRA; inv CONTRA | cbn; auto ])
           ].
-      - break_match;
+      - repeat break_match; try (apply orutt_raise;
+            [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]);
           apply orutt_Ret; eauto.
       - apply orutt_Ret; eauto.
         solve_dvalue_refine_strict.
@@ -21054,7 +20215,7 @@ Qed.
       + (* Arrays *)
         cbn.
         eapply map_monad_oom_Forall2 in H1.
-        assert (Forall2 (fun (a : DV1.uvalue) (b : DV2.uvalue) => uvalue_convert_strict a = NoOom b /\ DV2.uvalue_strict_subterm b (DV2.UVALUE_Array elts)) x elts).
+        assert (Forall2 (fun (a : DV1.uvalue) (b : DV2.uvalue) => uvalue_convert_strict a = NoOom b /\ DV2.uvalue_strict_subterm b (DV2.UVALUE_Array t elts)) x elts).
         { induction H1; cbn; auto.
           constructor.
           - split; eauto.
@@ -21090,7 +20251,7 @@ Qed.
       + (* Vectors *)
         cbn.
         eapply map_monad_oom_Forall2 in H1.
-        assert (Forall2 (fun (a : DV1.uvalue) (b : DV2.uvalue) => uvalue_convert_strict a = NoOom b /\ DV2.uvalue_strict_subterm b (DV2.UVALUE_Vector elts)) x elts).
+        assert (Forall2 (fun (a : DV1.uvalue) (b : DV2.uvalue) => uvalue_convert_strict a = NoOom b /\ DV2.uvalue_strict_subterm b (DV2.UVALUE_Vector t elts)) x elts).
         { induction H1; cbn; auto.
           constructor.
           - split; eauto.
@@ -21200,16 +20361,7 @@ Qed.
               [ apply orutt_raise;
                 [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]
               ].
-          { destruct sz.
-            apply orutt_raise;
-              [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
-
-            repeat (destruct p;
-              try solve
-                [ apply orutt_raise;
-                  [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]
-                   ]).
-            all: apply orutt_Ret;
+          { all: apply orutt_Ret;
               rewrite dvalue_refine_strict_equation; cbn;
               rewrite ptr_to_int_fin_to_inf_addr;
               reflexivity.
@@ -21404,8 +20556,12 @@ Qed.
             [ apply orutt_raise;
               [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]
             ].
-        { (* i1 *)
-          break_match;
+        { (* ix *)
+          repeat break_match_goal;
+            try solve
+              [ apply orutt_raise;
+                [ intros ? ? CONTRA; inv CONTRA | cbn; auto ]
+              ];
             eapply H; eauto; repeat constructor.
         }
 
@@ -21629,17 +20785,10 @@ Qed.
     - apply translate_LU_to_exp_lookup_id_orutt.
 
     - simplify_expr odt.
-      + pose proof (@IX_supported_dec sz)
-          as [SUPPORTED | UNSUPPORTED].
-        * inv SUPPORTED;
-            repeat rewrite map_ret;
-            apply orutt_Ret;
-            rewrite uvalue_refine_strict_equation;
-            reflexivity.
-        *  repeat rewrite unsupported_cases_match; auto;
-             repeat rewrite Raise.raise_map_itree;
-             apply orutt_raise;
-             [intros * CONTRA; dependent destruction CONTRA | cbn; auto].
+      + repeat rewrite map_ret;
+          apply orutt_Ret;
+          rewrite uvalue_refine_strict_equation;
+          reflexivity.
       + repeat rewrite map_bind.
         eapply orutt_bind with
           (RR:=(fun (ip1 : IS1.LP.IP.intptr) (ip2 : IS2.LP.IP.intptr) => IS1.LP.IP.to_Z ip1 = IS2.LP.IP.to_Z ip2)).
@@ -23015,14 +22164,16 @@ Qed.
       apply concretize_or_pick_exp_E_orutt_strict; eauto.
 
       intros r0 r3 H0.
-      break_match; unfold dvalue_refine_strict in *; cbn in *; try break_match_hyp; inv H0;
+      repeat break_match; unfold dvalue_refine_strict in *; cbn in *; try break_match_hyp; inv H0;
         try
           solve
           [ solve_orutt_raise
-          ].
-
-      break_match; apply orutt_Ret; auto.
-      solve_orutt_raiseUB.
+          | solve_orutt_raiseUB
+          ];
+        subst_existT;
+        apply orutt_Ret; cbn; auto.
+      rewrite Heqb in Heqb0; inv Heqb0.
+      rewrite Heqb in Heqb0; inv Heqb0.
     - apply orutt_Ret; auto.
     - destruct v.
       eapply orutt_bind with (RR:=uvalue_refine_strict).
@@ -23070,31 +22221,13 @@ Qed.
           + destruct H2; cbn in *; subst.
             destruct d0; red in fst_rel;
               cbn in fst_rel;
+              subst;
               try break_match_hyp_inv; try inv fst_rel;
               cbn; try solve_orutt_raise.
-            break_match_goal; cbn; eauto.
-            apply orutt_Ret; auto.
-          + destruct H2; cbn in *; subst.
-            destruct d0; red in fst_rel;
-              cbn in fst_rel;
-              try break_match_hyp_inv; try inv fst_rel;
-              cbn; try solve_orutt_raise.
-            break_match_goal; cbn; eauto.
-            apply orutt_Ret; auto.
-          + destruct H2; cbn in *; subst.
-            destruct d0; red in fst_rel;
-              cbn in fst_rel;
-              try break_match_hyp_inv; try inv fst_rel;
-              cbn; try solve_orutt_raise.
-            break_match_goal; cbn; eauto.
-            apply orutt_Ret; auto.
-          + destruct H2; cbn in *; subst.
-            destruct d0; red in fst_rel;
-              cbn in fst_rel;
-              try break_match_hyp_inv; try inv fst_rel;
-              cbn; try solve_orutt_raise.
-            break_match_goal; cbn; eauto.
-            apply orutt_Ret; auto.
+            break_match_goal; subst; cbn; eauto;
+              try solve_orutt_raise.
+            break_match_goal; subst; cbn; eauto;
+              apply orutt_Ret; auto.
       }
     - solve_orutt_raise.
     - solve_orutt_raise.
@@ -23197,7 +22330,12 @@ Qed.
     induction uv_fin using uvalue_ind;
       intros uv_inf REF;
       uvalue_refine_strict_inv REF;
-      try solve [cbn; auto].
+      try solve
+        [ cbn; auto
+        | cbn;
+          erewrite IHuv_fin1; eauto;
+          erewrite IHuv_fin2; eauto
+        ].
     - apply map_monad_oom_Forall2 in H1.
       induction H1.
       + cbn; auto.
@@ -23228,26 +22366,225 @@ Qed.
       + cbn.
         erewrite H; cbn; eauto.
         break_inner_match; auto.
-        apply Forall2_length in H1.
+        pose proof H1 as FORALL.
+        apply Forall2_length in H1; subst.
+        forward IHForall2.
+        intros e H2 uv_inf H3.
+        apply H; cbn; eauto.
+        cbn in IHForall2.
         Transparent Datatypes.length.
         cbn.
         Opaque Datatypes.length.
-        congruence.
+        repeat break_match_goal;
+          try congruence; exfalso.
+
+        * invert_bools.
+          rewrite <- H1, H2, H3 in Heqb0.
+          cbn in Heqb0.
+          rewrite <- H1, H4 in IHForall2.
+          cbn in IHForall2.
+          repeat break_match_hyp_inv.
+          inv Heqb0.
+          rewrite Bool.andb_true_r in Heqb0.
+          clear Heqb1.
+          apply dtyp_eqb_eq in H6; subst.
+
+          (* TODO: Move this *)
+          Lemma forallb_false :
+            forall A (f : A -> bool) xs,
+              forallb f xs = false ->
+              exists x, In x xs /\ f x = false.
+          Proof.
+            intros A f xs.
+            induction xs; intros FORALL.
+            - inv FORALL.
+            - cbn in FORALL.
+              apply Bool.andb_false_iff in FORALL.
+              destruct FORALL as [F | F].
+              + exists a; cbn; auto.
+              + specialize (IHxs F).
+                destruct IHxs as (?&?&?).
+                exists x; cbn; auto.
+          Qed.
+
+          apply forallb_false in Heqb0 as (?&?&?).
+          erewrite <- H in H5; cbn; eauto.
+          2: apply fin_to_inf_uvalue_refine_strict.
+          eapply forallb_forall with (x:=(fin_to_inf_uvalue x0)) in H4.
+          rewrite H4 in H5; discriminate.
+          eapply Forall2_In_exists2 in FORALL; eauto.
+          destruct FORALL as (?&?&?).
+          erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+        * invert_bools.
+          rewrite H1, H2, H3 in Heqb.
+          cbn in Heqb.
+          rewrite <- H1, H4 in IHForall2.
+          cbn in IHForall2.
+          rewrite Bool.andb_true_r in Heqb.
+          repeat break_match_hyp_inv;
+            rewrite Heqb in Heqb0.
+          inv Heqb0.
+          apply dtyp_eqb_eq in H6; subst.
+
+          apply forallb_false in Heqb as (?&?&?).
+          eapply Forall2_In in FORALL; eauto.
+          destruct FORALL as (?&?&?).
+          erewrite H in H5; cbn; eauto.
+          eapply forallb_forall with (x:=x1) in H4; auto.
+          rewrite H4 in H5; discriminate.
     - apply map_monad_oom_Forall2 in H1.
       induction H1.
       + cbn; auto.
       + cbn.
         erewrite H; cbn; eauto.
         break_inner_match; auto.
-        apply Forall2_length in H1.
+        pose proof H1 as FORALL.
+        apply Forall2_length in H1; subst.
+        forward IHForall2.
+        intros e H2 uv_inf H3.
+        apply H; cbn; eauto.
+        cbn in IHForall2.
         Transparent Datatypes.length.
         cbn.
         Opaque Datatypes.length.
-        congruence.
+        repeat break_match_goal;
+          try congruence; exfalso.
+
+        * invert_bools.
+          rewrite <- H1, H2, H3 in Heqb0.
+          cbn in Heqb0.
+          rewrite <- H1, H4 in IHForall2.
+          cbn in IHForall2.
+          repeat break_match_hyp_inv.
+          inv Heqb0.
+          rewrite Bool.andb_true_r in Heqb0.
+          clear Heqb1.
+          apply dtyp_eqb_eq in H6; subst.
+
+          apply forallb_false in Heqb0 as (?&?&?).
+          erewrite <- H in H5; cbn; eauto.
+          2: apply fin_to_inf_uvalue_refine_strict.
+          eapply forallb_forall with (x:=(fin_to_inf_uvalue x0)) in H4.
+          rewrite H4 in H5; discriminate.
+          eapply Forall2_In_exists2 in FORALL; eauto.
+          destruct FORALL as (?&?&?).
+          erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+        * invert_bools.
+          rewrite <- H1, H2, H3 in Heqb0.
+          cbn in Heqb0.
+          rewrite <- H1, H4 in IHForall2.
+          cbn in IHForall2.
+          repeat break_match_hyp_inv.
+          inv Heqb0.
+          rewrite Bool.andb_true_r in Heqb0.
+          clear Heqb1.
+          apply dtyp_eqb_eq in H6; subst.
+
+          apply forallb_false in Heqb0 as (?&?&?).
+          erewrite <- H in H5; cbn; eauto.
+          2: apply fin_to_inf_uvalue_refine_strict.
+          eapply forallb_forall with (x:=(fin_to_inf_uvalue x0)) in H4.
+          rewrite H4 in H5; discriminate.
+          eapply Forall2_In_exists2 in FORALL; eauto.
+          destruct FORALL as (?&?&?).
+          erewrite <- fin_to_inf_uvalue_refine_strict'; eauto.
+        * invert_bools.
+          rewrite H1, H2, H3 in Heqb.
+          cbn in Heqb.
+          rewrite <- H1, H4 in IHForall2.
+          cbn in IHForall2.
+          rewrite Bool.andb_true_r in Heqb.
+          repeat break_match_hyp_inv;
+            rewrite Heqb in Heqb0.
+          inv Heqb0.
+          apply dtyp_eqb_eq in H6; subst.
+
+          apply forallb_false in Heqb as (?&?&?).
+          eapply Forall2_In in FORALL; eauto.
+          destruct FORALL as (?&?&?).
+          erewrite H in H5; cbn; eauto.
+          eapply forallb_forall with (x:=x1) in H4; auto.
+          rewrite H4 in H5; discriminate.
+        * invert_bools.
+          rewrite H1, H2, H3 in Heqb.
+          cbn in Heqb.
+          rewrite <- H1, H4 in IHForall2.
+          cbn in IHForall2.
+          rewrite Bool.andb_true_r in Heqb.
+          repeat break_match_hyp_inv;
+            rewrite Heqb in Heqb0.
+          inv Heqb0.
+          apply dtyp_eqb_eq in H6; subst.
+
+          apply forallb_false in Heqb as (?&?&?).
+          eapply Forall2_In in FORALL; eauto.
+          destruct FORALL as (?&?&?).
+          erewrite H in H5; cbn; eauto.
+          eapply forallb_forall with (x:=x1) in H4; auto.
+          rewrite H4 in H5; discriminate.
     - cbn.
+      erewrite IHuv_fin; eauto.
+    - cbn.
+      erewrite IHuv_fin2; eauto.
       erewrite IHuv_fin1; eauto.
     - cbn.
       erewrite IHuv_fin3; eauto.
+      erewrite IHuv_fin1; eauto.
+      erewrite IHuv_fin2; eauto.
+    - cbn.
+      erewrite IHuv_fin3; eauto.
+      erewrite IHuv_fin1; eauto.
+      erewrite IHuv_fin2; eauto.
+    - cbn.
+      erewrite IHuv_fin; eauto.
+    - cbn.
+      erewrite IHuv_fin1; eauto.
+      erewrite IHuv_fin2; eauto.
+      erewrite IHuv_fin3; eauto.
+    - apply map_monad_oom_Forall2 in H1.
+      induction H1.
+      + cbn; auto.
+        rewrite sizeof_dtyp_fin_inf.
+        auto.
+      + cbn.
+        rewrite sizeof_dtyp_fin_inf.
+        pose proof H1 as FORALL.
+        apply Forall2_length in H1; subst.
+        forward IHForall2.
+        intros e H2 uv_inf H3.
+        apply H; cbn; eauto.
+        cbn in IHForall2.
+        Transparent Datatypes.length.
+        cbn.
+        Opaque Datatypes.length.
+        repeat break_match_goal;
+          try congruence; exfalso.
+
+        * invert_bools.
+          rewrite <- H1, H2 in Heqb0.
+          cbn in Heqb0.
+          destruct x; inv H3.
+          cbn in H0.
+          destruct (uvalue_convert_strict x) eqn:?; inv H0.
+          cbn in Heqb0.
+          rewrite <- H1, H4, Heqb0, sizeof_dtyp_fin_inf in IHForall2.
+          destruct ((N.of_nat (Datatypes.length l) =? SIZEOF.sizeof_dtyp dt)%N); inv IHForall2.
+          apply forallb_false in Heqb0 as (?&?&?).
+          eapply Forall2_In_exists2 in FORALL; eauto.
+          destruct FORALL as (?&?&?).
+          eapply forallb_forall in H4; eauto.
+          destruct x0; inv H3; uvalue_convert_strict_inv H6; discriminate.
+        * invert_bools.
+          rewrite H1, H2 in Heqb.
+          cbn in Heqb.
+          destruct y; inv H3.
+          uvalue_convert_strict_inv H0.
+          cbn in Heqb.
+          apply forallb_false in Heqb as (?&?&?).
+          eapply Forall2_In in FORALL; eauto.
+          destruct FORALL as (?&?&?).
+          eapply forallb_forall in H4; eauto.
+          destruct x1; inv H4; uvalue_convert_strict_inv H7; discriminate.
   Qed.
 
   Lemma address_one_function_E1E2_orutt :
@@ -23843,9 +23180,11 @@ Qed.
 
     intros r6 r7 H1.
     destruct r6; rewrite dvalue_refine_strict_equation in H1;
-      cbn in H1; inv H1; try break_match_hyp_inv;
+      cbn in H1; inv H1; repeat break_match_hyp_inv;
       try solve [eapply orutt_raise; [intros * CONTRA; inv CONTRA | constructor; constructor]].
 
+    repeat break_match_goal;
+        try solve [apply orutt_raise; [intros ? ? CONTRA; inv CONTRA|repeat constructor]].
     eapply orutt_Ret.
     reflexivity.
   Qed.
@@ -23860,37 +23199,37 @@ Qed.
         match r1 with
         | IS1.LP.Events.DV.DVALUE_Addr strptr =>
             ITree.bind (LLVM1.i8_str_index strptr 0)
-              (fun char : Int8.int =>
+              (fun (char : @Integers.int 8) =>
                  ITree.bind
                    (ITree.iter
                       (fun '(c, bytes, offset) =>
-                         if Int8.eq c Int8.zero
-                         then Ret (inr (Int8.repr 10 :: bytes))
+                         if @Integers.eq 8 c (@Integers.zero 8)
+                         then Ret (inr ((@Integers.repr 8 10) :: bytes))
                          else
                            ITree.bind (LLVM1.i8_str_index strptr offset)
-                             (fun next_char : Int8.int => Ret (inl (next_char, c :: bytes, (offset + 1)%Z))))
+                             (fun (next_char : @Integers.int 8) => Ret (inl (next_char, c :: bytes, (offset + 1)%Z))))
                       (char, [], 1%Z))
-                   (fun bytes : list int8 =>
+                   (fun (bytes : list int8) =>
                       ITree.bind (trigger (IS1.LP.Events.IO_stdout (DList.rev_tail_rec bytes)))
-                        (fun _ : unit => Ret (IS1.LP.Events.DV.UVALUE_I8 Int8.zero))))
+                        (fun _ : unit => Ret (@IS1.LP.Events.DV.UVALUE_I 8 (@Integers.zero 8)))))
         | _ => raiseUB "puts got non-address argument"
         end
         match r2 with
         | DVALUE_Addr strptr =>
             ITree.bind (i8_str_index strptr 0)
-              (fun char : Int8.int =>
+              (fun (char : @Integers.int 8) =>
                  ITree.bind
                    (ITree.iter
                       (fun '(c, bytes, offset) =>
-                         if Int8.eq c Int8.zero
-                         then Ret (inr (Int8.repr 10 :: bytes))
+                         if @Integers.eq 8 c (@Integers.zero 8)
+                         then Ret (inr (@Integers.repr 8 10 :: bytes))
                          else
                            ITree.bind (i8_str_index strptr offset)
-                             (fun next_char : Int8.int => Ret (inl (next_char, c :: bytes, (offset + 1)%Z))))
+                             (fun (next_char : @Integers.int 8) => Ret (inl (next_char, c :: bytes, (offset + 1)%Z))))
                       (char, [], 1%Z))
                    (fun bytes : list int8 =>
                       ITree.bind (trigger (IO_stdout (DList.rev_tail_rec bytes)))
-                        (fun _ : unit => Ret (UVALUE_I8 Int8.zero))))
+                        (fun _ : unit => Ret (@UVALUE_I 8 Integers.zero))))
         | _ => raiseUB "puts got non-address argument"
         end.
   Proof.
@@ -24055,6 +23394,14 @@ Qed.
       rewrite uvalue_refine_strict_equation; cbn; eauto.
   Qed.
 
+  (* TODO: Move these *)
+  Hint Resolve orutt_bind orutt_Ret orutt_trigger orutt_raise orutt_raiseUB orutt_raiseOOM: ORUTT.
+  Hint Extern 1 (uvalue_refine_strict _ _) => solve_uvalue_refine_strict : ORUTT.
+  Hint Extern 1 (dvalue_refine_strict _ _) => solve_dvalue_refine_strict : ORUTT.
+
+
+  Opaque Pos.eq_dec.
+
   Lemma putchar_denotation_refine_strict :
     function_denotation_refine_strict LLVM1.putchar_denotation LLVM2.putchar_denotation.
   Proof.
@@ -24081,71 +23428,65 @@ Qed.
 
       destruct y; uvalue_refine_strict_inv H.
       all:
+        try solve
+          [ eapply orutt_bind with (RR:=dvalue_refine_strict);
+            solve [ eapply orutt_bind with (RR:=fun r1 r2 => dvalue_refine_strict (proj1_sig r1) (proj1_sig r2));
+                    [ apply orutt_trigger;
+                      [ repeat constructor; cbn;
+                        rewrite uvalue_refine_strict_equation; cbn;
+                        try rewrite H0; try rewrite H1; try rewrite H2; reflexivity
+                      | intros [dv1 []] [dv2 []] REF;
+                        inv REF; subst_existT; cbn;
+                        match goal with
+                        | H: event_res_refine_strict _ _ _ _ _ _ |- _ =>
+                            apply H
+                        end
+                      | intros ? CONTRA; inv CONTRA
+                      ]
+                    | intros [dv1 []] [dv2 []] REF;
+                      eapply orutt_Ret; eauto; solve_uvalue_refine_strict
+                    ]
+                  | intros r1 r2 REF;
+                    destruct r2; dvalue_refine_strict_inv REF;
+                    try destruct (Pos.eq_dec 32 sz);
+                    try (eapply orutt_raiseUB;
+                         [ intros ? ? CONTRA; inv CONTRA
+                         | repeat constructor
+                      ]);
+                    eapply orutt_bind with (RR:=eq); subst; cbn; eauto with ORUTT;
+                    break_match; try contradiction; subst; cbn;
+                    dependent destruction e; cbn;
+                    eapply orutt_trigger; eauto with ORUTT;
+                    [ repeat constructor
+                    | intros [] [] ?; reflexivity
+                    | intros ? CONTRA; inv CONTRA
+                    ]
+                  | cbn;
+                    eapply concretize_or_pick_L0'_orutt_strict;
+                    rewrite uvalue_refine_strict_equation; cbn; rewrite H0; reflexivity
+              ]
+          ].
+
+      all:
         try solve [ cbn;
                     setoid_rewrite bind_ret_l;
                     eapply orutt_raiseUB; [intros * CONTRA; inv CONTRA | constructor; constructor]
-                  | cbn;
-                    eapply orutt_bind;
-                    [ eapply concretize_or_pick_L0'_orutt_strict;
-                      rewrite uvalue_refine_strict_equation; cbn; rewrite H0; reflexivity
-                    | intros r1 r2 REF;
-                      destruct r2; dvalue_refine_strict_inv REF;
-                      try solve [eapply orutt_raiseUB; [intros * CONTRA; inv CONTRA | constructor; constructor]];
-                      eapply orutt_bind;
-                      [ apply orutt_trigger;
-                        [ solve [repeat constructor]
-                        | intros [] [] ?; reflexivity
-                        | intros ? CONTRA; inv CONTRA
-                        ]
-                      | intros [] [] ?; eapply orutt_Ret; eauto; solve_uvalue_refine_strict
-                      ]
-                    ]
-                  | cbn;
-                    eapply orutt_bind with (RR:=dvalue_refine_strict);
-                    [ eapply orutt_bind with (RR:=fun r1 r2 => dvalue_refine_strict (proj1_sig r1) (proj1_sig r2));
-                      [ apply orutt_trigger;
-                        [ repeat constructor; cbn;
-                          rewrite uvalue_refine_strict_equation; cbn;
-                          try rewrite H0; try rewrite H1; try rewrite H2; reflexivity
-                        | intros [dv1 []] [dv2 []] REF;
-                          inv REF; subst_existT; cbn;
-                          match goal with
-                          | H: event_res_refine_strict _ _ _ _ _ _ |- _ =>
-                              apply H
-                          end
-                        | intros ? CONTRA; inv CONTRA
-                        ]
-                      | intros [dv1 []] [dv2 []] REF;
-                        eapply orutt_Ret; eauto; solve_uvalue_refine_strict
-                      ]
-                    | intros r1 r2 REF;
-                      destruct r2; dvalue_refine_strict_inv REF;
-                      try solve [eapply orutt_raiseUB; [intros * CONTRA; inv CONTRA | constructor; constructor]];
-                      eapply orutt_bind;
-                      [ apply orutt_trigger;
-                        [ solve [repeat constructor]
-                        | intros [] [] ?; reflexivity
-                        | intros ? CONTRA; inv CONTRA
-                        ]
-                      | intros [] [] ?; eapply orutt_Ret; eauto; solve_uvalue_refine_strict
-                      ]
-                    ]
           ].
 
       cbn.
       repeat rewrite bind_ret_l.
+      break_match_goal; subst; cbn;
+        try solve [eapply orutt_raiseUB; [intros * CONTRA; inv CONTRA | constructor; constructor]].
 
-      eapply orutt_bind with (RR:=eq).
+      break_match_goal; subst; try contradiction; cbn.
+      dependent destruction e; cbn.
+      eapply orutt_bind with (RR:=eq); eauto with ORUTT.
       { apply orutt_trigger;
           [ solve [repeat constructor]
           | intros [] [] ?; reflexivity
           | intros ? CONTRA; inv CONTRA
           ].
       }
-
-      intros [] [] _.
-      apply orutt_Ret.
-      solve_uvalue_refine_strict.
   Qed.
 
   Lemma address_one_builtin_functions_E1E2_orutt :
@@ -25414,33 +24755,13 @@ Qed.
               try congruence
             ].
 
-        destruct y;
-          dvalue_refine_strict_inv H0; subst; try congruence.
-
-        destruct ARGS; cbn in *;
-          try
-            solve
-            [ unfold_dvalue_refine_strict_in H;
-              cbn in *;
-              try break_match_hyp_inv;
-              try inv H;
-              try congruence
-            ].
-
-        dvalue_refine_strict_inv H.
-        inv H.
-        break_match; inv EXEC.
-        { eexists; split; eauto.
-          solve_dvalue_refine_strict.
-        }
-
-        break_match_hyp; inv H0.
-        { eexists; split; eauto.
-          solve_dvalue_refine_strict.
-        }
-
-        eexists; split; eauto.
-        solve_dvalue_refine_strict.
+        dvalue_refine_strict_inv H; inv H; subst_existT.
+        repeat break_match_hyp_inv; subst_existT; cbn; inv ARGS;
+          unfold_dvalue_refine_strict; inv H0;
+          eexists; split; eauto;
+          try rewrite Heqb;
+          try rewrite Heqb0;
+          try solve_dvalue_refine_strict; auto.
       Qed.
 
       Lemma llvm_ushl_sat_8_agrees_success :
@@ -25478,38 +24799,18 @@ Qed.
             solve
             [ unfold_dvalue_refine_strict_in H;
               cbn in *;
-              try break_match_hyp_inv;
+              repeat break_match_hyp_inv;
               try inv H;
               try congruence
             ].
 
-        destruct y;
-          dvalue_refine_strict_inv H0; subst; try congruence.
-
-        destruct ARGS; cbn in *;
-          try
-            solve
-            [ unfold_dvalue_refine_strict_in H;
-              cbn in *;
-              try break_match_hyp_inv;
-              try inv H;
-              try congruence
-            ].
-
-        dvalue_refine_strict_inv H.
-        inv H.
-        break_match; inv EXEC.
-        { eexists; split; eauto.
-          solve_dvalue_refine_strict.
-        }
-
-        break_match_hyp; inv H0.
-        { eexists; split; eauto.
-          solve_dvalue_refine_strict.
-        }
-
-        eexists; split; eauto.
-        solve_dvalue_refine_strict.
+        dvalue_refine_strict_inv H; inv H; subst_existT;
+          repeat break_match_hyp_inv; subst_existT; cbn; inv ARGS;
+          unfold_dvalue_refine_strict; inv H0;
+          eexists; split; eauto;
+          try rewrite Heqb;
+          try rewrite Heqb0;
+          try solve_dvalue_refine_strict; auto.
       Qed.
 
       Lemma llvm_ushl_sat_16_agrees_success :
@@ -25547,38 +24848,18 @@ Qed.
             solve
             [ unfold_dvalue_refine_strict_in H;
               cbn in *;
-              try break_match_hyp_inv;
+              repeat break_match_hyp_inv;
               try inv H;
               try congruence
             ].
 
-        destruct y;
-          dvalue_refine_strict_inv H0; subst; try congruence.
-
-        destruct ARGS; cbn in *;
-          try
-            solve
-            [ unfold_dvalue_refine_strict_in H;
-              cbn in *;
-              try break_match_hyp_inv;
-              try inv H;
-              try congruence
-            ].
-
-        dvalue_refine_strict_inv H.
-        inv H.
-        break_match; inv EXEC.
-        { eexists; split; eauto.
-          solve_dvalue_refine_strict.
-        }
-
-        break_match_hyp; inv H0.
-        { eexists; split; eauto.
-          solve_dvalue_refine_strict.
-        }
-
-        eexists; split; eauto.
-        solve_dvalue_refine_strict.
+        dvalue_refine_strict_inv H; inv H; subst_existT;
+          repeat break_match_hyp_inv; subst_existT; cbn; inv ARGS;
+          unfold_dvalue_refine_strict; inv H0;
+          eexists; split; eauto;
+          try rewrite Heqb;
+          try rewrite Heqb0;
+          try solve_dvalue_refine_strict; auto.
       Qed.
 
       Lemma llvm_ushl_sat_32_agrees_success :
@@ -25616,38 +24897,18 @@ Qed.
             solve
             [ unfold_dvalue_refine_strict_in H;
               cbn in *;
-              try break_match_hyp_inv;
+              repeat break_match_hyp_inv;
               try inv H;
               try congruence
             ].
 
-        destruct y;
-          dvalue_refine_strict_inv H0; subst; try congruence.
-
-        destruct ARGS; cbn in *;
-          try
-            solve
-            [ unfold_dvalue_refine_strict_in H;
-              cbn in *;
-              try break_match_hyp_inv;
-              try inv H;
-              try congruence
-            ].
-
-        dvalue_refine_strict_inv H.
-        inv H.
-        break_match; inv EXEC.
-        { eexists; split; eauto.
-          solve_dvalue_refine_strict.
-        }
-
-        break_match_hyp; inv H0.
-        { eexists; split; eauto.
-          solve_dvalue_refine_strict.
-        }
-
-        eexists; split; eauto.
-        solve_dvalue_refine_strict.
+        dvalue_refine_strict_inv H; inv H; subst_existT;
+          repeat break_match_hyp_inv; subst_existT; cbn; inv ARGS;
+          unfold_dvalue_refine_strict; inv H0;
+          eexists; split; eauto;
+          try rewrite Heqb;
+          try rewrite Heqb0;
+          try solve_dvalue_refine_strict; auto.
       Qed.
 
       Lemma llvm_ushl_sat_64_agrees_success :
@@ -25685,38 +24946,18 @@ Qed.
             solve
             [ unfold_dvalue_refine_strict_in H;
               cbn in *;
-              try break_match_hyp_inv;
+              repeat break_match_hyp_inv;
               try inv H;
               try congruence
             ].
 
-        destruct y;
-          dvalue_refine_strict_inv H0; subst; try congruence.
-
-        destruct ARGS; cbn in *;
-          try
-            solve
-            [ unfold_dvalue_refine_strict_in H;
-              cbn in *;
-              try break_match_hyp_inv;
-              try inv H;
-              try congruence
-            ].
-
-        dvalue_refine_strict_inv H.
-        inv H.
-        break_match; inv EXEC.
-        { eexists; split; eauto.
-          solve_dvalue_refine_strict.
-        }
-
-        break_match_hyp; inv H0.
-        { eexists; split; eauto.
-          solve_dvalue_refine_strict.
-        }
-
-        eexists; split; eauto.
-        solve_dvalue_refine_strict.
+        dvalue_refine_strict_inv H; inv H; subst_existT;
+          repeat break_match_hyp_inv; subst_existT; cbn; inv ARGS;
+          unfold_dvalue_refine_strict; inv H0;
+          eexists; split; eauto;
+          try rewrite Heqb;
+          try rewrite Heqb0;
+          try solve_dvalue_refine_strict; auto.
       Qed.
 
       Lemma llvm_ushl_sat_1_agrees_fail :
@@ -25747,33 +24988,12 @@ Qed.
               try congruence
             ].
 
-        destruct ARGS; cbn in *;
-          try
-            solve
-            [ unfold_dvalue_refine_strict_in H;
-              cbn in *;
-              try break_match_hyp_inv;
-              try inv H;
-              try congruence
-            ].
+        dvalue_refine_strict_inv H; inv H; subst_existT.
+        repeat break_match_hyp_inv; subst_existT; cbn; inv ARGS; auto;
+          unfold_dvalue_refine_strict; inv H1;
+          repeat break_match_hyp_inv; auto.
 
-        destruct y;
-          dvalue_refine_strict_inv H0; subst; try congruence.
-
-        destruct ARGS; cbn in *;
-          try
-            solve
-            [ unfold_dvalue_refine_strict_in H;
-              cbn in *;
-              try break_match_hyp_inv;
-              try inv H;
-              try congruence
-            ].
-
-        dvalue_refine_strict_inv H.
-        inv H.
-        break_match; inv EXEC.
-        break_match; inv H0.
+        inv H3; auto.
       Qed.
 
       Lemma llvm_ushl_sat_8_agrees_fail :
@@ -25804,33 +25024,12 @@ Qed.
               try congruence
             ].
 
-        destruct ARGS; cbn in *;
-          try
-            solve
-            [ unfold_dvalue_refine_strict_in H;
-              cbn in *;
-              try break_match_hyp_inv;
-              try inv H;
-              try congruence
-            ].
+        dvalue_refine_strict_inv H; inv H; subst_existT.
+        repeat break_match_hyp_inv; subst_existT; cbn; inv ARGS; auto;
+          unfold_dvalue_refine_strict; inv H1;
+          repeat break_match_hyp_inv; auto.
 
-        destruct y;
-          dvalue_refine_strict_inv H0; subst; try congruence.
-
-        destruct ARGS; cbn in *;
-          try
-            solve
-            [ unfold_dvalue_refine_strict_in H;
-              cbn in *;
-              try break_match_hyp_inv;
-              try inv H;
-              try congruence
-            ].
-
-        dvalue_refine_strict_inv H.
-        inv H.
-        break_match; inv EXEC.
-        break_match; inv H0.
+        inv H3; auto.
       Qed.
 
       Lemma llvm_ushl_sat_16_agrees_fail :
@@ -25861,33 +25060,12 @@ Qed.
               try congruence
             ].
 
-        destruct ARGS; cbn in *;
-          try
-            solve
-            [ unfold_dvalue_refine_strict_in H;
-              cbn in *;
-              try break_match_hyp_inv;
-              try inv H;
-              try congruence
-            ].
+        dvalue_refine_strict_inv H; inv H; subst_existT.
+        repeat break_match_hyp_inv; subst_existT; cbn; inv ARGS; auto;
+          unfold_dvalue_refine_strict; inv H1;
+          repeat break_match_hyp_inv; auto.
 
-        destruct y;
-          dvalue_refine_strict_inv H0; subst; try congruence.
-
-        destruct ARGS; cbn in *;
-          try
-            solve
-            [ unfold_dvalue_refine_strict_in H;
-              cbn in *;
-              try break_match_hyp_inv;
-              try inv H;
-              try congruence
-            ].
-
-        dvalue_refine_strict_inv H.
-        inv H.
-        break_match; inv EXEC.
-        break_match; inv H0.
+        inv H3; auto.
       Qed.
 
       Lemma llvm_ushl_sat_32_agrees_fail :
@@ -25918,33 +25096,12 @@ Qed.
               try congruence
             ].
 
-        destruct ARGS; cbn in *;
-          try
-            solve
-            [ unfold_dvalue_refine_strict_in H;
-              cbn in *;
-              try break_match_hyp_inv;
-              try inv H;
-              try congruence
-            ].
+        dvalue_refine_strict_inv H; inv H; subst_existT.
+        repeat break_match_hyp_inv; subst_existT; cbn; inv ARGS; auto;
+          unfold_dvalue_refine_strict; inv H1;
+          repeat break_match_hyp_inv; auto.
 
-        destruct y;
-          dvalue_refine_strict_inv H0; subst; try congruence.
-
-        destruct ARGS; cbn in *;
-          try
-            solve
-            [ unfold_dvalue_refine_strict_in H;
-              cbn in *;
-              try break_match_hyp_inv;
-              try inv H;
-              try congruence
-            ].
-
-        dvalue_refine_strict_inv H.
-        inv H.
-        break_match; inv EXEC.
-        break_match; inv H0.
+        inv H3; auto.
       Qed.
 
       Lemma llvm_ushl_sat_64_agrees_fail :
@@ -25975,33 +25132,12 @@ Qed.
               try congruence
             ].
 
-        destruct ARGS; cbn in *;
-          try
-            solve
-            [ unfold_dvalue_refine_strict_in H;
-              cbn in *;
-              try break_match_hyp_inv;
-              try inv H;
-              try congruence
-            ].
+        dvalue_refine_strict_inv H; inv H; subst_existT.
+        repeat break_match_hyp_inv; subst_existT; cbn; inv ARGS; auto;
+          unfold_dvalue_refine_strict; inv H1;
+          repeat break_match_hyp_inv; auto.
 
-        destruct y;
-          dvalue_refine_strict_inv H0; subst; try congruence.
-
-        destruct ARGS; cbn in *;
-          try
-            solve
-            [ unfold_dvalue_refine_strict_in H;
-              cbn in *;
-              try break_match_hyp_inv;
-              try inv H;
-              try congruence
-            ].
-
-        dvalue_refine_strict_inv H.
-        inv H.
-        break_match; inv EXEC.
-        break_match; inv H0.
+        inv H3; auto.
       Qed.
 
       all:

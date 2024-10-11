@@ -100,72 +100,6 @@ let rec eq_dvalue (l : DV.dvalue) (r : DV.dvalue) : bool = DV.dvalue_eqb l r
 (* Directly converts a piece of syntax to a dvalue without going through
    semantic interpretation. Only works on literals. *)
 
-let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
-    DV.dvalue =
-  match (typ, exp) with
-  (* Allow null pointers literals *)
-  | TYPE_Pointer _, EXP_Null ->
-      DVALUE_Addr InterpretationStack.InterpreterStackBigIntptr.LP.ADDR.null
-  | TYPE_I i, EXP_Integer x -> (
-    match Camlcoq.N.to_int i with
-    | 1 -> DVALUE_I1 x
-    | 8 -> DVALUE_I8 x
-    | 32 -> DVALUE_I32 x
-    | 64 -> DVALUE_I64 x
-    | _ ->
-        failwith
-          (Printf.sprintf
-             "Assertion includes ill-typed or unsupported integer expression:\n\
-              \t %s %s" (string_of_typ typ) (string_of_exp exp) ) )
-  | TYPE_Float, EXP_Float f -> DVALUE_Float f
-  | TYPE_Double, EXP_Double f -> DVALUE_Double f
-  | TYPE_Double, EXP_Hex f -> DVALUE_Double f
-  | TYPE_Array _, EXP_Array elts ->
-      DVALUE_Array (List.map texp_to_dvalue elts)
-  | TYPE_Struct _, EXP_Struct elts ->
-      DVALUE_Struct (List.map texp_to_dvalue elts)
-  | TYPE_Packed_struct _, EXP_Packed_struct elts ->
-      DVALUE_Packed_struct (List.map texp_to_dvalue elts)
-  | TYPE_Vector _, EXP_Vector elts ->
-      DVALUE_Vector (List.map texp_to_dvalue elts)
-  | _, _ ->
-      failwith
-        (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"
-           (string_of_typ typ) (string_of_exp exp) )
-
-let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
-    DV.uvalue =
-  match (typ, exp) with
-  (* Allow null pointers literals *)
-  | TYPE_Pointer _, EXP_Null ->
-      UVALUE_Addr InterpretationStack.InterpreterStackBigIntptr.LP.ADDR.null
-  | TYPE_I i, EXP_Integer x -> (
-    match Camlcoq.N.to_int i with
-    | 1 -> UVALUE_I1 x
-    | 8 -> UVALUE_I8 x
-    | 32 -> UVALUE_I32 x
-    | 64 -> UVALUE_I64 x
-    | _ ->
-        failwith
-          (Printf.sprintf
-             "Assertion includes ill-typed or unsupported integer expression:\n\
-              \t %s %s" (string_of_typ typ) (string_of_exp exp) ) )
-  | TYPE_Float, EXP_Float f -> UVALUE_Float f
-  | TYPE_Double, EXP_Double f -> UVALUE_Double f
-  | TYPE_Double, EXP_Hex f -> UVALUE_Double f
-  | TYPE_Array _, EXP_Array elts ->
-      UVALUE_Array (List.map texp_to_uvalue elts)
-  | TYPE_Struct _, EXP_Struct elts ->
-      UVALUE_Struct (List.map texp_to_uvalue elts)
-  | TYPE_Packed_struct _, EXP_Packed_struct elts ->
-      UVALUE_Packed_struct (List.map texp_to_uvalue elts)
-  | TYPE_Vector _, EXP_Vector elts ->
-      UVALUE_Vector (List.map texp_to_uvalue elts)
-  | _, _ ->
-      failwith
-        (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"
-           (string_of_typ typ) (string_of_exp exp) )
-
 let rec typ_to_dtyp (typ : LLVMAst.typ) : DynamicTypes.dtyp =
   match typ with
   | TYPE_Void -> DTYPE_Void
@@ -181,6 +115,54 @@ let rec typ_to_dtyp (typ : LLVMAst.typ) : DynamicTypes.dtyp =
       failwith
         (Printf.sprintf "Assertion includes unsupported type:\n\t %s"
            (string_of_typ typ) )
+
+let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
+    DV.dvalue =
+  match (typ, exp) with
+  (* Allow null pointers literals *)
+  | TYPE_Pointer _, EXP_Null ->
+      DVALUE_Addr InterpretationStack.InterpreterStackBigIntptr.LP.ADDR.null
+  | TYPE_I i, EXP_Integer x ->
+     DVALUE_I (i, x)
+  | TYPE_Float, EXP_Float f -> DVALUE_Float f
+  | TYPE_Double, EXP_Double f -> DVALUE_Double f
+  | TYPE_Double, EXP_Hex f -> DVALUE_Double f
+  | TYPE_Array _, EXP_Array (t, elts) ->
+      DVALUE_Array (typ_to_dtyp t, (List.map texp_to_dvalue elts))
+  | TYPE_Struct _, EXP_Struct elts ->
+      DVALUE_Struct (List.map texp_to_dvalue elts)
+  | TYPE_Packed_struct _, EXP_Packed_struct elts ->
+      DVALUE_Packed_struct (List.map texp_to_dvalue elts)
+  | TYPE_Vector _, EXP_Vector (t, elts) ->
+      DVALUE_Vector (typ_to_dtyp t, (List.map texp_to_dvalue elts))
+  | _, _ ->
+      failwith
+        (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"
+           (string_of_typ typ) (string_of_exp exp) )
+
+let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
+    DV.uvalue =
+  match (typ, exp) with
+  (* Allow null pointers literals *)
+  | TYPE_Pointer _, EXP_Null ->
+      UVALUE_Addr InterpretationStack.InterpreterStackBigIntptr.LP.ADDR.null
+  | TYPE_I i, EXP_Integer x ->
+     UVALUE_I (i, x)
+  | TYPE_Float, EXP_Float f -> UVALUE_Float f
+  | TYPE_Double, EXP_Double f -> UVALUE_Double f
+  | TYPE_Double, EXP_Hex f -> UVALUE_Double f
+  | TYPE_Array _, EXP_Array (t, elts) ->
+      UVALUE_Array (typ_to_dtyp t, (List.map texp_to_uvalue elts))
+  | TYPE_Struct _, EXP_Struct elts ->
+      UVALUE_Struct (List.map texp_to_uvalue elts)
+  | TYPE_Packed_struct _, EXP_Packed_struct elts ->
+      UVALUE_Packed_struct (List.map texp_to_uvalue elts)
+  | TYPE_Vector _, EXP_Vector (t, elts) ->
+      UVALUE_Vector (typ_to_dtyp t, (List.map texp_to_uvalue elts))
+  | _, _ ->
+      failwith
+        (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"
+           (string_of_typ typ) (string_of_exp exp) )
 
 let texp_to_function_name (_, exp) : string =
   match exp with

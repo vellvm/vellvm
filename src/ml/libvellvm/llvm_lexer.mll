@@ -27,6 +27,7 @@
   let str = Camlcoq.coqstring_of_camlstring
   let of_str = Camlcoq.camlstring_of_coqstring
   let coq_N_of_int = Camlcoq.N.of_int
+  let coq_P_of_int = Camlcoq.P.of_int
   let coq_of_int = Camlcoq.Z.of_sint
   let coq_of_int64 = Camlcoq.Z.of_sint64
   let coqfloat_of_float f = Floats.Float.of_bits(Camlcoq.coqint_of_camlint64(Int64.bits_of_float f))
@@ -452,7 +453,7 @@ rule token = parse
   | '"'                         { STRING (string (Buffer.create 10) lexbuf) }
 
   (* types *)
-  | 'i' (digit+ as i) { I (coq_N_of_int (int_of_string i)) }
+  | 'i' (digit+ as i) { I (coq_P_of_int (int_of_string i)) }
   | '*' { STAR }
 
   (* keywords *)

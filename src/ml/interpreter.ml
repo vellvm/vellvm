@@ -40,18 +40,9 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
   let pp_comma_space ppf () = pp_print_string ppf ", " in
   fun ppf -> function
     | UVALUE_Addr _x -> fprintf ppf "UVALUE_Addr"
-    | UVALUE_I1 x ->
-        fprintf ppf "UVALUE_I1(%d)"
-          (Camlcoq.Z.to_int (VellvmIntegers.Int1.unsigned x))
-    | UVALUE_I8 x ->
-        fprintf ppf "UVALUE_I8(%d)"
-          (Camlcoq.Z.to_int (VellvmIntegers.Int8.unsigned x))
-    | UVALUE_I32 x ->
-        fprintf ppf "UVALUE_I32(%d)"
-          (Camlcoq.Z.to_int (VellvmIntegers.Int32.unsigned x))
-    | UVALUE_I64 x ->
-        fprintf ppf "UVALUE_I64(%s)"
-          (Int64.to_string (Z.to_int64 (VellvmIntegers.Int64.unsigned x)))
+    | UVALUE_I (sz, x) ->
+        fprintf ppf "UVALUE_I%d(%d)"
+          (Camlcoq.P.to_int sz) (Camlcoq.Z.to_int (Integers.unsigned sz x))
     | UVALUE_IPTR x ->
         fprintf ppf "UVALUE_IPTR(%d)"
           (Camlcoq.Z.to_int
@@ -73,21 +64,21 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
         fprintf ppf "UVALUE_Packet_struct(%a)"
           (pp_print_list ~pp_sep:pp_comma_space pp_uvalue)
           l
-    | UVALUE_Array l ->
+    | UVALUE_Array (t, l) ->
         fprintf ppf "UVALUE_Array(%a)"
           (pp_print_list ~pp_sep:pp_comma_space pp_uvalue)
           l
-    | UVALUE_Vector l ->
+    | UVALUE_Vector (t, l) ->
         fprintf ppf "UVALUE_Vector(%a)"
           (pp_print_list ~pp_sep:pp_comma_space pp_uvalue)
           l
     | _ -> fprintf ppf "pp_uvalue: todo"
 
 let char_of_I8 x =
-  char_of_int (Camlcoq.Z.to_int (VellvmIntegers.Int8.unsigned x))
+  char_of_int (Camlcoq.Z.to_int (Integers.unsigned (Camlcoq.P.of_int 8) x))
 
 (* Converts a list of VellvmIntegers.Int8 values to OCaml string *)
-let string_of_bytes (bytes : VellvmIntegers.Int8.int list) : bytes =
+let string_of_bytes (bytes : Integers.int list) : bytes =
   List.map char_of_I8 bytes |> List.to_seq |> Bytes.of_seq
 
 let debug_flag = ref false

@@ -28,7 +28,7 @@ Ltac contra :=
 (* Inductive predicate for types in LLVM with a size *)
 Inductive sized_typ : list (ident * typ) -> typ -> Prop :=
 | sized_typ_I :
-    forall (defs : list (ident * typ)) (sz : N),
+    forall (defs : list (ident * typ)) (sz : positive),
       sized_typ defs (TYPE_I sz)
 
 | sized_typ_Pointer :
@@ -96,7 +96,7 @@ Inductive sized_typ : list (ident * typ) -> typ -> Prop :=
    https://llvm.org/docs/LangRef.html#vector-type *)
 Inductive element_typ : typ -> Prop :=
 | element_typ_Pointer : forall (t : typ), element_typ (TYPE_Pointer t)
-| element_typ_I : forall (sz : N), element_typ (TYPE_I sz)
+| element_typ_I : forall (sz : positive), element_typ (TYPE_I sz)
 | element_typ_Half : element_typ TYPE_Half
 | element_typ_Float : element_typ TYPE_Float
 | element_typ_Double : element_typ TYPE_Double
@@ -109,7 +109,7 @@ Inductive element_typ : typ -> Prop :=
 (* Predicate to ensure that an ident is guarded by a pointer everywhere in a type in an environment *)
 Inductive guarded_typ : ident -> list (ident * typ) -> typ -> Prop :=
 | guarded_typ_I :
-    forall (id : ident) (env : list (ident * typ)) (sz : N),
+    forall (id : ident) (env : list (ident * typ)) (sz : positive),
       guarded_typ id env (TYPE_I sz)
 
 | guarded_typ_Pointer :
@@ -243,8 +243,8 @@ Inductive wf_typ : list (ident * typ) -> typ -> Prop :=
       wf_typ defs t -> wf_typ defs (TYPE_Pointer t)
 
 | wf_typ_I :
-    forall (defs : list (ident * typ)) (sz : N),
-      (sz > 0)%N -> wf_typ defs (TYPE_I sz)
+    forall (defs : list (ident * typ)) (sz : positive),
+      wf_typ defs (TYPE_I sz)
 
 | wf_typ_Void :
     forall (defs : list (ident * typ)),
@@ -344,8 +344,8 @@ Inductive guarded_wf_typ : list (ident * typ) -> typ -> Prop :=
       guarded_wf_typ defs (TYPE_Pointer t)
 
 | guarded_wf_typ_I :
-    forall (defs : list (ident * typ)) (sz : N),
-      (sz > 0)%N -> guarded_wf_typ defs (TYPE_I sz)
+    forall (defs : list (ident * typ)) (sz : positive),
+      guarded_wf_typ defs (TYPE_I sz)
 
 | guarded_wf_typ_Void :
     forall (defs : list (ident * typ)),
@@ -451,7 +451,7 @@ Qed.
 
 Inductive unrolled_typ : typ -> Prop :=
 | unrolled_typ_I :
-    forall (sz : N),
+    forall (sz : positive),
       unrolled_typ (TYPE_I sz)
 
 | unrolled_typ_Pointer :

@@ -269,15 +269,14 @@ Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
     intros M HM HME op a b res BIND_RET_L EVAL.
     destruct op; cbn in *;
     destruct a, b; cbn in *; inv EVAL;
-      first [ unfold eval_int_icmp; cbn;
-              try rewrite BIND_RET_L;
-              reflexivity
-            | unfold eval_icmp, eval_int_icmp in *;
-              break_match;
-              [ cbn in *; inv H0
-              | cbn in *;
-                rewrite BIND_RET_L; inv H0; auto
-              ]
+      try first
+        [ unfold eval_int_icmp; cbn;
+          try rewrite BIND_RET_L;
+          reflexivity
+        | unfold eval_icmp, eval_int_icmp in *;
+          break_match; subst; cbn in *;
+          inv H0;
+          rewrite BIND_RET_L; auto
         ].
   Qed.
 
@@ -344,26 +343,26 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
             end
           ].
 
-    - solve_iop a b.
-    - solve_iop a b.
-    - Opaque to_dvalue.
-      destruct a, b; cbn in *; inversion EVAL; auto.
-      apply to_dvalue_OOM_NoOom.
+    (* - solve_iop a b. *)
+    (* - solve_iop a b. *)
+    (* - Opaque to_dvalue. *)
+    (*   destruct a, b; cbn in *; inversion EVAL; auto. *)
+    (*   apply to_dvalue_OOM_NoOom. *)
 
-      Ltac solve_bind_res :=
-        rewrite bind_ret_l;
-        repeat break_match_goal; inversion EVAL; subst; auto.
+    (*   Ltac solve_bind_res := *)
+    (*     rewrite bind_ret_l; *)
+    (*     repeat break_match_goal; inversion EVAL; subst; auto. *)
 
-      + rewrite bind_ret_l.
-        repeat (break_match_goal; inversion EVAL; subst).
+    (*   + rewrite bind_ret_l. *)
+    (*     repeat (break_match_goal; inversion EVAL; subst). *)
 
-        setoid_rewrite Heqb in H1.
-        inversion H1.
-        reflexivity.
+    (*     setoid_rewrite Heqb in H1. *)
+    (*     inversion H1. *)
+    (*     reflexivity. *)
 
-        setoid_rewrite Heqb in H1.
-        inversion H1.
-        reflexivity.
+    (*     setoid_rewrite Heqb in H1. *)
+    (*     inversion H1. *)
+    (*     reflexivity. *)
     (*   + solve_bind_res. *)
     (*   + solve_bind_res. *)
     (*   + repeat break_match_goal; *)

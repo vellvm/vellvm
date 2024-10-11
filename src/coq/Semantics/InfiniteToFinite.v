@@ -120,20 +120,20 @@ Module InfiniteToFinite.
   Import DVCS.
 
   Lemma unsigned_repr_eq:
-    forall i, ((0 <=? i)%Z && (i <? Int64.modulus)%Z)%bool = true ->
-         Int64.unsigned (Int64.repr i) = i.
+    forall sz i, ((0 <=? i)%Z && (i <? @Integers.modulus sz)%Z)%bool = true ->
+         @Integers.unsigned sz (Integers.repr i) = i.
   Proof.
-    intros i H.
-    Transparent Int64.repr.
-    unfold Int64.repr.
-    unfold Int64.unsigned.
+    intros sz i H.
+    Transparent Integers.repr.
+    unfold Integers.repr.
+    unfold Integers.unsigned.
     cbn.
-    Opaque Int64.repr.
+    Opaque Integers.repr.
     symmetry in H.
     apply Bool.andb_true_eq in H.
     destruct H.
-    assert (0 <= i < Integers.Int64.modulus)%Z by lia.
-    rewrite Integers.Int64.Z_mod_modulus_eq.
+    assert (0 <= i < @Integers.modulus sz)%Z by lia.
+    rewrite Integers.Z_mod_modulus_eq.
     rewrite Zmod_small; auto.
   Qed.
 
@@ -158,12 +158,12 @@ Module InfiniteToFinite.
     destruct a_inf.
     unfold FinITOP.int_to_ptr in H.
     unfold fin_to_inf_addr.
-    destruct (((i <? 0)%Z || (i >=? Int64.modulus)%Z)%bool) eqn: HEQ.
+    destruct (((i <? 0)%Z || (i >=? Integers.modulus)%Z)%bool) eqn: HEQ.
     - inversion H.
     - inversion H.
       unfold FiniteAddresses.Prov.
       unfold Prov in *.
-      remember (FinToInfAddrConvertSafe.addr_convert_succeeds (Int64.repr i, p)) as X.
+      remember (FinToInfAddrConvertSafe.addr_convert_succeeds (Integers.repr i, p)) as X.
       destruct X. destruct x.
       unfold FinToInfAddrConvert.addr_convert in e.
       cbn in e.
@@ -280,7 +280,7 @@ Module InfiniteToFinite.
     | Oom _ => false
     end.
 
-  Lemma in_bounds_Z : forall (z:Z), in_bounds z = ((0 <=? z)%Z && (z <? Int64.modulus)%Z)%bool.
+  Lemma in_bounds_Z : forall (z:Z), in_bounds z = ((0 <=? z)%Z && (z <? @Integers.modulus 64)%Z)%bool.
   Proof.
     intros z.
     unfold in_bounds.
@@ -1639,11 +1639,11 @@ Lemma lift_memory_convert_mem_byte :
           unfold FinITOP.int_to_ptr.
           break_match.
           {
-            pose proof Integers.Int64.unsigned_range i.
+            pose proof Integers.unsigned_range i.
             lia.
           }
 
-          rewrite Int64.repr_unsigned.
+          rewrite Integers.repr_unsigned.
           auto.
         }
       + rewrite List.map_map in IN.
@@ -8176,10 +8176,10 @@ cofix CIH
           break_match_hyp_inv.
           cbn in H6.
           unfold LLVMParams64BitIntptr.IP.to_Z in *.
-          rewrite Int64.unsigned_repr in H6.
+          rewrite Integers.unsigned_repr in H6.
           2: {
-            unfold Int64.max_unsigned.
-            pose proof Int64.modulus_pos.
+            unfold Integers.max_unsigned.
+            pose proof (@Integers.modulus_pos 64).
             lia.
           }
 
@@ -10580,9 +10580,9 @@ cofix CIH
     unfold FinITOP.int_to_ptr.
     cbn.
     break_match_goal.
-    pose proof (Int64.unsigned_range i).
+    pose proof (Integers.unsigned_range i).
     lia.
-    rewrite Int64.repr_unsigned.
+    rewrite Integers.repr_unsigned.
     reflexivity.
   Qed.
 
@@ -10620,8 +10620,8 @@ cofix CIH
     inv e.
     unfold LLVMParams64BitIntptr.ITOP.int_to_ptr in PTR.
     break_match_hyp_inv.
-    rewrite Int64.unsigned_repr; auto.
-    unfold Int64.max_unsigned.
+    rewrite Integers.unsigned_repr; auto.
+    unfold Integers.max_unsigned.
     lia.
   Qed.
 
@@ -13005,55 +13005,8 @@ cofix CIH
 
       apply DVC1.dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
       apply DVC1.dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
-      apply DVC1.dvalue_convert_strict_i32_inv in H1.
-      apply DVC1.dvalue_convert_strict_i1_inv in H2; subst.
-
-      unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
-      unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
-      red in HANDLER.
-
-      destruct res_fin.
-      break_match_hyp.
-      {
-        exists tt. exists (lift_MemState ms_fin').
-        split; auto.
-        split; auto.
-        apply lift_MemState_refine_prop.
-      }
-
-      erewrite <- fin_inf_no_overlap; eauto.
-      repeat erewrite <- fin_inf_ptoi; eauto.
-      break_match_goal.
-      { eapply MemPropT_fin_inf_bind.
-        4: apply HANDLER.
-        all: eauto.
-
-        { (* MA *)
-          intros a_fin ms_fin_ma H1.
-          eapply fin_inf_read_bytes_spec; eauto.
-          apply H1.
-        }
-
-        intros ms_inf0 ms_fin0 ms_fin'0 a_fin a_inf b_fin BYTES MSR' WRITE.
-        cbn in BYTES.
-        eapply fin_inf_write_bytes_spec; eauto.
-      }
-
-      exists tt. exists (lift_MemState ms_fin').
-      split; auto.
-      split; auto.
-      apply lift_MemState_refine_prop.
-    }
-
-    { (* 64 bit memcpy *)
-      inversion ARGS; subst.
-      clear ARGS.
-      rewrite DVCInfFin.dvalue_refine_strict_equation in H, H0, H1, H2.
-
-      apply DVC1.dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
-      apply DVC1.dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
-      apply DVC1.dvalue_convert_strict_i64_inv in H1.
-      apply DVC1.dvalue_convert_strict_i1_inv in H2; subst.
+      apply DVC1.dvalue_convert_strict_ix_inv in H1.
+      apply DVC1.dvalue_convert_strict_ix_inv in H2; subst.
 
       unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
       unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
@@ -13100,7 +13053,7 @@ cofix CIH
       apply DVC1.dvalue_convert_strict_addr_inv in H as (a' & H & X); subst.
       apply DVC1.dvalue_convert_strict_addr_inv in H0 as (a0' & H0 & X0); subst.
       apply DVC1.dvalue_convert_strict_iptr_inv in H1 as (x3' & H1 & X3); subst.
-      apply DVC1.dvalue_convert_strict_i1_inv in H2; subst.
+      apply DVC1.dvalue_convert_strict_ix_inv in H2; subst.
 
       unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
       unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
@@ -13399,19 +13352,19 @@ cofix CIH
        split; auto.
        unfold FinITOP.int_to_ptr in *.
        break_match_hyp; inv Heqo.
-       rewrite Int64.unsigned_repr in H.
+       rewrite Integers.unsigned_repr in H.
        2: {
          apply Bool.orb_false_elim in Heqb.
          destruct Heqb.
          apply Z.ltb_nlt in H0.
          rewrite Z.geb_leb in H1.
          apply Z.leb_gt in H1.
-         unfold Int64.max_unsigned.
+         unfold Integers.max_unsigned.
          lia.
        }
        subst.
 
-       rewrite Int64.repr_unsigned.
+       rewrite Integers.repr_unsigned.
        auto.
      + specialize (IHf_inf f ptr_inf eq_refl).
        forward IHf_inf.
@@ -13587,16 +13540,16 @@ cofix CIH
       cbn in *.
       inv H.
 
-      exists (Int64.unsigned i, p).
+      exists (Integers.unsigned i, p).
       split; auto.
       cbn.
       unfold FinITOP.int_to_ptr.
       break_match.
       {
-        pose proof Integers.Int64.unsigned_range i.
+        pose proof Integers.unsigned_range i.
         lia.
       }
-      rewrite Int64.repr_unsigned.
+      rewrite Integers.repr_unsigned.
       auto.
 
       intros fs H f0 H3.
@@ -13607,7 +13560,7 @@ cofix CIH
       red. cbn.
 
       apply in_map_iff.
-      exists (Int64.unsigned i, p0).
+      exists (Integers.unsigned i, p0).
       split; auto.
 
       apply in_map_iff.
@@ -13621,9 +13574,9 @@ cofix CIH
       cbn in *.
       unfold FinITOP.int_to_ptr in *.
       break_match_hyp; inv e.
-      rewrite Int64.unsigned_repr in H4.
+      rewrite Integers.unsigned_repr in H4.
       2: {
-        unfold Int64.max_unsigned.
+        unfold Integers.max_unsigned.
         lia.
       }
 
@@ -13658,16 +13611,16 @@ cofix CIH
       cbn in *.
       inv H.
 
-      exists (Int64.unsigned i, p).
+      exists (Integers.unsigned i, p).
       split; auto.
       cbn.
       unfold FinITOP.int_to_ptr.
       break_match.
       {
-        pose proof Integers.Int64.unsigned_range i.
+        pose proof Integers.unsigned_range i.
         lia.
       }
-      rewrite Int64.repr_unsigned.
+      rewrite Integers.repr_unsigned.
       auto.
 
       intros fs H f0 H4.
@@ -13678,7 +13631,7 @@ cofix CIH
       red. cbn.
 
       apply in_map_iff.
-      exists (Int64.unsigned i, p0).
+      exists (Integers.unsigned i, p0).
       split; auto.
 
       apply in_map_iff.
@@ -13692,9 +13645,9 @@ cofix CIH
       cbn in *.
       unfold FinITOP.int_to_ptr in *.
       break_match_hyp; inv e.
-      rewrite Int64.unsigned_repr in H5.
+      rewrite Integers.unsigned_repr in H5.
       2: {
-        unfold Int64.max_unsigned.
+        unfold Integers.max_unsigned.
         lia.
       }
 
@@ -17638,72 +17591,16 @@ cofix CIH
   Qed.
 
   (* TODO: Move this *)
-  Lemma dvalue_refine_strict_i1_r_inv :
-    forall v_inf x_fin,
-      DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I1 x_fin) ->
+  Lemma dvalue_refine_strict_ix_r_inv :
+    forall sz v_inf x_fin,
+      DVC1.dvalue_refine_strict v_inf (@DVC1.DV2.DVALUE_I sz x_fin) ->
       exists x_inf,
-        v_inf = DVC1.DV1.DVALUE_I1 x_inf /\
+        v_inf = @DVC1.DV1.DVALUE_I sz x_inf /\
           VellvmIntegers.unsigned x_inf = VellvmIntegers.unsigned x_fin.
   Proof.
-    intros v_inf x_fin REF.
+    intros sz v_inf x_fin REF.
     rewrite DVC1.dvalue_refine_strict_equation in REF.
-    apply DVC1.dvalue_convert_strict_i1_inv in REF.
-    exists x_fin; tauto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma dvalue_refine_strict_i8_r_inv :
-    forall v_inf x_fin,
-      DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I8 x_fin) ->
-      exists x_inf,
-        v_inf = DVC1.DV1.DVALUE_I8 x_inf /\
-          VellvmIntegers.unsigned x_inf = VellvmIntegers.unsigned x_fin.
-  Proof.
-    intros v_inf x_fin REF.
-    rewrite DVC1.dvalue_refine_strict_equation in REF.
-    apply DVC1.dvalue_convert_strict_i8_inv in REF.
-    exists x_fin; tauto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma dvalue_refine_strict_i16_r_inv :
-    forall v_inf x_fin,
-      DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I16 x_fin) ->
-      exists x_inf,
-        v_inf = DVC1.DV1.DVALUE_I16 x_inf /\
-          VellvmIntegers.unsigned x_inf = VellvmIntegers.unsigned x_fin.
-  Proof.
-    intros v_inf x_fin REF.
-    rewrite DVC1.dvalue_refine_strict_equation in REF.
-    apply DVC1.dvalue_convert_strict_i16_inv in REF.
-    exists x_fin; tauto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma dvalue_refine_strict_i32_r_inv :
-    forall v_inf x_fin,
-      DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I32 x_fin) ->
-      exists x_inf,
-        v_inf = DVC1.DV1.DVALUE_I32 x_inf /\
-          VellvmIntegers.unsigned x_inf = VellvmIntegers.unsigned x_fin.
-  Proof.
-    intros v_inf x_fin REF.
-    rewrite DVC1.dvalue_refine_strict_equation in REF.
-    apply DVC1.dvalue_convert_strict_i32_inv in REF.
-    exists x_fin; tauto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma dvalue_refine_strict_i64_r_inv :
-    forall v_inf x_fin,
-      DVC1.dvalue_refine_strict v_inf (DVC1.DV2.DVALUE_I64 x_fin) ->
-      exists x_inf,
-        v_inf = DVC1.DV1.DVALUE_I64 x_inf /\
-          VellvmIntegers.unsigned x_inf = VellvmIntegers.unsigned x_fin.
-  Proof.
-    intros v_inf x_fin REF.
-    rewrite DVC1.dvalue_refine_strict_equation in REF.
-    apply DVC1.dvalue_convert_strict_i64_inv in REF.
+    apply DVC1.dvalue_convert_strict_ix_inv in REF.
     exists x_fin; tauto.
   Qed.
 
@@ -17811,221 +17708,13 @@ cofix CIH
     red in HANDLE.
     repeat (break_match_hyp; try contradiction).
 
-    { (* I1 *)
+    { (* IX *)
       inv ARGS.
       inv H3.
       rename x0 into x_inf.
       rename x into x_fin.
 
-      apply dvalue_refine_strict_i1_r_inv in H2 as (?&?&?); subst.
-
-      eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE.
-      all: eauto.
-
-      { (* MA: fresh_sid *)
-        intros a_fin ms_fin_ma FRESH.
-        eapply fresh_sid_fin_inf; eauto.
-      }
-
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID HANDLE'.
-      cbn in SID; subst.
-
-      eapply MemPropT_fin_inf_bind.
-      all: eauto.
-
-      { (* MA: generate_num_undef_bytes *)
-        intros a_fin0 ms_fin_ma GEN.
-        red in GEN.
-        break_match_hyp; inv GEN.
-        rename Heqo into GEN.
-        eapply generate_num_undef_bytes_fin_inf in GEN as (bytes_inf&GEN&BYTES_REF).
-        exists bytes_inf. exists ms_inf.
-        split; eauto.
-        red.
-        rewrite H0.
-        rewrite GEN.
-        cbn.
-        auto.
-      }
-
-      intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
-      eapply MemPropT_fin_inf_bind.
-      all: eauto.
-
-      { (* MA: fresh_provenance *)
-        intros a_fin1 ms_fin_ma FRESH_PR.
-        eapply fresh_provenance_fin_inf; eauto.
-      }
-
-      intros ms_inf1 ms_fin1 ms_fin'1 a_fin1 a_inf0 b_fin1 PR MSR_PR HANDLE'''.
-      cbn in PR; subst.
-      eapply malloc_bytes_with_pr_spec_MemPropT_fin_inf; eauto.
-    }
-
-    { (* I8 *)
-      inv ARGS.
-      inv H3.
-      rename x0 into x_inf.
-      rename x into x_fin.
-
-      apply dvalue_refine_strict_i8_r_inv in H2 as (?&?&?); subst.
-
-      eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE.
-      all: eauto.
-
-      { (* MA: fresh_sid *)
-        intros a_fin ms_fin_ma FRESH.
-        eapply fresh_sid_fin_inf; eauto.
-      }
-
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID HANDLE'.
-      cbn in SID; subst.
-
-      eapply MemPropT_fin_inf_bind.
-      all: eauto.
-
-      { (* MA: generate_num_undef_bytes *)
-        intros a_fin0 ms_fin_ma GEN.
-        red in GEN.
-        break_match_hyp; inv GEN.
-        rename Heqo into GEN.
-        eapply generate_num_undef_bytes_fin_inf in GEN as (bytes_inf&GEN&BYTES_REF).
-        exists bytes_inf. exists ms_inf.
-        split; eauto.
-        red.
-        rewrite H0.
-        rewrite GEN.
-        cbn.
-        auto.
-      }
-
-      intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
-      eapply MemPropT_fin_inf_bind.
-      all: eauto.
-
-      { (* MA: fresh_provenance *)
-        intros a_fin1 ms_fin_ma FRESH_PR.
-        eapply fresh_provenance_fin_inf; eauto.
-      }
-
-      intros ms_inf1 ms_fin1 ms_fin'1 a_fin1 a_inf0 b_fin1 PR MSR_PR HANDLE'''.
-      cbn in PR; subst.
-      eapply malloc_bytes_with_pr_spec_MemPropT_fin_inf; eauto.
-    }
-
-    { (* I16 *)
-      inv ARGS.
-      inv H3.
-      rename x0 into x_inf.
-      rename x into x_fin.
-
-      apply dvalue_refine_strict_i16_r_inv in H2 as (?&?&?); subst.
-
-      eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE.
-      all: eauto.
-
-      { (* MA: fresh_sid *)
-        intros a_fin ms_fin_ma FRESH.
-        eapply fresh_sid_fin_inf; eauto.
-      }
-
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID HANDLE'.
-      cbn in SID; subst.
-
-      eapply MemPropT_fin_inf_bind.
-      all: eauto.
-
-      { (* MA: generate_num_undef_bytes *)
-        intros a_fin0 ms_fin_ma GEN.
-        red in GEN.
-        break_match_hyp; inv GEN.
-        rename Heqo into GEN.
-        eapply generate_num_undef_bytes_fin_inf in GEN as (bytes_inf&GEN&BYTES_REF).
-        exists bytes_inf. exists ms_inf.
-        split; eauto.
-        red.
-        rewrite H0.
-        rewrite GEN.
-        cbn.
-        auto.
-      }
-
-      intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
-      eapply MemPropT_fin_inf_bind.
-      all: eauto.
-
-      { (* MA: fresh_provenance *)
-        intros a_fin1 ms_fin_ma FRESH_PR.
-        eapply fresh_provenance_fin_inf; eauto.
-      }
-
-      intros ms_inf1 ms_fin1 ms_fin'1 a_fin1 a_inf0 b_fin1 PR MSR_PR HANDLE'''.
-      cbn in PR; subst.
-      eapply malloc_bytes_with_pr_spec_MemPropT_fin_inf; eauto.
-    }
-
-    { (* I32 *)
-      inv ARGS.
-      inv H3.
-      rename x0 into x_inf.
-      rename x into x_fin.
-
-      apply dvalue_refine_strict_i32_r_inv in H2 as (?&?&?); subst.
-
-      eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE.
-      all: eauto.
-
-      { (* MA: fresh_sid *)
-        intros a_fin ms_fin_ma FRESH.
-        eapply fresh_sid_fin_inf; eauto.
-      }
-
-      intros ms_inf ms_fin ms_fin' a_fin a_inf b_fin SID MSR_SID HANDLE'.
-      cbn in SID; subst.
-
-      eapply MemPropT_fin_inf_bind.
-      all: eauto.
-
-      { (* MA: generate_num_undef_bytes *)
-        intros a_fin0 ms_fin_ma GEN.
-        red in GEN.
-        break_match_hyp; inv GEN.
-        rename Heqo into GEN.
-        eapply generate_num_undef_bytes_fin_inf in GEN as (bytes_inf&GEN&BYTES_REF).
-        exists bytes_inf. exists ms_inf.
-        split; eauto.
-        red.
-        rewrite H0.
-        rewrite GEN.
-        cbn.
-        auto.
-      }
-
-      intros ms_inf0 ms_fin0 ms_fin'0 a_fin0 a_inf b_fin0 BYTES_REF MSR_GEN HANDLE''.
-      eapply MemPropT_fin_inf_bind.
-      all: eauto.
-
-      { (* MA: fresh_provenance *)
-        intros a_fin1 ms_fin_ma FRESH_PR.
-        eapply fresh_provenance_fin_inf; eauto.
-      }
-
-      intros ms_inf1 ms_fin1 ms_fin'1 a_fin1 a_inf0 b_fin1 PR MSR_PR HANDLE'''.
-      cbn in PR; subst.
-      eapply malloc_bytes_with_pr_spec_MemPropT_fin_inf; eauto.
-    }
-
-    { (* I64 *)
-      inv ARGS.
-      inv H3.
-      rename x0 into x_inf.
-      rename x into x_fin.
-
-      apply dvalue_refine_strict_i64_r_inv in H2 as (?&?&?); subst.
+      apply dvalue_refine_strict_ix_r_inv in H2 as (?&?&?); subst.
 
       eapply MemPropT_fin_inf_bind.
       4: apply HANDLE.
@@ -18143,62 +17832,23 @@ cofix CIH
     exists x; tauto.
   Qed.
 
-  Lemma handle_memset_spec_32_fin_inf :
-    forall {ms_fin_start ms_fin_final ms_inf_start a a_inf val
+  Lemma handle_memset_spec_fin_inf :
+    forall sz sz_vol {ms_fin_start ms_fin_final ms_inf_start a a_inf val
          val_inf len len_inf volatile volatile_inf sid res_fin},
       addr_refine a_inf a ->
       VellvmIntegers.unsigned volatile_inf = VellvmIntegers.unsigned volatile ->
       VellvmIntegers.unsigned val_inf = VellvmIntegers.unsigned val ->
       VellvmIntegers.unsigned len_inf = VellvmIntegers.unsigned len ->
       MemState_refine_prop ms_inf_start ms_fin_start ->
-      Memory64BitIntptr.MMEP.MemSpec.memset_spec a val (Int32.unsigned len) sid
-        (Int1.eq volatile Int1.one) ms_fin_start (success_unERR_UB_OOM (ms_fin_final, res_fin)) ->
+      Memory64BitIntptr.MMEP.MemSpec.memset_spec a val (@Integers.unsigned sz len) sid
+        (@Integers.eq sz_vol volatile Integers.one) ms_fin_start (success_unERR_UB_OOM (ms_fin_final, res_fin)) ->
       exists (res_inf : unit) (ms_inf_final : MemoryBigIntptr.MMEP.MMSP.MemState),
-        MemoryBigIntptr.MMEP.MemSpec.memset_spec a_inf val_inf (Int32.unsigned len_inf) sid
-          (Int1.eq volatile_inf Int1.one) ms_inf_start (success_unERR_UB_OOM (ms_inf_final, res_inf)) /\
+        MemoryBigIntptr.MMEP.MemSpec.memset_spec a_inf val_inf (@Integers.unsigned sz len_inf) sid
+          (@Integers.eq sz_vol volatile_inf Integers.one) ms_inf_start (success_unERR_UB_OOM (ms_inf_final, res_inf)) /\
           eq res_inf res_fin /\
           MemState_refine_prop ms_inf_final ms_fin_final.
   Proof.
-    intros ms_fin_start ms_fin_final ms_inf_start a a_inf val val_inf len len_inf volatile volatile_inf sid
-      res_fin A VOL VAL LEN MSR HANDLE.
-
-    unfold MemoryBigIntptr.MMEP.MemSpec.memset_spec.
-    unfold Memory64BitIntptr.MMEP.MemSpec.memset_spec in HANDLE.
-    break_match_hyp.
-    - inv HANDLE.
-    - unfold VellvmIntegers.unsigned in *.
-      cbn in LEN, VAL, VOL.
-      rewrite <- LEN in Heqb. rewrite Heqb.
-      eapply fin_inf_write_bytes_spec; eauto.
-
-      rewrite LEN.
-      apply Forall2_repeatN.
-      red.
-      cbn.
-      unfold Memory64BitIntptr.MP.BYTE_IMPL.uvalue_sbyte.
-      (* Proof irrelevance nonsense *)
-      destruct val, val_inf; cbn in VAL; subst.
-      assert (intrange = intrange0) by (apply proof_irrelevance); subst.
-      reflexivity.
-  Qed.
-
-  Lemma handle_memset_spec_64_fin_inf :
-    forall {ms_fin_start ms_fin_final ms_inf_start a a_inf val
-         val_inf len len_inf volatile volatile_inf sid res_fin},
-      addr_refine a_inf a ->
-      VellvmIntegers.unsigned volatile_inf = VellvmIntegers.unsigned volatile ->
-      VellvmIntegers.unsigned val_inf = VellvmIntegers.unsigned val ->
-      VellvmIntegers.unsigned len_inf = VellvmIntegers.unsigned len ->
-      MemState_refine_prop ms_inf_start ms_fin_start ->
-      Memory64BitIntptr.MMEP.MemSpec.memset_spec a val (Int64.unsigned len) sid
-        (Int1.eq volatile Int1.one) ms_fin_start (success_unERR_UB_OOM (ms_fin_final, res_fin)) ->
-      exists (res_inf : unit) (ms_inf_final : MemoryBigIntptr.MMEP.MMSP.MemState),
-        MemoryBigIntptr.MMEP.MemSpec.memset_spec a_inf val_inf (Int64.unsigned len_inf) sid
-          (Int1.eq volatile_inf Int1.one) ms_inf_start (success_unERR_UB_OOM (ms_inf_final, res_inf)) /\
-          eq res_inf res_fin /\
-          MemState_refine_prop ms_inf_final ms_fin_final.
-  Proof.
-    intros ms_fin_start ms_fin_final ms_inf_start a a_inf val val_inf len len_inf volatile volatile_inf sid
+    intros sz sz_vol ms_fin_start ms_fin_final ms_inf_start a a_inf val val_inf len len_inf volatile volatile_inf sid
       res_fin A VOL VAL LEN MSR HANDLE.
 
     unfold MemoryBigIntptr.MMEP.MemSpec.memset_spec.
@@ -18236,7 +17886,7 @@ cofix CIH
     red in HANDLE.
     repeat (break_match_hyp; try contradiction).
 
-    { (* I32 *)
+    { (* IX *)
       inv ARGS.
       inv H3; inv H5; inv H6; inv H7.
 
@@ -18251,11 +17901,11 @@ cofix CIH
 
       apply dvalue_refine_strict_addr_r_inv in H2 as (?&?&?); subst.
       rename x into a_inf.
-      apply dvalue_refine_strict_i32_r_inv in H3 as (?&?&?); subst.
+      apply dvalue_refine_strict_ix_r_inv in H3 as (?&?&?); subst.
       rename x into len_inf.
-      apply dvalue_refine_strict_i8_r_inv in H4 as (?&?&?); subst.
+      apply dvalue_refine_strict_ix_r_inv in H4 as (?&?&?); subst.
       rename x into val_inf.
-      apply dvalue_refine_strict_i1_r_inv in H5 as (?&?&?); subst.
+      apply dvalue_refine_strict_ix_r_inv in H5 as (?&?&?); subst.
       rename x into volatile_inf.
 
       eapply MemPropT_fin_inf_bind.
@@ -18269,43 +17919,7 @@ cofix CIH
 
       intros ms_inf ms_fin ms_fin' a_fin a_inf0 b_fin SID MSR_SID FRESH HANDLE'.
       cbn in SID; subst.
-      eapply handle_memset_spec_32_fin_inf; eauto.
-    }
-
-    { (* I64 *)
-      inv ARGS.
-      inv H3; inv H5; inv H6; inv H7.
-
-      rename x into val.
-      rename x0 into len.
-      rename x1 into volatile.
-
-      rename x2 into a_inf.
-      rename x3 into val_inf.
-      rename x4 into len_inf.
-      rename x5 into volatile_inf.
-
-      apply dvalue_refine_strict_addr_r_inv in H2 as (?&?&?); subst.
-      rename x into a_inf.
-      apply dvalue_refine_strict_i64_r_inv in H3 as (?&?&?); subst.
-      rename x into len_inf.
-      apply dvalue_refine_strict_i8_r_inv in H4 as (?&?&?); subst.
-      rename x into val_inf.
-      apply dvalue_refine_strict_i1_r_inv in H5 as (?&?&?); subst.
-      rename x into volatile_inf.
-
-      eapply MemPropT_fin_inf_bind.
-      4: apply HANDLE.
-      all: eauto.
-
-      { (* MA: fresh_sid *)
-        intros a_fin ms_fin_ma FRESH.
-        eapply fresh_sid_fin_inf; eauto.
-      }
-
-      intros ms_inf ms_fin ms_fin' a_fin a_inf0 b_fin SID MSR_SID FRESH HANDLE'.
-      cbn in SID; subst.
-      eapply handle_memset_spec_64_fin_inf; eauto.
+      eapply handle_memset_spec_fin_inf; eauto.
     }
   Qed.
 
@@ -19179,45 +18793,49 @@ cofix CIH
       repeat break_match_hyp_inv.
       constructor; auto.
       + rewrite map_monad_oom_Forall2 in Heqo.
-        revert sz H1.
+        revert sz H0.
         induction Heqo; constructor.
         * eapply IH; eauto. left.  reflexivity. 
         * eapply IHHeqo; intros; eauto.
           -- eapply IH; eauto. right.  assumption.
-          -- cbn in H2. rewrite Nnat.Nat2N.id. reflexivity.
+          -- cbn in H1. rewrite Nnat.Nat2N.id. reflexivity.
       + apply map_monad_oom_length in Heqo.
         rewrite <- Heqo. assumption.
     - (* Vectors *)
       repeat break_match_hyp_inv.
       constructor; auto.
       + rewrite map_monad_oom_Forall2 in Heqo.
-        revert sz H1.
+        revert sz H0.
         induction Heqo; constructor.
         * eapply IH; eauto. left.  reflexivity. 
         * eapply IHHeqo; intros; eauto.
           -- eapply IH; eauto. right.  assumption.
-          -- cbn in H2. rewrite Nnat.Nat2N.id. reflexivity.
+          -- cbn in H1. rewrite Nnat.Nat2N.id. reflexivity.
       + apply map_monad_oom_length in Heqo.
         rewrite <- Heqo. assumption.
     - repeat break_match_hyp_inv.
       econstructor; intuition.
-      left. eauto.
-    - repeat break_match_hyp_inv.
-      econstructor; intuition.
-      left. eauto.
 
     - repeat break_match_hyp_inv.
-      destruct H; subst.
-      econstructor. left. reflexivity. eauto. eauto.
-      econstructor. right. reflexivity. eauto. eauto.
+      econstructor; intuition.
+
+    - destruct H;
+      subst; repeat break_match_hyp_inv.
+      econstructor; intuition; subst; eauto.
+      econstructor; try right; auto; subst; eauto.
+
+    - destruct H;
+      subst; repeat break_match_hyp_inv.
+      econstructor; intuition; subst; eauto.
+      econstructor; try right; auto; subst; eauto.
 
     - break_match_hyp_inv.
       constructor; auto.
       + intros.
         rewrite map_monad_oom_Forall2 in Heqo.      
         apply Forall2_flip in Heqo.
-        destruct (Forall2_In _ _ _ _ H2 Heqo) as [x [HIN HX]].
-        destruct (H0 _ HIN) as [u [t [idx [sid HY]]]].
+        destruct (Forall2_In _ _ _ _ H1 Heqo) as [x [HIN HX]].
+        destruct (H _ HIN) as [u [t [idx [sid HY]]]].
         subst.
         cbn in HX.
         repeat break_match_hyp_inv.
@@ -19225,7 +18843,7 @@ cofix CIH
         reflexivity.
       + apply map_monad_oom_length in Heqo.
         rewrite <- Heqo.
-        rewrite <- H1.
+        rewrite <- H0.
         reflexivity.
         Unshelve.
         all: eauto.
@@ -19266,41 +18884,36 @@ cofix CIH
           econstructor; eauto
         ].
 
+    - DVC1.uvalue_convert_strict_inv H0.
+      solve_uvalue_has_dtyp.
     - (* Arrays *)
-      destruct uv_fin; cbn in H3;
-        repeat break_match_hyp_inv;
-        try inv H3.
+      DVC1.uvalue_convert_strict_inv H2.
       constructor; auto.
-      + rewrite map_monad_oom_Forall2 in Heqo.
-        revert sz H1.
-        induction Heqo; constructor.
+      + rewrite map_monad_oom_Forall2 in H2.
+        revert sz H0.
+        induction H2; constructor.
         * eapply IH; eauto. left.  reflexivity. 
-        * eapply IHHeqo; intros; eauto.
+        * eapply IHForall2; intros; eauto.
           -- eapply IH; eauto. right.  assumption.
           -- cbn in H2. rewrite Nnat.Nat2N.id. reflexivity.
-      + apply map_monad_oom_length in Heqo.
+      + apply map_monad_oom_length in H2.
         lia.
     - (* Vectors *)
-      destruct uv_fin; cbn in H4;
-        repeat break_match_hyp_inv;
-        try inv H4.
+      DVC1.uvalue_convert_strict_inv H3.
       constructor; auto.
-      + rewrite map_monad_oom_Forall2 in Heqo.
-        revert sz H1.
-        induction Heqo; constructor.
+      + rewrite map_monad_oom_Forall2 in H3.
+        revert sz H0.
+        induction H3; constructor.
         * eapply IH; eauto. left.  reflexivity. 
-        * eapply IHHeqo; intros; eauto.
+        * eapply IHForall2; intros; eauto.
           -- eapply IH; eauto. right.  assumption.
           -- cbn in H2. rewrite Nnat.Nat2N.id. reflexivity.
-      + apply map_monad_oom_length in Heqo.
+      + apply map_monad_oom_length in H3.
         lia.
-    - destruct uv_fin; cbn in H1;
-        repeat break_match_hyp_inv;
-        try inv H1.
+    - DVC1.uvalue_convert_strict_inv H1.
       destruct H.
-      + destruct H as (?&?&?).
+      + destruct H as (?&?).
         econstructor; eauto.
-        left; split; eauto.
       + destruct H.
         * destruct H.
           econstructor; eauto.
@@ -19308,13 +18921,10 @@ cofix CIH
         * destruct H.
           econstructor; eauto.
           right; right; split; eauto.
-    - destruct uv_fin; cbn in H1;
-        repeat break_match_hyp_inv;
-        try inv H1.
+    - DVC1.uvalue_convert_strict_inv H1.
       destruct H.
-      + destruct H as (?&?&?).
+      + destruct H as (?&?).
         econstructor; eauto.
-        left; split; eauto.
       + destruct H.
         * destruct H.
           econstructor; eauto.
@@ -19322,38 +18932,37 @@ cofix CIH
         * destruct H.
           econstructor; eauto.
           right; right; split; eauto.
-    - destruct uv_fin; cbn in H2;
-        repeat break_match_hyp_inv;
-        try inv H2.
-      destruct H0.
+    - DVC1.uvalue_convert_strict_inv H1.
+      destruct H.
       + econstructor; eauto.
-        destruct H0.
+        destruct H.
         left; eauto.
+      + subst.
+        econstructor; eauto.
+    - DVC1.uvalue_convert_strict_inv H1.
+      destruct H.
       + econstructor; eauto.
-    - destruct uv_fin; cbn in H2;
-        repeat break_match_hyp_inv;
-        try inv H2.
-      destruct H0.
+      + subst.
+        econstructor; eauto.
+    - DVC1.uvalue_convert_strict_inv H1.
+      destruct H.
       + econstructor; eauto.
-        destruct H0.
-        left; eauto.
-      + econstructor; eauto.
-    - destruct uv_fin; cbn in H3;
-        repeat break_match_hyp_inv;
-        try inv H3.
+      + subst.
+        econstructor; eauto.
+    - DVC1.uvalue_convert_strict_inv H2.
       constructor; auto.
       + intros.
-        rewrite map_monad_oom_Forall2 in Heqo.
-        destruct (Forall2_In _ _ _ _ H2 Heqo) as [x [HIN HX]].
-        destruct (H0 _ HIN) as [u [t [idx [sid HY]]]].
+        rewrite map_monad_oom_Forall2 in H2.
+        destruct (Forall2_In _ _ _ _ H1 H2) as [x' [HIN HX]].
+        destruct (H _ HIN) as [u [t [idx [sid HY]]]].
         subst.
         destruct byte; inv HX;
         repeat break_match_hyp_inv.
         do 4 eexists.
         reflexivity.
-      + apply map_monad_oom_length in Heqo.
-        rewrite Heqo.
-        rewrite <- H1.
+      + apply map_monad_oom_length in H2.
+        rewrite H2.
+        rewrite <- H0.
         reflexivity.
         Unshelve.
         all: eauto.
@@ -19390,7 +18999,7 @@ cofix CIH
       destruct ixbytes; inv H0.
       destruct p.
       break_match_hyp.
-      1-29,31: cbn in RESID; contradiction.
+      all: try (cbn in RESID; contradiction).
       destruct (Memory64BitIntptr.MMEP.MemSpec.MemHelpers.filter_sid_matches s ixbytes) eqn:FILTER.
       repeat red in RESID.
       destruct RESID as (?&?&FRESH&RESID).
@@ -21034,11 +20643,7 @@ cofix CIH
         solve
         [ rewrite DVC1.dvalue_refine_strict_equation in ADDR_REF;
           first
-            [ apply DVC1.dvalue_convert_strict_i1_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i8_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i16_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i32_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i64_inv in ADDR_REF
+            [ apply DVC1.dvalue_convert_strict_ix_inv in ADDR_REF
             | apply DVC1.dvalue_convert_strict_iptr_inv in ADDR_REF
             | apply DVC1.dvalue_convert_strict_addr_inv in ADDR_REF
             | apply DVC1.dvalue_convert_strict_double_inv in ADDR_REF
@@ -21097,11 +20702,7 @@ cofix CIH
         solve
         [ rewrite DVC1.dvalue_refine_strict_equation in ADDR_REF;
           first
-            [ apply DVC1.dvalue_convert_strict_i1_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i8_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i16_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i32_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i64_inv in ADDR_REF
+            [ apply DVC1.dvalue_convert_strict_ix_inv in ADDR_REF
             | apply DVC1.dvalue_convert_strict_iptr_inv in ADDR_REF
             | apply DVC1.dvalue_convert_strict_addr_inv in ADDR_REF
             | apply DVC1.dvalue_convert_strict_double_inv in ADDR_REF
@@ -21193,12 +20794,11 @@ cofix CIH
   (* TODO: Move this *)
   Lemma from_ubytes_dtyp :
     forall {bytes t uv},
-      ALL_IX_SUPPORTED t ->
       MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes bytes t = uv ->
       N.of_nat (Datatypes.length bytes) = LLVMParamsBigIntptr.SIZEOF.sizeof_dtyp t ->
       E1.DV.uvalue_has_dtyp uv t.
   Proof.
-    intros bytes t uv SUPPORTED UBYTES SIZE.
+    intros bytes t uv UBYTES SIZE.
     unfold MemoryBigIntptr.MMEP.MMSP.MemByte.from_ubytes in *.
     rewrite SIZE in UBYTES.
     rewrite N.eqb_refl in UBYTES.
@@ -21836,11 +21436,7 @@ cofix CIH
         solve
         [ rewrite DVC1.dvalue_refine_strict_equation in ADDR_REF;
           first
-            [ apply DVC1.dvalue_convert_strict_i1_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i8_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i16_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i32_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i64_inv in ADDR_REF
+            [ apply DVC1.dvalue_convert_strict_ix_inv in ADDR_REF
             | apply DVC1.dvalue_convert_strict_iptr_inv in ADDR_REF
             | apply DVC1.dvalue_convert_strict_addr_inv in ADDR_REF
             | apply DVC1.dvalue_convert_strict_double_inv in ADDR_REF
@@ -21911,11 +21507,7 @@ cofix CIH
         solve
         [ rewrite DVC1.dvalue_refine_strict_equation in ADDR_REF;
           first
-            [ apply DVC1.dvalue_convert_strict_i1_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i8_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i16_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i32_inv in ADDR_REF
-            | apply DVC1.dvalue_convert_strict_i64_inv in ADDR_REF
+            [ apply DVC1.dvalue_convert_strict_ix_inv in ADDR_REF
             | apply DVC1.dvalue_convert_strict_iptr_inv in ADDR_REF
             | apply DVC1.dvalue_convert_strict_addr_inv in ADDR_REF
             | apply DVC1.dvalue_convert_strict_double_inv in ADDR_REF
@@ -23172,47 +22764,12 @@ cofix CIH
     all: repeat break_match_hyp_inv.
     all: destruct ARGS; [|cbn in *; eauto].
 
-    { (* 32 bit memcpy *)
+    { (* ix memcpy *)
       unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
       unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
       do 2 red in HANDLER.
       break_match_hyp; try contradiction.
       break_match_hyp; try contradiction.
-      unfold VellvmIntegers.unsigned in Heqb, Heqb0.
-      cbn in Heqb, Heqb0.
-      unfold VellvmIntegers.unsigned.
-      unfold VInt32.
-      erewrite <- fin_inf_no_overlap; eauto.
-      repeat erewrite <- fin_inf_ptoi; eauto.
-      rewrite Heqb0.
-
-      destruct HANDLER.
-      { exists msg_fin.
-        left.
-        eapply fin_inf_read_bytes_spec_err; eauto.
-      }
-
-      destruct H as (?&?&?&?).
-      exists msg_fin.
-      right.
-
-      eapply fin_inf_read_bytes_spec in H; eauto.
-      destruct H as (?&?&?&?&?).
-      exists x4, x3.
-      split; eauto.
-      eapply fin_inf_write_bytes_spec_error; eauto.
-    }
-
-    { (* 64 bit memcpy *)
-      unfold MemoryBigIntptr.MMEP.MemSpec.handle_memcpy_prop.
-      unfold MemoryBigIntptr.MMEP.MemSpec.memcpy_spec.
-      do 2 red in HANDLER.
-      break_match_hyp; try contradiction.
-      break_match_hyp; try contradiction.
-      unfold VellvmIntegers.unsigned in Heqb, Heqb0.
-      cbn in Heqb, Heqb0.
-      unfold VellvmIntegers.unsigned.
-      unfold VInt64.
       erewrite <- fin_inf_no_overlap; eauto.
       repeat erewrite <- fin_inf_ptoi; eauto.
       rewrite Heqb0.
@@ -23296,135 +22853,7 @@ cofix CIH
     all: repeat break_match_hyp_inv.
     all: destruct ARGS; [|cbn in *; eauto].
 
-    { (* i1 *)
-      unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
-      red in HANDLER.
-      eapply MemPropT_bind_raise_error_inv in HANDLER.
-      destruct HANDLER as [[] | HANDLER].
-      destruct HANDLER as (?&?&?&?).
-      destruct H0.
-      { red in H0.
-        break_match_hyp; cbn in H0; contradiction.
-      }
-      destruct H0 as (?&?&?&?).
-      exists msg_fin.
-      right.
-      eapply fresh_sid_fin_inf in H; eauto.
-      destruct H as (?&?&?&?&?); subst.
-      do 2 eexists; split; eauto.
-
-      red in H0.
-      break_match_hyp_inv.
-      eapply generate_num_undef_bytes_fin_inf in Heqo.
-      destruct Heqo as (?&?&?).
-      right.
-      do 2 eexists.
-      split.
-      red.
-      cbn in H0.
-      cbn; rewrite H0.
-      split; reflexivity.
-
-      eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
-    }
-
-    { (* i8 *)
-      unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
-      red in HANDLER.
-      eapply MemPropT_bind_raise_error_inv in HANDLER.
-      destruct HANDLER as [[] | HANDLER].
-      destruct HANDLER as (?&?&?&?).
-      destruct H0.
-      { red in H0.
-        break_match_hyp; cbn in H0; contradiction.
-      }
-      destruct H0 as (?&?&?&?).
-      exists msg_fin.
-      right.
-      eapply fresh_sid_fin_inf in H; eauto.
-      destruct H as (?&?&?&?&?); subst.
-      do 2 eexists; split; eauto.
-
-      red in H0.
-      break_match_hyp_inv.
-      eapply generate_num_undef_bytes_fin_inf in Heqo.
-      destruct Heqo as (?&?&?).
-      right.
-      do 2 eexists.
-      split.
-      red.
-      cbn in H0.
-      cbn; rewrite H0.
-      split; reflexivity.
-
-      eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
-    }
-
-    { (* i16 *)
-      unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
-      red in HANDLER.
-      eapply MemPropT_bind_raise_error_inv in HANDLER.
-      destruct HANDLER as [[] | HANDLER].
-      destruct HANDLER as (?&?&?&?).
-      destruct H0.
-      { red in H0.
-        break_match_hyp; cbn in H0; contradiction.
-      }
-      destruct H0 as (?&?&?&?).
-      exists msg_fin.
-      right.
-      eapply fresh_sid_fin_inf in H; eauto.
-      destruct H as (?&?&?&?&?); subst.
-      do 2 eexists; split; eauto.
-
-      red in H0.
-      break_match_hyp_inv.
-      eapply generate_num_undef_bytes_fin_inf in Heqo.
-      destruct Heqo as (?&?&?).
-      right.
-      do 2 eexists.
-      split.
-      red.
-      cbn in H0.
-      cbn; rewrite H0.
-      split; reflexivity.
-
-      eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
-    }
-
-    { (* i32 *)
-      unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
-      red in HANDLER.
-      eapply MemPropT_bind_raise_error_inv in HANDLER.
-      destruct HANDLER as [[] | HANDLER].
-      destruct HANDLER as (?&?&?&?).
-      destruct H0.
-      { red in H0.
-        break_match_hyp; cbn in H0; contradiction.
-      }
-      destruct H0 as (?&?&?&?).
-      exists msg_fin.
-      right.
-      eapply fresh_sid_fin_inf in H; eauto.
-      destruct H as (?&?&?&?&?); subst.
-      do 2 eexists; split; eauto.
-
-      red in H0.
-      break_match_hyp_inv.
-      eapply generate_num_undef_bytes_fin_inf in Heqo.
-      destruct Heqo as (?&?&?).
-      right.
-      do 2 eexists.
-      split.
-      red.
-      cbn in H0.
-      cbn; rewrite H0.
-      split; reflexivity.
-
-      eapply fin_inf_malloc_bytes_spec_MemPropT_error; eauto.
-    }
-
-    { (* i64 *)
+    { (* ix *)
       unfold MemoryBigIntptr.MMEP.MemSpec.handle_malloc_prop.
       red in HANDLER.
       eapply MemPropT_bind_raise_error_inv in HANDLER.
@@ -23502,55 +22931,20 @@ cofix CIH
     }
   Qed.
 
-  Lemma handle_memset_spec_32_fin_inf_error :
-    forall {ms_fin_start ms_inf_start a a_inf val
+  Lemma handle_memset_spec_fin_inf_error :
+    forall sz sz_vol {ms_fin_start ms_inf_start a a_inf val
          val_inf len len_inf volatile volatile_inf sid msg},
       addr_refine a_inf a ->
       VellvmIntegers.unsigned volatile_inf = VellvmIntegers.unsigned volatile ->
       VellvmIntegers.unsigned val_inf = VellvmIntegers.unsigned val ->
       VellvmIntegers.unsigned len_inf = VellvmIntegers.unsigned len ->
       MemState_refine_prop ms_inf_start ms_fin_start ->
-      Memory64BitIntptr.MMEP.MemSpec.memset_spec a val (Int32.unsigned len) sid
-        (Int1.eq volatile Int1.one) ms_fin_start (raise_error msg) ->
-        MemoryBigIntptr.MMEP.MemSpec.memset_spec a_inf val_inf (Int32.unsigned len_inf) sid
-          (Int1.eq volatile_inf Int1.one) ms_inf_start (raise_error msg).
+      Memory64BitIntptr.MMEP.MemSpec.memset_spec a val (@Integers.unsigned sz len) sid
+        (@Integers.eq sz_vol volatile Integers.one) ms_fin_start (raise_error msg) ->
+        MemoryBigIntptr.MMEP.MemSpec.memset_spec a_inf val_inf (@Integers.unsigned sz len_inf) sid
+          (@Integers.eq sz_vol volatile_inf Integers.one) ms_inf_start (raise_error msg).
   Proof.
-    intros ms_fin_start ms_inf_start a a_inf val val_inf len len_inf volatile volatile_inf sid msg A VOL VAL LEN MSR HANDLE.
-
-    unfold MemoryBigIntptr.MMEP.MemSpec.memset_spec.
-    unfold Memory64BitIntptr.MMEP.MemSpec.memset_spec in HANDLE.
-    break_match_hyp.
-    - inv HANDLE.
-    - unfold VellvmIntegers.unsigned in *.
-      cbn in LEN, VAL, VOL.
-      rewrite <- LEN in Heqb. rewrite Heqb.
-      eapply fin_inf_write_bytes_spec_error; eauto.
-
-      rewrite LEN.
-      apply Forall2_repeatN.
-      red.
-      cbn.
-      unfold Memory64BitIntptr.MP.BYTE_IMPL.uvalue_sbyte.
-      (* Proof irrelevance nonsense *)
-      destruct val, val_inf; cbn in VAL; subst.
-      assert (intrange = intrange0) by (apply proof_irrelevance); subst.
-      reflexivity.
-  Qed.
-
-  Lemma handle_memset_spec_64_fin_inf_error :
-    forall {ms_fin_start ms_inf_start a a_inf val
-         val_inf len len_inf volatile volatile_inf sid msg},
-      addr_refine a_inf a ->
-      VellvmIntegers.unsigned volatile_inf = VellvmIntegers.unsigned volatile ->
-      VellvmIntegers.unsigned val_inf = VellvmIntegers.unsigned val ->
-      VellvmIntegers.unsigned len_inf = VellvmIntegers.unsigned len ->
-      MemState_refine_prop ms_inf_start ms_fin_start ->
-      Memory64BitIntptr.MMEP.MemSpec.memset_spec a val (Int64.unsigned len) sid
-        (Int1.eq volatile Int1.one) ms_fin_start (raise_error msg) ->
-        MemoryBigIntptr.MMEP.MemSpec.memset_spec a_inf val_inf (Int64.unsigned len_inf) sid
-          (Int1.eq volatile_inf Int1.one) ms_inf_start (raise_error msg).
-  Proof.
-    intros ms_fin_start ms_inf_start a a_inf val val_inf len len_inf volatile volatile_inf sid msg A VOL VAL LEN MSR HANDLE.
+    intros sz sz_vol ms_fin_start ms_inf_start a a_inf val val_inf len len_inf volatile volatile_inf sid msg A VOL VAL LEN MSR HANDLE.
 
     unfold MemoryBigIntptr.MMEP.MemSpec.memset_spec.
     unfold Memory64BitIntptr.MMEP.MemSpec.memset_spec in HANDLE.
@@ -23595,9 +22989,10 @@ cofix CIH
     all: repeat break_match_hyp_inv.
     all: destruct ARGS; [|cbn in *; eauto].
 
-    { (* i32 *)
+    { (* ix *)
       unfold MemoryBigIntptr.MMEP.MemSpec.handle_memset_prop.
       red in HANDLER.
+      break_match_hyp; subst.
       eapply MemPropT_fin_inf_bind_error.
       5: apply HANDLER.
       all: eauto.
@@ -23608,26 +23003,7 @@ cofix CIH
 
       intros ms_inf0 ms_fin0 a_fin a_inf H H0 H1 H2.
       cbn in *; subst.
-      eapply handle_memset_spec_32_fin_inf_error.
-      apply Heqo.
-      all: try reflexivity.
-      all: eauto.
-    }
-
-    { (* i64 *)
-      unfold MemoryBigIntptr.MMEP.MemSpec.handle_memset_prop.
-      red in HANDLER.
-      eapply MemPropT_fin_inf_bind_error.
-      5: apply HANDLER.
-      all: eauto.
-
-      { intros a_fin ms_fin_ma H.
-        eapply fresh_sid_fin_inf; eauto.
-      }
-
-      intros ms_inf0 ms_fin0 a_fin a_inf H H0 H1 H2.
-      cbn in *; subst.
-      eapply handle_memset_spec_64_fin_inf_error.
+      eapply handle_memset_spec_fin_inf_error.
       apply Heqo.
       all: try reflexivity.
       all: eauto.
@@ -25114,7 +24490,7 @@ cofix CIH
                                ]).
                         repeat break_match_hyp; cbn in HANDLER; try contradiction.
 
-                        { (* 32 bit *)
+                        { (* ix bit *)
                           red in HANDLER.
                           break_match_hyp.
                           { (* Negative length UB *)
@@ -25126,8 +24502,8 @@ cofix CIH
 
                             apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
                             apply dvalue_refine_strict_addr_r_inv in H3 as (?&?&?); subst.
-                            apply dvalue_refine_strict_i32_r_inv in H5 as (?&?&?); subst.
-                            apply dvalue_refine_strict_i1_r_inv in H7 as (?&?&?); subst.
+                            apply dvalue_refine_strict_ix_r_inv in H5 as (?&?&?); subst.
+                            apply dvalue_refine_strict_ix_r_inv in H7 as (?&?&?); subst.
 
                             eapply Interp_Memory_PropT_Vis with
                               (ta:=
@@ -25183,8 +24559,8 @@ cofix CIH
 
                           apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
                           apply dvalue_refine_strict_addr_r_inv in H3 as (?&?&?); subst.
-                          apply dvalue_refine_strict_i32_r_inv in H5 as (?&?&?); subst.
-                          apply dvalue_refine_strict_i1_r_inv in H7 as (?&?&?); subst.
+                          apply dvalue_refine_strict_ix_r_inv in H5 as (?&?&?); subst.
+                          apply dvalue_refine_strict_ix_r_inv in H7 as (?&?&?); subst.
 
                           break_match_hyp.
 
@@ -25301,193 +24677,6 @@ cofix CIH
                           apply lift_MemState_refine_prop.
                         }
 
-                        { (* 64 bit *)
-                          red in HANDLER.
-                          break_match_hyp.
-                          { (* Negative length UB *)
-                            subst.
-                            inversion ARGS; subst.
-                            inversion H4; subst.
-                            inversion H6; subst.
-                            inversion H8; subst.
-
-                            apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
-                            apply dvalue_refine_strict_addr_r_inv in H3 as (?&?&?); subst.
-                            apply dvalue_refine_strict_i64_r_inv in H5 as (?&?&?); subst.
-                            apply dvalue_refine_strict_i1_r_inv in H7 as (?&?&?); subst.
-
-                            eapply Interp_Memory_PropT_Vis with
-                              (ta:=
-                                 vis (ThrowUB tt)
-                                   (fun x : void =>
-                                      match
-                                        x
-                                        return
-                                        (itree
-                                           (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
-                                                                                                 LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-                                           (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                              (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
-                                      with
-                                      end)).
-
-                            3: {
-                              red in KS.
-                              red.
-                              left.
-                              eapply FindUB.
-                              pstep; red; cbn.
-                              constructor.
-                              intros [].
-                            }
-
-                            2: {
-                              cbn.
-                              repeat red.
-                              left.
-                              exists "memcpy given negative length.".
-                              red.
-                              rewrite Heqb.
-                              cbn.
-                              left.
-                              red.
-                              cbn in H2.
-                              rewrite H2.
-                              rewrite Heqb0.
-                              cbn; auto.
-                            }
-
-                            intros a1 b RETa RETb AB.
-                            eapply Returns_vis_inversion in RETb.
-                            destruct RETb as [[] _].
-                          }
-
-                          subst.
-                          inversion ARGS; subst.
-                          inversion H4; subst.
-                          inversion H6; subst.
-                          inversion H8; subst.
-
-                          apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
-                          apply dvalue_refine_strict_addr_r_inv in H3 as (?&?&?); subst.
-                          apply dvalue_refine_strict_i64_r_inv in H5 as (?&?&?); subst.
-                          apply dvalue_refine_strict_i1_r_inv in H7 as (?&?&?); subst.
-
-                          break_match_hyp.
-
-                          2: {
-                            (* Overlapping UB *)
-                            eapply Interp_Memory_PropT_Vis with
-                              (ta:=
-                                 vis (ThrowUB tt)
-                                   (fun x : void =>
-                                      match
-                                        x
-                                        return
-                                        (itree
-                                           (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
-                                                                                                 LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-                                           (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                              (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
-                                      with
-                                      end)).
-
-                            3: {
-                              red in KS.
-                              red.
-                              left.
-                              eapply FindUB.
-                              pstep; red; cbn.
-                              constructor.
-                              intros [].
-                            }
-
-                            2: {
-                              cbn.
-                              repeat red.
-                              left.
-                              exists "memcpy with overlapping or non-equal src and dst memory locations.".
-                              red.
-                              rewrite Heqb.
-                              cbn.
-                              left.
-                              red.
-                              cbn in H2.
-                              rewrite H2.
-                              rewrite Heqb0.
-                              erewrite <- fin_inf_no_overlap; eauto.
-                              erewrite <- fin_inf_ptoi; eauto.
-                              erewrite <- fin_inf_ptoi; eauto.
-                              rewrite Heqb1.
-                              cbn; auto.
-                            }
-
-                            intros a1 b RETa RETb AB.
-                            eapply Returns_vis_inversion in RETb.
-                            destruct RETb as [[] _].
-                          }
-
-                          (* May be UB in read / write... *)
-                          (* HANDLER has UB in it *)
-                          eapply Interp_Memory_PropT_Vis with
-                            (ta:=raise_ub "").
-
-                          3: {
-                            red in KS.
-                            red.
-                            left.
-                            eapply FindUB.
-                            pstep; red; cbn.
-                            constructor.
-                            intros [].
-                          }
-
-                          { intros a1 b RETa RETb AB.
-                            cbn in RETb.
-                            unfold raiseUB in RETb.
-                            rewrite bind_trigger in RETb.
-                            eapply Returns_vis_inversion in RETb.
-                            destruct RETb as [[] _].
-                          }
-
-                          cbn.
-                          red.
-                          left.
-                          exists ub_msg.
-                          red.
-                          rewrite Heqb.
-
-                          left.
-                          cbn.
-                          red.
-
-                          cbn in H2, H3.
-                          rewrite H2.
-                          rewrite Heqb0.
-                          erewrite <- fin_inf_no_overlap; eauto.
-                          erewrite <- fin_inf_ptoi; eauto.
-                          erewrite <- fin_inf_ptoi; eauto.
-                          rewrite Heqb1.
-                          eapply MemPropT_fin_inf_bind_ub.
-                          5: apply HANDLER.
-                          all: eauto with FinInf.
-
-                          2: {
-                            intros msg ?H.
-                            eapply fin_inf_read_bytes_spec_ub'; eauto.
-                            apply lift_MemState_refine_prop.
-                          }
-
-                          2: {
-                            intros ms_inf ms_fin a_fin a_inf msg ?H H7 H9 H11.
-                            eapply fin_inf_write_bytes_spec_ub; eauto.
-                          }
-
-                          intros a_fin ms_fin_ma READ.
-                          eapply fin_inf_read_bytes_spec; eauto.
-                          apply lift_MemState_refine_prop.
-                        }
-
                         { (* iptr *)
                           red in HANDLER.
                           break_match_hyp.
@@ -25501,7 +24690,7 @@ cofix CIH
                             apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
                             apply dvalue_refine_strict_addr_r_inv in H3 as (?&?&?); subst.
                             apply dvalue_refine_strict_iptr_r_inv in H5 as (?&?&?); subst.
-                            apply dvalue_refine_strict_i1_r_inv in H7 as (?&?&?); subst.
+                            apply dvalue_refine_strict_ix_r_inv in H7 as (?&?&?); subst.
 
                             eapply Interp_Memory_PropT_Vis with
                               (ta:=
@@ -25559,7 +24748,7 @@ cofix CIH
                           apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
                           apply dvalue_refine_strict_addr_r_inv in H3 as (?&?&?); subst.
                           apply dvalue_refine_strict_iptr_r_inv in H5 as (?&?&?); subst.
-                          apply dvalue_refine_strict_i1_r_inv in H7 as (?&?&?); subst.
+                          apply dvalue_refine_strict_ix_r_inv in H7 as (?&?&?); subst.
 
                           break_match_hyp.
 
@@ -25699,78 +24888,13 @@ cofix CIH
                         inv ARGS;
                         rename H into ARG_REF.
 
-                        { (* i32 *)
+                        { (* ix *)
                           apply dvalue_refine_strict_addr_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
-                          apply dvalue_refine_strict_i8_r_inv in H3 as (?&?&?); subst.
+                          apply dvalue_refine_strict_ix_r_inv in H3 as (?&?&?); subst.
                           inv H4.
-                          apply dvalue_refine_strict_i32_r_inv in H3 as (?&?&?); subst.
+                          apply dvalue_refine_strict_ix_r_inv in H3 as (?&?&?); subst.
                           inv H5.
-                          apply dvalue_refine_strict_i1_r_inv in H4 as (?&?&?); subst.
-                          inv H6.
-
-                          eapply Interp_Memory_PropT_Vis with
-                            (ta:=raise_ub "").
-
-                          3: {
-                            red.
-                            left.
-                            eapply FindUB.
-                            pstep; red; cbn.
-                            constructor.
-                            intros [].
-                          }
-
-                          { intros a0 b RETa RETb AB.
-                            cbn in RETb.
-                            unfold raiseUB in RETb.
-                            rewrite bind_trigger in RETb.
-                            eapply Returns_vis_inversion in RETb.
-                            destruct RETb as [[] _].
-                          }
-
-                          cbn.
-                          red.
-                          red.
-                          left.
-                          exists ub_msg.
-                          red.
-                          rewrite Heqb, Heqb0.
-                          left.
-                          red.
-                          
-                          eapply MemPropT_fin_inf_bind_ub.
-                          5: apply HANDLER.
-                          all: eauto with FinInf.
-
-                          { intros a_fin ms_fin_ma H.
-                            eapply fresh_sid_fin_inf; eauto with FinInf.
-                          }
-
-                          intros ms_inf ms_fin a_fin a_inf msg SID MSR' FRESH MEMSET.
-                          red in MEMSET.
-                          red.
-                          rewrite H1.
-                          break_match_goal.
-                          cbn in *; auto.
-                          eapply fin_inf_write_bytes_spec_ub; eauto.
-                          apply Forall2_repeatN.
-                          red.
-                          cbn.
-                          unfold Memory64BitIntptr.MP.BYTE_IMPL.uvalue_sbyte.
-                          (* Proof irrelevance nonsense *)
-                          destruct x, x0; cbn in H0; subst.
-                          assert (intrange = intrange0) by (apply proof_irrelevance); subst.
-                          cbn in SID; subst.
-                          reflexivity.
-                        }
-
-                        { (* i64 *)
-                          apply dvalue_refine_strict_addr_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
-                          apply dvalue_refine_strict_i8_r_inv in H3 as (?&?&?); subst.
-                          inv H4.
-                          apply dvalue_refine_strict_i64_r_inv in H3 as (?&?&?); subst.
-                          inv H5.
-                          apply dvalue_refine_strict_i1_r_inv in H4 as (?&?&?); subst.
+                          apply dvalue_refine_strict_ix_r_inv in H4 as (?&?&?); subst.
                           inv H6.
 
                           eapply Interp_Memory_PropT_Vis with
@@ -25846,288 +24970,8 @@ cofix CIH
                         inv ARGS;
                         rename H into ARG_REF.
 
-                        { (* i1 *)
-                          apply dvalue_refine_strict_i1_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
-                          eapply Interp_Memory_PropT_Vis with
-                            (ta:=raise_ub "").
-
-                          3: {
-                            red.
-                            left.
-                            eapply FindUB.
-                            pstep; red; cbn.
-                            constructor.
-                            intros [].
-                          }
-
-                          { intros a b RETa RETb AB.
-                            cbn in RETb.
-                            unfold raiseUB in RETb.
-                            rewrite bind_trigger in RETb.
-                            eapply Returns_vis_inversion in RETb.
-                            destruct RETb as [[] _].
-                          }
-
-                          cbn.
-                          red.
-                          red.
-                          left.
-                          exists ub_msg.
-                          red.
-                          rewrite Heqb, Heqb0, Heqb1.
-                          left.
-
-                          eapply MemPropT_fin_inf_bind_ub.
-                          5: apply HANDLER.
-                          all: eauto with FinInf.
-
-                          { intros a_fin ms_fin_ma H.
-                            eapply fresh_sid_fin_inf; eauto with FinInf.
-                          }
-
-                          intros ms_inf ms_fin a_fin a_inf msg SID MSR' FRESH MALLOC.
-
-                          eapply MemPropT_fin_inf_bind_ub with
-                            (A_REF:=sbytes_refine).
-                          5: apply MALLOC.
-                          all: eauto with FinInf.
-
-                          2: {
-                            intros msg0 GEN.
-                            red; red in GEN.
-                            break_match_hyp; cbn in GEN; try contradiction.
-                          }
-
-                          { intros a_fin0 ms_fin_ma GEN.
-                            red in GEN.
-                            break_match_hyp; cbn in GEN; try contradiction.
-                            destruct GEN; subst.
-                            eapply generate_num_undef_bytes_fin_inf in Heqo.
-
-                            destruct Heqo as (bytes_inf&GEN&BYTE_REF).
-                            exists bytes_inf. exists ms_inf.
-                            split; auto.
-
-                            red.
-                            cbn in *; subst.
-                            rewrite ARG_REF.
-                            rewrite GEN.
-                            auto.
-                          }
-                        }
-
-                        { (* i8 *)
-                          apply dvalue_refine_strict_i8_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
-                          eapply Interp_Memory_PropT_Vis with
-                            (ta:=raise_ub "").
-
-                          3: {
-                            red.
-                            left.
-                            eapply FindUB.
-                            pstep; red; cbn.
-                            constructor.
-                            intros [].
-                          }
-
-                          { intros a b RETa RETb AB.
-                            cbn in RETb.
-                            unfold raiseUB in RETb.
-                            rewrite bind_trigger in RETb.
-                            eapply Returns_vis_inversion in RETb.
-                            destruct RETb as [[] _].
-                          }
-
-                          cbn.
-                          red.
-                          red.
-                          left.
-                          exists ub_msg.
-                          red.
-                          rewrite Heqb, Heqb0, Heqb1.
-                          left.
-
-                          eapply MemPropT_fin_inf_bind_ub.
-                          5: apply HANDLER.
-                          all: eauto with FinInf.
-
-                          { intros a_fin ms_fin_ma H.
-                            eapply fresh_sid_fin_inf; eauto with FinInf.
-                          }
-
-                          intros ms_inf ms_fin a_fin a_inf msg SID MSR' FRESH MALLOC.
-
-                          eapply MemPropT_fin_inf_bind_ub with
-                            (A_REF:=sbytes_refine).
-                          5: apply MALLOC.
-                          all: eauto with FinInf.
-
-                          2: {
-                            intros msg0 GEN.
-                            red; red in GEN.
-                            break_match_hyp; cbn in GEN; try contradiction.
-                          }
-
-                          { intros a_fin0 ms_fin_ma GEN.
-                            red in GEN.
-                            break_match_hyp; cbn in GEN; try contradiction.
-                            destruct GEN; subst.
-                            eapply generate_num_undef_bytes_fin_inf in Heqo.
-
-                            destruct Heqo as (bytes_inf&GEN&BYTE_REF).
-                            exists bytes_inf. exists ms_inf.
-                            split; auto.
-
-                            red.
-                            cbn in *; subst.
-                            rewrite ARG_REF.
-                            rewrite GEN.
-                            auto.
-                          }
-                        }
-
-                        { (* i16 *)
-                          apply dvalue_refine_strict_i16_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
-                          eapply Interp_Memory_PropT_Vis with
-                            (ta:=raise_ub "").
-
-                          3: {
-                            red.
-                            left.
-                            eapply FindUB.
-                            pstep; red; cbn.
-                            constructor.
-                            intros [].
-                          }
-
-                          { intros a b RETa RETb AB.
-                            cbn in RETb.
-                            unfold raiseUB in RETb.
-                            rewrite bind_trigger in RETb.
-                            eapply Returns_vis_inversion in RETb.
-                            destruct RETb as [[] _].
-                          }
-
-                          cbn.
-                          red.
-                          red.
-                          left.
-                          exists ub_msg.
-                          red.
-                          rewrite Heqb, Heqb0, Heqb1.
-                          left.
-
-                          eapply MemPropT_fin_inf_bind_ub.
-                          5: apply HANDLER.
-                          all: eauto with FinInf.
-
-                          { intros a_fin ms_fin_ma H.
-                            eapply fresh_sid_fin_inf; eauto with FinInf.
-                          }
-
-                          intros ms_inf ms_fin a_fin a_inf msg SID MSR' FRESH MALLOC.
-
-                          eapply MemPropT_fin_inf_bind_ub with
-                            (A_REF:=sbytes_refine).
-                          5: apply MALLOC.
-                          all: eauto with FinInf.
-
-                          2: {
-                            intros msg0 GEN.
-                            red; red in GEN.
-                            break_match_hyp; cbn in GEN; try contradiction.
-                          }
-
-                          { intros a_fin0 ms_fin_ma GEN.
-                            red in GEN.
-                            break_match_hyp; cbn in GEN; try contradiction.
-                            destruct GEN; subst.
-                            eapply generate_num_undef_bytes_fin_inf in Heqo.
-
-                            destruct Heqo as (bytes_inf&GEN&BYTE_REF).
-                            exists bytes_inf. exists ms_inf.
-                            split; auto.
-
-                            red.
-                            cbn in *; subst.
-                            rewrite ARG_REF.
-                            rewrite GEN.
-                            auto.
-                          }
-                        }
-
-                        { (* i32 *)
-                          apply dvalue_refine_strict_i32_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
-                          eapply Interp_Memory_PropT_Vis with
-                            (ta:=raise_ub "").
-
-                          3: {
-                            red.
-                            left.
-                            eapply FindUB.
-                            pstep; red; cbn.
-                            constructor.
-                            intros [].
-                          }
-
-                          { intros a b RETa RETb AB.
-                            cbn in RETb.
-                            unfold raiseUB in RETb.
-                            rewrite bind_trigger in RETb.
-                            eapply Returns_vis_inversion in RETb.
-                            destruct RETb as [[] _].
-                          }
-
-                          cbn.
-                          red.
-                          red.
-                          left.
-                          exists ub_msg.
-                          red.
-                          rewrite Heqb, Heqb0, Heqb1.
-                          left.
-
-                          eapply MemPropT_fin_inf_bind_ub.
-                          5: apply HANDLER.
-                          all: eauto with FinInf.
-
-                          { intros a_fin ms_fin_ma H.
-                            eapply fresh_sid_fin_inf; eauto with FinInf.
-                          }
-
-                          intros ms_inf ms_fin a_fin a_inf msg SID MSR' FRESH MALLOC.
-
-                          eapply MemPropT_fin_inf_bind_ub with
-                            (A_REF:=sbytes_refine).
-                          5: apply MALLOC.
-                          all: eauto with FinInf.
-
-                          2: {
-                            intros msg0 GEN.
-                            red; red in GEN.
-                            break_match_hyp; cbn in GEN; try contradiction.
-                          }
-
-                          { intros a_fin0 ms_fin_ma GEN.
-                            red in GEN.
-                            break_match_hyp; cbn in GEN; try contradiction.
-                            destruct GEN; subst.
-                            eapply generate_num_undef_bytes_fin_inf in Heqo.
-
-                            destruct Heqo as (bytes_inf&GEN&BYTE_REF).
-                            exists bytes_inf. exists ms_inf.
-                            split; auto.
-
-                            red.
-                            cbn in *; subst.
-                            rewrite ARG_REF.
-                            rewrite GEN.
-                            auto.
-                          }
-                        }
-
-                        { (* i64 *)
-                          apply dvalue_refine_strict_i64_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
+                        { (* ix *)
+                          apply dvalue_refine_strict_ix_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
                           eapply Interp_Memory_PropT_Vis with
                             (ta:=raise_ub "").
 
@@ -28970,7 +27814,7 @@ cofix CIH
                        ]).
                 repeat break_match_hyp; cbn in HANDLER; try contradiction.
 
-                { (* 32 bit *)
+                { (* ix bit *)
                   red in HANDLER.
                   subst.
                   inversion ARGS; subst.
@@ -28980,183 +27824,8 @@ cofix CIH
 
                   apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
                   apply dvalue_refine_strict_addr_r_inv in H4 as (?&?&?); subst.
-                  apply dvalue_refine_strict_i32_r_inv in H6 as (?&?&?); subst.
-                  apply dvalue_refine_strict_i1_r_inv in H8 as (?&?&?); subst.
-
-                  break_match_hyp.
-                  { (* Negative length UB *)
-                    pstep; red; cbn.
-
-                    eapply Interp_Memory_PropT_Vis with
-                      (ta:=
-                         vis (ThrowUB tt)
-                           (fun x : void =>
-                              match
-                                x
-                                return
-                                (itree
-                                   (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
-                                                                                         LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-                                   (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                      (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
-                              with
-                              end)).
-
-                    2: {
-                      cbn.
-                      repeat red.
-                      left.
-                      exists "memcpy given negative length.".
-                      red.
-                      rewrite Heqb.
-                      cbn.
-                      left.
-                      red.
-                      cbn in H3.
-                      rewrite H3.
-                      rewrite Heqb0.
-                      cbn; auto.
-                    }
-
-                    intros a1 b RETa RETb AB.
-                    eapply Returns_vis_inversion in RETb.
-                    destruct RETb as [[] _].
-
-                    left.
-                    eapply FindUB.
-                    pstep.
-                    red.
-                    cbn.
-                    rewrite subevent_subevent.
-                    constructor.
-                    intros [].
-                  }
-
-                  break_match_hyp.
-                  2: {
-                    pstep; red; cbn.
-                    eapply Interp_Memory_PropT_Vis with
-                      (ta:=
-                         vis (ThrowUB tt)
-                           (fun x : void =>
-                              match
-                                x
-                                return
-                                (itree
-                                   (InterpreterStackBigIntptr.LP.Events.ExternalCallE +'
-                                                                                         LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-                                   (MemoryBigIntptr.MMEP.MMSP.MemState *
-                                      (store_id * LLVMParamsBigIntptr.Events.DV.dvalue)))
-                              with
-                              end)).
-
-                    2: {
-                      cbn.
-                      repeat red.
-                      left.
-                      exists "memcpy with overlapping or non-equal src and dst memory locations.".
-                      red.
-                      rewrite Heqb.
-                      left.
-                      red.
-                      cbn.
-                      red.
-                      cbn in H3; rewrite H3.
-                      rewrite Heqb0.
-                      erewrite <- fin_inf_no_overlap; eauto.
-                      erewrite <- fin_inf_ptoi; eauto.
-                      erewrite <- fin_inf_ptoi; eauto.
-                      rewrite Heqb1.
-                      cbn; auto.
-                    }
-
-                    2: {
-                      red.
-                      left.
-                      eapply FindUB.
-                      pstep; red; cbn.
-                      constructor.
-                      intros [].
-                    }
-
-                    intros a1 b RETa RETb AB.
-                    eapply Returns_vis_inversion in RETb.
-                    destruct RETb as [[] _].
-                  }
-
-                  (* HANDLER has UB in it *)
-                  pstep; red; cbn.
-                  eapply Interp_Memory_PropT_Vis with
-                    (ta:=raise_ub "").
-
-                  3: {
-                    red.
-                    left.
-                    eapply FindUB.
-                    pstep; red; cbn.
-                    constructor.
-                    intros [].
-                  }
-
-                  { intros a1 b RETa RETb AB.
-                    cbn in RETb.
-                    unfold raiseUB in RETb.
-                    rewrite bind_trigger in RETb.
-                    eapply Returns_vis_inversion in RETb.
-                    destruct RETb as [[] _].
-                  }
-
-                  cbn.
-                  red.
-                  left.
-                  exists ub_msg.
-                  red.
-                  rewrite Heqb.
-
-                  left.
-                  cbn.
-                  red.
-
-                  cbn in H2, H3, H5.
-                  unfold InterpreterStackBigIntptr.LP.IP.to_Z in *.
-                  rewrite H3.
-                  rewrite Heqb0.
-                  erewrite <- fin_inf_no_overlap; eauto.
-                  erewrite <- fin_inf_ptoi; eauto.
-                  erewrite <- fin_inf_ptoi; eauto.
-                  rewrite Heqb1.
-                  eapply MemPropT_fin_inf_bind_ub.
-                  5: apply HANDLER.
-                  all: eauto with FinInf.
-
-                  2: {
-                    intros msg H.
-                    eapply fin_inf_read_bytes_spec_ub'; eauto.
-                    apply lift_MemState_refine_prop.
-                  }
-
-                  2: {
-                    intros ms_inf ms_fin a_fin a_inf msg ? ? ? ?.
-                    eapply fin_inf_write_bytes_spec_ub; eauto.
-                  }
-
-                  intros a_fin ms_fin_ma READ.
-                  eapply fin_inf_read_bytes_spec; eauto.
-                  apply lift_MemState_refine_prop.
-                }
-
-                { (* 64 bit *)
-                  red in HANDLER.
-                  subst.
-                  inversion ARGS; subst.
-                  inversion H5; subst.
-                  inversion H7; subst.
-                  inversion H9; subst.
-
-                  apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
-                  apply dvalue_refine_strict_addr_r_inv in H4 as (?&?&?); subst.
-                  apply dvalue_refine_strict_i64_r_inv in H6 as (?&?&?); subst.
-                  apply dvalue_refine_strict_i1_r_inv in H8 as (?&?&?); subst.
+                  apply dvalue_refine_strict_ix_r_inv in H6 as (?&?&?); subst.
+                  apply dvalue_refine_strict_ix_r_inv in H8 as (?&?&?); subst.
 
                   break_match_hyp.
                   { (* Negative length UB *)
@@ -29331,7 +28000,7 @@ cofix CIH
                   apply dvalue_refine_strict_addr_r_inv in H as (?&?&?); subst.
                   apply dvalue_refine_strict_addr_r_inv in H4 as (?&?&?); subst.
                   apply dvalue_refine_strict_iptr_r_inv in H6 as (?&?&?); subst.
-                  apply dvalue_refine_strict_i1_r_inv in H8 as (?&?&?); subst.
+                  apply dvalue_refine_strict_ix_r_inv in H8 as (?&?&?); subst.
 
                   break_match_hyp.
                   { (* Negative length UB *)
@@ -29519,79 +28188,13 @@ cofix CIH
                   inv ARGS;
                   rename H into ARG_REF.
 
-                { (* i32 *)
+                { (* ix *)
                   apply dvalue_refine_strict_addr_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
-                  apply dvalue_refine_strict_i8_r_inv in H4 as (?&?&?); subst.
+                  apply dvalue_refine_strict_ix_r_inv in H4 as (?&?&?); subst.
                   inv H5.
-                  apply dvalue_refine_strict_i32_r_inv in H4 as (?&?&?); subst.
+                  apply dvalue_refine_strict_ix_r_inv in H4 as (?&?&?); subst.
                   inv H6.
-                  apply dvalue_refine_strict_i1_r_inv in H5 as (?&?&?); subst.
-                  inv H7.
-
-                  pstep; red; cbn.
-                  eapply Interp_Memory_PropT_Vis with
-                    (ta:=raise_ub "").
-
-                  3: {
-                    red.
-                    left.
-                    eapply FindUB.
-                    pstep; red; cbn.
-                    constructor.
-                    intros [].
-                  }
-
-                  { intros a0 b RETa RETb AB.
-                    cbn in RETb.
-                    unfold raiseUB in RETb.
-                    rewrite bind_trigger in RETb.
-                    eapply Returns_vis_inversion in RETb.
-                    destruct RETb as [[] _].
-                  }
-
-                  cbn.
-                  red.
-                  red.
-                  left.
-                  exists ub_msg.
-                  red.
-                  rewrite Heqb, Heqb0.
-                  left.
-                  red.
-                  
-                  eapply MemPropT_fin_inf_bind_ub.
-                  5: apply HANDLER.
-                  all: eauto with FinInf.
-
-                  { intros a_fin ms_fin_ma H.
-                    eapply fresh_sid_fin_inf; eauto with FinInf.
-                  }
-
-                  intros ms_inf ms_fin a_fin a_inf msg SID MSR' FRESH MEMSET.
-                  red in MEMSET.
-                  red.
-                  rewrite H2.
-                  break_match_goal.
-                  cbn in *; auto.
-                  eapply fin_inf_write_bytes_spec_ub; eauto.
-                  apply Forall2_repeatN.
-                  red.
-                  cbn.
-                  unfold Memory64BitIntptr.MP.BYTE_IMPL.uvalue_sbyte.
-                  (* Proof irrelevance nonsense *)
-                  destruct x, x0; cbn in H0; subst.
-                  assert (intrange = intrange0) by (apply proof_irrelevance); subst.
-                  cbn in SID; subst.
-                  reflexivity.
-                }
-
-                { (* i64 *)
-                  apply dvalue_refine_strict_addr_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
-                  apply dvalue_refine_strict_i8_r_inv in H4 as (?&?&?); subst.
-                  inv H5.
-                  apply dvalue_refine_strict_i64_r_inv in H4 as (?&?&?); subst.
-                  inv H6.
-                  apply dvalue_refine_strict_i1_r_inv in H5 as (?&?&?); subst.
+                  apply dvalue_refine_strict_ix_r_inv in H5 as (?&?&?); subst.
                   inv H7.
 
                   pstep; red; cbn.
@@ -29669,288 +28272,8 @@ cofix CIH
                   inv ARGS;
                   rename H into ARG_REF.
 
-                { (* i1 *)
-                  apply dvalue_refine_strict_i1_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
-                  eapply Interp_Memory_PropT_Vis with
-                    (ta:=raise_ub "").
-
-                  3: {
-                    red.
-                    left.
-                    eapply FindUB.
-                    pstep; red; cbn.
-                    constructor.
-                    intros [].
-                  }
-
-                  { intros a b RETa RETb AB.
-                    cbn in RETb.
-                    unfold raiseUB in RETb.
-                    rewrite bind_trigger in RETb.
-                    eapply Returns_vis_inversion in RETb.
-                    destruct RETb as [[] _].
-                  }
-
-                  cbn.
-                  red.
-                  red.
-                  left.
-                  exists ub_msg.
-                  red.
-                  rewrite Heqb, Heqb0, Heqb1.
-                  left.
-
-                  eapply MemPropT_fin_inf_bind_ub.
-                  5: apply HANDLER.
-                  all: eauto with FinInf.
-
-                  { intros a_fin ms_fin_ma H.
-                    eapply fresh_sid_fin_inf; eauto with FinInf.
-                  }
-
-                  intros ms_inf ms_fin a_fin a_inf msg SID MSR' FRESH MALLOC.
-
-                  eapply MemPropT_fin_inf_bind_ub with
-                    (A_REF:=sbytes_refine).
-                  5: apply MALLOC.
-                  all: eauto with FinInf.
-
-                  2: {
-                    intros msg0 GEN.
-                    red; red in GEN.
-                    break_match_hyp; cbn in GEN; try contradiction.
-                  }
-
-                  { intros a_fin0 ms_fin_ma GEN.
-                    red in GEN.
-                    break_match_hyp; cbn in GEN; try contradiction.
-                    destruct GEN; subst.
-                    eapply generate_num_undef_bytes_fin_inf in Heqo.
-
-                    destruct Heqo as (bytes_inf&GEN&BYTE_REF).
-                    exists bytes_inf. exists ms_inf.
-                    split; auto.
-
-                    red.
-                    cbn in *; subst.
-                    rewrite ARG_REF.
-                    rewrite GEN.
-                    auto.
-                  }
-                }
-
-                { (* i8 *)
-                  apply dvalue_refine_strict_i8_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
-                  eapply Interp_Memory_PropT_Vis with
-                    (ta:=raise_ub "").
-
-                  3: {
-                    red.
-                    left.
-                    eapply FindUB.
-                    pstep; red; cbn.
-                    constructor.
-                    intros [].
-                  }
-
-                  { intros a b RETa RETb AB.
-                    cbn in RETb.
-                    unfold raiseUB in RETb.
-                    rewrite bind_trigger in RETb.
-                    eapply Returns_vis_inversion in RETb.
-                    destruct RETb as [[] _].
-                  }
-
-                  cbn.
-                  red.
-                  red.
-                  left.
-                  exists ub_msg.
-                  red.
-                  rewrite Heqb, Heqb0, Heqb1.
-                  left.
-
-                  eapply MemPropT_fin_inf_bind_ub.
-                  5: apply HANDLER.
-                  all: eauto with FinInf.
-
-                  { intros a_fin ms_fin_ma H.
-                    eapply fresh_sid_fin_inf; eauto with FinInf.
-                  }
-
-                  intros ms_inf ms_fin a_fin a_inf msg SID MSR' FRESH MALLOC.
-
-                  eapply MemPropT_fin_inf_bind_ub with
-                    (A_REF:=sbytes_refine).
-                  5: apply MALLOC.
-                  all: eauto with FinInf.
-
-                  2: {
-                    intros msg0 GEN.
-                    red; red in GEN.
-                    break_match_hyp; cbn in GEN; try contradiction.
-                  }
-
-                  { intros a_fin0 ms_fin_ma GEN.
-                    red in GEN.
-                    break_match_hyp; cbn in GEN; try contradiction.
-                    destruct GEN; subst.
-                    eapply generate_num_undef_bytes_fin_inf in Heqo.
-
-                    destruct Heqo as (bytes_inf&GEN&BYTE_REF).
-                    exists bytes_inf. exists ms_inf.
-                    split; auto.
-
-                    red.
-                    cbn in *; subst.
-                    rewrite ARG_REF.
-                    rewrite GEN.
-                    auto.
-                  }
-                }
-
-                { (* i16 *)
-                  apply dvalue_refine_strict_i16_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
-                  eapply Interp_Memory_PropT_Vis with
-                    (ta:=raise_ub "").
-
-                  3: {
-                    red.
-                    left.
-                    eapply FindUB.
-                    pstep; red; cbn.
-                    constructor.
-                    intros [].
-                  }
-
-                  { intros a b RETa RETb AB.
-                    cbn in RETb.
-                    unfold raiseUB in RETb.
-                    rewrite bind_trigger in RETb.
-                    eapply Returns_vis_inversion in RETb.
-                    destruct RETb as [[] _].
-                  }
-
-                  cbn.
-                  red.
-                  red.
-                  left.
-                  exists ub_msg.
-                  red.
-                  rewrite Heqb, Heqb0, Heqb1.
-                  left.
-
-                  eapply MemPropT_fin_inf_bind_ub.
-                  5: apply HANDLER.
-                  all: eauto with FinInf.
-
-                  { intros a_fin ms_fin_ma H.
-                    eapply fresh_sid_fin_inf; eauto with FinInf.
-                  }
-
-                  intros ms_inf ms_fin a_fin a_inf msg SID MSR' FRESH MALLOC.
-
-                  eapply MemPropT_fin_inf_bind_ub with
-                    (A_REF:=sbytes_refine).
-                  5: apply MALLOC.
-                  all: eauto with FinInf.
-
-                  2: {
-                    intros msg0 GEN.
-                    red; red in GEN.
-                    break_match_hyp; cbn in GEN; try contradiction.
-                  }
-
-                  { intros a_fin0 ms_fin_ma GEN.
-                    red in GEN.
-                    break_match_hyp; cbn in GEN; try contradiction.
-                    destruct GEN; subst.
-                    eapply generate_num_undef_bytes_fin_inf in Heqo.
-
-                    destruct Heqo as (bytes_inf&GEN&BYTE_REF).
-                    exists bytes_inf. exists ms_inf.
-                    split; auto.
-
-                    red.
-                    cbn in *; subst.
-                    rewrite ARG_REF.
-                    rewrite GEN.
-                    auto.
-                  }
-                }
-
-                { (* i32 *)
-                  apply dvalue_refine_strict_i32_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
-                  eapply Interp_Memory_PropT_Vis with
-                    (ta:=raise_ub "").
-
-                  3: {
-                    red.
-                    left.
-                    eapply FindUB.
-                    pstep; red; cbn.
-                    constructor.
-                    intros [].
-                  }
-
-                  { intros a b RETa RETb AB.
-                    cbn in RETb.
-                    unfold raiseUB in RETb.
-                    rewrite bind_trigger in RETb.
-                    eapply Returns_vis_inversion in RETb.
-                    destruct RETb as [[] _].
-                  }
-
-                  cbn.
-                  red.
-                  red.
-                  left.
-                  exists ub_msg.
-                  red.
-                  rewrite Heqb, Heqb0, Heqb1.
-                  left.
-
-                  eapply MemPropT_fin_inf_bind_ub.
-                  5: apply HANDLER.
-                  all: eauto with FinInf.
-
-                  { intros a_fin ms_fin_ma H.
-                    eapply fresh_sid_fin_inf; eauto with FinInf.
-                  }
-
-                  intros ms_inf ms_fin a_fin a_inf msg SID MSR' FRESH MALLOC.
-
-                  eapply MemPropT_fin_inf_bind_ub with
-                    (A_REF:=sbytes_refine).
-                  5: apply MALLOC.
-                  all: eauto with FinInf.
-
-                  2: {
-                    intros msg0 GEN.
-                    red; red in GEN.
-                    break_match_hyp; cbn in GEN; try contradiction.
-                  }
-
-                  { intros a_fin0 ms_fin_ma GEN.
-                    red in GEN.
-                    break_match_hyp; cbn in GEN; try contradiction.
-                    destruct GEN; subst.
-                    eapply generate_num_undef_bytes_fin_inf in Heqo.
-
-                    destruct Heqo as (bytes_inf&GEN&BYTE_REF).
-                    exists bytes_inf. exists ms_inf.
-                    split; auto.
-
-                    red.
-                    cbn in *; subst.
-                    rewrite ARG_REF.
-                    rewrite GEN.
-                    auto.
-                  }
-                }
-
-                { (* i64 *)
-                  apply dvalue_refine_strict_i64_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
+                { (* ix *)
+                  apply dvalue_refine_strict_ix_r_inv in ARG_REF as (?&?&ARG_REF); cbn in ARG_REF; subst.
                   eapply Interp_Memory_PropT_Vis with
                     (ta:=raise_ub "").
 

@@ -32,6 +32,10 @@ Fixpoint concatStr (l : list string) : string :=
   end.
 (*  ------------------------------------------------------------------------- *)
 
+#[global] Instance Show_Pos : Show positive.
+split.
+exact (fun p => show (Zpos p)).
+Defined.
 
 Class DShow (A : Type) := { dshow : A -> DString }.
 
@@ -452,7 +456,7 @@ Section ShowInstances.
 
 
   Definition double_to_hex_string (f : float) : string
-    := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (Int64.unsigned (Float.to_bits f)))).
+    := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (@unsigned 64 (Float.to_bits f)))).
 
   Definition float_to_hex_string (f : float32) : string
     := double_to_hex_string (Float32.to_double f).
@@ -463,10 +467,10 @@ Section ShowInstances.
   #[global] Instance showFloat32 : Show float32
     := {| show := float_to_hex_string |}.
 
-  Definition show_int (x : Integers.Int.int) : string
-    := show (Int.unsigned x).
+  Definition show_int {sz} (x : @int sz) : string
+    := show (unsigned x).
 
-  #[global] Instance Show_Int : Show Integers.Int.int
+  #[global] Instance Show_Int {sz} : Show (@int sz)
     := {| show := show_int|}.
 
   Definition show_fast_math (fm : fast_math) : string
@@ -563,8 +567,8 @@ Section ShowInstances.
     | EXP_Undef =>         false
     | EXP_Struct fields =>    false
     | EXP_Packed_struct fields =>     false
-    | EXP_Array elts =>               false
-    | EXP_Vector elts =>        false
+    | EXP_Array t elts =>               false
+    | EXP_Vector t elts =>        false
     | _ => true
     end.
 
@@ -603,11 +607,11 @@ Section ShowInstances.
                   DList_join [dshow ty ; string_to_DString " "] @@
                     dshow_exp false ex) fields) @@ string_to_DString "}>"
 
-    | EXP_Array elts =>
+    | EXP_Array t elts =>
         string_to_DString "[" @@
           concat_DString (string_to_DString ", ")
           (map (fun '(ty, ex) => DList_join [dshow ty ; string_to_DString " "] @@ dshow_exp false ex) elts) @@ string_to_DString "]"
-    | EXP_Vector elts => string_to_DString "<" @@ concat_DString (string_to_DString ", ") (map (fun '(ty, ex) => DList_join [dshow ty ; string_to_DString " "] @@ dshow_exp false ex) elts) @@ string_to_DString ">"
+    | EXP_Vector t elts => string_to_DString "<" @@ concat_DString (string_to_DString ", ") (map (fun '(ty, ex) => DList_join [dshow ty ; string_to_DString " "] @@ dshow_exp false ex) elts) @@ string_to_DString ">"
 
     | OP_IBinop iop t v1 v2 =>
         let second_expression :=

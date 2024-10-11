@@ -28,7 +28,7 @@ Module FinSizeof : Sizeof.
 
   Fixpoint bit_sizeof_dtyp (t : dtyp) : N :=
     match t with
-    | DTYPE_I sz => N.max 1 sz
+    | DTYPE_I sz => N.max 1 (Npos sz)
     | DTYPE_IPTR => 64 (* TODO: probably kind of a lie... *)
     | DTYPE_Pointer => 64
     | DTYPE_Void => 0
@@ -50,12 +50,7 @@ Module FinSizeof : Sizeof.
 
   Fixpoint sizeof_dtyp (ty:dtyp) : N :=
     match ty with
-    | DTYPE_I 1          => 1 (* TODO: i1 sizes... *)
-    | DTYPE_I 8          => 1
-    | DTYPE_I 16         => 2
-    | DTYPE_I 32         => 4
-    | DTYPE_I 64         => 8
-    | DTYPE_I _          => 0 (* Unsupported integers *)
+    | DTYPE_I sz         => N.max 1 (N.div (Npos sz) 8)
     | DTYPE_IPTR         => N.of_nat ptr_size
     | DTYPE_Pointer      => N.of_nat ptr_size
     | DTYPE_Packed_struct l

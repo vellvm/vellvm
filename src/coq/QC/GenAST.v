@@ -175,12 +175,6 @@ Section Helpers.
     end.
    *)
 
-  Definition genNatInt : G int
-    := fmap (fun n => Int.repr (Z.of_nat n)) (arbitrary : G nat).
-
-  Definition genPosInt : G int
-    := fmap (fun n => Int.repr (Z.of_nat (S n))) (arbitrary : G nat).
-
   Definition genPosZ : G Z
     :=
       n <- (arbitrary : G nat);;
@@ -1501,12 +1495,12 @@ Section TypGenerators.
   (* Generate a type of size 0 *)
   Definition gen_typ_0 : GenLLVM typ :=
     oid <- gen_sized_type_alias;;
-    let ident_gen :=
-      match oid with
-      | None => []
-      | Some id => [ret (TYPE_Identified id)]
-      end
-    in
+    (* let ident_gen := *)
+    (*   match oid with *)
+    (*   | None => [] *)
+    (*   | Some id => [ret (TYPE_Identified id)] *)
+    (*   end *)
+    (* in *)
     oneOf_LLVM
           ((* identified ++ *)
            (map ret
@@ -1689,7 +1683,7 @@ Section ExpGenerators.
   Fixpoint dtyp_eq (a : dtyp) (b : dtyp) {struct a} : bool
     := match a, b with
        | DTYPE_I sz, DTYPE_I sz' =>
-         if N.eq_dec sz sz' then true else false
+         if Pos.eq_dec sz sz' then true else false
        | DTYPE_I _, _ => false
        | DTYPE_IPTR, DTYPE_IPTR => true
        | DTYPE_IPTR, _ => false
@@ -1747,7 +1741,7 @@ Section ExpGenerators.
     := match a with
        | TYPE_I sz =>
          match b with
-         | TYPE_I sz' => if N.eq_dec sz sz' then true else false
+         | TYPE_I sz' => if Pos.eq_dec sz sz' then true else false
          | _ => false
          end
        | TYPE_IPTR =>
@@ -1960,18 +1954,18 @@ Section ExpGenerators.
     b <- bool_gen;;
     if b then ret 1 else ret 0.
 
-  Fixpoint gen_unsigned_bitwidth_h (acc : Z) (bitwidth : N) {struct bitwidth} : G Z :=
-    if N.eqb bitwidth 0
-    then ret acc
+  Fixpoint gen_unsigned_bitwidth_h (acc : Z) (bitwidth : positive) {struct bitwidth} : G Z :=
+    if Pos.eqb bitwidth 1
+    then gen_bitZ
     else
       bit <- gen_bitZ;;
       gen_unsigned_bitwidth_h (2 * acc + bit)%Z (bitwidth-1).
 
-  Definition gen_unsigned_bitwidth (bitwidth : N) : G Z :=
+  Definition gen_unsigned_bitwidth (bitwidth : positive) : G Z :=
     gen_unsigned_bitwidth_h 0 bitwidth.
 
-  Definition gen_signed_bitwidth (bitwidth : N) : G Z :=
-    let zbitwidth := Z.of_N bitwidth in
+  Definition gen_signed_bitwidth (bitwidth : positive) : G Z :=
+    let zbitwidth := Zpos bitwidth in
     let zhalf := zbitwidth - 1 in
 
     z <- (arbitrary : G Z);;
@@ -1982,7 +1976,7 @@ Section ExpGenerators.
     else
       ret (Z.modulo z (2^zhalf)).
 
-  Definition gen_gt_zero (bitwidth : option N) : G Z
+  Definition gen_gt_zero (bitwidth : option positive) : G Z
     := match bitwidth with
        | None =>
            (* Unbounded *)
@@ -1990,18 +1984,18 @@ Section ExpGenerators.
            ret (1 + Z.modulo n (2^64 - 1))
        | Some bitwidth =>
            n <- gen_unsigned_bitwidth bitwidth;;
-           ret (1 + Z.modulo n (2^(Z.of_N bitwidth) - 1))
+           ret (1 + Z.modulo n (2^(Zpos bitwidth) - 1))
        end.
 
-  Definition gen_non_zero (bitwidth : option N) : G Z
+  Definition gen_non_zero (bitwidth : option positive) : G Z
     := match bitwidth with
        | None =>
            (* Unbounded *)
            x <- gen_gt_zero None;;
            elems_ x [x; -x]
        | Some bitwidth =>
-           let zbitwidth := Z.of_N bitwidth in
-           let half := (bitwidth - 1)%N in
+           let zbitwidth := Zpos bitwidth in
+           let half := (bitwidth - 1)%positive in
            let zhalf := zbitwidth - 1 in
            if Z.eqb zhalf 0
            then ret (-1)
@@ -2104,10 +2098,10 @@ Section ExpGenerators.
           (* Generate literals for aggregate structures *)
           | TYPE_Array n t =>
               es <- (vectorOf_LLVM (N.to_nat n) (gen_exp_size' gen_global_of_typ gen_global_of_typ 0%nat t));;
-              ret (EXP_Array (map (fun e => (t, e)) es))
+              ret (EXP_Array (TYPE_Array n t) (map (fun e => (t, e)) es))
           | TYPE_Vector n t =>
               es <- (vectorOf_LLVM (N.to_nat n) (gen_exp_size' gen_global_of_typ gen_global_of_typ 0%nat t));;
-              ret (EXP_Vector (map (fun e => (t, e)) es))
+              ret (EXP_Vector (TYPE_Vector n t) (map (fun e => (t, e)) es))
           | TYPE_Struct fields =>
               (* Should we divide size evenly amongst components of struct? *)
               tes <- map_monad (fun t => e <- (gen_exp_size' gen_global_of_typ gen_global_of_typ 0%nat t);; ret (t, e)) fields;;
@@ -2163,7 +2157,7 @@ Section ExpGenerators.
         let gens :=
           match t with
           | TYPE_I isz =>
-              if N.eqb isz 1%N
+              if Pos.eqb isz 1
               then
                 [ gen_ibinop_exp gen_global_of_typ gen_ident_of_typ isz
                   ; τ <- gen_int_typ;;
@@ -2227,7 +2221,7 @@ Section ExpGenerators.
         then
           let max_shift_size :=
             match t with
-            | TYPE_I i => BinIntDef.Z.of_N (i - 1)%N
+            | TYPE_I i => BinIntDef.Z.of_N (Npos i - 1)%N
             | _ => 0%Z
             end in
           x <- lift (choose (0%Z, max_shift_size));;
@@ -2235,7 +2229,7 @@ Section ExpGenerators.
           ret (OP_IBinop ibinop t exp_value exp_value2)
         else ret (OP_IBinop ibinop t exp_value) <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat t
   with
-  gen_ibinop_exp (gen_global_of_typ : typ -> GenLLVM (option ident)) (gen_ident_of_typ : typ -> GenLLVM (option ident)) (isz : N) {struct isz} : GenLLVM (exp typ)
+  gen_ibinop_exp (gen_global_of_typ : typ -> GenLLVM (option ident)) (gen_ident_of_typ : typ -> GenLLVM (option ident)) (isz : positive) {struct isz} : GenLLVM (exp typ)
   :=
     let t := TYPE_I isz in
     gen_ibinop_exp_typ gen_global_of_typ gen_ident_of_typ t
@@ -2319,7 +2313,7 @@ Section ExpGenerators.
          (fun sz =>
             match t with
             | TYPE_I isz =>
-                if N.eqb isz 1%N
+                if Pos.eqb isz 1
                 then
                   (* If I1 also allow ICmp and FCmp *)
                   oneOf_LLVM
@@ -2531,7 +2525,7 @@ Section InstrGenerators.
        let '(sz, t_in_vec) := get_size_ty tvec in
        index_for_extractelement <- lift_GenLLVM (choose (0, Z.of_N sz - 1)%Z);;
        id <- genInstrId t_in_vec;;
-       ret (id, INSTR_Op (OP_ExtractElement (tvec, evec) (TYPE_I 32%N, EXP_Integer index_for_extractelement)))).
+       ret (id, INSTR_Op (OP_ExtractElement (tvec, evec) (TYPE_I 32, EXP_Integer index_for_extractelement)))).
 
   Definition gen_insertelement (tvec : typ) : GenLLVM (instr_id * instr typ) :=
     annotate "gen_insertelement"
@@ -2554,7 +2548,7 @@ Section InstrGenerators.
 
   Fixpoint get_bit_size_from_typ (t : typ) : N :=
     match t with
-    | TYPE_I sz => N.max 1 sz
+    | TYPE_I sz => Npos sz
     | TYPE_IPTR => 64 (* TODO: probably kind of a lie... *)
     | TYPE_Pointer t => 64
     | TYPE_Void => 0
@@ -2806,13 +2800,6 @@ Section InstrGenerators.
           ret (id, INSTR_Call (TYPE_Function ret_t args varargs, efun) args_with_params [])
       | _ => failGen "gen_call"
       end.
-
-  (* TODO: move this *)
-  Definition genInt : G int
-    := fmap Int.repr (arbitrary : G Z).
-
-  Instance GenInt : Gen int
-    := Build_Gen int genInt.
 
   (* TODO: move this. Also give a less confusing name because genOption is a thing? *)
   Definition gen_option {A} (g : G A) : G (option A)

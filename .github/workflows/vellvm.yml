@@ -10,9 +10,9 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-20.04
+          - ubuntu-24.04
         coq_version:
-          - 8.19.2
+          - 8.20.0
         ocaml_version:
           - 4.14.2-flambda
 
@@ -28,3 +28,7 @@ jobs:
           opam_file: 'coq-vellvm.opam'
           coq_version: ${{ matrix.coq_version }}
           ocaml_version: ${{ matrix.ocaml_version }}
+          before_install: |
+            startGroup "Print opam config (and work around dune issue)"
+              opam pin add -y dune 3.16.0; opam config list; opam repo list; opam list
+            endGroup

@@ -1019,7 +1019,7 @@ Definition names'' {m} : Traversal (Metadata (WorldOf m)) (Metadata (WorldOf m))
   refine open_constr:(pure (mkMetadata (WorldOf m)) <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _
                         <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _ <*> _
                         <*> _ <*> _ <*> _ <*> _ <*> _);
-    try typeclasses_eauto.
+    try typeclasses_eauto; try eauto.
   - apply (focus (name _ meta)).
   - apply (pure (type_alias _ meta)).
   - apply (pure (variable_type _ meta)).

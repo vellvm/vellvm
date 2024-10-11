@@ -132,12 +132,10 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   (* Predicate testing whether a [dvalue] is equal to zero at its type *)
   Definition dvalue_is_zero (dv : dvalue) : Prop :=
     match dv with
-    | DVALUE_I1 x     => x = VellvmIntegers.zero
-    | DVALUE_I8 x     => x = VellvmIntegers.zero
-    | DVALUE_I32 x    => x = VellvmIntegers.zero
-    | DVALUE_I64 x    => x = VellvmIntegers.zero
-    | DVALUE_Double x => x = Float.zero
-    | DVALUE_Float x  => x = Float32.zero
+    | @DVALUE_I sz x   => x = VellvmIntegers.zero
+    | DVALUE_IPTR x    => x = IP.zero
+    | DVALUE_Double x  => x = Float.zero
+    | DVALUE_Float x   => x = Float32.zero
     | _               => False
     end.
 
@@ -233,8 +231,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     | EXP_Bool b =>
       match b with
-      | true  => ret (UVALUE_I1 VellvmIntegers.one)
-      | false => ret (UVALUE_I1 VellvmIntegers.zero)
+      | true  => ret (@UVALUE_I 1 VellvmIntegers.one)
+      | false => ret (@UVALUE_I 1 VellvmIntegers.zero)
       end
 
     | EXP_Null => ret (UVALUE_Addr ADDR.null)
@@ -247,7 +245,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     | EXP_Cstring es =>
       vs <- map_monad eval_texp es ;;
-      ret (UVALUE_Array vs)
+      ret (UVALUE_Array (@DTYPE_I 8) vs)
 
     | EXP_Undef =>
       match top with
@@ -277,13 +275,13 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       | _ => raise "bad type for VALUE_Packed_struct"
       end
 
-    | EXP_Array es =>
+    | EXP_Array t es =>
       vs <- map_monad eval_texp es ;;
-      ret (UVALUE_Array vs)
+      ret (UVALUE_Array t vs)
 
-    | EXP_Vector es =>
+    | EXP_Vector t es =>
       vs <- map_monad eval_texp es ;;
-      ret (UVALUE_Vector vs)
+      ret (UVALUE_Vector t vs)
 
     (* The semantics of operators is complicated by both uvalues and
            undefined behaviors.
@@ -502,21 +500,24 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
          assuming already neither poison nor undef for the selector *)
   Fixpoint select_switch
            (value : dvalue) (default_dest : block_id)
-           (switches : list (dvalue * block_id)) : err block_id :=
-    match switches with
-    | [] => ret default_dest
-    | (v,id):: switches =>
-      match value, v with
-      | DVALUE_I1 i1, DVALUE_I1 i2
-      | DVALUE_I8 i1, DVALUE_I8 i2
-      | DVALUE_I32 i1, DVALUE_I32 i2
-      | DVALUE_I64 i1, DVALUE_I64 i2
-        => if VellvmIntegers.cmp Ceq i1 i2
-           then ret id
-           else select_switch value default_dest switches
-      | _,_ => failwith "Ill-typed switch."
-      end
-    end.
+           (switches : list (dvalue * block_id)) : err block_id.
+    refine
+      (match switches with
+       | [] => ret default_dest
+       | (v,id):: switches =>
+           match value, v with
+           | @DVALUE_I sz1 i1, @DVALUE_I sz2 i2
+             => _
+           | _,_ => failwith "Ill-typed switch."
+           end
+       end).
+
+    destruct (Pos.eq_dec sz1 sz2); subst.
+    - exact (if VellvmIntegers.cmp Ceq i1 i2
+             then ret id
+             else select_switch value default_dest switches).
+    - exact (failwith "Ill-typed switch.").
+  Defined.
 
   (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
@@ -534,7 +535,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       uv <- denote_exp (Some dt) op ;;
       dv <- concretize_or_pick uv;;
       match dv with
-      | DVALUE_I1 comparison_bit =>
+      | @DVALUE_I 1 comparison_bit =>
         if equ comparison_bit one then
           ret (inl br1)
         else

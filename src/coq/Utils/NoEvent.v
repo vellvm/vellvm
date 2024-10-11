@@ -1145,6 +1145,6 @@ Require Import Sizeof.
 Module PICK_REMOVE (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERACTIONS ADDR IP SIZE).
   Import Events.
 
-  Variable remove_pick_ub : itree (ExternalCallE +' PickUvalueE +' UBE +' DebugE +' FailureE) ~> itree (ExternalCallE +' DebugE +' FailureE).
-  Variable deterministic_vellvm : forall R, itree L0 R -> Prop.
+  #[local] Parameter remove_pick_ub : itree (ExternalCallE +' PickUvalueE +' UBE +' DebugE +' FailureE) ~> itree (ExternalCallE +' DebugE +' FailureE).
+  #[local] Parameter deterministic_vellvm : forall R, itree L0 R -> Prop.
 End PICK_REMOVE.
