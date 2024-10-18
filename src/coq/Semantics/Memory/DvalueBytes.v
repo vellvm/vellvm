@@ -138,24 +138,32 @@ Module Type DvalueByte (LP : LLVMParams).
   
   Fixpoint dvalue_extract_byte {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOMABLE M} (dv : dvalue) (dt : dtyp) (idx : Z) {struct dv} : M Z
     :=
-    let dvalue_extract_struct_bytes :=
+    let dvalue_extract_struct_bytes (pad : bool) :=
       fix loop fields types (idx : Z) {struct fields}  :=
         match fields, types with
         | [], [] => raise_error "No fields left for byte-indexing..."
         | f::fs, dt::dts =>
-            let sz := Z.of_N (sizeof_dtyp dt) in
+            let sz :=
+              if pad
+              then Z.of_N (Sizeof.pad_to padding (sizeof_dtyp dt))
+              else Z.of_N (sizeof_dtyp dt)
+            in
             if Z.ltb idx sz
             then dvalue_extract_byte f dt idx
             else loop fs dts (idx - sz)%Z
         | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
         end
     in
-    let dvalue_extract_array_bytes :=
+    let dvalue_extract_array_bytes (pad : bool) :=
       fix loop elts dt (idx : Z) {struct elts}  :=
         match elts with
         | [] => raise_error "No fields left for byte-indexing..."
         | e::es =>
-            let sz := Z.of_N (sizeof_dtyp dt) in
+            let sz :=
+              if pad
+              then Z.of_N (Sizeof.pad_to padding (sizeof_dtyp dt))
+              else Z.of_N (sizeof_dtyp dt)
+            in
             if Z.ltb idx sz
             then dvalue_extract_byte e dt idx
             else loop es dt (idx - sz)%Z
@@ -183,21 +191,21 @@ Module Type DvalueByte (LP : LLVMParams).
        | DVALUE_Struct fields =>
            match dt with
            | DTYPE_Struct dts =>
-               dvalue_extract_struct_bytes fields dts idx 
+               dvalue_extract_struct_bytes true fields dts idx 
            | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Struct."
            end
 
        | DVALUE_Packed_struct fields =>
            match dt with
            | DTYPE_Packed_struct dts =>
-               dvalue_extract_struct_bytes fields dts idx
+               dvalue_extract_struct_bytes false fields dts idx
            | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
            end
 
        | DVALUE_Array _ elts =>
            match dt with
            | DTYPE_Array sz dt =>
-               dvalue_extract_array_bytes elts dt idx
+               dvalue_extract_array_bytes true elts dt idx
            | _ =>
                raise_error "dvalue_extract_byte: type mismatch on DVALUE_Array."
            end
@@ -205,7 +213,7 @@ Module Type DvalueByte (LP : LLVMParams).
        | DVALUE_Vector _ elts =>
            match dt with
            | DTYPE_Vector sz dt =>
-               dvalue_extract_array_bytes elts dt idx
+               dvalue_extract_array_bytes false elts dt idx
            | _ =>
                raise_error "dvalue_extract_byte: type mismatch on DVALUE_Vector."
            end
@@ -213,24 +221,32 @@ Module Type DvalueByte (LP : LLVMParams).
 
   Lemma dvalue_extract_byte_equation {M} `{HM: Monad M} `{RE: RAISE_ERROR M} `{RP: RAISE_POISON M} `{RO: RAISE_OOMABLE M} (dv : dvalue) (dt : dtyp) (idx : Z) :
     @dvalue_extract_byte M HM RE RP RO dv dt idx =
-    let dvalue_extract_struct_bytes :=
+    let dvalue_extract_struct_bytes (pad : bool) :=
       fix loop fields types (idx : Z) {struct fields}  :=
         match fields, types with
         | [], [] => raise_error "No fields left for byte-indexing..."
         | f::fs, dt::dts =>
-            let sz := Z.of_N (sizeof_dtyp dt) in
+            let sz :=
+              if pad
+              then Z.of_N (Sizeof.pad_to padding (sizeof_dtyp dt))
+              else Z.of_N (sizeof_dtyp dt)
+            in
             if Z.ltb idx sz
             then dvalue_extract_byte f dt idx
             else loop fs dts (idx - sz)%Z
         | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
         end
     in
-    let dvalue_extract_array_bytes :=
+    let dvalue_extract_array_bytes (pad : bool) :=
       fix loop elts dt (idx : Z) {struct elts}  :=
         match elts with
         | [] => raise_error "No fields left for byte-indexing..."
         | e::es =>
-            let sz := Z.of_N (sizeof_dtyp dt) in
+            let sz :=
+              if pad
+              then Z.of_N (Sizeof.pad_to padding (sizeof_dtyp dt))
+              else Z.of_N (sizeof_dtyp dt)
+            in
             if Z.ltb idx sz
             then dvalue_extract_byte e dt idx
             else loop es dt (idx - sz)%Z
@@ -258,21 +274,21 @@ Module Type DvalueByte (LP : LLVMParams).
        | DVALUE_Struct fields =>
            match dt with
            | DTYPE_Struct dts =>
-               dvalue_extract_struct_bytes fields dts idx 
+               dvalue_extract_struct_bytes true fields dts idx 
            | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Struct."
            end
 
        | DVALUE_Packed_struct fields =>
            match dt with
            | DTYPE_Packed_struct dts =>
-               dvalue_extract_struct_bytes fields dts idx
+               dvalue_extract_struct_bytes false fields dts idx
            | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
            end
 
        | DVALUE_Array _ elts =>
            match dt with
            | DTYPE_Array sz dt =>
-               dvalue_extract_array_bytes elts dt idx
+               dvalue_extract_array_bytes true elts dt idx
            | _ =>
                raise_error "dvalue_extract_byte: type mismatch on DVALUE_Array."
            end
@@ -280,7 +296,7 @@ Module Type DvalueByte (LP : LLVMParams).
        | DVALUE_Vector _ elts =>
            match dt with
            | DTYPE_Vector sz dt =>
-               dvalue_extract_array_bytes elts dt idx
+               dvalue_extract_array_bytes false elts dt idx
            | _ =>
                raise_error "dvalue_extract_byte: type mismatch on DVALUE_Vector."
            end

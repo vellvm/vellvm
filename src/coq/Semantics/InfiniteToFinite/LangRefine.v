@@ -7140,11 +7140,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         - destruct dts; try reflexivity.
           cbn.
           rewrite sizeof_dtyp_fin_inf.
-          destruct (idx <? Z.of_N (SIZEOF.sizeof_dtyp d))%Z.
+          rewrite padding_fin_inf.
+          destruct (idx <? Z.of_N (pad_to SIZEOF.padding (SIZEOF.sizeof_dtyp d)))%Z.
           + apply H. repeat constructor. apply H4.
-          + apply IHfields; intros; auto.
-            apply H; auto.
-            right. assumption.
+          + erewrite IHfields; intros; eauto.
+            rewrite padding_fin_inf.
+            reflexivity.
+            apply H; cbn; auto.
       } 
 
       { (* Packed Structs *)
@@ -7176,11 +7178,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         - reflexivity.
         - cbn.
           rewrite sizeof_dtyp_fin_inf.
-          destruct (idx <? Z.of_N (SIZEOF.sizeof_dtyp dt))%Z.
+          rewrite padding_fin_inf.
+          destruct (idx <? Z.of_N (pad_to SIZEOF.padding (SIZEOF.sizeof_dtyp dt)))%Z.
           + apply H. repeat constructor. apply H4.
-          + apply IHelts; intros; auto.
-            apply H; auto.
-            right. assumption.
+          + erewrite IHelts; intros; eauto.
+            rewrite padding_fin_inf.
+            reflexivity.
+            apply H; cbn; auto.
       }
 
       { (* Vectors *)
