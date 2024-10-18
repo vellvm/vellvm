@@ -23,147 +23,6 @@ Import EqvNotation.
 #[global] Instance eq_dec_int : RelDec (@eq int_ast) := Data.Z.RelDec_zeq.
 #[global] Instance eqv_int : Eqv int_ast := (@eq int_ast).
 
-(* These should be moved to part of the standard library, or at least to ExtLib *)
-Module AsciiOrd <: UsualOrderedType.
-  Definition t := ascii.
-  Definition eq := @eq t.
-  Definition eq_refl := @eq_refl t.
-  Definition eq_sym := @eq_sym t.
-  Definition eq_trans := @eq_trans t.
-  Definition lt (a b:ascii) := N.lt (N_of_ascii a) (N_of_ascii b).
-  Lemma lt_trans : forall a b c:t, lt a b -> lt b c -> lt a c.
-  Proof using.
-    intros a b c.
-    unfold lt.
-    apply N.lt_trans.
-  Qed.
-  Lemma lt_not_eq : forall a b:t, lt a b -> ~eq a b.
-  Proof using.
-    intros a b H.
-    unfold eq. unfold not. intros He. rewrite He in H.
-    eapply N.lt_neq. unfold lt in H. apply H. reflexivity.
-  Qed.
-
-  Lemma N_of_ascii_inj : forall x y, N_of_ascii x = N_of_ascii y -> x = y.
-  Proof using.
-    intros x y H.
-    rewrite <- ascii_N_embedding.
-    rewrite <- (@ascii_N_embedding x).
-    rewrite H. reflexivity.
-  Defined.
-
-  Program Definition compare (x y: t) : Compare lt eq x y :=
-    match N_as_OT.compare (N_of_ascii x) (N_of_ascii y) with
-    | LT p => _
-    | EQ p => _
-    | GT p => _
-    end.
-  Next Obligation.
-    apply LT. unfold lt. auto.
-  Defined.
-  Next Obligation.
-    apply EQ. unfold eq. apply N_of_ascii_inj. auto.
-  Defined.
-  Next Obligation.
-    apply GT. unfold lt. auto.
-  Defined.
-
-  Definition eq_dec := ascii_dec.
-End AsciiOrd.
-
-Module AsciiOrdFacts := OrderedTypeFacts(AsciiOrd).
-
-Module StringOrd <: UsualOrderedType.
-  Definition t := string.
-  Definition eq := @eq t.
-  Definition eq_refl := @eq_refl t.
-  Definition eq_sym := @eq_sym t.
-  Definition eq_trans := @eq_trans t.
-  Fixpoint lt (s1 s2:string) : Prop :=
-    match s1, s2 with
-    | EmptyString, EmptyString => False
-    | EmptyString, String _ _ => True
-    | String a s1', String b s2' =>
-      match AsciiOrd.compare a b with
-      | LT _ => True
-      | EQ _ => lt s1' s2'
-      | GT _ => False
-      end
-    | String _ _, EmptyString => False
-    end.
-
-  Lemma lt_trans : forall a b c : t, lt a b -> lt b c -> lt a c.
-  Proof using.
-    induction a.
-    - destruct b; destruct c; simpl; intros; try tauto.
-    - destruct b; destruct c; simpl; intros; try tauto.
-      destruct (AsciiOrd.compare a a1); try tauto.
-      + destruct (AsciiOrd.compare a1 a2); try tauto.
-        * AsciiOrdFacts.elim_comp; auto.
-        * AsciiOrdFacts.elim_comp; auto.
-      + destruct (AsciiOrd.compare a1 a2); try tauto.
-        * AsciiOrdFacts.elim_comp; auto.
-        * AsciiOrdFacts.elim_comp; auto.
-          eapply IHa; eauto.
-  Qed.
-
-  Lemma lt_not_eq : forall a b:t, lt a b -> ~eq a b.
-  Proof using.
-    induction a; intros b H He; unfold eq in He; subst.
-    - unfold lt in H. destruct H.
-    - simpl in H.
-      destruct (AsciiOrd.compare a a); auto.
-      apply AsciiOrd.lt_not_eq in l. apply l. AsciiOrdFacts.order.
-      apply IHa in H. apply H. unfold eq. reflexivity.
-  Qed.
-
-  Program Fixpoint compare (s1 s2 : t) : Compare lt eq s1 s2 :=
-    match s1, s2 with
-    | EmptyString, EmptyString => _
-    | EmptyString, String b s2' => _
-    | String a s1', String b s2' =>
-      match AsciiOrd.compare a b with
-      | LT _ => _
-      | EQ _ => match compare s1' s2' with
-               | LT _ => _
-               | EQ _ => _
-               | GT _ => _
-               end
-      | GT _ => _
-      end
-    | String a s1', EmptyString => _
-    end.
-  Next Obligation.
-    apply EQ. unfold eq. reflexivity.
-  Defined.
-  Next Obligation.
-    apply LT. simpl. auto.
-  Defined.
-  Next Obligation.
-    apply LT. simpl. rewrite <- Heq_anonymous. auto.
-  Defined.
-  Next Obligation.
-    apply LT. simpl. rewrite <- Heq_anonymous0. auto.
-  Defined.
-  Next Obligation.
-    apply EQ. simpl. unfold AsciiOrd.eq in wildcard'0. subst. unfold eq in e. subst. reflexivity.
-  Defined.
-  Next Obligation.
-    apply GT. simpl. unfold AsciiOrd.eq in wildcard'0. subst.
-    rewrite <- Heq_anonymous0. auto.
-  Defined.
-  Next Obligation.
-    apply GT. simpl. AsciiOrdFacts.elim_comp_lt b a. auto.
-  Defined.
-  Next Obligation.
-    apply GT. simpl. auto.
-  Defined.
-
-  Definition eq_dec := string_dec.
-End StringOrd.
-Module StringOrdFacts := OrderedTypeFacts(StringOrd).
-
-
 Module RawIDOrd <: UsualOrderedType.
   Definition t := raw_id.
   Definition eq := @eq t.
@@ -175,7 +34,7 @@ Module RawIDOrd <: UsualOrderedType.
   Definition lt (x:t) (y:t) : Prop :=
     match x,y with
     | Anon n1, Anon n2 => (n1 < n2)%Z
-    | Name s1, Name s2 => StringOrd.lt s1 s2
+    | Name s1, Name s2 => String_as_OT.lt s1 s2
     | Raw n1, Raw n2 => (n1 < n2)%Z
     | Anon _, _ => True
     | Name _, Raw _ => True
@@ -185,53 +44,114 @@ Module RawIDOrd <: UsualOrderedType.
   Lemma lt_trans : forall a b c : t, lt a b -> lt b c -> lt a c.
   Proof using.
     destruct a; destruct b; destruct c; simpl; intros H1 H2; intuition auto with *.
-    - eapply StringOrd.lt_trans; eauto.
+    - eapply String_as_OT.lt_trans; eauto.
   Qed.
 
   Lemma lt_not_eq : forall a b:t, lt a b -> ~eq a b.
   Proof using.
     destruct a; destruct b; simpl; intros H He; inversion He; subst.
-    - apply StringOrd.lt_not_eq in H. apply H. unfold StringOrd.eq. reflexivity.
+    - apply String_as_OT.lt_not_eq in H. apply H. unfold String_as_OT.eq. reflexivity.
     - apply Z_as_OT.lt_not_eq in H. tauto.
     - apply Z_as_OT.lt_not_eq in H. tauto.
   Qed.
 
-  Program Definition compare (x:t) (y:t) : Compare lt eq x y :=
+  Definition cmp (x:t) (y:t) : comparison :=
     match x,y with
     | Anon n1, Anon n2 =>
-      match Z_as_OT.compare n1 n2 with
-      | LT _ => LT _
-      | EQ _ => EQ _
-      | GT _ => GT _
-      end
-    | Anon _, Name _ => LT _
-    | Anon _, Raw _ => LT _
-    | Name _, Anon _ => GT _
+        Z.compare n1 n2
+    | Anon _, Name _ => Lt
+    | Anon _, Raw _ => Lt
+    | Name _, Anon _ => Gt
     | Name s1, Name s2 =>
-      match StringOrd.compare s1 s2 with
-      | LT _ => LT _
-      | EQ _ => EQ _
-      | GT _ => GT _
-      end
-    | Name _, Raw _ => LT _
-    | Raw _, Anon _ => GT _
-    | Raw _, Name _ => GT _
+        String_as_OT.cmp s1 s2
+    | Name _, Raw _ => Lt
+    | Raw _, Anon _ => Gt
+    | Raw _, Name _ => Gt
     | Raw n1, Raw n2 =>
-      match Z_as_OT.compare n1 n2 with
-      | LT _ => LT _
-      | EQ _ => EQ _
-      | GT _ => GT _
-      end
+        Z.compare n1 n2
     end.
-  Next Obligation.
-    unfold Z_as_OT.eq in wildcard'. subst. unfold eq. reflexivity.
-  Defined.
-  Next Obligation.
-    unfold StringOrd.eq in wildcard'. subst. unfold eq. reflexivity.
-  Defined.
-  Next Obligation.
-    unfold Z_as_OT.eq in wildcard'. subst. unfold eq. reflexivity.
-  Defined.
+
+  #[local]
+    Hint Resolve
+    Zcompare_antisym
+    Z.compare_eq
+    Zaux.Zcompare_Lt
+    String_as_OT.cmp_antisym
+    String_as_OT.cmp_eq
+    String_as_OT.cmp_lt : CMP.
+
+  Lemma cmp_lt (a b : t) :
+    cmp a b = Lt  <->  lt a b.
+  Proof.
+    destruct a,b; cbn;
+      try solve
+        [ eauto with CMP
+        | split; solve [discriminate | contradiction]
+        | split; auto
+        ].
+  Qed.
+
+  Lemma cmp_eq : forall a b : t, cmp a b = Datatypes.Eq <-> a = b.
+  Proof.
+    destruct a,b; cbn;
+      try solve
+        [ eauto with CMP
+        | split; solve [discriminate | contradiction]
+        | split; auto
+        ].
+    - split; intros.
+      + assert (s = s0).
+        { eapply String_as_OT.cmp_eq; eauto. }
+        subst; auto.
+      + inv H; eauto with CMP.
+        apply String_as_OT.cmp_eq; auto.
+    - split; intros.
+      + assert (n = n0).
+        { eapply Z.compare_eq; eauto. }
+        subst; auto.
+      + inv H; eauto with CMP.
+        apply Z.compare_refl.
+    - split; intros.
+      + assert (n = n0).
+        { eapply Z.compare_eq; eauto. }
+        subst; auto.
+      + inv H; eauto with CMP.
+        apply Z.compare_refl.
+  Qed.
+
+  Lemma cmp_antisym :
+    forall a b : t,
+      cmp a b = CompOpp (cmp b a).
+  Proof.
+    destruct a,b; cbn; auto with CMP.
+  Qed.
+
+  Local Lemma compare_helper_lt {a b : t} (L : cmp a b = Lt):
+    lt a b.
+  Proof.
+    now apply cmp_lt.
+  Qed.
+
+  Local Lemma compare_helper_gt {a b : t} (G : cmp a b = Gt):
+    lt b a.
+  Proof.
+    rewrite cmp_antisym in G.
+    rewrite CompOpp_iff in G.
+    now apply cmp_lt.
+  Qed.
+
+  Local Lemma compare_helper_eq {a b : t} (E : cmp a b = Datatypes.Eq):
+    a = b.
+  Proof.
+    now apply cmp_eq.
+  Qed.
+
+  Definition compare (a b : t) : Compare lt eq a b :=
+    match cmp a b as z return _ = z -> _ with
+    | Lt => fun E => LT (compare_helper_lt E)
+    | Gt => fun E => GT (compare_helper_gt E)
+    | Datatypes.Eq => fun E => EQ (compare_helper_eq E)
+    end Logic.eq_refl.
 
   Definition eq_dec : forall (x y : t), {x = y} + {x <> y}.
     decide equality.

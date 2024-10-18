@@ -697,10 +697,10 @@ Section ShowInstances.
     string_to_DString "[ " @@ dshow_exp true e @@ list_to_DString [", "; "%"] @@ dshow bid @@ string_to_DString " ]".
 
   Definition intersperse (sep : string) (l : list string) : string
-    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else acc ++ sep ++ s) l "".
+    := fold_left (fun acc s => if String.eqb "" acc then s else acc ++ sep ++ s) l "".
 
   Definition dintersperse (sep : DString) (l : list DString) : DString
-    := fold_left (fun acc s => if StringOrdFacts.eqb "" (DString_to_string acc) then s else acc @@ sep @@ s) l (string_to_DString "").
+    := fold_left (fun acc s => if String.eqb "" (DString_to_string acc) then s else acc @@ sep @@ s) l (string_to_DString "").
 
   Fixpoint dconcat (sep : DString) (ls : list DString) :=
     match ls with
