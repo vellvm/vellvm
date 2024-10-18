@@ -3,6 +3,45 @@ From Coq Require Import List String.
 Import ListNotations Ascii.
 Local Open Scope string_scope.
 
+Section TRList.
+  Definition revTR {A} : list A -> list A :=
+    @rev' A.
+  
+  Fixpoint appTR_aux {A} (l1 l2 acc : list A) : list A :=
+    match l1 with
+    | [] => rev_append acc l2
+    | x :: xs => appTR_aux xs l2 (x :: acc)
+    end.
+
+  Definition appTR {A} (l1 l2 : list A) : list A :=
+    appTR_aux l1 l2 [].
+
+  Lemma appTR_nil_r {A} : forall (l : list A), appTR l [] = l.
+  Proof.
+    intros l. induction l; unfold appTR in *; simpl; auto.
+    unfold appTR_aux in *; cbn in *.
+  Admitted.
+  
+  Fixpoint repeatTR_aux {A} (a : A) (n : nat) (acc : list A) : list A :=
+    match n with
+    | 0 => acc
+    | S n' => repeatTR_aux a (n') (a::acc)
+    end.
+
+  Definition repeatTR {A} (a : A) (n : nat) : list A :=
+    repeatTR_aux a n [].
+
+  Definition fold_rightTR {A B} (f : A -> B -> B) (init : B) (l : list A) : B :=
+    fold_left (fun b a => f a b) (revTR l) init.
+  
+End TRList.
+
+Module TRList_Notation.
+  Delimit Scope list_scope with list.
+  Notation "l1 +++ l2" := (appTR l1 l2) (right associativity, at level 60) : list_scope.
+End TRList_Notation.
+Import TRList_Notation.
+
 Section DList.
   Definition DList (A : Type) := list A -> list A.
 
@@ -27,16 +66,16 @@ Section DList.
   (* TODO: I think the original version (commented out) is O(n) runtime due to the use of fold_left *)
   Definition DList_from_list {A} (l : list A) : DList A
     (* := fold_left (fun x s => DList_append x (DList_singleton s)) l DList_empty. *)
-    := fun l2 => (l ++ l2)%list.
-
+    := fun l2 => (l +++ l2)%list.
+  
   Definition DList_map {A B} (f : A -> B) (dl : DList A) : DList B
-    := fold_right (fun a => DList_cons (f a)) (@DList_empty B) (DList_to_list dl).
+    := fold_left (fun acc a => DList_cons (f a) acc) (DList_to_list dl) (@DList_empty B) .
 
-  Definition concat {A} : list (DList A) -> DList A
-    := fold_right DList_append DList_empty.
+  Definition concat {A} (l : list (DList A)) : DList A
+    := fold_left DList_append l DList_empty.
 
   Definition replicate {A} (n : nat) (a : A) : DList A
-    := fold_right DList_cons DList_empty (repeat a n).
+    := fold_left (fun acc x => DList_cons x acc) (repeatTR a n) DList_empty .
 
   #[global] Instance Functor_DList : Functor DList.
   Proof.
@@ -46,7 +85,7 @@ Section DList.
   Defined.
 
   Definition DList_fold_right {A B} (f : A -> B -> B) (z: B) (dl : DList A) : B
-    := List.fold_right f z (DList_to_list dl).
+    := fold_rightTR f z (DList_to_list dl).
 
   Definition DList_fold_left {A B} (f : B -> A -> B) (dl : DList A) (z : B) : B
     := List.fold_left f (DList_to_list dl) z.
@@ -91,7 +130,7 @@ Section Lemmas.
   Lemma DList_to_from_list {A} : forall (l : list A),
       DList_to_list (DList_from_list l) = l.
   Proof.
-    intros l; unfold DList_from_list, DList_to_list. cbn. apply app_nil_r.
+    intros l; unfold DList_from_list, DList_to_list. cbn. apply appTR_nil_r.
   Qed.
 
   (* Lemma DList_from_to_list {A} : forall (dl : DList A) (l : list A), *)
@@ -153,13 +192,31 @@ Section DString.
   Definition DString_to_string (ds : DString) : string :=
     string_of_list_ascii_tail_rec (ds []).
 
-  Definition string_to_DString (s : string) : DString := app (list_ascii_of_string_tail_rec s).
+  Definition string_to_DString (s : string) : DString := appTR (list_ascii_of_string_tail_rec s).
 
   Definition list_to_DString (ls : list string) : DString :=
     fold_left (fun x s => DList_append x (string_to_DString s)) ls DList_empty.
 
   Definition EmptyDString := string_to_DString EmptyString.
 
+  (* Fixpoint concat_DString_aux (ls : list DString) (sep acc : DString) := *)
+  (*   match ls with *)
+  (*   | [] => EmptyDString *)
+  (*   | x :: nil => x *)
+  (*   | x :: y :: [] => *)
+  (*       DList_append (DList_append x sep) y *)
+  (*   | x :: y :: xs => *)
+        
+  
+  (* Fixpoint concat_DString (sep : DString) (ls : list DString) := *)
+  (*   match ls with *)
+  (*   | nil => EmptyDString *)
+  (*   | cons x nil => x *)
+  (*   | cons x (cons y []) => *)
+  (*       DList_append (DList_append x sep) y *)
+  (*   | cons x (cons y xs) => *)
+  (*       DList_append (DList_append (DList_append (DList_append x sep) y) sep) *)
+  (*   end. *)
   Fixpoint concat_DString (sep : DString) (ls : list DString) :=
     match ls with
     | nil => EmptyDString

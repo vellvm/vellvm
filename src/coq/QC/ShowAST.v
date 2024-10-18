@@ -17,6 +17,8 @@ Import DList.
 From Coq Require Import
      ZArith String Bool.Bool Numbers.HexadecimalString
      Strings.Ascii.
+
+From Coq Require Import Strings.String.
 From QuickChick Require Import Show.
 (* Import QcDefaultNotation. Open Scope qc_scope. *)
 Set Warnings "-extraction-opaque-accessed,-extraction".
@@ -25,13 +27,103 @@ Set Warnings "-extraction-opaque-accessed,-extraction".
 (* SAZ: this function was gotten from QuickChick Test.v, but really doesn't belong there.
    TODO: Move somewhere saner
  *)
-Fixpoint concatStr (l : list string) : string :=
-  match l with
-  | nil => ""
-  | (h :: t) => h ++ concatStr t
-  end.
-(*  ------------------------------------------------------------------------- *)
+Import TRList_Notation.
+Section List.
+  Definition is_empty {A} (l : list A) : bool :=
+    match l with
+    | [] => true
+    | _ => false
+    end.
 
+  Fixpoint length_geq {A} (l : list A) (n : nat) : bool :=
+    match l, n with
+    | _, O => true
+    | [], _ => false
+    | _::tl, S n' => length_geq tl n'
+    end.
+
+  Fixpoint length_eq {A} (l : list A) (n : nat) : bool :=
+    match l, n with
+    | [], O => true
+    | hd::tl, S n' => length_eq tl n'
+    | _, _ => false
+    end.
+
+  Definition lengthTR {A} (l : list A) : nat :=
+    fold_left (fun acc _ => (acc + 1)%nat) l O%nat.
+
+  Fixpoint mapTR_aux [A B] (f : A -> B) (l : list A) (acc : list B) : list B :=
+    match l with
+    | [] => revTR acc
+    | hd::tl => mapTR_aux f tl (f hd :: acc)
+    end.
+
+  Definition mapTR [A B] (f : A -> B) (l : list A) : list B :=
+    mapTR_aux f l [].
+End List.
+
+Section TRString.
+  Fixpoint rev_append_string (s acc : string) : string :=
+    match s with
+    | EmptyString => acc
+    | String c s' => rev_append_string s' (String c acc)
+    end.
+  
+  Fixpoint appendTR_string_aux (s1 s2 acc : string) : string :=
+    match s1 with
+    | EmptyString => rev_append_string acc s2
+    | String c s1' => appendTR_string_aux s1' s2 (String c acc)
+    end.
+
+  Definition appendTR_string (s1 s2 : string) : string :=
+    appendTR_string_aux s1 s2 EmptyString.
+
+  Fixpoint length_geq_string (s : string) (n : nat) : bool :=
+    match s, n with
+    | _, O => true
+    | EmptyString, _ => false
+    | String _ s', S n' => length_geq_string s' n'
+    end.
+  
+  Fixpoint length_eq_string (s : string) (n : nat) : bool :=
+    match s, n with
+    | EmptyString, O => true
+    | String _ s', S n' => length_eq_string s' n'
+    | _, _ => false
+    end.
+  
+End TRString.
+
+Module TRString_Notations.
+  Delimit Scope string_scope with string.
+  
+  Notation "s1 +++ s2" := (appendTR_string s1 s2) (right associativity, at level 60) : string_scope.
+End TRString_Notations.
+
+Import TRString_Notations.
+
+Open Scope string_scope.
+
+Section TRStringFuns.
+  Fixpoint concatStrTR (l : list string) : string :=
+    fold_rightTR appendTR_string "" l.
+
+  Notation "s1 >+++ s2" := (appendTR_string s2 s1) (at level 60, right associativity) : string_scope.
+
+  Fixpoint concatTR_aux (sep : string) (ss : list string) (acc : string) {struct ss} : string :=
+    match ss with
+    | [] => ""
+    | [s] => rev_string (acc >+++ s)
+    | s::ss' =>
+        concatTR_aux sep ss' (acc >+++ s >+++ sep)
+    end.
+  
+  Fixpoint concatTR (sep : string) (ss : list string) : string :=
+    concatTR_aux sep ss "".
+End TRStringFuns.
+
+Compute concatTR "," ["1"; "2"; "3"; "4"].
+(*  ------------------------------------------------------------------------- *)
 
 Class DShow (A : Type) := { dshow : A -> DString }.
 
@@ -50,11 +142,22 @@ Class DShow (A : Type) := { dshow : A -> DString }.
   show a := DString_to_string (dshow a);
 |}.
 
-#[global] Instance DShowString : DShow DString :=
+#[global] Instance DShowDString : DShow DString :=
   {|
     dshow := id
   |}.
 
+#[global] Instance dshowN : DShow N
+  := {| dshow := fun n => string_to_DString (show n)|}.
+
+#[global] Instance dshowZ : DShow Z
+  := {| dshow := fun z => string_to_DString (show z)|}.
+
+#[global] Instance dshowInt_Ast : DShow int_ast
+  := {| dshow := fun a => dshow a |}.
+
+#[global] Instance dshowString : DShow string
+  := {| dshow := string_to_DString |}.
 (* #[global] Instance DShowShow {A} `{Show A} : DShow A := *)
 (*   {| *)
 (*     dshow a := string_to_DString (show a) *)
@@ -84,7 +187,20 @@ Section ShowInstances.
 
   #[global] Instance dshowIdent : DShow ident
     := {| dshow := dshow_ident |}.
-
+  
+  (* Fixpoint dshow_typ_cps (t : typ) (f : DString -> DString) : DString := *)
+  (*   match t with *)
+  (*   | TYPE_I sz => f (string_to_DString "i" @@ string_to_DString (show sz)) *)
+  (*   | TYPE_IPTR => f (string_to_DString "iptr") *)
+  (*   | TYPE_Pointer t => *)
+  (*       let f' := fun ds => f (ds @@ string_to_DString "*") in *)
+  (*       dshow_typ_cps t f' *)
+  (*   | TYPE_Void => *)
+  (*       f (string_to_DString "void") *)
+  (*   |  *)
+  (*   | _ => EmptyDString *)
+  (*   end. *)
+  
   Fixpoint dshow_typ (t : typ) : DString  :=
     match t with
     | TYPE_I sz                 => string_to_DString "i" @@
@@ -105,35 +221,46 @@ Section ShowInstances.
         string_to_DString "]"
     | TYPE_Function ret args varargs =>
         let varargs_str :=
-          if Nat.eqb (List.length args) 0 then
-            (if varargs then string_to_DString "..." else string_to_DString  "")
-          else
-            (if varargs then string_to_DString ", ..." else string_to_DString "")
-        in dshow_typ ret @@ string_to_DString  " (" @@
-           concat_DString (string_to_DString ", ") (map dshow_typ args) @@ varargs_str @@ string_to_DString ")"
+          match args with
+          | [] =>  
+              (if varargs then string_to_DString "..." else string_to_DString  "")
+          | _ =>
+              (if varargs then string_to_DString ", ..." else string_to_DString "")
+          end
+        in dshow_typ ret @@
+             string_to_DString  " (" @@
+             concat_DString (string_to_DString ", ") (mapTR dshow_typ args) @@
+             varargs_str @@
+             string_to_DString ")"
 
-    | TYPE_Struct fields        => string_to_DString "{" @@
-                                   concat_DString (string_to_DString ", ") (map dshow_typ fields) @@
-                                   string_to_DString "}"
+    | TYPE_Struct fields        =>
+        (* let bla := mapTR dshow_typ fields in *)
+        (* string_to_DString "{" @@ *)
+        (*                            concat_DString (string_to_DString ", ") bla @@ *)
+        (*                            string_to_DString "}" *)
+        string_to_DString "{" @@
+          concat_DString (string_to_DString ", ") (map dshow_typ fields) @@
+          string_to_DString "}"
     | TYPE_Packed_struct fields =>
-        string_to_DString "<{" @@ concat_DString (string_to_DString ", ") (map dshow_typ fields) @@
-        string_to_DString "}>"
-
+        string_to_DString "<{" @@
+          concat_DString (string_to_DString ", ") (map dshow_typ fields) @@
+          string_to_DString "}>"
     | TYPE_Opaque               => string_to_DString "opaque"
     | TYPE_Vector sz t          => string_to_DString "<" @@
-                                   string_to_DString (show sz) @@
-                                   string_to_DString " x " @@ dshow_typ t @@
+                                   dshow sz @@
+                                   string_to_DString " x " @@
+                                   dshow_typ t @@
                                    string_to_DString ">"
     | TYPE_Identified id        => dshow id
     end.
 
   #[global] Instance dshowTyp : DShow typ :=
     {| dshow := dshow_typ |}.
-  
+
   Fixpoint dshow_dtyp (t : dtyp) : DString  :=
     match t with
     | DTYPE_I sz                 => string_to_DString "i" @@
-                                    string_to_DString (show sz)
+                                    dshow sz
     | DTYPE_IPTR                 => string_to_DString "iptr"
     | DTYPE_Pointer            => (* dshow_typ t @@  *)string_to_DString "*"
     | DTYPE_Void                 => string_to_DString "void"
@@ -146,15 +273,17 @@ Section ShowInstances.
     | DTYPE_Metadata             => string_to_DString "metadata"
     | DTYPE_X86_mmx              => string_to_DString "x86_mmx"
     | DTYPE_Array sz t           =>
-        list_to_DString ["["; show sz; " x "] @@ dshow_dtyp t @@
+        list_to_DString ["["; show sz; " x "] @@
+          dshow_dtyp t @@
         string_to_DString "]"
-    | DTYPE_Struct fields        => string_to_DString "{" @@
-                                   concat_DString (string_to_DString ", ") (map dshow_dtyp fields) @@
-                                   string_to_DString "}"
+    | DTYPE_Struct fields        =>
+        string_to_DString "{" @@
+          concat_DString (string_to_DString ", ") (map dshow_dtyp fields) @@
+          string_to_DString "}"
     | DTYPE_Packed_struct fields =>
-        string_to_DString "<{" @@ concat_DString (string_to_DString ", ") (map dshow_dtyp fields) @@
-        string_to_DString "}>"
-
+        string_to_DString "<{" @@
+          concat_DString (string_to_DString ", ") (map dshow_dtyp fields) @@
+          string_to_DString "}>"
     | DTYPE_Opaque               => string_to_DString "opaque"
     | DTYPE_Vector sz t          => string_to_DString "<" @@
                                    string_to_DString (show sz) @@
@@ -164,7 +293,7 @@ Section ShowInstances.
 
   Definition show_dtyp (t : dtyp) : string
     := match t with
-       | DTYPE_I sz                 => "Integer" ++ (show sz)
+       | DTYPE_I sz                 => appendTR_string "Integer" (show sz)
        | DTYPE_IPTR                 => "iptr"
        | DTYPE_Pointer              => "Pointer"
        | DTYPE_Void                 => "Void"
@@ -258,29 +387,56 @@ Section ShowInstances.
     | PARAMATTR_Zeroext => string_to_DString "zeroext"
     | PARAMATTR_Signext => string_to_DString "signext"
     | PARAMATTR_Inreg => string_to_DString "inreg"
-    | PARAMATTR_Byval t => string_to_DString "byval(" @@ dshow t @@ string_to_DString ")"
-    | PARAMATTR_Byref t => string_to_DString "byref(" @@ dshow t @@ string_to_DString ")"
-    | PARAMATTR_Preallocated t => string_to_DString "preallocated(" @@ dshow t @@ string_to_DString ")"
-    | PARAMATTR_Inalloca t => string_to_DString "inalloca(" @@ dshow t @@ string_to_DString ")"
-    | PARAMATTR_Sret t => string_to_DString "sret(" @@ dshow t @@ string_to_DString ")"
-    | PARAMATTR_Elementtype t => string_to_DString "elementtype(" @@ dshow t @@ string_to_DString ")"
-    | PARAMATTR_Align a => string_to_DString "align " @@ string_to_DString (show a)
+    | PARAMATTR_Byval t =>
+        string_to_DString "byval(" @@
+          dshow t @@
+          string_to_DString ")"
+    | PARAMATTR_Byref t =>
+        string_to_DString "byref(" @@
+          dshow t @@
+          string_to_DString ")"
+    | PARAMATTR_Preallocated t =>
+        string_to_DString "preallocated(" @@
+          dshow t @@
+          string_to_DString ")"
+    | PARAMATTR_Inalloca t =>
+        string_to_DString "inalloca(" @@
+          dshow t @@
+          string_to_DString ")"
+    | PARAMATTR_Sret t =>
+        string_to_DString "sret(" @@
+          dshow t @@
+          string_to_DString ")"
+    | PARAMATTR_Elementtype t =>
+        string_to_DString "elementtype(" @@
+          dshow t @@
+          string_to_DString ")"
+    | PARAMATTR_Align a =>
+        string_to_DString "align " @@
+          dshow a
     | PARAMATTR_Noalias => string_to_DString "noalias"
     | PARAMATTR_Nocapture => string_to_DString "nocapture"
     | PARAMATTR_Nofree => string_to_DString "nofree"
     | PARAMATTR_Nest => string_to_DString "nest"
     | PARAMATTR_Returned => string_to_DString "returned"
     | PARAMATTR_Nonnull => string_to_DString "nonnull"
-    | PARAMATTR_Dereferenceable a => string_to_DString "dereferenceable(" @@ string_to_DString (show a) @@
-                                    string_to_DString ")"
-    | PARAMATTR_Dereferenceable_or_null a => string_to_DString "dereferenceable_or_null(" @@
-                                            string_to_DString (show a) @@ string_to_DString ")"
+    | PARAMATTR_Dereferenceable a =>
+        string_to_DString "dereferenceable(" @@
+          dshow a @@
+          string_to_DString ")"
+    | PARAMATTR_Dereferenceable_or_null a =>
+        string_to_DString "dereferenceable_or_null(" @@
+          dshow a @@
+          string_to_DString ")"
     | PARAMATTR_Swiftself => string_to_DString "swiftself"
     | PARAMATTR_Swiftasync => string_to_DString "swiftasync"
     | PARAMATTR_Swifterror => string_to_DString "swifterror"
     | PARAMATTR_Immarg => string_to_DString "immarg"
     | PARAMATTR_Noundef => string_to_DString "noundef"
-    | PARAMATTR_Alignstack a => string_to_DString "alignstack(" @@ string_to_DString (show a)  @@ string_to_DString ")"
+    | PARAMATTR_Alignstack a =>
+        string_to_DString "alignstack(" @@
+          dshow a @@
+          string_to_DString ")"
     | PARAMATTR_Allocalign => string_to_DString "allocalign"
     | PARAMATTR_Allocptr => string_to_DString "allocptr"
     | PARAMATTR_Readnone => string_to_DString "readnone"
@@ -444,7 +600,7 @@ Section ShowInstances.
   (*How to implement select, freeze, call, va_arg, landingpad, catchpad, cleanuppad*)
 
   Definition show_op_nuw_nsw (op : string) (nuw : bool) (nsw : bool) :=
-    concatStr
+    concatStrTR
       [ op;
         if nuw then " nuw" else "";
         if nsw then " nsw" else ""
@@ -497,7 +653,7 @@ Section ShowInstances.
 
 
   Definition double_to_hex_string (f : float) : string
-    := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (Int64.unsigned (Float.to_bits f)))).
+    := appendTR_string "0x" (NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (Int64.unsigned (Float.to_bits f))))).
 
   Definition float_to_hex_string (f : float32) : string
     := double_to_hex_string (Float32.to_double f).
@@ -583,8 +739,10 @@ Section ShowInstances.
     let x : Z := ex_to_int ex in
     if ((n <? 32) || (126 <? n))%nat then (
         let conversion := NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N x)) in
-        if ((length conversion) =? (Z.to_nat 1))%nat then string_to_DString "\0" @@ string_to_DString conversion
-        else string_to_DString "\" @@ string_to_DString conversion
+        if (length_eq_string conversion 1)%nat then
+          string_to_DString "\0" @@ string_to_DString conversion
+        else
+          string_to_DString "\" @@ string_to_DString conversion
       )
     (*Special case for decimal 34/hex 22*)
     else if (n =? 34)%nat then string_to_DString "\22"
@@ -598,28 +756,28 @@ Section ShowInstances.
 
   Definition is_op (e : exp T) : bool :=
     match e with
-    | EXP_Integer x => false
-    | EXP_Float f =>  false
-    | EXP_Double f =>   false
-    | EXP_Hex f =>   false
-    | EXP_Bool b =>     false
-    | EXP_Null =>      false
-    | EXP_Zero_initializer =>    false
+    | EXP_Integer _        => false
+    | EXP_Float _          => false
+    | EXP_Double _         => false
+    | EXP_Hex _            => false
+    | EXP_Bool _           => false
+    | EXP_Null             => false
+    | EXP_Zero_initializer => false
     (* see notes on cstring on LLVMAst.v *)
     (* I'm using string_of_list_ascii bc I couldn't find any other function that converted asciis to strings  *)
-    | EXP_Cstring elts =>     false
-    | EXP_Undef =>         false
-    | EXP_Struct fields =>    false
-    | EXP_Packed_struct fields =>     false
-    | EXP_Array elts =>               false
-    | EXP_Vector elts =>        false
+    | EXP_Cstring _        => false
+    | EXP_Undef            => false
+    | EXP_Struct _         => false
+    | EXP_Packed_struct _  => false
+    | EXP_Array _          => false
+    | EXP_Vector _         => false
     | _ => true
     end.
 
   Definition add_parens (b : bool) (ds : DString) : DString :=
     if b then string_to_DString "(" @@ ds @@ string_to_DString ")" else ds.
-
-  Fixpoint dshow_exp (b: bool) (v : exp T) : DString :=
+  
+  Fixpoint dshow_exp (b: bool) (v : exp T) {struct v} : DString :=
     match v with
     | EXP_Ident id => dshow id
     | EXP_Integer x => string_to_DString (show x)
@@ -631,8 +789,11 @@ Section ShowInstances.
     | EXP_Zero_initializer => string_to_DString "zeroinitializer"
     (* see notes on cstring on LLVMAst.v *)
     (* I'm using string_of_list_ascii bc I couldn't find any other function that converted asciis to strings  *)
-    | EXP_Cstring elts => string_to_DString "c" @@ string_to_DString """" @@
-                           DList_join (map (fun '(ty, ex) => (dshow_c_string ex)) elts) @@ string_to_DString  """"
+    | EXP_Cstring elts =>
+        string_to_DString "c" @@
+          string_to_DString """" @@
+          DList_join (mapTR (fun '(ty, ex) => (dshow_c_string ex)) elts) @@
+          string_to_DString  """"
 
     | EXP_Undef => string_to_DString "undef"
     | EXP_Poison => string_to_DString "poison"
@@ -641,93 +802,173 @@ Section ShowInstances.
         string_to_DString "{" @@
           concat_DString (string_to_DString ", ")
           (map (fun '(ty, ex) =>
-                  DList_join [dshow ty ; string_to_DString " "] @@
-                    dshow_exp false ex) fields) @@ string_to_DString "}"
+                 DList_join [dshow ty ; string_to_DString " "] @@
+                   dshow_exp false ex) fields) @@
+          string_to_DString "}"
 
     | EXP_Packed_struct fields =>
         string_to_DString "<{" @@
           concat_DString (string_to_DString ", ")
           (map (fun '(ty, ex) =>
                   DList_join [dshow ty ; string_to_DString " "] @@
-                    dshow_exp false ex) fields) @@ string_to_DString "}>"
+                    dshow_exp false ex) fields) @@
+          string_to_DString "}>"
 
     | EXP_Array elts =>
         string_to_DString "[" @@
           concat_DString (string_to_DString ", ")
-          (map (fun '(ty, ex) => DList_join [dshow ty ; string_to_DString " "] @@ dshow_exp false ex) elts) @@ string_to_DString "]"
-    | EXP_Vector elts => string_to_DString "<" @@ concat_DString (string_to_DString ", ") (map (fun '(ty, ex) => DList_join [dshow ty ; string_to_DString " "] @@ dshow_exp false ex) elts) @@ string_to_DString ">"
-
+          (map (fun '(ty, ex) => DList_join [dshow ty ; string_to_DString " "] @@ dshow_exp false ex) elts) @@
+          string_to_DString "]"
+    | EXP_Vector elts =>
+        string_to_DString "<" @@
+          concat_DString (string_to_DString ", ") (map (fun '(ty, ex) => DList_join [dshow ty ; string_to_DString " "] @@ dshow_exp false ex) elts) @@
+          string_to_DString ">"
     | OP_IBinop iop t v1 v2 =>
         let second_expression :=
           if b
           then dshow t @@ string_to_DString " " @@ dshow_exp true v2
           else dshow_exp true v2
-       in string_to_DString (show iop) @@ string_to_DString " " @@ add_parens b (dshow t @@ string_to_DString " " @@ dshow_exp true v1 @@ string_to_DString ", " @@ second_expression)
+        in string_to_DString (show iop) @@
+             string_to_DString " " @@
+             add_parens b (dshow t @@
+                             string_to_DString " " @@
+                             dshow_exp true v1 @@
+                             string_to_DString ", " @@
+                             second_expression)
 
     | OP_ICmp cmp t v1 v2 =>
         let second_expression :=
           if b
           then dshow t @@ string_to_DString " " @@ dshow_exp true v2
           else dshow_exp true v2
-        in list_to_DString ["icmp " ; show cmp ; " "] @@ add_parens b (dshow t @@ string_to_DString " " @@ dshow_exp true v1 @@ string_to_DString ", " @@ second_expression)
-
+        in list_to_DString ["icmp " ; show cmp ; " "] @@
+             add_parens b (dshow t @@
+                             string_to_DString " " @@
+                             dshow_exp true v1 @@
+                             string_to_DString ", " @@
+                             second_expression)
     | OP_FBinop fop fmath t v1 v2 =>
         let fmath_string :=
           string_to_DString
             match fmath with
             | nil => " "
-            | _ =>  " " ++ concat " " (map (fun x => show x) fmath) ++  " "
+            | _ =>  " " ++ concat " " (mapTR (fun x => show x) fmath) ++  " "
             end
-        in list_to_DString [show fop ; " "] @@ add_parens b (fmath_string @@ dshow t @@ string_to_DString " " @@  dshow_exp true v1 @@ string_to_DString ", " @@ dshow_exp true v2)
+        in list_to_DString [show fop ; " "] @@
+             add_parens b (fmath_string @@
+                             dshow t @@
+                             string_to_DString " " @@
+                             dshow_exp true v1 @@
+                             string_to_DString ", " @@
+                             dshow_exp true v2)
 
     | OP_FCmp cmp t v1 v2 =>
-        string_to_DString "fcmp " @@ add_parens b (list_to_DString [show cmp ; " "] @@ dshow t @@ string_to_DString " " @@ dshow_exp true v1 @@
-                                                 string_to_DString ", " @@ dshow_exp true v2)
+        string_to_DString "fcmp " @@
+          add_parens b (list_to_DString [show cmp ; " "] @@
+                          dshow t @@
+                          string_to_DString " " @@
+                          dshow_exp true v1 @@
+                          string_to_DString ", " @@
+                          dshow_exp true v2)
 
-    | OP_Conversion conv t_from v t_to => list_to_DString [show conv ; " "] @@ add_parens b (dshow t_from @@ string_to_DString " " @@ dshow_exp true v @@
-                                                                                             string_to_DString " to " @@ dshow t_to)
+    | OP_Conversion conv t_from v t_to =>
+        list_to_DString [show conv ; " "] @@
+          add_parens b (dshow t_from @@
+                          string_to_DString " " @@
+                          dshow_exp true v @@
+                          string_to_DString " to " @@
+                          dshow t_to)
 
-    | OP_GetElementPtr t ptrval idxs =>
-        let (tptr, exp) := ptrval in
-        string_to_DString "getelementptr " @@ add_parens b (dshow t @@ string_to_DString ", " @@ dshow tptr @@ string_to_DString " " @@ dshow_exp true exp @@
-                                                              fold_left (fun str '(ty, ex) => str @@ string_to_DString ", " @@ dshow ty @@ string_to_DString " " @@ dshow_exp true ex) idxs DList_empty)
+    | OP_GetElementPtr t (tptr, exp) idxs =>
+        string_to_DString "getelementptr " @@
+          add_parens b (
+            dshow t @@
+              string_to_DString ", " @@
+              dshow tptr @@
+              string_to_DString " " @@
+              dshow_exp true exp @@
+              fold_left (fun str '(ty, ex) =>
+                           str @@
+                             string_to_DString ", " @@
+                             dshow ty @@
+                             string_to_DString " " @@
+                             dshow_exp true ex) idxs DList_empty)
 
-    | OP_ExtractElement vec idx =>
-        let (tptr, exp) := vec in
-        let (tidx, iexp) := idx in
-        string_to_DString "extractelement " @@ add_parens b (dshow tptr @@ string_to_DString " " @@ dshow_exp true exp @@ string_to_DString ", " @@ dshow tidx @@ string_to_DString " " @@  dshow_exp true iexp)
+    | OP_ExtractElement (tptr, exp) (tidx, iexp) =>
+        string_to_DString "extractelement " @@
+          add_parens b (dshow tptr @@
+                          string_to_DString " " @@
+                          dshow_exp true exp @@
+                          string_to_DString ", " @@
+                          dshow tidx @@
+                          string_to_DString " " @@
+                          dshow_exp true iexp)
 
-    | OP_InsertElement vec elt idx =>
-        let (tptr, exp) := vec in
-        let (telt, eexp) := elt in
-        let (tidx, iexp) := idx in
-        string_to_DString "insertelement " @@ add_parens b (dshow tptr @@ string_to_DString " " @@ dshow_exp true exp @@ string_to_DString ", " @@ dshow telt @@ string_to_DString " " @@
-                                                          dshow_exp true eexp @@ string_to_DString ", " @@ dshow tidx @@ string_to_DString " " @@ dshow_exp true iexp)
+    | OP_InsertElement (tptr, exp) (telt, eexp) (tidx, iexp) =>
+        string_to_DString "insertelement " @@
+          add_parens b (dshow tptr @@
+                          string_to_DString " " @@
+                          dshow_exp true exp @@
+                          string_to_DString ", " @@
+                          dshow telt @@
+                          string_to_DString " " @@
+                          dshow_exp true eexp @@
+                          string_to_DString ", " @@
+                          dshow tidx @@
+                          string_to_DString " " @@
+                          dshow_exp true iexp)
 
-    | OP_ShuffleVector vec1 vec2 idxmask =>
-        let (type1, expression1) := vec1 in
-        let (type2, expression2) := vec2 in
-        let (type3, expression3) := idxmask in
-        string_to_DString "shufflevector " @@ add_parens b (dshow type1 @@ dshow_exp true expression1 @@ string_to_DString ", " @@ dshow type2 @@ dshow_exp true expression2 @@
-                                                              string_to_DString ", " @@ dshow type3 @@ dshow_exp true expression3)
+    | OP_ShuffleVector (typ1, exp1) (typ2, exp2) (tidx, iexp) =>
+        string_to_DString "shufflevector " @@
+          add_parens b (dshow typ1 @@
+                          dshow_exp true exp1 @@
+                          string_to_DString ", " @@
+                          dshow typ2 @@
+                          dshow_exp true exp2 @@
+                          string_to_DString ", " @@
+                          dshow tidx @@
+                          dshow_exp true iexp)
     (* This one, extractValue *)
-    | OP_ExtractValue vec idxs =>
-        let (tptr, exp) := vec in
-        string_to_DString "extractvalue " @@ add_parens b (dshow tptr @@ string_to_DString " " @@ dshow_exp true exp @@ string_to_DString ", " @@
-                                                         concat_DString (string_to_DString ", ") (map (fun x => string_to_DString (show x)) idxs))
+    | OP_ExtractValue (tptr, exp) idxs =>
+        string_to_DString "extractvalue " @@
+          add_parens b (dshow tptr @@
+                          string_to_DString " " @@
+                          dshow_exp true exp @@
+                          string_to_DString ", " @@
+                          concat_DString (string_to_DString ", ") (mapTR (fun x => string_to_DString (show x)) idxs))
 
 
-    | OP_InsertValue vec elt idxs =>
-        let (tptr, exp) := vec in
-        let (telt, eexp) := elt in
-        string_to_DString "insertvalue " @@ add_parens b (dshow tptr @@ string_to_DString " " @@ dshow_exp false exp @@ string_to_DString ", " @@ dshow telt @@ string_to_DString " " @@
-                                                            dshow_exp false eexp @@ string_to_DString ", " @@ concat_DString (string_to_DString ", ") (map (fun x => string_to_DString (show x)) idxs))
+    | OP_InsertValue (tptr, exp) (telt, eexp) idxs =>
+        string_to_DString "insertvalue " @@
+          add_parens b (dshow tptr @@
+                          string_to_DString " " @@
+                          dshow_exp false exp @@
+                          string_to_DString ", " @@
+                          dshow telt @@
+                          string_to_DString " " @@
+                          dshow_exp false eexp @@
+                          string_to_DString ", " @@
+                          concat_DString (string_to_DString ", ") (mapTR (fun x => string_to_DString (show x)) idxs))
 
     | OP_Select (tc, cnd) (t1, v1) (t2, v2) =>
-        string_to_DString "select "  @@ add_parens b (dshow tc @@ string_to_DString " " @@ dshow_exp true cnd @@ string_to_DString ", " @@ dshow t1 @@ string_to_DString " " @@
-                                                    dshow_exp true v1  @@ string_to_DString ", " @@ dshow t2 @@ string_to_DString " " @@  dshow_exp true v2)
+        string_to_DString "select "  @@
+          add_parens b (dshow tc @@
+                          string_to_DString " " @@
+                          dshow_exp true cnd @@
+                          string_to_DString ", " @@
+                          dshow t1 @@
+                          string_to_DString " " @@
+                          dshow_exp true v1  @@
+                          string_to_DString ", " @@
+                          dshow t2 @@
+                          string_to_DString " " @@
+                          dshow_exp true v2)
 
-    | OP_Freeze (ty, ex) => string_to_DString "freeze " @@ add_parens b (dshow ty @@ string_to_DString " " @@ dshow_exp true ex)
+    | OP_Freeze (ty, ex) =>
+        string_to_DString "freeze " @@
+          add_parens b (dshow ty @@
+                          string_to_DString " " @@
+                          dshow_exp true ex)
     end.
 
   #[global] Instance dshowExp : DShow (exp T) :=
@@ -738,7 +979,11 @@ Section ShowInstances.
 
   Definition show_phi_block (p : block_id * exp T) : DString :=
     let '(bid, e) := p in
-    string_to_DString "[ " @@ dshow_exp true e @@ list_to_DString [", "; "%"] @@ dshow bid @@ string_to_DString " ]".
+    string_to_DString "[ " @@
+      dshow_exp true e @@
+      list_to_DString [", "; "%"] @@
+      dshow bid @@
+      string_to_DString " ]".
 
   Definition intersperse (sep : string) (l : list string) : string
     := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else acc ++ sep ++ s) l "".
@@ -746,12 +991,12 @@ Section ShowInstances.
   Definition dintersperse (sep : DString) (l : list DString) : DString
     := fold_left (fun acc s => if StringOrdFacts.eqb "" (DString_to_string acc) then s else acc @@ sep @@ s) l (string_to_DString "").
 
-  Fixpoint dconcat (sep : DString) (ls : list DString) :=
-    match ls with
-    | nil => string_to_DString EmptyString
-    | cons x nil => x
-    | cons x xs => x @@ sep @@ dconcat sep xs
-    end.
+  (* Fixpoint dconcat (sep : DString) (ls : list DString) := *)
+  (*   match ls with *)
+  (*   | nil => string_to_DString EmptyString *)
+  (*   | cons x nil => x *)
+  (*   | cons x xs => x @@ sep @@ dconcat sep xs *)
+  (*   end. *)
 
   #[global] Instance dshowPhi : DShow (phi T)
     := {| dshow p :=
@@ -823,7 +1068,6 @@ Section ShowInstances.
         |None => ""
         |Some x => ", align " ++ show x
         end in
-
     DList_join
       [string_to_DString "cmpxchg ";
        p_weak;
@@ -910,9 +1154,9 @@ Section ShowInstances.
     | METADATA_Align => string_to_DString "!align"
     | METADATA_Noundef => string_to_DString "!noundef"
     | METADATA_Id i => string_to_DString "!" @@ dshow i
-    | METADATA_String s => string_to_DString "!" @@ string_to_DString (show s)
+    | METADATA_String s => string_to_DString "!" @@ dshow s
     | METADATA_Named strs => string_to_DString "!{" @@
-                              concat_DString (string_to_DString " , ") (map (fun x => string_to_DString "!" @@
+                              concat_DString (string_to_DString " , ") (mapTR (fun x => string_to_DString "!" @@
                                                                                      string_to_DString x) strs)
                               @@ string_to_DString "}"
     | METADATA_Node mds => string_to_DString "!{"
@@ -953,25 +1197,25 @@ Section ShowInstances.
     | None => ""
     end.
 
-  Definition concat_with_space (c:string) (l:list string) :=
+  Definition concatTR_with_space (c:string) (l:list string) :=
     match l with
     | [] => ""
-    | _::_ => (concat c l) ++ " "
+    | _ => (concatTR c l) ++ " "
     end.
 
   Definition show_call_arg (x : texp T * list param_attr) : DString :=
-    let '(te, atts) := x in
-    let '(t, e) := te in
-    let attrs := concat_DString (string_to_DString " ") (map dshow atts) @@ string_to_DString " " in
-    dshow t @@ string_to_DString  " " @@
-    attrs @@ dshow_exp true e.
+    let '((t, e), atts) := x in
+    let attrs := concat_DString (string_to_DString " ") (mapTR dshow atts) @@ string_to_DString " " in
+    dshow t @@
+      string_to_DString  " " @@
+      attrs @@
+      dshow_exp true e.
 
   #[global] Instance dshowCallArg : DShow (texp T * list param_attr) :=
     { dshow := show_call_arg }.
 
   Definition dshow_metadata_list (ml : list (metadata T)) := 
-    concat_DString (string_to_DString " ") (map dshow_metadata ml).
-    
+    concat_DString (string_to_DString " ") (mapTR dshow_metadata ml).
   
   Definition dshow_instr (i : instr T) : DString
     := match i with
@@ -986,21 +1230,19 @@ Section ShowInstances.
            let ret_attrs := filter_option ann_ret_attribute anns in
            let addrspace := find_option ann_addrspace anns in
            let fn_attrs := filter_option ann_fun_attribute anns in
-           string_to_DString (show_opt_prefix "" tail) @@ string_to_DString (show_opt_space tail)
-             @@ string_to_DString "call " @@
-             concat_DString (string_to_DString " ") (map (fun x => string_to_DString (show_fast_math x)) fast_math_flags)
-             @@
-             list_to_DString (show_opt_list cconv)
-             @@
-             DList_join (map show_param_attr ret_attrs)
-             @@
-             list_to_DString (show_opt_list addrspace) 
-
-             @@ string_to_DString " " @@
-             dshow_texp fn @@ string_to_DString "(" @@
-             concat_DString (string_to_DString ", ") (map show_call_arg args) @@
+           string_to_DString (show_opt_prefix "" tail) @@
+             string_to_DString (show_opt_space tail) @@
+             string_to_DString "call " @@
+             concat_DString (string_to_DString " ") (mapTR (fun x => string_to_DString (show_fast_math x)) fast_math_flags) @@
+             list_to_DString (show_opt_list cconv) @@
+             DList_join (mapTR show_param_attr ret_attrs) @@
+             list_to_DString (show_opt_list addrspace) @@
+             string_to_DString " " @@
+             dshow_texp fn @@
+             string_to_DString "(" @@
+             concat_DString (string_to_DString ", ") (mapTR show_call_arg args) @@
              string_to_DString ") " @@
-             concat_DString (string_to_DString " ") (map (fun x => string_to_DString (show_fn_attr x)) fn_attrs)
+             concat_DString (string_to_DString " ") (mapTR (fun x => string_to_DString (show_fn_attr x)) fn_attrs)
 
        | INSTR_Alloca t anns =>
            let inalloca := match find_option ann_inalloca anns with
@@ -1010,7 +1252,10 @@ Section ShowInstances.
            in
            let nb := find_option ann_num_elements anns in
            let align := find_option ann_align anns in
-           list_to_DString ["alloca " ; inalloca] @@ dshow t @@ dshow_opt_prefix (string_to_DString ", ") nb @@ string_to_DString (show_opt_prefix ", align " align)
+           list_to_DString ["alloca " ; inalloca] @@
+             dshow t @@
+             dshow_opt_prefix (string_to_DString ", ") nb @@
+             string_to_DString (show_opt_prefix ", align " align)
 
        | INSTR_Load t ptr anns =>
            let volatile := match find_option ann_volatile anns with
@@ -1020,13 +1265,16 @@ Section ShowInstances.
            in
            let align := find_option ann_align anns in
            let meta := filter_option ann_metadata anns in
-           let meta_str := DList_join (map (fun 'ml =>
+           let meta_str := DList_join (mapTR (fun 'ml =>
                                                   string_to_DString ", "
                                                     @@ dshow_metadata_list ml)  meta)
            in
-           list_to_DString ["load "; volatile] @@ dshow t @@ string_to_DString ", " @@ dshow_texp ptr @@
-           string_to_DString (show_opt_prefix ", align " align) @@
-           meta_str
+           list_to_DString ["load "; volatile] @@
+             dshow t @@
+             string_to_DString ", " @@
+             dshow_texp ptr @@
+             string_to_DString (show_opt_prefix ", align " align) @@
+             meta_str
 
        | INSTR_Store tval ptr anns =>
            let volatile := match find_option ann_volatile anns with
@@ -1036,28 +1284,36 @@ Section ShowInstances.
            in
            let align := find_option ann_align anns in
            let meta := filter_option ann_metadata anns in
-           let meta_str := DList_join (map (fun 'ml =>
+           let meta_str := DList_join (mapTR (fun 'ml =>
                                                   string_to_DString ", "
                                                     @@ dshow_metadata_list ml) meta)
            in
-           string_to_DString "store " @@ string_to_DString volatile @@ dshow_texp tval @@
-           string_to_DString ", " @@ dshow_texp ptr @@ string_to_DString (show_opt_prefix ", align " align)
-                                                        @@ meta_str
+           string_to_DString "store " @@
+             string_to_DString volatile @@
+             dshow_texp tval @@
+             string_to_DString ", " @@
+             dshow_texp ptr @@
+             string_to_DString (show_opt_prefix ", align " align) @@
+             meta_str
 
-       | INSTR_Fence syncscope ordering => let printable_sync := match syncscope with
-                                                                 | None => ""
-                                                                 | Some x => "[syncscope(""" ++ show x ++ """)]"
-                                                                 end in
-                                          list_to_DString ["fence " ; printable_sync ] @@
-                                            dshow ordering @@
-                                            string_to_DString " ; yields void"
+       | INSTR_Fence syncscope ordering =>
+           let printable_sync := match syncscope with
+                                 | None => ""
+                                 | Some x => "[syncscope(""" ++ show x ++ """)]"
+                                 end in
+           list_to_DString ["fence " ; printable_sync ] @@
+             dshow ordering @@
+             string_to_DString " ; yields void"
 
        | INSTR_AtomicCmpXchg c => dshow c
 
        | INSTR_AtomicRMW a => show_atomic_rmw a
 
        | INSTR_VAArg va_list_and_arg_list t  =>
-           string_to_DString "va_arg " @@ dshow va_list_and_arg_list @@ string_to_DString ", " @@ dshow t
+           string_to_DString "va_arg " @@
+             dshow va_list_and_arg_list @@
+             string_to_DString ", " @@
+             dshow t
 
        | INSTR_LandingPad => string_to_DString "skipping implementation at the moment"
        end.
@@ -1098,25 +1354,42 @@ Section ShowInstances.
        | TERM_Ret v => string_to_DString "ret " @@ dshow_texp v
        | TERM_Ret_void => string_to_DString "ret void"
        | TERM_Br te b1 b2 =>
-           string_to_DString "br " @@ dshow_texp te @@
-           DList_join [string_to_DString ", label %" ; dshow b1 ; string_to_DString ", label %" ; dshow b2]
+           string_to_DString "br " @@
+             dshow_texp te @@
+             DList_join [string_to_DString ", label %" ;
+                         dshow b1 ;
+                         string_to_DString ", label %" ;
+                         dshow b2]
        | TERM_Br_1 b => string_to_DString "br label %" @@ dshow b
 
-       | TERM_Switch v def_dest brs => string_to_DString "switch " @@ dshow_texp v @@
-                                      string_to_DString ", label %" @@
-                                      dshow def_dest @@ string_to_DString " [" @@
-                                      fold_left (fun str '(x, y) => str @@ list_to_DString [show x; ", label %"] @@
-                                                                   dshow y @@ string_to_DString " ") brs DList_empty @@ string_to_DString "]"
+       | TERM_Switch v def_dest brs =>
+           string_to_DString "switch " @@
+             dshow_texp v @@
+             string_to_DString ", label %" @@
+             dshow def_dest @@
+             string_to_DString " [" @@
+             fold_left (fun str '(x, y) => str @@ list_to_DString [show x; ", label %"] @@
+                                          dshow y @@ string_to_DString " ") brs DList_empty @@
+             string_to_DString "]"
 
-       | TERM_IndirectBr v brs => string_to_DString "indirectbr " @@ dshow_texp v @@
-                                   dshow brs
+       | TERM_IndirectBr v brs =>
+           string_to_DString "indirectbr " @@
+             dshow_texp v @@
+             dshow brs
 
-       | TERM_Resume v => string_to_DString "remove " @@ dshow_texp v
+       | TERM_Resume v =>
+           string_to_DString "remove " @@
+             dshow_texp v
 
        | TERM_Invoke fnptrval args to_label unwind_label =>
-           string_to_DString "invoke " @@ dshow fnptrval @@
-             string_to_DString "( " @@ dshow args @@ string_to_DString "to label " @@
-             dshow to_label @@ string_to_DString "unwind label " @@ dshow unwind_label
+           string_to_DString "invoke " @@
+             dshow fnptrval @@
+             string_to_DString "( " @@
+             dshow args @@
+             string_to_DString "to label " @@
+             dshow to_label @@
+             string_to_DString "unwind label " @@
+             dshow unwind_label
 
        | TERM_Unreachable => string_to_DString "unreachable"
        end.
@@ -1124,13 +1397,14 @@ Section ShowInstances.
   #[global] Instance dshowTerminator : DShow (terminator T) := {dshow := dshow_terminator}.
 
   Definition dshow_code (indent : string) (c : code T) : DString
-    := DList_join (map (fun iid => string_to_DString indent @@  dshow_instr_id iid @@ string_to_DString newline) c).
+    := DList_join (mapTR (fun iid => string_to_DString indent @@  dshow_instr_id iid @@ string_to_DString newline) c).
 
   #[global] Instance dshowCode : DShow (code T) := { dshow := dshow_code "    " }.
 
   Definition dnewline := string_to_DString newline.
 
-  Definition dshow_local_id (lid : local_id) : DString := DList_join [string_to_DString "%"; dshow lid].
+  Definition dshow_local_id (lid : local_id) : DString :=
+    DList_join [string_to_DString "%"; dshow lid].
   
   Definition dshow_phi_id (phi_ins : local_id * phi T) : DString
     :=
@@ -1145,7 +1419,7 @@ Section ShowInstances.
   Definition dshow_block (indent : string) (b : block T) : DString
     :=
     let ind := string_to_DString indent in
-    let phis := DList_join (map (fun lp =>
+    let phis := DList_join (mapTR (fun lp =>
                                    ind @@
                                      dshow_phi_id lp)
                               (blk_phis b)) in
@@ -1172,7 +1446,7 @@ Section ShowInstances.
        dshow t @@
          (match parameter_attributes with
           | [] => string_to_DString ""
-          | _ => string_to_DString " " @@ concat_DString (string_to_DString " ") (map dshow (parameter_attributes))
+          | _ => string_to_DString " " @@ concat_DString (string_to_DString " ") (mapTR dshow (parameter_attributes))
           end) @@ string_to_DString " %" @@ dshow i.
 
   #[global] Instance dshowArg : DShow (local_id * T * list param_attr) :=
@@ -1181,32 +1455,53 @@ Section ShowInstances.
   Definition dshow_arg_list (args : list (local_id * T * list param_attr)) (varargs:bool) : DString
     :=
     let vararg_str :=
-      if Nat.eqb (List.length args) 0 then
+      if length_eq args 0 then
         (if varargs then string_to_DString "..." else string_to_DString "")
       else
         (if varargs then string_to_DString ", ..." else string_to_DString "")
     in
-    let arg_str := concat_DString (string_to_DString ", ") (map dshow args)
+    let arg_str := concat_DString (string_to_DString ", ") (mapTR dshow args)
     in
     string_to_DString "(" @@ arg_str @@ vararg_str @@ string_to_DString ")".
   
 End ShowInstances.
 
 (* TODO: REALLY?!? *)
-Fixpoint zip {X Y} (xs : list X) (ys : list Y) : list (X * Y)
-  := match xs, ys with
-     | [], _ => []
-     | _, [] => []
-     | (x::xs), (y::ys) => (x, y) :: zip xs ys
-     end.
 
-Fixpoint zip3 {X Y Z} (xs : list X) (ys : list Y) (zs : list Z) : list (X * Y * Z)
-  := match xs, ys, zs with
-     | [], _, _ => []
-     | _, [], _ => []
-     | _, _, [] => []
-     | (x::xs), (y::ys), (z::zs) => (x, y, z) :: zip3 xs ys zs
-     end.
+Fixpoint zipTR_aux {X Y} (xs : list X) (ys : list Y) (acc : list (X * Y)) : list (X * Y) :=
+  match xs, ys with
+  | [], _ => revTR acc
+  | _, [] => revTR acc
+  | (x::xs), (y::ys) => zipTR_aux xs ys ((x, y)::acc)
+  end.
+
+Definition zipTR {X Y} (xs : list X) (ys : list Y) : list (X * Y) :=
+  zipTR_aux xs ys [].
+
+Fixpoint zip3TR_aux {X Y Z} (xs : list X) (ys : list Y) (zs : list Z) (acc : list (X * Y * Z)) : list (X * Y * Z) :=
+  match xs, ys, zs with
+  | [], _, _ => revTR acc
+  | _, [], _ => revTR acc
+  | _, _, [] => revTR acc
+  | (x::xs), (y::ys), (z::zs) => zip3TR_aux xs ys zs ((x, y, z)::acc)
+  end.
+
+Definition zip3TR {X Y Z} (xs : list X) (ys : list Y) (zs : list Z) : list (X * Y * Z) :=
+  zip3TR_aux xs ys zs [].
+(* Fixpoint zip {X Y} (xs : list X) (ys : list Y) : list (X * Y) *)
+(*   := match xs, ys with *)
+(*      | [], _ => [] *)
+(*      | _, [] => [] *)
+(*      | (x::xs), (y::ys) => (x, y) :: zip xs ys *)
+(*      end. *)
+
+(* Fixpoint zip3 {X Y Z} (xs : list X) (ys : list Y) (zs : list Z) : list (X * Y * Z) *)
+(*   := match xs, ys, zs with *)
+(*      | [], _, _ => [] *)
+(*      | _, [], _ => [] *)
+(*      | _, _, [] => [] *)
+(*      | (x::xs), (y::ys), (z::zs) => (x, y, z) :: zip3 xs ys zs *)
+(*      end. *)
 
 (** Return empty string when None *)
 (** Adds a space -- is this the right place to do that? *)
@@ -1243,19 +1538,23 @@ Definition dshow_definition (defn : definition typ (block typ * list (block typ)
       (* Note: if these lists are not equal in length arguments will
          be dropped...  Better to check and spew garbage, as this may
          lead to tricky to catch problems otherwise.  *)
-      let arg_length := List.length arg_names in
-      if negb (Nat.eqb arg_length (List.length args_t) && (Nat.eqb arg_length (List.length argument_attributes)))
-      then string_to_DString "Function """ @@ dshow name @@ string_to_DString """ has mismatched arguments and argument attributes length"
+      let arg_length := lengthTR arg_names in
+      if negb (length_eq args_t arg_length && length_eq argument_attributes arg_length)
+             (* Nat.eqb arg_length (lengthTR args_t) && (Nat.eqb arg_length (lengthTR argument_attributes))) *)
+      then
+        string_to_DString "Function """ @@
+          dshow name @@
+          string_to_DString """ has mismatched arguments and argument attributes length"
       else
-        let args := zip3 arg_names args_t argument_attributes in
+        let args := zip3TR arg_names args_t argument_attributes in
 
         let blocks :=
           let '(b, bs) := df_instrs defn in
-          concat_DString dnewline (map dshow (b::bs))
+          concat_DString dnewline (mapTR dshow (b::bs))
         in
 
-        let ret_attributes := concat_DString (string_to_DString " ") (map (fun x => dshow x) (return_attributes)) @@
-        string_to_DString " " in
+        let ret_attributes := concat_DString (string_to_DString " ") (mapTR dshow return_attributes) @@
+                                string_to_DString " " in
         let printable_ret_attrs := ret_attributes in
 
         let linkage := maybe_show (dc_linkage defn.(df_prototype)) in
@@ -1265,22 +1564,24 @@ Definition dshow_definition (defn : definition typ (block typ * list (block typ)
 
         let section :=
           maybe_to_string
-            (fun s => concatStr ["section \"; s; "\"; " "])
+            (fun s => concatStrTR ["section \"; s; "\"; " "])
             (dc_section defn.(df_prototype)) in
 
         let align :=
           maybe_to_string
-            (fun a => concatStr [", align "; show a; " "])
+            (fun a => concatStrTR [", align "; show a; " "])
             (dc_align defn.(df_prototype)) in
 
         let gc := maybe_show (dc_gc defn.(df_prototype)) in
 
         DList_join [ list_to_DString ["define "; linkage; visibility; dll_storage ; cconv] @@
-                       printable_ret_attrs @@ dshow ret_t] @@ string_to_DString " @" @@ dshow name @@
-                     dshow_arg_list args vararg @@
-                     list_to_DString [section ; align ; gc ; " {"; newline] @@
-                     blocks @@
-                     list_to_DString ["}";  newline]
+                       printable_ret_attrs @@ dshow ret_t] @@
+          string_to_DString " @" @@
+          dshow name @@
+          dshow_arg_list args vararg @@
+          list_to_DString [section ; align ; gc ; " {"; newline] @@
+          blocks @@
+          list_to_DString ["}";  newline]
 
   | _ => string_to_DString "Invalid type on function: " @@ dshow name
   end.
@@ -1301,12 +1602,12 @@ Definition dshow_declaration (decl: declaration typ) : DString :=
 
       let section :=
         maybe_to_string
-          (fun s => concatStr ["section \"; s; "\"; " "])
+          (fun s => concatStrTR ["section \"; s; "\"; " "])
           (dc_section decl) in
 
       let align :=
         maybe_to_string
-          (fun a => concatStr [", align "; show a; " "])
+          (fun a => concatStrTR [", align "; show a; " "])
           (dc_align decl) in
 
       let gc := maybe_show (dc_gc decl) in
@@ -1318,18 +1619,18 @@ Definition dshow_declaration (decl: declaration typ) : DString :=
           (if vararg then ", ..." else "")
       in
       string_to_DString
-        (concatStr ["declare "; link; vis; dll; cc]) @@
-        DList_join [dintersperse (string_to_DString " ") (map dshow ret_attrs)] @@
+        (concatStrTR ["declare "; link; vis; dll; cc]) @@
+        DList_join [dintersperse (string_to_DString " ") (mapTR dshow ret_attrs)] @@
         string_to_DString " " @@
         dshow ret_t @@ string_to_DString " @" @@ dshow name @@ string_to_DString "(" @@
-        dconcat (string_to_DString ", ") (map (fun '(x, y) =>
+        concat_DString (string_to_DString ", ") (mapTR (fun '(x, y) =>
                                                  DList_join
                                                    [dshow x; string_to_DString " ";
                                                     match y with
                                                     | [] => string_to_DString ""
                                                     | z :: tl => dshow z
                                                     end ])
-                       (List.combine args_t args_attrs)) @@
+                       (zipTR args_t args_attrs)) @@
         string_to_DString vararg_str @@
         string_to_DString ")" @@ string_to_DString section @@ string_to_DString align @@ string_to_DString gc
   | _ => string_to_DString "Invalid type on function: " @@ dshow name
@@ -1357,12 +1658,12 @@ Definition dshow_global (g : global typ) : DString :=
 
   let section :=
     maybe_to_string
-      (fun s => concatStr ["section \"; s; "\"; " "])
+      (fun s => concatStrTR ["section \"; s; "\"; " "])
       (g_section g) in
 
   let align :=
     maybe_to_string
-      (fun a => concatStr [", align "; show a; " "])
+      (fun a => concatStrTR [", align "; show a; " "])
       (g_align g) in
 
   DList_join
@@ -1395,7 +1696,7 @@ Definition dshow_tle (tle : toplevel_entity typ (block typ * list (block typ))) 
      | TLE_Attribute_group i attrs =>
          DList_join
            [string_to_DString "attributes #"; string_to_DString (show i); string_to_DString " = { " ;
-            dconcat (string_to_DString " ") (map (fun x => string_to_DString (show x)) (attrs)); string_to_DString " }"
+            concat_DString (string_to_DString " ") (mapTR (fun x => string_to_DString (show x)) (attrs)); string_to_DString " }"
            ]
      end.
 
@@ -1403,7 +1704,7 @@ Definition dshow_tle (tle : toplevel_entity typ (block typ * list (block typ))) 
   {| dshow := dshow_tle |}.
 
 #[global] Instance dshowProg : DShow (list (toplevel_entity typ (block typ * list (block typ)))) :=
-  {| dshow tles := dconcat (dnewline @@ dnewline) (map dshow_tle tles) |}.
+  {| dshow tles := concat_DString (dnewline @@ dnewline) (mapTR dshow_tle tles) |}.
 
 Definition show_exp {T : Set} `{DShow T} (b: bool) (v : exp T) : string := show v.
 Definition showProg (p: list (toplevel_entity typ (block typ * list (block typ)))) : string := show p.
