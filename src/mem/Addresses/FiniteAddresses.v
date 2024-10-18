@@ -61,7 +61,7 @@ Module FinAddrType <: CORE_ADDRESS.
 End FinAddrType.
 
 Module FinNull <: HAS_NULL FinAddrType.
-  Definition null := (repr 0, nil_prov)%Z.
+  Definition null := (@Integers.repr 64%positive 0, nil_prov).
 
   Definition is_null (a : FinAddrType.t) : bool :=
     Integers.eq (fst null) (fst a).
@@ -197,7 +197,7 @@ Module Fin_PTOI_ITOP_EXTRA <: PTOI_ITOP_EXTRA N_ProvSet FinAddrType Fin_HAS_META
     unfold int_to_ptr, ptr_to_int, extract_metadata in *.
     break_match_hyp_inv.
     cbn.
-    rewrite Integers.unsigned_repr; auto.
+    apply (@Integers.unsigned_repr 64 x); auto.
     unfold Integers.max_unsigned; lia.
   Qed.
 End Fin_PTOI_ITOP_EXTRA.

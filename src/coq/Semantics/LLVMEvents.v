@@ -15,6 +15,7 @@ From Coq Require Import
      String
      Setoid
      Morphisms
+     Equalities
      Classes.RelationClasses.
 
 From ExtLib Require Import
@@ -29,7 +30,8 @@ From ITree Require Import
      Events.Exception.
 
 From Mem Require Import
-  Addresses.MemoryAddress.
+  Addresses.MemoryAddress
+  Addresses.Provenance.
 
 From LLVM_Memory Require Import
   Sizeof
@@ -160,12 +162,12 @@ Set Contextual Implicit.
 
 
 (* TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism not functors. *)
-Module Type LLVM_INTERACTIONS (ADDR : ADDRESS) (IP:INTPTR) (SIZEOF : Sizeof).
+Module Type LLVM_INTERACTIONS (ADDRESS_METADATA : Typ) (PS : PROV_SET) (ADDR : ADDRESS ADDRESS_METADATA PS) (IP:INTPTR) (SIZEOF : Sizeof).
 
   #[global] Instance eq_dec_addr : RelDec (@eq ADDR.addr) := RelDec_from_dec _ ADDR.eq_dec.
   #[global] Instance Eqv_addr : Eqv ADDR.addr := (@eq ADDR.addr).
 
-  Module DV := DynamicValues.DVALUE(ADDR)(IP)(SIZEOF).
+  Module DV := DynamicValues.DVALUE(ADDRESS_METADATA)(PS)(ADDR)(IP)(SIZEOF).
   Export DV.
 
   Section Events.
@@ -326,6 +328,6 @@ Module Type LLVM_INTERACTIONS (ADDR : ADDRESS) (IP:INTPTR) (SIZEOF : Sizeof).
 
 End LLVM_INTERACTIONS.
 
-Module Make(ADDR : ADDRESS)(IP:INTPTR)(SIZEOF : Sizeof) <: LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF).
-Include LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF).
+Module Make(ADDRESS_METADATA : Typ) (PS : PROV_SET) (ADDR : ADDRESS ADDRESS_METADATA PS) (IP:INTPTR) (SIZEOF : Sizeof) <: LLVM_INTERACTIONS(ADDRESS_METADATA)(PS)(ADDR)(IP)(SIZEOF).
+Include LLVM_INTERACTIONS(ADDRESS_METADATA)(PS)(ADDR)(IP)(SIZEOF).
 End Make.

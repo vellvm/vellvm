@@ -57,8 +57,8 @@ Module Type INTPTR.
       to_Z x = to_unsigned x.
 End INTPTR.
 
-Module Type INTPTR_BIG (IP : INTPTR).
-  Import IP.
+Module Type INTPTR_BIG.
+  Include INTPTR.
 
   Parameter from_Z_safe :
     forall z,
