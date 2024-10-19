@@ -96,12 +96,10 @@ let process_ast ll_ast file =
     else if !trace then
       match Interpreter.interpret ll_ast with
       | Ok dv ->
-        Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv);
-        (* Trace.print_log (); *)
-        (* Trace.print_normalized_log ll_ast; *)
+        Printf.printf "Program terminated with: %s\n%!" (string_of_dvalue dv);
         begin match Trace.gen_executable_trace ll_ast with
-        | Ok ll_ast_trace ->
-          let ll_ast_trace' = transform ll_ast_trace in
+          | Ok ll_ast_trace ->
+            let ll_ast_trace' = transform ll_ast_trace in
           let tracell_file = Platform.gen_name !Platform.output_path file ".trace.ll" in
           IO.output_file tracell_file ll_ast_trace'
         | Error s -> failwith s

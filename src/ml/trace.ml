@@ -11,7 +11,7 @@ let print_tblk tblk : unit =
   Printf.printf "%s" (ShowAST.dshowBlock ShowAST.dshowTyp (tblk) |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
 
 let print_log_entry (le : log_entry) =
-  Printf.printf "%s\n" (Log.dshow_log_entry le |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
+  Printf.printf "%s\n%!" (Log.dshow_log_entry le |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
 
 let print_log () : unit =
   Printf.printf "%s\n" (Log.dstring_of_log_stream !Log.log |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
@@ -239,15 +239,20 @@ sig
   val of_list : (key * 'a) list -> 'a t
 end
 
-
 module RawidOrdPrint : OrdPrintT with type t = raw_id = struct
   type t = raw_id
 
   let compare (t1 : t) (t2 : t) =
-    match AstLib.RawIDOrd.compare t1 t2 with
-    | LT -> -1
-    | EQ -> 0
-    | GT -> 1
+    match t1, t2 with
+    | Name cs1, Name cs2 ->
+      let s1 = Camlcoq.camlstring_of_coqstring cs1 in
+      let s2 = Camlcoq.camlstring_of_coqstring cs2 in
+      String.compare s1 s2
+    | _, _ -> 
+      match AstLib.RawIDOrd.compare t1 t2 with
+      | LT -> -1
+      | EQ -> 0
+      | GT -> 1
 
   let to_string r =
     ShowAST.dshow_raw_id r |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring
@@ -342,22 +347,37 @@ type code = (instr_id * typ instr) list
 
 let gensym : string -> string =
   let c = ref 0 in
-  fun (s:string) -> incr c; Printf.sprintf "_temp%s%d" s (!c)
+  fun (s:string) -> incr c; Printf.sprintf "_temp%s%d%!" s (!c)
 
 let gensym_int : int -> int =
   let c = ref 0 in
   fun (_:int) -> incr c; !c
 
-let gensym_raw_id : raw_id -> raw_id = function
-  | Name id ->
-    let id' = Camlcoq.camlstring_of_coqstring id |> gensym |> Camlcoq.coqstring_of_camlstring in
-    Name id'
-  | Anon i ->
-    let i' = Camlcoq.Z.to_int i |> gensym_int |> Camlcoq.Z.of_uint in
-    Anon i'
-  | Raw i ->
-    let i' = Camlcoq.Z.to_int i |> gensym_int |> Camlcoq.Z.of_uint in
-    Raw i'
+(* let gensym_raw_id : raw_id -> raw_id = function *)
+(*   | Name id -> *)
+(*     let id' = Camlcoq.camlstring_of_coqstring id |> gensym |> Camlcoq.coqstring_of_camlstring in *)
+(*     Name id' *)
+(*   | Anon i -> *)
+(*     let i' = Camlcoq.Z.to_int i |> gensym_int |> Camlcoq.Z.of_uint in *)
+(*     Anon i' *)
+(*   | Raw i -> *)
+(*     let i' = Camlcoq.Z.to_int i |> gensym_int |> Camlcoq.Z.of_uint in *)
+(*     Raw i' *)
+
+let gensym_raw_id : raw_id -> raw_id =
+  let c = ref 0 in
+  fun (rid : raw_id) ->
+    incr c;
+    match rid with
+    | Name _ ->
+      let id = Printf.sprintf "%d%!" !c |> Camlcoq.coqstring_of_camlstring in
+      Name id
+    | Anon _ ->
+      let i = Camlcoq.Z.of_uint !c in
+      Anon i
+    | Raw _ ->
+      let i = Camlcoq.Z.of_uint !c in
+      Raw i
 
 (* Substitution r2 using r1 *)
 let subst_raw_id_opt ~(ctx : ctx) (s : raw_id) ~(default : typ exp) =
@@ -473,8 +493,14 @@ let transform_exp ~(ctx : ctx) (op : typ exp) : typ exp =
     op
 
 let ctx_unit_to_string ~(k : raw_id) ~(v : typ exp) : string =
-  Printf.sprintf "%s->%s" (ShowAST.dshow_raw_id k |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
+  Printf.sprintf "%s->%s%!" (ShowAST.dshow_raw_id k |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
     (ShowAST.dshowExp ShowAST.dshowTyp v |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
+  (* Printf.sprintf "%s" (ShowAST.dshow_raw_id k |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring) *)
+  (* Printf.sprintf "%s" "bla" *)
+
+let print_ctx ctx : unit =
+  RawidM.iter (fun k v -> Printf.printf "%s; %!" (ctx_unit_to_string ~k ~v)) ctx;
+  print_endline ""
 
 let transform_phi ~(ctx : ctx) ~(id : raw_id) (phi : typ phi) ~(bid_from : raw_id) : ctx =
   match phi with
@@ -527,7 +553,6 @@ let rec transform_log
   | [] ->
     Ok tblk
   | log::logs' ->
-    (* print_log_entry log; *)
     let* ((ctx, f_def, ciid), ctxs_tl) = pop_stack ctxs in
     begin match log with
       | Phi_node (pid, _, bid_from) ->
@@ -581,7 +606,6 @@ Return the current transformed log with return added in it *)
               let ctx' = RawidM.update_or e (fun _ -> e) iid ctx in
               let tblk' = add_code tblk ~code:[(IId iid', INSTR_Op exp')] in
               let ctxs' = update_stack_ctx ~ctx:ctx' ctxs in
-              (* Printf.printf "Adding following OP into block:%s\n" (ShowAST.dshowInstrWithId ShowAST.dshowTyp (IId iid', INSTR_Op exp') |> camlstring_of_dstring); *)
               transform_log ~ctxs:ctxs' ~mcfg ~tblk:tblk' logs'
             end
           | INSTR_Call (_, _, _), Some (_, INSTR_Call ((f_t, f_exp), taargs, anns)) ->
@@ -670,7 +694,7 @@ Return the current transformed log with return added in it *)
                 let id' = gensym_raw_id id in
                 let exp = EXP_Ident (ID_Local id') in
                 let tblk' = add_code tblk ~code:[(IId id', INSTR_Load (dt, texp', anns))] in
-                let ctx' = RawidM.update_or exp (fun _ -> exp) id ctx in
+                let ctx' = RawidM.add id exp ctx in
                 let ctxs' = update_stack_ctx ~ctx:ctx' ctxs in
                 transform_log ~ctxs:ctxs' ~mcfg ~tblk:tblk' logs'
             end
@@ -766,7 +790,6 @@ let transform_code
   match get_f_def_from_mcfg (EXP_Ident (ID_Global f_id)) ~mcfg with
   | None -> Error (Printf.sprintf "Cannot found definition %s" (ShowAST.dshow_raw_id f_id |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring))
   | Some f_def -> 
-    (* Printf.printf "%s" (Log.dstring_of_log_stream stack |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring); *)
     let tblk : typ block = {blk_id= f_def.df_instrs.init;
                             blk_phis=[];
                             blk_code=[];
@@ -783,22 +806,6 @@ let transform_code
       blk_term = tblk'.blk_term;
       blk_comments=tblk'.blk_comments
     }
-(* match ret_texp_o with *)
-    (* | Some ret_texp -> *)
-    (*   Ok {blk_id=tblk'.blk_id; *)
-    (*    blk_phis=tblk'.blk_phis; *)
-    (*    blk_code=List.rev tblk'.blk_code; *)
-    (*    blk_term=(TERM_Ret ret_texp); *)
-    (*    blk_comments=tblk'.blk_comments *)
-    (*   } *)
-    (* | None ->                   (\* The branch when there is no return value *\) *)
-    (*   Ok {blk_id=tblk'.blk_id; *)
-    (*    blk_phis=tblk'.blk_phis; *)
-    (*    blk_code=List.rev tblk'.blk_code; *)
-    (*    blk_term=tblk.blk_term; *)
-    (*    blk_comments=tblk'.blk_comments *)
-    (*   } *)
-
 
 (** Printing trace **)
 let output_channel = ref stdout
