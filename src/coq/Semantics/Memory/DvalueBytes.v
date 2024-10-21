@@ -104,6 +104,7 @@ Module Type DvalueByte (LP : LLVMParams).
   Import PROV.
   Import SIZEOF.
   Import Events.DV.
+  Import Sizeof.
 
   (* Walk through a list *)
   (* Returns field index + number of bytes remaining *)
@@ -135,38 +136,68 @@ Module Type DvalueByte (LP : LLVMParams).
          size depends on the type.
    *)
 (*  Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | solve_dvalue_measure]. *)
-  
+
+  (* offset is the number of bytes indexed past so far *)
   Fixpoint dvalue_extract_byte {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOMABLE M} (dv : dvalue) (dt : dtyp) (idx : Z) {struct dv} : M Z
     :=
-    let dvalue_extract_struct_bytes (pad : bool) :=
-      fix loop fields types (idx : Z) {struct fields}  :=
+    let dvalue_extract_struct_bytes (pad : option N) :=
+      fix loop fields types (offset : N) (idx : Z) {struct fields}  :=
         match fields, types with
-        | [], [] => raise_error "No fields left for byte-indexing..."
-        | f::fs, dt::dts =>
-            let sz :=
-              if pad
-              then Z.of_N (Sizeof.pad_to padding (sizeof_dtyp dt))
-              else Z.of_N (sizeof_dtyp dt)
+        | [], [] =>
+            (* Handle padding at the end of the structure *)
+            let padding :=
+              match pad with
+              | Some max_pad
+                => pad_amount max_pad offset
+              | None =>
+                  0%N
+              end
             in
-            if Z.ltb idx sz
-            then dvalue_extract_byte f dt idx
-            else loop fs dts (idx - sz)%Z
+            let zpadding := Z.of_N padding in
+            if Z.ltb idx zpadding
+            then
+              (* Indexing into padding bytes *)
+              (* TODO: currently we just pad with 0 bytes. This
+                 prevents storing data in padding, though, which is
+                 technically allowed *)
+              ret 0%Z
+            else
+              raise_error "No fields left for byte-indexing..."
+        | f::fs, dt::dts =>
+            let padding :=
+              if pad
+              then pad_amount (preferred_alignment (dtyp_alignment dt)) offset
+              else 0%N
+            in
+            let zpadding := Z.of_N padding in
+            let sz := sizeof_dtyp dt in
+            let zsz := Z.of_N sz in
+            if Z.ltb idx zpadding
+            then
+              (* Indexing into padding bytes *)
+              (* TODO: currently we just pad with 0 bytes. This
+                 prevents storing data in padding, though, which is
+                 technically allowed *)
+              ret 0%Z
+            else
+              let offset' := (offset + padding)%N in
+              let idx' := (idx - zpadding)%Z in
+              if Z.ltb idx' zsz
+              then dvalue_extract_byte f dt idx'
+              else loop fs dts (offset' + sz)%N (idx' - zsz)%Z
         | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
         end
     in
-    let dvalue_extract_array_bytes (pad : bool) :=
+    let dvalue_extract_array_bytes :=
       fix loop elts dt (idx : Z) {struct elts}  :=
         match elts with
         | [] => raise_error "No fields left for byte-indexing..."
         | e::es =>
-            let sz :=
-              if pad
-              then Z.of_N (Sizeof.pad_to padding (sizeof_dtyp dt))
-              else Z.of_N (sizeof_dtyp dt)
-            in
-            if Z.ltb idx sz
+            let sz := sizeof_dtyp dt in
+            let zsz := Z.of_N sz in
+            if Z.ltb idx zsz
             then dvalue_extract_byte e dt idx
-            else loop es dt (idx - sz)%Z
+            else loop es dt (idx - zsz)%Z
         end
     in
     match dv with
@@ -187,25 +218,24 @@ Module Type DvalueByte (LP : LLVMParams).
            (* TODO: Not sure if this should be an error, poison, or what. *)
            raise_error "dvalue_extract_byte on DVALUE_None"
 
-       (* TODO: Take padding into account. *)
        | DVALUE_Struct fields =>
            match dt with
            | DTYPE_Struct dts =>
-               dvalue_extract_struct_bytes true fields dts idx 
+               dvalue_extract_struct_bytes (Some (max_preferred_dtyp_alignment dts)) fields dts 0 idx
            | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Struct."
            end
 
        | DVALUE_Packed_struct fields =>
            match dt with
            | DTYPE_Packed_struct dts =>
-               dvalue_extract_struct_bytes false fields dts idx
+               dvalue_extract_struct_bytes None fields dts 0 idx
            | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
            end
 
        | DVALUE_Array _ elts =>
            match dt with
            | DTYPE_Array sz dt =>
-               dvalue_extract_array_bytes true elts dt idx
+               dvalue_extract_array_bytes elts dt idx
            | _ =>
                raise_error "dvalue_extract_byte: type mismatch on DVALUE_Array."
            end
@@ -213,7 +243,7 @@ Module Type DvalueByte (LP : LLVMParams).
        | DVALUE_Vector _ elts =>
            match dt with
            | DTYPE_Vector sz dt =>
-               dvalue_extract_array_bytes false elts dt idx
+               dvalue_extract_array_bytes elts dt idx
            | _ =>
                raise_error "dvalue_extract_byte: type mismatch on DVALUE_Vector."
            end
@@ -221,35 +251,64 @@ Module Type DvalueByte (LP : LLVMParams).
 
   Lemma dvalue_extract_byte_equation {M} `{HM: Monad M} `{RE: RAISE_ERROR M} `{RP: RAISE_POISON M} `{RO: RAISE_OOMABLE M} (dv : dvalue) (dt : dtyp) (idx : Z) :
     @dvalue_extract_byte M HM RE RP RO dv dt idx =
-    let dvalue_extract_struct_bytes (pad : bool) :=
-      fix loop fields types (idx : Z) {struct fields}  :=
+    let dvalue_extract_struct_bytes (pad : option N) :=
+      fix loop fields types (offset : N) (idx : Z) {struct fields}  :=
         match fields, types with
-        | [], [] => raise_error "No fields left for byte-indexing..."
-        | f::fs, dt::dts =>
-            let sz :=
-              if pad
-              then Z.of_N (Sizeof.pad_to padding (sizeof_dtyp dt))
-              else Z.of_N (sizeof_dtyp dt)
+        | [], [] =>
+            (* Handle padding at the end of the structure *)
+            let padding :=
+              match pad with
+              | Some max_pad
+                => pad_amount max_pad offset
+              | None =>
+                  0%N
+              end
             in
-            if Z.ltb idx sz
-            then dvalue_extract_byte f dt idx
-            else loop fs dts (idx - sz)%Z
+            let zpadding := Z.of_N padding in
+            if Z.ltb idx zpadding
+            then
+              (* Indexing into padding bytes *)
+              (* TODO: currently we just pad with 0 bytes. This
+                 prevents storing data in padding, though, which is
+                 technically allowed *)
+              ret 0%Z
+            else
+              raise_error "No fields left for byte-indexing..."
+        | f::fs, dt::dts =>
+            let padding :=
+              if pad
+              then pad_amount (preferred_alignment (dtyp_alignment dt)) offset
+              else 0%N
+            in
+            let zpadding := Z.of_N padding in
+            let sz := sizeof_dtyp dt in
+            let zsz := Z.of_N sz in
+            if Z.ltb idx zpadding
+            then
+              (* Indexing into padding bytes *)
+              (* TODO: currently we just pad with 0 bytes. This
+                 prevents storing data in padding, though, which is
+                 technically allowed *)
+              ret 0%Z
+            else
+              let offset' := (offset + padding)%N in
+              let idx' := (idx - zpadding)%Z in
+              if Z.ltb idx' zsz
+              then dvalue_extract_byte f dt idx'
+              else loop fs dts (offset' + sz)%N (idx' - zsz)%Z
         | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
         end
     in
-    let dvalue_extract_array_bytes (pad : bool) :=
+    let dvalue_extract_array_bytes :=
       fix loop elts dt (idx : Z) {struct elts}  :=
         match elts with
         | [] => raise_error "No fields left for byte-indexing..."
         | e::es =>
-            let sz :=
-              if pad
-              then Z.of_N (Sizeof.pad_to padding (sizeof_dtyp dt))
-              else Z.of_N (sizeof_dtyp dt)
-            in
-            if Z.ltb idx sz
+            let sz := sizeof_dtyp dt in
+            let zsz := Z.of_N sz in
+            if Z.ltb idx zsz
             then dvalue_extract_byte e dt idx
-            else loop es dt (idx - sz)%Z
+            else loop es dt (idx - zsz)%Z
         end
     in
     match dv with
@@ -270,25 +329,24 @@ Module Type DvalueByte (LP : LLVMParams).
            (* TODO: Not sure if this should be an error, poison, or what. *)
            raise_error "dvalue_extract_byte on DVALUE_None"
 
-       (* TODO: Take padding into account. *)
        | DVALUE_Struct fields =>
            match dt with
            | DTYPE_Struct dts =>
-               dvalue_extract_struct_bytes true fields dts idx 
+               dvalue_extract_struct_bytes (Some (max_preferred_dtyp_alignment dts)) fields dts 0 idx
            | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Struct."
            end
 
        | DVALUE_Packed_struct fields =>
            match dt with
            | DTYPE_Packed_struct dts =>
-               dvalue_extract_struct_bytes false fields dts idx
+               dvalue_extract_struct_bytes None fields dts 0 idx
            | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
            end
 
        | DVALUE_Array _ elts =>
            match dt with
            | DTYPE_Array sz dt =>
-               dvalue_extract_array_bytes true elts dt idx
+               dvalue_extract_array_bytes elts dt idx
            | _ =>
                raise_error "dvalue_extract_byte: type mismatch on DVALUE_Array."
            end
@@ -296,7 +354,7 @@ Module Type DvalueByte (LP : LLVMParams).
        | DVALUE_Vector _ elts =>
            match dt with
            | DTYPE_Vector sz dt =>
-               dvalue_extract_array_bytes false elts dt idx
+               dvalue_extract_array_bytes elts dt idx
            | _ =>
                raise_error "dvalue_extract_byte: type mismatch on DVALUE_Vector."
            end
@@ -328,16 +386,28 @@ Module Type DvalueByte (LP : LLVMParams).
   #[local] Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia].
   Fixpoint dvalue_bytes_to_dvalue {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOMABLE M} (dbs : list dvalue_byte) (dt : dtyp) : M dvalue
     :=
-    let list_dvalue_bytes_to_dvalue :=
-      fix go dts dbs :=
+    let list_dvalue_bytes_to_dvalue (pad : option N) :=
+      fix go (offset : N) dts dbs :=
         match dts with
-        | [] => ret []
+        | [] =>
+            (* TODO: should we check that we have the appropriate number of extra padding bytes here? *)
+            (* Long term we'll have to include padding bytes in the dvalue *)
+            ret []
         | (dt::dts) =>
+            let padding :=
+              if pad
+              then pad_amount (preferred_alignment (dtyp_alignment dt)) offset
+              else 0%N
+            in
+            let zpadding := Z.of_N padding in
             let sz := sizeof_dtyp dt in
-            let init_bytes := take sz dbs in
-            let rest_bytes := drop sz dbs in
+            (* Skip any padding bytes *)
+            let dbs' := drop padding dbs in
+            let init_bytes := take sz dbs' in
+            let rest_bytes := drop sz dbs' in
+            let offset' := offset + padding in
             f <- dvalue_bytes_to_dvalue init_bytes dt;;
-            rest <- go dts rest_bytes;;
+            rest <- go (offset' + sz) dts rest_bytes;;
             ret (f :: rest)
         end
     in
@@ -398,9 +468,9 @@ Module Type DvalueByte (LP : LLVMParams).
            elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
            ret (DVALUE_Vector t elts)
        | DTYPE_Struct fields =>
-           Functor.fmap DVALUE_Struct (list_dvalue_bytes_to_dvalue fields dbs)
+           Functor.fmap DVALUE_Struct (list_dvalue_bytes_to_dvalue (Some (max_preferred_dtyp_alignment fields)) 0 fields dbs)
        | DTYPE_Packed_struct fields =>
-           Functor.fmap DVALUE_Packed_struct (list_dvalue_bytes_to_dvalue fields dbs)
+           Functor.fmap DVALUE_Packed_struct (list_dvalue_bytes_to_dvalue None 0 fields dbs)
        | DTYPE_Opaque =>
            raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Opaque."
        end.
@@ -408,16 +478,28 @@ Module Type DvalueByte (LP : LLVMParams).
   Lemma dvalue_bytes_to_dvalue_equation
     {M} `{HM : Monad M} `{RE: RAISE_ERROR M} `{RP: RAISE_POISON M} `{RO: RAISE_OOMABLE M} (dbs : list dvalue_byte) (dt : dtyp) :
     @dvalue_bytes_to_dvalue M HM RE RP RO dbs dt =
-    let list_dvalue_bytes_to_dvalue :=
-      fix go dts dbs :=
+    let list_dvalue_bytes_to_dvalue (pad : option N) :=
+      fix go (offset : N) dts dbs :=
         match dts with
-        | [] => ret []
+        | [] =>
+            (* TODO: should we check that we have the appropriate number of extra padding bytes here? *)
+            (* Long term we'll have to include padding bytes in the dvalue *)
+            ret []
         | (dt::dts) =>
+            let padding :=
+              if pad
+              then pad_amount (preferred_alignment (dtyp_alignment dt)) offset
+              else 0%N
+            in
+            let zpadding := Z.of_N padding in
             let sz := sizeof_dtyp dt in
-            let init_bytes := take sz dbs in
-            let rest_bytes := drop sz dbs in
+            (* Skip any padding bytes *)
+            let dbs' := drop padding dbs in
+            let init_bytes := take sz dbs' in
+            let rest_bytes := drop sz dbs' in
+            let offset' := offset + padding in
             f <- dvalue_bytes_to_dvalue init_bytes dt;;
-            rest <- go dts rest_bytes;;
+            rest <- go (offset' + sz) dts rest_bytes;;
             ret (f :: rest)
         end
     in
@@ -478,9 +560,9 @@ Module Type DvalueByte (LP : LLVMParams).
            elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
            ret (DVALUE_Vector t elts)
        | DTYPE_Struct fields =>
-           Functor.fmap DVALUE_Struct (list_dvalue_bytes_to_dvalue fields dbs)
+           Functor.fmap DVALUE_Struct (list_dvalue_bytes_to_dvalue (Some (max_preferred_dtyp_alignment fields)) 0 fields dbs)
        | DTYPE_Packed_struct fields =>
-           Functor.fmap DVALUE_Packed_struct (list_dvalue_bytes_to_dvalue fields dbs)
+           Functor.fmap DVALUE_Packed_struct (list_dvalue_bytes_to_dvalue None 0 fields dbs)
        | DTYPE_Opaque =>
            raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Opaque."
        end.

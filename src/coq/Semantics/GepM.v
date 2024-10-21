@@ -43,10 +43,9 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
         let k := signed i in
         let n := BinIntDef.Z.to_nat k in
         match t with
+        | DTYPE_Array _ ta
         | DTYPE_Vector _ ta =>
             handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
-        | DTYPE_Array _ ta =>
-          handle_gep_h ta (off + k * (Z.of_N (pad_to padding (sizeof_dtyp ta)))) vs'
         | _ => failwith ("non-i8-indexable type")
         end
       | @DVALUE_I 32 i =>
@@ -54,25 +53,24 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
         let ks := signed i in
         let n := BinIntDef.Z.to_nat k in
         match t with
+        | DTYPE_Array _ ta
         | DTYPE_Vector _ ta =>
             handle_gep_h ta (off + ks * (Z.of_N (sizeof_dtyp ta))) vs'
-        | DTYPE_Array _ ta =>
-            handle_gep_h ta (off + ks * (Z.of_N (pad_to padding (sizeof_dtyp ta)))) vs'
         | DTYPE_Struct ts =>
-            let offset := fold_left (fun acc t => (acc + (Z.of_N (pad_to padding (sizeof_dtyp t)))))%Z
-                            (firstn n ts) 0%Z in
+            let offset := fold_left (fun acc t => pad_to_align (dtyp_alignment t) acc + sizeof_dtyp t)%N
+                            (firstn n ts) 0%N in
             match nth_error ts n with
             | None => failwith "overflow"
             | Some t' =>
-                handle_gep_h t' (off + offset) vs'
+                handle_gep_h t' (off + Z.of_N offset) vs'
             end
         | DTYPE_Packed_struct ts =>
-          let offset := fold_left (fun acc t => (acc + (Z.of_N (sizeof_dtyp t))))%Z
-                                  (firstn n ts) 0%Z in
+          let offset := fold_left (fun acc t => acc + sizeof_dtyp t)%N
+                                  (firstn n ts) 0%N in
           match nth_error ts n with
           | None => failwith "overflow"
           | Some t' =>
-            handle_gep_h t' (off + offset) vs'
+            handle_gep_h t' (off + Z.of_N offset) vs'
           end
         | _ => failwith ("non-i32-indexable type")
         end
@@ -80,20 +78,18 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
         let k := signed i in
         let n := BinIntDef.Z.to_nat k in
         match t with
+        | DTYPE_Array _ ta
         | DTYPE_Vector _ ta =>
             handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
-        | DTYPE_Array _ ta =>
-            handle_gep_h ta (off + k * (Z.of_N (pad_to padding (sizeof_dtyp ta)))) vs'
         | _ => failwith ("non-i64-indexable type")
         end
       | DVALUE_IPTR i =>
         let k := IP.to_Z i in
         let n := BinIntDef.Z.to_nat k in
         match t with
+        | DTYPE_Array _ ta
         | DTYPE_Vector _ ta =>
             handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
-        | DTYPE_Array _ ta =>
-          handle_gep_h ta (off + k * (Z.of_N (pad_to padding (sizeof_dtyp ta)))) vs'
         | _ => failwith ("non-iptr-indexable type")
         end
       | _ => failwith "handle_gep_h: unsupported index type"

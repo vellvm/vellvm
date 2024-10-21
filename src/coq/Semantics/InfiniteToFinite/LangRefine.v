@@ -1042,8 +1042,13 @@ Module Type Sizeof_Refine (SZ_INF : Sizeof) (SZ_FIN : Sizeof).
     forall t,
       SZ_INF.sizeof_dtyp t = SZ_FIN.sizeof_dtyp t.
 
-  Parameter padding_fin_inf :
-    SZ_INF.padding = SZ_FIN.padding.
+  Parameter dtyp_alignment_fin_inf :
+    forall t,
+      SZ_INF.dtyp_alignment t = SZ_FIN.dtyp_alignment t.
+
+  Parameter max_preferred_dtyp_alignment_fin_inf :
+    forall dts,
+      SZ_INF.max_preferred_dtyp_alignment dts = SZ_FIN.max_preferred_dtyp_alignment dts.
 End Sizeof_Refine.
 
 Module Sizeof_Refine_InfFin : Sizeof_Refine InterpreterStackBigIntptr.LP.SIZEOF InterpreterStack64BitIntptr.LP.SIZEOF.
@@ -1063,11 +1068,20 @@ Module Sizeof_Refine_InfFin : Sizeof_Refine InterpreterStackBigIntptr.LP.SIZEOF 
     reflexivity.
   Qed.
 
-  Lemma padding_fin_inf :
-    InterpreterStackBigIntptr.LP.SIZEOF.padding = InterpreterStack64BitIntptr.LP.SIZEOF.padding.
+  Lemma dtyp_alignment_fin_inf :
+    forall t,
+      InterpreterStackBigIntptr.LP.SIZEOF.dtyp_alignment t = InterpreterStack64BitIntptr.LP.SIZEOF.dtyp_alignment t.
   Proof.
     reflexivity.
   Qed.
+
+  Lemma max_preferred_dtyp_alignment_fin_inf :
+    forall dts,
+      InterpreterStackBigIntptr.LP.SIZEOF.max_preferred_dtyp_alignment dts = InterpreterStack64BitIntptr.LP.SIZEOF.max_preferred_dtyp_alignment dts.
+  Proof.
+    reflexivity.
+  Qed.
+
 End Sizeof_Refine_InfFin.
 
 Module Type ItoP_Refine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI) (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI).
@@ -7132,21 +7146,27 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         destruct dt;
         dvalue_refine_strict_inv REF; auto.
         rename fields0 into dts.
+        rewrite max_preferred_dtyp_alignment_fin_inf.
+        generalize (SIZEOF.max_preferred_dtyp_alignment dts) as struct_padding.
         revert dts idx.
         eapply map_monad_oom_Forall2 in H1.
         revert x H1.
+        generalize 0 at 3 6 as offset.
         induction fields; intros; inversion H1; subst.
-        - reflexivity.
+        - cbn. reflexivity.
         - destruct dts; try reflexivity.
           cbn.
           rewrite sizeof_dtyp_fin_inf.
-          rewrite padding_fin_inf.
-          destruct (idx <? Z.of_N (pad_to SIZEOF.padding (SIZEOF.sizeof_dtyp d)))%Z.
-          + apply H. repeat constructor. apply H4.
-          + erewrite IHfields; intros; eauto.
-            rewrite padding_fin_inf.
-            reflexivity.
+          rewrite dtyp_alignment_fin_inf.
+          break_match; try reflexivity.
+          break_match.
+          + apply H; cbn; auto.
+          + forward IHfields; intros; auto.
             apply H; cbn; auto.
+            cbn in IHfields.
+            specialize (IHfields (offset + pad_amount (preferred_alignment (SIZEOF.dtyp_alignment d)) offset + SIZEOF.sizeof_dtyp d) l H5 dts (idx - Z.of_N (pad_amount (preferred_alignment (SIZEOF.dtyp_alignment d)) offset) - Z.of_N (SIZEOF.sizeof_dtyp d))%Z struct_padding).
+            cbn in *.
+            erewrite IHfields; intros; eauto.
       } 
 
       { (* Packed Structs *)
@@ -7156,14 +7176,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         revert dts idx.
         eapply map_monad_oom_Forall2 in H1.
         revert x H1.
+        generalize 0 at 3 6 as offset.
         induction fields; intros; inversion H1; subst.
         - reflexivity.
         - destruct dts; try reflexivity.
           cbn.
           rewrite sizeof_dtyp_fin_inf.
-          destruct (idx <? Z.of_N (SIZEOF.sizeof_dtyp d))%Z.
+          break_match; try reflexivity.
+          break_match.
           + apply H. repeat constructor. apply H4.
-          + apply IHfields; intros; auto.
+          + erewrite IHfields; intros; eauto. 
             apply H; auto.
             right. assumption.
       }
@@ -7178,12 +7200,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         - reflexivity.
         - cbn.
           rewrite sizeof_dtyp_fin_inf.
-          rewrite padding_fin_inf.
-          destruct (idx <? Z.of_N (pad_to SIZEOF.padding (SIZEOF.sizeof_dtyp dt)))%Z.
+          destruct (idx <? Z.of_N (SIZEOF.sizeof_dtyp dt))%Z.
           + apply H. repeat constructor. apply H4.
           + erewrite IHelts; intros; eauto.
-            rewrite padding_fin_inf.
-            reflexivity.
             apply H; cbn; auto.
       }
 
@@ -7392,7 +7411,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Lemma list_dvalue_bytes_to_dvalue_fin_inf :
-    forall dts dvbs_fin dvbs_inf res
+    forall (dts : list dtyp) (pad : option N) (offset : N) (dvbs_fin : list dvalue_byte) (dvbs_inf : list IS1.MEM.DVALUE_BYTE.dvalue_byte) (res : ErrOOMPoison (list dvalue))
       (IH : forall u : dtyp,
           In u dts ->
           forall (dvbs_fin : list dvalue_byte) (dvbs_inf : list IS1.MEM.DVALUE_BYTE.dvalue_byte)
@@ -7403,97 +7422,121 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue dvbs_inf u = fmap fin_to_inf_dvalue res),
       dvalue_bytes_refine dvbs_inf dvbs_fin ->
       (forall x : dtyp, res <> raise_oomable x) ->
-      ((fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
+      (fix go (offset : N) (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
          ErrOOMPoison (list dvalue) :=
-          match dts with
-          | [] => ret []
-          | dt :: dts0 =>
-              let sz := SIZEOF.sizeof_dtyp dt in
-              let init_bytes := take sz dbs in
-              let rest_bytes := drop sz dbs in
-              f <- dvalue_bytes_to_dvalue init_bytes dt;;
-              rest <- go dts0 rest_bytes;; ret (f :: rest)
-          end) dts dvbs_fin) = res ->
-      ((fix go (dts : list dtyp) (dbs : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte) {struct dts} :
-         ErrOOMPoison (list IS1.LP.Events.DV.dvalue) :=
-          match dts with
-          | [] => ret []
-          | dt :: dts0 =>
-              let sz := IS1.LP.SIZEOF.sizeof_dtyp dt in
-              let init_bytes := take sz dbs in
-              let rest_bytes := drop sz dbs in
-              f <- IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue init_bytes dt;;
-              rest <- go dts0 rest_bytes;; ret (f :: rest)
-          end) dts dvbs_inf)  = fmap (map fin_to_inf_dvalue) res.
+         match dts with
+         | [] =>
+             (* TODO: should we check that we have the appropriate number of extra padding bytes here? *)
+             (* Long term we'll have to include padding bytes in the dvalue *)
+             ret []
+         | (dt::dts) =>
+             let padding :=
+               if pad
+               then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset
+               else 0%N
+             in
+             let zpadding := Z.of_N padding in
+             let sz := SIZEOF.sizeof_dtyp dt in
+             (* Skip any padding bytes *)
+             let dbs' := drop padding dbs in
+             let init_bytes := take sz dbs' in
+             let rest_bytes := drop sz dbs' in
+             let offset' := (offset + padding)%N in
+             f <- dvalue_bytes_to_dvalue init_bytes dt;;
+             rest <- go (offset' + sz) dts rest_bytes;;
+             ret (f :: rest)
+         end) offset dts dvbs_fin = res ->
+      (fix go (offset : N) (dts : list dtyp) (dbs : list IS1.MEM.DVALUE_BYTE.dvalue_byte) {struct dts} :=
+         match dts with
+         | [] =>
+             (* TODO: should we check that we have the appropriate number of extra padding bytes here? *)
+             (* Long term we'll have to include padding bytes in the dvalue *)
+             ret []
+         | (dt::dts) =>
+             let padding :=
+               if pad
+               then pad_amount (preferred_alignment (IS1.LP.SIZEOF.dtyp_alignment dt)) offset
+               else 0%N
+             in
+             let zpadding := Z.of_N padding in
+             let sz := IS1.LP.SIZEOF.sizeof_dtyp dt in
+             (* Skip any padding bytes *)
+             let dbs' := drop padding dbs in
+             let init_bytes := take sz dbs' in
+             let rest_bytes := drop sz dbs' in
+             let offset' := offset + padding in
+             f <- IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue init_bytes dt;;
+             rest <- go (offset' + sz) dts rest_bytes;;
+             ret (f :: rest)
+         end) offset dts dvbs_inf = fmap (map fin_to_inf_dvalue) res.
   Proof.
-    induction dts; intros dvbs_fin dvbs_inf res IH REF NOOM FIN.
+    induction dts; intros pad offset dvbs_fin dvbs_inf res IH REF NOOM FIN.
     - inv FIN; reflexivity.
     - Opaque bind.
       cbn in *.
       rewrite sizeof_dtyp_fin_inf.
+      rewrite dtyp_alignment_fin_inf.
       erewrite IH; eauto.
-      2: apply Forall2_take; eauto.
+      2: {
+        apply Forall2_take; eauto.
+        apply Forall2_drop; eauto.
+      }
       2: {
         intros x CONTRA.
         eapply (NOOM x).
         subst.
-        rewrite CONTRA.
+        setoid_rewrite CONTRA.
         Transparent bind.
         cbn.
         reflexivity.
       }
 
-      remember (dvalue_bytes_to_dvalue (take (SIZEOF.sizeof_dtyp a) dvbs_fin) a) as init.
+      remember (dvalue_bytes_to_dvalue
+                  (take (SIZEOF.sizeof_dtyp a)
+                     (drop (if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment a)) offset else 0)
+                        dvbs_fin)) a) as init.
       destruct_err_oom_poison init;
         try solve [subst; cbn; eauto].
 
       remember
-        ((fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
+        ((fix go (offset : N) (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
            ErrOOMPoison (list dvalue) :=
             match dts with
-            | [] =>
-                {|
-                  EitherMonad.unEitherT :=
-                    {|
-                      unMkOomableT :=
-                        @Unpoisoned (Oomable (ERR (list dvalue)))
-                          (@Unoomed (ERR (list dvalue)) (@inr ERR_MESSAGE (list dvalue) []))
-                    |}
-                |}
+            | [] => {| EitherMonad.unEitherT := {| unMkOomableT := Unpoisoned (Unoomed (inr [])) |} |}
             | dt :: dts0 =>
                 f0 <-
-                  @dvalue_bytes_to_dvalue ErrOOMPoison
-                    (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-                       (@Monad_OomableT Poisonable MonadPoisonable))
-                    (@RAISE_ERROR_MonadExc ErrOOMPoison
-                       (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
-                          (@Monad_OomableT Poisonable MonadPoisonable)))
-                    (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-                       (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-                          (@Monad_OomableT Poisonable MonadPoisonable))
-                       (@RAISE_POISON_E_MT Poisonable OomableT
-                          (@MonadT_OomableT Poisonable MonadPoisonable) RAISE_POISON_Poisonable))
-                    (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-                       (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-                          (@Monad_OomableT Poisonable MonadPoisonable))
-                       (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable))
-                    (@take dvalue_byte (SIZEOF.sizeof_dtyp dt) dbs) dt;;
-                rest <- go dts0 (@drop dvalue_byte (SIZEOF.sizeof_dtyp dt) dbs);;
+                  dvalue_bytes_to_dvalue
+                    (take (SIZEOF.sizeof_dtyp dt)
+                       (drop
+                          (if pad
+                           then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset
+                           else 0) dbs)) dt;;
+                rest <-
+                  go
+                    (offset +
+                       (if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset else 0) +
+                       SIZEOF.sizeof_dtyp dt) dts0
+                    (drop (SIZEOF.sizeof_dtyp dt)
+                       (drop
+                          (if pad
+                           then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset
+                           else 0) dbs));;
                 {|
-                  EitherMonad.unEitherT :=
-                    {|
-                      unMkOomableT :=
-                        @Unpoisoned (Oomable (ERR (list dvalue)))
-                          (@Unoomed (ERR (list dvalue)) (@inr ERR_MESSAGE (list dvalue) (f0 :: rest)))
-                    |}
+                  EitherMonad.unEitherT := {| unMkOomableT := Unpoisoned (Unoomed (inr (f0 :: rest))) |}
                 |}
-            end) dts (@drop dvalue_byte (SIZEOF.sizeof_dtyp a) dvbs_fin)) as rest.
+            end)
+           (offset + (if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment a)) offset else 0) +
+              SIZEOF.sizeof_dtyp a) dts
+           (drop (SIZEOF.sizeof_dtyp a)
+              (drop (if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment a)) offset else 0)
+                 dvbs_fin))) as rest.
 
       erewrite IHdts with (res:=rest).
       + destruct_err_oom_poison rest;
           try solve [subst; cbn; eauto].
       + eauto.
       + eapply Forall2_drop; eauto.
+        eapply Forall2_drop; eauto.
       + intros x CONTRA; subst.
         specialize (NOOM x).
         eapply NOOM.
@@ -7779,42 +7822,67 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue_equation,
         dvalue_bytes_to_dvalue_equation.
 
-      remember (     fix go (dts : list dtyp) (dbs : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte) {struct dts} :
-         ErrOOMPoison (list IS1.LP.Events.DV.dvalue) :=
-       match dts with
-       | [] => ret []
-       | dt :: dts0 =>
-           let sz := IS1.LP.SIZEOF.sizeof_dtyp dt in
-           let init_bytes := take sz dbs in
-           let rest_bytes := drop sz dbs in
-           f <- IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue init_bytes dt;;
-           rest <- go dts0 rest_bytes;; ret (f :: rest)
-       end) as f1.
-      remember (fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} : ErrOOMPoison (list dvalue) :=
-         match dts with
-         | [] => ret []
-         | dt :: dts0 =>
-             let sz := SIZEOF.sizeof_dtyp dt in
-             let init_bytes := take sz dbs in
-             let rest_bytes := drop sz dbs in
-             f <- dvalue_bytes_to_dvalue init_bytes dt;; rest <- go dts0 rest_bytes;; ret (f :: rest)
-         end) as f2.
+      remember
+        (fun pad : option N => fix go
+           (offset : N) (dts : list dtyp) (dbs : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte) {struct dts} :
+          ErrOOMPoison (list IS1.LP.Events.DV.dvalue) :=
+           match dts with
+           | [] => ret []
+           | dt :: dts0 =>
+               let padding :=
+                 if pad
+                 then pad_amount (preferred_alignment (IS1.LP.SIZEOF.dtyp_alignment dt)) offset
+                 else 0 in
+               let zpadding := Z.of_N padding in
+               let sz := IS1.LP.SIZEOF.sizeof_dtyp dt in
+               let dbs' := drop padding dbs in
+               let init_bytes := take sz dbs' in
+               let rest_bytes := drop sz dbs' in
+               let offset' := offset + padding in
+               f <- IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue init_bytes dt;;
+               rest <- go (offset' + sz) dts0 rest_bytes;; ret (f :: rest)
+           end) as f1.
+
+      remember
+        (fun pad : option N =>
+           fix go (offset : N) (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
+           ErrOOMPoison (list dvalue) :=
+           match dts with
+           | [] => ret []
+           | dt :: dts0 =>
+               let padding :=
+                 if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset else 0
+               in
+               let zpadding := Z.of_N padding in
+               let sz := SIZEOF.sizeof_dtyp dt in
+               let dbs' := drop padding dbs in
+               let init_bytes := take sz dbs' in
+               let rest_bytes := drop sz dbs' in
+               let offset' := offset + padding in
+               f <- dvalue_bytes_to_dvalue init_bytes dt;;
+               rest <- go (offset' + sz) dts0 rest_bytes;; ret (f :: rest)
+           end) as f2.
       Opaque bind.
       cbn.
       subst.
-      erewrite list_dvalue_bytes_to_dvalue_fin_inf; eauto.
+      erewrite list_dvalue_bytes_to_dvalue_fin_inf with (pad:=Some 1); eauto.
       { Transparent bind.
-        remember ((fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
-                    ErrOOMPoison (list dvalue) :=
-                     match dts with
-                     | [] => ret []
-                     | dt :: dts0 =>
-                         let sz := SIZEOF.sizeof_dtyp dt in
-                         let init_bytes := take sz dbs in
-                         let rest_bytes := drop sz dbs in
-                         f <- dvalue_bytes_to_dvalue init_bytes dt;;
-                         rest <- go dts0 rest_bytes;; ret (f :: rest)
-                     end) fields dvbs_fin) as res.
+        remember
+          (((fix go (offset : N) (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
+             ErrOOMPoison (list dvalue) :=
+           match dts with
+           | [] => ret []
+           | dt :: dts0 =>
+               let padding := pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset in
+               let zpadding := Z.of_N padding in
+               let sz := SIZEOF.sizeof_dtyp dt in
+               let dbs' := drop padding dbs in
+               let init_bytes := take sz dbs' in
+               let rest_bytes := drop sz dbs' in
+               let offset' := offset + padding in
+               f <- dvalue_bytes_to_dvalue init_bytes dt;;
+               rest <- go (offset' + sz) dts0 rest_bytes;; ret (f :: rest)
+           end) 0 fields dvbs_fin)) as res.
         destruct_err_oom_poison res; cbn; auto.
         rewrite_fin_to_inf_dvalue.
         reflexivity.
@@ -7824,41 +7892,27 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       eapply (NOOM x).
       cbn.
       rewrite dvalue_bytes_to_dvalue_equation.
-      remember (fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} : ErrOOMPoison (list dvalue) :=
-       match dts with
-       | [] =>
-           @ret ErrOOMPoison
-             (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-                (@Monad_OomableT Poisonable MonadPoisonable)) (list dvalue) []
-       | dt :: dts0 =>
-           let sz := SIZEOF.sizeof_dtyp dt in
-           let init_bytes := @take dvalue_byte sz dbs in
-           let rest_bytes := @drop dvalue_byte sz dbs in
-           f <-
-           @dvalue_bytes_to_dvalue ErrOOMPoison
-             (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-                (@Monad_OomableT Poisonable MonadPoisonable))
-             (@RAISE_ERROR_MonadExc ErrOOMPoison
-                (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
-                   (@Monad_OomableT Poisonable MonadPoisonable)))
-             (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-                (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-                   (@Monad_OomableT Poisonable MonadPoisonable))
-                (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
-                   RAISE_POISON_Poisonable))
-             (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-                (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-                   (@Monad_OomableT Poisonable MonadPoisonable))
-                (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) init_bytes dt;;
-           rest <- go dts0 rest_bytes;;
-           @ret ErrOOMPoison
-             (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-                (@Monad_OomableT Poisonable MonadPoisonable)) (list dvalue)
-             (f :: rest)
-       end) as res.
-      destruct_err_oom_poison res; inv CONTRA; cbn; auto.
-      setoid_rewrite Hx.
-      cbn.
+      remember
+        ((fun pad : option N =>
+           fix go (offset : N) (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
+           ErrOOMPoison (list dvalue) :=
+           match dts with
+           | [] => ret []
+           | dt :: dts0 =>
+               let padding :=
+                 if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset else 0 in
+               let zpadding := Z.of_N padding in
+               let sz := SIZEOF.sizeof_dtyp dt in
+               let dbs' := drop padding dbs in
+               let init_bytes := take sz dbs' in
+               let rest_bytes := drop sz dbs' in
+               let offset' := offset + padding in
+               f <- dvalue_bytes_to_dvalue init_bytes dt;;
+               rest <- go (offset' + sz) dts0 rest_bytes;; ret (f :: rest)
+           end) (Some (SIZEOF.max_preferred_dtyp_alignment fields)) 0 fields dvbs_fin) as res.
+      destruct_err_oom_poison res; inv CONTRA; cbn in *; auto;
+      setoid_rewrite H1;
+      cbn;
       auto.
     }
 
@@ -7870,42 +7924,67 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       rewrite IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue_equation,
         dvalue_bytes_to_dvalue_equation.
 
-      remember (     fix go (dts : list dtyp) (dbs : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte) {struct dts} :
-         ErrOOMPoison (list IS1.LP.Events.DV.dvalue) :=
-       match dts with
-       | [] => ret []
-       | dt :: dts0 =>
-           let sz := IS1.LP.SIZEOF.sizeof_dtyp dt in
-           let init_bytes := take sz dbs in
-           let rest_bytes := drop sz dbs in
-           f <- IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue init_bytes dt;;
-           rest <- go dts0 rest_bytes;; ret (f :: rest)
-       end) as f1.
-      remember (fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} : ErrOOMPoison (list dvalue) :=
-         match dts with
-         | [] => ret []
-         | dt :: dts0 =>
-             let sz := SIZEOF.sizeof_dtyp dt in
-             let init_bytes := take sz dbs in
-             let rest_bytes := drop sz dbs in
-             f <- dvalue_bytes_to_dvalue init_bytes dt;; rest <- go dts0 rest_bytes;; ret (f :: rest)
-         end) as f2.
+      remember
+        (fun pad : option N => fix go
+           (offset : N) (dts : list dtyp) (dbs : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte) {struct dts} :
+          ErrOOMPoison (list IS1.LP.Events.DV.dvalue) :=
+           match dts with
+           | [] => ret []
+           | dt :: dts0 =>
+               let padding :=
+                 if pad
+                 then pad_amount (preferred_alignment (IS1.LP.SIZEOF.dtyp_alignment dt)) offset
+                 else 0 in
+               let zpadding := Z.of_N padding in
+               let sz := IS1.LP.SIZEOF.sizeof_dtyp dt in
+               let dbs' := drop padding dbs in
+               let init_bytes := take sz dbs' in
+               let rest_bytes := drop sz dbs' in
+               let offset' := offset + padding in
+               f <- IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue init_bytes dt;;
+               rest <- go (offset' + sz) dts0 rest_bytes;; ret (f :: rest)
+           end) as f1.
+
+      remember
+        (fun pad : option N =>
+           fix go (offset : N) (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
+           ErrOOMPoison (list dvalue) :=
+           match dts with
+           | [] => ret []
+           | dt :: dts0 =>
+               let padding :=
+                 if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset else 0
+               in
+               let zpadding := Z.of_N padding in
+               let sz := SIZEOF.sizeof_dtyp dt in
+               let dbs' := drop padding dbs in
+               let init_bytes := take sz dbs' in
+               let rest_bytes := drop sz dbs' in
+               let offset' := offset + padding in
+               f <- dvalue_bytes_to_dvalue init_bytes dt;;
+               rest <- go (offset' + sz) dts0 rest_bytes;; ret (f :: rest)
+           end) as f2.
       Opaque bind.
       cbn.
       subst.
-      erewrite list_dvalue_bytes_to_dvalue_fin_inf; eauto.
+      erewrite list_dvalue_bytes_to_dvalue_fin_inf with (pad:=None); eauto.
       { Transparent bind.
-        remember ((fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
-                    ErrOOMPoison (list dvalue) :=
-                     match dts with
-                     | [] => ret []
-                     | dt :: dts0 =>
-                         let sz := SIZEOF.sizeof_dtyp dt in
-                         let init_bytes := take sz dbs in
-                         let rest_bytes := drop sz dbs in
-                         f <- dvalue_bytes_to_dvalue init_bytes dt;;
-                         rest <- go dts0 rest_bytes;; ret (f :: rest)
-                     end) fields dvbs_fin) as res.
+        remember
+          (((fix go (offset : N) (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
+             ErrOOMPoison (list dvalue) :=
+           match dts with
+           | [] => ret []
+           | dt :: dts0 =>
+               let padding := 0 in
+               let zpadding := Z.of_N padding in
+               let sz := SIZEOF.sizeof_dtyp dt in
+               let dbs' := drop padding dbs in
+               let init_bytes := take sz dbs' in
+               let rest_bytes := drop sz dbs' in
+               let offset' := offset + padding in
+               f <- dvalue_bytes_to_dvalue init_bytes dt;;
+               rest <- go (offset' + sz) dts0 rest_bytes;; ret (f :: rest)
+           end) 0 fields dvbs_fin)) as res.
         destruct_err_oom_poison res; cbn; auto.
         rewrite_fin_to_inf_dvalue.
         reflexivity.
@@ -7915,41 +7994,27 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       eapply (NOOM x).
       cbn.
       rewrite dvalue_bytes_to_dvalue_equation.
-      remember (fix go (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} : ErrOOMPoison (list dvalue) :=
-       match dts with
-       | [] =>
-           @ret ErrOOMPoison
-             (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-                (@Monad_OomableT Poisonable MonadPoisonable)) (list dvalue) []
-       | dt :: dts0 =>
-           let sz := SIZEOF.sizeof_dtyp dt in
-           let init_bytes := @take dvalue_byte sz dbs in
-           let rest_bytes := @drop dvalue_byte sz dbs in
-           f <-
-           @dvalue_bytes_to_dvalue ErrOOMPoison
-             (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-                (@Monad_OomableT Poisonable MonadPoisonable))
-             (@RAISE_ERROR_MonadExc ErrOOMPoison
-                (@EitherMonad.Exception_eitherT ERR_MESSAGE (OomableT Poisonable)
-                   (@Monad_OomableT Poisonable MonadPoisonable)))
-             (@RAISE_POISON_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-                (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-                   (@Monad_OomableT Poisonable MonadPoisonable))
-                (@RAISE_POISON_E_MT Poisonable OomableT (@MonadT_OomableT Poisonable MonadPoisonable)
-                   RAISE_POISON_Poisonable))
-             (@RAISE_OOMABLE_E_MT (OomableT Poisonable) (EitherMonad.eitherT ERR_MESSAGE)
-                (@EitherMonad.MonadT_eitherT ERR_MESSAGE (OomableT Poisonable)
-                   (@Monad_OomableT Poisonable MonadPoisonable))
-                (@RAISE_OOMABLE_OomableT Poisonable MonadPoisonable)) init_bytes dt;;
-           rest <- go dts0 rest_bytes;;
-           @ret ErrOOMPoison
-             (@EitherMonad.Monad_eitherT ERR_MESSAGE (OomableT Poisonable)
-                (@Monad_OomableT Poisonable MonadPoisonable)) (list dvalue)
-             (f :: rest)
-       end) as res.
-      destruct_err_oom_poison res; inv CONTRA; cbn; auto.
-      setoid_rewrite Hx.
-      cbn.
+      remember
+        ((fun pad : option N =>
+           fix go (offset : N) (dts : list dtyp) (dbs : list dvalue_byte) {struct dts} :
+           ErrOOMPoison (list dvalue) :=
+           match dts with
+           | [] => ret []
+           | dt :: dts0 =>
+               let padding :=
+                 if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset else 0 in
+               let zpadding := Z.of_N padding in
+               let sz := SIZEOF.sizeof_dtyp dt in
+               let dbs' := drop padding dbs in
+               let init_bytes := take sz dbs' in
+               let rest_bytes := drop sz dbs' in
+               let offset' := offset + padding in
+               f <- dvalue_bytes_to_dvalue init_bytes dt;;
+               rest <- go (offset' + sz) dts0 rest_bytes;; ret (f :: rest)
+           end) None 0 fields dvbs_fin) as res.
+      destruct_err_oom_poison res; inv CONTRA; cbn in *; auto;
+      setoid_rewrite H1;
+      cbn;
       auto.
     }
 
@@ -8579,7 +8644,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                     rewrite H1;
                     rewrite_fin_to_inf_dvalue;
                     rewrite sizeof_dtyp_fin_inf;
-                    rewrite padding_fin_inf;
                     eapply IHidxs_fin in H1; eauto;
                     rewrite H1;
                     auto
@@ -8596,19 +8660,21 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
              try setoid_rewrite padding_fin_inf;
              auto).
 
-        - rewrite padding_fin_inf.
-          replace (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (pad_to SIZEOF.padding (IS1.LP.SIZEOF.sizeof_dtyp t)))%Z) with
-          (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (pad_to SIZEOF.padding (SIZEOF.sizeof_dtyp t)))%Z); eauto.
+        - cbn.
+          replace
+            (fun (acc : N) (t : dtyp) => pad_to_align (IS1.LP.SIZEOF.dtyp_alignment t) acc + IS1.LP.SIZEOF.sizeof_dtyp t)%N with
+              (fun (acc : N) (t : dtyp) => pad_to_align (SIZEOF.dtyp_alignment t) acc + SIZEOF.sizeof_dtyp t)%N; eauto.
 
           apply FunctionalExtensionality.functional_extensionality.
           intros.
           apply FunctionalExtensionality.functional_extensionality.
           intros.
           rewrite sizeof_dtyp_fin_inf.
+          rewrite dtyp_alignment_fin_inf.
           auto.
         - replace
-            (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (IS1.LP.SIZEOF.sizeof_dtyp t))%Z) with
-            (fun (acc : Z) (t : dtyp) => (acc + Z.of_N (SIZEOF.sizeof_dtyp t))%Z); eauto.
+            (fun (acc : N) (t : dtyp) => acc + IS1.LP.SIZEOF.sizeof_dtyp t) with
+            (fun (acc : N) (t : dtyp) => acc + SIZEOF.sizeof_dtyp t); eauto.
 
           apply FunctionalExtensionality.functional_extensionality.
           intros.
@@ -8623,7 +8689,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         rewrite H1.
         erewrite IHidxs_fin; eauto.
         rewrite sizeof_dtyp_fin_inf; eauto.
-        rewrite padding_fin_inf; eauto.
         unfold intptr_fin_inf; break_match_goal; clear Heqs.
         rewrite <- (IS1.LP.IP.from_Z_injective _ _ _ e (IS1.LP.IP.to_Z_from_Z x0)).
         auto.
@@ -15529,6 +15594,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         try solve [break_match_hyp_inv; auto;
                    erewrite IHidxs_fin; eauto;
                    repeat rewrite sizeof_dtyp_fin_inf;
+                   repeat rewrite dtyp_alignment_fin_inf;
                    repeat rewrite padded_fin_inf;
                    eauto
           ].
@@ -15536,11 +15602,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       + break_match_hyp_inv; auto.
         try solve [erewrite IHidxs_fin; eauto;
                    repeat setoid_rewrite sizeof_dtyp_fin_inf;
+                   repeat setoid_rewrite dtyp_alignment_fin_inf;
                    repeat setoid_rewrite padding_fin_inf; eauto
                   | break_match_hyp_inv; auto;
                     erewrite IHidxs_fin; eauto;
-                    replace (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (pad_to IS1.LP.SIZEOF.padding (IS1.LP.SIZEOF.sizeof_dtyp t))))%Z) with
-                      (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (pad_to SIZEOF.padding (SIZEOF.sizeof_dtyp t))))%Z); eauto;
+                    replace (fun (acc : Z) (t : dtyp) => (pad_to_align (IS1.LP.SIZEOF.dtyp_alignment t) acc + IS1.LP.SIZEOF.sizeof_dtyp t))%Z with
+                      (fun (acc : Z) (t : dtyp) => (pad_to_align (SIZEOF.dtyp_alignment t) acc + SIZEOF.sizeof_dtyp t)%Z); eauto;
                     apply FunctionalExtensionality.functional_extensionality;
                     intros;
                     apply FunctionalExtensionality.functional_extensionality;
@@ -15555,30 +15622,41 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           try rewrite H1;
           try rewrite H0;
           repeat setoid_rewrite sizeof_dtyp_fin_inf;
+          repeat setoid_rewrite dtyp_alignment_fin_inf;
           repeat setoid_rewrite padding_fin_inf;
           eauto.
 
-        replace (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (pad_to IS1.LP.SIZEOF.padding (IS1.LP.SIZEOF.sizeof_dtyp t))))%Z) with
-          (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (pad_to SIZEOF.padding (SIZEOF.sizeof_dtyp t))))%Z); eauto;
+        replace
+          (fun (acc : N) (t : dtyp) =>
+             pad_to_align (IS1.LP.SIZEOF.dtyp_alignment t) acc + IS1.LP.SIZEOF.sizeof_dtyp t) with
+          (fun (acc : N) (t : dtyp) =>
+             pad_to_align (SIZEOF.dtyp_alignment t) acc + SIZEOF.sizeof_dtyp t); eauto;
           apply FunctionalExtensionality.functional_extensionality;
           intros;
           apply FunctionalExtensionality.functional_extensionality;
           intros;
           repeat setoid_rewrite sizeof_dtyp_fin_inf;
+          repeat setoid_rewrite dtyp_alignment_fin_inf;
           repeat setoid_rewrite padding_fin_inf;
           auto.
 
-        replace (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (IS1.LP.SIZEOF.sizeof_dtyp t)))%Z) with
-          (fun (acc : Z) (t : dtyp) => (acc + (Z.of_N (SIZEOF.sizeof_dtyp t)))%Z); eauto;
+        replace
+          (fun (acc : N) (t : dtyp) =>
+             acc + IS1.LP.SIZEOF.sizeof_dtyp t) with
+          (fun (acc : N) (t : dtyp) =>
+             acc + SIZEOF.sizeof_dtyp t); eauto;
           apply FunctionalExtensionality.functional_extensionality;
           intros;
           apply FunctionalExtensionality.functional_extensionality;
           intros;
           repeat setoid_rewrite sizeof_dtyp_fin_inf;
+          repeat setoid_rewrite dtyp_alignment_fin_inf;
           repeat setoid_rewrite padding_fin_inf;
           auto.
+
       + break_match_hyp_inv; eauto;
           repeat setoid_rewrite sizeof_dtyp_fin_inf;
+          repeat setoid_rewrite dtyp_alignment_fin_inf;
           repeat setoid_rewrite padding_fin_inf;
           rewrite H1;
           erewrite IHidxs_fin;
