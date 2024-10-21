@@ -29,6 +29,7 @@ From ITree Require Import
      ITree
      Eq.Eqit
      Eq.EqAxiom
+     Eq.Paco2
      Events.StateFacts.
 
 Import HeterogeneousRelations.
@@ -780,6 +781,140 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       rewrite unfold_interp_memory; reflexivity.
     Qed.
 
+    Lemma interp_memory_bind:
+    forall (R S : Type) (t : itree Effin R) (k : R -> itree Effin S) sid m,
+      interp_memory (ITree.bind t k) sid m ≅
+                    ITree.bind (interp_memory t sid m) (fun '(m',(sid',r)) => interp_memory (k r) sid' m').
+    Proof.
+      Import ITree.Eq.Paco2.
+      intros R S.
+      ginit. pcofix CIH.
+      intros t k sid m.
+      rewrite unfold_interp_memory.
+      rewrite unfold_interp_memory.
+      rewrite Shallow.observe_bind.
+      destruct (observe t); cbn.
+      (* Ret *)
+      - rewrite bind_ret_l.
+        rewrite unfold_interp_memory.
+        apply reflexivity.
+      (* Tau *)
+      - rewrite bind_tau.
+        gstep.
+        econstructor.
+        gbase.
+        apply CIH.
+      (* Vis *)
+      - rewrite bind_bind.
+        guclo eqit_clo_bind.
+        econstructor.
+        reflexivity.
+        intros.
+        subst.
+        destruct u2.
+        destruct p.      
+        rewrite bind_tau.
+        gstep.
+        constructor.
+        auto with paco.
+    Qed.
+
+    Import State.
+
+  Lemma interp_state_vis_mem {T U : Type}
+        (e : Effin T) (k : T -> itree Effin U) (s : store_id) t
+    : interp_state interp_memory_h (Vis e k) s t
+    ≅ interp_memory_h e s t >>= fun sx => Tau (interp_state interp_memory_h (k (snd(snd sx))) (fst (snd sx)) (fst sx)).
+  Proof.
+    unfold interp_state, interp, Basics.iter, MonadIter_stateT0, Basics.iter, MonadIter_itree; cbn.
+    rewrite unfold_iter; cbn.
+    repeat rewrite bind_bind.
+    rewrite bind_map.
+    repeat setoid_rewrite bind_ret_l.
+    cbn.
+    eapply eqit_bind'.
+    reflexivity.
+    intros.
+    destruct r1, r2.
+    destruct p, p0.
+    inversion H.
+    subst.
+    cbn.
+
+    cbn.
+    rewrite unfold_iter.
+    repeat setoid_rewrite bind_bind.
+    destruct observe; cbn.
+    - rewrite 2 bind_ret_l. reflexivity.
+    - rewrite 2 bind_ret_l.
+      reflexivity.
+    - rewrite bind_map; cbn. setoid_rewrite bind_ret_l.
+      reflexivity.
+  Qed.
+  Lemma interp_state_ret_mem {R : Type}
+        (s : store_id) (r : R) t:
+    (interp_state interp_memory_h (Ret r) s t) ≅ (Ret (t,(s, r))).
+  Proof.
+    rewrite itree_eta. reflexivity.
+  Qed.
+  Lemma interp_state_trigger_eqit_mem {R: Type}
+        (e : Effin R)  (s : store_id) (t:MemState)
+    : (interp_state interp_memory_h (ITree.trigger e) s t) ≅ (interp_memory_h e s t >>= fun x => Tau (Ret x)).
+  Proof.
+    unfold ITree.trigger. 
+    rewrite interp_state_vis_mem.
+    eapply eqit_bind; try reflexivity.
+    intros [].
+    destruct p.
+    rewrite interp_state_ret_mem. reflexivity.
+  Qed.
+
+    Lemma interp_memory_trigger:
+      forall sid m X (e : Effin X),
+        interp_memory (ITree.trigger e) sid m ≈ interp_memory_h e sid m.
+    Proof using.
+      intros.
+      unfold interp_memory.
+      idtac.
+      rewrite interp_state_trigger_eqit_mem.
+      cbn.
+      setoid_rewrite tau_eutt.
+      rewrite bind_ret_r.
+      reflexivity.
+    Qed.
+
+    Lemma interp_memory_bind_trigger_eqit:
+      forall sid m S X (kk : X -> itree Effin S) (e : Effin X),
+        interp_memory (ITree.bind (trigger e) kk) sid m ≅ ITree.bind (interp_memory_h e sid m) (fun sx => Tau (interp_memory (kk (snd (snd sx))) (fst (snd sx)) (fst sx))).
+    Proof using.
+      intros.
+      rewrite unfold_interp_memory.
+      cbn.
+      ITree.fold_subst.
+      eapply eqit_bind'.
+      reflexivity.
+      intros.
+      subst.
+      destruct r2, p.
+      tau_steps.
+
+      unfold interp_memory.
+      apply eqit_Tau.
+      tau_steps.
+      destruct observe; reflexivity.
+    Qed.
+
+    Lemma interp_memory_trigger_bind:
+      forall sid m S X (kk : X -> itree Effin S) (e : Effin X),
+        interp_memory (ITree.bind (trigger e) kk) sid m ≈ ITree.bind (interp_memory_h e sid m) (fun sx => interp_memory (kk (snd (snd sx))) (fst (snd sx)) (fst sx)).
+    Proof using.
+    intros.
+    rewrite interp_memory_bind_trigger_eqit.
+    apply eutt_eq_bind.
+    intros.
+    tau_steps.
+    reflexivity.
+    Qed.
     Lemma my_handle_intrinsic_prop_correct {T} i sid ms (VALID: MemMonad_valid_state ms sid) :
       my_handle_intrinsic_prop i sid ms (my_handle_intrinsic (T := T) i sid ms).
     Proof using.
