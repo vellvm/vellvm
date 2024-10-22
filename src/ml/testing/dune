@@ -2,7 +2,8 @@
  (dev
   (flags (:standard -g -w -20-32-33-39)))
  (release
-  (flags (:standard -O3 -w -20-32-33-39))))
+  (ocamlopt_flags (:standard -O3))
+  (flags (:standard -w -20-32-33-39))))
 
 (library
   (name testing)

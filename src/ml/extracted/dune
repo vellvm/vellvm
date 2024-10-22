@@ -3,8 +3,9 @@
   (flags
    (:standard -g -w -20-32-33-39)))
  (release
+  (ocamlopt_flags (:standard -O3))
   (flags
-   (:standard -O3 -w -20-32-33-39))))
+   (:standard -w -20-32-33-39))))
 
 (library
  (name extracted)
