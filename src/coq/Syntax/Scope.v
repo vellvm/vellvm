@@ -256,8 +256,8 @@ Section REGISTER_OPERATIONS.
 
                       | EXP_Struct l
                       | EXP_Packed_struct l
-                      | EXP_Array l
-                      | EXP_Vector l
+                      | EXP_Array _ l
+                      | EXP_Vector _ l
                         => set_flat_map (fun x => f (snd x)) l
 
                       | OP_GetElementPtr _ (_,e) l

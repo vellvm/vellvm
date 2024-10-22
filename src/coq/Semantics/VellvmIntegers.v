@@ -16,7 +16,7 @@ Class VMemInt I : Type :=
     mcmpu : Numeric.Integers.comparison -> I -> I -> bool;
 
     (* Constants *)
-    mbitwidth : option nat;
+    mbitwidth : option positive;
     mzero : I;
     mone : I;
 
@@ -135,30 +135,11 @@ Definition mcmpu_Z (c : Numeric.Integers.comparison) (x y : Z) : bool :=
     mdtyp_of_int := DTYPE_IPTR
   }.
 
-(* Set up representations for for i1, i32, and i64 *)
-Module Wordsize1.
-  Definition wordsize := 1%nat.
-  Remark wordsize_not_zero: wordsize <> 0%nat.
-  Proof using. unfold wordsize; congruence. Qed.
-End Wordsize1.
-
-Module Wordsize8.
-  Definition wordsize := 8%nat.
-  Remark wordsize_not_zero: wordsize <> 0%nat.
-  Proof using. unfold wordsize; congruence. Qed.
-End Wordsize8.
-
-Module Int1 := Make(Wordsize1).
-Module Int8 := Make(Wordsize8).
-Module Int16 := Integers.Int16.
-Module Int32 := Integers.Int.
-Module Int64 := Integers.Int64.
-
-Definition int1 := Int1.int.
-Definition int8 := Int8.int.
-Definition int16 := Int16.int.
-Definition int32 := Int32.int.
-Definition int64 := Int64.int.
+Definition int1 := @int 1.
+Definition int8 := @int 8.
+Definition int16 := @int 16.
+Definition int32 := @int 32.
+Definition int64 := @int 64.
 
 Class VInt I : Type :=
   {
@@ -168,7 +149,7 @@ Class VInt I : Type :=
     cmpu : comparison -> I -> I -> bool;
 
     (* Constants *)
-    bitwidth : nat;
+    bitwidth : positive;
     zero : I;
     one : I;
 
@@ -211,212 +192,56 @@ Class VInt I : Type :=
     repr : Z -> I;
   }.
 
-#[global] Instance VInt32 : VInt Int32.int :=
+#[global] Instance VInt_Bounded (sz : positive) : VInt (@int sz) :=
   {
     (* Comparisons *)
-    equ := Int32.eq;
-    cmp := Int32.cmp;
-    cmpu := Int32.cmpu;
+    equ := @Integers.eq sz;
+    cmp := @Integers.cmp sz;
+    cmpu := @Integers.cmpu sz;
 
-    bitwidth := 32;
-
-    (* Constants *)
-    zero := Int32.zero;
-    one := Int32.one;
-
-    (* Arithmetic *)
-    add := Int32.add;
-    add_carry := Int32.add_carry;
-    add_overflow := Int32.add_overflow;
-
-    sub := Int32.sub;
-    sub_borrow := Int32.sub_borrow;
-    sub_overflow := Int32.sub_overflow;
-
-    mul := Int32.mul;
-
-    divu := Int32.divu;
-    divs := Int32.divs;
-    modu := Int32.modu;
-    mods := Int32.mods;
-
-    shl := Int32.shl;
-    shr := Int32.shr;
-    shru := Int32.shru;
-
-    negative := Int32.negative;
-
-    (* Logic *)
-    and := Int32.and;
-    or := Int32.or;
-    xor := Int32.xor;
-
-    (* Bounds *)
-    min_signed := Int32.min_signed;
-    max_signed := Int32.max_signed;
-    max_unsigned := Int32.max_unsigned;
-
-    (* Conversion *)
-    unsigned := Int32.unsigned;
-    signed := Int32.signed;
-
-    repr := Int32.repr;
-  }.
-
-#[global] Instance VInt1 : VInt Int1.int :=
-  {
-    (* Comparisons *)
-    equ := Int1.eq;
-    cmp := Int1.cmp;
-    cmpu := Int1.cmpu;
-
-    bitwidth := 1;
+    bitwidth := sz;
 
     (* Constants *)
-    zero := Int1.zero;
-    one := Int1.one;
+    zero := @Integers.zero sz;
+    one := @Integers.one sz;
 
     (* Arithmetic *)
-    add := Int1.add;
-    add_carry := Int1.add_carry;
-    add_overflow := Int1.add_overflow;
+    add := @Integers.add sz;
+    add_carry := @Integers.add_carry sz;
+    add_overflow := @Integers.add_overflow sz;
 
-    sub := Int1.sub;
-    sub_borrow := Int1.sub_borrow;
-    sub_overflow := Int1.sub_overflow;
+    sub := @Integers.sub sz;
+    sub_borrow := @Integers.sub_borrow sz;
+    sub_overflow := @Integers.sub_overflow sz;
 
-    mul := Int1.mul;
+    mul := @Integers.mul sz;
 
-    divu := Int1.divu;
-    divs := Int1.divs;
-    modu := Int1.modu;
-    mods := Int1.mods;
+    divu := @Integers.divu sz;
+    divs := @Integers.divs sz;
+    modu := @Integers.modu sz;
+    mods := @Integers.mods sz;
 
-    shl := Int1.shl;
-    shr := Int1.shr;
-    shru := Int1.shru;
+    shl := @Integers.shl sz;
+    shr := @Integers.shr sz;
+    shru := @Integers.shru sz;
 
-    negative := Int1.negative;
-
-    (* Logic *)
-    and := Int1.and;
-    or := Int1.or;
-    xor := Int1.xor;
-
-    (* Bounds *)
-    min_signed := Int1.min_signed;
-    max_signed := Int1.max_signed;
-    max_unsigned := Int1.max_unsigned;
-
-    (* Conversion *)
-    unsigned := Int1.unsigned;
-    signed := Int1.signed;
-
-    repr := Int1.repr;
-  }.
-
-#[global] Instance VInt8 : VInt Int8.int :=
-  {
-    (* Comparisons *)
-    equ := Int8.eq;
-    cmp := Int8.cmp;
-    cmpu := Int8.cmpu;
-
-    bitwidth := 8;
-
-    (* Constants *)
-    zero := Int8.zero;
-    one := Int8.one;
-
-    (* Arithmetic *)
-    add := Int8.add;
-    add_carry := Int8.add_carry;
-    add_overflow := Int8.add_overflow;
-
-    sub := Int8.sub;
-    sub_borrow := Int8.sub_borrow;
-    sub_overflow := Int8.sub_overflow;
-
-    mul := Int8.mul;
-
-    divu := Int8.divu;
-    divs := Int8.divs;
-    modu := Int8.modu;
-    mods := Int8.mods;
-
-    shl := Int8.shl;
-    shr := Int8.shr;
-    shru := Int8.shru;
-
-    negative := Int8.negative;
+    negative := @Integers.negative sz;
 
     (* Logic *)
-    and := Int8.and;
-    or := Int8.or;
-    xor := Int8.xor;
+    and := @Integers.and sz;
+    or := @Integers.or sz;
+    xor := @Integers.xor sz;
 
     (* Bounds *)
-    min_signed := Int8.min_signed;
-    max_signed := Int8.max_signed;
-    max_unsigned := Int8.max_unsigned;
+    min_signed := @Integers.min_signed sz;
+    max_signed := @Integers.max_signed sz;
+    max_unsigned := @Integers.max_unsigned sz;
 
     (* Conversion *)
-    unsigned := Int8.unsigned;
-    signed := Int8.signed;
+    unsigned := @Integers.unsigned sz;
+    signed := @Integers.signed sz;
 
-    repr := Int8.repr;
-  }.
-
-#[global] Instance VInt16 : VInt Int16.int :=
-  {
-    (* Comparisons *)
-    equ := Int16.eq;
-    cmp := Int16.cmp;
-    cmpu := Int16.cmpu;
-
-    bitwidth := 16;
-
-    (* Constants *)
-    zero := Int16.zero;
-    one := Int16.one;
-
-    (* Arithmetic *)
-    add := Int16.add;
-    add_carry := Int16.add_carry;
-    add_overflow := Int16.add_overflow;
-
-    sub := Int16.sub;
-    sub_borrow := Int16.sub_borrow;
-    sub_overflow := Int16.sub_overflow;
-
-    mul := Int16.mul;
-
-    divu := Int16.divu;
-    divs := Int16.divs;
-    modu := Int16.modu;
-    mods := Int16.mods;
-
-    shl := Int16.shl;
-    shr := Int16.shr;
-    shru := Int16.shru;
-
-    negative := Int16.negative;
-
-    (* Logic *)
-    and := Int16.and;
-    or := Int16.or;
-    xor := Int16.xor;
-
-    (* Bounds *)
-    min_signed := Int16.min_signed;
-    max_signed := Int16.max_signed;
-    max_unsigned := Int16.max_unsigned;
-
-    (* Conversion *)
-    unsigned := Int16.unsigned;
-    signed := Int16.signed;
-
-    repr := Int16.repr;
+    repr := @Integers.repr sz;
   }.
 
 #[global] Instance VIntVMemInt {I} `{VInt I} : VMemInt I :=
@@ -471,57 +296,5 @@ Class VInt I : Type :=
     mrepr := fun x => NoOom (repr x);
 
     (* dtyp *)
-    mdtyp_of_int := DTYPE_I (N.of_nat bitwidth)
-  }.
-
-#[global] Instance VInt64 : VInt Int64.int :=
-  {
-    (* Comparisons *)
-    equ := Int64.eq;
-    cmp := Int64.cmp;
-    cmpu := Int64.cmpu;
-
-    bitwidth := 64;
-
-    (* Constants *)
-    zero := Int64.zero;
-    one := Int64.one;
-
-    (* Arithmetic *)
-    add := Int64.add;
-    add_carry := Int64.add_carry;
-    add_overflow := Int64.add_overflow;
-
-    sub := Int64.sub;
-    sub_borrow := Int64.sub_borrow;
-    sub_overflow := Int64.sub_overflow;
-
-    mul := Int64.mul;
-
-    divu := Int64.divu;
-    divs := Int64.divs;
-    modu := Int64.modu;
-    mods := Int64.mods;
-
-    shl := Int64.shl;
-    shr := Int64.shr;
-    shru := Int64.shru;
-
-    negative := Int64.negative;
-
-    (* Logic *)
-    and := Int64.and;
-    or := Int64.or;
-    xor := Int64.xor;
-
-    (* Bounds *)
-    min_signed := Int64.min_signed;
-    max_signed := Int64.max_signed;
-    max_unsigned := Int64.max_unsigned;
-
-    (* Conversion *)
-    unsigned := Int64.unsigned;
-    signed := Int64.signed;
-
-    repr := Int64.repr;
+    mdtyp_of_int := DTYPE_I bitwidth
   }.

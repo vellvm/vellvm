@@ -20,14 +20,53 @@ Module FinSizeof : Sizeof.
   (* TODO: make parameter? *)
   Definition ptr_size : nat := 8.
 
+  (* Default alignment matching LLVMs defaults *)
+  Definition dtyp_alignment (dt : dtyp) : alignment
+    := match dt with
+       | DTYPE_I sz =>
+           if Pos.leb sz 8
+           then Build_alignment 1 1
+           else if Pos.leb sz 16
+                then Build_alignment 2 2
+                else if Pos.leb sz 32
+                     then Build_alignment 4 4
+                     else Build_alignment 4 8
+       | DTYPE_IPTR => Build_alignment 8 8
+       | DTYPE_Pointer => Build_alignment 8 8
+       | DTYPE_Void => Build_alignment 1 1
+       | DTYPE_Half => Build_alignment 2 2
+       | DTYPE_Float => Build_alignment 4 4
+       | DTYPE_Double => Build_alignment 8 8
+       | DTYPE_X86_fp80 => Build_alignment 16 16  (* Not sure if this is right *)
+       | DTYPE_Fp128 => Build_alignment 16 16
+       | DTYPE_Ppc_fp128 => Build_alignment 16 16
+       | DTYPE_Metadata => Build_alignment 1 1
+       | DTYPE_X86_mmx => Build_alignment 8 8 (* I assume these are 64-bit, but I'm not sure *)
+       | DTYPE_Array sz t => Build_alignment 8 8
+       | DTYPE_Struct fields => Build_alignment 8 8
+       | DTYPE_Packed_struct fields => Build_alignment 8 8
+       | DTYPE_Opaque => Build_alignment 1 1
+       | DTYPE_Vector sz t =>
+           (* Alignment depends on the size of the vector types *)
+           (* TODO: 64-bit+ vectors should be 128-bit aligned *)
+           Build_alignment 8 8
+       end.
+
+  Definition max_preferred_dtyp_alignment (dts : list dtyp) : N :=
+    match maximumByOpt (fun dt1 dt2 => preferred_alignment (dtyp_alignment dt1) <? preferred_alignment (dtyp_alignment dt1))%N dts with
+    | Some dt =>
+        preferred_alignment (dtyp_alignment dt)
+    | None => 1
+    end.
+
   Definition round_up_to_eight (n : N) : N :=
     if N.eqb 0 n
     then 0
     else (((n - 1) / 8) + 1) * 8.
 
-  Fixpoint bit_sizeof_dtyp (t : dtyp) : N :=
-    match t with
-    | DTYPE_I sz => N.max 1 sz
+  Fixpoint bit_sizeof_dtyp (ty : dtyp) : N :=
+    match ty with
+    | DTYPE_I sz => Npos sz
     | DTYPE_IPTR => 64 (* TODO: probably kind of a lie... *)
     | DTYPE_Pointer => 64
     | DTYPE_Void => 0
@@ -39,28 +78,31 @@ Module FinSizeof : Sizeof.
     | DTYPE_Ppc_fp128 => 128
     | DTYPE_Metadata => 0
     | DTYPE_X86_mmx => 64
-    | DTYPE_Array sz t => sz * (round_up_to_eight (bit_sizeof_dtyp t))
-    | DTYPE_Struct fields
+    | DTYPE_Array sz t => pad_to_align_bitwise (dtyp_alignment ty) (sz * (round_up_to_eight (bit_sizeof_dtyp t)))
+    | DTYPE_Struct fields =>
+        let sz := fold_left (fun acc x => pad_to_align_bitwise (dtyp_alignment x) acc + round_up_to_eight (bit_sizeof_dtyp x)%N) fields 0%N in
+        (* Add padding to the end of a struct if necessary *)
+        pad_to_align_bitwise (dtyp_alignment ty) sz
     | DTYPE_Packed_struct fields =>
-        fold_right (fun x acc => (round_up_to_eight (bit_sizeof_dtyp x) + acc)%N) 0%N fields
+        pad_to_align_bitwise (dtyp_alignment ty) (fold_left (fun acc x => (acc + round_up_to_eight (bit_sizeof_dtyp x))%N) fields 0%N)
     | DTYPE_Opaque => 0
-    | DTYPE_Vector sz t => sz * bit_sizeof_dtyp t
+    | DTYPE_Vector sz t => pad_to_align_bitwise (dtyp_alignment ty) (sz * bit_sizeof_dtyp t)
     end.
 
   Fixpoint sizeof_dtyp (ty:dtyp) : N :=
     match ty with
-    | DTYPE_I 1          => 1 (* TODO: i1 sizes... *)
-    | DTYPE_I 8          => 1
-    | DTYPE_I 16         => 2
-    | DTYPE_I 32         => 4
-    | DTYPE_I 64         => 8
-    | DTYPE_I _          => 0 (* Unsupported integers *)
+    | DTYPE_I sz         => N.max 1 (N.div (Npos sz) 8)
     | DTYPE_IPTR         => N.of_nat ptr_size
     | DTYPE_Pointer      => N.of_nat ptr_size
-    | DTYPE_Packed_struct l
-    | DTYPE_Struct l     => fold_left (fun acc x => (acc + sizeof_dtyp x)%N) l 0%N
-    | DTYPE_Vector sz ty'
-    | DTYPE_Array sz ty' => sz * sizeof_dtyp ty'
+    | DTYPE_Packed_struct l =>
+        fold_left (fun acc x => (acc + sizeof_dtyp x)%N) l 0%N
+    | DTYPE_Struct l =>
+        let sz := fold_left (fun acc x => pad_to_align (dtyp_alignment x) acc + (sizeof_dtyp x)%N) l 0%N in
+        let max_align := max_preferred_dtyp_alignment l in
+        pad_to max_align sz
+    | DTYPE_Vector sz ty'  (* TODO: Vector sizeof currently invalid for sub-bytesize / non-byte aligned elements. Changing this involves changing serialization. *)
+    | DTYPE_Array sz ty' =>
+        sz * (sizeof_dtyp ty')
     | DTYPE_Float        => 4
     | DTYPE_Double       => 8
     | DTYPE_Half         => 4
@@ -85,10 +127,9 @@ Module FinSizeof : Sizeof.
     lia.
   Qed.
 
-  (* Should take padding into account *)
   Lemma sizeof_dtyp_Struct :
     forall dts,
-      sizeof_dtyp (DTYPE_Struct dts) = List.fold_left (fun acc dt => N.add acc (sizeof_dtyp dt)) dts 0%N.
+      sizeof_dtyp (DTYPE_Struct dts) = pad_to (max_preferred_dtyp_alignment dts) (List.fold_left (fun acc dt => N.add (pad_to_align (dtyp_alignment dt) acc) (sizeof_dtyp dt)) dts 0%N).
   Proof.
     reflexivity.
   Qed.

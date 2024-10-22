@@ -72,9 +72,9 @@ Definition fabs_64_decl: declaration typ :=
   |}.
 
 Definition memcpy_8_32_decl: declaration typ :=
-  let pt := TYPE_Pointer (TYPE_I 8%N) in
-  let i32 := TYPE_I 32%N in
-  let i1 := TYPE_I 1%N in
+  let pt := TYPE_Pointer (TYPE_I 8%positive) in
+  let i32 := TYPE_I 32%positive in
+  let i1 := TYPE_I 1%positive in
   {|
     dc_name        := Name "llvm.memcpy.p0i8.p0i8.i32";
     dc_type        := TYPE_Function TYPE_Void [pt; pt; i32; i1] false;
@@ -84,9 +84,9 @@ Definition memcpy_8_32_decl: declaration typ :=
   |}.
 
 Definition memcpy_8_64_decl: declaration typ :=
-  let pt := TYPE_Pointer (TYPE_I 8%N) in
-  let i64 := TYPE_I 64%N in
-  let i1 := TYPE_I 1%N in
+  let pt := TYPE_Pointer (TYPE_I 8%positive) in
+  let i64 := TYPE_I 64%positive in
+  let i1 := TYPE_I 1%positive in
   {|
     dc_name        := Name "llvm.memcpy.p0i8.p0i8.i64";
     dc_type        := TYPE_Function TYPE_Void [pt; pt; i64; i1] false;
@@ -96,10 +96,10 @@ Definition memcpy_8_64_decl: declaration typ :=
   |}.
 
 Definition memset_8_32_decl: declaration typ :=
-  let pt := TYPE_Pointer (TYPE_I 8%N) in
-  let i32 := TYPE_I 32%N in
-  let i8 := TYPE_I 8%N in
-  let i1 := TYPE_I 1%N in
+  let pt := TYPE_Pointer (TYPE_I 8%positive) in
+  let i32 := TYPE_I 32%positive in
+  let i8 := TYPE_I 8%positive in
+  let i1 := TYPE_I 1%positive in
   {|
     dc_name        := Name "llvm.memset.p0i8.i32";
     dc_type        := TYPE_Function TYPE_Void [pt; i8; i32; i1] false;
@@ -109,10 +109,10 @@ Definition memset_8_32_decl: declaration typ :=
   |}.
 
 Definition memset_8_64_decl: declaration typ :=
-  let pt := TYPE_Pointer (TYPE_I 8%N) in
-  let i64 := TYPE_I 64%N in
-  let i8 := TYPE_I 8%N in
-  let i1 := TYPE_I 1%N in
+  let pt := TYPE_Pointer (TYPE_I 8%positive) in
+  let i64 := TYPE_I 64%positive in
+  let i8 := TYPE_I 8%positive in
+  let i1 := TYPE_I 1%positive in
   {|
     dc_name        := Name "llvm.memset.p0i8.i64";
     dc_type        := TYPE_Function TYPE_Void [pt; i8; i64; i1] false;
@@ -122,8 +122,8 @@ Definition memset_8_64_decl: declaration typ :=
   |}.
 
 Definition malloc_decl: declaration typ :=
-  let pt := TYPE_Pointer (TYPE_I 8%N) in
-  let i64 := TYPE_I 64%N in
+  let pt := TYPE_Pointer (TYPE_I 8%positive) in
+  let i64 := TYPE_I 64%positive in
   {|
     dc_name        := Name "malloc";
     dc_type        := TYPE_Function pt [i64] false;
@@ -133,7 +133,7 @@ Definition malloc_decl: declaration typ :=
   |}.
 
 Definition free_decl: declaration typ :=
-  let pt := TYPE_Pointer (TYPE_I 8%N) in
+  let pt := TYPE_Pointer (TYPE_I 8%positive) in
   {|
     dc_name        := Name "free";
     dc_type        := TYPE_Function TYPE_Void [pt] false;
@@ -355,7 +355,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
        | NoOom res =>
            let res_u := munsigned res in
            let res_u' := Z.shiftl (munsigned x) (munsigned y) in
-           if option_pred (fun bw => munsigned y >=? Z.of_nat bw) (@mbitwidth I VMI)
+           if option_pred (fun bw => munsigned y >=? Zpos bw) (@mbitwidth I VMI)
            then ret (DVALUE_Poison (@mdtyp_of_int I VMI))
            else
              if (res_u' >? res_u)
@@ -377,35 +377,35 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
   Definition llvm_ushl_sat_1: semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_I1 a; DVALUE_I1 b] => ushl_sat a b
+      | [@DVALUE_I 1 a; @DVALUE_I 1 b] => ushl_sat a b
       | _ => failwith "llvm_ushl_sat_1 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_8: semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_I8 a; DVALUE_I8 b] => ushl_sat a b
+      | [@DVALUE_I 8 a; @DVALUE_I 8 b] => ushl_sat a b
       | _ => failwith "llvm_ushl_sat_8 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_16: semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_I16 a; DVALUE_I16 b] => ushl_sat a b
+      | [@DVALUE_I 16 a; @DVALUE_I 16 b] => ushl_sat a b
       | _ => failwith "llvm_ushl_sat_16 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_32: semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_I32 a; DVALUE_I32 b] => ushl_sat a b
+      | [@DVALUE_I 32 a; @DVALUE_I 32 b] => ushl_sat a b
       | _ => failwith "llvm_ushl_sat_32 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_64: semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_I64 a; DVALUE_I64 b] => ushl_sat a b
+      | [@DVALUE_I 64 a; @DVALUE_I 64 b] => ushl_sat a b
       | _ => failwith "llvm_ushl_sat_64 got incorrect / ill-typed inputs"
       end.
 

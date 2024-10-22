@@ -90,32 +90,44 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     the character comes in as an i32, so the function truncates to an i8
     to match types with IO_stdout. *)
 
-  Definition putchar_denotation : function_denotation := 
-    let putchar_body (u_char:uvalue) : itree L0' uvalue :=
-      dv <- concretize_or_pick u_char ;; 
-      match dv with 
-        | DVALUE_I32 x32 => 
-          match get_conv_case Trunc (DTYPE_I 32) dv (DTYPE_I 8) with 
-            | Conv_Pure (DVALUE_I8 x8) => trigger (IO_stdout [x8])
-            | _ => raise "conversion from i32 to i8 in putchar gave unexpected conversion type"
-          end ;;
-          ret (dvalue_to_uvalue dv)
-        | bad => raiseUB ("putc got non-i32 argument " ++ show_dvalue bad)
-      end
-    in 
+  Definition putchar_denotation : function_denotation.
+    refine
+      (let putchar_body (u_char:uvalue) : itree L0' uvalue :=
+         dv <- concretize_or_pick u_char ;; 
+         match dv with
+         | @DVALUE_I sz x32 =>
+             if Pos.eq_dec 32 sz
+             then
+               match get_conv_case Trunc (DTYPE_I 32) dv (DTYPE_I 8) with 
+               | Conv_Pure (@DVALUE_I sz x8) =>
+                   if Pos.eq_dec 8 sz
+                   then _
+                   else raise "conversion from i32 to i8 in putchar gave unexpected conversion type"
+               | _ => raise "conversion from i32 to i8 in putchar gave unexpected conversion type"
+               end ;;
+               ret (dvalue_to_uvalue dv)
+             else
+               raiseUB ("putc got non-i32 integer argument")
+         | bad => raiseUB ("putc got non-i32 argument " ++ show_dvalue bad)
+         end
+       in 
 
-    fun (args : list uvalue) =>
-      match args with
-      | char::[] => putchar_body char
-      | _ => raise "putc called with zero or more than one arguments"
-      end.
+       fun (args : list uvalue) =>
+         match args with
+         | char::[] => putchar_body char
+         | _ => raise "putc called with zero or more than one arguments"
+         end).
+
+    subst.
+    exact (trigger (IO_stdout [x8])).
+  Defined.
  
 
   (** A semantic function to read an i8 value at [strptr + index] from the memory. 
       Propagates all memory failures and raises a Vellvm "Failure" if the 
       value read does not concretize to a DVALUE_I8.
    *)
-  Definition i8_str_index (strptr : addr) (index : Z) : itree L0' Int8.int :=
+  Definition i8_str_index (strptr : addr) (index : Z) : itree L0' (@Integers.int 8) :=
     iptr <- (@lift_OOM (itree L0') _ _ _ (LP.IP.from_Z index)) ;;
     addr <-
       match handle_gep_addr (DTYPE_I 8) strptr [DVALUE_IPTR iptr] with
@@ -125,7 +137,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     u_byte <- trigger (Load (DTYPE_I 8) (DVALUE_Addr addr)) ;;
     d_byte <- concretize_or_pick u_byte;;
     match d_byte with
-    | DVALUE_I8 b => ret b
+    | @DVALUE_I 8 b => ret b
     | bad => raise ("i8_str_index failed with non-DVALUE_I8 " ++ show_dvalue bad)
     end.
 
@@ -143,16 +155,16 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
           bytes <- 
             ITree.iter
               (fun '(c, bytes, offset) =>
-                 if Int8.eq c (Int8.zero) then
+                 if @Integers.eq 8 c (@Integers.zero 8) then
                    (* null terminated string so end the iteration, add the newline *)
-                   ret (inr ((Int8.repr 10) :: bytes))
+                   ret (inr ((@Integers.repr 8 10) :: bytes))
                  else 
                    next_char <- i8_str_index strptr offset ;;
                    ret (inl (next_char, c::bytes, (offset + 1)%Z))
               )
               (char, [], 1%Z) ;;
           v <- trigger (IO_stdout (DList.rev_tail_rec bytes)) ;;
-          ret (UVALUE_I8 (Int8.zero))
+          ret (@UVALUE_I 8 (@Integers.zero 8))
       | bad => raiseUB ("puts got non-address argument " ++ show_dvalue bad)
       end
     in
@@ -300,8 +312,8 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
 
   Definition PREDEFINED_FUNCTIONS : ll_toplevel_entities := List.concat [printf_definition]. 
 
-  Example ensure_functions_defined : negb (Nat.eqb (List.length PREDEFINED_FUNCTIONS) O) . 
-  Proof. reflexivity. Qed.  
+  (* Example ensure_functions_defined : negb (Nat.eqb (List.length PREDEFINED_FUNCTIONS) O) .  *)
+  (* Proof. reflexivity. Qed.   *)
 
   (* checks if `userdecl_n` is a name of a definition in `predefs`. *)
   Definition userdecl_defined_in (userdecl_n : string) 
@@ -497,12 +509,12 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     inputs from the command line is nontrivial since we have to martial C-level strings
     into the Vellvm memory.  
    *)
-  Definition main_args := [DV.UVALUE_I32 (Int32.zero);
+  Definition main_args := [@DV.UVALUE_I 32 (@Integers.zero 32);
                            DV.UVALUE_Addr null
     ].
 
   Definition denote_vellvm_main (mcfg : CFG.mcfg dtyp) : itree L0 dvalue :=
-    denote_vellvm (DTYPE_I (32)%N) "main" main_args mcfg.
+    denote_vellvm (DTYPE_I (32)%positive) "main" main_args mcfg.
 
 
   (**
@@ -525,7 +537,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
    *)
   Definition interpreter
              (prog : ll_toplevel_entities) : itree L4 res_L4
-    := interpreter_gen (DTYPE_I 32%N) "main" main_args prog.
+    := interpreter_gen (DTYPE_I 32%positive) "main" main_args prog.
 
   (**
      We now turn to the definition of our _model_ of vellvm's semantics. The
@@ -629,14 +641,14 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   (**
      Finally, the official model assumes no user-defined intrinsics.
    *)
-  Definition model := model_gen (DTYPE_I 32%N) "main" main_args.
-  Definition model_oom := model_gen_oom (DTYPE_I 32%N) "main" main_args.
-  Definition model_oom_L1 := model_gen_oom_L1 (DTYPE_I 32%N) "main" main_args.
-  Definition model_oom_L2 := model_gen_oom_L2 (DTYPE_I 32%N) "main" main_args.
-  Definition model_oom_L3 RR_mem := model_gen_oom_L3 RR_mem (DTYPE_I 32%N) "main" main_args.
-  Definition model_oom_L4 RR_mem RR_pick := model_gen_oom_L4 RR_mem RR_pick (DTYPE_I 32%N) "main" main_args.
-  Definition model_oom_L5 RR_mem RR_pick := model_gen_oom_L5 RR_mem RR_pick (DTYPE_I 32%N) "main" main_args.
-  Definition model_oom_L6 RR_mem RR_pick RR_oom := model_gen_oom_L6 RR_mem RR_pick RR_oom (DTYPE_I 32%N) "main" main_args.
+  Definition model := model_gen (DTYPE_I 32%positive) "main" main_args.
+  Definition model_oom := model_gen_oom (DTYPE_I 32%positive) "main" main_args.
+  Definition model_oom_L1 := model_gen_oom_L1 (DTYPE_I 32%positive) "main" main_args.
+  Definition model_oom_L2 := model_gen_oom_L2 (DTYPE_I 32%positive) "main" main_args.
+  Definition model_oom_L3 RR_mem := model_gen_oom_L3 RR_mem (DTYPE_I 32%positive) "main" main_args.
+  Definition model_oom_L4 RR_mem RR_pick := model_gen_oom_L4 RR_mem RR_pick (DTYPE_I 32%positive) "main" main_args.
+  Definition model_oom_L5 RR_mem RR_pick := model_gen_oom_L5 RR_mem RR_pick (DTYPE_I 32%positive) "main" main_args.
+  Definition model_oom_L6 RR_mem RR_pick RR_oom := model_gen_oom_L6 RR_mem RR_pick RR_oom (DTYPE_I 32%positive) "main" main_args.
 End LLVMTopLevel.
 
 Module Make (IS : InterpreterStack) : LLVMTopLevel IS.

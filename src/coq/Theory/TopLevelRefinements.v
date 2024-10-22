@@ -508,17 +508,17 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     (* TODO: Move this *)
     Lemma uvalue_strict_subterm_array :
-      forall f f' fields,
-        uvalue_strict_subterm f (UVALUE_Array fields) ->
-        uvalue_strict_subterm f (UVALUE_Array (f' :: fields)).
+      forall f f' fields t,
+        uvalue_strict_subterm f (UVALUE_Array t fields) ->
+        uvalue_strict_subterm f (UVALUE_Array t (f' :: fields)).
     Proof.
-      intros f f' fields H.
+      intros f f' fields t H.
       dependent induction H.
       - inv H.
         constructor.
         constructor.
         right; auto.
-      - specialize (IHclos_trans2 fields eq_refl).
+      - specialize (IHclos_trans2 fields t eq_refl).
         eapply t_trans.
         apply H.
         apply IHclos_trans2.
@@ -526,17 +526,17 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     (* TODO: Move this *)
     Lemma uvalue_strict_subterm_vector :
-      forall f f' fields,
-        uvalue_strict_subterm f (UVALUE_Vector fields) ->
-        uvalue_strict_subterm f (UVALUE_Vector (f' :: fields)).
+      forall f f' fields t,
+        uvalue_strict_subterm f (UVALUE_Vector t fields) ->
+        uvalue_strict_subterm f (UVALUE_Vector t (f' :: fields)).
     Proof.
-      intros f f' fields H.
+      intros f f' fields t H.
       dependent induction H.
       - inv H.
         constructor.
         constructor.
         right; auto.
-      - specialize (IHclos_trans2 fields eq_refl).
+      - specialize (IHclos_trans2 fields t eq_refl).
         eapply t_trans.
         apply H.
         apply IHclos_trans2.
@@ -606,15 +606,12 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         repeat (break_match; cbn; try reflexivity);
           repeat rewrite bind_ret_l; try reflexivity;
           try discriminate.
-        repeat (break_match; cbn; try reflexivity);
-          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
-          repeat rewrite bind_ret_l; inv Heqi1; try reflexivity; try discriminate.
-        repeat (break_match; cbn; try reflexivity);
-          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
-          repeat rewrite bind_ret_l; inv Heqi1; try reflexivity; try discriminate.
-        repeat (break_match; cbn; try reflexivity);
-          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
-          repeat rewrite bind_ret_l; reflexivity; try discriminate.
+        all: try (subst; cbn in *;
+                  rewrite Heqb3;
+                  inv Heqi1;
+                  reflexivity).
+        all: (repeat (break_match; cbn; try reflexivity);
+              repeat setoid_rewrite Raise.raiseOOM_bind_itree; reflexivity).
       - break_match; cbn; try reflexivity;
           unfold lift_OOM;
           break_inner_match; cbn;
@@ -695,8 +692,10 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       destruct x, y; cbn; try reflexivity;
         try solve
           [ break_match; reflexivity
-          | cbn; rewrite eval_int_op_err_ub_oom_to_itree; reflexivity
+          | cbn; subst; rewrite eval_int_op_err_ub_oom_to_itree; reflexivity
           ].
+      subst; break_match_goal; subst; cbn; try reflexivity.
+      cbn; rewrite eval_int_op_err_ub_oom_to_itree; reflexivity.
     Qed.
 
     Lemma eval_iop_err_ub_oom_to_itree :
@@ -721,6 +720,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           | break_match; reflexivity
           | cbn; apply eval_int_op_err_ub_oom_to_itree
           ].
+      subst; break_match_goal; subst; cbn; try reflexivity.
+      cbn; rewrite eval_int_op_err_ub_oom_to_itree; reflexivity.
 
       (* Need vec_loop lemma *)
       rename elts into xs.
@@ -792,7 +793,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           end.
     Proof.
       intros E H H0 H1 x y icmp.
-      destruct x, y; cbn;
+      destruct x, y; cbn; subst;
         try solve
           [ reflexivity
           | break_match; reflexivity
@@ -812,7 +813,18 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         cbn;
         try setoid_rewrite IP.VMemInt_intptr_dtyp;
         try setoid_rewrite dtyp_eqb_refl;
+        break_match; subst;
         cbn;
+        repeat setoid_rewrite Raise.raiseUB_bind_itree;
+        repeat setoid_rewrite Raise.raise_bind_itree;
+        repeat rewrite bind_ret_l; try reflexivity.
+
+      
+      destruct icmp;
+        unfold eval_icmp;
+        cbn;
+        try setoid_rewrite IP.VMemInt_intptr_dtyp;
+        try setoid_rewrite dtyp_eqb_refl;
         repeat setoid_rewrite Raise.raiseUB_bind_itree;
         repeat setoid_rewrite Raise.raise_bind_itree;
         repeat rewrite bind_ret_l; try reflexivity.
@@ -1289,8 +1301,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                   | DVALUE_Poison t =>
                       (* TODO: Should be the type of the result of the select... *)
                       @ret _ _ _ (DVALUE_Poison t)
-                  | DVALUE_I1 i =>
-                      if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                  | @DVALUE_I 1 i =>
+                      if (@Integers.unsigned 1 i =? 1)%Z
                       then @ret _ _ _ x
                       else @ret _ _ _ y
                   | _ =>
@@ -1313,8 +1325,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                           | DVALUE_Poison t =>
                               (* TODO: Should be the type of the result of the select... *)
                               @ret err_ub_oom _ _ (DVALUE_Poison t)
-                          | DVALUE_I1 i =>
-                              if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                          | @DVALUE_I 1 i =>
+                              if (@Integers.unsigned 1 i =? 1)%Z
                               then @ret _ _ _ x
                               else @ret _ _ _ y
                           | _ =>
@@ -1352,6 +1364,12 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         repeat rewrite bind_ret_l; try reflexivity.
 
       { break_match; cbn;
+          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+          repeat setoid_rewrite Raise.raiseUB_bind_itree;
+          repeat setoid_rewrite Raise.raise_bind_itree;
+          repeat rewrite bind_ret_l; try reflexivity.
+
+        break_match; cbn;
           repeat setoid_rewrite Raise.raiseOOM_bind_itree;
           repeat setoid_rewrite Raise.raiseUB_bind_itree;
           repeat setoid_rewrite Raise.raise_bind_itree;
@@ -1444,6 +1462,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       destruct cnd; try reflexivity.
       - (* i1 *)
         repeat rewrite eval_select_equation.
+        break_match; cbn; try reflexivity.
         break_match; eauto.
       - (* Vector *)
         setoid_rewrite eval_select_equation.
@@ -1500,8 +1519,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                  | y0 :: ys0 =>
                      selected <-
                      match c with
-                     | DVALUE_I1 i =>
-                         if (VellvmIntegers.Int1.unsigned i =? 1)%Z then ret x0 else ret y0
+                     | @DVALUE_I 1 i =>
+                         if (@Integers.unsigned 1 i =? 1)%Z then ret x0 else ret y0
                      | DVALUE_Poison t => ret (DVALUE_Poison t)
                      | _ =>
                          raise_error
@@ -1743,7 +1762,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         - break_match; cbn; try reflexivity.
         - break_match; cbn; try reflexivity.
           break_match; cbn; try reflexivity.
-          repeat (break_match; cbn; try reflexivity).
 
           unfold lift_OOM.
           repeat (break_match; cbn; try reflexivity);
@@ -2406,7 +2424,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         (err_ub_oom_T ident) (fun (A : Type) (x : err_ub_oom_T ident A) => x) u3) as u3r.
 
         destruct u1r0; try reflexivity.
-        + break_match.
+        + break_match; cbn; try reflexivity.
+          break_match.
           setoid_rewrite H.
           subst.
           unfold concretize_uvalue.

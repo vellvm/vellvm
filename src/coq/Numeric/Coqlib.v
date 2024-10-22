@@ -335,6 +335,15 @@ Proof.
   rewrite two_power_nat_S. rewrite Nat2Z.inj_succ. rewrite two_p_S. lia. lia.
 Qed.
 
+Lemma two_power_pos_two_p:
+  forall x, two_power_pos x = two_p (Zpos x).
+Proof.
+  intros x.
+  rewrite two_power_pos_nat.
+  rewrite <- positive_nat_Z.
+  apply two_power_nat_two_p.
+Qed.
+
 Lemma two_p_monotone:
   forall x y, 0 <= x <= y -> two_p x <= two_p y.
 Proof.

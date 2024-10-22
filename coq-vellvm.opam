@@ -23,18 +23,18 @@ install: [make "-C" "src" "install"]
 depends: [
   "ocaml" {>= "4.14.0"}
   "cppo" 
-  "dune" 
+  "dune" {>= "3.14.0"}
   "menhir" 
   "qcheck" 
-  "coq" {>= "8.19.0" & < "8.20~"}
-  "coq-ext-lib" {< "0.12.1"}
+  "coq" {>= "8.20.0" & < "8.21~"}
+  "coq-ext-lib" {>= "0.12.1" & < "0.13~"}
   "coq-paco" 
   "coq-ceres" 
-  "coq-flocq" {>= "4.1.1"}
+  "coq-flocq" {>= "4.2.0"}
   "coq-mathcomp-ssreflect" 
   "coq-simple-io"
-  "coq-itree" {>= "5.1.2" & < "5.2~"}
-  "coq-quickchick" {>= "2.0.2" & < "2.0.3"}
+  "coq-itree" {>= "5.2.0" & < "5.3~"}
+  "coq-quickchick" {>= "2.0.4" & < "2.0.5"}
 ]
 
 tags: [

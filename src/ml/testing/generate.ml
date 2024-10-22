@@ -2,6 +2,7 @@ module LL = LLVMAst
 open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 open QCheck
 module Z = Camlcoq.Z
+module P = Camlcoq.P
 module G = QCheck.Gen
 open MemoryModelImplementation
 open MemoryAddress
@@ -27,14 +28,14 @@ let g_const : 'a. 'a -> 'a G.t = fun v _rs -> v
 
 let g_i1 = G.map
              (fun v ->
-               DV.UVALUE_I1 (if v then Z.one else Z.zero) ) G.bool
+               DV.UVALUE_I (P.of_int 1, (if v then Z.one else Z.zero)) ) G.bool
 let g_si8 = G.map
-                ( fun v -> DV.UVALUE_I8 (Z.of_sint v)) i8gen
+                ( fun v -> DV.UVALUE_I (P.of_int 8, (Z.of_sint v))) i8gen
 
 let g_si32 = G.map
-                 (fun v -> DV.UVALUE_I32 (Z.of_sint v)) small_gen
+                 (fun v -> DV.UVALUE_I (P.of_int 32, (Z.of_sint v))) small_gen
 
-let g_si64 = G.map (fun v -> DV.UVALUE_I64 (Z.of_sint v)) small_gen
+let g_si64 = G.map (fun v -> DV.UVALUE_I (P.of_int 64, (Z.of_sint v))) small_gen
 
 let gen_uvalue'' (t : LL.typ) : DV.uvalue GL.coq_G =
   let ran = GA.run_GenALIVE2 (GA.gen_uvalue t) in
@@ -123,7 +124,7 @@ let rec nonNegInt2CoqPositive y =match y with| 0 -> BinNums.Coq_xH| 1 -> Coq_xH|
 let int2CoqN x =if (x < 0) then BinNums.Npos (nonNegInt2CoqPositive ~-x) else if (x > 0) then BinNums.Npos (nonNegInt2CoqPositive x) else N0
 
 let sample_exp' : LL.typ LL.exp GL.coq_G =
-  let ran = GA.run_GenALIVE2 (GA.gen_exp_size O (LLVMAst.TYPE_I (int2CoqN 8))) in
+  let ran = GA.run_GenALIVE2 (GA.gen_exp_size O (LLVMAst.TYPE_I (P.of_int 8))) in
   let ge = GL.bindGen
     (ran)
     (fun x ->

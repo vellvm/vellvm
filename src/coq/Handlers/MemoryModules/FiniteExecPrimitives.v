@@ -1,3 +1,7 @@
+From Vellvm Require Import
+     Numeric.Coqlib
+     Numeric.Integers.
+
 From Coq Require Import
      ZArith
      Strings.String
@@ -6,10 +10,6 @@ From Coq Require Import
      Relations
      RelationClasses
      Morphisms.
-
-From Vellvm Require Import
-     Numeric.Coqlib
-     Numeric.Integers.
 
 From Vellvm.Syntax Require Import
      DynamicTypes.
@@ -63,6 +63,8 @@ From ITree Require Import
      Eq.Eqit.
 
 Require Import Error.
+
+Import Logic.
 
 Import ListNotations.
 
@@ -5217,7 +5219,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           + rewrite OOM in H2.
             cbn in H2.
             unfold liftM in *.
-            do 2 rewrite rbm_raise_bind in H2; try typeclasses eauto.
+            do 2 rewrite (@rbm_raise_bind _ _ _ _ (@raise_oom _ _) _) in H2.
             symmetry in H2.
             apply MemMonad_eq1_raise_oom_inv in H2; contradiction.
           + rewrite GCP in H2.
@@ -5375,7 +5377,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           + rewrite OOM in H2.
             cbn in H2.
             unfold liftM in *.
-            do 2 rewrite rbm_raise_bind in H2; try typeclasses eauto.
+            do 2 rewrite (@rbm_raise_bind _ _ _ _ (@raise_oom _ _) _) in H2.
             symmetry in H2.
             apply MemMonad_eq1_raise_oom_inv in H2; contradiction.
           + rewrite GCP in H2.

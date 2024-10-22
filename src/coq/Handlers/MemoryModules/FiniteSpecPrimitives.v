@@ -1,3 +1,7 @@
+From Vellvm Require Import
+     Numeric.Coqlib
+     Numeric.Integers.
+
 From Coq Require Import
      ZArith
      Strings.String
@@ -6,10 +10,6 @@ From Coq Require Import
      Relations
      RelationClasses
      Morphisms.
-
-From Vellvm Require Import
-     Numeric.Coqlib
-     Numeric.Integers.
 
 From Vellvm.Semantics Require Import
      MemoryAddress
@@ -42,6 +42,7 @@ From Vellvm.Handlers.MemoryModules Require Import
 From ExtLib Require Import
      Structures.Monads.
 
+Import Logic.
 Import ListNotations.
 
 Import MonadNotation.

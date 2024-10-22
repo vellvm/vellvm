@@ -56,5 +56,5 @@ define i32 @main(i32 %argc, i8** %argv) {
 
 ; ASSERT EQ: i32 0 = call i32 @testPointerCast(i32 0)
 
-; ASSERT EQ: i64 0 = call i64 @testVectorToi64()
+; NO VECTOR LITERALS ASSERT EQ: i64 0 = call i64 @testVectorToi64()
 

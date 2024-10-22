@@ -8,7 +8,9 @@ From Vellvm Require Import
   QC.Generators
   Handlers
   QC.DList
-  VellvmIntegers.
+  VellvmIntegers
+  DynamicTypes.
+
 (* Maybe also import InterpretationStack *)
 
 From ExtLib.Structures Require Export
@@ -272,7 +274,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     := match a with
        | TYPE_I sz =>
          match b with
-         | TYPE_I sz' => if N.eq_dec sz sz' then true else false
+         | TYPE_I sz' => if Pos.eq_dec sz sz' then true else false
          | _ => false
          end
        | TYPE_IPTR =>
@@ -391,16 +393,18 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     let fix gen_size_0 (ty : typ) : GenALIVE2 (exp typ) :=
           match ty with
           | TYPE_I sz =>
-              ret sz >>= gen_int_exp
+              ret (Npos sz) >>= gen_int_exp
           | TYPE_Float =>
               gen_float_exp
           | TYPE_Double =>
               f32 <- gen_float32;;
               ret (EXP_Double (Float.of_single f32))
-          | TYPE_Array n t
+          | TYPE_Array n t =>
+              es <- vectorOf_ALIVE2 (N.to_nat n) (gen_exp_size 0 t);;
+              ret (EXP_Array (TYPE_Array n t) (map (fun e => (t, e)) es))
           | TYPE_Vector n t =>
               es <- vectorOf_ALIVE2 (N.to_nat n) (gen_exp_size 0 t);;
-              ret (EXP_Array (map (fun e => (t, e)) es))
+              ret (EXP_Vector (TYPE_Vector n t) (map (fun e => (t, e)) es))
           | TYPE_Struct vars =>
               failGen "Struct generation unimplemented"
           | TYPE_Packed_struct vars =>
@@ -850,28 +854,17 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
   
   Fixpoint gen_uvalue (t : typ) : GenALIVE2 uvalue :=
     match t with
-    | TYPE_I i =>
-        match i with
-        | 1%N =>
-            ret UVALUE_I1 <*> (ret repr <*> lift_GenALIVE2 (choose (0, 1)))
-        | 8%N =>
-            ret UVALUE_I8 <*> (ret repr <*> lift_GenALIVE2 (choose (0, 2^8 - 1)))
-        | 32%N =>
-            ret UVALUE_I32 <*> (ret repr <*> lift_GenALIVE2 (choose (0, 10000))) (* Modify to smaller number. Should be 2^32 - 1 *)
-        | 64%N =>
-            ret UVALUE_I64 <*> (ret repr <*> lift_GenALIVE2 (choose (0, 10000))) (* Modify to smaller number. Should be 2^64 - 1 *)
-        | _ =>
-            failGen "Invalid size"
-        end
+    | @TYPE_I sz =>
+        ret (@UVALUE_I sz) <*> (ret repr <*> lift_GenALIVE2 (choose (0, Z.min (2^(Zpos sz) - 1) 10000)))
     | TYPE_Float =>
         ret UVALUE_Float <*> lift_GenALIVE2 fing32
     | TYPE_Double =>
         failGen "Generating UValue Double - Not supported"
     | TYPE_Void => ret UVALUE_None
     | TYPE_Vector sz subtyp =>
-        ret UVALUE_Vector <*> (vectorOf_ALIVE2 (N.to_nat sz) (gen_uvalue subtyp))
+        ret (UVALUE_Vector (DTYPE_Vector sz (TypToDtyp.typ_to_dtyp [] subtyp))) <*> (vectorOf_ALIVE2 (N.to_nat sz) (gen_uvalue subtyp))
     | TYPE_Array sz subtyp =>
-        ret UVALUE_Array <*> (vectorOf_ALIVE2 (N.to_nat sz) (gen_uvalue subtyp))
+        ret (UVALUE_Array (DTYPE_Array sz (TypToDtyp.typ_to_dtyp [] subtyp))) <*> (vectorOf_ALIVE2 (N.to_nat sz) (gen_uvalue subtyp))
     | _ => failGen "Invalid"
     end.
                                             

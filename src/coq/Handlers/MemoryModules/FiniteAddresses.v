@@ -33,16 +33,16 @@ Definition nil_prov : Prov := Some [].
 (* TODO: If Prov is an NSet, I get a universe inconsistency here... *)
 Module FinAddr : MemoryAddress.ADDRESS
 with Definition addr := (Iptr * Prov) % type
-with Definition null := (Int64.zero, nil_prov)%Z.
+with Definition null := (@Integers.zero 64, nil_prov)%Z.
   Definition addr := (Iptr * Prov) % type.
-  Definition null : addr := (Int64.zero, nil_prov)%Z.
+  Definition null : addr := (@Integers.zero 64, nil_prov)%Z.
 
   (* TODO: is this what we should be using for equality on pointers? Probably *NOT* because of provenance. *)
   Lemma eq_dec : forall (a b : addr), {a = b} + {a <> b}.
   Proof.
     intros [a1 a2] [b1 b2].
 
-    destruct (Int64.eq_dec a1 b1);
+    destruct (Integers.eq_dec a1 b1);
       destruct (option_eq (fun x y => list_eq_dec N.eq_dec x y) a2 b2); subst.
     - left; reflexivity.
     - right. intros H. inversion H; subst. apply n. reflexivity.
@@ -57,24 +57,24 @@ with Definition null := (Int64.zero, nil_prov)%Z.
     destruct a.
     destruct i.
     destruct intval.
-    - exists (Int64.one, p).
+    - exists (@Integers.one 64, p).
       intros CONTRA; inversion CONTRA.
-    - exists (Int64.zero, p).
+    - exists (@Integers.zero 64, p).
       intros CONTRA; inversion CONTRA.
-    - exists (Int64.one, p).
+    - exists (@Integers.one 64, p).
       intros CONTRA; inversion CONTRA.
   Qed.
 
   Definition show_addr (a : addr) :=
     match a with
     | (i, p) =>
-        Show.show (Int64.unsigned i, p)
+        Show.show (unsigned i, p)
     end.
 End FinAddr.
 
 Module FinPTOI : PTOI(FinAddr)
-with Definition ptr_to_int := fun (ptr : FinAddr.addr) => Int64.unsigned (fst ptr).
-  Definition ptr_to_int := fun (ptr : FinAddr.addr) => Int64.unsigned (fst ptr).
+with Definition ptr_to_int := fun (ptr : FinAddr.addr) => Integers.unsigned (fst ptr).
+  Definition ptr_to_int := fun (ptr : FinAddr.addr) => Integers.unsigned (fst ptr).
 End FinPTOI.
 
 Module FinPROV <: PROVENANCE(FinAddr)
@@ -336,18 +336,18 @@ End FinPROV.
 Module FinITOP : ITOP(FinAddr)(FinPROV)(FinPTOI)
 with Definition int_to_ptr :=
   fun (i : Z) (pr : Prov) =>
-    if (i <? 0)%Z || (i >=? Int64.modulus)%Z
+    if (i <? 0)%Z || (i >=? @Integers.modulus 64)%Z
     then Oom ("FinITOP.int_to_ptr: out of range (" ++ show i ++ ").")
-    else NoOom (Int64.repr i, pr).
+    else NoOom (@Integers.repr 64 i, pr).
 
   Import FinAddr.
   Import FinPROV.
   Import FinPTOI.
 
   Definition int_to_ptr (i : Z) (pr : Prov) : OOM addr
-    := if (i <? 0)%Z || (i >=? Int64.modulus)%Z
+    := if (i <? 0)%Z || (i >=? @Integers.modulus 64)%Z
        then Oom ("FinITOP.int_to_ptr: out of range (" ++ show i ++ ").")
-       else NoOom (Int64.repr i, pr).
+       else NoOom (Integers.repr i, pr).
 
   Lemma int_to_ptr_provenance :
     forall (x : Z) (p : Prov) (a : addr),
@@ -356,7 +356,7 @@ with Definition int_to_ptr :=
   Proof.
     intros x p a IP.
     unfold int_to_ptr in *.
-    destruct ((x <? 0)%Z || (x >=? Int64.modulus)); inv IP; auto.
+    destruct ((x <? 0)%Z || (x >=? @Integers.modulus 64)); inv IP; auto.
   Qed.
 
   Lemma int_to_ptr_ptr_to_int :
@@ -368,9 +368,9 @@ with Definition int_to_ptr :=
     unfold int_to_ptr.
     unfold ptr_to_int.
     destruct a; cbn.
-    pose proof Int64.unsigned_range i as R.
-    destruct ((Int64.unsigned i <? 0)%Z || (Int64.unsigned i >=? Int64.modulus)) eqn:RANGE; [lia|].
-    rewrite Int64.repr_unsigned.
+    pose proof (@Integers.unsigned_range 64 i) as R.
+    destruct ((@Integers.unsigned 64 i <? 0)%Z || (@Integers.unsigned 64 i >=? @Integers.modulus 64)) eqn:RANGE; [lia|].
+    rewrite Integers.repr_unsigned.
     inv PROV; cbn; auto.
   Qed.
 
@@ -386,13 +386,13 @@ with Definition int_to_ptr :=
     split; auto.
     unfold int_to_ptr, ptr_to_int.
     cbn in *.
-    destruct ((Int64.unsigned a <? 0)%Z || (Int64.unsigned a >=? Int64.modulus)) eqn:BOUNDS.
+    destruct ((Integers.unsigned a <? 0)%Z || (Integers.unsigned a >=? Integers.modulus)) eqn:BOUNDS.
     - (* Out of bounds *)
       exfalso.
       destruct a.
       cbn in *.
       lia.
-    - rewrite Int64.repr_unsigned.
+    - rewrite Integers.repr_unsigned.
       reflexivity.
   Qed.
 
@@ -403,10 +403,10 @@ with Definition int_to_ptr :=
   Proof.
     intros x p a IP.
     unfold int_to_ptr in *.
-    destruct ((x <? 0)%Z || (x >=? Int64.modulus)) eqn:RANGE; inv IP; auto.
-    unfold ptr_to_int. cbn.
-    rewrite Int64.unsigned_repr; auto.
-    unfold Int64.max_unsigned.
+    destruct ((x <? 0)%Z || (x >=? @Integers.modulus 64)) eqn:RANGE; inv IP; auto.
+    unfold ptr_to_int, fst.
+    rewrite (@Integers.unsigned_repr 64); auto.
+    unfold Integers.max_unsigned.
     lia.
   Qed.
 End FinITOP.

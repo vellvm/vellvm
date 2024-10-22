@@ -55,8 +55,8 @@ Instance show_binary : forall (prec emax : Z), Show (binary_float prec emax) := 
 Close Scope string.
 Open Scope Z.
 
-Let log2 := Z.log2.
-Let digits := compose Z.succ log2.
+#[local] Definition log2 := Z.log2.
+#[local] Definition digits := compose Z.succ log2.
 
 Lemma digits2_pos_log2 (m : positive) :
   Z.pos (Digits.digits2_pos m) = Z.succ (log2 (Zpos m)).
@@ -151,8 +151,8 @@ Next Obligation.
   all: unfold is_true, set1, boundaries in *.
 
   (* simplify *)
-  apply andb_prop in b2; destruct b2 as [B11 B12].
-  apply andb_prop in b3; destruct b3 as [B21 B22].
+  destruct b2 as [B11 B12].
+  destruct b3 as [B21 B22].
   all: destruct t; try rewrite Z.leb_le in *.
   Opaque Z.sub.
   all: tuple_inversion.

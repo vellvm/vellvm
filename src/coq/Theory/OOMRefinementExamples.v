@@ -324,11 +324,11 @@ Module Infinite.
   Qed.
 
   Definition alloc_code : code dtyp :=
-    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) [])
+    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%positive) [])
     ].
 
   Definition ptoi_code : code dtyp :=
-    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) []);
+    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%positive) []);
       (IId (Name "i"), INSTR_Op (OP_Conversion Ptrtoint DTYPE_Pointer (EXP_Ident (ID_Local (Name "ptr"))) (DTYPE_IPTR)))
     ].
 
@@ -340,7 +340,7 @@ Module Infinite.
       blk_id := Name "";
       blk_phis := [];
       blk_code := alloc_code;
-      blk_term := TERM_Ret (DTYPE_I 1%N, EXP_Bool true);
+      blk_term := TERM_Ret (DTYPE_I 1%positive, EXP_Bool true);
       blk_comments := None;
     |}.
 
@@ -349,7 +349,7 @@ Module Infinite.
       blk_id := Name "";
       blk_phis := [];
       blk_code := ptoi_code;
-      blk_term := TERM_Ret (DTYPE_I 1%N, EXP_Bool true);
+      blk_term := TERM_Ret (DTYPE_I 1%positive, EXP_Bool true);
       blk_comments := None;
     |}.
 
@@ -358,7 +358,7 @@ Module Infinite.
       blk_id := Name "";
       blk_phis := [];
       blk_code := ret_code;
-      blk_term := TERM_Ret (DTYPE_I 1%N, EXP_Bool true);
+      blk_term := TERM_Ret (DTYPE_I 1%positive, EXP_Bool true);
       blk_comments := None;
     |}.
 
@@ -405,7 +405,7 @@ Module Infinite.
     interp_instr_E_to_L0 dvalue alloc_tree ≈
       Vis (subevent _ (Alloca (DTYPE_I 64) 1 None))
           (fun u => Vis (subevent _ (LocalWrite (Name "ptr") (dvalue_to_uvalue u)))
-                     (fun _ => Ret (DVALUE_I1 Int1.one))).
+                     (fun _ => Ret (@DVALUE_I 1 Integers.one))).
 
   Proof.
     unfold interp_instr_E_to_L0.
@@ -430,7 +430,7 @@ Module Infinite.
                       (fun x => Vis (subevent _ (LocalRead (Name "ptr")))
                                (fun u1 => u <- concretize_if_no_undef_or_poison (UVALUE_Conversion Ptrtoint DTYPE_Pointer u1 DTYPE_IPTR);;
                                        Vis (subevent _ (LocalWrite (Name "i") u))
-                                         (fun _ => Ret (DVALUE_I1 Int1.one))))).
+                                         (fun _ => Ret (@DVALUE_I 1 Integers.one))))).
   Proof.
     unfold interp_instr_E_to_L0.
     unfold ptoi_tree. cbn. go. cbn. go.
@@ -1325,7 +1325,7 @@ Module Infinite.
         inv ALLOC_OOM.
 
       rewrite MAP in H0.
-      exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 Int1.one)).
+      exists (Ret5 genv (lenv, stack) sid m (@DVALUE_I 1 Integers.one)).
       split; cycle 1.
       { clear - H0.
         eapply refine_OOM_h_model_undef_h_raise_OOM; eauto.
@@ -1337,7 +1337,7 @@ Module Infinite.
         apply interp_mcfg4_ret. } }
 
     clear ALLOCINV.
-    exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 Int1.one)).
+    exists (Ret5 genv (lenv, stack) sid m (@DVALUE_I 1 Integers.one)).
     destruct ALLOC_SUC as (?&?&?&?&?&?&?).
     rewrite H1 in H0; setoid_rewrite bind_ret_l in H0.
     split.
@@ -1482,11 +1482,11 @@ Module Finite.
   Import MemTheory.
 
   Definition alloc_code : code dtyp :=
-    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) [])
+    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%positive) [])
     ].
 
   Definition ptoi_code : code dtyp :=
-    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%N) []);
+    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%positive) []);
       (IId (Name "i"), INSTR_Op (OP_Conversion Ptrtoint DTYPE_Pointer (EXP_Ident (ID_Local (Name "ptr"))) (DTYPE_IPTR)))
     ].
 
@@ -1498,7 +1498,7 @@ Module Finite.
       blk_id := Name "";
       blk_phis := [];
       blk_code := alloc_code;
-      blk_term := TERM_Ret (DTYPE_I 1%N, EXP_Bool true);
+      blk_term := TERM_Ret (DTYPE_I 1%positive, EXP_Bool true);
       blk_comments := None;
     |}.
 
@@ -1507,7 +1507,7 @@ Module Finite.
       blk_id := Name "";
       blk_phis := [];
       blk_code := ptoi_code;
-      blk_term := TERM_Ret (DTYPE_I 1%N, EXP_Bool true);
+      blk_term := TERM_Ret (DTYPE_I 1%positive, EXP_Bool true);
       blk_comments := None;
     |}.
 
@@ -1516,7 +1516,7 @@ Module Finite.
       blk_id := Name "";
       blk_phis := [];
       blk_code := ret_code;
-      blk_term := TERM_Ret (DTYPE_I 1%N, EXP_Bool true);
+      blk_term := TERM_Ret (DTYPE_I 1%positive, EXP_Bool true);
       blk_comments := None;
     |}.
 
@@ -1545,10 +1545,10 @@ Module Finite.
     denote_program ret_block.
 
   Definition t_alloc : itree L0 dvalue
-    := trigger (Alloca (DTYPE_I 64%N) 1 None);; ret (DVALUE_I1 one).
+    := trigger (Alloca (DTYPE_I 64%positive) 1 None);; ret (@DVALUE_I 1 one).
 
   Definition t_ret : itree L0 dvalue
-    := ret (DVALUE_I1 one).
+    := ret (@DVALUE_I 1 one).
 
   Definition instr_E_to_L0 {T : Type} : instr_E T -> itree L0 T :=
     fun (e : instr_E T) =>
@@ -1584,7 +1584,7 @@ Module Finite.
     interp_instr_E_to_L0 dvalue alloc_tree ≈
       Vis (subevent _ (Alloca (DTYPE_I 64) 1 None))
           (fun u => Vis (subevent _ (LocalWrite (Name "ptr") (dvalue_to_uvalue u)))
-                     (fun _ => Ret (DVALUE_I1 Int1.one))).
+                     (fun _ => Ret (@DVALUE_I 1 Integers.one))).
   Proof.
     unfold interp_instr_E_to_L0.
     unfold alloc_tree. cbn. go. cbn. go.
@@ -2200,7 +2200,7 @@ Module Finite.
         inv ALLOC_OOM.
 
       rewrite MAP in H0.
-      exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 Int1.one)).
+      exists (Ret5 genv (lenv, stack) sid m (@DVALUE_I 1 Integers.one)).
       split; cycle 1.
       { clear - H0.
         eapply refine_OOM_h_model_undef_h_raise_OOM; eauto.
@@ -2211,7 +2211,7 @@ Module Finite.
         apply interp_mcfg4_ret. } }
 
     clear ALLOCINV.
-    exists (Ret5 genv (lenv, stack) sid m (DVALUE_I1 Int1.one)).
+    exists (Ret5 genv (lenv, stack) sid m (@DVALUE_I 1 Integers.one)).
     destruct ALLOC_SUC as (?&?&?&?&?&?&?).
     rewrite H1 in H0; setoid_rewrite bind_ret_l in H0.
     split.

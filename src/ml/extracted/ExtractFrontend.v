@@ -7,9 +7,11 @@ Require Import ZArith.
 Import ZArith.BinInt.
 
 From Vellvm Require
-     Utils.ParserHelper
-     QC.ShowAST
-     QC.ReprAST.
+  Utils.ParserHelper
+  Numeric.Integers
+  Transformations.Transform
+  QC.ShowAST
+  QC.ReprAST.
 
 Require ExtrOcamlBasic.
 Require ExtrOcamlString.
@@ -42,4 +44,4 @@ Extract Inlined Constant Archi.ppc64 => "false".
 (* NOTE: assumes that this file is compiled from /src *)
 Cd "ml/extracted".
 
-Separate Extraction LLVMAst AstLib ExtrOcamlIntConv ParserHelper ShowAST ReprAST Floats.
+Separate Extraction Integers Transform LLVMAst AstLib ExtrOcamlIntConv ParserHelper ShowAST ReprAST Floats.

@@ -5,16 +5,18 @@ let of_str = Camlcoq.camlstring_of_coqstring
 let coq_of_int = Camlcoq.Z.of_sint
 let to_int = Camlcoq.Z.to_int
 let n_to_int = Camlcoq.N.to_int
+let pos_to_int = Camlcoq.P.to_int
 
 let n_of_z z = Camlcoq.N.of_int64 (Camlcoq.Z.to_int64 z)
+let pos_of_z z = Camlcoq.P.of_int64 (Camlcoq.Z.to_int64 z)
 
 let byte_to_i8 (b:char) =
-  (LLVMAst.TYPE_I (n_of_z (coq_of_int 8)), LLVMAst.EXP_Integer (coq_of_int (int_of_char b)))
+  (LLVMAst.TYPE_I (pos_of_z (coq_of_int 8)), LLVMAst.EXP_Integer (coq_of_int (int_of_char b)))
 
 let i8_to_byte (typ, exp) =
   begin match (typ, exp) with
   | LLVMAst.TYPE_I sz, LLVMAst.EXP_Integer z ->
-     if (n_to_int sz) <> 8 then failwith "i8_to_byte failed with non-byte type annotation"
+     if (pos_to_int sz) <> 8 then failwith "i8_to_byte failed with non-byte type annotation"
      else Char.chr (to_int z)
   | _ -> failwith "i8_to_byte failed with incorrect type/value"
   end

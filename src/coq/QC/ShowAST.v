@@ -664,10 +664,10 @@ Section ShowInstances.
   #[global] Instance showFloat32 : Show float32
     := {| show := float_to_hex_string |}.
 
-  Definition show_int (x : Integers.Int.int) : string
-    := show (Int.unsigned x).
+  Definition show_int {sz} (x : @int sz) : string
+    := show (unsigned x).
 
-  #[global] Instance Show_Int : Show Integers.Int.int
+  #[global] Instance Show_Int {sz} : Show (@int sz)
     := {| show := show_int|}.
 
   Definition show_fast_math (fm : fast_math) : string
@@ -814,7 +814,7 @@ Section ShowInstances.
                     dshow_exp false ex) fields) @@
           string_to_DString "}>"
 
-    | EXP_Array elts =>
+    | EXP_Array t elts =>
         string_to_DString "[" @@
           concat_DString (string_to_DString ", ")
           (map (fun '(ty, ex) => DList_join [dshow ty ; string_to_DString " "] @@ dshow_exp false ex) elts) @@
@@ -986,10 +986,10 @@ Section ShowInstances.
       string_to_DString " ]".
 
   Definition intersperse (sep : string) (l : list string) : string
-    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else acc ++ sep ++ s) l "".
+    := fold_left (fun acc s => if String.eqb "" acc then s else acc ++ sep ++ s) l "".
 
   Definition dintersperse (sep : DString) (l : list DString) : DString
-    := fold_left (fun acc s => if StringOrdFacts.eqb "" (DString_to_string acc) then s else acc @@ sep @@ s) l (string_to_DString "").
+    := fold_left (fun acc s => if String.eqb "" (DString_to_string acc) then s else acc @@ sep @@ s) l (string_to_DString "").
 
   (* Fixpoint dconcat (sep : DString) (ls : list DString) := *)
   (*   match ls with *)

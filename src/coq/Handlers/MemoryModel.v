@@ -1,3 +1,6 @@
+From Vellvm.Numeric Require Import
+     Integers.
+
 From Vellvm.Syntax Require Import
      DataLayout
      DynamicTypes.
@@ -41,9 +44,6 @@ From Vellvm.Utils Require Import
      MonadExcLaws
      Inhabited.
 
-From Vellvm.Numeric Require Import
-     Integers.
-
 From ExtLib Require Import
      Structures.Monads
      Structures.Functor.
@@ -71,6 +71,7 @@ Import Monad.
 Import EitherMonad.
 
 From Coq Require Import FunctionalExtensionality.
+Import Logic.
 
 Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   Import LP.Events.
@@ -1509,7 +1510,6 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Lemma get_consecutive_ptrs_ge_eq1 :
     forall {M : Type -> Type}
       `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
-      {B} `{MB : Monad B}
       `{EQRET : @Eq1_ret_inv M EQM HM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
@@ -1521,7 +1521,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           In p ptrs ->
           (ptr_to_int ptr <= ptr_to_int p)%Z).
   Proof.
-    intros M HM EQM0 EQV B MB EQRET OOM ERR LAWS RAISE_OOM RAISE_ERR
+    intros M HM EQM0 EQV EQRET OOM ERR LAWS RAISE_OOM RAISE_ERR
       ptr len ptrs CONSEC p IN.
 
     assert (@within M EQM0 M unit unit (Reflexive_Within) _
@@ -1678,7 +1678,6 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Lemma get_consecutive_ptrs_range_eq1 :
     forall {M : Type -> Type}
       `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
-      {B} `{MB : Monad B}
       `{EQRET : @Eq1_ret_inv M EQM HM}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
@@ -1690,7 +1689,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           In p ptrs ->
           (ptr_to_int ptr <= ptr_to_int p < ptr_to_int ptr + (Z.of_nat len))%Z).
   Proof.
-    intros M HM EQM EQV B MB EQRET OOM ERR LAWS RBMOOM RBMERR
+    intros M HM EQM EQV EQRET OOM ERR LAWS RBMOOM RBMERR
       ptr len ptrs CONSEC p IN.
 
     assert (@within M EQM M unit unit (Reflexive_Within) _
@@ -1781,7 +1780,6 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     forall {M : Type -> Type}
       `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
       `{EQRET : @Eq1_ret_inv M EQM HM}
-      {B} `{MB : Monad B}
       `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
       `{LAWS: @MonadLawsE M EQM HM}
       `{RAISE_OOM : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
@@ -1794,7 +1792,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
             NoOom ix = IP.from_Z (Z.of_nat ix_nat) /\
               handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix] = inr (ret p)).
   Proof.
-    intros M HM EQM EQV EQRET B MB OOM ERR LAWS RAISE_OOM RAISE_ERR
+    intros M HM EQM EQV EQRET OOM ERR LAWS RAISE_OOM RAISE_ERR
       ptr len ptrs CONSEC p ix_nat NTH.
 
     assert (@within M EQM M unit unit (Reflexive_Within) _
@@ -1870,8 +1868,8 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM} `{LAWS: @MonadLawsE M EQM HM}
       `{RAISE : @RaiseBindM M HM EQM string (@raise_oom M OOM)}
       (ptr : addr) (len : nat),
-      (exists msg, @get_consecutive_ptrs M HM OOM ERR ptr len ≈ raise_oom msg) \/
-        (exists ptrs, @get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs).
+      (exists msg, @get_consecutive_ptrs M HM OOM ERR ptr len ≈ raise_oom msg)%monad \/
+        (exists ptrs, @get_consecutive_ptrs M HM OOM ERR ptr len ≈ ret ptrs)%monad.
   Proof.
     intros M HM OOM ERR EQM' EQV LAWS RAISE ptr len.
     unfold get_consecutive_ptrs.
@@ -2137,14 +2135,14 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     (* Converts an integer [x] to its byte representation over [n] bytes. *)
   (*    The representation is little endian. In particular, if [n] is too small, *)
   (*    only the least significant bytes are returned. *)
-  (*    *)
-    Fixpoint bytes_of_int_little_endian (n: nat) (x: Z) {struct n}: list byte :=
+    (*    *)
+    Fixpoint bytes_of_int_little_endian (n: nat) (x: Z) {struct n}: list (@int 8) :=
       match n with
       | O => nil
-      | S m => Byte.repr x :: bytes_of_int_little_endian m (x / 256)
+      | S m => repr x :: bytes_of_int_little_endian m (x / 256)
       end.
 
-    Definition bytes_of_int (e : Endianess) (n : nat) (x : Z) : list byte :=
+    Definition bytes_of_int (e : Endianess) (n : nat) (x : Z) : list (@int 8) :=
       correct_endianess e (bytes_of_int_little_endian n x).
 
     (* *)
@@ -2378,7 +2376,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     Defined.
 
     Definition lex_nats (ns1 ns2 : (nat * nat)) : Prop :=
-      lexprod nat (fun n => nat) lt (fun _ => lt) (sigT_of_prod ns1) (sigT_of_prod ns2).
+      lexprod nat (fun n => nat) Nat.lt (fun _ => Nat.lt) (sigT_of_prod ns1) (sigT_of_prod ns2).
 
     Lemma well_founded_lex_nats :
       well_founded lex_nats.
@@ -3619,7 +3617,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     then
       raise_ub "memset given negative length."
     else
-      let byte := uvalue_sbyte (UVALUE_I8 val) (DTYPE_I 8) 0 sid in
+      let byte := uvalue_sbyte (@UVALUE_I 8 val) (DTYPE_I 8) 0 sid in
       write_bytes_spec dst (repeatN (Z.to_N len) byte).
 
   (*** Handling memory events *)
@@ -3653,46 +3651,38 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       match args with
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
-                    DVALUE_I32 len ::
-                    DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (unsigned len) (equ volatile VellvmIntegers.one)
-      | DVALUE_Addr dst ::
-                    DVALUE_Addr src ::
-                    DVALUE_I64 len ::
-                    DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+                    @DVALUE_I sz len ::
+                    @DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
           memcpy_spec src dst (unsigned len) (equ volatile VellvmIntegers.one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_IPTR len ::
-                    DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+                    @DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
           memcpy_spec src dst (IP.to_Z len) (equ volatile VellvmIntegers.one)
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
-    Definition handle_memset_prop (args : list dvalue) : MemPropT MemState unit :=
-      match args with
-      | DVALUE_Addr dst ::
-          DVALUE_I8 val ::
-          DVALUE_I32 len ::
-          DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          sid <- fresh_sid;;
-          memset_spec dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
-      | DVALUE_Addr dst ::
-          DVALUE_I8 val ::
-          DVALUE_I64 len ::
-          DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          sid <- fresh_sid;;
-          memset_spec dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
-      | _ => raise_error "Unsupported arguments to memset."
-      end.
+    Definition handle_memset_prop (args : list dvalue) : MemPropT MemState unit.
+      refine
+        (match args with
+         | DVALUE_Addr dst ::
+             @DVALUE_I sz_val val ::
+             @DVALUE_I sz_len len ::
+             @DVALUE_I sz_vol volatile :: [] (* volatile ignored *)  =>
+             _
+         | _ => raise_error "Unsupported arguments to memset."
+         end).
+
+      destruct (Pos.eq_dec sz_val 8); subst.
+      - exact
+          (sid <- fresh_sid;;
+           memset_spec dst val (unsigned len) sid (equ volatile VellvmIntegers.one)).
+      - exact (raise_error "Unsupported arguments to memset.").
+    Defined.
 
     Definition handle_malloc_prop (args : list dvalue) : MemPropT MemState addr :=
       match args with
-      | [DVALUE_I1 sz]
-      | [DVALUE_I8 sz]
-      | [DVALUE_I16 sz]
-      | [DVALUE_I32 sz]
-      | [DVALUE_I64 sz] =>
+      | [@DVALUE_I bitwidth sz] =>
           sid <- fresh_sid;;
           bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8) sid);;
           malloc_bytes_spec_MemPropT bytes
@@ -4325,12 +4315,12 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
         match m with
         | inl (OOM_message x) =>
-            exists oom_msg, t ≈ raise_oom oom_msg
+            exists oom_msg, (t ≈ raise_oom oom_msg)%monad
         | inr (inl (UB_message x)) =>
             (* Should this be more permissive? *)
-            exists ub_msg, t ≈ raise_ub ub_msg
+            exists ub_msg, (t ≈ raise_ub ub_msg)%monad
         | inr (inr (inl (ERR_message x))) =>
-            exists err_msg, t ≈ raise_error err_msg
+            exists err_msg, (t ≈ raise_error err_msg)%monad
         | inr (inr (inr x)) =>
             (t ≈ ret x)%monad
         end
@@ -4745,7 +4735,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         rewrite MemMonad_run_bind.
         rewrite EXEC.
         rewrite OOM.
-        repeat (rewrite rbm_raise_bind; [| typeclasses eauto]).
+        repeat rewrite (@rbm_raise_bind _ _ _ _ (@raise_oom _ _) _).
         reflexivity.
       }
 
@@ -4785,7 +4775,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         rewrite MemMonad_run_bind.
         rewrite EXEC.
         rewrite ERR.
-        repeat (rewrite rbm_raise_bind; [| typeclasses eauto]).
+        repeat rewrite (@rbm_raise_bind _ _ _ _ (@raise_error _ _) _).
         reflexivity.
       }
 
@@ -5712,7 +5702,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       then
         raise_ub "memset given negative length."
       else
-        let byte := uvalue_sbyte (UVALUE_I8 val) (DTYPE_I 8) 0 sid in
+        let byte := uvalue_sbyte (@UVALUE_I 8 val) (DTYPE_I 8) 0 sid in
         write_bytes dst (repeatN (Z.to_N len) byte).
 
     Definition handle_memory `{MemMonad MemM (itree Eff)} : MemoryE ~> MemM
@@ -5746,46 +5736,37 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       match args with
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
-                    DVALUE_I32 len ::
-                    DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (unsigned len) (equ volatile VellvmIntegers.one)
-      | DVALUE_Addr dst ::
-                    DVALUE_Addr src ::
-                    DVALUE_I64 len ::
-                    DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+                    @DVALUE_I sz len ::
+                    @DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
           memcpy src dst (unsigned len) (equ volatile VellvmIntegers.one)
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
                     DVALUE_IPTR len ::
-                    DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+                    @DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
           memcpy src dst (IP.to_Z len) (equ volatile VellvmIntegers.one)
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
-    Definition handle_memset `{MemMonad MemM (itree Eff)} (args : list dvalue) : MemM unit :=
-      match args with
-      | DVALUE_Addr dst ::
-          DVALUE_I8 val ::
-          DVALUE_I32 len ::
-          DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          sid <- fresh_sid;;
-          memset dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
-      | DVALUE_Addr dst ::
-          DVALUE_I8 val ::
-          DVALUE_I64 len ::
-          DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
-          sid <- fresh_sid;;
-          memset dst val (unsigned len) sid (equ volatile VellvmIntegers.one)
-      | _ => raise_error "Unsupported arguments to memset."
-      end.
+    Definition handle_memset `{MemMonad MemM (itree Eff)} (args : list dvalue) : MemM unit.
+      refine
+        (match args with
+         | DVALUE_Addr dst ::
+             @DVALUE_I sz_val val ::
+             @DVALUE_I sz_len len ::
+             @DVALUE_I sz_vol volatile :: [] (* volatile ignored *)  =>
+             _
+         | _ => raise_error "Unsupported arguments to memset."
+         end).
+      destruct (Pos.eq_dec sz_val 8); subst.
+      - exact
+          (sid <- fresh_sid;;
+           memset dst val (unsigned len) sid (equ volatile VellvmIntegers.one)).
+      - exact (raise_error "Unsupported arguments to memset.").
+    Defined.
 
     Definition handle_malloc `{MemMonad MemM (itree Eff)} (args : list dvalue) : MemM addr :=
       match args with
-      | [DVALUE_I1 sz]
-      | [DVALUE_I8 sz]
-      | [DVALUE_I16 sz]
-      | [DVALUE_I32 sz]
-      | [DVALUE_I64 sz] =>
+      | [@DVALUE_I bitwidth sz] =>
           sid <- fresh_sid;;
           bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8) sid);;
           malloc_bytes bytes
@@ -7111,7 +7092,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
                    (intptr_seq 0
                       (@Datatypes.length BYTE_IMPL.SByte
                          (@repeatN BYTE_IMPL.SByte (Z.to_N len)
-                            (BYTE_IMPL.uvalue_sbyte (UVALUE_I8 val) (DTYPE_I 8) 0 sid)))))
+                            (BYTE_IMPL.uvalue_sbyte (@UVALUE_I 8 val) (DTYPE_I 8) 0 sid)))))
                 (fun ixs : list IP.intptr =>
                    @exec_correct_post_bind (list (OOM ADDR.addr)) (list ADDR.addr)
                      (@lift_err_RAISE_ERROR (list (OOM ADDR.addr)) exec_correct_post Monad_exec_correct_post
@@ -7126,12 +7107,12 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
                   (@map_monad_In exec_correct_post Monad_exec_correct_post (ADDR.addr * BYTE_IMPL.SByte) unit
                      (@zip ADDR.addr BYTE_IMPL.SByte a0
                         (@repeatN BYTE_IMPL.SByte (Z.to_N len)
-                           (BYTE_IMPL.uvalue_sbyte (UVALUE_I8 val) (DTYPE_I 8) 0 sid)))
+                           (BYTE_IMPL.uvalue_sbyte (@UVALUE_I 8 val) (DTYPE_I 8) 0 sid)))
                      (fun (H : ADDR.addr * BYTE_IMPL.SByte)
                         (_ : @In (ADDR.addr * BYTE_IMPL.SByte) H
                                (@zip ADDR.addr BYTE_IMPL.SByte a0
                                   (@repeatN BYTE_IMPL.SByte (Z.to_N len)
-                                     (BYTE_IMPL.uvalue_sbyte (UVALUE_I8 val) (DTYPE_I 8) 0 sid)))) 
+                                     (BYTE_IMPL.uvalue_sbyte (@UVALUE_I 8 val) (DTYPE_I 8) 0 sid)))) 
                         (_ : MemState) (st0 : store_id) (_ : unit) (_ : MemState) (st'0 : store_id) => 
                         st0 = st'0)) (fun _ : list unit => @exec_correct_post_ret unit tt))).
     Proof using Type.
@@ -7210,25 +7191,8 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
               try solve
                 [ eapply exec_correct_strengthen_post; cycle 1;
                   [apply exec_correct_raise_error|eauto]]).
-      { eapply exec_correct_strengthen_post; cycle 1.
-        { apply exec_correct_bind.
-          apply exec_correct_fresh_sid; eauto.
-          intros a0 ms_init ms_after_m st_init st_after_m H H0 H1 WEM.
-          eapply exec_correct_weaken_pre; cycle 1.
-          apply memset_correct.
-          intros ms st (?&?&?).
-          cbn in *.
-          repeat red in H3.
-          destruct H3 as (?&?&?).
-          cbn in *.
-          rewrite H3, bind_ret_l, H1 in H5.
-          eapply eq1_ret_ret in H5; try typeclasses eauto.
-          inv H5.
-          lia.
-        }
-        auto.
-      }
-      { eapply exec_correct_strengthen_post; cycle 1.
+      { subst.
+        eapply exec_correct_strengthen_post; cycle 1.
         { apply exec_correct_bind.
           apply exec_correct_fresh_sid; eauto.
           intros a0 ms_init ms_after_m st_init st_after_m H H0 H1 WEM.
@@ -7292,170 +7256,6 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
                 [ eapply exec_correct_strengthen_post; cycle 1;
                   [apply exec_correct_raise_error|eauto]]).
 
-      { eapply exec_correct_weaken_pre; cycle 1.
-        eapply exec_correct_strengthen_post; cycle 1.
-        { eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID POST RUN.
-          eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID' POST' RUN'.
-          eapply exec_correct_weaken_pre; cycle 1.
-          eapply malloc_bytes_correct.
-          intros ms st H.
-          cbn.
-          unfold lift_OOM in POST'.
-          break_match_hyp_inv.
-          eapply generate_num_undef_bytes_bounded; eauto.
-          destruct POST as (?&?&?); subst.
-          destruct H as (?&?&?&?); subst.
-          destruct H1; subst.
-          destruct H as (?&?&?).
-          repeat red in H3.
-          destruct H3 as (?&?&?).
-          cbn in H3.
-          cbn in H6.
-          rewrite H3 in H6.
-          rewrite MemMonad_run_ret, bind_ret_l in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          cbn in H1.
-          repeat red in H1.
-          destruct H1 as (?&?&?).
-          cbn in *.
-          rewrite H1, bind_ret_l in H6.
-          rewrite RUN in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          lia.
-        }
-        
-        eauto with EXEC_CORRECT.
-        eauto with EXEC_CORRECT.
-      }
-      { eapply exec_correct_weaken_pre; cycle 1.
-        eapply exec_correct_strengthen_post; cycle 1.
-        { eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID POST RUN.
-          eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID' POST' RUN'.
-          eapply exec_correct_weaken_pre; cycle 1.
-          eapply malloc_bytes_correct.
-          intros ms st H.
-          cbn.
-          unfold lift_OOM in POST'.
-          break_match_hyp_inv.
-          eapply generate_num_undef_bytes_bounded; eauto.
-          destruct POST as (?&?&?); subst.
-          destruct H as (?&?&?&?); subst.
-          destruct H1; subst.
-          destruct H as (?&?&?).
-          repeat red in H3.
-          destruct H3 as (?&?&?).
-          cbn in H3.
-          cbn in H6.
-          rewrite H3 in H6.
-          rewrite MemMonad_run_ret, bind_ret_l in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          cbn in H1.
-          repeat red in H1.
-          destruct H1 as (?&?&?).
-          cbn in *.
-          rewrite H1, bind_ret_l in H6.
-          rewrite RUN in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          lia.
-        }
-        
-        eauto with EXEC_CORRECT.
-        eauto with EXEC_CORRECT.
-      }
-      { eapply exec_correct_weaken_pre; cycle 1.
-        eapply exec_correct_strengthen_post; cycle 1.
-        { eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID POST RUN.
-          eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID' POST' RUN'.
-          eapply exec_correct_weaken_pre; cycle 1.
-          eapply malloc_bytes_correct.
-          intros ms st H.
-          cbn.
-          unfold lift_OOM in POST'.
-          break_match_hyp_inv.
-          eapply generate_num_undef_bytes_bounded; eauto.
-          destruct POST as (?&?&?); subst.
-          destruct H as (?&?&?&?); subst.
-          destruct H1; subst.
-          destruct H as (?&?&?).
-          repeat red in H3.
-          destruct H3 as (?&?&?).
-          cbn in H3.
-          cbn in H6.
-          rewrite H3 in H6.
-          rewrite MemMonad_run_ret, bind_ret_l in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          cbn in H1.
-          repeat red in H1.
-          destruct H1 as (?&?&?).
-          cbn in *.
-          rewrite H1, bind_ret_l in H6.
-          rewrite RUN in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          lia.
-        }
-        
-        eauto with EXEC_CORRECT.
-        eauto with EXEC_CORRECT.
-      }
-      { eapply exec_correct_weaken_pre; cycle 1.
-        eapply exec_correct_strengthen_post; cycle 1.
-        { eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID POST RUN.
-          eapply exec_correct_bind;
-            eauto with EXEC_CORRECT.
-          intros * VALID' POST' RUN'.
-          eapply exec_correct_weaken_pre; cycle 1.
-          eapply malloc_bytes_correct.
-          intros ms st H.
-          cbn.
-          unfold lift_OOM in POST'.
-          break_match_hyp_inv.
-          eapply generate_num_undef_bytes_bounded; eauto.
-          destruct POST as (?&?&?); subst.
-          destruct H as (?&?&?&?); subst.
-          destruct H1; subst.
-          destruct H as (?&?&?).
-          repeat red in H3.
-          destruct H3 as (?&?&?).
-          cbn in H3.
-          cbn in H6.
-          rewrite H3 in H6.
-          rewrite MemMonad_run_ret, bind_ret_l in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          cbn in H1.
-          repeat red in H1.
-          destruct H1 as (?&?&?).
-          cbn in *.
-          rewrite H1, bind_ret_l in H6.
-          rewrite RUN in H6.
-          eapply eq1_ret_ret in H6; try typeclasses eauto.
-          inv H6.
-          lia.
-        }
-        
-        eauto with EXEC_CORRECT.
-        eauto with EXEC_CORRECT.
-      }
       { eapply exec_correct_weaken_pre; cycle 1.
         eapply exec_correct_strengthen_post; cycle 1.
         { eapply exec_correct_bind;

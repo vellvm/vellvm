@@ -50,6 +50,7 @@ Import Monad.
 Import EqvNotation.
 Import MonadNotation.
 Import ListNotations.
+Import Logic.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -88,83 +89,6 @@ Definition inttyp (x:N) : Type :=
 apply N.eqb_eq.
 Qed.
 
-Lemma IX_supported_dec : forall (sz:N), {IX_supported sz} + {~IX_supported sz}.
-Proof using.
-  intros sz.
-  - decide (sz = 1)%N.
-    + left. subst. constructor.
-    + decide (sz = 8)%N.
-      * left. subst. constructor.
-      * decide (sz = 16).
-        -- left. subst. constructor.
-        -- decide (sz = 32).
-           ++ left. subst. constructor.
-           ++ decide (sz = 64).
-              ** left. subst. constructor.
-              ** right. intro X.
-                 inversion X; subst; contradiction.
-Qed.
-
-Lemma unsupported_cases : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x16 x8 x1 x : X),
-    (if (sz =? 64) then x64
-     else if (sz =? 32) then x32
-          else if (sz =? 16) then x16
-               else if (sz =? 8) then x8
-                    else if (sz =? 1) then x1
-                         else x) = x.
-Proof using.
-  intros.
-  destruct (sz =? 64) eqn: H.
-  rewrite N.eqb_eq in H.
-  destruct N. rewrite H. constructor.
-  destruct (sz =? 32) eqn: H'.
-  rewrite N.eqb_eq in H'.
-  destruct N. rewrite H'. constructor.
-  destruct (sz =? 16) eqn: H''.
-  rewrite N.eqb_eq in H''.
-  destruct N. rewrite H''. constructor.
-  destruct (sz =? 8) eqn: H'''.
-  rewrite N.eqb_eq in H'''.
-  destruct N. rewrite H'''. constructor.
-  destruct (sz =? 1) eqn: H''''.
-  rewrite N.eqb_eq in H''''.
-  destruct N. rewrite H''''. constructor.
-  reflexivity.
-Qed.
-
-Function unsupported_cases_match_ {X} (sz : N) (x64 x32 x16 x8 x1 x : X) :=
-  match sz with
-  | 64 => x64
-  | 32 => x32
-  | 16 => x16
-  | 8 => x8
-  | 1 => x1
-  | _ => x
-  end.
-
-Lemma unsupported_cases_match : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x16 x8 x1 x : X),
-    match sz with
-    | 64 => x64
-    | 32 => x32
-    | 16 => x16
-    | 8 => x8
-    | 1 => x1
-    | _ => x
-    end = x.
-Proof using.
-  intros.
-  change ((unsupported_cases_match_ sz x64 x32 x16 x8 x1 x) = x).
-  revert N.
-  apply unsupported_cases_match__ind; intros.
-  - assert False. apply N.  econstructor. inversion H.
-  - assert False. apply N.  econstructor. inversion H.
-  - assert False. apply N.  econstructor. inversion H.
-  - assert False. apply N.  econstructor. inversion H.
-  - assert False. apply N.  econstructor. inversion H.
-  - reflexivity.
-Qed.
-
-
 Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
 
@@ -198,11 +122,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Unset Elimination Schemes.
   Inductive dvalue : Set :=
   | DVALUE_Addr (a:A.addr)
-  | DVALUE_I1 (x:int1)
-  | DVALUE_I8 (x:int8)
-  | DVALUE_I16 (x:int16)
-  | DVALUE_I32 (x:int32)
-  | DVALUE_I64 (x:int64)
+  | DVALUE_I (sz : positive) (x:@int sz)
   | DVALUE_IPTR (x:intptr)
   | DVALUE_Double (x:ll_double)
   | DVALUE_Float (x:ll_float)
@@ -211,19 +131,15 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | DVALUE_None
   | DVALUE_Struct        (fields: list dvalue)
   | DVALUE_Packed_struct (fields: list dvalue)
-  | DVALUE_Array         (elts: list dvalue)
-  | DVALUE_Vector        (elts: list dvalue)
+  | DVALUE_Array         (t:dtyp) (elts: list dvalue)
+  | DVALUE_Vector        (t:dtyp) (elts: list dvalue)
   .
   Set Elimination Schemes.
 
   Fixpoint show_dvalue (dv : dvalue) : string :=
     match dv with
     | DVALUE_Addr a => "<addr>"
-    | DVALUE_I1 x => "i1 " ++ show (Int1.unsigned x)
-    | DVALUE_I8 x => "i8 " ++ show (Int8.unsigned x)
-    | DVALUE_I16 x => "i16 " ++ show (Int16.unsigned x)
-    | DVALUE_I32 x => "i32 " ++ show (Int32.unsigned x)
-    | DVALUE_I64 x => "i64 " ++ show (Int64.unsigned x)
+    | DVALUE_I sz x => "i" ++ show (Zpos sz) ++ " " ++ show (unsigned x)
     | DVALUE_IPTR x => "<intptr>"
     | DVALUE_Double x => "double " ++ show x
     | DVALUE_Float x => "float " ++ show x
@@ -232,18 +148,14 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_None => "none"
     | DVALUE_Struct fields => "{" ++ String.concat ", " (map show_dvalue fields) ++ "}"
     | DVALUE_Packed_struct fields => "{<" ++ String.concat ", " (map show_dvalue fields) ++ ">}"
-    | DVALUE_Array elts => "["  ++ String.concat ", " (map show_dvalue elts) ++ "]"
-    | DVALUE_Vector elts => "<"  ++ String.concat ", " (map show_dvalue elts) ++ ">"
+    | DVALUE_Array _ elts => "["  ++ String.concat ", " (map show_dvalue elts) ++ "]"
+    | DVALUE_Vector _ elts => "<"  ++ String.concat ", " (map show_dvalue elts) ++ ">"
     end.
 
   Fixpoint dvalue_measure (dv : dvalue) : nat :=
     match dv with
     | DVALUE_Addr a => 1
-    | DVALUE_I1 x => 1
-    | DVALUE_I8 x => 1
-    | DVALUE_I16 x => 1
-    | DVALUE_I32 x => 1
-    | DVALUE_I64 x => 1
+    | DVALUE_I sz x => 1
     | DVALUE_IPTR x => 1
     | DVALUE_Double x => 1
     | DVALUE_Float x => 1
@@ -252,8 +164,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_None => 1
     | DVALUE_Struct fields => S (S (list_sum (map dvalue_measure fields)))
     | DVALUE_Packed_struct fields => S (S (list_sum (map dvalue_measure fields)))
-    | DVALUE_Array elts => S (S (list_sum (map dvalue_measure elts)))
-    | DVALUE_Vector elts => S (S (list_sum (map dvalue_measure elts)))
+    | DVALUE_Array t elts => S (S (list_sum (map dvalue_measure elts)))
+    | DVALUE_Vector t elts => S (S (list_sum (map dvalue_measure elts)))
     end.
 
   Lemma dvalue_measure_gt_0 :
@@ -278,8 +190,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Inductive dvalue_direct_subterm : dvalue -> dvalue -> Prop :=
   | DVALUE_Struct_subterm : forall f fields, In f fields -> dvalue_direct_subterm f (DVALUE_Struct fields)
   | DVALUE_Packed_struct_subterm : forall f fields, In f fields -> dvalue_direct_subterm f (DVALUE_Packed_struct fields)
-  | DVALUE_Array_subterm : forall elt elts, In elt elts -> dvalue_direct_subterm elt (DVALUE_Array elts)
-  | DVALUE_Vector_subterm : forall elt elts, In elt elts -> dvalue_direct_subterm elt (DVALUE_Vector elts).
+  | DVALUE_Array_subterm : forall t elt elts, In elt elts -> dvalue_direct_subterm elt (DVALUE_Array t elts)
+  | DVALUE_Vector_subterm : forall t elt elts, In elt elts -> dvalue_direct_subterm elt (DVALUE_Vector t elts).
 
   Definition dvalue_strict_subterm := clos_trans _ dvalue_direct_subterm.
   Definition dvalue_subterm := clos_refl_trans _ dvalue_direct_subterm.
@@ -287,12 +199,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Section DvalueInd.
     Variable P : dvalue -> Prop.
     Hypothesis IH_Addr          : forall a, P (DVALUE_Addr a).
-    Hypothesis IH_I1            : forall x, P (DVALUE_I1 x).
-    Hypothesis IH_I8            : forall x, P (DVALUE_I8 x).
-    Hypothesis IH_I16            : forall x, P (DVALUE_I16 x).
-    Hypothesis IH_I32           : forall x, P (DVALUE_I32 x).
-    Hypothesis IH_I64           : forall x, P (DVALUE_I64 x).
-    Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x).
+    Hypothesis IH_I             : forall sz (x : @int sz), P (@DVALUE_I sz x).
+    Hypothesis IH_IPTR          : forall x, P (DVALUE_IPTR x).
     Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
     Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
     Hypothesis IH_Poison        : forall t, P (DVALUE_Poison t).
@@ -300,8 +208,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_None          : P DVALUE_None.
     Hypothesis IH_Struct        : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Struct fields).
     Hypothesis IH_Packed_Struct : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Packed_struct fields).
-    Hypothesis IH_Array         : forall (elts: list dvalue), (forall e, In e elts -> P e) -> P (DVALUE_Array elts).
-    Hypothesis IH_Vector        : forall (elts: list dvalue), (forall e, In e elts -> P e) -> P (DVALUE_Vector elts).
+    Hypothesis IH_Array         : forall t (elts: list dvalue), (forall e, In e elts -> P e) -> P (DVALUE_Array t elts).
+    Hypothesis IH_Vector        : forall t (elts: list dvalue), (forall e, In e elts -> P e) -> P (DVALUE_Vector t elts).
 
     Lemma dvalue_ind : forall (dv:dvalue), P dv.
     Proof using All.
@@ -334,11 +242,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Section DvalueRec.
     Variable P : dvalue -> Set.
     Hypothesis IH_Addr          : forall a, P (DVALUE_Addr a).
-    Hypothesis IH_I1            : forall x, P (DVALUE_I1 x).
-    Hypothesis IH_I8            : forall x, P (DVALUE_I8 x).
-    Hypothesis IH_I16           : forall x, P (DVALUE_I16 x).
-    Hypothesis IH_I32           : forall x, P (DVALUE_I32 x).
-    Hypothesis IH_I64           : forall x, P (DVALUE_I64 x).
+    Hypothesis IH_I            : forall sz (x : @int sz), P (@DVALUE_I sz x).
     Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x).
     Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
     Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
@@ -347,8 +251,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_None          : P DVALUE_None.
     Hypothesis IH_Struct        : forall (fields: list dvalue), (forall u, InT u fields -> P u) -> P (DVALUE_Struct fields).
     Hypothesis IH_Packed_Struct : forall (fields: list dvalue), (forall u, InT u fields -> P u) -> P (DVALUE_Packed_struct fields).
-    Hypothesis IH_Array         : forall (elts: list dvalue), (forall e, InT e elts -> P e) -> P (DVALUE_Array elts).
-    Hypothesis IH_Vector        : forall (elts: list dvalue), (forall e, InT e elts -> P e) -> P (DVALUE_Vector elts).
+    Hypothesis IH_Array         : forall t (elts: list dvalue), (forall e, InT e elts -> P e) -> P (DVALUE_Array t elts).
+    Hypothesis IH_Vector        : forall t (elts: list dvalue), (forall e, InT e elts -> P e) -> P (DVALUE_Vector t elts).
 
     Lemma dvalue_rec : forall (dv:dvalue), P dv.
     Proof using All.
@@ -412,11 +316,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Section DvalueStrongInd.
     Variable P : dvalue -> Prop.
     Hypothesis IH_Addr          : forall a, P (DVALUE_Addr a).
-    Hypothesis IH_I1            : forall x, P (DVALUE_I1 x).
-    Hypothesis IH_I8            : forall x, P (DVALUE_I8 x).
-    Hypothesis IH_I16            : forall x, P (DVALUE_I16 x).
-    Hypothesis IH_I32           : forall x, P (DVALUE_I32 x).
-    Hypothesis IH_I64           : forall x, P (DVALUE_I64 x).
+    Hypothesis IH_I             : forall sz (x : @int sz), P (@DVALUE_I sz x).
     Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x).
     Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
     Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
@@ -442,7 +342,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 ]
             end
 
-          | (* Solve structs and arrays *)
+          | (* Solve structs *)
             intros s H';
             dependent induction H';
             [ (* rt_step *)
@@ -495,7 +395,165 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                   ]
               end
             ]
+
+          | (* Solve arrays / vectors *)
+            intros t s H';
+            dependent induction H';
+            [ (* rt_step *)
+              match goal with
+              | H: dvalue_direct_subterm ?x _,
+                  IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                            |- P ?x =>
+                  inv H;
+                  apply IH_Subterm; eauto;
+                  intros; eapply IH; eauto;
+                  apply clos_t_rt; eauto
+              end
+            | (* rt_refl *)
+              apply IH_Subterm;
+              intros * STRICT;
+              dependent induction STRICT;
+              [ (* t_step *)
+                match goal with
+                | H: dvalue_direct_subterm ?x _,
+                    IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                              |- P ?x =>
+                    inv H;
+                    eapply IH; eauto;
+                    apply rt_refl
+                end
+              | (* t_trans *)
+                match goal with
+                | IH : forall u : dvalue, In u ?fields -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                            |- P ?x =>
+                    clear IHSTRICT1;
+                    specialize (IHSTRICT2 t fields);
+                    repeat (forward IHSTRICT2; auto);
+                    pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
+                    eapply dvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
+                    inv DIRECT;
+                    eapply IH; eauto
+                end
+              ]
+            | (* rt_trans *)
+              match goal with
+              | XY : clos_refl_trans dvalue dvalue_direct_subterm ?x ?y,
+                  YZ : clos_refl_trans dvalue dvalue_direct_subterm ?y ?z,
+                    IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                              |- _ =>
+                  pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
+                  apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
+                  [ subst;
+                    pose proof dvalue_subterm_antisymmetric XY YZ; subst; eauto
+                  | inv R; eapply IH; eauto
+                  ]
+              end
+            ]
           ].
+
+      { intros s H'.
+        dependent induction H'.
+        - (* rt_step *)
+          match goal with
+          | H: dvalue_direct_subterm ?x _,
+              IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                        |- P ?x =>
+              inv H;
+              apply IH_Subterm; eauto;
+              intros; eapply IH; eauto;
+              apply clos_t_rt; eauto
+          end.
+        - (* rt_refl *)
+          apply IH_Subterm.
+          intros * STRICT;
+            dependent induction STRICT.
+          + (* t_step *)
+              match goal with
+              | H: dvalue_direct_subterm ?x _,
+                  IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                            |- P ?x =>
+                  inv H;
+                  eapply IH; eauto;
+                  apply rt_refl
+              end.
+          + (* t_trans *)
+            match goal with
+            | IH : forall u : dvalue, In u ?fields -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                              |- P ?x =>
+                clear IHSTRICT1;
+                specialize (IHSTRICT2 t fields);
+                repeat (forward IHSTRICT2; auto);
+                pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
+                eapply dvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
+                inv DIRECT;
+                eapply IH; eauto
+            end.
+        - (* rt_trans *)
+          match goal with
+          | XY : clos_refl_trans dvalue dvalue_direct_subterm ?x ?y,
+              YZ : clos_refl_trans dvalue dvalue_direct_subterm ?y ?z,
+                IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                          |- _ =>
+              pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
+              apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
+              [ subst;
+                pose proof dvalue_subterm_antisymmetric XY YZ; subst; eauto
+              | inv R; eapply IH; eauto
+              ]
+          end.
+      }
+
+      { intros s H'.
+        dependent induction H'.
+        - (* rt_step *)
+          match goal with
+          | H: dvalue_direct_subterm ?x _,
+              IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                        |- P ?x =>
+              inv H;
+              apply IH_Subterm; eauto;
+              intros; eapply IH; eauto;
+              apply clos_t_rt; eauto
+          end.
+        - (* rt_refl *)
+          apply IH_Subterm.
+          intros * STRICT;
+            dependent induction STRICT.
+          + (* t_step *)
+              match goal with
+              | H: dvalue_direct_subterm ?x _,
+                  IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                            |- P ?x =>
+                  inv H;
+                  eapply IH; eauto;
+                  apply rt_refl
+              end.
+          + (* t_trans *)
+            match goal with
+            | IH : forall u : dvalue, In u ?fields -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                              |- P ?x =>
+                clear IHSTRICT1;
+                specialize (IHSTRICT2 t fields);
+                repeat (forward IHSTRICT2; auto);
+                pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
+                eapply dvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
+                inv DIRECT;
+                eapply IH; eauto
+            end.
+        - (* rt_trans *)
+          match goal with
+          | XY : clos_refl_trans dvalue dvalue_direct_subterm ?x ?y,
+              YZ : clos_refl_trans dvalue dvalue_direct_subterm ?y ?z,
+                IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                          |- _ =>
+              pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
+              apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
+              [ subst;
+                pose proof dvalue_subterm_antisymmetric XY YZ; subst; eauto
+              | inv R; eapply IH; eauto
+              ]
+          end.
+      }
     Qed.
   End DvalueStrongInd.
 
@@ -503,11 +561,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Unset Elimination Schemes.
   Inductive uvalue : Type :=
   | UVALUE_Addr (a:A.addr)
-  | UVALUE_I1 (x:int1)
-  | UVALUE_I8 (x:int8)
-  | UVALUE_I16 (x:int16)
-  | UVALUE_I32 (x:int32)
-  | UVALUE_I64 (x:int64)
+  | UVALUE_I (sz : positive) (x:@int sz)
   | UVALUE_IPTR (x:intptr)
   | UVALUE_Double (x:ll_double)
   | UVALUE_Float (x:ll_float)
@@ -517,8 +571,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_None
   | UVALUE_Struct        (fields: list uvalue)
   | UVALUE_Packed_struct (fields: list uvalue)
-  | UVALUE_Array         (elts: list uvalue)
-  | UVALUE_Vector        (elts: list uvalue)
+  | UVALUE_Array         (t : dtyp) (elts: list uvalue)
+  | UVALUE_Vector        (t : dtyp) (elts: list uvalue)
   | UVALUE_IBinop           (iop:ibinop) (v1:uvalue) (v2:uvalue)
   | UVALUE_ICmp             (cmp:icmp)   (v1:uvalue) (v2:uvalue)
   | UVALUE_FBinop           (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue)
@@ -542,11 +596,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Fixpoint uvalue_measure (uv : uvalue) : nat :=
     match uv with
     | UVALUE_Addr a => 1
-    | UVALUE_I1 x => 1
-    | UVALUE_I8 x => 1
-    | UVALUE_I16 x => 1
-    | UVALUE_I32 x => 1
-    | UVALUE_I64 x => 1
+    | UVALUE_I sz x => 1
     | UVALUE_IPTR x => 1
     | UVALUE_Double x => 1
     | UVALUE_Float x => 1
@@ -556,8 +606,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_None => 1
     | UVALUE_Struct fields => S (S (list_sum (map uvalue_measure fields)))
     | UVALUE_Packed_struct fields => S (S (list_sum (map uvalue_measure fields)))
-    | UVALUE_Array elts => S (S (list_sum (map uvalue_measure elts)))
-    | UVALUE_Vector elts => S (S (list_sum (map uvalue_measure elts)))
+    | UVALUE_Array t elts => S (S (list_sum (map uvalue_measure elts)))
+    | UVALUE_Vector t elts => S (S (list_sum (map uvalue_measure elts)))
     | UVALUE_IBinop _ v1 v2
     | UVALUE_ICmp _ v1 v2
     | UVALUE_FBinop _ _ v1 v2
@@ -647,8 +697,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Inductive uvalue_direct_subterm : uvalue -> uvalue -> Prop :=
   | UVALUE_Struct_subterm : forall f fields, In f fields -> uvalue_direct_subterm f (UVALUE_Struct fields)
   | UVALUE_Packed_struct_subterm : forall f fields, In f fields -> uvalue_direct_subterm f (UVALUE_Packed_struct fields)
-  | UVALUE_Array_subterm : forall elt elts, In elt elts -> uvalue_direct_subterm elt (UVALUE_Array elts)
-  | UVALUE_Vector_subterm : forall elt elts, In elt elts -> uvalue_direct_subterm elt (UVALUE_Vector elts)
+  | UVALUE_Array_subterm : forall t elt elts, In elt elts -> uvalue_direct_subterm elt (UVALUE_Array t elts)
+  | UVALUE_Vector_subterm : forall t elt elts, In elt elts -> uvalue_direct_subterm elt (UVALUE_Vector t elts)
   | UVALUE_IBinop_subterm_l : forall iop uv1 uv2, uvalue_direct_subterm uv1 (UVALUE_IBinop iop uv1 uv2)
   | UVALUE_IBinop_subterm_r : forall iop uv1 uv2, uvalue_direct_subterm uv2 (UVALUE_IBinop iop uv1 uv2)
   | UVALUE_ICmp_subterm_l : forall icmp uv1 uv2, uvalue_direct_subterm uv1 (UVALUE_ICmp icmp uv1 uv2)
@@ -683,11 +733,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Section UvalueInd.
     Variable P : uvalue -> Prop.
     Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a).
-    Hypothesis IH_I1             : forall x, P (UVALUE_I1 x).
-    Hypothesis IH_I8             : forall x, P (UVALUE_I8 x).
-    Hypothesis IH_I16             : forall x, P (UVALUE_I16 x).
-    Hypothesis IH_I32            : forall x, P (UVALUE_I32 x).
-    Hypothesis IH_I64            : forall x, P (UVALUE_I64 x).
+    Hypothesis IH_I              : forall sz x, P (@UVALUE_I sz x).
     Hypothesis IH_IPTR            : forall x, P (UVALUE_IPTR x).
     Hypothesis IH_Double         : forall x, P (UVALUE_Double x).
     Hypothesis IH_Float          : forall x, P (UVALUE_Float x).
@@ -697,8 +743,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_None           : P UVALUE_None.
     Hypothesis IH_Struct         : forall (fields: list uvalue), (forall u, In u fields -> P u) -> P (UVALUE_Struct fields).
     Hypothesis IH_Packed_Struct  : forall (fields: list uvalue), (forall u, In u fields -> P u) -> P (UVALUE_Packed_struct fields).
-    Hypothesis IH_Array          : forall (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Array elts).
-    Hypothesis IH_Vector         : forall (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Vector elts).
+    Hypothesis IH_Array          : forall t (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Array t elts).
+    Hypothesis IH_Vector         : forall t (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Vector t elts).
     Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
     Hypothesis IH_ICmp           : forall (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp cmp v1 v2).
     Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
@@ -864,11 +910,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Qed.
 
   Lemma uvalue_array_strict_subterm :
-    forall u uvs,
+    forall t u uvs,
       Exists (uvalue_subterm u) uvs ->
-      uvalue_strict_subterm u (UVALUE_Array uvs).
+      uvalue_strict_subterm u (UVALUE_Array t uvs).
   Proof using.
-    intros u uvs H.
+    intros t u uvs H.
     induction H.
     { unfold uvalue_subterm in H. unfold uvalue_strict_subterm.
       (* The idea here: if uvalue_direct_subterm is refl, then clos_trans is transitive with x and x is *)
@@ -886,11 +932,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Qed.
 
   Lemma uvalue_vector_strict_subterm :
-    forall u uvs,
+    forall t u uvs,
       Exists (uvalue_subterm u) uvs ->
-      uvalue_strict_subterm u (UVALUE_Vector uvs).
+      uvalue_strict_subterm u (UVALUE_Vector t uvs).
   Proof using.
-    intros u uvs H.
+    intros t u uvs H.
     induction H.
     { unfold uvalue_subterm in H. unfold uvalue_strict_subterm.
       (* The idea here: if uvalue_direct_subterm is refl, then clos_trans is transitive with x and x is *)
@@ -1197,6 +1243,110 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
             ]
           ].
 
+      { intros s H'.
+        dependent induction H'.
+        - (* rt_step *)
+          match goal with
+          | H: uvalue_direct_subterm ?x _,
+              IH : forall u : uvalue, In u _ -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                        |- P ?x =>
+              inv H;
+              apply IH_Subterm; eauto;
+              intros; eapply IH; eauto;
+              apply clos_t_rt; eauto
+          end.
+        - (* rt_refl *)
+          apply IH_Subterm.
+          intros * STRICT;
+            dependent induction STRICT.
+          + (* t_step *)
+              match goal with
+              | H: uvalue_direct_subterm ?x _,
+                  IH : forall u : uvalue, In u _ -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                            |- P ?x =>
+                  inv H;
+                  eapply IH; eauto;
+                  apply rt_refl
+              end.
+          + (* t_trans *)
+            match goal with
+            | IH : forall u : uvalue, In u ?fields -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                              |- P ?x =>
+                clear IHSTRICT1;
+                specialize (IHSTRICT2 t fields);
+                repeat (forward IHSTRICT2; auto);
+                pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
+                eapply uvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
+                inv DIRECT;
+                eapply IH; eauto
+            end.
+        - (* rt_trans *)
+          match goal with
+          | XY : clos_refl_trans uvalue uvalue_direct_subterm ?x ?y,
+              YZ : clos_refl_trans uvalue uvalue_direct_subterm ?y ?z,
+                IH : forall u : uvalue, In u _ -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                          |- _ =>
+              pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
+              apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
+              [ subst;
+                pose proof uvalue_subterm_antisymmetric XY YZ; subst; eauto
+              | inv R; eapply IH; eauto
+              ]
+          end.
+      }
+
+      { intros s H'.
+        dependent induction H'.
+        - (* rt_step *)
+          match goal with
+          | H: uvalue_direct_subterm ?x _,
+              IH : forall u : uvalue, In u _ -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                        |- P ?x =>
+              inv H;
+              apply IH_Subterm; eauto;
+              intros; eapply IH; eauto;
+              apply clos_t_rt; eauto
+          end.
+        - (* rt_refl *)
+          apply IH_Subterm.
+          intros * STRICT;
+            dependent induction STRICT.
+          + (* t_step *)
+              match goal with
+              | H: uvalue_direct_subterm ?x _,
+                  IH : forall u : uvalue, In u _ -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                            |- P ?x =>
+                  inv H;
+                  eapply IH; eauto;
+                  apply rt_refl
+              end.
+          + (* t_trans *)
+            match goal with
+            | IH : forall u : uvalue, In u ?fields -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                              |- P ?x =>
+                clear IHSTRICT1;
+                specialize (IHSTRICT2 t fields);
+                repeat (forward IHSTRICT2; auto);
+                pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
+                eapply uvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
+                inv DIRECT;
+                eapply IH; eauto
+            end.
+        - (* rt_trans *)
+          match goal with
+          | XY : clos_refl_trans uvalue uvalue_direct_subterm ?x ?y,
+              YZ : clos_refl_trans uvalue uvalue_direct_subterm ?y ?z,
+                IH : forall u : uvalue, In u _ -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                          |- _ =>
+              pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
+              apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
+              [ subst;
+                pose proof uvalue_subterm_antisymmetric XY YZ; subst; eauto
+              | inv R; eapply IH; eauto
+              ]
+          end.
+      }
+
       { (* GEP *)
         intros s H';
           dependent induction H'.
@@ -1274,11 +1424,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Section UvalueStrongInd.
     Variable P : uvalue -> Prop.
     Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a).
-    Hypothesis IH_I1             : forall x, P (UVALUE_I1 x).
-    Hypothesis IH_I8             : forall x, P (UVALUE_I8 x).
-    Hypothesis IH_I16             : forall x, P (UVALUE_I16 x).
-    Hypothesis IH_I32            : forall x, P (UVALUE_I32 x).
-    Hypothesis IH_I64            : forall x, P (UVALUE_I64 x).
+    Hypothesis IH_I              : forall sz x, P (@UVALUE_I sz x).
     Hypothesis IH_IPTR            : forall x, P (UVALUE_IPTR x).
     Hypothesis IH_Double         : forall x, P (UVALUE_Double x).
     Hypothesis IH_Float          : forall x, P (UVALUE_Float x).
@@ -1525,6 +1671,110 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
             ]
           ].
 
+      { intros s H'.
+        dependent induction H'.
+        - (* rt_step *)
+          match goal with
+          | H: uvalue_direct_subterm ?x _,
+              IH : forall u : uvalue, In u _ -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                        |- P ?x =>
+              inv H;
+              apply IH_Subterm; eauto;
+              intros; eapply IH; eauto;
+              apply clos_t_rt; eauto
+          end.
+        - (* rt_refl *)
+          apply IH_Subterm.
+          intros * STRICT;
+            dependent induction STRICT.
+          + (* t_step *)
+              match goal with
+              | H: uvalue_direct_subterm ?x _,
+                  IH : forall u : uvalue, In u _ -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                            |- P ?x =>
+                  inv H;
+                  eapply IH; eauto;
+                  apply rt_refl
+              end.
+          + (* t_trans *)
+            match goal with
+            | IH : forall u : uvalue, In u ?fields -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                              |- P ?x =>
+                clear IHSTRICT1;
+                specialize (IHSTRICT2 t fields);
+                repeat (forward IHSTRICT2; auto);
+                pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
+                eapply uvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
+                inv DIRECT;
+                eapply IH; eauto
+            end.
+        - (* rt_trans *)
+          match goal with
+          | XY : clos_refl_trans uvalue uvalue_direct_subterm ?x ?y,
+              YZ : clos_refl_trans uvalue uvalue_direct_subterm ?y ?z,
+                IH : forall u : uvalue, In u _ -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                          |- _ =>
+              pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
+              apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
+              [ subst;
+                pose proof uvalue_subterm_antisymmetric XY YZ; subst; eauto
+              | inv R; eapply IH; eauto
+              ]
+          end.
+      }
+
+      { intros s H'.
+        dependent induction H'.
+        - (* rt_step *)
+          match goal with
+          | H: uvalue_direct_subterm ?x _,
+              IH : forall u : uvalue, In u _ -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                        |- P ?x =>
+              inv H;
+              apply IH_Subterm; eauto;
+              intros; eapply IH; eauto;
+              apply clos_t_rt; eauto
+          end.
+        - (* rt_refl *)
+          apply IH_Subterm.
+          intros * STRICT;
+            dependent induction STRICT.
+          + (* t_step *)
+              match goal with
+              | H: uvalue_direct_subterm ?x _,
+                  IH : forall u : uvalue, In u _ -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                            |- P ?x =>
+                  inv H;
+                  eapply IH; eauto;
+                  apply rt_refl
+              end.
+          + (* t_trans *)
+            match goal with
+            | IH : forall u : uvalue, In u ?fields -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                              |- P ?x =>
+                clear IHSTRICT1;
+                specialize (IHSTRICT2 t fields);
+                repeat (forward IHSTRICT2; auto);
+                pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
+                eapply uvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
+                inv DIRECT;
+                eapply IH; eauto
+            end.
+        - (* rt_trans *)
+          match goal with
+          | XY : clos_refl_trans uvalue uvalue_direct_subterm ?x ?y,
+              YZ : clos_refl_trans uvalue uvalue_direct_subterm ?y ?z,
+                IH : forall u : uvalue, In u _ -> forall s : uvalue, uvalue_subterm s u -> P s
+                                                          |- _ =>
+              pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
+              apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
+              [ subst;
+                pose proof uvalue_subterm_antisymmetric XY YZ; subst; eauto
+              | inv R; eapply IH; eauto
+              ]
+          end.
+      }
+
       { (* GEP *)
         intros s H';
           dependent induction H'.
@@ -1602,11 +1852,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Section UvalueRec.
     Variable P : uvalue -> Set.
     Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a).
-    Hypothesis IH_I1             : forall x, P (UVALUE_I1 x).
-    Hypothesis IH_I8             : forall x, P (UVALUE_I8 x).
-    Hypothesis IH_I16             : forall x, P (UVALUE_I16 x).
-    Hypothesis IH_I32            : forall x, P (UVALUE_I32 x).
-    Hypothesis IH_I64            : forall x, P (UVALUE_I64 x).
+    Hypothesis IH_I              : forall sz x, P (@UVALUE_I sz x).
     Hypothesis IH_IPTR            : forall x, P (UVALUE_IPTR x).
     Hypothesis IH_Double         : forall x, P (UVALUE_Double x).
     Hypothesis IH_Float          : forall x, P (UVALUE_Float x).
@@ -1616,8 +1862,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_None           : P UVALUE_None.
     Hypothesis IH_Struct         : forall (fields: list uvalue), (forall u, InT u fields -> P u) -> P (UVALUE_Struct fields).
     Hypothesis IH_Packed_Struct  : forall (fields: list uvalue), (forall u, InT u fields -> P u) -> P (UVALUE_Packed_struct fields).
-    Hypothesis IH_Array          : forall (elts: list uvalue), (forall e, InT e elts -> P e) -> P (UVALUE_Array elts).
-    Hypothesis IH_Vector         : forall (elts: list uvalue), (forall e, InT e elts -> P e) -> P (UVALUE_Vector elts).
+    Hypothesis IH_Array          : forall t (elts: list uvalue), (forall e, InT e elts -> P e) -> P (UVALUE_Array t elts).
+    Hypothesis IH_Vector         : forall t (elts: list uvalue), (forall e, InT e elts -> P e) -> P (UVALUE_Vector t elts).
     Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
     Hypothesis IH_ICmp           : forall (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp cmp v1 v2).
     Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
@@ -1688,11 +1934,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Section UvalueInd''.
     Variable P : uvalue -> Prop.
     Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a).
-    Hypothesis IH_I1             : forall x, P (UVALUE_I1 x).
-    Hypothesis IH_I8             : forall x, P (UVALUE_I8 x).
-    Hypothesis IH_I16             : forall x, P (UVALUE_I16 x).
-    Hypothesis IH_I32            : forall x, P (UVALUE_I32 x).
-    Hypothesis IH_I64            : forall x, P (UVALUE_I64 x).
+    Hypothesis IH_I              : forall sz x, P (@UVALUE_I sz x).
     Hypothesis IH_IPTR            : forall x, P (UVALUE_IPTR x).
     Hypothesis IH_Double         : forall x, P (UVALUE_Double x).
     Hypothesis IH_Float          : forall x, P (UVALUE_Float x).
@@ -1795,8 +2037,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Struct_cons    : forall uv uvs, P uv -> P (UVALUE_Struct uvs) -> P (UVALUE_Struct (uv :: uvs)).
     Hypothesis IH_Packed_struct_nil     : P (UVALUE_Packed_struct []).
     Hypothesis IH_Packed_struct_cons    : forall uv uvs, P uv -> P (UVALUE_Packed_struct uvs) -> P (UVALUE_Packed_struct (uv :: uvs)).
-    Hypothesis IH_Array          : forall (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Array elts).
-    Hypothesis IH_Vector         : forall (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Vector elts).
+    Hypothesis IH_Array          : forall t (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Array t elts).
+    Hypothesis IH_Vector         : forall t (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Vector t elts).
     Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
     Hypothesis IH_ICmp           : forall (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp cmp v1 v2).
     Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
@@ -1976,11 +2218,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Section UvalueRec''.
     Variable P : uvalue -> Set.
     Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a).
-    Hypothesis IH_I1             : forall x, P (UVALUE_I1 x).
-    Hypothesis IH_I8             : forall x, P (UVALUE_I8 x).
-    Hypothesis IH_I16            : forall x, P (UVALUE_I16 x).
-    Hypothesis IH_I32            : forall x, P (UVALUE_I32 x).
-    Hypothesis IH_I64            : forall x, P (UVALUE_I64 x).
+    Hypothesis IH_I              : forall sz x, P (@UVALUE_I sz x).
     Hypothesis IH_IPTR            : forall x, P (UVALUE_IPTR x).
     Hypothesis IH_Double         : forall x, P (UVALUE_Double x).
     Hypothesis IH_Float          : forall x, P (UVALUE_Float x).
@@ -2083,8 +2321,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Struct_cons    : forall uv uvs, P uv -> P (UVALUE_Struct uvs) -> P (UVALUE_Struct (uv :: uvs)).
     Hypothesis IH_Packed_struct_nil     : P (UVALUE_Packed_struct []).
     Hypothesis IH_Packed_struct_cons    : forall uv uvs, P uv -> P (UVALUE_Packed_struct uvs) -> P (UVALUE_Packed_struct (uv :: uvs)).
-    Hypothesis IH_Array          : forall (elts: list uvalue), (forall e, InT e elts -> P e) -> P (UVALUE_Array elts).
-    Hypothesis IH_Vector         : forall (elts: list uvalue), (forall e, InT e elts -> P e) -> P (UVALUE_Vector elts).
+    Hypothesis IH_Array          : forall t (elts: list uvalue), (forall e, InT e elts -> P e) -> P (UVALUE_Array t elts).
+    Hypothesis IH_Vector         : forall t (elts: list uvalue), (forall e, InT e elts -> P e) -> P (UVALUE_Vector t elts).
     Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
     Hypothesis IH_ICmp           : forall (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp cmp v1 v2).
     Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
@@ -2265,11 +2503,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Fixpoint dvalue_to_uvalue (dv : dvalue) : uvalue :=
     match dv with
     | DVALUE_Addr a => UVALUE_Addr a
-    | DVALUE_I1 x => UVALUE_I1 x
-    | DVALUE_I8 x => UVALUE_I8 x
-    | DVALUE_I16 x => UVALUE_I16 x
-    | DVALUE_I32 x => UVALUE_I32 x
-    | DVALUE_I64 x => UVALUE_I64 x
+    | @DVALUE_I sz x => @UVALUE_I sz x
     | DVALUE_IPTR x => UVALUE_IPTR x
     | DVALUE_Double x => UVALUE_Double x
     | DVALUE_Float x => UVALUE_Float x
@@ -2278,19 +2512,15 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_None => UVALUE_None
     | DVALUE_Struct fields => UVALUE_Struct (map dvalue_to_uvalue fields)
     | DVALUE_Packed_struct fields => UVALUE_Packed_struct (map dvalue_to_uvalue fields)
-    | DVALUE_Array elts => UVALUE_Array (map dvalue_to_uvalue elts)
-    | DVALUE_Vector elts => UVALUE_Vector (map dvalue_to_uvalue elts)
+    | DVALUE_Array t elts => UVALUE_Array t (map dvalue_to_uvalue elts)
+    | DVALUE_Vector t elts => UVALUE_Vector t (map dvalue_to_uvalue elts)
     end.
 
   (* Partial injection of [uvalue] into [dvalue] *)
   Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
     match uv with
     | UVALUE_Addr a                          => ret (DVALUE_Addr a)
-    | UVALUE_I1 x                            => ret (DVALUE_I1 x)
-    | UVALUE_I8 x                            => ret (DVALUE_I8 x)
-    | UVALUE_I16 x                           => ret (DVALUE_I16 x)
-    | UVALUE_I32 x                           => ret (DVALUE_I32 x)
-    | UVALUE_I64 x                           => ret (DVALUE_I64 x)
+    | @UVALUE_I sz x                         => ret (@DVALUE_I sz x)
     | UVALUE_IPTR x                          => ret (DVALUE_IPTR x)
     | UVALUE_Double x                        => ret (DVALUE_Double x)
     | UVALUE_Float x                         => ret (DVALUE_Float x)
@@ -2307,13 +2537,13 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         fields' <- map_monad uvalue_to_dvalue fields ;;
         ret (DVALUE_Packed_struct fields')
 
-    | UVALUE_Array elts                      =>
+    | UVALUE_Array t elts                      =>
         elts' <- map_monad uvalue_to_dvalue elts ;;
-        ret (DVALUE_Array elts')
+        ret (DVALUE_Array t elts')
 
-    | UVALUE_Vector elts                     =>
+    | UVALUE_Vector t elts                     =>
         elts' <- map_monad uvalue_to_dvalue elts ;;
-        ret (DVALUE_Vector elts')
+        ret (DVALUE_Vector t elts')
 
     | _ => failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"
     end.
@@ -2378,11 +2608,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Fixpoint is_concrete (uv : uvalue) : bool :=
     match uv with
     | UVALUE_Addr a => true
-    | UVALUE_I1 x => true
-    | UVALUE_I8 x => true
-    | UVALUE_I16 x => true
-    | UVALUE_I32 x => true
-    | UVALUE_I64 x => true
+    | UVALUE_I sz x => true
     | UVALUE_IPTR x => true
     | UVALUE_Double x => true
     | UVALUE_Float x => true
@@ -2392,8 +2618,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_None => true
     | UVALUE_Struct fields => forallb is_concrete fields
     | UVALUE_Packed_struct fields => forallb is_concrete fields
-    | UVALUE_Array elts => forallb is_concrete elts
-    | UVALUE_Vector elts => forallb is_concrete elts
+    | UVALUE_Array t elts => forallb is_concrete elts
+    | UVALUE_Vector t elts => forallb is_concrete elts
     | _ => false
     end.
 
@@ -2403,8 +2629,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_Struct fields
     | UVALUE_Packed_struct fields =>
         anyb contains_undef_or_poison fields
-    | UVALUE_Array elts
-    | UVALUE_Vector elts =>
+    | UVALUE_Array t elts
+    | UVALUE_Vector t elts =>
         anyb contains_undef_or_poison elts
     | UVALUE_IBinop iop v1 v2 =>
         contains_undef_or_poison v1 || contains_undef_or_poison v2
@@ -2523,11 +2749,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       reflexivity.
     - cbn.
       pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
-      exists (DVALUE_Array dv). rewrite MAP.
+      exists (DVALUE_Array t dv). rewrite MAP.
       reflexivity.
     - cbn.
       pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
-      exists (DVALUE_Vector dv). rewrite MAP.
+      exists (DVALUE_Vector t dv). rewrite MAP.
       reflexivity.
   Qed.
 
@@ -2591,11 +2817,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Fixpoint serialize_dvalue' (dv:dvalue): sexp :=
       match dv with
       | DVALUE_Addr a => Atom "address" (* TODO: insist that memory models can print addresses? *)
-      | DVALUE_I1 x => Atom "dvalue(i1)"
-      | DVALUE_I8 x => Atom "dvalue(i8)"
-      | DVALUE_I16 x => Atom "dvalue(i16)"
-      | DVALUE_I32 x => Atom "dvalue(i32)"
-      | DVALUE_I64 x => Atom "dvalue(i64)"
+      | DVALUE_I sz x => Atom ("dvalue(i" ++ show (Zpos sz) ++ ")")%string
       | DVALUE_IPTR x => Atom "dvalue(iptr)"
       | DVALUE_Double x => Atom "dvalue(double)"
       | DVALUE_Float x => Atom "dvalue(float)"
@@ -2606,9 +2828,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         => [Atom "{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) fields) ; Atom "}"]
       | DVALUE_Packed_struct fields
         => [Atom "packed{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) fields) ; Atom "}"]
-      | DVALUE_Array elts
+      | DVALUE_Array t elts
         => [Atom "[" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) elts) ; Atom "]"]
-      | DVALUE_Vector elts
+      | DVALUE_Vector t elts
         => [Atom "<" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom  ","]) elts) ; Atom ">"]
       end.
 
@@ -2617,11 +2839,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Fixpoint serialize_uvalue' (pre post: string) (uv:uvalue): sexp :=
       match uv with
       | UVALUE_Addr a => Atom (pre ++ "address" ++ post)%string (* TODO: insist that memory models can print addresses? *)
-      | UVALUE_I1 x => Atom (pre ++ "uvalue(i1)" ++ post)%string
-      | UVALUE_I8 x => Atom (pre ++ "uvalue(i8)" ++ post)%string
-      | UVALUE_I16 x => Atom (pre ++ "uvalue(i16)" ++ post)%string
-      | UVALUE_I32 x => Atom (pre ++ "uvalue(i32)" ++ post)%string
-      | UVALUE_I64 x => Atom (pre ++ "uvalue(i64)" ++ post)%string
+      | UVALUE_I sz x => Atom (pre ++ "uvalue(i" ++ show (Zpos sz) ++")" ++ post)%string
       | UVALUE_Double x => Atom (pre ++ "uvalue(double)" ++ post)%string
       | UVALUE_Float x => Atom (pre ++ "uvalue(float)" ++ post)%string
       | UVALUE_Poison t => Atom (pre ++ "poison" ++ post)%string
@@ -2630,9 +2848,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         => [Atom "{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; Atom "}"]
       | UVALUE_Packed_struct fields
         => [Atom "packed{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; Atom "}"]
-      | UVALUE_Array elts
+      | UVALUE_Array t elts
         => [Atom "[" ; to_sexp (List.map (serialize_uvalue' "" ",") elts) ; Atom "]"]
-      | UVALUE_Vector elts
+      | UVALUE_Vector t elts
         => [Atom "<" ; to_sexp (List.map (serialize_uvalue' "" ",") elts) ; Atom ">"]
       | UVALUE_Undef t => [Atom "undef(" ; to_sexp t ; Atom ")"]
       | UVALUE_IBinop iop v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp iop ; serialize_uvalue' "" ")" v2]
@@ -2657,21 +2875,49 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
   Section DecidableEquality.
 
+    Definition dvalue_int_eq_dec_helper
+      (sz1 sz2 : positive) (x1 : @int sz1) (x2 : @int sz2) : {@DVALUE_I sz1 x1 = @DVALUE_I sz2 x2} + {@DVALUE_I sz1 x1 <> @DVALUE_I sz2 x2}.
+      destruct (Pos.eq_dec sz1 sz2); subst.
+      - destruct (Integers.eq_dec x1 x2); subst; auto.
+        right.
+        intros CONTRA; inv CONTRA. subst_existT.
+        contradiction.
+      - right.
+        intros CONTRA; inv CONTRA. subst_existT.
+        contradiction.
+    Defined.
+
+    Definition uvalue_int_eq_dec_helper
+      (sz1 sz2 : positive) (x1 : @int sz1) (x2 : @int sz2) : {@UVALUE_I sz1 x1 = @UVALUE_I sz2 x2} + {@UVALUE_I sz1 x1 <> @UVALUE_I sz2 x2}.
+      destruct (Pos.eq_dec sz1 sz2); subst.
+      - destruct (Integers.eq_dec x1 x2); subst; auto.
+        right.
+        intros CONTRA; inv CONTRA. subst_existT.
+        contradiction.
+      - right.
+        intros CONTRA; inv CONTRA. subst_existT.
+        contradiction.
+    Defined.
+
+    Program Definition dvalue_int_cmp (d1 d2:dvalue) : bool :=
+      match d1, d2 with
+      | @DVALUE_I sz1 x1, @DVALUE_I sz2 x2 =>
+          _
+      | _, _ => false
+      end.
+    Next Obligation.
+      destruct (Pos.eq_dec sz1 sz2); subst.
+      apply (if Integers.eq_dec x1 x2 then true else false).
+      apply false.
+    Defined.
+
     Fixpoint dvalue_eqb (d1 d2:dvalue) : bool :=
       let lsteq := list_eqb (Build_RelDec eq dvalue_eqb) in
       match d1, d2 with
       | DVALUE_Addr a1, DVALUE_Addr a2 =>
           if A.eq_dec a1 a2 then true else false
-      | DVALUE_I1 x1, DVALUE_I1 x2 =>
-          if Int1.eq_dec x1 x2 then true else false
-      | DVALUE_I8 x1, DVALUE_I8 x2 =>
-          if Int8.eq_dec x1 x2 then true else false
-      | DVALUE_I16 x1, DVALUE_I16 x2 =>
-          if Int16.eq_dec x1 x2 then true else false
-      | DVALUE_I32 x1, DVALUE_I32 x2 =>
-          if Int32.eq_dec x1 x2 then true else false
-      | DVALUE_I64 x1, DVALUE_I64 x2 =>
-          if Int64.eq_dec x1 x2 then true else false
+      | @DVALUE_I sz1 x1, @DVALUE_I sz2 x2 =>
+          dvalue_int_cmp d1 d2
       | DVALUE_Double x1, DVALUE_Double x2 =>
           if Float.eq_dec x1 x2 then true else false
       | DVALUE_Float x1, DVALUE_Float x2 =>
@@ -2683,53 +2929,82 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           lsteq f1 f2
       | DVALUE_Packed_struct f1, DVALUE_Packed_struct f2 =>
           lsteq f1 f2
-      | DVALUE_Array f1, DVALUE_Array f2 =>
-          lsteq f1 f2
-      | DVALUE_Vector f1, DVALUE_Vector f2 =>
-          lsteq f1 f2
+      | DVALUE_Array t1 f1, DVALUE_Array t2 f2 =>
+          dtyp_eqb t1 t2 && lsteq f1 f2
+      | DVALUE_Vector t1 f1, DVALUE_Vector t2 f2 =>
+          dtyp_eqb t1 t2 && lsteq f1 f2
       | _, _ => false
       end.
 
     Lemma dvalue_eq_dec : forall (d1 d2:dvalue), {d1 = d2} + {d1 <> d2}.
       refine (fix f d1 d2 :=
                 let lsteq_dec := list_eq_dec f in
-                match d1, d2 with
-                | DVALUE_Addr a1, DVALUE_Addr a2 => _
-                | DVALUE_I1 x1, DVALUE_I1 x2 => _
-                | DVALUE_I8 x1, DVALUE_I8 x2 => _
-                | DVALUE_I16 x1, DVALUE_I16 x2 => _
-                | DVALUE_I32 x1, DVALUE_I32 x2 => _
-                | DVALUE_I64 x1, DVALUE_I64 x2 => _
-                | DVALUE_IPTR x1, DVALUE_IPTR x2 => _
-                | DVALUE_Double x1, DVALUE_Double x2 => _
-                | DVALUE_Float x1, DVALUE_Float x2 => _
-                | DVALUE_Poison _, DVALUE_Poison _ => _
-                | DVALUE_Oom _, DVALUE_Oom _ => _
-                | DVALUE_None, DVALUE_None => _
-                | DVALUE_Struct f1, DVALUE_Struct f2 => _
-                | DVALUE_Packed_struct f1, DVALUE_Packed_struct f2 => _
-                | DVALUE_Array f1, DVALUE_Array f2 => _
-                | DVALUE_Vector f1, DVALUE_Vector f2 => _
-                | _, _ => _
-                end);  ltac:(dec_dvalue).
+                match d1 with
+                | DVALUE_Addr a1 =>
+                    match d2 with
+                    | DVALUE_Addr a2 => _
+                    | _ => _
+                    end
+                | DVALUE_I sz1 x1 =>
+                    match d2 with
+                    | DVALUE_I sz2 x2 => _
+                    | _ => _
+                    end
+                | DVALUE_IPTR x1 =>
+                    match d2 with
+                    | DVALUE_IPTR x2 => _
+                    | _ => _
+                    end
+                | DVALUE_Double x1 =>
+                    match d2 with
+                    | DVALUE_Double x2 => _
+                    | _ => _
+                    end
+                | DVALUE_Float x1 =>
+                    match d2 with
+                    | DVALUE_Float x2 => _
+                    | _ => _
+                    end
+                | DVALUE_Poison _ =>
+                    match d2 with
+                    | DVALUE_Poison _ => _
+                    | _ => _
+                    end
+                | DVALUE_Oom _ =>
+                    match d2 with
+                    | DVALUE_Oom _ => _
+                    | _ => _
+                    end
+                | DVALUE_None =>
+                    match d2 with
+                    | DVALUE_None => _
+                    | _ => _
+                    end
+                | DVALUE_Struct f1 =>
+                    match d2 with
+                    | DVALUE_Struct f2 => _
+                    | _ => _
+                    end
+                | DVALUE_Packed_struct f1 =>
+                    match d2 with
+                    | DVALUE_Packed_struct f2 => _
+                    | _ => _
+                    end
+                | DVALUE_Array t1 f1 =>
+                    match d2 with
+                    | DVALUE_Array t2 f2 => _
+                    | _ => _
+                    end
+                | DVALUE_Vector t1 f1 =>
+                    match d2 with
+                    | DVALUE_Vector t2 f2 => _
+                    | _ => _
+                    end
+                end);  try solve[ltac:(dec_dvalue)].
       - destruct (A.eq_dec a1 a2).
         * left; subst; reflexivity.
         * right; intros H; inversion H. contradiction.
-      - destruct (Int1.eq_dec x1 x2).
-        * left; subst; reflexivity.
-        * right; intros H; inversion H. contradiction.
-      - destruct (Int8.eq_dec x1 x2).
-        * left; subst; reflexivity.
-        * right; intros H; inversion H. contradiction.
-      - destruct (Int16.eq_dec x1 x2).
-        * left; subst; reflexivity.
-        * right; intros H; inversion H. contradiction.
-      - destruct (Int32.eq_dec x1 x2).
-        * left; subst; reflexivity.
-        * right; intros H; inversion H. contradiction.
-      - destruct (Int64.eq_dec x1 x2).
-        * left; subst; reflexivity.
-        * right; intros H; inversion H. contradiction.
+      - apply dvalue_int_eq_dec_helper.
       - destruct (IP.eq_dec x1 x2).
         * left; subst; reflexivity.
         * right; intros H; inversion H. contradiction.
@@ -2751,12 +3026,18 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       - destruct (lsteq_dec f1 f2).
         * left; subst; reflexivity.
         * right; intros H; inversion H. contradiction.
-      - destruct (lsteq_dec f1 f2).
-        * left; subst; reflexivity.
-        * right; intros H; inversion H. contradiction.
-      - destruct (lsteq_dec f1 f2).
-        * left; subst; reflexivity.
-        * right; intros H; inversion H. contradiction.
+      - destruct (dtyp_eq_dec t1 t2); subst.
+        + destruct (lsteq_dec f1 f2).
+          * left; subst; reflexivity.
+          * right; intros H; inversion H. contradiction.
+        + right.
+          intros CONTRA; inv CONTRA; contradiction.
+      - destruct (dtyp_eq_dec t1 t2); subst.
+        + destruct (lsteq_dec f1 f2).
+          * left; subst; reflexivity.
+          * right; intros H; inversion H. contradiction.
+        + right.
+          intros CONTRA; inv CONTRA; contradiction.
     Qed.
 
     #[global] Instance eq_dec_dvalue : RelDec (@eq dvalue) := RelDec_from_dec (@eq dvalue) (@dvalue_eq_dec).
@@ -2809,11 +3090,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 let lsteq_dec := list_eq_dec f in
                 match u1, u2 with
                 | UVALUE_Addr a1, UVALUE_Addr a2 => _
-                | UVALUE_I1 x1, UVALUE_I1 x2 => _
-                | UVALUE_I8 x1, UVALUE_I8 x2 => _
-                | UVALUE_I16 x1, UVALUE_I16 x2 => _
-                | UVALUE_I32 x1, UVALUE_I32 x2 => _
-                | UVALUE_I64 x1, UVALUE_I64 x2 => _
+                | @UVALUE_I sz1 x1, @UVALUE_I sz2 x2 => _
                 | UVALUE_IPTR x1, UVALUE_IPTR x2 => _
                 | UVALUE_Double x1, UVALUE_Double x2 => _
                 | UVALUE_Float x1, UVALUE_Float x2 => _
@@ -2823,8 +3100,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 | UVALUE_None, UVALUE_None => _
                 | UVALUE_Struct f1, UVALUE_Struct f2 => _
                 | UVALUE_Packed_struct f1, UVALUE_Packed_struct f2 => _
-                | UVALUE_Array f1, UVALUE_Array f2 => _
-                | UVALUE_Vector f1, UVALUE_Vector f2 => _
+                | UVALUE_Array t1 f1, UVALUE_Array t2 f2 => _
+                | UVALUE_Vector t1 f1, UVALUE_Vector t2 f2 => _
                 | UVALUE_IBinop op uv1 uv2, UVALUE_IBinop op' uv1' uv2' => _
                 | UVALUE_ICmp op uv1 uv2, UVALUE_ICmp op' uv1' uv2' => _
                 | UVALUE_FBinop op fm uv1 uv2, UVALUE_FBinop op' fm' uv1' uv2' => _
@@ -2840,13 +3117,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 | UVALUE_ExtractByte uv dt idx sid, UVALUE_ExtractByte uv' dt' idx' sid' => _
                 | UVALUE_ConcatBytes uvs dt, UVALUE_ConcatBytes uvs' dt' => _
                 | _, _ => _
-                end); try (ltac:(dec_dvalue); fail).
+                end); try solve [(ltac:(dec_dvalue); fail)].
       - destruct (A.eq_dec a1 a2)...
-      - destruct (Int1.eq_dec x1 x2)...
-      - destruct (Int8.eq_dec x1 x2)...
-      - destruct (Int16.eq_dec x1 x2)...
-      - destruct (Int32.eq_dec x1 x2)...
-      - destruct (Int64.eq_dec x1 x2)...
+      - apply uvalue_int_eq_dec_helper.
       - destruct (IP.eq_dec x1 x2)...
       - destruct (Float.eq_dec x1 x2)...
       - destruct (Float32.eq_dec x1 x2)...
@@ -2855,8 +3128,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       - destruct (dtyp_eq_dec t1 t2)...
       - destruct (lsteq_dec f1 f2)...
       - destruct (lsteq_dec f1 f2)...
-      - destruct (lsteq_dec f1 f2)...
-      - destruct (lsteq_dec f1 f2)...
+      - destruct (dtyp_eq_dec t1 t2); destruct (lsteq_dec f1 f2)...
+      - destruct (dtyp_eq_dec t1 t2); destruct (lsteq_dec f1 f2)...
       - destruct (ibinop_eq_dec op op')...
         destruct (f uv1 uv1')...
         destruct (f uv2 uv2')...
@@ -2916,36 +3189,39 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
   Definition is_DVALUE_I1 (d:dvalue) : bool :=
     match d with
-    | DVALUE_I1 _ => true
+    | @DVALUE_I 1 _ => true
     | _ => false
     end.
 
   Definition is_DVALUE_I8 (d:dvalue) : bool :=
     match d with
-    | DVALUE_I8 _ => true
+    | @DVALUE_I 8 _ => true
     | _ => false
     end.
 
   Definition is_DVALUE_I16 (d:dvalue) : bool :=
     match d with
-    | DVALUE_I16 _ => true
+    | @DVALUE_I 16 _ => true
     | _ => false
     end.
 
   Definition is_DVALUE_I32 (d:dvalue) : bool :=
     match d with
-    | DVALUE_I32 _ => true
+    | @DVALUE_I 32 _ => true
     | _ => false
     end.
 
   Definition is_DVALUE_I64 (d:dvalue) : bool :=
     match d with
-    | DVALUE_I64 _ => true
+    | @DVALUE_I 64 _ => true
     | _ => false
     end.
 
   Definition is_DVALUE_IX (d:dvalue) : bool :=
-    is_DVALUE_I1 d || is_DVALUE_I8 d || is_DVALUE_I16 d || is_DVALUE_I32 d || is_DVALUE_I64 d.
+    match d with
+    | @DVALUE_I _ _ => true
+    | _ => false
+    end.
 
   Class ToDvalue I : Type :=
     { to_dvalue : I -> dvalue;
@@ -2958,40 +3234,21 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   #[global] Instance ToDvalue_intptr : ToDvalue intptr :=
     { to_dvalue := DVALUE_IPTR }.
 
-  #[global] Instance ToDvalue_Int1 : ToDvalue Int1.int :=
-    { to_dvalue := DVALUE_I1 }.
-
-  #[global] Instance ToDvalue_Int8 : ToDvalue Int8.int :=
-    { to_dvalue := DVALUE_I8 }.
-
-  #[global] Instance ToDvalue_Int16 : ToDvalue Int16.int :=
-    { to_dvalue := DVALUE_I16 }.
-
-  #[global] Instance ToDvalue_Int32 : ToDvalue Int32.int :=
-    { to_dvalue := DVALUE_I32 }.
-
-  #[global] Instance ToDvalue_Int64 : ToDvalue Int64.int :=
-    { to_dvalue := DVALUE_I64 }.
+  #[global] Instance ToDvalue_Int `{sz : positive} : ToDvalue (@int sz) :=
+    { to_dvalue := @DVALUE_I sz }.
 
   (* Is a uvalue a concrete integer equal to i? *)
   Definition uvalue_int_eq_Z (uv : uvalue) (i : Z)
     := match uv with
-       | UVALUE_I1 x
-       | UVALUE_I8 x
-       | UVALUE_I16 x
-       | UVALUE_I32 x
-       | UVALUE_I64 x => Z.eqb (unsigned x) i
+       | @UVALUE_I sz x
+         => Z.eqb (unsigned x) i
        | UVALUE_IPTR x => Z.eqb (IP.to_Z x) i
        | _ => false
        end.
 
   Definition dvalue_int_unsigned (dv : dvalue) : Z
     := match dv with
-       | DVALUE_I1 x => unsigned x
-       | DVALUE_I8 x => unsigned x
-       | DVALUE_I16 x => unsigned x
-       | DVALUE_I32 x => unsigned x
-       | DVALUE_I64 x => unsigned x
+       | @DVALUE_I sz x => unsigned x
        | DVALUE_IPTR x => IP.to_unsigned x
        | _ => 0
        end.
@@ -3034,7 +3291,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Definition undef_i16 : uvalue := UVALUE_Undef (DTYPE_I 16).
   Definition undef_i32 : uvalue := UVALUE_Undef (DTYPE_I 32).
   Definition undef_i64 : uvalue := UVALUE_Undef (DTYPE_I 64).
-  Definition undef_int {Int} `{VInt Int} : uvalue  := UVALUE_Undef (DTYPE_I (N.of_nat bitwidth)).
+  Definition undef_int {Int} `{VInt Int} : uvalue  := UVALUE_Undef (DTYPE_I bitwidth).
 
   Definition to_uvalue {Int} `{ToDvalue Int} (i : Int) : uvalue := dvalue_to_uvalue (to_dvalue i).
 
@@ -3127,7 +3384,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
       | Mul nuw nsw =>
           (* I1 mul can't overflow, just based on the 4 possible multiplications. *)
-          if (option_pred (fun bw => Nat.eqb bw 1) mbitwidth)
+          if (option_pred (fun bw => Pos.eqb bw 1) mbitwidth)
           then to_dvalue_OOM (mmul x y)
           else
             res <- lift_OOM (mmul x y);;
@@ -3170,7 +3427,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           else
             (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
          then there is overflow. *)
-            if option_pred (fun bw => munsigned y >=? Z.of_nat bw) mbitwidth
+            if option_pred (fun bw => munsigned y >=? Zpos bw) mbitwidth
             then ret (DVALUE_Poison mdtyp_of_int)
             else
               if andb nuw (res_u' >? res_u)
@@ -3186,7 +3443,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                       (* TODO: should this OOM here? *)
                       nres <- lift_OOM (mnegative res);;
                       if (negb (Z.shiftr (munsigned x)
-                                  (Z.of_nat bw - munsigned y)
+                                  (Zpos bw - munsigned y)
                                 =? (munsigned nres)
                                    * (Z.pow 2 (munsigned y) - 1))%Z)
                       then ret (DVALUE_Poison mdtyp_of_int)
@@ -3213,7 +3470,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                  else to_dvalue_OOM (mdivs x y)
 
       | LShr ex =>
-          if option_pred (fun bw => (munsigned y) >=? Z.of_nat bw) mbitwidth && negb (dtyp_eqb mdtyp_of_int DTYPE_IPTR)
+          if option_pred (fun bw => (munsigned y) >=? Zpos bw) mbitwidth && negb (dtyp_eqb mdtyp_of_int DTYPE_IPTR)
           then ret (DVALUE_Poison mdtyp_of_int)
           else if andb ex (negb ((munsigned x)
                                    mod (Z.pow 2 (munsigned y)) =? 0))%Z
@@ -3223,7 +3480,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           if dtyp_eqb mdtyp_of_int DTYPE_IPTR
           then raise_error "Arithmetic shift for iptr."
           else
-            if option_pred (fun bw => (munsigned y) >=? Z.of_nat bw) mbitwidth
+            if option_pred (fun bw => (munsigned y) >=? Zpos bw) mbitwidth
             then ret (DVALUE_Poison mdtyp_of_int)
             else if andb ex (negb ((munsigned x)
                                      mod (Z.pow 2 (munsigned y)) =? 0))%Z
@@ -3253,31 +3510,18 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Arguments eval_int_op _ _ _ : simpl nomatch.
 
   (* Evaluate the given iop on the given arguments according to the bitsize *)
-  Definition integer_op {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} (bits:N) (iop:ibinop) (x y:inttyp bits) : M dvalue :=
-    match bits, x, y with
-    | 1, x, y  => eval_int_op iop x y
-    | 8, x, y  => eval_int_op iop x y
-    | 16, x, y => eval_int_op iop x y
-    | 32, x, y => eval_int_op iop x y
-    | 64, x, y => eval_int_op iop x y
-    | _, _, _  => raise_error "unsupported bitsize"
-    end.
+  Definition integer_op {M} `{HM : Monad M} `{ERR : RAISE_ERROR M} `{UB : RAISE_UB M} `{OOM : RAISE_OOM M} (bits:positive) (iop:ibinop) (x y:@int bits) : M dvalue :=
+    eval_int_op iop x y.
   Arguments integer_op _ _ _ _ : simpl nomatch.
 
   (* Convert written integer constant to corresponding integer with bitsize bits.
      Takes the integer modulo 2^bits. *)
-  Definition coerce_integer_to_int {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} (bits:option N) (i:Z) : M dvalue :=
+  Definition coerce_integer_to_int {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} (bits:option positive) (i:Z) : M dvalue :=
     match bits with
-    | Some 1  => ret (DVALUE_I1 (repr i))
-    | Some 8  => ret (DVALUE_I8 (repr i))
-    | Some 16 => ret (DVALUE_I16 (repr i))
-    | Some 32 => ret (DVALUE_I32 (repr i))
-    | Some 64 => ret (DVALUE_I64 (repr i))
+    | Some sz  => ret (@DVALUE_I sz (repr i))
     | None    =>
         i' <- lift_OOM (mrepr i);;
         ret (DVALUE_IPTR i')
-    | _       =>
-        raise_error "unsupported integer size"
     end.
   Arguments coerce_integer_to_int _ _ : simpl nomatch.
 
@@ -3295,23 +3539,25 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   (* Integer iop evaluation, called from eval_iop.
      Here the values must be integers. Helper defined
      in order to prevent eval_iop from being recursive. *)
-  Definition eval_iop_integer_h {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} iop v1 v2 : M dvalue :=
-    match v1, v2 with
-    | DVALUE_I1 i1, DVALUE_I1 i2
-    | DVALUE_I8 i1, DVALUE_I8 i2
-    | DVALUE_I16 i1, DVALUE_I16 i2
-    | DVALUE_I32 i1, DVALUE_I32 i2
-    | DVALUE_I64 i1, DVALUE_I64 i2
-    | DVALUE_IPTR i1, DVALUE_IPTR i2 =>
-        eval_int_op iop i1 i2
-    | DVALUE_Poison t, _             =>
-        ret (DVALUE_Poison t)
-    | _, DVALUE_Poison t             =>
-        if iop_is_div iop
-        then raise_ub "Division by poison."
-        else ret (DVALUE_Poison t)
-    | _, _                           => raise_error "ill_typed-iop"
-    end.
+  Definition eval_iop_integer_h {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} (iop : ibinop) (v1 v2 : dvalue) : M dvalue.
+    refine
+      (match v1, v2 with
+       | @DVALUE_I sz1 i1, @DVALUE_I sz2 i2 =>
+           _
+       | DVALUE_IPTR i1, DVALUE_IPTR i2 =>
+           eval_int_op iop i1 i2
+       | DVALUE_Poison t, _             =>
+           ret (DVALUE_Poison t)
+       | _, DVALUE_Poison t             =>
+           if iop_is_div iop
+           then raise_ub "Division by poison."
+           else ret (DVALUE_Poison t)
+       | _, _                           => raise_error "ill_typed-iop"
+       end).
+    destruct (Pos.eq_dec sz1 sz2); subst.
+    - apply (eval_int_op iop i1 i2).
+    - apply (raise_error "ill_typed-iop: integer bitwidth mismatch.").
+  Defined.
 
   (* I split the definition between the vector and other evaluations because
      otherwise eval_iop should be recursive to allow for vector calculations,
@@ -3328,9 +3574,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
   Definition eval_iop {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} iop v1 v2 : M dvalue :=
     match v1, v2 with
-    | (DVALUE_Vector elts1), (DVALUE_Vector elts2) =>
+    | (DVALUE_Vector t elts1), (DVALUE_Vector _ elts2) =>
       val <- vec_loop (eval_iop_integer_h iop) (List.combine elts1 elts2) ;;
-      ret (DVALUE_Vector val)
+      ret (DVALUE_Vector t val)
     | _, _ => eval_iop_integer_h iop v1 v2
     end.
   Arguments eval_iop _ _ _ : simpl nomatch.
@@ -3361,8 +3607,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
             else ret (mcmp Cle x y)
         end;;
     ret (if c
-         then DVALUE_I1 (Int1.one)
-         else DVALUE_I1 (Int1.zero)).
+         then @DVALUE_I 1 (Integers.one)
+         else @DVALUE_I 1 (Integers.zero)).
   Arguments eval_int_icmp _ _ _ : simpl nomatch.
 
   Definition double_op {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} (fop:fbinop) (v1:ll_double) (v2:ll_double) : M dvalue :=
@@ -3434,7 +3680,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
        | FUne => (Float32.cmp Cne x y)
        | FTrue => true
        end
-    then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
+    then @DVALUE_I 1 Integers.one else @DVALUE_I 1 Integers.zero.
   Arguments float_cmp _ _ _ : simpl nomatch.
 
   Definition double_cmp (fcmp:fcmp) (x:ll_double) (y:ll_double) : dvalue :=
@@ -3456,7 +3702,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
        | FUne => (Float.cmp Cne x y)
        | FTrue => true
        end
-    then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
+    then @DVALUE_I 1 Integers.one else @DVALUE_I 1 Integers.zero.
     Arguments double_cmp _ _ _ : simpl nomatch.
 
   Definition eval_fcmp {M} `{Monad M} `{RAISE_ERROR M} (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : M dvalue :=
@@ -3485,7 +3731,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     match v with
     | UVALUE_Struct f => loop f idx
     | UVALUE_Packed_struct f => loop f idx
-    | UVALUE_Array e => loop e idx
+    | UVALUE_Array t e => loop e idx
     | _ => raise_error "index_into_str: invalid aggregate data"
     end.
   Arguments index_into_str _ _ : simpl nomatch.
@@ -3502,7 +3748,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     match v with
     | DVALUE_Struct f => loop f idx
     | DVALUE_Packed_struct f => loop f idx
-    | DVALUE_Array e => loop e idx
+    | DVALUE_Array t e => loop e idx
     | _ => raise_error "index_into_str_dv: invalid aggregate data"
     end.
   Arguments index_into_str_dv _ _ : simpl nomatch.
@@ -3525,37 +3771,39 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       v <- (loop [] f idx) ;;
       ret (DVALUE_Packed_struct v)
 
-    | DVALUE_Array e =>
+    | DVALUE_Array t e =>
       v <- (loop [] e idx) ;;
-      ret (DVALUE_Array v)
+      ret (DVALUE_Array t v)
 
     | _ => raise_error "insert_into_str: invalid aggregate data"
     end.
   Arguments insert_into_str _ _ _ : simpl nomatch.
 
-  Definition index_into_vec_dv {M} `{Monad M} `{RAISE_ERROR M} (elt_typ : dtyp) (v:dvalue) (idx:dvalue) : M dvalue :=
-    let fix loop dt (elts : list dvalue) i :=
-        match elts with
-        | [] => ret (DVALUE_Poison dt) (* LangRef: if idx exceeds the length of val for a fixed-length vector, the result is a poison value *)
-        | h :: tl =>
-          if (i =? 0)%Z then ret h else loop dt tl (i-1)%Z
-        end in
-    match v with
-    | DVALUE_Array e
-    | DVALUE_Vector e =>
-        match idx with
-        | DVALUE_I32 i2
-        | DVALUE_I64 i2 =>
-            let iZ := signed i2 in
-            match iZ with
-            | Zneg _ =>
-                raise_error "index_into_vec_dv: negative index."
-            | _ => loop elt_typ e iZ
-            end
-        | _ => raise_error "index_into_vec_dv: non-integer dvalue index."
-        end
-    | _ => raise_error "index_into_vec_dv: not a vector or array."
-    end.
+  Definition index_into_vec_dv {M} `{Monad M} `{RAISE_ERROR M} (elt_typ : dtyp) (v:dvalue) (idx:dvalue) : M dvalue.
+    refine
+      (let fix loop dt (elts : list dvalue) i :=
+         match elts with
+         | [] => ret (DVALUE_Poison dt) (* LangRef: if idx exceeds the length of val for a fixed-length vector, the result is a poison value *)
+         | h :: tl =>
+             if (i =? 0)%Z then ret h else loop dt tl (i-1)%Z
+         end in
+       match v with
+       | DVALUE_Array t e
+       | DVALUE_Vector t e =>
+           match idx with
+           | @DVALUE_I sz i2 =>
+               (* TODO: should this be restricted to 32 / 64-bit integers? *)
+               let iZ := signed i2 in
+               match iZ with
+               | Zneg _ =>
+                   raise_error "index_into_vec_dv: negative index."
+               | _ => loop elt_typ e iZ
+               end
+           | _ => raise_error "index_into_vec_dv: non-integer dvalue index."
+           end
+       | _ => raise_error "index_into_vec_dv: not a vector or array."
+       end).
+  Defined.
   Arguments index_into_vec_dv _ _ : simpl nomatch.
 
   Definition insert_into_vec_dv {M} `{Monad M} `{RAISE_ERROR M} (vec_typ : dtyp) (vec:dvalue) (v:dvalue) (idx:dvalue) : M dvalue :=
@@ -3567,10 +3815,10 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           else loop (acc ++ [h]) tl (i-1))%Z
         end%list in
     match vec with
-    | DVALUE_Vector e =>
+    | DVALUE_Vector t e =>
         match idx with
-        | DVALUE_I32 i2
-        | DVALUE_I64 i2 =>
+        | @DVALUE_I _ i2 =>
+            (* TODO: should this be restricted to 32 / 64-bit integers? *)
             let iZ := signed i2 in
             match iZ with
             | Zneg _ =>
@@ -3580,16 +3828,16 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 | None =>
                     ret (DVALUE_Poison vec_typ)
                 | Some elts =>
-                    ret (DVALUE_Vector elts)
+                    ret (DVALUE_Vector t elts)
                 end
             end
         | _ =>
             raise_error "insert_into_vec_dv: non-integer dvalue index."
         end
-    | DVALUE_Array e =>
+    | DVALUE_Array t e =>
         match idx with
-        | DVALUE_I32 i2
-        | DVALUE_I64 i2 =>
+        | @DVALUE_I _ i2 =>
+            (* TODO: should this be restricted to 32 / 64-bit integers? *)
             let iZ := signed i2 in
             match iZ with
             | Zneg _ =>
@@ -3599,7 +3847,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 | None =>
                     ret (DVALUE_Poison vec_typ)
                 | Some elts =>
-                    ret (DVALUE_Array elts)
+                    ret (DVALUE_Array t elts)
                 end
             end
         | _ =>
@@ -3621,17 +3869,13 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Unset Elimination Schemes.
   Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
   | DVALUE_Addr_typ   : forall a, dvalue_has_dtyp (DVALUE_Addr a) DTYPE_Pointer
-  | DVALUE_I1_typ     : forall x, dvalue_has_dtyp (DVALUE_I1 x) (DTYPE_I 1)
-  | DVALUE_I8_typ     : forall x, dvalue_has_dtyp (DVALUE_I8 x) (DTYPE_I 8)
-  | DVALUE_I16_typ    : forall x, dvalue_has_dtyp (DVALUE_I16 x) (DTYPE_I 16)
-  | DVALUE_I32_typ    : forall x, dvalue_has_dtyp (DVALUE_I32 x) (DTYPE_I 32)
-  | DVALUE_I64_typ    : forall x, dvalue_has_dtyp (DVALUE_I64 x) (DTYPE_I 64)
+  | DVALUE_I_typ      : forall sz x, dvalue_has_dtyp (@DVALUE_I sz x) (DTYPE_I sz)
   | DVALUE_IPTR_typ   : forall x, dvalue_has_dtyp (DVALUE_IPTR x) DTYPE_IPTR
   | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
   | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
   | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
-  | DVALUE_Poison_typ  : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> dvalue_has_dtyp (DVALUE_Poison τ) τ
-  | DVALUE_Oom_typ  : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> dvalue_has_dtyp (DVALUE_Oom τ) τ
+  | DVALUE_Poison_typ  : forall τ, NO_VOID τ -> dvalue_has_dtyp (DVALUE_Poison τ) τ
+  | DVALUE_Oom_typ  : forall τ, NO_VOID τ -> dvalue_has_dtyp (DVALUE_Oom τ) τ
 
   | DVALUE_Struct_typ :
     forall fields dts,
@@ -3646,20 +3890,18 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   (* Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
   | DVALUE_Array_typ :
     forall xs sz dt,
-      ALL_IX_SUPPORTED dt ->
       NO_VOID dt ->
       Forall (fun x => dvalue_has_dtyp x dt) xs ->
       length xs = (N.to_nat sz) ->
-      dvalue_has_dtyp (DVALUE_Array xs) (DTYPE_Array sz dt)
+      dvalue_has_dtyp (DVALUE_Array (DTYPE_Array sz dt) xs) (DTYPE_Array sz dt)
 
   | DVALUE_Vector_typ :
       forall xs sz dt,
-      ALL_IX_SUPPORTED dt ->
       NO_VOID dt ->
       Forall (fun x => dvalue_has_dtyp x dt) xs ->
       length xs = (N.to_nat sz) ->
       vector_dtyp dt ->
-      dvalue_has_dtyp (DVALUE_Vector xs) (DTYPE_Vector sz dt)
+      dvalue_has_dtyp (DVALUE_Vector (DTYPE_Vector sz dt) xs) (DTYPE_Vector sz dt)
   .
   Set Elimination Schemes.
 
@@ -3669,14 +3911,10 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Section dvalue_has_dtyp_ind.
     Variable P : dvalue -> dtyp -> Prop.
     Hypothesis IH_Addr           : forall a, P (DVALUE_Addr a) DTYPE_Pointer.
-    Hypothesis IH_I1             : forall x, P (DVALUE_I1 x) (DTYPE_I 1).
-    Hypothesis IH_I8             : forall x, P (DVALUE_I8 x) (DTYPE_I 8).
-    Hypothesis IH_I16            : forall x, P (DVALUE_I16 x) (DTYPE_I 16).
-    Hypothesis IH_I32            : forall x, P (DVALUE_I32 x) (DTYPE_I 32).
-    Hypothesis IH_I64            : forall x, P (DVALUE_I64 x) (DTYPE_I 64).
+    Hypothesis IH_I              : forall sz x, P (@DVALUE_I sz x) (DTYPE_I sz).
     Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x) DTYPE_IPTR.
-    Hypothesis IH_Poison         : forall t (IX : ALL_IX_SUPPORTED t) (NV: NO_VOID t), P (DVALUE_Poison t) t.
-    Hypothesis IH_Oom            : forall t (IX : ALL_IX_SUPPORTED t) (NV: NO_VOID t), P (DVALUE_Oom t) t.
+    Hypothesis IH_Poison         : forall t (NV: NO_VOID t), P (DVALUE_Poison t) t.
+    Hypothesis IH_Oom            : forall t (NV: NO_VOID t), P (DVALUE_Oom t) t.
     Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
     Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
@@ -3695,17 +3933,15 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                              sz
                             (dt : dtyp)
                             (IH : forall x, In x xs -> P x dt),
-        ALL_IX_SUPPORTED dt ->
         NO_VOID dt ->
         Datatypes.length xs = (N.to_nat sz) ->
-        P (DVALUE_Array xs) (DTYPE_Array sz dt).
+        P (DVALUE_Array (DTYPE_Array sz dt) xs) (DTYPE_Array sz dt).
 
     Hypothesis IH_Vector : forall (xs : list dvalue) sz (dt : dtyp)
                              (IH : forall x, In x xs -> P x dt),
-        ALL_IX_SUPPORTED dt ->
         NO_VOID dt ->
         Datatypes.length xs = (N.to_nat sz) ->
-        vector_dtyp dt -> P (DVALUE_Vector xs) (DTYPE_Vector sz dt).
+        vector_dtyp dt -> P (DVALUE_Vector (DTYPE_Vector sz dt) xs) (DTYPE_Vector sz dt).
 
     Lemma dvalue_has_dtyp_ind : forall (dv:dvalue) (dt:dtyp) (TYP: dvalue_has_dtyp dv dt), P dv dt.
       fix IHQ 3.
@@ -3733,9 +3969,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           eauto.
 
       - apply IH_Array; auto.
-        revert xs sz dt H H0 H1 H2.
-        fix IHL_C 6.
-        intros xs sz dt HALL HNV H EQ .
+        revert xs sz dt H H0 H1.
+        fix IHL_C 5.
+        intros xs sz dt HNV H EQ .
         destruct H.
         * intros x HIN. inversion HIN.
         * intros x' HIN. inversion HIN.
@@ -3746,12 +3982,12 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           -- simpl in EQ.
              destruct (N.to_nat sz); inversion EQ.
              rewrite <- Nnat.Nat2N.id in H3.
-             apply (IHL_C _ _ _ HALL HNV H0 H3 x' H1).
+             apply (IHL_C _ _ _ HNV H0 H3 x' H1).
 
       - apply IH_Vector; auto.
-        revert xs sz dt H H0 H1 H2 H3.
-        fix IHL_C 6.
-        intros xs sz dt HALL HNV H EQ HX.
+        revert xs sz dt H H0 H1 H2.
+        fix IHL_C 5.
+        intros xs sz dt HNV H EQ HX.
         destruct H.
         * intros x HIN. inversion HIN.
         * intros x' HIN. inversion HIN.
@@ -3762,7 +3998,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           -- simpl in EQ.
              destruct (N.to_nat sz); inversion EQ.
              rewrite <- Nnat.Nat2N.id in H3.
-             apply (IHL_C _ _ _ HALL HNV H0 H3 HX x' H1).
+             apply (IHL_C _ _ _ HNV H0 H3 HX x' H1).
     Qed.
 
   End dvalue_has_dtyp_ind.
@@ -3784,20 +4020,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Addr a =>
         if dtyp_eq_dec dt DTYPE_Pointer then true else false
 
-    | DVALUE_I1 x =>
-        if dtyp_eq_dec dt (DTYPE_I 1) then true else false
-
-    | DVALUE_I8 x =>
-        if dtyp_eq_dec dt (DTYPE_I 8) then true else false
-
-    | DVALUE_I16 x =>
-        if dtyp_eq_dec dt (DTYPE_I 16) then true else false
-
-    | DVALUE_I32 x =>
-        if dtyp_eq_dec dt (DTYPE_I 32) then true else false
-
-    | DVALUE_I64 x =>
-        if dtyp_eq_dec dt (DTYPE_I 64) then true else false
+    | @DVALUE_I sz x =>
+        if dtyp_eq_dec dt (DTYPE_I sz) then true else false
 
     | DVALUE_IPTR x =>
         if dtyp_eq_dec dt (DTYPE_IPTR) then true else false
@@ -3810,10 +4034,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
     | DVALUE_Poison t
     | DVALUE_Oom t =>
-        if @ALL_IX_SUPPORTED_dec t then
-          if @NO_VOID_dec t then
-            if dtyp_eq_dec dt t then true else false
-          else false
+        if @NO_VOID_dec t then
+          if dtyp_eq_dec dt t then true else false
         else false
 
     | DVALUE_None =>
@@ -3833,29 +4055,27 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         | _ => false
         end
 
-    | DVALUE_Array elts =>
+    | DVALUE_Array t' elts =>
         match dt with
         | DTYPE_Array sz dtt =>
-          if (@ALL_IX_SUPPORTED_dec dtt) then
             if (@NO_VOID_dec dtt) then
               List.forallb (fun u => dvalue_has_dtyp_fun u dtt) elts &&
-                (Nat.eqb (List.length elts) (N.to_nat sz))
+                (Nat.eqb (List.length elts) (N.to_nat sz)) &&
+                dtyp_eqb t' (DTYPE_Array sz dtt)
             else false
-          else false
         | _ => false
         end
 
-    | DVALUE_Vector elts =>
+    | DVALUE_Vector t' elts =>
         match dt with
         | DTYPE_Vector sz dtt =>
-          if (@ALL_IX_SUPPORTED_dec dtt) then
             if (@NO_VOID_dec dtt) then
               if (@vector_dtyp_dec dtt) then
                 List.forallb (fun u => dvalue_has_dtyp_fun u dtt) elts &&
-                  (Nat.eqb (List.length elts) (N.to_nat sz))
+                  (Nat.eqb (List.length elts) (N.to_nat sz)) &&
+                  dtyp_eqb t' (DTYPE_Vector sz dtt)
               else false
             else false
-          else false
         | _ => false
         end
     end.
@@ -3916,8 +4136,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     - cbn in HX.
       repeat break_match_hyp_inv.
       invert_bools.
+      apply dtyp_eqb_eq in H1; subst.
       apply DVALUE_Array_typ; auto.
-      clear H1.
+      clear H2.
       induction elts.
       + constructor.
       + cbn in H0.
@@ -3928,14 +4149,14 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         intros.
         eapply H. right; auto.
         assumption.
-      + apply Nat.eqb_eq in H1.
+      + apply Nat.eqb_eq in H2.
         assumption.
-
     - cbn in HX.
       repeat break_match_hyp_inv.
       invert_bools.
+      apply dtyp_eqb_eq in H1; subst.
       apply DVALUE_Vector_typ; auto.
-      clear H1.
+      clear H2.
       induction elts.
       + constructor.
       + cbn in H0.
@@ -3946,7 +4167,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         intros.
         eapply H. right; auto.
         assumption.
-      + apply Nat.eqb_eq in H1.
+      + apply Nat.eqb_eq in H2.
         assumption.
   Qed.
 
@@ -3962,18 +4183,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       | [ H : (?P \/ ?Q) |- _ ] => destruct H
       end.
 
-  Ltac search_supported :=
-    forward_bools;
-    match goal with
-      [ H : ?X |- ?X ] => apply H
-    | [ |- ?X \/ ?Y  ] => try solve [left; search_supported]; right; search_supported
-    | [ H : ALL_IX_SUPPORTED DTYPE_IPTR -> ?Y |- _ ] =>
-        cbn in H; specialize (H I); search_supported
-    | [ H : ALL_IX_SUPPORTED DTYPE_Pointer -> ?Y |- _ ] =>
-        cbn in H; specialize (H I); search_supported
-    | [ H1 : ?X -> ?Y , H2 : ?X |- _] => apply H1 in H2; search_supported
-    end.
-
   Lemma dvalue_has_dtyp_fun_complete :
     forall dv dt,
       dvalue_has_dtyp dv dt -> dvalue_has_dtyp_fun dv dt = true.
@@ -3983,7 +4192,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       try solve [
           cbn; induction H; forward_bools; auto
         | cbn; repeat break_match_goal; auto; try contradiction;
-          forward_bools; [rewrite forallb_forall; auto | apply Nat.eqb_eq; auto]
+          forward_bools; [rewrite forallb_forall; auto | apply Nat.eqb_eq; auto | apply dtyp_eqb_refl]
         | cbn; repeat break_match_goal; auto
         | cbn;
           repeat break_match_goal; invert_hyps; subst;
@@ -4005,26 +4214,18 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     rewrite H in C. inversion C.
   Qed.
 
-
-  Definition IX_supported_ltb x y : bool :=
-    if @IX_supported_dec x then
-      if @IX_supported_dec y then
-        if N.ltb x y then true else false
-      else
-        false
-    else false.
-
   Definition trunc_base_okb from_dt to_dt :=
     match from_dt with
     | DTYPE_I from_sz =>
         match to_dt with
-        | DTYPE_I to_sz => IX_supported_ltb to_sz from_sz
+        | DTYPE_I to_sz => Pos.ltb to_sz from_sz
         | _ => false
         end
     | DTYPE_IPTR =>
         match to_dt with
         | DTYPE_I to_sz =>
-            if @IX_supported_dec to_sz then true else false
+            (* TODO: This is a little dodgy... Can we always truncate? What about finite iptrs? *)
+            true
         | _ => false
         end
     | _ => false
@@ -4045,9 +4246,10 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     match from_dt with
     | DTYPE_I from_sz =>
         match to_dt with
-        | DTYPE_I to_sz => IX_supported_ltb from_sz to_sz
+        | DTYPE_I to_sz => Pos.ltb from_sz to_sz
         | DTYPE_IPTR =>
-            if @IX_supported_dec from_sz then true else false
+            (* TODO: A little dodgy too... *)
+            true
         | _ => false
         end
     | _ => false
@@ -4062,138 +4264,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | _ => false
     end.
 
-  Lemma lift_conv_okb_supported :
-    forall conv_base_okb from_dt sz,
-      (conv_base_okb from_dt (DTYPE_I sz) = true -> IX_supported sz) ->
-      lift_conv_okb conv_base_okb from_dt (DTYPE_I sz) = true ->
-      IX_supported sz.
-  Proof using.
-    intros f from_dt sz H EQ.
-    destruct from_dt; simpl in *; inversion EQ; eauto.
-  Qed.
-
-  Lemma lift_conv_okb_ALL_IX_SUPPORTED:
-    forall conv_base_okb from_dt to_dt,
-      (forall ft dt, conv_base_okb ft dt = true -> ALL_IX_SUPPORTED dt) ->
-      lift_conv_okb conv_base_okb from_dt to_dt = true ->
-      ALL_IX_SUPPORTED to_dt.
-  Proof using.
-    intros f from_dt to_dt H EQ.
-    destruct from_dt; simpl in *; inversion EQ; eauto.
-    destruct to_dt eqn: HEQ; inversion EQ.
-    cbn.
-    subst.
-    eapply H; eauto.
-  Qed.
-
-  Lemma IX_supported_ltb_supported : forall sz1 sz2,
-      IX_supported_ltb sz1 sz2 = true -> IX_supported sz1 /\ IX_supported sz2.
-  Proof using.
-    intros.
-    unfold IX_supported_ltb in H.
-    break_match_hyp; [|inversion H].
-    break_match_hyp; [|inversion H].
-    auto.
-  Qed.
-
-  Lemma trunc_base_okb_supported:
-    forall from_dt sz, trunc_base_okb from_dt (DTYPE_I sz) = true -> IX_supported sz.
-  Proof using.
-    intros.
-    destruct from_dt; simpl in *; try inversion H.
-    - apply IX_supported_ltb_supported in H. intuition auto with *.
-    - break_match_hyp; [auto|inversion H].
-  Qed.
-
-  Lemma trunc_base_okb_ALL_IX_SUPPORTED :
-    forall from_dt to_dt, trunc_base_okb from_dt to_dt = true -> ALL_IX_SUPPORTED to_dt.
-  Proof using.
-    intros.
-    destruct from_dt; simpl in *; try inversion H.
-    - break_match_hyp; auto; try solve [inversion H1].
-      apply IX_supported_ltb_supported in H. intuition auto with *.
-    - break_match_hyp; auto; try solve [inversion H1].
-      break_match_hyp; auto. inversion H.
-  Qed.
-
-  Lemma ext_base_okb_supported :
-    forall from_dt sz, ext_base_okb from_dt (DTYPE_I sz) = true -> IX_supported sz.
-  Proof using.
-    intros.
-    destruct from_dt; simpl in *; try inversion H.
-    apply IX_supported_ltb_supported in H. intuition auto with *.
-  Qed.
-
-  Lemma ext_base_okb_ALL_IX_SUPPORTED :
-    forall from_dt to_dt, ext_base_okb from_dt to_dt = true -> ALL_IX_SUPPORTED to_dt.
-  Proof using.
-    intros.
-    destruct from_dt; simpl in *; try inversion H.
-    - break_match_hyp; cbn; try solve [inversion H1]; auto.
-      apply IX_supported_ltb_supported in H. intuition auto with *.
-  Qed.
-
-  Lemma conversion_okb_supported :
-    forall conv from_dt sz, conversion_okb conv from_dt (DTYPE_I sz) = true -> IX_supported sz.
-  Proof using.
-    destruct conv; intros from_dt sz H; try inversion H.
-    - simpl in H. apply lift_conv_okb_supported in H; auto.
-      apply trunc_base_okb_supported.
-    - simpl in H. apply lift_conv_okb_supported in H; auto.
-      apply ext_base_okb_supported.
-    - simpl in H. apply lift_conv_okb_supported in H; auto.
-      apply ext_base_okb_supported.
-  Qed.
-
-  Lemma conversion_okb_ALL_IX_SUPPORTED :
-    forall (conv : conversion_type) (from_typ to_typ : dtyp),
-      conversion_okb conv from_typ to_typ = true -> ALL_IX_SUPPORTED from_typ -> ALL_IX_SUPPORTED to_typ.
-  Proof using.
-    destruct conv; intros from_dt to_dt H HSUP; try inversion H.
-    - apply lift_conv_okb_ALL_IX_SUPPORTED in H1; auto.
-      apply trunc_base_okb_ALL_IX_SUPPORTED.
-    - apply lift_conv_okb_ALL_IX_SUPPORTED in H1; auto.
-      apply ext_base_okb_ALL_IX_SUPPORTED.
-    - apply lift_conv_okb_ALL_IX_SUPPORTED in H1; auto.
-      apply ext_base_okb_ALL_IX_SUPPORTED.
-  Qed.
-
   (* Assumes:
      [l] is a list of indices treated as a path into the nested structure.
      The function returns true iff the type at the index is equal to [dt]
 
   *)
-  Fixpoint check_extract_path l dt_src dt_tgt :=
-    match l with
-    | [] => false
-    | [idx] =>
-        if (Z.ltb idx 0) then false (* negative index *)
-        else
-          match dt_src with
-          | DTYPE_Array len t =>
-              if (N.ltb (Z.to_N idx) len) then
-                if dtyp_eq_dec t dt_tgt then true else false
-              else false
-          | DTYPE_Struct fts
-          | DTYPE_Packed_struct fts =>
-              if dtyp_eq_dec (List.nth (Z.to_nat idx) fts DTYPE_Void) dt_tgt then true
-              else false
-          | _ => false
-          end
-    | idx::idxs =>
-        if (Z.ltb idx 0) then false (* negative index *)
-        else
-          match dt_src with
-          | DTYPE_Array len t =>
-              if (N.ltb (Z.to_N idx) len) then check_extract_path idxs t dt_tgt else false
-          | DTYPE_Struct fts
-          | DTYPE_Packed_struct fts =>
-              let nth_ft := List.nth (Z.to_nat idx) fts DTYPE_Void in
-              check_extract_path idxs nth_ft dt_tgt
-          | _ => false
-          end
-    end.
-
   Fixpoint fetch_extract_path l dt_src : err dtyp :=
     match l with
     | [] => failwith "fetch_extract_path: no path"
@@ -4229,21 +4304,39 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           end
     end.
 
+  Definition check_extract_path l dt_src dt_tgt :=
+    match fetch_extract_path l dt_src with
+    | inr t => dtyp_eqb t dt_tgt
+    | _ => false
+    end.
+
+  Lemma check_fetch_extract_path :
+    forall idxs d dtx,
+      fetch_extract_path idxs d = inr dtx <-> check_extract_path idxs d dtx = true.
+  Proof.
+    intros idxs d dtx.
+    split.
+    - intros FETCH.
+      unfold check_extract_path.
+      rewrite FETCH.
+      apply dtyp_eqb_refl.
+    - intros CHECK.
+      unfold check_extract_path in CHECK.
+      break_match_hyp_inv.
+      apply dtyp_eqb_eq in H0; subst; auto.
+  Qed.
+
   Unset Elimination Schemes.
   Inductive uvalue_has_dtyp : uvalue -> dtyp -> Prop :=
   | UVALUE_Addr_typ   : forall a, uvalue_has_dtyp (UVALUE_Addr a) DTYPE_Pointer
-  | UVALUE_I1_typ     : forall x, uvalue_has_dtyp (UVALUE_I1 x) (DTYPE_I 1)
-  | UVALUE_I8_typ     : forall x, uvalue_has_dtyp (UVALUE_I8 x) (DTYPE_I 8)
-  | UVALUE_I16_typ    : forall x, uvalue_has_dtyp (UVALUE_I16 x) (DTYPE_I 16)
-  | UVALUE_I32_typ    : forall x, uvalue_has_dtyp (UVALUE_I32 x) (DTYPE_I 32)
-  | UVALUE_I64_typ    : forall x, uvalue_has_dtyp (UVALUE_I64 x) (DTYPE_I 64)
+  | UVALUE_I_typ      : forall sz x, uvalue_has_dtyp (@UVALUE_I sz x) (DTYPE_I sz)
   | UVALUE_IPTR_typ    : forall x, uvalue_has_dtyp (UVALUE_IPTR x) (DTYPE_IPTR)
   | UVALUE_Double_typ : forall x, uvalue_has_dtyp (UVALUE_Double x) DTYPE_Double
   | UVALUE_Float_typ  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Float
   | UVALUE_None_typ   : uvalue_has_dtyp UVALUE_None DTYPE_Void
-  | UVALUE_Poison_typ  : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> uvalue_has_dtyp (UVALUE_Poison τ) τ
-  | UVALUE_Oom_typ  : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> uvalue_has_dtyp (UVALUE_Oom τ) τ
-  | UVALUE_Undef_typ  : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> uvalue_has_dtyp (UVALUE_Undef τ) τ
+  | UVALUE_Poison_typ : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Poison τ) τ
+  | UVALUE_Oom_typ    : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Oom τ) τ
+  | UVALUE_Undef_typ  : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Undef τ) τ
 
   | UVALUE_Struct_typ :
     forall fields dts,
@@ -4258,31 +4351,36 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   (* Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
   | UVALUE_Array_typ :
     forall xs sz dt,
-      ALL_IX_SUPPORTED dt ->
       NO_VOID dt ->
       Forall (fun x => uvalue_has_dtyp x dt) xs ->
       length xs = (N.to_nat sz) ->
-      uvalue_has_dtyp (UVALUE_Array xs) (DTYPE_Array sz dt)
+      uvalue_has_dtyp (UVALUE_Array (DTYPE_Array sz dt) xs) (DTYPE_Array sz dt)
 
   | UVALUE_Vector_typ :
       forall xs sz dt,
-        ALL_IX_SUPPORTED dt ->
         NO_VOID dt ->
         Forall (fun x => uvalue_has_dtyp x dt) xs ->
         length xs = (N.to_nat sz) ->
         vector_dtyp dt ->
-        uvalue_has_dtyp (UVALUE_Vector xs) (DTYPE_Vector sz dt)
+        uvalue_has_dtyp (UVALUE_Vector (DTYPE_Vector sz dt) xs) (DTYPE_Vector sz dt)
 
   | UVALUE_IBinop_typ :
       forall x y sz op dt,
-      ((IX_supported sz /\ dt = (DTYPE_I sz)) \/ (dt = DTYPE_IPTR)) ->
+      (dt = (DTYPE_I sz) \/ dt = DTYPE_IPTR) ->
       uvalue_has_dtyp x dt ->
       uvalue_has_dtyp y dt ->
       uvalue_has_dtyp (UVALUE_IBinop op x y) dt
 
+  | UVALUE_IBinop_vector_typ :
+      forall x y vsz (isz : positive) op dt,
+      (dt = (DTYPE_I isz) \/ dt = DTYPE_IPTR) ->
+      uvalue_has_dtyp x (DTYPE_Vector vsz dt) ->
+      uvalue_has_dtyp y (DTYPE_Vector vsz dt) ->
+      uvalue_has_dtyp (UVALUE_IBinop op x y) (DTYPE_Vector vsz dt)
+
   | UVALUE_ICmp_typ :
       forall x y op sz,
-        ((IX_supported sz /\ uvalue_has_dtyp x (DTYPE_I sz) /\ uvalue_has_dtyp y (DTYPE_I sz))
+        ((uvalue_has_dtyp x (DTYPE_I sz) /\ uvalue_has_dtyp y (DTYPE_I sz))
          \/
            (uvalue_has_dtyp x DTYPE_IPTR /\ uvalue_has_dtyp y DTYPE_IPTR)
          \/
@@ -4291,7 +4389,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
   | UVALUE_ICmp_vector_typ :
       forall x y vsz isz op,
-        ((IX_supported isz /\ uvalue_has_dtyp x (DTYPE_Vector vsz (DTYPE_I isz)) /\
+        ((uvalue_has_dtyp x (DTYPE_Vector vsz (DTYPE_I isz)) /\
             uvalue_has_dtyp y (DTYPE_Vector vsz (DTYPE_I isz)))
          \/
            (uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_IPTR) /\
@@ -4309,12 +4407,29 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       uvalue_has_dtyp y dt ->
       uvalue_has_dtyp (UVALUE_FBinop op fms x y) dt
 
+  | UVALUE_FBinop_vector_typ :
+    forall x y vsz op fms dt,
+      (dt = DTYPE_Double \/ dt = DTYPE_Float) ->
+      uvalue_has_dtyp x (DTYPE_Vector vsz dt) ->
+      uvalue_has_dtyp y (DTYPE_Vector vsz dt) ->
+      uvalue_has_dtyp (UVALUE_FBinop op fms x y) (DTYPE_Vector vsz dt)
+
   | UVALUE_FCmp_typ :
     forall x y op dt,
       (dt = DTYPE_Double \/ dt = DTYPE_Float) ->
       uvalue_has_dtyp x dt ->
       uvalue_has_dtyp y dt ->
       uvalue_has_dtyp (UVALUE_FCmp op x y) (DTYPE_I 1)
+
+  | UVALUE_FCmp_vector_typ :
+      forall x y vsz op,
+        ((uvalue_has_dtyp x (DTYPE_Vector vsz (DTYPE_Double)) /\
+            uvalue_has_dtyp y (DTYPE_Vector vsz (DTYPE_Double)))
+         \/
+           (uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_Float) /\
+              uvalue_has_dtyp y (DTYPE_Vector vsz DTYPE_Float))
+        ) ->
+      uvalue_has_dtyp (UVALUE_FCmp op x y) (DTYPE_Vector vsz (DTYPE_I 1))
 
   | UVALUE_Conversion_typ :
     forall conv from_typ value to_typ,
@@ -4328,8 +4443,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
   | UVALUE_ExtractElement_typ :
       forall n vect idx t sz,
-        ALL_IX_SUPPORTED t ->
-        ((IX_supported sz /\ uvalue_has_dtyp idx (DTYPE_I sz))
+        ((uvalue_has_dtyp idx (DTYPE_I sz))
          \/
            uvalue_has_dtyp idx DTYPE_IPTR
          ) ->
@@ -4338,8 +4452,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
   | UVALUE_InsertElement_typ :
       forall n vect val idx t sz,
-        ALL_IX_SUPPORTED t ->
-        ((IX_supported sz /\ uvalue_has_dtyp idx (DTYPE_I sz))
+        ((uvalue_has_dtyp idx (DTYPE_I sz))
          \/
            uvalue_has_dtyp idx DTYPE_IPTR
          ) ->
@@ -4387,7 +4500,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   (*       uvalue_has_dtyp (UVALUE_ExtractByte uv dt idx sid) (DTYPE_I 8) *)
   | UVALUE_ConcatBytes_typ :
     forall bytes dt,
-      ALL_IX_SUPPORTED dt ->
       (forall byte, In byte bytes -> exists uv t idx sid, byte = UVALUE_ExtractByte uv t idx sid) ->
       N.of_nat (length bytes) = sizeof_dtyp dt ->
       uvalue_has_dtyp (UVALUE_ConcatBytes bytes dt) dt.
@@ -4395,18 +4507,14 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Section uvalue_has_dtyp_ind.
     Variable P : uvalue -> dtyp -> Prop.
     Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a) DTYPE_Pointer.
-    Hypothesis IH_I1             : forall x, P (UVALUE_I1 x) (DTYPE_I 1).
-    Hypothesis IH_I8             : forall x, P (UVALUE_I8 x) (DTYPE_I 8).
-    Hypothesis IH_I16            : forall x, P (UVALUE_I16 x) (DTYPE_I 16).
-    Hypothesis IH_I32            : forall x, P (UVALUE_I32 x) (DTYPE_I 32).
-    Hypothesis IH_I64            : forall x, P (UVALUE_I64 x) (DTYPE_I 64).
+    Hypothesis IH_I              : forall sz x, P (@UVALUE_I sz x) (DTYPE_I sz).
     Hypothesis IH_IPTR           : forall x, P (UVALUE_IPTR x) DTYPE_IPTR.
     Hypothesis IH_Double         : forall x, P (UVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (UVALUE_Float x) DTYPE_Float.
     Hypothesis IH_None           : P UVALUE_None DTYPE_Void.
-    Hypothesis IH_Poison         : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> P (UVALUE_Poison τ) τ.
-    Hypothesis IH_Oom            : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> P (UVALUE_Oom τ) τ.
-    Hypothesis IH_Undef          : forall τ, ALL_IX_SUPPORTED τ -> NO_VOID τ -> P (UVALUE_Undef τ) τ.
+    Hypothesis IH_Poison         : forall τ, NO_VOID τ -> P (UVALUE_Poison τ) τ.
+    Hypothesis IH_Oom            : forall τ, NO_VOID τ -> P (UVALUE_Oom τ) τ.
+    Hypothesis IH_Undef          : forall τ, NO_VOID τ -> P (UVALUE_Undef τ) τ.
 
     Hypothesis IH_Struct :
       forall fields fts,
@@ -4422,27 +4530,31 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                              sz
                             (dt : dtyp)
                             (IH : forall x, In x xs -> P x dt),
-        ALL_IX_SUPPORTED dt ->
         NO_VOID dt ->
         Datatypes.length xs = (N.to_nat sz) ->
-        P (UVALUE_Array xs) (DTYPE_Array sz dt).
+        P (UVALUE_Array (DTYPE_Array sz dt) xs) (DTYPE_Array sz dt).
 
     Hypothesis IH_Vector : forall (xs : list uvalue) sz (dt : dtyp)
                              (IH : forall x, In x xs -> P x dt),
-        ALL_IX_SUPPORTED dt ->
         NO_VOID dt ->
         Datatypes.length xs = (N.to_nat sz) ->
-        vector_dtyp dt -> P (UVALUE_Vector xs) (DTYPE_Vector sz dt).
+        vector_dtyp dt -> P (UVALUE_Vector (DTYPE_Vector sz dt) xs) (DTYPE_Vector sz dt).
 
-    Hypothesis IH_IBinop : forall (x y : uvalue) (sz : N) (op : ibinop) dt,
-        ((IX_supported sz /\ dt = (DTYPE_I sz)) \/ (dt = DTYPE_IPTR)) ->
+    Hypothesis IH_IBinop : forall (x y : uvalue) (sz : positive) (op : ibinop) dt,
+        ((dt = (DTYPE_I sz)) \/ (dt = DTYPE_IPTR)) ->
         P x dt ->
         P y dt ->
         P (UVALUE_IBinop op x y) dt.
 
+    Hypothesis IH_IBinop_vector : forall (x y : uvalue) vsz (sz : positive) (op : ibinop) dt,
+        ((dt = (DTYPE_I sz)) \/ (dt = DTYPE_IPTR)) ->
+        P x (DTYPE_Vector vsz dt) ->
+        P y (DTYPE_Vector vsz dt) ->
+        P (UVALUE_IBinop op x y) (DTYPE_Vector vsz dt).
+
     Hypothesis IH_ICmp :
           forall x y op sz,
-        ((IX_supported sz /\ P x (DTYPE_I sz) /\ P y (DTYPE_I sz))
+        ((P x (DTYPE_I sz) /\ P y (DTYPE_I sz))
          \/
            (P x DTYPE_IPTR /\ P y DTYPE_IPTR)
          \/
@@ -4450,7 +4562,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         P (UVALUE_ICmp op x y) (DTYPE_I 1).
 
     Hypothesis IH_ICmp_vector : forall x y vsz isz op,
-        ((IX_supported isz /\ P x (DTYPE_Vector vsz (DTYPE_I isz)) /\
+        ((P x (DTYPE_Vector vsz (DTYPE_I isz)) /\
             P y (DTYPE_Vector vsz (DTYPE_I isz)))
          \/
            (P x (DTYPE_Vector vsz DTYPE_IPTR) /\
@@ -4467,11 +4579,23 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         P y dt ->
         P (UVALUE_FBinop op fms x y) dt.
 
+    Hypothesis IH_FBinop_vector : forall (x y : uvalue) vsz (op : fbinop) (fms : list fast_math) dt,
+        (dt = DTYPE_Double \/ dt = DTYPE_Float) ->
+        P x (DTYPE_Vector vsz dt) ->
+        P y (DTYPE_Vector vsz dt) ->
+        P (UVALUE_FBinop op fms x y) (DTYPE_Vector vsz dt).
+
     Hypothesis IH_FCmp : forall (x y : uvalue) (op : fcmp) dt,
         (dt = DTYPE_Double \/ dt = DTYPE_Float) ->
         P x dt ->
         P y dt ->
         P (UVALUE_FCmp op x y) (DTYPE_I 1).
+
+    Hypothesis IH_FCmp_vector : forall (x y : uvalue) vsz (op : fcmp) dt,
+        (dt = DTYPE_Double \/ dt = DTYPE_Float) ->
+        P x (DTYPE_Vector vsz dt) ->
+        P y (DTYPE_Vector vsz dt) ->
+        P (UVALUE_FCmp op x y) (DTYPE_Vector vsz (DTYPE_I 1)).
 
     Hypothesis IH_Conversion : forall conv from_typ value to_typ,
         P value from_typ ->
@@ -4481,18 +4605,16 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_GetElementPtr : forall (dt : dtyp) (uv : uvalue) (idxs : list uvalue),
         P (UVALUE_GetElementPtr dt uv idxs) DTYPE_Pointer.
 
-    Hypothesis IH_ExtractElement : forall n (vect idx : uvalue) (t : dtyp) (sz : N),
-        ALL_IX_SUPPORTED t ->
-        ((IX_supported sz /\ P idx (DTYPE_I sz))
+    Hypothesis IH_ExtractElement : forall n (vect idx : uvalue) (t : dtyp) (sz : positive),
+        ((P idx (DTYPE_I sz))
          \/
            P idx DTYPE_IPTR
          ) ->
         P vect (DTYPE_Vector n t) ->
         P (UVALUE_ExtractElement (DTYPE_Vector n t) vect idx) t.
 
-    Hypothesis IH_InsertElement : forall n (vect val idx : uvalue) (t : dtyp) (sz : N),
-        ALL_IX_SUPPORTED t ->
-        ((IX_supported sz /\ P idx (DTYPE_I sz))
+    Hypothesis IH_InsertElement : forall n (vect val idx : uvalue) (t : dtyp) (sz : positive),
+        ((P idx (DTYPE_I sz))
          \/
            P idx DTYPE_IPTR
          ) ->
@@ -4539,7 +4661,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
     Hypothesis IH_UVALUE_ConcatBytes :
       forall bytes dt,
-        ALL_IX_SUPPORTED dt ->
         (forall byte, In byte bytes -> exists uv t idx sid, byte = UVALUE_ExtractByte uv t idx sid) ->
         N.of_nat (length bytes) = sizeof_dtyp dt ->
         P (UVALUE_ConcatBytes bytes dt) dt.
@@ -4576,9 +4697,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           eauto.
 
       - apply IH_Array; auto.
-        revert xs sz dt H H0 H1 H2.
-        fix IHL_C 6.
-        intros xs sz dt HALL HNV H EQ .
+        revert xs sz dt H H0 H1.
+        fix IHL_C 5.
+        intros xs sz dt HNV H EQ .
         destruct H.
         * intros x HIN. inversion HIN.
         * intros x' HIN. inversion HIN.
@@ -4589,12 +4710,12 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           -- simpl in EQ.
              destruct (N.to_nat sz); inversion EQ.
              rewrite <- Nnat.Nat2N.id in H3.
-             apply (IHL_C _ _ _ HALL HNV H0 H3 x' H1).
+             apply (IHL_C _ _ _ HNV H0 H3 x' H1).
 
       - apply IH_Vector; auto.
-        revert xs sz dt H H0 H1 H2 H3.
-        fix IHL_C 6.
-        intros xs sz dt HALL HNV H EQ HX.
+        revert xs sz dt H H0 H1 H2.
+        fix IHL_C 5.
+        intros xs sz dt HNV H EQ HX.
         destruct H.
         * intros x HIN. inversion HIN.
         * intros x' HIN. inversion HIN.
@@ -4605,34 +4726,35 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           -- simpl in EQ.
              destruct (N.to_nat sz); inversion EQ.
              rewrite <- Nnat.Nat2N.id in H3.
-             apply (IHL_C _ _ _ HALL HNV H0 H3 HX x' H1).
+             apply (IHL_C _ _ _ HNV H0 H3 HX x' H1).
 
-      - destruct H as [[HS [HX HY]]|[[HX HY]|[HX HY]]].
-        + eapply IH_ICmp.
+      - destruct H as [[HX HY]|[[HX HY]|[HX HY]]].
+        + eapply IH_ICmp with (sz := sz).
           left. split; eauto.
-        + eapply IH_ICmp.
+        + eapply IH_ICmp with (sz := sz).
           right. left; split; eauto.
-        + eapply IH_ICmp.
+        + eapply IH_ICmp with (sz := sz).
           right. right; split; eauto.
 
       - eapply IH_ICmp_vector.
-        destruct H as [[HS [HX HY]]|[[HX HY]|[HX HY]]].
+        destruct H as [[HX HY]|[[HX HY]|[HX HY]]].
         + left; split; eauto.
         + right. left; split; eauto.
         + right. right; split; eauto.
 
-      - eapply IH_ExtractElement; auto.
-        destruct H0 as [[HS HI] | HI].
-        + left; split; eauto.
+      - destruct H as [[HX HY]|[HX HY]].
+        + eapply IH_FCmp_vector with (dt:=DTYPE_Double); auto.
+        + eapply IH_FCmp_vector with (dt:=DTYPE_Float); auto.
+
+      - eapply IH_ExtractElement with (sz:=sz); auto.
+        destruct H as [HI | HI].
+        + left. eapply IHQ. apply HI.
         + right. eapply IHQ. apply HI.
 
-      - eapply IH_InsertElement; auto.
-        destruct H0 as [[HS HI] | HI].
-        + left; split; eauto.
-        + right; eauto.
-          Unshelve.
-           eauto. eauto.
-
+      - eapply IH_InsertElement with (sz:=sz); auto.
+        destruct H as [HI | HI].
+        + left. eapply IHQ. apply HI.
+        + right. eapply IHQ. apply HI.
     Qed.
 
   End uvalue_has_dtyp_ind.
@@ -4640,544 +4762,38 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   #[global]
     Hint Constructors uvalue_has_dtyp : uvalue.
 
-  Lemma dvalue_has_dtyp_ALL_IX_SUPPORTED :
-    forall dv dt,
-      dvalue_has_dtyp dv dt ->
-      ALL_IX_SUPPORTED dt.
-  Proof using.
-    intros dv dt TYPE.
-    induction TYPE; try solve [ auto
-                              | cbn; auto; try constructor; auto].
-    - cbn;
-      induction H; constructor; auto.
-    - cbn;
-      induction H; constructor; auto.
-  Qed.
-
-  Lemma ALL_IX_SUPPORTED_path_strong :
-    forall (τ : dtyp)
-      (dt : dtyp)
-      (HA : ALL_IX_SUPPORTED τ),
-    forall path : list Z, check_extract_path path τ dt = true -> ALL_IX_SUPPORTED dt.
-  Proof using.
-    intros.
-    revert τ dt HA H.
-    induction path; intros τ dt HA H.
-    - simpl in H. inversion H.
-    - destruct path.
-      + destruct τ; simpl in H; repeat break_match_hyp; try solve [inversion H].
-        * subst.
-          cbn in HA. auto.
-        * destruct (nth_in_or_default (Z.to_nat a) fields DTYPE_Void).
-          specialize (ALL_IX_SUPPORTED_Struct_fields _ HA _ i).
-          intros HX. rewrite e in HX.
-          assumption.
-          rewrite e in e0. inversion  e0.
-          constructor.
-
-        * destruct (nth_in_or_default (Z.to_nat a) fields DTYPE_Void).
-          specialize (ALL_IX_SUPPORTED_Packed_struct_fields _ HA _ i).
-          intros HX. rewrite e in HX.
-          assumption.
-          rewrite e in e0. inversion  e0.
-          constructor.
-
-      + cbn in H.
-        break_match_hyp.
-        * inversion H.
-        * break_match_hyp; try solve [inversion H].
-          -- cbn in HA.
-             break_match_hyp.
-             ++ apply IHpath in H; auto.
-             ++ inversion H.
-          -- apply IHpath in H; auto.
-             ++ destruct (nth_in_or_default (Z.to_nat a) fields DTYPE_Void).
-                specialize (ALL_IX_SUPPORTED_Struct_fields _ HA _ i); auto.
-                rewrite e in H.
-                rewrite e.
-                constructor.
-          -- apply IHpath in H; auto.
-             ++ destruct (nth_in_or_default (Z.to_nat a) fields DTYPE_Void).
-                specialize (ALL_IX_SUPPORTED_Packed_struct_fields _ HA _ i); auto.
-                rewrite e in H.
-                repeat break_match_hyp; inversion H.
-  Qed.
-
-  Lemma ALL_IX_SUPPORTED_path :
-    forall
-      (sz : N)
-      (τ : dtyp)
-      (HA : ALL_IX_SUPPORTED τ),
-    forall path : list Z, check_extract_path path τ (DTYPE_I sz) = true -> IX_supported sz.
-  Proof using.
-    intros.
-    apply ALL_IX_SUPPORTED_path_strong in H; auto.
-  Qed.
-
-  Lemma uvalue_has_dtyp_ALL_IX_SUPPORTED :
-    forall uv dt,
-      uvalue_has_dtyp uv dt ->
-      ALL_IX_SUPPORTED dt.
-  Proof using.
-    intros uv dt TYPE.
-    induction TYPE; try solve [ auto
-                              | cbn; auto; try constructor; auto].
-    - cbn;
-      induction H; constructor; auto.
-    - cbn;
-      induction H; constructor; auto.
-    - eapply conversion_okb_ALL_IX_SUPPORTED; eauto.
-    - eapply ALL_IX_SUPPORTED_path_strong; eauto.
-  Qed.
-
-  Lemma uvalue_has_dtyp_IX_supported :
-    forall uv sz,
-      uvalue_has_dtyp uv (DTYPE_I sz) -> IX_supported sz.
-  Proof using.
-    intros.
-    apply uvalue_has_dtyp_ALL_IX_SUPPORTED in H.
-    cbn in H.
-    assumption.
-  Qed.
-
-  Fixpoint uvalue_has_dtyp_fun (uv:uvalue) (dt:dtyp) : bool :=
-    let list_forallb2 :=
-      fix go uvs dts :=
-      match uvs, dts with
-      | [], [] => true
-      | uv::utl, dt::dttl => uvalue_has_dtyp_fun uv dt && go utl dttl
-      | _,_ => false
-      end
-    in
-
-    match uv with
-    | UVALUE_Addr a =>
-        if dtyp_eq_dec dt DTYPE_Pointer then true else false
-
-    | UVALUE_I1 x =>
-        if dtyp_eq_dec dt (DTYPE_I 1) then true else false
-
-    | UVALUE_I8 x =>
-        if dtyp_eq_dec dt (DTYPE_I 8) then true else false
-
-    | UVALUE_I16 x =>
-        if dtyp_eq_dec dt (DTYPE_I 16) then true else false
-
-    | UVALUE_I32 x =>
-        if dtyp_eq_dec dt (DTYPE_I 32) then true else false
-
-    | UVALUE_I64 x =>
-        if dtyp_eq_dec dt (DTYPE_I 64) then true else false
-
-    | UVALUE_IPTR x =>
-        if dtyp_eq_dec dt (DTYPE_IPTR) then true else false
-
-    | UVALUE_Double x =>
-        if dtyp_eq_dec dt (DTYPE_Double) then true else false
-
-    | UVALUE_Float x =>
-        if dtyp_eq_dec dt (DTYPE_Float) then true else false
-
-    | UVALUE_Undef t
-    | UVALUE_Poison t
-    | UVALUE_Oom t =>
-        if @ALL_IX_SUPPORTED_dec t then
-          if @NO_VOID_dec t then
-            if dtyp_eq_dec dt t then true else false
-          else false
-        else false
-
-    | UVALUE_None =>
-        if dtyp_eq_dec dt (DTYPE_Void) then true else false
-
-    | UVALUE_Struct fields =>
-        match dt with
-        | DTYPE_Struct field_dts =>
-            list_forallb2 fields field_dts
-        | _ => false
-        end
-
-    | UVALUE_Packed_struct fields =>
-        match dt with
-        | DTYPE_Packed_struct field_dts =>
-            list_forallb2 fields field_dts
-        | _ => false
-        end
-
-    | UVALUE_Array elts =>
-        match dt with
-        | DTYPE_Array sz dtt =>
-          if (@ALL_IX_SUPPORTED_dec dtt) then
-            if (@NO_VOID_dec dtt) then
-              List.forallb (fun u => uvalue_has_dtyp_fun u dtt) elts &&
-                (Nat.eqb (List.length elts) (N.to_nat sz))
-            else false
-          else false
-        | _ => false
-        end
-
-    | UVALUE_Vector elts =>
-        match dt with
-        | DTYPE_Vector sz dtt =>
-          if (@ALL_IX_SUPPORTED_dec dtt) then
-            if (@NO_VOID_dec dtt) then
-              if (@vector_dtyp_dec dtt) then
-                List.forallb (fun u => uvalue_has_dtyp_fun u dtt) elts &&
-                  (Nat.eqb (List.length elts) (N.to_nat sz))
-              else false
-            else false
-          else false
-        | _ => false
-        end
-
-    | UVALUE_IBinop iop x y =>
-        match dt with
-        | DTYPE_I sz =>
-            if @IX_supported_dec sz then
-              uvalue_has_dtyp_fun x dt && uvalue_has_dtyp_fun y dt
-            else false
-        | DTYPE_IPTR =>
-            uvalue_has_dtyp_fun x dt && uvalue_has_dtyp_fun y dt
-        | _ => false
-        end
-
-    | UVALUE_ICmp op x y =>
-        (* SAZ: TODO - is uvalue_has_dtyp missing an ICmp DTYPE_IPTR case? *)
-        match dt with
-        | DTYPE_I 1 =>
-            (List.existsb
-               (fun sz => uvalue_has_dtyp_fun x (DTYPE_I sz) &&
-                         uvalue_has_dtyp_fun y (DTYPE_I sz)) [1; 8; 16; 32; 64])
-            ||
-            (uvalue_has_dtyp_fun x (DTYPE_IPTR) && uvalue_has_dtyp_fun y (DTYPE_IPTR))
-            ||
-            (uvalue_has_dtyp_fun x (DTYPE_Pointer) && uvalue_has_dtyp_fun y (DTYPE_Pointer)
-            )
-
-        | DTYPE_Vector vsz (DTYPE_I 1) =>
-              (List.existsb
-                 (fun isz => uvalue_has_dtyp_fun x (DTYPE_Vector vsz (DTYPE_I isz)) &&
-                          uvalue_has_dtyp_fun y (DTYPE_Vector vsz (DTYPE_I isz))) [1; 8; 16; 32; 64])
-              ||
-              uvalue_has_dtyp_fun x (DTYPE_Vector vsz (DTYPE_IPTR)) &&
-                uvalue_has_dtyp_fun y (DTYPE_Vector vsz (DTYPE_IPTR))
-              ||
-              uvalue_has_dtyp_fun x (DTYPE_Vector vsz (DTYPE_Pointer)) &&
-                uvalue_has_dtyp_fun y (DTYPE_Vector vsz (DTYPE_Pointer))
-        | _ => false
-        end
-
-    | UVALUE_FBinop op fms x y =>
-        match dt with
-        | DTYPE_Float =>
-            (uvalue_has_dtyp_fun x (DTYPE_Float) &&
-               uvalue_has_dtyp_fun y (DTYPE_Float))
-
-        | DTYPE_Double =>
-            (uvalue_has_dtyp_fun x (DTYPE_Double) &&
-               uvalue_has_dtyp_fun y (DTYPE_Double))
-        | _ => false
-        end
-
-    | UVALUE_FCmp op x y =>
-        match dt with
-        | DTYPE_I 1 =>
-            (uvalue_has_dtyp_fun x (DTYPE_Float) &&
-               uvalue_has_dtyp_fun y (DTYPE_Float))
-            ||
-            (uvalue_has_dtyp_fun x (DTYPE_Double) &&
-               uvalue_has_dtyp_fun y (DTYPE_Double))
-        | _ => false
-        end
-
-    | UVALUE_Conversion conv from_dt value to_dt =>
-        if dtyp_eq_dec dt to_dt then
-          uvalue_has_dtyp_fun value from_dt && conversion_okb conv from_dt to_dt
-        else
-          false
-
-    | UVALUE_GetElementPtr agg_dt uv idxs =>
-        match dt with
-        | DTYPE_Pointer => true
-        | _ => false
-        end
-
-    | UVALUE_ExtractElement (DTYPE_Vector n t) vect idx =>
-        if dtyp_eq_dec t dt then
-          if (@ALL_IX_SUPPORTED_dec t) then
-            ((List.existsb
-                (fun sz => uvalue_has_dtyp_fun idx (DTYPE_I sz)) [1; 8; 16; 32; 64])
-             ||
-               uvalue_has_dtyp_fun idx DTYPE_IPTR
-            )
-            &&
-              uvalue_has_dtyp_fun vect (DTYPE_Vector n t)
-          else
-            false
-        else
-          false
-
-    | UVALUE_InsertElement (DTYPE_Vector n t) vect val idx =>
-        if dtyp_eq_dec (DTYPE_Vector n t) dt then
-          if (@ALL_IX_SUPPORTED_dec t) then
-            ((List.existsb
-                (fun sz => uvalue_has_dtyp_fun idx (DTYPE_I sz)) [1; 8; 16; 32; 64])
-             ||
-               uvalue_has_dtyp_fun idx DTYPE_IPTR
-            )
-            &&
-              uvalue_has_dtyp_fun vect (DTYPE_Vector n t)
-            &&
-              uvalue_has_dtyp_fun val t
-          else
-            false
-        else
-          false
-
-    | UVALUE_ShuffleVector (DTYPE_Vector n t) v1 v2 idxs =>
-        match dt with
-        | DTYPE_Vector m t' =>
-            if dtyp_eq_dec t t' then
-              uvalue_has_dtyp_fun idxs (DTYPE_Vector m (DTYPE_I 32))
-              &&
-                uvalue_has_dtyp_fun v1 (DTYPE_Vector n t)
-              &&
-                uvalue_has_dtyp_fun v2 (DTYPE_Vector n t)
-            else false
-        | _ => false
-        end
-
-    | UVALUE_ExtractValue dt_agg uv path =>
-        uvalue_has_dtyp_fun uv dt_agg
-        &&
-          check_extract_path path dt_agg dt
-
-    | UVALUE_InsertValue dt_agg uv dt_elt elt path =>
-        if dtyp_eq_dec dt dt_agg then
-          uvalue_has_dtyp_fun elt dt_elt &&
-            uvalue_has_dtyp_fun uv dt_agg &&
-            check_extract_path path dt_agg dt_elt
-        else false
-
-    | UVALUE_Select cond x y =>
-        uvalue_has_dtyp_fun x dt
-        &&
-          uvalue_has_dtyp_fun y dt
-        &&
-        match dt with
-        | DTYPE_Vector sz t =>
-            (uvalue_has_dtyp_fun cond (DTYPE_I 1))
-            ||
-            (uvalue_has_dtyp_fun cond (DTYPE_Vector sz (DTYPE_I 1)))
-        | _ => uvalue_has_dtyp_fun cond (DTYPE_I 1)
-        end
-
-    | UVALUE_ConcatBytes bytes t =>
-        if dtyp_eq_dec t dt then
-          if (@ALL_IX_SUPPORTED_dec t) then
-            if N.eq_dec (N.of_nat (length bytes)) (sizeof_dtyp dt) then
-              forallb (fun byte =>
-                         match byte with
-                         | UVALUE_ExtractByte _ _ _ _ =>
-                             true
-                         | _ => false
-                         end) bytes
-            else false
-          else false
-        else false
-
+  Definition valid_ibinop_type (t : dtyp) : bool :=
+    match t with
+    | DTYPE_I _
+    | DTYPE_IPTR
+    | DTYPE_Vector _ (DTYPE_I _)
+    | DTYPE_Vector _ (DTYPE_IPTR) =>
+        true
     | _ => false
     end.
 
+  Definition valid_icmp_type (t : dtyp) : bool :=
+    match t with
+    | DTYPE_I _
+    | DTYPE_IPTR
+    | DTYPE_Pointer
+    | DTYPE_Vector _ (DTYPE_I _)
+    | DTYPE_Vector _ (DTYPE_Pointer)
+    | DTYPE_Vector _ (DTYPE_IPTR) =>
+        true
+    | _ => false
+    end.
 
-  Lemma uvalue_has_dtyp_fun_sound :
-    forall uv dt,
-      uvalue_has_dtyp_fun uv dt = true -> uvalue_has_dtyp uv dt.
-  Proof using.
-    induction uv; intros dtx HX;
-      try solve [
-          cbn in HX;
-          repeat break_match_hyp_inv;
-          invert_bools;
-          econstructor; eauto with uvalue
-        ].
+  Definition valid_fbinop_type (t : dtyp) : bool :=
+    match t with
+    | DTYPE_Float
+    | DTYPE_Double
+    | DTYPE_Vector _ DTYPE_Float
+    | DTYPE_Vector _ DTYPE_Double =>
+        true
+    | _ => false
+    end.
 
-    - cbn in HX.
-      repeat break_match_hyp_inv.
-      constructor.
-      revert fields0 H1.
-      induction fields; intros fields0 H1.
-      + subst. break_match_hyp_inv.
-        constructor.
-      + subst. break_match_hyp_inv.
-        invert_bools.
-        constructor.
-        eapply H; eauto. constructor. reflexivity.
-        eapply IHfields; auto.
-        intros.
-        eapply H.
-        right.  assumption. assumption.
-
-    - cbn in HX.
-      repeat break_match_hyp_inv.
-      constructor.
-      revert fields0 H1.
-      induction fields; intros fields0 H1.
-      + subst. break_match_hyp_inv.
-        constructor.
-      + subst. break_match_hyp_inv.
-        invert_bools.
-        constructor.
-        eapply H; eauto. constructor. reflexivity.
-        eapply IHfields; auto.
-        intros.
-        eapply H.
-        right.  assumption. assumption.
-
-    - cbn in HX.
-      repeat break_match_hyp_inv.
-      invert_bools.
-      apply UVALUE_Array_typ; auto.
-      clear H1.
-      induction elts.
-      + constructor.
-      + cbn in H0.
-        invert_bools.
-        constructor.
-        eapply H; auto. left; auto.
-        apply IHelts; auto.
-        intros.
-        eapply H. right; auto.
-        assumption.
-      + apply Nat.eqb_eq in H1.
-        assumption.
-
-    - cbn in HX.
-      repeat break_match_hyp_inv.
-      invert_bools.
-      apply UVALUE_Vector_typ; auto.
-      clear H1.
-      induction elts.
-      + constructor.
-      + cbn in H0.
-        invert_bools.
-        constructor.
-        eapply H; auto. left; auto.
-        apply IHelts; auto.
-        intros.
-        eapply H. right; auto.
-        assumption.
-      + apply Nat.eqb_eq in H1.
-        assumption.
-
-    - cbn in HX;
-        repeat break_match_hyp_inv;
-        invert_bools;
-        repeat match goal with
-          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
-                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2; clear H1
-          end;
-        econstructor; eauto with uvalue;
-        try solve [
-           left; split; econstructor; eauto
-          ].
-
-    - cbn in HX;
-        repeat break_match_hyp_inv;
-        invert_bools;
-        repeat match goal with
-          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
-                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2; clear H1
-          end.
-      econstructor; eauto with uvalue.
-      econstructor. left. reflexivity. auto. auto.
-
-    - cbn in HX;
-        repeat break_match_hyp_inv;
-        invert_bools;
-        repeat match goal with
-          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
-                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2; clear H1
-          end; econstructor; eauto;
-        try solve [
-            left; split; swap 1 2; eauto; econstructor
-          ].
-
-    - cbn in HX;
-        repeat break_match_hyp_inv;
-        invert_bools;
-        repeat match goal with
-          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
-                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2; clear H1
-          end; econstructor; eauto;
-        try solve [
-            left; split; swap 1 2; eauto; econstructor
-          ].
-
-    - cbn in HX;
-        repeat break_match_hyp_inv;
-        invert_bools;
-        repeat match goal with
-          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
-                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2; clear H1
-          end.
-      econstructor; eauto.
-      intros byte HIN.
-      rewrite forallb_forall in H1.
-      specialize (H1 _ HIN).
-      repeat break_match_hyp_inv.
-      do 4 eexists. reflexivity.
-      Unshelve.
-      all : constructor.
-  Qed.
-
-  Lemma uvalue_has_dtyp_fun_complete :
-    forall uv dt,
-      uvalue_has_dtyp uv dt -> uvalue_has_dtyp_fun uv dt = true.
-  Proof using.
-    intros uv dt TYPE.
-    induction TYPE; auto;
-      try solve [
-          cbn; induction H; forward_bools; auto
-        | cbn; repeat break_match_goal; auto; try contradiction;
-          forward_bools; [rewrite forallb_forall; auto | apply Nat.eqb_eq; auto]
-        | cbn; repeat break_match_goal; auto
-        | cbn;
-          repeat break_match_goal; invert_hyps; subst;
-          try (inversion H0; subst; try contradiction);
-          try (solve [inversion H]);
-          forward_bools; auto
-        ].
-
-    - invert_hyps; cbn; [inversion H; subst; search_supported | search_supported | search_supported].
-    - invert_hyps; cbn; [inversion H; subst; search_supported | search_supported | search_supported].
-    - invert_hyps; subst; cbn; forward_bools; auto; search_supported.
-    - invert_hyps; cbn.
-      + repeat break_match_goal;
-          [inversion H0; subst; search_supported | contradiction | contradiction ].
-      + repeat break_match_goal;
-          [inversion H0; subst; idtac | contradiction | contradiction ].
-        rewrite H2.
-        forward_bools. right. auto. assumption.
-    - invert_hyps; cbn.
-      + repeat break_match_goal;
-          [inversion H0; subst; search_supported | contradiction | contradiction ].
-      + repeat break_match_goal;
-          [inversion H0; subst; idtac | contradiction | contradiction ].
-        rewrite H2.
-        forward_bools. right. auto. assumption.
-        assumption.
-    - cbn.
-      repeat break_match_goal;
-        [idtac | contradiction | contradiction | contradiction].
-      rewrite forallb_forall.
-      intros.
-      specialize (H0 x H2).
-      destruct H0 as [uv [t [idx [sid EQ]]]].
-      subst; reflexivity.
-  Qed.
-
-  (* May be odd on size 0 types and ill-typed uvalues *)
   Fixpoint dtyp_of_uvalue_fun (uv:uvalue) : err dtyp :=
     let list_dtyps :=
       fix go (uvs : list uvalue) : err (list dtyp) :=
@@ -5192,20 +4808,17 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
     match uv with
     | UVALUE_Addr a => ret DTYPE_Pointer  
-    | UVALUE_I1 x => ret (DTYPE_I 1)
-    | UVALUE_I8 x => ret (DTYPE_I 8)
-    | UVALUE_I16 x => ret (DTYPE_I 16)
-    | UVALUE_I32 x => ret (DTYPE_I 32)
-    | UVALUE_I64 x => ret (DTYPE_I 64)
+    | @UVALUE_I sz x => ret (DTYPE_I sz)
     | UVALUE_IPTR x => ret DTYPE_IPTR
     | UVALUE_Double x => ret DTYPE_Double
     | UVALUE_Float x => ret DTYPE_Float
     | UVALUE_Undef t
     | UVALUE_Poison t
     | UVALUE_Oom t =>
-        (* May be problems if 't' is unsupported somehow. E.g., if 't'
-           is void or a DTYPE_I X where X isn't supported... *)
-        ret t
+        if @NO_VOID_dec t then
+          ret t
+        else
+          inl "dtyp_of_uvalue_fun: void undef / poison / oom type"
     | UVALUE_None => ret DTYPE_Void
     | UVALUE_Struct fields =>
         dts <- list_dtyps fields;;
@@ -5213,78 +4826,738 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_Packed_struct fields =>
         dts <- list_dtyps fields;;
         ret (DTYPE_Packed_struct dts)
-    | UVALUE_Array elts =>
-        (* Could be odd cases where element types don't line up, or
-           unsupported types *)
-        (* Unclear what type should be for empty array... In some
-           sense it shouldn't matter because it's a size 0 type
-           regardless... *)
-        match elts with
-        | [] => ret (DTYPE_Array 0 (DTYPE_I 8)) (* Just pick a default... *)
-        | (e::elts') =>
-            dt <- dtyp_of_uvalue_fun e;;
-            ret (DTYPE_Array (N.of_nat (length elts)) dt)
-        end
-    | UVALUE_Vector elts =>
-        match elts with
-        | [] => ret (DTYPE_Vector 0 (DTYPE_I 8)) (* Just pick a default... *)
-        | (e::elts') =>
-            dt <- dtyp_of_uvalue_fun e;;
-            ret (DTYPE_Vector (N.of_nat (length elts)) dt)
-        end
-
+    | UVALUE_Array (DTYPE_Array sz t) elts =>
+        if @NO_VOID_dec t
+        then
+          if forallb (fun e => match dtyp_of_uvalue_fun e with | inr t' => dtyp_eqb t t' | _ => false end) elts && N.eqb sz (N.of_nat (length elts))
+          then ret (DTYPE_Array (N.of_nat (length elts)) t)
+          else inl "dtyp_of_uvalue_fun: mismatched element type in array"
+        else inl "dtyp_of_uvalue_fun: void in array type"
+    | UVALUE_Vector (DTYPE_Vector sz t) elts =>
+        if @NO_VOID_dec t
+        then
+          if forallb (fun e => match dtyp_of_uvalue_fun e with | inr t' => dtyp_eqb t t' | _ => false end) elts && N.eqb sz (N.of_nat (length elts))
+          then
+            if @vector_dtyp_dec t
+            then ret (DTYPE_Vector (N.of_nat (length elts)) t)
+            else inl "dtyp_of_uvalue_fun: invalid element type for vector"
+          else inl "dtyp_of_uvalue_fun: mismatched element type in vector"
+        else inl "dtyp_of_uvalue_fun: void in vector type"
     | UVALUE_IBinop iop x y =>
-        dtyp_of_uvalue_fun x
+        t1 <- dtyp_of_uvalue_fun x;;
+        t2 <- dtyp_of_uvalue_fun y;;
+        if dtyp_eqb t1 t2 && valid_ibinop_type t1
+        then ret t1
+        else inl "dtyp_of_uvalue_fun: mismatched ibinop types"
 
     | UVALUE_ICmp op x y =>
-        match dtyp_of_uvalue_fun x with
-        | inr (DTYPE_Vector vsz _) =>
-            ret (DTYPE_Vector vsz (DTYPE_I 1))
-        | inr _ =>
-            ret (DTYPE_I 1)
-        | f =>
-            f
-        end
+        t1 <- dtyp_of_uvalue_fun x;;
+        t2 <- dtyp_of_uvalue_fun y;;
+        if dtyp_eqb t1 t2 && valid_icmp_type t1
+        then
+          match t1 with
+          | DTYPE_Vector vsz _ =>
+              ret (DTYPE_Vector vsz (DTYPE_I 1))
+          | _ =>
+              ret (DTYPE_I 1)
+          end
+        else inl "dtyp_of_uvalue_fun: mismatched icmp types"
 
     | UVALUE_FBinop op fms x y =>
-        dtyp_of_uvalue_fun x
+        t1 <- dtyp_of_uvalue_fun x;;
+        t2 <- dtyp_of_uvalue_fun y;;
+        if dtyp_eqb t1 t2 && valid_fbinop_type t1
+        then ret t1
+        else inl "dtyp_of_uvalue_fun: mismatched fbinop types"
 
     | UVALUE_FCmp op x y =>
-        ret (DTYPE_I 1)
+        t1 <- dtyp_of_uvalue_fun x;;
+        t2 <- dtyp_of_uvalue_fun y;;
+        if dtyp_eqb t1 t2 && valid_fbinop_type t1
+        then
+          match t1 with
+          | DTYPE_Vector vsz _ =>
+              ret (DTYPE_Vector vsz (DTYPE_I 1))
+          | _ =>
+              ret (DTYPE_I 1)
+          end
+        else inl "dtyp_of_uvalue_fun: mismatched fcmp types"
 
     | UVALUE_Conversion conv from_dt value to_dt =>
-        ret to_dt
+        t <- dtyp_of_uvalue_fun value;;
+        if dtyp_eqb t from_dt && conversion_okb conv from_dt to_dt
+        then ret to_dt
+        else inl "dtyp_of_uvalue_fun: ill-typed conversion"
 
     | UVALUE_GetElementPtr agg_dt uv idxs =>
         ret DTYPE_Pointer
 
     | UVALUE_ExtractElement (DTYPE_Vector n t) vect idx =>
-        ret t
+        t_idx <- dtyp_of_uvalue_fun idx;;
+        match t_idx with
+        | (DTYPE_I _)
+        | DTYPE_IPTR =>
+            t_vect <- dtyp_of_uvalue_fun vect;;
+            if dtyp_eq_dec (DTYPE_Vector n t) t_vect
+            then ret t
+            else inl "dtyp_of_uvalue_fun: ill-typed vector for extractelement"
+        | _ => inl "dtyp_of_uvalue_fun: ill-typed index for extractelement"
+        end
 
     | UVALUE_InsertElement (DTYPE_Vector n t) vect val idx =>
-        ret (DTYPE_Vector n t)
+        t_idx <- dtyp_of_uvalue_fun idx;;
+        match t_idx with
+        | (DTYPE_I _)
+        | DTYPE_IPTR =>
+            t_vect <- dtyp_of_uvalue_fun vect;;
+            t_val <- dtyp_of_uvalue_fun val;;
+            if dtyp_eqb (DTYPE_Vector n t) t_vect && dtyp_eqb t_val t
+            then ret t_vect
+            else inl "dtyp_of_uvalue_fun: ill-typed insertelement"
+        | _ => inl "dtyp_of_uvalue_fun: ill-typed index for insertelement"
+        end
 
     | UVALUE_ShuffleVector (DTYPE_Vector n t) v1 v2 idxs =>
         match dtyp_of_uvalue_fun idxs with
-        | inr (DTYPE_Vector m _)  =>
-            ret (DTYPE_Vector m t)
+        | inr (DTYPE_Vector m (DTYPE_I 32))  =>
+            t_v1 <- dtyp_of_uvalue_fun v1;;
+            t_v2 <- dtyp_of_uvalue_fun v2;;
+            if dtyp_eqb (DTYPE_Vector n t) t_v1 && dtyp_eqb t_v1 t_v2
+            then ret (DTYPE_Vector m t)
+            else failwith "dtyp_of_uvalue_fun: invalid shufflevector"
         | _ => failwith "dtyp_of_uvalue_fun: invalid shufflevector"
         end
 
     | UVALUE_ExtractValue dt_agg uv path =>
-        fetch_extract_path path dt_agg
+        t_uv <- dtyp_of_uvalue_fun uv;;
+        if dtyp_eq_dec dt_agg t_uv
+        then fetch_extract_path path dt_agg
+        else inl "dtyp_of_uvalue_fun: extractvalue type mismatch"
 
     | UVALUE_InsertValue dt_agg uv dt_elt elt path =>
-        ret dt_agg
+        t_uv <- dtyp_of_uvalue_fun uv;;
+        t_elt <- dtyp_of_uvalue_fun elt;;
+        if dtyp_eqb dt_agg t_uv && dtyp_eqb dt_elt t_elt && check_extract_path path dt_agg dt_elt
+        then ret dt_agg
+        else inl "dtyp_of_uvalue_fun: insertvalue type mismatch"
 
     | UVALUE_Select cond x y =>
-        dtyp_of_uvalue_fun x
+        tcond <- dtyp_of_uvalue_fun cond;;
+        match tcond with
+        | DTYPE_I 1 =>
+            t1 <- dtyp_of_uvalue_fun x;;
+            t2 <- dtyp_of_uvalue_fun y;;
+            if dtyp_eq_dec t1 t2
+            then ret t1
+            else inl "dtyp_of_uvalue_fun: select type mismatch"
+        | DTYPE_Vector sz (DTYPE_I 1) =>
+            t1 <- dtyp_of_uvalue_fun x;;
+            match t1 with
+            | DTYPE_Vector sz' t' =>
+                if N.eq_dec sz sz'
+                then
+                  t2 <- dtyp_of_uvalue_fun y;;
+                  if dtyp_eq_dec t1 t2
+                  then ret t1
+                  else inl "dtyp_of_uvalue_fun: select type mismatch of t1 / t2"
+                else inl "dtyp_of_uvalue_fun: select type mismatch of vector sizes"
+            | _ => inl "dtyp_of_uvalue_fun: select vector type mismatch"
+            end
+        | _ => inl "dtyp_of_uvalue_fun: select type mismatch"
+        end
 
     | UVALUE_ConcatBytes bytes t =>
-        ret t
+        if (N.of_nat (length bytes) =? sizeof_dtyp t) && forallb (fun byte => match byte with | UVALUE_ExtractByte _ _ _ _ => true | _ => false end) bytes
+        then ret t
+        else inl "dtyp_of_uvalue_fun: concatbytes type mismatch"
 
     | _ => failwith "dtyp_of_uvalue_fun: missing case"
     end.
+
+  Definition uvalue_has_dtyp_fun (uv:uvalue) (dt:dtyp) : bool
+    := match dtyp_of_uvalue_fun uv with
+       | inr dt' => dtyp_eqb dt dt'
+       | _ => false
+       end.
+
+  Lemma dtyp_of_uvalue_fun_sound :
+    forall uv dt,
+      dtyp_of_uvalue_fun uv = inr dt -> uvalue_has_dtyp uv dt.
+  Proof using.
+    induction uv; intros dtx HX;
+      try solve [
+          unfold uvalue_has_dtyp_fun, dtyp_of_uvalue_fun in HX;
+          cbn in HX; try inv HX;
+          repeat break_match_hyp_inv;
+          econstructor; eauto with uvalue
+        ].
+
+    - assert (exists ts, dtx = DTYPE_Struct ts).
+      { unfold dtyp_of_uvalue_fun in HX;
+          cbn in HX;
+          repeat break_match_hyp_inv.
+        exists l.
+        reflexivity.
+      }
+      destruct H0 as (ts & DT).
+      subst.
+      constructor.
+      revert ts HX. induction fields; intros ts HX.
+      + cbn in HX.
+        inv HX.
+        constructor.
+      + unfold uvalue_has_dtyp_fun, dtyp_of_uvalue_fun in HX;
+          cbn in HX.
+        repeat (break_inner_match_hyp; try discriminate).
+        inv HX.
+        cbn.
+        forward IHfields.
+        { intros u H0 dt H1.
+          apply H; cbn; eauto.
+        }
+        specialize (IHfields l).
+        forward IHfields.
+        { unfold uvalue_has_dtyp_fun, dtyp_of_uvalue_fun; cbn.
+          auto.
+          rewrite Heqs0; auto.
+        }
+        constructor; auto.
+        apply H; cbn; auto.
+    - assert (exists ts, dtx = DTYPE_Packed_struct ts).
+      { unfold dtyp_of_uvalue_fun in HX;
+          cbn in HX;
+          repeat break_match_hyp_inv.
+        exists l.
+        reflexivity.
+      }
+      destruct H0 as (ts & DT).
+      subst.
+      constructor.
+      revert ts HX. induction fields; intros ts HX.
+      + cbn in HX.
+        inv HX.
+        constructor.
+      + unfold uvalue_has_dtyp_fun, dtyp_of_uvalue_fun in HX;
+          cbn in HX.
+        repeat (break_inner_match_hyp; try discriminate).
+        inv HX.
+        cbn.
+        forward IHfields.
+        { intros u H0 dt H1.
+          apply H; cbn; eauto.
+        }
+        specialize (IHfields l).
+        forward IHfields.
+        { unfold uvalue_has_dtyp_fun, dtyp_of_uvalue_fun; cbn.
+          auto.
+          rewrite Heqs0; auto.
+        }
+        constructor; auto.
+        apply H; cbn; auto.
+    - assert (exists d, t = DTYPE_Array (N.of_nat (length elts)) d /\ dtx = t).
+      { unfold dtyp_of_uvalue_fun in HX;
+          cbn in HX;
+          repeat break_match_hyp_inv.
+        invert_bools.
+        apply N.eqb_eq in H1; subst.
+        exists d. auto.
+      }
+      destruct H0 as (d & ? & ?).
+      subst.
+      apply UVALUE_Array_typ.
+      + unfold dtyp_of_uvalue_fun in HX;
+          cbn in HX;
+          repeat break_match_hyp_inv; auto.
+      + unfold dtyp_of_uvalue_fun in HX;
+          cbn in HX;
+          repeat break_match_hyp_inv;
+          invert_bools;
+          auto.
+        rename H0 into Heqb.
+        apply Forall_forall.
+        intros x H0.
+        eapply forallb_forall in Heqb; eauto.
+        eapply H; eauto.
+        break_match_hyp_inv.
+        apply dtyp_eqb_eq in H3; subst.
+        apply Heqs.
+      + rewrite Nnat.Nat2N.id; auto.
+    - assert (exists d, t = DTYPE_Vector (N.of_nat (length elts)) d /\ dtx = t).
+      { unfold dtyp_of_uvalue_fun in HX;
+          cbn in HX;
+          repeat break_match_hyp_inv.
+        invert_bools.
+        apply N.eqb_eq in H1; subst.
+        exists d. auto.
+      }
+      destruct H0 as (d & ? & ?).
+      subst.
+      apply UVALUE_Vector_typ.
+      + unfold dtyp_of_uvalue_fun in HX;
+          cbn in HX;
+          repeat break_match_hyp_inv; auto.
+      + unfold dtyp_of_uvalue_fun in HX;
+          cbn in HX;
+          repeat break_match_hyp_inv;
+          invert_bools;
+          auto.
+        rename H0 into Heqb.
+        apply Forall_forall.
+        intros x H0.
+        eapply forallb_forall in Heqb; eauto.
+        eapply H; eauto.
+        break_match_hyp_inv.
+        apply dtyp_eqb_eq in H3; subst.
+        apply Heqs.
+      + rewrite Nnat.Nat2N.id; auto.
+      + unfold dtyp_of_uvalue_fun in HX;
+          cbn in HX;
+          repeat break_match_hyp_inv; auto.
+
+    - cbn in HX;
+        repeat break_match_hyp_inv;
+        invert_bools;
+        unfold valid_ibinop_type in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        repeat match goal with
+          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
+                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2
+          end.
+
+      all: try solve [econstructor; eauto with uvalue].
+    - (* ICmp *)
+      cbn in HX.
+      do 3 break_match_hyp_inv.
+      invert_bools.
+      repeat
+        match goal with
+        | H: dtyp_eqb _ _ = true |- _ =>
+            apply dtyp_eqb_eq in H; subst
+        end.
+      unfold valid_icmp_type in *.
+      break_match_hyp_inv; inv H0;
+        repeat match goal with
+          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
+                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2
+          end.
+
+      all: try solve [econstructor; eauto with uvalue].
+      + eapply UVALUE_ICmp_typ with (sz:=1%positive); right;
+        eauto with uvalue.
+      + eapply UVALUE_ICmp_typ with (sz:=1%positive); right;
+        eauto with uvalue.
+      + break_match_hyp_inv.
+        * eapply UVALUE_ICmp_vector_typ; eauto with uvalue.
+        * eapply UVALUE_ICmp_vector_typ; right; eauto with uvalue.
+        * eapply UVALUE_ICmp_vector_typ; right; eauto with uvalue.
+    - (* FBinop *)
+      cbn in HX;
+        repeat break_match_hyp_inv;
+        invert_bools;
+        unfold valid_fbinop_type in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        repeat match goal with
+          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
+                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2
+          end.
+
+      all: try solve [econstructor; eauto with uvalue].
+
+    - (*FCmp *)
+      cbn in HX.
+      do 3 break_match_hyp_inv.
+      invert_bools.
+      repeat
+        match goal with
+        | H: dtyp_eqb _ _ = true |- _ =>
+            apply dtyp_eqb_eq in H; subst
+        end.
+      unfold valid_fbinop_type in *.
+      break_match_hyp_inv; inv H0;
+        repeat match goal with
+          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
+                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2
+          end.
+
+      all: try solve [econstructor; eauto with uvalue].
+      + eapply UVALUE_FCmp_typ; try left; eauto with uvalue.
+      + break_match_hyp_inv.
+        * eapply UVALUE_FCmp_vector_typ; eauto with uvalue.
+        * eapply UVALUE_FCmp_vector_typ; left; eauto with uvalue.
+
+    - (* Conversion *)
+      cbn in HX;
+        repeat break_match_hyp_inv;
+        invert_bools;
+        unfold valid_ibinop_type in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        repeat match goal with
+          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
+                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2
+          end.
+
+      all: try solve [econstructor; eauto with uvalue].
+
+    - (* InsertElement *)
+      cbn in HX;
+        repeat break_match_hyp_inv;
+        invert_bools;
+        unfold valid_ibinop_type in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        repeat match goal with
+          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
+                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2
+          end.
+
+      all: try solve [econstructor; eauto with uvalue].
+
+
+    - (* ShuffleVector *)
+      cbn in HX;
+        repeat break_match_hyp_inv;
+        invert_bools;
+        unfold valid_ibinop_type in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        repeat match goal with
+          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
+                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2
+          end.
+
+      constructor; auto with uvalue.
+      
+      all: try solve [econstructor; eauto with uvalue].
+
+    - (* ShuffleVector *)
+      cbn in HX;
+        repeat break_match_hyp_inv;
+        invert_bools;
+        unfold valid_ibinop_type in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        repeat match goal with
+          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
+                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2
+          end.
+
+      constructor; eauto with uvalue.
+      apply check_fetch_extract_path; auto.
+
+    - (* InsertValue *)
+      cbn in HX;
+        repeat break_match_hyp_inv;
+        invert_bools;
+        unfold valid_ibinop_type in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        repeat match goal with
+          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
+                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2
+          end.
+
+      constructor; auto with uvalue.
+
+    - (* ConcatBytes *)
+      cbn in HX;
+        repeat break_match_hyp_inv;
+        invert_bools;
+        repeat match goal with
+          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
+                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2; clear H1
+          end.
+      econstructor; eauto.
+      intros byte HIN.
+      rewrite forallb_forall in H1.
+      specialize (H1 _ HIN).
+      repeat break_match_hyp_inv.
+      do 4 eexists. reflexivity.
+      apply N.eqb_eq in H0; auto.
+      
+      Unshelve.
+      all : exact (1%positive).
+  Qed.
+
+  Lemma uvalue_has_dtyp_fun_complete :
+    forall uv dt,
+      uvalue_has_dtyp uv dt -> uvalue_has_dtyp_fun uv dt = true.
+  Proof using.
+    intros uv dt TYPE.
+    induction TYPE; auto;
+      try solve [
+          unfold uvalue_has_dtyp_fun;
+          cbn;
+          repeat break_inner_match_goal;
+          solve
+            [ apply dtyp_eqb_refl
+            | contradiction
+            ]
+        | cbn; induction H; forward_bools; auto
+        | cbn; repeat break_match_goal; auto; try contradiction;
+          forward_bools; [rewrite forallb_forall; auto | apply Nat.eqb_eq; auto]
+        | cbn; repeat break_match_goal; auto
+        | cbn;
+          repeat break_match_goal; invert_hyps; subst;
+          try (inversion H0; subst; try contradiction);
+          try (solve [inversion H]);
+          forward_bools; auto
+        ].
+
+    - unfold uvalue_has_dtyp_fun.
+      induction H; cbn; auto.
+      + break_match_hyp_inv.
+        cbn in *.
+        break_inner_match_hyp; try discriminate.
+        inv Heqs.
+        unfold uvalue_has_dtyp_fun in H.
+        break_match_hyp_inv.
+        rewrite H2.
+        apply dtyp_eqb_eq in H3, H2; subst.
+        inv H2.
+        apply dtyp_eqb_refl.
+    - unfold uvalue_has_dtyp_fun.
+      induction H; cbn; auto.
+      + break_match_hyp_inv.
+        cbn in *.
+        break_inner_match_hyp; try discriminate.
+        inv Heqs.
+        unfold uvalue_has_dtyp_fun in H.
+        break_match_hyp_inv.
+        rewrite H2.
+        apply dtyp_eqb_eq in H3, H2; subst.
+        inv H2.
+        apply dtyp_eqb_refl.
+    - unfold uvalue_has_dtyp_fun.
+      cbn.
+      break_inner_match; try contradiction.
+      apply forallb_forall in IH.
+      setoid_rewrite IH.
+      rewrite H0.
+      rewrite Nnat.N2Nat.id.
+      rewrite N.eqb_refl.
+      cbn.
+      apply dtyp_eqb_refl.
+    - unfold uvalue_has_dtyp_fun.
+      cbn.
+      break_inner_match; try contradiction.
+      apply forallb_forall in IH.
+      setoid_rewrite IH.
+      rewrite H0.
+      rewrite Nnat.N2Nat.id.
+      rewrite N.eqb_refl.
+      cbn.
+      break_inner_match; try contradiction.
+      apply dtyp_eqb_refl.
+    - invert_hyps; subst; cbn;
+        unfold uvalue_has_dtyp_fun in *; cbn;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl;
+        cbn; auto;
+        apply dtyp_eqb_refl.
+    - invert_hyps; subst; cbn;
+        unfold uvalue_has_dtyp_fun in *; cbn;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl;
+        cbn; auto;
+        apply dtyp_eqb_refl.
+    - destruct H as [[HX HY] | [[HX HY] | [HX HY]]];
+        try solve [unfold uvalue_has_dtyp_fun in *; cbn in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl;
+        cbn; auto].
+    - destruct H as [[HX HY] | [[HX HY] | [HX HY]]];
+      try solve [unfold uvalue_has_dtyp_fun in *; cbn in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl;
+        cbn; auto; apply dtyp_eqb_refl].
+
+    - invert_hyps; subst; cbn;
+        unfold uvalue_has_dtyp_fun in *; cbn;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl;
+        cbn; auto;
+        apply dtyp_eqb_refl.
+    - invert_hyps; subst; cbn;
+        unfold uvalue_has_dtyp_fun in *; cbn;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl;
+        cbn; auto;
+        apply dtyp_eqb_refl.
+    - destruct H as [H | H]; subst;
+        try solve [unfold uvalue_has_dtyp_fun in *; cbn in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl;
+        cbn; auto].
+    - destruct H as [H | H]; subst;
+      try solve [unfold uvalue_has_dtyp_fun in *; cbn in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl;
+        cbn; auto; apply dtyp_eqb_refl].
+    - unfold uvalue_has_dtyp_fun in *; cbn in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl.
+        cbn; rewrite H; cbn; auto; apply dtyp_eqb_refl.
+    - unfold uvalue_has_dtyp_fun in *; cbn in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl; auto;
+        destruct (N.eq_dec n n); try contradiction; subst;
+        destruct (dtyp_eq_dec t t); subst; try contradiction;
+        apply dtyp_eqb_refl.
+    - unfold uvalue_has_dtyp_fun in *; cbn in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl; auto;
+        cbn; apply dtyp_eqb_refl.
+    - unfold uvalue_has_dtyp_fun in *; cbn in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl; auto;
+        cbn; apply dtyp_eqb_refl.
+    - unfold uvalue_has_dtyp_fun in *; cbn in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl; auto; cbn;
+        destruct (dtyp_eq_dec d d); subst; try contradiction.
+      unfold check_extract_path in H.
+      break_match_hyp_inv.
+      apply dtyp_eqb_eq in H1; subst; auto.
+    - unfold uvalue_has_dtyp_fun in *; cbn in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl; auto; cbn.
+      rewrite H.
+      apply dtyp_eqb_refl.
+    - unfold uvalue_has_dtyp_fun in *; cbn in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl; auto; cbn.
+      destruct (dtyp_eq_dec d d); subst; try contradiction.
+      apply dtyp_eqb_refl.
+    - unfold uvalue_has_dtyp_fun in *; cbn in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl; auto; cbn.
+      destruct (N.eq_dec sz sz); subst; try contradiction.
+      destruct (dtyp_eq_dec t t); subst; try contradiction.
+      apply dtyp_eqb_refl.
+    - unfold uvalue_has_dtyp_fun in *; cbn in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        try setoid_rewrite dtyp_eqb_refl; auto; cbn.
+      rewrite H0.
+      rewrite N.eqb_refl.
+      cbn.
+
+      assert
+        (forallb
+           (fun byte : uvalue => match byte with
+                              | UVALUE_ExtractByte _ _ _ _ => true
+                              | _ => false
+                              end) bytes = true).
+      { apply forallb_forall.
+        intros x H1.
+        apply H in H1.
+        destruct H1 as (?&?&?&?&?); subst; auto.
+      }
+      rewrite H1.
+      apply dtyp_eqb_refl.
+  Qed.
+
+  Lemma uvalue_has_dtyp_fun_sound :
+    forall uv dt,
+      uvalue_has_dtyp_fun uv dt = true -> uvalue_has_dtyp uv dt.
+  Proof using.
+    intros uv dt H.
+    unfold uvalue_has_dtyp_fun in H.
+    break_match_hyp_inv.
+    eapply dtyp_of_uvalue_fun_sound.
+    apply dtyp_eqb_eq in H1; subst; auto.
+  Qed.
 
   Lemma uvalue_has_dtyp_dec :
     forall uv dt,
@@ -5296,7 +5569,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     right. intros C. apply uvalue_has_dtyp_fun_complete in C.
     rewrite H in C. inversion C.
   Qed.
-
 
   Ltac solve_no_void_dec :=
     solve
@@ -5383,7 +5655,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   #[global] Hint Constructors dvalue_has_dtyp : DVALUE_HAS_DTYP.
   #[global] Hint Rewrite Nnat.Nat2N.id : DVALUE_HAS_DTYP.
   #[global] Hint Resolve List.repeat_length : DVALUE_HAS_DTYP.
-  #[global] Hint Extern 1 (ALL_IX_SUPPORTED _) => solve_ALL_IX_SUPPORTED : DVALUE_HAS_DTYP.
   #[global] Hint Extern 1 (NO_VOID _) => solve_no_void : DVALUE_HAS_DTYP.
 
   Ltac solve_dvalue_has_dtyp :=
@@ -5394,7 +5665,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   #[global] Hint Constructors uvalue_has_dtyp : UVALUE_HAS_DTYP.
   #[global] Hint Rewrite Nnat.Nat2N.id : UVALUE_HAS_DTYP.
   #[global] Hint Resolve List.repeat_length : UVALUE_HAS_DTYP.
-  #[global] Hint Extern 1 (ALL_IX_SUPPORTED _) => solve_ALL_IX_SUPPORTED : UVALUE_HAS_DTYP.
   #[global] Hint Extern 1 (NO_VOID _) => solve_no_void : UVALUE_HAS_DTYP.
 
   Ltac solve_uvalue_has_dtyp :=
@@ -5427,12 +5697,49 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         dvalue_has_dtyp dv (DTYPE_I sz).
     Proof using ERR Eq1 FERR FUB M Monad NFR OOM RETS RET_INV UB.
       intros dx dy dv sz op TYPx TYPy EVAL.
-      inversion TYPx; inversion TYPy; subst;
-        destruct op;
-        cbn in EVAL;
-        repeat break_match_hyp;
+      inversion TYPx; inversion TYPy; subst; cbn in EVAL;
+        try solve [
+            cbn in *;
+            destruct op; cbn in EVAL;
+              repeat break_match_hyp;
+              try solve
+                [first
+                   [ apply eq1_ret_ret in EVAL; [| solve [eauto]]
+                   | apply MReturns_ret in EVAL;
+                     apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
+                     [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
+                     | break_match_hyp; apply MReturns_ret_inv in RET
+                     ]
+                   | apply MReturns_ret in EVAL;
+                     apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
+                     [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
+                     | repeat break_match_hyp;
+                       [ apply MReturns_ret_inv in RET
+                       | cbn in RET;
+                         apply MReturns_bind_inv in RET as [FAILS | (res' & MA' & RET)];
+                         [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
+                         | repeat break_match_hyp;
+                           apply MReturns_ret_inv in RET
+                         ]
+                       ]
+                     ]
+                   ]; subst; solve_dvalue_has_dtyp];
+              try solve [eapply EqRet_NoFail in EVAL; eauto;
+                         exfalso; apply EVAL;
+                         first [apply mfails_ub | apply mfails_error | apply mfails_oom]; eauto];
 
-        try solve
+            try solve [apply MReturns_ret in EVAL;
+              apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
+              [ cbn in FAILS; apply MFails_ret in FAILS; contradiction |];
+                       apply MReturns_ret_inv in RET; subst; constructor
+              ]; constructor
+          ].
+      - break_match_hyp; try contradiction.
+        dependent destruction e.
+        cbn in *.
+        destruct op; cbn in EVAL;
+          repeat break_match_hyp;
+          try solve
             [first
                [ apply eq1_ret_ret in EVAL; [| solve [eauto]]
                | apply MReturns_ret in EVAL;
@@ -5442,17 +5749,17 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                  ]
                | apply MReturns_ret in EVAL;
                  apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
-                   [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
-                   | repeat break_match_hyp;
-                     [ apply MReturns_ret_inv in RET
-                     | cbn in RET;
-                       apply MReturns_bind_inv in RET as [FAILS | (res' & MA' & RET)];
-                       [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
-                       | repeat break_match_hyp;
-                         apply MReturns_ret_inv in RET
-                       ]
+                 [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
+                 | repeat break_match_hyp;
+                   [ apply MReturns_ret_inv in RET
+                   | cbn in RET;
+                     apply MReturns_bind_inv in RET as [FAILS | (res' & MA' & RET)];
+                     [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
+                     | repeat break_match_hyp;
+                       apply MReturns_ret_inv in RET
                      ]
                    ]
+                 ]
                ]; subst; solve_dvalue_has_dtyp].
 
       all:
@@ -5619,21 +5926,15 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Qed.
   End EvalIopLemmas.
 
-  Definition default_dvalue_of_dtyp_i (sz : N) : err dvalue:=
-    (if (sz =? 64) then ret (DVALUE_I64 (repr 0))
-     else if (sz =? 32) then ret (DVALUE_I32 (repr 0))
-          else if (sz =? 16) then ret (DVALUE_I16 (repr 0))
-               else if (sz =? 8) then ret (DVALUE_I8 (repr 0))
-                    else if (sz =? 1) then ret (DVALUE_I1 (repr 0))
-                         else failwith
-                                "Illegal size for generating default dvalue of DTYPE_I").
+  Definition default_dvalue_of_dtyp_i (sz : positive) : dvalue :=
+    @DVALUE_I sz (repr 0).
 
   (* Handler for PickE which concretizes everything to 0 *)
   (* If this succeeds the dvalue returned should agree with
      dvalue_has_dtyp for the sake of the dvalue_default lemma. *)
   Fixpoint default_dvalue_of_dtyp (dt : dtyp) : err dvalue :=
     match dt with
-    | DTYPE_I sz => default_dvalue_of_dtyp_i sz
+    | DTYPE_I sz => ret (default_dvalue_of_dtyp_i sz)
     | DTYPE_IPTR => ret (DVALUE_IPTR IP.zero)
     | DTYPE_Pointer => ret (DVALUE_Addr A.null)
     | DTYPE_Void => failwith "DTYPE_Void is not a true LLVM value"
@@ -5648,7 +5949,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DTYPE_Opaque => failwith "Unimplemented default type: opaque"
     | DTYPE_Array sz t =>
         v <- default_dvalue_of_dtyp t ;;
-        (ret (DVALUE_Array (repeat v (N.to_nat sz))))
+        (ret (DVALUE_Array dt (repeat v (N.to_nat sz))))
 
     (* Matching valid Vector types... *)
     (* Currently commented out unsupported ones *)
@@ -5660,10 +5961,10 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     (*     failwith ("Negative array length for generating default value" ++ *)
     (*     "of DTYPE_Array or DTYPE_Vector") *)
     | DTYPE_Vector sz (DTYPE_Float) =>
-        ret (DVALUE_Vector
+        ret (DVALUE_Vector dt
                (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))
     | DTYPE_Vector sz (DTYPE_Double) =>
-        ret (DVALUE_Vector
+        ret (DVALUE_Vector dt
                (repeat (DVALUE_Double (Float32.to_double Float32.zero))
                        (N.to_nat sz)))
     (* | DTYPE_Vector sz (DTYPE_X86_fp80) => *)
@@ -5681,11 +5982,14 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     (*     failwith ("Negative array length for generating default value" ++ *)
     (*     "of DTYPE_Array or DTYPE_Vector") *)
     | DTYPE_Vector sz (DTYPE_I n) =>
-        v <- default_dvalue_of_dtyp_i n ;;
-        ret (DVALUE_Vector (repeat v (N.to_nat sz)))
+        let v := default_dvalue_of_dtyp_i n in
+        ret (DVALUE_Vector dt (repeat v (N.to_nat sz)))
 
     | DTYPE_Vector sz DTYPE_Pointer =>
-        ret (DVALUE_Vector (repeat (DVALUE_Addr A.null) (N.to_nat sz)))
+        ret (DVALUE_Vector dt (repeat (DVALUE_Addr A.null) (N.to_nat sz)))
+
+    | DTYPE_Vector sz DTYPE_IPTR =>
+        ret (DVALUE_Vector dt (repeat (DVALUE_IPTR zero) (N.to_nat sz)))
 
     | DTYPE_Vector _ _ => failwith ("Non-valid or unsupported vector type when generating default vector")
     | DTYPE_Struct fields =>
@@ -5697,47 +6001,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     end.
 
   Ltac do_it := constructor; cbn; auto; fail.
-
-  Lemma dvalue_default_ALL_IX_SUPPORTED :
-    forall t v, (default_dvalue_of_dtyp t) = inr v -> ALL_IX_SUPPORTED t.
-  Proof using.
-    induction t; intros;
-      try solve [
-          constructor
-        ].
-    - cbn in H.
-      unfold default_dvalue_of_dtyp_i in H.
-      repeat break_match_hyp_inv; auto;
-        match goal with
-        | [ H : (?X =? ?Y) = true |- _ ] => rewrite N.eqb_eq in H; subst
-        end; constructor.
-
-    - cbn in H.
-      repeat break_match_hyp_inv.
-      cbn.  eapply IHt; eauto.
-    - cbn in *.
-      break_match_hyp_inv.
-      rewrite FORALL_forall.
-      rewrite Forall_forall.
-      intros.
-      specialize (@map_monad_err_In' err _ _ _ _ _ _ _ _ _ _ default_dvalue_of_dtyp fields l _ H0 Heqs) as HX.
-      destruct HX as [b [EQ _]].
-      eapply H; eauto.
-
-    - cbn in *.
-      break_match_hyp_inv.
-      rewrite FORALL_forall.
-      rewrite Forall_forall.
-      intros.
-      specialize (@map_monad_err_In' err _ _ _ _ _ _ _ _ _ _ default_dvalue_of_dtyp fields l _ H0 Heqs) as HX.
-      destruct HX as [b [EQ _]].
-      eapply H; eauto.
-
-    - cbn in H.
-      repeat break_match_hyp_inv; cbn; auto.
-      eapply IHt. eassumption.
-  Qed.
-
 
   Lemma dvalue_default_NO_VOID :
     forall t v, (default_dvalue_of_dtyp t) = inr v -> NO_VOID t.
@@ -5775,15 +6038,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     intros t v. revert v.
     induction t; try do_it;
       try (intros; subst; inversion H; constructor).
-    - intros. subst. cbn in H.
-      unfold default_dvalue_of_dtyp_i in H.
-      destruct (@IX_supported_dec a).
-      * inversion i; subst; cbn in H; inversion H; constructor; auto.
-      * rewrite unsupported_cases in H; auto. inversion H.
     - intros. subst. inversion H. clear H.
       break_match_hyp_inv.
       constructor.
-      eapply dvalue_default_ALL_IX_SUPPORTED; eauto.
       + eapply dvalue_default_NO_VOID. apply Heqs.
       + apply forall_repeat_true. eapply IHt. reflexivity.
       + rewrite repeat_length. reflexivity.
@@ -5819,8 +6076,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           | rewrite repeat_length; auto
           | unfold vector_dtyp; intuition auto with *
           ].
-      + apply IHt in Heqs. apply dvalue_has_dtyp_ALL_IX_SUPPORTED in Heqs.
-        cbn in Heqs. assumption.
       + unfold vector_dtyp.
         left. exists sz0; auto.
   Qed.
@@ -5828,11 +6083,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Definition uvalue_constructor_string (u : uvalue) : string
     := match u with
        | UVALUE_Addr a => "UVALUE_Addr"
-       | UVALUE_I1 x => "UVALUE_I1"
-       | UVALUE_I8 x => "UVALUE_I8"
-       | UVALUE_I16 x => "UVALUE_I16"
-       | UVALUE_I32 x => "UVALUE_I32"
-       | UVALUE_I64 x => "UVALUE_I64"
+       | @UVALUE_I sz x => "UVALUE_I1"
        | UVALUE_IPTR x => "UVALUE_IPTR"
        | UVALUE_Double x => "UVALUE_Double"
        | UVALUE_Float x => "UVALUE_Float"
@@ -5842,8 +6093,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
        | UVALUE_None => "UVALUE_None"
        | UVALUE_Struct fields => "UVALUE_Struct"
        | UVALUE_Packed_struct fields => "UVALUE_Packed_struct"
-       | UVALUE_Array elts => "UVALUE_Array"
-       | UVALUE_Vector elts => "UVALUE_Vector"
+       | UVALUE_Array t elts => "UVALUE_Array"
+       | UVALUE_Vector t elts => "UVALUE_Vector"
        | UVALUE_IBinop iop v1 v2 => "UVALUE_IBinop"
        | UVALUE_ICmp cmp v1 v2 => "UVALUE_ICmp"
        | UVALUE_FBinop fop fm v1 v2 => "UVALUE_FBinop"
@@ -5876,12 +6127,13 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       constructor.
       eapply Forall2_map_impl; eauto.
       auto.
-    - constructor; auto.
+    - cbn.
+      constructor; auto.
       + rewrite Forall_forall.
         intros.
-        apply Coqlib.list_in_map_inv in H2.
-        destruct H2 as [dv [EQ]].
-        specialize (IH dv H2).
+        apply Coqlib.list_in_map_inv in H1.
+        destruct H1 as [dv [EQ]].
+        specialize (IH dv H1).
         subst.
         assumption.
       + rewrite map_length; auto.
@@ -5889,9 +6141,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     - constructor; auto.
       + rewrite Forall_forall.
         intros.
-        apply Coqlib.list_in_map_inv in H3.
-        destruct H3 as [dv [EQ]].
-        specialize (IH dv H3).
+        apply Coqlib.list_in_map_inv in H2.
+        destruct H2 as [dv [EQ]].
+        specialize (IH dv H2).
         subst.
         assumption.
       + rewrite map_length; auto.
@@ -5928,7 +6180,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       repeat break_match_hyp_inv.
       apply map_monad_err_Forall2 in Heqs.
       constructor; auto.
-      + clear H1.
+      + clear H0.
         induction Heqs; intros; auto.
         constructor.
         eapply IH; eauto. left; auto.
@@ -5941,7 +6193,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       repeat break_match_hyp_inv.
       apply map_monad_err_Forall2 in Heqs.
       constructor; auto.
-      + clear H1.
+      + clear H0.
         induction Heqs; intros; auto.
         constructor.
         eapply IH; eauto. left; auto.
@@ -5961,8 +6213,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       destruct b; cbn in EQ; inv EQ; auto.
     - apply map_inj in H1; subst; auto.
     - apply map_inj in H1; subst; auto.
-    - apply map_inj in H1; subst; auto.
-    - apply map_inj in H1; subst; auto.
+    - apply map_inj in H2; subst; auto.
+    - apply map_inj in H2; subst; auto.
   Qed.
 
 End DVALUE.

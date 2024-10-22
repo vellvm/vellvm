@@ -187,13 +187,13 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
     Transparent map_monad.
 
     (* TODO: Move these *)
-    Lemma default_dvalue_of_dtyp_i_not_poison :
+    Lemma default_dvalue_of_dtyp_i_not_poi2son :
       forall sz d t,
-        default_dvalue_of_dtyp_i sz = inr d ->
+        default_dvalue_of_dtyp_i sz = d ->
         d <> DVALUE_Poison t.
     Proof.
       intros sz d t H.
-      unfold default_dvalue_of_dtyp_i in *.
+      unfold default_dvalue_of_dtyp_i in *; subst.
       repeat break_match_hyp_inv; discriminate.
     Qed.
 
@@ -203,10 +203,8 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
         d <> DVALUE_Poison t'.
     Proof.
       intros t d t' H.
-      destruct t; cbn in *; inv H;
+      destruct t; cbn in *; inv H; subst;
         try break_match_hyp_inv; try discriminate.
-      - eapply default_dvalue_of_dtyp_i_not_poison; eauto.
-      - break_match_hyp_inv; discriminate.
     Qed.
 
     Lemma map_monad_concretize_u_concretize_uvalue :
@@ -553,8 +551,8 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                     | y0 :: ys0 =>
                         @bind_ErrUbOomProp dvalue (list dvalue)
                           match c with
-                          | DVALUE_I1 i =>
-                              if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                          | @DVALUE_I 1 i =>
+                              if (@Integers.unsigned 1 i =? 1)%Z
                               then fun y1 : err_ub_oom dvalue => success_unERR_UB_OOM x0 = y1
                               else fun y1 : err_ub_oom dvalue => success_unERR_UB_OOM y0 = y1
                           | DVALUE_Poison t =>
@@ -603,8 +601,8 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                       | y0 :: ys0 =>
                           match
                             match c with
-                            | DVALUE_I1 i =>
-                                if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                            | @DVALUE_I 1 i =>
+                                if (@Integers.unsigned 1 i =? 1)%Z
                                 then success_unERR_UB_OOM x0
                                 else success_unERR_UB_OOM y0
                             | DVALUE_Poison t =>
@@ -800,8 +798,8 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
       match goal with
       | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
           exists (match a with
-             | DVALUE_I1 i =>
-                 if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+             | @DVALUE_I 1 i =>
+                 if (@Integers.unsigned 1 i =? 1)%Z
                  then success_unERR_UB_OOM d
                  else success_unERR_UB_OOM d0
              | DVALUE_Poison t => success_unERR_UB_OOM (DVALUE_Poison t)
@@ -813,16 +811,18 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
       end.
       split.
       { destruct a; try reflexivity.
-        break_match; reflexivity.
+        repeat break_match; reflexivity.
       }
 
       split.
       { destruct a; try reflexivity.
-        break_match; reflexivity.
+        destruct sz; cbn; try reflexivity.
+        break_inner_match; reflexivity.
       }
 
       { destruct a; try reflexivity; cbn; auto.
-        - right.
+        - destruct sz; try reflexivity; cbn; auto.
+          right.
           intros a H.
           break_match_hyp_inv.
           + specialize (IHconds xs ys).
@@ -856,8 +856,8 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                  | y0 :: ys0 =>
                                      match
                                        match c with
-                                       | DVALUE_I1 i =>
-                                           if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                                       | @DVALUE_I 1 i =>
+                                           if (@Integers.unsigned 1 i =? 1)%Z
                                            then success_unERR_UB_OOM x0
                                            else success_unERR_UB_OOM y0
                                        | DVALUE_Poison t => success_unERR_UB_OOM (DVALUE_Poison t)
@@ -1081,8 +1081,8 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                  | y0 :: ys0 =>
                                      match
                                        match c with
-                                       | DVALUE_I1 i =>
-                                           if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                                       | @DVALUE_I 1 i =>
+                                           if (@Integers.unsigned 1 i =? 1)%Z
                                            then success_unERR_UB_OOM x0
                                            else success_unERR_UB_OOM y0
                                        | DVALUE_Poison t => success_unERR_UB_OOM (DVALUE_Poison t)
@@ -1308,8 +1308,8 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
                                | y0 :: ys0 =>
                                    match
                                      match c with
-                                     | DVALUE_I1 i =>
-                                         if (VellvmIntegers.Int1.unsigned i =? 1)%Z
+                                     | @DVALUE_I 1 i =>
+                                         if (@Integers.unsigned 1 i =? 1)%Z
                                          then success_unERR_UB_OOM x0
                                          else success_unERR_UB_OOM y0
                                      | DVALUE_Poison t => success_unERR_UB_OOM (DVALUE_Poison t)
@@ -1534,7 +1534,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
       rewrite eval_select_equation.
       rewrite (@eval_select_equation err_ub_oom).
       destruct cnd; try reflexivity.
-      - break_match.
+      - break_match; auto; break_match.
         + apply X.
         + apply Y.
       - cbn.
@@ -1693,7 +1693,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
             remember X
         end.
         exists e.
-        exists (fun a => ret (DVALUE_Array a)).
+        exists (fun a => ret (DVALUE_Array t a)).
         split; auto.
       }
 
@@ -1712,7 +1712,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
             remember X
         end.
         exists e.
-        exists (fun a => ret (DVALUE_Vector a)).
+        exists (fun a => ret (DVALUE_Vector t a)).
         split; auto.
       }
 
@@ -2155,6 +2155,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
 
         destruct a; auto.
         - (* i1 condition *)
+          break_match_goal; auto.
           break_match_goal;
             match goal with
             | _ : _ |- context [ concretize_uvalueM err_ub_oom _ _ _ ?u ] =>

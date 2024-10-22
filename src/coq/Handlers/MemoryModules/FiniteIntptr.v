@@ -162,101 +162,101 @@ Module BigIP_BIG : MemoryAddress.INTPTR_BIG BigIP.
   Qed.
 End BigIP_BIG.
 
-Definition from_Z_64 := (fun (x : Z) =>
-    if (x <=? Int64.max_unsigned)%Z && (x >=? 0)%Z
-    then ret (Int64.repr x)
-    else Oom "IP64Bit from_Z oom.").
+Definition from_Z_bits {sz : positive} : Z -> OOM (@int sz) := (fun (x : Z) =>
+    if (x <=? @Integers.max_unsigned sz)%Z && (x >=? 0)%Z
+    then ret (@Integers.repr sz x)
+    else Oom "IPBit from_Z oom.").
 
-Instance VMemInt_intptr_i64 : VMemInt int64
+Instance VMemInt_intptr_ix {sz : positive} : VMemInt (@int sz)
   :=
   { (* Comparisons *)
-    mequ := Int64.eq;
-    mcmp := Int64.cmp;
-    mcmpu := Int64.cmpu;
+    mequ := @Integers.eq sz;
+    mcmp := @Integers.cmp sz;
+    mcmpu := @Integers.cmpu sz;
 
     (* Constants *)
-    mbitwidth := Some 64%nat;
-    mzero := Int64.zero;
-    mone := Int64.one;
+    mbitwidth := Some sz;
+    mzero := @Integers.zero sz;
+    mone := @Integers.one sz;
 
     (* Arithmetic *)
     madd := fun x y =>
-              if (Int64.eq (Int64.add_carry x y Int64.zero) Int64.one)
-              then Oom "IP64Bit addition overflow."
-              else ret (Int64.add x y);
-    madd_carry := fun x y c => Int64.zero;
-    madd_overflow := fun x y c => Int64.zero;
+              if (Integers.eq (Integers.add_carry x y (@Integers.zero sz)) (@Integers.one sz))
+              then Oom "IPBit addition overflow."
+              else ret (Integers.add x y);
+    madd_carry := fun x y c => (@Integers.zero sz);
+    madd_overflow := fun x y c => (@Integers.zero sz);
 
     msub := fun x y =>
-              if (Int64.unsigned y >? Int64.unsigned x)%Z
-              then Oom "IP64Bit subtraction underflow."
-              else ret (Int64.sub x y);
-    msub_borrow := fun x y c => Int64.zero;
-    msub_overflow := fun x y c => Int64.zero;
+              if (@Integers.unsigned sz y >? @Integers.unsigned sz x)%Z
+              then Oom "IPBit subtraction underflow."
+              else ret (@Integers.sub sz x y);
+    msub_borrow := fun x y c => (@Integers.zero sz);
+    msub_overflow := fun x y c => (@Integers.zero sz);
 
     mmul :=
       fun x y =>
-        let res := ((Int64.unsigned x) * (Int64.unsigned y))%Z in
-        if (res >? Int64.max_unsigned)
-        then Oom "IP64Bit multiplication overflow."
-        else ret (Int64.repr res);
+        let res := ((Integers.unsigned x) * (Integers.unsigned y))%Z in
+        if (res >? @Integers.max_unsigned 64)
+        then Oom "IPBit multiplication overflow."
+        else ret (@Integers.repr sz res);
 
-    mdivu := Int64.divu;
-    mdivs := fun _ _ => Oom "IP64Bit signed division.";
+    mdivu := @Integers.divu sz;
+    mdivs := fun _ _ => Oom "IPBit signed division.";
 
-    mmodu := Int64.modu;
-    mmods := fun _ _ => Oom "IP64Bit signed modulo.";
+    mmodu := @Integers.modu sz;
+    mmods := fun _ _ => Oom "IPBit signed modulo.";
 
     mshl :=
       fun x y =>
-        let res_Z := Z.shiftl (Int64.unsigned x) (Int64.unsigned y) in
-        if res_Z >? Int64.max_unsigned
+        let res_Z := Z.shiftl (@Integers.unsigned sz x) (@Integers.unsigned sz y) in
+        if res_Z >? @Integers.max_unsigned sz
         then Oom "IP64Bit left shift overflow."
-        else ret (Int64.repr res_Z);
-    mshr := Int64.shr;
-    mshru := Int64.shru;
+        else ret (@Integers.repr sz res_Z);
+    mshr := @Integers.shr sz;
+    mshru := @Integers.shru sz;
 
     mnegative := fun _ => Oom "IP64Bit taking negative of a number.";
 
     (* Logic *)
-    mand := Int64.and;
-    mor := Int64.or;
-    mxor := Int64.xor;
+    mand := @Integers.and sz;
+    mor := @Integers.or sz;
+    mxor := @Integers.xor sz;
 
     (* Bounds *)
-    mmin_signed := ret Int64.min_signed;
-    mmax_signed := ret Int64.max_signed;
-    mmax_unsigned := ret Int64.max_unsigned;
+    mmin_signed := ret (@Integers.min_signed sz);
+    mmax_signed := ret (@Integers.max_signed sz);
+    mmax_unsigned := ret (@Integers.max_unsigned sz);
 
     (* Conversion *)
-    munsigned := Int64.unsigned;
-    msigned := Int64.signed;
+    munsigned := @Integers.unsigned sz;
+    msigned := @Integers.signed sz;
 
-    mrepr := from_Z_64;
+    mrepr := @from_Z_bits sz;
 
     mdtyp_of_int := DTYPE_IPTR
   }.
 
 Module IP64Bit : MemoryAddress.INTPTR with
 Definition intptr := int64 with
-Definition zero := Int64.zero with
-Definition from_Z := from_Z_64 with
-Definition to_Z := Int64.unsigned with
-Definition VMemInt_intptr := VMemInt_intptr_i64.
+Definition zero := (@Integers.zero 64) with
+Definition from_Z := @from_Z_bits 64 with
+Definition to_Z := @Integers.unsigned 64 with
+Definition VMemInt_intptr := @VMemInt_intptr_ix 64.
 
   Definition intptr := int64.
-  Definition zero := Int64.zero.
+  Definition zero := (@Integers.zero 64).
 
-  Definition eq_dec := Int64.eq_dec.
-  Definition eqb := Int64.eq.
+  Definition eq_dec := @Integers.eq_dec 64.
+  Definition eqb := @Integers.eq 64.
 
-  Definition to_Z (x : intptr) := Int64.unsigned x.
+  Definition to_Z (x : intptr) := Integers.unsigned x.
 
-  Definition VMemInt_intptr := VMemInt_intptr_i64.
+  Definition VMemInt_intptr := @VMemInt_intptr_ix 64.
 
   (* TODO: negatives.... ???? *)
   Definition to_unsigned := to_Z.
-  Definition from_Z (x : Z) : OOM intptr := from_Z_64 x.
+  Definition from_Z (x : Z) : OOM intptr := @from_Z_bits 64 x.
 
   Lemma from_Z_to_Z :
     forall (z : Z) (i : intptr),
@@ -264,10 +264,10 @@ Definition VMemInt_intptr := VMemInt_intptr_i64.
       to_Z i = z.
   Proof.
     intros z i FROM.
-    unfold from_Z, from_Z_64 in FROM.
+    unfold from_Z, from_Z_bits in FROM.
     break_match_hyp; inversion FROM.
     unfold to_Z.
-    apply Integers.Int64.unsigned_repr.
+    apply Integers.unsigned_repr.
     lia.
   Qed.
 
@@ -278,11 +278,11 @@ Definition VMemInt_intptr := VMemInt_intptr_i64.
       z1 = z2.
   Proof.
     intros z1 z2 i Z1 Z2.
-    unfold from_Z, from_Z_64 in *.
+    unfold from_Z, from_Z_bits in *.
     break_match_hyp; inversion Z2.
     break_match_hyp; inversion Z1.
-    pose proof Integers.Int64.unsigned_repr z1.
-    pose proof Integers.Int64.unsigned_repr z2.
+    pose proof (@Integers.unsigned_repr 64 z1).
+    pose proof (@Integers.unsigned_repr 64 z2).
     forward H; try lia.
     forward H2; try lia.
     congruence.
@@ -293,12 +293,12 @@ Definition VMemInt_intptr := VMemInt_intptr_i64.
       from_Z (to_Z i) = NoOom i.
   Proof.
     intros i.
-    unfold from_Z, from_Z_64, to_Z.
+    unfold from_Z, from_Z_bits, to_Z.
     break_match.
-    - rewrite Int64.repr_unsigned; auto.
+    - rewrite Integers.repr_unsigned; auto.
     - unfold intptr in *.
-      pose proof Int64.unsigned_range i.
-      unfold Int64.max_unsigned in *.
+      pose proof Integers.unsigned_range i.
+      unfold Integers.max_unsigned in *.
       lia.
   Qed.
 
@@ -324,7 +324,7 @@ Definition VMemInt_intptr := VMemInt_intptr_i64.
     intros x y EQ.
     unfold to_Z in *.
     destruct x, y.
-    unfold Int64.unsigned in *.
+    unfold Integers.unsigned in *.
     cbn in *; subst.
     rewrite (proof_irrelevance _ intrange intrange0); auto.
   Qed.
