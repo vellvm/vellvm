@@ -2,9 +2,9 @@ open Base
 open Log
 open LLVMAst
 open OrderedType
-open DynamicTypes
 open CFG
 open TypToDtyp
+open DynamicTypes
 
 (** Printing Helper Function **)
 let print_tblk tblk : unit =
@@ -70,7 +70,7 @@ let get_phi_from_def
 let rec typ_eq (t1 : LLVMAst.typ) (t2 : LLVMAst.typ) =
   match t1, t2 with
   | TYPE_I i1, TYPE_I i2 ->
-    Camlcoq.N.eq i1 i2
+    Camlcoq.P.eq i1 i2
   | TYPE_Pointer t1, TYPE_Pointer t2 ->
     typ_eq t1 t2
   | TYPE_IPTR, TYPE_IPTR 
@@ -127,18 +127,20 @@ let rec exp_eq ~(f : 'a -> 'a -> bool) (e1 : 'a exp) (e2 : 'a exp) : bool =
     List.equal (fun (t1, e1) (t2, e2) -> f t1 t2 && exp_eq ~f e1 e2) tes1 tes2
   | EXP_Packed_struct tes1, EXP_Packed_struct tes2 -> 
     List.equal (fun (t1, e1) (t2, e2) -> f t1 t2 && exp_eq ~f e1 e2) tes1 tes2
-  | EXP_Array tes1, EXP_Array tes2 ->
+  | EXP_Array (t1, tes1), EXP_Array (t2, tes2) ->
+    f t1 t2 &&
     List.equal (fun (t1, e1) (t2, e2) -> f t1 t2 && exp_eq ~f e1 e2) tes1 tes2
-  | EXP_Vector tes1, EXP_Vector tes2 ->
+  | EXP_Vector (t1, tes1), EXP_Vector (t2, tes2) ->
+    f t1 t2 &&
     List.equal (fun (t1, e1) (t2, e2) -> f t1 t2 && exp_eq ~f e1 e2) tes1 tes2
   (* OP part is never used *)
   | OP_IBinop (ibinop1, t1, e11, e12), OP_IBinop (ibinop2, t2, e21, e22) ->
     ibinop1 == ibinop2 && f t1 t2 && exp_eq ~f e11 e21 && exp_eq ~f e12 e22
-  | OP_ICmp (icmp1, t1, e11, e12), OP_ICmp (icmp2, t2, e21, e22) -> 
+  | OP_ICmp (icmp1, t1, e11, e12), OP_ICmp (icmp2, t2, e21, e22) ->
     icmp1 == icmp2 && f t1 t2 && exp_eq ~f e11 e21 && exp_eq ~f e12 e22
   | OP_FBinop (fbinop1, _, t1, e11, e12), OP_FBinop (fbinop2, _, t2, e21, e22) ->
     fbinop1 == fbinop2 && f t1 t2 && exp_eq ~f e11 e21 && exp_eq ~f e12 e22
-  | OP_FCmp (fcmp1, t1, e11, e12), OP_FCmp (fcmp2, t2, e21, e22) -> 
+  | OP_FCmp (fcmp1, t1, e11, e12), OP_FCmp (fcmp2, t2, e21, e22) ->
     fcmp1 == fcmp2 && f t1 t2 && exp_eq ~f e11 e21 && exp_eq ~f e12 e22
   | OP_Conversion (conv1, t11, e1, t12), OP_Conversion (conv2, t21, e2, t22) ->
     conv1 == conv2 && f t11 t21 && exp_eq ~f e1 e2 && f t12 t22
@@ -166,8 +168,9 @@ let texp_eq ~(f : 'a -> 'a -> bool) (texp1 : 'a * 'a exp) (texp2 : 'a * 'a exp) 
 
 let term_eq ~(f : 'a -> 'a -> bool) (term1 : 'a terminator) (term2 : 'a terminator) : bool =
   match term1, term2 with
-  | TERM_Ret (t1, exp1), TERM_Ret (t2, exp2) ->
-    f t1 t2 && exp_eq ~f exp1 exp2
+  | TERM_Ret texp1, TERM_Ret texp2 ->
+    (* f t1 t2 && exp_eq ~f exp1 exp2 *)
+    texp_eq ~f texp1 texp2
   | TERM_Ret_void, TERM_Ret_void ->
     true
   | TERM_Br (texp1, b11, b12), TERM_Br (texp2, b21, b22) ->
@@ -188,9 +191,9 @@ let get_term_from_def
     ~(mcfg : typ mcfg)
     (term : dtyp terminator): typ terminator option =
   let blocks = f_def.df_instrs.blks in
-  let terms = List.map (fun x -> x.blk_term) blocks in
+  let terms : typ terminator list = List.map (fun x -> x.blk_term) blocks in
   let convert_dtyp_term : typ terminator -> dtyp terminator = fun (x : typ terminator) -> convert_typ (Obj.magic coq_ConvertTyp_term) mcfg.m_type_defs (Obj.magic x) in
-  let find_aux : typ terminator -> bool = fun (x : typ terminator) -> term_eq ~f:dtyp_eqb (convert_dtyp_term x) term in
+  let find_aux : typ terminator -> bool = fun x -> term_eq ~f:dtyp_eqb (convert_dtyp_term x) term in
   List.find_opt find_aux terms
 
 let get_f_def_from_mcfg
@@ -793,7 +796,7 @@ let transform_code
     let tblk : typ block = {blk_id= f_def.df_instrs.init;
                             blk_phis=[];
                             blk_code=[];
-                            blk_term=(TERM_Ret (TYPE_I (Camlcoq.N.of_int 8), EXP_Integer (Camlcoq.Z.of_sint 1)));
+                            blk_term=(TERM_Ret (TYPE_I (Camlcoq.P.of_int 8), EXP_Integer (Camlcoq.Z.of_sint 1)));
                             blk_comments= None
                            } in
     let ctx = RawidM.empty in

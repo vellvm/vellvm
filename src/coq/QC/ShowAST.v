@@ -200,7 +200,13 @@ Section ShowInstances.
   (*   |  *)
   (*   | _ => EmptyDString *)
   (*   end. *)
-  
+
+  #[global] Instance showPositive : Show positive :=
+  {| show sz := show (Pos.to_nat sz)|}.
+
+  #[global] Instance dshowPositive : DShow positive :=
+    {| dshow sz := string_to_DString (show sz)|}.
+
   Fixpoint dshow_typ (t : typ) : DString  :=
     match t with
     | TYPE_I sz                 => string_to_DString "i" @@
@@ -650,10 +656,9 @@ Section ShowInstances.
 
   #[global] Instance showFBinop : Show fbinop
     := {| show := show_fbinop |}.
-
-
+  
   Definition double_to_hex_string (f : float) : string
-    := appendTR_string "0x" (NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (Int64.unsigned (Float.to_bits f))))).
+    := appendTR_string "0x" (NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (unsigned (Float.to_bits f))))).
 
   Definition float_to_hex_string (f : float32) : string
     := double_to_hex_string (Float32.to_double f).
@@ -769,8 +774,8 @@ Section ShowInstances.
     | EXP_Undef            => false
     | EXP_Struct _         => false
     | EXP_Packed_struct _  => false
-    | EXP_Array _          => false
-    | EXP_Vector _         => false
+    | EXP_Array _ _        => false
+    | EXP_Vector _ _       => false
     | _ => true
     end.
 
@@ -819,7 +824,7 @@ Section ShowInstances.
           concat_DString (string_to_DString ", ")
           (map (fun '(ty, ex) => DList_join [dshow ty ; string_to_DString " "] @@ dshow_exp false ex) elts) @@
           string_to_DString "]"
-    | EXP_Vector elts =>
+    | EXP_Vector t elts =>
         string_to_DString "<" @@
           concat_DString (string_to_DString ", ") (map (fun '(ty, ex) => DList_join [dshow ty ; string_to_DString " "] @@ dshow_exp false ex) elts) @@
           string_to_DString ">"

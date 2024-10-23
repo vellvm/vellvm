@@ -151,12 +151,12 @@ Next Obligation.
   all: unfold is_true, set1, boundaries in *.
 
   (* simplify *)
-  destruct b2 as [B11 B12].
-  destruct b3 as [B21 B22].
+  all: destruct b2 as [B11 B12].
   all: destruct t; try rewrite Z.leb_le in *.
   Opaque Z.sub.
   all: tuple_inversion.
   all: try unfold FLX.Prec_gt_0 in *.
+  all: destruct b3 as [B21 B22].
 
   (* main goals *)
   (* first main goal *)
@@ -185,16 +185,15 @@ Next Obligation.
   1,3,5: reflexivity.
   1,2,3: auto.
   1,2,3: lia.
-  - 
+  -
     assert (T : (1) = (2 - 1)) by lia; rewrite T; clear T.
     rewrite <-Z.sub_le_mono_r.
     assert (T : (2) = (2 ^ 1)) by lia; rewrite T; clear T.
     apply Z.pow_le_mono_r; lia; lia.
   -
-    clear m b2 e b3 H Hmax emax.
     assert (2 ^ (prec - 1) < 2 ^ prec); [| lia].
     apply Z.pow_lt_mono_r; lia.
-Qed.
+  Qed.
 
 Theorem fing32_prec : FLX.Prec_gt_0 24.
 Proof. unfold FLX.Prec_gt_0; reflexivity. Qed.
