@@ -915,6 +915,33 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     tau_steps.
     reflexivity.
     Qed.
+
+    #[global] Instance eq_itree_interp_memory_exec {R} :
+        Proper (eutt eq ==> eq ==> eq ==> eutt eq) (@interp_memory R).
+        Proof using.
+        ginit. pcofix CIH.
+        intros.
+
+        subst.
+        admit.
+      Admitted.
+        (* repeat rewrite unfold_interp_memory.
+
+        destruct observe; destruct observe; cbn.
+        - gstep. reflexivity.  
+
+        cbn.
+        repeat intro.
+        subst.
+        unfold interp_memory.
+        unfold interp_memory_h.
+        rewrite H.
+
+        rewrite H.
+        subst; rewrite H.
+        reflexivity.
+        Qed. *)
+
     Lemma my_handle_intrinsic_prop_correct {T} i sid ms (VALID: MemMonad_valid_state ms sid) :
       my_handle_intrinsic_prop i sid ms (my_handle_intrinsic (T := T) i sid ms).
     Proof using.
