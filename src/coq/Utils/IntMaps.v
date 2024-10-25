@@ -166,19 +166,251 @@ Section Map_Operations.
     | None => false
     end.
 
+  Fixpoint IM_raw_greatest_key {A} (m : IM.Raw.tree A) : option Z
+    := match m with
+       | IM.Raw.Leaf => None
+       | IM.Raw.Node l k _ (@IM.Raw.Leaf _) _ =>
+           ret k
+       | IM.Raw.Node l k _ r _ =>
+           IM_raw_greatest_key r
+       end.
+
+  Definition IM_greatest_key {A} (m : IM.t A) : option Z
+    := IM_raw_greatest_key (IM.this m).
+
   Definition next_key {A} (m : IntMap A) : Z
+    := match IM_greatest_key m with
+       | Some k => 1 + k
+       | None => 0
+       end.
+
+  Definition next_key_old {A} (m : IntMap A) : Z
     := let keys := map fst (IM.elements m) in
        1 + maximumBy Z.leb (-1)%Z keys.
 
-  Lemma next_key_gt_0 :
+  Lemma next_key_old_gt_0 :
     forall {A} (m : IntMap A),
-      next_key m >= 0.
+      next_key_old m >= 0.
   Proof using.
     intros A m.
-    unfold next_key.
+    unfold next_key_old.
     pose proof maximumBy_Z_def (-1) (map fst (IM.elements (elt:=A) m)).
     apply Zle_is_le_bool in H.
     lia.
+  Qed.
+
+  Lemma IM_greatest_key_none' :
+    forall {A} (m : IM.t A), IM.Empty m -> IM_greatest_key m = None.
+  Proof.
+    intros A m H.
+    induction m; cbn in *.
+    induction this; cbn in *; auto.
+    - exfalso; eapply H.
+      cbn.
+      constructor; reflexivity.
+  Qed.
+
+  Lemma IM_greatest_key_none'' :
+    forall {A} (m : IM.t A), IM_greatest_key m = None -> IM.Empty m.
+  Proof.
+    intros A m H.
+    induction m; cbn in *.
+    induction this; cbn in *; auto.
+    - intros k e CONTRA.
+      inv CONTRA.
+    - exfalso.
+      destruct (IM_raw_greatest_key this2) eqn:THIS2.
+      + break_match_hyp_inv.
+      + break_match_hyp_inv.
+        inv is_bst.
+        specialize (IHthis2 H5 eq_refl).
+        eapply IHthis2.
+        constructor; reflexivity.
+  Qed.
+
+  Lemma IM_greatest_key_none :
+    forall {A} (m : IM.t A), IM_greatest_key m = None <-> IM.Empty m.
+  Proof.
+    intros A m.
+    split; intros H.
+    + apply IM_greatest_key_none''; auto.
+    + apply IM_greatest_key_none'; auto.
+  Qed.
+
+  Lemma IM_greatest_key_In :
+    forall {A} (m : IM.t A) gk,
+      IM_greatest_key m = Some gk -> IM.In gk m.
+  Proof.
+    intros A m.
+    intros gk H.
+    apply F.in_find_iff.
+    revert gk H.
+    destruct m; cbn in *.
+    induction this; intros gk GK.
+    - cbn in *. inv GK.
+    - rename k into current_key.
+      cbn.
+      (* gk is the greatest key. It should be larger than current_key *)
+      cbn in GK.
+      pose proof is_bst as is_bst2.
+      inv is_bst.
+      destruct (IM_raw_greatest_key this2) eqn:THIS2;
+        destruct this2; inv GK.
+      + (* At a leaf eq *)
+        break_match; cbn in *;
+          solve
+            [ red in l; lia
+            | discriminate
+            ].
+      + (* Not at a leaf... *)
+        pose proof H5.
+        eapply IHthis2 in H5; eauto.
+        eapply IM.Raw.Proofs.find_in_iff in H5; eauto.
+
+        red in H7.
+        apply H7 in H5.
+
+        break_match; cbn in *;
+          try solve
+            [ red in l; lia
+            | discriminate
+            ].
+
+        apply IHthis2; auto.
+      + break_match; cbn in *;
+          solve
+            [ red in l; lia
+            | discriminate
+            ].
+  Qed.
+
+  Lemma IM_greatest_key_In' :
+    forall {A} (m : IM.t A) k,
+      IM.In k m ->
+      exists gk, IM_greatest_key m = Some gk.
+  Proof.
+    intros A m k IN.
+    destruct (IM_greatest_key m) eqn:GK.
+    exists z; auto.
+
+    apply F.in_find_iff in IN.
+    destruct (IM.find (elt:=A) k m) eqn:FIND; try contradiction.
+    apply F.find_mapsto_iff in FIND.
+    apply IM_greatest_key_none in FIND; try contradiction; auto.
+  Qed.
+
+  Lemma IM_greatest_key_lt :
+    forall {A} (m : IM.t A) gk,
+      IM_greatest_key m = Some gk -> IM.Raw.lt_tree (1 + gk) (IM.this m).
+  Proof.
+    intros A m.
+    destruct m; cbn in *.
+    induction this; intros gk GK.
+    - cbn in *. inv GK.
+    - rename k into current_key.
+      cbn.
+      (* gk is the greatest key. It should be larger than current_key *)
+      cbn in GK.
+      pose proof is_bst as is_bst2.
+      inv is_bst.
+      destruct (IM_raw_greatest_key this2) eqn:THIS2;
+        destruct this2; inv GK.
+      + (* At a leaf eq *)
+        break_match; cbn in *;
+          solve
+            [ red in l; lia
+            | discriminate
+            ].
+      + (* Not at a leaf... *)
+        pose proof H5.
+        eapply IHthis2 in H5; eauto.
+        red.
+        intros y H0.
+        inv H0.
+        * (* Root *)
+          red in H5.
+          specialize (H5 k).
+          forward H5.
+          constructor; auto.
+          specialize (H7 k).
+          forward H7.
+          constructor; auto.
+          cbn in H7.
+          lia.
+        * (* Left *)
+          red in H6.
+          specialize (H6 y H2).
+          red in H5.
+          specialize (H5 k).
+          forward H5.
+          constructor; auto.
+          specialize (H7 k).
+          forward H7.
+          constructor; auto.
+          cbn in H7.
+          lia.
+        * (* Right *)
+          red in H5.
+          specialize (H5 y H2).
+          auto.
+      + red.
+        intros y H.
+        assert (gk < 1 + gk) by lia.
+        inv H; auto.
+        * apply H6 in H2.
+          cbn in *; lia.
+        * inv H2.
+  Qed.
+
+
+  Lemma IM_raw_greatest_key_lr :
+    forall {elt} m k (e : elt) l t r kl kr,
+      IM.this m = (IM.Raw.Node l k e r t) ->
+      IM_raw_greatest_key l = Some kl ->
+      IM_raw_greatest_key r = Some kr ->
+      kl < kr.
+  Proof.
+    intros elt m k e l t r kl kr NODE GL GR.
+    destruct m.
+    cbn in *.
+    inv is_bst.
+    inv H.
+    inv H3.
+
+    unfold IM.Raw.gt_tree in *.
+    unfold IM.Raw.lt_tree in *.
+
+    assert (IM_greatest_key (@IM.Bst elt l H) = Some kl) as GL' by (cbn; auto).
+    assert (IM_greatest_key (@IM.Bst elt r H0) = Some kr) as GR' by (cbn; auto).
+
+    apply IM_greatest_key_In in GL', GR'.
+    unfold IM.In in *.
+    apply IM.Raw.Proofs.In_alt in GL', GR'.
+    apply H2 in GR'.
+    apply H1 in GL'.
+
+    lia.
+  Qed.
+
+  Lemma next_key_correct :
+    forall {A} (m : IM.t A) (a : Z),
+      IM.In a m ->
+      (a < next_key m)%Z.
+  Proof.
+    intros A m a IN.
+    pose proof IN as GK.
+    unfold next_key.
+    eapply IM_greatest_key_In' in GK.
+    destruct GK as (gk & GK).
+    rewrite GK.
+    apply IM_greatest_key_lt in GK.
+    red in GK.
+    specialize (GK a).
+    destruct m; cbn in IN.
+    unfold IM.In in IN.
+    apply IM.Raw.Proofs.In_alt in IN.
+    apply GK in IN.
+    auto.
   Qed.
 
   Lemma MapsTo_inj : forall {a} k v v' (m : IntMap a),

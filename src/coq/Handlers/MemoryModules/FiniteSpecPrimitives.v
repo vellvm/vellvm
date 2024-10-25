@@ -212,19 +212,10 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Proof using.
       intros mem ix H.
       unfold read_byte_raw.
+      pose proof next_key_correct mem ix as NEXT.
       apply IP.F.not_find_in_iff.
-      unfold next_key in *.
-      intros IN.
-      apply IP.F.elements_in_iff in IN.
-      destruct IN as [e IN].
-
-      pose proof (maximumBy_Z_correct (-1) (map fst (IM.elements (elt:=mem_byte) mem)) ix) as LE.
-      forward LE.
-      { apply InA_In in IN.
-        replace ix with (fst (ix, e)) by auto.
-        apply in_map; auto.
-      }
-      apply Zle_bool_imp_le in LE.
+      intros CONTRA.
+      apply NEXT in CONTRA.
       lia.
     Qed.
 
