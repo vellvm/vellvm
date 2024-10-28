@@ -162,12 +162,12 @@ Module BigIP_BIG : MemoryAddress.INTPTR_BIG BigIP.
   Qed.
 End BigIP_BIG.
 
-Definition from_Z_bits {sz : positive} : Z -> OOM (@int sz) := (fun (x : Z) =>
+Definition from_Z_bits {sz : positive} : Z -> OOM (@bit_int sz) := (fun (x : Z) =>
     if (x <=? @Integers.max_unsigned sz)%Z && (x >=? 0)%Z
     then ret (@Integers.repr sz x)
     else Oom "IPBit from_Z oom.").
 
-Instance VMemInt_intptr_ix {sz : positive} : VMemInt (@int sz)
+Instance VMemInt_intptr_ix {sz : positive} : VMemInt (@bit_int sz)
   :=
   { (* Comparisons *)
     mequ := @Integers.eq sz;

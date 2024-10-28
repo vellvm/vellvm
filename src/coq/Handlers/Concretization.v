@@ -241,8 +241,8 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                            then
                              Conv_Pure
                                (@DVALUE_I sz_to
-                                  (@repr (@int sz_to) (VInt_Bounded sz_to)
-                                     (@unsigned (@int sz_from) (VInt_Bounded sz_from) i1)))
+                                  (@repr (@bit_int sz_to) (VInt_Bounded sz_to)
+                                     (@unsigned (@bit_int sz_from) (VInt_Bounded sz_from) i1)))
                            else Conv_Illegal "ill-typed Trunc"
                        | _ => Conv_Illegal "ill-typed Trunc"
                        end
@@ -266,8 +266,8 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                            then
                              Conv_Pure
                                (@DVALUE_I sz_to
-                                  (@repr (@int sz_to) (VInt_Bounded sz_to)
-                                     (@unsigned (@int sz_from) (VInt_Bounded sz_from) i1)))
+                                  (@repr (@bit_int sz_to) (VInt_Bounded sz_to)
+                                     (@unsigned (@bit_int sz_from) (VInt_Bounded sz_from) i1)))
                            else Conv_Illegal "ill-typed Zext"
                        | _ => Conv_Illegal "ill-typed Zext"
                        end
@@ -291,8 +291,8 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                            then
                              Conv_Pure
                                (@DVALUE_I sz_to
-                                  (@repr (@int sz_to) (VInt_Bounded sz_to)
-                                     (@signed (@int sz_from) (VInt_Bounded sz_from) i1)))
+                                  (@repr (@bit_int sz_to) (VInt_Bounded sz_to)
+                                     (@signed (@bit_int sz_from) (VInt_Bounded sz_from) i1)))
                            else Conv_Illegal "ill-typed Sext"
                        | _ => Conv_Illegal "ill-typed Sext"
                        end
@@ -317,8 +317,8 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                              Conv_Pure
                                (DVALUE_Float
                                   (Float32.of_intu
-                                     (@repr (@int 32) (VInt_Bounded 32)
-                                        (@unsigned (@int sz_from)
+                                     (@repr (@bit_int 32) (VInt_Bounded 32)
+                                        (@unsigned (@bit_int sz_from)
                                            (VInt_Bounded sz_from) i1))))
                            else Conv_Illegal "ill-typed Uitofp"
                        | @DTYPE_Double =>
@@ -327,8 +327,8 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                              Conv_Pure
                                (DVALUE_Double
                                   (Float.of_longu
-                                     (@repr (@int 64) (VInt_Bounded 64)
-                                        (@unsigned (@int sz_from)
+                                     (@repr (@bit_int 64) (VInt_Bounded 64)
+                                        (@unsigned (@bit_int sz_from)
                                            (VInt_Bounded sz_from) i1))))
                            else Conv_Illegal "ill-typed Uitofp"
                        | _ => Conv_Illegal "ill-typed Uitofp"
@@ -354,8 +354,8 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                              Conv_Pure
                                (DVALUE_Float
                                   (Float32.of_intu
-                                     (@repr (@int 32) (VInt_Bounded 32)
-                                        (@signed (@int sz_from) (VInt_Bounded sz_from) i1))))
+                                     (@repr (@bit_int 32) (VInt_Bounded 32)
+                                        (@signed (@bit_int sz_from) (VInt_Bounded sz_from) i1))))
                            else Conv_Illegal "ill-typed Sitofp"
                        | @DTYPE_Double =>
                            if (sz_t =? sz_from)%positive
@@ -363,8 +363,8 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                              Conv_Pure
                                (DVALUE_Double
                                   (Float.of_longu
-                                     (@repr (@int 64) (VInt_Bounded 64)
-                                        (@signed (@int sz_from) (VInt_Bounded sz_from) i1))))
+                                     (@repr (@bit_int 64) (VInt_Bounded 64)
+                                        (@signed (@bit_int sz_from) (VInt_Bounded sz_from) i1))))
                            else Conv_Illegal "ill-typed Sitofp"
                        | _ => Conv_Illegal "ill-typed Sitofp"
                        end
@@ -1106,8 +1106,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                            then
                              Conv_Pure
                                (@DVALUE_I sz_to
-                                  (@repr (@int sz_to) (VInt_Bounded sz_to)
-                                     (@unsigned (@int sz_from) (VInt_Bounded sz_from) i1)))
+                                  (@repr (@bit_int sz_to) (VInt_Bounded sz_to)
+                                     (@unsigned (@bit_int sz_from) (VInt_Bounded sz_from) i1)))
                            else Conv_Illegal "ill-typed Trunc"
                        | _ => Conv_Illegal "ill-typed Trunc"
                        end
@@ -1131,8 +1131,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                            then
                              Conv_Pure
                                (@DVALUE_I sz_to
-                                  (@repr (@int sz_to) (VInt_Bounded sz_to)
-                                     (@unsigned (@int sz_from) (VInt_Bounded sz_from) i1)))
+                                  (@repr (@bit_int sz_to) (VInt_Bounded sz_to)
+                                     (@unsigned (@bit_int sz_from) (VInt_Bounded sz_from) i1)))
                            else Conv_Illegal "ill-typed Zext"
                        | _ => Conv_Illegal "ill-typed Zext"
                        end
@@ -1156,8 +1156,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                            then
                              Conv_Pure
                                (@DVALUE_I sz_to
-                                  (@repr (@int sz_to) (VInt_Bounded sz_to)
-                                     (@signed (@int sz_from) (VInt_Bounded sz_from) i1)))
+                                  (@repr (@bit_int sz_to) (VInt_Bounded sz_to)
+                                     (@signed (@bit_int sz_from) (VInt_Bounded sz_from) i1)))
                            else Conv_Illegal "ill-typed Sext"
                        | _ => Conv_Illegal "ill-typed Sext"
                        end
@@ -1182,8 +1182,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                              Conv_Pure
                                (DVALUE_Float
                                   (Float32.of_intu
-                                     (@repr (@int 32) (VInt_Bounded 32)
-                                        (@unsigned (@int sz_from)
+                                     (@repr (@bit_int 32) (VInt_Bounded 32)
+                                        (@unsigned (@bit_int sz_from)
                                            (VInt_Bounded sz_from) i1))))
                            else Conv_Illegal "ill-typed Uitofp"
                        | @DTYPE_Double =>
@@ -1192,8 +1192,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                              Conv_Pure
                                (DVALUE_Double
                                   (Float.of_longu
-                                     (@repr (@int 64) (VInt_Bounded 64)
-                                        (@unsigned (@int sz_from)
+                                     (@repr (@bit_int 64) (VInt_Bounded 64)
+                                        (@unsigned (@bit_int sz_from)
                                            (VInt_Bounded sz_from) i1))))
                            else Conv_Illegal "ill-typed Uitofp"
                        | _ => Conv_Illegal "ill-typed Uitofp"
@@ -1219,8 +1219,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                              Conv_Pure
                                (DVALUE_Float
                                   (Float32.of_intu
-                                     (@repr (@int 32) (VInt_Bounded 32)
-                                        (@signed (@int sz_from) (VInt_Bounded sz_from) i1))))
+                                     (@repr (@bit_int 32) (VInt_Bounded 32)
+                                        (@signed (@bit_int sz_from) (VInt_Bounded sz_from) i1))))
                            else Conv_Illegal "ill-typed Sitofp"
                        | @DTYPE_Double =>
                            if (sz_t =? sz_from)%positive
@@ -1228,8 +1228,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                              Conv_Pure
                                (DVALUE_Double
                                   (Float.of_longu
-                                     (@repr (@int 64) (VInt_Bounded 64)
-                                        (@signed (@int sz_from) (VInt_Bounded sz_from) i1))))
+                                     (@repr (@bit_int 64) (VInt_Bounded 64)
+                                        (@signed (@bit_int sz_from) (VInt_Bounded sz_from) i1))))
                            else Conv_Illegal "ill-typed Sitofp"
                        | _ => Conv_Illegal "ill-typed Sitofp"
                        end

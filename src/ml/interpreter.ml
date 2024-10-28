@@ -78,7 +78,7 @@ let char_of_I8 x =
   char_of_int (Camlcoq.Z.to_int (Integers.unsigned (Camlcoq.P.of_int 8) x))
 
 (* Converts a list of VellvmIntegers.Int8 values to OCaml string *)
-let string_of_bytes (bytes : Integers.int list) : bytes =
+let string_of_bytes (bytes : Integers.bit_int list) : bytes =
   List.map char_of_I8 bytes |> List.to_seq |> Bytes.of_seq
 
 let debug_flag = ref false

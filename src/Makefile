@@ -36,16 +36,19 @@ FRONTEND_EXE=_build/default/ml/frontend.exe
 AGGREGATE_EXE=_build/default/ml/aggregate.exe
 COQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib
 COQFILES_EXEC := QC/ShowAST QC/ReprAST QC/GenAlive2 Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib Semantics/Printfdefn Semantics/TopLevel Transformations/Transform Handlers/Handlers Theory/Refinement Utilities Numeric/Floats
+COQFILES_QC := QC/GenAST QC/GenMetadata QC/ECS QC/Lens QC/GenAlive2 QC/Generators QC/ReprAST QC/ShowAST QC/Utils QC/DList
 FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
 EXEC_VFILES := $(COQFILES_EXEC:%=coq/%.v)
 EXEC_VOFILES := $(COQFILES_EXEC:%=coq/%.vo)
+QC_VFILES := $(COQFILES_QC:%=coq/%.v)
+QC_VOFILES := $(COQFILES_QC:%=coq/%.vo)
 VFILES := $(shell find coq -name "*.v")
 
 .DEFAULT_GOAL := all
 
 ######## targets not in this "KNOWNTARGETS" list will be forwarded to CoqMakefile via invoke-coqmakefile
 ######## WARNING - every target of *this* Makefile must be listed here
-KNOWNTARGETS := CoqMakefile invoke-coqmakefile coq extracted $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/Extract.v $(VELLVM_EXE) vellvm vellvmbc test check qc-tests yarpgen-tests rm-qc-test-vo clean extractedclean clean-coqmakefile doc/coq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-coq opam print-opam print-includes
+KNOWNTARGETS := CoqMakefile invoke-coqmakefile coq extracted $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/Extract.v $(VELLVM_EXE) vellvm vellvmbc test check qc-tests yarpgen-tests rm-qc-test-vo clean extractedclean clean-coqmakefile doc/coq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-coq opam print-opam print-includes qc-files
 
 KNOWNFILES := Makefile _CoqProject
 
@@ -110,8 +113,12 @@ yarpgen-tests: rm-qc-test-vo coq
 ######## QuickChick testing targets
 
 .PHONY: qc-tests
-qc-tests: rm-qc-test-vo coq
-	$(COQEXEC) coq/QC/QCShowTesting.v
+qc-tests: rm-qc-test-vo qc-files vellvm
+	$(COQEXEC) coq/QC/QCVellvm.v
+
+.PHONY: qc-files
+qc-files: $(QC_VFILES)
+	make $(QC_VOFILES)
 
 .PHONY: rm-qc-test-vo
 rm-qc-test-vo:

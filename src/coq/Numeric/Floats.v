@@ -298,23 +298,23 @@ Definition ordered (f1 f2: float) : bool :=
 Definition of_single: float32 -> float := Bconv _ _ 53 1024 __ __ of_single_nan mode_NE.
 Definition to_single: float -> float32 := Bconv _ _ 24 128 __ __ to_single_nan mode_NE.
 
-Definition to_int (f:float): option (@int 32) := (**r conversion to signed 32-bit int *)
+Definition to_int (f:float): option (@bit_int 32) := (**r conversion to signed 32-bit int *)
   option_map (@repr 32) (ZofB_range _ _ f (@min_signed 32) (@max_signed 32)).
-Definition to_intu (f:float): option (@int 32) := (**r conversion to unsigned 32-bit int *)
+Definition to_intu (f:float): option (@bit_int 32) := (**r conversion to unsigned 32-bit int *)
   option_map (@repr 32) (ZofB_range _ _ f 0 (@max_unsigned 32)).
-Definition to_long (f:float): option (@int 64) := (**r conversion to signed 64-bit int *)
+Definition to_long (f:float): option (@bit_int 64) := (**r conversion to signed 64-bit int *)
   option_map (@repr 64) (ZofB_range _ _ f (@min_signed 64) (@max_signed 64)).
-Definition to_longu (f:float): option (@int 64) := (**r conversion to unsigned 64-bit int *)
+Definition to_longu (f:float): option (@bit_int 64) := (**r conversion to unsigned 64-bit int *)
   option_map (@repr 64) (ZofB_range _ _ f 0 (@max_unsigned 64)).
 
-Definition of_int (n:@int 32): float := (**r conversion from signed 32-bit int *)
+Definition of_int (n:@bit_int 32): float := (**r conversion from signed 32-bit int *)
   BofZ 53 1024 __ __ (signed n).
-Definition of_intu (n:@int 32): float:= (**r conversion from unsigned 32-bit int *)
+Definition of_intu (n:@bit_int 32): float:= (**r conversion from unsigned 32-bit int *)
   BofZ 53 1024 __ __ (unsigned n).
 
-Definition of_long (n:@int 64): float := (**r conversion from signed 64-bit int *)
+Definition of_long (n:@bit_int 64): float := (**r conversion from signed 64-bit int *)
   BofZ 53 1024 __ __ (signed n).
-Definition of_longu (n:@int 64): float:= (**r conversion from unsigned 64-bit int *)
+Definition of_longu (n:@bit_int 64): float:= (**r conversion from unsigned 64-bit int *)
   BofZ 53 1024 __ __ (unsigned n).
 
 Definition from_parsed (base:positive) (intPart:positive) (expPart:Z) : float :=
@@ -323,10 +323,10 @@ Definition from_parsed (base:positive) (intPart:positive) (expPart:Z) : float :=
 (** Conversions between floats and their concrete in-memory representation
     as a sequence of 64 bits. *)
 
-Definition to_bits (f: float): @int 64 := @repr 64 (bits_of_b64 f).
-Definition of_bits (b: @int 64): float := b64_of_bits (unsigned b).
+Definition to_bits (f: float): @bit_int 64 := @repr 64 (bits_of_b64 f).
+Definition of_bits (b: @bit_int 64): float := b64_of_bits (unsigned b).
 
-Definition from_words (hi lo: @int 32) : float := of_bits (ofwords hi lo).
+Definition from_words (hi lo: @bit_int 32) : float := of_bits (ofwords hi lo).
 
 (** ** Properties *)
 
@@ -884,7 +884,7 @@ Proof.
               testbit n i =
                 if zeq i 0 then testbit x 1 || testbit x 0
                 else if zeq i 63 then false else testbit x (i + 1)).
-  { intros; unfold n; autorewrite with ints; auto. rewrite unsigned_one.
+  { intros; unfold n; autorewrite with bit_ints; auto. rewrite unsigned_one.
     rewrite bits_one. compute_this (@zwordsize 64).
     destruct (zeq i 0); simpl proj_sumbool.
     rewrite zlt_true by lia. rewrite andb_true_r. subst i; auto.
@@ -1080,23 +1080,23 @@ Definition ordered (f1 f2: float32) : bool :=
 Definition of_double : float -> float32 := Float.to_single.
 Definition to_double : float32 -> float := Float.of_single.
 
-Definition to_int (f:float32): option (@int 32) := (**r conversion to signed 32-bit int *)
+Definition to_int (f:float32): option (@bit_int 32) := (**r conversion to signed 32-bit int *)
   option_map (@repr 32) (ZofB_range _ _ f (@min_signed 32) (@max_signed 32)).
-Definition to_intu (f:float32): option (@int 32) := (**r conversion to @unsigned 32-bit int *)
+Definition to_intu (f:float32): option (@bit_int 32) := (**r conversion to @unsigned 32-bit int *)
   option_map (@repr 32) (ZofB_range _ _ f 0 (@max_unsigned 32)).
-Definition to_long (f:float32): option (@int 64) := (**r conversion to signed-bit int *)
+Definition to_long (f:float32): option (@bit_int 64) := (**r conversion to signed-bit int *)
   option_map (@repr 64) (ZofB_range _ _ f (@min_signed 64) (@max_signed 64)).
-Definition to_longu (f:float32): option (@int 64) := (**r conversion to @unsigned-bit int *)
+Definition to_longu (f:float32): option (@bit_int 64) := (**r conversion to @unsigned-bit int *)
   option_map (@repr 64) (ZofB_range _ _ f 0 (@max_unsigned 64)).
 
-Definition of_int (n:@int 32): float32 := (**r conversion from signed 32-bit int to single-precision float *)
+Definition of_int (n:@bit_int 32): float32 := (**r conversion from signed 32-bit int to single-precision float *)
   BofZ 24 128 __ __ (signed n).
-Definition of_intu (n:@int 32): float32 := (**r conversion from @unsigned 32-bit int to single-precision float *)
+Definition of_intu (n:@bit_int 32): float32 := (**r conversion from @unsigned 32-bit int to single-precision float *)
   BofZ 24 128 __ __ (@unsigned 32 n).
 
-Definition of_long (n:@int 64): float32 := (**r conversion from signed-bit int to single-precision float *)
+Definition of_long (n:@bit_int 64): float32 := (**r conversion from signed-bit int to single-precision float *)
   BofZ 24 128 __ __ (signed n).
-Definition of_longu (n:@int 64): float32 := (**r conversion from @unsigned-bit int to single-precision float *)
+Definition of_longu (n:@bit_int 64): float32 := (**r conversion from @unsigned-bit int to single-precision float *)
   BofZ 24 128 __ __ (@unsigned 64 n).
 
 Definition from_parsed (base:positive) (intPart:positive) (expPart:Z) : float32 :=
@@ -1105,8 +1105,8 @@ Definition from_parsed (base:positive) (intPart:positive) (expPart:Z) : float32 
 (** Conversions between floats and their concrete in-memory representation
     as a sequence of 32 bits. *)
 
-Definition to_bits (f: float32) : @int 32 := @repr 32 (bits_of_b32 f).
-Definition of_bits (b: @int 32): float32 := b32_of_bits (@unsigned 32 b).
+Definition to_bits (f: float32) : @bit_int 32 := @repr 32 (bits_of_b32 f).
+Definition of_bits (b: @bit_int 32): float32 := b32_of_bits (@unsigned 32 b).
 
 (** ** Properties *)
 

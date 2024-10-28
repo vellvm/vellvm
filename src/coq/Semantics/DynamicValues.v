@@ -122,7 +122,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Unset Elimination Schemes.
   Inductive dvalue : Set :=
   | DVALUE_Addr (a:A.addr)
-  | DVALUE_I (sz : positive) (x:@int sz)
+  | DVALUE_I (sz : positive) (x:@bit_int sz)
   | DVALUE_IPTR (x:intptr)
   | DVALUE_Double (x:ll_double)
   | DVALUE_Float (x:ll_float)
@@ -199,7 +199,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Section DvalueInd.
     Variable P : dvalue -> Prop.
     Hypothesis IH_Addr          : forall a, P (DVALUE_Addr a).
-    Hypothesis IH_I             : forall sz (x : @int sz), P (@DVALUE_I sz x).
+    Hypothesis IH_I             : forall sz (x : @bit_int sz), P (@DVALUE_I sz x).
     Hypothesis IH_IPTR          : forall x, P (DVALUE_IPTR x).
     Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
     Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
@@ -242,7 +242,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Section DvalueRec.
     Variable P : dvalue -> Set.
     Hypothesis IH_Addr          : forall a, P (DVALUE_Addr a).
-    Hypothesis IH_I            : forall sz (x : @int sz), P (@DVALUE_I sz x).
+    Hypothesis IH_I            : forall sz (x : @bit_int sz), P (@DVALUE_I sz x).
     Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x).
     Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
     Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
@@ -316,7 +316,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Section DvalueStrongInd.
     Variable P : dvalue -> Prop.
     Hypothesis IH_Addr          : forall a, P (DVALUE_Addr a).
-    Hypothesis IH_I             : forall sz (x : @int sz), P (@DVALUE_I sz x).
+    Hypothesis IH_I             : forall sz (x : @bit_int sz), P (@DVALUE_I sz x).
     Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x).
     Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
     Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
@@ -561,7 +561,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Unset Elimination Schemes.
   Inductive uvalue : Type :=
   | UVALUE_Addr (a:A.addr)
-  | UVALUE_I (sz : positive) (x:@int sz)
+  | UVALUE_I (sz : positive) (x:@bit_int sz)
   | UVALUE_IPTR (x:intptr)
   | UVALUE_Double (x:ll_double)
   | UVALUE_Float (x:ll_float)
@@ -2876,7 +2876,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   Section DecidableEquality.
 
     Definition dvalue_int_eq_dec_helper
-      (sz1 sz2 : positive) (x1 : @int sz1) (x2 : @int sz2) : {@DVALUE_I sz1 x1 = @DVALUE_I sz2 x2} + {@DVALUE_I sz1 x1 <> @DVALUE_I sz2 x2}.
+      (sz1 sz2 : positive) (x1 : @bit_int sz1) (x2 : @bit_int sz2) : {@DVALUE_I sz1 x1 = @DVALUE_I sz2 x2} + {@DVALUE_I sz1 x1 <> @DVALUE_I sz2 x2}.
       destruct (Pos.eq_dec sz1 sz2); subst.
       - destruct (Integers.eq_dec x1 x2); subst; auto.
         right.
@@ -2888,7 +2888,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Defined.
 
     Definition uvalue_int_eq_dec_helper
-      (sz1 sz2 : positive) (x1 : @int sz1) (x2 : @int sz2) : {@UVALUE_I sz1 x1 = @UVALUE_I sz2 x2} + {@UVALUE_I sz1 x1 <> @UVALUE_I sz2 x2}.
+      (sz1 sz2 : positive) (x1 : @bit_int sz1) (x2 : @bit_int sz2) : {@UVALUE_I sz1 x1 = @UVALUE_I sz2 x2} + {@UVALUE_I sz1 x1 <> @UVALUE_I sz2 x2}.
       destruct (Pos.eq_dec sz1 sz2); subst.
       - destruct (Integers.eq_dec x1 x2); subst; auto.
         right.
@@ -3234,7 +3234,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   #[global] Instance ToDvalue_intptr : ToDvalue intptr :=
     { to_dvalue := DVALUE_IPTR }.
 
-  #[global] Instance ToDvalue_Int `{sz : positive} : ToDvalue (@int sz) :=
+  #[global] Instance ToDvalue_Int `{sz : positive} : ToDvalue (@bit_int sz) :=
     { to_dvalue := @DVALUE_I sz }.
 
   (* Is a uvalue a concrete integer equal to i? *)
@@ -3510,7 +3510,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Arguments eval_int_op _ _ _ : simpl nomatch.
 
   (* Evaluate the given iop on the given arguments according to the bitsize *)
-  Definition integer_op {M} `{HM : Monad M} `{ERR : RAISE_ERROR M} `{UB : RAISE_UB M} `{OOM : RAISE_OOM M} (bits:positive) (iop:ibinop) (x y:@int bits) : M dvalue :=
+  Definition integer_op {M} `{HM : Monad M} `{ERR : RAISE_ERROR M} `{UB : RAISE_UB M} `{OOM : RAISE_OOM M} (bits:positive) (iop:ibinop) (x y:@bit_int bits) : M dvalue :=
     eval_int_op iop x y.
   Arguments integer_op _ _ _ _ : simpl nomatch.
 

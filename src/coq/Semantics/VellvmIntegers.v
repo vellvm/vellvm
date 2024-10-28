@@ -135,11 +135,11 @@ Definition mcmpu_Z (c : Numeric.Integers.comparison) (x y : Z) : bool :=
     mdtyp_of_int := DTYPE_IPTR
   }.
 
-Definition int1 := @int 1.
-Definition int8 := @int 8.
-Definition int16 := @int 16.
-Definition int32 := @int 32.
-Definition int64 := @int 64.
+Definition int1 := @bit_int 1.
+Definition int8 := @bit_int 8.
+Definition int16 := @bit_int 16.
+Definition int32 := @bit_int 32.
+Definition int64 := @bit_int 64.
 
 Class VInt I : Type :=
   {
@@ -192,7 +192,7 @@ Class VInt I : Type :=
     repr : Z -> I;
   }.
 
-#[global] Instance VInt_Bounded (sz : positive) : VInt (@int sz) :=
+#[global] Instance VInt_Bounded (sz : positive) : VInt (@bit_int sz) :=
   {
     (* Comparisons *)
     equ := @Integers.eq sz;

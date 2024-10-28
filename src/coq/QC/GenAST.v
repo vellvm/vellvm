@@ -81,6 +81,10 @@ Open Scope string.
     actually terminate.  *)
 Unset Guard Checking.
 
+(* Controls whether or not we generate floats... The float generators
+often break with updates, so this may be convenient *)
+Definition enable_float_generation : bool := true.
+
 Section Helpers.
   Definition l_is_empty {A : Type} (l : list A) : bool :=
     match l with
@@ -1356,25 +1360,31 @@ Section TypGenerators.
       end
     in
     oneOf_LLVM
-           (ident_gen ++
-           (map ret
-                [ TYPE_I 1
-                ; TYPE_I 8
-                ; TYPE_I 16
-                ; TYPE_I 32
-                ; TYPE_I 64
-                (* TODO: Generate floats and stuff *)
-                ; TYPE_Float
-                (* ; TYPE_Double *)
-                (* TODO: Could generate TYPE_Identified if we filter for sized types *)
-                (* ; TYPE_Half *)
-                (* ; TYPE_X86_fp80 *)
-                (* ; TYPE_Fp128 *)
-                (* ; TYPE_Ppc_fp128 *)
-                (* ; TYPE_Metadata *)
-                (* ; TYPE_X86_mmx *)
-                (* ; TYPE_Opaque *)
-           ])).
+      (ident_gen ++
+         (map ret
+            ([ TYPE_I 1
+               ; TYPE_I 8
+               ; TYPE_I 16
+               ; TYPE_I 32
+               ; TYPE_I 64
+                        (* TODO: Could generate TYPE_Identified if we filter for sized types *)
+                        (* ; TYPE_Half *)
+                        (* ; TYPE_X86_fp80 *)
+                        (* ; TYPE_Fp128 *)
+                        (* ; TYPE_Ppc_fp128 *)
+                        (* ; TYPE_Metadata *)
+                        (* ; TYPE_X86_mmx *)
+                        (* ; TYPE_Opaque *)
+              ] ++
+               (if enable_float_generation
+                then
+                 [ (* TODO: Generate floats and stuff *)
+                   TYPE_Float
+                   (* ; TYPE_Double *)
+                 ]
+               else
+                 [])
+         ))).
 
   (* TODO: Move this *)
   Definition lengthN {X} (xs : list X) : N :=
@@ -1416,13 +1426,13 @@ Section TypGenerators.
     := gen_type_matching_variable_focus (gen_context' .@ variable_type') filter.
 
   Definition gen_primitive_typ : GenLLVM typ :=
-    oneOf_LLVM [ret (TYPE_I 1)
-                ; ret (TYPE_I 8)
-                ; ret (TYPE_I 16)
-                ; ret (TYPE_I 32)
-                ; ret (TYPE_I 64)
-                ; ret (TYPE_Float)
-                (* ; ret (TYPE_Double) *)].
+    oneOf_LLVM
+      ([ret (TYPE_I 1)
+        ; ret (TYPE_I 8)
+        ; ret (TYPE_I 16)
+        ; ret (TYPE_I 32)
+        ; ret (TYPE_I 64)
+        ] ++ if enable_float_generation then [ret (TYPE_Float) (* ; ret TYPE_DOUBLE *)] else []).
 
   Definition sized_aggregate_typ_gens (subg : nat -> GenLLVM typ) (sz : nat) :  list (unit -> GenLLVM typ)
     := [ (fun _ => gen_sized_typ_0)
@@ -1504,23 +1514,28 @@ Section TypGenerators.
     oneOf_LLVM
           ((* identified ++ *)
            (map ret
-                [ TYPE_I 1
+                ([ TYPE_I 1
                 ; TYPE_I 8
                 ; TYPE_I 16
                 ; TYPE_I 32
                 ; TYPE_I 64
                 ; TYPE_Void
-                (* TODO: Generate floats and stuff *)
-                ; TYPE_Float
-                (*; TYPE_Double*)
-                (* ; TYPE_Half *)
-                (* ; TYPE_X86_fp80 *)
-                (* ; TYPE_Fp128 *)
-                (* ; TYPE_Ppc_fp128 *)
                 (* ; TYPE_Metadata *)
                 (* ; TYPE_X86_mmx *)
                 (* ; TYPE_Opaque *)
-                ])).
+                ] ++
+                   (if enable_float_generation
+                    then
+                      [ (* TODO: Generate floats and stuff *)
+                        TYPE_Float
+                          (* ; TYPE_Double *)
+                          (* ; TYPE_Half *)
+                          (* ; TYPE_X86_fp80 *)
+                          (* ; TYPE_Fp128 *)
+                          (* ; TYPE_Ppc_fp128 *)
+                      ]
+                    else
+                      [])))).
 
 
   Definition aggregate_typ_gens (subg : nat -> GenLLVM typ) (sz : nat) :  list (unit -> GenLLVM typ)
@@ -1553,24 +1568,28 @@ Section TypGenerators.
       end
     in
     oneOf_LLVM
-          (ident_gen ++
-           (map ret
-                [ TYPE_I 1
-                ; TYPE_I 8
-                ; TYPE_I 16
-                ; TYPE_I 32
-                ; TYPE_I 64
-                (* TODO: Generate floats and stuff *)
-                ; TYPE_Float
-                (* ; TYPE_Double *)
-                (* ; TYPE_Half *)
-                (* ; TYPE_X86_fp80 *)
-                (* ; TYPE_Fp128 *)
-                (* ; TYPE_Ppc_fp128 *)
-                (* ; TYPE_Metadata *)
-                (* ; TYPE_X86_mmx *)
-                (* ; TYPE_Opaque *)
-          ])).
+      (ident_gen ++
+         (map ret
+            ([ TYPE_I 1
+               ; TYPE_I 8
+               ; TYPE_I 16
+               ; TYPE_I 32
+               ; TYPE_I 64
+                        (* ; TYPE_Metadata *)
+                        (* ; TYPE_X86_mmx *)
+                        (* ; TYPE_Opaque *)
+              ] ++ (if enable_float_generation
+                    then
+                      [ (* TODO: Generate floats and stuff *)
+                        TYPE_Float
+                          (* ; TYPE_Double *)
+                          (* ; TYPE_Half *)
+                          (* ; TYPE_X86_fp80 *)
+                          (* ; TYPE_Fp128 *)
+                          (* ; TYPE_Ppc_fp128 *)
+                      ]
+                    else
+                      [])))).
 
   Definition gen_typ_non_void_size : nat -> GenLLVM typ :=
     gen_typ_size' gen_typ_non_void_0 aggregate_typ_gens (gen_type_matching_variable (withl is_non_void')).
@@ -1589,23 +1608,27 @@ Section TypGenerators.
   (* Types for operation expressions *)
   Definition gen_op_typ : GenLLVM typ :=
     oneOf_LLVM
-           (map ret
-                [ TYPE_I 1
-                ; TYPE_I 8
-                ; TYPE_I 16
-                ; TYPE_I 32
-                ; TYPE_I 64
-                (* TODO: Generate floats and stuff *)
-                ; TYPE_Float
-                (* ; TYPE_Double *)
-                (* ; TYPE_Half *)
-                (* ; TYPE_X86_fp80 *)
-                (* ; TYPE_Fp128 *)
-                (* ; TYPE_Ppc_fp128 *)
-                (* ; TYPE_Metadata *)
-                (* ; TYPE_X86_mmx *)
-                (* ; TYPE_Opaque *)
-                ]).
+      (map ret
+         ([ TYPE_I 1
+            ; TYPE_I 8
+            ; TYPE_I 16
+            ; TYPE_I 32
+            ; TYPE_I 64
+                     (* ; TYPE_Metadata *)
+                     (* ; TYPE_X86_mmx *)
+                     (* ; TYPE_Opaque *)
+           ] ++ (if enable_float_generation
+                 then
+                   [ (* TODO: Generate floats and stuff *)
+                     TYPE_Float
+                       (* ; TYPE_Double *)
+                       (* ; TYPE_Half *)
+                       (* ; TYPE_X86_fp80 *)
+                       (* ; TYPE_Fp128 *)
+                       (* ; TYPE_Ppc_fp128 *)
+                   ]
+                 else
+                   []))).
 
   (* TODO: look up identifiers *)
   Definition gen_int_typ : GenLLVM typ :=
@@ -1951,7 +1974,7 @@ Section ExpGenerators.
      ocaml's Random.State.int function which has small bounds. *)
 
   Definition gen_bitZ : G Z :=
-    b <- bool_gen;;
+    b <- (arbitrary : G bool);;
     if b then ret 1 else ret 0.
 
   Fixpoint gen_unsigned_bitwidth_h (acc : Z) (bitwidth : positive) {struct bitwidth} : G Z :=
@@ -2159,12 +2182,16 @@ Section ExpGenerators.
           | TYPE_I isz =>
               if Pos.eqb isz 1
               then
-                [ gen_ibinop_exp gen_global_of_typ gen_ident_of_typ isz
+                ([ gen_ibinop_exp gen_global_of_typ gen_ident_of_typ isz
                   ; τ <- gen_int_typ;;
                     gen_icmp_exp_typ gen_global_of_typ gen_ident_of_typ τ
-                  ; τ <- gen_float_typ;;
-                    gen_fcmp_exp_typ gen_global_of_typ gen_ident_of_typ τ
-                ]
+                ] ++
+                  if enable_float_generation
+                  then
+                    [τ <- gen_float_typ;;
+                     gen_fcmp_exp_typ gen_global_of_typ gen_ident_of_typ τ
+                    ]
+                  else [])%list
               else
                 [ gen_ibinop_exp gen_global_of_typ gen_ident_of_typ isz ]
           | TYPE_IPTR =>
@@ -2987,7 +3014,7 @@ Section InstrGenerators.
        oneOf_LLVM
          ([ op <- gen_op_instr;; t <- gen_op_typ;;
             ret [op]
-            ; fmap ret gen_bitcast
+            (* ; fmap ret gen_bitcast *)
            ]
             ++ (* TODO: generate multiple element allocas. Will involve changing initialization *)
             (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)

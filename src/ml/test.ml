@@ -308,7 +308,7 @@ let test_dirs =
 
 let poison_test = function DV.DVALUE_Poison _ -> true | _ -> false
 
-let i_test (i1 : Integers.int) = function
+let i_test (i1 : Integers.bit_int) = function
   | DV.DVALUE_I (sz, i2) -> Integers.eq sz i1 i2
   | _ -> false
 

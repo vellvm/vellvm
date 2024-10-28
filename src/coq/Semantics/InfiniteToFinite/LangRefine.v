@@ -5861,19 +5861,19 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (* TODO: Move this *)
   Lemma eval_int_op_ix_fin_inf :
     forall sz v1 v2 iop res_fin res_inf,
-      @eval_int_op err_ub_oom (@Integers.int sz) (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+      @eval_int_op err_ub_oom (@Integers.bit_int sz) (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt (@Integers.int sz) (@VInt_Bounded sz)) (@ToDvalue_Int sz)
+        (@VIntVMemInt (@Integers.bit_int sz) (@VInt_Bounded sz)) (@ToDvalue_Int sz)
         iop v1 v2 = success_unERR_UB_OOM res_fin ->
       DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom (@Integers.int sz)
+      @IS1.LP.Events.DV.eval_int_op err_ub_oom (@Integers.bit_int sz)
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt (@Integers.int sz) (@VInt_Bounded sz)) (@IS1.LP.Events.DV.ToDvalue_Int sz)
+        (@VIntVMemInt (@Integers.bit_int sz) (@VInt_Bounded sz)) (@IS1.LP.Events.DV.ToDvalue_Int sz)
         iop v1 v2 = success_unERR_UB_OOM res_inf.
   Proof.
     intros sz v1 v2 iop res_fin res_inf EVAL CONV.
@@ -12076,18 +12076,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (* TODO: Move this *)
   Lemma eval_int_op_ix_ub_fin_inf :
     forall sz v1 v2 iop ub_msg,
-      @eval_int_op err_ub_oom (@Integers.int sz) (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+      @eval_int_op err_ub_oom (@Integers.bit_int sz) (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt (@Integers.int sz) (@VInt_Bounded sz)) (@ToDvalue_Int sz)
+        (@VIntVMemInt (@Integers.bit_int sz) (@VInt_Bounded sz)) (@ToDvalue_Int sz)
         iop v1 v2 = UB_unERR_UB_OOM ub_msg ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom (@Integers.int sz)
+      @IS1.LP.Events.DV.eval_int_op err_ub_oom (@Integers.bit_int sz)
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt (@Integers.int sz) (@VInt_Bounded sz)) (@IS1.LP.Events.DV.ToDvalue_Int sz)
+        (@VIntVMemInt (@Integers.bit_int sz) (@VInt_Bounded sz)) (@IS1.LP.Events.DV.ToDvalue_Int sz)
         iop v1 v2 = UB_unERR_UB_OOM ub_msg.
   Proof.
     intros sz v1 v2 iop ub_msg EVAL.
@@ -12294,18 +12294,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (* TODO: Move this *)
   Lemma eval_int_op_ix_err_fin_inf :
     forall sz v1 v2 iop err_msg,
-      @eval_int_op err_ub_oom (@Integers.int sz) (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+      @eval_int_op err_ub_oom (@Integers.bit_int sz) (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt (@Integers.int sz) (@VInt_Bounded sz)) (@ToDvalue_Int sz)
+        (@VIntVMemInt (@Integers.bit_int sz) (@VInt_Bounded sz)) (@ToDvalue_Int sz)
         iop v1 v2 = ERR_unERR_UB_OOM err_msg ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom (@Integers.int sz)
+      @IS1.LP.Events.DV.eval_int_op err_ub_oom (@Integers.bit_int sz)
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt (@Integers.int sz) (@VInt_Bounded sz)) (@IS1.LP.Events.DV.ToDvalue_Int sz)
+        (@VIntVMemInt (@Integers.bit_int sz) (@VInt_Bounded sz)) (@IS1.LP.Events.DV.ToDvalue_Int sz)
         iop v1 v2 = ERR_unERR_UB_OOM err_msg.
   Proof.
     intros sz v1 v2 iop ub_msg EVAL.
@@ -23281,7 +23281,7 @@ Qed.
         match r1 with
         | IS1.LP.Events.DV.DVALUE_Addr strptr =>
             ITree.bind (LLVM1.i8_str_index strptr 0)
-              (fun (char : @Integers.int 8) =>
+              (fun (char : @Integers.bit_int 8) =>
                  ITree.bind
                    (ITree.iter
                       (fun '(c, bytes, offset) =>
@@ -23289,7 +23289,7 @@ Qed.
                          then Ret (inr ((@Integers.repr 8 10) :: bytes))
                          else
                            ITree.bind (LLVM1.i8_str_index strptr offset)
-                             (fun (next_char : @Integers.int 8) => Ret (inl (next_char, c :: bytes, (offset + 1)%Z))))
+                             (fun (next_char : @Integers.bit_int 8) => Ret (inl (next_char, c :: bytes, (offset + 1)%Z))))
                       (char, [], 1%Z))
                    (fun (bytes : list int8) =>
                       ITree.bind (trigger (IS1.LP.Events.IO_stdout (DList.rev_tail_rec bytes)))
@@ -23299,7 +23299,7 @@ Qed.
         match r2 with
         | DVALUE_Addr strptr =>
             ITree.bind (i8_str_index strptr 0)
-              (fun (char : @Integers.int 8) =>
+              (fun (char : @Integers.bit_int 8) =>
                  ITree.bind
                    (ITree.iter
                       (fun '(c, bytes, offset) =>
@@ -23307,7 +23307,7 @@ Qed.
                          then Ret (inr (@Integers.repr 8 10 :: bytes))
                          else
                            ITree.bind (i8_str_index strptr offset)
-                             (fun (next_char : @Integers.int 8) => Ret (inl (next_char, c :: bytes, (offset + 1)%Z))))
+                             (fun (next_char : @Integers.bit_int 8) => Ret (inl (next_char, c :: bytes, (offset + 1)%Z))))
                       (char, [], 1%Z))
                    (fun bytes : list int8 =>
                       ITree.bind (trigger (IO_stdout (DList.rev_tail_rec bytes)))

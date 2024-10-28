@@ -2136,13 +2136,13 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   (*    The representation is little endian. In particular, if [n] is too small, *)
   (*    only the least significant bytes are returned. *)
     (*    *)
-    Fixpoint bytes_of_int_little_endian (n: nat) (x: Z) {struct n}: list (@int 8) :=
+    Fixpoint bytes_of_int_little_endian (n: nat) (x: Z) {struct n}: list (@bit_int 8) :=
       match n with
       | O => nil
       | S m => repr x :: bytes_of_int_little_endian m (x / 256)
       end.
 
-    Definition bytes_of_int (e : Endianess) (n : nat) (x : Z) : list (@int 8) :=
+    Definition bytes_of_int (e : Endianess) (n : nat) (x : Z) : list (@bit_int 8) :=
       correct_endianess e (bytes_of_int_little_endian n x).
 
     (* *)
