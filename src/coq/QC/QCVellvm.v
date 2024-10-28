@@ -24,7 +24,7 @@ From ITree Require Import
 From QuickChick Require Import Show Checker Generators Producer Test.
 From Vellvm Require Import ShowAST ReprAST GenAST TopLevel LLVMAst DynamicValues VellvmIntegers.
 
-Extraction Blacklist String List Char Core Z Format.
+Extraction Blacklist String List Char Core Z Format int.
 
 (* TODO: Use the existing vellvm version of this? Might actually just be ocaml result type. *)
 Inductive MlResult a e :=
@@ -159,7 +159,7 @@ Extract Constant vellvm_binary_command_ocaml =>
               let f = open_out llvm_file_name in
                 Printf.fprintf f ""%s"" prog;
                 close_out f;
-                Sys.command (""vellvm -interpret "" ^ llvm_file_name ^ "" | grep terminated | awk '{ exit $NF }'"")".
+                Sys.command (""./vellvm -interpret "" ^ llvm_file_name ^ "" | grep terminated | awk '{ exit $NF }'"")".
 
 Definition llc_command (prog : string) : int_ast
   := oint_to_Z (llc_command_ocaml prog).
@@ -173,13 +173,13 @@ Extract Constant vellvm_print_ll => "fun prog -> Llvm_printer.toplevel_entities 
 (** Use the *llc_command* Axiom to run a Vellvm program with clang,
     and wrap up the exit code as a dvalue. *)
 Definition run_llc (prog : list (toplevel_entity typ (block typ * list (block typ)))) : dvalue
-  := DVALUE_I8 (VellvmIntegers.repr (llc_command (to_caml_str (show prog)))).
+  := @DVALUE_I 8 (VellvmIntegers.repr (llc_command (to_caml_str (show prog)))).
 
 (** Use the *vellvm_binary_command* Axiom to run a Vellvm program with
     the vellvm interpreter in the user's path, and wrap up the exit
     code as a dvalue. *)
 Definition run_vellvm_binary (prog : list (toplevel_entity typ (block typ * list (block typ)))) : dvalue
-  := DVALUE_I8 (VellvmIntegers.repr (vellvm_binary_command (to_caml_str (show prog)))).
+  := @DVALUE_I 8 (VellvmIntegers.repr (vellvm_binary_command (to_caml_str (show prog)))).
 
 (* Hide show instance... *)
 Inductive PROG :=
@@ -204,7 +204,7 @@ Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
     let vellvm_res := interpret prog in
     let clang_res := snd (waitpid nil pid) in
     match vellvm_res, clang_res with
-    | MlOk _ _ (DVALUE_I8 x), (WEXITED ocaml_y) =>
+    | MlOk _ _ (@DVALUE_I sz x), (WEXITED ocaml_y) =>
         let y := repr (oint_to_Z ocaml_y) in
         if equ x y
         then checker true
@@ -226,24 +226,31 @@ Definition vellvm_agrees_with_clang_parallel (p : PROG) : Checker
 
 (** Basic property to make sure that Vellvm and Clang agree when they
     both produce values *)
-Definition vellvm_agrees_with_clang (p : string + PROG) : Checker
-  :=
-  match p with
-  | inl msg => checker false
-  | inr p =>
-      (* collect (show prog) *)
-      let '(Prog prog) := p in
-      let clang_res := run_llc prog in
-      let vellvm_res := interpret prog in
-      match clang_res, vellvm_res with
-      | DVALUE_I8 y, MlOk _ _ (DVALUE_I8 x) =>
-          if equ x y
-          then checker true
-          else whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
-      | _, _ =>
-          whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
-      end
-  end.
+Definition vellvm_agrees_with_clang (p : string + PROG) : Checker.
+  refine
+    (match p with
+     | inl msg => checker false
+     | inr p =>
+         (* collect (show prog) *)
+         let '(Prog prog) := p in
+         let clang_res := run_llc prog in
+         let vellvm_res := interpret prog in
+         match clang_res, vellvm_res with
+         | @DVALUE_I sz1 y, MlOk _ _ (@DVALUE_I sz2 x) =>
+             _
+         | _, _ =>
+             whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
+         end
+     end).
+
+  destruct ((Pos.eqb sz1 8%positive && Pos.eqb sz2 8%positive)%bool) eqn:SZ.
+  - invert_bools.
+    apply Peqb_true_eq in H, H0; subst.
+    destruct (equ x y) eqn:EQ.
+    + exact (checker true).
+    + exact (whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false).
+  - exact (whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false).
+Defined.
 
 (** This version runs the vellvm binary in your path instead...  This
     will be slower (has to read and parse a file), and will not
@@ -254,24 +261,31 @@ Definition vellvm_agrees_with_clang (p : string + PROG) : Checker
     in the pretty printer for LLVM ASTs), and this can also be helpful
     for skirting around extraction bugs which are easier to patch up
     outside of QC. *)
-Definition vellvm_binary_agrees_with_clang (p : string + PROG) : Checker
-  :=
-  match p with
-  | inl msg => checker false
-  | inr p =>
-      (* collect (show prog) *)
-      let '(Prog prog) := p in
-      let clang_res := run_llc prog in
-      let vellvm_res := run_vellvm_binary prog in
-      match clang_res, vellvm_res with
-      | DVALUE_I8 y, DVALUE_I8 x =>
-          if equ x y
-          then checker true
-          else whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false
-      | _, _ =>
-          whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
-      end
-  end.
+Definition vellvm_binary_agrees_with_clang (p : string + PROG) : Checker.
+  refine
+    (match p with
+     | inl msg => checker false
+     | inr p =>
+         (* collect (show prog) *)
+         let '(Prog prog) := p in
+         let clang_res := run_llc prog in
+         let vellvm_res := run_vellvm_binary prog in
+         match clang_res, vellvm_res with
+         | @DVALUE_I sz1 y, @DVALUE_I sz2 x =>
+             _
+         | _, _ =>
+             whenFail ("Something else went wrong... Vellvm: " ++ show vellvm_res ++ " | Clang: " ++ show clang_res) false
+         end
+     end).
+
+  destruct ((Pos.eqb sz1 8%positive && Pos.eqb sz2 8%positive)%bool) eqn:SZ.
+  - invert_bools.
+    apply Peqb_true_eq in H, H0; subst.
+    destruct (equ x y) eqn:EQ.
+    + exact (checker true).
+    + exact (whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false).
+  - exact (whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) false).
+Defined.
 
 Definition gen_PROG : GenLLVM PROG
   := fmap Prog gen_llvm.
@@ -291,5 +305,5 @@ QCInclude "ml/libvellvm/*".
 (* QCInclude "../../ml/libvellvm/Camlcoq.ml". *)
 (* QCInclude "../../ml/extracted/*ml". *)
 Extract Inlined Constant Error.failwith => "(fun _ -> raise)".
-QuickChick (forAll (run_GenLLVM gen_PROG) vellvm_agrees_with_clang).
+QuickChick (forAll (run_GenLLVM gen_PROG) vellvm_binary_agrees_with_clang).
 (*! QuickChick agrees. *)
