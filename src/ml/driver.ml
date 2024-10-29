@@ -21,6 +21,12 @@ let interpret = ref false
 
 let trace = ref false
 
+let trace_main = ref false
+
+let trace_nsubst = ref false
+
+let trace_skip = ref ""
+
 let link = ref false 
 
 let transform
@@ -93,20 +99,24 @@ let process_ast ll_ast file =
       | Error e ->
         Trace.print_log ();
         failwith (Result.string_of_exit_condition e))
-    else if !trace then
+    else
+    if !trace then 
       match Interpreter.interpret ll_ast with
       | Ok dv ->
         Printf.printf "Program terminated with: %s\n%!" (string_of_dvalue dv);
-        begin match Trace.gen_executable_trace ll_ast with
+        (* Printf.printf "skip: %s\n" (!trace_skip); *)
+        begin match Trace.gen_executable_trace ll_ast ~only_main:!trace_main ~nsubst:!trace_nsubst ~skip:!trace_skip with
           | Ok ll_ast_trace ->
             let ll_ast_trace' = transform ll_ast_trace in
-          let tracell_file = Platform.gen_name !Platform.output_path file ".trace.ll" in
-          IO.output_file tracell_file ll_ast_trace'
-        | Error s -> failwith s
+            let tracell_file = Platform.gen_name !Platform.output_path file ".trace.ll" in
+            IO.output_file tracell_file ll_ast_trace'
+          | Error s -> failwith s
         end
       | Error e ->
         Trace.print_log ();
         failwith (Result.string_of_exit_condition e)
+    else
+      failwith "Process AST: not valid parameter"
   in
   let ll_ast' = transform ll_ast in
   let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in
