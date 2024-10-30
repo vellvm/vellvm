@@ -78,15 +78,15 @@ Module FinSizeof : Sizeof.
     | DTYPE_Ppc_fp128 => 128
     | DTYPE_Metadata => 0
     | DTYPE_X86_mmx => 64
-    | DTYPE_Array sz t => pad_to_align_bitwise (dtyp_alignment ty) (sz * (round_up_to_eight (bit_sizeof_dtyp t)))
+    | DTYPE_Array sz t => sz * (round_up_to_eight (bit_sizeof_dtyp t))
     | DTYPE_Struct fields =>
-        let sz := fold_left (fun acc x => pad_to_align_bitwise (dtyp_alignment x) acc + round_up_to_eight (bit_sizeof_dtyp x)%N) fields 0%N in
-        (* Add padding to the end of a struct if necessary *)
-        pad_to_align_bitwise (dtyp_alignment ty) sz
+        let sz := fold_left (fun acc x => pad_to_align_bitwise (dtyp_alignment x) acc + (bit_sizeof_dtyp x)%N) fields 0%N in
+        let max_align := 8 * (max_preferred_dtyp_alignment fields) in
+        pad_to max_align sz
     | DTYPE_Packed_struct fields =>
-        pad_to_align_bitwise (dtyp_alignment ty) (fold_left (fun acc x => (acc + round_up_to_eight (bit_sizeof_dtyp x))%N) fields 0%N)
+        fold_left (fun acc x => (acc + round_up_to_eight (bit_sizeof_dtyp x))%N) fields 0%N
     | DTYPE_Opaque => 0
-    | DTYPE_Vector sz t => pad_to_align_bitwise (dtyp_alignment ty) (sz * bit_sizeof_dtyp t)
+    | DTYPE_Vector sz t => sz * bit_sizeof_dtyp t
     end.
 
   Fixpoint sizeof_dtyp (ty:dtyp) : N :=
