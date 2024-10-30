@@ -127,7 +127,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       Propagates all memory failures and raises a Vellvm "Failure" if the 
       value read does not concretize to a DVALUE_I8.
    *)
-  Definition i8_str_index (strptr : addr) (index : Z) : itree L0' (@Integers.int 8) :=
+  Definition i8_str_index (strptr : addr) (index : Z) : itree L0' (@Integers.bit_int 8) :=
     iptr <- (@lift_OOM (itree L0') _ _ _ (LP.IP.from_Z index)) ;;
     addr <-
       match handle_gep_addr (DTYPE_I 8) strptr [DVALUE_IPTR iptr] with

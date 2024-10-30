@@ -99,7 +99,7 @@ Qed.
   integer (type [Z]) plus a proof that it is in the range 0 (included) to
   [modulus] (excluded). *)
 
-Record int: Type := mkint { intval: Z; intrange: -1 < intval < modulus }.
+Record bit_int: Type := mkint { intval: Z; intrange: -1 < intval < modulus }.
 
 (** Fast normalization modulo [2^wordsize] *)
 
@@ -201,16 +201,16 @@ Qed.
   to the given machine integer, interpreted as unsigned or signed
   respectively. *)
 
-Definition unsigned (n: int) : Z := intval n.
+Definition unsigned (n: bit_int) : Z := intval n.
 
-Definition signed (n: int) : Z :=
+Definition signed (n: bit_int) : Z :=
   let x := unsigned n in
   if zlt x half_modulus then x else x - modulus.
 
 (** Conversely, [repr] takes a Coq integer and returns the corresponding
   machine integer.  The argument is treated modulo [modulus]. *)
 
-Definition repr (x: Z) : int :=
+Definition repr (x: Z) : bit_int :=
   mkint (Z_mod_modulus x) (Z_mod_modulus_range' x).
 
 Definition zero := repr 0.
@@ -234,7 +234,7 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma eq_dec: forall (x y: int), {x = y} + {x <> y}.
+Lemma eq_dec: forall (x y: bit_int), {x = y} + {x <> y}.
 Proof.
   intros. destruct x; destruct y. destruct (zeq intval0 intval1).
   left. apply mkint_eq. auto.
@@ -243,88 +243,88 @@ Defined.
 
 (** * Arithmetic and logical operations over machine integers *)
 
-Definition eq (x y: int) : bool :=
+Definition eq (x y: bit_int) : bool :=
   if zeq (unsigned x) (unsigned y) then true else false.
-Definition lt (x y: int) : bool :=
+Definition lt (x y: bit_int) : bool :=
   if zlt (signed x) (signed y) then true else false.
-Definition ltu (x y: int) : bool :=
+Definition ltu (x y: bit_int) : bool :=
   if zlt (unsigned x) (unsigned y) then true else false.
 
-Definition neg (x: int) : int := repr (- unsigned x).
+Definition neg (x: bit_int) : bit_int := repr (- unsigned x).
 
-Definition add (x y: int) : int :=
+Definition add (x y: bit_int) : bit_int :=
   repr (unsigned x + unsigned y).
-Definition sub (x y: int) : int :=
+Definition sub (x y: bit_int) : bit_int :=
   repr (unsigned x - unsigned y).
-Definition mul (x y: int) : int :=
+Definition mul (x y: bit_int) : bit_int :=
   repr (unsigned x * unsigned y).
 
-Definition divs (x y: int) : int :=
+Definition divs (x y: bit_int) : bit_int :=
   repr (Z.quot (signed x) (signed y)).
-Definition mods (x y: int) : int :=
+Definition mods (x y: bit_int) : bit_int :=
   repr (Z.rem (signed x) (signed y)).
 
-Definition divu (x y: int) : int :=
+Definition divu (x y: bit_int) : bit_int :=
   repr (unsigned x / unsigned y).
-Definition modu (x y: int) : int :=
+Definition modu (x y: bit_int) : bit_int :=
   repr ((unsigned x) mod (unsigned y)).
 
 (** Bitwise boolean operations. *)
 
-Definition and (x y: int): int := repr (Z.land (unsigned x) (unsigned y)).
-Definition or (x y: int): int := repr (Z.lor (unsigned x) (unsigned y)).
-Definition xor (x y: int) : int := repr (Z.lxor (unsigned x) (unsigned y)).
+Definition and (x y: bit_int): bit_int := repr (Z.land (unsigned x) (unsigned y)).
+Definition or (x y: bit_int): bit_int := repr (Z.lor (unsigned x) (unsigned y)).
+Definition xor (x y: bit_int) : bit_int := repr (Z.lxor (unsigned x) (unsigned y)).
 
-Definition not (x: int) : int := xor x mone.
+Definition not (x: bit_int) : bit_int := xor x mone.
 
 (** Shifts and rotates. *)
 
-Definition shl (x y: int): int := repr (Z.shiftl (unsigned x) (unsigned y)).
-Definition shru (x y: int): int := repr (Z.shiftr (unsigned x) (unsigned y)).
-Definition shr (x y: int): int := repr (Z.shiftr (signed x) (unsigned y)).
+Definition shl (x y: bit_int): bit_int := repr (Z.shiftl (unsigned x) (unsigned y)).
+Definition shru (x y: bit_int): bit_int := repr (Z.shiftr (unsigned x) (unsigned y)).
+Definition shr (x y: bit_int): bit_int := repr (Z.shiftr (signed x) (unsigned y)).
 
-Definition rol (x y: int) : int :=
+Definition rol (x y: bit_int) : bit_int :=
   let n := (unsigned y) mod zwordsize in
   repr (Z.lor (Z.shiftl (unsigned x) n) (Z.shiftr (unsigned x) (zwordsize - n))).
-Definition ror (x y: int) : int :=
+Definition ror (x y: bit_int) : bit_int :=
   let n := (unsigned y) mod zwordsize in
   repr (Z.lor (Z.shiftr (unsigned x) n) (Z.shiftl (unsigned x) (zwordsize - n))).
 
-Definition rolm (x a m: int): int := and (rol x a) m.
+Definition rolm (x a m: bit_int): bit_int := and (rol x a) m.
 
 (** Viewed as signed divisions by powers of two, [shrx] rounds towards
   zero, while [shr] rounds towards minus infinity. *)
 
-Definition shrx (x y: int): int :=
+Definition shrx (x y: bit_int): bit_int :=
   divs x (shl one y).
 
 (** High half of full multiply. *)
 
-Definition mulhu (x y: int): int := repr ((unsigned x * unsigned y) / modulus).
-Definition mulhs (x y: int): int := repr ((signed x * signed y) / modulus).
+Definition mulhu (x y: bit_int): bit_int := repr ((unsigned x * unsigned y) / modulus).
+Definition mulhs (x y: bit_int): bit_int := repr ((signed x * signed y) / modulus).
 
 (** Condition flags *)
 
-Definition negative (x: int): int :=
+Definition negative (x: bit_int): bit_int :=
   if lt x zero then one else zero.
 
-Definition add_carry (x y cin: int): int :=
+Definition add_carry (x y cin: bit_int): bit_int :=
   if zlt (unsigned x + unsigned y + unsigned cin) modulus then zero else one.
 
-Definition add_overflow (x y cin: int): int :=
+Definition add_overflow (x y cin: bit_int): bit_int :=
   let s := signed x + signed y + signed cin in
   if zle min_signed s && zle s max_signed then zero else one.
 
-Definition sub_borrow (x y bin: int): int :=
+Definition sub_borrow (x y bin: bit_int): bit_int :=
   if zlt (unsigned x - unsigned y - unsigned bin) 0 then one else zero.
 
-Definition sub_overflow (x y bin: int): int :=
+Definition sub_overflow (x y bin: bit_int): bit_int :=
   let s := signed x - signed y - signed bin in
   if zle min_signed s && zle s max_signed then zero else one.
 
 (** [shr_carry x y] is 1 if [x] is negative and at least one 1 bit is shifted away. *)
 
-Definition shr_carry (x y: int) : int :=
+Definition shr_carry (x y: bit_int) : bit_int :=
   if lt x zero && negb (eq (and x (sub (shl one y) one)) zero)
   then one else zero.
 
@@ -363,9 +363,9 @@ Definition Zsign_ext (n: Z) (x: Z) : Z :=
     (fun x => if Z.odd x then -1 else 0)
     x.
 
-Definition zero_ext (n: Z) (x: int) : int := repr (Zzero_ext n (unsigned x)).
+Definition zero_ext (n: Z) (x: bit_int) : bit_int := repr (Zzero_ext n (unsigned x)).
 
-Definition sign_ext (n: Z) (x: int) : int := repr (Zsign_ext n (unsigned x)).
+Definition sign_ext (n: Z) (x: bit_int) : bit_int := repr (Zsign_ext n (unsigned x)).
 
 (** Decomposition of a number as a sum of powers of two. *)
 
@@ -378,12 +378,12 @@ Fixpoint Z_one_bits (n: nat) (x: Z) (i: Z) {struct n}: list Z :=
       else Z_one_bits m (Z.div2 x) (i+1)
   end.
 
-Definition one_bits (x: int) : list int :=
+Definition one_bits (x: bit_int) : list bit_int :=
   List.map repr (Z_one_bits natwordsize (unsigned x) 0).
 
 (** Recognition of powers of two. *)
 
-Definition is_power2 (x: int) : option int :=
+Definition is_power2 (x: bit_int) : option bit_int :=
   match Z_one_bits natwordsize (unsigned x) 0 with
   | i :: nil => Some (repr i)
   | _ => None
@@ -391,7 +391,7 @@ Definition is_power2 (x: int) : option int :=
 
 (** Comparisons. *)
 
-Definition cmp (c: comparison) (x y: int) : bool :=
+Definition cmp (c: comparison) (x y: bit_int) : bool :=
   match c with
   | Ceq => eq x y
   | Cne => negb (eq x y)
@@ -401,7 +401,7 @@ Definition cmp (c: comparison) (x y: int) : bool :=
   | Cge => negb (lt x y)
   end.
 
-Definition cmpu (c: comparison) (x y: int) : bool :=
+Definition cmpu (c: comparison) (x y: bit_int) : bool :=
   match c with
   | Ceq => eq x y
   | Cne => negb (eq x y)
@@ -411,18 +411,18 @@ Definition cmpu (c: comparison) (x y: int) : bool :=
   | Cge => negb (ltu x y)
   end.
 
-Definition is_false (x: int) : Prop := x = zero.
-Definition is_true  (x: int) : Prop := x <> zero.
-Definition notbool  (x: int) : int  := if eq x zero then one else zero.
+Definition is_false (x: bit_int) : Prop := x = zero.
+Definition is_true  (x: bit_int) : Prop := x <> zero.
+Definition notbool  (x: bit_int) : bit_int  := if eq x zero then one else zero.
 
 (** x86-style extended division and modulus *)
 
-Definition divmodu2 (nhi nlo: int) (d: int) : option (int * int) :=
+Definition divmodu2 (nhi nlo: bit_int) (d: bit_int) : option (bit_int * bit_int) :=
   if eq_dec d zero then None else
    (let (q, r) := Z.div_eucl (unsigned nhi * modulus + unsigned nlo) (unsigned d) in
     if zle q max_unsigned then Some(repr q, repr r) else None).
 
-Definition divmods2 (nhi nlo: int) (d: int) : option (int * int) :=
+Definition divmods2 (nhi nlo: bit_int) (d: bit_int) : option (bit_int * bit_int) :=
   if eq_dec d zero then None else
    (let (q, r) := Z.quotrem (signed nhi * modulus + unsigned nlo) (signed d) in
     if zle min_signed q && zle q max_signed then Some(repr q, repr r) else None).
@@ -604,58 +604,58 @@ Qed.
 (** We then specialize these definitions to equality modulo
   $2^{wordsize}$ #2<sup>wordsize</sup>#. *)
 
-Hint Resolve modulus_pos: ints.
+Hint Resolve modulus_pos: bit_ints.
 
 Definition eqm := eqmod modulus.
 
 Lemma eqm_refl: forall x, eqm x x.
 Proof (eqmod_refl modulus).
-Hint Resolve eqm_refl: ints.
+Hint Resolve eqm_refl: bit_ints.
 
 Lemma eqm_refl2:
   forall x y, x = y -> eqm x y.
 Proof (eqmod_refl2 modulus).
-Hint Resolve eqm_refl2: ints.
+Hint Resolve eqm_refl2: bit_ints.
 
 Lemma eqm_sym: forall x y, eqm x y -> eqm y x.
 Proof (eqmod_sym modulus).
-Hint Resolve eqm_sym: ints.
+Hint Resolve eqm_sym: bit_ints.
 
 Lemma eqm_trans: forall x y z, eqm x y -> eqm y z -> eqm x z.
 Proof (eqmod_trans modulus).
-Hint Resolve eqm_trans: ints.
+Hint Resolve eqm_trans: bit_ints.
 
 Lemma eqm_small_eq:
   forall x y, eqm x y -> 0 <= x < modulus -> 0 <= y < modulus -> x = y.
 Proof (eqmod_small_eq modulus).
-Hint Resolve eqm_small_eq: ints.
+Hint Resolve eqm_small_eq: bit_ints.
 
 Lemma eqm_add:
   forall a b c d, eqm a b -> eqm c d -> eqm (a + c) (b + d).
 Proof (eqmod_add modulus).
-Hint Resolve eqm_add: ints.
+Hint Resolve eqm_add: bit_ints.
 
 Lemma eqm_neg:
   forall x y, eqm x y -> eqm (-x) (-y).
 Proof (eqmod_neg modulus).
-Hint Resolve eqm_neg: ints.
+Hint Resolve eqm_neg: bit_ints.
 
 Lemma eqm_sub:
   forall a b c d, eqm a b -> eqm c d -> eqm (a - c) (b - d).
 Proof (eqmod_sub modulus).
-Hint Resolve eqm_sub: ints.
+Hint Resolve eqm_sub: bit_ints.
 
 Lemma eqm_mult:
   forall a b c d, eqm a c -> eqm b d -> eqm (a * b) (c * d).
 Proof (eqmod_mult modulus).
-Hint Resolve eqm_mult: ints.
+Hint Resolve eqm_mult: bit_ints.
 
 (** ** Properties of the coercions between [Z] and [int] *)
 
 Lemma eqm_samerepr: forall x y, eqm x y -> repr x = repr y.
 Proof.
   intros. unfold repr. apply mkint_eq.
-  rewrite !Z_mod_modulus_eq. apply eqmod_mod_eq. auto with ints. exact H.
+  rewrite !Z_mod_modulus_eq. apply eqmod_mod_eq. auto with bit_ints. exact H.
 Qed.
 
 Lemma eqm_unsigned_repr:
@@ -663,7 +663,7 @@ Lemma eqm_unsigned_repr:
 Proof.
   unfold eqm; intros. rewrite unsigned_repr_eq. apply eqmod_mod.
 Qed.
-Hint Resolve eqm_unsigned_repr: ints.
+Hint Resolve eqm_unsigned_repr: bit_ints.
 
 Lemma eqm_unsigned_repr_l:
   forall a b, eqm a b -> eqm (unsigned (repr a)) b.
@@ -671,7 +671,7 @@ Proof.
   intros. apply eqm_trans with a.
   apply eqm_sym. apply eqm_unsigned_repr. auto.
 Qed.
-Hint Resolve eqm_unsigned_repr_l: ints.
+Hint Resolve eqm_unsigned_repr_l: bit_ints.
 
 Lemma eqm_unsigned_repr_r:
   forall a b, eqm a b -> eqm a (unsigned (repr b)).
@@ -679,7 +679,7 @@ Proof.
   intros. apply eqm_trans with b. auto.
   apply eqm_unsigned_repr.
 Qed.
-Hint Resolve eqm_unsigned_repr_r: ints.
+Hint Resolve eqm_unsigned_repr_r: bit_ints.
 
 Lemma eqm_signed_unsigned:
   forall x, eqm (signed x) (unsigned x).
@@ -694,7 +694,7 @@ Theorem unsigned_range:
 Proof.
   destruct i. simpl. lia.
 Qed.
-Hint Resolve unsigned_range: ints.
+Hint Resolve unsigned_range: bit_ints.
 
 Theorem unsigned_range_2:
   forall i, 0 <= unsigned i <= max_unsigned.
@@ -702,7 +702,7 @@ Proof.
   intro; unfold max_unsigned.
   generalize (unsigned_range i). lia.
 Qed.
-Hint Resolve unsigned_range_2: ints.
+Hint Resolve unsigned_range_2: bit_ints.
 
 Theorem signed_range:
   forall i, min_signed <= signed i <= max_signed.
@@ -721,15 +721,15 @@ Proof.
   destruct i; simpl. unfold repr. apply mkint_eq.
   rewrite Z_mod_modulus_eq. apply Zmod_small; lia.
 Qed.
-Hint Resolve repr_unsigned: ints.
+Hint Resolve repr_unsigned: bit_ints.
 
 Lemma repr_signed:
   forall i, repr (signed i) = i.
 Proof.
   intros. transitivity (repr (unsigned i)).
-  apply eqm_samerepr. apply eqm_signed_unsigned. auto with ints.
+  apply eqm_samerepr. apply eqm_signed_unsigned. auto with bit_ints.
 Qed.
-Hint Resolve repr_signed: ints.
+Hint Resolve repr_signed: bit_ints.
 
 Opaque repr.
 
@@ -744,7 +744,7 @@ Proof.
   intros. rewrite unsigned_repr_eq.
   apply Zmod_small. unfold max_unsigned in H. lia.
 Qed.
-Hint Resolve unsigned_repr: ints.
+Hint Resolve unsigned_repr: bit_ints.
 
 Theorem signed_repr:
   forall z, min_signed <= z <= max_signed -> signed (repr z) = z.
@@ -847,7 +847,7 @@ Proof.
   rewrite zeq_false. auto. auto.
 Qed.
 
-Theorem eq_spec: forall (x y: int), if eq x y then x = y else x <> y.
+Theorem eq_spec: forall (x y: bit_int), if eq x y then x = y else x <> y.
 Proof.
   intros; unfold eq. case (eq_dec x y); intro.
   subst y. rewrite zeq_true. auto.
@@ -909,8 +909,8 @@ Proof.
   set (z' := unsigned z).
   apply eqm_samerepr.
   apply eqm_trans with ((x' + y') + z').
-  auto with ints.
-  rewrite <- Z.add_assoc. auto with ints.
+  auto with bit_ints.
+  rewrite <- Z.add_assoc. auto with bit_ints.
 Qed.
 
 Theorem add_permut: forall x y z, add x (add y z) = add y (add x z).
@@ -922,7 +922,7 @@ Theorem add_neg_zero: forall x, add x (neg x) = zero.
 Proof.
   intros; unfold add, neg, zero. apply eqm_samerepr.
   replace 0 with (unsigned x + (- (unsigned x))).
-  auto with ints. lia.
+  auto with bit_ints. lia.
 Qed.
 
 Theorem unsigned_add_carry:
@@ -954,7 +954,7 @@ Qed.
 
 Theorem neg_repr: forall z, neg (repr z) = repr (-z).
 Proof.
-  intros; unfold neg. apply eqm_samerepr. auto with ints.
+  intros; unfold neg. apply eqm_samerepr. auto with bit_ints.
 Qed.
 
 Theorem neg_zero: neg zero = zero.
@@ -973,10 +973,10 @@ Theorem neg_add_distr: forall x y, neg(add x y) = add (neg x) (neg y).
 Proof.
   intros; unfold neg, add. apply eqm_samerepr.
   apply eqm_trans with (- (unsigned x + unsigned y)).
-  auto with ints.
+  auto with bit_ints.
   replace (- (unsigned x + unsigned y))
      with ((- unsigned x) + (- unsigned y)).
-  auto with ints. lia.
+  auto with bit_ints. lia.
 Qed.
 
 (** ** Properties of subtraction *)
@@ -995,7 +995,7 @@ Qed.
 Theorem sub_add_opp: forall x y, sub x y = add x (neg y).
 Proof.
   intros; unfold sub, add, neg. apply eqm_samerepr.
-  apply eqm_add; auto with ints.
+  apply eqm_add; auto with bit_ints.
 Qed.
 
 Theorem sub_idem: forall x, sub x x = zero.
@@ -1083,8 +1083,8 @@ Proof.
   set (y' := unsigned y).
   set (z' := unsigned z).
   apply eqm_samerepr. apply eqm_trans with ((x' * y') * z').
-  auto with ints.
-  rewrite <- Z.mul_assoc. auto with ints.
+  auto with bit_ints.
+  rewrite <- Z.mul_assoc. auto with bit_ints.
 Qed.
 
 Theorem mul_add_distr_l:
@@ -1096,9 +1096,9 @@ Proof.
   set (y' := unsigned y).
   set (z' := unsigned z).
   apply eqm_trans with ((x' + y') * z').
-  auto with ints.
+  auto with bit_ints.
   replace ((x' + y') * z') with (x' * z' + y' * z').
-  auto with ints.
+  auto with bit_ints.
   ring.
 Qed.
 
@@ -1115,9 +1115,9 @@ Proof.
   intros. unfold mul, neg.
   set (x' := unsigned x).  set (y' := unsigned y).
   apply eqm_samerepr. apply eqm_trans with (- (x' * y')).
-  auto with ints.
+  auto with bit_ints.
   replace (- (x' * y')) with ((-x') * y') by ring.
-  auto with ints.
+  auto with bit_ints.
 Qed.
 
 Theorem neg_mul_distr_r:
@@ -1140,7 +1140,7 @@ Lemma modu_divu_Euclid:
   forall x y, y <> zero -> x = add (mul (divu x y) y) (modu x y).
 Proof.
   intros. unfold add, mul, divu, modu.
-  transitivity (repr (unsigned x)). auto with ints.
+  transitivity (repr (unsigned x)). auto with bit_ints.
   apply eqm_samerepr.
   set (x' := unsigned x). set (y' := unsigned y).
   apply eqm_trans with ((x' / y') * y' + x' mod y').
@@ -1149,7 +1149,7 @@ Proof.
   assert (unsigned y <> 0). red; intro.
   elim H. rewrite <- (repr_unsigned y). unfold zero. congruence.
   unfold y'.
-  auto with ints.
+  auto with bit_ints.
 Qed.
 
 Theorem modu_divu:
@@ -1166,13 +1166,13 @@ Lemma mods_divs_Euclid:
   forall x y, x = add (mul (divs x y) y) (mods x y).
 Proof.
   intros. unfold add, mul, divs, mods.
-  transitivity (repr (signed x)). auto with ints.
+  transitivity (repr (signed x)). auto with bit_ints.
   apply eqm_samerepr.
   set (x' := signed x). set (y' := signed y).
   apply eqm_trans with ((Z.quot x' y') * y' + Z.rem x' y').
   apply eqm_refl2. rewrite Z.mul_comm. apply Z.quot_rem'.
-  apply eqm_add; auto with ints.
-  apply eqm_unsigned_repr_r. apply eqm_mult; auto with ints.
+  apply eqm_add; auto with bit_ints.
+  apply eqm_unsigned_repr_r. apply eqm_mult; auto with bit_ints.
   unfold y'. apply eqm_signed_unsigned.
 Qed.
 
@@ -1619,14 +1619,14 @@ Qed.
 
 (** ** Bit-level reasoning over type [int] *)
 
-Definition testbit (x: int) (i: Z) : bool := Z.testbit (unsigned x) i.
+Definition testbit (x: bit_int) (i: Z) : bool := Z.testbit (unsigned x) i.
 
 Lemma testbit_repr:
   forall x i,
   0 <= i < zwordsize ->
   testbit (repr x) i = Z.testbit x i.
 Proof.
-  intros. unfold testbit. apply same_bits_eqm; auto with ints.
+  intros. unfold testbit. apply same_bits_eqm; auto with bit_ints.
 Qed.
 
 Lemma same_bits_eq:
@@ -1667,10 +1667,10 @@ Proof.
   intros. unfold mone. rewrite testbit_repr; auto. apply Ztestbit_m1. lia.
 Qed.
 
-Hint Rewrite bits_zero bits_mone : ints.
+Hint Rewrite bits_zero bits_mone : bit_ints.
 
 Ltac bit_solve :=
-  intros; apply same_bits_eq; intros; autorewrite with ints; auto with bool.
+  intros; apply same_bits_eq; intros; autorewrite with bit_ints; auto with bool.
 
 Lemma sign_bit_of_unsigned:
   forall x, testbit x (zwordsize - 1) = if zlt (unsigned x) half_modulus then false else true.
@@ -1753,7 +1753,7 @@ Proof.
   intros. unfold not. rewrite bits_xor; auto. rewrite bits_mone; auto.
 Qed.
 
-Hint Rewrite bits_and bits_or bits_xor bits_not: ints.
+Hint Rewrite bits_and bits_or bits_xor bits_not: bit_ints.
 
 Theorem and_commut: forall x y, and x y = and y x.
 Proof.
@@ -1936,7 +1936,7 @@ Qed.
 (** Properties of bitwise complement.*)
 
 Theorem not_involutive:
-  forall (x: int), not (not x) = x.
+  forall (x: bit_int), not (not x) = x.
 Proof.
   intros. unfold not. rewrite xor_assoc. rewrite xor_idem. apply xor_zero.
 Qed.
@@ -2086,7 +2086,7 @@ Proof.
   apply Z_add_is_or. lia.
   intros.
   assert (testbit (and x y) j = testbit zero j) by congruence.
-  autorewrite with ints in H2. assumption. lia.
+  autorewrite with bit_ints in H2. assumption. lia.
 Qed.
 
 Theorem xor_is_or:
@@ -2094,7 +2094,7 @@ Theorem xor_is_or:
 Proof.
   bit_solve.
   assert (testbit (and x y) i = testbit zero i) by congruence.
-  autorewrite with ints in H1; auto.
+  autorewrite with bit_ints in H1; auto.
   destruct (testbit x i); destruct (testbit y i); simpl in *; congruence.
 Qed.
 
@@ -2161,7 +2161,7 @@ Proof.
   lia.
 Qed.
 
-Hint Rewrite bits_shl bits_shru bits_shr: ints.
+Hint Rewrite bits_shl bits_shru bits_shr: bit_ints.
 
 Theorem shl_zero: forall x, shl x zero = x.
 Proof.
@@ -2494,7 +2494,7 @@ Proof.
     Transparent zwordsize.
 Qed.
 
-Hint Rewrite bits_rol bits_ror: ints.
+Hint Rewrite bits_rol bits_ror: bit_ints.
 
 Theorem shl_rolm:
   forall x n,
@@ -2840,7 +2840,7 @@ Lemma shl_mul_two_p:
   shl x y = mul x (repr (two_p (unsigned y))).
 Proof.
   intros. unfold shl, mul. apply eqm_samerepr.
-  rewrite Zshiftl_mul_two_p. auto with ints.
+  rewrite Zshiftl_mul_two_p. auto with bit_ints.
   generalize (unsigned_range y); lia.
 Qed.
 
@@ -2873,9 +2873,9 @@ Theorem shifted_or_is_add:
   or (shl x (repr n)) y = repr(unsigned x * two_p n + unsigned y).
 Proof.
   intros. rewrite <- add_is_or.
-  - unfold add. apply eqm_samerepr. apply eqm_add; auto with ints.
+  - unfold add. apply eqm_samerepr. apply eqm_add; auto with bit_ints.
     rewrite shl_mul_two_p. unfold mul. apply eqm_unsigned_repr_l.
-    apply eqm_mult; auto with ints. apply eqm_unsigned_repr_l.
+    apply eqm_mult; auto with bit_ints. apply eqm_unsigned_repr_l.
     apply eqm_refl2. rewrite unsigned_repr. auto.
     generalize wordsize_max_unsigned; lia.
   - bit_solve.
@@ -3295,7 +3295,7 @@ Proof.
   lia. auto.
 Qed.
 
-Hint Rewrite bits_zero_ext bits_sign_ext: ints.
+Hint Rewrite bits_zero_ext bits_sign_ext: bit_ints.
 
 Theorem zero_ext_above:
   forall n x, n >= zwordsize -> zero_ext n x = x.
@@ -3571,7 +3571,7 @@ Proof.
   subst i. apply A. apply Z_one_bits_range with (unsigned x); auto.
 Qed.
 
-Fixpoint int_of_one_bits (l: list int) : int :=
+Fixpoint int_of_one_bits (l: list bit_int) : bit_int :=
   match l with
   | nil => zero
   | a :: b => add (shl one a) (int_of_one_bits b)
@@ -3583,8 +3583,8 @@ Proof.
   intros.
   transitivity (repr (powerserie (Z_one_bits natwordsize (unsigned x) 0))).
   transitivity (repr (unsigned x)).
-  auto with ints. decEq. apply Z_one_bits_powerserie.
-  auto with ints.
+  auto with bit_ints. decEq. apply Z_one_bits_powerserie.
+  auto with bit_ints.
   unfold one_bits.
   generalize (Z_one_bits_range (unsigned x)).
   generalize (Z_one_bits natwordsize (unsigned x) 0).
@@ -3593,9 +3593,9 @@ Proof.
   intros; simpl. rewrite <- IHl. unfold add. apply eqm_samerepr.
   apply eqm_add. rewrite shl_mul_two_p. rewrite mul_commut.
   rewrite mul_one. apply eqm_unsigned_repr_r.
-  rewrite unsigned_repr. auto with ints.
+  rewrite unsigned_repr. auto with bit_ints.
   generalize (H a (in_eq _ _)). generalize wordsize_max_unsigned. lia.
-  auto with ints.
+  auto with bit_ints.
   intros; apply H; auto with coqlib.
 Qed.
 
@@ -3632,12 +3632,12 @@ Proof.
   intros. unfold eq. case (zeq (unsigned x) (unsigned y)); intro.
   unfold add. rewrite e. apply zeq_true.
   apply zeq_false. unfold add. red; intro. apply n.
-  apply eqm_small_eq; auto with ints.
+  apply eqm_small_eq; auto with bit_ints.
   replace (unsigned x) with ((unsigned x + unsigned d) - unsigned d).
   replace (unsigned y) with ((unsigned y + unsigned d) - unsigned d).
   apply eqm_sub. apply eqm_trans with (unsigned (repr (unsigned x + unsigned d))).
-  eauto with ints. apply eqm_trans with (unsigned (repr (unsigned y + unsigned d))).
-  eauto with ints. eauto with ints. eauto with ints.
+  eauto with bit_ints. apply eqm_trans with (unsigned (repr (unsigned y + unsigned d))).
+  eauto with bit_ints. eauto with bit_ints. eauto with bit_ints.
   lia. lia.
 Qed.
 
@@ -3755,7 +3755,7 @@ Proof.
   destruct (zeq (unsigned x) (unsigned y));
   destruct (zeq (signed x) (signed y)); auto.
   elim n. unfold signed. rewrite e; auto.
-  elim n. apply eqm_small_eq; auto with ints.
+  elim n. apply eqm_small_eq; auto with bit_ints.
   eapply eqm_trans. apply eqm_sym. apply eqm_signed_unsigned.
   rewrite e. apply eqm_signed_unsigned.
 Qed.
@@ -3797,7 +3797,7 @@ Qed.
 
 (** Non-overlapping test *)
 
-Definition no_overlap (ofs1: int) (sz1: Z) (ofs2: int) (sz2: Z) : bool :=
+Definition no_overlap (ofs1: bit_int) (sz1: Z) (ofs2: bit_int) (sz2: Z) : bool :=
   let x1 := unsigned ofs1 in let x2 := unsigned ofs2 in
      zlt (x1 + sz1) modulus && zlt (x2 + sz2) modulus
   && (zle (x1 + sz1) x2 || zle (x2 + sz2) x1).
@@ -3829,7 +3829,7 @@ Definition Zsize (x: Z) : Z :=
   | _ => 0
   end.
 
-Definition size (x: int) : Z := Zsize (unsigned x).
+Definition size (x: bit_int) : Z := Zsize (unsigned x).
 
 Remark Zsize_pos: forall x, 0 <= Zsize x.
 Proof.
@@ -4054,11 +4054,11 @@ End MakeInt.
 
 (** Decomposing 64-bit ints as pairs of 32-bit ints *)
 
-Definition loword (n: @int 64) : @int 32 := repr (unsigned n).
+Definition loword (n: @bit_int 64) : @bit_int 32 := repr (unsigned n).
 
-Definition hiword (n: @int 64) : @int 32 := repr (unsigned (shru n (repr 32))).
+Definition hiword (n: @bit_int 64) : @bit_int 32 := repr (unsigned (shru n (repr 32))).
 
-Definition ofwords (hi lo: @int 32) : @int 64 :=
+Definition ofwords (hi lo: @bit_int 32) : @bit_int 64 :=
   or (shl (repr (unsigned hi)) (repr 32)) (repr (unsigned lo)).
 
 Lemma bits_loword:
@@ -4173,29 +4173,29 @@ Proof.
   apply eqm_samerepr. apply eqm_add. apply eqm_mul_2p32. apply eqm_signed_unsigned. apply eqm_refl.
 Qed.
 
-#[global] Hint Resolve modulus_pos: ints.
-#[global] Hint Resolve eqm_refl: ints.
-#[global] Hint Resolve eqm_refl2: ints.
-#[global] Hint Resolve eqm_sym: ints.
-#[global] Hint Resolve eqm_trans: ints.
-#[global] Hint Resolve eqm_small_eq: ints.
-#[global] Hint Resolve eqm_add: ints.
-#[global] Hint Resolve eqm_neg: ints.
-#[global] Hint Resolve eqm_sub: ints.
-#[global] Hint Resolve eqm_mult: ints.
-#[global] Hint Resolve eqm_unsigned_repr: ints.
-#[global] Hint Resolve eqm_unsigned_repr_l: ints.
-#[global] Hint Resolve eqm_unsigned_repr_r: ints.
-#[global] Hint Resolve unsigned_range: ints.
-#[global] Hint Resolve unsigned_range_2: ints.
-#[global] Hint Resolve repr_unsigned: ints.
-#[global] Hint Resolve repr_signed: ints.
-#[global] Hint Resolve unsigned_repr: ints.
-#[global] Hint Rewrite @bits_zero @bits_mone : ints.
-#[global] Hint Rewrite @bits_and @bits_or @bits_xor @bits_not: ints.
-#[global] Hint Rewrite @bits_shl @bits_shru @bits_shr: ints.
-#[global] Hint Rewrite @bits_rol @bits_ror: ints.
-#[global] Hint Rewrite @bits_zero_ext @bits_sign_ext: ints.
+#[global] Hint Resolve modulus_pos: bit_ints.
+#[global] Hint Resolve eqm_refl: bit_ints.
+#[global] Hint Resolve eqm_refl2: bit_ints.
+#[global] Hint Resolve eqm_sym: bit_ints.
+#[global] Hint Resolve eqm_trans: bit_ints.
+#[global] Hint Resolve eqm_small_eq: bit_ints.
+#[global] Hint Resolve eqm_add: bit_ints.
+#[global] Hint Resolve eqm_neg: bit_ints.
+#[global] Hint Resolve eqm_sub: bit_ints.
+#[global] Hint Resolve eqm_mult: bit_ints.
+#[global] Hint Resolve eqm_unsigned_repr: bit_ints.
+#[global] Hint Resolve eqm_unsigned_repr_l: bit_ints.
+#[global] Hint Resolve eqm_unsigned_repr_r: bit_ints.
+#[global] Hint Resolve unsigned_range: bit_ints.
+#[global] Hint Resolve unsigned_range_2: bit_ints.
+#[global] Hint Resolve repr_unsigned: bit_ints.
+#[global] Hint Resolve repr_signed: bit_ints.
+#[global] Hint Resolve unsigned_repr: bit_ints.
+#[global] Hint Rewrite @bits_zero @bits_mone : bit_ints.
+#[global] Hint Rewrite @bits_and @bits_or @bits_xor @bits_not: bit_ints.
+#[global] Hint Rewrite @bits_shl @bits_shru @bits_shr: bit_ints.
+#[global] Hint Rewrite @bits_rol @bits_ror: bit_ints.
+#[global] Hint Rewrite @bits_zero_ext @bits_sign_ext: bit_ints.
 
 Ltac bit_solve :=
-  intros; apply same_bits_eq; intros; autorewrite with ints; auto with bool.
+  intros; apply same_bits_eq; intros; autorewrite with bit_ints; auto with bool.

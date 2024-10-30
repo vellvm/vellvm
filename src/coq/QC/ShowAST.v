@@ -669,10 +669,10 @@ Section ShowInstances.
   #[global] Instance showFloat32 : Show float32
     := {| show := float_to_hex_string |}.
 
-  Definition show_int {sz} (x : @int sz) : string
+  Definition show_int {sz} (x : @bit_int sz) : string
     := show (unsigned x).
 
-  #[global] Instance Show_Int {sz} : Show (@int sz)
+  #[global] Instance Show_Int {sz} : Show (@bit_int sz)
     := {| show := show_int|}.
 
   Definition show_fast_math (fm : fast_math) : string

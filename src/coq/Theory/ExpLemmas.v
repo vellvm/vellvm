@@ -117,7 +117,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (* TO MOVE *)
 
-  Lemma repr_intval {sz : positive} (i: @Integers.int sz):
+  Lemma repr_intval {sz : positive} (i: @Integers.bit_int sz):
     @Integers.repr sz (@Integers.intval sz i) = i.
   Proof using.
     replace (Integers.intval i) with (Integers.unsigned i).
