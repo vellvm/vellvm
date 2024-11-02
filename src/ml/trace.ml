@@ -566,32 +566,33 @@ let rec transform_log
             transform_log ~ctxs:ctxs' ~mcfg ~tblk logs'
           | None -> Error "normalize_log: cannot find phi"
         end
-      | Ret dtexp ->
-        begin match get_term_from_def ~f_def ~mcfg (TERM_Ret dtexp) with
-          | Some (TERM_Ret texp) ->
-            let (t, exp) = subst_texp ~ctx texp in
-            (*
-               at the highest level and hit return
-Return the current transformed log with return added in it *)
-            if ctxs_tl = [] then
-              Ok (add_term tblk ~term:(TERM_Ret (t, exp)))
-              (* Not at the highest level *)
-            else
-              begin match ciid with
-                | IId rid -> 
-                  let ctxs' = update_stack_hd ctxs_tl ~f:(fun (ctx, f_def, iid) -> RawidM.add rid exp ctx, f_def, iid) in
-                  transform_log ~ctxs:ctxs' ~mcfg ~tblk logs'
-                | IVoid _ ->
-                  Error "transform_log: Ret match with IVoid"
-              end
-          | _ ->
-            Error "normalize_log: cannot find terminator"
-        end
-      | Ret_void ->
-        if ctxs = [] then
-          Ok (add_term tblk ~term:(TERM_Ret_void))
-        else
-          transform_log ~ctxs:ctxs_tl ~mcfg ~tblk logs'
+(*       | Ret dtexp -> *)
+(*         begin match get_term_from_def ~f_def ~mcfg (TERM_Ret dtexp) with *)
+(*           | Some (TERM_Ret texp) -> *)
+(*             let (t, exp) = subst_texp ~ctx texp in *)
+(*             (\* *)
+(*                at the highest level and hit return *)
+(* Return the current transformed log with return added in it *\) *)
+(*             if ctxs_tl = [] then *)
+(*               Ok (add_term tblk ~term:(TERM_Ret (t, exp))) *)
+(*               (\* Not at the highest level *\) *)
+(*             else *)
+(*               begin match ciid with *)
+(*                 | IId rid ->  *)
+(*                   let ctxs' = update_stack_hd ctxs_tl ~f:(fun (ctx, f_def, iid) -> RawidM.add rid exp ctx, f_def, iid) in *)
+(*                   transform_log ~ctxs:ctxs' ~mcfg ~tblk logs' *)
+(*                 | IVoid _ -> *)
+(*                   Error "transform_log: Ret match with IVoid" *)
+(*               end *)
+(*           | _ -> *)
+(*             Error "normalize_log: cannot find terminator" *)
+(*         end *)
+(*       | Ret_void -> *)
+(*         if ctxs = [] then *)
+(*           Ok (add_term tblk ~term:(TERM_Ret_void)) *)
+(*         else *)
+      (*           transform_log ~ctxs:ctxs_tl ~mcfg ~tblk logs' *)
+      | Term _ -> failwith "unimplemented"
       | Instr (id, ins) ->
         begin match ins, get_instr_from_def ~f_def id with
           | INSTR_Comment _, Some (_, INSTR_Comment c) ->

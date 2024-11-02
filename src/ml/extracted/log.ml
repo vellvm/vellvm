@@ -7,8 +7,7 @@ open CFG
 type log_entry =
   | Instr of instr_id * dtyp instr
   | Phi_node of local_id * dtyp phi * block_id
-  | Ret of dtyp texp
-  | Ret_void
+  | Term of dtyp terminator
   | F_args of (function_id) * local_id list
 
 type log_stream = log_entry list
@@ -30,11 +29,9 @@ let dshow_log_entry (le : log_entry) : DList.coq_DString =
       ShowAST.dshow_raw_id bid;
       ShowAST.dshow_phi_id ShowAST.dshow_dtyp (uid, phi)
     ]
-  | Ret term ->
-    ShowAST.dshowTerminator ShowAST.dshow_dtyp (TERM_Ret term)
-  | Ret_void ->
-    ShowAST.dshowTerminator ShowAST.dshow_dtyp (TERM_Ret_void)
-  | F_args (def, args) ->
+  | Term term ->
+    ShowAST.dshowTerminator ShowAST.dshow_dtyp term 
+  | F_args (def, _) ->
     (* List.fold_right (fun x acc -> coq_DList_append (ShowAST.dshowRawId x) acc) args (DList.coq_EmptyDString) *)
     ShowAST.dshowRawId def
 
