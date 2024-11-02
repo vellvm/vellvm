@@ -783,10 +783,162 @@ let rec transform_log
       | _ ->  Error "normalize_log has a standalone f_args not processed"
     end
 
-(* TODO: don't modify terminator in the function
-   Use the substitution to glue afterward
-   factrect.ll should be checked
+(* If hit a phi. Stop the current one, and the new one will have a phi node
+   Don't count branches
+   return will always be 1
 *)
+
+type f_def_stack = (typ, typ cfg) definition stack
+
+let rec get_last (l : 'a list) : ('a, string) result =
+  match l with
+  | [] -> Error "log is empty"
+  | [hd] -> Ok hd
+  | _::tl -> get_last tl
+
+type idmap = int RawidM.t RawidM.t
+
+let idmap_ref = ref RawidM.empty
+
+let incr_count_idmap ~(fid: function_id) ~(iid : instr_id) =
+  match iid with
+  | IVoid _ -> ()
+  | IId id -> 
+    let imap =
+      match RawidM.find_opt fid !idmap_ref with
+      | Some imap' -> imap'
+      | None -> RawidM.empty
+    in
+    let imap' =
+      match RawidM.find_opt id imap with
+      | Some c -> RawidM.add id (c + 1) imap
+      | None -> RawidM.add id 1 imap
+    in
+    idmap_ref := RawidM.add fid imap' !idmap_ref
+
+let clear_idmap =
+  idmap_ref := RawidM.empty
+
+let rec transform_log_nsubst
+    ~(f_def_stack : f_def_stack)
+    ~(mcfg : typ CFG.mcfg)
+    ~(tocfg : typ ocfg)
+    ~(fid_skip : function_id)
+    (logs : log_stream) : (typ ocfg, string) result =
+  match logs with
+  | [] ->
+    Ok tocfg
+  | log::logs' ->
+    let* tblk, tocfg_tl = pop_stack tocfg in
+    let* f_def, f_def_stack_tl = pop_stack f_def_stack in
+    begin match log with
+      | Phi_node (pid, _, _) ->
+        begin match get_phi_from_def ~f_def pid with
+          | Some lphi ->
+            (* Ceal last tblk and initialize a new tblk *)
+            let bid = Name (gensym "block" |> Camlcoq.coqstring_of_camlstring) in
+            let tblk' = {
+              blk_id=tblk.blk_id;
+              blk_phis = tblk.blk_phis;
+              blk_code = tblk.blk_code;
+              blk_term = TERM_Br_1 bid;
+              blk_comments = tblk.blk_comments
+            } in
+            let tocfg' = push_stack ~hd:tblk' tocfg_tl in
+            let new_tblk = {
+              blk_id=bid;
+              blk_phis=[lphi];
+              blk_code=[];
+              blk_term = TERM_Ret_void;
+              blk_comments=None
+            } in
+            let tocfg2 = push_stack ~hd:new_tblk tocfg' in
+            transform_log_nsubst ~f_def_stack ~mcfg ~tocfg:tocfg2 logs' ~fid_skip
+          | _ -> Error "normalize_log: cannot find phi"
+        end
+      | Ret dtexp ->
+        begin match get_term_from_def ~f_def ~mcfg (TERM_Ret dtexp) with
+          | Some (TERM_Ret texp) ->
+            if f_def_stack_tl = [] then
+              let tblk' = add_term tblk ~term:(TERM_Ret texp) in
+              Ok (tblk'::tocfg_tl)
+            else
+              transform_log_nsubst ~f_def_stack:f_def_stack_tl ~mcfg ~tocfg logs' ~fid_skip
+          | _ ->
+            Error "transform_log_nsubst: cannot find terminator"
+        end
+      | Ret_void ->
+        if f_def_stack_tl = [] then
+          let tblk' = add_term tblk ~term:(TERM_Ret_void) in
+          Ok (tblk'::tocfg_tl)
+        else
+          transform_log_nsubst ~f_def_stack:f_def_stack_tl ~mcfg ~tocfg logs' ~fid_skip
+      | Instr (iid, ins) ->
+        (* incr_count_idmap ~fid:(f_def.df_prototype.dc_name) ~iid; *)
+        begin match ins, get_instr_from_def ~f_def iid with
+          | INSTR_Comment _, Some (_, INSTR_Comment c) ->
+            let tblk' = add_code tblk ~code:[(iid, INSTR_Comment c)] in
+            transform_log_nsubst ~f_def_stack ~mcfg ~tocfg:(tblk'::tocfg_tl) logs' ~fid_skip
+          | INSTR_Op _, Some (_, INSTR_Op exp) ->
+            let tblk' = add_code tblk ~code:[(iid, INSTR_Op exp)] in
+            transform_log_nsubst ~f_def_stack ~mcfg ~tocfg:(tblk'::tocfg_tl) logs' ~fid_skip
+          | INSTR_Call (_, _, _), Some (_, INSTR_Call ((f_t, f_exp), taargs, anns)) ->
+            let tblk' = add_code tblk ~code:[(iid, INSTR_Call ((f_t, f_exp), taargs, anns))] in
+            begin match AstLib.intrinsic_exp f_exp with
+            | Some _ -> 
+              transform_log_nsubst ~f_def_stack ~mcfg ~tocfg:(tblk'::tocfg_tl) logs' ~fid_skip
+            | None ->
+              begin match logs' with
+                | F_args (f_id, _)::logs'' ->
+                  let* last_f_def = get_last f_def_stack in
+                  let* last_log = get_last logs'' in
+                  (* Printf.printf ("Call this: %s\n") (ShowAST.dshowRawId f_id |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring); *)
+                  (* Printf.printf ("Eq:%d\n") (RawidOrdPrint.compare f_id fid_skip); *)
+                  if RawidOrdPrint.compare f_id fid_skip = 0 then
+                    transform_log_nsubst ~f_def_stack:[last_f_def] ~mcfg ~tocfg:(tblk'::tocfg_tl) [last_log] ~fid_skip
+                  else
+                  begin match get_f_def_from_mcfg (EXP_Ident (ID_Global f_id)) ~mcfg with
+                    | Some f_def' ->
+                      let f_def_stack' = push_stack ~hd:(f_def') f_def_stack in
+                      transform_log_nsubst ~f_def_stack:f_def_stack' ~mcfg ~tocfg:(tblk'::tocfg_tl) logs'' ~fid_skip
+                    | None -> Error "transform_log_nsubst: logging error on call"
+                  end
+                | _ ->
+                  transform_log_nsubst ~f_def_stack ~mcfg ~tocfg:(tblk'::tocfg_tl) logs' ~fid_skip
+              end
+            end
+          | INSTR_Alloca _, Some (_, INSTR_Alloca (dt, anns)) ->
+            let tblk' = add_code tblk ~code:[(iid, INSTR_Alloca (dt,anns))] in
+            transform_log_nsubst ~f_def_stack ~mcfg ~tocfg:(tblk'::tocfg_tl) logs' ~fid_skip
+          | INSTR_Load _, Some (_, INSTR_Load (dt, texp, anns)) ->
+            let tblk' = add_code tblk ~code:[(iid, INSTR_Load (dt,texp, anns))] in
+            transform_log_nsubst ~f_def_stack ~mcfg ~tocfg:(tblk'::tocfg_tl) logs' ~fid_skip
+          | INSTR_Store _, Some (_, INSTR_Store (texp1, texp2, anns)) ->
+            let tblk' = add_code tblk ~code:[(iid, INSTR_Store (texp1, texp2, anns))] in
+            transform_log_nsubst ~f_def_stack ~mcfg ~tocfg:(tblk'::tocfg_tl) logs' ~fid_skip
+          | INSTR_Fence _, Some (_, INSTR_Fence (co, o)) ->
+            let tblk' = add_code tblk ~code:[(iid, INSTR_Fence (co, o))] in
+            transform_log_nsubst ~f_def_stack ~mcfg ~tocfg:(tblk'::tocfg_tl) logs' ~fid_skip
+          | INSTR_AtomicCmpXchg _, Some (_, INSTR_AtomicCmpXchg cmpxchg) ->
+            let tblk' = add_code tblk ~code:[(iid, INSTR_AtomicCmpXchg cmpxchg)] in
+            transform_log_nsubst ~f_def_stack ~mcfg ~tocfg:(tblk'::tocfg_tl) logs' ~fid_skip
+          | INSTR_AtomicRMW _, Some (_, INSTR_AtomicRMW atomicrmw) -> 
+            let tblk' = add_code tblk ~code:[(iid, INSTR_AtomicRMW atomicrmw)] in
+            transform_log_nsubst ~f_def_stack ~mcfg ~tocfg:(tblk'::tocfg_tl) logs' ~fid_skip
+          | INSTR_VAArg _, Some (_, INSTR_VAArg (texp, t)) ->
+            let tblk' = add_code tblk ~code:[(iid, INSTR_VAArg (texp, t))] in
+            transform_log_nsubst ~f_def_stack ~mcfg ~tocfg:(tblk'::tocfg_tl) logs' ~fid_skip
+          | INSTR_LandingPad, Some (_, INSTR_LandingPad) ->
+            let tblk' = add_code tblk ~code:[(iid, INSTR_LandingPad)] in
+            transform_log_nsubst ~f_def_stack ~mcfg ~tocfg:(tblk'::tocfg_tl) logs' ~fid_skip
+          | _ -> 
+            Printf.printf "The line with no match is: %s\n" (ShowAST.dshowInstrWithId ShowAST.dshowDtyp (iid, ins) |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring);
+            Printf.printf "The function this tracer is currently in:\n%s\n" (ShowAST.dshowDeclaration (f_def.df_prototype) |> camlstring_of_dstring);
+            Error "transform_log_nsubst: no match"
+        end
+      | _ -> Error "transform_log_nsubst has a standalong f_args not processed"
+    end
+
 let transform_code
     ~(f_id : function_id)
     ~(mcfg : typ CFG.mcfg)
@@ -810,6 +962,56 @@ let transform_code
       blk_term = tblk'.blk_term;
       blk_comments=tblk'.blk_comments
     }
+
+
+(* TODO: don't modify terminator in the function
+   Use the substitution to glue afterward
+   factrect.ll should be checked
+*)
+let rev_blk = fun blk ->
+  {
+    blk_id = blk.blk_id;
+    blk_phis = blk.blk_phis;
+    blk_code = List.rev blk.blk_code;
+    blk_term = blk.blk_term;
+    blk_comments = blk.blk_comments
+  }
+
+let transform_code
+    ~(f_id : function_id)
+    ~(mcfg : typ CFG.mcfg)
+    (stack : log_stream) =
+  match get_f_def_from_mcfg (EXP_Ident (ID_Global f_id)) ~mcfg with
+  | None -> Error (Printf.sprintf "Cannot found definition %s" (ShowAST.dshow_raw_id f_id |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring))
+  | Some f_def -> 
+    let tblk : typ block = {blk_id= f_def.df_instrs.init;
+                            blk_phis=[];
+                            blk_code=[];
+                            blk_term=(TERM_Ret (TYPE_I (Camlcoq.P.of_int 8), EXP_Integer (Camlcoq.Z.of_sint 1)));
+                            blk_comments= None
+                           } in
+    let ctx = RawidM.empty in
+    let ctxs = [(ctx, f_def, IVoid Z0)] in
+    let* tblk' = transform_log ~ctxs:ctxs ~mcfg ~tblk (List.tl stack) in
+    Ok (rev_blk tblk')
+
+let transform_code_nsubst
+    ~(f_id : function_id)
+    ~(mcfg : typ CFG.mcfg)
+    ~(fid_skip : function_id)
+    (stack : log_stream) =
+  match get_f_def_from_mcfg (EXP_Ident (ID_Global f_id)) ~mcfg with
+  | None -> Error (Printf.sprintf "Cannot found definition %s" (ShowAST.dshow_raw_id f_id |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring))
+  | Some f_def -> 
+    let tblk : typ block = {blk_id= f_def.df_instrs.init;
+                            blk_phis=[];
+                            blk_code=[];
+                            blk_term=(TERM_Ret (TYPE_I (Camlcoq.P.of_int 8), EXP_Integer (Camlcoq.Z.of_sint 1)));
+                            blk_comments= None
+                           } in
+    let* tocfg = transform_log_nsubst ~f_def_stack:[f_def] ~mcfg ~tocfg:[tblk] (List.tl stack) ~fid_skip in
+    let tocfg' = List.map rev_blk tocfg in
+    Ok (tocfg')
 
 (** Printing trace **)
 let output_channel = ref stdout
@@ -836,10 +1038,39 @@ let get_f_def_from_ast
     | _ -> false in
   List.partition find_aux ll_ast
 
-let gen_executable_trace ll_ast =
+let gen_executable_trace ll_ast
+    ~(only_main : bool)
+    ~(nsubst : bool)
+    ~(skip : string)
+  =
+  let fid_skip = Name (Camlcoq.coqstring_of_camlstring skip) in
   let mcfg = get_mcfg ll_ast in
   let main_f_id = (Name (Camlcoq.coqstring_of_camlstring "main")) in
   let code = List.rev !Log.log in
+  if nsubst then
+    let* tocfg = transform_code_nsubst ~f_id:main_f_id ~mcfg code ~fid_skip in
+    match get_f_def_from_ast (EXP_Ident (ID_Global main_f_id)) ll_ast with
+    | [f_tle], r_tles ->
+      begin match f_tle with
+        | TLE_Definition f_def ->
+          let tocfg' = List.rev tocfg in
+          begin match tocfg' with
+            | tocfg_hd :: tocfg_tl -> 
+              let f_def' =
+                {df_prototype=f_def.df_prototype;
+                 df_args=f_def.df_args;
+                 df_instrs=(tocfg_hd, tocfg_tl)
+                } in
+              if only_main then
+                Ok ([TLE_Definition f_def'])
+              else
+                Ok (r_tles @ [TLE_Definition f_def'])
+            | _ -> Error "gen_executable_trace: tocfg is empty"
+          end
+        | _ -> Error "gen_executable_trace: main function is not definition"
+      end
+    | _ -> Error "gen_executable_trace: failed to get main function"
+  else
   let* tblk = transform_code ~f_id:main_f_id ~mcfg code in
   match get_f_def_from_ast (EXP_Ident (ID_Global main_f_id)) ll_ast with
   | [f_tle], r_tles ->
@@ -850,8 +1081,10 @@ let gen_executable_trace ll_ast =
          df_args=f_def.df_args;
          df_instrs=tblk,[]
         } in
-       Ok (r_tles @ [TLE_Definition f_def'])
+      if only_main then
+        Ok ([TLE_Definition f_def'])
+      else
+        Ok (r_tles @ [TLE_Definition f_def'])
     | _ -> Error "gen_executable_trace: main function is not definition"
     end
   | _ -> Error "gen_executable_trace: failed to get main function"
-

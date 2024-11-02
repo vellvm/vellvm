@@ -188,7 +188,8 @@ let validate_declared_int n =
   then (LLVMAst.Anon (coq_of_int n))
   else
     let msg = Printf.sprintf "Unexpected sequential id: expected %n but found %n" expected n in
-    raise (InvalidAnonymousId msg)
+    (LLVMAst.Anon (coq_of_int n))
+    (* raise (InvalidAnonymousId msg) *)
 
 let validate_bound_lexed_id (r : lexed_id) : LLVMAst.raw_id =
   match r with
