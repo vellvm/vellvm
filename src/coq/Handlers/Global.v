@@ -167,6 +167,14 @@ Section Globals.
         reflexivity.
       Qed.
 
+      #[global] Instance eq_itree_interp_global {R} :
+        Proper (eq_itree eq ==> eq ==> eq_itree eq) (@interp_global R).
+        Proof using.
+        repeat intro.
+        subst; rewrite H1.
+        reflexivity.
+        Qed.
+
     End Structural_Lemmas.
 
   End PARAMS.
