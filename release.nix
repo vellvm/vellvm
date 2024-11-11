@@ -15,7 +15,7 @@
   qcheck ? coq.ocamlPackages.qcheck,
   cppo ? coq.ocamlPackages.cppo,
   QuickChick,
-  mathcomp, mathcomp-ssreflect, coq-ext-lib, paco, ITree, flocq, ceres, simple-io, zarith, ... }:
+  mathcomp, mathcomp-ssreflect, coq-ext-lib, paco, ITree, flocq, ceres, simple-io, zarith, math-classes, stdpp, ... }:
 
 { vellvm =
     mkCoqDerivation {
@@ -53,6 +53,8 @@
           simple-io
           zarith
           QuickChick
+          math-classes
+          stdpp
         ] ++
         # These ocaml packages have to come from coq.ocamlPackages to
         # avoid disagreements between ocaml compiler versions.

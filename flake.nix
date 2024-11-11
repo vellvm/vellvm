@@ -16,10 +16,32 @@
         ocamlPkgs = coq.ocamlPackages;
         coqPkgs = pkgs.coqPackages_8_20;
 
+        stdpp = with coqPkgs;
+          mkCoqDerivation rec {
+          pname = "stdpp";
+          domain = "gitlab.mpi-sws.org";
+          owner = "iris";
+          version = "master";
+          defaultVersion = version;
+
+          release.${version}.sha256 = "b7JPBusIc8ExUzrxyCkjxPAUGiKCMKnVhQcPC2VwoAA=";
+
+          preBuild = ''
+            if [[ -f coq-lint.sh ]]
+            then patchShebangs coq-lint.sh
+            fi
+          '';
+
+          meta = with lib; {
+            description = "Extended “Standard Library” for Coq";
+            license = licenses.bsd3;
+          };
+      };
+
         version = "vellvm:master";
       in rec {
         packages = {
-          default = (pkgs.callPackage ./release.nix (ocamlPkgs // coqPkgs // { nix-filter = nix-filter.lib; perl = pkgs.perl; inherit coq version; })).vellvm;
+          default = (pkgs.callPackage ./release.nix (ocamlPkgs // coqPkgs // { nix-filter = nix-filter.lib; perl = pkgs.perl; inherit coq version stdpp; })).vellvm;
         };
 
         defaultPackage = packages.default;
