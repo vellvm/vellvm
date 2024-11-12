@@ -2383,10 +2383,8 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
       Definition exec_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
         itree (E +' PickE +' F) ~> itree (E +' F) :=
         interp pick_exec_h.
-        Check exec_undef.
-        Print ">>=".
-        Print VisF.
-        Definition _exec_undef {R X Y Post} `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} 
+        
+      Definition _exec_undef {R X Y Post} `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} 
           (f : (E +' (@PickE X Y Post) +' F) ~> itree (E +' F)) (ot : itreeF (E +' (@PickE X Y Post) +' F) R _)
         : itree (E +' F) R :=
         match ot with
@@ -2396,23 +2394,22 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
         end.
 
         Lemma unfold_exec_undef {R} `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} 
-  h (t: itree (E +' PickE +' F) R):
+   (t: itree (E +' PickE +' F) R):
  eq_itree eq
    (exec_undef t)
-    (_exec_undef h (observe t)).
+    (_exec_undef pick_exec_h (observe t)).
+    
 Proof.
-Import ITree.Eq.Paco2.
-      Import gpacotac.
-
 unfold exec_undef, pick_exec_h, concretize_picks.
 cbn.
 
 rewrite InterpFacts.unfold_interp.
 destruct (observe t); cbn.
 - reflexivity.
-- admit.
-- admit.
-Admitted.
+- unfold exec_undef. unfold pick_exec_h. unfold concretize_picks. reflexivity.
+- unfold exec_undef, pick_exec_h, concretize_picks.
+  reflexivity.
+Qed.
 
         Lemma exec_undef_bind {T U} `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}: forall a b,
         exec_undef (ITree.bind a b) ≅ 
@@ -2421,25 +2418,46 @@ Admitted.
       (* intros. *)
       Import ITree.Eq.Paco2.
       Import gpacotac.
-
-      ginit.
-      pcofix CIH.
       intros.
+
       rewrite unfold_exec_undef.
       rewrite unfold_exec_undef.
       setoid_rewrite unfold_exec_undef.
-      all: rewrite Shallow.observe_bind.
+
+      generalize dependent a.
+      generalize dependent b.
+      ginit.
+      pcofix CIH.
+      intros.
       
       destruct (observe a) eqn: Ha; cbn.
-      rewrite bind_ret_l.
-      cbn.
-      destruct (observe (b _)) eqn: Hb1; cbn.
-      - gstep. reflexivity.
-      - gstep. reflexivity.
-      - gstep. unfold exec_undef. unfold pick_exec_h. admit.
-      - gstep. admit.
-      - setoid_rewrite bind_bind. admit.
-      Unshelve.
+      - rewrite Shallow.observe_bind. (* bind *)
+        rewrite Ha.
+        rewrite bind_ret_l.
+        gstep. reflexivity.
+      - rewrite Shallow.observe_bind, Ha. (* Tau *)
+        cbn.
+        tau_steps.
+        ITree.fold_subst.
+        setoid_rewrite unfold_exec_undef.
+        gstep.
+        econstructor.
+        gbase.
+        apply CIH.
+      - rewrite bind_bind.
+        setoid_rewrite bind_tau.
+        setoid_rewrite unfold_exec_undef.
+        rewrite Shallow.observe_bind,Ha.
+        cbn.
+        guclo eqit_clo_bind.
+        econstructor.
+        reflexivity.
+        intros. subst.
+
+        setoid_rewrite unfold_exec_undef.
+        (* How do we get rid of the Tau here to apply CIH? *)
+        admit.
+        
       Admitted.
 
     Lemma exec_undef_ret {R2} `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}: forall r, 
