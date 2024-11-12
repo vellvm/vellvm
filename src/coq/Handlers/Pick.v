@@ -2455,20 +2455,19 @@ Qed.
         intros. subst.
 
         setoid_rewrite unfold_exec_undef.
-        (* How do we get rid of the Tau here to apply CIH? *)
-        admit.
-        
-      Admitted.
+        gstep.
+        econstructor.
+        gbase.
+        apply CIH.
+    Qed.
 
     Lemma exec_undef_ret {R2} `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}: forall r, 
-      eq_itree (R2 := R2) eq (exec_undef (Ret r)) (Ret r).
+      @eq_itree _ _ R2 eq (exec_undef (Ret r)) (Ret r).
       Proof.
       intros.
       tau_steps.
       reflexivity.
-      Qed.
-    
-      
+      Qed.      
     End PARAMS_INTERP.
 
   End PickImplementation.
