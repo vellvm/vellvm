@@ -917,16 +917,21 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     Qed.
 
     #[global] Instance eutt_interp_memory_exec {R} :
-        Proper (eutt eq ==> eq ==> eq ==> eutt eq) (@interp_memory R).
+        Proper (eq_itree eq ==> eq ==> eq ==> eq_itree eq) (@interp_memory R).
         Proof using.
+        
         unfold Proper.
         unfold respectful.
+        ginit.
+        setoid_rewrite unfold_interp_memory.
+        pcofix CIH.
         intros.
         subst.
-        repeat rewrite unfold_interp_memory.
+
         assert (observe x = observe y).
         admit.
-        rewrite H0.
+        rewrite H.
+        gstep.
         reflexivity.
       Admitted.
 
