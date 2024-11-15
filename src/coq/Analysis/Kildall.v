@@ -36,7 +36,6 @@ From Vellvm.Analysis Require Import
 
 From MathClasses Require interfaces.orders interfaces.abstract_algebra orders.lattices.
 Import (hints) interfaces.canonical_names interfaces.orders interfaces.abstract_algebra orders.lattices.
-(* Print Instances abstract_algebra *)
 
 Module Framework.
   From MathClasses Require Import canonical_names.
@@ -83,7 +82,6 @@ Module Instance.
 End Instance.
 Export Instance(Instance).
 Export (hints) Instance.
-Print Instances Proper.
 
 Module Solver.
   Section Global.
@@ -107,15 +105,20 @@ Module Solver.
     Instance top_le: base.Top A := Framework.top (A := A).
     Instance sqsubseteq_le: base.SqSubsetEq A := canonical_names.le (A := A).
     Instance meet_meet: base.Meet A := canonical_names.meet (A := A).
+    Instance equiv `{canonical_names.Equiv T}: base.Equiv T := canonical_names.equiv (A := T).
 
     Class Analysis :=
       make {
           fixpoint: Map -> option Map;
           fixpoint_solution: forall (init result: Map) (n s: N),
-            fixpoint init = Some result -> n ∈ dom(init) -> s ∈ (Instance.successors n) -> (result ?! s) ⊑ Instance.transfer n (result ?! n);
+            fixpoint init = Some result ->
+            n ∈ dom(init) ->
+            s ∈ (Instance.successors n) ->
+            (result ?! s) ⊑ Instance.transfer n (result ?! n);
           fixpoint_invariant: forall (P: N -> A -> Prop) (init result: Map),
             fixpoint init = Some result ->
             (forall n, P n (init ?! n)) ->
+            Proper ((=) ==> (≡) ==> iff) P ->
             (forall (p n: N) (pApprox nApprox: A), P p pApprox -> P n nApprox ->
                                               n ∈ (Instance.successors p) ->
                                               P n (nApprox ⊓ (Instance.transfer p pApprox))) ->
@@ -125,12 +128,18 @@ Module Solver.
     Section Lemmas.
       Context `{analysis: Analysis} (init result: Map) (Def_result: fixpoint init = Some result).
 
+      (* Setoid are really useful (who knew?); let's expose their instances. *)
+      Existing Instance orders.po_setoid.
+      (* We will also need the fact that (MeetSemiLattice + order)s are (MeetSemiLattices)s. *)
+      Existing Instance orders.lattices.meet_sl_order_meet_sl.
+
       Lemma fixpoint_entry: forall (n: N), (result ?! n) ⊑ (init ?! n).
       Proof.
         intros n.
-        apply fixpoint_invariant with (init := init); [assumption| |]; clear n.
+        apply fixpoint_invariant with (init := init); [assumption| | |]; clear n.
         - intros n; generalize (init ?! n); clear n. intros l.
           reflexivity.
+        - intros n ? <- a a' <-. reflexivity.
         - intros p n pApprox nApprox IH_p IH_n Successor_n.
           (* For some reason, apply doesn't work...  *)
           unfold "⊓" in *.
@@ -160,7 +169,6 @@ Module Kildall.
 
     Definition lookup (m: Map) (n: N) := option.from_option id Framework.top (m !! n).
     Infix "?!" := lookup (at level 20).
-    Notation "'(' x '?!)'" := (fun (y: N) => (x: Map) ?! y) (at level 0).
 
     Definition andsb (P Q: Prop) `{base.Decision P} `{base.Decision Q}: {P /\ Q} + {~P \/ ~Q}.
       destruct (base.decide P).
@@ -214,47 +222,43 @@ Module Kildall.
     Definition in_flow (state: State) (n: N): A := state.(in_flow_map) ?! n.
     Definition out_flow (state: State) (n: N): A := Instance.transfer n (in_flow state n).
 
-    Arguments in_flow !state /.
-    Arguments out_flow !state /.
-
     (* Allows using the pointwise lattice on map lookup.
        This means that one can write
-            (m ?!) ⊑ (n ?!)
+            (in_flow m) ⊑ (in_flow n)
        as a shothand for
-            forall x, (m ?! x) ⊑ (n ?! x)
+            forall x, (in_flow m x) ⊑ (in_flow n x)
      *)
     Import (hints) Lattices.Pointwise.
     Instance state_lattice: Lattices.Pointwise.Pointwise N A := {}.
 
     (* Setoid are really useful (who knew?); let's expose their instances. *)
-    Local Instance setoid `{orders.PartialOrder T}: abstract_algebra.Setoid T.
-    Proof. apply orders.po_setoid. Qed.
+    Existing Instance orders.po_setoid.
+    (* We will also need the fact that (MeetSemiLattice + order)s are (MeetSemiLattices)s. *)
+    Existing Instance orders.lattices.meet_sl_order_meet_sl.
 
-    Local Instance meetsemilattice `{orders.MeetSemiLatticeOrder T}: abstract_algebra.MeetSemiLattice T := orders.lattices.meet_sl_order_meet_sl.
+    (* Instance state_equiv: canonical_names.Equiv State := fun s0 s1 => (in_flow s0 ≡ in_flow s1) /\ s0.(work) = s1.(work). *)
 
-    Instance state_equiv: canonical_names.Equiv State := fun s0 s1 => (in_flow s0 ≡ in_flow s1) /\ s0.(work) = s1.(work).
+    (* Instance state_equiv_equiv: Equivalence (@canonical_names.equiv _ state_equiv). *)
+    (* Proof. *)
+    (*   constructor. *)
+    (*   - intros []. split; reflexivity. *)
+    (*   - intros [] []. split; symmetry; firstorder. *)
+    (*   - intros [] [] [] [] []. split; etransitivity; eassumption. *)
+    (* Qed. *)
 
-    Instance state_equiv_equiv: Equivalence (@canonical_names.equiv _ state_equiv).
-    Proof.
-      constructor.
-      - intros []. split; reflexivity.
-      - intros [] []. split; symmetry; firstorder.
-      - intros [] [] [] [] []. split; etransitivity; eassumption.
-    Qed.
+    (* Add Morphism in_flow *)
+    (*     with signature (≡) ==> (=) ==> (≡) as in_flow_morph. *)
+    (* Proof. intros [x ?] [y ?] [x_Equiv_y ?]. apply x_Equiv_y. Qed. *)
 
-    Add Morphism in_flow
-        with signature (≡) ==> (=) ==> (≡) as in_flow_morph.
-    Proof. intros [x ?] [y ?] [x_Equiv_y ?]. apply x_Equiv_y. Qed.
-
-    Add Morphism out_flow
-        with signature (≡) ==> (=) ==> (≡) as out_flow_morph.
-    Proof.
-      intros x y x_Equiv_y n. unfold out_flow.
-      apply Instance.transfer_morphism.
-      apply in_flow_morph.
-      - assumption.
-      - reflexivity.
-    Qed.
+    (* Add Morphism out_flow *)
+    (*     with signature (≡) ==> (=) ==> (≡) as out_flow_morph. *)
+    (* Proof. *)
+    (*   intros x y x_Equiv_y n. unfold out_flow. *)
+    (*   apply Instance.transfer_morphism. *)
+    (*   apply in_flow_morph. *)
+    (*   - assumption. *)
+    (*   - reflexivity. *)
+    (* Qed. *)
 
     Section Implementation.
       (* Propagate the output of an update to the node n. *)
@@ -281,13 +285,17 @@ Module Kildall.
     Notation "x '~>' y" := (y ∈ (Instance.successors x)) (at level 70, no associativity).
     Notation "x '~/>' y" := (y ∉ (Instance.successors x)) (at level 70, no associativity).
 
+    Definition kd_closed (P: N -> A -> Prop) :=
+      Proper ((=) ==> (≡) ==> iff) P /\
+        (forall state p s, p ~> s -> P p (in_flow state p) -> P s (in_flow state s) -> P s (in_flow state s ⊓ out_flow state p)).
+
     Instance decide_succ: base.RelDecision (fun x y => x ~> y).
     Proof. intros x y. apply (@list.elem_of_list_dec N _ y (Instance.successors x)). Qed.
 
     Section Invariants.
 
       Local Definition InitCondition (init: Map) (state: State): Prop :=
-        in_flow state ⊑ (init ?!).
+        in_flow state ⊑ (lookup init).
 
       Local Definition undefined (state: State) (n: N): Prop :=
         n ∈ state.(work) \/ n ∉ dom(state.(in_flow_map)).
@@ -391,12 +399,6 @@ Module Kildall.
         - unfold in_flow; cbn. rewrite -> insert_lookup_ne by assumption. reflexivity.
       Qed.
 
-      (* Lemma propagation_ignored: forall out state w, *)
-      (*     w ∉ dom(state.(in_flow_map)) -> w ∈ (propagate_to out state w).(work). *)
-      (* Proof. *)
-      (*   intros. destruct_propagation. - contradiction. - apply base.elem_of_list_here. *)
-      (* Qed. *)
-
       Lemma propagation_work_update: forall out state w,
           state.(work) ⊆ (propagate_to out state w).(work).
       Proof.
@@ -418,6 +420,18 @@ Module Kildall.
               apply fin_map_dom.dom_insert in Falsum.
               rewrite -> base.elem_of_union in Falsum.
               destruct Falsum as [ ?%sets.elem_of_singleton_1 | ? ]; contradiction.
+      Qed.
+
+      (* The whole "domain increase" property is currently proved on the side of the main proof.
+         This should actually be proved as part of the main proof, using a [PartialPointwise] lattice.
+       *)
+      Lemma propagation_increases_domain: forall out state w,
+          dom(state.(in_flow_map)) ⊆ dom((propagate_to out state w).(in_flow_map)).
+      Proof.
+        intros out state w.
+        destruct_propagation.
+        - reflexivity.
+        - apply fin_map_dom.dom_insert_subseteq.
       Qed.
 
       Lemma propagation_preserves_succ: forall out state w n,
@@ -485,7 +499,6 @@ Module Kildall.
         assert (forall ls state state' out,
                    in_flow state' ⊑ in_flow state ->
                    (in_flow (fold_left (propagate_to out) ls state')) ⊑ (in_flow state)) as Ind. {
-
           induction ls; intros state state' out Smaller.
           - exact Smaller.
           - cbn. apply IHls. rewrite -> propagation_smaller. assumption.
@@ -493,17 +506,17 @@ Module Kildall.
         intros. apply Ind. reflexivity.
       Qed.
 
-      Add Parametric Morphism
-        (S T: Type) `{base.Equiv S} `{base.Equiv T} (f: S -> T -> S) `{Proper_f: Proper _  ((≡) ==> (≡) ==> (≡))%signature f}:
-        (@fold_left S T f) with signature (≡) ==> (≡) ==> (≡) as list_equiv_morphis.
-      Proof.
-        intros xs ys xs_Equiv_ys.
-        induction xs_Equiv_ys as [| x y xs ys ? ? IH].
-        - intros x y x_Equiv_y. cbn. assumption.
-        - intros hl hr hl_Equiv_hr.
-          cbn. apply IH.
-          apply Proper_f; assumption.
-      Qed.
+      (* Add Parametric Morphism *)
+      (*   (S T: Type) `{base.Equiv S} `{base.Equiv T} (f: S -> T -> S) `{Proper_f: Proper _  ((≡) ==> (≡) ==> (≡))%signature f}: *)
+      (*   (@fold_left S T f) with signature (≡) ==> (≡) ==> (≡) as list_equiv_morphis. *)
+      (* Proof. *)
+      (*   intros xs ys xs_Equiv_ys. *)
+      (*   induction xs_Equiv_ys as [| x y xs ys ? ? IH]. *)
+      (*   - intros x y x_Equiv_y. cbn. assumption. *)
+      (*   - intros hl hr hl_Equiv_hr. *)
+      (*     cbn. apply IH. *)
+      (*     apply Proper_f; assumption. *)
+      (* Qed. *)
 
       Lemma fold_propagation_lookup_nin: forall ls state out n,
           n ∉ ls -> in_flow (fold_left (propagate_to out) ls state) n ≡ in_flow state n.
@@ -613,12 +626,33 @@ Module Kildall.
         - cbn. apply IH. apply propagation_preserves_undefined. assumption.
       Qed.
 
+      Lemma fold_propagation_closed_predicate: forall (P: N -> A -> Prop), kd_closed P ->
+          forall state,
+            (forall n, P n (in_flow state n)) ->
+            forall n p, P n (in_flow (fold_left (propagate_to (out_flow state p)) (Instance.successors p) state) n).
+      Proof.
+        intros P [Proper_P IH] state Base n p.
+        destruct (base.decide (p ~> n)).
+        - rewrite -> fold_propagation_lookup_in by assumption.
+          apply IH; [ assumption | apply Base | apply Base ].
+        - rewrite -> fold_propagation_lookup_nin by assumption.
+          apply Base.
+      Qed.
+
       Lemma undefined_strenghtening: forall flow w work n,
           n <> w -> undefined (mkst flow (w :: work)) n -> undefined (mkst flow work) n.
       Proof.
         intros flow w work n n_NotEq_w [Work_n | Ignored_n].
         - apply list.elem_of_cons in Work_n as [? | ?]; [contradiction|]. left. assumption.
         - right. assumption.
+      Qed.
+
+      Lemma fold_propagation_increases_domain: forall ls out state,
+          dom(state.(in_flow_map)) ⊆ dom((fold_left (propagate_to out) ls state).(in_flow_map)).
+      Proof.
+        induction ls; intros.
+        - reflexivity.
+        - rewrite -> propagation_increases_domain. apply IHls.
       Qed.
 
       Lemma step_loop_preserves_succ: forall  state result,
@@ -660,8 +694,38 @@ Module Kildall.
         destruct work; cbn in Def_result.
         - discriminate.
         - injection Def_result as <-.
-          cbn.
+          cbn. unfold out_flow, in_flow.
           apply fold_propagation_smaller.
+      Qed.
+
+      Lemma step_loop_closed_predicate: forall state result P,
+          kd_closed P ->
+          step state = inr result ->
+          (forall n, P n (in_flow state n)) -> forall n, P n (in_flow result n).
+      Proof.
+        intros [flow work] result P kdClosed_P Def_result Base.
+        unfold step in Def_result.
+        destruct work as [| h t]; cbn in Def_result.
+        - discriminate.
+        - injection Def_result as <-.
+          intros.
+          assert (out_flow (mkst flow (h :: t)) h = out_flow (mkst flow t) h) as -> by reflexivity.
+          apply fold_propagation_closed_predicate.
+          + assumption. + apply Base.
+      Qed.
+
+      Lemma step_loop_increases_domain: forall state result,
+          step state = inr result ->
+          dom(state.(in_flow_map)) ⊆ dom(result.(in_flow_map)).
+      Proof.
+        intros [flow work] result Def_result.
+        unfold step in Def_result.
+        destruct work; cbn in Def_result.
+        - discriminate.
+        - injection Def_result as <-.
+          cbn.
+          rewrite <- fold_propagation_increases_domain.
+          reflexivity.
       Qed.
 
       Lemma init_invariants: forall init,
@@ -681,8 +745,8 @@ Module Kildall.
           fixpoint init = Some result ->
           Conditions init (mkst result []).
       Proof.
-        intros.
-        apply Iter.iter_prop with (P := (fun s => InitCondition init s /\ forall n, SuccCondition n s)) (3 := H2).
+        intros init result Def_result.
+        apply Iter.iter_prop with (P := (fun s => InitCondition init s /\ forall n, SuccCondition n s)) (3 := Def_result).
         - intros s Conditions_s.
           destruct (step s) eqn:Eq.
           + destruct s as [flow work].
@@ -695,6 +759,39 @@ Module Kildall.
         - apply init_invariants.
       Qed.
 
+
+      Lemma fixpoint_increases_domain: forall init result,
+          fixpoint init = Some result ->
+          dom init ⊆ dom result.
+      Proof.
+        intros init result Def_result.
+        apply Iter.iter_prop with (P := (fun (s: State) => dom init ⊆ dom s.(in_flow_map))) (3 := Def_result).
+        - intros s init_Smaller_s.
+          destruct s as [flow [|w work]].
+          + exact init_Smaller_s.
+          + cbn. rewrite -> init_Smaller_s.
+            apply step_loop_increases_domain.
+            reflexivity.
+        - reflexivity.
+      Qed.
+
+      Lemma fixpoint_closed_predicate:
+        forall P, kd_closed P ->
+             forall init result,
+               fixpoint init = Some result ->
+               (forall n, P n (init ?! n)) -> forall n, P n (result ?! n).
+      Proof.
+        intros P kdClosed_P init result Def_result Base.
+        (* unfold fixpoint in Def_result. *)
+        apply Iter.iter_prop with (P := (fun (s: State) => forall n, P n (in_flow s n))) (3 := Def_result).
+        - intros s Inv. destruct (step s) eqn:Eq.
+          + unfold step in Eq. destruct (work s); [|discriminate].
+            injection Eq as <-.
+            apply Inv.
+          + apply step_loop_closed_predicate with (1 := kdClosed_P) (2 := Eq) (3 := Inv).
+        - apply Base.
+      Qed.
+
       Lemma fixpoint_solution: forall (init result: Map) (p s: N),
           fixpoint init = Some result ->
           p ∈ dom(init) ->
@@ -705,527 +802,26 @@ Module Kildall.
         pose proof (fixpoint_invariants init result Def_result) as [InitCond SuccCond].
         specialize (SuccCond _ _ p_Pred_s) as [[Work_p | Ignored_p] | Equ_p_s].
         - rewrite -> list.elem_of_nil in Work_p. contradiction.
-        - admit.
+        - apply fixpoint_increases_domain in Def_result as DomIncrease.
+          rewrite -> sets.elem_of_subseteq in DomIncrease.
+          apply DomIncrease in p_In_init.
+          contradiction.
         - apply Equ_p_s.
       Qed.
-
-        (*
-
-          fixpoint_solution: forall (init result: Map) (n s: N),
-            fixpoint init = Some result -> n ∈ dom(init) -> s ∈ (Instance.successors n) -> (result ?! s) ⊑ Instance.transfer n (result ?! n);
-          fixpoint_invariant: forall (P: N -> A -> Prop) (init result: Map),
-            fixpoint init = Some result ->
-            (forall n, P n (init ?! n)) ->
-            (forall (p n: N) (pApprox nApprox: A), P p pApprox -> P n nApprox ->
-                                              n ∈ (Instance.successors p) ->
-                                              P n (nApprox ⊓ (Instance.transfer p pApprox))) ->
-            forall (n: N), P n (result ?! n);
-         *)
-
     End Invariants.
 
-  Definition n_invar (s:state) (n:N.t) : Prop :=
-    In n s.(wlist) \/ forall m, In m (succs n) ->
-      s.(lmap)!!m <= trans n s.(lmap)!!n.
-
-  Definition state_invar (s:state) : Prop :=
-    forall n, NM.In n inits -> n_invar s n.
-
-  Lemma prop_n_invar_pres : forall o s n n',
-    n_invar s n -> n_invar (prop_succ o s n') n.
-  Proof.
-    unfold n_invar. intros.
-    set (s' := prop_succ o s n'); unfold prop_succ in s'.
-    destruct (L.eq_dec _ _); [solve [apply H]|].
-    destruct H; [solve [simpl; intuition]|].
-    destruct (N.eq_dec n n'); [solve [simpl; intuition]|].
-    right. intros.
-    destruct (N.eq_dec n' m); subst s'; simpl.
-    - subst.
-      rewrite
-        -> (find_default_eq _ _ m),
-        -> (find_default_neq _ _ m n) by auto.
-      transitivity (lmap s)!!m.
-      + apply LFacts.le_meet_l.
-      + apply H. assumption.
-    - rewrite find_default_neq, find_default_neq; auto.
-  Qed.
-
-  (* TO MOVE *)
-  Lemma fold_left_1 : forall {A B: Type} (P:A -> Prop) (f:A -> B -> A) (bs : list B)
-                         (Hpres : forall a b, In b bs -> P a -> P (f a b)),
-      forall a a',
-        a' = fold_left f bs a -> P a -> P a'.
-  Proof.
-    intros. subst a'. generalize dependent a.
-    induction bs; simpl; intros. assumption.
-    apply IHbs. intros. apply Hpres. right; auto. assumption.
-    apply Hpres. left; auto. assumption.
-  Qed.
-
-  (* TO MOVE *)
-  Lemma fold_left_2 : forall {A B: Type} (P:A -> B -> Prop)
-                        (f:A -> B -> A)
-                        (Hpres : forall a b b', P a b -> P (f a b') b)
-                        (Hintr : forall a b, P (f a b) b),
-      forall a a' bs b,
-        a' = fold_left f bs a ->
-        In b bs -> P a' b.
-  Proof.
-    intros. subst a'. generalize dependent a.
-    induction bs as [|b']. contradiction.
-    simpl; intros. destruct H0. subst b'.
-    set (a' := fold_left _ _ _). pattern a'.
-    eapply fold_left_1; eauto.
-    subst; reflexivity.
-    apply IHbs; assumption.
-  Qed.
-
-  Lemma prop_n_out : forall o ns s s' n,
-    s' = fold_left (prop_succ o) ns s ->
-    ~ In n (wlist s') ->
-    trans n (lmap s')!!n == trans n (lmap s)!!n.
-  Proof.
-    intros o ns s s' n Heqs'. pattern s'.
-    eapply fold_left_1; eauto.
-    intros. set (r := prop_succ o a b) in *.
-    unfold prop_succ in r. destruct (L.eq_dec _ _). apply H0; auto.
-    destruct (N.eq_dec b n). contradict H1; simpl; auto.
-      subst r. simpl in *. rewrite find_default_neq; auto.
-   intro. reflexivity.
-  Qed.
-
-  Lemma step_state_invar : forall s s',
-    state_invar s -> inr s' = step s -> state_invar s'.
-  Proof.
-    unfold step, state_invar; intros s s' Hinv Hstep.
-    destruct (wlist s) eqn:Hwls. discriminate Hstep.
-    injection Hstep; clear Hstep. intros Heqs' n.
-
-    destruct (N.eq_dec t n).
-
-    (* n_invar is restablished for n *)
-    - subst t. unfold n_invar.
-      destruct(in_dec N.eq_dec n (wlist s')) as [|Hwl]; [auto | right].
-      intros m Hin. rewrite prop_n_out; eauto; simpl.
-      generalize Hwl; clear Hwl. pattern s', m.
-
-      eapply fold_left_2; eauto.
-      + intros a b b'.
-        set (r := prop_succ _ a b').
-        intros. unfold prop_succ in r. destruct (L.eq_dec _ _). apply H0; auto.
-        unfold r. simpl. destruct (N.eq_dec b' b).
-        * rewrite find_default_eq; auto. apply LFacts.le_meet_r.
-        * rewrite find_default_neq; auto. apply H0. contradict Hwl; simpl; auto.
-
-      + intros a b.
-        set (r := prop_succ _ a b).
-        intros. unfold prop_succ in r. destruct (L.eq_dec _ _) as [Heq|].
-        * subst r. rewrite Heq. apply LFacts.le_meet_r.
-        * simpl. rewrite find_default_eq; auto. apply LFacts.le_meet_r.
-    - (* n_invar is preserved for all successors ~= n *)
-      intros Hin. pattern s'. eapply fold_left_1; eauto.
-      intros. apply prop_n_invar_pres. assumption.
-      unfold state_invar, n_invar in Hinv |- *.
-      simpl. specialize (Hinv n). rewrite Hwls in Hinv. destruct Hinv.
-      assumption. left. destruct H; intuition. right. apply H.
-  Qed.
-
-  Lemma fixpoint_solution: forall res n s,
-    fixpoint = Some res ->
-    NM.In n inits ->
-    In s (succs n) ->
-    res!!s <= trans n res!!n.
-  Proof.
-    unfold fixpoint; intros. pattern res.
-    eapply Iter.iter_prop with
-      (step:=step) (P:=state_invar) (a:=make_init_state); eauto.
-    - intros a Ha.
-    unfold step. destruct (wlist a) eqn:Heql.
-      + specialize (Ha n). destruct Ha.
-        * auto.
-        * rewrite Heql in *. contradiction.
-        * auto.
-      + eapply step_state_invar. apply Ha.
-        unfold step. rewrite Heql. auto.
-    - left. simpl. apply in_map_iff.
-      pose proof (NMFacts.elements_in_iff inits n0) as [He _].
-      specialize (He H2). destruct He as [e Hine].
-      apply InA_alt in Hine as [y [Heq Hk]].
-      inversion Heq; eauto.
-  Qed.
-
-  (* monotonicity *)
-
-  Definition le_nlmap (nl1 nl2: nlmap) : Prop :=
-    forall n, nl1!!n <= nl2!!n.
-
-  Lemma le_nlmap_refl : forall nl, le_nlmap nl nl.
-  Proof.
-    unfold le_nlmap. reflexivity.
-  Qed.
-
-  Instance le_nlmap_trans : Transitive le_nlmap.
-    unfold Transitive, le_nlmap; intros. transitivity y !! n; auto.
-  Qed.
-
-  Hint Resolve LFacts.le_meet_l LFacts.le_meet_r : core .
-    (* L.eq_equiv L.le_preorder L.le_poset L.eq_le_reflexive. *)
-    (* Saw this in Relation_Definitions but it doesn't appear to work? *)
-
-  Lemma prop_succ_le_nlmap: forall st out n,
-    le_nlmap (prop_succ out st n).(lmap) st.(lmap).
-  Proof.
-    unfold le_nlmap, prop_succ; intros.
-    destruct (L.eq_dec _ _). reflexivity.
-    simpl. destruct (N.eq_dec n n0).
-      subst. rewrite find_default_eq; auto.
-      rewrite find_default_neq; auto. reflexivity.
-  Qed.
-
-  Lemma step_le_nlmap: forall st st',
-    inr st' = step st ->
-    le_nlmap st'.(lmap) st.(lmap).
-  Proof.
-    unfold step; intros. destruct (wlist st).
-    discriminate. injection H. intro Heqs.
-    pattern st'. eapply fold_left_1.
-    intros. transitivity (lmap a).
-       apply prop_succ_le_nlmap. assumption.
-    apply Heqs. apply le_nlmap_refl.
-  Qed.
-
-  Lemma fixpoint_entry : forall res n,
-    fixpoint = Some res -> res!!n <= inits!!n.
-  Proof.
-    unfold fixpoint. intros. pattern res.
-    eapply Iter.iter_prop with (step:=step).
-    - intros.
-      destruct (step a) eqn:Hstep.
-      + unfold step in Hstep. destruct (wlist a); try discriminate.
-        injection Hstep. intro; subst t. apply H0.
-      + simpl in *. transitivity (lmap a)!!n; [|assumption].
-        apply step_le_nlmap. auto.
-    - change inits with (lmap make_init_state).
-      cbv beta. reflexivity.
-    - apply H.
-  Qed.
-
-  Lemma fixpoint_invariant : forall
-    (P: N.t -> L.t -> Prop)
-    (Pinits: forall n, P n inits!!n)
-    (Ptrans: forall n ln s ls,
-      In s (succs n) ->
-      P n ln -> P s ls -> P s (L.meet ls (trans n ln))),
-    forall res n, fixpoint = Some res -> P n res!!n.
-  Proof.
-    intros until 2.
-    unfold fixpoint. intros. pattern res.
-    eapply Iter.iter_prop with (step:=step); eauto.
-
-    intro. destruct (step a) eqn:Hstep.
-
-    (* last step  Q implies P *)
-    unfold step in Hstep. destruct (wlist a); try discriminate.
-    instantiate (1:=fun s => forall n, P n s.(lmap)!!n).
-    injection Hstep. intro; subst t. intros; auto.
-
-    (* P preserved across step *)
-    simpl. intros. unfold step in Hstep.
-    destruct (wlist a); try discriminate.
-    injection Hstep; clear Hstep; intro Heqs.
-
-    pattern s. eapply fold_left_1 with (f:=prop_succ _); eauto.
-    intros. unfold prop_succ.
-    destruct (L.eq_dec _ _); simpl; auto.
-    destruct (N.eq_dec b n0).
-    rewrite find_default_eq; auto.
-      subst b. apply Ptrans; auto.
-    rewrite find_default_neq; auto.
-    auto.
-  Qed.
-
-
     #[refine]
-    Instance solver : Solver.Analysis := {
-
-      }.
-
-
-
+    Instance solver: Solver.Analysis := { fixpoint := fixpoint }.
+    Proof.
+      - apply fixpoint_solution.
+      - intros P init result Def_result Base Proper_P kdClosed_P.
+        apply fixpoint_closed_predicate with (init := init).
+        + split.
+          * assumption.
+          * intros state p s p_Pred_s P_p P_s.
+            apply kdClosed_P; assumption.
+        + assumption.
+        + apply Base.
+    Qed.
   End Global.
 End Kildall.
-
-Module ForwardSolver (PC:UsualDecidableType) (LAT: Lattice.SemiLattice) <:
-                     FORWARD_SOLVER with Module L := LAT
-                                    with Module N := PC.
-
-  Module L := LAT.
-  Module N := PC.
-  Module LFacts := Lattice.SemiLatticeFacts L.
-  Import (notations) L.
-
-
-  (* TODO: can define a total order for PCs to use more efficient sets/maps *)
-  Module NM := FMapWeakList.Make N.
-  Module Import FMP := FMapProps N NM.
-  Module NMFacts := FMapFacts.WFacts NM.
-
-  Import (notations) L.
-  Notation "a !! b" := (find_default _ a b L.top) (at level 1, format "a !! b").
-  Notation nlmap := (NM.t L.t).
-
-  Record state := mkst { lmap: NM.t L.t; wlist: list N.t }.
-
-  Section KILDALL.
-
-  Variable succs : N.t -> list N.t.
-  Variable trans : N.t -> L.t -> L.t.
-  Variable inits : nlmap.
-
-  Definition prop_succ (out:L.t) (s:state) (n:N.t) : state :=
-    let oldl := s.(lmap)!!n in
-    let newl := L.meet oldl out in
-    if L.eq_dec oldl newl
-    then s else mkst (NM.add n newl s.(lmap)) (n::s.(wlist)).
-
-  Definition step (s:state) : NM.t L.t + state :=
-    match s.(wlist) with
-      | nil => inl s.(lmap)
-      | n::rem =>
-        inr (fold_left (prop_succ (trans n s.(lmap)!!n))
-                       (succs n) (mkst s.(lmap) rem))
-    end.
-
-  Definition make_init_state : state :=
-    mkst inits (map (@fst _ _) (NM.elements inits)).
-
-  Definition fixpoint := Iter.iterate step make_init_state.
-
-
-  (* correctness *)
-
-  Definition n_invar (s:state) (n:N.t) : Prop :=
-    In n s.(wlist) \/ forall m, In m (succs n) ->
-      s.(lmap)!!m <= trans n s.(lmap)!!n.
-
-  Definition state_invar (s:state) : Prop :=
-    forall n, NM.In n inits -> n_invar s n.
-
-  Lemma prop_n_invar_pres : forall o s n n',
-    n_invar s n -> n_invar (prop_succ o s n') n.
-  Proof.
-    unfold n_invar. intros.
-    set (s' := prop_succ o s n'); unfold prop_succ in s'.
-    destruct (L.eq_dec _ _); [solve [apply H]|].
-    destruct H; [solve [simpl; intuition]|].
-    destruct (N.eq_dec n n'); [solve [simpl; intuition]|].
-    right. intros.
-    destruct (N.eq_dec n' m); subst s'; simpl.
-    - subst.
-      rewrite
-        -> (find_default_eq _ _ m),
-        -> (find_default_neq _ _ m n) by auto.
-      transitivity (lmap s)!!m.
-      + apply LFacts.le_meet_l.
-      + apply H. assumption.
-    - rewrite find_default_neq, find_default_neq; auto.
-  Qed.
-
-  (* TO MOVE *)
-  Lemma fold_left_1 : forall {A B: Type} (P:A -> Prop) (f:A -> B -> A) (bs : list B)
-                         (Hpres : forall a b, In b bs -> P a -> P (f a b)),
-      forall a a',
-        a' = fold_left f bs a -> P a -> P a'.
-  Proof.
-    intros. subst a'. generalize dependent a.
-    induction bs; simpl; intros. assumption.
-    apply IHbs. intros. apply Hpres. right; auto. assumption.
-    apply Hpres. left; auto. assumption.
-  Qed.
-
-  (* TO MOVE *)
-  Lemma fold_left_2 : forall {A B: Type} (P:A -> B -> Prop)
-                        (f:A -> B -> A)
-                        (Hpres : forall a b b', P a b -> P (f a b') b)
-                        (Hintr : forall a b, P (f a b) b),
-      forall a a' bs b,
-        a' = fold_left f bs a ->
-        In b bs -> P a' b.
-  Proof.
-    intros. subst a'. generalize dependent a.
-    induction bs as [|b']. contradiction.
-    simpl; intros. destruct H0. subst b'.
-    set (a' := fold_left _ _ _). pattern a'.
-    eapply fold_left_1; eauto.
-    subst; reflexivity.
-    apply IHbs; assumption.
-  Qed.
-
-  Lemma prop_n_out : forall o ns s s' n,
-    s' = fold_left (prop_succ o) ns s ->
-    ~ In n (wlist s') ->
-    trans n (lmap s')!!n == trans n (lmap s)!!n.
-  Proof.
-    intros o ns s s' n Heqs'. pattern s'.
-    eapply fold_left_1; eauto.
-    intros. set (r := prop_succ o a b) in *.
-    unfold prop_succ in r. destruct (L.eq_dec _ _). apply H0; auto.
-    destruct (N.eq_dec b n). contradict H1; simpl; auto.
-      subst r. simpl in *. rewrite find_default_neq; auto.
-   intro. reflexivity.
-  Qed.
-
-  Lemma step_state_invar : forall s s',
-    state_invar s -> inr s' = step s -> state_invar s'.
-  Proof.
-    unfold step, state_invar; intros s s' Hinv Hstep.
-    destruct (wlist s) eqn:Hwls. discriminate Hstep.
-    injection Hstep; clear Hstep. intros Heqs' n.
-
-    destruct (N.eq_dec t n).
-
-    (* n_invar is restablished for n *)
-    - subst t. unfold n_invar.
-      destruct(in_dec N.eq_dec n (wlist s')) as [|Hwl]; [auto | right].
-      intros m Hin. rewrite prop_n_out; eauto; simpl.
-      generalize Hwl; clear Hwl. pattern s', m.
-
-      eapply fold_left_2; eauto.
-      + intros a b b'.
-        set (r := prop_succ _ a b').
-        intros. unfold prop_succ in r. destruct (L.eq_dec _ _). apply H0; auto.
-        unfold r. simpl. destruct (N.eq_dec b' b).
-        * rewrite find_default_eq; auto. apply LFacts.le_meet_r.
-        * rewrite find_default_neq; auto. apply H0. contradict Hwl; simpl; auto.
-
-      + intros a b.
-        set (r := prop_succ _ a b).
-        intros. unfold prop_succ in r. destruct (L.eq_dec _ _) as [Heq|].
-        * subst r. rewrite Heq. apply LFacts.le_meet_r.
-        * simpl. rewrite find_default_eq; auto. apply LFacts.le_meet_r.
-    - (* n_invar is preserved for all successors ~= n *)
-      intros Hin. pattern s'. eapply fold_left_1; eauto.
-      intros. apply prop_n_invar_pres. assumption.
-      unfold state_invar, n_invar in Hinv |- *.
-      simpl. specialize (Hinv n). rewrite Hwls in Hinv. destruct Hinv.
-      assumption. left. destruct H; intuition. right. apply H.
-  Qed.
-
-  Lemma fixpoint_solution: forall res n s,
-    fixpoint = Some res ->
-    NM.In n inits ->
-    In s (succs n) ->
-    res!!s <= trans n res!!n.
-  Proof.
-    unfold fixpoint; intros. pattern res.
-    eapply Iter.iter_prop with
-      (step:=step) (P:=state_invar) (a:=make_init_state); eauto.
-    - intros a Ha.
-    unfold step. destruct (wlist a) eqn:Heql.
-      + specialize (Ha n). destruct Ha.
-        * auto.
-        * rewrite Heql in *. contradiction.
-        * auto.
-      + eapply step_state_invar. apply Ha.
-        unfold step. rewrite Heql. auto.
-    - left. simpl. apply in_map_iff.
-      pose proof (NMFacts.elements_in_iff inits n0) as [He _].
-      specialize (He H2). destruct He as [e Hine].
-      apply InA_alt in Hine as [y [Heq Hk]].
-      inversion Heq; eauto.
-  Qed.
-
-  (* monotonicity *)
-
-  Definition le_nlmap (nl1 nl2: nlmap) : Prop :=
-    forall n, nl1!!n <= nl2!!n.
-
-  Lemma le_nlmap_refl : forall nl, le_nlmap nl nl.
-  Proof.
-    unfold le_nlmap. reflexivity.
-  Qed.
-
-  Instance le_nlmap_trans : Transitive le_nlmap.
-    unfold Transitive, le_nlmap; intros. transitivity y !! n; auto.
-  Qed.
-
-  Hint Resolve LFacts.le_meet_l LFacts.le_meet_r : core .
-    (* L.eq_equiv L.le_preorder L.le_poset L.eq_le_reflexive. *)
-    (* Saw this in Relation_Definitions but it doesn't appear to work? *)
-
-  Lemma prop_succ_le_nlmap: forall st out n,
-    le_nlmap (prop_succ out st n).(lmap) st.(lmap).
-  Proof.
-    unfold le_nlmap, prop_succ; intros.
-    destruct (L.eq_dec _ _). reflexivity.
-    simpl. destruct (N.eq_dec n n0).
-      subst. rewrite find_default_eq; auto.
-      rewrite find_default_neq; auto. reflexivity.
-  Qed.
-
-  Lemma step_le_nlmap: forall st st',
-    inr st' = step st ->
-    le_nlmap st'.(lmap) st.(lmap).
-  Proof.
-    unfold step; intros. destruct (wlist st).
-    discriminate. injection H. intro Heqs.
-    pattern st'. eapply fold_left_1.
-    intros. transitivity (lmap a).
-       apply prop_succ_le_nlmap. assumption.
-    apply Heqs. apply le_nlmap_refl.
-  Qed.
-
-  Lemma fixpoint_entry : forall res n,
-    fixpoint = Some res -> res!!n <= inits!!n.
-  Proof.
-    unfold fixpoint. intros. pattern res.
-    eapply Iter.iter_prop with (step:=step).
-    - intros.
-      destruct (step a) eqn:Hstep.
-      + unfold step in Hstep. destruct (wlist a); try discriminate.
-        injection Hstep. intro; subst t. apply H0.
-      + simpl in *. transitivity (lmap a)!!n; [|assumption].
-        apply step_le_nlmap. auto.
-    - change inits with (lmap make_init_state).
-      cbv beta. reflexivity.
-    - apply H.
-  Qed.
-
-  Lemma fixpoint_invariant : forall
-    (P: N.t -> L.t -> Prop)
-    (Pinits: forall n, P n inits!!n)
-    (Ptrans: forall n ln s ls,
-      In s (succs n) ->
-      P n ln -> P s ls -> P s (L.meet ls (trans n ln))),
-    forall res n, fixpoint = Some res -> P n res!!n.
-  Proof.
-    intros until 2.
-    unfold fixpoint. intros. pattern res.
-    eapply Iter.iter_prop with (step:=step); eauto.
-
-    intro. destruct (step a) eqn:Hstep.
-
-    (* last step  Q implies P *)
-    unfold step in Hstep. destruct (wlist a); try discriminate.
-    instantiate (1:=fun s => forall n, P n s.(lmap)!!n).
-    injection Hstep. intro; subst t. intros; auto.
-
-    (* P preserved across step *)
-    simpl. intros. unfold step in Hstep.
-    destruct (wlist a); try discriminate.
-    injection Hstep; clear Hstep; intro Heqs.
-
-    pattern s. eapply fold_left_1 with (f:=prop_succ _); eauto.
-    intros. unfold prop_succ.
-    destruct (L.eq_dec _ _); simpl; auto.
-    destruct (N.eq_dec b n0).
-    rewrite find_default_eq; auto.
-      subst b. apply Ptrans; auto.
-    rewrite find_default_neq; auto.
-    auto.
-  Qed.
-
-  End KILDALL.
-
-End ForwardSolver.
