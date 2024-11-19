@@ -151,8 +151,8 @@ Definition VMemInt_intptr := VMemInt_Z.
 
 End BigIP.
 
-Module BigIP_BIG : INTPTR_BIG BigIP.
-  Import BigIP.
+Module BigIP_BIG : INTPTR_BIG.
+  Include BigIP.
 
   Lemma from_Z_safe :
     forall z,

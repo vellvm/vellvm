@@ -118,6 +118,7 @@ End PTOI_ARITH_EXTRAS.
 (** Types with additional metadata associated with them *)
 Module Type HAS_METADATA (METADATA : Typ) (Import T:Typ).
   Parameter extract_metadata : t -> METADATA.t.
+  Parameter default_metadata : METADATA.t.
 End HAS_METADATA.
 
 (** Metadata types with provenance *)

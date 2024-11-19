@@ -16,8 +16,6 @@
 ./mem/MemoryModules/FiniteSpecPrimitives.v
 ./mem/MemoryModules/Within.v
 ./mem/OOM.v
-./mem/Semantics/Memory/ErrSID.v
-./mem/Semantics/Memory/Provenance.v
 ./mem/Semantics/Memory/Overlaps.v
 ./mem/Semantics/Memory/StoreId.v
 ./mem/Addresses/MemoryAddress.v

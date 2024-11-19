@@ -120,7 +120,7 @@ Definition ll_double := Floats.float.
 
 
 (* Sizeof is needed for for ConcatBytes case *)
-Module DVALUE (ADDRESS_METADATA : Typ) (PS : PROV_SET) (A:ADDRESS ADDRESS_METADATA PS) (IP:INTPTR) (SIZEOF:Sizeof).
+Module DVALUE (A: NULLABLE_ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof).
 
   Import SIZEOF.
   Import IP.

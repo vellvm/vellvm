@@ -164,6 +164,6 @@ End StackMap.
    it until [TopLevel] either.
    We are hence exposing the specialization here, but it is slightly awkward.
  *)
-Module Make (A : ADDRESS)(IP : INTPTR)(SIZEOF : Sizeof)(LLVMEvents : LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
+Module Make (A : BASIC_ADDRESS)(IP : INTPTR)(SIZEOF : Sizeof)(LLVMEvents : LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
   Definition lstack := @stack (list (raw_id * LLVMEvents.DV.uvalue)).
 End Make.

@@ -6,15 +6,14 @@ From Coq Require Import
 
 From Vellvm.Semantics Require Import
      MemoryParams
-     Memory.ErrSID
      LLVMParams
-     LLVMEvents
-     StoreId.
+     LLVMEvents.
 
-From Vellvm.Handlers Require Import
-     MemoryModel
-     MemPropT
-     MemoryModules.Within.
+From Mem Require Import
+  MemoryModel
+  StoreId
+  MemPropT
+  MemoryModules.Within.
 
 From Vellvm.Utils Require Import
      Tactics

@@ -99,12 +99,10 @@ Fixpoint concat_bytes_Z (bytes : list Z) : Z
 
 Module Type DvalueByte (LP : LLVMParams).
   Import LP.
-  Import PTOI.
-  Import ITOP.
-  Import PROV.
   Import SIZEOF.
   Import Events.DV.
   Import Sizeof.
+  Import ADDR.
 
   (* Walk through a list *)
   (* Returns field index + number of bytes remaining *)
@@ -425,7 +423,7 @@ Module Type DvalueByte (LP : LLVMParams).
             *)
            (* TODO: not sure if this should be lazy OOM or not *)
            zs <- map_monad dvalue_byte_value dbs;;
-           match int_to_ptr (concat_bytes_Z zs) wildcard_prov with
+           match int_to_ptr (concat_bytes_Z zs) default_metadata with
            | NoOom a => ret (DVALUE_Addr a)
            | Oom msg => raise_oomable DTYPE_Pointer
            end
@@ -517,7 +515,7 @@ Module Type DvalueByte (LP : LLVMParams).
             *)
            (* TODO: not sure if this should be lazy OOM or not *)
            zs <- map_monad dvalue_byte_value dbs;;
-           match int_to_ptr (concat_bytes_Z zs) wildcard_prov with
+           match int_to_ptr (concat_bytes_Z zs) default_metadata with
            | NoOom a => ret (DVALUE_Addr a)
            | Oom msg => raise_oomable DTYPE_Pointer
            end

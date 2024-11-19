@@ -72,7 +72,7 @@ Set Contextual Implicit.
    exception.  Unknown Calls (either to other intrinsics or external calls) are
    passed through unchanged.
 *)
-Module Make(A:MemoryAddress.ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMIO: LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
+Module Make(A:MemoryAddress.BASIC_ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMIO: LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
 
   Module IS := IntrinsicsDefinitions.Make(A)(IP)(SIZEOF)(LLVMIO).
   Include IS.

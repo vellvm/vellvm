@@ -2,6 +2,9 @@ From Coq Require Import String List ZArith.
 
 From ExtLib Require Import Structures.Monads.
 
+From Coq Require Import
+  Structures.Equalities.
+
 From Vellvm Require Import
      Syntax.DynamicTypes
      Semantics.DynamicValues
@@ -28,7 +31,11 @@ Import Basics.Basics.Monads.
 Import ListNotations.
 Import MonadNotation.
 
-Module Type ByteImpl(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
+Module Type ByteImpl
+  (Addr:NULLABLE_ADDRESS)
+  (IP:INTPTR)
+  (SIZEOF:Sizeof)
+  (LLVMEvents: LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
   Import LLVMEvents.
   Import DV.
 
@@ -57,7 +64,7 @@ Module Type ByteImpl(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents: LLVM_IN
       sbyte_to_extractbyte (uvalue_sbyte uv dt idx sid) =  UVALUE_ExtractByte uv dt idx sid.
 End ByteImpl.
 
-Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(Byte:ByteImpl(Addr)(IP)(SIZEOF)(LLVMEvents)).
+Module Type ByteModule(Addr:NULLABLE_ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(Byte:ByteImpl(Addr)(IP)(SIZEOF)(LLVMEvents)).
   Export Byte.
   Import LLVMEvents.
   Import DV.
@@ -213,6 +220,6 @@ Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_I
     end.
 End ByteModule.
 
-Module Byte (Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(Byte:ByteImpl(Addr)(IP)(SIZEOF)(LLVMEvents)) : ByteModule Addr IP SIZEOF LLVMEvents Byte.
+Module Byte (Addr:NULLABLE_ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(Byte:ByteImpl(Addr)(IP)(SIZEOF)(LLVMEvents)) : ByteModule Addr IP SIZEOF LLVMEvents Byte.
   Include (ByteModule Addr IP SIZEOF LLVMEvents Byte).
 End Byte.

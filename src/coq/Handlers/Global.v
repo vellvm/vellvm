@@ -186,6 +186,6 @@ End Globals.
    it until [TopLevel] either.
    So exposing the specialization here, but it is awkward.
  *)
-Module Make (A : ADDRESS)(IP : INTPTR)(SIZEOF : Sizeof)(LLVMEvents : LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
+Module Make (A : BASIC_ADDRESS)(IP : INTPTR)(SIZEOF : Sizeof)(LLVMEvents : LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
   Definition global_env := FMapAList.alist raw_id LLVMEvents.DV.dvalue.
 End Make.
