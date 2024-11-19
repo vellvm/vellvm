@@ -9,6 +9,8 @@ From Mem Require Import
   Addresses.MemoryAddress
   Addresses.Provenance.
 
+Require Import LLVM_Memory.GepM.
+
 From ITree Require Import
      ITree
      Basics.Basics
@@ -59,7 +61,7 @@ Import EitherMonad.
 From Stdlib Require Import FunctionalExtensionality.
 Import Logic.
 
-Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL).
+Module MemoryHelpers (MD : Typ) (PS : PROV_SET) (ADDR : ADDRESS MD PS).
   (*** Other helpers *)
   Import MP.GEP.
   Import MP.BYTE_IMPL.

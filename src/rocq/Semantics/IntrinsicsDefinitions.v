@@ -255,7 +255,7 @@ Definition defined_intrinsics_decls :=
    any other effects.
 
 *)
-Module Make(A:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMIO: LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
+Module Make(A:BASIC_ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMIO: LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
   Open Scope string_scope.
 
   Import LLVMIO.

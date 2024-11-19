@@ -22,7 +22,7 @@ From Vellvm Require Import
 From Mem Require Import
   Addresses.MemoryAddress
   StoreId
-  Provenance.
+  Addresses.Provenance.
 
 From LLVM_Memory Require Import
   Sizeof

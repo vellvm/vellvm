@@ -6,17 +6,14 @@ From Stdlib Require Import
 
 From Vellvm.Semantics Require Import
      MemoryParams
-     Memory.ErrSID
      LLVMParams
      LLVMEvents.
 
-From Mem.Semantics Require Import
-  Memory.StoreId.
-
-From Vellvm.Handlers Require Import
-     MemoryModel
-     MemPropT
-     MemoryModules.Within.
+From Mem Require Import
+  MemoryModel
+  StoreId
+  MemPropT
+  MemoryModules.Within.
 
 From Vellvm.Utils Require Import
      Tactics
