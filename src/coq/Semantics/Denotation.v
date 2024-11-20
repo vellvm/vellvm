@@ -34,11 +34,13 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Semantics.LLVMParams
      Semantics.MemoryParams
-     Semantics.Memory.MemBytes
      Semantics.ConcretizationParams
      Utils.ListUtil
      DynamicValues
      Handlers.Concretization.
+
+From LLVM_Memory Require Import
+  MemBytes.
 
 Require Import Ceres.Ceres.
 
@@ -107,7 +109,7 @@ Open Scope N_scope.
     itrees in the second phase.
  *)
 
-Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP Byte).
+Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationParams LP MP).
   Import CP.
   Import CONC.
   Import MP.
@@ -685,7 +687,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   Definition lookup_defn (dv : dvalue) (m : IntMap function_denotation) : option function_denotation
     := match dv with
        | DVALUE_Addr addr =>
-           lookup (PTOI.ptr_to_int addr) m
+           lookup (ADDR.ptr_to_int addr) m
        | _ => None
        end.
 
