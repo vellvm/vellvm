@@ -15,6 +15,8 @@ From Mem Require Import
   MemPropT
   MemoryModules.Within.
 
+From LLVM_Memory Require Import MemoryLLVM.
+
 From Vellvm.Utils Require Import
      Tactics
      InterpProp
