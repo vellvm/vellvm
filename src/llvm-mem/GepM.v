@@ -1,6 +1,6 @@
 From Stdlib Require Import ZArith String List Lia.
 
-From Coq Require Import
+From Stdlib Require Import
   Structures.Equalities.
 
 From ExtLib Require Import

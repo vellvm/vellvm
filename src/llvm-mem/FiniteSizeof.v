@@ -170,7 +170,7 @@ End FinSizeof.
 Inductive UByte (uvalue : Type) :=
 | mkUByte (uv : uvalue) (dt : dtyp) (idx : N) (sid : store_id) : UByte uvalue.
 
-Module FinByte (ADDR : MemoryAddress.ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (LLVMEvents:LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF)) : ByteImpl(ADDR)(IP)(SIZEOF)(LLVMEvents)
+Module FinByte (ADDR : MemoryAddress.NULLABLE_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (LLVMEvents:LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF)) : ByteModule(ADDR)(IP)(SIZEOF)(LLVMEvents)
 with  Definition SByte := UByte LLVMEvents.DV.uvalue
 with  Definition uvalue_sbyte := mkUByte LLVMEvents.DV.uvalue.
   Import LLVMEvents.
@@ -200,4 +200,5 @@ with  Definition uvalue_sbyte := mkUByte LLVMEvents.DV.uvalue.
     auto.
   Qed.
 
+  Include (ByteExtras ADDR IP SIZEOF LLVMEvents).
 End FinByte.

@@ -16,7 +16,7 @@ From Vellvm Require Import
     Import LP.
 
     Declare Module GEP  : GEPM ADDR PTOI PROV ITOP IP SIZEOF Events.
-    Declare Module Byte : ByteImpl ADDR IP SIZEOF Events.
+    Declare Module Byte : ByteModule ADDR IP SIZEOF Events.
     Declare Module DVALUE_BYTE : DvalueByte LP.
 
     Module MP := MemoryParams.Make LP GEP Byte DVALUE_BYTE.

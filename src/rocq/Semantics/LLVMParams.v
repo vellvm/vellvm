@@ -1,4 +1,4 @@
-From Coq Require Import
+From Stdlib Require Import
   Equalities.
 
 From Vellvm Require Import

@@ -13,6 +13,7 @@ From ITree Require Import
 From Vellvm Require Import
      Utils.Error
      Utils.Raise
+     Utils.RaiseLLVM
      Utils.MonadReturnsLaws
      Utils.MonadEq1Laws
      Utils.MonadExcLaws

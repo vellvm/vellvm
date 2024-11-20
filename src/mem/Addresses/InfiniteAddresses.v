@@ -8,7 +8,6 @@ From Vellvm Require Import
 
 From Mem Require Import
   Addresses.MemoryAddress
-  Memory.Provenance
   Addresses.Provenance.
 
 From QuickChick Require Import Show.
@@ -28,7 +27,7 @@ Import ListNotations.
 Definition Iptr := Z. (* Integer pointer type (physical addresses) *)
 
 (* TODO: Should probably make this an NSet, but it gives universe inconsistency with Module addr *)
-Definition Prov := option (list Provenance). (* Provenance *)
+Definition Prov := N_ProvSet.t.
 
 Definition wildcard_prov : Prov := None.
 Definition nil_prov : Prov := Some [].
@@ -119,6 +118,8 @@ End Inf_PTOI_ARITH_EXTRAS.
 Module Inf_HAS_METADATA <: HAS_METADATA N_ProvSet InfAddrType.
   Definition extract_metadata (addr : InfAddrType.t) : N_ProvSet.t :=
     snd addr.
+
+  Definition default_metadata := N_ProvSet.wildcard_prov.
 End Inf_HAS_METADATA.
 
 (* TODO: Move to utility *)

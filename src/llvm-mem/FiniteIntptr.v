@@ -19,8 +19,7 @@ From Vellvm.Semantics Require Import
      VellvmIntegers.
 
 From Mem Require Import
-     Addresses.MemoryAddress
-     Memory.Provenance.
+     Addresses.MemoryAddress.
 
 From LLVM_Memory Require Import
   Intptr.
@@ -149,6 +148,7 @@ Definition VMemInt_intptr := VMemInt_Z.
     reflexivity.
   Qed.
 
+  Include INTPTR_SEQ.
 End BigIP.
 
 Module BigIP_BIG : INTPTR_BIG.
@@ -355,4 +355,5 @@ Definition VMemInt_intptr := @VMemInt_intptr_ix 64.
     reflexivity.
   Qed.
 
+  Include INTPTR_SEQ.
 End IP64Bit.

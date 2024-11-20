@@ -13,10 +13,12 @@ From Stdlib Require Import String.
 From Stdlib Require Import OrderedType OrderedTypeEx.
 From Stdlib Require Import ZArith.
 Require Import Rocqlib.
+From Stdlib Require Import List.
 
 From Vellvm Require Import
   Utils.Error
-  Utils.Monads.
+  Utils.Monads
+  MapMonadExtra.
 
 From ExtLib Require Import
   Structures.Monads.
@@ -28,6 +30,7 @@ From Mem Require Import
   Addresses.Provenance.
 
 Import MonadNotation.
+Import ListNotations.
 Open Scope monad_scope.
 (* end hide *)
 
@@ -101,7 +104,19 @@ Module Type HAS_POINTER_ARITHMETIC_HELPERS
     | nil => true
     | cons ptr ptrs => consecutive_ptrs_h ptr ptrs
     end.
-    
+
+  (*** Lemmas about get_consecutive_ptrs *)
+  Lemma get_consecutive_ptrs_length :
+    forall (ptr : addr) (len : nat) (ptrs : list addr),
+      get_consecutive_ptrs ptr len = ret ptrs ->
+      len = length ptrs.
+  Proof.
+    intros ptr len ptrs CONSEC.
+    unfold get_consecutive_ptrs in CONSEC.
+    apply map_monad_err_length in CONSEC.
+    rewrite length_seq in CONSEC.
+    auto.
+  Qed.  
 End HAS_POINTER_ARITHMETIC_HELPERS.
 
 Module Type HAS_POINTER_ARITHMETIC (ADDR : CORE_ADDRESS)
