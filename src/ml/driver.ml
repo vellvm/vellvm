@@ -130,16 +130,8 @@ let process_file f path =
 let last xs =  List.rev xs |> List.hd
 
 (* Here is where we can build extra checks: definition/declaration alignment, so on. *)
-let link_asts = List.concat
-
-(* let cons_uniq xs x = if List.mem x xs then xs else x :: xs
-
-let remove_from_left xs = List.rev (List.fold_left cons_uniq [] xs)
-(* RAB: credit https://stackoverflow.com/questions/30634119/ocaml-removing-duplicates-from-a-list-while-maintaining-order-from-the-right 
-  for aiding my laziness*)
-let validate_ssa = 
-  let remove_redundant_metadata ast =  *)
-
+let link_asts asts = 
+   TopLevel.TopLevelBigIntptr.link_tles asts  
 
 
 (* links many files to produce a single AST. returns the AST and the name it 

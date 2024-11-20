@@ -1422,8 +1422,12 @@ Notation "x :.: l" := (ncons x l)
 
 Notation "[ x .; y ]" := (ncons x (nbase y)).
 
-(* Currently not working *)
+Notation "[ x .; .. .; y .; z ]" := (ncons x (.. (ncons y (nbase z)) ..)).
+
+(* Why does this not work? *)
+(* Some idea why, not fully sure- SAZ likely knows. *)
 (* Notation "[ x .; y .; .. .; z ]" := (ncons x .. (ncons y (nbase z)) ..). *)
+
 
 Definition nfirst {A: Type} (l: nlist A) :=
   match l with nbase a => a | a :.: l' => a end.
@@ -1492,6 +1496,21 @@ Definition nrev {A : Type} (l : nlist A) : nlist A :=
       | nbase a    => nbase a 
       | ncons a l' => revacc (nbase a) l'
   end. 
+
+Fixpoint njoin_with {A : Type} (f : A -> A -> A) (l : nlist A) : A :=
+  match l with 
+    | nbase a  => a
+    | a :.: l' => f a (njoin_with f l')
+  end. 
+
+Definition nconcat {A : Type} (ll : nlist (nlist A)) : nlist A :=
+  njoin_with napp ll. 
+
+Example nconcat_1 :
+  nconcat [[1.; 2].; [3.; 4]] = [1.; 2.; 3.; 4].
+Proof. 
+  reflexivity.
+Qed. 
 
 Lemma first_never_fails_nlists : forall (A : Type) (l : nlist A), 
   exists (a : A), nfirst l = a.

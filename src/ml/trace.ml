@@ -16,8 +16,7 @@ let print_log_entry (le : log_entry) =
 let print_log () : unit =
   Printf.printf "%s\n" (Log.dstring_of_log_stream !Log.log |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
     
-let get_mcfg ll_ast =
-  (mcfg_of_tle (TopLevel.TopLevelBigIntptr.link TopLevel.TopLevelBigIntptr.coq_PREDEFINED_FUNCTIONS ll_ast))
+let get_mcfg = mcfg_of_tle
 
 let camlstring_of_dstring (dstr : DList.coq_DString) =
   dstr |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring

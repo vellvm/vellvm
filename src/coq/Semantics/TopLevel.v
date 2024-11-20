@@ -19,6 +19,7 @@ From Vellvm Require Import
   Utilities
   Utils.IntMaps
   Syntax
+  Numeric.Coqlib
   Syntax.LLVMAst
   Syntax.AstLib
   Semantics.LLVMEvents
@@ -298,10 +299,9 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   
   (* TOPLEVEL Semantics  ------------------------------------------------------------------------- *)
   
-
   (** * Linking 
 
-    We first need to link external definitions. Currently, these definitions are
+    We first need to link_predefs external definitions. Currently, these definitions are
    only functions we hard-code into the environment for their usefulness-- 
    most notably `printf`. Linking occurs at the `toplevel_definition` level. *)
 
@@ -312,29 +312,97 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
 
   Definition PREDEFINED_FUNCTIONS : ll_toplevel_entities := List.concat [printf_definition]. 
 
-  (* Example ensure_functions_defined : negb (Nat.eqb (List.length PREDEFINED_FUNCTIONS) O) .  *)
-  (* Proof. reflexivity. Qed.   *)
+  Example ensure_functions_defined : negb (Nat.eqb (List.length PREDEFINED_FUNCTIONS) O) . 
+  Proof. reflexivity. Qed. 
+
+   (* Get list of predef definitions 
+      Check each userdefined definition 
+      If it's in the list of predefs, remove it *)
+
+  Definition defined_in_predefs (userdef : ll_toplevel_entity) : bool := 
+    existsb (fun predef =>
+    match predef, userdef with 
+          TLE_Definition  {| df_prototype := {| dc_name := Name predef_n |}|}, 
+          TLE_Definition  {| df_prototype := {| dc_name := Name userdef_n |}|}
+             => String.eqb predef_n userdef_n
+      | _, _    => false
+    end) PREDEFINED_FUNCTIONS. 
+  
 
   (* checks if `userdecl_n` is a name of a definition in `predefs`. *)
-  Definition userdecl_defined_in (userdecl_n : string) 
-                                 (predefs    : ll_toplevel_entities) : bool := 
+  Definition userdecl_defined_in_predefs (userdecl : declaration dtyp) : bool := 
     existsb (fun predef =>
-    match predef with 
-          TLE_Definition  {| df_prototype := {| dc_name := Name predef_n |}|}
+    match predef, userdecl with 
+          TLE_Definition  {| df_prototype := {| dc_name := Name predef_n |}|}, 
+                          {| dc_name := Name userdecl_n |}          
              => String.eqb userdecl_n predef_n
-      | _    => false
-    end) predefs. 
+      | _, _    => false
+    end) PREDEFINED_FUNCTIONS. 
+    
+  Definition pairapp {A  B: Type} (p1 p2: list A * list B) :=
+    match (p1, p2) with 
+    ((l1, l2), (l1', l2')) => (List.app l1 l1', List.app l2 l2')
+    end.
 
-  Definition decl_defined_in (user_tle : ll_toplevel_entity) 
-                             (predefs  : ll_toplevel_entities) : bool := 
-    match user_tle with 
-      | TLE_Declaration {| dc_name := Name n |} => userdecl_defined_in n predefs
-      | _ => false 
+  Definition tripleapp {A B C: Type} (p1 p2: list A * list B * list C) :=
+    match (p1, p2) with 
+    ((l1, l2, l3), (l1', l2', l3')) => 
+      (List.app l1 l1', List.app l2 l2', List.app l3 l3')
+    end.
+
+  Definition tle_defs_eq (d1 d2 : ll_toplevel_entity) :=
+    match d1, d2 with 
+    | TLE_Definition  {| df_prototype := {| dc_name := Name n1 |}|}, 
+      TLE_Definition  {| df_prototype := {| dc_name := Name n2 |}|} => String.eqb n1 n2
+    | _, _ => false 
+    end. 
+  
+  Definition defs_eq (d1 d2 : definition dtyp (CFG.cfg dtyp)) :=
+    match d1, d2 with 
+    | {| df_prototype := {| dc_name := Name n1 |}|}, 
+      {| df_prototype := {| dc_name := Name n2 |}|} => String.eqb n1 n2
+    | _, _ => false 
     end. 
 
-  Definition defines_decl : 
-    ll_toplevel_entities -> ll_toplevel_entity -> bool := 
-    (flip decl_defined_in).
+  Definition tle_decls_eq (d1 d2 : ll_toplevel_entity) 
+  :=
+    match d1, d2 with 
+    | TLE_Declaration  {| dc_name := Name n1 |}, 
+      TLE_Declaration  {| dc_name := Name n2 |} => String.eqb n1 n2 
+    | _, _ => false 
+    end. 
+
+  Definition decls_eq (d1 d2 : declaration dtyp) 
+  :=
+    match d1, d2 with 
+    | {| dc_name := Name n1 |}, 
+      {| dc_name := Name n2 |} => String.eqb n1 n2 
+    | _, _ => false 
+    end. 
+
+  Fixpoint uniq_b {A : Type} (eqfn : A -> A -> bool) (l : list A) : bool :=
+    match l with 
+      | [] => true 
+      | (x::xs) => andb (negb (existsb (eqfn x) xs)) (uniq_b eqfn xs)
+    end. 
+
+  Fixpoint remove_duplicates_aux {A : Type} (p : A -> A -> bool) (new old : list A) : list A :=
+    match old with
+    | [] => new
+    | x :: xs =>
+      if existsb (fun n => p x n) new then
+        remove_duplicates_aux p new xs
+      else
+        remove_duplicates_aux p (x :: new) xs
+    end.
+
+  Definition remove_duplicates {A : Type} (p : A -> A -> bool) (l : list A) : list A :=
+    remove_duplicates_aux p [] l.
+
+
+(* nodup does not work because it needs decidable propositional equality- 
+   TOTAL definition of equality on the ll_toplevel_entity type. 
+   There is one decision procedure that does this. *)
 
   (** Importantly, the linker _removes any declaration_ from the user's
      program that shares a name with a definition in `predefs` 
@@ -342,21 +410,134 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
      This is so that we can enforce our handcrafted declaration 
      is the one referenced by their program. 
   *)
-  Definition link  (predefs  : ll_toplevel_entities)
-                   (userprog : ll_toplevel_entities) : ll_toplevel_entities := 
-      let predefined     := (defines_decl predefs) in
-      let userprog'      := filter (negb ∘ predefined) userprog 
-        in List.app predefs userprog'. 
 
-   (* Worth a proof that linking preserves structure when there are no 
-      duplicates + upholds the linking removal postcondition?
-   
+  Definition tle_decl_def_match (defs : ll_toplevel_entities) (decl : ll_toplevel_entity) : bool :=
+    existsb (fun def => 
+      match decl, def with 
+    | TLE_Declaration   {| dc_name := Name n1 ; dc_type := t1 |}, 
+      TLE_Definition    {| df_prototype := {| dc_name := Name n2 ; dc_type := t2 |}|} =>
+        andb (String.eqb n1 n2) true
+        (* (t1 = t2 ) NEED DECIDABLE EQUALITY ON typ  *)
+    | _, _ => false 
+      end
+    ) defs. 
+
+
+  Definition decl_def_match (defs : list (definition dtyp (CFG.cfg dtyp))) (decl : declaration dtyp) : bool :=
+    existsb (fun def => 
+      match decl, def with 
+    | {| dc_name := Name n1 ; dc_type := t1 |}, 
+      {| df_prototype := {| dc_name := Name n2 ; dc_type := t2 |}|} =>
+        andb (String.eqb n1 n2) (if dtyp_eq_dec t1 t2 then true else false) 
+    | _, _ => false 
+      end
+    ) defs. 
+
+  Definition link_tles 
+  (* {M} `{Monad M} `{RAISE_ERROR M} *)
+   (asts : list ll_toplevel_entities) : ll_toplevel_entities :=
+    (* 
+      If we want to do checks, we can put them back in. 
+    
+    Pulling out relevant information helps here. folds
+    are preferred over filter to minimize passes over linked programs, which can
+    hundreds of thousands to millions of elements long. 
+    *)
+    (* let decls_defs_rest_of_ast ast := 
+      let '(decls, defs, rest) :=
+        List.fold_left (fun ds tle => match (ds, tle) with 
+        | ((decls, defs, rest), TLE_Declaration _ as decl) => (decl::decls, defs, rest)
+        | ((decls, defs, rest), TLE_Definition  _ as def)  => (decls, def::defs, rest)
+        | ((decls, defs, rest), other) => (decls, defs, other::rest)
+        end) ast ([], [], []) in 
+        (List.rev decls, List.rev defs, List.rev rest) in 
+    (* one pass over the program *)
+    let '(decls, defs, rest) := 
+      List.fold_left (fun ds ast => tripleapp (decls_defs_rest_of_ast ast) ds) asts ([], [], []) 
+       in 
+    (* prune duplicate declarations *)
+    let unique_decls := remove_duplicates tle_decls_eq decls in  *)
+    List.concat asts. 
+
+(* Do this in 
+  linking goes before. happens in ocaml in driver.ml
+ *)
+  (* Important when linking with predefs: we want our definition of printf,
+  putc, puts, etc-- not stdio's. so, we need to REMOVE all definitions from the
+  user source that match definitions in our predefs/builtins. *)
+  Definition link_predefs (userprog : ll_toplevel_entities) := 
+      let filtered       := (filter (negb ∘ defined_in_predefs)) userprog
+        in List.app PREDEFINED_FUNCTIONS filtered. 
+
+   (* 
+    Potential lemma for linking-- 
+
    Lemma linking_postcondition :  
     forall (p1 p2 : ll_toplevel_entities), 
-      not exists tl in (link p1 p2), tl' in p1 s.t. 
-      (tl is a Definition with name n /\ tl' is a Declaration with name n)
-   
-      Will write tomorrow if so.  *)
+      not exists tl in (link_predefs p1 p2), tl' in p1 s.t. 
+      (tl is a Definition with name n /\ tl' is a Declaration with name n)   
+   *)
+
+
+  Import CFGNotations. 
+
+(* ms needs to be non-empty. enforce structurally, with a check, or not at all? *)
+  Definition link_mcfgs (ms : nlist (CFG.mcfg dtyp)) :=
+  (* merge ms, run transformations: enforce decl uniqueness,
+     and perform checks on linked program with the error monad.
+     either ret linked program or fail. *)
+    let wf_cfg_or_fail {M} `{Monad M} `{RAISE_ERROR M} (m : CFG.mcfg dtyp) 
+    (* : M (CFG.mcfg dtyp)  *)
+    := 
+    match m with 
+      {| 
+        m_name         := name;
+        m_target       := target;
+        m_datalayout   := d;
+        m_type_defs    := tds;
+        m_globals      := globals;
+        m_declarations := decls;
+        m_definitions  := defs;
+      |} => 
+    let unique_decls := remove_duplicates decls_eq decls in  
+    (*  Laws: 
+        Declarational Uniqueness: 
+          Each declaration in a program has a unique name (manually enforced). 
+        Declarations -> Definitions is Injective over names and types:
+          For each definition, there is at most one declaration that shares
+          its name and type (checked).
+       Jump Closure:
+          The set of terminator-mentioned labels in a CFG is a subset of 
+          the set of block labels in that CFG (checked).
+       *)
+    let declarational_uniqueness := andb (uniq_b decls_eq decls) (uniq_b defs_eq defs) in 
+    if negb declarational_uniqueness 
+    then raise_error "non-unique definitions in linked program"
+    else 
+    let decls_defs_injective : bool := 
+       (forallb (decl_def_match defs) decls) in 
+    if negb decls_defs_injective
+    then raise_error "decls/defs non-injective"
+    else 
+       ret {| 
+        m_name         := name;
+        m_target       := target;
+        m_datalayout   := d;
+        m_type_defs    := tds;
+        m_globals      := globals;
+        m_declarations := unique_decls;
+        m_definitions  := defs;
+      |}
+    end
+    in wf_cfg_or_fail (njoin_with modul_app ms).
+
+    (* let jump_closure : bool :=
+      let ocfgs : list (ocfg dtyp) := map (blks ∘ df_instrs) defs in 
+      let block_ids : FS.t := fs_of_list (flat_map Scope.inputs ocfgs) in 
+      let terminator_ids : FS.t := fs_of_list (flat_map (Scope.outputs) ocfgs)
+      in FS.subset terminator_ids block_ids
+    in  *)
+
 
 
   (** * Initialization
@@ -377,7 +558,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
      - For now we assume that there is only one mcfg, so we allocate addresses for all declared 
        and defined functions.
      - If we ever do some kind of "linking" we may need to revisit this, but it presumably
-       would be resolved by an operation of type [link : mcfg -> mcfg -> mcfg] that 
+       would be resolved by an operation of type [link_predefs : mcfg -> mcfg -> mcfg] that 
        combines two mcfgs coherently
    *)
 
@@ -385,7 +566,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   (* TODO: move to AstLib? *)
   Definition function_name_eq (a b:function_id) : bool :=
     match a, b with
-    | Name aname, Name bname => eqb aname bname
+    | Name aname, Name bname => String.eqb aname bname
     | _, _ => false
     end.
 
@@ -516,6 +697,12 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Definition denote_vellvm_main (mcfg : CFG.mcfg dtyp) : itree L0 dvalue :=
     denote_vellvm (DTYPE_I (32)%positive) "main" main_args mcfg.
 
+(* should change link_predefs to be over mcfg. 
+   it should happen after main linking happens. *)
+
+  Definition name_me progs :=
+    let linked_with_predefs := convert_types (mcfg_of_tle (link_predefs progs)) in
+    link_mcfgs (nbase linked_with_predefs).
 
   (**
      Now that we know how to denote a whole llvm program, we can _interpret_
@@ -528,7 +715,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (prog: ll_toplevel_entities)
     : itree L4 res_L4 :=
     let t := denote_vellvm ret_typ entry args 
-              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
+              (convert_types (mcfg_of_tle (link_predefs prog))) in
     interp_mcfg4_exec t [] ([],[]) 0 initial_memory_state.
 
   (**
@@ -557,7 +744,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (prog: ll_toplevel_entities)
     : PropT L4 res_L4 :=
     let t := denote_vellvm ret_typ entry args 
-              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
+              (convert_types (mcfg_of_tle (link_predefs prog))) in
     ℑs eq eq t [] ([],[]) 0 initial_memory_state.
 
   Definition model_gen_oom
@@ -567,7 +754,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (prog: ll_toplevel_entities)
     : PropT L4 res_L4 :=
     let t := denote_vellvm ret_typ entry args 
-              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
+              (convert_types (mcfg_of_tle (link_predefs prog))) in
     ℑs6 eq eq eq t [] ([],[]) 0 initial_memory_state.
 
   Definition model_gen_oom_L1
@@ -577,7 +764,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (prog: ll_toplevel_entities)
     : itree L1 res_L1 :=
     let t := denote_vellvm ret_typ entry args 
-              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
+              (convert_types (mcfg_of_tle (link_predefs prog))) in
     ℑs1 t [].
 
   Definition model_gen_oom_L2
@@ -587,7 +774,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (prog: ll_toplevel_entities)
     : itree L2 res_L2 :=
     let t := denote_vellvm ret_typ entry args 
-              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
+              (convert_types (mcfg_of_tle (link_predefs prog))) in
     ℑs2 t [] ([], []).
 
   Definition model_gen_oom_L3
@@ -598,7 +785,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     (prog: ll_toplevel_entities)
     : PropT L3 res_L3 :=
     let t := denote_vellvm ret_typ entry args 
-              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
+              (convert_types (mcfg_of_tle (link_predefs prog))) in
     ℑs3 RR t [] ([], []) 0 initial_memory_state.
 
   Definition model_gen_oom_L4
@@ -610,7 +797,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     (prog: ll_toplevel_entities)
     : PropT L4 res_L4 :=
     let t := denote_vellvm ret_typ entry args 
-              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
+              (convert_types (mcfg_of_tle (link_predefs prog))) in
     ℑs4 RR_mem RR_pick t [] ([], []) 0 initial_memory_state.
 
   Definition model_gen_oom_L5
@@ -622,7 +809,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     (prog: ll_toplevel_entities)
     : PropT L5 res_L5 :=
     let t := denote_vellvm ret_typ entry args 
-              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
+              (convert_types (mcfg_of_tle (link_predefs prog))) in
     ℑs5 RR_mem RR_pick t [] ([], []) 0 initial_memory_state.
 
   Definition model_gen_oom_L6
@@ -635,7 +822,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     (prog: ll_toplevel_entities)
     : PropT L6 res_L6 :=
     let t := denote_vellvm ret_typ entry args 
-              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
+              (convert_types (mcfg_of_tle (link_predefs prog))) in
     ℑs6 RR_mem RR_pick RR_oom t [] ([], []) 0 initial_memory_state.
 
   (**
