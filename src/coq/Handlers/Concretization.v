@@ -66,19 +66,18 @@ Proof.
   eapply Monad_stateT; typeclasses eauto.
 Defined.
 
-Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL).
+Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP).
   Import MP.
   Import LP.
-  Import PTOI.
-  Import ITOP.
-  Import PROV.
+  Import ADDR.
   Import GEP.
   Import SIZEOF.
   Import Events.
   Import DVALUE_BYTES.
+  Import BYTE_IMPL.
 
-  Module MemHelpers := MemoryHelpers LP MP Byte.
-  Import MemHelpers.
+  (* Module MemHelpers := MemoryHelpers LP MP Byte. *)
+  (* Import MemHelpers. *)
 
   Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} (icmp : icmp) (v1 v2 : dvalue) : M dvalue.
     refine
@@ -630,7 +629,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                     lift_ue _ (raise_error "Invalid PTOI conversion")
                 end
             | Conv_ItoP x =>
-                match int_to_ptr (dvalue_int_unsigned x) wildcard_prov with
+                match int_to_ptr (dvalue_int_unsigned x) default_metadata with
                 | NoOom a =>
                     ret (DVALUE_Addr a)
                 | Oom msg =>
@@ -665,7 +664,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
             eval_select dcond v1 v2
 
         | UVALUE_ConcatBytes bytes dt =>
-            match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), Byte.all_extract_bytes_from_uvalue dt bytes with
+            match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue dt bytes with
             | true, Some uv =>
                 match bytes with
                 | (UVALUE_ExtractByte uv _ _ _ :: _) => concretize_uvalueM M undef_handler ERR_M lift_ue uv
@@ -766,7 +765,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
 
 End ConcretizationBase.
 
-Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (SER : ConcretizationBase LP MP Byte) <: ConcretizationBase LP MP Byte.
+Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (SER : ConcretizationBase LP MP) <: ConcretizationBase LP MP.
   Include SER.
   Import MP.
   Import LP.
@@ -917,23 +916,22 @@ Module Type Concretization (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
 
 End Concretization.
 
-Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) <: ConcretizationBase LP MP Byte.
+Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) <: ConcretizationBase LP MP.
   Import MP.
   Import LP.
+  Import ADDR.
   Import Events.
   Import SIZEOF.
-  Import PTOI.
-  Import PROV.
-  Import ITOP.
   Import DV.
   Import GEP.
   Import DVALUE_BYTES.
+  Import BYTE_IMPL.
   Open Scope list.
 
   Export Byte.
 
-  Module MemHelpers := MemoryHelpers LP MP Byte.
-  Import MemHelpers.
+  (* Module MemHelpers := MemoryHelpers LP MP Byte. *)
+  (* Import MemHelpers. *)
 
   Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} (icmp : icmp) (v1 v2 : dvalue) : M dvalue.
     refine
@@ -1579,7 +1577,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                     lift_ue (raise_error "Invalid PTOI conversion")
                 end
             | Conv_ItoP x =>
-                match int_to_ptr (dvalue_int_unsigned x) wildcard_prov with
+                match int_to_ptr (dvalue_int_unsigned x) default_metadata with
                 | NoOom a =>
                     ret (DVALUE_Addr a)
                 | Oom msg =>
@@ -1800,7 +1798,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                         lift_ue (raise_error "Invalid PTOI conversion")
                     end
                 | Conv_ItoP x =>
-                    match int_to_ptr (dvalue_int_unsigned x) wildcard_prov with
+                    match int_to_ptr (dvalue_int_unsigned x) default_metadata with
                     | NoOom a =>
                         ret (DVALUE_Addr a)
                     | Oom msg =>
@@ -1835,7 +1833,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                 eval_select dcond v1 v2
 
             | UVALUE_ConcatBytes bytes dt =>
-                match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), Byte.all_extract_bytes_from_uvalue dt bytes with
+                match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue dt bytes with
                 | true, Some uv =>
                     match bytes with
                     | (UVALUE_ExtractByte uv _ _ _ :: _) => concretize_uvalueM uv
@@ -2055,6 +2053,6 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
   End Concretize.
 End MakeBase.
 
-Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (SER : ConcretizationBase LP MP Byte) : Concretization LP MP Byte SER.
-  Include Concretization LP MP Byte SER.
+Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SER : ConcretizationBase LP MP) : Concretization LP MP SER.
+  Include Concretization LP MP SER.
 End Make.

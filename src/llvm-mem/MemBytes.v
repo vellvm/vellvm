@@ -39,7 +39,7 @@ Module Type ByteImpl
   Import LLVMEvents.
   Import DV.
 
-  Parameter SByte : Set.
+  Parameter SByte : Type.
 
   (* Get a specific byte of a uvalue of a given type.
 
@@ -64,11 +64,13 @@ Module Type ByteImpl
       sbyte_to_extractbyte (uvalue_sbyte uv dt idx sid) =  UVALUE_ExtractByte uv dt idx sid.
 End ByteImpl.
 
-Module Type ByteModule(Addr:NULLABLE_ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(Byte:ByteImpl(Addr)(IP)(SIZEOF)(LLVMEvents)).
-  Export Byte.
-  Import LLVMEvents.
-  Import DV.
-  Import SIZEOF.
+Module ByteExtras
+  (Addr:NULLABLE_ADDRESS)
+  (IP:INTPTR)
+  (SIZEOF:Sizeof)
+  (LLVMEvents: LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))
+  (BYTE : ByteImpl Addr IP SIZEOF LLVMEvents).
+  Import Addr IP SIZEOF LLVMEvents BYTE.
 
   Fixpoint all_bytes_from_uvalue_helper (idx' : N) (sid' : store_id) (parent : uvalue) (bytes : list SByte) : option uvalue
     := match bytes with
@@ -218,8 +220,13 @@ Module Type ByteModule(Addr:NULLABLE_ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEven
     | UVALUE_ExtractByte uv dt idx sid => inr sid
     | _ => inl "Invalid sbyte, did not convert to extractbyte."%string
     end.
+End ByteExtras.
+
+Module Type ByteModule (Addr:NULLABLE_ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
+  Include (ByteImpl Addr IP SIZEOF LLVMEvents).
+  Include (ByteExtras Addr IP SIZEOF LLVMEvents).
 End ByteModule.
 
-Module Byte (Addr:NULLABLE_ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(Byte:ByteImpl(Addr)(IP)(SIZEOF)(LLVMEvents)) : ByteModule Addr IP SIZEOF LLVMEvents Byte.
-  Include (ByteModule Addr IP SIZEOF LLVMEvents Byte).
-End Byte.
+(* Module Byte (Addr:NULLABLE_ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(Byte:ByteImpl(Addr)(IP)(SIZEOF)(LLVMEvents)) : ByteModule Addr IP SIZEOF LLVMEvents. *)
+(*   Include (ByteModule Addr IP SIZEOF LLVMEvents Byte). *)
+(* End Byte. *)

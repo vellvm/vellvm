@@ -12,7 +12,9 @@ From ITree Require Import
      ITree.
 
 From Vellvm Require Import 
-  Utils.Tactics.
+  Utils.Tactics
+  Utils.Raise
+  LLVMEvents.
 
 Require Import Coq.Program.Equality.
 
@@ -78,8 +80,7 @@ Section Failure.
     revert t H.
     induction H0; inv Heqi0.
     - dependent destruction H1.
-      dependent destruction H2.
-      cbn in *. inv H0. intros.
+      cbn in *. intros.
       destruct (observe t); eapply eqit_inv in H; inv H.
       destruct H0 as (?&?). destruct H.
       constructor. intros. inv v.
@@ -171,8 +172,7 @@ Section OOM.
     revert t H.
     induction H0; inv Heqi0.
     - dependent destruction H1.
-      dependent destruction H2.
-      cbn in *. inv H0. intros.
+      cbn in *. intros.
       destruct (observe t); eapply eqit_inv in H; inv H.
       destruct H0 as (?&?). destruct H.
       constructor. intros. inv v.
@@ -264,8 +264,7 @@ Section UB.
     revert t H.
     induction H0; inv Heqi0.
     - dependent destruction H1.
-      dependent destruction H2.
-      cbn in *. inv H0. intros.
+      cbn in *. intros.
       destruct (observe t); eapply eqit_inv in H; inv H.
       destruct H0 as (?&?). destruct H.
       constructor. intros. inv v.

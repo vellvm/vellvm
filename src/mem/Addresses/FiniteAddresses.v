@@ -9,8 +9,7 @@ From Vellvm Require Import
 
 From Mem Require Import
   Addresses.MemoryAddress
-  Addresses.Provenance
-  Memory.Provenance.
+  Addresses.Provenance.
 
 From Vellvm.Semantics Require Import
   VellvmIntegers.
@@ -33,7 +32,7 @@ Import ListNotations.
 Definition Iptr := int64. (* Integer pointer type (physical addresses) *)
 
 (* TODO: Should probably make this an NSet, but it gives universe inconsistency with Module addr *)
-Definition Prov := option (list Provenance). (* Provenance *)
+Definition Prov := N_ProvSet.t.
 
 Definition wildcard_prov : Prov := None.
 Definition nil_prov : Prov := Some [].
@@ -129,6 +128,8 @@ End Fin_PTOI_ARITH_EXTRAS.
 Module Fin_HAS_METADATA <: HAS_METADATA N_ProvSet FinAddrType.
   Definition extract_metadata (addr : FinAddrType.t) : N_ProvSet.t :=
     snd addr.
+
+  Definition default_metadata := N_ProvSet.wildcard_prov.
 End Fin_HAS_METADATA.
 
 (* TODO: Move to utility *)

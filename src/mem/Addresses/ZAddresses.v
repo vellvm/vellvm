@@ -9,7 +9,6 @@ From Vellvm Require Import
 From Mem Require Import
   Addresses.MemoryAddress
   Addresses.TypeModules
-  Memory.Provenance
   Addresses.Provenance.
 
 From QuickChick Require Import Show.
@@ -94,6 +93,7 @@ End Z_PTOI_ARITH_EXTRAS.
 
 Module Z_HAS_METADATA <: HAS_METADATA UNIT_TYP ZAddrType.
   Definition extract_metadata (addr : ZAddrType.t) : unit := tt.
+  Definition default_metadata : unit := tt.
 End Z_HAS_METADATA.
 
 Module Z_HAS_ITOP <: HAS_ITOP UNIT_TYP ZAddrType Z_HAS_METADATA.

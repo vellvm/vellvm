@@ -150,6 +150,7 @@
 ./coq/Utils/PostConditions.v
 ./coq/Utils/PropT.v
 ./coq/Utils/Raise.v
+./coq/Utils/RaiseLLVM.v
 ./coq/Utils/RefineProp.v
 ./coq/Utils/ErrUbOomProp.v
 ./coq/Utils/ErrOomPoison.v
