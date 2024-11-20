@@ -24,17 +24,20 @@ From Vellvm Require Import
   Syntax.DynamicTypes
   Syntax.DataLayout
   Semantics.DynamicValues
-  Semantics.MemoryAddress
-  Semantics.GepM
-  Semantics.Memory.Sizeof
-  Semantics.Memory.MemBytes
   Semantics.LLVMEvents
   Semantics.LLVMParams
   Semantics.MemoryParams
-  Semantics.Memory.MemBytes
   Semantics.ConcretizationParams
   Handlers.Concretization
   ErrUbOomProp.
+
+From LLVM_Memory Require Import
+  GepM
+  MemBytes
+  Sizeof.
+
+From Mem Require Import
+  Addresses.MemoryAddress.
 
 From Vellvm.Utils Require Import
   InterpPropOOM.
@@ -57,12 +60,13 @@ Import MonadNotation.
   - The propositional one capture in [Prop] all possible values
   - The executable one interprets [undef] as 0 at the type
  *)
-Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP Byte).
+Module Make (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationParams LP MP).
   Import CP.
   Import CONC.
   Import MP.
   Import LP.
   Import Events.
+  Import BYTE_IMPL.
 
   Section PickPropositional.
 
@@ -2242,9 +2246,9 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
         break_match.
         { break_match; cbn.
           pose proof Heqo.
-          apply Byte.all_extract_bytes_from_uvalue_success_inv in H0 as (?&?&?); subst.
+          apply all_extract_bytes_from_uvalue_success_inv in H0 as (?&?&?); subst.
           eapply H.
-          eapply Byte.all_extract_bytes_from_uvalue_strict_subterm; auto.
+          eapply all_extract_bytes_from_uvalue_strict_subterm; auto.
 
           remember
             ((fix concretize_uvalue_bytes_helper (acc : NMaps.NMap (list (uvalue * dvalue))) (uvs : list uvalue) {struct uvs} : err_ub_oom (list DVALUE_BYTES.dvalue_byte)
