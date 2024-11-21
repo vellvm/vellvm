@@ -113,28 +113,6 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     go; reflexivity.
   Qed.
 
-  Lemma interp3_bind :
-    forall {R S} (t: itree L0 R) (k: R -> itree L0 S) g l s m,
-      interp_mcfg3_exec (t >>= k) g l s m ≈ '(m',(s',(l',(g',x)))) <- interp_mcfg3_exec t g l s m;; interp_mcfg3_exec (k x) g' l' s' m'.
-  Proof.
-    intros.
-    unfold interp_mcfg3_exec.
-    rewrite interp_intrinsics_bind.
-    rewrite interp_global_bind.
-    rewrite interp_local_stack_bind.
-    rewrite IS.MEM.MEM_EXEC_INTERP.interp_memory_bind.
-    apply eutt_eq_bind.
-    intros.
-    destruct u, p, p, p, p0.
-    reflexivity.
-  Qed.
-
-  Lemma interp3_ret : forall (R : Type) g l sid m (x : R), interp_mcfg3_exec (Ret x) g l sid m ≈ Ret3 l sid m (g, x).
-  Proof.
-    intros; unfold interp_mcfg3_exec.
-    go; reflexivity.
-  Qed.
-
   #[global] Instance eutt_interp1 {T}:
     Proper (eutt eq ==> eq ==> eutt eq) (@ℑs1 T).
   Proof.
@@ -153,17 +131,15 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     reflexivity.
   Qed.
 
-  #[global] Instance eutt_interp3 {T}:
+  (* #[global] Instance eutt_interp3 {T}:
     Proper (eutt eq ==> eq ==> eq ==> eq ==> eq ==> eutt eq) (@interp_mcfg3_exec T).
   Proof.
     repeat intro.
     unfold interp_mcfg3_exec.
     subst.
-    rewrite H.
-    reflexivity.
-    (* subst; rewrite H.
-    reflexivity. *)
-  Qed.
+    admit.
+    Admitted.
+     *)
 
   (* Lemma interp3_vis:  *)
   (*   forall T R (e : L0 T) (k : T -> itree L0 R) g l m, *)

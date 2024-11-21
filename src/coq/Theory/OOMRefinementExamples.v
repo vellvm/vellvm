@@ -225,6 +225,7 @@ Module Infinite.
       ℑs4 eq (MemoryBigIntptr.MMEP.MemSpec.MemState_eqv × eq) (ret r) g l sid m (Ret5 g l sid m r).
   Proof.
     intros.
+
     unfold interp_mcfg4, model_undef.
     setoid_rewrite interp_intrinsics_ret.
     setoid_rewrite interp_global_ret.
@@ -519,6 +520,7 @@ Module Infinite.
     intros [].
     force_go.
     rewrite tau_eutt.
+    rewrite bind_ret_l.
     go.
     rewrite interp_ret.
     reflexivity.
