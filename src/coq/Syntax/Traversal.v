@@ -73,7 +73,7 @@ Section Endo.
       : Endo typ | 50 :=
       fix endo_typ t :=
         match t with
-        | TYPE_Pointer t' => TYPE_Pointer (endo_typ t')
+        | TYPE_Pointer (Some t') => TYPE_Pointer (Some (endo_typ t'))
         | TYPE_Array sz t' => TYPE_Array sz (endo_typ t')
         | TYPE_Function ret args varargs => TYPE_Function (endo_typ ret) (List.map endo_typ args) varargs
         | TYPE_Struct fields => TYPE_Struct (List.map endo_typ fields)

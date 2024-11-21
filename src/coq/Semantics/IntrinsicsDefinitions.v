@@ -72,7 +72,7 @@ Definition fabs_64_decl: declaration typ :=
   |}.
 
 Definition memcpy_8_32_decl: declaration typ :=
-  let pt := TYPE_Pointer (TYPE_I 8%positive) in
+  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
   let i32 := TYPE_I 32%positive in
   let i1 := TYPE_I 1%positive in
   {|
@@ -84,7 +84,7 @@ Definition memcpy_8_32_decl: declaration typ :=
   |}.
 
 Definition memcpy_8_64_decl: declaration typ :=
-  let pt := TYPE_Pointer (TYPE_I 8%positive) in
+  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
   let i64 := TYPE_I 64%positive in
   let i1 := TYPE_I 1%positive in
   {|
@@ -96,7 +96,7 @@ Definition memcpy_8_64_decl: declaration typ :=
   |}.
 
 Definition memset_8_32_decl: declaration typ :=
-  let pt := TYPE_Pointer (TYPE_I 8%positive) in
+  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
   let i32 := TYPE_I 32%positive in
   let i8 := TYPE_I 8%positive in
   let i1 := TYPE_I 1%positive in
@@ -109,7 +109,7 @@ Definition memset_8_32_decl: declaration typ :=
   |}.
 
 Definition memset_8_64_decl: declaration typ :=
-  let pt := TYPE_Pointer (TYPE_I 8%positive) in
+  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
   let i64 := TYPE_I 64%positive in
   let i8 := TYPE_I 8%positive in
   let i1 := TYPE_I 1%positive in
@@ -122,7 +122,7 @@ Definition memset_8_64_decl: declaration typ :=
   |}.
 
 Definition malloc_decl: declaration typ :=
-  let pt := TYPE_Pointer (TYPE_I 8%positive) in
+  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
   let i64 := TYPE_I 64%positive in
   {|
     dc_name        := Name "malloc";
@@ -133,7 +133,7 @@ Definition malloc_decl: declaration typ :=
   |}.
 
 Definition free_decl: declaration typ :=
-  let pt := TYPE_Pointer (TYPE_I 8%positive) in
+  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
   {|
     dc_name        := Name "free";
     dc_type        := TYPE_Function TYPE_Void [pt] false;

@@ -32,7 +32,7 @@ Inductive sized_typ : list (ident * typ) -> typ -> Prop :=
       sized_typ defs (TYPE_I sz)
 
 | sized_typ_Pointer :
-    forall (defs : list (ident * typ)) (t : typ),
+    forall (defs : list (ident * typ)) (t : option typ),
       sized_typ defs (TYPE_Pointer t)
 
 | sized_typ_Half :
@@ -95,7 +95,7 @@ Inductive sized_typ : list (ident * typ) -> typ -> Prop :=
 
    https://llvm.org/docs/LangRef.html#vector-type *)
 Inductive element_typ : typ -> Prop :=
-| element_typ_Pointer : forall (t : typ), element_typ (TYPE_Pointer t)
+| element_typ_Pointer : forall (t : option typ), element_typ (TYPE_Pointer t)
 | element_typ_I : forall (sz : positive), element_typ (TYPE_I sz)
 | element_typ_Half : element_typ TYPE_Half
 | element_typ_Float : element_typ TYPE_Float
@@ -113,7 +113,7 @@ Inductive guarded_typ : ident -> list (ident * typ) -> typ -> Prop :=
       guarded_typ id env (TYPE_I sz)
 
 | guarded_typ_Pointer :
-    forall (id : ident) (env : list (ident * typ)) (t : typ),
+    forall (id : ident) (env : list (ident * typ)) (t : option typ),
       guarded_typ id env (TYPE_Pointer t)
 
 | guarded_typ_Void :
@@ -240,7 +240,11 @@ Definition function_ret_typ (t : typ) : Prop :=
 Inductive wf_typ : list (ident * typ) -> typ -> Prop :=
 | wf_typ_Pointer:
     forall (defs : list (ident * typ)) (t : typ),
-      wf_typ defs t -> wf_typ defs (TYPE_Pointer t)
+      wf_typ defs t -> wf_typ defs (TYPE_Pointer (Some t))
+
+| wf_typ_Opaque_Pointer:
+  forall (defs: list (ident * typ)),
+    wf_typ defs (TYPE_Pointer None)
 
 | wf_typ_I :
     forall (defs : list (ident * typ)) (sz : positive),
@@ -340,7 +344,7 @@ Definition wf_env (env : list (ident * typ)) : Prop :=
 
 Inductive guarded_wf_typ : list (ident * typ) -> typ -> Prop :=
 | guarded_wf_typ_Pointer:
-    forall (defs : list (ident * typ)) (t : typ),
+    forall (defs : list (ident * typ)) (t : option typ),
       guarded_wf_typ defs (TYPE_Pointer t)
 
 | guarded_wf_typ_I :
@@ -455,7 +459,7 @@ Inductive unrolled_typ : typ -> Prop :=
       unrolled_typ (TYPE_I sz)
 
 | unrolled_typ_Pointer :
-    forall (t : typ),
+    forall (t : option typ),
       unrolled_typ (TYPE_Pointer t)
 
 | unrolled_typ_Void :
@@ -515,7 +519,7 @@ Inductive unrolled_typ : typ -> Prop :=
 
 
 Inductive typ_order : typ -> typ -> Prop :=
-| typ_order_Pointer : forall (t : typ), typ_order t (TYPE_Pointer t)
+| typ_order_Pointer : forall (t : typ), typ_order t (TYPE_Pointer (Some t))
 | typ_order_Array : forall (sz : N) (t : typ), typ_order t (TYPE_Array sz t)
 | typ_order_Vector : forall (sz : N) (t : typ), typ_order t (TYPE_Vector sz t)
 | typ_order_Struct : forall (fields : list typ),
@@ -928,7 +932,8 @@ Hint Constructors guarded_typ : core.
 (* Types with no identifiers *)
 Inductive simple_typ : typ -> Prop :=
 | simple_typ_I : forall sz, simple_typ (TYPE_I sz)
-| simple_typ_Pointer : forall t, simple_typ t -> simple_typ (TYPE_Pointer t)
+| simple_typ_Pointer : forall t, simple_typ t -> simple_typ (TYPE_Pointer (Some (t)))
+| simple_typ_Opaque_Pointer : simple_typ (TYPE_Pointer None)
 | simple_typ_Void : simple_typ (TYPE_Void)
 | simple_typ_Half : simple_typ (TYPE_Half)
 | simple_typ_Float : simple_typ (TYPE_Float)

@@ -51,7 +51,7 @@ Unset Elimination Schemes.
 Inductive typ : Set :=
 | TYPE_I (sz:positive)
 | TYPE_IPTR
-| TYPE_Pointer (t:typ)
+| TYPE_Pointer (t: option typ)
 | TYPE_Void
 | TYPE_Half
 | TYPE_Float

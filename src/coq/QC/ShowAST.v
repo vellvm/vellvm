@@ -84,7 +84,8 @@ Section ShowInstances.
     | TYPE_I sz                 => string_to_DString "i" @@
                                     string_to_DString (show sz)
     | TYPE_IPTR                 => string_to_DString "iptr"
-    | TYPE_Pointer t            => dshow_typ t @@ string_to_DString "*"
+    | TYPE_Pointer (Some t)     => dshow_typ t @@ string_to_DString "*"
+    | TYPE_Pointer None         => string_to_DString "ptr"
     | TYPE_Void                 => string_to_DString "void"
     | TYPE_Half                 => string_to_DString "half"
     | TYPE_Float                => string_to_DString "float"
