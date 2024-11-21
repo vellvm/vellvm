@@ -2473,11 +2473,20 @@ Qed.
     Lemma exec_undef_raise {X} {E F: Type -> Type}  `{FailureE -< F} `{UBE -< F} `{OOME -< F} s:
       eutt eq (exec_undef (T:=X) (E:= E) (F:= F) (raise s)) (raise s).
     Proof.
+      unfold raise.
+      unfold exec_undef.
+      unfold pick_exec_h.
       tau_steps.
       apply eqit_Vis.
       intros [].
     Qed.
-  
+    (* Instance center_add_subevent {E F G Sub: Type -> Type} `{Sub -< E +' G}: Sub -< E +' F +' G.
+    Admitted. *)
+    (* Lemma exec_undef_raise' {X} {E F: Type -> Type}  `{FailureE -< E +' F}  `{FailureE -< E +' PickE +' F} `{UBE -< E +' F} `{OOME -< E +' F} s:
+      eutt eq (exec_undef (T:=X) (E:= E) (F:= F) (raise s)) (raise s).
+    Proof.
+
+    Qed. *)
   End PickImplementation.
 
 End Make.
