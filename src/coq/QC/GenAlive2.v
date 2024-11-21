@@ -264,7 +264,7 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
     match t with
     | TYPE_Array n sub_t
     | TYPE_Vector n sub_t => depth_of_typ (sub_t) + 1
-    | TYPE_Pointer sub_t => depth_of_typ (sub_t) + 1
+    | TYPE_Pointer (Some sub_t) => depth_of_typ (sub_t) + 1
     | TYPE_Struct vars
     | TYPE_Packed_struct vars => fold_right (fun x acc => max (depth_of_typ x) acc) 0%nat vars
     | _ => 0
@@ -284,7 +284,12 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
          end
        | TYPE_Pointer t =>
          match b with
-         | TYPE_Pointer t' => normalized_typ_eq t t'
+         | TYPE_Pointer t' =>
+             match (t, t') with
+             | (Some t, Some t') => normalized_typ_eq t t'
+             | (None, None) => true
+             | _ => false
+             end
          | _ => false
          end
        | TYPE_Void =>
@@ -458,6 +463,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         ret (IId i, instr)
     end.
 
+  (* TODO: handle opaque pointers?  *)
   Fixpoint gen_instantiate_instr (index : nat) (tgt : typ) {struct index}: GenALIVE2 (instr_id * instr typ) :=
     match tgt with
     | TYPE_I _ =>
@@ -520,7 +526,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
                          ret ins
         | _ => ret ins
         end
-    | TYPE_Pointer t' =>
+    | TYPE_Pointer (Some t') =>
         e_src <- gen_exp_ident tgt;;
         e_input <- gen_exp_size 0 t';;
         let ins := INSTR_Store (t', e_input) (tgt, e_src) [] in
@@ -557,7 +563,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
   (*     end;; *)
   (*   @foldM GenALIVE2 MGEN step []. *)
 
-
+  (* TODO: handle opaque pointers?  *)
   Fixpoint gen_instrs (depth : nat) (t : typ) {struct depth} : GenALIVE2 (list (instr_id * instr typ))
     :=
     (* here is a potential infinite loop *)
@@ -584,9 +590,9 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
          *)
         let sz_nat := N.to_nat sz in
         let ins_alloca := INSTR_Alloca t [] in
-        '(inst_alloca_id, inst_alloca_instr) <- hide_local_ctx (add_id_to_instr (TYPE_Pointer t, ins_alloca));;
+        '(inst_alloca_id, inst_alloca_instr) <- hide_local_ctx (add_id_to_instr (TYPE_Pointer (Some t), ins_alloca));;
         inst_alloca_raw_id <- instr_id2raw_id inst_alloca_id;;
-        let ins_load := INSTR_Load t (TYPE_Pointer t, EXP_Ident (ID_Local inst_alloca_raw_id)) [] in
+        let ins_load := INSTR_Load t (TYPE_Pointer (Some t), EXP_Ident (ID_Local inst_alloca_raw_id)) [] in
         '(inst_load_id, inst_load_instr) <- add_id_to_instr (t, ins_load);;
         inst_load_raw_id <- instr_id2raw_id inst_load_id;;
         insts <- gen_instrs_arrays (depth - 1) (inst_load_raw_id) t true;;
@@ -598,9 +604,9 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     | TYPE_Array sz t' => 
         let sz_nat := N.to_nat sz in
         let ins_alloca := INSTR_Alloca t [] in
-        '(inst_alloca_id, inst_alloca_instr) <- hide_local_ctx (add_id_to_instr (TYPE_Pointer t, ins_alloca));;
+        '(inst_alloca_id, inst_alloca_instr) <- hide_local_ctx (add_id_to_instr (TYPE_Pointer (Some t), ins_alloca));;
         inst_alloca_raw_id <- instr_id2raw_id inst_alloca_id;;
-        let ins_load := INSTR_Load t (TYPE_Pointer t, EXP_Ident (ID_Local inst_alloca_raw_id)) [] in
+        let ins_load := INSTR_Load t (TYPE_Pointer (Some t), EXP_Ident (ID_Local inst_alloca_raw_id)) [] in
         '(inst_load_id, inst_load_instr) <- add_id_to_instr (t, ins_load);;
         inst_load_raw_id <- instr_id2raw_id inst_load_id;;
         insts <- gen_instrs_arrays (depth - 1) (inst_load_raw_id) t false;;
@@ -611,9 +617,9 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         (* ret (upper_instrs ++ l_instrs) *)
     | TYPE_Struct fields =>
         let ins_alloca := INSTR_Alloca t [] in
-        '(inst_alloca_id, inst_alloca_instr) <- hide_local_ctx (add_id_to_instr (TYPE_Pointer t, ins_alloca));;
+        '(inst_alloca_id, inst_alloca_instr) <- hide_local_ctx (add_id_to_instr (TYPE_Pointer (Some t), ins_alloca));;
         inst_alloca_raw_id <- instr_id2raw_id inst_alloca_id;;
-        let ins_load := INSTR_Load t (TYPE_Pointer t, EXP_Ident (ID_Local inst_alloca_raw_id)) [] in
+        let ins_load := INSTR_Load t (TYPE_Pointer (Some t), EXP_Ident (ID_Local inst_alloca_raw_id)) [] in
         '(inst_load_id, inst_load_instr) <- add_id_to_instr (t, ins_load);;
         inst_load_raw_id <- instr_id2raw_id inst_load_id;;
         insts <- gen_instrs_arrays (depth - 1) (inst_load_raw_id) t false;;
@@ -624,9 +630,9 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         (* ret (upper_instrs ++ l_instrs) *)
     | TYPE_Packed_struct fields =>
         let ins_alloca := INSTR_Alloca t [] in
-        '(inst_alloca_id, inst_alloca_instr) <- hide_local_ctx (add_id_to_instr (TYPE_Pointer t, ins_alloca));;
+        '(inst_alloca_id, inst_alloca_instr) <- hide_local_ctx (add_id_to_instr (TYPE_Pointer (Some t), ins_alloca));;
         inst_alloca_raw_id <- instr_id2raw_id inst_alloca_id;;
-        let ins_load := INSTR_Load t (TYPE_Pointer t, EXP_Ident (ID_Local inst_alloca_raw_id)) [] in
+        let ins_load := INSTR_Load t (TYPE_Pointer (Some t), EXP_Ident (ID_Local inst_alloca_raw_id)) [] in
         '(inst_load_id, inst_load_instr) <- add_id_to_instr (t, ins_load);;
         inst_load_raw_id <- instr_id2raw_id inst_load_id;;
         insts <- gen_instrs_arrays (depth - 1) (inst_load_raw_id) t false;;
@@ -635,7 +641,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         (* l_instrs <- foldM (fun acc t' => gen_instrs (depth - 1) t' >>= (fun instrs => ret (acc ++ instrs))) [] fields;; *)
         (* upper_instrs <- gen_instr_iter (List.length fields) [];; *)
         (* ret (upper_instrs ++ l_instrs) *)
-    | TYPE_Pointer t' =>
+    | TYPE_Pointer (Some t') =>
     (* Generate alloca *)
         let ins_alloca := INSTR_Alloca t [] in
         inst_alloca <- add_id_to_instr (t, ins_alloca);;

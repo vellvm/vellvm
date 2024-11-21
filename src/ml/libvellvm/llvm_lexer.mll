@@ -334,6 +334,7 @@
 
   (*types*)
   ("iptr"      , KW_IPTR);
+  ("ptr"       , KW_PTR);
   ("void"      , KW_VOID);
   ("half"      , KW_HALF);
   ("float"     , KW_FLOAT);
