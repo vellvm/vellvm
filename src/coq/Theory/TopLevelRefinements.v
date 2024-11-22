@@ -2652,12 +2652,12 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     (**
    Theorem 5.8: We prove that the interpreter belongs to the model.
      *)
-    Theorem interpreter_sound: forall p,
-        refine_L6 (model p) (build_singleton (interpreter p)).
+    Theorem interpreter_sound: forall p args,
+        refine_L6 (model args p) (build_singleton (interpreter args p)).
     Proof using.
-      intros p.
+      intros p args'.
       intros ? [].
-      exists (interpreter p).
+      exists (interpreter args' p).
       split.
       - apply refine_UB.
         unfold interpreter.

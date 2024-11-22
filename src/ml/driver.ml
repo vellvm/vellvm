@@ -65,12 +65,12 @@ let link_files : string list ref = ref []
 
 let add_link_file path = link_files := path :: !link_files
 
-let process_ll_file path file =
+let process_ll_file command_line_arguments path file =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
   let ll_ast = IO.parse_file path in
   let _ =
     if !interpret then
-      match Interpreter.interpret ll_ast with
+      match Interpreter.interpret command_line_arguments ll_ast with
       | Ok dv ->
           Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv)
       | Error e -> failwith (Result.string_of_exit_condition e)
@@ -80,19 +80,20 @@ let process_ll_file path file =
   let _ = IO.output_file vll_file ll_ast' in
   ()
 
-let process_file path =
+let process_file command_line_arguments path =
   let _ = Printf.printf "Processing: %s\n" path in
   let basename, ext = Platform.path_to_basename_ext path in
   match ext with
-  | "ll" -> process_ll_file path basename
+  | "ll" -> process_ll_file command_line_arguments path basename
   | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
 
-let process_files files = List.iter process_file files
+let process_files command_line_args files =
+  List.iter (process_file command_line_args) files
 
 (* file running ---------------------------------------------------------- *)
 (* Parses and runs the ll file at the given path, returning the dvalue
    produced. *)
-let run_ll_file path : (DV.dvalue, Result.exit_condition) result =
+let run_ll_file command_line_arguments path : (DV.dvalue, Result.exit_condition) result =
   let _ = Platform.verb @@ Printf.sprintf "* running file: %s\n" path in
   let ll_ast = IO.parse_file path in
-  Interpreter.interpret ll_ast
+  Interpreter.interpret command_line_arguments ll_ast
