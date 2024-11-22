@@ -2718,7 +2718,8 @@ Section InstrGenerators.
              end;;
            '(iid, e) <- genInstrIdEnt new_tptr;;
            d <- use (gen_context' .@ entl ptrEnt .@ deterministic');;
-           (gen_context' .@ entl e .@ deterministic') .= d;;
+           (* TODO: for now consider all pointers nondeterministic *)
+           (gen_context' .@ entl e .@ deterministic') .= false;;
            ret (iid, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr))
        end).
 
@@ -2991,7 +2992,10 @@ Section InstrGenerators.
            let ptr_exp := EXP_Ident ptr_name in
            (* TODO: Copy whether the pointer is deterministic *)
            d <- use (gen_context' .@ entl ptr_ent .@ deterministic');;
-           (gen_context' .@ entl e .@ deterministic') .= d;;
+           (* Consider pointers nondeterministic for now. Currently
+              causes problems. E.g., a pointer returned from a function
+              defaults to deterministic *)
+           (gen_context' .@ entl e .@ deterministic') .= false;;
            (gen_context' .@ entl e .@ from_pointer') .= ret ptr_ent;;
            ret (id, INSTR_Op (OP_Conversion Ptrtoint tptr ptr_exp typ_from_cast))
        end).
