@@ -367,12 +367,48 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
 
   (** Allocate space for a global *)
   Definition allocate_global (g:global dtyp) : itree L0 unit :=
-    'v <- trigger (Alloca (g_typ g) 1%N None);;
+    v <- trigger (Alloca (g_typ g) 1%N None);;
     trigger (GlobalWrite (g_ident g) v).
 
   Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
     map_monad_ allocate_global gs.
 
+  Definition i8 : dtyp := DTYPE_I 8%positive.
+
+
+  Definition i8_array_of_string (s : string) : uvalue := 
+    let len := N.of_nat (String.length s) + 1%N in 
+      UVALUE_Array 
+          (DTYPE_Array len i8) 
+          (List.app
+            (map ((@UVALUE_I 8%positive) ∘ 
+            @Integers.repr 8%positive ∘
+            Z.of_N ∘
+            Coq.Strings.Ascii.N_of_ascii ) (Coq.Strings.String.list_ascii_of_string s))
+            [@UVALUE_I 8%positive (@Integers.zero 8%positive)]).
+
+  Definition allocate_arg (arg : string) : itree L0 dvalue :=
+    let len := N.of_nat (String.length arg) + 1%N in 
+    (* tl;dr allocating the string in a C-like manner; + 1 for null terminator *)
+    v <- trigger (Alloca i8 len None);;
+    trigger (Store (DTYPE_Array len i8) v (i8_array_of_string arg));;
+    ret v.
+
+  Definition allocate_args (args : list string) : itree L0 dvalue :=
+    let len := N.of_nat (Datatypes.length args) in 
+      v <- trigger (Alloca DTYPE_Pointer len None);;
+      arg_addrs <- map_monad allocate_arg args;;
+      trigger (Store (DTYPE_Array len DTYPE_Pointer) v 
+                     (UVALUE_Array (DTYPE_Array len DTYPE_Pointer) 
+                                   (map dvalue_to_uvalue arg_addrs)));; 
+      ret v. 
+
+  Definition build_main_args (args : list string) : itree L0 (list uvalue) := 
+    v <- allocate_args args;;
+    let main_args := 
+        [@DV.UVALUE_I 32 ((@Integers.repr 32%positive ∘ Z.of_nat) (List.length args)); dvalue_to_uvalue v] 
+    in 
+      ret main_args. 
   (* Who is in charge of allocating the addresses for external functions declared in this mcfg? 
      - For now we assume that there is only one mcfg, so we allocate addresses for all declared 
        and defined functions.
@@ -398,7 +434,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     end.
 
   Definition allocate_declarations (ds:list (declaration dtyp)) : itree L0 unit :=
-    map_monad_ allocate_declaration ds.
+    map_monad_ allocate_declaration ds. 
 
   (* We have to initialize the global definitions after allocating them because they
      might be mutually recursive.  It is possible to declare cyclic data structures 
@@ -496,11 +532,11 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
     'builtins <- map_monad address_one_builtin_function (built_in_functions (m_declarations mcfg));;
     'addr <- trigger (GlobalRead (Name entry)) ;;
-    'rv <- denote_mcfg (IP.of_list (defns ++ builtins)) ret_typ (dvalue_to_uvalue addr) args ;;
+    'rv <- denote_mcfg (IP.of_list (defns ++ builtins)) ret_typ (dvalue_to_uvalue addr) args;;
     dv_pred <- trigger (pickNonPoison rv);;
     ret (proj1_sig dv_pred).
 
-  (* main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them
+  (* default_main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them
      For backwards compatibility.
    *)
   (* (for now) assume that [main (i64 argc, i8** argv)]
@@ -509,35 +545,43 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     inputs from the command line is nontrivial since we have to martial C-level strings
     into the Vellvm memory.  
    *)
-  Definition main_args := [@DV.UVALUE_I 32 (@Integers.zero 32);
+  Definition default_main_args := [@DV.UVALUE_I 32 (@Integers.zero 32);
                            DV.UVALUE_Addr null
     ].
 
-  Definition denote_vellvm_main (mcfg : CFG.mcfg dtyp) : itree L0 dvalue :=
-    denote_vellvm (DTYPE_I (32)%positive) "main" main_args mcfg.
+  (* Definition denote_vellvm_main (mcfg : CFG.mcfg dtyp) : itree L0 dvalue :=
+    denote_vellvm (DTYPE_I (32)%positive) "main" main_args mcfg. *)
 
 
   (**
      Now that we know how to denote a whole llvm program, we can _interpret_
      the resulting [itree].
+
+     arg_gen is an itree so that main args can be allocated prior to 
+     interpretation (on the correct interpretation level).
    *)
   Definition interpreter_gen
              (ret_typ : dtyp)
              (entry : string)
-             (args : list uvalue)
+             (arg_gen : itree L0 (list uvalue))
              (prog: ll_toplevel_entities)
     : itree L4 res_L4 :=
-    let t := denote_vellvm ret_typ entry args 
-              (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
-    interp_mcfg4_exec t [] ([],[]) 0 initial_memory_state.
+    let t := 
+      args <- arg_gen;;
+      denote_vellvm ret_typ entry args
+                (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog)))
+      in interp_mcfg4_exec t [] ([],[]) 0 initial_memory_state.
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts
      from "main" using bogus initial inputs.
    *)
   Definition interpreter
-             (prog : ll_toplevel_entities) : itree L4 res_L4
-    := interpreter_gen (DTYPE_I 32%positive) "main" main_args prog.
+             (args : list string)
+             (prog : ll_toplevel_entities)
+              : itree L4 res_L4
+    := 
+    interpreter_gen (DTYPE_I 32%positive) "main" (build_main_args args) prog.
 
   (**
      We now turn to the definition of our _model_ of vellvm's semantics. The
@@ -641,14 +685,14 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   (**
      Finally, the official model assumes no user-defined intrinsics.
    *)
-  Definition model := model_gen (DTYPE_I 32%positive) "main" main_args.
-  Definition model_oom := model_gen_oom (DTYPE_I 32%positive) "main" main_args.
-  Definition model_oom_L1 := model_gen_oom_L1 (DTYPE_I 32%positive) "main" main_args.
-  Definition model_oom_L2 := model_gen_oom_L2 (DTYPE_I 32%positive) "main" main_args.
-  Definition model_oom_L3 RR_mem := model_gen_oom_L3 RR_mem (DTYPE_I 32%positive) "main" main_args.
-  Definition model_oom_L4 RR_mem RR_pick := model_gen_oom_L4 RR_mem RR_pick (DTYPE_I 32%positive) "main" main_args.
-  Definition model_oom_L5 RR_mem RR_pick := model_gen_oom_L5 RR_mem RR_pick (DTYPE_I 32%positive) "main" main_args.
-  Definition model_oom_L6 RR_mem RR_pick RR_oom := model_gen_oom_L6 RR_mem RR_pick RR_oom (DTYPE_I 32%positive) "main" main_args.
+  Definition model := model_gen (DTYPE_I 32%positive) "main" default_main_args.
+  Definition model_oom := model_gen_oom (DTYPE_I 32%positive) "main" default_main_args.
+  Definition model_oom_L1 := model_gen_oom_L1 (DTYPE_I 32%positive) "main" default_main_args.
+  Definition model_oom_L2 := model_gen_oom_L2 (DTYPE_I 32%positive) "main" default_main_args.
+  Definition model_oom_L3 RR_mem := model_gen_oom_L3 RR_mem (DTYPE_I 32%positive) "main" default_main_args.
+  Definition model_oom_L4 RR_mem RR_pick := model_gen_oom_L4 RR_mem RR_pick (DTYPE_I 32%positive) "main" default_main_args.
+  Definition model_oom_L5 RR_mem RR_pick := model_gen_oom_L5 RR_mem RR_pick (DTYPE_I 32%positive) "main" default_main_args.
+  Definition model_oom_L6 RR_mem RR_pick RR_oom := model_gen_oom_L6 RR_mem RR_pick RR_oom (DTYPE_I 32%positive) "main" default_main_args.
 End LLVMTopLevel.
 
 Module Make (IS : InterpreterStack) : LLVMTopLevel IS.

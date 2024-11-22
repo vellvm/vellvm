@@ -162,9 +162,11 @@ let rec step
     tuple of a single block, and a possibly empty list of blocks.
  *)
 let interpret
+(args : string list)
     (prog :
       ( LLVMAst.typ
       , LLVMAst.typ LLVMAst.block * LLVMAst.typ LLVMAst.block list )
       LLVMAst.toplevel_entity
-      list ) : (DV.dvalue, exit_condition) result =
-  step (TopLevel.TopLevelBigIntptr.interpreter prog)
+      list )
+      : (DV.dvalue, exit_condition) result =
+  step (TopLevel.TopLevelBigIntptr.interpreter (List.map Camlcoq.coqstring_of_camlstring args) prog)
