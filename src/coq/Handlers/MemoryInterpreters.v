@@ -916,67 +916,56 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     reflexivity.
     Qed.
 
-    (* #[global] Instance eutt_interp_memory_exec {R} :
-        Proper (eutt eq ==> eq ==> eq ==> eutt eq) (@interp_memory R).
+    #[global] Instance eq_itree_interp_memory_exec {R} :
+        Proper (eq_itree eq ==> eq ==> eq ==> eq_itree eq) (@interp_memory R).
         Proof using.
         unfold Proper.
         unfold respectful.
-        (* intros. *)
+        
         ginit.
-        setoid_rewrite unfold_interp_memory.
-        (* unfold interp_memory_h. *)
-        (* unfold _interp_memory. *)
-        cbn.
         pcofix CIH.
         intros.
-
         subst.
-        specialize (CIH x y H0 y0 y0 eq_refl y1 y1 eq_refl).
-        
-        pose proof (eqit_inv (RR := eq)(b1 := true) (b2 := true) x y) as Hinv1.
-        apply Hinv1 in H0 as Heqitinv.
-        clear Hinv1.
         pinversion H0.
-        (* destruct (observe x) eqn: Hobsx; destruct (observe y) eqn:Hobsy; 
-        pose proof Hobsx as Hobsx'; pose proof Hobsy as Hobsy';
-        unfold observe in Hobsx'; unfold observe in Hobsy';
-        cbn in *; rewrite Hobsx' in Heqitinv; rewrite Hobsy' in Heqitinv;
-        clear Hobsx'; clear Hobsy'.
-        all: try contradiction Heqitinv. *)
-        - gstep.
+        - setoid_rewrite unfold_interp_memory. gstep. 
+          rewrite <- H1 ,<- H.
           subst.
           reflexivity.
-        - unfold _interp_memory in CIH.
-          rewrite <- H1, <- H in CIH.
+        - simpl.  
+          setoid_rewrite unfold_interp_memory.
+          rewrite <- H1 ,<- H.
           gstep.
           econstructor.
           gbase.
-          admit.
-        - gstep.
-          unfold observe in H. rewrite <- H in Heqitinv.
-          unfold observe in H1. rewrite <- H1 in Heqitinv.
-          inversion Heqitinv.
-          destruct H2.
-          destruct e.
+          eapply CIH.
+          red. red. apply REL.
+          auto.
+          auto.
+        - setoid_rewrite unfold_interp_memory.
+          rewrite <- H1 ,<- H.
           cbn.
-          rewrite bind_trigger.
-          unfold Shallow.pweqeq in H3.
-        
-        reflexivity.
-        
-          (* Vis Vis *)
-          admit.
-        -  (* Tau Tau *)
-        
-          admit.
-        - (* Tau Vis *) admit. 
-        - (* Vis Tau *) admit.
-        -   
+          guclo eqit_clo_bind.
+          econstructor.
+          reflexivity.
+          intros.
+          subst.
           gstep.
-          inversion Heqitinv.
-          (* Vis Vis *) admit.
-          Print Ltac forward.
-      Admitted. *)
+          destruct u2.
+          destruct p.
+          cbn.
+          econstructor.
+          gbase.
+          eapply CIH; auto.
+          red. red. apply REL.
+        - 
+        (* setoid_rewrite unfold_interp_memory. *)
+        subst.
+        desobs y oty.
+        discriminate.
+        discriminate.
+        discriminate.
+        - desobs x otx; discriminate.
+        Qed.
 
     Lemma my_handle_intrinsic_prop_correct {T} i sid ms (VALID: MemMonad_valid_state ms sid) :
       my_handle_intrinsic_prop i sid ms (my_handle_intrinsic (T := T) i sid ms).
