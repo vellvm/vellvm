@@ -966,6 +966,98 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         discriminate.
         - desobs x otx; discriminate.
         Qed.
+            (* Interp Laws for [interp_memory] *)
+    (* Definition _interp_memory {E F R}
+              (f : E ~> MemStateFreshT (itree F)) (ot : itreeF E R _)
+      : MemStateFreshT (itree F) R := fun s sid =>
+      match ot with
+      | RetF r => Ret (sid, (s, r))
+      | TauF t => Tau (State.interp_state f t s sid)
+      | VisF _ e k => f _ e s sid >>= (fun '(sid', sx) => Tau (State.interp_state f (k (snd sx)) (fst sx) sid'))
+      end. *)
+Definition _interp_state_mem {E F R}
+           (f : E ~> MemStateFreshT (itree F)) (ot : itreeF E R _)
+  : MemStateFreshT (itree F) R := fun s sid =>
+  match ot with
+  | RetF r => Ret (sid, (s, r))
+  | TauF t => Tau (interp_state f t s sid)
+  | VisF _ e k => f _ e s sid >>= (fun '(sid', sx) => Tau (interp_state f (k (snd sx)) (fst sx) sid'))
+  end.
+
+Lemma unfold_interp_state_mem {E' F R} (h : E' ~> MemStateFreshT (itree F))
+      (t : itree E' R) s sid:
+    eq_itree eq
+      (interp_state h t s sid)
+      (_interp_state_mem h (observe t) s sid).
+Proof.
+  unfold interp_state, interp, Basics.iter, MonadIter_stateT0, Basics.iter, MonadIter_itree; cbn.
+  rewrite unfold_iter; cbn.
+  destruct observe; cbn.
+  - rewrite 3 bind_ret_l. reflexivity.
+  - rewrite 3 bind_ret_l.
+    reflexivity.
+  - rewrite bind_map, bind_bind; cbn.
+    rewrite bind_bind. setoid_rewrite bind_ret_l.
+    apply eqit_bind. reflexivity.
+    intro; subst. rewrite bind_ret_l; cbn.
+    destruct a. reflexivity.
+Qed.
+
+Lemma eqiv_unfold_interp_state_mem {E' F R}:
+  forall a b c d, _interp_state_mem a b c d = _interp_memory (R := R) (E := E') (F := F) a b c d.
+  intros.
+  unfold _interp_state_mem.
+  unfold _interp_memory.
+  reflexivity.
+  Qed.
+
+      #[global] Instance eutt_interp_memory_exec {R} :
+        Proper (eutt eq ==> eq ==> eq ==> eutt eq) (@interp_memory R).
+        Proof using.
+        unfold Proper.
+        unfold respectful.
+        
+        ginit.
+        gcofix CIH.
+        intros.
+        subst.
+        pinversion H0.
+        - setoid_rewrite unfold_interp_memory. gstep. 
+          rewrite <- H1 ,<- H.
+          subst.
+          reflexivity.
+        - simpl.  
+          setoid_rewrite unfold_interp_memory.
+          rewrite <- H1 ,<- H.
+          gstep.
+          econstructor.
+          gbase.
+          eapply CIH; auto.
+        - setoid_rewrite unfold_interp_memory.
+          rewrite <- H1 ,<- H.
+          cbn.
+          guclo eqit_clo_bind.
+          econstructor.
+          reflexivity.
+          intros.
+          subst.
+          gstep.
+          destruct u2.
+          destruct p.
+          cbn.
+          econstructor.
+          gbase.
+          eapply CIH; auto.
+          red. red. apply REL.
+        - setoid_rewrite unfold_interp_memory. rewrite <- H1.
+          cbn.
+          setoid_rewrite unfold_interp_state_mem.
+          setoid_rewrite eqiv_unfold_interp_state_mem.
+
+          admit. (* These two cases are the Tau vs Anything cases, not solvable with discriminate for eutt.*)
+        - admit. 
+        Admitted.
+
 
     Lemma my_handle_intrinsic_prop_correct {T} i sid ms (VALID: MemMonad_valid_state ms sid) :
       my_handle_intrinsic_prop i sid ms (my_handle_intrinsic (T := T) i sid ms).
