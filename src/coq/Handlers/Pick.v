@@ -2480,6 +2480,21 @@ Qed.
       apply eqit_Vis.
       intros [].
     Qed.
+    #[global] Instance eq_itree_exec_undef {X} {E F: Type -> Type}  `{FailureE -< F} `{UBE -< F} `{OOME -< F}:
+      Proper (eq_itree eq ==> eq_itree eq ) (exec_undef (T := X) (E := E) (F := F)).
+      unfold Proper, respectful.
+      intros.
+      rewrite H2.
+      reflexivity.
+    Qed.
+    
+    #[global] Instance eutt_exec_undef {X} {E F: Type -> Type}  `{FailureE -< F} `{UBE -< F} `{OOME -< F}:
+      Proper (eutt eq ==> eutt eq ) (exec_undef (T := X) (E := E) (F := F)).
+      unfold Proper, respectful.
+      intros.
+      rewrite H2.
+      reflexivity.
+    Qed.
     (* Instance center_add_subevent {E F G Sub: Type -> Type} `{Sub -< E +' G}: Sub -< E +' F +' G.
     Admitted. *)
     (* Lemma exec_undef_raise' {X} {E F: Type -> Type}  `{FailureE -< E +' F}  `{FailureE -< E +' PickE +' F} `{UBE -< E +' F} `{OOME -< E +' F} s:
