@@ -2394,15 +2394,10 @@ Lemma lift_memory_convert_mem_byte :
                              (MemState_refine_prop × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict))))
                              t t' (OOM:=OOME).
 
-  Definition model_E1E2_L3_orutt_strict p1 p2 :=
+  Definition model_E1E2_L3_orutt_strict args1 args2 p1 p2 :=
     L3_E1E2_orutt_strict
-      (TopLevelBigIntptr.model_oom_L3 TLR_INF.R.refine_res2 p1)
-      (TopLevel64BitIntptr.model_oom_L3 TLR_FIN.R.refine_res2 p2).
-
-  #[global] Instance mempush_spec_MemState_eqv_Proper :
-    Proper (MemoryBigIntptr.MMEP.MemSpec.MemState_eqv ==> MemoryBigIntptr.MMEP.MemSpec.MemState_eqv ==> iff) MemoryBigIntptr.MMEP.MemSpec.mempush_spec.
-  Proof.
-  Admitted.
+      (TopLevelBigIntptr.model_oom_L3 TLR_INF.R.refine_res2 args1 p1)
+      (TopLevel64BitIntptr.model_oom_L3 TLR_FIN.R.refine_res2 args2 p2).
 
   Lemma lift_MemState_refine_prop :
     forall ms,
@@ -30871,11 +30866,12 @@ cofix CIH
   (* Extra stuff from the proof of the above lemma that needs to get cleaned up... But there's some other stuff in here that I need to not accidentally delete *)
 
   Lemma model_E1E2_L3_orutt_strict_sound
+    (args : list string)
     (p : list
            (LLVMAst.toplevel_entity
               LLVMAst.typ
               (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) :
-    model_E1E2_L3_orutt_strict p p.
+    model_E1E2_L3_orutt_strict args args p p.
   Proof.
     eapply model_E1E2_23_orutt_strict;
       [ apply model_E1E2_L2_orutt_strict_sound
@@ -30899,10 +30895,10 @@ cofix CIH
                              (MemState_refine_prop × (eq × (local_refine_strict × stack_refine_strict × (global_refine_strict × DVC1.dvalue_refine_strict))))
                              t t' (OOM:=OOME).
 
-  Definition model_E1E2_L4_orutt_strict p1 p2 :=
+  Definition model_E1E2_L4_orutt_strict args1 args2 p1 p2 :=
     L4_E1E2_orutt_strict
-      (TopLevelBigIntptr.model_oom_L4 TLR_INF.R.refine_res2 TLR_INF.R.refine_res3 p1)
-      (TopLevel64BitIntptr.model_oom_L4 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 p2).
+      (TopLevelBigIntptr.model_oom_L4 TLR_INF.R.refine_res2 TLR_INF.R.refine_res3 args1 p1)
+      (TopLevel64BitIntptr.model_oom_L4 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 args2 p2).
 
   Definition get_inf_tree_L4' :
     forall (t_fin2 : itree L4 (FinMem.MMEP.MMSP.MemState * (store_id * (local_env * @stack local_env * res_L1)))), itree InfLP.Events.L4 TopLevelBigIntptr.res_L4.
@@ -37244,11 +37240,12 @@ cofix CIH
   Qed.
 
   Lemma model_E1E2_L4_orutt_strict_sound
+    (args : list string)
     (p : list
            (LLVMAst.toplevel_entity
               LLVMAst.typ
               (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) :
-    model_E1E2_L4_orutt_strict p p.
+    model_E1E2_L4_orutt_strict args args p p.
   Proof.
     apply model_E1E2_34_orutt_strict; apply model_E1E2_L3_orutt_strict_sound.
   Qed.
@@ -37270,10 +37267,10 @@ cofix CIH
                     t t' (OOM:=OOME)) \/
             (exists ub, t1 ub /\ ContainsUB.contains_UB ub).
 
-  Definition model_E1E2_L5_orutt_strict p1 p2 :=
+  Definition model_E1E2_L5_orutt_strict args1 args2 p1 p2 :=
     L5_E1E2_orutt_strict
-      (TopLevelBigIntptr.model_oom_L5 TLR_INF.R.refine_res2 TLR_INF.R.refine_res3 p1)
-      (TopLevel64BitIntptr.model_oom_L5 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 p2).
+      (TopLevelBigIntptr.model_oom_L5 TLR_INF.R.refine_res2 TLR_INF.R.refine_res3 args1 p1)
+      (TopLevel64BitIntptr.model_oom_L5 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 args2 p2).
 
   Lemma orutt_L4_contains_UB :
     forall (t_inf_ub : itree InfLP.Events.L4 TopLevelBigIntptr.res_L6) (t_fin_ub : itree E2 res_L6),
@@ -37506,11 +37503,12 @@ cofix CIH
   Qed.
 
   Lemma model_E1E2_L5_orutt_strict_sound
+    (args : list string)
     (p : list
            (LLVMAst.toplevel_entity
               LLVMAst.typ
               (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) :
-    model_E1E2_L5_orutt_strict p p.
+    model_E1E2_L5_orutt_strict args args p p.
   Proof.
     apply model_E1E2_45_orutt_strict; apply model_E1E2_L4_orutt_strict_sound.
   Qed.
@@ -37529,10 +37527,10 @@ cofix CIH
                     t t' (OOM:=OOME)) \/
             (exists ub, t1 ub /\ ContainsUB.contains_UB ub).
 
-  Definition model_E1E2_L6_orutt_strict p1 p2 :=
+  Definition model_E1E2_L6_orutt_strict args1 args2 p1 p2 :=
     L6_E1E2_orutt_strict
-      (TopLevelBigIntptr.model_oom_L6 TLR_INF.R.refine_res2 TLR_INF.R.refine_res3 eq p1)
-      (TopLevel64BitIntptr.model_oom_L6 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 eq p2).
+      (TopLevelBigIntptr.model_oom_L6 TLR_INF.R.refine_res2 TLR_INF.R.refine_res3 eq args1 p1)
+      (TopLevel64BitIntptr.model_oom_L6 TLR_FIN.R.refine_res2 TLR_FIN.R.refine_res3 eq args2 p2).
 
   Lemma refine_OOM_h_orutt :
     forall
@@ -37900,11 +37898,12 @@ cofix CIH
   Qed.
 
   Lemma model_E1E2_L6_orutt_strict_sound
+    (args : list string)
     (p : list
            (LLVMAst.toplevel_entity
               LLVMAst.typ
               (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) :
-    model_E1E2_L6_orutt_strict p p.
+    model_E1E2_L6_orutt_strict args args p p.
   Proof.
     apply model_E1E2_56_orutt_strict; apply model_E1E2_L5_orutt_strict_sound.
   Qed.

@@ -3009,20 +3009,20 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       (local_refine_strict × stack_refine_strict × (global_refine_strict × dvalue_refine_strict))
       t1 t2 (OOM:=OOME).
 
-  Definition model_E1E2_L0_orutt_strict p1 p2 :=
+  Definition model_E1E2_L0_orutt_strict args1 args2 p1 p2 :=
     L0_E1E2_orutt_strict
-      (LLVM1.denote_vellvm (DTYPE_I 32%positive) "main" LLVM1.main_args (convert_types (mcfg_of_tle p1)))
-      (LLVM2.denote_vellvm (DTYPE_I 32%positive) "main" LLVM2.main_args (convert_types (mcfg_of_tle p2))).
+      (LLVM1.denote_vellvm (DTYPE_I 32%positive) "main" args1 (convert_types (mcfg_of_tle p1)))
+      (LLVM2.denote_vellvm (DTYPE_I 32%positive) "main" args2 (convert_types (mcfg_of_tle p2))).
 
-  Definition model_E1E2_L1_orutt_strict p1 p2 :=
+  Definition model_E1E2_L1_orutt_strict args1 args2 p1 p2 :=
     L1_E1E2_orutt_strict
-      (LLVM1.model_oom_L1 p1)
-      (LLVM2.model_oom_L1 p2).
+      (LLVM1.model_oom_L1 args1 p1)
+      (LLVM2.model_oom_L1 args2 p2).
 
-  Definition model_E1E2_L2_orutt_strict p1 p2 :=
+  Definition model_E1E2_L2_orutt_strict args1 args2 p1 p2 :=
     L2_E1E2_orutt_strict
-      (LLVM1.model_oom_L2 p1)
-      (LLVM2.model_oom_L2 p2).
+      (LLVM1.model_oom_L2 args1 p1)
+      (LLVM2.model_oom_L2 args2 p2).
 
   Import TranslateFacts.
   Import RecursionFacts.
@@ -23632,11 +23632,14 @@ Qed.
   Qed.
 
   Lemma model_E1E2_L0_orutt_strict_sound
+    (args1 : list IS1.LP.Events.DV.uvalue)
+    (args2 : list uvalue)
+    (ARGS : Forall2 uvalue_refine_strict args1 args2)
     (p : list
            (LLVMAst.toplevel_entity
               LLVMAst.typ
               (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) :
-    model_E1E2_L0_orutt_strict p p.
+    model_E1E2_L0_orutt_strict args1 args2 p p.
   Proof.
     red.
 
@@ -23661,17 +23664,6 @@ Qed.
     { apply denote_mcfg_E1E2_orutt; auto.
       - apply IM_Refine_of_list_app; eauto.
       - apply dvalue_refine_strict_dvalue_to_uvalue; auto.
-      - (* TODO: fold into main_args lemma probably *)
-        unfold main_args.
-        unfold LLVM1.main_args.
-        constructor.
-        + unfold uvalue_refine_strict.
-          reflexivity.
-        + constructor; [|constructor].
-          unfold uvalue_refine_strict.
-          cbn.
-          rewrite AC1.addr_convert_null.
-          reflexivity.
     }
 
     intros r0 r5 H.
@@ -25632,25 +25624,146 @@ Qed.
     reflexivity.
   Qed.
 
+  Lemma Store_E1E2_rutt' :
+    forall dt r1 r2 r3 r4,
+      dvalue_refine_strict r1 r2 ->
+      uvalue_refine_strict r3 r4 ->
+      rutt event_refine_strict event_res_refine_strict eq
+        (trigger (IS1.LP.Events.Store dt r1 r3))
+        (trigger (IS2.LP.Events.Store dt r2 r4)).
+  Proof.
+    intros dt r1 r2 r3 r4 R1R2 R3R4.
+    apply rutt_trigger.
+    cbn. tauto.
+
+    intros [] [] _.
+    reflexivity.
+  Qed.
+
+  Lemma i8_array_of_string_fin_inf :
+    forall str,
+      uvalue_refine_strict (LLVM1.i8_array_of_string str) (i8_array_of_string str).
+  Proof.
+    intros str.
+    unfold LLVM1.i8_array_of_string, i8_array_of_string.
+    induction str.
+    - cbn.
+      solve_uvalue_refine_strict.
+    - uvalue_refine_strict_inv IHstr.
+      inv H.
+      red; cbn.
+      rewrite H0.
+      reflexivity.
+  Qed.
+
+  Lemma allocate_arg_E1E2_rutt_strict_sound :
+    forall (args : list string),
+      rutt event_refine_strict event_res_refine_strict (Forall2 dvalue_refine_strict)
+        (map_monad LLVM1.allocate_arg args)
+        (map_monad allocate_arg args).
+  Proof.
+    intros args.
+    induction args.
+    - cbn; apply rutt_Ret.
+      apply Forall2_nil.
+    - cbn.
+      eapply rutt_bind with (RR:=dvalue_refine_strict).
+      { eapply rutt_bind with (RR:=dvalue_refine_strict).
+        { apply trigger_alloca_E1E2_rutt_strict_sound.
+        }
+
+        intros r1 r2 H.
+        eapply rutt_bind with (RR:=eq).
+        apply Store_E1E2_rutt'; auto.
+        apply i8_array_of_string_fin_inf.
+
+        intros [] [] _.
+        apply rutt_Ret; auto.
+      }
+
+      intros r1 r2 R1R2.
+      eapply rutt_bind with (RR:=Forall2 dvalue_refine_strict); auto.
+
+      intros r1' r2' R1R2'.
+      subst.
+      apply rutt_Ret.
+      constructor; auto.
+  Qed.
+
+  Lemma allocate_args_fin_inf :
+    forall args,
+      rutt event_refine_strict event_res_refine_strict 
+        dvalue_refine_strict (LLVM1.allocate_args args) (allocate_args args).
+  Proof.
+    intros args.
+    unfold LLVM1.allocate_args, allocate_args.
+    eapply rutt_bind.
+    - apply trigger_alloca_E1E2_rutt_strict_sound.
+    - intros r1 r2 H.
+      eapply rutt_bind.
+      apply allocate_arg_E1E2_rutt_strict_sound.
+
+      intros r0 r3 H0.
+      eapply rutt_bind.
+      { apply Store_E1E2_rutt'; auto.
+        change ((IS1.LP.Events.DV.UVALUE_Array (DTYPE_Array (N.of_nat (Datatypes.length args)) DTYPE_Pointer)
+                   (map IS1.LP.Events.DV.dvalue_to_uvalue r0))) with
+          (IS1.LP.Events.DV.dvalue_to_uvalue (IS1.LP.Events.DV.DVALUE_Array (DTYPE_Array (N.of_nat (Datatypes.length args)) DTYPE_Pointer) r0)).
+        change (UVALUE_Array (DTYPE_Array (N.of_nat (Datatypes.length args)) DTYPE_Pointer)
+                  (map dvalue_to_uvalue r3)) with
+          (IS2.LP.Events.DV.dvalue_to_uvalue
+             (DVALUE_Array (DTYPE_Array (N.of_nat (Datatypes.length args)) DTYPE_Pointer)
+                r3)).
+        apply dvalue_refine_strict_dvalue_to_uvalue.
+        red; cbn.
+        apply map_monad_oom_Forall2 in H0.
+        rewrite H0.
+        reflexivity.
+      }
+
+      intros [] [] _.
+      apply rutt_Ret; auto.
+  Qed.
+
+  Lemma build_main_args_fin_inf
+    (args : list string) :
+    rutt event_refine_strict event_res_refine_strict (Forall2 uvalue_refine_strict) (LLVM1.build_main_args args) (build_main_args args).
+  Proof.
+    unfold build_main_args, LLVM1.build_main_args.
+    eapply rutt_bind.
+    - apply allocate_args_fin_inf.
+    - intros r1 r2 H.
+      apply rutt_Ret.
+      constructor; try solve_uvalue_refine_strict.
+      constructor; eauto.
+      apply dvalue_refine_strict_dvalue_to_uvalue; eauto.
+  Qed.
+
   Lemma model_E1E2_L1_orutt_strict_sound
+    (args : list string)
     (p : list
            (LLVMAst.toplevel_entity
               LLVMAst.typ
               (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) :
-    model_E1E2_L1_orutt_strict p p.
+    model_E1E2_L1_orutt_strict args args p p.
   Proof.
-    apply model_E1E2_01_orutt_strict;
-      [ apply model_E1E2_L0_orutt_strict_sound
-      | apply global_refine_strict_empty
-      ].
+    apply model_E1E2_01_orutt_strict.
+    - eapply orutt_bind with (RR:=Forall2 uvalue_refine_strict).
+      + apply rutt_orutt.
+        apply build_main_args_fin_inf.
+        solve_dec_oom.
+      + intros r1 r2 H.
+        intros *; apply model_E1E2_L0_orutt_strict_sound; auto.
+    - apply global_refine_strict_empty.
   Qed.
 
   Lemma model_E1E2_L2_orutt_strict_sound
+    (args : list string)
     (p : list
            (LLVMAst.toplevel_entity
               LLVMAst.typ
               (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))) :
-    model_E1E2_L2_orutt_strict p p.
+    model_E1E2_L2_orutt_strict args args p p.
   Proof.
     apply model_E1E2_12_orutt_strict;
       [ apply model_E1E2_L1_orutt_strict_sound

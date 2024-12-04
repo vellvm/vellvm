@@ -66,7 +66,7 @@ let run dtyp entry args ll_ast =
   Interpreter.step
     (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp
        (Camlcoq.coqstring_of_camlstring entry)
-       args ll_ast )
+       (Monad.ret (Obj.magic ITreeDefinition.coq_Monad_itree) args) ll_ast )
 
 (* This function takes in a name, a got and expected function, and the left
    hand side and right hand side of the equality. It will lift the result

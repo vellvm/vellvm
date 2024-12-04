@@ -75,7 +75,7 @@ let make_test name ll_ast t : (string * assertion) option =
     Interpreter.step
       (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp
          (Camlcoq.coqstring_of_camlstring entry)
-         args ll_ast )
+         (Monad.ret (Obj.magic ITreeDefinition.coq_Monad_itree) args) ll_ast )
   in
   let run_to_value dtyp entry args ll_ast () : DV.dvalue =
     match run dtyp entry args ll_ast with
@@ -320,11 +320,14 @@ let runCSmith () =
   in
   let _ = Sys.command (command1 ^ "; " ^ command2) in
   (* let _ = Sys.command command2 in *)
-  let res = Driver.run_ll_file llvm_file_name in
+  let res = Driver.run_ll_file [] llvm_file_name in
   match res with
   | Ok dval -> Printf.printf "%s\n" (string_of_dvalue dval)
   | Error exit_cond ->
       Printf.printf "%s\n" (Result.string_of_exit_condition exit_cond)
+
+let command_line_args = ref ["todo"]
+
 
 let args =
   [ ( "-set-test-dir"
@@ -360,6 +363,12 @@ let args =
     , "run the parsing on the given directory and write its internal ast \
        and domination tree to a .v.ast file in the output directory (see \
        -op)" )
+  ; ( "-args"
+    , Rest_all (fun args -> command_line_args := args)
+    , "interpret the rest of the command line arguments as 'argv' for 
+       EACH .ll file that vellvm interprets. Note that all strings after 
+       -args will be interpreted as members of argv, and not arguments to vellvm."
+    )
   ; ( "-op"
     , Set_string Platform.output_path
     , "set the path to the output files directory  [default='output']" )
@@ -376,7 +385,8 @@ let args =
     , Unit test_genAlive2
     , "Run the alive 2 generator and get some sample" ) ]
 
-let files = ref []
+
+    let files = ref []
 
 let _ =
   Printf.printf "(* -------- Vellvm Test Harness -------- *)\n%!" ;
@@ -385,7 +395,7 @@ let _ =
       (fun filename -> files := filename :: !files)
       "USAGE: ./vellvm [options] <files>\n" ;
     Platform.configure () ;
-    process_files !files
+    process_files !command_line_args !files 
   with
   | Ran_tests true -> exit 0
   | Ran_tests false -> exit 1
