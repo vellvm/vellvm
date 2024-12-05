@@ -417,9 +417,7 @@ let add_term tblk ~(term : typ terminator) : tblk =
    blk_term = term;
    blk_comments = tblk.blk_comments
   }
-(* TODO: How to deal with rightmost terminator when it is not well-formed *)
 
-(* TODO: Substitution needed *)
 let transform_exp ~(ctx : ctx) (op : typ exp) : typ exp =
   match op with
   | OP_IBinop (ibinop, t, exp1, exp2) ->
@@ -486,8 +484,6 @@ let transform_exp ~(ctx : ctx) (op : typ exp) : typ exp =
 let ctx_unit_to_string ~(k : raw_id) ~(v : typ exp) : string =
   Printf.sprintf "%s->%s%!" (ShowAST.dshow_raw_id k |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
     (ShowAST.dshowExp ShowAST.dshowTyp v |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
-(* Printf.sprintf "%s" (ShowAST.dshow_raw_id k |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring) *)
-(* Printf.sprintf "%s" "bla" *)
 
 let print_ctx ctx : unit =
   RawidM.iter (fun k v -> Printf.printf "%s; %!" (ctx_unit_to_string ~k ~v)) ctx;
@@ -501,7 +497,7 @@ let transform_phi ~(ctx : ctx) ~(id : raw_id) (phi : typ phi) ~(bid_from : raw_i
     (*
        If op is some values -> then need to case analysis on that {tempid / phi}
        If exp is some operations, then assign this id with that operations, and {id / phiid}
- *)
+   *)
       let exp = transform_exp ~ctx op in
       let ctx' = RawidM.update_or exp (fun _ -> exp) id ctx in
       ctx'
@@ -519,18 +515,11 @@ let is_variadic (def : (typ, typ cfg) definition) =
 
 let transform_definition ~ctx (targs : typ texp list) ~(params : function_id list) : ctx =
   let args = List.map (fun (_, arg) -> subst_exp ~ctx arg) targs in
-  (* print_endline "Here are the targs"; *)
-  (* List.iter (fun s -> Printf.printf "%s\n" (ShowAST.dshowTExp ShowAST.dshowTyp s |> camlstring_of_dstring)) targs; *)
-  (* print_endline "Here are the params:"; *)
-  (* List.iter (fun s -> Printf.printf "%s\n" (ShowAST.dshow_raw_id s |> camlstring_of_dstring)) params; *)
   List.combine params args |> RawidM.of_list
 
 let ( let* ) x f = Stdlib.Result.bind x f
 
 type ctx_stack = (ctx * (typ, typ cfg) definition * instr_id) stack
-
-(* let transform_phi_stack ~(ctxs : ctx_stack) ~(id : raw_id) (phi : typ phi) ~(bid_from : raw_id) : ctx_stack = *)
-(*   stack_update_hd ~f:(fun (ctx, opt) -> transform_phi ~ctx ~id phi ~bid_from, opt) ctxs *)
 
 let update_stack_ctx (ctxs : ctx_stack) ~(ctx : ctx) =
   update_stack_hd ctxs ~f:(fun (_, f_def, ciid) -> ctx, f_def, ciid)
@@ -745,11 +734,6 @@ let rec transform_log
       | _ ->  Error "normalize_log has a standalone f_args not processed"
     end
 
-(* If hit a phi. Stop the current one, and the new one will have a phi node
-   Don't count branches
-   return will always be 1
-*)
-
 type f_def_stack = (typ, typ cfg) definition stack
 
 let rec get_last (l : 'a list) : ('a, string) result =
@@ -757,34 +741,6 @@ let rec get_last (l : 'a list) : ('a, string) result =
   | [] -> Error "log is empty"
   | [hd] -> Ok hd
   | _::tl -> get_last tl
-
-type idmap = int RawidM.t RawidM.t
-
-let idmap_ref = ref RawidM.empty
-
-let incr_count_idmap ~(fid: function_id) ~(iid : instr_id) =
-  match iid with
-  | IVoid _ -> ()
-  | IId id -> 
-    let imap =
-      match RawidM.find_opt fid !idmap_ref with
-      | Some imap' -> imap'
-      | None -> RawidM.empty
-    in
-    let imap' =
-      match RawidM.find_opt id imap with
-      | Some c -> RawidM.add id (c + 1) imap
-      | None -> RawidM.add id 1 imap
-    in
-    idmap_ref := RawidM.add fid imap' !idmap_ref
-
-let clear_idmap =
-  idmap_ref := RawidM.empty
-
-let get_ret_typ_from_def (f_def : (typ, typ cfg) definition) : (typ, string) result =
-  match f_def.df_prototype.dc_type with
-  | TYPE_Function (ret_t, _, _) -> Ok ret_t
-  | _ -> Error "get_f_ret_typ: cannot get function type"
 
 let get_name_from_raw_id : raw_id -> (char list, string) result = function
   | Name s -> Ok s
@@ -911,6 +867,7 @@ let rec transform_log_typ_of_dtyp
             transform_log_typ_of_dtyp ~f_def_stack ~mcfg ~tocfg:(tblk'::tocfg_tl) logs' ~fid_skip
           | INSTR_Op _, Some (_, INSTR_Op exp) ->
             let tblk' = add_code tblk ~code:[(iid, INSTR_Op exp)] in
+
             transform_log_typ_of_dtyp ~f_def_stack ~mcfg ~tocfg:(tblk'::tocfg_tl) logs' ~fid_skip
           | INSTR_Call (_, _, _), Some (_, INSTR_Call ((f_t, f_exp), taargs, anns)) ->
             let tblk' = add_code tblk ~code:[(iid, INSTR_Call ((f_t, f_exp), taargs, anns))] in
@@ -998,7 +955,6 @@ let transform_code
                            } in
     let ctx = RawidM.empty in
     let ctxs = [(ctx, f_def, IVoid Z0)] in
-    (* let* tblk' = f ~ctxs:ctxs ~mcfg ~tblk (List.tl stack) in *)
     let* tblk' = f ~ctxs:ctxs ~mcfg ~tblk stack in
     Ok (rev_blk tblk')
 
@@ -1021,8 +977,6 @@ let transform_code_typ_of_dtyp
     Ok (tocfg')
 
 (** Printing trace **)
-let output_channel = ref stdout
-
 let print_normalized_log ll_ast =
   let mcfg = get_mcfg ll_ast in
   let main_f_id = (Name (Camlcoq.coqstring_of_camlstring "main")) in
@@ -1042,57 +996,6 @@ let get_f_def_from_ast
       exp_eq ~f:typ_eq (EXP_Ident (ID_Global f_def.df_prototype.dc_name)) f_exp
     | _ -> false in
   List.partition find_aux ll_ast
-
-let gen_executable_trace ll_ast
-    ~(only_main : bool)
-    ~(nsubst : bool)
-    ~(skip : string)
-  =
-  let fid_skip = Name (Camlcoq.coqstring_of_camlstring skip) in
-  let mcfg = get_mcfg ll_ast in
-  let main_f_id = (Name (Camlcoq.coqstring_of_camlstring "main")) in
-  let code = List.rev !Log.log_ref in
-  if nsubst then
-    let* tocfg = transform_code_typ_of_dtyp ~f_id:main_f_id ~mcfg code ~fid_skip in
-    match get_f_def_from_ast (EXP_Ident (ID_Global main_f_id)) ll_ast with
-    | [f_tle], r_tles ->
-      begin match f_tle with
-        | TLE_Definition f_def ->
-          let tocfg' = List.rev tocfg in
-          begin match tocfg' with
-            | tocfg_hd :: tocfg_tl -> 
-              let f_def' =
-                {df_prototype=f_def.df_prototype;
-                 df_args=f_def.df_args;
-                 df_instrs=(tocfg_hd, tocfg_tl)
-                } in
-              if only_main then
-                Ok ([TLE_Definition f_def'])
-              else
-                Ok (r_tles @ [TLE_Definition f_def'])
-            | _ -> Error "gen_executable_trace: tocfg is empty"
-          end
-        | _ -> Error "gen_executable_trace: main function is not definition"
-      end
-    | _ -> Error "gen_executable_trace: failed to get main function"
-  else
-    let* tblk = transform_code ~f:transform_log ~f_id:main_f_id ~mcfg code in
-    match get_f_def_from_ast (EXP_Ident (ID_Global main_f_id)) ll_ast with
-    | [f_tle], r_tles ->
-      begin match f_tle with
-        | TLE_Definition f_def ->
-          let f_def' =
-            {df_prototype=f_def.df_prototype;
-             df_args=f_def.df_args;
-             df_instrs=tblk,[]
-            } in
-          if only_main then
-            Ok ([TLE_Definition f_def'])
-          else
-            Ok (r_tles @ [TLE_Definition f_def'])
-        | _ -> Error "gen_executable_trace: main function is not definition"
-      end
-    | _ -> Error "gen_executable_trace: failed to get main function"
 
 let gen_executable_base_trace ll_ast
     ~(skip : string)
@@ -1353,12 +1256,6 @@ let get_main_from_base ll_ast =
   | [f_tle], _ ->
     Ok [f_tle]
   | _ -> Error "get_main_from_base: failed to get main function"
-(* let mcfg = get_mcfg ll_ast in *)
-(* let aux (f_def : ('a , 'a cfg) definition) = *)
-(*   let main_name = Name (Camlcoq.coqstring_of_camlstring "main") in *)
-(*   f_def.df_prototype.dc_name = main_name *)
-(* in *)
-(* List.find aux mcfg.m_definitions *)
 
 let transform_code_base_to_executable
     ~(f_id : function_id)
