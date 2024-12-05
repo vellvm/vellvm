@@ -109,8 +109,9 @@ let path_to_basename_ext (path : string) : string * string =
   | [root] -> (root, "")
   | l -> (
     match List.rev l with
-    | [] -> failwith "path_to_basename_ext got bad path"
-    | ext :: rst -> (String.concat "" (List.rev rst), ext) )
+      | [] -> failwith "path_to_basename_ext got bad path"
+      | ext :: rst ->
+        (String.concat "." (List.rev rst), ext) )
 
 (* compilation and shell
    commands-------------------------------------------- *)

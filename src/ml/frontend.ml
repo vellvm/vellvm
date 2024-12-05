@@ -109,12 +109,42 @@ let ast_pp_dir dir =
 
 let test_directory = ref "../tests"
 
+let trace_mode = ref ""
+
+let get_trace path : unit =
+  let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
+  let file', ext_trace = Platform.path_to_basename_ext path in
+  let file, ext_base = Platform.path_to_basename_ext file' in
+  match ext_trace, ext_base with
+  | "trace", "base" ->
+    let ll_ast = IO.parse_file path in
+    let ll_ast_res, suffix =
+      match !trace_mode with
+      | "main" ->
+        Trace.get_main_from_base ll_ast, ".main.trace"
+      | "executable" ->
+        Trace.gen_executable_from_base ll_ast, ".trace.ll"
+      | _ ->
+        failwith (Printf.sprintf "Error: Trace_mode %s is not supported." !trace_mode)
+    in
+    begin match ll_ast_res with
+    | Ok ll_ast' ->
+      let ll_ast_output = transform ll_ast' in
+      let tracell_file = Platform.gen_name !Platform.output_path file suffix in
+      IO.output_file tracell_file ll_ast_output
+    | Error s ->
+      failwith s
+    end
+  | _ -> failwith (Printf.sprintf "File is: %s. Suffix base is: %s. Suffix trace is:%s" file' ext_base ext_trace)
+
 let process_files files =
   Platform.configure ();
   if !test_pp then
     List.iter process_test_pp files
   else if !histogram_only then
     List.iter process_histogram files
+  else if !trace_mode != "" then
+    List.iter get_trace files
   else 
     List.iter ast_pp_file_inner files
 
@@ -133,7 +163,9 @@ let args =
   ; ("-histogram-only", Set histogram_only, "create only the .hist file for each of the .ll inputs")
   ; ("-print-ast-dir", String ast_pp_dir, "run the parsing on the given directory and write its internal ast and domination tree to a .v.ast file in the output directory (see -op)")
   ; ("-op", Set_string Platform.output_path, "set the path to the output files directory  [default='output']")
-  ; ("-v", Set Platform.verbose, "enables more verbose compilation output")] 
+  ; ("-v", Set Platform.verbose, "enables more verbose compilation output")
+  ; ("-trace", Set_string trace_mode, "provide keyword \"main\" or \"executable\" to modify .base.trace file to be either .main.trace or .trace.ll" )
+  ] 
 
 let files = ref []
 let _ =

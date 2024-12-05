@@ -390,6 +390,9 @@ let subst_texp ~(ctx : ctx) (s : typ texp) : typ texp =
   let (t, exp) = s in
   t, subst_exp ~ctx exp
 
+let subst_texps ~(ctx : ctx) (ss : typ texp list) : typ texp list =
+  List.map (subst_texp ~ctx) ss
+
 type tblk = typ LLVMAst.block
 
 (* Algorithm is as follows:

@@ -326,14 +326,6 @@ let args =
     , Set Driver.trace
     , "interpret ll program starting from 'main' (same as -interpret) and generate .trace.ll file"
     )
-  ; ( "-tracemain"
-    , Set Driver.trace_main
-    , "Hyperparameter: when generating trace will, only output main function in the trace"
-    )
-  ; ( "-tracensubst"
-    , Set Driver.trace_nsubst
-    , "Hyperparameter: when generating trace, will output trace without substitution "
-    )
   ; ( "-traceskip"
     , Set_string Driver.trace_skip
     , "Hyperparameter: when generating trace, will skip the rest of the trace after this call function" 

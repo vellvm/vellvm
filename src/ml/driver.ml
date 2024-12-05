@@ -21,10 +21,6 @@ let interpret = ref false
 
 let trace = ref false
 
-let trace_main = ref false
-
-let trace_nsubst = ref false
-
 let trace_skip = ref ""
 
 let link = ref false 
@@ -97,7 +93,7 @@ let process_ast ll_ast file =
       | Ok dv ->
         Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv);
       | Error e ->
-        Trace.print_log ();
+        Trace.print_log ~f:ShowAST.dshowDtyp;
         failwith (Result.string_of_exit_condition e))
     else
     if !trace then 
@@ -105,15 +101,21 @@ let process_ast ll_ast file =
       | Ok dv ->
         Printf.printf "Program terminated with: %s\n%!" (string_of_dvalue dv);
         (* Printf.printf "skip: %s\n" (!trace_skip); *)
-        begin match Trace.gen_executable_trace ll_ast ~only_main:!trace_main ~nsubst:!trace_nsubst ~skip:!trace_skip with
+        begin match Trace.gen_executable_base_trace ll_ast ~skip:!trace_skip with
           | Ok ll_ast_trace ->
             let ll_ast_trace' = transform ll_ast_trace in
-            let tracell_file = Platform.gen_name !Platform.output_path file ".trace.ll" in
+            let tracell_file = Platform.gen_name !Platform.output_path file ".base.trace" in
             IO.output_file tracell_file ll_ast_trace'
           | Error s -> failwith s
         end
       | Error e ->
-        Trace.print_log ();
+        begin match Trace.gen_executable_base_trace ll_ast ~skip:!trace_skip with
+          | Ok ll_ast_trace ->
+            let ll_ast_trace' = transform ll_ast_trace in
+            let tracell_file = Platform.gen_name !Platform.output_path file ".base.trace" in
+            IO.output_file tracell_file ll_ast_trace'
+          | Error s -> failwith s
+        end;
         failwith (Result.string_of_exit_condition e)
     else
       failwith "Process AST: not valid parameter"

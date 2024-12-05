@@ -17,8 +17,6 @@ let log_ref : dtyp log_stream ref = ref []
 let ( >@ ) x y = y @ x
 let ( >:: ) x y = y :: x
 
-let output_channel = ref stdout
-
 let dshow_log_entry (le : 'a log_entry) ~(f : 'a -> DList.coq_DString) : DList.coq_DString =
   match le with
   | Instr (uid, ins) ->
