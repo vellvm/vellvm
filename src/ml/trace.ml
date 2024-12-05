@@ -538,7 +538,6 @@ let rec transform_log
                 transform_log ~ctxs:ctxs' ~mcfg ~tblk:tblk' logs'
             end
           | INSTR_Call (_, _, _), Some (_, INSTR_Call ((f_t, f_exp), taargs, anns)) ->
-
             (* 1. Need to analyze the targs. Match them with the function signatures from mcfg
                2. Recursively call normalize_log
                3. continue with the rest of the stack
@@ -583,14 +582,6 @@ let rec transform_log
                       | Some f_def' ->
                         let ctxs' = push_stack ~hd:(ctx', f_def', id) ctxs in
                         transform_log ~ctxs:ctxs' ~mcfg ~tblk logs''
-                      (* let* (_, stack2, tblk2, texp) = transform_log ctx' f_def' mcfg tblk stack'' in *)
-                      (* begin match texp with *)
-                      (*   | Some (_, exp) -> *)
-                      (*     let ctx2 = RawidM.update_or exp (fun _ -> exp) iid ctx in *)
-                      (*     normalize_log ctx2 f_def mcfg tblk2 stack2 *)
-                      (*   | None -> *)
-                      (*     Error "normalize_log: call should return some value" *)
-                      (* end *)
                       | None -> Error "normalize_log: function not found"
                     end
                   | _ ->
@@ -834,7 +825,6 @@ let rec transform_log_typ_of_dtyp
             end
         end
       | Instr (iid, ins) ->
-        (* incr_count_idmap ~fid:(f_def.df_prototype.dc_name) ~iid; *)
         begin match ins, get_instr_from_def ~f_def iid with
           | INSTR_Comment _, Some (_, INSTR_Comment c) ->
             let tblk' = add_code tblk ~code:[(iid, INSTR_Comment c)] in
@@ -853,8 +843,6 @@ let rec transform_log_typ_of_dtyp
                   | F_args (f_id, _)::logs'' ->
                     let* last_f_def = get_last f_def_stack in
                     let* last_log = get_last logs'' in
-                    (* Printf.printf ("Call this: %s\n") (ShowAST.dshowRawId f_id |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring); *)
-                    (* Printf.printf ("Eq:%d\n") (RawidOrdPrint.compare f_id fid_skip); *)
                     if RawidOrdPrint.compare f_id fid_skip = 0 then
                       transform_log_typ_of_dtyp ~f_def_stack:[last_f_def] ~mcfg ~tocfg:(tblk'::tocfg_tl) [last_log] ~fid_skip
                     else
@@ -1077,7 +1065,6 @@ let rec transform_log_subst
                 transform_log_subst ~ctxs:ctxs' ~mcfg ~tblk:tblk' logs'
             end
           | INSTR_Call ((f_t, f_exp), taargs, anns) ->
-
             (* 1. Need to analyze the targs. Match them with the function signatures from mcfg
                2. Recursively call normalize_log
                3. continue with the rest of the stack
@@ -1256,7 +1243,6 @@ let gen_executable_from_base ll_ast
   match get_f_def_from_mcfg (EXP_Ident (ID_Global main_f_id)) ~mcfg with
   | Some f_def ->
     let code = typ_log_of_typ_ocfg f_def.df_instrs.blks in
-    (* List.iter (print_log_entry ~f:ShowAST.dshowTyp) code; *)
     let* tblk = transform_code ~f:transform_log_subst ~f_id:main_f_id ~mcfg code in
     begin match get_f_def_from_ast (EXP_Ident (ID_Global main_f_id)) ll_ast with
       | [f_tle], r_tles ->
