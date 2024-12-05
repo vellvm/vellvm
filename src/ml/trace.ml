@@ -22,32 +22,6 @@ let camlstring_of_dstring (dstr : DList.coq_DString) =
   dstr |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring
 
 (** dtyp -> typ mcfg helper function **)
-type tlog_entry =
-  | TInstr of instr_id * typ instr
-  | TPhi of local_id * typ phi * block_id
-  | TRet of typ texp
-
-type tlog_stream = tlog_entry list
-
-let dshow_tlog_entry (le : tlog_entry) : DList.coq_DString =
-  match le with
-  | TInstr (uid, ins) ->
-    ShowAST.dshow_instr_id ShowAST.dshowTyp (uid, ins)
-  | TPhi (uid, phi, bid) ->
-    DList.coq_DList_join
-      [
-        ShowAST.dshow_raw_id bid;
-        ShowAST.dshow_phi_id ShowAST.dshowTyp (uid, phi)
-      ]
-  | TRet term ->
-    ShowAST.dshowTerminator ShowAST.dshowTyp (TERM_Ret term)
-
-let dstring_of_tlog_stream (tlog_stream : tlog_stream) : DList.coq_DString =
-  List.map dshow_tlog_entry tlog_stream |> ShowAST.dintersperse (DList.string_to_DString ('\n' :: []))
-
-let print_tlog (code : tlog_stream) : unit =
-  Printf.printf "%s\n" (dstring_of_tlog_stream code |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring)
-
 (* TODO: This seems to be slow, can optimize by pre-storing the data structure *)
 let get_instr_from_def
     ~(f_def : (LLVMAst.typ, LLVMAst.typ cfg) definition)
