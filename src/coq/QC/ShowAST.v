@@ -1221,10 +1221,13 @@ Section ShowInstances.
 
   Definition dshow_metadata_list (ml : list (metadata T)) := 
     concat_DString (string_to_DString " ") (mapTR dshow_metadata ml).
+
+  Definition dshow_comment (comment : string) : DString :=
+    string_to_DString "; " @@ string_to_DString comment.
   
   Definition dshow_instr (i : instr T) : DString
     := match i with
-       | INSTR_Comment s => string_to_DString "; " @@  string_to_DString s
+       | INSTR_Comment s => dshow_comment s
 
        | INSTR_Op e => dshow e
 
@@ -1401,12 +1404,12 @@ Section ShowInstances.
 
   #[global] Instance dshowTerminator : DShow (terminator T) := {dshow := dshow_terminator}.
 
+  Definition dnewline := string_to_DString newline.
+  
   Definition dshow_code (indent : string) (c : code T) : DString
-    := DList_join (mapTR (fun iid => string_to_DString indent @@  dshow_instr_id iid @@ string_to_DString newline) c).
+    := DList_join (mapTR (fun iid => string_to_DString indent @@  dshow_instr_id iid @@ dnewline) c).
 
   #[global] Instance dshowCode : DShow (code T) := { dshow := dshow_code "    " }.
-
-  Definition dnewline := string_to_DString newline.
 
   Definition dshow_local_id (lid : local_id) : DString :=
     DList_join [string_to_DString "%"; dshow lid].
@@ -1420,9 +1423,14 @@ Section ShowInstances.
        dshow p;
        dnewline
       ].
-  
+
   Definition dshow_block (indent : string) (b : block T) : DString
     :=
+    let comments :=
+      match blk_comments b with
+      | None => EmptyDString
+      | Some cs => DList_join (mapTR (fun c => dshow_comment c @@ dnewline) cs)
+      end in
     let ind := string_to_DString indent in
     let phis := DList_join (mapTR (fun lp =>
                                    ind @@
