@@ -2051,12 +2051,31 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
          ret (byte :: rest_bytes))
       num start_ix.
 
+  (* Program Fixpoint generate_num_undef_bytes_h_no_OOM_ (start_ix: nat) (num: nat) (dt: dtyp) (sid: store_id) 
+    {measure (num - start_ix)}: list SByte := *)
+  Fixpoint generate_num_undef_bytes_h_no_OOM_ (start_ix: nat) (rem: nat) (dt: dtyp) (sid: store_id) 
+    : list SByte :=
+    match rem with
+    | (0)%nat => []
+    | S n => uvalue_sbyte (UVALUE_Undef dt) dt (N.of_nat start_ix) sid :: generate_num_undef_bytes_h_no_OOM_ (S start_ix) (n)%nat dt sid
+    end.
+
+  Definition generate_num_undef_bytes_h_no_OOM (start_ix : N) (num : N) (dt : dtyp) (sid : store_id)
+     : OOM (list SByte) := NoOom (generate_num_undef_bytes_h_no_OOM_ (N.to_nat start_ix) (N.to_nat num) dt sid).
+  
+
+
   Definition generate_num_undef_bytes (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
     generate_num_undef_bytes_h 0 num dt sid.
 
   Definition generate_undef_bytes (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
     generate_num_undef_bytes (sizeof_dtyp dt) dt sid.
 
+  Definition generate_num_undef_bytes_no_OOM (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+    generate_num_undef_bytes_h_no_OOM 0 num dt sid.
+
+  Definition generate_undef_bytes_no_OOM (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+    generate_num_undef_bytes_no_OOM (sizeof_dtyp dt) dt sid.
   Lemma generate_num_undef_bytes_h_length :
     forall num start_ix dt sid bytes,
       generate_num_undef_bytes_h start_ix num dt sid = NoOom bytes ->
@@ -7922,16 +7941,65 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
     break_match; auto.
   Qed.
 
+  Lemma generate_num_undef_bytes_h_no_OOM_equiv:
+    forall dt sid start ,
+    generate_num_undef_bytes_h start (sizeof_dtyp dt) dt sid = 
+      (generate_num_undef_bytes_h_no_OOM start (sizeof_dtyp dt) dt sid).
+  Proof.
+    intros dt.
+    induction (sizeof_dtyp dt) using N.peano_ind.
+    cbn. auto.
+    - intros.
+      unfold generate_num_undef_bytes_h_no_OOM.
+      (* specialize (IHn sid (N.succ start)). *)
+      pose proof (from_Z_safe (Z.of_N start)).
+      break_match_hyp; [|contradiction].
+
+      erewrite generate_num_undef_bytes_h_cons; eauto.
+      intros.
+      cbn.
+      rewrite IHn.
+      simpl.
+      destruct (N.to_nat (N.succ n)) eqn:Hrem.
+      unfold N.to_nat in Hrem. 
+      destruct (N.succ n) eqn:Hsucc.
+      unfold N.succ in Hsucc.
+      destruct n eqn:Hn.
+      discriminate.
+      discriminate.
+      pose proof (Pos2Nat.is_pos p).
+      rewrite Hrem in H0.
+      cbv in H0.
+      pose proof (Nat.le_0_r 1).
+      apply H1 in H0.
+      discriminate.
+      f_equal.
+
+      simpl.
+
+      f_equal.
+
+      rewrite Nnat.N2Nat.id.
+      reflexivity.
+      Search (N.to_nat (N.succ _)).
+      rewrite Nnat.N2Nat.inj_succ.
+      rewrite Nnat.N2Nat.inj_succ in Hrem.
+      inversion Hrem.
+      rewrite H1.
+      reflexivity.
+  Qed.
+
   (* TODO: should this be here? *)
   Lemma generate_num_undef_bytes_h_succeeds :
-    forall dt sid start,
+    forall dt sid start ,
+
     exists bytes : list SByte, generate_num_undef_bytes_h start (sizeof_dtyp dt) dt sid = ret bytes.
   Proof.
     intros dt.
     induction (sizeof_dtyp dt) using N.peano_ind;
       intros sid start.
 
-    - cbn; eexists; auto.
+    - cbn. eexists. auto.
     - specialize (IHn sid (N.succ start)).
       destruct IHn as [bytes IHn].
       pose proof (from_Z_safe (Z.of_N start)).
@@ -7964,6 +8032,16 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
     apply generate_num_undef_bytes_succeeds.
   Qed.
 
+  Lemma generate_undef_bytes_equiv :
+    forall dt sid,
+    generate_undef_bytes dt sid = generate_undef_bytes_no_OOM dt sid.
+  Proof.
+    intros.
+    unfold generate_undef_bytes,generate_undef_bytes_no_OOM, generate_num_undef_bytes, generate_num_undef_bytes_no_OOM.
+    rewrite generate_num_undef_bytes_h_no_OOM_equiv.
+    reflexivity.
+  Qed.
+  
   Lemma repeatMN_MemPropT_length :
     forall {A} n (ma : MemPropT MemState A) ms ms' a,
       repeatMN n ma ms (ret (ms', a)) -> length a = N.to_nat n.
