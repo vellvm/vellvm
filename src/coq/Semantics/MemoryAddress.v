@@ -96,13 +96,24 @@ End INTPTR.
 
 Module Type INTPTR_BIG (IP : INTPTR).
   Import IP.
-
+  Parameter from_Z_big: Z -> intptr.
+  Parameter from_Z_big_equiv:
+    forall x,
+      NoOom (from_Z_big x) = from_Z x.
   Parameter from_Z_safe :
     forall z,
       match from_Z z with
       | NoOom _ => True
       | Oom _ => False
       end.
+    Definition intptr_seq_no_OOM start len : OOM (list intptr)
+  := NoOom (List.map from_Z_big (ListUtil.Zseq start len)).
+  
+  Parameter big_intptr_seq_equiv:
+    forall start len,
+    Monads.map_monad (from_Z) (ListUtil.Zseq start len)
+      = intptr_seq_no_OOM start len.
+
 End INTPTR_BIG.
 
 (* TODO: move this? *)

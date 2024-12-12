@@ -251,7 +251,6 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   (* TODO: Move this? *)
   Definition intptr_seq (start : Z) (len : nat) : OOM (list IP.intptr)
     := map_monad (IP.from_Z) (Zseq start len).
-
   (* TODO: Move this? *)
   Lemma intptr_seq_succ :
     forall off n,
@@ -7716,6 +7715,23 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
    *)
 
   (* TODO: Move to something like IP_BIG? *)
+  Lemma big_intptr_seq_equiv:
+    forall start len,
+    intptr_seq start len
+      = intptr_seq_no_OOM start len.
+  Proof.
+  intros.
+  unfold intptr_seq, intptr_seq_no_OOM.
+    induction (Zseq start len); simpl.
+    reflexivity.
+    pose proof from_Z_big_equiv.
+    rewrite <- H.
+    simpl.
+    rewrite IHl.
+    reflexivity.
+  Qed.
+
+
   Lemma big_intptr_seq_succeeds :
     forall start len,
     exists ips, intptr_seq start len = NoOom ips.
