@@ -148,6 +148,15 @@ End BigIP.
 
 Module BigIP_BIG : MemoryAddress.INTPTR_BIG BigIP.
   Import BigIP.
+  Definition from_Z_big: Z -> intptr := id.
+    Lemma from_Z_big_equiv:
+    forall x,
+      NoOom (from_Z_big x) = from_Z x.
+      Proof.
+      intros.
+      auto.
+      Qed.
+
 
   Lemma from_Z_safe :
     forall z,
@@ -160,6 +169,26 @@ Module BigIP_BIG : MemoryAddress.INTPTR_BIG BigIP.
     unfold from_Z.
     reflexivity.
   Qed.
+
+  Definition intptr_seq_no_OOM start len : OOM (list intptr)
+  := NoOom (List.map from_Z_big (ListUtil.Zseq start len)).
+  
+  Lemma big_intptr_seq_equiv:
+    forall start len,
+    Monads.map_monad (from_Z) (ListUtil.Zseq start len)
+      = intptr_seq_no_OOM start len.
+  Proof.
+    unfold intptr_seq_no_OOM.
+    intros.
+    induction (ListUtil.Zseq start len).
+    cbn.
+    reflexivity.
+    cbn.
+    rewrite IHl.
+    f_equal.
+  Qed.
+  Check big_intptr_seq_equiv.
+
 End BigIP_BIG.
 
 Definition from_Z_bits {sz : positive} : Z -> OOM (@bit_int sz) := (fun (x : Z) =>
