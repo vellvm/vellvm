@@ -1,45 +1,51 @@
 From Vellvm.Numeric Require Import
-     Integers.
+  Integers.
 
 From Vellvm.Syntax Require Import
-     DataLayout
-     DynamicTypes.
+  DataLayout
+  DynamicTypes.
 
 From Mem Require Import
   Addresses.MemoryAddress
   Addresses.Provenance
+  MemoryModel
   MemoryModules.Within
   StoreId
-  MemPropT.
+  MemPropT
+  SByte.
 
-Require Import LLVM_Memory.GepM.
+From LLVM_Memory Require Import
+  Intptr
+  Sizeof
+  GepM
+  MemBytes.
 
 From ITree Require Import
-     ITree
-     Basics.Basics
-     Events.Exception
-     Eq.Eqit
-     Events.StateFacts
-     Events.State.
+  ITree
+  Basics.Basics
+  Events.Exception
+  Eq.Eqit
+  Events.StateFacts
+  Events.State.
 
 From Vellvm.Utils Require Import
-     Error
-     PropT
-     Util
-     Raise
-     RaiseLLVM
-     NMaps
-     Tactics
-     Monads
-     MapMonadExtra
-     MonadReturnsLaws
-     MonadEq1Laws
-     MonadExcLaws
-     Inhabited.
+  Error
+  PropT
+  Util
+  Raise
+  RaiseLLVM
+  NMaps
+  Tactics
+  Monads
+  MapMonadExtra
+  MonadReturnsLaws
+  MonadEq1Laws
+  MonadExcLaws
+  Inhabited.
 
 From ExtLib Require Import
-     Structures.Monads
-     Structures.Functor.
+  Structures.Monads
+  Structures.Functor.
 
 From Stdlib Require Import
      ZArith
@@ -53,7 +59,8 @@ From Stdlib Require Import
 
 From Vellvm.Semantics Require Import
   LLVMParams
-  MemoryParams.
+  MemoryParams
+  LLVMEvents.
 
 Require Import Morphisms.
 
@@ -106,15 +113,15 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
     | _:_ |-
         context [
             ({| unERR_UB_OOM :=
-               {|
-                 EitherMonad.unEitherT :=
                  {|
                    EitherMonad.unEitherT :=
-                   {|
-                     EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (@inl _ (sum ERR_MESSAGE ?t) (UB_message ?ub_msg)) |}
-                   |}
+                     {|
+                       EitherMonad.unEitherT :=
+                         {|
+                           EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (@inl _ (sum ERR_MESSAGE ?t) (UB_message ?ub_msg)) |}
+                         |}
+                     |}
                  |}
-               |}
              |}) ] =>
         replace (UB_unERR_UB_OOM ub_msg) with (@raise_ub err_ub_oom _ t ub_msg) by auto
     end.
@@ -124,15 +131,15 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
       match goal with
       | H : context [
                 ({| unERR_UB_OOM :=
-                   {|
-                     EitherMonad.unEitherT :=
                      {|
                        EitherMonad.unEitherT :=
-                       {|
-                         EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (@inl _ (sum ERR_MESSAGE ?t) (UB_message ?ub_msg)) |}
-                       |}
+                         {|
+                           EitherMonad.unEitherT :=
+                             {|
+                               EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (@inl _ (sum ERR_MESSAGE ?t) (UB_message ?ub_msg)) |}
+                             |}
+                         |}
                      |}
-                   |}
                  |}) ] |- _ =>
           replace (UB_unERR_UB_OOM ub_msg) with (@raise_ub err_ub_oom _ t ub_msg) in H by eauto
       end.
@@ -165,10 +172,10 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
       reflexivity.
     - unfold generate_num_undef_bytes_h in GEN.
       pose proof @N.recursion_succ (N -> OOM (list SByte)) Logic.eq (fun _ : N => ret [])
-           (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
+        (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
            rest_bytes <- mf (N.succ x);;
            ret (uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes))
-           eq_refl.
+        eq_refl.
       forward H.
       { unfold Proper, respectful.
         intros x y H0 x0 y0 H1; subst.
@@ -180,10 +187,10 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
 
       destruct
         (N.recursion (fun _ : N => ret [])
-                     (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
-                        rest_bytes <- mf (N.succ x);;
-                        ret (uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes)) num
-                     (N.succ start_ix)) eqn:HREC.
+           (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
+              rest_bytes <- mf (N.succ x);;
+              ret (uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes)) num
+           (N.succ start_ix)) eqn:HREC.
       + (* No OOM *)
         cbn in GEN.
         inv GEN.
@@ -219,8 +226,8 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
 
   Section Serialization.
     (** ** Serialization *)
-  (*      Conversion back and forth between values and their byte representation *)
-  (*    *)
+    (*      Conversion back and forth between values and their byte representation *)
+    (*    *)
     (* Given a little endian list of bytes, match the endianess of `e` *)
     Definition correct_endianess {BYTES : Type} (e : Endianess) (bytes : list BYTES)
       := match e with
@@ -229,8 +236,8 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
          end.
 
     (* Converts an integer [x] to its byte representation over [n] bytes. *)
-  (*    The representation is little endian. In particular, if [n] is too small, *)
-  (*    only the least significant bytes are returned. *)
+    (*    The representation is little endian. In particular, if [n] is too small, *)
+    (*    only the least significant bytes are returned. *)
     (*    *)
     Fixpoint bytes_of_int_little_endian (n: nat) (x: Z) {struct n}: list (@bit_int 8) :=
       match n with
@@ -242,8 +249,8 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
       correct_endianess e (bytes_of_int_little_endian n x).
 
     (* *)
-  (* Definition sbytes_of_int (e : Endianess) (count:nat) (z:Z) : list SByte := *)
-  (*   List.map Byte (bytes_of_int e count z). *)
+    (* Definition sbytes_of_int (e : Endianess) (count:nat) (z:Z) : list SByte := *)
+    (*   List.map Byte (bytes_of_int e count z). *)
 
     Definition uvalue_bytes_little_endian (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
       := map (fun n => UVALUE_ExtractByte uv dt n sid)
@@ -354,7 +361,7 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
     (* Assign fresh sids to ubytes while preserving entanglement *)
     (* Could potentially turn this into map (+max_sid) *)
     Program Fixpoint re_sid_ubytes_helper {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M}
-            (bytes : list (N * SByte)) (acc : NMap SByte) {measure (length bytes)} : M (NMap SByte)
+      (bytes : list (N * SByte)) (acc : NMap SByte) {measure (length bytes)} : M (NMap SByte)
       := match bytes with
          | [] => ret acc
          | ((n, x)::xs) =>
@@ -377,7 +384,7 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
     Defined.
 
     Lemma re_sid_ubytes_helper_equation {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M}
-          (bytes : list (N * SByte)) (acc : NMap SByte) :
+      (bytes : list (N * SByte)) (acc : NMap SByte) :
       re_sid_ubytes_helper bytes acc =
         match bytes with
         | [] => ret acc
@@ -409,9 +416,9 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
         unfold re_sid_ubytes_helper_func.
         assert ((fun (acc : NM.t SByte) '(n, ub) => NM.add n (replace_sid nsid ub) acc) =
                   (fun (acc : NM.t SByte) (pat : NM.key * SByte) =>
-                       (let
-                        '(n, ub) as anonymous' := pat return (anonymous' = pat -> NM.t SByte) in
-                         fun _ : (n, ub) = pat => NM.add n (replace_sid nsid ub) acc) eq_refl)) as EQN.
+                     (let
+                         '(n, ub) as anonymous' := pat return (anonymous' = pat -> NM.t SByte) in
+                       fun _ : (n, ub) = pat => NM.add n (replace_sid nsid ub) acc) eq_refl)) as EQN.
         { apply functional_extensionality. intros.
           apply functional_extensionality. intros.
           destruct x0.
@@ -437,7 +444,7 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
      *)
 
     Definition re_sid_ubytes {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M}
-               (bytes : list SByte) : M (list SByte)
+      (bytes : list SByte) : M (list SByte)
       := let len := length bytes in
          byte_map <- re_sid_ubytes_helper (zip (Nseq 0 len) bytes) (@NM.empty _);;
          trywith_error "re_sid_ubytes: missing indices." (NM_find_many (Nseq 0 len) byte_map).
@@ -490,7 +497,7 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
                                                                | H: _ |- _ =>
                                                                    try solve [inversion H]
                                                                end
-                                                    ].
+                                                      ].
 
 
     Fixpoint serialize_by_dtyp {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M} `{RAISE_OOM M}
@@ -521,91 +528,91 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
       (uv : uvalue) (dt : dtyp) : M (list SByte)
       := sid <- fresh_sid;;
          ret (to_ubytes uv dt sid).
-      (* match uv with *)
-      (* (* Base types *) *)
-      (* | UVALUE_Addr _ *)
-      (* | UVALUE_I1 _ *)
-      (* | UVALUE_I8 _ *)
-      (* | UVALUE_I32 _ *)
-      (* | UVALUE_I64 _ *)
-      (* | UVALUE_IPTR _ *)
-      (* | UVALUE_Float _ *)
-      (* | UVALUE_Double _ *)
+    (* match uv with *)
+    (* (* Base types *) *)
+    (* | UVALUE_Addr _ *)
+    (* | UVALUE_I1 _ *)
+    (* | UVALUE_I8 _ *)
+    (* | UVALUE_I32 _ *)
+    (* | UVALUE_I64 _ *)
+    (* | UVALUE_IPTR _ *)
+    (* | UVALUE_Float _ *)
+    (* | UVALUE_Double _ *)
 
-      (* (* Expressions *) *)
-      (* | UVALUE_IBinop _ _ _ *)
-      (* | UVALUE_ICmp _ _ _ *)
-      (* | UVALUE_FBinop _ _ _ _ *)
-      (* | UVALUE_FCmp _ _ _ *)
-      (* | UVALUE_Conversion _ _ _ _ *)
-      (* | UVALUE_GetElementPtr _ _ _ *)
-      (* | UVALUE_ExtractElement _ _ _ *)
-      (* | UVALUE_InsertElement _ _ _ _ *)
-      (* | UVALUE_ShuffleVector _ _ _ _ *)
-      (* | UVALUE_ExtractValue _ _ _ *)
-      (* | UVALUE_InsertValue _ _ _ _ _ *)
-      (* | UVALUE_Select _ _ _ => *)
-      (*     sid <- fresh_sid;; *)
-      (*     ret (to_ubytes uv dt sid) *)
+    (* (* Expressions *) *)
+    (* | UVALUE_IBinop _ _ _ *)
+    (* | UVALUE_ICmp _ _ _ *)
+    (* | UVALUE_FBinop _ _ _ _ *)
+    (* | UVALUE_FCmp _ _ _ *)
+    (* | UVALUE_Conversion _ _ _ _ *)
+    (* | UVALUE_GetElementPtr _ _ _ *)
+    (* | UVALUE_ExtractElement _ _ _ *)
+    (* | UVALUE_InsertElement _ _ _ _ *)
+    (* | UVALUE_ShuffleVector _ _ _ _ *)
+    (* | UVALUE_ExtractValue _ _ _ *)
+    (* | UVALUE_InsertValue _ _ _ _ _ *)
+    (* | UVALUE_Select _ _ _ => *)
+    (*     sid <- fresh_sid;; *)
+    (*     ret (to_ubytes uv dt sid) *)
 
-      (* | UVALUE_Undef _ => serialize_by_dtyp UVALUE_Undef dt *)
-      (* | UVALUE_Poison _ => serialize_by_dtyp UVALUE_Poison dt *)
-      (* | UVALUE_Oom _ => serialize_by_dtyp UVALUE_Oom dt *)
-      (* | UVALUE_Struct fields => *)
-      (*     match dt with *)
-      (*     | DTYPE_Struct ts => *)
-      (*         l <- map_monad2 serialize_sbytes fields ts ;; *)
-      (*         ret (concat l) *)
-      (*     | _ => *)
-      (*         raise_error "serialize_sbytes: UVALUE_Struct field / type mismatch." *)
-      (*     end *)
-      (* | UVALUE_Packed_struct fields => *)
-      (*     match dt with *)
-      (*     | DTYPE_Packed_struct ts => *)
-      (*         l <- map_monad2 serialize_sbytes fields ts ;; *)
-      (*         ret (concat l) *)
-      (*     | _ => *)
-      (*         raise_error "serialize_sbytes: UVALUE_Packed_struct field / type mismatch." *)
-      (*     end *)
+    (* | UVALUE_Undef _ => serialize_by_dtyp UVALUE_Undef dt *)
+    (* | UVALUE_Poison _ => serialize_by_dtyp UVALUE_Poison dt *)
+    (* | UVALUE_Oom _ => serialize_by_dtyp UVALUE_Oom dt *)
+    (* | UVALUE_Struct fields => *)
+    (*     match dt with *)
+    (*     | DTYPE_Struct ts => *)
+    (*         l <- map_monad2 serialize_sbytes fields ts ;; *)
+    (*         ret (concat l) *)
+    (*     | _ => *)
+    (*         raise_error "serialize_sbytes: UVALUE_Struct field / type mismatch." *)
+    (*     end *)
+    (* | UVALUE_Packed_struct fields => *)
+    (*     match dt with *)
+    (*     | DTYPE_Packed_struct ts => *)
+    (*         l <- map_monad2 serialize_sbytes fields ts ;; *)
+    (*         ret (concat l) *)
+    (*     | _ => *)
+    (*         raise_error "serialize_sbytes: UVALUE_Packed_struct field / type mismatch." *)
+    (*     end *)
 
-      (* | UVALUE_Array elts => *)
-      (*     match dt with *)
-      (*     | DTYPE_Array _ t => *)
-      (*         l <- map_monad (fun elt => serialize_sbytes elt t) elts;; *)
-      (*         ret (concat l) *)
-      (*     | _ => *)
-      (*         raise_error "serialize_sbytes: UVALUE_Array with incorrect type." *)
-      (*     end *)
+    (* | UVALUE_Array elts => *)
+    (*     match dt with *)
+    (*     | DTYPE_Array _ t => *)
+    (*         l <- map_monad (fun elt => serialize_sbytes elt t) elts;; *)
+    (*         ret (concat l) *)
+    (*     | _ => *)
+    (*         raise_error "serialize_sbytes: UVALUE_Array with incorrect type." *)
+    (*     end *)
 
-      (* | UVALUE_Vector elts => *)
-      (*     match dt with *)
-      (*     | DTYPE_Vector _ t => *)
-      (*         l <- map_monad (fun elt => serialize_sbytes elt t) elts;; *)
-      (*         ret (concat l) *)
-      (*     | _ => *)
-      (*         raise_error "serialize_sbytes: UVALUE_Vector with incorrect type." *)
-      (*     end *)
+    (* | UVALUE_Vector elts => *)
+    (*     match dt with *)
+    (*     | DTYPE_Vector _ t => *)
+    (*         l <- map_monad (fun elt => serialize_sbytes elt t) elts;; *)
+    (*         ret (concat l) *)
+    (*     | _ => *)
+    (*         raise_error "serialize_sbytes: UVALUE_Vector with incorrect type." *)
+    (*     end *)
 
-      (* | UVALUE_None => ret nil *)
+    (* | UVALUE_None => ret nil *)
 
-      (* | UVALUE_ExtractByte uv dt' idx sid => *)
-      (*     raise_error "serialize_sbytes: UVALUE_ExtractByte not guarded by UVALUE_ConcatBytes." *)
+    (* | UVALUE_ExtractByte uv dt' idx sid => *)
+    (*     raise_error "serialize_sbytes: UVALUE_ExtractByte not guarded by UVALUE_ConcatBytes." *)
 
-      (* | UVALUE_ConcatBytes bytes t => *)
-      (*     bytes' <- lift_ERR_RAISE_ERROR (map_monad extract_byte_to_sbyte bytes);; *)
-      (*     re_sid_ubytes bytes' *)
-      (* end. *)
+    (* | UVALUE_ConcatBytes bytes t => *)
+    (*     bytes' <- lift_ERR_RAISE_ERROR (map_monad extract_byte_to_sbyte bytes);; *)
+    (*     re_sid_ubytes bytes' *)
+    (* end. *)
 
 
-  (* deserialize_sbytes takes a list of SBytes and turns them into a uvalue. *)
+    (* deserialize_sbytes takes a list of SBytes and turns them into a uvalue. *)
 
-  (*    This relies on the similar, but different, from_ubytes function *)
-  (*    which given a set of bytes checks if all of the bytes are from *)
-  (*    the same uvalue, and if so returns the original uvalue, and *)
-  (*    otherwise returns a UVALUE_ConcatBytes value instead. *)
+    (*    This relies on the similar, but different, from_ubytes function *)
+    (*    which given a set of bytes checks if all of the bytes are from *)
+    (*    the same uvalue, and if so returns the original uvalue, and *)
+    (*    otherwise returns a UVALUE_ConcatBytes value instead. *)
 
-  (*    The reason we also have deserialize_sbytes is in order to deal *)
-  (*    with aggregate data types. *)
+    (*    The reason we also have deserialize_sbytes is in order to deal *)
+    (*    with aggregate data types. *)
     Definition from_ubytes_extra :=
       fun (bytes : list SByte) (dt : dtyp) =>
         match split_n (N.to_nat (sizeof_dtyp dt)) bytes with
@@ -621,37 +628,37 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
     Lemma from_ubytes_extra_from_ubytes :
       forall bs dt uv,
         from_ubytes_extra bs dt = (uv, []) ->
-          from_ubytes bs dt = uv.
+        from_ubytes bs dt = uv.
     Proof.
       unfold from_ubytes_extra.
       unfold from_ubytes.
       intros.
       break_inner_match_goal.
-        + break_match_hyp.
-          * assert (exists s, split_n (N.to_nat (sizeof_dtyp dt)) bs = inl s) by (eexists; eauto).
-            apply split_n_err in H0.
-            apply Neqb_ok in Heqb.
-            lia.
-          * destruct p.
-            apply split_n_correct in Heqs.
-            destruct Heqs as [_ EQ].
-            inversion H.
-            subst.
-            rewrite app_nil_r.
-            reflexivity.
-        + break_match_hyp.
-          * inversion H.
-            reflexivity.
-          * destruct p.
-            inversion H.
-            subst.
-            apply split_n_correct in Heqs.
-            destruct Heqs as [EQ1 EQ2].
-            rewrite app_nil_r in EQ2. subst.
-            rewrite EQ1 in Heqb.
-            rewrite Nnat.N2Nat.id in Heqb.
-            rewrite N.eqb_refl in Heqb.
-            inversion Heqb.
+      + break_match_hyp.
+        * assert (exists s, split_n (N.to_nat (sizeof_dtyp dt)) bs = inl s) by (eexists; eauto).
+          apply split_n_err in H0.
+          apply Neqb_ok in Heqb.
+          lia.
+        * destruct p.
+          apply split_n_correct in Heqs.
+          destruct Heqs as [_ EQ].
+          inversion H.
+          subst.
+          rewrite app_nil_r.
+          reflexivity.
+      + break_match_hyp.
+        * inversion H.
+          reflexivity.
+        * destruct p.
+          inversion H.
+          subst.
+          apply split_n_correct in Heqs.
+          destruct Heqs as [EQ1 EQ2].
+          rewrite app_nil_r in EQ2. subst.
+          rewrite EQ1 in Heqb.
+          rewrite Nnat.N2Nat.id in Heqb.
+          rewrite N.eqb_refl in Heqb.
+          inversion Heqb.
     Qed.
 
     (* Tries to deserialize a list of SBytes into a uvalue.
@@ -670,67 +677,67 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
     Definition deserialize_sbytes (bytes : list SByte) (dt : dtyp) : err uvalue :=
       match dt with
       | DTYPE_Void =>
-          raise "deserialize_sbytes: Attempt to deserialize void."%string
+          MonadExc.raise "deserialize_sbytes: Attempt to deserialize void."%string
       | _ => ret (from_ubytes bytes dt)
       end.
 
-      (* let dsb_list : list SByte -> list dtyp -> err (list uvalue * list SByte) := *)
-      (*   fix go (bytes : list SByte) (fields : list dtyp) : err (list uvalue * list SByte) :=  *)
-      (*     match fields with *)
-      (*     | [] => ret ([], bytes) *)
-      (*     | t::ts =>  *)
-      (*         '(bs1, bs2) <- split_n (N.to_nat (sizeof_dtyp t)) bytes ;; *)
-      (*         u <- deserialize_sbytes bs1 t ;; *)
-      (*         '(us, rest) <- go bs2 ts ;; *)
-      (*         ret (u::us, rest) *)
-      (*     end *)
-      (* in *)
-      (* let dsb_loop (dt:dtyp) : nat  -> list SByte -> err (list uvalue * list SByte) := *)
-      (*   fix go n bytes := *)
-      (*     match n with *)
-      (*     | 0 => ret ([], bytes) *)
-      (*     | S n => *)
-      (*         '(bs1, bs2) <- split_n (N.to_nat (sizeof_dtyp dt)) bytes ;; *)
-      (*         u <- deserialize_sbytes bs1 dt ;; *)
-      (*         '(us, rest) <- go n bs2;; *)
-      (*         ret (u::us, rest) *)
-      (*     end  *)
-      (* in  *)
-      (* match dt with *)
-      (* (* Base types *) *)
-      (* | DTYPE_I _ *)
-      (* | DTYPE_IPTR *)
-      (* | DTYPE_Pointer *)
-      (* | DTYPE_Half *)
-      (* | DTYPE_Float *)
-      (* | DTYPE_Double *)
-      (* | DTYPE_X86_fp80 *)
-      (* | DTYPE_Fp128 *)
-      (* | DTYPE_Ppc_fp128 *)
-      (* | DTYPE_X86_mmx *)
-      (* | DTYPE_Opaque *)
-      (* | DTYPE_Metadata => *)
-      (*     ret (from_ubytes bytes dt) *)
+    (* let dsb_list : list SByte -> list dtyp -> err (list uvalue * list SByte) := *)
+    (*   fix go (bytes : list SByte) (fields : list dtyp) : err (list uvalue * list SByte) :=  *)
+    (*     match fields with *)
+    (*     | [] => ret ([], bytes) *)
+    (*     | t::ts =>  *)
+    (*         '(bs1, bs2) <- split_n (N.to_nat (sizeof_dtyp t)) bytes ;; *)
+    (*         u <- deserialize_sbytes bs1 t ;; *)
+    (*         '(us, rest) <- go bs2 ts ;; *)
+    (*         ret (u::us, rest) *)
+    (*     end *)
+    (* in *)
+    (* let dsb_loop (dt:dtyp) : nat  -> list SByte -> err (list uvalue * list SByte) := *)
+    (*   fix go n bytes := *)
+    (*     match n with *)
+    (*     | 0 => ret ([], bytes) *)
+    (*     | S n => *)
+    (*         '(bs1, bs2) <- split_n (N.to_nat (sizeof_dtyp dt)) bytes ;; *)
+    (*         u <- deserialize_sbytes bs1 dt ;; *)
+    (*         '(us, rest) <- go n bs2;; *)
+    (*         ret (u::us, rest) *)
+    (*     end  *)
+    (* in  *)
+    (* match dt with *)
+    (* (* Base types *) *)
+    (* | DTYPE_I _ *)
+    (* | DTYPE_IPTR *)
+    (* | DTYPE_Pointer *)
+    (* | DTYPE_Half *)
+    (* | DTYPE_Float *)
+    (* | DTYPE_Double *)
+    (* | DTYPE_X86_fp80 *)
+    (* | DTYPE_Fp128 *)
+    (* | DTYPE_Ppc_fp128 *)
+    (* | DTYPE_X86_mmx *)
+    (* | DTYPE_Opaque *)
+    (* | DTYPE_Metadata => *)
+    (*     ret (from_ubytes bytes dt) *)
 
-      (* | DTYPE_Void => *)
-      (*     raise "deserialize_sbytes: Attempt to deserialize void."%string *)
+    (* | DTYPE_Void => *)
+    (*     raise "deserialize_sbytes: Attempt to deserialize void."%string *)
 
-      (* | DTYPE_Struct fields => *)
-      (*     '(uvs, _) <- dsb_list bytes fields ;; *)
-      (*     ret (UVALUE_Struct uvs) *)
+    (* | DTYPE_Struct fields => *)
+    (*     '(uvs, _) <- dsb_list bytes fields ;; *)
+    (*     ret (UVALUE_Struct uvs) *)
 
-      (* | DTYPE_Packed_struct fields => *)
-      (*     '(uvs, _) <- dsb_list bytes fields ;; *)
-      (*     ret (UVALUE_Packed_struct uvs) *)
+    (* | DTYPE_Packed_struct fields => *)
+    (*     '(uvs, _) <- dsb_list bytes fields ;; *)
+    (*     ret (UVALUE_Packed_struct uvs) *)
 
-      (* | DTYPE_Array sz t => *)
-      (*     '(uvs, _) <- dsb_loop t (N.to_nat sz) bytes ;; *)
-      (*     ret (UVALUE_Array uvs) *)
+    (* | DTYPE_Array sz t => *)
+    (*     '(uvs, _) <- dsb_loop t (N.to_nat sz) bytes ;; *)
+    (*     ret (UVALUE_Array uvs) *)
 
-      (* | DTYPE_Vector sz t => *)
-      (*     '(uvs, _) <- dsb_loop t (N.to_nat sz) bytes ;; *)
-      (*     ret (UVALUE_Vector uvs) *)
-      (* end. *)
+    (* | DTYPE_Vector sz t => *)
+    (*     '(uvs, _) <- dsb_loop t (N.to_nat sz) bytes ;; *)
+    (*     ret (UVALUE_Vector uvs) *)
+    (* end. *)
 
 
     (* Serialize a uvalue into bytes and combine them into UVALUE_ConcatBytes. Useful for bitcasts.
@@ -738,35 +745,309 @@ Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParam
        dt should be the type of the thing you are casting to in the case of bitcasts.
      *)
     Definition uvalue_to_concatbytes
-               {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M} `{RAISE_OOM M}
-               (uv : uvalue) (dt : dtyp) : M uvalue :=
+      {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M} `{RAISE_OOM M}
+      (uv : uvalue) (dt : dtyp) : M uvalue :=
       bytes <- serialize_sbytes uv dt;;
       ret (UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt).
 
-  (* (* TODO: *) *)
+    (* (* TODO: *) *)
 
-  (*  (*   What is the difference between a pointer and an integer...? *) *)
+    (*  (*   What is the difference between a pointer and an integer...? *) *)
 
-  (*  (*   Primarily, it's that pointers have provenance and integers don't? *) *)
+    (*  (*   Primarily, it's that pointers have provenance and integers don't? *) *)
 
-  (*  (*   So, if we do PVI is there really any difference between an address *) *)
-  (*  (*   and an integer, and should we actually distinguish between them? *) *)
+    (*  (*   So, if we do PVI is there really any difference between an address *) *)
+    (*  (*   and an integer, and should we actually distinguish between them? *) *)
 
-  (*  (*   Provenance in UVALUE_IPTR probably means we need provenance in *all* *) *)
-  (*  (*   data types... i1, i8, i32, etc, and even doubles and floats... *) *)
-  (*  (*  *) *)
+    (*  (*   Provenance in UVALUE_IPTR probably means we need provenance in *all* *) *)
+    (*  (*   data types... i1, i8, i32, etc, and even doubles and floats... *) *)
+    (*  (*  *) *)
 
-  (* (* TODO: *) *)
+    (* (* TODO: *) *)
 
-  (*  (*    Should uvalue have something like... UVALUE_ExtractByte which *) *)
-  (*  (*    extracts a certain byte out of a uvalue? *) *)
+    (*  (*    Should uvalue have something like... UVALUE_ExtractByte which *) *)
+    (*  (*    extracts a certain byte out of a uvalue? *) *)
 
-  (*  (*    Will probably need an equivalence relation on UVALUEs, likely won't *) *)
-  (*  (*    end up with a round-trip property with regular equality... *) *)
-  (*  (* *) *)
+    (*  (*    Will probably need an equivalence relation on UVALUEs, likely won't *) *)
+    (*  (*    end up with a round-trip property with regular equality... *) *)
+    (*  (* *) *)
 
   End Serialization.
 End MemoryHelpers.
+
+Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_MEMORY_MODEL ADDR SB AID H F FS).
+  Import EVENTS.
+  Import MM.
+  Import FS.
+  Import SB.
+  Import SIZEOF.
+  Import ADDR.
+
+  (** TODO: Move this generate_undef_bytes stuff *)
+  Definition generate_num_undef_bytes_h (start_ix : N) (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+    N.recursion
+      (fun (x : N) => ret [])
+      (fun n mf x =>
+         rest_bytes <- mf (N.succ x);;
+         let byte := uvalue_sbyte (UVALUE_Undef dt) dt x sid in
+         ret (byte :: rest_bytes))
+      num start_ix.
+
+  Definition generate_num_undef_bytes (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+    generate_num_undef_bytes_h 0 num dt sid.
+
+  Definition generate_undef_bytes (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+    generate_num_undef_bytes (sizeof_dtyp dt) dt sid.
+
+  Lemma generate_num_undef_bytes_h_length :
+    forall num start_ix dt sid bytes,
+      generate_num_undef_bytes_h start_ix num dt sid = NoOom bytes ->
+      num = N.of_nat (length bytes).
+  Proof.
+    intros num.
+    induction num using N.peano_rect; intros start_ix dt sid bytes GEN.
+    - cbn in *.
+      inv GEN.
+      reflexivity.
+    - unfold generate_num_undef_bytes_h in GEN.
+      pose proof @N.recursion_succ (N -> OOM (list SByte)) Logic.eq (fun _ : N => ret [])
+        (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
+           rest_bytes <- mf (N.succ x);;
+           ret (uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes))
+        eq_refl.
+      forward H.
+      { unfold Proper, respectful.
+        intros x y H0 x0 y0 H1; subst.
+        reflexivity.
+      }
+      specialize (H num).
+      rewrite H in GEN.
+      clear H.
+
+      destruct
+        (N.recursion (fun _ : N => ret [])
+           (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
+              rest_bytes <- mf (N.succ x);;
+              ret (uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes)) num
+           (N.succ start_ix)) eqn:HREC.
+      + (* No OOM *)
+        cbn in GEN.
+        inv GEN.
+        cbn.
+
+        unfold generate_num_undef_bytes_h in IHnum.
+        pose proof (IHnum (N.succ start_ix) dt sid l HREC) as IH.
+        lia.
+      + (* OOM *)
+        cbn in GEN.
+        inv GEN.
+  Qed.
+
+  Lemma generate_num_undef_bytes_length :
+    forall num dt sid bytes,
+      generate_num_undef_bytes num dt sid = NoOom bytes ->
+      num = N.of_nat (length bytes).
+  Proof.
+    intros num dt sid bytes GEN.
+    unfold generate_num_undef_bytes in *.
+    eapply generate_num_undef_bytes_h_length; eauto.
+  Qed.
+
+  Lemma generate_undef_bytes_length :
+    forall dt sid bytes,
+      generate_undef_bytes dt sid = ret bytes ->
+      sizeof_dtyp dt = N.of_nat (length bytes).
+  Proof.
+    intros dt sid bytes GEN_UNDEF.
+    unfold generate_undef_bytes in *.
+    apply generate_num_undef_bytes_length in GEN_UNDEF; auto.
+  Qed.
+
+  (** Utilities *)
+  Definition lift_spec_to_MemPropT {A}
+    (succeeds_spec : Memory -> A -> Memory -> Prop) (ub_spec : Memory -> Prop) :
+    MemPropT Memory A :=
+    fun m1 res =>
+      match run_err_ub_oom res with
+      | inl (OOM_message x) =>
+          True
+      | inr (inl (UB_message x)) =>
+          ub_spec m1
+      | inr (inr (inl (ERR_message x))) =>
+          False
+      | inr (inr (inr (m2, res))) =>
+          succeeds_spec m1 res m2
+      end.
+
+
+  Definition mempush_spec : Memory -> Memory -> Prop
+    := fun m m' => Memory_frame_stack_modify m (fun fs => push fs F.empty_frame) = m'.
+
+  Definition mempush_spec_MemPropT :=
+    @lift_spec_to_MemPropT unit
+      (fun m1 _ m2 =>
+         mempush_spec m1 m2)
+      (fun m1 => False).
+
+  (* TODO: Move this *)
+  Definition cannot_pop (m : Memory) : bool :=
+    match pop (Memory_frame_stack m) with
+    | Some _ => false
+    | None => true
+    end.
+
+  Definition mempop_spec_MemPropT : MemPropT Memory unit :=
+    fun m1 res =>
+      match run_err_ub_oom res with
+      | inl (OOM_message x) =>
+          True
+      | inr (inl (UB_message x)) =>
+          False
+      | inr (inr (inl (ERR_message x))) =>
+          (* Not being able to pop is an error, shouldn't happen *)
+          cannot_pop m1 = true
+      | inr (inr (inr (m2, res))) =>
+          stack_pop m1 m2
+      end.
+
+    Definition allocate_bytes_with_pr_spec_MemPropT
+      (init_bytes : list SByte) (prov : Provenance)
+      : MemPropT MemState addr
+      := '(ptr, ptrs) <- find_free_block (length init_bytes) prov;;
+         allocate_bytes_post_conditions_MemPropT init_bytes prov ptr ptrs;;
+         ret ptr.
+
+    Definition allocate_bytes_spec_MemPropT
+      (init_bytes : list SByte)
+      : MemPropT MemState addr
+      := prov <- fresh_provenance;;
+         allocate_bytes_with_pr_spec_MemPropT init_bytes prov.
+    (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
+    Definition allocate_dtyp_spec (dt : dtyp) (num_elements : N) : MemPropT Memory addr :=
+      MemPropT_assert_pre (dt <> DTYPE_Void);;
+      sid <- fresh_sid;;
+      element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
+      let bytes := concat element_bytes in
+      allocate_bytes_spec_MemPropT bytes.
+
+  Definition allocate_dtyp_
+
+    
+  (*** Handling memory events *)
+  Section Handlers.
+    Definition handle_memory_prop : MemoryE ~> MemPropT Memory
+      := fun T m =>
+           match m with
+           (* Unimplemented *)
+           | MemPush =>
+               mempush_spec_MemPropT
+           | MemPop =>
+               mempop_spec_MemPropT
+           | Alloca t n align =>
+               addr <- allocate_dtyp_spec t n;;
+               ret (DVALUE_Addr addr)
+           | Load t a =>
+               match a with
+               | DVALUE_Addr a =>
+                   read_uvalue_spec t a
+               | _ => raise_ub "Loading from something that isn't an address."
+               end
+           | Store t a v =>
+               match a with
+               | DVALUE_Addr a =>
+                   write_uvalue_spec t a v
+               | _ => raise_ub "Writing something to somewhere that isn't an address."
+               end
+           end.
+
+    Definition handle_memcpy_prop (args : list dvalue) : MemPropT MemState unit :=
+      match args with
+      | DVALUE_Addr dst ::
+          DVALUE_Addr src ::
+          @DVALUE_I sz len ::
+          @DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
+          memcpy_spec src dst (unsigned len) (equ volatile VellvmIntegers.one)
+      | DVALUE_Addr dst ::
+          DVALUE_Addr src ::
+          DVALUE_IPTR len ::
+          @DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
+          memcpy_spec src dst (IP.to_Z len) (equ volatile VellvmIntegers.one)
+      | _ => raise_error "Unsupported arguments to memcpy."
+      end.
+
+    Definition handle_memset_prop (args : list dvalue) : MemPropT MemState unit.
+      refine
+        (match args with
+         | DVALUE_Addr dst ::
+             @DVALUE_I sz_val val ::
+             @DVALUE_I sz_len len ::
+             @DVALUE_I sz_vol volatile :: [] (* volatile ignored *)  =>
+             _
+         | _ => raise_error "Unsupported arguments to memset."
+         end).
+
+      destruct (Pos.eq_dec sz_val 8); subst.
+      - exact
+          (sid <- fresh_sid;;
+           memset_spec dst val (unsigned len) sid (equ volatile VellvmIntegers.one)).
+      - exact (raise_error "Unsupported arguments to memset.").
+    Defined.
+
+    Definition handle_malloc_prop (args : list dvalue) : MemPropT MemState addr :=
+      match args with
+      | [@DVALUE_I bitwidth sz] =>
+          sid <- fresh_sid;;
+          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8) sid);;
+          malloc_bytes_spec_MemPropT bytes
+      | [DVALUE_IPTR sz] =>
+          sid <- fresh_sid;;
+          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (IP.to_unsigned sz)) (DTYPE_I 8) sid);;
+          malloc_bytes_spec_MemPropT bytes
+      | _ => raise_error "Malloc: invalid arguments."
+      end.
+
+    Definition handle_free_prop (args : list dvalue) : MemPropT MemState unit :=
+      match args with
+      | [DVALUE_Addr ptr] =>
+          free_spec_MemPropT ptr
+      | _ => raise_error "Free: invalid arguments."
+      end.
+
+    Definition handle_intrinsic_prop : IntrinsicE ~> MemPropT MemState
+      := fun T e =>
+           match e with
+           | Intrinsic t name args =>
+               (* Pick all arguments, they should all be unique. *)
+               (* TODO: add more variants to memcpy *)
+               (* FIXME: use reldec typeclass? *)
+               if orb (Coqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i32"))
+                    (Coqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i64"))
+               then
+                 handle_memcpy_prop args;;
+                 ret DVALUE_None
+               else
+                 if orb (Coqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i32"))
+                      (Coqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i64"))
+                 then
+                   handle_memset_prop args;;
+                   ret DVALUE_None
+                 else
+                   if (Coqlib.proj_sumbool (string_dec name "malloc"))
+                   then
+                     addr <- handle_malloc_prop args;;
+                     ret (DVALUE_Addr addr)
+                   else
+                     if (Coqlib.proj_sumbool (string_dec name "free"))
+                     then
+                       handle_free_prop args;;
+                       ret DVALUE_None
+                     else
+                       raise_error ("Unknown intrinsic: " ++ name)
+           end.
+
+  End Handlers.
+
+End MemoryHandlers.
 
 Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP).
   Import LP.
@@ -806,22 +1087,6 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     intros x y H.
     unfold disjoint_ptr_byte; auto.
   Qed.
-
-  (** Utilities *)
-  Definition lift_spec_to_MemPropT {A}
-             (succeeds_spec : MemState -> A -> MemState -> Prop) (ub_spec : MemState -> Prop) :
-    MemPropT MemState A :=
-    fun m1 res =>
-      match run_err_ub_oom res with
-      | inl (OOM_message x) =>
-          True
-      | inr (inl (UB_message x)) =>
-          ub_spec m1
-      | inr (inr (inl (ERR_message x))) =>
-          False
-      | inr (inr (inr (m2, res))) =>
-          succeeds_spec m1 res m2
-      end.
 
   (*** Predicates *)
 
@@ -892,7 +1157,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   (* SAZ: Add Heap_in_bounds *)
   Definition heap_preserved_memory (m1 m2 : memory_stack) : Prop
     := forall h,
-        memory_stack_heap_prop m1 h <-> memory_stack_heap_prop m2 h.
+      memory_stack_heap_prop m1 h <-> memory_stack_heap_prop m2 h.
 
   Definition heap_preserved (m1 m2 : MemState) : Prop
     := heap_preserved_memory (MemState_get_memory m1) (MemState_get_memory m2).
@@ -1067,7 +1332,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
        Therefore the MemState has to have some idea of what allocation
        ids have been used in the past, not just the allocation ids
        that are *currently* in use.
-    *)
+     *)
     split.
     - (* fresh_provenance *)
       unfold MemPropT.
@@ -1127,7 +1392,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Record add_ptr_to_frame (f1 : Frame) (ptr : addr) (f2 : Frame) : Prop :=
     {
       old_frame_lu : forall ptr', disjoint_ptr_byte ptr ptr' ->
-                             ptr_in_frame_prop f1 ptr' <-> ptr_in_frame_prop f2 ptr';
+                                  ptr_in_frame_prop f1 ptr' <-> ptr_in_frame_prop f2 ptr';
       new_frame_lu : ptr_in_frame_prop f2 ptr;
     }.
 
@@ -1145,8 +1410,8 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   Definition ptr_in_current_frame (ms : MemState) (ptr : addr) : Prop
     := forall fs, memory_stack_frame_stack_prop (MemState_get_memory ms) fs ->
-             forall f, peek_frame_stack_prop fs f ->
-                  ptr_in_frame_prop f ptr.
+                  forall f, peek_frame_stack_prop fs f ->
+                            ptr_in_frame_prop f ptr.
 
   (** mempush *)
   Record mempush_operation_invariants (m1 : MemState) (m2 : MemState) :=
@@ -1206,54 +1471,44 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         read_byte_spec m1 ptr byte <-> read_byte_spec m2 ptr byte;
 
       (* Set new framestack *)
-      pop_frame :
+        pop_frame :
+        forall fs1 fs2,
+          memory_stack_frame_stack_prop (MemState_get_memory m1) fs1 ->
+          pop_frame_stack_prop fs1 fs2 ->
+          memory_stack_frame_stack_prop (MemState_get_memory m2) fs2;
+
+        (* Invariants *)
+        mempop_invariants : mempop_operation_invariants m1 m2;
+      }.
+
+    Definition cannot_pop (ms : MemState) :=
       forall fs1 fs2,
-        memory_stack_frame_stack_prop (MemState_get_memory m1) fs1 ->
-        pop_frame_stack_prop fs1 fs2 ->
-        memory_stack_frame_stack_prop (MemState_get_memory m2) fs2;
+        memory_stack_frame_stack_prop (MemState_get_memory ms) fs1 ->
+        ~ pop_frame_stack_prop fs1 fs2.
 
-      (* Invariants *)
-      mempop_invariants : mempop_operation_invariants m1 m2;
-    }.
+    Definition mempop_spec_MemPropT : MemPropT MemState unit :=
+      fun m1 res =>
+        match run_err_ub_oom res with
+        | inl (OOM_message x) =>
+            True
+        | inr (inl (UB_message x)) =>
+            False
+        | inr (inr (inl (ERR_message x))) =>
+            (* Not being able to pop is an error, shouldn't happen *)
+            cannot_pop m1
+        | inr (inr (inr (m2, res))) =>
+            mempop_spec m1 m2
+        end.
 
-  Definition cannot_pop (ms : MemState) :=
-    forall fs1 fs2,
-      memory_stack_frame_stack_prop (MemState_get_memory ms) fs1 ->
-      ~ pop_frame_stack_prop fs1 fs2.
+    (* Add a pointer onto the current frame in the frame stack *)
+    Definition add_ptr_to_frame_stack (fs1 : FrameStack) (ptr : addr) (fs2 : FrameStack) : Prop :=
+      forall f,
+        peek_frame_stack_prop fs1 f ->
+        exists f', add_ptr_to_frame f ptr f' /\
+                     peek_frame_stack_prop fs2 f' /\
+                     (forall fs1_pop, pop_frame_stack_prop fs1 fs1_pop <-> pop_frame_stack_prop fs2 fs1_pop).
 
-  Definition mempop_spec_MemPropT : MemPropT MemState unit :=
-    fun m1 res =>
-      match run_err_ub_oom res with
-      | inl (OOM_message x) =>
-          True
-      | inr (inl (UB_message x)) =>
-          False
-      | inr (inr (inl (ERR_message x))) =>
-          (* Not being able to pop is an error, shouldn't happen *)
-          cannot_pop m1
-      | inr (inr (inr (m2, res))) =>
-          mempop_spec m1 m2
-      end.
-
-  (* Add a pointer onto the current frame in the frame stack *)
-  Definition add_ptr_to_frame_stack (fs1 : FrameStack) (ptr : addr) (fs2 : FrameStack) : Prop :=
-    forall f,
-      peek_frame_stack_prop fs1 f ->
-      exists f', add_ptr_to_frame f ptr f' /\
-              peek_frame_stack_prop fs2 f' /\
-              (forall fs1_pop, pop_frame_stack_prop fs1 fs1_pop <-> pop_frame_stack_prop fs2 fs1_pop).
-
-  Fixpoint add_ptrs_to_frame_stack (fs1 : FrameStack) (ptrs : list addr) (fs2 : FrameStack) : Prop :=
-    match ptrs with
-    | nil => frame_stack_eqv fs1 fs2
-    | (ptr :: ptrs) =>
-        exists fs',
-          add_ptrs_to_frame_stack fs1 ptrs fs' /\
-            add_ptr_to_frame_stack fs' ptr fs2
-    end.
-
-  Lemma add_ptrs_to_frame_stack_equation (fs1 : FrameStack) (ptrs : list addr) (fs2 : FrameStack) :
-    add_ptrs_to_frame_stack fs1 ptrs fs2 =
+    Fixpoint add_ptrs_to_frame_stack (fs1 : FrameStack) (ptrs : list addr) (fs2 : FrameStack) : Prop :=
       match ptrs with
       | nil => frame_stack_eqv fs1 fs2
       | (ptr :: ptrs) =>
@@ -1261,990 +1516,887 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
           add_ptrs_to_frame_stack fs1 ptrs fs' /\
             add_ptr_to_frame_stack fs' ptr fs2
       end.
-  Proof.
-    induction ptrs; cbn; auto.
-  Qed.
 
-  (*** Heap operations *)
-  Record empty_heap (h : Heap) : Prop :=
-    {
-      empty_heap_no_roots : forall root,
-        ~ root_in_heap_prop h root;
+    Lemma add_ptrs_to_frame_stack_equation (fs1 : FrameStack) (ptrs : list addr) (fs2 : FrameStack) :
+      add_ptrs_to_frame_stack fs1 ptrs fs2 =
+        match ptrs with
+        | nil => frame_stack_eqv fs1 fs2
+        | (ptr :: ptrs) =>
+            exists fs',
+            add_ptrs_to_frame_stack fs1 ptrs fs' /\
+              add_ptr_to_frame_stack fs' ptr fs2
+        end.
+    Proof.
+      induction ptrs; cbn; auto.
+    Qed.
 
-      empty_heap_no_ptrs : forall root ptr,
-        ~ ptr_in_heap_prop h root ptr;
-    }.
+    (*** Heap operations *)
+    Record empty_heap (h : Heap) : Prop :=
+      {
+        empty_heap_no_roots : forall root,
+          ~ root_in_heap_prop h root;
 
-  Definition root_in_memstate_heap (ms : MemState) (root : addr) : Prop
-    := forall h, memory_stack_heap_prop (MemState_get_memory ms) h ->
-            root_in_heap_prop h root.
+        empty_heap_no_ptrs : forall root ptr,
+          ~ ptr_in_heap_prop h root ptr;
+      }.
 
-  Definition ptr_in_memstate_heap (ms : MemState) (root : addr) (ptr : addr) : Prop
-    := forall h, memory_stack_heap_prop (MemState_get_memory ms) h ->
-            ptr_in_heap_prop h root ptr.
+    Definition root_in_memstate_heap (ms : MemState) (root : addr) : Prop
+      := forall h, memory_stack_heap_prop (MemState_get_memory ms) h ->
+                   root_in_heap_prop h root.
 
-  Record add_ptr_to_heap (h1 : Heap) (root : addr) (ptr : addr) (h2 : Heap) : Prop :=
-    {
-      old_heap_lu : forall ptr',
-        disjoint_ptr_byte ptr ptr' ->
-        ptr_in_heap_prop h1 root ptr' <-> ptr_in_heap_prop h2 root ptr';
+    Definition ptr_in_memstate_heap (ms : MemState) (root : addr) (ptr : addr) : Prop
+      := forall h, memory_stack_heap_prop (MemState_get_memory ms) h ->
+                   ptr_in_heap_prop h root ptr.
 
-      old_heap_lu_different_root : forall root',
-        disjoint_ptr_byte root root' ->
-        forall ptr', ptr_in_heap_prop h1 root' ptr' <-> ptr_in_heap_prop h2 root' ptr';
+    Record add_ptr_to_heap (h1 : Heap) (root : addr) (ptr : addr) (h2 : Heap) : Prop :=
+      {
+        old_heap_lu : forall ptr',
+          disjoint_ptr_byte ptr ptr' ->
+          ptr_in_heap_prop h1 root ptr' <-> ptr_in_heap_prop h2 root ptr';
 
-      old_heap_roots : forall root',
-        disjoint_ptr_byte root root' ->
-        root_in_heap_prop h1 root' <-> root_in_heap_prop h2 root';
+        old_heap_lu_different_root : forall root',
+          disjoint_ptr_byte root root' ->
+          forall ptr', ptr_in_heap_prop h1 root' ptr' <-> ptr_in_heap_prop h2 root' ptr';
 
-      new_heap_lu :
-      ptr_in_heap_prop h2 root ptr;
+        old_heap_roots : forall root',
+          disjoint_ptr_byte root root' ->
+          root_in_heap_prop h1 root' <-> root_in_heap_prop h2 root';
 
-      new_heap_root :
-      root_in_heap_prop h2 root;
-    }.
+        new_heap_lu :
+        ptr_in_heap_prop h2 root ptr;
 
-  Fixpoint add_ptrs_to_heap' (h1 : Heap) (root : addr) (ptrs : list addr) (h2 : Heap) : Prop :=
-    match ptrs with
-    | nil => heap_eqv h1 h2
-    | (ptr :: ptrs) =>
-        exists h',
-        add_ptrs_to_heap' h1 root ptrs h' /\
-          add_ptr_to_heap h' root ptr h2
-    end.
+        new_heap_root :
+        root_in_heap_prop h2 root;
+      }.
 
-  Definition add_ptrs_to_heap (h1 : Heap) (ptrs : list addr) (h2 : Heap) : Prop :=
-    match ptrs with
-    | nil => heap_eqv h1 h2
-    | (ptr :: _) =>
-        add_ptrs_to_heap' h1 ptr ptrs h2
-    end.
+    Fixpoint add_ptrs_to_heap' (h1 : Heap) (root : addr) (ptrs : list addr) (h2 : Heap) : Prop :=
+      match ptrs with
+      | nil => heap_eqv h1 h2
+      | (ptr :: ptrs) =>
+          exists h',
+          add_ptrs_to_heap' h1 root ptrs h' /\
+            add_ptr_to_heap h' root ptr h2
+      end.
 
-  (*** Writing to memory *)
-  Record set_byte_memory (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
-    {
-      new_lu : read_byte_spec m2 ptr byte;
-      old_lu : forall ptr',
-        disjoint_ptr_byte ptr ptr' ->
-        (forall byte', read_byte_spec m1 ptr' byte' <-> read_byte_spec m2 ptr' byte');
-    }.
+    Definition add_ptrs_to_heap (h1 : Heap) (ptrs : list addr) (h2 : Heap) : Prop :=
+      match ptrs with
+      | nil => heap_eqv h1 h2
+      | (ptr :: _) =>
+          add_ptrs_to_heap' h1 ptr ptrs h2
+      end.
 
-  Record write_byte_operation_invariants (m1 m2 : MemState) : Prop :=
-    {
-      write_byte_op_preserves_allocations : allocations_preserved m1 m2;
-      write_byte_op_preserves_frame_stack : frame_stack_preserved m1 m2;
-      write_byte_op_preserves_heap : heap_preserved m1 m2;
-      write_byte_op_read_allowed : read_byte_allowed_all_preserved m1 m2;
-      write_byte_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
-      write_byte_op_free_allowed : free_byte_allowed_all_preserved m1 m2;
-      write_byte_op_allocation_ids : preserve_allocation_ids m1 m2;
-    }.
+    (*** Writing to memory *)
+    Record set_byte_memory (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
+      {
+        new_lu : read_byte_spec m2 ptr byte;
+        old_lu : forall ptr',
+          disjoint_ptr_byte ptr ptr' ->
+          (forall byte', read_byte_spec m1 ptr' byte' <-> read_byte_spec m2 ptr' byte');
+      }.
 
-  Record write_byte_spec (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
-    {
-      byte_write_succeeds : write_byte_allowed m1 ptr;
-      byte_written : set_byte_memory m1 ptr byte m2;
+    Record write_byte_operation_invariants (m1 m2 : MemState) : Prop :=
+      {
+        write_byte_op_preserves_allocations : allocations_preserved m1 m2;
+        write_byte_op_preserves_frame_stack : frame_stack_preserved m1 m2;
+        write_byte_op_preserves_heap : heap_preserved m1 m2;
+        write_byte_op_read_allowed : read_byte_allowed_all_preserved m1 m2;
+        write_byte_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
+        write_byte_op_free_allowed : free_byte_allowed_all_preserved m1 m2;
+        write_byte_op_allocation_ids : preserve_allocation_ids m1 m2;
+      }.
 
-      write_byte_invariants : write_byte_operation_invariants m1 m2;
-    }.
+    Record write_byte_spec (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
+      {
+        byte_write_succeeds : write_byte_allowed m1 ptr;
+        byte_written : set_byte_memory m1 ptr byte m2;
 
-  Definition write_byte_spec_MemPropT (ptr : addr) (byte : SByte) : MemPropT MemState unit
-    :=
-    lift_spec_to_MemPropT
-      (fun m1 _ m2 =>
-         write_byte_spec m1 ptr byte m2)
-      (fun m1 => ~ write_byte_allowed m1 ptr).
+        write_byte_invariants : write_byte_operation_invariants m1 m2;
+      }.
 
-  (*** Allocation utilities *)
-  Record block_is_free (m1 : MemState) (len : nat) (pr : Provenance) (ptr : addr) (ptrs : list addr) : Prop :=
-    { block_is_free_consecutive : ret ptrs {{m1}} ∈ {{m1}} get_consecutive_ptrs ptr len;
-      block_is_free_ptr_provenance : address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr); (* Need this case if `ptrs` is empty (allocating 0 bytes) *)
-      block_is_free_ptrs_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr);
+    Definition write_byte_spec_MemPropT (ptr : addr) (byte : SByte) : MemPropT MemState unit
+      :=
+      lift_spec_to_MemPropT
+        (fun m1 _ m2 =>
+           write_byte_spec m1 ptr byte m2)
+        (fun m1 => ~ write_byte_allowed m1 ptr).
 
-      (* Actual free condition *)
-      block_is_free_bytes_are_free : forall ptr, In ptr ptrs -> byte_not_allocated m1 ptr;
-    }.
+    (*** Allocation utilities *)
+    Record block_is_free (m1 : MemState) (len : nat) (pr : Provenance) (ptr : addr) (ptrs : list addr) : Prop :=
+      { block_is_free_consecutive : ret ptrs {{m1}} ∈ {{m1}} get_consecutive_ptrs ptr len;
+        block_is_free_ptr_provenance : address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr); (* Need this case if `ptrs` is empty (allocating 0 bytes) *)
+        block_is_free_ptrs_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr);
 
-  Definition find_free_block (len : nat) (pr : Provenance) : MemPropT MemState (addr * list addr)%type
-    := fun m1 res =>
-         match run_err_ub_oom res with
-         | inl (OOM_message x) =>
-             True
-         | inr (inl (UB_message x)) =>
-             False
-         | inr (inr (inl (ERR_message x))) =>
-             False
-         | inr (inr (inr (m2, (ptr, ptrs)))) =>
-             m1 = m2 /\ block_is_free m1 len pr ptr ptrs
-         end.
+        (* Actual free condition *)
+        block_is_free_bytes_are_free : forall ptr, In ptr ptrs -> byte_not_allocated m1 ptr;
+      }.
 
-  Record extend_read_byte_allowed (m1 : MemState) (ptrs : list addr) (m2 : MemState) : Prop :=
-    { extend_read_byte_allowed_new_reads :
-      forall p, In p ptrs ->
-           read_byte_allowed m2 p;
+    Definition find_free_block (len : nat) (pr : Provenance) : MemPropT MemState (addr * list addr)%type
+      := fun m1 res =>
+           match run_err_ub_oom res with
+           | inl (OOM_message x) =>
+               True
+           | inr (inl (UB_message x)) =>
+               False
+           | inr (inr (inl (ERR_message x))) =>
+               False
+           | inr (inr (inr (m2, (ptr, ptrs)))) =>
+               m1 = m2 /\ block_is_free m1 len pr ptr ptrs
+           end.
 
-      extend_read_byte_allowed_old_reads :
-      forall ptr',
-        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
-        read_byte_allowed m1 ptr' <-> read_byte_allowed m2 ptr';
-    }.
+    Record extend_read_byte_allowed (m1 : MemState) (ptrs : list addr) (m2 : MemState) : Prop :=
+      { extend_read_byte_allowed_new_reads :
+        forall p, In p ptrs ->
+                  read_byte_allowed m2 p;
 
-  Record extend_reads (m1 : MemState) (ptrs : list addr) (bytes : list SByte) (m2 : MemState) : Prop :=
-    { extend_reads_new_reads :
-      forall p ix byte,
-        Util.Nth ptrs ix p ->
-        Util.Nth bytes ix byte ->
-        read_byte_prop m2 p byte;
+        extend_read_byte_allowed_old_reads :
+        forall ptr',
+          (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+          read_byte_allowed m1 ptr' <-> read_byte_allowed m2 ptr';
+      }.
 
-      extend_reads_old_reads :
-      forall ptr' byte,
-        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
-        read_byte_prop m1 ptr' byte <-> read_byte_prop m2 ptr' byte;
-    }.
+    Record extend_reads (m1 : MemState) (ptrs : list addr) (bytes : list SByte) (m2 : MemState) : Prop :=
+      { extend_reads_new_reads :
+        forall p ix byte,
+          Util.Nth ptrs ix p ->
+          Util.Nth bytes ix byte ->
+          read_byte_prop m2 p byte;
 
-  Record extend_write_byte_allowed (m1 : MemState) (ptrs : list addr) (m2 : MemState) : Prop :=
-    { extend_write_byte_allowed_new_writes :
-      forall p, In p ptrs ->
-           write_byte_allowed m2 p;
+        extend_reads_old_reads :
+        forall ptr' byte,
+          (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+          read_byte_prop m1 ptr' byte <-> read_byte_prop m2 ptr' byte;
+      }.
 
-      extend_write_byte_allowed_old_writes :
-      forall ptr',
-        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
-        write_byte_allowed m1 ptr' <-> write_byte_allowed m2 ptr';
-    }.
+    Record extend_write_byte_allowed (m1 : MemState) (ptrs : list addr) (m2 : MemState) : Prop :=
+      { extend_write_byte_allowed_new_writes :
+        forall p, In p ptrs ->
+                  write_byte_allowed m2 p;
 
-  Record extend_free_byte_allowed (m1 : MemState) (ptrs : list addr) (m2 : MemState) : Prop :=
-    { extend_free_byte_allowed_new :
-      forall p, In p ptrs ->
-           free_byte_allowed m2 p;
+        extend_write_byte_allowed_old_writes :
+        forall ptr',
+          (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+          write_byte_allowed m1 ptr' <-> write_byte_allowed m2 ptr';
+      }.
 
-      extend_free_byte_allowed_old :
-      forall ptr',
-        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
-        free_byte_allowed m1 ptr' <-> free_byte_allowed m2 ptr';
-    }.
+    Record extend_free_byte_allowed (m1 : MemState) (ptrs : list addr) (m2 : MemState) : Prop :=
+      { extend_free_byte_allowed_new :
+        forall p, In p ptrs ->
+                  free_byte_allowed m2 p;
 
-  Definition extend_stack_frame (m1 : MemState) (ptrs : list addr) (m2 : MemState) : Prop :=
-    forall fs1 fs2,
-      memory_stack_frame_stack_prop (MemState_get_memory m1) fs1 ->
-      add_ptrs_to_frame_stack fs1 ptrs fs2 ->
-      memory_stack_frame_stack_prop (MemState_get_memory m2) fs2.
+        extend_free_byte_allowed_old :
+        forall ptr',
+          (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+          free_byte_allowed m1 ptr' <-> free_byte_allowed m2 ptr';
+      }.
 
-  (*
+    Definition extend_stack_frame (m1 : MemState) (ptrs : list addr) (m2 : MemState) : Prop :=
+      forall fs1 fs2,
+        memory_stack_frame_stack_prop (MemState_get_memory m1) fs1 ->
+        add_ptrs_to_frame_stack fs1 ptrs fs2 ->
+        memory_stack_frame_stack_prop (MemState_get_memory m2) fs2.
+
+    (*
     SAZ TODO: add Heap_in_bounds
-  *)
-  Definition extend_heap (m1 : MemState) (ptrs : list addr) (m2 : MemState) : Prop :=
-    forall h1 h2,
-      memory_stack_heap_prop (MemState_get_memory m1) h1 ->
-      add_ptrs_to_heap h1 ptrs h2 ->
-      memory_stack_heap_prop (MemState_get_memory m2) h2.
-
-  Record extend_allocations (m1 : MemState) (ptrs : list addr) (pr : Provenance) (m2 : MemState) : Prop :=
-    { extend_allocations_bytes_now_allocated :
-      forall ptr, In ptr ptrs -> byte_allocated m2 ptr (provenance_to_allocation_id pr);
-
-      extend_allocations_old_allocations_preserved :
-      forall ptr aid,
-        (forall p, In p ptrs -> disjoint_ptr_byte p ptr) ->
-        (byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid);
-    }.
-
-  (*** Allocating bytes on the stack *)
-  (* Post conditions for actually reserving bytes in memory and allocating them in the current stack frame *)
-  Record allocate_bytes_post_conditions
-    (m1 : MemState) (init_bytes : list SByte)
-    (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr)
-    : Prop :=
-    { allocate_bytes_provenances_preserved :
-      forall pr',
-        (used_provenance_prop m1 pr' <-> used_provenance_prop m2 pr');
-
-      (* byte_allocated *)
-      allocate_bytes_extended_allocations : extend_allocations m1 ptrs pr m2;
-
-      (* read permissions *)
-      alloc_bytes_extended_reads_allowed : extend_read_byte_allowed m1 ptrs m2;
-
-      (* reads *)
-      alloc_bytes_extended_reads : extend_reads m1 ptrs init_bytes m2;
-
-      (* write permissions *)
-      alloc_bytes_extended_writes_allowed : extend_write_byte_allowed m1 ptrs m2;
-
-      (* Add allocated bytes onto the stack frame *)
-      allocate_bytes_add_to_frame : extend_stack_frame m1 ptrs m2;
-
-      (* Heap preserved *)
-      allocate_bytes_heap_preserved :
-      heap_preserved m1 m2;
-    }.
-
-  Definition allocate_bytes_post_conditions_MemPropT
-    (init_bytes : list SByte)
-    (prov : Provenance) (ptr : addr) (ptrs : list addr)
-    : MemPropT MemState (addr * list addr)
-    := fun m1 res =>
-         match run_err_ub_oom res with
-         | inl (OOM_message x) =>
-             False
-         | inr (inl (UB_message x)) =>
-             False
-         | inr (inr (inl (ERR_message x))) =>
-             False
-         | inr (inr (inr (m2, (ptr', ptrs')))) =>
-             allocate_bytes_post_conditions m1 init_bytes prov m2 ptr ptrs /\ ptr = ptr' /\ ptrs = ptrs'
-         end.
-
-  Definition allocate_bytes_with_pr_spec_MemPropT
-    (init_bytes : list SByte) (prov : Provenance)
-    : MemPropT MemState addr
-    := '(ptr, ptrs) <- find_free_block (length init_bytes) prov;;
-       allocate_bytes_post_conditions_MemPropT init_bytes prov ptr ptrs;;
-       ret ptr.
-
-  Definition allocate_bytes_spec_MemPropT
-    (init_bytes : list SByte)
-    : MemPropT MemState addr
-    := prov <- fresh_provenance;;
-       allocate_bytes_with_pr_spec_MemPropT init_bytes prov.
-
-  (*** Allocating bytes in the heap *)
-  Record malloc_bytes_post_conditions (m1 : MemState) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
-    { (* Provenance *)
-      malloc_bytes_provenances_preserved :
-      forall pr',
-        (used_provenance_prop m1 pr' <-> used_provenance_prop m2 pr');
-
-      (* byte_allocated *)
-      malloc_bytes_extended_allocations : extend_allocations m1 ptrs pr m2;
-
-      (* read permissions *)
-      malloc_bytes_extended_reads_allowed : extend_read_byte_allowed m1 ptrs m2;
-
-      (* reads *)
-      malloc_bytes_extended_reads : extend_reads m1 ptrs init_bytes m2;
-
-      (* write permissions *)
-      malloc_bytes_extended_writes_allowed : extend_write_byte_allowed m1 ptrs m2;
-
-      (* free permissions *)
-      (* TODO: See #312, need to add this condition back later, but this currently complicates things *)
-      (* free_root_allowed covers the case where 0 bytes are allocated *)
-      (* malloc_bytes_extended_free_root_allowed : extend_free_byte_allowed m1 [ptr] m2; *)
-      malloc_bytes_extended_free_allowed : extend_free_byte_allowed m1 ptrs m2;
-
-      (* Framestack preserved *)
-      malloc_bytes_frame_stack_preserved : frame_stack_preserved m1 m2;
-
-      (* Heap extended *)
-      malloc_bytes_add_to_frame : extend_heap m1 ptrs m2;
-    }.
-
-  Definition malloc_bytes_post_conditions_MemPropT (init_bytes : list SByte) (prov : Provenance) (ptr : addr) (ptrs : list addr) : MemPropT MemState (addr * list addr)
-    := fun m1 res =>
-         match run_err_ub_oom res with
-         | inl (OOM_message x) =>
-             False
-         | inr (inl (UB_message x)) =>
-             False
-         | inr (inr (inl (ERR_message x))) =>
-             False
-         | inr (inr (inr (m2, (ptr', ptrs')))) =>
-             malloc_bytes_post_conditions m1 init_bytes prov m2 ptr ptrs /\ ptr = ptr' /\ ptrs = ptrs'
-         end.
-
-  Definition malloc_bytes_with_pr_spec_MemPropT (init_bytes : list SByte) (prov : Provenance)
-    : MemPropT MemState addr
-    := '(ptr, ptrs) <- find_free_block (length init_bytes) prov;;
-       malloc_bytes_post_conditions_MemPropT init_bytes prov ptr ptrs;;
-       ret ptr.
-
-  Definition malloc_bytes_spec_MemPropT (init_bytes : list SByte)
-    : MemPropT MemState addr
-    := prov <- fresh_provenance;;
-       malloc_bytes_with_pr_spec_MemPropT init_bytes prov.
-
-  (*** Freeing heap allocations *)
-  Record free_operation_invariants (m1 : MemState) (m2 : MemState) :=
-    {
-      free_op_allocation_ids : preserve_allocation_ids m1 m2;
-      free_frame_stack_preserved : frame_stack_preserved m1 m2;
-    }.
-
-  Record free_block_prop (h1 : Heap) (root : addr) (h2 : Heap) : Prop :=
-    { free_block_ptrs_freed :
-      forall ptr,
-        ptr_in_heap_prop h1 root ptr ->
-        ~ ptr_in_heap_prop h2 root ptr;
-
-      free_block_root_freed :
-      ~ root_in_heap_prop h2 root;
-
-      (* TODO: make sure there's no weirdness about multiple roots *)
-      free_block_disjoint_preserved :
-      forall ptr root',
-        disjoint_ptr_byte root root' ->
-        ptr_in_heap_prop h1 root' ptr <-> ptr_in_heap_prop h2 root' ptr;
-
-      free_block_disjoint_roots :
-      forall root',
-        disjoint_ptr_byte root root' ->
-        root_in_heap_prop h1 root' <-> root_in_heap_prop h2 root';
-    }.
-
-  Record free_preconditions (m1 : MemState) (root : addr) : Prop :=
-    { (* ptr being freed was a root *)
-      free_was_root :
-      root_in_memstate_heap m1 root;
-
-      (* root being freed was allocated *)
-      free_was_allocated :
-      exists aid, byte_allocated m1 root aid;
-
-      (* ptrs in block were allocated *)
-      free_block_allocated :
-      forall ptr,
-        ptr_in_memstate_heap m1 root ptr ->
-        exists aid, byte_allocated m1 ptr aid;
-
-      (* root is allowed to be freed *)
-      (* TODO: add this back. #312 / #313 *)
-      (* Running into problems with exec_correct_free because of the
-         implementation with size 0 allocations / frees *)
-      (* free_root_allowed :
-         free_byte_allowed m1 root; *)
-    }.
-
-  Record free_spec (m1 : MemState) (root : addr) (m2 : MemState) : Prop :=
-    { (* all bytes in block are freed. *)
-      free_bytes_freed :
-      forall ptr,
-        ptr_in_memstate_heap m1 root ptr ->
-        byte_not_allocated m2 ptr;
-
-      (* Bytes not allocated in the block have the same allocation status as before *)
-      free_non_block_bytes_preserved :
-      forall ptr aid,
-        (~ ptr_in_memstate_heap m1 root ptr) ->
-        byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid;
-
-      (* Bytes not allocated in the freed block are the same when read *)
-      free_non_frame_bytes_read :
-      forall ptr byte,
-        (~ ptr_in_memstate_heap m1 root ptr) ->
-        read_byte_spec m1 ptr byte <-> read_byte_spec m2 ptr byte;
-
-      (* Set new heap *)
-      free_block :
+     *)
+    Definition extend_heap (m1 : MemState) (ptrs : list addr) (m2 : MemState) : Prop :=
       forall h1 h2,
         memory_stack_heap_prop (MemState_get_memory m1) h1 ->
-        memory_stack_heap_prop (MemState_get_memory m2) h2 ->
-        free_block_prop h1 root h2;
+        add_ptrs_to_heap h1 ptrs h2 ->
+        memory_stack_heap_prop (MemState_get_memory m2) h2.
 
-      (* Invariants *)
-      free_invariants : free_operation_invariants m1 m2;
-    }.
+    Record extend_allocations (m1 : MemState) (ptrs : list addr) (pr : Provenance) (m2 : MemState) : Prop :=
+      { extend_allocations_bytes_now_allocated :
+        forall ptr, In ptr ptrs -> byte_allocated m2 ptr (provenance_to_allocation_id pr);
 
-  Definition free_spec_MemPropT (root : addr) : MemPropT MemState unit :=
-    lift_spec_to_MemPropT
-      (fun m1 _ m2 =>
-         free_preconditions m1 root /\ free_spec m1 root m2)
-      (fun m1 => ~ free_preconditions m1 root).
+        extend_allocations_old_allocations_preserved :
+        forall ptr aid,
+          (forall p, In p ptrs -> disjoint_ptr_byte p ptr) ->
+          (byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid);
+      }.
 
-  (*** Aggregate things *)
+    (*** Allocating bytes on the stack *)
+    (* Post conditions for actually reserving bytes in memory and allocating them in the current stack frame *)
+    Record allocate_bytes_post_conditions
+      (m1 : MemState) (init_bytes : list SByte)
+      (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr)
+      : Prop :=
+      { allocate_bytes_provenances_preserved :
+        forall pr',
+          (used_provenance_prop m1 pr' <-> used_provenance_prop m2 pr');
 
-  (** Reading uvalues *)
-  Definition read_bytes_spec (ptr : addr) (len : nat) : MemPropT MemState (list SByte) :=
-    (* TODO: should this OOM, or should this count as walking outside of memory and be UB? *)
-    ptrs <- get_consecutive_ptrs ptr len;;
+        (* byte_allocated *)
+        allocate_bytes_extended_allocations : extend_allocations m1 ptrs pr m2;
 
-    (* Actually perform reads *)
-    map_monad (fun ptr => read_byte_spec_MemPropT ptr) ptrs.
+        (* read permissions *)
+        alloc_bytes_extended_reads_allowed : extend_read_byte_allowed m1 ptrs m2;
 
-  Definition read_uvalue_spec (dt : dtyp) (ptr : addr) : MemPropT MemState uvalue :=
-    bytes <- read_bytes_spec ptr (N.to_nat (sizeof_dtyp dt));;
-    lift_err_RAISE_ERROR (deserialize_sbytes bytes dt).
+        (* reads *)
+        alloc_bytes_extended_reads : extend_reads m1 ptrs init_bytes m2;
 
-  (** Writing uvalues *)
-  Definition write_bytes_spec (ptr : addr) (bytes : list SByte) : MemPropT MemState unit :=
-    ptrs <- get_consecutive_ptrs ptr (length bytes);;
-    let ptr_bytes := zip ptrs bytes in
+        (* write permissions *)
+        alloc_bytes_extended_writes_allowed : extend_write_byte_allowed m1 ptrs m2;
 
-    (* TODO: double check that this is correct... Should we check if all writes are allowed first? *)
-    (* Actually perform writes *)
-    map_monad_ (fun '(ptr, byte) => write_byte_spec_MemPropT ptr byte) ptr_bytes.
+        (* Add allocated bytes onto the stack frame *)
+        allocate_bytes_add_to_frame : extend_stack_frame m1 ptrs m2;
 
-  Definition write_uvalue_spec (dt : dtyp) (ptr : addr) (uv : uvalue) : MemPropT MemState unit :=
-    bytes <- serialize_sbytes uv dt;;
-    write_bytes_spec ptr bytes.
+        (* Heap preserved *)
+        allocate_bytes_heap_preserved :
+        heap_preserved m1 m2;
+      }.
 
-  (** Allocating dtyps *)
-  (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
-  Definition allocate_dtyp_spec (dt : dtyp) (num_elements : N) : MemPropT MemState addr :=
-    MemPropT_assert_pre (dt <> DTYPE_Void);;
-    sid <- fresh_sid;;
-    element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
-    let bytes := concat element_bytes in
-    allocate_bytes_spec_MemPropT bytes.
+    Definition allocate_bytes_post_conditions_MemPropT
+      (init_bytes : list SByte)
+      (prov : Provenance) (ptr : addr) (ptrs : list addr)
+      : MemPropT MemState (addr * list addr)
+      := fun m1 res =>
+           match run_err_ub_oom res with
+           | inl (OOM_message x) =>
+               False
+           | inr (inl (UB_message x)) =>
+               False
+           | inr (inr (inl (ERR_message x))) =>
+               False
+           | inr (inr (inr (m2, (ptr', ptrs')))) =>
+               allocate_bytes_post_conditions m1 init_bytes prov m2 ptr ptrs /\ ptr = ptr' /\ ptrs = ptrs'
+           end.
 
-  (** memcpy spec *)
-  Definition memcpy_spec (src dst : addr) (len : Z) (volatile : bool) : MemPropT MemState unit :=
-    if Z.ltb len 0
-    then
-      raise_ub "memcpy given negative length."
-    else
-      (* From LangRef: The ‘llvm.memcpy.*’ intrinsics copy a block of
+    Definition allocate_bytes_with_pr_spec_MemPropT
+      (init_bytes : list SByte) (prov : Provenance)
+      : MemPropT MemState addr
+      := '(ptr, ptrs) <- find_free_block (length init_bytes) prov;;
+         allocate_bytes_post_conditions_MemPropT init_bytes prov ptr ptrs;;
+         ret ptr.
+
+    Definition allocate_bytes_spec_MemPropT
+      (init_bytes : list SByte)
+      : MemPropT MemState addr
+      := prov <- fresh_provenance;;
+         allocate_bytes_with_pr_spec_MemPropT init_bytes prov.
+
+    (*** Allocating bytes in the heap *)
+    Record malloc_bytes_post_conditions (m1 : MemState) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
+      { (* Provenance *)
+        malloc_bytes_provenances_preserved :
+        forall pr',
+          (used_provenance_prop m1 pr' <-> used_provenance_prop m2 pr');
+
+        (* byte_allocated *)
+        malloc_bytes_extended_allocations : extend_allocations m1 ptrs pr m2;
+
+        (* read permissions *)
+        malloc_bytes_extended_reads_allowed : extend_read_byte_allowed m1 ptrs m2;
+
+        (* reads *)
+        malloc_bytes_extended_reads : extend_reads m1 ptrs init_bytes m2;
+
+        (* write permissions *)
+        malloc_bytes_extended_writes_allowed : extend_write_byte_allowed m1 ptrs m2;
+
+        (* free permissions *)
+        (* TODO: See #312, need to add this condition back later, but this currently complicates things *)
+        (* free_root_allowed covers the case where 0 bytes are allocated *)
+        (* malloc_bytes_extended_free_root_allowed : extend_free_byte_allowed m1 [ptr] m2; *)
+        malloc_bytes_extended_free_allowed : extend_free_byte_allowed m1 ptrs m2;
+
+        (* Framestack preserved *)
+        malloc_bytes_frame_stack_preserved : frame_stack_preserved m1 m2;
+
+        (* Heap extended *)
+        malloc_bytes_add_to_frame : extend_heap m1 ptrs m2;
+      }.
+
+    Definition malloc_bytes_post_conditions_MemPropT (init_bytes : list SByte) (prov : Provenance) (ptr : addr) (ptrs : list addr) : MemPropT MemState (addr * list addr)
+      := fun m1 res =>
+           match run_err_ub_oom res with
+           | inl (OOM_message x) =>
+               False
+           | inr (inl (UB_message x)) =>
+               False
+           | inr (inr (inl (ERR_message x))) =>
+               False
+           | inr (inr (inr (m2, (ptr', ptrs')))) =>
+               malloc_bytes_post_conditions m1 init_bytes prov m2 ptr ptrs /\ ptr = ptr' /\ ptrs = ptrs'
+           end.
+
+    Definition malloc_bytes_with_pr_spec_MemPropT (init_bytes : list SByte) (prov : Provenance)
+      : MemPropT MemState addr
+      := '(ptr, ptrs) <- find_free_block (length init_bytes) prov;;
+         malloc_bytes_post_conditions_MemPropT init_bytes prov ptr ptrs;;
+         ret ptr.
+
+    Definition malloc_bytes_spec_MemPropT (init_bytes : list SByte)
+      : MemPropT MemState addr
+      := prov <- fresh_provenance;;
+         malloc_bytes_with_pr_spec_MemPropT init_bytes prov.
+
+    (*** Freeing heap allocations *)
+    Record free_operation_invariants (m1 : MemState) (m2 : MemState) :=
+      {
+        free_op_allocation_ids : preserve_allocation_ids m1 m2;
+        free_frame_stack_preserved : frame_stack_preserved m1 m2;
+      }.
+
+    Record free_block_prop (h1 : Heap) (root : addr) (h2 : Heap) : Prop :=
+      { free_block_ptrs_freed :
+        forall ptr,
+          ptr_in_heap_prop h1 root ptr ->
+          ~ ptr_in_heap_prop h2 root ptr;
+
+        free_block_root_freed :
+        ~ root_in_heap_prop h2 root;
+
+        (* TODO: make sure there's no weirdness about multiple roots *)
+        free_block_disjoint_preserved :
+        forall ptr root',
+          disjoint_ptr_byte root root' ->
+          ptr_in_heap_prop h1 root' ptr <-> ptr_in_heap_prop h2 root' ptr;
+
+        free_block_disjoint_roots :
+        forall root',
+          disjoint_ptr_byte root root' ->
+          root_in_heap_prop h1 root' <-> root_in_heap_prop h2 root';
+      }.
+
+    Record free_preconditions (m1 : MemState) (root : addr) : Prop :=
+      { (* ptr being freed was a root *)
+        free_was_root :
+        root_in_memstate_heap m1 root;
+
+        (* root being freed was allocated *)
+        free_was_allocated :
+        exists aid, byte_allocated m1 root aid;
+
+        (* ptrs in block were allocated *)
+        free_block_allocated :
+        forall ptr,
+          ptr_in_memstate_heap m1 root ptr ->
+          exists aid, byte_allocated m1 ptr aid;
+
+        (* root is allowed to be freed *)
+        (* TODO: add this back. #312 / #313 *)
+        (* Running into problems with exec_correct_free because of the
+         implementation with size 0 allocations / frees *)
+        (* free_root_allowed :
+         free_byte_allowed m1 root; *)
+      }.
+
+    Record free_spec (m1 : MemState) (root : addr) (m2 : MemState) : Prop :=
+      { (* all bytes in block are freed. *)
+        free_bytes_freed :
+        forall ptr,
+          ptr_in_memstate_heap m1 root ptr ->
+          byte_not_allocated m2 ptr;
+
+        (* Bytes not allocated in the block have the same allocation status as before *)
+        free_non_block_bytes_preserved :
+        forall ptr aid,
+          (~ ptr_in_memstate_heap m1 root ptr) ->
+          byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid;
+
+        (* Bytes not allocated in the freed block are the same when read *)
+        free_non_frame_bytes_read :
+        forall ptr byte,
+          (~ ptr_in_memstate_heap m1 root ptr) ->
+          read_byte_spec m1 ptr byte <-> read_byte_spec m2 ptr byte;
+
+        (* Set new heap *)
+        free_block :
+        forall h1 h2,
+          memory_stack_heap_prop (MemState_get_memory m1) h1 ->
+          memory_stack_heap_prop (MemState_get_memory m2) h2 ->
+          free_block_prop h1 root h2;
+
+        (* Invariants *)
+        free_invariants : free_operation_invariants m1 m2;
+      }.
+
+    Definition free_spec_MemPropT (root : addr) : MemPropT MemState unit :=
+      lift_spec_to_MemPropT
+        (fun m1 _ m2 =>
+           free_preconditions m1 root /\ free_spec m1 root m2)
+        (fun m1 => ~ free_preconditions m1 root).
+
+    (*** Aggregate things *)
+
+    (** Reading uvalues *)
+    Definition read_bytes_spec (ptr : addr) (len : nat) : MemPropT MemState (list SByte) :=
+      (* TODO: should this OOM, or should this count as walking outside of memory and be UB? *)
+      ptrs <- get_consecutive_ptrs ptr len;;
+
+      (* Actually perform reads *)
+      map_monad (fun ptr => read_byte_spec_MemPropT ptr) ptrs.
+
+    Definition read_uvalue_spec (dt : dtyp) (ptr : addr) : MemPropT MemState uvalue :=
+      bytes <- read_bytes_spec ptr (N.to_nat (sizeof_dtyp dt));;
+      lift_err_RAISE_ERROR (deserialize_sbytes bytes dt).
+
+    (** Writing uvalues *)
+    Definition write_bytes_spec (ptr : addr) (bytes : list SByte) : MemPropT MemState unit :=
+      ptrs <- get_consecutive_ptrs ptr (length bytes);;
+      let ptr_bytes := zip ptrs bytes in
+
+      (* TODO: double check that this is correct... Should we check if all writes are allowed first? *)
+      (* Actually perform writes *)
+      map_monad_ (fun '(ptr, byte) => write_byte_spec_MemPropT ptr byte) ptr_bytes.
+
+    Definition write_uvalue_spec (dt : dtyp) (ptr : addr) (uv : uvalue) : MemPropT MemState unit :=
+      bytes <- serialize_sbytes uv dt;;
+      write_bytes_spec ptr bytes.
+
+    (** Allocating dtyps *)
+    (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
+    Definition allocate_dtyp_spec (dt : dtyp) (num_elements : N) : MemPropT MemState addr :=
+      MemPropT_assert_pre (dt <> DTYPE_Void);;
+      sid <- fresh_sid;;
+      element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
+      let bytes := concat element_bytes in
+      allocate_bytes_spec_MemPropT bytes.
+
+    (** memcpy spec *)
+    Definition memcpy_spec (src dst : addr) (len : Z) (volatile : bool) : MemPropT MemState unit :=
+      if Z.ltb len 0
+      then
+        raise_ub "memcpy given negative length."
+      else
+        (* From LangRef: The ‘llvm.memcpy.*’ intrinsics copy a block of
        memory from the source location to the destination location, which
        must either be equal or non-overlapping.
-       *)
-      if orb (no_overlap dst len src len)
+         *)
+        if orb (no_overlap dst len src len)
              (Z.eqb (ptr_to_int src) (ptr_to_int dst))
+        then
+          src_bytes <- read_bytes_spec src (Z.to_nat len);;
+
+          (* TODO: Double check that this is correct... Should we check if all writes are allowed first? *)
+          write_bytes_spec dst src_bytes
+        else
+          raise_ub "memcpy with overlapping or non-equal src and dst memory locations.".
+
+    (** memset spec *)
+    Definition memset_spec (dst : addr) (val : int8) (len : Z) (sid : store_id) (volatile : bool) : MemPropT MemState unit :=
+      if Z.ltb len 0
       then
-        src_bytes <- read_bytes_spec src (Z.to_nat len);;
-
-        (* TODO: Double check that this is correct... Should we check if all writes are allowed first? *)
-        write_bytes_spec dst src_bytes
+        raise_ub "memset given negative length."
       else
-        raise_ub "memcpy with overlapping or non-equal src and dst memory locations.".
+        let byte := uvalue_sbyte (@UVALUE_I 8 val) (DTYPE_I 8) 0 sid in
+        write_bytes_spec dst (repeatN (Z.to_N len) byte).
 
-  (** memset spec *)
-  Definition memset_spec (dst : addr) (val : int8) (len : Z) (sid : store_id) (volatile : bool) : MemPropT MemState unit :=
-    if Z.ltb len 0
-    then
-      raise_ub "memset given negative length."
-    else
-      let byte := uvalue_sbyte (@UVALUE_I 8 val) (DTYPE_I 8) 0 sid in
-      write_bytes_spec dst (repeatN (Z.to_N len) byte).
 
-  (*** Handling memory events *)
-  Section Handlers.
-    Definition handle_memory_prop : MemoryE ~> MemPropT MemState
-      := fun T m =>
-           match m with
-           (* Unimplemented *)
-           | MemPush =>
-               mempush_spec_MemPropT
-           | MemPop =>
-               mempop_spec_MemPropT
-           | Alloca t n align =>
-               addr <- allocate_dtyp_spec t n;;
-               ret (DVALUE_Addr addr)
-           | Load t a =>
-               match a with
-               | DVALUE_Addr a =>
-                   read_uvalue_spec t a
-               | _ => raise_ub "Loading from something that isn't an address."
-               end
-           | Store t a v =>
-               match a with
-               | DVALUE_Addr a =>
-                   write_uvalue_spec t a v
-               | _ => raise_ub "Writing something to somewhere that isn't an address."
-               end
-           end.
+    (* TODO: Should these be here, or in another module? *)
+    (* Useful helper lemmas and relations... *)
+    #[global] Instance preserve_allocation_ids_Reflexive :
+      Reflexive preserve_allocation_ids.
+    Proof.
+      red; intros ms.
+      red.
+      reflexivity.
+    Qed.
 
-    Definition handle_memcpy_prop (args : list dvalue) : MemPropT MemState unit :=
-      match args with
-      | DVALUE_Addr dst ::
-                    DVALUE_Addr src ::
-                    @DVALUE_I sz len ::
-                    @DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (unsigned len) (equ volatile VellvmIntegers.one)
-      | DVALUE_Addr dst ::
-                    DVALUE_Addr src ::
-                    DVALUE_IPTR len ::
-                    @DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (IP.to_Z len) (equ volatile VellvmIntegers.one)
-      | _ => raise_error "Unsupported arguments to memcpy."
-      end.
+    #[global] Instance read_byte_allowed_all_preserved_Reflexive :
+      Reflexive read_byte_allowed_all_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      reflexivity.
+    Qed.
 
-    Definition handle_memset_prop (args : list dvalue) : MemPropT MemState unit.
-      refine
-        (match args with
-         | DVALUE_Addr dst ::
-             @DVALUE_I sz_val val ::
-             @DVALUE_I sz_len len ::
-             @DVALUE_I sz_vol volatile :: [] (* volatile ignored *)  =>
-             _
-         | _ => raise_error "Unsupported arguments to memset."
-         end).
+    #[global] Instance read_byte_prop_all_preserved_Reflexive :
+      Reflexive read_byte_prop_all_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      reflexivity.
+    Qed.
 
-      destruct (Pos.eq_dec sz_val 8); subst.
-      - exact
-          (sid <- fresh_sid;;
-           memset_spec dst val (unsigned len) sid (equ volatile VellvmIntegers.one)).
-      - exact (raise_error "Unsupported arguments to memset.").
-    Defined.
+    #[global] Instance read_byte_preserved_Reflexive :
+      Reflexive read_byte_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      split; reflexivity.
+    Qed.
 
-    Definition handle_malloc_prop (args : list dvalue) : MemPropT MemState addr :=
-      match args with
-      | [@DVALUE_I bitwidth sz] =>
-          sid <- fresh_sid;;
-          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8) sid);;
-          malloc_bytes_spec_MemPropT bytes
-      | [DVALUE_IPTR sz] =>
-          sid <- fresh_sid;;
-          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (IP.to_unsigned sz)) (DTYPE_I 8) sid);;
-          malloc_bytes_spec_MemPropT bytes
-      | _ => raise_error "Malloc: invalid arguments."
-      end.
+    #[global] Instance write_byte_allowed_all_preserved_Reflexive :
+      Reflexive write_byte_allowed_all_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      reflexivity.
+    Qed.
 
-    Definition handle_free_prop (args : list dvalue) : MemPropT MemState unit :=
-      match args with
-      | [DVALUE_Addr ptr] =>
-          free_spec_MemPropT ptr
-      | _ => raise_error "Free: invalid arguments."
-      end.
+    #[global] Instance free_byte_allowed_all_preserved_Reflexive :
+      Reflexive free_byte_allowed_all_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      reflexivity.
+    Qed.
 
-    Definition handle_intrinsic_prop : IntrinsicE ~> MemPropT MemState
-      := fun T e =>
-           match e with
-           | Intrinsic t name args =>
-               (* Pick all arguments, they should all be unique. *)
-               (* TODO: add more variants to memcpy *)
-               (* FIXME: use reldec typeclass? *)
-               if orb (Rocqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i32"))
-                      (Rocqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i64"))
-               then
-                 handle_memcpy_prop args;;
-                 ret DVALUE_None
-               else
-                 if orb (Rocqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i32"))
-                      (Rocqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i64"))
-                 then
-                   handle_memset_prop args;;
-                   ret DVALUE_None
-                 else
-                   if (Rocqlib.proj_sumbool (string_dec name "malloc"))
-                   then
-                     addr <- handle_malloc_prop args;;
-                     ret (DVALUE_Addr addr)
-                   else
-                     if (Rocqlib.proj_sumbool (string_dec name "free"))
-                     then
-                       handle_free_prop args;;
-                       ret DVALUE_None
-                     else
-                       raise_error ("Unknown intrinsic: " ++ name)
-           end.
+    #[global] Instance allocations_preserved_Reflexive :
+      Reflexive allocations_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      reflexivity.
+    Qed.
 
-  End Handlers.
+    #[global] Instance frame_stack_preserved_memory_Reflexive :
+      Reflexive frame_stack_preserved_memory.
+    Proof.
+      red; intros ms.
+      red.
+      reflexivity.
+    Qed.
 
-  (* TODO: Should these be here, or in another module? *)
-  (* Useful helper lemmas and relations... *)
-  #[global] Instance preserve_allocation_ids_Reflexive :
-    Reflexive preserve_allocation_ids.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
+    #[global] Instance frame_stack_preserved_Reflexive :
+      Reflexive frame_stack_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      reflexivity.
+    Qed.
 
-  #[global] Instance read_byte_allowed_all_preserved_Reflexive :
-    Reflexive read_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
+    #[global] Instance heap_preserved_memory_Reflexive :
+      Reflexive heap_preserved_memory.
+    Proof.
+      red; intros ms.
+      red.
+      reflexivity.
+    Qed.
 
-  #[global] Instance read_byte_prop_all_preserved_Reflexive :
-    Reflexive read_byte_prop_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
+    #[global] Instance heap_preserved_Reflexive :
+      Reflexive heap_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      reflexivity.
+    Qed.
 
-  #[global] Instance read_byte_preserved_Reflexive :
-    Reflexive read_byte_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    split; reflexivity.
-  Qed.
+    #[global] Instance addr_allocated_preserved_Reflexive : Reflexive addr_allocated_prop_memory_preserved.
+    Proof.
+      repeat red.
+      intros x addr0 aid.
+      split; intros ALLOC; auto.
+    Qed.
 
-  #[global] Instance write_byte_allowed_all_preserved_Reflexive :
-    Reflexive write_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
+    #[global] Instance read_byte_prop_memory_preserved_Reflexive : Reflexive read_byte_prop_memory_preserved.
+    Proof.
+      repeat red.
+      intros x addr0 aid.
+      split; intros ALLOC; auto.
+    Qed.
 
-  #[global] Instance free_byte_allowed_all_preserved_Reflexive :
-    Reflexive free_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
+    #[global] Instance memory_stack_Reflexive : Reflexive memory_stack_eqv.
+    Proof.
+      red.
+      intros x.
+      split; try reflexivity.
+    Qed.
 
-  #[global] Instance allocations_preserved_Reflexive :
-    Reflexive allocations_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
+    #[global] Instance MemState_eqv'_Reflexive : Reflexive MemState_eqv'.
+    Proof.
+      red.
+      intros ms.
+      red.
+      split; [|reflexivity].
 
-  #[global] Instance frame_stack_preserved_memory_Reflexive :
-    Reflexive frame_stack_preserved_memory.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
+      repeat (split; [reflexivity|]); reflexivity.
+    Qed.
 
-  #[global] Instance frame_stack_preserved_Reflexive :
-    Reflexive frame_stack_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
+    #[global] Instance MemState_eqv_Reflexive : Reflexive MemState_eqv.
+    Proof.
+      red.
+      intros ms.
+      repeat (split; [reflexivity|]); reflexivity.
+    Qed.
 
-  #[global] Instance heap_preserved_memory_Reflexive :
-    Reflexive heap_preserved_memory.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
+    Lemma fresh_sid_MemState_eqv :
+      forall ms ms' sid,
+        fresh_sid ms (ret (ms', sid)) ->
+        MemState_eqv ms ms'.
+    Proof.
+      intros ms ms' sid H.
+      destruct H.
+      split; [|split; [|split; [|split; [|split; [|split]]]]];
+        tauto.
+    Qed.
 
-  #[global] Instance heap_preserved_Reflexive :
-    Reflexive heap_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    reflexivity.
-  Qed.
+    #[global] Instance preserve_allocation_ids_Transitive :
+      Transitive preserve_allocation_ids.
+    Proof.
+      red; intros ms.
+      red.
+      intros y z H H0 p.
+      split; intros USED.
+      - apply H0, H; auto.
+      - apply H, H0; auto.
+    Qed.
 
-  #[global] Instance addr_allocated_preserved_Reflexive : Reflexive addr_allocated_prop_memory_preserved.
-  Proof.
-    repeat red.
-    intros x addr0 aid.
-    split; intros ALLOC; auto.
-  Qed.
+    #[global] Instance read_byte_allowed_all_preserved_Transitive :
+      Transitive read_byte_allowed_all_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y z H H0 ptr.
+      split; intros READ.
+      - apply H0, H; auto.
+      - apply H, H0; auto.
+    Qed.
 
-  #[global] Instance read_byte_prop_memory_preserved_Reflexive : Reflexive read_byte_prop_memory_preserved.
-  Proof.
-    repeat red.
-    intros x addr0 aid.
-    split; intros ALLOC; auto.
-  Qed.
+    #[global] Instance read_byte_prop_all_preserved_Transitive :
+      Transitive read_byte_prop_all_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y z H H0 ptr byte.
+      split; intros READ.
+      - apply H0, H; auto.
+      - apply H, H0; auto.
+    Qed.
 
-  #[global] Instance memory_stack_Reflexive : Reflexive memory_stack_eqv.
-  Proof.
-    red.
-    intros x.
-    split; try reflexivity.
-  Qed.
+    #[global] Instance read_byte_preserved_Transitive :
+      Transitive read_byte_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y z H H0.
+      destruct H, H0.
+      split.
+      - eapply read_byte_allowed_all_preserved_Transitive; eauto.
+      - eapply read_byte_prop_all_preserved_Transitive; eauto.
+    Qed.
 
-  #[global] Instance MemState_eqv'_Reflexive : Reflexive MemState_eqv'.
-  Proof.
-    red.
-    intros ms.
-    red.
-    split; [|reflexivity].
+    #[global] Instance write_byte_allowed_all_preserved_Transitive :
+      Transitive write_byte_allowed_all_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y z H H0 ptr.
+      split; intros WRITE.
+      - apply H0, H; auto.
+      - apply H, H0; auto.
+    Qed.
 
-    repeat (split; [reflexivity|]); reflexivity.
-  Qed.
+    #[global] Instance free_byte_allowed_all_preserved_Transitive :
+      Transitive free_byte_allowed_all_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y z H H0 ptr.
+      split; intros FREE.
+      - apply H0, H; auto.
+      - apply H, H0; auto.
+    Qed.
 
-  #[global] Instance MemState_eqv_Reflexive : Reflexive MemState_eqv.
-  Proof.
-    red.
-    intros ms.
-    repeat (split; [reflexivity|]); reflexivity.
-  Qed.
+    #[global] Instance allocations_preserved_Transitive :
+      Transitive allocations_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y z H H0 ptr aid.
+      split; intros BYTE.
+      - apply H0, H; auto.
+      - apply H, H0; auto.
+    Qed.
 
-  Lemma fresh_sid_MemState_eqv :
-    forall ms ms' sid,
-      fresh_sid ms (ret (ms', sid)) ->
-      MemState_eqv ms ms'.
-  Proof.
-    intros ms ms' sid H.
-    destruct H.
-    split; [|split; [|split; [|split; [|split; [|split]]]]];
-      tauto.
-  Qed.
+    #[global] Instance frame_stack_preserved_Transitive :
+      Transitive frame_stack_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y z H H0 fs.
+      split; intros FSP.
+      - apply H0, H; auto.
+      - apply H, H0; auto.
+    Qed.
 
-  #[global] Instance preserve_allocation_ids_Transitive :
-    Transitive preserve_allocation_ids.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 p.
-    split; intros USED.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
+    #[global] Instance heap_preserved_Transitive :
+      Transitive heap_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y z H H0 h.
+      split; intros HEAP.
+      - apply H0, H; auto.
+      - apply H, H0; auto.
+    Qed.
 
-  #[global] Instance read_byte_allowed_all_preserved_Transitive :
-    Transitive read_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 ptr.
-    split; intros READ.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
+    #[global] Instance MemState_eqv_Transitive : Transitive MemState_eqv.
+    Proof.
+      red.
+      intros x y z H H0.
+      destruct H as (?&?&?&?&?&?&?).
+      destruct H0 as (?&?&?&?&?&?&?).
+      split; [|split; [|split; [|split; [|split; [|split]]]]].
+      - eapply preserve_allocation_ids_Transitive; eauto.
+      - eapply read_byte_preserved_Transitive; eauto.
+      - eapply write_byte_allowed_all_preserved_Transitive; eauto.
+      - eapply free_byte_allowed_all_preserved_Transitive; eauto.
+      - eapply allocations_preserved_Transitive; eauto.
+      - eapply frame_stack_preserved_Transitive; eauto.
+      - eapply heap_preserved_Transitive; eauto.
+    Qed.
 
-  #[global] Instance read_byte_prop_all_preserved_Transitive :
-    Transitive read_byte_prop_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 ptr byte.
-    split; intros READ.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
+    #[global] Instance preserve_allocation_ids_Symmetric :
+      Symmetric preserve_allocation_ids.
+    Proof.
+      red; intros ms.
+      red.
+      intros y H p.
+      split; intros USED.
+      - apply H; auto.
+      - apply H; auto.
+    Qed.
 
-  #[global] Instance read_byte_preserved_Transitive :
-    Transitive read_byte_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0.
-    destruct H, H0.
-    split.
-    - eapply read_byte_allowed_all_preserved_Transitive; eauto.
-    - eapply read_byte_prop_all_preserved_Transitive; eauto.
-  Qed.
+    #[global] Instance read_byte_allowed_all_preserved_Symmetric :
+      Symmetric read_byte_allowed_all_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y H ptr.
+      split; intros READ.
+      - apply H; auto.
+      - apply H; auto.
+    Qed.
 
-  #[global] Instance write_byte_allowed_all_preserved_Transitive :
-    Transitive write_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 ptr.
-    split; intros WRITE.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
+    #[global] Instance read_byte_prop_all_preserved_Symmetric :
+      Symmetric read_byte_prop_all_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y H ptr byte.
+      split; intros READ.
+      - apply H; auto.
+      - apply H; auto.
+    Qed.
 
-  #[global] Instance free_byte_allowed_all_preserved_Transitive :
-    Transitive free_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 ptr.
-    split; intros FREE.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
+    #[global] Instance read_byte_preserved_Symmetric :
+      Symmetric read_byte_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y H.
+      destruct H.
+      split.
+      - eapply read_byte_allowed_all_preserved_Symmetric; eauto.
+      - eapply read_byte_prop_all_preserved_Symmetric; eauto.
+    Qed.
 
-  #[global] Instance allocations_preserved_Transitive :
-    Transitive allocations_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 ptr aid.
-    split; intros BYTE.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
+    #[global] Instance write_byte_allowed_all_preserved_Symmetric :
+      Symmetric write_byte_allowed_all_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y H ptr.
+      split; intros WRITE.
+      - apply H; auto.
+      - apply H; auto.
+    Qed.
 
-  #[global] Instance frame_stack_preserved_Transitive :
-    Transitive frame_stack_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 fs.
-    split; intros FSP.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
+    #[global] Instance free_byte_allowed_all_preserved_Symmetric :
+      Symmetric free_byte_allowed_all_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y H ptr.
+      split; intros FREE.
+      - apply H; auto.
+      - apply H; auto.
+    Qed.
 
-  #[global] Instance heap_preserved_Transitive :
-    Transitive heap_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y z H H0 h.
-    split; intros HEAP.
-    - apply H0, H; auto.
-    - apply H, H0; auto.
-  Qed.
+    #[global] Instance allocations_preserved_Symmetric :
+      Symmetric allocations_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y H ptr aid.
+      split; intros BYTE.
+      - apply H; auto.
+      - apply H; auto.
+    Qed.
 
-  #[global] Instance MemState_eqv_Transitive : Transitive MemState_eqv.
-  Proof.
-    red.
-    intros x y z H H0.
-    destruct H as (?&?&?&?&?&?&?).
-    destruct H0 as (?&?&?&?&?&?&?).
-    split; [|split; [|split; [|split; [|split; [|split]]]]].
-    - eapply preserve_allocation_ids_Transitive; eauto.
-    - eapply read_byte_preserved_Transitive; eauto.
-    - eapply write_byte_allowed_all_preserved_Transitive; eauto.
-    - eapply free_byte_allowed_all_preserved_Transitive; eauto.
-    - eapply allocations_preserved_Transitive; eauto.
-    - eapply frame_stack_preserved_Transitive; eauto.
-    - eapply heap_preserved_Transitive; eauto.
-  Qed.
+    #[global] Instance frame_stack_preserved_Symmetric :
+      Symmetric frame_stack_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y H fs.
+      split; intros FSP.
+      - apply H; auto.
+      - apply H; auto.
+    Qed.
 
-  #[global] Instance preserve_allocation_ids_Symmetric :
-    Symmetric preserve_allocation_ids.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H p.
-    split; intros USED.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
+    #[global] Instance heap_preserved_Symmetric :
+      Symmetric heap_preserved.
+    Proof.
+      red; intros ms.
+      red.
+      intros y H h.
+      split; intros HEAP.
+      - apply H; auto.
+      - apply H; auto.
+    Qed.
 
-  #[global] Instance read_byte_allowed_all_preserved_Symmetric :
-    Symmetric read_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H ptr.
-    split; intros READ.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
+    #[global] Instance MemState_eqv_Symmetric : Symmetric MemState_eqv.
+    Proof.
+      red.
+      intros x y H.
+      destruct H as (?&?&?&?&?&?&?).
+      split; [|split; [|split; [|split; [|split; [|split]]]]].
+      - eapply preserve_allocation_ids_Symmetric; eauto.
+      - eapply read_byte_preserved_Symmetric; eauto.
+      - eapply write_byte_allowed_all_preserved_Symmetric; eauto.
+      - eapply free_byte_allowed_all_preserved_Symmetric; eauto.
+      - eapply allocations_preserved_Symmetric; eauto.
+      - eapply frame_stack_preserved_Symmetric; eauto.
+      - eapply heap_preserved_Symmetric; eauto.
+    Qed.
 
-  #[global] Instance read_byte_prop_all_preserved_Symmetric :
-    Symmetric read_byte_prop_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H ptr byte.
-    split; intros READ.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
+  End MemoryModelSpec.
 
-  #[global] Instance read_byte_preserved_Symmetric :
-    Symmetric read_byte_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H.
-    destruct H.
-    split.
-    - eapply read_byte_allowed_all_preserved_Symmetric; eauto.
-    - eapply read_byte_prop_all_preserved_Symmetric; eauto.
-  Qed.
+  Module MakeMemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) <: MemoryModelSpec LP MP MMSP.
+    Include MemoryModelSpec LP MP MMSP.
+  End MakeMemoryModelSpec.
 
-  #[global] Instance write_byte_allowed_all_preserved_Symmetric :
-    Symmetric write_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H ptr.
-    split; intros WRITE.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
+  Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
+    Import LP.
+    Import MMS.
+    Import PROV.
+    Import MMSP.
+    Import MemHelpers.
 
-  #[global] Instance free_byte_allowed_all_preserved_Symmetric :
-    Symmetric free_byte_allowed_all_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H ptr.
-    split; intros FREE.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
+    Definition MemMonad_valid_state (ms : MemState) (st : store_id) : Prop
+      := let sid := st in
+         (forall sid', used_store_id_prop ms sid' -> (sid' < sid)%N).
 
-  #[global] Instance allocations_preserved_Symmetric :
-    Symmetric allocations_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H ptr aid.
-    split; intros BYTE.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
+    Class MemMonad (M : Type -> Type) (RunM : Type -> Type)
+      `{MM : Monad M} `{MRun: Monad RunM}
+      `{MPROV : MonadProvenance Provenance M} `{MSID : MonadStoreId M} `{MMS: MonadMemState MemState M}
+      `{MERR : RAISE_ERROR M} `{MUB : RAISE_UB M} `{MOOM :RAISE_OOM M}
+      `{RunERR : RAISE_ERROR RunM} `{RunUB : RAISE_UB RunM} `{RunOOM :RAISE_OOM RunM}
+      `{EQM : Eq1 M} `{EQRI : @Eq1_ret_inv M EQM MM} `{MLAWS : @MonadLawsE M EQM MM}
+      : Type
+      :=
+      { #[global] MemMonad_eq1_runm :: Eq1 RunM;
+        #[global] MemMonad_runm_monadlaws :: MonadLawsE RunM;
+        #[global] MemMonad_eq1_runm_equiv :: Eq1Equivalence RunM;
+        #[global] MemMonad_eq1_runm_eq1laws :: Eq1_ret_inv RunM;
+        #[global] MemMonad_raisebindm_ub :: RaiseBindM RunM string (@raise_ub RunM RunUB);
+        #[global] MemMonad_raisebindm_oom :: RaiseBindM RunM string (@raise_oom RunM RunOOM);
+        #[global] MemMonad_raisebindm_err :: RaiseBindM RunM string (@raise_error RunM RunERR);
+        #[global] MemMonad_within :: @Within M EQM RunM (store_id * MemState)%type (store_id * MemState)%type;
 
-  #[global] Instance frame_stack_preserved_Symmetric :
-    Symmetric frame_stack_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H fs.
-    split; intros FSP.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
+        #[global] MemMonad_eq1_runm_proper ::
+          (forall A, Proper ((@eq1 _ MemMonad_eq1_runm) A ==> (@eq1 _ MemMonad_eq1_runm) A ==> iff) ((@eq1 _ MemMonad_eq1_runm) A));
 
-  #[global] Instance heap_preserved_Symmetric :
-    Symmetric heap_preserved.
-  Proof.
-    red; intros ms.
-    red.
-    intros y H h.
-    split; intros HEAP.
-    - apply H; auto.
-    - apply H; auto.
-  Qed.
+        MemMonad_run {A} (ma : M A) (ms : MemState) (st : store_id)
+        : RunM (store_id * (MemState * A))%type;
 
-  #[global] Instance MemState_eqv_Symmetric : Symmetric MemState_eqv.
-  Proof.
-    red.
-    intros x y H.
-    destruct H as (?&?&?&?&?&?&?).
-    split; [|split; [|split; [|split; [|split; [|split]]]]].
-    - eapply preserve_allocation_ids_Symmetric; eauto.
-    - eapply read_byte_preserved_Symmetric; eauto.
-    - eapply write_byte_allowed_all_preserved_Symmetric; eauto.
-    - eapply free_byte_allowed_all_preserved_Symmetric; eauto.
-    - eapply allocations_preserved_Symmetric; eauto.
-    - eapply frame_stack_preserved_Symmetric; eauto.
-    - eapply heap_preserved_Symmetric; eauto.
-  Qed.
+        #[global] MemMonad_run_proper ::
+          (forall A, Proper (@eq1 _ EQM A ==> eq ==> eq ==> @eq1 _ MemMonad_eq1_runm (store_id * (MemState * A))) MemMonad_run);
 
-End MemoryModelSpec.
-
-Module MakeMemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) <: MemoryModelSpec LP MP MMSP.
-  Include MemoryModelSpec LP MP MMSP.
-End MakeMemoryModelSpec.
-
-Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
-  Import LP.
-  Import MMS.
-  Import PROV.
-  Import MMSP.
-  Import MemHelpers.
-
-  Definition MemMonad_valid_state (ms : MemState) (st : store_id) : Prop
-    := let sid := st in
-       (forall sid', used_store_id_prop ms sid' -> (sid' < sid)%N).
-
-  Class MemMonad (M : Type -> Type) (RunM : Type -> Type)
-        `{MM : Monad M} `{MRun: Monad RunM}
-        `{MPROV : MonadProvenance Provenance M} `{MSID : MonadStoreId M} `{MMS: MonadMemState MemState M}
-        `{MERR : RAISE_ERROR M} `{MUB : RAISE_UB M} `{MOOM :RAISE_OOM M}
-        `{RunERR : RAISE_ERROR RunM} `{RunUB : RAISE_UB RunM} `{RunOOM :RAISE_OOM RunM}
-        `{EQM : Eq1 M} `{EQRI : @Eq1_ret_inv M EQM MM} `{MLAWS : @MonadLawsE M EQM MM}
-    : Type
-    :=
-    { #[global] MemMonad_eq1_runm :: Eq1 RunM;
-      #[global] MemMonad_runm_monadlaws :: MonadLawsE RunM;
-      #[global] MemMonad_eq1_runm_equiv :: Eq1Equivalence RunM;
-      #[global] MemMonad_eq1_runm_eq1laws :: Eq1_ret_inv RunM;
-      #[global] MemMonad_raisebindm_ub :: RaiseBindM RunM string (@raise_ub RunM RunUB);
-      #[global] MemMonad_raisebindm_oom :: RaiseBindM RunM string (@raise_oom RunM RunOOM);
-      #[global] MemMonad_raisebindm_err :: RaiseBindM RunM string (@raise_error RunM RunERR);
-      #[global] MemMonad_within :: @Within M EQM RunM (store_id * MemState)%type (store_id * MemState)%type;
-
-      #[global] MemMonad_eq1_runm_proper ::
-                               (forall A, Proper ((@eq1 _ MemMonad_eq1_runm) A ==> (@eq1 _ MemMonad_eq1_runm) A ==> iff) ((@eq1 _ MemMonad_eq1_runm) A));
-
-      MemMonad_run {A} (ma : M A) (ms : MemState) (st : store_id)
-      : RunM (store_id * (MemState * A))%type;
-
-      #[global] MemMonad_run_proper ::
-        (forall A, Proper (@eq1 _ EQM A ==> eq ==> eq ==> @eq1 _ MemMonad_eq1_runm (store_id * (MemState * A))) MemMonad_run);
-
-      (** Some lemmas about valid states *)
-      (* This may not be true for infinite memory. Valid state is
+        (** Some lemmas about valid states *)
+        (* This may not be true for infinite memory. Valid state is
          mostly used to ensure that we can find a store id that hasn't
          been used in memory yet...
 
@@ -2252,93 +2404,93 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
          construct a MemState that has a byte allocated for every
          store id... Even though store ids are unbounded integers,
          they have the same cardinality as the memory :|.
-       *)
-      (*
+         *)
+        (*
       MemMonad_has_valid_state :
       forall (ms : MemState), exists (st : store_id),
         MemMonad_valid_state ms st;
-       *)
-    (** Run bind / ret laws *)
-    MemMonad_run_bind
-      {A B} (ma : M A) (k : A -> M B) (ms : MemState) (st : store_id):
-    eq1 (MemMonad_run (x <- ma;; k x) ms st)
-        ('(st', (ms', x)) <- MemMonad_run ma ms st;; MemMonad_run (k x) ms' st');
+         *)
+        (** Run bind / ret laws *)
+        MemMonad_run_bind
+          {A B} (ma : M A) (k : A -> M B) (ms : MemState) (st : store_id):
+        eq1 (MemMonad_run (x <- ma;; k x) ms st)
+          ('(st', (ms', x)) <- MemMonad_run ma ms st;; MemMonad_run (k x) ms' st');
 
-    MemMonad_run_ret
-      {A} (x : A) (ms : MemState) st:
-    eq1 (MemMonad_run (ret x) ms st) (ret (st, (ms, x)));
+        MemMonad_run_ret
+          {A} (x : A) (ms : MemState) st:
+        eq1 (MemMonad_run (ret x) ms st) (ret (st, (ms, x)));
 
-    (** MonadMemState properties *)
-    MemMonad_get_mem_state
-      (ms : MemState) st :
-    eq1 (MemMonad_run (get_mem_state) ms st) (ret (st, (ms, ms)));
+        (** MonadMemState properties *)
+        MemMonad_get_mem_state
+          (ms : MemState) st :
+        eq1 (MemMonad_run (get_mem_state) ms st) (ret (st, (ms, ms)));
 
-    MemMonad_put_mem_state
-      (ms ms' : MemState) st :
-    eq1 (MemMonad_run (put_mem_state ms') ms st) (ret (st, (ms', tt)));
+        MemMonad_put_mem_state
+          (ms ms' : MemState) st :
+        eq1 (MemMonad_run (put_mem_state ms') ms st) (ret (st, (ms', tt)));
 
-    (** Fresh store id property *)
-    MemMonad_run_fresh_sid
-      (ms : MemState) st (VALID : MemMonad_valid_state ms st):
-    exists st' sid',
-      eq1 (MemMonad_run (fresh_sid) ms st) (ret (st', (ms, sid'))) /\
-        MemMonad_valid_state ms st' /\
-        sid' <= st /\ st < st' /\
-        ~ used_store_id_prop ms sid';
+        (** Fresh store id property *)
+        MemMonad_run_fresh_sid
+          (ms : MemState) st (VALID : MemMonad_valid_state ms st):
+        exists st' sid',
+          eq1 (MemMonad_run (fresh_sid) ms st) (ret (st', (ms, sid'))) /\
+            MemMonad_valid_state ms st' /\
+            sid' <= st /\ st < st' /\
+            ~ used_store_id_prop ms sid';
 
-    (** Fresh provenance property *)
-    (* TODO: unclear if this should exist, must change ms. *)
-    MemMonad_run_fresh_provenance
-      (ms : MemState) st (VALID : MemMonad_valid_state ms st):
-    exists ms' pr',
-      eq1 (MemMonad_run (fresh_provenance) ms st) (ret (st, (ms', pr'))) /\
-        MemMonad_valid_state ms' st /\
-        ms_get_memory ms = ms_get_memory ms' /\
-        (* Analogous to extend_provenance *)
-        (forall pr, used_provenance_prop ms pr -> used_provenance_prop ms' pr) /\
-        ~ used_provenance_prop ms pr' /\
-        used_provenance_prop ms' pr';
+        (** Fresh provenance property *)
+        (* TODO: unclear if this should exist, must change ms. *)
+        MemMonad_run_fresh_provenance
+          (ms : MemState) st (VALID : MemMonad_valid_state ms st):
+        exists ms' pr',
+          eq1 (MemMonad_run (fresh_provenance) ms st) (ret (st, (ms', pr'))) /\
+            MemMonad_valid_state ms' st /\
+            ms_get_memory ms = ms_get_memory ms' /\
+            (* Analogous to extend_provenance *)
+            (forall pr, used_provenance_prop ms pr -> used_provenance_prop ms' pr) /\
+            ~ used_provenance_prop ms pr' /\
+            used_provenance_prop ms' pr';
 
-    (** Exceptions *)
-    MemMonad_run_raise_oom :
-    forall {A} ms oom_msg st,
-      eq1 (MemMonad_run (@raise_oom _ _ A oom_msg) ms st) (raise_oom oom_msg);
+        (** Exceptions *)
+        MemMonad_run_raise_oom :
+        forall {A} ms oom_msg st,
+          eq1 (MemMonad_run (@raise_oom _ _ A oom_msg) ms st) (raise_oom oom_msg);
 
-    MemMonad_eq1_raise_oom_inv :
-    forall {A} x oom_msg,
-      ~ ((@eq1 _ MemMonad_eq1_runm) A (ret x) (raise_oom oom_msg));
+        MemMonad_eq1_raise_oom_inv :
+        forall {A} x oom_msg,
+          ~ ((@eq1 _ MemMonad_eq1_runm) A (ret x) (raise_oom oom_msg));
 
-    MemMonad_run_raise_ub :
-    forall {A} ms ub_msg st,
-      eq1 (MemMonad_run (@raise_ub _ _ A ub_msg) ms st) (raise_ub ub_msg);
+        MemMonad_run_raise_ub :
+        forall {A} ms ub_msg st,
+          eq1 (MemMonad_run (@raise_ub _ _ A ub_msg) ms st) (raise_ub ub_msg);
 
-    MemMonad_eq1_raise_ub_inv :
-    forall {A} x ub_msg,
-      ~ ((@eq1 _ MemMonad_eq1_runm) A (ret x) (raise_ub ub_msg));
+        MemMonad_eq1_raise_ub_inv :
+        forall {A} x ub_msg,
+          ~ ((@eq1 _ MemMonad_eq1_runm) A (ret x) (raise_ub ub_msg));
 
-    MemMonad_run_raise_error :
-    forall {A} ms error_msg st,
-      eq1 (MemMonad_run (@raise_error _ _ A error_msg) ms st) (raise_error error_msg);
+        MemMonad_run_raise_error :
+        forall {A} ms error_msg st,
+          eq1 (MemMonad_run (@raise_error _ _ A error_msg) ms st) (raise_error error_msg);
 
-    MemMonad_eq1_raise_error_inv :
-    forall {A} x error_msg,
-      ~ ((@eq1 _ MemMonad_eq1_runm) A (ret x) (raise_error error_msg));
+        MemMonad_eq1_raise_error_inv :
+        forall {A} x error_msg,
+          ~ ((@eq1 _ MemMonad_eq1_runm) A (ret x) (raise_error error_msg));
 
-    MemMonad_eq1_raise_oom_raise_error_inv :
-    forall {A} oom_msg error_msg,
-      ~ ((@eq1 _ MemMonad_eq1_runm) A (raise_oom oom_msg) (raise_error error_msg));
+        MemMonad_eq1_raise_oom_raise_error_inv :
+        forall {A} oom_msg error_msg,
+          ~ ((@eq1 _ MemMonad_eq1_runm) A (raise_oom oom_msg) (raise_error error_msg));
 
-    MemMonad_eq1_raise_error_raise_oom_inv :
-    forall {A} error_msg oom_msg,
-      ~ ((@eq1 _ MemMonad_eq1_runm) A (raise_error error_msg) (raise_oom oom_msg));
+        MemMonad_eq1_raise_error_raise_oom_inv :
+        forall {A} error_msg oom_msg,
+          ~ ((@eq1 _ MemMonad_eq1_runm) A (raise_error error_msg) (raise_oom oom_msg));
 
-    MemMonad_eq1_raise_ub_raise_error_inv :
-    forall {A} ub_msg error_msg,
-      ~ ((@eq1 _ MemMonad_eq1_runm) A (raise_ub ub_msg) (raise_error error_msg));
+        MemMonad_eq1_raise_ub_raise_error_inv :
+        forall {A} ub_msg error_msg,
+          ~ ((@eq1 _ MemMonad_eq1_runm) A (raise_ub ub_msg) (raise_error error_msg));
 
-    MemMonad_eq1_raise_error_raise_ub_inv :
-    forall {A} error_msg ub_msg,
-      ~ ((@eq1 _ MemMonad_eq1_runm) A (raise_error error_msg) (raise_ub ub_msg));
+        MemMonad_eq1_raise_error_raise_ub_inv :
+        forall {A} error_msg ub_msg,
+          ~ ((@eq1 _ MemMonad_eq1_runm) A (raise_error error_msg) (raise_ub ub_msg));
 
     MemMonad_eq1_raise_oom_raise_ub_inv :
     forall {A} oom_msg ub_msg,

@@ -1,7 +1,6 @@
 From Vellvm Require Import
   Utilities
   AstLib
-  Semantics.Memory.Sizeof
   LLVMEvents
   LLVMAst
   QC.Utils
@@ -12,6 +11,10 @@ From Vellvm Require Import
   DynamicTypes.
 
 (* Maybe also import InterpretationStack *)
+
+From LLVM_Memory Require Import
+  Intptr
+  Sizeof.
 
 From ExtLib.Structures Require Export
   Applicative Monad Monoid.
@@ -42,7 +45,7 @@ Set Warnings "-extraction-opaque-accessed,-extraction".
 
 Unset Guard Checking.
 
-Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZEOF : Sizeof).
+Module GEN_ALIVE2 (ADDR : MemoryAddress.NULLABLE_ADDRESS) (IP:INTPTR) (SIZEOF : Sizeof).
   Definition is_nil {A} (l : list A) : bool :=
     match l with
     | nil => true

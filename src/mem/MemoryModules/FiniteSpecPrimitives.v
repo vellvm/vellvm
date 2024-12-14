@@ -12,18 +12,18 @@ From Stdlib Require Import
      Morphisms.
 
 From Vellvm.Semantics Require Import
-     MemoryAddress
      MemoryParams
      LLVMParams
      LLVMEvents
-     Lang
-     Memory.FiniteProvenance
-     Memory.Sizeof
-     Memory.MemBytes
-     Memory.ErrSID
-     GepM
-     VellvmIntegers
-     StoreId.
+     VellvmIntegers.
+
+     (* Memory.Sizeof *)
+     (* Memory.MemBytes *)
+     (* Memory.ErrSID *)
+     (* GepM *)
+     (* StoreId. *)
+     (* Lang *)
+     (* MemoryAddress *)
 
 From Vellvm.Utils Require Import
      Error
@@ -31,13 +31,13 @@ From Vellvm.Utils Require Import
      Tactics
      Inhabited.
 
-From Vellvm.Handlers Require Import
-     MemPropT
-     MemoryModel
-     MemoryInterpreters.
+(* From Vellvm.Handlers Require Import *)
+(*      MemPropT *)
+(*      MemoryModel *)
+(*      MemoryInterpreters. *)
 
-From Vellvm.Handlers.MemoryModules Require Import
-     FiniteAddresses.
+From Mem Require Import
+  FiniteAddresses.
 
 From ExtLib Require Import
      Structures.Monads.

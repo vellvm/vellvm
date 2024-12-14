@@ -25,19 +25,26 @@ From Vellvm.Handlers Require Export
      Intrinsics
      Pick
      UndefinedBehaviour
-     MemoryModelImplementation
-     OOM
      Concretization.
 
-From Vellvm.Semantics Require Import Memory.Sizeof Memory.MemBytes GepM.
+From LLVM_Memory Require Import
+  GepM
+  Sizeof
+  MemBytes
+  FiniteIntptr
+  FiniteSizeof.
+
+From Mem Require Import
+  FiniteAddresses
+  InfiniteAddresses.
 
 (* Handlers get instantiated over the domain of addresses provided by the memory model *)
-Module LLVMEvents64 := LLVMEvents.Make(MemoryModelImplementation.FinAddr)(MemoryModelImplementation.IP64Bit)(MemoryModelImplementation.FinSizeof).
-Module Global64 := Global.Make MemoryModelImplementation.FinAddr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof LLVMEvents64.
-Module Local64  := Local.Make  MemoryModelImplementation.FinAddr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof LLVMEvents64.
-Module Stack64  := Stack.Make  MemoryModelImplementation.FinAddr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof LLVMEvents64.
+Module LLVMEvents64 := LLVMEvents.Make(FinAddr)(IP64Bit)(FinSizeof).
+Module Global64 := Global.Make FinAddr IP64Bit FinSizeof LLVMEvents64.
+Module Local64  := Local.Make FinAddr IP64Bit FinSizeof LLVMEvents64.
+Module Stack64  := Stack.Make FinAddr IP64Bit FinSizeof LLVMEvents64.
 
-Module LLVMEvents := LLVMEvents.Make(MemoryModelImplementation.InfAddr)(MemoryModelImplementation.BigIP)(MemoryModelImplementation.FinSizeof).
-Module Global := Global.Make MemoryModelImplementation.InfAddr MemoryModelImplementation.BigIP MemoryModelImplementation.FinSizeof LLVMEvents.
-Module Local  := Local.Make  MemoryModelImplementation.InfAddr MemoryModelImplementation.BigIP MemoryModelImplementation.FinSizeof LLVMEvents.
-Module Stack  := Stack.Make  MemoryModelImplementation.InfAddr MemoryModelImplementation.BigIP MemoryModelImplementation.FinSizeof LLVMEvents.
+Module LLVMEvents := LLVMEvents.Make(InfAddr)(BigIP)(FinSizeof).
+Module Global := Global.Make InfAddr BigIP FinSizeof LLVMEvents.
+Module Local  := Local.Make InfAddr BigIP FinSizeof LLVMEvents.
+Module Stack  := Stack.Make InfAddr BigIP FinSizeof LLVMEvents.
