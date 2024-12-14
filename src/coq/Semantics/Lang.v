@@ -1,61 +1,64 @@
+From LLVM_Memory Require Import
+  MemBytes
+  DvalueBytes
+  GepM.
+
 From Vellvm Require Import
-     Semantics.Memory.MemBytes
-     Semantics.Memory.DvalueBytes
-     Semantics.LLVMParams
-     Semantics.GepM
-     Semantics.Denotation
+  Semantics.LLVMParams
+  Semantics.Denotation
 
-     Handlers.Global
-     Handlers.Stack
-     Handlers.Intrinsics
-     Handlers.Pick
-     Handlers.MemoryModel
-     Handlers.MemoryInterpreters.
+  Handlers.Global
+  Handlers.Stack
+  Handlers.Intrinsics
+  Handlers.Pick.
 
-  Module Type Memory (LP: LLVMParams).
-    Import LP.
+(* Handlers.MemoryModel *)
+(* Handlers.MemoryInterpreters. *)
 
-    Declare Module GEP  : GEPM ADDR PTOI PROV ITOP IP SIZEOF Events.
-    Declare Module Byte : ByteModule ADDR IP SIZEOF Events.
-    Declare Module DVALUE_BYTE : DvalueByte LP.
+Module Type Memory (LP: LLVMParams).
+  Import LP.
 
-    Module MP := MemoryParams.Make LP GEP Byte DVALUE_BYTE.
+  Declare Module GEP  : GEPM ADDR IP SIZEOF Events.
+  Declare Module Byte : ByteModule ADDR IP SIZEOF Events.
+  Declare Module DVALUE_BYTE : DvalueByte LP.
 
-    Declare Module MMEP : MemoryModelExecPrimitives LP MP.
-    Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.
-    Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec MMEP.MemExecM.
-    Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
+  Module MP := MemoryParams.Make LP GEP Byte DVALUE_BYTE.
 
-    (* Concretization *)
-    Module ByteM := MemBytes.Byte ADDR IP SIZEOF LP.Events MP.BYTE_IMPL.
-    Module CP := ConcretizationParams.Make LP MP ByteM.
+  Declare Module MMEP : MemoryModelExecPrimitives LP MP.
+  Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.
+  Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec MMEP.MemExecM.
+  Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
 
-    Export GEP Byte DVALUE_BYTE MP MEM_MODEL CP.
-  End Memory.
+  (* Concretization *)
+  Module ByteM := MemBytes.Byte ADDR IP SIZEOF LP.Events MP.BYTE_IMPL.
+  Module CP := ConcretizationParams.Make LP MP ByteM.
 
-  Module Type Lang (LP: LLVMParams).
-    Export LP.
+  Export GEP Byte DVALUE_BYTE MP MEM_MODEL CP.
+End Memory.
 
-    (* Handlers *)
-    Module Global     := Global.Make ADDR IP SIZEOF LP.Events.
-    Module Local      := Local.Make ADDR IP SIZEOF LP.Events.
-    Module Stack      := Stack.Make ADDR IP SIZEOF LP.Events.
-    Module Intrinsics := Intrinsics.Make ADDR IP SIZEOF LP.Events.
+Module Type Lang (LP: LLVMParams).
+  Export LP.
 
-    (* Memory *)
-    Declare Module MEM : Memory LP.
-    Export MEM.
+  (* Handlers *)
+  Module Global     := Global.Make ADDR IP SIZEOF LP.Events.
+  Module Local      := Local.Make ADDR IP SIZEOF LP.Events.
+  Module Stack      := Stack.Make ADDR IP SIZEOF LP.Events.
+  Module Intrinsics := Intrinsics.Make ADDR IP SIZEOF LP.Events.
 
-    (* Pick handler (depends on memory / concretization) *)
-    Module Pick := Pick.Make LP MP ByteM CP.
+  (* Memory *)
+  Declare Module MEM : Memory LP.
+  Export MEM.
 
-    (* Denotation *)
-    Module D := Denotation LP MP ByteM CP.
+  (* Pick handler (depends on memory / concretization) *)
+  Module Pick := Pick.Make LP MP ByteM CP.
 
-    Export Events Events.DV Global Local Stack Pick Intrinsics
-           CP.CONC D.
-  End Lang.
+  (* Denotation *)
+  Module D := Denotation LP MP ByteM CP.
 
-  Module Make (LP : LLVMParams) (MEM' : Memory LP) <: Lang LP with Module MEM := MEM'.
-    Include Lang LP with Module MEM := MEM'.
-  End Make.
+  Export Events Events.DV Global Local Stack Pick Intrinsics
+    CP.CONC D.
+End Lang.
+
+Module Make (LP : LLVMParams) (MEM' : Memory LP) <: Lang LP with Module MEM := MEM'.
+  Include Lang LP with Module MEM := MEM'.
+End Make.

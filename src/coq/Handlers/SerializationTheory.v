@@ -12,17 +12,18 @@ From Vellvm Require Import
      Utils.RefineProp
      Utils.Monads
      Utils.MapMonadExtra
-     Handlers.MemoryModelImplementation
      Semantics.LLVMParams
      Semantics.Denotation
-     Semantics.Memory.MemBytes
      Semantics.MemoryParams
      Semantics.ConcretizationParams.
+
+     (* Semantics.Memory.MemBytes *)
+     (* Handlers.MemoryModelImplementation *)
 
 Import MonadNotation.
 Import MonadReturnsLaws.
 
-Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL) (CP : ConcretizationParams LP MP Byte).
+Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationParams LP MP).
   Import CP.
   Import CONC.
   Import MP.
@@ -30,9 +31,6 @@ Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModul
 
   Import Events.
   Import SIZEOF.
-  Import PTOI.
-  Import PROV.
-  Import ITOP.
   Import DV.
   Import GEP.
 

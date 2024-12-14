@@ -215,11 +215,10 @@ Module ByteExtras
     apply Nnat.N2Nat.id.
   Qed.
 
-  Definition sbyte_sid (byte : SByte) : err store_id :=
-    match sbyte_to_extractbyte byte with
-    | UVALUE_ExtractByte uv dt idx sid => inr sid
-    | _ => inl "Invalid sbyte, did not convert to extractbyte."%string
-    end.
+  Definition sbyte_sid (byte : SByte) : store_id.
+    destruct (sbyte_to_extractbyte_inv byte) as (?&?&?&?&?).
+    apply x2.
+  Defined.
 End ByteExtras.
 
 Module Type ByteModule (Addr:NULLABLE_ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
