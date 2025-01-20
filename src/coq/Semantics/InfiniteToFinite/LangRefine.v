@@ -19363,17 +19363,17 @@ Qed.
       reflexivity.
   Qed.
 
-  Lemma pickUnique_orutt_strict :
+  Lemma concretize_or_pick_unique_orutt_strict :
     forall uv1 uv2,
       uvalue_refine_strict uv1 uv2 ->
       orutt (sum_prerel call_refine_strict event_refine_strict)
         (sum_postrel call_res_refine_strict event_res_refine_strict) dvalue_refine_strict
-        (IS1.LLVM.D.pickUnique uv1) (pickUnique uv2)
+        (IS1.LLVM.D.concretize_or_pick_unique uv1) (concretize_or_pick_unique uv2)
         (OOM:=OOME).
   Proof.
     intros uv1 uv2 REF.
-    unfold IS1.LLVM.D.pickUnique, IS1.LLVM.D.concretize_or_pick.
-    unfold pickUnique, concretize_or_pick.
+    unfold IS1.LLVM.D.concretize_or_pick_unique, IS1.LLVM.D.concretize_or_pick.
+    unfold concretize_or_pick_unique, concretize_or_pick.
     cbn.
     break_match;
       eapply uvalue_refine_strict_preserves_is_concrete with (uvc:=uv2) in Heqb; eauto;
@@ -19399,18 +19399,18 @@ Qed.
     intros o CONTRA; inv CONTRA.
   Qed.
 
-  (* TODO: can these pickUnique lemmas be generalized? Different
+  (* TODO: can these concretize_or_pick_unique lemmas be generalized? Different
   prerel / postrel, but fundamentally the same lemma... *)
-  Lemma pickUnique_instr_E_orutt_strict :
+  Lemma concretize_or_pick_unique_instr_E_orutt_strict :
     forall uv1 uv2,
       uvalue_refine_strict uv1 uv2 ->
       orutt instr_E_refine_strict instr_E_res_refine_strict dvalue_refine_strict
-        (IS1.LLVM.D.pickUnique uv1) (pickUnique uv2)
+        (IS1.LLVM.D.concretize_or_pick_unique uv1) (concretize_or_pick_unique uv2)
         (OOM:=OOME).
   Proof.
     intros uv1 uv2 REF.
-    unfold IS1.LLVM.D.pickUnique, IS1.LLVM.D.concretize_or_pick.
-    unfold pickUnique, concretize_or_pick.
+    unfold IS1.LLVM.D.concretize_or_pick_unique, IS1.LLVM.D.concretize_or_pick.
+    unfold concretize_or_pick_unique, concretize_or_pick.
     cbn.
     break_match;
       eapply uvalue_refine_strict_preserves_is_concrete with (uvc:=uv2) in Heqb; eauto;
@@ -19435,16 +19435,16 @@ Qed.
     intros o CONTRA; inv CONTRA.
   Qed.
 
-  Lemma pickUnique_exp_E_orutt_strict :
+  Lemma concretize_or_pick_unique_exp_E_orutt_strict :
     forall uv1 uv2,
       uvalue_refine_strict uv1 uv2 ->
       orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
-        (IS1.LLVM.D.pickUnique uv1) (pickUnique uv2)
+        (IS1.LLVM.D.concretize_or_pick_unique uv1) (concretize_or_pick_unique uv2)
         (OOM:=OOME).
   Proof.
     intros uv1 uv2 REF.
-    unfold IS1.LLVM.D.pickUnique, IS1.LLVM.D.concretize_or_pick.
-    unfold pickUnique, concretize_or_pick.
+    unfold IS1.LLVM.D.concretize_or_pick_unique, IS1.LLVM.D.concretize_or_pick.
+    unfold concretize_or_pick_unique, concretize_or_pick.
     cbn.
     break_match;
       eapply uvalue_refine_strict_preserves_is_concrete with (uvc:=uv2) in Heqb; eauto;
@@ -21559,7 +21559,7 @@ Qed.
                 apply denote_exp_E1E2_orutt.
               * intros r0 r3 H0.
                 eapply orutt_bind with (RR:=dvalue_refine_strict).
-                eapply pickUnique_instr_E_orutt_strict; eauto.
+                eapply concretize_or_pick_unique_instr_E_orutt_strict; eauto.
                 intros ? ? ?.
                 destruct r5; dvalue_refine_strict_inv H2; try solve_orutt_raiseUB.
                 all: try (apply orutt_bind with (RR:=Logic.eq);
@@ -21599,7 +21599,7 @@ Qed.
                 apply denote_exp_E1E2_orutt.
               * intros r0 r3 H0.
                 eapply orutt_bind with (RR:=dvalue_refine_strict).
-                eapply pickUnique_instr_E_orutt_strict; eauto.
+                eapply concretize_or_pick_unique_instr_E_orutt_strict; eauto.
                 intros ? ? ?.
                 eapply orutt_bind with (RR:=uvalue_refine_strict).
                 { apply translate_exp_to_instr_E1E2_orutt_strict.
@@ -21608,7 +21608,7 @@ Qed.
 
                 intros ? ? ?.
                 eapply orutt_bind with (RR:=dvalue_refine_strict).
-                eapply pickUnique_instr_E_orutt_strict; eauto.
+                eapply concretize_or_pick_unique_instr_E_orutt_strict; eauto.
                 intros ? ? ?.
                 eapply orutt_bind with (RR:=uvalue_refine_strict).
                 { apply orutt_trigger; cbn; eauto.
@@ -21643,7 +21643,7 @@ Qed.
             + eapply orutt_bind with (RR:=Forall2 dvalue_refine_strict).
               * eapply map_monad_orutt2; eauto.
                 intros * ?.
-                eapply pickUnique_instr_E_orutt_strict; eauto.
+                eapply concretize_or_pick_unique_instr_E_orutt_strict; eauto.
               * intros r0 r3 H0.
                 eapply orutt_map.
                 -- apply orutt_trigger; cbn; eauto.
@@ -21708,7 +21708,7 @@ Qed.
 
           intros r1 r2 H.
           eapply orutt_bind with (RR:=dvalue_refine_strict).
-          apply pickUnique_instr_E_orutt_strict; auto.
+          apply concretize_or_pick_unique_instr_E_orutt_strict; auto.
 
           intros r0 r3 H0.
           eapply orutt_bind with (RR:=dvalue_refine_strict).
@@ -21748,7 +21748,7 @@ Qed.
 
         intros r1 r2 H.
         eapply orutt_bind.
-        { apply pickUnique_instr_E_orutt_strict; auto.
+        { apply concretize_or_pick_unique_instr_E_orutt_strict; auto.
         }
 
         intros r0 r3 H0.
@@ -21777,7 +21777,7 @@ Qed.
 
         intros ? ? ?.
         eapply orutt_bind.
-        { apply pickUnique_instr_E_orutt_strict; auto.
+        { apply concretize_or_pick_unique_instr_E_orutt_strict; auto.
         }
 
         intros ? ? ?.
@@ -21789,7 +21789,7 @@ Qed.
 
         intros ? ? ?.
         eapply orutt_bind.
-        { apply pickUnique_instr_E_orutt_strict; auto.
+        { apply concretize_or_pick_unique_instr_E_orutt_strict; auto.
         }
 
         intros ? ? ?.
@@ -21917,7 +21917,7 @@ Qed.
                 apply denote_exp_E1E2_orutt.
               * intros r0 r3 H0.
                 eapply orutt_bind with (RR:=dvalue_refine_strict).
-                eapply pickUnique_instr_E_orutt_strict; eauto.
+                eapply concretize_or_pick_unique_instr_E_orutt_strict; eauto.
                 intros ? ? ?.
                 destruct r5; dvalue_refine_strict_inv H2; try solve_orutt_raiseUB.
                 all: try (apply orutt_bind with (RR:=Logic.eq);
@@ -21955,7 +21955,7 @@ Qed.
                 apply denote_exp_E1E2_orutt.
               * intros r0 r3 H0.
                 eapply orutt_bind with (RR:=dvalue_refine_strict).
-                eapply pickUnique_instr_E_orutt_strict; eauto.
+                eapply concretize_or_pick_unique_instr_E_orutt_strict; eauto.
                 intros ? ? ?.
                 eapply orutt_bind with (RR:=uvalue_refine_strict).
                 { apply translate_exp_to_instr_E1E2_orutt_strict.
@@ -21964,7 +21964,7 @@ Qed.
 
                 intros ? ? ?.
                 eapply orutt_bind with (RR:=dvalue_refine_strict).
-                eapply pickUnique_instr_E_orutt_strict; eauto.
+                eapply concretize_or_pick_unique_instr_E_orutt_strict; eauto.
                 intros ? ? ?.
                 eapply orutt_bind with (RR:=uvalue_refine_strict).
                 { apply orutt_trigger; cbn; eauto.
@@ -21994,7 +21994,7 @@ Qed.
             + eapply orutt_bind with (RR:=Forall2 dvalue_refine_strict).
               * eapply map_monad_orutt2; eauto.
                 intros * ?.
-                eapply pickUnique_instr_E_orutt_strict; eauto.
+                eapply concretize_or_pick_unique_instr_E_orutt_strict; eauto.
               * intros r0 r3 H0.
                 eapply orutt_map.
                 -- apply orutt_trigger; cbn; eauto.
@@ -22039,7 +22039,7 @@ Qed.
 
         intros r0 r3 H0.
         apply orutt_bind with (RR:=dvalue_refine_strict).
-        { apply pickUnique_instr_E_orutt_strict; auto.
+        { apply concretize_or_pick_unique_instr_E_orutt_strict; auto.
         }
 
         intros r4 r5 H1.
@@ -22074,7 +22074,7 @@ Qed.
 
         intros ? ? ?.
         eapply orutt_bind.
-        { apply pickUnique_instr_E_orutt_strict; auto.
+        { apply concretize_or_pick_unique_instr_E_orutt_strict; auto.
         }
 
         intros ? ? ?.
@@ -22086,7 +22086,7 @@ Qed.
 
         intros ? ? ?.
         eapply orutt_bind.
-        { apply pickUnique_instr_E_orutt_strict; auto.
+        { apply concretize_or_pick_unique_instr_E_orutt_strict; auto.
         }
 
         intros ? ? ?.
@@ -22163,8 +22163,8 @@ Qed.
         (OOM:=OOME).
   Proof.
     intros uv1 uv2 REF.
-    unfold IS1.LLVM.D.pickUnique, IS1.LLVM.D.concretize_or_pick.
-    unfold pickUnique, concretize_or_pick.
+    unfold IS1.LLVM.D.concretize_or_pick_unique, IS1.LLVM.D.concretize_or_pick.
+    unfold concretize_or_pick_unique, concretize_or_pick.
     cbn.
     break_match;
       eapply uvalue_refine_strict_preserves_is_concrete with (uvc:=uv2) in Heqb; eauto;
@@ -22196,8 +22196,8 @@ Qed.
         (OOM:=OOME).
   Proof.
     intros uv1 uv2 REF.
-    unfold IS1.LLVM.D.pickUnique, IS1.LLVM.D.concretize_or_pick.
-    unfold pickUnique, concretize_or_pick.
+    unfold IS1.LLVM.D.concretize_or_pick_unique, IS1.LLVM.D.concretize_or_pick.
+    unfold concretize_or_pick_unique, concretize_or_pick.
     cbn.
     break_match;
       eapply uvalue_refine_strict_preserves_is_concrete with (uvc:=uv2) in Heqb; eauto;
@@ -22243,7 +22243,7 @@ Qed.
 
       intros r1 r2 H.
       eapply orutt_bind with (RR:=dvalue_refine_strict).
-      apply concretize_or_pick_exp_E_orutt_strict; eauto.
+      apply concretize_or_pick_unique_exp_E_orutt_strict; eauto.
 
       intros r0 r3 H0.
       repeat break_match; unfold dvalue_refine_strict in *; cbn in *; try break_match_hyp; inv H0;
@@ -22263,7 +22263,7 @@ Qed.
 
       intros r1 r2 H.
       eapply orutt_bind with (RR:=dvalue_refine_strict).
-      apply pickUnique_exp_E_orutt_strict; auto.
+      apply concretize_or_pick_unique_exp_E_orutt_strict; auto.
 
       intros r0 r3 H0.
 
@@ -23075,7 +23075,7 @@ Qed.
           cbn.
           eapply orutt_bind with (RR:=dvalue_refine_strict).
           {
-            apply pickUnique_orutt_strict; auto.
+            apply concretize_or_pick_unique_orutt_strict; auto.
           }
 
           intros r0 r3 R0R3.

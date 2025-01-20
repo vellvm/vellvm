@@ -142,7 +142,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   Definition dvalue_not_zero dv := ~ (dvalue_is_zero dv).
 
   (* A trivially concrete [uvalue] does not need to go through a pick event to get concretize.
-     This function therefore either trigger [pick], or perform a direct cast.
+     This function therefore either triggers [pick], or perform a direct cast.
      The value of this "optimization" is debatable. *)
   Definition concretize_or_pick {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue :=
     if is_concrete uv
@@ -157,7 +157,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | _             => concretize_or_pick uv
     end.
 
-  Definition pickUnique {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue
+  (* A version of concretize_or_pick which forces uniqueness *)
+  Definition concretize_or_pick_unique {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue
     :=
     if is_concrete uv
     then lift_err ret (uvalue_to_dvalue uv)
@@ -399,7 +400,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
             trigger (LocalWrite id (dvalue_to_uvalue dv))
         | Some (t, num_exp) =>
             un <- translate exp_to_instr (denote_exp (Some t) num_exp);;
-            n <- pickUnique un;;
+            n <- concretize_or_pick_unique un;;
             dv <- trigger (Alloca dt (Z.to_N (dvalue_int_unsigned n)) align);;
             trigger (LocalWrite id (dvalue_to_uvalue dv))
         end
@@ -407,7 +408,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | (IId id, INSTR_Load dt (du,ptr) _) =>
       ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
       (* Load addresses must be unique *)
-      da <- pickUnique ua;;
+      da <- concretize_or_pick_unique ua;;
       uv <- trigger (Load dt da);;
       trigger (LocalWrite id uv)
 
@@ -416,7 +417,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       uv <- translate exp_to_instr (denote_exp (Some dt) val) ;;
       ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
       (* Store addresses must be unique *)
-      da <- pickUnique ua ;;
+      da <- concretize_or_pick_unique ua ;;
       match da with
       | DVALUE_Poison dt => raiseUB "Store to poisoned address."
       | _ => trigger (Store dt da uv)
@@ -435,7 +436,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
             match args, varargs with
             | [ ((t, e), _) ], Some varargs =>
                 ua <- translate exp_to_instr (denote_exp (Some t) e);;
-                da <- pickUnique ua;;
+                da <- concretize_or_pick_unique ua;;
                 match da with
                 | DVALUE_Poison dt => raiseUB "Store to poisoned address."
                 | _ => trigger (Store DTYPE_Pointer da (UVALUE_Addr varargs));;
@@ -449,9 +450,9 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
               match args with
               | [((DTYPE_Pointer, exp_dest), _); ((DTYPE_Pointer, exp_src), _)] =>
                   usrc <- translate exp_to_instr (denote_exp (Some DTYPE_Pointer) exp_src);;
-                  dsrc <- pickUnique usrc;;
+                  dsrc <- concretize_or_pick_unique usrc;;
                   udest <- translate exp_to_instr (denote_exp (Some DTYPE_Pointer) exp_dest);;
-                  ddest <- pickUnique udest;;
+                  ddest <- concretize_or_pick_unique udest;;
                   vargs <- trigger (Load DTYPE_Pointer dsrc);;
                   trigger (Store DTYPE_Pointer ddest vargs);;
                   ret UVALUE_None
@@ -460,7 +461,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
             else
               if String.eqb s "llvm.va_end"
               then ret UVALUE_None
-              else dvs <- map_monad (fun uv => pickUnique uv) uvs ;;
+              else dvs <- map_monad (fun uv => concretize_or_pick_unique uv) uvs ;;
                    fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
       | None =>
         fv <- translate exp_to_instr (denote_exp None f) ;;
@@ -475,9 +476,9 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | (IVoid _, INSTR_Comment _) => ret tt
     | (pt, INSTR_VAArg (t, ptr_to_args_exp) argty) =>
         uptr_to_args <- translate exp_to_instr (denote_exp (Some DTYPE_Pointer) ptr_to_args_exp);;
-        ptr_to_args <- pickUnique uptr_to_args;;
+        ptr_to_args <- concretize_or_pick_unique uptr_to_args;;
         uargs <- trigger (Load DTYPE_Pointer ptr_to_args);;
-        args <- pickUnique uargs;;
+        args <- concretize_or_pick_unique uargs;;
         retv <- trigger (Load argty args);;
         ix <- lift_OOM (IP.from_Z 1);;
         args' <- lift_err_oom_RAISE_ERROR_OOM (GEP.handle_gep argty args [DVALUE_IPTR ix]);;
@@ -533,7 +534,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     | TERM_Br (dt,op) br1 br2 =>
       uv <- denote_exp (Some dt) op ;;
-      dv <- concretize_or_pick uv;;
+      (* Branching on a nondeterministic value should be considered UB *)
+      dv <- concretize_or_pick_unique uv;;
       match dv with
       | @DVALUE_I 1 comparison_bit =>
         if equ comparison_bit one then
@@ -549,7 +551,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | TERM_Switch (dt,e) default_br dests =>
       uselector <- denote_exp (Some dt) e;;
       (* Selection on [undef] is UB *)
-      selector <- pickUnique uselector;;
+      selector <- concretize_or_pick_unique uselector;;
       if dvalue_is_poison selector
       then raiseUB "Switching on poison."
       else (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
@@ -664,7 +666,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
           trigger MemPop ;;
           ret rv
       | _ => raise "Non-address returned from alloca in denote_function"
-      end.      
+      end.
 
   (* We now turn to the second knot to be tied: a top-level itree program is a set
          of mutually recursively defined functions, i.e. [cfg]s. We hence need to
@@ -699,7 +701,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
                | Some f_den => (* If the call is internal *)
                  f_den args
                | None =>
-                 dargs <- map_monad (fun uv => pickUnique uv) args ;;
+                 dargs <- map_monad (fun uv => concretize_or_pick_unique uv) args ;;
                  fmap dvalue_to_uvalue (trigger (ExternalCall dt fv dargs))
                end
              end)
