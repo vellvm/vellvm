@@ -326,7 +326,7 @@ let runCSmith () =
   | Error exit_cond ->
       Printf.printf "%s\n" (Result.string_of_exit_condition exit_cond)
 
-let command_line_args = ref ["todo"]
+let command_line_args = ref []
 
 
 let args =

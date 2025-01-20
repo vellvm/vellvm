@@ -573,15 +573,20 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       in interp_mcfg4_exec t [] ([],[]) 0 initial_memory_state.
 
   (**
-     Finally, the reference interpreter assumes no user-defined intrinsics and starts
-     from "main" using bogus initial inputs.
+     Finally, the reference interpreter checks for user-defined arguments and
+     starts from "main" using either passed-in initial inputs or bogus ones if
+     none were given.
    *)
   Definition interpreter
              (args : list string)
              (prog : ll_toplevel_entities)
               : itree L4 res_L4
     := 
-    interpreter_gen (DTYPE_I 32%positive) "main" (build_main_args args) prog.
+    let built_args := match args with [] => ret default_main_args 
+                                     | _ => build_main_args args 
+                      end
+    in  
+    interpreter_gen (DTYPE_I 32%positive) "main" built_args prog.
 
   (**
      We now turn to the definition of our _model_ of vellvm's semantics. The
