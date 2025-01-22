@@ -7825,6 +7825,69 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
     }
   Qed.
 
+  
+  Lemma get_consecutive_ptrs_equiv :
+    forall {M : Type -> Type}
+      `{HM: Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM}
+      `{EQRET : @Eq1_ret_inv M EQM HM}
+      `{OOM: RAISE_OOM M} `{ERR: RAISE_ERROR M}
+      `{LAWS: @MonadLawsE M EQM HM}
+      ptr len,
+    exists ptrs, (get_consecutive_ptrs ptr len ≈ ret ptrs)%monad.
+  Proof.
+    intros M HM EQM EQV EQRET OOM ERR LAWS ptr len.
+
+    (* Opaque handle_gep_addr. *)
+
+    unfold get_consecutive_ptrs.
+    rewrite big_intptr_seq_equiv.
+    cbn.
+    remember (map from_Z_big (Zseq 0 len)) as ips.
+    
+    pose proof map_monad_err_succeeds
+         (fun ix : intptr =>
+            handle_gep_addr (DTYPE_I 8) ptr [LP.Events.DV.DVALUE_IPTR ix])
+          ips as HMAPM.
+
+    forward HMAPM.
+    { intros a IN.
+      destruct (int_to_ptr (ptr_to_int ptr + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * LP.IP.to_Z a)%Z (address_provenance ptr)) eqn:IX.
+      - exists (ret a0).
+        cbn.
+        
+        apply handle_gep_addr_ix'; cbn; auto.
+      - eapply handle_gep_addr_ix'_OOM in IX; auto.
+        destruct IX as [msg' IX].
+        exists (Oom msg').
+        cbn; auto.
+    }
+
+    destruct HMAPM as (res & HMAPM).
+    destruct (Monads.sequence res) eqn:HSEQUENCE.
+    { rename l into ptrs.
+      exists ptrs.
+      rewrite bind_ret_l.
+      rewrite HMAPM.
+      cbn.
+      rewrite bind_ret_l.
+      rewrite HSEQUENCE.
+      cbn.
+      reflexivity.
+    }
+    { apply map_monad_OOM_fail in HSEQUENCE as [a [IN EQA]].
+      unfold id in EQA. subst.
+
+      pose proof map_monad_err_In _ _ _ _ HMAPM IN as [ix [GEP INix]].
+      apply handle_gep_addr_ix_OOM in GEP; auto.
+      destruct GEP as [msg' GEP].
+      pose proof
+        (LP.I2P_BIG.int_to_ptr_safe (ptr_to_int ptr + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * to_Z ix)
+           (address_provenance ptr)) as SAFE.
+      rewrite GEP in SAFE.
+      contradiction.
+    }
+    
+  Qed.
 End MemStateInfiniteHelpers.
 
 Module Type MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
