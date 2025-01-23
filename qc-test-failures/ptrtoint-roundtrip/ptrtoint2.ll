@@ -1,5 +1,3 @@
-declare i32 @puts(i8*)
-
 define  i8 @main() {
     %v0 = alloca i32
     store i32 0, i32* %v0, align 1
@@ -7,8 +5,5 @@ define  i8 @main() {
     %v2 = inttoptr i64 %v1 to <{<3 x i8>, i8}>*
     %v3 = load <{<3 x i8>, i8}>, <{<3 x i8>, i8}>* %v2, align 1
     %v4 = extractvalue <{<3 x i8>, i8}> %v3, 1
-    %v5 = alloca i8
-    store i8 %v4, i8* %v5, align 1
-    %result = call i32 @puts(i8* %v5)
     ret i8 %v4
 }
