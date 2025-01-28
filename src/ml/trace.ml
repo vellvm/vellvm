@@ -167,7 +167,8 @@ let term_eq ~(f : 'a -> 'a -> bool) (term1 : 'a terminator) (term2 : 'a terminat
     texp_eq ~f texp1 texp2 && List.equal AstLib.RawIDOrd.eq_dec bs1 bs2
   | TERM_Resume texp1, TERM_Resume texp2 ->
     texp_eq ~f texp1 texp2
-  | TERM_Invoke _, TERM_Invoke _ -> failwith "term_eq: TERM_Invoke not implemented"
+  | TERM_Invoke ((t1, i1), l1, b11, b12), TERM_Invoke ((t2, i2), l2, b21, b22) ->
+    f t1 t2 && AstLib.Ident.eq_dec i1 i2 && List.for_all2 (fun (texp1, _) (texp2,_) -> texp_eq ~f texp1 texp2) l1 l2 && AstLib.RawIDOrd.eq_dec b11 b21 && AstLib.RawIDOrd.eq_dec b12 b22
   | TERM_Unreachable, TERM_Unreachable -> true
   | _ -> false
 
