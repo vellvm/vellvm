@@ -126,7 +126,6 @@ let process_ll_file command_line_arguments path file =
       failwith "Process AST: not valid parameter"
   in
   let ll_ast' = transform ll_ast in
-  Printf.printf "%s" (ShowAST.showProg ll_ast' |> Camlcoq.camlstring_of_coqstring);
   let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in
   let _ = IO.output_file vll_file ll_ast' in
   ()
