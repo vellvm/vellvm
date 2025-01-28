@@ -196,6 +196,7 @@ In particular:
 - `src/vellvm -interpret tests/ll/factorial.ll` to run the interpreter on a given file.
 - `cd src && ./vellvm -test` to run the test suite against clang
 - `src/vellvm -test-file tests/ll/gep2.ll` to test a specific file using inlined assertions
+- `src/vellvm -t tests/ll/factorial.ll` to run and output the trace (which is located at the main function) on a given file. The trace is a psudo-LLVM format that can be further compiled into either a standard `.ll` format or only keeping the main function through `src/frontend -t executable tests/ll/factorial.ll` or `src/frontend -t main tests/ll/factorial.ll`. 
 
 
 # Adding a new test case
