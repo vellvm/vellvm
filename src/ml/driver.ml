@@ -84,27 +84,32 @@ let assert_max_one_main_fn ast file =
   )
 
 let process_trace command_line_arguments ll_ast file =
-  match Interpreter.interpret command_line_arguments ll_ast with
+  let interp_res = Interpreter.interpret command_line_arguments ll_ast in
+  let trace_res () = 
+    begin match Trace.gen_executable_base_trace ll_ast ~skip:!trace_skip with
+      | Ok ll_ast_trace ->
+        let ll_ast_trace' = transform ll_ast_trace in
+        let tracell_file = Platform.gen_name !Platform.output_path file ".base.trace" in
+        IO.output_file tracell_file ll_ast_trace';
+        Printf.printf "Trace outputed at: %s\n" tracell_file
+      | Error s -> failwith s
+    end in
+  match interp_res with
   | Ok dv ->
     Printf.printf "Program terminated with: %s\n%!" (string_of_dvalue dv);
-    (* Printf.printf "skip: %s\n" (!trace_skip); *)
-    begin match Trace.gen_executable_base_trace ll_ast ~skip:!trace_skip with
-      | Ok ll_ast_trace ->
-        let ll_ast_trace' = transform ll_ast_trace in
-        let tracell_file = Platform.gen_name !Platform.output_path file ".base.trace" in
-        IO.output_file tracell_file ll_ast_trace'
-      | Error s -> failwith s
-    end
+    trace_res ()
   | Error e ->
-    begin match Trace.gen_executable_base_trace ll_ast ~skip:!trace_skip with
-      | Ok ll_ast_trace ->
-        let ll_ast_trace' = transform ll_ast_trace in
-        let tracell_file = Platform.gen_name !Platform.output_path file ".base.trace" in
-        IO.output_file tracell_file ll_ast_trace'
-      | Error s -> failwith s
-    end;
+    trace_res ();
     failwith (Result.string_of_exit_condition e)
 
+let process_interpret command_line_arguments ll_ast =
+  let res = Interpreter.interpret command_line_arguments ll_ast in
+  if !Log.store_log then Trace.print_log ~f:ShowAST.dshowDtyp else ();
+  match res with
+  | Ok dv ->
+    Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv);
+  | Error e ->
+    failwith (Result.string_of_exit_condition e)
 
 let process_ll_file command_line_arguments path file =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
@@ -113,12 +118,7 @@ let process_ll_file command_line_arguments path file =
     Log.clear_log;
     assert_max_one_main_fn ll_ast file;
     if !interpret then
-      match Interpreter.interpret command_line_arguments ll_ast with
-      | Ok dv ->
-        Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv);
-      | Error e ->
-        Trace.print_log ~f:ShowAST.dshowDtyp;
-        failwith (Result.string_of_exit_condition e)
+      process_interpret command_line_arguments ll_ast
     else
     if !trace then
       process_trace command_line_arguments ll_ast file

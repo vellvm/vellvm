@@ -328,8 +328,12 @@ let args =
   ; ( "-i"
     , Set Driver.interpret
     , "interpret ll program starting from 'main' (same as -interpret)" )
+  ; ( "-log"
+    , Set Log.store_log
+    , "Use with -i or -interpret and allow storing log for debuggin purposes (which may create performing overhead)"
+    )
   ; ( "-t"
-    , Set Driver.trace
+    , Tuple [Set Driver.trace; Set Log.store_log]
     , "interpret ll program starting from 'main' (same as -interpret) and generate .trace.ll file"
     )
   ; ( "-traceskip"

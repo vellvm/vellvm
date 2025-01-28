@@ -12,6 +12,8 @@ type 'a log_entry =
 
 type 'a log_stream = 'a log_entry list
 
+let store_log : bool ref = ref false
+
 let log_ref : dtyp log_stream ref = ref []
 
 let ( >@ ) x y = y @ x
@@ -39,7 +41,9 @@ let dstring_of_log_stream (log_stream : 'a log_stream) ~(f : 'a -> DList.coq_DSt
 let clear_log : unit = log_ref := []
 
 let write_log_entry (le : dtyp log_entry) : unit =
-  log_ref := !log_ref >:: le
+  if !store_log then
+    log_ref := !log_ref >:: le
+  else ()
 
 let get_log_stream () : dtyp log_stream =
   List.rev !log_ref

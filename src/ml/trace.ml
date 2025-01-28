@@ -130,8 +130,10 @@ let rec exp_eq ~(f : 'a -> 'a -> bool) (e1 : 'a exp) (e2 : 'a exp) : bool =
     f t11 t21 && f t12 t22 && f t13 t23 && exp_eq ~f e11 e21 && exp_eq ~f e12 e22 && exp_eq ~f e13 e23
   | OP_ShuffleVector ((t11, e11), (t12, e12), (t13, e13)) , OP_ShuffleVector ((t21, e21), (t22, e22), (t23, e23)) ->
     f t11 t21 && f t12 t22 && f t13 t23 && exp_eq ~f e11 e21 && exp_eq ~f e12 e22 && exp_eq ~f e13 e23
-  | OP_ExtractValue _, OP_ExtractValue _ -> failwith "exp_eq: OP_ExtractValue"
-  | OP_InsertValue _, OP_InsertValue _ -> failwith "exp_eq: OP_InsertValue"
+  | OP_ExtractValue ((t1, e1), l1), OP_ExtractValue ((t2, e2), l2) ->
+    f t1 t2 && exp_eq ~f e1 e2 && List.for_all2 Int.Z_as_Int.eqb l1 l2
+  | OP_InsertValue ((t11, e11), (t12, e12), l1), OP_InsertValue ((t21, e21), (t22, e22), l2) ->
+    f t11 t21 && exp_eq ~f e11 e21 && f t12 t22 && exp_eq ~f e12 e22 && List.for_all2 Int.Z_as_Int.eqb l1 l2
   | OP_Select ((t11, e11), (t12, e12), (t13, e13)) , OP_Select ((t21, e21), (t22, e22), (t23, e23)) ->
     f t11 t21 && f t12 t22 && f t13 t23 && exp_eq ~f e11 e21 && exp_eq ~f e12 e22 && exp_eq ~f e13 e23
   | OP_Freeze (t1, e1), OP_Freeze (t2, e2) ->
@@ -154,13 +156,19 @@ let term_eq ~(f : 'a -> 'a -> bool) (term1 : 'a terminator) (term2 : 'a terminat
     texp_eq ~f texp1 texp2 && AstLib.RawIDOrd.eq_dec b11 b21 && AstLib.RawIDOrd.eq_dec b12 b22
   | TERM_Br_1 b1, TERM_Br_1 b2 ->
     AstLib.RawIDOrd.eq_dec b1 b2
-  | TERM_Switch _, TERM_Switch _ -> failwith "term_eq: TERM_Switch"
+  | TERM_Switch (texp1, bid1, l1), TERM_Switch (texp2, bid2, l2) ->
+    let tint_literal_eq (t1 : tint_literal) (t2 : tint_literal) =
+        match t1, t2 with
+          | TInt_Literal (sz1, x1), TInt_Literal (sz2, x2) ->
+          BinPos.Pos.eqb sz1 sz2 && Int.Z_as_Int.eqb x1 x2
+    in
+    texp_eq ~f texp1 texp2 && AstLib.eq_dec_raw_id bid1 bid2 && List.for_all2 (fun (t1, b1) (t2, b2) -> tint_literal_eq t1 t2 && AstLib.RawIDOrd.eq_dec b1 b2) l1 l2
   | TERM_IndirectBr (texp1, bs1), TERM_IndirectBr (texp2, bs2) ->
     texp_eq ~f texp1 texp2 && List.equal AstLib.RawIDOrd.eq_dec bs1 bs2
   | TERM_Resume texp1, TERM_Resume texp2 ->
     texp_eq ~f texp1 texp2
-  | TERM_Invoke _, TERM_Invoke _ -> failwith "term_eq: TERM_Invoke"
-  | TERM_Unreachable, TERM_Unreachable -> failwith "term_eq : TERM_Unreachable"
+  | TERM_Invoke _, TERM_Invoke _ -> failwith "term_eq: TERM_Invoke not implemented"
+  | TERM_Unreachable, TERM_Unreachable -> true
   | _ -> false
 
 let get_term_from_def
@@ -713,8 +721,8 @@ let rec get_last (l : 'a list) : ('a, string) result =
 
 let get_name_from_raw_id : raw_id -> (char list, string) result = function
   | Name s -> Ok s
-  | Anon _ -> Error "No string from Anonymous"
-  | Raw _ -> Error "No string from Raw"
+  | Anon x -> Ok (ShowAST.dshowZ x |> DList.coq_DString_to_string)
+  | Raw x -> Ok (ShowAST.dshowZ x |> DList.coq_DString_to_string)
 
 let rec transform_log_typ_of_dtyp
     ~(f_def_stack : f_def_stack)
