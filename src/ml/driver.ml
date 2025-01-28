@@ -102,6 +102,30 @@ let process_trace command_line_arguments ll_ast file =
     trace_res ();
     failwith (Result.string_of_exit_condition e)
 
+let trace_mode = ref ""
+
+let get_trace path : unit =
+  let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
+  let file', _ = Platform.path_to_basename_ext path in
+  let file, _ = Platform.path_to_basename_ext file' in
+  let ll_ast = IO.parse_file path in
+  let ll_ast_res, suffix =
+    match !trace_mode with
+    | "main" ->
+      Trace.get_main_from_base ll_ast, ".main.trace"
+    | "executable" ->
+      Trace.gen_executable_from_base ll_ast, ".trace.ll"
+    | _ ->
+      failwith (Printf.sprintf "Error: Trace_mode %s is not supported." !trace_mode)
+  in
+  match ll_ast_res with
+    | Ok ll_ast' ->
+      let ll_ast_output = transform ll_ast' in
+      let tracell_file = Platform.gen_name !Platform.output_path file suffix in
+      IO.output_file tracell_file ll_ast_output
+    | Error s ->
+      failwith s
+
 let process_interpret command_line_arguments ll_ast =
   let res = Interpreter.interpret command_line_arguments ll_ast in
   if !Log.store_log then Trace.print_log ~f:ShowAST.dshowDtyp else ();
@@ -135,6 +159,7 @@ let process_file command_line_arguments path =
   let basename, ext = Platform.path_to_basename_ext path in
   match ext with
   | "ll" -> process_ll_file command_line_arguments path basename
+  | "trace" -> get_trace path
   | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
 
 let process_files command_line_args files =

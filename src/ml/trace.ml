@@ -338,7 +338,7 @@ let gensym : string -> string =
   fun (s:string) -> incr c; Printf.sprintf "_temp%s%d%!" s (!c)
 
 let gensym_int : int -> int =
-  let c = ref 0 in
+  let c = ref (-1) in
   fun (_:int) -> incr c; !c
 
 let gensym_raw_id : raw_id -> raw_id =
@@ -350,11 +350,17 @@ let gensym_raw_id : raw_id -> raw_id =
       let id = Printf.sprintf "t%d%!" !c |> Camlcoq.coqstring_of_camlstring in
       Name id
     | Anon _ ->
-      let i = Camlcoq.Z.of_uint !c in
-      Anon i
+      let id = Printf.sprintf "_a%d%!" !c |> Camlcoq.coqstring_of_camlstring in
+      Name id
+      (* let i = Camlcoq.Z.of_uint !c in *)
+      (* Anon i *)
     | Raw _ ->
-      let i = Camlcoq.Z.of_uint !c in
-      Raw i
+      (* let i = Camlcoq.Z.of_uint !c in *)
+      (* Raw i *)
+      let id = Printf.sprintf "_a%d%!" !c |> Camlcoq.coqstring_of_camlstring in
+      Name id
+
+
 
 (* Substitution r2 using r1 *)
 let subst_raw_id_opt ~(ctx : ctx) (s : raw_id) ~(default : typ exp) =
@@ -1026,7 +1032,6 @@ let rec transform_log_subst
   | [] ->
     Ok tblk
   | log::logs' ->
-    (* print_log_entry log ~f:(ShowAST.dshowTyp); *)
     let* ((ctx, f_def, ciid), ctxs_tl) = pop_stack ctxs in
     begin match log with
       | Phi_node (pid, phi , bid_from) ->

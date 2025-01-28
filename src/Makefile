@@ -157,7 +157,6 @@ documentation: $(VFILES)
 
 $(EXTRACTDIR)/FRONTEND_STAMP: $(FRONTEND_VOFILES) $(EXTRACTDIR)/ExtractFrontend.v
 	@echo "Extracting Frontend"
-	extractedclean
 	$(COQEXEC) $(EXTRACTDIR)/ExtractFrontend.v
 	touch $(EXTRACTDIR)/FRONTEND_STAMP
 	rm -f $(EXTRACTDIR)/STAMP   # invalidate "normal" extraction

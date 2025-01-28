@@ -1,7 +1,6 @@
 let str = Camlcoq.coqstring_of_camlstring
 let of_str = Camlcoq.camlstring_of_coqstring
 
-
 let coq_of_int = Camlcoq.Z.of_sint
 let to_int = Camlcoq.Z.to_int
 let n_to_int = Camlcoq.N.to_int
@@ -182,14 +181,18 @@ let generate_anon_raw_id () : LLVMAst.raw_id =
 let generate_void_instr_id () : LLVMAst.instr_id =
   LLVMAst.IVoid (coq_of_int (void_ctr.get ()))
 
+let anonymous_check_ignore : bool ref = ref false
+
 let validate_declared_int n =
   let expected = anon_ctr.get () in
   if expected = n
   then (LLVMAst.Anon (coq_of_int n))
   else
     let msg = Printf.sprintf "Unexpected sequential id: expected %n but found %n" expected n in
-    (LLVMAst.Anon (coq_of_int n))
-    (* raise (InvalidAnonymousId msg) *)
+    if !anonymous_check_ignore then 
+      (LLVMAst.Anon (coq_of_int n))
+    else
+    raise (InvalidAnonymousId msg)
 
 let validate_bound_lexed_id (r : lexed_id) : LLVMAst.raw_id =
   match r with

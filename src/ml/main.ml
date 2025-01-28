@@ -340,6 +340,7 @@ let args =
     , Set_string Driver.trace_skip
     , "Hyperparameter: when generating trace, will skip the rest of the trace after this call function" 
     )
+  ; ("-trace", Tuple [Set_string trace_mode; Set ParseUtil.anonymous_check_ignore], "provide keyword \"main\" or \"executable\" to modify .base.trace file to be either .main.trace or .trace.ll" )
     ; ("-link", Set Driver.link, "links passed-in ll files in order and runs the final output (rather than interpreting each argument one at a time)")
   ; ("-debug", Set Interpreter.debug_flag, "enable debugging trace output")
   ; ("-v", Set Platform.verbose, "enables more verbose compilation output")
