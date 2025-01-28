@@ -16,6 +16,8 @@ open VellvmIntegers
 
 open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 
+let default_cl_test_args = []
+
 (* Vellvm test cases
    -------------------------------------------------------- *)
 
@@ -65,7 +67,7 @@ let pp_test_of_dir (dir : string) =
 
 let run_dvalue_test (test : DV.dvalue -> bool) path =
   let res, msg =
-    match run_ll_file path with
+    match run_ll_file default_cl_test_args path with
     | Error e -> (false, Result.string_of_exit_condition e)
     | Ok dv -> (test dv, "")
   in
@@ -83,7 +85,7 @@ let string_begins_with s1 s2 =
 let run_parsefail_test path prefix =
   let failed, msg =
     try
-      ignore (run_ll_file path) ;
+      ignore (run_ll_file default_cl_test_args path) ;
       (false, "")
     with Failure msg -> (string_begins_with msg prefix, msg)
   in

@@ -97,7 +97,8 @@ Section Helpers.
     := match t with
        | TYPE_I sz => true
        | TYPE_IPTR => true
-       | TYPE_Pointer t => is_sized_type_h t
+       | TYPE_Pointer (Some t) => is_sized_type_h t
+       | TYPE_Pointer None => true
        | TYPE_Void => false
        | TYPE_Half => true
        | TYPE_Float => true
@@ -138,7 +139,8 @@ Section Helpers.
 
   Definition is_function_pointer_h (t : typ) : bool
     := match t with
-       | TYPE_Pointer (TYPE_Function _ _ _) => true
+       | TYPE_Pointer (Some (TYPE_Function _ _ _)) => true
+       (* TODO: What about opaque pointers?  *)
        | _ => false
        end.
 
@@ -970,9 +972,10 @@ Section TypGenerators.
         end
     | TYPE_I sz => ret t
     | TYPE_IPTR => ret t
-    | TYPE_Pointer t' =>
+    | TYPE_Pointer (Some t') =>
         pt <- normalize_type_GenLLVM t';;
-        ret (TYPE_Pointer pt)
+        ret (TYPE_Pointer (Some pt))
+    | TYPE_Pointer None => ret t
     | TYPE_Void => ret t
     | TYPE_Half => ret t
     | TYPE_Float => ret t
@@ -990,6 +993,7 @@ Section TypGenerators.
     := t' <- normalize_type_GenLLVM t;;
        ret (is_sized_type_h t').
 
+  (* TODO: handle opaque PTR *)
   Definition typ_metadata_setter (τ : typ) : GenLLVM (Metadata SetterOf) :=
     normalized <- normalize_type_GenLLVM τ;;
     let st := is_sized_type_h normalized in
@@ -1051,7 +1055,7 @@ Section TypGenerators.
                | TYPE_Struct _
                | TYPE_Packed_struct _ => false
                | TYPE_Array _ _ => false
-               | TYPE_Pointer (TYPE_Function _ _ _) => false
+               | TYPE_Pointer (Some (TYPE_Function _ _ _)) => false
                | _ => true
                end))
          & (@is_function_pointer' SetterOf .~
@@ -1436,7 +1440,7 @@ Section TypGenerators.
 
   Definition sized_aggregate_typ_gens (subg : nat -> GenLLVM typ) (sz : nat) :  list (unit -> GenLLVM typ)
     := [ (fun _ => gen_sized_typ_0)
-       ; (fun _ => ret TYPE_Pointer <*> subg sz)
+       ; (fun _ => ret (fun t => TYPE_Pointer (Some t)) <*> subg sz)
        (* TODO: Might want to restrict the size to something reasonable *)
        ; (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> subg sz)
        ; (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_primitive_typ)
@@ -1540,7 +1544,7 @@ Section TypGenerators.
 
   Definition aggregate_typ_gens (subg : nat -> GenLLVM typ) (sz : nat) :  list (unit -> GenLLVM typ)
     := [ (fun _ => subg 0%nat)
-       ; (fun _ => ret TYPE_Pointer <*> subg sz)
+       ; (fun _ => ret (fun t => TYPE_Pointer (Some t)) <*> subg sz)
        (* TODO: Might want to restrict the size to something reasonable *)
        ; (fun _ => ret TYPE_Array <*> lift_GenLLVM genN <*> subg sz)
        ; (fun _ => ret TYPE_Vector <*> (n <- lift_GenLLVM genN;; ret (n + 1)%N) <*> gen_primitive_typ)
@@ -1774,7 +1778,12 @@ Section ExpGenerators.
          end
        | TYPE_Pointer t =>
          match b with
-         | TYPE_Pointer t' => normalized_typ_eq t t'
+         | TYPE_Pointer t' =>
+             match (t, t') with
+             | (Some t, Some t') => normalized_typ_eq t t'
+             | (None, None) => true
+             | _ => false
+             end
          | _ => false
          end
        | TYPE_Void =>
@@ -1901,6 +1910,7 @@ Section ExpGenerators.
         | _ => false
         end
     | TYPE_IPTR
+    | TYPE_Pointer None
     | TYPE_Half
     | TYPE_Float
     | TYPE_Double
@@ -1909,9 +1919,9 @@ Section ExpGenerators.
     | TYPE_Ppc_fp128
     | TYPE_Metadata
     | TYPE_X86_mmx => normalized_typ_eq t_from t
-    | TYPE_Pointer subtyp =>
+    | TYPE_Pointer (Some subtyp) =>
         match t with
-        | TYPE_Pointer subtyp' =>
+        | TYPE_Pointer (Some subtyp') =>
             match flag with
             | soft => true
             | hard => normalized_typ_eq subtyp subtyp' || contains_typ subtyp t flag
@@ -2112,7 +2122,7 @@ Section ExpGenerators.
           (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x)) *)
           (*  (* TODO: should the integer be forced to be in bounds? *) *)
           | TYPE_IPTR => ret EXP_Integer <*> lift (arbitrary : G Z)
-          | TYPE_Pointer subtyp       => failGen "gen_exp_size TYPE_Pointer"
+          | TYPE_Pointer _       => failGen "gen_exp_size TYPE_Pointer"
           (* Only pointer type expressions might be conversions? Maybe GEP? *)
           | TYPE_Void                 => failGen "gen_exp_size TYPE_Void" (* There should be no expressions of type void *)
           | TYPE_Function ret args _   => failGen "gen_exp_size TYPE_Function"(* No expressions of function type *)
@@ -2155,7 +2165,7 @@ Section ExpGenerators.
           end in
         (* Hack to avoid failing way too much *)
         match t with
-        | TYPE_Pointer t =>
+        | TYPE_Pointer (Some t) =>
             if (seq.nilp gen_idents)
             then
               (* Generate Global Pointer retroactively *)
@@ -2166,10 +2176,11 @@ Section ExpGenerators.
                 (in_exp <- gen_exp_size' gen_global_of_typ gen_global_of_typ 0%nat t;;
                  name <- new_global_id;;
                  add_to_global_memo (mk_global name t false (Some in_exp) false []);;
-                 e <- add_to_global_ctx (ID_Global name, TYPE_Pointer t);;
+                 e <- add_to_global_ctx (ID_Global name, TYPE_Pointer (Some t));;
                  (gen_context' .@ entl e .@ deterministic') .= false;;
                  ret (EXP_Ident (ID_Global name)))
             else freq_LLVM (gen_idents)
+        (* TODO: handle opaque ptrs *)
 
         (* freq_LLVM ((* (1%nat, ret EXP_Undef) :: *) gen_idents) *)
         (* TODO: Add some retroactive global generation *)
@@ -2196,7 +2207,7 @@ Section ExpGenerators.
                 [ gen_ibinop_exp gen_global_of_typ gen_ident_of_typ isz ]
           | TYPE_IPTR =>
               [gen_ibinop_exp_typ gen_global_of_typ gen_ident_of_typ TYPE_IPTR]
-          | TYPE_Pointer t         => [] (* GEP? *)
+          | TYPE_Pointer _         => [] (* GEP? *)
 
           (* TODO: currently only generate literals for aggregate structures with size 0 exps *)
           | TYPE_Array n t => []
@@ -2504,7 +2515,8 @@ Section InstrGenerators.
   Definition gen_gep (tptr : typ) : GenLLVM (instr_id * instr typ) :=
     let get_typ_in_ptr (tptr : typ) :=
       match tptr with
-      | TYPE_Pointer t => ret t
+      | TYPE_Pointer (Some t) => ret t
+      (* TODO: What about opaque pointers? *)
       | _ => failGen "gen_gep"
       end in
     annotate "gen_gep"
@@ -2513,10 +2525,10 @@ Section InstrGenerators.
        let paths_in_ptr := get_index_paths_ptr t_in_ptr in (* Inner paths: Paths after removing the outer pointer *)
        '(ret_t, path) <- elems_LLVM paths_in_ptr;; (* Select one path from the paths *)
        let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer (x))) path in (* Turning the path to integer *)
-       '(id, e) <- genInstrIdEnt (TYPE_Pointer ret_t);;
+       '(id, e) <- genInstrIdEnt (TYPE_Pointer (Some ret_t));;
        (* Default to non-deterministic for now. Need a way to look up whether the base pointer was deterministic *)
        (gen_context' .@ entl e .@ deterministic') .= false;;
-       ret (id, INSTR_Op (OP_GetElementPtr t_in_ptr (TYPE_Pointer t_in_ptr, eptr) path_for_gep))).
+       ret (id, INSTR_Op (OP_GetElementPtr t_in_ptr (TYPE_Pointer (Some t_in_ptr), eptr) path_for_gep))).
 
   Definition gen_extractvalue (tagg : typ): GenLLVM (instr_id * instr typ) :=
     annotate ("gen_extractvalue: " ++ show tagg)
@@ -2690,6 +2702,7 @@ Section InstrGenerators.
   (* TODO: old_tptr checks for vectors of pointers...
      I don't think we will find those with the new generator queries?
    *)
+  (* TODO: handle opaque pointers. *)
   Definition gen_inttoptr (ptrEnt : Ent) (id : ident) (typ_from_cast : typ) : GenLLVM (instr_id * instr typ) :=
     annotate "gen_inttoptr"
       (opt <- use (gen_context' .@ entl ptrEnt .@ normalized_type');;
@@ -2700,28 +2713,30 @@ Section InstrGenerators.
            (* TODO: Better identify the pointer inside and cast without changing their location *)
            new_tptr <-
              match old_tptr with
-             | TYPE_Pointer old_typ =>
+             | TYPE_Pointer (Some old_typ) =>
                  if typ_contains_pointer old_typ || is_function_type_h old_typ
                  then
                    ret old_tptr
                  else
                    x <- gen_typ_le_size (get_size_from_typ old_typ);;
-                   ret (TYPE_Pointer x)
-             | TYPE_Vector sz (TYPE_Pointer old_typ) =>
+                   ret (TYPE_Pointer (Some x))
+             | TYPE_Vector sz (TYPE_Pointer (Some old_typ)) =>
                  if typ_contains_pointer old_typ || is_function_type_h old_typ
                  then
                    ret old_tptr
                  else
                    x <- gen_typ_le_size (get_size_from_typ old_typ);;
-                   ret (TYPE_Pointer x)
+                   ret (TYPE_Pointer (Some x))
              | _ => ret (TYPE_Void) (* Won't reach here... Hopefully *)
              end;;
            '(iid, e) <- genInstrIdEnt new_tptr;;
            d <- use (gen_context' .@ entl ptrEnt .@ deterministic');;
-           (gen_context' .@ entl e .@ deterministic') .= d;;
+           (* TODO: for now consider all pointers nondeterministic *)
+           (gen_context' .@ entl e .@ deterministic') .= false;;
            ret (iid, INSTR_Op (OP_Conversion Inttoptr typ_from_cast (EXP_Ident id) new_tptr))
        end).
 
+  (* TODO: handle opaque pointers. *)
   Definition gen_bitcast_typ (t_from : typ) : GenLLVM typ :=
     let gen_typ_list :=
       match t_from with
@@ -2751,11 +2766,11 @@ Section InstrGenerators.
                                                        if ((sz' =? 0) || negb (rem =? 0))%N then acc else ((TYPE_Vector sz' t) :: acc)%list) trivial_typs [] in
               ret (t_from :: choices) (* I think adding t_from here slightly biases the generator sometimes *)
           end
-      | TYPE_Pointer subtyp =>
+      | TYPE_Pointer (Some subtyp) =>
           (* TODO: Clean up. Figure out what can subtyp of pointer be *)
           (* new_subtyp <- gen_bitcast_typ subtyp;; *)
           new_subtyp <- gen_sized_typ;;
-          ret [TYPE_Pointer new_subtyp]
+          ret [TYPE_Pointer (Some new_subtyp)]
       | _ => ret [t_from] (* TODO: Add more types *) (* This currently is to prevent types like pointer of struct from failing *)
       end in
     typ_list <- gen_typ_list;;
@@ -2814,7 +2829,7 @@ Section InstrGenerators.
     let blah := IM.Raw.elements ctx in
     annotate ("gen_call: " ++ show blah)
       match tfun with
-      | TYPE_Pointer (TYPE_Function ret_t args varargs) =>
+      | TYPE_Pointer (Some (TYPE_Function ret_t args varargs)) =>
           args_texp <- map_monad
                         (fun (arg_typ:typ) =>
                            arg_exp <- gen_exp_sz0 arg_typ;;
@@ -2855,7 +2870,7 @@ Section InstrGenerators.
 
   Definition get_typ_in_ptr (pt : typ) : GenLLVM typ :=
     match pt with
-    | TYPE_Pointer t => ret t
+    | TYPE_Pointer (Some t) => ret t
     | _ => failGen "get_typ_in_ptr"
     end.
 
@@ -2868,11 +2883,12 @@ Section InstrGenerators.
        (* TODO: Fix parameters / generate more of them *)
        ret (id, INSTR_Load ptr_typ (tptr, eptr) []).
 
+  (* TODO: handle opaque pointers?  *)
   Definition gen_store_to (ptr : texp typ) : GenLLVM (instr_id * instr typ)
     :=
     annotate "gen_store_to"
       match ptr with
-      | (TYPE_Pointer t, pexp) =>
+      | (TYPE_Pointer (Some t), pexp) =>
           ctx <- get_ctx;;
           e <- (gen_exp_sz0 t);;
           let val := (t, e) in
@@ -2991,7 +3007,10 @@ Section InstrGenerators.
            let ptr_exp := EXP_Ident ptr_name in
            (* TODO: Copy whether the pointer is deterministic *)
            d <- use (gen_context' .@ entl ptr_ent .@ deterministic');;
-           (gen_context' .@ entl e .@ deterministic') .= d;;
+           (* Consider pointers nondeterministic for now. Currently
+              causes problems. E.g., a pointer returned from a function
+              defaults to deterministic *)
+           (gen_context' .@ entl e .@ deterministic') .= false;;
            (gen_context' .@ entl e .@ from_pointer') .= ret ptr_ent;;
            ret (id, INSTR_Op (OP_Conversion Ptrtoint tptr ptr_exp typ_from_cast))
        end).
@@ -3019,10 +3038,10 @@ Section InstrGenerators.
             ++ (* TODO: generate multiple element allocas. Will involve changing initialization *)
             (* num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *) *)
             (* align <- ret None;; *)
-            maybe [] (fun t => ['(id, e) <- genLocalEnt (TYPE_Pointer t);;
+            maybe [] (fun t => ['(id, e) <- genLocalEnt (TYPE_Pointer (Some t));;
                              (* Allocas are non-deterministic *)
                              gen_context' .@ entl e .@ deterministic' .= false;;
-                             store <- gen_store_to (TYPE_Pointer t, EXP_Ident id);;
+                             store <- gen_store_to (TYPE_Pointer (Some t), EXP_Ident id);;
                              ret [(IId (ident_to_raw_id id), INSTR_Alloca t []); store]]) osized_typ
             ++ maybe [] (fun t => fmap (fun x => [x]) <$> [gen_load t; gen_store t; gen_gep t]) osized_ptr_typ
             ++ maybe [] (fun '(e, t) => [(fun x => [x]) <$> gen_ptrtoint e t]) ovalid_ptr_vecptr
@@ -3260,7 +3279,7 @@ Section InstrGenerators.
     :=
     annotate "gen_definition"
       (dfn <- backtrackMetadata (gen_definition_h name ret_t args);;
-       e <- add_to_global_ctx (ID_Global name, TYPE_Pointer (dfn.(df_prototype).(dc_type)));;
+       e <- add_to_global_ctx (ID_Global name, TYPE_Pointer (Some dfn.(df_prototype).(dc_type)));;
        (gen_context' .@ entl e .@ deterministic') .= false;;
        ret dfn).
 
@@ -3309,7 +3328,7 @@ Section InstrGenerators.
     t <- hide_ctx gen_sized_typ;;
     (* annotate_debug ("--Generate: Global: @" ++ show name ++ " " ++ show t);; *)
     opt_exp <- fmap Some (hide_ctx (gen_exp_sz0 t));;
-    e <- add_to_global_ctx (ID_Global name, TYPE_Pointer t);;
+    e <- add_to_global_ctx (ID_Global name, TYPE_Pointer (Some t));;
     (gen_context' .@ entl e .@ deterministic') .= false;;
     let ann_linkage : list (annotation typ) :=
       match opt_exp with
@@ -3329,7 +3348,7 @@ Section InstrGenerators.
   Definition list_high_level_dec : list (declaration typ) :=
     [
       let puts_id := Name "puts" in
-      let puts_typ := TYPE_Function (TYPE_I 32) [(TYPE_Pointer (TYPE_I 8))] false in
+      let puts_typ := TYPE_Function (TYPE_I 32) [(TYPE_Pointer (Some (TYPE_I 8)))] false in
       mk_declaration puts_id puts_typ ([], []) [] []
     ].
 

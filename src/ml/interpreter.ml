@@ -116,7 +116,7 @@ let rec step
   | RetF (_, (_, (_, (_, v)))) -> Ok v
   (* The ExternalCallE effect *)
   | VisF (Sum.Coq_inl1 (ExternalCall (t, _, dvs)), _) ->
-      Error (UninterpretedCall ("Call with return type " 
+      Error (UninterpretedCall ("Call with return type "
        ^ (Camlcoq.camlstring_of_coqstring (ReprAST.repr_dtyp t))
        ^ ", " ^ (string_of_int (List.length dvs)) ^ " dvalues."))
   (* Still TODO: Integrate 2nd argument *)
@@ -162,9 +162,11 @@ let rec step
     tuple of a single block, and a possibly empty list of blocks.
  *)
 let interpret
-    (prog :
-      ( LLVMAst.typ
-      , LLVMAst.typ LLVMAst.block * LLVMAst.typ LLVMAst.block list )
-      LLVMAst.toplevel_entity
-      list ) : (DV.dvalue, exit_condition) result =
-  step (TopLevel.TopLevelBigIntptr.interpreter prog)
+      (args : string list)
+      (prog :
+         ( LLVMAst.typ
+         , LLVMAst.typ LLVMAst.block * LLVMAst.typ LLVMAst.block list )
+           LLVMAst.toplevel_entity
+           list )
+    : (DV.dvalue, exit_condition) result =
+  step (TopLevel.TopLevelBigIntptr.interpreter (List.map Camlcoq.coqstring_of_camlstring args) prog)

@@ -187,32 +187,11 @@ frontend_exe:
 pin-coq:
 	opam pin add coq $(COQ_VERSION) -y
 
-######## opam packages (except for Coq) that Vellvm depends on
-########    use `make opam` to install these
-########    also used by .travis ci to configure the build process
-OPAMPKGS= coq-ext-lib\
-	coq-paco\
-	coq-ceres\
-	coq-flocq\
-	coq-mathcomp-ssreflect\
-	coq-simple-io\
-	coq-itree\
-	coq-quickchick\
-	cppo\
-	dune\
-	menhir\
-	qcheck\
-	ocamlbuild
-
-
 ######## WARNING: clobbers opam installation
 ########   after doing `make opam` you should do `eval $(opam env)`
 .PHONY: opam
 opam:
-	opam install -y --verbose $(OPAMPKGS)
-
-print-opam:
-	@echo $(OPAMPKGS)
+	opam install -y --verbose --deps-only ..
 
 .PHONY: print-includes
 print-includes:

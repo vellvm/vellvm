@@ -107,7 +107,8 @@ Section ReprInstances.
     match t with
     | TYPE_I sz                 => "(TYPE_I " ++ repr sz ++ ")"
     | TYPE_IPTR                 => "TYPE_IPTR"
-    | TYPE_Pointer t            => "(TYPE_Pointer " ++ repr_typ t ++ ")"
+    | TYPE_Pointer (Some t)     => "(TYPE_Pointer (Some " ++ repr_typ t ++ "))"
+    | TYPE_Pointer None         => "(TYPE_Pointer None)"
     | TYPE_Void                 => "TYPE_Void"
     | TYPE_Half                 => "TYPE_Half"
     | TYPE_Float                => "TYPE_Float"

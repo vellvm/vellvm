@@ -35,7 +35,7 @@ Fixpoint max_nat_list (l : list nat) : nat :=
 (* TODO: how big should lists be? *)
 Fixpoint sizeof_typ (t : typ) : nat :=
   match t with
-  | TYPE_Pointer t            => S (sizeof_typ t)
+  | TYPE_Pointer (Some t)     => S (sizeof_typ t)
   | TYPE_Array sz t           => S (sizeof_typ t)
   | TYPE_Function ret args _  => max (sizeof_typ ret) (max_nat_list (map sizeof_typ args))
   | TYPE_Struct fields        => max_nat_list (map sizeof_typ fields)

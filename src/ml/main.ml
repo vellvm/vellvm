@@ -74,7 +74,7 @@ let make_test name ll_ast t : (string * assertion) option =
     Interpreter.step
       (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp
          (Camlcoq.coqstring_of_camlstring entry)
-         args ll_ast )
+         (Monad.ret (Obj.magic ITreeDefinition.coq_Monad_itree) args) ll_ast )
   in
   let run_to_value dtyp entry args ll_ast () : DV.dvalue =
     match run dtyp entry args ll_ast with
@@ -275,11 +275,13 @@ let test_all () =
   let _ =
     Printf.printf "============== RUNNING TEST SUITE ==============\n"
   in
-  (* let b1 = try exec_tests () with Ran_tests b -> b in *)
+  let b1 = try exec_tests () with Ran_tests b -> b in
   let b2 = try test_pp_dir !test_directory with Ran_tests b -> b in
-  (* let b3 = try test_dir !test_directory with Ran_tests b -> b in *)
-  (* raise (Ran_tests (b1 && b2 && b3)) *)
+  let b3 = try test_dir !test_directory with Ran_tests b -> b in
+  raise (Ran_tests (b1 && b2 && b3))
   raise (Ran_tests (b2))
+
+let command_line_args = ref ["todo"]
 
 
 let args =
@@ -313,6 +315,12 @@ let args =
     , "run the parsing on the given directory and write its internal ast \
        and domination tree to a .v.ast file in the output directory (see \
        -op)" )
+  ; ( "-args"
+    , Rest_all (fun args -> command_line_args := args)
+    , "interpret the rest of the command line arguments as 'argv' for 
+       EACH .ll file that vellvm interprets. Note that all strings after 
+       -args will be interpreted as members of argv, and not arguments to vellvm."
+    )
   ; ( "-op"
     , Set_string Platform.output_path
     , "set the path to the output files directory  [default='output']" )
@@ -335,7 +343,8 @@ let args =
   ; ("-v", Set Platform.verbose, "enables more verbose compilation output")
  ]
 
-let files = ref []
+
+    let files = ref []
 
 let _ =
   Printf.printf "(* -------- Vellvm Test Harness -------- *)\n%!" ;
@@ -344,7 +353,7 @@ let _ =
       (fun filename -> files := filename :: !files)
       "USAGE: ./vellvm [options] <files>\n" ;
     Platform.configure () ;
-    process_files !files
+    process_files !command_line_args !files 
   with
   | Ran_tests true -> exit 0
   | Ran_tests false -> exit 1

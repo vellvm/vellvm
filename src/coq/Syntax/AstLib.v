@@ -215,7 +215,8 @@ Section TypInd.
 Variable P : typ -> Prop.
 Hypothesis IH_I          : forall sz, P (TYPE_I sz).
 Hypothesis IH_IPTR       : P TYPE_IPTR.
-Hypothesis IH_Pointer    : forall t, P t -> P(TYPE_Pointer t).
+Hypothesis IH_Pointer    : forall t, P t -> P(TYPE_Pointer (Some t)).
+Hypothesis IH_Opaque_Pointer : P (TYPE_Pointer None).
 Hypothesis IH_Void       : P(TYPE_Void).
 Hypothesis IH_Half       : P(TYPE_Half).
 Hypothesis IH_Float      : P(TYPE_Float).
@@ -238,7 +239,9 @@ Lemma typ_ind : forall (t:typ), P t.
   destruct t.
   - apply IH_I.
   - apply IH_IPTR.
-  - apply IH_Pointer. apply IH.
+  - destruct t.
+    + apply IH_Pointer. apply IH.
+    + apply IH_Opaque_Pointer.
   - apply IH_Void.
   - apply IH_Half.
   - apply IH_Float.
@@ -276,7 +279,8 @@ Section TypRect.
 Variable P : typ -> Type.
 Hypothesis IH_I          : forall sz, P (TYPE_I sz).
 Hypothesis IH_IPTR       : P TYPE_IPTR.
-Hypothesis IH_Pointer    : forall t, P t -> P(TYPE_Pointer t).
+Hypothesis IH_Pointer    : forall t, P t -> P(TYPE_Pointer (Some t)).
+Hypothesis IH_Opaque_Pointer: P (TYPE_Pointer None).
 Hypothesis IH_Void       : P(TYPE_Void).
 Hypothesis IH_Half       : P(TYPE_Half).
 Hypothesis IH_Float      : P(TYPE_Float).
@@ -299,7 +303,9 @@ Lemma typ_rect' : forall (t:typ), P t.
   destruct t.
   - apply IH_I.
   - apply IH_IPTR.
-  - apply IH_Pointer. apply IH.
+  - destruct t.
+    + apply IH_Pointer. apply IH.
+    + apply IH_Opaque_Pointer.
   - apply IH_Void.
   - apply IH_Half.
   - apply IH_Float.
@@ -525,7 +531,8 @@ Section hiding_notation.
     match typ with
     | TYPE_I sz => Atom ("i" ++ show_N (Npos sz))%string
     | TYPE_IPTR => Atom ("iptr")%string
-    | TYPE_Pointer t => [serialize_typ' t ; Atom "*"]
+    | TYPE_Pointer (Some t) => [serialize_typ' t ; Atom "*"]
+    | TYPE_Pointer None => Atom "ptr"
     | TYPE_Void => Atom "void"
     | TYPE_Half => Atom "half"
     | TYPE_Float => Atom "float"
