@@ -113,29 +113,25 @@ let trace_mode = ref ""
 
 let get_trace path : unit =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
-  let file', ext_trace = Platform.path_to_basename_ext path in
-  let file, ext_base = Platform.path_to_basename_ext file' in
-  match ext_trace, ext_base with
-  | "trace", "base" ->
-    let ll_ast = IO.parse_file path in
-    let ll_ast_res, suffix =
-      match !trace_mode with
-      | "main" ->
-        Trace.get_main_from_base ll_ast, ".main.trace"
-      | "executable" ->
-        Trace.gen_executable_from_base ll_ast, ".trace.ll"
-      | _ ->
-        failwith (Printf.sprintf "Error: Trace_mode %s is not supported." !trace_mode)
-    in
-    begin match ll_ast_res with
+  let file', _ = Platform.path_to_basename_ext path in
+  let file, _ = Platform.path_to_basename_ext file' in
+  let ll_ast = IO.parse_file path in
+  let ll_ast_res, suffix =
+    match !trace_mode with
+    | "main" ->
+      Trace.get_main_from_base ll_ast, ".main.trace"
+    | "executable" ->
+      Trace.gen_executable_from_base ll_ast, ".trace.ll"
+    | _ ->
+      failwith (Printf.sprintf "Error: Trace_mode %s is not supported." !trace_mode)
+  in
+  match ll_ast_res with
     | Ok ll_ast' ->
       let ll_ast_output = transform ll_ast' in
       let tracell_file = Platform.gen_name !Platform.output_path file suffix in
       IO.output_file tracell_file ll_ast_output
     | Error s ->
       failwith s
-    end
-  | _ -> failwith (Printf.sprintf "File is: %s. Suffix base is: %s. Suffix trace is:%s" file' ext_base ext_trace)
 
 let process_files files =
   Platform.configure ();
@@ -164,7 +160,7 @@ let args =
   ; ("-print-ast-dir", String ast_pp_dir, "run the parsing on the given directory and write its internal ast and domination tree to a .v.ast file in the output directory (see -op)")
   ; ("-op", Set_string Platform.output_path, "set the path to the output files directory  [default='output']")
   ; ("-v", Set Platform.verbose, "enables more verbose compilation output")
-  ; ("-trace", Set_string trace_mode, "provide keyword \"main\" or \"executable\" to modify .base.trace file to be either .main.trace or .trace.ll" )
+  ; ("-t", Set_string trace_mode, "provide keyword \"main\" or \"executable\" to modify .base.trace file to be either .main.trace or .trace.ll" )
   ] 
 
 let files = ref []

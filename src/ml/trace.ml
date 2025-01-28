@@ -45,7 +45,11 @@ let rec typ_eq (t1 : LLVMAst.typ) (t2 : LLVMAst.typ) =
   | TYPE_I i1, TYPE_I i2 ->
     Camlcoq.P.eq i1 i2
   | TYPE_Pointer t1, TYPE_Pointer t2 ->
-    typ_eq t1 t2
+    (match t1, t2 with
+    | None, None ->  true
+    | Some t1', Some t2' -> typ_eq t1' t2'
+    | _ -> false
+    )
   | TYPE_IPTR, TYPE_IPTR 
   | TYPE_Void, TYPE_Void
   | TYPE_Half, TYPE_Half 
@@ -722,12 +726,12 @@ let rec transform_log_typ_of_dtyp
   | [] ->
     Ok tocfg
   | log::logs' ->
-    print_log_entry ~f:ShowAST.dshowDtyp log;
+    (* print_log_entry ~f:ShowAST.dshowDtyp log; *)
     let* tblk, tocfg_tl = pop_stack tocfg in
     let* f_def, f_def_stack_tl = pop_stack f_def_stack in
     begin match log with
       | Phi_node (pid, _, bid) ->
-        Printf.printf "%s%!" (ShowAST.dshow_local_id pid |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring);
+        (* Printf.printf "%s%!" (ShowAST.dshow_local_id pid |> DList.coq_DString_to_string |> Camlcoq.camlstring_of_coqstring); *)
         begin match get_phi_from_def ~f_def pid with
           | Some (_, Phi (pt, blocks)) ->
             (* build a new phi
@@ -1014,7 +1018,7 @@ let rec transform_log_subst
   | [] ->
     Ok tblk
   | log::logs' ->
-    print_log_entry log ~f:(ShowAST.dshowTyp);
+    (* print_log_entry log ~f:(ShowAST.dshowTyp); *)
     let* ((ctx, f_def, ciid), ctxs_tl) = pop_stack ctxs in
     begin match log with
       | Phi_node (pid, phi , bid_from) ->

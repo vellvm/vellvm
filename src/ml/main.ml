@@ -279,10 +279,8 @@ let test_all () =
   let b2 = try test_pp_dir !test_directory with Ran_tests b -> b in
   let b3 = try test_dir !test_directory with Ran_tests b -> b in
   raise (Ran_tests (b1 && b2 && b3))
-  raise (Ran_tests (b2))
 
 let command_line_args = ref ["todo"]
-
 
 let args =
   [ ( "-set-test-dir"

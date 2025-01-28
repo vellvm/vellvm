@@ -83,6 +83,28 @@ let assert_max_one_main_fn ast file =
     ) false ast
   )
 
+let process_trace command_line_arguments ll_ast file =
+  match Interpreter.interpret command_line_arguments ll_ast with
+  | Ok dv ->
+    Printf.printf "Program terminated with: %s\n%!" (string_of_dvalue dv);
+    (* Printf.printf "skip: %s\n" (!trace_skip); *)
+    begin match Trace.gen_executable_base_trace ll_ast ~skip:!trace_skip with
+      | Ok ll_ast_trace ->
+        let ll_ast_trace' = transform ll_ast_trace in
+        let tracell_file = Platform.gen_name !Platform.output_path file ".base.trace" in
+        IO.output_file tracell_file ll_ast_trace'
+      | Error s -> failwith s
+    end
+  | Error e ->
+    begin match Trace.gen_executable_base_trace ll_ast ~skip:!trace_skip with
+      | Ok ll_ast_trace ->
+        let ll_ast_trace' = transform ll_ast_trace in
+        let tracell_file = Platform.gen_name !Platform.output_path file ".base.trace" in
+        IO.output_file tracell_file ll_ast_trace'
+      | Error s -> failwith s
+    end;
+    failwith (Result.string_of_exit_condition e)
+
 
 let process_ll_file command_line_arguments path file =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
@@ -96,90 +118,18 @@ let process_ll_file command_line_arguments path file =
         Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv);
       | Error e ->
         Trace.print_log ~f:ShowAST.dshowDtyp;
-        failwith (Result.string_of_exit_condition e))
-    else
-    if !trace then 
-      match Interpreter.interpret command_line_arguments ll_ast with
-      | Ok dv ->
-        Printf.printf "Program terminated with: %s\n%!" (string_of_dvalue dv);
-        (* Printf.printf "skip: %s\n" (!trace_skip); *)
-        begin match Trace.gen_executable_base_trace ll_ast ~skip:!trace_skip with
-          | Ok ll_ast_trace ->
-            let ll_ast_trace' = transform ll_ast_trace in
-            let tracell_file = Platform.gen_name !Platform.output_path file ".base.trace" in
-            IO.output_file tracell_file ll_ast_trace'
-          | Error s -> failwith s
-        end
-      | Error e ->
-        begin match Trace.gen_executable_base_trace ll_ast ~skip:!trace_skip with
-          | Ok ll_ast_trace ->
-            let ll_ast_trace' = transform ll_ast_trace in
-            let tracell_file = Platform.gen_name !Platform.output_path file ".base.trace" in
-            IO.output_file tracell_file ll_ast_trace'
-          | Error s -> failwith s
-        end;
         failwith (Result.string_of_exit_condition e)
+    else
+    if !trace then
+      process_trace command_line_arguments ll_ast file
     else
       failwith "Process AST: not valid parameter"
   in
   let ll_ast' = transform ll_ast in
+  Printf.printf "%s" (ShowAST.showProg ll_ast' |> Camlcoq.camlstring_of_coqstring);
   let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in
   let _ = IO.output_file vll_file ll_ast' in
   ()
-
-(* <<<<<<< HEAD *)
-(* let process_ll_file path file = *)
-(*   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in *)
-(*   let ll_ast = IO.parse_file path in *)
-(*   process_ast ll_ast file  *)
-
-(* let process_file f path = *)
-(*   let _ = Printf.printf "Processing: %s\n" path in *)
-(*   let basename, ext = Platform.path_to_basename_ext path in *)
-(*   match ext with *)
-(*   | "ll" -> f path basename *)
-(*   | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path *)
-
-
-(* (\* wishing for normal function composition here *\) *)
-(* let last xs =  List.rev xs |> List.hd *)
-
-(* (\* Here is where we can build extra checks: definition/declaration alignment, so on. *\) *)
-(* let link_asts = List.concat *)
-
-(* (\* let cons_uniq xs x = if List.mem x xs then xs else x :: xs *)
-
-(* let remove_from_left xs = List.rev (List.fold_left cons_uniq [] xs) *)
-(* (\* RAB: credit https://stackoverflow.com/questions/30634119/ocaml-removing-duplicates-from-a-list-while-maintaining-order-from-the-right  *)
-(*   for aiding my laziness*\) *)
-(* let validate_ssa =  *)
-(*   let remove_redundant_metadata ast =  *\) *)
-
-
-
-(* (\* links many files to produce a single AST. returns the AST and the name it  *)
-(*   will carry at runtime. *\) *)
-(* let link_files files =  *)
-(*   begin *)
-(*     (\* use existing machinery to validate files & add them to link_files *\) *)
-(*     List.iter (process_file (fun p _ -> add_link_file p)) files;  *)
-(*     (\* simple: build one ast and run it *\) *)
-(*     let linked_ast = link_asts (List.map IO.parse_file !link_files) in *)
-(*     let last_file, _ = Platform.path_to_basename_ext (last !link_files) in *)
-(*     let final_name =  *)
-(*       if String.starts_with ~prefix:"linked-" last_file then last_file else  *)
-(*       "linked-" ^ last_file in  *)
-(*      (linked_ast, final_name) *)
-(*   end *)
-
-(* let uncurry f (x, y) = f x y *)
-
-(* let process_files files =  *)
-(*   (\* length check validates use of `last` (which calls `hd`) *\) *)
-(*   if !link && List.length files >= 2 then *)
-(*     uncurry process_ast (link_files files) *)
-(*   else List.iter (process_file process_ll_file) files *)
-
 
 let process_file command_line_arguments path =
   let _ = Printf.printf "Processing: %s\n" path in

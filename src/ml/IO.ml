@@ -58,8 +58,3 @@ let unzip_filename (filename : string) : string list * string =
       (fun x -> not (List.mem x [".."; "tests"; ""]))
       (String.split_on_char '/' (Filename.dirname filename))
   , get_test_name (Filename.basename filename) )
-(* let rec concat_until_last (l : string list) (result : string * string) :
-   string * string = match l with | str2 :: [] -> (fst result, str2) | str1
-   :: xs -> concat_until_last xs (fst result ^ "/" ^ str1, snd result) | _ ->
-   result in concat_until_last (List.filter (Fun.flip List.mem ["..";
-   "tests"]) (String.split_on_char '/' filename) ) ("", "") *)
