@@ -910,6 +910,25 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
           stack_pop m1 m2
       end.
 
+  Definition stack_allocate_block_with_aid_MemPropT (bytes : list SByte) (aid : AID.AllocationId) : MemPropT Memory (list addr)
+    :=
+    fun m1 res =>
+      match run_err_ub_oom res with
+      | inl (OOM_message x) =>
+          True
+      | inr (inl (UB_message x)) =>
+          False
+      | inr (inr (inl (ERR_message x))) =>
+          False
+      | inr (inr (inr (m2, res))) =>
+          stack_allocate_block m1 bytes aid (m2, res)
+      end.
+
+  Definition stack_allocate_block_MemPropT (bytes : list SByte) : MemPropT Memory (list addr)
+    := aid <- AID.fresh_allocation_id;;
+       stack_allocate_block_with_aid_MemPropT bytes aid.
+               
+
     Definition allocate_bytes_with_pr_spec_MemPropT
       (init_bytes : list SByte) (prov : Provenance)
       : MemPropT MemState addr
@@ -922,13 +941,19 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
       : MemPropT MemState addr
       := prov <- fresh_provenance;;
          allocate_bytes_with_pr_spec_MemPropT init_bytes prov.
+
     (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
     Definition allocate_dtyp_spec (dt : dtyp) (num_elements : N) : MemPropT Memory addr :=
       MemPropT_assert_pre (dt <> DTYPE_Void);;
       sid <- fresh_sid;;
       element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
       let bytes := concat element_bytes in
+      stack_allocate_block_MemPropT bytes
+      
+
       allocate_bytes_spec_MemPropT bytes.
+
+    stack_allocate_block
 
   Definition allocate_dtyp_
 
