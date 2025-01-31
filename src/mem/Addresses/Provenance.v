@@ -33,11 +33,19 @@ Module Type PROVENANCE_TYPE := OrderedType <+ CORE_PROVENANCE_TYPE.
     memory. In many cases this will essentially be the same as
     Provenance, but could differ.
  *)
-Module Type CORE_ALLOCATION_ID (Import T:DecidableType).
+Module Type CORE_ALLOCATION_ID (Import OT:OrderedType).
   Notation AllocationId := t.
+
+  (* Fresh allocation ids *)
+  Parameter initial_aid : AllocationId.
+  Parameter next_aid : AllocationId -> AllocationId.
+
+  Parameter aid_lt_next_aid :
+    forall aid,
+      lt aid (next_aid aid).
 End CORE_ALLOCATION_ID.
 
-Module Type ALLOCATION_ID := DecidableType <+ CORE_ALLOCATION_ID.
+Module Type ALLOCATION_ID := OrderedType <+ CORE_ALLOCATION_ID.
 
 
 (** A ProvSet is the provenance associated with a pointer.

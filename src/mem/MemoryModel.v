@@ -347,6 +347,31 @@ Module Type MEMORY_ALLOCATED_CORE
       forall b, ~ read_byte m ptr b.
 End MEMORY_ALLOCATED_CORE.
 
+Module Type CORE_MEMORY_FRESH_AID
+  (Import ADDR : CORE_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import MEM : CORE_MEMORY_MODEL ADDR SB).
+
+  Parameter Memory_aid_counter :
+    Memory -> AllocationId.
+
+  Parameter Memory_aid_modify :
+      Memory -> (AllocationId -> AllocationId) -> Memory.
+
+  Parameter Memory_aid_modify_spec :
+    forall (m1 m2 : Memory) (f : AllocationId -> AllocationId) (aid1 aid2 : AllocationId),
+      aid1 = Memory_aid_counter m1 ->
+      m2 = Memory_aid_modify m1 f ->
+      aid2 = Memory_aid_counter m2 ->
+      aid2 = f aid1.
+
+  Definition Memory_fresh_aid (m : Memory) : (AllocationId * Memory)%type
+    := let aid := Memory_aid_counter m in
+       let aid' := next_aid aid in
+       (aid', Memory_aid_modify m (fun _ => aid')).
+End CORE_MEMORY_FRESH_AID.
+
 Module ALL_ALLOCATED_PRESERVED
   (Import ADDR : BASIC_ADDRESS)
   (Import SB : SBYTE)
@@ -414,7 +439,7 @@ Module Type MEMORY_ALLOCATE
   (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC).
 
   Parameter allocate_block :
-      Memory -> list SByte -> AllocationId -> Memory -> list addr -> Prop.
+    Memory -> list SByte -> AllocationId -> Memory -> list addr -> Prop.
 
   Parameter allocate_block_free :
     forall m1 bytes aid m2 ptrs,
@@ -446,7 +471,7 @@ End MEMORY_ALLOCATE.
 Module Type ALLOCATABLE_MEMORY (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) :=
   WRITEABLE_MEMORY ADDR SB <+ MEMORY_ALLOCATED_CORE ADDR SB AID <+
     WRITES_PRESERVES_ALLOCATED ADDR SB AID <+ MEMORY_FIND_FREE ADDR SB AID <+
-    MEMORY_ALLOCATE ADDR SB AID.
+    MEMORY_ALLOCATE ADDR SB AID <+ CORE_MEMORY_FRESH_AID ADDR SB AID.
 
 (*** Stack allocations *)
 Module Type CORE_FRAME
@@ -1076,13 +1101,13 @@ Module INTMAP_AID_MEMORY_MODEL
   (Import A : ACCESS PS AID)
   (Import SB : SBYTE) <: ALLOCATABLE_MEMORY ADDR SB AID.
 
-  Definition Memory := IntMap (SByte * AllocationId)%type.
-  Definition initial_memory := @IM.empty (SByte * AllocationId)%type.
+  Definition Memory := (AllocationId * IntMap (SByte * AllocationId))%type.
+  Definition initial_memory : Memory := (initial_aid, @IM.empty (SByte * AllocationId))%type.
 
   (*** MEMORY_ALLOCATED_CORE *)
   (** Whether an address is allocated with a given AllocationId *)
   Definition addr_allocated (m : Memory) (ptr : addr) (aid : AllocationId) : Prop :=
-    match IM.find (ptr_to_int ptr) m with
+    match IM.find (ptr_to_int ptr) (snd m) with
     | None => False
     | Some (_, aid') => AID.eq aid aid'
     end.
@@ -1095,7 +1120,7 @@ Module INTMAP_AID_MEMORY_MODEL
     exists aid, addr_allocated m ptr aid /\ access_allowed (address_provenance ptr) aid = true.
 
   Definition read_byte (m : Memory) (ptr : addr) (b : SByte) : Prop :=
-    match IM.find (ptr_to_int ptr) m with
+    match IM.find (ptr_to_int ptr) (snd m) with
     | None => False
     | Some (b', aid) => b = b' /\ access_allowed (address_provenance ptr) aid
     end.
@@ -1127,11 +1152,11 @@ Module INTMAP_AID_MEMORY_MODEL
   Definition write_byte (m1 : Memory) (ptr : addr) (b : SByte) (m2 : Memory) : Prop :=
     let phys_addr := ptr_to_int ptr in
     let pr := address_provenance ptr in
-    match IM.find phys_addr m1 with
+    match IM.find phys_addr (snd m1) with
     | None => False (* "Writing to unallocated memory" *)
     | Some (_, aid) =>
         if access_allowed pr aid
-        then m2 = IM.add phys_addr (b, aid) m1
+        then m2 = (fst m1, IM.add phys_addr (b, aid) (snd m1))
         else False (* Invalid access *)
     end.
 
@@ -1144,6 +1169,7 @@ Module INTMAP_AID_MEMORY_MODEL
     intros m1 ptr byte m2 WB.
     red in WB; red.
     repeat (break_match_hyp; try contradiction); subst.
+    unfold snd.
     rewrite IP.F.add_eq_o; auto.
   Qed.
 
@@ -1159,7 +1185,8 @@ Module INTMAP_AID_MEMORY_MODEL
     red in WB.
     repeat (break_match_hyp; try contradiction); subst.
     split; intros RB; red; red in RB;
-      repeat (break_match_hyp; try contradiction); destruct RB; subst.
+      repeat (break_match_hyp; try contradiction); destruct RB; subst;
+      unfold snd in *.
     { rewrite IP.F.add_neq_o; auto.
       rewrite Heqo0; auto.
     }
@@ -1204,13 +1231,14 @@ Module INTMAP_AID_MEMORY_MODEL
       split; intros RBA; red; red in RBA;
         destruct RBA as (aid & ALLOCATED & ACCESS);
         exists aid; cbn; split; auto.
-      - red. rewrite IP.F.add_eq_o; auto.
+      - red. unfold snd. rewrite IP.F.add_eq_o; auto.
         red in ALLOCATED.
         rewrite EQ in Heqo.
         rewrite Heqo in ALLOCATED; auto.
       - red; red in ALLOCATED.
         rewrite EQ in Heqo.
         rewrite Heqo.
+        unfold snd in ALLOCATED.
         rewrite IP.F.add_eq_o in ALLOCATED; auto.
     }
 
@@ -1218,8 +1246,8 @@ Module INTMAP_AID_MEMORY_MODEL
       split; intros RBA; red; red in RBA;
         destruct RBA as (aid & ALLOCATED & ACCESS);
         exists aid; cbn; split; auto.
-      - red. rewrite IP.F.add_neq_o; auto.
-      - red in ALLOCATED; red. rewrite IP.F.add_neq_o in ALLOCATED; auto.
+      - red. unfold snd. rewrite IP.F.add_neq_o; auto.
+      - red in ALLOCATED; red. unfold snd in *. rewrite IP.F.add_neq_o in ALLOCATED; auto.
     }
   Qed.
 
@@ -1269,11 +1297,13 @@ Module INTMAP_AID_MEMORY_MODEL
     { (* Pointers overlap *)
       rewrite <- EQ.
       rewrite Heqo.
+      unfold snd.
       rewrite IP.F.add_eq_o; auto.
       reflexivity.
     }
 
     { (* Pointers don't overlap *)
+      unfold snd.
       rewrite IP.F.add_neq_o; auto.
       reflexivity.
     }
@@ -1355,6 +1385,31 @@ Module INTMAP_AID_MEMORY_MODEL
   Proof.
     intros * LEN H; apply H; eauto.
   Qed.
+
+  Definition Memory_aid_counter : Memory -> AllocationId := fst.
+  Definition Memory_aid_modify (m : Memory) (f : AllocationId -> AllocationId) : Memory :=
+    let '(aid, m') := m
+    in (f aid, m').
+
+  Lemma Memory_aid_modify_spec :
+    forall (m1 m2 : Memory) (f : AllocationId -> AllocationId) (aid1 aid2 : AllocationId),
+      aid1 = Memory_aid_counter m1 ->
+      m2 = Memory_aid_modify m1 f ->
+      aid2 = Memory_aid_counter m2 ->
+      aid2 = f aid1.
+  Proof.
+    intros m1 m2 f aid1 aid2 H H0 H1.
+    subst.
+    unfold Memory_aid_counter, Memory_aid_modify.
+    destruct m1; cbn.
+    reflexivity.
+  Qed.
+
+  Definition Memory_fresh_aid (m : Memory) : (AllocationId * Memory)%type
+    := let aid := Memory_aid_counter m in
+       let aid' := next_aid aid in
+       (aid', Memory_aid_modify m (fun _ => aid')).
+
 End INTMAP_AID_MEMORY_MODEL.
 
 (** Add a heap and stack to allocatable memory *)
@@ -2010,6 +2065,35 @@ Module ALLOCATABLE_MEMORY_TO_FULL_MEMORY_MODEL
     eapply free_spec_block.
     apply FREE.
   Qed.
+
+
+  Definition Memory_aid_counter : Memory -> AllocationId := MEM.Memory_aid_counter ∘ sub_memory.
+  Definition Memory_aid_modify (m : Memory) (f : AllocationId -> AllocationId) : Memory :=
+    match m with
+    | (MkMemory bm fs h) =>
+        MkMemory (MEM.Memory_aid_modify bm f) fs h
+    end.
+
+  Lemma Memory_aid_modify_spec :
+    forall (m1 m2 : Memory) (f : AllocationId -> AllocationId) (aid1 aid2 : AllocationId),
+      aid1 = Memory_aid_counter m1 ->
+      m2 = Memory_aid_modify m1 f ->
+      aid2 = Memory_aid_counter m2 ->
+      aid2 = f aid1.
+  Proof.
+    intros m1 m2 f aid1 aid2 H H0 H1.
+    subst.
+    unfold Memory_aid_counter, Memory_aid_modify.
+    destruct m1; cbn.
+    unfold Basics.compose.
+    cbn.
+    eapply MEM.Memory_aid_modify_spec; eauto.
+  Qed.
+
+  Definition Memory_fresh_aid (m : Memory) : (AllocationId * Memory)%type
+    := let aid := Memory_aid_counter m in
+       let aid' := next_aid aid in
+       (aid', Memory_aid_modify m (fun _ => aid')).
 
 End ALLOCATABLE_MEMORY_TO_FULL_MEMORY_MODEL.
 
