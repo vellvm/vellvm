@@ -80,20 +80,12 @@ Import Logic.
 Import LLVMParams.
 Import MemoryParams.
 
-Module MemoryHelpers (LP : LLVMParams.LLVMParams) (MP : MemoryParams.MemoryParams LP).
+Module MemoryHelpers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_MEMORY_MODEL ADDR SB AID H F FS).
   (*** Other helpers *)
-  Import LP.
-  Import MP.
-
-  Import BYTE_IMPL.
-  Import GEP.
-
-  Import LP.ADDR.
-  Import LP.Events.
-  Import LP.SIZEOF.
-  Import IP.
-  Import Byte.
-  Import Util.
+  Import MM.
+  Import SB.
+  Import EVENTS.
+  Import SIZEOF.
 
   Ltac convert_to_ret :=
     match goal with
@@ -783,6 +775,9 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
   Import SIZEOF.
   Import ADDR.
 
+  Module MemHelp := MemoryHelpers ADDR IP SIZEOF EVENTS SB AID H F FS MM.
+  Import MemHelp.
+
   (** TODO: Move this generate_undef_bytes stuff *)
   Definition generate_num_undef_bytes_h (start_ix : N) (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
     N.recursion
@@ -958,6 +953,64 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
     element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
     let bytes := concat element_bytes in
     stack_allocate_block_MemPropT bytes.
+
+  (** Reading uvalues *)
+  Definition read_byte_MemPropT (ptr : addr) : MemPropT Memory SByte :=
+    fun ms res =>
+      match run_err_ub_oom res with
+      | inl (OOM_message x) =>
+          False
+      | inr (inl (UB_message x)) =>
+          forall sb, ~ read_byte ms ptr sb
+      | inr (inr (inl (ERR_message x))) =>
+          False
+      | inr (inr (inr (m2, sb))) =>
+          ms = m2 /\ read_byte ms ptr sb
+      end.
+  
+  Definition read_bytes_spec (ptr : addr) (len : nat) : MemPropT Memory (list SByte) :=
+    (* TODO: should this OOM, or should this count as walking outside of memory and be UB? *)
+    ptrs <- lift_err_RAISE_ERROR (get_consecutive_ptrs ptr len);;
+
+    (* Actually perform reads *)
+    map_monad (fun ptr => read_byte_MemPropT ptr) ptrs.
+
+  Definition read_uvalue_spec (dt : dtyp) (ptr : addr) : MemPropT Memory uvalue :=
+    bytes <- read_bytes_spec ptr (N.to_nat (sizeof_dtyp dt));;
+    lift_err_RAISE_ERROR (deserialize_sbytes bytes dt).
+
+  (** Writing uvalues *)
+  Definition write_byte_MemPropT (ptr : addr) (b : SByte) : MemPropT Memory unit :=
+    fun ms res =>
+      match run_err_ub_oom res with
+      | inl (OOM_message x) =>
+          False
+      | inr (inl (UB_message x)) =>
+          forall sb ms', ~ write_byte ms ptr sb ms'
+      | inr (inr (inl (ERR_message x))) =>
+          False
+      | inr (inr (inr (m2, tt))) =>
+          write_byte ms ptr b m2
+      end.
+
+  (* TODO: Should probably move this instance *)
+  #[global] Instance MonadStoreId_MemPropT : MonadStoreId (MemPropT Memory).
+  split.
+  apply fresh_sid.
+  Defined.
+
+  Definition write_bytes_spec (ptr : addr) (bytes : list SByte) : MemPropT Memory unit :=
+    (* TODO: should this OOM, or should this count as walking outside of memory and be UB? *)
+    ptrs <- lift_err_RAISE_ERROR (get_consecutive_ptrs ptr (length bytes));;
+    let ptr_bytes := zip ptrs bytes in
+
+    (* TODO: double check that this is correct... Should we check if all writes are allowed first? *)
+    (* Actually perform writes *)
+    map_monad_ (fun '(ptr, byte) => write_byte_MemPropT ptr byte) ptr_bytes.
+
+  Definition write_uvalue_spec (dt : dtyp) (ptr : addr) (uv : uvalue) : MemPropT Memory unit :=
+    bytes <- serialize_sbytes uv dt;;
+    write_bytes_spec ptr bytes.
     
   (*** Handling memory events *)
   Section Handlers.
@@ -986,7 +1039,7 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
                end
            end.
 
-    Definition handle_memcpy_prop (args : list dvalue) : MemPropT MemState unit :=
+    Definition handle_memcpy_prop (args : list dvalue) : MemPropT Memory unit :=
       match args with
       | DVALUE_Addr dst ::
           DVALUE_Addr src ::
