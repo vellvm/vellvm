@@ -182,13 +182,36 @@ Module Type MEMORY_MODEL_BASE
   Parameter initial_memory : Memory.
 End MEMORY_MODEL_BASE.
 
-Module Type CORE_MEMORY_MODEL
+Module Type CORE_READ_MEMORY_MODEL
   (Import ADDR : CORE_ADDRESS)
-  (Import SB : SBYTE).
-  Include (MEMORY_MODEL_BASE ADDR SB).
+  (Import SB : SBYTE)
+  (Import MEM : MEMORY_MODEL_BASE ADDR SB).
   (** Primitive byte reads *)
   Parameter read_byte : Memory -> addr -> SByte -> Prop.
-End CORE_MEMORY_MODEL.
+End CORE_READ_MEMORY_MODEL.
+
+Module Type CORE_MEMORY_MODEL (ADDR : CORE_ADDRESS) (SB : SBYTE) := MEMORY_MODEL_BASE ADDR SB <+ CORE_READ_MEMORY_MODEL ADDR SB.
+
+Module Type CORE_EXEC_MEMORY_MODEL
+  (Import ADDR : CORE_ADDRESS)
+  (Import SB : SBYTE)
+  (Import MEM : MEMORY_MODEL_BASE ADDR SB).
+  (** Primitive byte reads *)
+  Parameter read_byte_exec : Memory -> addr -> SByte.
+End CORE_EXEC_MEMORY_MODEL.
+
+Module Type CORE_EXEC_SPEC_MEMORY_MODEL (ADDR : CORE_ADDRESS) (SB : SBYTE) := CORE_MEMORY_MODEL ADDR SB <+ CORE_EXEC_MEMORY_MODEL ADDR SB.
+
+Module Type CORE_EXEC_MEMORY_MODEL_CORRECT
+  (Import ADDR : CORE_ADDRESS)
+  (Import SB : SBYTE)
+  (Import MEM : CORE_EXEC_SPEC_MEMORY_MODEL ADDR SB).
+
+  Parameter read_byte_correct :
+    forall m ptr sb,
+      read_byte_exec m ptr = sb ->
+      read_byte m ptr sb.
+End CORE_EXEC_MEMORY_MODEL_CORRECT.
 
 Module Type MEMORY_READ_ACCESS
   (Import ADDR : CORE_ADDRESS)
@@ -208,6 +231,7 @@ Module Type MEMORY_READ_ACCESS
 End MEMORY_READ_ACCESS.
 
 Module Type READABLE_MEMORY (ADDR : CORE_ADDRESS) (SB : SBYTE) := CORE_MEMORY_MODEL ADDR SB <+ MEMORY_READ_ACCESS ADDR SB.
+Module Type READABLE_EXEC_MEMORY (ADDR : CORE_ADDRESS) (SB : SBYTE) := READABLE_MEMORY ADDR SB <+ CORE_EXEC_MEMORY_MODEL ADDR SB <+ CORE_EXEC_MEMORY_MODEL_CORRECT ADDR SB.
 
 Module ALL_READS_PRESERVED
   (Import ADDR : CORE_ADDRESS)
@@ -270,6 +294,27 @@ Module Type MEMORY_WRITES
 End MEMORY_WRITES.
 
 Module Type WRITEABLE_MEMORY_HELPER (ADDR : BASIC_ADDRESS) (SB : SBYTE) := READABLE_MEMORY ADDR SB <+ MEMORY_WRITES ADDR SB.
+
+Module Type EXEC_MEMORY_WRITES
+  (Import ADDR : CORE_ADDRESS)
+  (Import SB : SBYTE)
+  (Import MEM : CORE_MEMORY_MODEL ADDR SB).
+  Parameter write_byte_exec : Memory -> addr -> SByte -> Memory.
+End EXEC_MEMORY_WRITES.
+
+Module Type EXEC_SPEC_MEMORY_WRITES (ADDR : BASIC_ADDRESS) (SB : SBYTE) := WRITEABLE_MEMORY_HELPER ADDR SB <+ EXEC_MEMORY_WRITES ADDR SB.
+
+Module Type EXEC_MEMORY_WRITES_CORRECT
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import MEM : EXEC_SPEC_MEMORY_WRITES ADDR SB).
+
+  (* TODO: May want to reformulate this in terms of a different equality on memory... *)
+  Parameter write_byte_correct :
+    forall m1 ptr b m2,
+      write_byte_exec m1 ptr b = m2 ->
+      write_byte m1 ptr b m2.
+End EXEC_MEMORY_WRITES_CORRECT.
 
 Module Type MEMORY_WRITE_ACCESS
   (Import ADDR : BASIC_ADDRESS)
@@ -350,6 +395,7 @@ Module Type CORE_MEMORY_FRESH_STORE_ID
 End CORE_MEMORY_FRESH_STORE_ID.
 
 Module Type WRITEABLE_MEMORY (ADDR : BASIC_ADDRESS) (SB : SBYTE) := WRITEABLE_MEMORY_HELPER ADDR SB <+ MEMORY_WRITE_ACCESS ADDR SB <+ WRITES_PRESERVES_READ_ACCESS ADDR SB <+ WRITES_PRESERVES_WRITE_ACCESS ADDR SB <+ CORE_MEMORY_FRESH_STORE_ID ADDR SB.
+Module Type WRITEABLE_EXEC_MEMORY (ADDR : BASIC_ADDRESS) (SB : SBYTE) := WRITEABLE_MEMORY ADDR SB <+ EXEC_MEMORY_WRITES ADDR SB <+ EXEC_MEMORY_WRITES_CORRECT ADDR SB.
 
 (*** Allocation helpers. Finding free blocks *)
 
@@ -454,6 +500,23 @@ Module Type MEMORY_FIND_FREE
       consecutive_ptrs ptrs = true.
 End MEMORY_FIND_FREE.
 
+Module Type EXEC_MEMORY_FIND_FREE
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import MEM : CORE_MEMORY_MODEL ADDR SB).
+
+  Parameter find_free_block_exec :
+    Memory -> nat -> list addr.
+End EXEC_MEMORY_FIND_FREE.
+
+Module Type EXEC_SPEC_MEMORY_FIND_FREE
+  (ADDR : BASIC_ADDRESS)
+  (SB : SBYTE)
+  (AID : ALLOCATION_ID)
+  (MEM : CORE_MEMORY_MODEL ADDR SB)
+  (ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
+  := READABLE_MEMORY ADDR SB <+ MEMORY_FIND_FREE ADDR SB AID MEM ALLOC <+ EXEC_MEMORY_FIND_FREE ADDR SB.
+
 Module Type MEMORY_ALLOCATE
   (Import ADDR : BASIC_ADDRESS)
   (Import SB : SBYTE)
@@ -492,10 +555,46 @@ Module Type MEMORY_ALLOCATE
       Forall (fun ptr => is_null ptr = false) ptrs.
 End MEMORY_ALLOCATE.
 
+Module Type EXEC_MEMORY_ALLOCATE
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB).
+
+  Parameter allocate_block_exec :
+    Memory -> list SByte -> AllocationId -> (Memory * list addr)%type.
+End EXEC_MEMORY_ALLOCATE.
+
+Module Type EXEC_SPEC_MEMORY_ALLOCATE
+  (ADDR : BASIC_ADDRESS)
+  (SB : SBYTE)
+  (AID : ALLOCATION_ID)
+  (MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
+  (ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
+  (FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC) := MEMORY_ALLOCATE ADDR SB AID MEM ALLOC FIND_FREE <+ EXEC_MEMORY_ALLOCATE ADDR SB AID MEM.
+
+Module Type EXEC_MEMORY_ALLOCATE_CORRECT
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
+  (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
+  (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC)
+  (Import EXEC_ALLOC : EXEC_SPEC_MEMORY_ALLOCATE ADDR SB AID MEM ALLOC FIND_FREE).
+
+  Parameter allocate_block_correct :
+    forall m1 bytes aid m2 ptrs,
+      allocate_block_exec m1 bytes aid = (m2, ptrs) ->
+      allocate_block m1 bytes aid m2 ptrs.
+End EXEC_MEMORY_ALLOCATE_CORRECT.
+
 Module Type ALLOCATABLE_MEMORY (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) :=
   WRITEABLE_MEMORY ADDR SB <+ MEMORY_ALLOCATED_CORE ADDR SB AID <+
     WRITES_PRESERVES_ALLOCATED ADDR SB AID <+ MEMORY_FIND_FREE ADDR SB AID <+
     MEMORY_ALLOCATE ADDR SB AID <+ CORE_MEMORY_FRESH_AID ADDR SB AID.
+
+Module Type EXEC_ALLOCATABLE_MEMORY (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID)
+  := ALLOCATABLE_MEMORY ADDR SB AID <+ EXEC_MEMORY_ALLOCATE ADDR SB AID <+ EXEC_MEMORY_ALLOCATE_CORRECT ADDR SB AID.
 
 (*** Stack allocations *)
 Module Type CORE_FRAME
@@ -671,6 +770,68 @@ Module Type MEMORY_STACK_ALLOCATE
         | Some fs =>
             res = (Memory_frame_stack_modify m' (fun _ => fs), ptrs)
         end.
+
+  Lemma stack_allocate_block_free :
+    forall m1 bytes aid m2 ptrs,
+      stack_allocate_block m1 bytes aid (m2, ptrs) ->
+      find_free_block m1 (length bytes) ptrs.
+  Proof.
+    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
+    break_match_hyp_inv.
+    eapply allocate_block_free; eauto.
+  Qed.
+
+  Parameter stack_allocate_block_non_null :
+    forall m1 bytes aid m2 ptrs,
+      length bytes > 0 ->
+      stack_allocate_block m1 bytes aid (m2, ptrs) ->
+      Forall (fun ptr => is_null ptr = false) ptrs.
+
+  Parameter stack_allocate_block_new_reads :
+    forall m1 bytes aid m2 ptrs,
+      stack_allocate_block m1 bytes aid (m2, ptrs) ->
+      Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs.
+
+  Parameter stack_allocate_block_old_reads :
+    forall m1 bytes aid m2 ptrs,
+      stack_allocate_block m1 bytes aid (m2, ptrs) ->
+      forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b.
+
+  Parameter stack_allocate_block_allocated :
+    forall m1 bytes aid m2 ptrs,
+      stack_allocate_block m1 bytes aid (m2, ptrs)->
+      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
+
+  (*
+  Parameter stack_allocate_block_new_frame :
+    forall m1 bytes aid m2 ptrs fs1 fs2,
+      stack_allocate_block m1 bytes aid (m2, ptrs)->
+      fs2 = Memory_frame_stack m2 ->
+      fs1 = Memory_frame_stack m1 ->
+      push fs1 (add_all_to_current_frame empty_frame ptrs) = fs2. *)
+End MEMORY_STACK_ALLOCATE.
+
+Module Type EXEC_MEMORY_STACK_ALLOCATE
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import F : FRAME ADDR)
+  (Import FS : FRAME_STACK ADDR F)
+  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
+  (Import ALLOCATE : EXEC_MEMORY_ALLOCATE ADDR SB AID MEM)
+  (Import MFS : MEMORY_FRAME_STACK ADDR SB F FS MEM).
+
+  Definition stack_allocate_block_exec
+    (m : Memory) (bytes : list SByte) (aid : AllocationId) : (Memory * list addr) :=
+    let (m', ptrs) := allocate_block_exec m bytes aid in
+    match add_all_to_current_frame (Memory_frame_stack m') ptrs with
+    | None => False
+    | Some fs =>
+        res = (Memory_frame_stack_modify m' (fun _ => fs), ptrs)
+    end.
+    
+    exists m' ptrs,
+      allocate_block_exec m bytes aid m' ptrs /\
 
   Lemma stack_allocate_block_free :
     forall m1 bytes aid m2 ptrs,

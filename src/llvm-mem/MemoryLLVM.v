@@ -1202,6 +1202,7 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
 
 End MemoryHandlers.
 
+(*
 Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP).
   Import LP.
   Import LP.Events.
@@ -6457,3 +6458,4 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
     tauto.
   Qed.
 End MemoryModelInfiniteSpecHelpers.
+ *)
