@@ -924,10 +924,34 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
           stack_allocate_block m1 bytes aid (m2, res)
       end.
 
-  Definition stack_allocate_block_MemPropT (bytes : list SByte) : MemPropT Memory (list addr)
-    := aid <- AID.fresh_allocation_id;;
+  (* TODO: Move this somewhere... *)
+  Definition fresh_allocation_id : MemPropT Memory AID.AllocationId
+    := fun m1 res =>
+         let '(aid, m2) := Memory_fresh_aid m1 in
+         res = ret (m2, aid).
+
+  Definition stack_allocate_block_MemPropT' (bytes : list SByte) : MemPropT Memory (list addr)
+    := aid <- fresh_allocation_id;;
        stack_allocate_block_with_aid_MemPropT bytes aid.
-               
+
+  (** Get the first address of a block, making up one if it's size 0 *)
+  Definition get_first_address (ma : MemPropT Memory (list addr)) : MemPropT Memory addr
+    := addrs <- ma;;
+       match addrs with
+       | nil => fun ms res => forall (a : addr), ret (ms, a) = res
+       | cons a _ => ret a
+       end.
+
+  Definition stack_allocate_block_MemPropT : list SByte -> MemPropT Memory addr
+    := get_first_address ∘ stack_allocate_block_MemPropT'.
+
+  (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
+  Definition stack_allocate_dtyp_spec (dt : dtyp) (num_elements : N) : MemPropT Memory addr :=
+    MemPropT_assert_pre (dt <> DTYPE_Void);;
+    sid <- fresh_sid;;
+    element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
+    let bytes := concat element_bytes in
+    stack_allocate_block_MemPropT bytes.
 
     Definition allocate_bytes_with_pr_spec_MemPropT
       (init_bytes : list SByte) (prov : Provenance)
@@ -943,7 +967,7 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
          allocate_bytes_with_pr_spec_MemPropT init_bytes prov.
 
     (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
-    Definition allocate_dtyp_spec (dt : dtyp) (num_elements : N) : MemPropT Memory addr :=
+    Definition stack_allocate_dtyp_spec (dt : dtyp) (num_elements : N) : MemPropT Memory addr :=
       MemPropT_assert_pre (dt <> DTYPE_Void);;
       sid <- fresh_sid;;
       element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;

@@ -325,7 +325,31 @@ Module Type WRITES_PRESERVES_WRITE_ACCESS
       write_byte_allowed_preserved m1 m2.
 End WRITES_PRESERVES_WRITE_ACCESS.
 
-Module Type WRITEABLE_MEMORY (ADDR : BASIC_ADDRESS) (SB : SBYTE) := WRITEABLE_MEMORY_HELPER ADDR SB <+ MEMORY_WRITE_ACCESS ADDR SB <+ WRITES_PRESERVES_READ_ACCESS ADDR SB <+ WRITES_PRESERVES_WRITE_ACCESS ADDR SB.
+Module Type CORE_MEMORY_FRESH_STORE_ID
+  (Import ADDR : CORE_ADDRESS)
+  (Import SB : SBYTE)
+  (Import MEM : CORE_MEMORY_MODEL ADDR SB).
+
+  Parameter Memory_sid_counter :
+    Memory -> store_id.
+
+  Parameter Memory_sid_modify :
+      Memory -> (store_id -> store_id) -> Memory.
+
+  Parameter Memory_sid_modify_spec :
+    forall (m1 m2 : Memory) (f : store_id -> store_id) (sid1 sid2 : store_id),
+      sid1 = Memory_sid_counter m1 ->
+      m2 = Memory_sid_modify m1 f ->
+      sid2 = Memory_sid_counter m2 ->
+      sid2 = f sid1.
+
+  Definition Memory_fresh_sid (m : Memory) : (store_id * Memory)%type
+    := let sid := Memory_sid_counter m in
+       let sid' := N.succ sid in
+       (sid', Memory_sid_modify m (fun _ => sid')).
+End CORE_MEMORY_FRESH_STORE_ID.
+
+Module Type WRITEABLE_MEMORY (ADDR : BASIC_ADDRESS) (SB : SBYTE) := WRITEABLE_MEMORY_HELPER ADDR SB <+ MEMORY_WRITE_ACCESS ADDR SB <+ WRITES_PRESERVES_READ_ACCESS ADDR SB <+ WRITES_PRESERVES_WRITE_ACCESS ADDR SB <+ CORE_MEMORY_FRESH_STORE_ID ADDR SB.
 
 (*** Allocation helpers. Finding free blocks *)
 
@@ -1092,7 +1116,7 @@ Module INTMAP_MEMORY_MODEL_CORE (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) (SB
     end.
 End INTMAP_MEMORY_MODEL_CORE.
 
-(** Memory models based on integer maps  with allocation ids *)
+(** Memory models based on integer maps with allocation ids *)
 Module INTMAP_AID_MEMORY_MODEL
   (MD : Typ)
   (PS : PROV_SET)
@@ -1101,13 +1125,20 @@ Module INTMAP_AID_MEMORY_MODEL
   (Import A : ACCESS PS AID)
   (Import SB : SBYTE) <: ALLOCATABLE_MEMORY ADDR SB AID.
 
-  Definition Memory := (AllocationId * IntMap (SByte * AllocationId))%type.
-  Definition initial_memory : Memory := (initial_aid, @IM.empty (SByte * AllocationId))%type.
+  Record Memory' := 
+    MkMemory {
+      Memory_aid_counter : AllocationId;
+      Memory_sid_counter : store_id;
+      Memory_byte_map : IntMap (SByte * AllocationId)%type;
+    }.
+
+  Definition Memory := Memory'.
+  Definition initial_memory : Memory := MkMemory initial_aid 0%N (@IM.empty (SByte * AllocationId))%type.
 
   (*** MEMORY_ALLOCATED_CORE *)
   (** Whether an address is allocated with a given AllocationId *)
   Definition addr_allocated (m : Memory) (ptr : addr) (aid : AllocationId) : Prop :=
-    match IM.find (ptr_to_int ptr) (snd m) with
+    match IM.find (ptr_to_int ptr) (Memory_byte_map m) with
     | None => False
     | Some (_, aid') => AID.eq aid aid'
     end.
@@ -1120,7 +1151,7 @@ Module INTMAP_AID_MEMORY_MODEL
     exists aid, addr_allocated m ptr aid /\ access_allowed (address_provenance ptr) aid = true.
 
   Definition read_byte (m : Memory) (ptr : addr) (b : SByte) : Prop :=
-    match IM.find (ptr_to_int ptr) (snd m) with
+    match IM.find (ptr_to_int ptr) (Memory_byte_map m) with
     | None => False
     | Some (b', aid) => b = b' /\ access_allowed (address_provenance ptr) aid
     end.
@@ -1152,11 +1183,11 @@ Module INTMAP_AID_MEMORY_MODEL
   Definition write_byte (m1 : Memory) (ptr : addr) (b : SByte) (m2 : Memory) : Prop :=
     let phys_addr := ptr_to_int ptr in
     let pr := address_provenance ptr in
-    match IM.find phys_addr (snd m1) with
+    match IM.find phys_addr (Memory_byte_map m1) with
     | None => False (* "Writing to unallocated memory" *)
     | Some (_, aid) =>
         if access_allowed pr aid
-        then m2 = (fst m1, IM.add phys_addr (b, aid) (snd m1))
+        then m2 = MkMemory (Memory_aid_counter m1) (Memory_sid_counter m1) (IM.add phys_addr (b, aid) (Memory_byte_map m1))
         else False (* Invalid access *)
     end.
 
@@ -1169,7 +1200,7 @@ Module INTMAP_AID_MEMORY_MODEL
     intros m1 ptr byte m2 WB.
     red in WB; red.
     repeat (break_match_hyp; try contradiction); subst.
-    unfold snd.
+    unfold Memory_byte_map.
     rewrite IP.F.add_eq_o; auto.
   Qed.
 
@@ -1186,7 +1217,7 @@ Module INTMAP_AID_MEMORY_MODEL
     repeat (break_match_hyp; try contradiction); subst.
     split; intros RB; red; red in RB;
       repeat (break_match_hyp; try contradiction); destruct RB; subst;
-      unfold snd in *.
+      unfold Memory_byte_map in *.
     { rewrite IP.F.add_neq_o; auto.
       rewrite Heqo0; auto.
     }
@@ -1231,14 +1262,14 @@ Module INTMAP_AID_MEMORY_MODEL
       split; intros RBA; red; red in RBA;
         destruct RBA as (aid & ALLOCATED & ACCESS);
         exists aid; cbn; split; auto.
-      - red. unfold snd. rewrite IP.F.add_eq_o; auto.
+      - red. unfold Memory_byte_map. rewrite IP.F.add_eq_o; auto.
         red in ALLOCATED.
         rewrite EQ in Heqo.
         rewrite Heqo in ALLOCATED; auto.
       - red; red in ALLOCATED.
         rewrite EQ in Heqo.
         rewrite Heqo.
-        unfold snd in ALLOCATED.
+        unfold Memory_byte_map in ALLOCATED.
         rewrite IP.F.add_eq_o in ALLOCATED; auto.
     }
 
@@ -1246,8 +1277,8 @@ Module INTMAP_AID_MEMORY_MODEL
       split; intros RBA; red; red in RBA;
         destruct RBA as (aid & ALLOCATED & ACCESS);
         exists aid; cbn; split; auto.
-      - red. unfold snd. rewrite IP.F.add_neq_o; auto.
-      - red in ALLOCATED; red. unfold snd in *. rewrite IP.F.add_neq_o in ALLOCATED; auto.
+      - red. unfold Memory_byte_map. rewrite IP.F.add_neq_o; auto.
+      - red in ALLOCATED; red. unfold Memory_byte_map in *. rewrite IP.F.add_neq_o in ALLOCATED; auto.
     }
   Qed.
 
@@ -1297,13 +1328,13 @@ Module INTMAP_AID_MEMORY_MODEL
     { (* Pointers overlap *)
       rewrite <- EQ.
       rewrite Heqo.
-      unfold snd.
+      unfold Memory_byte_map.
       rewrite IP.F.add_eq_o; auto.
       reflexivity.
     }
 
     { (* Pointers don't overlap *)
-      unfold snd.
+      unfold Memory_byte_map.
       rewrite IP.F.add_neq_o; auto.
       reflexivity.
     }
@@ -1386,10 +1417,8 @@ Module INTMAP_AID_MEMORY_MODEL
     intros * LEN H; apply H; eauto.
   Qed.
 
-  Definition Memory_aid_counter : Memory -> AllocationId := fst.
   Definition Memory_aid_modify (m : Memory) (f : AllocationId -> AllocationId) : Memory :=
-    let '(aid, m') := m
-    in (f aid, m').
+    MkMemory (f (Memory_aid_counter m)) (Memory_sid_counter m) (Memory_byte_map m).
 
   Lemma Memory_aid_modify_spec :
     forall (m1 m2 : Memory) (f : AllocationId -> AllocationId) (aid1 aid2 : AllocationId),
@@ -1409,6 +1438,28 @@ Module INTMAP_AID_MEMORY_MODEL
     := let aid := Memory_aid_counter m in
        let aid' := next_aid aid in
        (aid', Memory_aid_modify m (fun _ => aid')).
+
+  Definition Memory_sid_modify (m : Memory) (f : store_id -> store_id) : Memory :=
+    MkMemory (Memory_aid_counter m) (f (Memory_sid_counter m)) (Memory_byte_map m).
+
+  Lemma Memory_sid_modify_spec :
+    forall (m1 m2 : Memory) (f : store_id -> store_id) (sid1 sid2 : store_id),
+      sid1 = Memory_sid_counter m1 ->
+      m2 = Memory_sid_modify m1 f ->
+      sid2 = Memory_sid_counter m2 ->
+      sid2 = f sid1.
+  Proof.
+    intros m1 m2 f sid1 sid2 H H0 H1.
+    subst.
+    unfold Memory_sid_counter, Memory_sid_modify.
+    destruct m1; cbn.
+    reflexivity.
+  Qed.
+
+  Definition Memory_fresh_sid (m : Memory) : (store_id * Memory)%type
+    := let sid := Memory_sid_counter m in
+       let sid' := N.succ sid in
+       (sid', Memory_sid_modify m (fun _ => sid')).
 
 End INTMAP_AID_MEMORY_MODEL.
 
@@ -2094,6 +2145,34 @@ Module ALLOCATABLE_MEMORY_TO_FULL_MEMORY_MODEL
     := let aid := Memory_aid_counter m in
        let aid' := next_aid aid in
        (aid', Memory_aid_modify m (fun _ => aid')).
+
+  Definition Memory_sid_counter : Memory -> store_id := MEM.Memory_sid_counter ∘ sub_memory.
+  Definition Memory_sid_modify (m : Memory) (f : store_id -> store_id) : Memory :=
+    match m with
+    | (MkMemory bm fs h) =>
+        MkMemory (MEM.Memory_sid_modify bm f) fs h
+    end.
+
+  Lemma Memory_sid_modify_spec :
+    forall (m1 m2 : Memory) (f : store_id -> store_id) (sid1 sid2 : store_id),
+      sid1 = Memory_sid_counter m1 ->
+      m2 = Memory_sid_modify m1 f ->
+      sid2 = Memory_sid_counter m2 ->
+      sid2 = f sid1.
+  Proof.
+    intros m1 m2 f sid1 sid2 H H0 H1.
+    subst.
+    unfold Memory_sid_counter, Memory_sid_modify.
+    destruct m1; cbn.
+    unfold Basics.compose.
+    cbn.
+    eapply MEM.Memory_sid_modify_spec; eauto.
+  Qed.
+
+  Definition Memory_fresh_sid (m : Memory) : (store_id * Memory)%type
+    := let sid := Memory_sid_counter m in
+       let sid' := N.succ sid in
+       (sid', Memory_sid_modify m (fun _ => sid')).
 
 End ALLOCATABLE_MEMORY_TO_FULL_MEMORY_MODEL.
 
