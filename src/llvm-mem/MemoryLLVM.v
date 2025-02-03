@@ -12,7 +12,8 @@ From Mem Require Import
   MemoryModules.Within
   StoreId
   MemPropT
-  SByte.
+  SByte
+  Overlaps.
 
 From LLVM_Memory Require Import
   Intptr
@@ -79,6 +80,8 @@ Import Logic.
 
 Import LLVMParams.
 Import MemoryParams.
+
+From LLVM_Memory Require Import OverlapsLemmas.
 
 Module MemoryHelpers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_MEMORY_MODEL ADDR SB AID H F FS).
   (*** Other helpers *)
@@ -778,6 +781,11 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
   Module MemHelp := MemoryHelpers ADDR IP SIZEOF EVENTS SB AID H F FS MM.
   Import MemHelp.
 
+  (* TODO: Should probably incorporate this into the ADDR type... *)
+  Module OVER := PTOIOverlaps ADDR ADDR.
+  Module OVERLAP := OverlapHelpers ADDR SIZEOF OVER.
+  Import OVERLAP.
+
   (** TODO: Move this generate_undef_bytes stuff *)
   Definition generate_num_undef_bytes_h (start_ix : N) (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
     N.recursion
@@ -1012,6 +1020,72 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
     bytes <- serialize_sbytes uv dt;;
     write_bytes_spec ptr bytes.
     
+  (** memcpy spec *)
+  Definition memcpy_spec (src dst : addr) (len : Z) (volatile : bool) : MemPropT Memory unit :=
+    if Z.ltb len 0
+    then
+      raise_ub "memcpy given negative length."
+    else
+      (* From LangRef: The ‘llvm.memcpy.*’ intrinsics copy a block of
+       memory from the source location to the destination location, which
+       must either be equal or non-overlapping.
+       *)
+      if orb (no_overlap dst len src len)
+           (Z.eqb (ptr_to_int src) (ptr_to_int dst))
+      then
+        src_bytes <- read_bytes_spec src (Z.to_nat len);;
+
+        (* TODO: Double check that this is correct... Should we check if all writes are allowed first? *)
+        write_bytes_spec dst src_bytes
+      else
+        raise_ub "memcpy with overlapping or non-equal src and dst memory locations.".
+
+  (** memset spec *)
+  Definition memset_spec (dst : addr) (val : VellvmIntegers.int8) (len : Z) (sid : store_id) (volatile : bool) : MemPropT Memory unit :=
+    if Z.ltb len 0
+    then
+      raise_ub "memset given negative length."
+    else
+      let byte := uvalue_sbyte (@UVALUE_I 8 val) (DTYPE_I 8) 0 sid in
+      write_bytes_spec dst (repeatN (Z.to_N len) byte).
+
+  (** malloc spec *)
+  Definition heap_allocate_block_with_aid_MemPropT (bytes : list SByte) (aid : AID.AllocationId) : MemPropT Memory (list addr)
+    :=
+    fun m1 res =>
+      match run_err_ub_oom res with
+      | inl (OOM_message x) =>
+          True
+      | inr (inl (UB_message x)) =>
+          False
+      | inr (inr (inl (ERR_message x))) =>
+          False
+      | inr (inr (inr (m2, res))) =>
+          heap_allocate_block m1 bytes aid (m2, res)
+      end.
+
+  Definition heap_allocate_block_MemPropT' (bytes : list SByte) : MemPropT Memory (list addr)
+    := aid <- fresh_allocation_id;;
+       heap_allocate_block_with_aid_MemPropT bytes aid.
+
+  Definition heap_allocate_block_MemPropT : list SByte -> MemPropT Memory addr
+    := get_first_address ∘ stack_allocate_block_MemPropT'.
+
+  (** free spec *)
+  Definition free_spec_MemPropT (ptr : addr) : MemPropT Memory unit
+    := fun ms res =>
+         match run_err_ub_oom res with
+         | inl (OOM_message x) =>
+             False
+         | inr (inl (UB_message x)) =>
+             forall m2, ~ heap_free ms ptr m2
+         | inr (inr (inl (ERR_message x))) =>
+             False
+         | inr (inr (inr (m2, tt))) =>
+             heap_free ms ptr m2
+         end.
+
+
   (*** Handling memory events *)
   Section Handlers.
     Definition handle_memory_prop : MemoryE ~> MemPropT Memory
@@ -1045,16 +1119,16 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
           DVALUE_Addr src ::
           @DVALUE_I sz len ::
           @DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (unsigned len) (equ volatile VellvmIntegers.one)
+          memcpy_spec src dst (unsigned len) (VellvmIntegers.equ volatile VellvmIntegers.one)
       | DVALUE_Addr dst ::
           DVALUE_Addr src ::
           DVALUE_IPTR len ::
           @DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (IP.to_Z len) (equ volatile VellvmIntegers.one)
+          memcpy_spec src dst (IP.to_Z len) (VellvmIntegers.equ volatile VellvmIntegers.one)
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
-    Definition handle_memset_prop (args : list dvalue) : MemPropT MemState unit.
+    Definition handle_memset_prop (args : list dvalue) : MemPropT Memory unit.
       refine
         (match args with
          | DVALUE_Addr dst ::
@@ -1068,31 +1142,31 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
       destruct (Pos.eq_dec sz_val 8); subst.
       - exact
           (sid <- fresh_sid;;
-           memset_spec dst val (unsigned len) sid (equ volatile VellvmIntegers.one)).
+           memset_spec dst val (unsigned len) sid (VellvmIntegers.equ volatile VellvmIntegers.one)).
       - exact (raise_error "Unsupported arguments to memset.").
     Defined.
 
-    Definition handle_malloc_prop (args : list dvalue) : MemPropT MemState addr :=
-      match args with
-      | [@DVALUE_I bitwidth sz] =>
-          sid <- fresh_sid;;
-          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8) sid);;
-          malloc_bytes_spec_MemPropT bytes
-      | [DVALUE_IPTR sz] =>
-          sid <- fresh_sid;;
-          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (IP.to_unsigned sz)) (DTYPE_I 8) sid);;
-          malloc_bytes_spec_MemPropT bytes
-      | _ => raise_error "Malloc: invalid arguments."
-      end.
+  Definition handle_malloc_prop (args : list dvalue) : MemPropT Memory addr :=
+    match args with
+    | [@DVALUE_I bitwidth sz] =>
+        sid <- fresh_sid;;
+        bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8) sid);;
+        heap_allocate_block_MemPropT bytes
+    | [DVALUE_IPTR sz] =>
+        sid <- fresh_sid;;
+        bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (IP.to_unsigned sz)) (DTYPE_I 8) sid);;
+        heap_allocate_block_MemPropT bytes
+    | _ => raise_error "Malloc: invalid arguments."
+    end.
 
-    Definition handle_free_prop (args : list dvalue) : MemPropT MemState unit :=
+    Definition handle_free_prop (args : list dvalue) : MemPropT Memory unit :=
       match args with
       | [DVALUE_Addr ptr] =>
           free_spec_MemPropT ptr
       | _ => raise_error "Free: invalid arguments."
       end.
 
-    Definition handle_intrinsic_prop : IntrinsicE ~> MemPropT MemState
+    Definition handle_intrinsic_prop : IntrinsicE ~> MemPropT Memory
       := fun T e =>
            match e with
            | Intrinsic t name args =>
