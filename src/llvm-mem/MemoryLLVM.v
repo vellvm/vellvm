@@ -930,6 +930,12 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
          let '(aid, m2) := Memory_fresh_aid m1 in
          res = ret (m2, aid).
 
+  (* TODO: Move this somewhere... *)
+  Definition fresh_sid : MemPropT Memory store_id
+    := fun m1 res =>
+         let '(sid, m2) := Memory_fresh_sid m1 in
+         res = ret (m2, sid).
+
   Definition stack_allocate_block_MemPropT' (bytes : list SByte) : MemPropT Memory (list addr)
     := aid <- fresh_allocation_id;;
        stack_allocate_block_with_aid_MemPropT bytes aid.
@@ -952,35 +958,6 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
     element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
     let bytes := concat element_bytes in
     stack_allocate_block_MemPropT bytes.
-
-    Definition allocate_bytes_with_pr_spec_MemPropT
-      (init_bytes : list SByte) (prov : Provenance)
-      : MemPropT MemState addr
-      := '(ptr, ptrs) <- find_free_block (length init_bytes) prov;;
-         allocate_bytes_post_conditions_MemPropT init_bytes prov ptr ptrs;;
-         ret ptr.
-
-    Definition allocate_bytes_spec_MemPropT
-      (init_bytes : list SByte)
-      : MemPropT MemState addr
-      := prov <- fresh_provenance;;
-         allocate_bytes_with_pr_spec_MemPropT init_bytes prov.
-
-    (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
-    Definition stack_allocate_dtyp_spec (dt : dtyp) (num_elements : N) : MemPropT Memory addr :=
-      MemPropT_assert_pre (dt <> DTYPE_Void);;
-      sid <- fresh_sid;;
-      element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
-      let bytes := concat element_bytes in
-      stack_allocate_block_MemPropT bytes
-      
-
-      allocate_bytes_spec_MemPropT bytes.
-
-    stack_allocate_block
-
-  Definition allocate_dtyp_
-
     
   (*** Handling memory events *)
   Section Handlers.
@@ -993,7 +970,7 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
            | MemPop =>
                mempop_spec_MemPropT
            | Alloca t n align =>
-               addr <- allocate_dtyp_spec t n;;
+               addr <- stack_allocate_dtyp_spec t n;;
                ret (DVALUE_Addr addr)
            | Load t a =>
                match a with
