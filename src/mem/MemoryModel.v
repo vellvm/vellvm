@@ -506,7 +506,7 @@ Module Type EXEC_MEMORY_FIND_FREE
   (Import MEM : CORE_MEMORY_MODEL ADDR SB).
 
   Parameter find_free_block_exec :
-    Memory -> nat -> list addr.
+    Memory -> nat -> OOM (list addr).
 End EXEC_MEMORY_FIND_FREE.
 
 Module Type EXEC_SPEC_MEMORY_FIND_FREE
@@ -562,7 +562,7 @@ Module Type EXEC_MEMORY_ALLOCATE
   (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB).
 
   Parameter allocate_block_exec :
-    Memory -> list SByte -> AllocationId -> (Memory * list addr)%type.
+    Memory -> list SByte -> AllocationId -> OOM (Memory * list addr)%type.
 End EXEC_MEMORY_ALLOCATE.
 
 Module Type EXEC_SPEC_MEMORY_ALLOCATE
@@ -584,7 +584,7 @@ Module Type EXEC_MEMORY_ALLOCATE_CORRECT
 
   Parameter allocate_block_correct :
     forall m1 bytes aid m2 ptrs,
-      allocate_block_exec m1 bytes aid = (m2, ptrs) ->
+      allocate_block_exec m1 bytes aid = NoOom (m2, ptrs) ->
       allocate_block m1 bytes aid m2 ptrs.
 End EXEC_MEMORY_ALLOCATE_CORRECT.
 
