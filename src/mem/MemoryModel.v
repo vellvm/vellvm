@@ -580,7 +580,7 @@ End EXEC_MEMORY_ALLOCATE.
 Module Type EXEC_SPEC_MEMORY_ALLOCATE
   (ADDR : BASIC_ADDRESS)
   (SB : SBYTE)
-  (AID : ALLOCATION_ID) := MEMORY_ALLOCATE_HELPER ADDR SB AID<+ EXEC_MEMORY_ALLOCATE ADDR SB AID.
+  (AID : ALLOCATION_ID) := MEMORY_ALLOCATE_HELPER ADDR SB AID <+ EXEC_MEMORY_ALLOCATE ADDR SB AID.
 
 Module Type EXEC_MEMORY_ALLOCATE_CORRECT
   (Import ADDR : BASIC_ADDRESS)
@@ -607,6 +607,7 @@ Module Type CORE_FRAME
   (Import ADDR : CORE_ADDRESS) <: Typ.
   Parameter t : Type.
   Parameter ptr_in_frame : t -> addr -> bool.
+  Parameter ptrs_in_frame : t -> list addr.
   Parameter add_to_frame : t -> addr -> t.
   Parameter empty_frame : t.
 
@@ -625,6 +626,10 @@ Module Type CORE_FRAME
     forall ptr p f,
       ptr_in_frame f p = true ->
       ptr_in_frame (add_to_frame f ptr) p = true.
+
+  Parameter ptr_in_frame_ptrs_in_frame :
+    forall f ptr,
+      ptr_in_frame f ptr = true <-> In ptr (ptrs_in_frame f).
 End CORE_FRAME.
 
 Module Type FRAME_NOTATIONS
@@ -761,25 +766,23 @@ Module Type MEMORY_STACK_ALLOCATE
   (Import AID : ALLOCATION_ID)
   (Import F : FRAME ADDR)
   (Import FS : FRAME_STACK ADDR F)
-  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
-  (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
-  (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC)
-  (Import ALLOCATE : MEMORY_ALLOCATE ADDR SB AID MEM ALLOC FIND_FREE)
+  (Import MEM : ALLOCATABLE_MEMORY ADDR SB AID)
   (Import MFS : MEMORY_FRAME_STACK ADDR SB F FS MEM).
 
+  (* It's a little unclear if OOM or err should take precedence... Currently OOM takes precedence. *)
   Definition stack_allocate_block
-    (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : Memory * list addr) : Prop :=
+    (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : err (Memory * list addr)) : Prop :=
     exists m' ptrs,
       allocate_block m bytes aid m' ptrs /\
         match add_all_to_current_frame (Memory_frame_stack m') ptrs with
-        | None => False
+        | None => res = inl "stack_allocate_block: No stack frame"%string
         | Some fs =>
-            res = (Memory_frame_stack_modify m' (fun _ => fs), ptrs)
+            res = inr (Memory_frame_stack_modify m' (fun _ => fs), ptrs)
         end.
 
   Lemma stack_allocate_block_free :
     forall m1 bytes aid m2 ptrs,
-      stack_allocate_block m1 bytes aid (m2, ptrs) ->
+      stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
       find_free_block m1 (length bytes) ptrs.
   Proof.
     intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
@@ -790,22 +793,22 @@ Module Type MEMORY_STACK_ALLOCATE
   Parameter stack_allocate_block_non_null :
     forall m1 bytes aid m2 ptrs,
       length bytes > 0 ->
-      stack_allocate_block m1 bytes aid (m2, ptrs) ->
+      stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
       Forall (fun ptr => is_null ptr = false) ptrs.
 
   Parameter stack_allocate_block_new_reads :
     forall m1 bytes aid m2 ptrs,
-      stack_allocate_block m1 bytes aid (m2, ptrs) ->
+      stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
       Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs.
 
   Parameter stack_allocate_block_old_reads :
     forall m1 bytes aid m2 ptrs,
-      stack_allocate_block m1 bytes aid (m2, ptrs) ->
+      stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
       forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b.
 
   Parameter stack_allocate_block_allocated :
     forall m1 bytes aid m2 ptrs,
-      stack_allocate_block m1 bytes aid (m2, ptrs)->
+      stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
       Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
 
   (*
@@ -823,61 +826,63 @@ Module Type EXEC_MEMORY_STACK_ALLOCATE
   (Import AID : ALLOCATION_ID)
   (Import F : FRAME ADDR)
   (Import FS : FRAME_STACK ADDR F)
-  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
-  (Import ALLOCATE : EXEC_MEMORY_ALLOCATE ADDR SB AID MEM)
+  (Import MEM : EXEC_ALLOCATABLE_MEMORY ADDR SB AID)
   (Import MFS : MEMORY_FRAME_STACK ADDR SB F FS MEM).
 
   Definition stack_allocate_block_exec
-    (m : Memory) (bytes : list SByte) (aid : AllocationId) : (Memory * list addr) :=
-    let (m', ptrs) := allocate_block_exec m bytes aid in
-    match add_all_to_current_frame (Memory_frame_stack m') ptrs with
-    | None => False
-    | Some fs =>
-        res = (Memory_frame_stack_modify m' (fun _ => fs), ptrs)
+    (m : Memory) (bytes : list SByte) (aid : AllocationId) : err (OOM (Memory * list addr)) :=
+    match allocate_block_exec m bytes aid with
+    | Oom s => ret (Oom s)
+    | NoOom (m', ptrs) =>
+        match add_all_to_current_frame (Memory_frame_stack m') ptrs with
+        | None => inl "stack_allocate_block: No stack frame"%string
+        | Some fs =>
+            ret (NoOom (Memory_frame_stack_modify m' (fun _ => fs), ptrs))
+        end
     end.
-    
-    exists m' ptrs,
-      allocate_block_exec m bytes aid m' ptrs /\
+End EXEC_MEMORY_STACK_ALLOCATE.
 
-  Lemma stack_allocate_block_free :
-    forall m1 bytes aid m2 ptrs,
-      stack_allocate_block m1 bytes aid (m2, ptrs) ->
-      find_free_block m1 (length bytes) ptrs.
+Module Type EXEC_MEMORY_STACK_ALLOCATE_CORRECT
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import F : FRAME ADDR)
+  (Import FS : FRAME_STACK ADDR F)
+  (Import MEM : EXEC_ALLOCATABLE_MEMORY ADDR SB AID)
+  (Import MFS : MEMORY_FRAME_STACK ADDR SB F FS MEM)
+  (Import EXEC_MEM : EXEC_MEMORY_STACK_ALLOCATE ADDR SB AID F FS MEM MFS)
+  (Import MEM' : MEMORY_STACK_ALLOCATE ADDR SB AID F FS MEM MFS).
+
+  Lemma stack_allocate_block_succeeds_correct :
+    forall m m' ptrs bytes aid,
+      stack_allocate_block_exec m bytes aid = (inr (NoOom (m', ptrs))) ->
+      stack_allocate_block m bytes aid (inr (m', ptrs)).
   Proof.
-    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
-    break_match_hyp_inv.
-    eapply allocate_block_free; eauto.
+    intros m m' ptrs bytes aid STACK_ALLOC.
+    red.
+    unfold stack_allocate_block_exec in STACK_ALLOC.
+    repeat break_match_hyp_inv.
+    apply allocate_block_correct in Heqo.
+    repeat eexists; eauto.
+    rewrite Heqo0.
+    reflexivity.
   Qed.
 
-  Parameter stack_allocate_block_non_null :
-    forall m1 bytes aid m2 ptrs,
-      length bytes > 0 ->
-      stack_allocate_block m1 bytes aid (m2, ptrs) ->
-      Forall (fun ptr => is_null ptr = false) ptrs.
-
-  Parameter stack_allocate_block_new_reads :
-    forall m1 bytes aid m2 ptrs,
-      stack_allocate_block m1 bytes aid (m2, ptrs) ->
-      Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs.
-
-  Parameter stack_allocate_block_old_reads :
-    forall m1 bytes aid m2 ptrs,
-      stack_allocate_block m1 bytes aid (m2, ptrs) ->
-      forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b.
-
-  Parameter stack_allocate_block_allocated :
-    forall m1 bytes aid m2 ptrs,
-      stack_allocate_block m1 bytes aid (m2, ptrs)->
-      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
-
-  (*
-  Parameter stack_allocate_block_new_frame :
-    forall m1 bytes aid m2 ptrs fs1 fs2,
-      stack_allocate_block m1 bytes aid (m2, ptrs)->
-      fs2 = Memory_frame_stack m2 ->
-      fs1 = Memory_frame_stack m1 ->
-      push fs1 (add_all_to_current_frame empty_frame ptrs) = fs2. *)
-End MEMORY_STACK_ALLOCATE.
+  Lemma stack_allocate_block_err_correct :
+    forall m s bytes aid,
+      stack_allocate_block_exec m bytes aid = inl s ->
+      stack_allocate_block m bytes aid (inl s).
+  Proof.
+    intros m ptrs bytes aid STACK_ALLOC.
+    red.
+    unfold stack_allocate_block_exec in STACK_ALLOC.
+    repeat break_match_hyp_inv.
+    apply allocate_block_correct in Heqo.
+    repeat eexists; eauto.
+    rewrite Heqo0.
+    reflexivity.
+  Qed.
+End EXEC_MEMORY_STACK_ALLOCATE_CORRECT.
 
 Module Type MEMORY_STACK_POP_BASE
   (Import ADDR : BASIC_ADDRESS)
@@ -885,10 +890,8 @@ Module Type MEMORY_STACK_POP_BASE
   (Import AID : ALLOCATION_ID)
   (Import F : FRAME ADDR)
   (Import FS : FRAME_STACK ADDR F)
-  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
-  (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
-  (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC)
-  (Import MFS : MEMORY_FRAME_STACK ADDR SB F FS MEM).
+  (Import FIND_FREE : MEMORY_FIND_FREE_HELPER ADDR SB AID)
+  (Import MFS : MEMORY_FRAME_STACK ADDR SB F FS FIND_FREE).
 
   Parameter stack_pop :
       Memory -> Memory -> Prop.
@@ -926,19 +929,86 @@ Module Type MEMORY_STACK_POP_BASE
         read_byte m1 ptr byte <-> read_byte m2 ptr byte.
 End MEMORY_STACK_POP_BASE.
 
+Module Type EXEC_MEMORY_FREE_BYTE
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import MFS : WRITEABLE_MEMORY_ALLOCATED_HELPER ADDR SB AID).
+
+  Parameter free_byte_exec : Memory -> addr -> Memory.
+
+  Definition free_bytes_exec (m : Memory) (ptrs : list addr) : Memory
+    := fold_left (fun m' ptr => free_byte_exec m' ptr) ptrs m.
+
+  Parameter free_byte_frees :
+    forall m1 ptr aid m2,
+      addr_allocated m1 ptr aid /\ free_byte_exec m1 ptr = m2 ->
+      addr_not_allocated m2 ptr.
+
+  Parameter free_byte_other_allocations :
+    forall m1 ptr m2,
+      free_byte_exec m1 ptr = m2 ->
+      forall p' aid,
+        disjoint_ptr_byte ptr p' ->
+        addr_allocated m1 p' aid <-> addr_allocated m2 p' aid.
+
+  Parameter free_byte_other_reads :
+    forall m1 ptr m2,
+      free_byte_exec m1 ptr = m2 ->
+      forall p' byte,
+        disjoint_ptr_byte ptr p' ->
+        read_byte m1 p' byte <-> read_byte m2 p' byte.
+End EXEC_MEMORY_FREE_BYTE.
+
+Module Type EXEC_MEMORY_STACK_POP_BASE
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import F : FRAME ADDR)
+  (Import FS : FRAME_STACK ADDR F)
+  (Import ALLOC : ALLOCATABLE_MEMORY ADDR SB AID)
+  (Import FREE_BYTE : EXEC_MEMORY_FREE_BYTE ADDR SB AID ALLOC)
+  (Import MFS : MEMORY_FRAME_STACK ADDR SB F FS ALLOC).
+
+  Definition stack_pop_exec (m : Memory) : option Memory
+    := '(f, fs) <- pop (Memory_frame_stack m);;
+       (* Free pointers *)
+       let m' := free_bytes_exec m (ptrs_in_frame f) in
+       ret (Memory_frame_stack_modify m' (fun _ => fs)).
+End EXEC_MEMORY_STACK_POP_BASE.
+
 Module Type FULL_STACK_MEMORY (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) :=
   ALLOCATABLE_MEMORY ADDR SB AID <+ MEMORY_FRAME_STACK ADDR SB F FS <+ MEMORY_STACK_ALLOCATE ADDR SB AID F FS <+ MEMORY_STACK_POP_BASE ADDR SB AID F FS.
+
+Module Type EXEC_SPEC_FULL_STACK_MEMORY (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) :=
+  FULL_STACK_MEMORY ADDR SB AID F FS <+ EXEC_MEMORY_FREE_BYTE ADDR SB AID <+ EXEC_MEMORY_STACK_POP_BASE ADDR SB AID F FS.
+
+Module Type EXEC_MEMORY_STACK_POP_CORRECT
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import F : FRAME ADDR)
+  (Import FS : FRAME_STACK ADDR F)
+  (Import MEM : EXEC_SPEC_FULL_STACK_MEMORY ADDR SB AID F FS).
+
+  Parameter stack_pop_correct :
+    forall m1 m2,
+      stack_pop_exec m1 = Some m2 ->
+      stack_pop m1 m2.
+End EXEC_MEMORY_STACK_POP_CORRECT.
 
 Module FRAME_LIST_CORE
   (Import ADDR : CORE_ADDRESS)
   (Import PTOI : HAS_PTOI ADDR) <: CORE_FRAME ADDR.
-  Definition t := list Z.
+  Definition t := list addr.
   Definition ptr_in_frame (f : t) (p : addr) : bool :=
-    existsb (fun z => Z.eqb (ptr_to_int p) z) f.
+    existsb (fun z => Coqlib.proj_sumbool (ADDR.eq_dec p z)) f.
+  Definition ptrs_in_frame (f : t) : list addr :=
+    f.
   Definition empty_frame : t := [].
 
   Definition add_to_frame (f : t) (p : addr) : t :=
-    cons (ptr_to_int p) f.
+    cons p f.
 
   Lemma empty_frame_spec :
     forall ptr,
@@ -954,16 +1024,42 @@ Module FRAME_LIST_CORE
   Proof.
     intros ptr f.
     cbn.
-    lia.
+    apply Bool.orb_true_iff.
+    left.
+    unfold Coqlib.proj_sumbool.
+    break_match_goal; auto.
   Qed.
 
   (* May not hold for `ptr_in_frame f p = false`, because we may
      consider different pointers with the same provenance to be in a
      frame if they share a physical address *)
-  Parameter add_to_frame_old :
+  Lemma add_to_frame_old :
     forall ptr p f,
       ptr_in_frame f p = true ->
       ptr_in_frame (add_to_frame f ptr) p = true.
+  Proof.
+    intros ptr p f IN.
+    cbn.
+    apply Bool.orb_true_iff.
+    unfold Coqlib.proj_sumbool.
+    break_match_goal; auto.
+  Qed.
+
+  Lemma ptr_in_frame_ptrs_in_frame :
+    forall f ptr,
+      ptr_in_frame f ptr = true <-> In ptr (ptrs_in_frame f).
+  Proof.
+    intros f ptr.
+    unfold ptr_in_frame, ptrs_in_frame.
+    split; intros IN.
+    - apply existsb_exists in IN.
+      destruct IN as (?&?&?).
+      apply Coqlib.proj_sumbool_true in H0; subst; auto.
+    - apply existsb_exists.
+      exists ptr.
+      split; auto.
+      apply Coqlib.proj_sumbool_is_true; auto.
+  Qed.
 End FRAME_LIST_CORE.
 
 Module Type FRAME_LIST (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) := FRAME_LIST_CORE ADDR PTOI <+ FRAME_NOTATIONS ADDR <+ FRAME_EQV ADDR.
