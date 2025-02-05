@@ -1216,25 +1216,37 @@ Module Type MEMORY_HEAP_ALLOCATE
   (Import SB : SBYTE)
   (Import AID : ALLOCATION_ID)
   (Import H : HEAP ADDR)
-  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
-  (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
-  (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC)
+  (Import MEM : ALLOCATABLE_MEMORY ADDR SB AID)
   (Import MH : MEMORY_HEAP ADDR SB H MEM).
 
-  Parameter heap_allocate_block :
-    Memory -> list SByte -> AllocationId -> (Memory * list addr)%type -> Prop.
+  Definition heap_allocate_block
+    (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : Memory * list addr) : Prop :=
+    exists m' ptrs,
+      allocate_block m bytes aid m' ptrs /\
+        res = (Memory_heap_modify m' (fun h => add_ptrs_to_heap h ptrs), ptrs).
 
-  Parameter heap_allocate_block_free :
+  Lemma heap_allocate_block_free :
     forall m1 bytes aid m2 ptrs,
       heap_allocate_block m1 bytes aid (m2, ptrs) ->
       find_free_block m1 (length bytes) ptrs.
+  Proof.
+    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
+    inv ADD.
+    eapply allocate_block_free; eauto.
+  Qed.
 
-  Parameter heap_allocate_block_non_null :
+  Lemma heap_allocate_block_non_null :
     forall m1 bytes aid m2 ptrs,
       length bytes > 0 ->
       heap_allocate_block m1 bytes aid (m2, ptrs) ->
       Forall (fun p => is_null p = false) ptrs.
+  Proof.
+    intros m1 bytes aid m2 ptrs LEN (m' & ptrs' & ALLOC & ADD).
+    inv ADD.
+    eapply allocate_block_non_null; eauto.
+  Qed.
 
+  (* Need to know Modify_heap doesn't impact reads... *)
   Parameter heap_allocate_block_new_reads :
     forall m1 bytes aid m2 ptrs,
       heap_allocate_block m1 bytes aid (m2, ptrs) ->
@@ -1256,16 +1268,60 @@ Module Type MEMORY_HEAP_ALLOCATE
       Memory_heap m2 = add_ptrs_to_heap (Memory_heap m1) ptrs.
 End MEMORY_HEAP_ALLOCATE.
 
+Module Type EXEC_MEMORY_HEAP_ALLOCATE
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import H : HEAP ADDR)
+  (Import MEM : EXEC_ALLOCATABLE_MEMORY ADDR SB AID)
+  (Import MH : MEMORY_HEAP ADDR SB H MEM).
+
+  Definition heap_allocate_block_exec (m : Memory) (bytes : list SByte) (aid : AllocationId) : OOM (Memory * list addr) :=
+    match allocate_block_exec m bytes aid with
+    | Oom s => Oom s
+    | NoOom (m', ptrs) =>
+        NoOom (Memory_heap_modify m' (fun h => add_ptrs_to_heap h ptrs), ptrs)
+    end.
+End EXEC_MEMORY_HEAP_ALLOCATE.
+
+Module Type MEMORY_HEAP_ALLOCATE_HELPER (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) (H : HEAP ADDR) :=
+  ALLOCATABLE_MEMORY ADDR SB AID <+ MEMORY_HEAP ADDR SB H <+ MEMORY_HEAP_ALLOCATE ADDR SB AID H.
+
+Module Type EXEC_MEMORY_HEAP_ALLOCATE_HELPER (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) (H : HEAP ADDR) :=
+  EXEC_ALLOCATABLE_MEMORY ADDR SB AID <+ MEMORY_HEAP ADDR SB H <+ MEMORY_HEAP_ALLOCATE ADDR SB AID H.
+
+Module Type EXEC_SPEC_MEMORY_HEAP_ALLOCATE (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) (H : HEAP ADDR) :=
+  EXEC_MEMORY_HEAP_ALLOCATE_HELPER ADDR SB AID H <+ EXEC_MEMORY_HEAP_ALLOCATE ADDR SB AID H.
+
+Module Type EXEC_MEMORY_HEAP_ALLOCATE_CORRECT
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import H : HEAP ADDR)
+  (Import MEM : EXEC_SPEC_MEMORY_HEAP_ALLOCATE ADDR SB AID H).
+
+  Lemma heap_allocate_block_correct :
+    forall m m' ptrs bytes aid,
+      heap_allocate_block_exec m bytes aid = NoOom (m', ptrs) ->
+      heap_allocate_block m bytes aid (m', ptrs).
+  Proof.
+    intros m m' ptrs bytes aid HEAP_ALLOC.
+    red.
+    unfold heap_allocate_block_exec in HEAP_ALLOC.
+    repeat break_match_hyp_inv.
+    apply allocate_block_correct in Heqo.
+    repeat eexists; eauto.
+  Qed.
+End EXEC_MEMORY_HEAP_ALLOCATE_CORRECT.
+
 Module Type MEMORY_HEAP_FREE
   (Import ADDR : BASIC_ADDRESS)
   (Import SB : SBYTE)
   (Import AID : ALLOCATION_ID)
   (Import H : HEAP ADDR)
-  (Import MEM : WRITEABLE_MEMORY_HELPER ADDR SB)
-  (Import ALLOC : MEMORY_ALLOCATED_CORE ADDR SB AID MEM)
-  (Import FIND_FREE : MEMORY_FIND_FREE ADDR SB AID MEM ALLOC)
+  (Import MEM : ALLOCATABLE_MEMORY ADDR SB AID)
   (Import MH : MEMORY_HEAP ADDR SB H MEM)
-  (Import MHA : MEMORY_HEAP_ALLOCATE ADDR SB AID H MEM ALLOC FIND_FREE MH).
+  (Import MHA : MEMORY_HEAP_ALLOCATE ADDR SB AID H MEM MH).
 
   Parameter heap_free :
     Memory -> addr -> Memory -> Prop.
