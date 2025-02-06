@@ -83,62 +83,10 @@ Import MemoryParams.
 
 From LLVM_Memory Require Import OverlapsLemmas.
 
-Module MemoryHelpers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_MEMORY_MODEL ADDR SB AID H F FS).
-  (*** Other helpers *)
-  Import MM.
+Module SerializationHelpers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID).
   Import SB.
   Import EVENTS.
   Import SIZEOF.
-
-  Ltac convert_to_ret :=
-    match goal with
-    | _:_ |- context [ success_unERR_UB_OOM ?x ] =>
-        replace (success_unERR_UB_OOM x) with (@ret err_ub_oom _ _ x) by auto
-    end.
-
-  Ltac convert_to_ret_hyp :=
-    repeat
-      match goal with
-      | H : context [ success_unERR_UB_OOM ?x ] |- _ =>
-          replace (success_unERR_UB_OOM x) with (@ret err_ub_oom _ _ x) in H by auto
-      end.
-
-  Ltac convert_to_raise :=
-    match goal with
-    | _:_ |-
-        context [
-            ({| unERR_UB_OOM :=
-                 {|
-                   EitherMonad.unEitherT :=
-                     {|
-                       EitherMonad.unEitherT :=
-                         {|
-                           EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (@inl _ (sum ERR_MESSAGE ?t) (UB_message ?ub_msg)) |}
-                         |}
-                     |}
-                 |}
-             |}) ] =>
-        replace (UB_unERR_UB_OOM ub_msg) with (@raise_ub err_ub_oom _ t ub_msg) by auto
-    end.
-
-  Ltac convert_to_raise_hyp :=
-    repeat
-      match goal with
-      | H : context [
-                ({| unERR_UB_OOM :=
-                     {|
-                       EitherMonad.unEitherT :=
-                         {|
-                           EitherMonad.unEitherT :=
-                             {|
-                               EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (@inl _ (sum ERR_MESSAGE ?t) (UB_message ?ub_msg)) |}
-                             |}
-                         |}
-                     |}
-                 |}) ] |- _ =>
-          replace (UB_unERR_UB_OOM ub_msg) with (@raise_ub err_ub_oom _ t ub_msg) in H by eauto
-      end.
-
 
   Definition generate_num_undef_bytes_h (start_ix : N) (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
     N.recursion
@@ -768,103 +716,63 @@ Module MemoryHelpers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVE
     (*  (* *) *)
 
   End Serialization.
-End MemoryHelpers.
+End SerializationHelpers.
 
-Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_MEMORY_MODEL ADDR SB AID H F FS).
-  Import EVENTS.
+Module MemoryHelpers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_MEMORY_MODEL ADDR SB AID H F FS).
+  (*** Other helpers *)
   Import MM.
-  Import FS.
   Import SB.
+  Import EVENTS.
   Import SIZEOF.
-  Import ADDR.
 
-  Module MemHelp := MemoryHelpers ADDR IP SIZEOF EVENTS SB AID H F FS MM.
-  Import MemHelp.
+  Ltac convert_to_ret :=
+    match goal with
+    | _:_ |- context [ success_unERR_UB_OOM ?x ] =>
+        replace (success_unERR_UB_OOM x) with (@ret err_ub_oom _ _ x) by auto
+    end.
 
-  (* TODO: Should probably incorporate this into the ADDR type... *)
-  Module OVER := PTOIOverlaps ADDR ADDR.
-  Module OVERLAP := OverlapHelpers ADDR SIZEOF OVER.
-  Import OVERLAP.
+  Ltac convert_to_ret_hyp :=
+    repeat
+      match goal with
+      | H : context [ success_unERR_UB_OOM ?x ] |- _ =>
+          replace (success_unERR_UB_OOM x) with (@ret err_ub_oom _ _ x) in H by auto
+      end.
 
-  (** TODO: Move this generate_undef_bytes stuff *)
-  Definition generate_num_undef_bytes_h (start_ix : N) (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
-    N.recursion
-      (fun (x : N) => ret [])
-      (fun n mf x =>
-         rest_bytes <- mf (N.succ x);;
-         let byte := uvalue_sbyte (UVALUE_Undef dt) dt x sid in
-         ret (byte :: rest_bytes))
-      num start_ix.
+  Ltac convert_to_raise :=
+    match goal with
+    | _:_ |-
+        context [
+            ({| unERR_UB_OOM :=
+                 {|
+                   EitherMonad.unEitherT :=
+                     {|
+                       EitherMonad.unEitherT :=
+                         {|
+                           EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (@inl _ (sum ERR_MESSAGE ?t) (UB_message ?ub_msg)) |}
+                         |}
+                     |}
+                 |}
+             |}) ] =>
+        replace (UB_unERR_UB_OOM ub_msg) with (@raise_ub err_ub_oom _ t ub_msg) by auto
+    end.
 
-  Definition generate_num_undef_bytes (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
-    generate_num_undef_bytes_h 0 num dt sid.
-
-  Definition generate_undef_bytes (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
-    generate_num_undef_bytes (sizeof_dtyp dt) dt sid.
-
-  Lemma generate_num_undef_bytes_h_length :
-    forall num start_ix dt sid bytes,
-      generate_num_undef_bytes_h start_ix num dt sid = NoOom bytes ->
-      num = N.of_nat (length bytes).
-  Proof.
-    intros num.
-    induction num using N.peano_rect; intros start_ix dt sid bytes GEN.
-    - cbn in *.
-      inv GEN.
-      reflexivity.
-    - unfold generate_num_undef_bytes_h in GEN.
-      pose proof @N.recursion_succ (N -> OOM (list SByte)) Logic.eq (fun _ : N => ret [])
-        (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
-           rest_bytes <- mf (N.succ x);;
-           ret (uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes))
-        eq_refl.
-      forward H.
-      { unfold Proper, respectful.
-        intros x y H0 x0 y0 H1; subst.
-        reflexivity.
-      }
-      specialize (H num).
-      rewrite H in GEN.
-      clear H.
-
-      destruct
-        (N.recursion (fun _ : N => ret [])
-           (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
-              rest_bytes <- mf (N.succ x);;
-              ret (uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes)) num
-           (N.succ start_ix)) eqn:HREC.
-      + (* No OOM *)
-        cbn in GEN.
-        inv GEN.
-        cbn.
-
-        unfold generate_num_undef_bytes_h in IHnum.
-        pose proof (IHnum (N.succ start_ix) dt sid l HREC) as IH.
-        lia.
-      + (* OOM *)
-        cbn in GEN.
-        inv GEN.
-  Qed.
-
-  Lemma generate_num_undef_bytes_length :
-    forall num dt sid bytes,
-      generate_num_undef_bytes num dt sid = NoOom bytes ->
-      num = N.of_nat (length bytes).
-  Proof.
-    intros num dt sid bytes GEN.
-    unfold generate_num_undef_bytes in *.
-    eapply generate_num_undef_bytes_h_length; eauto.
-  Qed.
-
-  Lemma generate_undef_bytes_length :
-    forall dt sid bytes,
-      generate_undef_bytes dt sid = ret bytes ->
-      sizeof_dtyp dt = N.of_nat (length bytes).
-  Proof.
-    intros dt sid bytes GEN_UNDEF.
-    unfold generate_undef_bytes in *.
-    apply generate_num_undef_bytes_length in GEN_UNDEF; auto.
-  Qed.
+  Ltac convert_to_raise_hyp :=
+    repeat
+      match goal with
+      | H : context [
+                ({| unERR_UB_OOM :=
+                     {|
+                       EitherMonad.unEitherT :=
+                         {|
+                           EitherMonad.unEitherT :=
+                             {|
+                               EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (@inl _ (sum ERR_MESSAGE ?t) (UB_message ?ub_msg)) |}
+                             |}
+                         |}
+                     |}
+                 |}) ] |- _ =>
+          replace (UB_unERR_UB_OOM ub_msg) with (@raise_ub err_ub_oom _ t ub_msg) in H by eauto
+      end.
 
   (** Utilities *)
   Definition lift_spec_to_MemPropT {A}
@@ -881,7 +789,26 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
       | inr (inr (inr (m2, res))) =>
           succeeds_spec m1 res m2
       end.
+End MemoryHelpers.
 
+Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_MEMORY_MODEL ADDR SB AID H F FS).
+  Import EVENTS.
+  Import MM.
+  Import FS.
+  Import SB.
+  Import SIZEOF.
+  Import ADDR.
+
+  Module MemHelp := MemoryHelpers ADDR IP SIZEOF EVENTS SB AID H F FS MM.
+  Import MemHelp.
+
+  Module SerHelp := SerializationHelpers ADDR IP SIZEOF EVENTS SB AID.
+  Import SerHelp.
+
+  (* TODO: Should probably incorporate this into the ADDR type... *)
+  Module OVER := PTOIOverlaps ADDR ADDR.
+  Module OVERLAP := OverlapHelpers ADDR SIZEOF OVER.
+  Import OVERLAP.
 
   Definition mempush_spec : Memory -> Memory -> Prop
     := fun m m' => Memory_frame_stack_modify m (fun fs => push fs F.empty_frame) = m'.
@@ -913,7 +840,7 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
           stack_pop m1 m2
       end.
 
-  Definition stack_allocate_block_with_aid_MemPropT (bytes : list SByte) (aid : AID.AllocationId) : MemPropT Memory (list addr)
+  Definition stack_allocate_block_with_aid_MemPropT (bytes : list SByte) (aid : AID.AllocationId) : MemPropT Memory (addr * list addr)
     :=
     fun m1 res =>
       match run_err_ub_oom res with
@@ -922,9 +849,10 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
       | inr (inl (UB_message x)) =>
           False
       | inr (inr (inl (ERR_message x))) =>
-          False
+          (* Malformed stack, shouldn't happen *)
+          exists s, stack_allocate_block m1 bytes aid (inl s)
       | inr (inr (inr (m2, res))) =>
-          stack_allocate_block m1 bytes aid (m2, res)
+          stack_allocate_block m1 bytes aid (inr (m2, res))
       end.
 
   (* TODO: Move this somewhere... *)
@@ -939,7 +867,7 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
          let '(sid, m2) := Memory_fresh_sid m1 in
          res = ret (m2, sid).
 
-  Definition stack_allocate_block_MemPropT' (bytes : list SByte) : MemPropT Memory (list addr)
+  Definition stack_allocate_block_MemPropT' (bytes : list SByte) : MemPropT Memory (addr * list addr)
     := aid <- fresh_allocation_id;;
        stack_allocate_block_with_aid_MemPropT bytes aid.
 
@@ -952,7 +880,7 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
        end.
 
   Definition stack_allocate_block_MemPropT : list SByte -> MemPropT Memory addr
-    := get_first_address ∘ stack_allocate_block_MemPropT'.
+    := fmap fst ∘ stack_allocate_block_MemPropT'.
 
   (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
   Definition stack_allocate_dtyp_spec (dt : dtyp) (num_elements : N) : MemPropT Memory addr :=
@@ -975,7 +903,7 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
       | inr (inr (inr (m2, sb))) =>
           ms = m2 /\ read_byte ms ptr sb
       end.
-  
+
   Definition read_bytes_spec (ptr : addr) (len : nat) : MemPropT Memory (list SByte) :=
     (* TODO: should this OOM, or should this count as walking outside of memory and be UB? *)
     ptrs <- lift_err_RAISE_ERROR (get_consecutive_ptrs ptr len);;
@@ -1019,7 +947,7 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
   Definition write_uvalue_spec (dt : dtyp) (ptr : addr) (uv : uvalue) : MemPropT Memory unit :=
     bytes <- serialize_sbytes uv dt;;
     write_bytes_spec ptr bytes.
-    
+
   (** memcpy spec *)
   Definition memcpy_spec (src dst : addr) (len : Z) (volatile : bool) : MemPropT Memory unit :=
     if Z.ltb len 0
@@ -1050,7 +978,7 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
       write_bytes_spec dst (repeatN (Z.to_N len) byte).
 
   (** malloc spec *)
-  Definition heap_allocate_block_with_aid_MemPropT (bytes : list SByte) (aid : AID.AllocationId) : MemPropT Memory (list addr)
+  Definition heap_allocate_block_with_aid_MemPropT (bytes : list SByte) (aid : AID.AllocationId) : MemPropT Memory (addr * list addr)
     :=
     fun m1 res =>
       match run_err_ub_oom res with
@@ -1064,12 +992,12 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
           heap_allocate_block m1 bytes aid (m2, res)
       end.
 
-  Definition heap_allocate_block_MemPropT' (bytes : list SByte) : MemPropT Memory (list addr)
+  Definition heap_allocate_block_MemPropT' (bytes : list SByte) : MemPropT Memory (addr * list addr)
     := aid <- fresh_allocation_id;;
        heap_allocate_block_with_aid_MemPropT bytes aid.
 
   Definition heap_allocate_block_MemPropT : list SByte -> MemPropT Memory addr
-    := get_first_address ∘ stack_allocate_block_MemPropT'.
+    := fmap fst ∘ stack_allocate_block_MemPropT'.
 
   (** free spec *)
   Definition free_spec_MemPropT (ptr : addr) : MemPropT Memory unit
@@ -1201,6 +1129,356 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
   End Handlers.
 
 End MemoryHandlers.
+
+Module MemoryHandlersExec (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_EXEC_MEMORY_MODEL ADDR SB AID H F FS).
+  Import EVENTS.
+  Import MM.
+  Import FS.
+  Import SB.
+  Import SIZEOF.
+  Import ADDR.
+
+  Module SerHelp := SerializationHelpers ADDR IP SIZEOF EVENTS SB AID.
+  Import SerHelp.
+
+  (* TODO: Should probably incorporate this into the ADDR type... *)
+  Module OVER := PTOIOverlaps ADDR ADDR.
+  Module OVERLAP := OverlapHelpers ADDR SIZEOF OVER.
+  Import OVERLAP.
+
+  Definition MemStateT M := stateT Memory M.
+
+  #[global] Instance MonadExc_MemStateT {M E} `{Monad M} `{MonadExc E M} : MonadExc E (MemStateT M).
+  unfold MemStateT.
+  split.
+  (* Raise *)
+  - intros T e.
+    apply (lift (MonadExc.raise e)).
+  (* Catch *)
+  - intros T m f.
+    red.
+    intros m_init.
+    apply catch.
+    + apply (m m_init).
+    + intros e. apply (f e m_init).
+  Defined.
+
+  Definition mempush_exec {M} `{Monad M} : MemStateT M unit
+    := modify (fun m => Memory_frame_stack_modify m (fun fs => push fs F.empty_frame));;
+       ret tt.
+
+  (* TODO: Move this *)
+  Definition cannot_pop (m : Memory) : bool :=
+    match pop (Memory_frame_stack m) with
+    | Some _ => false
+    | None => true
+    end.
+
+  Definition mempop_exec {M} `{Monad M} `{MonadExc ERR_MESSAGE M} : MemStateT M unit
+    := m <- MonadState.get;;
+       match stack_pop_exec m with
+       | None => lift (MonadExc.raise (ERR_message "mempop: no frame to pop."%string))
+       | Some m' =>
+           put m'
+       end.
+
+  Definition stack_allocate_block_with_aid_exec
+    {M} `{Monad M} `{MonadExc ERR_MESSAGE M} `{MonadExc OOM_MESSAGE M}
+    (bytes : list SByte) (aid : AID.AllocationId) : MemStateT M (addr * list addr)
+    := m <- MonadState.get;;
+       match stack_allocate_block_exec m bytes aid with
+       | inl err => lift (MonadExc.raise (ERR_message err))
+       | inr (Oom oom) => lift (MonadExc.raise (OOM_message oom))
+       | inr (NoOom (m', ptrs)) =>
+           put m';;
+           ret ptrs
+       end.
+
+  (* TODO: Move this somewhere... *)
+  Definition fresh_allocation_id {M} `{Monad M} : MemStateT M AID.AllocationId
+    := m1 <- MonadState.get;;
+       let '(aid, m2) := Memory_fresh_aid m1 in
+       put m2;;
+       ret aid.
+
+  (* TODO: Move this somewhere... *)
+  Definition fresh_sid {M} `{Monad M} : MemStateT M store_id
+    := m1 <- MonadState.get;;
+       let '(sid, m2) := Memory_fresh_sid m1 in
+       put m2;;
+       ret sid.
+
+  Definition stack_allocate_block_exec'
+    {M} `{Monad M} `{MonadExc ERR_MESSAGE M} `{MonadExc OOM_MESSAGE M}
+    (bytes : list SByte) : MemStateT M (addr * list addr)
+    := aid <- fresh_allocation_id;;
+       stack_allocate_block_with_aid_exec bytes aid.
+
+  Definition stack_allocate_block_exec
+    {M} `{Monad M} `{MonadExc ERR_MESSAGE M} `{MonadExc OOM_MESSAGE M}
+    : list SByte -> MemStateT M addr
+    := fmap fst ∘ stack_allocate_block_exec'.
+
+  Definition stack_allocate_dtyp_exec
+    {M} `{Monad M} `{MonadExc ERR_MESSAGE M} `{MonadExc OOM_MESSAGE M}
+    (dt : dtyp) (num_elements : N) : MemStateT M addr :=
+    sid <- fresh_sid;;
+    element_bytes <- repeatMN num_elements (lift_OOM (generate_undef_bytes dt sid));;
+    let bytes := concat element_bytes in
+    stack_allocate_block_exec bytes.
+
+  (** Reading uvalues *)
+  Definition read_byte_raw
+    {M} `{Monad M}
+    (ptr : addr)
+    : MemStateT M SByte
+    := gets (fun m => read_byte_exec m ptr).
+
+  Definition read_bytes_exec
+    {M} `{Monad M} `{MonadExc UB_MESSAGE M}
+    (ptr : addr) (len : nat) : MemStateT M (list SByte)
+    := (* TODO: should this OOM, or should this count as walking outside of memory and be UB? *)
+    match get_consecutive_ptrs ptr len with
+    | inl err => lift (MonadExc.raise (UB_message err))
+    | inr ptrs =>
+        (* Actually perform reads *)
+        map_monad (fun ptr => read_byte_raw ptr) ptrs
+    end.
+    
+  Definition read_uvalue_exec
+    {M} `{Monad M} `{MonadExc UB_MESSAGE M}
+    (dt : dtyp) (ptr : addr) : MemStateT M uvalue
+    := bytes <- read_bytes_exec ptr (N.to_nat (sizeof_dtyp dt));;
+       match deserialize_sbytes bytes dt with
+       | inl err => lift (MonadExc.raise (UB_message err))
+       | inr uv => ret uv
+       end.
+
+  (** Writing uvalues *)
+  Definition write_byte_raw
+    {M} `{Monad M}
+    (ptr : addr) (b : SByte) : MemStateT M unit :=
+    modify (fun m => write_byte_exec m ptr b);; ret tt.
+
+  (* TODO: Should probably move this instance *)
+  #[global] Instance MonadStoreId_MemStateT {M} `{Monad M} : MonadStoreId (MemStateT M).
+  split.
+  apply fresh_sid.
+  Defined.
+
+  Definition write_bytes_exec
+    {M} `{Monad M} `{MonadExc UB_MESSAGE M}
+    (ptr : addr) (bytes : list SByte) : MemStateT M unit :=
+    (* TODO: should this OOM, or should this count as walking outside of memory and be UB? *)
+    match get_consecutive_ptrs ptr (length bytes) with
+    | inl err => lift (MonadExc.raise (UB_message err))
+    | inr ptrs =>
+        (* TODO: double check that this is correct... Should we check if all writes are allowed first? *)
+        (* Actually perform writes *)
+        let ptr_bytes := zip ptrs bytes in
+        map_monad_ (fun '(ptr, byte) => write_byte_raw ptr byte) ptr_bytes
+    end.
+
+  Definition write_uvalue_exec
+    {M} `{Monad M} `{MonadExc UB_MESSAGE M}
+    (dt : dtyp) (ptr : addr) (uv : uvalue) : MemStateT M unit :=
+    bytes <- serialize_sbytes uv dt;;
+    write_bytes_exec ptr bytes.
+
+  (** memcpy *)
+  Definition memcpy_exec
+    {M} `{Monad M} `{MonadExc UB_MESSAGE M}
+    (src dst : addr) (len : Z) (volatile : bool) : MemStateT M unit :=
+    if Z.ltb len 0
+    then
+      raise_ub "memcpy given negative length."
+    else
+      (* From LangRef: The ‘llvm.memcpy.*’ intrinsics copy a block of
+       memory from the source location to the destination location, which
+       must either be equal or non-overlapping.
+       *)
+      if orb (no_overlap dst len src len)
+           (Z.eqb (ptr_to_int src) (ptr_to_int dst))
+      then
+        src_bytes <- read_bytes_exec src (Z.to_nat len);;
+
+        (* TODO: Double check that this is correct... Should we check if all writes are allowed first? *)
+        write_bytes_exec dst src_bytes
+      else
+        raise_ub "memcpy with overlapping or non-equal src and dst memory locations.".
+
+  (** memset spec *)
+  Definition memset_spec
+    {M} `{Monad M} `{MonadExc UB_MESSAGE M}
+    (dst : addr) (val : VellvmIntegers.int8) (len : Z) (sid : store_id) (volatile : bool) : MemStateT M unit :=
+    if Z.ltb len 0
+    then
+      raise_ub "memset given negative length."
+    else
+      let byte := uvalue_sbyte (@UVALUE_I 8 val) (DTYPE_I 8) 0 sid in
+      write_bytes_exec dst (repeatN (Z.to_N len) byte).
+
+  (** malloc spec *)
+  Definition heap_allocate_block_with_aid_exec
+    {M} `{Monad M} `{MonadExc OOM_MESSAGE M}
+    (bytes : list SByte) (aid : AID.AllocationId) : MemStateT M (addr * list addr)
+    := m <- MonadState.get;;
+       match heap_allocate_block_exec m bytes aid with
+       | Oom oom => lift (MonadExc.raise (OOM_message oom))
+       | NoOom (m', ptrs) =>
+           put m';;
+           ret ptrs
+       end.
+
+  Definition heap_allocate_block_exec'
+    {M} `{Monad M} `{MonadExc OOM_MESSAGE M}
+    (bytes : list SByte) : MemStateT M (addr * list addr)
+    := aid <- fresh_allocation_id;;
+       heap_allocate_block_with_aid_exec bytes aid.
+
+  Definition heap_allocate_block_exec
+    {M} `{Monad M} `{MonadExc OOM_MESSAGE M}
+    : list SByte -> MemStateT M addr
+    := fmap fst ∘ heap_allocate_block_exec'.
+
+  (** free spec *)
+  Definition free_exec
+    {M} `{Monad M} `{MonadExc UB_MESSAGE M}
+    (ptr : addr) : MemStateT M unit
+    := m <- MonadState.get;;
+       match heap_free_exec m ptr with
+       | None => lift (MonadExc.raise (UB_message "free_exec: could not free pointer"%string))
+       | Some m' =>
+           put m'
+       end.
+
+  (*** Handling memory events *)
+  Section Handlers.
+    Definition handle_memory_exec
+      {M} `{Monad M} `{MonadExc ERR_MESSAGE M} `{MonadExc UB_MESSAGE M} `{MonadExc OOM_MESSAGE M}
+      : MemoryE ~> MemStateT M
+      := fun T m =>
+           match m with
+           (* Unimplemented *)
+           | MemPush =>
+               mempush_exec
+           | MemPop =>
+               mempop_exec
+           | Alloca t n align =>
+               addr <- stack_allocate_dtyp_exec t n;;
+               ret (DVALUE_Addr addr)
+           | Load t a =>
+               match a with
+               | DVALUE_Addr a =>
+                   read_uvalue_exec t a
+               | _ => lift (MonadExc.raise (UB_message "Loading from something that isn't an address."%string))
+               end
+           | Store t a v =>
+               match a with
+               | DVALUE_Addr a =>
+                   write_uvalue_exec t a v
+               | _ => lift (MonadExc.raise (UB_message "Writing something to somewhere that isn't an address."%string))
+               end
+           end.
+
+    Definition handle_memcpy_exec
+      {M} `{Monad M} `{MonadExc ERR_MESSAGE M} `{MonadExc UB_MESSAGE M}
+      (args : list dvalue) : MemStateT M unit :=
+      match args with
+      | DVALUE_Addr dst ::
+          DVALUE_Addr src ::
+          @DVALUE_I sz len ::
+          @DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
+          memcpy_exec src dst (unsigned len) (VellvmIntegers.equ volatile VellvmIntegers.one)
+      | DVALUE_Addr dst ::
+          DVALUE_Addr src ::
+          DVALUE_IPTR len ::
+          @DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
+          memcpy_exec src dst (IP.to_Z len) (VellvmIntegers.equ volatile VellvmIntegers.one)
+      | _ => raise_error "Unsupported arguments to memcpy."
+      end.
+
+    Definition handle_memset_exec
+      {M} `{Monad M} `{MonadExc ERR_MESSAGE M} `{MonadExc UB_MESSAGE M}
+      (args : list dvalue) : MemStateT M unit.
+      refine
+        (match args with
+         | DVALUE_Addr dst ::
+             @DVALUE_I sz_val val ::
+             @DVALUE_I sz_len len ::
+             @DVALUE_I sz_vol volatile :: [] (* volatile ignored *)  =>
+             _
+         | _ => raise_error "Unsupported arguments to memset."
+         end).
+
+      destruct (Pos.eq_dec sz_val 8); subst.
+      - exact
+          (sid <- fresh_sid;;
+           memset_spec dst val (unsigned len) sid (VellvmIntegers.equ volatile VellvmIntegers.one)).
+      - exact (raise_error "Unsupported arguments to memset.").
+    Defined.
+
+    Definition handle_malloc_exec
+      {M} `{Monad M} `{MonadExc ERR_MESSAGE M} `{MonadExc UB_MESSAGE M} `{MonadExc OOM_MESSAGE M}
+      (args : list dvalue) : MemStateT M addr :=
+      match args with
+      | [@DVALUE_I bitwidth sz] =>
+          sid <- fresh_sid;;
+          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8) sid);;
+          heap_allocate_block_exec bytes
+      | [DVALUE_IPTR sz] =>
+          sid <- fresh_sid;;
+          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (IP.to_unsigned sz)) (DTYPE_I 8) sid);;
+          heap_allocate_block_exec bytes
+      | _ => raise_error "Malloc: invalid arguments."
+      end.
+
+    Definition handle_free_exec
+      {M} `{Monad M} `{MonadExc ERR_MESSAGE M} `{MonadExc UB_MESSAGE M}
+      (args : list dvalue) : MemStateT M unit :=
+      match args with
+      | [DVALUE_Addr ptr] =>
+          free_exec ptr
+      | _ => raise_error "Free: invalid arguments."
+      end.
+
+    Definition handle_intrinsic_prop
+      {M} `{Monad M} `{MonadExc ERR_MESSAGE M} `{MonadExc UB_MESSAGE M} `{MonadExc OOM_MESSAGE M}
+      : IntrinsicE ~> MemStateT M
+      := fun T e =>
+           match e with
+           | Intrinsic t name args =>
+               (* Pick all arguments, they should all be unique. *)
+               (* TODO: add more variants to memcpy *)
+               (* FIXME: use reldec typeclass? *)
+               if orb (Coqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i32"))
+                    (Coqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i64"))
+               then
+                 handle_memcpy_exec args;;
+                 ret DVALUE_None
+               else
+                 if orb (Coqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i32"))
+                      (Coqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i64"))
+                 then
+                   handle_memset_exec args;;
+                   ret DVALUE_None
+                 else
+                   if (Coqlib.proj_sumbool (string_dec name "malloc"))
+                   then
+                     addr <- handle_malloc_exec args;;
+                     ret (DVALUE_Addr addr)
+                   else
+                     if (Coqlib.proj_sumbool (string_dec name "free"))
+                     then
+                       handle_free_exec args;;
+                       ret DVALUE_None
+                     else
+                       raise_error ("Unknown intrinsic: " ++ name)
+           end.
+
+  End Handlers.
+
+End MemoryHandlersExec.
 
 (*
 Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP).
@@ -4462,7 +4740,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
         exec_correct pre (read_uvalue dt ptr) (read_uvalue_spec dt ptr)
           (a0 <-
              (_ <- get_consecutive_ptrs ptr (N.to_nat (LP.SIZEOF.sizeof_dtyp dt));;
-              (fun (ms0 : MemState) (st0 : store_id) (bytes : list MP.BYTE_IMPL.SByte) 
+              (fun (ms0 : MemState) (st0 : store_id) (bytes : list MP.BYTE_IMPL.SByte)
                  (ms'0 : MemState) (st'0 : store_id) =>
                  Forall
                    (fun byte : MP.BYTE_IMPL.SByte =>
@@ -5407,7 +5685,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
              (_ <-
                 @get_consecutive_ptrs exec_correct_post Monad_exec_correct_post RAISE_OOM_exec_correct_post
                   RAISE_ERROR_exec_correct_post src (Z.to_nat len);;
-              (fun (ms0 : MemState) (st0 : store_id) (bytes : list BYTE_IMPL.SByte) 
+              (fun (ms0 : MemState) (st0 : store_id) (bytes : list BYTE_IMPL.SByte)
                  (ms'0 : MemState) (st'0 : store_id) =>
                  @Forall BYTE_IMPL.SByte
                    (fun byte : BYTE_IMPL.SByte =>
@@ -5422,7 +5700,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
                       @exec_correct_post_bind (list (OOM ADDR.addr)) (list ADDR.addr)
                         (@lift_err_RAISE_ERROR (list (OOM ADDR.addr)) exec_correct_post Monad_exec_correct_post
                            RAISE_ERROR_exec_correct_post
-                           (@map_monad err (EitherMonad.Monad_either string) IP.intptr 
+                           (@map_monad err (EitherMonad.Monad_either string) IP.intptr
                               (OOM ADDR.addr)
                               (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) dst [DVALUE_IPTR ix]) ixs))
                         (fun addrs : list (OOM ADDR.addr) =>
@@ -5514,8 +5792,8 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
                         (_ : @In (ADDR.addr * BYTE_IMPL.SByte) H
                                (@zip ADDR.addr BYTE_IMPL.SByte a0
                                   (@repeatN BYTE_IMPL.SByte (Z.to_N len)
-                                     (BYTE_IMPL.uvalue_sbyte (@UVALUE_I 8 val) (DTYPE_I 8) 0 sid)))) 
-                        (_ : MemState) (st0 : store_id) (_ : unit) (_ : MemState) (st'0 : store_id) => 
+                                     (BYTE_IMPL.uvalue_sbyte (@UVALUE_I 8 val) (DTYPE_I 8) 0 sid))))
+                        (_ : MemState) (st0 : store_id) (_ : unit) (_ : MemState) (st'0 : store_id) =>
                         st0 = st'0)) (fun _ : list unit => @exec_correct_post_ret unit tt))).
     Proof using Type.
       intros dst val len sid volatile.
@@ -5695,7 +5973,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           inv H6.
           lia.
         }
-        
+
         eauto with EXEC_CORRECT.
         eauto with EXEC_CORRECT.
       }
@@ -5736,7 +6014,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           inv H6.
           lia.
         }
-        
+
         eauto with EXEC_CORRECT.
         eauto with EXEC_CORRECT.
       }
