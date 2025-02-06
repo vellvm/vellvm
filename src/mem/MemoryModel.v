@@ -522,23 +522,31 @@ Module Type MEMORY_FIND_FREE
   (Import MEM : MEMORY_MODEL_BASE ADDR SB)
   (Import ALLOC : MEMORY_ALLOCATED_HELPER ADDR SB AID MEM).
 
-  Parameter find_free_block :
-      Memory -> nat -> list addr -> Prop.
+  Parameter find_free_block : Memory -> nat -> (addr * list addr) -> Prop.
 
   Parameter find_free_block_is_free :
-    forall m len ptrs,
-      find_free_block m len ptrs ->
-      Forall (addr_not_allocated m) ptrs.
+    forall (m : Memory) (len : nat) (ptrs : addr * list addr),
+      Forall (addr_not_allocated m) (snd ptrs).
 
   Parameter find_free_block_length :
-    forall m len ptrs,
-      find_free_block m len ptrs ->
-      length ptrs = len.
+    forall (m : Memory) (len : nat) (ptrs : addr * list addr),
+      length (snd ptrs) = len.
 
   Parameter find_free_block_consecutive :
-    forall m len ptrs,
-      find_free_block m len ptrs ->
-      consecutive_ptrs ptrs = true.
+    forall (m : Memory) (len : nat) (ptrs : addr * list addr),
+      consecutive_ptrs (snd ptrs) = true.
+
+  Parameter find_free_block_head :
+    forall (m : Memory) (len : nat) (ptrs : addr * list addr) ptr' ptrs',
+      snd ptrs = (ptr' :: ptrs') -> fst ptrs = ptr'.
+
+  Parameter find_free_non_null :
+    forall (m : Memory) (len : nat) (ptrs : addr * list addr),
+      Forall (fun ptr => is_null ptr = false) (snd ptrs).
+
+  Parameter find_free_non_null' :
+    forall (m : Memory) (len : nat) (ptrs : addr * list addr),
+      is_null (fst ptrs) = false.
 End MEMORY_FIND_FREE.
 
 Module Type MEMORY_FIND_FREE_HELPER (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) (MEM : MEMORY_MODEL_BASE ADDR SB)
@@ -550,7 +558,7 @@ Module Type EXEC_MEMORY_FIND_FREE
   (Import MEM : MEMORY_MODEL_BASE ADDR SB).
 
   Parameter find_free_block_exec :
-    Memory -> nat -> OOM (list addr).
+    Memory -> nat -> OOM (addr * list addr).
 End EXEC_MEMORY_FIND_FREE.
 
 Module Type EXEC_MEMORY_FIND_FREE_HELPER (ADDR : BASIC_ADDRESS) (SB : SBYTE) (MEM : MEMORY_MODEL_BASE ADDR SB)
@@ -582,34 +590,28 @@ Module Type MEMORY_ALLOCATE
   (Import MEM : MEMORY_MODEL_BASE ADDR SB)
   (Import FREE : MEMORY_FIND_FREE_HELPER ADDR SB AID MEM).
 
-  Parameter allocate_block :
-    Memory -> list SByte -> AllocationId -> Memory -> list addr -> Prop.
+  Parameter allocate_block : Memory -> list SByte -> AllocationId -> Memory -> (addr * list addr) -> Prop.
 
-  Parameter allocate_block_free :
-    forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid m2 ptrs ->
-      find_free_block m1 (length bytes) ptrs.
+    Parameter allocate_block_free :
+      forall (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)),
+        find_free_block m1 (length bytes) ptrs.
 
   Parameter allocate_block_new_reads :
-    forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid m2 ptrs ->
-      Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs.
+    forall (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)),
+      Forall2 (fun b ptr => read_byte m2 ptr b) bytes (snd ptrs).
 
   Parameter allocate_block_old_reads :
-    forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid m2 ptrs ->
+    forall (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)),
       forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b.
 
   Parameter allocate_block_allocated :
-    forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid m2 ptrs ->
-      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
+    forall (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)),
+      Forall (fun ptr => addr_allocated m2 ptr aid) (snd ptrs).
 
   Parameter allocate_block_non_null :
-    forall m1 bytes aid m2 ptrs,
-      length bytes > 0 ->
-      allocate_block m1 bytes aid m2 ptrs ->
-      Forall (fun ptr => is_null ptr = false) ptrs.
+    forall (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)),
+      Forall (fun ptr => is_null ptr = false) (snd ptrs).
+
 End MEMORY_ALLOCATE.
 
 Module Type EXEC_MEMORY_ALLOCATE
@@ -619,7 +621,7 @@ Module Type EXEC_MEMORY_ALLOCATE
   (Import MEM : MEMORY_MODEL_BASE ADDR SB).
 
   Parameter allocate_block_exec :
-    Memory -> list SByte -> AllocationId -> OOM (Memory * list addr)%type.
+    Memory -> list SByte -> AllocationId -> OOM (Memory * (addr * list addr))%type.
 End EXEC_MEMORY_ALLOCATE.
 
 Module Type MEMORY_ALLOCATE_HELPER
@@ -853,10 +855,10 @@ Module Type MEMORY_STACK_ALLOCATE
 
   (* It's a little unclear if OOM or err should take precedence... Currently OOM takes precedence. *)
   Definition stack_allocate_block
-    (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : err (Memory * list addr)) : Prop :=
+    (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : err (Memory * (addr * list addr))) : Prop :=
     exists m' ptrs,
       allocate_block m bytes aid m' ptrs /\
-        match add_all_to_current_frame (Memory_frame_stack m') ptrs with
+        match add_all_to_current_frame (Memory_frame_stack m') (snd ptrs) with
         | None => res = inl "stack_allocate_block: No stack frame"%string
         | Some fs =>
             res = inr (Memory_frame_stack_modify m' (fun _ => fs), ptrs)
@@ -874,14 +876,13 @@ Module Type MEMORY_STACK_ALLOCATE
 
   Parameter stack_allocate_block_non_null :
     forall m1 bytes aid m2 ptrs,
-      length bytes > 0 ->
       stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
-      Forall (fun ptr => is_null ptr = false) ptrs.
+      Forall (fun ptr => is_null ptr = false) (snd ptrs).
 
   Parameter stack_allocate_block_new_reads :
     forall m1 bytes aid m2 ptrs,
       stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
-      Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs.
+      Forall2 (fun b ptr => read_byte m2 ptr b) bytes (snd ptrs).
 
   Parameter stack_allocate_block_old_reads :
     forall m1 bytes aid m2 ptrs,
@@ -891,7 +892,7 @@ Module Type MEMORY_STACK_ALLOCATE
   Parameter stack_allocate_block_allocated :
     forall m1 bytes aid m2 ptrs,
       stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
-      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
+      Forall (fun ptr => addr_allocated m2 ptr aid) (snd ptrs).
 
   (*
   Parameter stack_allocate_block_new_frame :
@@ -913,11 +914,11 @@ Module Type EXEC_MEMORY_STACK_ALLOCATE
   (Import ALLOC : EXEC_ALLOCATABLE_MEMORY ADDR SB AID MEM).
 
   Definition stack_allocate_block_exec
-    (m : Memory) (bytes : list SByte) (aid : AllocationId) : err (OOM (Memory * list addr)) :=
+    (m : Memory) (bytes : list SByte) (aid : AllocationId) : err (OOM (Memory * (addr * list addr))) :=
     match allocate_block_exec m bytes aid with
     | Oom s => ret (Oom s)
     | NoOom (m', ptrs) =>
-        match add_all_to_current_frame (Memory_frame_stack m') ptrs with
+        match add_all_to_current_frame (Memory_frame_stack m') (snd ptrs) with
         | None => inl "stack_allocate_block: No stack frame"%string
         | Some fs =>
             ret (NoOom (Memory_frame_stack_modify m' (fun _ => fs), ptrs))
@@ -987,7 +988,7 @@ Module Type EXEC_MEMORY_STACK_ALLOCATE_CORRECT
     unfold stack_allocate_block_exec in STACK_ALLOC.
     repeat break_match_hyp_inv.
     apply allocate_block_correct in Heqo.
-    repeat eexists; eauto.
+    do 2 eexists; split; eauto.
     rewrite Heqo0.
     reflexivity.
   Qed.
@@ -1002,7 +1003,7 @@ Module Type EXEC_MEMORY_STACK_ALLOCATE_CORRECT
     unfold stack_allocate_block_exec in STACK_ALLOC.
     repeat break_match_hyp_inv.
     apply allocate_block_correct in Heqo.
-    repeat eexists; eauto.
+    do 2 eexists; split; eauto.
     rewrite Heqo0.
     reflexivity.
   Qed.
@@ -1403,10 +1404,10 @@ Module Type MEMORY_HEAP_ALLOCATE
   (Import ALLOC : ALLOCATABLE_MEMORY_F ADDR SB AID MEM).
 
   Definition heap_allocate_block
-    (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : Memory * list addr) : Prop :=
+    (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : Memory * (addr * list addr)) : Prop :=
     exists m' ptrs,
       allocate_block m bytes aid m' ptrs /\
-        res = (Memory_heap_modify m' (fun h => add_ptrs_to_heap h ptrs), ptrs).
+        res = (Memory_heap_modify m' (fun h => add_ptrs_to_heap h (snd ptrs)), ptrs).
 
   Lemma heap_allocate_block_free :
     forall m1 bytes aid m2 ptrs,
@@ -1420,11 +1421,10 @@ Module Type MEMORY_HEAP_ALLOCATE
 
   Lemma heap_allocate_block_non_null :
     forall m1 bytes aid m2 ptrs,
-      length bytes > 0 ->
       heap_allocate_block m1 bytes aid (m2, ptrs) ->
-      Forall (fun p => is_null p = false) ptrs.
+      Forall (fun p => is_null p = false) (snd ptrs).
   Proof.
-    intros m1 bytes aid m2 ptrs LEN (m' & ptrs' & ALLOC & ADD).
+    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
     inv ADD.
     eapply allocate_block_non_null; eauto.
   Qed.
@@ -1433,7 +1433,7 @@ Module Type MEMORY_HEAP_ALLOCATE
   Parameter heap_allocate_block_new_reads :
     forall m1 bytes aid m2 ptrs,
       heap_allocate_block m1 bytes aid (m2, ptrs) ->
-      Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs.
+      Forall2 (fun b ptr => read_byte m2 ptr b) bytes (snd ptrs).
 
   Parameter heap_allocate_block_old_reads :
     forall m1 bytes aid m2 ptrs,
@@ -1443,12 +1443,12 @@ Module Type MEMORY_HEAP_ALLOCATE
   Parameter heap_allocate_block_allocated :
     forall m1 bytes aid m2 ptrs,
       heap_allocate_block m1 bytes aid (m2, ptrs) ->
-      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
+      Forall (fun ptr => addr_allocated m2 ptr aid) (snd ptrs).
 
   Parameter heap_allocate_block_new_heap :
     forall m1 bytes aid m2 ptrs,
       heap_allocate_block m1 bytes aid (m2, ptrs) ->
-      Memory_heap m2 = add_ptrs_to_heap (Memory_heap m1) ptrs.
+      Memory_heap m2 = add_ptrs_to_heap (Memory_heap m1) (snd ptrs).
 End MEMORY_HEAP_ALLOCATE.
 
 Module Type EXEC_MEMORY_HEAP_ALLOCATE
@@ -1460,11 +1460,11 @@ Module Type EXEC_MEMORY_HEAP_ALLOCATE
   (Import MH : MEMORY_HEAP ADDR SB H MEM)
   (Import ALLOC : EXEC_ALLOCATABLE_MEMORY ADDR SB AID MEM).
 
-  Definition heap_allocate_block_exec (m : Memory) (bytes : list SByte) (aid : AllocationId) : OOM (Memory * list addr) :=
+  Definition heap_allocate_block_exec (m : Memory) (bytes : list SByte) (aid : AllocationId) : OOM (Memory * (addr * list addr)) :=
     match allocate_block_exec m bytes aid with
     | Oom s => Oom s
     | NoOom (m', ptrs) =>
-        NoOom (Memory_heap_modify m' (fun h => add_ptrs_to_heap h ptrs), ptrs)
+        NoOom (Memory_heap_modify m' (fun h => add_ptrs_to_heap h (snd ptrs)), ptrs)
     end.
 End EXEC_MEMORY_HEAP_ALLOCATE.
 
@@ -1501,7 +1501,7 @@ Module Type EXEC_MEMORY_HEAP_ALLOCATE_CORRECT
     unfold heap_allocate_block_exec in HEAP_ALLOC.
     repeat break_match_hyp_inv.
     apply allocate_block_correct in Heqo.
-    repeat eexists; eauto.
+    do 2 eexists; eauto.
   Qed.
 End EXEC_MEMORY_HEAP_ALLOCATE_CORRECT.
 
@@ -1668,7 +1668,7 @@ Module Type FULL_CORRECT_MEMORY_MODEL' (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID:
        EXEC_MEMORY_ALLOCATE_CORRECT ADDR SB AID MEM <+
        CORRECT_MEMORY_FREE_BYTE ADDR SB AID MEM <+
        EXEC_MEMORY_STACK_ALLOCATE_CORRECT ADDR SB AID F FS MEM MFS <+
-       EXEC_MEMORY_STACK_POP_CORRECT ADDR SB AID F FS MEM MFS <+ 
+       EXEC_MEMORY_STACK_POP_CORRECT ADDR SB AID F FS MEM MFS <+
        EXEC_MEMORY_HEAP_ALLOCATE_CORRECT ADDR SB AID H MEM MH <+
        EXEC_MEMORY_HEAP_FREE_CORRECT ADDR SB AID H MEM MH.
 
@@ -1687,7 +1687,7 @@ Module Type FULL_CORRECT_MEMORY_MODEL (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID: 
   := MEMORY_MODEL_BASE ADDR SB <+ MEMORY_HEAP ADDR SB H <+ MEMORY_FRAME_STACK ADDR SB F FS <+
        CORE_MEMORY_FRESH_AID ADDR SB AID <+ CORE_MEMORY_FRESH_STORE_ID ADDR SB <+
        FULL_CORRECT_MEMORY_MODEL' ADDR SB AID H F FS.
-       
+
 (*** Implementations of memory models *)
 (* TODO: Should this be in its own file? *)
 Require Import IntMaps.
@@ -1726,7 +1726,7 @@ Module INTMAP_AID_MEMORY_MODEL
   (Import A : ACCESS PS AID)
   (Import SB : SBYTE) <: ALLOCATABLE_MEMORY_FRESH ADDR SB AID.
 
-  Record Memory' := 
+  Record Memory' :=
     MkMemory {
       Memory_aid_counter : AllocationId;
       Memory_sid_counter : store_id;
@@ -1942,81 +1942,10 @@ Module INTMAP_AID_MEMORY_MODEL
   Qed.
 
   (** FIND_FREE *)
-  Definition find_free_block (m : Memory) (len : nat) (ptrs : list addr) : Prop :=
-    length ptrs = len /\ Forall (addr_not_allocated m) ptrs /\ consecutive_ptrs ptrs = true.
-
-  Lemma find_free_block_is_free :
-    forall m len ptrs,
-      find_free_block m len ptrs ->
-      Forall (addr_not_allocated m) ptrs.
-  Proof.
-    intros * H; apply H.
-  Qed.
-
-  Lemma find_free_block_length :
-    forall m len ptrs,
-      find_free_block m len ptrs ->
-      length ptrs = len.
-  Proof.
-    intros * H; apply H.
-  Qed.
-
-  Lemma find_free_block_consecutive :
-    forall m len ptrs,
-      find_free_block m len ptrs ->
-      consecutive_ptrs ptrs = true.
-  Proof.
-    intros * H; apply H.
-  Qed.
+  Include (MEMORY_FIND_FREE ADDR SB AID).
 
   (** MEMORY_ALLOCATE *)
-  Definition allocate_block (m1 : Memory) (bytes : list SByte) (aid : AID.t) (m2 : Memory) (ptrs : list addr) : Prop :=
-    find_free_block m1 (length bytes) ptrs /\
-      Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs /\
-      (forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b) /\
-      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs /\
-      (length bytes > 0 -> Forall (fun ptr => is_null ptr = false) ptrs).
-
-  Lemma allocate_block_free :
-    forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid m2 ptrs ->
-      find_free_block m1 (length bytes) ptrs.
-  Proof.
-    intros * H; apply H.
-  Qed.
-
-  Lemma allocate_block_new_reads :
-    forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid m2 ptrs ->
-      Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs.
-  Proof.
-    intros * H; apply H.
-  Qed.
-
-  Lemma allocate_block_old_reads :
-    forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid m2 ptrs ->
-      forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b.
-  Proof.
-    intros * H; apply H.
-  Qed.
-
-  Lemma allocate_block_allocated :
-    forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid m2 ptrs ->
-      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
-  Proof.
-    intros * H; apply H.
-  Qed.
-
-  Lemma allocate_block_non_null :
-    forall m1 bytes aid m2 ptrs,
-      length bytes > 0 ->
-      allocate_block m1 bytes aid m2 ptrs ->
-      Forall (fun ptr => is_null ptr = false) ptrs.
-  Proof.
-    intros * LEN H; apply H; eauto.
-  Qed.
+  Include (MEMORY_ALLOCATE ADDR SB AID).
 
   Definition Memory_aid_modify (m : Memory) (f : AllocationId -> AllocationId) : Memory :=
     MkMemory (f (Memory_aid_counter m)) (Memory_sid_counter m) (Memory_byte_map m).
@@ -2061,7 +1990,6 @@ Module INTMAP_AID_MEMORY_MODEL
     := let sid := Memory_sid_counter m in
        let sid' := N.succ sid in
        (sid', Memory_sid_modify m (fun _ => sid')).
-
 End INTMAP_AID_MEMORY_MODEL.
 
 (** Add a heap and stack to allocatable memory *)
@@ -2519,7 +2447,7 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
 
   Definition root_ptr_in_memory_heap (m : Memory) (root : addr) : bool :=
     root_ptr_in_heap (Memory_heap m) root.
-  
+
   Definition heap_allocate_block
     (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : (Memory * list addr)%type) : Prop
     := exists m' ptrs,
