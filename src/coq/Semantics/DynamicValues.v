@@ -3465,9 +3465,12 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
             (* What does signed i1 mean? *)
             if (msigned y =? 0)%Z
             then raise_ub "Signed division by 0."
-            else if andb ex (negb ((msigned x) mod (msigned y) =? 0))%Z
-                 then ret (DVALUE_Poison mdtyp_of_int)
-                 else to_dvalue_OOM (mdivs x y)
+            else
+              if (from_option false (fmap (fun min => min =? msigned x) mmin_signed) && (msigned y =? -1))%Z
+              then raise_ub "Signed division overflow."
+              else if andb ex (negb ((msigned x) mod (msigned y) =? 0))%Z
+                   then ret (DVALUE_Poison mdtyp_of_int)
+                   else to_dvalue_OOM (mdivs x y)
 
       | LShr ex =>
           if option_pred (fun bw => (munsigned y) >=? Zpos bw) mbitwidth && negb (dtyp_eqb mdtyp_of_int DTYPE_IPTR)
