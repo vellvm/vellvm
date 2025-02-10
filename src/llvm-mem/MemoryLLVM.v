@@ -83,7 +83,7 @@ Import MemoryParams.
 
 From LLVM_Memory Require Import OverlapsLemmas.
 
-Module SerializationHelpers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID).
+Module Type SerializationHelpers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID).
   Import SB.
   Import EVENTS.
   Import SIZEOF.
@@ -718,7 +718,7 @@ Module SerializationHelpers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeo
   End Serialization.
 End SerializationHelpers.
 
-Module MemoryHelpers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_MEMORY_MODEL ADDR SB AID H F FS).
+Module Type MemoryHelpers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_MEMORY_MODEL ADDR SB AID H F FS).
   (*** Other helpers *)
   Import MM.
   Import SB.
@@ -791,24 +791,15 @@ Module MemoryHelpers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVE
       end.
 End MemoryHelpers.
 
-Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_MEMORY_MODEL ADDR SB AID H F FS).
+Module MemoryHandlers (SIZEOF : Sizeof) (ADDR : BASIC_ADDRESS_WITH_OVERLAPS SIZEOF) (IP : INTPTR) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_MEMORY_MODEL ADDR SB AID H F FS) (MemHelp : MemoryHelpers ADDR IP SIZEOF EVENTS SB AID H F FS MM) (SerHelp : SerializationHelpers ADDR IP SIZEOF EVENTS SB AID).
   Import EVENTS.
   Import MM.
   Import FS.
   Import SB.
   Import SIZEOF.
   Import ADDR.
-
-  Module MemHelp := MemoryHelpers ADDR IP SIZEOF EVENTS SB AID H F FS MM.
   Import MemHelp.
-
-  Module SerHelp := SerializationHelpers ADDR IP SIZEOF EVENTS SB AID.
   Import SerHelp.
-
-  (* TODO: Should probably incorporate this into the ADDR type... *)
-  Module OVER := PTOIOverlaps ADDR ADDR.
-  Module OVERLAP := OverlapHelpers ADDR SIZEOF OVER.
-  Import OVERLAP.
 
   Definition mempush_spec : Memory -> Memory -> Prop
     := fun m m' => Memory_frame_stack_modify m (fun fs => push fs F.empty_frame) = m'.
@@ -856,16 +847,25 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
       end.
 
   (* TODO: Move this somewhere... *)
-  Definition fresh_allocation_id : MemPropT Memory AID.AllocationId
-    := fun m1 res =>
+  #[global] Instance MonadAllocationId_MemPropT_fresh : MonadAllocationId AID.AllocationId (MemPropT Memory).
+  split.
+  red.
+  apply (fun m1 res =>
          let '(aid, m2) := Memory_fresh_aid m1 in
-         res = ret (m2, aid).
+         res = ret (m2, aid)).
+  Defined.
 
   (* TODO: Move this somewhere... *)
-  Definition fresh_sid : MemPropT Memory store_id
+  Definition fresh_sid_MemPropT : MemPropT Memory store_id
     := fun m1 res =>
          let '(sid, m2) := Memory_fresh_sid m1 in
          res = ret (m2, sid).
+
+  (* TODO: Should probably move this instance *)
+  #[global] Instance MonadStoreId_MemPropT : MonadStoreId (MemPropT Memory).
+  split.
+  apply fresh_sid_MemPropT.
+  Defined.
 
   Definition stack_allocate_block_MemPropT' (bytes : list SByte) : MemPropT Memory (addr * list addr)
     := aid <- fresh_allocation_id;;
@@ -928,12 +928,6 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
       | inr (inr (inr (m2, tt))) =>
           write_byte ms ptr b m2
       end.
-
-  (* TODO: Should probably move this instance *)
-  #[global] Instance MonadStoreId_MemPropT : MonadStoreId (MemPropT Memory).
-  split.
-  apply fresh_sid.
-  Defined.
 
   Definition write_bytes_spec (ptr : addr) (bytes : list SByte) : MemPropT Memory unit :=
     (* TODO: should this OOM, or should this count as walking outside of memory and be UB? *)
@@ -1130,21 +1124,14 @@ Module MemoryHandlers (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EV
 
 End MemoryHandlers.
 
-Module MemoryHandlersExec (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_EXEC_MEMORY_MODEL ADDR SB AID H F FS).
+Module MemoryHandlersExec (SIZEOF : Sizeof) (ADDR : BASIC_ADDRESS_WITH_OVERLAPS SIZEOF) (IP : INTPTR) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_EXEC_MEMORY_MODEL ADDR SB AID H F FS) (SerHelp : SerializationHelpers ADDR IP SIZEOF EVENTS SB AID).
   Import EVENTS.
   Import MM.
   Import FS.
   Import SB.
   Import SIZEOF.
   Import ADDR.
-
-  Module SerHelp := SerializationHelpers ADDR IP SIZEOF EVENTS SB AID.
   Import SerHelp.
-
-  (* TODO: Should probably incorporate this into the ADDR type... *)
-  Module OVER := PTOIOverlaps ADDR ADDR.
-  Module OVERLAP := OverlapHelpers ADDR SIZEOF OVER.
-  Import OVERLAP.
 
   Definition MemStateT M := stateT Memory M.
 
@@ -1167,13 +1154,6 @@ Module MemoryHandlersExec (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof)
     := modify (fun m => Memory_frame_stack_modify m (fun fs => push fs F.empty_frame));;
        ret tt.
 
-  (* TODO: Move this *)
-  Definition cannot_pop (m : Memory) : bool :=
-    match pop (Memory_frame_stack m) with
-    | Some _ => false
-    | None => true
-    end.
-
   Definition mempop_exec {M} `{Monad M} `{MonadExc ERR_MESSAGE M} : MemStateT M unit
     := m <- MonadState.get;;
        match stack_pop_exec m with
@@ -1195,18 +1175,29 @@ Module MemoryHandlersExec (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof)
        end.
 
   (* TODO: Move this somewhere... *)
-  Definition fresh_allocation_id {M} `{Monad M} : MemStateT M AID.AllocationId
+  Definition fresh_allocation_id_MemStateT {M} `{Monad M} : MemStateT M AID.AllocationId
     := m1 <- MonadState.get;;
        let '(aid, m2) := Memory_fresh_aid m1 in
        put m2;;
        ret aid.
 
   (* TODO: Move this somewhere... *)
-  Definition fresh_sid {M} `{Monad M} : MemStateT M store_id
+  Definition fresh_sid_MemStateT {M} `{Monad M} : MemStateT M store_id
     := m1 <- MonadState.get;;
        let '(sid, m2) := Memory_fresh_sid m1 in
        put m2;;
        ret sid.
+
+  #[global] Instance MonadAllocationId_MemStateT_fresh {M} `{Monad M} : MonadAllocationId AID.AllocationId (MemStateT M).
+  split.
+  red.
+  apply fresh_allocation_id_MemStateT.
+  Defined.
+
+  #[global] Instance MonadStoreId_MemStateT {M} `{Monad M} : MonadStoreId (MemStateT M).
+  split.
+  apply fresh_sid_MemStateT.
+  Defined.
 
   Definition stack_allocate_block_exec'
     {M} `{Monad M} `{MonadExc ERR_MESSAGE M} `{MonadExc OOM_MESSAGE M}
@@ -1260,12 +1251,6 @@ Module MemoryHandlersExec (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof)
     (ptr : addr) (b : SByte) : MemStateT M unit :=
     modify (fun m => write_byte_exec m ptr b);; ret tt.
 
-  (* TODO: Should probably move this instance *)
-  #[global] Instance MonadStoreId_MemStateT {M} `{Monad M} : MonadStoreId (MemStateT M).
-  split.
-  apply fresh_sid.
-  Defined.
-
   Definition write_bytes_exec
     {M} `{Monad M} `{MonadExc UB_MESSAGE M}
     (ptr : addr) (bytes : list SByte) : MemStateT M unit :=
@@ -1308,7 +1293,7 @@ Module MemoryHandlersExec (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof)
         raise_ub "memcpy with overlapping or non-equal src and dst memory locations.".
 
   (** memset spec *)
-  Definition memset_spec
+  Definition memset_exec
     {M} `{Monad M} `{MonadExc UB_MESSAGE M}
     (dst : addr) (val : VellvmIntegers.int8) (len : Z) (sid : store_id) (volatile : bool) : MemStateT M unit :=
     if Z.ltb len 0
@@ -1414,7 +1399,7 @@ Module MemoryHandlersExec (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof)
       destruct (Pos.eq_dec sz_val 8); subst.
       - exact
           (sid <- fresh_sid;;
-           memset_spec dst val (unsigned len) sid (VellvmIntegers.equ volatile VellvmIntegers.one)).
+           memset_exec dst val (unsigned len) sid (VellvmIntegers.equ volatile VellvmIntegers.one)).
       - exact (raise_error "Unsupported arguments to memset.").
     Defined.
 
@@ -1442,7 +1427,7 @@ Module MemoryHandlersExec (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof)
       | _ => raise_error "Free: invalid arguments."
       end.
 
-    Definition handle_intrinsic_prop
+    Definition handle_intrinsic_exec
       {M} `{Monad M} `{MonadExc ERR_MESSAGE M} `{MonadExc UB_MESSAGE M} `{MonadExc OOM_MESSAGE M}
       : IntrinsicE ~> MemStateT M
       := fun T e =>
@@ -1480,6 +1465,13 @@ Module MemoryHandlersExec (ADDR : BASIC_ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof)
 
 End MemoryHandlersExec.
 
+
+Module MemoryHandlersCorrect (SIZEOF : Sizeof) (ADDR : BASIC_ADDRESS_WITH_OVERLAPS SIZEOF) (IP : INTPTR) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_CORRECT_MEMORY_MODEL ADDR SB AID H F FS).
+  Include (MemoryHelpers ADDR IP SIZEOF EVENTS SB AID H F FS MM).
+  Include (SerializationHelpers ADDR IP SIZEOF EVENTS SB AID).
+  Include (MemoryHandlers SIZEOF ADDR IP EVENTS SB AID H F FS MM).
+  Include (MemoryHandlersExec SIZEOF ADDR IP EVENTS SB AID H F FS MM).
+End MemoryHandlersCorrect.
 (*
 Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP).
   Import LP.

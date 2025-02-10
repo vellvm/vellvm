@@ -10,6 +10,10 @@ Class MonadProvenance (Provenance : Type) (M : Type -> Type) : Type :=
   { fresh_provenance : M Provenance;
   }.
 
+Class MonadAllocationId (AllocationId : Type) (M : Type -> Type) : Type :=
+  { fresh_allocation_id : M AllocationId;
+  }.
+
 Module Type CORE_PROVENANCE_TYPE (Import OT:OrderedType).
   Notation Provenance := t.
   (* Provenance allocation *)

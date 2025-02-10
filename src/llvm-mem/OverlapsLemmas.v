@@ -3,8 +3,9 @@ From Mem Require Import Overlaps.
 From LLVM_Memory Require Import Sizeof.
 From Vellvm Require Import DynamicTypes.
 Require Import Mem.Addresses.MemoryAddress.
+Require Import Mem.Semantics.Memory.Overlaps.
 
-Module OverlapHelpers (Addr : CORE_ADDRESS) (Size : Sizeof) (Over : Overlaps Addr).
+Module OverlapHelpers (Size : Sizeof) (Addr : CORE_ADDRESS) (Over : Overlaps Addr).
   Import Addr.
   Import Over.
   Import Size.
@@ -26,3 +27,5 @@ Module OverlapHelpers (Addr : CORE_ADDRESS) (Size : Sizeof) (Over : Overlaps Add
   Definition no_overlap_dtyp (a1 : addr) (τ1 : dtyp) (a2 : addr) (τ2 : dtyp)
     : bool := negb (overlaps_dtyp a1 τ1 a2 τ2).
 End OverlapHelpers.
+
+Module Type BASIC_ADDRESS_WITH_OVERLAPS (Size : Sizeof) := BASIC_ADDRESS <+ Overlaps.Overlaps <+ OverlapHelpers Size.
