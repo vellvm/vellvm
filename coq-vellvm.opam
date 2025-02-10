@@ -28,7 +28,7 @@ depends: [
   "qcheck" 
   "coq" {>= "8.20.0" & < "8.21~"}
   "coq-ext-lib" {>= "0.12.1" & < "0.13~"}
-  "coq-paco" 
+  "coq-paco"  {< "4.2.3"}
   "coq-ceres" 
   "coq-flocq" {>= "4.2.0"}
   "coq-mathcomp-ssreflect" 
