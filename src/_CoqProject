@@ -10,6 +10,8 @@
 ./mem/MemPropT.v
 ./mem/MemoryInterpreters.v
 ./mem/MemoryModel.v
+./mem/Heaps.v
+./mem/StackFrames.v
 ./mem/MemoryModelImplementation.v
 ./mem/SByte.v
 ./mem/MemoryModules/FiniteExecPrimitives.v
