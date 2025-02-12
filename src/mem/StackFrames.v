@@ -130,9 +130,10 @@ End FRAME_STACK_EXTRAS.
 
 Module Type FRAME_STACK (ADDR : CORE_ADDRESS) (F : FRAME ADDR) := CORE_FRAME_STACK ADDR F <+ FRAME_STACK_NOTATIONS ADDR F <+ FRAME_STACK_EXTRAS ADDR F.
 
+(*** List implementation of frames *)
+
 Module FRAME_LIST_CORE
-  (Import ADDR : CORE_ADDRESS)
-  (Import PTOI : HAS_PTOI ADDR) <: CORE_FRAME ADDR.
+  (Import ADDR : CORE_ADDRESS) <: CORE_FRAME ADDR.
   Definition t := list addr.
   Definition ptr_in_frame (f : t) (p : addr) : bool :=
     existsb (fun z => Coqlib.proj_sumbool (ADDR.eq_dec p z)) f.
@@ -195,4 +196,50 @@ Module FRAME_LIST_CORE
   Qed.
 End FRAME_LIST_CORE.
 
-Module Type FRAME_LIST (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) := FRAME_LIST_CORE ADDR PTOI <+ FRAME_NOTATIONS ADDR <+ FRAME_EQV ADDR.
+Module FRAME_LIST (ADDR : CORE_ADDRESS) <: FRAME ADDR := FRAME_LIST_CORE ADDR <+ FRAME_NOTATIONS ADDR <+ FRAME_EQV ADDR <+ FRAME_EXTRAS ADDR.
+
+(*** List implementation of frame stacks *)
+Module CORE_FRAME_STACK_LIST (Import ADDR: CORE_ADDRESS) (Import F : FRAME ADDR) <: CORE_FRAME_STACK ADDR F.
+  Definition t := list Frame.
+
+  Definition initial_frame_stack : t := [].
+
+  Definition peek (fs : t) : option F.t := hd_error fs.
+
+  Definition pop (fs : t) : option (F.t * t) :=
+    match fs with
+    | [] => None
+    | (f::fs) => ret (f, fs)
+    end.
+
+  Definition push (fs : t) (f : F.t) : t := f :: fs.
+
+  Lemma push_peek :
+    forall fs1 f fs2,
+      fs2 = push fs1 f ->
+      peek fs2 = Some f.
+  Proof.
+    intros fs1 f fs2 H.
+    rewrite H.
+    cbn; auto.
+  Qed.
+
+  Lemma push_pop :
+    forall fs1 f fs2,
+      fs2 = push fs1 f ->
+      pop fs2 = Some (f, fs1).
+  Proof.
+    intros fs1 f fs2 H.
+    rewrite H.
+    cbn; auto.
+  Qed.
+
+  Lemma pop_empty :
+    pop initial_frame_stack = None.
+  Proof.
+    cbn; auto.
+  Qed.
+    
+End CORE_FRAME_STACK_LIST.
+
+Module FRAME_STACK_LIST (ADDR : CORE_ADDRESS) (F : FRAME ADDR) <: FRAME_STACK ADDR F := CORE_FRAME_STACK_LIST ADDR F <+ FRAME_STACK_NOTATIONS ADDR F <+ FRAME_STACK_EXTRAS ADDR F.
