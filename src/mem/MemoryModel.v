@@ -16,7 +16,9 @@ From Mem Require Import
   MemPropT
   StoreId
   SByte
-  MemoryModules.Within.
+  MemoryModules.Within
+  StackFrames
+  Heaps.
 
 From Vellvm.Utils Require Import
      Error
@@ -956,9 +958,9 @@ Module Type EXEC_MEMORY_FREE_BYTE
   (Import SB : SBYTE)
   (Import MEM : MEMORY_MODEL_BASE ADDR SB).
 
-  Parameter free_byte_exec : Memory -> addr -> Memory.
+  Parameter free_byte_exec : Memory -> Z -> Memory.
 
-  Definition free_bytes_exec (m : Memory) (ptrs : list addr) : Memory
+  Definition free_bytes_exec (m : Memory) (ptrs : list Z) : Memory
     := fold_left (fun m' ptr => free_byte_exec m' ptr) ptrs m.
 End EXEC_MEMORY_FREE_BYTE.
 
@@ -974,19 +976,19 @@ Module Type CORRECT_MEMORY_FREE_BYTE
 
   Parameter free_byte_frees :
     forall m1 ptr aid m2,
-      addr_allocated m1 ptr aid /\ free_byte_exec m1 ptr = m2 ->
+      addr_allocated m1 ptr aid /\ free_byte_exec m1 (ptr_to_int ptr) = m2 ->
       addr_not_allocated m2 ptr.
 
   Parameter free_byte_other_allocations :
     forall m1 ptr m2,
-      free_byte_exec m1 ptr = m2 ->
+      free_byte_exec m1 (ptr_to_int ptr) = m2 ->
       forall p' aid,
         disjoint_ptr_byte ptr p' ->
         addr_allocated m1 p' aid <-> addr_allocated m2 p' aid.
 
   Parameter free_byte_other_reads :
     forall m1 ptr m2,
-      free_byte_exec m1 ptr = m2 ->
+      free_byte_exec m1 (ptr_to_int ptr) = m2 ->
       forall p' byte,
         disjoint_ptr_byte ptr p' ->
         read_byte m1 p' byte <-> read_byte m2 p' byte.
@@ -1004,7 +1006,7 @@ Module Type EXEC_MEMORY_STACK_POP_BASE
   Definition stack_pop_exec (m : Memory) : option Memory
     := '(f, fs) <- pop (Memory_frame_stack m);;
        (* Free pointers *)
-       let m' := free_bytes_exec m (ptrs_in_frame f) in
+       let m' := free_bytes_exec m (map ptr_to_int (ptrs_in_frame f)) in
        ret (Memory_frame_stack_modify m' (fun _ => fs)).
 End EXEC_MEMORY_STACK_POP_BASE.
 
