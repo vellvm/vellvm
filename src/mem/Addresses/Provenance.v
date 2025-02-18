@@ -207,3 +207,18 @@ End LIST_PROV_SET.
 Module N_ProvSet <: LIST_PROV_SET N_Provenance.
   Include (LIST_PROV_SET N_Provenance).
 End N_ProvSet.
+
+Module N_ALLOCATION_ID <: ALLOCATION_ID.
+  Include N.
+  Definition initial_aid : N := 0.
+  Definition next_aid (n : N) : N := N.succ n.
+
+  Lemma aid_lt_next_aid :
+    forall aid,
+      lt aid (next_aid aid).
+  Proof.
+    intros aid.
+    unfold next_aid.
+    lia.
+  Qed.
+End N_ALLOCATION_ID.

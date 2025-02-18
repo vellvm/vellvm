@@ -13,6 +13,7 @@
 ./mem/Heaps.v
 ./mem/StackFrames.v
 ./mem/MemoryModelImplementation.v
+./mem/FiniteMaps.v
 ./mem/SByte.v
 ./mem/MemoryModules/FiniteExecPrimitives.v
 ./mem/MemoryModules/FiniteSpecPrimitives.v
