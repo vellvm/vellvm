@@ -9,38 +9,37 @@
  ---------------------------------------------------------------------------- *)
 (* begin hide *)
 
-From Stdlib Require Import
-     ZArith String List
-     FSets.FMapWeakList
-     Bool.Bool.
-
-From ExtLib Require Import
-     Structures.Monads
-     Structures.Functor
-     Eqv.
-
-From ITree Require Import
-     ITree
-     Interp.Recursion
-     Events.Exception.
-
-From Vellvm Require Import
-     Numeric.Integers
-     Numeric.Floats
-     Utilities
-     Utils.IntMaps
-     Syntax
-     Semantics.VellvmIntegers
-     Semantics.LLVMEvents
-     Semantics.LLVMParams
-     Semantics.MemoryParams
-     Semantics.ConcretizationParams
-     Utils.ListUtil
-     DynamicValues
-     Handlers.Concretization.
-
 From LLVM_Memory Require Import
   MemBytes.
+
+From Stdlib Require Import
+  ZArith String List
+  Bool.Bool.
+
+From ExtLib Require Import
+  Structures.Monads
+  Structures.Functor
+  Eqv.
+
+From ITree Require Import
+  ITree
+  Interp.Recursion
+  Events.Exception.
+
+From Vellvm Require Import
+  Numeric.Integers
+  Numeric.Floats
+  Utilities
+  Syntax
+  Semantics.VellvmIntegers
+  Semantics.LLVMEvents
+  Semantics.LLVMParams
+  Semantics.MemoryParams
+  Semantics.ConcretizationParams
+  Utils.ListUtil
+  DynamicValues
+  Handlers.Concretization
+  IntMaps.
 
 Require Import Ceres.Ceres.
 
@@ -684,6 +683,9 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationP
          that life in the "right" injection of the [_CFG_INTERNAL] effect
    *)
 
+  (* TODO FIX THIS *)
+  Unset Universe Checking.
+
   Definition lookup_defn (dv : dvalue) (m : IntMap function_denotation) : option function_denotation
     := match dv with
        | DVALUE_Addr addr =>
@@ -708,4 +710,6 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (CP : ConcretizationP
                end
              end)
           _ (Call dt f_value args).
+
+  Set Universe Checking.
 End Denotation.

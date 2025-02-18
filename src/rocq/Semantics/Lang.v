@@ -1,7 +1,5 @@
-From LLVM_Memory Require Import
-  MemBytes
-  DvalueBytes
-  GepM.
+(* TODO: Fix this *)
+Unset Universe Checking.
 
 From Vellvm Require Import
   Semantics.LLVMParams
@@ -11,6 +9,20 @@ From Vellvm Require Import
   Handlers.Stack
   Handlers.Intrinsics
   Handlers.Pick.
+
+From Mem Require Import
+  MemoryModel
+  Heaps
+  StackFrames
+  Addresses.Provenance.
+
+From LLVM_Memory Require Import
+  MemBytes
+  DvalueBytes
+  GepM
+  MemoryLLVM.
+
+Import MemoryModel.
 
 (* Handlers.MemoryModel *)
 (* Handlers.MemoryInterpreters. *)
@@ -23,6 +35,13 @@ Module Type Memory (LP: LLVMParams).
   Declare Module DVALUE_BYTE : DvalueByte LP.
 
   Module MP := MemoryParams.Make LP GEP Byte DVALUE_BYTE.
+
+  Module H := HEAP_IMPL ADDR.
+  Module F := FRAME_LIST ADDR.
+  Module FS := FRAME_STACK_LIST ADDR F.
+
+  Include (FULL_CORRECT_MEMORY_MODEL ADDR Byte N_ALLOCATION_ID H F FS).
+  Module MEM_HANDLERS := MemoryHandlersCorrect SIZEOF ADDR IP LP.Events Byte (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_CORRECT_MEMORY_MODEL ADDR SB AID H F FS).
 
   Declare Module MMEP : MemoryModelExecPrimitives LP MP.
   Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.
@@ -47,6 +66,7 @@ Module Type Lang (LP: LLVMParams).
 
   (* Memory *)
   Declare Module MEM : Memory LP.
+  MemoryHandlersCorrect SIZEOF ADDR IP LP.Events ByteM (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_CORRECT_MEMORY_MODEL ADDR SB AID H F FS).
   Export MEM.
 
   (* Pick handler (depends on memory / concretization) *)

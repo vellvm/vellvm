@@ -13,7 +13,9 @@ From Mem Require Import
   StoreId
   MemPropT
   SByte
-  Overlaps.
+  Overlaps
+  Heaps
+  StackFrames.
 
 From LLVM_Memory Require Import
   Intptr

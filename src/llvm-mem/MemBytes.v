@@ -20,7 +20,8 @@ From Vellvm Require Import
 
 From Mem Require Import
   StoreId
-  Addresses.MemoryAddress.
+  Addresses.MemoryAddress
+  SByte.
 
 From LLVM_Memory Require Import
   Sizeof
@@ -221,7 +222,7 @@ Module ByteExtras
   Defined.
 End ByteExtras.
 
-Module Type ByteModule (Addr:NULLABLE_ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
+Module Type ByteModule (Addr:NULLABLE_ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)) <: SBYTE.
   Include (ByteImpl Addr IP SIZEOF LLVMEvents).
   Include (ByteExtras Addr IP SIZEOF LLVMEvents).
 End ByteModule.

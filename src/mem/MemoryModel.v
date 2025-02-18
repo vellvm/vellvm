@@ -18,28 +18,29 @@ From Mem Require Import
   SByte
   MemoryModules.Within
   StackFrames
-  Heaps.
+  Heaps
+  FiniteMaps.
 
 From Vellvm.Utils Require Import
-     Error
-     PropT
-     Util
-     NMaps
-     Tactics
-     Raise
-     Monads
-     MapMonadExtra
-     MonadReturnsLaws
-     MonadEq1Laws
-     MonadExcLaws
-     Inhabited.
+  Error
+  PropT
+  Util
+  NMaps
+  Tactics
+  Raise
+  Monads
+  MapMonadExtra
+  MonadReturnsLaws
+  MonadEq1Laws
+  MonadExcLaws
+  Inhabited.
 
 From Vellvm.Numeric Require Import
-     Integers.
+  Integers.
 
 From ExtLib Require Import
-     Structures.Monads
-     Structures.Functor.
+  Structures.Monads
+  Structures.Functor.
 
 From Stdlib Require Import
      ZArith
@@ -1357,22 +1358,19 @@ Module Type FULL_CORRECT_MEMORY_MODEL (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID: 
        FULL_CORRECT_MEMORY_MODEL' ADDR SB AID H F FS.
 
 (*** Implementations of memory models *)
-(* TODO: Should this be in its own file? *)
-Require Import IntMaps.
-
 (** Memory models based on integer maps *)
 Module INTMAP_MEMORY_MODEL_BASE (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) (SB : SBYTE) <: MEMORY_MODEL_BASE ADDR SB.
   Import ADDR.
   Import SB.
-  Require Import IntMaps.
-  Definition Memory := IntMap SByte.
+
+  Definition Memory := IM.t SByte.
   Definition initial_memory := @IM.empty SByte.
 End INTMAP_MEMORY_MODEL_BASE.
 
 Module INTMAP_MEMORY_MODEL_CORE (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) (SB : SBYTE) <: CORE_MEMORY_MODEL ADDR SB.
   Import ADDR.
   Import SB.
-  Require Import IntMaps.
+
   Include (INTMAP_MEMORY_MODEL_BASE ADDR PTOI SB).
 
   Definition read_byte (m : Memory) (ptr : addr) (b : SByte) : Prop :=
@@ -1398,7 +1396,7 @@ Module INTMAP_AID_MEMORY_MODEL
     MkMemory {
       Memory_aid_counter : AllocationId;
       Memory_sid_counter : store_id;
-      Memory_byte_map : IntMap (SByte * AllocationId)%type;
+      Memory_byte_map : IM.t (SByte * AllocationId)%type;
     }.
 
   Definition Memory := Memory'.
@@ -1422,7 +1420,7 @@ Module INTMAP_AID_MEMORY_MODEL
   Definition read_byte (m : Memory) (ptr : addr) (b : SByte) : Prop :=
     match IM.find (ptr_to_int ptr) (Memory_byte_map m) with
     | None => False
-    | Some (b', aid) => b = b' /\ access_allowed (address_provenance ptr) aid
+    | Some (b', aid) => b = b' /\ access_allowed (address_provenance ptr) aid = true
     end.
 
   Lemma read_byte_allowed_spec :
@@ -1470,7 +1468,7 @@ Module INTMAP_AID_MEMORY_MODEL
     red in WB; red.
     repeat (break_match_hyp; try contradiction); subst.
     unfold Memory_byte_map.
-    rewrite IP.F.add_eq_o; auto.
+    rewrite find_add_eq; auto.
   Qed.
 
   (** We can look up old values after writing to a disjoint location in memory *)
@@ -1487,8 +1485,8 @@ Module INTMAP_AID_MEMORY_MODEL
     split; intros RB; red; red in RB;
       repeat (break_match_hyp; try contradiction); destruct RB; subst;
       unfold Memory_byte_map in *.
-    { rewrite IP.F.add_neq_o; auto.
-      rewrite Heqo0; auto.
+    { erewrite find_add_neq; eauto.
+      cbn; auto.
     }
     { rewrite IP.F.add_neq_o in Heqo0; auto.
       rewrite Heqo0; auto.
