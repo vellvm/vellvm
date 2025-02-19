@@ -10,6 +10,8 @@
 ./mem/MemPropT.v
 ./mem/MemoryInterpreters.v
 ./mem/MemoryModel.v
+./mem/IntMapMemory.v
+./mem/Tactics.v
 ./mem/Heaps.v
 ./mem/StackFrames.v
 ./mem/MemoryModelImplementation.v
