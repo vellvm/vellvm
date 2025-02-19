@@ -17,6 +17,9 @@ From Mem Require Import
   Heaps
   StackFrames.
 
+(* Why do I need this...? *)
+Import Provenance.
+
 From LLVM_Memory Require Import
   Intptr
   Sizeof
@@ -1467,13 +1470,786 @@ Module MemoryHandlersExec (SIZEOF : Sizeof) (ADDR : BASIC_ADDRESS_WITH_OVERLAPS 
 
 End MemoryHandlersExec.
 
-
+(*
 Module MemoryHandlersCorrect (SIZEOF : Sizeof) (ADDR : BASIC_ADDRESS_WITH_OVERLAPS SIZEOF) (IP : INTPTR) (EVENTS : LLVM_INTERACTIONS ADDR IP SIZEOF) (SB : ByteModule ADDR IP SIZEOF EVENTS) (AID: ALLOCATION_ID) (H : HEAP ADDR) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MM : FULL_CORRECT_MEMORY_MODEL ADDR SB AID H F FS).
+  Import MM.
   Include (MemoryHelpers ADDR IP SIZEOF EVENTS SB AID H F FS MM).
   Include (SerializationHelpers ADDR IP SIZEOF EVENTS SB AID).
   Include (MemoryHandlers SIZEOF ADDR IP EVENTS SB AID H F FS MM).
   Include (MemoryHandlersExec SIZEOF ADDR IP EVENTS SB AID H F FS MM).
+
+  (*** Correctness *)
+  Definition exec_correct_post (X : Type) : Type := Memory -> store_id -> X -> Memory -> store_id -> Prop.
+  Definition exec_correct_id_post {X} : exec_correct_post X :=
+    fun _ _ _ _ _ => True.
+  #[global] Hint Unfold exec_correct_id_post : core.
+  Definition exec_correct_pre := Memory -> store_id -> Prop.
+
+  Definition exec_correct_post_ret {X} (x : X) : exec_correct_post X
+    := fun ms st x' ms' st' =>
+         x = x' /\ ms = ms' /\ st = st'.
+
+  Definition exec_correct_post_bind
+    {A B}
+    (ma : exec_correct_post A)
+    (k : A -> exec_correct_post B)
+    : exec_correct_post B
+    := fun ms st b ms'' st'' =>
+         exists a ms' st',
+           ma ms st a ms' st' /\
+             (k a) ms' st' b ms'' st''.
+
+  Definition exec_correct_post_eqv {A} (a b : exec_correct_post A) :=
+    forall ms st x ms' st',
+      a ms st x ms' st' <-> b ms st x ms' st'.
+
+  Lemma exec_correct_post_eqv_refl :
+    forall {A} (a : exec_correct_post A),
+      exec_correct_post_eqv a a.
+  Proof.
+    intros A a.
+    red.
+    reflexivity.
+  Qed.
+
+  #[global] Instance MonadStoreId_exec_correct_post : MonadStoreId exec_correct_post.
+  split.
+  red.
+  refine (fun ms st sid ms' st' =>
+            sid <= st /\ st < st' /\ ms = ms')%N.
+  Defined.
+
+  (*
+  #[global] Instance MonadProvenance_exec_correct_post : MonadProvenance Provenance exec_correct_post.
+  split.
+  refine (fun ms st pr ms' st' =>
+            (forall pr0 : Provenance, used_provenance_prop ms pr0 -> used_provenance_prop ms' pr0) /\
+              ~ used_provenance_prop ms pr /\ used_provenance_prop ms' pr /\
+              st = st').
+  Defined.
+   *)
+
+  #[global] Instance Proper_exec_correct_post_eqv {X} :
+    Proper (@exec_correct_post_eqv X ==> eq ==> eq ==> eq ==> eq ==> eq ==> iff) (fun post ms st x ms' st' => post ms st x ms' st').
+  Proof.
+    unfold Proper, respectful.
+    intros; subst.
+    apply H.
+  Qed.
+
+  Lemma exec_correct_post_left_identity :
+    forall {A B} (a : A) (k : A -> exec_correct_post B),
+      exec_correct_post_eqv (exec_correct_post_bind (exec_correct_post_ret a) k) (k a).
+  Proof.
+    intros A B a k ms st x ms' st'.
+    unfold exec_correct_post_ret.
+    unfold exec_correct_post_bind.
+    split; intros H.
+    - destruct H as (?&?&?&?&?); subst.
+      destruct H as (?&?&?); subst.
+      auto.
+    - exists a, ms, st.
+      auto.
+  Qed.
+
+  Lemma exec_correct_post_right_identity :
+    forall {A} (ma : exec_correct_post A),
+      exec_correct_post_eqv (exec_correct_post_bind ma exec_correct_post_ret) ma.
+  Proof.
+    intros A ma ms st x ms' st'.
+    unfold exec_correct_post_ret.
+    unfold exec_correct_post_bind.
+    split; intros H.
+    - destruct H as (?&?&?&?&?); subst.
+      destruct H0 as (?&?&?); subst.
+      auto.
+    - exists x, ms', st'.
+      auto.
+  Qed.
+
+  Lemma exec_correct_post_associativity :
+    forall {A B C}
+      (ma : exec_correct_post A)
+      (mab : A -> exec_correct_post B)
+      (mbc : B -> exec_correct_post C),
+      exec_correct_post_eqv
+        (exec_correct_post_bind (exec_correct_post_bind ma mab) mbc)
+        (exec_correct_post_bind ma (fun a => exec_correct_post_bind (mab a) mbc)).
+  Proof.
+    intros A B C ma mab mbc.
+    unfold exec_correct_post_ret.
+    unfold exec_correct_post_bind.
+    split; intros H.
+    - destruct H as (?&?&?&?&?); subst.
+      destruct H as (?&?&?&?&?); subst.
+      exists x3, x4, x5.
+      split; eauto.
+    - destruct H as (?&?&?&?&?); subst.
+      destruct H0 as (?&?&?&?&?); subst.
+      exists x3, x4, x5.
+      split; eauto.
+  Qed.
+
+  #[global] Instance Monad_exec_correct_post : Monad exec_correct_post.
+  split.
+  - intros; apply exec_correct_post_ret; auto.
+  - intros; eapply exec_correct_post_bind; eauto.
+  Defined.
+
+  #[global] Instance Eq1_exec_correct_post : Eq1 exec_correct_post.
+  red. intros. eapply exec_correct_post_eqv.
+  apply X.
+  apply X0.
+  Defined.
+
+  #[global] Instance MonadLawsE_exec_correct_post : MonadLawsE exec_correct_post.
+  split.
+  - intros. apply exec_correct_post_left_identity.
+  - intros. apply exec_correct_post_right_identity.
+  - intros. apply exec_correct_post_associativity.
+  - intros A B.
+    unfold Proper, respectful.
+    intros x y H x0 y0 H0.
+    repeat red in H.
+    repeat red.
+    intros ms st x1 ms' st'.
+    split.
+    + intros H1.
+      red in H0.
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      specialize (H ms st x2 x3 x4).
+      destruct H.
+      eapply H in H1.
+      repeat red.
+      exists x2, x3, x4.
+      split; eauto.
+      apply H0; auto.
+    + intros H1.
+      red in H0.
+      repeat red in H1.
+      destruct H1 as (?&?&?&?&?).
+      specialize (H ms st x2 x3 x4).
+      destruct H.
+      eapply H3 in H1.
+      repeat red.
+      exists x2, x3, x4.
+      split; eauto.
+      apply H0; auto.
+  Defined.
+
+  Lemma exec_correct_post_bind_unfold :
+    forall {A B}
+      (ma : exec_correct_post A)
+      (mab : A -> exec_correct_post B)
+      ms st b ms'' st'',
+      (exists a ms' st',
+          ma ms st a ms' st' /\
+            (mab a) ms' st' b ms'' st'') ->
+      (a <- ma;;
+       mab a) ms st b ms'' st''.
+  Proof.
+    intros A B ma mab ms st b ms'' st'' H.
+    cbn.
+    unfold exec_correct_post_bind.
+    auto.
+  Qed.
+
+  Definition MemM Eff X := err_ub_oom_T (itree Eff) X.
+
+  Definition exec_correct {Eff X} (pre : exec_correct_pre) (exec : MemM Eff X) (spec : MemPropT Memory X) (post : exec_correct_post X) : Prop :=
+    forall ms st,
+      pre ms st ->
+      (* UB catchall *)
+      (exists ms' msg_spec,
+          @raise_ub err_ub_oom _ X msg_spec {{ ms }} ∈ {{ ms' }} spec) \/
+        ( (* exists a behaviour in exec that lines up with spec.
+
+               Technically this should be something along the lines of...
+
+               "There is at least one behaviour in exec, and for every
+               behaviour in exec it is within the spec"
+
+               For our purposes exec is deterministic, so "exists"
+               should be fine here for simplicity.
+             *)
+           exists (e : err_ub_oom X) (st' : store_id) (ms' : Memory),
+             (* Had to manually supply typeclasses, but this within expression is: (e {{(st, ms)}} ∈ {{(st', ms')}} exec))
+
+                 I.e., The executable is correct if forall behaviours
+                 in the executable those behaviours are in the spec as
+                 well, and if the executable returns successfully it
+                 gives a valid store_id / MemState pair.
+              *)
+             let WEM := (Within_err_ub_oom_MemM (EQI:=(@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) (EQV:=(@MemMonad_eq1_runm_equiv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM))) in
+             (@within MemM _ err_ub_oom (store_id * MemState)%type (store_id * MemState)%type WEM X exec (st, ms) e (st', ms')) /\
+               (e {{ms}} ∈ {{ms'}} spec) /\ ((exists x, e = ret x) -> (MemMonad_valid_state ms' st' /\ (exists x, e = ret x /\ post ms st x ms' st')))).
+
+  (* TODO: Move this *)
+  Lemma exec_correct_weaken_pre :
+    forall {MemM Eff} `{MEMM : MemMonad MemM (itree Eff)}
+      {A}
+      (pre : exec_correct_pre)
+      (post : exec_correct_post A)
+      (weak_pre : exec_correct_pre)
+      (exec : MemM A)
+      (spec : MemPropT MemState A),
+      (forall ms st, pre ms st -> weak_pre ms st) ->
+      exec_correct weak_pre exec spec post ->
+      exec_correct pre exec spec post.
+  Proof.
+    intros MemM Eff MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MEMM A pre post weak_pre exec spec WEAK EXEC.
+    unfold exec_correct in *.
+    intros ms st VALID PRE.
+    apply WEAK in PRE.
+    eauto.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma exec_correct_strengthen_post :
+    forall {MemM Eff} `{MEMM : MemMonad MemM (itree Eff)}
+      {A}
+      (pre : exec_correct_pre)
+      (post : exec_correct_post A)
+      (strong_post : exec_correct_post A)
+      (exec : MemM A)
+      (spec : MemPropT MemState A),
+      (forall ms st a ms' st', pre ms st -> strong_post ms st a ms' st' -> post ms st a ms' st') ->
+      exec_correct pre exec spec strong_post ->
+      exec_correct pre exec spec post.
+  Proof.
+    intros MemM Eff MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MEMM A pre post strong_post exec spec STRONG EXEC.
+    unfold exec_correct in *.
+    intros ms st VALID PRE.
+    specialize (EXEC _ _ VALID PRE).
+    destruct EXEC as [UB | EXEC]; auto.
+    right.
+    destruct EXEC as (?&?&?&?&?&?).
+    exists x, x0, x1.
+    split; auto.
+    split; auto.
+    intros H2.
+    forward H1; auto.
+    destruct H1 as (?&(?&?&?)).
+    subst.
+    split; auto.
+    exists x2.
+    split; auto.
+  Qed.
+
+  (* TODO: move this *)
+  Lemma exec_correct_bind :
+    forall {MemM Eff} `{MEMM : MemMonad MemM (itree Eff)}
+      {A B}
+      (pre : exec_correct_pre)
+      (post_a : exec_correct_post A)
+      (post_b : A -> exec_correct_post B)
+      (m_exec : MemM A) (k_exec : A -> MemM B)
+      (m_spec : MemPropT MemState A) (k_spec : A -> MemPropT MemState B),
+      exec_correct pre m_exec m_spec post_a ->
+      (* This isn't true:
+
+           (forall a ms ms', m_spec ms (ret (ms', a)) -> exec_correct (k_exec a) (k_spec a)) -> ...
+
+           E.g., if 1 is a valid return value in m_spec, but m_exec can only return 0, then
+
+           k_spec may ≈ ret 2
+
+           But k_exec may ≈ \a => if a == 0 then ret 2 else raise_ub "blah"
+
+           I.e., k_exec may be set up to only be valid when results are returned by m_exec.
+       *)
+      (* The exec continuation `k_exec a` agrees with `k_spec a`
+           whenever `a` is a valid return value from the spec and the
+           executable prefix
+
+           Questions:
+
+           - What if m_exec returns an `a` that isn't in the spec...
+             + Should be covered by `exec_correct m_exec m_spec` assumption.
+       *)
+      (forall a ms_init ms_after_m st_init st_after_m,
+          MemMonad_valid_state ms_after_m st_after_m ->
+          post_a ms_init st_init a ms_after_m st_after_m ->
+          ((@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MEMM)) _
+                                                                                (MemMonad_run m_exec ms_init st_init)
+                                                                                (ret (st_after_m, (ms_after_m, a))))%monad ->
+          (* ms_k is a MemState after evaluating m *)
+          let WEM := (Within_err_ub_oom_MemM (EQI:=(@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MEMM)) (EQV:=(@MemMonad_eq1_runm_equiv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MEMM))) in
+          exec_correct (fun ms_k st_k =>
+                          pre ms_init st_init /\
+                            (@within MemM _ err_ub_oom (store_id * MemState)%type (store_id * MemState)%type WEM _ m_exec (st_init, ms_init) (ret a) (st_k, ms_k))
+                          /\ m_spec ms_init (ret (ms_k, a))) (k_exec a) (k_spec a) (post_b a)) ->
+      exec_correct pre (a <- m_exec;; k_exec a) (a <- m_spec;; k_spec a) (a <- post_a;; post_b a).
+  Proof.
+    intros MemM Eff MM MRun MPROV MSID MMS
+      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
+      MLAWS MEMM A B pre post_a post_b m_exec k_exec m_spec
+      k_spec M_CORRECT K_CORRECT.
+
+    unfold exec_correct in *.
+    intros ms st VALID PRE.
+    specialize (M_CORRECT ms st VALID PRE).
+    destruct M_CORRECT as [[ub_ms' [msg M_UB]] | M_CORRECT].
+    { (* UB *)
+      left.
+      exists ub_ms'. exists msg.
+      left; auto.
+    }
+
+    destruct M_CORRECT as [e [st' [ms' [M_EXEC_CORRECT [M_SPEC_CORRECT M_POST]]]]].
+    destruct e as [[[[[[[oom_e] | [[ub_e] | [[err_e] | e']]]]]]]] eqn:He.
+
+    - (* OOM *)
+      right.
+      exists (raise_oom oom_e).
+      exists st'.
+      exists ms'.
+
+      split.
+      { (* Exec *)
+        cbn in M_EXEC_CORRECT.
+        red in M_EXEC_CORRECT.
+        cbn. red.
+        destruct M_EXEC_CORRECT as [m2 [[oom_msg OOM] EXEC]].
+        exists (raise_oom oom_msg).
+        split.
+        cbn.
+        eexists; reflexivity.
+        cbn.
+        cbn in EXEC.
+        rewrite MemMonad_run_bind.
+        rewrite EXEC.
+        rewrite OOM.
+        repeat rewrite (@rbm_raise_bind _ _ _ _ (@raise_oom _ _) _).
+        reflexivity.
+      }
+
+      split.
+      { (* In spec *)
+        cbn.
+        left.
+        apply M_SPEC_CORRECT.
+      }
+
+      intros [x CONTRA].
+      inv CONTRA.
+    - (* UB *)
+      left.
+      exists ms'. exists ub_e.
+      cbn.
+      left.
+      apply M_SPEC_CORRECT.
+    - (* Err *)
+      right.
+      exists (raise_error err_e).
+      exists st'.
+      exists ms'.
+
+      split.
+      { (* Exec *)
+        cbn in M_EXEC_CORRECT.
+        red in M_EXEC_CORRECT.
+        cbn. red.
+        destruct M_EXEC_CORRECT as [m2 [[err_msg ERR] EXEC]].
+        exists (raise_error err_msg).
+        split.
+        cbn.
+        eexists; reflexivity.
+        cbn.
+        cbn in EXEC.
+        rewrite MemMonad_run_bind.
+        rewrite EXEC.
+        rewrite ERR.
+        repeat rewrite (@rbm_raise_bind _ _ _ _ (@raise_error _ _) _).
+        reflexivity.
+      }
+
+      split.
+      { (* In spec *)
+        cbn.
+        left.
+        apply M_SPEC_CORRECT.
+      }
+
+      intros [x CONTRA].
+      cbn in CONTRA.
+      inv CONTRA.
+    - (* Success *)
+      (* Need to know if there's UB in K... *)
+      rename e' into a.
+      forward M_POST.
+      { eexists; reflexivity. }
+      destruct M_POST as (VALID' & POST').
+      destruct POST' as (?&?&POST').
+      inv H.
+      rename x into a.
+
+      specialize (K_CORRECT a ms ms' st st').
+      forward K_CORRECT; eauto.
+      forward K_CORRECT; eauto.
+
+      forward K_CORRECT.
+      { cbn in M_EXEC_CORRECT.
+        red in M_EXEC_CORRECT.
+        destruct M_EXEC_CORRECT as [m2 [SUCC EXEC]].
+        cbn in *.
+        rewrite EXEC, SUCC.
+        rewrite bind_ret_l.
+        reflexivity.
+      }
+
+      specialize (K_CORRECT _ _ VALID').
+      forward K_CORRECT.
+      { split; auto. }
+
+      destruct K_CORRECT as [[ub_ms [ub_msg K_UB]] | K_CORRECT].
+      { (* UB in K *)
+        left.
+        exists ub_ms. exists ub_msg.
+        right.
+        exists ms'. exists a.
+        split; auto.
+      }
+
+      (* UB not necessarily in K *)
+      right.
+      destruct K_CORRECT as [eb [st'' [ms'' [K_EXEC [K_SPEC K_POST]]]]].
+
+      cbn in M_EXEC_CORRECT.
+      red in M_EXEC_CORRECT.
+
+      cbn in K_EXEC.
+      red in K_EXEC.
+
+      destruct M_EXEC_CORRECT as [tm [M_SUCC M_EXEC]].
+      destruct K_EXEC as [tk [K_SUCC K_EXEC]].
+
+      cbn in M_SUCC, M_EXEC.
+      rewrite M_SUCC in M_EXEC.
+      rewrite bind_ret_l in M_EXEC.
+
+      exists eb. exists st''. exists ms''.
+      split; [| split].
+
+      { (* Exec *)
+        exists tk.
+        split; auto.
+
+        cbn.
+        rewrite MemMonad_run_bind.
+
+        rewrite M_EXEC.
+        rewrite bind_ret_l.
+        rewrite K_EXEC.
+        reflexivity.
+      }
+
+      { (* Spec *)
+        (* TODO: Probably a good bind lemma for this *)
+        destruct eb as [[[[[[[oom_eb] | [[ub_eb] | [[err_eb] | eb']]]]]]]] eqn:Heb;
+          try right; cbn; exists ms'; exists a; split; auto.
+      }
+
+      { (* Post *)
+        intros [x RET].
+        subst.
+        forward K_POST; eauto.
+        destruct K_POST.
+        split; eauto.
+        exists x.
+        split; auto.
+        destruct H0 as (?&?&?).
+        inv H0.
+
+        repeat red.
+        exists a, ms', st'.
+        split; eauto.
+      }
+  Qed.
+
+  Lemma exec_correct_ret :
+    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
+      {X}
+      (pre : exec_correct_pre)
+      (x : X),
+      exec_correct pre (ret x) (ret x) (exec_correct_post_ret x).
+  Proof.
+    intros MemM Eff MM MRun MPROV MSID MMS
+      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
+      MLAWS H X pre x.
+    intros ms st VALID PRE.
+    right.
+    exists (ret x), st, ms.
+    split.
+    { (* TODO: cleaner lemma *)
+      cbn.
+      red.
+      exists (ret x).
+      split.
+      - cbn. reflexivity.
+      - cbn.
+        rewrite MemMonad_run_ret.
+        rewrite bind_ret_l.
+        reflexivity.
+    }
+
+    split; cbn; auto.
+    intros H0.
+    split; eauto.
+    exists x.
+    split; eauto.
+    red.
+    auto.
+  Qed.
+
+  Lemma exec_correct_map_monad :
+    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
+      {A B}
+      xs
+      (m_exec : A -> MemM B) (m_spec : A -> MemPropT MemState B)
+      (post : A -> exec_correct_post B),
+      (forall a (pre : _ -> _ -> Prop),
+          exec_correct pre (m_exec a) (m_spec a) (post a)) ->
+      forall pre, exec_correct pre (map_monad m_exec xs) (map_monad m_spec xs) (map_monad post xs).
+  Proof.
+    induction xs;
+      intros m_exec m_spec HM pre post.
+
+    - unfold map_monad.
+      apply exec_correct_ret; auto.
+    - rewrite map_monad_unfold.
+      rewrite map_monad_unfold.
+
+      eapply exec_correct_bind; eauto.
+      intros * VALID POST RUN.
+
+      eapply exec_correct_bind; eauto.
+      intros * VALID2 POST2 RUN2.
+
+      apply exec_correct_ret; auto.
+  Qed.
+
+  Lemma exec_correct_map_monad_ :
+    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
+      {A B}
+      (xs : list A)
+      (m_exec : A -> MemM B) (m_spec : A -> MemPropT MemState B)
+      (post : A -> exec_correct_post B),
+      (forall a pre, exec_correct pre (m_exec a) (m_spec a) (post a)) ->
+      forall pre, exec_correct pre (map_monad_ m_exec xs) (map_monad_ m_spec xs) (map_monad_ post xs).
+  Proof.
+    intros MemM Eff MM MRun SID_FRESH MPROV MSID MMS
+      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
+      MLAWS A B xs m_exec m_spec H0 pre post.
+    eapply exec_correct_bind; auto.
+    eapply exec_correct_map_monad; auto.
+    intros * VALID POST RUN.
+    apply exec_correct_ret; auto.
+  Qed.
+
+  Lemma exec_correct_map_monad_In :
+    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
+      {A B}
+      (xs : list A)
+      (m_exec : forall (x : A), In x xs -> MemM B) (m_spec : forall (x : A), In x xs -> MemPropT MemState B)
+      post,
+      (forall a pre (IN : In a xs), exec_correct pre (m_exec a IN) (m_spec a IN) (post a IN)) ->
+      forall pre, exec_correct pre (map_monad_In xs m_exec) (map_monad_In xs m_spec) (map_monad_In xs post).
+  Proof.
+    induction xs; intros m_exec m_spec HM pre post.
+    - unfold map_monad_In.
+      apply exec_correct_ret; auto.
+    - rewrite map_monad_In_unfold.
+      rewrite map_monad_In_unfold.
+
+      eapply exec_correct_bind; eauto.
+      intros * VALID1 POST1 RUN1.
+
+      eapply exec_correct_bind; eauto.
+      intros * VALID2 POST2 RUN2.
+
+      apply exec_correct_ret; auto.
+  Qed.
+
+  Lemma exec_correct_raise_oom :
+    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
+      {A} (msg : string),
+    forall pre post, exec_correct pre (raise_oom msg) (raise_oom msg : MemPropT MemState A) post.
+  Proof.
+    intros MemM Eff MM MRun MPROV MSID MMS
+      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
+      MLAWS H A msg pre post.
+    red.
+    intros ms st VALID PRE.
+    right.
+    exists (raise_oom msg).
+    exists st. exists ms.
+    split.
+    { (* TODO: cleaner lemma? *)
+      cbn.
+      red.
+      exists (raise_oom msg).
+      split; cbn.
+      - eexists; reflexivity.
+      - rewrite MemMonad_run_raise_oom.
+        rewrite rbm_raise_bind; [| typeclasses eauto].
+        reflexivity.
+    }
+
+    split; cbn; auto.
+    intros [x CONTRA].
+    inv CONTRA.
+  Qed.
+
+  Lemma exec_correct_raise_error :
+    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
+      {A} (msg1 msg2 : string),
+    forall pre post, exec_correct pre (raise_error msg1) (raise_error msg2 : MemPropT MemState A) post.
+  Proof.
+    intros MemM Eff MM MRun MPROV MSID MMS
+      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
+      MLAWS H A msg1 msg2 pre post.
+    red.
+    intros ms st VALID PRE.
+    right.
+    exists (raise_error msg2).
+    exists st. exists ms.
+    split.
+    { (* TODO: cleaner lemma? *)
+      cbn.
+      red.
+      exists (raise_error msg1).
+      split; cbn.
+      - eexists; reflexivity.
+      - rewrite MemMonad_run_raise_error.
+        rewrite rbm_raise_bind; [| typeclasses eauto].
+        reflexivity.
+    }
+
+    split; cbn; auto.
+    intros [x CONTRA].
+    inv CONTRA.
+  Qed.
+
+  Lemma exec_correct_raise_ub :
+    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
+      {A} (msg1 msg2 : string),
+    forall pre post, exec_correct pre (raise_ub msg1) (raise_ub msg2 : MemPropT MemState A) post.
+  Proof.
+    intros MemM Eff MM MRun MPROV MSID MMS
+      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
+      MLAWS H A msg1 msg2 pre post.
+
+    red.
+    intros ms st VALID PRE.
+
+    left.
+    exists ms. exists msg2.
+    cbn; auto.
+  Qed.
+
+  (* TODO: Move this *)
+  #[global] Instance RAISE_OOM_exec_correct_post : RAISE_OOM exec_correct_post.
+  split.
+  intros A H.
+  refine (fun ms st x ms' st' => False).
+  Defined.
+
+  (* TODO: Move this *)
+  #[global] Instance RAISE_UB_exec_correct_post : RAISE_UB exec_correct_post.
+  split.
+  intros A H.
+  refine (fun ms st x ms' st' => False).
+  Defined.
+
+  (* TODO: Move this *)
+  #[global] Instance RAISE_ERROR_exec_correct_post : RAISE_ERROR exec_correct_post.
+  split.
+  intros A H.
+  refine (fun ms st x ms' st' => True).
+  Defined.
+
+  Lemma exec_correct_lift_OOM :
+    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
+      {A} (m : OOM A)
+      (pre : exec_correct_pre),
+      exec_correct pre (lift_OOM m) (lift_OOM m) (lift_OOM m).
+  Proof.
+    intros MemM Eff MM MRun MPROV MSID MMS
+      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
+      MLAWS H A [NOOM | OOM] pre post.
+    - apply exec_correct_ret; auto.
+    - apply exec_correct_raise_oom.
+  Qed.
+
+  Lemma exec_correct_lift_ERR_RAISE_ERROR :
+    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
+      {A} (m : ERR A)
+      (pre : _ -> _ -> Prop),
+      exec_correct pre (lift_ERR_RAISE_ERROR m) (lift_ERR_RAISE_ERROR m) (lift_ERR_RAISE_ERROR m).
+  Proof.
+    intros MemM Eff MM MRun MPROV MSID MMS
+      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
+      MLAWS H A [[ERR] | NOERR] pre.
+    - apply exec_correct_raise_error; auto.
+    - cbn.
+      repeat red.
+      intros ms st H0 H1.
+      right.
+      exists (ret NOERR), st, ms.
+      cbn; split; eauto.
+      repeat red.
+      cbn.
+      exists (ret NOERR).
+      split.
+      reflexivity.
+      rewrite MemMonad_run_ret.
+      rewrite bind_ret_l.
+      reflexivity.
+      split; eauto.
+      intros (?&?).
+      inv H2.
+      split; eauto.
+      exists x.
+      split; eauto.
+      red; auto.
+  Qed.
+
+  Lemma exec_correct_lift_err_RAISE_ERROR :
+    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
+      {A} (m : err A)
+      (pre : _ -> _ -> Prop),
+      exec_correct pre (lift_err_RAISE_ERROR m) (lift_err_RAISE_ERROR m) (lift_err_RAISE_ERROR m).
+  Proof.
+    intros MemM Eff MM MRun MPROV MSID MMS
+      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
+      MLAWS H A [ERR | NOERR] pre.
+    - apply exec_correct_raise_error; auto.
+    - repeat red.
+      intros ms st H0 H1.
+      right.
+      exists (ret NOERR), st, ms.
+      cbn; split; eauto.
+      repeat red.
+      cbn.
+      exists (ret NOERR).
+      split.
+      reflexivity.
+      rewrite MemMonad_run_ret.
+      rewrite bind_ret_l.
+      reflexivity.
+      split; eauto.
+      intros (?&?).
+      inv H2.
+      split; eauto.
+      exists x.
+      split; eauto.
+      red; auto.
+  Qed.
 End MemoryHandlersCorrect.
+*)
+
 (*
 Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP).
   Import LP.
@@ -3069,772 +3845,6 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     - eapply Within_err_ub_oom_itree'.
     - eapply Within_RunM_MemMonad.
   Defined.
-
-  (*** Correctness *)
-  Definition exec_correct_post (X : Type) : Type := MemState -> store_id -> X -> MemState -> store_id -> Prop.
-  Definition exec_correct_id_post {X} : exec_correct_post X :=
-    fun _ _ _ _ _ => True.
-  #[global] Hint Unfold exec_correct_id_post : core.
-  Definition exec_correct_pre := MemState -> store_id -> Prop.
-
-  Definition exec_correct_post_ret {X} (x : X) : exec_correct_post X
-    := fun ms st x' ms' st' =>
-         x = x' /\ ms = ms' /\ st = st'.
-
-  Definition exec_correct_post_bind
-    {A B}
-    (ma : exec_correct_post A)
-    (k : A -> exec_correct_post B)
-    : exec_correct_post B
-    := fun ms st b ms'' st'' =>
-         exists a ms' st',
-           ma ms st a ms' st' /\
-             (k a) ms' st' b ms'' st''.
-
-  Definition exec_correct_post_eqv {A} (a b : exec_correct_post A) :=
-    forall ms st x ms' st',
-      a ms st x ms' st' <-> b ms st x ms' st'.
-
-  Lemma exec_correct_post_eqv_refl :
-    forall {A} (a : exec_correct_post A),
-      exec_correct_post_eqv a a.
-  Proof.
-    intros A a.
-    red.
-    reflexivity.
-  Qed.
-
-  #[global] Instance MonadStoreId_exec_correct_post : MonadStoreId exec_correct_post.
-  split.
-  refine (fun ms st sid ms' st' =>
-            sid <= st /\ st < st' /\ ms = ms').
-  Defined.
-
-  #[global] Instance MonadProvenance_exec_correct_post : MonadProvenance Provenance exec_correct_post.
-  split.
-  refine (fun ms st pr ms' st' =>
-            (forall pr0 : Provenance, used_provenance_prop ms pr0 -> used_provenance_prop ms' pr0) /\
-              ~ used_provenance_prop ms pr /\ used_provenance_prop ms' pr /\
-              st = st').
-  Defined.
-
-  #[global] Instance Proper_exec_correct_post_eqv {X} :
-    Proper (@exec_correct_post_eqv X ==> eq ==> eq ==> eq ==> eq ==> eq ==> iff) (fun post ms st x ms' st' => post ms st x ms' st').
-  Proof.
-    unfold Proper, respectful.
-    intros; subst.
-    apply H.
-  Qed.
-
-  Lemma exec_correct_post_left_identity :
-    forall {A B} (a : A) (k : A -> exec_correct_post B),
-      exec_correct_post_eqv (exec_correct_post_bind (exec_correct_post_ret a) k) (k a).
-  Proof.
-    intros A B a k ms st x ms' st'.
-    unfold exec_correct_post_ret.
-    unfold exec_correct_post_bind.
-    split; intros H.
-    - destruct H as (?&?&?&?&?); subst.
-      destruct H as (?&?&?); subst.
-      auto.
-    - exists a, ms, st.
-      auto.
-  Qed.
-
-  Lemma exec_correct_post_right_identity :
-    forall {A} (ma : exec_correct_post A),
-      exec_correct_post_eqv (exec_correct_post_bind ma exec_correct_post_ret) ma.
-  Proof.
-    intros A ma ms st x ms' st'.
-    unfold exec_correct_post_ret.
-    unfold exec_correct_post_bind.
-    split; intros H.
-    - destruct H as (?&?&?&?&?); subst.
-      destruct H0 as (?&?&?); subst.
-      auto.
-    - exists x, ms', st'.
-      auto.
-  Qed.
-
-  Lemma exec_correct_post_associativity :
-    forall {A B C}
-      (ma : exec_correct_post A)
-      (mab : A -> exec_correct_post B)
-      (mbc : B -> exec_correct_post C),
-      exec_correct_post_eqv
-        (exec_correct_post_bind (exec_correct_post_bind ma mab) mbc)
-        (exec_correct_post_bind ma (fun a => exec_correct_post_bind (mab a) mbc)).
-  Proof.
-    intros A B C ma mab mbc.
-    unfold exec_correct_post_ret.
-    unfold exec_correct_post_bind.
-    split; intros H.
-    - destruct H as (?&?&?&?&?); subst.
-      destruct H as (?&?&?&?&?); subst.
-      exists x3, x4, x5.
-      split; eauto.
-    - destruct H as (?&?&?&?&?); subst.
-      destruct H0 as (?&?&?&?&?); subst.
-      exists x3, x4, x5.
-      split; eauto.
-  Qed.
-
-  #[global] Instance Monad_exec_correct_post : Monad exec_correct_post.
-  split.
-  - intros; apply exec_correct_post_ret; auto.
-  - intros; eapply exec_correct_post_bind; eauto.
-  Defined.
-
-  #[global] Instance Eq1_exec_correct_post : Eq1 exec_correct_post.
-  red. intros. eapply exec_correct_post_eqv.
-  apply X.
-  apply X0.
-  Defined.
-
-  #[global] Instance MonadLawsE_exec_correct_post : MonadLawsE exec_correct_post.
-  split.
-  - intros. apply exec_correct_post_left_identity.
-  - intros. apply exec_correct_post_right_identity.
-  - intros. apply exec_correct_post_associativity.
-  - intros A B.
-    unfold Proper, respectful.
-    intros x y H x0 y0 H0.
-    repeat red in H.
-    repeat red.
-    intros ms st x1 ms' st'.
-    split.
-    + intros H1.
-      red in H0.
-      repeat red in H1.
-      destruct H1 as (?&?&?&?&?).
-      specialize (H ms st x2 x3 x4).
-      destruct H.
-      eapply H in H1.
-      repeat red.
-      exists x2, x3, x4.
-      split; eauto.
-      apply H0; auto.
-    + intros H1.
-      red in H0.
-      repeat red in H1.
-      destruct H1 as (?&?&?&?&?).
-      specialize (H ms st x2 x3 x4).
-      destruct H.
-      eapply H3 in H1.
-      repeat red.
-      exists x2, x3, x4.
-      split; eauto.
-      apply H0; auto.
-  Defined.
-
-  Lemma exec_correct_post_bind_unfold :
-    forall {A B}
-      (ma : exec_correct_post A)
-      (mab : A -> exec_correct_post B)
-      ms st b ms'' st'',
-      (exists a ms' st',
-          ma ms st a ms' st' /\
-            (mab a) ms' st' b ms'' st'') ->
-      (a <- ma;;
-       mab a) ms st b ms'' st''.
-  Proof.
-    intros A B ma mab ms st b ms'' st'' H.
-    cbn.
-    unfold exec_correct_post_bind.
-    auto.
-  Qed.
-
-  Definition exec_correct {MemM Eff} `{MM: MemMonad MemM (itree Eff)} {X} (pre : exec_correct_pre) (exec : MemM X) (spec : MemPropT MemState X) (post : exec_correct_post X) : Prop :=
-    forall ms st,
-      (MemMonad_valid_state ms st) ->
-      pre ms st ->
-      (* UB catchall *)
-      (exists ms' msg_spec,
-          @raise_ub err_ub_oom _ X msg_spec {{ ms }} ∈ {{ ms' }} spec) \/
-        ( (* exists a behaviour in exec that lines up with spec.
-
-               Technically this should be something along the lines of...
-
-               "There is at least one behaviour in exec, and for every
-               behaviour in exec it is within the spec"
-
-               For our purposes exec is deterministic, so "exists"
-               should be fine here for simplicity.
-             *)
-           exists (e : err_ub_oom X) (st' : store_id) (ms' : MemState),
-             (* Had to manually supply typeclasses, but this within expression is: (e {{(st, ms)}} ∈ {{(st', ms')}} exec))
-
-                 I.e., The executable is correct if forall behaviours
-                 in the executable those behaviours are in the spec as
-                 well, and if the executable returns successfully it
-                 gives a valid store_id / MemState pair.
-              *)
-             let WEM := (Within_err_ub_oom_MemM (EQI:=(@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) (EQV:=(@MemMonad_eq1_runm_equiv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM))) in
-             (@within MemM _ err_ub_oom (store_id * MemState)%type (store_id * MemState)%type WEM X exec (st, ms) e (st', ms')) /\
-               (e {{ms}} ∈ {{ms'}} spec) /\ ((exists x, e = ret x) -> (MemMonad_valid_state ms' st' /\ (exists x, e = ret x /\ post ms st x ms' st')))).
-
-  (* TODO: Move this *)
-  Lemma exec_correct_weaken_pre :
-    forall {MemM Eff} `{MEMM : MemMonad MemM (itree Eff)}
-      {A}
-      (pre : exec_correct_pre)
-      (post : exec_correct_post A)
-      (weak_pre : exec_correct_pre)
-      (exec : MemM A)
-      (spec : MemPropT MemState A),
-      (forall ms st, pre ms st -> weak_pre ms st) ->
-      exec_correct weak_pre exec spec post ->
-      exec_correct pre exec spec post.
-  Proof.
-    intros MemM Eff MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MEMM A pre post weak_pre exec spec WEAK EXEC.
-    unfold exec_correct in *.
-    intros ms st VALID PRE.
-    apply WEAK in PRE.
-    eauto.
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma exec_correct_strengthen_post :
-    forall {MemM Eff} `{MEMM : MemMonad MemM (itree Eff)}
-      {A}
-      (pre : exec_correct_pre)
-      (post : exec_correct_post A)
-      (strong_post : exec_correct_post A)
-      (exec : MemM A)
-      (spec : MemPropT MemState A),
-      (forall ms st a ms' st', pre ms st -> strong_post ms st a ms' st' -> post ms st a ms' st') ->
-      exec_correct pre exec spec strong_post ->
-      exec_correct pre exec spec post.
-  Proof.
-    intros MemM Eff MM MRun MPROV MSID MMS MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MEMM A pre post strong_post exec spec STRONG EXEC.
-    unfold exec_correct in *.
-    intros ms st VALID PRE.
-    specialize (EXEC _ _ VALID PRE).
-    destruct EXEC as [UB | EXEC]; auto.
-    right.
-    destruct EXEC as (?&?&?&?&?&?).
-    exists x, x0, x1.
-    split; auto.
-    split; auto.
-    intros H2.
-    forward H1; auto.
-    destruct H1 as (?&(?&?&?)).
-    subst.
-    split; auto.
-    exists x2.
-    split; auto.
-  Qed.
-
-  (* TODO: move this *)
-  Lemma exec_correct_bind :
-    forall {MemM Eff} `{MEMM : MemMonad MemM (itree Eff)}
-      {A B}
-      (pre : exec_correct_pre)
-      (post_a : exec_correct_post A)
-      (post_b : A -> exec_correct_post B)
-      (m_exec : MemM A) (k_exec : A -> MemM B)
-      (m_spec : MemPropT MemState A) (k_spec : A -> MemPropT MemState B),
-      exec_correct pre m_exec m_spec post_a ->
-      (* This isn't true:
-
-           (forall a ms ms', m_spec ms (ret (ms', a)) -> exec_correct (k_exec a) (k_spec a)) -> ...
-
-           E.g., if 1 is a valid return value in m_spec, but m_exec can only return 0, then
-
-           k_spec may ≈ ret 2
-
-           But k_exec may ≈ \a => if a == 0 then ret 2 else raise_ub "blah"
-
-           I.e., k_exec may be set up to only be valid when results are returned by m_exec.
-       *)
-      (* The exec continuation `k_exec a` agrees with `k_spec a`
-           whenever `a` is a valid return value from the spec and the
-           executable prefix
-
-           Questions:
-
-           - What if m_exec returns an `a` that isn't in the spec...
-             + Should be covered by `exec_correct m_exec m_spec` assumption.
-       *)
-      (forall a ms_init ms_after_m st_init st_after_m,
-          MemMonad_valid_state ms_after_m st_after_m ->
-          post_a ms_init st_init a ms_after_m st_after_m ->
-          ((@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MEMM)) _
-                                                                                (MemMonad_run m_exec ms_init st_init)
-                                                                                (ret (st_after_m, (ms_after_m, a))))%monad ->
-          (* ms_k is a MemState after evaluating m *)
-          let WEM := (Within_err_ub_oom_MemM (EQI:=(@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MEMM)) (EQV:=(@MemMonad_eq1_runm_equiv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MEMM))) in
-          exec_correct (fun ms_k st_k =>
-                          pre ms_init st_init /\
-                            (@within MemM _ err_ub_oom (store_id * MemState)%type (store_id * MemState)%type WEM _ m_exec (st_init, ms_init) (ret a) (st_k, ms_k))
-                          /\ m_spec ms_init (ret (ms_k, a))) (k_exec a) (k_spec a) (post_b a)) ->
-      exec_correct pre (a <- m_exec;; k_exec a) (a <- m_spec;; k_spec a) (a <- post_a;; post_b a).
-  Proof.
-    intros MemM Eff MM MRun MPROV MSID MMS
-      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
-      MLAWS MEMM A B pre post_a post_b m_exec k_exec m_spec
-      k_spec M_CORRECT K_CORRECT.
-
-    unfold exec_correct in *.
-    intros ms st VALID PRE.
-    specialize (M_CORRECT ms st VALID PRE).
-    destruct M_CORRECT as [[ub_ms' [msg M_UB]] | M_CORRECT].
-    { (* UB *)
-      left.
-      exists ub_ms'. exists msg.
-      left; auto.
-    }
-
-    destruct M_CORRECT as [e [st' [ms' [M_EXEC_CORRECT [M_SPEC_CORRECT M_POST]]]]].
-    destruct e as [[[[[[[oom_e] | [[ub_e] | [[err_e] | e']]]]]]]] eqn:He.
-
-    - (* OOM *)
-      right.
-      exists (raise_oom oom_e).
-      exists st'.
-      exists ms'.
-
-      split.
-      { (* Exec *)
-        cbn in M_EXEC_CORRECT.
-        red in M_EXEC_CORRECT.
-        cbn. red.
-        destruct M_EXEC_CORRECT as [m2 [[oom_msg OOM] EXEC]].
-        exists (raise_oom oom_msg).
-        split.
-        cbn.
-        eexists; reflexivity.
-        cbn.
-        cbn in EXEC.
-        rewrite MemMonad_run_bind.
-        rewrite EXEC.
-        rewrite OOM.
-        repeat rewrite (@rbm_raise_bind _ _ _ _ (@raise_oom _ _) _).
-        reflexivity.
-      }
-
-      split.
-      { (* In spec *)
-        cbn.
-        left.
-        apply M_SPEC_CORRECT.
-      }
-
-      intros [x CONTRA].
-      inv CONTRA.
-    - (* UB *)
-      left.
-      exists ms'. exists ub_e.
-      cbn.
-      left.
-      apply M_SPEC_CORRECT.
-    - (* Err *)
-      right.
-      exists (raise_error err_e).
-      exists st'.
-      exists ms'.
-
-      split.
-      { (* Exec *)
-        cbn in M_EXEC_CORRECT.
-        red in M_EXEC_CORRECT.
-        cbn. red.
-        destruct M_EXEC_CORRECT as [m2 [[err_msg ERR] EXEC]].
-        exists (raise_error err_msg).
-        split.
-        cbn.
-        eexists; reflexivity.
-        cbn.
-        cbn in EXEC.
-        rewrite MemMonad_run_bind.
-        rewrite EXEC.
-        rewrite ERR.
-        repeat rewrite (@rbm_raise_bind _ _ _ _ (@raise_error _ _) _).
-        reflexivity.
-      }
-
-      split.
-      { (* In spec *)
-        cbn.
-        left.
-        apply M_SPEC_CORRECT.
-      }
-
-      intros [x CONTRA].
-      cbn in CONTRA.
-      inv CONTRA.
-    - (* Success *)
-      (* Need to know if there's UB in K... *)
-      rename e' into a.
-      forward M_POST.
-      { eexists; reflexivity. }
-      destruct M_POST as (VALID' & POST').
-      destruct POST' as (?&?&POST').
-      inv H.
-      rename x into a.
-
-      specialize (K_CORRECT a ms ms' st st').
-      forward K_CORRECT; eauto.
-      forward K_CORRECT; eauto.
-
-      forward K_CORRECT.
-      { cbn in M_EXEC_CORRECT.
-        red in M_EXEC_CORRECT.
-        destruct M_EXEC_CORRECT as [m2 [SUCC EXEC]].
-        cbn in *.
-        rewrite EXEC, SUCC.
-        rewrite bind_ret_l.
-        reflexivity.
-      }
-
-      specialize (K_CORRECT _ _ VALID').
-      forward K_CORRECT.
-      { split; auto. }
-
-      destruct K_CORRECT as [[ub_ms [ub_msg K_UB]] | K_CORRECT].
-      { (* UB in K *)
-        left.
-        exists ub_ms. exists ub_msg.
-        right.
-        exists ms'. exists a.
-        split; auto.
-      }
-
-      (* UB not necessarily in K *)
-      right.
-      destruct K_CORRECT as [eb [st'' [ms'' [K_EXEC [K_SPEC K_POST]]]]].
-
-      cbn in M_EXEC_CORRECT.
-      red in M_EXEC_CORRECT.
-
-      cbn in K_EXEC.
-      red in K_EXEC.
-
-      destruct M_EXEC_CORRECT as [tm [M_SUCC M_EXEC]].
-      destruct K_EXEC as [tk [K_SUCC K_EXEC]].
-
-      cbn in M_SUCC, M_EXEC.
-      rewrite M_SUCC in M_EXEC.
-      rewrite bind_ret_l in M_EXEC.
-
-      exists eb. exists st''. exists ms''.
-      split; [| split].
-
-      { (* Exec *)
-        exists tk.
-        split; auto.
-
-        cbn.
-        rewrite MemMonad_run_bind.
-
-        rewrite M_EXEC.
-        rewrite bind_ret_l.
-        rewrite K_EXEC.
-        reflexivity.
-      }
-
-      { (* Spec *)
-        (* TODO: Probably a good bind lemma for this *)
-        destruct eb as [[[[[[[oom_eb] | [[ub_eb] | [[err_eb] | eb']]]]]]]] eqn:Heb;
-          try right; cbn; exists ms'; exists a; split; auto.
-      }
-
-      { (* Post *)
-        intros [x RET].
-        subst.
-        forward K_POST; eauto.
-        destruct K_POST.
-        split; eauto.
-        exists x.
-        split; auto.
-        destruct H0 as (?&?&?).
-        inv H0.
-
-        repeat red.
-        exists a, ms', st'.
-        split; eauto.
-      }
-  Qed.
-
-  Lemma exec_correct_ret :
-    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
-      {X}
-      (pre : exec_correct_pre)
-      (x : X),
-      exec_correct pre (ret x) (ret x) (exec_correct_post_ret x).
-  Proof.
-    intros MemM Eff MM MRun MPROV MSID MMS
-      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
-      MLAWS H X pre x.
-    intros ms st VALID PRE.
-    right.
-    exists (ret x), st, ms.
-    split.
-    { (* TODO: cleaner lemma *)
-      cbn.
-      red.
-      exists (ret x).
-      split.
-      - cbn. reflexivity.
-      - cbn.
-        rewrite MemMonad_run_ret.
-        rewrite bind_ret_l.
-        reflexivity.
-    }
-
-    split; cbn; auto.
-    intros H0.
-    split; eauto.
-    exists x.
-    split; eauto.
-    red.
-    auto.
-  Qed.
-
-  Lemma exec_correct_map_monad :
-    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
-      {A B}
-      xs
-      (m_exec : A -> MemM B) (m_spec : A -> MemPropT MemState B)
-      (post : A -> exec_correct_post B),
-      (forall a (pre : _ -> _ -> Prop),
-          exec_correct pre (m_exec a) (m_spec a) (post a)) ->
-      forall pre, exec_correct pre (map_monad m_exec xs) (map_monad m_spec xs) (map_monad post xs).
-  Proof.
-    induction xs;
-      intros m_exec m_spec HM pre post.
-
-    - unfold map_monad.
-      apply exec_correct_ret; auto.
-    - rewrite map_monad_unfold.
-      rewrite map_monad_unfold.
-
-      eapply exec_correct_bind; eauto.
-      intros * VALID POST RUN.
-
-      eapply exec_correct_bind; eauto.
-      intros * VALID2 POST2 RUN2.
-
-      apply exec_correct_ret; auto.
-  Qed.
-
-  Lemma exec_correct_map_monad_ :
-    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
-      {A B}
-      (xs : list A)
-      (m_exec : A -> MemM B) (m_spec : A -> MemPropT MemState B)
-      (post : A -> exec_correct_post B),
-      (forall a pre, exec_correct pre (m_exec a) (m_spec a) (post a)) ->
-      forall pre, exec_correct pre (map_monad_ m_exec xs) (map_monad_ m_spec xs) (map_monad_ post xs).
-  Proof.
-    intros MemM Eff MM MRun SID_FRESH MPROV MSID MMS
-      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
-      MLAWS A B xs m_exec m_spec H0 pre post.
-    eapply exec_correct_bind; auto.
-    eapply exec_correct_map_monad; auto.
-    intros * VALID POST RUN.
-    apply exec_correct_ret; auto.
-  Qed.
-
-  Lemma exec_correct_map_monad_In :
-    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
-      {A B}
-      (xs : list A)
-      (m_exec : forall (x : A), In x xs -> MemM B) (m_spec : forall (x : A), In x xs -> MemPropT MemState B)
-      post,
-      (forall a pre (IN : In a xs), exec_correct pre (m_exec a IN) (m_spec a IN) (post a IN)) ->
-      forall pre, exec_correct pre (map_monad_In xs m_exec) (map_monad_In xs m_spec) (map_monad_In xs post).
-  Proof.
-    induction xs; intros m_exec m_spec HM pre post.
-    - unfold map_monad_In.
-      apply exec_correct_ret; auto.
-    - rewrite map_monad_In_unfold.
-      rewrite map_monad_In_unfold.
-
-      eapply exec_correct_bind; eauto.
-      intros * VALID1 POST1 RUN1.
-
-      eapply exec_correct_bind; eauto.
-      intros * VALID2 POST2 RUN2.
-
-      apply exec_correct_ret; auto.
-  Qed.
-
-  Lemma exec_correct_raise_oom :
-    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
-      {A} (msg : string),
-    forall pre post, exec_correct pre (raise_oom msg) (raise_oom msg : MemPropT MemState A) post.
-  Proof.
-    intros MemM Eff MM MRun MPROV MSID MMS
-      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
-      MLAWS H A msg pre post.
-    red.
-    intros ms st VALID PRE.
-    right.
-    exists (raise_oom msg).
-    exists st. exists ms.
-    split.
-    { (* TODO: cleaner lemma? *)
-      cbn.
-      red.
-      exists (raise_oom msg).
-      split; cbn.
-      - eexists; reflexivity.
-      - rewrite MemMonad_run_raise_oom.
-        rewrite rbm_raise_bind; [| typeclasses eauto].
-        reflexivity.
-    }
-
-    split; cbn; auto.
-    intros [x CONTRA].
-    inv CONTRA.
-  Qed.
-
-  Lemma exec_correct_raise_error :
-    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
-      {A} (msg1 msg2 : string),
-    forall pre post, exec_correct pre (raise_error msg1) (raise_error msg2 : MemPropT MemState A) post.
-  Proof.
-    intros MemM Eff MM MRun MPROV MSID MMS
-      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
-      MLAWS H A msg1 msg2 pre post.
-    red.
-    intros ms st VALID PRE.
-    right.
-    exists (raise_error msg2).
-    exists st. exists ms.
-    split.
-    { (* TODO: cleaner lemma? *)
-      cbn.
-      red.
-      exists (raise_error msg1).
-      split; cbn.
-      - eexists; reflexivity.
-      - rewrite MemMonad_run_raise_error.
-        rewrite rbm_raise_bind; [| typeclasses eauto].
-        reflexivity.
-    }
-
-    split; cbn; auto.
-    intros [x CONTRA].
-    inv CONTRA.
-  Qed.
-
-  Lemma exec_correct_raise_ub :
-    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
-      {A} (msg1 msg2 : string),
-    forall pre post, exec_correct pre (raise_ub msg1) (raise_ub msg2 : MemPropT MemState A) post.
-  Proof.
-    intros MemM Eff MM MRun MPROV MSID MMS
-      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
-      MLAWS H A msg1 msg2 pre post.
-
-    red.
-    intros ms st VALID PRE.
-
-    left.
-    exists ms. exists msg2.
-    cbn; auto.
-  Qed.
-
-  (* TODO: Move this *)
-  #[global] Instance RAISE_OOM_exec_correct_post : RAISE_OOM exec_correct_post.
-  split.
-  intros A H.
-  refine (fun ms st x ms' st' => False).
-  Defined.
-
-  (* TODO: Move this *)
-  #[global] Instance RAISE_UB_exec_correct_post : RAISE_UB exec_correct_post.
-  split.
-  intros A H.
-  refine (fun ms st x ms' st' => False).
-  Defined.
-
-  (* TODO: Move this *)
-  #[global] Instance RAISE_ERROR_exec_correct_post : RAISE_ERROR exec_correct_post.
-  split.
-  intros A H.
-  refine (fun ms st x ms' st' => True).
-  Defined.
-
-  Lemma exec_correct_lift_OOM :
-    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
-      {A} (m : OOM A)
-      (pre : exec_correct_pre),
-      exec_correct pre (lift_OOM m) (lift_OOM m) (lift_OOM m).
-  Proof.
-    intros MemM Eff MM MRun MPROV MSID MMS
-      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
-      MLAWS H A [NOOM | OOM] pre post.
-    - apply exec_correct_ret; auto.
-    - apply exec_correct_raise_oom.
-  Qed.
-
-  Lemma exec_correct_lift_ERR_RAISE_ERROR :
-    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
-      {A} (m : ERR A)
-      (pre : _ -> _ -> Prop),
-      exec_correct pre (lift_ERR_RAISE_ERROR m) (lift_ERR_RAISE_ERROR m) (lift_ERR_RAISE_ERROR m).
-  Proof.
-    intros MemM Eff MM MRun MPROV MSID MMS
-      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
-      MLAWS H A [[ERR] | NOERR] pre.
-    - apply exec_correct_raise_error; auto.
-    - cbn.
-      repeat red.
-      intros ms st H0 H1.
-      right.
-      exists (ret NOERR), st, ms.
-      cbn; split; eauto.
-      repeat red.
-      cbn.
-      exists (ret NOERR).
-      split.
-      reflexivity.
-      rewrite MemMonad_run_ret.
-      rewrite bind_ret_l.
-      reflexivity.
-      split; eauto.
-      intros (?&?).
-      inv H2.
-      split; eauto.
-      exists x.
-      split; eauto.
-      red; auto.
-  Qed.
-
-  Lemma exec_correct_lift_err_RAISE_ERROR :
-    forall {MemM Eff} `{MemMonad MemM (itree Eff)}
-      {A} (m : err A)
-      (pre : _ -> _ -> Prop),
-      exec_correct pre (lift_err_RAISE_ERROR m) (lift_err_RAISE_ERROR m) (lift_err_RAISE_ERROR m).
-  Proof.
-    intros MemM Eff MM MRun MPROV MSID MMS
-      MERR MUB MOOM RunERR RunUB RunOOM EQM EQRI
-      MLAWS H A [ERR | NOERR] pre.
-    - apply exec_correct_raise_error; auto.
-    - repeat red.
-      intros ms st H0 H1.
-      right.
-      exists (ret NOERR), st, ms.
-      cbn; split; eauto.
-      repeat red.
-      cbn.
-      exists (ret NOERR).
-      split.
-      reflexivity.
-      rewrite MemMonad_run_ret.
-      rewrite bind_ret_l.
-      reflexivity.
-      split; eauto.
-      intros (?&?).
-      inv H2.
-      split; eauto.
-      exists x.
-      split; eauto.
-      red; auto.
-  Qed.
 
   Definition get_consecutive_ptrs_post len : exec_correct_post (list ADDR.addr) :=
     (fun ms st addrs ms' st' =>
