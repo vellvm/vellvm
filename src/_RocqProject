@@ -12,6 +12,7 @@
 ./mem/MemoryModel.v
 ./mem/IntMapMemory.v
 ./mem/Tactics.v
+./mem/Utils.v
 ./mem/Heaps.v
 ./mem/StackFrames.v
 ./mem/MemoryModelImplementation.v
