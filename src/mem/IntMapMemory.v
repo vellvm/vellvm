@@ -1,6 +1,7 @@
 (*** Memory model implementations using intmaps *)
 From Coq Require Import
   ZArith
+  String
   Structures.Equalities.
 
 From Mem Require Import
@@ -10,7 +11,15 @@ From Mem Require Import
   SByte
   StoreId
   FiniteMaps
-  Tactics.
+  Tactics
+  Heaps
+  StackFrames
+  Utils.
+
+From Coq Require Import
+  List.
+
+Notation err := (sum string).
 
 (** Memory models based on integer maps *)
 Module INTMAP_MEMORY_MODEL_BASE (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) (SB : SBYTE) <: MEMORY_MODEL_BASE ADDR SB.
@@ -313,7 +322,6 @@ Module INTMAP_AID_MEMORY_MODEL
 End INTMAP_AID_MEMORY_MODEL.
 
 (** Add a heap and stack to allocatable memory *)
-(*
 Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
   (Import ADDR : BASIC_ADDRESS)
   (Import SB : SBYTE)
@@ -484,82 +492,15 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
   Qed.
 
   (** FIND_FREE *)
-  Definition find_free_block (m : Memory) (len : nat) (ptrs : list addr) : Prop :=
-    length ptrs = len /\ Forall (addr_not_allocated m) ptrs /\ consecutive_ptrs ptrs = true.
-
-  Lemma find_free_block_is_free :
-    forall m len ptrs,
-      find_free_block m len ptrs ->
-      Forall (addr_not_allocated m) ptrs.
-  Proof.
-    intros * H; apply H.
-  Qed.
-
-  Lemma find_free_block_length :
-    forall m len ptrs,
-      find_free_block m len ptrs ->
-      length ptrs = len.
-  Proof.
-    intros * H; apply H.
-  Qed.
-
-  Lemma find_free_block_consecutive :
-    forall m len ptrs,
-      find_free_block m len ptrs ->
-      consecutive_ptrs ptrs = true.
-  Proof.
-    intros * H; apply H.
-  Qed.
-
-  (** MEMORY_ALLOCATE *)
-  Definition allocate_block (m1 : Memory) (bytes : list SByte) (aid : AID.t) (m2 : Memory) (ptrs : list addr) : Prop :=
-    find_free_block m1 (length bytes) ptrs /\
-      Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs /\
-      (forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b) /\
-      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs /\
-      (length bytes > 0 -> Forall (fun ptr => is_null ptr = false) ptrs).
-
-  Lemma allocate_block_free :
-    forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid m2 ptrs ->
-      find_free_block m1 (length bytes) ptrs.
-  Proof.
-    intros * H; apply H.
-  Qed.
-
-  Lemma allocate_block_new_reads :
-    forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid m2 ptrs ->
-      Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs.
-  Proof.
-    intros * H; apply H.
-  Qed.
-
-  Lemma allocate_block_old_reads :
-    forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid m2 ptrs ->
-      forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b.
-  Proof.
-    intros * H; apply H.
-  Qed.
-
-  Lemma allocate_block_allocated :
-    forall m1 bytes aid m2 ptrs,
-      allocate_block m1 bytes aid m2 ptrs ->
-      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
-  Proof.
-    intros * H; apply H.
-  Qed.
-
-  Lemma allocate_block_non_null :
-    forall m1 bytes aid m2 ptrs,
-      length bytes > 0 ->
-      allocate_block m1 bytes aid m2 ptrs ->
-      Forall (fun ptr => is_null ptr = false) ptrs.
-  Proof.
-    intros * LEN H; apply H; auto.
-  Qed.
-
+  Record find_free_block (m : Memory) (len : nat) (ptrs : (addr * list addr)) : Prop :=
+    { (* Minimal *)
+      find_free_block_is_free : Forall (addr_not_allocated m) (snd ptrs)
+    ; find_free_block_length : length (snd ptrs) = len
+    ; find_free_block_consecutive : consecutive_ptrs (snd ptrs) = true
+    ; find_free_block_head : forall ptr' ptrs', snd ptrs = (ptr' :: ptrs') -> fst ptrs = ptr'
+    ; find_free_non_null : Forall (fun ptr => is_null ptr = false) (snd ptrs)
+    ; find_free_non_null' : is_null (fst ptrs) = false
+    }.
 
   (** STACK *)
   Definition Memory_frame_stack := memory_frame_stack.
@@ -580,161 +521,6 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
   Qed.
 
   Include (MEMORY_FRAME_STACK_EXTRAS ADDR SB F FS).
-
-  Definition stack_allocate_block
-    (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : err (Memory * list addr)) : Prop :=
-    exists m' ptrs,
-      allocate_block m bytes aid m' ptrs /\
-        match add_all_to_current_frame (Memory_frame_stack m') ptrs with
-        | None => res = inl "stack_allocate_block: No stack frame"%string
-        | Some fs =>
-            res = inr (Memory_frame_stack_modify m' (fun _ => fs), ptrs)
-        end.
-
-  Lemma stack_allocate_block_free :
-    forall m1 bytes aid m2 ptrs,
-      stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
-      find_free_block m1 (length bytes) ptrs.
-  Proof.
-    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
-    break_match_hyp_inv.
-    eapply allocate_block_free; eauto.
-  Qed.
-
-  Lemma stack_allocate_block_non_null :
-    forall m1 bytes aid m2 ptrs,
-      length bytes > 0 ->
-      stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
-      Forall (fun ptr => is_null ptr = false) ptrs.
-  Proof.
-    intros m1 bytes aid m2 ptrs LEN ALLOC.
-    red in ALLOC.
-    destruct ALLOC as (?&?&ALLOC&?).
-    break_match_hyp_inv.
-    eapply allocate_block_non_null; eauto.
-  Qed.
-
-  (* TODO: Make lemma in framestack module? *)
-  Lemma read_byte_frame_ambivalent :
-    forall m ptr b fs,
-      read_byte m ptr b <-> read_byte (Memory_frame_stack_modify m fs) ptr b.
-  Proof.
-    intros m ptr b fs.
-    unfold read_byte.
-    unfold Memory_frame_stack_modify.
-    destruct m; cbn.
-    reflexivity.
-  Qed.
-
-  Lemma stack_allocate_block_new_reads :
-    forall m1 bytes aid m2 ptrs,
-      stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
-      Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs.
-  Proof.
-    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
-    break_match_hyp_inv.
-    eapply Forall2_impl with (R1:= fun b ptr => read_byte m' ptr b).
-    intros a b H.
-    apply read_byte_frame_ambivalent; auto.
-    eapply allocate_block_new_reads; eauto.
-  Qed.
-
-  Lemma stack_allocate_block_old_reads :
-    forall m1 bytes aid m2 ptrs,
-      stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
-      forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b.
-  Proof.
-    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
-    break_match_hyp_inv.
-    intros b ptr READ.
-    apply read_byte_frame_ambivalent; auto.
-    eapply allocate_block_old_reads; eauto.
-  Qed.
-
-  (* TODO: Make lemma in framestack module? *)
-  Lemma addr_allocated_frame_ambivalent :
-    forall m ptr aid fs,
-      addr_allocated m ptr aid <-> addr_allocated (Memory_frame_stack_modify m fs) ptr aid.
-  Proof.
-    intros m ptr b fs.
-    unfold read_byte.
-    unfold Memory_frame_stack_modify.
-    destruct m; cbn.
-    reflexivity.
-  Qed.
-
-  Lemma stack_allocate_block_allocated :
-    forall m1 bytes aid m2 ptrs,
-      stack_allocate_block m1 bytes aid (inr (m2, ptrs))->
-      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
-  Proof.
-    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
-    break_match_hyp_inv.
-    eapply Forall_impl with (P:=fun ptr => addr_allocated m' ptr aid).
-    - intros a H.
-      apply addr_allocated_frame_ambivalent; auto.
-    - eapply allocate_block_allocated; eauto.
-  Qed.
-
-  Definition stack_pop (m1 m2 : Memory) : Prop
-    := (exists f',
-           peek (Memory_frame_stack m1) = Some f' /\
-             pop (Memory_frame_stack m1) = Some (f', Memory_frame_stack m2)) /\
-         (forall ptr, ptr_in_current_frame m1 ptr = true -> addr_not_allocated m2 ptr) /\
-         (forall ptr aid,
-             ptr_in_current_frame m1 ptr = false ->
-             addr_allocated m1 ptr aid <-> addr_allocated m2 ptr aid) /\
-         (forall ptr byte,
-             ptr_in_current_frame m1 ptr = false ->
-             read_byte m1 ptr byte <-> read_byte m2 ptr byte).
-
-  Lemma stack_pop_bytes_freed :
-    forall m1 m2,
-      stack_pop m1 m2 ->
-      forall ptr,
-        ptr_in_current_frame m1 ptr = true ->
-        addr_not_allocated m2 ptr.
-  Proof.
-    unfold ptr_in_current_frame, addr_not_allocated.
-    intros m1 m2 POP ptr INFRAME AID ALLOC.
-    break_match_hyp_inv.
-    destruct POP as (?&FREE&?).
-    apply FREE in ALLOC; auto.
-    unfold ptr_in_current_frame.
-    rewrite Heqo; auto.
-  Qed.
-
-  Lemma stack_pop_non_frame_allocations :
-    forall m1 m2 : Memory,
-      stack_pop m1 m2 ->
-      forall ptr aid,
-        ptr_in_current_frame m1 ptr = false ->
-        addr_allocated m1 ptr aid <-> addr_allocated m2 ptr aid.
-  Proof.
-    intros m1 m2 POP ptr aid INFRAME.
-    apply POP; auto.
-  Qed.
-
-  Lemma stack_pop_non_frame_bytes_read :
-    forall m1 m2 : Memory,
-      stack_pop m1 m2 ->
-      forall ptr byte,
-        ptr_in_current_frame m1 ptr = false -> read_byte m1 ptr byte <-> read_byte m2 ptr byte.
-  Proof.
-    intros m1 m2 POP ptr byte INFRAME.
-    apply POP; auto.
-  Qed.
-
-  Lemma stack_pop_pop_frame :
-    forall (m1 m2 : Memory),
-      stack_pop m1 m2 ->
-      exists f',
-        peek (Memory_frame_stack m1) = Some f' /\
-          pop (Memory_frame_stack m1) = Some (f', Memory_frame_stack m2).
-  Proof.
-    intros m1 m2 POP.
-    apply POP.
-  Qed.
 
   (** HEAP *)
   Definition Memory_heap := memory_heap.
@@ -768,30 +554,161 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
   Definition root_ptr_in_memory_heap (m : Memory) (root : addr) : bool :=
     root_ptr_in_heap (Memory_heap m) root.
 
-  Definition heap_allocate_block
-    (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : (Memory * list addr)%type) : Prop
-    := exists m' ptrs,
+
+  (** MEMORY_ALLOCATE *)
+  Record allocate_block (m1 : Memory) (bytes : list SByte) (aid : AID.t) (m2 : Memory) (ptrs : (addr * list addr)) : Prop :=
+    { (* Minimal set *)
+      allocate_block_free : find_free_block m1 (length bytes) ptrs
+    ; allocate_block_new_reads : Forall2 (fun b ptr => read_byte m2 ptr b) bytes (snd ptrs)
+    ; allocate_block_old_reads : forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b
+    ; allocate_block_allocated : Forall (fun ptr => addr_allocated m2 ptr aid) (snd ptrs)
+    ; allocate_block_non_null : Forall (fun ptr => is_null ptr = false) (snd ptrs)
+
+      (* Extras *)
+    ; allocate_block_preserves_heap : Memory_heap m1 = Memory_heap m2
+    ; allocate_block_preserves_stack : Memory_frame_stack m1 = Memory_frame_stack m2
+    }.
+
+  (** Stack allocations *)
+  (* It's a little unclear if OOM or err should take precedence... Currently OOM takes precedence. *)
+  Definition stack_allocate_block
+    (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : err (Memory * (addr * list addr))) : Prop :=
+    exists m' ptrs,
       allocate_block m bytes aid m' ptrs /\
-        res = (Memory_heap_modify m' (fun h => add_ptrs_to_heap h ptrs), ptrs).
+        match add_all_to_current_frame (Memory_frame_stack m') (snd ptrs) with
+        | None => res = inl "stack_allocate_block: No stack frame"%string
+        | Some fs =>
+            res = inr (Memory_frame_stack_modify m' (fun _ => fs), ptrs)
+        end.
+
+  Lemma stack_allocate_block_free :
+    forall m1 bytes aid m2 ptrs,
+      stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
+      find_free_block m1 (length bytes) ptrs.
+  Proof.
+    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
+    break_match_hyp_inv.
+    eapply allocate_block_free; eauto.
+  Qed.
+
+  Lemma stack_allocate_block_non_null :
+    forall m1 bytes aid m2 ptrs,
+      stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
+      Forall (fun ptr => is_null ptr = false) (snd ptrs).
+  Proof.
+    intros m1 bytes aid m2 ptrs ALLOC.
+    red in ALLOC.
+    destruct ALLOC as (?&?&ALLOC&?).
+    break_match_hyp_inv.
+    eapply allocate_block_non_null; eauto.
+  Qed.
+
+  (* TODO: Make lemma in framestack module? *)
+  Lemma read_byte_frame_ambivalent :
+    forall m ptr b fs,
+      read_byte m ptr b <-> read_byte (Memory_frame_stack_modify m fs) ptr b.
+  Proof.
+    intros m ptr b fs.
+    unfold read_byte.
+    unfold Memory_frame_stack_modify.
+    destruct m; cbn.
+    reflexivity.
+  Qed.
+
+  (* TODO: Make lemma in framestack module? *)
+  Lemma addr_allocated_frame_ambivalent :
+    forall m ptr aid fs,
+      addr_allocated m ptr aid <-> addr_allocated (Memory_frame_stack_modify m fs) ptr aid.
+  Proof.
+    intros m ptr b fs.
+    unfold read_byte.
+    unfold Memory_frame_stack_modify.
+    destruct m; cbn.
+    reflexivity.
+  Qed.
+
+  Lemma stack_allocate_block_new_reads :
+    forall m1 bytes aid m2 ptrs,
+      stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
+      Forall2 (fun b ptr => read_byte m2 ptr b) bytes (snd ptrs).
+  Proof.
+    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
+    break_match_hyp_inv.
+    eapply Forall2_impl with (R1:= fun b ptr => read_byte m' ptr b).
+    intros a b H.
+    apply read_byte_frame_ambivalent; auto.
+    eapply allocate_block_new_reads; eauto.
+  Qed.
+
+  Lemma stack_allocate_block_old_reads :
+    forall m1 bytes aid m2 ptrs,
+      stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
+      forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b.
+  Proof.
+    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
+    break_match_hyp_inv.
+    intros b ptr READ.
+    apply read_byte_frame_ambivalent; auto.
+    eapply allocate_block_old_reads; eauto.
+  Qed.
+
+  Lemma stack_allocate_block_allocated :
+    forall m1 bytes aid m2 ptrs,
+      stack_allocate_block m1 bytes aid (inr (m2, ptrs)) ->
+      Forall (fun ptr => addr_allocated m2 ptr aid) (snd ptrs).
+  Proof.
+    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
+    break_match_hyp_inv.
+    eapply Forall_impl with (P:=fun ptr => addr_allocated m' ptr aid).
+    - intros a H.
+      apply addr_allocated_frame_ambivalent; auto.
+    - eapply allocate_block_allocated; eauto.
+  Qed.
+
+  Record stack_pop (m1 m2 : Memory) : Prop :=
+    { (* Minimal *)
+      stack_pop_pop_frame :
+      exists f',
+        peek (Memory_frame_stack m1) = Some f' /\
+          pop (Memory_frame_stack m1) = Some (f', Memory_frame_stack m2)
+    ; stack_pop_bytes_freed :
+      forall ptr,
+        ptr_in_current_frame m1 ptr = true ->
+        addr_not_allocated m2 ptr
+    ; stack_pop_non_frame_allocations :
+      forall ptr aid,
+        ptr_in_current_frame m1 ptr = false ->
+        addr_allocated m1 ptr aid <-> addr_allocated m2 ptr aid
+    ; stack_pop_non_frame_bytes_read :
+      forall ptr byte,
+        ptr_in_current_frame m1 ptr = false ->
+        read_byte m1 ptr byte <-> read_byte m2 ptr byte
+    }.
+
+  (** Heap allocations *)
+  Definition heap_allocate_block
+    (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : Memory * (addr * list addr)) : Prop :=
+    exists m' ptrs,
+      allocate_block m bytes aid m' ptrs /\
+        res = (Memory_heap_modify m' (fun h => add_ptrs_to_heap h (snd ptrs)), ptrs).
 
   Lemma heap_allocate_block_free :
     forall m1 bytes aid m2 ptrs,
       heap_allocate_block m1 bytes aid (m2, ptrs) ->
       find_free_block m1 (length bytes) ptrs.
   Proof.
-    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & HEAP).
-    inv HEAP.
+    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
+    inv ADD.
     eapply allocate_block_free; eauto.
   Qed.
 
   Lemma heap_allocate_block_non_null :
     forall m1 bytes aid m2 ptrs,
-      length bytes > 0 ->
       heap_allocate_block m1 bytes aid (m2, ptrs) ->
-      Forall (fun p => is_null p = false) ptrs.
+      Forall (fun p => is_null p = false) (snd ptrs).
   Proof.
-    intros m1 bytes aid m2 ptrs LEN (m' & ptrs' & ALLOC & HEAP).
-    inv HEAP.
+    intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
+    inv ADD.
     eapply allocate_block_non_null; eauto.
   Qed.
 
@@ -828,7 +745,7 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
   Lemma heap_allocate_block_new_reads :
     forall m1 bytes aid m2 ptrs,
       heap_allocate_block m1 bytes aid (m2, ptrs) ->
-      Forall2 (fun b ptr => read_byte m2 ptr b) bytes ptrs.
+      Forall2 (fun b ptr => read_byte m2 ptr b) bytes (snd ptrs).
   Proof.
     intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & HEAP).
     inv HEAP.
@@ -854,7 +771,7 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
   Lemma heap_allocate_block_allocated :
     forall m1 bytes aid m2 ptrs,
       heap_allocate_block m1 bytes aid (m2, ptrs) ->
-      Forall (fun ptr => addr_allocated m2 ptr aid) ptrs.
+      Forall (fun ptr => addr_allocated m2 ptr aid) (snd ptrs).
   Proof.
     intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & HEAP).
     inv HEAP.
@@ -868,22 +785,13 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
   Lemma heap_allocate_block_new_heap :
     forall m1 bytes aid m2 ptrs,
       heap_allocate_block m1 bytes aid (m2, ptrs) ->
-      Memory_heap m2 = add_ptrs_to_heap (Memory_heap m1) ptrs.
+      Memory_heap m2 = add_ptrs_to_heap (Memory_heap m1) (snd ptrs).
   Proof.
     intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & HEAP).
     inv HEAP.
-    induction ptrs'; cbn; auto.
-    - replace (fun h : Heap => h) with (@id Heap) by auto.
-      rewrite Memory_heap_modify_id.
-      inv ALLOC.
-    apply Forall_forall.
-    intros x IN.
-    apply Memory_heap_modify_all_allocated_preserved.
-    eapply allocate_block_allocated in ALLOC.
-    eapply Forall_forall in ALLOC; eauto.
-
-    intros m1 bytes aid m2 ptrs ALLOC.
-    apply ALLOC; auto.
+    apply allocate_block_preserves_heap in ALLOC.
+    rewrite ALLOC.
+    erewrite Memory_heap_modify_spec; eauto; cbn; eauto.
   Qed.
 
   (** Heap free *)
