@@ -529,26 +529,32 @@ Module Type MEMORY_FIND_FREE
 
   Parameter find_free_block_is_free :
     forall (m : Memory) (len : nat) (ptrs : addr * list addr),
+      find_free_block m len ptrs ->
       Forall (addr_not_allocated m) (snd ptrs).
 
   Parameter find_free_block_length :
     forall (m : Memory) (len : nat) (ptrs : addr * list addr),
+      find_free_block m len ptrs ->
       length (snd ptrs) = len.
 
   Parameter find_free_block_consecutive :
     forall (m : Memory) (len : nat) (ptrs : addr * list addr),
+      find_free_block m len ptrs ->
       consecutive_ptrs (snd ptrs) = true.
 
   Parameter find_free_block_head :
-    forall (m : Memory) (len : nat) (ptrs : addr * list addr) ptr' ptrs',
-      snd ptrs = (ptr' :: ptrs') -> fst ptrs = ptr'.
+    forall (m : Memory) (len : nat) (ptrs : addr * list addr),
+      find_free_block m len ptrs ->
+      forall ptr' ptrs', snd ptrs = (ptr' :: ptrs') -> fst ptrs = ptr'.
 
   Parameter find_free_non_null :
     forall (m : Memory) (len : nat) (ptrs : addr * list addr),
+      find_free_block m len ptrs ->
       Forall (fun ptr => is_null ptr = false) (snd ptrs).
 
   Parameter find_free_non_null' :
     forall (m : Memory) (len : nat) (ptrs : addr * list addr),
+      find_free_block m len ptrs ->
       is_null (fst ptrs) = false.
 End MEMORY_FIND_FREE.
 
@@ -595,24 +601,29 @@ Module Type MEMORY_ALLOCATE
 
   Parameter allocate_block : Memory -> list SByte -> AllocationId -> Memory -> (addr * list addr) -> Prop.
 
-    Parameter allocate_block_free :
-      forall (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)),
-        find_free_block m1 (length bytes) ptrs.
+  Parameter allocate_block_free :
+    forall (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)),
+      allocate_block m1 bytes aid m2 ptrs ->
+      find_free_block m1 (length bytes) ptrs.
 
   Parameter allocate_block_new_reads :
     forall (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)),
+      allocate_block m1 bytes aid m2 ptrs ->
       Forall2 (fun b ptr => read_byte m2 ptr b) bytes (snd ptrs).
 
   Parameter allocate_block_old_reads :
     forall (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)),
+      allocate_block m1 bytes aid m2 ptrs ->
       forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b.
 
   Parameter allocate_block_allocated :
     forall (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)),
+      allocate_block m1 bytes aid m2 ptrs ->
       Forall (fun ptr => addr_allocated m2 ptr aid) (snd ptrs).
 
   Parameter allocate_block_non_null :
     forall (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)),
+      allocate_block m1 bytes aid m2 ptrs ->
       Forall (fun ptr => is_null ptr = false) (snd ptrs).
 
 End MEMORY_ALLOCATE.
