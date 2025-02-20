@@ -492,7 +492,7 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
   Qed.
 
   (** FIND_FREE *)
-  Record find_free_block (m : Memory) (len : nat) (ptrs : (addr * list addr)) : Prop :=
+  Record find_free_block' (m : Memory) (len : nat) (ptrs : (addr * list addr)) : Prop :=
     { (* Minimal *)
       find_free_block_is_free : Forall (addr_not_allocated m) (snd ptrs)
     ; find_free_block_length : length (snd ptrs) = len
@@ -501,6 +501,9 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
     ; find_free_non_null : Forall (fun ptr => is_null ptr = false) (snd ptrs)
     ; find_free_non_null' : is_null (fst ptrs) = false
     }.
+
+  (* Make module types happy :| *)
+  Definition find_free_block := find_free_block'.
 
   (** STACK *)
   Definition Memory_frame_stack := memory_frame_stack.
@@ -556,7 +559,7 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
 
 
   (** MEMORY_ALLOCATE *)
-  Record allocate_block (m1 : Memory) (bytes : list SByte) (aid : AID.t) (m2 : Memory) (ptrs : (addr * list addr)) : Prop :=
+  Record allocate_block' (m1 : Memory) (bytes : list SByte) (aid : AID.t) (m2 : Memory) (ptrs : (addr * list addr)) : Prop :=
     { (* Minimal set *)
       allocate_block_free : find_free_block m1 (length bytes) ptrs
     ; allocate_block_new_reads : Forall2 (fun b ptr => read_byte m2 ptr b) bytes (snd ptrs)
@@ -568,6 +571,9 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
     ; allocate_block_preserves_heap : Memory_heap m1 = Memory_heap m2
     ; allocate_block_preserves_stack : Memory_frame_stack m1 = Memory_frame_stack m2
     }.
+
+  (* Make module types happy... *)
+  Definition allocate_block := allocate_block'.
 
   (** Stack allocations *)
   (* It's a little unclear if OOM or err should take precedence... Currently OOM takes precedence. *)
@@ -665,7 +671,7 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
     - eapply allocate_block_allocated; eauto.
   Qed.
 
-  Record stack_pop (m1 m2 : Memory) : Prop :=
+  Record stack_pop' (m1 m2 : Memory) : Prop :=
     { (* Minimal *)
       stack_pop_pop_frame :
       exists f',
@@ -684,6 +690,8 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
         ptr_in_current_frame m1 ptr = false ->
         read_byte m1 ptr byte <-> read_byte m2 ptr byte
     }.
+
+  Definition stack_pop := stack_pop'.
 
   (** Heap allocations *)
   Definition heap_allocate_block
@@ -843,19 +851,19 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
     { (* all bytes in block are freed. *)
       free_spec_bytes_freed :
       forall ptr,
-        ptr_in_memory_heap m1 root ptr ->
+        ptr_in_memory_heap m1 root ptr = true ->
         addr_not_allocated m2 ptr;
 
       (* Bytes not allocated in the block have the same allocation status as before *)
       free_spec_non_block_bytes_preserved :
       forall ptr aid,
-        (~ ptr_in_memory_heap m1 root ptr) ->
+        ptr_in_memory_heap m1 root ptr = false ->
         addr_allocated m1 ptr aid <-> addr_allocated m2 ptr aid;
 
       (* Bytes not allocated in the freed block are the same when read *)
       free_spec_non_frame_bytes_read :
       forall ptr byte,
-        (~ ptr_in_memory_heap m1 root ptr) ->
+        ptr_in_memory_heap m1 root ptr = false ->
         read_byte m1 ptr byte <-> read_byte m2 ptr byte;
 
       (* Set new heap *)
@@ -901,10 +909,8 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
   Proof.
     intros m1 root m2 FREE ptr aid IN_HEAP.
     eapply free_spec_non_block_bytes_preserved.
-    apply FREE.
-    intros CONTRA.
-    rewrite CONTRA in IN_HEAP.
-    discriminate.
+    apply FREE; auto.
+    auto.
   Qed.
 
   (** Bytes not allocated in the freed block are the same when read *)
@@ -917,10 +923,8 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
   Proof.
     intros m1 root m2 FREE ptr byte IN_HEAP.
     eapply free_spec_non_frame_bytes_read.
-    apply FREE.
-    intros CONTRA.
-    rewrite CONTRA in IN_HEAP.
-    discriminate.
+    apply FREE; auto.
+    auto.
   Qed.
 
   (** Set new heap *)
@@ -991,7 +995,7 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
        let sid' := N.succ sid in
        (sid', Memory_sid_modify m (fun _ => sid')).
 
-End ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL. *)
+End ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL.
 
 (* Module NAT_SBYTE <: SBYTE. *)
 (*   Definition SByte := (nat * N)%type. *)
