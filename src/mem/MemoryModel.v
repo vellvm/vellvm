@@ -198,7 +198,7 @@ Module Type CORE_EXEC_READ_MEMORY_MODEL
   (Import SB : SBYTE)
   (Import MEM : MEMORY_MODEL_BASE ADDR SB).
   (** Primitive byte reads *)
-  Parameter read_byte_exec : Memory -> addr -> option SByte.
+  Parameter read_byte_exec : Memory -> addr -> err SByte.
 End CORE_EXEC_READ_MEMORY_MODEL.
 
 Module Type CORE_MEMORY_MODEL_F (ADDR : CORE_ADDRESS) (SB : SBYTE) (MEM : MEMORY_MODEL_BASE ADDR SB) := CORE_READ_MEMORY_MODEL ADDR SB MEM.
@@ -214,12 +214,12 @@ Module Type CORE_EXEC_MEMORY_MODEL_CORRECT
 
   Parameter read_byte_correct :
     forall m ptr sb,
-      read_byte_exec m ptr = Some sb ->
+      read_byte_exec m ptr = inr sb ->
       read_byte m ptr sb.
 
-  Parameter read_byte_correct_none :
-    forall m ptr sb,
-      read_byte_exec m ptr = None ->
+  Parameter read_byte_correct_err :
+    forall m ptr sb str,
+      read_byte_exec m ptr = inl str ->
       ~ read_byte m ptr sb.
 End CORE_EXEC_MEMORY_MODEL_CORRECT.
 
@@ -315,7 +315,7 @@ Module Type EXEC_MEMORY_WRITES
   (Import ADDR : CORE_ADDRESS)
   (Import SB : SBYTE)
   (Import MEM : MEMORY_MODEL_BASE ADDR SB).
-  Parameter write_byte_exec : Memory -> addr -> SByte -> Memory.
+  Parameter write_byte_exec : Memory -> addr -> SByte -> err Memory.
 End EXEC_MEMORY_WRITES.
 
 Module Type WRITEABLE_MEMORY_HELPER (ADDR : BASIC_ADDRESS) (SB : SBYTE) (MEM : MEMORY_MODEL_BASE ADDR SB) := READABLE_MEMORY ADDR SB MEM <+ MEMORY_WRITES ADDR SB MEM.
@@ -332,8 +332,13 @@ Module Type EXEC_MEMORY_WRITES_CORRECT
   (* TODO: May want to reformulate this in terms of a different equality on memory... *)
   Parameter write_byte_correct :
     forall m1 ptr b m2,
-      write_byte_exec m1 ptr b = m2 ->
+      write_byte_exec m1 ptr b = inr m2 ->
       write_byte m1 ptr b m2.
+
+  Parameter write_byte_correct_err :
+    forall m1 ptr b m2 str,
+      write_byte_exec m1 ptr b = inl str ->
+      ~ write_byte m1 ptr b m2.
 End EXEC_MEMORY_WRITES_CORRECT.
 
 Module Type CORRECT_WRITEABLE_MEMORY_HELPER (ADDR : BASIC_ADDRESS) (SB : SBYTE) (MEM : MEMORY_MODEL_BASE ADDR SB) :=
