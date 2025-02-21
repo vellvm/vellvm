@@ -45,27 +45,30 @@ Module INTMAP_MEMORY_MODEL_CORE (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) (SB
     | Some b' => b = b'
     end.
 
-  Definition read_byte_exec (m : Memory) (ptr : addr) : option SByte :=
-    IM.find (PTOI.ptr_to_int ptr) m.
+  Definition read_byte_exec (m : Memory) (ptr : addr) : err SByte :=
+    match IM.find (PTOI.ptr_to_int ptr) m with
+    | None => inl "read_byte_exec: byte doesn't exist in memory"%string
+    | Some b => inr b
+    end.
 
   Lemma read_byte_correct :
     forall m ptr sb,
-      read_byte_exec m ptr = Some sb ->
+      read_byte_exec m ptr = inr sb ->
       read_byte m ptr sb.
   Proof.
     intros m ptr sb READ.
     unfold read_byte, read_byte_exec in *.
-    rewrite READ; auto.
+    repeat break_match_hyp_inv; auto.
   Qed.
 
-  Lemma read_byte_correct_none :
-    forall m ptr sb,
-      read_byte_exec m ptr = None ->
+  Lemma read_byte_correct_err :
+    forall m ptr sb str,
+      read_byte_exec m ptr = inl str ->
       ~ read_byte m ptr sb.
   Proof.
-    intros m ptr sb READ.
+    intros m ptr sb str READ.
     unfold read_byte, read_byte_exec in *.
-    rewrite READ; auto.
+    repeat break_match_hyp_inv; auto.
   Qed.
 End INTMAP_MEMORY_MODEL_CORE.
 
@@ -109,6 +112,36 @@ Module INTMAP_AID_MEMORY_MODEL
     | Some (b', aid) => b = b' /\ access_allowed (address_provenance ptr) aid = true
     end.
 
+  Definition read_byte_exec (m : Memory) (ptr : addr) : err SByte :=
+    match IM.find (ptr_to_int ptr) (Memory_byte_map m) with
+    | None => inl "read_byte_exec: byte not in memory."%string
+    | Some (b', aid) =>
+        if access_allowed (address_provenance ptr) aid
+        then inr b'
+        else inl "ready_byte_exec: invalid provenance."%string
+    end.
+
+  Lemma read_byte_correct :
+    forall m ptr sb,
+      read_byte_exec m ptr = inr sb ->
+      read_byte m ptr sb.
+  Proof.
+    intros m ptr sb READ.
+    unfold read_byte, read_byte_exec in *.
+    repeat break_match_hyp_inv; auto.
+  Qed.
+
+  Lemma read_byte_correct_err :
+    forall m ptr sb str,
+      read_byte_exec m ptr = inl str ->
+      ~ read_byte m ptr sb.
+  Proof.
+    intros m ptr sb str READ.
+    unfold read_byte, read_byte_exec in *.
+    repeat break_match_hyp_inv; auto.
+    intros (_&CONTRA); inv CONTRA.
+  Qed.
+
   Lemma read_byte_allowed_spec :
     forall (m : Memory) (ptr : addr),
       ~ read_byte_allowed m ptr ->
@@ -143,6 +176,39 @@ Module INTMAP_AID_MEMORY_MODEL
         then m2 = MkMemory (Memory_aid_counter m1) (Memory_sid_counter m1) (IM.add phys_addr (b, aid) (Memory_byte_map m1))
         else False (* Invalid access *)
     end.
+
+  Definition write_byte_exec (m1 : Memory) (ptr : addr) (b : SByte) : err Memory :=
+    let phys_addr := ptr_to_int ptr in
+    let pr := address_provenance ptr in
+    match IM.find phys_addr (Memory_byte_map m1) with
+    | None => inl "write_byte_exec: trying to write to unallocated memory."%string
+    | Some (_, aid) =>
+        if access_allowed pr aid
+        then inr (MkMemory (Memory_aid_counter m1) (Memory_sid_counter m1) (IM.add phys_addr (b, aid) (Memory_byte_map m1)))
+        else inl "write_byte_exec: provenance mismatch."%string
+    end.
+
+  #[global] Hint Unfold write_byte write_byte_exec : WRITES.
+
+  Lemma write_byte_correct :
+    forall m1 ptr b m2,
+      write_byte_exec m1 ptr b = inr m2 ->
+      write_byte m1 ptr b m2.
+  Proof.
+    intros m1 ptr b m2 WRITE.
+    autounfold with WRITES in *.
+    repeat break_match_hyp_inv; auto.            
+  Qed.
+
+  Lemma write_byte_correct_err :
+    forall m1 ptr b m2 str,
+      write_byte_exec m1 ptr b = inl str ->
+      ~ write_byte m1 ptr b m2.
+  Proof.
+    intros m1 ptr b m2 str WRITE.
+    autounfold with WRITES in *.
+    repeat break_match_hyp_inv; auto.            
+  Qed.
 
   (** We can look up a new value after writing it to memory *)
   Lemma write_byte_new_lu :
