@@ -42,6 +42,9 @@ Module INTMAP_MEMORY_MODEL_CORE (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) (SB
     | None => False
     | Some b' => b = b'
     end.
+
+  Definition read_byte_exec (m : Memory) (ptr : addr) : option SByte :=
+    IM.find (PTOI.ptr_to_int ptr) m.
 End INTMAP_MEMORY_MODEL_CORE.
 
 (** Memory models based on integer maps with allocation ids *)
@@ -318,6 +321,20 @@ Module INTMAP_AID_MEMORY_MODEL
        let sid' := N.succ sid in
        (sid', Memory_sid_modify m (fun _ => sid')).
 End INTMAP_AID_MEMORY_MODEL.
+
+Module INTMAP_AID_FULL_MEMORY
+  (MD : Typ)
+  (PS : PROV_SET)
+  (ADDR : PROVENANCE_ADDRESS MD PS)
+  (AID : ALLOCATION_ID)
+  (A : ACCESS PS AID)
+  (SB : SBYTE)
+  (H : HEAP ADDR)
+  (F : FRAME ADDR)
+  (FS : FRAME_STACK ADDR F) <: FULL_MEMORY_MODEL ADDR SB AID H F FS.
+  Module MEM := INTMAP_AID_MEMORY_MODEL MD PS ADDR AID A SB.
+  Include (ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL ADDR SB AID H F FS MEM).
+End INTMAP_AID_FULL_MEMORY.
 
 (* Module NAT_SBYTE <: SBYTE. *)
 (*   Definition SByte := (nat * N)%type. *)

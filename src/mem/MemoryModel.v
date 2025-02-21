@@ -198,7 +198,7 @@ Module Type CORE_EXEC_READ_MEMORY_MODEL
   (Import SB : SBYTE)
   (Import MEM : MEMORY_MODEL_BASE ADDR SB).
   (** Primitive byte reads *)
-  Parameter read_byte_exec : Memory -> addr -> SByte.
+  Parameter read_byte_exec : Memory -> addr -> option SByte.
 End CORE_EXEC_READ_MEMORY_MODEL.
 
 Module Type CORE_MEMORY_MODEL_F (ADDR : CORE_ADDRESS) (SB : SBYTE) (MEM : MEMORY_MODEL_BASE ADDR SB) := CORE_READ_MEMORY_MODEL ADDR SB MEM.
@@ -214,8 +214,13 @@ Module Type CORE_EXEC_MEMORY_MODEL_CORRECT
 
   Parameter read_byte_correct :
     forall m ptr sb,
-      read_byte_exec m ptr = sb ->
+      read_byte_exec m ptr = Some sb ->
       read_byte m ptr sb.
+
+  Parameter read_byte_correct_none :
+    forall m ptr sb,
+      read_byte_exec m ptr = None ->
+      ~ read_byte m ptr sb.
 End CORE_EXEC_MEMORY_MODEL_CORRECT.
 
 Module Type CORE_CORRECT_MEMORY_MODEL (ADDR : CORE_ADDRESS) (SB : SBYTE) (MEM : MEMORY_MODEL_BASE ADDR SB) := CORE_EXEC_SPEC_MEMORY_MODEL ADDR SB MEM <+ CORE_EXEC_MEMORY_MODEL_CORRECT ADDR SB MEM.
