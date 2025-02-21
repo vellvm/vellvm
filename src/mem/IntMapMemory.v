@@ -31,7 +31,9 @@ Module INTMAP_MEMORY_MODEL_BASE (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) (SB
   Definition initial_memory := @IM.empty SByte.
 End INTMAP_MEMORY_MODEL_BASE.
 
-Module INTMAP_MEMORY_MODEL_CORE (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) (SB : SBYTE) <: CORE_MEMORY_MODEL ADDR SB.
+Module Type CORE_CORRECT_MEMORY_MODEL_HELPER (ADDR : CORE_ADDRESS) (SB : SBYTE) := MEMORY_MODEL_BASE ADDR SB <+ CORE_CORRECT_MEMORY_MODEL ADDR SB.
+
+Module INTMAP_MEMORY_MODEL_CORE (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) (SB : SBYTE) <: CORE_CORRECT_MEMORY_MODEL_HELPER ADDR SB.
   Import ADDR.
   Import SB.
 
@@ -45,6 +47,26 @@ Module INTMAP_MEMORY_MODEL_CORE (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) (SB
 
   Definition read_byte_exec (m : Memory) (ptr : addr) : option SByte :=
     IM.find (PTOI.ptr_to_int ptr) m.
+
+  Lemma read_byte_correct :
+    forall m ptr sb,
+      read_byte_exec m ptr = Some sb ->
+      read_byte m ptr sb.
+  Proof.
+    intros m ptr sb READ.
+    unfold read_byte, read_byte_exec in *.
+    rewrite READ; auto.
+  Qed.
+
+  Lemma read_byte_correct_none :
+    forall m ptr sb,
+      read_byte_exec m ptr = None ->
+      ~ read_byte m ptr sb.
+  Proof.
+    intros m ptr sb READ.
+    unfold read_byte, read_byte_exec in *.
+    rewrite READ; auto.
+  Qed.
 End INTMAP_MEMORY_MODEL_CORE.
 
 (** Memory models based on integer maps with allocation ids *)
