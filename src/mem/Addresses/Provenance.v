@@ -83,6 +83,21 @@ Module Type ACCESS (Import PS : PROV_SET) (Import AID : ALLOCATION_ID).
   Parameter access_allowed : ProvSet -> AllocationId -> bool.
 End ACCESS.
 
+(** Conversions between AID and PROV_SETs *)
+Module Type AID_PROVENANCE (Import PS : PROV_SET) (Import AID : ALLOCATION_ID).
+  Include ACCESS PS AID.
+  Parameter aid_to_prov : AllocationId -> ProvSet.
+
+  Parameter access_allowed_refl :
+    forall aid,
+      access_allowed (aid_to_prov aid) aid = true.
+
+  Parameter allocation_id_to_prov_inj:
+    forall aid aid',
+      aid_to_prov aid = aid_to_prov aid' ->
+      aid = aid'.
+End AID_PROVENANCE.
+
 (* Module Type PROVENANCE (Addr:ADDRESS_BASE). *)
 (*   (* Types *) *)
 (*   (* Morally: *)

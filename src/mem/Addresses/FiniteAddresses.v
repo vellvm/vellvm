@@ -1,5 +1,6 @@
 From Coq Require Import
   Lia
+  Basics
   Morphisms.
 
 From Vellvm Require Import
@@ -134,7 +135,17 @@ End Fin_HAS_METADATA.
 
 (* TODO: Move to utility *)
 Module METADATA_PROVENANCE_ID (MD : Typ) <: METADATA_PROVENANCE MD MD.
-  Definition metadata_provenance (md : MD.t) := md.
+  (** Modify the provenance in the metadata, returning the new provenance and metadata values *)
+  Definition metadata_modify_provenance (md : MD.t) (f : MD.t -> MD.t) : (MD.t * MD.t) :=
+    let md' := f md in
+    (md', md').
+
+  (** Access the provenance for an address *)
+  Definition metadata_provenance (md : MD.t) : MD.t
+    := fst (metadata_modify_provenance md id).
+
+  Definition metadata_set_provenance (md : MD.t) (p : MD.t) : MD.t
+    := snd (metadata_modify_provenance md (const p)).
 End METADATA_PROVENANCE_ID.
 
 Module Fin_HAS_ITOP <: HAS_ITOP N_ProvSet FinAddrType Fin_HAS_METADATA.
