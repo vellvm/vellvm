@@ -138,8 +138,15 @@ End HAS_METADATA.
 
 (** Metadata types with provenance *)
 Module Type METADATA_PROVENANCE (Import PS : PROV_SET) (METADATA : Typ).
+  (** Modify the provenance in the metadata, returning the new provenance and metadata values *)
+  Parameter metadata_modify_provenance : METADATA.t -> (ProvSet -> ProvSet) -> (ProvSet * METADATA.t).
+
   (** Access the provenance for an address *)
-  Parameter metadata_provenance : METADATA.t -> ProvSet.
+  Definition metadata_provenance (md : METADATA.t) : ProvSet
+    := fst (metadata_modify_provenance md id).
+
+  Definition metadata_set_provenance (md : METADATA.t) (p : ProvSet) : METADATA.t
+    := snd (metadata_modify_provenance md (const p)).
 End METADATA_PROVENANCE.
 
 Module Type METADATA_WITH_PROVENANCE (PS : PROV_SET) := Typ <+ METADATA_PROVENANCE PS.
