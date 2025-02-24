@@ -22,6 +22,10 @@ From Coq Require Import
 
 From Vellvm Require Import Error.
 
+From ExtLib Require Import Structures.Monads.
+Import MonadNotation.
+Open Scope monad.
+
 Notation err := (sum string).
 
 (** Memory models based on integer maps *)
@@ -78,9 +82,9 @@ End INTMAP_MEMORY_MODEL_CORE.
 Module INTMAP_AID_MEMORY_MODEL
   (MD : Typ)
   (PS : PROV_SET)
-  (Import ADDR : PROVENANCE_ADDRESS MD PS)
+  (Import ADDR : ADDRESS MD PS)
   (Import AID : ALLOCATION_ID)
-  (Import A : ACCESS PS AID)
+  (Import A : AID_PROVENANCE PS AID)
   (Import SB : SBYTE) <: CORRECT_ALLOCATABLE_MEMORY_FRESH ADDR SB AID.
 
   Record Memory' :=
@@ -199,7 +203,7 @@ Module INTMAP_AID_MEMORY_MODEL
   Proof.
     intros m1 ptr b m2 WRITE.
     autounfold with WRITES in *.
-    repeat break_match_hyp_inv; auto.            
+    repeat break_match_hyp_inv; auto.
   Qed.
 
   Lemma write_byte_correct_err :
@@ -209,7 +213,7 @@ Module INTMAP_AID_MEMORY_MODEL
   Proof.
     intros m1 ptr b m2 str WRITE.
     autounfold with WRITES in *.
-    repeat break_match_hyp_inv; auto.            
+    repeat break_match_hyp_inv; auto.
   Qed.
 
   (** We can look up a new value after writing it to memory *)
@@ -408,7 +412,34 @@ Module INTMAP_AID_MEMORY_MODEL
   (** FIND_FREE *)
   Include (MEMORY_FIND_FREE_SPEC_IMPL ADDR SB AID).
 
+  (** MEMORY_ALLOCATE *)
+  Include (MEMORY_ALLOCATE_SPEC_IMPL ADDR SB AID).
 
+  Definition find_free_block_exec
+    (m : Memory) (len : nat) (aid : AllocationId) : OOM (addr * list addr)%type :=
+    let mem_map := Memory_byte_map m in
+    let addr := next_key mem_map in
+    let pr := aid_to_prov aid in
+    let md := metadata_set_provenance default_metadata pr in
+    ptr <- int_to_ptr addr md;;
+    match get_consecutive_ptrs ptr len with
+    | inl msg => Oom msg
+    | inr ptrs => ret (ptr, ptrs)
+    end.
+
+  Definition allocate_block_exec
+    (m : Memory) (bytes : list SByte) (aid : AllocationId) : OOM (Memory * (addr * list addr))%type :=
+    ptrs <- find_free_block_exec m (length bytes) aid;;
+    (* Actually allocate pointers *)
+    ret (m, ptrs).
+
+  Lemma allocate_block_correct :
+    forall m1 bytes aid m2 ptrs,
+      allocate_block_exec m1 bytes aid = NoOom (m2, ptrs) ->
+      allocate_block m1 bytes aid m2 ptrs.
+
+
+  allocate_block_exec
   (* AHHHH. PROVENANCE. GAAAOAOHUEHEUOAUA *)
   Definition find_free_block_exec (m : Memory) (len : nat) : OOM (addr * list addr) :=
     let mem_map := Memory_byte_map m in
@@ -420,13 +451,6 @@ Module INTMAP_AID_MEMORY_MODEL
     ptrs <- get_consecutive_ptrs ptr len;;
     ret (ptr, ptrs).
 
-  Parameter find_free_block_correct :
-    forall m n addrs,
-      find_free_block_exec m n = NoOom addrs ->
-      find_free_block m n addrs.
-
-  (** MEMORY_ALLOCATE *)
-  Include (MEMORY_ALLOCATE_SPEC_IMPL ADDR SB AID).
 
 End INTMAP_AID_MEMORY_MODEL.
 
@@ -468,4 +492,3 @@ End INTMAP_AID_FULL_MEMORY.
 (*     | Some b => ret b *)
 (*     end. *)
 (* End CORE_INT_MEM. *)
-
