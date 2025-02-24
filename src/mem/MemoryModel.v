@@ -568,6 +568,38 @@ Module Type MEMORY_FIND_FREE
       is_null (fst ptrs) = false.
 End MEMORY_FIND_FREE.
 
+(* Basic implementation of the find_free_block spec *)
+Module MEMORY_FIND_FREE_SPEC_IMPL
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import MEM : MEMORY_MODEL_BASE ADDR SB)
+  (Import ALLOC : MEMORY_ALLOCATED_HELPER ADDR SB AID MEM) <: MEMORY_FIND_FREE ADDR SB AID MEM ALLOC.
+
+  Record find_free_block' (m : Memory) (len : nat) (ptrs : addr * list addr) : Prop :=
+    {
+      find_free_block_is_free :
+      Forall (addr_not_allocated m) (snd ptrs)
+
+    ; find_free_block_length :
+      length (snd ptrs) = len
+
+    ; find_free_block_consecutive :
+      consecutive_ptrs (snd ptrs) = true
+
+    ; find_free_block_head :
+      forall ptr' ptrs', snd ptrs = (ptr' :: ptrs') -> fst ptrs = ptr'
+
+    ; find_free_non_null :
+      Forall (fun ptr => is_null ptr = false) (snd ptrs)
+
+    ; find_free_non_null' :
+      is_null (fst ptrs) = false
+    }.
+
+  Definition find_free_block := find_free_block'.
+End MEMORY_FIND_FREE_SPEC_IMPL.
+
 Module Type MEMORY_FIND_FREE_HELPER (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) (MEM : MEMORY_MODEL_BASE ADDR SB)
   := MEMORY_ALLOCATED_HELPER ADDR SB AID MEM <+ MEMORY_FIND_FREE ADDR SB AID MEM.
 
@@ -637,6 +669,36 @@ Module Type MEMORY_ALLOCATE
       Forall (fun ptr => is_null ptr = false) (snd ptrs).
 
 End MEMORY_ALLOCATE.
+
+Module MEMORY_ALLOCATE_SPEC_IMPL
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import MEM : MEMORY_MODEL_BASE ADDR SB)
+  (Import FREE : MEMORY_FIND_FREE_HELPER ADDR SB AID MEM) <: MEMORY_ALLOCATE ADDR SB AID MEM FREE.
+
+  Record allocate_block' (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)) : Prop :=
+    {
+      allocate_block_free :
+      find_free_block m1 (length bytes) ptrs
+
+    ; allocate_block_new_reads :
+      Forall2 (fun b ptr => read_byte m2 ptr b) bytes (snd ptrs)
+
+    ; allocate_block_old_reads :
+      forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b
+
+    ; allocate_block_allocated :
+      Forall (fun ptr => addr_allocated m2 ptr aid) (snd ptrs)
+
+    ; allocate_block_non_null :
+      Forall (fun ptr => is_null ptr = false) (snd ptrs)
+    }.
+
+  Definition allocate_block := allocate_block'.
+
+End MEMORY_ALLOCATE_SPEC_IMPL.
+
 
 Module Type EXEC_MEMORY_ALLOCATE
   (Import ADDR : BASIC_ADDRESS)
