@@ -20,6 +20,8 @@ From Mem Require Import
 From Coq Require Import
   List.
 
+From Vellvm Require Import Error.
+
 Notation err := (sum string).
 
 (** Memory models based on integer maps *)
@@ -79,7 +81,7 @@ Module INTMAP_AID_MEMORY_MODEL
   (Import ADDR : PROVENANCE_ADDRESS MD PS)
   (Import AID : ALLOCATION_ID)
   (Import A : ACCESS PS AID)
-  (Import SB : SBYTE) <: ALLOCATABLE_MEMORY_FRESH ADDR SB AID.
+  (Import SB : SBYTE) <: CORRECT_ALLOCATABLE_MEMORY_FRESH ADDR SB AID.
 
   Record Memory' :=
     MkMemory {
@@ -359,12 +361,6 @@ Module INTMAP_AID_MEMORY_MODEL
     }
   Qed.
 
-  (** FIND_FREE *)
-  Include (MEMORY_FIND_FREE ADDR SB AID).
-
-  (** MEMORY_ALLOCATE *)
-  Include (MEMORY_ALLOCATE ADDR SB AID).
-
   Definition Memory_aid_modify (m : Memory) (f : AllocationId -> AllocationId) : Memory :=
     MkMemory (f (Memory_aid_counter m)) (Memory_sid_counter m) (Memory_byte_map m).
 
@@ -408,6 +404,30 @@ Module INTMAP_AID_MEMORY_MODEL
     := let sid := Memory_sid_counter m in
        let sid' := N.succ sid in
        (sid', Memory_sid_modify m (fun _ => sid')).
+
+  (** FIND_FREE *)
+  Include (MEMORY_FIND_FREE_SPEC_IMPL ADDR SB AID).
+
+
+  (* AHHHH. PROVENANCE. GAAAOAOHUEHEUOAUA *)
+  Definition find_free_block_exec (m : Memory) (len : nat) : OOM (addr * list addr) :=
+    let mem_map := Memory_byte_map m in
+    let addr := next_key mem_map in
+    _.
+    let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
+    let aid := provenance_to_allocation_id pr in
+    ptr <- lift_OOM (int_to_ptr addr (allocation_id_to_prov aid));;
+    ptrs <- get_consecutive_ptrs ptr len;;
+    ret (ptr, ptrs).
+
+  Parameter find_free_block_correct :
+    forall m n addrs,
+      find_free_block_exec m n = NoOom addrs ->
+      find_free_block m n addrs.
+
+  (** MEMORY_ALLOCATE *)
+  Include (MEMORY_ALLOCATE_SPEC_IMPL ADDR SB AID).
+
 End INTMAP_AID_MEMORY_MODEL.
 
 Module INTMAP_AID_FULL_MEMORY
