@@ -264,20 +264,32 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
 
 
   (** MEMORY_ALLOCATE *)
-  Record allocate_block' (m1 : Memory) (bytes : list SByte) (aid : AID.t) (m2 : Memory) (ptrs : (addr * list addr)) : Prop :=
-    { (* Minimal set *)
-      allocate_block_free : find_free_block m1 (length bytes) ptrs
-    ; allocate_block_new_reads : Forall2 (fun b ptr => read_byte m2 ptr b) bytes (snd ptrs)
-    ; allocate_block_old_reads : forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b
-    ; allocate_block_allocated : Forall (fun ptr => addr_allocated m2 ptr aid) (snd ptrs)
-    ; allocate_block_non_null : Forall (fun ptr => is_null ptr = false) (snd ptrs)
+  (* Include (MEMORY_ALLOCATE_SPEC_IMPL ADDR SB AID). *) (* Need some extras :) *)
+  Record allocate_block' (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)) : Prop :=
+    {
+      allocate_block_free :
+      find_free_block m1 (length bytes) ptrs
 
-      (* Extras *)
+    ; allocate_block_new_reads :
+      Forall2 (fun b ptr => read_byte m2 ptr b) bytes (snd ptrs)
+
+    ; allocate_block_old_reads :
+      forall b ptr, read_byte m1 ptr b -> read_byte m2 ptr b
+
+    ; allocate_block_allocated :
+      Forall (fun ptr => addr_allocated m2 ptr aid) (snd ptrs)
+
+    ; allocate_block_old_allocated :
+      forall ptr, addr_allocated m1 ptr aid <-> addr_allocated m2 ptr aid
+
+    ; allocate_block_non_null :
+      Forall (fun ptr => is_null ptr = false) (snd ptrs)
+
+    (* Extras *)
     ; allocate_block_preserves_heap : Memory_heap m1 = Memory_heap m2
     ; allocate_block_preserves_stack : Memory_frame_stack m1 = Memory_frame_stack m2
     }.
 
-  (* Make module types happy... *)
   Definition allocate_block := allocate_block'.
 
   (** Stack allocations *)

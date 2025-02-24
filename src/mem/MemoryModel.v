@@ -632,6 +632,12 @@ Module Type MEMORY_ALLOCATE
       allocate_block m1 bytes aid m2 ptrs ->
       Forall (fun ptr => addr_allocated m2 ptr aid) (snd ptrs).
 
+  (* This may be implied by reads... *)
+  Parameter allocate_block_old_allocated :
+    forall (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)),
+      allocate_block m1 bytes aid m2 ptrs ->
+      forall ptr, addr_allocated m1 ptr aid <-> addr_allocated m2 ptr aid.
+
   Parameter allocate_block_non_null :
     forall (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)),
       allocate_block m1 bytes aid m2 ptrs ->
@@ -659,6 +665,9 @@ Module MEMORY_ALLOCATE_SPEC_IMPL
 
     ; allocate_block_allocated :
       Forall (fun ptr => addr_allocated m2 ptr aid) (snd ptrs)
+
+    ; allocate_block_old_allocated :
+      forall ptr, addr_allocated m1 ptr aid <-> addr_allocated m2 ptr aid
 
     ; allocate_block_non_null :
       Forall (fun ptr => is_null ptr = false) (snd ptrs)
