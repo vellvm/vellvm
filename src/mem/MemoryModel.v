@@ -566,6 +566,14 @@ Module Type MEMORY_FIND_FREE
     forall (m : Memory) (len : nat) (ptrs : addr * list addr),
       find_free_block m len ptrs ->
       is_null (fst ptrs) = false.
+
+  #[global] Hint Resolve
+    find_free_block_is_free
+    find_free_block_length
+    find_free_block_consecutive
+    find_free_block_head
+    find_free_non_null
+    find_free_non_null' : MEM.
 End MEMORY_FIND_FREE.
 
 (* Basic implementation of the find_free_block spec *)
@@ -638,6 +646,12 @@ Module Type MEMORY_ALLOCATE
       allocate_block m1 bytes aid m2 ptrs ->
       forall ptr, addr_allocated m1 ptr aid <-> addr_allocated m2 ptr aid.
 
+  #[global] Hint Resolve
+    allocate_block_free
+    allocate_block_new_reads
+    allocate_block_old_reads
+    allocate_block_allocated
+    allocate_block_old_allocated : MEM.
 End MEMORY_ALLOCATE.
 
 Module MEMORY_ALLOCATE_SPEC_IMPL
@@ -1139,7 +1153,7 @@ Module Type MEMORY_HEAP_ALLOCATE
   Proof.
     intros m1 bytes aid m2 ptrs (m' & ptrs' & ALLOC & ADD).
     inv ADD.
-    eapply allocate_block_non_null; eauto.
+    eauto with MEM.
   Qed.
 
   (* Need to know Modify_heap doesn't impact reads... *)
