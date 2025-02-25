@@ -195,7 +195,7 @@ Module INTMAP_AID_MEMORY_MODEL
         else inl "write_byte_exec: provenance mismatch."%string
     end.
 
-  #[global] Hint Unfold write_byte write_byte_exec : WRITES.
+  #[global] Hint Unfold write_byte write_byte_exec : MEM.
 
   Lemma write_byte_correct :
     forall m1 ptr b m2,
@@ -203,7 +203,7 @@ Module INTMAP_AID_MEMORY_MODEL
       write_byte m1 ptr b m2.
   Proof.
     intros m1 ptr b m2 WRITE.
-    autounfold with WRITES in *.
+    autounfold with MEM in *.
     repeat break_match_hyp_inv; auto.
   Qed.
 
@@ -213,7 +213,7 @@ Module INTMAP_AID_MEMORY_MODEL
       ~ write_byte m1 ptr b m2.
   Proof.
     intros m1 ptr b m2 str WRITE.
-    autounfold with WRITES in *.
+    autounfold with MEM in *.
     repeat break_match_hyp_inv; auto.
   Qed.
 
@@ -428,7 +428,7 @@ Module INTMAP_AID_MEMORY_MODEL
     | inr ptrs => ret (ptr, ptrs)
     end.
 
-  #[global] Hint Unfold find_free_block_exec find_free_block : FIND_FREE.
+  #[global] Hint Unfold find_free_block_exec find_free_block : MEM.
 
   Lemma find_free_block_correct :
     forall m len aid ptrs,
@@ -436,7 +436,7 @@ Module INTMAP_AID_MEMORY_MODEL
       find_free_block m len ptrs.
   Proof.
     intros m len aid ptrs FIND_FREE.
-    autounfold with FIND_FREE in *.
+    autounfold with MEM in *.
     cbn in *.
     repeat break_match_hyp_inv.
     split;
@@ -488,7 +488,7 @@ Module INTMAP_AID_MEMORY_MODEL
       apply is_null_is_zero in NULL; contradiction.
   Qed.
 
-  #[global] Hint Resolve find_free_block_correct : FIND_FREE.
+  #[global] Hint Resolve find_free_block_correct : MEM.
 
   Fixpoint add_ptrs_to_byte_map (mem_byte : SByte * AllocationId) (ptrs : list addr) (mem : IM.t (SByte * AllocationId)) : IM.t (SByte * AllocationId)
     := match ptrs with
@@ -513,21 +513,37 @@ Module INTMAP_AID_MEMORY_MODEL
   Proof.
     intros m1 bytes aid m2 ptrs ALLOC.
     autounfold with ALLOCATE_BLOCK in *.
-    split.
-    - 
+    destruct (find_free_block_exec m1 (Datatypes.length bytes) aid) eqn:FIND_FREE;
+      cbn in ALLOC; inv ALLOC.
+    assert (find_free_block m1 (Datatypes.length bytes) ptrs) as FREE_SPEC; eauto with MEM.
+    split;
+      eauto with MEM.
+    - (* New reads *)
+      apply Forall2_forall.
+      split; eauto with MEM.
+      intros i a b H H0.
+      red; cbn.
+      erewrite find_in_add_all.
+      3: {
+        assert (list_values_injective (map ptr_to_int (snd ptrs))) by eauto with MEM.
+        intros i' j' x NTH1 NTH2.
+        apply nth_map_inv in NTH1, NTH2.
+        destruct NTH1 as (?&?&?).
+        destruct NTH2 as (?&?&?).
+        destruct x0, x1; inv H3; inv H5.
+        cbn in *; subst.
+        apply nth_map_inv in NTH1, NTH2.
+        eapply H1.
+        eapply nth_error_map.
+      }
+      eauto with MEM.
+      break_match.
+
+      unfold read_byte.
+      cbn.
+      
+    
   Qed.
-
-  (* AHHHH. PROVENANCE. GAAAOAOHUEHEUOAUA *)
-  Definition find_free_block_exec (m : Memory) (len : nat) : OOM (addr * list addr) :=
-    let mem_map := Memory_byte_map m in
-    let addr := next_key mem_map in
-    _.
-    let '(mkMemoryStack mem fs h) := ms_memory_stack ms in
-    let aid := provenance_to_allocation_id pr in
-    ptr <- lift_OOM (int_to_ptr addr (allocation_id_to_prov aid));;
-    ptrs <- get_consecutive_ptrs ptr len;;
-    ret (ptr, ptrs).
-
 
 End INTMAP_AID_MEMORY_MODEL.
 

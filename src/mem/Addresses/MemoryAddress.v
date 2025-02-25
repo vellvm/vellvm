@@ -29,6 +29,7 @@ From Coq Require Import
 
 From Mem Require Import
   Tactics
+  FiniteMaps
   Addresses.Provenance.
 
 Import MonadNotation.
@@ -369,10 +370,45 @@ Module Type PTOI_ARITH_EXTRAS_HELPERS (Import Addr:CORE_ADDRESS) (Import PTOI : 
     lia.
   Qed.
 
+  Lemma consecutive_ptrs_ptoi_gt :
+    forall ptrs ptr,
+      consecutive_ptrs (ptr :: ptrs) = true ->
+      forall p, In p (map ptr_to_int ptrs) -> p > ptr_to_int ptr.
+  Proof.
+    induction ptrs;
+      intros ptr CONSEC p IN;
+      [inv IN|].    
+    cbn in *.
+    break_match_hyp_inv.
+    apply ptr_to_int_ptr_add in Heqs.
+    apply andb_true_iff in H0 as (?&?).
+    destruct eq_dec in H; try discriminate; subst.
+    clear H.
+    destruct IN; subst; try lia.
+    eapply Zgt_trans.
+    eapply IHptrs; eauto with MEM.
+    lia.
+  Qed.
+
   Lemma get_consecutive_ptrs_h_gt :
     forall len start ptr ptrs,
       get_consecutive_ptrs_h ptr start len = inr ptrs ->
       forall p, In p ptrs -> ptr_to_int p >= ptr_to_int ptr.
+  Proof.
+    induction len;
+      intros start ptr ptrs GCP p IN.
+    - cbn in *; inv GCP; inv IN.
+    - cbn in *.
+      repeat break_match_hyp_inv.
+      destruct IN; subst.
+      + apply ptr_to_int_ptr_add in Heqs. lia.
+      + eapply IHlen in Heqs0; eauto.
+  Qed.
+
+  Lemma get_consecutive_ptrs_h_ptoi_gt :
+    forall len start ptr ptrs,
+      get_consecutive_ptrs_h ptr start len = inr ptrs ->
+      forall p, In p (map ptr_to_int ptrs) -> p >= ptr_to_int ptr.
   Proof.
     induction len;
       intros start ptr ptrs GCP p IN.
@@ -393,10 +429,98 @@ Module Type PTOI_ARITH_EXTRAS_HELPERS (Import Addr:CORE_ADDRESS) (Import PTOI : 
       eapply get_consecutive_ptrs_h_gt; eauto.
   Qed.
 
+  Lemma get_consecutive_ptrs_ptoi_gt :
+    forall len ptr ptrs,
+      get_consecutive_ptrs ptr len = inr ptrs ->
+      forall p, In p (map ptr_to_int ptrs) -> p >= ptr_to_int ptr.
+  Proof.
+    intros *;
+      eapply get_consecutive_ptrs_h_ptoi_gt; eauto.
+  Qed.
+
   #[global] Hint Resolve
     consecutive_ptrs_gt
     get_consecutive_ptrs_h_gt
-    get_consecutive_ptrs_gt : MEM.
+    get_consecutive_ptrs_gt
+    consecutive_ptrs_ptoi_gt
+    get_consecutive_ptrs_h_ptoi_gt
+    get_consecutive_ptrs_ptoi_gt
+    : MEM.
+
+  Lemma consecutive_ptrs_injective :
+    forall ptrs,
+      consecutive_ptrs ptrs = true ->
+      list_values_injective ptrs.
+  Proof.
+    induction ptrs;
+      intros CONSEC.
+    - intros i j x NTH1 NTH2.
+      destruct i, j; cbn in *; inv NTH1.
+    - cbn in CONSEC.
+      intros i j x NTH1 NTH2.
+      destruct i, j; cbn in *; inv NTH1; inv NTH2; auto.
+      + apply nth_error_In in H0.
+        eapply consecutive_ptrs_gt in H0; eauto.
+        lia.
+      + apply nth_error_In in H0.
+        eapply consecutive_ptrs_gt in H0; eauto.
+        lia.
+      + apply Nat.succ_inj_wd.
+        eapply IHptrs; eauto with MEM.
+  Qed.
+  
+  #[global] Hint Resolve
+    consecutive_ptrs_injective : MEM.
+
+  Lemma get_consecutive_ptrs_injective :
+    forall len ptr ptrs,
+      get_consecutive_ptrs ptr len = inr ptrs ->
+      list_values_injective ptrs.
+  Proof.
+    intros * GCP.
+    eauto with MEM.
+  Qed.
+
+  #[global] Hint Resolve
+    get_consecutive_ptrs_injective : MEM.
+
+  Lemma consecutive_ptrs_ptoi_injective :
+    forall ptrs,
+      consecutive_ptrs ptrs = true ->
+      list_values_injective (map ptr_to_int ptrs).
+  Proof.
+    induction ptrs;
+      intros CONSEC.
+    - intros i j x NTH1 NTH2.
+      destruct i, j; cbn in *; inv NTH1.
+    - cbn in CONSEC.
+      intros i j x NTH1 NTH2.
+      destruct i, j; cbn in *; inv NTH1; inv NTH2; auto.
+      + apply nth_error_In in H0.
+        eapply consecutive_ptrs_ptoi_gt in H0; eauto.
+        lia.
+      + apply nth_error_In in H0.
+        eapply consecutive_ptrs_ptoi_gt in H0; eauto.
+        lia.
+      + apply Nat.succ_inj_wd.
+        eapply IHptrs; eauto with MEM.
+  Qed.
+  
+  #[global] Hint Resolve
+    consecutive_ptrs_ptoi_injective : MEM.
+
+  Lemma get_consecutive_ptrs_ptoi_injective :
+    forall len ptr ptrs,
+      get_consecutive_ptrs ptr len = inr ptrs ->
+      list_values_injective (map ptr_to_int ptrs).
+  Proof.
+    intros * GCP.
+    eauto with MEM.
+  Qed.
+
+  #[global] Hint Resolve
+    get_consecutive_ptrs_ptoi_injective : MEM.
+
 End PTOI_ARITH_EXTRAS_HELPERS.
 
 Module Type PTOI_ARITH_EXTRAS (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) (HPA : HAS_POINTER_ARITHMETIC ADDR)
