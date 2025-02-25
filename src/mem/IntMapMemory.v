@@ -2,6 +2,7 @@
 From Stdlib Require Import
   ZArith
   String
+  Lia
   Structures.Equalities.
 
 From Mem Require Import
@@ -427,19 +428,95 @@ Module INTMAP_AID_MEMORY_MODEL
     | inr ptrs => ret (ptr, ptrs)
     end.
 
+  #[global] Hint Unfold find_free_block_exec find_free_block : FIND_FREE.
+
+  Lemma find_free_block_correct :
+    forall m len aid ptrs,
+      find_free_block_exec m len aid = NoOom ptrs ->
+      find_free_block m len ptrs.
+  Proof.
+    intros m len aid ptrs FIND_FREE.
+    autounfold with FIND_FREE in *.
+    cbn in *.
+    repeat break_match_hyp_inv.
+    split;
+      eauto with MEM.
+    - (* New block was free *)
+      (* Should follow from next_key *)
+      cbn.
+      apply Forall_forall.
+      intros x IN aid' ALLOC.
+      red in ALLOC.
+      break_match_hyp; auto.
+      destruct p as (b, baid).
+      pose proof next_key_correct (Memory_byte_map m) (ptr_to_int x) as NEXT.
+      forward NEXT.
+      apply IP.F.find_mapsto_iff in Heqo0.
+      eexists; apply Heqo0.
+      eapply get_consecutive_ptrs_gt in Heqs; eauto.
+      erewrite ptr_to_int_int_to_ptr with (a:=t0) in Heqs; eauto.
+    - (* Block head *)
+      intros ptr' ptrs' HEAD.
+      cbn in *.
+      subst; eauto with MEM.
+    - (* Nothing is NULL *)
+      apply Forall_forall.
+      intros x IN.
+      cbn in *.
+      assert (ptr_to_int x > 0)%Z.
+      {
+        eapply get_consecutive_ptrs_gt in Heqs; eauto.
+        erewrite ptr_to_int_int_to_ptr with (a:=t0) in Heqs; eauto.
+        pose proof next_key_gt_0 (Memory_byte_map m).
+        lia.
+      }
+
+      assert (ptr_to_int x <> 0)%Z by lia.
+      destruct is_null eqn:NULL; auto.
+      apply is_null_is_zero in NULL; contradiction.
+    - (* New allocation is not null *)
+      cbn.
+      clear Heqs.
+      assert (ptr_to_int t0 > 0)%Z.
+      {
+        erewrite ptr_to_int_int_to_ptr with (a:=t0); eauto.
+        apply next_key_gt_0.
+      }
+
+      assert (ptr_to_int t0 <> 0)%Z by lia.
+      destruct is_null eqn:NULL; auto.
+      apply is_null_is_zero in NULL; contradiction.
+  Qed.
+
+  #[global] Hint Resolve find_free_block_correct : FIND_FREE.
+
+  Fixpoint add_ptrs_to_byte_map (mem_byte : SByte * AllocationId) (ptrs : list addr) (mem : IM.t (SByte * AllocationId)) : IM.t (SByte * AllocationId)
+    := match ptrs with
+       | nil => mem
+       | cons ptr ptrs => add_ptrs_to_byte_map mem_byte ptrs (IM.add (ptr_to_int ptr) mem_byte mem)
+       end.
+
   Definition allocate_block_exec
     (m : Memory) (bytes : list SByte) (aid : AllocationId) : OOM (Memory * (addr * list addr))%type :=
     ptrs <- find_free_block_exec m (length bytes) aid;;
+    let ptr_bytes := combine (map ptr_to_int (snd ptrs)) (map (fun b => (b, aid)) bytes) in
     (* Actually allocate pointers *)
-    ret (m, ptrs).
+    let m' := MkMemory (Memory_aid_counter m) (Memory_sid_counter m) (add_all ptr_bytes (Memory_byte_map m)) in
+    ret (m', ptrs).
+
+  #[global] Hint Unfold allocate_block allocate_block_exec : ALLOCATE_BLOCK.
 
   Lemma allocate_block_correct :
     forall m1 bytes aid m2 ptrs,
       allocate_block_exec m1 bytes aid = NoOom (m2, ptrs) ->
       allocate_block m1 bytes aid m2 ptrs.
+  Proof.
+    intros m1 bytes aid m2 ptrs ALLOC.
+    autounfold with ALLOCATE_BLOCK in *.
+    split.
+    - 
+  Qed.
 
-
-  allocate_block_exec
   (* AHHHH. PROVENANCE. GAAAOAOHUEHEUOAUA *)
   Definition find_free_block_exec (m : Memory) (len : nat) : OOM (addr * list addr) :=
     let mem_map := Memory_byte_map m in
