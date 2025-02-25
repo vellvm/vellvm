@@ -517,6 +517,56 @@ Section Map_Operations.
     eapply IM.Raw.Proofs.MapsTo_In,EQy.
   Qed.
 
+  (* TODO: move this to list utilities? *)
+  Definition list_values_injective {A} (xs : list A) : Prop :=
+    forall i j,
+      nth_error xs i = nth_error xs j ->
+      i = j.
+
+  Lemma list_values_injective_cons :
+    forall {A} (xs : list A) x,
+      list_values_injective (x :: xs) ->
+      list_values_injective xs.
+  Proof.
+    intros A xs x H.
+    red.
+    intros i j H0.
+    red in H.
+    apply Nat.succ_inj.
+    apply H.
+    cbn; auto.
+  Qed.
+
+  Lemma find_in_add_all :
+    forall {elt} i kvs m k (v : elt),
+      nth_error kvs i = Some (k, v) ->
+      list_values_injective (map fst kvs) ->
+      IM.find k (add_all kvs m) = Some v.
+  Proof.
+    induction i;
+      intros kvs m k v NTH INJ.
+    - destruct kvs in *; cbn in NTH; inv NTH.
+      cbn.
+      apply find_add_eq.
+    - cbn in NTH.
+      destruct kvs in *; cbn in NTH; inv NTH.
+      destruct p.
+      cbn.
+      apply find_add_neq.
+      { erewrite <- nth_error_cons_succ with (x:=(k0,e)) in H0.
+        eapply map_nth_error with (f:=fst) in H0.
+        rewrite map_cons in H0.
+        specialize (INJ (S i) 0).
+        intros CONTRA; subst.
+        forward INJ.
+        cbn in *; auto.
+        discriminate.
+      }
+
+      apply IHi; auto.
+      eapply list_values_injective_cons; eauto.
+  Qed.
+
   (** ** [add]/[member] interaction
         Added keys are a member of the map
    *)
