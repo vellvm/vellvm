@@ -519,8 +519,9 @@ Section Map_Operations.
 
   (* TODO: move this to list utilities? *)
   Definition list_values_injective {A} (xs : list A) : Prop :=
-    forall i j,
-      nth_error xs i = nth_error xs j ->
+    forall i j x,
+      nth_error xs i = Some x ->
+      nth_error xs j = Some x ->
       i = j.
 
   Lemma list_values_injective_cons :
@@ -530,11 +531,9 @@ Section Map_Operations.
   Proof.
     intros A xs x H.
     red.
-    intros i j H0.
-    red in H.
+    intros i j a NTH1 NTH2.
     apply Nat.succ_inj.
-    apply H.
-    cbn; auto.
+    eapply H; cbn; eauto.
   Qed.
 
   Lemma find_in_add_all :
@@ -556,10 +555,9 @@ Section Map_Operations.
       { erewrite <- nth_error_cons_succ with (x:=(k0,e)) in H0.
         eapply map_nth_error with (f:=fst) in H0.
         rewrite map_cons in H0.
-        specialize (INJ (S i) 0).
+        specialize (INJ (S i) 0 k).
         intros CONTRA; subst.
-        forward INJ.
-        cbn in *; auto.
+        repeat (forward INJ; cbn in *; auto).
         discriminate.
       }
 

@@ -606,6 +606,26 @@ Module MEMORY_FIND_FREE_SPEC_IMPL
     }.
 
   Definition find_free_block := find_free_block'.
+
+  #[global] Hint Constructors find_free_block' : MEM.
+  #[global] Hint Resolve
+    find_free_block_is_free
+    find_free_block_length
+    find_free_block_consecutive
+    find_free_block_head
+    find_free_non_null
+    find_free_non_null' : MEM.
+
+  Lemma find_free_block_length' :
+    forall (m : Memory) (len : nat) (ptrs : addr * list addr),
+      find_free_block' m len ptrs -> len = Datatypes.length (snd ptrs).
+  Proof.
+    symmetry.
+    eauto with MEM.
+  Qed.
+
+  #[global] Hint Resolve
+    find_free_block_length' : MEM.
 End MEMORY_FIND_FREE_SPEC_IMPL.
 
 Module Type MEMORY_FIND_FREE_HELPER (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) (MEM : MEMORY_MODEL_BASE ADDR SB)
@@ -680,6 +700,15 @@ Module MEMORY_ALLOCATE_SPEC_IMPL
     }.
 
   Definition allocate_block := allocate_block'.
+
+  #[global] Hint Constructors allocate_block' : MEM.
+  #[global] Hint Resolve
+    allocate_block_free
+    allocate_block_new_reads
+    allocate_block_old_reads
+    allocate_block_allocated
+    allocate_block_old_allocated : MEM.
+
 
 End MEMORY_ALLOCATE_SPEC_IMPL.
 
