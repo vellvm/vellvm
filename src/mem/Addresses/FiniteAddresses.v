@@ -10,7 +10,8 @@ From Vellvm Require Import
 
 From Mem Require Import
   Addresses.MemoryAddress
-  Addresses.Provenance.
+  Addresses.Provenance
+  Tactics.
 
 From Vellvm.Semantics Require Import
   VellvmIntegers.
@@ -26,6 +27,8 @@ From Stdlib Require Import
   Structures.Orders.
 
 Import ListNotations.
+Import MonadNotation.
+Open Scope monad.
 
 (** ** Type of pointers
     Implementation of the notion of pointer used: an address and an offset.
@@ -86,7 +89,7 @@ Module Type Fin_HAS_POINTER_ARITHMETIC_CORE <: HAS_POINTER_ARITHMETIC_CORE FinAd
        | (ptr, pr) =>
            let res := @Integers.unsigned 64 ptr + i in
            if (res <? 0)%Z || (res >=? @Integers.modulus 64)%Z
-           then inl ("ptr_add: out of range (" ++ show i ++ ").")%string
+           then inl ("ptr_add: out of range.")%string
            else ret (@Integers.repr 64 res, pr)
        end.
 
@@ -102,6 +105,41 @@ Module Type Fin_HAS_POINTER_ARITHMETIC_CORE <: HAS_POINTER_ARITHMETIC_CORE FinAd
     break_match; try lia.
     rewrite Integers.repr_unsigned.
     reflexivity.
+  Qed.
+
+  Lemma ptr_add_hom :
+    forall ptr x y,
+      x >= 0 ->
+      y >= 0 ->
+      p <- ptr_add ptr x;;
+      ptr_add p y = ptr_add ptr (x + y).
+  Proof.
+    intros ptr x y X Y.
+    cbn.
+    destruct ptr; cbn; auto.
+    pose proof Integers.unsigned_range i.
+    repeat break_match;
+      try inv Heqs; auto; try lia.
+    - cbn.
+      break_match; auto.
+      apply orb_false_iff in Heqb1, Heqb0;
+        apply orb_true_iff in Heqb.
+      destruct Heqb0.
+      destruct Heqb; try lia.
+      destruct Heqb1; try lia.
+      rewrite Integers.Z_mod_modulus_eq in H3, H4.
+      pose proof Z.mod_small (Integers.unsigned i + x) (@Integers.modulus 64) as MOD.
+      lia.
+    - cbn.
+      rewrite Integers.Z_mod_modulus_eq.
+      pose proof Z.mod_small (Integers.unsigned i + x) (@Integers.modulus 64) as MOD.
+      break_match; auto; try lia.
+      apply orb_false_iff in Heqb, Heqb0, Heqb1.
+      destruct Heqb0; try lia;
+      destruct Heqb; try lia;
+        destruct Heqb1; try lia.
+      replace ((Integers.unsigned i + x) mod Integers.modulus + y) with (Integers.unsigned i + (x + y)) by lia.
+      reflexivity.
   Qed.
 End Fin_HAS_POINTER_ARITHMETIC_CORE.
 

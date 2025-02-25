@@ -21,6 +21,8 @@ From Stdlib Require Import
   Structures.Equalities.
 
 Import ListNotations.
+Import MonadNotation.
+Open Scope monad.
 
 Module ZAddrType <: CORE_ADDRESS.
   Definition t := Z.
@@ -70,6 +72,19 @@ Module Type Z_HAS_POINTER_ARITHMETIC_CORE <: HAS_POINTER_ARITHMETIC_CORE ZAddrTy
     rewrite Z.add_0_r in *.
     reflexivity.
   Qed.
+
+  Lemma ptr_add_hom :
+    forall ptr x y,
+      x >= 0 ->
+      y >= 0 ->
+      p <- ptr_add ptr x;;
+      ptr_add p y = ptr_add ptr (x + y).
+  Proof.
+    intros ptr x y X Y.
+    cbn.
+    replace (ptr + x + y) with (ptr + (x + y)) by lia; auto.
+  Qed.
+
 End Z_HAS_POINTER_ARITHMETIC_CORE.
 
 Module Z_PTOI_HAS_POINTER_ARITHMETIC <: HAS_POINTER_ARITHMETIC ZAddrType := Z_HAS_POINTER_ARITHMETIC_CORE  <+ HAS_POINTER_ARITHMETIC_HELPERS ZAddrType.

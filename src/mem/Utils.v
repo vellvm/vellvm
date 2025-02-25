@@ -1,8 +1,8 @@
 From Mem Require Import
      Tactics.
 
-Require Coqlib.
-From Coq Require Import
+Require Rocqlib.
+From Stdlib Require Import
      micromega.Lia
      Ascii
      Strings.String
@@ -11,7 +11,7 @@ From Coq Require Import
      Nat
      PeanoNat
      Psatz.
-Require Import FunInd Recdef.
+From Stdlib Require Import FunInd Recdef.
 
 Section nat_Show.
   #[local] Open Scope string.
@@ -850,7 +850,7 @@ Qed.
 Lemma Nth_list_nth_z :
   forall {X} (ix : nat) (xs : list X) (x : X),
     Nth xs ix x ->
-    Coqlib.list_nth_z xs (Z.of_nat ix) = Some x.
+    Rocqlib.list_nth_z xs (Z.of_nat ix) = Some x.
 Proof using.
   intros X ix xs.
   revert ix.
@@ -1447,7 +1447,7 @@ Tactic Notation "inv_bind" hyp(H) :=
     end.
 
 From Vellvm Require Import
-     Numeric.Coqlib.
+     Numeric.Rocqlib.
  
 Infix "⊍" := list_disjoint (at level 60).
 
@@ -1568,7 +1568,7 @@ Section DisjointLists.
     induction l1;
       intros l2 P1 P2 L1 L2 P1NP2.
     - intros ? ? CONTRA. inversion CONTRA.
-    - apply Coqlib.list_disjoint_cons_l.
+    - apply Rocqlib.list_disjoint_cons_l.
       + eapply IHl1; eauto using Forall_inv_tail.
       + apply Forall_inv in L1.
         apply P1NP2 in L1.

@@ -1,7 +1,7 @@
 From Mem Require Import
   Addresses.MemoryAddress.
 
-From Coq Require Import
+From Stdlib Require Import
   List
   Relations
   RelationClasses
@@ -136,7 +136,7 @@ Module FRAME_LIST_CORE
   (Import ADDR : CORE_ADDRESS) <: CORE_FRAME ADDR.
   Definition t := list addr.
   Definition ptr_in_frame (f : t) (p : addr) : bool :=
-    existsb (fun z => Coqlib.proj_sumbool (ADDR.eq_dec p z)) f.
+    existsb (fun z => Rocqlib.proj_sumbool (ADDR.eq_dec p z)) f.
   Definition ptrs_in_frame (f : t) : list addr :=
     f.
   Definition empty_frame : t := [].
@@ -160,7 +160,7 @@ Module FRAME_LIST_CORE
     cbn.
     apply Bool.orb_true_iff.
     left.
-    unfold Coqlib.proj_sumbool.
+    unfold Rocqlib.proj_sumbool.
     destruct (eq_dec ptr ptr); auto.
   Qed.
 
@@ -175,7 +175,7 @@ Module FRAME_LIST_CORE
     intros ptr p f IN.
     cbn.
     apply Bool.orb_true_iff.
-    unfold Coqlib.proj_sumbool.
+    unfold Rocqlib.proj_sumbool.
     destruct (eq_dec p ptr); auto.
   Qed.
 
@@ -188,11 +188,11 @@ Module FRAME_LIST_CORE
     split; intros IN.
     - apply existsb_exists in IN.
       destruct IN as (?&?&?).
-      apply Coqlib.proj_sumbool_true in H0; subst; auto.
+      apply Rocqlib.proj_sumbool_true in H0; subst; auto.
     - apply existsb_exists.
       exists ptr.
       split; auto.
-      apply Coqlib.proj_sumbool_is_true; auto.
+      apply Rocqlib.proj_sumbool_is_true; auto.
   Qed.
 End FRAME_LIST_CORE.
 

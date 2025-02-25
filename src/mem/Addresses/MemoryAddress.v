@@ -24,9 +24,11 @@ From ExtLib Require Import
   Structures.Monads.
 
 From Stdlib Require Import
+  Lia
   Structures.Equalities.
 
 From Mem Require Import
+  Tactics
   Addresses.Provenance.
 
 Import MonadNotation.
@@ -72,26 +74,38 @@ Module Type HAS_POINTER_ARITHMETIC_CORE (Import Addr:CORE_ADDRESS).
       as a pointer, e.g., if it would be out of bounds.
    *)
   Parameter ptr_add : addr -> Z -> err addr.
+
   Parameter ptr_add_0 :
     forall ptr,
       ptr_add ptr 0 = inr ptr.
+
+  Parameter ptr_add_hom :
+    forall ptr x y,
+      x >= 0 ->
+      y >= 0 ->
+      p <- ptr_add ptr x;;
+      ptr_add p y = ptr_add ptr (x + y).
 End HAS_POINTER_ARITHMETIC_CORE.
 
 Module Type HAS_POINTER_ARITHMETIC_HELPERS
   (Import Addr:CORE_ADDRESS)
   (Import ARITH:HAS_POINTER_ARITHMETIC_CORE Addr).
 
-  Definition get_consecutive_ptrs (ptr : addr) (len : nat) : err (list addr) :=
-    let ixs := seq 0 len in
+  (* Slightly more general to help with induction *)
+  Definition get_consecutive_ptrs_h (ptr : addr) (start len : nat) : err (list addr) :=
+    let ixs := seq start len in
     map_monad
       (fun ix => ptr_add ptr (Z.of_nat ix))
       ixs (m:=err).
+
+  Definition get_consecutive_ptrs (ptr : addr) (len : nat) : err (list addr) :=
+    get_consecutive_ptrs_h ptr 0 len.
 
   Fixpoint consecutive_ptrs_h (start : addr) (ptrs : list addr) : bool :=
     match ptrs with
     | nil => true
     | cons ptr ptrs =>
-        match (ptr_add ptr 1) with
+        match (ptr_add start 1) with
         | inl _ => false
         | inr ptr' =>
             proj_sumbool (eq_dec ptr ptr') &&
@@ -116,7 +130,175 @@ Module Type HAS_POINTER_ARITHMETIC_HELPERS
     apply map_monad_err_length in CONSEC.
     rewrite length_seq in CONSEC.
     auto.
-  Qed.  
+  Qed.
+
+  Lemma consecutive_ptrs_nil :
+    consecutive_ptrs [] = true.
+  Proof.
+    auto.
+  Qed.
+
+  #[global] Hint Resolve consecutive_ptrs_nil : GCP.
+
+  Lemma consecutive_ptrs_cons :
+    forall (ptrs : list addr) (ptr : addr),
+      consecutive_ptrs (ptr :: ptrs) = true ->
+      consecutive_ptrs ptrs = true.
+  Proof.
+    induction ptrs; intros ptr CONSEC;
+      auto.
+
+    cbn in *.
+    break_match_hyp_inv.
+    apply andb_true_iff in H0.
+    destruct H0.
+    rewrite H, H0.
+    auto.
+  Qed.
+
+  Lemma consecutive_ptrs_cons' :
+    forall (ptrs : list addr) (ptr : addr),
+      consecutive_ptrs (ptr :: ptrs) = true ->
+      match head ptrs with
+      | None => True
+      | Some p =>
+          match ptr_add ptr 1 with
+          | inl _ => False
+          | inr p' => p = p'
+          end
+      end.
+  Proof.
+    intros ptrs ptr H.
+    cbn in *.
+    induction ptrs; cbn in *; auto.
+    repeat break_match_hyp_inv.
+    apply andb_true_iff in H1.
+    destruct H1.
+    auto.
+    destruct (eq_dec a t0); auto.
+    inv H.
+  Qed.
+
+  #[global] Hint Resolve
+    consecutive_ptrs_cons
+    consecutive_ptrs_cons' : GCP.
+
+  Lemma consecutive_ptrs_h_consecutive_ptrs :
+    forall ptr ptrs,
+      consecutive_ptrs_h ptr ptrs = consecutive_ptrs (ptr :: ptrs).
+  Proof.
+    intros ptr ptrs.
+    cbn; auto.
+  Qed.
+
+  #[global] Hint Rewrite consecutive_ptrs_h_consecutive_ptrs : GCP.
+
+  Lemma consecutive_ptrs_app_r :
+    forall (ptrs1 ptrs2 : list addr),
+      consecutive_ptrs (ptrs1 ++ ptrs2) = true ->
+      consecutive_ptrs ptrs2 = true.
+  Proof.
+    induction ptrs1;
+      intros ptrs2 CONSEC;
+      cbn in *; auto with GCP.
+
+
+    autorewrite with GCP in *.
+    apply consecutive_ptrs_cons in CONSEC as CONSEC'.
+    apply IHptrs1 in CONSEC' as CONSEC2; auto.
+  Qed.
+
+  #[global] Hint Resolve consecutive_ptrs_app_r : GCP.
+
+  Lemma consecutive_ptrs_app_l :
+    forall (ptrs1 ptrs2 : list addr),
+      consecutive_ptrs (ptrs1 ++ ptrs2) = true ->
+      consecutive_ptrs ptrs1 = true.
+  Proof.
+    induction ptrs1;
+      intros ptrs2 CONSEC;
+      cbn in *; auto with GCP.
+    autorewrite with GCP in *.
+
+    apply consecutive_ptrs_cons in CONSEC as CONSEC'.
+    apply consecutive_ptrs_cons' in CONSEC.
+
+    apply IHptrs1 in CONSEC'.
+    cbn.
+    destruct (hd_error (ptrs1 ++ ptrs2)) eqn:PTRS;
+      try break_match_hyp_inv.
+    - destruct (ptrs1 ++ ptrs2) eqn:PTRS'; inv PTRS.
+      destruct ptrs1; auto.
+      rewrite <- app_comm_cons in PTRS'.
+      inv PTRS'.
+      cbn.
+      rewrite Heqs; auto.
+      apply andb_true_iff.
+      split; auto.
+      destruct eq_dec; auto.
+    - destruct (ptrs1 ++ ptrs2) eqn:PTRS'; inv PTRS.
+      apply app_eq_nil in PTRS' as [PTRS1 PTRS2]; subst.
+      auto.
+  Qed.
+
+  #[global] Hint Resolve consecutive_ptrs_app_l : GCP.
+
+  Lemma consecutive_ptrs_app :
+    forall (ptrs1 ptrs2 : list addr),
+      consecutive_ptrs (ptrs1 ++ ptrs2) = true ->
+      consecutive_ptrs ptrs1 = true /\ consecutive_ptrs ptrs2 = true.
+  Proof.
+    eauto with GCP.
+  Qed.
+
+  #[global] Hint Resolve consecutive_ptrs_app : GCP.
+
+  Lemma get_consecutive_ptrs_h_consecutive :
+    forall (len start : nat) (ptr : addr) (ptrs : list addr),
+      get_consecutive_ptrs_h ptr start len = ret ptrs ->
+      consecutive_ptrs ptrs = true.
+  Proof.
+    unfold get_consecutive_ptrs, get_consecutive_ptrs_h, consecutive_ptrs.
+    induction len; intros start ptr ptrs CONSEC.
+    - inv CONSEC; auto.
+    - cbn in CONSEC.
+      repeat break_match_hyp_inv.
+      apply IHlen in Heqs0 as CONSEC.
+      destruct l; auto.
+      cbn.
+      pose proof Heqs0 as L.
+      apply map_monad_err_cons_inv in L as (?&?&?).
+      rewrite H in Heqs0.
+      cbn in Heqs0.
+      assert (x = S start).
+      { destruct len; inv H; auto.
+      }
+      subst.
+      repeat break_match_hyp_inv.
+      pose proof (ptr_add_hom ptr (Z.of_nat start) 1) as PTR.
+      do 2 (forward PTR; [lia|]).
+      cbn in PTR.
+      rewrite Heqs in PTR.
+      replace (Z.of_nat start + 1) with (Z.of_nat (S start)) in PTR by lia.
+      rewrite Heqs1 in PTR.
+      rewrite PTR.
+      apply andb_true_iff.
+      split; auto.
+      destruct eq_dec; auto.
+  Qed.
+
+  Lemma get_consecutive_ptrs_consecutive :
+    forall (len start : nat) (ptr : addr) (ptrs : list addr),
+      get_consecutive_ptrs_h ptr start len = ret ptrs ->
+      consecutive_ptrs ptrs = true.
+  Proof.
+    intros len start ptr ptrs H.
+    eapply get_consecutive_ptrs_h_consecutive; eauto.
+  Qed.
+
+  #[global] Hint Resolve
+    get_consecutive_ptrs_length
+    get_consecutive_ptrs_consecutive : GCP.
 End HAS_POINTER_ARITHMETIC_HELPERS.
 
 Module Type HAS_POINTER_ARITHMETIC (ADDR : CORE_ADDRESS)

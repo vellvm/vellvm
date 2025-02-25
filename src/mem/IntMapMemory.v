@@ -1,5 +1,5 @@
 (*** Memory model implementations using intmaps *)
-From Coq Require Import
+From Stdlib Require Import
   ZArith
   String
   Structures.Equalities.
@@ -17,7 +17,7 @@ From Mem Require Import
   StackFrames
   Utils.
 
-From Coq Require Import
+From Stdlib Require Import
   List.
 
 From Vellvm Require Import Error.
