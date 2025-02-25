@@ -205,8 +205,9 @@ Section Map_Operations.
 
   Definition next_key {A} (m : IntMap A) : Z
     := match IM_greatest_key m with
-       | Some k => 1 + k
-       | None => 0
+       | Some k =>
+           1 + Z.abs k
+       | None => 1
        end.
 
   Definition next_key_old {A} (m : IntMap A) : Z
@@ -436,6 +437,16 @@ Section Map_Operations.
     apply IM.Raw.Proofs.In_alt in IN.
     apply GK in IN.
     auto.
+    lia.
+  Qed.
+
+  Lemma next_key_gt_0 :
+    forall {A} (m : IntMap A),
+      (next_key m > 0)%Z.
+  Proof using.
+    intros A m.
+    unfold next_key.
+    break_match; try lia.
   Qed.
 
   Lemma MapsTo_inj : forall {a} k v v' (m : IntMap a),
