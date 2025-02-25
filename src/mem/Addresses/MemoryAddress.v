@@ -69,6 +69,14 @@ Module Type HAS_PTOI (Import Addr:CORE_ADDRESS).
   Parameter ptr_to_int : addr -> Z.
 End HAS_PTOI.
 
+Module Type HAS_NULL_PTOI (Import Addr:CORE_ADDRESS) (Import Null : HAS_NULL Addr) (Import PTOI : HAS_PTOI Addr).
+  Parameter is_null_is_zero :
+    forall ptr,
+      is_null ptr = true <-> ptr_to_int ptr = 0.
+
+  #[global] Hint Resolve is_null_is_zero : MEM.
+End HAS_NULL_PTOI.
+
 Module Type HAS_POINTER_ARITHMETIC_CORE (Import Addr:CORE_ADDRESS).
   (** Pointer addition. May error if the result cannot be represented
       as a pointer, e.g., if it would be out of bounds.
@@ -120,6 +128,22 @@ Module Type HAS_POINTER_ARITHMETIC_HELPERS
     end.
 
   (*** Lemmas about get_consecutive_ptrs *)
+  Lemma get_consecutive_ptrs_head :
+    forall len (ptr ptr' : addr) (ptrs : list addr),
+      get_consecutive_ptrs ptr len = ret (ptr' :: ptrs) ->
+      ptr = ptr'.
+  Proof.
+    destruct len;
+      intros ptr ptr' ptrs CONSEC;
+      inv CONSEC.
+    cbn in *.
+    repeat break_match_hyp_inv.
+    rewrite ptr_add_0 in Heqs.
+    inv Heqs; auto.
+  Qed.
+
+  #[global] Hint Resolve get_consecutive_ptrs_head : MEM.
+
   Lemma get_consecutive_ptrs_length :
     forall (ptr : addr) (len : nat) (ptrs : list addr),
       get_consecutive_ptrs ptr len = ret ptrs ->
@@ -132,13 +156,22 @@ Module Type HAS_POINTER_ARITHMETIC_HELPERS
     auto.
   Qed.
 
+  (* Add symmetric version for better automation *)
+  Lemma get_consecutive_ptrs_length' :
+    forall (ptr : addr) (len : nat) (ptrs : list addr),
+      get_consecutive_ptrs ptr len = ret ptrs ->
+      length ptrs = len.
+  Proof.
+    intros *; symmetry; eapply get_consecutive_ptrs_length; eauto.
+  Qed.
+
   Lemma consecutive_ptrs_nil :
     consecutive_ptrs [] = true.
   Proof.
     auto.
   Qed.
 
-  #[global] Hint Resolve consecutive_ptrs_nil : GCP.
+  #[global] Hint Resolve consecutive_ptrs_nil : MEM.
 
   Lemma consecutive_ptrs_cons :
     forall (ptrs : list addr) (ptr : addr),
@@ -181,7 +214,7 @@ Module Type HAS_POINTER_ARITHMETIC_HELPERS
 
   #[global] Hint Resolve
     consecutive_ptrs_cons
-    consecutive_ptrs_cons' : GCP.
+    consecutive_ptrs_cons' : MEM.
 
   Lemma consecutive_ptrs_h_consecutive_ptrs :
     forall ptr ptrs,
@@ -191,7 +224,7 @@ Module Type HAS_POINTER_ARITHMETIC_HELPERS
     cbn; auto.
   Qed.
 
-  #[global] Hint Rewrite consecutive_ptrs_h_consecutive_ptrs : GCP.
+  #[global] Hint Rewrite consecutive_ptrs_h_consecutive_ptrs : MEM.
 
   Lemma consecutive_ptrs_app_r :
     forall (ptrs1 ptrs2 : list addr),
@@ -200,15 +233,15 @@ Module Type HAS_POINTER_ARITHMETIC_HELPERS
   Proof.
     induction ptrs1;
       intros ptrs2 CONSEC;
-      cbn in *; auto with GCP.
+      cbn in *; auto with MEM.
 
 
-    autorewrite with GCP in *.
+    autorewrite with MEM in *.
     apply consecutive_ptrs_cons in CONSEC as CONSEC'.
     apply IHptrs1 in CONSEC' as CONSEC2; auto.
   Qed.
 
-  #[global] Hint Resolve consecutive_ptrs_app_r : GCP.
+  #[global] Hint Resolve consecutive_ptrs_app_r : MEM.
 
   Lemma consecutive_ptrs_app_l :
     forall (ptrs1 ptrs2 : list addr),
@@ -217,8 +250,8 @@ Module Type HAS_POINTER_ARITHMETIC_HELPERS
   Proof.
     induction ptrs1;
       intros ptrs2 CONSEC;
-      cbn in *; auto with GCP.
-    autorewrite with GCP in *.
+      cbn in *; auto with MEM.
+    autorewrite with MEM in *.
 
     apply consecutive_ptrs_cons in CONSEC as CONSEC'.
     apply consecutive_ptrs_cons' in CONSEC.
@@ -241,17 +274,17 @@ Module Type HAS_POINTER_ARITHMETIC_HELPERS
       auto.
   Qed.
 
-  #[global] Hint Resolve consecutive_ptrs_app_l : GCP.
+  #[global] Hint Resolve consecutive_ptrs_app_l : MEM.
 
   Lemma consecutive_ptrs_app :
     forall (ptrs1 ptrs2 : list addr),
       consecutive_ptrs (ptrs1 ++ ptrs2) = true ->
       consecutive_ptrs ptrs1 = true /\ consecutive_ptrs ptrs2 = true.
   Proof.
-    eauto with GCP.
+    eauto with MEM.
   Qed.
 
-  #[global] Hint Resolve consecutive_ptrs_app : GCP.
+  #[global] Hint Resolve consecutive_ptrs_app : MEM.
 
   Lemma get_consecutive_ptrs_h_consecutive :
     forall (len start : nat) (ptr : addr) (ptrs : list addr),
@@ -298,18 +331,76 @@ Module Type HAS_POINTER_ARITHMETIC_HELPERS
 
   #[global] Hint Resolve
     get_consecutive_ptrs_length
-    get_consecutive_ptrs_consecutive : GCP.
+    get_consecutive_ptrs_length'
+    get_consecutive_ptrs_consecutive : MEM.
 End HAS_POINTER_ARITHMETIC_HELPERS.
 
 Module Type HAS_POINTER_ARITHMETIC (ADDR : CORE_ADDRESS)
   := HAS_POINTER_ARITHMETIC_CORE ADDR <+ HAS_POINTER_ARITHMETIC_HELPERS ADDR.
 
-Module Type PTOI_ARITH_EXTRAS (Import Addr:CORE_ADDRESS) (Import PTOI : HAS_PTOI Addr) (Import HPA : HAS_POINTER_ARITHMETIC Addr).
+Module Type PTOI_ARITH_EXTRAS_CORE (Import Addr:CORE_ADDRESS) (Import PTOI : HAS_PTOI Addr) (Import HPA : HAS_POINTER_ARITHMETIC Addr).
   Parameter ptr_to_int_ptr_add :
     forall (ptr ptr' : addr) (x : Z),
       ptr_add ptr x = inr ptr' ->
       ptr_to_int ptr' = ptr_to_int ptr + x.
-End PTOI_ARITH_EXTRAS.
+
+  #[global] Hint Resolve ptr_to_int_ptr_add : MEM.
+End PTOI_ARITH_EXTRAS_CORE.
+
+Module Type PTOI_ARITH_EXTRAS_HELPERS (Import Addr:CORE_ADDRESS) (Import PTOI : HAS_PTOI Addr) (Import HPA : HAS_POINTER_ARITHMETIC Addr) (Import CORE : PTOI_ARITH_EXTRAS_CORE Addr PTOI HPA).
+
+  Lemma consecutive_ptrs_gt :
+    forall ptrs ptr,
+      consecutive_ptrs (ptr :: ptrs) = true ->
+      forall p, In p ptrs -> ptr_to_int p > ptr_to_int ptr.
+  Proof.
+    induction ptrs;
+      intros ptr CONSEC p IN;
+      [inv IN|].    
+    cbn in *.
+    break_match_hyp_inv.
+    apply ptr_to_int_ptr_add in Heqs.
+    apply andb_true_iff in H0 as (?&?).
+    destruct eq_dec in H; try discriminate; subst.
+    clear H.
+    destruct IN; subst; try lia.
+    eapply Zgt_trans.
+    eapply IHptrs; eauto with MEM.
+    lia.
+  Qed.
+
+  Lemma get_consecutive_ptrs_h_gt :
+    forall len start ptr ptrs,
+      get_consecutive_ptrs_h ptr start len = inr ptrs ->
+      forall p, In p ptrs -> ptr_to_int p >= ptr_to_int ptr.
+  Proof.
+    induction len;
+      intros start ptr ptrs GCP p IN.
+    - cbn in *; inv GCP; inv IN.
+    - cbn in *.
+      repeat break_match_hyp_inv.
+      destruct IN; subst.
+      + apply ptr_to_int_ptr_add in Heqs. lia.
+      + eapply IHlen in Heqs0; eauto.
+  Qed.
+
+  Lemma get_consecutive_ptrs_gt :
+    forall len ptr ptrs,
+      get_consecutive_ptrs ptr len = inr ptrs ->
+      forall p, In p ptrs -> ptr_to_int p >= ptr_to_int ptr.
+  Proof.
+    intros *;
+      eapply get_consecutive_ptrs_h_gt; eauto.
+  Qed.
+
+  #[global] Hint Resolve
+    consecutive_ptrs_gt
+    get_consecutive_ptrs_h_gt
+    get_consecutive_ptrs_gt : MEM.
+End PTOI_ARITH_EXTRAS_HELPERS.
+
+Module Type PTOI_ARITH_EXTRAS (ADDR : CORE_ADDRESS) (PTOI : HAS_PTOI ADDR) (HPA : HAS_POINTER_ARITHMETIC ADDR)
+  := PTOI_ARITH_EXTRAS_CORE ADDR PTOI HPA <+ PTOI_ARITH_EXTRAS_HELPERS ADDR PTOI HPA.
 
 (* TODO: Should this be moved to a utility file? *)
 (** Types with additional metadata associated with them *)
@@ -399,7 +490,7 @@ Module Type PTOI_ADDRESS :=
 
 (** Addresses without metadata *)
 Module Type BASIC_ADDRESS :=
-  PTOI_ADDRESS <+ HAS_NULL.
+  PTOI_ADDRESS <+ HAS_NULL <+ HAS_NULL_PTOI.
 
 (** Addresses with metadata *)
 Module Type METADATA_ADDRESS (MD : Typ) :=
