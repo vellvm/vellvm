@@ -76,6 +76,23 @@ Module InfPTOI <: HAS_PTOI InfAddrType.
   Definition ptr_to_int := fun (ptr : InfAddrType.t) => fst ptr.
 End InfPTOI.
 
+Module Inf_HAS_NULL_PTOI <: HAS_NULL_PTOI InfAddrType InfNull InfPTOI.
+  Import InfAddrType InfNull InfPTOI.
+
+  Lemma is_null_is_zero :
+    forall ptr,
+      is_null ptr = true <-> ptr_to_int ptr = 0.
+  Proof.
+    intros ptr.
+    destruct ptr; unfold is_null, ptr_to_int; cbn.
+    split; intros H.
+    - destruct i; inv H; auto.
+    - subst; auto.
+  Qed.
+
+  #[global] Hint Resolve is_null_is_zero : MEM.
+End Inf_HAS_NULL_PTOI.
+
 Module Type Inf_HAS_POINTER_ARITHMETIC_CORE <: HAS_POINTER_ARITHMETIC_CORE InfAddrType.
   (** Pointer addition. May error if the result cannot be represented
       as a pointer, e.g., if it would be out of bounds.
@@ -131,6 +148,8 @@ Module Inf_PTOI_ARITH_EXTRAS <: PTOI_ARITH_EXTRAS InfAddrType InfPTOI Inf_PTOI_H
     inv H.
     reflexivity.
   Qed.
+
+  Include (PTOI_ARITH_EXTRAS_HELPERS InfAddrType InfPTOI Inf_PTOI_HAS_POINTER_ARITHMETIC).
 End Inf_PTOI_ARITH_EXTRAS.
 
 Module Inf_HAS_METADATA <: HAS_METADATA N_ProvSet InfAddrType.
@@ -153,6 +172,37 @@ Module METADATA_PROVENANCE_ID (MD : Typ) <: METADATA_PROVENANCE MD MD.
 
   Definition metadata_set_provenance (md : MD.t) (p : MD.t) : MD.t
     := snd (metadata_modify_provenance md (const p)).
+
+  Lemma metadata_modify_provenance_spec :
+    forall md f,
+    exists md', metadata_modify_provenance md f = (f (metadata_provenance md), md') /\
+             metadata_provenance md' = f (metadata_provenance md).
+  Proof.
+    intros md f.
+    cbn in *.
+    exists (f md).
+    eexists; cbn; split; eauto.
+  Qed.
+
+  Lemma metadata_get_set_provenance :
+    forall md p,
+      metadata_provenance (metadata_set_provenance md p) = p.
+  Proof.
+    intros md p.
+    unfold metadata_provenance.
+    unfold metadata_set_provenance.
+    pose proof (metadata_modify_provenance_spec md (const p)) as (?&?&?).
+    rewrite H.
+    cbn.
+    pose proof (metadata_modify_provenance_spec x id) as (?&?&?).
+    cbn in *.
+    unfold id, const in *; subst; auto.
+  Qed.
+
+  #[global] Hint Resolve
+    metadata_get_set_provenance
+    metadata_set_provenance : MEM.
+
 End METADATA_PROVENANCE_ID.
 
 Module Inf_HAS_ITOP <: HAS_ITOP N_ProvSet InfAddrType Inf_HAS_METADATA.
@@ -185,8 +235,8 @@ Module Inf_ITOP_BIG <: ITOP_BIG N_ProvSet InfAddrType Inf_HAS_METADATA Inf_HAS_I
   Qed.
 End Inf_ITOP_BIG.
 
-Module Inf_PTOI_ITOP_EXTRA <: PTOI_ITOP_EXTRA N_ProvSet InfAddrType Inf_HAS_METADATA Inf_HAS_ITOP InfPTOI.
-  Import InfPTOI Inf_HAS_METADATA Inf_HAS_ITOP.
+Module Inf_PTOI_ITOP_EXTRA <: PTOI_ITOP_EXTRA N_ProvSet InfAddrType Inf_PTOI_HAS_POINTER_ARITHMETIC Inf_HAS_METADATA Inf_HAS_ITOP InfPTOI.
+  Import InfPTOI Inf_HAS_METADATA Inf_HAS_ITOP Inf_PTOI_HAS_POINTER_ARITHMETIC.
   Lemma int_to_ptr_ptr_to_int :
     forall (a : InfAddrType.t) (p : N_ProvSet.t),
       extract_metadata a = p ->
@@ -219,8 +269,19 @@ Module Inf_PTOI_ITOP_EXTRA <: PTOI_ITOP_EXTRA N_ProvSet InfAddrType Inf_HAS_META
   Proof.
     intros x p a H.
     unfold int_to_ptr, ptr_to_int, extract_metadata in *.
-    inv H; cbn; auto.
+    destruct a; cbn in *; subst; inv H; auto.
+  Qed.
+
+  Lemma ptr_add_metadata :
+    forall a x p,
+      ptr_add a x = inr p ->
+      extract_metadata p = extract_metadata a.
+  Proof.
+    intros a x p ADD.
+    destruct a; cbn in *.
+    inv ADD.
+    cbn; auto.
   Qed.
 End Inf_PTOI_ITOP_EXTRA.
 
-Module InfAddr <: INFINITE_ADDRESS N_ProvSet N_ProvSet := InfAddrType <+ InfNull <+ InfPTOI <+ Inf_PTOI_HAS_POINTER_ARITHMETIC <+ Inf_PTOI_ARITH_EXTRAS <+ METADATA_PROVENANCE_ID N_ProvSet <+ Inf_HAS_METADATA <+ HAS_PROVENANCE N_ProvSet N_ProvSet <+ Inf_HAS_ITOP <+ Inf_ITOP_BIG <+ Inf_PTOI_ITOP_EXTRA.
+Module InfAddr <: INFINITE_ADDRESS N_ProvSet N_ProvSet := InfAddrType <+ InfNull <+ InfPTOI <+ Inf_HAS_NULL_PTOI  <+ Inf_PTOI_HAS_POINTER_ARITHMETIC <+ Inf_PTOI_ARITH_EXTRAS <+ METADATA_PROVENANCE_ID N_ProvSet <+ Inf_HAS_METADATA <+ HAS_PROVENANCE N_ProvSet N_ProvSet <+ Inf_HAS_ITOP <+ Inf_ITOP_BIG <+ Inf_PTOI_ITOP_EXTRA <+ PTOI_ITOP_ARITH_EXTRA N_ProvSet.

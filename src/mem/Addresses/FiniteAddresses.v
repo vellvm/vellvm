@@ -74,11 +74,36 @@ Module FinNull <: HAS_NULL FinAddrType.
   Proof.
     reflexivity.
   Qed.
+
 End FinNull.
 
 Module FinPTOI <: HAS_PTOI FinAddrType.
   Definition ptr_to_int := fun (ptr : FinAddrType.t) => @Integers.unsigned 64 (fst ptr).
 End FinPTOI.
+
+Module Fin_HAS_NULL_PTOI <: HAS_NULL_PTOI FinAddrType FinNull FinPTOI.
+  Import FinAddrType FinNull FinPTOI.
+
+  Lemma is_null_is_zero :
+    forall ptr,
+      is_null ptr = true <-> ptr_to_int ptr = 0.
+  Proof.
+    intros ptr.
+    destruct ptr; unfold is_null, ptr_to_int; cbn.
+    pose proof (Integers.eq_spec (Integers.repr 0) i) as EQ.
+    split; intros H.
+    - rewrite H in EQ; auto.
+      subst.
+      auto.
+    - break_match_hyp; auto.
+      exfalso.
+      apply EQ.
+      epose proof Integers.repr_unsigned i.
+      rewrite H in H0; auto.
+  Qed.
+
+  #[global] Hint Resolve is_null_is_zero : MEM.
+End Fin_HAS_NULL_PTOI.
 
 Module Type Fin_HAS_POINTER_ARITHMETIC_CORE <: HAS_POINTER_ARITHMETIC_CORE FinAddrType.
   (** Pointer addition. May error if the result cannot be represented
@@ -162,6 +187,8 @@ Module Fin_PTOI_ARITH_EXTRAS <: PTOI_ARITH_EXTRAS FinAddrType FinPTOI Fin_PTOI_H
     rewrite (Integers.unsigned_repr (@Integers.unsigned 64 i + x)); unfold Integers.max_unsigned;
       lia.
   Qed.
+
+  Include (PTOI_ARITH_EXTRAS_HELPERS FinAddrType FinPTOI Fin_PTOI_HAS_POINTER_ARITHMETIC).
 End Fin_PTOI_ARITH_EXTRAS.
 
 Module Fin_HAS_METADATA <: HAS_METADATA N_ProvSet FinAddrType.
@@ -184,6 +211,37 @@ Module METADATA_PROVENANCE_ID (MD : Typ) <: METADATA_PROVENANCE MD MD.
 
   Definition metadata_set_provenance (md : MD.t) (p : MD.t) : MD.t
     := snd (metadata_modify_provenance md (const p)).
+
+  Lemma metadata_modify_provenance_spec :
+    forall md f,
+    exists md', metadata_modify_provenance md f = (f (metadata_provenance md), md') /\
+             metadata_provenance md' = f (metadata_provenance md).
+  Proof.
+    intros md f.
+    cbn in *.
+    exists (f md).
+    eexists; cbn; split; eauto.
+  Qed.
+
+  Lemma metadata_get_set_provenance :
+    forall md p,
+      metadata_provenance (metadata_set_provenance md p) = p.
+  Proof.
+    intros md p.
+    unfold metadata_provenance.
+    unfold metadata_set_provenance.
+    pose proof (metadata_modify_provenance_spec md (const p)) as (?&?&?).
+    rewrite H.
+    cbn.
+    pose proof (metadata_modify_provenance_spec x id) as (?&?&?).
+    cbn in *.
+    unfold id, const in *; subst; auto.
+  Qed.
+
+  #[global] Hint Resolve
+    metadata_get_set_provenance
+    metadata_set_provenance : MEM.
+
 End METADATA_PROVENANCE_ID.
 
 Module Fin_HAS_ITOP <: HAS_ITOP N_ProvSet FinAddrType Fin_HAS_METADATA.
@@ -205,8 +263,8 @@ Module Fin_HAS_ITOP <: HAS_ITOP N_ProvSet FinAddrType Fin_HAS_METADATA.
   Qed.
 End Fin_HAS_ITOP.
 
-Module Fin_PTOI_ITOP_EXTRA <: PTOI_ITOP_EXTRA N_ProvSet FinAddrType Fin_HAS_METADATA Fin_HAS_ITOP FinPTOI.
-  Import FinPTOI Fin_HAS_METADATA Fin_HAS_ITOP.
+Module Fin_PTOI_ITOP_EXTRA <: PTOI_ITOP_EXTRA N_ProvSet FinAddrType Fin_PTOI_HAS_POINTER_ARITHMETIC Fin_HAS_METADATA Fin_HAS_ITOP FinPTOI.
+  Import FinPTOI Fin_HAS_METADATA Fin_HAS_ITOP Fin_PTOI_HAS_POINTER_ARITHMETIC.
   Lemma int_to_ptr_ptr_to_int :
     forall (a : FinAddrType.t) (p : N_ProvSet.t),
       extract_metadata a = p ->
@@ -250,6 +308,16 @@ Module Fin_PTOI_ITOP_EXTRA <: PTOI_ITOP_EXTRA N_ProvSet FinAddrType Fin_HAS_META
     apply (@Integers.unsigned_repr 64 x); auto.
     unfold Integers.max_unsigned; lia.
   Qed.
+
+  Lemma ptr_add_metadata :
+    forall a x p,
+      ptr_add a x = inr p ->
+      extract_metadata p = extract_metadata a.
+  Proof.
+    intros a x p ADD.
+    destruct a; cbn in *.
+    break_match_hyp_inv; cbn; auto.
+  Qed.
 End Fin_PTOI_ITOP_EXTRA.
 
-Module FinAddr <: ADDRESS N_ProvSet N_ProvSet := FinAddrType <+ FinNull <+ FinPTOI <+ Fin_PTOI_HAS_POINTER_ARITHMETIC <+ Fin_PTOI_ARITH_EXTRAS <+ METADATA_PROVENANCE_ID N_ProvSet <+ Fin_HAS_METADATA <+ HAS_PROVENANCE N_ProvSet N_ProvSet <+ Fin_HAS_ITOP <+ Fin_PTOI_ITOP_EXTRA.
+Module FinAddr <: ADDRESS N_ProvSet N_ProvSet := FinAddrType <+ FinNull <+ FinPTOI <+ Fin_HAS_NULL_PTOI <+ Fin_PTOI_HAS_POINTER_ARITHMETIC <+ Fin_PTOI_ARITH_EXTRAS <+ METADATA_PROVENANCE_ID N_ProvSet <+ Fin_HAS_METADATA <+ HAS_PROVENANCE N_ProvSet N_ProvSet <+ Fin_HAS_ITOP <+ Fin_PTOI_ITOP_EXTRA <+ PTOI_ITOP_ARITH_EXTRA N_ProvSet.
