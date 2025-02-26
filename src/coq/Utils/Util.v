@@ -1046,6 +1046,36 @@ Proof using.
     ecase IHl as [? [? ?]]; eauto. 
 Qed.
 
+Lemma nth_combine :
+  forall {A B} (xs : list A) (ys : list B) x y n,
+    nth_error (combine xs ys) n = Some (x, y) <->
+      nth_error xs n = Some x /\ nth_error ys n = Some y.
+Proof.
+  intros A; induction xs;
+    intros ys x y n.
+  { split; intros NTH.
+    - cbn in *.
+      rewrite nth_error_nil in NTH; discriminate.
+    - destruct NTH as (XS&YS).
+      rewrite nth_error_nil in XS; discriminate.
+  }
+
+  { split; intros NTH.
+    - cbn in *.
+      break_match_hyp_inv.
+      rewrite nth_error_nil in H0; discriminate.
+      destruct n; cbn in *.
+      + inv H0; auto.
+      + apply IHxs; auto.
+    - destruct NTH as (XS&YS).
+      cbn in *.
+      break_match_goal; subst.
+      rewrite nth_error_nil in YS; discriminate.
+      destruct n; cbn in *.
+      + inv XS; inv YS; auto.
+      + apply IHxs; auto.
+  }
+Qed.
 
 Fixpoint trim {A} (lo:list (option A)) : list A :=
   match lo with
