@@ -664,7 +664,7 @@ Module Type MEMORY_ALLOCATE
   Parameter allocate_block_old_allocated :
     forall (m1 : Memory) (bytes : list SByte) (aid : AllocationId) (m2 : Memory) (ptrs : (addr * list addr)),
       allocate_block m1 bytes aid m2 ptrs ->
-      forall ptr, addr_allocated m1 ptr aid <-> addr_allocated m2 ptr aid.
+      forall ptr, addr_allocated m1 ptr aid -> addr_allocated m2 ptr aid.
 
   #[global] Hint Resolve
     allocate_block_free
@@ -696,7 +696,7 @@ Module MEMORY_ALLOCATE_SPEC_IMPL
       Forall (fun ptr => addr_allocated m2 ptr aid) (snd ptrs)
 
     ; allocate_block_old_allocated :
-      forall ptr, addr_allocated m1 ptr aid <-> addr_allocated m2 ptr aid
+      forall ptr, addr_allocated m1 ptr aid -> addr_allocated m2 ptr aid
     }.
 
   Definition allocate_block := allocate_block'.
