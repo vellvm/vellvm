@@ -773,7 +773,9 @@ Module Type EXEC_SPEC_ALLOCATABLE_MEMORY (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AI
 
 Module Type CORRECT_ALLOCATABLE_MEMORY (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) (MEM : MEMORY_MODEL_BASE ADDR SB)
   := EXEC_SPEC_ALLOCATABLE_MEMORY ADDR SB AID MEM <+
-       EXEC_MEMORY_ALLOCATE_CORRECT ADDR SB AID MEM.
+       EXEC_MEMORY_ALLOCATE_CORRECT ADDR SB AID MEM <+
+       CORE_EXEC_MEMORY_MODEL_CORRECT ADDR SB MEM <+
+       EXEC_MEMORY_WRITES_CORRECT ADDR SB MEM.
 
 (*** Stack allocations *)
 Module Type CORE_MEMORY_FRAME_STACK
@@ -790,11 +792,9 @@ Module Type CORE_MEMORY_FRAME_STACK
       Memory -> (FrameStack -> FrameStack) -> Memory.
 
   Parameter Memory_frame_stack_modify_spec :
-    forall (m1 m2 : Memory) (f : FrameStack -> FrameStack) (fs1 fs2 : FrameStack),
-      fs1 = Memory_frame_stack m1 ->
-      m2 = Memory_frame_stack_modify m1 f ->
-      fs2 = Memory_frame_stack m2 ->
-      fs2 = f fs1.
+    forall (m1 : Memory) (f : FrameStack -> FrameStack),
+      Memory_frame_stack (Memory_frame_stack_modify m1 f) = f (Memory_frame_stack m1).
+
 End CORE_MEMORY_FRAME_STACK.
 
 Module Type MEMORY_FRAME_STACK_EXTRAS
