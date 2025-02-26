@@ -18,24 +18,30 @@ From Mem Require Import
 From Coq Require Import
   List.
 
+From ExtLib Require Import
+  Structures.Monad.
+
+Import MonadNotation.
+Open Scope monad.
+
 Notation err := (sum string).
 
 Module Type ALLOCATABLE_MEMORY_FRESH (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) :=
   ALLOCATABLE_MEMORY ADDR SB AID <+ CORE_MEMORY_FRESH_STORE_ID ADDR SB <+ CORE_MEMORY_FRESH_AID ADDR SB AID.
 
+Module Type EXEC_ALLOCATABLE_FREE_MEMORY_FRESH (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) :=
+  MEMORY_MODEL_BASE ADDR SB <+ EXEC_MEMORY_FREE_BYTE ADDR SB <+ EXEC_ALLOCATABLE_MEMORY ADDR SB AID <+ CORE_MEMORY_FRESH_STORE_ID ADDR SB <+ CORE_MEMORY_FRESH_AID ADDR SB AID.
+
 Module Type CORRECT_ALLOCATABLE_MEMORY_FRESH (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) :=
   MEMORY_MODEL_BASE ADDR SB <+ CORRECT_ALLOCATABLE_MEMORY ADDR SB AID <+ CORE_MEMORY_FRESH_STORE_ID ADDR SB <+ CORE_MEMORY_FRESH_AID ADDR SB AID.
 
-(** Add a heap and stack to allocatable memory *)
-Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
+Module Type FRAME_HEAP_MEMORY_BASE
   (Import ADDR : BASIC_ADDRESS)
   (Import SB : SBYTE)
-  (Import AID : ALLOCATION_ID)
   (Import H : HEAP ADDR)
   (Import F : FRAME ADDR)
   (Import FS : FRAME_STACK ADDR F)
-  (MEM : ALLOCATABLE_MEMORY_FRESH ADDR SB AID) <: FULL_MEMORY_MODEL ADDR SB AID H F FS.
-
+  (MEM : MEMORY_MODEL_BASE ADDR SB) <: MEMORY_MODEL_BASE ADDR SB.
   Record Memory' :=
     MkMemory {
         memory_byte_map : MEM.Memory;
@@ -50,6 +56,70 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
 
   Definition sub_memory (m : Memory) : MEM.Memory :=
     memory_byte_map m.
+
+  (** STACK *)
+  Definition Memory_frame_stack := memory_frame_stack.
+  Definition Memory_frame_stack_modify (m : Memory) (f : FrameStack -> FrameStack) : Memory :=
+    match m with
+    | MkMemory bm fs h =>
+        MkMemory bm (f fs) h
+    end.
+
+  Lemma Memory_frame_stack_modify_spec :
+    forall (m1 m2 : Memory) (f : FrameStack -> FrameStack) (fs1 fs2 : FrameStack),
+      fs1 = Memory_frame_stack m1 ->
+      m2 = Memory_frame_stack_modify m1 f -> fs2 = Memory_frame_stack m2 -> fs2 = f fs1.
+  Proof.
+    intros m1 m2 f fs1 fs2 H H0 H1.
+    subst.
+    destruct m1; cbn; reflexivity.
+  Qed.
+
+  Include (MEMORY_FRAME_STACK_EXTRAS ADDR SB F FS).
+
+  (** HEAP *)
+  Definition Memory_heap := memory_heap.
+  Definition Memory_heap_modify (m : Memory) (f : Heap -> Heap) : Memory :=
+    match m with
+    | MkMemory bm fs h =>
+        MkMemory bm fs (f h)
+    end.
+
+  Lemma Memory_heap_modify_spec :
+    forall (m1 m2 : Memory) (f : Heap -> Heap),
+      m2 = Memory_heap_modify m1 f ->
+      Memory_heap m2 = f (Memory_heap m1).
+  Proof.
+    intros m1 m2 f H.
+    subst.
+    destruct m1; cbn; reflexivity.
+  Qed.
+
+  Lemma Memory_heap_modify_id :
+    forall m,
+      Memory_heap_modify m id = m.
+  Proof.
+    intros m.
+    destruct m; cbn; auto.
+  Qed.
+
+  Definition ptr_in_memory_heap (m : Memory) (root ptr : addr) : bool :=
+    ptr_in_heap (Memory_heap m) root ptr.
+
+  Definition root_ptr_in_memory_heap (m : Memory) (root : addr) : bool :=
+    root_ptr_in_heap (Memory_heap m) root.
+End FRAME_HEAP_MEMORY_BASE.
+
+(** Add a heap and stack to allocatable memory *)
+Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL'
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID: ALLOCATION_ID)
+  (Import H : HEAP ADDR)
+  (Import F : FRAME ADDR)
+  (Import FS : FRAME_STACK ADDR F)
+  (MEM : ALLOCATABLE_MEMORY_FRESH ADDR SB AID)
+  (Import FH_MEM : FRAME_HEAP_MEMORY_BASE ADDR SB H F FS MEM) <: FULL_MEMORY_MODEL' ADDR SB AID H F FS FH_MEM FH_MEM FH_MEM.
 
   (*** MEMORY_ALLOCATED_CORE *)
   (** Whether an address is allocated with a given AllocationId *)
@@ -209,59 +279,6 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
 
   (* Make module types happy :| *)
   Definition find_free_block := find_free_block'.
-
-  (** STACK *)
-  Definition Memory_frame_stack := memory_frame_stack.
-  Definition Memory_frame_stack_modify (m : Memory) (f : FrameStack -> FrameStack) : Memory :=
-    match m with
-    | MkMemory bm fs h =>
-        MkMemory bm (f fs) h
-    end.
-
-  Lemma Memory_frame_stack_modify_spec :
-    forall (m1 m2 : Memory) (f : FrameStack -> FrameStack) (fs1 fs2 : FrameStack),
-      fs1 = Memory_frame_stack m1 ->
-      m2 = Memory_frame_stack_modify m1 f -> fs2 = Memory_frame_stack m2 -> fs2 = f fs1.
-  Proof.
-    intros m1 m2 f fs1 fs2 H H0 H1.
-    subst.
-    destruct m1; cbn; reflexivity.
-  Qed.
-
-  Include (MEMORY_FRAME_STACK_EXTRAS ADDR SB F FS).
-
-  (** HEAP *)
-  Definition Memory_heap := memory_heap.
-  Definition Memory_heap_modify (m : Memory) (f : Heap -> Heap) : Memory :=
-    match m with
-    | MkMemory bm fs h =>
-        MkMemory bm fs (f h)
-    end.
-
-  Lemma Memory_heap_modify_spec :
-    forall (m1 m2 : Memory) (f : Heap -> Heap),
-      m2 = Memory_heap_modify m1 f ->
-      Memory_heap m2 = f (Memory_heap m1).
-  Proof.
-    intros m1 m2 f H.
-    subst.
-    destruct m1; cbn; reflexivity.
-  Qed.
-
-  Lemma Memory_heap_modify_id :
-    forall m,
-      Memory_heap_modify m id = m.
-  Proof.
-    intros m.
-    destruct m; cbn; auto.
-  Qed.
-
-  Definition ptr_in_memory_heap (m : Memory) (root ptr : addr) : bool :=
-    ptr_in_heap (Memory_heap m) root ptr.
-
-  Definition root_ptr_in_memory_heap (m : Memory) (root : addr) : bool :=
-    root_ptr_in_heap (Memory_heap m) root.
-
 
   (** MEMORY_ALLOCATE *)
   (* Include (MEMORY_ALLOCATE_SPEC_IMPL ADDR SB AID). *) (* Need some extras :) *)
@@ -437,7 +454,7 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
     eapply allocate_block_non_null; eauto.
   Qed.
 
-  Include (ALL_READS_PRESERVED ADDR SB).
+  Include (ALL_READS_PRESERVED ADDR SB FH_MEM).
 
   Lemma Memory_heap_modify_reads_preserved :
     forall m f,
@@ -712,4 +729,66 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
        let sid' := N.succ sid in
        (sid', Memory_sid_modify m (fun _ => sid')).
 
-End ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL.
+End ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL'.
+
+Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
+   (ADDR : BASIC_ADDRESS)
+   (SB : SBYTE)
+   (AID : ALLOCATION_ID)
+   (H : HEAP ADDR)
+   (F : FRAME ADDR)
+   (FS : FRAME_STACK ADDR F)
+   (MEM : ALLOCATABLE_MEMORY_FRESH ADDR SB AID)  <: FULL_MEMORY_MODEL ADDR SB AID H F FS
+  :=
+  FRAME_HEAP_MEMORY_BASE ADDR SB H F FS MEM <+
+    ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL' ADDR SB AID H F FS MEM.
+
+(** Add a heap and stack to allocatable memory *)
+Module EXEC_ALLOCATABLE_MEMORY_FRESH_TO_FULL_EXEC_MEMORY_MODEL'
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID: ALLOCATION_ID)
+  (Import H : HEAP ADDR)
+  (Import F : FRAME ADDR)
+  (Import FS : FRAME_STACK ADDR F)
+  (MEM : EXEC_ALLOCATABLE_FREE_MEMORY_FRESH ADDR SB AID)
+  (Import FH_MEM : FRAME_HEAP_MEMORY_BASE ADDR SB H F FS MEM) <: FULL_EXEC_MEMORY_MODEL' ADDR SB AID H F FS FH_MEM FH_MEM FH_MEM.
+  (*** READABLE_MEMORY *)
+  Definition read_byte_exec (m : Memory) (ptr : addr) : err SByte :=
+    MEM.read_byte_exec (memory_byte_map m) ptr.
+
+  (*** WRITEABLE_MEMORY *)
+  Definition write_byte_exec (m1 : Memory) (ptr : addr) (b : SByte) : err Memory :=
+    match m1 with
+    | (MkMemory bm1 fs h) =>
+        bm2 <- MEM.write_byte_exec bm1 ptr b;;
+        ret (MkMemory bm2 fs h)
+    end.
+
+  (** MEMORY_ALLOCATE *)
+  Definition allocate_block_exec (m1 : Memory) (bytes : list SByte) (aid : AllocationId) : Error.OOM (Memory * (addr * list addr))
+    :=
+    match m1 with
+    | (MkMemory bm1 fs h) =>
+       '(bm2, ptrs) <- MEM.allocate_block_exec bm1 bytes aid;;
+        ret (MkMemory bm2 fs h, ptrs)
+    end.
+
+  Definition free_byte_exec (m1 : Memory) (addr : Z) : Memory
+    :=
+    match m1 with
+    | (MkMemory bm1 fs h) =>
+        MkMemory (MEM.free_byte_exec bm1 addr) fs h
+    end.
+
+  Definition free_bytes_exec (m : Memory) (ptrs : list Z) : Memory
+    := fold_left (fun m' ptr => free_byte_exec m' ptr) ptrs m.
+
+  (** Stack allocations *)
+  Include (EXEC_MEMORY_STACK_ALLOCATE ADDR SB AID F FS FH_MEM FH_MEM).
+  Include (EXEC_MEMORY_STACK_POP_BASE ADDR SB F FS FH_MEM FH_MEM).
+
+  (** Heap allocations *)
+  Include (EXEC_MEMORY_HEAP_ALLOCATE ADDR SB AID H FH_MEM FH_MEM).
+  Include (EXEC_MEMORY_HEAP_FREE ADDR SB H FH_MEM FH_MEM).
+End EXEC_ALLOCATABLE_MEMORY_FRESH_TO_FULL_EXEC_MEMORY_MODEL'.
