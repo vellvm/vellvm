@@ -56,6 +56,22 @@ Module Z_PTOI <: HAS_PTOI ZAddrType.
   Definition ptr_to_int := fun (ptr : ZAddrType.t) => ptr.
 End Z_PTOI.
 
+Module Z_HAS_NULL_PTOI <: HAS_NULL_PTOI ZAddrType ZNull Z_PTOI.
+  Import ZAddrType ZNull Z_PTOI.
+
+  Lemma is_null_is_zero :
+    forall ptr,
+      is_null ptr = true <-> ptr_to_int ptr = 0.
+  Proof.
+    intros ptr.
+    split; intros H; cbn in *.
+    - destruct ptr; inv H; cbn; auto.
+    - destruct ptr; inv H; auto.
+  Qed.
+
+  #[global] Hint Resolve is_null_is_zero : MEM.
+End Z_HAS_NULL_PTOI.
+
 Module Type Z_HAS_POINTER_ARITHMETIC_CORE <: HAS_POINTER_ARITHMETIC_CORE ZAddrType.
   (** Pointer addition. May error if the result cannot be represented
       as a pointer, e.g., if it would be out of bounds.
@@ -104,6 +120,8 @@ Module Z_PTOI_ARITH_EXTRAS <: PTOI_ARITH_EXTRAS ZAddrType Z_PTOI Z_PTOI_HAS_POIN
     inv H.
     reflexivity.
   Qed.
+
+  Include (PTOI_ARITH_EXTRAS_HELPERS ZAddrType Z_PTOI Z_PTOI_HAS_POINTER_ARITHMETIC).
 End Z_PTOI_ARITH_EXTRAS.
 
 Module Z_HAS_METADATA <: HAS_METADATA UNIT_TYP ZAddrType.
@@ -140,8 +158,8 @@ Module Z_ITOP_BIG <: ITOP_BIG UNIT_TYP ZAddrType Z_HAS_METADATA Z_HAS_ITOP.
   Qed.
 End Z_ITOP_BIG.
 
-Module Z_PTOI_ITOP_EXTRA <: PTOI_ITOP_EXTRA UNIT_TYP ZAddrType Z_HAS_METADATA Z_HAS_ITOP Z_PTOI.
-  Import Z_PTOI Z_HAS_METADATA Z_HAS_ITOP.
+Module Z_PTOI_ITOP_EXTRA <: PTOI_ITOP_EXTRA UNIT_TYP ZAddrType Z_PTOI_HAS_POINTER_ARITHMETIC Z_HAS_METADATA Z_HAS_ITOP Z_PTOI.
+  Import Z_PTOI Z_PTOI_HAS_POINTER_ARITHMETIC Z_HAS_METADATA Z_HAS_ITOP.
   Lemma int_to_ptr_ptr_to_int :
     forall (a : ZAddrType.t) (p : unit),
       extract_metadata a = p ->
@@ -175,6 +193,17 @@ Module Z_PTOI_ITOP_EXTRA <: PTOI_ITOP_EXTRA UNIT_TYP ZAddrType Z_HAS_METADATA Z_
     unfold int_to_ptr, ptr_to_int, extract_metadata in *.
     inv H; cbn; auto.
   Qed.
+
+  Lemma ptr_add_metadata :
+    forall a x p,
+      ptr_add a x = inr p ->
+      extract_metadata p = extract_metadata a.
+  Proof.
+    intros a x p ADD.
+    unfold extract_metadata.
+    reflexivity.
+  Qed.
+
 End Z_PTOI_ITOP_EXTRA.
 
-Module ZAddr := ZAddrType <+ ZNull <+ Z_PTOI <+ Z_PTOI_HAS_POINTER_ARITHMETIC <+ Z_PTOI_ARITH_EXTRAS <+ Z_HAS_METADATA <+ Z_HAS_ITOP <+ Z_ITOP_BIG <+ Z_PTOI_ITOP_EXTRA.
+Module ZAddr <: METADATA_ADDRESS UNIT_TYP := ZAddrType <+ ZNull <+ Z_PTOI <+ Z_HAS_NULL_PTOI <+ Z_PTOI_HAS_POINTER_ARITHMETIC <+ Z_PTOI_ARITH_EXTRAS <+ Z_HAS_METADATA <+ Z_HAS_ITOP <+ Z_ITOP_BIG <+ Z_PTOI_ITOP_EXTRA <+ PTOI_ITOP_ARITH_EXTRA UNIT_TYP.
