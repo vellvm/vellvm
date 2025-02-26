@@ -1225,10 +1225,15 @@ Module MemoryHandlersExec (SIZEOF : Sizeof) (ADDR : BASIC_ADDRESS_WITH_OVERLAPS 
 
   (** Reading uvalues *)
   Definition read_byte_raw
-    {M} `{Monad M}
+    {M} `{Monad M} `{MonadExc UB_MESSAGE M}
     (ptr : addr)
     : MemStateT M SByte
-    := gets (fun m => read_byte_exec m ptr).
+    := m <- MonadState.get;;
+       match read_byte_exec m ptr with
+       | inl err => lift (MonadExc.raise (UB_message err))
+       | inr b =>
+           ret b
+       end.
 
   Definition read_bytes_exec
     {M} `{Monad M} `{MonadExc UB_MESSAGE M}
@@ -1252,9 +1257,14 @@ Module MemoryHandlersExec (SIZEOF : Sizeof) (ADDR : BASIC_ADDRESS_WITH_OVERLAPS 
 
   (** Writing uvalues *)
   Definition write_byte_raw
-    {M} `{Monad M}
+    {M} `{Monad M} `{MonadExc UB_MESSAGE M}
     (ptr : addr) (b : SByte) : MemStateT M unit :=
-    modify (fun m => write_byte_exec m ptr b);; ret tt.
+    m <- MonadState.get;;
+    match write_byte_exec m ptr b with
+    | inl err => lift (MonadExc.raise (UB_message err))
+    | inr m' =>
+        put m'
+    end.
 
   Definition write_bytes_exec
     {M} `{Monad M} `{MonadExc UB_MESSAGE M}
