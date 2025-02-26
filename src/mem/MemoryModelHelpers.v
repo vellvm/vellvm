@@ -280,7 +280,7 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL
       Forall (fun ptr => addr_allocated m2 ptr aid) (snd ptrs)
 
     ; allocate_block_old_allocated :
-      forall ptr, addr_allocated m1 ptr aid <-> addr_allocated m2 ptr aid
+      forall ptr, addr_allocated m1 ptr aid -> addr_allocated m2 ptr aid
 
     ; allocate_block_non_null :
       Forall (fun ptr => is_null ptr = false) (snd ptrs)

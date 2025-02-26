@@ -565,6 +565,18 @@ Section Map_Operations.
       eapply list_values_injective_cons; eauto.
   Qed.
 
+  Lemma find_nin_add_all :
+    forall {elt} kvs (m : @IM.t elt) k,
+      Forall (fun '(k', _) => k <> k') kvs ->
+      IM.find k (add_all kvs m) = IM.find k m.
+  Proof.
+    intros elt kvs m k NEQ.
+    induction NEQ; cbn; auto.
+
+    destruct x.
+    rewrite lookup_add_ineq; auto.
+  Qed.
+
   (** ** [add]/[member] interaction
         Added keys are a member of the map
    *)

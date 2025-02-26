@@ -544,6 +544,31 @@ Module Type METADATA_PROVENANCE (Import PS : PROV_SET) (METADATA : Typ).
 
   Definition metadata_set_provenance (md : METADATA.t) (p : ProvSet) : METADATA.t
     := snd (metadata_modify_provenance md (const p)).
+
+  Parameter metadata_modify_provenance_spec :
+    forall md f,
+      exists md', metadata_modify_provenance md f = (f (metadata_provenance md), md') /\
+               metadata_provenance md' = f (metadata_provenance md).
+
+  Lemma metadata_get_set_provenance :
+    forall md p,
+      metadata_provenance (metadata_set_provenance md p) = p.
+  Proof.
+    intros md p.
+    unfold metadata_provenance.
+    unfold metadata_set_provenance.
+    pose proof (metadata_modify_provenance_spec md (const p)) as (?&?&?).
+    rewrite H.
+    cbn.
+    pose proof (metadata_modify_provenance_spec x id) as (?&?&?).
+    rewrite H1.
+    cbn in *; auto.
+  Qed.
+
+  #[global] Hint Resolve
+    metadata_get_set_provenance
+    metadata_set_provenance : MEM.
+
 End METADATA_PROVENANCE.
 
 Module Type METADATA_WITH_PROVENANCE (PS : PROV_SET) := Typ <+ METADATA_PROVENANCE PS.
@@ -585,7 +610,7 @@ Module Type ITOP_BIG (METADATA : Typ) (Import Addr:CORE_ADDRESS) (Import HMD : H
 End ITOP_BIG.
 
 (** Extra properties for addresses that support both ptoi and itop casts *)
-Module Type PTOI_ITOP_EXTRA (METADATA : Typ) (Import Addr:CORE_ADDRESS) (Import HMD : HAS_METADATA METADATA Addr) (Import ITOP : HAS_ITOP METADATA Addr HMD) (Import PTOI : HAS_PTOI Addr).
+Module Type PTOI_ITOP_EXTRA (METADATA : Typ) (Import Addr:CORE_ADDRESS) (Import HPA : HAS_POINTER_ARITHMETIC Addr) (Import HMD : HAS_METADATA METADATA Addr) (Import ITOP : HAS_ITOP METADATA Addr HMD) (Import PTOI : HAS_PTOI Addr).
   Parameter int_to_ptr_ptr_to_int :
     forall (a : addr) (p : METADATA.t),
       extract_metadata a = p ->
@@ -602,7 +627,41 @@ Module Type PTOI_ITOP_EXTRA (METADATA : Typ) (Import Addr:CORE_ADDRESS) (Import 
     forall (x : Z) (p : METADATA.t) (a : addr),
       int_to_ptr x p = ret a ->
       ptr_to_int a = x.
+
+  Parameter ptr_add_metadata :
+    forall a x p,
+      ptr_add a x = inr p ->
+      extract_metadata p = extract_metadata a.
 End PTOI_ITOP_EXTRA.
+
+Module Type PTOI_ITOP_ARITH_EXTRA (METADATA : Typ) (Import Addr:CORE_ADDRESS) (Import HPA : HAS_POINTER_ARITHMETIC Addr) (Import HMD : HAS_METADATA METADATA Addr) (Import ITOP : HAS_ITOP METADATA Addr HMD) (Import PTOI : HAS_PTOI Addr) (Import PTOI_ARITH : PTOI_ARITH_EXTRAS Addr PTOI HPA) (Import PIEXTRA : PTOI_ITOP_EXTRA METADATA Addr HPA HMD ITOP PTOI).
+  Lemma get_consecutive_ptrs_h_metadata :
+    forall len start ptr ptrs,
+      get_consecutive_ptrs_h ptr start len = inr ptrs ->
+      Forall (fun p => extract_metadata p = extract_metadata ptr) ptrs.
+  Proof.
+    induction len;
+      intros * GCP.
+    cbn in *; inv GCP; auto.
+    cbn in *.
+    repeat break_match_hyp_inv.
+    apply ptr_add_metadata in Heqs.
+    constructor; auto.
+    eapply IHlen; eauto.
+  Qed.
+
+  #[global] Hint Resolve get_consecutive_ptrs_h_metadata : MEM.
+
+  Lemma get_consecutive_ptrs_metadata :
+    forall len ptr ptrs,
+      get_consecutive_ptrs ptr len = inr ptrs ->
+      Forall (fun p => extract_metadata p = extract_metadata ptr) ptrs.
+  Proof.
+    eauto with MEM.
+  Qed.
+
+  #[global] Hint Resolve get_consecutive_ptrs_metadata : MEM.
+End PTOI_ITOP_ARITH_EXTRA.
 
 (*** Address module types *)
 (** Addresses that can be null *)
@@ -634,7 +693,7 @@ Module Type PROVENANCE_ADDRESS (MD : Typ) (PS : PROV_SET) :=
 
 (** Basic addresses with the batteries and metadata included *)
 Module Type ADDRESS (MD : Typ) (PS : PROV_SET) :=
-  PROVENANCE_ADDRESS MD PS <+ HAS_ITOP MD <+ PTOI_ITOP_EXTRA MD.
+  PROVENANCE_ADDRESS MD PS <+ HAS_ITOP MD <+ PTOI_ITOP_EXTRA MD <+ PTOI_ITOP_ARITH_EXTRA MD.
 
 (** Infinite addresses with the batteries included *)
 Module Type INFINITE_ADDRESS (MD : Typ) (PS : PROV_SET) :=

@@ -490,6 +490,41 @@ Module INTMAP_AID_MEMORY_MODEL
 
   #[global] Hint Resolve find_free_block_correct : MEM.
 
+  Lemma find_free_block_exec_aids :
+    forall m len aid ptrs,
+      find_free_block_exec m len aid = NoOom ptrs ->
+      Forall (fun p => address_provenance p = aid_to_prov aid) (snd ptrs).
+  Proof.
+    intros m len aid ptrs FREE.
+    unfold find_free_block_exec in FREE.
+    cbn in *.
+    repeat break_match_hyp_inv.
+    cbn.
+    eapply get_consecutive_ptrs_metadata in Heqs.
+    apply Forall_forall.
+    intros x IN.
+    eapply Forall_forall in Heqs; eauto.
+    unfold address_provenance.
+    apply int_to_ptr_metadata in Heqo as H.
+    rewrite Heqs.
+    rewrite H.
+    eauto with MEM.
+  Qed.
+
+  Lemma find_free_block_exec_access_allowed :
+    forall m len aid ptrs,
+      find_free_block_exec m len aid = NoOom ptrs ->
+      Forall (fun p => access_allowed (address_provenance p) aid) (snd ptrs).
+  Proof.
+    intros m len aid ptrs FREE.
+    apply find_free_block_exec_aids in FREE.
+    apply Forall_forall.
+    intros x H.
+    eapply Forall_forall in FREE; eauto.
+    rewrite FREE.
+    apply access_allowed_refl.
+  Qed.
+
   Fixpoint add_ptrs_to_byte_map (mem_byte : SByte * AllocationId) (ptrs : list addr) (mem : IM.t (SByte * AllocationId)) : IM.t (SByte * AllocationId)
     := match ptrs with
        | nil => mem
@@ -523,7 +558,8 @@ Module INTMAP_AID_MEMORY_MODEL
       split; eauto with MEM.
       intros i a b H H0.
       red; cbn.
-      erewrite find_in_add_all.
+      erewrite find_in_add_all with (i:=i) (v:=(a, aid)).
+      split; auto.
       3: {
         assert (list_values_injective (map ptr_to_int (snd ptrs))) by eauto with MEM.
         intros i' j' x NTH1 NTH2.
@@ -532,17 +568,109 @@ Module INTMAP_AID_MEMORY_MODEL
         destruct NTH2 as (?&?&?).
         destruct x0, x1; inv H3; inv H5.
         cbn in *; subst.
-        apply nth_map_inv in NTH1, NTH2.
-        eapply H1.
-        eapply nth_error_map.
+        apply nth_combine in H2, H4.
+        destruct H2 as (?&?).
+        destruct H4 as (?&?).
+        eauto.
       }
-      eauto with MEM.
-      break_match.
 
-      unfold read_byte.
-      cbn.
-      
-    
+      2: {
+        apply nth_combine; split.
+        - apply map_nth_error; auto.
+        - change (a, aid) with ((fun b0 : SByte => (b0, aid)) a).
+          apply map_nth_error; auto.
+      }
+
+      apply find_free_block_exec_access_allowed in FIND_FREE.
+      eapply Forall_Nth in FIND_FREE; eauto.
+    - (* Old reads *)
+      intros b ptr H.
+      red; cbn.
+      (* The read should be disjoint from find_free_block_is_free *)
+      erewrite find_nin_add_all.
+      unfold read_byte in H; apply H.
+
+      apply Forall_forall.
+      intros [k v] IN.
+
+      cbn in FIND_FREE.
+      repeat break_match_hyp_inv.
+      unfold read_byte in H.
+      break_match_hyp; auto.
+      destruct p.
+      destruct H; subst.
+
+      assert (IM.In (elt:=SByte * AllocationId) (ptr_to_int ptr) (Memory_byte_map m1)) as INM.
+      { apply IP.F.find_mapsto_iff in Heqo0; eexists; eauto.
+      }
+      apply next_key_correct in INM.
+
+      assert (k >= next_key (Memory_byte_map m1))%Z.
+      { apply in_combine_l in IN; cbn in *.
+        apply in_map_iff in IN as (?&?&?); subst.
+        eapply get_consecutive_ptrs_gt in Heqs; eauto.
+        erewrite ptr_to_int_int_to_ptr with (a:=t0) in Heqs; eauto.
+      }
+      lia.
+    - (* Allocated *)
+      apply Forall_forall.
+      intros x IN.
+      red; cbn.
+      apply in_nth_error in IN as (n&NTH).
+      assert (exists b, nth_error bytes n = Some b) as (b & NTHB).
+      { assert (Datatypes.length bytes = Datatypes.length (snd ptrs)) as LEN by eauto with MEM.
+        eapply nth_error_succeeds.
+        apply nth_error_in in NTH.
+        lia.
+      }
+
+      erewrite find_in_add_all with (i:=n) (v:=(b, aid)).
+      + reflexivity.
+      + apply nth_combine.
+        split.
+        * apply map_nth_error; auto.
+        * change (b, aid) with ((fun b0 : SByte => (b0, aid)) b).
+          apply map_nth_error; auto.
+      + red.
+        intros i j x0 H H0.
+        apply nth_map_inv in H, H0.
+        destruct H as (?&?&?).
+        destruct H0 as (?&?&?).
+        destruct x1, x2; cbn in *; subst.
+        apply nth_combine in H, H0.
+        destruct H as (?&?).
+        destruct H0 as (?&?).
+        repeat break_match_hyp_inv.
+        eapply get_consecutive_ptrs_ptoi_injective; eauto.
+    - (* Old allocated *)
+      intros ptr ALLOC.
+      { red; cbn.
+        (* The read should be disjoint from find_free_block_is_free *)
+        erewrite find_nin_add_all.
+        unfold addr_allocated in ALLOC; auto.
+
+        apply Forall_forall.
+        intros [k v] IN.
+
+        cbn in FIND_FREE.
+        repeat break_match_hyp_inv.
+        unfold addr_allocated in ALLOC.
+        break_match_hyp; auto.
+        destruct p.
+
+        assert (IM.In (elt:=SByte * AllocationId) (ptr_to_int ptr) (Memory_byte_map m1)) as INM.
+        { apply IP.F.find_mapsto_iff in Heqo0; eexists; eauto.
+        }
+        apply next_key_correct in INM.
+
+        assert (k >= next_key (Memory_byte_map m1))%Z.
+        { apply in_combine_l in IN; cbn in *.
+          apply in_map_iff in IN as (?&?&?); subst.
+          eapply get_consecutive_ptrs_gt in Heqs; eauto.
+          erewrite ptr_to_int_int_to_ptr with (a:=t0) in Heqs; eauto.
+        }
+        lia.
+      }
   Qed.
 
 End INTMAP_AID_MEMORY_MODEL.
