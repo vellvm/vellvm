@@ -8,7 +8,8 @@ From Stdlib Require Import
   Structures.Equalities.
 
 From ExtLib Require Import
-     Structures.Monads.
+  Structures.Monads
+  Structures.Functor.
 
 Require Import Morphisms.
 
@@ -101,6 +102,10 @@ Module Type CORE_FRAME_STACK
     forall fs1 f fs2,
       fs2 = push fs1 f ->
       pop fs2 = Some (f, fs1).
+
+  Parameter peek_pop :
+    forall fs1,
+      peek fs1 = fmap fst (pop fs1).
 
   Parameter pop_empty :
     pop initial_frame_stack = None.
@@ -222,6 +227,14 @@ Module CORE_FRAME_STACK_LIST (Import ADDR: CORE_ADDRESS) (Import F : FRAME ADDR)
     intros fs1 f fs2 H.
     rewrite H.
     cbn; auto.
+  Qed.
+
+  Lemma peek_pop :
+    forall fs1,
+      peek fs1 = fmap fst (pop fs1).
+  Proof.
+    intros fs1.
+    destruct fs1; cbn; auto.
   Qed.
 
   Lemma push_pop :

@@ -32,8 +32,8 @@ Module Type ALLOCATABLE_MEMORY_FRESH (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : 
 Module Type EXEC_ALLOCATABLE_FREE_MEMORY_FRESH (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) :=
   MEMORY_MODEL_BASE ADDR SB <+ EXEC_MEMORY_FREE_BYTE ADDR SB <+ EXEC_ALLOCATABLE_MEMORY ADDR SB AID <+ CORE_MEMORY_FRESH_STORE_ID ADDR SB <+ CORE_MEMORY_FRESH_AID ADDR SB AID.
 
-Module Type CORRECT_ALLOCATABLE_MEMORY_FRESH (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) :=
-  MEMORY_MODEL_BASE ADDR SB <+ CORRECT_ALLOCATABLE_MEMORY ADDR SB AID <+ CORE_MEMORY_FRESH_STORE_ID ADDR SB <+ CORE_MEMORY_FRESH_AID ADDR SB AID.
+Module Type CORRECT_ALLOCATABLE_FREE_MEMORY_FRESH (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) :=
+  MEMORY_MODEL_BASE ADDR SB <+ EXEC_MEMORY_FREE_BYTE ADDR SB <+ CORRECT_ALLOCATABLE_MEMORY ADDR SB AID <+ CORE_MEMORY_FRESH_STORE_ID ADDR SB <+ CORE_MEMORY_FRESH_AID ADDR SB AID <+ CORRECT_MEMORY_FREE_BYTE ADDR SB AID.
 
 Module Type FRAME_HEAP_MEMORY_BASE
   (Import ADDR : BASIC_ADDRESS)
@@ -66,12 +66,10 @@ Module Type FRAME_HEAP_MEMORY_BASE
     end.
 
   Lemma Memory_frame_stack_modify_spec :
-    forall (m1 m2 : Memory) (f : FrameStack -> FrameStack) (fs1 fs2 : FrameStack),
-      fs1 = Memory_frame_stack m1 ->
-      m2 = Memory_frame_stack_modify m1 f -> fs2 = Memory_frame_stack m2 -> fs2 = f fs1.
+    forall (m1 : Memory) (f : FrameStack -> FrameStack),
+      Memory_frame_stack (Memory_frame_stack_modify m1 f) = f (Memory_frame_stack m1).
   Proof.
-    intros m1 m2 f fs1 fs2 H H0 H1.
-    subst.
+    intros m1 f.
     destruct m1; cbn; reflexivity.
   Qed.
 
@@ -792,3 +790,257 @@ Module EXEC_ALLOCATABLE_MEMORY_FRESH_TO_FULL_EXEC_MEMORY_MODEL'
   Include (EXEC_MEMORY_HEAP_ALLOCATE ADDR SB AID H FH_MEM FH_MEM).
   Include (EXEC_MEMORY_HEAP_FREE ADDR SB H FH_MEM FH_MEM).
 End EXEC_ALLOCATABLE_MEMORY_FRESH_TO_FULL_EXEC_MEMORY_MODEL'.
+
+Module CORRECT_ALLOCATABLE_MEMORY_FRESH_TO_FULL_CORRECT_MEMORY_MODEL'
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID: ALLOCATION_ID)
+  (Import H : HEAP ADDR)
+  (Import F : FRAME ADDR)
+  (Import FS : FRAME_STACK ADDR F)
+  (MEM : CORRECT_ALLOCATABLE_FREE_MEMORY_FRESH ADDR SB AID)
+  (Import FH_MEM : FRAME_HEAP_MEMORY_BASE ADDR SB H F FS MEM) <: FULL_CORRECT_MEMORY_MODEL' ADDR SB AID H F FS FH_MEM FH_MEM FH_MEM.
+
+  (*** Spec *)
+  Include (ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL' ADDR SB AID H F FS MEM FH_MEM).
+
+  (*** Exec *)
+  Include (EXEC_ALLOCATABLE_MEMORY_FRESH_TO_FULL_EXEC_MEMORY_MODEL' ADDR SB AID H F FS MEM FH_MEM).
+
+  Hint Resolve
+    MEM.allocate_block_free
+    MEM.allocate_block_old_allocated
+    MEM.allocate_block_old_reads
+    MEM.allocate_block_allocated
+    MEM.allocate_block_new_reads
+    MEM.allocate_block_correct
+    MEM.find_free_block_is_free
+    MEM.find_free_block_length
+    MEM.find_free_non_null'
+    MEM.find_free_block_consecutive
+    MEM.find_free_non_null
+    MEM.find_free_block_head
+    MEM.read_byte_correct
+    MEM.read_byte_correct_err
+    MEM.write_byte_correct
+    MEM.write_byte_correct_err
+    : BASE_MEM.
+
+  Hint Unfold
+    read_byte_exec
+    write_byte_exec
+    read_byte
+    write_byte
+    free_byte_exec
+    allocate_block_exec
+    : BASE_MEM.
+
+  (*** Correctness Proofs *)
+  Lemma read_byte_correct :
+    forall (m : Memory) (ptr : addr)
+      (sb : SByte),
+      read_byte_exec m ptr = inr sb -> read_byte m ptr sb.
+  Proof.
+    intros * READ.
+    eapply MEM.read_byte_correct; eauto.
+  Qed.
+
+  Lemma read_byte_correct_err :
+    forall (m : Memory) (ptr : addr)
+      (sb : SByte) (str : string),
+      read_byte_exec m ptr = inl str -> ~ read_byte m ptr sb.
+  Proof.
+    intros * READ.
+    eapply MEM.read_byte_correct_err; eauto.
+  Qed.
+
+  Lemma write_byte_correct :
+    forall (m1 : Memory) (ptr : addr)
+      (b : SByte) (m2 : Memory),
+      write_byte_exec m1 ptr b = inr m2 ->
+      write_byte m1 ptr b m2.
+  Proof.
+    intros * WRITE.
+    destruct m1; cbn in *.
+    break_match_hyp_inv.
+    eexists; split;
+      [ auto
+      | eapply MEM.write_byte_correct; eauto
+      ].
+  Qed.
+
+  Lemma write_byte_correct_err :
+    forall (m1 : Memory) (ptr : addr)
+      (b : SByte) (m2 : Memory)
+      (str : string),
+      write_byte_exec m1 ptr b = inl str ->
+      ~ write_byte m1 ptr b m2.
+  Proof.
+    intros * WRITE.
+    destruct m1; cbn in *.
+    break_match_hyp_inv.
+    intros (?&?&?); subst.
+    eapply MEM.write_byte_correct_err in Heqs; eauto.
+  Qed.
+
+  Lemma allocate_block_correct :
+    forall (m1 : Memory) (bytes : list SByte)
+      (aid : AllocationId) (m2 : Memory)
+      (ptrs : addr * list addr),
+      allocate_block_exec m1 bytes aid =
+        Error.NoOom (m2, ptrs) ->
+      allocate_block m1 bytes aid m2 ptrs.
+  Proof.
+    intros * ALLOC.
+    destruct m1; cbn in *.
+    break_match_hyp_inv.
+    destruct p; inv H0.
+    eapply MEM.allocate_block_correct in Heqo.
+    split; cbn; eauto with BASE_MEM.
+    - eapply MEM.allocate_block_free in Heqo; eauto with BASE_MEM.
+      split; cbn; eauto with BASE_MEM.
+      eapply MEM.find_free_block_is_free; eauto.
+    - eapply MEM.allocate_block_new_reads; eauto.
+    - eapply MEM.allocate_block_allocated; eauto.
+    - eapply MEM.allocate_block_old_allocated; eauto.
+  Qed.
+
+  Lemma free_byte_frees :
+    forall (m1 : Memory) (ptr : addr)
+      (aid : AllocationId) (m2 : Memory),
+      addr_allocated m1 ptr aid /\
+        free_byte_exec m1 (ptr_to_int ptr) = m2 ->
+      addr_not_allocated m2 ptr.
+  Proof.
+    intros * (ALLOC & FREE).
+    autounfold with BASE_MEM in *.
+    break_match_hyp_inv.
+    eapply MEM.free_byte_frees; eauto with BASE_MEM.
+  Qed.
+
+  Lemma free_byte_other_allocations :
+    forall (m1 : Memory) (ptr : addr)
+      (m2 : Memory),
+      free_byte_exec m1 (ptr_to_int ptr) = m2 ->
+      forall (p' : addr) (aid : AllocationId),
+        disjoint_ptr_byte ptr p' ->
+        addr_allocated m1 p' aid <-> addr_allocated m2 p' aid.
+  Proof.
+    intros * FREE p' aid DISJOINT.
+    autounfold with BASE_MEM in *.
+    break_match_hyp_inv.
+    eapply MEM.free_byte_other_allocations; cbn; eauto with BASE_MEM.
+  Qed.
+
+  Lemma free_byte_other_reads :
+    forall (m1 : Memory) (ptr : addr)
+      (m2 : Memory),
+      free_byte_exec m1 (ptr_to_int ptr) = m2 ->
+      forall (p' : addr) (byte : SByte),
+        disjoint_ptr_byte ptr p' ->
+        read_byte m1 p' byte <-> read_byte m2 p' byte.
+  Proof.
+    intros * FREE p' aid DISJOINT.
+    autounfold with BASE_MEM in *.
+    break_match_hyp_inv.
+    eapply MEM.free_byte_other_reads; cbn; eauto with BASE_MEM.
+  Qed.
+
+  Lemma stack_allocate_block_succeeds_correct :
+    forall (m m' : Memory)
+      (ptrs : addr * list addr)
+      (bytes : list SByte)
+      (aid : AllocationId),
+      stack_allocate_block_exec m bytes aid =
+        inr (Error.NoOom (m', ptrs)) ->
+      stack_allocate_block m bytes aid (inr (m', ptrs)).
+  Proof.
+    intros * STACK.
+    autounfold with BASE_MEM in *.
+    unfold stack_allocate_block_exec in *.
+    repeat break_match_hyp_inv.
+    red.
+    exists m0, ptrs.
+    split.
+    - apply allocate_block_correct; eauto.
+    - rewrite Heqo0.
+      reflexivity.
+  Qed.
+
+  Lemma stack_allocate_block_err_correct :
+    forall (m : Memory) (s : string)
+      (bytes : list SByte)
+      (aid : AllocationId),
+      stack_allocate_block_exec m bytes aid = inl s ->
+      stack_allocate_block m bytes aid (inl s).
+  Proof.
+    intros * STACK.
+    autounfold with BASE_MEM in *.
+    unfold stack_allocate_block_exec in *.
+    repeat break_match_hyp_inv.
+    red.
+    exists m0, p0.
+    split.
+    - apply allocate_block_correct; eauto.
+    - rewrite Heqo0.
+      reflexivity.
+  Qed.
+
+  Lemma stack_pop_correct :
+    forall m1 m2 : Memory,
+      stack_pop_exec m1 = Some m2 -> stack_pop m1 m2.
+  Proof.
+    intros * POP.
+    cbn in *.
+    repeat break_match_hyp_inv.
+    split.
+    - eexists; split.
+      rewrite peek_pop, Heqo; cbn.
+      reflexivity.
+      rewrite Memory_frame_stack_modify_spec; auto.
+    - intros * PTRIN.
+      destruct m1; cbn in *.
+      pose proof free_byte_frees.
+      admit.
+    - intros * PTRIN.
+      admit.
+    - intros * PTRIN.
+      admit.
+  Admitted.
+
+  Lemma heap_allocate_block_correct :
+    forall (m m' : Memory)
+      (ptrs : addr * list addr)
+      (bytes : list SByte)
+      (aid : AllocationId),
+      heap_allocate_block_exec m bytes aid =
+        Error.NoOom (m', ptrs) ->
+      heap_allocate_block m bytes aid (m', ptrs).
+  Proof.
+    intros * ALLOC.
+    autounfold with BASE_MEM in *.
+    unfold heap_allocate_block_exec in *.
+    repeat break_match_hyp_inv.
+    red.
+    exists m0, ptrs.
+    split.
+    - apply allocate_block_correct; eauto.
+    - auto.
+  Qed.
+
+  Lemma heap_free_correct :
+    forall (m : Memory) (ptr : addr)
+      (m' : Memory),
+      heap_free_exec m ptr = Some m' -> heap_free m ptr m'.
+  Proof.
+    intros m ptr m' FREE.
+    unfold heap_free_exec in *.
+    cbn in *.
+    break_match_hyp_inv.
+    red; cbn.
+    split.
+    - admit.
+    - admit.
+  Admitted.
+
+End CORRECT_ALLOCATABLE_MEMORY_FRESH_TO_FULL_CORRECT_MEMORY_MODEL'.
