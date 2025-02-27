@@ -908,24 +908,21 @@ Module CORRECT_ALLOCATABLE_MEMORY_FRESH_TO_FULL_CORRECT_MEMORY_MODEL'
   Qed.
 
   Lemma free_byte_frees :
-    forall (m1 : Memory) (ptr : addr)
-      (aid : AllocationId) (m2 : Memory),
-      addr_allocated m1 ptr aid /\
-        free_byte_exec m1 (ptr_to_int ptr) = m2 ->
+    forall (m1 : Memory) (ptr : addr) (m2 : Memory),
+      free_byte_exec m1 (ptr_to_int ptr) = m2 ->
       addr_not_allocated m2 ptr.
   Proof.
-    intros * (ALLOC & FREE).
+    intros * FREE.
     autounfold with BASE_MEM in *.
     break_match_hyp_inv.
-    eapply MEM.free_byte_frees; eauto with BASE_MEM.
+    eapply MEM.free_byte_frees; cbn in *; eauto with BASE_MEM.
   Qed.
 
   Lemma free_byte_other_allocations :
-    forall (m1 : Memory) (ptr : addr)
-      (m2 : Memory),
-      free_byte_exec m1 (ptr_to_int ptr) = m2 ->
-      forall (p' : addr) (aid : AllocationId),
-        disjoint_ptr_byte ptr p' ->
+    forall m1 ptr m2,
+      free_byte_exec m1 ptr = m2 ->
+      forall p' aid,
+        ptr_to_int p' <> ptr ->
         addr_allocated m1 p' aid <-> addr_allocated m2 p' aid.
   Proof.
     intros * FREE p' aid DISJOINT.
@@ -935,17 +932,48 @@ Module CORRECT_ALLOCATABLE_MEMORY_FRESH_TO_FULL_CORRECT_MEMORY_MODEL'
   Qed.
 
   Lemma free_byte_other_reads :
-    forall (m1 : Memory) (ptr : addr)
-      (m2 : Memory),
-      free_byte_exec m1 (ptr_to_int ptr) = m2 ->
-      forall (p' : addr) (byte : SByte),
-        disjoint_ptr_byte ptr p' ->
+    forall m1 ptr m2,
+      free_byte_exec m1 ptr = m2 ->
+      forall p' byte,
+        ptr_to_int p' <> ptr ->
         read_byte m1 p' byte <-> read_byte m2 p' byte.
   Proof.
     intros * FREE p' aid DISJOINT.
     autounfold with BASE_MEM in *.
     break_match_hyp_inv.
     eapply MEM.free_byte_other_reads; cbn; eauto with BASE_MEM.
+  Qed.
+
+  Lemma free_byte_comm :
+    forall m1 ptr1 ptr2,
+      free_byte_exec (free_byte_exec m1 ptr1) ptr2 = free_byte_exec (free_byte_exec m1 ptr2) ptr1.
+  Proof.
+    intros m1 ptr1 ptr2.
+    unfold free_byte_exec in *.
+    destruct m1.
+    rewrite MEM.free_byte_comm.
+    reflexivity.
+  Qed.
+
+  Include (CORRECT_MEMORY_FREE_BYTE_EXTRAS ADDR SB AID FH_MEM).
+
+  Lemma free_byte_exec_sub_mem :
+    forall bm fs h ptr,
+      free_byte_exec (MkMemory bm fs h) ptr = MkMemory (MEM.free_byte_exec bm ptr) fs h.
+  Proof.
+    auto.
+  Qed.
+
+  Lemma free_bytes_exec_sub_mem :
+    forall ptrs bm fs h,
+      free_bytes_exec (MkMemory bm fs h) ptrs = MkMemory (MEM.free_bytes_exec bm ptrs) fs h.
+  Proof.
+    induction ptrs;
+      intros *; auto.
+
+    rewrite free_bytes_exec_cons'.
+    setoid_rewrite <- IHptrs.
+    reflexivity.
   Qed.
 
   Lemma stack_allocate_block_succeeds_correct :
@@ -996,17 +1024,31 @@ Module CORRECT_ALLOCATABLE_MEMORY_FRESH_TO_FULL_CORRECT_MEMORY_MODEL'
     cbn in *.
     repeat break_match_hyp_inv.
     split.
-    - eexists; split.
+    - (* pop frame *)
+      eexists; split.
       rewrite peek_pop, Heqo; cbn.
       reflexivity.
       rewrite Memory_frame_stack_modify_spec; auto.
-    - intros * PTRIN.
+    - (* bytes freed *)
+      intros * PTRIN.
       destruct m1; cbn in *.
       pose proof free_byte_frees.
+      intros aid ALLOC.
+      unfold addr_allocated in *.
+      unfold ptr_in_current_frame in PTRIN.
+      break_match_hyp_inv.
+      cbn in Heqo0.
+      rewrite peek_pop, Heqo in Heqo0; inv Heqo0.
+      rewrite free_bytes_exec_sub_mem in ALLOC.
+      cbn in ALLOC.
+      eapply MEM.free_bytes_exec_frees; eauto.
+      apply in_map.
+      apply ptr_in_frame_ptrs_in_frame; auto.
+    - (* Non frame allocations preserved *)
+      intros * PTRIN.
       admit.
-    - intros * PTRIN.
-      admit.
-    - intros * PTRIN.
+    - (* Non frame reads preserved *)
+      intros * PTRIN.
       admit.
   Admitted.
 

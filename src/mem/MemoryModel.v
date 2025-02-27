@@ -1201,14 +1201,13 @@ Module Type CORRECT_MEMORY_FREE_BYTE_EXTRAS
     free_bytes_exec_other_allocations : MEM.
 
   Lemma free_bytes_exec_frees :
-    forall ptrs m1 ptr aid m2,
-      addr_allocated m1 ptr aid ->
+    forall ptrs m1 ptr m2,
       In (ptr_to_int ptr) ptrs ->
       free_bytes_exec m1 ptrs = m2 ->
       addr_not_allocated m2 ptr.
   Proof.
     induction ptrs;
-      intros * ALLOC IN FREE.
+      intros * IN FREE.
     inv IN.
 
     destruct IN as [IN | IN].
@@ -1220,12 +1219,7 @@ Module Type CORRECT_MEMORY_FREE_BYTE_EXTRAS
       + rewrite free_bytes_exec_cons.
         eapply free_byte_frees; eauto.
       + rewrite free_bytes_exec_cons'.
-        eapply IHptrs.
-        3: reflexivity.
-        all: eauto.
-        apply -> free_byte_other_allocations.
-        3: reflexivity.
-        all: eauto.
+        eapply IHptrs; eauto.
   Qed.
 
   #[global] Hint Resolve
