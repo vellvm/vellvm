@@ -1041,46 +1041,233 @@ Module Type MEMORY_STACK_POP_BASE
         read_byte m1 ptr byte <-> read_byte m2 ptr byte.
 End MEMORY_STACK_POP_BASE.
 
-Module Type EXEC_MEMORY_FREE_BYTE
+Module Type EXEC_MEMORY_FREE_BYTE_CORE
   (Import ADDR : CORE_ADDRESS)
   (Import SB : SBYTE)
   (Import MEM : MEMORY_MODEL_BASE ADDR SB).
 
   Parameter free_byte_exec : Memory -> Z -> Memory.
+End EXEC_MEMORY_FREE_BYTE_CORE.
+
+Module Type EXEC_MEMORY_FREE_BYTE_EXTRAS
+  (Import ADDR : CORE_ADDRESS)
+  (Import SB : SBYTE)
+  (Import MEM : MEMORY_MODEL_BASE ADDR SB)
+  (Import FREE : EXEC_MEMORY_FREE_BYTE_CORE ADDR SB MEM).
 
   Definition free_bytes_exec (m : Memory) (ptrs : list Z) : Memory
     := fold_left (fun m' ptr => free_byte_exec m' ptr) ptrs m.
-End EXEC_MEMORY_FREE_BYTE.
 
-Module Type EXEC_SPEC_MEMORY_FREE_BYTE (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) (MEM : MEMORY_MODEL_BASE ADDR SB)
-  := EXEC_MEMORY_FREE_BYTE ADDR SB MEM <+ ALLOCATABLE_MEMORY_F ADDR SB AID MEM.
+  #[global] Arguments free_bytes_exec _ _ : simpl nomatch.
 
-Module Type CORRECT_MEMORY_FREE_BYTE
+End EXEC_MEMORY_FREE_BYTE_EXTRAS.
+
+Module Type EXEC_MEMORY_FREE_BYTE
+  (ADDR : CORE_ADDRESS)
+  (SB : SBYTE)
+  (MEM : MEMORY_MODEL_BASE ADDR SB)
+  := EXEC_MEMORY_FREE_BYTE_CORE ADDR SB MEM <+ EXEC_MEMORY_FREE_BYTE_EXTRAS ADDR SB MEM.
+
+Module Type EXEC_SPEC_MEMORY_FREE_BYTE_CORE (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID : ALLOCATION_ID) (MEM : MEMORY_MODEL_BASE ADDR SB)
+  := EXEC_MEMORY_FREE_BYTE_CORE ADDR SB MEM <+ ALLOCATABLE_MEMORY_F ADDR SB AID MEM.
+
+Module Type CORRECT_MEMORY_FREE_BYTE_CORE
   (Import ADDR : BASIC_ADDRESS)
   (Import SB : SBYTE)
   (Import AID : ALLOCATION_ID)
   (Import MEM : MEMORY_MODEL_BASE ADDR SB)
-  (Import EXEC_SPEC : (EXEC_SPEC_MEMORY_FREE_BYTE ADDR SB AID MEM)).
+  (Import EXEC_SPEC : (EXEC_SPEC_MEMORY_FREE_BYTE_CORE ADDR SB AID MEM)).
 
   Parameter free_byte_frees :
-    forall m1 ptr aid m2,
-      addr_allocated m1 ptr aid /\ free_byte_exec m1 (ptr_to_int ptr) = m2 ->
+    forall m1 ptr m2,
+      free_byte_exec m1 (ptr_to_int ptr) = m2 ->
       addr_not_allocated m2 ptr.
 
   Parameter free_byte_other_allocations :
     forall m1 ptr m2,
-      free_byte_exec m1 (ptr_to_int ptr) = m2 ->
+      free_byte_exec m1 ptr = m2 ->
       forall p' aid,
-        disjoint_ptr_byte ptr p' ->
+        ptr_to_int p' <> ptr ->
         addr_allocated m1 p' aid <-> addr_allocated m2 p' aid.
 
   Parameter free_byte_other_reads :
     forall m1 ptr m2,
-      free_byte_exec m1 (ptr_to_int ptr) = m2 ->
+      free_byte_exec m1 ptr = m2 ->
       forall p' byte,
-        disjoint_ptr_byte ptr p' ->
+        ptr_to_int p' <> ptr ->
         read_byte m1 p' byte <-> read_byte m2 p' byte.
-End CORRECT_MEMORY_FREE_BYTE.
+
+  Parameter free_byte_comm :
+    forall m1 ptr1 ptr2,
+      free_byte_exec (free_byte_exec m1 ptr1) ptr2 = free_byte_exec (free_byte_exec m1 ptr2) ptr1.
+
+End CORRECT_MEMORY_FREE_BYTE_CORE.
+
+Module Type CORRECT_MEMORY_FREE_BYTE_EXTRAS
+  (Import ADDR : BASIC_ADDRESS)
+  (Import SB : SBYTE)
+  (Import AID : ALLOCATION_ID)
+  (Import MEM : MEMORY_MODEL_BASE ADDR SB)
+  (Import EXEC_SPEC : (EXEC_SPEC_MEMORY_FREE_BYTE_CORE ADDR SB AID MEM))
+  (Import CORRECT : (CORRECT_MEMORY_FREE_BYTE_CORE ADDR SB AID MEM EXEC_SPEC))
+  (Import EXTRAS : (EXEC_MEMORY_FREE_BYTE_EXTRAS ADDR SB MEM EXEC_SPEC)).
+  Lemma free_bytes_exec_cons' :
+    forall ptrs ptr m1,
+      free_bytes_exec m1 (ptr::ptrs) = free_bytes_exec (free_byte_exec m1 ptr) ptrs.
+  Proof.
+    cbn; auto.
+  Qed.
+
+  Lemma free_bytes_exec_cons :
+    forall ptrs ptr m1,
+      free_bytes_exec m1 (ptr::ptrs) = free_byte_exec (free_bytes_exec m1 ptrs) ptr.
+  Proof.
+    induction ptrs;
+      intros *.
+    - cbn; auto.
+    - rewrite free_bytes_exec_cons'.
+      rewrite free_bytes_exec_cons'.
+      rewrite free_byte_comm.
+      simpl.
+      setoid_rewrite IHptrs at 1.
+      reflexivity.
+  Qed.
+
+  #[global] Hint Resolve
+    free_bytes_exec_cons
+    free_bytes_exec_cons' : MEM.
+
+  Lemma free_byte_creates_no_allocations :
+    forall ptr m1 m2,
+      free_byte_exec m1 ptr = m2 ->
+      forall p' aid,
+        addr_allocated m2 p' aid -> addr_allocated m1 p' aid.
+  Proof.
+    intros * FREE * ALLOC.
+    eapply free_byte_other_allocations; eauto.
+    intros CONTRA.
+    assert (addr_not_allocated m2 p').
+    { eapply free_byte_frees; eauto.
+      rewrite CONTRA.
+      eauto.
+    }
+
+    eapply H; eauto.
+  Qed.
+
+  #[global] Hint Resolve
+    free_byte_creates_no_allocations : MEM.
+
+  Lemma free_bytes_exec_creates_no_allocations :
+    forall ptrs m1 m2,
+      free_bytes_exec m1 ptrs = m2 ->
+      forall p' aid,
+        addr_allocated m2 p' aid -> addr_allocated m1 p' aid.
+  Proof.
+    induction ptrs;
+      intros * FREE * ALLOC.
+    - cbn in FREE; subst; auto.
+    - rewrite free_bytes_exec_cons' in FREE;
+        eauto with MEM.
+  Qed.
+
+  #[global] Hint Resolve
+    free_bytes_exec_creates_no_allocations : MEM.
+
+  Lemma free_bytes_exec_other_allocations :
+    forall ptrs m1 m2,
+      free_bytes_exec m1 ptrs = m2 ->
+      forall p' aid,
+        Forall (fun p => ptr_to_int p' <> p) ptrs ->
+        addr_allocated m1 p' aid <-> addr_allocated m2 p' aid.
+  Proof.
+    induction ptrs;
+      intros * FREE * DISJOINT.
+    - cbn in FREE; subst; reflexivity.
+    - rewrite free_bytes_exec_cons in FREE.
+      pose proof FREE as FREE'.
+      inversion DISJOINT. subst x; subst l.
+      apply free_byte_other_allocations with (p':=p') (aid:=aid) in FREE'; auto.
+      split; intros ALLOC.
+      + eapply FREE'.
+        apply -> IHptrs; eauto.
+      + apply <- IHptrs.
+        3: reflexivity.
+        apply FREE'; auto.
+        eauto.
+  Qed.
+
+  #[global] Hint Resolve
+    free_bytes_exec_other_allocations : MEM.
+
+  Lemma free_bytes_exec_frees :
+    forall ptrs m1 ptr aid m2,
+      addr_allocated m1 ptr aid ->
+      In (ptr_to_int ptr) ptrs ->
+      free_bytes_exec m1 ptrs = m2 ->
+      addr_not_allocated m2 ptr.
+  Proof.
+    induction ptrs;
+      intros * ALLOC IN FREE.
+    inv IN.
+
+    destruct IN as [IN | IN].
+    - subst.
+      rewrite free_bytes_exec_cons.
+      eapply free_byte_frees; eauto.
+    - subst.
+      destruct (Z.eq_dec (ptr_to_int ptr) a) as [EQ | NEQ]; subst.
+      + rewrite free_bytes_exec_cons.
+        eapply free_byte_frees; eauto.
+      + rewrite free_bytes_exec_cons'.
+        eapply IHptrs.
+        3: reflexivity.
+        all: eauto.
+        apply -> free_byte_other_allocations.
+        3: reflexivity.
+        all: eauto.
+  Qed.
+
+  #[global] Hint Resolve
+    free_bytes_exec_frees : MEM.
+
+  Lemma free_bytes_exec_other_reads :
+    forall ptrs m1 m2,
+      free_bytes_exec m1 ptrs = m2 ->
+      forall p' byte,
+        Forall (fun p => ptr_to_int p' <> p) ptrs ->
+        read_byte m1 p' byte <-> read_byte m2 p' byte.
+  Proof.
+    induction ptrs;
+      intros * FREE * DISJOINT.
+    - cbn in FREE; subst; reflexivity.
+    - rewrite free_bytes_exec_cons in FREE.
+      pose proof FREE as FREE'.
+      inversion DISJOINT. subst x; subst l.
+      apply free_byte_other_reads with (p':=p') (byte:=byte) in FREE'; auto.
+      split; intros ALLOC.
+      + eapply FREE'.
+        apply -> IHptrs; eauto.
+      + apply <- IHptrs.
+        3: reflexivity.
+        apply FREE'; auto.
+        eauto.
+  Qed.
+
+  #[global] Hint Resolve
+    free_bytes_exec_other_reads : MEM.
+
+End CORRECT_MEMORY_FREE_BYTE_EXTRAS.
+
+Module Type CORRECT_MEMORY_FREE_BYTE
+  (ADDR : BASIC_ADDRESS)
+  (SB : SBYTE)
+  (AID : ALLOCATION_ID)
+  (MEM : MEMORY_MODEL_BASE ADDR SB) :=
+  EXEC_SPEC_MEMORY_FREE_BYTE_CORE ADDR SB AID MEM<+
+    EXEC_MEMORY_FREE_BYTE_EXTRAS ADDR SB MEM <+
+    CORRECT_MEMORY_FREE_BYTE_CORE ADDR SB AID MEM <+
+    CORRECT_MEMORY_FREE_BYTE_EXTRAS ADDR SB AID MEM.
 
 Module Type EXEC_MEMORY_STACK_POP_BASE
   (Import ADDR : BASIC_ADDRESS)
@@ -1421,7 +1608,8 @@ Module Type FULL_CORRECT_MEMORY_MODEL' (ADDR : BASIC_ADDRESS) (SB : SBYTE) (AID:
        CORE_EXEC_MEMORY_MODEL_CORRECT ADDR SB MEM <+
        EXEC_MEMORY_WRITES_CORRECT ADDR SB MEM <+
        EXEC_MEMORY_ALLOCATE_CORRECT ADDR SB AID MEM <+
-       CORRECT_MEMORY_FREE_BYTE ADDR SB AID MEM <+
+       CORRECT_MEMORY_FREE_BYTE_CORE ADDR SB AID MEM <+
+       CORRECT_MEMORY_FREE_BYTE_EXTRAS ADDR SB AID MEM <+
        EXEC_MEMORY_STACK_ALLOCATE_CORRECT ADDR SB AID F FS MEM MFS <+
        EXEC_MEMORY_STACK_POP_CORRECT ADDR SB AID F FS MEM MFS <+
        EXEC_MEMORY_HEAP_ALLOCATE_CORRECT ADDR SB AID H MEM MH <+
