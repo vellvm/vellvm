@@ -1,4 +1,4 @@
-From Coq Require Import
+From Stdlib Require Import
   Lia
   Morphisms.
 
@@ -19,7 +19,7 @@ From ExtLib Require Import
   Structures.Functor
   Structures.Monads.
 
-From Coq Require Import
+From Stdlib Require Import
   Structures.Equalities.
 
 Import ListNotations.

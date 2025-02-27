@@ -1,4 +1,4 @@
-From Coq Require Import
+From Stdlib Require Import
   ZArith
   String
   Structures.Equalities.
@@ -15,7 +15,7 @@ From Mem Require Import
   StackFrames
   Utils.
 
-From Coq Require Import
+From Stdlib Require Import
   List.
 
 From ExtLib Require Import
@@ -315,7 +315,7 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL'
     (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : err (Memory * (addr * list addr))) : Prop :=
     exists m' ptrs,
       allocate_block m bytes aid m' ptrs /\
-        match add_all_to_current_frame (Memory_frame_stack m') (snd ptrs) with
+        match add_all_to_current_frame (Memory_frame_stack m') (map ptr_to_int (snd ptrs)) with
         | None => res = inl "stack_allocate_block: No stack frame"%string
         | Some fs =>
             res = inr (Memory_frame_stack_modify m' (fun _ => fs), ptrs)
@@ -1032,7 +1032,6 @@ Module CORRECT_ALLOCATABLE_MEMORY_FRESH_TO_FULL_CORRECT_MEMORY_MODEL'
     - (* bytes freed *)
       intros * PTRIN.
       destruct m1; cbn in *.
-      pose proof free_byte_frees.
       intros aid ALLOC.
       unfold addr_allocated in *.
       unfold ptr_in_current_frame in PTRIN.
@@ -1042,15 +1041,38 @@ Module CORRECT_ALLOCATABLE_MEMORY_FRESH_TO_FULL_CORRECT_MEMORY_MODEL'
       rewrite free_bytes_exec_sub_mem in ALLOC.
       cbn in ALLOC.
       eapply MEM.free_bytes_exec_frees; eauto.
-      apply in_map.
       apply ptr_in_frame_ptrs_in_frame; auto.
     - (* Non frame allocations preserved *)
       intros * PTRIN.
-      admit.
+      destruct m1; cbn in *.
+      rewrite free_bytes_exec_sub_mem.
+      cbn; unfold addr_allocated; cbn.
+      eapply MEM.free_bytes_exec_other_allocations; eauto.
+      unfold ptr_in_current_frame in PTRIN.
+      cbn in *.
+      rewrite peek_pop, Heqo in PTRIN.
+      cbn in PTRIN.
+      apply Forall_forall.
+      intros x H CONTRA; subst.
+      apply ptr_in_frame_ptrs_in_frame in H.
+      rewrite PTRIN in H.
+      discriminate.
     - (* Non frame reads preserved *)
       intros * PTRIN.
-      admit.
-  Admitted.
+      destruct m1; cbn in *.
+      rewrite free_bytes_exec_sub_mem.
+      cbn; unfold read_byte; cbn.
+      eapply MEM.free_bytes_exec_other_reads; eauto.
+      unfold ptr_in_current_frame in PTRIN.
+      cbn in *.
+      rewrite peek_pop, Heqo in PTRIN.
+      cbn in PTRIN.
+      apply Forall_forall.
+      intros x H CONTRA; subst.
+      apply ptr_in_frame_ptrs_in_frame in H.
+      rewrite PTRIN in H.
+      discriminate.
+  Qed.
 
   Lemma heap_allocate_block_correct :
     forall (m m' : Memory)

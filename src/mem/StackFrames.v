@@ -5,6 +5,7 @@ From Stdlib Require Import
   List
   Relations
   RelationClasses
+  ZArith
   Structures.Equalities.
 
 From ExtLib Require Import
@@ -19,9 +20,9 @@ Import ListNotations.
 Module Type CORE_FRAME
   (Import ADDR : CORE_ADDRESS) <: Typ.
   Parameter t : Type.
-  Parameter ptr_in_frame : t -> addr -> bool.
-  Parameter ptrs_in_frame : t -> list addr.
-  Parameter add_to_frame : t -> addr -> t.
+  Parameter ptr_in_frame : t -> Z -> bool.
+  Parameter ptrs_in_frame : t -> list Z.
+  Parameter add_to_frame : t -> Z -> t.
   Parameter empty_frame : t.
 
   Parameter empty_frame_spec :
@@ -77,7 +78,7 @@ Module Type FRAME_EXTRAS
   (Import F : CORE_FRAME ADDR)
   (Import FN : FRAME_NOTATIONS ADDR F).
 
-  Definition add_all_to_frame (f : Frame) (ptrs : list addr) : Frame
+  Definition add_all_to_frame (f : Frame) (ptrs : list Z) : Frame
     := fold_left add_to_frame ptrs f.
 End FRAME_EXTRAS.
 
@@ -129,7 +130,7 @@ Module Type FRAME_STACK_EXTRAS
     := '(f, fs') <- pop fs;;
        ret (push fs' (g f)).
 
-  Definition add_all_to_current_frame (fs : FrameStack) (ptrs : list addr) : option FrameStack
+  Definition add_all_to_current_frame (fs : FrameStack) (ptrs : list Z) : option FrameStack
     := modify_current_frame fs (fun f => add_all_to_frame f ptrs).
 End FRAME_STACK_EXTRAS.
 
@@ -139,14 +140,14 @@ Module Type FRAME_STACK (ADDR : CORE_ADDRESS) (F : FRAME ADDR) := CORE_FRAME_STA
 
 Module FRAME_LIST_CORE
   (Import ADDR : CORE_ADDRESS) <: CORE_FRAME ADDR.
-  Definition t := list addr.
-  Definition ptr_in_frame (f : t) (p : addr) : bool :=
-    existsb (fun z => Rocqlib.proj_sumbool (ADDR.eq_dec p z)) f.
-  Definition ptrs_in_frame (f : t) : list addr :=
+  Definition t := list Z.
+  Definition ptr_in_frame (f : t) (p : Z) : bool :=
+    existsb (fun z => Rocqlib.proj_sumbool (Z.eq_dec p z)) f.
+  Definition ptrs_in_frame (f : t) : list Z :=
     f.
   Definition empty_frame : t := [].
 
-  Definition add_to_frame (f : t) (p : addr) : t :=
+  Definition add_to_frame (f : t) (p : Z) : t :=
     cons p f.
 
   Lemma empty_frame_spec :
@@ -166,7 +167,7 @@ Module FRAME_LIST_CORE
     apply Bool.orb_true_iff.
     left.
     unfold Rocqlib.proj_sumbool.
-    destruct (eq_dec ptr ptr); auto.
+    destruct (Z.eq_dec ptr ptr); auto.
   Qed.
 
   (* May not hold for `ptr_in_frame f p = false`, because we may
@@ -181,7 +182,7 @@ Module FRAME_LIST_CORE
     cbn.
     apply Bool.orb_true_iff.
     unfold Rocqlib.proj_sumbool.
-    destruct (eq_dec p ptr); auto.
+    destruct (Z.eq_dec p ptr); auto.
   Qed.
 
   Lemma ptr_in_frame_ptrs_in_frame :

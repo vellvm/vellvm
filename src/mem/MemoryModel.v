@@ -798,7 +798,7 @@ Module Type CORE_MEMORY_FRAME_STACK
 End CORE_MEMORY_FRAME_STACK.
 
 Module Type MEMORY_FRAME_STACK_EXTRAS
-  (Import ADDR : CORE_ADDRESS)
+  (Import ADDR : PTOI_ADDRESS)
   (Import SB : SBYTE)
   (Import F : FRAME ADDR)
   (Import FS : FRAME_STACK ADDR F)
@@ -807,7 +807,7 @@ Module Type MEMORY_FRAME_STACK_EXTRAS
 
   Definition ptr_in_current_frame (m : Memory) (ptr : addr) : bool
     := match peek (Memory_frame_stack m) with
-       | Some f => ptr_in_frame f ptr
+       | Some f => ptr_in_frame f (ptr_to_int ptr)
        | None => false
        end.
 
@@ -815,7 +815,7 @@ Module Type MEMORY_FRAME_STACK_EXTRAS
     := Memory_frame_stack m1 = Memory_frame_stack m2.
 End MEMORY_FRAME_STACK_EXTRAS.
 
-Module Type MEMORY_FRAME_STACK (ADDR : CORE_ADDRESS) (SB : SBYTE) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MEM : MEMORY_MODEL_BASE ADDR SB)
+Module Type MEMORY_FRAME_STACK (ADDR : PTOI_ADDRESS) (SB : SBYTE) (F : FRAME ADDR) (FS : FRAME_STACK ADDR F) (MEM : MEMORY_MODEL_BASE ADDR SB)
   := CORE_MEMORY_FRAME_STACK ADDR SB F FS MEM <+ MEMORY_FRAME_STACK_EXTRAS ADDR SB F FS MEM.
 
 Module Type MEMORY_STACK_ALLOCATE
@@ -833,7 +833,7 @@ Module Type MEMORY_STACK_ALLOCATE
     (m : Memory) (bytes : list SByte) (aid : AllocationId) (res : err (Memory * (addr * list addr))) : Prop :=
     exists m' ptrs,
       allocate_block m bytes aid m' ptrs /\
-        match add_all_to_current_frame (Memory_frame_stack m') (snd ptrs) with
+        match add_all_to_current_frame (Memory_frame_stack m') (map ptr_to_int (snd ptrs)) with
         | None => res = inl "stack_allocate_block: No stack frame"%string
         | Some fs =>
             res = inr (Memory_frame_stack_modify m' (fun _ => fs), ptrs)
@@ -893,7 +893,7 @@ Module Type EXEC_MEMORY_STACK_ALLOCATE
     match allocate_block_exec m bytes aid with
     | Oom s => ret (Oom s)
     | NoOom (m', ptrs) =>
-        match add_all_to_current_frame (Memory_frame_stack m') (snd ptrs) with
+        match add_all_to_current_frame (Memory_frame_stack m') (map ptr_to_int (snd ptrs)) with
         | None => inl "stack_allocate_block: No stack frame"%string
         | Some fs =>
             ret (NoOom (Memory_frame_stack_modify m' (fun _ => fs), ptrs))
@@ -1275,7 +1275,7 @@ Module Type EXEC_MEMORY_STACK_POP_BASE
   Definition stack_pop_exec (m : Memory) : option Memory
     := '(f, fs) <- pop (Memory_frame_stack m);;
        (* Free pointers *)
-       let m' := free_bytes_exec m (map ptr_to_int (ptrs_in_frame f)) in
+       let m' := free_bytes_exec m (ptrs_in_frame f) in
        ret (Memory_frame_stack_modify m' (fun _ => fs)).
 End EXEC_MEMORY_STACK_POP_BASE.
 

@@ -403,7 +403,7 @@ Section nat_Show.
 
 End nat_Show.
 
-From Coq Require Import
+From Stdlib Require Import
      List
      Lia
      RelationClasses.

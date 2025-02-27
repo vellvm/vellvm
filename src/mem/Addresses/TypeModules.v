@@ -1,4 +1,4 @@
-From Coq Require Import
+From Stdlib Require Import
   Structures.Equalities.
 
 Module UNIT_TYP <: DecidableType.

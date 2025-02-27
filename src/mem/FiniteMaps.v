@@ -1,4 +1,4 @@
-From Coq Require Import
+From Stdlib Require Import
   FSets.FMapAVL
   FSets.FSetAVL
   FSetProperties
@@ -23,10 +23,10 @@ Import FunctorNotation.
 Import ApplicativeNotation.
 Open Scope monad.
 
-Module IM := FMapAVL.Make(Coq.Structures.OrderedTypeEx.Z_as_OT).
-Module IS := FSetAVL.Make(Coq.Structures.OrderedTypeEx.Z_as_OT).
-Module Import ISP := FSetProperties.WProperties_fun(Coq.Structures.OrderedTypeEx.Z_as_OT)(IS).
-Module Import IP := FMapFacts.WProperties_fun(Coq.Structures.OrderedTypeEx.Z_as_OT)(IM).
+Module IM := FMapAVL.Make(Stdlib.Structures.OrderedTypeEx.Z_as_OT).
+Module IS := FSetAVL.Make(Stdlib.Structures.OrderedTypeEx.Z_as_OT).
+Module Import ISP := FSetProperties.WProperties_fun(Stdlib.Structures.OrderedTypeEx.Z_as_OT)(IS).
+Module Import IP := FMapFacts.WProperties_fun(Stdlib.Structures.OrderedTypeEx.Z_as_OT)(IM).
 
 Lemma find_add_eq :
   forall {elt} (m : @IM.t elt) (k : IM.key) (v : elt),

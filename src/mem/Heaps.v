@@ -2,7 +2,7 @@ From Mem Require Import
   Addresses.MemoryAddress
   FiniteMaps.
 
-From Coq Require Import
+From Stdlib Require Import
   List
   Relations
   RelationClasses
