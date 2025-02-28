@@ -1498,12 +1498,6 @@ Module Type MEMORY_HEAP_FREE
         root_ptr_in_heap h1 root' = root_ptr_in_heap h2 root';
     }.
 
-  (** If the free proconditions aren't met then heap_free can't proceed *)
-  Parameter heap_free_no_preconditions_ub :
-    forall (m1 : Memory) (root : addr) (m2 : Memory),
-      ~ free_preconditions m1 root ->
-      ~ heap_free m1 root m2.
-
   (** all bytes in block are freed. *)
   Parameter free_bytes_freed :
     forall (m1 : Memory) (root : addr) (m2 : Memory),

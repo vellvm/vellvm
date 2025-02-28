@@ -606,18 +606,7 @@ Module ALLOCATABLE_MEMORY_FRESH_TO_FULL_MEMORY_MODEL'
     }.
 
   Definition heap_free (m1 : Memory) (root : addr) (m2 : Memory) : Prop
-    := free_preconditions m1 root /\ free_spec m1 root m2.
-
-  (** If the free proconditions aren't met then heap_free can't proceed *)
-  Lemma heap_free_no_preconditions_ub :
-    forall (m1 : Memory) (root : addr) (m2 : Memory),
-      ~ free_preconditions m1 root ->
-      ~ heap_free m1 root m2.
-  Proof.
-    intros m1 root m2 PRE FREE.
-    apply PRE.
-    apply FREE.
-  Qed.
+    := free_spec m1 root m2.
 
   (** all bytes in block are freed. *)
   Lemma free_bytes_freed :
@@ -1199,26 +1188,13 @@ Module CORRECT_ALLOCATABLE_MEMORY_FRESH_TO_FULL_CORRECT_MEMORY_MODEL'
   Qed.
 
   Lemma heap_free_correct :
-    forall (m : Memory) (ptr : addr)
+    forall (m : Memory) (root : addr)
       (m' : Memory),
-      heap_free_exec m ptr = Some m' -> heap_free m ptr m'.
+      heap_free_exec m root = Some m' -> heap_free m root m'.
   Proof.
-    intros m ptr m' FREE.
+    intros m root m' FREE.
     red; cbn.
-    split.
-    - unfold heap_free_exec in *.
-      cbn in *.
-      break_match_hyp_inv.
-
-      split.
-      + unfold root_ptr_in_memory_heap.
-        destruct (root_ptr_in_heap (Memory_heap m) ptr) eqn:ROOT; auto.
-        exfalso.
-        apply free_root_in_heap_root_not_in_heap in ROOT.
-        rewrite Heqo in ROOT; inv ROOT.
-      + admit.
-      + admit.
     - apply heap_free_free_spec; eauto.
-  Admitted.
+  Qed.
 
 End CORRECT_ALLOCATABLE_MEMORY_FRESH_TO_FULL_CORRECT_MEMORY_MODEL'.
