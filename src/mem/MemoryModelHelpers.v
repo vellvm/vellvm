@@ -1094,19 +1094,116 @@ Module CORRECT_ALLOCATABLE_MEMORY_FRESH_TO_FULL_CORRECT_MEMORY_MODEL'
     - auto.
   Qed.
 
+  Lemma addr_allocated_Modify_heap_invariant :
+    forall m ptr aid f,
+      addr_allocated m ptr aid <->
+        addr_allocated (Memory_heap_modify m f) ptr aid.
+  Proof.
+    intros m ptr aid f.
+    destruct m; cbn.
+    unfold addr_allocated; cbn.
+    reflexivity.
+  Qed.
+
+  #[global] Hint Resolve -> addr_allocated_Modify_heap_invariant : MEM.
+  #[global] Hint Resolve <- addr_allocated_Modify_heap_invariant : MEM.
+
+  Lemma addr_not_allocated_Modify_heap_invariant :
+    forall m ptr f,
+      addr_not_allocated m ptr <->
+        addr_not_allocated (Memory_heap_modify m f) ptr.
+  Proof.
+    intros m ptr f.
+    unfold addr_not_allocated.
+    split; intros NOT aid CONTRA; eapply NOT; eauto with MEM.
+  Qed.
+
+  #[global] Hint Resolve -> addr_not_allocated_Modify_heap_invariant : MEM.
+  #[global] Hint Resolve <- addr_not_allocated_Modify_heap_invariant : MEM.
+
+  Lemma read_byte_Modify_heap_invariant :
+    forall m ptr aid f,
+      read_byte m ptr aid <->
+        read_byte (Memory_heap_modify m f) ptr aid.
+  Proof.
+    intros m ptr aid f.
+    destruct m; cbn.
+    unfold read_byte; cbn.
+    reflexivity.
+  Qed.
+
+  #[global] Hint Resolve -> read_byte_Modify_heap_invariant : MEM.
+  #[global] Hint Resolve <- read_byte_Modify_heap_invariant : MEM.
+
+  Lemma heap_free_free_spec :
+    forall (m : Memory) (root : addr)
+      (m' : Memory),
+      heap_free_exec m root = Some m' -> free_spec m root m'.
+  Proof.
+    intros m root m' FREE.
+    unfold heap_free_exec in *.
+    cbn in *.
+    break_match_hyp_inv.
+    split.
+    - (* bytes freed *)
+      intros ptr PTRIN.
+      destruct m; cbn.
+      apply addr_not_allocated_Modify_heap_invariant.
+      eapply free_bytes_exec_frees; eauto with MEM.
+      unfold ptr_in_memory_heap in PTRIN.
+      cbn in PTRIN.
+      eapply ptr_in_heap_ptrs_in_heap; eauto.
+    - (* block bytes preserved *)
+      intros ptr aid PTRIN.
+      destruct m; cbn.
+      rewrite <- addr_allocated_Modify_heap_invariant.
+      eapply free_bytes_exec_other_allocations.
+      reflexivity.
+      cbn in *.
+      apply Forall_forall.
+      intros x H.
+      unfold ptr_in_memory_heap in *; cbn in *.
+      intros CONTRA; subst.
+      eapply ptr_in_heap_ptrs_in_heap in H.
+      rewrite H in PTRIN; inv PTRIN.
+    - (* reads preserved *)
+      intros ptr aid PTRIN.
+      destruct m; cbn.
+      rewrite <- read_byte_Modify_heap_invariant.
+      eapply free_bytes_exec_other_reads.
+      reflexivity.
+      cbn in *.
+      apply Forall_forall.
+      intros x H.
+      unfold ptr_in_memory_heap in *; cbn in *.
+      intros CONTRA; subst.
+      eapply ptr_in_heap_ptrs_in_heap in H.
+      rewrite H in PTRIN; inv PTRIN.
+    - (* Block is free *)
+      admit.
+  Admitted.
+
   Lemma heap_free_correct :
     forall (m : Memory) (ptr : addr)
       (m' : Memory),
       heap_free_exec m ptr = Some m' -> heap_free m ptr m'.
   Proof.
     intros m ptr m' FREE.
-    unfold heap_free_exec in *.
-    cbn in *.
-    break_match_hyp_inv.
     red; cbn.
     split.
-    - admit.
-    - admit.
+    - unfold heap_free_exec in *.
+      cbn in *.
+      break_match_hyp_inv.
+
+      split.
+      + unfold root_ptr_in_memory_heap.
+        destruct (root_ptr_in_heap (Memory_heap m) ptr) eqn:ROOT; auto.
+        exfalso.
+        apply free_root_in_heap_root_not_in_heap in ROOT.
+        rewrite Heqo in ROOT; inv ROOT.
+      + admit.
+      + admit.
+    - apply heap_free_free_spec; eauto.
   Admitted.
 
 End CORRECT_ALLOCATABLE_MEMORY_FRESH_TO_FULL_CORRECT_MEMORY_MODEL'.

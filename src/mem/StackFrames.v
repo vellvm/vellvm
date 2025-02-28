@@ -44,6 +44,9 @@ Module Type CORE_FRAME
   Parameter ptr_in_frame_ptrs_in_frame :
     forall f ptr,
       ptr_in_frame f ptr = true <-> In ptr (ptrs_in_frame f).
+
+  #[global] Hint Resolve -> ptr_in_frame_ptrs_in_frame : MEM.
+  #[global] Hint Resolve <- ptr_in_frame_ptrs_in_frame : MEM.
 End CORE_FRAME.
 
 Module Type FRAME_NOTATIONS
@@ -200,6 +203,9 @@ Module FRAME_LIST_CORE
       split; auto.
       apply Rocqlib.proj_sumbool_is_true; auto.
   Qed.
+
+  #[global] Hint Resolve -> ptr_in_frame_ptrs_in_frame : MEM.
+  #[global] Hint Resolve <- ptr_in_frame_ptrs_in_frame : MEM.
 End FRAME_LIST_CORE.
 
 Module FRAME_LIST (ADDR : CORE_ADDRESS) <: FRAME ADDR := FRAME_LIST_CORE ADDR <+ FRAME_NOTATIONS ADDR <+ FRAME_EQV ADDR <+ FRAME_EXTRAS ADDR.
