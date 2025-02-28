@@ -92,6 +92,11 @@ Module Type CORE_HEAP
       free_root_in_heap h root = Some h' ->
       forall ptr, ptr_in_heap h root' ptr = ptr_in_heap h' root' ptr.
 
+  Parameter free_root_in_heap_preserves_other_roots' :
+    forall h root root' h',
+      ptr_to_int root <> ptr_to_int root' ->
+      free_root_in_heap h root = Some h' ->
+      root_ptr_in_heap h root' = root_ptr_in_heap h' root'.
 
   #[global] Hint Resolve
     empty_heap_ptr_spec
@@ -104,7 +109,8 @@ Module Type CORE_HEAP
     free_root_in_heap_root_not_in_heap
     free_root_in_heap_removes_root
     free_root_in_heap_removes_ptrs
-    free_root_in_heap_preserves_other_roots : MEM.
+    free_root_in_heap_preserves_other_roots
+    free_root_in_heap_preserves_other_roots' : MEM.
 End CORE_HEAP.
 
 Module Type HEAP_NOTATIONS
@@ -442,6 +448,21 @@ Module CORE_HEAP_INTMAP (Import ADDR : BASIC_ADDRESS) <: CORE_HEAP ADDR.
       discriminate.
   Qed.
 
+  Lemma free_root_in_heap_preserves_other_roots' :
+    forall h root root' h',
+      ptr_to_int root <> ptr_to_int root' ->
+      free_root_in_heap h root = Some h' ->
+      root_ptr_in_heap h root' = root_ptr_in_heap h' root'.
+  Proof.
+    intros h root root' h' NEQ FREE.
+    unfold free_root_in_heap in *.
+    unfold root_ptr_in_heap in *.
+
+    destruct (IM.mem (elt:=Block) (ptr_to_int root) h) eqn:MEM; try discriminate.
+    inversion FREE; subst.
+    rewrite IP.F.remove_neq_b; eauto.
+  Qed.
+
   #[global] Hint Resolve
     empty_heap_ptr_spec
     empty_heap_root_spec
@@ -453,7 +474,8 @@ Module CORE_HEAP_INTMAP (Import ADDR : BASIC_ADDRESS) <: CORE_HEAP ADDR.
     free_root_in_heap_root_not_in_heap
     free_root_in_heap_removes_root
     free_root_in_heap_removes_ptrs
-    free_root_in_heap_preserves_other_roots : MEM.
+    free_root_in_heap_preserves_other_roots
+    free_root_in_heap_preserves_other_roots' : MEM.
 End CORE_HEAP_INTMAP.
 
 Module HEAP_IMPL (ADDR : BASIC_ADDRESS) <: HEAP ADDR := CORE_HEAP_INTMAP ADDR <+ HEAP_NOTATIONS ADDR <+ HEAP_EQV ADDR <+ HEAP_EXTRAS ADDR.
