@@ -91,6 +91,20 @@ Module Type CORE_HEAP
       ptr_to_int root <> ptr_to_int root' ->
       free_root_in_heap h root = Some h' ->
       forall ptr, ptr_in_heap h root' ptr = ptr_in_heap h' root' ptr.
+
+
+  #[global] Hint Resolve
+    empty_heap_ptr_spec
+    empty_heap_root_spec
+    add_ptr_to_heap_ptr_in_heap_new
+    add_ptr_to_heap_ptr_in_heap_old
+    add_ptr_to_heap_root_ptr_in_heap_new
+    add_ptr_to_heap_root_ptr_in_heap_old
+    ptr_in_heap_ptrs_in_heap
+    free_root_in_heap_root_not_in_heap
+    free_root_in_heap_removes_root
+    free_root_in_heap_removes_ptrs
+    free_root_in_heap_preserves_other_roots : MEM.
 End CORE_HEAP.
 
 Module Type HEAP_NOTATIONS
@@ -427,6 +441,19 @@ Module CORE_HEAP_INTMAP (Import ADDR : BASIC_ADDRESS) <: CORE_HEAP ADDR.
 
       discriminate.
   Qed.
+
+  #[global] Hint Resolve
+    empty_heap_ptr_spec
+    empty_heap_root_spec
+    add_ptr_to_heap_ptr_in_heap_new
+    add_ptr_to_heap_ptr_in_heap_old
+    add_ptr_to_heap_root_ptr_in_heap_new
+    add_ptr_to_heap_root_ptr_in_heap_old
+    ptr_in_heap_ptrs_in_heap
+    free_root_in_heap_root_not_in_heap
+    free_root_in_heap_removes_root
+    free_root_in_heap_removes_ptrs
+    free_root_in_heap_preserves_other_roots : MEM.
 End CORE_HEAP_INTMAP.
 
 Module HEAP_IMPL (ADDR : BASIC_ADDRESS) <: HEAP ADDR := CORE_HEAP_INTMAP ADDR <+ HEAP_NOTATIONS ADDR <+ HEAP_EQV ADDR <+ HEAP_EXTRAS ADDR.
