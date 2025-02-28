@@ -1180,8 +1180,23 @@ Module CORRECT_ALLOCATABLE_MEMORY_FRESH_TO_FULL_CORRECT_MEMORY_MODEL'
       eapply ptr_in_heap_ptrs_in_heap in H.
       rewrite H in PTRIN; inv PTRIN.
     - (* Block is free *)
-      admit.
-  Admitted.
+      split.
+      + intros ptr PTRIN.
+        erewrite Memory_heap_modify_spec; eauto; cbn.
+        eapply free_root_in_heap_removes_ptrs; eauto.
+      + erewrite Memory_heap_modify_spec; eauto; cbn.
+        eapply free_root_in_heap_removes_root; eauto.
+      + intros * DISJOINT.
+        erewrite (Memory_heap_modify_spec (free_bytes_exec m (ptrs_in_heap (Memory_heap m) root))
+                 (Memory_heap_modify (free_bytes_exec m (ptrs_in_heap (Memory_heap m) root))
+          (fun _ : Heap => t0))); eauto; cbn.
+        eapply free_root_in_heap_preserves_other_roots; eauto.
+      + intros * DISJOINT.
+        erewrite (Memory_heap_modify_spec (free_bytes_exec m (ptrs_in_heap (Memory_heap m) root))
+                 (Memory_heap_modify (free_bytes_exec m (ptrs_in_heap (Memory_heap m) root))
+          (fun _ : Heap => t0))); eauto; cbn.
+        eapply free_root_in_heap_preserves_other_roots'; eauto.
+  Qed.
 
   Lemma heap_free_correct :
     forall (m : Memory) (ptr : addr)
