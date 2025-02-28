@@ -1005,13 +1005,12 @@ Module MemoryHandlers (SIZEOF : Sizeof) (ADDR : BASIC_ADDRESS_WITH_OVERLAPS SIZE
          | inl (OOM_message x) =>
              False
          | inr (inl (UB_message x)) =>
-             forall m2, ~ heap_free ms ptr m2
+             ~ free_preconditions ms ptr \/ forall m2, ~ heap_free ms ptr m2
          | inr (inr (inl (ERR_message x))) =>
              False
          | inr (inr (inr (m2, tt))) =>
              heap_free ms ptr m2
          end.
-
 
   (*** Handling memory events *)
   Section Handlers.
