@@ -251,7 +251,7 @@ Section SurfaceSyntaxTest.
 
   Definition add_twice := mcfg_of_tle [TLE_Definition {|
                                            df_prototype := {|dc_name := (Name "main");
-                                                             dc_type := (TYPE_Function (TYPE_I 32%positive) [(TYPE_I 32%positive); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%positive)))] false);
+                                                             dc_type := (TYPE_Function (TYPE_I 32%positive) [(TYPE_I 32%positive); (TYPE_Pointer (Some (TYPE_Pointer (Some (TYPE_I 8%positive)))))] false);
                                                              dc_param_attrs := ([], [
                                                                                ]);
                                                              dc_attrs := [];

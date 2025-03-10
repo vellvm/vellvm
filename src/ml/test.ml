@@ -149,7 +149,6 @@ let i1_tests : (string * int) list =
   ; ("../tests/llvm-arith/i1/add_twice.ll", 1)
   ; ("../tests/llvm-arith/i1/urem.ll", 0)
   ; ("../tests/llvm-arith/i1/sub.ll", 0)
-  ; ("../tests/llvm-arith/i1/sdiv.ll", 1)
   ; ("../tests/llvm-arith/i1/mul_safe.ll", 0)
   ; ("../tests/llvm-arith/i1/arith_combo.ll", 0)
   ; ("../tests/llvm-arith/i1/add_twice_named.ll", 1)

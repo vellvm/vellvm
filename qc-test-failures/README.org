@@ -4,9 +4,7 @@ This is a collection of some QuickChick test cases that have failed.
 
 ** Possible semantics / clang bugs
 *** extract-element-disagreement
-
-Not sure what's happening here, it seems like clang and vellvm
-disagree when doing ~extractelement~ on ~i1~ vectors.
+The ~extractelement~ is not compile correctly. It uses ~srli~ to shift the value in the byte with the offset provided by ~extractelement~, instead of actually calculating the offset. See this [[./clang-bugs/extract-element-disagreement][directory]], which includes a bug report summary. This bug is reported in Clang 13 but is optimized away in Clang 19.
 
 *** clang-segmentation-fault
 
@@ -59,7 +57,8 @@ InstalledDir: /nix/store/jv4yilzgjj4ycizjjidlgx36flh1nzw0-clang-13.0.1/bin
 clang-13: note: diagnostic msg: Error generating preprocessed source(s) - no preprocessable inputs.
 #+end_example
 
+*** extractvalue a packed struct with non-2-powered sized vector
+The offset for ~extractvalue~ from a packed struct with a vector that has size not being a power of 2 is calculated incorrectly. This is mainly because the function for calculating the size of the vector does not know whether the struct is "packed" or not. This bug can be found in this [[./clang-bugs/extractvalue-packedstruct-vector][directory]]. The relevant bug report was submitted and recognized on [[https://github.com/llvm/llvm-project/issues/124061][github]]
 ** Generator issues
 *** use-after-free
-
-This is an issue with our generator in the malloc branch.
+This is an issue with our generator in the malloc branch. More specifically, this is caused by us storing a value into a pointer that is freed. Because the pointer is an alias of the original freed pointer (through various instructions), we were not able to determine whether this pointer is freed or not. A solution is to use a union-find technique to tag each pointer with how it is generated (or how its ancestor is generated) to determine whether they can be safely used.ls

@@ -69,7 +69,7 @@ endif
 endif
 
 .PHONY: all $(KNOWNFILES)
-all: vellvm
+all: extracted
 
 .PHONY: coq
 coq: real-all

@@ -15,7 +15,7 @@
   qcheck ? coq.ocamlPackages.qcheck,
   cppo ? coq.ocamlPackages.cppo,
   QuickChick,
-  mathcomp, mathcomp-ssreflect, coq-ext-lib, paco, ITree, flocq, ceres, simple-io, zarith, ... }:
+  mathcomp, mathcomp-ssreflect, ExtLib, paco, ITree, flocq, ceres, simple-io, zarith, ... }:
 
 { vellvm =
     mkCoqDerivation {
@@ -45,7 +45,7 @@
         # Coq libraries
         [ mathcomp
           mathcomp-ssreflect
-          coq-ext-lib
+          ExtLib
           paco
           ITree
           flocq
@@ -107,8 +107,6 @@
       installPhase = ''
   runHook preInstall
   mkdir -p $out/bin
-  install src/vellvm $out/bin/vellvm
-  install src/frontend $out/bin/frontend
   COQLIBINSTALL=$out/lib/coq/${coq.coq-version}/user-contrib make -C src/ install
   runHook postInstall
   '';
