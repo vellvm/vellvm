@@ -121,28 +121,63 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   End InstrTactics.
 
   Import InstrTactics.
+  Import InterpretationStack.
+  Import LLVMAst.
+  Require Import ZArith.
+
+  (* RJS 10 Mar:
+      1. Let's do symbolic stepping over the following instructions:
+        Alloca
+        Load
+        Store
+        Op
+        Ret
+      
+      2. Multi-instruction steps, i.e. if we have store-load, and the loaded pointer is no longer live, can we turn that into just the register value?
+
+      3. A 'swap instruction' lemma along the lines of swapping two loads or a load and a store if they are of different memory locations and to different registers.
+      
+      4. How do I say that two functions are equivalent for any input
+        that is, they have the same set of external effects and the same return value,
+        at the denote function level.
+      
+      5. To show that two functions are equivalent, should we be using interp_cfgn_exec, interp_cfgn, interp_mcfgn_exec, or interp_mcfgn?
+
+      6. What would an alternate 'error-absorbing' interp for levels 4-6 look like that would allow us to always have a Ret,
+        allowing Program Definition based approach to defining instruction rewriting lemmas. 
+      
+      *)
+
+
 
   (* Note: we know that we can prove that [l = l'] is always true.
    However there is no reason to put this burden on the hypothesis, it is easier to use this way.
    Arguably we could do the same for [g] and [m] but haven't felt the need for it so far.
    *)
-  (* Lemma denote_instr_load : *)
-  (*   forall (i : raw_id) volatile τ τp ptr align g l l' m a uv, *)
-  (*     ⟦ ptr at τp ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a) -> *)
-  (*     read m a τ = inr uv -> *)
-  (*     ⟦ (IId i, INSTR_Load volatile τ (τp, ptr) align) ⟧i3 g l m ≈ Ret3 g (Maps.add i uv l') m tt. *)
-  (* Proof. *)
-  (*   intros * EXP READ. *)
-  (*   cbn. *)
-  (*   go. *)
-  (*   rewrite EXP. *)
-  (*   go. *)
-  (*   cbn. *)
-  (*   go. *)
-  (*   step. *)
-  (*   step. *)
-  (*   reflexivity. *)
-  (* Qed. *)
+   Program Definition interp3e_instr g les sid m _id ret:
+   {v: _ |
+   InterpreterStackBigIntptr.MEM.MMEP.MemSpec.MemHelpers.dtyp_eqb ret DynamicTypes.DTYPE_Void = false ->
+   eutt eq (interp_cfg3_exec (⟦ (IId _id, INSTR_Alloca ret [ANN_align 4%Z]) ⟧i None) g les sid m) (Ret v)
+   }:=
+   _.
+ 
+  Lemma denote_instr_load :
+    forall (i : raw_id) volatile τ τp ptr align g l l' m a uv,
+      ⟦ ptr at τp ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a) ->
+      read m a τ = inr uv ->
+      ⟦ (IId i, INSTR_Load volatile τ (τp, ptr) align) '⟧ i3 g l m ≈ Ret3 g (Maps.add i uv l') m tt.
+  Proof.
+    intros * EXP READ.
+    cbn.
+    go.
+    rewrite EXP.
+    go.
+    cbn.
+    go.
+    step.
+    step.
+    reflexivity.
+  Qed.
 
   (* Lemma denote_instr_store : *)
   (*   forall {M} `{MemMonad MemState M} *)
