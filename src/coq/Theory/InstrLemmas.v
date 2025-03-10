@@ -154,13 +154,101 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
    However there is no reason to put this burden on the hypothesis, it is easier to use this way.
    Arguably we could do the same for [g] and [m] but haven't felt the need for it so far.
    *)
-   Program Definition interp3e_instr g les sid m _id ret:
+
+   Program Definition interp3e_instr_op g les u sid m _id dt i:
+   {v: _ |
+  (FMapAList.alist_find (Anon 3%Z) les) = Some u ->
+  dt = DynamicTypes.DTYPE_I i -> 
+   eutt eq (interp_cfg3_exec (⟦ (IId _id, INSTR_Op (OP_IBinop (LLVMAst.Add false true) dt (EXP_Ident (ID_Local (Anon (3)%Z))) (EXP_Integer (5)%Z))) ⟧i None) g les sid m) (Ret v)
+   }:=
+   _.
+   Next Obligation.
+   eexists.
+   intros.
+   unfold interp_cfg3_exec.
+   rewrite interp_intrinsics_bind.
+   rewrite interp_global_bind.
+   rewrite interp_local_bind.
+   cbn.
+   Import IS.MEM.MEM_EXEC_INTERP.
+   rewrite interp_memory_bind.
+   rewrite bind_bind.
+   go.
+   cbn.
+   rewrite bind_trigger.
+   rewrite interp_intrinsics_vis.
+   cbn.
+   rewrite bind_trigger.
+   rewrite interp_global_vis.
+   cbn.
+   rewrite bind_bind.
+   rewrite bind_trigger.
+   rewrite interp_local_vis.
+   cbn.
+   rewrite interp_memory_bind.
+   rewrite bind_bind.
+   rewrite H.
+   rewrite interp_memory_ret.
+   go.
+   cbn.
+   rewrite bind_bind.
+   rewrite interp_intrinsics_bind.
+   rewrite interp_global_bind.
+   rewrite interp_local_bind.
+   rewrite interp_memory_bind.
+   rewrite bind_bind.
+   
+   rewrite H0.
+   unfold ITree.map.
+   go.
+   rewrite interp_intrinsics_ret.
+   rewrite interp_global_ret.
+   rewrite interp_local_ret.
+   rewrite interp_memory_ret.
+   rewrite bind_ret_l.
+   rewrite interp_intrinsics_bind.
+   rewrite interp_global_bind.
+   rewrite interp_local_bind.
+   rewrite interp_memory_bind.
+   rewrite bind_bind.
+   cbn.
+   go.
+   rewrite interp_intrinsics_ret.
+   rewrite interp_global_ret.
+   rewrite interp_local_ret.
+   rewrite interp_memory_ret.
+   rewrite bind_ret_l.
+   cbn.
+   cbn.
+   go.
+   
+   cbn.
+   tau_steps.
+   go.
+   cbn.
+   tau_steps.
+   cbn.
+   rewrite 
+   simpl.
+
+   cbn.
+   rewrite bind_trigger.
+   step.
+   go.
+   cbn.
+   rewrite bind_bind.
+   destruct pat.
+   rewrite bind_ret_l.
+   simpl.
+   tau_steps.
+   tau_steps.
+   intros.
+   Program Definition interp3e_instr_alloca g les sid m _id ret:
    {v: _ |
    InterpreterStackBigIntptr.MEM.MMEP.MemSpec.MemHelpers.dtyp_eqb ret DynamicTypes.DTYPE_Void = false ->
    eutt eq (interp_cfg3_exec (⟦ (IId _id, INSTR_Alloca ret [ANN_align 4%Z]) ⟧i None) g les sid m) (Ret v)
    }:=
    _.
- 
   Lemma denote_instr_load :
     forall (i : raw_id) volatile τ τp ptr align g l l' m a uv,
       ⟦ ptr at τp ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a) ->
