@@ -266,6 +266,28 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     reflexivity.
   Qed.
 
+  Lemma interp_cfg2_OOM : forall s l g,
+      ℑ2 (trigger (ThrowOOM s)) g l ≈ v <- trigger (ThrowOOM s);; Ret2 g l v.
+  Proof.
+    intros.
+    unfold interp_cfg2.
+    go.
+    apply eutt_eq_bind; intros.
+    go.
+    reflexivity.
+  Qed.
+
+  Lemma interp_cfg2_Err : forall s l g,
+      ℑ2 (trigger (Throw s)) g l ≈ v <- trigger (Throw s);; Ret2 g l v.
+  Proof.
+    intros.
+    unfold interp_cfg2.
+    go.
+    apply eutt_eq_bind; intros.
+    go.
+    reflexivity.
+  Qed.
+
   (* Lemma interp_cfg3_Load : forall t a g l m val, *)
   (*     read m a t = inr val -> *)
   (*     ℑ3 (trigger (Load t (DVALUE_Addr a))) g l m ≈ Ret3 g l m val. *)
