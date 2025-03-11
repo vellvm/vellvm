@@ -15,7 +15,8 @@ From Vellvm Require Import
      Utilities
      Utils.MapMonadExtra
      Semantics
-     Theory.InterpreterCFG.
+     Theory.InterpreterCFG
+     TopLevelRefinements.
 
 From ExtLib.Data.Monads Require Import EitherMonad IdentityMonad.
 
@@ -24,7 +25,7 @@ Open Scope itree_scope.
 
 Import ITreeNotations.
 
-Module InstrLemmas (IS : InterpreterStackBig) (TOP : LLVMTopLevel IS).
+Module InstrLemmas (IS : InterpreterStackBig) (TOP : LLVMTopLevel IS) (REFS: TopLevelRefinements IS TOP).
   Module CFGT := CFGTheory IS TOP.
 
 
@@ -33,6 +34,7 @@ Module InstrLemmas (IS : InterpreterStackBig) (TOP : LLVMTopLevel IS).
   Export IS.
   Export IS.LLVM.
   Import SemNotations.
+  Import REFS.
   (* end hide *)
 
   (** * Lemmas related to the semantics of instructions (and terminators)
@@ -298,7 +300,7 @@ Lemma interp3e_instr_op g les reg u  _id:
   Locate eval_int_op.
   Locate interp_cfg2.
 
-Lemma interp3e_instr_op g les reg u  _id:
+Lemma interp2_instr_op g les reg u _id:
     (FMapAList.alist_find (Anon reg%Z) les) = Some (@UVALUE_I 64 u) ->
     (* contains_undef_or_poison u = false ->  *)
     eutt eq (interp_cfg2 (⟦ (IId _id,
@@ -414,6 +416,261 @@ Proof.
   cbn.
   reflexivity.
 Qed.
+Import VellvmRelations.
+From ITree Require Import RuttFacts.
+
+
+Definition instr_E_to_L0 {T : Type} : instr_E T -> itree L0 T :=
+fun (e : instr_E T) =>
+  match e with
+  | inl1 call =>
+      match call with
+      | Call dt fv args =>
+          raise "call"
+      end
+  | inr1 e0 =>
+      trigger e0
+  end.
+
+Definition interp_instr_E_to_L0 :=
+interp (@instr_E_to_L0).
+
+(* Lemma interpm2_instr_op reg u _id g les ls:
+    (FMapAList.alist_find (Anon reg%Z) les) = Some (@UVALUE_I 64 u) ->
+    (* contains_undef_or_poison u = false ->  *)
+    eutt eq (interp_mcfg2 (interp_instr_E_to_L0 _ (⟦ (IId _id,
+                              INSTR_Op (OP_IBinop (LLVMAst.Add false true)
+                                          (DynamicTypes.DTYPE_I 64) (EXP_Ident (ID_Local (Anon (reg)%Z))) (EXP_Integer (5)%Z))) ⟧i None)) g (les, ls))
+      (fmap (fun res => ((FMapAList.alist_add _id (dvalue_to_uvalue res) les, ls), (g, tt))) (@eval_int_op _ _ _ _ _ _ ((@VellvmIntegers.VIntVMemInt (@Integers.bit_int 64) (VellvmIntegers.VInt_Bounded 64))) _ (Add false true) u (Integers.repr 5%Z))).
+Proof.
+  Local Opaque eval_int_op.
+  intros Hfind .
+  cbn.
+  rewrite interp2_bind.
+  rewrite interp_mcfg2_bind.
+  cbn.
+  rewrite bind_bind.
+  go.
+  rewrite bind_bind.
+  cbn.
+  unfold exp_to_instr.
+
+
+  rewrite <- subevent_left.
+  rewrite <- subevent_right.
+  rewrite <- subevent_right.
+  rewrite <- subevent_right.
+  rewrite subevent_subevent.
+  rewrite subevent_subevent.
+  rewrite subevent_subevent.
+  rewrite subevent_subevent.
+  unfold resum.
+  unfold ReSum_id.
+  unfold id_.
+  unfold Id_IFun.
+
+  rewrite interp_cfg2_LR; try apply Hfind.
+
+  rewrite bind_ret_l.
+  unfold ITree.map.
+  rewrite bind_ret_l.
+  rewrite bind_ret_l.
+  rewrite bind_ret_l.
+  
+  cbn.
+  unfold concretize_if_no_undef_or_poison.
+  rewrite bind_bind.
+  setoid_rewrite bind_ret_l.
+  setoid_rewrite bind_ret_l.
+  (* Local Opaque eval_iop. *)
+  rewrite translate_bind.
+  rewrite interp_cfg2_bind.
+  rewrite bind_bind.
+  unfold eval_iop.
+  unfold eval_iop_integer_h.
+  cbn.
+  repeat rewrite eval_int_op_err_ub_oom_to_itree.
+  remember (eval_int_op (Add false true) u (Integers.repr 5)) as x.
+  destruct_err_ub_oom x.
+  { unfold raiseOOM.
+    setoid_rewrite bind_trigger.
+    rewrite translate_vis.
+    rewrite <- subevent_right.
+    rewrite <- subevent_right.
+    rewrite subevent_subevent.
+
+    rewrite interp_cfg2_vis.
+    setoid_rewrite interp_cfg2_OOM.
+    repeat rewrite bind_bind.
+    rewrite bind_trigger.
+    rewrite bind_vis.
+    eapply eqit_Vis.
+    intros [].
+  }
+
+  { unfold raiseOOM.
+    setoid_rewrite bind_trigger.
+    rewrite translate_vis.
+    rewrite <- subevent_right.
+    rewrite <- subevent_right.
+    rewrite subevent_subevent.
+
+    rewrite interp_cfg2_vis.
+    setoid_rewrite interp_cfg2_UB.
+    repeat rewrite bind_bind.
+    rewrite bind_trigger.
+    rewrite bind_vis.
+    eapply eqit_Vis.
+    intros [].
+  }
+
+  { unfold raiseOOM.
+    setoid_rewrite bind_trigger.
+    rewrite translate_vis.
+    rewrite <- subevent_right.
+    rewrite <- subevent_right.
+    rewrite subevent_subevent.
+
+    rewrite interp_cfg2_vis.
+    setoid_rewrite interp_cfg2_Err.
+    repeat rewrite bind_bind.
+    rewrite bind_trigger.
+    rewrite bind_vis.
+    eapply eqit_Vis.
+    intros [].
+  }
+
+  cbn.
+  rewrite translate_ret.
+  rewrite interp_cfg2_ret.
+  rewrite bind_ret_l.
+  rewrite translate_ret.
+  rewrite interp_cfg2_ret.
+  rewrite bind_ret_l.
+  rewrite bind_ret_l.
+  rewrite interp_cfg2_LW.
+  cbn.
+  reflexivity.
+Qed.
+Lemma interp3_instr_op reg u  _id g les sid mem:
+    (FMapAList.alist_find (Anon reg%Z) les) = Some (@UVALUE_I 64 u) ->
+    (* contains_undef_or_poison u = false ->  *)
+    (interp_cfg3 eq (⟦ (IId _id,
+                              INSTR_Op (OP_IBinop (LLVMAst.Add false true)
+                                          (DynamicTypes.DTYPE_I 64) (EXP_Ident (ID_Local (Anon (reg)%Z))) (EXP_Integer (5)%Z))) ⟧i None) g les sid mem)
+      (fmap (fun res => (mem, (sid, (FMapAList.alist_add _id (dvalue_to_uvalue res) les, (g, tt))))) 
+        (@eval_int_op _ _ _ _ _ _ ((@VellvmIntegers.VIntVMemInt (@Integers.bit_int 64) (VellvmIntegers.VInt_Bounded 64))) _ (Add false true) u (Integers.repr 5%Z))).
+Proof.
+  Local Opaque eval_int_op.
+  intros Hfind .
+  cbn.
+  Search interp_cfg3.
+  tau_steps.
+  rewrite bind_bind.
+  rewrite interp_cfg3_bind.
+  cbn.
+  rewrite bind_bind.
+  go.
+  rewrite bind_bind.
+  cbn.
+  unfold exp_to_instr.
+
+
+  rewrite <- subevent_left.
+  rewrite <- subevent_right.
+  rewrite <- subevent_right.
+  rewrite <- subevent_right.
+  rewrite subevent_subevent.
+  rewrite subevent_subevent.
+  rewrite subevent_subevent.
+  rewrite subevent_subevent.
+  unfold resum.
+  unfold ReSum_id.
+  unfold id_.
+  unfold Id_IFun.
+
+  rewrite interp_cfg2_LR; try apply Hfind.
+
+  rewrite bind_ret_l.
+  unfold ITree.map.
+  rewrite bind_ret_l.
+  rewrite bind_ret_l.
+  rewrite bind_ret_l.
+  
+  cbn.
+  unfold concretize_if_no_undef_or_poison.
+  rewrite bind_bind.
+  setoid_rewrite bind_ret_l.
+  setoid_rewrite bind_ret_l.
+  (* Local Opaque eval_iop. *)
+  rewrite translate_bind.
+  rewrite interp_cfg2_bind.
+  rewrite bind_bind.
+  unfold eval_iop.
+  unfold eval_iop_integer_h.
+  cbn.
+  repeat rewrite eval_int_op_err_ub_oom_to_itree.
+  remember (eval_int_op (Add false true) u (Integers.repr 5)) as x.
+  destruct_err_ub_oom x.
+  { unfold raiseOOM.
+    setoid_rewrite bind_trigger.
+    rewrite translate_vis.
+    rewrite <- subevent_right.
+    rewrite <- subevent_right.
+    rewrite subevent_subevent.
+
+    rewrite interp_cfg2_vis.
+    setoid_rewrite interp_cfg2_OOM.
+    repeat rewrite bind_bind.
+    rewrite bind_trigger.
+    rewrite bind_vis.
+    eapply eqit_Vis.
+    intros [].
+  }
+
+  { unfold raiseOOM.
+    setoid_rewrite bind_trigger.
+    rewrite translate_vis.
+    rewrite <- subevent_right.
+    rewrite <- subevent_right.
+    rewrite subevent_subevent.
+
+    rewrite interp_cfg2_vis.
+    setoid_rewrite interp_cfg2_UB.
+    repeat rewrite bind_bind.
+    rewrite bind_trigger.
+    rewrite bind_vis.
+    eapply eqit_Vis.
+    intros [].
+  }
+
+  { unfold raiseOOM.
+    setoid_rewrite bind_trigger.
+    rewrite translate_vis.
+    rewrite <- subevent_right.
+    rewrite <- subevent_right.
+    rewrite subevent_subevent.
+
+    rewrite interp_cfg2_vis.
+    setoid_rewrite interp_cfg2_Err.
+    repeat rewrite bind_bind.
+    rewrite bind_trigger.
+    rewrite bind_vis.
+    eapply eqit_Vis.
+    intros [].
+  }
+
+  cbn.
+  rewrite translate_ret.
+  rewrite interp_cfg2_ret.
+  rewrite bind_ret_l.
+  rewrite translate_ret.
+  rewrite interp_cfg2_ret.
+  rewrite bind_ret_l.
+  rewrite bind_ret_l.
+  rewrite interp_cfg2_LW.
+  cbn.
+  reflexivity.
    (* Program Definition interp3e_instr_op g les reg u sid m _id dt i:
    {v: _ |
   (FMapAList.alist_find (Anon reg%Z) les) = Some u ->
@@ -421,88 +678,6 @@ Qed.
    eutt eq (interp_cfg3_exec (⟦ (IId _id, INSTR_Op (OP_IBinop (LLVMAst.Add false true) dt (EXP_Ident (ID_Local (Anon (reg)%Z))) (EXP_Integer (5)%Z))) ⟧i None) g les sid m) (Ret v)
    }:=
    _. *)
-   Next Obligation.
-   eexists.
-   intros.
-   unfold interp_cfg3_exec.
-   rewrite interp_intrinsics_bind.
-   rewrite interp_global_bind.
-   rewrite interp_local_bind.
-   cbn.
-   Import IS.MEM.MEM_EXEC_INTERP.
-   rewrite interp_memory_bind.
-   rewrite bind_bind.
-   go.
-   cbn.
-   rewrite bind_trigger.
-   rewrite interp_intrinsics_vis.
-   cbn.
-   rewrite bind_trigger.
-   rewrite interp_global_vis.
-   cbn.
-   rewrite bind_bind.
-   rewrite bind_trigger.
-   rewrite interp_local_vis.
-   cbn.
-   rewrite interp_memory_bind.
-   rewrite bind_bind.
-   rewrite H.
-   rewrite interp_memory_ret.
-   go.
-   cbn.
-   rewrite bind_bind.
-   rewrite interp_intrinsics_bind.
-   rewrite interp_global_bind.
-   rewrite interp_local_bind.
-   rewrite interp_memory_bind.
-   rewrite bind_bind.
-   
-   rewrite H0.
-   unfold ITree.map.
-   go.
-   rewrite interp_intrinsics_ret.
-   rewrite interp_global_ret.
-   rewrite interp_local_ret.
-   rewrite interp_memory_ret.
-   rewrite bind_ret_l.
-   rewrite interp_intrinsics_bind.
-   rewrite interp_global_bind.
-   rewrite interp_local_bind.
-   rewrite interp_memory_bind.
-   rewrite bind_bind.
-   cbn.
-   go.
-   rewrite interp_intrinsics_ret.
-   rewrite interp_global_ret.
-   rewrite interp_local_ret.
-   rewrite interp_memory_ret.
-   rewrite bind_ret_l.
-   unfold concretize_if_no_undef_or_poison.
-   cbn.
-   cbn.
-   go.
-   
-   cbn.
-   tau_steps.
-   go.
-   cbn.
-   tau_steps.
-   cbn.
-   rewrite 
-   simpl.
-
-   cbn.
-   rewrite bind_trigger.
-   step.
-   go.
-   cbn.
-   rewrite bind_bind.
-   destruct pat.
-   rewrite bind_ret_l.
-   simpl.
-   tau_steps.
-   tau_steps.
-   intros.
    (* Program Definition interp3e_instr_alloca g les sid m _id ret:
    {v: _ |
    InterpreterStackBigIntptr.MEM.MMEP.MemSpec.MemHelpers.dtyp_eqb ret DynamicTypes.DTYPE_Void = false ->
@@ -814,5 +989,5 @@ Qed.
   (*   cbn. *)
   (*   go. *)
   (*   reflexivity. *)
-  (* Qed. *)
+  Qed. *)
 End InstrLemmas.
