@@ -19,6 +19,7 @@ From Vellvm Require Import
      TopLevelRefinements.
 
 From ExtLib.Data.Monads Require Import EitherMonad IdentityMonad.
+Import ExtLib.Structures.Functor.
 
 Open Scope list_scope.
 Open Scope itree_scope.
@@ -121,6 +122,27 @@ Module InstrLemmas (IS : InterpreterStackBig) (TOP : LLVMTopLevel IS) (REFS: Top
       | |- context [trigger (GlobalWrite _ _)] => rewrite interp_cfg2_GW
       end.
 
+  Ltac ev_subevent_condense_step ev :=
+    match ev with
+      | subevent _ _ => rewrite subevent_subevent
+      | inr1 _ => rewrite <- subevent_right
+      | inl1 _ => rewrite <- subevent_left
+      | @resum _ _ _ _ _ _ _ => unfold resum, ReSum_id, id_, Id_IFun
+    end.
+  Ltac ev_subevent_condense ev := repeat ev_subevent_condense_step ev.
+  Ltac process :=
+    repeat match goal with
+      | |- _ (_ <- ?first_body;; _) _ => match first_body with
+        |  _ (trigger ?ev) _ _ => ev_subevent_condense_step ev
+        |  _ (Vis ?ev _) _ _ => ev_subevent_condense_step ev
+        |  _ (vis ?ev _) _ _ => ev_subevent_condense_step ev
+        | raiseOOM _ => setoid_rewrite Raise.raiseOOM_bind_itree
+        | raiseUB _ => setoid_rewrite Raise.raiseUB_bind_itree
+        | raise _ => setoid_rewrite Raise.raise_bind_itree
+        | Ret _ => rewrite bind_ret_l
+    end
+  end
+  .
   End InstrTactics.
 
   Import InstrTactics.
@@ -174,17 +196,13 @@ Module InstrLemmas (IS : InterpreterStackBig) (TOP : LLVMTopLevel IS) (REFS: Top
           | break_match; cbn; try reflexivity;
             unfold lift_OOM;
             break_inner_match; cbn;
-            repeat setoid_rewrite Raise.raiseOOM_bind_itree;
-            repeat setoid_rewrite Raise.raiseUB_bind_itree;
-            repeat setoid_rewrite Raise.raise_bind_itree;
-            repeat rewrite bind_ret_l; try reflexivity
+            process;
+            try reflexivity
           | break_match; cbn; try reflexivity;
             unfold lift_OOM;
             break_inner_match; cbn;
-            repeat setoid_rewrite Raise.raiseOOM_bind_itree;
-            repeat setoid_rewrite Raise.raiseUB_bind_itree;
-            repeat setoid_rewrite Raise.raise_bind_itree;
-            repeat rewrite bind_ret_l; try reflexivity;
+            process;
+            try reflexivity;
             setoid_rewrite IP.VMemInt_intptr_dtyp;
             setoid_rewrite dtyp_eqb_refl;
             break_match; cbn; reflexivity
@@ -192,27 +210,15 @@ Module InstrLemmas (IS : InterpreterStackBig) (TOP : LLVMTopLevel IS) (REFS: Top
       - break_match; cbn; try reflexivity;
           unfold lift_OOM;
           break_inner_match; cbn;
-          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
-          repeat setoid_rewrite Raise.raiseUB_bind_itree;
-          repeat setoid_rewrite Raise.raise_bind_itree;
-          repeat rewrite bind_ret_l; try reflexivity.
+          process; try reflexivity.
         repeat (break_match; cbn; try reflexivity);
-          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
-          repeat setoid_rewrite Raise.raiseUB_bind_itree;
-          repeat setoid_rewrite Raise.raise_bind_itree;
-          repeat rewrite bind_ret_l; try reflexivity.
+          process; try reflexivity.
       - break_match; cbn; try reflexivity;
           unfold lift_OOM;
           break_inner_match; cbn;
-          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
-          repeat setoid_rewrite Raise.raiseUB_bind_itree;
-          repeat setoid_rewrite Raise.raise_bind_itree;
-          repeat rewrite bind_ret_l; try reflexivity.
+          process; try reflexivity.
         repeat (break_match; cbn; try reflexivity);
-          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
-          repeat setoid_rewrite Raise.raiseUB_bind_itree;
-          repeat setoid_rewrite Raise.raise_bind_itree;
-          repeat rewrite bind_ret_l; try reflexivity.
+          process; try reflexivity.
         repeat (break_match; cbn; try reflexivity);
           repeat rewrite bind_ret_l; try reflexivity;
           try discriminate.
@@ -225,39 +231,21 @@ Module InstrLemmas (IS : InterpreterStackBig) (TOP : LLVMTopLevel IS) (REFS: Top
       - break_match; cbn; try reflexivity;
           unfold lift_OOM;
           break_inner_match; cbn;
-          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
-          repeat setoid_rewrite Raise.raiseUB_bind_itree;
-          repeat setoid_rewrite Raise.raise_bind_itree;
-          repeat rewrite bind_ret_l; try reflexivity.
+          process; try reflexivity.
         repeat (break_match; cbn; try reflexivity);
-          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
-          repeat setoid_rewrite Raise.raiseUB_bind_itree;
-          repeat setoid_rewrite Raise.raise_bind_itree;
-          repeat rewrite bind_ret_l; try reflexivity.
+          process; try reflexivity.
       - break_match; cbn; try reflexivity;
           unfold lift_OOM;
           break_inner_match; cbn;
-          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
-          repeat setoid_rewrite Raise.raiseUB_bind_itree;
-          repeat setoid_rewrite Raise.raise_bind_itree;
-          repeat rewrite bind_ret_l; try reflexivity.
+          process; try reflexivity.
         repeat (break_match; cbn; try reflexivity);
-          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
-          repeat setoid_rewrite Raise.raiseUB_bind_itree;
-          repeat setoid_rewrite Raise.raise_bind_itree;
-          repeat rewrite bind_ret_l; try reflexivity.
+          process; try reflexivity.
       - break_match; cbn; try reflexivity;
           unfold lift_OOM;
           break_inner_match; cbn;
-          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
-          repeat setoid_rewrite Raise.raiseUB_bind_itree;
-          repeat setoid_rewrite Raise.raise_bind_itree;
-          repeat rewrite bind_ret_l; try reflexivity.
+          process; try reflexivity.
         repeat (break_match; cbn; try reflexivity);
-          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
-          repeat setoid_rewrite Raise.raiseUB_bind_itree;
-          repeat setoid_rewrite Raise.raise_bind_itree;
-          repeat rewrite bind_ret_l; try reflexivity.
+          process; try reflexivity.
     Qed.
 
   (* Note: we know that we can prove that [l = l'] is always true.
@@ -265,7 +253,6 @@ Module InstrLemmas (IS : InterpreterStackBig) (TOP : LLVMTopLevel IS) (REFS: Top
    Arguably we could do the same for [g] and [m] but haven't felt the need for it so far.
    *)
    (* Need to put the result of eval_int_op into the environment. *)
-   Import ExtLib.Structures.Functor.
    (* Check interp_cfg2.
    Section dostuff.
     Variable u: @Integers.bit_int 64.
@@ -290,8 +277,6 @@ Lemma interp3e_instr_op g les reg u  _id:
    Proof.
 
   Check (fmap (fun res => (FMapAList.alist_add _id (dvalue_to_uvalue res) les, (g, tt))) (@eval_int_op (itree L2) _ _ _ _ _ _ _ (Add false true) u (Integers.repr 5%Z))). *)
-  Locate eval_int_op.
-  Locate local_env.
   (* Import LLVMParamsBigIntptr.Events.DV.
   Import InterpreterStackBigIntptr.
   Import InterpreterStackBigIntptr.LLVM.
@@ -318,38 +303,23 @@ Proof.
   rewrite bind_bind.
   cbn.
   unfold exp_to_instr.
-
-
-  rewrite <- subevent_left.
-  rewrite <- subevent_right.
-  rewrite <- subevent_right.
-  rewrite <- subevent_right.
-  rewrite subevent_subevent.
-  rewrite subevent_subevent.
-  rewrite subevent_subevent.
-  rewrite subevent_subevent.
-  unfold resum.
-  unfold ReSum_id.
-  unfold id_.
-  unfold Id_IFun.
+  process.
 
   rewrite interp_cfg2_LR; try apply Hfind.
+  process.
 
-  rewrite bind_ret_l.
   unfold ITree.map.
   rewrite bind_ret_l.
   rewrite bind_ret_l.
   rewrite bind_ret_l.
   
   cbn.
-  unfold concretize_if_no_undef_or_poison.
+  rewrite translate_bind.
+  rewrite interp_cfg2_bind.
   rewrite bind_bind.
   setoid_rewrite bind_ret_l.
   setoid_rewrite bind_ret_l.
   (* Local Opaque eval_iop. *)
-  rewrite translate_bind.
-  rewrite interp_cfg2_bind.
-  rewrite bind_bind.
   unfold eval_iop.
   unfold eval_iop_integer_h.
   cbn.
@@ -359,9 +329,7 @@ Proof.
   { unfold raiseOOM.
     setoid_rewrite bind_trigger.
     rewrite translate_vis.
-    rewrite <- subevent_right.
-    rewrite <- subevent_right.
-    rewrite subevent_subevent.
+    process.
 
     rewrite interp_cfg2_vis.
     setoid_rewrite interp_cfg2_OOM.
@@ -375,9 +343,7 @@ Proof.
   { unfold raiseOOM.
     setoid_rewrite bind_trigger.
     rewrite translate_vis.
-    rewrite <- subevent_right.
-    rewrite <- subevent_right.
-    rewrite subevent_subevent.
+    process.
 
     rewrite interp_cfg2_vis.
     setoid_rewrite interp_cfg2_UB.
@@ -391,9 +357,7 @@ Proof.
   { unfold raiseOOM.
     setoid_rewrite bind_trigger.
     rewrite translate_vis.
-    rewrite <- subevent_right.
-    rewrite <- subevent_right.
-    rewrite subevent_subevent.
+    process.
 
     rewrite interp_cfg2_vis.
     setoid_rewrite interp_cfg2_Err.
@@ -435,123 +399,15 @@ fun (e : instr_E T) =>
 Definition interp_instr_E_to_L0 :=
 interp (@instr_E_to_L0).
 
-(* Lemma interpm2_instr_op reg u _id g les ls:
-    (FMapAList.alist_find (Anon reg%Z) les) = Some (@UVALUE_I 64 u) ->
-    (* contains_undef_or_poison u = false ->  *)
-    eutt eq (interp_mcfg2 (interp_instr_E_to_L0 _ (⟦ (IId _id,
-                              INSTR_Op (OP_IBinop (LLVMAst.Add false true)
-                                          (DynamicTypes.DTYPE_I 64) (EXP_Ident (ID_Local (Anon (reg)%Z))) (EXP_Integer (5)%Z))) ⟧i None)) g (les, ls))
-      (fmap (fun res => ((FMapAList.alist_add _id (dvalue_to_uvalue res) les, ls), (g, tt))) (@eval_int_op _ _ _ _ _ _ ((@VellvmIntegers.VIntVMemInt (@Integers.bit_int 64) (VellvmIntegers.VInt_Bounded 64))) _ (Add false true) u (Integers.repr 5%Z))).
-Proof.
-  Local Opaque eval_int_op.
-  intros Hfind .
-  cbn.
-  rewrite interp2_bind.
-  rewrite interp_mcfg2_bind.
-  cbn.
-  rewrite bind_bind.
-  go.
-  rewrite bind_bind.
-  cbn.
-  unfold exp_to_instr.
+(* Lemma interp3_instr_load _id les sid mem
+some_memory_precondition ->
+(interp_cfg3 refine_res3 
+(IId (Anon _id)), (INSTR_Load (TYPE_I 32) ((TYPE_Pointer (Some (TYPE_I 32))), (EXP_Ident (ID_Local (Anon (2)%Z)))) [ANN_align (4)%Z]) les sid mem
+(fmap (fun res => (mem, (sid, (FMapAList.alist_add _id (dvalue_to_uvalue res) les, (g, tt))))) 
+  (@eval_int_op _ _ _ _ _ _ ((@VellvmIntegers.VIntVMemInt (@Integers.bit_int 64) (VellvmIntegers.VInt_Bounded 64))) _ (Add false true) u (Integers.repr 5%Z)))
+  . *)
 
 
-  rewrite <- subevent_left.
-  rewrite <- subevent_right.
-  rewrite <- subevent_right.
-  rewrite <- subevent_right.
-  rewrite subevent_subevent.
-  rewrite subevent_subevent.
-  rewrite subevent_subevent.
-  rewrite subevent_subevent.
-  unfold resum.
-  unfold ReSum_id.
-  unfold id_.
-  unfold Id_IFun.
-
-  rewrite interp_cfg2_LR; try apply Hfind.
-
-  rewrite bind_ret_l.
-  unfold ITree.map.
-  rewrite bind_ret_l.
-  rewrite bind_ret_l.
-  rewrite bind_ret_l.
-  
-  cbn.
-  unfold concretize_if_no_undef_or_poison.
-  rewrite bind_bind.
-  setoid_rewrite bind_ret_l.
-  setoid_rewrite bind_ret_l.
-  (* Local Opaque eval_iop. *)
-  rewrite translate_bind.
-  rewrite interp_cfg2_bind.
-  rewrite bind_bind.
-  unfold eval_iop.
-  unfold eval_iop_integer_h.
-  cbn.
-  repeat rewrite eval_int_op_err_ub_oom_to_itree.
-  remember (eval_int_op (Add false true) u (Integers.repr 5)) as x.
-  destruct_err_ub_oom x.
-  { unfold raiseOOM.
-    setoid_rewrite bind_trigger.
-    rewrite translate_vis.
-    rewrite <- subevent_right.
-    rewrite <- subevent_right.
-    rewrite subevent_subevent.
-
-    rewrite interp_cfg2_vis.
-    setoid_rewrite interp_cfg2_OOM.
-    repeat rewrite bind_bind.
-    rewrite bind_trigger.
-    rewrite bind_vis.
-    eapply eqit_Vis.
-    intros [].
-  }
-
-  { unfold raiseOOM.
-    setoid_rewrite bind_trigger.
-    rewrite translate_vis.
-    rewrite <- subevent_right.
-    rewrite <- subevent_right.
-    rewrite subevent_subevent.
-
-    rewrite interp_cfg2_vis.
-    setoid_rewrite interp_cfg2_UB.
-    repeat rewrite bind_bind.
-    rewrite bind_trigger.
-    rewrite bind_vis.
-    eapply eqit_Vis.
-    intros [].
-  }
-
-  { unfold raiseOOM.
-    setoid_rewrite bind_trigger.
-    rewrite translate_vis.
-    rewrite <- subevent_right.
-    rewrite <- subevent_right.
-    rewrite subevent_subevent.
-
-    rewrite interp_cfg2_vis.
-    setoid_rewrite interp_cfg2_Err.
-    repeat rewrite bind_bind.
-    rewrite bind_trigger.
-    rewrite bind_vis.
-    eapply eqit_Vis.
-    intros [].
-  }
-
-  cbn.
-  rewrite translate_ret.
-  rewrite interp_cfg2_ret.
-  rewrite bind_ret_l.
-  rewrite translate_ret.
-  rewrite interp_cfg2_ret.
-  rewrite bind_ret_l.
-  rewrite bind_ret_l.
-  rewrite interp_cfg2_LW.
-  cbn.
-  reflexivity.
-Qed.
 Lemma interp3_instr_op reg u  _id g les sid mem:
     (FMapAList.alist_find (Anon reg%Z) les) = Some (@UVALUE_I 64 u) ->
     (* contains_undef_or_poison u = false ->  *)
@@ -564,126 +420,7 @@ Proof.
   Local Opaque eval_int_op.
   intros Hfind .
   cbn.
-  Search interp_cfg3.
-  tau_steps.
-  rewrite bind_bind.
-  rewrite interp_cfg3_bind.
-  cbn.
-  rewrite bind_bind.
-  go.
-  rewrite bind_bind.
-  cbn.
-  unfold exp_to_instr.
-
-
-  rewrite <- subevent_left.
-  rewrite <- subevent_right.
-  rewrite <- subevent_right.
-  rewrite <- subevent_right.
-  rewrite subevent_subevent.
-  rewrite subevent_subevent.
-  rewrite subevent_subevent.
-  rewrite subevent_subevent.
-  unfold resum.
-  unfold ReSum_id.
-  unfold id_.
-  unfold Id_IFun.
-
-  rewrite interp_cfg2_LR; try apply Hfind.
-
-  rewrite bind_ret_l.
-  unfold ITree.map.
-  rewrite bind_ret_l.
-  rewrite bind_ret_l.
-  rewrite bind_ret_l.
-  
-  cbn.
-  unfold concretize_if_no_undef_or_poison.
-  rewrite bind_bind.
-  setoid_rewrite bind_ret_l.
-  setoid_rewrite bind_ret_l.
-  (* Local Opaque eval_iop. *)
-  rewrite translate_bind.
-  rewrite interp_cfg2_bind.
-  rewrite bind_bind.
-  unfold eval_iop.
-  unfold eval_iop_integer_h.
-  cbn.
-  repeat rewrite eval_int_op_err_ub_oom_to_itree.
-  remember (eval_int_op (Add false true) u (Integers.repr 5)) as x.
-  destruct_err_ub_oom x.
-  { unfold raiseOOM.
-    setoid_rewrite bind_trigger.
-    rewrite translate_vis.
-    rewrite <- subevent_right.
-    rewrite <- subevent_right.
-    rewrite subevent_subevent.
-
-    rewrite interp_cfg2_vis.
-    setoid_rewrite interp_cfg2_OOM.
-    repeat rewrite bind_bind.
-    rewrite bind_trigger.
-    rewrite bind_vis.
-    eapply eqit_Vis.
-    intros [].
-  }
-
-  { unfold raiseOOM.
-    setoid_rewrite bind_trigger.
-    rewrite translate_vis.
-    rewrite <- subevent_right.
-    rewrite <- subevent_right.
-    rewrite subevent_subevent.
-
-    rewrite interp_cfg2_vis.
-    setoid_rewrite interp_cfg2_UB.
-    repeat rewrite bind_bind.
-    rewrite bind_trigger.
-    rewrite bind_vis.
-    eapply eqit_Vis.
-    intros [].
-  }
-
-  { unfold raiseOOM.
-    setoid_rewrite bind_trigger.
-    rewrite translate_vis.
-    rewrite <- subevent_right.
-    rewrite <- subevent_right.
-    rewrite subevent_subevent.
-
-    rewrite interp_cfg2_vis.
-    setoid_rewrite interp_cfg2_Err.
-    repeat rewrite bind_bind.
-    rewrite bind_trigger.
-    rewrite bind_vis.
-    eapply eqit_Vis.
-    intros [].
-  }
-
-  cbn.
-  rewrite translate_ret.
-  rewrite interp_cfg2_ret.
-  rewrite bind_ret_l.
-  rewrite translate_ret.
-  rewrite interp_cfg2_ret.
-  rewrite bind_ret_l.
-  rewrite bind_ret_l.
-  rewrite interp_cfg2_LW.
-  cbn.
-  reflexivity.
-   (* Program Definition interp3e_instr_op g les reg u sid m _id dt i:
-   {v: _ |
-  (FMapAList.alist_find (Anon reg%Z) les) = Some u ->
-  dt = DynamicTypes.DTYPE_I i -> 
-   eutt eq (interp_cfg3_exec (⟦ (IId _id, INSTR_Op (OP_IBinop (LLVMAst.Add false true) dt (EXP_Ident (ID_Local (Anon (reg)%Z))) (EXP_Integer (5)%Z))) ⟧i None) g les sid m) (Ret v)
-   }:=
-   _. *)
-   (* Program Definition interp3e_instr_alloca g les sid m _id ret:
-   {v: _ |
-   InterpreterStackBigIntptr.MEM.MMEP.MemSpec.MemHelpers.dtyp_eqb ret DynamicTypes.DTYPE_Void = false ->
-   eutt eq (interp_cfg3_exec (⟦ (IId _id, INSTR_Alloca ret [ANN_align 4%Z]) ⟧i None) g les sid m) (Ret v)
-   }:=
-   _. *)
+Admitted.
   (* Lemma denote_instr_load :
     forall (i : raw_id) volatile τ τp ptr align g l l' m a uv,
       ⟦ ptr at τp ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a) ->
