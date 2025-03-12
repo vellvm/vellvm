@@ -151,14 +151,14 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
      The similar results mentioned in the paper are listed below.
      *)
-    Lemma refine_01: forall t1 t2 g,
-        refine_L0 t1 t2 -> refine_L1 (interp_global t1 g) (interp_global t2 g).
+    Lemma refine_01 {R}: forall t1 t2 g,
+        refine_L0 (R:= R) t1 t2 -> refine_L1 (interp_global t1 g) (interp_global t2 g).
     Proof using.
       intros t1 t2 g REF.
       apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
     Qed.
 
-    Lemma refine_01_eq : forall (t1 t2 : itree L0 dvalue) (g : global_env),
+    Lemma refine_01_eq {R}: forall (t1 t2 : itree L0 R) (g : global_env),
         eutt eq t1 t2 -> eutt eq (interp_global t1 g) (interp_global t2 g).
     Proof using.
       intros t1 t2 g REF.
@@ -168,7 +168,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Qed.
 
     (* No stack *)
-    Lemma refine_01_cfg_eq : forall (t1 t2 : itree instr_E dvalue) (g : global_env),
+    Lemma refine_01_cfg_eq {T}: forall (t1 t2 : itree instr_E T) (g : global_env),
         eutt eq t1 t2 -> eutt eq (interp_global t1 g) (interp_global t2 g).
     Proof using.
       intros t1 t2 g REF.
@@ -177,14 +177,14 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       eapply eutt_interp_state; eauto.
     Qed.
 
-    Lemma refine_12 : forall t1 t2 l,
-        refine_L1 t1 t2 -> refine_L2 (interp_local_stack t1 l) (interp_local_stack t2 l).
+    Lemma refine_12 {R}: forall t1 t2 l,
+        refine_L1 t1 t2 -> refine_L2 (R:=R) (interp_local_stack t1 l) (interp_local_stack t2 l).
     Proof using.
       intros t1 t2 l REF.
       apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
     Qed.
 
-    Lemma refine_12_eq : forall (t1 t2 : itree L1 res_L1) (l : local_env * stack),
+    Lemma refine_12_eq {R}: forall (t1 t2 : itree L1 R) (l : local_env * stack),
         eutt eq t1 t2 ->  eutt eq (interp_local_stack t1 l) (interp_local_stack t2 l).
     Proof using.
       intros * REF.
@@ -195,7 +195,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     (* No stack, used for interp_cfg instead of interp_mcfg *)
     (* TODO: Generalize itree event type? *)
-    Lemma refine_12_cfg_eq : forall (t1 t2 : itree (CallE +' IntrinsicE +' LLVMEnvE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) res_L1) (l : local_env),
+    Lemma refine_12_cfg_eq {R}: forall (t1 t2 : itree (CallE +' IntrinsicE +' LLVMEnvE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE) R) (l : local_env),
         eutt eq t1 t2 ->  eutt eq (interp_local t1 l) (interp_local t2 l).
     Proof using.
       intros * REF.
@@ -204,8 +204,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       eapply eutt_interp_state; eauto.
     Qed.
 
-    Lemma refine_23 : forall t1 t2 sid m,
-        refine_L2 t1 t2 -> refine_L3 (interp_memory_spec refine_res2 t1 sid m) (interp_memory_spec refine_res2 t2 sid m).
+    Lemma refine_23 {R}: forall t1 t2 sid m,
+        refine_L2 t1 t2 -> refine_L3 (R:= R) (interp_memory_spec refine_res2 t1 sid m) (interp_memory_spec refine_res2 t2 sid m).
     Proof using.
       intros * REF t Ht.
       exists t; split.
@@ -216,10 +216,23 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - reflexivity.
     Qed.
 
-    Lemma refine_23_cfg :
-      forall (t1 t2 : itree L2 (local_env * res_L1)) (sid : StoreId.store_id) (m : MemState),
+    Lemma refine_23_cfg {R} :
+      forall t1 t2 (sid : StoreId.store_id) (m : MemState),
         eutt eq t1 t2 ->
-        refine_L3_cfg (interp_memory_spec eq t1 sid m) (interp_memory_spec eq t2 sid m).
+        refine_L3_cfg (R := R) (interp_memory_spec eq t1 sid m) (interp_memory_spec eq t2 sid m).
+    Proof using.
+      intros * REF t Ht.
+      exists t; split.
+      - unfold L3 in *.
+        unfold refine_L2 in *.
+        eapply interp_memory_prop_Proper_eq in Ht; try typeclasses eauto; eauto.
+      - reflexivity.
+    Qed.
+    
+    Lemma refine_23_eq {R}:
+      forall t1 t2 (sid : StoreId.store_id) (m : MemState),
+        eutt eq t1 t2 ->
+        refine_L3_eq (R:= R) (interp_memory_spec eq t1 sid m) (interp_memory_spec eq t2 sid m).
     Proof using.
       intros * REF t Ht.
       exists t; split.
@@ -229,23 +242,10 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - reflexivity.
     Qed.
 
-    Lemma refine_23_eq :
-      forall (t1 t2 : itree L2 (local_env * stack * res_L1)) (sid : StoreId.store_id) (m : MemState),
+    Lemma refine_23_cfg_eq {R}:
+      forall t1 t2 (sid : StoreId.store_id) (m : MemState),
         eutt eq t1 t2 ->
-        refine_L3_eq (interp_memory_spec eq t1 sid m) (interp_memory_spec eq t2 sid m).
-    Proof using.
-      intros * REF t Ht.
-      exists t; split.
-      - unfold L3 in *.
-        unfold refine_L2 in *.
-        eapply interp_memory_prop_Proper_eq in Ht; try typeclasses eauto; eauto.
-      - reflexivity.
-    Qed.
-
-    Lemma refine_23_cfg_eq :
-      forall (t1 t2 : itree L2 (local_env * res_L1)) (sid : StoreId.store_id) (m : MemState),
-        eutt eq t1 t2 ->
-        refine_L3_cfg_eq (interp_memory_spec eq t1 sid m) (interp_memory_spec eq t2 sid m).
+        refine_L3_cfg_eq (R := R) (interp_memory_spec eq t1 sid m) (interp_memory_spec eq t2 sid m).
     Proof using.
       intros * REF t Ht.
       exists t; split.
@@ -256,8 +256,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Qed.
 
     (* Things are different for L4 and L5: we get into the [Prop] monad. *)
-    Lemma refine_34 : forall t1 t2,
-        refine_L3 t1 t2 -> refine_L4 (model_undef refine_res3 t1) (model_undef refine_res3 t2).
+    Lemma refine_34 {R}: forall t1 t2,
+        refine_L3 (R:= R) t1 t2 -> refine_L4 (model_undef refine_res3 t1) (model_undef refine_res3 t2).
     Proof using.
       intros t1 t2 REF t Ht.
       exists t; split.
@@ -271,8 +271,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - reflexivity.
     Qed.
 
-    Lemma refine_34_cfg : forall t1 t2,
-        refine_L3_cfg t1 t2 -> refine_L4_cfg (model_undef refine_res3_cfg t1) (model_undef refine_res3_cfg t2).
+    Lemma refine_34_cfg {R}: forall t1 t2,
+        refine_L3_cfg (R:= R) t1 t2 -> refine_L4_cfg (model_undef refine_res3_cfg t1) (model_undef refine_res3_cfg t2).
     Proof using.
       intros t1 t2 REF t Ht.
       exists t; split.
@@ -286,8 +286,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - reflexivity.
     Qed.
 
-    Lemma refine_34_eq : forall t1 t2,
-        refine_L3_eq t1 t2 -> refine_L4_eq (model_undef eq t1) (model_undef eq t2).
+    Lemma refine_34_eq {R}: forall t1 t2,
+        refine_L3_eq (R:=R) t1 t2 -> refine_L4_eq (model_undef eq t1) (model_undef eq t2).
     Proof using.
       intros t1 t2 REF t Ht.
       exists t; split.
@@ -301,8 +301,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - reflexivity.
     Qed.
 
-    Lemma refine_34_cfg_eq : forall t1 t2,
-        refine_L3_cfg_eq t1 t2 -> refine_L4_cfg_eq (model_undef eq t1) (model_undef eq t2).
+    Lemma refine_34_cfg_eq {R}: forall t1 t2,
+        refine_L3_cfg_eq (R:= R) t1 t2 -> refine_L4_cfg_eq (model_undef eq t1) (model_undef eq t2).
     Proof using.
       intros t1 t2 REF t Ht.
       exists t; split.
@@ -316,8 +316,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - reflexivity.
     Qed.
 
-    Lemma refine_45 : forall Pt1 Pt2,
-        refine_L4 Pt1 Pt2 -> refine_L5 (model_UB Pt1) (model_UB Pt2).
+    Lemma refine_45 {R}: forall Pt1 Pt2,
+        refine_L4 (R:= R) Pt1 Pt2 -> refine_L5 (model_UB Pt1) (model_UB Pt2).
     Proof using.
       intros Pt1 Pt2 HR t2 HM.
       destruct HM as [Pt2_t2 | [ub [Pt2_ub UB]]].
@@ -332,8 +332,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         rewrite EQ; auto.
     Qed.
 
-    Lemma refine_45_eq : forall Pt1 Pt2,
-        refine_L4_eq Pt1 Pt2 -> refine_L5_eq (model_UB Pt1) (model_UB Pt2).
+    Lemma refine_45_eq {R}: forall Pt1 Pt2,
+        refine_L4_eq (R:= R) Pt1 Pt2 -> refine_L5_eq (model_UB Pt1) (model_UB Pt2).
     Proof using.
       intros Pt1 Pt2 HR t2 HM.
       destruct HM as [Pt2_t2 | [ub [Pt2_ub UB]]].
@@ -348,8 +348,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         rewrite EQ; auto.
     Qed.
 
-    Lemma refine_45_cfg : forall Pt1 Pt2,
-        refine_L4_cfg Pt1 Pt2 -> refine_L5_cfg (model_UB Pt1) (model_UB Pt2).
+    Lemma refine_45_cfg {R}: forall Pt1 Pt2,
+        refine_L4_cfg (R:=R) Pt1 Pt2 -> refine_L5_cfg (model_UB Pt1) (model_UB Pt2).
     Proof using.
       intros Pt1 Pt2 HR t2 HM.
       destruct HM as [Pt2_t2 | [ub [Pt2_ub UB]]].
@@ -364,8 +364,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         rewrite EQ; auto.
     Qed.
 
-    Lemma refine_45_cfg_eq : forall Pt1 Pt2,
-        refine_L4_cfg_eq Pt1 Pt2 -> refine_L5_cfg_eq (model_UB Pt1) (model_UB Pt2).
+    Lemma refine_45_cfg_eq {R}: forall Pt1 Pt2,
+        refine_L4_cfg_eq (R:= R) Pt1 Pt2 -> refine_L5_cfg_eq (model_UB Pt1) (model_UB Pt2).
     Proof using.
       intros Pt1 Pt2 HR t2 HM.
       destruct HM as [Pt2_t2 | [ub [Pt2_ub UB]]].
@@ -380,8 +380,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         rewrite EQ; auto.
     Qed.
 
-    Lemma refine_56 : forall Pt1 Pt2,
-        refine_L5 Pt1 Pt2 -> refine_L6 Pt1 Pt2.
+    Lemma refine_56 {R}: forall Pt1 Pt2,
+        refine_L5 (R:= R) Pt1 Pt2 -> refine_L6 Pt1 Pt2.
     Proof using.
       intros Pt1 Pt2 HR t2 HM.
       apply HR in HM as (t1 & HPt1 & HPT1);
@@ -390,8 +390,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         typeclasses eauto.
     Qed.
 
-    Lemma refine_56_eq : forall Pt1 Pt2,
-        refine_L5_eq Pt1 Pt2 -> refine_L6_eq Pt1 Pt2.
+    Lemma refine_56_eq {R}: forall Pt1 Pt2,
+        refine_L5_eq (R:=R) Pt1 Pt2 -> refine_L6_eq Pt1 Pt2.
     Proof using.
       intros Pt1 Pt2 HR t2 HM.
       apply HR in HM as (t1 & HPt1 & HPT1).
@@ -400,8 +400,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         typeclasses eauto.
     Qed.
 
-    Lemma refine_56_cfg : forall Pt1 Pt2,
-        refine_L5_cfg Pt1 Pt2 -> refine_L6_cfg Pt1 Pt2.
+    Lemma refine_56_cfg {R}: forall Pt1 Pt2,
+        refine_L5_cfg (R:=R) Pt1 Pt2 -> refine_L6_cfg Pt1 Pt2.
     Proof using.
       intros Pt1 Pt2 HR t2 HM.
       apply HR in HM as (t1 & HPt1 & HPT1);
@@ -410,8 +410,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         typeclasses eauto.
     Qed.
 
-    Lemma refine_56_cfg_eq : forall Pt1 Pt2,
-        refine_L5_cfg_eq Pt1 Pt2 -> refine_L6_cfg_eq Pt1 Pt2.
+    Lemma refine_56_cfg_eq {R}: forall Pt1 Pt2,
+        refine_L5_cfg_eq (R:=R) Pt1 Pt2 -> refine_L6_cfg_eq Pt1 Pt2.
     Proof using.
       intros Pt1 Pt2 HR t2 HM.
       apply HR in HM as (t1 & HPt1 & HPT1).
