@@ -395,35 +395,32 @@ some_memory_precondition ->
   (@eval_int_op _ _ _ _ _ _ ((@VellvmIntegers.VIntVMemInt (@Integers.bit_int 64) (VellvmIntegers.VInt_Bounded 64))) _ (Add false true) u (Integers.repr 5%Z)))
   . *)
 
-
+    (* forall t, 
+    (interp_cfg3 eq (⟦ (IId _id,
+                              INSTR_Op (OP_IBinop (LLVMAst.Add false true)
+                                          (DynamicTypes.DTYPE_I 64) (EXP_Ident (ID_Local (Anon (reg)%Z))) (EXP_Integer (5)%Z))) ⟧i None) g les sid mem
+      ) t 
+       <->
+    (MEM_SPEC_INTERP.interp_memory_spec eq 
+      (fmap (fun res => (FMapAList.alist_add _id (dvalue_to_uvalue res) les, (g, tt))) 
+        (@eval_int_op _ _ _ _ _ _ ((@VellvmIntegers.VIntVMemInt (@Integers.bit_int 64) (VellvmIntegers.VInt_Bounded 64))) _ (Add false true) u (Integers.repr 5%Z))) sid mem
+      ) t. *)
 Lemma interp3_instr_op reg u  _id g les sid mem:
     (FMapAList.alist_find (Anon reg%Z) les) = Some (@UVALUE_I 64 u) ->
     (* contains_undef_or_poison u = false ->  *)
-    (interp_cfg3 eq (⟦ (IId _id,
+    refine_L3_cfg_eq (interp_cfg3 eq (⟦ (IId _id,
                               INSTR_Op (OP_IBinop (LLVMAst.Add false true)
-                                          (DynamicTypes.DTYPE_I 64) (EXP_Ident (ID_Local (Anon (reg)%Z))) (EXP_Integer (5)%Z))) ⟧i None) g les sid mem)
-      (fmap (fun res => (mem, (sid, (FMapAList.alist_add _id (dvalue_to_uvalue res) les, (g, tt))))) 
-        (@eval_int_op _ _ _ _ _ _ ((@VellvmIntegers.VIntVMemInt (@Integers.bit_int 64) (VellvmIntegers.VInt_Bounded 64))) _ (Add false true) u (Integers.repr 5%Z))).
+                                          (DynamicTypes.DTYPE_I 64) (EXP_Ident (ID_Local (Anon (reg)%Z))) (EXP_Integer (5)%Z))) ⟧i None) g les sid mem
+      ) (MEM_SPEC_INTERP.interp_memory_spec eq 
+      (fmap (fun res => (FMapAList.alist_add _id (dvalue_to_uvalue res) les, (g, tt))) 
+        (@eval_int_op _ _ _ _ _ _ ((@VellvmIntegers.VIntVMemInt (@Integers.bit_int 64) (VellvmIntegers.VInt_Bounded 64))) _ (Add false true) u (Integers.repr 5%Z))) sid mem
+      ).
 Proof.
-  intros Hfind .
-  pose proof (interp2_instr_op g les reg u _id Hfind).
-  remember (ℑ2
-(⟦ (IId _id,
-INSTR_Op
-(OP_IBinop (Add false true) (DynamicTypes.DTYPE_I 64)
-(EXP_Ident (ID_Local (Anon reg))) (EXP_Integer 5%Z))) ⟧i None) g
-les) as t1.
-  remember (fmap
-(fun res : dvalue =>
-(FMapAList.alist_add _id (dvalue_to_uvalue res) les, (g, tt)))
-(eval_int_op (Add false true) u (Integers.repr 5))) as t2.
-  pose proof (refine_23_cfg_eq t1 t2).
-
-  Print res_L1.
-  apply H in H0.
-  Search "refine_23_cfg_eq".
-  cbn.
-Admitted.
+  intros Hfind.
+  eapply refine_23_cfg_eq.
+  apply interp2_instr_op.
+  eauto.
+Qed.
   (* Lemma denote_instr_load :
     forall (i : raw_id) volatile τ τp ptr align g l l' m a uv,
       ⟦ ptr at τp ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a) ->

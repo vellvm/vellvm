@@ -216,10 +216,10 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - reflexivity.
     Qed.
 
-    Lemma refine_23_cfg {R} :
+    Lemma refine_23_cfg {E R} :
       forall t1 t2 (sid : StoreId.store_id) (m : MemState),
         eutt eq t1 t2 ->
-        refine_L3_cfg (R := R) (interp_memory_spec eq t1 sid m) (interp_memory_spec eq t2 sid m).
+        refine_L3_cfg (E:= (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) (R := R) (interp_memory_spec eq t1 sid m) (interp_memory_spec eq t2 sid m).
     Proof using.
       intros * REF t Ht.
       exists t; split.
@@ -242,10 +242,10 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - reflexivity.
     Qed.
 
-    Lemma refine_23_cfg_eq {R}:
+    Lemma refine_23_cfg_eq {E R}:
       forall t1 t2 (sid : StoreId.store_id) (m : MemState),
         eutt eq t1 t2 ->
-        refine_L3_cfg_eq (R := R) (interp_memory_spec eq t1 sid m) (interp_memory_spec eq t2 sid m).
+        refine_L3_cfg_eq (E:= (E +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)) (R := R) (interp_memory_spec eq t1 sid m) (interp_memory_spec eq t2 sid m).
     Proof using.
       intros * REF t Ht.
       exists t; split.

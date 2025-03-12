@@ -372,8 +372,10 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Definition refine_res1 {R}: relation (global_env * R)
     := TT × eq.
 
-  Definition refine_L1 {R}: relation (itree L1 (global_env * R))
+  Definition refine_L1' {E R}: relation (itree E (global_env * R))
     := eutt refine_res1.
+  
+  Definition refine_L1 {R} := @refine_L1' L1 R.
 
   (* Refinement of mcfg after locals *)
   Definition refine_res2 {R}: relation (local_env * lstack * (global_env * R))
@@ -383,8 +385,10 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Definition refine_res2_cfg {R}: relation (local_env * (global_env * R))
     := TT × refine_res1.
 
-  Definition refine_L2 {R}: relation (itree L2 (local_env * stack * (global_env * R)))
+  Definition refine_L2' {E R}: relation (itree E (local_env * stack * (global_env * R)))
     := eutt refine_res2.
+  
+  Definition refine_L2 {R} := @refine_L2' L2 R.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
   Definition refine_res3 {R}: relation (MemState * (store_id * (local_env * stack * (global_env * R))))
@@ -394,22 +398,22 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Definition refine_res3_cfg {R}: relation (MemState * (store_id * (local_env * (global_env * R))))
     := TT × (TT × refine_res2_cfg).
 
-  Definition refine_L3' {R} (RR : relation (MemState * (store_id * (local_env * @stack local_env * (global_env * R)))))
-    : relation (itree L3 (MemState * (store_id * (local_env * @stack _ * (global_env * R)))) -> Prop)
+  Definition refine_L3' {E R} (RR : relation (MemState * (store_id * (local_env * @stack local_env * (global_env * R)))))
+    : relation (itree E (MemState * (store_id * (local_env * @stack _ * (global_env * R)))) -> Prop)
     := fun ts ts' => forall t', ts' t' -> exists t, ts t /\ eutt RR t t'.
 
   Definition refine_L3 {R}: relation (itree L3 (MemState * (store_id * (local_env * stack * (global_env * R)))) -> Prop)
-    := refine_L3' refine_res3.
+    := @refine_L3' L3 R refine_res3.
 
   Definition refine_L3_eq {R} : relation (itree L3 (MemState * (store_id * (local_env * stack * (global_env * R)))) -> Prop)
     := refine_L3' eq.
 
-  Definition refine_L3_cfg' {R} (RR : relation (MemState * (store_id * (local_env * (global_env * R)))))
-    : relation (itree L3 (MemState * (store_id * (local_env * (global_env * R)))) -> Prop)
+  Definition refine_L3_cfg' {E R} (RR : relation (MemState * (store_id * (local_env * (global_env * R)))))
+    : relation (itree E (MemState * (store_id * (local_env * (global_env * R)))) -> Prop)
     := fun ts ts' => forall t', ts' t' -> exists t, ts t /\ eutt RR t t'.
 
-  Definition refine_L3_cfg {R}:= refine_L3_cfg' (R:= R) refine_res3_cfg.
-  Definition refine_L3_cfg_eq {R} := @refine_L3_cfg' R eq.
+  Definition refine_L3_cfg {E R}:= @refine_L3_cfg' E R refine_res3_cfg.
+  Definition refine_L3_cfg_eq {E R} := @refine_L3_cfg' E R eq.
 
   (* Refinement for after interpreting pick. *)
   Definition refine_L4'
@@ -481,7 +485,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Definition refine_L6_cfg {R}:= refine_L6_cfg' (R:=R) refine_res3_cfg.
   Definition refine_L6_cfg_eq {R} := @refine_L6_cfg' R eq.
 
-  #[global] Instance Transitive_refine_L3 {R} RR `{@Transitive _ RR} : Transitive (@refine_L3' R RR).
+  #[global] Instance Transitive_refine_L3 {E R} RR `{@Transitive _ RR} : Transitive (@refine_L3' E R RR).
   Proof.
     unfold Transitive.
     intros tx ty tz XY YZ.
@@ -541,7 +545,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     rewrite XY. eauto.
   Qed.
 
-  #[global] Instance Transitive_refine_L3_cfg R RR `{@Transitive _ RR} : Transitive (@refine_L3_cfg' R RR).
+  #[global] Instance Transitive_refine_L3_cfg E R RR `{@Transitive _ RR} : Transitive (@refine_L3_cfg' E R RR).
   Proof.
     unfold Transitive.
     intros tx ty tz XY YZ.
