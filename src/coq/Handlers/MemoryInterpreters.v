@@ -30,6 +30,7 @@ From ITree Require Import
      Eq.Eqit
      Eq.EqAxiom
      Eq.Paco2
+     Eq.EuttExtras
      Events.StateFacts.
 
 Import HeterogeneousRelations.
@@ -49,6 +50,7 @@ Import MonadNotation.
 
 Import MemoryAddress.
 Import Error.
+Import VellvmRelations.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -501,6 +503,69 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       fun (t : itree Effin R1) (sid : store_id) (ms : MemState) (t' : itree Effout (MemState * (store_id * R2))) =>
         interp_memory_prop (OOM:=OOME) interp_memory_spec_h (fun x '(ms', (sid', y)) => RR x y) (@memory_k_spec) t t'.
 
+    Lemma interp_memory_spec_ret {R} {RR: R -> R -> Prop} sid ms r:
+      forall t,
+      (interp_memory_spec RR (Ret r) sid ms) t
+       <-> (eutt (eq × (eq × RR)) (ret (ms, (sid, r))) t).
+    Proof using.
+    admit.
+    Admitted.
+    Lemma interp_memory_spec_tau {R} {RR: R -> R -> Prop} sid ms r:
+      forall t,
+      (interp_memory_spec RR (Tau r) sid ms) t
+       <-> 
+      (interp_memory_spec RR r sid ms) t.
+    Proof using.
+    admit.
+    Admitted.
+
+    Lemma interp_memory_spec_vis {T R} e k ms sid :
+      forall t,
+      (interp_memory_spec RR (Vis e k) sid ms) t
+      <->
+        interp_memory_spec_h e sid ms >>= fun '(sid', sx) => Tau (interp_memory_spec (k (snd sx)) (fst (B := R) sx) sid').
+
+    Proof using.
+      rewrite unfold_interp_memory; reflexivity.
+    Qed.
+
+    Lemma interp_memory_spec_bind:
+    forall (R S : Type) (t : itree Effin R) (k : R -> itree Effin S) sid m,
+      interp_memory_spec (ITree.bind t k) sid m ≅
+                    ITree.bind (interp_memory_spec t sid m) (fun '(m',(sid',r)) => interp_memory_spec (k r) sid' m').
+    Proof.
+      Import ITree.Eq.Paco2.
+      intros R S.
+      ginit. pcofix CIH.
+      intros t k sid m.
+      rewrite unfold_interp_memory.
+      rewrite unfold_interp_memory.
+      rewrite Shallow.observe_bind.
+      destruct (observe t); cbn.
+      (* Ret *)
+      - rewrite bind_ret_l.
+        rewrite unfold_interp_memory.
+        apply reflexivity.
+      (* Tau *)
+      - rewrite bind_tau.
+        gstep.
+        econstructor.
+        gbase.
+        apply CIH.
+      (* Vis *)
+      - rewrite bind_bind.
+        guclo eqit_clo_bind.
+        econstructor.
+        reflexivity.
+        intros.
+        subst.
+        destruct u2.
+        destruct p.      
+        rewrite bind_tau.
+        gstep.
+        constructor.
+        auto with paco.
+    Qed.
   End Interpreters.
 End MemorySpecInterpreter.
 

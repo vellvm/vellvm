@@ -387,13 +387,6 @@ fun (e : instr_E T) =>
 Definition interp_instr_E_to_L0 :=
 interp (@instr_E_to_L0).
 
-(* Lemma interp3_instr_load _id les sid mem
-some_memory_precondition ->
-(interp_cfg3 refine_res3 
-(IId (Anon _id)), (INSTR_Load (TYPE_I 32) ((TYPE_Pointer (Some (TYPE_I 32))), (EXP_Ident (ID_Local (Anon (2)%Z)))) [ANN_align (4)%Z]) les sid mem
-(fmap (fun res => (mem, (sid, (FMapAList.alist_add _id (dvalue_to_uvalue res) les, (g, tt))))) 
-  (@eval_int_op _ _ _ _ _ _ ((@VellvmIntegers.VIntVMemInt (@Integers.bit_int 64) (VellvmIntegers.VInt_Bounded 64))) _ (Add false true) u (Integers.repr 5%Z)))
-  . *)
 
     (* forall t, 
     (interp_cfg3 eq (⟦ (IId _id,
@@ -421,6 +414,28 @@ Proof.
   apply interp2_instr_op.
   eauto.
 Qed.
+Import DynamicTypes.
+Print local_env.
+Print raw_id.
+Lemma interp3_instr_load _id g les sid mem:
+ refine_L3_cfg_eq (interp_cfg3 eq (⟦ (IId  _id, (INSTR_Load (DTYPE_I 32) ((DTYPE_Pointer), (EXP_Ident (ID_Local (Anon (2)%Z)))) [ANN_align (4)%Z]))⟧i None) g les sid mem)
+  (MEM_SPEC_INTERP.interp_memory_spec eq 
+    (fmap (fun res => (FMapAList.alist_add _id (dvalue_to_uvalue res) les, (g, tt))) 
+    (ret (DVALUE_None))) sid mem )
+  .
+Proof.
+  simpl.
+  unfold refine_L3_cfg_eq, refine_L3_cfg'.
+  intros.
+  eexists t'.
+  split; try reflexivity.
+  cbn.
+  unfold interp_cfg3.
+  setoid_rewrite interp_intrinsics_bind.
+  
+
+
+Admitted.
   (* Lemma denote_instr_load :
     forall (i : raw_id) volatile τ τp ptr align g l l' m a uv,
       ⟦ ptr at τp ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a) ->
