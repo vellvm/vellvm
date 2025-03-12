@@ -519,53 +519,71 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     admit.
     Admitted.
 
-    Lemma interp_memory_spec_vis {T R} e k ms sid :
+    (* Lemma interp_memory_spec_vis {T R} {RR} e k ms sid :
       forall t,
       (interp_memory_spec RR (Vis e k) sid ms) t
       <->
-        interp_memory_spec_h e sid ms >>= fun '(sid', sx) => Tau (interp_memory_spec (k (snd sx)) (fst (B := R) sx) sid').
+        interp_memory_spec_h e sid ms >>= fun '(sid', sx) => Tau (interp_memory_spec RR (k (snd sx)) (fst (B := R) sx) sid').
 
     Proof using.
       rewrite unfold_interp_memory; reflexivity.
-    Qed.
+    Qed. *)
 
-    Lemma interp_memory_spec_bind:
-    forall (R S : Type) (t : itree Effin R) (k : R -> itree Effin S) sid m,
-      interp_memory_spec (ITree.bind t k) sid m ≅
-                    ITree.bind (interp_memory_spec t sid m) (fun '(m',(sid',r)) => interp_memory_spec (k r) sid' m').
+    Lemma interp_memory_spec_bind {R S} {RR1: R -> R -> Prop} {RR2: S -> S -> Prop}:
+    forall t (k : R -> itree Effin S) sid m,
+      forall u,
+      (interp_memory_spec RR2 (ITree.bind t k) sid m) u
+        <->
+          (bind (interp_memory_spec RR1 t sid m) (fun '(m',(sid',r)) => interp_memory_spec RR2 (k r) sid' m') u).
     Proof.
-      Import ITree.Eq.Paco2.
-      intros R S.
-      ginit. pcofix CIH.
-      intros t k sid m.
-      rewrite unfold_interp_memory.
-      rewrite unfold_interp_memory.
-      rewrite Shallow.observe_bind.
-      destruct (observe t); cbn.
-      (* Ret *)
-      - rewrite bind_ret_l.
-        rewrite unfold_interp_memory.
-        apply reflexivity.
-      (* Tau *)
-      - rewrite bind_tau.
-        gstep.
-        econstructor.
-        gbase.
-        apply CIH.
-      (* Vis *)
-      - rewrite bind_bind.
-        guclo eqit_clo_bind.
-        econstructor.
-        reflexivity.
-        intros.
-        subst.
-        destruct u2.
-        destruct p.      
-        rewrite bind_tau.
-        gstep.
-        constructor.
-        auto with paco.
+    Admitted.
+    #[global] Instance interp_memory_spec_proper {R} {RR: R -> R -> Prop} 
+      {HR: Reflexive RR} {TR: Transitive RR} {SR: Symmetric RR}
+      :
+        Proper (eutt RR ==> Monad.eq1) (@interp_memory_spec R R RR).
+    Proof.
+      unfold Proper, respectful.
+      intros.
+      repeat red.
+      intros.
+      unfold interp_memory_spec.
+      split.
+      intros.
+      split.
+      intros.
+
+      rewrite H0 in H1.
+      rewrite H in H1.
+      eauto.
+
+      intros.
+      rewrite H0.
+      rewrite H.
+      eauto.
+
+      split;
+      unfold eutt_closed;
+      repeat red.
+      intros.
+      split.
+      intros.
+      rewrite H0 in H1.
+      eauto.
+
+      intros.
+      rewrite H0.
+      eauto.
+
+      intros.
+      split; intros.
+
+      rewrite H0 in H1.
+      eauto.
+
+      rewrite H0.
+      eauto.
     Qed.
+      
   End Interpreters.
 End MemorySpecInterpreter.
 
