@@ -140,7 +140,7 @@ Module InstrLemmas (IS : InterpreterStackBig) (TOP : LLVMTopLevel IS) (REFS: Top
         | raiseUB _ => setoid_rewrite Raise.raiseUB_bind_itree
         | raise _ => setoid_rewrite Raise.raise_bind_itree
         | Ret _ => rewrite bind_ret_l
-    end
+        end
   end
   .
   End InstrTactics.
@@ -296,88 +296,76 @@ Proof.
   Local Opaque eval_int_op.
   intros Hfind .
   cbn.
-  rewrite interp_cfg2_bind.
+  Ltac step :=  lazymatch goal with 
+  | |- _ (interp_cfg2 (_ <- _ ;; _ ) _ _) _ => rewrite interp_cfg2_bind
+  | |- _ (interp_cfg2 (translate _ (_ <- _ ;; _ )) _ _) _ => rewrite translate_bind
+  | |- _ (_ <- (interp_cfg2 (_ <- _ ;; _ ) _ _);; _) _ => rewrite interp_cfg2_bind
+  | |- _ (_ <- (interp_cfg2 (translate _ (_ <- _ ;; _ )) _ _);; _) _ => rewrite translate_bind
+  | |- _ (_ <- (interp_cfg2 (translate _ (ITree.map _ _)) _ _);; _) _ => unfold ITree.map
+  | |- _ (_ <- (interp_cfg2 (translate _ (Ret _)) _ _);; _) _ => rewrite translate_ret
+  | |- _ (_ <- (interp_cfg2 (translate _ (raiseOOM _)) _ _);; _) _ => unfold raiseOOM; rewrite bind_trigger
+  | |- _ (_ <- (interp_cfg2 (translate _ (raiseUB _)) _ _);; _) _  => unfold raiseUB; rewrite bind_trigger
+  | |- _ (_ <- (interp_cfg2 (translate _ (raise _)) _ _);; _) _    => unfold raise; rewrite bind_trigger
+  | |- _ (_ <- (interp_cfg2 (translate _ (vis _ _)) _ _);; _) _    => rewrite translate_vis
+  | |- _ (_ <- (interp_cfg2 (vis _ _) _ _);; _) _    => rewrite interp_cfg2_vis
+  | |- _ (_ <- (interp_cfg2 (Vis _ _) _ _);; _) _    => rewrite interp_cfg2_vis
+  | |- _ (_ <- (interp_cfg2 (Ret _) _ _);; _) _ => rewrite interp_cfg2_ret
+  | |- _ (_ <- (interp_cfg2 (translate _ (translate _ _)) _ _);; _) _ => go; cbn
+  | |- _ (_ <- (interp_cfg2 (trigger (exp_to_instr _) ) _ _);; _) _ => unfold exp_to_instr; process
+  | |- _ (_ <- (interp_cfg2 (trigger (LocalRead _) ) _ _);; _) _ => rewrite interp_cfg2_LR
+  | |- _ (_ <- (_ <- _;; _) ;; _) _ => rewrite bind_bind
+  | |- _ (_ <- (trigger _) ;; _) _ => rewrite bind_trigger
+  | |- _ (_ <- (vis _ _) ;; _) _ => rewrite bind_vis
+  | |- _ (_ <- (Ret _);; _) _ => rewrite bind_ret_l
+  | |- _ => cbn
+  end.
+  repeat step.
+  2: apply Hfind.
   cbn.
-  rewrite bind_bind.
-  go.
-  rewrite bind_bind.
-  cbn.
-  unfold exp_to_instr.
-  process.
-
-  rewrite interp_cfg2_LR; try apply Hfind.
-  process.
-
-  unfold ITree.map.
-  rewrite bind_ret_l.
-  rewrite bind_ret_l.
-  rewrite bind_ret_l.
+  repeat step.
   
-  cbn.
-  rewrite translate_bind.
-  rewrite interp_cfg2_bind.
-  rewrite bind_bind.
-  setoid_rewrite bind_ret_l.
-  setoid_rewrite bind_ret_l.
+  
   (* Local Opaque eval_iop. *)
-  unfold eval_iop.
-  unfold eval_iop_integer_h.
-  cbn.
   repeat rewrite eval_int_op_err_ub_oom_to_itree.
   remember (eval_int_op (Add false true) u (Integers.repr 5)) as x.
   destruct_err_ub_oom x.
-  { unfold raiseOOM.
-    setoid_rewrite bind_trigger.
-    rewrite translate_vis.
+  {
+    repeat step. 
     process.
-
-    rewrite interp_cfg2_vis.
     setoid_rewrite interp_cfg2_OOM.
-    repeat rewrite bind_bind.
+    repeat step.
     rewrite bind_trigger.
     rewrite bind_vis.
     eapply eqit_Vis.
     intros [].
   }
 
-  { unfold raiseOOM.
-    setoid_rewrite bind_trigger.
-    rewrite translate_vis.
+  { 
+    repeat step.
     process.
-
-    rewrite interp_cfg2_vis.
     setoid_rewrite interp_cfg2_UB.
-    repeat rewrite bind_bind.
+    repeat step.
     rewrite bind_trigger.
     rewrite bind_vis.
     eapply eqit_Vis.
     intros [].
   }
 
-  { unfold raiseOOM.
-    setoid_rewrite bind_trigger.
-    rewrite translate_vis.
+  { 
+    repeat step.
     process.
-
-    rewrite interp_cfg2_vis.
     setoid_rewrite interp_cfg2_Err.
-    repeat rewrite bind_bind.
+    repeat step.
     rewrite bind_trigger.
     rewrite bind_vis.
     eapply eqit_Vis.
     intros [].
   }
+  repeat step.
 
-  cbn.
-  rewrite translate_ret.
-  rewrite interp_cfg2_ret.
-  rewrite bind_ret_l.
-  rewrite translate_ret.
-  rewrite interp_cfg2_ret.
-  rewrite bind_ret_l.
-  rewrite bind_ret_l.
   rewrite interp_cfg2_LW.
   cbn.
+  rewrite bind_ret_l.
   reflexivity.
 Qed.
 Import VellvmRelations.
@@ -417,8 +405,23 @@ Lemma interp3_instr_op reg u  _id g les sid mem:
       (fmap (fun res => (mem, (sid, (FMapAList.alist_add _id (dvalue_to_uvalue res) les, (g, tt))))) 
         (@eval_int_op _ _ _ _ _ _ ((@VellvmIntegers.VIntVMemInt (@Integers.bit_int 64) (VellvmIntegers.VInt_Bounded 64))) _ (Add false true) u (Integers.repr 5%Z))).
 Proof.
-  Local Opaque eval_int_op.
   intros Hfind .
+  pose proof (interp2_instr_op g les reg u _id Hfind).
+  remember (ℑ2
+(⟦ (IId _id,
+INSTR_Op
+(OP_IBinop (Add false true) (DynamicTypes.DTYPE_I 64)
+(EXP_Ident (ID_Local (Anon reg))) (EXP_Integer 5%Z))) ⟧i None) g
+les) as t1.
+  remember (fmap
+(fun res : dvalue =>
+(FMapAList.alist_add _id (dvalue_to_uvalue res) les, (g, tt)))
+(eval_int_op (Add false true) u (Integers.repr 5))) as t2.
+  pose proof (refine_23_cfg_eq t1 t2).
+
+  Print res_L1.
+  apply H in H0.
+  Search "refine_23_cfg_eq".
   cbn.
 Admitted.
   (* Lemma denote_instr_load :
@@ -726,5 +729,5 @@ Admitted.
   (*   cbn. *)
   (*   go. *)
   (*   reflexivity. *)
-  Qed. *)
+  (* Qed. *)
 End InstrLemmas.
