@@ -94,17 +94,42 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     go.
     reflexivity.
   Qed.
+Import VellvmRelations.
 
-  (* Lemma interp_cfg3_bind : *)
-  (*   forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g l m, *)
-  (*     ℑ3 (t >>= k) g l m ≈ *)
-  (*        '(m',(l',(g',x))) <- ℑ3 t g l m ;; ℑ3 (k x) g' l' m'. *)
-  (* Proof. *)
-  (*   intros. *)
-  (*   unfold ℑ3. *)
-  (*   go. *)
-  (*   apply eutt_eq_bind; intros3; reflexivity. *)
-  (* Qed. *)
+    Lemma interp_cfg3_ret {R} {RR} g les sid ms (r: R):
+      forall t,
+      (interp_cfg3 RR (Ret r) g les sid ms) t
+       <-> (eutt (eq × (eq × RR)) (ret (ms, (sid, (les, (g, r))))) t).
+    Proof using.
+    admit.
+    Admitted.
+    (* Lemma interp_cfg3_tau {R} {RR} g les sid ms (r: R):
+      forall t,
+      (interp_cfg3 RR (tau r) g les sid ms) t
+       <-> 
+      (interp_cfg3 RR r g les sid ms) t.
+    Proof using.
+    admit.
+    Admitted. *)
+
+    (* Lemma interp_cfg3_vis {T R} {RR} e k ms sid :
+      forall t,
+      (interp_cfg3 RR (Vis e k) sid ms) t
+      <->
+        interp_cfg3_h e sid ms >>= fun '(sid', sx) => Tau (interp_cfg3 RR (k (snd sx)) (fst (B := R) sx) sid').
+
+    Proof using.
+      rewrite unfold_interp_memory; reflexivity.
+    Qed. *)
+
+    Lemma interp_cfg3_bind {R S} {RR1} {RR2}:
+    forall t (k : R -> itree _ S) g les sid m,
+      forall u,
+      (interp_cfg3 RR2 (ITree.bind t k) g les sid m) u
+        <->
+          (bind (interp_cfg3 RR1 t g les sid m) (fun '(m',(sid',(les', (g', r)))) => interp_cfg3 RR2 (k r) g' les' sid' m')) u.
+    Proof.
+    Admitted.
 
   (* Lemma interp_cfg3_ret : forall (R : Type) g l m (x : R), ℑ3 (Ret x) g l m ≈ Ret3 g l m x. *)
   (* Proof. *)
@@ -131,6 +156,11 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     reflexivity.
   Qed.
 
+  #[global] Instance interp_cfg3_proper {R}:
+      Proper (eutt eq ==> eq ==> eq ==> eq ==> eq ==> PropT.equiv_PropT) (@interp_cfg3 R eq).
+  Proof.
+    admit.
+  Admitted.
   (* #[global] Instance eutt_interp_cfg3 {T}: *)
   (*   Proper (eutt eq ==> eq ==> eq ==> eq ==> eutt eq) (@ℑ3 T). *)
   (* Proof. *)

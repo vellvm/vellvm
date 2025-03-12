@@ -415,9 +415,21 @@ Proof.
   eauto.
 Qed.
 Import DynamicTypes.
-Print local_env.
-Print raw_id.
+  Import IS.MEM.MEM_SPEC_INTERP.
+  #[global] Instance interp_cfg3_proper' {R}:
+      Proper (eutt eq ==> eq ==> eq ==> eq ==> eq ==> PropT.equiv_PropT) (@interp_cfg3 R eq).
+  Proof.
+    repeat red.
+    intros.
+    subst.
+  Admitted.
+
+  Polymorphic Instance Eq1_PropT {E} : Eq1 (PropT E) :=
+    fun a PA PA' =>
+      (forall x y, x ≈ y -> (PA x <-> PA' y)).
+
 Lemma interp3_instr_load _id g les sid mem:
+  (* read_uvalue_spec (DTYPE_I 32)  *)
  refine_L3_cfg_eq (interp_cfg3 eq (⟦ (IId  _id, (INSTR_Load (DTYPE_I 32) ((DTYPE_Pointer), (EXP_Ident (ID_Local (Anon (2)%Z)))) [ANN_align (4)%Z]))⟧i None) g les sid mem)
   (MEM_SPEC_INTERP.interp_memory_spec eq 
     (fmap (fun res => (FMapAList.alist_add _id (dvalue_to_uvalue res) les, (g, tt))) 
@@ -430,9 +442,68 @@ Proof.
   eexists t'.
   split; try reflexivity.
   cbn.
+  cbn.
+  (* eapply interp_cfg3_proper. *)
+  rewrite (interp_cfg3_bind (RR1:= eq)).
+  eapply bind_PropT_Proper.
+  repeat red.
+  Check eq1.
+  eapply interp_cfg3_proper.
+  rewrite translate_bind.
+  rewrite translate_bind.
   unfold interp_cfg3.
-  setoid_rewrite interp_intrinsics_bind.
+  eapply interp_memory_spec_proper.
+  rewrite interp_intrinsics_bind.
+  reflexivity.
+  reflexivity.
+  remember (interp_local
+(interp_global
+(interp_intrinsics
+(ua <-
+translate exp_to_instr
+(uv <- translate LU_to_exp (trigger (LocalRead (Anon 2%Z)));;
+concretize_if_no_undef_or_poison uv);;
+da <- concretize_or_pick_unique ua;;
+uv <- trigger (Load (DTYPE_I 32) da);; trigger (LocalWrite _id uv))) g) les).
+remember (interp_local
+(interp_global
+(r <-
+interp_intrinsics
+(translate exp_to_instr
+(uv <- translate LU_to_exp (trigger (LocalRead (Anon 2%Z)));;
+concretize_if_no_undef_or_poison uv));;
+interp_intrinsics
+(da <- concretize_or_pick_unique r;;
+uv <- trigger (Load (DTYPE_I 32) da);; trigger (LocalWrite _id uv))) g) les).
+
+  assert (eutt eq i i0).
+  subst.
+  rewrite interp_intrinsics_bind.
+  reflexivity.
+  eapply interp_memory_spec_proper in H0.
+  repeat red in H0.
+  specialize (H0 sid mem).
+  (* destruct H0. *)
+  eapply H0.
+  reflexivity.
+  specialize (H0 i).
+  unfold eq1 in H0.
+  pose proof (@interp_memory_spec_proper).
+
+  reflexivity.
+  reflexivity.
+
   
+interp_memory_spec eq
+(interp_local
+(interp_global
+(interp_intrinsics
+(ua <-
+translate exp_to_instr
+(uv <- translate LU_to_exp (trigger (LocalRead [...]));;
+concretize_if_no_undef_or_poison uv);;
+da <- concretize_or_pick_unique ua;;
+uv <- trigger (Load (DTYPE_I 32) da);; trigger (LocalWrite _id uv))) g) les) sid mem t'
 
 
 Admitted.

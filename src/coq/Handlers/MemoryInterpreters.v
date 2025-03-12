@@ -497,7 +497,6 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         rewrite BIND.
         reflexivity.
     Qed.
-
     Definition interp_memory_spec {R1 R2} (RR : R1 -> R2 -> Prop) :
       itree Effin R1 -> MemStateFreshT (PropT Effout) R2 :=
       fun (t : itree Effin R1) (sid : store_id) (ms : MemState) (t' : itree Effout (MemState * (store_id * R2))) =>
@@ -537,7 +536,34 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
           (bind (interp_memory_spec RR1 t sid m) (fun '(m',(sid',r)) => interp_memory_spec RR2 (k r) sid' m') u).
     Proof.
     Admitted.
+    Import Relations.
+    Definition equiv_memStateFreshT_PropT {F R}: relation (MemStateFreshT (PropT F) R) := 
+      pointwise_relation store_id (pointwise_relation MemState equiv_PropT).
+
     #[global] Instance interp_memory_spec_proper {R} {RR: R -> R -> Prop} 
+      {HR: Reflexive RR} {TR: Transitive RR} {SR: Symmetric RR}
+      :
+        Proper (eutt RR ==> equiv_memStateFreshT_PropT) (@interp_memory_spec R R RR).
+    Proof.
+      unfold Proper, respectful.
+      intros.
+      unfold Monad.eq1.
+      repeat red.
+      intros.
+      unfold interp_memory_spec.
+      split.
+      intros.
+
+      rewrite H0 in H1.
+      rewrite H in H1.
+      eauto.
+
+      intros.
+      rewrite H0.
+      rewrite H.
+      eauto.
+    Qed.
+    #[global] Instance interp_memory_spec_proper' {R} {RR: R -> R -> Prop} 
       {HR: Reflexive RR} {TR: Transitive RR} {SR: Symmetric RR}
       :
         Proper (eutt RR ==> Monad.eq1) (@interp_memory_spec R R RR).

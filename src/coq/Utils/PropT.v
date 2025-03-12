@@ -148,6 +148,10 @@ Section PropMonad.
   Definition eutt_closed {E X} (P: itree E X -> Prop): Prop :=
     Proper (eutt eq ==> iff) P.
 
+  Definition equiv_PropT {E X} : relation (PropT E X) :=
+    fun PA PA' =>
+      (forall x y, x ≈ y -> (PA x <-> PA' y)).
+  
   #[global] Polymorphic Instance Eq1_PropT {E} : Eq1 (PropT E) :=
     fun a PA PA' =>
       (forall x y, x ≈ y -> (PA x <-> PA' y)) /\
