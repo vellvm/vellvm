@@ -416,20 +416,129 @@ Proof.
 Qed.
 Import DynamicTypes.
   Import IS.MEM.MEM_SPEC_INTERP.
-  #[global] Instance interp_cfg3_proper' {R}:
+  (* #[global] Instance interp_cfg3_proper' {R}:
       Proper (eutt eq ==> eq ==> eq ==> eq ==> eq ==> PropT.equiv_PropT) (@interp_cfg3 R eq).
   Proof.
     repeat red.
     intros.
     subst.
-  Admitted.
+  Admitted. *)
 
-  Polymorphic Instance Eq1_PropT {E} : Eq1 (PropT E) :=
+  (* Polymorphic Instance Eq1_PropT {E} : Eq1 (PropT E) :=
     fun a PA PA' =>
-      (forall x y, x ≈ y -> (PA x <-> PA' y)).
+      (forall x y, x ≈ y -> (PA x <-> PA' y)). *)
 
-Lemma interp3_instr_load _id g les sid mem:
+
+    (* #[global] Instance interp_memory_spec_proper' {E R} {RR: R -> R -> Prop} :
+        Proper (eutt eq ==> eq ==> eq ==> eq ==> Basics.impl) (@interp_memory_spec E R R RR).
+    Proof.
+      Admitted. *)
+  Lemma interp_cfg3_LR' {RR} {EQR: Equivalence RR} : forall id g l sid mem v,
+      Maps.lookup id l = Some v ->
+      forall t1 t2,
+      eutt eq t1 t2 -> 
+      (* (interp_cfg3' RR (Ret v) g l sid mem) t -> *)
+      (interp_cfg3 RR (trigger (LocalRead id)) g l sid mem) t1
+      <->
+      (interp_cfg3 RR (Ret v) g l sid mem) t2.
+  Proof.
+    intros.
+    split.
+    unfold interp_cfg3.
+    intros.
+    rewrite interp_cfg2_LR in H1.
+    setoid_rewrite interp_cfg2_ret.
+    rewrite <- H0.
+    eauto.
+    eauto.
+    intros.
+    unfold interp_cfg3 in *.
+    rewrite interp_cfg2_LR.
+    setoid_rewrite interp_cfg2_ret in H1.
+    rewrite H0.
+    eauto.
+    eauto.
+  Qed.
+
+  (* #[global] Instance interp_cfg3_proper {R}:
+      Proper (eutt eq ==> iff ) (@interp_cfg3 R eq).
+  Proof.
+    admit.
+  Admitted. *)
+
+  (* #[global] Instance interp_cfg3_proper {R RR}:
+      Proper (eutt eq ==> eq ==> eq ==> eq ==> eq ==> eutt eq ==> iff ) (@interp_cfg3 R RR).
+  Proof.
+    admit.
+  Admitted. *)
+  Lemma interp_cfg3_LR {RR} {EQR: Equivalence RR} : forall id g l sid mem v,
+      Maps.lookup id l = Some v ->
+      (* (interp_cfg3' RR (Ret v) g l sid mem) t -> *)
+      Monad.eq1
+      (interp_cfg3 RR (trigger (LocalRead id)) g l sid mem)
+      (interp_cfg3 RR (Ret v) g l sid mem).
+  Proof.
+    intros.
+    repeat red.
+    split; intros; split; intros.
+    rewrite <- interp_cfg3_LR'; eauto.
+    rewrite interp_cfg3_LR'; eauto.
+
+    all: repeat red; intros; split; intros;
+      [try rewrite <- H0 | try rewrite H0]; eauto.
+  Qed.
+
+  Lemma interp_cfg3_LR'' {RR} {EQR: Equivalence RR} : forall id g l sid mem v,
+      Maps.lookup id l = Some v ->
+      (* (interp_cfg3' RR (Ret v) g l sid mem) t -> *)
+      Monad.eq1
+      (interp_cfg3 RR (trigger (LocalRead id)) g l sid mem)
+       (eutt (eq × (eq × RR)) (ret (mem, (sid, (l, (g, v)))))).
+  Proof.
+    intros.
+    repeat red.
+    split; intros; split; intros.
+    red in H1.
+    rewrite interp_cfg2_LR in H1; eauto.
+    rewrite interp_memory_spec_ret in H1.
+    rewrite H0 in H1.
+    eauto.
+
+    red.
+    rewrite interp_cfg2_LR; eauto.
+    rewrite interp_memory_spec_ret.
+    rewrite H0.
+    eauto.
+
+
+    all: repeat red; intros; split; intros;
+      [try rewrite <- H0 | try rewrite H0]; eauto.
+  Qed.
+   #[global] Instance bind_PropT_Proper {E} {A B} :
+     Proper (eq1 ==> eq  ==> eq ==> iff) (@bind_PropT E A B).
+   Proof using.
+   Admitted.
+
+    (* Lemma interp_cfg3_ret'' {R} {RR} g les sid ms (r: R):
+      forall t,
+      (interp_cfg3 RR (Ret r) g les sid ms) t
+       <-> (eutt (eq × (eq × RR)) (ret (ms, (sid, (les, (g, r))))) t).
+    Proof using.
+    admit.
+    Admitted.
+    Lemma interp_cfg3_ret' {R} {RR} g les sid ms (r: R):
+      Monad.eq1
+      (interp_cfg3 RR (Ret r) g les sid ms) t
+       <-> (eutt (eq × (eq × RR)) (ret (ms, (sid, (les, (g, r))))) t).
+    Proof using.
+    admit.
+    Admitted. *)
+
+
+
+Lemma interp3_instr_load _id g les sid mem pointer:
   (* read_uvalue_spec (DTYPE_I 32)  *)
+  Maps.lookup (Anon 2%Z) les = Some pointer ->
  refine_L3_cfg_eq (interp_cfg3 eq (⟦ (IId  _id, (INSTR_Load (DTYPE_I 32) ((DTYPE_Pointer), (EXP_Ident (ID_Local (Anon (2)%Z)))) [ANN_align (4)%Z]))⟧i None) g les sid mem)
   (MEM_SPEC_INTERP.interp_memory_spec eq 
     (fmap (fun res => (FMapAList.alist_add _id (dvalue_to_uvalue res) les, (g, tt))) 
@@ -444,7 +553,33 @@ Proof.
   cbn.
   cbn.
   (* eapply interp_cfg3_proper. *)
-  rewrite (interp_cfg3_bind (RR1:= eq)).
+  rewrite translate_bind.
+  rewrite bind_bind.
+  go.
+  (* rewrite bind_trigger. *)
+  cbn.
+  unfold exp_to_instr.
+  rewrite <- subevent_left.
+  rewrite <- subevent_right.
+  rewrite <- subevent_right.
+  rewrite <- subevent_right.
+  repeat rewrite subevent_subevent.
+  rewrite (interp_cfg3_bind (RR1 := eq)).
+  (* repeat red. *)
+  setoid_rewrite interp_cfg3_LR''; eauto.
+  rewrite bind_ret_l.
+  setoid_rewrite interp_cfg3_ret.
+  unfold bind.
+  eexists.
+  eexists.
+  rewrite interp_cfg3_LR.
+  Search (vis _ _).
+
+  go.
+  go.
+  process.
+  cbn.
+  eewrite (interp_cfg3_bind (RR1:= eq)).
   eapply bind_PropT_Proper.
   repeat red.
   Check eq1.

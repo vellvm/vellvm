@@ -156,11 +156,48 @@ Import VellvmRelations.
     reflexivity.
   Qed.
 
-  #[global] Instance interp_cfg3_proper {R}:
+  (* #[global] Instance interp_cfg3_proper {R}:
       Proper (eutt eq ==> eq ==> eq ==> eq ==> eq ==> PropT.equiv_PropT) (@interp_cfg3 R eq).
   Proof.
     admit.
+  Admitted. *)
+  #[global] Instance interp_cfg3_proper {R RR}:
+      Proper (eutt eq ==> eq ==> eq ==> eq ==> eq ==> eutt eq ==> iff ) (@interp_cfg3 R RR).
+  Proof.
+    admit.
   Admitted.
+
+Example interp_cfg3_proper_test {R} (t1 t2: itree _ R) g les sid mem:
+  eutt eq t1 t2 ->
+  PropT.equiv_PropT
+    (interp_cfg3 eq t1 g les sid mem)
+    (interp_cfg3 eq t2 g les sid mem).
+    Proof.
+      intros.
+      (* eapply interp_cfg3_proper; auto. *)
+      (* rewrite H. *)
+    Admitted.
+Example interp_cfg3_proper_test_2 {R} (t1 t2: itree _ R) g les sid mem:
+  eutt eq t1 t2 ->
+    forall t,
+    (interp_cfg3 eq t1 g les sid mem) t->
+    (interp_cfg3 eq t2 g les sid mem) t.
+  Proof.
+    intros.
+    rewrite H in H0.
+    auto.
+Qed.
+Example interp_cfg3_proper_test_3 {R} (t1 t2: itree _ R) g les sid mem:
+  eutt eq t1 t2 ->
+    forall t,
+    (interp_cfg3 eq t2 g les sid mem) t ->
+    (interp_cfg3 eq t1 g les sid mem) t.
+  Proof.
+    intros.
+    rewrite H.
+    auto.
+Qed.
+
   (* #[global] Instance eutt_interp_cfg3 {T}: *)
   (*   Proper (eutt eq ==> eq ==> eq ==> eq ==> eutt eq) (@ℑ3 T). *)
   (* Proof. *)

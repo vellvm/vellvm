@@ -149,9 +149,10 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       L2_trace.
 
     Definition interp_cfg3 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : PropT (CallE +' PickE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) :=
-      let L0_trace       := interp_intrinsics t in
-      let L1_trace       := interp_global L0_trace g in
-      let L2_trace       := interp_local L1_trace l in
+      (* let L0_trace       := interp_intrinsics t in *)
+      (* let L1_trace       := interp_global L0_trace g in *)
+      (* let L2_trace       := interp_local L1_trace l in *)
+      let L2_trace       := interp_cfg2 t g l in
       let L3_trace       := interp_memory_spec RR L2_trace sid m in
       L3_trace.
 

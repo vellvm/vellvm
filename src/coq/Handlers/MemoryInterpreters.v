@@ -536,11 +536,39 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
           (bind (interp_memory_spec RR1 t sid m) (fun '(m',(sid',r)) => interp_memory_spec RR2 (k r) sid' m') u).
     Proof.
     Admitted.
-    Import Relations.
-    Definition equiv_memStateFreshT_PropT {F R}: relation (MemStateFreshT (PropT F) R) := 
-      pointwise_relation store_id (pointwise_relation MemState equiv_PropT).
 
+    Import Relations.
+    
     #[global] Instance interp_memory_spec_proper {R} {RR: R -> R -> Prop} 
+      {ER: Equivalence RR}
+      :
+        Proper (eutt eq ==> eq ==> eq ==> eutt eq ==> iff) (@interp_memory_spec R R RR).
+    Proof.
+      repeat red.
+      unfold interp_memory_spec.
+      intros; split; intros.
+      subst.
+      rewrite <- H.
+      rewrite <- H2.
+      auto.
+      subst.
+      rewrite H, H2.
+      auto.
+  Qed.
+Example interp_memory_spec_proper_test_1 {R} (t1 t2: itree _ R) sid mem:
+  eutt eq t1 t2 ->
+    forall t,
+    (interp_memory_spec eq t2 sid mem) t <->
+    (interp_memory_spec eq t1 sid mem) t.
+  Proof.
+    intros; split; intros.
+    rewrite H.
+    auto.
+    rewrite <- H.
+    auto.
+Qed.
+
+    (* #[global] Instance interp_memory_spec_proper {R} {RR: R -> R -> Prop} 
       {HR: Reflexive RR} {TR: Transitive RR} {SR: Symmetric RR}
       :
         Proper (eutt RR ==> equiv_memStateFreshT_PropT) (@interp_memory_spec R R RR).
@@ -608,7 +636,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
 
       rewrite H0.
       eauto.
-    Qed.
+    Qed. *)
       
   End Interpreters.
 End MemorySpecInterpreter.
