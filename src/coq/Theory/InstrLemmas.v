@@ -488,28 +488,66 @@ Import DynamicTypes.
       [try rewrite <- H0 | try rewrite H0]; eauto.
   Qed.
 
+Notation PRet5 g l sid mem v:= (ret (mem, (sid, (l, (g, v))))).
+
+    (* Lemma interp_memory_spec_ret {R} {RR: R -> R -> Prop} sid ms r:
+      Monad.eq1
+      (interp_memory_spec RR (Ret r) sid ms)
+       (ret (ms, (sid, r))).
+    Proof using.
+    admit.
+    Admitted. *)
+  Lemma eq1_iff_propt {E R} (a b: PropT E R):
+    Monad.eq1 a b
+    ->
+    forall x,
+    a x <-> b x.
+  Proof.
+    intros.
+    destruct H.
+    apply H.
+    reflexivity.
+  Qed.
+
+Locate ret.
+   #[global] Instance ret_PropT_Proper {E R} :
+     Proper (eq ==> eutt eq ==> iff) (@ret (PropT E) _ R).
+   Proof using.
+   repeat red.
+   intros.
+   split;  cbn; intros; red; red; subst.
+   red in H1. red in H1.
+   rewrite <- H0. auto.
+   rewrite H0. auto.
+  Qed.
+
   Lemma interp_cfg3_LR'' {RR} {EQR: Equivalence RR} : forall id g l sid mem v,
       Maps.lookup id l = Some v ->
       (* (interp_cfg3' RR (Ret v) g l sid mem) t -> *)
       Monad.eq1
       (interp_cfg3 RR (trigger (LocalRead id)) g l sid mem)
-       (eutt (eq × (eq × RR)) (ret (mem, (sid, (l, (g, v)))))).
+       (* (eutt (eq × (eq × RR)) (ret (mem, (sid, (l, (g, v)))))). *)
+       (ret (mem, (sid, (l, (g, v))))).
   Proof.
     intros.
     repeat red.
     split; intros; split; intros.
     red in H1.
+
     rewrite interp_cfg2_LR in H1; eauto.
-    rewrite interp_memory_spec_ret in H1.
-    rewrite H0 in H1.
+    epose proof interp_memory_spec_ret.
+    eapply eq1_iff_propt in H2.
+    apply H2.
+    rewrite <- H0.
     eauto.
 
     red.
     rewrite interp_cfg2_LR; eauto.
-    rewrite interp_memory_spec_ret.
     rewrite H0.
+    epose proof interp_memory_spec_ret.
+    eapply eq1_iff_propt in H2.
+    apply H2.
     eauto.
-
 
     all: repeat red; intros; split; intros;
       [try rewrite <- H0 | try rewrite H0]; eauto.
@@ -535,23 +573,69 @@ Import DynamicTypes.
     Admitted. *)
 
 
+    Lemma interp_cfg3_bind' {R S} {RR1} {RR2}:
+    forall t (k : R -> itree _ S) g les sid m,
+    Monad.eq1
+      (interp_cfg3 RR2 (ITree.bind t k) g les sid m)
+          (bind (interp_cfg3 RR1 t g les sid m) (fun '(m',(sid',(les', (g', r)))) => interp_cfg3 RR2 (k r) g' les' sid' m')).
+    Proof.
+    Admitted.
+  Lemma ret_bind': forall {E} (a b : Type) (f : a -> PropT E b) (x : a),
+      eq1 (bind (ret x) f) (f x).
+  Proof using.
+  Admitted.
+#[global] Instance proptT_eq1_proper {E R}:
+  Proper (eq1 ==> eq1 ==> iff) (@eq1 (PropT E) _ R).
+  Proof.
+    repeat red.
+    intros.
+    Admitted.
+  #[global] Instance propT_eq1_eqiv {E R}: Equivalence (@eq1 (PropT E) _ R).
+  Proof.
+    split.
+    + unfold Reflexive.
+      intros.
+      unfold eq1.
+      red.
+      split.
+      - intros.
+        admit.
+      - split.
+        unfold eutt_closed.
+        repeat red.
+        intros.
+        split; intros.
 
+    split.
+    intros.
+    split.
+    intros.
+
+    red.
+
+  Admitted.
 Lemma interp3_instr_load _id g les sid mem pointer:
   (* read_uvalue_spec (DTYPE_I 32)  *)
   Maps.lookup (Anon 2%Z) les = Some pointer ->
- refine_L3_cfg_eq (interp_cfg3 eq (⟦ (IId  _id, (INSTR_Load (DTYPE_I 32) ((DTYPE_Pointer), (EXP_Ident (ID_Local (Anon (2)%Z)))) [ANN_align (4)%Z]))⟧i None) g les sid mem)
+ eq1 (interp_cfg3 eq (⟦ (IId  _id, (INSTR_Load (DTYPE_I 32) ((DTYPE_Pointer), (EXP_Ident (ID_Local (Anon (2)%Z)))) [ANN_align (4)%Z]))⟧i None) g les sid mem)
   (MEM_SPEC_INTERP.interp_memory_spec eq 
     (fmap (fun res => (FMapAList.alist_add _id (dvalue_to_uvalue res) les, (g, tt))) 
     (ret (DVALUE_None))) sid mem )
   .
 Proof.
   simpl.
-  unfold refine_L3_cfg_eq, refine_L3_cfg'.
   intros.
-  eexists t'.
-  split; try reflexivity.
+  (* split; try reflexivity. *)
   cbn.
-  cbn.
+  Set Printing Implicit.
+  Check proptT_eq1_proper.
+  rewrite (interp_cfg3_bind' (RR1 := eq)(RR2 := eq)).
+
+  split.
+  intros.
+  rewrite (interp_cfg3_bind (RR1 := eq)).
+  unfold interp_cfg3.
+  (* rewrite interp_cfg3_bind. *)
   (* eapply interp_cfg3_proper. *)
   rewrite translate_bind.
   rewrite bind_bind.
@@ -567,7 +651,15 @@ Proof.
   rewrite (interp_cfg3_bind (RR1 := eq)).
   (* repeat red. *)
   setoid_rewrite interp_cfg3_LR''; eauto.
-  rewrite bind_ret_l.
+  eapply eq1_iff_propt.
+  rewrite ret_bind.
+  split.
+  intros.
+  split.
+  match goal with 
+    | |- bind ?x ?f => remember x; remember f
+  end.
+  rewrite ret_bind'.
   setoid_rewrite interp_cfg3_ret.
   unfold bind.
   eexists.

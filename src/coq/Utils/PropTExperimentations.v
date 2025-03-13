@@ -97,7 +97,7 @@ Section ITreeMisc.
     intros.
     split; intros H.
     - eapply transitivity. 2 : { apply H. }
-      red. apply eqit_tauR. reflexivity.
+      red. apply eqit_Tau_r. reflexivity.
     - red. red. pstep. econstructor. auto. punfold H.
   Qed.  
 
@@ -114,7 +114,7 @@ Section ITreeMisc.
     intros.
     split; intros H.
     - eapply transitivity. apply H.
-      red. apply eqit_tauL. reflexivity.
+      red. apply eqit_Tau_l. reflexivity.
     - red. red. pstep. econstructor. auto. punfold H.
   Qed.  
 
@@ -1184,11 +1184,11 @@ Section PropMonad.
         }
         3,4:auto_ctrans_eq.
         2: reflexivity.
-        eapply eqit_tauL. rewrite unfold_bind, <-itree_eta. reflexivity.
+        eapply eqit_Tau_l. rewrite unfold_bind, <-itree_eta. reflexivity.
       - destruct b2; try discriminate.
         guclo eqit_clo_trans.
         econstructor; auto_ctrans_eq; cycle -1; eauto; try reflexivity.
-        eapply eqit_tauL. rewrite unfold_bind, <-itree_eta. reflexivity.
+        eapply eqit_Tau_l. rewrite unfold_bind, <-itree_eta. reflexivity.
     Qed.
 
   End ReturnsBind.

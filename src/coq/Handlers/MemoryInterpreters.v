@@ -503,17 +503,16 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         interp_memory_prop (OOM:=OOME) interp_memory_spec_h (fun x '(ms', (sid', y)) => RR x y) (@memory_k_spec) t t'.
 
     Lemma interp_memory_spec_ret {R} {RR: R -> R -> Prop} sid ms r:
-      forall t,
-      (interp_memory_spec RR (Ret r) sid ms) t
-       <-> (eutt (eq × (eq × RR)) (ret (ms, (sid, r))) t).
+      Monad.eq1
+      (interp_memory_spec RR (Ret r) sid ms)
+       (ret (ms, (sid, r))).
     Proof using.
     admit.
     Admitted.
     Lemma interp_memory_spec_tau {R} {RR: R -> R -> Prop} sid ms r:
-      forall t,
-      (interp_memory_spec RR (Tau r) sid ms) t
-       <-> 
-      (interp_memory_spec RR r sid ms) t.
+      Monad.eq1
+      (interp_memory_spec RR (Tau r) sid ms)
+      (interp_memory_spec RR r sid ms).
     Proof using.
     admit.
     Admitted.
@@ -530,10 +529,9 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
 
     Lemma interp_memory_spec_bind {R S} {RR1: R -> R -> Prop} {RR2: S -> S -> Prop}:
     forall t (k : R -> itree Effin S) sid m,
-      forall u,
-      (interp_memory_spec RR2 (ITree.bind t k) sid m) u
-        <->
-          (bind (interp_memory_spec RR1 t sid m) (fun '(m',(sid',r)) => interp_memory_spec RR2 (k r) sid' m') u).
+      Monad.eq1
+      (interp_memory_spec RR2 (ITree.bind t k) sid m)
+          (bind (interp_memory_spec RR1 t sid m) (fun '(m',(sid',r)) => interp_memory_spec RR2 (k r) sid' m')).
     Proof.
     Admitted.
 
