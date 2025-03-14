@@ -531,7 +531,8 @@ Locate ret.
   Proof.
     intros.
     repeat red.
-    split; intros; split; intros.
+    split;
+     intros; split; intros.
     red in H1.
 
     rewrite interp_cfg2_LR in H1; eauto.
@@ -572,6 +573,14 @@ Locate ret.
     admit.
     Admitted. *)
 
+      #[global] Instance interp_cfg3_proper_eq_itree {R RR}:
+      Proper (eq_itree eq ==> eq ==> eq ==> eq ==> eq ==> (@eq1 (PropT _) _ _ )) (@interp_cfg3 R RR).
+  Proof.
+    repeat red.
+    intros.
+    subst.
+    admit.
+  Admitted.
 
     Lemma interp_cfg3_bind' {R S} {RR1} {RR2}:
     forall t (k : R -> itree _ S) g les sid m,
@@ -599,6 +608,8 @@ Locate ret.
       red.
       split.
       - intros.
+        split; intros.
+        admit.
         admit.
       - split.
         unfold eutt_closed.
@@ -606,14 +617,15 @@ Locate ret.
         intros.
         split; intros.
 
-    split.
-    intros.
-    split.
-    intros.
-
-    red.
 
   Admitted.
+
+
+   #[global] Instance bind_PropT_Proper' {E} {A B} :
+     Proper (eq1 ==> eq ==> (@eq1 (PropT E) _ _)) (@bind_PropT E A B).
+   Proof using.
+   repeat red. intros.
+Admitted.
 Lemma interp3_instr_load _id g les sid mem pointer:
   (* read_uvalue_spec (DTYPE_I 32)  *)
   Maps.lookup (Anon 2%Z) les = Some pointer ->
@@ -627,17 +639,13 @@ Proof.
   intros.
   (* split; try reflexivity. *)
   cbn.
-  Set Printing Implicit.
-  Check proptT_eq1_proper.
   rewrite (interp_cfg3_bind' (RR1 := eq)(RR2 := eq)).
 
-  split.
-  intros.
-  rewrite (interp_cfg3_bind (RR1 := eq)).
-  unfold interp_cfg3.
-  (* rewrite interp_cfg3_bind. *)
-  (* eapply interp_cfg3_proper. *)
   rewrite translate_bind.
+  rewrite (interp_cfg3_bind' (RR1 := eq)(RR2 := eq)).
+  Print bind_bind.
+  rewrite bind_bind_Prop.
+  go.
   rewrite bind_bind.
   go.
   (* rewrite bind_trigger. *)
