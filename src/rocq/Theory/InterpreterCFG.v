@@ -59,15 +59,46 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   End CFGTactics.
 
+  Hint Rewrite
+    interp_intrinsics_bind
+    interp_global_bind
+    interp_local_bind
+    interp_intrinsics_trigger
+    interp_global_trigger
+    interp_local_trigger
+    interp_intrinsics_ret
+    interp_global_ret
+    interp_local_ret
+    interp_intrinsics_vis
+    @bind_bind
+    @bind_ret_l
+    : VELLVM_REWRITE.
+
+  Hint Unfold
+    interp_cfg1
+    interp_cfg2
+    interp_cfg3
+    interp_cfg4
+    interp_cfg5
+    interp_mcfg1
+    interp_mcfg2
+    interp_mcfg3
+    interp_mcfg4
+    interp_mcfg5
+    : VELLVM_REWRITE.
+
   Import CFGTactics.
+
+  Ltac go_rewrite :=
+    autounfold with VELLVM_REWRITE;
+    repeat (autorewrite with VELLVM_REWRITE; cbn).
 
   Lemma interp_cfg1_bind :
     forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g,
       ℑ1 (t >>= k) g ≈ '(g',x) <- ℑ1 t g ;; ℑ1 (k x) g'.
   Proof.
     intros.
-    unfold ℑ1.
-    go.
+    go_rewrite.
     apply eutt_eq_bind; intros (? & ?); reflexivity.
   Qed.
 
@@ -78,20 +109,24 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     reflexivity.
   Qed.
 
+  Hint Rewrite
+    @interp_cfg1_bind
+    interp_cfg1_ret
+    : VELLVM_REWRITE.
+
   Lemma interp_cfg2_bind :
     forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g l,
       ℑ2 (t >>= k) g l ≈ '(g',(l',x)) <- ℑ2 t g l ;; ℑ2 (k x) l' g'.
   Proof.
     intros.
-    unfold ℑ2.
-    go.
+    go_rewrite.
     apply eutt_eq_bind; intros (? & ? & ?); reflexivity.
   Qed.
 
   Lemma interp_cfg2_ret : forall (R : Type) g l (x : R), ℑ2 (Ret x) g l ≈ Ret (l, (g, x)).
   Proof.
     intros; unfold ℑ2.
-    go.
+    go_rewrite.
     reflexivity.
   Qed.
 
@@ -146,8 +181,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Proof.
     intros.
     unfold ℑ2.
-    rewrite interp_intrinsics_vis.
-    go.
+    go_rewrite.
     apply eutt_eq_bind.
     intros2; go.
     reflexivity.
@@ -159,8 +193,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
          '(l, (g, x)) <- ℑ2 (trigger e) g l ;; ℑ2 (k x) g l.
   Proof.
     intros.
-    unfold ℑ2.
-    go.
+    go_rewrite.
     apply eutt_eq_bind.
     intros2.
     reflexivity.
@@ -171,9 +204,8 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       ℑ2 (trigger (GlobalRead id)) g l ≈ Ret2 g l v.
   Proof.
     intros * LU.
-    unfold ℑ2.
-    go.
-    cbn in *; rewrite LU.
+    go_rewrite.
+    cbn in *; go_rewrite; cbn. rewrite LU.
     go.
     reflexivity.
   Qed.
@@ -184,8 +216,9 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Proof.
     intros * LU.
     unfold ℑ2.
-    go.
-    cbn in *; rewrite LU.
+    repeat (go_rewrite; cbn).
+    cbn in *.
+    rewrite LU.
     go.
     reflexivity.
   Qed.
@@ -194,8 +227,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       ℑ2 (trigger (LocalWrite id v)) g l ≈ Ret2 g (Maps.add id v l) tt.
   Proof.
     intros.
-    unfold ℑ2.
-    go.
+    go_rewrite; cbn.
     reflexivity.
   Qed.
 
@@ -204,7 +236,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Proof.
     intros.
     unfold ℑ2.
-    go; reflexivity.
+    go_rewrite; reflexivity.
   Qed.
 
   Lemma interp_cfg2_GR_fail : forall id g l,
@@ -213,7 +245,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Proof.
     intros * LU.
     unfold interp_cfg2.
-    go.
+    go_rewrite.
     cbn in *; rewrite LU.
     unfold raise; cbn.
     go.
@@ -226,7 +258,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Proof.
     intros * LU.
     unfold interp_cfg2.
-    go.
+    go_rewrite.
     cbn in *; rewrite LU.
     unfold raise; cbn.
     go.
@@ -238,7 +270,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Proof.
     intros.
     unfold interp_cfg2.
-    go.
+    go_rewrite.
     apply eutt_eq_bind; intros.
     go.
     reflexivity.
@@ -249,7 +281,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Proof.
     intros.
     unfold interp_cfg2.
-    go.
+    go_rewrite.
     apply eutt_eq_bind; intros.
     go.
     reflexivity.
@@ -260,7 +292,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Proof.
     intros.
     unfold interp_cfg2.
-    go.
+    go_rewrite.
     apply eutt_eq_bind; intros.
     go.
     reflexivity.

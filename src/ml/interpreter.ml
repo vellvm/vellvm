@@ -105,7 +105,7 @@ let rec step
       ( 'a coq_L4
       , MMEP.MMSP.coq_MemState
         * ( StoreId.store_id
-          * ((local_env * lstack) * (global_env * DV.dvalue)) ) )
+          * ((lstack_frame * lstack) * (global_env * DV.dvalue)) ) )
       itree ) : (DV.dvalue, exit_condition) result =
   let open ITreeDefinition in
   match observe m with
@@ -134,17 +134,21 @@ let rec step
   | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 _msg), _k) ->
      Error (OutOfMemory "")
 
+  (* LLVM Exception event *)
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 uv)), _k) ->
+     Error (LLVMException "")
+
   (* UBE event *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 _msg)), _k) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg))), _k) ->
      Error (UndefinedBehavior "")
 
   (* The DebugE effect *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 _msg))), k) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg)))), k) ->
      (debug "";
       step (k (Obj.magic DV.DVALUE_None)))
 
   (* The FailureE effect is a failure *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 _msg))), _) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 msg)))), _) ->
      Error (Failed "")
 
 (* The only visible effects from LLVMIO that should propagate to the

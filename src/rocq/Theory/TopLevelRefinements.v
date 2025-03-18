@@ -238,19 +238,19 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Definition model_to_L2 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs2 L0_trace [] ([],[]).
+      ℑs2 L0_trace [] (Build_stack_frame [] None None,[]).
 
     Definition model_to_L3 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs3 (refine_res2) L0_trace [] ([],[]) 0 initial_memory_state.
+      ℑs3 (refine_res2) L0_trace [] (Build_stack_frame [] None None,[]) 0 initial_memory_state.
 
     Definition model_to_L4 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs4 (refine_res2) (refine_res3) L0_trace [] ([],[]) 0 initial_memory_state.
+      ℑs4 (refine_res2) (refine_res3) L0_trace [] (Build_stack_frame [] None None,[]) 0 initial_memory_state.
 
     Definition model_to_L5 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs5 (refine_res2) (refine_res3) L0_trace [] ([],[]) 0 initial_memory_state.
+      ℑs5 (refine_res2) (refine_res3) L0_trace [] (Build_stack_frame [] None None,[]) 0 initial_memory_state.
 
     (**
    Which leads to five notion of equivalence of [mcfg]s.
@@ -282,20 +282,29 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
          refine_mcfg_L3 refine_mcfg_L4 refine_mcfg_L5
          refine_mcfg_L6 : refine_xx.
 
-    (* Apparently auto's use of simple apply fails here *)
-    Hint Extern 1 (refine_L4 (model_to_L4 _) (model_to_L4 _))
-         => apply refine_34 : refine_xx.
-
-    Hint Extern 1 (refine_L5 (model_to_L5 _) (model_to_L5 _))
-         => apply refine_45 : refine_xx.
+    Hint Unfold
+      model_to_L1
+      model_to_L2
+      model_to_L3
+      model_to_L4
+      model_to_L5
+      interp_mcfg1
+      interp_mcfg2
+      interp_mcfg3
+      interp_mcfg4
+      interp_mcfg5
+      : refine_xx.
 
     Ltac solve_refine :=
-      auto 9 with refine_xx.
+      autounfold with refine_xx;
+      auto 10 with refine_xx.
 
     (**
    The chain of refinements is monotone, legitimating the ability to
    conduct reasoning before interpretation when suitable.
      *)
+
+    Hint Resolve refine_01 refine_12 refine_23 refine_34 refine_45 refine_56 : REF.
     Lemma refine_mcfg_L1_correct: forall p1 p2,
         refine_mcfg_L1 p1 p2 -> refine_mcfg p1 p2.
     Proof using.
@@ -2633,12 +2642,12 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     (* TODO: probably a bad name... model_UB_exec is just... id *)
     Lemma refine_UB
-      : forall (E F G : Type -> Type) T
-          (xs : PropT (E +' F +' UBE +' G) T) x,
+      : forall (E F K G : Type -> Type) T
+          (xs : PropT (E +' F +' K +' UBE +' G) T) x,
         xs x ->
         model_UB xs x.
     Proof using.
-      intros E F G T xs x XS.
+      intros E F K G T xs x XS.
       red.
       left; auto.
     Qed.
@@ -2693,7 +2702,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           (ITree.bind (ℑs2 t s1 s2) (fun '(s1',(s2',x)) => ℑs2 (k x) s2' s1')).
   Proof using.
     intros.
-    unfold ℑs2.
+    unfold ℑs2, ℑs1.
     rewrite interp_intrinsics_bind, interp_global_bind, interp_local_stack_bind.
     apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros ? (? & ? & ?) ->; reflexivity].
   Qed.
@@ -2702,16 +2711,16 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     forall (R : Type) s1 s2 (x : R),
       ℑs2 (Ret x) s1 s2 ≈ Ret (s2, (s1, x)).
   Proof using.
-    intros; unfold ℑs2.
+    intros; unfold ℑs2; unfold ℑs1.
     rewrite interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret; reflexivity.
   Qed.
 
-  Definition interp_cfg {R: Type} (trace: itree instr_E R) g l sid m :=
+  Definition interp_cfg {R: Type} (trace: itree instr_E R) (g : global_env) (l : local_env) sid m :=
     let uvalue_trace   := interp_intrinsics trace in
     let L1_trace       := interp_global uvalue_trace g in
     let L2_trace       := interp_local L1_trace l in
     let L3_trace       := interp_memory_spec eq L2_trace sid m in
-    let L4_trace       := model_undef eq L3_trace in
+    let L4_trace       := model_undef eq L3_trace in  
     L4_trace.
 
   Definition model_to_L4_cfg (prog: cfg dtyp) (varargs : option addr) :=

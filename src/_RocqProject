@@ -16,6 +16,7 @@
 ./rocq/Handlers/Global.v
 ./rocq/Handlers/Handlers.v
 ./rocq/Handlers/Intrinsics.v
+./rocq/Handlers/LLVMExceptions.v
 ./rocq/Handlers/Local.v
 ./rocq/Handlers/MemPropT.v
 ./rocq/Handlers/MemoryInterpreters.v
@@ -123,6 +124,7 @@
 ./rocq/Utils/ITreeRaise.v
 ./rocq/Utils/Inhabited.v
 ./rocq/Utils/IntMaps.v
+./rocq/Utils/InterpEither.v
 ./rocq/Utils/InterpMemoryProp.v
 ./rocq/Utils/InterpProp.v
 ./rocq/Utils/InterpPropOOM.v

@@ -178,7 +178,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                                 ≈
                                 ⟦ phis ⟧Φs origin;;
       ⟦ c ⟧c vararg ;;
-      translate exp_to_instr ⟦ t ⟧t >>= k.
+      ⟦ t ⟧t >>= k.
   Proof using.
     intros; cbn; repeat setoid_rewrite bind_bind.
     reflexivity.
@@ -189,7 +189,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       ⟦ mk_block id phis c t s ⟧b origin vararg ≈
                                 ⟦ phis ⟧Φs origin;;
       ⟦ c ⟧c vararg;;
-      translate exp_to_instr ⟦ t ⟧t.
+      ⟦ t ⟧t.
   Proof using.
     intros; cbn; reflexivity.
   Qed.
@@ -360,16 +360,19 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         ⟦ term ⟧t ⤳ sum_pred (fun id => In id (terminator_outputs term)) TT.
     Proof using.
       intros term; destruct term eqn:Hterm; cbn; try (apply raise_has_all_posts || apply eutt_Ret; cbn; eauto).
-      - destruct v.
+      - (* Ret *)
+        destruct v.
         apply has_post_bind; intros ?.
         apply eutt_Ret; cbn; eauto.
-      - destruct v; cbn.
+      - (* Br *)
+        destruct v; cbn.
         apply has_post_bind; intros ?.
         apply has_post_bind; intros ?.
         break_match_goal; try (apply raise_has_all_posts || apply raiseUB_has_all_posts); subst.
         break_match_goal; try (apply raise_has_all_posts || apply raiseUB_has_all_posts); subst.
         break_match_goal; apply eutt_Ret; cbn; eauto.
-      - destruct v; cbn.
+      - (* Switch *)
+        destruct v; cbn.
         apply has_post_bind; intros ?.
         apply has_post_bind; intros ?.
         break_match_goal;
@@ -409,6 +412,24 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           apply eutt_Ret; cbn.
           destruct HSwitch; auto; right.
           eapply Forall_forall in H; eauto.
+      - (* Resume *)
+        destruct v; cbn.
+        apply has_post_bind; intros ?.
+        apply has_post_bind; intros ?.
+        destruct x0.
+      - (* Invoke *)
+        destruct fnptrval; cbn.
+        apply has_post_bind; intros ?.
+        apply has_post_bind; intros ?.
+        apply has_post_bind; intros ?.
+        destruct x1.
+        apply eutt_Ret; cbn; eauto.
+        destruct i as [[i | i] | i];
+          try rewrite bind_ret_l;
+          try solve [apply eutt_Ret; cbn; eauto].
+        apply has_post_bind.
+        intros x1.
+        apply eutt_Ret; cbn; eauto.
       - apply raiseUB_has_all_posts.
     Qed.
 
@@ -423,7 +444,6 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       cbn.
       apply has_post_bind; intros [].
       apply has_post_bind; intros [].
-      apply has_post_translate.
       apply denote_terminator_exits_in_outputs.
     Qed.
 

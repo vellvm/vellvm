@@ -255,6 +255,7 @@ let c_tests = [("../tests/c/average.ll", 2)]
 let exception_tests =
   [ ("../tests/ll/invoke_landingpad.ll", 5)
   ; ("../tests/ll/invoke_landingpad_void.ll", 42)
+  ; ("../tests/ll/invoke_throw.ll", 2)
   ]
 
 let other_tests =

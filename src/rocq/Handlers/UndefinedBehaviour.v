@@ -14,8 +14,8 @@ Set Contextual Implicit.
 (* end hide *)
 
 Section UBPropositional.
-  Variable (E F G : Type -> Type).
-  #[local] Notation Eff := (E +' F +' UBE +' G).
+  Variable (E F G K : Type -> Type).
+  #[local] Notation Eff := (E +' F +' K +' UBE +' G).
 
   Definition model_UB {T} (ts : PropT Eff T) : PropT Eff T:=
     fun t =>

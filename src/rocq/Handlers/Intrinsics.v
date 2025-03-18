@@ -85,7 +85,8 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
                                   end
                                ) defined_intrinsics.
 
-  Definition handle_intrinsics {E} `{FailureE -< E} `{IntrinsicE -< E} : IntrinsicE ~> itree E :=
+  Definition handle_intrinsics {E} `{FailureE -< E} `{IntrinsicE -< E} :
+    IntrinsicE ~> itree E :=
     (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
     fun X (e : IntrinsicE X) =>
       match e in IntrinsicE Y return X = Y -> itree E Y with
@@ -94,15 +95,17 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
           | Some f => fun pf =>
                        match f args with
                        | inl msg => raise msg
-                       | inr result => Ret result
+                       | inr result =>
+                           Ret result
                        end
-          | None => fun pf => (eq_rect X (fun a => itree E a) (trigger e)) dvalue pf
+          | None => fun pf => (eq_rect X (fun a => itree E a) (trigger e)) (uvalue + dvalue)%type pf
           end
       end eq_refl.
 
   Section PARAMS.
     Variable (E F : Type -> Type).
     Context `{FailureE -< F}.
+    Context `{LLVMExcE uvalue -< F}.
     Notation Eff := (E +' IntrinsicE +' F).
 
     Definition E_trigger : Handler E Eff := fun _ e => trigger e.
@@ -196,12 +199,12 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
         intros ?; tau_steps; reflexivity.
       Qed.
 
-      #[global] Instance eutt_interp_intrinsics {R} :
-        Proper (eutt Logic.eq ==> eutt Logic.eq) (@interp_intrinsics R).
+      #[global] Instance eutt_interp_intrinsics {R} {b} :
+        Proper (eqit Logic.eq b b ==> eqit Logic.eq b b) (@interp_intrinsics R).
       Proof using.
         do 2 red; intros * EQ.
         unfold interp_intrinsics.
-        rewrite EQ; reflexivity.
+        destruct b; try rewrite EQ; try reflexivity.
       Qed.
 
   End Structural_Lemmas.

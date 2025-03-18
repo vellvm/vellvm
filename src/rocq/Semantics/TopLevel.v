@@ -504,11 +504,11 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
    *)
 
   Notation res_L1 := (global_env * dvalue)%type.
-  Notation res_L2 := (local_env * lstack * res_L1)%type.
+  Notation res_L2 := (lstack_frame * lstack * res_L1)%type.
   Notation res_L3 := (MemState * (store_id * res_L2))%type.
-  Notation res_L4 := (MemState * (store_id * (local_env * lstack * (global_env * dvalue))))%type.
-  Notation res_L5 := (MemState * (store_id * (local_env * lstack * (global_env * dvalue))))%type.
-  Notation res_L6 := (MemState * (store_id * (local_env * lstack * (global_env * dvalue))))%type.
+  Notation res_L4 := (MemState * (store_id * (lstack_frame * lstack * (global_env * dvalue))))%type.
+  Notation res_L5 := (MemState * (store_id * (lstack_frame * lstack * (global_env * dvalue))))%type.
+  Notation res_L6 := (MemState * (store_id * (lstack_frame * lstack * (global_env * dvalue))))%type.
 
   (**
      Full denotation of a Vellvm program as an interaction tree:
@@ -534,8 +534,12 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     'builtins <- map_monad address_one_builtin_function (built_in_functions (m_declarations mcfg));;
     'addr <- trigger (GlobalRead (Name entry)) ;;
     'rv <- denote_mcfg (IP.of_list (defns ++ builtins)) ret_typ (dvalue_to_uvalue addr) args;;
-    dv_pred <- trigger (pickNonPoison rv);;
-    ret (proj1_sig dv_pred).
+    match rv with
+    | inl exc => raiseLLVM exc
+    | inr rv =>
+        dv_pred <- trigger (pickNonPoison rv);; 
+        ret (proj1_sig dv_pred)
+    end.
 
   (* default_main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them
      For backwards compatibility.
@@ -569,7 +573,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
         (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog)))
-    in interp_mcfg4_exec t [] ([],[]) 0 initial_memory_state.
+    in interp_mcfg4_exec t [] (Build_stack_frame [] None None,[]) 0 initial_memory_state.
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts
@@ -603,7 +607,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
         (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
-    ℑs eq eq t [] ([],[]) 0 initial_memory_state.
+    ℑs eq eq t [] (Build_stack_frame [] None None,[]) 0 initial_memory_state.
 
   Definition model_gen_oom
              (ret_typ : dtyp)
@@ -615,7 +619,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
         (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
-    ℑs6 eq eq eq t [] ([],[]) 0 initial_memory_state.
+    ℑs6 eq eq eq t [] (Build_stack_frame [] None None,[]) 0 initial_memory_state.
 
   Definition model_gen_oom_L1
              (ret_typ : dtyp)
@@ -639,7 +643,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
         (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
-    ℑs2 t [] ([], []).
+    ℑs2 t [] (Build_stack_frame [] None None, []).
 
   Definition model_gen_oom_L3
     (RR : relation res_L2)
@@ -652,7 +656,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
         (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
-    ℑs3 RR t [] ([], []) 0 initial_memory_state.
+    ℑs3 RR t [] (Build_stack_frame [] None None, []) 0 initial_memory_state.
 
   Definition model_gen_oom_L4
     RR_mem
@@ -666,7 +670,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
         (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
-    ℑs4 RR_mem RR_pick t [] ([], []) 0 initial_memory_state.
+    ℑs4 RR_mem RR_pick t [] (Build_stack_frame [] None None, []) 0 initial_memory_state.
 
   Definition model_gen_oom_L5
     RR_mem
@@ -680,7 +684,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
         (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
-    ℑs5 RR_mem RR_pick t [] ([], []) 0 initial_memory_state.
+    ℑs5 RR_mem RR_pick t [] (Build_stack_frame [] None None, []) 0 initial_memory_state.
 
   Definition model_gen_oom_L6
     RR_mem
@@ -695,7 +699,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
         (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in
-    ℑs6 RR_mem RR_pick RR_oom t [] ([], []) 0 initial_memory_state.
+    ℑs6 RR_mem RR_pick RR_oom t [] (Build_stack_frame [] None None, []) 0 initial_memory_state.
 
   (**
      Finally, the official model assumes no user-defined intrinsics.

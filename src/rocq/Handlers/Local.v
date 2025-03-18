@@ -1,23 +1,24 @@
 (* begin hide *)
 From Stdlib Require Import
-     String.
+  String
+  Morphisms.
 
 From ExtLib Require Import
-     Structures.Monads
-     Structures.Maps.
+  Structures.Monads
+  Structures.Maps.
 
 From ITree Require Import
-     ITree
-     Eq.Eqit
-     Events.State
-     Events.StateFacts.
+  ITree
+  Eq.Eqit
+  Events.State
+  Events.StateFacts.
 
 From Vellvm Require Import
-     Utils.Util
-     Utils.Error
-     Utils.Tactics
-     Semantics.LLVMEvents
-     Semantics.Memory.Sizeof.
+  Utils.Util
+  Utils.Error
+  Utils.Tactics
+  Semantics.LLVMEvents
+  Semantics.Memory.Sizeof.
 
 Require Import Ceres.Ceres.
 
@@ -151,6 +152,25 @@ Section Locals.
         rewrite interp_local_bind_trigger_eqit.
         apply eutt_eq_bind.
         intros ?; tau_steps; reflexivity.
+      Qed.
+
+      #[global] Instance Proper_interp_local {T} {b} :
+        Proper (eqit eq b b ==> Monad.eq1) (@interp_local T).
+      Proof.
+        intros ? ? ?.
+        do 3 red.
+        intros a.
+        do 2 red.
+        destruct b; try setoid_rewrite H1; try reflexivity.
+      Qed.
+
+      #[global] Instance Proper_interp_local_pointwise {T} {b} :
+        Proper (eqit eq b b ==> eq ==> eqit eq b b) (@interp_local T).
+      Proof.
+        intros ? ? ? ? ? ?; subst.
+        unfold interp_local.
+        destruct b; rewrite H1;
+          reflexivity.
       Qed.
 
     End Structural_Lemmas.

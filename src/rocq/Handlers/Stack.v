@@ -41,29 +41,64 @@ Import ITree.Basics.Basics.Monads.
 *)
 
 Section StackMap.
-  Variable (k v:Type).
+  Variable (k v exc :Type).
   Context {map : Type}.
   Context {M: Map k v map}.
   Context {SK : Serialize k}.
 
-  Definition stack := list map.
+  Record stack_frame :=
+    { stack_vars : map;
+      stack_handler : option block_id;
+      stack_exc : option exc;
+    }.
 
-  Definition handle_stack {E} `{FailureE -< E} : (StackE k v) ~> stateT (map * stack) (itree E) :=
-      fun _ e '(env, stk) =>
-        match e with
-        | StackPush bs =>
-          let init := List.fold_right (fun '(x,dv) => Maps.add x dv) Maps.empty bs in
-          Ret ((init, env::stk), tt)
-        | StackPop =>
+  Definition stack := list stack_frame.
+
+  #[global] Instance Map_stack_frame : Map k v stack_frame :=
+  { empty := Build_stack_frame Maps.empty None None;
+    add := fun k v stack_frame => Build_stack_frame (add k v stack_frame.(stack_vars)) stack_frame.(stack_handler) stack_frame.(stack_exc);
+    remove := fun k stack_frame => Build_stack_frame (remove k stack_frame.(stack_vars)) stack_frame.(stack_handler) stack_frame.(stack_exc);
+    lookup := fun k stack_frame => lookup k stack_frame.(stack_vars);
+    union := fun s1 s2 =>
+               let var_union := union s1.(stack_vars) s2.(stack_vars) in
+               (* Not sure of the order these should merge in... *)
+               let handler_union := CFG.opt_first s2.(stack_handler) s1.(stack_handler) in
+               let exc_union := CFG.opt_first s2.(stack_exc) s1.(stack_exc) in
+               Build_stack_frame var_union handler_union exc_union
+  }.
+
+  Definition handle_stack {E} `{FailureE -< E} : (StackE k v exc) ~> stateT (stack_frame * stack) (itree E) :=
+    fun _ e '(env, stk) =>
+      match e with
+      | StackPush args =>
+          let init := List.fold_right (fun '(x,dv) => Maps.add x dv) Maps.empty args in
+          Ret ((Build_stack_frame init None None, env::stk), tt)
+      | StackPop =>
           match stk with
           | [] => raise "Tried to pop too many stack frames."
           | (env'::stk') => Ret ((env',stk'), tt)
           end
-        end.
+      | StackSetHandler handler =>
+          let new_frame := Build_stack_frame env.(stack_vars) handler env.(stack_exc) in
+          Ret ((new_frame, stk), tt)
+      | StackHandler =>
+          match env with
+          | Build_stack_frame stack_vars stack_handler stack_exc =>
+              Ret ((env, stk), stack_handler)
+          end
+      | StackRaise x =>
+          let new_frame := Build_stack_frame env.(stack_vars) env.(stack_handler) (Some x) in
+          Ret ((new_frame, stk), tt)
+      | StackGetExc =>
+          match env with
+          | Build_stack_frame stack_vars stack_handler stack_exc =>
+              Ret ((env, stk), stack_exc)
+          end
+      end.
 
     (* Transform a local handler that works on maps to one that works on stacks *)
-    Definition handle_local_stack {E} `{FailureE -< E} (h:(LocalE k v) ~> stateT map (itree E)) :
-      LocalE k v ~> stateT (map * stack) (itree E)
+    Definition handle_local_stack {E} `{FailureE -< E} (h:(LocalE k v) ~> stateT stack_frame (itree E)) :
+      LocalE k v ~> stateT (stack_frame * stack) (itree E)
       :=
       fun _ e '(env, stk) => ITree.map (fun '(env',r) => ((env',stk), r)) (h _ e env).
 
@@ -71,7 +106,7 @@ Section StackMap.
   Section PARAMS.
     Variable (E F G : Type -> Type).
     Context `{FailureE -< E +' F +' G}.
-    Notation Effin := (E +' F +' (LocalE k v +' StackE k v) +' G).
+    Notation Effin := (E +' F +' (LocalE k v +' StackE k v exc) +' G).
     Notation Effout := (E +' F +' G).
 
     Definition E_trigger {S} : forall R, E R -> (stateT S (itree Effout) R) :=
@@ -83,7 +118,7 @@ Section StackMap.
     Definition G_trigger {S} : forall R , G R -> (stateT S (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition  interp_local_stack_h (h:(LocalE k v) ~> stateT map (itree Effout)) :=
+    Definition  interp_local_stack_h (h:(LocalE k v) ~> stateT stack_frame (itree Effout)) :=
       (case_ E_trigger
              (case_ F_trigger
                     (case_ (case_ (handle_local_stack h)
@@ -91,7 +126,7 @@ Section StackMap.
                            G_trigger))).
 
     Definition interp_local_stack `{FailureE -< E +' F +' G}  :
-      (itree Effin) ~>  stateT (map * stack) (itree Effout) :=
+      (itree Effin) ~>  stateT (stack_frame * stack) (itree Effout) :=
       interp_state (interp_local_stack_h (handle_local (v:=v))).
 
     Section Structural_Lemmas.
@@ -119,8 +154,8 @@ Section StackMap.
       Qed.
 
       Lemma interp_local_stack_vis_eqit:
-        forall (ls : map * stack) S X (kk : X -> itree Effin S) (e : Effin X),
-          interp_local_stack (Vis e kk) ls ≅ ITree.bind (interp_local_stack_h (handle_local (v:=v)) e ls) (fun (sx : map * stack * X) => Tau (interp_local_stack (kk (snd sx)) (fst sx))).
+        forall (ls : stack_frame * stack) S X (kk : X -> itree Effin S) (e : Effin X),
+          interp_local_stack (Vis e kk) ls ≅ ITree.bind (interp_local_stack_h (handle_local (v:=v)) e ls) (fun (sx : stack_frame * stack * X) => Tau (interp_local_stack (kk (snd sx)) (fst sx))).
       Proof using.
         intros.
         unfold interp_local_stack.
@@ -129,8 +164,8 @@ Section StackMap.
       Qed.
 
       Lemma interp_local_stack_vis:
-        forall (ls : (map * stack)) S X (kk : X -> itree Effin S) (e : Effin X),
-          interp_local_stack (Vis e kk) ls ≈ ITree.bind (interp_local_stack_h (handle_local (v:=v)) e ls) (fun (sx : map * stack * X) => interp_local_stack (kk (snd sx)) (fst sx)).
+        forall (ls : (stack_frame * stack)) S X (kk : X -> itree Effin S) (e : Effin X),
+          interp_local_stack (Vis e kk) ls ≈ ITree.bind (interp_local_stack_h (handle_local (v:=v)) e ls) (fun (sx : stack_frame * stack * X) => interp_local_stack (kk (snd sx)) (fst sx)).
       Proof using.
         intros.
         rewrite interp_local_stack_vis_eqit.
@@ -163,5 +198,6 @@ From ExtLib Require Import
    We are hence exposing the specialization here, but it is slightly awkward.
  *)
 Module Make (A : ADDRESS)(IP : INTPTR)(SIZEOF : Sizeof)(LLVMEvents : LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
-  Definition lstack := @stack (list (raw_id * LLVMEvents.DV.uvalue)).
+  Definition lstack_frame := @stack_frame LLVMEvents.DV.uvalue (list (raw_id * LLVMEvents.DV.uvalue)).
+  Definition lstack := @stack LLVMEvents.DV.uvalue (list (raw_id * LLVMEvents.DV.uvalue)).
 End Make.

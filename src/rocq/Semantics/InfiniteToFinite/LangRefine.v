@@ -1207,13 +1207,25 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     := map_monad (fun '(k, uv) => uv' <- uvalue_convert_strict uv;;
                                ret (k, uv')) l.
 
+  Definition convert_stack_frame_strict (sf : IS1.LLVM.Stack.lstack_frame) : OOM IS2.LLVM.Stack.lstack_frame
+    := match sf with
+       | Build_stack_frame stack_vars stack_handler stack_exc =>
+           stack_vars' <- convert_local_env_strict stack_vars;;
+           stack_exc' <-
+             match stack_exc with
+             | None => ret None
+             | Some exc => fmap Some (uvalue_convert_strict exc)
+             end;;
+           ret (Build_stack_frame stack_vars' stack_handler stack_exc')
+       end.
+
   (*
   Definition convert_stack_lazy (s : @stack IS1.LLVM.Local.local_env) : (@stack IS2.LLVM.Local.local_env)
     := map convert_local_env_lazy s.
    *)
 
-  Definition convert_stack_strict (s : @stack IS1.LLVM.Local.local_env) : OOM (@stack IS2.LLVM.Local.local_env)
-    := map_monad convert_local_env_strict s.
+  Definition convert_stack_strict (s : IS1.LLVM.Stack.lstack) : OOM IS2.LLVM.Stack.lstack
+    := map_monad convert_stack_frame_strict s.
 
   (** Refinement between states *)
   (* Not sure if this is right...
@@ -1282,8 +1294,24 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
    *)
 
-  Definition stack_refine_strict (s1 : @stack IS1.LLVM.Local.local_env) (s2 : @stack IS2.LLVM.Local.local_env) : Prop
-    := Forall2 local_refine_strict s1 s2.
+  Definition stack_frame_refine_strict (l1 : IS1.LLVM.Stack.lstack_frame) (l2 : IS2.LLVM.Stack.lstack_frame) : Prop
+    := match l1, l2 with
+       | Build_stack_frame stack_vars1 stack_handler1 stack_exc1,
+         Build_stack_frame stack_vars2 stack_handler2 stack_exc2 =>
+           local_refine_strict stack_vars1 stack_vars2 /\
+             stack_handler1 = stack_handler2 /\
+             Rocqlib.option_rel uvalue_refine_strict stack_exc1 stack_exc2
+       end.
+
+  Lemma stack_frame_refine_strict_empty :
+    stack_frame_refine_strict (Build_stack_frame [] None None) (Build_stack_frame [] None None).
+  Proof.
+    repeat split; auto.
+    apply Rocqlib.option_rel_none.
+  Qed.
+
+  Definition stack_refine_strict (s1 : IS1.LLVM.Stack.lstack) (s2 : IS2.LLVM.Stack.lstack) : Prop
+    := Forall2 stack_frame_refine_strict s1 s2.
 
   Lemma stack_refine_strict_empty :
     stack_refine_strict [] [].
@@ -1312,20 +1340,20 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
    *)
 
   Definition local_stack_refine_strict
-    (ls1 : (IS1.LLVM.Local.local_env * @stack IS1.LLVM.Local.local_env)%type)
-    (ls2 : (IS2.LLVM.Local.local_env * @stack IS2.LLVM.Local.local_env)%type)
+    (ls1 : (IS1.LLVM.Stack.lstack_frame * IS1.LLVM.Stack.lstack)%type)
+    (ls2 : (IS2.LLVM.Stack.lstack_frame * IS2.LLVM.Stack.lstack)%type)
     : Prop :=
     match ls1, ls2 with
     | (l1, s1), (l2, s2) =>
-        local_refine_strict l1 l2 /\ stack_refine_strict s1 s2
+        stack_frame_refine_strict l1 l2 /\ stack_refine_strict s1 s2
     end.
 
   Lemma local_stack_refine_strict_empty :
-    local_stack_refine_strict ([], []) ([], []).
+    local_stack_refine_strict ((Build_stack_frame [] None None), []) ((Build_stack_frame [] None None), []).
   Proof.
     cbn.
     split.
-    apply local_refine_strict_empty.
+    apply stack_frame_refine_strict_empty.
     apply stack_refine_strict_empty.
   Qed.
 
@@ -1344,7 +1372,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma stack_refine_strict_add :
     forall s1 s2 lenv1 lenv2,
       stack_refine_strict s1 s2 ->
-      local_refine_strict lenv1 lenv2 ->
+      stack_frame_refine_strict lenv1 lenv2 ->
       stack_refine_strict (lenv1 :: s1) (lenv2 :: s2).
   Proof.
     intros s1 s2 lenv1 lenv2 H H0.
@@ -1389,61 +1417,34 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (** Model *)
   Import DynamicTypes TypToDtyp CFG.
 
-  Definition event_refine_strict A B (e1 : IS1.LP.Events.L0 A) (e2 : IS2.LP.Events.L0 B) : Prop.
-  Proof.
+  Definition external_call_refine_strict {A B} (e1 : E1.ExternalCallE A) (e2 : E2.ExternalCallE B) : Prop.
+    (* External Calls *)
     refine (match e1, e2 with
-            | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
-                _
-            | inl1 (E1.IO_stdout msg1), inl1 (E2.IO_stdout msg2) =>
-                _
-            | inl1 (E1.IO_stderr msg1), inl1 (E2.IO_stderr msg2) =>
-                _
-            | inr1 (inl1 (E1.Intrinsic dt1 name1 args1)), inr1 (inl1 (E2.Intrinsic dt2 name2 args2)) =>
-                _ (* IntrinsicE *)
-            | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
-                _ (* Globals *)
-            | inr1 (inr1 (inr1 (inl1 (inl1 e1)))), inr1 (inr1 (inr1 (inl1 (inl1 e2)))) =>
-                _ (* Locals *)
-            | inr1 (inr1 (inr1 (inl1 (inr1 e1)))), inr1 (inr1 (inr1 (inl1 (inr1 e2)))) =>
-                _ (* Stack *)
-            | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
-                _ (* MemoryE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
-                _ (* PickE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))) =>
-                _ (* OOME *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))) =>
-                _ (* UBE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))))) =>
-                _ (* DebugE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2)))))))) =>
-                _ (* FailureE *)
+            | E1.ExternalCall dt1 f1 args1, E2.ExternalCall dt2 f2 args2 =>
+                (* Doesn't say anything about return value... *)
+                dt1 = dt2 /\
+                  uvalue_refine_strict f1 f2 /\
+                  Forall2 dvalue_refine_strict args1 args2
+            | E1.IO_stdout msg1, E2.IO_stdout msg2 =>
+                msg1 = msg2
+            | E1.IO_stderr msg1, E2.IO_stderr msg2 =>
+                msg1 = msg2
             | _, _ =>
-                (* Mismatch of event types *)
                 False
             end).
+  Defined.
 
-    (* External Calls *)
-    { (* Doesn't say anything about return value... *)
-      apply (dt1 = dt2 /\
-               uvalue_refine_strict f1 f2 /\
-               Forall2 dvalue_refine_strict args1 args2).
-    }
+  Definition intrinsic_refine_strict {A B} (e1 : E1.IntrinsicE A) (e2 : E2.IntrinsicE B) : Prop.
+    refine
+      (match e1, e2 with
+       | E1.Intrinsic dt1 name1 args1, E2.Intrinsic dt2 name2 args2 =>
+           dt1 = dt2 /\
+             name1 = name2 /\
+             Forall2 dvalue_refine_strict args1 args2
+       end).
+  Defined.
 
-    (* Stdout *)
-    { apply (msg1 = msg2).
-    }
-
-    (* Stderr *)
-    { apply (msg1 = msg2).
-    }
-
-    (* Intrinsics *)
-    { apply (dt1 = dt2 /\
-               name1 = name2 /\
-               Forall2 dvalue_refine_strict args1 args2).
-    }
-
+  Definition globalE_refine_strict {A B} (e1 : GlobalE LLVMAst.raw_id E1.DV.dvalue A) (e2 : GlobalE LLVMAst.raw_id E2.DV.dvalue B) : Prop.
     (* Globals *)
     { inversion e1.
       - (* Global write *)
@@ -1456,7 +1457,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         + apply False.
         + apply (id = id0).
     }
+  Defined.
 
+  Definition localE_refine_strict {A B} (e1 : LocalE LLVMAst.raw_id E1.DV.uvalue A) (e2 : LocalE LLVMAst.raw_id E2.DV.uvalue B) : Prop.
     (* Locals *)
     { inversion e1.
       - (* Local write *)
@@ -1469,19 +1472,39 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         + apply False.
         + apply (id = id0).
     }
+  Defined.
 
+  Definition stackE_refine_strict {A B} (e1 : StackE LLVMAst.raw_id E1.DV.uvalue E1.DV.uvalue A) (e2 : StackE LLVMAst.raw_id E2.DV.uvalue E2.DV.uvalue B) : Prop.
     (* Stack *)
     { inversion e1.
       - (* Stack Push *)
         destruct e2 eqn:HE2.
-        + apply (local_refine_strict args args0).
-        + apply False.
+        1: apply (local_refine_strict args args0).
+        all: apply False.
       - (* Stack Pop *)
         destruct e2 eqn:HE2.
-        + apply False.
-        + apply True.
+        2: apply True.
+        all: apply False.
+      - (* StackSetHandler *)
+        destruct e2 eqn:HE2.
+        3: apply (Rocqlib.option_rel eq H o).
+        all: apply False.
+      - (* StackHandler *)
+        destruct e2 eqn:HE2.
+        4: apply True.
+        all: apply False.
+      - (* StackRaise *)
+        destruct e2 eqn:HE2.
+        5: apply (uvalue_refine_strict H u).
+        all: apply False.
+      - (* StackGetExc *)
+        destruct e2 eqn:HE2.
+        6: apply True.
+        all: apply False.        
     }
+  Defined.
 
+  Definition memoryE_refine_strict {A B} (e1 : E1.MemoryE A) (e2 : E2.MemoryE B) : Prop.
     (* MemoryE *)
     { inversion e1.
       - (* MemPush *)
@@ -1513,7 +1536,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                  dvalue_refine_strict a a0 /\
                  uvalue_refine_strict v v0).
     }
+  Defined.
 
+  Definition pickE_refine_strict {A B} (e1 : E1.PickUvalueE A) (e2 : E2.PickUvalueE B) : Prop.
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
       inversion e1.
@@ -1536,517 +1561,224 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         + exact False.
         + apply (uvalue_refine_strict x x0).
     }
+  Defined.
 
+  Definition oomE_refine_strict {A B} (e1 : OOME A) (e2 : OOME B) : Prop.
     (* OOME *)
     { apply True.
     }
+  Defined.
 
+  Definition llvmExcE_refine_strict {A B} (e1 : LLVMExcE E1.DV.uvalue A) (e2 : LLVMExcE E2.DV.uvalue B) : Prop.
+    (* LLVMExcE *)
+    { destruct e1 as [exc1].
+      destruct e2 as [exc2].
+      apply (uvalue_refine_strict exc1 exc2).
+    }
+  Defined.
+
+  Definition ubE_refine_strict {A B} (e1 : UBE A) (e2 : UBE B) : Prop.
     (* UBE *)
     { apply True.
     }
+  Defined.
 
+  Definition debugE_refine_strict {A B} (e1 : DebugE A) (e2 : DebugE B) : Prop.
     (* DebugE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
+    { refine
+        (match e1, e2 with
+         | Debug e1_msg, Debug e2_msg =>
+             e1_msg = e2_msg
+         end).
     }
+  Defined.
 
+  Definition failureE_refine_strict {A B} (e1 : FailureE A) (e2 : FailureE B) : Prop.
     (* FailureE *)
     { destruct e1 as [e1_msg].
       destruct e2 as [e2_msg].
       exact (e1_msg = e2_msg).
     }
+  Defined.
+
+  Definition event_refine_strict A B (e1 : IS1.LP.Events.L0 A) (e2 : IS2.LP.Events.L0 B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 e1, inl1 e2 =>
+                external_call_refine_strict e1 e2
+            | inr1 (inl1 e1), inr1 (inl1 e2) =>
+                intrinsic_refine_strict e1 e2
+            | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
+                globalE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inl1 (inl1 e1)))), inr1 (inr1 (inr1 (inl1 (inl1 e2)))) =>
+                localE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inl1 (inr1 e1)))), inr1 (inr1 (inr1 (inl1 (inr1 e2)))) =>
+                stackE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
+                memoryE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
+                pickE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))) =>
+                oomE_refine_strict e0 e1
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))) =>
+                llvmExcE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))))) =>
+                ubE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))))) =>
+                debugE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1))))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2))))))))) =>
+                failureE_refine_strict e1 e2
+            | _, _ =>
+                (* Mismatch of event types *)
+                False
+            end).
   Defined.
 
   Definition L1_refine_strict A B (e1 : IS1.LP.Events.L1 A) (e2 : IS2.LP.Events.L1 B) : Prop.
   Proof.
     refine (match e1, e2 with
-            | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
-                _
-            | inl1 (E1.IO_stdout msg1), inl1 (E2.IO_stdout msg2) =>
-                _
-            | inl1 (E1.IO_stderr msg1), inl1 (E2.IO_stderr msg2) =>
-                _
-            | inr1 (inl1 (E1.Intrinsic dt1 name1 args1)), inr1 (inl1 (E2.Intrinsic dt2 name2 args2)) =>
-                _ (* IntrinsicE *)
+            | inl1 e1, inl1 e2 =>
+                external_call_refine_strict e1 e2
+            | inr1 (inl1 e1), inr1 (inl1 e2) =>
+                intrinsic_refine_strict e1 e2
             | inr1 (inr1 (inl1 (inl1 e1))), inr1 (inr1 (inl1 (inl1 e2))) =>
-                _ (* Locals *)
+                localE_refine_strict e1 e2
             | inr1 (inr1 (inl1 (inr1 e1))), inr1 (inr1 (inl1 (inr1 e2))) =>
-                _ (* Stack *)
+                stackE_refine_strict e1 e2
             | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
-                _ (* MemoryE *)
+                memoryE_refine_strict e1 e2
             | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
-                _ (* PickE *)
+                pickE_refine_strict e1 e2
             | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))) =>
-                _ (* OOME *)
+                oomE_refine_strict e0 e1
             | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))) =>
-                _ (* UBE *)
+                llvmExcE_refine_strict e1 e2
             | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))) =>
-                _ (* DebugE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2))))))) =>
-                _ (* FailureE *)
+                ubE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))))) =>
+                debugE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2)))))))) =>
+                failureE_refine_strict e1 e2
             | _, _ =>
                 (* Mismatch of event types *)
                 False
             end).
-
-    (* External Calls *)
-    { (* Doesn't say anything about return value... *)
-      apply (dt1 = dt2 /\
-               uvalue_refine_strict f1 f2 /\
-               Forall2 dvalue_refine_strict args1 args2).
-    }
-
-    (* Stdout *)
-    { apply (msg1 = msg2).
-    }
-
-    (* Stderr *)
-    { apply (msg1 = msg2).
-    }
-
-    (* Intrinsics *)
-    { apply (dt1 = dt2 /\
-               name1 = name2 /\
-               Forall2 dvalue_refine_strict args1 args2).
-    }
-
-    (* Locals *)
-    { inversion e1.
-      - (* Local write *)
-        destruct e2 eqn:HE2.
-        + apply (id = id0 /\
-                   uvalue_refine_strict dv dv0).
-        + apply False.
-      - (* Local read *)
-        destruct e2 eqn:HE2.
-        + apply False.
-        + apply (id = id0).
-    }
-
-    (* Stack *)
-    { inversion e1.
-      - (* Stack Push *)
-        destruct e2 eqn:HE2.
-        + apply (local_refine_strict args args0).
-        + apply False.
-      - (* Stack Pop *)
-        destruct e2 eqn:HE2.
-        + apply False.
-        + apply True.
-    }
-
-    (* MemoryE *)
-    { inversion e1.
-      - (* MemPush *)
-        destruct e2 eqn:HE2.
-        2-5: apply False.
-
-        apply True.
-      - (* MemPop *)
-        destruct e2 eqn:HE2.
-        2: apply True.
-        all: apply False.
-      - (* Alloca *)
-        destruct e2 eqn:HE2.
-        1,2,4,5: apply False.
-
-        apply (t = t0 /\
-                 num_elements = num_elements0 /\
-                 align = align0).
-      - (* Load *)
-        destruct e2 eqn:HE2.
-        1-3,5: apply False.
-        apply (t = t0 /\
-                 dvalue_refine_strict a a0).
-      - (* Store *)
-        destruct e2 eqn:HE2.
-        1-4: apply False.
-
-        apply (t = t0 /\
-                 dvalue_refine_strict a a0 /\
-                 uvalue_refine_strict v v0).
-    }
-
-    (* PickE *)
-    { (* TODO: confirm whether this is sane... *)
-      inversion e1.
-      - (* pickUnique *)
-        subst.
-        destruct e2.
-        + apply (uvalue_refine_strict x x0).
-        + exact False.
-        + exact False.
-      - (* pickNonPoison *)
-        subst.
-        destruct e2.
-        + exact False.
-        + apply (uvalue_refine_strict x x0).
-        + exact False.
-      - (* pick *)
-        subst.
-        destruct e2.
-        + exact False.
-        + exact False.
-        + apply (uvalue_refine_strict x x0).
-    }
-
-    (* OOME *)
-    { apply True.
-    }
-
-    (* UBE *)
-    { apply True.
-    }
-
-    (* DebugE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
-
-    (* FailureE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
   Defined.
 
   Definition L2_refine_strict A B (e1 : IS1.LP.Events.L2 A) (e2 : IS2.LP.Events.L2 B) : Prop.
   Proof.
     refine (match e1, e2 with
-            | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
-                _
-            | inl1 (E1.IO_stdout msg1), inl1 (E2.IO_stdout msg2) =>
-                _
-            | inl1 (E1.IO_stderr msg1), inl1 (E2.IO_stderr msg2) =>
-                _
-            | inr1 (inl1 (E1.Intrinsic dt1 name1 args1)), inr1 (inl1 (E2.Intrinsic dt2 name2 args2)) =>
-                _ (* IntrinsicE *)
+            | inl1 e1, inl1 e2 =>
+                external_call_refine_strict e1 e2
+            | inr1 (inl1 e1), inr1 (inl1 e2) =>
+                intrinsic_refine_strict e1 e2
             | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
-                _ (* MemoryE *)
+                memoryE_refine_strict e1 e2
             | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
-                _ (* PickE *)
+                pickE_refine_strict e1 e2
             | inr1 (inr1 (inr1 (inr1 (inl1 e0)))), inr1 (inr1 (inr1 (inr1 (inl1 e1)))) =>
-                _ (* OOME *)
+                oomE_refine_strict e0 e1
             | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
-                _ (* UBE *)
+                llvmExcE_refine_strict e1 e2
             | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))) =>
-                _ (* DebugE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2)))))) =>
-                _ (* FailureE *)
+                ubE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))) =>
+                debugE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2))))))) =>
+                failureE_refine_strict e1 e2
             | _, _ =>
                 (* Mismatch of event types *)
                 False
             end).
-
-    (* External Calls *)
-    { (* Doesn't say anything about return value... *)
-      apply (dt1 = dt2 /\
-               uvalue_refine_strict f1 f2 /\
-               Forall2 dvalue_refine_strict args1 args2).
-    }
-
-    (* Stdout *)
-    { apply (msg1 = msg2).
-    }
-
-    (* Stderr *)
-    { apply (msg1 = msg2).
-    }
-
-    (* Intrinsics *)
-    { apply (dt1 = dt2 /\
-               name1 = name2 /\
-               Forall2 dvalue_refine_strict args1 args2).
-    }
-
-    (* MemoryE *)
-    { inversion e1.
-      - (* MemPush *)
-        destruct e2 eqn:HE2.
-        2-5: apply False.
-
-        apply True.
-      - (* MemPop *)
-        destruct e2 eqn:HE2.
-        2: apply True.
-        all: apply False.
-      - (* Alloca *)
-        destruct e2 eqn:HE2.
-        1,2,4,5: apply False.
-
-        apply (t = t0 /\
-                 num_elements = num_elements0 /\
-                 align = align0).
-      - (* Load *)
-        destruct e2 eqn:HE2.
-        1-3,5: apply False.
-        apply (t = t0 /\
-                 dvalue_refine_strict a a0).
-      - (* Store *)
-        destruct e2 eqn:HE2.
-        1-4: apply False.
-
-        apply (t = t0 /\
-                 dvalue_refine_strict a a0 /\
-                 uvalue_refine_strict v v0).
-    }
-
-    (* PickE *)
-    { (* TODO: confirm whether this is sane... *)
-      inversion e1.
-      - (* pickUnique *)
-        subst.
-        destruct e2.
-        + apply (uvalue_refine_strict x x0).
-        + exact False.
-        + exact False.
-      - (* pickNonPoison *)
-        subst.
-        destruct e2.
-        + exact False.
-        + apply (uvalue_refine_strict x x0).
-        + exact False.
-      - (* pick *)
-        subst.
-        destruct e2.
-        + exact False.
-        + exact False.
-        + apply (uvalue_refine_strict x x0).
-    }
-
-    (* OOME *)
-    { apply True.
-    }
-
-    (* UBE *)
-    { apply True.
-    }
-
-    (* DebugE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
-
-    (* FailureE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
   Defined.
 
   Definition L3_refine_strict A B (e1 : IS1.LP.Events.L3 A) (e2 : IS2.LP.Events.L3 B) : Prop.
   Proof.
     refine (match e1, e2 with
-            | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
-                _
-            | inl1 (E1.IO_stdout msg1), inl1 (E2.IO_stdout msg2) =>
-                _
-            | inl1 (E1.IO_stderr msg1), inl1 (E2.IO_stderr msg2) =>
-                _
+            | inl1 e1, inl1 e2 =>
+                external_call_refine_strict e1 e2
             | inr1 (inl1 e1), inr1 (inl1 e2) =>
-                _ (* PickE *)
+                pickE_refine_strict e1 e2
             | inr1 (inr1 (inl1 e0)), inr1 (inr1 (inl1 e1)) =>
-                _ (* OOME *)
+                oomE_refine_strict e0 e1
             | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
-                _ (* UBE *)
+                llvmExcE_refine_strict e1 e2
             | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
-                _ (* DebugE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 e1)))), inr1 (inr1 (inr1 (inr1 (inr1 e2)))) =>
-                _ (* FailureE *)
+                ubE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
+                debugE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2))))) =>
+                failureE_refine_strict e1 e2
             | _, _ =>
                 (* Mismatch of event types *)
                 False
             end).
-
-    (* External Calls *)
-    { (* Doesn't say anything about return value... *)
-      apply (dt1 = dt2 /\
-               uvalue_refine_strict f1 f2 /\
-               Forall2 dvalue_refine_strict args1 args2).
-    }
-
-    (* Stdout *)
-    { apply (msg1 = msg2).
-    }
-
-    (* Stderr *)
-    { apply (msg1 = msg2).
-    }
-
-    (* PickE *)
-    { (* TODO: confirm whether this is sane... *)
-      inversion e1.
-      - (* pickUnique *)
-        subst.
-        destruct e2.
-        + apply (uvalue_refine_strict x x0).
-        + exact False.
-        + exact False.
-      - (* pickNonPoison *)
-        subst.
-        destruct e2.
-        + exact False.
-        + apply (uvalue_refine_strict x x0).
-        + exact False.
-      - (* pick *)
-        subst.
-        destruct e2.
-        + exact False.
-        + exact False.
-        + apply (uvalue_refine_strict x x0).
-    }
-
-    (* OOME *)
-    { apply True.
-    }
-
-    (* UBE *)
-    { apply True.
-    }
-
-    (* DebugE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
-
-    (* FailureE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
   Defined.
 
   Definition L4_refine_strict A B (e1 : IS1.LP.Events.L4 A) (e2 : IS2.LP.Events.L4 B) : Prop.
   Proof.
     refine (match e1, e2 with
-            | inl1 (E1.ExternalCall dt1 f1 args1), inl1 (E2.ExternalCall dt2 f2 args2) =>
-                _
-            | inl1 (E1.IO_stdout msg1), inl1 (E2.IO_stdout msg2) =>
-                _
-            | inl1 (E1.IO_stderr msg1), inl1 (E2.IO_stderr msg2) =>
-                _
-            | inr1 (inl1 e1), inr1 (inl1 e2) =>
-                _ (* OOME *)
-            | inr1 (inr1 (inl1 e0)), inr1 (inr1 (inl1 e1)) =>
-                _ (* UBE *)
+            | inl1 e1, inl1 e2 =>
+                external_call_refine_strict e1 e2
+            | inr1 (inl1 e0), inr1 (inl1 e1) =>
+                oomE_refine_strict e0 e1
+            | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
+                llvmExcE_refine_strict e1 e2
             | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
-                _ (* DebugE *)
-            | inr1 (inr1 (inr1 (inr1 e1))), inr1 (inr1 (inr1 (inr1 e2))) =>
-                _ (* FailureE *)
+                ubE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
+                debugE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inr1 e1)))), inr1 (inr1 (inr1 (inr1 (inr1 e2)))) =>
+                failureE_refine_strict e1 e2
             | _, _ =>
                 (* Mismatch of event types *)
                 False
             end).
-
-    (* External Calls *)
-    { (* Doesn't say anything about return value... *)
-      apply (dt1 = dt2 /\
-               uvalue_refine_strict f1 f2 /\
-               Forall2 dvalue_refine_strict args1 args2).
-    }
-
-    (* Stdout *)
-    { apply (msg1 = msg2).
-    }
-
-    (* Stderr *)
-    { apply (msg1 = msg2).
-    }
-
-    (* OOME *)
-    { apply True.
-    }
-
-    (* UBE *)
-    { apply True.
-    }
-
-    (* DebugE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
-
-    (* FailureE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
   Defined.
 
-  Definition event_res_refine_strict A B (e1 : IS1.LP.Events.L0 A) (res1 : A) (e2 : IS2.LP.Events.L0 B) (res2 : B) : Prop.
-  Proof.
-    refine (match e1, e2 with
-            | inl1 e1, inl1 e2 =>
-                _
-            | inr1 (inl1 e1), inr1 (inl1 e2) =>
-                _ (* IntrinsicE *)
-            | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
-                _ (* Globals *)
-            | inr1 (inr1 (inr1 (inl1 (inl1 e1)))), inr1 (inr1 (inr1 (inl1 (inl1 e2)))) =>
-                _ (* Locals *)
-            | inr1 (inr1 (inr1 (inl1 (inr1 e1)))), inr1 (inr1 (inr1 (inl1 (inr1 e2)))) =>
-                _ (* Stack *)
-            | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
-                _ (* MemoryE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
-                _ (* PickE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))) =>
-                _ (* OOME *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))) =>
-                _ (* UBE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))))) =>
-                _ (* DebugE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2)))))))) =>
-                _ (* FailureE *)
-            | _, _ =>
-                (* Mismatch of event types *)
-                False
-            end).
 
+  Definition external_call_res_refine_strict {A B} (e1 : E1.ExternalCallE A) (res1 : A) (e2 : E2.ExternalCallE B) (res2 : B) : Prop.
     (* External Calls *)
-    { inv e1.
-      - (* ExternalCall *)
-        inv e2.
-        { apply (t = t0 /\
+    inv e1.
+    - (* ExternalCall *)
+      inv e2.
+      { apply (t = t0 /\
                  uvalue_refine_strict f f0 /\
                  Forall2 dvalue_refine_strict args args0 /\
                  dvalue_refine_strict res1 res2
-                ).
-        }
-        all: exact False. (* Mismatch of event types *)
-      - (* Stdout *)
-        inv e2.
-        2: {
-          apply (str = str0).
-        }
-        all: exact False. (* Mismatch of event types *)
-      - (* Stderr *)
-        inv e2.
-        3: {
-          apply (str = str0).
-        }
-        all: exact False. (* Mismatch of event types *)
-    }
-
-    (* Intrinsics *)
-    { inv e1.
+              ).
+      }
+      all: exact False. (* Mismatch of event types *)
+    - (* Stdout *)
       inv e2.
-      apply (t = t0 /\
-               f = f0 /\
-               Forall2 dvalue_refine_strict args args0 /\
-               dvalue_refine_strict res1 res2
-            ).
-    }
+      2: {
+        apply (str = str0).
+      }
+      all: exact False. (* Mismatch of event types *)
+    - (* Stderr *)
+      inv e2.
+      3: {
+        apply (str = str0).
+      }
+      all: exact False. (* Mismatch of event types *)
+  Defined.
 
+  Definition intrinsic_res_refine_strict {A B} (e1 : E1.IntrinsicE A) (res1 : A) (e2 : E2.IntrinsicE B) (res2 : B) : Prop.
+    (* Intrinsics *)
+    inv e1.
+    inv e2.
+    apply (t = t0 /\
+             f = f0 /\
+             Forall2 dvalue_refine_strict args args0 /\
+             sum_rel uvalue_refine_strict dvalue_refine_strict res1 res2
+          ).
+  Defined.
+
+  Definition globalE_res_refine_strict {A B} (e1 : GlobalE LLVMAst.raw_id E1.DV.dvalue A) (res1 : A) (e2 : GlobalE LLVMAst.raw_id E2.DV.dvalue B) (res2 : B) : Prop.
     (* Globals *)
     { inversion e1; subst.
       - (* Global write *)
-        destruct e2 eqn:HE2.
+        inversion e2.
         + apply (id = id0 /\
                    dvalue_refine_strict dv dv0).
         + apply False.
@@ -2057,11 +1789,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                    dvalue_refine_strict res1 res2
                 ).
     }
+  Defined.
 
+  Definition localE_res_refine_strict {A B} (e1 : LocalE LLVMAst.raw_id E1.DV.uvalue A) (res1 : A) (e2 : LocalE LLVMAst.raw_id E2.DV.uvalue B) (res2 : B) : Prop.
     (* Locals *)
     { inversion e1; subst.
       - (* Local write *)
-        destruct e2 eqn:HE2.
+        inversion e2.
         + apply (id = id0 /\
                    uvalue_refine_strict dv dv0).
         + apply False.
@@ -2071,32 +1805,52 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         + apply (id = id0 /\
                 uvalue_refine_strict res1 res2).
     }
+  Defined.
 
+  Definition stackE_res_refine_strict {A B} (e1 : StackE LLVMAst.raw_id E1.DV.uvalue E1.DV.uvalue A) (res1 : A) (e2 : StackE LLVMAst.raw_id E2.DV.uvalue E2.DV.uvalue B) (res2 : B) : Prop.
     (* Stack *)
-    { inversion e1; subst.
+    { inversion e1.
       - (* Stack Push *)
-        destruct e2 eqn:HE2.
-        + apply (local_refine_strict args args0).
-        + apply False.
+        inversion e2; subst.
+        1: apply (local_refine_strict args args0).
+        all: apply False.
       - (* Stack Pop *)
         destruct e2 eqn:HE2.
-        + apply False.
-        + apply True.
+        2: apply True.
+        all: apply False.
+      - (* StackSetHandler *)
+        destruct e2 eqn:HE2.
+        3: apply (Rocqlib.option_rel eq H o).
+        all: apply False.
+      - (* StackHandler *)
+        inversion e2; subst.
+        4: apply (res1 = res2).
+        all: apply False.
+      - (* StackRaise *)
+        inversion e2; subst.
+        5: apply (uvalue_refine_strict H H1).
+        all: apply False.
+      - (* StackGetExc *)
+        inversion e2; subst.
+        6: apply (Rocqlib.option_rel uvalue_refine_strict res1 res2).
+        all: apply False.        
     }
+  Defined.
 
+  Definition memoryE_res_refine_strict {A B} (e1 : E1.MemoryE A) (res1 : A) (e2 : E2.MemoryE B) (res2 : B) : Prop.
     (* MemoryE *)
     { inversion e1; subst.
       - (* MemPush *)
-        destruct e2 eqn:HE2.
+        inversion e2; subst.
         2-5: apply False.
 
         apply True.
       - (* MemPop *)
-        destruct e2 eqn:HE2.
+        inversion e2; subst.
         2: apply True.
         all: apply False.
       - (* Alloca *)
-        destruct e2 eqn:HE2.
+        inversion e2; subst.
         1,2,4,5: apply False.
 
         apply (t = t0 /\
@@ -2104,7 +1858,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                  align = align0 /\
                  dvalue_refine_strict res1 res2).
       - (* Load *)
-        destruct e2 eqn:HE2.
+        inversion e2; subst.
         1-3,5: apply False.
         apply (t = t0 /\
                  dvalue_refine_strict a a0 /\
@@ -2117,530 +1871,316 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                  dvalue_refine_strict a a0 /\
                  uvalue_refine_strict v v0).
     }
+  Defined.
 
+  Definition pickE_res_refine_strict {A B} (e1 : E1.PickUvalueE A) (res1 : A) (e2 : E2.PickUvalueE B) (res2 : B) : Prop.
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
       inversion e1.
       - (* pickUnique *)
-        subst.
-        destruct e2.
+        inversion e2; subst.
         + destruct res1 as [r1 P1].
           destruct res2 as [r2 P2].
           apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
         + exact False.
         + exact False.
       - (* pickNonPoison *)
-        subst.
-        destruct e2.
+        inversion e2; subst.
         + exact False.
         + destruct res1 as [r1 P1].
           destruct res2 as [r2 P2].
           apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
         + exact False.
       - (* pick *)
-        subst.
-        destruct e2.
+        inversion e2; subst.
         + exact False.
         + exact False.
         + destruct res1 as [r1 P1].
           destruct res2 as [r2 P2].
           apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
     }
+  Defined.
 
+  Definition oomE_res_refine_strict {A B} (e1 : OOME A) (res1 : A) (e2 : OOME B) (res2 : B) : Prop.
     (* OOME *)
     { apply True.
     }
+  Defined.
 
+  Definition llvmExcE_res_refine_strict {A B} (e1 : LLVMExcE E1.DV.uvalue A) (res1 : A) (e2 : LLVMExcE E2.DV.uvalue B) (res2 : B) : Prop.
+    (* LLVMExcE *)
+    { inversion e1; inversion e2; subst.
+      apply (uvalue_refine_strict H H1).
+    }
+  Defined.
+
+  Definition ubE_res_refine_strict {A B} (e1 : UBE A) (res1 : A) (e2 : UBE B) (res2 : B) : Prop.
     (* UBE *)
     { apply True.
     }
+  Defined.
 
+  Definition debugE_res_refine_strict {A B} (e1 : DebugE A) (res1 : A) (e2 : DebugE B) (res2 : B) : Prop.
     (* DebugE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
+    { refine
+        (match e1, e2 with
+         | Debug e1_msg, Debug e2_msg =>
+             e1_msg = e2_msg
+         end).
     }
+  Defined.
 
+  Definition failureE_res_refine_strict {A B} (e1 : FailureE A) (res1 : A) (e2 : FailureE B) (res2 : B) : Prop.
     (* FailureE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
+    { inversion e1; inversion e2; subst.
+      exact True.
     }
+  Defined.
+
+  Lemma external_call_res_refine_strict_external_call_refine_strict {A B} (e1 : E1.ExternalCallE A) (res1 : A) (e2 : E2.ExternalCallE B) (res2 : B) :
+    external_call_res_refine_strict e1 res1 e2 res2 -> external_call_refine_strict e1 e2.
+  Proof.
+    intros RES; red; red in RES.
+    repeat (break_match_goal; subst; cbn in *; eauto);
+      tauto.
+  Qed.
+  
+  Lemma intrinsic_res_refine_strict_intrinsic_refine_strict {A B} (e1 : E1.IntrinsicE A) (res1 : A) (e2 : E2.IntrinsicE B) (res2 : B) :
+    intrinsic_res_refine_strict e1 res1 e2 res2 -> intrinsic_refine_strict e1 e2.
+  Proof.
+    intros RES; red; red in RES.
+    repeat (break_match_goal; subst; cbn in *; eauto);
+      tauto.
+  Qed.
+
+  Lemma globalE_res_refine_strict_globalE_refine_strict {A B} (e1 : GlobalE LLVMAst.raw_id E1.DV.dvalue A) (res1 : A) (e2 : GlobalE LLVMAst.raw_id E2.DV.dvalue B) (res2 : B) :
+    globalE_res_refine_strict e1 res1 e2 res2 -> globalE_refine_strict e1 e2.
+  Proof.
+    intros RES; red; red in RES.
+    repeat (break_match_goal; subst; cbn in *; eauto);
+      tauto.
+  Qed.
+
+  Lemma localE_res_refine_strict_localE_refine_strict {A B} (e1 : LocalE LLVMAst.raw_id E1.DV.uvalue A) (res1 : A) (e2 : LocalE LLVMAst.raw_id E2.DV.uvalue B) (res2 : B) :
+    localE_res_refine_strict e1 res1 e2 res2 -> localE_refine_strict e1 e2.
+  Proof.
+    intros RES; red; red in RES.
+    repeat (break_match_goal; subst; cbn in *; eauto);
+      tauto.
+  Qed.
+
+  Lemma stackE_res_refine_strict_stackE_refine_strict {A B} (e1 : StackE LLVMAst.raw_id E1.DV.uvalue E1.DV.uvalue A) (res1 : A) (e2 : StackE LLVMAst.raw_id E2.DV.uvalue E2.DV.uvalue B) (res2 : B) :
+    stackE_res_refine_strict e1 res1 e2 res2 -> stackE_refine_strict e1 e2.
+  Proof.
+    intros RES; red; red in RES.
+    repeat (break_match_goal; subst; cbn in *; eauto);
+      tauto.
+  Qed.
+
+  Lemma memoryE_res_refine_strict_memoryE_refine_strict {A B} (e1 : E1.MemoryE A) (res1 : A) (e2 : E2.MemoryE B) (res2 : B) :
+    memoryE_res_refine_strict e1 res1 e2 res2 -> memoryE_refine_strict e1 e2.
+  Proof.
+    intros RES; red; red in RES.
+    repeat (break_match_goal; subst; cbn in *; eauto);
+      tauto.
+  Qed.
+
+  Lemma pickE_res_refine_strict_pickE_refine_strict {A B} (e1 : E1.PickUvalueE A) (res1 : A) (e2 : E2.PickUvalueE B) (res2 : B) :
+    pickE_res_refine_strict e1 res1 e2 res2 -> pickE_refine_strict e1 e2.
+  Proof.
+    destruct e1, e2; destruct res1, res2; cbn in *;
+    intros RES; cbn in *;
+    repeat (break_match_goal; subst; cbn in *; eauto);
+      try tauto.
+  Qed.
+
+  Lemma oomE_res_refine_strict_oomE_refine_strict {A B} (e1 : OOME A) (res1 : A) (e2 : OOME B) (res2 : B) :
+    oomE_res_refine_strict e1 res1 e2 res2 -> oomE_refine_strict e1 e2.
+  Proof.
+    intros RES; red; red in RES.
+    repeat (break_match_goal; subst; cbn in *; eauto);
+      tauto.
+  Qed.
+
+  Lemma llvmExcE_res_refine_strict_llvmExcE_refine_strict {A B} (e1 : LLVMExcE E1.DV.uvalue A) (res1 : A) (e2 : LLVMExcE E2.DV.uvalue B) (res2 : B) :
+    llvmExcE_res_refine_strict e1 res1 e2 res2 -> llvmExcE_refine_strict e1 e2.
+  Proof.
+    intros RES; red; red in RES.
+    repeat (break_match_goal; subst; cbn in *; eauto);
+      tauto.
+  Qed.
+
+  Lemma ubE_res_refine_strict_ubE_refine_strict {A B} (e1 : UBE A) (res1 : A) (e2 : UBE B) (res2 : B) :
+    ubE_res_refine_strict e1 res1 e2 res2 -> ubE_refine_strict e1 e2.
+  Proof.
+    intros RES; red; red in RES.
+    repeat (break_match_goal; subst; cbn in *; eauto);
+      tauto.
+  Qed.
+  
+  Lemma debugE_res_refine_strict_debugE_refine_strict {A B} (e1 : DebugE A) (res1 : A) (e2 : DebugE B) (res2 : B) :
+    debugE_res_refine_strict e1 res1 e2 res2 -> debugE_refine_strict e1 e2.
+  Proof.
+    intros RES; red; red in RES.
+    repeat (break_match_goal; subst; cbn in *; eauto);
+      tauto.
+  Qed.
+  
+  Lemma failureE_res_refine_strict_failureE_refine_strict {A B} (e1 : FailureE A) (res1 : A) (e2 : FailureE B) (res2 : B) :
+    failureE_res_refine_strict e1 res1 e2 res2 -> failureE_refine_strict e1 e2.
+  Proof.
+    intros RES; red; red in RES.
+    repeat (break_match_goal; subst; cbn in *; eauto);
+      tauto.
+  Qed.
+
+  #[global] Hint Resolve
+    external_call_res_refine_strict_external_call_refine_strict
+    intrinsic_res_refine_strict_intrinsic_refine_strict
+    globalE_res_refine_strict_globalE_refine_strict
+    localE_res_refine_strict_localE_refine_strict
+    stackE_res_refine_strict_stackE_refine_strict
+    memoryE_res_refine_strict_memoryE_refine_strict
+    pickE_res_refine_strict_pickE_refine_strict
+    oomE_res_refine_strict_oomE_refine_strict
+    llvmExcE_res_refine_strict_llvmExcE_refine_strict
+    ubE_res_refine_strict_ubE_refine_strict
+    debugE_res_refine_strict_debugE_refine_strict
+    failureE_res_refine_strict_failureE_refine_strict : REFINE_DB.   
+
+  Definition event_res_refine_strict A B (e1 : IS1.LP.Events.L0 A) (res1 : A) (e2 : IS2.LP.Events.L0 B) (res2 : B) : Prop.
+  Proof.
+    refine (match e1, e2 with
+            | inl1 e1, inl1 e2 =>
+                external_call_res_refine_strict e1 res1 e2 res2
+            | inr1 (inl1 e1), inr1 (inl1 e2) =>
+                intrinsic_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
+                globalE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inl1 (inl1 e1)))), inr1 (inr1 (inr1 (inl1 (inl1 e2)))) =>
+                localE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inl1 (inr1 e1)))), inr1 (inr1 (inr1 (inl1 (inr1 e2)))) =>
+                stackE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
+                memoryE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
+                pickE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))) =>
+                oomE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))) =>
+                llvmExcE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))))) =>
+                ubE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))))) =>
+                debugE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1))))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2))))))))) =>
+                failureE_res_refine_strict e1 res1 e2 res2
+            | _, _ =>
+                (* Mismatch of event types *)
+                False
+            end).
   Defined.
 
   Definition L1_res_refine_strict A B (e1 : IS1.LP.Events.L1 A) (res1 : A) (e2 : IS2.LP.Events.L1 B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
-                _
+                external_call_res_refine_strict e1 res1 e2 res2
             | inr1 (inl1 e1), inr1 (inl1 e2) =>
-                _ (* IntrinsicE *)
+                intrinsic_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inl1 (inl1 e1))), inr1 (inr1 (inl1 (inl1 e2))) =>
-                _ (* Locals *)
+                localE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inl1 (inr1 e1))), inr1 (inr1 (inl1 (inr1 e2))) =>
-                _ (* Stack *)
+                stackE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
-                _ (* MemoryE *)
+                memoryE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
-                _ (* PickE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e0))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))) =>
-                _ (* OOME *)
+                pickE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
+                oomE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))) =>
-                _ (* UBE *)
+                llvmExcE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))) =>
-                _ (* DebugE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2))))))) =>
-                _ (* FailureE *)
+                ubE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))))) =>
+                debugE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1)))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2)))))))) =>
+                failureE_res_refine_strict e1 res1 e2 res2
             | _, _ =>
                 (* Mismatch of event types *)
                 False
             end).
-
-    (* External Calls *)
-    { inv e1.
-      - (* ExternalCall *)
-        inv e2.
-        { apply (t = t0 /\
-                 uvalue_refine_strict f f0 /\
-                 Forall2 dvalue_refine_strict args args0 /\
-                 dvalue_refine_strict res1 res2
-                ).
-        }
-        all: exact False. (* Mismatch of event types *)
-      - (* Stdout *)
-        inv e2.
-        2: {
-          apply (str = str0).
-        }
-        all: exact False. (* Mismatch of event types *)
-      - (* Stderr *)
-        inv e2.
-        3: {
-          apply (str = str0).
-        }
-        all: exact False. (* Mismatch of event types *)
-    }
-
-    (* Intrinsics *)
-    { inv e1.
-      inv e2.
-      apply (t = t0 /\
-               f = f0 /\
-               Forall2 dvalue_refine_strict args args0 /\
-               dvalue_refine_strict res1 res2
-            ).
-    }
-
-    (* Locals *)
-    { inversion e1; subst.
-      - (* Local write *)
-        destruct e2 eqn:HE2.
-        + apply (id = id0 /\
-                   uvalue_refine_strict dv dv0).
-        + apply False.
-      - (* Local read *)
-        destruct e2 eqn:HE2.
-        + apply False.
-        + apply (id = id0 /\
-                uvalue_refine_strict res1 res2).
-    }
-
-    (* Stack *)
-    { inversion e1; subst.
-      - (* Stack Push *)
-        destruct e2 eqn:HE2.
-        + apply (local_refine_strict args args0).
-        + apply False.
-      - (* Stack Pop *)
-        destruct e2 eqn:HE2.
-        + apply False.
-        + apply True.
-    }
-
-    (* MemoryE *)
-    { inversion e1; subst.
-      - (* MemPush *)
-        destruct e2 eqn:HE2.
-        2-5: apply False.
-
-        apply True.
-      - (* MemPop *)
-        destruct e2 eqn:HE2.
-        2: apply True.
-        all: apply False.
-      - (* Alloca *)
-        destruct e2 eqn:HE2.
-        1,2,4,5: apply False.
-
-        apply (t = t0 /\
-                 num_elements = num_elements0 /\
-                 align = align0 /\
-                 dvalue_refine_strict res1 res2).
-      - (* Load *)
-        destruct e2 eqn:HE2.
-        1-3,5: apply False.
-        apply (t = t0 /\
-                 dvalue_refine_strict a a0 /\
-                 uvalue_refine_strict res1 res2).
-      - (* Store *)
-        destruct e2 eqn:HE2.
-        1-4: apply False.
-
-        apply (t = t0 /\
-                 dvalue_refine_strict a a0 /\
-                 uvalue_refine_strict v v0).
-    }
-
-    (* PickE *)
-    { (* TODO: confirm whether this is sane... *)
-      inversion e1.
-      - (* pickUnique *)
-        subst.
-        destruct e2.
-        + destruct res1 as [r1 P1].
-          destruct res2 as [r2 P2].
-          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
-        + exact False.
-        + exact False.
-      - (* pickNonPoison *)
-        subst.
-        destruct e2.
-        + exact False.
-        + destruct res1 as [r1 P1].
-          destruct res2 as [r2 P2].
-          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
-        + exact False.
-      - (* pick *)
-        subst.
-        destruct e2.
-        + exact False.
-        + exact False.
-        + destruct res1 as [r1 P1].
-          destruct res2 as [r2 P2].
-          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
-    }
-
-    (* OOME *)
-    { apply True.
-    }
-
-    (* UBE *)
-    { apply True.
-    }
-
-    (* DebugE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
-
-    (* FailureE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
   Defined.
 
   Definition L2_res_refine_strict A B (e1 : IS1.LP.Events.L2 A) (res1 : A) (e2 : IS2.LP.Events.L2 B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
-                _
+                external_call_res_refine_strict e1 res1 e2 res2
             | inr1 (inl1 e1), inr1 (inl1 e2) =>
-                _ (* IntrinsicE *)
+                intrinsic_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
-                _ (* MemoryE *)
+                memoryE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
-                _ (* PickE *)
-            | inr1 (inr1 (inr1 (inr1 (inl1 e0)))), inr1 (inr1 (inr1 (inr1 (inl1 e1)))) =>
-                _ (* OOME *)
+                pickE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
+                oomE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
-                _ (* UBE *)
+                llvmExcE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))) =>
-                _ (* DebugE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2)))))) =>
-                _ (* FailureE *)
+                ubE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))) =>
+                debugE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2))))))) =>
+                failureE_res_refine_strict e1 res1 e2 res2
             | _, _ =>
                 (* Mismatch of event types *)
                 False
             end).
-
-    (* External Calls *)
-    { inv e1.
-      - (* ExternalCall *)
-        inv e2.
-        { apply (t = t0 /\
-                 uvalue_refine_strict f f0 /\
-                 Forall2 dvalue_refine_strict args args0 /\
-                 dvalue_refine_strict res1 res2
-                ).
-        }
-        all: exact False. (* Mismatch of event types *)
-      - (* Stdout *)
-        inv e2.
-        2: {
-          apply (str = str0).
-        }
-        all: exact False. (* Mismatch of event types *)
-      - (* Stderr *)
-        inv e2.
-        3: {
-          apply (str = str0).
-        }
-        all: exact False. (* Mismatch of event types *)
-    }
-
-    (* Intrinsics *)
-    { inv e1.
-      inv e2.
-      apply (t = t0 /\
-               f = f0 /\
-               Forall2 dvalue_refine_strict args args0 /\
-               dvalue_refine_strict res1 res2
-            ).
-    }
-
-    (* MemoryE *)
-    { inversion e1; subst.
-      - (* MemPush *)
-        destruct e2 eqn:HE2.
-        2-5: apply False.
-
-        apply True.
-      - (* MemPop *)
-        destruct e2 eqn:HE2.
-        2: apply True.
-        all: apply False.
-      - (* Alloca *)
-        destruct e2 eqn:HE2.
-        1,2,4,5: apply False.
-
-        apply (t = t0 /\
-                 num_elements = num_elements0 /\
-                 align = align0 /\
-                 dvalue_refine_strict res1 res2).
-      - (* Load *)
-        destruct e2 eqn:HE2.
-        1-3,5: apply False.
-        apply (t = t0 /\
-                 dvalue_refine_strict a a0 /\
-                 uvalue_refine_strict res1 res2).
-      - (* Store *)
-        destruct e2 eqn:HE2.
-        1-4: apply False.
-
-        apply (t = t0 /\
-                 dvalue_refine_strict a a0 /\
-                 uvalue_refine_strict v v0).
-    }
-
-    (* PickE *)
-    { (* TODO: confirm whether this is sane... *)
-      inversion e1.
-      - (* pickUnique *)
-        subst.
-        destruct e2.
-        + destruct res1 as [r1 P1].
-          destruct res2 as [r2 P2].
-          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
-        + exact False.
-        + exact False.
-      - (* pickNonPoison *)
-        subst.
-        destruct e2.
-        + exact False.
-        + destruct res1 as [r1 P1].
-          destruct res2 as [r2 P2].
-          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
-        + exact False.
-      - (* pick *)
-        subst.
-        destruct e2.
-        + exact False.
-        + exact False.
-        + destruct res1 as [r1 P1].
-          destruct res2 as [r2 P2].
-          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
-    }
-
-    (* OOME *)
-    { apply True.
-    }
-
-    (* UBE *)
-    { apply True.
-    }
-
-    (* DebugE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
-
-    (* FailureE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
   Defined.
 
   Definition L3_res_refine_strict A B (e1 : IS1.LP.Events.L3 A) (res1 : A) (e2 : IS2.LP.Events.L3 B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
-                _
+                external_call_res_refine_strict e1 res1 e2 res2
             | inr1 (inl1 e1), inr1 (inl1 e2) =>
-                _ (* PickE *)
-            | inr1 (inr1 (inl1 e0)), inr1 (inr1 (inl1 e1)) =>
-                _ (* OOME *)
+                pickE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
+                oomE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
-                _ (* UBE *)
+                llvmExcE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
-                _ (* DebugE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 e1)))), inr1 (inr1 (inr1 (inr1 (inr1 e2)))) =>
-                _ (* FailureE *)
+                ubE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
+                debugE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2))))) =>
+                failureE_res_refine_strict e1 res1 e2 res2
             | _, _ =>
                 (* Mismatch of event types *)
                 False
             end).
-
-    (* External Calls *)
-    { inv e1.
-      - (* ExternalCall *)
-        inv e2.
-        { apply (t = t0 /\
-                 uvalue_refine_strict f f0 /\
-                 Forall2 dvalue_refine_strict args args0 /\
-                 dvalue_refine_strict res1 res2
-                ).
-        }
-        all: exact False. (* Mismatch of event types *)
-      - (* Stdout *)
-        inv e2.
-        2: {
-          apply (str = str0).
-        }
-        all: exact False. (* Mismatch of event types *)
-      - (* Stderr *)
-        inv e2.
-        3: {
-          apply (str = str0).
-        }
-        all: exact False. (* Mismatch of event types *)
-    }
-
-    (* PickE *)
-    { (* TODO: confirm whether this is sane... *)
-      inversion e1.
-      - (* pickUnique *)
-        subst.
-        destruct e2.
-        + destruct res1 as [r1 P1].
-          destruct res2 as [r2 P2].
-          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
-        + exact False.
-        + exact False.
-      - (* pickNonPoison *)
-        subst.
-        destruct e2.
-        + exact False.
-        + destruct res1 as [r1 P1].
-          destruct res2 as [r2 P2].
-          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
-        + exact False.
-      - (* pick *)
-        subst.
-        destruct e2.
-        + exact False.
-        + exact False.
-        + destruct res1 as [r1 P1].
-          destruct res2 as [r2 P2].
-          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
-    }
-
-    (* OOME *)
-    { apply True.
-    }
-
-    (* UBE *)
-    { apply True.
-    }
-
-    (* DebugE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
-
-    (* FailureE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
   Defined.
 
   Definition L4_res_refine_strict A B (e1 : IS1.LP.Events.L4 A) (res1 : A) (e2 : IS2.LP.Events.L4 B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
-                _
+                external_call_res_refine_strict e1 res1 e2 res2
             | inr1 (inl1 e1), inr1 (inl1 e2) =>
-                _ (* OOME *)
-            | inr1 (inr1 (inl1 e0)), inr1 (inr1 (inl1 e1)) =>
-                _ (* UBE *)
+                oomE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
+                llvmExcE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
-                _ (* DebugE *)
-            | inr1 (inr1 (inr1 (inr1 e1))), inr1 (inr1 (inr1 (inr1 e2))) =>
-                _ (* FailureE *)
+                ubE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
+                debugE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 e1)))), inr1 (inr1 (inr1 (inr1 (inr1 e2)))) =>
+                failureE_res_refine_strict e1 res1 e2 res2
             | _, _ =>
                 (* Mismatch of event types *)
                 False
             end).
-
-    (* External Calls *)
-    { inv e1.
-      - (* ExternalCall *)
-        inv e2.
-        { apply (t = t0 /\
-                 uvalue_refine_strict f f0 /\
-                 Forall2 dvalue_refine_strict args args0 /\
-                 dvalue_refine_strict res1 res2
-                ).
-        }
-        all: exact False. (* Mismatch of event types *)
-      - (* Stdout *)
-        inv e2.
-        2: {
-          apply (str = str0).
-        }
-        all: exact False. (* Mismatch of event types *)
-      - (* Stderr *)
-        inv e2.
-        3: {
-          apply (str = str0).
-        }
-        all: exact False. (* Mismatch of event types *)
-    }
-
-    (* OOME *)
-    { apply True.
-    }
-
-    (* UBE *)
-    { apply True.
-    }
-
-    (* DebugE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
-
-    (* FailureE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
   Defined.
 
   Definition call_refine_strict (A B : Type) (c1 : IS1.LP.Events.CallE A) (c2 : CallE B) : Prop.
@@ -2663,9 +2203,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply (t = t0 /\
                uvalue_refine_strict f f0 /\
                Forall2 uvalue_refine_strict args args0 /\
-               uvalue_refine_strict res1 res2).
+               sum_rel uvalue_refine_strict uvalue_refine_strict res1 res2).
     }
   Defined.
+
+  Lemma call_res_refine_strict_call_refine_strict {A B : Type} (c1 : IS1.LP.Events.CallE A) (res1 : A) (c2 : CallE B) (res2 : B) :
+    call_res_refine_strict _ _ c1 res1 c2 res2 -> call_refine_strict _ _ c1 c2.
+  Proof.
+    intros H; red in H; red.
+    repeat break_match; cbn in *; auto; tauto.
+  Qed.
+
+  #[global] Hint Resolve call_res_refine_strict_call_refine_strict : REFINE_DB.
 
   Definition L0'_refine_strict A B (e1 : IS1.LP.Events.L0' A) (e2 : IS2.LP.Events.L0' B) : Prop
     := (sum_prerel call_refine_strict event_refine_strict) _ _ e1 e2.
@@ -2677,263 +2226,54 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
-                _ (* Globals *)
+                globalE_refine_strict e1 e2
             | inr1 (inl1 e1), inr1 (inl1 e2) =>
-                _ (* Locals *)
+                localE_refine_strict e1 e2
             | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
-                _ (* MemoryE *)
+                memoryE_refine_strict e1 e2
             | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
-                _ (* PickE *)
+                pickE_refine_strict e1 e2
             | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
-                _ (* OOME *)
+                oomE_refine_strict e1 e2
             | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
-                _ (* UBE *)
+                llvmExcE_refine_strict e1 e2
             | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))) =>
-                _ (* DebugE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2)))))) =>
-                _ (* FailureE *)
+                ubE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))) =>
+                debugE_refine_strict e1 e2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2))))))) =>
+                failureE_refine_strict e1 e2
             | _, _ =>
                 (* Mismatch of event types *)
                 False
             end).
-
-    (* Globals *)
-    { inversion e1.
-      - (* Global write *)
-        destruct e2 eqn:HE2.
-        + apply (id = id0 /\
-                   dvalue_refine_strict dv dv0).
-        + apply False.
-      - (* Global read *)
-        destruct e2 eqn:HE2.
-        + apply False.
-        + apply (id = id0).
-    }
-
-    (* Locals *)
-    { inversion e1.
-      - (* Local write *)
-        destruct e2 eqn:HE2.
-        + apply (id = id0 /\
-                   uvalue_refine_strict dv dv0).
-        + apply False.
-      - (* Local read *)
-        destruct e2 eqn:HE2.
-        + apply False.
-        + apply (id = id0).
-    }
-
-    (* MemoryE *)
-    { inversion e1.
-      - (* MemPush *)
-        destruct e2 eqn:HE2.
-        2-5: apply False.
-
-        apply True.
-      - (* MemPop *)
-        destruct e2 eqn:HE2.
-        2: apply True.
-        all: apply False.
-      - (* Alloca *)
-        destruct e2 eqn:HE2.
-        1,2,4,5: apply False.
-
-        apply (t = t0 /\
-                 num_elements = num_elements0 /\
-                 align = align0).
-      - (* Load *)
-        destruct e2 eqn:HE2.
-        1-3,5: apply False.
-        apply (t = t0 /\
-                 dvalue_refine_strict a a0).
-      - (* Store *)
-        destruct e2 eqn:HE2.
-        1-4: apply False.
-
-        apply (t = t0 /\
-                 dvalue_refine_strict a a0 /\
-                 uvalue_refine_strict v v0).
-    }
-
-    (* PickE *)
-    { (* TODO: confirm whether this is sane... *)
-      inversion e1.
-      - (* pickUnique *)
-        subst.
-        destruct e2.
-        + apply (uvalue_refine_strict x x0).
-        + exact False.
-        + exact False.
-      - (* pickNonPoison *)
-        subst.
-        destruct e2.
-        + exact False.
-        + apply (uvalue_refine_strict x x0).
-        + exact False.
-      - (* pick *)
-        subst.
-        destruct e2.
-        + exact False.
-        + exact False.
-        + apply (uvalue_refine_strict x x0).
-    }
-
-    (* OOME *)
-    { apply True.
-    }
-
-    (* UBE *)
-    { apply True.
-    }
-
-    (* DebugE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
-
-    (* FailureE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
   Defined.
 
   Definition exp_E_res_refine_strict A B (e1 : IS1.LP.Events.exp_E A) (res1 : A) (e2 : IS2.LP.Events.exp_E B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
-                _ (* Globals *)
+                globalE_res_refine_strict e1 res1 e2 res2
             | inr1 (inl1 e1), inr1 (inl1 e2) =>
-                _ (* Locals *)
+                localE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inl1 e1)), inr1 (inr1 (inl1 e2)) =>
-                _ (* MemoryE *)
+                memoryE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inr1 (inl1 e1))), inr1 (inr1 (inr1 (inl1 e2))) =>
-                _ (* PickE *)
+                pickE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inr1 (inr1 (inl1 e1)))), inr1 (inr1 (inr1 (inr1 (inl1 e2)))) =>
-                _ (* OOME *)
+                oomE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))), inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))) =>
-                _ (* UBE *)
+                llvmExcE_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2)))))) =>
-                _ (* DebugE *)
-            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1)))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2)))))) =>
-                _ (* FailureE *)
+                ubE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e2))))))) =>
+                debugE_res_refine_strict e1 res1 e2 res2
+            | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e1))))))), inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e2))))))) =>
+                failureE_res_refine_strict e1 res1 e2 res2
             | _, _ =>
                 (* Mismatch of event types *)
                 False
             end).
-
-    (* Globals *)
-    { inversion e1; subst.
-      - (* Global write *)
-        inversion e2; subst.
-        + apply (id = id0 /\
-                   dvalue_refine_strict dv dv0).
-        + apply False.
-      - (* Global read *)
-        destruct e2 eqn:HE2.
-        + apply False.
-        + apply (id = id0 /\
-                   dvalue_refine_strict res1 res2
-                ).
-    }
-
-    (* Locals *)
-    { inversion e1; subst.
-      - (* Local write *)
-        destruct e2 eqn:HE2.
-        + apply (id = id0 /\
-                   uvalue_refine_strict dv dv0).
-        + apply False.
-      - (* Local read *)
-        destruct e2 eqn:HE2.
-        + apply False.
-        + apply (id = id0 /\
-                uvalue_refine_strict res1 res2).
-    }
-
-    (* MemoryE *)
-    { inversion e1; subst.
-      - (* MemPush *)
-        destruct e2 eqn:HE2.
-        2-5: apply False.
-
-        apply True.
-      - (* MemPop *)
-        destruct e2 eqn:HE2.
-        2: apply True.
-        all: apply False.
-      - (* Alloca *)
-        destruct e2 eqn:HE2.
-        1,2,4,5: apply False.
-
-        apply (t = t0 /\
-                 num_elements = num_elements0 /\
-                 align = align0 /\
-                 dvalue_refine_strict res1 res2).
-      - (* Load *)
-        destruct e2 eqn:HE2.
-        1-3,5: apply False.
-        apply (t = t0 /\
-                 dvalue_refine_strict a a0 /\
-                 uvalue_refine_strict res1 res2).
-      - (* Store *)
-        destruct e2 eqn:HE2.
-        1-4: apply False.
-
-        apply (t = t0 /\
-                 dvalue_refine_strict a a0 /\
-                 uvalue_refine_strict v v0).
-    }
-
-    (* PickE *)
-    { (* TODO: confirm whether this is sane... *)
-      inversion e1.
-      - (* pickUnique *)
-        subst.
-        destruct e2.
-        + destruct res1 as [r1 P1].
-          destruct res2 as [r2 P2].
-          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
-        + exact False.
-        + exact False.
-      - (* pickNonPoison *)
-        subst.
-        destruct e2.
-        + exact False.
-        + destruct res1 as [r1 P1].
-          destruct res2 as [r2 P2].
-          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
-        + exact False.
-      - (* pick *)
-        subst.
-        destruct e2.
-        + exact False.
-        + exact False.
-        + destruct res1 as [r1 P1].
-          destruct res2 as [r2 P2].
-          apply (uvalue_refine_strict x x0 /\ dvalue_refine_strict r1 r2).
-    }
-
-    (* OOME *)
-    { apply True.
-    }
-
-    (* UBE *)
-    { apply True.
-    }
-
-    (* DebugE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
-
-    (* FailureE *)
-    { destruct e1 as [e1_msg].
-      destruct e2 as [e2_msg].
-      exact (e1_msg = e2_msg).
-    }
   Defined.
 
   Definition instr_E_refine_strict A B (e1 : IS1.LP.Events.instr_E A) (e2 : IS2.LP.Events.instr_E B) : Prop.
@@ -2943,21 +2283,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 call_refine_strict _ _ e1 e2
             | inr1 (inl1 e1), inr1 (inl1 e2) =>
                 (* Intrinsics *)
-                _
+                intrinsic_refine_strict e1 e2
             | inr1 (inr1 e1), inr1 (inr1 e2) =>
                 exp_E_refine_strict _ _ e1 e2
             | _, _ =>
                 False
             end).
-
-    (* Intrinsics *)
-    { inv e1.
-      inv e2.
-      apply (t = t0 /\
-               f = f0 /\
-               Forall2 dvalue_refine_strict args args0
-            ).
-    }
   Defined.
 
   Definition instr_E_res_refine_strict A B (e1 : IS1.LP.Events.instr_E A) (res1 : A) (e2 : IS2.LP.Events.instr_E B) (res2 : B) : Prop.
@@ -2966,23 +2297,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             | inl1 e1, inl1 e2 =>
                 call_res_refine_strict _ _ e1 res1 e2 res2
             | inr1 (inl1 e1), inr1 (inl1 e2) =>
-                (* Intrinsics *)
-                _
+                intrinsic_res_refine_strict e1 res1 e2 res2
             | inr1 (inr1 e1), inr1 (inr1 e2) =>
                 exp_E_res_refine_strict _ _ e1 res1 e2 res2
             | _, _ =>
                 False
             end).
-
-    (* Intrinsics *)
-    { inv e1.
-      inv e2.
-      apply (t = t0 /\
-               f = f0 /\
-               Forall2 dvalue_refine_strict args args0 /\
-               dvalue_refine_strict res1 res2
-            ).
-    }
   Defined.
 
   Definition L0_E1E2_orutt_strict t1 t2
@@ -3006,7 +2326,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     orutt
       L2_refine_strict
       L2_res_refine_strict
-      (local_refine_strict × stack_refine_strict × (global_refine_strict × dvalue_refine_strict))
+      (stack_frame_refine_strict × stack_refine_strict × (global_refine_strict × dvalue_refine_strict))
       t1 t2 (OOM:=OOME).
 
   Definition model_E1E2_L0_orutt_strict args1 args2 p1 p2 :=
@@ -3187,6 +2507,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           2,3: (cbn in H;
                 (repeat break_match_hyp; try contradiction)).
 
+          { cbn; auto. }
+
+          destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+
           { destruct u, u0; cbn; auto. }
 
           destruct s, s0.
@@ -3242,6 +2569,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 (repeat break_match_hyp; try contradiction)).
 
           { destruct o, o0; cbn; auto. }
+
+          destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { cbn; auto. }
 
           destruct s, s0.
           2,3: (cbn in H;
@@ -3313,13 +2646,17 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                 (repeat break_match_hyp; try contradiction)).
 
           { destruct o, o0; cbn; constructor; cbn; auto. }
-          { destruct s, s0; cbn; constructor; auto.
-            destruct s, s0; try solve [ cbn in H; contradiction ].
-            - (* Debug *)
-              destruct d, d0; cbn in *; auto.
-            - (* Failure *)
-              destruct f, f0.
-              cbn in *; auto.
+
+          destruct s, s0.
+          2,3: (cbn in H;
+                (repeat break_match_hyp; try contradiction)).
+
+          { cbn; constructor; cbn; auto. }
+
+          { destruct s, s0; cbn; try constructor; auto.
+            destruct s; try solve [ cbn in H; contradiction ].
+            destruct s; try solve [ cbn in H; contradiction ].
+            destruct s, s0; cbn; try constructor; auto.
           }
         }
   Qed.
@@ -3330,66 +2667,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       exp_E_refine_strict A B e1 e2.
   Proof.
     intros A B e1 e2 a b H.
-    destruct e1, e2.
-    2-3: (cbn in *;
-          break_match_hyp; subst; cbn in *; auto).
-
-    2: {
-      repeat (break_match_hyp; subst; cbn in *; auto).
-      all: inv Heql0.
-    }
-
-    - destruct l, l0.
-      2,3: (cbn in H;
-            (repeat break_match_hyp; try contradiction)).
-
-      all: cbn in *; tauto.
-    - destruct s, s0.
-      2,3: (cbn in H;
-            (repeat break_match_hyp; try contradiction)).
-
-      + destruct l, l0.
-        2,3: (cbn in H;
-              (repeat break_match_hyp; try contradiction)).
-
-        all: cbn in *; tauto.
-
-      + destruct s, s0.
-        2,3: (cbn in H;
-              (repeat break_match_hyp; try contradiction)).
-
-        { destruct m, m0; cbn in *; tauto.
-        }
-
-        { destruct s, s0.
-          2,3: (cbn in H;
-                (repeat break_match_hyp; try contradiction)).
-
-          { destruct p, p0; cbn in *; auto;
-            destruct a, b;
-            tauto.
-          }
-
-          destruct s, s0.
-          2,3: (cbn in H;
-                (repeat break_match_hyp; try contradiction)).
-
-          { destruct o, o0; cbn; auto. }
-
-          destruct s, s0.
-          2,3: (cbn in H;
-                (repeat break_match_hyp; try contradiction)).
-
-          { destruct u, u0; cbn; auto. }
-
-          destruct s, s0.
-          2,3: (cbn in H;
-                (repeat break_match_hyp; try contradiction)).
-
-          { destruct d, d0; cbn; auto. }
-          { destruct f, f0; cbn; auto. }
-
-        }
+    red; red in H.
+    repeat (break_match_goal; subst; cbn in *; eauto with REFINE_DB);
+      repeat (unfold resum, ReSum_sum, ReSum_inr, cat, Cat_IFun, case_, Case_sum1, case_sum1 in *;
+              break_match_hyp; subst; cbn in *; auto); discriminate.
   Qed.
 
   Lemma event_res_refine_strict_exp_E_res_refine_strict_inv :
@@ -3398,64 +2679,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       exp_E_res_refine_strict A B e1 a e2 b.
   Proof.
     intros A B e1 e2 a b H.
-    destruct e1, e2.
-    2-3: (cbn in *;
-          break_match_hyp; subst; cbn in *; auto).
-
-    2: {
-      repeat (break_match_hyp; subst; cbn in *; auto).
-      all: inv Heql0.
-    }
-
-    - destruct l, l0.
-      2,3: (cbn in H;
-            (repeat break_match_hyp; try contradiction)).
-
-      all: cbn in *; tauto.
-    - destruct s, s0.
-      2,3: (cbn in H;
-            (repeat break_match_hyp; try contradiction)).
-
-      + destruct l, l0.
-        2,3: (cbn in H;
-              (repeat break_match_hyp; try contradiction)).
-
-        all: cbn in *; tauto.
-
-      + destruct s, s0.
-        2,3: (cbn in H;
-              (repeat break_match_hyp; try contradiction)).
-
-        { destruct m, m0; cbn in *; tauto.
-        }
-
-        { destruct s, s0.
-          2,3: (cbn in H;
-                (repeat break_match_hyp; try contradiction)).
-
-          { destruct p, p0; cbn in *; auto.
-          }
-
-          destruct s, s0.
-          2,3: (cbn in H;
-                (repeat break_match_hyp; try contradiction)).
-
-          { destruct o, o0; cbn; auto. }
-
-          destruct s, s0.
-          2,3: (cbn in H;
-                (repeat break_match_hyp; try contradiction)).
-
-          { destruct u, u0; cbn; auto. }
-
-          destruct s, s0.
-          2,3: (cbn in H;
-                (repeat break_match_hyp; try contradiction)).
-
-          { destruct d, d0; cbn; auto. }
-          { destruct f, f0; cbn; auto. }
-
-        }
+    red; red in H.
+    repeat (break_match_goal; subst; cbn in *; eauto with REFINE_DB);
+      repeat (unfold resum, ReSum_sum, ReSum_inr, cat, Cat_IFun, case_, Case_sum1, case_sum1 in *;
+              break_match_hyp; subst; cbn in *; auto); discriminate.
   Qed.
 
   Lemma L0'_res_refine_strict_instr_E_res_refine_strict_inv :
@@ -3464,52 +2691,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       instr_E_res_refine_strict A B e1 a e2 b.
   Proof.
     intros A B e1 e2 a b H.
-    destruct e1, e2.
-    1-3:
-      (cbn in *;
-       repeat (first [ tauto
-                     | break_match_hyp; subst; cbn in *; auto
-                     | repeat match goal with
-                         | H: L0'_res_refine_strict _ _ _ _ _ _ |- _ =>
-                             inv H; subst_existT; unfold call_res_refine_strict in *; cbn in *
-                         end
-                 ]
-         )).
-
-    - destruct s, s0.
-      1-3:
-        (cbn in *;
-         repeat (first [ tauto
-                       | break_match_hyp; subst; cbn in *; auto
-                       | repeat match goal with
-                           | H: L0'_res_refine_strict _ _ _ _ _ _ |- _ =>
-                               inv H; subst_existT; unfold call_res_refine_strict in *; cbn in *
-                           end
-                   ]
-        )).
-
-      destruct e, e0.
-      1-3:
-        (cbn in *;
-         repeat (first [ tauto
-                       | break_match_hyp; subst; cbn in *; auto
-                       | repeat match goal with
-                           | H: L0'_res_refine_strict _ _ _ _ _ _ |- _ =>
-                               inv H; subst_existT; unfold call_res_refine_strict in *; cbn in *
-                           end
-                   ]
-        )).
-
-      + destruct s;
-          (cbn in *;
-           repeat (first [ tauto
-                         | break_match_hyp; subst; cbn in *; auto
-                         | repeat match goal with
-                             | H: L0'_res_refine_strict _ _ _ _ _ _ |- _ =>
-                                 inv H; subst_existT; unfold call_res_refine_strict in *; cbn in *
-                             end
-                     ]
-          )).
+    red in H; red.
+    repeat (break_match_goal; subst; cbn in *; eauto with REFINE_DB);
+      repeat (unfold resum, ReSum_sum, ReSum_inr, cat, Cat_IFun, case_, Case_sum1, case_sum1 in *;
+              break_match_hyp; subst; cbn in *; auto); inv H; subst_existT; cbn in *; eauto with REFINE_DB; try discriminate.
   Qed.
 
   Lemma translate_exp_to_L0_E1E2_rutt :
@@ -3556,6 +2741,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     - rewrite tau_euttge, unfold_translate. eauto with itree.
   Qed.
 
+  Ltac unfold_subevents :=
+    repeat (unfold subevent, resum, ReSum_inr, ReSum_inl, ReSum_sum, ReSum_id, id_, Id_IFun, case_, Case_sum1, case_sum1, cat, Cat_IFun, inr_, Inr_sum1, inl_, Inl_sum1 in *; cbn in *).
+
   Lemma translate_exp_to_L0_E1E2_orutt :
     forall {R1 R2} {RR : R1 -> R2 -> Prop} t1 t2,
       orutt exp_E_refine_strict exp_E_res_refine_strict RR
@@ -3601,9 +2789,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       intros o CONTRA.
       specialize (H1 o).
       apply H1.
-      destruct e2; inv CONTRA.
-      destruct s; inv H3.
-      reflexivity.
+      unfold exp_to_L0 in CONTRA.
+      unfold_subevents.
+      repeat break_match_hyp_inv; auto.
     - gstep; eauto.
       red.
       cbn.
@@ -3622,51 +2810,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       exp_E_res_refine_strict A B e1 a e2 b.
   Proof.
     intros A B e1 e2 a b H.
-    destruct e1, e2.
-    1-3:(cbn in *;
-       repeat (first [ tauto
-                     | break_match_hyp; subst; cbn in *; auto
-                     | repeat match goal with
-                         | H: instr_E_res_refine_strict _ _ _ _ _ _ |- _ =>
-                             inv H; subst_existT; unfold call_res_refine_strict in *; cbn in *
-                         end
-                 ]
-         )).
-
-    - destruct s, s0.
-      1-3:
-        (cbn in *;
-         repeat (first [ tauto
-                       | break_match_hyp; subst; cbn in *; auto
-                       | repeat match goal with
-                           | H: instr_E_res_refine_strict _ _ _ _ _ _ |- _ =>
-                               inv H; subst_existT; unfold call_res_refine_strict in *; cbn in *
-                           end
-                   ]
-        )).
-
-      destruct s, s0.
-      1-3:
-        (cbn in *;
-         repeat (first [ tauto
-                       | break_match_hyp; subst; cbn in *; auto
-                       | repeat match goal with
-                           | H: L0'_res_refine_strict _ _ _ _ _ _ |- _ =>
-                               inv H; subst_existT; unfold call_res_refine_strict in *; cbn in *
-                           end
-                   ]
-        )).
-
-      + destruct s;
-          (cbn in *;
-           repeat (first [ tauto
-                         | break_match_hyp; subst; cbn in *; auto
-                         | repeat match goal with
-                             | H: L0'_res_refine_strict _ _ _ _ _ _ |- _ =>
-                                 inv H; subst_existT; unfold call_res_refine_strict in *; cbn in *
-                             end
-                     ]
-          )).
+    red in H; red.
+    repeat (break_match_goal; subst; cbn in *; eauto with REFINE_DB);
+      repeat (unfold resum, ReSum_sum, ReSum_inr, cat, Cat_IFun, case_, Case_sum1, case_sum1 in *;
+              break_match_hyp; subst; cbn in *; auto); cbn in *; eauto with REFINE_DB; try discriminate.
   Qed.
 
   Lemma translate_instr_to_L0'_E1E2_rutt_strict :
@@ -3753,13 +2900,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       intros o CONTRA.
       eapply H1.
-      destruct e2.
       unfold instr_to_L0' in CONTRA.
-      inv CONTRA.
-      cbn in *; break_match_hyp; inv CONTRA.
-      cbn in *; break_match_hyp; inv H3.
-      cbn in *; break_match_hyp; inv H4.
-      reflexivity.
+      unfold_subevents.
+      repeat break_match_hyp_inv; auto.
     - gstep; eauto.
       red.
       cbn.
@@ -3801,6 +2944,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       red.
       cbn.
       constructor; eauto.
+      apply exp_E_refine_strict_instr_E_refine_strict; auto.
       intros a b H2.
 
       gbase.
@@ -3843,6 +2987,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       red.
       cbn.
       constructor; eauto.
+      apply exp_E_refine_strict_instr_E_refine_strict; auto.
       intros a b H2.
 
       gbase.
@@ -3856,8 +3001,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       intros o CONTRA.
       eapply H1.
-      inv CONTRA.
-      reflexivity.
+      unfold exp_to_instr in *.
+      unfold_subevents.
+      repeat break_match_hyp_inv; auto.
     - gstep; eauto.
       red.
       cbn.
@@ -19560,6 +18706,8 @@ Qed.
       apply orutt_raiseUB; cbn; auto.
       intros ? ? CONTRA.
       inv CONTRA.
+      subst.
+      reflexivity.
     - erewrite eval_iop_err_fin_inf; cbn; eauto;
         try erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
       apply orutt_raise; cbn; auto.
@@ -19591,6 +18739,7 @@ Qed.
       apply orutt_raiseUB; cbn; auto.
       intros ? ? CONTRA.
       inv CONTRA.
+      reflexivity.
     - erewrite eval_icmp_err_fin_inf; cbn; eauto;
         try erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
       apply orutt_raise; cbn; auto.
@@ -19622,6 +18771,7 @@ Qed.
       apply orutt_raiseUB; cbn; auto.
       intros ? ? CONTRA.
       inv CONTRA.
+      reflexivity.
     - erewrite eval_fop_err_fin_inf; cbn; eauto;
         try erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
       apply orutt_raise; cbn; auto.
@@ -19653,6 +18803,7 @@ Qed.
       apply orutt_raiseUB; cbn; auto.
       intros ? ? CONTRA.
       inv CONTRA.
+      reflexivity.
     - erewrite eval_fcmp_err_fin_inf; cbn; eauto;
         try erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
       apply orutt_raise; cbn; auto.
@@ -19926,6 +19077,7 @@ Qed.
     - apply orutt_raiseOOM.
     - apply orutt_raiseUB;
         [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+      reflexivity.
     - apply orutt_raise;
         [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
     - apply orutt_Ret.
@@ -19949,6 +19101,7 @@ Qed.
     - erewrite dvalue_bytes_to_dvalue_ub_fin_inf; eauto.
       apply orutt_raiseUB;
         [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
+      reflexivity.
     - erewrite dvalue_bytes_to_dvalue_err_fin_inf; eauto.
       apply orutt_raise;
         [ intros ? ? CONTRA; inv CONTRA | cbn; auto ].
@@ -21579,6 +20732,27 @@ Qed.
     apply denote_exp'_E1E2_orutt.
   Qed.
 
+  #[global] Hint Unfold
+    subevent resum ReSum_inr ReSum_inl
+    ReSum_sum ReSum_id id_ Id_IFun case_
+    Case_sum1 case_sum1 cat Cat_IFun inr_
+    Inr_sum1 inl_ Inl_sum1
+    : SUBEVENTS.
+
+  #[global] Hint Resolve
+    orutt_bind
+    orutt_trigger
+    orutt_Ret
+    orutt_raiseLLVM
+    orutt_raiseUB
+    orutt_raiseOOM
+    orutt_raise
+    : ORUTT.
+
+  #[global] Hint Resolve
+    dvalue_refine_strict_dvalue_to_uvalue
+    : REF.
+
   Lemma denote_instr_orutt_strict :
     forall instr varg1 varg2,
       OptionUtil.option_rel2 addr_refine varg1 varg2 ->
@@ -21600,14 +20774,18 @@ Qed.
         }
 
         intros r1 r2 H.
-        eapply orutt_trigger; cbn.
-        inv H; auto.
+        apply orutt_bind with (RR:=eq).
+        { eapply orutt_trigger; cbn.
+          inv H; auto.
 
-        intros [] [] H1; auto.
+          intros [] [] ?; subst; auto.
+          intros o CONTRA.
+          unfold_subevents.
+          inv CONTRA.
+        }
 
-        intros o CONTRA.
-        inv CONTRA.
-
+        intros [] [] ?; subst.
+        apply orutt_Ret; auto.
       - destruct fn.
         apply orutt_bind with (RR:=Forall2 uvalue_refine_strict).
         { apply map_monad_orutt.
@@ -21652,10 +20830,21 @@ Qed.
                          apply orutt_Ret;
                        solve_uvalue_refine_strict
                        ]).
+                apply orutt_raiseUB; try reflexivity.
+                intros [] o CONTRA; unfold_subevents. inv CONTRA.
             + intros ? ? ?.
-              apply orutt_trigger; cbn; auto.
-              intros [] [] ?; auto.
-              intros o CONTRA; unfold subevent in CONTRA; inv CONTRA.
+              apply orutt_bind with (RR:=eq).
+              { eapply orutt_trigger; cbn.
+                inv H; auto.
+
+                intros [] [] ?; subst; auto.
+                intros o CONTRA.
+                unfold_subevents.
+                inv CONTRA.
+              }
+
+              intros [] [] ?; subst.
+              apply orutt_Ret; auto.
           - (* va_copy *)
             eapply orutt_bind with (RR:=uvalue_refine_strict).
             + destruct args; try solve_orutt_raise.
@@ -21700,38 +20889,63 @@ Qed.
                 apply orutt_Ret.
                 solve_uvalue_refine_strict.
             + intros ? ? ?.
-              apply orutt_trigger; cbn; auto.
-              intros [] [] ?; auto.
-              intros o CONTRA; unfold subevent in CONTRA; inv CONTRA.
+              eapply orutt_bind with (RR:=Logic.eq).
+              { apply orutt_trigger; cbn; eauto.
+                intros [] [] ?; auto.
+                intros ? CONTRA; inv CONTRA.
+              }
+
+              intros [] [] _.
+              apply orutt_Ret.
+              solve_uvalue_refine_strict.
           - (* va_end *)
             eapply orutt_bind with (RR:=uvalue_refine_strict).
             apply orutt_Ret; try solve_uvalue_refine_strict.
             intros ? ? ?.
-            apply orutt_trigger.
-            repeat constructor; auto.
-            intros [] [] _; auto.
-            intros ? CONTRA; inv CONTRA.
+            eapply orutt_bind with (RR:=Logic.eq).
+            { apply orutt_trigger; cbn; eauto.
+              intros [] [] ?; auto.
+              intros ? CONTRA; inv CONTRA.
+            }
+
+            intros [] [] _.
+            apply orutt_Ret.
+            solve_uvalue_refine_strict.
           - eapply orutt_bind with (RR:=uvalue_refine_strict).
             + eapply orutt_bind with (RR:=Forall2 dvalue_refine_strict).
               * eapply map_monad_orutt2; eauto.
                 intros * ?.
                 eapply concretize_or_pick_unique_instr_E_orutt_strict; eauto.
               * intros r0 r3 H0.
-                eapply orutt_map.
-                -- apply orutt_trigger; cbn; eauto.
-                   ++ intros * ?.
-                      apply H1.
-                   ++ intros ? CONTRA.
-                      inv CONTRA.
-                -- intros r4 r5 H1.
-                   cbn in *.
-                   apply dvalue_refine_strict_dvalue_to_uvalue; eauto.
-                   apply H1.
+                eapply orutt_bind with (RR:=sum_rel uvalue_refine_strict dvalue_refine_strict).
+                { apply orutt_trigger; cbn; eauto.
+                  intros ? ? ?; auto; tauto.
+
+                  intros ? CONTRA.
+                  unfold_subevents; inv CONTRA.
+                }
+
+                intros [] [] REL; inv REL.
+                apply orutt_raiseLLVM.
+                intros ? ? CONTRA.
+                inv CONTRA; inv H1.
+                cbn; auto.
+
+                apply orutt_Ret.
+                apply dvalue_refine_strict_dvalue_to_uvalue; eauto.
             + intros r0 r3 H0.
-              eapply orutt_trigger; cbn; eauto.
-              * intros [] [] ?; auto.
-              * intros o CONTRA.
+              apply orutt_bind with (RR:=eq).
+              { eapply orutt_trigger; cbn.
+                inv H; auto.
+
+                intros [] [] ?; subst; auto.
+                intros o CONTRA.
+                unfold_subevents.
                 inv CONTRA.
+              }
+
+              intros [] [] ?; subst.
+              apply orutt_Ret; auto.
         }
 
         apply orutt_bind with (RR:=uvalue_refine_strict).
@@ -21741,38 +20955,57 @@ Qed.
             }
             intros r0 r3 H0.
 
-            eapply orutt_trigger; cbn; try tauto.
-            intros o CONTRA.
-            unfold subevent in CONTRA.
-            inv CONTRA.
+            apply orutt_bind with (RR:=sum_rel uvalue_refine_strict uvalue_refine_strict).
+            { eapply orutt_trigger; cbn; eauto.
+              intros ? ? REL; subst; auto; tauto.
+
+              intros o CONTRA.
+              unfold_subevents.
+              inv CONTRA.
+            }
+
+            intros [] [] REL; inv REL; subst.
+            apply orutt_raiseLLVM.
+            intros ? ? CONTRA.
+            inv CONTRA; inv H1.
+            cbn; auto.
+
+            apply orutt_Ret; auto.
         }
 
         intros r0 r3 H0.
-        eapply orutt_trigger; cbn; try tauto.
-        intros [] [] _; auto.
-        intros o CONTRA.
-        inv CONTRA.
+        apply orutt_bind with (RR:=eq).
+        { eapply orutt_trigger; cbn.
+          inv H; auto.
+
+          intros [] [] ?; subst; auto.
+          intros o CONTRA.
+          unfold_subevents.
+          inv CONTRA.
+        }
+
+        intros [] [] ?; subst.
+        apply orutt_Ret; auto.
       - break_inner_match.
         { break_inner_match;
             try
               solve
-              [ cbn;
-                eapply orutt_bind with (RR:=dvalue_refine_strict);
-                [ eapply orutt_trigger; cbn; try tauto;
-                  intros o CONTRA;
-                  inv CONTRA
-                |
-                ];
-
-                intros r1 r2 H;
-                eapply orutt_trigger; cbn; try tauto;
-                [ split; auto; eapply dvalue_refine_strict_dvalue_to_uvalue; eauto
-                | intros [] [] _; auto
-                | intros o CONTRA; inv CONTRA
+              [
+                eapply orutt_bind; eauto with ORUTT REF;
+                eapply orutt_bind with (RR:=dvalue_refine_strict); eauto with ORUTT REF;
+                [ apply orutt_trigger; cbn in *; eauto; try tauto;
+                  intros o CONTRA; inv CONTRA
+                | intros; eauto with ORUTT REF;
+                  apply orutt_trigger;
+                  [ cbn; eauto with ORUTT REF
+                  | intros [] [] ?; reflexivity
+                  | intros o CONTRA; inv CONTRA
+                  ]
                 ]
               ].
 
           destruct t0.
+          eapply orutt_bind; eauto with ORUTT REF.
           eapply orutt_bind with (RR:=uvalue_refine_strict).
           { apply translate_exp_to_instr_E1E2_orutt_strict.
             apply denote_exp_E1E2_orutt.
@@ -21796,18 +21029,19 @@ Qed.
           intros r4 r5 H1.
           eapply orutt_trigger; cbn; try tauto;
             [ split; auto; eapply dvalue_refine_strict_dvalue_to_uvalue; eauto
-            | intros [] [] _; auto
+            | intros [] [] _; auto; reflexivity
             | intros o CONTRA; inv CONTRA
             ].
         }
 
-        { apply orutt_bind with (RR:=dvalue_refine_strict).
+        { eapply orutt_bind; eauto with ORUTT REF.
+          apply orutt_bind with (RR:=dvalue_refine_strict).
           eapply orutt_trigger; cbn; try tauto; intros o CONTRA; inv CONTRA.
 
           intros r1 r2 H.
           eapply orutt_trigger; cbn; try tauto;
             [ split; auto; eapply dvalue_refine_strict_dvalue_to_uvalue; eauto
-            | intros [] [] _; auto
+            | intros [] [] _; auto; reflexivity
             | intros o CONTRA; inv CONTRA
             ].
         }
@@ -21834,9 +21068,10 @@ Qed.
 
         intros r4 r5 H1.
         cbn in H1.
+        eapply orutt_bind; eauto with ORUTT REF.
         apply orutt_trigger; cbn; auto.
         tauto.
-        intros [] [] _; auto.
+        intros [] [] _; auto; reflexivity.
         intros o CONTRA; inv CONTRA.
       - apply orutt_raise; cbn; auto.
         intros msg o0 CONTRA; inv CONTRA.
@@ -21958,8 +21193,9 @@ Qed.
         }
 
         intros [] [] _.
+        eapply orutt_bind; eauto with ORUTT REF.
         apply orutt_trigger; cbn; eauto.
-        intros [] [] _; auto.
+        intros [] [] _; auto; reflexivity.
         intros ? CONTRA; inv CONTRA.
     }
 
@@ -22003,13 +21239,16 @@ Qed.
                                  rewrite H3; auto
                                | eauto
                            ]
-                       | intros [] [] ?; auto
+                       | intros [] [] ?; auto; reflexivity
                        | intros o CONTRA; inv CONTRA
                        ]
                      | intros ? ? ?;
                          apply orutt_Ret;
                        solve_uvalue_refine_strict
                        ]).
+                apply orutt_raiseUB.
+                intros [] o CONTRA; inv CONTRA.
+                cbn; reflexivity.
             + intros ? ? ?.
               apply orutt_Ret; eauto.
           - (* va_copy *)
@@ -22068,16 +21307,21 @@ Qed.
                 intros * ?.
                 eapply concretize_or_pick_unique_instr_E_orutt_strict; eauto.
               * intros r0 r3 H0.
-                eapply orutt_map.
+                eapply orutt_bind with (RR:=sum_rel uvalue_refine_strict dvalue_refine_strict); eauto with ORUTT REF.
                 -- apply orutt_trigger; cbn; eauto.
                    ++ intros * ?.
                       apply H1.
                    ++ intros ? CONTRA.
                       inv CONTRA.
                 -- intros r4 r5 H1.
-                   cbn in *.
+                   inv H1.
+                   apply orutt_raiseLLVM.
+                   intros ? ? CONTRA.
+                   inv CONTRA; inv H1.
+                   cbn; auto.
+
+                   apply orutt_Ret.
                    apply dvalue_refine_strict_dvalue_to_uvalue; eauto.
-                   apply H1.
             + intros r0 r3 H0.
               eapply orutt_Ret; eauto.
         }
@@ -22089,10 +21333,19 @@ Qed.
             }
             intros r0 r3 H0.
 
+            eapply orutt_bind with (RR:=sum_rel uvalue_refine_strict uvalue_refine_strict); eauto with ORUTT REF.
             eapply orutt_trigger; cbn; try tauto.
             intros o CONTRA.
             unfold subevent in CONTRA.
             inv CONTRA.
+
+            intros [] [] REL; inv REL; subst.
+            apply orutt_raiseLLVM.
+            intros ? ? CONTRA.
+            inv CONTRA; inv H1.
+            cbn; auto.
+
+            apply orutt_Ret; eauto.
         }
 
         intros r0 r3 H0.
@@ -22118,20 +21371,30 @@ Qed.
         { destruct r4; unfold dvalue_refine_strict; cbn in *; repeat break_match_hyp; inv H1; cbn;
             try
               solve
-              [ apply orutt_trigger; cbn; auto;
-                [ split; auto;
-                  split; cbn; auto; solve_dvalue_refine_strict
-                | intros [] [] _; auto
-                | intros o CONTRA; inv CONTRA
+              [ eapply orutt_bind; eauto with ORUTT REF;
+                eapply orutt_bind with (RR:=dvalue_refine_strict); eauto with ORUTT REF;
+                [ apply orutt_trigger; cbn in *; eauto; try tauto;
+                  intros o CONTRA; inv CONTRA
+                | intros; eauto with ORUTT REF;
+                  apply orutt_trigger;
+                  [ cbn; eauto with ORUTT REF
+                  | intros [] [] ?; reflexivity
+                  | intros o CONTRA; inv CONTRA
+                  ]
                 ]
-              | solve_orutt_raiseUB
               | repeat break_match_hyp_inv;
+                eapply orutt_bind; eauto with ORUTT REF;
                 apply orutt_trigger; cbn; auto;
                 [ split; auto;
-                  split; auto; unfold dvalue_refine_strict; cbn; rewrite Heqo; auto
+                  split; auto; unfold dvalue_refine_strict; cbn; try rewrite Heqo; auto
                 | intros [] [] _; auto
-                | intros o CONTRA; inv CONTRA]
+                | intros o CONTRA; inv CONTRA]; reflexivity
               ].
+
+           eapply orutt_bind; eauto with ORUTT REF.
+           eapply orutt_raiseUB.
+           intros [] o CONTRA; inv CONTRA.
+           cbn; reflexivity.
         }
 
       - clear o.
@@ -22215,6 +21478,8 @@ Qed.
         intros [] [] _.
         apply orutt_Ret; auto.
     }
+   Unshelve.
+   apply eq.
   Qed.
 
   Lemma dvalue_refine_strict_preserves_dvalue_is_poison :
@@ -22295,7 +21560,7 @@ Qed.
 
   Lemma denote_terminator_orutt_strict :
     forall term,
-      orutt exp_E_refine_strict exp_E_res_refine_strict (sum_rel eq uvalue_refine_strict) (IS1.LLVM.D.denote_terminator term)
+      orutt instr_E_refine_strict instr_E_res_refine_strict (sum_rel eq uvalue_refine_strict) (IS1.LLVM.D.denote_terminator term)
         (denote_terminator term)
         (OOM:=OOME).
   Proof.
@@ -22303,6 +21568,72 @@ Qed.
     destruct term; cbn.
     - destruct v.
       eapply orutt_bind with (RR:=uvalue_refine_strict).
+
+  Lemma orutt_translate :
+    forall {E1 E1' E2 E2' OOM : Type -> Type} `{OOME : OOM -< E2} `{OOME' : OOM -< E2'} (h1 : E1 ~> E1') (h2 : E2 ~> E2')
+      {PRE1 : prerel E1 E2} {POST1 : postrel E1 E2}
+      {PRE2 : prerel E1' E2'} {POST2 : postrel E1' E2'}
+      {R1 R2 : Type} {RR : R1 -> R2 -> Prop} t1 t2,
+      (forall A B e1 e2, PRE1 A B e1 e2 -> PRE2 A B (h1 _ e1) (h2 _ e2)) ->
+      (forall A B e1 a e2 b, POST2 A B (h1 A e1) a (h2 B e2) b -> POST1 A B e1 a e2 b) ->
+      (forall A (e : E2 A) (o : OOM _), e <> @subevent OOM E2 OOME A o -> h2 _ e <> @subevent OOM E2' OOME' A o) ->
+      (forall A (e : E2 A) (o : OOM _), e = @subevent OOM E2 OOME A o -> h2 _ e = @subevent OOM E2' OOME' A o) ->
+      orutt PRE1 POST1 RR
+        t1
+        t2
+      (OOM:=OOM) ->
+      orutt PRE2 POST2 RR
+        (translate h1 t1)
+        (translate h2 t2)
+        (OOM:=OOM).
+  Proof.
+    intros * PRE POST NOOM OOMOOM.
+    revert t1 t2.
+    ginit.
+    gcofix CIH.
+    intros * RUTT.
+    rewrite !unfold_translate. punfold RUTT. red in RUTT.
+    induction RUTT; intros; subst; simpl; pclearbot.
+    - gstep.
+      constructor.
+      auto.
+    - gstep.
+      red.
+      constructor.
+      gbase.
+      apply CIH.
+      auto.
+    - gstep; eauto.
+      red.
+      constructor; eauto.
+      intros a b H2.
+      apply POST in H2.
+      eapply H0 in H2.
+      gbase.
+      apply CIH; auto.
+    - gstep; eauto.
+      red.
+      cbn.
+      erewrite OOMOOM; try reflexivity.
+      apply EqVisOOM.
+    - rewrite tau_euttge, unfold_translate. eauto with itree.
+    - rewrite tau_euttge, unfold_translate. eauto with itree.
+  Qed.
+
+      eapply orutt_translate; eauto.
+      2: { intros *. eapply instr_E_res_refine_strict_exp_E_res_refine_strict_inv. }
+      1: { intros *. eapply exp_E_refine_strict_instr_E_refine_strict. }
+
+      intros A e0 o SUB CONTRA.
+      eapply SUB.
+      unfold exp_to_instr in *.
+      unfold_subevents.
+      repeat break_match_hyp_inv; auto.
+      intros A e0 o SUB.
+      unfold exp_to_instr in *.
+      unfold_subevents.
+      repeat (break_match_goal; inv SUB; auto).
+
       apply denote_exp_E1E2_orutt.
 
       intros r1 r2 H.
@@ -22311,11 +21642,26 @@ Qed.
       constructor; solve_uvalue_refine_strict.
     - destruct v.
       eapply orutt_bind with (RR:=uvalue_refine_strict).
+
+      eapply orutt_translate; eauto.
+      2: { intros *. eapply instr_E_res_refine_strict_exp_E_res_refine_strict_inv. }
+      1: { intros *. eapply exp_E_refine_strict_instr_E_refine_strict. }
+
+      intros A e0 o SUB CONTRA.
+      eapply SUB.
+      unfold exp_to_instr in *.
+      unfold_subevents.
+      repeat break_match_hyp_inv; auto.
+      intros A e0 o SUB.
+      unfold exp_to_instr in *.
+      unfold_subevents.
+      repeat (break_match_goal; inv SUB; auto).
+
       apply denote_exp_E1E2_orutt.
 
       intros r1 r2 H.
       eapply orutt_bind with (RR:=dvalue_refine_strict).
-      apply concretize_or_pick_unique_exp_E_orutt_strict; eauto.
+      apply concretize_or_pick_unique_instr_E_orutt_strict; eauto.
 
       intros r0 r3 H0.
       repeat break_match; unfold dvalue_refine_strict in *; cbn in *; try break_match_hyp; inv H0;
@@ -22323,24 +21669,48 @@ Qed.
           solve
           [ solve_orutt_raise
           | solve_orutt_raiseUB
+          | auto with ORUTT REF
           ];
-        subst_existT;
-        apply orutt_Ret; cbn; auto.
+      subst_existT.
       rewrite Heqb in Heqb0; inv Heqb0.
       rewrite Heqb in Heqb0; inv Heqb0.
+      apply orutt_raiseUB.
+      intros [] o CONTRA; inv CONTRA.
+      cbn; reflexivity.
     - apply orutt_Ret; auto.
     - destruct v.
       eapply orutt_bind with (RR:=uvalue_refine_strict).
+      eapply orutt_translate; eauto.
+      2: { intros *. eapply instr_E_res_refine_strict_exp_E_res_refine_strict_inv. }
+      1: { intros *. eapply exp_E_refine_strict_instr_E_refine_strict. }
+
+      intros A e0 o SUB CONTRA.
+      eapply SUB.
+      unfold exp_to_instr in *.
+      unfold_subevents.
+      repeat break_match_hyp_inv; auto.
+      intros A e0 o SUB.
+      unfold exp_to_instr in *.
+      unfold_subevents.
+      repeat (break_match_goal; inv SUB; auto).
+
       apply denote_exp_E1E2_orutt.
 
       intros r1 r2 H.
       eapply orutt_bind with (RR:=dvalue_refine_strict).
-      apply concretize_or_pick_unique_exp_E_orutt_strict; auto.
+      apply concretize_or_pick_unique_instr_E_orutt_strict; auto.
 
       intros r0 r3 H0.
 
       pose proof dvalue_refine_strict_preserves_dvalue_is_poison _ _ H0.
       rewrite H1.
+
+      (* TODO: move this *)
+      Ltac solve_orutt_raiseUB :=
+        apply orutt_raiseUB; cbn; auto; try reflexivity;
+  intros msg o CONTRA;
+  inv CONTRA.
+
       break_match;
         [solve_orutt_raiseUB|].
 
@@ -22384,8 +21754,97 @@ Qed.
               apply orutt_Ret; auto.
       }
     - solve_orutt_raise.
-    - solve_orutt_raise.
-    - solve_orutt_raise.
+    - (* invoke? *)
+      destruct v.
+      eapply orutt_bind with (RR:=uvalue_refine_strict); eauto with ORUTT REF.
+      eapply orutt_translate; eauto.
+      2: { intros *. eapply instr_E_res_refine_strict_exp_E_res_refine_strict_inv. }
+      1: { intros *. eapply exp_E_refine_strict_instr_E_refine_strict. }
+
+      intros A e0 o SUB CONTRA.
+      eapply SUB.
+      unfold exp_to_instr in *.
+      unfold_subevents.
+      repeat break_match_hyp_inv; auto.
+      intros A e0 o SUB.
+      unfold exp_to_instr in *.
+      unfold_subevents.
+      repeat (break_match_goal; inv SUB; auto).
+
+      apply denote_exp_E1E2_orutt.
+
+      intros r1 r2 H.
+      apply orutt_raiseLLVM.
+      intros ? ? CONTRA.
+      inv CONTRA; inv H1.
+      cbn; auto.
+    - (* invoke? *)
+      destruct fnptrval.
+
+      eapply orutt_bind with (RR:=Forall2 uvalue_refine_strict); eauto with ORUTT REF.
+      { eapply map_monad_orutt.
+        intros [dt ex].
+
+        eapply orutt_translate; eauto.
+        2: { intros *. eapply instr_E_res_refine_strict_exp_E_res_refine_strict_inv. }
+        1: { intros *. eapply exp_E_refine_strict_instr_E_refine_strict. }
+
+        intros A e0 o SUB CONTRA.
+        eapply SUB.
+        unfold exp_to_instr in *.
+        unfold_subevents.
+        repeat break_match_hyp_inv; auto.
+        intros A e0 o SUB.
+        unfold exp_to_instr in *.
+        unfold_subevents.
+        repeat (break_match_goal; inv SUB; auto).
+        Transparent denote_exp.
+        unfold denote_exp.
+        Opaque denote_exp.
+        eapply orutt_bind with (RR:=uvalue_refine_strict).
+        change (fun (A B : Type) (e1 : IS1.LP.Events.exp_E A) (e2 : exp_E B) => exp_E_refine_strict A B e1 e2)
+          with
+          exp_E_refine_strict.
+        change (fun (A B : Type) (e1 : IS1.LP.Events.exp_E A) (a : A) (e2 : exp_E B) (b : B) =>
+                  exp_E_res_refine_strict A B e1 a e2 b)
+          with
+          exp_E_res_refine_strict.
+        eapply denote_exp'_E1E2_orutt.
+
+        intros ? ? ?.
+        apply orutt_denote_exp_concretize_if_no_undef_or_poison; auto.
+      }
+
+      intros ? ? ?.
+      eapply orutt_bind with (RR:=uvalue_refine_strict); eauto with ORUTT REF.
+      eapply orutt_translate; eauto.
+      2: { intros *. eapply instr_E_res_refine_strict_exp_E_res_refine_strict_inv. }
+      1: { intros *. eapply exp_E_refine_strict_instr_E_refine_strict. }
+
+      intros A e0 o SUB CONTRA.
+      eapply SUB.
+      unfold exp_to_instr in *.
+      unfold_subevents.
+      repeat break_match_hyp_inv; auto.
+      intros A e0 o SUB.
+      unfold exp_to_instr in *.
+      unfold_subevents.
+      repeat (break_match_goal; inv SUB; auto).
+
+      apply denote_exp_E1E2_orutt.
+
+      intros ? ? ?.
+      eapply orutt_bind with (RR:=sum_rel uvalue_refine_strict uvalue_refine_strict); eauto with ORUTT REF.
+      eapply orutt_trigger; eauto; cbn; try reflexivity; try tauto.
+
+      intros o CONTRA; inv CONTRA.
+
+      intros ? ? REL; inv REL; eauto with ORUTT.
+      eapply orutt_bind with (RR:=eq); eauto with ORUTT REF.
+      destruct i as [[i | i] | i]; eauto with ORUTT.
+      eapply orutt_trigger; eauto; cbn; try reflexivity; try tauto.
+      intros [] []; cbn; auto.
+      intros o CONTRA; inv CONTRA.
     - solve_orutt_raiseUB.
   Qed.
 
@@ -22416,7 +21875,6 @@ Qed.
     }
 
     intros [] [] _.
-    apply translate_exp_to_instr_E1E2_orutt_strict.
     apply denote_terminator_orutt_strict.
   Qed.
 
@@ -22457,7 +21915,6 @@ Qed.
         }
 
         intros [] [] _.
-        apply translate_exp_to_instr_E1E2_orutt_strict.
         apply denote_terminator_orutt_strict.
       }
 
@@ -22767,6 +22224,7 @@ Qed.
       red.
       intros args1 args2 ARGS.
       cbn.
+      eapply orutt_bind with (RR:=addr_refine).
       eapply orutt_bind with (RR:=(Forall2 (eq × uvalue_refine_strict)) × Forall2 uvalue_refine_strict).
       { cbn.
         pose proof (Util.Forall2_length ARGS) as LEN.
@@ -22917,8 +22375,10 @@ Qed.
 
       intros [] [] _.
       destruct r0; dvalue_refine_strict_inv H0;
-        try solve [apply orutt_raise; [intros ? ? CONTRA; inv CONTRA|repeat constructor]].
-      
+        try solve [apply orutt_raise; [intros ? ? CONTRA; inv CONTRA|repeat constructor]];
+        eauto with ORUTT.
+
+      intros r1 r2 REF.
       eapply orutt_bind with (RR:=uvalue_refine_strict).
       { rewrite translate_bind.
         rewrite translate_bind.
@@ -22928,7 +22388,7 @@ Qed.
           apply translate_instr_to_L0'_E1E2_orutt_strict.
           apply denote_ocfg_orutt_strict.
           cbn.
-          apply H0.
+          apply REF.
         }
 
         intros r0 r3 ?.
@@ -22948,23 +22408,21 @@ Qed.
           intros [] [] _.
           intros o CONTRA.
           inv CONTRA.
-          do 2 rewrite translate_ret.
+        - do 2 rewrite translate_ret.
           apply orutt_Ret.
           auto.
       }
 
       intros r0 r3 R0R3.
       eapply orutt_bind with (RR:=eq).
-      { eapply orutt_trigger.
+      { eapply orutt_bind with (RR:=eq).
+        eapply orutt_trigger.
         cbn; constructor; cbn; auto.
         intros [] [] _.
         reflexivity.
         intros o CONTRA; inv CONTRA.
-      }
-
-      intros [] [] _.
-      eapply orutt_bind with (RR:=eq).
-      { eapply orutt_trigger.
+        intros [] [] _.
+        eapply orutt_trigger.
         cbn; constructor; cbn; auto.
         intros [] [] _.
         reflexivity.
@@ -23043,13 +22501,252 @@ Qed.
     discriminate.
   Qed.
 
+  Import Utils.InterpEither.
+  Import EitherMonad.
+
+  (* TODO: Move this *)
+  Lemma raiseOOM_bind_itree_eq_itree :
+    forall {E} `{OOME -< E} A B (f : A -> itree E B) x,
+      bind (raiseOOM x) f ≅ raiseOOM x.
+  Proof using.
+    intros E OOM A B f x.
+    unfold raiseOOM.
+    cbn.
+    rewrite bind_bind.
+    eapply eq_itree_clo_bind.
+    reflexivity.
+    intros u1 u2 H.
+    destruct u1.
+  Qed.
+
+  Lemma interp_either_orutt :
+    forall {E1 E2 F1 F2 X Y EXC1 EXC2}
+      `{OOME2 : OOME -< E2}
+      `{OOMF2 : OOME -< F2}
+      (pre1 : prerel E1 E2)
+      (pre2 : prerel F1 F2)
+      (post1 : postrel E1 E2)
+      (post2 : postrel F1 F2)
+      (RXY : X -> Y -> Prop)
+      (REXC : EXC1 -> EXC2 -> Prop)
+      (h1 : E1 ~> eitherT EXC1 (itree F1))
+      (h2 : E2 ~> eitherT EXC2 (itree F2))
+      (PRE12 : forall (A B : Type) (e1 : E1 A) (e2 : E2 B),
+          pre1 A B e1 e2 ->
+          orutt (OOME:=OOMF2) pre2 post2 (sum_rel REXC (fun a b => post1 A B e1 a e2 b)) (unEitherT (h1 A e1)) (unEitherT (h2 B e2)))
+      (* (POST12 : forall (A B : Type) (e1 : E1 A) (a : A) (e2 : E2 B) (b : B),
+          post2 A B (h1 A e1) a (h2 B e2) b -> post1 A B e1 a e2 b) *)
+      (OOMH2 : forall A (e : OOME A), unEitherT (h2 A (subevent A e)) ≅ raiseOOM "")
+      (t1 : itree E1 X) (t2 : itree E2 Y)
+      (ORUTT : orutt (OOME:=OOME2) pre1 post1 RXY t1 t2),
+      orutt (OOME:=OOMF2) pre2 post2 (sum_rel REXC RXY)
+            (unEitherT (interp_either h1 t1))
+            (unEitherT (interp_either h2 t2)).
+  Proof.
+    intros.
+    rewrite (itree_eta_ t1) in *.
+    rewrite (itree_eta_ t2) in *.
+    genobs t1 ot1.
+    genobs t2 ot2.
+    clear t1 t2 Heqot1 Heqot2.
+    revert ot1 ot2 ORUTT.
+    ginit. gcofix CIH.
+    intros t1 t2 ORUTT.
+    punfold ORUTT.
+    red in ORUTT; cbn in ORUTT.
+    hinduction ORUTT before r; intros.
+    - rewrite !interp_either_ret'.
+      cbn.
+      gstep; constructor.
+      constructor; auto.
+    - rewrite !interp_either_tau'.
+      gstep; constructor.
+      gbase.
+      rewrite (itree_eta_ m1).
+      rewrite (itree_eta_ m2).
+      apply CIH.
+      pclearbot.
+      rewrite <- !itree_eta.
+      apply H.
+    - (* TODO: proper instances for eq_either_itree *)
+      epose proof interp_either_vis'.
+      unfold eq_either_itree in *.
+      rewrite H2.
+      epose proof interp_either_vis'.
+      unfold eq_either_itree in *.
+      rewrite H3.
+      clear H2 H3.
+      eapply gpaco2_uclo; [|eapply orutt_clo_bind|]; eauto with paco.
+      econstructor.
+      (* Assumption *)
+      apply PRE12; auto.
+
+      intros u1 u2 H2.
+      destruct H2.
+      + gstep; red; constructor.
+        constructor; auto.
+      + rewrite !interp_either_tau'.
+        gstep; red; constructor.
+        gbase.
+        rewrite (itree_eta_ (k1 b1)).
+        rewrite (itree_eta_ (k2 b2)).
+        apply CIH.
+        rewrite <- !itree_eta.
+        pclearbot.
+        apply H0; auto.
+    - (* OOM *)
+      (* TODO: proper instances for eq_either_itree *)
+      epose proof interp_either_vis'.
+      unfold eq_either_itree in *.
+      rewrite H.
+      clear H.
+      cbn.
+      rewrite OOMH2.
+      setoid_rewrite raiseOOM_bind_itree_eq_itree.
+      gfinal.
+      right.
+      eapply paco2_mon_bot.
+      eapply orutt_raiseOOM.
+      intros x0 x1 x2 PR.
+      apply PR.
+    - (* TauL *)
+      rewrite interp_either_tau'.
+      rewrite tau_euttge.
+      rewrite (itree_eta_ t1).
+      eauto with itree.
+    - (* TauR *)
+      rewrite interp_either_tau'.
+      rewrite tau_euttge.
+      rewrite (itree_eta_ t2).
+      eauto with itree.
+  Qed.
+
+  Lemma catch_llvm_exc_L0'_orutt :
+    forall (t1 : itree IS1.LP.Events.L0' DV1.uvalue) (t2 : itree IS2.LP.Events.L0' DV2.uvalue),
+      orutt (OOM:=OOME) L0'_refine_strict L0'_res_refine_strict uvalue_refine_strict t1 t2 ->
+      orutt (OOM:=OOME) L0'_refine_strict L0'_res_refine_strict (sum_rel uvalue_refine_strict uvalue_refine_strict)
+        (EitherMonad.unEitherT (IS1.LLVM.D.catch_llvm_exc_L0' t1))
+        (EitherMonad.unEitherT (catch_llvm_exc_L0' t2)).
+(*
+      orutt (OOM:=OOME) (sum_prerel call_refine_strict event_refine_strict)
+        (sum_postrel call_res_refine_strict event_res_refine_strict)
+        (sum_rel uvalue_refine_strict uvalue_refine_strict)
+        (EitherMonad.unEitherT (IS1.LLVM.D.catch_llvm_exc_L0' t1))
+        (EitherMonad.unEitherT (catch_llvm_exc_L0' t2)). *)
+  Proof.
+    intros t1 t2 ORUTT.
+    unfold catch_llvm_exc_L0'.
+    unfold IS1.LLVM.D.catch_llvm_exc_L0'.
+    eapply interp_either_orutt with (pre1:=L0'_refine_strict); eauto.
+    - intros A B e1 e2 H.
+      unfold IS1.LLVM.D.catch_llvm_exc_L0'_h.
+      unfold IS2.LLVM.D.catch_llvm_exc_L0'_h.
+      destruct H.
+
+      { cbn.
+        eapply orutt_bind.
+        - apply orutt_trigger; cbn; eauto.
+          constructor; auto.
+          intros t0 t3 H0.
+          apply H0.
+          intros o CONTRA.
+          inv CONTRA.
+        - intros r1 r2 H0.
+          apply orutt_Ret.
+          constructor; auto.
+      }
+
+      destruct e2, d2; try inversion H.
+      { cbn.
+        eapply orutt_bind.
+        - apply orutt_trigger; cbn; eauto.
+          constructor; auto.
+          intros t0 t3 H0.
+          apply H0.
+          intros o CONTRA.
+          inv CONTRA.
+        - intros r1 r2 H0.
+          apply orutt_Ret.
+          constructor; auto.
+      }
+
+      cbn in H.
+      repeat (destruct s; try contradiction).
+
+      cbn in *.
+      repeat (try destruct s; try destruct s0; try contradiction); try contradiction;
+        try (cbn;
+             eapply orutt_bind;
+             [ apply orutt_trigger; cbn; eauto;
+               try constructor; auto;
+               try intros t0 t3 HT0T3;
+               try apply HT0T3;
+          intros o CONTRA;
+          inv CONTRA
+       | intros r1 r2 H0;
+          apply orutt_Ret;
+          constructor; auto
+        ]).
+
+      { cbn.
+        setoid_rewrite bind_trigger.
+        cbn.
+        pstep; red; cbn.
+        change (@subevent L0' L0' (@ReSum_id (Type -> Type) IFun Id_IFun L0') B
+          (@inr1 CallE L0 B
+             (@inr1 ExternalCallE
+                (IntrinsicE +'
+                 LLVMGEnvE +'
+                 (LLVMEnvE +' LLVMStackE) +'
+                 MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                B
+                (@inr1 IntrinsicE
+                   (LLVMGEnvE +'
+                    (LLVMEnvE +' LLVMStackE) +'
+                    MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                   B
+                   (@inr1 LLVMGEnvE
+                      ((LLVMEnvE +' LLVMStackE) +'
+                       MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                      B
+                      (@inr1 (LLVMEnvE +' LLVMStackE)
+                         (MemoryE +'
+                          PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                         B
+                         (@inr1 MemoryE
+                            (PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) B
+                            (@inr1 PickUvalueE (OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                               B (@inl1 OOME (LLVMExcE uvalue +' UBE +' DebugE +' FailureE) B o0)))))))))
+          with
+          (@subevent OOME L0' _ B o0).
+        eapply EqVisOOM.
+      }
+
+      { red in H.
+        destruct l, l0.
+        cbn.
+        eapply orutt_Ret.
+        constructor; auto.
+      }
+    - intros A o.
+      inversion o; subst.
+      cbn.
+      unfold raiseOOM.
+      eapply eq_itree_clo_bind with (UU:=eq).
+      2: intros [].
+      dependent destruction o.
+      destruct u.
+      unfold print_msg.
+      reflexivity.
+  Qed.
+
   Lemma denote_mcfg_E1E2_orutt' :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
       IM_Refine function_denotation_refine_strict dfns1 dfns2 ->
       (uvalue_refine_strict f1 f2) ->
       (Forall2 uvalue_refine_strict args1 args2) ->
-      call_refine_strict IS1.LP.Events.DV.uvalue IS2.LP.Events.DV.uvalue (IS1.LP.Events.Call dt f1 args1) (Call dt f2 args2) ->
-      orutt event_refine_strict event_res_refine_strict (fun res1 res2 => call_res_refine_strict IS1.LP.Events.DV.uvalue IS2.LP.Events.DV.uvalue (IS1.LP.Events.Call dt f1 args1) res1 (Call dt f2 args2) res2)
+      call_refine_strict _ _ (IS1.LP.Events.Call dt f1 args1) (Call dt f2 args2) ->
+      orutt event_refine_strict event_res_refine_strict (fun res1 res2 => call_res_refine_strict _ _ (IS1.LP.Events.Call dt f1 args1) res1 (Call dt f2 args2) res2)
         (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
         (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2)
         (OOM:=OOME).
@@ -23063,56 +22760,15 @@ Qed.
     eapply mrec_orutt with (RPreInv:=call_refine_strict).
     { intros A B d1 d2 PRE.
 
+      Opaque catch_llvm_exc_L0' IS1.LLVM.D.catch_llvm_exc_L0'.
       cbn.
       destruct d1.
       destruct d2.
 
       cbn in PRE.
 
-      eapply orutt_bind with (RR:=(fun r1 r2 => dvalue_refine_strict r1 r2)).
-      { (* This may be tricky... *)
-        (* Hopefully follows from uvalue_convert f = NoOom f0 in PRE *)
-        unfold concretize_or_pick, IS1.LLVM.D.concretize_or_pick.
-        destruct PRE as [T [UV ARGS_CONV]]; subst.
-
-        break_match;
-          eapply uvalue_refine_strict_preserves_is_concrete in Heqb;
-          eauto; rewrite Heqb.
-        - (* Concrete so just use uvalue_to_dvalue (simple) conversion *)
-          apply rutt_orutt.
-          apply lift_err_uvalue_to_dvalue_rutt_strict; auto.
-          solve_dec_oom.
-        - (* Not concrete, trigger pick events *)
-          eapply orutt_bind with (RR:= fun (t1 : {_ : IS1.LP.Events.DV.dvalue | True}) (t2 : {_ : dvalue | True}) => dvalue_refine_strict (proj1_sig t1) (proj1_sig t2)) .
-          { apply orutt_trigger.
-            { constructor.
-              cbn.
-              tauto.
-            }
-
-            { intros t1 t2 H.
-              inv H.
-              cbn in *.
-              apply inj_pair2 in H0, H3, H4, H5.
-              subst.
-
-              destruct t1 as [dv1 P1].
-              destruct t2 as [dv2 P2].
-              cbn in H6.
-              cbn.
-              tauto.
-            }
-
-            intros o CONTRA.
-            inv CONTRA.
-          }
-
-          intros r1 r2 R1R2.
-          apply orutt_Ret.
-          destruct r1, r2.
-          cbn in *.
-          auto.
-      }
+      eapply orutt_bind with (RR:=dvalue_refine_strict).
+      apply concretize_or_pick_L0'_orutt_strict; try tauto.
 
       intros r1 r2 R1R2.
       (* Should be able to determine that the lookups
@@ -23132,6 +22788,7 @@ Qed.
         destruct PRE as [T [CONV MAPM]]; subst.
 
         eapply orutt_weaken; eauto.
+        apply catch_llvm_exc_L0'_orutt; auto.
       }
 
       eapply lookup_defn_none_strict in Heqo; eauto.
@@ -23165,6 +22822,13 @@ Qed.
       destruct PRE as [T [UV ARGS_CONV]]; subst.
 
       unfold ITree.map.
+      eapply orutt_bind with (RR:=uvalue_refine_strict).
+      2: {
+        intros r0 r5 H.
+        apply orutt_Ret.
+        eauto.
+      }
+
       eapply orutt_bind with (RR:=dvalue_refine_strict).
       {
         apply orutt_trigger.
@@ -23188,10 +22852,6 @@ Qed.
 
       intros r0 r5 R0R5.
       apply orutt_Ret.
-
-      split; split; auto.
-      split; auto.
-
       eapply dvalue_refine_strict_dvalue_to_uvalue; auto.
     }
 
@@ -23200,11 +22860,11 @@ Qed.
 
   Lemma denote_mcfg_E1E2_orutt'_orutt :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
-      orutt event_refine_strict event_res_refine_strict (fun res1 res2 => call_res_refine_strict IS1.LP.Events.DV.uvalue IS2.LP.Events.DV.uvalue (IS1.LP.Events.Call dt f1 args1) res1 (Call dt f2 args2) res2)
+      orutt event_refine_strict event_res_refine_strict (fun res1 res2 => call_res_refine_strict (IS1.LP.Events.DV.uvalue + IS1.LP.Events.DV.uvalue) (IS2.LP.Events.DV.uvalue + IS2.LP.Events.DV.uvalue) (IS1.LP.Events.Call dt f1 args1) res1 (Call dt f2 args2) res2)
         (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
         (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2)
         (OOM:=OOME) ->
-      orutt event_refine_strict event_res_refine_strict uvalue_refine_strict
+      orutt event_refine_strict event_res_refine_strict (sum_rel uvalue_refine_strict uvalue_refine_strict)
         (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
         (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2)
         (OOM:=OOME).
@@ -23221,7 +22881,7 @@ Qed.
       IM_Refine function_denotation_refine_strict dfns1 dfns2 ->
       (uvalue_refine_strict f1 f2) ->
       (Forall2 uvalue_refine_strict args1 args2) ->
-      orutt event_refine_strict event_res_refine_strict uvalue_refine_strict
+      orutt event_refine_strict event_res_refine_strict (sum_rel uvalue_refine_strict uvalue_refine_strict)
         (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
         (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2)
         (OOM:=OOME).
@@ -23739,6 +23399,12 @@ Qed.
     }
 
     intros r0 r5 H.
+    destruct H.
+    { apply orutt_raiseLLVM.
+      intros ? ? CONTRA; inv CONTRA.
+      cbn; auto.
+    }
+
     eapply orutt_bind with (RR:=fun x y => dvalue_refine_strict (proj1_sig x) (proj1_sig y)).
     { (* Pick *)
       apply orutt_trigger.
@@ -24145,143 +23811,56 @@ Qed.
         destruct e2; try inv REF;
         repeat (break_match_hyp; try inv REF).
       + cbn in *.
-        apply orutt_Ret.
-        split; auto.
-        apply global_refine_strict_add; auto.
-
-      + cbn.
-        pose proof GREF as GREF'.
-        do 2 red in GREF.
-        specialize (GREF id0).
-        red in GREF.
-        break_match_goal.
-        { (* Found id in genv *)
-          break_match_goal; try contradiction.
-          apply orutt_Ret.
-          split; eauto.
-        }
-
-        { (* Id not found in genv *)
-          break_match_goal; try contradiction.
-          solve_orutt_raise.
-        }
+        subst.
+        red in REF.
+        destruct l, l0; cbn in *; try contradiction.
+        -- apply orutt_Ret.
+           split; auto.
+           destruct REF; subst.
+           apply global_refine_strict_add; auto.
+        -- subst.
+           pose proof GREF as GREF'.
+           do 2 red in GREF.
+           specialize (GREF id0).
+           red in GREF.
+           break_match_goal; break_match_goal; try contradiction.
+           apply orutt_Ret; eauto.
+           solve_orutt_raise.
     - cbn in REF;
         destruct e2; try inv REF;
         repeat (break_match_hyp; try inv REF).
 
       { cbn.
-        apply orutt_bind with (RR:=eq).
-        apply orutt_trigger; cbn; eauto.
-        intros [] [] _; auto.
-        intros o CONTRA; inv CONTRA.
-        intros [] [] _.
-        apply orutt_Ret; tauto.
-      }
+        inversion o.
+        inversion o0.
+        subst.
+        setoid_rewrite bind_trigger.
+        cbn.
+        pstep; red; cbn.
+        change 
+          (@subevent ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+             (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) ExternalCallE
+                (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) IntrinsicE
+                   (@ReSum_id (Type -> Type) IFun Id_IFun ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE))))
+             void
+             (@inr1 (LLVMEnvE +' LLVMStackE) (MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) void
+                (@inr1 MemoryE (PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) void (@inr1 PickUvalueE (OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) void (@inl1 OOME (LLVMExcE uvalue +' UBE +' DebugE +' FailureE) void o0)))))
+          with (@subevent OOME (ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) _ _ o0).
 
-      { cbn.
-        apply orutt_bind with (RR:=uvalue_refine_strict).
-        apply orutt_trigger; cbn; eauto.
-        intros x y [_ REFxy]; auto.
-        intros o CONTRA; inv CONTRA.
-        intros r1 r2 REFr1r2.
-        apply orutt_Ret; tauto.
+        apply EqVisOOM.
       }
     - cbn in REF;
         destruct e2; try inv REF;
         repeat (break_match_hyp; try inv REF).
 
        { cbn.
-         apply orutt_bind with (RR:=eq).
-         { apply orutt_trigger; cbn; eauto.
-           intros [] [] _; auto.
-           intros o CONTRA; inv CONTRA.
-         }
-         intros [] [] _.
-         apply orutt_Ret; split; auto.
+         setoid_rewrite bind_trigger.
+         apply orutt_Vis.
+         constructor.
+         intros.
+         apply orutt_Ret; split; eauto.
+         intros o CONTRA; inv CONTRA.
       }
-
-       { cbn.
-         apply orutt_bind with (RR:=eq).
-         { apply orutt_trigger; cbn; eauto.
-           intros [] [] _; auto.
-           intros o CONTRA; inv CONTRA.
-         }
-         intros [] [] _.
-         apply orutt_Ret; split; auto.
-      }
-    - cbn in REF;
-        destruct e2; try inv REF;
-        repeat (break_match_hyp; try inv REF);
-
-        try (cbn;
-         try apply orutt_bind with (RR:=eq);
-         [ apply orutt_trigger; cbn; eauto;
-           [ intros [] [] _; auto
-           | intros o CONTRA; inv CONTRA
-           ]
-         |
-         ];
-         intros [] [] _;
-             apply orutt_Ret; split; auto).
-
-      { cbn.
-        apply orutt_bind with (RR:=dvalue_refine_strict).
-        apply orutt_trigger; cbn; eauto.
-        intros t1 t2 H; tauto.
-        intros o CONTRA; inv CONTRA.
-        intros r1 r2 H.
-        apply orutt_Ret; tauto.
-      }
-      { cbn.
-        apply orutt_bind with (RR:=uvalue_refine_strict).
-        apply orutt_trigger; cbn; eauto.
-        intros t1 t2 H; tauto.
-        intros o CONTRA; inv CONTRA.
-        intros r1 r2 H.
-        apply orutt_Ret; tauto.
-      }
-    - cbn in REF;
-        destruct e2; try inv REF;
-        repeat (break_match_hyp; try inv REF).
-      + (* PickUnique *)
-        cbn.
-        eapply orutt_bind with (RR:=fun x y => dvalue_refine_strict (proj1_sig x) (proj1_sig y)).
-        apply orutt_trigger; cbn; eauto.
-        intros [t1] [t2] H; tauto.
-        intros o CONTRA; inv CONTRA.
-        intros [r1] [r2] H.
-        apply orutt_Ret; tauto.
-      + (* PickNonPoison *)
-        cbn.
-        eapply orutt_bind with (RR:=fun x y => dvalue_refine_strict (proj1_sig x) (proj1_sig y)).
-        apply orutt_trigger; cbn; eauto.
-        intros [t1] [t2] H; tauto.
-        intros o CONTRA; inv CONTRA.
-        intros [r1] [r2] H.
-        apply orutt_Ret; tauto.
-      + (* Pick *)
-        cbn.
-        eapply orutt_bind with (RR:=fun x y => dvalue_refine_strict (proj1_sig x) (proj1_sig y)).
-        apply orutt_trigger; cbn; eauto.
-        intros [t1] [t2] H; tauto.
-        intros o CONTRA; inv CONTRA.
-        intros [r1] [r2] H.
-        apply orutt_Ret; tauto.
-    - cbn in REF;
-        destruct e2; try inv REF;
-        repeat (break_match_hyp; try inv REF).
-
-      cbn.
-      do 2 rewrite bind_trigger.
-      change (inr1 (inr1 (inr1 (inl1 o0)))) with
-        (@subevent _ _ (ReSum_inr IFun sum1 OOME
-                          (IS2.LP.Events.MemoryE +' IS2.LP.Events.PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
-                          (IS2.LP.Events.LLVMEnvE +' IS2.LP.Events.LLVMStackE)
-
-           ) B o0).
-      pstep; red; cbn.
-      rewrite subevent_subevent.
-      eapply EqVisOOM.
     Qed.
 
     eapply orutt_interp_state; eauto.
@@ -24347,12 +23926,12 @@ Qed.
               | intros o CONTRA; inv CONTRA
              ])
            ].
-
     -
       cbn in REF;
         destruct e2; try inv REF;
-        repeat (break_match_hyp; try inv REF);
+        repeat (break_match_hyp; try inv REF; try red in REF);
         cbn in *.
+
       destruct H0 as [FEQ REFARGS]; subst.
       repeat break_inner_match_goal;
         try solve_orutt_raise.
@@ -24392,7 +23971,7 @@ Qed.
           IS1.LLVM.Intrinsics.llvm_fabs_f32 args1 = inr d1 ->
           exists d2,
             IS2.LLVM.Intrinsics.llvm_fabs_f32 args2 = inr d2 /\
-              dvalue_refine_strict d1 d2.
+              sum_rel uvalue_refine_strict dvalue_refine_strict d1 d2.
       Proof.
         intros args1 args2 s ARGS EXEC.
         destruct ARGS; cbn in *; try congruence.
@@ -24421,6 +24000,7 @@ Qed.
         inv H.
         eexists.
         split; eauto.
+        constructor; eauto.
         unfold_dvalue_refine_strict.
         reflexivity.
       Qed.
@@ -24460,7 +24040,7 @@ Qed.
           IS1.LLVM.Intrinsics.llvm_fabs_f64 args1 = inr d1 ->
           exists d2,
             IS2.LLVM.Intrinsics.llvm_fabs_f64 args2 = inr d2 /\
-              dvalue_refine_strict d1 d2.
+              sum_rel uvalue_refine_strict dvalue_refine_strict d1 d2.
       Proof.
         intros args1 args2 s ARGS EXEC.
         destruct ARGS; cbn in *; try congruence.
@@ -24489,6 +24069,7 @@ Qed.
         inv H.
         eexists.
         split; eauto.
+        constructor; eauto.
         unfold_dvalue_refine_strict.
         reflexivity.
       Qed.
@@ -24540,7 +24121,7 @@ Qed.
           IS1.LLVM.Intrinsics.llvm_maxnum_f32 args1 = inr d1 ->
           exists d2,
             IS2.LLVM.Intrinsics.llvm_maxnum_f32 args2 = inr d2 /\
-              dvalue_refine_strict d1 d2.
+              sum_rel uvalue_refine_strict dvalue_refine_strict d1 d2.
       Proof.
         intros args1 args2 s ARGS EXEC.
         destruct ARGS; cbn in *; try congruence.
@@ -24581,6 +24162,7 @@ Qed.
         inv H0.
         eexists.
         split; eauto.
+        constructor; eauto.
         unfold_dvalue_refine_strict.
         reflexivity.
       Qed.
@@ -24632,7 +24214,7 @@ Qed.
           IS1.LLVM.Intrinsics.llvm_maxnum_f64 args1 = inr d1 ->
           exists d2,
             IS2.LLVM.Intrinsics.llvm_maxnum_f64 args2 = inr d2 /\
-              dvalue_refine_strict d1 d2.
+              sum_rel uvalue_refine_strict dvalue_refine_strict d1 d2.
       Proof.
         intros args1 args2 s ARGS EXEC.
         destruct ARGS; cbn in *; try congruence.
@@ -24673,6 +24255,7 @@ Qed.
         inv H0.
         eexists.
         split; eauto.
+        constructor; eauto.
         unfold_dvalue_refine_strict.
         reflexivity.
       Qed.
@@ -24724,7 +24307,7 @@ Qed.
           IS1.LLVM.Intrinsics.llvm_minimum_f32 args1 = inr d1 ->
           exists d2,
             IS2.LLVM.Intrinsics.llvm_minimum_f32 args2 = inr d2 /\
-              dvalue_refine_strict d1 d2.
+              sum_rel uvalue_refine_strict dvalue_refine_strict d1 d2.
       Proof.
         intros args1 args2 s ARGS EXEC.
         destruct ARGS; cbn in *; try congruence.
@@ -24765,6 +24348,7 @@ Qed.
         inv H0.
         eexists.
         split; eauto.
+        constructor; eauto.
         unfold_dvalue_refine_strict.
         reflexivity.
       Qed.
@@ -24816,7 +24400,7 @@ Qed.
           IS1.LLVM.Intrinsics.llvm_minimum_f64 args1 = inr d1 ->
           exists d2,
             IS2.LLVM.Intrinsics.llvm_minimum_f64 args2 = inr d2 /\
-              dvalue_refine_strict d1 d2.
+              sum_rel uvalue_refine_strict dvalue_refine_strict d1 d2.
       Proof.
         intros args1 args2 s ARGS EXEC.
         destruct ARGS; cbn in *; try congruence.
@@ -24857,6 +24441,7 @@ Qed.
         inv H0.
         eexists.
         split; eauto.
+        constructor; eauto.
         unfold_dvalue_refine_strict.
         reflexivity.
       Qed.
@@ -24867,7 +24452,7 @@ Qed.
           IS1.LLVM.Intrinsics.llvm_ushl_sat_1 args1 = inr d1 ->
           exists d2,
             IS2.LLVM.Intrinsics.llvm_ushl_sat_1 args2 = inr d2 /\
-              dvalue_refine_strict d1 d2.
+              sum_rel uvalue_refine_strict dvalue_refine_strict d1 d2.
       Proof.
         intros args1 args2 s ARGS EXEC.
         destruct ARGS; cbn in *; try congruence.
@@ -24916,7 +24501,7 @@ Qed.
           IS1.LLVM.Intrinsics.llvm_ushl_sat_8 args1 = inr d1 ->
           exists d2,
             IS2.LLVM.Intrinsics.llvm_ushl_sat_8 args2 = inr d2 /\
-              dvalue_refine_strict d1 d2.
+              sum_rel uvalue_refine_strict dvalue_refine_strict d1 d2.
       Proof.
         intros args1 args2 s ARGS EXEC.
         destruct ARGS; cbn in *; try congruence.
@@ -24965,7 +24550,7 @@ Qed.
           IS1.LLVM.Intrinsics.llvm_ushl_sat_16 args1 = inr d1 ->
           exists d2,
             IS2.LLVM.Intrinsics.llvm_ushl_sat_16 args2 = inr d2 /\
-              dvalue_refine_strict d1 d2.
+              sum_rel uvalue_refine_strict dvalue_refine_strict d1 d2.
       Proof.
         intros args1 args2 s ARGS EXEC.
         destruct ARGS; cbn in *; try congruence.
@@ -25014,7 +24599,7 @@ Qed.
           IS1.LLVM.Intrinsics.llvm_ushl_sat_32 args1 = inr d1 ->
           exists d2,
             IS2.LLVM.Intrinsics.llvm_ushl_sat_32 args2 = inr d2 /\
-              dvalue_refine_strict d1 d2.
+              sum_rel uvalue_refine_strict dvalue_refine_strict d1 d2.
       Proof.
         intros args1 args2 s ARGS EXEC.
         destruct ARGS; cbn in *; try congruence.
@@ -25063,7 +24648,7 @@ Qed.
           IS1.LLVM.Intrinsics.llvm_ushl_sat_64 args1 = inr d1 ->
           exists d2,
             IS2.LLVM.Intrinsics.llvm_ushl_sat_64 args2 = inr d2 /\
-              dvalue_refine_strict d1 d2.
+              sum_rel uvalue_refine_strict dvalue_refine_strict d1 d2.
       Proof.
         intros args1 args2 s ARGS EXEC.
         destruct ARGS; cbn in *; try congruence.
@@ -25104,6 +24689,21 @@ Qed.
           try rewrite Heqb;
           try rewrite Heqb0;
           try solve_dvalue_refine_strict; auto.
+      Qed.
+
+      Lemma llvm_internal_throw_agrees_success :
+        forall args1 args2 d1,
+          Forall2 dvalue_refine_strict args1 args2 ->
+          IS1.LLVM.Intrinsics.llvm_vellvm_internal_throw args1 = inr d1 ->
+          exists d2,
+            IS2.LLVM.Intrinsics.llvm_vellvm_internal_throw args2 = inr d2 /\
+              sum_rel uvalue_refine_strict dvalue_refine_strict d1 d2.
+      Proof.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence; inv EXEC.
+        eexists; split; eauto.
+        constructor; eauto.
+        constructor; eauto.
       Qed.
 
       Lemma llvm_ushl_sat_1_agrees_fail :
@@ -25286,6 +24886,16 @@ Qed.
         inv H3; auto.
       Qed.
 
+      Lemma llvm_internal_throw_agrees_fail :
+        forall args1 args2 s,
+          Forall2 dvalue_refine_strict args1 args2 ->
+          IS1.LLVM.Intrinsics.llvm_vellvm_internal_throw args1 = inl s ->
+            IS2.LLVM.Intrinsics.llvm_vellvm_internal_throw args2 = inl s.
+      Proof.
+        intros args1 args2 s ARGS EXEC.
+        destruct ARGS; cbn in *; try congruence; inv EXEC.
+      Qed.
+
       all:
         try solve
           [ pose proof (llvm_fabs_f32_agrees_fail _ _ _ REFARGS Heqs) as CONTRA;
@@ -25320,6 +24930,9 @@ Qed.
           |
             pose proof (llvm_ushl_sat_64_agrees_fail _ _ _ REFARGS Heqs) as CONTRA;
             rewrite Heqs0 in CONTRA; inv CONTRA
+          |
+            pose proof (llvm_internal_throw_agrees_fail _ _ _ REFARGS Heqs) as CONTRA;
+            rewrite Heqs0 in CONTRA; inv CONTRA
           ].
 
       all:
@@ -25346,6 +24959,8 @@ Qed.
             rewrite Heqs0 in CONTRA; inv CONTRA; eauto using orutt_Ret
           | pose proof (llvm_ushl_sat_64_agrees_success _ _ _ REFARGS Heqs) as [d2 [CONTRA REF]];
             rewrite Heqs0 in CONTRA; inv CONTRA; eauto using orutt_Ret
+          | pose proof (llvm_internal_throw_agrees_success _ _ _ REFARGS Heqs) as [d2 [CONTRA REF]];
+            rewrite Heqs0 in CONTRA; inv CONTRA; eauto using orutt_Ret
           ].
 
       cbn.
@@ -25364,12 +24979,41 @@ Qed.
       pstep; red; cbn.
       change (inr1 (inr1 (inr1 (inr1 (inl1 o0))))) with
         (@subevent _ _ (ReSum_inr IFun sum1 OOME
-                          ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                          ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
                           LLVMGEnvE
 
            ) B o0).
       rewrite subevent_subevent.
       eapply EqVisOOM.
+    - cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF);
+        cbn in *.
+      pstep; red; cbn.
+      change (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 u0))))))) with
+        (@subevent _ _ (ReSum_inr IFun sum1 UBE
+                          ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                          LLVMGEnvE
+
+           ) B u0).
+      rewrite subevent_subevent.
+      change (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 u))))))) with
+        (@subevent _ _ (ReSum_inr IFun sum1 UBE
+                                  ((IS1.LP.Events.LLVMEnvE +' IS1.LP.Events.LLVMStackE) +'
+  IS1.LP.Events.MemoryE +'
+  IS1.LP.Events.PickUvalueE +' OOME +' LLVMExcE IS1.LP.Events.DV.uvalue +' UBE +' DebugE +' FailureE)
+                          IS1.LP.Events.LLVMGEnvE
+
+           ) A u).
+      rewrite subevent_subevent.
+      econstructor.
+      constructor.
+
+      intros a b H.
+      left.
+      apply orutt_Ret.
+      constructor.
+      intros o CONTRA; inv CONTRA.
   Qed.
 
   Lemma E1E2_interp_intrinsics_orutt_strict :
@@ -25407,13 +25051,196 @@ Qed.
     apply E1E2_interp_intrinsics_orutt_strict; auto.
   Qed.
 
+  (* TODO: Move this *)
+  (* TODO: look at frame stack equivalence *)
+  Lemma alist_refine_strict_fold_right_add_self :
+    forall {K V}
+      `{RD_K : @RelDec.RelDec K (@eq K)}
+      `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K}
+      (vs : FMapAList.alist K V),
+      alist_refine eq vs (fold_right (fun '(id, v) => FMapAList.alist_add id v) [] vs).
+  Proof.
+    induction vs.
+    - cbn; red; cbn.
+      auto.
+    - cbn; red; cbn.
+      red in IHvs.
+      intros k.
+      unfold OptionUtil.option_rel2 in *.
+      destruct a.
+      break_inner_match_goal.
+      + assert (k = k0).
+        apply RelDec.rel_dec_correct; eauto.
+
+        subst.
+        rewrite alist_find_add_eq; auto.
+      + rewrite alist_find_neq; eauto.
+        apply IHvs.
+        intros CONTRA.
+        subst.
+        rewrite Util.eq_dec_eq in Heqb.
+        discriminate.
+  Qed.
+
+  Lemma alist_refine_strict_fold_right_add :
+    forall {K V1 V2}
+      `{RD_K : @RelDec.RelDec K (@eq K)}
+      `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K}
+      (R: V1 -> V2 -> Prop) vs1 vs2,
+      alist_refine R vs1 vs2 ->
+      alist_refine R (fold_right (fun '(id, v) => FMapAList.alist_add id v) [] vs1) (fold_right (fun '(id, v) => FMapAList.alist_add id v) [] vs2).
+  Proof.
+    intros K V1 V2 RD_K RD_K_CORRECT R vs1 vs2 REF.
+    pose proof alist_refine_strict_fold_right_add_self vs1.
+    red.
+    red in H.
+    unfold OptionUtil.option_rel2 in *.
+    intros k.
+    specialize (H k).
+    break_match_hyp; try contradiction.
+    - break_match_hyp; try contradiction; subst.
+      pose proof alist_refine_strict_fold_right_add_self vs2.
+      red in H.
+      unfold OptionUtil.option_rel2 in *.
+      specialize (H k).
+      specialize (REF k).
+      unfold OptionUtil.option_rel2 in *.
+      rewrite Heqo in REF; auto.
+      break_match_hyp; try contradiction.
+      break_match_hyp; subst; auto.
+    - specialize (REF k).
+      unfold OptionUtil.option_rel2 in *.
+      rewrite Heqo in REF; auto.
+      break_match_hyp; try contradiction; subst.
+      pose proof alist_refine_strict_fold_right_add_self vs2.
+      red in H0.
+      unfold OptionUtil.option_rel2 in *.
+      specialize (H0 k).
+      break_match_hyp; try contradiction; auto.
+  Qed.
+
+  Lemma handle_local_orutt :
+    forall A B E1 E2
+      `{OOME -< E2}
+      `{FailureE -< E1} `{FailureE -< E2}
+      (NOOM : forall A (e : FailureE A) (o : OOME A), @subevent FailureE E2 _ _ e <> @subevent OOME E2 _ _ o)
+      (l1 : LocalE LLVMAst.raw_id E1.DV.uvalue A) (l2 : LocalE LLVMAst.raw_id E2.DV.uvalue B)
+      (REF : localE_refine_strict l1 l2)
+      (s1 : IS1.LLVM.Stack.lstack_frame) (s2 : IS2.LLVM.Stack.lstack_frame)
+      (SREF : stack_frame_refine_strict s1 s2)
+      (pre : prerel E1 E2)
+      (FAILPRE : forall A (e : FailureE A), pre _ _ (@subevent FailureE E1 _ _ e) (@subevent FailureE E2 _ _ e))
+      (post : postrel E1 E2),
+      orutt (OOM:=OOME) pre post (prod_rel stack_frame_refine_strict (fun a b => localE_res_refine_strict l1 a l2 b))
+        (handle_local (map:=IS1.LLVM.Stack.lstack_frame) l1 s1)
+        (handle_local (map:=IS2.LLVM.Stack.lstack_frame) l2 s2).
+  Proof.
+    intros A B E1 E2 H H0 H1 NOOM l1 l2 REF s1 s2 SREF pre FAILPRE post.
+    red in REF.
+    destruct l1, l2; inversion REF; subst; cbn in *.
+    - (* LocalWrite *)
+      apply orutt_Ret.
+      constructor; cbn.
+      red in SREF.
+      destruct s1, s2; cbn in *.
+      split; try tauto.
+      destruct SREF.
+      eapply local_stack_refine_strict_add; eauto.
+      split; eauto.
+    - (* LocalRead *)
+      destruct s1, s2; cbn in *.
+      destruct SREF.
+      pose proof H2 as FIND.
+      red in FIND.
+      repeat break_match_goal.
+      + eapply alist_refine_find_some in FIND; eauto.
+        apply orutt_Ret; constructor; cbn; eauto.
+      + eapply alist_refine_find_some_iff with (k:=id0) in  FIND.
+        destruct FIND.
+        forward H4; eauto.
+        destruct H4.
+        rewrite H4 in Heqo0.
+        discriminate.
+      + eapply alist_refine_find_some_iff with (k:=id0) in  FIND.
+        destruct FIND.
+        forward H5; eauto.
+        destruct H5.
+        rewrite H5 in Heqo.
+        discriminate.
+      + apply orutt_raise.
+        intros ? ? CONTRA.
+        apply NOOM in CONTRA; auto.
+        eauto.
+  Qed.
+
+  Lemma handle_stack_orutt :
+    forall A B E1 E2
+      `{OOME -< E2}
+      `{FailureE -< E1} `{FailureE -< E2}
+      (NOOM : forall A (e : FailureE A) (o : OOME A), @subevent FailureE E2 _ _ e <> @subevent OOME E2 _ _ o)
+      (e1 : StackE LLVMAst.raw_id E1.DV.uvalue E1.DV.uvalue A) (e2 : StackE LLVMAst.raw_id E2.DV.uvalue E2.DV.uvalue B)
+      (REF : stackE_refine_strict e1 e2)
+      (s1 : IS1.LLVM.Stack.lstack_frame * IS1.LLVM.Stack.lstack) (s2 : IS2.LLVM.Stack.lstack_frame * IS2.LLVM.Stack.lstack)
+      (SREF : (prod_rel stack_frame_refine_strict stack_refine_strict) s1 s2)
+      (pre : prerel E1 E2)
+      (FAILPRE : forall A (e : FailureE A), pre _ _ (@subevent FailureE E1 _ _ e) (@subevent FailureE E2 _ _ e))
+      (post : postrel E1 E2),
+      orutt (OOM:=OOME) pre post (prod_rel local_stack_refine_strict (fun a b => stackE_res_refine_strict e1 a e2 b))
+        (handle_stack e1 s1)
+        (handle_stack e2 s2).
+  Proof.
+    intros A B E1 E2 H H0 H1 NOOM e1 e2 REF s1 s2 SREF pre FAILPRE post.
+    red in REF.
+    destruct e1, e2; cbn in *; try contradiction.
+    - (* StackPush *)
+      destruct s1, s2; cbn in *.
+      apply orutt_Ret.
+      destruct SREF; cbn in *.
+      repeat (constructor; cbn; eauto).
+      eapply alist_refine_strict_fold_right_add.
+      apply REF.
+    - (* StackPop *)
+      destruct s1, s2; cbn in *.
+      destruct SREF; cbn in *.
+      destruct snd_rel.
+      solve_orutt_raise.
+      apply orutt_Ret.
+      repeat (constructor; cbn; eauto).
+    - (* StackSetHandler *)
+      destruct s1, s2; cbn in *.
+      destruct SREF; cbn in *.
+      apply orutt_Ret; cbn;
+        repeat (constructor; cbn; eauto).
+      destruct l, l1; cbn in *; tauto.
+      destruct REF; subst; eauto.
+      destruct l, l1; cbn in *; tauto.
+    - (* StackHandler *)
+      destruct s1, s2; cbn in *.
+      destruct SREF; cbn in *.
+      destruct l, l1; cbn in *;
+      apply orutt_Ret; cbn;
+        repeat (constructor; cbn; eauto); tauto.
+    - (* StackRaise *)
+      destruct s1, s2; cbn in *.
+      destruct SREF; cbn in *.
+      destruct l, l1; cbn in *;
+      apply orutt_Ret; cbn;
+        repeat (constructor; cbn; eauto); tauto.
+    - (* StackGetExc *)
+      destruct s1, s2; cbn in *.
+      destruct SREF; cbn in *.
+      destruct l, l1; cbn in *;
+      apply orutt_Ret; cbn;
+        repeat (constructor; cbn; eauto); tauto.
+  Qed.
+
   Lemma orutt_interp_local_stack_h :
     forall A B e1 e2 ls1 ls2,
       L1_refine_strict A B e1 e2 ->
       local_stack_refine_strict ls1 ls2 ->
       orutt L2_refine_strict L2_res_refine_strict
         (fun '(s0, a) '(s3, b) =>
-           L1_res_refine_strict A B e1 a e2 b /\ (local_refine_strict × stack_refine_strict) s0 s3)
+           L1_res_refine_strict A B e1 a e2 b /\ (stack_frame_refine_strict × stack_refine_strict) s0 s3)
         (interp_local_stack_h (handle_local (v:=IS1.LP.Events.DV.uvalue)) e1 ls1)
         (interp_local_stack_h (handle_local (v:=uvalue)) e2 ls2)
         (OOM:=OOME).
@@ -25464,207 +25291,86 @@ Qed.
       unfold local_stack_refine_strict in LSR.
       destruct ls1, ls2, LSR.
       constructor; cbn; eauto.
-    - cbn in REF;
+    - (* LocalE *) cbn in REF;
         destruct e2; try inv REF;
-        repeat (break_match_hyp; try inv REF).
-      + cbn in *.
-        destruct ls1, ls2.
-        cbn.
-        repeat rewrite map_ret.
-        apply orutt_Ret;
-          split; try tauto.
-        constructor; cbn in *; try tauto.
-        apply local_stack_refine_strict_add; tauto.
-      + cbn in *.
-        destruct ls1, ls2.
-        cbn.
-        repeat rewrite map_ret.
-        destruct LSR.
-        pose proof H as FIND.
-        do 2 red in FIND.
-        specialize (FIND id0).
-        red in FIND.
-        break_match_hyp; break_match_hyp; inv FIND.
-        repeat rewrite map_ret.
-        apply orutt_Ret; split; try tauto.
-        constructor; cbn in *; try tauto.
-
-        apply orutt_bind with (RR:=local_refine_strict × uvalue_refine_strict).
-        solve_orutt_raise.
-        intros [l1 r1] [l2 r2] [L R]; cbn in *.
+        repeat (break_match_hyp; try inv REF); subst.
+      destruct ls1, ls2.
+      cbn in *.
+      unfold ITree.map.
+      eapply orutt_bind.
+      + eapply handle_local_orutt; eauto; try tauto.
+        intros ? ? ? CONTRA; inv CONTRA.
+        intros ? ?.
+        red. cbn.
+        red.
+        repeat break_match_goal; auto.
+      + intros r1 r2 R1R2.
+        destruct r1, r2.
         apply orutt_Ret.
+        destruct R1R2; cbn in *.
         split; try tauto.
-        constructor; tauto.
-
+        constructor; cbn; eauto.
+        tauto.
+    - (* StackE *) cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF); subst.
+      cbn in *.
+      eapply orutt_weaken with (PRE1:=L2_refine_strict) (POST1:=L2_res_refine_strict); eauto.
+      + eapply handle_stack_orutt; eauto.
+        intros ? ? ? CONTRA; inv CONTRA.
+        destruct ls1, ls2; cbn in *.
+        constructor; cbn; tauto.
+        intros A0 e.
+        cbn. destruct e; cbn; auto.
+      + intros r1 r2 H.
+        destruct r1, r2, H; cbn in *.
+        constructor; eauto.
+        destruct p, p0; cbn in *.
+        repeat (constructor; cbn; eauto); tauto.
     - cbn in REF;
         destruct e2; try inv REF;
         repeat (break_match_hyp; try inv REF).
-      + red in REF.
-        cbn in *.
-        destruct ls1, ls2.
-        cbn.
-        apply orutt_Ret;
-          split; try tauto.
-        constructor; cbn in *; try tauto.
-        { (* TODO: Move this *)
-          (* TODO: look at frame stack equivalence *)
-          Lemma alist_refine_strict_fold_right_add_self :
-            forall {K V}
-              `{RD_K : @RelDec.RelDec K (@eq K)}
-              `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K}
-              (vs : FMapAList.alist K V),
-              alist_refine eq vs (fold_right (fun '(id, v) => FMapAList.alist_add id v) [] vs).
-          Proof.
-            induction vs.
-            - cbn; red; cbn.
-              auto.
-            - cbn; red; cbn.
-              red in IHvs.
-              intros k.
-              unfold OptionUtil.option_rel2 in *.
-              destruct a.
-              break_inner_match_goal.
-              + assert (k = k0).
-                apply RelDec.rel_dec_correct; eauto.
-
-                subst.
-                rewrite alist_find_add_eq; auto.
-              + rewrite alist_find_neq; eauto.
-                apply IHvs.
-                intros CONTRA.
-                subst.
-                rewrite Util.eq_dec_eq in Heqb.
-                discriminate.
-          Qed.
-
-          Lemma alist_refine_strict_fold_right_add :
-            forall {K V1 V2}
-              `{RD_K : @RelDec.RelDec K (@eq K)}
-              `{RD_K_CORRECT : @RelDec.RelDec_Correct _ eq RD_K}
-              (R: V1 -> V2 -> Prop) vs1 vs2,
-              alist_refine R vs1 vs2 ->
-              alist_refine R (fold_right (fun '(id, v) => FMapAList.alist_add id v) [] vs1) (fold_right (fun '(id, v) => FMapAList.alist_add id v) [] vs2).
-          Proof.
-            intros K V1 V2 RD_K RD_K_CORRECT R vs1 vs2 REF.
-            pose proof alist_refine_strict_fold_right_add_self vs1.
-            red.
-            red in H.
-            unfold OptionUtil.option_rel2 in *.
-            intros k.
-            specialize (H k).
-            break_match_hyp; try contradiction.
-            - break_match_hyp; try contradiction; subst.
-              pose proof alist_refine_strict_fold_right_add_self vs2.
-              red in H.
-              unfold OptionUtil.option_rel2 in *.
-              specialize (H k).
-              specialize (REF k).
-              unfold OptionUtil.option_rel2 in *.
-              rewrite Heqo in REF; auto.
-              break_match_hyp; try contradiction.
-              break_match_hyp; subst; auto.
-            - specialize (REF k).
-              unfold OptionUtil.option_rel2 in *.
-              rewrite Heqo in REF; auto.
-              break_match_hyp; try contradiction; subst.
-              pose proof alist_refine_strict_fold_right_add_self vs2.
-              red in H0.
-              unfold OptionUtil.option_rel2 in *.
-              specialize (H0 k).
-              break_match_hyp; try contradiction; auto.
-          Qed.
-
-          apply alist_refine_strict_fold_right_add; auto.
-        }
-
-        apply stack_refine_strict_add; tauto.
-      + cbn in *.
-        destruct ls1, ls2.
-        cbn.
-        repeat rewrite map_ret.
-
-        destruct LSR.
-        destruct s; inv H0.
-        -- solve_orutt_raise.
-        -- apply orutt_Ret. split; auto.
-    - (* Memory Events *)
-      cbn in REF;
-        destruct e2; try inv REF;
-        repeat (break_match_hyp; try inv REF);
-        try solve [cbn;
-         repeat rewrite bind_trigger;
-         red; pstep; red; cbn;
-         constructor; cbn; auto;
-         [ intros ?a ?b ?H;
-           left;
-           pstep; red; cbn;
-           constructor; cbn; auto;
-           split; auto;
-           destruct ls1, ls2; cbn in *;
-           constructor; tauto
-         | intros o CONTRA; inv CONTRA
-          ]].
-    - (* Pick events *)
-      cbn in REF;
-        destruct e2; try inv REF;
-        repeat (break_match_hyp; try inv REF);
-        try solve [cbn;
-         repeat rewrite bind_trigger;
-         red; pstep; red; cbn;
-         constructor; cbn; auto;
-         [ intros ?a ?b ?H;
-           left;
-           pstep; red; cbn;
-           constructor; cbn; auto;
-           split; auto;
-           destruct ls1, ls2; cbn in *;
-           constructor; tauto
-         | intros o CONTRA; inv CONTRA
-          ]].
-    - (* OOM Events *)
-      cbn in REF;
-        destruct e2; try inv REF;
-        repeat (break_match_hyp; try inv REF).
-
       cbn.
-      repeat rewrite bind_trigger.
+      rewrite !bind_trigger.
+      pstep; red; cbn.
       change (inr1 (inr1 (inl1 o0))) with
         (@subevent _ _ (ReSum_inr IFun sum1 OOME
-                          (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE)
+                          (PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
                           MemoryE
+
            ) B o0).
-      pstep; red; cbn.
       rewrite subevent_subevent.
       eapply EqVisOOM.
-    - cbn in REF;
-       destruct e2; try inv REF;
-        repeat (break_match_hyp; try inv REF).
+    - (* UBE Events *)
+      cbn in REF;
+        destruct e2; try inv REF;
+        repeat (break_match_hyp; try inv REF);
+        try solve [cbn;
+         repeat rewrite bind_trigger;
+         red; pstep; red; cbn;
+         constructor; cbn; auto;
+         [ intros ?a ?b ?H;
+           left;
+           pstep; red; cbn;
+           constructor; cbn; auto;
+           split; auto;
+           destruct ls1, ls2; cbn in *;
+           constructor; tauto
+         | intros o CONTRA; inv CONTRA
+          ]].
       cbn.
-      repeat rewrite bind_trigger.
-      pfold. red.
-      cbn.
-      constructor; cbn; auto.
-      intros [] [] _.
-      left.
+
+      rewrite !bind_trigger.
       pstep; red; cbn.
       constructor.
-      split; auto.
-      red in LSR.
-      destruct ls1, ls2.
-      constructor; tauto.
-      intros o CONTRA.
-      inv CONTRA.
-    - cbn in REF;
-       destruct e2; try inv REF;
-        repeat (break_match_hyp; try inv REF).
-      cbn.
-      repeat rewrite bind_trigger.
-      pfold. red.
-      cbn.
-      constructor; cbn; auto.
-      intros [].
-      intros o CONTRA.
-      inv CONTRA.
+      constructor.
+      intros a b H.
+      cbn in H.
+      left.
+      apply orutt_Ret.
+      split; eauto.
+      destruct ls1, ls2; cbn in *; constructor; tauto.
+      intros ? CONTRA; inv CONTRA.
   Qed.
 
   Lemma model_E1E2_12_orutt_strict :

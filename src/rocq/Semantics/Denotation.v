@@ -17,6 +17,7 @@ From Stdlib Require Import
 From ExtLib Require Import
      Structures.Monads
      Structures.Functor
+     EitherMonad
      Eqv.
 
 From ITree Require Import
@@ -29,6 +30,7 @@ From Vellvm Require Import
      Numeric.Floats
      Utilities
      Utils.IntMaps
+     Utils.InterpEither
      Syntax
      Semantics.VellvmIntegers
      Semantics.LLVMEvents
@@ -38,7 +40,8 @@ From Vellvm Require Import
      Semantics.ConcretizationParams
      Utils.ListUtil
      DynamicValues
-     Handlers.Concretization.
+     Handlers.Concretization
+     Handlers.LLVMExceptions.
 
 Require Import Ceres.Ceres.
 
@@ -366,6 +369,57 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     denote_exp None o.
   Arguments denote_op _ : simpl nomatch.
 
+
+  (* TODO: it would be nice to generalize this, but I really need to
+     care about where the exception event is *)
+  Definition catch_llvm_exc_instr_E_h : IFun instr_E (fun R : Type => eitherT uvalue (itree instr_E) R).
+    red.
+    intros T e.
+    refine
+      (match e with
+       | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 exc))))))) =>
+           match exc with
+           | LLVMExc x => mkEitherT (ret (inl x))
+           end
+       | _ => mkEitherT (r <- trigger e ;; ret (inr r))
+       end).
+  Defined.
+
+  Definition catch_llvm_exc_L0_h : IFun L0 (fun R : Type => eitherT uvalue (itree L0) R).
+    red.
+    intros T e.
+    refine
+      (match e with
+       | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 exc))))))) =>
+           match exc with
+           | LLVMExc x => mkEitherT (ret (inl x))
+           end
+       | _ => mkEitherT (r <- trigger e ;; ret (inr r))
+       end).
+  Defined.
+
+  Definition catch_llvm_exc_L0'_h : IFun L0' (fun R : Type => eitherT uvalue (itree L0') R).
+    red.
+    intros T e.
+    refine
+      (match e with
+       | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 exc)))))))) =>
+           match exc with
+           | LLVMExc x => mkEitherT (ret (inl x))
+           end
+       | _ => mkEitherT (r <- trigger e ;; ret (inr r))
+       end).
+  Defined.
+
+  Definition catch_llvm_exc_instr_E : itree instr_E ~> eitherT uvalue (itree instr_E)
+      := interp_either catch_llvm_exc_instr_E_h.
+
+  Definition catch_llvm_exc_L0 : itree L0 ~> eitherT uvalue (itree L0)
+      := interp_either catch_llvm_exc_L0_h.
+
+  Definition catch_llvm_exc_L0' : itree L0' ~> eitherT uvalue (itree L0')
+      := interp_either catch_llvm_exc_L0'_h.
+
   (* An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
     (i: (instr_id * instr dtyp)) (varargs : option ADDR.addr) : itree instr_E unit :=
@@ -374,8 +428,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     | (IId id, INSTR_Op op) =>
         uv <- translate exp_to_instr (denote_op op) ;;
-        trigger (LocalWrite id uv)
-
+        trigger (LocalWrite id uv) ;;
+        ret tt
     (* Allocation *)
     | (IId id, INSTR_Alloca dt annotations) =>
         let num_elements :=
@@ -403,14 +457,17 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
             n <- concretize_or_pick_unique un;;
             dv <- trigger (Alloca dt (Z.to_N (dvalue_int_unsigned n)) align);;
             trigger (LocalWrite id (dvalue_to_uvalue dv))
-        end
+        end;;
+        ret tt
+
     (* Load *)
     | (IId id, INSTR_Load dt (du,ptr) _) =>
-      ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
+      ua <- translate exp_to_instr (denote_exp (Some du) ptr);;
       (* Load addresses must be unique *)
       da <- concretize_or_pick_unique ua;;
       uv <- trigger (Load dt da);;
-      trigger (LocalWrite id uv)
+      trigger (LocalWrite id uv) ;;
+      ret tt
 
     (* Store *)
     | (IVoid _, INSTR_Store (dt, val) (du, ptr) _) =>
@@ -421,7 +478,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       match da with
       | DVALUE_Poison dt => raiseUB "Store to poisoned address."
       | _ => trigger (Store dt da uv)
-      end
+      end;;
+      ret tt
 
     | (_, INSTR_Store _ _ _) => raise "ILL-FORMED itree ERROR: Store to non-void ID"
 
@@ -461,16 +519,27 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
             else
               if String.eqb s "llvm.va_end"
               then ret UVALUE_None
-              else dvs <- map_monad (fun uv => concretize_or_pick_unique uv) uvs ;;
-                   fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
+              else dvs <- map_monad (fun uv => concretize_or_pick_unique uv) uvs;;
+                   res <- trigger (Intrinsic dt s dvs);;
+                   match res with
+                   | inl exc => raiseLLVM exc
+                   | inr dv => ret (dvalue_to_uvalue dv)
+                   end
       | None =>
-        fv <- translate exp_to_instr (denote_exp None f) ;;
-        trigger (Call dt fv uvs)
+        fv <- translate exp_to_instr (denote_exp None f);;
+        res <- trigger (Call dt fv uvs);;
+        match res with
+        | inl exc => raiseLLVM exc
+        | inr uv => ret uv
+        end
       end
       ;;
       match pt with
-      | IVoid _ => ret tt
-      | IId id  => trigger (LocalWrite id returned_value)
+      | IVoid _ =>
+          ret tt
+      | IId id  =>
+          trigger (LocalWrite id returned_value);;
+          ret tt
       end
 
     | (IVoid _, INSTR_Comment _) => ret tt
@@ -485,13 +554,14 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
         trigger (Store DTYPE_Pointer ptr_to_args (dvalue_to_uvalue args'));;
         match pt with
         | IVoid _ => ret tt
-        | IId id  => trigger (LocalWrite id retv)
+        | IId id  => trigger (LocalWrite id retv);;
+                     ret tt
         end
+    | (_, INSTR_LandingPad _ _ _) => raise "todo landingpad"
     (* Currently unhandled itree instructions *)
     | (_, INSTR_Fence _ _)
     | (_, INSTR_AtomicCmpXchg _)
-    | (_, INSTR_AtomicRMW _)
-    | (_, INSTR_LandingPad _ _ _) => raise "Unsupported VIR instruction"
+    | (_, INSTR_AtomicRMW _) => raise "Unsupported VIR instruction"
 
     (* Error states *)
     | (_, _) => raise "ID / Instr mismatch void/non-void"
@@ -522,19 +592,19 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
   (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
-  Definition denote_terminator (t: terminator dtyp): itree exp_E (block_id + uvalue) :=
+
+  Definition denote_terminator (t: terminator dtyp): itree instr_E (block_id + uvalue) :=
     match t with
 
     | TERM_Ret (dt, op) =>
-      dv <- denote_exp (Some dt) op ;;
+      dv <- (translate exp_to_instr (denote_exp (Some dt) op)) ;;
       ret (inr dv)
 
     | TERM_Ret_void =>
-      ret (inr UVALUE_None)
+        ret (inr UVALUE_None)
 
     | TERM_Br (dt,op) br1 br2 =>
-      uv <- denote_exp (Some dt) op ;;
-      (* Branching on a nondeterministic value should be considered UB *)
+      uv <- (translate exp_to_instr (denote_exp (Some dt) op)) ;;
       dv <- concretize_or_pick_unique uv;;
       match dv with
       | @DVALUE_I 1 comparison_bit =>
@@ -549,7 +619,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | TERM_Br_1 br => ret (inl br)
 
     | TERM_Switch (dt,e) default_br dests =>
-      uselector <- denote_exp (Some dt) e;;
+      uselector <- (translate exp_to_instr (denote_exp (Some dt) e));;
       (* Selection on [undef] is UB *)
       selector <- concretize_or_pick_unique uselector;;
       if dvalue_is_poison selector
@@ -565,9 +635,30 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | TERM_Unreachable => raiseUB "IMPOSSIBLE: unreachable in reachable position"
 
     (* Currently unhandled VIR terminators *)
-    | TERM_IndirectBr _ _
-    | TERM_Resume _
-    | TERM_Invoke _ _ _ _ _ _ => raise "Unsupport itree terminator"
+    | TERM_Invoke iid (dt, fnptrval) args to_label unwind_label anns =>
+      uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) (List.map fst args) ;;
+      fv <- (translate exp_to_instr (denote_exp None fnptrval)) ;;
+      rv <- trigger (Call dt fv uvs) ;;
+      (* branch to to_label *)
+      match rv with
+      | inl exc =>
+          (* Exception case. Need to jump to unwind label *)
+          (* TODO: Need to pass exception value to somewhere *)
+          ret (inl unwind_label)
+      | inr returned_value =>
+          match iid with
+          | None => ret tt
+          | Some (IVoid _) => ret tt
+          | Some (IId id)  => trigger (LocalWrite id returned_value)
+          end;;
+          ret (inl to_label)
+      end
+
+    | TERM_Resume (t, expr) => 
+      exn <- translate exp_to_instr (denote_exp (Some t) expr);;
+      raiseLLVM exn
+
+    | TERM_IndirectBr _ _ => raise "Unsupport itree terminator"
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
@@ -595,7 +686,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option ADDR.addr) : itree instr_E (block_id + uvalue) :=
     denote_phis bid_from (blk_phis b);;
     denote_code (blk_code b) varargs;;
-    translate exp_to_instr (denote_terminator (blk_term b)).
+    denote_terminator (blk_term b).
 
   (* Our denotation currently contains two kinds of indirections: jumps to labels, internal to
          a cfg, and calls to functions, that jump from a cfg to another.
@@ -648,25 +739,33 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
         ret ([], vargs)
     end.
 
+  Definition pop_call_frame {E k v exc} `{MemoryE -< E} `{StackE k v exc -< E} : itree E unit :=
+    trigger StackPop;;
+    trigger MemPop.
+
+  (* Push call frame, return varargs address *)
+  Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list uvalue) : itree L0' ADDR.addr :=
+    (* We match the arguments variables to the inputs *)
+    '(bs, vs) <- lift_err ret (combine_lists_varargs (df_args df) args) ;;
+    dts <- lift_err ret (map_monad dtyp_of_uvalue_fun vs);;
+    let dt := DTYPE_Packed_struct dts in
+    (* generate the corresponding writes to the local stack frame *)
+    trigger MemPush ;;
+    trigger (StackPush bs) ;;
+    varargs <- trigger (Alloca dt 1 None);;
+    trigger (Store dt varargs (UVALUE_Packed_struct vs));;
+    match varargs with
+    | DVALUE_Addr varg =>
+        ret varg
+    | _ => raise "Non-address returned from alloca of varargs"
+    end.
+
   Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
     fun (args : list uvalue) =>
-      (* We match the arguments variables to the inputs *)
-      '(bs, vs) <- lift_err ret (combine_lists_varargs (df_args df) args) ;;
-      dts <- lift_err ret (map_monad dtyp_of_uvalue_fun vs);;
-      let dt := DTYPE_Packed_struct dts in
-        (* generate the corresponding writes to the local stack frame *)
-      trigger MemPush ;;
-      trigger (StackPush bs) ;;
-      varargs <- trigger (Alloca dt 1 None);;
-      trigger (Store dt varargs (UVALUE_Packed_struct vs));;
-      match varargs with
-      | DVALUE_Addr varg =>
-          rv <- translate instr_to_L0' (denote_cfg (df_instrs df) (Some varg)) ;;
-          trigger StackPop ;;
-          trigger MemPop ;;
-          ret rv
-      | _ => raise "Non-address returned from alloca in denote_function"
-      end.
+      varg <- push_call_frame df args;;
+      rv <- translate instr_to_L0' (denote_cfg (df_instrs df) (Some varg));;
+      pop_call_frame;;
+      ret rv.
 
   (* We now turn to the second knot to be tied: a top-level itree program is a set
          of mutually recursively defined functions, i.e. [cfg]s. We hence need to
@@ -690,20 +789,20 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
        end.
 
   Definition denote_mcfg
-             (fundefs:IntMap function_denotation) (dt : dtyp)
-             (f_value : uvalue) (args : list uvalue) : itree L0 uvalue :=
+    (fundefs:IntMap function_denotation) (dt : dtyp)
+    (f_value : uvalue) (args : list uvalue) : itree L0 (uvalue + uvalue) :=
     @mrec CallE (ExternalCallE +' _)
-          (fun T call =>
-             match call with
-             | Call dt fv args =>
-               dfv <- concretize_or_pick fv;;
-               match (lookup_defn dfv fundefs) with
-               | Some f_den => (* If the call is internal *)
-                 f_den args
-               | None =>
+      (fun T call =>
+         match call with
+         | Call dt fv args =>
+             dfv <- concretize_or_pick fv;;
+             match (lookup_defn dfv fundefs) with
+             | Some f_den => (* If the call is internal *)
+                 unEitherT (catch_llvm_exc_L0' (f_den args))
+             | None =>
                  dargs <- map_monad (fun uv => concretize_or_pick_unique uv) args ;;
-                 fmap dvalue_to_uvalue (trigger (ExternalCall dt fv dargs))
-               end
-             end)
-          _ (Call dt f_value args).
+                 fmap inr (fmap dvalue_to_uvalue (trigger (ExternalCall dt fv dargs)))
+             end
+         end)
+      _ (Call dt f_value args).
 End Denotation.

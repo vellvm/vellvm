@@ -75,7 +75,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
 
     Context {E : Type -> Type}.
 
-    Notation F := (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE).
+    Notation F := (PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE).
 
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).
@@ -525,7 +525,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
     Context {E : Type -> Type}.
     Notation E := ExternalCallE.
-    Notation F := (PickUvalueE +' OOME +' UBE +' DebugE +' FailureE).
+    Notation F := (PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE).
 
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).

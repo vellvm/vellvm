@@ -300,28 +300,21 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Proof using opt_correct.
         intros *.
         destruct t; try reflexivity.
-        - destruct v.
-          cbn.
-          rewrite !translate_bind, !interp_cfg2_bind.
+        - destruct v; cbn.
+          rewrite !interp_cfg2_bind.
           rewrite opt_correct.
-          cbn.
-
+          reflexivity.
+        - destruct v; cbn.
+          rewrite !interp_cfg2_bind.
+          rewrite opt_correct.
           apply eutt_eq_bind.
           intro2; reflexivity.
-        - destruct v; cbn.
-          rewrite !translate_bind, !interp_cfg2_bind.
-          rewrite opt_correct; apply eutt_eq_bind.
-          intro2.
-          rewrite !translate_bind, !interp_cfg2_bind.
-          apply eutt_eq_bind.
-          intro2.
-          break_match_goal; try reflexivity.
         - destruct v.
           cbn.
-          rewrite !translate_bind, !interp_cfg2_bind.
+          rewrite !interp_cfg2_bind.
           rewrite opt_correct; apply eutt_eq_bind.
           intro2.
-          rewrite !translate_bind, !interp_cfg2_bind.
+          rewrite !interp_cfg2_bind.
           apply eutt_eq_bind.
           intro2.
           assert (EQbrs: (brs = endo brs)).
@@ -330,6 +323,42 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
           setoid_rewrite <- EQbrs.
           unfold endo, Endo_id.
           reflexivity.
+        - destruct v; cbn.
+          rewrite !interp_cfg2_bind.
+          rewrite opt_correct.
+          reflexivity.
+        - cbn.
+          destruct fnptrval; cbn.
+          rewrite !interp_cfg2_bind.
+          eapply eutt_clo_bind with (UU:=eq).
+          { revert g l.
+            induction args; intros g l; cbn; try reflexivity.
+            destruct a; cbn.
+            destruct t; cbn.
+            rewrite !interp_cfg2_bind.
+            rewrite opt_correct.
+            apply eutt_eq_bind.
+            intros (?&?&?).
+
+            rewrite !interp_cfg2_bind.
+            apply eutt_clo_bind with (UU:=eq); eauto.
+
+            intros (?&?&?) (?&?&?) EQ; inv EQ.
+            reflexivity.
+          }
+
+          intros (?&?&?) (?&?&?) EQ; inv EQ.
+          rewrite !interp_cfg2_bind.
+          rewrite opt_correct.
+          apply eutt_eq_bind.
+
+          intros (?&?&?).
+          rewrite !interp_cfg2_bind.
+          apply eutt_eq_bind.
+
+          intros (?&?&?).
+          destruct s; try reflexivity.
+          destruct i as [[i | i] | i]; try reflexivity.
       Qed.
 
       Lemma exp_optim_correct_code : forall varargs c g l,
@@ -432,11 +461,12 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
         apply exp_optim_correct_term.
       Qed.
 
-      #[global] Instance eq_itree_interp_cfg2: forall {T : Type}, Proper (eq_itree eq ==> eq ==> eq ==> eq_itree eq) (@ℑ2 T).
+      #[global] Instance eq_itree_interp_cfg2: forall {T : Type} {b}, Proper (eqit eq b b ==> eq ==> eq ==> eqit eq b b) (@ℑ2 T).
       Proof using Type.
         repeat intro.
-        unfold ℑ2.
-        subst; rewrite H.
+        subst.
+        unfold interp_cfg2.
+        rewrite H.
         reflexivity.
       Qed.
 
@@ -445,7 +475,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
           ℑ2 (Ret x) g l ≅ Ret2 g l x.
       Proof using Type.
         intros.
-        unfold interp_cfg2.
+        autounfold with VELLVM_REWRITE.
         rewrite interp_intrinsics_ret, interp_global_ret, interp_local_ret.
         reflexivity.
       Qed.
@@ -456,7 +486,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
              '(l',(g',x)) <- ℑ2 t g l ;; ℑ2 (k x) g' l'.
       Proof using Type.
         intros.
-        unfold ℑ2.
+        autounfold with VELLVM_REWRITE.
         rewrite interp_intrinsics_bind, interp_global_bind, interp_local_bind.
         eapply eq_itree_clo_bind; [reflexivity | intro2; reflexivity].
       Qed.
@@ -466,7 +496,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
           ℑ2 (Tau t) g l ≅ Tau (ℑ2 t g l).
       Proof using Type.
         intros.
-        unfold ℑ2.
+        autounfold with VELLVM_REWRITE.
         rewrite interp_intrinsics_Tau, interp_global_Tau, interp_local_Tau.
         reflexivity.
       Qed.

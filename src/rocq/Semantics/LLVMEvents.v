@@ -74,9 +74,20 @@ Set Contextual Implicit.
   | LocalWrite (id: k) (dv: v): LocalE k v unit
   | LocalRead  (id: k): LocalE k v v.
 
-  Variant StackE (k v:Type) : Type -> Type :=
-  | StackPush (args: list (k * v)) : StackE k v unit (* Pushes a fresh environment during a call *)
-  | StackPop : StackE k v unit. (* Pops it back during a ret *)
+  Variant StackE (k v exc:Type) : Type -> Type :=
+  | StackPush (args: list (k * v)) : StackE k v exc unit (* Pushes a fresh environment during a call *)
+  | StackPop : StackE k v exc unit (* Pops it back during a ret *)
+  | StackSetHandler : option block_id -> StackE k v exc unit (* Insert / remove landingpad for exception *)
+  | StackHandler : StackE k v exc (option block_id) (* Get exception handler for current frame *)
+  | StackRaise : exc -> StackE k v exc unit (* Place exception onto the stack, does not pop *)
+  | StackGetExc : StackE k v exc (option exc). (* Fetches the currently raised exception if there is one *)
+
+  (* LLVM exceptions *)
+  Variant LLVMExcE (EXC : Type) : Type -> Type :=
+    | LLVMExc : EXC -> LLVMExcE EXC void.
+
+  Definition raiseLLVM {E EXC} {A} `{LLVMExcE EXC -< E} (e : EXC) : itree E A :=
+    v <- trigger (LLVMExc e);; match v: void with end.
 
   (* This function can be replaced with print_string during extraction
      to print the error messages of Throw and (indirectly) ThrowUB. *)
@@ -167,7 +178,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
 
     (* Generic calls, refined by [denote_mcfg] *)
     Variant CallE : Type -> Type :=
-    | Call        : forall (t:dtyp) (f:uvalue) (args:list uvalue), CallE uvalue.
+    | Call        : forall (t:dtyp) (f:uvalue) (args:list uvalue), CallE (uvalue + uvalue).
 
     (* ExternalCallE values are the "observable" events by which one should compare the 
        equivalence of two LLVM IR programs.  These should never be interpreted away
@@ -190,8 +201,9 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
       | IO_stderr : forall (str : list int8), ExternalCallE unit.
 
     (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
+    (* Intrinsics may raise an exception by returning inl *)
     Variant IntrinsicE : Type -> Type :=
-    | Intrinsic : forall (t:dtyp) (f:string) (args:list dvalue), IntrinsicE dvalue.
+    | Intrinsic : forall (t:dtyp) (f:string) (args:list dvalue), IntrinsicE (uvalue + dvalue).
 
     (* Interactions with the memory *)
     Variant MemoryE : Type -> Type :=
@@ -225,11 +237,11 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
    *)
   Definition LLVMGEnvE := (GlobalE raw_id dvalue).
   Definition LLVMEnvE := (LocalE raw_id uvalue).
-  Definition LLVMStackE := (StackE raw_id uvalue).
+  Definition LLVMStackE := (StackE raw_id uvalue uvalue).
 
-  Definition conv_E := MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE.
+  Definition conv_E := MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
   Definition lookup_E := LLVMGEnvE +' LLVMEnvE.
-  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE.
+  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
 
   Definition LU_to_exp : lookup_E ~> exp_E :=
     fun T e =>
@@ -243,76 +255,43 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
 
   Definition instr_E := CallE +' IntrinsicE +' exp_E.
   Definition exp_to_instr : exp_E ~> instr_E :=
-    fun T e => inr1 (inr1 e).
+    fun T e => subevent _ e.
 
   (* Core effects. *)
-  Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE.
+  Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
 
-  Definition instr_to_L0' : instr_E ~> L0' :=
-    fun T e =>
-      match e with
-      | inl1 e => inl1 e
-      | inr1 (inl1 e) => inr1 (inr1 (inl1 e))
-      | inr1 (inr1 (inl1 e)) => inr1 (inr1 (inr1 (inl1 e)))
-      | inr1 (inr1 (inr1 (inl1 e))) => inr1 (inr1 (inr1 (inr1 (inl1 (inl1 e)))))
-      | inr1 (inr1 (inr1 (inr1 e))) => inr1 (inr1 (inr1 (inr1 (inr1 e))))
-      end.
+  Definition instr_to_L0' : instr_E ~> L0' := subevent.
 
-  Definition exp_to_L0' : exp_E ~> L0' :=
-    fun T e => instr_to_L0' (exp_to_instr e).
+  Definition exp_to_L0' : exp_E ~> L0' := subevent.
 
-  Definition FUB_to_exp : (FailureE +' UBE) ~> exp_E :=
-    fun T e =>
-      match e with
-      | inl1 x => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 x))))))
-      | inr1 x => inr1 (inr1 (inr1 (inr1 (inr1 (inl1 x)))))
-      end.
+  Definition FUB_to_exp : (FailureE +' UBE) ~> exp_E := subevent.
 
-  Definition FUBO_to_exp : (FailureE +' UBE +' OOME) ~> exp_E :=
-    fun T e =>
-      match e with
-      | inl1 x => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 x))))))
-      | inr1 (inl1 x) => inr1 (inr1 (inr1 (inr1 (inr1 (inl1 x)))))
-      | inr1 (inr1 x) => inr1 (inr1 (inr1 (inr1 (inl1 x))))
-      end.
+  Definition FUBO_to_exp : (FailureE +' UBE +' OOME) ~> exp_E := subevent.
 
-  Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE.
+  Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
 
-  Definition exp_to_L0 : exp_E ~> L0 :=
-    fun T e =>
-      match e with
-      | inl1 e => inr1 (inr1 (inl1 e))
-      | inr1 (inl1 e) => inr1 (inr1 (inr1 (inl1 (inl1 e))))
-      | inr1 (inr1 e) => inr1 (inr1 (inr1 (inr1 e)))
-      end.
+  Definition exp_to_L0 : exp_E ~> L0 := subevent.
 
   (* For multiple CFG, after interpreting [GlobalE] *)
-  Definition L1 := ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE.
+  Definition L1 := ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] *)
-  Definition L2 := ExternalCallE +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE.
+  Definition L2 := ExternalCallE +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
-  Definition L3 := ExternalCallE +' PickUvalueE +' OOME +' UBE +' DebugE +' FailureE.
+  Definition L3 := ExternalCallE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [PickUvalueE]*)
   (* Interprets [Pick] events: forcing evaluation of [uvalue]s, [UBE] has no semantic meaning *)
-  Definition L4 := ExternalCallE +' OOME +' UBE +' DebugE +' FailureE.
+  Definition L4 := ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
 
   (* [UBE] is still present in tree to identify failure, but the [model_UB] semantics allows [UB] to subsume all behavior *)
-  Definition L5 := ExternalCallE +' OOME +' UBE +' DebugE +' FailureE.
+  Definition L5 := ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
 
   (* [OOM] semantics is introduced through [interp_prop], so the semantic change is not apparent in the event signature *)
-  Definition L6 := ExternalCallE +' OOME +' UBE +' DebugE +' FailureE.
+  Definition L6 := ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
 
-  Definition FUBO_to_L4 : (FailureE +' UBE +' OOME) ~> L4:=
-    fun T e =>
-      match e with
-      | inl1 x => inr1 (inr1 (inr1 (inr1 x)))
-      | inr1 (inl1 x) => inr1 (inr1 (inl1 x))
-      | inr1 (inr1 x) => inr1 (inl1 x)
-      end
-    .
+  Definition FUBO_to_L4 : (FailureE +' UBE +' OOME) ~> L4:= subevent.
 
   End Events.
 

@@ -158,13 +158,13 @@ Section Globals.
         intros ?; tau_steps; reflexivity.
       Qed.
 
-      #[global] Instance eutt_interp_global {R} :
-        Proper (eutt eq ==> eq ==> eutt eq) (@interp_global R).
+      #[global] Instance eutt_interp_global {R} {b} :
+        Proper (eqit eq b b ==> eq ==> eqit eq b b) (@interp_global R).
       Proof using.
         repeat intro.
         unfold interp_global.
-        subst; rewrite H1.
-        reflexivity.
+        destruct b; subst; rewrite H1;
+          reflexivity.
       Qed.
 
     End Structural_Lemmas.

@@ -614,6 +614,21 @@ Proof using.
   intros [] [] _.
 Qed.
 
+Lemma orutt_raiseLLVM :
+  forall {E1 E2 OOM : Type -> Type} OOME {R1 R2 : Type} EXCT1 EXCT2 `{EXC1 : LLVMExcE EXCT1 -< E1} `{EXC2 : LLVMExcE EXCT2 -< E2}
+    {PRE : prerel E1 E2} {POST : postrel E1 E2} {R1R2 : R1 -> R2 -> Prop}
+    exc1 exc2,
+    (forall exc (o : OOM _), @subevent _ E2 EXC2 void (LLVMExc exc) <> @subevent OOM E2 OOME void o) ->
+    PRE void void (subevent void (LLVMExc exc1)) (subevent void (LLVMExc exc2)) ->
+    orutt PRE POST R1R2 (raiseLLVM exc1) (raiseLLVM exc2) (OOM:=OOM) (OOME:=OOME).
+Proof using.
+  intros E1 E2 OOM OOME R1 R2 EXCT1 EXCT2 EXC1 EXC2 PRE POST R1R2 msg1 msg2 H H0.
+  unfold raiseLLVM.
+  repeat rewrite bind_trigger.
+  apply orutt_Vis; auto.
+  intros [] [] _.
+Qed.
+
 Ltac solve_orutt_raise :=
   apply orutt_raise; cbn; auto;
   intros msg o CONTRA;

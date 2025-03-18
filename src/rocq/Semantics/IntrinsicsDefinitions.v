@@ -13,9 +13,10 @@ From Stdlib Require Import
      ZArith List String.
 
 From ExtLib Require Import
-     Structures.Monads
-     Programming.Eqv
-     Data.String.
+  Structures.Monads
+  Structures.Functor
+  Programming.Eqv
+  Data.String.
 
 From Vellvm Require Import
      Utilities
@@ -29,8 +30,8 @@ From Vellvm Require Import
 
 
 From Flocq.IEEE754 Require Import
-     Binary
-     Bits.
+  Binary
+  Bits.
 
 Import MonadNotation.
 Import EqvNotation.
@@ -51,6 +52,15 @@ Set Contextual Implicit.
     implementation must be provided in [src/coq/Handlers/Memory.v] and an equality test on its
     name added to [handle_intrinsic].
 *)
+
+Definition vellvm_internal_throw_decl: declaration typ :=
+  {|
+    dc_name        := Name "llvm.vellvm.internal.throw";
+    dc_type        := TYPE_Function TYPE_Void [] false;
+    dc_param_attrs := ([], [[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
 
 Definition fabs_32_decl: declaration typ :=
   {|
@@ -267,8 +277,9 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
    - error should be returned only in the case that the LLVM program is ill-formed
      (e.g. if the wrong number and/or type of arguments is given to the intrinsic)
 
+   - The uvalue case is used to throw an exception.
    *)
-  Definition semantic_function := (list dvalue) -> err dvalue.
+  Definition semantic_function := (list dvalue) -> err (uvalue + dvalue).
 
   (* An association list mapping intrinsic names to their semantic definitions *)
   Definition intrinsic_definitions := list (declaration typ * semantic_function).
@@ -280,7 +291,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
   Definition llvm_fabs_f32 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Float d] => ret (DVALUE_Float (b32_abs d))
+      | [DVALUE_Float d] => ret (inr (DVALUE_Float (b32_abs d)))
       | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed inputs"
       end.
 
@@ -288,7 +299,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
   Definition llvm_fabs_f64 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Double d] => ret (DVALUE_Double (b64_abs d))
+      | [DVALUE_Double d] => ret (inr (DVALUE_Double (b64_abs d)))
       | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed inputs"
       end.
 
@@ -309,14 +320,14 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
   Definition llvm_maxnum_f64 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Double a; DVALUE_Double b] => ret (DVALUE_Double (Float_maxnum a b))
+      | [DVALUE_Double a; DVALUE_Double b] => ret (inr (DVALUE_Double (Float_maxnum a b)))
       | _ => failwith "llvm_maxnum_f64 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_maxnum_f32 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Float a; DVALUE_Float b] => ret (DVALUE_Float (Float32_maxnum a b))
+      | [DVALUE_Float a; DVALUE_Float b] => ret (inr (DVALUE_Float (Float32_maxnum a b)))
       | _ => failwith "llvm_maxnum_f32 got incorrect / ill-typed inputs"
       end.
 
@@ -337,14 +348,14 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
   Definition llvm_minimum_f64 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Double a; DVALUE_Double b] => ret (DVALUE_Double (Float_minimum a b))
+      | [DVALUE_Double a; DVALUE_Double b] => ret (inr (DVALUE_Double (Float_minimum a b)))
       | _ => failwith "llvm_minimum_f64 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_minimum_f32 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Float a; DVALUE_Float b] => ret (DVALUE_Float (Float32_minimum a b))
+      | [DVALUE_Float a; DVALUE_Float b] => ret (inr (DVALUE_Float (Float32_minimum a b)))
       | _ => failwith "llvm_minimum_f32 got incorrect / ill-typed inputs"
       end.
 
@@ -377,36 +388,43 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
   Definition llvm_ushl_sat_1: semantic_function :=
     fun args =>
       match args with
-      | [@DVALUE_I 1 a; @DVALUE_I 1 b] => ushl_sat a b
+      | [@DVALUE_I 1 a; @DVALUE_I 1 b] => fmap inr (ushl_sat a b)
       | _ => failwith "llvm_ushl_sat_1 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_8: semantic_function :=
     fun args =>
       match args with
-      | [@DVALUE_I 8 a; @DVALUE_I 8 b] => ushl_sat a b
+      | [@DVALUE_I 8 a; @DVALUE_I 8 b] => fmap inr (ushl_sat a b)
       | _ => failwith "llvm_ushl_sat_8 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_16: semantic_function :=
     fun args =>
       match args with
-      | [@DVALUE_I 16 a; @DVALUE_I 16 b] => ushl_sat a b
+      | [@DVALUE_I 16 a; @DVALUE_I 16 b] => fmap inr (ushl_sat a b)
       | _ => failwith "llvm_ushl_sat_16 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_32: semantic_function :=
     fun args =>
       match args with
-      | [@DVALUE_I 32 a; @DVALUE_I 32 b] => ushl_sat a b
+      | [@DVALUE_I 32 a; @DVALUE_I 32 b] => fmap inr (ushl_sat a b)
       | _ => failwith "llvm_ushl_sat_32 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_64: semantic_function :=
     fun args =>
       match args with
-      | [@DVALUE_I 64 a; @DVALUE_I 64 b] => ushl_sat a b
+      | [@DVALUE_I 64 a; @DVALUE_I 64 b] => fmap inr (ushl_sat a b)
       | _ => failwith "llvm_ushl_sat_64 got incorrect / ill-typed inputs"
+      end.
+
+  Definition llvm_vellvm_internal_throw : semantic_function :=
+    fun args =>
+      match args with
+      | [] => ret (inl UVALUE_None)
+      | _ => failwith "llvm_vellvm_internal_throw got incorrect / ill-typed inputs"
       end.
 
   (* Clients of Vellvm can register the names of their own intrinsics
@@ -422,8 +440,8 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
       (ushl_sat_8_decl, llvm_ushl_sat_8);
       (ushl_sat_16_decl, llvm_ushl_sat_16);
       (ushl_sat_32_decl, llvm_ushl_sat_32);
-      (ushl_sat_64_decl, llvm_ushl_sat_64)
+      (ushl_sat_64_decl, llvm_ushl_sat_64);
+      (vellvm_internal_throw_decl, llvm_vellvm_internal_throw)
     ].
-
 
 End Make.

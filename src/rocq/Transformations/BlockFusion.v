@@ -628,7 +628,8 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
         repeat setoid_rewrite bind_ret_l.
         (* Constant jump on the left *)
         rewrite TERM.
-        cbn; rewrite translate_ret, !bind_ret_l.
+        cbn.
+        cbn; rewrite !bind_ret_l.
         (* We dismiss the extra tau guard on the left, we'll use the symmetric pair after b2 *)
         rewrite tau_euttge.
         rewrite denote_ocfg_unfold_in_eq_itree; eauto.
@@ -640,6 +641,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
         unfold denote_phis; cbn; rewrite bind_ret_l, !bind_bind.
         cbn; rewrite !bind_ret_l, !bind_bind; cbn.
         (* Match the code from b2 *)
+        unfold denote_code.
         ebind; econstructor; [reflexivity | intros ? ? <-].
         rewrite bind_ret_l.
         (* Match the final jump. We'll need to justify that the destination is not b2:
@@ -647,7 +649,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
          *)
         pose proof denote_terminator_exits_in_outputs (blk_term bk2) as EXIT;
           apply has_post_post_strong in EXIT.
-        ebind; econstructor; [apply eutt_translate_gen, EXIT | clear EXIT; intros ? ? [<- EXIT]].
+        ebind; econstructor; [apply EXIT | clear EXIT; intros ? ? [<- EXIT]].
         (* We either jump or return. In the latter case, it's trivial *)
         destruct u3 as [next | ?]; [| eret].
         (* Here is the guard for our coinductive call *)

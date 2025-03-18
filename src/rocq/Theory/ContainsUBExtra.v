@@ -35,12 +35,19 @@ Ltac inv_observes :=
     end.
 
 Section contains_UB_Extra.
-  Context {E F G J : Type -> Type}.
-  #[local] Notation Eff := (E +' F +' G +' UBE +' J).
+  Context {E F G J K : Type -> Type}.
+  #[local] Notation Eff' := (E +' F +' G +' UBE +' J).
+  #[local] Notation Eff := (E +' F +' G +' K +' UBE +' J).
+
+  Inductive contains_UB_Extra' {R} : itree Eff' R -> Prop :=
+  | CrawlTau'  : forall t1 t2, t2 ≅ Tau t1 -> contains_UB_Extra' t1 -> contains_UB_Extra' t2
+  | CrawlVis1' : forall Y (e : (E +' F +' G) Y) x k t2, t2 ≅ (vis e k) -> contains_UB_Extra' (k x) -> contains_UB_Extra' t2
+  | CrawlVis2' : forall Y (e : J Y) x k t2, t2 ≅ (vis e k) -> contains_UB_Extra' (k x) -> contains_UB_Extra' t2
+  | FindUB'    : forall s k t2, t2 ≅ (vis (subevent (F:=Eff') _ (ThrowUB s)) k) -> contains_UB_Extra' t2.
 
   Inductive contains_UB_Extra {R} : itree Eff R -> Prop :=
   | CrawlTau  : forall t1 t2, t2 ≅ Tau t1 -> contains_UB_Extra t1 -> contains_UB_Extra t2
-  | CrawlVis1 : forall Y (e : (E +' F +' G) Y) x k t2, t2 ≅ (vis e k) -> contains_UB_Extra (k x) -> contains_UB_Extra t2
+  | CrawlVis1 : forall Y (e : (E +' F +' G +' K) Y) x k t2, t2 ≅ (vis e k) -> contains_UB_Extra (k x) -> contains_UB_Extra t2
   | CrawlVis2 : forall Y (e : J Y) x k t2, t2 ≅ (vis e k) -> contains_UB_Extra (k x) -> contains_UB_Extra t2
   | FindUB    : forall s k t2, t2 ≅ (vis (subevent (F:=Eff) _ (ThrowUB s)) k) -> contains_UB_Extra t2.
 
@@ -376,8 +383,8 @@ Section contains_UB_Extra.
 End contains_UB_Extra.
 
 Section contains_UB_Extra_lemmas.
-  Context {E F G J : Type -> Type}.
-  Local Notation Eff := (E +' F +' G +' UBE +' J).
+  Context {E F G K J : Type -> Type}.
+  Local Notation Eff := (E +' F +' G +' K +' UBE +' J).
 
   Lemma ret_not_contains_UB_Extra {R} {RR : relation R} :
     forall (t : itree Eff R) rv, eqit RR true true t (ret rv) -> ~ contains_UB_Extra t.
@@ -391,8 +398,8 @@ Section contains_UB_Extra_lemmas.
 End contains_UB_Extra_lemmas.
 
 Section bind_lemmas.
-  Context {E F G J : Type -> Type}.
-  Local Notation Eff := (E +' F +' G +' UBE +' J).
+  Context {E F G K J : Type -> Type}.
+  Local Notation Eff := (E +' F +' G +' K +' UBE +' J).
 
   Lemma bind_contains_UB_Extra :
     forall {R T} (t : itree Eff R) (k : R -> itree Eff T),
@@ -426,22 +433,15 @@ Section bind_lemmas.
     induction RET.
     - rewrite H; rewrite bind_ret_l; auto.
     - rewrite H; rewrite tau_eutt; eauto.
-    - destruct e as [e | [f | [g | [ube | j]]]].
-      + rewrite H.
-        rewrite bind_vis.
-        eapply CrawlVis1 with (e := (inl1 e)) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
-        reflexivity.
-        eauto.
-      + rewrite H.
-        rewrite bind_vis.
-        eapply CrawlVis1 with (e := (inr1 (inl1 f))) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
-        reflexivity.
-        eauto.
-      + rewrite H.
-        rewrite bind_vis.
-        eapply CrawlVis1 with (e := (inr1 (inr1 g))) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
-        reflexivity.
-        eauto.
+    - destruct e as [e | [e | [e | [e | [ube | e]]]]];
+        try
+          solve
+          [ rewrite H;
+            rewrite bind_vis;
+            eapply CrawlVis1 with (e := subevent _ e) (k := (fun x0 : X => ITree.bind (k0 x0) k));
+            try reflexivity;
+            eauto
+          ].
       + rewrite H.
         rewrite bind_vis.
         destruct ube.
@@ -449,7 +449,7 @@ Section bind_lemmas.
         reflexivity.
       + rewrite H.
         rewrite bind_vis.
-        eapply CrawlVis2 with (e := j) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
+        eapply CrawlVis2 with (e := subevent _ e) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
         reflexivity.
         eauto.
   Qed.
@@ -465,17 +465,17 @@ Section bind_lemmas.
 End bind_lemmas.
 
 Section interp_lemmas.
-  Context {E1 F1 G1 J1 : Type -> Type}.
-  Local Notation Eff1 := (E1 +' F1 +' G1 +' UBE +' J1).
+  Context {E1 F1 G1 K1 J1 : Type -> Type}.
+  Local Notation Eff1 := (E1 +' F1 +' G1 +' K1 +' UBE +' J1).
 
-  Context {E2 F2 G2 J2 : Type -> Type}.
-  Local Notation Eff2 := (E2 +' F2 +' G2 +' UBE +' J2).
+  Context {E2 F2 G2 K2 J2 : Type -> Type}.
+  Local Notation Eff2 := (E2 +' F2 +' G2 +' K1 +' UBE +' J2).
 
   Variable (handler : Handler Eff1 Eff2).
 
   Definition handler_keeps_UB :=
     forall {R} (e : UBE R),
-      contains_UB_Extra (handler _ (inr1 ((inr1 (inr1 (inl1 e)))) : Eff1 R)).
+      contains_UB_Extra (handler _ (subevent _ e : Eff1 R)).
 
   (* We want a lemma about `interp` preserving `contains_UB_Extra`.
 
@@ -539,8 +539,8 @@ Section interp_lemmas.
 End interp_lemmas.
 
 Section refine_OOM_h_lemmas.
-  Context {E F G : Type -> Type}.
-  Local Notation Eff := (E +' F +' OOME +' UBE +' G).
+  Context {E F G K : Type -> Type}.
+  Local Notation Eff := (E +' F +' OOME +' K +' UBE +' G).
 
   Hint Resolve interp_PropT__mono : paco.
 
@@ -698,8 +698,8 @@ Section refine_OOM_h_lemmas.
   Qed.
 
   Lemma contains_UB_Extra_raiseOOM :
-    forall {E F G J} `{O : OOME -< E +' F +' G +' UBE +' J} {X} msg,
-      (forall X e1 e2, O X e1 <> inr1 (inr1 (inr1 (inl1 e2)))) ->
+    forall {E F G J} `{O : OOME -< E +' F +' G +' K +' UBE +' J} {X} msg,
+      (forall X e1 e2, O X e1 <> inr1 (inr1 (inr1 (inr1 (inl1 e2))))) ->
       ~ contains_UB_Extra (@raiseOOM _ _ X msg).
   Proof using.
     intros E0 F0 G0 J0 O X msg NUBE CONTRA.

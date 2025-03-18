@@ -77,6 +77,46 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
              | H: context [translate _ (Ret _)] |- _ => rewrite translate_ret in H
              end.
 
+    Hint Rewrite
+      interp_intrinsics_bind
+      interp_global_bind
+      interp_local_bind
+      interp_intrinsics_trigger
+      interp_global_trigger
+      interp_local_trigger
+      interp_local_stack_trigger
+      interp_local_stack_ret
+      interp_intrinsics_ret
+      interp_global_ret
+      interp_local_ret
+      interp_intrinsics_vis
+      @bind_bind
+      @bind_ret_l
+      @translate_ret
+      : VELLVM_REWRITE.
+
+    Hint Unfold
+      interp_cfg1
+      interp_cfg2
+      interp_cfg3
+      interp_cfg4
+      interp_cfg5
+      interp_mcfg1
+      interp_mcfg2
+      interp_mcfg3
+      interp_mcfg4
+      interp_mcfg5
+      : VELLVM_REWRITE.
+
+    Ltac go_rewrite :=
+      autounfold with VELLVM_REWRITE;
+      repeat (autorewrite with VELLVM_REWRITE; cbn).
+
+    Ltac go_rewrite_in H :=
+      autounfold with VELLVM_REWRITE in H;
+      repeat (autorewrite with VELLVM_REWRITE in H; cbn in H).
+
+
   End MCFGTactics.
 
   Import MCFGTactics.
@@ -101,6 +141,7 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       ℑs2 (t >>= k) g l ≈ '(g',(l',x)) <- ℑs2 t g l;; ℑs2 (k x) l' g'.
   Proof.
     intros; unfold ℑs2.
+    go_rewrite.
     go.
     apply eutt_eq_bind; intros (? & ? & ?); reflexivity.
   Qed.
@@ -108,7 +149,7 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Lemma interp2_ret : forall (R : Type) g l (x : R), ℑs2 (Ret x) g l ≈ Ret2 g l x.
   Proof.
     intros; unfold ℑs2.
-    go; reflexivity.
+    go_rewrite. reflexivity.
   Qed.
 
   (* Lemma interp3_bind : *)

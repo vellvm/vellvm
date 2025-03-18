@@ -17,6 +17,7 @@ type exit_condition =
   | OutOfMemory of string
   | UndefinedBehavior of string
   | Failed of string
+  | LLVMException of string
 
 let string_of_exit_condition e =
   match e with
@@ -24,6 +25,7 @@ let string_of_exit_condition e =
   | OutOfMemory s -> "Out Of Memory: " ^ s
   | UndefinedBehavior s -> "Undefined Behavior: " ^ s
   | Failed s -> "Failed: " ^ s
+  | LLVMException s -> "LLVM Level Exception: " ^ s
 
 (* Serve as the key for the mapping *)
 type test_result =
