@@ -140,7 +140,7 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 
 ## Assumes:
   - OCaml 4.14.1 (typically installed via `opam`, see below)
-  - Coq 8.19.1
+  - Coq 8.20.1
   - opam  2.0.0+
   - Clang 14.0.1+ (available for Mac OSX in XCode 4.2+, or installed via, e.g. `sudo apt-get install clang`)
   - `gnu-sed`
