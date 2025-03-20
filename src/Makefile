@@ -34,7 +34,7 @@ VELLVM_BC =_build/default/ml/main.bc
 ######## The "frontend" is only the parser/pretty-printer
 FRONTEND_EXE=_build/default/ml/frontend.exe
 AGGREGATE_EXE=_build/default/ml/aggregate.exe
-COQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib
+COQFILES_FRONTEND := Transformations/Transform QC/ShowAST QC/ReprAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib
 COQFILES_EXEC := QC/ShowAST QC/ReprAST QC/GenAlive2 Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib Semantics/Printfdefn Semantics/TopLevel Transformations/Transform Handlers/Handlers Theory/Refinement Utilities Numeric/Floats
 COQFILES_QC := QC/GenAST QC/GenMetadata QC/ECS QC/Lens QC/GenAlive2 QC/Generators QC/ReprAST QC/ShowAST QC/Utils QC/DList
 FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
