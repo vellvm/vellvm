@@ -2,10 +2,10 @@
 [![Opam build for vellvm](https://github.com/vellvm/vellvm/actions/workflows/vellvm.yml/badge.svg)](https://github.com/vellvm/vellvm/actions/workflows/vellvm.yml)
 [![Nix build for vellvm](https://github.com/vellvm/vellvm/actions/workflows/test.yml/badge.svg)](https://github.com/vellvm/vellvm/actions/workflows/test.yml)
 
-Vellvm is an ongoing project aiming at the formal verification in the Coq proof
+Vellvm is an ongoing project aiming at the formal verification in the Rocq proof
 assistant of a compilation infrastructure inspired by the LLVM compiler.
 
-The central piece of Vellvm is the Verified IR (VIR), a Coq formalization of the
+The central piece of Vellvm is the Verified IR (VIR), a Rocq formalization of the
 semantics of (a subset of) the [LLVM IR](https://www.llvm.org/) that is intended for _formal
 verification_ of LLVM-based software.
 It is being developed at the University of Pennsylvania as part of the [DeepSpec](https://www.deepspec.org) project.
@@ -89,29 +89,29 @@ The development is organized as follows.
 ## Interaction Trees
 
 Vellvm heavily relies on the [Interaction Trees](https://github.com/DeepSpec/InteractionTrees). Its development is hence
-tied to contributions to the itree libraries. Temporary itree contributions not yet ready for merge are stored in the `src/coq/Utils`
+tied to contributions to the itree libraries. Temporary itree contributions not yet ready for merge are stored in the `src/rocq/Utils`
 folder.
 
-## Coq formalization
+## Rocq formalization
 
-The core of the project is encompassed by the Coq formalization of LLVM IR and the proof of its metatheory.
-This formalization is entirely contained in the `src/coq` folder.
+The core of the project is encompassed by the Rocq formalization of LLVM IR and the proof of its metatheory.
+This formalization is entirely contained in the `src/rocq` folder.
 
 More specifically, the following selection of files are among the most important to understand the development:
 
-Syntax, in `src/coq/Syntax/`
+Syntax, in `src/rocq/Syntax/`
 - `LLVMAst.v` the front VIR internal AST. Our parser of native llvm syntax returns an element of this AST.
 - `CFG.v`     the VIR internal AST as used for the semantics.
 
-Semantics, in `src/coq/Semantics/`:
+Semantics, in `src/rocq/Semantics/`:
 - `DynamicValues.v` definition of the dynamic values and underdefined values.
 - `LLVMEvents.v`    inventory of all events.
 - `Denotation.v`    definitions of the representation of VIR programs as ITrees.
 - `Handlers/`       includes the code for all of the handlers. They are broken up into files based on the nature of the event handled, each file hence corresponding to a subsection.
 - `TopLevel.v`      provides the full model and the full interpreter, by plugging all components together.
 
-Theory, in `src/coq/Theory/`:
-- `src/coq/Utils/PropT.v` metatheory required to reason about sets of itrees, i.e. about the propositional monad transformer.
+Theory, in `src/rocq/Theory/`:
+- `src/rocq/Utils/PropT.v` metatheory required to reason about sets of itrees, i.e. about the propositional monad transformer.
 - `InterpreterMCFG.v`     the layers of interpretation and some of their metatheory
 - `InterpreterCFG.v`      the same layers of interpretation and metatheory, but when reasoning about single functions (i.e. single cfg)
 - `Refinement.v`          definition of the refinement relations between layers of interpretations
@@ -140,7 +140,7 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 
 ## Assumes:
   - OCaml 4.14.1 (typically installed via `opam`, see below)
-  - Coq 8.20.1
+  - Rocq 9.0.0
   - opam  2.0.0+
   - Clang 14.0.1+ (available for Mac OSX in XCode 4.2+, or installed via, e.g. `sudo apt-get install clang`)
   - `gnu-sed`
@@ -155,7 +155,7 @@ Our current test-suite of LLVM programs for which we compare our semantics again
    - Note: you should be able to install all of the opam libraries  with `make opam` in the `src/` directory.
 4. Run `make` in the `src/` directory: it will produce the OCaml executable called `vellvm`
 
-## opam, Coq, and opam dependencies
+## opam, Rocq, and opam dependencies
 
 `opam` is available via [homebrew](https://brew.sh/) on Mac, and most system's package managers on Linux, e.g. `sudo apt-get install opam`.
 
@@ -165,17 +165,17 @@ If this is the first time you are using opam you need to initialize it:
 
 Then:
 
-1. Add the Coq package repository:
-    `opam repo add coq-released https://coq.inria.fr/opam/released`.
+1. Add the Rocq package repository:
+    `opam repo add rocq-released https://rocq.inria.fr/opam/released`.
 
 2. Create an opam vellvm development *switch* with:
     `opam switch create vellvm ocaml-base-compiler.4.14.1`.
 
-3. Install Coq:
-   `opam pin add coq 8.19.1`
+3. Install Rocq:
+   `opam pin add rocq 9.0.0`
 
 4. Install opam dependencies (run in the root directory of the project):
-   `opam install . --deps-only`
+   `opam install -y --verbose --deps-only .`
 
 Note: the dependency constraints in the opam file should be sufficient
 for installing `vellvm`, however if you are having compilation

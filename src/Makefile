@@ -1,29 +1,21 @@
 ## Vellvm Project Makefile
 
-## Follows the model suggested by:
-## https://coq.inria.fr/refman/practical-tools/utilities.html#building-a-coq-project-with-coq-makefile
-
 #### Build Configuration Information
 
-######## Tested/Recommended versions of Coq and OCaml
-########    If these are changed, update .travis.yml too
-COQ_VERSION=8.20.0
-OCAML_VERSION=4.14.2
-
 ## Project Source Locations
-# Coq sources
-COQDIR = coq
-COQLIBDIR = ../lib
+# Rocq sources
+ROCQDIR = rocq
+ROCQLIBDIR = ../lib
 
 # OCaml sources
 MLDIR = ml
 EXTRACTDIR = ml/extracted
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract
-COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
-COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
-COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
-COQMAKEFILE="$(COQBIN)coq_makefile"
+ROCQINCLUDES=$(foreach d, $(ROCQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract
+ROCQC="$(ROCQBIN)rocq" c -q $(ROCQINCLUDES) $(ROCQCOPTS)
+ROCQDEP="$(ROCQBIN)rocq" dep $(ROCQINCLUDES)
+ROCQEXEC="$(ROCQBIN)rocq" top -q -w none $(ROCQINCLUDES) -batch -load-vernac-source
+ROCQMAKEFILE="$(ROCQBIN)rocq" makefile
 MENHIR=menhir
 CP=cp
 
@@ -34,45 +26,45 @@ VELLVM_BC =_build/default/ml/main.bc
 ######## The "frontend" is only the parser/pretty-printer
 FRONTEND_EXE=_build/default/ml/frontend.exe
 AGGREGATE_EXE=_build/default/ml/aggregate.exe
-COQFILES_FRONTEND := Transformations/Transform QC/ShowAST QC/ReprAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib
-COQFILES_EXEC := QC/ShowAST QC/ReprAST QC/GenAlive2 Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib Semantics/Printfdefn Semantics/TopLevel Transformations/Transform Handlers/Handlers Theory/Refinement Utilities Numeric/Floats
-COQFILES_QC := QC/GenAST QC/GenMetadata QC/ECS QC/Lens QC/GenAlive2 QC/Generators QC/ReprAST QC/ShowAST QC/Utils QC/DList
-FRONTEND_VOFILES := $(COQFILES_FRONTEND:%=coq/%.vo)
-EXEC_VFILES := $(COQFILES_EXEC:%=coq/%.v)
-EXEC_VOFILES := $(COQFILES_EXEC:%=coq/%.vo)
-QC_VFILES := $(COQFILES_QC:%=coq/%.v)
-QC_VOFILES := $(COQFILES_QC:%=coq/%.vo)
-VFILES := $(shell find coq -name "*.v")
+ROCQFILES_FRONTEND := Transformations/Transform QC/ShowAST QC/ReprAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib
+ROCQFILES_EXEC := QC/ShowAST QC/ReprAST QC/GenAlive2 Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib Semantics/Printfdefn Semantics/TopLevel Transformations/Transform Handlers/Handlers Theory/Refinement Utilities Numeric/Floats
+ROCQFILES_QC := QC/GenAST QC/GenMetadata QC/ECS QC/Lens QC/GenAlive2 QC/Generators QC/ReprAST QC/ShowAST QC/Utils QC/DList
+FRONTEND_VOFILES := $(ROCQFILES_FRONTEND:%=rocq/%.vo)
+EXEC_VFILES := $(ROCQFILES_EXEC:%=rocq/%.v)
+EXEC_VOFILES := $(ROCQFILES_EXEC:%=rocq/%.vo)
+QC_VFILES := $(ROCQFILES_QC:%=rocq/%.v)
+QC_VOFILES := $(ROCQFILES_QC:%=rocq/%.vo)
+VFILES := $(shell find rocq -name "*.v")
 
 .DEFAULT_GOAL := all
 
-######## targets not in this "KNOWNTARGETS" list will be forwarded to CoqMakefile via invoke-coqmakefile
+######## targets not in this "KNOWNTARGETS" list will be forwarded to RocqMakefile via invoke-rocqmakefile
 ######## WARNING - every target of *this* Makefile must be listed here
-KNOWNTARGETS := CoqMakefile invoke-coqmakefile coq extracted $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/Extract.v $(VELLVM_EXE) vellvm vellvmbc test check qc-tests yarpgen-tests rm-qc-test-vo clean extractedclean clean-coqmakefile doc/coq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-coq opam print-opam print-includes qc-files
+KNOWNTARGETS := RocqMakefile invoke-rocqmakefile rocq extracted $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/Extract.v $(VELLVM_EXE) vellvm vellvmbc test check qc-tests yarpgen-tests rm-qc-test-vo clean extractedclean clean-rocqmakefile doc/rocq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-rocq opam print-opam print-includes qc-files
 
-KNOWNFILES := Makefile _CoqProject
+KNOWNFILES := Makefile _RocqProject
 
-CoqMakefile: _CoqProject
-	$(COQMAKEFILE) -docroot ../doc -f _CoqProject -o CoqMakefile
+RocqMakefile: _RocqProject
+	$(ROCQMAKEFILE) -docroot ../doc -f _RocqProject -o RocqMakefile
 
-######## defer to CoqMakefile for anything not in $(KNOWNTARGETS)
-.PHONY: invoke-coqmakefile
-invoke-coqmakefile: CoqMakefile
+######## defer to RocqMakefile for anything not in $(KNOWNTARGETS)
+.PHONY: invoke-rocqmakefile
+invoke-rocqmakefile: RocqMakefile
 ifeq ($(MAKECMDGOALS),)
-	$(MAKE) -j --no-print-directory -f CoqMakefile
+	$(MAKE) -j --no-print-directory -f RocqMakefile
 else
 ifeq ($(filter-out $(KNOWNTARGETS), $(MAKECMDGOALS)),)
 	@true
 else
-	$(MAKE) -j --no-print-directory -f CoqMakefile $(filter-out $(KNOWNTARGETS),$(MAKECMDGOALS))
+	$(MAKE) -j --no-print-directory -f RocqMakefile $(filter-out $(KNOWNTARGETS),$(MAKECMDGOALS))
 endif
 endif
 
 .PHONY: all $(KNOWNFILES)
 all: vellvm
 
-.PHONY: coq
-coq: real-all
+.PHONY: rocq
+rocq: real-all
 
 .PHONY: extracted
 extracted: $(EXTRACTDIR)/STAMP
@@ -80,7 +72,7 @@ extracted: $(EXTRACTDIR)/STAMP
 $(EXTRACTDIR)/STAMP: $(EXEC_VFILES) $(EXEC_VOFILES) $(EXTRACTDIR)/Extract.v
 	make $(EXEC_VOFILES)
 	@echo "Extracting"
-	$(COQEXEC) $(EXTRACTDIR)/Extract.v
+	$(ROCQEXEC) $(EXTRACTDIR)/Extract.v
 	@echo "Patching extraction"
 	# patch -p0 < CRelationClasses.mli.patch
 	# patch -u $(EXTRACTDIR)/GenAlive2.ml -i GenAlive2.ml.patch
@@ -107,14 +99,14 @@ check: test
 
 ####### Yarpgen testing targets
 .PHONY: yarpgen-tests
-yarpgen-tests: rm-qc-test-vo coq
-	$(COQEXEC) coq/QC/QCVellvm.v
+yarpgen-tests: rm-qc-test-vo rocq
+	$(ROCQEXEC) rocq/QC/QCVellvm.v
 
 ######## QuickChick testing targets
 
 .PHONY: qc-tests
 qc-tests: rm-qc-test-vo qc-files vellvm
-	$(COQEXEC) coq/QC/QCVellvm.v
+	$(ROCQEXEC) rocq/QC/QCVellvm.v
 
 .PHONY: qc-files
 qc-files: $(QC_VFILES)
@@ -122,26 +114,26 @@ qc-files: $(QC_VFILES)
 
 .PHONY: rm-qc-test-vo
 rm-qc-test-vo:
-	rm -f coq/QC/QCVellvm.vo
+	rm -f rocq/QC/QCVellvm.vo
 
 ######## cleaning the project
 
 .PHONY: clean
-clean: extractedclean clean-coqmakefile
+clean: extractedclean clean-rocqmakefile
 	rm -rf doc/html doc/*.glob
 	rm -rf output
 	rm -f vellvm
 	rm -f frontend
 	rm -f aggregate
-	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
+	rm -f doc/rocq2html.ml doc/rocq2html doc/*.cm? doc/*.o
 	dune clean
 
 .PHONY: extractedclean
 extractedclean:
 	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/FRONTEND_STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli $(EXTRACTDIR)/\#* $(EXTRACTDIR)/.!*
 
-clean-coqmakefile: CoqMakefile
-	$(MAKE) -j --no-print-directory -f CoqMakefile clean
+clean-rocqmakefile: RocqMakefile
+	$(MAKE) -j --no-print-directory -f RocqMakefile clean
 
 ######## documentation
 
@@ -149,14 +141,14 @@ clean-coqmakefile: CoqMakefile
 documentation: $(VFILES)
 	mkdir -p doc/html
 	rm -f doc/html/*.html
-	coq2html -d doc/html $^
+	rocq2html -d doc/html $^
 
 ####### Facilities for building only the frontend - parser and pretty printer
 
 $(EXTRACTDIR)/FRONTEND_STAMP: $(FRONTEND_VOFILES) $(EXTRACTDIR)/ExtractFrontend.v
 	@echo "Extracting Frontend"
 	rm -f $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
-	$(COQEXEC) $(EXTRACTDIR)/ExtractFrontend.v
+	$(ROCQEXEC) $(EXTRACTDIR)/ExtractFrontend.v
 	touch $(EXTRACTDIR)/FRONTEND_STAMP
 	rm -f $(EXTRACTDIR)/STAMP   # invalidate "normal" extraction
 
@@ -179,12 +171,6 @@ frontend_exe:
 
 #### configuring / inspecting the build process
 
-######## WARNING: clobbers coq installation
-########   after doing `make pin-coq` you should do `eval $(opam env)`
-.PHONY: pin-coq
-pin-coq:
-	opam pin add coq $(COQ_VERSION) -y
-
 ######## WARNING: clobbers opam installation
 ########   after doing `make opam` you should do `eval $(opam env)`
 .PHONY: opam
@@ -193,8 +179,8 @@ opam:
 
 .PHONY: print-includes
 print-includes:
-	@echo $(COQINCLUDES)
+	@echo $(ROCQINCLUDES)
 
-######## Any other target gets "forwarded" to the generated CoqMakefile
-%: invoke-coqmakefile
+######## Any other target gets "forwarded" to the generated RocqMakefile
+%: invoke-rocqmakefile
 	@true

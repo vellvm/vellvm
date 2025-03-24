@@ -1,9 +1,9 @@
-From Coq Require Import
+From Stdlib Require Import
      Morphisms String.
 
-Require Import List.
+From Stdlib Require Import List.
 Import ListNotations.
-Require Import ZArith.
+From Stdlib Require Import ZArith.
 Import ZArith.BinInt.
 
 From Vellvm Require
@@ -44,4 +44,4 @@ Extract Inlined Constant Archi.ppc64 => "false".
 (* NOTE: assumes that this file is compiled from /src *)
 Cd "ml/extracted".
 
-Separate Extraction Integers Transform LLVMAst AstLib ExtrOcamlIntConv ParserHelper ShowAST ReprAST Floats.
+Separate Extraction Integers Transform LLVMAst AstLib ExtrOcamlIntConv ParserHelper ShowAST ReprAST Floats BinNums BinPos.

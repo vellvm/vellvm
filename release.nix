@@ -1,37 +1,28 @@
 { lib,
   nix-filter,
-  mkCoqDerivation,
   version ? null,
   coq,
-  coq2html,
-  dune_3,
+  rocq,
+  rocqPkgs,
+  coqPkgs,
   perl,
-  # All of these ocaml packages should probably come from the coq
-  # version, or there will be disagreements between compiler versions.
-  ocaml ? coq.ocaml,
-  ocamlbuild ? coq.ocamlPackagse.ocamlbuild,
-  findlib ? coq.ocamlPackagse.findlib,
-  menhir ? coq.ocamlPackages.menhir,
-  qcheck ? coq.ocamlPackages.qcheck,
-  cppo ? coq.ocamlPackages.cppo,
-  QuickChick,
-  mathcomp, mathcomp-ssreflect, ExtLib, paco, ITree, flocq, ceres, simple-io, zarith, ... }:
+  ... }:
 
 { vellvm =
-    mkCoqDerivation {
-      namePrefix = [ "coq" ];
+    rocqPkgs.mkRocqDerivation {
       pname = "vellvm";
       owner = "vellvm";
 
       inherit version;
 
       buildInputs =
-        [ coq
-          coq2html
+        with rocq.ocamlPackages;
+        [ rocq
+          coq # Needed to make QuickChick happy for now...
           dune_3
           perl
         ] ++
-        # These ocaml packages have to come from coq.ocamlPackages to
+        # These ocaml packages have to come from rocq.ocamlPackages to
         # avoid disagreements between ocaml compiler versions.
         [ ocaml
           ocamlbuild
@@ -42,7 +33,10 @@
         ];
 
       propagatedBuildInputs =
-        # Coq libraries
+        # Rocq libraries
+        with rocqPkgs;
+        with coqPkgs;
+        with rocq.ocamlPackages;
         [ mathcomp
           mathcomp-ssreflect
           ExtLib
@@ -54,7 +48,7 @@
           zarith
           QuickChick
         ] ++
-        # These ocaml packages have to come from coq.ocamlPackages to
+        # These ocaml packages have to come from rocq.ocamlPackages to
         # avoid disagreements between ocaml compiler versions.
         [ ocaml
           ocamlbuild
@@ -99,6 +93,7 @@
 
       buildPhase = ''
   runHook preBuild
+  unset COQPATH
   make -C src/
   make -C src/ frontend
   runHook postBuild
@@ -106,10 +101,11 @@
 
       installPhase = ''
   runHook preInstall
+  unset COQPATH
   mkdir -p $out/bin
   install src/vellvm $out/bin/vellvm
   install src/frontend $out/bin/frontend
-  COQLIBINSTALL=$out/lib/coq/${coq.coq-version}/user-contrib make -C src/ install
+  COQLIBINSTALL=$out/lib/coq/${rocq.rocq-version}/user-contrib make -C src/ install
   runHook postInstall
   '';
 

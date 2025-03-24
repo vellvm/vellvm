@@ -12,7 +12,7 @@ jobs:
         os:
           - ubuntu-24.04
         coq_version:
-          - "8.20"
+          - "9.0"
         ocaml_version:
           - "4.14-flambda"
 
@@ -25,7 +25,7 @@ jobs:
       - name: Compiling Vellvm
         uses: coq-community/docker-coq-action@v1
         with:
-          opam_file: 'coq-vellvm.opam'
+          opam_file: 'rocq-vellvm.opam'
           coq_version: ${{ matrix.coq_version }}
           ocaml_version: ${{ matrix.ocaml_version }}
           before_install: |

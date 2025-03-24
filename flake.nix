@@ -12,14 +12,14 @@
       let
         pkgs = import nixpkgs { inherit system; };
         lib = pkgs.lib;
-        coq = pkgs.coq_8_20;
-        ocamlPkgs = coq.ocamlPackages;
-        coqPkgs = pkgs.coqPackages_8_20;
+        rocq = pkgs.rocq-core;
+        rocqPkgs = pkgs.rocqPackages_9_0;
+        coqPkgs = pkgs.coqPackages_9_0;
 
         version = "vellvm:master";
       in rec {
         packages = {
-          default = (pkgs.callPackage ./release.nix (ocamlPkgs // coqPkgs // { nix-filter = nix-filter.lib; perl = pkgs.perl; inherit coq version; })).vellvm;
+          default = (pkgs.callPackage ./release.nix ({ nix-filter = nix-filter.lib; perl = pkgs.perl; coq = pkgs.coq; inherit rocq version rocqPkgs coqPkgs; })).vellvm;
         };
 
         defaultPackage = packages.default;
@@ -60,7 +60,7 @@
             (Col1 'Line)
             (Col2 'Trust)
             (Col3 'Warning)
-            (lint-report (org-lint))
+            (lint-report (org-lint '(link-to-local-file)))
           )
           (princ (format \"file: %s\n%6s%6s%8s\n\" file-name Col1 Col2 Col3))
           (dolist (element lint-report)
@@ -81,12 +81,13 @@
         devShells = {
           # Include a fixed version of clang in the development environment for testing.
           default = pkgs.mkShell {
-            inputsFrom = [ packages.default ];
+            inputsFrom = [ packages.default];
             buildInputs = [ pkgs.clang_19
+                            pkgs.coq # Needed to make proof general happy for development.
                             pkgs.llvmPackages_19.libllvm
-                            ocamlPkgs.utop
-                            ocamlPkgs.bisect_ppx
-                            ocamlPkgs.ppxlib
+                            rocq.ocamlPackages.utop
+                            rocq.ocamlPackages.bisect_ppx
+                            rocq.ocamlPackages.ppxlib
                             pkgs.util-linux
                           ];
           };
