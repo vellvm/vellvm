@@ -76,7 +76,7 @@ Set Guard Checking.
 
 (** Top level interpreter to run LLVM programs. Yields either a uvalue, or an error string. *)
 Definition interpret (prog : list (toplevel_entity typ (block typ * list (block typ)))) : MlResult dvalue string
-  := step (interpreter prog).
+  := step (interpreter nil prog).
 
 Axiom to_caml_str : string -> string.
 Extract Constant to_caml_str =>
