@@ -29,6 +29,6 @@ jobs:
           coq_version: ${{ matrix.coq_version }}
           ocaml_version: ${{ matrix.ocaml_version }}
           before_install: |
-            startGroup "Print opam config (and work around dune issue)"
-              opam pin add -y dune 3.16.0; opam config list; opam repo list; opam list
+            startGroup "Print opam config"
+              opam config list; opam repo list; opam list
             endGroup
