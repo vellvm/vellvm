@@ -19,20 +19,20 @@ license: "GPL-3.0-or-later"
 
 build: [make "-C" "src" "all" "-j%{jobs}%"]
 install: [make "-C" "src" "install"]
-    
+
 depends: [
   "ocaml" {>= "4.14.0"}
-  "cppo" 
+  "cppo"
   "dune" {>= "3.14.0"}
-  "menhir" 
-  "qcheck" 
+  "menhir"
+  "qcheck"
   "rocq-core" {>= "9.0.0" & < "9.1~"}
   "rocq-stdlib" {>= "9.0.0" & < "9.1~"}
   "coq-ext-lib" {>= "0.13.0" & < "0.14~"}
   "coq-paco"  {>= "4.2.3" & < "4.3~"}
-  "coq-ceres" 
+  "coq-ceres"
   "coq-flocq" {>= "4.2.0"}
-  "coq-mathcomp-ssreflect" 
+  "coq-mathcomp-ssreflect"
   "coq-simple-io"
   "coq-itree" {>= "5.2.0" & < "5.3~"}
   "coq-quickchick" {>= "2.0.4" & < "2.0.5"}
@@ -43,7 +43,7 @@ tags: [
 
   "category:Computer Science/Programming Languages/Formal Definitions and Theory"
   "category:Computer Science/Semantics and Compilation/Compilation"
-  "category:Computer Science/Semantics and Compilation/Semantics"  
+  "category:Computer Science/Semantics and Compilation/Semantics"
 
   "keyword:semantics"
   "keyword:interpreter"
