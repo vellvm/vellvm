@@ -6280,10 +6280,26 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     repeat break_match_hyp_inv;
       rewrite_fin_to_inf_dvalue;
       cbn in *;
-      try setoid_rewrite Heqb; cbn; eauto with EVAL_INT_FIN_INF.
+      try setoid_rewrite Heqb; cbn;
+      try break_match_goal;
+      cbn;
+      eauto with EVAL_INT_FIN_INF.
+    all: try
+           (first
+              [ inv Heqs
+              | contradiction
+           ]); try lia.
+    3: {
+      unfold intptr_fin_inf in *.
+      break_match_hyp_inv.
+      clear Heqs.
+      eapply IS1.LP.IP.from_Z_to_Z in e0.
+      rewrite <- e0 in n.
+      lia.
+    }
 
     { (* dv1: ix *)
-      break_match_goal; cbn in *; subst; try contradiction.
+      cbn in *; subst; try contradiction.
       dependent destruction e; cbn.
       unfold fin_to_inf_dvalue.
       break_match_goal; clear Heqs.
@@ -6407,12 +6423,30 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn;
       try setoid_rewrite Heqb; eauto with EVAL_INT_FIN_INF.
 
+    all: try
+           (first
+              [ inv Heqs
+              | contradiction
+           ]); try lia.
+
+    all:
+      try (cbn; break_match_goal; try contradiction; cbn; auto).
+
+    3: {
+      unfold intptr_fin_inf in *.
+      break_match_hyp_inv.
+      clear Heqs.
+      eapply IS1.LP.IP.from_Z_to_Z in e0.
+      rewrite <- e0 in n.
+      lia.
+    }
+
     { (* dv1: ix *)
       unfold fin_to_inf_dvalue.
       break_match_goal; try contradiction.
       dependent destruction e.
       break_match_goal; clear Heqs.
-      destruct p; clear e0.
+      destruct p; inv Heqp0.
       unfold intptr_fin_inf.
       repeat break_match_goal.
       eapply eval_int_op_ix_fin_inf; eauto.
@@ -6431,7 +6465,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { (* dv1: Vector *)
       (* dv2 is also a vector *)
       remember (vec_loop (eval_iop_integer_h iop) (combine elts elts0)) as res.
-      destruct_err_ub_oom res; cbn in *; inv Heqs; inv Heqe; inv H0.
+      destruct_err_ub_oom res; cbn in *; inv Heqe; inv H0.
+      change (unERR_UB_OOM0) with (unERR_UB_OOM {| unERR_UB_OOM := unERR_UB_OOM0 |}).
+      rewrite <- Heqe0.
 
       symmetry in Heqres.
       erewrite vec_loop_fin_inf; cbn; eauto.
@@ -12657,6 +12693,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn;
       try setoid_rewrite Heqb; eauto with EVAL_INT_FIN_INF.
 
+    all: try
+           (first
+              [ inv Heqs
+              | contradiction
+           ]); try lia.
+
+    all:
+      try (cbn; break_match_goal; try contradiction; cbn; auto).
+
     { (* dv1: ix *)
       unfold intptr_fin_inf.
       repeat break_match_goal; try contradiction.
@@ -12670,6 +12715,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       clear Heqs Heqs0.
       eapply eval_int_op_iptr_ub_fin_inf; eauto.
     }
+
+    exfalso.
+    eapply n.
+    unfold intptr_fin_inf.
+    break_match_goal.
+    clear Heqs.
+    eapply intptr_convert_safe in e.
+    erewrite IP.from_Z_to_Z; eauto.
   Qed.
 
   Hint Resolve eval_iop_integer_h_ub_fin_inf : EVAL_INT_FIN_INF.
@@ -12699,16 +12752,21 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn;
       try setoid_rewrite Heqb; eauto with EVAL_INT_FIN_INF.
 
+    all: try
+           (first
+              [ inv Heqs
+              | contradiction
+           ]); try lia.
+
+    all:
+      try (cbn; break_match_goal; try contradiction; cbn; auto).
+    all: auto.
+
     { (* dv1: ix *)
       unfold intptr_fin_inf.
       repeat break_match_goal; try contradiction.
       dependent destruction e; cbn in *; subst.
       eapply eval_int_op_ix_err_fin_inf; eauto.
-    }
-
-    { (* dv1: ix *)
-      unfold intptr_fin_inf.
-      repeat break_match_goal; try contradiction; auto.
     }
 
     { (* dv1: iptr *)
@@ -12746,6 +12804,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn;
       try setoid_rewrite Heqb; eauto with EVAL_INT_FIN_INF.
 
+    all: try inv Heqs.
+    all: (try break_match_goal; try contradiction; cbn; auto).
+
     { (* dv1: ix *)
       unfold intptr_fin_inf.
       repeat break_match_goal; try contradiction.
@@ -12761,11 +12822,22 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       eapply eval_int_op_iptr_ub_fin_inf; eauto.
     }
 
+    { exfalso.
+      eapply n.
+      unfold intptr_fin_inf.
+      break_match_goal.
+      clear Heqs.
+      eapply intptr_convert_safe in e.
+      erewrite IP.from_Z_to_Z; eauto.
+    }
+
     { (* dv1: Vector *)
       (* dv2 is also a vector *)
       remember (vec_loop (eval_iop_integer_h iop) (combine elts elts0)) as res.
-      destruct_err_ub_oom res; cbn in *; inv Heqs; inv Heqe; inv H0.
+      destruct_err_ub_oom res; cbn in *; inv Heqe; inv H0.
 
+      change (unERR_UB_OOM0) with (unERR_UB_OOM {| unERR_UB_OOM := unERR_UB_OOM0 |}).
+      rewrite <- Heqe0.
       symmetry in Heqres.
       erewrite vec_loop_ub_fin_inf; cbn; eauto.
 
@@ -12802,16 +12874,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn;
       try setoid_rewrite Heqb; eauto with EVAL_INT_FIN_INF.
 
+    all: try inv Heqs.
+    all: (try break_match_goal; try contradiction; cbn; auto).
+
     { (* dv1: ix *)
       unfold intptr_fin_inf.
       repeat break_match_goal; try contradiction.
       dependent destruction e; cbn in *; subst.
       eapply eval_int_op_ix_err_fin_inf; eauto.
-    }
-
-    { (* dv1: ix *)
-      unfold intptr_fin_inf.
-      repeat break_match_goal; try contradiction; auto.
     }
 
     { (* dv1: iptr *)
@@ -12825,8 +12895,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     { (* dv1: Vector *)
       (* dv2 is also a vector *)
       remember (vec_loop (eval_iop_integer_h iop) (combine elts elts0)) as res.
-      destruct_err_ub_oom res; cbn in *; inv Heqs; inv Heqe; inv H0.
+      destruct_err_ub_oom res; cbn in *; inv Heqe; inv H0.
 
+      change (unERR_UB_OOM0) with (unERR_UB_OOM {| unERR_UB_OOM := unERR_UB_OOM0 |}).
+      rewrite <- Heqe0.
       symmetry in Heqres.
       erewrite vec_loop_err_fin_inf; cbn; eauto.
 

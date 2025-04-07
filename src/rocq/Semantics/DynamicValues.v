@@ -39,6 +39,7 @@ From Vellvm Require Import
      Utils.MapMonadExtra
      Utils.MonadEq1Laws
      Utils.MonadReturnsLaws
+     Utils.MonadExcLaws
      QC.ShowAST.
 
 Require Import Stdlib.Program.Equality.
@@ -3550,7 +3551,21 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
        | DVALUE_IPTR i1, DVALUE_IPTR i2 =>
            eval_int_op iop i1 i2
        | DVALUE_Poison t, _             =>
-           ret (DVALUE_Poison t)
+           match iop with
+           | SDiv _ =>
+               x <- match v2 with
+                   | @DVALUE_I sz2 i2 =>
+                       ret (@Integers.signed sz2 i2)
+                   | DVALUE_IPTR i2 =>
+                       ret (to_Z i2)
+                   | _ => raise_error "ill_typed-iop: sdiv"
+                   end;;
+               if Z.eq_dec x (-1)
+               then raise_ub "Signed division poison overflow"
+               else ret (DVALUE_Poison t)
+           | _ =>
+               ret (DVALUE_Poison t)
+           end
        | _, DVALUE_Poison t             =>
            if iop_is_div iop
            then raise_ub "Division by poison."
@@ -5662,7 +5677,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
   Ltac solve_dvalue_has_dtyp :=
     try normalize_array_vector_dtyp;
-    solve [autorewrite with DVALUE_HAS_DTYP; auto with DVALUE_HAS_DTYP].
+    solve [autorewrite with DVALUE_HAS_DTYP; subst; cbn; eauto with DVALUE_HAS_DTYP].
 
   #[global] Hint Resolve forall_repeat_true : UVALUE_HAS_DTYP.
   #[global] Hint Constructors uvalue_has_dtyp : UVALUE_HAS_DTYP.
@@ -5692,13 +5707,67 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Context {FUB : MFails_UB M}.
     Context {FOOM : MFails_OOM M}.
 
+    Hint Resolve
+      mfails_ub
+      mfails_oom
+      mfails_error
+      MFails_bind_ma
+      MFails_ret
+      MReturns_ret
+      EqRet_NoFail
+      MReturns_bind_inv : MRETFAIL.
+
+    Ltac fail_contra_in H :=
+      solve
+        [ exfalso; eapply EqRet_NoFail in H; eauto with MRETFAIL
+        | exfalso; eapply MFails_MReturns in H; eauto with MRETFAIL
+        ].
+
+    Hint Rewrite
+      VMemInt_intptr_dtyp
+      bind_ret_l : MRETFAIL.
+
+    Hint Unfold
+      VMemInt_intptr' : MRETFAIL.
+
+    Ltac step_mreturns_in H :=
+      let FAILS := fresh "FAILS" in
+      let res := fresh "res" in
+      let MA := fresh "MA" in
+      autounfold with MRETFAIL in H;
+      autorewrite with MRETFAIL in H;
+      apply MReturns_bind_inv in H as [FAILS | (res & MA & H)];
+      [ cbn in FAILS; apply MFails_ret in FAILS; contradiction |].
+
+    Ltac go_mreturns_in H :=
+      first
+        [ apply MReturns_ret_inv in H
+        |
+          let FAILS := fresh "FAILS" in
+          let res := fresh "res" in
+          let MA := fresh "MA" in
+          autorewrite with MRETFAIL in H;
+          apply MReturns_bind_inv in H as [FAILS | (res & MA & H)];
+          [ cbn in FAILS; apply MFails_ret in FAILS; contradiction |];
+          try go_mreturns_in MA;
+          try go_mreturns_in H
+        ]; try go_mreturns_in H.
+
+    #[local] Ltac solve_mretfail_in EVAL :=
+      try go_mreturns_in EVAL;
+      solve
+        [ solve_dvalue_has_dtyp
+        | fail_contra_in EVAL
+        | break_match_hyp; solve_mretfail_in EVAL
+        ].
+
     Lemma eval_iop_integer_h_dtyp :
       forall dx dy dv sz op,
         dvalue_has_dtyp dx (DTYPE_I sz) ->
         dvalue_has_dtyp dy (DTYPE_I sz) ->
         Monad.eq1 (eval_iop_integer_h op dx dy) (@ret M _ _ dv) ->
         dvalue_has_dtyp dv (DTYPE_I sz).
-    Proof using ERR Eq1 FERR FUB M Monad NFR OOM RETS RET_INV UB.
+    Proof using ERR Eq1 MonadLaws Eq1EQV FERR FUB M Monad NFR OOM RETS RET_INV UB MFR.
       intros dx dy dv sz op TYPx TYPy EVAL.
       inversion TYPx; inversion TYPy; subst; cbn in EVAL;
         try solve [
@@ -5706,30 +5775,10 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
             destruct op; cbn in EVAL;
               repeat break_match_hyp;
               try solve
-                [first
-                   [ apply eq1_ret_ret in EVAL; [| solve [eauto]]
-                   | apply MReturns_ret in EVAL;
-                     apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
-                     [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
-                     | break_match_hyp; apply MReturns_ret_inv in RET
-                     ]
-                   | apply MReturns_ret in EVAL;
-                     apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
-                     [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
-                     | repeat break_match_hyp;
-                       [ apply MReturns_ret_inv in RET
-                       | cbn in RET;
-                         apply MReturns_bind_inv in RET as [FAILS | (res' & MA' & RET)];
-                         [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
-                         | repeat break_match_hyp;
-                           apply MReturns_ret_inv in RET
-                         ]
-                       ]
-                     ]
-                   ]; subst; solve_dvalue_has_dtyp];
-              try solve [eapply EqRet_NoFail in EVAL; eauto;
-                         exfalso; apply EVAL;
-                         first [apply mfails_ub | apply mfails_error | apply mfails_oom]; eauto];
+                [ fail_contra_in EVAL
+                | apply MReturns_ret in EVAL;
+                  solve_mretfail_in EVAL
+                ];
 
             try solve [apply MReturns_ret in EVAL;
               apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
@@ -5737,44 +5786,16 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                        apply MReturns_ret_inv in RET; subst; constructor
               ]; constructor
           ].
-      - break_match_hyp; try contradiction.
+      - repeat break_match_hyp; try contradiction.
         dependent destruction e.
         cbn in *.
         destruct op; cbn in EVAL;
           repeat break_match_hyp;
           try solve
-            [first
-               [ apply eq1_ret_ret in EVAL; [| solve [eauto]]
-               | apply MReturns_ret in EVAL;
-                 apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
-                 [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
-                 | break_match_hyp; apply MReturns_ret_inv in RET
-                 ]
-               | apply MReturns_ret in EVAL;
-                 apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
-                 [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
-                 | repeat break_match_hyp;
-                   [ apply MReturns_ret_inv in RET
-                   | cbn in RET;
-                     apply MReturns_bind_inv in RET as [FAILS | (res' & MA' & RET)];
-                     [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
-                     | repeat break_match_hyp;
-                       apply MReturns_ret_inv in RET
-                     ]
-                   ]
-                 ]
-               ]; subst; solve_dvalue_has_dtyp].
-
-      all:
-        try solve [eapply EqRet_NoFail in EVAL; eauto;
-        exfalso; apply EVAL;
-        first [apply mfails_ub | apply mfails_error | apply mfails_oom]; eauto].
-
-      all : apply MReturns_ret in EVAL;
-              apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
-                          [ cbn in FAILS; apply MFails_ret in FAILS; contradiction |];
-                          apply MReturns_ret_inv in RET; subst; constructor.
-      all : constructor.
+            [ fail_contra_in EVAL
+            | apply MReturns_ret in EVAL;
+              solve_mretfail_in EVAL
+            ].
     Qed.
 
     Lemma eval_iop_dtyp_i :
@@ -5783,7 +5804,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         dvalue_has_dtyp dy (DTYPE_I sz) ->
         Monad.eq1 (eval_iop op dx dy) (ret dv) ->
         dvalue_has_dtyp dv (DTYPE_I sz).
-    Proof using ERR Eq1 FERR FUB M Monad NFR OOM RETS RET_INV UB.
+    Proof using ERR Eq1 MonadLaws Eq1EQV FERR FUB M Monad NFR OOM RETS RET_INV UB MFR.
       intros dx dy dv sz op TYPx TYPy EVAL.
       unfold eval_iop in EVAL.
       inversion TYPx; inversion TYPy; subst; try lia.
@@ -5810,67 +5831,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                           repeat rewrite VMemInt_intptr_dtyp in *)
                          | solve [eauto]
                        ]
-
-                   | eapply EqRet_NoFail in CONTRA; eauto;
-                     exfalso; apply CONTRA;
-                     apply mfails_ub; eauto
-
-                   | eapply EqRet_NoFail in CONTRA; eauto;
-                     exfalso; apply CONTRA;
-                     apply mfails_error; eauto
-
                    | apply MReturns_ret in EVAL;
-                     apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
-                     [eapply EqRet_NoFail in CONTRA; eauto;
-                      exfalso; apply CONTRA;
-                      apply MFails_bind_ma; eauto
-                     | first
-                         [ apply MReturns_ret_inv in RET;
-                           cbn in RET
-                         | break_match_hyp;
-                           [ apply MFails_MReturns in RET; try contradiction;
-                             apply mfails_oom; eauto
-                           | apply MReturns_ret_inv in RET;
-                             cbn in RET
-                           ]
-                         ]
-                     ]
-
-                   | apply MReturns_ret in EVAL;
-                     apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
-                     [eapply EqRet_NoFail in CONTRA; eauto;
-                      exfalso; apply CONTRA;
-                      apply MFails_bind_ma; eauto
-                     | first
-                         [ apply MReturns_ret_inv in RET;
-                           cbn in RET
-                         | break_match_hyp;
-                           [ apply MFails_MReturns in RET; try contradiction;
-                             apply mfails_oom; eauto
-                           | apply MReturns_ret_inv in RET;
-                             cbn in RET
-                           ]
-                         ]
-                     ]
-
-                   | apply MReturns_ret in EVAL;
-                     apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
-                     [ eapply EqRet_NoFail in CONTRA; eauto;
-                       exfalso; apply CONTRA;
-                       apply MFails_bind_ma; eauto
-                     | clear CONTRA;
-                       break_match_hyp;
-                       first
-                         [ apply MReturns_ret_inv in RET;
-                           cbn in RET
-                         | break_match_hyp;
-                           [ apply MFails_MReturns in RET; try contradiction;
-                             apply mfails_oom; eauto
-                           | apply MReturns_ret_inv in RET;
-                             cbn in RET
-                           ]
-                         ]
-                     ]
+                     solve_mretfail_in EVAL
 
                    | apply MReturns_ret in EVAL;
                      apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];

@@ -694,8 +694,11 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           [ break_match; reflexivity
           | cbn; subst; rewrite eval_int_op_err_ub_oom_to_itree; reflexivity
           ].
-      subst; break_match_goal; subst; cbn; try reflexivity.
-      cbn; rewrite eval_int_op_err_ub_oom_to_itree; reflexivity.
+      all: try (subst; break_match_goal; subst; cbn; try reflexivity).
+      all: try (cbn; rewrite eval_int_op_err_ub_oom_to_itree; reflexivity).
+      all: try (setoid_rewrite Raise.raise_bind_itree; reflexivity).
+      all: rewrite bind_ret_l;
+        break_match_goal; cbn; reflexivity.
     Qed.
 
     Lemma eval_iop_err_ub_oom_to_itree :
@@ -720,8 +723,15 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           | break_match; reflexivity
           | cbn; apply eval_int_op_err_ub_oom_to_itree
           ].
-      subst; break_match_goal; subst; cbn; try reflexivity.
-      cbn; rewrite eval_int_op_err_ub_oom_to_itree; reflexivity.
+      all: try solve
+             [try (break_match_goal; subst; cbn; try reflexivity);
+              try (cbn; rewrite eval_int_op_err_ub_oom_to_itree; reflexivity);
+              try (setoid_rewrite Raise.raise_bind_itree; reflexivity;
+                   rewrite bind_ret_l;
+                   break_match_goal; cbn; reflexivity)
+             ].
+
+      1-2: destruct iop; try reflexivity; rewrite bind_ret_l; break_match_goal; cbn; reflexivity.
 
       (* Need vec_loop lemma *)
       rename elts into xs.
@@ -734,11 +744,11 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
       induction ZIP using double_list_rect.
       - (* Both nil *)
-        unfold fst, snd in *; cbn; rewrite bind_ret_l; reflexivity.
+        unfold fst, snd in *; cbn in *; rewrite bind_ret_l; reflexivity.
       - (* nil l *)
-        unfold fst, snd in *; cbn; rewrite bind_ret_l; reflexivity.
+        unfold fst, snd in *; cbn in *; rewrite bind_ret_l; reflexivity.
       - (* nil r *)
-        unfold fst, snd in *; cbn; rewrite bind_ret_l; reflexivity.
+        unfold fst, snd in *; cbn in *; rewrite bind_ret_l; reflexivity.
       - (* Both cons *)
         unfold fst, snd in *.
         rewrite combine_cons.
