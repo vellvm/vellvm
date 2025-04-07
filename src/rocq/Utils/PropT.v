@@ -12,6 +12,9 @@ From ITree Require Import
      CategoryKleisliFacts
      Eq.Eqit.
 
+From ItreeExtra Require Import
+  Dijkstra.TracesIT.
+
 From ExtLib Require Import
      Structures.Functor.
 
@@ -142,86 +145,13 @@ End ITreeMisc.
 
 Section PropMonad.
 
-  Definition PropT (E: Type -> Type) (X: Type): Type :=
-    itree E X -> Prop.
-
-  Definition eutt_closed {E X} (P: itree E X -> Prop): Prop :=
-    Proper (eutt eq ==> iff) P.
-
-  #[global] Polymorphic Instance Eq1_PropT {E} : Eq1 (PropT E) :=
-    fun a PA PA' =>
-      (forall x y, x ≈ y -> (PA x <-> PA' y)) /\
-      eutt_closed PA /\ eutt_closed PA'.
-
-  #[global] Instance Functor_Prop {E}
-    : Functor (PropT E) :=
-    {| fmap := fun A B f PA b => exists (a: itree E A), PA a /\ b = fmap f a |}.
+  Notation PropT := TraceSpec.
 
   Inductive Returns {E} {A: Type} (a: A) : itree E A -> Prop :=
   | ReturnsRet: forall t, t ≈ Ret a -> Returns a t
-  | ReturnsTau: forall t u, t ≈ Tau u -> Returns a u -> Returns a t
   | ReturnsVis: forall {X} (e: E X) (x: X) t k, t ≈ Vis e k -> Returns a (k x) -> Returns a t
   .
   Hint Constructors Returns: core.
-
-  Definition subtree {E} {A B} (ta : itree E A) (tb : itree E B) := exists (k : A -> itree E B), tb ≈ bind ta k.
-
-  Definition PropT_itree_map {E F X} (f : itree E X -> itree F X) (pe : PropT E X) : PropT F X
-    := fun tf => exists te, pe te /\ f te ≈ tf.
-
-  (* Definition 5.1 *)
-  Definition bind_PropT {E} :=
-    fun A B (specA : PropT E A) (K: A -> PropT E B) (tb: itree E B) =>
-      exists (ta: itree E A) (k: A -> itree E B),
-        specA ta /\
-        tb ≈ bind ta k /\
-        (forall a, Returns a ta -> K a (k a)).
-
-  Definition bind_PropT_stronger {E} :=
-    fun A B (PA: PropT E A) (K: A -> PropT E B) (tb: itree E B) =>
-      exists (ta: itree E A) (k: A -> itree E B),
-        PA ta /\
-        tb ≈ bind ta k /\
-        (forall a, Returns a ta -> K a (k a)).
-
-(* Alternate, logically equivalent version of bind.
-   It should not matter which one we use. Since bind_PropT has fewer cases, we should
-   stick to it.*)
-  Definition bind_PropT' {E} :=
-    fun A B (PA: PropT E A) (K: A -> PropT E B) (tb: itree E B) =>
-      exists (ta: itree E A),  PA ta /\
-                          ((exists (k: A -> itree E B),
-                               (forall a, Returns a ta -> K a (k a))
-                               /\ tb ≈ bind ta k)
-                           \/ (forall k, (forall a, K a (k a)) /\ tb ≈ bind ta k)).
-
-  Lemma bind_PropT_bind_PropT' {E}:
-    forall A B PA K (tb : itree E B), bind_PropT A B PA K tb <-> bind_PropT' A B PA K tb.
-  Proof using.
-    intros. split.
-    intros.
-    - red. red in H.
-      destruct H as (ta & ka & HPA & eq & HR).
-      exists ta. split; auto.
-      left.  exists ka. split; auto.
-    - intros.
-      red. red in H.
-      destruct H as  (ta & EQ1 & [(k & KA & EQ2) | HX]).
-      + exists ta. exists k. auto.
-      + exists ta. exists (fun _ => ITree.spin).
-        split; auto.
-        specialize (HX (fun _ => ITree.spin)).
-        destruct HX as (HA & H).
-        split; auto.
-  Qed.
-
-
-  (* Definition 5.1 *)
-  #[global] Instance Monad_Prop {E} : Monad (PropT E) :=
-    {|
-      ret := fun _ x y => y ≈ ret x
-      ; bind := bind_PropT
-    |}.
 
   Lemma Returns_ret_inv_ : forall {E} A (a b : A) (t : itree E A), t ≈ (Ret b) -> Returns a t -> a = b.
   Proof using.
@@ -229,7 +159,6 @@ Section PropMonad.
     revert b eq.
     induction H; intros; subst.
     - rewrite H in eq. apply Eqit.eqit_Ret in eq. auto.
-    - eapply IHReturns. rewrite tau_eutt in H. rewrite <- H. assumption.
     - rewrite H in eq. symmetry in eq. apply eqit_inv in eq; inv eq.
   Qed.
 
@@ -239,8 +168,121 @@ Section PropMonad.
     eapply Returns_ret_inv_. reflexivity. cbn in H. apply H.
   Qed.
 
-  Definition singletonT {E}: itree E ~> PropT E :=
-    fun R t t' => t' ≈ t.
+  Import ITraceDefinition.
+  Import DijkstraMonad.
+  Import ITraceFacts.
+  Require Import Utils.Tactics.
+
+  Definition singletonT {E}: itree E ~> PropT E.
+    intros X t.
+    apply obs_trace.
+    apply t.
+  Defined.
+
+  (* TODO: Move this *)
+  #[global] Instance obs_trace_eutt_Proper {E} {A} :
+    Proper (eutt eq ==> @eq1 (TraceSpec E) _ _) (@obs_trace E A).
+  Proof.
+    repeat red.    
+    intros x y H log p.
+    destruct p.
+    cbn.
+    split; intros PRE b TR.
+    - eapply PRE.
+      rewrite H; auto.
+    - eapply PRE.
+      rewrite <- H; auto.
+  Qed.
+
+  Lemma singletonT_correct :
+    forall {E X} (t1 t2 : itree E X),
+      sound_and_complete_cond E (singletonT X t1) t2 <-> t1 ≈ t2.
+  Proof.
+    intros E X t1 t2.
+    split.
+    { intros COND.
+      destruct COND as [COND COMPLETE].
+      unfold verify_cond in COND.
+      unfold DijkstraProp in COND.
+      unfold singletonT in COND.
+      unfold obs in COND.
+      unfold TraceSpecObs in COND.
+      unfold lem in COND.
+      unfold TraceSpecOrder in COND.
+      unfold complete_cond in COMPLETE.
+
+      apply refine_set_eq_to_eutt.
+
+      intros b.
+      split; intros TR.
+      { specialize (COND nil).
+        specialize (COMPLETE nil).
+        cbn in COND.
+        remember (trace_refine t1).
+        cbn in COND.
+        assert (Proper (eutt eq ==> iff) P).
+        { repeat red.
+          intros x y H.
+          subst.
+          rewrite H.
+          auto.
+        }
+        remember (@exist (itrace E X -> Prop) (Proper (eutt eq ==> iff)) P H) as p.
+        specialize (COND p).
+        specialize (COMPLETE p).
+        subst.
+        cbn in *.
+        eapply COMPLETE; eauto.
+        intros b0 H0.
+        rewrite append_nil; auto.
+      }
+      {
+        specialize (COND nil).
+        remember (trace_refine t1).
+        assert (Proper (eutt eq ==> iff) P).
+        { repeat red.
+          intros x y H.
+          subst.
+          rewrite H.
+          auto.
+        }
+        remember (@exist (itrace E X -> Prop) (Proper (eutt eq ==> iff)) P H) as p.
+        specialize (COND p).
+        subst.
+
+        forward COND.
+        { cbn.
+          intros b0 H0.
+          rewrite append_nil; auto.
+        }
+
+        cbn in COND.
+        rewrite <- append_nil.
+        apply COND; auto.
+      }
+    }
+
+    { intros EQ.
+      repeat red.
+      split.
+      { intros log p H b H0.
+        destruct p as (S&PROP).
+        cbn in *.
+        rewrite <- EQ in H0.
+        pose proof (H _ H0).
+        apply H1.
+      }
+      { red.
+        intros log p b H H0.
+        destruct p as (S&PROP).
+        cbn in *.
+        rewrite <- EQ.
+        repeat red in PROP.
+        pose proof (H _ H0).
+        apply H1.
+      }
+    }
+  Qed.
 
   Definition iter_cont {I E R} (step' : I -> itree E (I + R)) :
     I + R -> itree E R :=

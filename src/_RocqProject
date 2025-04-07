@@ -1,4 +1,5 @@
 -R rocq Vellvm
+-R ItreeExtra ItreeExtra
 
 -arg -w -arg -masking-absolute-name
 -arg -w -arg -deprecated-hint-without-locality
@@ -155,3 +156,32 @@
 ./rocq/Utils/Tactics.v
 ./rocq/Utils/UBAndErrors.v
 ./rocq/Utils/Util.v
+
+./ItreeExtra/Dijkstra/DelaySpecMonad.v
+./ItreeExtra/Dijkstra/DijkstraMonad.v
+./ItreeExtra/Dijkstra/IterRel.v
+./ItreeExtra/Dijkstra/PureITreeBasics.v
+./ItreeExtra/Dijkstra/PureITreeDijkstra.v
+./ItreeExtra/Dijkstra/StateDelaySpec.v
+./ItreeExtra/Dijkstra/StateSpecT.v
+./ItreeExtra/Dijkstra/ITreeDijkstra.v
+./ItreeExtra/Dijkstra/StateIOTrace.v
+./ItreeExtra/Dijkstra/TracesIT.v
+./ItreeExtra/ITrace/ITraceDefinition.v
+./ItreeExtra/ITrace/ITraceBind.v
+./ItreeExtra/ITrace/ITraceFacts.v
+./ItreeExtra/ITrace/ITracePreds.v
+./ItreeExtra/ITrace/ITracePrefix.v
+./ItreeExtra/Secure/SecureEqBind.v
+./ItreeExtra/Secure/SecureEqEuttHalt.v
+./ItreeExtra/Secure/SecureEqEuttTrans.v
+./ItreeExtra/Secure/SecureEqHaltProgInsens.v
+./ItreeExtra/Secure/SecureEqProgInsens.v
+./ItreeExtra/Secure/SecureEqProgInsensFacts.v
+./ItreeExtra/Secure/SecureEqWcompat.v
+./ItreeExtra/Secure/SecureStateHandler.v
+./ItreeExtra/Secure/SecureStateHandlerPi.v
+./ItreeExtra/Secure/StrongBisimProper.v
+./ItreeExtra/Secure/Labels.v
+./ItreeExtra/Secure/SecureEqHalt.v
+./ItreeExtra/IForest.v
