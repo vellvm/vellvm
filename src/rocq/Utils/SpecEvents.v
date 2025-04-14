@@ -198,6 +198,41 @@ Qed.
 Import MonadNotation.
 Open Scope monad.
 Import State.
+Import Morphisms.
+
+Lemma alloc_spec :
+  forall m k,
+    member k m = false <->
+    @refines
+      Effin Effin (memory * Z) (memory * Z)
+      in_rel
+      in_post_rel
+      eq
+      (handle_mem_spec Z (AllocE) m)
+      (ret (add k 0 m, k)).
+Proof.
+  intros m k.
+  split.
+  { intros NMEM.
+    cbn.
+    pstep; red; cbn.
+    apply refinesF_forallL
+      with (a:=exist (fun k => member k m = false) k NMEM).
+    constructor; cbn; auto.
+  }
+  { intros REF.
+    cbn in *.
+    (* Should this be a lemma? *)
+    punfold REF.
+    red in REF; cbn in REF.
+    apply refinesF_Vis_forallL in REF.
+    inversion REF; subst.
+    destruct a; auto.
+    cbn in *.
+    inversion H; subst.
+    inversion H2; subst; auto.
+  }
+Qed.
 
 Definition double_alloc : itree MemE bool
   := k <- trigger AllocE;;
@@ -206,7 +241,7 @@ Definition double_alloc : itree MemE bool
 
 Lemma alloc_disjoint :
   exists m,
-    @refines
+    @padded_refines
       Effin Effin (memory * bool) (memory * bool)
       in_rel
       in_post_rel
@@ -214,9 +249,21 @@ Lemma alloc_disjoint :
       (interp_state handle_mem_spec double_alloc empty)
       (ret (m, false)).
 Proof.
-  eexists.
+  exists (add 1%Z 0 (add 0%Z 0 empty)).
+  assert
+    ((@ret (itree (SpecEvent (sum1 MemE FailureE))) _ _ (add 1%Z 0 (add 0%Z 0 empty), false))
+       ≈
+       '(m, x) <- ret (add 0%Z 0 empty, 0%Z);;
+       '(m, y) <- ret (add 1%Z 0 m, 1%Z);;
+       ret (m, false)) as RET.
+  { repeat (cbn; setoid_rewrite bind_ret_l).
+    reflexivity.
+  }
   cbn.
   rewrite bind_trigger.
   setoid_rewrite StateFacts.interp_state_vis.
-  cbn.
-Admitted.
+  rewrite RET.
+  eapply padded_refines_bind.
+  apply -> alloc_spec.
+  apply 
+Qed.
