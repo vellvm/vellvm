@@ -297,10 +297,9 @@ Section TraceSpec.
   (* For any trace in the spec, the trace exists in the itree t *)
   Definition complete_cond {A : Type} (spec : TraceSpec A) (t : itree E A) : Prop :=
     (* Should log just be nil here? *)
-    forall log p b,
-      proj1_sig (spec log) p ->
-      proj1_sig p b ->
-      b ⊑ t.
+    forall log p,
+      proj1_sig (obs_trace A t log) p ->
+      proj1_sig (spec log) p.
 
   Definition sound_and_complete_cond {A : Type} (spec : TraceSpec A) (t : itree E A) : Prop :=
     verify_cond spec t /\ complete_cond spec t.

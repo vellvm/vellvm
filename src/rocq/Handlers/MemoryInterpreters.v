@@ -48,6 +48,7 @@ Import MonadNotation.
 
 Import MemoryAddress.
 Import Error.
+Import SpecEvents.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -71,6 +72,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
   Import LP.Events.
   Import LP.PROV.
 
+  Unset Universe Checking.
   Section Interpreters.
 
     Context {E : Type -> Type}.
@@ -354,17 +356,21 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         pinversion EQ.
     Defined.
 
-    Definition E_trigger' : forall R, E R -> (MemStateT (PropT Effout) R) :=
-      fun R e m => fun t => t ≈ r <- trigger e;; ret (m, r).
+    Definition E_trigger' : forall R, E R -> (MemStateT (itree_spec Effout) R) :=
+      fun R e m =>
+        r <- trigger e;; ret (m, r).
 
-    Definition F_trigger' : forall R, F R -> (MemStateT (PropT Effout) R) :=
-      fun R e m => fun t => t ≈ r <- trigger e;; ret (m, r).
+    Definition F_trigger' : forall R, F R -> (MemStateT (itree_spec Effout) R) :=
+      fun R e m =>
+        r <- trigger e;; ret (m, r).
 
-    Definition E_trigger : forall R, E R -> (MemStateFreshT (PropT Effout) R) :=
-      fun R e sid m => fun t => t ≈ r <- trigger e;; ret (m, (sid, r)).
+    Definition E_trigger : forall R, E R -> (MemStateFreshT (itree_spec Effout) R) :=
+      fun R e sid m =>
+        r <- trigger e;; ret (m, (sid, r)).
 
-    Definition F_trigger : forall R, F R -> (MemStateFreshT (PropT Effout) R) :=
-      fun R e sid m => fun t => t ≈ r <- trigger e;; ret (m, (sid, r)).
+    Definition F_trigger : forall R, F R -> (MemStateFreshT (itree_spec Effout) R) :=
+      fun R e sid m =>
+        r <- trigger e;; ret (m, (sid, r)).
 
     (* Should line up with exec_correct *)
     Definition MemPropT_lift_PropT_fresh {X} {EFF} `{UBE -< EFF} `{OOME -< EFF} `{FailureE -< EFF} (spec : MemPropT MemState X) :
@@ -395,39 +401,45 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
 
     (* TODO: get rid of this silly hack. *)
     Definition my_handle_memory_prop' :
-      forall T : Type, MemoryE T -> MemStateT (PropT Effout) T.
+      forall T : Type, MemoryE T -> stateT MemState (itree_spec Effout) T.
     Proof using.
-      intros T MemE.
-      eapply MemPropT_lift_PropT.
-      eapply handle_memory_prop; auto.
+      intros T MemE ms.
+      eapply handle_memory_prop in ms; eauto.
+      refine (Vis (@Spec_forall Effout {a : (err_ub_oom (MemState * T)) | ms a}) (fun (x : {a : (err_ub_oom (MemState * T)) | ms a}) => _)).
+      destruct x.
+      apply (lift_err_ub_oom ret x).
     Defined.
 
     Definition my_handle_intrinsic_prop' :
-      forall T : Type, IntrinsicE T -> MemStateT (PropT Effout) T.
+      forall T : Type, IntrinsicE T -> stateT MemState (itree_spec Effout) T.
     Proof using.
-      intros T IntE.
-      eapply MemPropT_lift_PropT.
-      eapply handle_intrinsic_prop; auto.
+      intros T IntE ms.
+      eapply handle_intrinsic_prop in ms; eauto.
+      refine (Vis (@Spec_forall Effout {a : (err_ub_oom (MemState * T)) | ms a}) (fun (x : {a : (err_ub_oom (MemState * T)) | ms a}) => _)).
+      destruct x.
+      apply (lift_err_ub_oom ret x).
     Defined.
 
     Definition my_handle_memory_prop :
-      forall T : Type, MemoryE T -> MemStateFreshT (PropT Effout) T.
+      forall T : Type, MemoryE T -> MemStateFreshT (itree_spec Effout) T.
     Proof using.
-      intros T MemE.
-      eapply MemPropT_lift_PropT_fresh.
-      eapply handle_memory_prop; auto.
+      (* TODO: May need to punt through MemMonad_valid_state like from MemPropT_lift_PropT_fresh *)
+      intros T MemE sid ms.
+      eapply handle_memory_prop in ms; eauto.
+      refine (Vis (@Spec_forall Effout {a : (err_ub_oom (MemState * (store_id * T))) | ms (fmap (fun '(m, (sid, x)) => (m, x)) a)}) (fun (x : {a : (err_ub_oom (MemState * (store_id * T))) | ms (fmap (fun '(m, (sid, x)) => (m, x)) a)}) => _)).
+      destruct x.
+      apply (lift_err_ub_oom ret x).
     Defined.
 
     Definition my_handle_intrinsic_prop :
-      forall T : Type, IntrinsicE T -> MemStateFreshT (PropT Effout) T.
+      forall T : Type, IntrinsicE T -> MemStateFreshT (itree_spec Effout) T.
     Proof using.
-      intros T IntE.
-      unfold MemStateFreshT.
-      unfold MemStateT.
-      unfold PropT.
-      unfold stateT.
-      eapply MemPropT_lift_PropT_fresh.
-      eapply handle_intrinsic_prop; auto.
+      (* TODO: May need to punt through MemMonad_valid_state like from MemPropT_lift_PropT_fresh *)
+      intros T IntE sid ms.
+      eapply handle_intrinsic_prop in ms; eauto.
+      refine (Vis (@Spec_forall Effout {a : (err_ub_oom (MemState * (store_id * T))) | ms (fmap (fun '(m, (sid, x)) => (m, x)) a)}) (fun (x : {a : (err_ub_oom (MemState * (store_id * T))) | ms (fmap (fun '(m, (sid, x)) => (m, x)) a)}) => _)).
+      destruct x.
+      apply (lift_err_ub_oom ret x).
     Defined.
 
     Definition memory_k_spec
@@ -478,27 +490,26 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       typeclasses eauto.
     Qed.
 
-    Definition interp_memory_spec_h : forall T, Effin T -> MemStateFreshT (PropT Effout) T
+    Definition interp_memory_spec_h : forall T, Effin T -> MemStateFreshT (itree_spec Effout) T
       := case_ E_trigger (case_ my_handle_intrinsic_prop (case_ my_handle_memory_prop F_trigger)).
 
-    #[global] Instance memory_k_spec_WF : @k_spec_WF store_id MemState _ _ interp_memory_spec_h (@memory_k_spec).
-    Proof using.
-      split.
-      - (* k_spec_Proper *)
-        typeclasses eauto.
-      - (* k_spec_Correct *)
-        red.
-        intros T R2 e k2 t2 s1 s2 ta H_SPEC BIND.
-        unfold memory_k_spec.
-        right.
-        rewrite BIND.
-        reflexivity.
-    Qed.
+    (* #[global] Instance memory_k_spec_WF : @k_spec_WF store_id MemState _ _ interp_memory_spec_h (@memory_k_spec). *)
+    (* Proof using. *)
+    (*   split. *)
+    (*   - (* k_spec_Proper *) *)
+    (*     typeclasses eauto. *)
+    (*   - (* k_spec_Correct *) *)
+    (*     red. *)
+    (*     intros T R2 e k2 t2 s1 s2 ta H_SPEC BIND. *)
+    (*     unfold memory_k_spec. *)
+    (*     right. *)
+    (*     rewrite BIND. *)
+    (*     reflexivity. *)
+    (* Qed. *)
 
-    Definition interp_memory_spec {R1 R2} (RR : R1 -> R2 -> Prop) :
-      itree Effin R1 -> MemStateFreshT (PropT Effout) R2 :=
-      fun (t : itree Effin R1) (sid : store_id) (ms : MemState) (t' : itree Effout (MemState * (store_id * R2))) =>
-        interp_memory_prop (OOM:=OOME) interp_memory_spec_h (fun x '(ms', (sid', y)) => RR x y) (@memory_k_spec) t t'.
+    Definition interp_memory_spec {R} :
+      itree Effin R -> MemStateFreshT (itree_spec Effout) R :=
+      fun (t : itree Effin R) => interp interp_memory_spec_h t.
 
   End Interpreters.
 End MemorySpecInterpreter.
@@ -780,8 +791,121 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       rewrite unfold_interp_memory; reflexivity.
     Qed.
 
-    Lemma my_handle_intrinsic_prop_correct {T} i sid ms (VALID: MemMonad_valid_state ms sid) :
-      my_handle_intrinsic_prop i sid ms (my_handle_intrinsic (T := T) i sid ms).
+    (* TODO: Move this *)
+    Definition to_SpecEvent {F : Type -> Type} (T : Type) (e : F T) : SpecEvent F T
+      := Spec_vis F e.
+
+    Definition to_itree_spec {F : Type -> Type} (T : Type) (t : itree F T) : itree_spec F T
+      := translate to_SpecEvent t.
+
+    Program Definition ref_Effout_pre (A B : Type) (e1 : Effout A) (e2 : Effout B) : Prop
+      := match e1, e2 with
+         | inl1 a, inl1 b =>
+             _
+         | inr1 a, inr1 b => _
+         | _, _ => False
+         end.
+    Next Obligation.
+    Admitted.
+    Next Obligation.
+    Admitted.
+    Next Obligation.
+    Admitted.
+    Next Obligation.
+    Admitted.
+
+    Definition ref_Effout_postrel : postrel Effout Effout.
+      intros A B X X0 X1 X2.
+    Admitted.
+
+  Definition exec_correct_no_ub {MemM Eff} `{MM: MemMonad MemM (itree Eff)} {X} (pre : exec_correct_pre) (exec : MemM X) (spec : MemPropT MemState X) (post : exec_correct_post X) : Prop :=
+    forall ms st,
+      (MemMonad_valid_state ms st) ->
+      pre ms st ->
+        ( (* exists a behaviour in exec that lines up with spec.
+
+               Technically this should be something along the lines of...
+
+               "There is at least one behaviour in exec, and for every
+               behaviour in exec it is within the spec"
+
+               For our purposes exec is deterministic, so "exists"
+               should be fine here for simplicity.
+             *)
+           exists (e : err_ub_oom X) (st' : store_id) (ms' : MemState),
+             (* Had to manually supply typeclasses, but this within expression is: (e {{(st, ms)}} ∈ {{(st', ms')}} exec))
+
+                 I.e., The executable is correct if forall behaviours
+                 in the executable those behaviours are in the spec as
+                 well, and if the executable returns successfully it
+                 gives a valid store_id / MemState pair.
+              *)
+             let WEM := (Within_err_ub_oom_MemM (EQI:=(@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) (EQV:=(@MemMonad_eq1_runm_equiv _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM))) in
+             (@within MemM _ err_ub_oom (store_id * MemState)%type (store_id * MemState)%type WEM X exec (st, ms) e (st', ms')) /\
+               (e {{ms}} ∈ {{ms'}} spec) /\ ((exists x, e = ret x) -> (MemMonad_valid_state ms' st' /\ (exists x, e = ret x /\ post ms st x ms' st')))).
+
+    Lemma handle_intrinsic_correct' :
+      forall T (e : IntrinsicE T) pre,
+        exec_correct_no_ub pre (handle_intrinsic T e) (handle_intrinsic_prop T e) exec_correct_id_post.
+    Proof using Type.
+      intros T e pre.
+      unfold handle_intrinsic, handle_intrinsic_prop.
+      break_match.
+      break_match.
+      { (* Memcpy *)
+        eapply exec_correct_strengthen_post; cycle 1.
+        { apply exec_correct_bind.
+          apply handle_memcpy_correct.
+          intros * VALID POST RUN.
+          apply exec_correct_ret.
+        }
+        auto.
+      }
+
+      break_match.
+      { (* Memset *)
+        eapply exec_correct_strengthen_post; cycle 1.
+        { apply exec_correct_bind.
+          apply handle_memset_correct.
+          intros * VALID POST RUN.
+          apply exec_correct_ret.
+        }
+        auto.
+      }
+
+      break_match.
+      { (* Malloc *)
+        eapply exec_correct_strengthen_post; cycle 1.
+        { apply exec_correct_bind.
+          apply handle_malloc_correct.
+          intros * VALID POST RUN.
+          eapply exec_correct_ret.
+        }
+        auto.
+      }
+
+      break_match.
+      { (* Free *)
+        eapply exec_correct_strengthen_post; cycle 1.
+        { apply exec_correct_bind.
+          apply handle_free_correct.
+          intros * VALID POST RUN.
+          eapply exec_correct_ret.
+        }
+        auto.
+      }
+
+      apply exec_correct_raise_error.
+    Qed.
+
+    Lemma my_handle_intrinsic_prop_correct {T} (i : IntrinsicE T) sid ms (VALID: MemMonad_valid_state ms sid) :
+      @spec_refines Effout Effout _ _
+        (* Change this relation *)
+        ref_Effout_pre
+        ref_Effout_postrel
+        eq
+        (my_handle_intrinsic_prop i sid ms)
+        (to_itree_spec (my_handle_intrinsic (T := T) i sid ms)).
     Proof using.
       unfold my_handle_intrinsic_prop, my_handle_intrinsic.
       cbn.
