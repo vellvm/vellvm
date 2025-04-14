@@ -1,5 +1,6 @@
 -R rocq Vellvm
 -R ItreeExtra ItreeExtra
+-R ITreeSpec ITreeSpec
 
 -arg -w -arg -masking-absolute-name
 -arg -w -arg -deprecated-hint-without-locality
@@ -115,6 +116,7 @@
 ./rocq/Transformations/Peephole.v
 ./rocq/Transformations/Transform.v
 ./rocq/Utilities.v
+./rocq/Utils/SpecEvents.v
 ./rocq/Utils/AListFacts.v
 ./rocq/Utils/Commutation.v
 ./rocq/Utils/Default.v
@@ -185,3 +187,11 @@
 ./ItreeExtra/Secure/Labels.v
 ./ItreeExtra/Secure/SecureEqHalt.v
 ./ItreeExtra/IForest.v
+
+./ITreeSpec/Concrete.v
+./ITreeSpec/MRecSpec.v
+./ITreeSpec/Padded.v
+./ITreeSpec/ITreeSpecCombinatorFacts.v
+./ITreeSpec/ITreeSpecFacts.v
+./ITreeSpec/ITreeSpecDefinition.v
+./ITreeSpec/Relations.v
