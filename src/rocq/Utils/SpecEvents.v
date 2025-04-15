@@ -684,3 +684,59 @@ Qed.
 (*   apply -> alloc_spec. *)
 (*   apply  *)
 (* Qed. *)
+
+Lemma double_alloc_spec :
+  forall m m' b,
+    (b = false /\
+       exists k1 k2,
+         m' = add k2 0 (add k1 0 m) /\
+           k1 <> k2 /\
+           member k1 m = false /\
+           member k2 m = false) ->
+    @padded_refines
+      Effin Effin (memory * bool) (memory * bool)
+      in_rel
+      in_post_rel
+      eq
+      (interp_state handle_mem_spec double_alloc m)
+      (ret (m', b)).
+Proof.
+  intros m m' b.
+  { intros [B K].
+    destruct K as (k1&k2&M'&NK1K2&MEM1&MEM2).
+    cbn.
+    repeat setoid_rewrite interp_state_bind.
+    repeat setoid_rewrite interp_state_trigger.
+
+    assert
+      ((@ret (itree (SpecEvent (sum1 MemE FailureE))) _ _ (add k2 0 (add k1 0 m), false))
+         ≈
+         '(m, x) <- ret (add k1 0 m, k1);;
+       '(m, y) <- ret (add k2 0 m, k2);;
+       ret (m, false)) as RET.
+    { repeat (cbn; setoid_rewrite bind_ret_l).
+      reflexivity.
+    }
+
+    subst.
+    setoid_rewrite RET.
+
+    eapply padded_refines_bind.
+    apply refines_padded_refines.
+    apply alloc_spec; auto.
+    intros r1 [m' k] (?&?&?); cbn in *; subst.
+
+    eapply padded_refines_bind.
+    apply refines_padded_refines.
+    apply alloc_spec.
+    unfold fst; split; auto.
+    unfold member.
+    rewrite IP.F.add_neq_b; eauto.
+    intros r1 [m'' k'] (?&?&?); cbn in *; subst.
+
+    pstep; red; cbn.
+    constructor.
+    replace (k1 =? k2)%Z with false by lia.
+    reflexivity.
+  }
+Qed.
