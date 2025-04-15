@@ -44,7 +44,7 @@ Definition handle_mem {E} `{FailureE -< E} : MemE ~> stateT memory (itree E) :=
         end
     | StoreE k v =>
         match lookup k mem with
-        | Some v =>
+        | Some _ =>
             let mem' := add k v mem in
             ret (mem', tt)
         | None => raise "Store to unallocated address."
@@ -64,7 +64,7 @@ Definition handle_mem_spec {E} `{FailureE -< E} : MemE ~> stateT memory (itree_s
         end
     | StoreE k v =>
         match lookup k mem with
-        | Some v =>
+        | Some _ =>
             let mem' := add k v mem in
             ret (mem', tt)
         | None => raise "Store to unallocated address."
@@ -200,6 +200,137 @@ Open Scope monad.
 Import State.
 Import Morphisms.
 
+Lemma load_succeeds_spec :
+  forall m k v,
+    lookup k m = Some v <->
+    @refines
+      Effin Effin (memory * _) (memory * _)
+      in_rel
+      in_post_rel
+      (fun r1 r2 =>
+         r1 = r2 /\
+           fst r2 = m /\
+           snd r2 = v
+      )
+      (handle_mem_spec _ (LoadE k) m)
+      (ret (m, v)).
+Proof.
+  intros m k v.
+  split.
+  { intros LUP.
+    cbn; rewrite LUP.
+    pstep; red; cbn; constructor.
+    cbn; auto.
+  }
+  { intros REF.
+    cbn in REF.
+    destruct (lookup k m) eqn:LUP;
+      punfold REF; inversion REF; subst.
+    destruct H1 as (?&?&?).
+    cbn in *; subst; auto.
+    inversion H; subst; auto.
+  }
+Qed.
+
+Lemma load_fails_spec :
+  forall m k,
+    lookup k m = None <->
+    @refines
+      Effin Effin (memory * _) (memory * _)
+      in_rel
+      in_post_rel
+      eq
+      (handle_mem_spec _ (LoadE k) m)
+      (raise "Load from unallocated address.").
+Proof.
+  intros m k.
+  split.
+  { intros LUP.
+    cbn; rewrite LUP.
+    pstep; red; cbn; constructor.
+    cbn; auto.
+    intros [].
+  }
+  { intros REF.
+    cbn in REF.
+    destruct (lookup k m) eqn:LUP;
+      punfold REF; inversion REF; subst.
+  }
+Qed.
+
+Lemma store_succeeds_spec :
+  forall m m' k v,
+    member k m = true /\
+      m' = add k v m
+    <->
+      @refines
+        Effin Effin (memory * _) (memory * _)
+        in_rel
+        in_post_rel
+        (fun r1 r2 =>
+           r1 = r2 /\
+             fst r2 = m'
+        )
+        (handle_mem_spec _ (StoreE k v) m)
+        (ret (m', tt)).
+Proof.
+  intros m m' k v.
+  split.
+  { intros [MEM ADD]; subst.
+    cbn.
+    apply member_lookup in MEM as (v'&MEM).
+    rewrite MEM.
+    pstep; red; cbn; constructor.
+    cbn; auto.
+  }
+  { intros REF.
+    cbn in REF.
+    destruct (lookup k m) eqn:LUP;
+      punfold REF; inversion REF; subst.
+    destruct H1 as (?&?).
+    cbn in *; subst; auto.
+    inversion H; subst; split; auto.
+    eapply lookup_member; eauto.
+  }
+Qed.
+
+Lemma store_fails_spec :
+  forall m k v,
+    member k m = false
+    <->
+      @refines
+        Effin Effin (memory * _) (memory * _)
+        in_rel
+        in_post_rel
+        eq
+        (handle_mem_spec _ (StoreE k v) m)
+        (raise "Store to unallocated address.").
+Proof.
+  intros m k v.
+  split.
+  { intros MEM; subst.
+    cbn.
+    destruct (lookup k m) eqn:LUP.
+    apply lookup_member in LUP.
+    rewrite LUP in MEM.
+    discriminate.
+
+    pstep; red; cbn; constructor.
+    cbn; auto.
+    intros [].
+  }
+  { intros REF.
+    cbn in REF.
+    destruct (lookup k m) eqn:LUP;
+      punfold REF; inversion REF; subst.
+    inj_existT; subst.
+    cbn in *.
+    destruct (member k m) eqn:MEM; auto.
+    apply member_lookup in MEM as (?&?).
+    rewrite LUP in H; discriminate.
+  }
+Qed.
+
 Lemma alloc_spec :
   forall (m m' : memory) k,
     member k m = false /\
@@ -214,8 +345,7 @@ Lemma alloc_spec :
           let m2 := fst r2 in
           let k2 := snd r2 in
           k2 = k /\
-            m2 = add k 0 m
-      )
+            m2 = add k 0 m)
       (handle_mem_spec Z (AllocE) m)
       (ret (m', k)).
 Proof.
@@ -244,6 +374,75 @@ Proof.
     inversion H0; subst; auto.
   }
 Qed.
+
+Lemma alloc_spec_exists :
+  forall (m : memory),
+  exists m' k,
+    member k m = false /\
+      m' = add k 0 m /\
+    @refines
+      Effin Effin (memory * Z) (memory * Z)
+      in_rel
+      in_post_rel
+      (fun r1 r2 =>
+         r1 = r2 /\
+           fst r2 = m' /\
+           snd r2 = k)
+      (handle_mem_spec Z (AllocE) m)
+      (ret (m', k)).
+Proof.
+  intros m.
+  destruct (member (next_key m) m) eqn:MEM; auto.
+  apply IM.mem_2 in MEM.
+  apply next_key_correct in MEM.
+  lia.
+
+  exists (add (next_key m) 0 m), (next_key m).
+  split; auto.
+  split; auto.
+
+  cbn.
+  pstep; red; cbn.
+
+  eapply refinesF_forallL.
+  Unshelve.
+  2: {
+    exists (next_key m).
+    auto.
+  }
+
+  constructor; cbn; auto.
+Qed.
+
+
+Lemma handle_mem_spec_alloc_bind :
+  forall RR m (k : memory * Z -> itree_spec Effin (memory * Z)) t,
+    (exists (x : (memory * Z)),
+        (fun r1 r2 =>
+        r1 = r2 /\
+          let m2 := fst r2 in
+          let k2 := snd r2 in
+          m2 = add k2 0 m) x x ->
+        @padded_refines
+          Effin Effin (memory * Z) (memory * Z)
+          in_rel
+          in_post_rel
+          (fun r1 r2 =>
+             r1 = r2 /\
+               let m2 := fst r2 in
+               let k2 := snd r2 in
+               m2 = add k2 0 m)
+          (k x) (* This is wrong *)
+          t) ->
+    @padded_refines
+      Effin Effin (memory * Z) (memory * Z)
+      in_rel
+      in_post_rel
+      RR
+      (ITree.bind (handle_mem_spec _ AllocE m) k)
+      t.
+Proof.
+Abort.
 
 Definition double_alloc : itree MemE bool
   := k <- trigger AllocE;;
@@ -740,3 +939,111 @@ Proof.
     reflexivity.
   }
 Qed.
+
+Definition store_prog (v : nat) : itree MemE nat :=
+  k <- trigger AllocE;;
+  trigger (StoreE k v);;
+  trigger (LoadE k).
+
+Import HasPost.
+
+Lemma padded_refines_strengthen_RR :
+  forall E1 E2 X Y PRE POST RR1 RR2 t1 t2,
+    (forall x y, RR1 x y -> RR2 x y) ->
+    @padded_refines E1 E2 X Y
+                    PRE POST RR1 t1 t2 ->
+    @padded_refines E1 E2 X Y
+      PRE POST RR2 t1 t2.
+Proof.
+  intros E1 E2 X Y PRE POST RR1 RR2 t1 t2 H H0.
+Admitted.
+
+Lemma store_forward :
+  forall m v,
+    exists m',
+    @padded_refines
+      Effin Effin (memory * nat) (memory * nat)
+      in_rel
+      in_post_rel
+      eq
+      (interp_state handle_mem_spec (store_prog v) m)
+      (ret (m', v)).
+Proof.
+  intros m v.
+  cbn.
+  repeat setoid_rewrite interp_state_bind.
+  repeat setoid_rewrite interp_state_trigger.
+
+  pose proof alloc_spec_exists m as (m' & k & MEM & M' & ALLOC).
+  apply refines_padded_refines in ALLOC.
+
+  exists (add k v m').
+
+  assert
+    ((@ret (itree (SpecEvent (sum1 MemE FailureE))) _ _ (add k v m', v))
+       ≈
+       '(m, x) <- ret (add k 0 m, k);;
+       '(m, x) <- ret (add k v m, tt);;
+       ret (m, v)).
+  { repeat (cbn; setoid_rewrite bind_ret_l).
+    subst.
+    reflexivity.
+  }
+
+  rewrite H.
+  eapply padded_refines_bind with (RR:=(fun r1 r2 : memory * Z => r1 = r2 /\ fst r2 = m' /\ snd r2 = k));
+  subst.
+  apply ALLOC.
+
+  intros r1 [m' k'] (?&?&?).
+  cbn in *; subst.
+
+  eapply padded_refines_bind.
+  cbn.
+  eapply refines_padded_refines.
+  eapply store_succeeds_spec.
+  split; auto.
+  apply member_add_eq.
+
+  intros r1 [m'' []] (?&?).
+  cbn in *; subst.
+  cbn.
+
+  eapply padded_refines_strengthen_RR; cycle 1.
+  eapply refines_padded_refines.
+  apply load_succeeds_spec.
+  apply lookup_add_eq.
+
+  intros x [m'' n] (?&?&?).
+  cbn in *; subst.
+  auto.
+Qed.
+
+(* Lemma padded_refines_bind_inv: *)
+(*   forall (E1 E2 : Type -> Type) (R1 R2 S1 S2 : Type) (RPre : prerel E1 E2)  *)
+(*     (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) (RS : S1 -> S2 -> Prop)  *)
+(*     (t1 : itree_spec E1 R1) (t2 : itree_spec E2 R2) (k1 : R1 -> itree_spec E1 S1) *)
+(*     (k2 : R2 -> itree_spec E2 S2), *)
+(*   padded_refines RPre RPost RS (ITree.bind t1 k1) (ITree.bind t2 k2) -> *)
+(*   padded_refines RPre RPost RR t1 t2 /\ *)
+(*     (forall (r1 : R1) (r2 : R2), RR r1 r2 -> padded_refines RPre RPost RS (k1 r1) (k2 r2)). *)
+
+(* Lemma double_alloc_spec' : *)
+(*   forall m m' b, *)
+(*     @padded_refines *)
+(*       Effin Effin (memory * bool) (memory * bool) *)
+(*       in_rel *)
+(*       in_post_rel *)
+(*       eq *)
+(*       (interp_state handle_mem_spec double_alloc m) *)
+(*       (ret (m', b)) -> *)
+(*     (b = false /\ *)
+(*        exists k1 k2, *)
+(*          m' = add k2 0 (add k1 0 m) /\ *)
+(*            k1 <> k2 /\ *)
+(*            member k1 m = false /\ *)
+(*            member k2 m = false). *)
+(* Proof. *)
+(*   intros m m' b REF. *)
+  
+(* Qed. *)
