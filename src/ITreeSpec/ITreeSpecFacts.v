@@ -1036,3 +1036,68 @@ Lemma padded_refines_weaken_r {E1 E2 R1 R2}
 Proof.
   intros. eapply strict_refines_proper; eauto. reflexivity.
 Qed.
+
+Lemma refines_padded_refines :
+  forall E1 E2 R1 R2 in_rel in_post_rel RR t1 t2,
+    @refines
+      E1 E2 R1 R2
+      in_rel
+      in_post_rel
+      RR
+      t1 t2 ->
+    @padded_refines
+      E1 E2 R1 R2
+      in_rel
+      in_post_rel
+      RR
+      t1 t2.
+Proof.
+  intros E1 E2 R1 R2 in_rel0 in_post_rel0 RR t1 t2 REF.
+  punfold REF; red in REF; cbn in REF.
+  setoid_rewrite itree_eta.
+  genobs t1 ot1.
+  genobs t2 ot2.
+  clear t1 t2 Heqot1 Heqot2.
+  revert ot1 ot2 REF.
+  pcofix CIH; intros ot1 ot2 REF.
+  induction REF; cbn in *; subst; pclearbot;
+    pstep; red; cbn;
+    try solve [constructor; eauto with paco].
+  - constructor.
+    right.
+    apply CIH.
+    punfold H.
+  - constructor; eauto.
+    intros a b H1.
+    left.
+    pstep; red; cbn.
+    constructor.
+    right.
+    apply CIH.
+    apply H0 in H1.
+    punfold H1.
+  - constructor; eauto.
+    punfold IHREF.
+  - constructor; eauto.
+    punfold IHREF.
+  - constructor; eauto.
+    intros a.
+    specialize (H0 a).
+    cbn.
+    constructor.
+    punfold H0.
+  - econstructor.
+    cbn.
+    constructor.
+    punfold IHREF.
+  - econstructor.
+    cbn.
+    constructor.
+    punfold IHREF.
+  - constructor; eauto.
+    intros a.
+    specialize (H0 a).
+    cbn.
+    constructor.
+    punfold H0.
+Qed.
