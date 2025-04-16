@@ -766,6 +766,20 @@ Proof.
   auto.
 Qed.
 
+Lemma next_key_not_member :
+  forall (m : memory),
+    member (next_key m) m = false.
+Proof.
+Admitted.
+
+Ltac do_trans :=
+  eapply padded_refines_strengthen_PRE; cycle 1;
+  [eapply padded_refines_weaken_post; cycle 1;
+   [eapply padded_refines_strengthen_RR; cycle 1;
+    [eapply padded_refines_trans|]
+   |]
+  |].
+
 Lemma store_forward_ignore_mem :
   forall m v,
     @padded_refines
@@ -780,54 +794,45 @@ Proof.
   cbn.
   repeat setoid_rewrite interp_state_bind.
   repeat setoid_rewrite interp_state_trigger.
-  unfold ITree.map.
-  repeat setoid_rewrite bind_bind.
-  eapply padded_refines_trans.
+  repeat setoid_rewrite map_bind.
+  do_trans.
 
-  pose proof alloc_spec_exists m as (m' & k & MEM & M' & ALLOC).
-  apply refines_padded_refines in ALLOC.
+  { eapply padded_refines_bind.
+    eapply refines_padded_refines; eapply alloc_spec with (k:=next_key m).
+    split; [apply next_key_not_member | reflexivity].
+    intros r1 [m' k'] [EQ [K' M']]; cbn in *; subst.
 
-  exists (add k v m').
+    do_trans.
+    { eapply padded_refines_bind.
+      cbn.
+      eapply refines_padded_refines.
+      eapply store_succeeds_spec.
+      split; auto.
+      apply member_add_eq.
 
-  assert
-    ((@ret (itree (SpecEvent (sum1 MemE FailureE))) _ _ (add k v m', v))
-       ≈
-       '(m, x) <- ret (add k 0 m, k);;
-       '(m, x) <- ret (add k v m, tt);;
-       ret (m, v)).
-  { repeat (cbn; setoid_rewrite bind_ret_l).
-    subst.
-    reflexivity.
+      intros r1 [m' []] [EQ M']; cbn in *; subst.
+
+      do_trans.
+      { eapply padded_refines_bind with (k2:=(fun x => Ret (snd x))).
+        cbn.
+        eapply refines_padded_refines.
+        eapply load_succeeds_spec.
+        apply lookup_add_eq.
+
+        intros r1 [m' k'] [EQ [M' K']]; cbn in *; subst.
+        cbn.
+        apply padded_refines_ret.
+        reflexivity.
+      }
+
+      cbn.
+      all: admit.      
+    }
+    all: admit.
   }
 
-  rewrite H.
-  eapply padded_refines_bind with (RR:=(fun r1 r2 : memory * Z => r1 = r2 /\ fst r2 = m' /\ snd r2 = k));
-  subst.
-  apply ALLOC.
-
-  intros r1 [m' k'] (?&?&?).
-  cbn in *; subst.
-
-  eapply padded_refines_bind.
-  cbn.
-  eapply refines_padded_refines.
-  eapply store_succeeds_spec.
-  split; auto.
-  apply member_add_eq.
-
-  intros r1 [m'' []] (?&?).
-  cbn in *; subst.
-  cbn.
-
-  eapply padded_refines_strengthen_RR; cycle 1.
-  eapply refines_padded_refines.
-  apply load_succeeds_spec.
-  apply lookup_add_eq.
-
-  intros x [m'' n] (?&?&?).
-  cbn in *; subst.
-  auto.
-Qed.
+  all: admit.
+Abort.
 
 (* Lemma padded_refines_bind_inv: *)
 (*   forall (E1 E2 : Type -> Type) (R1 R2 S1 S2 : Type) (RPre : prerel E1 E2)  *)
