@@ -8,19 +8,10 @@ From ITree Require Import
      Basics.Basics
      Basics.Utils
      Basics.HeterogeneousRelations
-     Basics.HeterogeneousRelations
      Core.ITreeDefinition
+     Eq.EqAxiom
      ITree
-     Eq.Eqit.
-
-From ITree Require Import
-     Basics.Basics
-     Basics.Utils
-     Basics.HeterogeneousRelations
-     Basics.HeterogeneousRelations
-     Core.ITreeDefinition
-     ITree
-     Eq.Eqit.
+     Eqit.
 
 From ITreeSpec Require Import
      Padded
@@ -558,3 +549,73 @@ Qed.
  
 
 End interp_mrec_spec_bind.
+
+Lemma refines_strengthen_RR :
+  forall E1 E2 X Y PRE POST RR1 RR2 t1 t2,
+    (forall x y, RR1 x y -> RR2 x y) ->
+    @refines E1 E2 X Y
+                    PRE POST RR1 t1 t2 ->
+    @refines E1 E2 X Y
+      PRE POST RR2 t1 t2.
+Proof.
+  intros E1 E2 X Y PRE POST RR1 RR2 t1 t2 STRENGTHEN REF.
+  punfold REF; red in REF; cbn in REF.
+  setoid_rewrite itree_eta.
+  genobs t1 ot1.
+  genobs t2 ot2.
+  clear t1 t2 Heqot1 Heqot2.
+  revert ot1 ot2 REF.
+  pcofix CIH; intros ot1 ot2 REF.
+  induction REF; cbn in *; subst; pclearbot;
+    try solve
+      [pstep; red; cbn;
+       constructor; eauto with paco].
+  - pstep; red; cbn;
+    constructor; eauto.
+    right.
+    setoid_rewrite EqAxiom.itree_eta_.
+    punfold H.
+  - pstep; red; cbn;
+    constructor; eauto.
+    right.
+    apply H0 in H1.
+    setoid_rewrite EqAxiom.itree_eta_.
+    eapply CIH; eauto.
+    punfold H1.
+  - pstep; red; cbn;
+    constructor; eauto.
+    punfold IHREF.
+  - pstep; red; cbn;    
+    constructor; eauto.
+    punfold IHREF.
+  - pstep; red; cbn;    
+    constructor; eauto.
+
+    intros a.
+    specialize (H0 a).
+    punfold H0.
+  - pstep; red; cbn.
+    econstructor; eauto.
+    punfold IHREF.
+  - pstep; red; cbn.
+    econstructor; eauto.
+    punfold IHREF.
+  - pstep; red; cbn;    
+    constructor; eauto.
+
+    intros a.
+    specialize (H0 a).
+    punfold H0.
+Qed.
+
+Lemma padded_refines_strengthen_RR :
+  forall E1 E2 X Y PRE POST RR1 RR2 t1 t2,
+    (forall x y, RR1 x y -> RR2 x y) ->
+    @padded_refines E1 E2 X Y
+                    PRE POST RR1 t1 t2 ->
+    @padded_refines E1 E2 X Y
+      PRE POST RR2 t1 t2.
+Proof.
+  intros E1 E2 X Y PRE POST RR1 RR2 t1 t2 H H0.
+  eapply refines_strengthen_RR; eauto.
+Qed.

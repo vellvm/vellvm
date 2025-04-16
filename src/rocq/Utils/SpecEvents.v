@@ -760,31 +760,6 @@ Qed.
 (*   - constructor. eapply IHHeutt; eauto. inv Hpad3. pclearbot. pstep_reverse. *)
 (* Qed. *)
 
-(* TODO: May not be true? *)
-Lemma refines_padded_refines :
-  forall E1 E2 R1 R2 in_rel in_post_rel RR t1 t2,
-    @refines
-      E1 E2 R1 R2
-      in_rel
-      in_post_rel
-      RR
-      t1 t2 ->
-    @padded_refines
-      E1 E2 R1 R2
-      in_rel
-      in_post_rel
-      RR
-      t1 t2.
-Proof.
-  intros E1 E2 R1 R2 in_rel0 in_post_rel0 RR t1 t2 H.
-  unfold padded_refines.
-  eapply refines_eutt_padded_l; eauto using pad_is_padded.
-  apply pad_eutt.
-  eapply refines_eutt_padded_r; eauto using pad_is_padded.
-  admit.
-  apply pad_eutt.
-Admitted.
-
 Lemma alloc_disjoint :
   exists m,
     @padded_refines
@@ -1014,7 +989,8 @@ Lemma padded_refines_strengthen_RR :
       PRE POST RR2 t1 t2.
 Proof.
   intros E1 E2 X Y PRE POST RR1 RR2 t1 t2 H H0.
-Admitted.
+  eapply refines_strengthen_RR; eauto.
+Qed.
 
 Lemma store_forward :
   forall m v,
