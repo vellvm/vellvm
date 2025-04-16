@@ -630,24 +630,6 @@ Proof.
   apply H0 in H6. pclearbot. auto.
 Qed.
 
-(* Variant RComposePostRel {E1 E2 E3} `{EncodingType E1} `{EncodingType E2} `{EncodingType E3} *)
-(*   (RPre1 : Rel E1 E2) (RPre2 : Rel E2 E3) (RPost1 : PostRel E1 E2) (RPost2 : PostRel E2 E3) : PostRel E1 E3 := *)
-(*   | RComposePostRel_intro (e1 : E1) (e3 : E3) a c :  *)
-(*     (forall e2, RPre1 e1 e2 -> RPre2 e2 e3 -> exists b, RPost1 e1 e2 a b /\ RPost2 e2 e3 b c) -> *)
-(*     RComposePostRel RPre1 RPre2 RPost1 RPost2 e1 e3 a c. *)
-
-Variant RComposePostRel {E1 E2 E3}
-  (RPre1 : prerel E1 E2) (RPre2 : prerel E2 E3) (RPost1 : postrel E1 E2) (RPost2 : postrel E2 E3) : postrel E1 E3 :=
-  | RComposePostRel_intro {A C} (e1 : E1 A) (e3 : E3 C) a c :
-    (forall B (e2 : E2 B), RPre1 A B e1 e2 -> RPre2 B C e2 e3 -> exists b, RPost1 A B e1 a e2 b /\ RPost2 B C e2 b e3 c) ->
-    RComposePostRel RPre1 RPre2 RPost1 RPost2 A C e1 a e3 c.
-
-Variant RComposePreRel {E1 E2 E3}
-  (RPre1 : prerel E1 E2) (RPre2 : prerel E2 E3) : prerel E1 E3 :=
-  | RComposePreRel_intro {A C} (e1 : E1 A) (e3 : E3 C) :
-    forall {B} e2, RPre1 A B e1 e2 -> RPre2 B C e2 e3 ->
-    @RComposePreRel E1 E2 E3 RPre1 RPre2 A C e1 e3.
-
 Lemma refinesTrans_aux:
   forall (E3 : Type -> Type) (R3 : Type) (E1 : Type -> Type) (R1 : Type) (E2 : Type -> Type) (R2 : Type)
     (RPre1 : prerel E1 E2) (RPre2 : prerel E2 E3) (RPost1 : postrel E1 E2)
