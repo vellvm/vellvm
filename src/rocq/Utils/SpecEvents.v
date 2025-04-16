@@ -766,6 +766,69 @@ Proof.
   auto.
 Qed.
 
+Lemma store_forward_ignore_mem :
+  forall m v,
+    @padded_refines
+      Effin Effin _ _
+      in_rel
+      in_post_rel
+      eq
+      (fmap snd (interp_state handle_mem_spec (store_prog v) m))
+      (ret v).
+Proof.
+  intros m v.
+  cbn.
+  repeat setoid_rewrite interp_state_bind.
+  repeat setoid_rewrite interp_state_trigger.
+  unfold ITree.map.
+  repeat setoid_rewrite bind_bind.
+  eapply padded_refines_trans.
+
+  pose proof alloc_spec_exists m as (m' & k & MEM & M' & ALLOC).
+  apply refines_padded_refines in ALLOC.
+
+  exists (add k v m').
+
+  assert
+    ((@ret (itree (SpecEvent (sum1 MemE FailureE))) _ _ (add k v m', v))
+       ≈
+       '(m, x) <- ret (add k 0 m, k);;
+       '(m, x) <- ret (add k v m, tt);;
+       ret (m, v)).
+  { repeat (cbn; setoid_rewrite bind_ret_l).
+    subst.
+    reflexivity.
+  }
+
+  rewrite H.
+  eapply padded_refines_bind with (RR:=(fun r1 r2 : memory * Z => r1 = r2 /\ fst r2 = m' /\ snd r2 = k));
+  subst.
+  apply ALLOC.
+
+  intros r1 [m' k'] (?&?&?).
+  cbn in *; subst.
+
+  eapply padded_refines_bind.
+  cbn.
+  eapply refines_padded_refines.
+  eapply store_succeeds_spec.
+  split; auto.
+  apply member_add_eq.
+
+  intros r1 [m'' []] (?&?).
+  cbn in *; subst.
+  cbn.
+
+  eapply padded_refines_strengthen_RR; cycle 1.
+  eapply refines_padded_refines.
+  apply load_succeeds_spec.
+  apply lookup_add_eq.
+
+  intros x [m'' n] (?&?&?).
+  cbn in *; subst.
+  auto.
+Qed.
+
 (* Lemma padded_refines_bind_inv: *)
 (*   forall (E1 E2 : Type -> Type) (R1 R2 S1 S2 : Type) (RPre : prerel E1 E2)  *)
 (*     (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) (RS : S1 -> S2 -> Prop)  *)
