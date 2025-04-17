@@ -1127,6 +1127,19 @@ Proof.
   pstep; red; cbn; eauto.
 Qed.
 
+Lemma refinesF_tau_tau_inv:
+  forall (E1 E2 : Type -> Type) (RPre : prerel E1 E2) (RPost : postrel E1 E2) 
+    (R1 R2 : Type) (RR : R1 -> R2 -> Prop) (phi1 : itree (SpecEvent E1) R1)
+    (phi2 : itree (SpecEvent E2) R2),
+  refinesF RPre RPost RR (upaco2 (refines_ RPre RPost RR) bot2) (TauF phi1) (TauF phi2) ->
+  refinesF RPre RPost RR (upaco2 (refines_ RPre RPost RR) bot2) (observe phi1) (observe phi2).
+Proof.
+  intros E1 E2 RPre RPost R1 R2 RR phi1 phi2 REF.
+  change (TauF phi2) with (observe (Tau phi2)) in REF.
+  eapply refinesF_TauL_inv, refinesF_TauR_inv in REF.
+  auto.
+Qed.
+
 Lemma refines_tau_tau_inv :
   forall E1 E2 R1 R2 in_rel in_post_rel RR t1 t2,
     @refines
@@ -1144,7 +1157,6 @@ Lemma refines_tau_tau_inv :
 Proof.
   intros E1 E2 R1 R2 in_rel0 in_post_rel0 RR t1 t2 REF.
   punfold REF; red in REF; cbn in *.
-  change (TauF t2) with (observe (Tau t2)) in REF.
-  eapply refinesF_TauL_inv, refinesF_TauR_inv in REF.
+  eapply refinesF_tau_tau_inv in REF.
   pstep; red; cbn; eauto.
 Qed.
