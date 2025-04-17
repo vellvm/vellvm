@@ -9,6 +9,7 @@ From ITree Require Import
      Basics.Utils
      Basics.HeterogeneousRelations
      Eq.Eqit
+     Eq.EqAxiom
      Core.ITreeDefinition.
 
 From ITreeSpec Require Import
@@ -1082,4 +1083,68 @@ Proof.
     cbn.
     constructor.
     punfold H0.
+Qed.
+
+Lemma refines_tauR_inv :
+  forall E1 E2 R1 R2 in_rel in_post_rel RR t1 t2,
+    @refines
+      E1 E2 R1 R2
+      in_rel
+      in_post_rel
+      RR
+      t1 (Tau t2) ->
+    @refines
+      E1 E2 R1 R2
+      in_rel
+      in_post_rel
+      RR
+      t1 t2.
+Proof.
+  intros E1 E2 R1 R2 in_rel0 in_post_rel0 RR t1 t2 REF.
+  punfold REF; red in REF; cbn in *.
+  eapply refinesF_TauR_inv in REF.
+  pstep; red; cbn; eauto.
+Qed.
+
+Lemma refines_tauL_inv :
+  forall E1 E2 R1 R2 in_rel in_post_rel RR t1 t2,
+    @refines
+      E1 E2 R1 R2
+      in_rel
+      in_post_rel
+      RR
+      (Tau t1) t2 ->
+    @refines
+      E1 E2 R1 R2
+      in_rel
+      in_post_rel
+      RR
+      t1 t2.
+Proof.
+  intros E1 E2 R1 R2 in_rel0 in_post_rel0 RR t1 t2 REF.
+  punfold REF; red in REF; cbn in *.
+  eapply refinesF_TauL_inv in REF.
+  pstep; red; cbn; eauto.
+Qed.
+
+Lemma refines_tau_tau_inv :
+  forall E1 E2 R1 R2 in_rel in_post_rel RR t1 t2,
+    @refines
+      E1 E2 R1 R2
+      in_rel
+      in_post_rel
+      RR
+      (Tau t1) (Tau t2) ->
+    @refines
+      E1 E2 R1 R2
+      in_rel
+      in_post_rel
+      RR
+      t1 t2.
+Proof.
+  intros E1 E2 R1 R2 in_rel0 in_post_rel0 RR t1 t2 REF.
+  punfold REF; red in REF; cbn in *.
+  change (TauF t2) with (observe (Tau t2)) in REF.
+  eapply refinesF_TauL_inv, refinesF_TauR_inv in REF.
+  pstep; red; cbn; eauto.
 Qed.
