@@ -473,6 +473,22 @@ Qed.
 
 #[global] Hint Resolve padded_ret padded_Ret : solve_padded.
 
+
+Lemma next_key_not_member :
+  forall {A} (m : IntMap A),
+    member (next_key m) m = false.
+Proof.
+Admitted.
+
+Lemma alloc_sigma :
+  forall {A} (m : IntMap A),
+    {k | member k m = false}.
+Proof.
+  intros A m.
+  exists (next_key m).
+  eapply next_key_not_member.
+Defined.
+
 Lemma alloc_disjoint :
   exists m,
     @padded_refines
@@ -484,93 +500,62 @@ Lemma alloc_disjoint :
       (ret (m, false)).
 Proof.
   eexists.
-  cbn.
+  Opaque member.
   setoid_rewrite interp_state_bind.
   setoid_rewrite interp_state_bind.
   setoid_rewrite interp_state_trigger.
-
-  assert
-    ((@ret (itree (SpecEvent (sum1 MemE FailureE))) _ _ (add 1%Z 0 (add 0%Z 0 empty), false))
-       ≈
-       '(m, x) <- ret (add 0%Z 0 empty, 0%Z);;
-       '(m, y) <- ret (add 1%Z 0 m, 1%Z);;
-       ret (m, false)) as RET.
-  { repeat (cbn; setoid_rewrite bind_ret_l).
-    reflexivity.
-  }
-
-  setoid_rewrite RET.
-  Opaque handle_mem_spec.
   cbn.
-  eapply padded_refines_bind.
+  setoid_rewrite bind_vis.
+
   apply refines_padded_refines.
-  cbn.
-  apply alloc_spec.
-  cbn; auto.
-
-  intros r1 [m k] (?&?&?).
-  cbn in *; subst.
-
-  eapply padded_refines_bind.
-  apply refines_padded_refines.
-  cbn.
-  apply alloc_spec.
-  cbn; auto.
-
-  intros r1 [m' k'] (?&?&?).
-  cbn in *; subst.
+  pstep; red; cbn.
+  apply refinesF_forallL with (a:=alloc_sigma _).
 
   cbn.
-  rewrite interp_state_ret.
-  apply padded_refines_ret.
+  apply refinesF_forallL with (a:=alloc_sigma _).
+  cbn.
+
+  constructor.
   reflexivity.
 Qed.
 
-(* Lemma alloc_disjoint' : *)
-(*   forall m m' b, *)
-(*     @padded_refines *)
-(*       Effin Effin (memory * bool) (memory * bool) *)
-(*       in_rel *)
-(*       in_post_rel *)
-(*       eq *)
-(*       (interp_state handle_mem_spec double_alloc m) *)
-(*       (ret (m', b)) -> b = false. *)
-(* Proof. *)
-(*   intros m m' b REF. *)
-(*   cbn in REF. *)
-(*   setoid_rewrite interp_state_bind in REF. *)
-(*   setoid_rewrite interp_state_bind in REF. *)
-(*   setoid_rewrite interp_state_trigger in REF. *)
-(*   cbn in REF. *)
-(*   setoid_rewrite bind_vis in REF. *)
+Lemma alloc_disjoint' :
+  forall m,
+    @padded_refines
+      Effin Effin _ _
+      in_rel
+      in_post_rel
+      eq
+      (ret false)
+      (fmap snd (interp_state handle_mem_spec double_alloc m)).
+Proof.
+  intros m.
+  Opaque member.
+  setoid_rewrite interp_state_bind.
+  setoid_rewrite interp_state_bind.
+  setoid_rewrite interp_state_trigger.
+  cbn.
+  setoid_rewrite bind_vis.
 
-(*   punfold REF; red in REF; *)
-(*     cbn in REF. *)
-(*   apply Spec_vis_inv in REF. *)
-(*   4: { *)
+  apply refines_padded_refines.
+  pstep; red; cbn.
+  apply refinesF_forallR.
+  intros [k KSPEC].
 
-(*   } *)
+  cbn.
+  apply refinesF_forallR.
+  intros [p PSPEC].
 
+  cbn.
+  destruct (Z.eq_dec k p); subst.
+  rewrite member_add_eq in PSPEC.
+  discriminate.
 
-  
-(*   exists (add 1%Z 0 (add 0%Z 0 empty)). *)
-(*   assert *)
-(*     ((@ret (itree (SpecEvent (sum1 MemE FailureE))) _ _ (add 1%Z 0 (add 0%Z 0 empty), false)) *)
-(*        ≈ *)
-(*        '(m, x) <- ret (add 0%Z 0 empty, 0%Z);; *)
-(*        '(m, y) <- ret (add 1%Z 0 m, 1%Z);; *)
-(*        ret (m, false)) as RET. *)
-(*   { repeat (cbn; setoid_rewrite bind_ret_l). *)
-(*     reflexivity. *)
-(*   } *)
-(*   cbn. *)
-(*   rewrite bind_trigger. *)
-(*   setoid_rewrite StateFacts.interp_state_vis. *)
-(*   rewrite RET. *)
-(*   eapply padded_refines_bind. *)
-(*   apply -> alloc_spec. *)
-(*   apply  *)
-(* Qed. *)
+  replace (k =? p)%Z with false by lia.
+  constructor.
+  reflexivity.
+Qed.
+
 
 Lemma double_alloc_spec :
   forall m m' b,
@@ -617,6 +602,7 @@ Proof.
     apply refines_padded_refines.
     apply alloc_spec.
     unfold fst; split; auto.
+    Transparent member.
     unfold member.
     rewrite IP.F.add_neq_b; eauto.
     intros r1 [m'' k'] (?&?&?); cbn in *; subst.
@@ -627,11 +613,6 @@ Proof.
     reflexivity.
   }
 Qed.
-
-Definition store_prog (v : nat) : itree MemE nat :=
-  k <- trigger AllocE;;
-  trigger (StoreE k v);;
-  trigger (LoadE k).
 
 Import HasPost.
 
@@ -705,6 +686,208 @@ Proof.
   eapply refines_strengthen_RR; eauto.
 Qed.
 
+Definition store_prog (v : nat) : itree MemE nat :=
+  k <- trigger AllocE;;
+  trigger (StoreE k v);;
+  trigger (LoadE k).
+
+Lemma padded_refines_forallR :
+  forall {E1 E2 : Type -> Type} {R1 R2 : Type} (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop)
+    (A : Type) (t1 : itree_spec E1 R1) (k : A -> itree (SpecEvent E2) R2),
+    (forall a : A, padded_refines RPre RPost RR t1 (k a)) ->
+    padded_refines RPre RPost RR t1 (Vis (Spec_forall A) k).
+Admitted.
+
+Lemma padded_refines_forallL :
+forall {E1 E2 : Type -> Type} {R1 R2 : Type} (RPre : prerel E1 E2) (RPost : postrel E1 E2)
+  (RR : R1 -> R2 -> Prop) 
+  (A : Type) (t2 : itree_spec E2 R2) (k : A -> itree (SpecEvent E1) R1) (a : A),
+  padded_refines RPre RPost RR (k a) t2 ->
+  padded_refines RPre RPost RR (Vis (Spec_forall A) k) t2.
+Admitted.
+
+Lemma alloc_lemma :
+  forall m m_final k,
+    member k m = false ->
+    m_final = add k 0 m ->
+    @padded_refines
+      Effin Effin _ _
+      in_rel
+      in_post_rel
+      eq
+      (interp_state handle_mem_spec (trigger AllocE) m)
+      (ret (m_final, k)).
+Proof.
+  intros m m_final k MEM FINAL.
+  setoid_rewrite interp_state_trigger.
+  cbn.
+  eapply padded_refines_forallL.
+  Unshelve.
+  2: {
+    exists k; auto.
+  }
+
+  cbn.
+  subst.
+  pstep; red; cbn; constructor; auto.
+Qed.
+
+Lemma alloc_lemma' :
+  forall m,
+    @padded_refines
+      Effin Effin _ _
+      in_rel
+      in_post_rel
+      eq
+      (interp_state handle_mem_spec (trigger AllocE) m)
+      (ret (add (next_key m) 0 m, next_key m)).
+Proof.
+  intros m.
+  eapply alloc_lemma.
+  apply next_key_not_member.
+  reflexivity.
+Qed.
+
+Lemma store_succ_lemma :
+  forall m m_final k v,
+    member k m = true ->
+    m_final = add k v m ->
+    @padded_refines
+      Effin Effin _ _
+      in_rel
+      in_post_rel
+      eq
+      (interp_state handle_mem_spec (trigger (StoreE k v)) m)
+      (ret (m_final, tt)).
+Proof.
+  intros m m_final k v MEM FINAL.
+  setoid_rewrite interp_state_trigger.
+  cbn.
+  apply member_lookup in MEM.
+  destruct MEM.
+  rewrite H.
+  subst.
+  pstep; red; cbn; constructor; auto.
+Qed.
+
+Lemma load_succ_lemma :
+  forall m k v,
+    lookup k m = Some v ->
+    @padded_refines
+      Effin Effin _ _
+      in_rel
+      in_post_rel
+      eq
+      (interp_state handle_mem_spec (trigger (LoadE k)) m)
+      (ret (m, v)).
+Proof.
+  intros m k v LUP.
+  setoid_rewrite interp_state_trigger.
+  cbn.
+  rewrite LUP.
+  pstep; red; cbn; constructor; auto.
+Qed.
+
+Lemma store_fail_lemma :
+  forall m k v,
+    member k m = false ->
+    @padded_refines
+      Effin Effin _ _
+      in_rel
+      in_post_rel
+      eq
+      (interp_state handle_mem_spec (trigger (StoreE k v)) m)
+      (raise "Store to unallocated address.").
+Proof.
+  intros m k v MEM.
+  setoid_rewrite interp_state_trigger.
+  cbn.
+  destruct (lookup k m) eqn:LUP.
+  apply lookup_member in LUP.
+  rewrite LUP in MEM; discriminate.
+  apply refines_padded_refines.
+  apply spec_refines_raise.
+Qed.
+
+Lemma load_fails_lemma :
+  forall m k,
+    member k m = false ->
+    @padded_refines
+      Effin Effin _ _
+      in_rel
+      in_post_rel
+      eq
+      (interp_state handle_mem_spec (trigger (LoadE k)) m)
+      (raise "Load from unallocated address.").
+Proof.
+  intros m k MEM.
+  setoid_rewrite interp_state_trigger.
+  cbn.
+  destruct (lookup k m) eqn:LUP.
+
+  apply lookup_member in LUP.
+  rewrite LUP in MEM.
+  discriminate.
+
+  apply refines_padded_refines.
+  apply spec_refines_raise.
+Qed.
+
+
+Lemma blah :
+  @padded_refines Effin Effin _ _
+    in_rel
+    in_post_rel
+    eq
+    (forall_spec nat) (ret 1).
+Proof.
+  unfold forall_spec.
+  eapply padded_refines_forallL.
+  pstep; red; cbn; constructor; auto.
+Qed.
+
+Lemma blah' :
+  @padded_refines Effin Effin _ _
+    in_rel
+    in_post_rel
+    eq
+    (forall_spec nat)
+    (forall_spec nat).
+Proof.
+  unfold forall_spec.
+  eapply padded_refines_forallR.
+  intros a.
+  eapply padded_refines_forallL.
+  pstep; red; cbn; constructor; auto.
+Qed.
+
+Lemma store_forward_with_rewrites :
+  forall m v,
+    @padded_refines
+      Effin Effin _ _
+      in_rel
+      in_post_rel
+      eq
+      (ret v)
+      (fmap snd (interp_state handle_mem_spec (store_prog v) m)).
+Proof.
+  intros m v.
+  cbn.
+  unfold ITree.map.
+  cbn.
+
+  Opaque member lookup add.
+  setoid_rewrite interp_state_bind.
+  setoid_rewrite interp_state_bind.
+  cbn.
+  repeat setoid_rewrite bind_bind.
+  repeat setoid_rewrite bind_vis.
+  repeat setoid_rewrite bind_ret_l.
+  cbn.
+
+  (* TODO: Need proper instances *)
+Admitted.
+
 Lemma store_forward :
   forall m v,
     exists m',
@@ -765,12 +948,6 @@ Proof.
   cbn in *; subst.
   auto.
 Qed.
-
-Lemma next_key_not_member :
-  forall (m : memory),
-    member (next_key m) m = false.
-Proof.
-Admitted.
 
 Ltac do_trans :=
   eapply padded_refines_strengthen_PRE; cycle 1;
