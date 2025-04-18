@@ -7,12 +7,14 @@ From Stdlib Require Import
 From Paco Require Import paco.
 
 From ITree Require Import
+  ITreeMonad
   Basics.Basics
   Basics.Utils
   Basics.HeterogeneousRelations
   Basics.Monad
   Eq
-  Eq.Paco2.
+  Eq.Paco2
+  Eqit.
 
 From ITree Require Import
   Basics
@@ -50,6 +52,13 @@ Definition itree_spec (E : Type -> Type) (R : Type) :=
   itree (SpecEvent E) R.
 
 Notation itree_spec' E R := (itree' (SpecEvent E) R).
+
+#[global] Instance itree_spec_MonadEq1 {E} : Eq1 (itree_spec E).
+red.
+unfold itree_spec.
+intros A.
+apply eq1.
+Defined.
 
 #[global] Instance Monad_itree_spec {E} : Monad (itree_spec E).
 unfold itree_spec.

@@ -128,7 +128,6 @@ Proof.
   repeat intro. eapply padded_refines_bind; intros; subst; eauto. subst. apply H0.
 Qed.
 
-
 Lemma padded_refines_forall_specr {E1 E2} 
       (A : Type) R1 R2  RPre RPost RR
       (k : A -> itree_spec E2 R1) (t : itree_spec E1 R2) :

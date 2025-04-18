@@ -10,7 +10,9 @@ Ltac inj_existT := repeat match goal with
                           end.
 
 Class ReflexivePostRel {E} (PR : postrel E E) : Prop :=
-  refl_postrel : forall X (e : E X) a b, PR _ _ e a e b -> a = b.
+  { refl_postrel : forall X (e : E X) x, PR _ _ e x e x
+  ; refl_postrel_inv : forall X (e : E X) x y, PR _ _ e x e y -> x = y
+  }.
 
 Class ReflexivePreRel {E} (PR : prerel E E) : Prop :=
   refl_prerel : forall X (e : E X), PR _ _ e e.
@@ -44,6 +46,14 @@ Variant RComposePostRel {E1 E2 E3}
     (forall B (e2 : E2 B), RPre1 A B e1 e2 -> RPre2 B C e2 e3 -> exists b, RPost1 A B e1 a e2 b /\ RPost2 B C e2 b e3 c) ->
     RComposePostRel RPre1 RPre2 RPost1 RPost2 A C e1 a e3 c.
 
+Variant RComposePostRel' {E1 E2 E3}
+  (RPost1 : postrel E1 E2) (RPost2 : postrel E2 E3) : postrel E1 E3 :=
+  | RComposePostRel_intro' {A C} (e1 : E1 A) (e3 : E3 C) a c :
+    forall {B} (e2 : E2 B) b,
+      RPost1 A B e1 a e2 b ->
+      RPost2 B C e2 b e3 c ->
+      RComposePostRel' RPost1 RPost2 A C e1 a e3 c.
+
 Variant RComposePreRel {E1 E2 E3}
   (RPre1 : prerel E1 E2) (RPre2 : prerel E2 E3) : prerel E1 E3 :=
   | RComposePreRel_intro {A C} (e1 : E1 A) (e3 : E3 C) :
@@ -72,6 +82,28 @@ Proof.
   econstructor.
   apply REL.
   apply refl_prerel.
+Qed.
+
+Lemma trans_RComposePostRel' :
+  forall E (POST : postrel E E) `{TRANS : @TransitivePostRel _ POST},
+  forall {X Y} (e1 : E X) x (e2 : E Y) y,
+    RComposePostRel' POST POST _ _ e1 x e2 y -> POST _ _ e1 x e2 y.
+Proof.
+  intros E POST TRANS X Y e1 x e2 y REL.
+  inversion REL; inj_existT; subst.
+  eapply TRANS; eauto.
+Qed.
+
+Lemma refl_RComposePostRel' :
+  forall E (POST : postrel E E) `{REFL : @ReflexivePostRel _ POST},
+  forall {X Y} (e1 : E X) x (e2 : E Y) y,
+    POST _ _ e1 x e2 y ->
+    RComposePostRel' POST POST _ _ e1 x e2 y.
+Proof.
+  intros E POST REFL X Y e1 x e2 y REL.
+  econstructor.
+  apply REL.
+  apply refl_postrel.
 Qed.
 
 Variant SumPostRel {E1 E2 D1 D2}
