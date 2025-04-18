@@ -906,7 +906,7 @@ Proof.
 Qed.
 
 
-Global Instance padded_refines_proper_eutt {E1 E2 R1 R2} RPre RPost RR : Proper (eutt eq ==> eutt eq ==> flip impl)  (@padded_refines E1 E2 R1 R2 RPre RPost RR).
+#[global] Instance padded_refines_proper_eutt {E1 E2 R1 R2} RPre RPost RR : Proper (eutt eq ==> eutt eq ==> flip impl)  (@padded_refines E1 E2 R1 R2 RPre RPost RR).
 Proof.
   intros t1 t2 Ht12 t3 t4 Ht34 Href. red. red in Href.
   eapply refines_eutt_padded_r; try apply pad_is_padded.
@@ -917,7 +917,7 @@ Proof.
   symmetry. eauto. auto.
 Qed.
 
-Global Instance padded_refines_proper_eq_itree {E1 E2 R1 R2} RPre RPost RR : Proper (eq_itree eq ==> eq_itree eq ==> flip impl)  (@padded_refines E1 E2 R1 R2 RPre RPost RR).
+#[global] Instance padded_refines_proper_eq_itree {E1 E2 R1 R2} RPre RPost RR : Proper (eq_itree eq ==> eq_itree eq ==> flip impl)  (@padded_refines E1 E2 R1 R2 RPre RPost RR).
 Proof.
   repeat intro. eapply padded_refines_proper_eutt; eauto.
   rewrite H. reflexivity. rewrite H0. reflexivity.
@@ -939,6 +939,9 @@ Defined.
 Definition strict_refines {E R} : itree_spec E R -> itree_spec E R -> Prop :=
   padded_refines eq_prerel PostRelEq eq.
 
+Definition strict_refines_unpadded {E R} : itree_spec E R -> itree_spec E R -> Prop :=
+  refines eq_prerel PostRelEq eq.
+
 #[global] Instance strict_refines_proper {E1 E2 R1 R2}
        (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) :
   Proper (strict_refines ==> flip strict_refines ==> Basics.flip Basics.impl) (padded_refines RPre RPost RR).
@@ -959,65 +962,6 @@ Proof.
     constructor.
   - intros. destruct PR. subst.
     inv REL2; auto.
-Qed.
-
-Lemma refines_refl {E R} (RPre : prerel E E) (RPost : postrel E E)
-      (RR : R -> R -> Prop) :
-  ReflexivePreRel RPre -> ReflexivePostRel RPost -> Reflexive RR ->
-  forall t, padded t ->
-  refines RPre RPost RR t t.
-Proof.
-  intros HRPre HRPost HRR.  pcofix CIH. intros t Ht. pstep. red.
-  punfold Ht. red in Ht. inversion Ht.
-  - constructor. auto.
-  - constructor. right. pclearbot. eauto.
-  - destruct e.
-    + constructor. auto. intros. apply HRPost in H1. subst. pclearbot.
-      left. pstep. constructor. right. eapply CIH; eauto. apply H0.
-    + constructor. intros. eapply refinesF_forallL. constructor.
-      right. pclearbot. eapply CIH; eauto. apply H0.
-    + constructor. intros. eapply refinesF_existsR. constructor.
-      right. pclearbot. eapply CIH; eauto. apply H0.
-Qed.
-
-Lemma padded_refines_refl {E R} (RPre : prerel E E) (RPost : postrel E E)
-      (RR : R -> R -> Prop) :
-  ReflexivePreRel RPre -> ReflexivePostRel RPost -> Reflexive RR ->
-  Reflexive (padded_refines RPre RPost RR).
-Proof.
-  repeat intro. apply refines_refl; auto. apply pad_is_padded.
-Qed.
-
-#[global] Instance strict_refines_refl {E R} : Reflexive (@strict_refines E R).
-Proof.
-  apply padded_refines_refl; auto. red. intros.
-  constructor.
-  repeat red.
-  intros X e a b H.
-  dependent destruction H; auto.
-Qed.
-
-#[global] Instance strict_refines_trans  {E R} : Transitive (@strict_refines E R).
-Proof.
-  repeat intro. eapply strict_refines_proper; eauto. reflexivity.
-Qed.
-
-Lemma padded_refines_weaken_l {E1 E2 R1 R2}
-       (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) phi1 phi2 phi3 :
-  strict_refines phi2 phi3 ->
-  padded_refines RPre RPost RR phi1 phi2 ->
-  padded_refines RPre RPost RR phi1 phi3.
-Proof.
-  intros. eapply strict_refines_proper; eauto. reflexivity.
-Qed.
-
-Lemma padded_refines_weaken_r {E1 E2 R1 R2}
-       (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) phi1 phi2 phi3 :
-  strict_refines phi1 phi2 ->
-  padded_refines RPre RPost RR phi2 phi3 ->
-  padded_refines RPre RPost RR phi1 phi3.
-Proof.
-  intros. eapply strict_refines_proper; eauto. reflexivity.
 Qed.
 
 Lemma refines_padded_refines :
@@ -1083,6 +1027,92 @@ Proof.
     cbn.
     constructor.
     punfold H0.
+Qed.
+
+#[global] Instance strict_refines_unpadded_proper {E1 E2 R1 R2}
+       (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) :
+  Proper (strict_refines_unpadded ==> flip strict_refines_unpadded ==> Basics.flip Basics.impl) (padded_refines RPre RPost RR).
+Proof.
+  repeat intro. red in H1. eapply padded_refines_monot with (RPre1 := RComposePreRel eq_prerel (RComposePreRel RPre eq_prerel)).
+  4 : { eapply padded_refines_trans; eauto.
+        apply refines_padded_refines; eauto.
+        eapply padded_refines_trans. eauto.
+        apply refines_padded_refines; eauto.
+  }
+  - intros. destruct PR. destruct H3.
+    destruct H2.
+    destruct H4.
+    auto.
+  - intros. econstructor. intros. subst. destruct H3.
+    destruct H4. destruct H2. subst. exists x1. split; [constructor | idtac].
+    constructor. intros. subst.
+    destruct H4.
+    exists x2; split; eauto.
+    constructor.
+  - intros. destruct PR. subst.
+    inv REL2; auto.
+Qed.
+
+Lemma refines_refl {E R} (RPre : prerel E E) (RPost : postrel E E)
+      (RR : R -> R -> Prop) :
+  ReflexivePreRel RPre -> ReflexivePostRel RPost -> Reflexive RR ->
+  forall t, padded t ->
+  refines RPre RPost RR t t.
+Proof.
+  intros HRPre HRPost HRR.  pcofix CIH. intros t Ht. pstep. red.
+  punfold Ht. red in Ht. inversion Ht.
+  - constructor. auto.
+  - constructor. right. pclearbot. eauto.
+  - destruct e.
+    + constructor. auto. intros. apply HRPost in H1. subst. pclearbot.
+      left. pstep. constructor. right. eapply CIH; eauto. apply H0.
+    + constructor. intros. eapply refinesF_forallL. constructor.
+      right. pclearbot. eapply CIH; eauto. apply H0.
+    + constructor. intros. eapply refinesF_existsR. constructor.
+      right. pclearbot. eapply CIH; eauto. apply H0.
+Qed.
+
+Lemma padded_refines_refl {E R} (RPre : prerel E E) (RPost : postrel E E)
+      (RR : R -> R -> Prop) :
+  ReflexivePreRel RPre -> ReflexivePostRel RPost -> Reflexive RR ->
+  Reflexive (padded_refines RPre RPost RR).
+Proof.
+  repeat intro. apply refines_refl; auto. apply pad_is_padded.
+Qed.
+
+#[global] Instance strict_refines_refl {E R} : Reflexive (@strict_refines E R).
+Proof.
+  apply padded_refines_refl; auto. red. intros.
+  constructor.
+  constructor.
+  - intros X e x.
+    constructor.
+  - repeat red.
+    intros X e a b H.
+    dependent destruction H; auto.
+Qed.
+
+#[global] Instance strict_refines_trans  {E R} : Transitive (@strict_refines E R).
+Proof.
+  repeat intro. eapply strict_refines_proper; eauto. reflexivity.
+Qed.
+
+Lemma padded_refines_weaken_l {E1 E2 R1 R2}
+       (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) phi1 phi2 phi3 :
+  strict_refines phi2 phi3 ->
+  padded_refines RPre RPost RR phi1 phi2 ->
+  padded_refines RPre RPost RR phi1 phi3.
+Proof.
+  intros. eapply strict_refines_proper; eauto. reflexivity.
+Qed.
+
+Lemma padded_refines_weaken_r {E1 E2 R1 R2}
+       (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) phi1 phi2 phi3 :
+  strict_refines phi1 phi2 ->
+  padded_refines RPre RPost RR phi2 phi3 ->
+  padded_refines RPre RPost RR phi1 phi3.
+Proof.
+  intros. eapply strict_refines_proper; eauto. reflexivity.
 Qed.
 
 Lemma refines_tauR_inv :
