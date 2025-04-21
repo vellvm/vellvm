@@ -33,7 +33,6 @@ From Vellvm.Handlers Require Import
 From Vellvm.Utils Require Import
      Error
      PropT
-     SpecEvents
      Util
      NMaps
      Tactics

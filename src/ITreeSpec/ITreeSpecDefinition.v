@@ -53,6 +53,12 @@ Definition itree_spec (E : Type -> Type) (R : Type) :=
 
 Notation itree_spec' E R := (itree' (SpecEvent E) R).
 
+Definition to_SpecEvent {F : Type -> Type} {T : Type} (e : F T) : SpecEvent F T
+  := @Spec_vis F T e.
+
+Definition to_itree_spec {F : Type -> Type} {T : Type} (t : itree F T) : itree_spec F T
+  := translate (@to_SpecEvent F) t.
+
 #[global] Instance Monad_itree_spec {E} : Monad (itree_spec E).
 unfold itree_spec.
 constructor.
