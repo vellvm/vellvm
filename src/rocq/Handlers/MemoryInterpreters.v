@@ -31,6 +31,11 @@ From ITree Require Import
      Eq.EqAxiom
      Events.StateFacts.
 
+From ITreeSpec Require Import
+  ITreeSpecDefinition
+  ITreeSpecFacts
+  ITreeSpecCombinatorFacts.
+
 Import HeterogeneousRelations.
 
 From ExtLib Require Import
@@ -48,7 +53,6 @@ Import MonadNotation.
 
 Import MemoryAddress.
 Import Error.
-Import SpecEvents.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -791,33 +795,6 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       rewrite unfold_interp_memory; reflexivity.
     Qed.
 
-    (* TODO: Move this *)
-    Definition to_SpecEvent {F : Type -> Type} (T : Type) (e : F T) : SpecEvent F T
-      := Spec_vis F e.
-
-    Definition to_itree_spec {F : Type -> Type} (T : Type) (t : itree F T) : itree_spec F T
-      := translate to_SpecEvent t.
-
-    Program Definition ref_Effout_pre (A B : Type) (e1 : Effout A) (e2 : Effout B) : Prop
-      := match e1, e2 with
-         | inl1 a, inl1 b =>
-             _
-         | inr1 a, inr1 b => _
-         | _, _ => False
-         end.
-    Next Obligation.
-    Admitted.
-    Next Obligation.
-    Admitted.
-    Next Obligation.
-    Admitted.
-    Next Obligation.
-    Admitted.
-
-    Definition ref_Effout_postrel : postrel Effout Effout.
-      intros A B X X0 X1 X2.
-    Admitted.
-
   Definition exec_correct_no_ub {MemM Eff} `{MM: MemMonad MemM (itree Eff)} {X} (pre : exec_correct_pre) (exec : MemM X) (spec : MemPropT MemState X) (post : exec_correct_post X) : Prop :=
     forall ms st,
       (MemMonad_valid_state ms st) ->
@@ -844,66 +821,8 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
              (@within MemM _ err_ub_oom (store_id * MemState)%type (store_id * MemState)%type WEM X exec (st, ms) e (st', ms')) /\
                (e {{ms}} ∈ {{ms'}} spec) /\ ((exists x, e = ret x) -> (MemMonad_valid_state ms' st' /\ (exists x, e = ret x /\ post ms st x ms' st')))).
 
-    Lemma handle_intrinsic_correct' :
-      forall T (e : IntrinsicE T) pre,
-        exec_correct_no_ub pre (handle_intrinsic T e) (handle_intrinsic_prop T e) exec_correct_id_post.
-    Proof using Type.
-      intros T e pre.
-      unfold handle_intrinsic, handle_intrinsic_prop.
-      break_match.
-      break_match.
-      { (* Memcpy *)
-        eapply exec_correct_strengthen_post; cycle 1.
-        { apply exec_correct_bind.
-          apply handle_memcpy_correct.
-          intros * VALID POST RUN.
-          apply exec_correct_ret.
-        }
-        auto.
-      }
-
-      break_match.
-      { (* Memset *)
-        eapply exec_correct_strengthen_post; cycle 1.
-        { apply exec_correct_bind.
-          apply handle_memset_correct.
-          intros * VALID POST RUN.
-          apply exec_correct_ret.
-        }
-        auto.
-      }
-
-      break_match.
-      { (* Malloc *)
-        eapply exec_correct_strengthen_post; cycle 1.
-        { apply exec_correct_bind.
-          apply handle_malloc_correct.
-          intros * VALID POST RUN.
-          eapply exec_correct_ret.
-        }
-        auto.
-      }
-
-      break_match.
-      { (* Free *)
-        eapply exec_correct_strengthen_post; cycle 1.
-        { apply exec_correct_bind.
-          apply handle_free_correct.
-          intros * VALID POST RUN.
-          eapply exec_correct_ret.
-        }
-        auto.
-      }
-
-      apply exec_correct_raise_error.
-    Qed.
-
     Lemma my_handle_intrinsic_prop_correct {T} (i : IntrinsicE T) sid ms (VALID: MemMonad_valid_state ms sid) :
-      @spec_refines Effout Effout _ _
-        (* Change this relation *)
-        ref_Effout_pre
-        ref_Effout_postrel
-        eq
+      strict_refines
         (my_handle_intrinsic_prop i sid ms)
         (to_itree_spec (my_handle_intrinsic (T := T) i sid ms)).
     Proof using.
