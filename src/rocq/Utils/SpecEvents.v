@@ -756,7 +756,7 @@ Lemma store_succ_lemma :
   forall m m_final k v,
     member k m ->
     m_final = add k v m ->
-    eq1 (interp_state (@handle_mem_spec Effin _) (trigger (StoreE k v)) m)
+    eutt eq (interp_state (@handle_mem_spec Effin _) (trigger (StoreE k v)) m)
       (ret (m_final, tt)).
 Proof.
   intros m m_final k v MEM FINAL.
@@ -772,7 +772,7 @@ Qed.
 Lemma load_succ_lemma :
   forall m k v,
     lookup k m = Some v ->
-    eq1 (interp_state (@handle_mem_spec Effin _) (trigger (LoadE k)) m)
+    eutt eq (interp_state (@handle_mem_spec Effin _) (trigger (LoadE k)) m)
       (ret (m, v)).
 Proof.
   intros m k v LUP.
@@ -785,7 +785,7 @@ Qed.
 Lemma store_fail_lemma :
   forall m k v,
     member k m = false ->
-    eq1 (interp_state handle_mem_spec (trigger (StoreE k v)) m)
+    eutt eq (interp_state handle_mem_spec (trigger (StoreE k v)) m)
       (raise "Store to unallocated address.").
 Proof.
   intros m k v MEM.
@@ -800,7 +800,7 @@ Qed.
 Lemma load_fails_lemma :
   forall m k,
     member k m = false ->
-    eq1 (interp_state handle_mem_spec (trigger (LoadE k)) m)
+    eutt eq (interp_state handle_mem_spec (trigger (LoadE k)) m)
       (raise "Load from unallocated address.").
 Proof.
   intros m k MEM.
@@ -953,188 +953,14 @@ Proof.
   reflexivity.
 Qed.
 
-(* This isn't true. Should probably use a refines equivalence instead of eutt *)
-(* Lemma store_forward_stronger_with_rewrites : *)
-(*   forall m v, *)
-(*     eq1 (ret v) *)
-(*       (fmap snd (interp_state (@handle_mem_spec Effin _) (store_prog v) m)). *)
-(* Proof. *)
-(*   intros m v. *)
-(*   cbn. *)
-(*   unfold ITree.map. *)
-(*   cbn. *)
-
-(*   Opaque member lookup add. *)
-(*   setoid_rewrite interp_state_bind. *)
-(*   setoid_rewrite interp_state_bind. *)
-(*   cbn. *)
-(*   repeat setoid_rewrite bind_bind. *)
-(*   cbn. *)
-
-(*   (* This first alloc is hard to rewrite :| *)
-
-(*      alloc is generally not a refinement of a ret because it can *)
-(*      return many values. The overall lemma holds, however, because *)
-(*      this detail is hidden from the outside. *)
-(*    *) *)
-(*   setoid_rewrite interp_state_trigger at 1. *)
-(*   cbn. *)
-(*   rewrite bind_vis. *)
-(*   apply padded_refines_forallR. *)
-(*   intros [k m']. *)
-(*   solve_refines. *)
-(*   reflexivity. *)
-(* Qed. *)
-
-
-Lemma store_forward :
+Lemma store_forward_stronger :
   forall m v,
-    exists m',
-    @padded_refines
-      Effin Effin (memory * nat) (memory * nat)
-      in_rel
-      in_post_rel
-      eq
-      (interp_state handle_mem_spec (store_prog v) m)
-      (ret (m', v)).
+    eq1 (ret v)
+      (fmap snd (interp_state (@handle_mem_spec Effin _) (store_prog v) m)).
 Proof.
   intros m v.
-  cbn.
-  repeat setoid_rewrite interp_state_bind.
-  repeat setoid_rewrite interp_state_trigger.
-
-  pose proof alloc_spec_exists m as (m' & k & MEM & M' & ALLOC).
-  apply refines_padded_refines in ALLOC.
-
-  exists (add k v m').
-
-  assert
-    ((@ret (itree (SpecEvent (sum1 MemE FailureE))) _ _ (add k v m', v))
-       ≈
-       '(m, x) <- ret (add k 0 m, k);;
-       '(m, x) <- ret (add k v m, tt);;
-       ret (m, v)).
-  { repeat (cbn; setoid_rewrite bind_ret_l).
-    subst.
-    reflexivity.
-  }
-
-  rewrite H.
-  eapply padded_refines_bind with (RR:=(fun r1 r2 : memory * Z => r1 = r2 /\ fst r2 = m' /\ snd r2 = k));
-  subst.
-  apply ALLOC.
-
-  intros r1 [m' k'] (?&?&?).
-  cbn in *; subst.
-
-  eapply padded_refines_bind.
-  cbn.
-  eapply refines_padded_refines.
-  eapply store_succeeds_spec.
-  split; auto.
-  apply member_add_eq.
-
-  intros r1 [m'' []] (?&?).
-  cbn in *; subst.
-  cbn.
-
-  eapply padded_refines_strengthen_RR; cycle 1.
-  eapply refines_padded_refines.
-  apply load_succeeds_spec.
-  apply lookup_add_eq.
-
-  intros x [m'' n] (?&?&?).
-  cbn in *; subst.
-  auto.
+  repeat red.
+  split.
+  apply store_forward_with_rewrites.
+  apply store_forward_with_rewrites'.
 Qed.
-
-Ltac do_trans :=
-  eapply padded_refines_strengthen_PRE; cycle 1;
-  [eapply padded_refines_weaken_post; cycle 1;
-   [eapply padded_refines_strengthen_RR; cycle 1;
-    [eapply padded_refines_trans|]
-   |]
-  |].
-
-Lemma store_forward_ignore_mem :
-  forall m v,
-    @padded_refines
-      Effin Effin _ _
-      in_rel
-      in_post_rel
-      eq
-      (fmap snd (interp_state handle_mem_spec (store_prog v) m))
-      (ret v).
-Proof.
-  intros m v.
-  cbn.
-  repeat setoid_rewrite interp_state_bind.
-  repeat setoid_rewrite interp_state_trigger.
-  repeat setoid_rewrite map_bind.
-  do_trans.
-
-  { eapply padded_refines_bind.
-    eapply refines_padded_refines; eapply alloc_spec with (k:=next_key m).
-    split; [apply next_key_not_member | reflexivity].
-    intros r1 [m' k'] [EQ [K' M']]; cbn in *; subst.
-
-    do_trans.
-    { eapply padded_refines_bind.
-      cbn.
-      eapply refines_padded_refines.
-      eapply store_succeeds_spec.
-      split; auto.
-      apply member_add_eq.
-
-      intros r1 [m' []] [EQ M']; cbn in *; subst.
-
-      do_trans.
-      { eapply padded_refines_bind with (k2:=(fun x => Ret (snd x))).
-        cbn.
-        eapply refines_padded_refines.
-        eapply load_succeeds_spec.
-        apply lookup_add_eq.
-
-        intros r1 [m' k'] [EQ [M' K']]; cbn in *; subst.
-        cbn.
-        apply padded_refines_ret.
-        reflexivity.
-      }
-
-      cbn.
-      all: admit.      
-    }
-    all: admit.
-  }
-
-  all: admit.
-Abort.
-
-(* Lemma padded_refines_bind_inv: *)
-(*   forall (E1 E2 : Type -> Type) (R1 R2 S1 S2 : Type) (RPre : prerel E1 E2)  *)
-(*     (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) (RS : S1 -> S2 -> Prop)  *)
-(*     (t1 : itree_spec E1 R1) (t2 : itree_spec E2 R2) (k1 : R1 -> itree_spec E1 S1) *)
-(*     (k2 : R2 -> itree_spec E2 S2), *)
-(*   padded_refines RPre RPost RS (ITree.bind t1 k1) (ITree.bind t2 k2) -> *)
-(*   padded_refines RPre RPost RR t1 t2 /\ *)
-(*     (forall (r1 : R1) (r2 : R2), RR r1 r2 -> padded_refines RPre RPost RS (k1 r1) (k2 r2)). *)
-
-(* Lemma double_alloc_spec' : *)
-(*   forall m m' b, *)
-(*     @padded_refines *)
-(*       Effin Effin (memory * bool) (memory * bool) *)
-(*       in_rel *)
-(*       in_post_rel *)
-(*       eq *)
-(*       (interp_state handle_mem_spec double_alloc m) *)
-(*       (ret (m', b)) -> *)
-(*     (b = false /\ *)
-(*        exists k1 k2, *)
-(*          m' = add k2 0 (add k1 0 m) /\ *)
-(*            k1 <> k2 /\ *)
-(*            member k1 m = false /\ *)
-(*            member k2 m = false). *)
-(* Proof. *)
-(*   intros m m' b REF. *)
-  
-(* Qed. *)
