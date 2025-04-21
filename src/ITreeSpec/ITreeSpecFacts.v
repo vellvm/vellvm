@@ -5,18 +5,19 @@ From Stdlib Require Import
      Relations.
 
 From ITree Require Import
-     Basics.Basics
-     Basics.Utils
-     Basics.HeterogeneousRelations
-     Eq.Eqit
-     Eq.EqAxiom
-     Core.ITreeDefinition.
+  Basics.Basics
+  Monad
+  Basics.Utils
+  Basics.HeterogeneousRelations
+  Eq.Eqit
+  Eq.EqAxiom
+  Core.ITreeDefinition.
 
 From ITreeSpec Require Import
-     Padded
-     ITreeSpecDefinition
-     MRecSpec
-     Relations.
+  Padded
+  ITreeSpecDefinition
+  MRecSpec
+  Relations.
 
 From Paco Require Import paco.
 
@@ -1189,4 +1190,25 @@ Proof.
   punfold REF; red in REF; cbn in *.
   eapply refinesF_tau_tau_inv in REF.
   pstep; red; cbn; eauto.
+Qed.
+
+Definition itree_spec_eqv {E R} (t1 t2 : itree_spec E R) : Prop :=
+  strict_refines t1 t2 /\ strict_refines t2 t1.
+
+#[global] Instance itree_spec_MonadEq1 {E} : Eq1 (itree_spec E).
+red.
+unfold itree_spec.
+intros A.
+apply itree_spec_eqv.
+Defined.
+
+Lemma eutt_spec_eqv :
+  forall {E R} (t1 t2 : itree_spec E R),
+    eutt eq t1 t2 ->
+    eq1 t1 t2.
+Proof.
+  intros E R t1 t2 EQ.
+  repeat red.
+  rewrite EQ.
+  split; reflexivity.  
 Qed.
