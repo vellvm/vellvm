@@ -445,7 +445,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       destruct x.
       apply (lift_err_ub_oom ret x).
     Defined.
-
+ 
     Definition memory_k_spec
                {T R : Type}
                (e : Effin T)
@@ -821,8 +821,74 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
              (@within MemM _ err_ub_oom (store_id * MemState)%type (store_id * MemState)%type WEM X exec (st, ms) e (st', ms')) /\
                (e {{ms}} ∈ {{ms'}} spec) /\ ((exists x, e = ret x) -> (MemMonad_valid_state ms' st' /\ (exists x, e = ret x /\ post ms st x ms' st')))).
 
+  (* TODO: Move this *)
+  #[global] Instance RAISE_UB_ITREE_SPEC_UB {E : Type -> Type} `{UBE -< E} : RAISE_UB (itree_spec E) :=
+    { raise_ub := fun A e => raiseUB e
+    }.
+
+  (* TODO: Move this *)
+  #[global] Instance RAISE_OOM_ITREE_SPEC_OOM {E : Type -> Type} `{OOME -< E} : RAISE_OOM (itree_spec E) :=
+    { raise_oom := fun A e => raiseOOM e
+    }.
+
+  (* TODO: Move this *)
+  Lemma to_itree_spec_raiseOOM :
+    forall {E T} `{OOME -< E} oom_msg,
+      @to_itree_spec E T (raiseOOM oom_msg) ≈ raiseOOM oom_msg.
+  Proof.
+    intros E0 T H oom_msg.
+    unfold to_itree_spec, raiseOOM.
+    repeat (rewrite TranslateFacts.translate_bind, TranslateFacts.translate_trigger).
+    eapply eutt_clo_bind; [| intros []].
+    reflexivity.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma to_itree_spec_raiseUB :
+    forall {E T} `{UBE -< E} msg,
+      @to_itree_spec E T (raiseUB msg) ≈ raiseUB msg.
+  Proof.
+    intros E0 T H oom_msg.
+    unfold to_itree_spec, raiseUB.
+    repeat (rewrite TranslateFacts.translate_bind, TranslateFacts.translate_trigger).
+    eapply eutt_clo_bind; [| intros []].
+    reflexivity.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma to_itree_spec_raise :
+    forall {E T} `{FailureE -< E} msg,
+      @to_itree_spec E T (LLVMEvents.raise msg) ≈ LLVMEvents.raise msg.
+  Proof.
+    intros E0 T H oom_msg.
+    unfold to_itree_spec, LLVMEvents.raise.
+    repeat (rewrite TranslateFacts.translate_bind, TranslateFacts.translate_trigger).
+    eapply eutt_clo_bind; [| intros []].
+    reflexivity.
+  Qed.
+
+  (* TODO: Move this *)
+  Lemma to_itree_spec_ret :
+    forall {E T} v,
+      @to_itree_spec E T (ret v) ≈ ret v.
+  Proof.
+    intros E0 T v.
+    unfold to_itree_spec.
+    setoid_rewrite TranslateFacts.translate_ret.
+    reflexivity.
+  Qed.
+
+  Definition exec_refines {E R} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (spec exec : itree_spec E R) :=
+    (* Refinement taking into account UB / OOM *)
+    (exists ub_msg, strict_refines spec (raise_ub ub_msg)) \/
+      (* Need this case because both sides could have different messages *)
+      (exists oom_msg, exec ≈ raise_oom oom_msg) \/
+      (* Need this case because both sides could have different messages *)
+      (exists err1 err2, exec ≈ LLVMEvents.raise err1 /\ strict_refines spec (LLVMEvents.raise err2)) \/
+      strict_refines spec exec.
+
     Lemma my_handle_intrinsic_prop_correct {T} (i : IntrinsicE T) sid ms (VALID: MemMonad_valid_state ms sid) :
-      strict_refines
+      exec_refines
         (my_handle_intrinsic_prop i sid ms)
         (to_itree_spec (my_handle_intrinsic (T := T) i sid ms)).
     Proof using.
@@ -832,7 +898,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       (* TODO: probably an easier more general lemma about
          [exec_correct] and [MemPropT_lift_PropT_fresh] *)
       epose proof @handle_intrinsic_correct (MemStateFreshT (itree Effout)) Effout
-        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T i (fun _ _ => True) as HANDLE_CORRECT.
+        _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T i (fun _ _ => True) as HANDLE_CORRECT.      
 
       red in HANDLE_CORRECT.
       specialize (HANDLE_CORRECT ms sid).
@@ -845,7 +911,16 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       destruct HANDLE_CORRECT as [[ms' [ub_msg UB]] | HANDLE_CORRECT].
       { (* UB.. *)
         left.
-        exists ub_msg; eauto.
+        exists ub_msg.
+        eapply padded_refines_forallL; cbn.
+        Unshelve.
+        2: {
+          exists (raise_ub ub_msg).
+          apply UB.
+        }
+
+        cbn.
+        reflexivity.
       }
 
       (* Not necessarily UB *)
@@ -862,7 +937,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       destruct_err_ub_oom exec_res.
 
       { (* OOM *)
-        cbn in *.
+        cbn in *; subst.
         destruct EXEC as [oom_msg EXEC].
         rewrite EXEC in EXEC_IN.
 
@@ -870,17 +945,28 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         apply raiseOOM_map_itree_inv in EXEC_IN.
 
         red.
-        right; right; left.
+        right; left.
         exists oom_msg.
-        split; auto.
-        exists oom_x; auto.
+        cbn.
+        rewrite EXEC_IN.
+        apply to_itree_spec_raiseOOM.
       }
 
       { (* UB events *)
         red.
         left.
         exists ub_x.
-        auto.
+        cbn.
+        eapply padded_refines_forallL.
+        Unshelve.
+        2: {
+          exists (raise_ub ub_x).
+          cbn.
+          auto.
+        }
+
+        cbn.
+        reflexivity.
       }
 
       { (* Error *)
@@ -890,11 +976,22 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_Fail _)) in EXEC_IN.
         apply raise_map_itree_inv in EXEC_IN.
 
-        red.
-        right; left.
-        exists err_msg.
-        split; auto.
-        exists err_x; auto.
+        right; right; left.
+        do 2 eexists.
+        split.
+        rewrite EXEC_IN.
+        apply to_itree_spec_raise.
+
+        eapply padded_refines_forallL.
+        Unshelve.
+        3: {
+          exists (raise_error err_x).
+          cbn.
+          auto.
+        }
+
+        cbn.
+        reflexivity.
       }
 
       { (* Success *)
@@ -908,12 +1005,18 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
         red.
         right; right; right.
-        do 3 eexists.
-        split; eauto.
-        split; eauto.
-        split; eauto.
-        eapply POST.
-        eauto.
+        forward POST; [eexists; reflexivity|].
+        eapply padded_refines_forallL.
+        rewrite EXEC_IN.
+        rewrite to_itree_spec_ret.
+
+        Unshelve.
+        2: {
+          exists (success_unERR_UB_OOM (ms', (st', exec_res0))).
+          cbn; auto.
+        }
+        cbn.
+        reflexivity.
       }
     Qed.
 

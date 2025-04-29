@@ -761,3 +761,30 @@ Proof.
   intros E1 E2 X Y PRE POST1 POST2 RR t1 t2 H H0.
   eapply refines_weaken_post; eauto.
 Qed.
+
+Lemma padded_refines_forallR :
+  forall {E1 E2 : Type -> Type} {R1 R2 : Type} (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop)
+    (A : Type) (t1 : itree_spec E1 R1) (k : A -> itree (SpecEvent E2) R2),
+    (forall a : A, padded_refines RPre RPost RR t1 (k a)) ->
+    padded_refines RPre RPost RR t1 (Vis (Spec_forall A) k).
+Proof.
+  intros E1 E2 R1 R2 RPre RPost RR A t1 k REF.
+  pstep; red; cbn; constructor.
+  intros a.
+  specialize (REF a).
+  cbn; constructor.
+  punfold REF.
+Qed.
+
+Lemma padded_refines_forallL :
+forall {E1 E2 : Type -> Type} {R1 R2 : Type} (RPre : prerel E1 E2) (RPost : postrel E1 E2)
+  (RR : R1 -> R2 -> Prop) 
+  (A : Type) (t2 : itree_spec E2 R2) (k : A -> itree (SpecEvent E1) R1) (a : A),
+  padded_refines RPre RPost RR (k a) t2 ->
+  padded_refines RPre RPost RR (Vis (Spec_forall A) k) t2.
+Proof.
+  intros E1 E2 R1 R2 RPre RPost RR A t2 k a REF.
+  pstep; red; cbn; econstructor.
+  cbn; constructor.
+  punfold REF.
+Qed.

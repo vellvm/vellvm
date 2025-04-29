@@ -614,107 +614,10 @@ Qed.
 
 Import HasPost.
 
-Lemma refines_strengthen_RR :
-  forall E1 E2 X Y PRE POST RR1 RR2 t1 t2,
-    (forall x y, RR1 x y -> RR2 x y) ->
-    @refines E1 E2 X Y
-                    PRE POST RR1 t1 t2 ->
-    @refines E1 E2 X Y
-      PRE POST RR2 t1 t2.
-Proof.
-  intros E1 E2 X Y PRE POST RR1 RR2 t1 t2 STRENGTHEN REF.
-  punfold REF; red in REF; cbn in REF.
-  setoid_rewrite itree_eta.
-  genobs t1 ot1.
-  genobs t2 ot2.
-  clear t1 t2 Heqot1 Heqot2.
-  revert ot1 ot2 REF.
-  pcofix CIH; intros ot1 ot2 REF.
-  induction REF; cbn in *; subst; pclearbot;
-    try solve
-      [pstep; red; cbn;
-       constructor; eauto with paco].
-  - pstep; red; cbn;
-    constructor; eauto.
-    right.
-    setoid_rewrite EqAxiom.itree_eta_.
-    punfold H.
-  - pstep; red; cbn;
-    constructor; eauto.
-    right.
-    apply H0 in H1.
-    setoid_rewrite EqAxiom.itree_eta_.
-    eapply CIH; eauto.
-    punfold H1.
-  - pstep; red; cbn;
-    constructor; eauto.
-    punfold IHREF.
-  - pstep; red; cbn;    
-    constructor; eauto.
-    punfold IHREF.
-  - pstep; red; cbn;    
-    constructor; eauto.
-
-    intros a.
-    specialize (H0 a).
-    punfold H0.
-  - pstep; red; cbn.
-    econstructor; eauto.
-    punfold IHREF.
-  - pstep; red; cbn.
-    econstructor; eauto.
-    punfold IHREF.
-  - pstep; red; cbn;    
-    constructor; eauto.
-
-    intros a.
-    specialize (H0 a).
-    punfold H0.
-Qed.
-
-Lemma padded_refines_strengthen_RR :
-  forall E1 E2 X Y PRE POST RR1 RR2 t1 t2,
-    (forall x y, RR1 x y -> RR2 x y) ->
-    @padded_refines E1 E2 X Y
-                    PRE POST RR1 t1 t2 ->
-    @padded_refines E1 E2 X Y
-      PRE POST RR2 t1 t2.
-Proof.
-  intros E1 E2 X Y PRE POST RR1 RR2 t1 t2 H H0.
-  eapply refines_strengthen_RR; eauto.
-Qed.
-
 Definition store_prog (v : nat) : itree MemE nat :=
   k <- trigger AllocE;;
   trigger (StoreE k v);;
   trigger (LoadE k).
-
-Lemma padded_refines_forallR :
-  forall {E1 E2 : Type -> Type} {R1 R2 : Type} (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop)
-    (A : Type) (t1 : itree_spec E1 R1) (k : A -> itree (SpecEvent E2) R2),
-    (forall a : A, padded_refines RPre RPost RR t1 (k a)) ->
-    padded_refines RPre RPost RR t1 (Vis (Spec_forall A) k).
-Proof.
-  intros E1 E2 R1 R2 RPre RPost RR A t1 k REF.
-  pstep; red; cbn; constructor.
-  intros a.
-  specialize (REF a).
-  cbn; constructor.
-  punfold REF.
-Qed.
-
-Lemma padded_refines_forallL :
-forall {E1 E2 : Type -> Type} {R1 R2 : Type} (RPre : prerel E1 E2) (RPost : postrel E1 E2)
-  (RR : R1 -> R2 -> Prop) 
-  (A : Type) (t2 : itree_spec E2 R2) (k : A -> itree (SpecEvent E1) R1) (a : A),
-  padded_refines RPre RPost RR (k a) t2 ->
-  padded_refines RPre RPost RR (Vis (Spec_forall A) k) t2.
-Proof.
-  intros E1 E2 R1 R2 RPre RPost RR A t2 k a REF.
-  pstep; red; cbn; econstructor.
-  cbn; constructor.
-  punfold REF.
-Qed.
 
 Lemma alloc_lemma :
   forall m m_final k,
@@ -822,6 +725,32 @@ Proof.
   unfold forall_spec.
   eapply padded_refines_forallL.
   pstep; red; cbn; constructor; auto.
+Qed.
+
+(* This doesn't work. The thing on the left is an empty set, and the
+refinement relation doesn't hold vacuously *)
+Lemma ub_test :
+  @strict_refines Effin _
+    (x <- forall_spec void;; ret 9) (ret 1).
+Proof.
+  unfold forall_spec.
+  cbn.
+  rewrite bind_vis.
+  eapply padded_refines_forallL.
+  Unshelve.
+Abort.
+
+(* This *does* work. The set on the right is empty, and therefore a
+   subset of the thing on the left. *)
+Lemma ub_test_r :
+  @strict_refines Effin _
+    (ret 1) (x <- forall_spec void;; ret 9).
+Proof.
+  unfold forall_spec.
+  cbn.
+  rewrite bind_vis.
+  eapply padded_refines_forallR.
+  intros [].
 Qed.
 
 Lemma blah' :

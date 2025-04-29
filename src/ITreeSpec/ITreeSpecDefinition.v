@@ -14,7 +14,8 @@ From ITree Require Import
   Basics.Monad
   Eq
   Eq.Paco2
-  Eqit.
+  Eqit
+  TranslateFacts.
 
 From ITree Require Import
   Basics
@@ -87,6 +88,14 @@ eapply Basics.iter.
 apply X.
 apply X0.
 Defined.
+
+#[global] Instance Proper_to_itree_spec {E T} : Proper (eutt eq ==> eutt eq) (@to_itree_spec E T).
+Proof.
+  intros x y H.
+  unfold to_itree_spec.
+  rewrite H.
+  reflexivity.
+Qed.
 
 Create HintDb itree_spec.
 
