@@ -1005,7 +1005,6 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
         red.
         right; right; right.
-        forward POST; [eexists; reflexivity|].
         eapply padded_refines_forallL.
         rewrite EXEC_IN.
         rewrite to_itree_spec_ret.
@@ -1022,7 +1021,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
     (* TODO: Import result from [handle_memory_correct]*)
     Lemma my_handle_memory_prop_correct {T} m sid ms (VALID: MemMonad_valid_state ms sid) :
-      my_handle_memory_prop m sid ms (my_handle_memory (T := T) m sid ms).
+      exec_refines
+        (my_handle_memory_prop m sid ms)
+        (to_itree_spec (my_handle_memory (T := T) m sid ms)).
+    Proof.
       unfold my_handle_memory_prop, my_handle_memory.
       cbn.
 
@@ -1040,6 +1042,15 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       { (* UB.. *)
         left.
         exists ub_msg; eauto.
+        eapply padded_refines_forallL.
+        Unshelve.
+        2: {
+          exists (raise_ub ub_msg).
+          apply UB.
+        }
+
+        cbn.
+        reflexivity.
       }
 
       (* Not necessarily UB *)
@@ -1064,17 +1075,27 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         apply raiseOOM_map_itree_inv in EXEC_IN.
 
         red.
-        right; right; left.
+        right; left.
         exists oom_msg.
-        split; auto.
-        exists oom_x; auto.
+        rewrite EXEC_IN.
+        apply to_itree_spec_raiseOOM.
       }
 
       { (* UB events *)
         red.
         left.
         exists ub_x.
-        auto.
+        cbn.
+        eapply padded_refines_forallL.
+        Unshelve.
+        2: {
+          exists (raise_ub ub_x).
+          cbn.
+          apply SPEC.
+        }
+
+        cbn.
+        reflexivity.
       }
 
       { (* Error *)
@@ -1085,10 +1106,22 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         apply raise_map_itree_inv in EXEC_IN.
 
         red.
-        right; left.
+        right; right; left.
         exists err_msg.
-        split; auto.
-        exists err_x; auto.
+        exists err_x.
+        split.
+        rewrite EXEC_IN.
+        apply to_itree_spec_raise.
+
+        eapply padded_refines_forallL.
+        Unshelve.
+        2: {
+          exists (ERR_unERR_UB_OOM err_x).
+          cbn; auto.
+        }
+
+        cbn.
+        reflexivity.
       }
 
       { (* Success *)
@@ -1100,13 +1133,18 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         destruct EXEC_IN as [[ms'' [sid'' res]] [EXEC_IN RES_EQ]].
         inv RES_EQ.
 
-        red.
         right; right; right.
-        do 3 eexists.
-        split; eauto.
-        split; eauto.
-        split; eauto.
-        eapply POST; eauto.
+        eapply padded_refines_forallL.
+        rewrite EXEC_IN.
+        rewrite to_itree_spec_ret.
+
+        Unshelve.
+        2: {
+          exists (success_unERR_UB_OOM (ms', (st', exec_res0))).
+          cbn; auto.
+        }
+        cbn.
+        reflexivity.
       }
     Qed.
 
