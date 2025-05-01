@@ -54,11 +54,48 @@ Definition itree_spec (E : Type -> Type) (R : Type) :=
 
 Notation itree_spec' E R := (itree' (SpecEvent E) R).
 
-Definition to_SpecEvent {F : Type -> Type} {T : Type} (e : F T) : SpecEvent F T
-  := @Spec_vis F T e.
+  Inductive contains_quantifiers {F R} : itree_spec F R -> Prop :=
+  | contains_quant_CrawlTau  : forall t1 t2, t2 ≅ Tau t1 -> contains_quantifiers t1 -> contains_quantifiers t2
+  | contains_quant_CrawVis : forall Y (e : F Y) x k t2, t2 ≅ (vis (Spec_vis e) k) ->  contains_quantifiers (k x) -> contains_quantifiers t2
+  | contains_quant_Forall : forall A k t2, t2 ≅ (vis (Spec_forall A) k) -> contains_quantifiers t2
+  | contains_quant_Exists : forall A k t2, t2 ≅ (vis (Spec_forall A) k) -> contains_quantifiers t2.
 
-Definition to_itree_spec {F : Type -> Type} {T : Type} (t : itree F T) : itree_spec F T
-  := translate (@to_SpecEvent F) t.
+  Definition spec_event_to_event_err {F R} (e : SpecEvent F R) : option (F R) :=
+    match e with
+    | Spec_vis e => Some e
+    | Spec_forall A => None
+    | Spec_exists A => None
+    end.
+
+  Definition spec_event_to_event {F R} (e : SpecEvent F R) (VIS: {e' | e = @Spec_vis F R e'}) : F R.    
+    destruct VIS.
+    apply x.
+  Defined.
+
+  Definition is_spec_vis {F R} (e : SpecEvent F R) : bool :=
+    match e with
+    | Spec_vis  e => true
+    | Spec_forall A => false
+    | Spec_exists A => false
+    end.
+
+  Variant VisOnlyE F T :=
+    | is_vis : {e | @is_spec_vis F T e = true} -> VisOnlyE F T.
+
+  Definition to_SpecEvent {F : Type -> Type} {T : Type} (e : F T) : SpecEvent F T
+    := @Spec_vis F T e.
+
+  Definition to_VisOnlyE {F : Type -> Type} {T : Type} (e : F T) : VisOnlyE F T.
+    constructor.
+    exists (to_SpecEvent e).
+    cbn; auto.
+  Defined.
+
+  Definition to_itree_spec {F : Type -> Type} {T : Type} (t : itree F T) : itree_spec F T
+    := translate (@to_SpecEvent F) t.
+
+  Definition to_itree_VisOnlyE {F : Type -> Type} {T : Type} (t : itree F T) : itree (VisOnlyE F) T
+    := translate (@to_VisOnlyE F) t.
 
 #[global] Instance Monad_itree_spec {E} : Monad (itree_spec E).
 unfold itree_spec.
@@ -93,6 +130,30 @@ Defined.
 Proof.
   intros x y H.
   unfold to_itree_spec.
+  rewrite H.
+  reflexivity.
+Qed.
+
+#[global] Instance Proper_to_itree_spec_eq_itree {E T} : Proper (eq_itree eq ==> eq_itree eq) (@to_itree_spec E T).
+Proof.
+  intros x y H.
+  unfold to_itree_spec.
+  rewrite H.
+  reflexivity.
+Qed.
+
+#[global] Instance Proper_to_itree_VisOnly {E T} : Proper (eutt eq ==> eutt eq) (@to_itree_VisOnlyE E T).
+Proof.
+  intros x y H.
+  unfold to_itree_VisOnlyE.
+  rewrite H.
+  reflexivity.
+Qed.
+
+#[global] Instance Proper_to_itree_VisOnly_eq_itree {E T} : Proper (eq_itree eq ==> eq_itree eq) (@to_itree_VisOnlyE E T).
+Proof.
+  intros x y H.
+  unfold to_itree_VisOnlyE.
   rewrite H.
   reflexivity.
 Qed.
