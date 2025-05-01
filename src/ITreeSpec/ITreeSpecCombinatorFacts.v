@@ -11,7 +11,8 @@ From ITree Require Import
      Core.ITreeDefinition
      Eq.EqAxiom
      ITree
-     Eqit.
+     Eqit
+     Events.StateFacts.
 
 From ITreeSpec Require Import
      Padded
@@ -788,3 +789,483 @@ Proof.
   cbn; constructor.
   punfold REF.
 Qed.
+
+
+Definition to_VisOnly_handler {E F} (h : E ~> F) : (VisOnlyE E ~> F).
+  intros T e.
+  destruct e.
+  destruct s.
+  destruct x; cbn in e; inversion e.
+  apply h in e0.
+  apply e0.
+Defined.
+
+Definition to_itree_spec_handler
+  {E F : Type -> Type}
+  (h : E ~> itree F) : (VisOnlyE E ~> itree_spec F).
+  intros T e.
+  destruct e.
+  destruct s.
+  destruct x; cbn in e; inversion e.
+  apply h in e0.
+  apply to_itree_spec.
+  apply e0.
+Defined.
+
+Definition to_itree_spec_state_handler
+  {E F : Type -> Type} {S}
+  (h : E ~> Monads.stateT S (itree F)) : (VisOnlyE E ~> Monads.stateT S (itree_spec F)).
+  intros T e.
+  destruct e.
+  destruct s.
+  destruct x; cbn in e; inversion e.
+  apply h in e0.
+  intros s.
+  apply e0 in s.
+  apply to_itree_spec.
+  apply s.
+Defined.
+
+Definition to_itree_VisOnlyE_handler
+  {E F : Type -> Type}
+  (h : E ~> itree F) : (VisOnlyE E ~> itree (VisOnlyE F)).
+  intros T e.
+  destruct e.
+  destruct s.
+  destruct x; cbn in e; inversion e.
+  apply h in e0.
+  apply to_itree_VisOnlyE.
+  apply e0.
+Defined.
+
+
+From ITree Require Import Interp.InterpFacts.
+From ITree Require Import Interp.HandlerFacts.
+From ITree Require Import Interp.TranslateFacts.
+
+Lemma to_itree_spec_ret:
+  forall {E : Type -> Type} {R : Type} (r : R),
+    @to_itree_spec E R (Ret r) ≅ Ret r.
+Proof.
+  unfold to_itree_spec.
+  intros.
+  apply TranslateFacts.translate_ret.
+Qed.
+
+Lemma to_itree_spec_tau :
+    forall {E : Type -> Type} {R : Type} (t : itree E R),
+      to_itree_spec (Tau t) ≅ Tau (to_itree_spec t).
+Proof.
+  unfold to_itree_spec.
+  intros.
+  apply TranslateFacts.translate_tau.
+Qed.
+
+Lemma to_itree_spec_iter :
+  forall {E : Type -> Type} {I R : Type} (b : I -> itree E (I + R))
+    (i : I),
+    to_itree_spec (ITree.iter b i) ≈ ITree.iter (fun x : I => to_itree_spec (b x)) i.
+Proof.
+  unfold to_itree_spec.
+  intros.
+  apply translate_iter.
+Qed.
+
+Lemma to_itree_spec_bind :
+  forall {E : Type -> Type} {R S : Type}
+    (t : itree E S) (k : S -> itree E R),
+  to_itree_spec (ITree.bind t (fun x : S => k x))
+  ≅ ITree.bind (to_itree_spec t) (fun x : S => to_itree_spec (k x)).
+Proof.
+  unfold to_itree_spec.
+  intros.
+  apply TranslateFacts.translate_bind.
+Qed.
+
+Lemma to_itree_spec_to_interp :
+  forall {E : Type -> Type} {R : Type} (t : itree E R),
+  to_itree_spec t ≈ interp (fun (T : Type) (e : (fun H : Type => E H) T) => ITree.trigger (to_SpecEvent e)) t.
+Proof.
+  unfold to_itree_spec.
+  intros.
+  apply translate_to_interp.
+Qed.
+
+Lemma to_itree_spec_vis :
+  forall {E : Type -> Type} {R : Type}
+    (X : Type) (e : E X) (k : X -> itree E R),
+  to_itree_spec (Vis e k) ≅ Vis (to_SpecEvent e) (fun x : X => to_itree_spec (k x)).
+Proof.
+  unfold to_itree_spec.
+  intros.
+  apply TranslateFacts.translate_vis.
+Qed.
+
+Lemma to_itree_VisOnlyE_ret:
+  forall {E : Type -> Type} {R : Type} (r : R),
+    @to_itree_VisOnlyE E R (Ret r) ≅ Ret r.
+Proof.
+  unfold to_itree_VisOnlyE.
+  intros.
+  apply TranslateFacts.translate_ret.
+Qed.
+
+Lemma to_itree_VisOnlyE_tau :
+    forall {E : Type -> Type} {R : Type} (t : itree E R),
+      to_itree_VisOnlyE (Tau t) ≅ Tau (to_itree_VisOnlyE t).
+Proof.
+  unfold to_itree_VisOnlyE.
+  intros.
+  apply TranslateFacts.translate_tau.
+Qed.
+
+Lemma to_itree_VisOnlyE_iter :
+  forall {E : Type -> Type} {I R : Type} (b : I -> itree E (I + R))
+    (i : I),
+    to_itree_VisOnlyE (ITree.iter b i) ≈ ITree.iter (fun x : I => to_itree_VisOnlyE (b x)) i.
+Proof.
+  unfold to_itree_VisOnlyE.
+  intros.
+  apply translate_iter.
+Qed.
+
+Lemma to_itree_VisOnlyE_bind :
+  forall {E : Type -> Type} {R S : Type}
+    (t : itree E S) (k : S -> itree E R),
+  to_itree_VisOnlyE (ITree.bind t (fun x : S => k x))
+  ≅ ITree.bind (to_itree_VisOnlyE t) (fun x : S => to_itree_VisOnlyE (k x)).
+Proof.
+  unfold to_itree_VisOnlyE.
+  intros.
+  apply TranslateFacts.translate_bind.
+Qed.
+
+Lemma to_itree_VisOnlyE_to_interp :
+  forall {E : Type -> Type} {R : Type} (t : itree E R),
+  to_itree_VisOnlyE t ≈ interp (fun (T : Type) (e : (fun H : Type => E H) T) => ITree.trigger (to_VisOnlyE e)) t.
+Proof.
+  unfold to_itree_VisOnlyE.
+  intros.
+  apply translate_to_interp.
+Qed.
+
+Lemma to_itree_VisOnlyE_vis :
+  forall {E : Type -> Type} {R : Type}
+    (X : Type) (e : E X) (k : X -> itree E R),
+  to_itree_VisOnlyE (Vis e k) ≅ Vis (to_VisOnlyE e) (fun x : X => to_itree_VisOnlyE (k x)).
+Proof.
+  unfold to_itree_VisOnlyE.
+  intros.
+  apply TranslateFacts.translate_vis.
+Qed.
+
+Lemma to_itree_spec_handler_correct :
+  forall {E F : Type -> Type} h {T} (e : E T),
+    @to_itree_spec_handler E F h T (to_VisOnlyE e) ≈ to_itree_spec (h T e).
+Proof.
+  intros E F h T e.
+  cbn.
+  reflexivity.
+Qed.
+
+(* Need to convert the handler to a SpecEvent handler...
+
+   There should be *NO* Spec_forall / Spec_exists events in the
+   tree, which in theory makes this easier. Could bail out to
+   failure potentially.
+ *)
+Lemma to_itree_VisOnlyE_iterp :
+  forall {E F : Type -> Type}
+    (h : forall T, E T -> itree F T) {R} (t : itree E R),
+    (@to_itree_spec F R (@interp E (itree F) _ _ _ h R t)) ≈
+      (interp (to_itree_spec_handler h) (to_itree_VisOnlyE t)).
+Proof.
+  intros E F h R t.
+  unfold to_itree_spec.
+  unfold to_itree_VisOnlyE.
+  setoid_rewrite interp_translate.
+  cbn.
+  unfold to_itree_spec.
+  rewrite translate_to_interp.
+  rewrite interp_interp.
+  cbn.
+  epose proof eutt_interp'.
+  unfold Proper, respectful in *.
+(*   unfold Relation.i_pointwise, Relation.i_respectful in *. *)
+(*   rewrite (H _ _ _ (fun (T : Type) (e : E T) => translate (@to_SpecEvent F) (h T e))). *)
+(*   reflexivity. *)
+(*   2: reflexivity. *)
+(*   intros T a. *)
+  
+  
+(*   2: { *)
+(*     intros T a. *)
+    
+(*     setoid_rewrite translate_to_interp. *)
+(*   } *)
+  
+(*   replace *)
+(*     (fun (T : Type) (e : E T) => *)
+(*        @interp (fun H : Type => F H) (itree (SpecEvent F)) (@Functor_itree (SpecEvent F)) *)
+(*          (@Monad_itree (SpecEvent F)) (@MonadIter_itree (SpecEvent F)) *)
+(*          (fun (T0 : Type) (e0 : F T0) => @ITree.trigger (SpecEvent F) T0 (@to_SpecEvent F T0 e0)) T *)
+(*          (h T e)) with *)
+(*     (fun (T : Type) (e : E T) => @translate F (SpecEvent F) (@to_SpecEvent F) T (h T e)). *)
+(*   reflexivity. *)
+(*   repeat (apply functional_extensionality_dep; intros). *)
+(*   rewrite FunctionalExtensionality.functional_extensionality. *)
+(*   apply functional_extensionality. *)
+
+  
+(*     (fun (T : Type) (e : E T) => *)
+(*        interp (fun (T0 : Type) (e0 : F T0) => ITree.trigger (to_SpecEvent e0)) (h T e)) *)
+(*     with *)
+(*     (fun (T : Type) (e : E T) => translate (@to_SpecEvent F) (h T e)). *)
+
+(*     term *)
+(*   rewrite translate_trigger. *)
+
+(*     (fun (T : Type) (e : E T) => trigger ((@to_SpecEvent F) _ (h T e)) *)
+(*   setoid_rewrite <- translate_to_interp. *)
+(*   cbn. *)
+(*   revert t. einit. ecofix CIH. intros. *)
+(*   unfold to_itree_spec, to_itree_VisOnlyE. *)
+(*   cbn. *)
+(*   setoid_rewrite unfold_interp. *)
+(*   cbn. *)
+(*   destruct (observe t); try estep. *)
+(*   cbn. *)
+
+(*   rewrite interp_to_translate. *)
+(*   unfold to_itree_spec. *)
+(*   rewrite unfold_translate. *)
+  
+(*   cbn. *)
+(*   rewrite <- translate_bind. *)
+(*   unfold ITree.trigger. simpl. rewrite bind_vis. *)
+(*   evis. intros. rewrite bind_ret_l, tau_euttge. auto with paco. *)
+
+(*   setoid_rewrite to_itree_spec_to_interp. *)
+(*   setoid_rewrite <- interp_translate. *)
+(*   cbn. *)
+(*   unfold to_itree_spec. *)
+(*   setoid_rewrite interp_interp. *)
+(*   cbn. *)
+(*   setoid_rewrite interp_translate. *)
+(*   setoid_rewrite translate_to_interp. *)
+(*   setoid_rewrite to_itree_VisOnlyE_to_interp. *)
+(*   rewrite interp_interp. *)
+(*   setoid_rewrite interp_trigger. *)
+(*   setoid_rewrite interp_interp. *)
+
+  
+(*   unfold to_itree_spec. *)
+(*   unfold to_itree_VisOnlyE. *)
+  
+(*   setoid_rewrite interp_translate. *)
+(*   cbn. *)
+(*   unfold to_itree_spec. *)
+(*   rewrite translate_to_interp. *)
+(*   erewrite <- to_itree_spec_to_interp. *)
+(*   2: { intros. apply X. }. *)
+(*   cbn. *)
+(*   rewrite (itree_eta t). *)
+(*   genobs t to. *)
+(*   clear t Heqto. *)
+(*   cbn. *)
+(*   revert to. *)
+(*   pcofix CIH. *)
+(*   intros to. *)
+(*   hinduction to before r; intros. *)
+(*   admit. *)
+(*   admit. *)
+(*   - eapply paco2_mon_bot with (gf:=eqit_ eq true true id); auto. *)
+(*     rewrite interp_ret. *)
+(*     rewrite to_itree_VisOnlyE_ret, to_itree_spec_ret. *)
+(*     setoid_rewrite interp_ret. *)
+(*     pstep; red; cbn. *)
+(*     constructor. *)
+(*     reflexivity. *)
+(*   - specialize (CIH (observe t)). *)
+(*     pstep; red; cbn. *)
+(*     constructor. *)
+(*     right. *)
+(*     unfold interp at 2 in CIH. *)
+(*     unfold to_itree_spec, to_itree_VisOnlyE in *. *)
+(*     rewrite (EqAxiom.itree_eta_ t). *)
+(*     apply CIH. *)
+(*   - pstep; red; cbn. *)
+
+(* Proof. *)
+(*   intros E F h R t. *)
+(*   rewrite (itree_eta t). *)
+(*   genobs t to. *)
+(*   clear t Heqto. *)
+(*   revert to. *)
+(*   pcofix CIH. *)
+(*   intros to. *)
+(*   hinduction to before r; intros. *)
+(*   - eapply paco2_mon_bot with (gf:=eqit_ eq true true id); auto. *)
+(*     rewrite interp_ret. *)
+(*     rewrite to_itree_VisOnlyE_ret, to_itree_spec_ret. *)
+(*     setoid_rewrite interp_ret. *)
+(*     pstep; red; cbn. *)
+(*     constructor. *)
+(*     reflexivity. *)
+(*   - specialize (CIH (observe t)). *)
+(*     pstep; red; cbn. *)
+(*     constructor. *)
+(*     right. *)
+(*     unfold interp at 2 in CIH. *)
+(*     unfold to_itree_spec, to_itree_VisOnlyE in *. *)
+(*     rewrite (EqAxiom.itree_eta_ t). *)
+(*     apply CIH. *)
+(*   - pstep; red; cbn. *)
+
+(*     eapply paco2_mon_bot with (gf:=eqit_ eq true true id); auto. *)
+(*     setoid_rewrite interp_vis. *)
+(*     setoid_rewrite to_itree_spec_bind. *)
+(*     setoid_rewrite to_itree_VisOnlyE_vis. *)
+(*     setoid_rewrite interp_vis. *)
+(*     setoid_rewrite to_itree_spec_tau. *)
+(*     rewrite to_itree_spec_handler_correct. *)
+(*     eapply eutt_clo_bind. *)
+(*     reflexivity. *)
+(*     intros u1 u2 U1U2. *)
+(*     setoid_rewrite tau_eutt. *)
+(*     cbn. *)
+
+(*     pstep; red; cbn. *)
+    
+(*     constructor. *)
+
+(*     apply CIH. *)
+(*     left. *)
+
+(*     unfold to_itree_VisOnlyE in *. *)
+(*     pstep; red; cbn. *)
+(*     constructor; auto. *)
+(*     right. *)
+(*     apply CIH. *)
+(*     left. *)
+
+(*     setoid_rewrite interp_tau. *)
+(*     rewrite to_itree_VisOnlyE_tau, to_itree_spec_tau. *)
+(*     setoid_rewrite interp_tau. *)
+(*     setoid_rewrite tau_eutt. *)
+
+(*     apply tau_eutt. *)
+(*     pstep; red; cbn. *)
+(*     constructor. *)
+(*     reflexivity. *)
+(* Qed. *)
+Admitted.
+
+Lemma to_itree_VisOnlyE_iterp_state :
+  forall {E F : Type -> Type} {S}
+    (h : forall T, E T -> Monads.stateT S (itree F) T) {R} (t : itree E R) s,
+    (@to_itree_spec F (S * R) (@State.interp_state E (itree F) S _ _ _ h R t s)) ≈
+      (State.interp_state (to_itree_spec_state_handler h) (to_itree_VisOnlyE t) s).
+Proof.
+Admitted.
+
+Lemma refines_retL_inv
+  {E1 E2 : Type -> Type} {R1 R2 : Type}
+  (pre : prerel E1 E2) (post : postrel E1 E2) (R1R2 : R1 -> R2 -> Prop)
+  r1 t2 :
+  refines pre post R1R2 (Ret r1) t2 ->
+  exists r2, t2 ≅ Ret r2 /\ R1R2 r1 r2.
+Proof.
+  intros REF. punfold REF. red in REF.
+  cbn in *.
+  setoid_rewrite (itree_eta t2).
+  genobs t2 ot2.
+  clear t2 Heqot2.
+  inversion REF; subst.
+  - exists r2; split; eauto; reflexivity.
+Admitted.
+
+Lemma padded_refines_map
+  {E1 E2 : Type -> Type} {R1 R2 R3 R4 : Type}
+  (pre : prerel E1 E2) (post : postrel E1 E2)
+  (R1R2 : R1 -> R2 -> Prop) (R3R4 : R3 -> R4 -> Prop)
+  f1 f2 t1 t2 :
+  (forall r1 r2, R1R2 r1 r2 -> R3R4 (f1 r1) (f2 r2)) ->
+  padded_refines pre post R1R2 t1 t2 ->
+  padded_refines pre post R3R4 (ITree.map f1 t1) (ITree.map f2 t2).
+Proof.
+  intros RRS REF.
+  unfold ITree.map.
+  eapply padded_refines_bind; eauto.
+  intros r1 r2 H0.
+  apply padded_refines_ret; auto.
+Qed.
+
+Definition to_spec_post {E1 E2 : Type -> Type} (post : postrel E1 E2) : postrel (SpecEvent E1) (SpecEvent E2).
+  intros A B se1 a se2 b.
+  dependent destruction se1.
+  - (* Vis *)
+    dependent destruction se2.
+    2-3: apply False.
+    eapply post; eauto.
+  - (* Forall *)
+    dependent destruction se2.
+    1,3: apply False.
+    apply True. (* Not sure about this *)
+  - (* Exists *)
+    dependent destruction se2.
+    1-2: apply False.
+    apply True. (* Not sure about this *)
+Defined.
+
+Lemma interp_handler_refine
+  {E1 E2 : Type -> Type} {R1 R2 : Type}
+  (pre : prerel E1 E2) (post : postrel E1 E2) (R1R2 : R1 -> R2 -> Prop)
+  (h1 : forall T : Type, SpecEvent E1 T -> itree_spec E1 T)
+  (h2 : forall T : Type, SpecEvent E2 T -> itree_spec E2 T)
+  t1 t2 :
+  (* to_spec_post may not be quite right *)
+  (forall X Y (e1 : SpecEvent E1 X) (e2 : SpecEvent E2 Y) ,
+      padded_refines pre post (fun a b => to_spec_post post _ _ e1 a e2 b)
+        (h1 X e1) (h2 Y e2)) ->
+  padded_refines pre post R1R2 t1 t2 ->
+  padded_refines pre post R1R2 (interp h1 t1) (interp h2 t2).
+Proof.
+  intros HREF REF.
+  unfold interp.
+  apply padded_refines_iter with (RR:=padded_refines pre post R1R2); auto.
+  clear t1 t2 REF.
+  intros t1 t2 REF.
+  rewrite (EqAxiom.itree_eta_ t1) in *.
+  rewrite (EqAxiom.itree_eta_ t2) in *.
+
+  genobs t1 ot1.
+  genobs t2 ot2.
+  clear t1 Heqot1 t2 Heqot2.
+  destruct ot1, ot2; cbn.
+  9: {
+    (* vis / vis *)
+    eapply padded_refines_map.
+    2: {
+      apply HREF.
+    }
+
+    intros r1 r2 POST.
+    cbn in POST.
+    left.
+    red.
+    change (pad (k r1)) with ((fun a => pad (k a)) r1).
+    change (pad (k0 r2)) with ((fun a => pad (k0 a)) r2).
+
+    punfold REF; red in REF; cbn in *.
+    eapply Spec_vis_inv with (k0 := (fun a => pad (k a))) (k1 := (fun a => pad (k0 a))) in REF; eauto.
+    eapply refines_weaken_post.
+    2: apply REF.
+    { intros X1 Y e1 x e2 y H.
+      cbn in *.
+      unfold to_spec_post in POST.
+      admit.
+    }
+    admit.
+    admit.
+Admitted.

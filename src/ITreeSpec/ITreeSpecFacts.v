@@ -604,15 +604,16 @@ Qed.
 
 Lemma Spec_vis_inv:
   forall (E1 : Type -> Type) (R1 : Type) (E2 : Type -> Type) (R2 : Type)
-    (RPre1 : prerel E1 E2) (RPost1 : postrel E1 E2) (RR1 : R1 -> R2 -> Prop) (e3 : E2 R2)
-    (k1 : R2 -> itree_spec E2 R2) (e0 : E1 R1) (k0 : R1 -> itree_spec E1 R1),
-    padded ((Vis (Spec_vis e0) k0)) -> padded (Vis (Spec_vis e3) k1 : itree_spec E2 R2) ->
+    R3 R4
+    (RPre1 : prerel E1 E2) (RPost1 : postrel E1 E2) (RR1 : R3 -> R4 -> Prop) (e3 : E2 R2)
+    (k1 : R2 -> itree_spec E2 R4) (e0 : E1 R1) (k0 : R1 -> itree_spec E1 R3),
+    padded ((Vis (Spec_vis e0) k0)) -> padded (Vis (Spec_vis e3) k1 : itree_spec E2 R4) ->
     refinesF RPre1 RPost1 RR1 (upaco2 (refines_ RPre1 RPost1 RR1) bot2) (VisF (Spec_vis e0) k0)
              (VisF (Spec_vis e3) k1) ->
     forall (a : R1) (c : R2),
       RPost1 _ _ e0 a e3 c -> refines RPre1 RPost1 RR1 (k0 a) (k1 c).
 Proof.
-  intros E1 R1 E2 R2 RPre1 RPost1 RR1 e3 k1 e0 k0 Hpad1 Hpad2 Href a c H6.
+  intros E1 R1 E2 R2 R3 R4 RPre1 RPost1 RR1 e3 k1 e0 k0 Hpad1 Hpad2 Href a c H6.
   remember (VisF (Spec_vis e0) k0) as x.
   remember (VisF (Spec_vis e3) k1) as y. cbn in *.
   hinduction Href before E1; intros; try discriminate.

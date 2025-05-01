@@ -878,6 +878,24 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     reflexivity.
   Qed.
 
+  (*
+  Definition to_spec_handler {F M} `{Functor M} `{Monad M}
+    (h : (forall T : Type, F T -> M T)) : forall T : Type, SpecEvent F T -> M T.
+    intros T X.
+    apply h.
+    refine (match X with
+            | Spec_vis X e => e
+            | Spec_forall A => _
+            | Spec_exists A => _
+            end).
+
+    admit.
+    admit.
+    
+    destruct X.
+
+    (h : forall T, E T -> _ T)
+   *)
   Definition exec_refines {E R} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (spec exec : itree_spec E R) :=
     (* Refinement taking into account UB / OOM *)
     (exists ub_msg, strict_refines spec (raise_ub ub_msg)) \/
@@ -886,6 +904,39 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       (* Need this case because both sides could have different messages *)
       (exists err1 err2, exec ≈ LLVMEvents.raise err1 /\ strict_refines spec (LLVMEvents.raise err2)) \/
       strict_refines spec exec.
+
+  #[global] Instance exec_refines_Proper_eutt {F R} `{UBE -< F} `{OOME -< F} `{FailureE -< F} :
+    Proper (eutt eq ==> eutt eq ==> iff) (@exec_refines F R _ _ _).
+  Proof.
+    intros t1 t2 REF1 t3 t4 REF2.
+    split; intros REF3.
+    { destruct REF3 as [[ub UB] | [[oom OOM] | [[err1 [err2 ERR]] | SUCC]]].
+      - left.
+        exists ub.
+        rewrite <- REF1; auto.
+      - right; left.
+        exists oom.
+        rewrite <- REF2; auto.
+      - right; right; left.
+        exists err1, err2.
+        rewrite <- REF2, <- REF1; auto.
+      - right; right; right.
+        rewrite <- REF2, <- REF1; auto.
+    }
+    { destruct REF3 as [[ub UB] | [[oom OOM] | [[err1 [err2 ERR]] | SUCC]]].
+      - left.
+        exists ub.
+        rewrite REF1; auto.
+      - right; left.
+        exists oom.
+        rewrite REF2; auto.
+      - right; right; left.
+        exists err1, err2.
+        rewrite REF2, REF1; auto.
+      - right; right; right.
+        rewrite REF2, REF1; auto.
+    }
+  Qed.
 
     Lemma my_handle_intrinsic_prop_correct {T} (i : IntrinsicE T) sid ms (VALID: MemMonad_valid_state ms sid) :
       exec_refines
@@ -1148,33 +1199,143 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       }
     Qed.
 
-    (* fmap throws away extra sid / provenance from state
-       handler. This is fine because interp_memory_prop should include
-       propositions that make sure ids and provenances are fresh when
-       necessary.
+    Definition to_itree_spec_MemStateFresh_handler
+      {G F : Type -> Type}
+      (h : G ~> MemStateFreshT (itree F)) : (VisOnlyE G ~> MemStateFreshT (itree_spec F)).
+      intros T e.
+      destruct e.
+      destruct s.
+      destruct x; cbn in e; inversion e.
+      apply h in e0.
+      intros s ms.
+      apply to_itree_spec.
+      apply e0; auto.
+    Defined.
+
+    Lemma interp_memstatefresh_ret :
+      forall {E F : Type -> Type} {R : Type} (f : forall T : Type, E T -> MemStateFreshT (itree F) T)
+        s ms (r : R),
+        State.interp_state f (Ret r) s ms ≅ Ret (ms, (s, r)).
+    Proof.
+      intros E0 F R f s ms r.
+      rewrite itree_eta. reflexivity.
+    Qed.
+
+    Lemma to_itree_VisOnlyE_iterp_MemStateFreshT :
+      forall {E F : Type -> Type}
+        (h : forall T, E T -> MemStateFreshT (itree F) T) {R} (t : itree E R) s ms,
+        (@to_itree_spec F _ (@State.interp_state E _ _ _ _ _ h R t s ms)) ≈
+          (State.interp_state (to_itree_spec_MemStateFresh_handler h) (to_itree_VisOnlyE t) s ms).
+    Proof.
+      intros E0 F h R t s ms.
+      setoid_rewrite (itree_eta_ t).
+      genobs t ot.
+      clear t Heqot.
+      revert ot.
+      pcofix CIH.
+      intros ot.
+      hinduction ot before r; intros.
+      - pstep; red; cbn.
+        constructor; auto.
+      - pstep; red; cbn.
+        constructor; auto.
+        left.
+        cbn.
+        right.
+        eapply CIH.
+
+        eapply paco2_mon_bot.
+        rewrite interp_memstatefresh_ret.
+        setoid_rewrite to_itree_spec_ret.
+        setoid_rewrite to_itree_VisOnlyE.
+        setoid_rewrite State.interp_state_ret.
+      revert t.
+      einit.
+      ecofix CIH; intros t.
+      
+      cbn.
+    Qed.
+
+    (* Lemma interp_handler_refine *)
+    (*   {E1 E2 : Type -> Type} {R1 R2 : Type} *)
+    (*   (pre : prerel E1 E2) (post : postrel E1 E2) (R1R2 : R1 -> R2 -> Prop) *)
+    (*   (h1 : forall T : Type, SpecEvent E1 T -> MemStateFreshT (itree_spec E1) T) *)
+    (*   (h2 : forall T : Type, SpecEvent E2 T -> MemStateFreshT (itree_spec E2) T) *)
+    (*   t1 t2 s ms: *)
+    (*   (* (* to_spec_post may not be quite right *) *) *)
+    (*   (* (forall X Y (e1 : SpecEvent E1 X) (e2 : SpecEvent E2 Y) , *) *)
+    (*   (*     padded_refines pre post (fun a b => to_spec_post post _ _ e1 a e2 b) *) *)
+    (*   (*       (h1 X e1) (h2 Y e2)) -> *) *)
+    (*   padded_refines pre post R1R2 t1 t2 -> *)
+    (*   padded_refines pre post R1R2 (@State.interp_state E1 _ _ _ _ _ h1 _ t1 s ms) (interp h2 t2). *)
+    (* Proof. *)
+    (*   intros HREF REF. *)
+    (*   unfold interp. *)
+    (*   apply padded_refines_iter with (RR:=padded_refines pre post R1R2); auto. *)
+    (*   clear t1 t2 REF. *)
+    (*   intros t1 t2 REF. *)
+    (*   rewrite (EqAxiom.itree_eta_ t1) in *. *)
+    (*   rewrite (EqAxiom.itree_eta_ t2) in *. *)
+
+    (*   genobs t1 ot1. *)
+    (*   genobs t2 ot2. *)
+    (*   clear t1 Heqot1 t2 Heqot2. *)
+    (*   destruct ot1, ot2; cbn. *)
+    (*   9: { *)
+    (*     (* vis / vis *) *)
+    (*     eapply padded_refines_map. *)
+    (*     2: { *)
+    (*       apply HREF. *)
+    (*     } *)
+
+    (*     intros r1 r2 POST. *)
+    (*     cbn in POST. *)
+    (*     left. *)
+    (*     red. *)
+    (*     change (pad (k r1)) with ((fun a => pad (k a)) r1). *)
+    (*     change (pad (k0 r2)) with ((fun a => pad (k0 a)) r2). *)
+
+    (*     punfold REF; red in REF; cbn in *. *)
+    (*     eapply Spec_vis_inv with (k0 := (fun a => pad (k a))) (k1 := (fun a => pad (k0 a))) in REF; eauto. *)
+    (*     eapply refines_weaken_post. *)
+    (*     2: apply REF. *)
+    (*     { intros X1 Y e1 x e2 y H. *)
+    (*       cbn in *. *)
+    (*       unfold to_spec_post in POST. *)
+    (*       admit. *)
+    (*     } *)
+    (*     admit. *)
+    (*     admit. *)
+    (* Admitted. *)
+
+
+    (* Specification can contain UB and the implementation could OOM...
      *)
     Lemma interp_memory_correct :
       forall {T} t (ms : MemState) (sid : store_id)
         (VALID: MemMonad_valid_state ms sid),
-        interp_memory_spec eq t sid ms (@interp_memory T t sid ms).
+        exec_refines
+          (interp_memory_spec t sid ms)
+          (to_itree_spec (@interp_memory T t sid ms)).
     Proof using.
       intros T t ms sid VALID.
-      red.
-      unfold interp_memory_spec.
-      unfold interp_memory.
-      cbn.
-      match goal with
-      | |- InterpMemoryProp.interp_memory_prop _ _ _ _ ?i => remember i
-      end.
-      match goal with
-      | [H : i = ?r |- _] => assert (i ≅ r) by (subst; reflexivity)
-      end. clear Heqi.
-      rename H into EQ.
+      unfold interp_memory_spec, interp_memory.
+      unfold interp_memory_spec_h, interp_memory_h.
 
-      revert t i EQ.
+      cbn.
+
+      revert t.
       revert ms sid VALID.
-      pcofix CIH.
       intros.
+      setoid_rewrite to_itree_VisOnlyE_iterp_MemStateFreshT.
+      unfold State.interp_state.
+      repeat right.
+      revert t.
+      pcofix CIH.
+      intros t.
+      pstep; red; cbn.
+      setoid_rewrite interp_handler_refine.
+      cbn.
       pstep.
       red.
 
