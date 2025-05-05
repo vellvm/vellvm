@@ -137,6 +137,7 @@
 ./rocq/Utils/Monads.v
 ./rocq/Utils/NMaps.v
 ./rocq/Utils/NoEvent.v
+./rocq/Utils/NoSpecEvent.v
 ./rocq/Utils/NoFailure.v
 ./rocq/Utils/NonEmpty.v
 ./rocq/Utils/OOMRutt.v

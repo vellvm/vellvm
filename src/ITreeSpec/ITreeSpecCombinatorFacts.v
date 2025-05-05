@@ -802,14 +802,14 @@ Defined.
 
 Definition to_itree_spec_handler
   {E F : Type -> Type}
-  (h : E ~> itree F) : (VisOnlyE E ~> itree_spec F).
+  (h : E ~> itree F) : (SpecEvent E ~> itree_spec F).
   intros T e.
   destruct e.
-  destruct s.
-  destruct x; cbn in e; inversion e.
-  apply h in e0.
-  apply to_itree_spec.
-  apply e0.
+  - apply h in e.
+    apply to_itree_spec.
+    apply e.
+  - apply ITree.spin.
+  - apply ITree.spin.
 Defined.
 
 Definition to_itree_spec_state_handler
@@ -961,7 +961,7 @@ Qed.
 
 Lemma to_itree_spec_handler_correct :
   forall {E F : Type -> Type} h {T} (e : E T),
-    @to_itree_spec_handler E F h T (to_VisOnlyE e) ≈ to_itree_spec (h T e).
+    @to_itree_spec_handler E F h T (to_SpecEvent e) ≈ to_itree_spec (h T e).
 Proof.
   intros E F h T e.
   cbn.
@@ -978,7 +978,7 @@ Lemma to_itree_VisOnlyE_iterp :
   forall {E F : Type -> Type}
     (h : forall T, E T -> itree F T) {R} (t : itree E R),
     (@to_itree_spec F R (@interp E (itree F) _ _ _ h R t)) ≈
-      (interp (to_itree_spec_handler h) (to_itree_VisOnlyE t)).
+      (interp (to_itree_spec_handler h) (to_itree_spec t)).
 Proof.
   intros E F h R t.
   unfold to_itree_spec.
@@ -1184,6 +1184,70 @@ Proof.
   inversion REF; subst.
   - exists r2; split; eauto; reflexivity.
 Admitted.
+
+Lemma refines_spec_vis_inv
+  {E1 E2 : Type -> Type} {R1 R2 : Type}
+  (pre : prerel E1 E2) (post : postrel E1 E2) (R1R2 : R1 -> R2 -> Prop)
+  X Y (e1 : E1 X) (e2 : E2 Y)
+  (k1 : X -> itree_spec E1 R1) (k2 : Y -> itree_spec E2 R2) :
+  refines pre post R1R2 (vis (Spec_vis e1) k1) (vis (Spec_vis e2) k2) ->
+  (forall x y, post _ _ e1 x e2 y -> refines pre post R1R2 (k1 x) (k2 y)).
+Proof.
+  intros REF x y POST.
+  pinversion REF; inj_existT; subst.
+  eapply H8; eauto.
+Qed.
+
+(* (* TODO: Move to SpecFacts? *) *)
+(* Lemma refines_Vis_forallL : *)
+(*   forall {E1 E2 : Type -> Type} {R1 R2} *)
+(*     (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) *)
+(*     {A} t k, *)
+(*     refines RPre RPost RR (Vis (Spec_forall A) k) t -> *)
+(*     exists a, refines RPre RPost RR (k a) t. *)
+(* Proof. *)
+(*   intros E1 E2 R1 R2 RPre RPost RR A t k REF. *)
+(*   punfold REF; red in REF; cbn in *. *)
+(*   setoid_rewrite (itree_eta_ t). *)
+(*   genobs t ot. *)
+(*   setoid_rewrite <- Heqot. *)
+(*   clear t Heqot. *)
+(*   remember (VisF (Spec_forall A) k) as x. *)
+(*   (* Only cases I should have are... *)
+(*      - refinesF_forallL *)
+(*      - refinesF_forallR *)
+(*      - refinesF_TauR *)
+(*      - refinesF_Tau *)
+(*    *) *)
+(*   hinduction REF before E1; intros; inv Heqx; inj_existT; subst; pclearbot; eauto with itree_spec. *)
+(*   - specialize (IHREF _ _ eq_refl). *)
+(*     destruct IHREF. *)
+(*     exists x. *)
+(*     pstep; red; cbn. *)
+(*     constructor. *)
+(*     punfold H. *)
+(*   -  *)
+
+(*     specialize (H0 _ _ _ eq_refl). *)
+(*     destruct IHREF. *)
+(* Qed. *)
+
+
+(* Lemma refines_spec_forall_inv *)
+(*   {E1 E2 : Type -> Type} {R1 R2 : Type} *)
+(*   (pre : prerel E1 E2) (post : postrel E1 E2) (R1R2 : R1 -> R2 -> Prop) *)
+(*   {A B} *)
+(*   (k1 : A -> itree_spec E1 R1) (k2 : B -> itree_spec E2 R2) : *)
+(*   refines pre post R1R2 (vis (Spec_forall A) k1) (vis (Spec_forall B) k2) -> *)
+(*   (forall x y, refines pre post R1R2 (k1 x) (k2 y)). *)
+(* Proof. *)
+(*   intros REF x y. *)
+(*   pose proof REF as REF2. *)
+(*   apply refines_Vis_forallR with (a:=y) in REF2. *)
+(*   pinversion REF; inj_existT; subst. *)
+(*   eauto. *)
+(*   eapply H8; eauto. *)
+(* Qed. *)
 
 Lemma padded_refines_map
   {E1 E2 : Type -> Type} {R1 R2 R3 R4 : Type}
