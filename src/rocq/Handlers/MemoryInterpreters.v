@@ -905,6 +905,28 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       (exists err1 err2, exec ≈ LLVMEvents.raise err1 /\ strict_refines spec (LLVMEvents.raise err2)) \/
       strict_refines spec exec.
 
+  Lemma exec_refines_oom :
+    forall {E R} `{UBE -< E} `{OOME -< E} `{FailureE -< E}
+      (t : itree_spec E R) oom_msg,
+      exec_refines t (raise_oom oom_msg).
+  Proof.
+    intros F R UB OOM FAIL t oom_msg.
+    right; left.
+    exists oom_msg.
+    reflexivity.
+  Qed.
+
+  Lemma exec_refines_ub :
+    forall {E R} `{UBE -< E} `{OOME -< E} `{FailureE -< E}
+      (t : itree_spec E R) ub_msg,
+      exec_refines (raise_ub ub_msg) t.
+  Proof.
+    intros F R UB OOM FAIL t ub_msg.
+    left.
+    exists ub_msg.
+    reflexivity.
+  Qed.
+
   #[global] Instance exec_refines_Proper_eutt {F R} `{UBE -< F} `{OOME -< F} `{FailureE -< F} :
     Proper (eutt eq ==> eutt eq ==> iff) (@exec_refines F R _ _ _).
   Proof.
@@ -1239,22 +1261,8 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         constructor; auto.
       - pstep; red; cbn.
         constructor; auto.
-        left.
-        cbn.
         right.
-        eapply CIH.
-
-        eapply paco2_mon_bot.
-        rewrite interp_memstatefresh_ret.
-        setoid_rewrite to_itree_spec_ret.
-        setoid_rewrite to_itree_VisOnlyE.
-        setoid_rewrite State.interp_state_ret.
-      revert t.
-      einit.
-      ecofix CIH; intros t.
-      
-      cbn.
-    Qed.
+    Admitted.
 
     (* Lemma interp_handler_refine *)
     (*   {E1 E2 : Type -> Type} {R1 R2 : Type} *)
@@ -1308,7 +1316,6 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     (*     admit. *)
     (* Admitted. *)
 
-
     (* Specification can contain UB and the implementation could OOM...
      *)
     Lemma interp_memory_correct :
@@ -1329,7 +1336,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       intros.
       setoid_rewrite to_itree_VisOnlyE_iterp_MemStateFreshT.
       unfold State.interp_state.
+
+
       repeat right.
+      setoid_rewrite interp_handler_refine.
       revert t.
       pcofix CIH.
       intros t.
