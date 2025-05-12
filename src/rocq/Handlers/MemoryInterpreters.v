@@ -44,7 +44,7 @@ From ExtLib Require Import
 
 (* Needs to be after ITree.Events.State *)
 From Vellvm.Utils Require Import
-     PropT InterpMemoryProp.
+     PropT InterpMemoryProp NoSpecEvent.
 
 Require Import Paco.paco.
 
@@ -870,7 +870,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
   (* TODO: Move this *)
   Lemma to_itree_spec_ret :
     forall {E T} v,
-      @to_itree_spec E T (ret v) ≈ ret v.
+      @to_itree_spec E T (ret v) ≅ ret v.
   Proof.
     intros E0 T v.
     unfold to_itree_spec.
@@ -1221,7 +1221,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       }
     Qed.
 
-    Definition to_itree_spec_MemStateFresh_handler
+    Definition to_itree_spec_MemStateFresh_handler'
       {G F : Type -> Type}
       (h : G ~> MemStateFreshT (itree F)) : (VisOnlyE G ~> MemStateFreshT (itree_spec F)).
       intros T e.
@@ -1234,6 +1234,19 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       apply e0; auto.
     Defined.
 
+    Definition to_itree_spec_MemStateFresh_handler
+      {G F : Type -> Type}
+      (h : G ~> MemStateFreshT (itree F)) : (SpecEvent G ~> MemStateFreshT (itree_spec F)).
+      intros T e.
+      intros sid ms.
+      destruct e.
+      - apply to_itree_spec.
+        apply h; auto.
+      - apply ITree.spin.
+      - apply ITree.spin.
+    Defined.
+
+
     Lemma interp_memstatefresh_ret :
       forall {E F : Type -> Type} {R : Type} (f : forall T : Type, E T -> MemStateFreshT (itree F) T)
         s ms (r : R),
@@ -1243,26 +1256,138 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       rewrite itree_eta. reflexivity.
     Qed.
 
-    Lemma to_itree_VisOnlyE_iterp_MemStateFreshT :
+    Lemma interp_memstatefresh_tau :
+      forall {E F : Type -> Type} {R : Type} (f : forall T : Type, E T -> MemStateFreshT (itree F) T)
+        s ms (t : itree E R),
+        State.interp_state f (Tau t) s ms ≅ Tau (State.interp_state f t s ms).
+    Proof.
+      intros E0 F R f s ms r.
+      rewrite itree_eta. reflexivity.
+    Qed.
+
+    Definition _interp_memstatefresh {E F R}
+      (f : E ~> MemStateFreshT (itree F)) (ot : itreeF E R _)
+      : MemStateFreshT (itree F) R := fun s ms =>
+                                  match ot with
+                                  | RetF r => Ret (ms, (s, r))
+                                  | TauF t => Tau (State.interp_state f t s ms)
+                                  | VisF _ e k => f _ e s ms >>= (fun sx => Tau (State.interp_state f (k (snd (snd sx))) (fst (snd sx)) (fst sx)))
+                                  end.
+
+    Lemma unfold_interp_memstatefresh {G F R} (h : G ~> MemStateFreshT (itree F))
+      (t : itree G R) s ms :
+      eq_itree eq
+        (State.interp_state h t s ms)
+        (_interp_memstatefresh h (observe t) s ms).
+    Proof.
+      unfold State.interp_state, interp, Basics.iter, MonadIter_stateT0, Basics.iter, MonadIter_itree; cbn.
+      rewrite unfold_iter; cbn.
+      destruct observe; cbn.
+      - repeat rewrite bind_ret_l. reflexivity.
+      - repeat rewrite bind_ret_l.
+        reflexivity.
+      - repeat rewrite bind_map, bind_bind; cbn. repeat setoid_rewrite bind_ret_l.
+        rewrite bind_bind.
+        apply eqit_bind. reflexivity.
+        red.
+        intros a.
+        repeat setoid_rewrite bind_ret_l; cbn.
+        reflexivity.
+    Qed.
+
+    Lemma interp_memstatefresh_vis :
+      forall {E F : Type -> Type} {T U : Type} (e : E T) (k : T -> itree E U)
+        (h : forall T0 : Type, E T0 -> MemStateFreshT (itree F) T0) s ms,
+        State.interp_state h (Vis e k) s ms
+          ≅ ITree.bind (h T e s ms) (fun sx : (MemState * (store_id * T)) => Tau (State.interp_state h (k (snd (snd sx))) (fst (snd sx)) (fst sx))).
+    Proof.
+      intros E0 F T U e k h s ms.
+      setoid_rewrite unfold_interp_memstatefresh.
+      cbn.
+      setoid_rewrite unfold_interp_memstatefresh.
+      reflexivity.
+    Qed.
+
+    #[global]
+      Instance eutt_interp_state_MemFreshT_eq {G F: Type -> Type}
+      (h : G ~> MemStateFreshT (itree F)) R :
+      Proper (eutt eq ==> eq ==> eq ==> eutt eq) (@State.interp_state G _ _ _ _ _ h R).
+    Proof.
+      repeat intro. subst. Tactics.revert_until R.
+      einit. ecofix CIH. intros.
+      punfold H0. red in H0.
+      rewrite (itree_eta_ x).
+      rewrite (itree_eta_ y).
+      genobs x ox.
+      genobs y oy.
+      clear x y Heqox Heqoy.
+      induction H0; intros; subst; simpl; pclearbot.
+      - rewrite interp_memstatefresh_ret.
+        eret.
+      - repeat rewrite interp_memstatefresh_tau.
+        etau.
+      - repeat rewrite interp_memstatefresh_vis.
+        ebind.
+        econstructor; [reflexivity|].
+        intros; subst.
+        etau. ebase.
+      - repeat rewrite interp_memstatefresh_tau.
+        rewrite tau_euttge; eauto.
+        rewrite (itree_eta_ t1); eauto.
+      - repeat rewrite interp_memstatefresh_tau.
+        rewrite tau_euttge; eauto.
+        rewrite (itree_eta_ t2); eauto.
+    Qed.
+
+    #[global]
+      Instance eq_itree_interp_state_MemFreshT_eq {G F: Type -> Type}
+      (h : G ~> MemStateFreshT (itree F)) R :
+      Proper (eq_itree eq ==> eq ==> eq ==> eq_itree eq) (@State.interp_state G _ _ _ _ _ h R).
+    Proof.
+      ginit. gcofix CIH. intros; subst.
+      rewrite !unfold_interp_memstatefresh.
+      punfold H0; repeat red in H0.
+      destruct H0; subst; pclearbot; try discriminate; cbn.
+      - gstep; constructor; auto.
+      - gstep; constructor; auto with paco.
+      - guclo eqit_clo_bind. econstructor.
+        + reflexivity.
+        + intros [] _ []. gstep; constructor; auto with paco itree.
+    Qed.
+
+    Lemma to_itree_spec_iterp_MemStateFreshT :
       forall {E F : Type -> Type}
         (h : forall T, E T -> MemStateFreshT (itree F) T) {R} (t : itree E R) s ms,
         (@to_itree_spec F _ (@State.interp_state E _ _ _ _ _ h R t s ms)) ≈
-          (State.interp_state (to_itree_spec_MemStateFresh_handler h) (to_itree_VisOnlyE t) s ms).
+          (State.interp_state (to_itree_spec_MemStateFresh_handler h) (to_itree_spec t) s ms).
     Proof.
-      intros E0 F h R t s ms.
-      setoid_rewrite (itree_eta_ t).
+      einit.
+      ecofix CIH.
+      intros E0 h t s ms.
+      rewrite (itree_eta_ t).
       genobs t ot.
       clear t Heqot.
-      revert ot.
-      pcofix CIH.
-      intros ot.
-      hinduction ot before r; intros.
-      - pstep; red; cbn.
-        constructor; auto.
-      - pstep; red; cbn.
-        constructor; auto.
-        right.
-    Admitted.
+      hinduction ot before CIH; intros.
+      - rewrite interp_memstatefresh_ret.
+        setoid_rewrite to_itree_spec_ret.
+        setoid_rewrite interp_memstatefresh_ret.
+        eret.
+      - setoid_rewrite interp_memstatefresh_tau.
+        setoid_rewrite to_itree_spec_tau.
+        setoid_rewrite interp_memstatefresh_tau.
+        rewrite (itree_eta t).
+        etau.
+      - setoid_rewrite interp_memstatefresh_vis.
+        setoid_rewrite to_itree_spec_vis.
+        setoid_rewrite interp_memstatefresh_vis.
+        cbn.
+        rewrite to_itree_spec_bind.
+        ebind.
+        econstructor; [reflexivity|].
+        intros u1 u2 H; subst.
+        setoid_rewrite to_itree_spec_tau.
+        etau.
+    Qed.
 
     (* Lemma interp_handler_refine *)
     (*   {E1 E2 : Type -> Type} {R1 R2 : Type} *)
@@ -1316,6 +1441,71 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     (*     admit. *)
     (* Admitted. *)
 
+    Import InterpFacts.
+
+    Lemma strict_refines_unpadded_to_itree_spec :
+      forall {F R} h g (t : itree F R),
+        @strict_refines_unpadded F R (interp h t) (interp g (to_itree_spec t)).
+    Proof.
+      intros F R h g t.
+      rewrite (itree_eta_ t).
+      genobs t ot; clear t Heqot.
+      revert ot.
+      setoid_rewrite unfold_interp.
+      cbn.
+      unfold to_intree_spec.
+
+      ginit.
+      2: {
+        gcofix CIH.
+        intros ot.
+        hinduction ot before r; intros.
+        - gstep; red; cbn.
+          constructor; auto.
+        - gstep; red; cbn.
+          constructor; auto.
+          unfold interp in *.
+          unfold to_itree_spec in *.
+          rewrite (itree_eta_ t).
+          gbase.
+          apply CIH.
+        - gstep; red; cbn.
+          
+
+          setoid_rewrite interp_vis.
+      }
+    Qed.
+
+
+    Lemma blah :
+      forall {F R} h g (t : itree F R),
+        @strict_refines F R (interp h t) (interp g (to_itree_spec t)).
+    Proof.
+      intros F R h g t.
+      rewrite (itree_eta_ t).
+      genobs t ot; clear t Heqot.
+      revert ot.
+      ginit.
+      2: {
+        gcofix CIH.
+        intros ot.
+        hinduction ot before r; intros.
+        - gstep; red; cbn.
+          constructor; auto.
+        - gstep; red; cbn.
+          constructor; auto.
+          unfold interp in *.
+          unfold to_itree_spec in *.
+          rewrite (itree_eta_ t).
+          gbase.
+          apply CIH.
+        - 
+
+          setoid_rewrite interp_vis.
+      }
+    Qed.
+      
+
     (* Specification can contain UB and the implementation could OOM...
      *)
     Lemma interp_memory_correct :
@@ -1334,10 +1524,8 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       revert t.
       revert ms sid VALID.
       intros.
-      setoid_rewrite to_itree_VisOnlyE_iterp_MemStateFreshT.
+      setoid_rewrite to_itree_spec_iterp_MemStateFreshT.
       unfold State.interp_state.
-
-
       repeat right.
       setoid_rewrite interp_handler_refine.
       revert t.
