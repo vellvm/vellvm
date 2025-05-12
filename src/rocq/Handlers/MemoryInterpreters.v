@@ -1221,6 +1221,14 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       }
     Qed.
 
+    (* TODO: Prove this, should just need some lemmas about case_ *)
+    Lemma interp_memory_spec_h_correct {T} e sid ms (VALID: MemMonad_valid_state ms sid) :
+      exec_refines
+        (interp_memory_spec_h e sid ms)
+        (to_itree_spec (interp_memory_h (T := T) e sid ms)).
+    Proof.
+    Admitted.
+
     Definition to_itree_spec_MemStateFresh_handler'
       {G F : Type -> Type}
       (h : G ~> MemStateFreshT (itree F)) : (VisOnlyE G ~> MemStateFreshT (itree_spec F)).
@@ -1443,7 +1451,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
     Import InterpFacts.
 
-    Lemma strict_refines_unpadded_to_itree_spec :
+    Lemma strict_refines_unpadded_interp_to_itree_spec :
       forall {F R} h g (t : itree F R),
         @strict_refines_unpadded F R (interp h t) (interp g (to_itree_spec t)).
     Proof.
@@ -1453,8 +1461,6 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       revert ot.
       setoid_rewrite unfold_interp.
       cbn.
-      unfold to_intree_spec.
-
       ginit.
       2: {
         gcofix CIH.
@@ -1463,49 +1469,49 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         - gstep; red; cbn.
           constructor; auto.
         - gstep; red; cbn.
-          constructor; auto.
-          unfold interp in *.
-          unfold to_itree_spec in *.
-          rewrite (itree_eta_ t).
-          gbase.
-          apply CIH.
-        - gstep; red; cbn.
-          
-
-          setoid_rewrite interp_vis.
+          constructor; auto with paco.
+          (* Need to be able to do this rewrite... *)
+          (* setoid_rewrite unfold_interp. *)
+          admit.
+        - admit.
       }
-    Qed.
+      admit.
+    Abort.
 
-
-    Lemma blah :
+    Lemma strict_refines_to_itree_spec :
       forall {F R} h g (t : itree F R),
         @strict_refines F R (interp h t) (interp g (to_itree_spec t)).
     Proof.
-      intros F R h g t.
-      rewrite (itree_eta_ t).
-      genobs t ot; clear t Heqot.
-      revert ot.
-      ginit.
-      2: {
-        gcofix CIH.
-        intros ot.
-        hinduction ot before r; intros.
-        - gstep; red; cbn.
-          constructor; auto.
-        - gstep; red; cbn.
-          constructor; auto.
-          unfold interp in *.
-          unfold to_itree_spec in *.
-          rewrite (itree_eta_ t).
-          gbase.
-          apply CIH.
-        - 
+    Abort.
 
-          setoid_rewrite interp_vis.
-      }
-    Qed.
-      
+    Theorem exec_refines_interp :
+      forall {F G}
+        `{UBE -< G} `{OOME -< G} `{FailureE -< G}
+        (h : F ~> itree_spec G) (g : F ~> itree G),
+        (* Handler refinement *)
+        (forall R (e1 : F R) (e2 : F R),
+            exec_refines (h _ e1) (to_itree_spec (g _ e2))) ->
+        forall R (t : itree F R),
+          exec_refines
+            (interp h t)
+            (to_itree_spec (interp g t)).
+    Proof.
+    Admitted.
 
+    Theorem exec_refines_interp_MemStateFreshT :
+      forall {F G}
+        `{UBE -< G} `{OOME -< G} `{FailureE -< G}
+        (h : F ~> MemStateFreshT (itree_spec G)) (g : F ~> MemStateFreshT (itree G)),
+        (* Handler refinement *)
+        (forall R (e : F R) s ms,
+            exec_refines (h _ e s ms) (to_itree_spec (g _ e s ms))) ->
+        forall R (t : itree F R) s ms,
+          exec_refines
+            (State.interp_state h t s ms)
+            (to_itree_spec (State.interp_state g t s ms)).
+    Proof.
+    Admitted.
+            
     (* Specification can contain UB and the implementation could OOM...
      *)
     Lemma interp_memory_correct :
@@ -1516,403 +1522,13 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
           (to_itree_spec (@interp_memory T t sid ms)).
     Proof using.
       intros T t ms sid VALID.
-      unfold interp_memory_spec, interp_memory.
-      unfold interp_memory_spec_h, interp_memory_h.
+      eapply exec_refines_interp_MemStateFreshT.
+      intros R e s ms0.
+      eapply interp_memory_spec_h_correct.
 
-      cbn.
-
-      revert t.
-      revert ms sid VALID.
-      intros.
-      setoid_rewrite to_itree_spec_iterp_MemStateFreshT.
-      unfold State.interp_state.
-      repeat right.
-      setoid_rewrite interp_handler_refine.
-      revert t.
-      pcofix CIH.
-      intros t.
-      pstep; red; cbn.
-      setoid_rewrite interp_handler_refine.
-      cbn.
-      pstep.
-      red.
-
-      unfold State.interp_state in EQ.
-      force_rewrite: (itree_eta t) in EQ.
-      force_rewrite: (itree_eta i) in EQ.
-      genobs t ot.
-      genobs i oi.
-      clear t i Heqot Heqoi.
-      hinduction ot before CIH; intros; subst.
-      - force_rewrite: @interp_memory_ret in EQ.
-        apply eqitree_inv_Ret_r in EQ.
-        cbn in EQ; subst.
-        constructor; auto.
-      - pclearbot.
-        force_rewrite: @interp_memory_tau in EQ. subst.
-        apply eqitree_inv_Tau_r in EQ.
-        destruct EQ as (?&?&?).
-        cbn in H; subst.
-        constructor.
-        right.
-        eapply CIH; eauto.
-      - pclearbot.
-        force_rewrite: @interp_memory_vis in EQ.
-        cbn in *.
-        symmetry in EQ.
-        rewrite itree_eta'.
-        remember ({| _observe := oi |}) as oi'.
-        clear oi Heqoi'.
-        (* I should only need `MemMonad_valid_state m s` in the successful cases...
-           Not in the cases where UB / OOM / Error occurs...
-
-           If UB / OOM / Error occurs, do I need CIH?
-         *)
-        destruct e.
-        { (* Abstract E events that don't touch ms / sid *)
-          cbn in *.
-          eapply Interp_Memory_PropT_Vis
-            with (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
-          2: {
-            cbn.
-            red.
-            reflexivity.
-          }
-          2: {
-            repeat red.
-            right.
-            rewrite <- EQ.
-            cbn.
-            eapply eutt_clo_bind.
-            reflexivity.
-            intros ? ? ?; subst.
-            destruct u2.
-            rewrite tau_eutt.
-            reflexivity.
-          }
-
-          intros a b H H0 H1.
-          apply Returns_bind_inversion in H0.
-          destruct H0 as (?&?&?).
-          apply Returns_ret_inv in H2; inv H2; auto.
-          right.
-          cbn.
-          eapply CIH; eauto.
-          reflexivity.
-        }
-
-        destruct s.
-        { (* Intrinsics *)
-          cbn in *.
-          pose proof (@my_handle_intrinsic_prop_correct _ i _ _ VALID) as CORRECT.
-          repeat red in CORRECT.
-          destruct CORRECT.
-          { (* UB case *)
-            destruct H as (ub_msg & UB).
-            eapply Interp_Memory_PropT_Vis
-              with (ta:=(raise_ub ub_msg)).
-            2: {
-              repeat red.
-              left.
-              exists ub_msg.
-              apply UB.
-            }
-            2: {
-              repeat red.
-              left.
-              eapply FindUB.
-              pstep; red; cbn.
-              constructor.
-              intros [].
-            }
-
-            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
-            unfold raiseUB in RETb.
-            rewrite bind_trigger in RETb.
-
-            eapply Returns_vis_inversion in RETb.
-            destruct RETb as [[] _].
-          }
-          destruct H.
-          { (* Error case *)
-            destruct H as (err_msg & ERR).
-            eapply Interp_Memory_PropT_Vis
-              with (ta:=(raise_error err_msg))
-                   (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
-            2: {
-              repeat red.
-              right. left.
-              exists err_msg.
-              split.
-              reflexivity.
-              apply ERR.
-            }
-            2: {
-              repeat red.
-              right.
-              rewrite <- EQ.
-              eapply eutt_clo_bind.
-              apply ERR.
-              intros ? ? ?; subst.
-              destruct u2 as (?&?&?).
-              cbn.
-              rewrite tau_eutt.
-              reflexivity.
-            }
-
-            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
-            unfold LLVMEvents.raise in RETb.
-            rewrite bind_trigger in RETb.
-
-            eapply Returns_vis_inversion in RETb.
-            destruct RETb as [[] _].
-          }
-
-          destruct H.
-          { (* OOM case *)
-            destruct H as (oom_msg & OOM).
-            eapply Interp_Memory_PropT_Vis
-              with (ta:=(raise_oom oom_msg))
-                   (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
-            2: {
-              repeat red.
-              right. right. left.
-              exists oom_msg.
-              split.
-              reflexivity.
-              apply OOM.
-            }
-            2: {
-              repeat red.
-              right.
-              rewrite <- EQ.
-              eapply eutt_clo_bind.
-              apply OOM.
-              intros ? ? ?; subst.
-              destruct u2 as (?&?&?).
-              cbn.
-              rewrite tau_eutt.
-              reflexivity.
-            }
-
-            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
-            unfold raiseOOM in RETb.
-            rewrite bind_trigger in RETb.
-
-            eapply Returns_vis_inversion in RETb.
-            destruct RETb as [[] _].
-          }
-
-          { (* Success case *)
-            destruct H as (sid' & ms' & x & VALID' & EXEC & SPEC); auto.
-            eapply Interp_Memory_PropT_Vis
-              with (ta:=ret (ms', (sid', x)))
-                   (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
-            2: {
-              repeat red.
-              right. right. right.
-              exists sid', ms', x.
-              split; eauto.
-              split; eauto.
-              reflexivity.
-            }
-            2: {
-              repeat red.
-              right.
-              rewrite <- EQ.
-              eapply eutt_clo_bind.
-              apply EXEC.
-              intros ? ? ?; subst.
-              destruct u2 as (?&?&?).
-              cbn.
-              rewrite tau_eutt.
-              reflexivity.
-            }
-
-            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
-            apply Returns_ret_inv in RETb.
-            inv RETb.
-            right.
-            eapply CIH.
-            2: reflexivity.
-
-            eapply SPEC.
-          }
-        }
-
-        destruct s.
-        { (* Memory events *)
-          cbn in *.
-          pose proof (@my_handle_memory_prop_correct _ m _ _ VALID) as CORRECT.
-          repeat red in CORRECT.
-          destruct CORRECT.
-          { (* UB case *)
-            destruct H as (ub_msg & UB).
-            eapply Interp_Memory_PropT_Vis
-              with (ta:=(raise_ub ub_msg)).
-            2: {
-              repeat red.
-              left.
-              exists ub_msg.
-              apply UB.
-            }
-            2: {
-              repeat red.
-              left.
-              eapply FindUB.
-              pstep; red; cbn.
-              constructor.
-              intros [].
-            }
-
-            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
-            unfold raiseUB in RETb.
-            rewrite bind_trigger in RETb.
-
-            eapply Returns_vis_inversion in RETb.
-            destruct RETb as [[] _].
-          }
-          destruct H.
-          { (* Error case *)
-            destruct H as (err_msg & ERR).
-            eapply Interp_Memory_PropT_Vis
-              with (ta:=(raise_error err_msg))
-                   (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
-            2: {
-              repeat red.
-              right. left.
-              exists err_msg.
-              split.
-              reflexivity.
-              apply ERR.
-            }
-            2: {
-              repeat red.
-              right.
-              rewrite <- EQ.
-              eapply eutt_clo_bind.
-              apply ERR.
-              intros ? ? ?; subst.
-              destruct u2 as (?&?&?).
-              cbn.
-              rewrite tau_eutt.
-              reflexivity.
-            }
-
-            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
-            unfold LLVMEvents.raise in RETb.
-            rewrite bind_trigger in RETb.
-
-            eapply Returns_vis_inversion in RETb.
-            destruct RETb as [[] _].
-          }
-
-          destruct H.
-          { (* OOM case *)
-            destruct H as (oom_msg & OOM).
-            eapply Interp_Memory_PropT_Vis
-              with (ta:=(raise_oom oom_msg))
-                   (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
-            2: {
-              repeat red.
-              right. right. left.
-              exists oom_msg.
-              split.
-              reflexivity.
-              apply OOM.
-            }
-            2: {
-              repeat red.
-              right.
-              rewrite <- EQ.
-              eapply eutt_clo_bind.
-              apply OOM.
-              intros ? ? ?; subst.
-              destruct u2 as (?&?&?).
-              cbn.
-              rewrite tau_eutt.
-              reflexivity.
-            }
-
-            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
-            unfold raiseOOM in RETb.
-            rewrite bind_trigger in RETb.
-
-            eapply Returns_vis_inversion in RETb.
-            destruct RETb as [[] _].
-          }
-
-          { (* Success case *)
-            destruct H as (sid' & ms' & x & VALID' & EXEC & SPEC & VALID''); auto.
-            eapply Interp_Memory_PropT_Vis
-              with (ta:=ret (ms', (sid', x)))
-                   (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
-            2: {
-              repeat red.
-              right. right. right.
-              exists sid', ms', x.
-              split.
-              apply VALID'.
-              split; eauto; reflexivity.
-            }
-            2: {
-              repeat red.
-              right.
-              rewrite <- EQ.
-              eapply eutt_clo_bind.
-              apply EXEC.
-              intros ? ? ?; subst.
-              destruct u2 as (?&?&?).
-              cbn.
-              rewrite tau_eutt.
-              reflexivity.
-            }
-
-            intros a (?&?&?) RETa RETb AB; cbn in *; subst.
-            apply Returns_ret_inv in RETb.
-            inv RETb.
-            right.
-            eapply CIH; eauto; reflexivity.
-          }
-        }
-
-        { (* Abstract F events that don't touch ms / sid *)
-          cbn in *.
-          eapply Interp_Memory_PropT_Vis
-            with (k2:=(fun '(sid', sx) => (interp_memory (k (snd sx)) (fst sx) sid'))).
-          2: {
-            cbn.
-            red.
-            reflexivity.
-          }
-          2: {
-            repeat red.
-            right.
-            rewrite <- EQ.
-            cbn.
-            eapply eutt_clo_bind.
-            reflexivity.
-            intros ? ? ?; subst.
-            destruct u2.
-            rewrite tau_eutt.
-            reflexivity.
-          }
-
-          intros a b H H0 H1.
-          apply Returns_bind_inversion in H0.
-          destruct H0 as (?&?&?).
-          apply Returns_ret_inv in H2; inv H2; auto.
-          right.
-          cbn.
-          eapply CIH; eauto.
-          reflexivity.
-        }
-
-        Unshelve.
-        all: eauto.
-        intros [].
-        intros [].
-    Qed.
+      (* May need to modify exec_refines_interp_MemStateFreshT to carry this through *)
+      admit.
+    Admitted.
 
   End Interpreters.
 End MemoryExecInterpreter.
