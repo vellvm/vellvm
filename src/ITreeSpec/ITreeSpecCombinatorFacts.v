@@ -901,6 +901,17 @@ Proof.
   apply TranslateFacts.translate_vis.
 Qed.
 
+Lemma to_itree_spec_trigger :
+  forall {E F : Type -> Type} `{E -< F}
+    (X : Type) (e : E X),
+  to_itree_spec (F:=F) (trigger e) ≈ trigger e.
+Proof.
+  intros E F H X e.
+  unfold to_itree_spec.
+  setoid_rewrite translate_trigger.
+  reflexivity.
+Qed.
+
 Lemma to_itree_VisOnlyE_ret:
   forall {E : Type -> Type} {R : Type} (r : R),
     @to_itree_VisOnlyE E R (Ret r) ≅ Ret r.
