@@ -284,28 +284,57 @@ Definition elim_spec {E}: itree (SpecEvent E) ~> itree E := interp helim_spec.
 (*     ebase. right. eapply CIHL. apply H1. *)
 (* Qed. *)
 
-Lemma no_spec_event_interp :
-  forall {E X} (t : itree (SpecEvent E) X),
-    no_spec_event t ->
-    forall (h : E ~> itree E) ,
-      t ≈ interp (to_itree_spec_handler h) t.
-Proof using.
-  intros E X.
-  einit.
-  ecofix CIH.
-  intros t H h.
-  rewrite (itree_eta t).
-  rewrite (itree_eta t) in H.
-  genobs t ot.
-  clear t Heqot.
-  pinversion H; cbn in *; subst.
-  - setoid_rewrite interp_ret. reflexivity.
-  - setoid_rewrite interp_tau. estep.
-  - setoid_rewrite interp_vis. cbn.
-    unfold to_itree_spec.
-    red in H.
-    cbn in *.
-Admitted.
+(* Lemma no_spec_event_interp : *)
+(*   forall {E X} (t : itree (SpecEvent E) X), *)
+(*     no_spec_event t -> *)
+(*     forall (h : E ~> itree E) , *)
+(*       t ≈ interp (to_itree_spec_handler h) t. *)
+(* Proof using. *)
+(*   intros E X. *)
+(*   einit. *)
+(*   ecofix CIH. *)
+(*   intros t NS h. *)
+(*   rewrite (itree_eta t). *)
+(*   rewrite (itree_eta t) in NS. *)
+(*   genobs t ot. *)
+(*   clear t Heqot. *)
+(*   hinduction ot before E; intros. *)
+(*   - setoid_rewrite interp_ret. reflexivity. *)
+(*   - setoid_rewrite interp_tau. etau. *)
+(*     ebase. *)
+(*     right. *)
+(*     eapply CIHL. *)
+(*     pinversion NS; subst; auto. *)
+(*   - setoid_rewrite interp_vis. *)
+(*     unfold to_itree_spec_handler. *)
+(*     destruct e; pinversion NS. *)
+(*     inj_existT; subst. *)
+(*     change ((Vis (Spec_vis e) k)) with (Vis (Spec_vis e) (fun x => k x)). *)
+(*     rewrite <- bind_trigger. *)
+(*     ebind. *)
+(*     econstructor. *)
+(*     setoid_rewrite <- translate_bind. *)
+(*     ebind. *)
+(*     econstructor. *)
+(*     red. *)
+(*     red. *)
+(*     estep. *)
+(*     constructor. *)
+    
+
+
+(*     red. *)
+    
+(*     right. *)
+(*     eapply CIHL. *)
+(*   pinversion NS; cbn in *; subst. *)
+(*   - setoid_rewrite interp_ret. reflexivity. *)
+(*   - setoid_rewrite interp_tau. estep. *)
+(*   - setoid_rewrite interp_vis. cbn. *)
+(*     unfold to_itree_spec. *)
+(*     red in H. *)
+(*     cbn in *. *)
+(* Admitted. *)
 
 (** By expressing that [elim] is an inverse to the signature injection: *)
 
