@@ -1221,12 +1221,101 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       }
     Qed.
 
+    Lemma exec_refines_handler_case :
+      forall F D G
+        `{UBE -< G} `{OOME -< G} `{FailureE -< G}
+        (h1 : F ~> itree_spec G) (h2 : F ~> itree_spec G)
+        (d1 : D ~> itree_spec G) (d2 : D ~> itree_spec G),
+        (forall R (e : F R), exec_refines (h1 _ e) (h2 _ e)) ->
+        (forall R (e : D R), exec_refines (d1 _ e) (d2 _ e)) ->
+        (forall R (e : (F +' D) R),
+            exec_refines ((case_ h1 d1) _ e) ((case_ h2 d2) _ e)).
+    Proof.
+      intros F D G H H0 H1 h1 h2 d1 d2 H2 H3 R e.
+      destruct e; cbn; eauto.
+    Qed.
+
+    Lemma exec_refines_handler_case_memstatefresht :
+      forall F D G
+        `{UBE -< G} `{OOME -< G} `{FailureE -< G}
+        (h1 : F ~> MemStateFreshT (itree_spec G)) (h2 : F ~> MemStateFreshT (itree_spec G))
+        (d1 : D ~> MemStateFreshT (itree_spec G)) (d2 : D ~> MemStateFreshT (itree_spec G)),
+        (forall R (e : F R) s ms, exec_refines (h1 _ e s ms) (h2 _ e s ms)) ->
+        (forall R (e : D R) s ms, exec_refines (d1 _ e s ms) (d2 _ e s ms)) ->
+        (forall R (e : (F +' D) R) (s : store_id) (ms : MemState),
+            exec_refines (case_ h1 d1 _ e s ms) (case_ h2 d2 _ e s ms)).
+    Proof.
+      intros F D G H H0 H1 h1 h2 d1 d2 H2 H3 R e s ms.
+      destruct e; cbn; eauto.
+    Qed.
+
+    Lemma E_trigger_spec_correct {T} e sid ms :
+      exec_refines
+        (SPEC_INTERP.E_trigger e sid ms)
+        (to_itree_spec (E_trigger (T := T) e sid ms)).
+    Proof.
+      repeat right.
+      unfold SPEC_INTERP.E_trigger, E_trigger.
+      cbn.
+      rewrite to_itree_spec_bind.
+      eapply padded_refines_bind.
+      setoid_rewrite to_itree_spec_trigger.
+      reflexivity.
+      intros r1 r2 H; subst.
+      setoid_rewrite to_itree_spec_ret.
+      reflexivity.
+    Qed.
+
+    Lemma F_trigger_spec_correct {T} e sid ms :
+      exec_refines
+        (SPEC_INTERP.F_trigger e sid ms)
+        (to_itree_spec (F_trigger (T := T) e sid ms)).
+    Proof.
+      repeat right.
+      cbn.
+      rewrite to_itree_spec_bind.
+      eapply padded_refines_bind.
+      setoid_rewrite to_itree_spec_trigger.
+      reflexivity.
+      intros r1 r2 H; subst.
+      setoid_rewrite to_itree_spec_ret.
+      reflexivity.
+    Qed.
+
+    Lemma exec_refines_case_to_itree_spec_memstatefresht :
+      forall F D G
+        `{UBE -< G} `{OOME -< G} `{FailureE -< G}
+        (h1 : F ~> MemStateFreshT (itree_spec G)) (h2 : F ~> MemStateFreshT (itree G))
+        (d1 : D ~> MemStateFreshT (itree_spec G)) (d2 : D ~> MemStateFreshT (itree G)),
+        (forall R (e : F R) s ms, exec_refines (h1 _ e s ms) (to_itree_spec (h2 _ e s ms))) ->
+        (forall R (e : D R) s ms, exec_refines (d1 _ e s ms) (to_itree_spec (d2 _ e s ms))) ->
+        (forall R (e : (F +' D) R) (s : store_id) (ms : MemState),
+            exec_refines (case_ h1 d1 _ e s ms) (to_itree_spec (case_ h2 d2 _ e s ms))).
+    Proof.
+      intros F D G H H0 H1 h1 h2 d1 d2 H2 H3 R e s ms.
+      destruct e; cbn; eauto.
+    Qed.
+
     (* TODO: Prove this, should just need some lemmas about case_ *)
     Lemma interp_memory_spec_h_correct {T} e sid ms (VALID: MemMonad_valid_state ms sid) :
       exec_refines
         (interp_memory_spec_h e sid ms)
         (to_itree_spec (interp_memory_h (T := T) e sid ms)).
     Proof.
+      eapply exec_refines_case_to_itree_spec_memstatefresht; intros.
+      apply E_trigger_spec_correct.
+
+      eapply exec_refines_case_to_itree_spec_memstatefresht; intros.
+      eapply my_handle_intrinsic_prop_correct.
+      (* Need to manage MemMonad_valid_state *)
+      admit.
+
+      eapply exec_refines_case_to_itree_spec_memstatefresht; intros.
+      eapply my_handle_memory_prop_correct.
+      (* Need to manage MemMonad_valid_state *)
+      admit.
+
+      apply F_trigger_spec_correct.
     Admitted.
 
     Definition to_itree_spec_MemStateFresh_handler'
