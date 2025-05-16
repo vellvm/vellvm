@@ -985,7 +985,7 @@ Qed.
    tree, which in theory makes this easier. Could bail out to
    failure potentially.
  *)
-Lemma to_itree_VisOnlyE_iterp :
+Lemma to_itree_spec_iterp :
   forall {E F : Type -> Type}
     (h : forall T, E T -> itree F T) {R} (t : itree E R),
     (@to_itree_spec F R (@interp E (itree F) _ _ _ h R t)) ≈
@@ -1343,4 +1343,4 @@ Proof.
     }
     admit.
     admit.
-Admitted.
+Abort.
