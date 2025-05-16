@@ -1213,3 +1213,115 @@ Proof.
   rewrite EQ.
   split; reflexivity.  
 Qed.
+
+Section refine_closure.
+
+Context {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
+Context (pre : prerel E E) (post : postrel E E).
+
+(** *** "Up-to" principles for coinduction. *)
+
+Inductive refines_trans_clo (r : itree_spec E R1 -> itree_spec E R2 -> Prop)
+  : itree_spec E R1 -> itree_spec E R2 -> Prop :=
+| refine_trans_clo_intro t1 t2 t1' t2' RR1 RR2
+      (EQVl: refines pre post RR1 t1 t1')
+      (EQVr: refines pre post RR2 t2 t2')
+      (REL: r t1' t2')
+      (LERR1: forall x x' y, RR1 x x' -> RR x' y -> RR x y)
+      (LERR2: forall x y y', RR2 y y' -> RR x y' -> RR x y)
+  : refines_trans_clo r t1 t2
+.
+Hint Constructors refines_trans_clo : itree.
+
+Definition refinesC := refines_trans_clo.
+Hint Unfold refinesC : itree.
+
+Lemma refinesC_mon r1 r2 t1 t2
+      (IN: refinesC r1 t1 t2)
+      (LE: r1 <2= r2):
+  refinesC r2 t1 t2.
+Proof.
+  destruct IN. econstructor; eauto.
+Qed.
+
+Hint Resolve refinesC_mon : paco.
+
+Ltac unfold_refines :=
+  (try match goal with [|- refines_ _ _ _ _ _ _ ] => red end);
+  (repeat match goal with [H: refines_ _ _ _ _ _ _ |- _ ] => red in H end).
+
+(* Lemma refinesC_wcompat : *)
+(*   wcompatible2 (@refines_ E E R1 R2 pre post RR) refinesC. *)
+(* Proof with eauto with paco itree. *)
+(*   econstructor; [ eauto with paco itree | ]. *)
+(*   intros. destruct PR. *)
+(*   punfold EQVl. punfold EQVr. unfold_refines. *)
+(*   hinduction REL before r; intros; clear t1' t2'. *)
+(*   - remember (RetF r1) as x. *)
+(*     hinduction EQVl before r; intros; subst; try inv Heqx. *)
+(*     + remember (RetF r3) as y. *)
+(*       hinduction EQVr before r; intros; subst; try inv Heqy; *)
+(*         try solve [constructor; eauto]. *)
+(*       -- constructor; eauto. *)
+(*          intros a0. *)
+(*          admit. *)
+(*       -- constructor; eauto. *)
+
+(*     [ | eauto with itree ]. *)
+(*     remember (RetF r3) as y. *)
+(*     hinduction EQVr before r; intros; subst; try inv Heqy... *)
+(*   - remember (TauF m1) as x. *)
+(*     hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; [ | eauto with itree ]. *)
+(*     remember (TauF m3) as y. *)
+(*     hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; [ | eauto with itree ]. *)
+(*     pclearbot. econstructor. gclo. *)
+(*     econstructor; eauto with paco. *)
+(*   - remember (VisF e k1) as x. *)
+(*     hinduction EQVl before r; intros; try discriminate Heqx; [ inv_Vis | eauto with itree ]. *)
+(*     remember (VisF e k3) as y. *)
+(*     hinduction EQVr before r; intros; try discriminate Heqy; [ inv_Vis | eauto with itree ]. *)
+(*     econstructor. intros. pclearbot. *)
+(*     eapply MON. *)
+(*     + apply CMP. econstructor... *)
+(*     + intros. apply gpaco2_clo, PR. *)
+(*   - remember (TauF t1) as x. *)
+(*     hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; [ | eauto with itree ]. *)
+(*     pclearbot. punfold REL... *)
+(*   - remember (TauF t2) as y. *)
+(*     hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; [ | eauto with itree ]. *)
+(*     pclearbot. punfold REL... *)
+(* Qed. *)
+
+(* Hint Resolve refineC_wcompat : paco. *)
+
+Lemma refines_idclo_compat : compose refinesC id <3= compose id refinesC.
+Proof.
+  intros. apply PR.
+Qed.
+Hint Resolve refines_idclo_compat : paco.
+
+Lemma refinesC_dist :
+  forall r1 r2, refinesC (r1 \2/ r2) <2= (refinesC r1 \2/ refinesC r2).
+Proof.
+  intros. destruct PR. destruct REL; eauto with itree.
+Qed.
+
+Hint Resolve refinesC_dist : paco.
+
+(* Lemma refines_clo_trans vclo *)
+(*       (MON: monotone2 vclo) *)
+(*       (CMP: compose refinesC vclo <3= compose vclo refinesC): *)
+(*   refines_trans_clo vclo <3= gupaco2 (refines_ RR vclo) refinesC. *)
+(* Proof. *)
+(*   intros. destruct PR. gclo. econstructor; eauto with paco. *)
+(* Qed. *)
+
+End refine_closure.
+
+#[global] Hint Unfold refinesC : itree.
+#[global] Hint Resolve refinesC_mon : paco.
+(* #[global] Hint Resolve refinesC_wcompat : paco. *)
+#[global] Hint Resolve refines_idclo_compat : paco.
+#[global] Hint Resolve refinesC_dist : paco.
+(* Arguments refines_clo_trans : clear implicits. *)
+#[global] Hint Constructors refines_trans_clo : itree.

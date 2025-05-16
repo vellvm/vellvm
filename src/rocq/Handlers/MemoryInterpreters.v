@@ -1539,12 +1539,29 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     (* Admitted. *)
 
     Import InterpFacts.
+    Import ITreeSpecFacts.
 
+    #[global] Instance grefinegen_cong_eqit {F R1 R2 RR1 RR2 RS} pre post r rg
+      (LERR1: forall x x' y, (RR1 x x': Prop) -> (RS x' y: Prop) -> RS x y)
+      (LERR2: forall x y y', (RR2 y y': Prop) -> RS x y' -> RS x y):
+      Proper (eq_itree RR1 ==> eq_itree RR2 ==> flip impl)
+        (gpaco2 (@refines_ F F R1 R2 pre post RS) (refinesC RS pre post) r rg).
+    Proof.
+    (*   repeat intro. guclo eqit_clo_trans. econstructor; cycle -3; eauto. *)
+    (*   - eapply eqit_mon, H; eauto; discriminate. *)
+    (*   - eapply eqit_mon, H0; eauto; discriminate. *)
+      (* Qed. *)
+    Admitted.
+
+    (* This may only hold for the padded version because of ITree.bind in the vis cases? *)
     Lemma strict_refines_unpadded_interp_to_itree_spec :
       forall {F R} h g (t : itree F R),
+        (* Handler refinement *)
+        (forall R (e1 : F R) (e2 : F R),
+            strict_refines_unpadded (h _ e1) (g _ (to_SpecEvent e2))) ->
         @strict_refines_unpadded F R (interp h t) (interp g (to_itree_spec t)).
     Proof.
-      intros F R h g t.
+      intros F R h g t REF.
       rewrite (itree_eta_ t).
       genobs t ot; clear t Heqot.
       revert ot.
@@ -1560,20 +1577,119 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         - gstep; red; cbn.
           constructor; auto with paco.
           (* Need to be able to do this rewrite... *)
+          (* This relies on grefinegen_cong_eqit *)
+          (* Why can't I rewrite? *)
           (* setoid_rewrite unfold_interp. *)
+          eapply grefinegen_cong_eqit; cbn.
+          3-4: rewrite unfold_interp; reflexivity.
+          1-2: intros; subst; auto.
+
+          gbase.
+          apply CIH.
+        - gfinal.
+          right.
+          cbn.
+          eapply paco2_mon_bot.
+          eapply refines_bind.
+          apply REF.
+
+          intros r1 r2 H; subst.
+          pstep; red; cbn.
+          constructor; left.
+          pstep; red.
           admit.
-        - admit.
+
+          intros x0 x1 x2 PR.
+          apply PR.
       }
       admit.
     Abort.
 
-    Lemma strict_refines_to_itree_spec :
+    (* Lemma strict_refines_unpadded_to_itree_spec : *)
+    (*   forall {F R} h g (t : itree F R), *)
+    (*     (* Handler refinement *) *)
+    (*     (forall R (e1 : F R) (e2 : F R), *)
+    (*         strict_refines_unpadded (h _ e1) (to_itree_spec (g _ e2))) -> *)
+    (*     @strict_refines_unpadded F R (interp h t) (to_itree_spec (interp g t)). *)
+    (* Proof. *)
+    (*   intros F R h g t REF. *)
+    (*   setoid_rewrite to_itree_spec_iterp. *)
+    (*   apply to_itree_spec_interp. *)
+      
+    (*   ginit. *)
+    (*   2: { *)
+    (*     revert t. *)
+    (*     gcofix CIH. *)
+    (*     rewrite !unfold_interp. *)
+
+    (*     intros ot. *)
+    (*     hinduction ot before R; intros. *)
+    (*     - gstep; red; cbn; *)
+    (*       constructor; auto. *)
+    (*     - gstep; red; cbn; *)
+    (*         constructor; auto. *)
+
+          
+    (*       gbase. *)
+    (*       apply CIH. *)
+        
+
+    (*   } *)
+
+        
+    (* Qed. *)
+
+    Lemma strict_refines_interp_to_itree_spec :
       forall {F R} h g (t : itree F R),
+        (* Handler refinement *)
+        (forall R (e1 : F R) (e2 : F R),
+            strict_refines (h _ e1) (g _ (to_SpecEvent e2))) ->
         @strict_refines F R (interp h t) (interp g (to_itree_spec t)).
     Proof.
-    Abort.
+      intros F R h g t REF.
+      rewrite (itree_eta_ t).
+      genobs t ot; clear t Heqot.
+      revert ot.
+      setoid_rewrite unfold_interp.
+      cbn.
+      ginit.
+      2: {
+        gcofix CIH.
+        intros ot.
+        hinduction ot before r; intros.
+        - gstep; red; cbn.
+          constructor; auto.
+        - gstep; red; cbn.
+          constructor; auto with paco.
+          (* Need to be able to do this rewrite... *)
+          (* This relies on grefinegen_cong_eqit *)
+          (* Why can't I rewrite? *)
+          (* setoid_rewrite unfold_interp. *)
+          eapply grefinegen_cong_eqit; cbn.
+          (* 3-4: setoid_rewrite unfold_interp. ; reflexivity. *)
+          (* 1-2: intros; subst; auto. *)
 
-    Theorem exec_refines_interp :
+          (* gbase. *)
+        (* apply CIH. *)
+          all: admit.
+        - admit.
+      }
+      admit.
+    Admitted.
+
+    Lemma strict_refines_to_itree_spec_interp :
+      forall {F R} h g (t : itree F R),
+        (* Handler refinement *)
+        (forall R (e1 : F R) (e2 : F R),
+            strict_refines (h _ e1) (to_itree_spec (g _ e2))) ->
+        @strict_refines F R (interp h t) (to_itree_spec (interp g t)).
+    Proof.
+      intros F R h g t REF.
+      rewrite to_itree_spec_iterp.
+      apply strict_refines_interp_to_itree_spec; auto.
+    Qed.
+
+    Theorem exec_refines_to_itree_spec_interp :
       forall {F G}
         `{UBE -< G} `{OOME -< G} `{FailureE -< G}
         (h : F ~> itree_spec G) (g : F ~> itree G),
@@ -1587,7 +1703,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     Proof.
     Admitted.
 
-    Theorem exec_refines_interp_MemStateFreshT :
+    Theorem exec_refines_to_itree_spec_interp_MemStateFreshT :
       forall {F G}
         `{UBE -< G} `{OOME -< G} `{FailureE -< G}
         (h : F ~> MemStateFreshT (itree_spec G)) (g : F ~> MemStateFreshT (itree G)),
@@ -1611,7 +1727,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
           (to_itree_spec (@interp_memory T t sid ms)).
     Proof using.
       intros T t ms sid VALID.
-      eapply exec_refines_interp_MemStateFreshT.
+      eapply exec_refines_to_itree_spec_interp_MemStateFreshT.
       intros R e s ms0.
       eapply interp_memory_spec_h_correct.
 
