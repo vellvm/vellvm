@@ -5,6 +5,9 @@ From ITree Require Import
      Events.StateFacts
      Eq.Eqit.
 
+From ITreeSpec Require Import
+  ITreeSpecDefinition.
+
 From Vellvm Require Import
      Utilities
      Semantics.LLVMEvents

@@ -14,8 +14,7 @@ From ITree Require Import
   Basics.Monad
   Eq
   Eq.Paco2
-  Eqit
-  TranslateFacts.
+  Eqit.
 
 From ITree Require Import
   Basics
@@ -24,10 +23,10 @@ From ITree Require Import
   Basics.HeterogeneousRelations.
 
 From ExtLib Require Import
-  Structures.Functor
-  Structures.Monads.
+  Structures.Monad
+  Structures.Functor.
 
-Variant SpecEvent (E : Type -> Type) : Type -> Type :=
+Polymorphic Variant SpecEvent (E : Type -> Type) : Type -> Type :=
 | Spec_vis {X} (e : E X) : SpecEvent E X
 | Spec_forall (A : Type) : SpecEvent E A
 | Spec_exists (A : Type) : SpecEvent E A.
@@ -51,6 +50,28 @@ Defined.
 
 Definition itree_spec (E : Type -> Type) (R : Type) :=
   itree (SpecEvent E) R.
+
+Import EitherMonad.
+
+Universes u v w.
+
+Definition my_handle_memory_prop' {E : Type@{u} -> Type@{v}} :
+  forall T : Type@{w}, itree_spec E T.
+Proof using.
+  intros T.
+  (*
+Error:
+In environment
+E : Type@{u} -> Type@{v}
+T : Type@{w}
+The term "eitherT T (fun X : Type@{except.u1} => X) T" has type "Type@{except.u2}"
+while it is expected to have type "Type@{SpecEvent.u3}" (universe inconsistency: Cannot enforce
+except.u2 <= SpecEvent.u3 because SpecEvent.u3 < Functor_itree.u1 <= ITree.map.u2
+<= ITreeMonad.Eq1_ITree.u0 <= MonadPlus.MonadPlus.u0 <= except.u2).
+
+   *)
+  refine (Vis (@Spec_forall E (eitherT T (fun X => X) T)) (fun (x : (eitherT T (fun X => X) T)) => _)).
+Abort.
 
 Notation itree_spec' E R := (itree' (SpecEvent E) R).
 
@@ -125,38 +146,6 @@ eapply Basics.iter.
 apply X.
 apply X0.
 Defined.
-
-#[global] Instance Proper_to_itree_spec {E T} : Proper (eutt eq ==> eutt eq) (@to_itree_spec E T).
-Proof.
-  intros x y H.
-  unfold to_itree_spec.
-  rewrite H.
-  reflexivity.
-Qed.
-
-#[global] Instance Proper_to_itree_spec_eq_itree {E T} : Proper (eq_itree eq ==> eq_itree eq) (@to_itree_spec E T).
-Proof.
-  intros x y H.
-  unfold to_itree_spec.
-  rewrite H.
-  reflexivity.
-Qed.
-
-#[global] Instance Proper_to_itree_VisOnly {E T} : Proper (eutt eq ==> eutt eq) (@to_itree_VisOnlyE E T).
-Proof.
-  intros x y H.
-  unfold to_itree_VisOnlyE.
-  rewrite H.
-  reflexivity.
-Qed.
-
-#[global] Instance Proper_to_itree_VisOnly_eq_itree {E T} : Proper (eq_itree eq ==> eq_itree eq) (@to_itree_VisOnlyE E T).
-Proof.
-  intros x y H.
-  unfold to_itree_VisOnlyE.
-  rewrite H.
-  reflexivity.
-Qed.
 
 Create HintDb itree_spec.
 
