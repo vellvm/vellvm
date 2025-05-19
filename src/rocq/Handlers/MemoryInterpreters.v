@@ -1,50 +1,40 @@
 From Stdlib Require Import
-     Morphisms
-     ZArith
-     Lia
-     Program.Equality.
+  Morphisms
+  ZArith
+  Lia
+  Program.Equality.
 
 From Vellvm.Semantics Require Import
-     MemoryParams
-     Memory.ErrSID
-     LLVMParams
-     LLVMEvents
-     StoreId.
+  MemoryParams
+  Memory.ErrSID
+  LLVMParams
+  LLVMEvents
+  StoreId.
 
 From Vellvm.Handlers Require Import
-     MemoryModel
-     MemPropT
-     MemoryModules.Within.
+  MemoryModel
+  MemPropT
+  MemoryModules.Within.
 
 From Vellvm.Utils Require Import
-     Tactics
-     InterpProp
-     VellvmRelations
-     StateMonads Raise Tactics ITreeMap.
+  Tactics
+  InterpProp
+  VellvmRelations
+  StateMonads Raise Tactics ITreeMap
+  Error.
 
 From Vellvm.Theory Require Import
   ContainsUBExtra.
 
-From ITree Require Import
-     ITree
-     Eq.Eqit
-     Eq.EqAxiom
-     Events.StateFacts.
-
-From ITreeSpec Require Import
-  ITreeSpecDefinition
-  ITreeSpecFacts
-  ITreeSpecCombinatorFacts.
-
 Import HeterogeneousRelations.
 
 From ExtLib Require Import
-     Structures.Functor
-     Structures.Monads.
+  Structures.Functor
+  Structures.Monads.
 
 (* Needs to be after ITree.Events.State *)
 From Vellvm.Utils Require Import
-     PropT InterpMemoryProp NoSpecEvent.
+  PropT InterpMemoryProp NoSpecEvent.
 
 Require Import Paco.paco.
 
@@ -52,10 +42,23 @@ Import Basics.Basics.Monads.
 Import MonadNotation.
 
 Import MemoryAddress.
-Import Error.
+
+From ITree Require Import
+  ITree
+  Eq.Eqit
+  Eq.EqAxiom
+  Events.StateFacts.
+
+From ITreeSpec Require Import
+  ITreeSpecDefinition
+  ITreeSpecFacts
+  ITreeSpecCombinatorFacts.
+
 
 Set Implicit Arguments.
 Set Contextual Implicit.
+
+Unset Universe Checking.
 
 Ltac raise_abs :=
   let H := fresh "H" in
@@ -76,7 +79,6 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
   Import LP.Events.
   Import LP.PROV.
 
-  Unset Universe Checking.
   Section Interpreters.
 
     Context {E : Type -> Type}.
@@ -409,6 +411,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Proof using.
       intros T MemE ms.
       eapply handle_memory_prop in ms; eauto.
+      pose proof (err_ub_oom (MemState * T)).
       refine (Vis (@Spec_forall Effout {a : (err_ub_oom (MemState * T)) | ms a}) (fun (x : {a : (err_ub_oom (MemState * T)) | ms a}) => _)).
       destruct x.
       apply (lift_err_ub_oom ret x).
@@ -1541,17 +1544,17 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     Import InterpFacts.
     Import ITreeSpecFacts.
 
-    #[global] Instance grefinegen_cong_eqit {F R1 R2 RR1 RR2 RS} pre post r rg
-      (LERR1: forall x x' y, (RR1 x x': Prop) -> (RS x' y: Prop) -> RS x y)
-      (LERR2: forall x y y', (RR2 y y': Prop) -> RS x y' -> RS x y):
-      Proper (eq_itree RR1 ==> eq_itree RR2 ==> flip impl)
-        (gpaco2 (@refines_ F F R1 R2 pre post RS) (refinesC RS pre post) r rg).
-    Proof.
-    (*   repeat intro. guclo eqit_clo_trans. econstructor; cycle -3; eauto. *)
+    (* #[global] Instance grefinegen_cong_eqit {F R1 R2 RR1 RR2 RS} pre post r rg *)
+    (*   (LERR1: forall x x' y, (RR1 x x': Prop) -> (RS x' y: Prop) -> RS x y) *)
+    (*   (LERR2: forall x y y', (RR2 y y': Prop) -> RS x y' -> RS x y): *)
+    (*   Proper (eq_itree RR1 ==> eq_itree RR2 ==> flip impl) *)
+    (*     (gpaco2 (@refines_ F F R1 R2 pre post RS) (refinesC RS pre post) r rg). *)
+    (* Proof. *)
+    (*   repeat intro. *)
+    (*   guclo eqit_clo_trans. econstructor; cycle -3; eauto. *)
     (*   - eapply eqit_mon, H; eauto; discriminate. *)
     (*   - eapply eqit_mon, H0; eauto; discriminate. *)
-      (* Qed. *)
-    Admitted.
+    (* Abort. *)
 
     (* This may only hold for the padded version because of ITree.bind in the vis cases? *)
     Lemma strict_refines_unpadded_interp_to_itree_spec :
@@ -1580,12 +1583,56 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
           (* This relies on grefinegen_cong_eqit *)
           (* Why can't I rewrite? *)
           (* setoid_rewrite unfold_interp. *)
-          eapply grefinegen_cong_eqit; cbn.
-          3-4: rewrite unfold_interp; reflexivity.
-          1-2: intros; subst; auto.
+          pose proof (unfold_interp (f:= h) t) as UNFOLD.
+          apply EqAxiom.bisimulation_is_eq in UNFOLD.
+          rewrite UNFOLD; clear UNFOLD.
+
+          pose proof (unfold_interp (f:=g) (translate (@to_SpecEvent F) t)) as UNFOLD.
+          apply EqAxiom.bisimulation_is_eq in UNFOLD.
+          setoid_rewrite UNFOLD; clear UNFOLD.
 
           gbase.
           apply CIH.
+        (* - cbn. *)
+        (*   (* How do I deal with bind in gpaco2? *) *)
+        (*   pose proof (unfold_bind (h X e) (fun x : X => Tau (interp h (k x)))) as UNFOLD. *)
+        (*   apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
+        (*   setoid_rewrite UNFOLD; clear UNFOLD. *)
+
+        (*   pose proof (unfold_bind (g X (to_SpecEvent e)) (fun x : X => Tau (interp g (translate (@to_SpecEvent F) (k x))))) as UNFOLD. *)
+        (*   apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
+        (*   setoid_rewrite UNFOLD; clear UNFOLD. *)
+
+        (*   pose proof (REF _ e e) as REF'. *)
+
+        (*   pinversion REF'; subst. *)
+        (*   + gstep; red; cbn; constructor. *)
+        (*     pose proof (unfold_interp (f:= h) (k r2)) as UNFOLD. *)
+        (*     apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
+        (*     setoid_rewrite UNFOLD; clear UNFOLD. *)
+
+        (*     pose proof (unfold_interp (f:=g) (translate (@to_SpecEvent F) (k r2))) as UNFOLD. *)
+        (*     apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
+        (*     setoid_rewrite UNFOLD; clear UNFOLD. *)
+        (*     gbase. *)
+        (*     apply CIH. *)
+        (*   + gstep; red; cbn; constructor. *)
+        (*     pose proof (unfold_interp (f:= h) (k x)) as UNFOLD. *)
+        (*     apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
+        (*     setoid_rewrite UNFOLD; clear UNFOLD. *)
+
+        (*     pose proof (unfold_interp (f:=g) (translate (@to_SpecEvent F) (k r2))) as UNFOLD. *)
+        (*     apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
+        (*     setoid_rewrite UNFOLD; clear UNFOLD. *)
+        (*     gbase. *)
+        (*     apply CIH. *)
+
+            
+
+        (*   gstep; red; cbn. *)
+        (*   constructor; auto with paco. *)
+
+          
         - gfinal.
           right.
           cbn.
@@ -1596,7 +1643,9 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
           intros r1 r2 H; subst.
           pstep; red; cbn.
           constructor; left.
+          
           pstep; red.
+
           admit.
 
           intros x0 x1 x2 PR.
@@ -1665,7 +1714,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
           (* This relies on grefinegen_cong_eqit *)
           (* Why can't I rewrite? *)
           (* setoid_rewrite unfold_interp. *)
-          eapply grefinegen_cong_eqit; cbn.
+          (* eapply grefinegen_cong_eqit; cbn. *)
           (* 3-4: setoid_rewrite unfold_interp. ; reflexivity. *)
           (* 1-2: intros; subst; auto. *)
 

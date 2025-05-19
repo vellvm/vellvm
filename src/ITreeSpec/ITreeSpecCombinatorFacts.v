@@ -34,6 +34,38 @@ Ltac use_simpobs := repeat match goal with
                            | H : observe ?t = VisF _ _ |- _ => apply simpobs in H
                            end.
 
+#[global] Instance Proper_to_itree_spec {E T} : Proper (eutt eq ==> eutt eq) (@to_itree_spec E T).
+Proof.
+  intros x y H.
+  unfold to_itree_spec.
+  rewrite H.
+  reflexivity.
+Qed.
+
+#[global] Instance Proper_to_itree_spec_eq_itree {E T} : Proper (eq_itree eq ==> eq_itree eq) (@to_itree_spec E T).
+Proof.
+  intros x y H.
+  unfold to_itree_spec.
+  rewrite H.
+  reflexivity.
+Qed.
+
+#[global] Instance Proper_to_itree_VisOnly {E T} : Proper (eutt eq ==> eutt eq) (@to_itree_VisOnlyE E T).
+Proof.
+  intros x y H.
+  unfold to_itree_VisOnlyE.
+  rewrite H.
+  reflexivity.
+Qed.
+
+#[global] Instance Proper_to_itree_VisOnly_eq_itree {E T} : Proper (eq_itree eq ==> eq_itree eq) (@to_itree_VisOnlyE E T).
+Proof.
+  intros x y H.
+  unfold to_itree_VisOnlyE.
+  rewrite H.
+  reflexivity.
+Qed.
+
 Global Instance eq_itree_refines_Proper1 {E1 E2 R1 R2 RR}
   {RPre : prerel E1 E2} {RPost : postrel E1 E2} {r} : 
   Proper (eq_itree eq ==> eq_itree eq ==> flip impl)

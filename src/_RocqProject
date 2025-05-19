@@ -6,7 +6,7 @@
 -arg -w -arg -deprecated-hint-without-locality
 -arg -w -arg -deprecated-hint-rewrite-without-locality
 -arg -w -arg -require-in-module
-
+-arg -type-in-type
 
 ./rocq/Analysis/Dom.v
 ./rocq/Analysis/DomId.v
@@ -35,6 +35,7 @@
 ./rocq/Handlers/SerializationTheory.v
 ./rocq/Handlers/Stack.v
 ./rocq/Handlers/UndefinedBehaviour.v
+./rocq/Handlers/MyTranslateFacts.v
 ./rocq/Numeric/Archi.v
 ./rocq/Numeric/Rocqlib.v
 ./rocq/Numeric/Floats.v
