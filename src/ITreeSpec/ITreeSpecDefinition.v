@@ -155,43 +155,54 @@ Section refines.
 
   Context (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop).
 
-  Inductive refinesF (sim : itree_spec E1 R1 -> itree_spec E2 R2 -> Prop) : itree_spec' E1 R1 -> itree_spec' E2 R2 -> Prop := 
-  | refinesF_Ret r1 r2 : RR r1 r2 -> refinesF sim (RetF r1) (RetF r2)
-  | refinesF_Tau t1 t2 : sim t1 t2 -> refinesF sim (TauF t1) (TauF t2)
+  Inductive refinesF vclo (sim : itree_spec E1 R1 -> itree_spec E2 R2 -> Prop) : itree_spec' E1 R1 -> itree_spec' E2 R2 -> Prop := 
+  | refinesF_Ret r1 r2 : RR r1 r2 -> refinesF vclo sim (RetF r1) (RetF r2)
+  | refinesF_Tau t1 t2 : sim t1 t2 -> refinesF vclo sim (TauF t1) (TauF t2)
 
   | refinesF_Vis {X Y} (e1 : E1 X) (e2 : E2 Y) k1 k2 :
     RPre X Y e1 e2 ->
-    (forall a b, RPost X Y e1 a e2 b -> sim (k1 a) (k2 b)) ->
-    refinesF sim (VisF (Spec_vis e1) k1) (VisF (Spec_vis e2) k2)
+    (forall a b, RPost X Y e1 a e2 b -> vclo sim (k1 a) (k2 b)) ->
+    refinesF vclo sim (VisF (Spec_vis e1) k1) (VisF (Spec_vis e2) k2)
 
-  | refinesF_TauL t1 ot2 : refinesF sim (observe t1) ot2 -> refinesF sim (TauF t1) ot2
-  | refinesF_TauR ot1 t2 : refinesF sim ot1 (observe t2) -> refinesF sim ot1 (TauF t2)
+  | refinesF_TauL t1 ot2 : refinesF vclo sim (observe t1) ot2 -> refinesF vclo sim (TauF t1) ot2
+  | refinesF_TauR ot1 t2 : refinesF vclo sim ot1 (observe t2) -> refinesF vclo sim ot1 (TauF t2)
 
-  | refinesF_forallR A ot1 k : (forall a, refinesF sim ot1 (observe (k a)) ) -> refinesF sim ot1 (VisF (Spec_forall A) k)
-  | refinesF_existsR A ot1 k a : refinesF sim ot1 (observe (k a)) -> refinesF sim ot1 (VisF (Spec_exists A) k)
-  | refinesF_forallL A ot2 k a : refinesF sim (observe (k a)) ot2 -> refinesF sim (VisF (Spec_forall A) k ) ot2
-  | refinesF_existsL A ot2 k : (forall a, refinesF sim (observe (k a)) ot2) -> refinesF sim (VisF (Spec_exists A) k) ot2
+  | refinesF_forallR A ot1 k : (forall a, refinesF vclo sim ot1 (observe (k a)) ) -> refinesF vclo sim ot1 (VisF (Spec_forall A) k)
+  | refinesF_existsR A ot1 k a : refinesF vclo sim ot1 (observe (k a)) -> refinesF vclo sim ot1 (VisF (Spec_exists A) k)
+  | refinesF_forallL A ot2 k a : refinesF vclo sim (observe (k a)) ot2 -> refinesF vclo sim (VisF (Spec_forall A) k ) ot2
+  | refinesF_existsL A ot2 k : (forall a, refinesF vclo sim (observe (k a)) ot2) -> refinesF vclo sim (VisF (Spec_exists A) k) ot2
   .
 
   Hint Constructors refinesF : itree_spec.
 
-  Definition refines_ sim : itree_spec E1 R1 -> itree_spec E2 R2 -> Prop :=
-    fun t1 t2 => refinesF sim (observe t1) (observe t2).
+  Definition refines_ vclo sim : itree_spec E1 R1 -> itree_spec E2 R2 -> Prop :=
+    fun t1 t2 => refinesF vclo sim (observe t1) (observe t2).
 
-  Lemma monotone_refinesF ot1 ot2 sim sim' (LE : sim <2= sim')
-    (IN : refinesF sim ot1 ot2) : refinesF sim' ot1 ot2.
+  Lemma monotone_refinesF ot1 ot2 vclo vclo' sim sim'
+    (MON: monotone2 vclo)
+    (LEc: vclo <3= vclo')
+    (LE : sim <2= sim')
+    (IN : refinesF vclo sim ot1 ot2) : refinesF vclo' sim' ot1 ot2.
   Proof with eauto with itree_spec.
     induction IN...
   Qed.
 
-  Lemma monotone_refines_: monotone2 refines_.
+  Lemma monotone_refines_ vclo (MON: monotone2 vclo) : monotone2 (refines_ vclo).
   Proof. red. intros. eapply monotone_refinesF; eauto. Qed.
 
   Hint Resolve monotone_refines_ : paco.
 
-  Definition refines := paco2 refines_ bot2.
+  Lemma refines_idclo_mono : monotone2 (@id (itree_spec E1 R1 -> itree_spec E2 R2 -> Prop)).
+  Proof. unfold id. eauto. Qed.
+
+  Hint Resolve refines_idclo_mono : paco.
+
+  Definition refines := paco2 (refines_ id) bot2.
 
 End refines.
+
+Hint Resolve monotone_refines_ : paco.
+Hint Resolve refines_idclo_mono : paco.
 
 Definition forall_spec {E} (A : Type) : itree_spec E A :=
   Vis (Spec_forall A) (fun a => Ret a).
@@ -211,7 +222,7 @@ Lemma forall_spec_correctr {E1 E2}
   refines RPre RPost RR t (ITree.bind (forall_spec A) k).
 Proof.
   intros. pstep. red. cbn. constructor. cbn. intros. simpl.
-  pstep_reverse. auto with itree_spec. apply monotone_refines_.
+  pstep_reverse. auto with itree_spec.
   apply H.
 Qed.
 
@@ -226,7 +237,6 @@ Proof.
   apply refinesF_forallL with (a:=a).
   unfold observe. cbn.
   pstep_reverse.
-  apply monotone_refines_.
 Qed.
 
 Lemma exists_spec_correctr {E1 E2}
@@ -240,7 +250,6 @@ Proof.
   apply refinesF_existsR with (a:=a).
   simpl.
   pstep_reverse.
-  apply monotone_refines_.
 Qed.
 
 Lemma exists_spec_correctl {E1 E2}
@@ -250,6 +259,6 @@ Lemma exists_spec_correctl {E1 E2}
   refines RPre RPost RR t (ITree.bind (forall_spec A) k).
 Proof.
   intros. pstep. red. cbn. constructor. cbn. intros. simpl.
-  pstep_reverse. auto with itree_spec. apply monotone_refines_.
+  pstep_reverse. auto with itree_spec.
   apply H.
 Qed.

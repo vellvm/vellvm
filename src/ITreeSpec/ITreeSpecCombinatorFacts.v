@@ -983,14 +983,14 @@ Proof.
   apply TranslateFacts.translate_bind.
 Qed.
 
-Lemma to_itree_VisOnlyE_to_interp :
-  forall {E : Type -> Type} {R : Type} (t : itree E R),
-  to_itree_VisOnlyE t ≈ interp (fun (T : Type) (e : (fun H : Type => E H) T) => ITree.trigger (to_VisOnlyE e)) t.
-Proof.
-  unfold to_itree_VisOnlyE.
-  intros.
-  apply translate_to_interp.
-Qed.
+(* Lemma to_itree_VisOnlyE_to_interp : *)
+(*   forall {E : Type -> Type} {R : Type} (t : itree E R), *)
+(*   to_itree_VisOnlyE t ≈ interp (fun (T : Type) (e : (fun H : Type => E H) T) => ITree.trigger (to_VisOnlyE e)) t. *)
+(* Proof. *)
+(*   unfold to_itree_VisOnlyE. *)
+(*   intros. *)
+(*   apply translate_to_interp. *)
+(* Qed. *)
 
 Lemma to_itree_VisOnlyE_vis :
   forall {E : Type -> Type} {R : Type}
