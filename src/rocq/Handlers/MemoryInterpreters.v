@@ -1571,7 +1571,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       setoid_rewrite unfold_interp.
       cbn.
       ginit.
-      2: {
+      {
         gcofix CIH.
         intros ot.
         hinduction ot before r; intros.
@@ -1592,47 +1592,38 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
           setoid_rewrite UNFOLD; clear UNFOLD.
 
           gbase.
+          guclo
           apply CIH.
-        (* - cbn. *)
-        (*   (* How do I deal with bind in gpaco2? *) *)
-        (*   pose proof (unfold_bind (h X e) (fun x : X => Tau (interp h (k x)))) as UNFOLD. *)
-        (*   apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
-        (*   setoid_rewrite UNFOLD; clear UNFOLD. *)
+        - paco2_mon_bot.
+          econstructor.
 
-        (*   pose proof (unfold_bind (g X (to_SpecEvent e)) (fun x : X => Tau (interp g (translate (@to_SpecEvent F) (k x))))) as UNFOLD. *)
-        (*   apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
-        (*   setoid_rewrite UNFOLD; clear UNFOLD. *)
+          x > y
 
-        (*   pose proof (REF _ e e) as REF'. *)
+          x' > y' ===> x > y
 
-        (*   pinversion REF'; subst. *)
-        (*   + gstep; red; cbn; constructor. *)
-        (*     pose proof (unfold_interp (f:= h) (k r2)) as UNFOLD. *)
-        (*     apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
-        (*     setoid_rewrite UNFOLD; clear UNFOLD. *)
-
-        (*     pose proof (unfold_interp (f:=g) (translate (@to_SpecEvent F) (k r2))) as UNFOLD. *)
-        (*     apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
-        (*     setoid_rewrite UNFOLD; clear UNFOLD. *)
-        (*     gbase. *)
-        (*     apply CIH. *)
-        (*   + gstep; red; cbn; constructor. *)
-        (*     pose proof (unfold_interp (f:= h) (k x)) as UNFOLD. *)
-        (*     apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
-        (*     setoid_rewrite UNFOLD; clear UNFOLD. *)
-
-        (*     pose proof (unfold_interp (f:=g) (translate (@to_SpecEvent F) (k r2))) as UNFOLD. *)
-        (*     apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
-        (*     setoid_rewrite UNFOLD; clear UNFOLD. *)
-        (*     gbase. *)
-        (*     apply CIH. *)
-
-            
-
-        (*   gstep; red; cbn. *)
-        (*   constructor; auto with paco. *)
-
+          x'
           
+          (* trying to show that t1 >= t2
+
+             We want to do that by showing t1' >= t2'
+
+             t1' has to be smaller than t1
+             and t2' >= t2
+
+           *)
+          
+          cbn.
+          eapply refines_bind.
+          
+          guclo refines_clo_trans.
+          cbn.
+          econstructor.
+          setoid_rewrite REF.
+          apply REF.
+          cbn.
+          guclo.
+          constructor.
+
         - gfinal.
           right.
           cbn.
@@ -1700,6 +1691,60 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       genobs t ot; clear t Heqot.
       revert ot.
       setoid_rewrite unfold_interp.
+      pcofix CIH.
+      intros ot.
+      hinduction ot before r; intros.
+      - pstep; red; cbn.
+        constructor; auto.
+      - pstep; red; cbn.
+        constructor; auto with paco.
+        right.
+        pose proof (unfold_interp (f:= h) t) as UNFOLD.
+        apply EqAxiom.bisimulation_is_eq in UNFOLD.
+        setoid_rewrite UNFOLD; clear UNFOLD.
+
+        pose proof (unfold_interp (f:=g) (translate (@to_SpecEvent F) t)) as UNFOLD.
+        apply EqAxiom.bisimulation_is_eq in UNFOLD.
+        setoid_rewrite UNFOLD; clear UNFOLD.
+        apply CIH.
+      - cbn.
+        pose proof (Padded.pad_bind (h X e) (fun x : X => Tau (interp h (k x)))) as BIND.
+        apply EqAxiom.bisimulation_is_eq in BIND.
+        setoid_rewrite BIND; clear BIND.
+
+        pose proof (Padded.pad_bind (g X (to_SpecEvent e)) (fun x : X => Tau (interp g (translate (@to_SpecEvent F) (k x))))) as BIND.
+        apply EqAxiom.bisimulation_is_eq in BIND.
+        setoid_rewrite BIND; clear BIND.
+
+        eapply paco2_mon.        
+        eapply refines_bind.
+        apply REF.
+
+        intros r1 r2 H; subst.
+        pstep; red; cbn.
+        constructor.
+        left.
+
+
+        
+        apply CIH.
+        left.
+        (* Need to be able to do this rewrite... *)
+        (* This relies on grefinegen_cong_eqit *)
+        (* Why can't I rewrite? *)
+        (* setoid_rewrite unfold_interp. *)
+        (* eapply grefinegen_cong_eqit; cbn. *)
+        (* 3-4: setoid_rewrite unfold_interp. ; reflexivity. *)
+        (* 1-2: intros; subst; auto. *)
+
+        (* gbase. *)
+        (* apply CIH. *)
+        all: admit.
+      - admit.
+
+
+
+      
       cbn.
       ginit.
       2: {

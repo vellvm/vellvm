@@ -109,52 +109,52 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
 
     Arguments lift_err_ub_oom_post_ret {_ _ _ _ _ _} _ _ _.
 
-    Definition PickUvalue_handler  {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : PickUvalueE ~> itree_spec E.
-      intros T p.
-      refine (match p with
-              | pickUnique x => _
-              | pickNonPoison x => _
-              | pick x => _
-              end).
-      - (* pickUnique *)
-        admit.
-      - (* pickNonPoison *)
-        admit.
-      - (* pick *)
-        apply (x <- trigger (@Spec_forall E {dv : dvalue | concretize_u x (ret dv)});; _).
-        refine (Vis (@Spec_forall Effout {a : (err_ub_oom (MemState * (store_id * T))) | ms (fmap (fun '(m, (sid, x)) => (m, x)) a)}) (fun (x : {a : (err_ub_oom (MemState * (store_id * T))) | ms (fmap (fun '(m, (sid, x)) => (m, x)) a)}) => _)).
-    Defined.
+    (* Definition PickUvalue_handler  {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : PickUvalueE ~> itree_spec E. *)
+    (*   intros T p. *)
+    (*   refine (match p with *)
+    (*           | pickUnique x => _ *)
+    (*           | pickNonPoison x => _ *)
+    (*           | pick x => _ *)
+    (*           end). *)
+    (*   - (* pickUnique *) *)
+    (*     admit. *)
+    (*   - (* pickNonPoison *) *)
+    (*     admit. *)
+    (*   - (* pick *) *)
+    (*     apply (x <- trigger (@Spec_forall E {dv : dvalue | concretize_u x (ret dv)});; _). *)
+    (*     refine (Vis (@Spec_forall Effout {a : (err_ub_oom (MemState * (store_id * T))) | ms (fmap (fun '(m, (sid, x)) => (m, x)) a)}) (fun (x : {a : (err_ub_oom (MemState * (store_id * T))) | ms (fmap (fun '(m, (sid, x)) => (m, x)) a)}) => _)). *)
+    (* Defined. *)
 
 
-    (* Unique picks have two possibilities...
+    (* (* Unique picks have two possibilities... *)
 
-       1) The choice isn't unique, in which case UB occurs
-       2) The choice is unique
-     *)
-    | PickUV_UniqueUB : forall x t,
-        ~ (unique_prop x) ->
-        PickUvalue_handler (@pickUnique _ _ (fun _ _ => True) x) t
-    | PickUV_UniqueRet :
-      forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True})
-        (Conc : concretize_u x res),
-        unique_prop x ->
-        t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
-        PickUvalue_handler (@pickUnique _ _ (fun _ _ => True) x) t
+    (*    1) The choice isn't unique, in which case UB occurs *)
+    (*    2) The choice is unique *)
+    (*  *) *)
+    (* | PickUV_UniqueUB : forall x t, *)
+    (*     ~ (unique_prop x) -> *)
+    (*     PickUvalue_handler (@pickUnique _ _ (fun _ _ => True) x) t *)
+    (* | PickUV_UniqueRet : *)
+    (*   forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True}) *)
+    (*     (Conc : concretize_u x res), *)
+    (*     unique_prop x -> *)
+    (*     t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) -> *)
+    (*     PickUvalue_handler (@pickUnique _ _ (fun _ _ => True) x) t *)
 
-    | PickUV_NonPoisonUB : forall x t,
-        ~ (non_poison_prop x) ->
-        PickUvalue_handler (@pickNonPoison _ _ (fun _ _ => True) x) t
-    | PickUV_NonPoisonRet :
-      forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True})
-        (Conc : concretize_u x res),
-        non_poison_prop x ->
-        t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
-        PickUvalue_handler (@pickNonPoison _ _ (fun _ _ => True) x) t
-    | PickUV_Ret :
-      forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True})
-        (Conc : concretize_u x res),
-        t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
-        PickUvalue_handler (@pick _ _ (fun _ _ => True) x) t.
+    (* | PickUV_NonPoisonUB : forall x t, *)
+    (*     ~ (non_poison_prop x) -> *)
+    (*     PickUvalue_handler (@pickNonPoison _ _ (fun _ _ => True) x) t *)
+    (* | PickUV_NonPoisonRet : *)
+    (*   forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True}) *)
+    (*     (Conc : concretize_u x res), *)
+    (*     non_poison_prop x -> *)
+    (*     t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) -> *)
+    (*     PickUvalue_handler (@pickNonPoison _ _ (fun _ _ => True) x) t *)
+    (* | PickUV_Ret : *)
+    (*   forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True}) *)
+    (*     (Conc : concretize_u x res), *)
+    (*     t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) -> *)
+    (*     PickUvalue_handler (@pick _ _ (fun _ _ => True) x) t. *)
 
     Inductive PickUvalue_handler  {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : PickUvalueE ~> PropT E :=
     | PickUV_UniqueUB : forall x t,
@@ -221,7 +221,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
         interp_prop_oom_r (OOM:=OOME) (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) RR (@model_undef_k_spec UB).
 
       Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< F}
-        {T} (RR : T -> T -> Prop) (ts : PropT (E +' PickUvalueE +' F) T) : itree_spec (E +' F) T:=
+        {T} (RR : T -> T -> Prop) (ts : PropT (E +' PickUvalueE +' F) T) : PropT (E +' F) T:=
         fun t_picked => exists t_pre, ts t_pre /\ model_undef_h RR t_pre t_picked.
     End PARAMS_MODEL.
 

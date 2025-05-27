@@ -36,9 +36,9 @@ Context (E1 E2 : Type -> Type).
 Context (RPre : prerel E1 E2) (RPost : postrel E1 E2).
 Context (R1 R2 : Type) (RR : R1 -> R2 -> Prop).
 Context (A : Type).
-Lemma refines_Vis_forallR : forall t k,
-             refines RPre RPost RR t (Vis (Spec_forall A) k) ->
-         forall a, refines RPre RPost RR t (k a).
+Lemma refines_Vis_forallR b1 b2 : forall t k,
+             refines' RPre RPost RR b1 b2 t (Vis (Spec_forall A) k) ->
+         forall a, refines' RPre RPost RR b1 b2 t (k a).
 Proof.
  intros t k Href a. punfold Href. red in Href. cbn in *. pstep. red.
   remember (observe t) as ot. clear Heqot.
@@ -46,9 +46,9 @@ Proof.
   hinduction Href before E1; intros; inv Heqx; inj_existT; subst; pclearbot; eauto with itree_spec.
 Qed.
 
-Lemma refines_existsL : forall t k,
-    refines RPre RPost RR (Vis (Spec_exists A) k) t ->
-    forall a, refines RPre RPost RR (k a) t.
+Lemma refines_existsL b1 b2 : forall t k,
+    refines' RPre RPost RR b1 b2 (Vis (Spec_exists A) k) t ->
+    forall a, refines' RPre RPost RR b1 b2 (k a) t.
 Proof.
   intros t k Href a. punfold Href. red in Href. cbn in *. pstep. red.
   remember (observe t) as ot. clear Heqot.
@@ -62,44 +62,44 @@ Context {E1 E2 : Type -> Type} {R1 R2 : Type} (A : Type).
 Context (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop).
 
 (* A version of refinesF specialized to a forall on the left *)
-Inductive forallRefinesF vclo (F : itree_spec E1 R1 -> itree_spec E2 R2 -> Prop)
+Inductive forallRefinesF b1 b2 vclo (F : itree_spec E1 R1 -> itree_spec E2 R2 -> Prop)
           (kphi1 : A -> itree_spec E1 R1) : itree_spec' E2 R2 -> Prop :=
   | forallRefines_forallR B (kphi2 : B -> itree_spec E2 R2) :
-    (forall b, forallRefinesF vclo F kphi1 (observe (kphi2 b))) ->
-    forallRefinesF vclo F kphi1 (VisF (Spec_forall B) kphi2)
+    (forall b, forallRefinesF b1 b2 vclo F kphi1 (observe (kphi2 b))) ->
+    forallRefinesF b1 b2 vclo F kphi1 (VisF (Spec_forall B) kphi2)
   | forallRefines_forallL phi (a : A) :
-    refinesF RPre RPost RR vclo F (observe (kphi1 a)) phi ->
-    forallRefinesF vclo F kphi1 phi
+    refinesF RPre RPost RR b1 b2 vclo F (observe (kphi1 a)) phi ->
+    forallRefinesF b1 b2 vclo F kphi1 phi
   | forallRefines_existsR B kphi2 (b : B) :
-    (forallRefinesF vclo F kphi1 (observe (kphi2 b))) ->
-    forallRefinesF vclo F kphi1 (VisF (Spec_exists B) kphi2)
+    (forallRefinesF b1 b2 vclo F kphi1 (observe (kphi2 b))) ->
+    forallRefinesF b1 b2 vclo F kphi1 (VisF (Spec_exists B) kphi2)
   | forallRefines_TauR phi2 :
-    forallRefinesF vclo F kphi1 (observe phi2) ->
-    forallRefinesF vclo F kphi1 (TauF phi2).
+    forallRefinesF b1 b2 vclo F kphi1 (observe phi2) ->
+    forallRefinesF b1 b2 vclo F kphi1 (TauF phi2).
 
 (* A version of refinesF specialized to an exists on the left *)
-Inductive existsRefinesF vclo (F : itree_spec E1 R1 -> itree_spec E2 R2 -> Prop)
+Inductive existsRefinesF b1 b2 vclo (F : itree_spec E1 R1 -> itree_spec E2 R2 -> Prop)
           (kphi2 : A -> itree_spec E2 R2) : itree_spec' E1 R1 -> Prop :=
   | existsRefines_existsR phi a :
-    refinesF RPre RPost RR vclo F phi (observe (kphi2 a)) ->
-    existsRefinesF vclo F kphi2 phi
+    refinesF RPre RPost RR b1 b2 vclo F phi (observe (kphi2 a)) ->
+    existsRefinesF b1 b2 vclo F kphi2 phi
   | existsRefines_forallL B (kphi1 : B -> itree_spec E1 R1) (b : B):
-    existsRefinesF vclo F kphi2 (observe (kphi1 b)) ->
-    existsRefinesF vclo F kphi2 (VisF (@Spec_forall E1 B) kphi1)
+    existsRefinesF b1 b2 vclo F kphi2 (observe (kphi1 b)) ->
+    existsRefinesF b1 b2 vclo F kphi2 (VisF (@Spec_forall E1 B) kphi1)
   | existsRefines_existsL B (kphi1 : B -> itree_spec E1 R1) :
-    (forall b, existsRefinesF vclo F kphi2 (observe (kphi1 b))) ->
-    existsRefinesF vclo F kphi2 (VisF (@Spec_exists E1 B) kphi1)
+    (forall b, existsRefinesF b1 b2 vclo F kphi2 (observe (kphi1 b))) ->
+    existsRefinesF b1 b2 vclo F kphi2 (VisF (@Spec_exists E1 B) kphi1)
   | existsRefines_TauL phi1 :
-    existsRefinesF vclo F kphi2 (observe phi1) ->
-    existsRefinesF vclo F kphi2 (TauF phi1).
+    existsRefinesF b1 b2 vclo F kphi2 (observe phi1) ->
+    existsRefinesF b1 b2 vclo F kphi2 (TauF phi1).
 End refinesF_inv.
 
 Lemma refinesF_Vis_existsR
   {E1 E2 R1 R2} (A : Type)
   (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop)
-  : forall vclo F (t : itree_spec' E1 R1) (k : A -> itree_spec E2 R2),
-    refinesF RPre RPost RR vclo F t (VisF (@Spec_exists E2 A) k) ->
-    existsRefinesF A RPre RPost RR vclo F k t.
+  : forall b1 b2 vclo F (t : itree_spec' E1 R1) (k : A -> itree_spec E2 R2),
+    refinesF RPre RPost RR b1 b2 vclo F t (VisF (@Spec_exists E2 A) k) ->
+    existsRefinesF A RPre RPost RR b1 b2 vclo F k t.
 Proof.
   intros. remember (VisF (Spec_exists A) k) as t1.
   induction H; try discriminate.
@@ -113,9 +113,9 @@ Qed.
 
 Lemma refinesF_Vis_forallL {E1 E2 R1 R2} (A : Type)
   (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop)
-  : forall vclo F (t : itree_spec' E2 R2) (k : A -> itree_spec E1 R1),
-    refinesF RPre RPost RR vclo F (VisF (@Spec_forall E1 A) k) t ->
-    forallRefinesF A RPre RPost RR vclo F k t.
+  : forall b1 b2 vclo F (t : itree_spec' E2 R2) (k : A -> itree_spec E1 R1),
+    refinesF RPre RPost RR b1 b2 vclo F (VisF (@Spec_forall E1 A) k) t ->
+    forallRefinesF A RPre RPost RR b1 b2 vclo F k t.
 Proof.
   intros. remember (VisF (Spec_forall A) k) as t1.
   induction H; try discriminate.
@@ -133,13 +133,15 @@ Context (E1 E2 : Type -> Type).
 Context (RPre : prerel E1 E2) (RPost : postrel E1 E2).
 Context (R1 R2 : Type) (RR : R1 -> R2 -> Prop).
 
-Lemma refines_TauL_inv : forall phi1 phi2,
-    refines RPre RPost RR (Tau phi1) phi2 -> refines RPre RPost RR phi1 phi2.
+Lemma refines_TauL_inv : forall b1 phi1 phi2,
+    refines' RPre RPost RR b1 true (Tau phi1) phi2 -> refines' RPre RPost RR b1 true phi1 phi2.
 Proof.
+  intros b1.
   pcofix CIH. intros. pstep. red. punfold H0. red in H0.
   cbn in *. remember (TauF phi1) as x.
   hinduction H0 before RPre; intros; inv Heqx; pclearbot; eauto with itree_spec.
-  constructor. pstep_reverse.
+  constructor. constructor.
+  pstep_reverse.
   eapply paco2_mon; try apply H. intros. contradiction.
   eapply monotone_refinesF.
   4: {
@@ -152,32 +154,33 @@ Proof.
   eapply paco2_mon; try apply PR. intros. contradiction.
 Qed.
 
-Lemma refines_TauR_inv : forall phi1 phi2,
-    refines RPre RPost RR phi1 (Tau phi2) -> refines RPre RPost RR phi1 phi2.
+Lemma refines_TauR_inv : forall (b2 : bool) phi1 phi2,
+    refines' RPre RPost RR true b2 phi1 (Tau phi2) -> refines' RPre RPost RR true b2 phi1 phi2.
 Proof.
   intros. pstep. red. punfold H. red in H.
   cbn in *. remember (TauF phi2) as x.
   hinduction H before RPre; intros; inv Heqx; pclearbot; eauto with itree_spec.
-  constructor. pstep_reverse.
+  constructor; try constructor.
+  pstep_reverse.
 Qed.
 
-Lemma refinesF_TauR_inv : forall phi1 phi2,
-      refinesF RPre RPost RR id (upaco2 (refines_ RPre RPost RR id) bot2) (observe phi1) (TauF phi2) ->
-      refinesF RPre RPost RR id (upaco2 (refines_ RPre RPost RR id) bot2) (observe phi1) (observe phi2).
+Lemma refinesF_TauR_inv : forall b2 phi1 phi2,
+      refinesF RPre RPost RR true b2 id (upaco2 (refines_ RPre RPost RR true b2 id) bot2) (observe phi1) (TauF phi2) ->
+      refinesF RPre RPost RR true b2 id (upaco2 (refines_ RPre RPost RR true b2 id) bot2) (observe phi1) (observe phi2).
 Proof.
   intros. pstep_reverse. apply refines_TauR_inv. pstep. auto.
 Qed.
 
-Lemma refinesF_TauL_inv : forall phi1 phi2,
-      refinesF RPre RPost RR id (upaco2 (refines_ RPre RPost RR id) bot2) (TauF phi1) (observe phi2) ->
-      refinesF RPre RPost RR id (upaco2 (refines_ RPre RPost RR id) bot2) (observe phi1) (observe phi2).
+Lemma refinesF_TauL_inv : forall b1 phi1 phi2,
+      refinesF RPre RPost RR b1 true id (upaco2 (refines_ RPre RPost RR b1 true id) bot2) (TauF phi1) (observe phi2) ->
+      refinesF RPre RPost RR b1 true id (upaco2 (refines_ RPre RPost RR b1 true id) bot2) (observe phi1) (observe phi2).
 Proof.
   intros. pstep_reverse. apply refines_TauL_inv. pstep. auto.
 Qed.
 
-Lemma refinesF_Vis_existsR_Tau_inv {A} : forall t (k : A -> _),
-    existsRefinesF A RPre RPost RR id (upaco2 (refines_ RPre RPost RR id) bot2) k (TauF t) ->
-    existsRefinesF A RPre RPost RR id (upaco2 (refines_ RPre RPost RR id) bot2) k (observe t).
+Lemma refinesF_Vis_existsR_Tau_inv {A} b1 : forall t (k : A -> _),
+    existsRefinesF A RPre RPost RR b1 true id (upaco2 (refines_ RPre RPost RR b1 true id) bot2) k (TauF t) ->
+    existsRefinesF A RPre RPost RR b1 true id (upaco2 (refines_ RPre RPost RR b1 true id) bot2) k (observe t).
 Proof.
   intros. inv H; auto.
   econstructor. eapply refinesF_TauL_inv. eauto.
@@ -295,9 +298,9 @@ Lemma refines_eutt_padded_l_tau_aux:
     paco2 (eqit_ eq true true id) bot2 m1 m2 ->
     paddedF (upaco1 padded_ bot1) (TauF m2) ->
     paddedF (upaco1 padded_ bot1) (observe t3) ->
-    refinesF RPre RPost RR id (upaco2 (refines_ RPre RPost RR id) bot2)
+    refinesF RPre RPost RR true true id (upaco2 (refines_ RPre RPost RR true true id) bot2)
              (TauF m1) (observe t3) ->
-    refinesF RPre RPost RR id (upaco2 (refines_ RPre RPost RR id) r)
+    refinesF RPre RPost RR true true id (upaco2 (refines_ RPre RPost RR true true id) r)
              (TauF m2) (observe t3).
 Proof.
   intros E1 E2 R2 R1 RPre RPost RR r m1 m2 t3 CIH REL Hpad2 Hpad3 Href.
@@ -311,7 +314,7 @@ Proof.
     apply refines_TauL_inv. apply refines_TauR_inv. pstep. auto.
   }
   destruct ot3; try (exfalso; eapply Ht3; eauto; fail); try destruct e.
-  + inv Href. constructor. punfold REL. red in REL.
+  + inv Href. constructor. constructor. punfold REL. red in REL.
     remember (RetF r0) as y. hinduction H0 before r; intros; inv Heqy; subst; eauto with itree_spec.
     * remember (RetF r1) as x. hinduction REL before r; intros; inv Heqx; subst; eauto with itree_spec.
     * eapply IHrefinesF; eauto. pstep_reverse.
@@ -328,7 +331,7 @@ Proof.
       econstructor. intros. pclearbot. eapply H0; eauto with solve_padded. pstep_reverse.
 
       (* left off here *)
-  + inv Href. constructor.
+  + inv Href. constructor. constructor.
     inv Hpad2. pclearbot. punfold H1. red in H1. punfold REL. red in REL.
     inv Hpad3. inj_existT. subst.
     remember (VisF (Spec_vis e) (fun a : _  => Tau (k1 a))) as y.
@@ -349,7 +352,7 @@ Proof.
          (* dholland 20250131: consequently this is no longer needed *)
          (*destruct H3; try contradiction.*)
          right. pclearbot. inv Hy. inj_existT. subst. eapply CIH; eauto with solve_padded; try apply REL.
-      -- constructor. eapply IHREL; eauto.
+      -- constructor. constructor. eapply IHREL; eauto.
          inv H1. pclearbot. pstep_reverse.
     * eapply IHrefinesF; eauto with solve_padded. pstep_reverse. rewrite <- (tau_eutt t1).
       pstep. auto.
@@ -367,8 +370,8 @@ Proof.
     rewrite H.
     apply refines_Vis_forallR. unfold k2'. apply refines_TauL_inv. pstep. auto.
   + inv Hpad3. inj_existT. subst.
-    assert ( refinesF RPre RPost RR id
-                      (upaco2 (refines_ RPre RPost RR id) bot2)
+    assert ( refinesF RPre RPost RR true true id
+                      (upaco2 (refines_ RPre RPost RR true true id) bot2)
                       (observe m1)
                       (VisF (Spec_exists A) (fun a => Tau (k1 a))) ).
     { rewrite itree_eta'. pstep_reverse. apply refines_TauL_inv. pstep. auto. }
@@ -385,19 +388,19 @@ Proof.
     * inv Hpad2. pclearbot. punfold H1. red in H1.
       remember (VisF (Spec_forall B) kphi1) as x. remember (observe m2) as om2.
       hinduction REL before r; intros; inv Heqx; inj_existT; subst.
-      -- inv H1. inj_existT. subst. constructor. rewrite <- Heqom2.
+      -- inv H1. inj_existT. subst. constructor. constructor. rewrite <- Heqom2.
          eapply refinesF_forallL. Unshelve. 2 : exact b. eapply IHHref; eauto.
          pclearbot. pstep_reverse. rewrite <- (tau_eutt (k1 b)). auto.
          constructor. auto.
-      -- constructor. rewrite <- Heqom2. inv H1. pclearbot. punfold H2.
+      -- constructor. constructor. rewrite <- Heqom2. inv H1. pclearbot. punfold H2.
     * inv Hpad2. pclearbot. punfold H3. red in H3.
       remember (VisF (Spec_exists B) kphi1) as x. remember (observe m2) as om2.
       hinduction REL before r; intros; inv Heqx; inj_existT; subst.
-      -- inv H3. inj_existT. subst. constructor. intros.
+      -- inv H3. inj_existT. subst. constructor. constructor. intros.
          rewrite <- Heqom2. constructor. intros. eapply H0; eauto. Unshelve. all : auto.
          pclearbot. pstep_reverse.  setoid_rewrite tau_eutt in REL. auto.
          constructor. auto.
-      -- constructor. rewrite <- Heqom2.
+      -- constructor. constructor. rewrite <- Heqom2.
          eapply IHREL; eauto. inv H3. pclearbot. pstep_reverse.
     * eapply IHHref; eauto. pstep_reverse. rewrite <- (tau_eutt phi1). pstep. auto.
 Qed.
@@ -408,7 +411,7 @@ Lemma refines_eutt_padded_r_tau_aux:
     (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop)
     (r : itree_spec E1 R1 -> itree_spec E2 R2 -> Prop)
     (m1 m2 : itree_spec E2 R2) (t1 : itree_spec E1 R1),
-    refinesF RPre RPost RR id (upaco2 (refines_ RPre RPost RR id) bot2)
+    refinesF RPre RPost RR true true id (upaco2 (refines_ RPre RPost RR true true id) bot2)
              (observe t1) (TauF m1) ->
     paddedF (upaco1 padded_ bot1) (TauF m2) ->
     paddedF (upaco1 padded_ bot1) (observe t1) ->
@@ -416,7 +419,7 @@ Lemma refines_eutt_padded_r_tau_aux:
     (forall (t2 : itree_spec E1 R1) (t3 t4 : itree_spec E2 R2),
         padded t2 ->
         padded t4 -> t3 ≈ t4 -> refines RPre RPost RR t2 t3 -> r t2 t4) ->
-    refinesF RPre RPost RR id (upaco2 (refines_ RPre RPost RR id) r)
+    refinesF RPre RPost RR true true id (upaco2 (refines_ RPre RPost RR true true id) r)
              (observe t1) (TauF m2).
 Proof.
   intros E1 E2 R2 R1 RPre RPost RR r m1 m2 t1 Href Hpad3 Hpad1 REL CIH.
@@ -428,7 +431,7 @@ Proof.
     inv Hpad3. pclearbot. auto. apply refines_TauL_inv.
     apply refines_TauR_inv. pstep. auto. }
   destruct ot1; try (exfalso; eapply Ht1; eauto; fail); try destruct e.
-  - inv Href. constructor. remember (RetF r0) as x.
+  - inv Href. constructor. constructor. remember (RetF r0) as x.
     punfold REL. red in REL. hinduction H1 before r; intros; inv Heqx; subst.
     + remember (RetF r2) as x. hinduction REL before r; intros; inv Heqx; subst; eauto with solve_padded.
     + eapply IHrefinesF; eauto. pstep_reverse. rewrite <- (tau_eutt t2).
@@ -438,14 +441,14 @@ Proof.
       hinduction REL before r; intros; inv Heqx; inj_existT; subst; pclearbot.
       constructor. intros. eapply H0; eauto.  inv H2. inj_existT.
       subst. constructor. left. pstep. constructor. auto.
-      pstep_reverse. constructor. eapply IHREL; eauto. inv H2. pclearbot. punfold H3.
+      pstep_reverse. constructor. constructor. eapply IHREL; eauto. inv H2. pclearbot. punfold H3.
     + inv Hpad3. pclearbot. punfold H0. red in H0.
       remember (VisF (Spec_exists A) k) as x.
       hinduction REL before r; intros; inv Heqx; inj_existT; subst; pclearbot.
       econstructor. Unshelve. all : auto. intros. eapply IHrefinesF; eauto.  inv H0. inj_existT.
       subst. constructor. left. pstep. constructor. auto.
-      pstep_reverse. constructor. eapply IHREL; eauto. inv H0. pclearbot. pstep_reverse.
-  - inv Href. constructor. remember (VisF (Spec_vis e) k) as x.
+      pstep_reverse. constructor. constructor. eapply IHREL; eauto. inv H0. pclearbot. pstep_reverse.
+  - inv Href. constructor. constructor. remember (VisF (Spec_vis e) k) as x.
     inv Hpad3. pclearbot. punfold H0. red in H0. punfold REL. red in REL.
     remember (VisF (Spec_vis e) k) as x.
     hinduction H1 before r; intros; inv Heqx; inj_existT; subst; eauto with solve_padded.
@@ -454,14 +457,14 @@ Proof.
       * constructor; auto. intros. eapply H0 in H2. right. pclearbot.
         eapply CIH; eauto with solve_padded.
         apply REL.
-      * constructor. eapply IHREL; eauto. inv H1. pclearbot. pstep_reverse.
+      * constructor. constructor. eapply IHREL; eauto. inv H1. pclearbot. pstep_reverse.
     + eapply IHrefinesF; eauto. pstep_reverse. setoid_rewrite <- (tau_eutt t2).
       pstep. auto.
    + remember (VisF (Spec_forall A) k) as x.
      hinduction REL before r; intros; inv Heqx; inj_existT; subst.
      * constructor; intros. eapply H0; eauto. pclearbot. pstep_reverse.
        inv H1. inj_existT. subst. constructor. auto.
-     * constructor. eapply IHREL; eauto. inv H1. pclearbot. pstep_reverse.
+     * constructor. constructor. eapply IHREL; eauto. inv H1. pclearbot. pstep_reverse.
    + remember (VisF (Spec_exists A) k) as x.
      hinduction REL before r; intros; inv Heqx; inj_existT; subst; eauto with solve_padded.
      econstructor; intros. Unshelve. all : auto. eapply IHrefinesF; eauto with solve_padded.
@@ -473,23 +476,23 @@ Proof.
     punfold Href. red in Href. inv Hpad3. pclearbot. punfold H1. red in H1.
     apply refinesF_Vis_forallL in Href. punfold REL. red in REL.
     hinduction Href before r; intros; pclearbot.
-    + constructor. remember (VisF (Spec_forall B) kphi2) as x.
+    + constructor. constructor. remember (VisF (Spec_forall B) kphi2) as x.
       hinduction REL before r; intros; inv Heqx; inj_existT; subst.
       * inv H2. inj_existT. subst. constructor. intros. eapply H0; auto.
         Unshelve. all : auto. pclearbot. setoid_rewrite tau_eutt in REL. pstep_reverse.
         pclearbot. pstep_reverse.
-      * constructor. eapply IHREL; eauto. inv H2. pclearbot. pstep_reverse.
+      * constructor. constructor. eapply IHREL; eauto. inv H2. pclearbot. pstep_reverse.
     + eapply refinesF_forallL. Unshelve. all : auto. constructor.
       right. eapply CIH; eauto with solve_padded.
       rewrite (itree_eta' phi) in REL. pstep. red. eauto.
       apply refines_TauL_inv. pstep. auto.
-    + constructor. remember (VisF (Spec_exists B) kphi2) as x.
+    + constructor. constructor. remember (VisF (Spec_exists B) kphi2) as x.
       hinduction REL before r; intros; inv Heqx; inj_existT; subst.
       * inv H1. inj_existT. subst. eapply refinesF_existsR.
         Unshelve. all : auto. cbn. eapply IHHref; eauto.
         pclearbot. setoid_rewrite tau_eutt in REL.
         pstep_reverse. pclearbot. pstep_reverse.
-      * constructor. eapply IHREL; eauto. inv H1. pclearbot.
+      * constructor. constructor. eapply IHREL; eauto. inv H1. pclearbot.
         pstep_reverse.
     + eapply IHHref; eauto. pstep_reverse. setoid_rewrite <- (tau_eutt phi2).
       pstep. auto.
@@ -546,23 +549,23 @@ Proof.
         rewrite itree_eta'.
         eapply refines_eutt_padded_l_tau_aux; eauto.
         setoid_rewrite tau_eutt in REL. auto. constructor. left. auto.
-        constructor. auto.
+        constructor. constructor. auto.
       * eapply refinesF_existsR. eapply IHHref; eauto with solve_padded.
-      * constructor. eapply IHHref. inv Hpad3. pclearbot. pstep_reverse.
+      * constructor. constructor. eapply IHHref. inv Hpad3. pclearbot. pstep_reverse.
     + inv Hpad2. inj_existT. subst.
       (* this should be fine, exists L is invertible and then I just
          further invert Href until I learn more about t3
        *)
       constructor. intros.
-      assert (forall a, refinesF RPre RPost RR id (upaco2 (refines_ RPre RPost RR id) bot2) (observe (k1 a)) (observe t3)).
+      assert (forall a, refinesF RPre RPost RR true true id (upaco2 (refines_ RPre RPost RR true true id) bot2) (observe (k1 a)) (observe t3)).
       intros. pstep_reverse. eapply refines_existsL. pstep. auto.
       clear Href. rename H into Href. specialize (Href a).
       eapply refines_eutt_padded_l_tau_aux; eauto.
       setoid_rewrite tau_eutt in REL. auto.
-      constructor. auto. constructor. auto.
+      constructor. auto. constructor. constructor. auto.
   - eapply IHHeutt; eauto.
     pstep_reverse. apply refines_TauL_inv. pstep. auto.
-  - constructor. eapply IHHeutt; eauto with solve_padded.
+  - constructor. constructor. eapply IHHeutt; eauto with solve_padded.
 Qed.
 
 Lemma refines_eutt_padded_r E1 E2 R1 R2 RPre RPost RR :
@@ -591,6 +594,7 @@ Proof.
     + inv Hpad3. inj_existT. subst.
       constructor. intros.
       eapply refines_eutt_padded_r_tau_aux with (m1 := k1 a); auto.
+      constructor.
       constructor. pstep_reverse. apply refines_Vis_forallR. pstep. auto.
       constructor. auto. setoid_rewrite tau_eutt in REL. auto.
     + eapply refinesF_Vis_existsR in Href.
@@ -599,15 +603,15 @@ Proof.
         Unshelve. all : auto. cbn.
         rewrite itree_eta' at 1.
         eapply refines_eutt_padded_r_tau_aux; auto. eauto.
-        constructor. eauto.
+        constructor. constructor. eauto.
         constructor. auto. setoid_rewrite tau_eutt in REL. auto.
       * eapply refinesF_forallL. eapply IHHref; eauto.
         inv Hpad1. inj_existT. subst. constructor. auto.
       * apply refinesF_existsL. intros. eapply H0; eauto.
         inv Hpad1. inj_existT. subst. constructor. auto.
-      * constructor. eapply IHHref; eauto. inv Hpad1. pclearbot. pstep_reverse.
+      * constructor. constructor. eapply IHHref; eauto. inv Hpad1. pclearbot. pstep_reverse.
   - eapply IHHeutt; eauto. pstep_reverse. apply refines_TauR_inv. pstep. auto.
-  - constructor. eapply IHHeutt; eauto. inv Hpad3. pclearbot. pstep_reverse.
+  - constructor. constructor. eapply IHHeutt; eauto. inv Hpad3. pclearbot. pstep_reverse.
 Qed.
 
 Lemma Spec_vis_inv:
@@ -616,7 +620,7 @@ Lemma Spec_vis_inv:
     (RPre1 : prerel E1 E2) (RPost1 : postrel E1 E2) (RR1 : R3 -> R4 -> Prop) (e3 : E2 R2)
     (k1 : R2 -> itree_spec E2 R4) (e0 : E1 R1) (k0 : R1 -> itree_spec E1 R3),
     padded ((Vis (Spec_vis e0) k0)) -> padded (Vis (Spec_vis e3) k1 : itree_spec E2 R4) ->
-    refinesF RPre1 RPost1 RR1 id (upaco2 (refines_ RPre1 RPost1 RR1 id) bot2) (VisF (Spec_vis e0) k0)
+    refinesF RPre1 RPost1 RR1 true true id (upaco2 (refines_ RPre1 RPost1 RR1 true true id) bot2) (VisF (Spec_vis e0) k0)
              (VisF (Spec_vis e3) k1) ->
     forall (a : R1) (c : R2),
       RPost1 _ _ e0 a e3 c -> refines RPre1 RPost1 RR1 (k0 a) (k1 c).
@@ -641,33 +645,95 @@ Proof.
   apply H0 in H6. pclearbot. auto.
 Qed.
 
+Section refines_tau_inv.
+  Context (E1 E2 : Type -> Type).
+  Context (RPre : prerel E1 E2) (RPost : postrel E1 E2).
+  Context (R1 R2 : Type) (RR : R1 -> R2 -> Prop).
+
+  (* Quantifier cases may need padding? *)
+  (* May need to move this to where there are more lemmas about padding *)
+  Lemma refines_TauTau_inv : forall b1 b2 phi1 phi2,
+      padded phi1 ->
+      padded phi2 ->
+      refines' RPre RPost RR b1 b2 (Tau phi1) (Tau phi2) -> refines' RPre RPost RR b1 b2 phi1 phi2.
+  Proof with eauto with itree.
+    intros * PAD1 PAD2 H. punfold H. red in H. simpl in *.
+    remember (TauF phi1) as tt1. remember (TauF phi2) as tt2.
+    hinduction H before b2; intros; try discriminate.
+    - inv Heqtt1. inv Heqtt2. pclearbot. eauto.
+    - inv Heqtt1. inv H.
+      + pclearbot. punfold H2. pstep. red. simpobs...
+        constructor; auto.
+      + pstep. red. simpobs. econstructor; eauto. pstep_reverse. apply IHrefinesF; eauto with solve_padded.
+        punfold PAD1.
+        red in PAD1.
+        rewrite <- H0 in PAD1.
+        inv PAD1; pclearbot; eauto.
+      + pstep; red; auto.
+      + pstep; red.
+        rewrite <- H0.
+        econstructor.
+        punfold PAD1; red in PAD1.
+        rewrite <- H0 in PAD1.
+        inv PAD1; inj_existT; subst.
+        cbn.
+        cbn in H1.
+        admit.
+      + admit.
+    - inv Heqtt2. inv H;
+        try solve [pstep; red; eauto].
+      + pclearbot. punfold H2. pstep. red. simpobs...
+        constructor; auto.
+      + pstep; red.
+        rewrite <- H0.
+        constructor; auto.
+        admit.
+      + admit.
+      + pstep. red. simpobs. econstructor; auto. pstep_reverse. apply IHrefinesF; eauto.
+        admit.
+        admit.
+  Admitted.
+
+  Lemma refinesF_TauTau_inv : forall b1 b2 phi1 phi2,
+      padded phi1 ->
+      padded phi2 ->
+      refinesF RPre RPost RR b1 b2 id (upaco2 (refines_ RPre RPost RR b1 b2 id) bot2) (TauF phi1) (TauF phi2) ->
+      refinesF RPre RPost RR b1 b2 id (upaco2 (refines_ RPre RPost RR b1 b2 id) bot2) (observe phi1) (observe phi2).
+  Proof.
+    intros. pstep_reverse. apply refines_TauTau_inv; eauto. pstep. eauto.
+  Qed.
+
+End refines_tau_inv.
+
+
 Lemma refinesTrans_aux:
   forall (E3 : Type -> Type) (R3 : Type) (E1 : Type -> Type) (R1 : Type) (E2 : Type -> Type) (R2 : Type)
     (RPre1 : prerel E1 E2) (RPre2 : prerel E2 E3) (RPost1 : postrel E1 E2)
     (RPost2 : postrel E2 E3) (RR1 : R1 -> R2 -> Prop) (RR2 : R2 -> R3 -> Prop)
+    b1 b2
     (r : itree_spec E1 R1 -> itree_spec E3 R3 -> Prop) (t1 : itree_spec E1 R1) (t0 : itree_spec E2 R2)
     X (e : SpecEvent E3 X) (k1 : X -> itree (SpecEvent E3) R3),
     (forall (t2 : itree_spec E1 R1) (t3 : itree_spec E2 R2) (t4 : itree_spec E3 R3),
         padded t2 ->
-        padded t3 -> padded t4 -> refines RPre1 RPost1 RR1 t2 t3 -> refines RPre2 RPost2 RR2 t3 t4 -> r t2 t4) ->
-    paco2 (refines_ RPre1 RPost1 RR1 id) bot2 t1 t0 ->
+        padded t3 -> padded t4 -> refines' RPre1 RPost1 RR1 b1 b2 t2 t3 -> refines' RPre2 RPost2 RR2 b1 b2 t3 t4 -> r t2 t4) ->
+    paco2 (refines_ RPre1 RPost1 RR1 b1 b2 id) bot2 t1 t0 ->
     paddedF (upaco1 padded_ bot1) (TauF t1) ->
     paddedF (upaco1 padded_ bot1) (TauF t0) ->
-    refinesF RPre2 RPost2 RR2 id (upaco2 (refines_ RPre2 RPost2 RR2 id) bot2) (TauF t0)
+    refinesF RPre2 RPost2 RR2 b1 b2 id (upaco2 (refines_ RPre2 RPost2 RR2 b1 b2 id) bot2) (TauF t0)
              (VisF e (fun a : _ => Tau (k1 a))) ->
     (forall a : _, upaco1 padded_ bot1 (k1 a)) ->
-    refinesF (RComposePreRel RPre1 RPre2) (RComposePostRel RPre1 RPre2 RPost1 RPost2) (rcompose RR1 RR2) id
-             (upaco2 (refines_ (RComposePreRel RPre1 RPre2) (RComposePostRel RPre1 RPre2 RPost1 RPost2) (rcompose RR1 RR2) id) r)
+    refinesF (RComposePreRel RPre1 RPre2) (RComposePostRel RPre1 RPre2 RPost1 RPost2) (rcompose RR1 RR2) b1 b2 id
+             (upaco2 (refines_ (RComposePreRel RPre1 RPre2) (RComposePostRel RPre1 RPre2 RPost1 RPost2) (rcompose RR1 RR2) b1 b2 id) r)
              (TauF t1) (VisF e (fun a : _ => Tau (k1 a))).
 Proof.
-  intros E3 R3 E1 R1 E2 R2 RPre1 RPre2 RPost1 RPost2 RR1 RR2 r t1 t0 X e k1.
+  intros E3 R3 E1 R1 E2 R2 RPre1 RPre2 RPost1 RPost2 RR1 RR2 b1 b2 r t1 t0 X e k1.
   (* Pad names... *)
   pose proof True as H.
   pose proof True as H1.
   pose proof True as H0.
   intros CIH Ht10 Ht1 Ht0 Ht23 Hk1.
   destruct e.
-  - inv Ht23. rename H3 into Ht23. constructor.
+  - inv Ht23. rename H3 into Ht23. constructor; auto.
     punfold Ht10. red in Ht10.
     assert (Hy : padded (Vis (Spec_vis e) (fun a : X => Tau (k1 a)))).
     pstep. constructor. auto. punfold Hy. red in Hy. cbn in *.
@@ -677,7 +743,7 @@ Proof.
     inv Ht1. inv Ht0. pclearbot. punfold H4. punfold H5. red in H4. red in H5.
     remember (VisF (Spec_vis e) k1) as y. (* at this point need to prove that go _ _ y is padded*)
     hinduction Ht23 before r; intros; inv Heqy; inj_existT; subst; eauto with solve_padded.
-    + assert (refines RPre2 RPost2 RR2 (Vis (Spec_vis e1) k1) (Vis (Spec_vis e) k0)).
+    + assert (refines' RPre2 RPost2 RR2 b1 b2 (Vis (Spec_vis e1) k1) (Vis (Spec_vis e) k0)).
       pstep. constructor. auto. auto.
       clear H3. punfold H7. red in H7. cbn in H7.
       remember (VisF (Spec_vis e1) k1) as x. cbn in *.
@@ -695,7 +761,8 @@ Proof.
       right; eapply CIH; eauto with solve_padded.
       apply H0; eauto.
       apply H2; eauto.
-    + eapply IHHt23; eauto with solve_padded. apply refinesF_TauR_inv. auto.
+    + eapply IHHt23; eauto with solve_padded. inv CHECK0.
+      apply refinesF_TauR_inv. auto.
     + eapply IHHt23; eauto with solve_padded. pstep_reverse. eapply refines_Vis_forallR. pstep. auto.
     + eapply refinesF_Vis_existsR in Ht10. assert (Hk : forall a, padded (k a)). inv H6. inj_existT.
       subst. intros. pstep. constructor. auto.
@@ -703,90 +770,99 @@ Proof.
       * rewrite itree_eta' at 1. eapply H0; eauto with solve_padded.
       * econstructor. eapply IHHt10; eauto. inv H5. inj_existT. subst. constructor. auto.
       * constructor. intros. eapply H8; eauto with solve_padded.
-      * constructor. eauto with solve_padded.
+      * constructor; auto. eauto with solve_padded.
   - apply refinesF_forallR. intros. constructor. right. eapply CIH; eauto with solve_padded.
-    pclearbot. apply Hk1. apply refines_TauL_inv. apply refines_TauR_inv.
+    pclearbot. apply Hk1. apply refines_TauTau_inv; eauto with solve_padded.
+    specialize (Hk1 a).
+    pclearbot. auto.
     set (fun a => Tau (k1 a)) as k'. assert (Tau (k1 a) = k' a). auto. rewrite H2.
     apply refines_Vis_forallR. pstep. auto.
-  - rewrite itree_eta' in Ht23. apply refinesF_TauL_inv in Ht23. cbn in Ht23.
+  - rewrite itree_eta' in Ht23.
+    cbn in *.
     punfold Ht10. red in Ht10. inv Ht1. inv Ht0. pclearbot.
     punfold H3. punfold H4. red in H3. red in H4. eapply refinesF_Vis_existsR in Ht23.
     remember (observe t1) as ot1. remember (observe t0) as ot0.
     remember (fun a => Tau (k1 a)) as k'.
+    remember (TauF t0) as t0'.
     hinduction Ht23 before r; intros; subst.
     + eapply refinesF_existsR. Unshelve. all : auto. constructor.
       right. eapply CIH; eauto with solve_padded. pstep. auto.
-      apply refines_TauR_inv. pstep. auto.
+      apply refinesF_TauTau_inv in H; eauto with solve_padded.
+      pstep; red; auto.
     + inv H4. inj_existT. subst. pclearbot. cbn in Ht23.
-      assert (Hk2 : forall a, refinesF RPre1 RPost1 RR1 id (upaco2 (refines_ RPre1 RPost1 RR1 id) bot2) (observe t1) (observe (k0 a)) ).
-      { cbn. intros. eapply refinesF_TauR_inv. set (fun a => Tau (k0 a)) as k2'.
-        assert (TauF (k0 a) = observe (k2' a)). auto. rewrite H2.
-        pstep_reverse. eapply refines_Vis_forallR. pstep. auto. }
-      apply refinesF_Vis_existsR_Tau_inv in Ht23.
-      specialize (Hk2 b). specialize (H5 b). punfold H5. red in H5.
-      eapply IHHt23; eauto with solve_padded.
-    + inv H5. inj_existT. subst. pclearbot.
-      apply refinesF_Vis_existsR in Ht10.
-      assert (Hk2 : forall b, existsRefinesF A RPre2 RPost2 RR2 id (upaco2 (refines_ RPre2 RPost2 RR2 id) bot2)
-         (fun a : A => Tau (k1 a)) (observe ((k0 b)))).
-      {
-        intros. apply refinesF_Vis_existsR_Tau_inv.
-        eauto.
-      }
-      clear H2.
-      remember (observe t1) as ot1. pclearbot.
-      remember (fun a => Tau (k1 a)) as k'.
-      assert (go ot1 ≈ t1). subst. rewrite <- itree_eta. reflexivity.
-      assert (Ht1 : padded t1). pstep. red. rewrite <- Heqot1. auto.
-      clear Heqot1.
-      hinduction Ht10 before r; intros; subst.
-      * eapply H1; eauto with solve_padded. Unshelve. all : auto.
-        pstep_reverse. eapply refines_eutt_padded_l; eauto with solve_padded.
-        pstep. constructor. auto.
-        pstep. auto. pstep_reverse. constructor. auto.
-      * inv H4. inj_existT. subst. pclearbot. constructor.
-        punfold H2. red in H2. cbn in *.
-        punfold Ht1. red in Ht1.
-        remember (VisF (Spec_forall _) (fun a => Tau (k2 a)) : itree_spec' E1 R1) as x.
-        cbn in Heqx. setoid_rewrite <- Heqx in H2.
-        remember (observe t1) as ot1. clear Heqot1 t1. pclearbot.
-        remember (fun a => Tau (k2 a)) as k3'.
-        hinduction H2 before r; intros; try (exfalso; inv Heqx; fail).
-        -- pclearbot. subst. inv Heqx. inj_existT. subst.
-           inv Ht1. inj_existT. subst.
-           eapply refinesF_forallL. Unshelve. all : auto.
-           eapply IHHt10; eauto with solve_padded.
-           constructor. auto. clear - REL.
-           specialize (REL b).
-           rewrite <- (tau_eutt (k1 b)).
-           apply REL.
-           pclearbot. apply H4.
-        -- constructor. eapply IHeqitF; eauto with solve_padded.
-      * inv H5. inj_existT. subst. constructor. punfold H6. red in H6.
-        cbn in H6. punfold Ht1. red in Ht1.
-        remember (VisF (Spec_exists _) (fun a => Tau (k2 a)) : itree_spec' E1 R1) as x.
-        cbn in Heqx. setoid_rewrite <- Heqx in H6.
-        remember (fun a : _ => Tau (k2 a)) as k3'.
-        hinduction H6 before r; intros; inv Heqx; inj_existT; subst.
-        -- inv Ht1. inj_existT. subst. constructor. cbn. intros.
-           eapply H0; eauto with solve_padded. Unshelve. all : auto.
-           constructor. auto. cbn. pclearbot.
-           rewrite <- (tau_eutt (k1 a)).
-           apply REL.
-           pclearbot. apply H6.
-        -- constructor. eapply IHeqitF; eauto with solve_padded. auto.
-      * eapply IHHt10; eauto with solve_padded. rewrite <- itree_eta. rewrite <- H2.
-        rewrite tau_eutt. reflexivity.
-    + eapply IHHt23; eauto with solve_padded. apply refinesF_TauR_inv. auto.
-Qed.
+      assert (Hk2 : forall a, refinesF RPre1 RPost1 RR1 b1 b2 id (upaco2 (refines_ RPre1 RPost1 RR1 b1 b2 id) bot2) (observe t1) (observe (kphi1 a)) ).
+      { cbn. intros.
+        eapply refinesF_TauTau_inv; eauto with solve_padded.
+        (* set (fun a => Tau (k0 a)) as k2'. *)
+(*         assert (TauF (k0 a) = observe (k2' a)). auto. rewrite H2. *)
+(*         pstep_reverse. eapply refines_Vis_forallR. pstep. auto. } *)
+(*       apply refinesF_Vis_existsR_Tau_inv in Ht23. *)
+(*       specialize (Hk2 b). specialize (H5 b). punfold H5. red in H5. *)
+(*       eapply IHHt23; eauto with solve_padded. *)
+(*     + inv H5. inj_existT. subst. pclearbot. *)
+(*       apply refinesF_Vis_existsR in Ht10. *)
+(*       assert (Hk2 : forall b, existsRefinesF A RPre2 RPost2 RR2 true true id (upaco2 (refines_ RPre2 RPost2 RR2 true true id) bot2) *)
+(*          (fun a : A => Tau (k1 a)) (observe ((k0 b)))). *)
+(*       { *)
+(*         intros. apply refinesF_Vis_existsR_Tau_inv. *)
+(*         eauto. *)
+(*       } *)
+(*       clear H2. *)
+(*       remember (observe t1) as ot1. pclearbot. *)
+(*       remember (fun a => Tau (k1 a)) as k'. *)
+(*       assert (go ot1 ≈ t1). subst. rewrite <- itree_eta. reflexivity. *)
+(*       assert (Ht1 : padded t1). pstep. red. rewrite <- Heqot1. auto. *)
+(*       clear Heqot1. *)
+(*       hinduction Ht10 before r; intros; subst. *)
+(*       * eapply H1; eauto with solve_padded. Unshelve. all : auto. *)
+(*         pstep_reverse. eapply refines_eutt_padded_l; eauto with solve_padded. *)
+(*         pstep. constructor. auto. *)
+(*         pstep. auto. pstep_reverse. constructor. auto. *)
+(*       * inv H4. inj_existT. subst. pclearbot. constructor. *)
+(*         punfold H2. punfold H2. red in H2. cbn in *. *)
+(*         punfold Ht1. red in Ht1. *)
+(*         remember (VisF (Spec_forall _) (fun a => Tau (k2 a)) : itree_spec' E1 R1) as x. *)
+(*         cbn in Heqx. setoid_rewrite <- Heqx in H2. *)
+(*         remember (observe t1) as ot1. clear Heqot1 t1. pclearbot. *)
+(*         remember (fun a => Tau (k2 a)) as k3'. *)
+(*         hinduction H2 before r; intros; try (exfalso; inv Heqx; fail). *)
+(*         -- pclearbot. subst. inv Heqx. inj_existT. subst. *)
+(*            inv Ht1. inj_existT. subst. *)
+(*            eapply refinesF_forallL. Unshelve. all : auto. *)
+(*            eapply IHHt10; eauto with solve_padded. *)
+(*            constructor. auto. clear - REL. *)
+(*            specialize (REL b). *)
+(*            rewrite <- (tau_eutt (k1 b)). *)
+(*            apply REL. *)
+(*            pclearbot. apply H4. *)
+(*         -- constructor. constructor. eapply IHeqitF; eauto with solve_padded. *)
+(*       * inv H5. inj_existT. subst. constructor. constructor. punfold H6. red in H6. *)
+(*         cbn in H6. punfold Ht1. red in Ht1. *)
+(*         remember (VisF (Spec_exists _) (fun a => Tau (k2 a)) : itree_spec' E1 R1) as x. *)
+(*         cbn in Heqx. setoid_rewrite <- Heqx in H6. *)
+(*         remember (fun a : _ => Tau (k2 a)) as k3'. *)
+(*         hinduction H6 before r; intros; inv Heqx; inj_existT; subst. *)
+(*         -- inv Ht1. inj_existT. subst. *)
+(*            constructor. cbn. intros. *)
+(*            eapply H0; eauto with solve_padded. Unshelve. all : auto. *)
+(*            constructor. auto. cbn. pclearbot. *)
+(*            rewrite <- (tau_eutt (k1 a)). *)
+(*            apply REL. *)
+(*            pclearbot. apply H6. *)
+(*         -- constructor. constructor. eapply IHeqitF; eauto with solve_padded. auto. *)
+(*       * eapply IHHt10; eauto with solve_padded. rewrite <- itree_eta. rewrite <- H2. *)
+(*         rewrite tau_eutt. reflexivity. *)
+(*     + eapply IHHt23; eauto with solve_padded. apply refinesF_TauR_inv. auto. *)
+(* Qed. *)
+Admitted.
 
 Theorem refinesTrans {E1 E2 E3 R1 R2 R3} RPre1 RPre2 RPost1 RPost2
-        (RR1 : R1 -> R2 -> Prop) (RR2 : R2 -> R3 -> Prop)
+        (RR1 : R1 -> R2 -> Prop) (RR2 : R2 -> R3 -> Prop) b1 b2
         (t1 : itree_spec E1 R1) (t2 : itree_spec E2 R2) (t3 : itree_spec E3 R3):
   padded t1 -> padded t2 -> padded t3 ->
-  refines RPre1 RPost1 RR1 t1 t2 -> refines RPre2 RPost2 RR2 t2 t3 ->
-  refines (RComposePreRel RPre1 RPre2) (RComposePostRel RPre1 RPre2 RPost1 RPost2)
-          (rcompose RR1 RR2) t1 t3.
+  refines' RPre1 RPost1 RR1 b1 b2 t1 t2 -> refines' RPre2 RPost2 RR2 b1 b2 t2 t3 ->
+  refines' (RComposePreRel RPre1 RPre2) (RComposePostRel RPre1 RPre2 RPost1 RPost2)
+          (rcompose RR1 RR2) b1 b2 t1 t3.
 Proof.
   revert t1 t2 t3; pcofix CIH.
   intros t1 t2 t3  Ht1 Ht2 Ht3 Ht12 Ht23.
@@ -804,82 +880,93 @@ Proof.
     { destruct ot3; eauto; right; repeat intro; discriminate. }
     destruct Hdec as [ [t4 Ht4] | Ht4 ]; subst.
     + constructor. right. eapply CIH; eauto with solve_padded.
-      apply refines_TauL_inv. apply refines_TauR_inv. pstep. auto.
+      pstep. red.
+      apply refinesF_TauTau_inv in Ht23; eauto with solve_padded.
     + destruct ot3; try (exfalso; eapply Ht4; eauto; fail).
-      * constructor. inv Ht23. clear Ht2 Ht3.
+      * inv Ht23. clear Ht2 Ht3.
         inv Ht1. pclearbot. punfold H2.
         red in H2.
         punfold H. red in H. remember (RetF r0) as y.
         remember (observe t0) as ot0.
+        constructor; auto.
         hinduction H1 before r; intros; inv Heqy; eauto with solve_padded.
         -- remember (RetF r1) as y.
            remember (observe t1) as ot1. clear Heqot1.
            hinduction H0 before r; intros; inv Heqy; eauto with solve_padded.
         -- eapply IHrefinesF; eauto.
+           inv CHECK0.
            pstep_reverse. apply refines_TauR_inv. pstep. auto.
         -- eapply IHrefinesF; eauto. pstep_reverse.
+           inv CHECK.
            eapply refines_Vis_forallR. pstep. auto.
         -- eapply refinesF_Vis_existsR in H1.
            induction H1; eauto with solve_padded.
            rewrite itree_eta' at 1. eapply H0; eauto with solve_padded.
       * inv Ht3. inj_existT. subst.
         eapply refinesTrans_aux; eauto.
-  - assert (Href : refines RPre1 RPost1 RR1 (Vis (Spec_vis e1) k1) (Vis (Spec_vis e2) k2)).
-    pstep. red. constructor. auto. auto. punfold Href. red in Href. cbn in *.
-    remember (VisF (Spec_vis e2) k2) as x.
-    (*k2 is getting captured in a weird way here from H3,
-      need to ter
-     *)
+(*   - assert (Href : refines RPre1 RPost1 RR1 (Vis (Spec_vis e1) k1) (Vis (Spec_vis e2) k2)). *)
+(*     pstep. red. constructor. auto. auto. punfold Href. red in Href. cbn in *. *)
+(*     remember (VisF (Spec_vis e2) k2) as x. *)
+(*     (*k2 is getting captured in a weird way here from H3, *)
+(*       need to ter *)
+(*      *) *)
 
-    hinduction Ht23 before r; intros; inv Heqx; inj_existT; subst; eauto.
-    + (*k1 and k3 are the same thing here *)
-      constructor.
-      econstructor; eauto.
-      intros a b H3.
-      inv H3; inj_existT; subst.
-      specialize (H11 _ e3 H1 H) as [c [? ?]].
-      right. eapply CIH; (* k3 vs k1?, might be an artifact of my recursion *) eauto with solve_padded. inv Ht1. inj_existT. subst.
-      pclearbot.
-      eapply H2; eauto.
-      pclearbot.
-      eapply H0; eauto.
-    + constructor. eapply IHHt23; eauto with solve_padded.
-    + pclearbot. constructor. intros. eapply H0; try unfold id; eauto with solve_padded.
-    + econstructor. eapply IHHt23; eauto with solve_padded.
-  - constructor. eapply IHHt12; eauto with solve_padded.
-  - eapply IHHt12; eauto with solve_padded.
-    rewrite itree_eta'.
-    apply refinesF_TauL_inv. auto.
-  - apply refinesF_Vis_forallL in Ht23.
-    induction Ht23.
-    + constructor. intros. eauto with solve_padded.
-    + eapply H0; eauto with solve_padded.
-    + econstructor. eapply IHHt23; eauto with solve_padded.
-    + constructor. eapply IHHt23; eauto with solve_padded.
-  - eapply IHHt12; eauto with solve_padded. rewrite itree_eta'.
-    pstep_reverse. apply refines_existsL.
-    pstep. auto.
-  - econstructor. eapply IHHt12; eauto with solve_padded.
-  - constructor. intros. eapply H0; eauto with solve_padded.
-Qed.
+(*     hinduction Ht23 before r; intros; inv Heqx; inj_existT; subst; eauto. *)
+(*     + (*k1 and k3 are the same thing here *) *)
+(*       constructor. *)
+(*       econstructor; eauto. *)
+(*       intros a b H3. *)
+(*       inv H3; inj_existT; subst. *)
+(*       specialize (H11 _ e3 H1 H) as [c [? ?]]. *)
+(*       right. eapply CIH; (* k3 vs k1?, might be an artifact of my recursion *) eauto with solve_padded. inv Ht1. inj_existT. subst. *)
+(*       pclearbot. *)
+(*       eapply H2; eauto. *)
+(*       pclearbot. *)
+(*       eapply H0; eauto. *)
+(*     + constructor. constructor. eapply IHHt23; eauto with solve_padded. *)
+(*     + pclearbot. constructor. intros. eapply H0; try unfold id; eauto with solve_padded. *)
+(*     + econstructor. eapply IHHt23; eauto with solve_padded. *)
+(*   - constructor. constructor. eapply IHHt12; eauto with solve_padded. *)
+(*   - eapply IHHt12; eauto with solve_padded. *)
+(*     rewrite itree_eta'. *)
+(*     apply refinesF_TauL_inv. auto. *)
+(*   - apply refinesF_Vis_forallL in Ht23. *)
+(*     induction Ht23. *)
+(*     + constructor. intros. eauto with solve_padded. *)
+(*     + eapply H0; eauto with solve_padded. *)
+(*     + econstructor. eapply IHHt23; eauto with solve_padded. *)
+(*     + constructor. constructor. eapply IHHt23; eauto with solve_padded. *)
+(*   - eapply IHHt12; eauto with solve_padded. rewrite itree_eta'. *)
+(*     pstep_reverse. apply refines_existsL. *)
+(*     pstep. auto. *)
+(*   - econstructor. eapply IHHt12; eauto with solve_padded. *)
+(*   - constructor. intros. eapply H0; eauto with solve_padded. *)
+(* Qed. *)
+Admitted.
+
+Definition padded_refines' {E1 E2 : Type -> Type}
+  {R1 R2 : Type} (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop)
+  b1 b2
+  (t1 : itree_spec E1 R1) (t2 : itree_spec E2 R2) :=
+  refines' RPre RPost RR b1 b2 (pad t1) (pad t2).
 
 Definition padded_refines {E1 E2 : Type -> Type}
            {R1 R2 : Type} (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop)
            (t1 : itree_spec E1 R1) (t2 : itree_spec E2 R2) :=
-  refines RPre RPost RR (pad t1) (pad t2).
+  @padded_refines' E1 E2 R1 R2 RPre RPost RR true true t1 t2.
 
 Section refines_monot.
 Context (E1 E2 : Type -> Type).
 Context (R1 R2: Type).
 Context (RPre1 RPre2 : prerel E1 E2) (RPost1 RPost2 : postrel E1 E2) (RR1 RR2 : R1 -> R2 -> Prop).
 
-Lemma refines_monot :
+Lemma refines_monot b1 b2 :
   (forall A B, RPre1 A B <2= RPre2 A B) ->
   (forall A B e1 e2, (fun a b => RPost2 A B e1 a e2 b) <2= (fun a b => RPost1 A B e1 a e2 b)) ->
   RR1 <2= RR2 ->
   forall phi1 phi2,
-    refines RPre1 RPost1 RR1 phi1 phi2 ->
-    refines RPre2 RPost2 RR2 phi1 phi2.
+    refines' RPre1 RPost1 RR1 b1 b2 phi1 phi2 ->
+    refines' RPre2 RPost2 RR2 b1 b2 phi1 phi2.
 Proof.
   intros HPre HPost HRR. pcofix CIH.
   intros phi1 phi2 Hphi12. punfold Hphi12. red in Hphi12.
@@ -892,25 +979,25 @@ Proof.
   eauto.
 Qed.
 
-Lemma padded_refines_monot :
+Lemma padded_refines_monot b1 b2 :
   (forall A B, RPre1 A B <2= RPre2 A B) ->
   (forall A B e1 e2, (fun a b => RPost2 A B e1 a e2 b) <2= (fun a b => RPost1 A B e1 a e2 b)) ->
   RR1 <2= RR2 ->
   forall phi1 phi2,
-    padded_refines RPre1 RPost1 RR1 phi1 phi2 ->
-    padded_refines RPre2 RPost2 RR2 phi1 phi2.
+    padded_refines' RPre1 RPost1 RR1 b1 b2 phi1 phi2 ->
+    padded_refines' RPre2 RPost2 RR2 b1 b2 phi1 phi2.
 Proof.
   intros. apply refines_monot; auto.
 Qed.
 
 End refines_monot.
 
-Theorem padded_refines_trans (E1 E2 E3 : Type -> Type)
+Theorem padded_refines_trans (E1 E2 E3 : Type -> Type) b1 b2
         (R1 R2 R3 : Type) (RPre1 : prerel E1 E2) (RPre2 : prerel E2 E3) (RPost1 : postrel E1 E2)
         (RPost2 : postrel E2 E3) (RR1 : R1 -> R2 -> Prop) (RR2 : R2 -> R3 -> Prop) t1 t2 t3:
-  padded_refines RPre1 RPost1 RR1 t1 t2 ->
-  padded_refines RPre2 RPost2 RR2 t2 t3 ->
-  padded_refines (RComposePreRel RPre1 RPre2) (RComposePostRel RPre1 RPre2 RPost1 RPost2) (rcompose RR1 RR2) t1 t3.
+  padded_refines' RPre1 RPost1 RR1 b1 b2 t1 t2 ->
+  padded_refines' RPre2 RPost2 RR2 b1 b2 t2 t3 ->
+  padded_refines' (RComposePreRel RPre1 RPre2) (RComposePostRel RPre1 RPre2 RPost1 RPost2) (rcompose RR1 RR2) b1 b2 t1 t3.
 Proof.
   unfold padded_refines. intros. eapply refinesTrans; eauto; apply pad_is_padded.
 Qed.
@@ -1021,21 +1108,21 @@ Proof.
     intros a.
     specialize (H0 a).
     cbn.
-    constructor.
+    constructor. constructor.
     punfold H0.
   - econstructor.
     cbn.
-    constructor.
+    constructor. constructor.
     punfold IHREF.
   - econstructor.
     cbn.
-    constructor.
+    constructor. constructor.
     punfold IHREF.
   - constructor; eauto.
     intros a.
     specialize (H0 a).
     cbn.
-    constructor.
+    constructor. constructor.
     punfold H0.
 Qed.
 
@@ -1171,8 +1258,8 @@ Lemma refinesF_tau_tau_inv:
   forall (E1 E2 : Type -> Type) (RPre : prerel E1 E2) (RPost : postrel E1 E2) 
     (R1 R2 : Type) (RR : R1 -> R2 -> Prop) (phi1 : itree (SpecEvent E1) R1)
     (phi2 : itree (SpecEvent E2) R2),
-  refinesF RPre RPost RR id (upaco2 (refines_ RPre RPost RR id) bot2) (TauF phi1) (TauF phi2) ->
-  refinesF RPre RPost RR id (upaco2 (refines_ RPre RPost RR id) bot2) (observe phi1) (observe phi2).
+  refinesF RPre RPost RR true true id (upaco2 (refines_ RPre RPost RR true true id) bot2) (TauF phi1) (TauF phi2) ->
+  refinesF RPre RPost RR true true id (upaco2 (refines_ RPre RPost RR true true id) bot2) (observe phi1) (observe phi2).
 Proof.
   intros E1 E2 RPre RPost R1 R2 RR phi1 phi2 REF.
   change (TauF phi2) with (observe (Tau phi2)) in REF.
@@ -1228,26 +1315,35 @@ Context {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
 Context (pre : prerel E E) (post : postrel E E).
 
 (** *** "Up-to" principles for coinduction. *)
-
-Inductive refines_trans_clo (r : itree_spec E R1 -> itree_spec E R2 -> Prop)
+Inductive refines_trans_clo (b1 b2 b1' b2' : bool) (r : itree_spec E R1 -> itree_spec E R2 -> Prop)
   : itree_spec E R1 -> itree_spec E R2 -> Prop :=
 | refine_trans_clo_intro t1 t2 t1' t2' RR1 RR2
-      (EQVl: refines pre post RR1 t1 t1')
-      (EQVr: refines pre post RR2 t2 t2')
+      (* t1' is smaller (or equal) to t1 *)
+      (EQVl: refines' eq_prerel PostRelEq RR1 b1 b1' t1 t1')
+      (* t2' is bigger (or equal) to t2 *)
+      (EQVr: refines' eq_prerel PostRelEq RR2 b2' b2 t2' t2)
       (REL: r t1' t2')
       (LERR1: forall x x' y, RR1 x x' -> RR x' y -> RR x y)
-      (LERR2: forall x y y', RR2 y y' -> RR x y' -> RR x y)
-  : refines_trans_clo r t1 t2
+      (LERR2: forall x y y', RR2 y' y -> RR x y' -> RR x y)
+  : refines_trans_clo b1 b2 b1' b2' r t1 t2
 .
+
+(*
+t1 >= t2   ===> t1' >= t2 where t1' >= t1
+t1 >= t2   ===> t1 >= t2' where t2' <= t2
+
+t1 >= t2 ====> t1' >= t2' where t1' >= t1 and t2' <= t2
+*)
+
 Hint Constructors refines_trans_clo : itree.
 
-Definition refinesC := refines_trans_clo.
+Definition refinesC b1 b2 := refines_trans_clo b1 b2 false false.
 Hint Unfold refinesC : itree.
 
-Lemma refinesC_mon r1 r2 t1 t2
-      (IN: refinesC r1 t1 t2)
+Lemma refinesC_mon b1 b2 r1 r2 t1 t2
+      (IN: refinesC b1 b2 r1 t1 t2)
       (LE: r1 <2= r2):
-  refinesC r2 t1 t2.
+  refinesC b1 b2 r2 t1 t2.
 Proof.
   destruct IN. econstructor; eauto.
 Qed.
@@ -1255,213 +1351,189 @@ Qed.
 Hint Resolve refinesC_mon : paco.
 
 Ltac unfold_refines :=
-  (try match goal with [|- refines_ _ _ _ _ _ _ _ ] => red end);
-  (repeat match goal with [H: refines_ _ _ _ _ _ _ _ |- _ ] => red in H end).
+  (try match goal with [|- refines_ _ _ _ _ _ _ _ _ _ ] => red end);
+  (repeat match goal with [H: refines_ _ _ _ _ _ _ _ _ _ |- _ ] => red in H end).
 
-Lemma refinesC_wcompat vclo
+Lemma refinesC_wcompat b1 b2 vclo
       (MON: monotone2 vclo)
-      (CMP: compose refinesC vclo <3= compose vclo refinesC):
-  wcompatible2 (@refines_ E E R1 R2 pre post RR vclo) refinesC.
+      (CMP: compose (refinesC b1 b2) vclo <3= compose vclo (refinesC b1 b2)):
+  wcompatible2 (@refines_ E E R1 R2 pre post RR b1 b2 vclo) (refinesC b1 b2).
 Proof with eauto with paco itree_spec itree.
   econstructor; [ eauto with paco itree itree_spec | ].
   intros. destruct PR.
   punfold EQVl. punfold EQVr. unfold_refines.
   hinduction REL before r; intros; clear t1' t2'.
   - remember (RetF r1) as x.
-    hinduction EQVl before r; intros; subst; try inv Heqx; eauto with itree_spec.
+    hinduction EQVl before r; intros; subst; try inv Heqx; eauto with paco itree itree_spec.
     remember (RetF r3) as y.
-    genobs t2 ot2; clear t2 Heqot2.
-    induction EQVr.
-    all: try solve [intros; subst; try inv Heqy; eauto with paco itree_spec itree].
-    specialize (IHEQVr Heqy).
-    admit.
+    induction EQVr;
+      try solve [intros; subst; try inv Heqy; eauto with paco itree_spec itree].
   - remember (TauF t1) as x.
     hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK...
-    constructor.
     remember (TauF t4) as y.
-    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; eauto with itree.
+    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK...
     pclearbot. econstructor. gclo.
     econstructor; eauto with paco.
-  - remember (VisF e k1) as x.
-    hinduction EQVl before r; intros; try discriminate Heqx; [ inv_Vis | eauto with itree ].
-    remember (VisF e k3) as y.
-    hinduction EQVr before r; intros; try discriminate Heqy; [ inv_Vis | eauto with itree ].
-    econstructor. intros. pclearbot.
+  - (* LHS can be replaced with (VisF (Spec_vis e1) k1)
+       RHS can be replaced with (VisF (Spec_vis e2) k2)
+     *)
+    rename k1 into kl.
+    rename k2 into kr.
+    rename e1 into el.
+    rename e2 into er.
+    remember (VisF (Spec_vis el) kl) as x.
+    (* Heqx: x = VisF (Spec_vis e1) k1 *)
+    (* H: pre X Y e1 e2 *)
+    hinduction EQVl before r; intros; try solve [discriminate Heqx | eauto with paco itree itree_spec].
+    inv Heqx; inj_existT; subst.
+    (* H: pre X X0 e1 e0 *)
+    (* This is a different H because of the intros... *)
+    (* e1 became e0, e2 became e3 *)
+    (* a new e1 was introduced for observe t1 *)
+
+    (* Heqx: VisF (Spec_vis e2) k2 = VisF (Spec_vis e0) k0 *)
+    (* I don't understand where e1 and k1 went? *)
+    (* e2 turned into e3... EQVr *)
+    remember (VisF (Spec_vis er) kr) as y.
+    hinduction EQVr before r; intros; try discriminate Heqy...
+    inv Heqy; inj_existT; subst.
+    inv H1; inj_existT; subst.
+    inv H; inj_existT; subst.
+
+    rename H2 into HL.
+    rename H0 into HR.
+    rename H4 into HREC.
+    move HL after H8.
+    move HR after HL.
+    move HREC after HR.
+    unfold id in HL, HR.
+    pclearbot.
+    (* In this remaining case we know that our original t1 / t2 are vis vodes...
+
+       observe t1 = VisF (Spec_vis e0) k0
+       observe t2 = VisF (Spec_vis e2) k2
+
+       And we also have relations between these and our intermediate rewrites...
+
+  HL :
+    forall (a : X0) (b : X1),
+    post X0 X1 e0 a el b ->
+    paco2 (refines_ pre post RR1 b1 false (fun x : itree_spec E R1 -> itree_spec E R1 -> Prop => x))
+      bot2 (k0 a) (kl b)
+  HR :
+    forall (a : Y0) (b : Y),
+    post Y0 Y er a e2 b ->
+    paco2 (refines_ pre post RR2 false b2 (fun x : itree_spec E R2 -> itree_spec E R2 -> Prop => x))
+      bot2 (kr a) (k2 b)
+  HREC : forall (a : X1) (b : Y0), post X1 Y0 el a er b -> vclo r (kl a) (kr b)
+     *)
+    constructor; eauto.
+    (* e0 and e2 have to be related with post *)
+    (* We want to replace:
+
+       - e0 with el
+       - e2 with er
+
+       We have...
+
+       H : pre Y0 Y er e2
+       H1 : pre X0 X1 e0 el
+       H3 : pre X1 Y0 el er
+
+       So, I know that those events are somehow related.
+
+       I also know...
+
+       post X0 Y e0 a e2 b
+     *)
+    intros.
+    pclearbot.
     eapply MON.
-    + apply CMP. econstructor...
+    + (* Want to use the closure to apply transitivity *)
+      apply CMP.
+      red.
+      econstructor...
+      -- apply HL.
+         (* e0 and el are related with H1
+
+            H0 should be irrelevant, e2 is for the RHS.
+            Same with H3...
+          *)
+         constructor.
+      -- apply HR.
+         constructor.
     + intros. apply gpaco2_clo, PR.
   - remember (TauF t1) as x.
-    hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; [ | eauto with itree ].
-    pclearbot. punfold REL...
+    hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK...
+    pclearbot.
+    punfold H...
   - remember (TauF t2) as y.
-    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; [ | eauto with itree ].
-    pclearbot. punfold REL...
+    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK...
+    pclearbot. punfold H...
+  - (* forallR *)
+    remember (VisF (Spec_forall A) k) as y.
+    hinduction EQVr before r; intros; try discriminate Heqy...
+    inv Heqy; inj_existT; subst.
+    (* Should make sense by transitivity...
+
+       H: ot1 >= observe (k0 a)
+       EQVr: observe (k0 a) >= ot2
+       EQVl: observe t1 >= ot1
+       ===>
+       observe t1 >= ot2
+
+       Induction principles:
+       IHEQVr: observe ?x >= ot2
+       H0: observe ?x >= observe ?y
+    *)
+
+    rewrite (itree_eta' ot2); eauto.
+  - (* existsR *)
+    remember (VisF (Spec_exists A) k) as y.
+    hinduction EQVr before r; intros; try discriminate Heqy...
+    inv Heqy; inj_existT; subst.
+    rewrite (itree_eta' ot2); eauto.
+  - (* forallL *)
+    remember (VisF (Spec_forall A) k) as y.
+    hinduction EQVl before r; intros; try discriminate Heqy...
+    inv Heqy; inj_existT; subst.
+    rewrite (itree_eta' ot1); eauto.
+  - (* existsL *)
+    remember (VisF (Spec_exists A) k) as y.
+    hinduction EQVl before r; intros; try discriminate Heqy...
+    inv Heqy; inj_existT; subst.
+    rewrite (itree_eta' ot1); eauto.
 Qed.
 
-Lemma refinesC_wcompat :
-  wcompatible2 (@refines_ E E R1 R2 pre post RR) refinesC.
-Proof with eauto with paco itree.
-  econstructor; [ eauto with paco itree | ].
-  intros. destruct PR.
-  punfold EQVl. punfold EQVr. unfold_refines.
-  hinduction REL before r; intros; clear t1' t2'.
-  - remember (RetF r1) as x.
-    hinduction EQVl before r; intros; subst; try inv Heqx.
-    + remember (RetF r3) as y.
-      hinduction EQVr before r; intros; subst; try inv Heqy;
-        try solve [constructor; eauto].
-      -- constructor; eauto.
-         intros a0.
-         admit.
-      -- constructor; eauto.
+Hint Resolve refinesC_wcompat : paco.
 
-    [ | eauto with itree ].
-    remember (RetF r3) as y.
-    hinduction EQVr before r; intros; subst; try inv Heqy...
-  - remember (TauF m1) as x.
-    hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; [ | eauto with itree ].
-    remember (TauF m3) as y.
-    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; [ | eauto with itree ].
-    pclearbot. econstructor. gclo.
-    econstructor; eauto with paco.
-  - remember (VisF e k1) as x.
-    hinduction EQVl before r; intros; try discriminate Heqx; [ inv_Vis | eauto with itree ].
-    remember (VisF e k3) as y.
-    hinduction EQVr before r; intros; try discriminate Heqy; [ inv_Vis | eauto with itree ].
-    econstructor. intros. pclearbot.
-    eapply MON.
-    + apply CMP. econstructor...
-    + intros. apply gpaco2_clo, PR.
-  - remember (TauF t1) as x.
-    hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; [ | eauto with itree ].
-    pclearbot. punfold REL...
-  - remember (TauF t2) as y.
-    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; [ | eauto with itree ].
-    pclearbot. punfold REL...
-Qed.
-
-Hint Resolve refineC_wcompat : paco.
-
-Lemma refines_idclo_compat : compose refinesC id <3= compose id refinesC.
+Lemma refines_idclo_compat b1 b2 : compose (refinesC b1 b2) id <3= compose id (refinesC b1 b2).
 Proof.
   intros. apply PR.
 Qed.
 Hint Resolve refines_idclo_compat : paco.
 
-Lemma refinesC_dist :
-  forall r1 r2, refinesC (r1 \2/ r2) <2= (refinesC r1 \2/ refinesC r2).
+Lemma refinesC_dist b1 b2 :
+  forall r1 r2, refinesC b1 b2 (r1 \2/ r2) <2= (refinesC b1 b2 r1 \2/ refinesC b1 b2 r2).
 Proof.
   intros. destruct PR. destruct REL; eauto with itree.
 Qed.
 
 Hint Resolve refinesC_dist : paco.
 
-(* Lemma refines_clo_trans vclo *)
-(*       (MON: monotone2 vclo) *)
-(*       (CMP: compose refinesC vclo <3= compose vclo refinesC): *)
-(*   refines_trans_clo vclo <3= gupaco2 (refines_ RR vclo) refinesC. *)
-(* Proof. *)
-(*   intros. destruct PR. gclo. econstructor; eauto with paco. *)
-(* Qed. *)
-
+Lemma refines_clo_trans b1 b2 vclo
+      (MON: monotone2 vclo)
+      (CMP: compose (refinesC b1 b2) vclo <3= compose vclo (refinesC b1 b2)):
+  refines_trans_clo b1 b2 false false <3= gupaco2 (eqit_ RR b1 b2 vclo) (refinesC b1 b2).
+Proof.
+  intros. destruct PR. gclo. econstructor; eauto with paco.
+Qed.
 End refine_closure.
 
 #[global] Hint Unfold refinesC : itree.
 #[global] Hint Resolve refinesC_mon : paco.
-(* #[global] Hint Resolve refinesC_wcompat : paco. *)
+#[global] Hint Resolve refinesC_wcompat : paco.
 #[global] Hint Resolve refines_idclo_compat : paco.
 #[global] Hint Resolve refinesC_dist : paco.
-(* Arguments refines_clo_trans : clear implicits. *)
+Arguments refines_clo_trans : clear implicits.
 #[global] Hint Constructors refines_trans_clo : itree.
-
-Section eqit_closure.
-
-Context {E1 E2 : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
-Context {pre : prerel E1 E2} {post : postrel E1 E2}.
-
-(** *** "Up-to" principles for coinduction. *)
-
-Inductive refines_trans_clo (r : itree_spec E1 R1 -> itree E2 R2 -> Prop)
-  : itree_spec E1 R1 -> itree_spec E2 R2 -> Prop :=
-| refines_trans_clo_intro t1 t2 t1' t2' (RR1 : R1 -> R1 -> Prop) (RR2 : R2 -> R2 -> Prop)
-    (EQVl: strict_refines RR1 t1 t1')
-      (EQVr: refines pre post RR2 t2 t2')
-      (REL: r t1' t2')
-      (LERR1: forall x x' y, RR1 x x' -> RR x' y -> RR x y)
-      (LERR2: forall x y y', RR2 y y' -> RR x y' -> RR x y)
-  : refines_trans_clo r t1 t2.
-Hint Constructors eqit_trans_clo : itree.
-
-Definition eqitC b1 b2 := eqit_trans_clo b1 b2 false false.
-Hint Unfold eqitC : itree.
-
-Lemma eqitC_mon b1 b2 r1 r2 t1 t2
-      (IN: eqitC b1 b2 r1 t1 t2)
-      (LE: r1 <2= r2):
-  eqitC b1 b2 r2 t1 t2.
-Proof.
-  destruct IN. econstructor; eauto.
-Qed.
-
-Hint Resolve eqitC_mon : paco.
-
-Lemma eqitC_wcompat b1 b2 vclo
-      (MON: monotone2 vclo)
-      (CMP: compose (eqitC b1 b2) vclo <3= compose vclo (eqitC b1 b2)):
-  wcompatible2 (@eqit_ E R1 R2 RR b1 b2 vclo) (eqitC b1 b2).
-Proof with eauto with paco itree.
-  econstructor; [ eauto with paco itree | ].
-  intros. destruct PR.
-  punfold EQVl. punfold EQVr. unfold_eqit.
-  hinduction REL before r; intros; clear t1' t2'.
-  - remember (RetF r1) as x.
-    hinduction EQVl before r; intros; subst; try inv Heqx; [ | eauto with itree ].
-    remember (RetF r3) as y.
-    hinduction EQVr before r; intros; subst; try inv Heqy...
-  - remember (TauF m1) as x.
-    hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; [ | eauto with itree ].
-    remember (TauF m3) as y.
-    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; [ | eauto with itree ].
-    pclearbot. econstructor. gclo.
-    econstructor; eauto with paco.
-  - remember (VisF e k1) as x.
-    hinduction EQVl before r; intros; try discriminate Heqx; [ inv_Vis | eauto with itree ].
-    remember (VisF e k3) as y.
-    hinduction EQVr before r; intros; try discriminate Heqy; [ inv_Vis | eauto with itree ].
-    econstructor. intros. pclearbot.
-    eapply MON.
-    + apply CMP. econstructor...
-    + intros. apply gpaco2_clo, PR.
-  - remember (TauF t1) as x.
-    hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; [ | eauto with itree ].
-    pclearbot. punfold REL...
-  - remember (TauF t2) as y.
-    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; [ | eauto with itree ].
-    pclearbot. punfold REL...
-Qed.
-
-Hint Resolve eqitC_wcompat : paco.
-
-Lemma eqit_idclo_compat b1 b2: compose (eqitC b1 b2) id <3= compose id (eqitC b1 b2).
-Proof.
-  intros. apply PR.
-Qed.
-Hint Resolve eqit_idclo_compat : paco.
-
-Lemma eqitC_dist b1 b2:
-  forall r1 r2, eqitC b1 b2 (r1 \2/ r2) <2= (eqitC b1 b2 r1 \2/ eqitC b1 b2 r2).
-Proof.
-  intros. destruct PR. destruct REL; eauto with itree.
-Qed.
-
-Hint Resolve eqitC_dist : paco.
-
-Lemma eqit_clo_trans b1 b2 vclo
-      (MON: monotone2 vclo)
-      (CMP: compose (eqitC b1 b2) vclo <3= compose vclo (eqitC b1 b2)):
-  eqit_trans_clo b1 b2 false false <3= gupaco2 (eqit_ RR b1 b2 vclo) (eqitC b1 b2).
-Proof.
-  intros. destruct PR. gclo. econstructor; eauto with paco.
-Qed.
-
-End eqit_closure.

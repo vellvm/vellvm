@@ -66,19 +66,19 @@ Proof.
   reflexivity.
 Qed.
 
-Global Instance eq_itree_refines_Proper1 {E1 E2 R1 R2 RR}
+Global Instance eq_itree_refines_Proper1 {E1 E2 R1 R2 RR} {b1 b2 : bool}
   {RPre : prerel E1 E2} {RPost : postrel E1 E2} {r} : 
   Proper (eq_itree eq ==> eq_itree eq ==> flip impl)
-    (@refines_ E1 E2 R1 R2 RPre RPost RR (upaco2 (refines_ RPre RPost RR) r)).
+    (@refines_ E1 E2 R1 R2 RPre RPost RR b1 b2 id (upaco2 (refines_ RPre RPost RR b1 b2 id) r)).
 Proof.
   repeat intro. apply bisimulation_is_eq in H. apply bisimulation_is_eq in H0.
   subst. auto.
 Qed.
 
-Global Instance eq_itree_refines_Proper2 {E1 E2 R1 R2 RR}
+Global Instance eq_itree_refines_Proper2 {E1 E2 R1 R2 RR} {b1 b2}
   {RPre : prerel E1 E2} {RPost : postrel E1 E2} {r} : 
   Proper (eq_itree eq ==> eq_itree eq ==> flip impl)
-    (paco2 (@refines_ E1 E2 R1 R2 RPre RPost RR) r).
+    (paco2 (@refines_ E1 E2 R1 R2 RPre RPost RR b1 b2 id) r).
 Proof.
   repeat intro. apply bisimulation_is_eq in H. apply bisimulation_is_eq in H0.
   subst. auto.
@@ -116,14 +116,14 @@ Proof.
   intros. pstep. red. cbn. constructor. auto. left. pstep. constructor. left. apply H0. auto.
 Qed.
 
-
-Theorem refines_bind (E1 E2 : Type -> Type) (R1 R2 S1 S2: Type)
-        (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) (RS : S1 -> S2 -> Prop) 
-        (t1 : itree_spec E1 R1) (t2 : itree_spec E2 R2)
-        (k1 : R1 -> itree_spec E1 S1) (k2 : R2 -> itree_spec E2 S2) :
-  refines RPre RPost RR t1 t2 ->
-  (forall r1 r2, RR r1 r2 -> refines RPre RPost RS (k1 r1) (k2 r2)) ->
-  refines RPre RPost RS (ITree.bind t1 k1) (ITree.bind t2 k2).
+Theorem refines'_bind (E1 E2 : Type -> Type) (R1 R2 S1 S2: Type)
+  (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) (RS : S1 -> S2 -> Prop)
+  b1 b2
+  (t1 : itree_spec E1 R1) (t2 : itree_spec E2 R2)
+  (k1 : R1 -> itree_spec E1 S1) (k2 : R2 -> itree_spec E2 S2) :
+  refines' RPre RPost RR b1 b2 t1 t2 ->
+  (forall r1 r2, RR r1 r2 -> refines' RPre RPost RS b1 b2 (k1 r1) (k2 r2)) ->
+  refines' RPre RPost RS b1 b2 (ITree.bind t1 k1) (ITree.bind t2 k2).
 Proof.
   revert t1 t2. pcofix CIH. intros t1 t2 Ht12 Hk.
   punfold Ht12. red in Ht12. remember (observe t1) as ot1. remember (observe t2) as ot2.
@@ -134,12 +134,23 @@ Proof.
     pclearbot. eapply CIH; eauto.
   - rewrite Heqot1, Heqot2. repeat rewrite bind_vis. pstep. constructor. auto. intros. right.
     eapply H0 in H1. pclearbot. eapply CIH; eauto.
-  - rewrite Heqot1. rewrite bind_tau. pstep. constructor. pstep_reverse.
-  - rewrite Heqot2. rewrite bind_tau. pstep. constructor. pstep_reverse.
+  - rewrite Heqot1. rewrite bind_tau. pstep. constructor; auto. pstep_reverse.
+  - rewrite Heqot2. rewrite bind_tau. pstep. constructor; auto. pstep_reverse.
   - rewrite Heqot2. rewrite bind_vis. pstep. constructor. intros. pstep_reverse.
   - rewrite Heqot2. rewrite bind_vis. pstep. econstructor. intros. pstep_reverse.
   - rewrite Heqot1. rewrite bind_vis. pstep. econstructor. intros. pstep_reverse.
   - rewrite Heqot1. rewrite bind_vis. pstep. constructor. intros. pstep_reverse.
+Qed.
+
+Theorem refines_bind (E1 E2 : Type -> Type) (R1 R2 S1 S2: Type)
+        (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) (RS : S1 -> S2 -> Prop) 
+        (t1 : itree_spec E1 R1) (t2 : itree_spec E2 R2)
+        (k1 : R1 -> itree_spec E1 S1) (k2 : R2 -> itree_spec E2 S2) :
+  refines RPre RPost RR t1 t2 ->
+  (forall r1 r2, RR r1 r2 -> refines RPre RPost RS (k1 r1) (k2 r2)) ->
+  refines RPre RPost RS (ITree.bind t1 k1) (ITree.bind t2 k2).
+Proof.
+  apply refines'_bind.
 Qed.
 
 Theorem padded_refines_bind (E1 E2 : Type -> Type) (R1 R2 S1 S2: Type)
@@ -150,7 +161,8 @@ Theorem padded_refines_bind (E1 E2 : Type -> Type) (R1 R2 S1 S2: Type)
   (forall r1 r2, RR r1 r2 -> padded_refines RPre RPost RS (k1 r1) (k2 r2)) ->
   padded_refines RPre RPost RS (ITree.bind t1 k1) (ITree.bind t2 k2).
 Proof.
-  intros. unfold padded_refines. repeat rewrite pad_bind.
+  intros. unfold padded_refines, padded_refines'.
+  repeat rewrite pad_bind.
   eapply refines_bind; eauto.
 Qed.
 
@@ -221,9 +233,9 @@ Lemma refines_iter_aux:
     (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) (RS : S1 -> S2 -> Prop) (body1 : R1 -> itree_spec E1 (R1 + S1))
     (body2 : R2 -> itree_spec E2 (R2 + S2)) (t1 : itree_spec E1 (R1 + S1)) (t2 : itree_spec E2 (R2 + S2))
     (r : (itree_spec E1 S1) -> (itree_spec E2 S2) -> Prop),
-    paco2 (refines_ RPre RPost (sum_rel RR RS)) bot2 t1 t2 ->
+    paco2 (refines_ RPre RPost (sum_rel RR RS) true true id) bot2 t1 t2 ->
     (forall (r2 : R2) (r1 : R1), RR r1 r2 -> r (ITree.iter body1 r1) (ITree.iter body2 r2)) ->
-    paco2 (refines_ RPre RPost RS) r
+    paco2 (refines_ RPre RPost RS true true id) r
           (ITree.bind t1 (fun rs : R1 + S1 => match rs with
                                             | inl r0 => Tau (ITree.iter body1 r0)
                                             | inr s => Ret s
@@ -243,9 +255,9 @@ Proof.
     + pstep. constructor. auto.
   - repeat rewrite bind_tau. pstep. constructor. pclearbot. eauto.
   - repeat  rewrite bind_vis. pstep. constructor. pclearbot. auto.
-    intros. apply H0 in H1. pclearbot. eauto.
-  - rewrite bind_tau. pstep. constructor. pstep_reverse.
-  - rewrite bind_tau. pstep. constructor. pstep_reverse.
+    intros. apply H0 in H1. pclearbot. red. eauto.
+  - rewrite bind_tau. pstep. constructor. constructor. pstep_reverse.
+  - rewrite bind_tau. pstep. constructor. constructor. pstep_reverse.
   - rewrite bind_vis. pstep. econstructor. intros. pstep_reverse.
   - rewrite bind_vis. pstep. econstructor. intros. pstep_reverse.
   - rewrite bind_vis. pstep. econstructor. intros. pstep_reverse.
@@ -272,10 +284,10 @@ Proof.
   - repeat rewrite bind_vis. pstep. constructor. auto. pclearbot. intros * H5. left.
     apply H0 in H5. pclearbot.
     eapply refines_iter_aux; eauto.
-  - rewrite bind_tau. pstep. constructor. pstep_reverse.
+  - rewrite bind_tau. pstep. constructor. constructor. pstep_reverse.
     eapply refines_iter_aux; eauto. pstep. red. rewrite <- Heqob2.
     eauto.
-  - rewrite bind_tau. pstep. constructor. pstep_reverse.
+  - rewrite bind_tau. pstep. constructor. constructor. pstep_reverse.
     eapply refines_iter_aux; eauto. pstep. red.
     rewrite <- Heqob1. auto.
   - rewrite bind_vis. pstep. constructor. intros. pstep_reverse.
@@ -299,7 +311,7 @@ Theorem padded_refines_iter (E1 E2 : Type -> Type) (R1 R2 S1 S2: Type)
   RR r1 r2 ->
   padded_refines RPre RPost RS (ITree.iter body1 r1) (ITree.iter body2 r2).
 Proof.
-  unfold padded_refines. intros.
+  unfold padded_refines, padded_refines'. intros.
   repeat rewrite pad_iter. eapply refines_iter; eauto.
 Qed.
 
@@ -805,7 +817,7 @@ Proof.
   pstep; red; cbn; constructor.
   intros a.
   specialize (REF a).
-  cbn; constructor.
+  cbn; constructor. constructor.
   punfold REF.
 Qed.
 
@@ -818,7 +830,7 @@ forall {E1 E2 : Type -> Type} {R1 R2 : Type} (RPre : prerel E1 E2) (RPost : post
 Proof.
   intros E1 E2 R1 R2 RPre RPost RR A t2 k a REF.
   pstep; red; cbn; econstructor.
-  cbn; constructor.
+  cbn; constructor. constructor.
   punfold REF.
 Qed.
 
