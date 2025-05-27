@@ -90,6 +90,9 @@
                             rocq.ocamlPackages.ppxlib
                             pkgs.util-linux
                           ];
+            shellHook = ''
+              unset COQPATH
+            '';
           };
         };
 
