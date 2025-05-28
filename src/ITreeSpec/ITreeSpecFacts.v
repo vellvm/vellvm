@@ -1528,6 +1528,7 @@ Lemma refines_clo_trans b1 b2 vclo
 Proof.
   intros. destruct PR. gclo. econstructor; eauto with paco.
 Qed.
+
 End refine_closure.
 
 #[global] Hint Unfold refinesC : itree.

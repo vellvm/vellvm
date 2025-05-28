@@ -1388,3 +1388,47 @@ Proof.
     admit.
     admit.
 Abort.
+
+Section refine_closure.
+
+  Context {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
+  Context (pre : prerel E E) (post : postrel E E).
+
+  (** *** "Up-to" principles for coinduction. *)
+
+  Inductive refines_bind_clo b1 b2 (r : itree_spec E R1 -> itree_spec E R2 -> Prop) :
+    itree_spec E R1 -> itree_spec E R2 -> Prop :=
+  | pbc_intro_h U1 U2 (RU : U1 -> U2 -> Prop) t1 t2 k1 k2
+      (EQV: refines' pre post RU b1 b2 t1 t2)
+      (REL: forall u1 u2, RU u1 u2 -> r (k1 u1) (k2 u2))
+    : refines_bind_clo b1 b2 r (ITree.bind t1 k1) (ITree.bind t2 k2)
+  .
+  Hint Constructors refines_bind_clo : itree.
+
+  Lemma refines_clo_bind b1 b2 vclo
+    (MON: monotone2 vclo)
+    (CMP: compose (refinesC b1 b2) vclo <3= compose vclo (refinesC b1 b2))
+    (ID: id <3= vclo):
+    refines_bind_clo b1 b2 <3= gupaco2 (refines_ pre post RR b1 b2 vclo) (refinesC b1 b2).
+  Proof.
+    intros rr.
+    gcofix CIH. intros. destruct PR.
+    gclo. econstructor; auto_ctrans_eq.
+    1,2: setoid_rewrite unfold_bind; reflexivity.
+    punfold EQV. unfold_eqit.
+    hinduction EQV before CIH; intros; pclearbot; cbn;
+      repeat (change (ITree.subst ?k ?m) with (ITree.bind m k)).
+    - guclo eqit_clo_trans. econstructor; auto_ctrans_eq.
+      1,2: reflexivity.
+      eauto with paco.
+    - gstep. econstructor. eauto 7 with paco itree.
+    - gstep. econstructor. intros. red in CMP. unfold id in ID. apply ID. eauto 7 with paco itree.
+    - destruct b1; try discriminate.
+      guclo eqit_clo_trans.
+      econstructor; auto_ctrans_eq; eauto; try reflexivity.
+      eapply eqit_Tau_l. rewrite unfold_bind. reflexivity.
+    - destruct b2; try discriminate.
+      guclo eqit_clo_trans. econstructor; auto_ctrans_eq; eauto; try reflexivity.
+      eapply eqit_Tau_l. rewrite unfold_bind. reflexivity.
+  Qed.
+End refine_closure.

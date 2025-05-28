@@ -1592,9 +1592,8 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
           setoid_rewrite UNFOLD; clear UNFOLD.
 
           gbase.
-          guclo
           apply CIH.
-        - paco2_mon_bot.
+        - guclo.
           econstructor.
 
           x > y
