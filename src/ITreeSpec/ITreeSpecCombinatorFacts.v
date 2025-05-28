@@ -1407,14 +1407,14 @@ Section refine_closure.
 
   Lemma refines_clo_bind b1 b2 vclo
     (MON: monotone2 vclo)
-    (CMP: compose (refinesC b1 b2) vclo <3= compose vclo (refinesC b1 b2))
+    (CMP: compose (refinesC RR b1 b2) vclo <3= compose vclo (refinesC RR b1 b2))
     (ID: id <3= vclo):
-    refines_bind_clo b1 b2 <3= gupaco2 (refines_ pre post RR b1 b2 vclo) (refinesC b1 b2).
+    refines_bind_clo b1 b2 <3= gupaco2 (refines_ pre post RR b1 b2 vclo) (refinesC RR b1 b2).
   Proof.
     intros rr.
     gcofix CIH. intros. destruct PR.
     gclo. econstructor; auto_ctrans_eq.
-    1,2: setoid_rewrite unfold_bind; reflexivity.
+    1,2: setoid_rewrite unfold_bind; cbn. reflexivity.
     punfold EQV. unfold_eqit.
     hinduction EQV before CIH; intros; pclearbot; cbn;
       repeat (change (ITree.subst ?k ?m) with (ITree.bind m k)).

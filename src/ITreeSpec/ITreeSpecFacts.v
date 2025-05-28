@@ -405,30 +405,100 @@ Proof.
     * eapply IHHref; eauto. pstep_reverse. rewrite <- (tau_eutt phi1). pstep. auto.
 Qed.
 
+Section refines_tau_inv.
+  Context (E1 E2 : Type -> Type).
+  Context (RPre : prerel E1 E2) (RPost : postrel E1 E2).
+  Context (R1 R2 : Type) (RR : R1 -> R2 -> Prop).
+
+  Lemma refines_TauTau_inv : forall b1 b2 phi1 phi2,
+      refines' RPre RPost RR b1 b2 (Tau phi1) (Tau phi2) -> refines' RPre RPost RR b1 b2 phi1 phi2.
+  Proof with eauto with itree.
+    intros * H. punfold H. red in H. simpl in *.
+    remember (TauF phi1) as tt1. remember (TauF phi2) as tt2.
+    hinduction H before b2; intros; try discriminate; try inv CHECK.
+    - inv Heqtt1. inv Heqtt2. pclearbot. eauto.
+    - inv Heqtt1. inv H.
+      + pclearbot. punfold H2. pstep. red. simpobs...
+        constructor; auto.
+      + pstep. red.
+        simpobs. econstructor; eauto. pstep_reverse. apply IHrefinesF; eauto with solve_padded.
+      + pstep; red; auto.
+      + pstep; red.
+        rewrite <- H0.
+        econstructor.
+        eapply refinesF_TauR_inv.
+        apply H1.
+      + pstep; red.
+        rewrite <- H0.
+        econstructor.
+        intros a.
+        eapply refinesF_TauR_inv.
+        apply H1.
+    - inv Heqtt2. inv H;
+        try solve [pstep; red; eauto].
+      + pclearbot. punfold H2. pstep. red. simpobs...
+        constructor; auto.
+      + pstep; red.
+        rewrite <- H0.
+        constructor; auto.
+        eapply refinesF_TauL_inv; eauto.
+      + pstep; red.
+        rewrite <- H0.
+        econstructor.
+        intros a.
+        eapply refinesF_TauL_inv.
+        eauto.
+      + pstep; red.
+        rewrite <- H0.
+        econstructor; eauto.
+        eapply refinesF_TauL_inv; eauto.
+  Qed.
+
+  Lemma refinesF_TauTau_inv : forall b1 b2 phi1 phi2,
+      padded phi1 ->
+      padded phi2 ->
+      refinesF RPre RPost RR b1 b2 id (upaco2 (refines_ RPre RPost RR b1 b2 id) bot2) (TauF phi1) (TauF phi2) ->
+      refinesF RPre RPost RR b1 b2 id (upaco2 (refines_ RPre RPost RR b1 b2 id) bot2) (observe phi1) (observe phi2).
+  Proof.
+    intros. pstep_reverse. apply refines_TauTau_inv; eauto. pstep. eauto.
+  Qed.
+
+End refines_tau_inv.
+
 Lemma refines_eutt_padded_r_tau_aux:
   forall (E1 E2 : Type -> Type) (R2 : Type)
     (R1 : Type) (RPre : prerel E1 E2)
     (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop)
+    b1
     (r : itree_spec E1 R1 -> itree_spec E2 R2 -> Prop)
     (m1 m2 : itree_spec E2 R2) (t1 : itree_spec E1 R1),
-    refinesF RPre RPost RR true true id (upaco2 (refines_ RPre RPost RR true true id) bot2)
+    refinesF RPre RPost RR b1 true id (upaco2 (refines_ RPre RPost RR b1 true id) bot2)
              (observe t1) (TauF m1) ->
     paddedF (upaco1 padded_ bot1) (TauF m2) ->
     paddedF (upaco1 padded_ bot1) (observe t1) ->
-    paco2 (eqit_ eq true true id) bot2 m1 m2 ->
+    paco2 (eqit_ eq b1 true id) bot2 m1 m2 ->
     (forall (t2 : itree_spec E1 R1) (t3 t4 : itree_spec E2 R2),
         padded t2 ->
-        padded t4 -> t3 ≈ t4 -> refines RPre RPost RR t2 t3 -> r t2 t4) ->
-    refinesF RPre RPost RR true true id (upaco2 (refines_ RPre RPost RR true true id) r)
+        padded t4 -> (eqit eq b1 true t3 t4) -> refines' RPre RPost RR b1 true t2 t3 -> r t2 t4) ->
+    refinesF RPre RPost RR b1 true id (upaco2 (refines_ RPre RPost RR b1 true id) r)
              (observe t1) (TauF m2).
 Proof.
-  intros E1 E2 R2 R1 RPre RPost RR r m1 m2 t1 Href Hpad3 Hpad1 REL CIH.
+  intros E1 E2 R2 R1 RPre RPost RR b1 r m1 m2 t1 Href Hpad3 Hpad1 REL CIH.
   remember (observe t1) as ot1. clear Heqot1 t1.
   assert (HDEC : (exists t4, ot1 = TauF t4) \/ (forall t4, ot1 <> TauF t4)).
   { destruct ot1; eauto; right; repeat intro; discriminate. }
   destruct HDEC as [ [t4 Ht4] | Ht1]; subst.
   { constructor. right. eapply CIH; eauto. inv Hpad1. pclearbot. auto.
-    inv Hpad3. pclearbot. auto. apply refines_TauL_inv.
+    inv Hpad3. pclearbot. auto.
+    apply refines_TauTau_inv. eauto with solve_padded.
+    2: pstep; eauto.
+    (* m2 is padded...
+       m2 has strictly more taus than m1, so m1 must be padded.
+     *)
+    
+    rewrite REL.
+    pstep. auto.
+    apply refines_TauL_inv.
     apply refines_TauR_inv. pstep. auto. }
   destruct ot1; try (exfalso; eapply Ht1; eauto; fail); try destruct e.
   - inv Href. constructor. constructor. remember (RetF r0) as x.
@@ -568,10 +638,10 @@ Proof.
   - constructor. constructor. eapply IHHeutt; eauto with solve_padded.
 Qed.
 
-Lemma refines_eutt_padded_r E1 E2 R1 R2 RPre RPost RR :
+Lemma refines_eutt_padded_r E1 E2 R1 R2 RPre RPost RR b1 :
   forall (t1 : itree_spec E1 R1) (t2 t3 : itree_spec E2 R2),
     padded t1 -> padded t3 -> t2 ≈ t3 ->
-    refines RPre RPost RR t1 t2 -> refines RPre RPost RR t1 t3.
+    refines' RPre RPost RR b1 true t1 t2 -> refines' RPre RPost RR b1 true t1 t3.
 Proof.
   pcofix CIH. intros t1 t2 t3 Hpad1 Hpad3 Heutt Href.
   punfold Href. punfold Heutt. red in Heutt. red in Href.
@@ -1003,7 +1073,7 @@ Proof.
 Qed.
 
 
-#[global] Instance padded_refines_proper_eutt {E1 E2 R1 R2} RPre RPost RR : Proper (eutt eq ==> eutt eq ==> flip impl)  (@padded_refines E1 E2 R1 R2 RPre RPost RR).
+#[global] Instance padded_refines_proper_eutt {E1 E2 R1 R2} RPre RPost RR b1 b2 : Proper (eutt eq ==> eutt eq ==> flip impl)  (@padded_refines' E1 E2 R1 R2 RPre RPost RR b1 b2).
 Proof.
   intros t1 t2 Ht12 t3 t4 Ht34 Href. red. red in Href.
   eapply refines_eutt_padded_r; try apply pad_is_padded.
@@ -1033,15 +1103,21 @@ Defined.
 (* Definition eq_prerel {E} : prerel E E :=
   (fun (A B : Type) e1 e2 => @JMeq (E A) e1 (E B) e2). *)
 
+Definition strict_refines' {E R} b1 b2 : itree_spec E R -> itree_spec E R -> Prop :=
+  padded_refines' eq_prerel PostRelEq eq b1 b2.
+
 Definition strict_refines {E R} : itree_spec E R -> itree_spec E R -> Prop :=
-  padded_refines eq_prerel PostRelEq eq.
+  strict_refines' true true.
+
+Definition strict_refines_unpadded' {E R} b1 b2 : itree_spec E R -> itree_spec E R -> Prop :=
+  refines' eq_prerel PostRelEq eq b1 b2.
 
 Definition strict_refines_unpadded {E R} : itree_spec E R -> itree_spec E R -> Prop :=
-  refines eq_prerel PostRelEq eq.
+  strict_refines_unpadded' true true.
 
 #[global] Instance strict_refines_proper {E1 E2 R1 R2}
-       (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) :
-  Proper (strict_refines ==> flip strict_refines ==> Basics.flip Basics.impl) (padded_refines RPre RPost RR).
+       (RPre : prerel E1 E2) (RPost : postrel E1 E2) (RR : R1 -> R2 -> Prop) b1 b2:
+  Proper (strict_refines' b1 b2 ==> flip (strict_refines' b1 b2) ==> Basics.flip Basics.impl) (padded_refines' RPre RPost RR b1 b2).
 Proof.
   repeat intro. red in H1. eapply padded_refines_monot with (RPre1 := RComposePreRel eq_prerel (RComposePreRel RPre eq_prerel)).
   4 : { eapply padded_refines_trans; eauto.
@@ -1062,21 +1138,23 @@ Proof.
 Qed.
 
 Lemma refines_padded_refines :
-  forall E1 E2 R1 R2 in_rel in_post_rel RR t1 t2,
-    @refines
+  forall E1 E2 R1 R2 in_rel in_post_rel RR b1 b2 t1 t2,
+    @refines'
       E1 E2 R1 R2
       in_rel
       in_post_rel
       RR
+      b1 b2
       t1 t2 ->
-    @padded_refines
+    @padded_refines'
       E1 E2 R1 R2
       in_rel
       in_post_rel
       RR
+      b1 b2
       t1 t2.
 Proof.
-  intros E1 E2 R1 R2 in_rel0 in_post_rel0 RR t1 t2 REF.
+  intros E1 E2 R1 R2 in_rel0 in_post_rel0 RR b1 b2 t1 t2 REF.
   punfold REF; red in REF; cbn in REF.
   setoid_rewrite itree_eta.
   genobs t1 ot1.
@@ -1151,10 +1229,10 @@ Proof.
 Qed.
 
 Lemma refines_refl {E R} (RPre : prerel E E) (RPost : postrel E E)
-      (RR : R -> R -> Prop) :
+      (RR : R -> R -> Prop) b1 b2 :
   ReflexivePreRel RPre -> ReflexivePostRel RPost -> Reflexive RR ->
   forall t, padded t ->
-  refines RPre RPost RR t t.
+  refines' RPre RPost RR b1 b2 t t.
 Proof.
   intros HRPre HRPost HRR.  pcofix CIH. intros t Ht. pstep. red.
   punfold Ht. red in Ht. inversion Ht.
@@ -1170,9 +1248,9 @@ Proof.
 Qed.
 
 Lemma padded_refines_refl {E R} (RPre : prerel E E) (RPost : postrel E E)
-      (RR : R -> R -> Prop) :
+      (RR : R -> R -> Prop) b1 b2 :
   ReflexivePreRel RPre -> ReflexivePostRel RPost -> Reflexive RR ->
-  Reflexive (padded_refines RPre RPost RR).
+  Reflexive (padded_refines' RPre RPost RR b1 b2).
 Proof.
   repeat intro. apply refines_refl; auto. apply pad_is_padded.
 Qed.
