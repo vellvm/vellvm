@@ -984,6 +984,78 @@ Proof.
       eapply paco2_mon; [pstep; apply Href | intros; contradiction].
 Qed.
 
+Lemma refines'_eq_itree_l E1 E2 R1 R2 RPre RPost RR b1 b2 :
+  forall (t1 t1' : itree_spec E1 R1) (t2 : itree_spec E2 R2),
+    eq_itree eq t1 t1' ->
+    refines' RPre RPost RR b1 b2 t1 t2 -> refines' RPre RPost RR b1 b2 t1' t2.
+Proof.
+  pcofix CIH. intros t1 t1' t2 Heutt Href.
+  punfold Href. punfold Heutt. red in Heutt. red in Href.
+  pstep. red. hinduction Heutt before r; intros; pclearbot; try discriminate.
+  - subst. setoid_rewrite itree_eta'. pstep_reverse.
+    eapply paco2_mon; [ pstep; eapply Href | intros; contradiction].
+  - (* Tau / Tau case...
+
+       Must use CIH. The tricky part here is that b1 / b2 could be
+       true.
+
+       If b1 and b2 are both false then we would know that t1 has to
+       have a Tau, and we can apply the Tau/Tau constructor to get to
+       r in order to apply CIH.
+
+       If b1 and b2 are both true, then it's possible that we're just
+       in a case with extra Taus on the right hand side of either the
+       goal or Href. If that's the case, then we need to do induction
+       to strip off the extra Taus.
+
+     *)
+
+    remember (TauF m1) as x.
+    hinduction Href before r; intros;
+      inv Heqx; inj_existT; subst; pclearbot; eauto with solve_padded.
+
+    apply bisimulation_is_eq in REL; subst.
+    constructor; auto.
+
+    setoid_rewrite itree_eta'.
+    pstep_reverse.
+    eapply paco2_mon; [ pstep; eapply Href | intros; contradiction].      
+  - destruct e.
+    + assert (Hx : eq_itree eq (Vis (Spec_vis e) k1) (Vis (Spec_vis e) k2)).
+      pstep. constructor. left. auto. punfold Hx. red in Hx.
+      cbn in Hx.
+      remember (VisF (Spec_vis e) k1) as y.
+      hinduction Href before r; intros; inv Heqy; inj_existT; subst; eauto with solve_padded.
+      constructor. auto. right. eapply CIH; eauto.
+      inv Hx; inj_existT; cbn in *; subst.
+      pclearbot.
+      apply REL0.
+      apply H0 in H1. destruct H1; auto; try contradiction.
+    + remember (VisF (Spec_forall A) k1) as x.
+      hinduction Href before r; intros;
+        inv Heqx; inj_existT; subst; pclearbot; eauto with solve_padded.
+
+      specialize (REL a).
+      apply bisimulation_is_eq in REL.
+      econstructor.
+      rewrite <- REL.
+      setoid_rewrite itree_eta'.
+      pstep_reverse.
+      eapply paco2_mon; [pstep; apply Href | intros; contradiction].
+    + remember (VisF (Spec_exists A) k1) as x.
+      hinduction Href before r; intros;
+        inv Heqx; inj_existT; subst; pclearbot; eauto with solve_padded.
+
+      econstructor.
+      intros.
+      specialize (REL a).
+      apply bisimulation_is_eq in REL.
+      rewrite <- REL.
+      setoid_rewrite itree_eta'.
+      pstep_reverse.
+      eapply paco2_mon; [pstep; apply H | intros; contradiction].
+Qed.
+
 Lemma Spec_vis_inv:
   forall (E1 : Type -> Type) (R1 : Type) (E2 : Type -> Type) (R2 : Type)
     R3 R4
