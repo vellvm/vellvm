@@ -12,7 +12,8 @@ From ITree Require Import
 From ITree Require Import
   Basics.HeterogeneousRelations
   Core.ITreeDefinition
-  Eq.Eqit.
+  Eq.Eqit
+  Eq.EqAxiom.
 
 From Paco Require Import paco.
 
@@ -105,6 +106,14 @@ Proof with eauto with itree_spec.
     constructor. intros. red.
     rewrite tau_euttge.
     gfinal. eauto.
+Qed.
+
+Theorem pad_eq_itree {E : Type -> Type} {R : Type} : forall t1 t2 : itree E R, t1 ≅ t2 -> pad t1 ≅ pad t2.
+Proof with eauto with itree_spec.
+  intros t1 t2 H.
+  apply bisimulation_is_eq in H.
+  subst.
+  reflexivity.
 Qed.
 
 Global Instance pad_Proper {b1 b2 : bool} {E : Type -> Type} {R : Type} : Proper (eqit eq b1 b2 ==> eqit eq b1 b2) (@pad E R).

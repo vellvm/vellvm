@@ -1397,10 +1397,13 @@ Qed.
 
 #[global] Instance padded_refines_proper_eq_itree {E1 E2 R1 R2} RPre RPost RR b1 b2 : Proper (eq_itree eq ==> eq_itree eq ==> flip impl)  (@padded_refines' E1 E2 R1 R2 RPre RPost RR b1 b2).
 Proof.
-(*   repeat intro. eapply padded_refines_proper_eutt; eauto. *)
-(*   rewrite H. reflexivity. rewrite H0. reflexivity. *)
-(* Qed. *)
-Admitted.
+  intros t1 t2 Ht12 t3 t4 Ht34 Href. red. red in Href.
+  eapply refines'_eq_itree_r.
+  symmetry; apply pad_eq_itree; eauto.
+  eapply refines'_eq_itree_l.
+  symmetry; apply pad_eq_itree; eauto.
+  auto.
+Qed.
 
 Variant PostRelEq {E : Type -> Type} : postrel E E :=
   | PostRelEq_intro A e a : @PostRelEq E A A e a e a.
