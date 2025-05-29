@@ -1525,9 +1525,9 @@ Qed.
 Proof.
   repeat intro. red in H1. eapply padded_refines_monot with (RPre1 := RComposePreRel eq_prerel (RComposePreRel RPre eq_prerel)).
   4 : { eapply padded_refines_trans; eauto.
-        apply refines_padded_refines; eauto.
+        eapply refines_padded_refines; eauto.
         eapply padded_refines_trans. eauto.
-        apply refines_padded_refines; eauto.
+        eapply refines_padded_refines; eauto.
   }
   - intros. destruct PR. destruct H3.
     destruct H2.
@@ -1622,7 +1622,7 @@ Lemma refines_tauR_inv :
 Proof.
   intros E1 E2 R1 R2 in_rel0 in_post_rel0 RR t1 t2 REF.
   punfold REF; red in REF; cbn in *.
-  eapply refinesF_TauR_inv in REF.
+  eapply refinesF_TauR_inv in REF; auto.
   pstep; red; cbn; eauto.
 Qed.
 
@@ -1643,7 +1643,7 @@ Lemma refines_tauL_inv :
 Proof.
   intros E1 E2 R1 R2 in_rel0 in_post_rel0 RR t1 t2 REF.
   punfold REF; red in REF; cbn in *.
-  eapply refinesF_TauL_inv in REF.
+  eapply refinesF_TauL_inv in REF; auto.
   pstep; red; cbn; eauto.
 Qed.
 
@@ -1656,8 +1656,7 @@ Lemma refinesF_tau_tau_inv:
 Proof.
   intros E1 E2 RPre RPost R1 R2 RR phi1 phi2 REF.
   change (TauF phi2) with (observe (Tau phi2)) in REF.
-  eapply refinesF_TauL_inv, refinesF_TauR_inv in REF.
-  auto.
+  eapply refinesF_TauL_inv, refinesF_TauR_inv in REF; auto.
 Qed.
 
 Lemma refines_tau_tau_inv :
