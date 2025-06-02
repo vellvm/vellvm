@@ -47,6 +47,18 @@ Proof.
   hinduction Href before E1; intros; inv Heqx; inj_existT; subst; pclearbot; eauto with itree_spec.
 Qed.
 
+Lemma refines_Vis_forallR' :
+  forall b1 b2 (t1 : itree_spec E1 R1) (k : A -> itree (SpecEvent E2) R2),
+    (forall a : A, refines' RPre RPost RR b1 b2 t1 (k a)) ->
+    refines' RPre RPost RR b1 b2 t1 (Vis (Spec_forall A) k).
+Proof.
+  intros b1 b2 t1 k REF.
+  pstep; red; cbn; constructor.
+  intros a.
+  specialize (REF a).
+  pstep_reverse.
+Qed.
+
 Lemma refines_existsL b1 b2 : forall t k,
     refines' RPre RPost RR b1 b2 (Vis (Spec_exists A) k) t ->
     forall a, refines' RPre RPost RR b1 b2 (k a) t.
