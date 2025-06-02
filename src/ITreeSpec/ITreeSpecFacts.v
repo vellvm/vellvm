@@ -138,6 +138,14 @@ Context (E1 E2 : Type -> Type).
 Context (RPre : prerel E1 E2) (RPost : postrel E1 E2).
 Context (R1 R2 : Type) (RR : R1 -> R2 -> Prop).
 
+Lemma refines_TauL : forall b1 b2 (CHECK : is_true b1) phi1 phi2,
+    refines' RPre RPost RR b1 b2 phi1 phi2 -> refines' RPre RPost RR b1 b2 (Tau phi1) phi2.
+Proof.
+  intros b1 b2 CHECK phi1 phi2 REF.
+  pstep; red; constructor; auto.
+  pstep_reverse.
+Qed.
+
 Lemma refines_TauL_inv : forall b1 b2 (CHECK : is_true b2) phi1 phi2,
     refines' RPre RPost RR b1 b2 (Tau phi1) phi2 -> refines' RPre RPost RR b1 b2 phi1 phi2.
 Proof.
@@ -157,6 +165,14 @@ Proof.
   pclearbot.
   left.
   eapply paco2_mon; try apply PR. intros. contradiction.
+Qed.
+
+Lemma refines_TauR : forall b1 b2 (CHECK : is_true b2) phi1 phi2,
+    refines' RPre RPost RR b1 b2 phi1 phi2 -> refines' RPre RPost RR b1 b2 phi1 (Tau phi2).
+Proof.
+  intros b1 b2 CHECK phi1 phi2 REF.
+  pstep; red; constructor; auto.
+  pstep_reverse.
 Qed.
 
 Lemma refines_TauR_inv : forall (b1 b2 : bool) (CHECK : is_true b1) phi1 phi2,
@@ -1417,6 +1433,22 @@ Definition eq_prerel {E} : prerel E E.
   intros A B e1 e2.
   apply (eq_dep _ E A e1 B e2).
 Defined.
+
+Instance eq_prerel_refl {E} : ReflexivePreRel (@eq_prerel E).
+Proof.
+  red.
+  intros X e.
+  constructor.
+Qed.
+
+Instance eq_prerel_trans {E} : TransitivePreRel (@eq_prerel E).
+Proof.
+  red.
+  intros * AB BC.
+  inversion AB. inversion BC.
+  subst; inj_existT; subst.
+  constructor.
+Qed.
 
 (* Definition eq_prerel {E} : prerel E E :=
   (fun (A B : Type) e1 e2 => @JMeq (E A) e1 (E B) e2). *)
