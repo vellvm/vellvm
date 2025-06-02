@@ -11,6 +11,7 @@ From ITree Require Import
   Basics.HeterogeneousRelations
   Eq.Eqit
   Eq.EqAxiom
+  Rutt
   Core.ITreeDefinition.
 
 From ITreeSpec Require Import
@@ -1125,7 +1126,7 @@ Proof.
     clear Heqk1' Hk1 k1. rename k1' into k1.
     inv Ht1. inv Ht0. pclearbot. punfold H4. punfold H5. red in H4. red in H5.
     remember (VisF (Spec_vis e) k1) as y. (* at this point need to prove that go _ _ y is padded*)
-    hinduction Ht23 before r; intros; inv Heqy; inj_existT; subst; eauto with solve_padded.
+    hinduction Ht23 before r; intros; inv Heqy; inj_existT; subst.
     + assert (refines RPre2 RPost2 RR2 (Vis (Spec_vis e1) k1) (Vis (Spec_vis e) k0)).
       pstep. constructor. auto. auto.
       clear H3.
@@ -1703,20 +1704,31 @@ Proof.
   split; reflexivity.  
 Qed.
 
+
 Section refine_closure.
 
 Context {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
 Context (pre : prerel E E) (post : postrel E E).
+(* Context (PRET : forall {A B C} (e1 : E A) (e2 : E B) (e3 : E C),
+            pre _ _ e1 e2 -> pre _ _ e2 e3 -> pre _ _ e1 e3). *)
+(* Context (POSTT : forall {A B C} (e1 : E A) a (e2 : E B) b (e3 : E C) c,
+            post _ _ e1 a e2 b -> post _ _ e2 b e3 c -> post _ _ e1 a e3 c). *)
+
+
+(*replicate this proof for the models functor*)
+(* Validity of the up-to [euttge] principle *)
 
 (** *** "Up-to" principles for coinduction. *)
 Inductive refines_trans_clo (b1 b2 b1' b2' : bool) (r : itree_spec E R1 -> itree_spec E R2 -> Prop)
   : itree_spec E R1 -> itree_spec E R2 -> Prop :=
-| refine_trans_clo_intro t1 t2 t1' t2' RR1 RR2
+| refine_trans_clo_intro t1 t2 t1' t2' (* pre1 *) post1 RR1 (* pre2 *) post2 RR2
       (* t1' is smaller (or equal) to t1 *)
-      (EQVl: refines' eq_prerel PostRelEq RR1 b1 b1' t1 t1')
+      (EQVl: refines' eq_prerel post1 RR1 b1 b1' t1 t1')
       (* t2' is bigger (or equal) to t2 *)
-      (EQVr: refines' eq_prerel PostRelEq RR2 b2' b2 t2' t2)
+      (EQVr: refines' eq_prerel post2 RR2 b2' b2 t2' t2)
       (REL: r t1' t2')
+      (POST1REFL : ReflexivePostRel post1)
+      (POST2REFL : ReflexivePostRel post2)
       (LERR1: forall x x' y, RR1 x x' -> RR x' y -> RR x y)
       (LERR2: forall x y y', RR2 y' y -> RR x y' -> RR x y)
   : refines_trans_clo b1 b2 b1' b2' r t1 t2
@@ -1727,6 +1739,21 @@ t1 >= t2   ===> t1' >= t2 where t1' >= t1
 t1 >= t2   ===> t1 >= t2' where t2' <= t2
 
 t1 >= t2 ====> t1' >= t2' where t1' >= t1 and t2' <= t2
+
+
+With post conditions...
+
+t1_post >= t2_post ====> t1'_post >= t2'_post where t1'_post1 >= t1_post1 and t2'_post2 <= t2_post2
+
+This would mean that...
+
+post e1' a e2' b -> post e1 a e2 b
+
+Maybe rules like this?
+
+post1 e1 a e1' a' -> post e1' a e2 b -> post e1 a e2 b
+post2 e2 a e2' a' -> post e1 a e2' b -> post e1 a e2 b
+
 *)
 
 Hint Constructors refines_trans_clo : itree.
@@ -1791,8 +1818,8 @@ Proof with eauto with paco itree_spec itree.
     remember (VisF (Spec_vis er) kr) as y.
     hinduction EQVr before r; intros; try discriminate Heqy...
     inv Heqy; inj_existT; subst.
-    inv H1; inj_existT; subst.
-    inv H; inj_existT; subst.
+    (* inv H1; inj_existT; subst.
+    inv H; inj_existT; subst. *)
 
     rename H2 into HL.
     rename H0 into HR.
@@ -1821,7 +1848,9 @@ Proof with eauto with paco itree_spec itree.
       bot2 (kr a) (k2 b)
   HREC : forall (a : X1) (b : Y0), post X1 Y0 el a er b -> vclo r (kl a) (kr b)
      *)
+    destruct H, H1; subst; eauto.
     constructor; eauto.
+
     (* e0 and e2 have to be related with post *)
     (* We want to replace:
 
@@ -1846,16 +1875,23 @@ Proof with eauto with paco itree_spec itree.
     + (* Want to use the closure to apply transitivity *)
       apply CMP.
       red.
-      econstructor...
+      econstructor; auto.
       -- apply HL.
          (* e0 and el are related with H1
 
             H0 should be irrelevant, e2 is for the RHS.
             Same with H3...
+
+            post e0 a e2 b...
           *)
-         constructor.
+         apply POST1REFL.
       -- apply HR.
-         constructor.
+         apply POST2REFL.
+      -- apply HREC; auto.
+      -- auto.
+      -- auto.
+      -- auto.
+      -- auto.
     + intros. apply gpaco2_clo, PR.
   - remember (TauF t1) as x.
     hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK...
