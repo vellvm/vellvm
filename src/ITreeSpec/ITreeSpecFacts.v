@@ -1889,6 +1889,13 @@ Qed.
 
 #[global] Hint Resolve refines_eqit_trans_clo_het_wcompat : paco.
 
+Lemma refines_clo_eqitC_het_trans {E1 E2 R1 R2} (RR : R1 -> R2 -> Prop) pre post b1 b2 vclo
+      (MON: monotone2 vclo)
+      (CMP: compose (eqitC_het RR b1 b2) vclo <3= compose vclo (eqitC_het RR b1 b2)):
+  @eqit_trans_clo_het _ _ R1 R2 RR b1 b2 false false <3= gupaco2 (@refines_ E1 E2 R1 R2 pre post RR b1 b2 vclo) (eqitC_het RR b1 b2).
+Proof.
+  intros. destruct PR. gclo. econstructor; eauto with paco.
+Qed.
 
 Section refine_closure.
 

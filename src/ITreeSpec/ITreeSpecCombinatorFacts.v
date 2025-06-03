@@ -12,6 +12,7 @@ From ITree Require Import
      Eq.EqAxiom
      ITree
      Eqit
+     Rutt
      Events.StateFacts.
 
 From ITreeSpec Require Import
@@ -1398,7 +1399,7 @@ Section refine_closure.
 
   Inductive refines_bind_clo b1 b2 (r : itree_spec E R1 -> itree_spec E R2 -> Prop) :
     itree_spec E R1 -> itree_spec E R2 -> Prop :=
-  | pbc_intro_h U1 U2 (RU : U1 -> U2 -> Prop) t1 t2 k1 k2 post
+  | pbc_intro_h U1 U2 (RU : U1 -> U2 -> Prop) t1 t2 k1 k2
       (EQV: refines' eq_prerel post RU b1 b2 t1 t2)
       (REL: forall u1 u2, RU u1 u2 -> r (k1 u1) (k2 u2))
     : refines_bind_clo b1 b2 r (ITree.bind t1 k1) (ITree.bind t2 k2)
@@ -1425,7 +1426,8 @@ Proof.
     1,2: reflexivity.
     eauto with paco.
   - gstep. econstructor. eauto 7 with paco itree.
-  - gstep. econstructor. intros. red in CMP. unfold id in ID. apply ID. eauto 7 with paco itree.
+  - gstep. econstructor. intros. red in CMP. unfold id in ID. apply ID.
+    eauto 7 with paco itree.
   - destruct b1; try discriminate.
     guclo eqit_clo_trans.
     econstructor; auto_ctrans_eq; eauto; try reflexivity.
@@ -1434,6 +1436,61 @@ Proof.
     guclo eqit_clo_trans. econstructor; auto_ctrans_eq; eauto; try reflexivity.
     eapply eqit_Tau_l. rewrite unfold_bind. reflexivity.
 Qed.
+
+  Lemma refines_clo_bind_eqit_het b1 b2 vclo
+    (MON: monotone2 vclo)
+    (CMP: compose (eqitC_het RR b1 b2) vclo <3= compose vclo (eqitC_het RR b1 b2))
+    (ID: id <3= vclo) :
+    refines_bind_clo b1 b2 <3= gupaco2 (refines_ eq_prerel post RR b1 b2 vclo) (eqitC_het RR b1 b2).
+  Proof.
+    intros rr. gcofix CIH. intros. destruct PR.
+    gclo. econstructor; auto_ctrans_eq.
+    1,2: rewrite unfold_bind; reflexivity.
+    punfold EQV. unfold_refines.
+    hinduction EQV before CIH; intros; pclearbot; cbn;
+      repeat (change (ITree.subst ?k ?m) with (ITree.bind m k)).
+    - (* Ret *) gclo. econstructor; auto_ctrans_eq.
+      1,2: reflexivity.
+      eauto with paco.
+    - (* Tau / Tau *)
+      gstep. econstructor. eauto 7 with paco itree.
+    - (* Spec_vis *)
+      gstep. econstructor; auto.
+      intros. red in CMP. unfold id in ID. apply ID.
+      gbase.
+      apply CIH.
+      econstructor; eauto.
+      apply H0.
+      eauto.
+    - (* TauL *)
+      destruct b1; try discriminate.
+      gclo.
+      econstructor; auto_ctrans_eq; eauto; try reflexivity.
+      eapply eqit_Tau_l. rewrite unfold_bind. reflexivity.
+    - (* TauR *)
+      destruct b2; try discriminate.
+      gclo. econstructor; auto_ctrans_eq; eauto; try reflexivity.
+      eapply eqit_Tau_l. rewrite unfold_bind. reflexivity.
+    - (* ForallR *)
+      (* Should be able to refine the right hand side to
+         bind (k a) k2...
+
+         Which should follow from H0 / H.
+       *)
+      gstep; red; econstructor; intros.
+      pose proof unfold_bind (k a) k2 as BIND.
+      apply bisimulation_is_eq in BIND.
+      rewrite BIND.
+      specialize (H0 a k1 k2 REL).
+      admit.
+    - (* ExistsR *)
+      specialize (IHEQV k1 k2 REL).
+      admit.
+    - (* ForallL *)
+      admit.
+    - (* ExistsL *)
+      admit.
+  Abort.
 
   Lemma refines_clo_bind b1 b2 vclo
     (MON: monotone2 vclo)
