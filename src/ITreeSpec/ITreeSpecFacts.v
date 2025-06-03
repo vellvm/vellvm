@@ -1749,18 +1749,58 @@ Proof.
   split; reflexivity.
 Qed.
 
-(* Validity of the up-to [euttge] principle *)
-Lemma refines_euttge_trans_clo_wcompat E1 E2 R1 R2 (REv : forall A B, E1 A -> E2 B -> Prop)
+Section eqit_trans_clo_het.
+
+  Context {E1 E2 : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
+
+  (* Essentially the same closure as [eqit_trans_clo], but heterogeneous
+     in the interface argument [E].
+   *)
+
+  (* A transitivity functor *)
+  Variant eqit_trans_clo_het b1 b2 b1' b2' (r : itree E1 R1 -> itree E2 R2 -> Prop) :
+    itree E1 R1 -> itree E2 R2 -> Prop :=
+    eqit_trans_clo_intro t1 t2 t1' t2' RR1 RR2
+                         (EQVl: eqit RR1 b1 b1' t1 t1')
+                         (EQVr: eqit RR2 b2 b2' t2 t2')
+                         (REL: r t1' t2')
+                         (LERR1: forall x x' y, RR1 x x' -> RR x' y -> RR x y)
+                         (LERR2: forall x y y', RR2 y y' -> RR x y' -> RR x y) :
+      eqit_trans_clo_het b1 b2 b1' b2' r t1 t2.
+  Hint Constructors eqit_trans_clo_het : itree.
+
+  Lemma eqit_trans_clo_het_mon b1 b2 b1' b2' r1 r2 t1 t2
+        (IN : eqit_trans_clo_het b1 b2 b1' b2' r1 t1 t2)
+        (LE : r1 <2= r2) :
+    eqit_trans_clo_het b1 b2 b1' b2' r2 t1 t2.
+  Proof.
+    destruct IN; econstructor; eauto.
+  Qed.
+
+  Definition eqitC_het b1 b2 := eqit_trans_clo_het b1 b2 false false.
+
+  Lemma eqitC_het_mon b1 b2 :
+    monotone2 (eqitC_het b1 b2).
+  Proof.
+    red.
+    intros x0 x1 r r' IN LE.
+    eapply eqit_trans_clo_het_mon; eauto.
+  Qed.
+End eqit_trans_clo_het.
+
+Hint Constructors eqit_trans_clo_het : itree.
+Hint Resolve eqit_trans_clo_het_mon : paco.
+Hint Resolve eqitC_het_mon : paco.
+
+(* Validity of the up-to [eqit] principle *)
+Lemma refines_eqit_trans_clo_het_wcompat E1 E2 R1 R2 (REv : forall A B, E1 A -> E2 B -> Prop)
   (RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop ) (RR : R1 -> R2 -> Prop) b1 b2
   vclo
   (MON: monotone2 vclo)
-  (CMP: compose (euttge_trans_clo RR) vclo <3= compose vclo (euttge_trans_clo RR))
-  (CHECK1 : is_true b1)
-  (CHECK2 : is_true b2) :
-  wcompatible2 (@refines_ E1 E2 R1 R2 REv RAns RR b1 b2 vclo) (euttge_trans_clo RR).
+  (CMP: compose (eqitC_het RR b1 b2) vclo <3= compose vclo (eqitC_het RR b1 b2)) :
+  wcompatible2 (@refines_ E1 E2 R1 R2 REv RAns RR b1 b2 vclo) (eqitC_het RR b1 b2).
 Proof using.
   constructor; eauto with paco.
-  { red. intros. eapply euttge_trans_clo_mon; eauto. }
   intros.
   destruct PR. punfold EQVl. punfold EQVr. unfold_eqit.
   hinduction REL before r; intros; clear t1' t2'.
@@ -1847,7 +1887,7 @@ Proof using.
     pstep_reverse.
 Qed.
 
-#[global] Hint Resolve refines_euttge_trans_clo_wcompat : paco.
+#[global] Hint Resolve refines_eqit_trans_clo_het_wcompat : paco.
 
 
 Section refine_closure.
