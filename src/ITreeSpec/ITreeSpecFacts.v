@@ -22,6 +22,7 @@ From ITreeSpec Require Import
 
 From Paco Require Import paco.
 
+
 Local Open Scope itree_scope.
 
 Ltac inj_existT := repeat match goal with
@@ -615,15 +616,15 @@ Qed.
 (*     dependent induction REL; intros; *)
 (*       try rewrite <- x; try rewrite <- x0 in Href. *)
 (*   - inv Href; eauto. *)
-    
-    
+
+
 (*     apply Href. *)
-    
+
 (*     remember (TauF m1) as x. *)
 (*     remember (VisF (Spec_exists A) (fun a : A => Tau (k1 a))) as y. *)
-    
 
-    
+
+
 (*     induction Href; intros; *)
 (*       try solve [inversion Heqx; inversion Heqy; subst; inj_existT; subst; eauto with solve_padded]. *)
 (*     { subst. *)
@@ -640,13 +641,13 @@ Qed.
 (*       inv Href; pclearbot; eauto. *)
 (*       inv REL; *)
 (*         try rewrite <- H1 in *. *)
-      
+
 (*       eapply IHHref; eauto. *)
 (*       admit. *)
-      
+
 (*       apply Href. *)
 (*       apply *)
-      
+
 (*       induction REL; intros. *)
 (*       admit. *)
 (*       admit. *)
@@ -976,7 +977,7 @@ Proof.
 
     setoid_rewrite itree_eta'.
     pstep_reverse.
-    eapply paco2_mon; [ pstep; eapply Href | intros; contradiction].      
+    eapply paco2_mon; [ pstep; eapply Href | intros; contradiction].
   - destruct e.
     + assert (Hx : eq_itree eq (Vis (Spec_vis e) k1) (Vis (Spec_vis e) k2)).
       pstep. constructor. left. auto. punfold Hx. red in Hx.
@@ -1048,7 +1049,7 @@ Proof.
 
     setoid_rewrite itree_eta'.
     pstep_reverse.
-    eapply paco2_mon; [ pstep; eapply Href | intros; contradiction].      
+    eapply paco2_mon; [ pstep; eapply Href | intros; contradiction].
   - destruct e.
     + assert (Hx : eq_itree eq (Vis (Spec_vis e) k1) (Vis (Spec_vis e) k2)).
       pstep. constructor. left. auto. punfold Hx. red in Hx.
@@ -1208,7 +1209,7 @@ Proof.
         assert (TauF (k0 a) = observe (k2' a)). auto. rewrite H2.
         pstep_reverse. eapply refines_Vis_forallR. pstep. auto. }
       apply refinesF_Vis_existsR_Tau_inv in Ht23; auto.
-      specialize (Hk2 b). specialize (H5 b). 
+      specialize (Hk2 b). specialize (H5 b).
       eapply IHHt23; eauto with solve_padded.
       cbn. constructor.
       left; auto.
@@ -1695,7 +1696,7 @@ Proof.
 Qed.
 
 Lemma refinesF_tau_tau_inv:
-  forall (E1 E2 : Type -> Type) (RPre : prerel E1 E2) (RPost : postrel E1 E2) 
+  forall (E1 E2 : Type -> Type) (RPre : prerel E1 E2) (RPost : postrel E1 E2)
     (R1 R2 : Type) (RR : R1 -> R2 -> Prop) (phi1 : itree (SpecEvent E1) R1)
     (phi2 : itree (SpecEvent E2) R2),
   refinesF RPre RPost RR true true id (upaco2 (refines_ RPre RPost RR true true id) bot2) (TauF phi1) (TauF phi2) ->
@@ -1745,8 +1746,108 @@ Proof.
   intros E R t1 t2 EQ.
   repeat red.
   rewrite EQ.
-  split; reflexivity.  
+  split; reflexivity.
 Qed.
+
+(* Validity of the up-to [euttge] principle *)
+Lemma refines_euttge_trans_clo_wcompat E1 E2 R1 R2 (REv : forall A B, E1 A -> E2 B -> Prop)
+  (RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop ) (RR : R1 -> R2 -> Prop) b1 b2
+  vclo
+  (MON: monotone2 vclo)
+  (CMP: compose (euttge_trans_clo RR) vclo <3= compose vclo (euttge_trans_clo RR))
+  (CHECK1 : is_true b1)
+  (CHECK2 : is_true b2) :
+  wcompatible2 (@refines_ E1 E2 R1 R2 REv RAns RR b1 b2 vclo) (euttge_trans_clo RR).
+Proof using.
+  constructor; eauto with paco.
+  { red. intros. eapply euttge_trans_clo_mon; eauto. }
+  intros.
+  destruct PR. punfold EQVl. punfold EQVr. unfold_eqit.
+  hinduction REL before r; intros; clear t1' t2'.
+  - remember (RetF r1) as x. red.
+    hinduction EQVl before r; intros; subst; try inv Heqx; eauto; (try constructor; eauto).
+    remember (RetF r3) as x. hinduction EQVr before r; intros; subst; try inv Heqx; (try constructor; eauto).
+  - red. remember (TauF t1) as x.
+    hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; ( try (constructor; eauto; fail )).
+    remember (TauF t2) as y.
+    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; (try (constructor; eauto; fail)).
+    pclearbot. constructor. gclo. econstructor; eauto with paco.
+  - remember (VisF (Spec_vis e1) k1) as x. red.
+    hinduction EQVl before r; intros; subst; try discriminate; try (constructor; eauto; fail).
+    remember (VisF (Spec_vis e2) k3) as y.
+    hinduction EQVr before r; intros; subst; try discriminate; try (constructor; eauto; fail).
+    dependent destruction Heqx.
+    dependent destruction Heqy.
+    constructor; auto. intros. apply H0 in H1. pclearbot.
+    eapply MON.
+    { apply CMP.
+      red.
+      econstructor.
+      apply REL0.
+      apply REL.
+      apply H1.
+      all: eauto.
+    }
+    apply gpaco2_clo.
+  - (* TauL *)
+    remember (TauF t1) as x. red.
+    hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; (try (constructor; eauto; fail)).
+    pclearbot. punfold REL. constructor; auto. eapply IHREL; eauto.
+  - (* TauR *)
+    remember (TauF t2) as y. red.
+    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; (try (constructor; eauto; fail)).
+    pclearbot. punfold REL. constructor; auto. eapply IHREL; eauto.
+  - (* forallR *)
+    remember (VisF (Spec_forall A) k) as y. red.
+    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; (try (constructor; eauto; fail)).
+    inj_existT; subst.
+    constructor; intros.
+    pclearbot.
+    (* REL:  k1 a ≈ k a
+         H:    ot1 >= observe (k a)
+         EQvl: observe t1 ≈ ot1
+     *)
+    eapply H0; eauto.
+    pstep_reverse.
+  - (* existsR *)
+    remember (VisF (Spec_exists A) k) as y. red.
+    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; (try (constructor; eauto; fail)).
+    inj_existT; subst.
+    econstructor.
+    pclearbot.
+    (* REL:  k1 a ≈ k a
+         H:    ot1 >= observe (k a)
+         EQvl: observe t1 ≈ ot1
+     *)
+    eapply IHREL; eauto.
+    pstep_reverse.
+  - (* forallL *)
+    remember (VisF (Spec_forall A) k) as y. red.
+    hinduction EQVl before r; intros; subst; try inv Heqy; try inv CHECK; (try (constructor; eauto; fail)).
+    inj_existT; subst.
+    econstructor.
+    pclearbot.
+    (* REL:  k1 a ≈ k a
+         H:    ot1 >= observe (k a)
+         EQvl: observe t1 ≈ ot1
+     *)
+    eapply IHREL; eauto.
+    pstep_reverse.
+  - (* existsR *)
+    remember (VisF (Spec_exists A) k) as y. red.
+    hinduction EQVl before r; intros; subst; try inv Heqy; try inv CHECK; (try (constructor; eauto; fail)).
+    inj_existT; subst.
+    econstructor; intros.
+    pclearbot.
+    (* REL:  k1 a ≈ k a
+         H:    ot1 >= observe (k a)
+         EQvl: observe t1 ≈ ot1
+     *)
+    eapply H0; eauto.
+    pstep_reverse.
+Qed.
+
+#[global] Hint Resolve refines_euttge_trans_clo_wcompat : paco.
 
 
 Section refine_closure.
