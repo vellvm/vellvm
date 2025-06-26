@@ -54,7 +54,7 @@ Section LABELS_OPERATIONS.
        | TERM_Switch v default_dest brs => default_dest :: map snd brs
        | TERM_IndirectBr v brs => brs
        | TERM_Resume v => []
-       | TERM_Invoke fnptrval args to_label unwind_label => [to_label; unwind_label]
+       | TERM_Invoke _ fnptrval args to_label unwind_label _ => [to_label; unwind_label]
        | TERM_Unreachable => []
        end.
 
@@ -268,6 +268,14 @@ Section REGISTER_OPERATIONS.
     #[global] Instance texp_use_sites {T} : Use_sites (texp T) := {| use_sites := fun x => use_sites (snd x) |}.
     #[global] Instance option_use_sites {T} `{Use_sites T} : Use_sites (option T) := {| use_sites := fun x => match x with | Some e => use_sites e | None => ∅ end |}.
 
+    #[global] Instance landingpad_clause_use_sites {T} : Use_sites (@landingpad_clause T) :=
+      {| use_sites := fun c => match c with
+                            | CATCH t => use_sites t
+                            | FILTER t => use_sites t
+                            end
+      |}.
+                                    
+    
     #[global] Instance instr_use_sites {T} : Use_sites (instr T) :=
       {| use_sites := fun i => match i with
                             | INSTR_Op e => use_sites e
@@ -277,12 +285,12 @@ Section REGISTER_OPERATIONS.
                               => use_sites e
                             | INSTR_Store e1 e2 _
                               => use_sites e1 +++ use_sites e2
+                            | INSTR_LandingPad _ _ cs => set_flat_map use_sites cs
                             | INSTR_Alloca _ _
                             | INSTR_Fence _ _
                             | INSTR_AtomicCmpXchg _
                             | INSTR_AtomicRMW _
                             | INSTR_VAArg _ _
-                            | INSTR_LandingPad
                             | INSTR_Comment _
                               => []
                             end
@@ -307,7 +315,7 @@ Section REGISTER_OPERATIONS.
                                | TERM_Unreachable
                                  => []
 
-                               | TERM_Invoke _ l _ _ =>
+                               | TERM_Invoke _ _ l _ _ _ =>
                                  set_flat_map use_sites (List.map fst l)
                                end
       |}.

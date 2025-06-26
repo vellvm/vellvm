@@ -709,6 +709,16 @@ Section ReprInstances.
    Instance reprCmpxchg : Repr (cmpxchg typ) :=
     {| repr := repr_cmpxchg |}.
 
+  #[global]
+    Instance reprClause : Repr (@landingpad_clause typ) :=
+    {| repr := fun c =>
+                 match c with
+                 | CATCH t => "(CATCH " ++ repr t ++ ")"
+                 | FILTER t => "(FILTER " ++ repr t ++ ")"
+                 end
+    |}.
+                   
+  
   Definition repr_instr (i : instr typ) : string
     := match i with
        | INSTR_Comment s => "(INSTR_Comment " ++ s ++ ")"
@@ -729,8 +739,8 @@ Section ReprInstances.
            "(INSTR_AtomicRMW " ++ repr rmw ++ ")"
        | INSTR_VAArg e t =>
            "(INSTR_VAArg " ++ repr e ++ " " ++ repr t ++ ")"
-       | INSTR_LandingPad =>
-           "INSTR_LandingPad"
+       | INSTR_LandingPad t b cs =>
+           "(INSTR_LandingPad " ++ (repr t) ++ " " ++ repr b ++ " " ++ repr cs ++ ")"
        end.
 
   #[global]
@@ -767,9 +777,9 @@ Section ReprInstances.
       | TERM_IndirectBr v brs  => 
           "(TERM_IndirectBr " ++ repr v ++ " " ++ repr brs ++ ")" 
       | TERM_Resume v  => "(TERM_Resume " ++ repr v ++ ")"
-      | TERM_Invoke fnptrval args to_label unwind_label  =>
-          "(TERM_Invoke " ++ repr fnptrval ++ " " ++ repr args 
-          ++ " " ++ repr to_label ++ " " ++ repr unwind_label ++ ")"
+      | TERM_Invoke i fnptrval args to_label unwind_label anns  =>
+          "(TERM_Invoke " ++ repr i ++ repr fnptrval ++ " " ++ repr args 
+          ++ " " ++ repr to_label ++ " " ++ repr unwind_label ++ repr anns ++ ")"
       | TERM_Unreachable => "TERM_Unreachable"
        end.
 

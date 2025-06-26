@@ -491,7 +491,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | (_, INSTR_Fence _ _)
     | (_, INSTR_AtomicCmpXchg _)
     | (_, INSTR_AtomicRMW _)
-    | (_, INSTR_LandingPad) => raise "Unsupported VIR instruction"
+    | (_, INSTR_LandingPad _ _ _) => raise "Unsupported VIR instruction"
 
     (* Error states *)
     | (_, _) => raise "ID / Instr mismatch void/non-void"
@@ -567,7 +567,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     (* Currently unhandled VIR terminators *)
     | TERM_IndirectBr _ _
     | TERM_Resume _
-    | TERM_Invoke _ _ _ _ => raise "Unsupport itree terminator"
+    | TERM_Invoke _ _ _ _ _ _ => raise "Unsupport itree terminator"
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
