@@ -281,7 +281,7 @@ let test_all () =
   let b3 = try test_dir !test_directory with Ran_tests b -> b in
   raise (Ran_tests (b1 && b2 && b3))
 
-let test_all' () =
+let _test_all' () =
   let _ =
     Printf.printf "============== RUNNING TEST SUITE ==============\n"
   in

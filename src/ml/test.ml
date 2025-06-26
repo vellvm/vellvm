@@ -12,7 +12,6 @@ open Base
 open Driver
 
 open Assert
-open VellvmIntegers
 
 open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 
