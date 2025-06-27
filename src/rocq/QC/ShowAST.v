@@ -929,6 +929,13 @@ Section ShowInstances.
   Definition dshow_metadata_list (ml : list (metadata T)) := 
     concat_DString (string_to_DString " ") (map dshow_metadata ml).
     
+  Definition dnewline := string_to_DString newline.
+
+  Definition dshow_clause (c : landingpad_clause) : DString :=
+    match c with
+    | CATCH t => (string_to_DString "catch ") @@ dshow_texp t @@ dnewline
+    | FILTER t => (string_to_DString "filter ") @@ dshow_texp t @@ dnewline
+    end.
   
   Definition dshow_instr (i : instr T) : DString
     := match i with
@@ -1016,7 +1023,11 @@ Section ShowInstances.
        | INSTR_VAArg va_list_and_arg_list t  =>
            string_to_DString "va_arg " @@ dshow va_list_and_arg_list @@ string_to_DString ", " @@ dshow t
 
-       | INSTR_LandingPad => string_to_DString "skipping implementation at the moment"
+       | INSTR_LandingPad t b cs =>
+           (string_to_DString "landingpad ") @@ dshow t @@ dnewline @@
+             (if b then string_to_DString "cleanup " else DList_empty)
+             @@
+             DList_join (map dshow_clause cs)
        end.
 
   #[global] Instance dshowInstr : DShow (instr T) := { dshow := dshow_instr }.
@@ -1070,10 +1081,35 @@ Section ShowInstances.
 
        | TERM_Resume v => string_to_DString "remove " @@ dshow_texp v
 
-       | TERM_Invoke fnptrval args to_label unwind_label =>
-           string_to_DString "invoke " @@ dshow fnptrval @@
-             string_to_DString "( " @@ dshow args @@ string_to_DString "to label " @@
-             dshow to_label @@ string_to_DString "unwind label " @@ dshow unwind_label
+       | TERM_Invoke io fn args to_label unwind_label anns =>
+           let tail := find_option ann_tail anns in
+           let fast_math_flags := filter_option ann_fast_math_flag anns in
+           let cconv := find_option ann_cconv anns in
+           let ret_attrs := filter_option ann_ret_attribute anns in
+           let addrspace := find_option ann_addrspace anns in
+           let fn_attrs := filter_option ann_fun_attribute anns in
+           (match io with
+            | None => DList_empty
+            | Some i => dshow i @@ string_to_DString " = "
+            end
+           ) @@ string_to_DString "invoke "
+             @@
+             concat_DString (string_to_DString " ") (map (fun x => string_to_DString (show_fast_math x)) fast_math_flags)
+             @@
+             list_to_DString (show_opt_list cconv)
+             @@
+             DList_join (map show_param_attr ret_attrs)
+             @@
+             list_to_DString (show_opt_list addrspace) 
+             
+             @@ string_to_DString " " @@
+             dshow_texp fn @@ string_to_DString "(" @@
+             concat_DString (string_to_DString ", ") (map show_call_arg args) @@
+             string_to_DString ") " @@
+             concat_DString (string_to_DString " ") (map (fun x => string_to_DString (show_fn_attr x)) fn_attrs)
+             @@
+             string_to_DString "to label %" @@ dshow to_label @@ string_to_DString " " @@
+             string_to_DString "unwind label %" @@ dshow unwind_label
 
        | TERM_Unreachable => string_to_DString "unreachable"
        end.
@@ -1084,8 +1120,6 @@ Section ShowInstances.
     := DList_join (map (fun iid => string_to_DString indent @@  dshow_instr_id iid @@ string_to_DString newline) c).
 
   #[global] Instance dshowCode : DShow (code T) := { dshow := dshow_code "    " }.
-
-  Definition dnewline := string_to_DString newline.
 
   Definition dshow_block (indent : string) (b : block T) : DString
     :=

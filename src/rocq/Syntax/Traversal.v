@@ -186,6 +186,16 @@ Section Endo.
     #[global] Instance Endo_tint_literal
       : Endo tint_literal | 50 := id.
 
+    #[global] Instance Endo_clause
+      `{Endo T}
+      `{Endo (exp T)}
+      : Endo landingpad_clause | 50 :=
+      fun c =>
+        match c with
+        | CATCH t => CATCH (endo t)
+        | FILTER t => FILTER (endo t)
+        end.
+    
     #[global] Instance Endo_instr
            `{Endo T}
            `{Endo (exp T)}
@@ -207,7 +217,7 @@ Section Endo.
         | INSTR_AtomicCmpXchg c => ins
         | INSTR_AtomicRMW a => ins
         | INSTR_VAArg va t => ins
-        | INSTR_LandingPad => ins
+        | INSTR_LandingPad t b cs =>  INSTR_LandingPad (endo t) b (endo cs)
         end.
 
     #[global] Instance Endo_terminator
@@ -215,6 +225,7 @@ Section Endo.
            `{Endo raw_id}
            `{Endo (exp T)}
            `{Endo param_attr}
+           `{Endo (annotation T)}           
       : Endo (terminator T) | 50 :=
       fun trm =>
         match trm with
@@ -227,8 +238,8 @@ Section Endo.
         | TERM_IndirectBr v brs =>
           TERM_IndirectBr (endo v) (endo brs)
         | TERM_Resume v => TERM_Resume (endo v)
-        | TERM_Invoke fnptrval args to_label unwind_label =>
-          TERM_Invoke (endo fnptrval) (endo args) (endo to_label) (endo unwind_label)
+        | TERM_Invoke i fnptrval args to_label unwind_label atts =>
+          TERM_Invoke (endo i) (endo fnptrval) (endo args) (endo to_label) (endo unwind_label) (endo atts)
         | TERM_Unreachable => TERM_Unreachable
         end.
 
@@ -543,6 +554,15 @@ Section TFunctor.
           (endo (a_align a))
           (f (a_type a)).
 
+    #[global] Instance TFunctor_landingpad_clause
+     `{TFunctor exp}
+      : TFunctor (@landingpad_clause) | 50 :=
+    fun U V f c =>
+      match c with
+      | CATCH v => CATCH (tfmap f v)
+      | FILTER v => FILTER (tfmap f v)
+      end.
+  
     #[global] Instance TFunctor_instr
      `{TFunctor exp}
      `{TFunctor annotation}
@@ -561,7 +581,7 @@ Section TFunctor.
         | INSTR_AtomicCmpXchg c => INSTR_AtomicCmpXchg (tfmap f c)
         | INSTR_AtomicRMW a => INSTR_AtomicRMW (tfmap f a)
         | INSTR_VAArg va t => INSTR_VAArg (tfmap f va) (f t)
-        | INSTR_LandingPad => INSTR_LandingPad
+        | INSTR_LandingPad t b cs => INSTR_LandingPad (f t) b (tfmap f cs)
         end.
 
     #[global] Instance TFunctor_tident
@@ -572,6 +592,7 @@ Section TFunctor.
            `{Endo tint_literal}
            `{Endo raw_id}
            `{TFunctor exp}
+           `{TFunctor annotation}           
       : TFunctor terminator | 50 :=
       fun U V f trm =>
         match trm with
@@ -582,10 +603,11 @@ Section TFunctor.
         | TERM_Switch v default_dest brs => TERM_Switch (tfmap f v) (endo default_dest) (endo brs)
         | TERM_IndirectBr v brs => TERM_IndirectBr (tfmap f v) (endo brs)
         | TERM_Resume v => TERM_Resume (tfmap f v)
-        | TERM_Invoke fnptrval args to_label unwind_label =>
-            TERM_Invoke (tfmap f fnptrval)
+        | TERM_Invoke i fnptrval args to_label unwind_label atts =>
+            TERM_Invoke i
+                        (tfmap f fnptrval)
                         (List.map (fun '(te, a) => (tfmap f te, a))  args)
-                        (endo to_label) (endo unwind_label)
+                        (endo to_label) (endo unwind_label) (tfmap f atts)
         | TERM_Unreachable => TERM_Unreachable
         end.
 

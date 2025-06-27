@@ -64,11 +64,11 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
         fprintf ppf "UVALUE_Packet_struct(%a)"
           (pp_print_list ~pp_sep:pp_comma_space pp_uvalue)
           l
-    | UVALUE_Array (t, l) ->
+    | UVALUE_Array (_, l) ->
         fprintf ppf "UVALUE_Array(%a)"
           (pp_print_list ~pp_sep:pp_comma_space pp_uvalue)
           l
-    | UVALUE_Vector (t, l) ->
+    | UVALUE_Vector (_, l) ->
         fprintf ppf "UVALUE_Vector(%a)"
           (pp_print_list ~pp_sep:pp_comma_space pp_uvalue)
           l
@@ -131,20 +131,20 @@ let rec step
       output_bytes stderr str ;
       step (k (Obj.magic ()))
   (* The OOME effect *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 msg), _k) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 _msg), _k) ->
      Error (OutOfMemory "")
 
   (* UBE event *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg)), _k) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 _msg)), _k) ->
      Error (UndefinedBehavior "")
 
   (* The DebugE effect *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg))), k) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 _msg))), k) ->
      (debug "";
       step (k (Obj.magic DV.DVALUE_None)))
 
   (* The FailureE effect is a failure *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 msg))), _) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 _msg))), _) ->
      Error (Failed "")
 
 (* The only visible effects from LLVMIO that should propagate to the

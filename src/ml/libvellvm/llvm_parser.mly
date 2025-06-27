@@ -324,6 +324,9 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_EXTRACTVALUE
 %token KW_INSERTVALUE
 %token KW_LANDINGPAD
+%token KW_CATCH
+%token KW_FILTER
+%token KW_CLEANUP
 
 %token KW_NNAN
 %token KW_NINF
@@ -717,7 +720,7 @@ declaration:
 
     midrule( { void_ctr.reset () } )   (* reset the void counter to 0 *)
 
-    LPAREN args = dc_args RPAREN
+    LPAREN args = dc_args RPAREN EOL*
 
     u = unnamed_addr?
     dc_attrs = fn_attr*
@@ -772,7 +775,7 @@ definition:
 
     midrule( { void_ctr.reset () } )   (* reset the void counter to 0 *)
 
-    LPAREN df_args = df_args RPAREN
+    LPAREN df_args = df_args RPAREN EOL*
 
     u = unnamed_addr?
     ad = addrspace?
@@ -812,11 +815,17 @@ definition:
 	  (IId (check_or_generate_id lopt), i)
       in
 
-      let process_block (lopt, (phis, instrs), blk_term) =
+      let process_block (lopt, (phis, instrs, (id_opt, blk_term))) =
 	  let blk_id   = check_or_generate_label lopt in
 	  let blk_phis = List.map process_lhs_phi phis in
 	  let blk_code = List.map process_lhs_instr instrs in
-	  { blk_id; blk_phis; blk_code; blk_term; blk_comments = None }
+	  let term_id =
+	    begin match id_opt with
+	    | None    -> None
+	    | Some id -> Some (IId (validate_bound_lexed_id id))
+	    end
+	  in
+	  { blk_id; blk_phis; blk_code; blk_term=(blk_term term_id) ; blk_comments = None }
       in
 
       let blocks = List.map process_block blks
@@ -923,21 +932,23 @@ block_label:
   | lbl=LABEL EOL*
     { Some lbl }
 
+block_phis_and_instrs_and_term:
+  | id_opt=instr_lhs p=phi EOL+ bl=block_phis_and_instrs_and_term
+    { let (phis, instrs, t) = bl in ((id_opt, p)::phis, instrs, t) }
 
-block_phis_and_instrs:
-  | /* empty */   { ([], []) }
+  | id_opt=instr_lhs inst=instr EOL+ ins=block_instrs_and_term
+    { let (instrs, t) = ins in 
+      ([], (id_opt, inst)::instrs, t) }
 
-  | id_opt=instr_lhs p=phi EOL+ bl=block_phis_and_instrs
-    { let (phis, instrs) = bl in ((id_opt, p)::phis, instrs) }
+  | t=terminator instr_metadata? EOL+
+    { ([], [], t) }
+      
+block_instrs_and_term:
+  | t=terminator instr_metadata? EOL+ { ([], t) }
 
-  | id_opt=instr_lhs inst=instr EOL+ ins=block_instrs
-    { ([], (id_opt, inst)::ins) }
-
-block_instrs:
-  | /* empty */  { [] }
-
-  | id_opt=instr_lhs inst=instr EOL+ ins=block_instrs
-    {  (id_opt, inst)::ins }
+  | id_opt=instr_lhs inst=instr EOL+ ins=block_instrs_and_term
+    { let (instrs, t) = ins in
+      ((id_opt, inst)::instrs, t) }
 
 %inline phi:
   | KW_PHI t=typ table=separated_nonempty_list(csep, phi_table_entry)
@@ -948,12 +959,12 @@ phi_table_entry:
 
 block:
   blk_id   = block_label
-  body     = block_phis_and_instrs
-  blk_term = terminator instr_metadata? EOL+
+  body     = block_phis_and_instrs_and_term
     {
-	(blk_id, body, blk_term)
+	(blk_id, body)
     }
 
+%inline
 instr_metadata:
   | COMMA list(metadata_value) { }
 
@@ -1450,7 +1461,6 @@ exp:
 
 
   | KW_VAARG tv=texp COMMA t=typ { INSTR_VAArg (tv, t)  }
-  // | KW_LANDINGPAD    { failwith"INSTR_LandingPad"    }
 
   | KW_STORE vol=KW_VOLATILE? all=texp COMMA ptr=texp anns=store_anns
     { let v = match vol with Some _ -> [ANN_volatile] | None -> [] in
@@ -1459,42 +1469,63 @@ exp:
   | KW_ATOMICCMPXCHG { failwith"INSTR_AtomicCmpXchg" }
   | KW_ATOMICRMW     { failwith"INSTR_AtomicRMW"     }
   | KW_FENCE         { failwith"INSTR_Fence"         }
+  | KW_LANDINGPAD t=typ EOL* KW_CLEANUP cs=clause* { INSTR_LandingPad (t, true, cs) }
+  | KW_LANDINGPAD t=typ EOL* cs=clause+            { INSTR_LandingPad (t, false, cs) }
 
+%inline
+clause:
+  | KW_CATCH t=typ v=expr_val EOL* { CATCH (t, v t) }
+  | KW_FILTER t=typ v=expr_val EOL* { FILTER (t, v t) }
 
 branch_label:
   KW_LABEL o=LOCAL  { lexed_id_to_raw_id o }
 
+%inline
 terminator:
   | KW_RET tv=texp
-    { TERM_Ret tv }
+    { None, fun _ -> TERM_Ret tv }
 
   | KW_RET KW_VOID
-    { TERM_Ret_void }
+    { None, fun _ -> TERM_Ret_void }
 
   | KW_BR c=texp COMMA o1=branch_label COMMA o2=branch_label
-    { TERM_Br (c, o1, o2) }
+    { None, fun _ -> TERM_Br (c, o1, o2) }
 
   | KW_BR b=branch_label
-    { TERM_Br_1 b }
+    { None, fun _ -> TERM_Br_1 b }
 
   | KW_SWITCH c=texp COMMA
     def=branch_label LSQUARE EOL? table=list(switch_table_entry) RSQUARE
-    { TERM_Switch (c, def, table) }
+    { None, fun _ -> TERM_Switch (c, def, table) }
 
   | KW_INDIRECTBR tv=texp
     COMMA LSQUARE til=separated_list(csep, branch_label)  RSQUARE
-    { TERM_IndirectBr (tv, til) }
+    { None, fun _ -> TERM_IndirectBr (tv, til) }
 
   | KW_RESUME tv=texp
-    { TERM_Resume tv }
+    { None, fun _ -> TERM_Resume tv }
 
-  | KW_INVOKE cconv? ret=tident
-    LPAREN a=separated_list(csep, call_arg) RPAREN
-    list(fn_attr) KW_TO l1=branch_label KW_UNWIND l2=branch_label
-    { TERM_Invoke (ret, a, l1, l2)  }
+  /* | l=LOCAL EQ KW_INVOKE cconv? ret=tident */
+  /*   LPAREN a=separated_list(csep, call_arg) RPAREN EOL* */
+  /*   list(fn_attr) KW_TO l1=branch_label EOL* KW_UNWIND l2=branch_label */
+  /*   { TERM_Invoke (Some (IId (validate_bound_lexed_id l)), ret, a, l1, l2)  } */
+
+  | id_opt=instr_lhs KW_INVOKE fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
+    f=texp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
+    fa=list(fn_attr) EOL*
+    KW_TO l1=branch_label EOL*
+    KW_UNWIND l2=branch_label
+    { let atts =
+	  (List.map (fun f -> ANN_fast_math_flag f) fm)
+	@ (opt_list cc)
+        @ (List.map (fun r -> ANN_ret_attribute r) ra)
+        @ (opt_list addr)
+        @ (List.map (fun f -> ANN_fun_attribute f) fa)
+      in
+      (id_opt, fun id_opt -> TERM_Invoke (id_opt, f, a, l1, l2, atts))  }
 
   | KW_UNREACHABLE
-    { TERM_Unreachable }
+    { None, fun _ -> TERM_Unreachable }
 
 align:
   | KW_ALIGN n=INTEGER { ANN_align n }

@@ -281,6 +281,9 @@
   ("extractvalue"   , KW_EXTRACTVALUE);
   ("insertvalue"    , KW_INSERTVALUE);
   ("landingpad"     , KW_LANDINGPAD);
+  ("catch"          , KW_CATCH);
+  ("filter"         , KW_FILTER);
+  ("cleanup"        , KW_CLEANUP);    
 
   ("dso_preemptable" , KW_DSO_PREEMPTABLE);
   ("dso_local"       , KW_DSO_LOCAL);

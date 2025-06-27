@@ -55,7 +55,7 @@ define i32 @foo() #0 {
   %11 = load i32, ptr %1, align 4
   %12 = add i32 %11, 1
   store i32 %12, ptr %1, align 4
-  br label %2, !llvm.loop !5
+  br label %2
 
 13:                                               ; preds = %2
   %14 = call i32 @get_a(i32 noundef 7)

@@ -674,6 +674,10 @@ Definition ann_fun_attribute (a:annotation) : option fn_attr :=
   | _ => None
   end.
 
+Variant landingpad_clause :=
+  | CATCH (t : texp)
+  | FILTER (t : texp).
+
 Variant instr : Set :=
 | INSTR_Comment (msg:string)
 | INSTR_Op   (op:exp)                                             (* INVARIANT: op must be of the form (OP_ ...) *)
@@ -685,7 +689,7 @@ Variant instr : Set :=
 | INSTR_AtomicCmpXchg (c : cmpxchg)
 | INSTR_AtomicRMW (a :atomicrmw )
 | INSTR_VAArg (va_list_and_arg_list : texp) (t: T) (* arg_list isn't actually a list, this is just the name of the argument  *)
-| INSTR_LandingPad
+| INSTR_LandingPad (resultty:T) (cleanup:bool) (cs:list landingpad_clause)
 .
 
 Variant terminator : Set :=
@@ -698,7 +702,10 @@ Variant terminator : Set :=
 | TERM_Switch     (v:texp) (default_dest:block_id) (brs: list (tint_literal * block_id))
 | TERM_IndirectBr (v:texp) (brs:list block_id) (* address * possible addresses (labels) *)
 | TERM_Resume     (v:texp)
-| TERM_Invoke     (fnptrval:tident) (args:list (texp * (list param_attr))) (to_label:block_id) (unwind_label:block_id)
+
+  (* The `invoke` terminator, unlike the others, can optionally define an
+     instr_id for use in the "to_label" block, as with a `call` instruction.  *)                  
+| TERM_Invoke  (i:option instr_id) (fnptrval:texp) (args:list (texp * (list param_attr))) (to_label:block_id) (unwind_label:block_id) (anns:list annotation)
 | TERM_Unreachable
 .
 

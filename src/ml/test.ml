@@ -12,7 +12,6 @@ open Base
 open Driver
 
 open Assert
-open VellvmIntegers
 
 open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 
@@ -253,6 +252,11 @@ let larger_memory_tests =
 
 let c_tests = [("../tests/c/average.ll", 2)]
 
+let exception_tests =
+  [ ("../tests/ll/invoke_landingpad.ll", 5)
+  ; ("../tests/ll/invoke_landingpad_void.ll", 42)
+  ]
+
 let other_tests =
   arith_tests @ calling_convention_tests @ memory_tests @ phi_tests
   @ terminator_tests @ bitcast_tests
@@ -395,6 +399,12 @@ let suite =
           (fun (f, i) ->
             (f, fun () -> run_dvalue_test (i_test (i32_of_int i)) f) )
           c_tests )
+  ; Test
+      ( "Exception Tests"
+      , List.map
+          (fun (f, i) ->
+            (f, fun () -> run_dvalue_test (i_test (i64_of_int i)) f) )
+          exception_tests )
   ; (* Test ("Parsing-Must-fail",
      *       List.map (fun (f, p) ->
      *           (f, (fun () -> run_parsefail_test f p)))
