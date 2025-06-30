@@ -67,7 +67,7 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %}
 
 %token<ParseUtil.lexed_id> GLOBAL LOCAL
-%token LPAREN RPAREN LCURLY RCURLY LTLCURLY RCURLYGT LSQUARE RSQUARE LT GT EQ COMMA EOF EOL STAR DOTDOTDOT
+%token LPAREN RPAREN LCURLY RCURLY LTLCURLY RCURLYGT LSQUARE RSQUARE LT GT EQ COMMA EOF STAR DOTDOTDOT
 
 %token<string> STRING
 %token<Camlcoq.Z.t> INTEGER
@@ -417,7 +417,7 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %%
 
 toplevel_entities:
-  | EOL* m=terminated(toplevel_entity, EOL*)* EOF { m }
+  | m=toplevel_entity* EOF { m }
 
 toplevel_entity:
   | d=definition                        { TLE_Definition d               }
@@ -715,12 +715,12 @@ declaration:
     d = dll_storage_class?
     c = cconv?
     df_ret_attrs=param_attr*
-    df_ret_typ=typ
+    df_ret_typ=ret_typ
     name=GLOBAL
 
     midrule( { void_ctr.reset () } )   (* reset the void counter to 0 *)
 
-    LPAREN args = dc_args RPAREN EOL*
+    LPAREN args = dc_args RPAREN 
 
     u = unnamed_addr?
     dc_attrs = fn_attr*
@@ -758,8 +758,8 @@ df_args:
 
 
 df_arg:
- | t=typ EOL* p=param_attr*                { ((t, p), None)   }  (* Later generate anonymous label *)
- | t=typ EOL * p=param_attr* l=bound_lident { ((t, p), Some l) }  (* Later validate anonymous or use name *)
+ | t=typ p=param_attr*                { ((t, p), None)   }  (* Later generate anonymous label *)
+ | t=typ p=param_attr* l=bound_lident { ((t, p), Some l) }  (* Later validate anonymous or use name *)
 
 %inline
 definition:
@@ -770,12 +770,12 @@ definition:
     d = dll_storage_class?
     c = cconv?
     df_ret_attrs  = param_attr*
-    df_ret_typ    = typ
+    df_ret_typ    = ret_typ
     name          = GLOBAL
 
     midrule( { void_ctr.reset () } )   (* reset the void counter to 0 *)
 
-    LPAREN df_args = df_args RPAREN EOL*
+    LPAREN df_args = df_args RPAREN
 
     u = unnamed_addr?
     ad = addrspace?
@@ -790,7 +790,7 @@ definition:
     pro = prologue?
     per = personality?
     meta = global_metadata
-    LCURLY EOL*
+    LCURLY 
     blks=df_blocks
     RCURLY
     { let (args, vararg) = df_args in
@@ -929,24 +929,24 @@ block_label:
   | /* empty */
     { None }
 
-  | lbl=LABEL EOL*
+  | lbl=LABEL 
     { Some lbl }
 
 block_phis_and_instrs_and_term:
-  | id_opt=instr_lhs p=phi EOL+ bl=block_phis_and_instrs_and_term
+  | id_opt=instr_lhs p=phi bl=block_phis_and_instrs_and_term
     { let (phis, instrs, t) = bl in ((id_opt, p)::phis, instrs, t) }
 
-  | id_opt=instr_lhs inst=instr EOL+ ins=block_instrs_and_term
+  | id_opt=instr_lhs inst=instr ins=block_instrs_and_term
     { let (instrs, t) = ins in 
       ([], (id_opt, inst)::instrs, t) }
 
-  | t=terminator instr_metadata? EOL+
+  | t=terminator instr_metadata?
     { ([], [], t) }
       
 block_instrs_and_term:
-  | t=terminator instr_metadata? EOL+ { ([], t) }
+  | t=terminator instr_metadata? { ([], t) }
 
-  | id_opt=instr_lhs inst=instr EOL+ ins=block_instrs_and_term
+  | id_opt=instr_lhs inst=instr ins=block_instrs_and_term
     { let (instrs, t) = ins in
       ((id_opt, inst)::instrs, t) }
 
@@ -979,11 +979,19 @@ typ_args:
   | arg=typ   { ([arg], false) }
   | arg=typ csep r=typ_args  { (arg::(fst r), snd r) }
 
+ret_typ:
+  | KW_VOID {TYPE_Void}
+  | t = non_function_type { t }
+
 typ:
+  | t=non_function_type { t }
+  | t=non_function_type LPAREN args=typ_args RPAREN   { let (ts,v) = args in TYPE_Function (t, ts, v) }
+  | KW_VOID LPAREN args=typ_args RPAREN               { let (ts,v) = args in TYPE_Function (TYPE_Void, ts, v) }
+
+non_function_type:
   | n=I                                               { TYPE_I n              }
   | KW_IPTR                                           { TYPE_IPTR             }
   | KW_PTR                                            { TYPE_Pointer (None)   }
-  | KW_VOID                                           { TYPE_Void             }
   | KW_HALF                                           { TYPE_Half             }
   | KW_FLOAT                                          { TYPE_Float            }
   | KW_DOUBLE                                         { TYPE_Double           }
@@ -994,7 +1002,6 @@ typ:
   | KW_X86_MMX                                        { TYPE_X86_mmx          }
   | t=typ STAR                                        { TYPE_Pointer (Some t) }
   | LSQUARE n=INTEGER KW_X t=typ RSQUARE              { TYPE_Array (n_of_z n, t)  }
-  | t=typ LPAREN args=typ_args RPAREN                 { let (ts,v) = args in TYPE_Function (t, ts, v) }
   | LCURLY ts=separated_list(csep, typ) RCURLY        { TYPE_Struct ts        }
   | LTLCURLY ts=separated_list(csep, typ) RCURLYGT    { TYPE_Packed_struct ts }
   | KW_OPAQUE                                         { TYPE_Opaque           }
@@ -1438,7 +1445,7 @@ exp:
   | eo=instr_op { INSTR_Op eo }
 
   | t=tailcall? KW_CALL fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
-    f=texp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
+    f=call_exp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
     fa=list(fn_attr) call_metadata? (* TODO: operand bundles? *)
     { let atts =
 	(opt_list t)
@@ -1469,13 +1476,13 @@ exp:
   | KW_ATOMICCMPXCHG { failwith"INSTR_AtomicCmpXchg" }
   | KW_ATOMICRMW     { failwith"INSTR_AtomicRMW"     }
   | KW_FENCE         { failwith"INSTR_Fence"         }
-  | KW_LANDINGPAD t=typ EOL* KW_CLEANUP cs=clause* { INSTR_LandingPad (t, true, cs) }
-  | KW_LANDINGPAD t=typ EOL* cs=clause+            { INSTR_LandingPad (t, false, cs) }
+  | KW_LANDINGPAD t=typ KW_CLEANUP cs=clause* { INSTR_LandingPad (t, true, cs) }
+  | KW_LANDINGPAD t=typ cs=clause+            { INSTR_LandingPad (t, false, cs) }
 
 %inline
 clause:
-  | KW_CATCH t=typ v=expr_val EOL* { CATCH (t, v t) }
-  | KW_FILTER t=typ v=expr_val EOL* { FILTER (t, v t) }
+  | KW_CATCH t=typ v=expr_val { CATCH (t, v t) }
+  | KW_FILTER t=typ v=expr_val{ FILTER (t, v t) }
 
 branch_label:
   KW_LABEL o=LOCAL  { lexed_id_to_raw_id o }
@@ -1495,7 +1502,7 @@ terminator:
     { None, fun _ -> TERM_Br_1 b }
 
   | KW_SWITCH c=texp COMMA
-    def=branch_label LSQUARE EOL? table=list(switch_table_entry) RSQUARE
+    def=branch_label LSQUARE table=list(switch_table_entry) RSQUARE
     { None, fun _ -> TERM_Switch (c, def, table) }
 
   | KW_INDIRECTBR tv=texp
@@ -1505,15 +1512,10 @@ terminator:
   | KW_RESUME tv=texp
     { None, fun _ -> TERM_Resume tv }
 
-  /* | l=LOCAL EQ KW_INVOKE cconv? ret=tident */
-  /*   LPAREN a=separated_list(csep, call_arg) RPAREN EOL* */
-  /*   list(fn_attr) KW_TO l1=branch_label EOL* KW_UNWIND l2=branch_label */
-  /*   { TERM_Invoke (Some (IId (validate_bound_lexed_id l)), ret, a, l1, l2)  } */
-
   | id_opt=instr_lhs KW_INVOKE fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
-    f=texp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
-    fa=list(fn_attr) EOL*
-    KW_TO l1=branch_label EOL*
+    f=call_exp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
+    fa=list(fn_attr) 
+    KW_TO l1=branch_label 
     KW_UNWIND l2=branch_label
     { let atts =
 	  (List.map (fun f -> ANN_fast_math_flag f) fm)
@@ -1532,10 +1534,10 @@ align:
 
 
 switch_table_entry:
-  | sz=I x=INTEGER COMMA i=branch_label EOL? { (TInt_Literal(sz, x), i) }
+  | sz=I x=INTEGER COMMA i=branch_label { (TInt_Literal(sz, x), i) }
 
 %inline csep:
-  COMMA EOL* { }
+  COMMA { }
 
 
 lident:
@@ -1551,9 +1553,12 @@ ident:
   | g=gident  { ID_Global g }
   | l=lident  { ID_Local  l }
 
+call_exp:
+  | t=typ v=exp { (t, v t) }
+  | KW_VOID v=exp { (TYPE_Void, v TYPE_Void) }
+
 texp:   t=typ v=exp { (t, v t) }
 tconst: t=typ c=exp { (t, c t) }
-tident: t=typ i=ident { (t, i) }
 
 (* SAZ: Copying this here is a bit unfortunate but works for now.
    It might be better to experiment with eliminating the "inline" keyword

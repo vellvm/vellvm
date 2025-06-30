@@ -410,7 +410,7 @@ let kwletter   = alphanum | ['_']
 rule token = parse
   (* seps and stuff *)
   | ws+ { token lexbuf }
-  | eol { Lexing.new_line lexbuf; EOL }
+  | eol { Lexing.new_line lexbuf; token lexbuf } (* ignore newlines! *)
   | eof { EOF }
   | ';' { comment lexbuf }
   | '=' { EQ }
@@ -464,7 +464,7 @@ rule token = parse
   | kwletter+ as a { create_token a }
 
 and comment = parse
-  | eol { Lexing.new_line lexbuf; EOL }
+  | eol { Lexing.new_line lexbuf; token lexbuf }
   | eof { EOF }
   | _ { comment lexbuf }
 
