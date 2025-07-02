@@ -166,7 +166,7 @@ If this is the first time you are using opam you need to initialize it:
 Then:
 
 1. Add the Rocq package repository:
-    `opam repo add rocq-released https://rocq.inria.fr/opam/released`.
+    `opam repo add rocq-released https://rocq-prover.org/opam/released`.
 
 2. Create an opam vellvm development *switch* with:
     `opam switch create vellvm ocaml-base-compiler.4.14.1`.
