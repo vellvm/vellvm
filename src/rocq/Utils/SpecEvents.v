@@ -365,6 +365,7 @@ Proof.
     destruct H1; cbn in *; subst.
     split; auto.
     inversion H0; subst; auto.
+    auto.
   }
 Qed.
 
@@ -505,7 +506,7 @@ Proof.
   cbn.
   setoid_rewrite bind_vis.
 
-  apply refines_padded_refines.
+  eapply refines_padded_refines.
   pstep; red; cbn.
   apply refinesF_forallL with (a:=alloc_sigma _).
 
@@ -515,6 +516,8 @@ Proof.
 
   constructor.
   reflexivity.
+  Unshelve.
+  all: constructor.
 Qed.
 
 Lemma alloc_disjoint' :
@@ -535,7 +538,7 @@ Proof.
   cbn.
   setoid_rewrite bind_vis.
 
-  apply refines_padded_refines.
+  apply refines_padded_refines with (b1:=true) (b2:=true).
   pstep; red; cbn.
   apply refinesF_forallR.
   intros [k KSPEC].
@@ -592,12 +595,12 @@ Proof.
     setoid_rewrite RET.
 
     eapply padded_refines_bind.
-    apply refines_padded_refines.
+    apply refines_padded_refines with (b1:=true) (b2:=true).
     apply alloc_spec; auto.
     intros r1 [m' k] (?&?&?); cbn in *; subst.
 
     eapply padded_refines_bind.
-    apply refines_padded_refines.
+    apply refines_padded_refines with (b1:=true) (b2:=true).
     apply alloc_spec.
     unfold fst; split; auto.
     Transparent member.

@@ -1518,72 +1518,72 @@ Qed.
          induction PR; try tauto.
          inv IN.
          apply H1.
-         eapply rclo2_mon in PR.
+(*          eapply rclo2_mon in PR. *)
          
           
 
-      ginit.
+(*       ginit. *)
 
 
       
-      assert (paco2 (refines_ eq_prerel post RR b1 b2 vclo) r
-      match ot1 with
-      | RetF r => k1 r
-      | TauF t => Tau (ITree.bind t k1)
-      | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k1)
-      end
-      match observe (k a) with
-      | RetF r => k2 r
-      | TauF t => Tau (ITree.bind t k2)
-      | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k2)
-      end) by admit.
-      punfold H0.
+(*       assert (paco2 (refines_ eq_prerel post RR b1 b2 vclo) r *)
+(*       match ot1 with *)
+(*       | RetF r => k1 r *)
+(*       | TauF t => Tau (ITree.bind t k1) *)
+(*       | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k1) *)
+(*       end *)
+(*       match observe (k a) with *)
+(*       | RetF r => k2 r *)
+(*       | TauF t => Tau (ITree.bind t k2) *)
+(*       | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k2) *)
+(*       end) by admit. *)
+(*       punfold H0. *)
 
 
-      red in H0.
-      apply H0.
-      gunfold IHEQV.
-      inv IHEQV.
-      induction IN.
-      destruct IN.
-      admit.
+(*       red in H0. *)
+(*       apply H0. *)
+(*       gunfold IHEQV. *)
+(*       inv IHEQV. *)
+(*       induction IN. *)
+(*       destruct IN. *)
+(*       admit. *)
 
-      specialize (H a).
-      inv H; eauto.
-      + specialize (IHEQV a k1 k2 REL).
-        rewrite <- H0 in IHEQV.
-        eauto with paco itree itree_spec.
-(* Variant *)
-(* gpaco2 (T0 : Type) (T1 : T0 -> Type) (gf clo : rel2 T0 T1 -> rel2 T0 T1) *)
-(* (r0 rg : forall x : T0, T1 x -> Prop) (x0 : T0) (x1 : T1 x0) : Prop := *)
-(*     gpaco2_intro : rclo2 clo (paco2 (gf ∘ rclo2 clo) (rg \2/ r0) \2/ r0) x0 x1 -> *)
-(*                    gpaco2 gf clo r0 rg x0 x1. *)
+(*       specialize (H a). *)
+(*       inv H; eauto. *)
+(*       + specialize (IHEQV a k1 k2 REL). *)
+(*         rewrite <- H0 in IHEQV. *)
+(*         eauto with paco itree itree_spec. *)
+(* (* Variant *) *)
+(* (* gpaco2 (T0 : Type) (T1 : T0 -> Type) (gf clo : rel2 T0 T1 -> rel2 T0 T1) *) *)
+(* (* (r0 rg : forall x : T0, T1 x -> Prop) (x0 : T0) (x1 : T1 x0) : Prop := *) *)
+(* (*     gpaco2_intro : rclo2 clo (paco2 (gf ∘ rclo2 clo) (rg \2/ r0) \2/ r0) x0 x1 -> *) *)
+(* (*                    gpaco2 gf clo r0 rg x0 x1. *) *)
 
-(* Arguments gpaco2 [T0]%type_scope [T1]%function_scope (gf clo r rg)%function_scope x0 x1 *)
-(* Arguments gpaco2_intro [T0]%type_scope [T1 gf clo]%function_scope (r rg)%function_scope [x0 x1] IN *)
-        gunfold IHEQV.
-        destruct IHEQV.
-        -- destruct IN.
-           ** red in H.
-              gunfold H.
-        pstep_reverse.
+(* (* Arguments gpaco2 [T0]%type_scope [T1]%function_scope (gf clo r rg)%function_scope x0 x1 *) *)
+(* (* Arguments gpaco2_intro [T0]%type_scope [T1 gf clo]%function_scope (r rg)%function_scope [x0 x1] IN *) *)
+(*         gunfold IHEQV. *)
+(*         destruct IHEQV. *)
+(*         -- destruct IN. *)
+(*            ** red in H. *)
+(*               gunfold H. *)
+(*         pstep_reverse. *)
 
-        apply REL in H2.
-        pstep_reverse.
+(*         apply REL in H2. *)
+(*         pstep_reverse. *)
       
-      specialize (H0 a k1 k2 REL).
-      gunfold H0.
-      inv H0.
-      admit.
-      eapply gpaco2_init in H0.
-      admit.
-    - (* ExistsR *)
-      specialize (IHEQV k1 k2 REL).
-      admit.
-    - (* ForallL *)
-      admit.
-    - (* ExistsL *)
-      admit.
+(*       specialize (H0 a k1 k2 REL). *)
+(*       gunfold H0. *)
+(*       inv H0. *)
+(*       admit. *)
+(*       eapply gpaco2_init in H0. *)
+(*       admit. *)
+(*     - (* ExistsR *) *)
+(*       specialize (IHEQV k1 k2 REL). *)
+(*       admit. *)
+(*     - (* ForallL *) *)
+(*       admit. *)
+(*     - (* ExistsL *) *)
+(*       admit. *)
   Abort.
 
   Lemma refines_clo_bind b1 b2 vclo
@@ -1640,40 +1640,42 @@ Qed.
     setoid_rewrite unfold_bind.
     apply refines_Vis_forallR'.
     intros a.
-    eapply refines_refl; try typeclasses eauto.
+    (* GRRRRR *)
+    (* eapply refines_refl; try typeclasses eauto.*)
     
 
 
 
-    guclo eqit_clo_trans. econstructor; auto_ctrans_eq; eauto; try reflexivity.
-    eapply eqit_Tau_l. rewrite unfold_bind. reflexivity.
+  (*   guclo eqit_clo_trans. econstructor; auto_ctrans_eq; eauto; try reflexivity. *)
+  (*   eapply eqit_Tau_l. rewrite unfold_bind. reflexivity. *)
 
-    intros rr.
-    gcofix CIH. intros. destruct PR.
-    gclo. econstructor; auto_ctrans_eq.
+  (*   intros rr. *)
+  (*   gcofix CIH. intros. destruct PR. *)
+  (*   gclo. econstructor; auto_ctrans_eq. *)
 
-    apply refines_refl.
-    admit.
-    admit.
-    admit.
-    admit.
+  (*   apply refines_refl. *)
+  (*   admit. *)
+  (*   admit. *)
+  (*   admit. *)
+  (*   admit. *)
 
-    apply refines_refl.
-    admit.
-    admit.
-    admit.
-    admit.
+  (*   apply refines_refl. *)
+  (*   admit. *)
+  (*   admit. *)
+  (*   admit. *)
+  (*   admit. *)
 
-    eauto with paco.
-    - gstep. econstructor. eauto 7 with paco itree.
-    - gstep. econstructor. intros. red in CMP. unfold id in ID. apply ID. eauto 7 with paco itree.
-    - destruct b1; try discriminate.
-      guclo eqit_clo_trans.
-      econstructor; auto_ctrans_eq; eauto; try reflexivity.
-      eapply eqit_Tau_l. rewrite unfold_bind. reflexivity.
-    - destruct b2; try discriminate.
-      guclo eqit_clo_trans. econstructor; auto_ctrans_eq; eauto; try reflexivity.
-      eapply eqit_Tau_l. rewrite unfold_bind. reflexivity.
-  Qed.
+  (*   eauto with paco. *)
+  (*   - gstep. econstructor. eauto 7 with paco itree. *)
+  (*   - gstep. econstructor. intros. red in CMP. unfold id in ID. apply ID. eauto 7 with paco itree. *)
+  (*   - destruct b1; try discriminate. *)
+  (*     guclo eqit_clo_trans. *)
+  (*     econstructor; auto_ctrans_eq; eauto; try reflexivity. *)
+  (*     eapply eqit_Tau_l. rewrite unfold_bind. reflexivity. *)
+  (*   - destruct b2; try discriminate. *)
+  (*     guclo eqit_clo_trans. econstructor; auto_ctrans_eq; eauto; try reflexivity. *)
+  (*     eapply eqit_Tau_l. rewrite unfold_bind. reflexivity. *)
+  (* Qed. *)
+  Admitted.
 
 End refine_closure.

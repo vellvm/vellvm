@@ -92,11 +92,11 @@ Section non_padded_completeness_counter.
         apply refinesF_existsR with (a:=true).
         cbn.
         constructor; auto.
-      + constructor. auto.
+      + constructor; auto.
     - pstep. red. cbn.
       apply refinesF_existsR with (a:=false).
       cbn.
-      constructor. pstep_reverse.
+      constructor; auto. pstep_reverse.
       generalize dependent t. pcofix CIH. intros t Ht.
       pstep. red. punfold Ht. red in Ht. remember (observe ITree.spin) as x.
       hinduction Ht before r; intros; inv Heqx; pclearbot; eauto.
