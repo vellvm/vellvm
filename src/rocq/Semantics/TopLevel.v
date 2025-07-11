@@ -348,6 +348,11 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       let userprog'      := filter (negb ∘ predefined) userprog
         in List.app predefs userprog'.
 
+  Definition link_all
+    (linked_files  : list ll_toplevel_entities)
+    (userprog : ll_toplevel_entities) : ll_toplevel_entities :=
+    fold_left (fun prog linked => link linked prog) linked_files userprog.
+
    (* Worth a proof that linking preserves structure when there are no
       duplicates + upholds the linking removal postcondition?
 

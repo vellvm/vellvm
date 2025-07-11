@@ -372,6 +372,9 @@ let args =
   ; ( "-op"
     , Set_string Platform.output_path
     , "set the path to the output files directory  [default='output']" )
+  ; ( "-l"
+    , String Driver.add_link_file
+    , "Specify LLVM files to link against." )
   ; ( "-interpret"
     , Set Driver.interpret
     , "interpret ll program starting from 'main'" )

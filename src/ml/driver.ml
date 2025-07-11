@@ -61,16 +61,16 @@ let string_of_file (f : in_channel) : string =
 
 (* file processing
    ---------------------------------------------------------- *)
-let link_files : string list ref = ref []
+let link_files : TopLevel.TopLevelBigIntptr.ll_toplevel_entities list ref = ref []
 
-let add_link_file path = link_files := path :: !link_files
+let add_link_file path = link_files := IO.parse_file path :: !link_files
 
 let process_ll_file command_line_arguments path file =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
   let ll_ast = IO.parse_file path in
   let _ =
     if !interpret then
-      match Interpreter.interpret command_line_arguments ll_ast with
+      match Interpreter.interpret command_line_arguments (TopLevel.TopLevelBigIntptr.link_all !link_files ll_ast) with
       | Ok dv ->
           Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv)
       | Error e -> failwith (Result.string_of_exit_condition e)
