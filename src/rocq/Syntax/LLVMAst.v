@@ -163,6 +163,20 @@ Variant frame_pointer_val : Set :=
 | FRAMEPTR_All
 .
 
+Variant mem_loc : Set :=
+| LOC_Default
+| LOC_Argmem
+| LOC_Inaccessiblemem
+| LOC_Errnomem
+.
+
+Variant mem_access_kind : Set :=
+| ACC_None
+| ACC_Read      
+| ACC_Write
+| ACC_Readwrite
+.
+    
 Variant fn_attr : Set :=
 | FNATTR_Alignstack (a:int_ast)
 (* | FNATTR_Alloc_family (fam : string) - FNATTR_KeyValue *)
@@ -242,6 +256,9 @@ Variant fn_attr : Set :=
 | FNATTR_String (s:string)   (* See the comments above for cases covered by FNATTR_String *)
 | FNATTR_Key_value (kv : string * string) (* See the comments above for cases covered by FNATTR_KeyValue *)
 | FNATTR_Attr_grp (g:int_ast)
+(* This memory attribute is just a syntactic representation of the constraints. *)                    
+| FNATTR_Memory (effs: list (mem_loc * mem_access_kind))
+| FNATTR_UNKNOWN (s:string)
 .
 
 Variant thread_local_storage : Set :=
@@ -387,6 +404,7 @@ Inductive metadata : Set :=
 | METADATA_String (str:string)
 | METADATA_Named  (strs:list string)
 | METADATA_Node   (mds:list metadata)
+| METADATA_Debug_info_elided  (* represents a !DI.(_) metadata node *)
 .
 
 

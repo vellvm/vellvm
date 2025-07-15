@@ -67,7 +67,7 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %}
 
 %token<ParseUtil.lexed_id> GLOBAL LOCAL
-%token LPAREN RPAREN LCURLY RCURLY LTLCURLY RCURLYGT LSQUARE RSQUARE LT GT EQ COMMA EOF STAR DOTDOTDOT
+%token LPAREN RPAREN LCURLY RCURLY LTLCURLY RCURLYGT LSQUARE RSQUARE LT GT EQ COMMA EOF STAR COLON DOTDOTDOT
 
 %token<string> STRING
 %token<Camlcoq.Z.t> INTEGER
@@ -255,6 +255,15 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 (* %token KW_WARN_STACK_SIZE (* quoted "warn-stack-size" *) *)
 %token KW_VSCALE_RANGE
 (* %token KW_MIN_LEGAL_VECTOR_WIDTH (* quoted "min-legal-vector-width" *) *)
+%token KW_MEMORY
+%token KW_READ
+%token KW_WRITE
+%token KW_NONE
+%token KW_READWRITE
+%token KW_ARGMEM
+%token KW_INACCESSIBLEMEM
+%token KW_ERRNOMEM
+
 
 %token KW_DSO_PREEMPTABLE
 %token KW_DSO_LOCAL
@@ -390,6 +399,8 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_ACQ_REL
 %token KW_SEQ_CST
 
+%token<string> KW_UNKNOWN
+
 (* METADATA constants *)
 
 (* for load instructions *)
@@ -401,6 +412,8 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token META_DEREFERENCEABLE_OR_NULL
 %token META_ALIGN
 %token META_NOUNDEF
+
+%token METADATA_DEBUG
 
 %token<LLVMAst.raw_id> METADATA_ID
 %token<string> METADATA_STRING
@@ -432,14 +445,16 @@ toplevel_entity:
    *)
   | i=lident EQ KW_TYPE t=typ           { TLE_Type_decl (ID_Local i, t)  }
   | g=global_decl                       { TLE_Global g                   }
-  | i=METADATA_ID EQ KW_DISTINCT? m=tle_metadata     { TLE_Metadata (i, m)            }
+  | i=METADATA_ID EQ KW_DISTINCT? m=tle_metadata
+                                        { TLE_Metadata (i, m)            }
   | KW_ATTRIBUTES i=ATTR_GRP_ID EQ LCURLY a=fn_attr* RCURLY
                                         { TLE_Attribute_group (i, a)     }
 
 (* metadata are not implemented yet, but are at least (partially) parsed *)
 tle_metadata:
-  | BANGLCURLY m=separated_list(csep, metadata_value) RCURLY
-   { METADATA_Node m }
+  | BANGLCURLY m=separated_list(csep, tconst_or_metadata_value) RCURLY
+    { METADATA_Node m }
+  | METADATA_DEBUG { METADATA_Debug_info_elided }
   | KW_METADATA m=metadata_node
     { m }
 
@@ -456,11 +471,14 @@ metadata_id:
   | mid=METADATA_ID              { METADATA_Id mid }
 
 metadata_node:
-  | BANGLCURLY m=separated_list(csep, metadata_value) RCURLY
+  | BANGLCURLY m=separated_list(csep, tconst_or_metadata_value) RCURLY
     { METADATA_Node m }
 
+tconst_or_metadata_value:
+  | tconst                      { METADATA_Const $1  } 
+  | m=metadata_value            { m } 
+
 metadata_value:
-  | tconst                      { METADATA_Const $1  }
   | KW_NULL                     { METADATA_Null      } (* null with no type *)
   | ms=METADATA_STRING          { METADATA_String (str ms) }
   | mid=METADATA_ID             { METADATA_Id mid     }
@@ -764,6 +782,7 @@ df_arg:
 %inline
 definition:
   | KW_DEFINE
+    (* begin LLParser::parseFunctionHeader from https://github.com/llvm/llvm-project/blob/main/llvm/lib/AsmParser/LLParser.cpp *)
     l = linkage?
     p = preemption_specifier?
     v = visibility?
@@ -789,7 +808,13 @@ definition:
     pre = prefix?
     pro = prologue?
     per = personality?
+    (* end LLParser::parseFunctionHeader *)
+
+    (* begin LLParser::parseOptionalFunctionMetadata *)
     meta = global_metadata
+    (* end LLParser::parseOptionalFunctionMetadata *)
+
+    (* begin LLParser::parseFunctionBody *)
     LCURLY 
     blks=df_blocks
     RCURLY
@@ -951,7 +976,7 @@ block_instrs_and_term:
       ((id_opt, inst)::instrs, t) }
 
 %inline phi:
-  | KW_PHI t=typ table=separated_nonempty_list(csep, phi_table_entry)
+  | KW_PHI t=typ table=comma_path_with_instr_metadata(phi_table_entry)
     { Phi (t, List.map (fun (l,v) -> (l, v t)) table)}
 
 phi_table_entry:
@@ -966,7 +991,7 @@ block:
 
 %inline
 instr_metadata:
-  | COMMA list(metadata_value) { }
+  | COMMA metadata_value+ { }
 
 
 df_blocks:
@@ -1138,7 +1163,24 @@ fn_attr:
   | s=STRING                              { FNATTR_String (str s)   }
   | k=STRING EQ v=STRING                  { FNATTR_Key_value (str k, str v) }
   | i=ATTR_GRP_ID                         { FNATTR_Attr_grp i       }
+  | s=KW_UNKNOWN                          { FNATTR_UNKNOWN (str s)  }
+  | KW_MEMORY LPAREN l=separated_nonempty_list (csep, mem_attr) RPAREN   { FNATTR_Memory l }
 
+mem_attr:
+  | k=mem_access_kind { (LOC_Default, k) }
+  | l=mem_loc COLON k=mem_access_kind { (l, k) }
+
+mem_access_kind:
+  | KW_NONE  { ACC_None }
+  | KW_READ  { ACC_Read }
+  | KW_WRITE { ACC_Write }
+  | KW_READWRITE { ACC_Readwrite }
+
+mem_loc:
+  | KW_DEFAULT         { LOC_Default }
+  | KW_ARGMEM          { LOC_Argmem }
+  | KW_INACCESSIBLEMEM { LOC_Inaccessiblemem }
+  | KW_ERRNOMEM        { LOC_Errnomem }
 
 %inline
 ibinop_nuw_nsw_opt: (* may appear with `nuw`/`nsw` keywords *)
@@ -1192,6 +1234,12 @@ fcmp:
   | KW_UNE   { FUne   }
   | KW_TRUE  { FTrue  }
 
+
+(* TODO:
+- zext and uitofp support the nneg modifier
+- trunc supports the nuw and nsw modifiers
+- fptrunc and fpext support the fastmath flag(s)
+*)
 conversion:
   | KW_TRUNC    { Trunc    }
   | KW_ZEXT     { Zext     }
@@ -1232,51 +1280,53 @@ fast_math:
   | KW_REASSOC { Reassoc }
   | KW_FAST { Fast }
 
+comma_path_with_instr_metadata(X):
+  | COMMA x=X l=comma_path_with_instr_metadata(X)    { x::l }
+  | instr_metadata? { [] }
+
 instr_op:
-  | op=ibinop t=typ o1=exp COMMA o2=exp
+  | op=ibinop t=typ o1=exp COMMA o2=exp instr_metadata?
     { OP_IBinop (op, t, o1 t, o2 t) }
 
-  | KW_ICMP op=icmp t=typ o1=exp COMMA o2=exp
+  | KW_ICMP op=icmp t=typ o1=exp COMMA o2=exp instr_metadata?
     { OP_ICmp (op, t, o1 t, o2 t) }
 
-  | op=fbinop f=fast_math* t=typ o1=exp COMMA o2=exp
+  | op=fbinop f=fast_math* t=typ o1=exp COMMA o2=exp instr_metadata?
     { OP_FBinop (op, f, t, o1 t, o2 t) }
 
     // special case, coerced to fsub
-  | KW_FNEG f=fast_math* t=typ o=exp
+  | KW_FNEG f=fast_math* t=typ o=exp instr_metadata?
      { OP_FBinop (FSub, f, t, EXP_Double Floats.Float32.zero, o t) }
 
-  | KW_FCMP op=fcmp t=typ o1=exp COMMA o2=exp
+  | KW_FCMP op=fcmp t=typ o1=exp COMMA o2=exp instr_metadata?
     { OP_FCmp (op, t, o1 t, o2 t) }
 
-  | c=conversion t1=typ v=exp KW_TO t2=typ
+  | c=conversion t1=typ v=exp KW_TO t2=typ instr_metadata?
     { OP_Conversion (c, t1, v t1, t2) }
 
-  | KW_GETELEMENTPTR KW_INBOUNDS? t=typ COMMA ptr=texp idx=preceded(COMMA, texp)*
+  | KW_GETELEMENTPTR KW_INBOUNDS? t=typ COMMA ptr=texp idx=comma_path_with_instr_metadata(texp)
     { OP_GetElementPtr (t, ptr, idx) }
 
-  | KW_SELECT if_=texp COMMA then_=texp COMMA else_= texp
+  | KW_SELECT if_=texp COMMA then_=texp COMMA else_= texp instr_metadata?
     { OP_Select (if_, then_, else_) }
 
-  | KW_FREEZE v=texp
+  | KW_FREEZE v=texp instr_metadata?
     { OP_Freeze v }
 
-  | KW_EXTRACTELEMENT vec=texp COMMA idx=texp
+  | KW_EXTRACTELEMENT vec=texp COMMA idx=texp instr_metadata?
     { OP_ExtractElement (vec, idx) }
 
-  | KW_INSERTELEMENT vec=texp
-    COMMA new_el=texp COMMA idx=texp
+  | KW_INSERTELEMENT vec=texp 
+    COMMA new_el=texp COMMA idx=texp instr_metadata?
     { OP_InsertElement (vec, new_el, idx)  }
 
-  | KW_EXTRACTVALUE tv=texp COMMA
-    idx=separated_nonempty_list (csep, INTEGER)
+  | KW_EXTRACTVALUE tv=texp idx=comma_path_with_instr_metadata(INTEGER)
     { OP_ExtractValue (tv, idx) }
 
-  | KW_INSERTVALUE agg=texp COMMA new_val=texp COMMA
-    idx=separated_nonempty_list (csep, INTEGER)
+  | KW_INSERTVALUE agg=texp COMMA new_val=texp idx=comma_path_with_instr_metadata(INTEGER)
     { OP_InsertValue (agg, new_val, idx) }
 
-  | KW_SHUFFLEVECTOR v1=texp COMMA v2=texp COMMA mask=texp
+  | KW_SHUFFLEVECTOR v1=texp COMMA v2=texp COMMA mask=texp instr_metadata?
     { OP_ShuffleVector (v1, v2, mask)  }
 
 expr_op:
@@ -1353,7 +1403,7 @@ a_align:
 
 a_addrspace:
   | csep a=addrspace { [a] }
-  | (* empty *) { [] }
+  | instr_metadata? (* empty *) { [] }
 
 alloca_anns:
   anns=a_num_elts { anns }
@@ -1442,7 +1492,7 @@ exp:
   | csep md=global_metadata { md }
 
 %inline instr:
-  | eo=instr_op { INSTR_Op eo }
+  | eo=instr_op  { INSTR_Op eo }
 
   | t=tailcall? KW_CALL fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
     f=call_exp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)

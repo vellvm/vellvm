@@ -440,6 +440,31 @@ Section ReprInstances.
    Instance reprCconv : Repr cconv :=
     {| repr := repr_cconv |}.
 
+  Definition repr_mem_loc loc : string :=
+    match loc with
+    | LOC_Default => "LOC_Default"
+    | LOC_Argmem => "LOC_Armem"
+    | LOC_Inaccessiblemem  => "LOC_Inaccessiblemem"
+    | LOC_Errnomem => "LOC_Errnomem"
+    end.
+
+  #[global]
+    Instance reprMemLoc : Repr mem_loc :=
+    {| repr := repr_mem_loc |}.
+
+  Definition repr_mem_access_kind k : string :=
+    match k with
+    | ACC_None => "ACC_None"
+    | ACC_Read => "ACC_Read"
+    | ACC_Write => "ACC_Write"
+    | ACC_Readwrite => "ACC_Readwrite"
+    end.
+
+  #[global]
+    Instance reprMemAccessKind : Repr mem_access_kind :=
+    {| repr := repr_mem_access_kind |}.
+
+  
   Definition repr_fn_attr (fa : fn_attr) : string :=
     match fa with
     | FNATTR_Alignstack a => "(FNATTR_Alignstack " ++ repr a ++ ")"
@@ -540,6 +565,8 @@ Section ReprInstances.
     | FNATTR_String s => "(FNATTR_String " ++ repr s ++ ")"
     | FNATTR_Key_value kv => "(FNATTR_Key_value " ++ repr kv ++ ")"
     | FNATTR_Attr_grp g => "(FNATTR_Attr_grp " ++ repr g ++ ")"
+    | FNATTR_Memory l => "(FNATTR_Memory " ++ repr l ++ ")"
+    | FNATTR_UNKNOWN s => "(FNATTR_UNKNOWN " ++ repr s ++ ")"
     end.
 
   #[global]
@@ -574,6 +601,7 @@ Section ReprInstances.
     | METADATA_String str => "(METADATA_String " ++ repr str ++ ")"
     | METADATA_Named strs => "(METADATA_Named " ++ repr strs ++ ")"
     | METADATA_Node mds => "(METADATA_Node [" ++ (contents id (List.map repr_metadata mds)) ++ "])"
+    | METADATA_Debug_info_elided => "METADATA_Debug_info_elided"
     end.
 
   #[global]
