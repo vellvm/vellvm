@@ -1,4 +1,3 @@
-Unset Universe Checking.
 From Vellvm Require Import
      Semantics.Memory.MemBytes
      Semantics.Memory.DvalueBytes

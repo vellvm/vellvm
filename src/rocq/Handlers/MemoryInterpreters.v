@@ -58,8 +58,6 @@ From ITreeSpec Require Import
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Unset Universe Checking.
-
 Ltac raise_abs :=
   let H := fresh "H" in
   intro H; unfold raise_oom, raise_ub, raise_error in H;
@@ -411,10 +409,10 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Proof using.
       intros T MemE ms.
       eapply handle_memory_prop in ms; eauto.
-      pose proof (err_ub_oom (MemState * T)).
-      refine (Vis (@Spec_forall Effout {a : (err_ub_oom (MemState * T)) | ms a}) (fun (x : {a : (err_ub_oom (MemState * T)) | ms a}) => _)).
-      destruct x.
-      apply (lift_err_ub_oom ret x).
+      apply (Vis (Spec_forall {a : err_ub_oom (MemState * T) | ms a})
+                  (fun x : {a : err_ub_oom (MemState * T) | ms a} =>
+                     let (x0, m) := x in
+                     (fun (x1 : err_ub_oom (MemState * T)) (_ : ms x1) => lift_err_ub_oom ret x1) x0 m)).
     Defined.
 
     Definition my_handle_intrinsic_prop' :
@@ -1450,7 +1448,11 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       destruct H0; subst; pclearbot; try discriminate; cbn.
       - gstep; constructor; auto.
       - gstep; constructor; auto with paco.
-      - guclo eqit_clo_bind. econstructor.
+      - guclo (eqit_clo_bind
+                 (E:=F)
+                 (R1:=(MemState * (store_id * R)))
+                 (R2:=(MemState * (store_id * R)))).
+        econstructor.
         + reflexivity.
         + intros [] _ []. gstep; constructor; auto with paco itree.
     Qed.
@@ -1571,77 +1573,77 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       setoid_rewrite unfold_interp.
       cbn.
       ginit.
-      {
-        gcofix CIH.
-        intros ot.
-        hinduction ot before r; intros.
-        - gstep; red; cbn.
-          constructor; auto.
-        - gstep; red; cbn.
-          constructor; auto with paco.
-          (* Need to be able to do this rewrite... *)
-          (* This relies on grefinegen_cong_eqit *)
-          (* Why can't I rewrite? *)
-          (* setoid_rewrite unfold_interp. *)
-          pose proof (unfold_interp (f:= h) t) as UNFOLD.
-          apply EqAxiom.bisimulation_is_eq in UNFOLD.
-          rewrite UNFOLD; clear UNFOLD.
+      (* { *)
+      (*   gcofix CIH. *)
+      (*   intros ot. *)
+      (*   hinduction ot before r; intros. *)
+      (*   - gstep; red; cbn. *)
+      (*     constructor; auto. *)
+      (*   - gstep; red; cbn. *)
+      (*     constructor; auto with paco. *)
+      (*     (* Need to be able to do this rewrite... *) *)
+      (*     (* This relies on grefinegen_cong_eqit *) *)
+      (*     (* Why can't I rewrite? *) *)
+      (*     (* setoid_rewrite unfold_interp. *) *)
+      (*     pose proof (unfold_interp (f:= h) t) as UNFOLD. *)
+      (*     apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
+      (*     rewrite UNFOLD; clear UNFOLD. *)
 
-          pose proof (unfold_interp (f:=g) (translate (@to_SpecEvent F) t)) as UNFOLD.
-          apply EqAxiom.bisimulation_is_eq in UNFOLD.
-          setoid_rewrite UNFOLD; clear UNFOLD.
+      (*     pose proof (unfold_interp (f:=g) (translate (@to_SpecEvent F) t)) as UNFOLD. *)
+      (*     apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
+      (*     setoid_rewrite UNFOLD; clear UNFOLD. *)
 
-          gbase.
-          apply CIH.
-        - guclo.
-          econstructor.
+      (*     gbase. *)
+      (*     apply CIH. *)
+      (*   - guclo. *)
+      (*     econstructor. *)
 
-          x > y
+      (*     x > y *)
 
-          x' > y' ===> x > y
+      (*     x' > y' ===> x > y *)
 
-          x'
+      (*     x' *)
           
-          (* trying to show that t1 >= t2
+      (*     (* trying to show that t1 >= t2 *)
 
-             We want to do that by showing t1' >= t2'
+      (*        We want to do that by showing t1' >= t2' *)
 
-             t1' has to be smaller than t1
-             and t2' >= t2
+      (*        t1' has to be smaller than t1 *)
+      (*        and t2' >= t2 *)
 
-           *)
+      (*      *) *)
           
-          cbn.
-          eapply refines_bind.
+      (*     cbn. *)
+      (*     eapply refines_bind. *)
           
-          guclo refines_clo_trans.
-          cbn.
-          econstructor.
-          setoid_rewrite REF.
-          apply REF.
-          cbn.
-          guclo.
-          constructor.
+      (*     guclo refines_clo_trans. *)
+      (*     cbn. *)
+      (*     econstructor. *)
+      (*     setoid_rewrite REF. *)
+      (*     apply REF. *)
+      (*     cbn. *)
+      (*     guclo. *)
+      (*     constructor. *)
 
-        - gfinal.
-          right.
-          cbn.
-          eapply paco2_mon_bot.
-          eapply refines_bind.
-          apply REF.
+      (*   - gfinal. *)
+      (*     right. *)
+      (*     cbn. *)
+      (*     eapply paco2_mon_bot. *)
+      (*     eapply refines_bind. *)
+      (*     apply REF. *)
 
-          intros r1 r2 H; subst.
-          pstep; red; cbn.
-          constructor; left.
+      (*     intros r1 r2 H; subst. *)
+      (*     pstep; red; cbn. *)
+      (*     constructor; left. *)
           
-          pstep; red.
+      (*     pstep; red. *)
 
-          admit.
+      (*     admit. *)
 
-          intros x0 x1 x2 PR.
-          apply PR.
-      }
-      admit.
+      (*     intros x0 x1 x2 PR. *)
+      (*     apply PR. *)
+      (* } *)
+      (* admit. *)
     Abort.
 
     (* Lemma strict_refines_unpadded_to_itree_spec : *)
@@ -1720,54 +1722,13 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         apply REF.
 
         intros r1 r2 H; subst.
+        Import Padded.
+        rewrite !pad_tau.
         pstep; red; cbn.
         constructor.
         left.
-
-
-        
-        apply CIH.
-        left.
-        (* Need to be able to do this rewrite... *)
-        (* This relies on grefinegen_cong_eqit *)
-        (* Why can't I rewrite? *)
-        (* setoid_rewrite unfold_interp. *)
-        (* eapply grefinegen_cong_eqit; cbn. *)
-        (* 3-4: setoid_rewrite unfold_interp. ; reflexivity. *)
-        (* 1-2: intros; subst; auto. *)
-
-        (* gbase. *)
-        (* apply CIH. *)
-        all: admit.
-      - admit.
-
-
-
-      
-      cbn.
-      ginit.
-      2: {
-        gcofix CIH.
-        intros ot.
-        hinduction ot before r; intros.
-        - gstep; red; cbn.
-          constructor; auto.
-        - gstep; red; cbn.
-          constructor; auto with paco.
-          (* Need to be able to do this rewrite... *)
-          (* This relies on grefinegen_cong_eqit *)
-          (* Why can't I rewrite? *)
-          (* setoid_rewrite unfold_interp. *)
-          (* eapply grefinegen_cong_eqit; cbn. *)
-          (* 3-4: setoid_rewrite unfold_interp. ; reflexivity. *)
-          (* 1-2: intros; subst; auto. *)
-
-          (* gbase. *)
-        (* apply CIH. *)
-          all: admit.
-        - admit.
-      }
-      admit.
+        admit.
+        intros ? ? [].
     Admitted.
 
     Lemma strict_refines_to_itree_spec_interp :

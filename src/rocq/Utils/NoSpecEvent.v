@@ -402,12 +402,9 @@ Proof using.
   unfold elim_spec in *.
   unfold inject_spec in *.
   pinversion H0.
-  - rewrite <- H1.
-    setoid_rewrite interp_ret. rewrite translate_ret. estep.
-  - rewrite <- H.
-    rewrite interp_tau. rewrite translate_tau. estep.
-  - rewrite <- H.
-    rewrite interp_vis. rewrite translate_bind.  cbn.
+  - setoid_rewrite interp_ret. rewrite translate_ret. estep.
+  - rewrite interp_tau. rewrite translate_tau. estep.
+  - rewrite interp_vis. rewrite translate_bind.  cbn.
     unfold trigger.  rewrite translate_vis. rewrite bind_vis.
     estep. intros. rewrite translate_ret. rewrite bind_ret_l.
     rewrite translate_tau. rewrite tau_eutt. ebase.

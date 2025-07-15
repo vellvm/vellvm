@@ -9,9 +9,6 @@ From ExtLib Require Import
      Structures.MonadExc
      Data.Monads.EitherMonad.
 
-From ITree Require Import
-     ITree.
-
 From Vellvm.Utils Require Import
      MonadReturnsLaws
      MonadEq1Laws

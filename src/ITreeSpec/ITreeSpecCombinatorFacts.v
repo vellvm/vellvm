@@ -1632,16 +1632,21 @@ Qed.
     apply refines_refl; try typeclasses eauto.
     1-2: shelve.
   - (* forallR *)
-    gclo.
-    econstructor; auto_ctrans_eq; eauto; try reflexivity.
-    3-4: shelve.
-    apply refines_refl; try typeclasses eauto.
-    1-2: shelve.
-    setoid_rewrite unfold_bind.
-    apply refines_Vis_forallR'.
-    intros a.
-    (* GRRRRR *)
-    (* eapply refines_refl; try typeclasses eauto.*)
+    gfinal.
+    right.
+    eapply paco2_mon_bot; eauto.
+    (* apply refines_Vis_forallR'. *)
+    
+    (* gclo. *)
+    (* econstructor; auto_ctrans_eq; eauto; try reflexivity. *)
+    (* 3-4: shelve. *)
+    (* apply refines_refl; try typeclasses eauto. *)
+    (* 1-2: shelve. *)
+    (* setoid_rewrite unfold_bind. *)
+    (* apply refines_Vis_forallR'. *)
+    (* intros a. *)
+    (* (* GRRRRR *) *)
+    (* eapply refines_refl; try typeclasses eauto. *)
     
 
 

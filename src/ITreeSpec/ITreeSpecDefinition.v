@@ -26,7 +26,7 @@ From ExtLib Require Import
   Structures.Monad
   Structures.Functor.
 
-Polymorphic Variant SpecEvent (E : Type -> Type) : Type -> Type :=
+Variant SpecEvent (E : Type -> Type) : Type -> Type :=
 | Spec_vis {X} (e : E X) : SpecEvent E X
 | Spec_forall (A : Type) : SpecEvent E A
 | Spec_exists (A : Type) : SpecEvent E A.
