@@ -181,6 +181,7 @@ Section Endo.
         | METADATA_String str => METADATA_String (endo str)
         | METADATA_Named strs => METADATA_Named (endo strs)
         | METADATA_Node mds => METADATA_Node (List.map endo_metadata mds)
+        | METADATA_Debug_info_elided => METADATA_Debug_info_elided
         end.
 
     #[global] Instance Endo_tint_literal
@@ -658,6 +659,7 @@ Section TFunctor.
         | METADATA_String str => METADATA_String (endo str)
         | METADATA_Named strs => METADATA_Named (endo strs)
         | METADATA_Node mds => METADATA_Node (tfmap endo_metadata mds)
+        | METADATA_Debug_info_elided => METADATA_Debug_info_elided
         end.
 
 

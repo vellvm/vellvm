@@ -30,6 +30,14 @@ Fixpoint concatStr (l : list string) : string :=
   | nil => ""
   | (h :: t) => h ++ concatStr t
   end.
+
+Fixpoint concat_str_sep (sep:string) (l : list string) : string :=
+  match l with
+  | nil => ""
+  | (h::nil) => h          
+  | (h :: t) => h ++ sep ++ (concat_str_sep sep t)
+  end.
+
 (*  ------------------------------------------------------------------------- *)
 
 #[global] Instance Show_Pos : Show positive.
@@ -253,6 +261,20 @@ Section ShowInstances.
   #[global] Instance dshowParamAttr : DShow param_attr
     := { dshow := show_param_attr }.
 
+  Definition show_eff '(loc, k) :=
+    match loc with
+    | LOC_Default => ""
+    | LOC_Argmem => "argmem: "
+    | LOC_Inaccessiblemem  => "inaccessiblemem: "
+    | LOC_Errnomem => "errnomem: "
+    end ++
+    match k with
+    | ACC_None => "none"
+    | ACC_Read => "read"
+    | ACC_Write => "write"
+    | ACC_Readwrite => "readwrite"
+    end.
+  
   Definition show_fn_attr (f : fn_attr) : string :=
     match f with
     | FNATTR_Alignstack a => "alignstack(" ++ show a ++ ")"
@@ -344,6 +366,8 @@ Section ShowInstances.
     | FNATTR_String s => """" ++ s ++ """"  (* "no-see" *)
     | FNATTR_Key_value kv => """" ++ fst kv ++ """=" ++ """" ++ snd kv ++ """" (* "unsafe-fp-math"="false" *)
     | FNATTR_Attr_grp g => "#" ++ show g
+    | FNATTR_Memory l => "memory(" ++ concat_str_sep ", " (map show_eff l ) ++ ")"
+    | FNATTR_UNKNOWN s => s
     end.
 
   #[global] Instance showFnAttr : Show fn_attr
@@ -875,6 +899,7 @@ Section ShowInstances.
     | METADATA_Node mds => string_to_DString "!{"
                             @@ concat_DString (string_to_DString " , ") (map dshow_metadata mds)
                             @@ string_to_DString "}"
+    | METADATA_Debug_info_elided => string_to_DString "!DI(debug info elided)"
     end.
 
   #[global] Instance dshowMetadata (md : metadata T) : DShow (metadata T) :=

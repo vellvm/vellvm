@@ -220,6 +220,14 @@
   ("musttail"                     , KW_MUSTTAIL);
   ("notail"                       , KW_NOTAIL);
   ("volatile"                     , KW_VOLATILE);
+  ("memory"                       , KW_MEMORY);
+  ("read"                         , KW_READ);
+  ("write"                        , KW_WRITE);
+  ("none"                         , KW_NONE);
+  ("readwrite"                    , KW_READWRITE);
+  ("argmem"                       , KW_ARGMEM);
+  ("inaccessiblemem"              , KW_INACCESSIBLEMEM);
+  ("errnomem"                     , KW_ERRNOMEM);
 
   (* instrs *)
   ("add"            , KW_ADD);
@@ -376,7 +384,7 @@
       let token = Hashtbl.find symbol_table str in
       let _ = Histogram.record histogram str in
       token
-    with _ -> failwith ("Unknown or unsupported keyword: " ^ str)
+    with _ -> KW_UNKNOWN str
 
   type ident_type = Named | NamedString | Unnamed
 
@@ -402,9 +410,9 @@ let upletter = ['A'-'Z']
 let lowletter = ['a'-'z']
 let letter = upletter | lowletter
 let alphanum = digit | letter
-let ident_fst  = letter   | ['-' '$' '.' '_']
-let ident_nxt  = alphanum | ['-' '$' '.' '_']
-let label_char = alphanum | ['-' '$' '.' '_']
+let ident_fst  = letter   | ['-' '$' '.' '_' ':']
+let ident_nxt  = alphanum | ['-' '$' '.' '_' ':']
+let label_char = alphanum | ['-' '$' '.' '_' ':'] 
 let kwletter   = alphanum | ['_']
 
 rule token = parse
@@ -425,6 +433,7 @@ rule token = parse
   | ']'  { RSQUARE }
   | '<'  { LT }
   | '>'  { GT }
+  | ':'  { COLON }
   | "..." { DOTDOTDOT }
 
   (* labels *)
@@ -436,6 +445,7 @@ rule token = parse
 
   (* FIXME: support metadata strings and struct. Parsed as identifier here. *)
   | "!{" { BANGLCURLY }
+  | "!DI" kwletter* '(' { gobble_metadata_debug 1 lexbuf } (* ignore input until next closing paren; produce METADATA_DEBUG after *)
   | '!'  { let rid = lexed_id lexbuf in
            begin match rid with
            | ParseUtil.Named id ->
@@ -448,6 +458,8 @@ rule token = parse
          }
 
   | '#' (digit+ as i) { ATTR_GRP_ID (coq_of_int (int_of_string i)) }
+
+  | "#dbg" kwletter* '(' { gobble_debug 1 lexbuf } (* ignore input until next closing paren *)
 
   (* constants *)
   | ('-'? digit+) as d            { INTEGER (z_of_ocaml_Z (Z.of_string d)) }
@@ -462,6 +474,19 @@ rule token = parse
 
   (* keywords *)
   | kwletter+ as a { create_token a }
+
+and gobble_debug depth = parse
+  | '(' { gobble_debug (depth+1) lexbuf }
+  | ')' { if depth = 1 then token lexbuf else gobble_debug (depth - 1) lexbuf }
+  | eol { Lexing.new_line lexbuf; gobble_debug depth lexbuf }
+  | _   { gobble_debug depth lexbuf }
+
+and gobble_metadata_debug depth = parse
+  | '(' { gobble_metadata_debug (depth+1) lexbuf }
+  | ')' { if depth = 1 then METADATA_DEBUG else gobble_metadata_debug (depth - 1) lexbuf }
+  | eol { Lexing.new_line lexbuf; gobble_metadata_debug depth lexbuf }
+  | _   { gobble_metadata_debug depth lexbuf }
+
 
 and comment = parse
   | eol { Lexing.new_line lexbuf; token lexbuf }

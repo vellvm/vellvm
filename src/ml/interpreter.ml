@@ -10,8 +10,6 @@
 
 open InterpretationStack.InterpreterStackBigIntptr.LLVM.MEM
 
-open InterpretationStack.InterpreterStackBigIntptr.LLVM.Local
-
 open InterpretationStack.InterpreterStackBigIntptr.LLVM.Stack
 
 open InterpretationStack.InterpreterStackBigIntptr.LLVM.Global
@@ -135,20 +133,20 @@ let rec step
      Error (OutOfMemory "")
 
   (* LLVM Exception event *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 uv)), _k) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 _uv)), _k) ->
      Error (LLVMException "")
 
   (* UBE event *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg))), _k) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 _msg))), _k) ->
      Error (UndefinedBehavior "")
 
   (* The DebugE effect *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg)))), k) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 _msg)))), k) ->
      (debug "";
       step (k (Obj.magic DV.DVALUE_None)))
 
   (* The FailureE effect is a failure *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 msg)))), _) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 _msg)))), _) ->
      Error (Failed "")
 
 (* The only visible effects from LLVMIO that should propagate to the
