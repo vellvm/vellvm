@@ -70,6 +70,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
     Hypothesis IH_METADATA_Id    : forall id, P (METADATA_Id id).
     Hypothesis IH_METADATA_String : forall str, P (METADATA_String str).
     Hypothesis IH_METADATA_Named : forall strs, P (METADATA_Named strs).
+    Hypothesis IH_METADATA_Debug_info_elided : P (METADATA_Debug_info_elided).
     Hypothesis IH_METADATA_Node : forall (mds : list (metadata T)),
         (forall md, In md mds -> P md) ->
         P (METADATA_Node mds).
