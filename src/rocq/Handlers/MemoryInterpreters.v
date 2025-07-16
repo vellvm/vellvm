@@ -54,6 +54,7 @@ From ITreeSpec Require Import
   ITreeSpecFacts
   ITreeSpecCombinatorFacts.
 
+Unset Universe Checking.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -1573,77 +1574,99 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       setoid_rewrite unfold_interp.
       cbn.
       ginit.
-      (* { *)
-      (*   gcofix CIH. *)
-      (*   intros ot. *)
-      (*   hinduction ot before r; intros. *)
-      (*   - gstep; red; cbn. *)
-      (*     constructor; auto. *)
-      (*   - gstep; red; cbn. *)
-      (*     constructor; auto with paco. *)
-      (*     (* Need to be able to do this rewrite... *) *)
-      (*     (* This relies on grefinegen_cong_eqit *) *)
-      (*     (* Why can't I rewrite? *) *)
-      (*     (* setoid_rewrite unfold_interp. *) *)
-      (*     pose proof (unfold_interp (f:= h) t) as UNFOLD. *)
-      (*     apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
-      (*     rewrite UNFOLD; clear UNFOLD. *)
+      {
+        gcofix CIH.
+        intros ot.
+        hinduction ot before r; intros.
+        - gstep; red; cbn.
+          constructor; auto.
+        - gstep; red; cbn.
+          constructor; auto with paco.
+          (* Need to be able to do this rewrite... *)
+          (* This relies on grefinegen_cong_eqit *)
+          (* Why can't I rewrite? *)
+          (* setoid_rewrite unfold_interp. *)
+          pose proof (unfold_interp (f:= h) t) as UNFOLD.
+          apply EqAxiom.bisimulation_is_eq in UNFOLD.
+          rewrite UNFOLD; clear UNFOLD.
 
-      (*     pose proof (unfold_interp (f:=g) (translate (@to_SpecEvent F) t)) as UNFOLD. *)
-      (*     apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
-      (*     setoid_rewrite UNFOLD; clear UNFOLD. *)
+          pose proof (unfold_interp (f:=g) (translate (@to_SpecEvent F) t)) as UNFOLD.
+          apply EqAxiom.bisimulation_is_eq in UNFOLD.
+          setoid_rewrite UNFOLD; clear UNFOLD.
 
-      (*     gbase. *)
-      (*     apply CIH. *)
-      (*   - guclo. *)
-      (*     econstructor. *)
+          gbase.
+          apply CIH.
+        - cbn.
+          gfinal.
+          right.
+          eapply paco2_mon_bot.
+          eapply refines_bind.
+          apply REF.
+          intros ? ? ?; subst.
+          Print Assumptions refines_bind.
 
-      (*     x > y *)
+          econstructor.
+          + eapply refines_bind.
 
-      (*     x' > y' ===> x > y *)
-
-      (*     x' *)
+          gfinal.
+          right.
           
-      (*     (* trying to show that t1 >= t2 *)
+          eapply paco2_mon_bot.
+          eapply refines_bind.
+          apply REF.
+          intros r1 r2 H; subst.
+          pstep; red; constructor.
+          left.
+
+          gclo.
+          econstructor.
+
+          (* x > y *)
+
+          (* x' > y' ===> x > y *)
+
+          (* x' *)
+          
+          (* trying to show that t1 >= t2 *)
 
       (*        We want to do that by showing t1' >= t2' *)
 
       (*        t1' has to be smaller than t1 *)
       (*        and t2' >= t2 *)
 
-      (*      *) *)
+      (*      *)
           
-      (*     cbn. *)
-      (*     eapply refines_bind. *)
+          cbn.
+          eapply refines_bind.
           
-      (*     guclo refines_clo_trans. *)
-      (*     cbn. *)
-      (*     econstructor. *)
-      (*     setoid_rewrite REF. *)
-      (*     apply REF. *)
-      (*     cbn. *)
-      (*     guclo. *)
-      (*     constructor. *)
+          guclo refines_clo_trans.
+          cbn.
+          econstructor.
+          setoid_rewrite REF.
+          apply REF.
+          cbn.
+          guclo.
+          constructor.
 
-      (*   - gfinal. *)
-      (*     right. *)
-      (*     cbn. *)
-      (*     eapply paco2_mon_bot. *)
-      (*     eapply refines_bind. *)
-      (*     apply REF. *)
+        - gfinal.
+          right.
+          cbn.
+          eapply paco2_mon_bot.
+          eapply refines_bind.
+          apply REF.
 
-      (*     intros r1 r2 H; subst. *)
-      (*     pstep; red; cbn. *)
-      (*     constructor; left. *)
+          intros r1 r2 H; subst.
+          pstep; red; cbn.
+          constructor; left.
           
-      (*     pstep; red. *)
+          pstep; red.
 
-      (*     admit. *)
+          admit.
 
-      (*     intros x0 x1 x2 PR. *)
-      (*     apply PR. *)
-      (* } *)
-      (* admit. *)
+          intros x0 x1 x2 PR.
+          apply PR.
+      }
+      admit.
     Abort.
 
     (* Lemma strict_refines_unpadded_to_itree_spec : *)
