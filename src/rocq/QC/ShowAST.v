@@ -899,7 +899,7 @@ Section ShowInstances.
     | METADATA_Node mds => string_to_DString "!{"
                             @@ concat_DString (string_to_DString " , ") (map dshow_metadata mds)
                             @@ string_to_DString "}"
-    | METADATA_Debug_info_elided => string_to_DString "!DI(debug info elided)"
+    | METADATA_Debug_info_elided => string_to_DString "!{!""debug info elided""}"
     end.
 
   #[global] Instance dshowMetadata (md : metadata T) : DShow (metadata T) :=

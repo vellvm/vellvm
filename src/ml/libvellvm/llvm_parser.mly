@@ -976,7 +976,7 @@ block_instrs_and_term:
       ((id_opt, inst)::instrs, t) }
 
 %inline phi:
-  | KW_PHI t=typ table=comma_path_with_instr_metadata(phi_table_entry)
+  | KW_PHI t=typ table=separated_nonempty_list(csep, phi_table_entry)
     { Phi (t, List.map (fun (l,v) -> (l, v t)) table)}
 
 phi_table_entry:
