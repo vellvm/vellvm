@@ -62,10 +62,17 @@ let compare_tgt_for_poison src tgt : (string, unit) Either.t =
            "TargetMorePoisonous: expected tgt to be poison but got %s"
            (string_of_dvalue tgt) )
 
+let string_of_function_id id : string =
+  LLVMAst.( match id with
+  | Name n -> "@" ^ (Camlcoq.camlstring_of_coqstring n)
+  | Anon z -> "@" ^ (Camlcoq.Z.to_string z)
+  | Raw z ->  "_RAW_" ^  (Camlcoq.Z.to_string z)
+  )
+
 let run dtyp entry args ll_ast =
   Interpreter.step
     (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp
-       (Camlcoq.coqstring_of_camlstring entry)
+       entry
        (Monad.ret (Obj.magic ITreeDefinition.coq_Monad_itree) args) ll_ast )
 
 (* This function takes in a name, a got and expected function, and the left
@@ -91,7 +98,7 @@ let eval_POISONTest (name : string) (got : unit -> DV.dvalue)
    src_tgt_error_side * string -> test_result*)
 
 let eval_SRCTGTTest (name : string) (expected_rett : DynamicTypes.dtyp)
-    (tgt_fn_str : string) (src_fn_str : string) (v_args : DV.uvalue list)
+    (tgt_fn_str : LLVMAst.function_id) (src_fn_str : LLVMAst.function_id) (v_args : DV.uvalue list)
     (mode : Assertion.src_tgt_mode) (sum_ast : Result.ast) () : result_sum =
   let res_tgt = run expected_rett tgt_fn_str v_args sum_ast in
   let res_src = run expected_rett src_fn_str v_args sum_ast in
@@ -131,6 +138,7 @@ let eval_SRCTGTTest (name : string) (expected_rett : DynamicTypes.dtyp)
   | Error e ->
       Result.make_singleton (STErr Tgt) name (AST_TEST_ERR (sum_ast, e))
 
+
 let make_test name ll_ast t : string * (unit -> result_sum) =
   let open Format in
   (* TODO: ll_ast is of type list (toplevel_entity typ (block typ * list
@@ -155,7 +163,7 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
           flush_str_formatter ()
         in
         let lhs = expected_str in
-        let rhs = Printf.sprintf "%s(%s)" entry args_str in
+        let rhs = Printf.sprintf "%s(%s)" (string_of_function_id entry) args_str in
         (lhs, rhs)
       in
       let result = run_to_value dtyp entry args ll_ast in
@@ -177,7 +185,7 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
           flush_str_formatter ()
         in
         let lhs = expected_str in
-        let rhs = Printf.sprintf "%s(%s)" entry args_str in
+        let rhs = Printf.sprintf "%s(%s)" (string_of_function_id entry) args_str in
         (lhs, rhs)
       in
       let result = run_to_value dtyp entry args ll_ast in
@@ -201,8 +209,10 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
         in
         Printf.sprintf "src = tgt on generated input (%s)" args_str
       in
+      let tgt_fn_id = LLVMAst.Name (Camlcoq.coqstring_of_camlstring tgt_fn_str) in
+      let src_fn_id = LLVMAst.Name (Camlcoq.coqstring_of_camlstring src_fn_str) in      
       ( str
-      , eval_SRCTGTTest name expected_rett tgt_fn_str src_fn_str v_args mode
+      , eval_SRCTGTTest name expected_rett tgt_fn_id src_fn_id v_args mode
           sum_ast )
 
 let print_stats (rs : result_sum) () : unit =

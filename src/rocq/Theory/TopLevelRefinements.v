@@ -222,7 +222,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Hint Resolve refine_12 refine_23 refine_34 refine_45 refine_56 : refine_xx.
 
     Variable ret_typ : dtyp.
-    Variable entry : string.
+    Variable entry : function_id.
     Variable args : list uvalue.
 
     Definition denote_vellvm_init := denote_vellvm ret_typ entry args.

@@ -531,13 +531,13 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
      *)
   Definition denote_vellvm
              (ret_typ : dtyp)
-             (entry : string)
+             (entry : function_id)
              (args : list uvalue)
              (mcfg : CFG.mcfg dtyp) : itree L0 dvalue :=
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
     'builtins <- map_monad address_one_builtin_function (built_in_functions (m_declarations mcfg));;
-    'addr <- trigger (GlobalRead (Name entry)) ;;
+    'addr <- trigger (GlobalRead entry) ;;
     'rv <- denote_mcfg (IP.of_list (defns ++ builtins)) ret_typ (dvalue_to_uvalue addr) args;;
     match rv with
     | inl exc => raiseLLVM exc
@@ -570,7 +570,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
    *)
   Definition interpreter_gen
     (ret_typ : dtyp)
-    (entry : string)
+    (entry : function_id)
     (arg_gen : itree L0 (list uvalue))
     (prog: ll_toplevel_entities)
     : itree L4 res_L4 :=
@@ -589,7 +589,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (prog : ll_toplevel_entities)
               : itree L4 res_L4
     :=
-    interpreter_gen (DTYPE_I 32%positive) "main" (build_main_args args) prog.
+    interpreter_gen (DTYPE_I 32%positive) (Name "main") (build_main_args args) prog.
 
   (**
      We now turn to the definition of our _model_ of vellvm's semantics. The
@@ -604,7 +604,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
    *)
   Definition model_gen
              (ret_typ : dtyp)
-             (entry : string)
+             (entry : function_id)
              (arg_gen : itree L0 (list uvalue))
              (prog: ll_toplevel_entities)
     : PropT L4 res_L4 :=
@@ -616,7 +616,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
 
   Definition model_gen_oom
              (ret_typ : dtyp)
-             (entry : string)
+             (entry : function_id)
              (arg_gen : itree L0 (list uvalue))
              (prog: ll_toplevel_entities)
     : PropT L4 res_L4 :=
@@ -628,7 +628,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
 
   Definition model_gen_oom_L1
              (ret_typ : dtyp)
-             (entry : string)
+             (entry : function_id)
              (arg_gen : itree L0 (list uvalue))
              (prog: ll_toplevel_entities)
     : itree L1 res_L1 :=
@@ -640,7 +640,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
 
   Definition model_gen_oom_L2
              (ret_typ : dtyp)
-             (entry : string)
+             (entry : function_id)
              (arg_gen : itree L0 (list uvalue))
              (prog: ll_toplevel_entities)
     : itree L2 res_L2 :=
@@ -653,7 +653,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Definition model_gen_oom_L3
     (RR : relation res_L2)
     (ret_typ : dtyp)
-    (entry : string)
+    (entry : function_id)
     (arg_gen : itree L0 (list uvalue))
     (prog: ll_toplevel_entities)
     : PropT L3 res_L3 :=
@@ -667,7 +667,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     RR_mem
     RR_pick
     (ret_typ : dtyp)
-    (entry : string)
+    (entry : function_id)
     (arg_gen : itree L0 (list uvalue))
     (prog: ll_toplevel_entities)
     : PropT L4 res_L4 :=
@@ -681,7 +681,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     RR_mem
     RR_pick
     (ret_typ : dtyp)
-    (entry : string)
+    (entry : function_id)
     (arg_gen : itree L0 (list uvalue))
     (prog: ll_toplevel_entities)
     : PropT L5 res_L5 :=
@@ -696,7 +696,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     RR_pick
     RR_oom
     (ret_typ : dtyp)
-    (entry : string)
+    (entry : function_id)
     (arg_gen : itree L0 (list uvalue))
     (prog: ll_toplevel_entities)
     : PropT L6 res_L6 :=
@@ -709,14 +709,14 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   (**
      Finally, the official model assumes no user-defined intrinsics.
    *)
-  Definition model args := model_gen (DTYPE_I 32%positive) "main" (build_main_args args).
-  Definition model_oom args := model_gen_oom (DTYPE_I 32%positive) "main" (build_main_args args).
-  Definition model_oom_L1 args := model_gen_oom_L1 (DTYPE_I 32%positive) "main" (build_main_args args).
-  Definition model_oom_L2 args := model_gen_oom_L2 (DTYPE_I 32%positive) "main" (build_main_args args).
-  Definition model_oom_L3 RR_mem args := model_gen_oom_L3 RR_mem (DTYPE_I 32%positive) "main" (build_main_args args).
-  Definition model_oom_L4 RR_mem RR_pick args := model_gen_oom_L4 RR_mem RR_pick (DTYPE_I 32%positive) "main" (build_main_args args).
-  Definition model_oom_L5 RR_mem RR_pick args := model_gen_oom_L5 RR_mem RR_pick (DTYPE_I 32%positive) "main" (build_main_args args).
-  Definition model_oom_L6 RR_mem RR_pick RR_oom args := model_gen_oom_L6 RR_mem RR_pick RR_oom (DTYPE_I 32%positive) "main" (build_main_args args).
+  Definition model args := model_gen (DTYPE_I 32%positive) (Name "main") (build_main_args args).
+  Definition model_oom args := model_gen_oom (DTYPE_I 32%positive) (Name "main") (build_main_args args).
+  Definition model_oom_L1 args := model_gen_oom_L1 (DTYPE_I 32%positive) (Name "main") (build_main_args args).
+  Definition model_oom_L2 args := model_gen_oom_L2 (DTYPE_I 32%positive) (Name "main") (build_main_args args).
+  Definition model_oom_L3 RR_mem args := model_gen_oom_L3 RR_mem (DTYPE_I 32%positive) (Name "main") (build_main_args args).
+  Definition model_oom_L4 RR_mem RR_pick args := model_gen_oom_L4 RR_mem RR_pick (DTYPE_I 32%positive) (Name "main") (build_main_args args).
+  Definition model_oom_L5 RR_mem RR_pick args := model_gen_oom_L5 RR_mem RR_pick (DTYPE_I 32%positive) (Name "main") (build_main_args args).
+  Definition model_oom_L6 RR_mem RR_pick RR_oom args := model_gen_oom_L6 RR_mem RR_pick RR_oom (DTYPE_I 32%positive) (Name "main") (build_main_args args).
 End LLVMTopLevel.
 
 Module Make (IS : InterpreterStack) : LLVMTopLevel IS.

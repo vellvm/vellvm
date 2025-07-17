@@ -61,9 +61,9 @@ let show_src_tgt_mode = function
 
 type test =
   (* expected dvalue, dynamic type, entry, arguments *)
-  | EQTest of DV.dvalue * DynamicTypes.dtyp * string * DV.uvalue list
+  | EQTest of DV.dvalue * DynamicTypes.dtyp * function_id * DV.uvalue list
   (* dynamic type, entry, arguments *)
-  | POISONTest of DynamicTypes.dtyp * string * DV.uvalue list
+  | POISONTest of DynamicTypes.dtyp * function_id * DV.uvalue list
   (* Find a better name for this *)
   (* retty, args for src, (t, args) for arguments to source and test *)
   (* Source target mode, dynamic type, Left is arguments and right is AST*)
@@ -164,27 +164,23 @@ let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
         (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"
            (string_of_typ typ) (string_of_exp exp) )
 
-let texp_to_function_name (_, exp) : string =
+let texp_to_function_id (_, exp) : function_id =
   match exp with
-  | EXP_Ident (ID_Global (Name x)) -> Camlcoq.camlstring_of_coqstring x
+  | EXP_Ident (ID_Global id) -> id
   | _ -> failwith "found non-function name"
 
 (* | INSTR_Call of 't texp * 't texp list *)
 let instr_to_call_data instr =
   match instr with
   | INSTR_Call (fn, args, _) ->
-      ( texp_to_function_name fn
+      ( texp_to_function_id fn
       , List.map (fun x -> texp_to_uvalue (fst x)) args )
   | _ ->
       failwith "Assertion includes unsupported instruction (must be a call)"
 
-let texp_to_name_retty (texp : LLVMAst.typ texp) : DynamicTypes.dtyp * string
-    =
-  let t, exp = texp in
-  match exp with
-  | EXP_Ident (ID_Global (Name x)) ->
-      (typ_to_dtyp t, Camlcoq.camlstring_of_coqstring x)
-  | _ -> failwith "found non-function name"
+let texp_to_name_retty (texp : LLVMAst.typ texp) : DynamicTypes.dtyp * function_id =
+  let t, _ = texp in
+  (typ_to_dtyp t, texp_to_function_id texp)
 
 let instr_to_call_data' instr =
   match instr with

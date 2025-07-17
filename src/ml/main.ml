@@ -18,6 +18,14 @@ open ShowAST
 
 module DV = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV
 
+let string_of_function_id id : string =
+  LLVMAst.( match id with
+  | Name n -> "@" ^ (Camlcoq.camlstring_of_coqstring n)
+  | Anon z -> "@" ^ (Camlcoq.Z.to_string z)
+  | Raw z ->  "_RAW_" ^  (Camlcoq.Z.to_string z)
+  )
+
+
 (* test harness
    ------------------------------------------------------------- *)
 exception Ran_tests of bool
@@ -74,7 +82,7 @@ let make_test name ll_ast t : (string * assertion) option =
   let run dtyp entry args ll_ast =
     Interpreter.step
       (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp
-         (Camlcoq.coqstring_of_camlstring entry)
+         entry
          (Monad.ret (Obj.magic ITreeDefinition.coq_Monad_itree) args) ll_ast )
   in
   let run_to_value dtyp entry args ll_ast () : DV.dvalue =
@@ -93,7 +101,7 @@ let make_test name ll_ast t : (string * assertion) option =
             Interpreter.pp_uvalue str_formatter args ;
           flush_str_formatter ()
         in
-        Printf.sprintf "%s = %s(%s)" expected_str entry args_str
+        Printf.sprintf "%s = %s(%s)" expected_str (string_of_function_id entry) args_str
       in
       let result = run_to_value dtyp entry args ll_ast in
       Some (str, dvalue_eq_assertion name result (fun () -> expected))
@@ -113,7 +121,7 @@ let make_test name ll_ast t : (string * assertion) option =
              Interpreter.pp_uvalue str_formatter args ;
            flush_str_formatter ()
          in
-         Printf.sprintf "%s = %s(%s)" expected_str entry args_str
+         Printf.sprintf "%s = %s(%s)" expected_str (string_of_function_id entry) args_str
        in
        let result = run_to_value dtyp entry args ll_ast in
        Some (str, dvalue_eq_assertion name result (fun () -> expected))
@@ -131,8 +139,10 @@ let make_test name ll_ast t : (string * assertion) option =
       let assertion () =
         (* let buf = Buffer.create 16 in List.iter (Buffer.add_char buf)
            (showProg sum_ast); Printf.printf "%s\n" (Buffer.contents buf); *)
-        let res_tgt = run expected_rett tgt_fn_str v_args sum_ast in
-        let res_src = run expected_rett src_fn_str v_args sum_ast in
+        let tgt_fn_id = LLVMAst.Name (Camlcoq.coqstring_of_camlstring tgt_fn_str) in
+        let src_fn_id = LLVMAst.Name (Camlcoq.coqstring_of_camlstring src_fn_str) in      
+        let res_tgt = run expected_rett tgt_fn_id v_args sum_ast in
+        let res_src = run expected_rett src_fn_id v_args sum_ast in
         match res_tgt with
         | Error (UndefinedBehavior _) ->
             () (* If the target is UB then the src can be anything! *)
