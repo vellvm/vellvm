@@ -2331,8 +2331,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Definition model_E1E2_L0_orutt_strict args1 args2 p1 p2 :=
     L0_E1E2_orutt_strict
-      (LLVM1.denote_vellvm (DTYPE_I 32%positive) "main" args1 (convert_types (mcfg_of_tle p1)))
-      (LLVM2.denote_vellvm (DTYPE_I 32%positive) "main" args2 (convert_types (mcfg_of_tle p2))).
+      (LLVM1.denote_vellvm (DTYPE_I 32%positive) (LLVMAst.Name "main") args1 (convert_types (mcfg_of_tle p1)))
+      (LLVM2.denote_vellvm (DTYPE_I 32%positive) (LLVMAst.Name "main") args2 (convert_types (mcfg_of_tle p2))).
 
   Definition model_E1E2_L1_orutt_strict args1 args2 p1 p2 :=
     L1_E1E2_orutt_strict
