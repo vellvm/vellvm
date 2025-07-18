@@ -484,10 +484,12 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | (_, INSTR_Store _ _ _) => raise "ILL-FORMED itree ERROR: Store to non-void ID"
 
     (* Call *)
-    | (pt, INSTR_Call (dt, f) args _) =>
+    (* TODO: technically operand bundles can affect semantics *)                                     
+    | (pt, INSTR_Call (dt, f) args _ _) =>
       uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) (List.map fst args) ;;
       returned_value <-
-      match intrinsic_exp f with
+        match intrinsic_exp f with
+          (* TODO: look at whether these can be moved to IntrinsicsDefinitions.v *)
       | Some s =>
           if String.eqb s "llvm.va_start"
           then
@@ -634,8 +636,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     | TERM_Unreachable => raiseUB "IMPOSSIBLE: unreachable in reachable position"
 
-    (* Currently unhandled VIR terminators *)
-    | TERM_Invoke iid (dt, fnptrval) args to_label unwind_label anns =>
+      (* TODO: technically operand bundles can affect the semantics of invoke *)
+    | TERM_Invoke iid (dt, fnptrval) args to_label unwind_label anns _ =>
       uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) (List.map fst args) ;;
       fv <- (translate exp_to_instr (denote_exp None fnptrval)) ;;
       rv <- trigger (Call dt fv uvs) ;;
@@ -658,6 +660,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       exn <- translate exp_to_instr (denote_exp (Some t) expr);;
       raiseLLVM exn
 
+    (* Currently unhandled VIR terminators *)
     | TERM_IndirectBr _ _ => raise "Unsupport itree terminator"
     end.
 

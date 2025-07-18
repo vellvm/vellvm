@@ -2839,7 +2839,7 @@ Section InstrGenerators.
           (* Otherwise we won't find function pointers *)
           efun <- gen_exp_possibly_non_deterministic_sz0 tfun;;
           id <- genInstrId ret_t;;
-          ret (id, INSTR_Call (TYPE_Function ret_t args varargs, efun) args_with_params [])
+          ret (id, INSTR_Call (TYPE_Function ret_t args varargs, efun) args_with_params [] [])
       | _ => failGen "gen_call"
       end.
 

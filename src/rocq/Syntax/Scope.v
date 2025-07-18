@@ -54,7 +54,7 @@ Section LABELS_OPERATIONS.
        | TERM_Switch v default_dest brs => default_dest :: map snd brs
        | TERM_IndirectBr v brs => brs
        | TERM_Resume v => []
-       | TERM_Invoke _ fnptrval args to_label unwind_label _ => [to_label; unwind_label]
+       | TERM_Invoke _ fnptrval args to_label unwind_label _ _ => [to_label; unwind_label]
        | TERM_Unreachable => []
        end.
 
@@ -279,7 +279,7 @@ Section REGISTER_OPERATIONS.
     #[global] Instance instr_use_sites {T} : Use_sites (instr T) :=
       {| use_sites := fun i => match i with
                             | INSTR_Op e => use_sites e
-                            | INSTR_Call e l _ => use_sites (e:texp T) +++
+                            | INSTR_Call e l _ _ => use_sites (e:texp T) +++
                                                    set_flat_map use_sites (List.map fst l)
                             | INSTR_Load  _ e _
                               => use_sites e
@@ -315,7 +315,7 @@ Section REGISTER_OPERATIONS.
                                | TERM_Unreachable
                                  => []
 
-                               | TERM_Invoke _ _ l _ _ _ =>
+                               | TERM_Invoke _ _ l _ _ _ _ =>
                                  set_flat_map use_sites (List.map fst l)
                                end
       |}.

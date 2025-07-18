@@ -750,7 +750,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
                   args;;
     let fun_exp : (exp typ) := EXP_Ident (ID_Global (Name fn)) in
     let fun_typ : typ := TYPE_Function ret_t args false in
-    let fun_instr : (instr typ) := INSTR_Call (fun_typ, fun_exp) args_texp [] in
+    let fun_instr : (instr typ) := INSTR_Call (fun_typ, fun_exp) args_texp [] [] in
     fun_id_instr <- add_id_to_instr (fun_typ, fun_instr);;
     ret fun_id_instr
     .
@@ -776,7 +776,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     (* Generate function call itself *)
     let fn_exp : (exp typ) := EXP_Ident (ID_Global (Name fn_str)) in
     let fn_typ : typ := TYPE_Function ret_t args_t false in
-    let fn_instr : (instr typ) := INSTR_Call (fn_typ, fn_exp) args_texp [] in
+    let fn_instr : (instr typ) := INSTR_Call (fn_typ, fn_exp) args_texp [] [] in
     '(fn_instr_id, fn_instr) <- add_id_to_instr (fn_typ, fn_instr);;
 
     let pred_b :=

@@ -687,13 +687,17 @@ Definition is_void_typ (t:typ) : bool :=
 Definition is_void_instr (i:instr typ) : bool :=
   match i with
   | INSTR_Comment _ => true
-  | INSTR_Call (t,_) _ _ => is_void_typ t
+  | INSTR_Call (t,_) _ _ _ => is_void_typ t
   | INSTR_Store _ _ _ => true
   | _ => false
   end.
 
 Ltac unfold_eqv :=
   repeat (unfold eqv in *; unfold eqv_raw_id in *; unfold eqv_instr_id in * ).
+
+
+(* TODO: Move this and above to IntrinsicsDefinitions.v -- refactor to return
+   Some only for "semantically" defined intrinsics (not ones definable by LLVM IR)  *)
 
 (* This function extracts the string of the form [llvm._] from an LLVM expression.
    It returns None if the expression is not an intrinsic definition.

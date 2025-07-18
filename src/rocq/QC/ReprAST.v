@@ -745,14 +745,31 @@ Section ReprInstances.
                  | FILTER t => "(FILTER " ++ repr t ++ ")"
                  end
     |}.
-                   
+
+
+  #[global] Instance reprOperand : Repr operand :=
+      {| repr := fun op =>
+                   match op with
+                   | SSA_value t => "(SSA_value " ++ (repr t) ++ ")"
+                   | Metadata_string m => "(Metadata_string " ++ (repr m) ++ ")"
+                   end
+              |}.
+
+  #[global] Instance ReprOperand_bundle : Repr operand_bundle :=
+    {| repr := fun ob =>
+                 "(mk_operand_bundle " ++
+                   (repr (ob_tag ob)) ++
+                   (repr (ob_ops ob)) ++
+                   ")"
+    |}.
+
   
   Definition repr_instr (i : instr typ) : string
     := match i with
        | INSTR_Comment s => "(INSTR_Comment " ++ s ++ ")"
        | INSTR_Op e => "(INSTR_Op " ++ repr e ++ ")"
-       | INSTR_Call e params annotations =>
-           "(INSTR_Call " ++ repr e ++ " " ++ repr params ++ " " ++ repr annotations ++ ")"
+       | INSTR_Call e params annotations obs =>
+           "(INSTR_Call " ++ repr e ++ " " ++ repr params ++ " " ++ repr annotations ++ repr obs ++ ")"
        | INSTR_Alloca t anns =>
          "(INSTR_Alloca " ++ repr t ++ " " ++ repr anns ++ ")"
        | INSTR_Load t ptr anns =>
@@ -805,9 +822,9 @@ Section ReprInstances.
       | TERM_IndirectBr v brs  => 
           "(TERM_IndirectBr " ++ repr v ++ " " ++ repr brs ++ ")" 
       | TERM_Resume v  => "(TERM_Resume " ++ repr v ++ ")"
-      | TERM_Invoke i fnptrval args to_label unwind_label anns  =>
+      | TERM_Invoke i fnptrval args to_label unwind_label anns obs  =>
           "(TERM_Invoke " ++ repr i ++ repr fnptrval ++ " " ++ repr args 
-          ++ " " ++ repr to_label ++ " " ++ repr unwind_label ++ repr anns ++ ")"
+          ++ " " ++ repr to_label ++ " " ++ repr unwind_label ++ repr anns ++ repr obs ++ ")"
       | TERM_Unreachable => "TERM_Unreachable"
        end.
 

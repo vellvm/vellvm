@@ -1491,12 +1491,24 @@ exp:
 %inline call_metadata:
   | csep md=global_metadata { md }
 
+operand:
+  | t=texp    { SSA_value t }
+  | s=STRING  { Metadata_string (METADATA_String (str s)) }
+
+operand_bundle:
+  tag=STRING LPAREN ops=separated_list(csep, operand) RPAREN
+    { {ob_tag = str tag; ob_ops = ops } }
+
+operand_bundles:
+  LSQUARE ops=separated_list(csep, operand_bundle) RSQUARE { ops }
+
 %inline instr:
   | eo=instr_op  { INSTR_Op eo }
 
+    (* TODO - save call_metadata somewhere? *)
   | t=tailcall? KW_CALL fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
     f=call_exp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
-    fa=list(fn_attr) call_metadata? (* TODO: operand bundles? *)
+    fa=list(fn_attr) call_metadata? ops=operand_bundles? 
     { let atts =
 	(opt_list t)
 	@ (List.map (fun f -> ANN_fast_math_flag f) fm)
@@ -1504,9 +1516,14 @@ exp:
         @ (List.map (fun r -> ANN_ret_attribute r) ra)
         @ (opt_list addr)
         @ (List.map (fun f -> ANN_fun_attribute f) fa)
-(*      @ (opt_list md) TODO: record metadata *)
+      (*      @ (opt_list md) TODO: record metadata *)
       in
-      INSTR_Call (f, a, atts) }
+      let ops = begin match ops with
+		| None -> []
+		| Some ops -> ops
+		end
+      in
+      INSTR_Call (f, a, atts, ops) }
 
   | KW_ALLOCA ia=KW_INALLOCA? t=typ anns=alloca_anns
     { let a = match ia with Some _ -> [ANN_inalloca] | None -> [] in
@@ -1564,9 +1581,11 @@ terminator:
 
   | id_opt=instr_lhs KW_INVOKE fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
     f=call_exp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
-    fa=list(fn_attr) 
+    fa=list(fn_attr)
+    ops=operand_bundles?
     KW_TO l1=branch_label 
     KW_UNWIND l2=branch_label
+
     { let atts =
 	  (List.map (fun f -> ANN_fast_math_flag f) fm)
 	@ (opt_list cc)
@@ -1574,7 +1593,12 @@ terminator:
         @ (opt_list addr)
         @ (List.map (fun f -> ANN_fun_attribute f) fa)
       in
-      (id_opt, fun id_opt -> TERM_Invoke (id_opt, f, a, l1, l2, atts))  }
+      let ops = begin match ops with
+		| None -> []
+		| Some ops -> ops
+		end
+      in
+      (id_opt, fun id_opt -> TERM_Invoke (id_opt, f, a, l1, l2, atts, ops))  }
 
   | KW_UNREACHABLE
     { None, fun _ -> TERM_Unreachable }
@@ -1629,4 +1653,4 @@ test_call:
         @ (opt_list addr)
         @ (List.map (fun f -> ANN_fun_attribute f) fa)
       in
-      INSTR_Call (f, a, atts) }
+      INSTR_Call (f, a, atts, []) }
