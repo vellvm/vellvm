@@ -1597,6 +1597,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
           gbase.
           apply CIH.
         - cbn.
+          gclo.
+          econstructor.
+
+          
           gfinal.
           right.
           eapply paco2_mon_bot.

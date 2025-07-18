@@ -1597,7 +1597,8 @@ Lemma refines_refl {E R} (RPre : prerel E E) (RPost : postrel E E)
   forall t, padded t ->
   refines' RPre RPost RR b1 b2 t t.
 Proof.
-  intros HRPre HRPost HRR.  pcofix CIH. intros t Ht. pstep. red.
+  intros HRPre HRPost HRR.
+  pcofix CIH. intros t Ht. pstep. red.
   punfold Ht. red in Ht. inversion Ht.
   - constructor. auto.
   - constructor. right. pclearbot. eauto.

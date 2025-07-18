@@ -1395,12 +1395,52 @@ Section refine_closure.
   Context {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop).
   Context (pre : prerel E E) (post : postrel E E).
 
+  (* The postcondition requiring return values on both sides to be equal *)
+  Variant eq_post_rel {E} : postrel E E :=
+    | eq_post : forall A (e : E A) a, eq_post_rel A A e a e a.
+
+  #[global] Instance ReflexivePostRel_eq_post_rel {F} : ReflexivePostRel (@eq_post_rel F).
+  Proof.
+    constructor; intros; subst.
+    - constructor.
+    - inv H.
+      inj_existT; subst.
+      reflexivity.
+  Qed.
+
+
+  (* TODO: Move this *)
+  Lemma padded_tau_inv :
+    forall {E R} (t : itree E R),
+      padded (Tau t) -> padded t.
+  Proof.
+    intros E0 R t H.
+    pinversion H; subst.
+    apply H1.
+  Qed.
+
+  Lemma padded_tau :
+    forall {E R} (t : itree E R),
+      padded t -> padded (Tau t).
+  Proof.
+    intros E0 R t H.
+    pstep; red; constructor.
+    left. apply H.
+  Qed.
+
+  Hint Resolve padded_tau_inv padded_tau padded_bind : solve_padded.
+
+
   (** *** "Up-to" principles for coinduction. *)
 
   Inductive refines_bind_clo b1 b2 (r : itree_spec E R1 -> itree_spec E R2 -> Prop) :
     itree_spec E R1 -> itree_spec E R2 -> Prop :=
   | pbc_intro_h U1 U2 (RU : U1 -> U2 -> Prop) t1 t2 k1 k2
-      (EQV: refines' eq_prerel post RU b1 b2 t1 t2)
+      (PAD1 : padded t1)
+      (PAD2 : padded t2)
+      (PADk1 : forall (u : U1), padded (k1 u))
+      (PADk2 : forall (u : U2), padded (k2 u))
+      (EQV: refines' eq_prerel eq_post_rel RU b1 b2 t1 t2)
       (REL: forall u1 u2, RU u1 u2 -> r (k1 u1) (k2 u2))
     : refines_bind_clo b1 b2 r (ITree.bind t1 k1) (ITree.bind t2 k2)
   .
@@ -1441,92 +1481,63 @@ Proof.
     eapply eqit_Tau_l. rewrite unfold_bind. reflexivity.
 Qed.
 
-  Lemma refines_clo_bind_eqit_het b1 b2 vclo
-    (MON: monotone2 vclo)
-    (CMP: compose (eqitC_het RR b1 b2) vclo <3= compose vclo (eqitC_het RR b1 b2))
-    (ID: id <3= vclo) :
-    refines_bind_clo b1 b2 <3= gupaco2 (refines_ eq_prerel post RR b1 b2 vclo) (eqitC_het RR b1 b2).
-  Proof.
-    intros rr. pcofix CIH. intros. destruct PR.
-    gclo. econstructor; auto_ctrans_eq.
-    1,2: rewrite unfold_bind; reflexivity.
-    punfold EQV. unfold_refines.
-    hinduction EQV before CIH; intros; pclearbot; cbn;
-      repeat (change (ITree.subst ?k ?m) with (ITree.bind m k)).
-    - (* Ret *) gclo. econstructor; auto_ctrans_eq.
-      1,2: reflexivity.
-      eauto with paco.
-    - (* Tau / Tau *)
-      gstep. econstructor. eauto 7 with paco itree.
-    - (* Spec_vis *)
-      gstep. econstructor; auto.
-      intros. red in CMP. unfold id in ID. apply ID.
-      gbase.
-      apply CIH.
-      econstructor; eauto.
-      apply H0.
-      eauto.
-    - (* TauL *)
-      destruct b1; try discriminate.
-      gclo.
-      econstructor; auto_ctrans_eq; eauto; try reflexivity.
-      eapply eqit_Tau_l. rewrite unfold_bind. reflexivity.
-    - (* TauR *)
-      destruct b2; try discriminate.
-      gclo. econstructor; auto_ctrans_eq; eauto; try reflexivity.
-      eapply eqit_Tau_l. rewrite unfold_bind. reflexivity.
-    - (* ForallR *)
-      (* Should be able to refine the right hand side to
-         bind (k a) k2...
+(*   Lemma refines_clo_bind_eqit_het b1 b2 vclo *)
+(*     (MON: monotone2 vclo) *)
+(*     (CMP: compose (eqitC_het RR b1 b2) vclo <3= compose vclo (eqitC_het RR b1 b2)) *)
+(*     (ID: id <3= vclo) : *)
+(*     refines_bind_clo b1 b2 <3= gupaco2 (refines_ eq_prerel post RR b1 b2 vclo) (eqitC_het RR b1 b2). *)
+(*   Proof. *)
+(*     intros rr. pcofix CIH. intros. destruct PR. *)
+(*     gclo. econstructor; auto_ctrans_eq. *)
+(*     1,2: rewrite unfold_bind; reflexivity. *)
+(*     punfold EQV. unfold_refines. *)
+(*     hinduction EQV before CIH; intros; pclearbot; cbn; *)
+(*       repeat (change (ITree.subst ?k ?m) with (ITree.bind m k)). *)
+(*     - (* Ret *) gclo. econstructor; auto_ctrans_eq. *)
+(*       1,2: reflexivity. *)
+(*       eauto with paco. *)
+(*     - (* Tau / Tau *) *)
+(*       gstep. econstructor. eauto 7 with paco itree. *)
+(*     - (* Spec_vis *) *)
+(*       gstep. econstructor; auto. *)
+(*       intros. red in CMP. unfold id in ID. apply ID. *)
+(*       gbase. *)
+(*       apply CIH. *)
+(*       econstructor; eauto. *)
+(*       apply H0. *)
+(*       eauto. *)
+(*     - (* TauL *) *)
+(*       destruct b1; try discriminate. *)
+(*       gclo. *)
+(*       econstructor; auto_ctrans_eq; eauto; try reflexivity. *)
+(*       eapply eqit_Tau_l. rewrite unfold_bind. reflexivity. *)
+(*     - (* TauR *) *)
+(*       destruct b2; try discriminate. *)
+(*       gclo. econstructor; auto_ctrans_eq; eauto; try reflexivity. *)
+(*       eapply eqit_Tau_l. rewrite unfold_bind. reflexivity. *)
+(*     - (* ForallR *) *)
+(*       (* Should be able to refine the right hand side to *)
+(*          bind (k a) k2... *)
 
-         Which should follow from H0 / H.
-       *)
-      rename H0 into IHEQV.
-      gfinal. (* gfinal gets us further because of the upaco2 in base functor. *)
-      right.
-      pstep; red; econstructor; intros.
-      pose proof unfold_bind (k a) k2 as BIND.
-      apply bisimulation_is_eq in BIND.
-      rewrite BIND.
+(*          Which should follow from H0 / H. *)
+(*        *) *)
+(*       rename H0 into IHEQV. *)
+(*       gfinal. (* gfinal gets us further because of the upaco2 in base functor. *) *)
+(*       right. *)
+(*       pstep; red; econstructor; intros. *)
+(*       pose proof unfold_bind (k a) k2 as BIND. *)
+(*       apply bisimulation_is_eq in BIND. *)
+(*       rewrite BIND. *)
 
-      specialize (IHEQV a k1 k2 REL).
-      pstep_reverse.
+(*       specialize (IHEQV a k1 k2 REL). *)
+(*       pstep_reverse. *)
 
-      eapply paco2_mon_gen.
-      3: apply CIH0.
-      2: eauto.
+(*       eapply paco2_mon_gen. *)
+(*       3: apply CIH0. *)
+(*       2: eauto. *)
 
-      assert
-        (gpaco2 (refines_ eq_prerel post RR b1 b2 vclo) (eqitC_het RR b1 b2) rr rr
-      match ot1 with
-      | RetF r => k1 r
-      | TauF t => Tau (ITree.bind t k1)
-      | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k1)
-      end
-      match observe (k a) with
-      | RetF r => k2 r
-      | TauF t => Tau (ITree.bind t k2)
-      | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k2)
-      end) by admit.
-
-      eapply gpaco2_dist in H0.
-      destruct H0.
-      -- eapply paco2_mon_gen.
-         apply H0; intros; eauto.
-         intros; eauto.
-         intros; eauto.
-         induction PR; try tauto.
-         inv IN.
-         apply H1.
-(*          eapply rclo2_mon in PR. *)
-         
-          
-
-(*       ginit. *)
-
-
-      
-(*       assert (paco2 (refines_ eq_prerel post RR b1 b2 vclo) r *)
+(*       assert *)
+(*         (gpaco2 (refines_ eq_prerel post RR b1 b2 vclo) (eqitC_het RR b1 b2) rr rr *)
 (*       match ot1 with *)
 (*       | RetF r => k1 r *)
 (*       | TauF t => Tau (ITree.bind t k1) *)
@@ -1537,150 +1548,365 @@ Qed.
 (*       | TauF t => Tau (ITree.bind t k2) *)
 (*       | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k2) *)
 (*       end) by admit. *)
-(*       punfold H0. *)
+
+(*       eapply gpaco2_dist in H0. *)
+(*       destruct H0. *)
+(*       -- eapply paco2_mon_gen. *)
+(*          apply H0; intros; eauto. *)
+(*          intros; eauto. *)
+(*          intros; eauto. *)
+(*          induction PR; try tauto. *)
+(*          inv IN. *)
+(*          apply H1. *)
+(* (*          eapply rclo2_mon in PR. *) *)
+         
+          
+
+(* (*       ginit. *) *)
 
 
-(*       red in H0. *)
-(*       apply H0. *)
-(*       gunfold IHEQV. *)
-(*       inv IHEQV. *)
-(*       induction IN. *)
-(*       destruct IN. *)
-(*       admit. *)
-
-(*       specialize (H a). *)
-(*       inv H; eauto. *)
-(*       + specialize (IHEQV a k1 k2 REL). *)
-(*         rewrite <- H0 in IHEQV. *)
-(*         eauto with paco itree itree_spec. *)
-(* (* Variant *) *)
-(* (* gpaco2 (T0 : Type) (T1 : T0 -> Type) (gf clo : rel2 T0 T1 -> rel2 T0 T1) *) *)
-(* (* (r0 rg : forall x : T0, T1 x -> Prop) (x0 : T0) (x1 : T1 x0) : Prop := *) *)
-(* (*     gpaco2_intro : rclo2 clo (paco2 (gf ∘ rclo2 clo) (rg \2/ r0) \2/ r0) x0 x1 -> *) *)
-(* (*                    gpaco2 gf clo r0 rg x0 x1. *) *)
-
-(* (* Arguments gpaco2 [T0]%type_scope [T1]%function_scope (gf clo r rg)%function_scope x0 x1 *) *)
-(* (* Arguments gpaco2_intro [T0]%type_scope [T1 gf clo]%function_scope (r rg)%function_scope [x0 x1] IN *) *)
-(*         gunfold IHEQV. *)
-(*         destruct IHEQV. *)
-(*         -- destruct IN. *)
-(*            ** red in H. *)
-(*               gunfold H. *)
-(*         pstep_reverse. *)
-
-(*         apply REL in H2. *)
-(*         pstep_reverse. *)
       
-(*       specialize (H0 a k1 k2 REL). *)
-(*       gunfold H0. *)
-(*       inv H0. *)
-(*       admit. *)
-(*       eapply gpaco2_init in H0. *)
-(*       admit. *)
-(*     - (* ExistsR *) *)
-(*       specialize (IHEQV k1 k2 REL). *)
-(*       admit. *)
-(*     - (* ForallL *) *)
-(*       admit. *)
-(*     - (* ExistsL *) *)
-(*       admit. *)
-  Abort.
+(* (*       assert (paco2 (refines_ eq_prerel post RR b1 b2 vclo) r *) *)
+(* (*       match ot1 with *) *)
+(* (*       | RetF r => k1 r *) *)
+(* (*       | TauF t => Tau (ITree.bind t k1) *) *)
+(* (*       | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k1) *) *)
+(* (*       end *) *)
+(* (*       match observe (k a) with *) *)
+(* (*       | RetF r => k2 r *) *)
+(* (*       | TauF t => Tau (ITree.bind t k2) *) *)
+(* (*       | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k2) *) *)
+(* (*       end) by admit. *) *)
+(* (*       punfold H0. *) *)
+
+
+(* (*       red in H0. *) *)
+(* (*       apply H0. *) *)
+(* (*       gunfold IHEQV. *) *)
+(* (*       inv IHEQV. *) *)
+(* (*       induction IN. *) *)
+(* (*       destruct IN. *) *)
+(* (*       admit. *) *)
+
+(* (*       specialize (H a). *) *)
+(* (*       inv H; eauto. *) *)
+(* (*       + specialize (IHEQV a k1 k2 REL). *) *)
+(* (*         rewrite <- H0 in IHEQV. *) *)
+(* (*         eauto with paco itree itree_spec. *) *)
+(* (* (* Variant *) *) *)
+(* (* (* gpaco2 (T0 : Type) (T1 : T0 -> Type) (gf clo : rel2 T0 T1 -> rel2 T0 T1) *) *) *)
+(* (* (* (r0 rg : forall x : T0, T1 x -> Prop) (x0 : T0) (x1 : T1 x0) : Prop := *) *) *)
+(* (* (*     gpaco2_intro : rclo2 clo (paco2 (gf ∘ rclo2 clo) (rg \2/ r0) \2/ r0) x0 x1 -> *) *) *)
+(* (* (*                    gpaco2 gf clo r0 rg x0 x1. *) *) *)
+
+(* (* (* Arguments gpaco2 [T0]%type_scope [T1]%function_scope (gf clo r rg)%function_scope x0 x1 *) *) *)
+(* (* (* Arguments gpaco2_intro [T0]%type_scope [T1 gf clo]%function_scope (r rg)%function_scope [x0 x1] IN *) *) *)
+(* (*         gunfold IHEQV. *) *)
+(* (*         destruct IHEQV. *) *)
+(* (*         -- destruct IN. *) *)
+(* (*            ** red in H. *) *)
+(* (*               gunfold H. *) *)
+(* (*         pstep_reverse. *) *)
+
+(* (*         apply REL in H2. *) *)
+(* (*         pstep_reverse. *) *)
+      
+(* (*       specialize (H0 a k1 k2 REL). *) *)
+(* (*       gunfold H0. *) *)
+(* (*       inv H0. *) *)
+(* (*       admit. *) *)
+(* (*       eapply gpaco2_init in H0. *) *)
+(* (*       admit. *) *)
+(* (*     - (* ExistsR *) *) *)
+(* (*       specialize (IHEQV k1 k2 REL). *) *)
+(* (*       admit. *) *)
+(* (*     - (* ForallL *) *) *)
+(* (*       admit. *) *)
+(* (*     - (* ExistsL *) *) *)
+(* (*       admit. *) *)
+(*   Abort. *)
+
+    Lemma refinesF_TauTau_inv_strong :
+      forall (E1 E2 : Type -> Type)
+      (RPre : prerel E1 E2) (RPost : postrel E1 E2)
+      (R1 R2 : Type) (RR : R1 -> R2 -> Prop) b1 b2 vclo sim t1 t2,
+      refinesF RPre RPost RR b1 b2 vclo
+        sim
+      (TauF t1)
+      (TauF t2) ->
+      (forall t1 t2, (sim t1 t2 ->
+      refinesF RPre RPost RR b1 b2 vclo
+      sim
+      (observe t1)
+      (observe t2))) ->
+      refinesF RPre RPost RR b1 b2 vclo
+      sim
+      (observe t1)
+      (observe t2).
+    Proof.
+      intros E1 E2 RPre RPost R0 R3 RR0 b1 b2 vclo sim t1 t2 H SIM.
+      setoid_rewrite EqAxiom.itree_eta_ in H.
+      genobs t1 ot1.
+      genobs t2 ot2.
+      clear t1 t2 Heqot1 Heqot2.
+      remember (TauF {| _observe := ot1 |}) as t1.
+      remember (TauF {| _observe := ot2 |}) as t2.
+      hinduction H before E; intros; try discriminate.
+      - inv Heqt1; inv Heqt2.
+        setoid_rewrite itree_eta'; eauto.
+      - inv CHECK; inv Heqt1.
+        inv H.
+    Admitted.
 
   Lemma refines_clo_bind b1 b2 vclo
     (MON: monotone2 vclo)
     (CMP: compose (refinesC RR b1 b2) vclo <3= compose vclo (refinesC RR b1 b2))
     (ID: id <3= vclo):
-    refines_bind_clo b1 b2 <3= gupaco2 (refines_ eq_prerel post RR b1 b2 vclo) (refinesC RR b1 b2).
+    refines_bind_clo b1 b2 <3= gupaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2).
   Proof.
-  intros rr. gcofix CIH. intros. destruct PR.
-  gclo. econstructor; auto_ctrans_eq.
-  4-5: shelve.
+    intros rr. gcofix CIH. intros.
+    destruct PR.
+    gclo.
+    eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel); try typeclasses eauto.
   1,2: (setoid_rewrite unfold_bind; apply refines_refl; try typeclasses eauto).
-  1,3: shelve.
-  1,2: shelve.
 
-  punfold EQV. unfold_refines.
-  hinduction EQV before CIH; intros; pclearbot; cbn;
-    repeat (change (ITree.subst ?k ?m) with (ITree.bind m k)).
-  - gclo. econstructor; auto_ctrans_eq.
-    4-5: shelve.
-    1,2: apply refines_refl; try typeclasses eauto.
-    1-4: shelve.
-    eauto with paco.
-  - (* Ret *)
-    gstep. econstructor. eauto 7 with paco itree.
-  - (* Vis *)
-    gstep. econstructor; eauto.
-    intros. red in CMP. unfold id in ID. apply ID.
-    admit.
-  - (* TauL *)
-    destruct b1; try discriminate.
-    gclo.
-    econstructor; auto_ctrans_eq; eauto; try reflexivity.
-    eapply refines_TauL; auto. rewrite unfold_bind.
-    apply refines_refl; try typeclasses eauto.
-    1,2,4,5: shelve.
-    apply refines_refl; try typeclasses eauto.
-    1-2: shelve.
-  - (* TauR *)
-    destruct b2; try discriminate.
-    gclo.
-    econstructor; auto_ctrans_eq; eauto; try reflexivity.
-    apply refines_refl; try typeclasses eauto.
-    1,2,4,5: shelve.
-    eapply refines_TauR; auto. rewrite unfold_bind.
-    apply refines_refl; try typeclasses eauto.
-    1-2: shelve.
-  - (* forallR *)
-    gfinal.
-    right.
-    eapply paco2_mon_bot; eauto.
-    (* apply refines_Vis_forallR'. *)
-    
-    (* gclo. *)
-    (* econstructor; auto_ctrans_eq; eauto; try reflexivity. *)
-    (* 3-4: shelve. *)
-    (* apply refines_refl; try typeclasses eauto. *)
-    (* 1-2: shelve. *)
-    (* setoid_rewrite unfold_bind. *)
-    (* apply refines_Vis_forallR'. *)
-    (* intros a. *)
-    (* (* GRRRRR *) *)
-    (* eapply refines_refl; try typeclasses eauto. *)
-    
+  { setoid_rewrite <- unfold_bind.
+    eapply padded_bind; eauto.
+  }
 
+  { setoid_rewrite <- unfold_bind.
+    eapply padded_bind; eauto.
+  }
 
+  { punfold EQV. unfold_refines.
+    rewrite itree_eta in PAD1.
+    rewrite itree_eta in PAD2.
+    genobs t1 ot1.
+    genobs t2 ot2.
+    clear t1 t2 Heqot1 Heqot2.
+    hinduction EQV before CIH; intros; pclearbot; cbn;
+      repeat (change (ITree.subst ?k ?m) with (ITree.bind m k)).
+    - (* Ret *)
+      gbase.
+      eauto.
+    - (* Tau / Tau *)
+      gstep; constructor.
+      gbase.
+      eapply CIH.
+      eapply pbc_intro_h; try typeclasses eauto; eauto with solve_padded.
+    - (* Vis *)
+      gstep; constructor; eauto.
+      intros a b H1.
+      apply ID.
+      red.
+      gbase.
+      apply CIH.
+      eapply pbc_intro_h; try typeclasses eauto; eauto with solve_padded.
+      + pinversion PAD1; subst; inj_existT; subst; eauto with solve_padded.
+        apply padded_Tau_hint; eauto.
+      + pinversion PAD2; subst; inj_existT; subst; eauto with solve_padded.
+        apply padded_Tau_hint; eauto.
+      + apply H0; eauto.
+    - (* TauL *)
+      destruct b1; try discriminate.
 
-  (*   guclo eqit_clo_trans. econstructor; auto_ctrans_eq; eauto; try reflexivity. *)
-  (*   eapply eqit_Tau_l. rewrite unfold_bind. reflexivity. *)
+      rewrite (itree_eta t1) in PAD1.
+      (* Probably could get rid of this axiom *)
+      rewrite (EqAxiom.itree_eta_ t1).
+      genobs t1 ot1.
+      clear t1 Heqot1.
 
-  (*   intros rr. *)
-  (*   gcofix CIH. intros. destruct PR. *)
-  (*   gclo. econstructor; auto_ctrans_eq. *)
+      gclo.
+      eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel);
+        try typeclasses eauto; auto_ctrans_eq; eauto; try reflexivity.
 
-  (*   apply refines_refl. *)
-  (*   admit. *)
-  (*   admit. *)
-  (*   admit. *)
-  (*   admit. *)
+      eapply refines_TauL; cbn; auto. rewrite unfold_bind.
+      1-2: cbn; apply refines_refl; try typeclasses eauto.
+      + destruct ot1; eauto with solve_padded.
+        rewrite <- bind_vis.
+        eauto with solve_padded.
+      + destruct ot2; eauto with solve_padded.
+        rewrite <- bind_vis.
+        eauto with solve_padded.
+      + eapply IHEQV; eauto with solve_padded.
+    - (* TauR *)
+      destruct b2; try discriminate.
 
-  (*   apply refines_refl. *)
-  (*   admit. *)
-  (*   admit. *)
-  (*   admit. *)
-  (*   admit. *)
+      rewrite (itree_eta t2) in PAD2.
+      (* Probably could get rid of this axiom *)
+      rewrite (EqAxiom.itree_eta_ t2).
+      genobs t2 ot2.
+      clear t2 Heqot2.
 
-  (*   eauto with paco. *)
-  (*   - gstep. econstructor. eauto 7 with paco itree. *)
-  (*   - gstep. econstructor. intros. red in CMP. unfold id in ID. apply ID. eauto 7 with paco itree. *)
-  (*   - destruct b1; try discriminate. *)
-  (*     guclo eqit_clo_trans. *)
-  (*     econstructor; auto_ctrans_eq; eauto; try reflexivity. *)
-  (*     eapply eqit_Tau_l. rewrite unfold_bind. reflexivity. *)
-  (*   - destruct b2; try discriminate. *)
-  (*     guclo eqit_clo_trans. econstructor; auto_ctrans_eq; eauto; try reflexivity. *)
-  (*     eapply eqit_Tau_l. rewrite unfold_bind. reflexivity. *)
-  (* Qed. *)
+      gclo.
+      eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel);
+        try typeclasses eauto; auto_ctrans_eq; eauto; try reflexivity.
+
+      2: eapply refines_TauR; cbn; auto; rewrite unfold_bind.
+      1-2: cbn; apply refines_refl; try typeclasses eauto.
+      + destruct ot1; eauto with solve_padded.
+        rewrite <- bind_vis; eauto with solve_padded.
+      + destruct ot2; eauto with solve_padded.
+        rewrite <- bind_vis; eauto with solve_padded.
+      + eapply IHEQV; eauto with solve_padded.
+    - (* forallR *)
+      (* Will probably need induction on H to match up steps *)
+      admit.
+    (*   gclo. *)
+    (*   eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel); *)
+    (*     try typeclasses eauto; auto_ctrans_eq; eauto; try reflexivity. *)
+    (*   2: { *)
+    (*     pstep; red. *)
+    (*     constructor. *)
+    (*     intros a. *)
+    (*     eapply refinesF_refl. *)
+
+    (*     gstep. *)
+    (*   } *)
+
+    (*   gstep; red; constructor. *)
+    (*   intros a. *)
+    (*   pinversion PAD2; inj_existT; subst. *)
+    (*   specialize (H0 a). *)
+    (*   specialize (H0 k1 k2). *)
+    (*   From Vellvm Require Import Utils.Tactics. *)
+    (*   repeat (forward H0; [admit|]). *)
+
+    (*   gunfold H0. *)
+      
+    (*   PADk1 PADk2 REL). *)
+    (*   remember (Tau (k3 a)). *)
+    (*   hinduction H before H0; intros; inv Heqi. *)
+
+    (*   destruct ot1. *)
+    (*   + (* Ret *) *)
+    (*     specialize (H a). *)
+    (*     specialize (H0 a k1 k2 PAD1). *)
+
+    (*     forward H0. *)
+    (*     { pinversion PAD2; inj_existT; subst. *)
+    (*       eapply padded_tau. *)
+    (*       apply H2. *)
+    (*     } *)
+
+    (*     specialize (H0 PADk1 PADk2 REL). *)
+    (*     pose proof (unfold_bind (k a) k2). *)
+    (*     eapply EqAxiom.bisimulation_is_eq in H1. *)
+    (*     rewrite H1. *)
+    (*     apply refinesF_TauTau_inv_strong. *)
+    (*     constructor. *)
+    (*     eapply gpaco2_mon; try apply H0; eauto. *)
+
+    (*     { intros t1 t2 H2. *)
+    (*       gunfold  *)
+    (*       gfold. *)
+
+    (*     apply H0. *)
+
+    (*     assert (refinesF eq_prerel eq_post_rel RR false b2 vclo *)
+    (* (gpaco2 (refines_ eq_prerel eq_post_rel RR false b2 vclo) (refinesC RR false b2) r r) *)
+    (* (observe (Tau (k1 r0))) *)
+    (* (observe (Tau *)
+    (*    match observe (k a) with *)
+    (*    | RetF r1 => k2 r1 *)
+    (*    | TauF t => Tau (ITree.bind t k2) *)
+    (*    | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k2) *)
+    (*    end))). *)
+    (*     constructor. *)
+    (*     eapply gpaco2_mon. *)
+    (*     apply H0. *)
+    (*     eauto. *)
+    (*     eauto. *)
+    (*     cbn in H2. *)
+    (*     eapply refinesF_TauTau_inv in H2. *)
+    (*     apply H2. *)
+
+    (*     intros t1 t2 H3. *)
+        
+
+    (*     apply refinesf_tautau_inv in H2. *)
+    (*     gunfold *)
+    - (* ExistsR *)
+      gclo.
+      eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel) (t2':=(ITree.bind (k a) k2));
+        try typeclasses eauto; auto_ctrans_eq; eauto; try reflexivity.
+      2: {
+        pstep; red; cbn.
+        eapply refinesF_existsR with (a:=a).
+        pinversion PAD2; inj_existT; subst.
+        cbn.
+        constructor.
+        left.
+        apply refines_refl; try typeclasses eauto.
+        (change (ITree.subst ?k ?m) with (ITree.bind m k)).
+        eapply padded_bind.
+        apply H0.
+        eauto.
+      }
+
+      apply refines_refl; try typeclasses eauto.
+      { pinversion PAD1; cbn in *; subst; eauto with solve_padded.
+        setoid_rewrite bind_tau.
+        pstep; red; cbn.
+        constructor.
+        intros.
+        left.
+        apply padded_bind.
+        apply H.
+        apply PADk1.
+      }
+
+      pose proof (unfold_bind (k a) k2).
+      apply EqAxiom.bisimulation_is_eq in H.
+      rewrite H.
+      apply IHEQV; eauto with solve_padded.
+      pinversion PAD2; inj_existT; subst.
+      cbn.
+      apply padded_tau.
+      apply H1.
+    - (* ForallL *)
+      gclo.
+      eapply refine_trans_clo_intro with
+        (post1:=eq_post_rel) (post2:=eq_post_rel)
+        (t1':= match observe (k a) with
+               | RetF r => k1 r
+               | TauF t => Tau (ITree.bind t k1)
+               | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k1)
+               end);
+        try typeclasses eauto; auto_ctrans_eq; eauto; try reflexivity.
+      {
+        pstep; red; cbn.
+        eapply refinesF_forallL with (a:=a).
+        pinversion PAD1; inj_existT; subst.
+        cbn.
+        constructor.
+        left.
+        apply refines_refl; try typeclasses eauto.
+        (change (ITree.subst ?k ?m) with (ITree.bind m k)).
+        eapply padded_bind.
+        apply H0.
+        eauto.
+      }
+
+      apply refines_refl; try typeclasses eauto.
+      { pinversion PAD2; cbn in *; subst; eauto with solve_padded.
+        setoid_rewrite bind_tau.
+        pstep; red; cbn.
+        constructor.
+        intros.
+        left.
+        apply padded_bind.
+        apply H.
+        apply PADk2.
+      }
+
+      apply IHEQV; cbn; eauto with solve_padded.
+      pinversion PAD1; inj_existT; subst.
+      cbn.
+      apply padded_tau.
+      apply H0.
+    - (* ExistsL *)
+      admit.
   Admitted.
 
 End refine_closure.
