@@ -32,7 +32,7 @@ depends: [
   "coq-paco"  {>= "4.2.3" & < "4.3~"}
   "coq-ceres"
   "coq-flocq" {>= "4.2.0"}
-  "coq-mathcomp-ssreflect"
+  "rocq-mathcomp-ssreflect"
   "coq-simple-io"
   "coq-itree" {>= "5.2.0" & < "5.3~"}
   "coq-quickchick" {>= "2.0.4" & < "2.0.5"}
