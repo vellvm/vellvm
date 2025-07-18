@@ -692,6 +692,21 @@ Definition ann_fun_attribute (a:annotation) : option fn_attr :=
   | _ => None
   end.
 
+
+(* Operand Bundles
+   - Note: does not support `preallocated(%foo)` style bundles.
+ *)
+
+Variant operand :=
+  | SSA_value (t:texp)
+  | Metadata_string (m:metadata).
+
+Record operand_bundle :=
+  mk_operand_bundle {
+      ob_tag : string ;
+      ob_ops : list operand 
+    }.
+
 Variant landingpad_clause :=
   | CATCH (t : texp)
   | FILTER (t : texp).
@@ -699,7 +714,7 @@ Variant landingpad_clause :=
 Variant instr : Set :=
 | INSTR_Comment (msg:string)
 | INSTR_Op   (op:exp)                                             (* INVARIANT: op must be of the form (OP_ ...) *)
-| INSTR_Call (fn:texp) (args:list (texp * (list param_attr))) (anns:list annotation)    (* CORNER CASE: return type is void treated specially *)
+| INSTR_Call (fn:texp) (args:list (texp * (list param_attr))) (anns:list annotation) (obs : list operand_bundle)   (* CORNER CASE: return type is void treated specially *)
 | INSTR_Alloca (t:T) (anns: list annotation)
 | INSTR_Load  (t:T) (ptr:texp) (anns: list annotation)
 | INSTR_Store (val:texp) (ptr:texp) (anns: list annotation)
@@ -723,7 +738,7 @@ Variant terminator : Set :=
 
   (* The `invoke` terminator, unlike the others, can optionally define an
      instr_id for use in the "to_label" block, as with a `call` instruction.  *)                  
-| TERM_Invoke  (i:option instr_id) (fnptrval:texp) (args:list (texp * (list param_attr))) (to_label:block_id) (unwind_label:block_id) (anns:list annotation)
+| TERM_Invoke  (i:option instr_id) (fnptrval:texp) (args:list (texp * (list param_attr))) (to_label:block_id) (unwind_label:block_id) (anns:list annotation) (obs : list operand_bundle)
 | TERM_Unreachable
 .
 

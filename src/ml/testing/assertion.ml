@@ -172,7 +172,7 @@ let texp_to_function_id (_, exp) : function_id =
 (* | INSTR_Call of 't texp * 't texp list *)
 let instr_to_call_data instr =
   match instr with
-  | INSTR_Call (fn, args, _) ->
+  | INSTR_Call (fn, args, _, _) ->
       ( texp_to_function_id fn
       , List.map (fun x -> texp_to_uvalue (fst x)) args )
   | _ ->
@@ -184,7 +184,7 @@ let texp_to_name_retty (texp : LLVMAst.typ texp) : DynamicTypes.dtyp * function_
 
 let instr_to_call_data' instr =
   match instr with
-  | INSTR_Call (fn, args, _) ->
+  | INSTR_Call (fn, args, _, _) ->
       let t, fname = texp_to_name_retty fn in
       (t, fname, List.map (fun x -> texp_to_uvalue (fst x)) args)
   | _ ->

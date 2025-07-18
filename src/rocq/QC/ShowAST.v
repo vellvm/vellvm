@@ -961,6 +961,32 @@ Section ShowInstances.
     | CATCH t => (string_to_DString "catch ") @@ dshow_texp t @@ dnewline
     | FILTER t => (string_to_DString "filter ") @@ dshow_texp t @@ dnewline
     end.
+
+(*
+operand bundle set ::= '[' operand bundle (, operand bundle )* ']'
+operand bundle ::= tag '(' [ bundle operand ] (, bundle operand )* ')'
+bundle operand ::= SSA value | metadata string
+tag ::= string constant
+ *)
+
+  Definition show_operand (o:operand) : DString :=
+    match o with
+    | SSA_value t => dshow_texp t
+    | Metadata_string m => dshow_metadata m
+    end.
+  
+  Definition show_operand_bundle (ob:operand_bundle) : DString :=
+    (string_to_DString ("""" ++ ob_tag ob ++ """("))
+      @@
+      concat_DString (string_to_DString ", ") (map show_operand (ob_ops ob))
+      @@
+      string_to_DString (")").
+  
+  Definition dshow_operand_bundles (obs : list (@operand_bundle T)) : DString :=
+    match obs with
+    | nil =>  DList_empty
+    | _::_ => string_to_DString "[" @@ concat_DString (string_to_DString ", ") (map show_operand_bundle obs) @@ string_to_DString "]"
+    end.
   
   Definition dshow_instr (i : instr T) : DString
     := match i with
@@ -968,7 +994,7 @@ Section ShowInstances.
 
        | INSTR_Op e => dshow e
 
-       | INSTR_Call fn args anns =>
+       | INSTR_Call fn args anns obs =>
            let tail := find_option ann_tail anns in
            let fast_math_flags := filter_option ann_fast_math_flag anns in
            let cconv := find_option ann_cconv anns in
@@ -990,7 +1016,9 @@ Section ShowInstances.
              concat_DString (string_to_DString ", ") (map show_call_arg args) @@
              string_to_DString ") " @@
              concat_DString (string_to_DString " ") (map (fun x => string_to_DString (show_fn_attr x)) fn_attrs)
-
+             @@
+             dshow_operand_bundles obs 
+             
        | INSTR_Alloca t anns =>
            let inalloca := match find_option ann_inalloca anns with
                            | Some _ => "inalloca"
@@ -1106,7 +1134,7 @@ Section ShowInstances.
 
        | TERM_Resume v => string_to_DString "remove " @@ dshow_texp v
 
-       | TERM_Invoke io fn args to_label unwind_label anns =>
+       | TERM_Invoke io fn args to_label unwind_label anns obs =>
            let tail := find_option ann_tail anns in
            let fast_math_flags := filter_option ann_fast_math_flag anns in
            let cconv := find_option ann_cconv anns in
@@ -1135,7 +1163,10 @@ Section ShowInstances.
              @@
              string_to_DString "to label %" @@ dshow to_label @@ string_to_DString " " @@
              string_to_DString "unwind label %" @@ dshow unwind_label
+             @@
+             dshow_operand_bundles obs 
 
+             
        | TERM_Unreachable => string_to_DString "unreachable"
        end.
 

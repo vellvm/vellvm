@@ -196,17 +196,42 @@ Section Endo.
         | CATCH t => CATCH (endo t)
         | FILTER t => FILTER (endo t)
         end.
-    
+
+    #[global] Instance Endo_operand
+      `{Endo T}
+      `{Endo (exp T)}
+      `{Endo raw_id}
+      `{Endo string}
+      : Endo operand | 50 :=
+      fun op =>
+        match op with
+        | SSA_value t => SSA_value (endo t)
+        | Metadata_string m => Metadata_string (endo m)
+        end.
+
+    #[global] Instance Endo_operand_bundle
+      `{Endo T}
+      `{Endo (exp T)}
+      `{Endo raw_id}
+      `{Endo string}
+      : Endo operand_bundle | 50 :=
+      fun ob =>
+        mk_operand_bundle
+          (endo (ob_tag ob))
+          (endo (ob_ops ob)).
+
     #[global] Instance Endo_instr
            `{Endo T}
            `{Endo (exp T)}
            `{Endo param_attr}
            `{Endo (annotation T)}
+           `{Endo raw_id}
+           `{Endo string}
       : Endo (instr T) | 50 :=
       fun ins =>
         match ins with
         | INSTR_Op op => INSTR_Op (endo op)
-        | INSTR_Call fn args atts => INSTR_Call (endo fn) (endo args) (endo atts)
+        | INSTR_Call fn args atts ops => INSTR_Call (endo fn) (endo args) (endo atts) (endo ops)
         | INSTR_Alloca t atts =>
           INSTR_Alloca (endo t) (endo atts)
         | INSTR_Load t ptr atts =>
@@ -226,7 +251,8 @@ Section Endo.
            `{Endo raw_id}
            `{Endo (exp T)}
            `{Endo param_attr}
-           `{Endo (annotation T)}           
+           `{Endo (annotation T)}
+           `{Endo string}
       : Endo (terminator T) | 50 :=
       fun trm =>
         match trm with
@@ -239,8 +265,8 @@ Section Endo.
         | TERM_IndirectBr v brs =>
           TERM_IndirectBr (endo v) (endo brs)
         | TERM_Resume v => TERM_Resume (endo v)
-        | TERM_Invoke i fnptrval args to_label unwind_label atts =>
-          TERM_Invoke (endo i) (endo fnptrval) (endo args) (endo to_label) (endo unwind_label) (endo atts)
+        | TERM_Invoke i fnptrval args to_label unwind_label atts obs =>
+          TERM_Invoke (endo i) (endo fnptrval) (endo args) (endo to_label) (endo unwind_label) (endo atts) (endo obs)
         | TERM_Unreachable => TERM_Unreachable
         end.
 
@@ -555,6 +581,30 @@ Section TFunctor.
           (endo (a_align a))
           (f (a_type a)).
 
+    #[global] Instance TFunctor_metadata
+           `{TFunctor exp}
+           `{Endo raw_id}
+           `{Endo string}
+      : TFunctor metadata | 50 :=
+      fun U V f => fix endo_metadata m :=
+        match m with
+        | METADATA_Const tv => METADATA_Const (tfmap f tv)
+        | METADATA_Null => METADATA_Null
+        | METADATA_Nontemporal => METADATA_Nontemporal
+        | METADATA_Invariant_load => METADATA_Invariant_load
+        | METADATA_Invariant_group => METADATA_Invariant_group
+        | METADATA_Nonnull => METADATA_Nonnull
+        | METADATA_Dereferenceable => METADATA_Dereferenceable
+        | METADATA_Dereferenceable_or_null => METADATA_Dereferenceable_or_null
+        | METADATA_Align => METADATA_Align
+        | METADATA_Noundef => METADATA_Noundef
+        | METADATA_Id id => METADATA_Id (endo id)
+        | METADATA_String str => METADATA_String (endo str)
+        | METADATA_Named strs => METADATA_Named (endo strs)
+        | METADATA_Node mds => METADATA_Node (tfmap endo_metadata mds)
+        | METADATA_Debug_info_elided => METADATA_Debug_info_elided
+        end.
+
     #[global] Instance TFunctor_landingpad_clause
      `{TFunctor exp}
       : TFunctor (@landingpad_clause) | 50 :=
@@ -563,7 +613,22 @@ Section TFunctor.
       | CATCH v => CATCH (tfmap f v)
       | FILTER v => FILTER (tfmap f v)
       end.
-  
+
+    #[global] Instance TFunctor_operand
+      `{TFunctor exp}
+      : TFunctor (@operand) | 50 :=
+      fun U V f op =>
+        match op with
+        | SSA_value t => SSA_value (tfmap f t)
+        | Metadata_string m => Metadata_string (tfmap f m)
+        end.
+    
+    #[global] Instance TFunctor_operand_bundle
+      `{TFunctor exp}
+      : TFunctor (@operand_bundle) | 50 :=
+      fun U V f ob =>
+        mk_operand_bundle (ob_tag ob) (tfmap f (ob_ops ob)).
+    
     #[global] Instance TFunctor_instr
      `{TFunctor exp}
      `{TFunctor annotation}
@@ -572,9 +637,10 @@ Section TFunctor.
         match ins with
         | INSTR_Comment s => INSTR_Comment s
         | INSTR_Op op => INSTR_Op (tfmap f op)
-        | INSTR_Call fn args atts => INSTR_Call  (tfmap f fn)
+        | INSTR_Call fn args atts obs => INSTR_Call  (tfmap f fn)
                                                 (List.map (fun '(te, a) => (tfmap f te, a))  args)
                                                 (tfmap f atts)
+                                                (tfmap f obs)
         | INSTR_Alloca t atts => INSTR_Alloca (f t) (tfmap f atts)
         | INSTR_Load  t ptr atts => INSTR_Load  (f t) (tfmap f ptr) (tfmap f atts)
         | INSTR_Store val ptr atts => INSTR_Store (tfmap f val) (tfmap f ptr) (tfmap f atts)
@@ -604,11 +670,11 @@ Section TFunctor.
         | TERM_Switch v default_dest brs => TERM_Switch (tfmap f v) (endo default_dest) (endo brs)
         | TERM_IndirectBr v brs => TERM_IndirectBr (tfmap f v) (endo brs)
         | TERM_Resume v => TERM_Resume (tfmap f v)
-        | TERM_Invoke i fnptrval args to_label unwind_label atts =>
+        | TERM_Invoke i fnptrval args to_label unwind_label atts obs =>
             TERM_Invoke i
                         (tfmap f fnptrval)
                         (List.map (fun '(te, a) => (tfmap f te, a))  args)
-                        (endo to_label) (endo unwind_label) (tfmap f atts)
+                        (endo to_label) (endo unwind_label) (tfmap f atts) (tfmap f obs)
         | TERM_Unreachable => TERM_Unreachable
         end.
 
@@ -638,29 +704,6 @@ Section TFunctor.
                  (tfmap f (blk_term b))
                  (blk_comments b).
 
-    #[global] Instance TFunctor_metadata
-           `{TFunctor exp}
-           `{Endo raw_id}
-           `{Endo string}
-      : TFunctor metadata | 50 :=
-      fun U V f => fix endo_metadata m :=
-        match m with
-        | METADATA_Const tv => METADATA_Const (tfmap f tv)
-        | METADATA_Null => METADATA_Null
-        | METADATA_Nontemporal => METADATA_Nontemporal
-        | METADATA_Invariant_load => METADATA_Invariant_load
-        | METADATA_Invariant_group => METADATA_Invariant_group
-        | METADATA_Nonnull => METADATA_Nonnull
-        | METADATA_Dereferenceable => METADATA_Dereferenceable
-        | METADATA_Dereferenceable_or_null => METADATA_Dereferenceable_or_null
-        | METADATA_Align => METADATA_Align
-        | METADATA_Noundef => METADATA_Noundef
-        | METADATA_Id id => METADATA_Id (endo id)
-        | METADATA_String str => METADATA_String (endo str)
-        | METADATA_Named strs => METADATA_Named (endo strs)
-        | METADATA_Node mds => METADATA_Node (tfmap endo_metadata mds)
-        | METADATA_Debug_info_elided => METADATA_Debug_info_elided
-        end.
 
 
     (* SAZ: Not as parameterized as it could be - how often do we want to change annnotations? *)
