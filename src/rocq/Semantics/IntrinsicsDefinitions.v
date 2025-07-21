@@ -41,17 +41,42 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 (* end hide *)
 
-(** * Intrinsics
-    VIR provides an easily extensible support for instrinsics.
-    In this file are defined the intrinsics suuported by VIR.
-    Each intrinsic must be:
-    - registered by providing a [declaration typ] and added to [defined_intrinsics_decls]
-    - _if_ the intrinsics is a pure computation, it must be implemented as a pure Gallina
-      function of type [semantic_function] and added to [defined_intrinsics]
-    - _if_ it is impure, i.e. depends on the memory, as is the case for [memcpy], its
-    implementation must be provided in [src/coq/Handlers/Memory.v] and an equality test on its
-    name added to [handle_intrinsic].
-*)
+(** * Intrinsics VIR provides an easily extensible support for instrinsics.
+    
+    There are several ways to define the semantics of intrinsics:
+
+    1. As LLVM IR "library" code.
+
+       This is the most easily extensible way to extend VIR with semantics for
+       intrinsics. It works by providing a `.ll` file that defines the meaning
+       of the intrinsic using standard LLVM instructions.  There are a few
+       potential semantic implications that may impact reasoning about such
+       intrinsics.  In particular, because such an intrinsic is just an
+       "ordinary" LLVM function:
+
+       - calling it will create a stack frame, and do a function call it will
+       - have global address address in the heap
+
+       Neither of which would be true of "real" intrinsics.
+
+    2. As a Rocq function that directly manipulates [VIR] [dvalue] or [uvalues].
+       These are either defined below in this file _or_, like some memory
+       intrinsics and varargs that interact with LLVM IR's effects, defined
+       elsewhere.
+
+       Each such intrinsic must be:
+
+        - registered by providing a [declaration typ] and added to
+          [defined_intrinsics_decls]
+
+        - _if_ the intrinsics is a pure computation, it must be implemented as a
+          pure Gallina function of type [semantic_function] and added to
+          [defined_intrinsics]
+
+        - _if_ it is impure, i.e. depends on the memory, as is the case for
+          [memcpy], its implementation must be provided in [src/coq/Handlers/Memory.v]
+          and an equality test on its name added to [handle_intrinsic].
+ *)
 
 Definition vellvm_internal_throw_decl: declaration typ :=
   {|
@@ -239,9 +264,63 @@ Definition ushl_sat_64_decl: declaration typ :=
    2. It includes declarations for built-in memory-dependent intrinisics such as `memcpy`.
  *)
 Definition defined_intrinsics_decls :=
-  [ fabs_32_decl; fabs_64_decl; maxnum_32_decl ; maxnum_64_decl; minimum_32_decl; minimum_64_decl;
-    ushl_sat_1_decl; ushl_sat_8_decl; ushl_sat_16_decl; ushl_sat_32_decl; ushl_sat_64_decl;
-    memcpy_8_32_decl; memcpy_8_64_decl; memset_8_32_decl; memset_8_64_decl; malloc_decl; free_decl ].
+  [ (* pure intrinsics *)
+    fabs_32_decl;
+    fabs_64_decl;
+    maxnum_32_decl ;
+    maxnum_64_decl;
+    minimum_32_decl;
+    minimum_64_decl;
+    ushl_sat_1_decl;
+    ushl_sat_8_decl;
+    ushl_sat_16_decl;
+    ushl_sat_32_decl;
+    ushl_sat_64_decl;
+
+    (* memory intrinsics *)
+    memcpy_8_32_decl;
+    memcpy_8_64_decl;
+    memset_8_32_decl;
+    memset_8_64_decl;
+    malloc_decl;
+    free_decl
+  ].
+
+
+(* This function extracts the string of the form [llvm._] from an LLVM expression.
+   It returns None if the expression is not an intrinsic definition.
+*)
+Definition intrinsic_ident (id:ident) : option string :=
+  match id with
+  | ID_Global (Name s) =>
+      if orb (orb (String.prefix "llvm." s)
+                  (Rocqlib.proj_sumbool (string_dec "malloc" s)))
+             (Rocqlib.proj_sumbool (string_dec "free" s))
+      then Some s else None
+  | _ => None
+  end.
+
+(* Returns `true` only if both function are named and have the same name.  *)
+Definition function_name_eq (a b:function_id) : bool :=
+  match a, b with
+  | Name aname, Name bname => String.eqb aname bname
+  | _, _ => false
+  end.
+
+Definition lookup_intrinsic_declaration name : option (declaration typ) :=
+  List.find (fun x => function_name_eq name (dc_name x)) defined_intrinsics_decls.
+
+Definition intrinsic_exp {T} (e:exp T) : option string :=
+  match e with
+  | EXP_Ident (ID_Global (Name s)) =>
+      match lookup_intrinsic_declaration (Name s) with
+      | Some x => Some s
+      | None => None
+      end
+  | _ => None
+  end.
+
+
 
 (* This functor module provides a way to (extensibly) add the semantic behavior
    for intrinsics defined outside of the core Vellvm operational semantics.

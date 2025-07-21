@@ -423,16 +423,8 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
        combines two mcfgs coherently
    *)
 
-  (* Returns `true` only if both function are named and have the same name.  *)
-  (* TODO: move to AstLib? *)
-  Definition function_name_eq (a b:function_id) : bool :=
-    match a, b with
-    | Name aname, Name bname => eqb aname bname
-    | _, _ => false
-    end.
-
   Definition allocate_declaration (d:declaration dtyp) : itree L0 unit :=
-    match List.find (fun x => function_name_eq (dc_name d) (dc_name x)) defined_intrinsics_decls with
+    match lookup_intrinsic_declaration (dc_name d) with
     | Some _ => Ret tt (* Don't allocate pointers for LLVM intrinsics declarations *)
     | None =>
         'v <- trigger (Alloca DTYPE_Pointer 1%N None);;

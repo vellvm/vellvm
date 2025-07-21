@@ -38,6 +38,7 @@ From Vellvm Require Import
      Semantics.MemoryParams
      Semantics.Memory.MemBytes
      Semantics.ConcretizationParams
+     Semantics.IntrinsicsDefinitions
      Utils.ListUtil
      DynamicValues
      Handlers.Concretization
