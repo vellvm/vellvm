@@ -2347,16 +2347,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Import TranslateFacts.
   Import RecursionFacts.
 
-  (* TODO: Could be worth considering making sure this isn't behind a module? *)
-  Lemma function_name_eq_equiv :
-    forall id1 id2,
-      LLVM1.function_name_eq id1 id2 = LLVM2.function_name_eq id1 id2.
-  Proof.
-    intros id1 id2.
-    unfold LLVM1.function_name_eq, LLVM2.function_name_eq.
-    reflexivity.
-  Qed.
-
   Lemma trigger_alloca_E1E2_rutt_strict_sound :
     forall dt n osz,
       rutt event_refine_strict event_res_refine_strict dvalue_refine_strict
@@ -2391,7 +2381,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     induction a.
     unfold LLVM1.allocate_declaration, allocate_declaration.
     cbn.
-    repeat setoid_rewrite function_name_eq_equiv.
     break_match.
     - apply rutt_Ret; reflexivity.
     - eapply rutt_bind with (RR:=dvalue_refine_strict).

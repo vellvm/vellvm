@@ -695,32 +695,10 @@ Definition is_void_instr (i:instr typ) : bool :=
 Ltac unfold_eqv :=
   repeat (unfold eqv in *; unfold eqv_raw_id in *; unfold eqv_instr_id in * ).
 
-
-(* TODO: Move this and above to IntrinsicsDefinitions.v -- refactor to return
-   Some only for "semantically" defined intrinsics (not ones definable by LLVM IR)  *)
-
-(* This function extracts the string of the form [llvm._] from an LLVM expression.
-   It returns None if the expression is not an intrinsic definition.
-*)
-Definition intrinsic_ident (id:ident) : option string :=
-  match id with
-  | ID_Global (Name s) =>
-      if orb (orb (String.prefix "llvm." s)
-                  (Rocqlib.proj_sumbool (string_dec "malloc" s)))
-             (Rocqlib.proj_sumbool (string_dec "free" s))
-      then Some s else None
-  | _ => None
-  end.
-
-Definition intrinsic_exp {T} (e:exp T) : option string :=
-  match e with
-  | EXP_Ident id => intrinsic_ident id
-  | _ => None
-  end.
-
 Lemma Name_inj : forall s1 s2,
     Name s1 = Name s2 ->
     s1 = s2.
 Proof using.
   intros * EQ; inv EQ; auto.
 Qed.
+

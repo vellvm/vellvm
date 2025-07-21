@@ -13,4 +13,5 @@ From Vellvm Require Export
      Semantics.TopLevel
      Semantics.DynamicValues
      Semantics.InterpretationStack
-     Semantics.LLVMEvents.
+     Semantics.LLVMEvents
+     Semantics.IntrinsicsDefinitions.
