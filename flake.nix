@@ -15,7 +15,8 @@
         rocq = pkgs.rocq-core;
         rocqPkgs = pkgs.rocqPackages_9_0;
         coqPkgs = pkgs.coqPackages_9_0;
-
+        libllvm = pkgs.llvmPackages_19.libllvm;
+        clang = pkgs.clang_19;
         version = "vellvm:master";
       in rec {
         packages = {
@@ -35,10 +36,10 @@
               meta = {
                 description = "Run the simple suite of vellvm tests";
               };
-              buildInputs = [packages.default];
+              buildInputs = [packages.default libllvm clang];
               installPhase = ''
               cd src
-              ${packages.default}/bin/vellvm -test-suite
+              ${packages.default}/bin/vellvm -l libll/rust-intrinsics.ll -test
               if [[ $? == 0 ]]; then
                 mkdir $out
               fi
@@ -82,9 +83,9 @@
           # Include a fixed version of clang in the development environment for testing.
           default = pkgs.mkShell {
             inputsFrom = [ packages.default];
-            buildInputs = [ pkgs.clang_19
+            buildInputs = [ clang
                             pkgs.coq # Needed to make proof general happy for development.
-                            pkgs.llvmPackages_19.libllvm
+                            libllvm
                             rocq.ocamlPackages.utop
                             rocq.ocamlPackages.bisect_ppx
                             rocq.ocamlPackages.ppxlib
