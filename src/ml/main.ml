@@ -80,10 +80,11 @@ let make_test name ll_ast t : (string * assertion) option =
      (block typ))) *)
   (* Can just replace this with the newer ones? *)
   let run dtyp entry args ll_ast =
+    let linked_ast = (TopLevel.TopLevelBigIntptr.link_all !Driver.link_files ll_ast) in
     Interpreter.step
       (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp
          entry
-         (Monad.ret (Obj.magic ITreeDefinition.coq_Monad_itree) args) ll_ast )
+         (Monad.ret (Obj.magic ITreeDefinition.coq_Monad_itree) args) linked_ast )
   in
   let run_to_value dtyp entry args ll_ast () : DV.dvalue =
     match run dtyp entry args ll_ast with
