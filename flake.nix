@@ -15,8 +15,8 @@
         rocq = pkgs.rocq-core;
         rocqPkgs = pkgs.rocqPackages_9_0;
         coqPkgs = pkgs.coqPackages_9_0;
-        libllvm = pkgs.llvmPackages_19.libllvm;
-        clang = pkgs.clang_19;
+        libllvm = pkgs.llvmPackages_20.libllvm;
+        clang = pkgs.clang_20;
         version = "vellvm:master";
       in rec {
         packages = {
