@@ -65,11 +65,13 @@ CoFixpoint step (t : ITreeDefinition.itree L4 res_L4) : MlResult dvalue string
          MlError _ string "Uninterpreted external call"
      | VisF (inr1 (inl1 (ThrowOOM msg))) k =>
          MlError _ string ("OOM")%string
-     | VisF (inr1 (inr1 (inl1 (ThrowUB msg)))) k =>
+     | VisF (inr1 (inr1 (inl1 (LLVMExc _)))) k =>
          MlError _ string ("UB")%string
-     | VisF (inr1 (inr1 (inr1 (inl1 (Debug msg))))) k =>
+     | VisF (inr1 (inr1 (inr1 (inl1 (ThrowUB _))))) k =>
+         MlError _ string ("UB")%string
+     | VisF (inr1 (inr1 (inr1 (inr1 (inl1 (Debug _)))))) k =>
          MlError _ string ("Debug")%string
-     | VisF (inr1 (inr1 (inr1 (inr1 (LLVMEvents.Throw msg))))) k =>
+     | VisF (inr1 (inr1 (inr1 (inr1 (inr1 (LLVMEvents.Throw _)))))) k =>
          MlError _ string ("Failure")%string
      end.
 Set Guard Checking.
