@@ -283,7 +283,10 @@ Definition defined_intrinsics_decls :=
     memset_8_32_decl;
     memset_8_64_decl;
     malloc_decl;
-    free_decl
+    free_decl;
+
+    (* exception intrinsics *)
+    vellvm_internal_throw_decl
   ].
 
 
