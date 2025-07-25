@@ -386,6 +386,15 @@
       token
     with _ -> KW_UNKNOWN str
 
+  let create_label_or_colon_kw str =
+    begin match str with
+    | "default" -> KW_DEFAULT_COLON
+    | "argmem" -> KW_ARGMEM_COLON
+    | "inaccessiblemem" -> KW_INACCESSIBLEMEM_COLON
+    | "errnomem" -> KW_ERRNOMEM_COLON
+    | _ -> LABEL str
+    end	
+
   type ident_type = Named | NamedString | Unnamed
 
 
@@ -410,9 +419,9 @@ let upletter = ['A'-'Z']
 let lowletter = ['a'-'z']
 let letter = upletter | lowletter
 let alphanum = digit | letter
-let ident_fst  = letter   | ['-' '$' '.' '_' ':']
-let ident_nxt  = alphanum | ['-' '$' '.' '_' ':']
-let label_char = alphanum | ['-' '$' '.' '_' ':'] 
+let ident_fst  = letter   | ['-' '$' '.' '_']
+let ident_nxt  = alphanum | ['-' '$' '.' '_']
+let label_char = alphanum | ['-' '$' '.' '_'] 
 let kwletter   = alphanum | ['_']
 
 rule token = parse
@@ -435,9 +444,6 @@ rule token = parse
   | '>'  { GT }
   | ':'  { COLON }
   | "..." { DOTDOTDOT }
-
-  (* labels *)
-  | ((label_char)+) as l ':' { LABEL l }
 
   (* identifier *)
   | '@' { GLOBAL (lexed_id lexbuf) }
@@ -472,8 +478,13 @@ rule token = parse
   | 'i' (digit+ as i) { I (coq_P_of_int (int_of_string i)) }
   | '*' { STAR }
 
+  (* labels *)
+  | ((label_char)+) as l ':' { create_label_or_colon_kw l }
+
   (* keywords *)
   | kwletter+ as a { create_token a }
+
+
 
 and gobble_debug depth = parse
   | '(' { gobble_debug (depth+1) lexbuf }
