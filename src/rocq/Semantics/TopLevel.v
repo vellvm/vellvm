@@ -98,7 +98,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
          | @DVALUE_I sz x32 =>
              if Pos.eq_dec 32 sz
              then
-               match get_conv_case Trunc (DTYPE_I 32) dv (DTYPE_I 8) with
+               match get_conv_case (Trunc false false) (DTYPE_I 32) dv (DTYPE_I 8) with
                | Conv_Pure (@DVALUE_I sz x8) =>
                    if Pos.eq_dec 8 sz
                    then _

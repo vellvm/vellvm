@@ -299,6 +299,7 @@
   (* icmp *)
   ("nuw"            , KW_NUW);
   ("nsw"            , KW_NSW);
+  ("nneg"           , KW_NNEG);  
   ("exact"          , KW_EXACT);
   ("eq"             , KW_EQ);
   ("ne"             , KW_NE);

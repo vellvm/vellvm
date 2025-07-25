@@ -4274,11 +4274,12 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     end.
 
   (* SAZ: TODO - add the other conversion operations *)
+  (* SAZ: TODO - handle nuw and nsf flags for Trun, nneg for Zext *)
   Definition conversion_okb (conv : LLVMAst.conversion_type) (from_dt to_dt : dtyp)  : bool :=
     match conv with
-    | Trunc => lift_conv_okb trunc_base_okb from_dt to_dt
-    | Zext
+    | Trunc nuw nsw => lift_conv_okb trunc_base_okb from_dt to_dt
     | Sext => lift_conv_okb ext_base_okb from_dt to_dt
+    | Zext nneg => lift_conv_okb ext_base_okb from_dt to_dt
     | _ => false
     end.
 

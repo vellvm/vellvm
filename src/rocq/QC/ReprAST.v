@@ -185,6 +185,23 @@ Section ReprInstances.
       end
     |}.
 
+  Definition repr_fast_math (fm:fast_math) : string :=
+    match fm with
+    | Nnan => "Nnan"
+    | Ninf => "Ninf"
+    | Nsz => "Nsz"
+    | Arcp => "Arcp"
+    | Contract => "Contract"
+    | Afn => "Afn"
+    | Reassoc => "Reassoc"
+    | Fast => "Fast"
+    end.
+
+  #[global]
+   Instance reprFastMath : Repr fast_math :=
+    {| repr := repr_fast_math |}.
+
+  
   Definition pair_repr {A B : Type} (fa : A -> string) (fb : B -> string) (ab : A * B) : string :=
     match ab with
     | (a, b) =>
@@ -193,12 +210,12 @@ Section ReprInstances.
 
   Definition repr_conversion_type (c:conversion_type) : string :=
     match c with
-    | Trunc => "Trunc"
-    | Zext => "Zext"
+    | Trunc a b => "(Trunc " ++ repr a ++ " " ++ repr b ++ ")"
+    | Zext a => "(Zext " ++ repr a ++ ")"
     | Sext => "Sext"
-    | Fptrunc => "Fptrunc"
-    | Fpext => "Fpext"
-    | Uitofp => "Uitofp"
+    | Fptrunc flags => "(Fptrunc " ++ repr flags ++ ")"
+    | Fpext flags => "(Fpext " ++ repr flags ++ ")"
+    | Uitofp a => "(Uitofp " ++ repr a ++ ")"
     | Sitofp => "Sitofp"
     | Fptoui => "Fptoui"
     | Fptosi => "Fptosi"
@@ -224,22 +241,6 @@ Section ReprInstances.
   #[global]
    Instance reprFBinop : Repr fbinop :=
     {| repr := repr_fbinop |}.
-
-  Definition repr_fast_math (fm:fast_math) : string :=
-    match fm with
-    | Nnan => "Nnan"
-    | Ninf => "Ninf"
-    | Nsz => "Nsz"
-    | Arcp => "Arcp"
-    | Contract => "Contract"
-    | Afn => "Afn"
-    | Reassoc => "Reassoc"
-    | Fast => "Fast"
-    end.
-
-  #[global]
-   Instance reprFastMath : Repr fast_math :=
-    {| repr := repr_fast_math |}.
 
   Definition repr_fcmp (f:fcmp) : string :=
     match f with

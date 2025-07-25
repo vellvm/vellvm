@@ -313,8 +313,13 @@ Variant fast_math : Set :=
   Nnan | Ninf | Nsz | Arcp | Contract | Afn | Reassoc | Fast.
 
 Variant conversion_type : Set :=
-  Trunc | Zext | Sext | Fptrunc | Fpext | Uitofp | Sitofp | Fptoui |
-  Fptosi | Inttoptr | Ptrtoint | Bitcast | Addrspacecast.
+  | Trunc (nuw:bool) (nsw:bool)
+  | Zext (nneg:bool)
+  | Sext
+  | Fptrunc (flags:list fast_math)
+  | Fpext (flags:list fast_math)
+  | Uitofp (nneg:bool)
+  | Sitofp | Fptoui | Fptosi | Inttoptr | Ptrtoint | Bitcast | Addrspacecast.
 
 Section TypedSyntax.
 

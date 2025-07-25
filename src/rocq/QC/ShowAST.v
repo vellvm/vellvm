@@ -516,12 +516,12 @@ Section ShowInstances.
   (*These are Constant Expressions*)
   Definition show_conversion_type (ct : conversion_type) : string
     := match ct with
-       | Trunc => "trunc"
-       | Zext => "zext"
+       | Trunc nuw nsw => show_op_nuw_nsw "trunc" nuw nsw
+       | Zext nneg => "zext" ++ (if nneg then " nneg" else "")
        | Sext => "sext"
-       | Fptrunc => "fptrunc"
-       | Fpext => "fpext"
-       | Uitofp => "uitofp"
+       | Fptrunc flags => "fptrunc" ++ concatStr (List.map (fun f => " " ++ (show_fast_math f)) flags)
+       | Fpext flags => "fpext" ++ concatStr (List.map (fun f => " " ++ (show_fast_math f)) flags)
+       | Uitofp nneg => "uitofp" ++ (if nneg then " nneg" else "")
        | Sitofp => "sitofp"
        | Fptoui => "fptoui"
        | Fptosi => "fptosi"
