@@ -373,6 +373,7 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_NUW
 %token KW_NSW
 %token KW_EXACT
+%token KW_NNEG
 %token KW_EQ
 %token KW_NE
 %token KW_SGT
@@ -1251,24 +1252,22 @@ fcmp:
   | KW_TRUE  { FTrue  }
 
 
-(* TODO:
-- zext and uitofp support the nneg modifier
-- trunc supports the nuw and nsw modifiers
-- fptrunc and fpext support the fastmath flag(s)
-*)
 conversion:
-  | KW_TRUNC    { Trunc    }
-  | KW_ZEXT     { Zext     }
-  | KW_SEXT     { Sext     }
-  | KW_FPTRUNC  { Fptrunc  }
-  | KW_FPEXT    { Fpext    }
-  | KW_UITOFP   { Uitofp   }
-  | KW_SITOFP   { Sitofp   }
-  | KW_FPTOUI   { Fptoui   }
-  | KW_FPTOSI   { Fptosi   }
-  | KW_INTTOPTR { Inttoptr }
-  | KW_PTRTOINT { Ptrtoint }
-  | KW_BITCAST  { Bitcast  }
+  | KW_TRUNC                 { Trunc(false, false)   }
+  | KW_TRUNC KW_NSW          { Trunc(false, true)   }
+  | KW_TRUNC KW_NUW          { Trunc(true, false)   }
+  | KW_TRUNC KW_NUW KW_NSW   { Trunc(true, true)   }
+  | KW_ZEXT n=KW_NNEG?       { Zext(match n with None -> false | Some _ -> true) }
+  | KW_SEXT                  { Sext     }
+  | KW_FPTRUNC f=fast_math*  { Fptrunc f }
+  | KW_FPEXT f=fast_math*    { Fpext f }
+  | KW_UITOFP n=KW_NNEG?     { Uitofp(match n with None -> false | Some _ -> true)   }
+  | KW_SITOFP                { Sitofp   }
+  | KW_FPTOUI                { Fptoui   }
+  | KW_FPTOSI                { Fptosi   }
+  | KW_INTTOPTR              { Inttoptr }
+  | KW_PTRTOINT              { Ptrtoint }
+  | KW_BITCAST               { Bitcast  }
 
 ibinop:
   | op=ibinop_nuw_nsw_opt   { op false false }

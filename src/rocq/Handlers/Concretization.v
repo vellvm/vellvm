@@ -108,7 +108,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
      *)
     Definition get_conv_case (conv : conversion_type) (t1:dtyp) (x:dvalue) (t2:dtyp) : conv_case :=
       match conv with
-      | Trunc =>
+      | Trunc nuw nsb => (* TODO: handle the nuw and nsb flags *)
           match t1, x, t2 with
           | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_I sz_to =>
               if Pos.eqb sz_t sz_from && (sz_to <? sz_from)%positive
@@ -121,7 +121,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
           | _, _, _ => Conv_Illegal "ill-typed Trunc"
           end
 
-      | Zext =>
+      | Zext nneg => (* TODO: handle the nneg flag *)
           match t1, x, t2 with
           | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_I sz_to =>
               if Pos.eqb sz_t sz_from && (sz_from <? sz_to)%positive
@@ -166,7 +166,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                  end
                else Conv_Illegal "unequal bitsize in cast"
 
-      | Uitofp =>
+      | Uitofp nneg => (* TODO: handle the nneg flag *)
           match t1, x, t2 with
           | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_Float =>
               if Pos.eqb sz_t sz_from
@@ -219,8 +219,8 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
 
       | Fptoui
       | Fptosi
-      | Fptrunc
-      | Fpext
+      | Fptrunc _
+      | Fpext _
       | Addrspacecast
         => Conv_Illegal "TODO: unimplemented numeric conversion"
       end.
@@ -230,7 +230,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
       forall (conv : conversion_type) (t1:dtyp) (x:dvalue) (t2:dtyp),
         get_conv_case conv t1 x t2 =
           (match conv with
-           | @Trunc =>
+           | @Trunc nuw nsw => (* TODO: nuw and nsw flags *)
                match t1 with
                | @DTYPE_I sz_t =>
                    match x with
@@ -255,7 +255,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                    end
                | _ => Conv_Illegal "ill-typed Trunc"
                end
-           | @Zext =>
+           | @Zext nneg => (* TODO: nneg flag *)
                match t1 with
                | @DTYPE_I sz_t =>
                    match x with
@@ -305,7 +305,7 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
                    end
                | _ => Conv_Illegal "ill-typed Sext"
                end
-           | @Uitofp =>
+           | @Uitofp nneg => (* TODO: nneg flag *)
                match t1 with
                | @DTYPE_I sz_t =>
                    match x with
@@ -973,7 +973,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
      *)
     Definition get_conv_case (conv : conversion_type) (t1:dtyp) (x:dvalue) (t2:dtyp) : conv_case :=
       match conv with
-      | Trunc =>
+      | Trunc nuw nsb  => (* TODO: update to support the nuw and nsb flags *)
           match t1, x, t2 with
           | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_I sz_to =>
               if Pos.eqb sz_t sz_from && (sz_to <? sz_from)%positive
@@ -986,7 +986,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
           | _, _, _ => Conv_Illegal "ill-typed Trunc"
           end
 
-      | Zext =>
+      | Zext nneg => (* TODO: handle the nneg flag correctly *)
           match t1, x, t2 with
           | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_I sz_to =>
               if Pos.eqb sz_t sz_from && (sz_from <? sz_to)%positive
@@ -1031,7 +1031,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                  end
                else Conv_Illegal "unequal bitsize in cast"
 
-      | Uitofp =>
+      | Uitofp nneg => (* TODO: nneg flag *)
           match t1, x, t2 with
           | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_Float =>
               if Pos.eqb sz_t sz_from
@@ -1084,8 +1084,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
 
       | Fptoui
       | Fptosi
-      | Fptrunc
-      | Fpext
+      | Fptrunc _
+      | Fpext _
       | Addrspacecast
         => Conv_Illegal "TODO: unimplemented numeric conversion"
       end.
@@ -1095,7 +1095,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
       forall (conv : conversion_type) (t1:dtyp) (x:dvalue) (t2:dtyp),
         get_conv_case conv t1 x t2 =
           (match conv with
-           | @Trunc =>
+           | @Trunc nuw nsw => (* TODO: nuw and nsw flags *)
                match t1 with
                | @DTYPE_I sz_t =>
                    match x with
@@ -1120,7 +1120,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                    end
                | _ => Conv_Illegal "ill-typed Trunc"
                end
-           | @Zext =>
+           | @Zext nneg => (* TODO: nneg flag *)
                match t1 with
                | @DTYPE_I sz_t =>
                    match x with
@@ -1170,7 +1170,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
                    end
                | _ => Conv_Illegal "ill-typed Sext"
                end
-           | @Uitofp =>
+           | @Uitofp nneg => (* TODO: nneg flag *)
                match t1 with
                | @DTYPE_I sz_t =>
                    match x with
