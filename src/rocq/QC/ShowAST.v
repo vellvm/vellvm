@@ -279,7 +279,7 @@ Section ShowInstances.
     match f with
     | FNATTR_Alignstack a => "alignstack(" ++ show a ++ ")"
     (* | FNATTR_Alloc_family (fam : string) - FNATTR_KeyValue *)
-    | FNATTR_Allockind kind => "allockind(" ++ """" ++ show kind ++ """" ++ ")"
+    | FNATTR_Allockind kind => "allockind(" ++ show kind ++ ")"
     | FNATTR_Allocsize a1 a2 =>
         match a2 with
         | None => "allocsize(" ++ show a1 ++ ")"
