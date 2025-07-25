@@ -263,7 +263,15 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_ARGMEM
 %token KW_INACCESSIBLEMEM
 %token KW_ERRNOMEM
-
+(* keywords that can be followed by `:` with no space:
+   memory(default: foo)
+   memory(default : foo)
+   memory(defaul :foo)
+*)
+%token KW_DEFAULT_COLON
+%token KW_ARGMEM_COLON
+%token KW_INACCESSIBLEMEM_COLON
+%token KW_ERRNOMEM_COLON
 
 %token KW_DSO_PREEMPTABLE
 %token KW_DSO_LOCAL
@@ -1169,6 +1177,7 @@ fn_attr:
 mem_attr:
   | k=mem_access_kind { (LOC_Default, k) }
   | l=mem_loc COLON k=mem_access_kind { (l, k) }
+  | l=mem_loc_colon k=mem_access_kind { (l, k) }
 
 mem_access_kind:
   | KW_NONE  { ACC_None }
@@ -1181,6 +1190,13 @@ mem_loc:
   | KW_ARGMEM          { LOC_Argmem }
   | KW_INACCESSIBLEMEM { LOC_Inaccessiblemem }
   | KW_ERRNOMEM        { LOC_Errnomem }
+
+mem_loc_colon:
+  | KW_DEFAULT_COLON   { LOC_Default }
+  | KW_ARGMEM_COLON    { LOC_Argmem }
+  | KW_INACCESSIBLEMEM_COLON { LOC_Inaccessiblemem }
+  | KW_ERRNOMEM_COLON  { LOC_Errnomem }
+
 
 %inline
 ibinop_nuw_nsw_opt: (* may appear with `nuw`/`nsw` keywords *)
