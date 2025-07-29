@@ -2175,7 +2175,7 @@ Section ExpGenerators.
               annotate "retroactive global pointer"
                 (in_exp <- gen_exp_size' gen_global_of_typ gen_global_of_typ 0%nat t;;
                  name <- new_global_id;;
-                 add_to_global_memo (mk_global name t false (Some in_exp) false []);;
+                 add_to_global_memo (mk_global name t false (Some in_exp) false false []);;
                  e <- add_to_global_ctx (ID_Global name, TYPE_Pointer (Some t));;
                  (gen_context' .@ entl e .@ deterministic') .= false;;
                  ret (EXP_Ident (ID_Global name)))
@@ -3337,7 +3337,7 @@ Section InstrGenerators.
       end in
     let annotations := ann_linkage in (* TODO: Add more flags *)
 
-    ret (mk_global name t false opt_exp false annotations).
+    ret (mk_global name t false opt_exp false false annotations).
 
   Definition gen_global_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
     := ret TLE_Global <*> gen_global_var.

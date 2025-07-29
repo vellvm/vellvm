@@ -2421,6 +2421,25 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Lemma allocate_global_E1E2_rutt_strict_sound :
+    forall (m_global : LLVMAst.global dtyp),
+      rutt event_refine_strict event_res_refine_strict eq
+        (LLVM1.allocate_global m_global)
+        (allocate_global m_global).
+  Proof.
+    intros m_global.
+    unfold LLVM1.allocate_global, allocate_global.
+    break_match_goal.
+    - apply rutt_Ret; reflexivity.
+    - eapply rutt_bind with (RR:=dvalue_refine_strict).
+      { apply trigger_alloca_E1E2_rutt_strict_sound.
+      }
+
+      intros r1 r2 H.
+      apply trigger_globalwrite_E1E2_rutt_strict_sound; auto.
+  Qed.
+
+
+  Lemma allocate_globals_E1E2_rutt_strict_sound :
     forall (m_globals : list (LLVMAst.global dtyp)),
       rutt event_refine_strict event_res_refine_strict eq
         (map_monad LLVM1.allocate_global m_globals)
@@ -2431,13 +2450,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     - cbn; apply rutt_Ret; reflexivity.
     - cbn.
       eapply rutt_bind with (RR:=eq).
-      { eapply rutt_bind with (RR:=dvalue_refine_strict).
-        { apply trigger_alloca_E1E2_rutt_strict_sound.
-        }
-
-        intros r1 r2 H.
-        apply trigger_globalwrite_E1E2_rutt_strict_sound; auto.
-      }
+      apply allocate_global_E1E2_rutt_strict_sound.
 
       intros [] [] _.
       eapply rutt_bind with (RR:=eq); auto.
@@ -20516,24 +20529,56 @@ Qed.
   Proof.
     intros g.
     cbn.
-    eapply orutt_bind with (RR:=dvalue_refine_strict).
-    { apply rutt_orutt.
-      apply GlobalRead_exp_E_E1E2_rutt.
-      intros A e2.
-      apply exp_E_dec_oom.
-    }
+    unfold LLVM1.initialize_global, initialize_global.
+    break_match_goal.
+    - break_match_goal.
+      + destruct e;
+          try (apply orutt_raiseUB; cbn; eauto;
+          solve [ intros ? ? CONTRA; inv CONTRA
+                | constructor
+            ]).
 
-    intros r1 r2 R1R2.
-    apply orutt_bind with (RR:=uvalue_refine_strict).
-    { break_match.
-      apply denote_exp_E1E2_orutt.
-      eapply orutt_Ret.
-      solve_uvalue_refine_strict.
-    }
+        destruct id;
+          try (apply orutt_raiseUB; cbn; eauto;
+          solve [ intros ? ? CONTRA; inv CONTRA
+                | constructor
+            ]).
 
-    intros r3 r4 R3R4.
-    apply rutt_orutt; [| apply exp_E_dec_oom].
-    apply Store_E1E2_rutt; auto.
+        eapply orutt_bind with (RR:=dvalue_refine_strict).
+        { apply rutt_orutt.
+          apply GlobalRead_exp_E_E1E2_rutt.
+          intros A e2.
+          apply exp_E_dec_oom.
+        }
+
+        intros r1 r2 R1R2.
+        apply rutt_orutt.
+        apply rutt_trigger; cbn; eauto.
+        intros [] [] (?&?); auto.
+        intros ? ?.
+        apply exp_E_dec_oom.
+      + apply orutt_raiseUB; cbn; eauto;
+          solve [ intros ? ? CONTRA; inv CONTRA
+                | constructor
+            ].
+    - eapply orutt_bind with (RR:=dvalue_refine_strict).
+      { apply rutt_orutt.
+        apply GlobalRead_exp_E_E1E2_rutt.
+        intros A e2.
+        apply exp_E_dec_oom.
+      }
+
+      intros r1 r2 R1R2.
+      apply orutt_bind with (RR:=uvalue_refine_strict).
+      { break_match.
+        apply denote_exp_E1E2_orutt.
+        eapply orutt_Ret.
+        solve_uvalue_refine_strict.
+      }
+
+      intros r3 r4 R3R4.
+      apply rutt_orutt; [| apply exp_E_dec_oom].
+      apply Store_E1E2_rutt; auto.
   Qed.
 
   Lemma initialize_globals_E1E2_orutt :
@@ -20593,7 +20638,7 @@ Qed.
     apply orutt_bind with (RR:=eq).
     { apply orutt_bind with (RR:=eq).
       apply rutt_orutt; [| apply L0_dec_oom].
-      apply allocate_global_E1E2_rutt_strict_sound.
+      apply allocate_globals_E1E2_rutt_strict_sound.
       intros r1 r2 EQ; subst.
       apply orutt_Ret; auto.
     }
