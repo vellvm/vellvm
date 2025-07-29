@@ -48,8 +48,9 @@ define noundef zeroext i1 @"_ZN40_$LT$str$u20$as$u20$core..fmt..Debug$GT$3fmt17h
 ; core::panicking::panic_fmt
 ; Function Attrs: cold noinline noreturn nonlazybind uwtable
 define void @_ZN4core9panicking9panic_fmt17h62ccf03c8a8a51b5E(%"core::fmt::Arguments"* noalias nocapture noundef dereferenceable(48), %"core::panic::location::Location"* noalias noundef readonly align 8 dereferenceable(24)) {
-       ; TODO: This needs a proper implementation
-       ret void
+   ; TODO: This needs a proper implementation
+   call void @llvm.vellvm.internal.throw()
+   ret void
 }
 
 
