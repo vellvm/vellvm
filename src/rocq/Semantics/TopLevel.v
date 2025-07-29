@@ -27,7 +27,8 @@ From Vellvm Require Import
   Semantics.InterpretationStack
   Semantics.VellvmIntegers
   Semantics.StoreId
-  Semantics.Printfdefn.
+  Semantics.Printfdefn
+  QC.ShowAST.
 Import MonadNotation.
 Import ListNotations.
 Import Monads.
@@ -367,13 +368,17 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   (** * Initialization
 
     The initialization phase allocates and initializes globals, and allocates
-   function pointers. This initialization phase is internalizedin [Vellvm], it
+   function pointers. This initialization phase is internalized in [Vellvm], it
    is an [itree] as any other.  *)
 
   (** Allocate space for a global *)
   Definition allocate_global (g:global dtyp) : itree L0 unit :=
-    v <- trigger (Alloca (g_typ g) 1%N None);;
-    trigger (GlobalWrite (g_ident g) v).
+    if (g_alias g) then
+      (* Aliases don't allocate new storage space. *)
+      ret tt 
+    else
+      v <- trigger (Alloca (g_typ g) 1%N None);;
+      trigger (GlobalWrite (g_ident g) v).
 
   Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
     map_monad_ allocate_global gs.
@@ -439,6 +444,17 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
      statically at the global level in LLVM.
    *)
   Definition initialize_global (g:global dtyp) : itree exp_E unit :=
+    if (g_alias g) then
+      (* aliases simply populate the global ID map *)
+      match (g_exp g) with
+      | Some (EXP_Ident (ID_Global g_source)) =>
+          addr <- trigger (GlobalRead g_source);;
+          trigger (GlobalWrite (g_ident g) addr)
+      | Some _ => raiseUB ("alias " ++ (show_raw_id (g_ident g)) ++ " has bad initializer expression")
+      | None => raiseUB ("alias " ++ (show_raw_id (g_ident g)) ++ " not initialized")
+      end
+    else
+      (* non-aliases are intialized by storing values *)
     let dt := (g_typ g) in
     a <- trigger (GlobalRead (g_ident g));;
     uv <- match (g_exp g) with

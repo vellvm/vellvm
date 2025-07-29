@@ -57,6 +57,7 @@
   ("triple"                       , KW_TRIPLE);
   ("define"                       , KW_DEFINE);
   ("declare"                      , KW_DECLARE);
+  ("alias"                        , KW_ALIAS);
 
   (* Linkage *)
   ("private"                      , KW_PRIVATE);

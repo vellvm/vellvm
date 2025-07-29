@@ -89,6 +89,7 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_DATALAYOUT
 %token KW_TRIPLE
 %token KW_SOURCE_FILENAME
+%token KW_ALIAS
 
 (* Linkage *)
 %token KW_PRIVATE
@@ -647,6 +648,7 @@ global_decl:
         g_constant ;
         g_exp = Some (gv g_typ) ;
         g_externally_initialized ;
+	g_alias = false; 
         g_annotations = ((opt_list (ann_linkage_opt l)) @ g_pre @ g_post)
       }
     }
@@ -664,7 +666,28 @@ global_decl:
 	g_constant ;
 	g_exp = None ; (* No initializer *)
 	g_externally_initialized ;
+	g_alias = false;
 	g_annotations = ([ANN_linkage l] @ g_pre @ g_post)
+      }
+    }
+
+(* Aliases - resolve to an existing global.*)
+  |  g_ident = gident EQ
+     l = nonexternal_linkage?
+     g_pre = global_pre_annotations
+     KW_ALIAS
+     g_typ=typ
+     COMMA
+     typ
+     gv = gident
+     g_post = global_post_annotations
+    { { g_ident ;
+	g_typ ;
+	g_constant = false ;
+	g_exp = Some (EXP_Ident (ID_Global gv)) ; (* Initializer _is_ the aliased global value *)
+	g_externally_initialized = false;
+	g_alias = true;
+	g_annotations = ((opt_list (ann_linkage_opt l)) @ g_pre @ g_post)
       }
     }
 

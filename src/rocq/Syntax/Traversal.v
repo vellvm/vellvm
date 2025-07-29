@@ -326,6 +326,7 @@ Section Endo.
           (endo (g_constant g))
           (endo (g_exp g))
           (endo (g_externally_initialized g))
+          (endo (g_alias g))
           (endo (g_annotations g))
     .
 
@@ -760,6 +761,7 @@ Section TFunctor.
           (endo (g_constant g))
           (tfmap f (g_exp g))
           (endo (g_externally_initialized g))
+          (endo (g_alias g))
           (tfmap f (g_annotations g))
         .
 

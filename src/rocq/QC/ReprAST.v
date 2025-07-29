@@ -888,12 +888,13 @@ Section ReprInstances.
 
   Definition repr_global (g : global typ) : string :=
     match g with
-    | mk_global g_ident g_typ g_constant g_exp g_externally_initialized g_annotations =>
+    | mk_global g_ident g_typ g_constant g_exp g_externally_initialized g_alias g_annotations =>
       "(mk_global " ++ repr g_ident ++ " "
                     ++ repr g_typ ++ " "
                     ++ repr g_constant ++ " "
                     ++ repr g_exp ++ " "
                     ++ repr g_externally_initialized ++ " "
+                    ++ repr g_alias ++ " "                    
                     ++ repr g_annotations
                     ++ ")"
     end.

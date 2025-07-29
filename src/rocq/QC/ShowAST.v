@@ -1406,14 +1406,37 @@ Definition dshow_global (g : global typ) : DString :=
       (fun a => concatStr [", align "; show a; " "])
       (g_align g) in
 
-  DList_join
+  let partition :=
+    maybe_to_string
+      (fun a => concatStr [", partition "; show a; " "])
+      (g_partition g) in
+  
+  (DList_join
     [string_to_DString "@"; dshow name; string_to_DString " = ";
      string_to_DString linkage ; string_to_DString visibility;
      string_to_DString dll_storage ; string_to_DString thread_local;
      string_to_DString unnamed_addr; string_to_DString addrspace;
-     string_to_DString externally_initialized; string_to_DString g_or_c;
-     dshow gtype; string_to_DString " "; g_exp; string_to_DString section ; string_to_DString align
-    ].
+     string_to_DString externally_initialized])
+    @@
+    (if (g.(g_alias)) then
+       DList_join
+         [ string_to_DString " alias";
+           dshow gtype;
+           string_to_DString ", ";
+           dshow gtype;
+           string_to_DString "* ";
+           g_exp;
+           string_to_DString partition
+         ]
+     else
+       DList_join
+       [ string_to_DString g_or_c;
+         dshow gtype;
+         string_to_DString " ";
+         g_exp;
+         string_to_DString section ;
+         string_to_DString align
+       ]).
 
 #[global] Instance dshowGlobal : DShow (global typ) :=
   {| dshow := dshow_global |}.
@@ -1450,6 +1473,7 @@ Definition show_exp {T : Set} `{DShow T} (b: bool) (v : exp T) : string := show 
 Definition showProg (p: list (toplevel_entity typ (block typ * list (block typ)))) : string := show p.
 Definition show_tle (tle : toplevel_entity typ (block typ * list (block typ))) : string := show tle.
 Definition show_typ (t : typ) : string := show t.
+Definition show_raw_id (id : raw_id) : string := show id.
 
 #[global] Instance showTyp : Show typ :=
   {| show := show_typ |}.
