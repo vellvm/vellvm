@@ -966,6 +966,10 @@ block_label:
   | lbl=LABEL 
     { Some lbl }
 
+    (* labels with quoted identifiers are lexed as strings - include the quotes *)
+  | str=STRING COLON
+    { Some ("\"" ^ str ^ "\"")}
+
 block_phis_and_instrs_and_term:
   | id_opt=instr_lhs p=phi bl=block_phis_and_instrs_and_term
     { let (phis, instrs, t) = bl in ((id_opt, p)::phis, instrs, t) }
