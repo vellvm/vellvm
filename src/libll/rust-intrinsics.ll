@@ -1,3 +1,15 @@
+%"core::fmt::Formatter" = type { { i64, i64 }, { i64, i64 }, { {}*, [3 x i64]* }, i32, i32, i8, [7 x i8] }
+%"core::fmt::builders::DebugList" = type { %"core::fmt::builders::DebugInner" }
+%"core::fmt::builders::DebugInner" = type { %"core::fmt::Formatter"*, i8, i8, [6 x i8] }
+%"core::option::Option<core::fmt::Arguments>" = type { {}*, [5 x i64] }
+%"core::panic::location::Location" = type { { [0 x i8]*, i64 }, i32, i32 }
+%"incomplete_arrays::sized_array" = type { i32, [0 x i32] }
+%"packed_arrays::event_queue_t" = type { %"packed_arrays::event_queue_t_Inner" }
+%"packed_arrays::event_queue_t_Inner" = type { i32 }
+%"core::fmt::Arguments" = type { { [0 x { [0 x i8]*, i64 }]*, i64 }, { i64*, i64 }, { [0 x { i8*, i64* }]*, i64 } }
+%"unwind::libunwind::_Unwind_Exception" = type { i64, void (i32, %"unwind::libunwind::_Unwind_Exception"*)*, [6 x i64] }
+%"unwind::libunwind::_Unwind_Context" = type { [0 x i8] }
+
 ; Function Attrs: mustprogress nofree nosync nounwind readnone speculatable willreturn
 define {i32, i1} @llvm.umul.with.overflow.i32(i32 noundef %0, i32 noundef %1) local_unnamed_addr {
   %3 = mul i32 %1, %0
@@ -34,7 +46,9 @@ define noundef i32 @rust_eh_personality(i32 %a1, i32 noundef %a2, i64 %a3, %"unw
 
 ; std::rt::lang_start_internal
 ; Function Attrs: nonlazybind uwtable
-define i64 @_ZN3std2rt19lang_start_internal17h498f9556b87c8e5fE({}* noundef nonnull align 1 %a1, [3 x i64]* noalias noundef readonly align 8 dereferenceable(24) %a2, i64 %a3, i8** %a4) {
+define i64 @_ZN3std2rt19lang_start_internal17h498f9556b87c8e5fE({}* noundef nonnull align 1 %mainptr, [3 x i64]* noalias noundef readonly align 8 dereferenceable(24) %a2, i64 %a3, i8** %a4) {
+    %mainf = load ptr, ptr %mainptr, align 8
+    call void %mainf(i64 %a3, i8** %a4)
     ret i64 0
 }
 
