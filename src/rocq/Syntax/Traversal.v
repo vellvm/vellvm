@@ -150,6 +150,8 @@ Section Endo.
                     (endo (fst v2), f_exp (snd v2))
         | OP_Freeze v =>
           OP_Freeze (endo (fst v), f_exp (snd v))
+        | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
+            EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints
         end.
 
     #[global] Instance Endo_texp
@@ -533,6 +535,8 @@ Section TFunctor.
         | OP_InsertValue vec elt idxs        => OP_InsertValue (ftexp vec) (ftexp elt) idxs
         | OP_Select cnd v1 v2                => OP_Select (ftexp cnd) (ftexp v1) (ftexp v2)
         | OP_Freeze v                        => OP_Freeze (ftexp v)
+        | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
+            EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints
         end.
 
     #[global] Instance TFunctor_texp

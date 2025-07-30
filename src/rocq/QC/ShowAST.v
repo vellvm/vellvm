@@ -594,12 +594,16 @@ Section ShowInstances.
     | EXP_Packed_struct fields =>     false
     | EXP_Array t elts =>               false
     | EXP_Vector t elts =>        false
+    | EXP_Asm _ _ _ _ _ _ => false                                    
     | _ => true
     end.
 
   Definition add_parens (b : bool) (ds : DString) : DString :=
     if b then string_to_DString "(" @@ ds @@ string_to_DString ")" else ds.
 
+  Definition dshow_bool (b : bool) (s : string) : DString :=
+    if b then (string_to_DString s) else DList_empty.
+  
   Fixpoint dshow_exp (b: bool) (v : exp T) : DString :=
     match v with
     | EXP_Ident id => dshow id
@@ -709,6 +713,14 @@ Section ShowInstances.
                                                     dshow_exp true v1  @@ string_to_DString ", " @@ dshow t2 @@ string_to_DString " " @@  dshow_exp true v2)
 
     | OP_Freeze (ty, ex) => string_to_DString "freeze " @@ add_parens b (dshow ty @@ string_to_DString " " @@ dshow_exp true ex)
+    | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
+        string_to_DString "asm "
+          @@ (dshow_bool sideffect "sideeffect ")
+          @@ (dshow_bool alignstack "alignstack ")
+          @@ (dshow_bool inteldialect "inteldialect ")
+          @@ (dshow_bool unwind "unwind ")
+          @@ string_to_DString """" @@ string_to_DString template @@ string_to_DString """, "
+          @@ string_to_DString """" @@ string_to_DString operand_constraints @@ string_to_DString """"
     end.
 
   #[global] Instance dshowExp : DShow (exp T) :=

@@ -4,6 +4,10 @@ start:
   ret i32 4
 }
 
+define void @foo() {
+  tail call void @llvm.experimental.noalias.scope.decl(metadata !7) #14
+  ret void
+}  
 
 !1 = !DILocation(line: 11, column: 5, scope: !7)
 !7 = !{}

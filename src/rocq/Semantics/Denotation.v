@@ -358,6 +358,9 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       uv <- denote_exp' (Some dt) e ;;
       dv <- pick_your_poison uv;;
       ret (dvalue_to_uvalue dv)
+
+    | EXP_Asm _ _ _ _ template _ =>
+        raise ("encountered inlined asm template " ++ template)
     end.
 
   Definition denote_exp (top:option dtyp) (o:exp dtyp) : itree exp_E uvalue

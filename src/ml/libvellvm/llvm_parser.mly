@@ -58,6 +58,11 @@ let opt_list (m:'a option) : 'a list =
   | None -> []
   | Some x -> [x]
 
+let opt_bool (m:'a option) : bool =
+  match m with
+  | None -> false
+  | Some _ -> true
+
 let ann_linkage_opt (m : linkage option) : (typ annotation) option =
   match m with
   | None -> None
@@ -428,6 +433,11 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token<LLVMAst.raw_id> METADATA_ID
 %token<string> METADATA_STRING
 %token BANGLCURLY
+
+(* ASM *)
+%token KW_ASM
+%token KW_SIDEEFFECT
+%token KW_INTELDIALECT
 
 %token KW_ATTRIBUTES
 %token<Camlcoq.Z.t> ATTR_GRP_ID
@@ -1434,6 +1444,15 @@ expr_val:
   | KW_C cstr=STRING                                  { fun _ -> EXP_Cstring (
 								     cstring_bytes_to_LLVM_i8_array
 								     (unescape (str cstr))) }
+  | KW_ASM se=KW_SIDEEFFECT? al=KW_ALIGNSTACK? id=KW_INTELDIALECT? uw=KW_UNWIND? s1=STRING COMMA s2=STRING
+      { fun _ -> EXP_Asm (
+		     (opt_bool se),
+		     (opt_bool al),
+		     (opt_bool id),
+		     (opt_bool uw),
+		     str s1,
+		     str s2)
+		   }
 
 a_num_elts:
   | csep t=texp l=a_align { (ANN_num_elements t)::l }

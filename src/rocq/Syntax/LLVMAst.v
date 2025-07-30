@@ -388,6 +388,7 @@ Inductive exp : Set :=
 | OP_InsertValue      (vec:(T * exp)) (elt:(T * exp)) (idxs:list int_ast)
 | OP_Select           (cnd:(T * exp)) (v1:(T * exp)) (v2:(T * exp)) (* if * then * else *)
 | OP_Freeze           (v:(T * exp))
+| EXP_Asm             (sideffect:bool) (alignstack:bool) (inteldialect:bool) (unwind:bool) (template:string) (operand_constraints:string)
 .
 
 Set Elimination Schemes.

@@ -314,7 +314,15 @@ Section ReprInstances.
     | OP_Select cnd v1 v2 =>
         "(OP_Select " ++ texp cnd ++ " " ++ texp v1 ++ " " ++ texp v2 ++ ")"
     | OP_Freeze v =>
-        "(OP_Freez " ++ texp v ++")"
+        "(OP_Freeze " ++ texp v ++")"
+    | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
+        "(EXP_Asm " ++
+          (repr sideffect) ++ " " ++
+          (repr alignstack) ++ " " ++
+          (repr inteldialect) ++ " " ++
+          (repr unwind) ++ " " ++
+          """" ++ template ++ """ " ++
+          """" ++ operand_constraints ++ """)"
     end.
 
 

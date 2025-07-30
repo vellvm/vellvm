@@ -359,6 +359,9 @@
   ("metadata"  , KW_METADATA);
   ("distinct"  , KW_DISTINCT);
   ("x86_mmx"   , KW_X86_MMX);
+  ("asm"       , KW_ASM);
+  ("sideeffect", KW_SIDEEFFECT);
+  ("inteldialect", KW_INTELDIALECT);    
 
   ("attributes" , KW_ATTRIBUTES);
 

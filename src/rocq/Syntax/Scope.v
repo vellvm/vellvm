@@ -234,6 +234,7 @@ Section REGISTER_OPERATIONS.
                       | EXP_Cstring _
                       | EXP_Undef
                       | EXP_Poison
+                      | EXP_Asm _ _ _ _ _ _ (* Technically: probably need to parse operand_constraint string *) 
                         => []
 
                       | OP_Conversion _ _ e _

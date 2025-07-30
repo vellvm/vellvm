@@ -368,6 +368,8 @@ Section ExpInd.
   Hypothesis IH_Select        : forall (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select cnd v1 v2)).
   Hypothesis IH_Freeze        : forall (v:(T * exp T)), P (snd v) -> P ((OP_Freeze v)).
 
+  Hypothesis IH_Asm           : forall (sideffect:bool) (alignstack:bool) (inteldialect:bool) (unwind:bool) (template:string) (operand_constraints:string), P(EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints).
+  
   Lemma exp_ind : forall (v:exp T), P v.
     fix IH 1.
     destruct v.
@@ -424,6 +426,7 @@ Section ExpInd.
     - apply IH_InsertValue. apply IH. apply IH.
     - apply IH_Select.  apply IH. apply IH. apply IH.
     - apply IH_Freeze. apply IH.
+    - apply IH_Asm.
   Qed.
 End ExpInd.
 
