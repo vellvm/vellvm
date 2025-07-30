@@ -1420,7 +1420,7 @@ Definition dshow_global (g : global typ) : DString :=
     @@
     (if (g.(g_alias)) then
        DList_join
-         [ string_to_DString " alias";
+         [ string_to_DString "alias ";
            dshow gtype;
            string_to_DString ", ";
            dshow gtype;
