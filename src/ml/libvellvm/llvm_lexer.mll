@@ -48,8 +48,6 @@
 
   exception Lex_error_unterminated_string of Lexing.position
 
-
-  (* TODO: Replace this function with a hash table, which should be a lot more efficient. *)
   let reserved_words = [
   ("target"                       , KW_TARGET);
   ("datalayout"                   , KW_DATALAYOUT);
@@ -374,6 +372,16 @@
   ("zeroinitializer" , KW_ZEROINITIALIZER);
   ("c" , KW_C);
 
+  (* metadata *)
+(*  
+  ("nontemporal"             , META_NONTEMPORAL);
+  ("invariant.load"          , META_INVARIANT_LOAD);
+  ("invariant.group"         , META_INVARIANT_GROUP);
+  ("nonnull"                 , META_NONNULL);
+  ("dereferenceable"         , META_DEREFERENCEABLE);
+  ("dereferenceable_or_null" , META_DEREFERENCEABLE_OR_NULL);
+  ("noundef"                 , META_NOUNDEF);
+*)
   (* misc *)
   ("x" , KW_X);
 ]
@@ -400,19 +408,6 @@
     | _ -> LABEL str
     end	
 
-  type ident_type = Named | NamedString | Unnamed
-
-
-  let metadata = function
-  | "nontemporal"             -> META_NONTEMPORAL
-  | "invariant.load"          -> META_INVARIANT_LOAD
-  | "invariant.group"         -> META_INVARIANT_GROUP
-  | "nonnull"                 -> META_NONNULL
-  | "dereferenceable"         -> META_DEREFERENCEABLE
-  | "dereferenceable_or_null" -> META_DEREFERENCEABLE_OR_NULL
-  | "align"                   -> META_ALIGN
-  | "noundef"                 -> META_NOUNDEF
-  | s                         -> METADATA_ID (Name (str s))
 }
 
 let ws = [' ' '\t']
@@ -427,7 +422,7 @@ let alphanum = digit | letter
 let ident_fst  = letter   | ['-' '$' '.' '_']
 let ident_nxt  = alphanum | ['-' '$' '.' '_']
 let label_char = alphanum | ['-' '$' '.' '_'] 
-let kwletter   = alphanum | ['_']
+let kwletter   = alphanum | ['_' '$' '.' '_']
 
 rule token = parse
   (* seps and stuff *)
@@ -454,20 +449,14 @@ rule token = parse
   | '@' { GLOBAL (lexed_id lexbuf) }
   | '%' { LOCAL  (lexed_id lexbuf) }
 
-  (* FIXME: support metadata strings and struct. Parsed as identifier here. *)
-  | "!{" { BANGLCURLY }
+  (* "DI" metadata has special, nested structure, but we just ignore it all *)
   | "!DI" kwletter* '(' { gobble_metadata_debug 1 lexbuf } (* ignore input until next closing paren; produce METADATA_DEBUG after *)
-  | '!'  { let rid = lexed_id lexbuf in
-           begin match rid with
-           | ParseUtil.Named id ->
-	   (if id.[0] = '"' && id.[String.length id - 1] = '"'
-               then METADATA_STRING (String.sub id 1 (String.length id - 2))
-               else (metadata id))
 
-	   | ParseUtil.Anonymous n -> METADATA_ID (Anon (coq_of_int n))
-	   end
-         }
+  (* Strip out LTI Module Summarries *)
+  | '^' (alphanum|ws)*'='(alphanum|ws)*':' { gobble_module lexbuf }
 
+  (* FIXME: support metadata strings and struct. Parsed as identifier here. *)
+  | "!"  { BANG }
   | '#' (digit+ as i) { ATTR_GRP_ID (coq_of_int (int_of_string i)) }
 
   | "#dbg" kwletter* '(' { gobble_debug 1 lexbuf } (* ignore input until next closing paren *)
@@ -489,18 +478,24 @@ rule token = parse
   (* keywords *)
   | kwletter+ as a { create_token a }
 
-
-
+and gobble_module = parse
+  | ws*'('     { gobble_debug 1 lexbuf }
+  | eol        { token lexbuf }
+  | eof        { EOF }
+  | _          { gobble_module lexbuf }
+  
 and gobble_debug depth = parse
   | '(' { gobble_debug (depth+1) lexbuf }
   | ')' { if depth = 1 then token lexbuf else gobble_debug (depth - 1) lexbuf }
   | eol { Lexing.new_line lexbuf; gobble_debug depth lexbuf }
+  | eof { EOF }
   | _   { gobble_debug depth lexbuf }
 
 and gobble_metadata_debug depth = parse
   | '(' { gobble_metadata_debug (depth+1) lexbuf }
   | ')' { if depth = 1 then METADATA_DEBUG else gobble_metadata_debug (depth - 1) lexbuf }
   | eol { Lexing.new_line lexbuf; gobble_metadata_debug depth lexbuf }
+  | eof { EOF }
   | _   { gobble_metadata_debug depth lexbuf }
 
 

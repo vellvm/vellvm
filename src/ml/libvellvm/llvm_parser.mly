@@ -68,7 +68,6 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
   | None -> None
   | Some l -> Some (ANN_linkage l)
 
-
 %}
 
 %token<ParseUtil.lexed_id> GLOBAL LOCAL
@@ -162,6 +161,7 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_ELEMENTTYPE
 %token KW_ALIGN
 %token KW_NOALIAS
+%token KW_NOALIASSCOPE
 %token KW_NOCAPTURE
 %token KW_READONLY
 %token KW_NOFREE
@@ -269,6 +269,7 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token KW_ARGMEM
 %token KW_INACCESSIBLEMEM
 %token KW_ERRNOMEM
+%token KW_ALIASSCOPE
 (* keywords that can be followed by `:` with no space:
    memory(default: foo)
    memory(default : foo)
@@ -420,19 +421,11 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 
 (* for load instructions *)
 %token META_NONTEMPORAL
-%token META_INVARIANT_LOAD
 %token META_INVARIANT_GROUP
-%token META_NONNULL
-%token META_DEREFERENCEABLE
-%token META_DEREFERENCEABLE_OR_NULL
-%token META_ALIGN
-%token META_NOUNDEF
 
 %token METADATA_DEBUG
 
-%token<LLVMAst.raw_id> METADATA_ID
-%token<string> METADATA_STRING
-%token BANGLCURLY
+%token BANG
 
 (* ASM *)
 %token KW_ASM
@@ -445,7 +438,7 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %start<(LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities> toplevel_entities
 %start<LLVMAst.typ LLVMAst.instr> test_call
 %start<(LLVMAst.typ * LLVMAst.typ LLVMAst.exp)> texp
-
+%start<LLVMAst.typ LLVMAst.metadata> metadata_id
 
 %%
 
@@ -465,33 +458,39 @@ toplevel_entity:
    *)
   | i=lident EQ KW_TYPE t=typ           { TLE_Type_decl (ID_Local i, t)  }
   | g=global_decl                       { TLE_Global g                   }
-  | i=METADATA_ID EQ KW_DISTINCT? m=tle_metadata
+  | BANG i=metadata_id EQ KW_DISTINCT? m=tle_metadata
                                         { TLE_Metadata (i, m)            }
   | KW_ATTRIBUTES i=ATTR_GRP_ID EQ LCURLY a=fn_attr* RCURLY
                                         { TLE_Attribute_group (i, a)     }
 
 (* metadata are not implemented yet, but are at least (partially) parsed *)
 tle_metadata:
-  | BANGLCURLY m=separated_list(csep, tconst_or_metadata_value) RCURLY
+  | BANG LCURLY m=separated_list(csep, tconst_or_metadata_value) RCURLY
     { METADATA_Node m }
   | METADATA_DEBUG { METADATA_Debug_info_elided }
   | KW_METADATA m=metadata_node
     { m }
 
 metadata_id:
-  | META_NONTEMPORAL             { METADATA_Nontemporal }
-  | META_INVARIANT_LOAD          { METADATA_Invariant_load }
-  | META_INVARIANT_GROUP         { METADATA_Invariant_group }
-  | META_NONNULL                 { METADATA_Nonnull }
-  | META_DEREFERENCEABLE         { METADATA_Dereferenceable }
-  | META_DEREFERENCEABLE_OR_NULL { METADATA_Dereferenceable_or_null }
-  | META_ALIGN                   { METADATA_Align }
-  | META_NOUNDEF                 { METADATA_Noundef }
-  | ms=METADATA_STRING           { METADATA_String (str ms) }
-  | mid=METADATA_ID              { METADATA_Id mid }
+  /* | META_NONTEMPORAL             { METADATA_Nontemporal } */
+  /* | META_INVARIANT_LOAD          { METADATA_Invariant_load } */
+  /* | META_INVARIANT_GROUP         { METADATA_Invariant_group } */
+  /* | META_NONNULL                 { METADATA_Nonnull } */
+  /* | META_DEREFERENCEABLE         { METADATA_Dereferenceable } */
+  /* | META_DEREFERENCEABLE_OR_NULL { METADATA_Dereferenceable_or_null } */
+  /* | META_ALIGN                   { METADATA_Align } */
+  /* | META_NOUNDEF                 { METADATA_Noundef } */
+  | KW_NOALIAS                   { METADATA_Id (Name (str "noalias")) }
+  | KW_NONNULL                   { METADATA_Id (Name (str "nonnull")) }
+  | KW_NOUNDEF                   { METADATA_Id (Name (str "noundef")) }
+  | KW_ALIGN                     { METADATA_Id (Name (str "align")) }
+  /* | KW_ALIASSCOPE                { METADATA_Id (Name (str "alias.scope")) } */
+  | mid=INTEGER                  { METADATA_Id (Anon mid) }
+  | mid=KW_UNKNOWN               { METADATA_Id (Name (str mid)) }
+
 
 metadata_node:
-  | BANGLCURLY m=separated_list(csep, tconst_or_metadata_value) RCURLY
+  | LCURLY m=separated_list(csep, tconst_or_metadata_value) RCURLY
     { METADATA_Node m }
 
 tconst_or_metadata_value:
@@ -500,9 +499,10 @@ tconst_or_metadata_value:
 
 metadata_value:
   | KW_NULL                     { METADATA_Null      } (* null with no type *)
-  | ms=METADATA_STRING          { METADATA_String (str ms) }
-  | mid=METADATA_ID             { METADATA_Id mid     }
-  | mn=metadata_node            { mn                  }
+  | BANG ms=STRING              { METADATA_String (str ms) }
+  | BANG mid=metadata_id        { mid }
+  | BANG mn=metadata_node       { mn  }
+  | METADATA_DEBUG              { METADATA_Debug_info_elided }
 
 (* For externally defined global variables *)
 %inline
@@ -626,7 +626,7 @@ c_sanitize_address_dyninit:
   | l=c_global_metadata { l }
 
 c_global_metadata:
- |  csep m1=metadata_id m2=metadata_value l=c_global_metadata { (ANN_metadata [m1; m2]) :: l }
+ |  csep BANG m1=metadata_id m2=metadata_value l=c_global_metadata { (ANN_metadata [m1; m2]) :: l }
  | (* empty *) { [] }
 
 global_post_annotations:
@@ -720,7 +720,7 @@ align_ann:
 
 
 global_metadata:
- |  m1=metadata_id m2=metadata_value l=c_global_metadata { (ANN_metadata [m1; m2]) :: l }
+ |  BANG m1=metadata_id m2=metadata_value l=c_global_metadata { (ANN_metadata [m1; m2]) :: l }
  | (* empty *) { [] }
 
 %inline
@@ -1058,6 +1058,12 @@ typ:
   | t=non_function_type { t }
   | t=non_function_type LPAREN args=typ_args RPAREN   { let (ts,v) = args in TYPE_Function (t, ts, v) }
   | KW_VOID LPAREN args=typ_args RPAREN               { let (ts,v) = args in TYPE_Function (TYPE_Void, ts, v) }
+  | KW_METADATA                                       { TYPE_Metadata         }
+
+non_metadata_type:
+  | t=non_function_type { t }
+  | t=non_function_type LPAREN args=typ_args RPAREN   { let (ts,v) = args in TYPE_Function (t, ts, v) }
+  | KW_VOID LPAREN args=typ_args RPAREN               { let (ts,v) = args in TYPE_Function (TYPE_Void, ts, v) }
 
 non_function_type:
   | n=I                                               { TYPE_I n              }
@@ -1069,7 +1075,6 @@ non_function_type:
   | KW_X86_FP80                                       { TYPE_X86_fp80         }
   | KW_FP128                                          { TYPE_Fp128            }
   | KW_PPC_FP128                                      { TYPE_Ppc_fp128        }
-  | KW_METADATA                                       { TYPE_Metadata         }
   | KW_X86_MMX                                        { TYPE_X86_mmx          }
   | t=typ STAR                                        { TYPE_Pointer (Some t) }
   | LSQUARE n=INTEGER KW_X t=typ RSQUARE              { TYPE_Array (n_of_z n, t)  }
@@ -1116,8 +1121,12 @@ param_attr:
   | KW_WRITABLE                          { PARAMATTR_Writable                  }
   | KW_DEADONUNWIND                      { PARAMATTR_Dead_on_unwind            }
 
-call_arg: t=typ ra=list(param_attr) i=exp
-    { ((t, i t), ra) }
+ (* TODO: This loses information when metadata is used as an argument *)
+call_arg:
+  | t=non_metadata_type ra=list(param_attr) i=exp { ((t, i t), ra) }
+  | KW_METADATA metadata_value                    { ((TYPE_Metadata, EXP_Null), []) } 
+  | KW_METADATA t=non_metadata_type ra=list(param_attr) i=exp 
+      { ((t, i t), ra) }
 
 fn_attr:
   | KW_ALIGNSTACK LPAREN p=INTEGER RPAREN { FNATTR_Alignstack p     }
@@ -1432,7 +1441,7 @@ expr_val:
   | f=HEXCONSTANT                                     { fun _ -> EXP_Hex f            }
   | KW_TRUE                                           { fun _ -> EXP_Bool true        }
   | KW_FALSE                                          { fun _ -> EXP_Bool false       }
-  | KW_NULL                                           { fun _ -> EXP_Null             }
+  /* | KW_NULL                                           { fun _ -> EXP_Null             } */
   | KW_UNDEF                                          { fun _ -> EXP_Undef            }
   | KW_POISON                                         { fun _ -> EXP_Poison           }
   | KW_ZEROINITIALIZER                                { fun _ -> EXP_Zero_initializer }
@@ -1453,6 +1462,12 @@ expr_val:
 		     str s1,
 		     str s2)
 		   }
+  | m=metadata_value { fun _ -> begin match m with
+                                | METADATA_Null -> EXP_Null
+		                | _ -> EXP_Null (* TODO: what value for metadata *)
+				end
+		     } 
+
 
 a_num_elts:
   | csep t=texp l=a_align { (ANN_num_elements t)::l }
@@ -1469,7 +1484,7 @@ a_addrspace:
 alloca_anns:
   anns=a_num_elts { anns }
 
-
+(*
 l_nontemporal:
   | csep META_NONTEMPORAL m=metadata_value l=l_invariant_load
      { (ANN_metadata [METADATA_Nontemporal; m]) :: l }
@@ -1501,7 +1516,7 @@ l_dereferenceable_or_null:
   | l=l_align { l }
 
 l_align:
-  | csep META_ALIGN m=metadata_value l=l_noundef
+  | csep KW_ALIGN m=metadata_value l=l_noundef
     { (ANN_metadata [METADATA_Align; m]) :: l }
   | l=l_noundef { l }
 
@@ -1509,21 +1524,18 @@ l_noundef:
   | csep META_NOUNDEF m=metadata_value
     { (ANN_metadata [METADATA_Noundef; m]) :: [] }
   | l=l_other { l }
+*)
 
 l_other:
   | csep l=separated_list(csep, m_pair) { l }
   | (* empty *) { [] }
 
 load_anns:
-  | csep a=align l=l_nontemporal {  a::l }
-  | anns=l_nontemporal { anns }
+  | csep a=align l=l_other {  a::l }
+  | anns=l_other { anns }
 
 m_pair:
-  | m1=m_other m2=m_other { ANN_metadata([m1; m2]) }
-
-m_other:
-  | m=METADATA_STRING { METADATA_String (str m) }
-  | m=METADATA_ID { METADATA_Id m }
+  | m1=metadata_value m2=metadata_value { ANN_metadata([m1; m2]) }
 
 s_nontemporal:
   | csep META_NONTEMPORAL m=metadata_value l=s_invariant_group
@@ -1604,8 +1616,8 @@ operand_bundles:
   | KW_ATOMICCMPXCHG { failwith"INSTR_AtomicCmpXchg" }
   | KW_ATOMICRMW     { failwith"INSTR_AtomicRMW"     }
   | KW_FENCE         { failwith"INSTR_Fence"         }
-  | KW_LANDINGPAD t=typ KW_CLEANUP cs=clause* { INSTR_LandingPad (t, true, cs) }
-  | KW_LANDINGPAD t=typ cs=clause+            { INSTR_LandingPad (t, false, cs) }
+  | KW_LANDINGPAD t=typ KW_CLEANUP cs=clause* instr_metadata? { INSTR_LandingPad (t, true, cs) }
+  | KW_LANDINGPAD t=typ cs=clause+ instr_metadata?            { INSTR_LandingPad (t, false, cs) }
 
 %inline
 clause:

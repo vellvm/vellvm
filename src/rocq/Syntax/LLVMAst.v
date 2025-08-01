@@ -894,7 +894,7 @@ Variant toplevel_entity {FnBody:Set} : Set :=
 | TLE_Type_decl       (id:ident) (t:T)
 | TLE_Source_filename (s:string)
 | TLE_Global          (g:global)
-| TLE_Metadata        (id:raw_id) (md:metadata)
+| TLE_Metadata        (id:metadata) (md:metadata)
 | TLE_Attribute_group (i:int_ast) (attrs:list fn_attr)
 .
 

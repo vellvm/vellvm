@@ -825,7 +825,7 @@ Section TFunctor.
         | TLE_Type_decl id t => TLE_Type_decl (endo id) (f t)
         | TLE_Source_filename s => TLE_Source_filename (endo s)
         | TLE_Global g => TLE_Global (tfmap f g)
-        | TLE_Metadata id md => TLE_Metadata (endo id) (tfmap f md)
+        | TLE_Metadata id md => TLE_Metadata (tfmap f id) (tfmap f md)
         | TLE_Attribute_group i attrs => TLE_Attribute_group (endo i) (endo attrs)
         end.
 

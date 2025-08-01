@@ -1466,7 +1466,7 @@ Definition dshow_tle (tle : toplevel_entity typ (block typ * list (block typ))) 
      | TLE_Source_filename s => string_to_DString "source_filename = " @@ quoted_dstring s
      | TLE_Declaration decl => dshow decl
      | TLE_Global g => dshow g
-     | TLE_Metadata id md => string_to_DString "!" @@ dshow id @@ string_to_DString " = " @@ dshow_metadata md (* Can't use implicit *)
+     | TLE_Metadata id md => dshow_metadata id @@ string_to_DString " = " @@ dshow_metadata md (* Can't use implicit *)
      | TLE_Type_decl id t => DList_join [dshow_ident id ; string_to_DString " = type "; dshow t ]
      | TLE_Attribute_group i attrs =>
          DList_join
