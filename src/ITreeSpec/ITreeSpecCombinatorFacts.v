@@ -1656,7 +1656,7 @@ Qed.
         setoid_rewrite itree_eta'; eauto.
       - inv CHECK; inv Heqt1.
         inv H.
-    Admitted.
+    Abort.
 
   Lemma refines_clo_bind b1 b2 vclo
     (MON: monotone2 vclo)
@@ -1751,6 +1751,159 @@ Qed.
       + eapply IHEQV; eauto with solve_padded.
     - (* forallR *)
       (* Will probably need induction on H to match up steps *)
+      From Vellvm Require Import Utils.Tactics.
+      (* Monotonicity *)
+      assert (forall (x2 : itree_spec E R1) (x3 : itree_spec E R2),
+      gupaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) (r \2/ rr) x2 x3 ->
+      gpaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) r r x2 x3) as PACMON.
+      { intros.
+        eapply gpaco2_mon; eauto;
+          intros; cbn in PR; destruct PR; eauto.
+      }
+
+      (* Monotonicity of refinesF *)
+      assert (forall x y, refinesF eq_prerel eq_post_rel RR b1 b2 vclo
+      (gupaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) (r \2/ rr))
+      (observe x) (observe y) ->
+  refinesF eq_prerel eq_post_rel RR b1 b2 vclo
+    (gpaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) r r) 
+    (observe x) (observe y)) as REFMON.
+      { intros x y REF.
+        clear - REF PACMON MON ID.
+        eapply monotone_refinesF; eauto.
+      }
+
+      move PACMON before rr.
+      move REFMON before rr.
+
+      (* I think I need to step in order to get the value for the quantifier *)
+      gstep; red; constructor.
+      intros a.
+
+      (* Satisfy all of H0's preconditions *)
+      specialize (H0 a k1 k2).
+      forward H0; eauto with solve_padded.
+      forward H0; eauto with solve_padded.
+      { cbn.
+        pinversion PAD2; inj_existT; subst; cbn.
+        apply padded_tau.
+        apply H2.
+      }
+      repeat (forward H0; eauto with solve_padded).
+
+      (* Try unfolding the bind... *)
+      pose proof unfold_bind (k a) k2 as BIND.
+      apply bisimulation_is_eq in BIND.
+      rewrite BIND; clear BIND.
+
+      (* My current goal looks so painfully similar to H0... How can I conclude? *)
+      (* I'd like to use H0 directly. *)
+
+      (* Maybe I need to get rid of rr in H0? *)
+      eapply gpaco2_mon with (r':=r) (rg':=r) in H0; eauto.
+
+      (* I can potentially make progress via induction on H...
+         We'll have to invert H0...
+
+         But it should let us apply constructors to refinesF.
+
+         But I'm not sure I can get anywhere after that.
+       *)
+      specialize (H a).
+      remember (observe (k a)) as oka.
+      hinduction H before R1; intros.
+      + eapply H0. rewrite <- Heqoka.
+        gunfold H0.
+        induction H0.
+        * destruct IN; eauto.
+          -- red in H0.
+             eauto.
+             inv H0; try solve [constructor; eauto].
+             ++ inv CHECK.
+                constructor; eauto.
+             ++ constructor; eauto.
+                intros a0 b H0.
+                apply H4 in H0.
+                eapply MON; eauto.
+                
+                eapply ID.
+                red.
+                eapply ID.
+                eapply H4.
+
+
+
+        eapply gpaco2_base in H0
+                                
+        eauto with gpaco.
+        
+
+      
+
+      pose proof unfold_bind (k a) k2 as BIND.
+      apply bisimulation_is_eq in BIND.
+      rewrite BIND.
+      apply H0.
+      clear BIND.
+      hinduction H before R1; intros.
+
+
+
+
+      
+
+
+      pinversion PAD2; inj_existT; subst.
+      gstep; red; constructor.
+      intros a.
+      specialize (H a).
+      specialize (H0 a k1 k2).
+      forward H0; eauto with solve_padded.
+      forward H0; eauto with solve_padded.
+      { cbn. apply padded_tau.
+        apply H2.
+      }
+      repeat (forward H0; eauto with solve_padded).
+
+      remember (Tau (k3 a)).
+      hinduction H before r; intros; subst.
+      + 
+      destruct ot1.
+      + admit.
+      + cbn.
+        constructor.
+        repeat (change (ITree.subst ?k ?m) with (ITree.bind m k)).
+        cbn in *.
+        gclo.
+        econstructor.
+        
+        gbase.
+        apply CIH.
+        econstructor.
+        gunfold H0.
+        
+        pinversion H0.
+
+        rewrite <- (tau_eutt t).
+        
+
+      pinversion PAD2
+
+      gunfold H0.
+      induction H0.
+      + cbn in *.
+        destruct IN.
+        * eauto.
+
+      
+      pose proof unfold_bind (k a) k2 as BIND.
+      apply bisimulation_is_eq in BIND.
+      rewrite BIND.
+      remember (observe (k a)) as ka.
+      clear BIND.
+      hinduction H before R1; intros.
+      + 
+
       admit.
     (*   gclo. *)
     (*   eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel); *)
