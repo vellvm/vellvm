@@ -1011,11 +1011,11 @@ block_phis_and_instrs_and_term:
     { let (instrs, t) = ins in 
       ([], (id_opt, inst)::instrs, t) }
 
-  | t=terminator instr_metadata?
+  | t=terminator instr_metadata*
     { ([], [], t) }
       
 block_instrs_and_term:
-  | t=terminator instr_metadata? { ([], t) }
+  | t=terminator instr_metadata* { ([], t) }
 
   | id_opt=instr_lhs inst=instr ins=block_instrs_and_term
     { let (instrs, t) = ins in
@@ -1616,8 +1616,8 @@ operand_bundles:
   | KW_ATOMICCMPXCHG { failwith"INSTR_AtomicCmpXchg" }
   | KW_ATOMICRMW     { failwith"INSTR_AtomicRMW"     }
   | KW_FENCE         { failwith"INSTR_Fence"         }
-  | KW_LANDINGPAD t=typ KW_CLEANUP cs=clause* instr_metadata? { INSTR_LandingPad (t, true, cs) }
-  | KW_LANDINGPAD t=typ cs=clause+ instr_metadata?            { INSTR_LandingPad (t, false, cs) }
+  | KW_LANDINGPAD t=typ KW_CLEANUP cs=clause* instr_metadata* { INSTR_LandingPad (t, true, cs) }
+  | KW_LANDINGPAD t=typ cs=clause+ instr_metadata*            { INSTR_LandingPad (t, false, cs) }
 
 %inline
 clause:
