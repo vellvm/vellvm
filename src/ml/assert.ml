@@ -57,18 +57,18 @@ let successful (o : outcome) : bool =
 
 let result_test_to_string (name_pts : string) (r : result test) : string =
   let string_of_case (name, res) =
-    let p, m =
       match res with
-      | Pass -> ("PASSED", "")
-      | Fail msg -> ("FAILED", "\n\t   ERROR: " ^ msg)
-    in
-    Printf.sprintf "  %s - %s%s%!" p name m
+      | Pass ->
+         if !Platform.verbose then Printf.sprintf " PASSED - %s\n%!" name else ""
+
+      | Fail msg ->
+         Printf.sprintf " FAILED - %s\n\t   ERROR: %s\n%!" name msg
   in
   match r with
   | Test (_, cases) ->
       name_pts ^ ":"
       ^ List.fold_left
-          (fun rest case -> rest ^ "\n" ^ string_of_case case)
+          (fun rest case -> rest ^ string_of_case case)
           "" cases
 
 (* returns (name_pts, passed, failed, total, points_earned, max_given,
@@ -98,11 +98,17 @@ let outcome_to_string (o : outcome) : string =
     ( passed + p
     , failed + f
     , total + tot
-    , str ^ "\n"
+    , str
       ^
-      if f > 0 then result_test_to_string name_pts t
-      else if tot > 0 then Printf.sprintf "%s: PASSED" name_pts
-      else Printf.sprintf "%s: NO ASSERT" name_pts )
+        if f > 0 then "\n" ^ (result_test_to_string name_pts t)
+        else
+          if !Platform.verbose then
+            begin if tot > 0 then
+                    Printf.sprintf "\n%s: PASSED" name_pts
+                  else
+                    Printf.sprintf "\n%s: NO ASSERT" name_pts
+            end
+          else "")
   in
   let p, f, tot, str = List.fold_left helper (0, 0, 0, "") o in
   str ^ sep ^ Printf.sprintf "Passed: %d/%d\nFailed: %d/%d\n" p tot f tot

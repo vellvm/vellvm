@@ -194,7 +194,7 @@ let make_test name ll_ast t : (string * assertion) option =
       else None
 
 let test_pp_dir dir =
-  let _ = Printf.printf "===> RUNNING PRETTY PRINTING TESTS IN: %s\n" dir in
+  let _ = Printf.printf "===> RUNNING PRETTY PRINTING TESTS IN: %s\n%!" dir in
   Platform.configure () ;
   let suite = [Test.pp_test_of_dir dir] in
   let outcome = run_suite suite in
