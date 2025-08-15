@@ -18816,9 +18816,9 @@ attributes #18 = { nounwind }
 !6282 = distinct !DISubprogram(name: "main", linkageName: "_ZN11array_tests4main17h235eec6d3a7779e1E", scope: !69, file: !2982, line: 1, type: !21, scopeLine: 1, flags: DIFlagPrototyped, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition | DISPFlagMainSubprogram, unit: !92, templateParams: !23, retainedNodes: !23)
 !6283 = !DILocation(line: 1, column: 1, scope: !6282)
 
-; ASSERT EQ: i64 0 = call i64 @_ZN11array_tests11test_arrays22test_sized_array_impls17h57abe5361e552b4dE()
-; ASSERT EQ: i64 0 = call i64 @_ZN11array_tests11test_arrays28test_global_incomplete_array17hbc36e12f9f804e95E()
-; ASSERT EQ: i64 0 = call i64 @_ZN11array_tests11test_arrays11test_buffer17h19ec7a6a9cf167f6E()
-; ASSERT EQ: i64 0 = call i64 @_ZN11array_tests11test_arrays12test_buffer217h1b59355fc445ac2fE()
+; ASSERT SUCCEEDS: call i64 @_ZN11array_tests11test_arrays22test_sized_array_impls17h57abe5361e552b4dE()
+; ASSERT SUCCEEDS: call i64 @_ZN11array_tests11test_arrays28test_global_incomplete_array17hbc36e12f9f804e95E()
+; ASSERT SUCCEEDS: call i64 @_ZN11array_tests11test_arrays11test_buffer17h19ec7a6a9cf167f6E()
+; ASSERT SUCCEEDS: call i64 @_ZN11array_tests11test_arrays12test_buffer217h1b59355fc445ac2fE()
 ; NOASSERT EQ: i64 0 = call i64 @_ZN11array_tests11test_arrays20test_variable_arrays17hd4262a5ee37d60c9E()
 ; NOASSERT EQ: i64 0 = call i64 @_ZN11array_tests11test_arrays18test_alloca_arrays17had1968208e6f5da6E()

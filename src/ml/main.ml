@@ -107,7 +107,7 @@ let make_test name ll_ast t : (string * assertion) option =
       in
       let result = run_to_value dtyp entry args ll_ast in
       Some (str, dvalue_eq_assertion name result (fun () -> expected))
-  | Assertion.SuccessTest (dtyp, entry, args) ->
+  | Assertion.SuccessTest ( entry, args) ->
       let str =
         let args_str : doc =
           pp_print_list
@@ -117,7 +117,8 @@ let make_test name ll_ast t : (string * assertion) option =
         in
         Printf.sprintf "%s(%s)" (string_of_function_id entry) args_str
       in
-      Some (str, (fun () -> ignore (run_to_value dtyp entry args ll_ast ())))
+      let t_void = Assertion.typ_to_dtyp (LLVMAst.TYPE_Void) in
+      Some (str, (fun () -> ignore (run_to_value t_void entry args ll_ast ())))
   | Assertion.POISONTest (dtyp, entry, args) ->
      if !poison_test_flag
      then

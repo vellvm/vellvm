@@ -69,7 +69,7 @@ let show_src_tgt_mode = function
 type test =
   (* expected dvalue, dynamic type, entry, arguments *)
   | EQTest of DV.dvalue * DynamicTypes.dtyp * function_id * DV.uvalue list
-  | SuccessTest of DynamicTypes.dtyp * function_id * DV.uvalue list
+  | SuccessTest of function_id * DV.uvalue list
   (* dynamic type, entry, arguments *)
   | POISONTest of DynamicTypes.dtyp * function_id * DV.uvalue list
   (* Find a better name for this *)
@@ -188,6 +188,7 @@ let rec parse_assertion (filename : string) (line : string) : test list =
     let assertions =
       [ parse_poison_assertion line
       ; parse_eq_assertion line
+      ; parse_succeeds_assertion line
       ; parse_srctgt_assertion filename line ]
     in
     List.flatten assertions
@@ -241,6 +242,24 @@ and parse_eq_assertion (line : string) : test list =
     let dt = typ_to_dtyp (fst l) in
     let fn, args = instr_to_call_data r in
     [EQTest (uv, dt, fn, args)]
+
+and parse_succeeds_assertion (line : string) : test list =
+  (* ws* "ASSERT" ws+ "SUCCEEDS" ws* ':' ws*  (anything+ as r) *)
+  let regex = "^[ \t]*;[ \t]*ASSERT[ \t]+SUCCEEDS[ \t]*:[ \t]*\\(.*\\)" in
+  if not (Str.string_match (Str.regexp regex) line 0) then
+    (* let _ = print_endline ("NO MATCH: " ^ line) in *)
+    []
+  else
+    let rhs = Str.matched_group 1 line in
+    (* let _ = print_endline ("RHS: " ^ rhs) in *)
+    let r =
+      try Llvm_lexer.parse_test_call (Lexing.from_string rhs)
+      with _ -> failwith (Printf.sprintf "Ill-formed ASSERT EQ: %s" rhs)
+    in
+    (* let _ = print_endline "PARSED RHS" in *)
+    let fn, args = instr_to_call_data r in
+    [SuccessTest (fn, args)]
+
 
 and parse_srctgt_assertion (filename : string) (line : string) : test list =
   (* ws* ; ws* "ASSERT" ws+ "SRCTGT" ws+ (some optional number) *)

@@ -181,12 +181,13 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
       ( str
       , eval_EQTest name result (fun () -> expected) (fst strs) (snd strs) )
 
-  | Assertion.SuccessTest (dtyp, entry, args) ->
+  | Assertion.SuccessTest (entry, args) ->
       let fun_str =
         let args_str : doc = args_str args in
         Printf.sprintf "%s(%s)" (string_of_function_id entry) args_str 
       in
-      let result = run_to_value dtyp entry args ll_ast in
+      let t_void = Assertion.typ_to_dtyp (LLVMAst.TYPE_Void) in
+      let result = run_to_value t_void entry args ll_ast in
       let str = Printf.sprintf "Succeeds: %s" fun_str in
       ( str
       , eval_SuccessTest name result fun_str)
