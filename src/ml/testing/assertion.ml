@@ -14,10 +14,12 @@ open List
 type raw_assertion_string =
   | Eq of {lhs: string; rhs: string}
   | Poison' of {fcall: string}
+  | Success of string
 
 let string_of_raw_assertion_string = function
   | Eq {lhs; rhs} -> Printf.sprintf "Eq{LHS:%s; RHS:%s}" lhs rhs
   | Poison' {fcall} -> Printf.sprintf "Poison'{fcall:%s}" fcall
+  | Success s -> s
 (* SPECIAL TREATMENT FOR Alive2 TESTS
 
    - ERROR comments put the assertion parser into a different mode:
@@ -67,6 +69,7 @@ let show_src_tgt_mode = function
 type test =
   (* expected dvalue, dynamic type, entry, arguments *)
   | EQTest of DV.dvalue * DynamicTypes.dtyp * function_id * DV.uvalue list
+  | SuccessTest of DynamicTypes.dtyp * function_id * DV.uvalue list
   (* dynamic type, entry, arguments *)
   | POISONTest of DynamicTypes.dtyp * function_id * DV.uvalue list
   (* Find a better name for this *)

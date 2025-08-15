@@ -85,6 +85,15 @@ let eval_EQTest (name : string) (got : unit -> DV.dvalue)
   | Right _ -> Result.make_singleton EQOk name (RAW_STR (Eq {lhs; rhs}))
   | Left _ -> Result.make_singleton EQNOk name (RAW_STR (Eq {lhs; rhs}))
 
+let eval_SuccessTest (name : string) result (fun_str:string) () :
+    result_sum =
+  try
+    let _ = result () in 
+    Result.make_singleton SuccessOk name (RAW_STR (Success fun_str))
+  with
+  | _ ->
+     Result.make_singleton SuccessNOk name (RAW_STR (Success fun_str))
+
 (* This function takes in a name, a got and expected function, and function
    call name. It will lift the result into the test result class *)
 let eval_POISONTest (name : string) (got : unit -> DV.dvalue)
@@ -152,16 +161,17 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
     | Ok dv -> dv
     | Error e -> failwith (Result.string_of_exit_condition e)
   in
+  let args_str args : doc =
+    pp_print_list
+      ~pp_sep:(fun f () -> pp_print_string f ", ")
+      Interpreter.pp_uvalue str_formatter args ;
+    flush_str_formatter ()
+  in
   match t with
   | Assertion.EQTest (expected, dtyp, entry, args) ->
       let strs =
         let expected_str = string_of_dvalue expected in
-        let args_str : doc =
-          pp_print_list
-            ~pp_sep:(fun f () -> pp_print_string f ", ")
-            Interpreter.pp_uvalue str_formatter args ;
-          flush_str_formatter ()
-        in
+        let args_str = args_str args in
         let lhs = expected_str in
         let rhs = Printf.sprintf "%s(%s)" (string_of_function_id entry) args_str in
         (lhs, rhs)
@@ -170,6 +180,17 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
       let str = Printf.sprintf "%s=%s" (fst strs) (snd strs) in
       ( str
       , eval_EQTest name result (fun () -> expected) (fst strs) (snd strs) )
+
+  | Assertion.SuccessTest (dtyp, entry, args) ->
+      let fun_str =
+        let args_str : doc = args_str args in
+        Printf.sprintf "%s(%s)" (string_of_function_id entry) args_str 
+      in
+      let result = run_to_value dtyp entry args ll_ast in
+      let str = Printf.sprintf "Succeeds: %s" fun_str in
+      ( str
+      , eval_SuccessTest name result fun_str)
+
   | Assertion.POISONTest (dtyp, entry, args) ->
       let expected =
         InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV

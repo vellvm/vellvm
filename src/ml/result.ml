@@ -34,6 +34,8 @@ type test_result =
   | STErr : src_tgt_error_side -> test_result
   | EQOk
   | EQNOk
+  | SuccessOk
+  | SuccessNOk
   | POIOk
   | POINOk
   | UNSOLVED
@@ -50,6 +52,8 @@ let string_of_test_result = function
       Printf.sprintf "%s Error" (string_of_src_tgt_error_side side)
   | EQOk -> "Equality Correct"
   | EQNOk -> "Equality Incorrect"
+  | SuccessOk -> "Success Correct"
+  | SuccessNOk -> "Success Incorrect"
   | POIOk -> "Poison Correct"
   | POINOk -> "Poison Incorrect"
   | UNSOLVED -> "Not Runnable"
@@ -66,6 +70,8 @@ let int_of_test_result = function
   | POINOk -> 7
   | UNSOLVED -> 8
   | NOASSERT -> 9
+  | SuccessOk -> 10
+  | SuccessNOk -> 11
 (* The first string is always file name *)
 
 module Test_Result_Key = struct
