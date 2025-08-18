@@ -247,6 +247,11 @@ let ast_pp_dir dir =
   let files = Test.ll_files_of_dir dir in
   List.iter ast_pp_file_inner files
 
+let link_dir dir =
+  Platform.configure () ;
+  let files = Test.ll_files_of_dir dir in
+  List.iter Driver.add_link_file files
+
 let test_file path =
   Platform.configure () ;
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
@@ -396,6 +401,9 @@ let args =
   ; ( "-op"
     , Set_string Platform.output_path
     , "set the path to the output files directory  [default='output']" )
+  ; ( "-L"
+    , String link_dir
+    , "Link all .ll files in the given directory" )
   ; ( "-l"
     , String Driver.add_link_file
     , "Specify LLVM files to link against." )
