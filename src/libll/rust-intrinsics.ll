@@ -43,11 +43,119 @@ define { i64, i1 } @llvm.umul.with.overflow.i64(i64 noundef %0, i64 noundef %1) 
   ret {i64, i1} %fullres
 }
 
+define i1 @llvm.vellvm.internal.smuloverflow.i32(i32 noundef %0, i32 noundef %1) {
+  %3 = icmp sgt i32 %0, 0
+  br i1 %3, label %4, label %17
+
+4:                                                ; preds = %2
+  %5 = icmp sgt i32 %1, 0
+  br i1 %5, label %6, label %9
+
+6:                                                ; preds = %4
+  %7 = udiv i32 2147483647, %1
+  %8 = icmp ult i32 %7, %0
+  br label %34
+
+9:                                                ; preds = %4
+  %10 = icmp slt i32 %1, 0
+  br i1 %10, label %11, label %34
+
+11:                                               ; preds = %9
+  %12 = sext i32 %1 to i64
+  %13 = udiv i32 -2147483648, %0
+  %14 = zext i32 %13 to i64
+  %15 = sub nsw i64 0, %14
+  %16 = icmp ugt i64 %15, %12
+  br label %34
+
+17:                                               ; preds = %2
+  %18 = icmp slt i32 %0, 0
+  br i1 %18, label %19, label %34
+
+19:                                               ; preds = %17
+  %20 = icmp sgt i32 %1, 0
+  br i1 %20, label %21, label %27
+
+21:                                               ; preds = %19
+  %22 = sext i32 %0 to i64
+  %23 = udiv i32 -2147483648, %1
+  %24 = zext i32 %23 to i64
+  %25 = sub nsw i64 0, %24
+  %26 = icmp ugt i64 %25, %22
+  br label %34
+
+27:                                               ; preds = %19
+  %28 = icmp slt i32 %1, 0
+  br i1 %28, label %29, label %34
+
+29:                                               ; preds = %27
+  %30 = sub i32 0, %1
+  %31 = udiv i32 2147483647, %30
+  %32 = sub nsw i32 0, %31
+  %33 = icmp sgt i32 %32, %0
+  br label %34
+
+34:                                               ; preds = %17, %27, %9, %29, %21, %11, %6
+  %35 = phi i1 [ %8, %6 ], [ %16, %11 ], [ %26, %21 ], [ %33, %29 ], [ false, %9 ], [ false, %27 ], [ false, %17 ]
+  ret i32 %35
+}
+
+define i1 @llvm.vellvm.internal.smuloverflow.i64(i64 noundef %0, i64 noundef %1) local_unnamed_addr #0 {
+  %3 = icmp sgt i64 %0, 0
+  br i1 %3, label %4, label %15
+
+4:                                                ; preds = %2
+  %5 = icmp sgt i64 %1, 0
+  br i1 %5, label %6, label %9
+
+6:                                                ; preds = %4
+  %7 = udiv i64 9223372036854775807, %1
+  %8 = icmp ult i64 %7, %0
+  br label %30
+
+9:                                                ; preds = %4
+  %10 = icmp slt i64 %1, 0
+  br i1 %10, label %11, label %30
+
+11:                                               ; preds = %9
+  %12 = udiv i64 -9223372036854775808, %0
+  %13 = sub i64 0, %12
+  %14 = icmp ugt i64 %13, %1
+  br label %30
+
+15:                                               ; preds = %2
+  %16 = icmp slt i64 %0, 0
+  br i1 %16, label %17, label %30
+
+17:                                               ; preds = %15
+  %18 = icmp sgt i64 %1, 0
+  br i1 %18, label %19, label %23
+
+19:                                               ; preds = %17
+  %20 = udiv i64 -9223372036854775808, %1
+  %21 = sub i64 0, %20
+  %22 = icmp ugt i64 %21, %0
+  br label %30
+
+23:                                               ; preds = %17
+  %24 = icmp slt i64 %1, 0
+  br i1 %24, label %25, label %30
+
+25:                                               ; preds = %23
+  %26 = sub i64 0, %1
+  %27 = udiv i64 9223372036854775807, %26
+  %28 = sub nsw i64 0, %27
+  %29 = icmp sgt i64 %28, %0
+  br label %30
+
+30:                                               ; preds = %15, %23, %9, %25, %19, %11, %6
+  %31 = phi i1 [ %8, %6 ], [ %14, %11 ], [ %22, %19 ], [ %29, %25 ], [ false, %9 ], [ false, %23 ], [ false, %15 ]
+  ret i64 %31
+}
+
 define {i32, i1} @llvm.smul.with.overflow.i32(i32 noundef %0, i32 noundef %1) local_unnamed_addr {
   %3 = mul i32 %1, %0
-  %4 = icmp slt i32 %3, %0
-  %5 = icmp slt i32 %3, %1
-  %overflow = and i1 %4, %5
+  %overflow = call i1 @llvm.vellvm.internal.smuloverflow.i32(i32 %0, i32 %1)
   %base = insertvalue {i32, i1} {i32 0, i1 0}, i32 %3, 0
   %fullres = insertvalue {i32, i1} %base, i1 %overflow, 1
   ret {i32, i1} %fullres
@@ -55,22 +163,119 @@ define {i32, i1} @llvm.smul.with.overflow.i32(i32 noundef %0, i32 noundef %1) lo
 
 define { i64, i1 } @llvm.smul.with.overflow.i64(i64 noundef %0, i64 noundef %1) local_unnamed_addr {
   %3 = mul i64 %1, %0
-  %4 = icmp slt i64 %3, %0
-  %5 = icmp slt i64 %3, %1
-  %overflow = and i1 %4, %5
+  %overflow = call i1 @llvm.vellvm.internal.smuloverflow.i64(i32 %0, i32 %1)
   %base = insertvalue {i64, i1} {i64 0, i1 0}, i64 %3, 0
   %fullres = insertvalue {i64, i1} %base, i1 %overflow, 1
   ret {i64, i1} %fullres
 }
 
-define {i32, i1} @llvm.sadd.with.overflow.i32(i32 noundef %0, i32 noundef %1) local_unnamed_addr {
+define i1 @llvm.vellvm.internal.saddoverflow.i32(i32 noundef %0, i32 noundef %1) {
+  %3 = icmp sgt i32 %1, 0
+  %4 = xor i32 %1, 2147483647
+  %5 = icmp slt i32 %4, %0
+  %6 = and i1 %3, %5
+  br i1 %6, label %13, label %7
+
+7:                                                ; preds = %2
+  %8 = icmp slt i32 %1, 0
+  %9 = sub nsw i32 -2147483648, %1
+  %10 = icmp sgt i32 %9, %0
+  %11 = select i1 %8, i1 %10, i1 false
+  br label %12
+
+12:                                               ; preds = %7, %2
+  %13 = phi i1 [ 1, %2 ], [ %11, %7 ]
+  ret i1 %13
+}
+
+define i1 @llvm.vellvm.internal.saddoverflow.i64(i64 noundef %0, i64 noundef %1) {
+  %3 = icmp sgt i64 %1, 0
+  %4 = xor i64 %1, 9223372036854775807
+  %5 = icmp slt i64 %4, %0
+  %6 = and i1 %3, %5
+  br i1 %6, label %13, label %7
+
+7:                                                ; preds = %2
+  %8 = icmp slt i64 %1, 0
+  %9 = sub nsw i64 -9223372036854775808, %1
+  %10 = icmp sgt i64 %9, %0
+  %11 = select i1 %8, i1 %10, i1 false
+  br label %12
+
+12:                                               ; preds = %7, %2
+  %13 = phi i1 [ 1, %2 ], [ %11, %7 ]
+  ret i1 %13
+}
+
+define {i32, i1} @llvm.sadd.with.overflow.i32(i32 noundef %0, i32 noundef %1) {
   %3 = add i32 %1, %0
-  %4 = icmp slt i32 %3, %0
-  %5 = icmp slt i32 %3, %1
-  %overflow = and i1 %4, %5
+  %overflow = call i1 @llvm.vellvm.internal.saddoverflow.i32(i32 %0, i32 %1)
   %base = insertvalue {i32, i1} {i32 0, i1 0}, i32 %3, 0
   %fullres = insertvalue {i32, i1} %base, i1 %overflow, 1
   ret {i32, i1} %fullres
+}
+
+define {i64, i1} @llvm.sadd.with.overflow.i64(i64 noundef %0, i64 noundef %1) {
+  %3 = add i64 %1, %0
+  %overflow = call i1 @llvm.vellvm.internal.saddoverflow.i64(i64 %0, i64 %1)
+  %base = insertvalue {i64, i1} {i64 0, i1 0}, i64 %3, 0
+  %fullres = insertvalue {i64, i1} %base, i1 %overflow, 1
+  ret {i64, i1} %fullres
+}
+
+define i1 @llvm.vellvm.internal.suboverflow.i32(i32 noundef %0, i32 noundef %1) {
+2:
+  %3 = icmp slt i32 %1, 0
+  %4 = add nsw i32 %1, 2147483647
+  %5 = icmp slt i32 %4, %0
+  %6 = select i1 %3, i1 %5, i1 false
+  br i1 %6, label %13, label %7
+
+7:                                                ; preds = %2
+  %8 = icmp sgt i32 %1, 0
+  %9 = add nsw i32 %1, -2147483648
+  %10 = icmp sgt i32 %9, %0
+  %11 = select i1 %8, i1 %10, i1 false
+  br label %12
+
+12:                                               ; preds = %7, %2
+  %13 = phi i1 [ 1, %2 ], [ %11, %7 ]
+  ret i1 %13
+}
+
+define i1 @llvm.vellvm.internal.suboverflow.i64(i64 noundef %0, i64 noundef %1) {
+  %3 = icmp slt i64 %1, 0
+  %4 = add nsw i64 %1, 9223372036854775807
+  %5 = icmp slt i64 %4, %0
+  %6 = select i1 %3, i1 %5, i1 false
+  br i1 %6, label %13, label %7
+
+7:                                                ; preds = %2
+  %8 = icmp sgt i64 %1, 0
+  %9 = or i64 %1, -9223372036854775808
+  %10 = icmp sgt i64 %9, %0
+  %11 = select i1 %8, i1 %10, i1 false
+  br label %12
+
+12:                                               ; preds = %7, %2
+  %13 = phi i1 [ 1, %2 ], [ %11, %7 ]
+  ret i1 %13
+}
+
+define {i32, i1} @llvm.ssub.with.overflow.i32(i32 noundef %0, i32 noundef %1) local_unnamed_addr {
+  %3 = sub i32 %0, %1
+  %overflow = call i1 @llvm.vellvm.internal.suboverflow.i32(i32 %0, i32 %1)
+  %base = insertvalue {i32, i1} {i32 0, i1 0}, i32 %3, 0
+  %fullres = insertvalue {i32, i1} %base, i1 %overflow, 1
+  ret {i32, i1} %fullres
+}
+
+define {i64, i1} @llvm.ssub.with.overflow.i64(i64 noundef %0, i64 noundef %1) local_unnamed_addr {
+  %3 = sub i64 %0, %1
+  %overflow = call i1 @llvm.vellvm.internal.suboverflow.i32(i64 %0, i64 %1)
+  %base = insertvalue {i64, i1} {i64 0, i1 0}, i64 %3, 0
+  %fullres = insertvalue {i64, i1} %base, i1 %overflow, 1
+  ret {i64, i1} %fullres
 }
 
 define void @llvm.lifetime.start.p0i8(i64 %blah, i8* nonnull %foo) {
@@ -78,6 +283,22 @@ define void @llvm.lifetime.start.p0i8(i64 %blah, i8* nonnull %foo) {
 }
 
 define void @llvm.lifetime.end.p0i8(i64 immarg %a1, i8* nocapture %a2) {
+     ret void
+}
+
+define void @llvm.lifetime.start.p0(i64 %blah, i8* nonnull %foo) {
+     ret void
+}
+
+define void @llvm.lifetime.end.p0(i64 immarg %a1, i8* nocapture %a2) {
+     ret void
+}
+
+define void @llvm.lifetime.start(i64 %blah, i8* nonnull %foo) {
+     ret void
+}
+
+define void @llvm.lifetime.end(i64 immarg %a1, i8* nocapture %a2) {
      ret void
 }
 
@@ -151,7 +372,7 @@ define void @llvm.dbg.declare(metadata, metadata, metadata) {
 }
 
 define i1 @llvm.expect.i1(i1 %x, i1 %y) {
-       ret i1 %y
+       ret i1 %x
 }
 
 
@@ -179,4 +400,58 @@ define noalias i8* @__rust_realloc(i8* %old, i64 %old_size, i64 %align, i64 %new
   call void @llvm.memcpy.p0i8.p0i8.i64(i8* %ptr, i8* %old, i64 48, i1 false)
   call void @free(i8* %old)
   ret i8* %ptr
+}
+
+define void @llvm.memset.p0.i64(ptr %dest, i8 %val, i64 %len, i1 %vol) {
+        call void @llvm.memset.p0i8.i64(ptr %dest, i8 %val, i64 %len, i1 %vol)
+        ret void
+}
+
+define void @llvm.memset.p0.i32(ptr %dest, i8 %val, i32 %len, i1 %vol) {
+        call void @llvm.memset.p0i8.i32(ptr %dest, i8 %val, i32 %len, i1 %vol)
+        ret void
+}
+
+define i8* @memset(i8* %ptr, i32 %val, i64 %len) {
+  %valc = trunc i32 %val to i8
+  call void @llvm.memset.p0.i64(i8* %ptr, i8 %valc, i64 %len, i1 false)
+  ret i8* %ptr
+}
+
+define void @llvm.memcpy.p0.p0.i64(i8* %ptr, i8* %old, i64 %len, i1 %vol) {
+  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %ptr, i8* %old, i64 %len, i1 %vol)
+  ret void
+}
+
+define dso_local noundef i32 @memcmp(i8* %0, i8* %1, i64 %2) {
+  %4 = icmp eq i64 %2, 0
+  br i1 %4, label %17, label %8
+
+5:                                                ; preds = %15
+  %6 = add nuw i64 %9, 1
+  %7 = icmp eq i64 %6, %2
+  br i1 %7, label %17, label %8, !llvm.loop !6
+
+8:                                                ; preds = %3, %5
+  %9 = phi i64 [ %6, %5 ], [ 0, %3 ]
+  %10 = getelementptr inbounds i8, ptr %0, i64 %9
+  %11 = load i8, ptr %10, align 1, !tbaa !8
+  %12 = getelementptr inbounds i8, ptr %1, i64 %9
+  %13 = load i8, ptr %12, align 1, !tbaa !8
+  %14 = icmp slt i8 %11, %13
+  br i1 %14, label %17, label %15
+
+15:                                               ; preds = %8
+  %16 = icmp sgt i8 %11, %13
+  br i1 %16, label %17, label %5
+
+17:                                               ; preds = %5, %8, %15, %3
+  %18 = phi i32 [ 0, %3 ], [ 1, %15 ], [ -1, %8 ], [ 0, %5 ]
+  ret i32 %18
+}
+
+define i64 @llvm.umax.i64(i64 %x, i64 %y) {
+       %c = icmp ult i64 %x, %y
+       %res = select i1 %c, i64 %y, i64 %x
+       ret i64 %res
 }
