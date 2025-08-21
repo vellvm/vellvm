@@ -323,8 +323,19 @@ Section ReprInstances.
           (repr unwind) ++ " " ++
           """" ++ template ++ """ " ++
           """" ++ operand_constraints ++ """)"
+    | EXP_Metadata md =>
+        "(EXP_Metadata " ++ repr_metadata md ++ ")"
+    end with
+  repr_metadata (m : metadata typ) : string :=
+    let texp (te : (typ * exp typ)) : string :=
+      let '(t, e) := te in "(" ++ repr_typ t ++ ", " ++ repr_exp e ++ ")"
+    in
+    match m with
+    | METADATA_Const tv => "(METADATA_Const " ++ texp tv ++ ")"
+    | METADATA_Id id => "(METADATA_Id " ++ repr id ++ ")"
+    | METADATA_Node mds => "(METADATA_Node [" ++ (contents id (List.map repr_metadata mds)) ++ "])"
+    | METADATA_Debug s1 s2 => "(METADATA_Debug " ++ repr s1 ++ ", " ++ repr s2 ++ ")"
     end.
-
 
   #[global]
    Instance reprExp : Repr (exp typ)
@@ -338,6 +349,11 @@ Section ReprInstances.
             end
        |}.
 
+  #[global]
+   Instance reprMetadata : Repr (metadata typ) :=
+    {| repr := repr_metadata |}.
+
+  
   Definition repr_opt {A} `{Repr A} (ma : option A) : string
     := match ma with
        | None   => "None"
@@ -594,28 +610,6 @@ Section ReprInstances.
    Instance reprThread_Local_Storage : Repr thread_local_storage :=
     {| repr := repr_thread_local_storage |}.
 
-  Program Fixpoint repr_metadata (m : metadata typ) : string :=
-    match m with
-    | METADATA_Const tv => "(METADATA_Const " ++ repr tv ++ ")"
-    | METADATA_Null => "METADATA_Null"
-    | METADATA_Nontemporal => "METADATA_Nontemporal"
-    | METADATA_Invariant_load => "METADATA_Invariant_load"
-    | METADATA_Invariant_group => "METADATA_Invariant_group"
-    | METADATA_Nonnull => "METADATA_Nonnull"
-    | METADATA_Dereferenceable => "METADATA_Dereferenceable"
-    | METADATA_Dereferenceable_or_null => "METADATA_Dereferenceable_or_null"
-    | METADATA_Align => "METADATA_Align"
-    | METADATA_Noundef => "METADATA_Noundef"
-    | METADATA_Id id => "(METADATA_Id " ++ repr id ++ ")"
-    | METADATA_String str => "(METADATA_String " ++ repr str ++ ")"
-    | METADATA_Named strs => "(METADATA_Named " ++ repr strs ++ ")"
-    | METADATA_Node mds => "(METADATA_Node [" ++ (contents id (List.map repr_metadata mds)) ++ "])"
-    | METADATA_Debug_info_elided => "METADATA_Debug_info_elided"
-    end.
-
-  #[global]
-   Instance reprMetadata : Repr (metadata typ) :=
-    {| repr := repr_metadata |}.
 
 
   Definition repr_preemption_specifier (p:preemption_specifier) : string :=
@@ -831,8 +825,8 @@ Section ReprInstances.
       | TERM_IndirectBr v brs  => 
           "(TERM_IndirectBr " ++ repr v ++ " " ++ repr brs ++ ")" 
       | TERM_Resume v  => "(TERM_Resume " ++ repr v ++ ")"
-      | TERM_Invoke i fnptrval args to_label unwind_label anns obs  =>
-          "(TERM_Invoke " ++ repr i ++ repr fnptrval ++ " " ++ repr args 
+      | TERM_Invoke fnptrval args to_label unwind_label anns obs  =>
+          "(TERM_Invoke " ++ repr fnptrval ++ " " ++ repr args 
           ++ " " ++ repr to_label ++ " " ++ repr unwind_label ++ repr anns ++ repr obs ++ ")"
       | TERM_Unreachable => "TERM_Unreachable"
        end.

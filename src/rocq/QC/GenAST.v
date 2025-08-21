@@ -3058,7 +3058,7 @@ Section InstrGenerators.
        | S n' =>
            instr <- gen_instr;;
            rest  <- gen_code_length n';;
-           ret (instr ++ rest)%list
+           ret ((List.map (fun x => (x, [])) instr) ++ rest)%list
        end.
 
   Definition block_size : nat := 20.
@@ -3145,7 +3145,7 @@ Section InstrGenerators.
           let b := {| blk_id   := bid
                    ;  blk_phis := []
                    ;  blk_code := code
-                   ;  blk_term := term
+                   ;  blk_term := (IVoid 0%Z, term, [])
                    ;  blk_comments := None
                    |} in
           ret (b, (b, bs))
@@ -3180,7 +3180,7 @@ Section InstrGenerators.
            iid <- genInstrId (TYPE_I 1);;
            ret (iid, loop_cond_exp));;
 
-         let entry_code : list (instr_id * instr typ) := [(loop_init_instr_id, loop_init_instr); (loop_cmp_id, loop_cmp); (select_id, select_instr); (loop_cond_id, loop_cond)] in
+         let entry_code : (code typ) := [(loop_init_instr_id, loop_init_instr, []); (loop_cmp_id, loop_cmp, []); (select_id, select_instr, []); (loop_cond_id, loop_cond, [])] in
 
          (* Generate end blocks *)
          '(loop_bid, phi_id, bid_entry, bid_next, next_instr_raw_id, next_block, end_bid, end_blocks) <- backtrack_variable_ctxs
@@ -3205,11 +3205,11 @@ Section InstrGenerators.
                       ret (iid, INSTR_Op next_cond_exp));;
                    let next_cond_raw_id := instr_id_to_raw_id "next_cond_exp" next_cond_id in
 
-                   let next_code := [(next_instr_id, next_instr); (next_cond_id, next_cond)] in
+                   let next_code : (code typ) := [(next_instr_id, next_instr, []); (next_cond_id, next_cond, [])] in
                    let next_block := {| blk_id   := bid_next
                                      ; blk_phis := []
                                      ; blk_code := next_code
-                                     ; blk_term := TERM_Br (TYPE_I 1, (EXP_Ident (ID_Local next_cond_raw_id))) loop_bid end_bid
+                                     ; blk_term := (IVoid 0%Z, TERM_Br (TYPE_I 1, (EXP_Ident (ID_Local next_cond_raw_id))) loop_bid end_bid, [])
                                      ; blk_comments := None
                                      |} in
                    ret (loop_bid, phi_id, bid_entry, bid_next, next_instr_raw_id, next_block, end_bid, end_blocks));;
@@ -3222,7 +3222,7 @@ Section InstrGenerators.
          let entry_block := {| blk_id   := bid_entry
                             ; blk_phis := []
                             ; blk_code := entry_code
-                            ; blk_term := TERM_Br (TYPE_I 1, (EXP_Ident (ID_Local (instr_id_to_raw_id "loop_cond_id" loop_cond_id)))) loop_bid end_bid
+                            ; blk_term := (IVoid 0%Z, TERM_Br (TYPE_I 1, (EXP_Ident (ID_Local (instr_id_to_raw_id "loop_cond_id" loop_cond_id)))) loop_bid end_bid, [])
                             ; blk_comments := None
                             |} in
 
@@ -3240,9 +3240,9 @@ Section InstrGenerators.
          code <- gen_code;;
          '(term, bs) <- gen_terminator_sz (sz - 1) t (bid_next::back_blocks);;
          let b := {| blk_id   := bid_loop
-                  ; blk_phis := [(phi_id, Phi (TYPE_I 32 (* TODO: big ints *)) [(bid_entry, entry_exp); (bid_next, next_exp)])]
+                  ; blk_phis := [(phi_id, Phi (TYPE_I 32 (* TODO: big ints *)) [(bid_entry, entry_exp); (bid_next, next_exp)], [])]
                   ; blk_code := code
-                  ; blk_term := term
+                  ; blk_term := (IVoid 0%Z, term, [])
                   ; blk_comments := None
                   |} in
          ret (b, bs).

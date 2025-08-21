@@ -54,12 +54,13 @@ Section LABELS_OPERATIONS.
        | TERM_Switch v default_dest brs => default_dest :: map snd brs
        | TERM_IndirectBr v brs => brs
        | TERM_Resume v => []
-       | TERM_Invoke _ fnptrval args to_label unwind_label _ _ => [to_label; unwind_label]
+       | TERM_Invoke fnptrval args to_label unwind_label _ _ => [to_label; unwind_label]
        | TERM_Unreachable => []
        end.
 
   Definition successors (bk : block T) : list block_id :=
-    terminator_outputs (blk_term bk).
+    let '(_, t, _) := (blk_term bk) in
+    terminator_outputs t.
 
   Definition outputs (bks : ocfg T) : list block_id
     := fold_left (fun acc bk => acc ++ successors bk) bks [].
@@ -137,9 +138,9 @@ Section LABELS_OPERATIONS.
      - the sources of [phi] and the predecessors of [bk] are in bijection
    *)
   Definition wf_ocfg_phis (G : ocfg T) :=
-    forall bk pred x phi,
+    forall bk pred x phi md,
       In bk G ->
-      In (x,phi) bk.(blk_phis) ->
+      In (x,phi,md) bk.(blk_phis) ->
       (In pred (phi_sources phi) <-> In pred (predecessors bk.(blk_id) G)).
 
   Record wf_cfg (G : cfg T): Prop :=
@@ -194,10 +195,10 @@ Section REGISTER_OPERATIONS.
     .
 
     #[global] Instance code_defs {T} : Def_sites (code T) :=
-      {| def_sites := fold_right (fun '(id,_) acc => def_sites id +++ acc) ∅ |}.
+      {| def_sites := fold_right (fun '(id,_,_) acc => def_sites id +++ acc) ∅ |}.
 
     #[global] Instance block_def_sites {T} : Def_sites (block T) :=
-      {| def_sites := fun bk => map fst bk.(blk_phis) +++ def_sites bk.(blk_code) |}.
+      {| def_sites := fun bk => map (fun '(id,_,_) => id) bk.(blk_phis) +++ def_sites bk.(blk_code) |}.
 
     #[global] Instance ocfg_def_sites {T} : Def_sites (ocfg T) :=
       {| def_sites := set_flat_map def_sites |}.
@@ -234,7 +235,8 @@ Section REGISTER_OPERATIONS.
                       | EXP_Cstring _
                       | EXP_Undef
                       | EXP_Poison
-                      | EXP_Asm _ _ _ _ _ _ (* Technically: probably need to parse operand_constraint string *) 
+                      | EXP_Asm _ _ _ _ _ _ (* Technically: probably need to parse operand_constraint string *)
+                      | EXP_Metadata _
                         => []
 
                       | OP_Conversion _ _ e _
@@ -298,7 +300,7 @@ Section REGISTER_OPERATIONS.
       |}.
 
     #[global] Instance code_use_sites {T} : Use_sites (code T) :=
-      {| use_sites := set_flat_map (fun x => use_sites (snd x)) |}.
+      {| use_sites := set_flat_map (fun x => use_sites (snd (fst x))) |}.
 
     #[global] Instance term_use_sites {T} : Use_sites (terminator T) :=
       {| use_sites := fun t => match t with
@@ -316,7 +318,7 @@ Section REGISTER_OPERATIONS.
                                | TERM_Unreachable
                                  => []
 
-                               | TERM_Invoke _ _ l _ _ _ _ =>
+                               | TERM_Invoke _ l _ _ _ _ =>
                                  set_flat_map use_sites (List.map fst l)
                                end
       |}.
@@ -325,7 +327,7 @@ Section REGISTER_OPERATIONS.
       {| use_sites := fun '(Phi _ l) => set_flat_map (fun x => use_sites (snd x)) l |}.
 
     #[global] Instance block_use_sites {T} : Use_sites (block T) :=
-      {| use_sites := fun bk => set_flat_map (fun x => use_sites (snd x)) bk.(blk_phis) +++ use_sites bk.(blk_code) +++ use_sites bk.(blk_term) |}.
+      {| use_sites := fun bk => set_flat_map (fun x => use_sites (snd (fst x))) bk.(blk_phis) +++ use_sites bk.(blk_code) +++ use_sites (snd (fst bk.(blk_term))) |}.
 
     #[global] Instance ocfg_use_sites {T} : Use_sites (ocfg T) :=
       {| use_sites := set_flat_map use_sites |}.

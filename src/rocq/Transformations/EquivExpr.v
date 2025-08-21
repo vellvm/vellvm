@@ -53,40 +53,6 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
   Module R := Refinement.Make LP LLVM.
   Import R.
 
-  Section MetadataInd.
-    Context {T : Set}.
-    Variable P : metadata T -> Prop.
-
-    Hypothesis IH_METADATA_Const  : forall tv, P (METADATA_Const tv).
-    Hypothesis IH_METADATA_Null : P METADATA_Null.
-    Hypothesis IH_METADATA_Nontemporal : P METADATA_Nontemporal.
-    Hypothesis IH_METADATA_Invariant_load : P METADATA_Invariant_load.
-    Hypothesis IH_METADATA_Invariant_group : P METADATA_Invariant_group.
-    Hypothesis IH_METADATA_Nonnull : P METADATA_Nonnull.
-    Hypothesis IH_METADATA_Dereferenceable : P METADATA_Dereferenceable.
-    Hypothesis IH_METADATA_Dereferenceable_or_null : P METADATA_Dereferenceable_or_null.
-    Hypothesis IH_METADATA_Align : P METADATA_Align.
-    Hypothesis IH_METADATA_Noundef : P METADATA_Noundef.
-    Hypothesis IH_METADATA_Id    : forall id, P (METADATA_Id id).
-    Hypothesis IH_METADATA_String : forall str, P (METADATA_String str).
-    Hypothesis IH_METADATA_Named : forall strs, P (METADATA_Named strs).
-    Hypothesis IH_METADATA_Debug_info_elided : P (METADATA_Debug_info_elided).
-    Hypothesis IH_METADATA_Node : forall (mds : list (metadata T)),
-        (forall md, In md mds -> P md) ->
-        P (METADATA_Node mds).
-
-    Lemma metadata_ind : forall (md:metadata T), P md.
-      fix IH 1.
-      remember P as P0 in IH.
-      destruct md; auto; subst.
-      - apply IH_METADATA_Node.
-        { revert mds.
-          fix IHMetadata 1. intros [|u mds']. intros. inversion H.
-          intros u' [<-|Hin]. apply IH. eapply IHMetadata. apply Hin.
-        }
-    Qed.
-  End MetadataInd.
-
 
   Section ExpOptim.
 
@@ -155,8 +121,8 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Ltac intro2 := first [intros (? & ? & ?) ? <- | intros (? & ? & ?)].
       Ltac intro3 := first [intros (? & ? & ? & ?) ? <- | intros (? & ? & ? & ?)].
 
-      Lemma exp_optim_correct_instr : forall varargs x i g l,
-          ⟦ (x,i) at varargs ⟧i2 g l ≈ ⟦ (x, endo i) at varargs ⟧i2 g l.
+      Lemma exp_optim_correct_instr : forall varargs x i md g l,
+          ⟦ (x,i,md) at varargs ⟧i2 g l ≈ ⟦ (x, endo i, md) at varargs ⟧i2 g l.
       Proof using opt_correct opt_respect_int.
         intros *.
         destruct i; try reflexivity.
@@ -295,11 +261,14 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
           reflexivity.
       Qed.
 
+      
       Opaque denote_exp.
       Lemma exp_optim_correct_term : forall t g l,
           ⟦ t ⟧t2 g l ≈ ⟦ endo t ⟧t2 g l.
       Proof using opt_correct.
         intros *.
+        destruct t.
+        destruct p.
         destruct t; try reflexivity.
         - destruct v; cbn.
           rewrite !interp_cfg2_bind.
@@ -359,7 +328,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
 
           intros (?&?&?).
           destruct s; try reflexivity.
-          destruct i as [[i | i] | i]; try reflexivity.
+          destruct i as [i | i]; try reflexivity.
       Qed.
 
       Lemma exp_optim_correct_code : forall varargs c g l,
@@ -369,7 +338,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
         unfold endo; simpl.
         rewrite 2denote_code_cons, 2interp_cfg2_bind.
         apply eutt_clo_bind with (UU := eq).
-        destruct i as [[] ?]; apply exp_optim_correct_instr.
+        destruct i as [[[] ?] ?]; apply exp_optim_correct_instr.
         intro2.
         apply IH.
       Qed.
@@ -377,7 +346,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Lemma exp_optim_correct_phi : forall phi f g l,
           ℑ2 (translate exp_to_instr ⟦ phi ⟧Φ (f)) g l ≈ ℑ2 (translate exp_to_instr ⟦ endo phi ⟧Φ (f)) g l.
       Proof using opt_correct.
-        intros [id []] f.
+        intros [[id []] md] f.
         induction args as [| [] args IH]; intros; [reflexivity |].
         cbn.
         do 2 break_match_goal.

@@ -733,7 +733,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         (* Not sure if I need this. *)
         (*    Allocate store *)
         (* alloca_store <- fix_alloca isntr;; *)
-        ret (instr ++ rest)
+        ret ((List.map (fun x => (x, [])) instr) ++ rest)
     end.
 
   (* How to generate a list of arguments
@@ -784,7 +784,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         blk_id := pred_bid
       ; blk_phis := []
       ; blk_code := init_code
-      ; blk_term := TERM_Br_1 fn_bid
+      ; blk_term := (IVoid 0%Z, TERM_Br_1 fn_bid, [])
       ; blk_comments := None
       |} in
     let fn_term := match fn_instr_id with
@@ -795,8 +795,8 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
       {|
         blk_id := fn_bid
       ; blk_phis := []
-      ; blk_code := [(fn_instr_id, fn_instr)]
-      ; blk_term := fn_term
+      ; blk_code := [(fn_instr_id, fn_instr, [])]
+      ; blk_term := (IVoid 0%Z, fn_term, [])
       ; blk_comments := None
       |} in
     ret (pred_b, [fn_b]).

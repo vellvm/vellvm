@@ -794,6 +794,9 @@ Section DTyp.
     f_equal.
     destruct bk; cbn.
     unfold successors.
+    destruct blk_term.
+    destruct p.
+    simpl.
     rewrite <- convert_typ_terminator_outputs.
     reflexivity.
   Qed.

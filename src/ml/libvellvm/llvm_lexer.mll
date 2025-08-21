@@ -429,7 +429,7 @@ rule token = parse
   | ws+ { token lexbuf }
   | eol { Lexing.new_line lexbuf; token lexbuf } (* ignore newlines! *)
   | eof { EOF }
-  | ';' { comment lexbuf }
+  | ';' { comment (Buffer.create 10) lexbuf }
   | '=' { EQ }
   | ',' { COMMA }
   | '('  { LPAREN }
@@ -450,7 +450,9 @@ rule token = parse
   | '%' { LOCAL  (lexed_id lexbuf) }
 
   (* "DI" metadata has special, nested structure, but we just ignore it all *)
-  | "!DI" kwletter* '(' { gobble_metadata_debug 1 lexbuf } (* ignore input until next closing paren; produce METADATA_DEBUG after *)
+  | "!DI" (kwletter*  as di) '('
+     (* ignore input until next closing paren; produce METADATA_DEBUG after *)
+     { gobble_metadata_debug di (Buffer.create 10) 1 lexbuf } 
 
   (* Strip out LTI Module Summarries *)
   | '^' (alphanum|ws)*'='(alphanum|ws)*':' { gobble_module lexbuf }
@@ -491,18 +493,37 @@ and gobble_debug depth = parse
   | eof { EOF }
   | _   { gobble_debug depth lexbuf }
 
-and gobble_metadata_debug depth = parse
-  | '(' { gobble_metadata_debug (depth+1) lexbuf }
-  | ')' { if depth = 1 then METADATA_DEBUG else gobble_metadata_debug (depth - 1) lexbuf }
-  | eol { Lexing.new_line lexbuf; gobble_metadata_debug depth lexbuf }
+and gobble_metadata_debug di buf depth = parse
+  | '(' {
+          Buffer.add_char buf '(';
+          gobble_metadata_debug di buf (depth+1) lexbuf
+	}
+  | ')' {
+          if depth = 1 then
+            METADATA_DEBUG (di, Buffer.contents buf)
+	  else begin
+	    Buffer.add_char buf ')';
+	    gobble_metadata_debug di buf (depth - 1) lexbuf
+	  end
+	}
+  | eol as x {
+          Lexing.new_line lexbuf;
+	  Buffer.add_string buf x;
+          gobble_metadata_debug di buf depth lexbuf
+	}
   | eof { EOF }
-  | _   { gobble_metadata_debug depth lexbuf }
+  | _ as c  { Buffer.add_char buf c; gobble_metadata_debug di buf depth lexbuf }
 
 
-and comment = parse
-  | eol { Lexing.new_line lexbuf; token lexbuf }
-  | eof { EOF }
-  | _ { comment lexbuf }
+and comment buf = parse
+  | eol    { Lexing.new_line lexbuf;
+             COMMENT (Buffer.contents buf)
+           }
+  | eof    { raise Llvm_parser.Error }
+  | _ as c {
+             Buffer.add_char buf c;
+             comment buf lexbuf
+	   }
 
 and string buf = parse
   | '"'    { Buffer.contents buf }
@@ -532,7 +553,7 @@ and lexed_id = parse
     | Llvm_parser.Error -> parsing_err lexbuf "Error token encountered"
     | Failure s ->
       begin
-        parsing_err lexbuf s
+        parsing_err lexbuf ("Failure: " ^ s)
       end
 
   let parse_test_call lexbuf =

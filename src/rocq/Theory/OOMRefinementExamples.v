@@ -326,12 +326,12 @@ Module Infinite.
   Qed.
 
   Definition alloc_code : code dtyp :=
-    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%positive) [])
+    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%positive) [], [])
     ].
 
   Definition ptoi_code : code dtyp :=
-    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%positive) []);
-      (IId (Name "i"), INSTR_Op (OP_Conversion Ptrtoint DTYPE_Pointer (EXP_Ident (ID_Local (Name "ptr"))) (DTYPE_IPTR)))
+    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%positive) [], []);
+      (IId (Name "i"), INSTR_Op (OP_Conversion Ptrtoint DTYPE_Pointer (EXP_Ident (ID_Local (Name "ptr"))) (DTYPE_IPTR)), [])
     ].
 
   Definition ret_code : code dtyp :=
@@ -342,7 +342,7 @@ Module Infinite.
       blk_id := Name "";
       blk_phis := [];
       blk_code := alloc_code;
-      blk_term := TERM_Ret (DTYPE_I 1%positive, EXP_Bool true);
+      blk_term := (IVoid 0%Z, TERM_Ret (DTYPE_I 1%positive, EXP_Bool true), []);
       blk_comments := None;
     |}.
 
@@ -351,7 +351,7 @@ Module Infinite.
       blk_id := Name "";
       blk_phis := [];
       blk_code := ptoi_code;
-      blk_term := TERM_Ret (DTYPE_I 1%positive, EXP_Bool true);
+      blk_term := (IVoid 0%Z, TERM_Ret (DTYPE_I 1%positive, EXP_Bool true), []);
       blk_comments := None;
     |}.
 
@@ -360,7 +360,7 @@ Module Infinite.
       blk_id := Name "";
       blk_phis := [];
       blk_code := ret_code;
-      blk_term := TERM_Ret (DTYPE_I 1%positive, EXP_Bool true);
+      blk_term := (IVoid 0%Z, TERM_Ret (DTYPE_I 1%positive, EXP_Bool true), []);
       blk_comments := None;
     |}.
 
@@ -1486,12 +1486,12 @@ Module Finite.
   Import MemTheory.
 
   Definition alloc_code : code dtyp :=
-    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%positive) [])
+    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%positive) [], [])
     ].
 
   Definition ptoi_code : code dtyp :=
-    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%positive) []);
-      (IId (Name "i"), INSTR_Op (OP_Conversion Ptrtoint DTYPE_Pointer (EXP_Ident (ID_Local (Name "ptr"))) (DTYPE_IPTR)))
+    [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%positive) [], []);
+      (IId (Name "i"), INSTR_Op (OP_Conversion Ptrtoint DTYPE_Pointer (EXP_Ident (ID_Local (Name "ptr"))) (DTYPE_IPTR)), [])
     ].
 
   Definition ret_code : code dtyp :=
@@ -1502,7 +1502,7 @@ Module Finite.
       blk_id := Name "";
       blk_phis := [];
       blk_code := alloc_code;
-      blk_term := TERM_Ret (DTYPE_I 1%positive, EXP_Bool true);
+      blk_term := (IVoid 0%Z, TERM_Ret (DTYPE_I 1%positive, EXP_Bool true), []);
       blk_comments := None;
     |}.
 
@@ -1511,7 +1511,7 @@ Module Finite.
       blk_id := Name "";
       blk_phis := [];
       blk_code := ptoi_code;
-      blk_term := TERM_Ret (DTYPE_I 1%positive, EXP_Bool true);
+      blk_term := (IVoid 0%Z, TERM_Ret (DTYPE_I 1%positive, EXP_Bool true), []);
       blk_comments := None;
     |}.
 
@@ -1520,7 +1520,7 @@ Module Finite.
       blk_id := Name "";
       blk_phis := [];
       blk_code := ret_code;
-      blk_term := TERM_Ret (DTYPE_I 1%positive, EXP_Bool true);
+      blk_term := (IVoid 0%Z, TERM_Ret (DTYPE_I 1%positive, EXP_Bool true), []);
       blk_comments := None;
     |}.
 

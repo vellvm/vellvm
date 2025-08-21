@@ -37,8 +37,8 @@ Definition float32 := Floats.float32.
 
 Variant raw_id : Set :=
 | Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)
-| Anon (n:int_ast)        (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
-| Raw  (n:int_ast)        (* Used for code generation -- serializes as %_RAW_0 %_RAW_1 etc. *)
+| Anon (n:int_ast)    (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
+| Raw  (n:int_ast)    (* Used for code generation -- serializes as %_RAW_0 %_RAW_1 etc. *)
 .
 
 Variant ident : Set :=
@@ -59,8 +59,8 @@ Inductive typ : Set :=
 | TYPE_X86_fp80
 | TYPE_Fp128
 | TYPE_Ppc_fp128
-(* | TYPE_Label  label is not really a type *)
-(* | TYPE_Token -- used with exceptions *)
+(* | TYPE_Label  type of block labels, currently unsupported *)
+(* | TYPE_Token  used with exceptions *)
 | TYPE_Metadata
 | TYPE_X86_mmx
 | TYPE_Array (sz:N) (t:typ)
@@ -71,7 +71,7 @@ Inductive typ : Set :=
 | TYPE_Packed_struct (fields:list typ)
 | TYPE_Opaque
 | TYPE_Vector (sz:N) (t:typ)     (* t must be integer, floating point, or pointer type *)
-| TYPE_Identified (id:ident) (* add *)
+| TYPE_Identified (id:ident)     
 .
 
 Variant linkage : Set :=
@@ -389,30 +389,45 @@ Inductive exp : Set :=
 | OP_Select           (cnd:(T * exp)) (v1:(T * exp)) (v2:(T * exp)) (* if * then * else *)
 | OP_Freeze           (v:(T * exp))
 | EXP_Asm             (sideffect:bool) (alignstack:bool) (inteldialect:bool) (unwind:bool) (template:string) (operand_constraints:string)
-.
+| EXP_Metadata        (m:metadata)
 
+with metadata : Set :=
+(* METADATA_Id covers all metadata values of the form:
+    !id (without quotes), including, !invariant.load  !nontemporal, etc.
+    !"llvm.loop.unroll", (with quotes)
+    !0, !1, !2
+   Following the same conventions as for other identifiers
+    - Anon is for numbers
+    - Name is for others, but the string includes quotes  
+*)
+| METADATA_Id     (id:raw_id)  
+| METADATA_Const  (tv:T * exp)
+| METADATA_Node   (mds:list metadata)
+
+(* DI Metadata introduced completely new lexical conventions for "structured" debug
+   metadata.  Vellvm doesn't do anything interesting with this metadata (yet),
+   so we simply parse it in a way that preserves the information.
+
+   METADATA_Debug represents a !DI<str>(<contents>) metadata node tag
+   and its contents represented as a string.
+   For example
+      !DIExpression(DW_OP_deref, DW_OP_constu, 3, DW_OP_plus, DW_OP_LLVM_fragment, 3, 7)
+
+   would be represented as:
+      METADATA_Debug ("Expression", "DW_OP_deref, DW_OP_constu, 3, DW_OP_plus, DW_OP_LLVM_fragment, 3, 7")
+
+   Note that there is no parsing of the inner contents (but balanced parens are enforced), so
+      !DIExpression(2, 3, !DIExpression(1, !DIExpression()))
+
+   would be represented as:
+      METADATA_Debug ("Expression", "2, 3, !DIExpression(1, !DIExpression())")
+ *)
+| METADATA_Debug (DIstr:string) (contents:string)
+
+.
 Set Elimination Schemes.
 
 Definition texp : Set := T * exp.
-
-Inductive metadata : Set :=
-| METADATA_Const  (tv:texp)
-| METADATA_Null
-| METADATA_Nontemporal
-| METADATA_Invariant_load
-| METADATA_Invariant_group
-| METADATA_Nonnull
-| METADATA_Dereferenceable
-| METADATA_Dereferenceable_or_null
-| METADATA_Align
-| METADATA_Noundef
-| METADATA_Id     (id:raw_id)  (* local or global? *)
-| METADATA_String (str:string)
-| METADATA_Named  (strs:list string)
-| METADATA_Node   (mds:list metadata)
-| METADATA_Debug_info_elided  (* represents a !DI.(_) metadata node *)
-.
-
 
 (* Used in switch branches which insist on integer literals *)
 Variant tint_literal : Set :=
@@ -420,7 +435,7 @@ Variant tint_literal : Set :=
 
 Variant instr_id : Set :=
   | IId   (id:raw_id)    (* "Anonymous" or explicitly named instructions *)
-  | IVoid (n:int_ast)        (* "Void" return type, for "store",  "void call", and terminators.
+  | IVoid (n:int_ast)    (* "Void" return type, for "store",  "void call", and terminators.
                             Each with unique number (NOTE: these are distinct from Anon raw_id) *)
 .
 
@@ -719,7 +734,7 @@ Variant landingpad_clause :=
 
 Variant instr : Set :=
 | INSTR_Comment (msg:string)
-| INSTR_Op   (op:exp)                                             (* INVARIANT: op must be of the form (OP_ ...) *)
+| INSTR_Op   (op:exp) (* INVARIANT: op must be of the form (OP_ ...) *)
 | INSTR_Call (fn:texp) (args:list (texp * (list param_attr))) (anns:list annotation) (obs : list operand_bundle)   (* CORNER CASE: return type is void treated specially *)
 | INSTR_Alloca (t:T) (anns: list annotation)
 | INSTR_Load  (t:T) (ptr:texp) (anns: list annotation)
@@ -742,9 +757,7 @@ Variant terminator : Set :=
 | TERM_IndirectBr (v:texp) (brs:list block_id) (* address * possible addresses (labels) *)
 | TERM_Resume     (v:texp)
 
-  (* The `invoke` terminator, unlike the others, can optionally define an
-     instr_id for use in the "to_label" block, as with a `call` instruction.  *)                  
-| TERM_Invoke  (i:option instr_id) (fnptrval:texp) (args:list (texp * (list param_attr))) (to_label:block_id) (unwind_label:block_id) (anns:list annotation) (obs : list operand_bundle)
+| TERM_Invoke  (fnptrval:texp) (args:list (texp * (list param_attr))) (to_label:block_id) (unwind_label:block_id) (anns:list annotation) (obs : list operand_bundle)
 | TERM_Unreachable
 .
 
@@ -757,7 +770,7 @@ Record global : Set :=
       g_exp          : option exp;     (* InitializerConstant *)
       g_externally_initialized: bool;
       g_alias        : bool;              (* Is this an Alias? see: https://llvm.org/docs/LangRef.html#aliases *)
-      g_annotations : list annotation  (* Invariant: the list list of annotations is in the same order as is valid for the LLVM IR grammar *)
+      g_annotations : list annotation  (* Invariant: the list of annotations is in the same order as is valid for the LLVM IR grammar *)
 }.
 
 Definition g_linkage (g:global) : option linkage :=
@@ -863,16 +876,15 @@ Definition dc_personality (d:declaration) : option texp :=
 Definition dc_metadata (d:declaration) : list (list metadata) :=
   filter_option ann_metadata (dc_annotations d).
 
-
-Definition code := list (instr_id * instr).
+Definition code := list (instr_id * instr * (list metadata)).
 
 Record block : Set :=
   mk_block
     {
       blk_id    : block_id;
-      blk_phis  : list (local_id * phi);
+      blk_phis  : list (local_id * phi * (list metadata));
       blk_code  : code;
-      blk_term  : terminator;
+      blk_term  : instr_id * terminator * (list metadata);
       blk_comments : option (list string)
     }.
 

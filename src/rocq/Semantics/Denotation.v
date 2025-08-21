@@ -360,7 +360,16 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       ret (dvalue_to_uvalue dv)
 
     | EXP_Asm _ _ _ _ template _ =>
-        raise ("encountered inlined asm template " ++ template)
+        raise ("denote_exp encountered inlined asm template " ++ template)
+
+    | EXP_Metadata md =>
+        (* METADATA TODO - it isn't clear what the denotations should be *)
+        match md with
+        | METADATA_Id _ => ret UVALUE_None
+        | METADATA_Const tv => eval_texp tv
+        | METADATA_Node _ => ret UVALUE_None
+        | METADATA_Debug _ _ => ret UVALUE_None
+        end
     end.
 
   Definition denote_exp (top:option dtyp) (o:exp dtyp) : itree exp_E uvalue
@@ -426,7 +435,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
   (* An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
-    (i: (instr_id * instr dtyp)) (varargs : option ADDR.addr) : itree instr_E unit :=
+    (i: (instr_id * instr dtyp * list (metadata dtyp))) (varargs : option ADDR.addr) : itree instr_E unit :=
+    let '(i, md) := i in
     match i with
     (* Pure operations *)
 
@@ -549,6 +559,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       end
 
     | (IVoid _, INSTR_Comment _) => ret tt
+
     | (pt, INSTR_VAArg (t, ptr_to_args_exp) argty) =>
         uptr_to_args <- translate exp_to_instr (denote_exp (Some DTYPE_Pointer) ptr_to_args_exp);;
         ptr_to_args <- concretize_or_pick_unique uptr_to_args;;
@@ -599,7 +610,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
 
-  Definition denote_terminator (t: terminator dtyp): itree instr_E (block_id + uvalue) :=
+  Definition denote_terminator (trm: (instr_id * terminator dtyp * list (metadata dtyp))): itree instr_E (block_id + uvalue) :=
+    let '(iid, t, _) := trm in
     match t with
 
     | TERM_Ret (dt, op) =>
@@ -641,7 +653,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | TERM_Unreachable => raiseUB "IMPOSSIBLE: unreachable in reachable position"
 
       (* TODO: technically operand bundles can affect the semantics of invoke *)
-    | TERM_Invoke iid (dt, fnptrval) args to_label unwind_label anns _ =>
+    | TERM_Invoke (dt, fnptrval) args to_label unwind_label anns _ =>
       uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) (List.map fst args) ;;
       fv <- (translate exp_to_instr (denote_exp None fnptrval)) ;;
       rv <- trigger (Call dt fv uvs) ;;
@@ -653,9 +665,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
           ret (inl unwind_label)
       | inr returned_value =>
           match iid with
-          | None => ret tt
-          | Some (IVoid _) => ret tt
-          | Some (IId id)  => trigger (LocalWrite id returned_value)
+          | IVoid _ => ret tt
+          | IId id  => trigger (LocalWrite id returned_value)
           end;;
           ret (inl to_label)
       end
@@ -672,8 +683,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   Definition denote_code (c: code dtyp) (varargs : option ADDR.addr) : itree instr_E unit :=
     map_monad_ (fun i => denote_instr i varargs) c.
 
-  Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp) : itree exp_E (local_id * uvalue) :=
-    let '(id, Phi dt args) := id_p in
+  Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : itree exp_E (local_id * uvalue) :=
+    let '(id, Phi dt args, _) := id_p in
     match assoc bid_from args with
     | Some op =>
       uv <- denote_exp (Some dt) op ;;
@@ -681,7 +692,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | None => raise ("jump: phi node doesn't include block ")
     end.
 
-  Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp)): itree instr_E unit :=
+  Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp * (list (metadata dtyp)))): itree instr_E unit :=
     dvs <- map_monad
              (fun x => translate exp_to_instr (denote_phi bid_from x))
              phis;;

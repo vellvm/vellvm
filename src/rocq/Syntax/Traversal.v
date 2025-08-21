@@ -83,76 +83,104 @@ Section Endo.
         | _ => t
         end.
 
-    #[global] Instance Endo_exp
-           `{Endo T}
-           `{Endo raw_id}
-           `{Endo ibinop}
-           `{Endo icmp}
-           `{Endo fbinop}
-           `{Endo fcmp}
-      : Endo (exp T) | 50 :=
-      fix f_exp (e:exp T) :=
-        match e with
-        | EXP_Ident id => EXP_Ident (endo id)
-        | EXP_Integer _
-        | EXP_Float   _
-        | EXP_Double  _
-        | EXP_Hex     _
-        | EXP_Bool    _
-        | EXP_Null
-        | EXP_Zero_initializer
-        | EXP_Undef
-        | EXP_Poison => e
-        | EXP_Cstring elts =>
+    Fixpoint f_exp
+      `{Endo T}
+      `{Endo raw_id}
+      `{Endo ibinop}
+      `{Endo icmp}
+      `{Endo fbinop}
+      `{Endo fcmp}
+      `{Endo string}
+      (e:exp T) :=
+      match e with
+      | EXP_Ident id => EXP_Ident (endo id)
+      | EXP_Integer _
+      | EXP_Float   _
+      | EXP_Double  _
+      | EXP_Hex     _
+      | EXP_Bool    _
+      | EXP_Null
+      | EXP_Zero_initializer
+      | EXP_Undef
+      | EXP_Poison => e
+      | EXP_Cstring elts =>
           EXP_Cstring (List.map (fun '(t,e) => (endo t, f_exp e)) elts)
-        | EXP_Struct fields =>
+      | EXP_Struct fields =>
           EXP_Struct (List.map (fun '(t,e) => (endo t, f_exp e)) fields)
-        | EXP_Packed_struct fields =>
+      | EXP_Packed_struct fields =>
           EXP_Packed_struct (List.map (fun '(t,e) => (endo t, f_exp e)) fields)
-        | EXP_Array t elts =>
+      | EXP_Array t elts =>
           EXP_Array (endo t) (List.map (fun '(t,e) => (endo t, f_exp e)) elts)
-        | EXP_Vector t elts =>
+      | EXP_Vector t elts =>
           EXP_Vector (endo t) (List.map (fun '(t,e) => (endo t, f_exp e)) elts)
-        | OP_IBinop iop t v1 v2 =>
+      | OP_IBinop iop t v1 v2 =>
           OP_IBinop (endo iop) (endo t) (f_exp v1) (f_exp v2)
-        | OP_ICmp cmp t v1 v2 =>
+      | OP_ICmp cmp t v1 v2 =>
           OP_ICmp (endo cmp) (endo t) (f_exp v1) (f_exp v2)
-        | OP_FBinop fop fm t v1 v2 =>
+      | OP_FBinop fop fm t v1 v2 =>
           OP_FBinop (endo fop) fm (endo t) (f_exp v1) (f_exp v2)
-        | OP_FCmp cmp t v1 v2 =>
+      | OP_FCmp cmp t v1 v2 =>
           OP_FCmp (endo cmp) (endo t) (f_exp v1) (f_exp v2)
-        | OP_Conversion conv t_from v t_to =>
+      | OP_Conversion conv t_from v t_to =>
           OP_Conversion conv (endo t_from) (f_exp v) (endo t_to)
-        | OP_GetElementPtr t ptrval idxs =>
+      | OP_GetElementPtr t ptrval idxs =>
           OP_GetElementPtr (endo t) (endo (fst ptrval), f_exp (snd ptrval))
-                           (List.map (fun '(a,b) => (endo a, f_exp b)) idxs)
-        | OP_ExtractElement vec idx =>
+            (List.map (fun '(a,b) => (endo a, f_exp b)) idxs)
+      | OP_ExtractElement vec idx =>
           OP_ExtractElement (endo (fst vec), f_exp (snd vec))
-                            (endo (fst idx), f_exp (snd idx))
-        | OP_InsertElement  vec elt idx =>
+            (endo (fst idx), f_exp (snd idx))
+      | OP_InsertElement  vec elt idx =>
           OP_InsertElement (endo (fst vec), f_exp (snd vec))
-                           (endo (fst elt), f_exp (snd elt))
-                           (endo (fst idx), f_exp (snd idx))
-        | OP_ShuffleVector vec1 vec2 idxmask =>
+            (endo (fst elt), f_exp (snd elt))
+            (endo (fst idx), f_exp (snd idx))
+      | OP_ShuffleVector vec1 vec2 idxmask =>
           OP_ShuffleVector (endo (fst vec1), f_exp (snd vec1))
-                           (endo (fst vec2), f_exp (snd vec2))
-                           (endo (fst idxmask), f_exp (snd idxmask))
-        | OP_ExtractValue vec idxs =>
+            (endo (fst vec2), f_exp (snd vec2))
+            (endo (fst idxmask), f_exp (snd idxmask))
+      | OP_ExtractValue vec idxs =>
           OP_ExtractValue (endo (fst vec), f_exp (snd vec))
-                          idxs
-        | OP_InsertValue vec elt idxs =>
+            idxs
+      | OP_InsertValue vec elt idxs =>
           OP_InsertValue (endo (fst vec), f_exp (snd vec))
-                         (endo (fst elt), f_exp (snd elt))
-                         idxs
-        | OP_Select cnd v1 v2 =>
+            (endo (fst elt), f_exp (snd elt))
+            idxs
+      | OP_Select cnd v1 v2 =>
           OP_Select (endo (fst cnd), f_exp (snd cnd))
-                    (endo (fst v1), f_exp (snd v1))
-                    (endo (fst v2), f_exp (snd v2))
-        | OP_Freeze v =>
+            (endo (fst v1), f_exp (snd v1))
+            (endo (fst v2), f_exp (snd v2))
+      | OP_Freeze v =>
           OP_Freeze (endo (fst v), f_exp (snd v))
-        | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
-            EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints
+      | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
+          EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints
+      | EXP_Metadata m => EXP_Metadata (@endo_metadata _ _ _ _ _ _ _ m)
+      end
+    with endo_metadata
+      `{Endo T}
+      `{Endo raw_id}
+      `{Endo ibinop}
+      `{Endo icmp}
+      `{Endo fbinop}
+      `{Endo fcmp}
+      `{Endo string}
+      (m : metadata T)
+      : (metadata T)  :=
+        match m with
+        | METADATA_Const  tv => METADATA_Const ((endo (fst tv)), (f_exp (snd tv)))
+        | METADATA_Id id => METADATA_Id (endo id)
+        | METADATA_Node mds => METADATA_Node (List.map endo_metadata mds)
+        | METADATA_Debug sd d => METADATA_Debug (endo sd) (endo d)
         end.
+
+    
+    #[global] Instance Endo_exp
+      `{Endo T}
+      `{Endo raw_id}
+      `{Endo ibinop}
+      `{Endo icmp}
+      `{Endo fbinop}
+      `{Endo fcmp}
+      `{Endo string}
+      : Endo (exp T) | 50 := f_exp.
 
     #[global] Instance Endo_texp
            `{Endo T}
@@ -162,29 +190,14 @@ Section Endo.
 
 
     #[global] Instance Endo_metadata
-           `{Endo T}
-           `{Endo (exp T)}
-           `{Endo raw_id}
-           `{Endo string}
-      : Endo (metadata T) | 50 :=
-      fix endo_metadata m :=
-        match m with
-        | METADATA_Const  tv => METADATA_Const (endo tv)
-        | METADATA_Null => METADATA_Null
-        | METADATA_Nontemporal => METADATA_Nontemporal
-        | METADATA_Invariant_load => METADATA_Invariant_load
-        | METADATA_Invariant_group => METADATA_Invariant_group
-        | METADATA_Nonnull => METADATA_Nonnull
-        | METADATA_Dereferenceable => METADATA_Dereferenceable
-        | METADATA_Dereferenceable_or_null => METADATA_Dereferenceable_or_null
-        | METADATA_Align => METADATA_Align
-        | METADATA_Noundef => METADATA_Noundef
-        | METADATA_Id id => METADATA_Id (endo id)
-        | METADATA_String str => METADATA_String (endo str)
-        | METADATA_Named strs => METADATA_Named (endo strs)
-        | METADATA_Node mds => METADATA_Node (List.map endo_metadata mds)
-        | METADATA_Debug_info_elided => METADATA_Debug_info_elided
-        end.
+      `{Endo T}
+      `{Endo raw_id}
+      `{Endo ibinop}
+      `{Endo icmp}
+      `{Endo fbinop}
+      `{Endo fcmp}
+      `{Endo string}
+      : Endo (metadata T) | 50 := endo_metadata.
 
     #[global] Instance Endo_tint_literal
       : Endo tint_literal | 50 := id.
@@ -202,8 +215,7 @@ Section Endo.
     #[global] Instance Endo_operand
       `{Endo T}
       `{Endo (exp T)}
-      `{Endo raw_id}
-      `{Endo string}
+      `{Endo (metadata T)}
       : Endo operand | 50 :=
       fun op =>
         match op with
@@ -214,7 +226,7 @@ Section Endo.
     #[global] Instance Endo_operand_bundle
       `{Endo T}
       `{Endo (exp T)}
-      `{Endo raw_id}
+      `{Endo (metadata T)}
       `{Endo string}
       : Endo operand_bundle | 50 :=
       fun ob =>
@@ -223,12 +235,13 @@ Section Endo.
           (endo (ob_ops ob)).
 
     #[global] Instance Endo_instr
-           `{Endo T}
-           `{Endo (exp T)}
-           `{Endo param_attr}
-           `{Endo (annotation T)}
-           `{Endo raw_id}
-           `{Endo string}
+      `{Endo T}
+      `{Endo (exp T)}
+      `{Endo (metadata T)}
+      `{Endo raw_id}
+      `{Endo string}
+      `{Endo param_attr}
+      `{Endo (annotation T)}
       : Endo (instr T) | 50 :=
       fun ins =>
         match ins with
@@ -249,12 +262,13 @@ Section Endo.
         end.
 
     #[global] Instance Endo_terminator
-           `{Endo T}
-           `{Endo raw_id}
-           `{Endo (exp T)}
-           `{Endo param_attr}
-           `{Endo (annotation T)}
-           `{Endo string}
+      `{Endo T}
+      `{Endo (exp T)}
+      `{Endo (metadata T)}
+      `{Endo string}
+      `{Endo raw_id}
+      `{Endo param_attr}
+      `{Endo (annotation T)}
       : Endo (terminator T) | 50 :=
       fun trm =>
         match trm with
@@ -267,8 +281,8 @@ Section Endo.
         | TERM_IndirectBr v brs =>
           TERM_IndirectBr (endo v) (endo brs)
         | TERM_Resume v => TERM_Resume (endo v)
-        | TERM_Invoke i fnptrval args to_label unwind_label atts obs =>
-          TERM_Invoke (endo i) (endo fnptrval) (endo args) (endo to_label) (endo unwind_label) (endo atts) (endo obs)
+        | TERM_Invoke fnptrval args to_label unwind_label atts obs =>
+          TERM_Invoke (endo fnptrval) (endo args) (endo to_label) (endo unwind_label) (endo atts) (endo obs)
         | TERM_Unreachable => TERM_Unreachable
         end.
 
@@ -282,10 +296,11 @@ Section Endo.
             end.
 
     #[global] Instance Endo_block
-           `{Endo raw_id}
-           `{Endo (code T)}
-           `{Endo (terminator T)}
-           `{Endo (phi T)}
+      `{Endo raw_id}
+      `{Endo (code T)}
+      `{Endo (terminator T)}
+      `{Endo (phi T)}
+      `{Endo (metadata T)}
       : Endo (block T) | 50 :=
       fun b =>
         mk_block (endo (blk_id b))
@@ -320,6 +335,7 @@ Section Endo.
            `{Endo int_ast}
            `{Endo string}
            `{Endo (exp T)}
+           `{Endo (metadata T)}
       : Endo (global T) | 50 :=
       fun g =>
         mk_global
@@ -497,15 +513,14 @@ Section TFunctor.
 
   Section Syntax.
 
-    #[global] Instance TFunctor_exp
-           `{Endo raw_id}
-           `{Endo ibinop}
-           `{Endo icmp}
-           `{Endo fbinop}
-           `{Endo fcmp}
-    : TFunctor exp | 50 :=
-      fun (U V: Set) (f: U -> V) => fix f_exp (e:exp U) :=
-        let ftexp (te: U * exp U) := (f (fst te), f_exp (snd te)) in
+    Fixpoint ft_exp
+      `{Endo raw_id}
+      `{Endo ibinop}
+      `{Endo icmp}
+      `{Endo fbinop}
+      `{Endo fcmp}
+      (U V: Set) (f: U -> V) (e:exp U) :=
+        let ftexp (te: U * exp U) := (f (fst te), ft_exp U V f (snd te)) in
         match e with
         | EXP_Ident id                       => EXP_Ident (endo id)
         | EXP_Integer n                      => EXP_Integer n
@@ -522,11 +537,11 @@ Section TFunctor.
         | EXP_Packed_struct fields           => EXP_Packed_struct (tfmap ftexp fields)
         | EXP_Array t elts                   => EXP_Array (f t) (tfmap ftexp elts)
         | EXP_Vector t elts                  => EXP_Vector (f t) (tfmap ftexp elts)
-        | OP_IBinop iop t v1 v2              => OP_IBinop (endo iop) (f t) (f_exp v1) (f_exp v2)
-        | OP_ICmp cmp t v1 v2                => OP_ICmp (endo cmp) (f t) (f_exp v1) (f_exp v2)
-        | OP_FBinop fop fm t v1 v2           => OP_FBinop (endo fop) fm (f t) (f_exp v1) (f_exp v2)
-        | OP_FCmp cmp t v1 v2                => OP_FCmp (endo cmp) (f t) (f_exp v1) (f_exp v2)
-        | OP_Conversion conv t_from v t_to   => OP_Conversion conv (f t_from) (f_exp v) (f t_to)
+        | OP_IBinop iop t v1 v2              => OP_IBinop (endo iop) (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
+        | OP_ICmp cmp t v1 v2                => OP_ICmp (endo cmp) (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
+        | OP_FBinop fop fm t v1 v2           => OP_FBinop (endo fop) fm (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
+        | OP_FCmp cmp t v1 v2                => OP_FCmp (endo cmp) (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
+        | OP_Conversion conv t_from v t_to   => OP_Conversion conv (f t_from) (ft_exp U V f  v) (f t_to)
         | OP_GetElementPtr t ptr idxs        => OP_GetElementPtr (f t) (ftexp ptr) (tfmap ftexp idxs)
         | OP_ExtractElement vec idx          => OP_ExtractElement (ftexp vec) (ftexp idx)
         | OP_InsertElement vec elt idx       => OP_InsertElement (ftexp vec) (ftexp elt) (ftexp idx)
@@ -537,8 +552,39 @@ Section TFunctor.
         | OP_Freeze v                        => OP_Freeze (ftexp v)
         | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
             EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints
+        | EXP_Metadata m => EXP_Metadata (ft_metadata U V f m)
+        end
+    with ft_metadata
+      `{Endo raw_id}
+      `{Endo ibinop}
+      `{Endo icmp}
+      `{Endo fbinop}
+      `{Endo fcmp}
+           (U V : Set) (f : U -> V) (m : metadata U) :=
+        match m with
+        | METADATA_Const tv => METADATA_Const (f (fst tv), ft_exp U V f (snd tv))
+        | METADATA_Id id => METADATA_Id (endo id)
+        | METADATA_Node mds => METADATA_Node (map (ft_metadata U V f) mds)
+        | METADATA_Debug ds s => METADATA_Debug ds s
         end.
+          
+               
+    #[global] Instance TFunctor_exp
+           `{Endo raw_id}
+           `{Endo ibinop}
+           `{Endo icmp}
+           `{Endo fbinop}
+           `{Endo fcmp}
+    : TFunctor exp | 50 :=
+      fun (U V: Set) (f: U -> V) => ft_exp U V f.
 
+    #[global] Instance TFunctor_metadata
+           `{TFunctor exp}
+           `{Endo raw_id}
+           `{Endo string}
+      : TFunctor metadata | 50 :=
+      fun U V f => ft_metadata U V f.
+    
     #[global] Instance TFunctor_texp
            `{TFunctor exp}
       : TFunctor texp | 50 :=
@@ -586,29 +632,6 @@ Section TFunctor.
           (endo (a_align a))
           (f (a_type a)).
 
-    #[global] Instance TFunctor_metadata
-           `{TFunctor exp}
-           `{Endo raw_id}
-           `{Endo string}
-      : TFunctor metadata | 50 :=
-      fun U V f => fix endo_metadata m :=
-        match m with
-        | METADATA_Const tv => METADATA_Const (tfmap f tv)
-        | METADATA_Null => METADATA_Null
-        | METADATA_Nontemporal => METADATA_Nontemporal
-        | METADATA_Invariant_load => METADATA_Invariant_load
-        | METADATA_Invariant_group => METADATA_Invariant_group
-        | METADATA_Nonnull => METADATA_Nonnull
-        | METADATA_Dereferenceable => METADATA_Dereferenceable
-        | METADATA_Dereferenceable_or_null => METADATA_Dereferenceable_or_null
-        | METADATA_Align => METADATA_Align
-        | METADATA_Noundef => METADATA_Noundef
-        | METADATA_Id id => METADATA_Id (endo id)
-        | METADATA_String str => METADATA_String (endo str)
-        | METADATA_Named strs => METADATA_Named (endo strs)
-        | METADATA_Node mds => METADATA_Node (tfmap endo_metadata mds)
-        | METADATA_Debug_info_elided => METADATA_Debug_info_elided
-        end.
 
     #[global] Instance TFunctor_landingpad_clause
      `{TFunctor exp}
@@ -675,8 +698,8 @@ Section TFunctor.
         | TERM_Switch v default_dest brs => TERM_Switch (tfmap f v) (endo default_dest) (endo brs)
         | TERM_IndirectBr v brs => TERM_IndirectBr (tfmap f v) (endo brs)
         | TERM_Resume v => TERM_Resume (tfmap f v)
-        | TERM_Invoke i fnptrval args to_label unwind_label atts obs =>
-            TERM_Invoke i
+        | TERM_Invoke fnptrval args to_label unwind_label atts obs =>
+            TERM_Invoke 
                         (tfmap f fnptrval)
                         (List.map (fun '(te, a) => (tfmap f te, a))  args)
                         (endo to_label) (endo unwind_label) (tfmap f atts) (tfmap f obs)
@@ -693,22 +716,23 @@ Section TFunctor.
     #[global] Instance TFunctor_code
            `{Endo raw_id}
            `{TFunctor instr}
+           `{TFunctor metadata}
       : TFunctor code | 50 :=
-      fun U V f => tfmap (fun '(id,i) => (endo id, tfmap f i)).
+      fun U V f => tfmap (fun '(id,i, l) => (endo id, tfmap f i, tfmap f l)).
 
     #[global] Instance TFunctor_block
            `{Endo raw_id}
            `{TFunctor instr}
            `{TFunctor terminator}
            `{TFunctor phi}
+           `{TFunctor metadata}
       : TFunctor block | 50  :=
       fun U V f b =>
         mk_block (endo (blk_id b))
-                 (tfmap (fun '(id,phi) => (endo id, tfmap f phi)) (blk_phis b))
+                 (tfmap (fun '(id,phi,md) => (endo id, tfmap f phi, tfmap f md)) (blk_phis b))
                  (tfmap f (blk_code b))
-                 (tfmap f (blk_term b))
+                 ((fun '(id, t, md) => (endo id, tfmap f t, tfmap f md)) (blk_term b))
                  (blk_comments b).
-
 
 
     (* SAZ: Not as parameterized as it could be - how often do we want to change annnotations? *)
@@ -874,8 +898,8 @@ Section TFunctor.
 
 End TFunctor.
 
-Lemma tfmap_list_app: forall U V H H' c1 c2 f,
-    @tfmap code (@TFunctor_code H H') U V f (c1 ++ c2) =
+Lemma tfmap_list_app: forall U V H H' H'' c1 c2 f,
+    @tfmap code (@TFunctor_code H H' H'') U V f (c1 ++ c2) =
     tfmap f c1  ++ tfmap f c2.
 Proof using.
   induction c1 as [| [] c1 IH]; cbn; intros; [reflexivity |].

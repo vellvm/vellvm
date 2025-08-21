@@ -20071,7 +20071,20 @@ Qed.
         (OOM:=OOME).
   Proof.
     intros e.
-    induction e using AstLib.exp_ind; intros odt; cbn;
+    induction e using AstLib.exp_ind with
+      (Q := fun md =>
+              match md with
+              | LLVMAst.METADATA_Id _ 
+              | LLVMAst.METADATA_Node _ 
+              | LLVMAst.METADATA_Debug _ _ => True
+              | LLVMAst.METADATA_Const (t, v) =>
+                  orutt exp_E_refine_strict
+                    exp_E_res_refine_strict uvalue_refine_strict
+                    (IS1.LLVM.D.denote_exp' (Some t) v)
+                    (IS2.LLVM.D.denote_exp' (Some t) v)
+                    (OOM:=OOME)
+              end)
+    ; try intros odt; cbn;
       try solve
         [ match goal with
                    [ b : bool |- _ ] => destruct b; cbn; apply orutt_Ret; solve_uvalue_refine_strict
@@ -20504,6 +20517,16 @@ Qed.
       intros r0 r3 H0.
       apply orutt_Ret.
       apply dvalue_refine_strict_dvalue_to_uvalue; auto.
+    - destruct m; simpl in *;
+        try apply orutt_Ret; try reflexivity.
+      destruct tv.
+      assumption.
+    - auto.
+    - destruct te.
+      simpl in IHe.
+      apply IHe.
+    - auto.
+    - auto.
   Qed.
 
   Lemma denote_exp_E1E2_orutt :
@@ -20662,7 +20685,7 @@ Qed.
         (OOM:=OOME).
   Proof.
     intros bid_from id_p.
-    destruct id_p as [lid phi].
+    destruct id_p as [[lid phi] md].
     destruct phi.
     cbn.
     break_match_goal.
@@ -20796,7 +20819,7 @@ Qed.
         (OOM:=OOME).
   Proof.
     Opaque denote_exp.
-    intros [[id | id] instr] varg1 varg2 VARG.
+    intros [[[id | id] instr] md] varg1 varg2 VARG.
     { cbn.
       destruct instr; try solve_orutt_raise.
       - apply orutt_raise; cbn; auto.
@@ -21592,17 +21615,6 @@ Qed.
     intros o CONTRA; inv CONTRA.
   Qed.
 
-  Lemma denote_terminator_orutt_strict :
-    forall term,
-      orutt instr_E_refine_strict instr_E_res_refine_strict (sum_rel eq uvalue_refine_strict) (IS1.LLVM.D.denote_terminator term)
-        (denote_terminator term)
-        (OOM:=OOME).
-  Proof.
-    intros term.
-    destruct term; cbn.
-    - destruct v.
-      eapply orutt_bind with (RR:=uvalue_refine_strict).
-
   Lemma orutt_translate :
     forall {E1 E1' E2 E2' OOM : Type -> Type} `{OOME : OOM -< E2} `{OOME' : OOM -< E2'} (h1 : E1 ~> E1') (h2 : E2 ~> E2')
       {PRE1 : prerel E1 E2} {POST1 : postrel E1 E2}
@@ -21653,6 +21665,18 @@ Qed.
     - rewrite tau_euttge, unfold_translate. eauto with itree.
     - rewrite tau_euttge, unfold_translate. eauto with itree.
   Qed.
+  
+  Lemma denote_terminator_orutt_strict :
+    forall term,
+      orutt instr_E_refine_strict instr_E_res_refine_strict (sum_rel eq uvalue_refine_strict) (IS1.LLVM.D.denote_terminator term)
+        (denote_terminator term)
+        (OOM:=OOME).
+  Proof.
+    intros term.
+    destruct term as [[i term] md]; cbn.
+    destruct term.
+    - destruct v.
+      eapply orutt_bind with (RR:=uvalue_refine_strict).
 
       eapply orutt_translate; eauto.
       2: { intros *. eapply instr_E_res_refine_strict_exp_E_res_refine_strict_inv. }
@@ -21875,7 +21899,7 @@ Qed.
 
       intros ? ? REL; inv REL; eauto with ORUTT.
       eapply orutt_bind with (RR:=eq); eauto with ORUTT REF.
-      destruct i as [[i | i] | i]; eauto with ORUTT.
+      destruct i as [i | i]; eauto with ORUTT.
       eapply orutt_trigger; eauto; cbn; try reflexivity; try tauto.
       intros [] []; cbn; auto.
       intros o CONTRA; inv CONTRA.

@@ -262,9 +262,9 @@ Section SurfaceSyntaxTest.
                                                          {|
                                                            blk_id := (Anon 0%Z);
                                                            blk_phis := [];
-                                                           blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%positive) (EXP_Integer (5)%Z) (EXP_Integer (9)%Z))));
-                                                                        (IId (Anon 2%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%positive) (EXP_Ident (ID_Local (Anon 1%Z))) (EXP_Integer (15)%Z))))];
-                                                           blk_term := TERM_Ret ((TYPE_I 32%positive), (EXP_Ident (ID_Local (Anon 2%Z))));
+                                                           blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%positive) (EXP_Integer (5)%Z) (EXP_Integer (9)%Z))), []);
+                                                                        (IId (Anon 2%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%positive) (EXP_Ident (ID_Local (Anon 1%Z))) (EXP_Integer (15)%Z))), [])];
+                                                           blk_term := (IVoid 0%Z, TERM_Ret ((TYPE_I 32%positive), (EXP_Ident (ID_Local (Anon 2%Z)))), []);
                                                            blk_comments := None
                                                          |}
                                                          ,[])

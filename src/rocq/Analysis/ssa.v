@@ -12,8 +12,8 @@ From Vellvm Require Import
     intros. destruct (Eqv.eqv_dec_p x y); auto.
   Qed.
 
-  Definition def_sites_phis (phis : list (local_id * phi dtyp)) : list instr_id :=
-    List.map (fun '(x,_) => IId x) phis.
+  Definition def_sites_phis (phis : list (local_id * phi dtyp * list (metadata dtyp))) : list instr_id :=
+    List.map (fun '(x,_,_) => IId x) phis.
 
   Definition pc : Type := block_id * option (nat * instr_id).
 
@@ -30,7 +30,7 @@ From Vellvm Require Import
     match find_block c.(blks) bid with
     | Some bk =>
       match List.nth_error
-              (def_sites_phis bk.(blk_phis) ++ List.map fst bk.(blk_code)) (opt_succ mx) with
+              (def_sites_phis bk.(blk_phis) ++ List.map (fun '(x,_,_) => x) bk.(blk_code)) (opt_succ mx) with
       | None => exists bid', List.In bid' (successors bk) /\ v' = (bid',None)
       | Some iid => v' = (bid, Some (opt_succ mx, iid))
       end
@@ -45,7 +45,7 @@ From Vellvm Require Import
       | None => True
       | Some (offset,x) =>
         match List.nth_error
-                (def_sites_phis bk.(blk_phis) ++ List.map fst bk.(blk_code)) offset with
+                (def_sites_phis bk.(blk_phis) ++ List.map (fun '(x,_,_) => x) bk.(blk_code)) offset with
         | None => False
         | Some iid => x = iid
         end

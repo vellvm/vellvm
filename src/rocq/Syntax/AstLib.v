@@ -336,6 +336,7 @@ Section ExpInd.
 
   Variable T : Set.
   Variable P : (exp T) -> Prop.
+  Variable Q : (metadata T) -> Prop.
   Hypothesis IH_Ident   : forall (id:ident), P ((EXP_Ident id)).
   Hypothesis IH_Integer : forall (x:int_ast), P ((EXP_Integer x)).
   Hypothesis IH_Float   : forall (f:float32), P ((EXP_Float f)).
@@ -369,69 +370,192 @@ Section ExpInd.
   Hypothesis IH_Freeze        : forall (v:(T * exp T)), P (snd v) -> P ((OP_Freeze v)).
 
   Hypothesis IH_Asm           : forall (sideffect:bool) (alignstack:bool) (inteldialect:bool) (unwind:bool) (template:string) (operand_constraints:string), P(EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints).
-  
-  Lemma exp_ind : forall (v:exp T), P v.
-    fix IH 1.
-    destruct v.
-    - apply IH_Ident.
-    - apply IH_Integer.
-    - apply IH_Float.
-    - apply IH_Double.
-    - apply IH_Hex.
-    - apply IH_Bool.
-    - apply IH_Null.
-    - apply IH_Zero_initializer.
-    - apply IH_Cstring.
-      { revert elts.
-        fix IHelts 1. intros [|u elts']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
-      }
 
-    - apply IH_Undef.
-    - apply IH_Poison.
-    - apply IH_Struct.
-      { revert fields.
-        fix IHfields 1. intros [|u fields']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
-      }
-    - apply IH_Packed_struct.
-      { revert fields.
-        fix IHfields 1. intros [|u fields']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
-      }
-    - apply IH_Array.
-      { revert elts.
-        fix IHelts 1. intros [|u elts']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
-      }
-    - apply IH_Vector.
-      { revert elts.
-        fix IHelts 1. intros [|u elts']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
-      }
-    - apply IH_IBinop. apply IH. apply IH.
-    - apply IH_ICmp. apply IH. apply IH.
-    - apply IH_FBinop. apply IH. apply IH.
-    - apply IH_FCmp. apply IH. apply IH.
-    - apply IH_Conversion. apply IH.
-    - apply IH_GetElementPtr. apply IH.
-      { revert idxs.
-        fix IHidxs 1. intros [|u idxs']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHidxs. apply Hin.
-      }
-    - apply IH_ExtractElement. apply IH. apply IH.
-    - apply IH_InsertElement. apply IH. apply IH. apply IH.
-    - apply IH_ShuffleVector. apply IH. apply IH. apply IH.
-    - apply IH_ExtractValue. apply IH.
-    - apply IH_InsertValue. apply IH. apply IH.
-    - apply IH_Select.  apply IH. apply IH. apply IH.
-    - apply IH_Freeze. apply IH.
-    - apply IH_Asm.
-  Qed.
+  Hypothesis IH_Metadata      : forall (m:metadata T), Q m -> P (EXP_Metadata m).
+
+  Hypothesis IH_METADATA_Id   : forall (id:raw_id), Q (METADATA_Id id).
+  Hypothesis IH_METADATA_Const : forall (te:T * exp T), P (snd te) -> Q (METADATA_Const te).
+  Hypothesis IH_METADATA_Node : forall (ms:list (metadata T)), (forall m, In m ms -> Q m) -> Q (METADATA_Node ms).
+  Hypothesis IH_METADATA_Debug : forall (s t:string), Q (METADATA_Debug s t).
+
+  Lemma exp_ind : forall (v:exp T), P v.
+Proof.    
+refine(  
+  fix F (e : exp T) : P e :=
+  match e as e0 return (P e0) with
+  | EXP_Ident id => IH_Ident id
+  | EXP_Integer x => IH_Integer x
+  | EXP_Float f33 => IH_Float f33
+  | EXP_Double f33 => IH_Double f33
+  | EXP_Hex f33 => IH_Hex f33
+  | EXP_Bool b => IH_Bool b
+  | EXP_Null => IH_Null
+  | EXP_Zero_initializer => IH_Zero_initializer
+  | EXP_Cstring elts => _
+  | EXP_Undef => IH_Undef
+  | EXP_Poison => IH_Poison
+  | EXP_Struct fields => _
+  | EXP_Packed_struct fields => _
+  | EXP_Array t elts => _
+  | EXP_Vector t elts => _
+  | OP_IBinop iop t v1 v2 => @IH_IBinop iop t v1 v2 (F v1) (F v2)
+  | OP_ICmp cmp t v1 v2 => IH_ICmp cmp t v1 v2 (F v1) (F v2)
+  | OP_FBinop fop fm t v1 v2 => IH_FBinop fop fm t v1 v2 (F v1) (F v2)
+  | OP_FCmp cmp t v1 v2 => IH_FCmp cmp t v1 v2 (F v1) (F v2)
+  | OP_Conversion conv t_from v t_to => IH_Conversion conv t_from v t_to (F v) 
+  | OP_GetElementPtr t ptrval idxs => _
+  | OP_ExtractElement vec idx => IH_ExtractElement vec idx (F (snd vec)) (F (snd idx))
+  | OP_InsertElement vec elt idx => IH_InsertElement vec elt idx (F (snd vec)) (F (snd elt)) (F (snd idx))
+  | OP_ShuffleVector vec1 vec2 idxmask => IH_ShuffleVector vec1 vec2 idxmask (F (snd vec1))  (F (snd vec2)) (F (snd idxmask))
+  | OP_ExtractValue vec idxs => IH_ExtractValue vec idxs (F (snd vec))
+  | OP_InsertValue vec elt idxs => IH_InsertValue vec elt idxs (F (snd vec)) (F (snd elt))
+  | OP_Select cnd v1 v2 => IH_Select cnd v1 v2 (F (snd cnd)) (F (snd v1)) (F (snd v2))
+  | OP_Freeze v => IH_Freeze v (F (snd v))
+  | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
+      IH_Asm sideffect alignstack inteldialect unwind template operand_constraints
+  | EXP_Metadata m => IH_Metadata m (F0 m)
+  end
+with F0 (m : metadata T) : Q m :=
+  match m as m0 return (Q m0) with
+  | METADATA_Id id => IH_METADATA_Id id
+  | METADATA_Const tv => IH_METADATA_Const tv (F (snd tv))
+  | METADATA_Node mds => _
+  | METADATA_Debug DIstr contents => IH_METADATA_Debug DIstr contents
+  end
+for
+F).
+- apply IH_Cstring.
+  { revert elts.
+    fix IHelts 1. intros [|u elts']. intros. inversion H.
+    intros u' [<-|Hin]. apply F. eapply IHelts. apply Hin.
+  }
+- apply IH_Struct.
+  { revert fields.
+    fix IHfields 1. intros [|u fields']. intros. inversion H.
+    intros u' [<-|Hin]. apply F. eapply IHfields. apply Hin.
+  }
+- apply IH_Packed_struct.
+  { revert fields.
+    fix IHfields 1. intros [|u fields']. intros. inversion H.
+    intros u' [<-|Hin]. apply F. eapply IHfields. apply Hin.
+  }
+- apply IH_Array.
+  { revert elts.
+    fix IHelts 1. intros [|u elts']. intros. inversion H.
+    intros u' [<-|Hin]. apply F. eapply IHelts. apply Hin.
+  }
+- apply IH_Vector.
+  { revert elts.
+    fix IHelts 1. intros [|u elts']. intros. inversion H.
+    intros u' [<-|Hin]. apply F. eapply IHelts. apply Hin.
+  }
+- apply IH_GetElementPtr. apply F.
+  { revert idxs.
+    fix IHidxs 1. intros [|u idxs']. intros. inversion H.
+    intros u' [<-|Hin]. apply F. eapply IHidxs. apply Hin.
+  }
+- apply IH_METADATA_Node.
+  { revert mds.
+    fix IHmds 1. intros [| m' md']. intros. inversion H.
+    intros n' [<-|Hin]. apply F0. eapply IHmds. apply Hin.
+  }
+Qed.
+
+  Lemma metadata_ind : forall (m:metadata T), Q m.
+Proof.    
+refine(  
+  fix F (e : exp T) : P e :=
+  match e as e0 return (P e0) with
+  | EXP_Ident id => IH_Ident id
+  | EXP_Integer x => IH_Integer x
+  | EXP_Float f33 => IH_Float f33
+  | EXP_Double f33 => IH_Double f33
+  | EXP_Hex f33 => IH_Hex f33
+  | EXP_Bool b => IH_Bool b
+  | EXP_Null => IH_Null
+  | EXP_Zero_initializer => IH_Zero_initializer
+  | EXP_Cstring elts => _
+  | EXP_Undef => IH_Undef
+  | EXP_Poison => IH_Poison
+  | EXP_Struct fields => _
+  | EXP_Packed_struct fields => _
+  | EXP_Array t elts => _
+  | EXP_Vector t elts => _
+  | OP_IBinop iop t v1 v2 => @IH_IBinop iop t v1 v2 (F v1) (F v2)
+  | OP_ICmp cmp t v1 v2 => IH_ICmp cmp t v1 v2 (F v1) (F v2)
+  | OP_FBinop fop fm t v1 v2 => IH_FBinop fop fm t v1 v2 (F v1) (F v2)
+  | OP_FCmp cmp t v1 v2 => IH_FCmp cmp t v1 v2 (F v1) (F v2)
+  | OP_Conversion conv t_from v t_to => IH_Conversion conv t_from v t_to (F v) 
+  | OP_GetElementPtr t ptrval idxs => _
+  | OP_ExtractElement vec idx => IH_ExtractElement vec idx (F (snd vec)) (F (snd idx))
+  | OP_InsertElement vec elt idx => IH_InsertElement vec elt idx (F (snd vec)) (F (snd elt)) (F (snd idx))
+  | OP_ShuffleVector vec1 vec2 idxmask => IH_ShuffleVector vec1 vec2 idxmask (F (snd vec1))  (F (snd vec2)) (F (snd idxmask))
+  | OP_ExtractValue vec idxs => IH_ExtractValue vec idxs (F (snd vec))
+  | OP_InsertValue vec elt idxs => IH_InsertValue vec elt idxs (F (snd vec)) (F (snd elt))
+  | OP_Select cnd v1 v2 => IH_Select cnd v1 v2 (F (snd cnd)) (F (snd v1)) (F (snd v2))
+  | OP_Freeze v => IH_Freeze v (F (snd v))
+  | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
+      IH_Asm sideffect alignstack inteldialect unwind template operand_constraints
+  | EXP_Metadata m => IH_Metadata m (F0 m)
+  end
+with F0 (m : metadata T) : Q m :=
+  match m as m0 return (Q m0) with
+  | METADATA_Id id => IH_METADATA_Id id
+  | METADATA_Const tv => IH_METADATA_Const tv (F (snd tv))
+  | METADATA_Node mds => _
+  | METADATA_Debug DIstr contents => IH_METADATA_Debug DIstr contents
+  end
+for
+F0).
+- apply IH_Cstring.
+  { revert elts.
+    fix IHelts 1. intros [|u elts']. intros. inversion H.
+    intros u' [<-|Hin]. apply F. eapply IHelts. apply Hin.
+  }
+- apply IH_Struct.
+  { revert fields.
+    fix IHfields 1. intros [|u fields']. intros. inversion H.
+    intros u' [<-|Hin]. apply F. eapply IHfields. apply Hin.
+  }
+- apply IH_Packed_struct.
+  { revert fields.
+    fix IHfields 1. intros [|u fields']. intros. inversion H.
+    intros u' [<-|Hin]. apply F. eapply IHfields. apply Hin.
+  }
+- apply IH_Array.
+  { revert elts.
+    fix IHelts 1. intros [|u elts']. intros. inversion H.
+    intros u' [<-|Hin]. apply F. eapply IHelts. apply Hin.
+  }
+- apply IH_Vector.
+  { revert elts.
+    fix IHelts 1. intros [|u elts']. intros. inversion H.
+    intros u' [<-|Hin]. apply F. eapply IHelts. apply Hin.
+  }
+- apply IH_GetElementPtr. apply F.
+  { revert idxs.
+    fix IHidxs 1. intros [|u idxs']. intros. inversion H.
+    intros u' [<-|Hin]. apply F. eapply IHidxs. apply Hin.
+  }
+- apply IH_METADATA_Node.
+  { revert mds.
+    fix IHmds 1. intros [| m' md']. intros. inversion H.
+    intros n' [<-|Hin]. apply F0. eapply IHmds. apply Hin.
+  }
+Qed.
+
+Lemma exp_metadata_mut_ind : (forall (e:exp T), P e) /\ (forall (m:metadata T), Q m).
+  split.
+  - apply exp_ind; auto.
+  - apply metadata_ind; auto.
+Qed.  
+
 End ExpInd.
 
 
 (* Display *)
+(* SAZ: Aug. 2025 - this serialization stuff is very out of date an probably
+   not used anymore. *)
 Require Import Ceres.Ceres.
 
 Section hiding_notation.
@@ -595,6 +719,8 @@ Section hiding_notation.
         | Some a => [Atom s ; to_sexp a]
         end.
 
+    #[global] Instance serialize_metadata : Serialize (metadata T) := fun m => Atom "to_sexp_metadata todo".
+    
     #[global] Instance serialize_instr : Serialize (instr T) :=
       fun instr =>
         match instr with

@@ -147,7 +147,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (* TODO: make a choice about it and move *)
   Opaque assoc.
   Lemma denote_phi_hd : forall bid e id τ tl,
-      ⟦ (id, Phi τ ((bid,e)::tl)) ⟧Φ bid ≈ uv <- ⟦ e at τ ⟧e;; Ret (id,uv).
+      ⟦ (id, Phi τ ((bid,e)::tl), []) ⟧Φ bid ≈ uv <- ⟦ e at τ ⟧e;; Ret (id,uv).
   Proof using.
     intros; cbn.
     rewrite assoc_hd; reflexivity.
@@ -155,7 +155,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   Lemma denote_phi_tl : forall bid bid' e id τ tl,
       bid <> bid' ->
-      ⟦ (id, Phi τ ((bid',e)::tl)) ⟧Φ bid ≈ ⟦ (id, Phi τ tl) ⟧Φ bid.
+      ⟦ (id, Phi τ ((bid',e)::tl), []) ⟧Φ bid ≈ ⟦ (id, Phi τ tl, []) ⟧Φ bid.
   Proof using.
     intros; cbn.
     rewrite assoc_tl; auto; reflexivity.
@@ -357,9 +357,12 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Lemma denote_terminator_exits_in_outputs :
       forall term,
-        ⟦ term ⟧t ⤳ sum_pred (fun id => In id (terminator_outputs term)) TT.
+        ⟦ term ⟧t ⤳ sum_pred (fun id => In id (let '(_, t, _) := term in terminator_outputs t)) TT.
     Proof using.
-      intros term; destruct term eqn:Hterm; cbn; try (apply raise_has_all_posts || apply eutt_Ret; cbn; eauto).
+      intros term.
+      destruct term as [p ?].
+      destruct p as [id term].
+      destruct term eqn:Hterm; cbn; try (apply raise_has_all_posts || apply eutt_Ret; cbn; eauto).
       - (* Ret *)
         destruct v.
         apply has_post_bind; intros ?.
@@ -424,7 +427,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         apply has_post_bind; intros ?.
         destruct x1.
         apply eutt_Ret; cbn; eauto.
-        destruct i as [[i | i] | i];
+        destruct id as [i | i];
           try rewrite bind_ret_l;
           try solve [apply eutt_Ret; cbn; eauto].
         apply has_post_bind.

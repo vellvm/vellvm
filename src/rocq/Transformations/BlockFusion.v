@@ -155,10 +155,10 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
      have a recursive dependency in your phi-nodes, but it might be tricky to argue/capture formally.
      To keep an eye on it.
      *)
-    Definition phi_to_code {T} (Φs : list (local_id * phi T)) : code T :=
-      fold_left (fun acc '(id, Phi τ l) =>
+    Definition phi_to_code {T} (Φs : list (local_id * phi T * (list (metadata T))))  : code T :=
+      fold_left (fun acc '(id, Phi τ l, md) =>
                    match l with
-                   | [(_,e)] => acc ++ [(IId id, INSTR_Op e)] (* Keeping the order should not matter, but if we can spare the argument later... *)
+                   | [(_,e)] => acc ++ [(IId id, INSTR_Op e, md)] (* Keeping the order should not matter, but if we can spare the argument later... *)
                    | _ => (* This is a failure case, it should not happen if called in the expected context *)
                        acc
                    end) Φs [].
@@ -185,7 +185,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
     Definition update_provenance_block {T} (old new : block_id) (bk : block T) : block T :=
       {|
         blk_id         := bk.(blk_id);
-        blk_phis       := map (fun '(x,φ) => (x,update_provenance_phi old new φ)) bk.(blk_phis);
+        blk_phis       := map (fun '(x,φ,md) => (x,update_provenance_phi old new φ, md)) bk.(blk_phis);
         blk_code       := bk.(blk_code);
         blk_term       := bk.(blk_term);
         blk_comments   := None (* TODO: proper propagation of comments *)
@@ -203,7 +203,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
       match bks with
       | [] => (G,None)
       | bk_s :: bks =>
-          match bk_s.(blk_term) with
+          match (snd (fst bk_s.(blk_term))) with
           | TERM_Br_1 b_t =>
               (* ... We find a block [bk_s] with a direct jump to some [b_t]. *)
               match find_block G b_t with
@@ -266,7 +266,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
         f1 <> f2 /\
           exists b1 b2,
             find_block G f1 = Some b1 /\
-              blk_term b1 = TERM_Br_1 f2 /\
+              (snd (fst (blk_term b1))) = TERM_Br_1 f2 /\
               find_block G f2 = Some b2 /\
               (forall b, find_block G b.(blk_id) = Some b -> In f2 (successors b) -> b.(blk_id) = f1) /\
               has_no_phi b2 = true /\
@@ -310,6 +310,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
           {
             cbn.
             unfold is_predecessor, successors.
+            destruct (blk_term bk1). destruct p. simpl in *.
             rewrite Heqt; cbn.
             break_match_goal; intuition auto with *.
             break_match_hyp; intuition auto with *.
@@ -394,7 +395,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
         f1 <> f2 /\
           exists b1 b2,
             find_block G f1 = Some b1 /\
-              blk_term b1 = TERM_Br_1 f2 /\
+              (snd (fst (blk_term b1))) = TERM_Br_1 f2 /\
               find_block G f2 = Some b2 /\
               (forall b, find_block G b.(blk_id) = Some b -> In f2 (successors b) -> b.(blk_id) = f1) /\
               has_no_phi b2 = true /\
@@ -527,8 +528,8 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
           intros ?; apply NIN; cbn; auto.
     Qed.
 
-    Definition phis_block_id_not_in {T} b (φs : list (local_id * phi T)) :=
-      forall φ, In φ φs -> ~ In b (phi_sources (snd φ)).
+    Definition phis_block_id_not_in {T} b (φs : list (local_id * phi T * (list (metadata T)))) :=
+      forall φ, In φ φs -> ~ In b (phi_sources (snd (fst φ))).
 
     Definition block_phis_block_id_not_in {T} b (bk : block T) :=
       phis_block_id_not_in b bk.(blk_phis).
@@ -537,14 +538,14 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
       forall phis old new f,
         f <> new ->
         phis_block_id_not_in new phis ->
-        ⟦ phis ⟧Φs f ≅ ⟦ map (fun '(x, φ) => (x, update_provenance_phi old new φ)) phis ⟧Φs (update_provenance old new f).
+        ⟦ phis ⟧Φs f ≅ ⟦ map (fun '(x, φ, md) => (x, update_provenance_phi old new φ, md)) phis ⟧Φs (update_provenance old new f).
     Proof.
       intros * INEQ PHIN.
       unfold denote_phis.
       cbn.
       apply eq_itree_clo_bind with (UU := eq).
       apply map_monad_eq_itree_map_ind.
-      - intros [? []] IN.
+      - intros [[? []] ?] IN.
         cbn.
         apply PHIN in IN; cbn in IN.
         rewrite <- assoc_update_provenance; auto.
@@ -627,6 +628,7 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
         ebind; econstructor; [reflexivity | intros ? ? <-].
         repeat setoid_rewrite bind_ret_l.
         (* Constant jump on the left *)
+        destruct (blk_term bk1); destruct p. simpl in TERM.
         rewrite TERM.
         cbn.
         cbn; rewrite !bind_ret_l.
@@ -725,13 +727,15 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
         ocfg_phis_not_id src (blks G).
     Proof.
       intros * [WF1 WF2] FUSE.
-      intros bk IN [x phi] IN'.
-      rewrite (WF2 _ src _ _ IN IN').
+      intros bk IN [[x phi] md] IN'.
+      rewrite (WF2 _ src _ _ _ IN IN').
       apply block_fusion_some in FUSE; auto.
       destruct FUSE as (INEQ & bk1 & bk2 & LU1 & TERM & LU2 & PRED & NOPHI & LU3 & LU4 & LU5).
       intros ABS.
       eapply predecessor_successor in ABS; eauto.
-      unfold successors in ABS; rewrite TERM in ABS; destruct ABS as [EQ | []].
+      unfold successors in ABS.
+      destruct (blk_term bk1); destruct p; simpl in TERM.
+      rewrite TERM in ABS; destruct ABS as [EQ | []].
       subst tgt.
       rewrite wf_ocfg_bid_In_is_found in LU2; auto; inv LU2.
       unfold has_no_phi in NOPHI.

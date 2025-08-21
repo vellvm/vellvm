@@ -69,8 +69,8 @@ Section DeadCodeElim.
     fix dead_code_elim c :=
       match c with
       | [] => []
-      | (IId id,i)::c => if pure_instr i && dead id then dead_code_elim c else (IId id,i) :: dead_code_elim c
-      | (IVoid id,i)::c => (IVoid id,i) :: dead_code_elim c
+      | (IId id,i,md)::c => if pure_instr i && dead id then dead_code_elim c else (IId id,i,md) :: dead_code_elim c
+      | (IVoid id,i,md)::c => (IVoid id,i,md) :: dead_code_elim c
       end.
 
 End DeadCodeElim.

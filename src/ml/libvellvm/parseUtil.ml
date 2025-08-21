@@ -164,11 +164,12 @@ type lexed_id =
 
 exception InvalidAnonymousId of string
 
-type ctr = {peek : unit -> int ; get : unit -> int; reset : unit -> unit}
+type ctr = {peek : unit -> int ; get : unit -> int; set : int -> unit; reset : unit -> unit}
 let mk_counter () =
   let c = ref 0 in
   { peek = (fun () -> !c);
     get = (fun () -> let cnt = !c in incr c; cnt);
+    set = (fun cnt -> c := cnt);
     reset = (fun () -> c := 0);
   }
 
@@ -184,10 +185,13 @@ let generate_void_instr_id () : LLVMAst.instr_id =
 
 let validate_declared_int n =
   let expected = anon_ctr.get () in
-  if expected = n
-  then (LLVMAst.Anon (coq_of_int n))
+  if expected <= n
+  then begin
+      anon_ctr.set (n + 1);
+      (LLVMAst.Anon (coq_of_int n))
+    end
   else
-    let msg = Printf.sprintf "Unexpected sequential id: expected %n but found %n" expected n in
+    let msg = Printf.sprintf "Unexpected sequential id: expected >= %n but found %n" expected n in
     raise (InvalidAnonymousId msg)
 
 let validate_bound_lexed_id (r : lexed_id) : LLVMAst.raw_id =

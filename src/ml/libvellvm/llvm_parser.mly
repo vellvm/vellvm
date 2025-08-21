@@ -68,11 +68,15 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
   | None -> None
   | Some l -> Some (ANN_linkage l)
 
+let mk_metadata (m : ('a metadata list list)) : 'a metadata list =
+  List.flatten m
+
 %}
 
 %token<ParseUtil.lexed_id> GLOBAL LOCAL
 %token LPAREN RPAREN LCURLY RCURLY LTLCURLY RCURLYGT LSQUARE RSQUARE LT GT EQ COMMA EOF STAR COLON DOTDOTDOT
 
+%token<string> COMMENT
 %token<string> STRING
 %token<Camlcoq.Z.t> INTEGER
 %token<string> FLOAT
@@ -423,7 +427,7 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
 %token META_NONTEMPORAL
 %token META_INVARIANT_GROUP
 
-%token METADATA_DEBUG
+%token<(string * string)> METADATA_DEBUG
 
 %token BANG
 
@@ -461,30 +465,22 @@ toplevel_entity:
   | BANG i=metadata_id EQ KW_DISTINCT? m=tle_metadata
                                         { TLE_Metadata (i, m)            }
   | KW_ATTRIBUTES i=ATTR_GRP_ID EQ LCURLY a=fn_attr* RCURLY
-                                        { TLE_Attribute_group (i, a)     }
+    { TLE_Attribute_group (i, a)     }
+  | c=COMMENT { TLE_Comment (str c) }
 
 (* metadata are not implemented yet, but are at least (partially) parsed *)
 tle_metadata:
   | BANG LCURLY m=separated_list(csep, tconst_or_metadata_value) RCURLY
     { METADATA_Node m }
-  | METADATA_DEBUG { METADATA_Debug_info_elided }
+  | md=METADATA_DEBUG { METADATA_Debug(str (fst md), str (snd md)) }
   | KW_METADATA m=metadata_node
     { m }
 
 metadata_id:
-  /* | META_NONTEMPORAL             { METADATA_Nontemporal } */
-  /* | META_INVARIANT_LOAD          { METADATA_Invariant_load } */
-  /* | META_INVARIANT_GROUP         { METADATA_Invariant_group } */
-  /* | META_NONNULL                 { METADATA_Nonnull } */
-  /* | META_DEREFERENCEABLE         { METADATA_Dereferenceable } */
-  /* | META_DEREFERENCEABLE_OR_NULL { METADATA_Dereferenceable_or_null } */
-  /* | META_ALIGN                   { METADATA_Align } */
-  /* | META_NOUNDEF                 { METADATA_Noundef } */
   | KW_NOALIAS                   { METADATA_Id (Name (str "noalias")) }
   | KW_NONNULL                   { METADATA_Id (Name (str "nonnull")) }
   | KW_NOUNDEF                   { METADATA_Id (Name (str "noundef")) }
   | KW_ALIGN                     { METADATA_Id (Name (str "align")) }
-  /* | KW_ALIASSCOPE                { METADATA_Id (Name (str "alias.scope")) } */
   | mid=INTEGER                  { METADATA_Id (Anon mid) }
   | mid=KW_UNKNOWN               { METADATA_Id (Name (str mid)) }
 
@@ -498,11 +494,9 @@ tconst_or_metadata_value:
   | m=metadata_value            { m } 
 
 metadata_value:
-  | KW_NULL                     { METADATA_Null      } (* null with no type *)
-  | BANG ms=STRING              { METADATA_String (str ms) }
   | BANG mid=metadata_id        { mid }
   | BANG mn=metadata_node       { mn  }
-  | METADATA_DEBUG              { METADATA_Debug_info_elided }
+  | db=METADATA_DEBUG           { METADATA_Debug(str (fst db), str (snd db)) }
 
 (* For externally defined global variables *)
 %inline
@@ -870,29 +864,30 @@ definition:
 	List.map (fun (_, aopt) -> check_or_generate_id aopt) args
       in
 
-      let process_lhs_phi (lopt, x) = (check_or_generate_id lopt, x)
+      let process_lhs_phi ((lopt, x), md) = ((check_or_generate_id lopt, x), md)
       in
 
-      let process_lhs_instr (lopt, i) =
+      let process_lhs_instr ((lopt, i), md) =
 	if AstLib.is_void_instr i then
 	  match lopt with
-	  | None   -> (generate_void_instr_id (), i)
+	  | None   -> ((generate_void_instr_id (), i), md)
 	  | Some _ -> failwith "void function has defined left-hand-side"
 	else
-	  (IId (check_or_generate_id lopt), i)
+	  ((IId (check_or_generate_id lopt), i), md)
       in
 
-      let process_block (lopt, (phis, instrs, (id_opt, blk_term))) =
+      let process_lhs_term ((lopt, t), md) =
+	match lopt with
+	| None -> ((generate_void_instr_id (), t), md)
+	| Some r -> ((IId (validate_bound_lexed_id r), t), md)
+      in
+      
+      let process_block (lopt, (phis, instrs, term)) =
 	  let blk_id   = check_or_generate_label lopt in
 	  let blk_phis = List.map process_lhs_phi phis in
 	  let blk_code = List.map process_lhs_instr instrs in
-	  let term_id =
-	    begin match id_opt with
-	    | None    -> None
-	    | Some id -> Some (IId (validate_bound_lexed_id id))
-	    end
-	  in
-	  { blk_id; blk_phis; blk_code; blk_term=(blk_term term_id) ; blk_comments = None }
+	  let blk_term = process_lhs_term term in
+	  { blk_id; blk_phis; blk_code; blk_term; blk_comments = None }
       in
 
       let blocks = List.map process_block blks
@@ -1004,26 +999,33 @@ block_label:
     { Some ("\"" ^ str ^ "\"")}
 
 block_phis_and_instrs_and_term:
-  | id_opt=instr_lhs p=phi bl=block_phis_and_instrs_and_term
-    { let (phis, instrs, t) = bl in ((id_opt, p)::phis, instrs, t) }
+  | id_opt=instr_lhs pm=phi
+    bl=block_phis_and_instrs_and_term
+    {
+      let (p, md) = pm in 
+      let (phis, instrs, t) = bl in
+      (((id_opt, p), mk_metadata md)::phis, instrs, t) }
 
-  | id_opt=instr_lhs inst=instr ins=block_instrs_and_term
+  | id_opt=instr_lhs inst=instr md=instr_metadata*
+    ins=block_instrs_and_term
     { let (instrs, t) = ins in 
-      ([], (id_opt, inst)::instrs, t) }
+      ([], ((id_opt, inst), mk_metadata md)::instrs, t) }
 
-  | t=terminator instr_metadata*
-    { ([], [], t) }
+  | id_opt=instr_lhs t=terminator md=instr_metadata*
+    { ([], [], ((id_opt, t), mk_metadata md)) }
       
 block_instrs_and_term:
-  | t=terminator instr_metadata* { ([], t) }
+  | id_opt=instr_lhs t=terminator md=instr_metadata*
+    { ([], ((id_opt, t), mk_metadata md)) }
 
-  | id_opt=instr_lhs inst=instr ins=block_instrs_and_term
+  | id_opt=instr_lhs inst=instr md=instr_metadata*
+    ins=block_instrs_and_term
     { let (instrs, t) = ins in
-      ((id_opt, inst)::instrs, t) }
+      (((id_opt, inst), mk_metadata md)::instrs, t) }
 
 %inline phi:
-  | KW_PHI t=typ table=separated_nonempty_list(csep, phi_table_entry)
-    { Phi (t, List.map (fun (l,v) -> (l, v t)) table)}
+  | KW_PHI t=typ table=separated_nonempty_list(csep, phi_table_entry) md=instr_metadata*
+    { (Phi (t, List.map (fun (l,v) -> (l, v t)) table), md) }
 
 phi_table_entry:
   | LSQUARE v=exp COMMA l=lident RSQUARE { (l, v) }
@@ -1035,9 +1037,9 @@ block:
 	(blk_id, body)
     }
 
-%inline
 instr_metadata:
-  | COMMA metadata_value+ { }
+  | COMMA mvs=metadata_value+
+    { mvs }
 
 
 df_blocks:
@@ -1346,39 +1348,39 @@ comma_path_with_instr_metadata(X):
   | instr_metadata? { [] }
 
 instr_op:
-  | op=ibinop t=typ o1=exp COMMA o2=exp instr_metadata?
+  | op=ibinop t=typ o1=exp COMMA o2=exp
     { OP_IBinop (op, t, o1 t, o2 t) }
 
-  | KW_ICMP op=icmp t=typ o1=exp COMMA o2=exp instr_metadata?
+  | KW_ICMP op=icmp t=typ o1=exp COMMA o2=exp
     { OP_ICmp (op, t, o1 t, o2 t) }
 
-  | op=fbinop f=fast_math* t=typ o1=exp COMMA o2=exp instr_metadata?
+  | op=fbinop f=fast_math* t=typ o1=exp COMMA o2=exp
     { OP_FBinop (op, f, t, o1 t, o2 t) }
 
     // special case, coerced to fsub
-  | KW_FNEG f=fast_math* t=typ o=exp instr_metadata?
+  | KW_FNEG f=fast_math* t=typ o=exp 
      { OP_FBinop (FSub, f, t, EXP_Double Floats.Float32.zero, o t) }
 
-  | KW_FCMP op=fcmp t=typ o1=exp COMMA o2=exp instr_metadata?
+  | KW_FCMP op=fcmp t=typ o1=exp COMMA o2=exp 
     { OP_FCmp (op, t, o1 t, o2 t) }
 
-  | c=conversion t1=typ v=exp KW_TO t2=typ instr_metadata?
+  | c=conversion t1=typ v=exp KW_TO t2=typ
     { OP_Conversion (c, t1, v t1, t2) }
 
   | KW_GETELEMENTPTR KW_INBOUNDS? t=typ COMMA ptr=texp idx=comma_path_with_instr_metadata(texp)
     { OP_GetElementPtr (t, ptr, idx) }
 
-  | KW_SELECT if_=texp COMMA then_=texp COMMA else_= texp instr_metadata?
+  | KW_SELECT if_=texp COMMA then_=texp COMMA else_= texp
     { OP_Select (if_, then_, else_) }
 
-  | KW_FREEZE v=texp instr_metadata?
+  | KW_FREEZE v=texp
     { OP_Freeze v }
 
-  | KW_EXTRACTELEMENT vec=texp COMMA idx=texp instr_metadata?
+  | KW_EXTRACTELEMENT vec=texp COMMA idx=texp 
     { OP_ExtractElement (vec, idx) }
 
   | KW_INSERTELEMENT vec=texp 
-    COMMA new_el=texp COMMA idx=texp instr_metadata?
+    COMMA new_el=texp COMMA idx=texp 
     { OP_InsertElement (vec, new_el, idx)  }
 
   | KW_EXTRACTVALUE tv=texp idx=comma_path_with_instr_metadata(INTEGER)
@@ -1387,7 +1389,7 @@ instr_op:
   | KW_INSERTVALUE agg=texp COMMA new_val=texp idx=comma_path_with_instr_metadata(INTEGER)
     { OP_InsertValue (agg, new_val, idx) }
 
-  | KW_SHUFFLEVECTOR v1=texp COMMA v2=texp COMMA mask=texp instr_metadata?
+  | KW_SHUFFLEVECTOR v1=texp COMMA v2=texp COMMA mask=texp
     { OP_ShuffleVector (v1, v2, mask)  }
 
 expr_op:
@@ -1441,7 +1443,7 @@ expr_val:
   | f=HEXCONSTANT                                     { fun _ -> EXP_Hex f            }
   | KW_TRUE                                           { fun _ -> EXP_Bool true        }
   | KW_FALSE                                          { fun _ -> EXP_Bool false       }
-  /* | KW_NULL                                           { fun _ -> EXP_Null             } */
+  | KW_NULL                                           { fun _ -> EXP_Null             } 
   | KW_UNDEF                                          { fun _ -> EXP_Undef            }
   | KW_POISON                                         { fun _ -> EXP_Poison           }
   | KW_ZEROINITIALIZER                                { fun _ -> EXP_Zero_initializer }
@@ -1462,11 +1464,7 @@ expr_val:
 		     str s1,
 		     str s2)
 		   }
-  | m=metadata_value { fun _ -> begin match m with
-                                | METADATA_Null -> EXP_Null
-		                | _ -> EXP_Null (* TODO: what value for metadata *)
-				end
-		     } 
+  | m=metadata_value { fun _ -> EXP_Metadata m }
 
 
 a_num_elts:
@@ -1479,52 +1477,10 @@ a_align:
 
 a_addrspace:
   | csep a=addrspace { [a] }
-  | instr_metadata? (* empty *) { [] }
+  | (* empty *) { [] }
 
 alloca_anns:
   anns=a_num_elts { anns }
-
-(*
-l_nontemporal:
-  | csep META_NONTEMPORAL m=metadata_value l=l_invariant_load
-     { (ANN_metadata [METADATA_Nontemporal; m]) :: l }
-  | l=l_invariant_load { l }
-
-l_invariant_load:
-  | csep META_INVARIANT_LOAD m=metadata_value l=l_invariant_group
-    { (ANN_metadata [METADATA_Invariant_load; m]) :: l }
-  | l=l_invariant_group { l }
-
-l_invariant_group:
-  | csep META_INVARIANT_GROUP m=metadata_value l=l_nonnull
-    { (ANN_metadata [METADATA_Invariant_group; m]) :: l }
-  | l=l_nonnull { l }
-
-l_nonnull:
-  | csep META_NONNULL m=metadata_value l=l_dereferenceable
-    { (ANN_metadata [METADATA_Nonnull; m]) :: l }
-  | l=l_dereferenceable { l }
-
-l_dereferenceable:
-  | csep META_DEREFERENCEABLE m=metadata_value l=l_dereferenceable_or_null
-    { (ANN_metadata [METADATA_Dereferenceable; m]) :: l }
-  | l=l_dereferenceable_or_null { l }
-
-l_dereferenceable_or_null:
-  | csep META_DEREFERENCEABLE_OR_NULL m=metadata_value l=l_align
-    { (ANN_metadata [METADATA_Dereferenceable_or_null; m]) :: l }
-  | l=l_align { l }
-
-l_align:
-  | csep KW_ALIGN m=metadata_value l=l_noundef
-    { (ANN_metadata [METADATA_Align; m]) :: l }
-  | l=l_noundef { l }
-
-l_noundef:
-  | csep META_NOUNDEF m=metadata_value
-    { (ANN_metadata [METADATA_Noundef; m]) :: [] }
-  | l=l_other { l }
-*)
 
 l_other:
   | csep l=separated_list(csep, m_pair) { l }
@@ -1537,19 +1493,9 @@ load_anns:
 m_pair:
   | m1=metadata_value m2=metadata_value { ANN_metadata([m1; m2]) }
 
-s_nontemporal:
-  | csep META_NONTEMPORAL m=metadata_value l=s_invariant_group
-     { (ANN_metadata [METADATA_Nontemporal; m]) :: l }
-  | l=s_invariant_group { l }
-
-s_invariant_group:
-  | csep META_INVARIANT_GROUP m=metadata_value
-    { (ANN_metadata [METADATA_Invariant_group; m]) :: [] }
-  | l=l_other { l }
-
 store_anns:
-  | csep a=align l=s_nontemporal {  a::l }
-  | anns=s_nontemporal { anns }
+  | csep a=align l=l_other {  a::l }
+  | anns=l_other { anns }
 
 
 tailcall:
@@ -1561,12 +1507,9 @@ exp:
   | eo=expr_op { fun _ -> eo }
   | ev=expr_val { ev }
 
-%inline call_metadata:
-  | csep md=global_metadata { md }
-
 operand:
   | t=texp    { SSA_value t }
-  | s=STRING  { Metadata_string (METADATA_String (str s)) }
+  | s=STRING  { Metadata_string (METADATA_Id (LLVMAst.Name (str s))) }
 
 operand_bundle:
   tag=STRING LPAREN ops=separated_list(csep, operand) RPAREN
@@ -1575,13 +1518,12 @@ operand_bundle:
 operand_bundles:
   LSQUARE ops=separated_list(csep, operand_bundle) RSQUARE { ops }
 
-%inline instr:
+instr:
   | eo=instr_op  { INSTR_Op eo }
 
-    (* TODO - save call_metadata somewhere? *)
   | t=tailcall? KW_CALL fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
     f=call_exp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
-    fa=list(fn_attr) call_metadata? ops=operand_bundles? 
+    fa=list(fn_attr) ops=operand_bundles? 
     { let atts =
 	(opt_list t)
 	@ (List.map (fun f -> ANN_fast_math_flag f) fm)
@@ -1589,7 +1531,6 @@ operand_bundles:
         @ (List.map (fun r -> ANN_ret_attribute r) ra)
         @ (opt_list addr)
         @ (List.map (fun f -> ANN_fun_attribute f) fa)
-      (*      @ (opt_list md) TODO: record metadata *)
       in
       let ops = begin match ops with
 		| None -> []
@@ -1616,8 +1557,8 @@ operand_bundles:
   | KW_ATOMICCMPXCHG { failwith"INSTR_AtomicCmpXchg" }
   | KW_ATOMICRMW     { failwith"INSTR_AtomicRMW"     }
   | KW_FENCE         { failwith"INSTR_Fence"         }
-  | KW_LANDINGPAD t=typ KW_CLEANUP cs=clause* instr_metadata* { INSTR_LandingPad (t, true, cs) }
-  | KW_LANDINGPAD t=typ cs=clause+ instr_metadata*            { INSTR_LandingPad (t, false, cs) }
+  | KW_LANDINGPAD t=typ KW_CLEANUP cs=clause*  { INSTR_LandingPad (t, true, cs) }
+  | KW_LANDINGPAD t=typ cs=clause+             { INSTR_LandingPad (t, false, cs) }
 
 %inline
 clause:
@@ -1630,29 +1571,29 @@ branch_label:
 %inline
 terminator:
   | KW_RET tv=texp
-    { None, fun _ -> TERM_Ret tv }
+    { TERM_Ret tv }
 
   | KW_RET KW_VOID
-    { None, fun _ -> TERM_Ret_void }
+    { TERM_Ret_void }
 
   | KW_BR c=texp COMMA o1=branch_label COMMA o2=branch_label
-    { None, fun _ -> TERM_Br (c, o1, o2) }
+    { TERM_Br (c, o1, o2) }
 
   | KW_BR b=branch_label
-    { None, fun _ -> TERM_Br_1 b }
+    { TERM_Br_1 b }
 
   | KW_SWITCH c=texp COMMA
     def=branch_label LSQUARE table=list(switch_table_entry) RSQUARE
-    { None, fun _ -> TERM_Switch (c, def, table) }
+    { TERM_Switch (c, def, table) }
 
   | KW_INDIRECTBR tv=texp
     COMMA LSQUARE til=separated_list(csep, branch_label)  RSQUARE
-    { None, fun _ -> TERM_IndirectBr (tv, til) }
+    { TERM_IndirectBr (tv, til) }
 
   | KW_RESUME tv=texp
-    { None, fun _ -> TERM_Resume tv }
+    { TERM_Resume tv }
 
-  | id_opt=instr_lhs KW_INVOKE fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
+  | KW_INVOKE fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
     f=call_exp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
     fa=list(fn_attr)
     ops=operand_bundles?
@@ -1671,10 +1612,10 @@ terminator:
 		| Some ops -> ops
 		end
       in
-      (id_opt, fun id_opt -> TERM_Invoke (id_opt, f, a, l1, l2, atts, ops))  }
+      ( TERM_Invoke (f, a, l1, l2, atts, ops))  }
 
   | KW_UNREACHABLE
-    { None, fun _ -> TERM_Unreachable }
+    { TERM_Unreachable }
 
 align:
   | KW_ALIGN n=INTEGER { ANN_align n }
