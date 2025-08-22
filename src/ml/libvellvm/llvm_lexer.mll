@@ -517,9 +517,9 @@ and gobble_metadata_debug di buf depth = parse
 
 and comment buf = parse
   | eol    { Lexing.new_line lexbuf;
-             COMMENT (Buffer.contents buf)
+             token lexbuf  
            }
-  | eof    { COMMENT_EOF (Buffer.contents buf) }
+  | eof    { EOF } 
   | _ as c {
              Buffer.add_char buf c;
              comment buf lexbuf

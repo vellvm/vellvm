@@ -400,10 +400,12 @@ with metadata : Set :=
     - Anon is for numbers
     - Name is for others, but the string includes quotes  
 *)
+| METADATA_Null   (* Annoying edge case -- no ! needed *)
 | METADATA_Id     (id:raw_id)  
 | METADATA_Const  (tv:T * exp)
 | METADATA_Node   (mds:list metadata)
-
+| METADATA_Pair   (md1 md2:metadata)  (* adjacent elements in instruction metadata *)
+                  
 (* DI Metadata introduced completely new lexical conventions for "structured" debug
    metadata.  Vellvm doesn't do anything interesting with this metadata (yet),
    so we simply parse it in a way that preserves the information.
@@ -906,7 +908,7 @@ Variant toplevel_entity {FnBody:Set} : Set :=
 | TLE_Type_decl       (id:ident) (t:T)
 | TLE_Source_filename (s:string)
 | TLE_Global          (g:global)
-| TLE_Metadata        (id:metadata) (md:metadata)
+| TLE_Metadata        (id:metadata) (distinct:bool) (md:metadata)
 | TLE_Attribute_group (i:int_ast) (attrs:list fn_attr)
 .
 

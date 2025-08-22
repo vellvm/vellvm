@@ -331,9 +331,11 @@ Section ReprInstances.
       let '(t, e) := te in "(" ++ repr_typ t ++ ", " ++ repr_exp e ++ ")"
     in
     match m with
+    | METADATA_Null => "METADATA_Null"
     | METADATA_Const tv => "(METADATA_Const " ++ texp tv ++ ")"
     | METADATA_Id id => "(METADATA_Id " ++ repr id ++ ")"
     | METADATA_Node mds => "(METADATA_Node [" ++ (contents id (List.map repr_metadata mds)) ++ "])"
+    | METADATA_Pair md1 md2 => "(METADATA_Pair " ++ (repr_metadata md1) ++ " " ++ (repr_metadata md2) ++ ")"
     | METADATA_Debug s1 s2 => "(METADATA_Debug " ++ repr s1 ++ ", " ++ repr s2 ++ ")"
     end.
 
@@ -916,7 +918,7 @@ Section ReprInstances.
        | TLE_Type_decl id t => "(TLE_Type_decl " ++ repr id ++ " " ++ repr t ++ ")"
        | TLE_Source_filename s => "(TLE_Source_filename " ++ repr s ++ ")"
        | TLE_Global g => "(TLE_Global " ++ repr g ++ ")"
-       | TLE_Metadata id md => "(TLE_Metadata " ++ repr id ++ " " ++ repr md ++ ")"
+       | TLE_Metadata id b md => "(TLE_Metadata " ++ repr id ++ " " ++ repr b ++ " " ++ repr md ++ ")"
        | TLE_Attribute_group i attrs => "(TLE_Attribute_group " ++ repr i ++ " " ++ repr attrs ++ ")"
        end.
 

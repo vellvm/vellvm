@@ -373,9 +373,11 @@ Section ExpInd.
 
   Hypothesis IH_Metadata      : forall (m:metadata T), Q m -> P (EXP_Metadata m).
 
+  Hypothesis IH_METADATA_Null : Q(METADATA_Null).
   Hypothesis IH_METADATA_Id   : forall (id:raw_id), Q (METADATA_Id id).
   Hypothesis IH_METADATA_Const : forall (te:T * exp T), P (snd te) -> Q (METADATA_Const te).
   Hypothesis IH_METADATA_Node : forall (ms:list (metadata T)), (forall m, In m ms -> Q m) -> Q (METADATA_Node ms).
+  Hypothesis IH_METADATA_Pair : forall (m1 m2:metadata T), Q m1 -> Q m2 -> Q (METADATA_Pair m1 m2).
   Hypothesis IH_METADATA_Debug : forall (s t:string), Q (METADATA_Debug s t).
 
   Lemma exp_ind : forall (v:exp T), P v.
@@ -416,10 +418,12 @@ refine(
   | EXP_Metadata m => IH_Metadata m (F0 m)
   end
 with F0 (m : metadata T) : Q m :=
-  match m as m0 return (Q m0) with
+    match m as m0 return (Q m0) with
+  | METADATA_Null => IH_METADATA_Null      
   | METADATA_Id id => IH_METADATA_Id id
   | METADATA_Const tv => IH_METADATA_Const tv (F (snd tv))
   | METADATA_Node mds => _
+  | METADATA_Pair md1 md2 => IH_METADATA_Pair md1 md2 (F0 md1) (F0 md2)
   | METADATA_Debug DIstr contents => IH_METADATA_Debug DIstr contents
   end
 for
@@ -500,9 +504,11 @@ refine(
   end
 with F0 (m : metadata T) : Q m :=
   match m as m0 return (Q m0) with
+  | METADATA_Null => IH_METADATA_Null
   | METADATA_Id id => IH_METADATA_Id id
   | METADATA_Const tv => IH_METADATA_Const tv (F (snd tv))
   | METADATA_Node mds => _
+  | METADATA_Pair md1 md2 => IH_METADATA_Pair md1 md2 (F0 md1) (F0 md2)                          
   | METADATA_Debug DIstr contents => IH_METADATA_Debug DIstr contents
   end
 for

@@ -716,12 +716,14 @@ Section ShowInstances.
     | EXP_Metadata m => (dshow_metadata m)
     end
   with dshow_metadata (md : metadata T)  : DString :=
-    match md with
+         match md with
+    | METADATA_Null => sd "null"
     | METADATA_Const tv => let '(t,e) := tv in (dshow t) @@ sd " " @@ dshow_exp false e
     | METADATA_Id i => sd "!" @@ dshow i
     | METADATA_Node mds => sd "!{"
                             @@ concat_DString (sd " , ") (map dshow_metadata mds)
                             @@ sd "}"
+    | METADATA_Pair md1 md2 => dshow_metadata md1 @@ sd " " @@ dshow_metadata md2
     | METADATA_Debug ds s => sd ("!DI" ++ ds ++ "(" ++ s ++ ")")
     end.
   
@@ -1070,7 +1072,7 @@ tag ::= string constant
   Definition dshow_metadata_suffix (md : list (metadata T)) : DString :=
     match md with
     | [] => DList_empty
-    | _ => sd ", " @@ (dshow_metadata_list md)
+    | _ => DList_join (map (fun m => sd ", " @@ (dshow_metadata m)) md)
     end.
   
   Definition dshow_id_instr_metadata (inst : instr_id * instr T * list (metadata T)) : DString :=
@@ -1436,7 +1438,9 @@ Definition dshow_tle (tle : toplevel_entity typ (block typ * list (block typ))) 
      | TLE_Source_filename s => sd "source_filename = " @@ quoted_dstring s
      | TLE_Declaration decl => dshow decl
      | TLE_Global g => dshow g
-     | TLE_Metadata id md => dshow_metadata id @@ sd " = " @@ dshow_metadata md (* Can't use implicit *)
+     | TLE_Metadata id b md => dshow_metadata id @@ sd " = " @@
+                                dshow_bool b "distinct " @@
+                                dshow_metadata md (* Can't use implicit *)
      | TLE_Type_decl id t => DList_join [dshow_ident id ; sd " = type "; dshow t ]
      | TLE_Attribute_group i attrs =>
          DList_join

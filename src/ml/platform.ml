@@ -151,7 +151,12 @@ let clang_compile (dot_ll : string) (dot_s : string) (opt_level : string) :
   sh (sprintf "%s%s %s" (clang_cmd opt_level) dot_s dot_ll) raise_error
 
 let clang_parse (in_dot_ll : string) (out_dot_ll : string) : unit =
-  sh (sprintf "%s%s %s" clang_parse_cmd out_dot_ll in_dot_ll) raise_error
+  let parse_cmd = if !verbose then
+                    sprintf "%s%s %s" clang_parse_cmd out_dot_ll in_dot_ll
+                  else
+                    sprintf "%s%s %s 2> /dev/null" clang_parse_cmd out_dot_ll in_dot_ll
+  in
+  sh parse_cmd raise_error
 
 let llc_compile (in_dot_ll : string) (dot_s : string) : unit =
   sh (sprintf "%s%s %s" llc_compile_cmd dot_s in_dot_ll) raise_error

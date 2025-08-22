@@ -181,6 +181,10 @@ opam:
 print-includes:
 	@echo $(ROCQINCLUDES)
 
+.PHONY: c2rust-tests
+c2rust-tests:
+	make -C ../tractor/c2rust-tests
+
 ######## Any other target gets "forwarded" to the generated RocqMakefile
 %: invoke-rocqmakefile
 	@true

@@ -56,7 +56,7 @@ let ll_files_of_dir path : string list =
 
 let pp_test_of_dir dir =
   Test
-    ( "Parsing files in: " ^ dir
+    ( "Parsing files in: " ^ dir ^ "\n"
     , List.map
         (fun f -> (f, fun () -> parse_pp_test f))
         (ll_files_of_dir dir) )

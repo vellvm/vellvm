@@ -165,9 +165,11 @@ Section Endo.
       (m : metadata T)
       : (metadata T)  :=
         match m with
+        | METADATA_Null => METADATA_Null           
         | METADATA_Const  tv => METADATA_Const ((endo (fst tv)), (f_exp (snd tv)))
         | METADATA_Id id => METADATA_Id (endo id)
         | METADATA_Node mds => METADATA_Node (List.map endo_metadata mds)
+        | METADATA_Pair md1 md2 => METADATA_Pair (endo_metadata md1) (endo_metadata md2)                                            
         | METADATA_Debug sd d => METADATA_Debug (endo sd) (endo d)
         end.
 
@@ -401,7 +403,7 @@ Section Endo.
         | TLE_Type_decl id t => TLE_Type_decl (endo id) (endo t)
         | TLE_Source_filename s => TLE_Source_filename (endo s)
         | TLE_Global g => TLE_Global (endo g)
-        | TLE_Metadata id md => TLE_Metadata (endo id) (endo md)
+        | TLE_Metadata id b md => TLE_Metadata (endo id) b (endo md)
         | TLE_Attribute_group i attrs => TLE_Attribute_group (endo i) (endo attrs)
         end.
 
@@ -562,9 +564,11 @@ Section TFunctor.
       `{Endo fcmp}
            (U V : Set) (f : U -> V) (m : metadata U) :=
         match m with
+        | METADATA_Null => METADATA_Null
         | METADATA_Const tv => METADATA_Const (f (fst tv), ft_exp U V f (snd tv))
         | METADATA_Id id => METADATA_Id (endo id)
         | METADATA_Node mds => METADATA_Node (map (ft_metadata U V f) mds)
+        | METADATA_Pair md1 md2 => METADATA_Pair (ft_metadata U V f md1) (ft_metadata U V f md2)         
         | METADATA_Debug ds s => METADATA_Debug ds s
         end.
           
@@ -849,7 +853,7 @@ Section TFunctor.
         | TLE_Type_decl id t => TLE_Type_decl (endo id) (f t)
         | TLE_Source_filename s => TLE_Source_filename (endo s)
         | TLE_Global g => TLE_Global (tfmap f g)
-        | TLE_Metadata id md => TLE_Metadata (tfmap f id) (tfmap f md)
+        | TLE_Metadata id b md => TLE_Metadata (tfmap f id) b (tfmap f md)
         | TLE_Attribute_group i attrs => TLE_Attribute_group (endo i) (endo attrs)
         end.
 

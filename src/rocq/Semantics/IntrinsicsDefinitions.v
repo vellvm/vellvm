@@ -87,6 +87,33 @@ Definition vellvm_internal_throw_decl: declaration typ :=
     dc_annotations  := []
   |}.
 
+Definition va_start_decl: declaration typ :=
+  {|
+    dc_name        := Name "llvm.va_start";
+    dc_type        := TYPE_Function TYPE_Void [TYPE_Pointer None] false;
+    dc_param_attrs := ([], [[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
+Definition va_end_decl: declaration typ :=
+  {|
+    dc_name        := Name "llvm.va_end";
+    dc_type        := TYPE_Function TYPE_Void [TYPE_Pointer None] false;
+    dc_param_attrs := ([], [[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
+Definition va_copy_decl: declaration typ :=
+  {|
+    dc_name        := Name "llvm.va_copy";
+    dc_type        := TYPE_Function TYPE_Void [TYPE_Pointer None; TYPE_Pointer None] false;
+    dc_param_attrs := ([], [[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
 Definition fabs_32_decl: declaration typ :=
   {|
     dc_name        := Name "llvm.fabs.f32";
@@ -286,7 +313,12 @@ Definition defined_intrinsics_decls :=
     free_decl;
 
     (* exception intrinsics *)
-    vellvm_internal_throw_decl
+    vellvm_internal_throw_decl;
+
+    (* Vararg intrinsics *)
+    va_start_decl;
+    va_end_decl;
+    va_copy_decl
   ].
 
 

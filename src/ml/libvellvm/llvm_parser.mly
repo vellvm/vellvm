@@ -68,8 +68,10 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
   | None -> None
   | Some l -> Some (ANN_linkage l)
 
-let mk_metadata (m : ('a metadata list list)) : 'a metadata list =
-  List.flatten m
+let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
+  match m with
+  | None -> []
+  | Some ms -> ms
 
 %}
 
@@ -464,8 +466,8 @@ toplevel_entity:
    *)
   | i=lident EQ KW_TYPE t=typ           { TLE_Type_decl (ID_Local i, t)  }
   | g=global_decl                       { TLE_Global g                   }
-  | BANG i=metadata_id EQ KW_DISTINCT? m=tle_metadata
-                                        { TLE_Metadata (i, m)            }
+  | BANG i=metadata_id EQ d=KW_DISTINCT? m=tle_metadata
+                                        { TLE_Metadata (i, opt_bool d, m)}
   | KW_ATTRIBUTES i=ATTR_GRP_ID EQ LCURLY a=fn_attr* RCURLY
     { TLE_Attribute_group (i, a)     }
   | c=COMMENT { TLE_Comment (str c) }
@@ -483,6 +485,7 @@ metadata_id:
   | KW_NONNULL                   { METADATA_Id (Name (str "nonnull")) }
   | KW_NOUNDEF                   { METADATA_Id (Name (str "noundef")) }
   | KW_ALIGN                     { METADATA_Id (Name (str "align")) }
+  | s=STRING                     { METADATA_Id (Name (str ("\"" ^ s ^ "\""))) } (* preserve quotes *)
   | mid=INTEGER                  { METADATA_Id (Anon mid) }
   | mid=KW_UNKNOWN               { METADATA_Id (Name (str mid)) }
 
@@ -492,6 +495,7 @@ metadata_node:
     { METADATA_Node m }
 
 tconst_or_metadata_value:
+  | KW_NULL                     { METADATA_Id (Name (str "null")) }
   | tconst                      { METADATA_Const $1  } 
   | m=metadata_value            { m } 
 
@@ -1001,10 +1005,6 @@ block_label:
     { Some ("\"" ^ str ^ "\"")}
 
 block_phis_and_instrs_and_term:
-  | COMMENT bl=block_phis_and_instrs_and_term
-    (* TODO: our AST doesn't have a place for beginning-of-block comments *)
-    { bl }
-
   | id=bound_lident EQ pm=phi
     bl=block_phis_and_instrs_and_term
     {
@@ -1012,22 +1012,26 @@ block_phis_and_instrs_and_term:
       let (phis, instrs, t) = bl in
       (((Some id, p), md)::phis, instrs, t) }
 
-  | id_opt=instr_lhs inst=instr md=instr_metadata*
+  | id_opt=instr_lhs im=instr 
     ins=block_instrs_and_term
-    { let (instrs, t) = ins in 
-      ([], ((id_opt, inst), mk_metadata md)::instrs, t) }
+    { let (inst, md) = im in 
+      let (instrs, t) = ins in 
+      ([], ((id_opt, inst), md)::instrs, t) }
 
-  | id_opt=instr_lhs t=terminator md=instr_metadata*
-    { ([], [], ((id_opt, t), mk_metadata md)) }
+  | id_opt=instr_lhs tm=terminator
+    { let (t,md) = tm in 
+      ([], [], ((id_opt, t), md)) }
       
 block_instrs_and_term:
-  | id_opt=instr_lhs t=terminator md=instr_metadata*
-    { ([], ((id_opt, t), mk_metadata md)) }
+  | id_opt=instr_lhs tm=terminator
+    { let (t,md) = tm in
+      ([], ((id_opt, t), md)) }
 
-  | id_opt=instr_lhs inst=instr md=instr_metadata*
+  | id_opt=instr_lhs im=instr
     ins=block_instrs_and_term
-    { let (instrs, t) = ins in
-      (((id_opt, inst), mk_metadata md)::instrs, t) }
+    { let (inst, md) = im in
+      let (instrs, t) = ins in
+      (((id_opt, inst), md)::instrs, t) }
 
 
 phi:
@@ -1055,10 +1059,15 @@ block:
 	(blk_id, body)
     }
 
-instr_metadata:
-  | COMMA mvs=metadata_value+
-    { mvs }
+metadata_pair:
+  m1=metadata_value m2=metadata_value
+    { METADATA_Pair(m1, m2) }
 
+instr_metadata:
+  | COMMA mp=metadata_pair md=instr_metadata
+    { mp::md }
+  | 
+    { [] }
 
 df_blocks:
   | blks=block+
@@ -1362,9 +1371,12 @@ fast_math:
   | KW_FAST { Fast }
 
 comma_path_with_instr_metadata(X):
-  | COMMA x=X l=comma_path_with_instr_metadata(X)    { x::l }
-  | instr_metadata? { [] }
+  | COMMA x=X lm=comma_path_with_instr_metadata(X)
+    { let (l,md) = lm in
+      (x::l, md) }
+  | md=instr_metadata { ([], md) }
 
+%inline
 instr_op:
   | op=ibinop t=typ o1=exp COMMA o2=exp
     { OP_IBinop (op, t, o1 t, o2 t) }
@@ -1385,9 +1397,6 @@ instr_op:
   | c=conversion t1=typ v=exp KW_TO t2=typ
     { OP_Conversion (c, t1, v t1, t2) }
 
-  | KW_GETELEMENTPTR KW_INBOUNDS? t=typ COMMA ptr=texp idx=comma_path_with_instr_metadata(texp)
-    { OP_GetElementPtr (t, ptr, idx) }
-
   | KW_SELECT if_=texp COMMA then_=texp COMMA else_= texp
     { OP_Select (if_, then_, else_) }
 
@@ -1400,12 +1409,6 @@ instr_op:
   | KW_INSERTELEMENT vec=texp 
     COMMA new_el=texp COMMA idx=texp 
     { OP_InsertElement (vec, new_el, idx)  }
-
-  | KW_EXTRACTVALUE tv=texp idx=comma_path_with_instr_metadata(INTEGER)
-    { OP_ExtractValue (tv, idx) }
-
-  | KW_INSERTVALUE agg=texp COMMA new_val=texp idx=comma_path_with_instr_metadata(INTEGER)
-    { OP_InsertValue (agg, new_val, idx) }
 
   | KW_SHUFFLEVECTOR v1=texp COMMA v2=texp COMMA mask=texp
     { OP_ShuffleVector (v1, v2, mask)  }
@@ -1454,6 +1457,19 @@ expr_op:
   | KW_SHUFFLEVECTOR LPAREN v1=texp COMMA v2=texp COMMA mask=texp RPAREN
     { OP_ShuffleVector (v1, v2, mask)  }
 
+instr_path:
+  | KW_EXTRACTVALUE tv=texp im=comma_path_with_instr_metadata(INTEGER)
+    { let (idx, md) = im in 
+      (INSTR_Op (OP_ExtractValue (tv, idx)), md) }
+
+  | KW_INSERTVALUE agg=texp COMMA new_val=texp im=comma_path_with_instr_metadata(INTEGER)
+    { let (idx, md) = im in
+      (INSTR_Op (OP_InsertValue (agg, new_val, idx)), md) }
+
+  | KW_GETELEMENTPTR KW_INBOUNDS? t=typ COMMA ptr=texp im=comma_path_with_instr_metadata(texp)
+    { let (idx, md) = im in
+      (INSTR_Op(OP_GetElementPtr (t, ptr, idx)), md) }
+
 
 expr_val:
   | i=INTEGER                                         { fun _ -> EXP_Integer i        }
@@ -1486,16 +1502,20 @@ expr_val:
 
 
 a_num_elts:
-  | csep t=texp l=a_align { (ANN_num_elements t)::l }
+  | csep t=texp lm=a_align
+    { let (l,md) = lm in
+      ((ANN_num_elements t)::l, md) }
   | l=a_align { l }
 
 a_align:
-  | csep KW_ALIGN n=INTEGER l=a_addrspace { (ANN_align n) :: l }
+  | csep KW_ALIGN n=INTEGER lm=a_addrspace
+    { let (l,md) = lm in
+      ((ANN_align n) :: l, md) }
   | l=a_addrspace { l }
 
 a_addrspace:
-  | csep a=addrspace { [a] }
-  | (* empty *) { [] }
+  | csep a=addrspace md=instr_metadata { ([a], md) }
+  | md=instr_metadata { ([], md) }
 
 alloca_anns:
   anns=a_num_elts { anns }
@@ -1537,11 +1557,15 @@ operand_bundles:
   LSQUARE ops=separated_list(csep, operand_bundle) RSQUARE { ops }
 
 instr:
-  | eo=instr_op  { INSTR_Op eo }
+  | eo=instr_op md=instr_metadata
+     { (INSTR_Op eo, md)  }
+
+  | ep=instr_path
+     { ep }
 
   | t=tailcall? KW_CALL fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
     f=call_exp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
-    fa=list(fn_attr) ops=operand_bundles? 
+    fa=list(fn_attr) ops=operand_bundles? md=instr_metadata
     { let atts =
 	(opt_list t)
 	@ (List.map (fun f -> ANN_fast_math_flag f) fm)
@@ -1555,28 +1579,32 @@ instr:
 		| Some ops -> ops
 		end
       in
-      INSTR_Call (f, a, atts, ops) }
+      (INSTR_Call (f, a, atts, ops), md) }
 
-  | KW_ALLOCA ia=KW_INALLOCA? t=typ anns=alloca_anns
+  | KW_ALLOCA ia=KW_INALLOCA? t=typ am=alloca_anns
     { let a = match ia with Some _ -> [ANN_inalloca] | None -> [] in
-      INSTR_Alloca (t, a@anns) }
+      let (anns, md) = am in
+      (INSTR_Alloca (t, a@anns), md) } (* TODO: ALLOCA METADATA *)
 
   | KW_LOAD vol=KW_VOLATILE? t=typ COMMA tv=texp anns=load_anns
     { let v = match vol with Some _ -> [ANN_volatile] | None -> [] in
-      INSTR_Load (t, tv, v@anns) }
+      (INSTR_Load (t, tv, v@anns), []) } (* TODO: LOAD METADATA *)
 
 
-  | KW_VAARG tv=texp COMMA t=typ { INSTR_VAArg (tv, t)  }
+  | KW_VAARG tv=texp COMMA t=typ md=instr_metadata { (INSTR_VAArg (tv, t), md)  }
 
   | KW_STORE vol=KW_VOLATILE? all=texp COMMA ptr=texp anns=store_anns
     { let v = match vol with Some _ -> [ANN_volatile] | None -> [] in
-      INSTR_Store (all, ptr, v@anns) }
+      (INSTR_Store (all, ptr, v@anns), []) } (* TODO: LOAD METADATA *)
 
   | KW_ATOMICCMPXCHG { failwith"INSTR_AtomicCmpXchg" }
   | KW_ATOMICRMW     { failwith"INSTR_AtomicRMW"     }
   | KW_FENCE         { failwith"INSTR_Fence"         }
-  | KW_LANDINGPAD t=typ KW_CLEANUP cs=clause*  { INSTR_LandingPad (t, true, cs) }
-  | KW_LANDINGPAD t=typ cs=clause+             { INSTR_LandingPad (t, false, cs) }
+  | KW_LANDINGPAD t=typ KW_CLEANUP cs=clause* md=instr_metadata
+    { (INSTR_LandingPad (t, true, cs), md) }
+
+  | KW_LANDINGPAD t=typ cs=clause+ md=instr_metadata
+    { (INSTR_LandingPad (t, false, cs), md) }
 
 
 %inline
@@ -1589,28 +1617,28 @@ branch_label:
 
 %inline
 terminator:
-  | KW_RET tv=texp
-    { TERM_Ret tv }
+  | KW_RET tv=texp md=instr_metadata
+    { ((TERM_Ret tv), md) }
 
-  | KW_RET KW_VOID
-    { TERM_Ret_void }
+  | KW_RET KW_VOID md=instr_metadata
+    { (TERM_Ret_void, md) }
 
-  | KW_BR c=texp COMMA o1=branch_label COMMA o2=branch_label
-    { TERM_Br (c, o1, o2) }
+  | KW_BR c=texp COMMA o1=branch_label COMMA o2=branch_label md=instr_metadata
+    { (TERM_Br (c, o1, o2), md) }
 
-  | KW_BR b=branch_label
-    { TERM_Br_1 b }
+  | KW_BR b=branch_label md=instr_metadata
+    { (TERM_Br_1 b, md) }
 
   | KW_SWITCH c=texp COMMA
-    def=branch_label LSQUARE table=list(switch_table_entry) RSQUARE
-    { TERM_Switch (c, def, table) }
+    def=branch_label LSQUARE table=list(switch_table_entry) RSQUARE md=instr_metadata
+    { (TERM_Switch (c, def, table), md) }
 
   | KW_INDIRECTBR tv=texp
-    COMMA LSQUARE til=separated_list(csep, branch_label)  RSQUARE
-    { TERM_IndirectBr (tv, til) }
+    COMMA LSQUARE til=separated_list(csep, branch_label)  RSQUARE md=instr_metadata
+    { (TERM_IndirectBr (tv, til), md) }
 
-  | KW_RESUME tv=texp
-    { TERM_Resume tv }
+  | KW_RESUME tv=texp md=instr_metadata
+    { (TERM_Resume tv, md) }
 
   | KW_INVOKE fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
     f=call_exp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
@@ -1618,6 +1646,7 @@ terminator:
     ops=operand_bundles?
     KW_TO l1=branch_label 
     KW_UNWIND l2=branch_label
+    md=instr_metadata
 
     { let atts =
 	  (List.map (fun f -> ANN_fast_math_flag f) fm)
@@ -1631,10 +1660,10 @@ terminator:
 		| Some ops -> ops
 		end
       in
-      ( TERM_Invoke (f, a, l1, l2, atts, ops))  }
+      (TERM_Invoke(f, a, l1, l2, atts, ops), md)  }
 
-  | KW_UNREACHABLE
-    { TERM_Unreachable }
+  | KW_UNREACHABLE md=instr_metadata
+    { (TERM_Unreachable, md) }
 
 align:
   | KW_ALIGN n=INTEGER { ANN_align n }

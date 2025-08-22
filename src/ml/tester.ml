@@ -85,6 +85,15 @@ let eval_EQTest (name : string) (got : unit -> DV.dvalue)
   | Right _ -> Result.make_singleton EQOk name (RAW_STR (Eq {lhs; rhs}))
   | Left _ -> Result.make_singleton EQNOk name (RAW_STR (Eq {lhs; rhs}))
 
+let eval_SuccessTest (name : string) result (fun_str:string) () :
+    result_sum =
+  try
+    let _ = result () in 
+    Result.make_singleton SuccessOk name (RAW_STR (Success fun_str))
+  with
+  | _ ->
+     Result.make_singleton SuccessNOk name (RAW_STR (Success fun_str))
+
 (* This function takes in a name, a got and expected function, and function
    call name. It will lift the result into the test result class *)
 let eval_POISONTest (name : string) (got : unit -> DV.dvalue)
@@ -152,16 +161,17 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
     | Ok dv -> dv
     | Error e -> failwith (Result.string_of_exit_condition e)
   in
+  let args_str args : doc =
+    pp_print_list
+      ~pp_sep:(fun f () -> pp_print_string f ", ")
+      Interpreter.pp_uvalue str_formatter args ;
+    flush_str_formatter ()
+  in
   match t with
   | Assertion.EQTest (expected, dtyp, entry, args) ->
       let strs =
         let expected_str = string_of_dvalue expected in
-        let args_str : doc =
-          pp_print_list
-            ~pp_sep:(fun f () -> pp_print_string f ", ")
-            Interpreter.pp_uvalue str_formatter args ;
-          flush_str_formatter ()
-        in
+        let args_str = args_str args in
         let lhs = expected_str in
         let rhs = Printf.sprintf "%s(%s)" (string_of_function_id entry) args_str in
         (lhs, rhs)
@@ -170,6 +180,18 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
       let str = Printf.sprintf "%s=%s" (fst strs) (snd strs) in
       ( str
       , eval_EQTest name result (fun () -> expected) (fst strs) (snd strs) )
+
+  | Assertion.SuccessTest (entry, args) ->
+      let fun_str =
+        let args_str : doc = args_str args in
+        Printf.sprintf "%s(%s)" (string_of_function_id entry) args_str 
+      in
+      let t_void = Assertion.typ_to_dtyp (LLVMAst.TYPE_Void) in
+      let result = run_to_value t_void entry args ll_ast in
+      let str = Printf.sprintf "Succeeds: %s" fun_str in
+      ( str
+      , eval_SuccessTest name result fun_str)
+
   | Assertion.POISONTest (dtyp, entry, args) ->
       let expected =
         InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV
@@ -363,43 +385,3 @@ let test_dir dir =
   print_result outcome () ;
   output_asts outcome () ;
   raise (Ran_tests true)
-
-(* failwith "unimplemented" *)
-(* Printf.printf "%s\n" (outcome_to_string outcome) ; raise (Ran_tests
-   (successful outcome)) *)
-
-(* Need to add in the test directory stuff... *)
-(* let test_dir2 dir = Printf.printf "===> TESTING ASSERTIONS WITH
-   STATISTICS\n IN : %s\n" dir ; Platform.configure () ; let pathlist =
-   Test.ll_files_of_dir dir in let files = List.filter_map (fun path -> let
-   _file, ext = Platform.path_to_basename_ext path in try match ext with |
-   "ll" -> Some (path, IO.parse_file path, parse_tests path) | _ -> None with
-   | Failure s | ParseUtil.InvalidAnonymousId s -> let _ = Printf.printf
-   "FAILURE\n %s\n\t%s\n%!" path s in None | _ -> let _ = Printf.printf
-   "FAILURE %s\n%!" path in None ) pathlist in let suite = List.map (fun
-   (file, ast, tests) -> Test (file, List.map (make_test file ast) tests) )
-   files in let outcome = run_suite' suite in failwith "TODO:\n
-   Unimplemented" *)
-(* Printf.printf "%s\n" (outcome_to_string outcome) ; raise (Ran_tests
-   (successful outcome)) *)
-
-(* ******** Section for comparing Vellvm and LLVM ******** *)
-
-(* llc_command_ocaml *)
-(* let llc_command_ocaml prog = let llvm_file_name = Filename.(concat
-   (get_temp_dir_name ()) " temporary_vellvm.ll ") in let test_binary =
-   Filename.(concat (get_temp_dir_name ()) " vellvmqc ") in let f = open_out
-   llvm_file_name in Printf.fprintf f "%s" prog ; close_out f ; Sys.command (
-   "clang -lm -Wno-everything " ^ llvm_file_name ^ " -o " ^ test_binary ^ "
-   && " ^ test_binary ) *)
-
-(* Use yarpgen to generate a test cases in a specific folders *)
-(* Run clang to compile it down *)
-(* run all files in that folders *)
-
-(* let runCsmith () = let command1 = "./generators/csmith/csmith" in let
-   argument1 = [| "> ./generators/csmith/temporary_csmith.c" |] in let
-   command2 = "clang -emit-llvm -S -I./generators/csmith/runtime -O0 -std=c99
-   ./generators/csmith/temporary_csmith.c -o
-   ./generators/csmith/temporary_csmith.ll" in let result =
-   Unix.create_process command *)

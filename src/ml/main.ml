@@ -74,6 +74,7 @@ let compare_tgt_for_poison src tgt : unit =
 
 (* TODO: This could be reformated to make it cleaner - move some of it to
    assertion.ml?. *)
+(* SAZ: why does this duplicate a lot of code in tester.ml? *)
 let make_test name ll_ast t : (string * assertion) option =
   let open Format in
   (* TODO: ll_ast is of type list (toplevel_entity typ (block typ * list
@@ -106,6 +107,18 @@ let make_test name ll_ast t : (string * assertion) option =
       in
       let result = run_to_value dtyp entry args ll_ast in
       Some (str, dvalue_eq_assertion name result (fun () -> expected))
+  | Assertion.SuccessTest ( entry, args) ->
+      let str =
+        let args_str : doc =
+          pp_print_list
+            ~pp_sep:(fun f () -> pp_print_string f ", ")
+            Interpreter.pp_uvalue str_formatter args ;
+          flush_str_formatter ()
+        in
+        Printf.sprintf "%s(%s)" (string_of_function_id entry) args_str
+      in
+      let t_void = Assertion.typ_to_dtyp (LLVMAst.TYPE_Void) in
+      Some (str, (fun () -> ignore (run_to_value t_void entry args ll_ast ())))
   | Assertion.POISONTest (dtyp, entry, args) ->
      if !poison_test_flag
      then
@@ -192,9 +205,9 @@ let make_test name ll_ast t : (string * assertion) option =
         in
         Some (str, assertion)
       else None
-
+      
 let test_pp_dir dir =
-  let _ = Printf.printf "===> RUNNING PRETTY PRINTING TESTS IN: %s\n" dir in
+  let _ = Printf.printf "===> RUNNING PRETTY PRINTING TESTS IN: %s\n%!" dir in
   Platform.configure () ;
   let suite = [Test.pp_test_of_dir dir] in
   let outcome = run_suite suite in
@@ -233,6 +246,11 @@ let ast_pp_dir dir =
   Platform.configure () ;
   let files = Test.ll_files_of_dir dir in
   List.iter ast_pp_file_inner files
+
+let link_dir dir =
+  Platform.configure () ;
+  let files = Test.ll_files_of_dir dir in
+  List.iter Driver.add_link_file files
 
 let test_file path =
   Platform.configure () ;
@@ -383,6 +401,9 @@ let args =
   ; ( "-op"
     , Set_string Platform.output_path
     , "set the path to the output files directory  [default='output']" )
+  ; ( "-L"
+    , String link_dir
+    , "Link all .ll files in the given directory" )
   ; ( "-l"
     , String Driver.add_link_file
     , "Specify LLVM files to link against." )

@@ -365,9 +365,11 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | EXP_Metadata md =>
         (* METADATA TODO - it isn't clear what the denotations should be *)
         match md with
+        | METADATA_Null => ret (UVALUE_Addr ADDR.null)
         | METADATA_Id _ => ret UVALUE_None
         | METADATA_Const tv => eval_texp tv
         | METADATA_Node _ => ret UVALUE_None
+        | METADATA_Pair _ _ => ret UVALUE_None
         | METADATA_Debug _ _ => ret UVALUE_None
         end
     end.

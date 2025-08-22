@@ -3,14 +3,14 @@ source_filename = "printf.c"
 target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
 target triple = "arm64-apple-macosx14.0.0"
 
-%struct.out_fct_wrap_type = type { void (i8, i8*)*, i8* }
-%union.anon = type { i64 }
+%_printf_internal.struct.out_fct_wrap_type = type { void (i8, i8*)*, i8* }
+%_printf_internal.union.anon = type { i64 }
 
-@_ftoa.pow10 = internal constant [10 x double] [double 1.000000e+00, double 1.000000e+01, double 1.000000e+02, double 1.000000e+03, double 1.000000e+04, double 1.000000e+05, double 1.000000e+06, double 1.000000e+07, double 1.000000e+08, double 1.000000e+09], align 8
-@.str = private unnamed_addr constant [4 x i8] c"nan\00", align 1
-@.str.1 = private unnamed_addr constant [5 x i8] c"fni-\00", align 1
-@.str.2 = private unnamed_addr constant [5 x i8] c"fni+\00", align 1
-@.str.3 = private unnamed_addr constant [4 x i8] c"fni\00", align 1
+@_printf_internal_ftoa.pow10 = internal constant [10 x double] [double 1.000000e+00, double 1.000000e+01, double 1.000000e+02, double 1.000000e+03, double 1.000000e+04, double 1.000000e+05, double 1.000000e+06, double 1.000000e+07, double 1.000000e+08, double 1.000000e+09], align 8
+@._printf_internal.str = private unnamed_addr constant [4 x i8] c"nan\00", align 1
+@._printf_internal.str.1 = private unnamed_addr constant [5 x i8] c"fni-\00", align 1
+@._printf_internal.str.2 = private unnamed_addr constant [5 x i8] c"fni+\00", align 1
+@._printf_internal.str.3 = private unnamed_addr constant [4 x i8] c"fni\00", align 1
 
 ; Function Attrs: noinline nounwind optnone ssp uwtable
 define i32 @printf(i8* noundef %0, ...) #0 {
@@ -1364,20 +1364,20 @@ define i32 @fctprintf(void (i8, i8*)* noundef %0, i8* noundef %1, i8* noundef %2
   %5 = alloca i8*, align 8
   %6 = alloca i8*, align 8
   %7 = alloca i8*, align 8
-  %8 = alloca %struct.out_fct_wrap_type, align 8
+  %8 = alloca %_printf_internal.struct.out_fct_wrap_type, align 8
   %9 = alloca i32, align 4
   store void (i8, i8*)* %0, void (i8, i8*)** %4, align 8
   store i8* %1, i8** %5, align 8
   store i8* %2, i8** %6, align 8
   %10 = bitcast i8** %7 to i8*
   call void @llvm.va_start(i8* %10)
-  %11 = getelementptr inbounds %struct.out_fct_wrap_type, %struct.out_fct_wrap_type* %8, i32 0, i32 0
+  %11 = getelementptr inbounds %_printf_internal.struct.out_fct_wrap_type, %_printf_internal.struct.out_fct_wrap_type* %8, i32 0, i32 0
   %12 = load void (i8, i8*)*, void (i8, i8*)** %4, align 8
   store void (i8, i8*)* %12, void (i8, i8*)** %11, align 8
-  %13 = getelementptr inbounds %struct.out_fct_wrap_type, %struct.out_fct_wrap_type* %8, i32 0, i32 1
+  %13 = getelementptr inbounds %_printf_internal.struct.out_fct_wrap_type, %_printf_internal.struct.out_fct_wrap_type* %8, i32 0, i32 1
   %14 = load i8*, i8** %5, align 8
   store i8* %14, i8** %13, align 8
-  %15 = ptrtoint %struct.out_fct_wrap_type* %8 to i64
+  %15 = ptrtoint %_printf_internal.struct.out_fct_wrap_type* %8 to i64
   %16 = inttoptr i64 %15 to i8*
   %17 = load i8*, i8** %6, align 8
   %18 = load i8*, i8** %7, align 8
@@ -1407,13 +1407,13 @@ define internal void @_out_fct(i8 noundef signext %0, i8* noundef %1, i64 nounde
 
 13:                                               ; preds = %4
   %14 = load i8*, i8** %6, align 8
-  %15 = bitcast i8* %14 to %struct.out_fct_wrap_type*
-  %16 = getelementptr inbounds %struct.out_fct_wrap_type, %struct.out_fct_wrap_type* %15, i32 0, i32 0
+  %15 = bitcast i8* %14 to %_printf_internal.struct.out_fct_wrap_type*
+  %16 = getelementptr inbounds %_printf_internal.struct.out_fct_wrap_type, %_printf_internal.struct.out_fct_wrap_type* %15, i32 0, i32 0
   %17 = load void (i8, i8*)*, void (i8, i8*)** %16, align 8
   %18 = load i8, i8* %5, align 1
   %19 = load i8*, i8** %6, align 8
-  %20 = bitcast i8* %19 to %struct.out_fct_wrap_type*
-  %21 = getelementptr inbounds %struct.out_fct_wrap_type, %struct.out_fct_wrap_type* %20, i32 0, i32 1
+  %20 = bitcast i8* %19 to %_printf_internal.struct.out_fct_wrap_type*
+  %21 = getelementptr inbounds %_printf_internal.struct.out_fct_wrap_type, %_printf_internal.struct.out_fct_wrap_type* %20, i32 0, i32 1
   %22 = load i8*, i8** %21, align 8
   call void %17(i8 noundef signext %18, i8* noundef %22)
   br label %23
@@ -1792,7 +1792,7 @@ define internal i64 @_ftoa(void (i8, i8*, i64, i64)* noundef %0, i8* noundef %1,
   %33 = load i64, i64* %13, align 8
   %34 = load i32, i32* %16, align 4
   %35 = load i32, i32* %17, align 4
-  %36 = call i64 @_out_rev(void (i8, i8*, i64, i64)* noundef %30, i8* noundef %31, i64 noundef %32, i64 noundef %33, i8* noundef getelementptr inbounds ([4 x i8], [4 x i8]* @.str, i64 0, i64 0), i64 noundef 3, i32 noundef %34, i32 noundef %35)
+  %36 = call i64 @_out_rev(void (i8, i8*, i64, i64)* noundef %30, i8* noundef %31, i64 noundef %32, i64 noundef %33, i8* noundef getelementptr inbounds ([4 x i8], [4 x i8]* @._printf_internal.str, i64 0, i64 0), i64 noundef 3, i32 noundef %34, i32 noundef %35)
   store i64 %36, i64* %9, align 8
   br label %318
 
@@ -1808,7 +1808,7 @@ define internal i64 @_ftoa(void (i8, i8*, i64, i64)* noundef %0, i8* noundef %1,
   %44 = load i64, i64* %13, align 8
   %45 = load i32, i32* %16, align 4
   %46 = load i32, i32* %17, align 4
-  %47 = call i64 @_out_rev(void (i8, i8*, i64, i64)* noundef %41, i8* noundef %42, i64 noundef %43, i64 noundef %44, i8* noundef getelementptr inbounds ([5 x i8], [5 x i8]* @.str.1, i64 0, i64 0), i64 noundef 4, i32 noundef %45, i32 noundef %46)
+  %47 = call i64 @_out_rev(void (i8, i8*, i64, i64)* noundef %41, i8* noundef %42, i64 noundef %43, i64 noundef %44, i8* noundef getelementptr inbounds ([5 x i8], [5 x i8]* @._printf_internal.str.1, i64 0, i64 0), i64 noundef 4, i32 noundef %45, i32 noundef %46)
   store i64 %47, i64* %9, align 8
   br label %318
 
@@ -1826,7 +1826,7 @@ define internal i64 @_ftoa(void (i8, i8*, i64, i64)* noundef %0, i8* noundef %1,
   %57 = and i32 %56, 4
   %58 = icmp ne i32 %57, 0
   %59 = zext i1 %58 to i64
-  %60 = select i1 %58, i8* getelementptr inbounds ([5 x i8], [5 x i8]* @.str.2, i64 0, i64 0), i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.str.3, i64 0, i64 0)
+  %60 = select i1 %58, i8* getelementptr inbounds ([5 x i8], [5 x i8]* @._printf_internal.str.2, i64 0, i64 0), i8* getelementptr inbounds ([4 x i8], [4 x i8]* @._printf_internal.str.3, i64 0, i64 0)
   %61 = load i32, i32* %17, align 4
   %62 = and i32 %61, 4
   %63 = icmp ne i32 %62, 0
@@ -1923,7 +1923,7 @@ define internal i64 @_ftoa(void (i8, i8*, i64, i64)* noundef %0, i8* noundef %1,
   %118 = fsub double %115, %117
   %119 = load i32, i32* %15, align 4
   %120 = zext i32 %119 to i64
-  %121 = getelementptr inbounds [10 x double], [10 x double]* @_ftoa.pow10, i64 0, i64 %120
+  %121 = getelementptr inbounds [10 x double], [10 x double]* @_printf_internal_ftoa.pow10, i64 0, i64 %120
   %122 = load double, double* %121, align 8
   %123 = fmul double %118, %122
   store double %123, double* %23, align 8
@@ -1947,7 +1947,7 @@ define internal i64 @_ftoa(void (i8, i8*, i64, i64)* noundef %0, i8* noundef %1,
   %136 = uitofp i64 %135 to double
   %137 = load i32, i32* %15, align 4
   %138 = zext i32 %137 to i64
-  %139 = getelementptr inbounds [10 x double], [10 x double]* @_ftoa.pow10, i64 0, i64 %138
+  %139 = getelementptr inbounds [10 x double], [10 x double]* @_printf_internal_ftoa.pow10, i64 0, i64 %138
   %140 = load double, double* %139, align 8
   %141 = fcmp oge double %136, %140
   br i1 %141, label %142, label %145
@@ -2285,7 +2285,7 @@ define internal i64 @_etoa(void (i8, i8*, i64, i64)* noundef %0, i8* noundef %1,
   %16 = alloca i32, align 4
   %17 = alloca i32, align 4
   %18 = alloca i8, align 1
-  %19 = alloca %union.anon, align 8
+  %19 = alloca %_printf_internal.union.anon, align 8
   %20 = alloca i32, align 4
   %21 = alloca i32, align 4
   %22 = alloca double, align 8
@@ -2356,25 +2356,25 @@ define internal i64 @_etoa(void (i8, i8*, i64, i64)* noundef %0, i8* noundef %1,
 
 60:                                               ; preds = %59, %55
   %61 = load double, double* %14, align 8
-  %62 = bitcast %union.anon* %19 to double*
+  %62 = bitcast %_printf_internal.union.anon* %19 to double*
   store double %61, double* %62, align 8
-  %63 = bitcast %union.anon* %19 to i64*
+  %63 = bitcast %_printf_internal.union.anon* %19 to i64*
   %64 = load i64, i64* %63, align 8
   %65 = lshr i64 %64, 52
   %66 = and i64 %65, 2047
   %67 = trunc i64 %66 to i32
   %68 = sub nsw i32 %67, 1023
   store i32 %68, i32* %20, align 4
-  %69 = bitcast %union.anon* %19 to i64*
+  %69 = bitcast %_printf_internal.union.anon* %19 to i64*
   %70 = load i64, i64* %69, align 8
   %71 = and i64 %70, 4503599627370495
   %72 = or i64 %71, 4607182418800017408
-  %73 = bitcast %union.anon* %19 to i64*
+  %73 = bitcast %_printf_internal.union.anon* %19 to i64*
   store i64 %72, i64* %73, align 8
   %74 = load i32, i32* %20, align 4
   %75 = sitofp i32 %74 to double
   %76 = call double @llvm.fmuladd.f64(double %75, double 0x3FD34413509F79FB, double 0x3FC68A288B60C8B3)
-  %77 = bitcast %union.anon* %19 to double*
+  %77 = bitcast %_printf_internal.union.anon* %19 to double*
   %78 = load double, double* %77, align 8
   %79 = fsub double %78, 1.500000e+00
   %80 = call double @llvm.fmuladd.f64(double %79, double 0x3FD287A7636F4361, double %76)
@@ -2401,7 +2401,7 @@ define internal i64 @_etoa(void (i8, i8*, i64, i64)* noundef %0, i8* noundef %1,
   %97 = add nsw i32 %96, 1023
   %98 = sext i32 %97 to i64
   %99 = shl i64 %98, 52
-  %100 = bitcast %union.anon* %19 to i64*
+  %100 = bitcast %_printf_internal.union.anon* %19 to i64*
   store i64 %99, i64* %100, align 8
   %101 = load double, double* %22, align 8
   %102 = fmul double 2.000000e+00, %101
@@ -2418,12 +2418,12 @@ define internal i64 @_etoa(void (i8, i8*, i64, i64)* noundef %0, i8* noundef %1,
   %113 = fadd double %104, %112
   %114 = fdiv double %102, %113
   %115 = fadd double 1.000000e+00, %114
-  %116 = bitcast %union.anon* %19 to double*
+  %116 = bitcast %_printf_internal.union.anon* %19 to double*
   %117 = load double, double* %116, align 8
   %118 = fmul double %117, %115
   store double %118, double* %116, align 8
   %119 = load double, double* %14, align 8
-  %120 = bitcast %union.anon* %19 to double*
+  %120 = bitcast %_printf_internal.union.anon* %19 to double*
   %121 = load double, double* %120, align 8
   %122 = fcmp olt double %119, %121
   br i1 %122, label %123, label %129
@@ -2432,7 +2432,7 @@ define internal i64 @_etoa(void (i8, i8*, i64, i64)* noundef %0, i8* noundef %1,
   %124 = load i32, i32* %21, align 4
   %125 = add nsw i32 %124, -1
   store i32 %125, i32* %21, align 4
-  %126 = bitcast %union.anon* %19 to double*
+  %126 = bitcast %_printf_internal.union.anon* %19 to double*
   %127 = load double, double* %126, align 8
   %128 = fdiv double %127, 1.000000e+01
   store double %128, double* %126, align 8
@@ -2557,7 +2557,7 @@ define internal i64 @_etoa(void (i8, i8*, i64, i64)* noundef %0, i8* noundef %1,
   br i1 %193, label %194, label %199
 
 194:                                              ; preds = %191
-  %195 = bitcast %union.anon* %19 to double*
+  %195 = bitcast %_printf_internal.union.anon* %19 to double*
   %196 = load double, double* %195, align 8
   %197 = load double, double* %14, align 8
   %198 = fdiv double %197, %196
