@@ -519,7 +519,7 @@ and comment buf = parse
   | eol    { Lexing.new_line lexbuf;
              COMMENT (Buffer.contents buf)
            }
-  | eof    { raise Llvm_parser.Error }
+  | eof    { COMMENT_EOF (Buffer.contents buf) }
   | _ as c {
              Buffer.add_char buf c;
              comment buf lexbuf
@@ -539,7 +539,7 @@ and lexed_id = parse
   let parsing_err lexbuf msg =
     let pos = Lexing.lexeme_start_p lexbuf in
     let msg =
-        Printf.sprintf "Parsing error: line %d, column %d, token '%s': %s\n%s"
+        Printf.sprintf "Parsing error: line %d, column %d, token '%s': %s %s"
                        pos.Lexing.pos_lnum
                        (pos.Lexing.pos_cnum - pos.Lexing.pos_bol)
                        (Lexing.lexeme lexbuf)

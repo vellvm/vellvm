@@ -77,6 +77,7 @@ let mk_metadata (m : ('a metadata list list)) : 'a metadata list =
 %token LPAREN RPAREN LCURLY RCURLY LTLCURLY RCURLYGT LSQUARE RSQUARE LT GT EQ COMMA EOF STAR COLON DOTDOTDOT
 
 %token<string> COMMENT
+%token<string> COMMENT_EOF (* Special case of comment that ends in eof and not a line break. *)
 %token<string> STRING
 %token<Camlcoq.Z.t> INTEGER
 %token<string> FLOAT
@@ -448,6 +449,7 @@ let mk_metadata (m : ('a metadata list list)) : 'a metadata list =
 
 toplevel_entities:
   | m=toplevel_entity* EOF { m }
+  | m=toplevel_entity* c = COMMENT_EOF { m @ [TLE_Comment (str c) ] }
 
 toplevel_entity:
   | d=definition                        { TLE_Definition d               }
@@ -999,12 +1001,16 @@ block_label:
     { Some ("\"" ^ str ^ "\"")}
 
 block_phis_and_instrs_and_term:
-  | id_opt=instr_lhs pm=phi
+  | COMMENT bl=block_phis_and_instrs_and_term
+    (* TODO: our AST doesn't have a place for beginning-of-block comments *)
+    { bl }
+
+  | id=bound_lident EQ pm=phi
     bl=block_phis_and_instrs_and_term
     {
       let (p, md) = pm in 
       let (phis, instrs, t) = bl in
-      (((id_opt, p), mk_metadata md)::phis, instrs, t) }
+      (((Some id, p), md)::phis, instrs, t) }
 
   | id_opt=instr_lhs inst=instr md=instr_metadata*
     ins=block_instrs_and_term
@@ -1023,10 +1029,22 @@ block_instrs_and_term:
     { let (instrs, t) = ins in
       (((id_opt, inst), mk_metadata md)::instrs, t) }
 
-%inline phi:
-  | KW_PHI t=typ table=separated_nonempty_list(csep, phi_table_entry) md=instr_metadata*
-    { (Phi (t, List.map (fun (l,v) -> (l, v t)) table), md) }
 
+phi:
+  | KW_PHI t=typ ps=phi_suffix
+    { let (table, md) = ps in 
+      (Phi (t, List.map (fun (l,v) -> (l, v t)) table), md) }
+
+phi_suffix:
+  | te=phi_table_entry
+    { [te], [] }
+  | te=phi_table_entry COMMA ps=phi_suffix
+    { let (tes, md) = ps in
+      (te::tes, md) }
+  | te=phi_table_entry COMMA mvs=metadata_value+
+    { ([te], mvs) }
+
+%inline
 phi_table_entry:
   | LSQUARE v=exp COMMA l=lident RSQUARE { (l, v) }
 
@@ -1559,6 +1577,7 @@ instr:
   | KW_FENCE         { failwith"INSTR_Fence"         }
   | KW_LANDINGPAD t=typ KW_CLEANUP cs=clause*  { INSTR_LandingPad (t, true, cs) }
   | KW_LANDINGPAD t=typ cs=clause+             { INSTR_LandingPad (t, false, cs) }
+
 
 %inline
 clause:
