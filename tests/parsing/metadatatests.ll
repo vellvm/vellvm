@@ -9,7 +9,7 @@ start:
 
 define void @foo() {
   %1 = alloca i32
-  tail call void @llvm.experimental.noalias.scope.decl(metadata !7)
+  tail call void @llvm.experimental.noalias.scope.decl(metadata !7) #14
   call void @llvm.dbg.value(metadata !24, metadata !25, metadata !26)  
   call void @llvm.dbg.value(metadata !24, metadata !25, metadata !26)
   call void @llvm.dbg.value(metadata ! 24, metadata !25, metadata ! {!{! {! 26, !25, !{ptr null}}}})  

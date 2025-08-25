@@ -1018,27 +1018,28 @@ tag ::= string constant
                                                   sd ", "
                                                     @@ dshow_metadata_list ml)  meta)
            in
-           concat_DString (sd " ") (map sd ["load"; atomic; volatile]) @@ sd " " @@
+           concat_DString (sd " ") (map sd ["load"; atomic; volatile]) @@ (sd " ") @@
            dshow t @@ sd ", " @@ dshow_texp ptr @@
            concat_DString (sd " ") (map sd [ss; ord]) @@                
            sd (show_opt_prefix ", align " align) @@
            meta_str
 
-       | INSTR_Store tval ptr anns =>
-           let volatile := match find_option ann_volatile anns with
-                           | Some _ => "volatile"
-                           | None => ""
-                           end
-           in
+       | INSTR_Store t ptr anns =>
+           let atomic := ann_str anns ann_atomic (fun _ => "atomic") in
+           let volatile := ann_str anns ann_volatile (fun _ => "volatile") in
+           let ss := ann_str anns ann_syncscope show_syncscope in
+           let ord := ann_str anns ann_ordering show_ordering in
            let align := find_option ann_align anns in
            let meta := filter_option ann_metadata anns in
            let meta_str := DList_join (map (fun 'ml =>
                                                   sd ", "
-                                                    @@ dshow_metadata_list ml) meta)
+                                                    @@ dshow_metadata_list ml)  meta)
            in
-           sd "store " @@ sd volatile @@ dshow_texp tval @@
-           sd ", " @@ dshow_texp ptr @@ sd (show_opt_prefix ", align " align)
-                                                        @@ meta_str
+           concat_DString (sd " ") (map sd ["store"; atomic; volatile]) @@ (sd " ") @@
+           dshow t @@ sd ", " @@ dshow_texp ptr @@
+           concat_DString (sd " ") (map sd [ss; ord]) @@                
+           sd (show_opt_prefix ", align " align) @@
+           meta_str
 
        | INSTR_Fence syncscope ordering => let printable_sync := match syncscope with
                                                                  | None => ""

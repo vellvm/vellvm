@@ -1526,15 +1526,11 @@ a_addrspace:
 alloca_anns:
   anns=a_num_elts { anns }
 
-m_pair:
-  | m1=metadata_value m2=metadata_value { ANN_metadata([m1; m2]) }
+ls_anns:
+  | csep a=align md=instr_metadata
+    { ([a], md) }
+  | md=instr_metadata { ([], md) }
 
-store_anns:
-  | csep a=align l=l_other {  a::l }
-  | anns=l_other { anns }
-
-l_other:
-  | { [] }
 
 tailcall:
   | KW_TAIL { ANN_tail Tail }
@@ -1586,20 +1582,24 @@ instr:
       let (anns, md) = am in
       (INSTR_Alloca (t, a@anns), md) }
 
-  | KW_LOAD vol=KW_VOLATILE? t=typ COMMA tv=texp md=instr_metadata
-    { let v = ann_opt vol ANN_volatile in
-      (INSTR_Load (t, tv, v), md) } (* TODO: LOAD METADATA *)
+  | KW_LOAD at=KW_ATOMIC? vol=KW_VOLATILE? t=typ COMMA tv=texp ss=syncscope? o=ordering? am=ls_anns
+    { let at_ann = ann_opt at ANN_atomic in
+      let v = ann_opt vol ANN_volatile in
+      let (a, md) = am in
+      let (ss_ann : typ annotation list) = opt_list ss in
+      let ord_ann = opt_list o in
+      (INSTR_Load (t, tv, at_ann@v@ss_ann@ord_ann@a), md) } 
 
-  | KW_LOAD KW_ATOMIC vol=KW_VOLATILE? t=typ COMMA tv=texp ss=syncscope? o=ordering COMMA a=align md=instr_metadata
-    { let v = ann_opt vol ANN_volatile in      
-      let ss_ann = opt_list ss in
-      (INSTR_Load (t, tv, ANN_atomic::v@ss_ann@[o;a]), md) }
 
   | KW_VAARG tv=texp COMMA t=typ md=instr_metadata { (INSTR_VAArg (tv, t), md)  }
 
-  | KW_STORE vol=KW_VOLATILE? all=texp COMMA ptr=texp anns=store_anns
-    { let v = match vol with Some _ -> [ANN_volatile] | None -> [] in
-      (INSTR_Store (all, ptr, v@anns), []) } (* TODO: LOAD METADATA *)
+  | KW_STORE at=KW_ATOMIC? vol=KW_VOLATILE? all=texp COMMA ptr=texp ss=syncscope? o=ordering? am=ls_anns
+    { let at_ann = ann_opt at ANN_atomic in
+      let v = ann_opt vol ANN_volatile in
+      let (a, md) = am in
+      let (ss_ann : typ annotation list) = opt_list ss in
+      let ord_ann = opt_list o in
+      (INSTR_Store (all, ptr, at_ann@v@ss_ann@ord_ann@a), md) }
 
   | KW_ATOMICCMPXCHG { failwith"INSTR_AtomicCmpXchg" }
   | KW_ATOMICRMW     { failwith"INSTR_AtomicRMW"     }
@@ -1684,7 +1684,6 @@ terminator:
 
 align:
   | KW_ALIGN n=INTEGER { ANN_align n }
-
 
 switch_table_entry:
   | sz=I x=INTEGER COMMA i=branch_label { (TInt_Literal(sz, x), i) }
