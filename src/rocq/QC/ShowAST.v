@@ -771,8 +771,7 @@ Section ShowInstances.
        | Some a => [dshow a]
        end.
 
-  Definition show_ordering (o : ordering) : DString :=
-    sd
+  Definition show_ordering (o : ordering) : string :=
       match o with
       |Unordered => "unordered"
       |Monotonic => "monotonic"
@@ -783,7 +782,7 @@ Section ShowInstances.
       end.
 
   #[global] Instance dshowOrdering : DShow (ordering)
-    := {| dshow := show_ordering |}.
+    := {| dshow := fun o => sd (show_ordering o) |}.
 
   Definition show_cmpxchg (c : cmpxchg T) : DString :=
     let p_weak :=
@@ -942,11 +941,21 @@ bundle operand ::= SSA value | metadata string
 tag ::= string constant
  *)
 
+  Definition show_syncscope str : string := "syncscope(""" ++ str ++ """)".
+
+  Definition ann_str {A B} (l : list A) (k:A -> option B) (to_str : B -> string) : string :=
+  match find_option k l with
+  | None => ""
+  | Some b => to_str b
+  end.
+  
   Definition show_operand (o:operand) : DString :=
     match o with
     | SSA_value t => dshow_texp t
     | Metadata_string m => dshow_metadata m
     end.
+
+
   
   Definition show_operand_bundle (ob:operand_bundle) : DString :=
     (sd ("""" ++ ob_tag ob ++ """("))
@@ -993,28 +1002,25 @@ tag ::= string constant
              dshow_operand_bundles obs 
              
        | INSTR_Alloca t anns =>
-           let inalloca := match find_option ann_inalloca anns with
-                           | Some _ => "inalloca"
-                           | None => ""
-                           end
-           in
+           let inalloca := ann_str anns ann_inalloca (fun _ => "inalloca") in 
            let nb := find_option ann_num_elements anns in
            let align := find_option ann_align anns in
            list_to_DString ["alloca " ; inalloca] @@ dshow t @@ dshow_opt_prefix (sd ", ") nb @@ sd (show_opt_prefix ", align " align)
 
        | INSTR_Load t ptr anns =>
-           let volatile := match find_option ann_volatile anns with
-                           | Some _ => "volatile"
-                           | None => ""
-                           end
-           in
+           let atomic := ann_str anns ann_atomic (fun _ => "atomic") in
+           let volatile := ann_str anns ann_volatile (fun _ => "volatile") in
+           let ss := ann_str anns ann_syncscope show_syncscope in
+           let ord := ann_str anns ann_ordering show_ordering in
            let align := find_option ann_align anns in
            let meta := filter_option ann_metadata anns in
            let meta_str := DList_join (map (fun 'ml =>
                                                   sd ", "
                                                     @@ dshow_metadata_list ml)  meta)
            in
-           list_to_DString ["load "; volatile] @@ dshow t @@ sd ", " @@ dshow_texp ptr @@
+           concat_DString (sd " ") (map sd ["load"; atomic; volatile]) @@ sd " " @@
+           dshow t @@ sd ", " @@ dshow_texp ptr @@
+           concat_DString (sd " ") (map sd [ss; ord]) @@                
            sd (show_opt_prefix ", align " align) @@
            meta_str
 

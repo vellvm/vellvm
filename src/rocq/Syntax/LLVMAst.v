@@ -545,6 +545,9 @@ Variant annotation : Set :=
   | ANN_fast_math_flag (f:fast_math)
   | ANN_ret_attribute (p:param_attr)
   | ANN_fun_attribute (f:fn_attr)
+  | ANN_atomic
+  | ANN_syncscope (s:string)
+  | ANN_ordering (o:ordering)                       
 .
 
 Definition ann_linkage (a:annotation) : option linkage :=
@@ -715,6 +718,23 @@ Definition ann_fun_attribute (a:annotation) : option fn_attr :=
   | _ => None
   end.
 
+Definition ann_atomic (a:annotation) : option unit :=
+  match a with
+  | ANN_atomic => Some tt
+  | _ => None
+  end.
+
+Definition ann_syncscope (a:annotation) : option string :=
+  match a with
+  | ANN_syncscope s => Some s
+  | _ => None
+  end.
+
+Definition ann_ordering (a:annotation) : option ordering :=
+  match a with
+  | ANN_ordering o => Some o
+  | _ => None
+  end.
 
 (* Operand Bundles
    - Note: does not support `preallocated(%foo)` style bundles.

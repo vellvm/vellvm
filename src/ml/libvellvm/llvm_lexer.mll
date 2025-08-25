@@ -335,6 +335,7 @@
   ("fast"           , KW_FAST);
 
   (* synchronization *)
+  ("atomic"         , KW_ATOMIC);
   ("syncscope"      , KW_SYNCSCOPE);
   ("unordered"      , KW_UNORDERED);
   ("monotonic"      , KW_MONOTONIC);

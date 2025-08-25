@@ -647,6 +647,20 @@ Section ReprInstances.
    Instance reprTailcall : Repr tailcall :=
     {| repr := show_tailcall |}.
 
+  Definition repr_ordering (o : ordering) : string :=
+      match o with
+      |Unordered => "Unordered"
+      |Monotonic => "Monotonic"
+      |Acquire => "Acquire"
+      |Release => "Release"
+      |Acq_rel => "Acq_rel"
+      |Seq_cst => "Seq_cst"
+      end.
+
+  #[global]
+    Instance reprOrdering : Repr ordering :=
+    {| repr := repr_ordering |}.
+  
   Definition repr_annotation (a : annotation typ) : string :=
     match a with
     | ANN_linkage l => "ANN_linkage " ++ (repr l)
@@ -677,25 +691,14 @@ Section ReprInstances.
     | ANN_fast_math_flag f => "ANN_fast_math_flag " ++ (repr f)
     | ANN_ret_attribute r => "ANN_ret_attribute " ++ (repr r)
     | ANN_fun_attribute f => "ANN_fun_attribute " ++ (repr f)
+    | ANN_atomic => "ANN_atomic"
+    | ANN_syncscope s => "ANN_syncscope " ++ (repr s)
+    | ANN_ordering o => "ANN_ordering " ++ (repr o)      
     end.
 
   #[global]
    Instance reprAnnotation : Repr (annotation typ) :=
     {| repr := repr_annotation |}.
-
-  Definition repr_ordering (ord : ordering) : string
-    := match ord with
-       | Unordered => "Unordered"
-       | Monotonic => "Monotonic"
-       | Acquire => "Acquire"
-       | Release => "Release"
-       | Acq_rel => "Acq_rel"
-       | Seq_cst => "Seq_cst"
-       end.
-
-  #[global]
-   Instance reprOrdering : Repr ordering :=
-    {| repr := repr_ordering |}.
 
   Definition repr_atomic_rmw_operation (op : atomic_rmw_operation) :=
     match op with

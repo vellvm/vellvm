@@ -776,6 +776,9 @@ Section TFunctor.
         | ANN_fast_math_flag f => ANN_fast_math_flag f
         | ANN_ret_attribute p => ANN_ret_attribute (endo p)
         | ANN_fun_attribute a => ANN_fun_attribute (endo a)
+        | ANN_atomic => ANN_atomic
+        | ANN_syncscope s => ANN_syncscope s
+        | ANN_ordering o => ANN_ordering o      
         end
         .
 

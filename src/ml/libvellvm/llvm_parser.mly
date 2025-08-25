@@ -63,6 +63,11 @@ let opt_bool (m:'a option) : bool =
   | None -> false
   | Some _ -> true
 
+let ann_opt (m:'a option) (a:typ annotation) : typ annotation list =
+  match m with
+  | None -> []
+  | Some _ -> [a]
+
 let ann_linkage_opt (m : linkage option) : (typ annotation) option =
   match m with
   | None -> None
@@ -414,6 +419,7 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_VOLATILE
 
 
+%token KW_ATOMIC
 %token KW_SYNCSCOPE
 %token KW_UNORDERED
 %token KW_MONOTONIC
@@ -1520,14 +1526,6 @@ a_addrspace:
 alloca_anns:
   anns=a_num_elts { anns }
 
-l_other:
-  | csep l=separated_list(csep, m_pair) { l }
-  | (* empty *) { [] }
-
-load_anns:
-  | csep a=align l=l_other {  a::l }
-  | anns=l_other { anns }
-
 m_pair:
   | m1=metadata_value m2=metadata_value { ANN_metadata([m1; m2]) }
 
@@ -1535,6 +1533,8 @@ store_anns:
   | csep a=align l=l_other {  a::l }
   | anns=l_other { anns }
 
+l_other:
+  | { [] }
 
 tailcall:
   | KW_TAIL { ANN_tail Tail }
@@ -1582,14 +1582,18 @@ instr:
       (INSTR_Call (f, a, atts, ops), md) }
 
   | KW_ALLOCA ia=KW_INALLOCA? t=typ am=alloca_anns
-    { let a = match ia with Some _ -> [ANN_inalloca] | None -> [] in
+    { let a = ann_opt ia ANN_inalloca in
       let (anns, md) = am in
-      (INSTR_Alloca (t, a@anns), md) } (* TODO: ALLOCA METADATA *)
+      (INSTR_Alloca (t, a@anns), md) }
 
-  | KW_LOAD vol=KW_VOLATILE? t=typ COMMA tv=texp anns=load_anns
-    { let v = match vol with Some _ -> [ANN_volatile] | None -> [] in
-      (INSTR_Load (t, tv, v@anns), []) } (* TODO: LOAD METADATA *)
+  | KW_LOAD vol=KW_VOLATILE? t=typ COMMA tv=texp md=instr_metadata
+    { let v = ann_opt vol ANN_volatile in
+      (INSTR_Load (t, tv, v), md) } (* TODO: LOAD METADATA *)
 
+  | KW_LOAD KW_ATOMIC vol=KW_VOLATILE? t=typ COMMA tv=texp ss=syncscope? o=ordering COMMA a=align md=instr_metadata
+    { let v = ann_opt vol ANN_volatile in      
+      let ss_ann = opt_list ss in
+      (INSTR_Load (t, tv, ANN_atomic::v@ss_ann@[o;a]), md) }
 
   | KW_VAARG tv=texp COMMA t=typ md=instr_metadata { (INSTR_VAArg (tv, t), md)  }
 
@@ -1605,6 +1609,19 @@ instr:
 
   | KW_LANDINGPAD t=typ cs=clause+ md=instr_metadata
     { (INSTR_LandingPad (t, false, cs), md) }
+
+syncscope:
+  KW_SYNCSCOPE LPAREN s=STRING RPAREN
+    { ANN_syncscope (str s) }
+
+ordering:
+ | KW_UNORDERED  { ANN_ordering(Unordered) }
+ | KW_MONOTONIC  { ANN_ordering(Monotonic) }
+ | KW_ACQUIRE    { ANN_ordering(Acquire) }
+ | KW_RELEASE    { ANN_ordering(Release) }
+ | KW_ACQ_REL    { ANN_ordering(Acq_rel) }
+ | KW_SEQ_CST    { ANN_ordering(Seq_cst) }
+
 
 
 %inline
