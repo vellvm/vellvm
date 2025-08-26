@@ -603,6 +603,7 @@ Section ReprInstances.
 
   Definition repr_thread_local_storage (tls : thread_local_storage) : string :=
     match tls with
+    | TLS_NONE => "TLS_NONE"
     | TLS_Localdynamic => "TLS_Localdynamic"
     | TLS_Initialexec => "TLS_Initialexec"
     | TLS_Localexec => "TLS_Localexec"

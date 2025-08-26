@@ -387,9 +387,10 @@ Section ShowInstances.
 
   Definition show_thread_local_storage (tls : thread_local_storage) : string :=
     match tls with
-    | TLS_Localdynamic => "localdynamic"
-    | TLS_Initialexec => "initialexec"
-    | TLS_Localexec => "localexec"
+    | TLS_NONE => "thread_local"  (* should never be printed *)
+    | TLS_Localdynamic => "thread_local(localdynamic)"
+    | TLS_Initialexec => "thread_local(initialexec)"
+    | TLS_Localexec => "thread_local(localexec)"
     end.
 
   #[global] Instance showTLS : Show thread_local_storage

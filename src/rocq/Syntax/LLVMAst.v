@@ -262,6 +262,7 @@ Variant fn_attr : Set :=
 .
 
 Variant thread_local_storage : Set :=
+| TLS_NONE (* tls is optional *)  
 | TLS_Localdynamic
 | TLS_Initialexec
 | TLS_Localexec

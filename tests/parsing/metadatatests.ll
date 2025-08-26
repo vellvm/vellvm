@@ -7,6 +7,9 @@ start:
   ret i32 4
 }
 
+@_ZN10proc_macro6bridge6client12BRIDGE_STATE7__getit5__KEY17hf23c929d95a924ccE = external thread_local global %"std::thread::local::fast::Key<proc_macro::bridge::scoped_cell::ScopedCell<proc_macro::bridge::client::BridgeStateL>>"
+
+
 define void @foo() {
   %1 = alloca i32
   tail call void @llvm.experimental.noalias.scope.decl(metadata !7) #14

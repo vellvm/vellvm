@@ -501,7 +501,7 @@ metadata_node:
     { METADATA_Node m }
 
 tconst_or_metadata_value:
-  | KW_NULL                     { METADATA_Id (Name (str "null")) }
+  | KW_NULL                     { METADATA_Null }
   | tconst                      { METADATA_Const $1  } 
   | m=metadata_value            { m } 
 
@@ -563,6 +563,7 @@ dll_storage_class:
 
 %inline
 thread_local_storage:
+  | KW_THREAD_LOCAL { ANN_thread_local_storage TLS_NONE }
   | KW_THREAD_LOCAL LPAREN t=tls RPAREN  { ANN_thread_local_storage t }
 
 %inline
@@ -1046,13 +1047,11 @@ phi:
       (Phi (t, List.map (fun (l,v) -> (l, v t)) table), md) }
 
 phi_suffix:
-  | te=phi_table_entry
-    { [te], [] }
   | te=phi_table_entry COMMA ps=phi_suffix
     { let (tes, md) = ps in
       (te::tes, md) }
-  | te=phi_table_entry COMMA mvs=metadata_value+
-    { ([te], mvs) }
+  | te=phi_table_entry md=instr_metadata
+    { ([te], md) }
 
 %inline
 phi_table_entry:
