@@ -591,9 +591,6 @@ Section interp_prop_extra.
     intros ? ? ?.
     pcofix self. pstep. intros u v ? euv. punfold euv.
     red in euv |- *. induction euv; pclearbot; eauto 7 with paco.
-    econstructor; eauto.
-    intros. specialize (HK _ H2). pclearbot.
-    right. eapply self; eauto.
   Qed.
 
   (* Figure 7: Interpreter law for Ret *)

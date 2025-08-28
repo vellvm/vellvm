@@ -627,7 +627,6 @@ Proof using.
     eauto with paco.
   - gstep. econstructor. eauto 7 with paco.
   - gstep. econstructor; eauto 7 with paco.
-    intros. specialize (H0 a b H1). pclearbot. eauto 7 with paco.
   - gclo. econstructor; auto_ctrans_eq; cycle -1; eauto; try reflexivity.
     eapply eqit_Tau_l. rewrite unfold_bind. reflexivity.
   - gclo. econstructor; auto_ctrans_eq; cycle -1; eauto; try reflexivity.
