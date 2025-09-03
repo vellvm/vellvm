@@ -1136,7 +1136,7 @@ tag ::= string constant
        | TERM_IndirectBr v brs => sd "indirectbr " @@ dshow_texp v @@
                                    dshow brs
 
-       | TERM_Resume v => sd "remove " @@ dshow_texp v
+       | TERM_Resume v => sd "resume " @@ dshow_texp v
 
        | TERM_Invoke fn args to_label unwind_label anns obs =>
            let tail := find_option ann_tail anns in
@@ -1304,20 +1304,27 @@ Definition dshow_definition (defn : definition typ (block typ * list (block typ)
 
         let section :=
           maybe_to_string
-            (fun s => concatStr ["section \"; s; "\"; " "])
-            (dc_section defn.(df_prototype)) in
-
+            (fun s => concatStr ["section """; s; """ "])
+            (dc_section defn.(df_prototype))
+        in
         let align :=
           maybe_to_string
-            (fun a => concatStr [", align "; show a; " "])
-            (dc_align defn.(df_prototype)) in
+            (fun a => concatStr ["align "; show a; " "])
+            (dc_align defn.(df_prototype))
+        in
+        let gc := maybe_show (dc_gc defn.(df_prototype))
+        in
+        let personality :=
+          maybe_to_string
+            (fun t => concatStr [" personality "; show t; " "])
+            (dc_personality defn.(df_prototype))
+        in
 
-        let gc := maybe_show (dc_gc defn.(df_prototype)) in
 
         DList_join [ list_to_DString ["define "; linkage; visibility; dll_storage ; cconv] @@
                        printable_ret_attrs @@ dshow ret_t] @@ sd " @" @@ dshow name @@
                      dshow_arg_list args vararg @@
-                     list_to_DString [section ; align ; gc ; " {"; newline] @@
+                     list_to_DString [section ; align ; gc ; personality ; " {"; newline] @@
                      blocks @@
                      list_to_DString ["}";  newline]
 

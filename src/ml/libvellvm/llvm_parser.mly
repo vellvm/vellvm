@@ -1172,9 +1172,9 @@ param_attr:
  (* TODO: This loses information when metadata is used as an argument *)
 call_arg:
   | t=non_metadata_type ra=list(param_attr) i=exp { ((t, i t), ra) }
-  | KW_METADATA metadata_value                    { ((TYPE_Metadata, EXP_Null), []) } 
+  | KW_METADATA mv=metadata_value                 { ((TYPE_Metadata, EXP_Metadata mv), []) } 
   | KW_METADATA t=non_metadata_type ra=list(param_attr) i=exp 
-      { ((t, i t), ra) }
+      { ((TYPE_Metadata, EXP_Metadata(METADATA_Const(t, i t))), ra) }
 
 fn_attr:
   | KW_ALIGNSTACK LPAREN p=INTEGER RPAREN { FNATTR_Alignstack p     }
