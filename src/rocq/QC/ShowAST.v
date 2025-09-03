@@ -1043,7 +1043,7 @@ tag ::= string constant
                                                     @@ dshow_metadata_list ml)  meta)
            in
            concat_DString (sd " ") (map sd ["store"; atomic; volatile]) @@ (sd " ") @@
-           dshow t @@ sd ", " @@ dshow_texp ptr @@
+           dshow_texp t @@ sd ", " @@ dshow_texp ptr @@
            concat_DString (sd " ") (map sd [ss; ord]) @@                
            sd (show_opt_prefix ", align " align) @@
            meta_str
