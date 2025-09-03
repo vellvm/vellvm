@@ -1614,23 +1614,47 @@ instr:
       let ord_ann = List.map (fun x -> ANN_ordering x) (opt_list o) in
       (INSTR_Store (all, ptr, at_ann@v@ss_ann@ord_ann@a), md) }
 
-  | KW_ATOMICCMPXCHG { failwith"INSTR_AtomicCmpXchg" }
-
-  | KW_ATOMICRMW vol=KW_VOLATILE? op=atomicrmw_op ptr=texp COMMA v=texp ss=syncscope? o=ordering al=comma_align?
-    { let ss = begin match ss with
+  | KW_ATOMICCMPXCHG c_weak=KW_WEAK? c_volatile=KW_VOLATILE?
+    c_ptr=texp COMMA c_cmp=texp COMMA c_new=texp ss=syncscope?
+    c_success_ordering=ordering c_failure_ordering=ordering c_align=comma_align?
+    { let c_syncscope =
+	       begin match ss with
+               | Some (ANN_syncscope s) -> Some s
+	       | Some _ -> failwith "impossible: syncscope not found"
+	       | _ -> None
+	       end
+      in
+      (INSTR_AtomicCmpXchg
+	 {
+	   c_weak;
+	   c_volatile;
+	   c_ptr;
+	   c_cmp;
+	   c_new;
+	   c_syncscope;
+	   c_success_ordering;
+	   c_failure_ordering;	   
+	   c_align;
+	 }
+      , [])
+    }
+      
+  | KW_ATOMICRMW a_volatile=KW_VOLATILE? a_operation=atomicrmw_op
+    a_ptr=texp COMMA a_val=texp ss=syncscope? a_ordering=ordering a_align=comma_align?
+    { let a_syncscope = begin match ss with
                | Some (ANN_syncscope s) -> Some s
 	       | Some _ -> failwith "impossible: syncscope not found"
 	       | _ -> None
 	       end
       in
       (INSTR_AtomicRMW
-	{ a_volatile = vol;
-        a_operation = op;
-	a_ptr = ptr;
-	a_val = v;
-	a_syncscope = ss;
-	a_ordering = o;
-	a_align = al;
+	{ a_volatile;
+          a_operation;
+	  a_ptr;
+	  a_val;
+	  a_syncscope;
+	  a_ordering;
+	  a_align;
 	}
       , [])
     }

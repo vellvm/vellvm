@@ -457,11 +457,10 @@ Variant ordering : Set :=
 
 Record cmpxchg : Set :=
   mk_cmpxchg {
-      c_weak              : option bool;
-      c_volatile          : option bool;
+      c_weak              : option unit;
+      c_volatile          : option unit;
       c_ptr               : texp;
-      c_cmp               : icmp;
-      c_cmp_type          : T;
+      c_cmp               : texp;
       c_new               : texp;
       c_syncscope            : option string;
       c_success_ordering     : ordering;

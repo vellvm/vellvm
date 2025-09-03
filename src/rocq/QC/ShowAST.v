@@ -790,19 +790,19 @@ Section ShowInstances.
       sd
         match c.(c_weak) with
         |None => ""
-        |Some x => show x
+        |Some _ => "weak "
         end in
     let p_volatile :=
       sd
         match c.(c_volatile) with
         |None => ""
-        |Some x => show x
+        |Some x => "volatile "
         end in
     let p_syncscope :=
       sd
         match c.(c_syncscope) with
         |None => ""
-        |Some x => "[syncscope(""" ++ show x ++ """)]"
+        |Some x => "[syncscope(" ++ show x ++ ")] "
         end in
     let p_align :=
       sd
@@ -817,17 +817,15 @@ Section ShowInstances.
        p_volatile;
        dshow c.(c_ptr);
        sd ", ";
-       dshow c.(c_cmp_type);
-       sd (show c.(c_cmp));
+       dshow c.(c_cmp);
        sd ", " ;
        dshow c.(c_new);
+       sd " ";
        p_syncscope;
        dshow c.(c_success_ordering);
+       sd " ";
        dshow c.(c_failure_ordering);
-       p_align;
-       sd "yields  { ";
-       dshow c.(c_cmp_type);
-       sd ", i1 } "
+       p_align
       ].
 
   #[global] Instance dshowCmpxchg : DShow (cmpxchg T)
@@ -868,7 +866,7 @@ Section ShowInstances.
                       end in
     let p_syncscope := match a.(a_syncscope) with
                        |None => ""
-                       |Some x => "[syncscope(""" ++ show x ++ """)] "
+                       |Some x => "[syncscope(" ++ show x ++ ")] "
                        end in
 
     let p_align := match a.(a_align) with

@@ -750,9 +750,9 @@ Section ReprInstances.
 
   Definition repr_cmpxchg (cmp : cmpxchg typ) : string
     := match cmp with
-       | mk_cmpxchg c_weak c_volatile c_ptr c_cmp c_cmp_type c_new c_syncscope c_success_ordering
+       | mk_cmpxchg c_weak c_volatile c_ptr c_cmp c_new c_syncscope c_success_ordering
            c_failure_ordering c_align =>
-           "(mk_cmpxchg " ++ repr c_weak ++ " " ++ repr c_volatile ++ " " ++ repr c_ptr ++ " " ++ repr c_cmp ++ " " ++ repr c_cmp_type ++ " " ++ repr c_new ++ " " ++ repr c_syncscope ++ " " ++ repr c_success_ordering
+           "(mk_cmpxchg " ++ repr c_weak ++ " " ++ repr c_volatile ++ " " ++ repr c_ptr ++ " " ++ repr c_cmp ++ " " ++ repr c_new ++ " " ++ repr c_syncscope ++ " " ++ repr c_success_ordering
            ++ " " ++ repr c_failure_ordering ++ " " ++ repr c_align ++ ")"
        end.
 
