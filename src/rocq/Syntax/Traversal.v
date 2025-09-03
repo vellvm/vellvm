@@ -633,8 +633,7 @@ Section TFunctor.
           (tfmap f (a_val a))
           (endo (a_syncscope a))
           (endo (a_ordering a))
-          (endo (a_align a))
-          (f (a_type a)).
+          (endo (a_align a)).
 
 
     #[global] Instance TFunctor_landingpad_clause

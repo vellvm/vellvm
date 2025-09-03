@@ -48,6 +48,12 @@ Section ReprInstances.
     }.
 
   #[global]
+    Instance reprUnit : Repr unit :=
+    {
+      repr u := "tt"
+    }.
+  
+  #[global]
    Instance reprString : Repr string
     := {| repr s := ("" ++ show s ++ "")%string |}.
 
@@ -716,6 +722,14 @@ Section ReprInstances.
     | Aumin => "Aumin"
     | Afadd => "Afadd"
     | Afsub => "Afsub"
+    | Afmax => "Afmax"
+    | Afmin => "Afmin"
+    | Afmaximum => "Afmaximum"
+    | Afminimum => "Afminimum"
+    | Auinc_wrap => "Auinc_wrap"
+    | Audec_wrap => "Audec_wrap"
+    | Ausub_cond => "Ausub_cond"
+    | Ausub_sat => "Ausub_sat"
     end.
 
   #[global]
@@ -724,10 +738,10 @@ Section ReprInstances.
 
   Definition repr_atomicrmw (rmw : atomicrmw typ) : string
     := match rmw with
-       | mk_atomicrmw a_volatile a_operation a_ptr a_val a_syncscope a_ordering a_align a_type =>
+       | mk_atomicrmw a_volatile a_operation a_ptr a_val a_syncscope a_ordering a_align =>
            "(mk_atomicrmw " ++ repr a_volatile ++ " " ++ repr a_operation ++ " " ++
              repr a_ptr ++ " " ++ repr a_val ++ " " ++ repr a_syncscope ++ " " ++
-             repr a_ordering ++ " " ++ repr a_align ++ " " ++ repr a_type ++ ")"
+             repr a_ordering ++ " " ++ repr a_align ++ ")"
        end.
 
   #[global]

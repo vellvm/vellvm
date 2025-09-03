@@ -483,18 +483,25 @@ Variant atomic_rmw_operation : Set :=
   | Aumin
   | Afadd
   | Afsub
+  | Afmax
+  | Afmin
+  | Afmaximum
+  | Afminimum
+  | Auinc_wrap
+  | Audec_wrap
+  | Ausub_cond
+  | Ausub_sat
 .
 
 Record atomicrmw : Set :=
   mk_atomicrmw {
-      a_volatile             : option bool;
+      a_volatile             : option unit;
       a_operation            : atomic_rmw_operation;
       a_ptr                  : texp;
       a_val                  : texp;
       a_syncscope            : option string;
       a_ordering             : ordering;
       a_align                : option int_ast;
-      a_type                 : T;
     }.
 
 

@@ -835,19 +835,27 @@ Section ShowInstances.
 
   Definition show_a_rmw_operation (a :  atomic_rmw_operation) : string :=
     match a with
-    |Axchg => "xchg"
-    |Aadd  => "add"
-    |Asub => "sub"
-    |Aand => "and"
-    |Anand => "nand"
-    |Aor  => "or"
-    |Axor => "xor"
-    |Amax => "max"
-    |Amin => "min"
-    |Aumax => "umax"
-    |Aumin => "umin"
-    |Afadd => "fadd"
-    |Afsub => "fsub"
+    | Axchg => "xchg"
+    | Aadd  => "add"
+    | Asub => "sub"
+    | Aand => "and"
+    | Anand => "nand"
+    | Aor  => "or"
+    | Axor => "xor"
+    | Amax => "max"
+    | Amin => "min"
+    | Aumax => "umax"
+    | Aumin => "umin"
+    | Afadd => "fadd"
+    | Afsub => "fsub"
+    | Afmax => "fmax"
+    | Afmin => "fmin"
+    | Afmaximum => "fmaximum"
+    | Afminimum => "fminimum"
+    | Auinc_wrap => "uinc_wrap"
+    | Audec_wrap => "udec_wrap"
+    | Ausub_cond => "usub_cond"
+    | Ausub_sat => "usub_sat"
     end.
 
   #[global] Instance showARmwOperation : Show (atomic_rmw_operation)
@@ -856,11 +864,11 @@ Section ShowInstances.
   Definition show_atomic_rmw (a : atomicrmw T) : DString :=
     let p_volatile := match a.(a_volatile) with
                       |None => ""
-                      |Some x => show x
+                      |Some _ => "volatile "
                       end in
     let p_syncscope := match a.(a_syncscope) with
                        |None => ""
-                       |Some x => "[syncscope(""" ++ show x ++ """)]"
+                       |Some x => "[syncscope(""" ++ show x ++ """)] "
                        end in
 
     let p_align := match a.(a_align) with
@@ -869,17 +877,17 @@ Section ShowInstances.
                    end in
 
     DList_join
-      [sd "atomicrmw";
+      [sd "atomicrmw ";
        sd p_volatile;
        sd (show a.(a_operation));
+       sd " ";
        dshow a.(a_ptr);
        sd ", ";
        dshow a.(a_val);
+       sd " ";
        sd p_syncscope;
        dshow a.(a_ordering);
-       sd p_align;
-       sd "yields ";
-       dshow a.(a_type)].
+       sd p_align].
 
   #[global] Instance showAtomicrmw : DShow (atomicrmw T)
     := {| dshow := show_atomic_rmw |}.

@@ -418,6 +418,20 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_NOTAIL
 %token KW_VOLATILE
 
+%token KW_MAX
+%token KW_MIN
+%token KW_XCHG
+%token KW_FMAX
+%token KW_FMIN
+%token KW_UMIN
+%token KW_UMAX
+%token KW_NAND
+%token KW_FMAXIMUM 
+%token KW_FMINIMUM 
+%token KW_UINC_WRAP 
+%token KW_UDEC_WRAP 
+%token KW_USUB_COND 
+%token KW_USUB_SAT  
 
 %token KW_ATOMIC
 %token KW_SYNCSCOPE
@@ -1586,7 +1600,7 @@ instr:
       let v = ann_opt vol ANN_volatile in
       let (a, md) = am in
       let (ss_ann : typ annotation list) = opt_list ss in
-      let ord_ann = opt_list o in
+      let ord_ann = List.map (fun x -> ANN_ordering x) (opt_list o) in
       (INSTR_Load (t, tv, at_ann@v@ss_ann@ord_ann@a), md) } 
 
 
@@ -1597,11 +1611,30 @@ instr:
       let v = ann_opt vol ANN_volatile in
       let (a, md) = am in
       let (ss_ann : typ annotation list) = opt_list ss in
-      let ord_ann = opt_list o in
+      let ord_ann = List.map (fun x -> ANN_ordering x) (opt_list o) in
       (INSTR_Store (all, ptr, at_ann@v@ss_ann@ord_ann@a), md) }
 
   | KW_ATOMICCMPXCHG { failwith"INSTR_AtomicCmpXchg" }
-  | KW_ATOMICRMW     { failwith"INSTR_AtomicRMW"     }
+
+  | KW_ATOMICRMW vol=KW_VOLATILE? op=atomicrmw_op ptr=texp COMMA v=texp ss=syncscope? o=ordering al=comma_align?
+    { let ss = begin match ss with
+               | Some (ANN_syncscope s) -> Some s
+	       | Some _ -> failwith "impossible: syncscope not found"
+	       | _ -> None
+	       end
+      in
+      (INSTR_AtomicRMW
+	{ a_volatile = vol;
+        a_operation = op;
+	a_ptr = ptr;
+	a_val = v;
+	a_syncscope = ss;
+	a_ordering = o;
+	a_align = al;
+	}
+      , [])
+    }
+
   | KW_FENCE         { failwith"INSTR_Fence"         }
   | KW_LANDINGPAD t=typ KW_CLEANUP cs=clause* md=instr_metadata
     { (INSTR_LandingPad (t, true, cs), md) }
@@ -1614,12 +1647,36 @@ syncscope:
     { ANN_syncscope (str s) }
 
 ordering:
- | KW_UNORDERED  { ANN_ordering(Unordered) }
- | KW_MONOTONIC  { ANN_ordering(Monotonic) }
- | KW_ACQUIRE    { ANN_ordering(Acquire) }
- | KW_RELEASE    { ANN_ordering(Release) }
- | KW_ACQ_REL    { ANN_ordering(Acq_rel) }
- | KW_SEQ_CST    { ANN_ordering(Seq_cst) }
+ | KW_UNORDERED  { Unordered }
+ | KW_MONOTONIC  { Monotonic }
+ | KW_ACQUIRE    { Acquire }
+ | KW_RELEASE    { Release }
+ | KW_ACQ_REL    { Acq_rel }
+ | KW_SEQ_CST    { Seq_cst }
+
+atomicrmw_op:
+ | KW_XCHG  { Axchg }
+ | KW_ADD   { Aadd }
+ | KW_SUB   { Asub }
+ | KW_AND   { Aand }
+ | KW_NAND  { Anand }
+ | KW_OR    { Aor }
+ | KW_XOR   { Axor }
+ | KW_MAX   { Amax }
+ | KW_MIN   { Amin }
+ | KW_UMAX  { Aumax }
+ | KW_UMIN  { Aumin }
+ | KW_FADD  { Afadd }
+ | KW_FSUB  { Afsub }
+ | KW_FMAX  { Afmax }
+ | KW_FMIN  { Afmin }
+ | KW_FMAXIMUM { Afmaximum }
+ | KW_FMINIMUM { Afminimum }
+ | KW_UINC_WRAP { Auinc_wrap }
+ | KW_UDEC_WRAP { Audec_wrap }
+ | KW_USUB_COND { Ausub_cond }
+ | KW_USUB_SAT  { Ausub_sat }
+
 
 
 
@@ -1680,6 +1737,9 @@ terminator:
 
   | KW_UNREACHABLE md=instr_metadata
     { (TERM_Unreachable, md) }
+
+comma_align:
+  | COMMA KW_ALIGN n=INTEGER { n }
 
 align:
   | KW_ALIGN n=INTEGER { ANN_align n }
