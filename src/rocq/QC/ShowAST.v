@@ -802,7 +802,7 @@ Section ShowInstances.
       sd
         match c.(c_syncscope) with
         |None => ""
-        |Some x => "[syncscope(" ++ show x ++ ")] "
+        |Some x => "syncscope(" ++ show x ++ ") "
         end in
     let p_align :=
       sd
@@ -866,7 +866,7 @@ Section ShowInstances.
                       end in
     let p_syncscope := match a.(a_syncscope) with
                        |None => ""
-                       |Some x => "[syncscope(" ++ show x ++ ")] "
+                       |Some x => "syncscope(" ++ show x ++ ") "
                        end in
 
     let p_align := match a.(a_align) with
@@ -1396,7 +1396,7 @@ Definition dshow_global (g : global typ) : DString :=
 
   let section :=
     maybe_to_string
-      (fun s => concatStr ["section \"; s; "\"; " "])
+      (fun s => concatStr [", section """; s; """"])
       (g_section g) in
 
   let align :=
