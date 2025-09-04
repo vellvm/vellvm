@@ -92,7 +92,7 @@ vellvm: $(VELLVM_EXE)
 
 .PHONY: test
 test: vellvm
-	./vellvm -test
+	./vellvm -l libll/rust-intrinsics.ll -test
 
 .PHONY: check
 check: test

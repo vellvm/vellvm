@@ -1021,7 +1021,6 @@ block_label:
   | lbl=LABEL 
     { Some lbl }
 
-    (* labels with quoted identifiers are lexed as strings - include the quotes *)
   | str=STRING COLON
     { Some ("\"" ^ str ^ "\"")}
 
