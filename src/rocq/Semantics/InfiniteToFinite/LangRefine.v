@@ -20074,8 +20074,10 @@ Qed.
     induction e using AstLib.exp_ind with
       (Q := fun md =>
               match md with
+              | LLVMAst.METADATA_Null                 
               | LLVMAst.METADATA_Id _ 
-              | LLVMAst.METADATA_Node _ 
+              | LLVMAst.METADATA_Node _
+              | LLVMAst.METADATA_Pair _ _
               | LLVMAst.METADATA_Debug _ _ => True
               | LLVMAst.METADATA_Const (t, v) =>
                   orutt exp_E_refine_strict
@@ -20519,12 +20521,17 @@ Qed.
       apply dvalue_refine_strict_dvalue_to_uvalue; auto.
     - destruct m; simpl in *;
         try apply orutt_Ret; try reflexivity.
+      rewrite uvalue_refine_strict_equation; cbn.
+      rewrite AC1.addr_convert_null.
+      reflexivity.
       destruct tv.
       assumption.
+    - auto.
     - auto.
     - destruct te.
       simpl in IHe.
       apply IHe.
+    - auto.
     - auto.
     - auto.
   Qed.
@@ -21089,8 +21096,22 @@ Qed.
             | intros [] [] _; auto; reflexivity
             | intros o CONTRA; inv CONTRA
             ].
-        }
 
+          eapply orutt_bind; eauto with ORUTT REF.
+          eapply orutt_bind with (RR:=dvalue_refine_strict); eauto with ORUTT REF.
+          { eapply orutt_trigger; cbn; try tauto.
+            intros dv CONTRA.
+            inv CONTRA.
+          } 
+
+          intros r1 r2 H.
+          eapply orutt_trigger; cbn; try tauto;
+            [ split; auto; eapply dvalue_refine_strict_dvalue_to_uvalue; eauto
+            | intros [] [] _; auto; reflexivity
+            | intros dv CONTRA; inv CONTRA
+            ].
+        }
+        
         { eapply orutt_bind; eauto with ORUTT REF.
           apply orutt_bind with (RR:=dvalue_refine_strict).
           eapply orutt_trigger; cbn; try tauto; intros o CONTRA; inv CONTRA.
