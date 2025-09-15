@@ -455,3 +455,15 @@ define i64 @llvm.umax.i64(i64 %x, i64 %y) {
        %res = select i1 %c, i64 %y, i64 %x
        ret i64 %res
 }
+
+define double @llvm.fmuladd.f64(double %a, double %b, double %c) {
+       %x = fmul double %a, %b
+       %y = fadd double %x, %c
+       ret double %y
+}
+
+define float @llvm.fmuladd.f32(float %a, float %b, float %c) {
+       %x = fmul float %a, %b
+       %y = fadd float %x, %c
+       ret float %y
+}

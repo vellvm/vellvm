@@ -122,13 +122,11 @@ let rec step
   | VisF (Sum.Coq_inl1 (IO_stdout bytes), k) ->
       let str = string_of_bytes bytes in
       output_bytes stdout str ;
-      flush stdout ;
       step (k (Obj.magic ()))
   (* The IO_stderr effect *)
   | VisF (Sum.Coq_inl1 (IO_stderr bytes), k) ->
       let str = string_of_bytes bytes in
       output_bytes stderr str ;
-      flush stderr ;
       step (k (Obj.magic ()))
   (* The OOME effect *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 _msg), _k) ->
@@ -173,4 +171,6 @@ let interpret
            LLVMAst.toplevel_entity
            list )
     : (DV.dvalue, exit_condition) result =
+  Out_channel.set_buffered stdout false;
+  Out_channel.set_buffered stderr false;
   step (TopLevel.TopLevelBigIntptr.interpreter (List.map Camlcoq.coqstring_of_camlstring args) prog)
