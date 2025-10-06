@@ -258,7 +258,7 @@ Proof.
 Qed.
 
 Lemma padded_Tau_hint:
-  forall {A} R3 (e : E A) (k1 : A -> itree_spec E R3) (b : A), (forall a , paco1 padded_ bot1 (k1 a)) -> padded (Tau (k1 b)).
+  forall {A} R3 (k1 : A -> itree_spec E R3) (b : A), (forall a , paco1 padded_ bot1 (k1 a)) -> padded (Tau (k1 b)).
 Proof.
   intros. pstep. constructor. left. auto.
 Qed.
@@ -1177,7 +1177,7 @@ Proof.
       pclearbot.
       specialize (H19 _ e0 H H1).
       destruct H19 as (?&?&?).
-      right; eapply CIH; eauto with solve_padded.
+      right; eapply CIH with (t3:=k0 x); eauto with solve_padded.
       apply H0; eauto.
       apply H2; eauto.
     + eapply IHHt23; eauto with solve_padded. apply refinesF_TauR_inv; auto.
@@ -1231,8 +1231,9 @@ Proof.
       * eapply H1; eauto with solve_padded. Unshelve. all : auto.
         inv B1; inv B2.
         pstep_reverse. eapply refines_eutt_padded_l; eauto with solve_padded.
-        pstep. constructor. auto.
-        pstep. auto. pstep_reverse. constructor. auto.
+        pstep; red; auto.
+        punfold Ht1.
+        pstep_reverse. eapply padded_Tau_hint; eauto.
       * inv H4. inj_existT. subst. pclearbot. constructor.
         punfold H2. punfold H2. red in H2. cbn in *.
         punfold Ht1. red in Ht1.
@@ -1332,7 +1333,7 @@ Proof.
       intros a b H3.
       inv H3; inj_existT; subst.
       specialize (H11 _ e3 H1 H) as [c [? ?]].
-      right. eapply CIH; (* k3 vs k1?, might be an artifact of my recursion *) eauto with solve_padded. inv Ht1. inj_existT. subst.
+      right. eapply CIH with (t2:=k3 c); (* k3 vs k1?, might be an artifact of my recursion *) eauto with solve_padded.
       pclearbot.
       eapply H2; eauto.
       pclearbot.
