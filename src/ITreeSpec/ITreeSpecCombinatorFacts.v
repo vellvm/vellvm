@@ -23,6 +23,7 @@ From ITreeSpec Require Import
      Relations.
 
 From Paco Require Import paco.
+
 Axiom bisimulation_is_eq : forall (E : Type -> Type) (R: Type)
   (t1 t2 : itree E R), eq_itree eq t1 t2 -> t1 = t2.
 
@@ -173,6 +174,41 @@ Global Instance padded_refines_bind_proper {E S R} :
 Proof.
   repeat intro. eapply padded_refines_bind; intros; subst; eauto. subst. apply H0.
 Qed.
+
+#[global] Instance itree_spec_eqv_bind_proper {E S R} :
+  Proper (itree_spec_eqv ==> pointwise_relation S itree_spec_eqv ==>
+            @itree_spec_eqv E R) ITree.bind.
+Proof.
+  repeat intro.
+  destruct H.
+  red.
+  split.
+  - eapply padded_refines_bind;
+      intros; subst; eauto. subst. apply H0.
+  - eapply padded_refines_bind;
+      intros; subst; eauto. subst. apply H0.
+Qed.
+
+#[global] Instance itree_spec_MonadLaws {E} : @Monad.MonadLawsE (itree_spec E) itree_spec_MonadEq1 Monad_itree_spec.
+split.
+- intros A B f x.
+  eapply eutt_spec_eqv.
+  cbn.
+  rewrite bind_ret_l.
+  reflexivity.
+- intros A x.
+  eapply eutt_spec_eqv.
+  cbn.
+  rewrite bind_ret_r.
+  reflexivity.
+- intros A B C x f g.
+  eapply eutt_spec_eqv.
+  cbn.
+  rewrite bind_bind.
+  reflexivity.
+- cbn. intros A B.
+  apply itree_spec_eqv_bind_proper.
+Defined.
 
 Lemma padded_refines_forall_specr {E1 E2}
       (A : Type) R1 R2  RPre RPost RR
@@ -1777,7 +1813,22 @@ Qed.
       move REFMON before rr.
 
       (* I think I need to step in order to get the value for the quantifier *)
-      gstep; red; constructor.
+      gfinal.
+      assert (rr
+    match ot1 with
+    | RetF r0 => k1 r0
+    | TauF t => Tau (ITree.bind t k1)
+    | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k1)
+    end (Vis (Spec_forall A) (fun x : A => ITree.bind (k x) k2)) \/ ~ rr
+    match ot1 with
+    | RetF r0 => k1 r0
+    | TauF t => Tau (ITree.bind t k1)
+    | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k1)
+    end (Vis (Spec_forall A) (fun x : A => ITree.bind (k x) k2))) by admit.
+      destruct H1; auto.
+
+      right.
+      pstep; red; constructor.
       intros a.
 
       (* Satisfy all of H0's preconditions *)
@@ -1787,7 +1838,7 @@ Qed.
       { cbn.
         pinversion PAD2; inj_existT; subst; cbn.
         apply padded_tau.
-        apply H2.
+        apply H3.
       }
       repeat (forward H0; eauto with solve_padded).
 
@@ -1796,12 +1847,93 @@ Qed.
       apply bisimulation_is_eq in BIND.
       rewrite BIND; clear BIND.
 
+      eapply gpaco2_dist in H0; eauto with paco.
+      destruct H0; eauto.
+      { pstep_reverse; eauto.
+        eapply paco2_mon; eauto with paco.
+        intros x0 x1 PR.
+        induction PR; eauto.
+        - destruct IN; eauto.
+        - inv IN; cbn in *; subst.
+          eapply CIH0.
+          eapply H2.
+        eapply CIH0.
+      }
+
+
       (* My current goal looks so painfully similar to H0... How can I conclude? *)
       (* I'd like to use H0 directly. *)
 
       (* Maybe I need to get rid of rr in H0? *)
       eapply gpaco2_mon with (r':=r) (rg':=r) in H0; eauto.
+      eapply gpaco2_dist in H0; eauto with paco.
+      destruct H0.
+      + punfold H0.
+        red in H0.
+        eapply monotone_refinesF; cycle -1; eauto with paco.
 
+        intros x0 x1 PR.
+        red.
+        destruct PR.
+        * left.
+          eapply paco2_mon; eauto.
+          intros x2 x3 PR.
+          induction PR; try tauto.
+          inv IN; eauto.
+          apply H1.
+
+
+      eapply gpaco2_unfold in H0.
+      induction H0.
+      + destruct IN.
+        * red in H0.
+          eapply monotone_refinesF; cycle -1; eauto.
+          intros x2 x3 PR.
+          red in PR.
+          red.
+          eapply gpaco2_dist in PR; eauto with paco.
+
+          eapply REFMON.
+      
+      remember (k a) as ka.
+      genobs ka oka.
+      destruct ot1, oka; subst.
+
+      eapply refinesC_wcompat.
+
+      
+      refinesF_gupaco
+
+      gunfold H0.
+      destruct H0.
+      + destruct IN; eauto.
+        * eapply monotone_refinesF; cycle 3; try apply H0; eauto.
+          intros x2 x3 PR.
+          left.
+          
+          right.
+          apply CIH.
+          unfold refines_bind_clo.
+          econstructor.
+          left.
+          apply PR.
+          right.
+
+          
+        
+        red in H0.
+        eapply refinesF_
+        eapply refines_m
+        intros x0 x1 PR.
+        admit.
+      + induction H0; try tauto.
+        pstep; red. 
+        inv IN.
+        eapply H1.
+
+
+      
+      apply H0.
       (* I can potentially make progress via induction on H...
          We'll have to invert H0...
 
