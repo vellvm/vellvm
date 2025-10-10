@@ -1700,284 +1700,454 @@ Qed.
     (ID: id <3= vclo):
     refines_bind_clo b1 b2 <3= gupaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2).
   Proof.
-    intros rr. gcofix CIH. intros.
-    destruct PR.
-    gclo.
-    eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel); try typeclasses eauto.
-  1,2: (setoid_rewrite unfold_bind; apply refines_refl; try typeclasses eauto).
+  (*   (* intros rr. intros t1 t2 PR. *) *)
+  (*   (* destruct PR. *) *)
+  (*   (* pose proof refines'_bind *) *)
+  (*   (*   _ _ _ _ _ _ _ _ _ RR b1 b2 _ _ k1 k2 EQV. *) *)
+  (*   (* From Vellvm Require Import Utils.Tactics. *) *)
+  (*   (* forward H. *) *)
+  (*   (* { *) *)
+  (*   (*   intros r1 r2 H0. *) *)
+  (*   (*   red. *) *)
+  (*   (* } *) *)
+    
+  (*   (* Unshelve. *) *)
 
-  { setoid_rewrite <- unfold_bind.
-    eapply padded_bind; eauto.
-  }
+  (*   intros rr. gcofix CIH. intros. *)
+  (*   destruct PR. *)
+  (*   epose proof refines'_bind *)
+  (*   _ _ _ _ _ _ _ _ _ _ b1 b2 _ _ k1 k2 EQV. *)
+  (*   gclo. *)
+  (*   eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel); try typeclasses eauto. *)
+  (* 1,2: (setoid_rewrite unfold_bind; apply refines_refl; try typeclasses eauto). *)
 
-  { setoid_rewrite <- unfold_bind.
-    eapply padded_bind; eauto.
-  }
+  (* { setoid_rewrite <- unfold_bind. *)
+  (*   eapply padded_bind; eauto. *)
+  (* } *)
 
-  { punfold EQV. unfold_refines.
-    rewrite itree_eta in PAD1.
-    rewrite itree_eta in PAD2.
-    genobs t1 ot1.
-    genobs t2 ot2.
-    clear t1 t2 Heqot1 Heqot2.
-    hinduction EQV before CIH; intros; pclearbot; cbn;
-      repeat (change (ITree.subst ?k ?m) with (ITree.bind m k)).
-    - (* Ret *)
-      gbase.
-      eauto.
-    - (* Tau / Tau *)
-      gstep; constructor.
-      gbase.
-      eapply CIH.
-      eapply pbc_intro_h; try typeclasses eauto; eauto with solve_padded.
-    - (* Vis *)
-      gstep; constructor; eauto.
-      intros a b H1.
-      apply ID.
-      red.
-      gbase.
-      apply CIH.
-      eapply pbc_intro_h; try typeclasses eauto; eauto with solve_padded.
-      + pinversion PAD1; subst; inj_existT; subst; eauto with solve_padded.
-        apply padded_Tau_hint; eauto.
-      + pinversion PAD2; subst; inj_existT; subst; eauto with solve_padded.
-        apply padded_Tau_hint; eauto.
-      + apply H0; eauto.
-    - (* TauL *)
-      destruct b1; try discriminate.
+  (* { setoid_rewrite <- unfold_bind. *)
+  (*   eapply padded_bind; eauto. *)
+  (* } *)
 
-      rewrite (itree_eta t1) in PAD1.
-      (* Probably could get rid of this axiom *)
-      rewrite (EqAxiom.itree_eta_ t1).
-      genobs t1 ot1.
-      clear t1 Heqot1.
+  (* { punfold EQV. unfold_refines. *)
+  (*   rewrite itree_eta in PAD1. *)
+  (*   rewrite itree_eta in PAD2. *)
+  (*   genobs t1 ot1. *)
+  (*   genobs t2 ot2. *)
+  (*   clear t1 t2 Heqot1 Heqot2. *)
+  (*   hinduction EQV before CIH; intros; pclearbot; cbn; *)
+  (*     repeat (change (ITree.subst ?k ?m) with (ITree.bind m k)). *)
+  (*   - (* Ret *) *)
+  (*     gbase. *)
+  (*     eauto. *)
+  (*   - (* Tau / Tau *) *)
+  (*     gstep; constructor. *)
+  (*     gbase. *)
+  (*     eapply CIH. *)
+  (*     eapply pbc_intro_h; try typeclasses eauto; eauto with solve_padded. *)
+  (*   - (* Vis *) *)
+  (*     gstep; constructor; eauto. *)
+  (*     intros a b H1. *)
+  (*     apply ID. *)
+  (*     red. *)
+  (*     gbase. *)
+  (*     apply CIH. *)
+  (*     eapply pbc_intro_h; try typeclasses eauto; eauto with solve_padded. *)
+  (*     + pinversion PAD1; subst; inj_existT; subst; eauto with solve_padded. *)
+  (*       apply padded_Tau_hint; eauto. *)
+  (*     + pinversion PAD2; subst; inj_existT; subst; eauto with solve_padded. *)
+  (*       apply padded_Tau_hint; eauto. *)
+  (*     + apply H0; eauto. *)
+  (*   - (* TauL *) *)
+  (*     destruct b1; try discriminate. *)
 
-      gclo.
-      eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel);
-        try typeclasses eauto; auto_ctrans_eq; eauto; try reflexivity.
+  (*     rewrite (itree_eta t1) in PAD1. *)
+  (*     (* Probably could get rid of this axiom *) *)
+  (*     rewrite (EqAxiom.itree_eta_ t1). *)
+  (*     genobs t1 ot1. *)
+  (*     clear t1 Heqot1. *)
 
-      eapply refines_TauL; cbn; auto. rewrite unfold_bind.
-      1-2: cbn; apply refines_refl; try typeclasses eauto.
-      + destruct ot1; eauto with solve_padded.
-        rewrite <- bind_vis.
-        eauto with solve_padded.
-      + destruct ot2; eauto with solve_padded.
-        rewrite <- bind_vis.
-        eauto with solve_padded.
-      + eapply IHEQV; eauto with solve_padded.
-    - (* TauR *)
-      destruct b2; try discriminate.
+  (*     gclo. *)
+  (*     eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel); *)
+  (*       try typeclasses eauto; auto_ctrans_eq; eauto; try reflexivity. *)
 
-      rewrite (itree_eta t2) in PAD2.
-      (* Probably could get rid of this axiom *)
-      rewrite (EqAxiom.itree_eta_ t2).
-      genobs t2 ot2.
-      clear t2 Heqot2.
+  (*     eapply refines_TauL; cbn; auto. rewrite unfold_bind. *)
+  (*     1-2: cbn; apply refines_refl; try typeclasses eauto. *)
+  (*     + destruct ot1; eauto with solve_padded. *)
+  (*       rewrite <- bind_vis. *)
+  (*       eauto with solve_padded. *)
+  (*     + destruct ot2; eauto with solve_padded. *)
+  (*       rewrite <- bind_vis. *)
+  (*       eauto with solve_padded. *)
+  (*     + eapply IHEQV; eauto with solve_padded. *)
+  (*   - (* TauR *) *)
+  (*     destruct b2; try discriminate. *)
 
-      gclo.
-      eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel);
-        try typeclasses eauto; auto_ctrans_eq; eauto; try reflexivity.
+  (*     rewrite (itree_eta t2) in PAD2. *)
+  (*     (* Probably could get rid of this axiom *) *)
+  (*     rewrite (EqAxiom.itree_eta_ t2). *)
+  (*     genobs t2 ot2. *)
+  (*     clear t2 Heqot2. *)
 
-      2: eapply refines_TauR; cbn; auto; rewrite unfold_bind.
-      1-2: cbn; apply refines_refl; try typeclasses eauto.
-      + destruct ot1; eauto with solve_padded.
-        rewrite <- bind_vis; eauto with solve_padded.
-      + destruct ot2; eauto with solve_padded.
-        rewrite <- bind_vis; eauto with solve_padded.
-      + eapply IHEQV; eauto with solve_padded.
-    - (* forallR *)
-      (* Will probably need induction on H to match up steps *)
-      From Vellvm Require Import Utils.Tactics.
-      (* Monotonicity *)
-      assert (forall (x2 : itree_spec E R1) (x3 : itree_spec E R2),
-      gupaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) (r \2/ rr) x2 x3 ->
-      gpaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) r r x2 x3) as PACMON.
-      { intros.
-        eapply gpaco2_mon; eauto;
-          intros; cbn in PR; destruct PR; eauto.
-      }
+  (*     gclo. *)
+  (*     eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel); *)
+  (*       try typeclasses eauto; auto_ctrans_eq; eauto; try reflexivity. *)
 
-      (* Monotonicity of refinesF *)
-      assert (forall x y, refinesF eq_prerel eq_post_rel RR b1 b2 vclo
-      (gupaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) (r \2/ rr))
-      (observe x) (observe y) ->
-  refinesF eq_prerel eq_post_rel RR b1 b2 vclo
-    (gpaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) r r) 
-    (observe x) (observe y)) as REFMON.
-      { intros x y REF.
-        clear - REF PACMON MON ID.
-        eapply monotone_refinesF; eauto.
-      }
+  (*     2: eapply refines_TauR; cbn; auto; rewrite unfold_bind. *)
+  (*     1-2: cbn; apply refines_refl; try typeclasses eauto. *)
+  (*     + destruct ot1; eauto with solve_padded. *)
+  (*       rewrite <- bind_vis; eauto with solve_padded. *)
+  (*     + destruct ot2; eauto with solve_padded. *)
+  (*       rewrite <- bind_vis; eauto with solve_padded. *)
+  (*     + eapply IHEQV; eauto with solve_padded. *)
+  (*   - (* forallR *) *)
+  (*     From Vellvm Require Import Utils.Tactics. *)
 
-      move PACMON before rr.
-      move REFMON before rr.
+  (*     assert (forall a, gpaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo)  *)
+  (*   (refinesC RR b1 b2) rr r *)
+  (*   match ot1 with *)
+  (*   | RetF r0 => k1 r0 *)
+  (*   | TauF t => Tau (ITree.bind t k1) *)
+  (*   | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k1) *)
+  (*   end (ITree.bind (k a) k2)). *)
+  (*     { intros a. *)
+  (*       cbn. *)
+  (*       rewrite EqAxiom.itree_eta_. *)
+  (*       rewrite observe_bind. *)
+  (*       rewrite <- EqAxiom.itree_eta_. *)
+  (*       apply H0; *)
+  (*       eauto with solve_padded. *)
+  (*       { pinversion PAD2; subst; inj_existT; subst; eauto with solve_padded. *)
+  (*         apply padded_Tau_hint; eauto. *)
+  (*       } *)
+  (*     } *)
 
-      (* I think I need to step in order to get the value for the quantifier *)
-      gfinal.
-      assert (rr
-    match ot1 with
-    | RetF r0 => k1 r0
-    | TauF t => Tau (ITree.bind t k1)
-    | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k1)
-    end (Vis (Spec_forall A) (fun x : A => ITree.bind (k x) k2)) \/ ~ rr
-    match ot1 with
-    | RetF r0 => k1 r0
-    | TauF t => Tau (ITree.bind t k1)
-    | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k1)
-    end (Vis (Spec_forall A) (fun x : A => ITree.bind (k x) k2))) by admit.
-      destruct H1; auto.
-
-      right.
-      pstep; red; constructor.
-      intros a.
-
-      (* Satisfy all of H0's preconditions *)
-      specialize (H0 a k1 k2).
-      forward H0; eauto with solve_padded.
-      forward H0; eauto with solve_padded.
-      { cbn.
-        pinversion PAD2; inj_existT; subst; cbn.
-        apply padded_tau.
-        apply H3.
-      }
-      repeat (forward H0; eauto with solve_padded).
-
-      (* Try unfolding the bind... *)
-      pose proof unfold_bind (k a) k2 as BIND.
-      apply bisimulation_is_eq in BIND.
-      rewrite BIND; clear BIND.
-
-      eapply gpaco2_dist in H0; eauto with paco.
-      destruct H0; eauto.
-      { pstep_reverse; eauto.
-        eapply paco2_mon; eauto with paco.
-        intros x0 x1 PR.
-        induction PR; eauto.
-        - destruct IN; eauto.
-        - inv IN; cbn in *; subst.
-          eapply CIH0.
-          eapply H2.
-        eapply CIH0.
-      }
+  (*     clear H0. *)
+  (*     gstep. *)
+  (*     red. *)
+  (*     constructor. *)
+  (*     intros a. *)
+  (*     specialize (H1 a). *)
+  (*     gunfold H1. *)
+  (*     destruct H1. *)
+  (*     + destruct IN. *)
+  (*       red in H0. *)
+  (*       apply H0. *)
+  (*     2: { *)
+  (*       inv IN. *)
+  (*       apply  *)
+  (*     } *)
 
 
-      (* My current goal looks so painfully similar to H0... How can I conclude? *)
-      (* I'd like to use H0 directly. *)
+  (*     (* Monotonicity *) *)
+  (*     assert (forall (x2 : itree_spec E R1) (x3 : itree_spec E R2), *)
+  (*     gupaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) (r \2/ rr) x2 x3 -> *)
+  (*     gpaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) r r x2 x3) as PACMON. *)
+  (*     { intros. *)
+  (*       eapply gpaco2_mon; eauto; *)
+  (*         intros; cbn in PR; destruct PR; eauto. *)
+  (*     } *)
 
-      (* Maybe I need to get rid of rr in H0? *)
-      eapply gpaco2_mon with (r':=r) (rg':=r) in H0; eauto.
-      eapply gpaco2_dist in H0; eauto with paco.
-      destruct H0.
-      + punfold H0.
-        red in H0.
-        eapply monotone_refinesF; cycle -1; eauto with paco.
+  (*     (* Monotonicity of refinesF *) *)
+  (*     assert (forall x y, refinesF eq_prerel eq_post_rel RR b1 b2 vclo *)
+  (*     (gupaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) (r \2/ rr)) *)
+  (*     (observe x) (observe y) -> *)
+  (* refinesF eq_prerel eq_post_rel RR b1 b2 vclo *)
+  (*   (gpaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) r r)  *)
+  (*   (observe x) (observe y)) as REFMON. *)
+  (*     { intros x y REF. *)
+  (*       clear - REF PACMON MON ID. *)
+  (*       eapply monotone_refinesF; eauto. *)
+  (*     } *)
 
-        intros x0 x1 PR.
-        red.
-        destruct PR.
-        * left.
-          eapply paco2_mon; eauto.
-          intros x2 x3 PR.
-          induction PR; try tauto.
-          inv IN; eauto.
-          apply H1.
+  (*     move PACMON before rr. *)
+  (*     move REFMON before rr. *)
 
-
-      eapply gpaco2_unfold in H0.
-      induction H0.
-      + destruct IN.
-        * red in H0.
-          eapply monotone_refinesF; cycle -1; eauto.
-          intros x2 x3 PR.
-          red in PR.
-          red.
-          eapply gpaco2_dist in PR; eauto with paco.
-
-          eapply REFMON.
-      
-      remember (k a) as ka.
-      genobs ka oka.
-      destruct ot1, oka; subst.
-
-      eapply refinesC_wcompat.
+  (*     gstep. red. *)
+  (*     (* Constructor *) *)
+  (*     apply refinesF_forallR; eauto. *)
+  (*     intros a. *)
+  (*     specialize (H a). *)
+  (*     specialize (H0 a k1 k2). *)
+  (*     forward H0; eauto with solve_padded. *)
+  (*     forward H0; eauto with solve_padded. *)
+  (*     { pinversion PAD2; subst; inj_existT; subst; eauto with solve_padded. *)
+  (*       apply padded_Tau_hint; eauto. *)
+  (*     } *)
+  (*     repeat (forward H0; eauto). *)
+  (*     cbn. *)
+  (*     rewrite observe_bind. *)
+  (*     assert (rr = bot2) by admit. *)
+  (*     rewrite H1 in H0. *)
 
       
-      refinesF_gupaco
+  (*     eapply gpaco2_dist in H0. *)
+  (*     destruct H0. *)
+  (*     2: { *)
+  (*       induction H0; cbn in *; try contradiction. *)
+  (*       apply H0. *)
+  (*       inv IN. *)
+  (*     } *)
 
-      gunfold H0.
-      destruct H0.
-      + destruct IN; eauto.
-        * eapply monotone_refinesF; cycle 3; try apply H0; eauto.
-          intros x2 x3 PR.
-          left.
+  (*     eapply gpaco2_mon in H0. *)
+  (*     eapply gpaco2_init in H0; eauto. *)
+  (*     punfold H0. *)
+  (*     red in H0. *)
+  (*     eapply monotone_refinesF; cycle -1. *)
+  (*     apply H0. *)
+  (*     all: eauto with paco. *)
+  (*     2: { *)
+  (*       intros x0 x1 PR. *)
+  (*       red. *)
+        
+  (*     } *)
+
+  (*     induction H. *)
+  (*     + eapply gpaco2_mon in H0. *)
+  (*       eapply gpaco2_init in H0; eauto. *)
+  (*       punfold H0. *)
+  (*       red in H0. *)
+  (*       eapply monotone_refinesF; cycle -1. *)
+  (*       apply H0. *)
+  (*       all: eauto. *)
+  (*       apply H0. *)
+  (*     pose proof gpaco2_compat_init. *)
+  (*     Unset Printing Notations. *)
+      
+  (*     induction H. *)
+  (*     + gunfold H0. *)
+  (*       induction H0. *)
+  (*       * destruct IN; eauto. *)
           
-          right.
-          apply CIH.
-          unfold refines_bind_clo.
-          econstructor.
-          left.
-          apply PR.
-          right.
+  (*         -- red in H0; eauto. *)
+  (*            eapply monotone_refinesF; cycle -1; eauto. *)
+  (*            intros x2 x3 PR. *)
+  (*            eapply gpaco2_gupaco; eauto. *)
+
+  (*            4 *)
+  (*            eapply refinesF_mono. *)
+      
+
+
+  (*     gstep; constructor; eauto. *)
+  (*     intros a b H1. *)
+  (*     apply ID. *)
+  (*     red. *)
+  (*     gbase. *)
+  (*     apply CIH. *)
+  (*     eapply pbc_intro_h; try typeclasses eauto; eauto with solve_padded. *)
+  (*     + pinversion PAD1; subst; inj_existT; subst; eauto with solve_padded. *)
+  (*       apply padded_Tau_hint; eauto. *)
+  (*     + pinversion PAD2; subst; inj_existT; subst; eauto with solve_padded. *)
+  (*       apply padded_Tau_hint; eauto. *)
+  (*     + apply H0; eauto. *)
+
+
+  (*     apply ID. *)
+  (*     red. *)
+  (*     gbase. *)
+  (*     apply CIH. *)
+  (*     eapply pbc_intro_h; try typeclasses eauto; eauto with solve_padded. *)
+  (*     + pinversion PAD1; subst; inj_existT; subst; eauto with solve_padded. *)
+  (*       apply padded_Tau_hint; eauto. *)
+  (*     + pinversion PAD2; subst; inj_existT; subst; eauto with solve_padded. *)
+  (*       apply padded_Tau_hint; eauto. *)
+  (*     + apply H0; eauto. *)
+
+  (*     gstep. *)
+
+      
+  (*     (* Will probably need induction on H to match up steps *) *)
+  (*     From Vellvm Require Import Utils.Tactics. *)
+  (*     (* Monotonicity *) *)
+  (*     assert (forall (x2 : itree_spec E R1) (x3 : itree_spec E R2), *)
+  (*     gupaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) (r \2/ rr) x2 x3 -> *)
+  (*     gpaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) r r x2 x3) as PACMON. *)
+  (*     { intros. *)
+  (*       eapply gpaco2_mon; eauto; *)
+  (*         intros; cbn in PR; destruct PR; eauto. *)
+  (*     } *)
+
+  (*     (* Monotonicity of refinesF *) *)
+  (*     assert (forall x y, refinesF eq_prerel eq_post_rel RR b1 b2 vclo *)
+  (*     (gupaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) (r \2/ rr)) *)
+  (*     (observe x) (observe y) -> *)
+  (* refinesF eq_prerel eq_post_rel RR b1 b2 vclo *)
+  (*   (gpaco2 (refines_ eq_prerel eq_post_rel RR b1 b2 vclo) (refinesC RR b1 b2) r r)  *)
+  (*   (observe x) (observe y)) as REFMON. *)
+  (*     { intros x y REF. *)
+  (*       clear - REF PACMON MON ID. *)
+  (*       eapply monotone_refinesF; eauto. *)
+  (*     } *)
+
+  (*     move PACMON before rr. *)
+  (*     move REFMON before rr. *)
+
+  (*     (* I think I need to step in order to get the value for the quantifier *) *)
+  (*     gfinal. *)
+  (*     assert (rr *)
+  (*   match ot1 with *)
+  (*   | RetF r0 => k1 r0 *)
+  (*   | TauF t => Tau (ITree.bind t k1) *)
+  (*   | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k1) *)
+  (*   end (Vis (Spec_forall A) (fun x : A => ITree.bind (k x) k2)) \/ ~ rr *)
+  (*   match ot1 with *)
+  (*   | RetF r0 => k1 r0 *)
+  (*   | TauF t => Tau (ITree.bind t k1) *)
+  (*   | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k1) *)
+  (*   end (Vis (Spec_forall A) (fun x : A => ITree.bind (k x) k2))) by admit. *)
+  (*     destruct H1; auto. *)
+
+  (*     right. *)
+  (*     pstep; red; constructor. *)
+  (*     intros a. *)
+
+  (*     (* Satisfy all of H0's preconditions *) *)
+  (*     specialize (H0 a k1 k2). *)
+  (*     forward H0; eauto with solve_padded. *)
+  (*     forward H0; eauto with solve_padded. *)
+  (*     { cbn. *)
+  (*       pinversion PAD2; inj_existT; subst; cbn. *)
+  (*       apply padded_tau. *)
+  (*       apply H3. *)
+  (*     } *)
+  (*     repeat (forward H0; eauto with solve_padded). *)
+
+  (*     (* Try unfolding the bind... *) *)
+  (*     pose proof unfold_bind (k a) k2 as BIND. *)
+  (*     apply bisimulation_is_eq in BIND. *)
+  (*     rewrite BIND; clear BIND. *)
+
+  (*     eapply gpaco2_dist in H0; eauto with paco. *)
+  (*     destruct H0; eauto. *)
+  (*     { pstep_reverse; eauto. *)
+  (*       eapply paco2_mon; eauto with paco. *)
+  (*       intros x0 x1 PR. *)
+  (*       induction PR; eauto. *)
+  (*       - destruct IN; eauto. *)
+  (*       - inv IN; cbn in *; subst. *)
+  (*         eapply CIH0. *)
+  (*         admit. *)
+  (*     } *)
+
+
+  (*   (*   (* My current goal looks so painfully similar to H0... How can I conclude? *) *) *)
+  (*   (*   (* I'd like to use H0 directly. *) *) *)
+
+  (*   (*   (* Maybe I need to get rid of rr in H0? *) *) *)
+  (*   (*   eapply gpaco2_mon with (r':=r) (rg':=r) in H0; eauto. *) *)
+  (*   (*   eapply gpaco2_dist in H0; eauto with paco. *) *)
+  (*   (*   destruct H0. *) *)
+  (*   (*   + punfold H0. *) *)
+  (*   (*     red in H0. *) *)
+  (*   (*     eapply monotone_refinesF; cycle -1; eauto with paco. *) *)
+
+  (*   (*     intros x0 x1 PR. *) *)
+  (*   (*     red. *) *)
+  (*   (*     destruct PR. *) *)
+  (*   (*     * left. *) *)
+  (*   (*       eapply paco2_mon; eauto. *) *)
+  (*   (*       intros x2 x3 PR. *) *)
+  (*   (*       induction PR; try tauto. *) *)
+  (*   (*       inv IN; eauto. *) *)
+  (*   (*       apply H1. *) *)
+
+
+  (*   (*   eapply gpaco2_unfold in H0. *) *)
+  (*   (*   induction H0. *) *)
+  (*   (*   + destruct IN. *) *)
+  (*   (*     * red in H0. *) *)
+  (*   (*       eapply monotone_refinesF; cycle -1; eauto. *) *)
+  (*   (*       intros x2 x3 PR. *) *)
+  (*   (*       red in PR. *) *)
+  (*   (*       red. *) *)
+  (*   (*       eapply gpaco2_dist in PR; eauto with paco. *) *)
+
+  (*   (*       eapply REFMON. *) *)
+      
+  (*   (*   remember (k a) as ka. *) *)
+  (*   (*   genobs ka oka. *) *)
+  (*   (*   destruct ot1, oka; subst. *) *)
+
+  (*   (*   eapply refinesC_wcompat. *) *)
+
+      
+  (*   (*   refinesF_gupaco *) *)
+
+  (*   (*   gunfold H0. *) *)
+  (*   (*   destruct H0. *) *)
+  (*   (*   + destruct IN; eauto. *) *)
+  (*   (*     * eapply monotone_refinesF; cycle 3; try apply H0; eauto. *) *)
+  (*   (*       intros x2 x3 PR. *) *)
+  (*   (*       left. *) *)
+          
+  (*   (*       right. *) *)
+  (*   (*       apply CIH. *) *)
+  (*   (*       unfold refines_bind_clo. *) *)
+  (*   (*       econstructor. *) *)
+  (*   (*       left. *) *)
+  (*   (*       apply PR. *) *)
+  (*   (*       right. *) *)
 
           
         
-        red in H0.
-        eapply refinesF_
-        eapply refines_m
-        intros x0 x1 PR.
-        admit.
-      + induction H0; try tauto.
-        pstep; red. 
-        inv IN.
-        eapply H1.
+  (*   (*     red in H0. *) *)
+  (*   (*     eapply refinesF_ *) *)
+  (*   (*     eapply refines_m *) *)
+  (*   (*     intros x0 x1 PR. *) *)
+  (*   (*     admit. *) *)
+  (*   (*   + induction H0; try tauto. *) *)
+  (*   (*     pstep; red.  *) *)
+  (*   (*     inv IN. *) *)
+  (*   (*     eapply H1. *) *)
 
 
       
-      apply H0.
-      (* I can potentially make progress via induction on H...
-         We'll have to invert H0...
+  (*   (*   apply H0. *) *)
+  (*   (*   (* I can potentially make progress via induction on H... *) *)
+  (*   (*      We'll have to invert H0... *) *)
 
-         But it should let us apply constructors to refinesF.
+  (*   (*      But it should let us apply constructors to refinesF. *) *)
 
-         But I'm not sure I can get anywhere after that.
-       *)
-      specialize (H a).
-      remember (observe (k a)) as oka.
-      hinduction H before R1; intros.
-      + eapply H0. rewrite <- Heqoka.
-        gunfold H0.
-        induction H0.
-        * destruct IN; eauto.
-          -- red in H0.
-             eauto.
-             inv H0; try solve [constructor; eauto].
-             ++ inv CHECK.
-                constructor; eauto.
-             ++ constructor; eauto.
-                intros a0 b H0.
-                apply H4 in H0.
-                eapply MON; eauto.
+  (*   (*      But I'm not sure I can get anywhere after that. *) *)
+  (*   (*    *) *) *)
+  (*   (*   specialize (H a). *) *)
+  (*   (*   remember (observe (k a)) as oka. *) *)
+  (*   (*   hinduction H before R1; intros. *) *)
+  (*   (*   + eapply H0. rewrite <- Heqoka. *) *)
+  (*   (*     gunfold H0. *) *)
+  (*   (*     induction H0. *) *)
+  (*   (*     * destruct IN; eauto. *) *)
+  (*   (*       -- red in H0. *) *)
+  (*   (*          eauto. *) *)
+  (*   (*          inv H0; try solve [constructor; eauto]. *) *)
+  (*   (*          ++ inv CHECK. *) *)
+  (*   (*             constructor; eauto. *) *)
+  (*   (*          ++ constructor; eauto. *) *)
+  (*   (*             intros a0 b H0. *) *)
+  (*   (*             apply H4 in H0. *) *)
+  (*   (*             eapply MON; eauto. *) *)
                 
-                eapply ID.
-                red.
-                eapply ID.
-                eapply H4.
+  (*   (*             eapply ID. *) *)
+  (*   (*             red. *) *)
+  (*   (*             eapply ID. *) *)
+  (*   (*             eapply H4. *) *)
 
 
 
-        eapply gpaco2_base in H0
+  (*   (*     eapply gpaco2_base in H0 *) *)
                                 
-        eauto with gpaco.
+  (*   (*     eauto with gpaco. *) *)
         
 
       
 
-      pose proof unfold_bind (k a) k2 as BIND.
-      apply bisimulation_is_eq in BIND.
-      rewrite BIND.
-      apply H0.
-      clear BIND.
-      hinduction H before R1; intros.
+  (*   (*   pose proof unfold_bind (k a) k2 as BIND. *) *)
+  (*   (*   apply bisimulation_is_eq in BIND. *) *)
+  (*   (*   rewrite BIND. *) *)
+  (*   (*   apply H0. *) *)
+  (*   (*   clear BIND. *) *)
+  (*   (*   hinduction H before R1; intros. *) *)
 
 
 
@@ -1985,213 +2155,216 @@ Qed.
       
 
 
-      pinversion PAD2; inj_existT; subst.
-      gstep; red; constructor.
-      intros a.
-      specialize (H a).
-      specialize (H0 a k1 k2).
-      forward H0; eauto with solve_padded.
-      forward H0; eauto with solve_padded.
-      { cbn. apply padded_tau.
-        apply H2.
-      }
-      repeat (forward H0; eauto with solve_padded).
+  (*   (*   pinversion PAD2; inj_existT; subst. *) *)
+  (*   (*   gstep; red; constructor. *) *)
+  (*   (*   intros a. *) *)
+  (*   (*   specialize (H a). *) *)
+  (*   (*   specialize (H0 a k1 k2). *) *)
+  (*   (*   forward H0; eauto with solve_padded. *) *)
+  (*   (*   forward H0; eauto with solve_padded. *) *)
+  (*   (*   { cbn. apply padded_tau. *) *)
+  (*   (*     apply H2. *) *)
+  (*   (*   } *) *)
+  (*   (*   repeat (forward H0; eauto with solve_padded). *) *)
 
-      remember (Tau (k3 a)).
-      hinduction H before r; intros; subst.
-      + 
-      destruct ot1.
-      + admit.
-      + cbn.
-        constructor.
-        repeat (change (ITree.subst ?k ?m) with (ITree.bind m k)).
-        cbn in *.
-        gclo.
-        econstructor.
+  (*   (*   remember (Tau (k3 a)). *) *)
+  (*   (*   hinduction H before r; intros; subst. *) *)
+  (*   (*   +  *) *)
+  (*   (*   destruct ot1. *) *)
+  (*   (*   + admit. *) *)
+  (*   (*   + cbn. *) *)
+  (*   (*     constructor. *) *)
+  (*   (*     repeat (change (ITree.subst ?k ?m) with (ITree.bind m k)). *) *)
+  (*   (*     cbn in *. *) *)
+  (*   (*     gclo. *) *)
+  (*   (*     econstructor. *) *)
         
-        gbase.
-        apply CIH.
-        econstructor.
-        gunfold H0.
+  (*   (*     gbase. *) *)
+  (*   (*     apply CIH. *) *)
+  (*   (*     econstructor. *) *)
+  (*   (*     gunfold H0. *) *)
         
-        pinversion H0.
+  (*   (*     pinversion H0. *) *)
 
-        rewrite <- (tau_eutt t).
+  (*   (*     rewrite <- (tau_eutt t). *) *)
         
 
-      pinversion PAD2
+  (*   (*   pinversion PAD2 *) *)
 
-      gunfold H0.
-      induction H0.
-      + cbn in *.
-        destruct IN.
-        * eauto.
+  (*   (*   gunfold H0. *) *)
+  (*   (*   induction H0. *) *)
+  (*   (*   + cbn in *. *) *)
+  (*   (*     destruct IN. *) *)
+  (*   (*     * eauto. *) *)
 
       
-      pose proof unfold_bind (k a) k2 as BIND.
-      apply bisimulation_is_eq in BIND.
-      rewrite BIND.
-      remember (observe (k a)) as ka.
-      clear BIND.
-      hinduction H before R1; intros.
-      + 
+  (*   (*   pose proof unfold_bind (k a) k2 as BIND. *) *)
+  (*   (*   apply bisimulation_is_eq in BIND. *) *)
+  (*   (*   rewrite BIND. *) *)
+  (*   (*   remember (observe (k a)) as ka. *) *)
+  (*   (*   clear BIND. *) *)
+  (*   (*   hinduction H before R1; intros. *) *)
+  (*   (*   +  *) *)
 
-      admit.
-    (*   gclo. *)
-    (*   eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel); *)
-    (*     try typeclasses eauto; auto_ctrans_eq; eauto; try reflexivity. *)
-    (*   2: { *)
-    (*     pstep; red. *)
-    (*     constructor. *)
-    (*     intros a. *)
-    (*     eapply refinesF_refl. *)
+  (*   (*   admit. *) *)
+  (*   (* (*   gclo. *) *) *)
+  (*   (* (*   eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel); *) *) *)
+  (*   (* (*     try typeclasses eauto; auto_ctrans_eq; eauto; try reflexivity. *) *) *)
+  (*   (* (*   2: { *) *) *)
+  (*   (* (*     pstep; red. *) *) *)
+  (*   (* (*     constructor. *) *) *)
+  (*   (* (*     intros a. *) *) *)
+  (*   (* (*     eapply refinesF_refl. *) *) *)
 
-    (*     gstep. *)
-    (*   } *)
+  (*   (* (*     gstep. *) *) *)
+  (*   (* (*   } *) *) *)
 
-    (*   gstep; red; constructor. *)
-    (*   intros a. *)
-    (*   pinversion PAD2; inj_existT; subst. *)
-    (*   specialize (H0 a). *)
-    (*   specialize (H0 k1 k2). *)
-    (*   From Vellvm Require Import Utils.Tactics. *)
-    (*   repeat (forward H0; [admit|]). *)
+  (*   (* (*   gstep; red; constructor. *) *) *)
+  (*   (* (*   intros a. *) *) *)
+  (*   (* (*   pinversion PAD2; inj_existT; subst. *) *) *)
+  (*   (* (*   specialize (H0 a). *) *) *)
+  (*   (* (*   specialize (H0 k1 k2). *) *) *)
+  (*   (* (*   From Vellvm Require Import Utils.Tactics. *) *) *)
+  (*   (* (*   repeat (forward H0; [admit|]). *) *) *)
 
-    (*   gunfold H0. *)
+  (*   (* (*   gunfold H0. *) *) *)
       
-    (*   PADk1 PADk2 REL). *)
-    (*   remember (Tau (k3 a)). *)
-    (*   hinduction H before H0; intros; inv Heqi. *)
+  (*   (* (*   PADk1 PADk2 REL). *) *) *)
+  (*   (* (*   remember (Tau (k3 a)). *) *) *)
+  (*   (* (*   hinduction H before H0; intros; inv Heqi. *) *) *)
 
-    (*   destruct ot1. *)
-    (*   + (* Ret *) *)
-    (*     specialize (H a). *)
-    (*     specialize (H0 a k1 k2 PAD1). *)
+  (*   (* (*   destruct ot1. *) *) *)
+  (*   (* (*   + (* Ret *) *) *) *)
+  (*   (* (*     specialize (H a). *) *) *)
+  (*   (* (*     specialize (H0 a k1 k2 PAD1). *) *) *)
 
-    (*     forward H0. *)
-    (*     { pinversion PAD2; inj_existT; subst. *)
-    (*       eapply padded_tau. *)
-    (*       apply H2. *)
-    (*     } *)
+  (*   (* (*     forward H0. *) *) *)
+  (*   (* (*     { pinversion PAD2; inj_existT; subst. *) *) *)
+  (*   (* (*       eapply padded_tau. *) *) *)
+  (*   (* (*       apply H2. *) *) *)
+  (*   (* (*     } *) *) *)
 
-    (*     specialize (H0 PADk1 PADk2 REL). *)
-    (*     pose proof (unfold_bind (k a) k2). *)
-    (*     eapply EqAxiom.bisimulation_is_eq in H1. *)
-    (*     rewrite H1. *)
-    (*     apply refinesF_TauTau_inv_strong. *)
-    (*     constructor. *)
-    (*     eapply gpaco2_mon; try apply H0; eauto. *)
+  (*   (* (*     specialize (H0 PADk1 PADk2 REL). *) *) *)
+  (*   (* (*     pose proof (unfold_bind (k a) k2). *) *) *)
+  (*   (* (*     eapply EqAxiom.bisimulation_is_eq in H1. *) *) *)
+  (*   (* (*     rewrite H1. *) *) *)
+  (*   (* (*     apply refinesF_TauTau_inv_strong. *) *) *)
+  (*   (* (*     constructor. *) *) *)
+  (*   (* (*     eapply gpaco2_mon; try apply H0; eauto. *) *) *)
 
-    (*     { intros t1 t2 H2. *)
-    (*       gunfold  *)
-    (*       gfold. *)
+  (*   (* (*     { intros t1 t2 H2. *) *) *)
+  (*   (* (*       gunfold  *) *) *)
+  (*   (* (*       gfold. *) *) *)
 
-    (*     apply H0. *)
+  (*   (* (*     apply H0. *) *) *)
 
-    (*     assert (refinesF eq_prerel eq_post_rel RR false b2 vclo *)
-    (* (gpaco2 (refines_ eq_prerel eq_post_rel RR false b2 vclo) (refinesC RR false b2) r r) *)
-    (* (observe (Tau (k1 r0))) *)
-    (* (observe (Tau *)
-    (*    match observe (k a) with *)
-    (*    | RetF r1 => k2 r1 *)
-    (*    | TauF t => Tau (ITree.bind t k2) *)
-    (*    | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k2) *)
-    (*    end))). *)
-    (*     constructor. *)
-    (*     eapply gpaco2_mon. *)
-    (*     apply H0. *)
-    (*     eauto. *)
-    (*     eauto. *)
-    (*     cbn in H2. *)
-    (*     eapply refinesF_TauTau_inv in H2. *)
-    (*     apply H2. *)
+  (*   (* (*     assert (refinesF eq_prerel eq_post_rel RR false b2 vclo *) *) *)
+  (*   (* (* (gpaco2 (refines_ eq_prerel eq_post_rel RR false b2 vclo) (refinesC RR false b2) r r) *) *) *)
+  (*   (* (* (observe (Tau (k1 r0))) *) *) *)
+  (*   (* (* (observe (Tau *) *) *)
+  (*   (* (*    match observe (k a) with *) *) *)
+  (*   (* (*    | RetF r1 => k2 r1 *) *) *)
+  (*   (* (*    | TauF t => Tau (ITree.bind t k2) *) *) *)
+  (*   (* (*    | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k2) *) *) *)
+  (*   (* (*    end))). *) *) *)
+  (*   (* (*     constructor. *) *) *)
+  (*   (* (*     eapply gpaco2_mon. *) *) *)
+  (*   (* (*     apply H0. *) *) *)
+  (*   (* (*     eauto. *) *) *)
+  (*   (* (*     eauto. *) *) *)
+  (*   (* (*     cbn in H2. *) *) *)
+  (*   (* (*     eapply refinesF_TauTau_inv in H2. *) *) *)
+  (*   (* (*     apply H2. *) *) *)
 
-    (*     intros t1 t2 H3. *)
+  (*   (* (*     intros t1 t2 H3. *) *) *)
         
 
-    (*     apply refinesf_tautau_inv in H2. *)
-    (*     gunfold *)
-    - (* ExistsR *)
-      gclo.
-      eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel) (t2':=(ITree.bind (k a) k2));
-        try typeclasses eauto; auto_ctrans_eq; eauto; try reflexivity.
-      2: {
-        pstep; red; cbn.
-        eapply refinesF_existsR with (a:=a).
-        pinversion PAD2; inj_existT; subst.
-        cbn.
-        constructor.
-        left.
-        apply refines_refl; try typeclasses eauto.
-        (change (ITree.subst ?k ?m) with (ITree.bind m k)).
-        eapply padded_bind.
-        apply H0.
-        eauto.
-      }
+  (*   (* (*     apply refinesf_tautau_inv in H2. *) *) *)
+  (*   (* (*     gunfold *) *) *)
+  (*   (* - (* ExistsR *) *) *)
+  (*   (*   gclo. *) *)
+  (*   (*   eapply refine_trans_clo_intro with (post1:=eq_post_rel) (post2:=eq_post_rel) (t2':=(ITree.bind (k a) k2)); *) *)
+  (*   (*     try typeclasses eauto; auto_ctrans_eq; eauto; try reflexivity. *) *)
+  (*   (*   2: { *) *)
+  (*   (*     pstep; red; cbn. *) *)
+  (*   (*     eapply refinesF_existsR with (a:=a). *) *)
+  (*   (*     pinversion PAD2; inj_existT; subst. *) *)
+  (*   (*     cbn. *) *)
+  (*   (*     constructor. *) *)
+  (*   (*     left. *) *)
+  (*   (*     apply refines_refl; try typeclasses eauto. *) *)
+  (*   (*     (change (ITree.subst ?k ?m) with (ITree.bind m k)). *) *)
+  (*   (*     eapply padded_bind. *) *)
+  (*   (*     apply H0. *) *)
+  (*   (*     eauto. *) *)
+  (*   (*   } *) *)
 
-      apply refines_refl; try typeclasses eauto.
-      { pinversion PAD1; cbn in *; subst; eauto with solve_padded.
-        setoid_rewrite bind_tau.
-        pstep; red; cbn.
-        constructor.
-        intros.
-        left.
-        apply padded_bind.
-        apply H.
-        apply PADk1.
-      }
+  (*   (*   apply refines_refl; try typeclasses eauto. *) *)
+  (*   (*   { pinversion PAD1; cbn in *; subst; eauto with solve_padded. *) *)
+  (*   (*     setoid_rewrite bind_tau. *) *)
+  (*   (*     pstep; red; cbn. *) *)
+  (*   (*     constructor. *) *)
+  (*   (*     intros. *) *)
+  (*   (*     left. *) *)
+  (*   (*     apply padded_bind. *) *)
+  (*   (*     apply H. *) *)
+  (*   (*     apply PADk1. *) *)
+  (*   (*   } *) *)
 
-      pose proof (unfold_bind (k a) k2).
-      apply EqAxiom.bisimulation_is_eq in H.
-      rewrite H.
-      apply IHEQV; eauto with solve_padded.
-      pinversion PAD2; inj_existT; subst.
-      cbn.
-      apply padded_tau.
-      apply H1.
-    - (* ForallL *)
-      gclo.
-      eapply refine_trans_clo_intro with
-        (post1:=eq_post_rel) (post2:=eq_post_rel)
-        (t1':= match observe (k a) with
-               | RetF r => k1 r
-               | TauF t => Tau (ITree.bind t k1)
-               | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k1)
-               end);
-        try typeclasses eauto; auto_ctrans_eq; eauto; try reflexivity.
-      {
-        pstep; red; cbn.
-        eapply refinesF_forallL with (a:=a).
-        pinversion PAD1; inj_existT; subst.
-        cbn.
-        constructor.
-        left.
-        apply refines_refl; try typeclasses eauto.
-        (change (ITree.subst ?k ?m) with (ITree.bind m k)).
-        eapply padded_bind.
-        apply H0.
-        eauto.
-      }
+  (*   (*   pose proof (unfold_bind (k a) k2). *) *)
+  (*   (*   apply EqAxiom.bisimulation_is_eq in H. *) *)
+  (*   (*   rewrite H. *) *)
+  (*   (*   apply IHEQV; eauto with solve_padded. *) *)
+  (*   (*   pinversion PAD2; inj_existT; subst. *) *)
+  (*   (*   cbn. *) *)
+  (*   (*   apply padded_tau. *) *)
+  (*   (*   apply H1. *) *)
+  (*   (* - (* ForallL *) *) *)
+  (*   (*   gclo. *) *)
+  (*   (*   eapply refine_trans_clo_intro with *) *)
+  (*   (*     (post1:=eq_post_rel) (post2:=eq_post_rel) *) *)
+  (*   (*     (t1':= match observe (k a) with *) *)
+  (*   (*            | RetF r => k1 r *) *)
+  (*   (*            | TauF t => Tau (ITree.bind t k1) *) *)
+  (*   (*            | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) k1) *) *)
+  (*   (*            end); *) *)
+  (*   (*     try typeclasses eauto; auto_ctrans_eq; eauto; try reflexivity. *) *)
+  (*   (*   { *) *)
+  (*   (*     pstep; red; cbn. *) *)
+  (*   (*     eapply refinesF_forallL with (a:=a). *) *)
+  (*   (*     pinversion PAD1; inj_existT; subst. *) *)
+  (*   (*     cbn. *) *)
+  (*   (*     constructor. *) *)
+  (*   (*     left. *) *)
+  (*   (*     apply refines_refl; try typeclasses eauto. *) *)
+  (*   (*     (change (ITree.subst ?k ?m) with (ITree.bind m k)). *) *)
+  (*   (*     eapply padded_bind. *) *)
+  (*   (*     apply H0. *) *)
+  (*   (*     eauto. *) *)
+  (*   (*   } *) *)
 
-      apply refines_refl; try typeclasses eauto.
-      { pinversion PAD2; cbn in *; subst; eauto with solve_padded.
-        setoid_rewrite bind_tau.
-        pstep; red; cbn.
-        constructor.
-        intros.
-        left.
-        apply padded_bind.
-        apply H.
-        apply PADk2.
-      }
+  (*   (*   apply refines_refl; try typeclasses eauto. *) *)
+  (*   (*   { pinversion PAD2; cbn in *; subst; eauto with solve_padded. *) *)
+  (*   (*     setoid_rewrite bind_tau. *) *)
+  (*   (*     pstep; red; cbn. *) *)
+  (*   (*     constructor. *) *)
+  (*   (*     intros. *) *)
+  (*   (*     left. *) *)
+  (*   (*     apply padded_bind. *) *)
+  (*   (*     apply H. *) *)
+  (*   (*     apply PADk2. *) *)
+  (*   (*   } *) *)
 
-      apply IHEQV; cbn; eauto with solve_padded.
-      pinversion PAD1; inj_existT; subst.
-      cbn.
-      apply padded_tau.
-      apply H0.
-    - (* ExistsL *)
-      admit.
+  (*   (*   apply IHEQV; cbn; eauto with solve_padded. *) *)
+  (*   (*   pinversion PAD1; inj_existT; subst. *) *)
+  (*   (*   cbn. *) *)
+  (*   (*   apply padded_tau. *) *)
+  (*   (*   apply H0. *) *)
+  (*   (* - (* ExistsL *) *) *)
+  (*   (*   admit. *) *)
   Admitted.
 
 End refine_closure.
+
+Arguments refines_clo_bind : clear implicits.
+#[global] Hint Constructors refines_bind_clo : itree.

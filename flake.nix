@@ -5,9 +5,21 @@
     nixpkgs.url = "github:NixOS/nixpkgs/master";
     flake-utils.url = "github:numtide/flake-utils";
     nix-filter.url = "github:numtide/nix-filter";
+    coinduction-repo = {
+      url = "github:damien-pous/coinduction";
+      flake = false;
+    };
+    relation-algebra-repo = {
+      url = "github:damien-pous/relation-algebra";
+      flake = false;
+    };
+    ctrees = {
+      url = "github:Chobbes/ctrees/rocq9.0";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, nix-filter }:
+  outputs = { self, nixpkgs, flake-utils, nix-filter, coinduction-repo, relation-algebra-repo, ctrees }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
@@ -16,10 +28,50 @@
         rocqPkgs = pkgs.rocqPackages_9_0;
         coqPkgs = pkgs.coqPackages_9_0;
 
+        coinduction = rocqPkgs.callPackage
+          ( { rocq, stdenv }:
+            rocqPkgs.mkRocqDerivation {
+              owner = "damien-pous";
+              pname = "coinduction";
+              version = "coinduction:master";
+              src = coinduction-repo;
+
+              buildInputs =
+                with rocqPkgs;
+                with coqPkgs;
+                with rocq.ocamlPackages;
+                [ ocaml camlp5 rocq pkgs.coq dune_3 stdlib rocq-core findlib ];
+              propagatedBuildInputs =
+                with rocqPkgs;
+                with coqPkgs;
+                with rocq.ocamlPackages;
+                [ rocq ];
+            }) { inherit rocq; } ;
+
+        relation-algebra = rocqPkgs.callPackage
+          ( { rocq, stdenv }:
+            rocqPkgs.mkRocqDerivation {
+              owner = "damien-pous";
+              pname = "relation-algebra";
+              version = "relation-algebra:master";
+              src = relation-algebra-repo;
+
+              buildInputs =
+                with rocqPkgs;
+                with coqPkgs;
+                with rocq.ocamlPackages;
+                [ ocaml camlp5 rocq pkgs.coq dune_3 stdlib rocq-core findlib ];
+              propagatedBuildInputs =
+                with rocqPkgs;
+                with coqPkgs;
+                with rocq.ocamlPackages;
+                [ rocq ];
+            }) { inherit rocq; } ;
+
         version = "vellvm:master";
       in rec {
         packages = {
-          default = (pkgs.callPackage ./release.nix ({ nix-filter = nix-filter.lib; perl = pkgs.perl; coq = pkgs.coq; inherit rocq version rocqPkgs coqPkgs; })).vellvm;
+          default = (pkgs.callPackage ./release.nix ({ nix-filter = nix-filter.lib; perl = pkgs.perl; coq = pkgs.coq; ctrees = ctrees.packages.${system}.default; inherit rocq version rocqPkgs coqPkgs coinduction; })).vellvm;
         };
 
         defaultPackage = packages.default;

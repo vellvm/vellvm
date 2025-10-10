@@ -1211,8 +1211,8 @@ Proof.
       apply refinesF_Vis_existsR_Tau_inv in Ht23; auto.
       specialize (Hk2 b). specialize (H5 b).
       eapply IHHt23; eauto with solve_padded.
-      cbn. constructor.
-      left; auto.
+      cbn. constructor; auto.
+      cbn. constructor; auto.
     + inv H5. inj_existT. subst. pclearbot.
       apply refinesF_Vis_existsR in Ht10; auto.
       assert (Hk2 : forall b, existsRefinesF A RPre2 RPost2 RR2 b1 b2 id (upaco2 (refines_ RPre2 RPost2 RR2 b1 b2 id) bot2)

@@ -1559,119 +1559,119 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     (*   - eapply eqit_mon, H0; eauto; discriminate. *)
     (* Abort. *)
 
-    (* This may only hold for the padded version because of ITree.bind in the vis cases? *)
-    Lemma strict_refines_unpadded_interp_to_itree_spec :
-      forall {F R} h g (t : itree F R),
-        (* Handler refinement *)
-        (forall R (e1 : F R) (e2 : F R),
-            strict_refines_unpadded (h _ e1) (g _ (to_SpecEvent e2))) ->
-        @strict_refines_unpadded F R (interp h t) (interp g (to_itree_spec t)).
-    Proof.
-      intros F R h g t REF.
-      rewrite (itree_eta_ t).
-      genobs t ot; clear t Heqot.
-      revert ot.
-      setoid_rewrite unfold_interp.
-      cbn.
-      ginit.
-      {
-        gcofix CIH.
-        intros ot.
-        hinduction ot before r; intros.
-        - gstep; red; cbn.
-          constructor; auto.
-        - gstep; red; cbn.
-          constructor; auto with paco.
-          (* Need to be able to do this rewrite... *)
-          (* This relies on grefinegen_cong_eqit *)
-          (* Why can't I rewrite? *)
-          (* setoid_rewrite unfold_interp. *)
-          pose proof (unfold_interp (f:= h) t) as UNFOLD.
-          apply EqAxiom.bisimulation_is_eq in UNFOLD.
-          rewrite UNFOLD; clear UNFOLD.
+    (* (* This may only hold for the padded version because of ITree.bind in the vis cases? *) *)
+    (* Lemma strict_refines_unpadded_interp_to_itree_spec : *)
+    (*   forall {F R} h g (t : itree F R), *)
+    (*     (* Handler refinement *) *)
+    (*     (forall R (e1 : F R) (e2 : F R), *)
+    (*         strict_refines_unpadded (h _ e1) (g _ (to_SpecEvent e2))) -> *)
+    (*     @strict_refines_unpadded F R (interp h t) (interp g (to_itree_spec t)). *)
+    (* Proof. *)
+    (*   intros F R h g t REF. *)
+    (*   rewrite (itree_eta_ t). *)
+    (*   genobs t ot; clear t Heqot. *)
+    (*   revert ot. *)
+    (*   setoid_rewrite unfold_interp. *)
+    (*   cbn. *)
+    (*   ginit. *)
+    (*   { *)
+    (*     gcofix CIH. *)
+    (*     intros ot. *)
+    (*     hinduction ot before r; intros. *)
+    (*     - gstep; red; cbn. *)
+    (*       constructor; auto. *)
+    (*     - gstep; red; cbn. *)
+    (*       constructor; auto with paco. *)
+    (*       (* Need to be able to do this rewrite... *) *)
+    (*       (* This relies on grefinegen_cong_eqit *) *)
+    (*       (* Why can't I rewrite? *) *)
+    (*       (* setoid_rewrite unfold_interp. *) *)
+    (*       pose proof (unfold_interp (f:= h) t) as UNFOLD. *)
+    (*       apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
+    (*       rewrite UNFOLD; clear UNFOLD. *)
 
-          pose proof (unfold_interp (f:=g) (translate (@to_SpecEvent F) t)) as UNFOLD.
-          apply EqAxiom.bisimulation_is_eq in UNFOLD.
-          setoid_rewrite UNFOLD; clear UNFOLD.
+    (*       pose proof (unfold_interp (f:=g) (translate (@to_SpecEvent F) t)) as UNFOLD. *)
+    (*       apply EqAxiom.bisimulation_is_eq in UNFOLD. *)
+    (*       setoid_rewrite UNFOLD; clear UNFOLD. *)
 
-          gbase.
-          apply CIH.
-        - cbn.
-          gclo.
-          econstructor.
+    (*       gbase. *)
+    (*       apply CIH. *)
+    (*     - cbn. *)
+    (*       gclo. *)
+    (*       econstructor. *)
 
           
-          gfinal.
-          right.
-          eapply paco2_mon_bot.
-          eapply refines_bind.
-          apply REF.
-          intros ? ? ?; subst.
-          Print Assumptions refines_bind.
+    (*       gfinal. *)
+    (*       right. *)
+    (*       eapply paco2_mon_bot. *)
+    (*       eapply refines_bind. *)
+    (*       apply REF. *)
+    (*       intros ? ? ?; subst. *)
+    (*       Print Assumptions refines_bind. *)
 
-          econstructor.
-          + eapply refines_bind.
+    (*       econstructor. *)
+    (*       + eapply refines_bind. *)
 
-          gfinal.
-          right.
+    (*       gfinal. *)
+    (*       right. *)
           
-          eapply paco2_mon_bot.
-          eapply refines_bind.
-          apply REF.
-          intros r1 r2 H; subst.
-          pstep; red; constructor.
-          left.
+    (*       eapply paco2_mon_bot. *)
+    (*       eapply refines_bind. *)
+    (*       apply REF. *)
+    (*       intros r1 r2 H; subst. *)
+    (*       pstep; red; constructor. *)
+    (*       left. *)
 
-          gclo.
-          econstructor.
+    (*       gclo. *)
+    (*       econstructor. *)
 
-          (* x > y *)
+    (*       (* x > y *) *)
 
-          (* x' > y' ===> x > y *)
+    (*       (* x' > y' ===> x > y *) *)
 
-          (* x' *)
+    (*       (* x' *) *)
           
-          (* trying to show that t1 >= t2 *)
+    (*       (* trying to show that t1 >= t2 *) *)
 
-      (*        We want to do that by showing t1' >= t2' *)
+    (*   (*        We want to do that by showing t1' >= t2' *) *)
 
-      (*        t1' has to be smaller than t1 *)
-      (*        and t2' >= t2 *)
+    (*   (*        t1' has to be smaller than t1 *) *)
+    (*   (*        and t2' >= t2 *) *)
 
-      (*      *)
+    (*   (*      *) *)
           
-          cbn.
-          eapply refines_bind.
+    (*       cbn. *)
+    (*       eapply refines_bind. *)
           
-          guclo refines_clo_trans.
-          cbn.
-          econstructor.
-          setoid_rewrite REF.
-          apply REF.
-          cbn.
-          guclo.
-          constructor.
+    (*       guclo refines_clo_trans. *)
+    (*       cbn. *)
+    (*       econstructor. *)
+    (*       setoid_rewrite REF. *)
+    (*       apply REF. *)
+    (*       cbn. *)
+    (*       guclo. *)
+    (*       constructor. *)
 
-        - gfinal.
-          right.
-          cbn.
-          eapply paco2_mon_bot.
-          eapply refines_bind.
-          apply REF.
+    (*     - gfinal. *)
+    (*       right. *)
+    (*       cbn. *)
+    (*       eapply paco2_mon_bot. *)
+    (*       eapply refines_bind. *)
+    (*       apply REF. *)
 
-          intros r1 r2 H; subst.
-          pstep; red; cbn.
-          constructor; left.
+    (*       intros r1 r2 H; subst. *)
+    (*       pstep; red; cbn. *)
+    (*       constructor; left. *)
           
-          pstep; red.
+    (*       pstep; red. *)
 
-          admit.
+    (*       admit. *)
 
-          intros x0 x1 x2 PR.
-          apply PR.
-      }
-      admit.
-    Abort.
+    (*       intros x0 x1 x2 PR. *)
+    (*       apply PR. *)
+    (*   } *)
+    (*   admit. *)
+    (* Abort. *)
 
     (* Lemma strict_refines_unpadded_to_itree_spec : *)
     (*   forall {F R} h g (t : itree F R), *)
@@ -1706,6 +1706,99 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
         
     (* Qed. *)
+
+    Lemma strict_refines_interp_to_itree_spec :
+      forall {F R} h g (t : itree F R),
+        (* Handler refinement *)
+        (forall R (e1 : F R) (e2 : F R),
+            strict_refines (h _ e1) (g _ (to_SpecEvent e2))) ->
+        @strict_refines F R (interp h t) (interp g (to_itree_spec t)).
+    Proof.
+      intros F R h g t REF.
+      rewrite (itree_eta_ t).
+      genobs t ot; clear t Heqot.
+      revert ot.
+      setoid_rewrite unfold_interp.
+      ginit.
+      gcofix CIH.
+      intros ot.
+      hinduction ot before r; intros; cbn.
+      - gstep; red; cbn.
+        constructor; auto.
+      - gstep; red; cbn.
+        constructor; auto with paco.
+        pose proof (unfold_interp (f:= h) t) as UNFOLD.
+        apply EqAxiom.bisimulation_is_eq in UNFOLD.
+        setoid_rewrite UNFOLD; clear UNFOLD.
+
+        pose proof (unfold_interp (f:=g) (translate (@to_SpecEvent F) t)) as UNFOLD.
+        apply EqAxiom.bisimulation_is_eq in UNFOLD.
+        setoid_rewrite UNFOLD; clear UNFOLD.
+        gbase.
+        apply CIH.
+      - cbn.
+        pose proof (Padded.pad_bind (h X e) (fun x : X => Tau (interp h (k x)))) as BIND.
+        apply EqAxiom.bisimulation_is_eq in BIND.
+        setoid_rewrite BIND; clear BIND.
+
+        pose proof (Padded.pad_bind (g X (to_SpecEvent e)) (fun x : X => Tau (interp g (translate (@to_SpecEvent F) (k x))))) as BIND.
+        apply EqAxiom.bisimulation_is_eq in BIND.
+        setoid_rewrite BIND; clear BIND.
+
+        repeat red.
+        gclo.
+        guclo (refines_clo_bind F R R eq eq_prerel PostRelEq).
+                 (E:=F)
+                 (R1:=(MemState * (store_id * R)))
+                 (R2:=(MemState * (store_id * R)))).
+        guclo refines_clo_bind.
+        eapply gpaco2_clo.
+        eapply refines_clo_trans.
+        guclo refines_clo_bind.
+        eapply guclo_.
+        eapply (@refines_clo_bind E R R eq eq_prerel PostRelEq).
+        eapply refine_trans_clo_intro
+          with (post1:=PostRelEq) (post2:=PostRelEq) (RR1:=eq) (RR2:=eq).
+        econstructor.
+
+        {
+          eapply refines'_bind with (RPost:=eq_post_rel) (RR:=eq).
+          - apply refines_refl; try typeclasses eauto.
+            eauto with solve_padded.
+          - intros r1 r2 H; subst.
+            apply refines_refl; try typeclasses eauto.
+            eauto with solve_padded.
+        }
+
+        {
+          eapply refines'_bind with (RPost:=eq_post_rel) (RR:=eq).
+          - apply refines_refl; try typeclasses eauto.
+            eauto with solve_padded.
+          - intros r1 r2 H; subst.
+            apply refines_refl; try typeclasses eauto.
+            eauto with solve_padded.
+        }
+
+        
+        3: {
+          gfinal.
+          right.
+          apply REF.
+        }
+
+        eapply paco2_mon.        
+        eapply refines_bind.
+        apply REF.
+
+        intros r1 r2 H; subst.
+        Import Padded.
+        rewrite !pad_tau.
+        pstep; red; cbn.
+        constructor.
+        left.
+        admit.
+        intros ? ? [].
+    Qed.
 
     Lemma strict_refines_interp_to_itree_spec :
       forall {F R} h g (t : itree F R),

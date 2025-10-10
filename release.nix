@@ -6,6 +6,8 @@
   rocqPkgs,
   coqPkgs,
   perl,
+  ctrees,
+  coinduction,
   ... }:
 
 { vellvm =
@@ -21,6 +23,8 @@
           coq # Needed to make QuickChick happy for now...
           dune_3
           perl
+          ctrees
+          coinduction
         ] ++
         # These ocaml packages have to come from rocq.ocamlPackages to
         # avoid disagreements between ocaml compiler versions.

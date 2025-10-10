@@ -90,6 +90,7 @@ Qed.
 #[global] Hint Resolve padded_monotone_ : paco.
 #[global] Hint Resolve padded_monotone_ : itree_spec.
 #[global] Hint Resolve pad_is_padded : itree_spec.
+#[global] Hint Resolve pad_is_padded : solve_padded.
 
 Theorem pad_eutt {E : Type -> Type} {R : Type} : forall t : itree E R, t ≈ pad t.
 Proof with eauto with itree_spec.
