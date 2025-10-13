@@ -8,6 +8,7 @@
   perl,
   ctrees,
   coinduction,
+  relation-algebra,
   ... }:
 
 { vellvm =
@@ -25,6 +26,7 @@
           perl
           ctrees
           coinduction
+          relation-algebra
         ] ++
         # These ocaml packages have to come from rocq.ocamlPackages to
         # avoid disagreements between ocaml compiler versions.

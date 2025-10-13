@@ -71,7 +71,7 @@
         version = "vellvm:master";
       in rec {
         packages = {
-          default = (pkgs.callPackage ./release.nix ({ nix-filter = nix-filter.lib; perl = pkgs.perl; coq = pkgs.coq; ctrees = ctrees.packages.${system}.default; inherit rocq version rocqPkgs coqPkgs coinduction; })).vellvm;
+          default = (pkgs.callPackage ./release.nix ({ nix-filter = nix-filter.lib; perl = pkgs.perl; coq = pkgs.coq; ctrees = ctrees.packages.${system}.default; inherit rocq version rocqPkgs coqPkgs coinduction relation-algebra; })).vellvm;
         };
 
         defaultPackage = packages.default;
