@@ -1,6 +1,18 @@
 From Paco Require Import paco.
 
-From CTree Require Import CTree CTreeDefinitions.
+From CTree Require Import
+  CTree CTreeDefinitions Eq Fold.
+
+From Stdlib Require Import
+  FSets.FMapAVL
+  FMapFacts
+  ZArith.
+
+Module IM := FMapAVL.Make(Stdlib.Structures.OrderedTypeEx.Z_as_OT).
+
+(* (* For some reason this causes universe inconsistencies *) *)
+(* From Vellvm Require Import *)
+(*   Utils.IntMaps. *)
 
 (* From ITree Require Import *)
 (*   ITree *)
@@ -19,18 +31,16 @@ From ExtLib Require Import
   Structures.Functor
   Structures.Monads.
 
-From Vellvm Require Import
-  Utils.IntMaps
-  Semantics.RuttProps.
 
 From Stdlib Require Import ZArith String.
 
-From Vellvm Require Import LLVMEvents.
+(* Universe issues... *)
+(* From Vellvm Require Import LLVMEvents. *)
 
 Import CTreeNotations.
 
 (* Memory that's just an IntMap of possibly allocated nat "bytes" *)
-Definition memory := IntMap nat.
+Definition memory := IM.t nat.
 
 Variant MemE : Type -> Type :=
   | LoadE (key : Z) : MemE nat
@@ -39,50 +49,75 @@ Variant MemE : Type -> Type :=
 
 Variant voidE (X : Type) :=.
 
+(* Failure. Carries a string for a message. *)
+Variant FailureE : Type -> Type :=
+  | Throw : unit -> FailureE void.
+
+(* This function can be replaced with print_string during extraction
+     to print the error messages of Throw and (indirectly) ThrowUB. *)
+Definition print_msg (msg : string) : unit := tt.
+
 Definition raise {E B} {A} `{FailureE -< E} (msg : string) : ctree E B A :=
-  v <- trigger (Throw (print_msg msg));;
-  match v: void with end.
+  v <- trigger (Throw (print_msg msg));; match v: void with end.
+
+Fixpoint IM_raw_greatest_key {A} (m : IM.Raw.tree A) : option Z
+  := match m with
+     | IM.Raw.Leaf _ => None
+     | IM.Raw.Node l k _ (@IM.Raw.Leaf _) _ =>
+         ret k
+     | IM.Raw.Node l k _ r _ =>
+         IM_raw_greatest_key r
+     end.
+
+Definition IM_greatest_key {A} (m : IM.t A) : option Z
+  := IM_raw_greatest_key (IM.this m).
+
+Definition next_key {A} (m : IM.t A) : Z
+  := match IM_greatest_key m with
+     | Some k => 1 + k
+     | None => 0
+     end.
 
 Definition handle_mem {E} `{FailureE -< E} : MemE ~> Monads.stateT memory (ctree E voidE) :=
   fun _ e mem =>
     match e with
     | LoadE k =>
-        match lookup k mem with
+        match IM.find k mem with
         | Some v => ret (mem, v)
         | None => raise "Load from unallocated address."
         end
     | StoreE k v =>
-        match lookup k mem with
+        match IM.find k mem with
         | Some _ =>
-            let mem' := add k v mem in
+            let mem' := IM.add k v mem in
             ret (mem', tt)
         | None => raise "Store to unallocated address."
         end
     | AllocE =>
         let k := next_key mem in
-        ret (add k 0 mem, k)
+        ret (IM.add k 0 mem, k)
     end.
 
 Variant AllocC : Type -> Type :=
-  | allocC (m : memory) : AllocC ({k | member k m = false}).
+  | allocC (m : memory) : AllocC ({k | IM.mem k m = false}).
 
 Definition do_alloc {E} `{FailureE -< E} (mem : memory) : ctree E AllocC (memory * Z) :=
   res <- branch (allocC mem);;
   let k := proj1_sig res in
-  ret (add k 0 mem, k).
+  ret (IM.add k 0 mem, k).
 
 Definition handle_mem_spec {E} `{FailureE -< E} : MemE ~> Monads.stateT memory (ctree E AllocC) :=
   fun _ e mem =>
     match e with
     | LoadE k =>
-        match lookup k mem with
+        match IM.find k mem with
         | Some v => ret (mem, v)
         | None => raise "Load from unallocated address."
         end
     | StoreE k v =>
-        match lookup k mem with
+        match IM.find k mem with
         | Some _ =>
-            let mem' := add k v mem in
+            let mem' := IM.add k v mem in
             ret (mem', tt)
         | None => raise "Store to unallocated address."
         end
@@ -90,8 +125,11 @@ Definition handle_mem_spec {E} `{FailureE -< E} : MemE ~> Monads.stateT memory (
     end.
 
 Notation Effin := (MemE +' FailureE).
+Notation Bspec := AllocC.
+Notation Bexec := voidE.
 Notation Effout := FailureE.
 
+(* 
 Definition in_rel : prerel Effin Effin.
   intros A B e1 e2.
   destruct e1, e2.
@@ -134,6 +172,75 @@ Definition in_post_rel : postrel Effin Effin.
   - apply False.
   - apply True.
 Defined.
+
+ *)
+
+Require Import Vellvm.Utils.Tactics.
+
+Lemma handle_mem_correct {T} (e : MemE T) (m : memory) (mon : rel (ctree Effin Bexec (memory * T)) (ctree Effin Bspec (memory * T))):
+  @ss
+    Effin Effin
+    _ _ (* Branch types *)
+    _ _
+    eq
+    (* rel (ctree Effin Bspec (memory * T)) (ctree Effin Bexec (memory * T)) *)
+    mon (* Mon *)
+    (handle_mem T e m)
+    (handle_mem_spec T e m).
+Proof.
+  do 2 red.
+  intros l t' TRANSITION.
+  exists l.
+  cbn in *.
+  destruct e.
+  - (* Loads *)
+    cbn in *.
+    break_match_hyp.
+    + apply trans_ret_inv in TRANSITION.
+      destruct TRANSITION; subst.
+      exists Stuck.
+      split; [|split]; eauto.
+      apply trans_ret.
+      admit. (* mon *)
+    + (* Need a lemma about trans / raise *)
+      eapply trans_trigger_inv in TRANSITION.
+      destruct TRANSITION as [[] _].
+  - (* Stores *)
+    cbn in *.
+    break_match_hyp.
+    + apply trans_ret_inv in TRANSITION.
+      destruct TRANSITION; subst.
+      exists Stuck.
+      split; [|split]; eauto.
+      apply trans_ret.
+      admit. (* mon *)
+    + (* Need a lemma about trans / raise *)
+      eapply trans_trigger_inv in TRANSITION.
+      destruct TRANSITION as [[] _].
+  - (* Allocas *)
+    cbn in *.
+    apply trans_ret_inv in TRANSITION.
+    destruct TRANSITION; subst.
+    exists Stuck.
+    split; [|split]; eauto.
+    unfold do_alloc.
+    eapply trans_branch.
+    apply trans_ret.
+    cbn.
+    apply trans_bind.
+
+    
+    break_match_hyp.
+    + apply trans_ret_inv in TRANSITION.
+      destruct TRANSITION; subst.
+      exists Stuck.
+      split; [|split]; eauto.
+      apply trans_ret.
+      admit. (* mon *)
+    + (* Need a lemma about trans / raise *)
+      eapply trans_trigger_inv in TRANSITION.
+      destruct TRANSITION as [[] _].
+Qed.
 
 Lemma spec_refines_raise T s :
   @strict_refines_unpadded
