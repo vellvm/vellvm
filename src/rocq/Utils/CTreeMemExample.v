@@ -177,193 +177,156 @@ Defined.
 
 Require Import Vellvm.Utils.Tactics.
 
-Lemma handle_mem_correct {T} (e : MemE T) (m : memory) (mon : rel (ctree Effin Bexec (memory * T)) (ctree Effin Bspec (memory * T))):
-  @ss
-    Effin Effin
-    _ _ (* Branch types *)
-    _ _
-    eq
-    (* rel (ctree Effin Bspec (memory * T)) (ctree Effin Bexec (memory * T)) *)
-    mon (* Mon *)
-    (handle_mem T e m)
-    (handle_mem_spec T e m).
+Import SSimNotations.
+
+Lemma spec_refines_raise E `{Effout -< E} F `{Effout -< F} C D X Y L s :
+  @ssim
+    E F C D X Y L
+    (@raise E C _ _ s)
+    (@raise F D _ _ s).
 Proof.
-  do 2 red.
-  intros l t' TRANSITION.
-  exists l.
+  unfold raise.
+  eapply ssim_clo_bind.
+  2: intros [].
+  apply ssim_vis.
+  intros [].
+  Unshelve.
+  apply eq.
+Qed.
+
+Lemma ssim_raise_ret E `{Effout -< E} F `{Effout -< F} C D X Y L s y :
+  ~ @ssim
+    E F C D X Y L
+    (@raise E C _ _ s)
+    (ret y).
+Proof.
+  intros CONTRA.
+  unfold raise in *.
+  unfold CTree.trigger in *.
+  (* Need vis / ret inv *)
+  step in CONTRA.
+  eapply ss_vis_l_inv in CONTRA.
+  destruct ss.
   cbn in *.
+  inversion CONTRA.
+  
+  
+  apply ssim_vis_l_inv in CONTRA.
+  destruct CONTRA as (?&?&?&?&?).
+  rewrite bind_ret_l in H2.
+  break_match_hyp.
+  Unshelve.
+  eapply ssim_clo_bind.
+  2: intros [].
+  apply ssim_vis.
+  intros [].
+  Unshelve.
+  apply eq.
+Qed.
+
+Lemma handle_mem_correct {T} (e : MemE T) (m : memory):
+  @ssim Effin Effin _ _ _ _ eq (handle_mem T e m) (handle_mem_spec T e m).
+Proof.
   destruct e.
-  - (* Loads *)
-    cbn in *.
-    break_match_hyp.
-    + apply trans_ret_inv in TRANSITION.
-      destruct TRANSITION; subst.
-      exists Stuck.
-      split; [|split]; eauto.
-      apply trans_ret.
-      admit. (* mon *)
-    + (* Need a lemma about trans / raise *)
-      eapply trans_trigger_inv in TRANSITION.
-      destruct TRANSITION as [[] _].
-  - (* Stores *)
-    cbn in *.
-    break_match_hyp.
-    + apply trans_ret_inv in TRANSITION.
-      destruct TRANSITION; subst.
-      exists Stuck.
-      split; [|split]; eauto.
-      apply trans_ret.
-      admit. (* mon *)
-    + (* Need a lemma about trans / raise *)
-      eapply trans_trigger_inv in TRANSITION.
-      destruct TRANSITION as [[] _].
-  - (* Allocas *)
-    cbn in *.
-    apply trans_ret_inv in TRANSITION.
-    destruct TRANSITION; subst.
-    exists Stuck.
-    split; [|split]; eauto.
+  - cbn.
+    break_match_goal.
+    + apply ssim_ret; auto.
+    + apply spec_refines_raise.
+  - cbn.
+    break_match_goal.
+    + apply ssim_ret; auto.
+    + apply spec_refines_raise.
+  - cbn.
     unfold do_alloc.
-    eapply trans_branch.
-    apply trans_ret.
-    cbn.
-    apply trans_bind.
-
-    
-    break_match_hyp.
-    + apply trans_ret_inv in TRANSITION.
-      destruct TRANSITION; subst.
-      exists Stuck.
-      split; [|split]; eauto.
-      apply trans_ret.
-      admit. (* mon *)
-    + (* Need a lemma about trans / raise *)
-      eapply trans_trigger_inv in TRANSITION.
-      destruct TRANSITION as [[] _].
-Qed.
-
-Lemma spec_refines_raise T s :
-  @strict_refines_unpadded
-    Effin (memory * T)
-    (raise s)
-    (raise s).
-Proof.
-  apply refines_bind with (RR:=eq); cbn.
-  - apply refines_vis; cbn; auto.
-    constructor.
-    intros [] [].
-  - intros [].  
-Qed.
-
-Lemma handle_mem_correct {T} (e : MemE T) (m : memory) :
-  @strict_refines_unpadded
-    Effin (memory * T)
-    (handle_mem_spec T e m)
-    (handle_mem T e m).
-Proof.
-  revert e m.
-  intros e m.
-  destruct e.
-  - (* Load *)
-    cbn.
-    destruct (lookup key m).
-    + pstep; constructor; auto.
-    + apply spec_refines_raise.
-  - cbn.
-    destruct (lookup key m).
-    + pstep; constructor; auto.
-    + apply spec_refines_raise.
-  - cbn.
-    pstep.
-    red; cbn.
-    eapply refinesF_forallL.
+    rewrite bind_branch.
+    eapply ssim_br_r.
     Unshelve.
     2: {
       exists (next_key m).
-      destruct (member (next_key m) m) eqn:MEM; auto.
-      apply IM.mem_2 in MEM.
-      apply next_key_correct in MEM.
-      lia.
+      admit.
     }
     cbn.
-    constructor.
+    apply ssim_ret.
     reflexivity.
-Qed.
+Admitted.
 
 Lemma alloca_empty :
   forall k,
-    @strict_refines_unpadded
-      Effin (memory * Z)
-      (handle_mem_spec Z (AllocE) empty)
-      (ret (add k 0 empty, k)).
+  @ssim Effin Effin voidE _ _ _ eq (ret (IM.add k 0 (IM.empty _), k))
+      (handle_mem_spec Z (AllocE) (IM.empty _)).
 Proof.
   intros k.
   cbn.
-  pstep. red; cbn.
-  apply refinesF_forallL with (a:=exist (fun k => false = false) k eq_refl).
-  cbn.
-  constructor; auto.
-Qed.
+  unfold do_alloc.
+  rewrite bind_branch.
+  eapply ssim_br_r.
+  Unshelve.
+  2: {
+    exists k.
+    admit.
+  }
 
-Import MonadNotation.
-Open Scope monad.
-Import State.
-Import Morphisms.
+  cbn.
+  apply ssim_ret.
+  reflexivity.
+Admitted.
 
 Lemma load_succeeds_spec :
   forall m k v,
-    lookup k m = Some v <->
-    @refines
-      Effin Effin (memory * _) (memory * _)
-      in_rel
-      in_post_rel
-      (fun r1 r2 =>
-         r1 = r2 /\
-           fst r2 = m /\
-           snd r2 = v
-      )
-      (handle_mem_spec _ (LoadE k) m)
-      (ret (m, v)).
+    IM.find k m = Some v <->
+      @ssim Effin Effin voidE _ _ _ eq (ret (m, v))
+        (handle_mem_spec nat (LoadE k) m).
 Proof.
   intros m k v.
   split.
   { intros LUP.
     cbn; rewrite LUP.
-    pstep; red; cbn; constructor.
-    cbn; auto.
+    apply ssim_ret.
+    auto.
   }
   { intros REF.
     cbn in REF.
-    destruct (lookup k m) eqn:LUP;
-      punfold REF; inversion REF; subst.
-    destruct H1 as (?&?&?).
-    cbn in *; subst; auto.
-    inversion H; subst; auto.
+    destruct (IM.find k m) eqn:LUP.
+    - apply ssim_ret_inv in REF.
+      apply val_eq_inv in REF; inv REF; auto.
+    - apply ssim_ret_l_inv in REF.
+      destruct REF as (?&?&?&?); subst.
+      unfold raise in H.
+      apply trans_trigger_inv in H.
+      destruct H as [[] _].
   }
 Qed.
 
 Lemma load_fails_spec :
-  forall m k,
-    lookup k m = None <->
-    @refines
-      Effin Effin (memory * _) (memory * _)
-      in_rel
-      in_post_rel
-      eq
-      (handle_mem_spec _ (LoadE k) m)
-      (raise "Load from unallocated address.").
+  forall T m k,
+    IM.find k m = None <->
+      @ssim Effin Effin voidE _ T _ eq
+        (raise "Load from unallocated address.")
+        (handle_mem_spec _ (LoadE k) m).
 Proof.
-  intros m k.
+  intros T m k.
   split.
   { intros LUP.
     cbn; rewrite LUP.
-    pstep; red; cbn; constructor.
-    cbn; auto.
-    intros [].
+    apply spec_refines_raise.
   }
   { intros REF.
     cbn in REF.
-    destruct (lookup k m) eqn:LUP;
+    destruct (IM.find k m) eqn:LUP; auto.
+
+    unfold raise in *.
+    eapply SSim.ssim_vis_inv in REF.
+    2: {
+      reflexivity.
+    }
+    eapply trans_trigger_inv in REF.
+    
+    - admit.
+    - apply ssim_ret_r_inv in REF.
+      destruct REF as (?&?&?&?); subst.
+      unfold raise in H.
+      apply trans_trigger_inv in H.
+      destruct H as [[] _]. 
       punfold REF; inversion REF; subst.
   }
 Qed.
