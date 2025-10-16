@@ -588,84 +588,71 @@ Proof.
 Qed.
 
 Lemma store_fails_spec :
-  forall m k v,
-    member k m = false
+  forall T m k v,
+    IM.find k m = None
     <->
-      @refines
-        Effin Effin (memory * _) (memory * _)
-        in_rel
-        in_post_rel
-        eq
-        (handle_mem_spec _ (StoreE k v) m)
-        (raise "Store to unallocated address.").
+      @ssim Effin Effin voidE _ T _ eq
+        (raise "Store to unallocated address.")
+        (handle_mem_spec _ (StoreE k v) m).
 Proof.
-  intros m k v.
+  intros T m k v.
   split.
-  { intros MEM; subst.
-    cbn.
-    destruct (lookup k m) eqn:LUP.
-    apply lookup_member in LUP.
-    rewrite LUP in MEM.
-    discriminate.
-
-    pstep; red; cbn; constructor.
-    cbn; auto.
-    intros [].
+  { intros LUP.
+    cbn; rewrite LUP.
+    apply spec_refines_raise.
   }
   { intros REF.
     cbn in REF.
-    destruct (lookup k m) eqn:LUP;
-      punfold REF; inversion REF; subst.
-    inj_existT; subst.
-    cbn in *.
-    destruct (member k m) eqn:MEM; auto.
-    apply member_lookup in MEM as (?&?).
-    rewrite LUP in H; discriminate.
+    destruct (IM.find k m) eqn:LUP; auto.
+    apply ssim_raise_ret in REF.
+    contradiction.
   }
 Qed.
 
 Lemma alloc_spec :
   forall (m m' : memory) k,
-    member k m = false /\
-      m' = add k 0 m
+    IM.mem k m = false /\
+      m' = IM.add k 0 m
     <->
-    @refines
-      Effin Effin (memory * Z) (memory * Z)
-      in_rel
-      in_post_rel
-      (fun r1 r2 =>
+      @ssim Effin Effin voidE _ _ _ eq
+        (ret (m', k))
+        (handle_mem_spec Z (AllocE) m).
+(* (fun r1 r2 =>
         r1 = r2 /\
           let m2 := fst r2 in
           let k2 := snd r2 in
           k2 = k /\
-            m2 = add k 0 m)
-      (handle_mem_spec Z (AllocE) m)
-      (ret (m', k)).
+            m2 = add k 0 m) *)
 Proof.
   intros m m' k.
   split.
   { intros [NMEM ADD].
-    cbn.
-    pstep; red; cbn.
-    apply refinesF_forallL
-      with (a:=exist (fun k => member k m = false) k NMEM).
-    constructor; cbn; subst; auto.
+    cbn; unfold do_alloc.
+    rewrite bind_branch.
+    eapply ssim_br_r.
+    Unshelve.
+    2: {
+      exists k.
+      destruct (IM.mem (elt:=nat) k (IM.empty nat)) eqn:MEM; auto.
+    }
+
+    cbn; subst.
+    apply ssim_ret.
+    reflexivity.
   }
   { intros REF.
     cbn in *.
-    (* Should this be a lemma? *)
-    punfold REF.
-    red in REF; cbn in REF.
-    apply refinesF_Vis_forallL in REF.
-    inversion REF; subst.
-    destruct a; auto.
-    cbn in *.
-    inversion H; subst.
-    inversion H2; subst; auto.
-    destruct H1; cbn in *; subst.
-    split; auto.
-    inversion H0; subst; auto.
-    auto.
+    unfold do_alloc in *.
+    apply ssim_ret_l_inv in REF.
+    destruct REF as (?&?&?&?); subst.
+    rewrite bind_branch in H.
+    apply trans_br_inv in H.
+    destruct H as (?&?).
+    apply trans_ret_inv in H.
+    destruct H.
+    apply val_eq_inv in H0. inv H0.
+    destruct x; subst; cbn in *.
+    eauto.
   }
 Qed.
 
