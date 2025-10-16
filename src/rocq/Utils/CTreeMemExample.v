@@ -659,42 +659,41 @@ Qed.
 Lemma alloc_spec_exists :
   forall (m : memory),
   exists m' k,
-    member k m = false /\
-      m' = add k 0 m /\
-    @refines
-      Effin Effin (memory * Z) (memory * Z)
-      in_rel
-      in_post_rel
-      (fun r1 r2 =>
+    IM.mem k m = false /\
+      m' = IM.add k 0 m /\
+      @ssim Effin Effin voidE _ _ _ eq
+        (ret (m', k))
+        (handle_mem_spec Z (AllocE) m).
+(* (fun r1 r2 =>
          r1 = r2 /\
            fst r2 = m' /\
-           snd r2 = k)
-      (handle_mem_spec Z (AllocE) m)
-      (ret (m', k)).
+           snd r2 = k) *)
 Proof.
   intros m.
-  destruct (member (next_key m) m) eqn:MEM; auto.
+  destruct (IM.mem (next_key m) m) eqn:MEM; auto.
   apply IM.mem_2 in MEM.
   apply next_key_correct in MEM.
   lia.
 
-  exists (add (next_key m) 0 m), (next_key m).
+  exists (IM.add (next_key m) 0 m), (next_key m).
   split; auto.
   split; auto.
 
   cbn.
-  pstep; red; cbn.
-
-  eapply refinesF_forallL.
+  unfold do_alloc.
+  rewrite bind_branch.
+  
+  cbn.
+  eapply ssim_br_r.
   Unshelve.
   2: {
-    exists (next_key m).
-    auto.
+    exists (next_key m); auto.
   }
 
-  constructor; cbn; auto.
+  cbn.
+  apply ssim_ret.
+  reflexivity.
 Qed.
-
 
 Lemma handle_mem_spec_alloc_bind :
   forall RR m (k : memory * Z -> itree_spec Effin (memory * Z)) t,
