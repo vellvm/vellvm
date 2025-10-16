@@ -165,16 +165,19 @@ If this is the first time you are using opam you need to initialize it:
 
 Then:
 
-1. Add the Rocq package repository:
-    `opam repo add rocq-released https://rocq-prover.org/opam/released`.
+1. Create a vellvm development *opam switch* with:
+   `opam switch create vellvm ocaml-base-compiler.4.14.1`.
 
-2. Create an opam vellvm development *switch* with:
-    `opam switch create vellvm ocaml-base-compiler.4.14.1`.
+2. Make sure the switch is activated (see the instructions in the output of the previous command), e.g.:
+   `eval $(opam env --switch=vellvm)` (omit the dollar sign if using fish shell)
 
-3. Install Rocq:
-   `opam pin add rocq 9.0.0`
+3. Add the Rocq package repository:
+   `opam repo add rocq-released https://rocq-prover.org/opam/released`.
 
-4. Install opam dependencies (run in the root directory of the project):
+4. Install Rocq:
+   `opam pin add rocq-core 9.0.0`
+
+5. Install opam dependencies (run in the root directory of the project):
    `opam install -y --verbose --deps-only .`
 
 Note: the dependency constraints in the opam file should be sufficient

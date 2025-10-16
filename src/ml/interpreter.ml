@@ -171,4 +171,6 @@ let interpret
            LLVMAst.toplevel_entity
            list )
     : (DV.dvalue, exit_condition) result =
+  Out_channel.set_buffered stdout false;
+  Out_channel.set_buffered stderr false;
   step (TopLevel.TopLevelBigIntptr.interpreter (List.map Camlcoq.coqstring_of_camlstring args) prog)
