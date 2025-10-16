@@ -3,10 +3,13 @@ From Paco Require Import paco.
 From CTree Require Import
   CTree CTreeDefinitions Eq Fold.
 
+From Vellvm.Utils Require Import Tactics.
+
 From Stdlib Require Import
   FSets.FMapAVL
   FMapFacts
-  ZArith.
+  ZArith
+  Lia.
 
 Module IM := FMapAVL.Make(Stdlib.Structures.OrderedTypeEx.Z_as_OT).
 
@@ -77,6 +80,217 @@ Definition next_key {A} (m : IM.t A) : Z
      | Some k => 1 + k
      | None => 0
      end.
+
+  Lemma IM_greatest_key_none' :
+    forall {A} (m : IM.t A), IM.Empty m -> IM_greatest_key m = None.
+  Proof.
+    intros A m H.
+    induction m; cbn in *.
+    induction this; cbn in *; auto.
+    - exfalso; eapply H.
+      cbn.
+      constructor; reflexivity.
+  Qed.
+
+  Lemma IM_greatest_key_none'' :
+    forall {A} (m : IM.t A), IM_greatest_key m = None -> IM.Empty m.
+  Proof.
+    intros A m H.
+    induction m; cbn in *.
+    induction this; cbn in *; auto.
+    - intros k e CONTRA.
+      inv CONTRA.
+    - exfalso.
+      destruct (IM_raw_greatest_key this2) eqn:THIS2.
+      + break_match_hyp_inv.
+      + break_match_hyp_inv.
+        inv is_bst.
+        specialize (IHthis2 H5 eq_refl).
+        eapply IHthis2.
+        constructor; reflexivity.
+  Qed.
+
+  Lemma IM_greatest_key_none :
+    forall {A} (m : IM.t A), IM_greatest_key m = None <-> IM.Empty m.
+  Proof.
+    intros A m.
+    split; intros H.
+    + apply IM_greatest_key_none''; auto.
+    + apply IM_greatest_key_none'; auto.
+  Qed.
+
+  Lemma IM_greatest_key_In :
+    forall {A} (m : IM.t A) gk,
+      IM_greatest_key m = Some gk -> IM.In gk m.
+  Proof.
+    intros A m.
+    intros gk H.
+    apply IM.mem_2.
+    revert gk H.
+    destruct m; cbn in *.
+    induction this; intros gk GK.
+    - cbn in *. inv GK.
+    - rename k into current_key.
+      cbn.
+      (* gk is the greatest key. It should be larger than current_key *)
+      cbn in GK.
+      pose proof is_bst as is_bst2.
+      inv is_bst.
+      destruct (IM_raw_greatest_key this2) eqn:THIS2;
+        destruct this2; inv GK.
+      + (* At a leaf eq *)
+        break_match; cbn in *;
+          solve
+            [ red in l; lia
+            | discriminate
+            ].
+      + (* Not at a leaf... *)
+        pose proof H5.
+        eapply IHthis2 in H5; eauto.
+        eapply IM.Raw.Proofs.mem_2 in H5; eauto.
+
+        red in H7.
+        apply H7 in H5.
+
+        break_match; cbn in *;
+          try solve
+            [ red in l; lia
+            | discriminate
+            ]; auto.
+      + break_match; cbn in *; auto;
+          solve
+            [ red in l; lia
+            | discriminate
+            ].
+  Qed.
+
+  Lemma IM_greatest_key_In' :
+    forall {A} (m : IM.t A) k,
+      IM.In k m ->
+      exists gk, IM_greatest_key m = Some gk.
+  Proof.
+    intros A m k IN.
+    destruct (IM_greatest_key m) eqn:GK.
+    exists z; auto.
+    apply IM_greatest_key_none in GK.
+    destruct IN.
+    apply GK in H.
+    contradiction.
+  Qed.
+
+  Lemma IM_greatest_key_lt :
+    forall {A} (m : IM.t A) gk,
+      IM_greatest_key m = Some gk -> IM.Raw.lt_tree (1 + gk) (IM.this m).
+  Proof.
+    intros A m.
+    destruct m; cbn in *.
+    induction this; intros gk GK.
+    - cbn in *. inv GK.
+    - rename k into current_key.
+      cbn.
+      (* gk is the greatest key. It should be larger than current_key *)
+      cbn in GK.
+      pose proof is_bst as is_bst2.
+      inv is_bst.
+      destruct (IM_raw_greatest_key this2) eqn:THIS2;
+        destruct this2; inv GK.
+      + (* At a leaf eq *)
+        break_match; cbn in *;
+          solve
+            [ red in l; lia
+            | discriminate
+            ].
+      + (* Not at a leaf... *)
+        pose proof H5.
+        eapply IHthis2 in H5; eauto.
+        red.
+        intros y H0.
+        inv H0.
+        * (* Root *)
+          red in H5.
+          specialize (H5 k).
+          forward H5.
+          constructor; auto.
+          specialize (H7 k).
+          forward H7.
+          constructor; auto.
+          cbn in H7.
+          lia.
+        * (* Left *)
+          red in H6.
+          specialize (H6 y H2).
+          red in H5.
+          specialize (H5 k).
+          forward H5.
+          constructor; auto.
+          specialize (H7 k).
+          forward H7.
+          constructor; auto.
+          cbn in H7.
+          lia.
+        * (* Right *)
+          red in H5.
+          specialize (H5 y H2).
+          auto.
+      + red.
+        intros y H.
+        assert (gk < 1 + gk)%Z by lia.
+        inv H; auto.
+        * apply H6 in H2.
+          cbn in *; lia.
+        * inv H2.
+  Qed.
+
+  Lemma IM_raw_greatest_key_lr :
+    forall {elt} m k (e : elt) l t r kl kr,
+      IM.this m = (IM.Raw.Node l k e r t) ->
+      IM_raw_greatest_key l = Some kl ->
+      IM_raw_greatest_key r = Some kr ->
+      (kl < kr)%Z.
+  Proof.
+    intros elt m k e l t r kl kr NODE GL GR.
+    destruct m.
+    cbn in *.
+    inv is_bst.
+    inv H.
+    inv H3.
+
+    unfold IM.Raw.gt_tree in *.
+    unfold IM.Raw.lt_tree in *.
+
+    assert (IM_greatest_key (@IM.Bst elt l H) = Some kl) as GL' by (cbn; auto).
+    assert (IM_greatest_key (@IM.Bst elt r H0) = Some kr) as GR' by (cbn; auto).
+
+    apply IM_greatest_key_In in GL', GR'.
+    unfold IM.In in *.
+    apply IM.Raw.Proofs.In_alt in GL', GR'.
+    apply H2 in GR'.
+    apply H1 in GL'.
+
+    lia.
+  Qed.
+
+  Lemma next_key_correct :
+    forall {A} (m : IM.t A) (a : Z),
+      IM.In a m ->
+      (a < next_key m)%Z.
+  Proof.
+    intros A m a IN.
+    pose proof IN as GK.
+    unfold next_key.
+    eapply IM_greatest_key_In' in GK.
+    destruct GK as (gk & GK).
+    rewrite GK.
+    apply IM_greatest_key_lt in GK.
+    red in GK.
+    specialize (GK a).
+    destruct m; cbn in IN.
+    unfold IM.In in IN.
+    apply IM.Raw.Proofs.In_alt in IN.
+    apply GK in IN.
+    auto.
+  Qed.
+
 
 Definition handle_mem {E} `{FailureE -< E} : MemE ~> Monads.stateT memory (ctree E voidE) :=
   fun _ e mem =>
@@ -194,7 +408,7 @@ Proof.
   apply eq.
 Qed.
 
-Lemma ssim_raise_ret E `{Effout -< E} F `{Effout -< F} C D X Y L s y :
+Lemma ssim_raise_ret E `{Effout -< E} F C D X Y L s y :
   ~ @ssim
     E F C D X Y L
     (@raise E C _ _ s)
@@ -202,27 +416,13 @@ Lemma ssim_raise_ret E `{Effout -< E} F `{Effout -< F} C D X Y L s y :
 Proof.
   intros CONTRA.
   unfold raise in *.
+  (* NEED vis / ret inv *)
   unfold CTree.trigger in *.
-  (* Need vis / ret inv *)
-  step in CONTRA.
-  eapply ss_vis_l_inv in CONTRA.
-  destruct ss.
   cbn in *.
-  inversion CONTRA.
-  
-  
-  apply ssim_vis_l_inv in CONTRA.
-  destruct CONTRA as (?&?&?&?&?).
-  rewrite bind_ret_l in H2.
-  break_match_hyp.
-  Unshelve.
-  eapply ssim_clo_bind.
-  2: intros [].
-  apply ssim_vis.
-  intros [].
-  Unshelve.
-  apply eq.
-Qed.
+  rewrite bind_vis in CONTRA.
+  step in CONTRA.
+  cbn in *.
+Admitted.
 
 Lemma handle_mem_correct {T} (e : MemE T) (m : memory):
   @ssim Effin Effin _ _ _ _ eq (handle_mem T e m) (handle_mem_spec T e m).
@@ -243,12 +443,15 @@ Proof.
     Unshelve.
     2: {
       exists (next_key m).
-      admit.
+      destruct (IM.mem (elt:=nat) (next_key m) m) eqn:MEM; auto.
+      apply IM.mem_2 in MEM.
+      apply next_key_correct in MEM.
+      lia.
     }
     cbn.
     apply ssim_ret.
     reflexivity.
-Admitted.
+Qed.
 
 Lemma alloca_empty :
   forall k,
@@ -263,13 +466,13 @@ Proof.
   Unshelve.
   2: {
     exists k.
-    admit.
+    destruct (IM.mem (elt:=nat) k (IM.empty nat)) eqn:MEM; auto.
   }
 
   cbn.
   apply ssim_ret.
   reflexivity.
-Admitted.
+Qed.
 
 Lemma load_succeeds_spec :
   forall m k v,
@@ -313,21 +516,8 @@ Proof.
   { intros REF.
     cbn in REF.
     destruct (IM.find k m) eqn:LUP; auto.
-
-    unfold raise in *.
-    eapply SSim.ssim_vis_inv in REF.
-    2: {
-      reflexivity.
-    }
-    eapply trans_trigger_inv in REF.
-    
-    - admit.
-    - apply ssim_ret_r_inv in REF.
-      destruct REF as (?&?&?&?); subst.
-      unfold raise in H.
-      apply trans_trigger_inv in H.
-      destruct H as [[] _]. 
-      punfold REF; inversion REF; subst.
+    apply ssim_raise_ret in REF.
+    contradiction.
   }
 Qed.
 
