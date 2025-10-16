@@ -424,6 +424,28 @@ Proof.
   cbn in *.
 Admitted.
 
+Lemma ssim_ret_raise E F `{Effout -< F} C D X Y L s y :
+  ~ @ssim
+    E F C D X Y L
+    (ret y)
+    (@raise F D _ _ s).
+Proof.
+  intros CONTRA.
+  unfold raise in *.
+  (* NEED vis / ret inv *)
+  unfold CTree.trigger in *.
+  cbn in *.
+  rewrite bind_vis in CONTRA.
+  step in CONTRA.
+  cbn in *.
+  specialize (CONTRA (val y) Stuck).
+  forward CONTRA.
+  constructor.
+  destruct CONTRA as (?&?&?&?&?).
+  apply trans_vis_inv in H0.
+  destruct H0 as [[] _].
+Qed.
+
 Lemma handle_mem_correct {T} (e : MemE T) (m : memory):
   @ssim Effin Effin _ _ _ _ eq (handle_mem T e m) (handle_mem_spec T e m).
 Proof.
@@ -523,9 +545,15 @@ Qed.
 
 Lemma store_succeeds_spec :
   forall m m' k v,
-    member k m /\
-      m' = add k v m
+    IM.mem k m = true /\
+      m' = IM.add k v m
     <->
+      @ssim Effin Effin voidE _ _ _ eq
+        (ret (m', tt))
+        (handle_mem_spec _ (StoreE k v) m).
+
+  (*
+
       @refines
         Effin Effin (memory * _) (memory * _)
         in_rel
@@ -533,27 +561,29 @@ Lemma store_succeeds_spec :
         (fun r1 r2 =>
            r1 = r2 /\
              fst r2 = m'
-        )
-        (handle_mem_spec _ (StoreE k v) m)
-        (ret (m', tt)).
+        ) *)
 Proof.
   intros m m' k v.
   split.
   { intros [MEM ADD]; subst.
     cbn.
-    apply member_lookup in MEM as (v'&MEM).
-    rewrite MEM.
-    pstep; red; cbn; constructor.
-    cbn; auto.
+    apply IM.mem_2 in MEM.
+    destruct MEM.
+    erewrite IM.find_1; eauto.
+    apply ssim_ret.
+    auto.
   }
   { intros REF.
     cbn in REF.
-    destruct (lookup k m) eqn:LUP;
-      punfold REF; inversion REF; subst.
-    destruct H1 as (?&?).
-    cbn in *; subst; auto.
-    inversion H; subst; split; auto.
-    eapply lookup_member; eauto.
+    destruct (IM.find k m) eqn:LUP; subst.
+    - apply ssim_ret_inv in REF.
+      apply val_eq_inv in REF.
+      inv REF.
+      split; auto.
+      apply IM.mem_1.
+      exists n.
+      eapply IM.find_2; eauto.
+    - apply ssim_ret_raise in REF; contradiction.
   }
 Qed.
 
