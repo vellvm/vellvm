@@ -226,16 +226,9 @@ let ast_pp_file_inner path =
         Platform.gen_name !Platform.output_path file ".v.ast"
       in
       (* Prints the original llvm program *)
-      let _ = IO.output_file vast_file ll_ast' in
       let perm = [Open_append; Open_creat] in
       let channel = open_out_gen perm 0o640 vast_file in
       let oc = Format.formatter_of_out_channel channel in
-      (* Prints the internal representation of the llvm program *)
-      Format.pp_force_newline oc () ;
-      Format.pp_force_newline oc () ;
-      Format.pp_print_string oc "Internal Coq representation of the ast:" ;
-      Format.pp_force_newline oc () ;
-      Format.pp_force_newline oc () ;
       let _ = IO.output_ast ll_ast' oc in
       close_out channel
   | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
@@ -385,8 +378,8 @@ let args =
        directory" )
   ; ( "-print-ast"
     , String ast_pp_file
-    , "run the parsing on the given .ll file and write its internal ast and \
-       domination tree to a .v.ast file in the output directory (see -op)" )
+    , "run the parsing on the given .ll file and write its internal ast \
+       representation to a .v.ast file in the output directory." )
   ; ( "-print-ast-dir"
     , String ast_pp_dir
     , "run the parsing on the given directory and write its internal ast \
