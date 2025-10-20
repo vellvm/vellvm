@@ -50,8 +50,6 @@ Variant MemE : Type -> Type :=
   | StoreE (key : Z) (val : nat) : MemE unit
   | AllocE : MemE Z.
 
-Variant voidE (X : Type) :=.
-
 (* Failure. Carries a string for a message. *)
 Variant FailureE : Type -> Type :=
   | Throw : unit -> FailureE void.
@@ -292,7 +290,7 @@ Definition next_key {A} (m : IM.t A) : Z
   Qed.
 
 
-Definition handle_mem {E} `{FailureE -< E} : MemE ~> Monads.stateT memory (ctree E voidE) :=
+Definition handle_mem {E} `{FailureE -< E} : MemE ~> Monads.stateT memory (ctree E void1) :=
   fun _ e mem =>
     match e with
     | LoadE k =>
@@ -340,8 +338,30 @@ Definition handle_mem_spec {E} `{FailureE -< E} : MemE ~> Monads.stateT memory (
 
 Notation Effin := (MemE +' FailureE).
 Notation Bspec := AllocC.
-Notation Bexec := voidE.
+Notation Bexec := void1.
 Notation Effout := FailureE.
+
+#[global] Instance Functor_VoidE : Functor void1.
+split.
+intros A B X H.
+destruct H.
+Defined.
+
+#[global] Instance Functor_Bexec : Functor Bexec.
+try typeclasses eauto.
+Defined.
+
+#[global] Instance Functor_AllocC : Functor AllocC.
+split.
+intros A B X H.
+inversion H; subst.
+forward X.
+exists (next_key m).
+destruct (IM.mem (elt:=nat) (next_key m) m) eqn:MEM; auto.
+apply IM.mem_2 in MEM.
+apply next_key_correct in MEM.
+lia.
+Abort.
 
 (* 
 Definition in_rel : prerel Effin Effin.
@@ -477,7 +497,7 @@ Qed.
 
 Lemma alloca_empty :
   forall k,
-  @ssim Effin Effin voidE _ _ _ eq (ret (IM.add k 0 (IM.empty _), k))
+  @ssim Effin Effin void1 _ _ _ eq (ret (IM.add k 0 (IM.empty _), k))
       (handle_mem_spec Z (AllocE) (IM.empty _)).
 Proof.
   intros k.
@@ -499,7 +519,7 @@ Qed.
 Lemma load_succeeds_spec :
   forall m k v,
     IM.find k m = Some v <->
-      @ssim Effin Effin voidE _ _ _ eq (ret (m, v))
+      @ssim Effin Effin void1 _ _ _ eq (ret (m, v))
         (handle_mem_spec nat (LoadE k) m).
 Proof.
   intros m k v.
@@ -525,7 +545,7 @@ Qed.
 Lemma load_fails_spec :
   forall T m k,
     IM.find k m = None <->
-      @ssim Effin Effin voidE _ T _ eq
+      @ssim Effin Effin void1 _ T _ eq
         (raise "Load from unallocated address.")
         (handle_mem_spec _ (LoadE k) m).
 Proof.
@@ -548,7 +568,7 @@ Lemma store_succeeds_spec :
     IM.mem k m = true /\
       m' = IM.add k v m
     <->
-      @ssim Effin Effin voidE _ _ _ eq
+      @ssim Effin Effin void1 _ _ _ eq
         (ret (m', tt))
         (handle_mem_spec _ (StoreE k v) m).
 
@@ -591,7 +611,7 @@ Lemma store_fails_spec :
   forall T m k v,
     IM.find k m = None
     <->
-      @ssim Effin Effin voidE _ T _ eq
+      @ssim Effin Effin void1 _ T _ eq
         (raise "Store to unallocated address.")
         (handle_mem_spec _ (StoreE k v) m).
 Proof.
@@ -614,7 +634,7 @@ Lemma alloc_spec :
     IM.mem k m = false /\
       m' = IM.add k 0 m
     <->
-      @ssim Effin Effin voidE _ _ _ eq
+      @ssim Effin Effin void1 _ _ _ eq
         (ret (m', k))
         (handle_mem_spec Z (AllocE) m).
 (* (fun r1 r2 =>
@@ -661,7 +681,7 @@ Lemma alloc_spec_exists :
   exists m' k,
     IM.mem k m = false /\
       m' = IM.add k 0 m /\
-      @ssim Effin Effin voidE _ _ _ eq
+      @ssim Effin Effin void1 _ _ _ eq
         (ret (m', k))
         (handle_mem_spec Z (AllocE) m).
 (* (fun r1 r2 =>
@@ -695,98 +715,451 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma handle_mem_spec_alloc_bind :
-  forall RR m (k : memory * Z -> itree_spec Effin (memory * Z)) t,
-    (exists (x : (memory * Z)),
-        (fun r1 r2 =>
-        r1 = r2 /\
-          let m2 := fst r2 in
-          let k2 := snd r2 in
-          m2 = add k2 0 m) x x ->
-        @padded_refines
-          Effin Effin (memory * Z) (memory * Z)
-          in_rel
-          in_post_rel
-          (fun r1 r2 =>
-             r1 = r2 /\
-               let m2 := fst r2 in
-               let k2 := snd r2 in
-               m2 = add k2 0 m)
-          (k x) (* This is wrong *)
-          t) ->
-    @padded_refines
-      Effin Effin (memory * Z) (memory * Z)
-      in_rel
-      in_post_rel
-      RR
-      (ITree.bind (handle_mem_spec _ AllocE m) k)
-      t.
-Proof.
-Abort.
-
-Definition double_alloc : itree MemE bool
+Definition double_alloc : ctree MemE void1 bool
   := k <- trigger AllocE;;
      p <- trigger AllocE;;
      ret (Z.eqb k p).
 
-Import StateFacts.
-Import Padded.
-Import Utils.Tactics.
-
-(* TODO: Move this *)
-Lemma padded_ret :
-  forall {X E} x,
-    padded (@ret (itree E) _ X x).
-Proof.
-  intros X E x.
-  pstep; red; cbn.
-  constructor.
-Qed.
-
-Lemma padded_Ret :
-  forall {X E} x,
-    @padded E X (Ret x).
-Proof.
-  intros X E x.
-  apply padded_ret.
-Qed.
-
-#[global] Hint Resolve padded_ret padded_Ret : solve_padded.
-
 
 Lemma next_key_not_member :
-  forall {A} (m : IntMap A),
-    member (next_key m) m = false.
+  forall {A} (m : IM.t A),
+    IM.mem (next_key m) m = false.
 Proof.
   intros A m.
-  destruct (member (next_key m) m) eqn:MEM; auto.
+  destruct (IM.mem (next_key m) m) eqn:MEM; auto.
   apply IM.mem_2 in MEM.
   apply next_key_correct in MEM.
   lia.
 Qed.
 
 Lemma alloc_sigma :
-  forall {A} (m : IntMap A),
-    {k | member k m = false}.
+  forall {A} (m : IM.t A),
+    {k | IM.mem k m = false}.
 Proof.
   intros A m.
   exists (next_key m).
   eapply next_key_not_member.
 Defined.
 
+
+(* Definition interp_state {E B M S} *)
+(*            {FM : Functor M} {MM : Monad M} *)
+(*            {IM : MonadIter M} *)
+(*            (h : E ~> Monads.stateT S M) : *)
+(*   ctree E B ~> Monads.stateT S M := interp h. *)
+
+Import Monads.
+
+#[global] Instance ctree_monad {E B} : Monad (ctree E B).
+split.
+- intros.
+  apply ret; apply X.
+- intros t u X X0.
+  eapply bind.
+  apply X.
+  apply X0.
+Defined.
+
+#[global] Instance MonadStepState {S M} `{HM : Monad M} `{MS : MonadStep M} : MonadStep (stateT S M).
+red.
+intros s.
+eapply bind.
+apply mstep.
+intros _.
+apply (ret (s, tt)).
+Defined.
+
+#[global] Instance MonadStuckState {S M} `{HM : Monad M} `{MS : MonadStuck M} : MonadStuck (stateT S M).
+red.
+intros X.
+red.
+intros s.
+apply mstuck.
+Defined.
+
+#[global] Instance MonadBrState {B S M} `{HM : Monad M} `{MB : MonadBr B M} `{FB : Functor B}: MonadBr B (stateT S M).
+red.
+intros X b s.
+apply mbr.
+eapply fmap in b.
+apply b.
+intros x.
+apply (s, x).
+Defined.
+
+Definition interp_state {E B M S}
+  {FB : Functor B}
+  {FM : Functor M} {MM : Monad M}
+  {IM : MonadIter M}
+  {MSTUCK : MonadStuck M}
+  {MSTEP : MonadStep M}
+  {MBR : MonadBr B M}
+  (h : E ~> stateT S M) :
+  ctree E B ~> stateT S M := interp h.
+
+Arguments interp_state {E B M S FB FM MM IM MSTUCK MSTEP MBR} h [T].
+
+(* Definition _interp_state {E F C D S R} *)
+(*            (f : E ~> stateT S (ctree F D)) (ot : ctreeF E C R _) *)
+(*   : stateT S (ctree F D) R := *)
+(*   fun s => *)
+(*     match ot with *)
+(*     | RetF r => Ret (s, r) *)
+(*     | StuckF => Stuck *)
+(*     | StepF t => StepF  *)
+(*     | GuardF t => _ *)
+(*     | VisF X e k => _ *)
+(*     | BrF X c k => _ *)
+(*     end. *)
+(*   match ot with *)
+(*   | RetF r => Ret (s, r) *)
+(*   | TauF t => Tau (interp_state f t s) *)
+(*   | VisF e k => f _ e s >>= (fun sx => Tau (interp_state f (k (snd sx)) (fst sx))) *)
+(*   end. *)
+
+(* Lemma unfold_interp_state {E F S R} (h : E ~> Monads.stateT S (itree F)) *)
+(*       (t : itree E R) s : *)
+(*     eq_itree eq *)
+(*       (interp_state h t s) *)
+(*       (_interp_state h (observe t) s). *)
+(* Proof. *)
+(*   unfold interp_state, interp, Basics.iter, MonadIter_stateT0, Basics.iter, MonadIter_itree; cbn. *)
+(*   rewrite unfold_iter; cbn. *)
+(*   destruct observe; cbn. *)
+(*   - rewrite 2 bind_ret_l. reflexivity. *)
+(*   - rewrite 2 bind_ret_l. *)
+(*     reflexivity. *)
+(*   - rewrite bind_map, bind_bind; cbn. setoid_rewrite bind_ret_l. *)
+(*     apply eqit_bind; reflexivity. *)
+(* Qed. *)
+
+(* #[global] *)
+(* Instance eq_itree_interp_state {E F S R} (h : E ~> Monads.stateT S (itree F)) : *)
+(*   Proper (eq_itree eq ==> eq ==> eq_itree eq) *)
+(*          (@interp_state _ _ _ _ _ _ h R). *)
+(* Proof. *)
+(*   revert_until R. *)
+(*   ginit. pcofix CIH. intros h x y H0 x2 _ []. *)
+(*   rewrite !unfold_interp_state. *)
+(*   punfold H0; repeat red in H0. *)
+(*   destruct H0; subst; pclearbot; try discriminate; cbn. *)
+(*   - gstep; constructor; auto. *)
+(*   - gstep; constructor; auto with paco. *)
+(*   - guclo eqit_clo_bind. econstructor. *)
+(*     + reflexivity. *)
+(*     + intros [] _ []. gstep; constructor; auto with paco itree. *)
+(* Qed. *)
+
+(* Lemma interp_state_ret {E F : Type -> Type} {R S : Type} *)
+(*       (f : forall T, E T -> S -> itree F (S * T)%type) *)
+(*       (s : S) (r : R) : *)
+(*   (interp_state f (Ret r) s) ≅ (Ret (s, r)). *)
+(* Proof. *)
+(*   rewrite itree_eta. reflexivity. *)
+(* Qed. *)
+
+(* Lemma interp_state_vis {E F : Type -> Type} {S T U : Type} *)
+(*       (e : E T) (k : T -> itree E U) (h : E ~> Monads.stateT S (itree F)) (s : S) *)
+(*   : interp_state h (Vis e k) s *)
+(*   ≅ h T e s >>= fun sx => Tau (interp_state h (k (snd sx)) (fst sx)). *)
+(* Proof. *)
+(*   rewrite unfold_interp_state; reflexivity. *)
+(* Qed. *)
+
+(* Lemma interp_state_tau {E F : Type -> Type} S {T : Type} *)
+(*       (t : itree E T) (h : E ~> Monads.stateT S (itree F)) (s : S) *)
+(*   : interp_state h (Tau t) s ≅ Tau (interp_state h t s). *)
+(* Proof. *)
+(*   rewrite unfold_interp_state; reflexivity. *)
+(* Qed. *)
+
+(* Lemma interp_state_trigger_eqit {E F : Type -> Type} {R S : Type} *)
+(*       (e : E R) (f : E ~> Monads.stateT S (itree F)) (s : S) *)
+(*   : (interp_state f (ITree.trigger e) s) ≅ (f _ e s >>= fun x => Tau (Ret x)). *)
+(* Proof. *)
+(*   unfold ITree.trigger. rewrite interp_state_vis. *)
+(*   eapply eqit_bind; try reflexivity. *)
+(*   intros []. rewrite interp_state_ret. reflexivity. *)
+(* Qed. *)
+
+(* Lemma interp_state_trigger {E F : Type -> Type} {R S : Type} *)
+(*       (e : E R) (f : E ~> Monads.stateT S (itree F)) (s : S) *)
+(*   : interp_state f (ITree.trigger e) s ≈ f _ e s. *)
+(* Proof. *)
+(*   unfold ITree.trigger. rewrite interp_state_vis. *)
+(*   match goal with *)
+(*     |- ?y ≈ ?x => remember y; rewrite <- (bind_ret_r x); subst *)
+(*   end. *)
+(*   eapply eqit_bind; try reflexivity. *)
+(*   intros []; rewrite interp_state_ret,tau_eutt. *)
+(*   reflexivity. *)
+(* Qed. *)
+
+(* Lemma interp_state_bind {E F : Type -> Type} {A B S : Type} *)
+(*       (f : forall T, E T -> S -> itree F (S * T)%type) *)
+(*       (t : itree E A) (k : A -> itree E B) *)
+(*       (s : S) : *)
+(*   (interp_state f (t >>= k) s) *)
+(*     ≅ *)
+(*   (interp_state f t s >>= fun st => interp_state f (k (snd st)) (fst st)). *)
+(* Proof. *)
+(*   revert t k s. *)
+(*   ginit. pcofix CIH. *)
+(*   intros t k s. *)
+(*   rewrite unfold_bind. *)
+(*   rewrite (unfold_interp_state f t). *)
+(*   destruct (observe t). *)
+(*   - cbn. rewrite !bind_ret_l. cbn. *)
+(*     apply reflexivity. *)
+(*   - cbn. rewrite !bind_tau, interp_state_tau. *)
+(*     gstep. econstructor. gbase. apply CIH. *)
+(*   - cbn. rewrite interp_state_vis, bind_bind. *)
+(*     guclo eqit_clo_bind. econstructor. *)
+(*     + reflexivity. *)
+(*     + intros u2 ? []. *)
+(*       rewrite bind_tau. *)
+(*       gstep; constructor. *)
+(*       ITree.fold_subst. *)
+(*       auto with paco. *)
+(* Qed. *)
+
+(* #[global] *)
+(* Instance eutt_interp_state {E F: Type -> Type} {S : Type} *)
+(*          (h : E ~> Monads.stateT S (itree F)) R RR : *)
+(*   Proper (eutt RR ==> eq ==> eutt (prod_rel eq RR)) (@interp_state E (itree F) S _ _ _ h R). *)
+(* Proof. *)
+(*   repeat intro. subst. revert_until RR. *)
+(*   einit. ecofix CIH. intros. *)
+
+(*   rewrite !unfold_interp_state. punfold H0. red in H0. *)
+(*   induction H0; intros; subst; simpl; pclearbot. *)
+(*   - eret. *)
+(*   - etau. *)
+(*   - ebind. econstructor; [reflexivity|]. *)
+(*     intros; subst. *)
+(*     etau. ebase. *)
+(*   - rewrite tau_euttge, unfold_interp_state; eauto. *)
+(*   - rewrite tau_euttge, unfold_interp_state; eauto. *)
+(* Qed. *)
+
+(* #[global] *)
+(* Instance eutt_interp_state_eq {E F: Type -> Type} {S : Type} *)
+(*          (h : E ~> Monads.stateT S (itree F)) R : *)
+(*   Proper (eutt eq ==> eq ==> eutt eq) (@interp_state E (itree F) S _ _ _ h R). *)
+(* Proof. *)
+(*   repeat intro. subst. revert_until R. *)
+(*   einit. ecofix CIH. intros. *)
+
+(*   rewrite !unfold_interp_state. punfold H0. red in H0. *)
+(*   induction H0; intros; subst; simpl; pclearbot. *)
+(*   - eret. *)
+(*   - etau. *)
+(*   - ebind. econstructor; [reflexivity|]. *)
+(*     intros; subst. *)
+(*     etau. ebase. *)
+(*   - rewrite tau_euttge, unfold_interp_state; eauto. *)
+(*   - rewrite tau_euttge, unfold_interp_state; eauto. *)
+(* Qed. *)
+
+
+(* Lemma eutt_interp_state_aloop {E F S I I' A A'} *)
+(*       (RA : A -> A' -> Prop) (RI : I -> I' -> Prop) *)
+(*       (RS : S -> S -> Prop) *)
+(*       (h : E ~> Monads.stateT S (itree F)) *)
+(*       (t1 : I -> itree E (I + A)) *)
+(*       (t2 : I' -> itree E (I' + A')): *)
+(*   (forall i i' s1 s2, RS s1 s2 -> RI i i' -> *)
+(*      eutt (prod_rel RS (sum_rel RI RA)) *)
+(*                      (interp_state h (t1 i) s1) *)
+(*                      (interp_state h (t2 i') s2)) -> *)
+(*   (forall i i' s1 s2, RS s1 s2 -> RI i i' -> *)
+(*      eutt (fun a b => RS (fst a) (fst b) /\ RA (snd a) (snd b)) *)
+(*           (interp_state h (ITree.iter t1 i) s1) *)
+(*           (interp_state h (ITree.iter t2 i') s2)). *)
+(* Proof. *)
+(*   intro Ht. *)
+(*   einit. ecofix CIH. intros. *)
+(*   rewrite 2 unfold_iter. *)
+(*   rewrite 2 interp_state_bind. *)
+(*   ebind; econstructor. *)
+(*   - eapply Ht; auto. *)
+(*   - intros [s1' i1'] [s2' i2'] [? []]; cbn. *)
+(*     + rewrite 2 interp_state_tau. auto with paco. *)
+(*     + rewrite 2 interp_state_ret. auto with paco. *)
+(* Qed. *)
+
+(* Lemma eutt_interp_state_iter {E F S A A' B B'} *)
+(*       (RA : A -> A' -> Prop) (RB : B -> B' -> Prop) *)
+(*       (RS : S -> S -> Prop) *)
+(*       (h : E ~> Monads.stateT S (itree F)) *)
+(*       (t1 : A -> itree E (A + B)) *)
+(*       (t2 : A' -> itree E (A' + B')) : *)
+(*   (forall ca ca' s1 s2, RS s1 s2 -> *)
+(*                         RA ca ca' -> *)
+(*      eutt (prod_rel RS (sum_rel RA RB)) *)
+(*           (interp_state h (t1 ca) s1) *)
+(*           (interp_state h (t2 ca') s2)) -> *)
+(*   (forall a a' s1 s2, RS s1 s2 -> RA a a' -> *)
+(*      eutt (fun a b => RS (fst a) (fst b) /\ RB (snd a) (snd b)) *)
+(*           (interp_state h (iter (C := ktree _) t1 a) s1) *)
+(*           (interp_state h (iter (C := ktree _) t2 a') s2)). *)
+(* Proof. *)
+(*   apply eutt_interp_state_aloop. *)
+(* Qed. *)
+
+(* Lemma eutt_eq_interp_state_iter {E F S} (f: E ~> stateT S (itree F)) {I A} *)
+(*     (t : I -> itree E (I + A)): *)
+(*   forall i s, interp_state f (ITree.iter t i) s ≈ *)
+(*     Basics.iter (fun i => interp_state f (t i)) i s. *)
+(* Proof. *)
+(*   unfold Basics.iter, MonadIter_stateT0, Basics.iter, MonadIter_itree in *; cbn. *)
+(*   ginit. gcofix CIH; intros i s. *)
+(*   rewrite 2 unfold_iter; cbn. *)
+(*   rewrite !bind_bind. *)
+(*   setoid_rewrite bind_ret_l. *)
+(*   rewrite interp_state_bind. *)
+(*   guclo eqit_clo_bind; econstructor; eauto. reflexivity. *)
+(*   intros [s' []] _ []; cbn. *)
+(*   - rewrite interp_state_tau. *)
+(*     gstep; constructor. *)
+(*     auto with paco. *)
+(*   - rewrite interp_state_ret; apply reflexivity. *)
+(* Qed. *)
+
+(* Lemma eutt_interp_state_loop {E F S A B C} (RS : S -> S -> Prop) *)
+(*       (h : E ~> Monads.stateT S (itree F)) *)
+(*       (t1 t2 : C + A -> itree E (C + B)) : *)
+(*   (forall ca s1 s2, RS s1 s2 -> *)
+(*      eutt (fun a b => RS (fst a) (fst b) /\ snd a = snd b) *)
+(*           (interp_state h (t1 ca) s1) *)
+(*           (interp_state h (t2 ca) s2)) -> *)
+(*   (forall a s1 s2, RS s1 s2 -> *)
+(*      eutt (fun a b => RS (fst a) (fst b) /\ snd a = snd b) *)
+(*           (interp_state h (loop (C := ktree E) t1 a) s1) *)
+(*           (interp_state h (loop (C := ktree E) t2 a) s2)). *)
+(* Proof. *)
+(*   intros. *)
+(*   unfold loop, bimap, Bimap_Coproduct, case_, Case_Kleisli, Function.case_sum, id_, Id_Kleisli, cat, Cat_Kleisli, inr_, Inr_Kleisli, inl_, Inl_Kleisli, lift_ktree_; cbn. *)
+(*   rewrite 2 bind_ret_l. *)
+(*   eapply (eutt_interp_state_iter eq eq); auto; intros. *)
+(*   rewrite 2 interp_state_bind. *)
+(*   subst. *)
+(*   eapply eutt_clo_bind; eauto. *)
+(*   intros. *)
+(*   cbn in H2; destruct H2 as [H21 H22]. *)
+(*   destruct (snd u1); rewrite <- H22. *)
+(*   - rewrite bind_ret_l, 2 interp_state_ret. *)
+(*     pstep. *)
+(*     constructor. *)
+(*     split; cbn; auto using H21. *)
+(*   - rewrite bind_ret_l, 2 interp_state_ret. pstep. constructor. *)
+(*     split; cbn; auto using H21. *)
+(* Qed. *)
+
+(* (* SAZ: These are probably too specialized. *) *)
+(* Definition state_eq {E S X} *)
+(*   : (stateT S (itree E) X) -> (stateT S (itree E) X) -> Prop := *)
+(*   fun t1 t2 => forall s, eq_itree eq (t1 s) (t2 s). *)
+
+(* Lemma interp_state_iter {E F } S (f : E ~> stateT S (itree F)) {I A} *)
+(*       (t  : I -> itree E (I + A)) *)
+(*       (t' : I -> stateT S (itree F) (I + A)) *)
+(*       (EQ_t : forall i, state_eq (State.interp_state f (t i)) (t' i)) *)
+(*   : forall i, state_eq (State.interp_state f (ITree.iter t i)) *)
+(*                   (Basics.iter t' i). *)
+(* Proof. *)
+(*   unfold Basics.iter, MonadIter_stateT0, Basics.iter, MonadIter_itree in *; cbn. *)
+(*   ginit. pcofix CIH; intros i s. *)
+(*   rewrite 2 unfold_iter; cbn. *)
+(*   rewrite !bind_bind. *)
+(*   setoid_rewrite bind_ret_l. *)
+(*   rewrite interp_state_bind. *)
+(*   guclo eqit_clo_bind; econstructor; eauto. *)
+(*   - apply EQ_t. *)
+(*   - intros [s' []] _ []; cbn. *)
+(*     + rewrite interp_state_tau. *)
+(*       gstep; constructor. *)
+(*       auto with paco. *)
+(*     + rewrite interp_state_ret; apply reflexivity. *)
+(* Qed. *)
+
+(* Lemma interp_state_iter' {E F } S (f : E ~> stateT S (itree F)) {I A} *)
+(*       (t  : I -> itree E (I + A)) *)
+(*   : forall i, state_eq (State.interp_state f (ITree.iter t i)) *)
+(*                        (Basics.iter (fun i => State.interp_state f (t i)) i). *)
+(* Proof. *)
+(*   eapply interp_state_iter. *)
+(*   intros i. *)
+(*   red. reflexivity. *)
+(* Qed. *)
+
+(* Lemma interp_state_iter'_eutt {E F S} (f: E ~> stateT S (itree F)) {I A} *)
+(*     (t : I -> itree E (I + A)) *)
+(*     (t': I -> stateT S (itree F) (I + A)) *)
+(*     (Heq: forall i s, interp_state f (t i) s ≈ (t' i) s): *)
+(*   forall i s, interp_state f (ITree.iter t i) s ≈ Basics.iter t' i s. *)
+(* Proof. *)
+(*   unfold Basics.iter, MonadIter_stateT0, Basics.iter, MonadIter_itree in *; cbn. *)
+(*   ginit. gcofix CIH; intros i s. *)
+(*   rewrite 2 unfold_iter; cbn. *)
+(*   rewrite !bind_bind. *)
+(*   setoid_rewrite bind_ret_l. *)
+(*   rewrite interp_state_bind. *)
+(*   guclo eqit_clo_bind; econstructor; eauto. *)
+(*   - apply Heq. *)
+(*   - intros [s' []] _ []; cbn. *)
+(*     + rewrite interp_state_tau. *)
+(*       gstep; constructor. *)
+(*       auto with paco. *)
+(*     + rewrite interp_state_ret; apply reflexivity. *)
+(* Qed. *)
+
+Lemma interp_state_bind {E F C D : Type -> Type} {A B S : Type}
+  `{FC : Functor C}
+  `{FD : Functor D}
+  `{C -< D}
+  (f : forall T, E T -> S -> ctree F D (S * T)%type)
+  (t : ctree E C A) (k : A -> ctree E C B)
+  (s : S) :
+  (interp_state f (t >>= k) s)
+  ~
+  (interp_state f t s >>= fun st => interp_state f (k (snd st)) (fst st)).
+Proof.
+Admitted.
+
+Unset Universe Checking.
 Lemma alloc_disjoint :
   exists m,
-    @padded_refines
-      Effin Effin (memory * bool) (memory * bool)
-      in_rel
-      in_post_rel
-      eq
-      (interp_state handle_mem_spec double_alloc empty)
-      (ret (m, false)).
+    @ssim Effin Effin void1 Bspec (memory * bool)%type (memory * bool)%type eq
+      (ret (m, false))
+      (interp_state handle_mem_spec double_alloc (IM.empty _)).
 Proof.
   eexists.
-  Opaque member.
-  setoid_rewrite interp_state_bind.
+  unfold double_alloc.
+  assert ((@CTree.bind MemE void1 Z bool
+          (@CTree.trigger MemE void1 Z
+             (@subevent MemE MemE (@CategoryOps.ReSum_id (forall _ : Type, Type) IFun Id_IFun MemE) Z
+                AllocE))
+          (fun k : Z =>
+           @CTree.bind MemE void1 Z bool
+             (@CTree.trigger MemE void1 Z
+                (@subevent MemE MemE (@CategoryOps.ReSum_id (forall _ : Type, Type) IFun Id_IFun MemE)
+                   Z AllocE))
+             (fun p : Z => @ret (ctree MemE void1) (@Monad_ctree MemE void1) bool (Z.eqb k p)))) ~
+            (  vis AllocE
+    (fun k : Z =>
+     vis AllocE (fun p : Z => @ret (ctree MemE Bexec) (@Monad_ctree MemE Bexec) bool (k =? p)%Z))
+)).
+  admit.
+
+  setoid_rewrite H.
+  setoid_rewrite bind_bind.
+  rewrite interp_state_bind.
+
+
+  setoid_rewrite H.
+    ((k <- trigger AllocE;; p <- trigger AllocE;; ret (k =? p)%Z) ~ (k <- trigger AllocE;; p <- trigger AllocE;; ret (k =? p)%Z)).
+  rewrite interp_state_bind.
   setoid_rewrite interp_state_bind.
   setoid_rewrite interp_state_trigger.
   cbn.
