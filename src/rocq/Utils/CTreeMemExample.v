@@ -823,6 +823,14 @@ Proof using.
   rewrite IM.Raw.Proofs.add_in; auto.
 Qed.
 
+Lemma mem_add_neq {a}: forall k1 k2 v (m: IM.t a),
+    k1 <> k2 ->
+    IM.mem k1 (IM.add k2 v m) = IM.mem k1 m.
+Proof using.
+  intros.
+  cbn.
+Admitted.
+
 Lemma alloc_disjoint' :
   forall m,
     @ssim Effin Effin Bspec Bexec bool bool eq
@@ -873,17 +881,13 @@ Lemma double_alloc_spec :
   forall m m' b,
     (b = false /\
        exists k1 k2,
-         m' = add k2 0 (add k1 0 m) /\
+         m' = IM.add k2 0 (IM.add k1 0 m) /\
            k1 <> k2 /\
-           member k1 m = false /\
-           member k2 m = false) ->
-    @padded_refines
-      Effin Effin (memory * bool) (memory * bool)
-      in_rel
-      in_post_rel
-      eq
-      (interp_state handle_mem_spec double_alloc m)
-      (ret (m', b)).
+           IM.mem k1 m = false /\
+           IM.mem k2 m = false) ->
+    @ssim Effin Effin void1 Bspec (memory * bool)%type (memory * bool)%type eq
+      (ret (m', b))
+      (interp_state handle_mem_spec double_alloc m).
 Proof.
   intros m m' b.
   { intros [B K].
@@ -891,37 +895,30 @@ Proof.
     cbn.
     repeat setoid_rewrite interp_state_bind.
     repeat setoid_rewrite interp_state_trigger.
+    repeat setoid_rewrite bind_bind.
 
-    assert
-      ((@ret (itree (SpecEvent (sum1 MemE FailureE))) _ _ (add k2 0 (add k1 0 m), false))
-         ≈
-         '(m, x) <- ret (add k1 0 m, k1);;
-       '(m, y) <- ret (add k2 0 m, k2);;
-       ret (m, false)) as RET.
-    { repeat (cbn; setoid_rewrite bind_ret_l).
-      reflexivity.
-    }
+    rewrite bind_branch.
+    apply ssim_br_r with (x:=exist _ k1 MEM1); cbn.
+    rewrite bind_ret_l.
+    rewrite bind_guard.
+    eapply ssim_guard_r.
+    repeat setoid_rewrite bind_ret_l.
 
+    rewrite bind_branch; cbn.
+    assert (IM.mem (elt:=nat) k2 (IM.add k1 0 m) = false) as MEM2'.
+    rewrite mem_add_neq; eauto.
+
+    apply ssim_br_r with (x:=exist _ k2 MEM2'); cbn.
+    rewrite bind_guard.
+    apply ssim_guard_r.
+    rewrite bind_ret_l.
+    rewrite interp_state_ret.
+    cbn.
     subst.
-    setoid_rewrite RET.
+    apply ssim_ret.
 
-    eapply padded_refines_bind.
-    apply refines_padded_refines with (b1:=true) (b2:=true).
-    apply alloc_spec; auto.
-    intros r1 [m' k] (?&?&?); cbn in *; subst.
-
-    eapply padded_refines_bind.
-    apply refines_padded_refines with (b1:=true) (b2:=true).
-    apply alloc_spec.
-    unfold fst; split; auto.
-    Transparent member.
-    unfold member.
-    rewrite IP.F.add_neq_b; eauto.
-    intros r1 [m'' k'] (?&?&?); cbn in *; subst.
-
-    pstep; red; cbn.
-    constructor.
-    replace (k1 =? k2)%Z with false by lia.
+    assert ((k1 =? k2)%Z = false) by lia.
+    rewrite H.
     reflexivity.
   }
 Qed.
