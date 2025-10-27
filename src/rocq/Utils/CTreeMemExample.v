@@ -923,34 +923,32 @@ Proof.
   }
 Qed.
 
-Import HasPost.
-
-Definition store_prog (v : nat) : itree MemE nat :=
+Definition store_prog (v : nat) : ctree MemE void1 nat :=
   k <- trigger AllocE;;
   trigger (StoreE k v);;
   trigger (LoadE k).
 
 Lemma alloc_lemma :
   forall m m_final k,
-    member k m = false ->
-    m_final = add k 0 m ->
-    @strict_refines
-      Effin _
-      (interp_state handle_mem_spec (trigger AllocE) m)
-      (ret (m_final, k)).
+    IM.mem k m = false ->
+    m_final = IM.add k 0 m ->
+    @ssim Effin Effin void1 Bspec (memory * IM.key)%type (memory * IM.key)%type eq
+      (ret (m_final, k))
+      (interp_state handle_mem_spec (trigger AllocE : ctree MemE void1 Z) m).
 Proof.
   intros m m_final k MEM FINAL.
   setoid_rewrite interp_state_trigger.
   cbn.
-  eapply padded_refines_forallL.
-  Unshelve.
-  2: {
-    exists k; auto.
-  }
 
-  cbn.
+  unfold do_alloc.
+  rewrite bind_branch.
+  rewrite bind_br.
+  eapply ssim_br_r with (x:=exist _ k MEM); cbn.
+  rewrite bind_ret_l.
+  apply ssim_guard_r.
+  apply ssim_ret.
   subst.
-  pstep; red; cbn; constructor; auto.
+  reflexivity.
 Qed.
 
 Lemma alloc_lemma' :
