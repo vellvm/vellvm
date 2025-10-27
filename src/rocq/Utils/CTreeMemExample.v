@@ -813,40 +813,58 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma mem_add_eq {a}: forall k v (m: IM.t a),
+    IM.mem k (IM.add k v m) = true.
+Proof using.
+  intros.
+  cbn.
+  apply IM.Raw.Proofs.mem_1.
+  apply IM.Raw.Proofs.add_bst, IM.is_bst.
+  rewrite IM.Raw.Proofs.add_in; auto.
+Qed.
+
 Lemma alloc_disjoint' :
   forall m,
-    @padded_refines
-      Effin Effin _ _
-      in_rel
-      in_post_rel
-      eq
-      (ret false)
-      (fmap snd (interp_state handle_mem_spec double_alloc m)).
+    @ssim Effin Effin Bspec Bexec bool bool eq
+      (fmap snd (interp_state handle_mem_spec double_alloc m))
+      (ret false).
 Proof.
   intros m.
-  Opaque member.
+  Opaque IM.mem.
   setoid_rewrite interp_state_bind.
   setoid_rewrite interp_state_bind.
   setoid_rewrite interp_state_trigger.
+  repeat setoid_rewrite map_bind.
   cbn.
-  setoid_rewrite bind_vis.
-
-  apply refines_padded_refines with (b1:=true) (b2:=true).
-  pstep; red; cbn.
-  apply refinesF_forallR.
+  repeat setoid_rewrite bind_bind; cbn.
+  rewrite bind_branch.
+  apply ssim_br_l.
   intros [k KSPEC].
 
-  cbn.
-  apply refinesF_forallR.
+  rewrite bind_ret_l; cbn.
+  rewrite bind_guard.
+  apply ssim_guard_l.
+  rewrite bind_ret_l; cbn.
+
+  rewrite bind_branch.
+  apply ssim_br_l.
   intros [p PSPEC].
 
-  cbn.
-  destruct (Z.eq_dec k p); subst.
-  rewrite member_add_eq in PSPEC.
-  discriminate.
+  rewrite bind_ret_l; cbn.
+  rewrite bind_guard.
+  apply ssim_guard_l.
+  rewrite bind_ret_l; cbn.
 
-  replace (k =? p)%Z with false by lia.
-  constructor.
+  rewrite interp_state_ret.
+  rewrite map_ret.
+  cbn.
+
+  destruct (Z.eq_dec k p) as [EQ | NEQ]; cbn in *; subst.
+  rewrite mem_add_eq in PSPEC; try discriminate.
+
+  assert ((k =? p)%Z = false) by lia.
+  rewrite H.
+  apply ssim_ret.
   reflexivity.
 Qed.
 
