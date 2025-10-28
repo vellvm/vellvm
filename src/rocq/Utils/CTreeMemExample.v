@@ -1099,18 +1099,17 @@ Proof.
   reflexivity.
 Qed.
 
-(* This doesn't work. The thing on the left is an empty set, and the
-refinement relation doesn't hold vacuously *)
+(* This doesn't hold in itree_spec, but does for ctrees... *)
 Lemma ub_test :
-  @strict_refines Effin _
+  @ssim Effin Effin ForallE ForallE nat nat eq
     (x <- forall_spec void;; ret 9) (ret 1).
 Proof.
   unfold forall_spec.
   cbn.
-  rewrite bind_vis.
-  eapply padded_refines_forallL.
-  Unshelve.
-Abort.
+  rewrite bind_br.
+  eapply ssim_br_l.
+  intros [].
+Qed.
 
 (* This *does* work. The set on the right is empty, and therefore a
    subset of the thing on the left. *)
