@@ -998,17 +998,46 @@ Proof.
   reflexivity.
 Qed.
 
+Ltac inj_pair2_existT :=
+  repeat
+      match goal with
+      | H : _ |- _ => apply Eqdep.EqdepTheory.inj_pair2 in H
+      end.
+
+Ltac subst_existT :=
+  inj_pair2_existT; subst.
+
+(* #[global] Instance Reflexive_update_val_rel {E X} L R0 : *)
+(*   Reflexive L -> *)
+(*   Reflexive R0 -> *)
+(*   Reflexive (@update_val_rel E E X X L R0). *)
+(* Proof. *)
+(*   red. intros. destruct x. *)
+(*   1-2: constructor; eauto; intros VAL; inversion VAL. *)
+(*   assert (X = X0 \/ X <> X0) as [EQ | NEQ] by admit. *)
+(*   - subst. *)
+(*     apply update_Val. *)
+(*     reflexivity. *)
+(*   - constructor. *)
+(*     + intros VAL. *)
+(*       inv VAL. *)
+(*       subst_existT. *)
+(*     inv VAL. *)
+(* Qed. *)
+
 Lemma raise_bind :
-  forall E `{FailureE -< E} B R1 R2 msg (k : R1 -> ctree E B R2),
-    ((raise msg : ctree E B R1) >>= k) ~ (raise msg : ctree E B R2).
+  forall E `{FailureE -< E} B R1 R2 R3 msg (k : R1 -> ctree E B R2),
+    ((raise msg : ctree E B R1) >>= k) ~ (raise msg : ctree E B R3).
 Proof.
-  intros E H B R1 R2 msg k.
+  intros E H B R1 R2 R3 msg k.
   cbn.
   unfold raise.
   rewrite bind_bind.
-  eapply sbisim_clo_bind_eq.
-  reflexivity.
-  intros [].
+  apply sbisim_clo_bind with (R0:=eq).
+  - eapply Lequiv_sbisim; [| reflexivity].
+    symmetry.
+    apply update_val_rel_eq.
+  - intros [].
 Qed.
 
 Lemma store_fail_lemma :
@@ -1033,19 +1062,25 @@ Qed.
 
 Lemma load_fails_lemma :
   forall m k,
-    member k m = false ->
-    eutt eq (interp_state handle_mem_spec (trigger (LoadE k)) m)
-      (raise "Load from unallocated address.").
+    IM.mem k m = false ->
+    (interp_state handle_mem_spec (trigger (LoadE k) : ctree MemE Bspec nat) m) ~
+      (raise "Load from unallocated address." : ctree Effin Bspec (memory * unit)%type).
 Proof.
   intros m k MEM.
   setoid_rewrite interp_state_trigger.
   cbn.
-  destruct (lookup k m) eqn:LUP.
-
-  apply lookup_member in LUP.
-  rewrite LUP in MEM.
-  discriminate.
-  reflexivity.
+  destruct (IM.find k m) eqn:LUP.
+  - exfalso.
+    apply IM.find_2 in LUP.
+    assert (IM.In k m) as IN.
+    exists n. apply LUP.
+    apply IM.mem_1 in IN.
+    rewrite MEM in IN; discriminate.
+  - cbn.
+    (* Why can't I just rewrite? *)
+    pose proof (@raise_bind Effin _ Bspec (memory * nat)%type (memory * nat)%type (memory * unit)%type "Load from unallocated address." (fun x => Guard (Ret x))).
+    cbn in *.
+    apply H.
 Qed.
 
 
