@@ -1083,14 +1083,20 @@ Proof.
     apply H.
 Qed.
 
+Variant ForallE : Type -> Type :=
+  | Spec_forall A : ForallE A.
+
+Definition forall_spec {E} (A : Type) : ctree E ForallE A :=
+  Br (Spec_forall A) (fun (a : A) => Ret a).
 
 Lemma blah :
-  @strict_refines Effin _
-    (forall_spec nat) (ret 1).
+  @ssim Effin Effin void1 ForallE nat nat eq
+  (ret 1) (forall_spec nat).
 Proof.
   unfold forall_spec.
-  eapply padded_refines_forallL.
-  pstep; red; cbn; constructor; auto.
+  apply ssim_br_r with (x:=1).
+  apply ssim_ret.
+  reflexivity.
 Qed.
 
 (* This doesn't work. The thing on the left is an empty set, and the
