@@ -953,10 +953,9 @@ Qed.
 
 Lemma alloc_lemma' :
   forall m,
-    @strict_refines
-      Effin _
-      (interp_state handle_mem_spec (trigger AllocE) m)
-      (ret (add (next_key m) 0 m, next_key m)).
+    @ssim Effin Effin void1 Bspec (memory * IM.key)%type (memory * IM.key)%type eq
+      (ret (IM.add (next_key m) 0 m, next_key m))
+      (interp_state handle_mem_spec (trigger AllocE : ctree MemE void1 Z) m).
 Proof.
   intros m.
   eapply alloc_lemma.
@@ -966,47 +965,70 @@ Qed.
 
 Lemma store_succ_lemma :
   forall m m_final k v,
-    member k m ->
-    m_final = add k v m ->
-    eutt eq (interp_state (@handle_mem_spec Effin _) (trigger (StoreE k v)) m)
-      (ret (m_final, tt)).
+    IM.mem k m = true ->
+    m_final = IM.add k v m ->
+    (interp_state (@handle_mem_spec Effin _) (trigger (StoreE k v) : ctree MemE Bspec unit) m) ~
+      (ret (m_final, tt) : ctree Effin Bspec (memory * unit)%type).
 Proof.
   intros m m_final k v MEM FINAL.
   setoid_rewrite interp_state_trigger.
   cbn.
-  apply member_lookup in MEM.
+  apply IM.mem_2 in MEM.
   destruct MEM.
-  rewrite H.
+  erewrite IM.find_1; eauto.
+  rewrite bind_ret_l.
+
+  apply sb_guard_l.
   subst.
   reflexivity.
 Qed.
 
 Lemma load_succ_lemma :
   forall m k v,
-    lookup k m = Some v ->
-    eutt eq (interp_state (@handle_mem_spec Effin _) (trigger (LoadE k)) m)
-      (ret (m, v)).
+    IM.find k m = Some v ->
+    (interp_state (@handle_mem_spec Effin _) (trigger (LoadE k) : ctree MemE Bspec nat) m) ~
+      (ret (m, v) : ctree Effin Bspec (memory * nat)%type).
 Proof.
   intros m k v LUP.
   setoid_rewrite interp_state_trigger.
   cbn.
   rewrite LUP.
+  rewrite bind_ret_l.
+  apply sb_guard_l.
   reflexivity.
+Qed.
+
+Lemma raise_bind :
+  forall E `{FailureE -< E} B R1 R2 msg (k : R1 -> ctree E B R2),
+    ((raise msg : ctree E B R1) >>= k) ~ (raise msg : ctree E B R2).
+Proof.
+  intros E H B R1 R2 msg k.
+  cbn.
+  unfold raise.
+  rewrite bind_bind.
+  eapply sbisim_clo_bind_eq.
+  reflexivity.
+  intros [].
 Qed.
 
 Lemma store_fail_lemma :
   forall m k v,
-    member k m = false ->
-    eutt eq (interp_state handle_mem_spec (trigger (StoreE k v)) m)
-      (raise "Store to unallocated address.").
+    IM.mem k m = false ->
+    (interp_state handle_mem_spec (trigger (StoreE k v) : ctree MemE Bspec unit) m) ~
+      (raise "Store to unallocated address." : ctree Effin Bspec (memory * unit)%type).
 Proof.
   intros m k v MEM.
   setoid_rewrite interp_state_trigger.
   cbn.
-  destruct (lookup k m) eqn:LUP.
-  apply lookup_member in LUP.
-  rewrite LUP in MEM; discriminate.
-  reflexivity.
+  destruct (IM.find k m) eqn:LUP.
+  - exfalso.
+    apply IM.find_2 in LUP.
+    assert (IM.In k m) as IN.
+    exists n. apply LUP.
+    apply IM.mem_1 in IN.
+    rewrite MEM in IN; discriminate.
+  - rewrite raise_bind.
+    reflexivity.
 Qed.
 
 Lemma load_fails_lemma :
