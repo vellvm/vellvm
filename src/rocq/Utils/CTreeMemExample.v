@@ -823,6 +823,14 @@ Proof using.
   rewrite IM.Raw.Proofs.add_in; auto.
 Qed.
 
+Lemma find_add_eq {a}: forall k v (m: IM.t a),
+    IM.find k (IM.add k v m) = Some v.
+Proof using.
+  intros.
+  apply IM.find_1.
+  apply IM.add_1; auto.
+Qed.
+
 Lemma mem_add_neq {a}: forall k1 k2 v (m: IM.t a),
     k1 <> k2 ->
     IM.mem k1 (IM.add k2 v m) = IM.mem k1 m.
@@ -923,7 +931,7 @@ Proof.
   }
 Qed.
 
-Definition store_prog (v : nat) : ctree MemE void1 nat :=
+Definition store_prog (v : nat) : ctree MemE Bspec nat :=
   k <- trigger AllocE;;
   trigger (StoreE k v);;
   trigger (LoadE k).
@@ -932,9 +940,9 @@ Lemma alloc_lemma :
   forall m m_final k,
     IM.mem k m = false ->
     m_final = IM.add k 0 m ->
-    @ssim Effin Effin void1 Bspec (memory * IM.key)%type (memory * IM.key)%type eq
+    @ssim Effin Effin Bspec Bspec (memory * IM.key)%type (memory * IM.key)%type eq
       (ret (m_final, k))
-      (interp_state handle_mem_spec (trigger AllocE : ctree MemE void1 Z) m).
+      (interp_state handle_mem_spec (trigger AllocE : ctree MemE Bspec Z) m).
 Proof.
   intros m m_final k MEM FINAL.
   setoid_rewrite interp_state_trigger.
@@ -953,9 +961,9 @@ Qed.
 
 Lemma alloc_lemma' :
   forall m,
-    @ssim Effin Effin void1 Bspec (memory * IM.key)%type (memory * IM.key)%type eq
+    @ssim Effin Effin Bspec Bspec (memory * IM.key)%type (memory * IM.key)%type eq
       (ret (IM.add (next_key m) 0 m, next_key m))
-      (interp_state handle_mem_spec (trigger AllocE : ctree MemE void1 Z) m).
+      (interp_state handle_mem_spec (trigger AllocE : ctree MemE Bspec Z) m).
 Proof.
   intros m.
   eapply alloc_lemma.
@@ -1126,45 +1134,37 @@ Proof.
 Qed.
 
 Lemma blah' :
-  @strict_refines Effin _
+  @ssim Effin Effin ForallE ForallE nat nat eq
     (forall_spec nat)
     (forall_spec nat).
 Proof.
   unfold forall_spec.
-  eapply padded_refines_forallR.
-  intros a.
-  eapply padded_refines_forallL.
-  pstep; red; cbn; constructor; auto.
+  apply ssim_br_id.
+  intros x.
+  apply ssim_ret; reflexivity.
 Qed.
 
 Lemma store_forward_with_rewrites' :
   forall m v,
-    @strict_refines
-      Effin _
-      (fmap snd (interp_state handle_mem_spec (store_prog v) m))
-      (ret v).
+    @ssim Effin Effin Bspec Bspec _ _ eq
+      (ret v)
+      (fmap snd (interp_state handle_mem_spec (store_prog v) m)).
 Proof.
   intros m v.
+  unfold store_prog.
   cbn.
-  unfold ITree.map.
-  cbn.
-
-  Opaque member lookup add.
-  setoid_rewrite interp_state_bind.
-  setoid_rewrite interp_state_bind.
+  repeat setoid_rewrite interp_state_bind.
   repeat setoid_rewrite bind_bind.
-  cbn.
 
-  rewrite alloc_lemma'; cbn.
-  setoid_rewrite bind_ret_l.
+  rewrite <- alloc_lemma'; cbn.
+  rewrite bind_ret_l; cbn.
   rewrite store_succ_lemma; cbn; eauto.
-  2: apply member_add_eq.
+  2: apply mem_add_eq.
 
-  setoid_rewrite bind_ret_l.
-  rewrite load_succ_lemma; cbn; eauto.
-  2: apply lookup_add_eq.
+  rewrite bind_ret_l; cbn.
+  rewrite load_succ_lemma; [cbn; eauto | apply find_add_eq].
 
-  setoid_rewrite bind_ret_l.
+  rewrite bind_ret_l.
   cbn.
   reflexivity.
 Qed.
