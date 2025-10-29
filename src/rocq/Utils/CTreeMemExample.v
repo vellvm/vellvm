@@ -1171,6 +1171,7 @@ Qed.
 
 Hint Rewrite
   @bind_bind
+  @bind_branch
   @bind_vis
   @bind_ret_l
   @interp_state_bind
@@ -1185,20 +1186,16 @@ Hint Resolve
   @bind_ret_l
   @interp_state_bind
   @interp_state_trigger
-  strict_refines_refl
-  strict_refines_trans
-  strict_refines_proper
-  padded_refines_bind_proper
-  padded_refines_proper_eq_itree
-  padded_refines_proper_eutt
-  refines_padded_refines
+  @ssim_br_r
+  @ssim_br_l
+  @ssim_guard_r
+  @ssim_guard_l
+  @ssim_ret
   alloc_lemma'
   store_succ_lemma
   load_succ_lemma 
-  member_add_eq
-  lookup_add_eq : SolveMem.
-
-Hint Extern 100 (@strict_refines _ _ _ _) => reflexivity : SolveMem.
+  mem_add_eq
+  find_add_eq : SolveMem.
 
 Ltac solve_refines :=
   cbn;
@@ -1209,30 +1206,40 @@ Ltac solve_refines :=
 
 Lemma store_forward_with_rewrites'' :
   forall m v,
-    @strict_refines
-      Effin _
-      (fmap snd (interp_state handle_mem_spec (store_prog v) m))
-      (ret v).
-Proof.
-  intros m v.
-  cbn.
-  unfold ITree.map.
-  solve_refines.
-Qed.
-
-Lemma store_forward_with_rewrites :
-  forall m v,
-    @strict_refines
-      Effin _
+    @ssim Effin Effin Bspec Bspec _ _ eq
       (ret v)
       (fmap snd (interp_state handle_mem_spec (store_prog v) m)).
 Proof.
   intros m v.
   cbn.
-  unfold ITree.map.
+  unfold CTree.map.
+  unfold store_prog.
+  solve_refines.
+  unfold do_alloc.
+  rewrite bind_bind.
+  rewrite bind_branch.
+  eapply ssim_br_r.
+  cbn.
+  rewrite bind_ret_l.
+  rewrite bind_guard.
+  apply ssim_guard_r.
+  solve_refines.
+  Unshelve.
+  apply alloc_sigma.
+Qed.
+
+Lemma store_forward_with_rewrites :
+  forall m v,
+    @ssim Effin Effin Bspec Bspec _ _ eq
+      (fmap snd (interp_state handle_mem_spec (store_prog v) m))
+      (ret v).
+Proof.
+  intros m v.
+  cbn.
+  unfold CTree.map.
   cbn.
 
-  Opaque member lookup add.
+  Opaque IM.mem IM.find IM.add.
   setoid_rewrite interp_state_bind.
   setoid_rewrite interp_state_bind.
   cbn.
@@ -1247,21 +1254,28 @@ Proof.
    *)
   setoid_rewrite interp_state_trigger at 1.
   cbn.
-  rewrite bind_vis.
-  apply padded_refines_forallR.
+  unfold do_alloc.
+  repeat rewrite bind_bind.
+  rewrite bind_branch.
+  apply ssim_br_l.
   intros [k m'].
   solve_refines.
-  reflexivity.
+  rewrite bind_guard.
+  apply ssim_guard_l.
+  solve_refines.
 Qed.
 
-Lemma store_forward_stronger :
-  forall m v,
-    eq1 (ret v)
-      (fmap snd (interp_state (@handle_mem_spec Effin _) (store_prog v) m)).
-Proof.
-  intros m v.
-  repeat red.
-  split.
-  apply store_forward_with_rewrites.
-  apply store_forward_with_rewrites'.
-Qed.
+
+(* (* May need complete simulations to break this proof up like this... May be resolved in askrcv ctrees branch *) *)
+(* Lemma store_forward_stronger : *)
+(*   forall m v, *)
+(*     (ret v : ctree Effin Bspec nat) ~ *)
+(*       (fmap snd (interp_state (@handle_mem_spec Effin _) (store_prog v) m)). *)
+(* Proof. *)
+(*   intros m v. *)
+(*   sbisim *)
+(*   rewrite store_forward_with_rewrites'. *)
+(*   split. *)
+(*   apply store_forward_with_rewrites. *)
+(*   apply store_forward_with_rewrites'. *)
+(* Qed. *)
