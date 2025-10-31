@@ -761,7 +761,7 @@ split.
   apply X0.
 Defined.
 
-#[global] Instance MonadStepState {S M} `{HM : Monad M} `{MS : MonadStep M} : MonadStep (stateT S M).
+#[global] Instance MonadStepState {S M} `{HM : Monad M} `{MS : MonadStep M} : MonadStep (Monads.stateT S M).
 red.
 intros s.
 eapply bind.
@@ -770,7 +770,7 @@ intros _.
 apply (ret (s, tt)).
 Defined.
 
-#[global] Instance MonadStuckState {S M} `{HM : Monad M} `{MS : MonadStuck M} : MonadStuck (stateT S M).
+#[global] Instance MonadStuckState {S M} `{HM : Monad M} `{MS : MonadStuck M} : MonadStuck (Monads.stateT S M).
 red.
 intros X.
 red.

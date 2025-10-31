@@ -119,6 +119,7 @@
 ./rocq/Utils/SpecEvents.v
 ./rocq/Utils/AListFacts.v
 ./rocq/Utils/Commutation.v
+./rocq/Utils/CTreeUtils.v
 ./rocq/Utils/Default.v
 ./rocq/Utils/Error.v
 ./rocq/Utils/ErrorMonads.v

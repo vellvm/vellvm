@@ -43,18 +43,12 @@ Import MonadNotation.
 
 Import MemoryAddress.
 
-From ITree Require Import
-  ITree
-  Eq.Eqit
-  Eq.EqAxiom
-  Events.StateFacts.
-
-From ITreeSpec Require Import
-  ITreeSpecDefinition
-  ITreeSpecFacts
-  ITreeSpecCombinatorFacts.
-
 Unset Universe Checking.
+From CTree Require Import
+  CTree CTreeDefinitions Eq Fold FoldStateT.
+
+From Vellvm.Utils Require Import
+  CTreeUtils.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -83,6 +77,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Context {E : Type -> Type}.
 
     Notation F := (PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE).
+    Notation MB := void1.
 
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).
@@ -98,9 +93,9 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Proof using.
       split.
       exact (lift
-               (ms <- get;;
+               (ms <- MonadState.get;;
                 let (pr', ms') := mem_state_fresh_provenance ms in
-                put ms';;
+                MonadState.put ms';;
                 ret pr')).
     Defined.
 
@@ -108,17 +103,17 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Proof using.
       split.
       unfold MemStateFreshT.
-      apply (sid <- get;;
+      apply (sid <- MonadState.get;;
              let sid' := BinNatDef.N.succ sid in
-             put sid';;
+             MonadState.put sid';;
              ret sid).
     Defined.
 
     #[global] Instance MemStateFreshT_MonadMemState M `{Monad M} : MonadMemState MemState (MemStateFreshT M).
     Proof using.
       split.
-      - apply (lift get).
-      - intros ms; apply (lift (put ms)).
+      - apply (lift MonadState.get).
+      - intros ms; apply (lift (MonadState.put ms)).
     Defined.
 
     #[global] Instance MemState_StoreIdFreshness : StoreIdFreshness MemState.
@@ -152,7 +147,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Defined.
 
     (* M may be PropT or itree... *)
-    Definition MemStateFreshT_run {A} {Eff} (ma : MemStateFreshT (itree Eff) A) (ms : MemState) (st : MemStateFreshT_State) : itree Eff (MemStateFreshT_State * (MemState * A)).
+    Definition MemStateFreshT_run {A} {Eff B} (ma : MemStateFreshT (ctree Eff B) A) (ms : MemState) (st : MemStateFreshT_State) : ctree Eff B (MemStateFreshT_State * (MemState * A)).
     Proof using.
       unfold MemStateFreshT in *.
       specialize (ma st ms).
@@ -162,41 +157,49 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       apply (s', (ms', x)).
     Defined.
 
-  Definition within_MemStateFreshT_itree
-    {Eff}
-    {A} (msf : MemStateFreshT (itree Eff) A) (pre : MemStateFreshT_State * MemState) (t : itree Eff A) (post : MemStateFreshT_State * MemState) : Prop :=
+  Definition within_MemStateFreshT_ctree
+    {Eff B}
+    {A} (msf : MemStateFreshT (ctree Eff B) A) (pre : MemStateFreshT_State * MemState) (t : ctree Eff B A) (post : MemStateFreshT_State * MemState) : Prop :=
     let '(sid, ms) := pre in
     let '(sid', ms') := post in
-    MemStateFreshT_run msf ms sid ≈ fmap (fun x => (sid', (ms', x))) t.
+    MemStateFreshT_run msf ms sid ~ fmap (fun x => (sid', (ms', x))) t.
 
   Lemma within_eq1_Proper_MemStateFreshT_itree
-    {Eff} :
+    {Eff B} :
     forall A : Type,
       Proper (Monad.eq1 ==> eq ==> eq ==> eq ==> iff)
-        (@within_MemStateFreshT_itree Eff A).
+        (@within_MemStateFreshT_ctree Eff B A).
   Proof using.
     intros A.
     unfold Proper, respectful.
-    intros x y H2 x0 y0 H3 x1 y1 H4 x2 y2 H5.
+    intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2.
     subst.
-    unfold within_MemStateFreshT_itree.
+    unfold within_MemStateFreshT_ctree.
     cbn.
-    destruct y0, y2.
+    destruct y0, y2; cbn.
     split; intros WITHIN.
-    - rewrite H2 in WITHIN.
-      auto.
-    - rewrite H2.
-      auto.
+    - rewrite <- WITHIN.
+      unfold CTree.map.
+      apply sbisim_clo_bind_eq.
+      rewrite H; reflexivity.
+      intros [? [? ?]]; cbn.
+      reflexivity.
+    - rewrite <- WITHIN.
+      unfold CTree.map.
+      apply sbisim_clo_bind_eq.
+      rewrite H; reflexivity.
+      intros [? [? ?]]; cbn.
+      reflexivity.
   Qed.
 
-  #[global] Instance MemStateFreshT_Within {Eff} :
-    Within (MemStateFreshT (itree Eff)) (itree Eff) (MemStateFreshT_State * MemState) (MemStateFreshT_State * MemState).
+  #[global] Instance MemStateFreshT_Within {Eff B} :
+    Within (MemStateFreshT (ctree Eff B)) (ctree Eff B) (MemStateFreshT_State * MemState) (MemStateFreshT_State * MemState).
   Proof using.
     esplit.
     Unshelve.
     2: {
       intros A m pre b post.
-      eapply within_MemStateFreshT_itree.
+      eapply within_MemStateFreshT_ctree.
       2: apply pre.
       3: apply post.
       eauto.
@@ -213,8 +216,8 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
 
     Import MonadEq1Laws.
 
-    #[global] Instance MemStateFreshT_Eq1_ret_inv {Eff} `{FAIL: FailureE -< Eff} `{OOM: OOME -< Eff} `{UB: UBE -< Eff}
-      : Eq1_ret_inv (MemStateFreshT (itree Eff)).
+    #[global] Instance MemStateFreshT_Eq1_ret_inv {Eff B} `{FAIL: FailureE -< Eff} `{OOM: OOME -< Eff} `{UB: UBE -< Eff}
+      : Eq1_ret_inv (MemStateFreshT (ctree Eff B)).
     Proof using.
       split.
       intros A x y EQ.
@@ -226,28 +229,54 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       specialize (EQ initial_memory_state).
       unfold Monad.eq1 in *.
       unfold ITreeMonad.Eq1_ITree in *.
-      cbn in EQ.
-      apply eqit_inv_Ret in EQ.
+      red in EQ.
+      apply sbisim_ret_inv in EQ.
       inv EQ.
       reflexivity.
     Qed.
 
-    #[global] Instance MemStateFreshT_run_Proper {A Eff} :
-      Proper (Monad.eq1 ==> eq ==> eq ==> Monad.eq1) (@MemStateFreshT_run A Eff).
+    #[global] Instance MemStateFreshT_run_Proper {A Eff B} :
+      Proper (Monad.eq1 ==> eq ==> eq ==> Monad.eq1) (@MemStateFreshT_run A Eff B).
     Proof using.
       unfold Proper, respectful.
       intros x y H2 x0 y0 H3 x1 y1 H4; subst.
       cbn. do 2 red.
       do 8 red in H2.
-      rewrite H2.
-      reflexivity.
+      apply sbisim_clo_bind_eq; eauto.
     Qed.
 
+    (* TODO: Move this *)
+    Definition raise {E B} {A} `{FailureE -< E} (msg : String.string) : ctree E B A :=
+      v <- trigger (Throw (print_msg msg));; match v: void with end.
+
+    (* TODO: Move this *)
+    #[global] Instance RAISE_ERR_CTREE_FAILUREE {E B : Type -> Type} `{FailureE -< E} : RAISE_ERROR (ctree E B) :=
+      { raise_error := fun A e => raise e
+      }.
+
+    (* TODO: Move this *)
+    Definition raiseUB {E B} {A} `{UBE -< E} (msg : String.string) : ctree E B A :=
+      v <- trigger (ThrowUB (print_msg msg));; match v: void with end.
+
+    (* TODO: Move this *)
+    #[global] Instance RAISE_UB_CTREE_FAILUREE {E B : Type -> Type} `{UBE -< E} : RAISE_UB (ctree E B) :=
+      { raise_ub := fun A e => raiseUB e
+      }.
+
+    (* TODO: Move this *)
+    Definition raiseOOM {E B} {A} `{OOME -< E} (msg : String.string) : ctree E B A :=
+      v <- trigger (ThrowOOM (print_msg msg));; match v: void with end.
+
+    (* TODO: Move this *)
+    #[global] Instance RAISE_OOM_CTREE_FAILUREE {E B : Type -> Type} `{OOME -< E} : RAISE_OOM (ctree E B) :=
+      { raise_oom := fun A e => raiseOOM e
+      }.
+
     #[global] Instance MemStateFreshT_MemMonad:
-      MemMonad (MemStateFreshT (itree F)) (itree F).
+      MemMonad (MemStateFreshT (ctree F MB)) (ctree F MB).
     Proof using.
       esplit with
-        (MemMonad_run := fun A => @MemStateFreshT_run A F); try solve [typeclasses eauto].
+        (MemMonad_run := fun A => @MemStateFreshT_run A F MB); try solve [typeclasses eauto].
       13-18:intros; raise_abs.
 
       - (* run bind *)
@@ -451,9 +480,9 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Definition memory_k_spec
                {T R : Type}
                (e : Effin T)
-               (ta : itree Effout (MemState * (store_id * T)))
-               (k2 : (MemState * (store_id * T)) -> itree Effout (MemState * (store_id * R)))
-               (t2 : itree Effout (MemState * (store_id * R))) : Prop
+               (ta : ctree Eff Bout (MemState * (store_id * T)))
+               (k2 : (MemState * (store_id * T)) -> ctree Eff Bout (MemState * (store_id * R)))
+               (t2 : ctree Eff Bout (MemState * (store_id * R))) : Prop
       := contains_UB_Extra ta \/ eutt (prod_rel MM.MemState_eqv eq) t2 (bind ta k2).
 (* /\
    Proper (prod_rel MM.MemState_eqv eq ==> eutt (prod_rel MM.MemState_eqv eq)) k2) *)
@@ -514,8 +543,8 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     (* Qed. *)
 
     Definition interp_memory_spec {R} :
-      itree Effin R -> MemStateFreshT (itree_spec Effout) R :=
-      fun (t : itree Effin R) => interp interp_memory_spec_h t.
+      ctree Eff Bin R -> MemStateFreshT (itree_spec Effout) R :=
+      fun (t : ctree Eff Bin R) => interp interp_memory_spec_h t.
 
   End Interpreters.
 End MemorySpecInterpreter.
@@ -601,7 +630,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     Defined.
 
     (* M may be PropT or itree... *)
-    Definition MemStateFreshT_run {A} {Eff} `{FailureE -< Eff} `{OOME -< Eff} `{UBE -< Eff} (ma : MemStateFreshT (itree Eff) A) (ms : MemState) (st : MemStateFreshT_State) : itree Eff (MemStateFreshT_State * (MemState * A)).
+    Definition MemStateFreshT_run {A} {Eff} `{FailureE -< Eff} `{OOME -< Eff} `{UBE -< Eff} (ma : MemStateFreshT (ctree Eff B) A) (ms : MemState) (st : MemStateFreshT_State) : ctree Eff B (MemStateFreshT_State * (MemState * A)).
     Proof using.
       unfold MemStateFreshT in *.
       specialize (ma st ms).
@@ -612,7 +641,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     Defined.
 
     #[global] Instance MemStateFreshT_MemMonad :
-      MemMonad (MemStateFreshT (itree Effout)) (itree Effout).
+      MemMonad (MemStateFreshT (ctree Eff Bout)) (ctree Eff Bout).
     Proof using.
       esplit with
         (MemMonad_run := fun A => @MemStateFreshT_run A Effout _ _ _); try solve [typeclasses eauto].
@@ -730,24 +759,24 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     Defined.
 
     (** Handlers *)
-    Definition E_trigger : E ~> MemStateFreshT (itree Effout) :=
+    Definition E_trigger : E ~> MemStateFreshT (ctree Eff Bout) :=
       fun R e sid m => r <- trigger e;; ret (m, (sid, r)).
 
-    Definition F_trigger : F ~> MemStateFreshT (itree Effout) :=
+    Definition F_trigger : F ~> MemStateFreshT (ctree Eff Bout) :=
       fun R e sid m => r <- trigger e;; ret (m, (sid, r)).
 
     (* TODO: get rid of this silly hack. *)
-    Definition my_handle_memory : MemoryE ~> MemStateFreshT (itree Effout) :=
-      @handle_memory (MemStateFreshT (itree Effout)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+    Definition my_handle_memory : MemoryE ~> MemStateFreshT (ctree Eff Bout) :=
+      @handle_memory (MemStateFreshT (ctree Eff Bout)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
-    Definition my_handle_intrinsic : IntrinsicE ~> MemStateFreshT (itree Effout) :=
-      @handle_intrinsic (MemStateFreshT (itree Effout)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+    Definition my_handle_intrinsic : IntrinsicE ~> MemStateFreshT (ctree Eff Bout) :=
+      @handle_intrinsic (MemStateFreshT (ctree Eff Bout)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
-    Definition interp_memory_h : Effin ~> MemStateFreshT (itree Effout)
+    Definition interp_memory_h : Effin ~> MemStateFreshT (ctree Eff Bout)
       := case_ E_trigger (case_ my_handle_intrinsic (case_ my_handle_memory F_trigger)).
 
     Definition interp_memory :
-      itree Effin ~> MemStateFreshT (itree Effout) :=
+      ctree Eff Bin ~> MemStateFreshT (ctree Eff Bout) :=
     State.interp_state interp_memory_h.
 
     (* Interp Laws for [interp_memory] *)
@@ -797,7 +826,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       rewrite unfold_interp_memory; reflexivity.
     Qed.
 
-  Definition exec_correct_no_ub {MemM Eff} `{MM: MemMonad MemM (itree Eff)} {X} (pre : exec_correct_pre) (exec : MemM X) (spec : MemPropT MemState X) (post : exec_correct_post X) : Prop :=
+  Definition exec_correct_no_ub {MemM Eff} `{MM: MemMonad MemM (ctree Eff B)} {X} (pre : exec_correct_pre) (exec : MemM X) (spec : MemPropT MemState X) (post : exec_correct_post X) : Prop :=
     forall ms st,
       (MemMonad_valid_state ms st) ->
       pre ms st ->
@@ -972,7 +1001,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
       (* TODO: probably an easier more general lemma about
          [exec_correct] and [MemPropT_lift_PropT_fresh] *)
-      epose proof @handle_intrinsic_correct (MemStateFreshT (itree Effout)) Effout
+      epose proof @handle_intrinsic_correct (MemStateFreshT (ctree Eff Bout)) Effout
         _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T i (fun _ _ => True) as HANDLE_CORRECT.      
 
       red in HANDLE_CORRECT.
