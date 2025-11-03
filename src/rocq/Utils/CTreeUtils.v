@@ -7,6 +7,9 @@ From ExtLib Require Import
   Structures.Functor
   Structures.Monads.
 
+From Vellvm.Utils Require Import
+  MonadEq1Laws.
+
 Import Monad.
 
 #[global] Instance ctree_monad {E B} : Monad (ctree E B).
@@ -23,6 +26,13 @@ Defined.
 intros A.
 apply sbisim.
 apply eq.
+Defined.
+
+#[global] Instance ctree_Eq1_ret_inv {Eff B} : Eq1_ret_inv (ctree Eff B).
+split.
+intros A x y H.
+eapply sbisim_ret_inv; eauto.
+apply H.
 Defined.
 
 #[global] Instance ctree_monad_eq1_equiv {Eff B} : Monad.Eq1Equivalence (ctree Eff B).

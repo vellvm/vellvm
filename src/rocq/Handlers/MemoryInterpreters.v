@@ -245,39 +245,15 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       apply sbisim_clo_bind_eq; eauto.
     Qed.
 
-    (* TODO: Move this *)
-    Definition raise {E B} {A} `{FailureE -< E} (msg : String.string) : ctree E B A :=
-      v <- trigger (Throw (print_msg msg));; match v: void with end.
-
-    (* TODO: Move this *)
-    #[global] Instance RAISE_ERR_CTREE_FAILUREE {E B : Type -> Type} `{FailureE -< E} : RAISE_ERROR (ctree E B) :=
-      { raise_error := fun A e => raise e
-      }.
-
-    (* TODO: Move this *)
-    Definition raiseUB {E B} {A} `{UBE -< E} (msg : String.string) : ctree E B A :=
-      v <- trigger (ThrowUB (print_msg msg));; match v: void with end.
-
-    (* TODO: Move this *)
-    #[global] Instance RAISE_UB_CTREE_FAILUREE {E B : Type -> Type} `{UBE -< E} : RAISE_UB (ctree E B) :=
-      { raise_ub := fun A e => raiseUB e
-      }.
-
-    (* TODO: Move this *)
-    Definition raiseOOM {E B} {A} `{OOME -< E} (msg : String.string) : ctree E B A :=
-      v <- trigger (ThrowOOM (print_msg msg));; match v: void with end.
-
-    (* TODO: Move this *)
-    #[global] Instance RAISE_OOM_CTREE_FAILUREE {E B : Type -> Type} `{OOME -< E} : RAISE_OOM (ctree E B) :=
-      { raise_oom := fun A e => raiseOOM e
-      }.
-
     #[global] Instance MemStateFreshT_MemMonad:
       MemMonad (MemStateFreshT (ctree F MB)) (ctree F MB).
     Proof using.
       esplit with
         (MemMonad_run := fun A => @MemStateFreshT_run A F MB); try solve [typeclasses eauto].
-      13-18:intros; raise_abs.
+
+      - 
+
+      13-18:intros; raise_abs..
 
       - (* run bind *)
         intros A B ma k ms sid.

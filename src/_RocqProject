@@ -149,6 +149,7 @@
 ./rocq/Utils/PostConditions.v
 ./rocq/Utils/PropT.v
 ./rocq/Utils/Raise.v
+./rocq/Utils/RaiseCtree.v
 ./rocq/Utils/RefineProp.v
 ./rocq/Utils/ErrUbOomProp.v
 ./rocq/Utils/ErrOomPoison.v
