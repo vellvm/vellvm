@@ -16,11 +16,12 @@ From Vellvm.Handlers Require Import
   MemPropT
   MemoryModules.Within.
 
+Unset Universe Checking.
 From Vellvm.Utils Require Import
   Tactics
   InterpProp
   VellvmRelations
-  StateMonads Raise Tactics ITreeMap
+  StateMonads Raise RaiseCtree Tactics ITreeMap
   Error.
 
 From Vellvm.Theory Require Import
@@ -43,7 +44,6 @@ Import MonadNotation.
 
 Import MemoryAddress.
 
-Unset Universe Checking.
 From CTree Require Import
   CTree CTreeDefinitions Eq Fold FoldStateT.
 
@@ -251,9 +251,8 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       esplit with
         (MemMonad_run := fun A => @MemStateFreshT_run A F MB); try solve [typeclasses eauto].
 
-      - 
-
-      13-18:intros; raise_abs..
+      (* TODO: I think this needs ctrees askrcv changes *)
+      13-18: admit.
 
       - (* run bind *)
         intros A B ma k ms sid.
@@ -261,10 +260,9 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         cbn.
         rewrite map_bind.
         rewrite bind_map.
-        eapply eutt_clo_bind.
+        eapply sbisim_clo_bind_eq.
         reflexivity.
-        intros u1 u2 H2; subst.
-        destruct u2 as [ms' [sid' x]].
+        intros [ms' [sid' x]].
         cbn.
         reflexivity.
       - (* run ret *)
@@ -338,80 +336,86 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         intros A ms oom_msg sid.
         cbn.
         rewrite map_bind.
-        setoid_rewrite Raise.raiseOOM_bind_itree.
+        setoid_rewrite raiseOOM_bind_ctree.
         reflexivity.
       - (* raise_oom_inv *)
         intros A x oom_msg.
-        intros EQ.
-        pinversion EQ.
+        intros CONTRA.
+        symmetry in CONTRA.
+        apply raiseOOM_ret_inv_ctree in CONTRA; auto.
       - (* raise_ub *)
         intros A ms oom_msg sid.
         cbn.
         rewrite map_bind.
-        setoid_rewrite Raise.raiseUB_bind_itree.
+        setoid_rewrite raiseUB_bind_ctree.
         reflexivity.
       - (* raise_ub_inv *)
         intros A x ub_msg.
-        intros EQ.
-        pinversion EQ.
+        intros CONTRA.
+        symmetry in CONTRA.
+        apply raiseUB_ret_inv_ctree in CONTRA; auto.
       - (* raise_error *)
         intros A ms oom_msg sid.
         cbn.
         rewrite map_bind.
-        setoid_rewrite Raise.raise_bind_itree.
+        setoid_rewrite raise_bind_ctree.
         reflexivity.
       - (* raise_error_inv *)
         intros A x error_msg.
-        intros EQ.
-        pinversion EQ.
-    Defined.
+        intros CONTRA.
+        symmetry in CONTRA.
+        apply raise_ret_inv_ctree in CONTRA; auto.
+    Admitted.
 
-    Definition E_trigger' : forall R, E R -> (MemStateT (itree_spec Effout) R) :=
+    Notation post_mem_tree := (ctree Effout MB).
+
+    Definition E_trigger' : forall R, E R -> (MemStateT post_mem_tree R) :=
       fun R e m =>
         r <- trigger e;; ret (m, r).
 
-    Definition F_trigger' : forall R, F R -> (MemStateT (itree_spec Effout) R) :=
+    Definition F_trigger' : forall R, F R -> (MemStateT post_mem_tree R) :=
       fun R e m =>
         r <- trigger e;; ret (m, r).
 
-    Definition E_trigger : forall R, E R -> (MemStateFreshT (itree_spec Effout) R) :=
+    Definition E_trigger : forall R, E R -> (MemStateFreshT post_mem_tree R) :=
       fun R e sid m =>
         r <- trigger e;; ret (m, (sid, r)).
 
-    Definition F_trigger : forall R, F R -> (MemStateFreshT (itree_spec Effout) R) :=
+    Definition F_trigger : forall R, F R -> (MemStateFreshT post_mem_tree R) :=
       fun R e sid m =>
         r <- trigger e;; ret (m, (sid, r)).
 
-    (* Should line up with exec_correct *)
-    Definition MemPropT_lift_PropT_fresh {X} {EFF} `{UBE -< EFF} `{OOME -< EFF} `{FailureE -< EFF} (spec : MemPropT MemState X) :
-      stateT store_id (stateT MemState (PropT EFF)) X.
-    Proof.
-      unfold PropT, MemPropT, stateT in *.
+    (* TODO: delete this? *)
+    (* (* Should line up with exec_correct *) *)
+    (* Definition MemPropT_lift_PropT_fresh {X} {EFF} `{UBE -< EFF} `{OOME -< EFF} `{FailureE -< EFF} (spec : MemPropT MemState X) : *)
+    (*   stateT store_id (stateT MemState (PropT EFF)) X. *)
+    (* Proof. *)
+    (*   unfold PropT, MemPropT, stateT in *. *)
 
-      refine
-        (fun st ms t =>
-           (* UB *)
-           (exists msg_spec,
-               spec ms (raise_ub msg_spec)) \/
-             (* Error *)
-             ((exists msg,
-                  t ≈ (raise_error msg) /\
-                    exists msg_spec, spec ms (raise_error msg_spec))) \/
-             (* OOM *)
-             (exists msg,
-                 t ≈ (raise_oom msg) /\
-                   exists msg_spec, spec ms (raise_oom msg_spec)) \/
-             (* Success *)
-             (exists st' ms' x,
-                 MemMonad_valid_state ms st /\
-                 t ≈ (ret (ms', (st', x))) /\
-                   spec ms (ret (ms', x)) /\
-                   MemMonad_valid_state ms' st')).
-    Defined.
+    (*   refine *)
+    (*     (fun st ms t => *)
+    (*        (* UB *) *)
+    (*        (exists msg_spec, *)
+    (*            spec ms (raise_ub msg_spec)) \/ *)
+    (*          (* Error *) *)
+    (*          ((exists msg, *)
+    (*               t ~ (raise_error msg) /\ *)
+    (*                 exists msg_spec, spec ms (raise_error msg_spec))) \/ *)
+    (*          (* OOM *) *)
+    (*          (exists msg, *)
+    (*              t ~ (raise_oom msg) /\ *)
+    (*                exists msg_spec, spec ms (raise_oom msg_spec)) \/ *)
+    (*          (* Success *) *)
+    (*          (exists st' ms' x, *)
+    (*              MemMonad_valid_state ms st /\ *)
+    (*              t ~ (ret (ms', (st', x))) /\ *)
+    (*                spec ms (ret (ms', x)) /\ *)
+    (*                MemMonad_valid_state ms' st')). *)
+    (* Defined. *)
 
     (* TODO: get rid of this silly hack. *)
     Definition my_handle_memory_prop' :
-      forall T : Type, MemoryE T -> stateT MemState (itree_spec Effout) T.
+      forall T : Type, MemoryE T -> stateT MemState post_mem_tree T.
     Proof using.
       intros T MemE ms.
       eapply handle_memory_prop in ms; eauto.
@@ -422,7 +426,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Defined.
 
     Definition my_handle_intrinsic_prop' :
-      forall T : Type, IntrinsicE T -> stateT MemState (itree_spec Effout) T.
+      forall T : Type, IntrinsicE T -> stateT MemState post_mem_tree T.
     Proof using.
       intros T IntE ms.
       eapply handle_intrinsic_prop in ms; eauto.
@@ -432,7 +436,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Defined.
 
     Definition my_handle_memory_prop :
-      forall T : Type, MemoryE T -> MemStateFreshT (itree_spec Effout) T.
+      forall T : Type, MemoryE T -> MemStateFreshT post_mem_tree T.
     Proof using.
       (* TODO: May need to punt through MemMonad_valid_state like from MemPropT_lift_PropT_fresh *)
       intros T MemE sid ms.
@@ -443,7 +447,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Defined.
 
     Definition my_handle_intrinsic_prop :
-      forall T : Type, IntrinsicE T -> MemStateFreshT (itree_spec Effout) T.
+      forall T : Type, IntrinsicE T -> MemStateFreshT post_mem_tree T.
     Proof using.
       (* TODO: May need to punt through MemMonad_valid_state like from MemPropT_lift_PropT_fresh *)
       intros T IntE sid ms.
@@ -501,7 +505,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       typeclasses eauto.
     Qed.
 
-    Definition interp_memory_spec_h : forall T, Effin T -> MemStateFreshT (itree_spec Effout) T
+    Definition interp_memory_spec_h : forall T, Effin T -> MemStateFreshT post_mem_tree T
       := case_ E_trigger (case_ my_handle_intrinsic_prop (case_ my_handle_memory_prop F_trigger)).
 
     (* #[global] Instance memory_k_spec_WF : @k_spec_WF store_id MemState _ _ interp_memory_spec_h (@memory_k_spec). *)
@@ -519,7 +523,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     (* Qed. *)
 
     Definition interp_memory_spec {R} :
-      ctree Eff Bin R -> MemStateFreshT (itree_spec Effout) R :=
+      ctree Eff Bin R -> MemStateFreshT post_mem_tree R :=
       fun (t : ctree Eff Bin R) => interp interp_memory_spec_h t.
 
   End Interpreters.
