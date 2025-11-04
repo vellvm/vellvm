@@ -1,3 +1,4 @@
+Unset Universe Checking.
 From Vellvm.Syntax Require Import
      DataLayout
      DynamicTypes.
@@ -143,7 +144,8 @@ Module MakeFiniteMemory (LP : LLVMParams) <: Memory LP.
   Module MMEP := FiniteMemoryModelExecPrimitives LP MP.
   Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.
   Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec MMEP.MemExecM.
-  Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
+  (* TODO: may not need this with ctrees *)
+  (* Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP. *)
 
   (* Concretization *)
   Module ByteM := MemBytes.Byte ADDR IP SIZEOF LP.Events MP.BYTE_IMPL.
@@ -209,12 +211,13 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Import MemTheory.
 
   Module SpecInterp := MakeMemorySpecInterpreter LP MP MMSP MMS MemExecM.
-  Module ExecInterp := MakeMemoryExecInterpreter LP MP MMEP MME SpecInterp.
+  (* Module ExecInterp := MakeMemoryExecInterpreter LP MP MMEP MME SpecInterp. *)
   Import SpecInterp.
-  Import ExecInterp.
+  (* Import ExecInterp. *)
 
   #[local] Parameter (E : Type -> Type).
   Notation Eff := (E +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE).
+  Notation MB := void1.
 
   Import Eq.
   Import MMSP.
@@ -361,7 +364,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Proof using.
     intros ms len pr.
     pose proof @find_free_block_correct as GET_FREE.
-    specialize (GET_FREE (MemStateFreshT (itree Eff)) Eff _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    specialize (GET_FREE (MemStateFreshT (ctree Eff _)) Eff _ _ _ _ _ _ _ _ _ _ _ _ _ _
                   MemStateFreshT_MemMonad len pr (fun _ _ => True)).
     red in GET_FREE.
     pose proof MemMonad_valid_state_exists ms as (st & VALID).
