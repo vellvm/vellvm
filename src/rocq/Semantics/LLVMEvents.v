@@ -163,7 +163,6 @@ Set Contextual Implicit.
       end
     end.
 
-
 (* TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism not functors. *)
 Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZEOF : Sizeof).
 

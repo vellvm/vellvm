@@ -44,6 +44,8 @@ Import MonadNotation.
 
 Import MemoryAddress.
 
+Import CategoryOps.
+
 From CTree Require Import
   CTree CTreeDefinitions Eq Fold FoldStateT.
 
@@ -72,12 +74,16 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
   Import LP.Events.
   Import LP.PROV.
 
+  Variant MemC : Type -> Type :=
+    | memC {X} (e : MemoryE X) m : MemC ({res | handle_memory_prop _ e m res})
+    | intrinsicC {X} (e : IntrinsicE X) m : MemC ({res | handle_intrinsic_prop _ e m res}).
+
   Section Interpreters.
 
     Context {E : Type -> Type}.
 
     Notation F := (PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE).
-    Notation MB := void1.
+    Notation MB := MemC.
 
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).
@@ -413,97 +419,77 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     (*                MemMonad_valid_state ms' st')). *)
     (* Defined. *)
 
-    (* TODO: get rid of this silly hack. *)
-    Definition my_handle_memory_prop' :
-      forall T : Type, MemoryE T -> stateT MemState post_mem_tree T.
-    Proof using.
-      intros T MemE ms.
-      eapply handle_memory_prop in ms; eauto.
-      apply (Vis (Spec_forall {a : err_ub_oom (MemState * T) | ms a})
-                  (fun x : {a : err_ub_oom (MemState * T) | ms a} =>
-                     let (x0, m) := x in
-                     (fun (x1 : err_ub_oom (MemState * T)) (_ : ms x1) => lift_err_ub_oom ret x1) x0 m)).
-    Defined.
-
-    Definition my_handle_intrinsic_prop' :
-      forall T : Type, IntrinsicE T -> stateT MemState post_mem_tree T.
-    Proof using.
-      intros T IntE ms.
-      eapply handle_intrinsic_prop in ms; eauto.
-      refine (Vis (@Spec_forall Effout {a : (err_ub_oom (MemState * T)) | ms a}) (fun (x : {a : (err_ub_oom (MemState * T)) | ms a}) => _)).
-      destruct x.
-      apply (lift_err_ub_oom ret x).
-    Defined.
-
     Definition my_handle_memory_prop :
       forall T : Type, MemoryE T -> MemStateFreshT post_mem_tree T.
     Proof using.
       (* TODO: May need to punt through MemMonad_valid_state like from MemPropT_lift_PropT_fresh *)
       intros T MemE sid ms.
-      eapply handle_memory_prop in ms; eauto.
-      refine (Vis (@Spec_forall Effout {a : (err_ub_oom (MemState * (store_id * T))) | ms (fmap (fun '(m, (sid, x)) => (m, x)) a)}) (fun (x : {a : (err_ub_oom (MemState * (store_id * T))) | ms (fmap (fun '(m, (sid, x)) => (m, x)) a)}) => _)).
+      refine (Br (ltac:(eapply (memC MemE ms))) _).
+      intros x.
       destruct x.
-      apply (lift_err_ub_oom ret x).
+      apply (fun x => lift_err_ub_oom_ctree ret (fmap (fun '(ms', r) => (ms', (sid, r))) x)); auto.
     Defined.
 
     Definition my_handle_intrinsic_prop :
       forall T : Type, IntrinsicE T -> MemStateFreshT post_mem_tree T.
     Proof using.
       (* TODO: May need to punt through MemMonad_valid_state like from MemPropT_lift_PropT_fresh *)
-      intros T IntE sid ms.
-      eapply handle_intrinsic_prop in ms; eauto.
-      refine (Vis (@Spec_forall Effout {a : (err_ub_oom (MemState * (store_id * T))) | ms (fmap (fun '(m, (sid, x)) => (m, x)) a)}) (fun (x : {a : (err_ub_oom (MemState * (store_id * T))) | ms (fmap (fun '(m, (sid, x)) => (m, x)) a)}) => _)).
+      intros T MemE sid ms.
+      refine (Br (ltac:(eapply (intrinsicC MemE ms))) _).
+      intros x.
       destruct x.
-      apply (lift_err_ub_oom ret x).
+      apply (fun x => lift_err_ub_oom_ctree ret (fmap (fun '(ms', r) => (ms', (sid, r))) x)); auto.
     Defined.
  
     Definition memory_k_spec
                {T R : Type}
                (e : Effin T)
-               (ta : ctree Eff Bout (MemState * (store_id * T)))
-               (k2 : (MemState * (store_id * T)) -> ctree Eff Bout (MemState * (store_id * R)))
-               (t2 : ctree Eff Bout (MemState * (store_id * R))) : Prop
-      := contains_UB_Extra ta \/ eutt (prod_rel MM.MemState_eqv eq) t2 (bind ta k2).
+               (ta : ctree Effout MB (MemState * (store_id * T)))
+               (k2 : (MemState * (store_id * T)) -> ctree Effout MB (MemState * (store_id * R)))
+               (t2 : ctree Effout MB (MemState * (store_id * R))) : Prop
+      := (* contains_UB_Extra ta \/ *) (* TODO: Do we need UB at the memory model level? *)
+      t2  (~update_val_rel eq (prod_rel MM.MemState_eqv (@eq (store_id * R)))) (bind ta k2).
+
 (* /\
    Proper (prod_rel MM.MemState_eqv eq ==> eutt (prod_rel MM.MemState_eqv eq)) k2) *)
 
-    #[global] Instance memory_k_spec_proper {A R2 : Type} e ta k2 :
-      Proper
-        (eutt eq ==> iff)
-        (@memory_k_spec A R2 e ta k2).
-    Proof using.
-      unfold Proper, respectful.
-      intros x y EQV.
-      split; intros K_SPEC;
-        red; red in K_SPEC; destruct K_SPEC as [UB | K_SPEC];
-        eauto; right;
-        first [rewrite EQV | rewrite <- EQV];
-        eauto.
-    Qed.
+    (* #[global] Instance memory_k_spec_proper {A R2 : Type} e ta k2 : *)
+    (*   Proper *)
+    (*     (eutt eq ==> iff) *)
+    (*     (@memory_k_spec A R2 e ta k2). *)
+    (* Proof using. *)
+    (*   unfold Proper, respectful. *)
+    (*   intros x y EQV. *)
+    (*   split; intros K_SPEC; *)
+    (*     red; red in K_SPEC; destruct K_SPEC as [UB | K_SPEC]; *)
+    (*     eauto; right; *)
+    (*     first [rewrite EQV | rewrite <- EQV]; *)
+    (*     eauto. *)
+    (* Qed. *)
 
-    #[global] Instance memory_k_spec_Proper_S1S2_Proper {A R2 : Type} e ta k2 :
-      Proper
-        (eutt (prod_rel MM.MemState_eqv (prod_rel eq eq)) ==> iff)
-        (@memory_k_spec A R2 e ta k2).
-    Proof using.
-      unfold Proper, respectful.
-      intros x y EQV.
-      split; intros K_SPEC;
-        red; red in K_SPEC; destruct K_SPEC as [UB | K_SPEC];
-        eauto; right.
-      - rewrite prod_rel_eq in EQV.
-        rewrite <- EQV.
-        auto.
-      - rewrite prod_rel_eq in EQV.
-        rewrite EQV.
-        auto.
-    Qed.
+    (* #[global] Instance memory_k_spec_Proper_S1S2_Proper {A R2 : Type} e ta k2 : *)
+    (*   Proper *)
+    (*     (eutt (prod_rel MM.MemState_eqv (prod_rel eq eq)) ==> iff) *)
+    (*     (@memory_k_spec A R2 e ta k2). *)
+    (* Proof using. *)
+    (*   unfold Proper, respectful. *)
+    (*   intros x y EQV. *)
+    (*   split; intros K_SPEC; *)
+    (*     red; red in K_SPEC; destruct K_SPEC as [UB | K_SPEC]; *)
+    (*     eauto; right. *)
+    (*   - rewrite prod_rel_eq in EQV. *)
+    (*     rewrite <- EQV. *)
+    (*     auto. *)
+    (*   - rewrite prod_rel_eq in EQV. *)
+    (*     rewrite EQV. *)
+    (*     auto. *)
+    (* Qed. *)
 
-    #[global] Instance k_spec_Proper_S1S2_memory_k_spec : k_spec_Proper_S1S2 (@memory_k_spec) eq MM.MemState_eqv.
-    Proof using.
-      split.
-      typeclasses eauto.
-    Qed.
+    (* #[global] Instance k_spec_Proper_S1S2_memory_k_spec : k_spec_Proper_S1S2 (@memory_k_spec) eq MM.MemState_eqv. *)
+    (* Proof using. *)
+    (*   split. *)
+    (*   typeclasses eauto. *)
+    (* Qed. *)
 
     Definition interp_memory_spec_h : forall T, Effin T -> MemStateFreshT post_mem_tree T
       := case_ E_trigger (case_ my_handle_intrinsic_prop (case_ my_handle_memory_prop F_trigger)).
@@ -523,8 +509,8 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     (* Qed. *)
 
     Definition interp_memory_spec {R} :
-      ctree Eff Bin R -> MemStateFreshT post_mem_tree R :=
-      fun (t : ctree Eff Bin R) => interp interp_memory_spec_h t.
+      ctree Effin void1 R -> MemStateFreshT post_mem_tree R :=
+      fun (t : ctree Effin void1 R) => interp interp_memory_spec_h t.
 
   End Interpreters.
 End MemorySpecInterpreter.
@@ -621,7 +607,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     Defined.
 
     #[global] Instance MemStateFreshT_MemMonad :
-      MemMonad (MemStateFreshT (ctree Eff Bout)) (ctree Eff Bout).
+      MemMonad (MemStateFreshT (ctree Effout MB)) (ctree Effout MB).
     Proof using.
       esplit with
         (MemMonad_run := fun A => @MemStateFreshT_run A Effout _ _ _); try solve [typeclasses eauto].
@@ -739,24 +725,24 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     Defined.
 
     (** Handlers *)
-    Definition E_trigger : E ~> MemStateFreshT (ctree Eff Bout) :=
+    Definition E_trigger : E ~> MemStateFreshT (ctree Effout MB) :=
       fun R e sid m => r <- trigger e;; ret (m, (sid, r)).
 
-    Definition F_trigger : F ~> MemStateFreshT (ctree Eff Bout) :=
+    Definition F_trigger : F ~> MemStateFreshT (ctree Effout MB) :=
       fun R e sid m => r <- trigger e;; ret (m, (sid, r)).
 
     (* TODO: get rid of this silly hack. *)
-    Definition my_handle_memory : MemoryE ~> MemStateFreshT (ctree Eff Bout) :=
-      @handle_memory (MemStateFreshT (ctree Eff Bout)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+    Definition my_handle_memory : MemoryE ~> MemStateFreshT (ctree Effout MB) :=
+      @handle_memory (MemStateFreshT (ctree Effout MB)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
-    Definition my_handle_intrinsic : IntrinsicE ~> MemStateFreshT (ctree Eff Bout) :=
-      @handle_intrinsic (MemStateFreshT (ctree Eff Bout)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+    Definition my_handle_intrinsic : IntrinsicE ~> MemStateFreshT (ctree Effout MB) :=
+      @handle_intrinsic (MemStateFreshT (ctree Effout MB)) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
-    Definition interp_memory_h : Effin ~> MemStateFreshT (ctree Eff Bout)
+    Definition interp_memory_h : Effin ~> MemStateFreshT (ctree Effout MB)
       := case_ E_trigger (case_ my_handle_intrinsic (case_ my_handle_memory F_trigger)).
 
     Definition interp_memory :
-      ctree Eff Bin ~> MemStateFreshT (ctree Eff Bout) :=
+      ctree Eff Bin ~> MemStateFreshT (ctree Effout MB) :=
     State.interp_state interp_memory_h.
 
     (* Interp Laws for [interp_memory] *)
@@ -981,7 +967,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
       (* TODO: probably an easier more general lemma about
          [exec_correct] and [MemPropT_lift_PropT_fresh] *)
-      epose proof @handle_intrinsic_correct (MemStateFreshT (ctree Eff Bout)) Effout
+      epose proof @handle_intrinsic_correct (MemStateFreshT (ctree Effout MB)) Effout
         _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ T i (fun _ _ => True) as HANDLE_CORRECT.      
 
       red in HANDLE_CORRECT.

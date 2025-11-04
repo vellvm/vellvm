@@ -3,7 +3,9 @@ From Stdlib Require Import
      Morphisms.
 
 From ExtLib Require Import
-     Structures.Monads.
+  Structures.Monads
+  Data.Monads.EitherMonad
+  Data.Monads.IdentityMonad.
 
 Unset Universe Checking.
 From Vellvm Require Import 
@@ -236,3 +238,14 @@ Section UB.
       rbm_raise_ret_inv := raiseUB_ret_inv_ctree;
     }.
 End UB.
+
+  Definition lift_err_ub_oom_ctree {X Y} {E B} `{FailureE -< E} `{UBE -< E} `{OOME -< E} (f : X -> ctree E B Y) (m:err_ub_oom X) : ctree E B Y :=
+    match m with
+    | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
+        match m with
+        | inl (OOM_message x) => raiseOOM x
+        | inr (inl (UB_message x)) => raiseUB x
+        | inr (inr (inl (ERR_message x))) => raise x
+        | inr (inr (inr x)) => f x
+      end
+    end.
