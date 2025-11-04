@@ -3734,6 +3734,10 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   End Handlers.
 
+  Variant MemC : Type -> Type :=
+    | memC {X} (e : MemoryE X) m : MemC ({res | handle_memory_prop _ e m res})
+    | intrinsicC {X} (e : IntrinsicE X) m : MemC ({res | handle_intrinsic_prop _ e m res}).
+
   (* TODO: Should these be here, or in another module? *)
   (* Useful helper lemmas and relations... *)
   #[global] Instance preserve_allocation_ids_Reflexive :
