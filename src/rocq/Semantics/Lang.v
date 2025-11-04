@@ -1,3 +1,4 @@
+Unset Universe Checking.
 From Vellvm Require Import
      Semantics.Memory.MemBytes
      Semantics.Memory.DvalueBytes
@@ -24,7 +25,8 @@ From Vellvm Require Import
     Declare Module MMEP : MemoryModelExecPrimitives LP MP.
     Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.
     Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec MMEP.MemExecM.
-    Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
+    (* TODO: May not need this with ctrees *)
+    (* Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP. *)
 
     (* Concretization *)
     Module ByteM := MemBytes.Byte ADDR IP SIZEOF LP.Events MP.BYTE_IMPL.

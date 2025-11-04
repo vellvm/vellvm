@@ -1,3 +1,4 @@
+Unset Universe Checking.
 From Vellvm Require Import
      Numeric.Rocqlib
      Numeric.Integers.
@@ -202,7 +203,6 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       - apply SetoidList.InA_cons.
         destruct INS as [INS | INS]; firstorder.
         left; subst; eauto.
-        repeat red; eauto.
     Qed.
 
     Lemma read_byte_raw_next_memory_key :
@@ -726,8 +726,9 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       eapply FSNth_frame_eqv; eauto.
     - red in H'.
       apply H'.
-      eapply FSNth_frame_eqv; eauto.
-      symmetry; auto.
+      eapply FSNth_frame_eqv.
+      symmetry; apply H1.
+      auto.
   Qed.
 
   #[global] Instance frame_stack_eqv_Singleton_Proper :

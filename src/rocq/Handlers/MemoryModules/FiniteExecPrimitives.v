@@ -1,3 +1,4 @@
+Unset Universe Checking.
 From Vellvm Require Import
      Numeric.Rocqlib
      Numeric.Integers.
@@ -674,8 +675,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         eapply FSNth_frame_eqv; eauto.
       - red in H'.
         apply H'.
-        eapply FSNth_frame_eqv; eauto.
-        symmetry; auto.
+        eapply FSNth_frame_eqv.
+        symmetry; apply H1.
+        auto.
     Qed.
 
     #[global] Instance heap_eqv_ptr_in_head_prop_Proper :
@@ -753,9 +755,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           destruct ADD as [fs' [ADDPTRS ADD]].
           eexists.
           rewrite <- RS; split; eauto.
-
-          eapply IHptrs; eauto.
-          reflexivity.
       - revert x y XY r s RS ADD.
         induction ptrs' as [|a ptrs];
           intros x y XY r s RS ADD;
@@ -768,9 +767,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           destruct ADD as [fs' [ADDPTRS ADD]].
           eexists.
           rewrite RS; split; eauto.
-
-          eapply IHptrs; eauto.
-          reflexivity.
     Qed.
 
     #[global] Instance heap_eqv_add_ptrs_to_heap'_Proper :
@@ -792,9 +788,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           destruct ADD as [h' [ADDPTRS ADD]].
           eexists.
           rewrite <- RS; split; eauto.
-
-          eapply IHptrs; eauto.
-          reflexivity.
       - revert x y XY r s RS ADD.
         induction ptrs' as [|a ptrs];
           intros x y XY r s RS ADD;
@@ -807,9 +800,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           destruct ADD as [h' [ADDPTRS ADD]].
           eexists.
           rewrite RS; split; eauto.
-
-          eapply IHptrs; eauto.
-          reflexivity.
     Qed.
 
     #[global] Instance heap_eqv_add_ptrs_to_heap_Proper :
@@ -1352,9 +1342,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           }
 
           { rewrite IP.F.add_eq_o in *; auto.
-            setoid_rewrite Heqo in EQROOT.
-            setoid_rewrite Heqo0 in EQROOT.
-            firstorder.
           }
         }
       - subst.
@@ -1713,7 +1700,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         intros ms ms' ADD_ALL.
       - cbn in *.
         apply add_all_to_frame_nil in ADD_ALL; subst; auto.
-        reflexivity.
       - cbn in *.
         eexists.
         split.
@@ -1784,10 +1770,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         break_match.
         + unfold ptr_in_heap_prop.
           rewrite IP.F.add_neq_o; auto.
-          reflexivity.
         + unfold ptr_in_heap_prop.
           rewrite IP.F.add_neq_o; auto.
-          reflexivity.
       - intros root' DISJOINT.
         inv ADD.
         destruct ms as [mem fs h].
@@ -1796,10 +1780,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         break_match.
         + unfold root_in_heap_prop.
           rewrite member_add_ineq; auto.
-          reflexivity.
         + unfold root_in_heap_prop.
           rewrite member_add_ineq; auto.
-          reflexivity.
       - (* New *)
         destruct ms as [mem fs h].
         unfold add_to_heap in *.
@@ -3389,7 +3371,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           rewrite MemMonad_run_raise_error.
           rewrite rbm_raise_bind; eauto.
           rewrite rbm_raise_bind; eauto.
-          reflexivity.
         + cbn.
           rewrite MemMonad_run_bind.
           rewrite MemMonad_run_ret.
@@ -3410,7 +3391,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         rewrite bind_bind.
         rewrite rbm_raise_bind; eauto.
         rewrite rbm_raise_bind; eauto.
-        reflexivity.
     Qed.
 
     Lemma byte_not_allocated_ge_next_memory_key :
@@ -3675,8 +3655,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           lia.
         + intros [[a' addrs'] ADDRS]; inv ADDRS.
           split; eauto.
-          eexists; split; eauto.
-          reflexivity.
     Qed.
 
     Hint Resolve find_free_block_correct : EXEC_CORRECT.
@@ -4565,7 +4543,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       subst.
       split.
       + solve_used_provenance_prop.
-        solve_provenances_preserved.
       + (* extend_allocations *)
         pose proof FIND_FREE as FIND_FREE'.
         eapply find_free_block_ms_eq in FIND_FREE'; subst.
@@ -5015,7 +4992,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       subst.
       split.
       + solve_used_provenance_prop.
-        solve_provenances_preserved.
       + (* extend_allocations *)
         pose proof FIND_FREE as FIND_FREE'.
         eapply find_free_block_ms_eq in FIND_FREE'; subst.
@@ -6678,7 +6654,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 unfold lookup in FINDPTR.
                 rewrite FINDPTR; eauto.
               }
-              inv READ; solve_read_byte_prop.
               inv READ; solve_read_byte_prop.
           + (* read_byte_spec *)
             split.
