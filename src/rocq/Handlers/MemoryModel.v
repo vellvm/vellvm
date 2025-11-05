@@ -8110,11 +8110,24 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
 
   Lemma allocate_dtyp_spec_can_always_succeed :
     forall (ms_init ms_fresh_sid ms_fresh_pr : MemState) dt num_elements pr sid
-      (FRESH_SID : (ret sid {{ms_init}} ∈ {{ms_fresh_sid}} fresh_sid))
-      (FRESH_PR : (ret pr {{ms_fresh_sid}} ∈ {{ms_fresh_pr}} fresh_provenance))
+      (FRESH_SID : @within (MemPropT MemState) (@MemPropT_Eq1 MemState) err_ub_oom MemState MemState
+                     (@Within_err_ub_oom_MemPropT MemState) store_id
+                     (@fresh_sid (MemPropT MemState) MemPropT_MonadStoreID) ms_init
+                     (@ret err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) store_id sid)
+                     ms_fresh_sid)
+      (FRESH_PR : @within (MemPropT MemState) (@MemPropT_Eq1 MemState) err_ub_oom MemState MemState
+                    (@Within_err_ub_oom_MemPropT MemState) Provenance
+                    (@fresh_provenance Provenance (MemPropT MemState) MemPropT_MonadProvenance) ms_fresh_sid
+                    (@ret err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Provenance pr)
+                    ms_fresh_pr)
+      (* (FRESH_SID : (ret sid {{ms_init}} ∈ {{ms_fresh_sid}} fresh_sid)) *)
+      (* (FRESH_PR : (ret pr {{ms_fresh_sid}} ∈ {{ms_fresh_pr}} fresh_provenance)) *)
       (NON_VOID : dt <> DTYPE_Void),
     exists ms_final ptr,
-      ret ptr {{ms_init}} ∈ {{ms_final}} allocate_dtyp_spec dt num_elements.
+      @within (MemPropT MemState) (@MemPropT_Eq1 MemState) err_ub_oom MemState MemState
+        (@Within_err_ub_oom_MemPropT MemState) addr (allocate_dtyp_spec dt num_elements) ms_init
+        (@ret err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) addr ptr) ms_final.
+      (* ret ptr {{ms_init}} ∈ {{ms_final}} allocate_dtyp_spec dt num_elements. *)
   Proof.
     intros ms_init ms_fresh_sid ms_fresh_pr dt num_elements pr sid FRESH_SID FRESH_PR NON_VOID.
 
@@ -8182,4 +8195,5 @@ Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP
     exists ms_fresh_sid, bytes.
     tauto.
   Qed.
+
 End MemoryModelInfiniteSpecHelpers.
