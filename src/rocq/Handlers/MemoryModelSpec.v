@@ -3262,7 +3262,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   (*** Allocation utilities *)
   Record block_is_free (m1 : MemState) (len : nat) (pr : Provenance) (ptr : addr) (ptrs : list addr) : Prop :=
-    { block_is_free_consecutive : ret ptrs {{m1}} ∈ {{m1}} get_consecutive_ptrs ptr len;
+    { block_is_free_consecutive : (@within _ _ _ _ _ (@Within_err_ub_oom_MemPropT MemState) _ (get_consecutive_ptrs ptr len) m1 (@ret err_ub_oom _ _ ptrs) m1); (* ret ptrs {{m1}} ∈ {{m1}} (@get_consecutive_ptrs err_ub_oom _ _ _ ptr len); *)
       block_is_free_ptr_provenance : address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr); (* Need this case if `ptrs` is empty (allocating 0 bytes) *)
       block_is_free_ptrs_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr);
 
@@ -3712,7 +3712,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
                       (Rocqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i64"))
                then
                  handle_memcpy_prop args;;
-                 ret DVALUE_None
+                 ret (DVALUE_None
                else
                  if orb (Rocqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i32"))
                       (Rocqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i64"))
@@ -4301,6 +4301,13 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     {Eff}
     `{FAIL : FailureE -< Eff} `{UB : UBE -< Eff} `{OOM : OOME -< Eff}
     {A} (t : itree Eff A) (pre : Pre) (e : err_ub_oom A) (post : Post) : Prop :=
+    t ≈ lift_err_ub_oom ret e.
+
+  Definition within_err_ub_oom_itree
+    {Pre Post : Type}
+    {Eff B}
+    `{FAIL : FailureE -< Eff} `{UB : UBE -< Eff} `{OOM : OOME -< Eff}
+    {A} (t : ctree Eff B A) (pre : Pre) (e : err_ub_oom A) (post : Post) : Prop :=
     t ≈ lift_err_ub_oom ret e.
 
   (* Version that uses RAISE_OOM etc explicitly *)

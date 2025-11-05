@@ -152,12 +152,12 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
   Qed.
 
   Lemma handle_gep_addr_ix_OOM :
-    forall (dt : dtyp) (p p' : addr) ix msg,
+    forall (dt : dtyp) (p : addr) ix msg,
       handle_gep_addr dt p [DVALUE_IPTR ix] = inr (Oom msg) ->
       exists msg',
         int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z (address_provenance p) = Oom msg'.
   Proof.
-    intros dt p p' ix msg GEP.
+    intros dt p ix msg GEP.
     cbn in *.
     exists msg.
     inv GEP.
@@ -176,11 +176,11 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
   Qed.
 
   Lemma handle_gep_addr_ix'_OOM :
-    forall (dt : dtyp) (p p' : addr) ix msg,
+    forall (dt : dtyp) (p : addr) ix msg,
       int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z (address_provenance p) = Oom msg ->
       exists msg', handle_gep_addr dt p [DVALUE_IPTR ix] = inr (Oom msg').
   Proof.
-    intros dt p p' ix msg IX.
+    intros dt p ix msg IX.
     cbn in *.
     exists msg.
     inv IX.
