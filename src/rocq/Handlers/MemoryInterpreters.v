@@ -22,7 +22,7 @@ From Vellvm.Utils Require Import
   Tactics
   InterpProp
   VellvmRelations
-  StateMonads Raise RaiseCtree Tactics ITreeMap
+  StateMonads Raise Tactics ITreeMap
   Error.
 
 From Vellvm.Theory Require Import

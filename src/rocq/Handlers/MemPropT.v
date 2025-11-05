@@ -1,3 +1,4 @@
+Unset Universe Checking.
 From Stdlib Require Import
      Strings.String
      ZArith.
@@ -5,12 +6,10 @@ From Stdlib Require Import
 From ExtLib Require Import
      Structures.Monad.
 
-From ITree Require Import
-     ITree
-     Basics.Basics
-     Eq.Eqit
-     Events.StateFacts
-     Events.State.
+From CTree Require Import
+    CTree
+    CTreeDefinitions
+    Eq.
 
 From Vellvm Require Import Error.
 
@@ -550,4 +549,4 @@ Proof.
            (exists ms' x,
                t ≈ (ret (ms', x)) /\
                spec ms (ret (ms', x)))).
-Defined.
+Admitted.

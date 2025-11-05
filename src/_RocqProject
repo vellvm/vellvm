@@ -12,6 +12,7 @@
 ./rocq/Analysis/Iteration.v
 ./rocq/Analysis/Kildall.v
 ./rocq/Analysis/ssa.v
+./rocq/Handlers/CTreeHandler.v
 ./rocq/Handlers/Concretization.v
 ./rocq/Handlers/Global.v
 ./rocq/Handlers/Handlers.v
@@ -66,7 +67,7 @@
 ./rocq/Semantics/InfiniteToFinite/R2Injective.v
 ./rocq/Semantics/InterpretationStack.v
 ./rocq/Semantics/IntrinsicsDefinitions.v
-./rocq/Semantics/ItreeRaiseMReturns.v
+./rocq/Semantics/RaiseMReturns.v
 ./rocq/Semantics/LLVMEvents.v
 ./rocq/Semantics/LLVMParams.v
 ./rocq/Semantics/Lang.v
@@ -124,7 +125,6 @@
 ./rocq/Utils/Error.v
 ./rocq/Utils/ErrorMonads.v
 ./rocq/Utils/ITreeMap.v
-./rocq/Utils/ITreeRaise.v
 ./rocq/Utils/Inhabited.v
 ./rocq/Utils/IntMaps.v
 ./rocq/Utils/InterpEither.v
@@ -149,7 +149,6 @@
 ./rocq/Utils/PostConditions.v
 ./rocq/Utils/PropT.v
 ./rocq/Utils/Raise.v
-./rocq/Utils/RaiseCtree.v
 ./rocq/Utils/RefineProp.v
 ./rocq/Utils/ErrUbOomProp.v
 ./rocq/Utils/ErrOomPoison.v

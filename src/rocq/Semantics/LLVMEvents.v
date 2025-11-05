@@ -24,9 +24,7 @@ From ExtLib Require Import
      Data.Monads.EitherMonad
      Data.Monads.IdentityMonad.
 
-From ITree Require Import
-     ITree
-     Events.Exception.
+From CTree Require Import CTree.
 
 From Vellvm Require Import
      Utilities
@@ -35,7 +33,8 @@ From Vellvm Require Import
      Semantics.DynamicValues
      Semantics.VellvmIntegers.
 
-Import ITreeNotations.
+Import CTreeNotations.
+Open Scope monad_scope.
 (* end hide *)
 
 (****************************** LLVM Events *******************************)
@@ -86,7 +85,7 @@ Set Contextual Implicit.
   Variant LLVMExcE (EXC : Type) : Type -> Type :=
     | LLVMExc : EXC -> LLVMExcE EXC void.
 
-  Definition raiseLLVM {E EXC} {A} `{LLVMExcE EXC -< E} (e : EXC) : itree E A :=
+  Definition raiseLLVM {E EXC} {A} {BR}  `{LLVMExcE EXC -< E} (e : EXC) : ctree E BR A :=
     v <- trigger (LLVMExc e);; match v: void with end.
 
   (* This function can be replaced with print_string during extraction
@@ -99,12 +98,12 @@ Set Contextual Implicit.
 
   (** Since the output type of [ThrowUB] is [void], we can make it an action
     with any return type. *)
-  Definition raiseUB {E : Type -> Type} `{UBE -< E} {X}
+  Definition raiseUB {E : Type -> Type} {BR} {X} `{UBE -< E}
              (e : string)
-    : itree E X
+    : ctree E BR X
     := v <- trigger (ThrowUB (print_msg e));; match v: void with end.
 
-  #[global] Instance RAISE_UB_ITREE_UB {E : Type -> Type} `{UBE -< E} : RAISE_UB (itree E) :=
+  #[global] Instance RAISE_UB_ITREE_UB {E : Type -> Type} {BR} `{UBE -< E} : RAISE_UB (ctree E BR) :=
   { raise_ub := fun A e => raiseUB e
   }.
 
@@ -114,12 +113,12 @@ Set Contextual Implicit.
 
   (** Since the output type of [ThrowUB] is [void], we can make it an action
     with any return type. *)
-  Definition raiseOOM {E : Type -> Type} `{OOME -< E} {X}
+  Definition raiseOOM {E : Type -> Type} {BR} {X} `{OOME -< E}
              (e : string)
-    : itree E X
+    : ctree E BR X
     := v <- trigger (ThrowOOM (print_msg e));; match v: void with end.
 
-  #[global] Instance RAISE_OOM_ITREE_OOME {E : Type -> Type} `{OOME -< E} : RAISE_OOM (itree E) :=
+  #[global] Instance RAISE_OOM_ITREE_OOME {E : Type -> Type} `{OOME -< E} {BR} : RAISE_OOM (ctree E BR) :=
   { raise_oom := fun A => raiseOOM
   }.
 
@@ -129,30 +128,30 @@ Set Contextual Implicit.
   | Debug : unit -> DebugE unit.
 
   (* Utilities to conveniently trigger debug events *)
-  Definition debug {E} `{DebugE -< E} (msg : string) : itree E unit :=
+  Definition debug {E} {BR} `{DebugE -< E} (msg : string) : ctree E BR unit :=
     trigger (Debug (print_msg msg)).
 
   (* Failure. Carries a string for a message. *)
   Variant FailureE : Type -> Type :=
   | Throw : unit -> FailureE void.
 
-  Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
+  Definition raise {E} {BR} {A} `{FailureE -< E} (msg : string) : ctree E BR A :=
     v <- trigger (Throw (print_msg msg));; match v: void with end.
 
-  #[global] Instance RAISE_ERR_ITREE_FAILUREE {E : Type -> Type} `{FailureE -< E} : RAISE_ERROR (itree E) :=
+  #[global] Instance RAISE_ERR_ITREE_FAILUREE {E : Type -> Type} {BR} `{FailureE -< E} : RAISE_ERROR (ctree E BR) :=
   { raise_error := fun A e => raise e
   }.
 
-  Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m:err A) : itree E B :=
+  Definition lift_err {A B} {E} {BR} `{FailureE -< E} (f : A -> ctree E BR B) (m:err A) : ctree E BR B :=
     match m with
     | inl x => raise x
     | inr x => f x
     end.
 
-  Definition lift_pure_err {A} {E} `{FailureE -< E} (m:err A) : itree E A :=
+  Definition lift_pure_err {A} {E} {BR} `{FailureE -< E} (m:err A) : ctree E BR A :=
     lift_err ret m.
 
-  Definition lift_err_ub_oom {A B} {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} (f : A -> itree E B) (m:err_ub_oom A) : itree E B :=
+  Definition lift_err_ub_oom {A B} {E} {BR} `{FailureE -< E} `{UBE -< E} `{OOME -< E} (f : A -> ctree E BR B) (m:err_ub_oom A) : ctree E BR B :=
     match m with
     | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
         match m with
@@ -269,26 +268,33 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
 
   Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
 
+  Definition B0 := void1.
   Definition exp_to_L0 : exp_E ~> L0 := subevent.
 
   (* For multiple CFG, after interpreting [GlobalE] *)
   Definition L1 := ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  Definition B1 := void1.
 
   (* For multiple CFG, after interpreting [LocalE] *)
   Definition L2 := ExternalCallE +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  Definition B2 := void1.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
   Definition L3 := ExternalCallE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  Definition B3 := void1.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [PickUvalueE]*)
   (* Interprets [Pick] events: forcing evaluation of [uvalue]s, [UBE] has no semantic meaning *)
   Definition L4 := ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  Definition B4 := void1.
 
   (* [UBE] is still present in tree to identify failure, but the [model_UB] semantics allows [UB] to subsume all behavior *)
   Definition L5 := ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  Definition B5 := void1.
 
   (* [OOM] semantics is introduced through [interp_prop], so the semantic change is not apparent in the event signature *)
   Definition L6 := ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  Definition B6 := void1.
 
   Definition FUBO_to_L4 : (FailureE +' UBE +' OOME) ~> L4:= subevent.
 

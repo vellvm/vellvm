@@ -3,312 +3,222 @@ From Stdlib Require Import
      Morphisms.
 
 From ExtLib Require Import
-     Structures.Monads.
+     Structures.Monads
+     Data.Monads.EitherMonad
+     Data.Monads.IdentityMonad.
 
-From ITree Require Import
-     Basics.Basics
-     Basics.Monad
-     Eq
-     ITree.
-
+Unset Universe Checking.
 From Vellvm Require Import 
   Semantics.LLVMEvents
-  Utils.Tactics.
+  Utils.Tactics
+  Utils.CTreeUtils
+  Utils.Error.
 
+From CTree Require Import
+      CTree
+      CTreeDefinitions
+      Fold
+      FoldCTree
+      Eq.
 Require Import Stdlib.Program.Equality.
 
 Require Import Paco.paco.
-
 Section Laws.
   Variable M : Type -> Type.
   Context `{HM : Monad M}.
-  Context `{EQM : Eq1 M}.
+  Context `{EQM : Monad.Eq1 M}.
   Variable MSG : Type.
   Variable rbm_raise : forall {X}, MSG -> M X.
 
   Class RaiseBindM :=
     { rbm_raise_bind :
       forall A B (f : A -> M B) (x : MSG),
-        eq1 (bind (rbm_raise x) f) (rbm_raise x);
+        Monad.eq1 (bind (rbm_raise x) f) (rbm_raise x);
       rbm_raise_ret_inv :
       forall A (x : MSG) (y : A),
-        ~ eq1 (rbm_raise x) (ret y);
+        ~ Monad.eq1 (rbm_raise x) (ret y);
     }.
 End Laws.
 
 Section Failure.
   Variable E : Type -> Type.
+  Variable B : Type -> Type.
   Context {FAIL : FailureE -< E}.
 
-  Lemma raise_bind_itree :
-    forall A B (f : A -> itree E B) x,
-      bind (raise x) f ≈ raise x.
+  Lemma raise_bind_ctree :
+    forall X Y (f : X -> ctree E B Y) x,
+      bind (raise x) f ~ (raise x : ctree E B Y).
   Proof using.
-    intros A B f x.
-    unfold raise.
+    intros X Y f x.
     cbn.
+    unfold raise.
     rewrite bind_bind.
-    eapply eutt_clo_bind.
+    eapply sbisim_clo_bind_eq; [|intros []].
     reflexivity.
-    intros u1 u2 H.
-    destruct u1.
   Qed.
 
-  Lemma raise_map_itree :
-    forall A B (f : A -> B) x,
-      ITree.map f (@raise _ _ FAIL x) ≈ raise x.
+  Lemma raise_map_ctree :
+    forall X Y (f : X -> Y) x,
+      CTree.map f (@raise _ _ _ FAIL x : ctree E B X) ~ (raise x : ctree E B Y).
   Proof using.
-    intros A B f x.
+    intros X Y f x.
     unfold raise.
-    rewrite map_bind.
-    eapply eutt_clo_bind.
+    setoid_rewrite map_bind.
+    eapply sbisim_clo_bind_eq.
     reflexivity.
     intros [].
   Qed.
 
-  Lemma raise_map_itree_inv :
-    forall A B (f : A -> B) t x,
-      ITree.map f t ≈ @raise _ _ FAIL x ->
-      t ≈ raise x.
+  Lemma raise_map_ctree_inv :
+    forall X Y (f : X -> Y) (t : ctree E B X) x,
+      CTree.map f t ~ (@raise _ _ _ FAIL x : ctree E B Y) ->
+      t ~ (raise x : ctree E B X).
   Proof using.
-    unfold ITree.map. intros A B.
-    ginit. gcofix CIH.
-    intros. rewrite unfold_bind in H0.
-    punfold H0. red in H0.
-    remember
-         (observe
-            match observe t with
-            | RetF r => Ret (f r)
-            | TauF t => Tau (ITree.bind t (fun x : A => Ret (f x)))
-            | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) (fun x0 : A => Ret (f x0)))
-            end); remember (observe (raise x)).
+    intros X Y f t x H.
+    unfold CTree.map in *.
+  Admitted.
 
-    assert (go i ≅
-           match observe t with
-           | RetF r => Ret (f r)
-           | TauF t => Tau (ITree.bind t (fun x : A => Ret (f x)))
-           | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) (fun x0 : A => Ret (f x0)))
-           end). rewrite Heqi; rewrite <- itree_eta; reflexivity.
-    clear Heqi.
-    rewrite itree_eta; unfold raise; rewrite bind_trigger.
-    gstep.
-
-    revert t H.
-    induction H0; inv Heqi0.
-    - dependent destruction H1.
-      cbn in *. intros.
-      destruct (observe t); eapply eqit_inv in H; inv H.
-      destruct H0 as (?&?). destruct H.
-      constructor. intros. inv v.
-    - intros t TAU.
-      destruct (observe t); eapply eqit_inv in TAU; try solve [inv TAU].
-      cbn in *. assert (t1 ≈ raise x). { pstep; eauto. }
-      clear H0.
-      assert (t1 ≅ ITree.map f t0). { punfold TAU; pstep; unfold ITree.map; eauto. }
-      clear TAU.
-      rewrite H0 in H1.
-      specialize (IHeqitF eq_refl).
-      setoid_rewrite <- unfold_bind in IHeqitF.
-      constructor; eauto. eapply IHeqitF; rewrite <- itree_eta; eauto.
-  Qed.
-
-  Lemma raise_ret_inv_itree :
+  Lemma raise_ret_inv_ctree :
       forall A x (y : A),
-        ~ (@raise _ _ FAIL x) ≈ (ret y).
+        ~ (@raise _ _ _ FAIL x : ctree E B A) ~ (ret y : ctree E B A).
   Proof using.
     intros A x y.
     intros CONTRA.
-    cbn in CONTRA.
-    pinversion CONTRA.
+    symmetry in CONTRA.
+    unfold raise in CONTRA.
+    setoid_rewrite bind_trigger in CONTRA.
+    apply sbisim_ret_vis_inv in CONTRA.
+    auto.
   Qed.
 
-  #[global] Instance RaiseBindM_Fail : RaiseBindM (itree E) string (fun T => raise) :=
-    { rbm_raise_bind := raise_bind_itree;
-      rbm_raise_ret_inv := raise_ret_inv_itree;
+  #[global] Instance RaiseBindM_Fail : RaiseBindM (ctree E B) string (fun T => raise) :=
+    { rbm_raise_bind := raise_bind_ctree;
+      rbm_raise_ret_inv := raise_ret_inv_ctree;
     }.
 End Failure.
 
 Section OOM.
   Variable E : Type -> Type.
+  Variable B : Type -> Type.
   Context {OOM : OOME -< E}.
 
-  Lemma raiseOOM_bind_itree :
-    forall A B (f : A -> itree E B) x,
-      bind (raiseOOM x) f ≈ raiseOOM x.
+  Lemma raiseOOM_bind_ctree :
+    forall X Y (f : X -> ctree E B Y) x,
+      bind (raiseOOM x) f ~ (raiseOOM x : ctree E B Y).
   Proof using.
-    intros A B f x.
-    unfold raiseOOM.
+    intros X Y f x.
     cbn.
+    unfold raiseOOM.
+
     rewrite bind_bind.
-    eapply eutt_clo_bind.
+    eapply sbisim_clo_bind_eq; [|intros []].
     reflexivity.
-    intros u1 u2 H.
-    destruct u1.
   Qed.
 
-  Lemma raiseOOM_map_itree :
-    forall A B (f : A -> B) x,
-      ITree.map f (raiseOOM (E:=E) x) ≈ raiseOOM x.
+  Lemma raiseOOM_map_ctree :
+    forall X Y (f : X -> Y) x,
+      CTree.map f (@raiseOOM _ _ _ OOM x : ctree E B X) ~ (raiseOOM x : ctree E B Y).
   Proof using.
-    intros A B f x.
-    unfold raiseOOM, raise.
-    rewrite map_bind.
-    eapply eutt_clo_bind.
+    intros X Y f x.
+    unfold raise.
+    setoid_rewrite map_bind.
+    eapply sbisim_clo_bind_eq.
     reflexivity.
     intros [].
   Qed.
 
-  Lemma raiseOOM_map_itree_inv :
-    forall A B (f : A -> B) t x,
-      ITree.map f t ≈ raiseOOM (E:=E) x ->
-      t ≈ raiseOOM x.
+  Lemma raiseOOM_map_ctree_inv :
+    forall X Y (f : X -> Y) (t : ctree E B X) x,
+      CTree.map f t ~ (@raiseOOM _ _ _ OOM x : ctree E B Y) ->
+      t ~ (raiseOOM x : ctree E B X).
   Proof using.
-    unfold ITree.map. intros A B.
-    ginit. gcofix CIH.
-    intros. rewrite unfold_bind in H0.
-    punfold H0. red in H0.
-    remember
-         (observe
-            match observe t with
-            | RetF r => Ret (f r)
-            | TauF t => Tau (ITree.bind t (fun x : A => Ret (f x)))
-            | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) (fun x0 : A => Ret (f x0)))
-            end); remember (observe (raiseOOM x)).
+    intros X Y f t x H.
+    unfold CTree.map in *.
+  Admitted.
 
-    assert (go i ≅
-           match observe t with
-           | RetF r => Ret (f r)
-           | TauF t => Tau (ITree.bind t (fun x : A => Ret (f x)))
-           | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) (fun x0 : A => Ret (f x0)))
-           end). rewrite Heqi; rewrite <- itree_eta; reflexivity.
-    clear Heqi.
-    rewrite itree_eta; unfold raiseOOM; rewrite bind_trigger.
-    gstep.
-
-    revert t H.
-    induction H0; inv Heqi0.
-    - dependent destruction H1.
-      cbn in *. intros.
-      destruct (observe t); eapply eqit_inv in H; inv H.
-      destruct H0 as (?&?). destruct H.
-      constructor. intros. inv v.
-    - intros t TAU.
-      destruct (observe t); eapply eqit_inv in TAU; try solve [inv TAU].
-      cbn in *. assert (t1 ≈ raiseOOM x). { pstep; eauto. }
-      clear H0.
-      assert (t1 ≅ ITree.map f t0). { punfold TAU; pstep; unfold ITree.map; eauto. }
-      clear TAU.
-      rewrite H0 in H1.
-      specialize (IHeqitF eq_refl).
-      setoid_rewrite <- unfold_bind in IHeqitF.
-      constructor; eauto. eapply IHeqitF; rewrite <- itree_eta; eauto.
-  Qed.
-
-  Lemma raiseOOM_ret_inv_itree :
+  Lemma raiseOOM_ret_inv_ctree :
       forall A x (y : A),
-        ~ (raiseOOM (E:=E) x) ≈ (ret y).
+        ~ (@raiseOOM _ _ _ OOM x : ctree E B A) ~ (ret y : ctree E B A).
   Proof using.
     intros A x y.
     intros CONTRA.
-    cbn in CONTRA.
-    pinversion CONTRA.
+    symmetry in CONTRA.
+    unfold raise in CONTRA.
+    setoid_rewrite bind_trigger in CONTRA.
+    apply sbisim_ret_vis_inv in CONTRA.
+    auto.
   Qed.
 
-  #[global] Instance RaiseBindM_OOM : RaiseBindM (itree E) string (fun T => raiseOOM) :=
-    { rbm_raise_bind := raiseOOM_bind_itree;
-      rbm_raise_ret_inv := raiseOOM_ret_inv_itree;
+  #[global] Instance RaiseBindM_OOM : RaiseBindM (ctree E B) string (fun T => raiseOOM) :=
+    { rbm_raise_bind := raiseOOM_bind_ctree;
+      rbm_raise_ret_inv := raiseOOM_ret_inv_ctree;
     }.
 End OOM.
 
 Section UB.
   Variable E : Type -> Type.
+  Variable B : Type -> Type.
   Context {UB : UBE -< E}.
 
-  Lemma raiseUB_bind_itree :
-    forall A B (f : A -> itree E B) x,
-      bind (raiseUB x) f ≈ raiseUB x.
+  Lemma raiseUB_bind_ctree :
+    forall X Y (f : X -> ctree E B Y) x,
+      bind (raiseUB x) f ~ (raiseUB x : ctree E B Y).
   Proof using.
-    intros A B f x.
-    unfold raiseUB.
+    intros X Y f x.
     cbn.
+    unfold raiseUB.
     rewrite bind_bind.
-    eapply eutt_clo_bind.
+    eapply sbisim_clo_bind_eq; [|intros []].
     reflexivity.
-    intros u1 u2 H.
-    destruct u1.
   Qed.
 
-  Lemma raiseUB_map_itree :
-    forall A B (f : A -> B) x,
-      ITree.map f (raiseUB (E:=E) x) ≈ raiseUB x.
+  Lemma raiseUB_map_ctree :
+    forall X Y (f : X -> Y) x,
+      CTree.map f (@raiseUB _ _ _ UB x : ctree E B X) ~ (raiseUB x : ctree E B Y).
   Proof using.
-    intros A B f x.
-    unfold raiseUB, raise.
-    rewrite map_bind.
-    eapply eutt_clo_bind.
+    intros X Y f x.
+    unfold raise.
+    setoid_rewrite map_bind.
+    eapply sbisim_clo_bind_eq.
     reflexivity.
     intros [].
   Qed.
 
-  Lemma raiseUB_map_itree_inv :
-    forall A B (f : A -> B) t x,
-      ITree.map f t ≈ raiseUB (E:=E) x ->
-      t ≈ raiseUB x.
+  Lemma raiseUB_map_ctree_inv :
+    forall X Y (f : X -> Y) (t : ctree E B X) x,
+      CTree.map f t ~ (@raiseUB _ _ _ UB x : ctree E B Y) ->
+      t ~ (raiseUB x : ctree E B X).
   Proof using.
-    unfold ITree.map. intros A B.
-    ginit. gcofix CIH.
-    intros. rewrite unfold_bind in H0.
-    punfold H0. red in H0.
-    remember
-         (observe
-            match observe t with
-            | RetF r => Ret (f r)
-            | TauF t => Tau (ITree.bind t (fun x : A => Ret (f x)))
-            | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) (fun x0 : A => Ret (f x0)))
-            end); remember (observe (raiseUB x)).
+    intros X Y f t x H.
+    unfold CTree.map in *.
+  Admitted.
 
-    assert (go i ≅
-           match observe t with
-           | RetF r => Ret (f r)
-           | TauF t => Tau (ITree.bind t (fun x : A => Ret (f x)))
-           | @VisF _ _ _ X e ke => Vis e (fun x : X => ITree.bind (ke x) (fun x0 : A => Ret (f x0)))
-           end). rewrite Heqi; rewrite <- itree_eta; reflexivity.
-    clear Heqi.
-    rewrite itree_eta; unfold raiseUB; rewrite bind_trigger.
-    gstep.
-
-    revert t H.
-    induction H0; inv Heqi0.
-    - dependent destruction H1.
-      cbn in *. intros.
-      destruct (observe t); eapply eqit_inv in H; inv H.
-      destruct H0 as (?&?). destruct H.
-      constructor. intros. inv v.
-    - intros t TAU.
-      destruct (observe t); eapply eqit_inv in TAU; try solve [inv TAU].
-      cbn in *. assert (t1 ≈ raiseUB x). { pstep; eauto. }
-      clear H0.
-      assert (t1 ≅ ITree.map f t0). { punfold TAU; pstep; unfold ITree.map; eauto. }
-      clear TAU.
-      rewrite H0 in H1.
-      specialize (IHeqitF eq_refl).
-      setoid_rewrite <- unfold_bind in IHeqitF.
-      constructor; eauto. eapply IHeqitF; rewrite <- itree_eta; eauto.
-  Qed.
-
-
-  Lemma raiseUB_ret_inv_itree :
+  Lemma raiseUB_ret_inv_ctree :
       forall A x (y : A),
-        ~ (raiseUB (E:=E) x) ≈ (ret y).
+        ~ (@raiseUB _ _ _ UB x : ctree E B A) ~ (ret y : ctree E B A).
   Proof using.
     intros A x y.
     intros CONTRA.
-    cbn in CONTRA.
-    pinversion CONTRA.
+    symmetry in CONTRA.
+    unfold raise in CONTRA.
+    setoid_rewrite bind_trigger in CONTRA.
+    apply sbisim_ret_vis_inv in CONTRA.
+    auto.
   Qed.
 
-  #[global] Instance RaiseBindM_UB : RaiseBindM (itree E) string (fun T => raiseUB) :=
-    { rbm_raise_bind := raiseUB_bind_itree;
-      rbm_raise_ret_inv := raiseUB_ret_inv_itree;
+  #[global] Instance RaiseBindM_UB : RaiseBindM (ctree E B) string (fun T => raiseUB) :=
+    { rbm_raise_bind := raiseUB_bind_ctree;
+      rbm_raise_ret_inv := raiseUB_ret_inv_ctree;
     }.
 End UB.
+
+  Definition lift_err_ub_oom_ctree {X Y} {E B} `{FailureE -< E} `{UBE -< E} `{OOME -< E} (f : X -> ctree E B Y) (m:err_ub_oom X) : ctree E B Y :=
+    match m with
+    | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
+        match m with
+        | inl (OOM_message x) => raiseOOM x
+        | inr (inl (UB_message x)) => raiseUB x
+        | inr (inr (inl (ERR_message x))) => raise x
+        | inr (inr (inr x)) => f x
+      end
+    end.

@@ -1,15 +1,7 @@
 From ExtLib Require Import
      Structures.Monads.
 
-From ITree Require Import
-     ITree
-     Basics.Basics
-     Events.Exception
-     Eq.Eqit
-     Events.StateFacts
-     Events.State
-     Events.Exception.
-
+     Unset Universe Checking.
 From Vellvm Require Import
      Utils.Error
      Utils.Raise
@@ -19,6 +11,12 @@ From Vellvm Require Import
      Utils.PropT
      Semantics.LLVMEvents.
 
+From CTree Require Import
+    CTree
+    CTreeDefinitions
+    Eq
+
+    .
 Require Import Paco.paco.
 From Stdlib Require Import String.
 
@@ -26,39 +24,42 @@ Import Basics.Basics.Monads.
 Import MonadNotation.
 Open Scope monad_scope.
 
-Section ITreeRaiseError.
+Section CTreeRaiseError.
   Context {E : Type -> Type}.
+  Context {BR : Type -> Type}.
   Context `{FAILE: FailureE -< E}.
 
-  Definition ITreeReturns {A} (x : A) (ma : itree E A) := ma ≈ ret x.
-  Definition ITreeErrorMFails {A} (t : itree E A) := exists x, t ≈ raise_error x.
+  Definition CTreeReturns {A} (x : A) (ma : ctree E BR A) := ma ~ (ret x: ctree E BR A).
+  Definition CTreeErrorMFails {A} (t : ctree E BR A) := exists x, t ~ (raise_error x: ctree E BR A).
 
-  #[global] Instance ITreeErrorMonadReturns : MonadReturns (itree E).
+  #[global] Instance CTreeErrorMonadReturns : MonadReturns (ctree E BR).
   Proof using E FAILE.
     split with
-      (MReturns := @ITreeReturns)
-      (MFails := @ITreeErrorMFails).
+      (MReturns := @CTreeReturns)
+      (MFails := @CTreeErrorMFails).
     - (* MFails_ret *)
       intros A a [x CONTRA].
-      pinversion CONTRA.
+      symmetry in CONTRA.
+      apply raise_ret_inv_ctree in CONTRA.
+      auto.
     - (* MFails_bind_ma *)
       intros A B ma k [x FAIL].
       exists x.
       rewrite FAIL.
-      apply (@rbm_raise_bind (itree E) _ _ string (fun T => raise) (@RaiseBindM_Fail E FAILE)).
+      apply (@rbm_raise_bind (ctree E BR) _ _ string (fun T => raise) (@RaiseBindM_Fail E _ FAILE)).
     - (* MFails_bind_ma *)
       intros A B ma a k RET [x FAIL].
       exists x.
       cbn in *.
-      unfold ITreeReturns in *.
+      unfold CTreeReturns in *.
       rewrite RET.
       cbn.
       rewrite bind_ret_l.
       auto.
     - (* MFails_bind_k *)
       intros A B ma k [x FAIL].
-      unfold ITreeErrorMFails in *.
-      unfold ITreeReturns in *.
+      unfold CTreeErrorMFails in *.
+      unfold CTreeReturns in *.
       (* ma could loop forever.
 
          ma could raise another event...
@@ -88,7 +89,8 @@ Section ITreeRaiseError.
       cbn in FAIL.
       unfold raise in FAIL.
       rewrite bind_trigger in FAIL.
-      apply eutt_inv_bind_vis in FAIL as [RAISEMA | RETMA].
+      admit.
+      (* apply sbisim_inv_bind_vis in FAIL as [RAISEMA | RETMA].
       + destruct RAISEMA as [k' [MA EUTT]].
         left.
         exists x.
@@ -109,27 +111,27 @@ Section ITreeRaiseError.
         reflexivity.
     - (* MReturns_bind *)
       intros A B a b ma k RET1 RET2.
-      unfold ITreeReturns in *.
+      unfold CTreeReturns in *.
       rewrite RET1.
       cbn.
       rewrite bind_ret_l.
       auto.
     - (* MReturns_bind_inv *)
       intros A B t k b EQ.
-      unfold ITreeReturns in *.
+      unfold CTreeReturns in *.
       right.
       apply eutt_inv_bind_ret in EQ.
       auto.
     - (* MReturns_ret *)
       intros A a ma RET.
-      unfold ITreeReturns.
+      unfold CTreeReturns.
       rewrite RET.
       reflexivity.
     - (* MReturns_ret_inv *)
       intros A x y RET.
-      unfold ITreeReturns in *.
+      unfold CTreeReturns in *.
       eapply (@eq1_ret_ret _ _ _ (Eq1_ret_inv_itree _)).
       rewrite RET.
-      reflexivity.
-  Defined.
-End ITreeRaiseError.
+      reflexivity. *)
+Admitted.
+End CTreeRaiseError.

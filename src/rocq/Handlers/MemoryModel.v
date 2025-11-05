@@ -1,3 +1,5 @@
+Unset Universe Checking.
+
 From Vellvm.Numeric Require Import
      Integers.
 
@@ -5,7 +7,6 @@ From Vellvm.Syntax Require Import
      DataLayout
      DynamicTypes.
 
-Unset Universe Checking.
 From CTree Require Import
   CTree Eq.
 
@@ -26,7 +27,7 @@ From Vellvm.Semantics Require Import
   Memory.Overlaps
   LLVMParams
   LLVMEvents
-  ItreeRaiseMReturns.
+  RaiseMReturns.
 
 Require Import MemBytes.
 
@@ -48,8 +49,7 @@ From Vellvm.Utils Require Import
      MonadEq1Laws
      MonadExcLaws
      Inhabited
-     CTreeUtils
-     RaiseCtree.
+     CTreeUtils.
 
 From ExtLib Require Import
      Structures.Monads

@@ -9,6 +9,7 @@
  ---------------------------------------------------------------------------- *)
 
 (* begin hide *)
+Unset Universe Checking.
 From Stdlib Require Import
      ZArith List String Morphisms.
 
@@ -17,21 +18,27 @@ From ExtLib Require Import
      Programming.Eqv
      Data.String.
 
+From CTree Require Import
+     CTree
+     Fold
+     FoldCTree
+     Eq
+     SBisim.
+
 From Vellvm Require Import
      Utils.Util
      Syntax.LLVMAst
+     Handlers.CTreeHandler
      Semantics.LLVMEvents
      Semantics.Memory.Sizeof
      Semantics.IntrinsicsDefinitions.
 
-From ITree Require Import
-     ITree
-     InterpFacts
-     Eq.Eqit.
 
 Import MonadNotation.
 Import EqvNotation.
 Import ListNotations.
+
+Import CategoryOps.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -85,11 +92,11 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
                                   end
                                ) defined_intrinsics.
 
-  Definition handle_intrinsics {E} `{FailureE -< E} `{IntrinsicE -< E} :
-    IntrinsicE ~> itree E :=
+  Definition handle_intrinsics {E} {BR} `{FailureE -< E} `{IntrinsicE -< E} :
+    IntrinsicE ~> ctree E BR :=
     (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
     fun X (e : IntrinsicE X) =>
-      match e in IntrinsicE Y return X = Y -> itree E Y with
+      match e in IntrinsicE Y return X = Y -> ctree E BR Y with
       | (Intrinsic _ fname args) =>
           match assoc fname defs_assoc with
           | Some f => fun pf =>
@@ -98,55 +105,56 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
                        | inr result =>
                            Ret result
                        end
-          | None => fun pf => (eq_rect X (fun a => itree E a) (trigger e)) (uvalue + dvalue)%type pf
+          | None => fun pf => (eq_rect X (fun a => ctree E BR a) (trigger e)) (uvalue + dvalue)%type pf
           end
       end eq_refl.
 
   Section PARAMS.
     Variable (E F : Type -> Type).
+    Variable (BR : Type -> Type).
+    
     Context `{FailureE -< F}.
     Context `{LLVMExcE uvalue -< F}.
     Notation Eff := (E +' IntrinsicE +' F).
+    Definition E_trigger : Handler E Eff BR := fun _ e => trigger e.
+    Definition F_trigger : Handler F Eff BR := fun _ e => trigger e.
 
-    Definition E_trigger : Handler E Eff := fun _ e => trigger e.
-    Definition F_trigger : Handler F Eff := fun _ e => trigger e.
-
-    Definition interp_intrinsics_h :=
-      (case_ E_trigger (case_ handle_intrinsics F_trigger)).
+    Definition interp_intrinsics_h: Handler Eff Eff BR :=
+      (Handler.case_ E_trigger (case_ (handle_intrinsics (BR := BR)) F_trigger)).
 
     Definition interp_intrinsics :
-      forall R, itree Eff R -> itree Eff R :=
+      forall R, ctree Eff BR R -> ctree Eff BR R :=
       interp interp_intrinsics_h.
 
     Section Structural_Lemmas.
 
       Lemma interp_intrinsics_bind :
-        forall (R S : Type) (t : itree Eff R) (k : R -> itree _ S),
-          interp_intrinsics (ITree.bind t k) ≅ ITree.bind (interp_intrinsics t) (fun r : R => interp_intrinsics (k r)).
+        forall (R S : Type) (t : ctree Eff BR R) (k : R -> ctree _ BR S),
+          (equ eq (interp_intrinsics (CTree.bind t k)) (CTree.bind (interp_intrinsics t) (fun r : R => interp_intrinsics (k r)))).
       Proof using.
-        intros; apply interp_bind.
+        intros. apply interp_bind.
       Qed.
 
       Lemma interp_intrinsics_ret :
         forall (R : Type) (x: R),
-          interp_intrinsics (Ret x: itree Eff _) ≅ Ret x.
+          interp_intrinsics (Ret x: ctree Eff BR _) ≅ Ret x.
       Proof using.
         intros; apply interp_ret.
       Qed.
 
-      Lemma interp_intrinsics_Tau :
-        forall {R} (t: itree Eff R),
-          interp_intrinsics (Tau t) ≅ Tau (interp_intrinsics t).
+      Lemma interp_intrinsics_Guard :
+        forall {R} (t: ctree Eff BR R),
+          interp_intrinsics (Guard t) ≅ Guard (interp_intrinsics t).
       Proof using.
         intros.
-        unfold interp_intrinsics; rewrite interp_tau; reflexivity.
+        unfold interp_intrinsics; rewrite interp_guard; reflexivity.
       Qed.
 
       Lemma interp_intrinsics_vis_eqit:
         forall {X R} (e : Eff X)
-          (kk : X -> itree Eff R),
+          (kk : X -> ctree Eff BR R),
           interp_intrinsics (Vis e kk) ≅
-          ITree.bind (interp_intrinsics_h e) (fun x : X => Tau (interp_intrinsics (kk x))).
+          CTree.bind (interp_intrinsics_h e) (fun x : X => Guard (interp_intrinsics (kk x))).
       Proof using.
         intros.
         unfold interp_intrinsics.
@@ -156,30 +164,42 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
 
       Lemma interp_intrinsics_vis:
         forall X R (e : Eff X)
-          (kk : X -> itree Eff R),
-          interp_intrinsics (Vis e kk) ≈
-          ITree.bind (interp_intrinsics_h e) (fun x : X => interp_intrinsics (kk x)).
+          (kk : X -> ctree Eff BR R),
+          interp_intrinsics (Vis e kk) ~
+          CTree.bind (interp_intrinsics_h e) (fun x : X => interp_intrinsics (kk x)).
       Proof using.
         intros.
         rewrite interp_intrinsics_vis_eqit.
-        apply eutt_eq_bind.
-        intros ?; tau_steps; reflexivity.
+        apply sbisim_bind_eq.
+        intros ?. 
+        apply sbisim_guard_l.
+        reflexivity.
       Qed.
 
+  Lemma interp_trigger {C L D K} {h: K ~> ctree L D} {R} `{C -< D} : forall (e : K R),
+    interp h (CTree.trigger e : ctree K C R) ≅ x <- h _ e ;; Guard (Ret x).
+  Proof.
+    intros. rewrite unfold_interp. cbn.
+    upto_bind. reflexivity. intros. 
+    rewrite H2.
+    now rewrite interp_ret.
+  Qed.
       Lemma interp_intrinsics_trigger:
         forall X (e : Eff X),
-          interp_intrinsics (ITree.trigger e) ≈ interp_intrinsics_h e.
+          interp_intrinsics (CTree.trigger e) ~ interp_intrinsics_h e.
       Proof using.
         intros *.
         unfold interp_intrinsics.
         rewrite interp_trigger.
+        setoid_rewrite sb_guard.
+        setoid_rewrite bind_ret_r.
         reflexivity.
       Qed.
 
       Lemma interp_intrinsics_bind_trigger_eqit:
-        forall X R (e : Eff X) (kk : X -> itree Eff R),
-          interp_intrinsics (ITree.bind (trigger e) kk) ≅
-          ITree.bind (interp_intrinsics_h e) (fun x : X => Tau (interp_intrinsics (kk x))).
+        forall X R (e : Eff X) (kk : X -> ctree Eff BR R),
+          interp_intrinsics (CTree.bind (trigger e) kk) ≅
+          CTree.bind (interp_intrinsics_h e) (fun x : X => Guard (interp_intrinsics (kk x))).
       Proof using.
         intros *.
         unfold interp_intrinsics.
@@ -189,23 +209,31 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
       Qed.
 
       Lemma interp_intrinsics_bind_trigger:
-        forall X R (e : Eff X) (kk : X -> itree Eff R),
-          interp_intrinsics (ITree.bind (trigger e) kk) ≈
-          ITree.bind (interp_intrinsics_h e) (fun x : X => interp_intrinsics (kk x)).
+        forall X R (e : Eff X) (kk : X -> ctree Eff BR R),
+          interp_intrinsics (CTree.bind (trigger e) kk) ~
+          CTree.bind (interp_intrinsics_h e) (fun x : X => interp_intrinsics (kk x)).
       Proof using.
         intros.
         rewrite interp_intrinsics_bind_trigger_eqit.
-        apply eutt_eq_bind.
-        intros ?; tau_steps; reflexivity.
+        apply sbisim_bind_eq.
+        intros ?. rewrite sb_guard. reflexivity.
       Qed.
 
-      #[global] Instance eutt_interp_intrinsics {R} {b} :
-        Proper (eqit Logic.eq b b ==> eqit Logic.eq b b) (@interp_intrinsics R).
+      #[global] Instance equ_interp_intrinsics {R} :
+        Proper (equ Logic.eq ==> equ Logic.eq) (@interp_intrinsics R).
       Proof using.
         do 2 red; intros * EQ.
         unfold interp_intrinsics.
-        destruct b; try rewrite EQ; try reflexivity.
+        try rewrite EQ; try reflexivity.
       Qed.
+      (* #[global] Instance sbisim_interp_intrinsics {R} :
+        Proper (sbisim Logic.eq ==> sbisim Logic.eq) (@interp_intrinsics R).
+      Proof using.
+        do 2 red; intros * EQ.
+        unfold interp_intrinsics.
+        rewrite EQ.
+        try rewrite EQ; try reflexivity.
+      Qed. *)
 
   End Structural_Lemmas.
 

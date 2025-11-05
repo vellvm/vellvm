@@ -5,6 +5,8 @@ From ITree Require Import
      Events.StateFacts
      Eq.Eqit.
 
+From CTree Require Import
+     CTree.
 From ITreeSpec Require Import
   ITreeSpecDefinition.
 
@@ -12,49 +14,57 @@ Unset Universe Checking.
 From Vellvm Require Import
      Utilities
      Semantics.LLVMEvents
-     Semantics.Lang
+     (* Semantics.Lang *)
      Semantics.LLVMParams
      Semantics.StoreId.
 
 From Vellvm.Handlers Require Export
      Global
-     Local
-     Stack
+     (* Local *)
+     (* Stack *)
      Intrinsics
-     MemoryModel
+     (* MemoryModel *)
      (* MemoryModelImplementation *)
-     MemPropT
-     Pick
-     OOM
-     Concretization
-     UndefinedBehaviour.
+     (* MemPropT *)
+     (* Pick *)
+     (* OOM *)
+     (* Concretization *)
+     (* UndefinedBehaviour. *)
+     .
+
 
 From Stdlib Require Import
   Morphisms.
 
 (* end hide *)
 
-Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
-  Module LLVM := Lang.Make LP MEM.
-
-  Import LP.Events.
-  Import LP.PROV.
-  Import LLVM.Intrinsics.
-  Import MEM.MEM_MODEL.
-  Import MEM.MMEP.MMSP.
-  Import MEM.MMEP.MemExecM.
+Module Type InterpreterStack_common (LP : LLVMParams).
+(* Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP). *)
+  (* Module LLVM := Lang.Make LP MEM. *)
+    Import LP.Events.
+    Import LP.
+    Module Global     := Global.Make ADDR IP SIZEOF LP.Events.
+    Module Intrinsics := Intrinsics.Make ADDR IP SIZEOF LP.Events.
+      Import Global.
+      Import Intrinsics.
+  (* Import LP.Events. *)
+  (* Import LP.PROV. *)
+  (* Import LLVM.Intrinsics. *)
+  (* Import MEM.MEM_MODEL. *)
+  (* Import MEM.MMEP.MMSP. *)
+  (* Import MEM.MMEP.MemExecM. *)
   (* Import MEM.MEM_EXEC_INTERP. *)
-  Import MEM.MEM_SPEC_INTERP.
-  Import MEM.GEP.
-  Import LLVM.Pick.
-  Import LLVM.Global.
-  Import LLVM.Local.
-  Import LLVM.Stack.
-  Import LLVM.D.
+  (* Import MEM.MEM_SPEC_INTERP. *)
+  (* Import MEM.GEP. *)
+  (* Import LLVM.Pick. *)
+  (* Import LLVM.Global. *)
+  (* Import LLVM.Local. *)
+  (* Import LLVM.Stack. *)
+  (* Import LLVM.D. *)
 
   Section InterpreterMCFG.
-    Context {MemM : Type -> Type}.
-    Context `{MemMonad MemM}.
+    (* Context {MemM : Type -> Type}. *)
+    (* Context `{MemMonad MemM}. *)
 
     (**
    Partial interpretations of the trees produced by the denotation of _VIR_ programs.
@@ -65,7 +75,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
      *)
 
     (* TODO: just make these types, instead of duplicating the definitions? *)
-    Definition interp_mcfg1 {R} (t: itree L0 R) g : itree L1 (global_env * R) :=
+    Definition interp_mcfg1 {R} (t: ctree L0 B0 R) g : ctree L1 B1 (global_env * R) :=
       let uvalue_trace       := interp_intrinsics t in
       let L1_trace           := interp_global uvalue_trace g in
       L1_trace.
