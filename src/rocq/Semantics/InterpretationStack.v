@@ -8,6 +8,7 @@ From ITree Require Import
 From ITreeSpec Require Import
   ITreeSpecDefinition.
 
+Unset Universe Checking.
 From Vellvm Require Import
      Utilities
      Semantics.LLVMEvents
@@ -21,7 +22,7 @@ From Vellvm.Handlers Require Export
      Stack
      Intrinsics
      MemoryModel
-     MemoryModelImplementation
+     (* MemoryModelImplementation *)
      MemPropT
      Pick
      OOM
@@ -42,7 +43,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
   Import MEM.MEM_MODEL.
   Import MEM.MMEP.MMSP.
   Import MEM.MMEP.MemExecM.
-  Import MEM.MEM_EXEC_INTERP.
+  (* Import MEM.MEM_EXEC_INTERP. *)
   Import MEM.MEM_SPEC_INTERP.
   Import MEM.GEP.
   Import LLVM.Pick.
