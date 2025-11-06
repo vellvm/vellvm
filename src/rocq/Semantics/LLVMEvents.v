@@ -9,6 +9,7 @@
  ---------------------------------------------------------------------------- *)
 
 (* begin hide *)
+Unset Universe Checking.
 From Stdlib Require Import
      ZArith
      List
@@ -24,7 +25,9 @@ From ExtLib Require Import
      Data.Monads.EitherMonad
      Data.Monads.IdentityMonad.
 
-From CTree Require Import CTree.
+From CTree Require Import
+     CTree
+     Misc.Pure.
 
 From Vellvm Require Import
      Utilities
@@ -141,6 +144,19 @@ Set Contextual Implicit.
   #[global] Instance RAISE_ERR_ITREE_FAILUREE {E : Type -> Type} {BR} `{FailureE -< E} : RAISE_ERROR (ctree E BR) :=
   { raise_error := fun A e => raise e
   }.
+  #[global] Instance is_simple_raise {E BR R} `{FailureE -< E } s:
+    Pure.is_simple (raise s: ctree E BR R).
+  Proof.
+  Admitted.
+  #[global] Instance is_simple_raiseUB {E BR R} `{UBE -< E } s:
+    Pure.is_simple (raiseUB s: ctree E BR R).
+  Proof.
+  Admitted.
+  #[global] Instance is_simple_raiseOOM {E BR R} `{OOME -< E } s:
+    Pure.is_simple (raiseOOM s: ctree E BR R).
+  Proof.
+  Admitted.
+
 
   Definition lift_err {A B} {E} {BR} `{FailureE -< E} (f : A -> ctree E BR B) (m:err A) : ctree E BR B :=
     match m with
@@ -178,7 +194,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
     Variant CallE : Type -> Type :=
     | Call        : forall (t:dtyp) (f:uvalue) (args:list uvalue), CallE (uvalue + uvalue).
 
-    (* ExternalCallE values are the "observable" events by which one should compare the 
+    (* ExternalCallE values are the "observable" events by which one should compare the
        equivalence of two LLVM IR programs.  These should never be interpreted away
        by the Coq semantics. However, for practicality, we _do_ interpet some calls that
        generate outputs to [stdout] (SAZ: and eventuall[stderr]).  The stream of bytes
@@ -193,9 +209,9 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
     Variant ExternalCallE : Type -> Type :=
       | ExternalCall        : forall (t:dtyp) (f:uvalue) (args:list dvalue), ExternalCallE dvalue
 
-      (* This event corresponds to writing to the [stdout] channel. ] *)                              
+      (* This event corresponds to writing to the [stdout] channel. ] *)
       | IO_stdout : forall (str : list int8), ExternalCallE unit
-      (* This event corresponds to writing to the [stderr] channel. ] *)                              
+      (* This event corresponds to writing to the [stderr] channel. ] *)
       | IO_stderr : forall (str : list int8), ExternalCallE unit.
 
     (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)

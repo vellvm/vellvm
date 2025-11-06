@@ -165,6 +165,29 @@ Section Globals.
         intros ?. rewrite sb_guard. reflexivity.
       Qed.
 
+      #[global] Instance is_simple_e_trigger {R L}  e st:
+        Pure.is_simple (E_trigger (R:= R) (M:= L) e st).
+        Proof.
+          typeclasses eauto.
+        Qed.
+
+      #[global] Instance is_simple_global_h {T}  e st:
+        Pure.is_simple (interp_global_h (T := T) e st).
+        Proof.
+          unfold interp_global_h.
+          destruct e.
+          typeclasses eauto.
+          destruct s.
+          typeclasses eauto.
+          destruct s.
+          - unfold handle_global. cbn.
+            destruct g.
+            typeclasses eauto.
+            destruct (lookup id st);
+            typeclasses eauto.
+          - typeclasses eauto.
+        Qed.
+
       #[global] Instance equ_interp_global {R} :
         Proper (equ eq ==> eq ==> equ eq) (@interp_global R).
       Proof using.
@@ -174,6 +197,14 @@ Section Globals.
           reflexivity.
       Qed.
 
+      #[global] Instance sbisim_interp_global {R} :
+        Proper (sbisim eq ==> eq ==> sbisim eq) (@interp_global R).
+      Proof using.
+        repeat intro.
+        unfold interp_global.
+        subst; rewrite H1;
+          reflexivity.
+      Qed.
     End Structural_Lemmas.
 
   End PARAMS.

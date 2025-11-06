@@ -4,6 +4,7 @@ From Stdlib Require Import
   String
   Lia.
 
+Unset Universe Checking.
 From Vellvm Require Import
   Numeric.Floats
   Utils.Monads

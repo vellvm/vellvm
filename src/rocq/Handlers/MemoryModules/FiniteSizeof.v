@@ -3,6 +3,7 @@ From Stdlib Require Import
      Lia
      ZArith.
 
+Unset Universe Checking.
 From Vellvm.Utils Require Import
      ListUtil.
 

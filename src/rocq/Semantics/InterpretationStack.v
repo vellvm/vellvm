@@ -5,12 +5,13 @@ From ITree Require Import
      Events.StateFacts
      Eq.Eqit.
 
-From CTree Require Import
-     CTree.
-From ITreeSpec Require Import
-  ITreeSpecDefinition.
-
 Unset Universe Checking.
+From CTree Require Import
+     CTree
+     Eq
+     Fold
+     FoldStateT.
+
 From Vellvm Require Import
      Utilities
      Semantics.LLVMEvents
@@ -79,7 +80,9 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let L2_trace       := interp_local_stack L1_trace l in
       L2_trace.
 
-    Definition interp_mcfg3 {R} (* (RR : Relation_Definitions.relation (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R))) *)  (t: ctree L0 B0 R) (g : global_env) (l : @stack_frame uvalue local_env * @stack uvalue local_env) (sid : store_id) (m : MemState) : ctree L3 MemC (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
+    Definition interp_mcfg3 {R} (* (RR : Relation_Definitions.relation (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R))) *)
+      (t: ctree L0 B0 R) (g : global_env) (l : @stack_frame uvalue local_env * @stack uvalue local_env) (sid : store_id) (m : MemState) :
+        ctree L3 MemC (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
       let L2_trace       := interp_mcfg2 t g l in
       let L3_trace       := interp_memory_spec L2_trace sid m in
       L3_trace.
@@ -89,7 +92,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
     (*   let L3_trace       := interp_memory L2_trace sid m in *)
     (*   L3_trace. *)
 
-    Definition interp_mcfg4 {R} RR_mem RR_pick (t: ctree L0 B0 R) g l sid m : PropT L4 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
+    (* Definition interp_mcfg4 {R} RR_mem RR_pick (t: ctree L0 B0 R) g l sid m : PropT L4 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
       let L3_trace       := interp_mcfg3 RR_mem t g l sid m in
       let L4_trace       := model_undef RR_pick L3_trace in
       L4_trace.
@@ -107,19 +110,31 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
     Definition interp_mcfg6 {R} RR_mem RR_pick RR_oom (t: ctree L0 B0 R) g l sid m : PropT L6 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
       let L5_trace       := interp_mcfg5 RR_mem RR_pick t g l sid m in
       let L6_trace       := refine_OOM RR_oom L5_trace in
-      L6_trace.
+      L6_trace. *)
 
-    #[global] Instance Proper_interp_mcfg1 {R} :
-      Proper (eutt eq ==> eq ==> eutt eq) (@interp_mcfg1 R).
+    #[global] Instance Proper_equ_interp_mcfg1 {R} :
+      Proper (equ eq ==> eq ==> equ eq) (@interp_mcfg1 R).
     Proof.
       intros x y H0 x0 y0 H1.
       unfold interp_mcfg1; subst.
-      rewrite H0.
+      unfold interp_global.
+      unfold interp_intrinsics.
+      setoid_rewrite H0.
+      reflexivity.
+    Qed.
+    #[global] Instance Proper_interp_mcfg1 {R} :
+      Proper (sbisim eq ==> eq ==> sbisim eq) (@interp_mcfg1 R).
+    Proof.
+      intros x y H0 x0 y0 H1.
+      unfold interp_mcfg1; subst.
+      unfold interp_global.
+      unfold interp_intrinsics.
+      setoid_rewrite H0.
       reflexivity.
     Qed.
 
     #[global] Instance Proper_interp_mcfg2 {R} :
-      Proper (eutt eq ==> eq ==> eq ==> eutt eq) (@interp_mcfg2 R).
+      Proper (sbisim eq ==> eq ==> eq ==> sbisim eq) (@interp_mcfg2 R).
     Proof.
       intros x y H0 x0 y0 H1 x1 y1 H2.
       unfold interp_mcfg2; subst.
@@ -146,27 +161,27 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
    NOTE: Can we avoid this duplication w.r.t. [interpi]?
      *)
 
-    Definition interp_cfg1 {R} (t: itree instr_E R) (g: global_env) : itree (CallE +' IntrinsicE +' LLVMEnvE +' MemoryE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (global_env * R) :=
+    Definition interp_cfg1 {R} (t: ctree instr_E R) (g: global_env) : ctree (CallE +' IntrinsicE +' LLVMEnvE +' MemoryE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (global_env * R) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       L1_trace.
 
-    Definition interp_cfg2 {R} (t: itree instr_E R) (g: global_env) (l: local_env) : itree (CallE +' IntrinsicE +' MemoryE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (local_env * (global_env * R)) :=
+    Definition interp_cfg2 {R} (t: ctree instr_E R) (g: global_env) (l: local_env) : ctree (CallE +' IntrinsicE +' MemoryE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (local_env * (global_env * R)) :=
       let L1_trace       := interp_cfg1 t g in
       let L2_trace       := interp_local L1_trace l in
       L2_trace.
 
-    Definition interp_cfg3 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : PropT (CallE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) :=
+    Definition interp_cfg3 {R} RR (t: ctree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : PropT (CallE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) :=
       let L2_trace       := interp_cfg2 t g l in
       let L3_trace       := interp_memory_spec RR L2_trace sid m in
       L3_trace.
 
-    Definition interp_cfg3_exec {R} (t: itree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : itree (CallE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) :=
+    Definition interp_cfg3_exec {R} (t: ctree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : ctree (CallE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) :=
       let L2_trace       := interp_cfg2 t g l in
       let L3_trace       := interp_memory L2_trace sid m in
       L3_trace.
 
-    Definition interp_cfg4 {R} RR_mem RR_pick (t: itree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : PropT (CallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) :=
+    Definition interp_cfg4 {R} RR_mem RR_pick (t: ctree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : PropT (CallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) :=
       let L3_trace       := interp_cfg3 RR_mem t g l sid m in
       let L4_trace       := model_undef RR_pick L3_trace in
       L4_trace.

@@ -22,11 +22,13 @@ From CTree Require Import
      CTree
      Fold
      FoldCTree
+     FoldStateT
      Eq
      SBisim.
 
 From Vellvm Require Import
      Utils.Util
+     Utils.Tactics
      Syntax.LLVMAst
      Handlers.CTreeHandler
      Semantics.LLVMEvents
@@ -112,7 +114,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
   Section PARAMS.
     Variable (E F : Type -> Type).
     Variable (BR : Type -> Type).
-    
+
     Context `{FailureE -< F}.
     Context `{LLVMExcE uvalue -< F}.
     Notation Eff := (E +' IntrinsicE +' F).
@@ -171,7 +173,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
         intros.
         rewrite interp_intrinsics_vis_eqit.
         apply sbisim_bind_eq.
-        intros ?. 
+        intros ?.
         apply sbisim_guard_l.
         reflexivity.
       Qed.
@@ -180,7 +182,7 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
     interp h (CTree.trigger e : ctree K C R) ≅ x <- h _ e ;; Guard (Ret x).
   Proof.
     intros. rewrite unfold_interp. cbn.
-    upto_bind. reflexivity. intros. 
+    upto_bind. reflexivity. intros.
     rewrite H2.
     now rewrite interp_ret.
   Qed.
@@ -226,14 +228,25 @@ Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLV
         unfold interp_intrinsics.
         try rewrite EQ; try reflexivity.
       Qed.
-      (* #[global] Instance sbisim_interp_intrinsics {R} :
+
+      #[global] Instance is_simple_intrinsics_h {T}  e :
+        Pure.is_simple (interp_intrinsics_h (T := T) e ).
+        Proof.
+          unfold interp_intrinsics_h.
+          destruct e.
+          typeclasses eauto.
+          destruct s.
+          destruct i.
+          - unfold handle_intrinsics. cbn.
+            repeat break_inner_match_goal; typeclasses eauto.
+          - typeclasses eauto.
+        Qed.
+      #[global] Instance sbisim_interp_intrinsics {R} :
         Proper (sbisim Logic.eq ==> sbisim Logic.eq) (@interp_intrinsics R).
       Proof using.
         do 2 red; intros * EQ.
-        unfold interp_intrinsics.
-        rewrite EQ.
         try rewrite EQ; try reflexivity.
-      Qed. *)
+      Qed.
 
   End Structural_Lemmas.
 

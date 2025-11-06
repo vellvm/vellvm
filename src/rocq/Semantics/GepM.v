@@ -4,6 +4,7 @@ From ExtLib Require Import
      Structures.Monad
      Structures.Functor.
 
+     Unset Universe Checking.
 From Vellvm Require Import
   DynamicTypes
   VellvmIntegers

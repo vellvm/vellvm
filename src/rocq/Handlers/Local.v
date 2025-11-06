@@ -7,6 +7,7 @@ From ExtLib Require Import
   Structures.Monads
   Structures.Maps.
 
+Unset Universe Checking.
 From Vellvm Require Import
   Utils.Util
   Utils.Error
@@ -14,7 +15,6 @@ From Vellvm Require Import
   Semantics.LLVMEvents
   Semantics.Memory.Sizeof.
 
-Unset Universe Checking.
 From CTree Require Import
   CTree
   Fold
@@ -168,11 +168,30 @@ Section Locals.
         reflexivity.
       Qed.
 
+      #[global] Instance is_simple_local_h {T}  e st:
+        Pure.is_simple (interp_local_h (T := T) e st).
+        Proof.
+          unfold interp_local_h.
+          destruct e.
+          typeclasses eauto.
+          destruct s.
+          typeclasses eauto.
+          destruct s.
+          - unfold handle_local. cbn.
+            destruct l.
+            typeclasses eauto.
+            destruct (lookup id st);
+            typeclasses eauto.
+          - typeclasses eauto.
+        Qed.
+
       #[global] Instance Proper_interp_local_sbisim {T} :
         Proper (sbisim eq  ==> eq ==> sbisim eq) (@interp_local T).
       Proof.
         intros ? ? ? ? ? ?; subst.
-      Abort.
+        rewrite H1.
+        reflexivity.
+      Qed.
 
       #[global] Instance Proper_interp_local_pointwise_equ {T} :
         Proper (equ eq  ==> eq ==> equ eq) (@interp_local T).

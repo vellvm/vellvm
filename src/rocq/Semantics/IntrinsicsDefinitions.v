@@ -17,7 +17,7 @@ From ExtLib Require Import
   Structures.Functor
   Programming.Eqv
   Data.String.
-
+Unset Universe Checking.
 From Vellvm Require Import
      Utilities
      Syntax
