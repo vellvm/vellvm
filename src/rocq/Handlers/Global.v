@@ -16,16 +16,14 @@ From Vellvm Require Import
      Utils.Tactics
      Semantics.LLVMEvents
      Semantics.Memory.Sizeof.
+
 From CTree Require Import
-      CTree
-      Fold
-      FoldCTree
-      FoldStateT
-      Eq
-      SBisim
-      .
-
-
+  CTree
+  Fold
+  FoldCTree
+  FoldStateT
+  Eq
+  SBisim.
 
 Require Import Ceres.Ceres.
 
