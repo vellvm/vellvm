@@ -412,14 +412,14 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   Definition catch_llvm_exc_instr_E {BR}: ctree instr_E BR ~> eitherT uvalue (ctree instr_E BR)
       := interp_either catch_llvm_exc_instr_E_h.
 
-  Definition catch_llvm_exc_L0 : ctree L0 ~> eitherT uvalue (ctree L0)
+  Definition catch_llvm_exc_L0 : ctree L0 B0 ~> eitherT uvalue (ctree L0 B0)
       := interp_either catch_llvm_exc_L0_h.
 
-  Definition catch_llvm_exc_L0' : ctree L0' ~> eitherT uvalue (ctree L0')
+  Definition catch_llvm_exc_L0' : ctree L0' B0 ~> eitherT uvalue (ctree L0' B0)
       := interp_either catch_llvm_exc_L0'_h.
 
   (* An instruction has only side-effects, it therefore returns [unit] *)
-  Definition denote_instr
+  Definition denote_instr {BR}
     (i: (instr_id * instr dtyp)) (varargs : option ADDR.addr) : ctree instr_E BR unit :=
     match i with
     (* Pure operations *)
@@ -591,7 +591,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
 
-  Definition denote_terminator (t: terminator dtyp): ctree instr_E (block_id + uvalue) :=
+  Definition denote_terminator {BR} (t: terminator dtyp): ctree instr_E BR (block_id + uvalue) :=
     match t with
 
     | TERM_Ret (dt, op) =>
@@ -614,7 +614,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       | _ => raise "Br got non-bool value"
       end
 
-    | TERM_Br_1 br => ret (inl br)
+    | TERM_Br_1 brn => ret (inl brn)
 
     | TERM_Switch (dt,e) default_br dests =>
       uselector <- (translate exp_to_instr (denote_exp (Some dt) e));;
@@ -660,10 +660,10 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
-  Definition denote_code (c: code dtyp) (varargs : option ADDR.addr) : ctree instr_E BR unit :=
+  Definition denote_code {BR} (c: code dtyp) (varargs : option ADDR.addr) : ctree instr_E BR unit :=
     map_monad_ (fun i => denote_instr i varargs) c.
 
-  Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp) : ctree exp_E (local_id * uvalue) :=
+  Definition denote_phi {BR} (bid_from : block_id) (id_p : local_id * phi dtyp) : ctree exp_E BR (local_id * uvalue) :=
     let '(id, Phi dt args) := id_p in
     match assoc bid_from args with
     | Some op =>
@@ -672,7 +672,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | None => raise ("jump: phi node doesn't include block ")
     end.
 
-  Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp)): ctree instr_E BR unit :=
+  Definition denote_phis {BR} (bid_from: block_id) (phis: list (local_id * phi dtyp)): ctree instr_E BR unit :=
     dvs <- map_monad
              (fun x => translate exp_to_instr (denote_phi bid_from x))
              phis;;
@@ -681,7 +681,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
   (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-  Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option ADDR.addr) : ctree instr_E (block_id + uvalue) :=
+  Definition denote_block {BR} (b: LLVMAst.block dtyp) (bid_from : block_id) (varargs : option ADDR.addr) : ctree instr_E BR (block_id + uvalue) :=
     denote_phis bid_from (blk_phis b);;
     denote_code (blk_code b) varargs;;
     denote_terminator (blk_term b).
@@ -699,9 +699,9 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
          As long as the computation returns a new label to jump to, we feed it back to the loop.
          If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
    *)
-  Definition denote_ocfg (bks: ocfg dtyp) (varargs : option ADDR.addr)
-    : (block_id * block_id) -> ctree instr_E ((block_id * block_id) + uvalue) :=
-    iter (C := ktree _) (bif := sum)
+  Definition denote_ocfg {BR} (bks: ocfg dtyp) (varargs : option ADDR.addr)
+    : (block_id * block_id) -> ctree instr_E BR ((block_id * block_id) + uvalue) :=
+    CTree.iter
          (fun '((bid_from,bid_src) : block_id * block_id) =>
             match find_block bks bid_src with
             | None => ret (inr (inl (bid_from,bid_src)))
@@ -713,7 +713,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
               end
             end).
 
-  Definition denote_cfg (f: cfg dtyp) (varargs : option ADDR.addr) : ctree instr_E BR uvalue :=
+  Definition denote_cfg {BR} (f: cfg dtyp) (varargs : option ADDR.addr) : ctree instr_E BR uvalue :=
     r <- denote_ocfg (blks f) varargs (init f,init f) ;;
     match r with
     | inl bid => raise ("Can't find block in denote_cfg " ++ to_string (snd bid))
@@ -723,7 +723,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   (* The denotation of an ctree function is a coq function that takes
          a list of uvalues and returns the appropriate semantics. *)
   Definition function_denotation : Type :=
-    list uvalue -> ctree L0' uvalue.
+    list uvalue -> ctree L0' B0 uvalue.
 
   Fixpoint combine_lists_varargs {A B:Type} (l1:list A) (l2:list B) : err (list (A * B) * list B) :=
     match l1, l2 with
@@ -737,12 +737,12 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
         ret ([], vargs)
     end.
 
-  Definition pop_call_frame {E k v exc} `{MemoryE -< E} `{StackE k v exc -< E} : ctree E BR unit :=
+  Definition pop_call_frame {E BR k v exc} `{MemoryE -< E} `{StackE k v exc -< E} : ctree E BR unit :=
     trigger StackPop;;
     trigger MemPop.
 
   (* Push call frame, return varargs address *)
-  Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list uvalue) : ctree L0' ADDR.addr :=
+  Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list uvalue) : ctree L0' B0 ADDR.addr :=
     (* We match the arguments variables to the inputs *)
     '(bs, vs) <- lift_err ret (combine_lists_varargs (df_args df) args) ;;
     dts <- lift_err ret (map_monad dtyp_of_uvalue_fun vs);;
@@ -786,21 +786,22 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
        | _ => None
        end.
 
-  Definition denote_mcfg
-    (fundefs:IntMap function_denotation) (dt : dtyp)
-    (f_value : uvalue) (args : list uvalue) : ctree L0 (uvalue + uvalue) :=
-    @mrec CallE (ExternalCallE +' _)
-      (fun T call =>
-         match call with
-         | Call dt fv args =>
-             dfv <- concretize_or_pick fv;;
-             match (lookup_defn dfv fundefs) with
-             | Some f_den => (* If the call is internal *)
-                 unEitherT (catch_llvm_exc_L0' (f_den args))
-             | None =>
-                 dargs <- map_monad (fun uv => concretize_or_pick_unique uv) args ;;
-                 fmap inr (fmap dvalue_to_uvalue (trigger (ExternalCall dt fv dargs)))
-             end
-         end)
-      _ (Call dt f_value args).
+  (* TODO: ctrees mrec needed *)
+  (* Definition denote_mcfg *)
+  (*   (fundefs:IntMap function_denotation) (dt : dtyp) *)
+  (*   (f_value : uvalue) (args : list uvalue) : ctree L0 B0 (uvalue + uvalue) := *)
+  (*   @mrec CallE (ExternalCallE +' _) *)
+  (*     (fun T call => *)
+  (*        match call with *)
+  (*        | Call dt fv args => *)
+  (*            dfv <- concretize_or_pick fv;; *)
+  (*            match (lookup_defn dfv fundefs) with *)
+  (*            | Some f_den => (* If the call is internal *) *)
+  (*                unEitherT (catch_llvm_exc_L0' (f_den args)) *)
+  (*            | None => *)
+  (*                dargs <- map_monad (fun uv => concretize_or_pick_unique uv) args ;; *)
+  (*                fmap inr (fmap dvalue_to_uvalue (trigger (ExternalCall dt fv dargs))) *)
+  (*            end *)
+  (*        end) *)
+  (*     _ (Call dt f_value args). *)
 End Denotation.

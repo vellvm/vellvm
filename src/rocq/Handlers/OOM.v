@@ -1,4 +1,5 @@
 (* begin hide *)
+Unset Universe Checking.
 From Stdlib Require Import
      Relations
      String
@@ -17,10 +18,13 @@ From Vellvm Require Import
      Utils.InterpProp
      Semantics.LLVMEvents.
 
-From ITree Require Import
-     ITree
-     Eq.Eqit
-     Eq.EqAxiom.
+From CTree Require Import
+  CTree
+  Fold
+  FoldCTree
+  FoldStateT
+  Eq
+  SBisim.
 
 From Paco Require Import paco.
 
@@ -29,6 +33,8 @@ Set Contextual Implicit.
 
 Import MonadNotation.
 Open Scope monad_scope.
+
+Import CategoryOps.
 (* end hide *)
 
 (** * Handler for out of memory

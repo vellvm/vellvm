@@ -20,12 +20,12 @@ From Vellvm Require Import
 
 From Vellvm.Handlers Require Export
      Global
-     (* Local *)
-     (* Stack *)
+     Local
+     Stack
      Intrinsics
-     (* MemoryModel *)
+     MemoryModel
      (* MemoryModelImplementation *)
-     (* MemPropT *)
+     MemPropT
      (* Pick *)
      (* OOM *)
      (* Concretization *)
@@ -44,9 +44,17 @@ Module Type InterpreterStack_common (LP : LLVMParams).
     Import LP.Events.
     Import LP.
     Module Global     := Global.Make ADDR IP SIZEOF LP.Events.
+    Module Local      := Local.Make ADDR IP SIZEOF LP.Events.
+    Module Stack      := Stack.Make ADDR IP SIZEOF LP.Events.
     Module Intrinsics := Intrinsics.Make ADDR IP SIZEOF LP.Events.
-      Import Global.
-      Import Intrinsics.
+    Import Global.
+    Import Local.
+    Import Stack.
+    Import Intrinsics.
+
+    Declare Module MEM : Memory LP.
+    Export MEM.
+
   (* Import LP.Events. *)
   (* Import LP.PROV. *)
   (* Import LLVM.Intrinsics. *)
@@ -80,37 +88,37 @@ Module Type InterpreterStack_common (LP : LLVMParams).
       let L1_trace           := interp_global uvalue_trace g in
       L1_trace.
 
-    Definition interp_mcfg2 {R} (t: itree L0 R) (g : global_env) (l : @stack_frame uvalue local_env * @stack uvalue local_env) : itree L2 (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)) :=
+    Definition interp_mcfg2 {R} (t: ctree L0 B0 R) (g : global_env) (l : @stack_frame uvalue local_env * @stack uvalue local_env) : ctree L2 B2 (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)) :=
       let L1_trace       := interp_mcfg1 t g in
       let L2_trace       := interp_local_stack L1_trace l in
       L2_trace.
 
-    Definition interp_mcfg3 {R} (RR : Relation_Definitions.relation (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))  (t: itree L0 R) (g : global_env) (l : @stack_frame uvalue local_env * @stack uvalue local_env) (sid : store_id) (m : MemState) : PropT L3 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
+    Definition interp_mcfg3 {R} (RR : Relation_Definitions.relation (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))  (t: ctree L0 B0 R) (g : global_env) (l : @stack_frame uvalue local_env * @stack uvalue local_env) (sid : store_id) (m : MemState) : PropT L3 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
       let L2_trace       := interp_mcfg2 t g l in
       let L3_trace       := interp_memory_spec RR L2_trace sid m in
       L3_trace.
 
-    Definition interp_mcfg3_exec {R} (t: itree L0 R) g l sid m : itree L3 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
+    Definition interp_mcfg3_exec {R} (t: ctree L0 B0 R) g l sid m : ctree L3 B3 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
       let L2_trace       := interp_mcfg2 t g l in
       let L3_trace       := interp_memory L2_trace sid m in
       L3_trace.
 
-    Definition interp_mcfg4 {R} RR_mem RR_pick (t: itree L0 R) g l sid m : PropT L4 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
+    Definition interp_mcfg4 {R} RR_mem RR_pick (t: ctree L0 B0 R) g l sid m : PropT L4 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
       let L3_trace       := interp_mcfg3 RR_mem t g l sid m in
       let L4_trace       := model_undef RR_pick L3_trace in
       L4_trace.
 
-    Definition interp_mcfg4_exec {R} (t: itree L0 R) g l sid m : itree L4 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
+    Definition interp_mcfg4_exec {R} (t: ctree L0 B0 R) g l sid m : ctree L4 B4 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
       let L3_trace       := interp_mcfg3_exec t g l sid m in
       let L4_trace       := exec_undef L3_trace in
       L4_trace.
 
-    Definition interp_mcfg5 {R} RR_mem RR_pick (t: itree L0 R) g l sid m : PropT L5 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
+    Definition interp_mcfg5 {R} RR_mem RR_pick (t: ctree L0 B0 R) g l sid m : PropT L5 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
       let L4_trace       := interp_mcfg4 RR_mem RR_pick t g l sid m in
       let L5_trace       := model_UB L4_trace in
       L5_trace.
 
-    Definition interp_mcfg6 {R} RR_mem RR_pick RR_oom (t: itree L0 R) g l sid m : PropT L6 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
+    Definition interp_mcfg6 {R} RR_mem RR_pick RR_oom (t: ctree L0 B0 R) g l sid m : PropT L6 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
       let L5_trace       := interp_mcfg5 RR_mem RR_pick t g l sid m in
       let L6_trace       := refine_OOM RR_oom L5_trace in
       L6_trace.
