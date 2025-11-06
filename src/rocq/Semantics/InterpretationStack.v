@@ -48,6 +48,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
   Import MEM.MMEP.MemExecM.
   (* Import MEM.MEM_EXEC_INTERP. *)
   Import MEM.MEM_SPEC_INTERP.
+  Import MEM.MMEP.MemSpec.
   Import MEM.GEP.
   (* Import LLVM.Pick. *)
   Import LLVM.Global.
@@ -78,15 +79,15 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let L2_trace       := interp_local_stack L1_trace l in
       L2_trace.
 
-    Definition interp_mcfg3 {R} (RR : Relation_Definitions.relation (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))  (t: ctree L0 B0 R) (g : global_env) (l : @stack_frame uvalue local_env * @stack uvalue local_env) (sid : store_id) (m : MemState) : PropT L3 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
+    Definition interp_mcfg3 {R} (* (RR : Relation_Definitions.relation (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R))) *)  (t: ctree L0 B0 R) (g : global_env) (l : @stack_frame uvalue local_env * @stack uvalue local_env) (sid : store_id) (m : MemState) : ctree L3 MemC (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
       let L2_trace       := interp_mcfg2 t g l in
-      let L3_trace       := interp_memory_spec RR L2_trace sid m in
+      let L3_trace       := interp_memory_spec L2_trace sid m in
       L3_trace.
 
-    Definition interp_mcfg3_exec {R} (t: ctree L0 B0 R) g l sid m : ctree L3 B3 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
-      let L2_trace       := interp_mcfg2 t g l in
-      let L3_trace       := interp_memory L2_trace sid m in
-      L3_trace.
+    (* Definition interp_mcfg3_exec {R} (t: ctree L0 B0 R) g l sid m : ctree L3 B3 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) := *)
+    (*   let L2_trace       := interp_mcfg2 t g l in *)
+    (*   let L3_trace       := interp_memory L2_trace sid m in *)
+    (*   L3_trace. *)
 
     Definition interp_mcfg4 {R} RR_mem RR_pick (t: ctree L0 B0 R) g l sid m : PropT L4 (MemState * (store_id * (@stack_frame uvalue local_env * @stack uvalue local_env * (global_env * R)))) :=
       let L3_trace       := interp_mcfg3 RR_mem t g l sid m in
