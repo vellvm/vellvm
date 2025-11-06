@@ -1,4 +1,5 @@
 (* begin hide *)
+Unset Universe Checking.
 From Stdlib Require Import
      List
      String.
@@ -6,12 +7,6 @@ From Stdlib Require Import
 From ExtLib Require Import
      Structures.Monads
      Structures.Maps.
-
-From ITree Require Import
-     ITree
-     Events.StateFacts
-     Eq.Eqit
-     Events.State.
 
 From Vellvm Require Import
      Utils.Util
@@ -25,6 +20,14 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Handlers.Local.
 
+From CTree Require Import
+  CTree
+  Fold
+  FoldCTree
+  FoldStateT
+  Eq
+  SBisim.
+
 Require Import Ceres.Ceres.
 
 Set Implicit Arguments.
@@ -34,6 +37,8 @@ Import ListNotations.
 Import MonadNotation.
 
 Import ITree.Basics.Basics.Monads.
+
+Import CategoryOps.
 (* end hide *)
 
 (** * Stack handler
@@ -67,7 +72,7 @@ Section StackMap.
                Build_stack_frame var_union handler_union exc_union
   }.
 
-  Definition handle_stack {E} `{FailureE -< E} : (StackE k v exc) ~> stateT (stack_frame * stack) (itree E) :=
+  Definition handle_stack {E BR} `{FailureE -< E} : (StackE k v exc) ~> stateT (stack_frame * stack) (ctree E BR) :=
     fun _ e '(env, stk) =>
       match e with
       | StackPush args =>
@@ -97,28 +102,28 @@ Section StackMap.
       end.
 
     (* Transform a local handler that works on maps to one that works on stacks *)
-    Definition handle_local_stack {E} `{FailureE -< E} (h:(LocalE k v) ~> stateT stack_frame (itree E)) :
-      LocalE k v ~> stateT (stack_frame * stack) (itree E)
+    Definition handle_local_stack {E BR} `{FailureE -< E} (h:(LocalE k v) ~> stateT stack_frame (ctree E BR)) :
+      LocalE k v ~> stateT (stack_frame * stack) (ctree E BR)
       :=
-      fun _ e '(env, stk) => ITree.map (fun '(env',r) => ((env',stk), r)) (h _ e env).
+      fun _ e '(env, stk) => CTree.map (fun '(env',r) => ((env',stk), r)) (h _ e env).
 
   Open Scope monad_scope.
   Section PARAMS.
-    Variable (E F G : Type -> Type).
+    Variable (E F G BR : Type -> Type).
     Context `{FailureE -< E +' F +' G}.
     Notation Effin := (E +' F +' (LocalE k v +' StackE k v exc) +' G).
     Notation Effout := (E +' F +' G).
 
-    Definition E_trigger {S} : forall R, E R -> (stateT S (itree Effout) R) :=
+    Definition E_trigger {S} : forall R, E R -> (stateT S (ctree Effout BR) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition F_trigger {S} : forall R, F R -> (stateT S (itree Effout) R) :=
+    Definition F_trigger {S} : forall R, F R -> (stateT S (ctree Effout BR) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition G_trigger {S} : forall R , G R -> (stateT S (itree Effout) R) :=
+    Definition G_trigger {S} : forall R , G R -> (stateT S (ctree Effout BR) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition  interp_local_stack_h (h:(LocalE k v) ~> stateT stack_frame (itree Effout)) :=
+    Definition  interp_local_stack_h (h:(LocalE k v) ~> stateT stack_frame (ctree Effout BR)) :=
       (case_ E_trigger
              (case_ F_trigger
                     (case_ (case_ (handle_local_stack h)
@@ -126,36 +131,35 @@ Section StackMap.
                            G_trigger))).
 
     Definition interp_local_stack `{FailureE -< E +' F +' G}  :
-      (itree Effin) ~>  stateT (stack_frame * stack) (itree Effout) :=
+      (ctree Effin BR) ~>  stateT (stack_frame * stack) (ctree Effout BR) :=
       interp_state (interp_local_stack_h (handle_local (v:=v))).
 
     Section Structural_Lemmas.
 
       Lemma interp_local_stack_bind :
-        forall (R S: Type) (t : itree Effin _) (k : R -> itree Effin S) s,
-          interp_local_stack (ITree.bind t k) s ≅
-                             ITree.bind (interp_local_stack t s)
+        forall (R S: Type) (t : ctree Effin BR _) (k : R -> ctree Effin BR S) s,
+          interp_local_stack (CTree.bind t k) s ≅
+                             CTree.bind (interp_local_stack t s)
                              (fun '(s',r) => interp_local_stack (k r) s').
       Proof using.
         intros.
         unfold interp_local_stack.
         setoid_rewrite interp_state_bind.
-        apply eq_itree_clo_bind with (UU := Logic.eq).
-        reflexivity.
-        intros [] [] EQ; inversion EQ; reflexivity.
+        upto_bind_eq.
+        intros ((?&?)&?); cbn; reflexivity.
       Qed.
 
       Lemma interp_local_stack_ret :
         forall (R : Type) l (x: R),
-          interp_local_stack (Ret x: itree Effin R) l ≅ Ret (l,x).
+          interp_local_stack (Ret x: ctree Effin BR R) l ≅ Ret (l,x).
       Proof using.
         intros; unfold interp_local_stack.
         apply interp_state_ret.
       Qed.
 
       Lemma interp_local_stack_vis_eqit:
-        forall (ls : stack_frame * stack) S X (kk : X -> itree Effin S) (e : Effin X),
-          interp_local_stack (Vis e kk) ls ≅ ITree.bind (interp_local_stack_h (handle_local (v:=v)) e ls) (fun (sx : stack_frame * stack * X) => Tau (interp_local_stack (kk (snd sx)) (fst sx))).
+        forall (ls : stack_frame * stack) S X (kk : X -> ctree Effin BR S) (e : Effin X),
+          interp_local_stack (Vis e kk) ls ≅ CTree.bind (interp_local_stack_h (handle_local (v:=v)) e ls) (fun (sx : stack_frame * stack * X) => Guard (interp_local_stack (kk (snd sx)) (fst sx))).
       Proof using.
         intros.
         unfold interp_local_stack.
@@ -164,20 +168,22 @@ Section StackMap.
       Qed.
 
       Lemma interp_local_stack_vis:
-        forall (ls : (stack_frame * stack)) S X (kk : X -> itree Effin S) (e : Effin X),
-          interp_local_stack (Vis e kk) ls ≈ ITree.bind (interp_local_stack_h (handle_local (v:=v)) e ls) (fun (sx : stack_frame * stack * X) => interp_local_stack (kk (snd sx)) (fst sx)).
+        forall (ls : (stack_frame * stack)) S X (kk : X -> ctree Effin BR S) (e : Effin X),
+          interp_local_stack (Vis e kk) ls ~ CTree.bind (interp_local_stack_h (handle_local (v:=v)) e ls) (fun (sx : stack_frame * stack * X) => interp_local_stack (kk (snd sx)) (fst sx)).
       Proof using.
         intros.
         rewrite interp_local_stack_vis_eqit.
-        apply eutt_eq_bind.
-        intros ?; tau_steps; reflexivity.
+        upto_bind_eq.
+        intros ?; rewrite sb_guard; reflexivity.
       Qed.
 
       Lemma interp_local_stack_trigger ls X (e : Effin X):
-          interp_local_stack (ITree.trigger e) ls ≈ interp_local_stack_h (handle_local (v:=v)) e ls.
+          interp_local_stack (CTree.trigger e) ls ~ interp_local_stack_h (handle_local (v:=v)) e ls.
       Proof using.
         unfold interp_local_stack.
         rewrite interp_state_trigger.
+        setoid_rewrite sb_guard.
+        setoid_rewrite bind_ret_r.
         reflexivity.
       Qed.
 
