@@ -13,14 +13,6 @@ From ExtLib Require Import
   Structures.Monads
   Structures.Maps.
 
-From ITree Require Import
-  ITree
-  Eq.Eqit
-  Events.State.
-
-From ITreeSpec Require Import
-  ITreeSpecDefinition.
-
 From Vellvm Require Import
   Utilities
   Syntax.LLVMAst
@@ -43,12 +35,20 @@ From Vellvm Require Import
 From Vellvm.Utils Require Import
   InterpPropOOM.
 
+From CTree Require Import
+  CTree
+  Fold
+  FoldCTree
+  FoldStateT
+  Eq
+  SBisim.
+
 From ExtLib Require Import
   Data.Monads.EitherMonad
   Data.Monads.IdentityMonad
   Structures.Functor.
 
-Require Import ContainsUB.
+(* Require Import ContainsUB. *)
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -83,7 +83,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
            (forall err_msg, ~ concretize_u uv (ERR_unERR_UB_OOM err_msg)) /\
            (forall dt, ~concretize uv (DVALUE_Poison dt)).
 
-    Program Definition lift_err_ub_oom_post {A B} {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} (m:err_ub_oom A) (Post : B -> Prop) (f : forall (a : A), m = ret a -> itree E {b : B | Post b}) : itree E {b : B | Post b} :=
+    Program Definition lift_err_ub_oom_post {A B} {E BR} `{FailureE -< E} `{UBE -< E} `{OOME -< E} (m:err_ub_oom A) (Post : B -> Prop) (f : forall (a : A), m = ret a -> ctree E BR {b : B | Post b}) : ctree E BR {b : B | Post b} :=
       match m with
       | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
           match m with
@@ -94,13 +94,13 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
           end
       end.
 
-    Arguments lift_err_ub_oom_post {_ _ _ _ _ _} _ _ _.
+    Arguments lift_err_ub_oom_post {_ _ _ _ _ _ _} _ _ _.
 
     Program Definition lift_err_ub_oom_post_ret
-      {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E}
+      {E BR} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E}
       {X Y} (f : X -> Y) (res : err_ub_oom X) (Post : Y -> Prop)
       (P : forall (y : Y), fmap f res = ret y -> Post y)
-      : itree E {y : Y | Post y}
+      : ctree E BR {y : Y | Post y}
       := lift_err_ub_oom_post res Post _.
     Next Obligation.
       cbn in *.
@@ -110,7 +110,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
 
     Arguments lift_err_ub_oom_post_ret {_ _ _ _ _ _} _ _ _.
 
-    (* Definition PickUvalue_handler  {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : PickUvalueE ~> itree_spec E. *)
+    (* Definition PickUvalue_handler  {E BR} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : PickUvalueE ~> itree_spec E. *)
     (*   intros T p. *)
     (*   refine (match p with *)
     (*           | pickUnique x => _ *)
@@ -157,29 +157,29 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
     (*     t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) -> *)
     (*     PickUvalue_handler (@pick _ _ (fun _ _ => True) x) t. *)
 
-    Inductive PickUvalue_handler  {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : PickUvalueE ~> PropT E :=
+    Inductive PickUvalue_handler  {E BR} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : PickUvalueE ~> PropT E :=
     | PickUV_UniqueUB : forall x t,
         ~ (unique_prop x) ->
         PickUvalue_handler (@pickUnique _ _ (fun _ _ => True) x) t
     | PickUV_UniqueRet :
-      forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True})
+      forall x (res : err_ub_oom dvalue) (t : ctree E BR {y : dvalue | True})
         (Conc : concretize_u x res),
         unique_prop x ->
-        t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
+        t ~ lift_err_ub_oom_post_ret _ Datatypes.id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
         PickUvalue_handler (@pickUnique _ _ (fun _ _ => True) x) t
     | PickUV_NonPoisonUB : forall x t,
         ~ (non_poison_prop x) ->
         PickUvalue_handler (@pickNonPoison _ _ (fun _ _ => True) x) t
     | PickUV_NonPoisonRet :
-      forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True})
+      forall x (res : err_ub_oom dvalue) (t : ctree E BR {y : dvalue | True})
         (Conc : concretize_u x res),
         non_poison_prop x ->
-        t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
+        t ~ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
         PickUvalue_handler (@pickNonPoison _ _ (fun _ _ => True) x) t
     | PickUV_Ret :
-      forall x (res : err_ub_oom dvalue) (t : itree E {y : dvalue | True})
+      forall x (res : err_ub_oom dvalue) (t : ctree E BR {y : dvalue | True})
         (Conc : concretize_u x res),
-        t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
+        t ~ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
         PickUvalue_handler (@pick _ _ (fun _ _ => True) x) t.
 
     Section PARAMS_MODEL.
@@ -2406,7 +2406,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
       }
     Qed.
 
-    Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : PickUvalueE ~> itree E :=
+    Definition concretize_picks {E BR} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : PickUvalueE ~> ctree E BR :=
       fun T p =>
         match p with
         | pick u

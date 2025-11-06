@@ -14,7 +14,7 @@ Unset Universe Checking.
 From Vellvm Require Import
      Utilities
      Semantics.LLVMEvents
-     (* Semantics.Lang *)
+     Semantics.Lang
      Semantics.LLVMParams
      Semantics.StoreId.
 
@@ -38,37 +38,22 @@ From Stdlib Require Import
 
 (* end hide *)
 
-Module Type InterpreterStack_common (LP : LLVMParams).
-(* Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP). *)
-  (* Module LLVM := Lang.Make LP MEM. *)
-    Import LP.Events.
-    Import LP.
-    Module Global     := Global.Make ADDR IP SIZEOF LP.Events.
-    Module Local      := Local.Make ADDR IP SIZEOF LP.Events.
-    Module Stack      := Stack.Make ADDR IP SIZEOF LP.Events.
-    Module Intrinsics := Intrinsics.Make ADDR IP SIZEOF LP.Events.
-    Import Global.
-    Import Local.
-    Import Stack.
-    Import Intrinsics.
-
-    Declare Module MEM : Memory LP.
-    Export MEM.
-
-  (* Import LP.Events. *)
-  (* Import LP.PROV. *)
-  (* Import LLVM.Intrinsics. *)
-  (* Import MEM.MEM_MODEL. *)
-  (* Import MEM.MMEP.MMSP. *)
-  (* Import MEM.MMEP.MemExecM. *)
+Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
+    Module LLVM := Lang.Make LP MEM.
+  Import LP.Events.
+  Import LP.PROV.
+  Import LLVM.Intrinsics.
+  Import MEM.MEM_MODEL.
+  Import MEM.MMEP.MMSP.
+  Import MEM.MMEP.MemExecM.
   (* Import MEM.MEM_EXEC_INTERP. *)
-  (* Import MEM.MEM_SPEC_INTERP. *)
-  (* Import MEM.GEP. *)
+  Import MEM.MEM_SPEC_INTERP.
+  Import MEM.GEP.
   (* Import LLVM.Pick. *)
-  (* Import LLVM.Global. *)
-  (* Import LLVM.Local. *)
-  (* Import LLVM.Stack. *)
-  (* Import LLVM.D. *)
+  Import LLVM.Global.
+  Import LLVM.Local.
+  Import LLVM.Stack.
+  Import LLVM.D.
 
   Section InterpreterMCFG.
     (* Context {MemM : Type -> Type}. *)

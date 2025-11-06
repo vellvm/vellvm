@@ -25,8 +25,8 @@ From Vellvm.Utils Require Import
   StateMonads Raise Tactics ITreeMap
   Error.
 
-From Vellvm.Theory Require Import
-  ContainsUBExtra.
+(* From Vellvm.Theory Require Import
+  ContainsUBExtra. *)
 
 Import HeterogeneousRelations.
 

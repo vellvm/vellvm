@@ -9,7 +9,7 @@ From Vellvm Require Import
      Handlers.Global
      Handlers.Stack
      Handlers.Intrinsics
-     Handlers.Pick
+     (* Handlers.Pick *)
      Handlers.MemoryModel
      Handlers.MemoryInterpreters.
 
@@ -49,12 +49,14 @@ From Vellvm Require Import
     Export MEM.
 
     (* Pick handler (depends on memory / concretization) *)
-    Module Pick := Pick.Make LP MP ByteM CP.
+    (* TODO: ctrees pick conversion *)
+    (* Module Pick := Pick.Make LP MP ByteM CP. *)
 
     (* Denotation *)
     Module D := Denotation LP MP ByteM CP.
 
-    Export Events Events.DV Global Local Stack Pick Intrinsics
+    (* TODO: ctrees pick conversion *)
+    Export Events Events.DV Global Local Stack (* Pick *) Intrinsics
            CP.CONC D.
   End Lang.
 
