@@ -187,6 +187,46 @@ Section StackMap.
         reflexivity.
       Qed.
 
+      #[global] Instance is_simple_local_stack_h {T}  e st:
+        Pure.is_simple (interp_local_stack_h (T := T) (handle_local (v:=v)) e st).
+      Proof.
+        unfold interp_local_h.
+        destruct e.
+        typeclasses eauto.
+        destruct s.
+        typeclasses eauto.
+        destruct s.
+        - destruct st.
+          destruct s; cbn.
+          + unfold handle_local_stack.
+            destruct l; cbn; try
+            typeclasses eauto.
+            destruct (lookup id _);
+              typeclasses eauto.
+          + destruct s; try typeclasses eauto.
+            destruct s1; try typeclasses eauto.
+            destruct s0; try typeclasses eauto.
+            destruct s0; try typeclasses eauto.
+        - typeclasses eauto.
+      Qed.
+
+      #[global] Instance Proper_interp_local_stack_sbisim {T} :
+        Proper (sbisim eq  ==> eq ==> sbisim eq) (@interp_local_stack _ T).
+      Proof.
+        intros ? ? ? ? ? ?; subst.
+        unfold interp_local_stack.
+        setoid_rewrite H0.
+        reflexivity.
+      Qed.
+
+      #[global] Instance Proper_interp_local_pointwise_equ {T} :
+        Proper (equ eq  ==> eq ==> equ eq) (@interp_local_stack _ T).
+      Proof.
+        intros ? ? ? ? ? ?; subst.
+        unfold interp_local.
+        rewrite H0; reflexivity.
+      Qed.
+
     End Structural_Lemmas.
 
   End PARAMS.
