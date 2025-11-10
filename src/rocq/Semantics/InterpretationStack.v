@@ -161,52 +161,52 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
    NOTE: Can we avoid this duplication w.r.t. [interpi]?
      *)
 
-    Definition interp_cfg1 {R} (t: ctree instr_E R) (g: global_env) : ctree (CallE +' IntrinsicE +' LLVMEnvE +' MemoryE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (global_env * R) :=
+    Definition interp_cfg1 {R} (t: ctree instr_E B0 R) (g: global_env) : ctree (CallE +' IntrinsicE +' LLVMEnvE +' MemoryE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) B1 (global_env * R) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       L1_trace.
 
-    Definition interp_cfg2 {R} (t: ctree instr_E R) (g: global_env) (l: local_env) : ctree (CallE +' IntrinsicE +' MemoryE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (local_env * (global_env * R)) :=
+    Definition interp_cfg2 {R} (t: ctree instr_E B1 R) (g: global_env) (l: local_env) : ctree (CallE +' IntrinsicE +' MemoryE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) B2 (local_env * (global_env * R)) :=
       let L1_trace       := interp_cfg1 t g in
       let L2_trace       := interp_local L1_trace l in
       L2_trace.
 
-    Definition interp_cfg3 {R} RR (t: ctree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : PropT (CallE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) :=
+    Definition interp_cfg3 {R} (t: ctree instr_E B2 R) (g: global_env) (l: local_env) sid (m: MemState) : ctree (CallE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) MemC (MemState * (store_id * (local_env * (global_env * R)))) :=
       let L2_trace       := interp_cfg2 t g l in
-      let L3_trace       := interp_memory_spec RR L2_trace sid m in
+      let L3_trace       := interp_memory_spec L2_trace sid m in
       L3_trace.
 
-    Definition interp_cfg3_exec {R} (t: ctree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : ctree (CallE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) :=
-      let L2_trace       := interp_cfg2 t g l in
-      let L3_trace       := interp_memory L2_trace sid m in
-      L3_trace.
+    (* Definition interp_cfg3_exec {R} (t: ctree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : ctree (CallE +' PickE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) := *)
+    (*   let L2_trace       := interp_cfg2 t g l in *)
+    (*   let L3_trace       := interp_memory L2_trace sid m in *)
+    (*   L3_trace. *)
 
-    Definition interp_cfg4 {R} RR_mem RR_pick (t: ctree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : PropT (CallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) :=
-      let L3_trace       := interp_cfg3 RR_mem t g l sid m in
-      let L4_trace       := model_undef RR_pick L3_trace in
-      L4_trace.
+    (* Definition interp_cfg4 {R} RR_mem RR_pick (t: ctree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : PropT (CallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) := *)
+    (*   let L3_trace       := interp_cfg3 RR_mem t g l sid m in *)
+    (*   let L4_trace       := model_undef RR_pick L3_trace in *)
+    (*   L4_trace. *)
 
-    Definition interp_cfg4_exec {R} (t: itree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : itree (CallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) :=
-      let L3_trace       := interp_cfg3_exec t g l sid m in
-      let L4_trace       := exec_undef L3_trace in
-      L4_trace.
+    (* Definition interp_cfg4_exec {R} (t: itree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : itree (CallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) := *)
+    (*   let L3_trace       := interp_cfg3_exec t g l sid m in *)
+    (*   let L4_trace       := exec_undef L3_trace in *)
+    (*   L4_trace. *)
 
-    Definition interp_cfg5 {R} RR_mem RR_pick (t: itree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : PropT (CallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) :=
-      let L4_trace       := interp_cfg4 RR_mem RR_pick t g l sid m in
-      let L5_trace       := model_UB L4_trace in
-      L5_trace.
+    (* Definition interp_cfg5 {R} RR_mem RR_pick (t: itree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : PropT (CallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) := *)
+    (*   let L4_trace       := interp_cfg4 RR_mem RR_pick t g l sid m in *)
+    (*   let L5_trace       := model_UB L4_trace in *)
+    (*   L5_trace. *)
 
-    Definition interp_cfg6 {R} RR_mem RR_pick (t: itree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : PropT (CallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) :=
-      let L5_trace       := interp_cfg5 RR_mem RR_pick t g l sid m in
-      let L6_trace       := refine_OOM
-                              (fun '(ms, (sid, (lenv, (genv, x))))
-                                 '(ms', (sid', (lenv', (genv', y)))) =>
-                                 x = y)
-                              L5_trace in
-      L6_trace.
+    (* Definition interp_cfg6 {R} RR_mem RR_pick (t: itree instr_E R) (g: global_env) (l: local_env) sid (m: MemState) : PropT (CallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (MemState * (store_id * (local_env * (global_env * R)))) := *)
+    (*   let L5_trace       := interp_cfg5 RR_mem RR_pick t g l sid m in *)
+    (*   let L6_trace       := refine_OOM *)
+    (*                           (fun '(ms, (sid, (lenv, (genv, x)))) *)
+    (*                              '(ms', (sid', (lenv', (genv', y)))) => *)
+    (*                              x = y) *)
+    (*                           L5_trace in *)
+    (*   L6_trace. *)
 
-    #[global] Instance Proper_interp_cfg1 {R} {b} :
-      Proper (eqit eq b b ==> eq ==> eqit eq b b) (@interp_cfg1 R).
+    #[global] Instance Proper_interp_cfg1_sbisim {R} :
+      Proper (sbisim eq ==> eq ==> sbisim eq) (@interp_cfg1 R).
     Proof.
       intros x y H0 x0 y0 H1.
       unfold interp_cfg1; subst.
@@ -215,7 +215,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
     Qed.
 
     #[global] Instance Proper_interp_cfg2 {R} :
-      Proper (eutt eq ==> eq ==> eq ==> eutt eq) (@interp_cfg2 R).
+      Proper (sbisim eq ==> eq ==> eq ==> sbisim eq) (@interp_cfg2 R).
     Proof.
       intros x y H0 x0 y0 H1 x1 y1 H2.
       unfold interp_cfg2; subst.
@@ -229,20 +229,20 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
     Notation ℑ1 := interp_cfg1.
     Notation ℑ2 := interp_cfg2.
     Notation ℑ3 := interp_cfg3.
-    Notation ℑ4 := interp_cfg4.
-    Notation ℑ5 := interp_cfg5.
-    Notation ℑ6 := interp_cfg6.
-    (* TODO: should probably switch to interp_cfg6 *)
-    Notation ℑ  := interp_cfg5.
+    (* Notation ℑ4 := interp_cfg4. *)
+    (* Notation ℑ5 := interp_cfg5. *)
+    (* Notation ℑ6 := interp_cfg6. *)
+    (* (* TODO: should probably switch to interp_cfg6 *) *)
+    (* Notation ℑ  := interp_cfg5. *)
 
     Notation ℑs1 := interp_mcfg1.
     Notation ℑs2 := interp_mcfg2.
     Notation ℑs3 := interp_mcfg3.
-    Notation ℑs4 := interp_mcfg4.
-    Notation ℑs5 := interp_mcfg5.
-    Notation ℑs6 := interp_mcfg6.
-    (* TODO: should probably switch to interp_mcfg6 *)
-    Notation ℑs  := interp_mcfg5.
+    (* Notation ℑs4 := interp_mcfg4. *)
+    (* Notation ℑs5 := interp_mcfg5. *)
+    (* Notation ℑs6 := interp_mcfg6. *)
+    (* (* TODO: should probably switch to interp_mcfg6 *) *)
+    (* Notation ℑs  := interp_mcfg5. *)
 
     Notation Ret1 g x     := (Ret (g,x)).
     Notation Ret2 g l x   := (Ret (l,(g,x))).
