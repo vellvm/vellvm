@@ -72,7 +72,7 @@ From Vellvm.Handlers.MemoryModules Require Import
   FiniteIntptr
   FiniteSizeof
   FiniteSpecPrimitives
-  FiniteExecPrimitives
+  (* FiniteExecPrimitives *)
   Within.
 
 #[local] Open Scope Z_scope.
@@ -127,10 +127,11 @@ Module MakeFiniteMemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
   Export FMSP FMS.
 End MakeFiniteMemoryModelSpec.
 
-Module MakeFiniteMemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP).
-  Module FMEP := FiniteMemoryModelExecPrimitives LP MP.
-  Module FME := MakeMemoryModelExec LP MP FMEP.
-End MakeFiniteMemoryModelExec.
+(* TODO: ctrees execution? *)
+(* Module MakeFiniteMemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP). *)
+(*   Module FMEP := FiniteMemoryModelExecPrimitives LP MP. *)
+(*   Module FME := MakeMemoryModelExec LP MP FMEP. *)
+(* End MakeFiniteMemoryModelExec. *)
 
 Module MakeFiniteMemory (LP : LLVMParams) <: Memory LP.
   Import LP.
@@ -141,8 +142,9 @@ Module MakeFiniteMemory (LP : LLVMParams) <: Memory LP.
 
   Module MP := MemoryParams.Make LP GEP Byte DVALUE_BYTE.
 
-  Module MMEP := FiniteMemoryModelExecPrimitives LP MP.
-  Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.
+  (* TODO: may not need this with ctrees *)
+  (* Module MMEP := FiniteMemoryModelExecPrimitives LP MP. *)
+  (* Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP. *)
   Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec MMEP.MemExecM.
   (* TODO: may not need this with ctrees *)
   (* Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP. *)

@@ -1,7 +1,7 @@
 Unset Universe Checking.
 
 From CTree Require Import
-  CTree CTreeDefinitions Eq Fold FoldStateT.
+  CTree CTreeDefinitions Eq Fold FoldStateT Refine.
 
 From Vellvm.Utils Require Import Tactics.
 
@@ -44,6 +44,7 @@ Import CTreeNotations.
 
 (* Memory that's just an IntMap of possibly allocated nat "bytes" *)
 Definition memory := IM.t nat.
+Definition memory_size : option Z := Some 10%Z.
 
 Variant MemE : Type -> Type :=
   | LoadE (key : Z) : MemE nat
@@ -60,6 +61,17 @@ Definition print_msg (msg : string) : unit := tt.
 
 Definition raise {E B} {A} `{FailureE -< E} (msg : string) : ctree E B A :=
   v <- trigger (Throw (print_msg msg));; match v: void with end.
+
+(* Out of memory / abort. Carries a string for a message. *)
+Variant OOME : Type -> Type :=
+  | ThrowOOM : unit -> OOME void.
+
+(** Since the output type of [ThrowUB] is [void], we can make it an action
+    with any return type. *)
+Definition raiseOOM {E : Type -> Type} {BR} {X} `{OOME -< E}
+  (e : string)
+  : ctree E BR X
+  := v <- trigger (ThrowOOM (print_msg e));; match v: void with end.
 
 Fixpoint IM_raw_greatest_key {A} (m : IM.Raw.tree A) : option Z
   := match m with
@@ -290,7 +302,7 @@ Definition next_key {A} (m : IM.t A) : Z
   Qed.
 
 
-Definition handle_mem {E} `{FailureE -< E} : MemE ~> Monads.stateT memory (ctree E void1) :=
+Definition handle_mem {E} `{FailureE -< E} `{OOME -< E} : MemE ~> Monads.stateT memory (ctree E void1) :=
   fun _ e mem =>
     match e with
     | LoadE k =>
@@ -307,18 +319,28 @@ Definition handle_mem {E} `{FailureE -< E} : MemE ~> Monads.stateT memory (ctree
         end
     | AllocE =>
         let k := next_key mem in
-        ret (IM.add k 0 mem, k)
+        match memory_size with
+        | Some sz =>
+            if (k <=? sz)%Z
+            then ret (IM.add k 0 mem, k)
+            else raiseOOM "Not enough memory."
+        | None => ret (IM.add k 0 mem, k)
+        end
     end.
 
 Variant AllocC : Type -> Type :=
-  | allocC (m : memory) : AllocC ({k | IM.mem k m = false}).
+  | allocC (m : memory) : AllocC (unit + {k | IM.mem k m = false /\ ((exists sz, memory_size = Some sz /\ (k <= sz)%Z) \/ memory_size = None)}).
 
-Definition do_alloc {E} `{FailureE -< E} (mem : memory) : ctree E AllocC (memory * Z) :=
+Definition do_alloc {E} `{OOME -< E} (mem : memory) : ctree E AllocC (memory * Z) :=
   res <- branch (allocC mem);;
-  let k := proj1_sig res in
-  ret (IM.add k 0 mem, k).
+  match res with
+  | inl x => raiseOOM "Not enough memory."
+  | inr x =>
+      let k := proj1_sig x in
+      ret (IM.add k 0 mem, k)
+  end.
 
-Definition handle_mem_spec {E} `{FailureE -< E} : MemE ~> Monads.stateT memory (ctree E AllocC) :=
+Definition handle_mem_spec {E} `{OOME -< E} `{FailureE -< E} : MemE ~> Monads.stateT memory (ctree E AllocC) :=
   fun _ e mem =>
     match e with
     | LoadE k =>
@@ -336,10 +358,49 @@ Definition handle_mem_spec {E} `{FailureE -< E} : MemE ~> Monads.stateT memory (
     | AllocE => do_alloc mem
     end.
 
-Notation Effin := (MemE +' FailureE).
+Program Definition handle_AllocC {E} `{FailureE -< E} : AllocC ~> ctree E void1 :=
+  fun _ e => _.
+Next Obligation.
+  destruct e.
+  refine
+    (let k := next_key m in
+     match memory_size with
+     | Some sz => _
+     | None => _
+     end).
+  - (* Finite memory *)
+    destruct (Z_lt_le_dec sz k).
+    + (* Out of memory *)
+      apply (ret (inl tt)).
+    + refine (ret (inr _)).
+      exists (next_key m).
+      destruct (IM.mem (elt:=nat) (next_key m) m) eqn:MEM.
+      * (* Contradiction *)
+        apply IM.mem_2 in MEM.
+        apply next_key_correct in MEM.
+        lia.
+      * split; auto.
+        left.
+        exists sz; split; auto; lia.
+  - (* Infinite memory *)
+    refine (ret (inr _)).
+    exists (next_key m).
+    destruct (IM.mem (elt:=nat) (next_key m) m) eqn:MEM.
+    * (* Contradiction *)
+      apply IM.mem_2 in MEM.
+      apply next_key_correct in MEM.
+      lia.
+    * split; auto.
+Defined.
+
+Definition handle_mem_exec {E} `{FailureE -< E} `{OOME -< E} : MemE ~> Monads.stateT memory (ctree E void1) :=
+  fun _ e mem =>
+    Fold.refine handle_AllocC (@handle_mem_spec E _ _ _ e mem).
+
+Notation Effin := (MemE +' FailureE +' OOME).
 Notation Bspec := AllocC.
 Notation Bexec := void1.
-Notation Effout := FailureE.
+Notation Effout := (FailureE +' OOME).
 
 #[global] Instance Functor_VoidE : Functor void1.
 split.
@@ -351,18 +412,18 @@ Defined.
 try typeclasses eauto.
 Defined.
 
-#[global] Instance Functor_AllocC : Functor AllocC.
-split.
-intros A B X H.
-inversion H; subst.
-forward X.
-exists (next_key m).
-destruct (IM.mem (elt:=nat) (next_key m) m) eqn:MEM; auto.
-apply IM.mem_2 in MEM.
-apply next_key_correct in MEM.
-lia.
+(* #[global] Instance Functor_AllocC : Functor AllocC. *)
+(* split. *)
+(* intros A B X H. *)
+(* inversion H; subst. *)
+(* forward X. *)
+(* exists (next_key m). *)
+(* destruct (IM.mem (elt:=nat) (next_key m) m) eqn:MEM; auto. *)
+(* apply IM.mem_2 in MEM. *)
+(* apply next_key_correct in MEM. *)
+(* lia. *)
 
-Abort.
+(* Abort. *)
 
 (* 
 Definition in_rel : prerel Effin Effin.
@@ -414,7 +475,7 @@ Require Import Vellvm.Utils.Tactics.
 
 Import SSimNotations.
 
-Lemma spec_refines_raise E `{Effout -< E} F `{Effout -< F} C D X Y L s :
+Lemma spec_refines_raise E `{FailureE -< E} F `{FailureE -< F} C D X Y L s :
   @ssim
     E F C D X Y L
     (@raise E C _ _ s)
@@ -429,7 +490,7 @@ Proof.
   apply eq.
 Qed.
 
-Lemma ssim_raise_ret E `{Effout -< E} F C D X Y L s y :
+Lemma ssim_raise_ret E `{FailureE -< E} F C D X Y L s y :
   ~ @ssim
     E F C D X Y L
     (@raise E C _ _ s)
@@ -445,7 +506,7 @@ Proof.
   cbn in *.
 Admitted.
 
-Lemma ssim_ret_raise E F `{Effout -< F} C D X Y L s y :
+Lemma ssim_ret_raise E F `{FailureE -< F} C D X Y L s y :
   ~ @ssim
     E F C D X Y L
     (ret y)
@@ -485,15 +546,150 @@ Proof.
     eapply ssim_br_r.
     Unshelve.
     2: {
-      exists (next_key m).
-      destruct (IM.mem (elt:=nat) (next_key m) m) eqn:MEM; auto.
-      apply IM.mem_2 in MEM.
-      apply next_key_correct in MEM.
-      lia.
+      refine
+        (let k := next_key m in
+         match memory_size with
+         | Some sz => _
+         | None => inr _
+         end).
+
+      - destruct (Z_lt_le_dec sz k);
+          [apply (inl tt) | right].
+
+        exists k.
+        destruct (IM.mem (elt:=nat) (next_key m) m) eqn:MEM;
+          try solve
+              [ apply IM.mem_2 in MEM;
+                apply next_key_correct in MEM;
+                lia
+              ];
+          split; auto.
+        left; eexists; split; eauto; subst k; try lia.
+      - exists k.
+        destruct (IM.mem (elt:=nat) (next_key m) m) eqn:MEM;
+          try solve
+              [ apply IM.mem_2 in MEM;
+                apply next_key_correct in MEM;
+                lia
+              ];
+          split; auto.
     }
     cbn.
-    apply ssim_ret.
-    reflexivity.
+    destruct (Z_lt_le_dec 10 (next_key m)) as [SZ | SZ].
+    + assert ((next_key m <=? 10)%Z = false) by lia; rewrite H.
+      unfold raiseOOM.
+      apply ssim_clo_bind_eq; [| intros []].
+      unfold CTree.trigger.
+      apply ssim_vis.
+      intros [].
+    + assert ((next_key m <=? 10)%Z = true) by lia; rewrite H.
+      cbn.
+      apply ssim_ret.
+      reflexivity.
+Qed.
+
+#[global] Instance handle_AllocC_pure :
+  forall E `{FailureE -< E}
+    (X : Type) (c : Bspec X), Pure.pure_finite (@handle_AllocC E _ X c).
+Proof.
+  intros E H X c.
+  destruct c.
+  cbn.
+  break_match_goal;
+    apply Pure.pure_finite_ret.
+Qed.
+
+Lemma handle_mem_correct' {T} (e : MemE T) (m : memory):
+  @ssim Effin Effin _ _ _ _ eq (handle_mem_exec T e m) (handle_mem_spec T e m).
+Proof.
+  unfold handle_mem_exec.
+  apply refine_ctree_ssim;
+    typeclasses eauto.
+Qed.
+
+Import FoldCTree.
+
+Lemma refine_trigger :
+  forall E B1 B2 X (h : B1 ~> ctree E B2) (e: E X),
+    refine h (trigger e : ctree E B1 X) ~ (trigger e : ctree E B2 X).
+Proof.
+  intros E B1 B2 X h e.
+  unfold trigger.
+  setoid_rewrite refine_vis.
+  setoid_rewrite sb_guard.
+  setoid_rewrite refine_ret.
+  rewrite bind_ret_r.
+  reflexivity.
+Qed.
+
+Lemma refine_raiseOOM :
+  forall E `{OOME -< E} B1 B2 X (h : B1 ~> ctree E B2) msg1 msg2,
+    refine h (raiseOOM msg1 : ctree E B1 X) ~ (raiseOOM msg2 : ctree E B2 X).
+Proof.
+  intros E H B1 B2 X h msg1 msg2.
+  unfold raiseOOM.
+  rewrite refine_bind.
+  apply sbisim_clo_bind_eq; [|intros []].
+  apply refine_trigger.
+Qed.
+
+Lemma refine_raise :
+  forall E `{FailureE -< E} B1 B2 X (h : B1 ~> ctree E B2) msg1 msg2,
+    refine h (raise msg1 : ctree E B1 X) ~ (raise msg2 : ctree E B2 X).
+Proof.
+  intros E H B1 B2 X h msg1 msg2.
+  unfold raise.
+  rewrite refine_bind.
+  apply sbisim_clo_bind_eq; [|intros []].
+  apply refine_trigger.
+Qed.
+
+Lemma handle_mem_exec_correct {T} (e : MemE T) (m : memory):
+  @sbisim Effin Effin _ _ _ _ eq (handle_mem_exec T e m) (handle_mem T e m).
+Proof.
+  unfold handle_mem_exec.
+  unfold handle_mem.
+  destruct e; cbn.
+  - break_match_goal; cbn.
+    + rewrite refine_ret.
+      reflexivity.
+    + unfold raise, trigger.
+      rewrite refine_bind.
+      apply sbisim_clo_bind_eq; [|intros []].
+      rewrite refine_vis.
+      unfold trigger.
+      setoid_rewrite sb_guard.
+      setoid_rewrite refine_ret.
+      setoid_rewrite bind_ret_r.
+      reflexivity.
+  - break_match_goal; cbn.
+    + rewrite refine_ret.
+      reflexivity.
+    + unfold raise, trigger.
+      rewrite refine_bind.
+      apply sbisim_clo_bind_eq; [|intros []].
+      rewrite refine_vis.
+      unfold trigger.
+      setoid_rewrite sb_guard.
+      setoid_rewrite refine_ret.
+      setoid_rewrite bind_ret_r.
+      reflexivity.
+  - unfold do_alloc.
+    rewrite refine_bind.
+    setoid_rewrite refine_br.
+    rewrite bind_bind.
+    setoid_rewrite sb_guard.
+    setoid_rewrite refine_ret.
+    setoid_rewrite bind_ret_l.
+    cbn.
+    break_match_goal.
+    + setoid_rewrite bind_ret_l.
+      assert ((next_key m <=? 10)%Z = false) by lia; rewrite H.
+      apply refine_raiseOOM.
+    + rewrite bind_ret_l; cbn.
+      rewrite refine_ret.
+      assert ((next_key m <=? 10)%Z = true) by lia; rewrite H.
+      reflexivity.
 Qed.
 
 Lemma alloca_empty :
