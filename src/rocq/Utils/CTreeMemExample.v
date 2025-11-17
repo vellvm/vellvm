@@ -330,8 +330,15 @@ Section Memory.
           end
       end.
 
+  Definition memory_size_ge (sz : Z) : bool :=
+    match memory_size with
+    | Some x => (sz <=? Z.of_N x)%Z
+    | None => true
+    end.
+
   Variant AllocC : Type -> Type :=
-    | allocC (m : memory) : AllocC (unit + {k | IM.mem k m = false /\ ((exists sz, memory_size = Some sz /\ (k <= Z.of_N sz)%Z) \/ memory_size = None)}).
+    | allocC (m : memory) : AllocC (unit + {k | IM.mem k m = false /\ 
+                                                  memory_size_ge k = true}).
 
   Definition do_alloc {E} `{OOME -< E} (mem : memory) : ctree E AllocC (memory * Z) :=
     res <- branch (allocC mem);;
@@ -365,11 +372,8 @@ Section Memory.
   Next Obligation.
     destruct e.
     refine
-      (let k := next_key m in
-       match memory_size with
-       | Some sz => _
-       | None => _
-       end).
+      (let k := next_key m in _).
+    destruct memory_size as [sz | ] eqn:MEMSZ.
     - (* Finite memory *)
       destruct (Z_lt_le_dec (Z.of_N sz) k).
       + (* Out of memory *)
@@ -382,8 +386,8 @@ Section Memory.
           apply next_key_correct in MEM.
           lia.
         * split; auto.
-          left.
-          exists sz; split; auto; lia.
+          unfold memory_size_ge; rewrite MEMSZ.
+          lia.
     - (* Infinite memory *)
       refine (ret (inr _)).
       exists (next_key m).
@@ -393,6 +397,7 @@ Section Memory.
         apply next_key_correct in MEM.
         lia.
       * split; auto.
+        unfold memory_size_ge; rewrite MEMSZ; lia.
   Defined.
 
   Definition handle_mem_exec {E} `{FailureE -< E} `{OOME -< E} : MemE ~> Monads.stateT memory (ctree E void1) :=
@@ -549,11 +554,8 @@ Defined.
       Unshelve.
       2: {
         refine
-          (let k := next_key m in
-           match memory_size with
-           | Some sz => _
-           | None => inr _
-           end).
+          (let k := next_key m in _).
+        destruct memory_size as [sz | ] eqn:MEMSZ.
 
         - destruct (Z_lt_le_dec (Z.of_N sz) k);
             [apply (inl tt) | right].
@@ -566,8 +568,9 @@ Defined.
                 lia
               ];
             split; auto.
-          left; eexists; split; eauto; subst k; try lia.
-        - exists k.
+          unfold memory_size_ge.
+          rewrite MEMSZ; lia.
+        - apply inr. exists k.
           destruct (IM.mem (elt:=nat) (next_key m) m) eqn:MEM;
             try solve
               [ apply IM.mem_2 in MEM;
@@ -575,9 +578,11 @@ Defined.
                 lia
               ];
             split; auto.
+          unfold memory_size_ge; rewrite MEMSZ; lia.
       }
       cbn.
-      destruct memory_size as [sz | sz]; cbn.
+      dependent destruction memory_size.
+      destruct memory_size as [sz | ]; cbn.
       { (* Finite *)
         destruct (Z_lt_le_dec (Z.of_N sz) (next_key m)) as [SZ | SZ].
         + assert ((next_key m <=? Z.of_N sz)%Z = false) by lia; rewrite H.
@@ -958,12 +963,6 @@ Defined.
     lia.
   Qed.
 
-  Definition memory_size_ge (sz : Z) : bool :=
-    match memory_size with
-    | Some x => (sz <=? Z.of_N x)%Z
-    | None => true
-    end.
-
   (* None means infinite memory is available *)
   Definition free_memory_amount (m : memory) : option N :=
     match memory_size with
@@ -1184,8 +1183,8 @@ Defined.
       IM.mem k1 (IM.add k2 v m) = IM.mem k1 m.
   Proof using.
     intros.
-    cbn.
-  Admitted.
+    apply F.add_neq_b; auto.
+  Qed.
 
   Lemma alloc_disjoint' :
     forall m,
@@ -1240,13 +1239,47 @@ Defined.
     reflexivity.
   Admitted.
 
+  Lemma bytes_available_ge :
+    forall m x y,
+      bytes_available m x = true ->
+      (y <= x)%N ->
+      bytes_available m y = true.
+  Proof.
+    intros m x y AVAIL GE.
+    unfold bytes_available, free_memory_amount in *.
+    break_inner_match; auto; cbn.
+    apply N.leb_le.
+    apply N.leb_le in AVAIL.
+    lia.
+  Qed.
+
+  Lemma well_formed_memory_mem :
+    forall m k,
+      well_formed_memory m = true ->
+      IM.mem k m = true ->
+      memory_size_ge k = true.
+  Proof.
+    intros m k WF MEM.
+    unfold well_formed_memory, memory_size_ge in *.
+    break_match_goal; auto.
+    break_match_hyp; auto.
+    - (* Non-empty *)
+      admit.
+    - (* Empty *)
+      apply IM_greatest_key_none in Heqo0.
+      apply F.mem_in_iff in MEM as (?&MEM).
+      apply Heqo0 in MEM.
+      contradiction.
+  Admitted.
 
   Lemma double_alloc_spec :
     forall m m' b,
       (b = false /\
+         well_formed_memory m = true /\
          bytes_available m 2%N = true /\
          exists k1 k2,
            m' = IM.add k2 0 (IM.add k1 0 m) /\
+             well_formed_memory m' = true /\
              k1 <> k2 /\
              IM.mem k1 m = false /\
              IM.mem k2 m = false) ->
@@ -1255,14 +1288,21 @@ Defined.
         (interp_state handle_mem_spec double_alloc m).
   Proof.
     intros m m' b.
-    { intros [B [AVAIL K]].
-      destruct K as (k1&k2&M'&NK1K2&MEM1&MEM2).
+    { intros [B [WF [AVAIL K]]].
+      destruct K as (k1&k2&M'&WF'&NK1K2&MEM1&MEM2).
       cbn.
       repeat setoid_rewrite interp_state_bind.
       repeat setoid_rewrite interp_state_trigger.
       repeat setoid_rewrite bind_bind.
 
       rewrite bind_branch.
+      assert (IM.mem (elt:=nat) k1 m = false /\
+                ((exists sz : N, memory_size = Some sz /\ (k1 <= Z.of_N sz)%Z) \/ memory_size = None)) as HK1.
+      { split; auto.
+        destruct memory_size; auto.
+        left.
+        exists n; auto.
+      }
       apply ssim_br_r with (x:=exist _ k1 MEM1); cbn.
       rewrite bind_ret_l.
       rewrite bind_guard.
