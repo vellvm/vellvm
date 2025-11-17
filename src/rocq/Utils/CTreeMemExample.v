@@ -550,40 +550,31 @@ Defined.
     - cbn.
       unfold do_alloc.
       rewrite bind_branch.
-      eapply ssim_br_r.
-      Unshelve.
-      2: {
-        refine
-          (let k := next_key m in _).
-        destruct memory_size as [sz | ] eqn:MEMSZ.
-
-        - destruct (Z_lt_le_dec (Z.of_N sz) k);
-            [apply (inl tt) | right].
-
-          exists k.
-          destruct (IM.mem (elt:=nat) (next_key m) m) eqn:MEM;
-            try solve
-              [ apply IM.mem_2 in MEM;
-                apply next_key_correct in MEM;
-                lia
-              ];
-            split; auto.
-          unfold memory_size_ge.
-          rewrite MEMSZ; lia.
-        - apply inr. exists k.
-          destruct (IM.mem (elt:=nat) (next_key m) m) eqn:MEM;
-            try solve
-              [ apply IM.mem_2 in MEM;
-                apply next_key_correct in MEM;
-                lia
-              ];
-            split; auto.
-          unfold memory_size_ge; rewrite MEMSZ; lia.
-      }
-      cbn.
-      dependent destruction memory_size.
-      destruct memory_size as [sz | ]; cbn.
+      destruct memory_size as [sz | ] eqn:MEMSZ.
       { (* Finite *)
+
+        eapply ssim_br_r.
+        Unshelve.
+        2: {
+          refine
+            (let k := next_key m in _).
+
+          - destruct (Z_lt_le_dec (Z.of_N sz) k);
+              [apply (inl tt) | right].
+
+            exists k.
+            destruct (IM.mem (elt:=nat) (next_key m) m) eqn:MEM;
+              try solve
+                [ apply IM.mem_2 in MEM;
+                  apply next_key_correct in MEM;
+                  lia
+                ];
+              split; auto.
+            unfold memory_size_ge.
+            rewrite MEMSZ; lia.
+        }
+
+        cbn.
         destruct (Z_lt_le_dec (Z.of_N sz) (next_key m)) as [SZ | SZ].
         + assert ((next_key m <=? Z.of_N sz)%Z = false) by lia; rewrite H.
           unfold raiseOOM.
@@ -598,6 +589,27 @@ Defined.
       }
 
       { (* Infinite *)
+
+        eapply ssim_br_r.
+        Unshelve.
+        2: {
+          refine
+            (let k := next_key m in _).
+
+          - right.
+            exists k.
+            destruct (IM.mem (elt:=nat) (next_key m) m) eqn:MEM;
+              try solve
+                [ apply IM.mem_2 in MEM;
+                  apply next_key_correct in MEM;
+                  lia
+                ];
+              split; auto.
+            unfold memory_size_ge.
+            rewrite MEMSZ; lia.
+        }
+
+        cbn.
         apply ssim_ret.
         reflexivity.
       }
