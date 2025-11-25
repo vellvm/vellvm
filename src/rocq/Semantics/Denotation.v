@@ -576,10 +576,56 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
         | IId id  => trigger (LocalWrite id retv);;
                      ret tt
         end
-    | (_, INSTR_LandingPad _ _ _) => raise "todo landingpad"
+
+          
+    | (IId id, INSTR_AtomicCmpXchg cpx) =>
+        (* SAZ: This will have to be revisited when we have a truly concurrent semantics. *)
+        let '(ptr_ty, ptr_val) := cpx.(c_ptr) in
+        let '(cmp_ty, cmp_val) := cpx.(c_cmp) in
+        let '(new_ty, new_val) := cpx.(c_new) in
+
+        (* Check whether the comparison types agree.  LLVM IR requires them to be integer
+           or pointer types (otherwise the IR is not well formed).  Vellvm checks that
+           the types are the same, but doesn't check their specific type.
+         *)
+        if (dtyp_eq_dec cmp_ty new_ty) then
+          
+          (* evaluate the arguments to the instruction *)
+          ptr_uv <- translate exp_to_instr (denote_exp (Some ptr_ty) ptr_val) ;;
+          cmp_uv <- translate exp_to_instr (denote_exp' (Some cmp_ty) cmp_val) ;;
+          new_uv <- translate exp_to_instr (denote_exp' (Some cmp_ty) new_val) ;;
+          
+          (* Perform the load - load addresses must be unique *)
+          ptr_dv <- concretize_or_pick_unique ptr_uv;;
+          loaded_uv <- trigger (Load cmp_ty ptr_dv);;
+
+          (* Perform the comparison - again we have to concretize the results *)
+          dv <- concretize_or_pick_unique (UVALUE_ICmp Eq loaded_uv cmp_uv);;
+          match dv with
+          | @DVALUE_I 1 comparison_bit =>
+              if equ comparison_bit one then
+                
+                (* They compared as equal: perform the write to memory *)
+                trigger (Store cmp_ty ptr_dv new_uv) ;;
+                (* return a struct with the loaded value and "true" *)
+                let ret_uv := UVALUE_Struct [loaded_uv; @UVALUE_I 1 one] in
+                trigger (LocalWrite id ret_uv);;
+                ret tt
+              else
+                (* They compared as distinct: do not perform the write to memory *)
+                (* return a struct with the loaded value and "false" *)                
+                let ret_uv := UVALUE_Struct [loaded_uv; @UVALUE_I 1 zero] in
+                trigger (LocalWrite id ret_uv);;
+                ret tt
+          | DVALUE_Poison dt => raiseUB "comparing poison in atomiccmpxchg."
+          | _ => raise "Br got non-bool value"
+          end
+        else 
+          raise "Ill-typed atomiccmpxchg"
+
     (* Currently unhandled itree instructions *)
+    | (_, INSTR_LandingPad _ _ _) => raise "todo landingpad"
     | (_, INSTR_Fence _ _)
-    | (_, INSTR_AtomicCmpXchg _)
     | (_, INSTR_AtomicRMW _) => raise "Unsupported VIR instruction"
 
     (* Error states *)
