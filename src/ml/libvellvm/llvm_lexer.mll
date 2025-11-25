@@ -344,6 +344,22 @@
   ("acq_rel"        , KW_ACQ_REL);
   ("seq_cst"        , KW_SEQ_CST);
 
+  (* atomicrmw ops *)
+  ("max"      	    , KW_MAX);
+  ("min"	    , KW_MIN);
+  ("xchg"           , KW_XCHG);
+  ("fmax"           , KW_FMAX);
+  ("fmin"	    , KW_FMIN);
+  ("umin"	    , KW_UMIN);
+  ("umax"	    , KW_UMAX);
+  ("nand"	    , KW_NAND);
+  ("fmaximum"	    , KW_FMAXIMUM);
+  ("fminimum"	    , KW_FMINIMUM); 
+  ("uinc_wrap"	    , KW_UINC_WRAP);
+  ("udec_wrap"	    , KW_UDEC_WRAP);
+  ("usub_cond"	    , KW_USUB_COND);
+  ("usub_sat"	    , KW_USUB_SAT);
+
   (*types*)
   ("iptr"      , KW_IPTR);
   ("ptr"       , KW_PTR);
