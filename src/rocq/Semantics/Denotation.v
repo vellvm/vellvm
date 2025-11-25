@@ -482,7 +482,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
 
   (* Implement the atomic modify operations in terms of Vellvm uvalues.
-     Note: Langref doesn' seem to specifiy whether the arithmetic operations should be treated
+     Note: Langref doesn't seem to specifiy whether the arithmetic operations should be treated
            as having (or not) the signed/wrapping flags activated.  Here we (arbitrarily?)
            set them to false.
   *)
@@ -506,6 +506,16 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | Axor =>
         (* xor: *ptr = *ptr ^ val *)
         ret (UVALUE_IBinop Xor pv val)
+    | Anand =>
+        (* nand: *ptr = ~( *ptr & val ) *)
+        match val with
+        | UVALUE_I sz _ =>
+            (* SAZ: Is this the best way to get a UValue with 0xFFFF..FFFF bit pattern? *)
+            ret (UVALUE_IBinop (Sub false false)
+                   (@UVALUE_I sz (@repr (@bit_int sz) _ (@max_unsigned (@bit_int sz) _)))
+                   (UVALUE_IBinop And pv val))            
+        | _ => raise "atomicrmw nand of non-integer value"
+        end
     | Afadd =>
         (* fadd: *ptr = *ptr + val (using floating point arithmetic) *)
         ret (UVALUE_FBinop FAdd [] pv val)
@@ -518,7 +528,6 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | Aumin
     | Afmax
     | Afmin
-    | Anand
     | Afmaximum
     | Afminimum
     | Auinc_wrap
