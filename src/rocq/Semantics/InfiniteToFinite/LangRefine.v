@@ -20817,6 +20817,247 @@ Qed.
     dvalue_refine_strict_dvalue_to_uvalue
     : REF.
 
+  Lemma denote_cmpxchg_orutt_strict :
+    forall id c,
+      orutt instr_E_refine_strict instr_E_res_refine_strict eq
+        (IS1.LLVM.D.denote_cmpxchg id c) (denote_cmpxchg id c) (OOM:=OOME).
+  Proof.
+    intros id c.
+    destruct c, c_ptr, c_cmp, c_new.
+    cbn.
+    break_match_goal; eauto with ORUTT.
+    2: {
+      apply orutt_raise; cbn; eauto.
+      intros ? ? CONTRA.
+      inv CONTRA.
+    }
+
+    cbn.
+    apply orutt_bind with (RR:=uvalue_refine_strict).
+    { apply translate_exp_to_instr_E1E2_orutt_strict.
+      apply orutt_bind with (RR:=uvalue_refine_strict).
+      apply denote_exp'_E1E2_orutt.
+      apply orutt_denote_exp_concretize_if_no_undef_or_poison.
+    }
+
+    intros r1 r2 H.
+    subst.
+    apply orutt_bind with (RR:=uvalue_refine_strict).
+    { apply translate_exp_to_instr_E1E2_orutt_strict.
+      apply denote_exp'_E1E2_orutt.
+    }
+
+    intros r0 r3 H0.
+    apply orutt_bind with (RR:=uvalue_refine_strict).
+    { apply translate_exp_to_instr_E1E2_orutt_strict.
+      apply denote_exp'_E1E2_orutt.
+    }
+
+    intros r4 r5 H1.
+    apply orutt_bind with (RR:=dvalue_refine_strict).
+    apply concretize_or_pick_unique_instr_E_orutt_strict; auto.
+
+    intros r6 r7 H2.
+    apply orutt_bind with (RR:=uvalue_refine_strict).
+    { apply orutt_trigger; cbn; auto.
+      tauto.
+      intros o CONTRA.
+      unfold_subevents.
+      inv CONTRA.
+    }
+
+    intros r8 r9 H3.
+    repeat rewrite bind_bind.
+    setoid_rewrite bind_ret_l.
+
+    apply orutt_bind with (RR:=fun a b => dvalue_refine_strict (proj1_sig a) (proj1_sig b)).
+    { apply orutt_trigger; cbn; auto.
+      - unfold uvalue_refine_strict.
+        cbn.
+        rewrite H3, H0.
+        reflexivity.
+      - intros [t1 ?] [t2 ?].
+        intros H4.
+        tauto.
+      - intros o CONTRA.
+        unfold_subevents.
+        inv CONTRA.
+    }
+
+    intros r10 r11 H4.
+    destruct r10, r11; cbn in *.
+    destruct x, x0; try solve [first [apply orutt_raise
+                                     | apply orutt_raiseUB
+                                     | apply orutt_raiseOOM
+                                     | apply orutt_raiseLLVM
+                                 ]; [ intros * CONTRA; unfold_subevents; inv CONTRA | cbn; auto]
+                              | unfold dvalue_refine_strict in *; cbn in *;
+                                break_match_hyp_inv
+                              | unfold dvalue_refine_strict in *; cbn in *; inv H4
+                      ].
+    unfold dvalue_refine_strict in *; cbn in *; inv H4.
+    subst_existT.
+
+    destruct sz0; try solve [first [apply orutt_raise
+                                     | apply orutt_raiseUB
+                                     | apply orutt_raiseOOM
+                                     | apply orutt_raiseLLVM
+                                 ]; [ intros * CONTRA; unfold_subevents; inv CONTRA | cbn; auto]
+                              | unfold dvalue_refine_strict in *; cbn in *;
+                                break_match_hyp_inv
+                              | unfold dvalue_refine_strict in *; cbn in *; inv H4
+                    ].
+    break_match_goal.
+    { apply orutt_bind with (RR:=eq).
+      { apply orutt_trigger; cbn; auto.
+        intros [] [] ?; auto.
+        intros o CONTRA.
+        unfold_subevents.
+        inv CONTRA.
+      }
+
+      intros [] [] ?.
+      apply orutt_bind with (RR:=eq).
+      { apply orutt_trigger; cbn; unfold uvalue_refine_strict;
+          repeat setoid_rewrite H3; cbn; auto.
+        split; auto.
+        rewrite H3.
+        reflexivity.
+
+        intros [] [] ?; auto.
+
+        intros o CONTRA.
+        unfold_subevents.
+        inv CONTRA.
+      }
+
+      intros [] [] ?.
+      eauto with ORUTT.
+    }
+
+    apply orutt_bind with (RR:=eq).
+    { apply orutt_trigger; cbn; unfold uvalue_refine_strict;
+        repeat setoid_rewrite H3; cbn; auto.
+      split; auto.
+      rewrite H3.
+      reflexivity.
+
+      intros [] [] ?; auto.
+
+      intros o CONTRA.
+      unfold_subevents.
+      inv CONTRA.
+    }
+
+    intros [] [] ?.
+    eauto with ORUTT.
+  Qed.
+
+  Lemma denote_atomic_rmw_operation_orutt_strict :
+    forall r0 r8 r3 r9 a_operation,
+      uvalue_refine_strict r0 r3 ->
+      uvalue_refine_strict r8 r9 ->
+      orutt instr_E_refine_strict instr_E_res_refine_strict uvalue_refine_strict
+        (IS1.LLVM.D.denote_atomic_rmw_operation a_operation r8 r0)
+        (denote_atomic_rmw_operation a_operation r9 r3)
+        (OOM:=OOME).
+  Proof.
+    intros r0 r8 r3 r9 a_operation REF1 REF2.
+    destruct a_operation; cbn;
+      try solve
+        [ apply orutt_Ret; unfold_uvalue_refine_strict; try rewrite REF1; try rewrite REF2; auto
+        | first [apply orutt_raise
+                | apply orutt_raiseUB
+                | apply orutt_raiseOOM
+                | apply orutt_raiseLLVM
+            ]; [ intros * CONTRA; unfold_subevents; inv CONTRA | cbn; auto]].
+    unfold_uvalue_refine_strict.
+    (* TODO: this match is huge, we should be smarter about this *)
+    destruct r0, r3;
+      try solve
+        [ first [apply orutt_raise
+                | apply orutt_raiseUB
+                | apply orutt_raiseOOM
+                | apply orutt_raiseLLVM
+            ]; [ intros * CONTRA; unfold_subevents; inv CONTRA | cbn; auto]
+        | cbn in *; repeat break_match_hyp_inv
+        | inv REF1
+        | inv REF2
+        | inv REF1; subst_existT;
+          inv REF2; subst_existT;
+          apply orutt_Ret; cbn;
+          unfold_uvalue_refine_strict;
+          repeat match goal with
+            | H: uvalue_convert_strict _ = _ |- _ =>
+                setoid_rewrite H
+            end; auto
+        ].
+  Qed.
+
+  Lemma denote_atomicrmw_orutt_strict :
+    forall id a,
+      orutt instr_E_refine_strict instr_E_res_refine_strict eq (IS1.LLVM.D.denote_atomicrmw id a)
+        (denote_atomicrmw id a) (OOM:=OOME).
+  Proof.
+    intros id a.
+    destruct a, a_ptr, a_val.
+    cbn.
+
+    apply orutt_bind with (RR:=uvalue_refine_strict).
+    { apply translate_exp_to_instr_E1E2_orutt_strict.
+      apply orutt_bind with (RR:=uvalue_refine_strict).
+      apply denote_exp'_E1E2_orutt.
+      apply orutt_denote_exp_concretize_if_no_undef_or_poison.
+    }
+
+    intros r1 r2 H.
+    subst.
+    apply orutt_bind with (RR:=uvalue_refine_strict).
+    { apply translate_exp_to_instr_E1E2_orutt_strict.
+      apply denote_exp'_E1E2_orutt.
+    }
+
+    intros r0 r3 H0.
+    apply orutt_bind with (RR:=dvalue_refine_strict).
+    apply concretize_or_pick_unique_instr_E_orutt_strict; auto.
+
+    intros r6 r7 H2.
+    apply orutt_bind with (RR:=uvalue_refine_strict).
+    { apply orutt_trigger; cbn; auto.
+      tauto.
+      intros o CONTRA.
+      unfold_subevents.
+      inv CONTRA.
+    }
+
+    intros r8 r9 H3.
+    apply orutt_bind with (RR:=uvalue_refine_strict).
+    { apply denote_atomic_rmw_operation_orutt_strict; auto.
+    }
+
+    intros r10 r11 H4.
+    apply orutt_bind with (RR:=eq).
+    { apply orutt_trigger; cbn; auto.
+      intros [] [] ?; auto.
+      intros o CONTRA.
+      unfold_subevents.
+      inv CONTRA.
+    }
+
+    intros [] [] ?.
+    apply orutt_bind with (RR:=eq).
+    { apply orutt_trigger; cbn; unfold uvalue_refine_strict;
+        repeat setoid_rewrite H3; cbn; auto.
+      intros [] [] ?; auto.
+      intros o CONTRA.
+      unfold_subevents.
+      inv CONTRA.
+    }
+
+    intros [] [] ?.
+    eauto with ORUTT.
+  Qed.
+
   Lemma denote_instr_orutt_strict :
     forall instr varg1 varg2,
       OptionUtil.option_rel2 addr_refine varg1 varg2 ->
@@ -21153,6 +21394,10 @@ Qed.
         intros o CONTRA; inv CONTRA.
       - apply orutt_raise; cbn; auto.
         intros msg o0 CONTRA; inv CONTRA.
+      - (* cmpxchg *)
+        apply denote_cmpxchg_orutt_strict.
+      - (* atomicrmw *)
+        apply denote_atomicrmw_orutt_strict.
       - (* va_arg *)
         break_match_goal; subst.
         eapply orutt_bind with (RR:=uvalue_refine_strict).
