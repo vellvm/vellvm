@@ -390,6 +390,7 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_UNWIND
 %token KW_TO
 %token KW_NUW
+%token KW_NUSW
 %token KW_NSW
 %token KW_EXACT
 %token KW_NNEG
@@ -1451,7 +1452,8 @@ expr_op:
   | c=conversion LPAREN t1=typ v=exp KW_TO t2=typ RPAREN
     { OP_Conversion (c, t1, v t1, t2) }
 
-  | KW_GETELEMENTPTR KW_INBOUNDS? LPAREN t=typ COMMA ptr=texp idx=preceded(COMMA, texp)* RPAREN
+    (* SAZ: TODO - record the inbounds, nuw, nusw flags, also allow inrange(S,E) *) 
+  | KW_GETELEMENTPTR KW_INBOUNDS? KW_NUSW? KW_NUW? LPAREN t=typ COMMA ptr=texp idx=preceded(COMMA, texp)* RPAREN
     { OP_GetElementPtr (t, ptr, idx) }
 
   | KW_SELECT LPAREN if_=texp COMMA then_=texp COMMA else_= texp RPAREN
@@ -1484,7 +1486,8 @@ instr_path:
     { let (idx, md) = im in
       (INSTR_Op (OP_InsertValue (agg, new_val, idx)), md) }
 
-  | KW_GETELEMENTPTR KW_INBOUNDS? t=typ COMMA ptr=texp im=comma_path_with_instr_metadata(texp)
+    (* SAZ: TODO - record the inbounds, nuw, nusw flags, also allow inrange(S,E) *) 
+  | KW_GETELEMENTPTR KW_INBOUNDS? KW_NUSW? KW_NUW? t=typ COMMA ptr=texp im=comma_path_with_instr_metadata(texp)
     { let (idx, md) = im in
       (INSTR_Op(OP_GetElementPtr (t, ptr, idx)), md) }
 
