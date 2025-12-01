@@ -707,10 +707,12 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     | (IId id, INSTR_AtomicRMW armw) =>
         denote_atomicrmw id armw
+      (* TODO: revisit with a proper concurrenc model *)
+
+    | (_, INSTR_Fence _ _) => ret tt
                        
     (* Currently unhandled itree instructions *)
     | (_, INSTR_LandingPad _ _ _) => raise "Unsupported INSTR_Landingpad"
-    | (_, INSTR_Fence _ _) => raise "Unsupported INSTR_Fence"
     (* Error states *)
     | (_, _) => raise "ID / Instr mismatch void / non-void"
     end.

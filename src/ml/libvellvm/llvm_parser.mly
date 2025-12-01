@@ -1658,7 +1658,15 @@ instr:
       , [])
     }
 
-  | KW_FENCE         { failwith"INSTR_Fence"         }
+  | KW_FENCE ss=syncscope? a_ordering=ordering
+    { let a_syncscope = begin match ss with
+               | Some (ANN_syncscope s) -> Some s
+	       | Some _ -> failwith "impossible: syncscope not found"
+	       | _ -> None
+	       end
+      in
+      (INSTR_Fence(a_syncscope, a_ordering), [])
+    }
   | KW_LANDINGPAD t=typ KW_CLEANUP cs=clause* md=instr_metadata
     { (INSTR_LandingPad (t, true, cs), md) }
 
