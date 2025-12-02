@@ -21392,8 +21392,8 @@ Qed.
         tauto.
         intros [] [] _; auto; reflexivity.
         intros o CONTRA; inv CONTRA.
-      - apply orutt_raise; cbn; auto.
-        intros msg o0 CONTRA; inv CONTRA.
+      - (* fence - implemented trivially without concurrency *)
+        eapply orutt_Ret; eauto.
       - (* cmpxchg *)
         apply denote_cmpxchg_orutt_strict.
       - (* atomicrmw *)
@@ -21720,8 +21720,7 @@ Qed.
            cbn; reflexivity.
         }
 
-      - clear o.
-        solve_orutt_raise.
+      - eapply orutt_Ret; eauto.
 
       - (* va_arg *)
         break_match_goal; subst.
