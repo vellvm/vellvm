@@ -34,6 +34,24 @@ Definition int_ast := Z.
 Definition float := Floats.float.  (* 64-bit floating point value *)
 Definition float32 := Floats.float32.
 
+(* File Information - this is used by the Vellvm-only 
+   METADATA_File_info "virtual" metadata value to record source information.
+   Every phi, instr, and terminator is annotated with a file_info value provided
+   by the parser.
+   - These are never pretty printed via "show"
+   - They *are* reflected via "repr"
+   - They can be used to generate error messages: see examples in Denotation.v
+   - See AstLib for some utility functions (especially [location_error_string])
+ *)
+Record file_info : Set :=
+  mk_file_info {
+      filename : string ;
+      start_line : int_ast ;
+      start_col  : int_ast ;
+      end_line   : int_ast ;
+      end_col    : int_ast ;
+    }.
+
 
 Variant raw_id : Set :=
 | Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)
@@ -427,6 +445,11 @@ with metadata : Set :=
  *)
 | METADATA_Debug (DIstr:string) (contents:string)
 
+(* SAZ: hijack the metadata to add Vellvm line numbers - this will be added by the parser but
+   elided in the prettyprinter.
+   We can use this to improve the error messages by providing more context.
+ *)
+| METADATA_File_info (finfo:file_info)
 .
 Set Elimination Schemes.
 

@@ -62,14 +62,26 @@ Extract Inlined Constant ascii_dec => "(=)".
 Extract Inductive string => "string" [ "str_nil" "str_cons" ].
 *)
 
+
 (* camlstring_of_coqstring is from Camlcoq *)
-Extract Constant print_msg => "let camlstring_of_coqstring (s: char list) =
-  let r = Bytes.create (List.length s) in
-  let rec fill pos = function
-  | [] -> r
-  | c :: s -> Bytes.set r pos c; fill (pos + 1) s
-  in Bytes.to_string (fill 0 s)
-in fun msg -> print_string (camlstring_of_coqstring msg ^ ""\n"")".
+Extract Constant printer_object => "
+  let loc_state = ref [] in
+  let camlstring_of_coqstring (s: char list) =
+    let r = Bytes.create (List.length s) in
+    let rec fill pos = function
+      | [] -> r
+      | c :: s -> Bytes.set r pos c; fill (pos + 1) s
+    in Bytes.to_string (fill 0 s)
+  in
+  let printer_set_loc loc = (loc_state := loc; []) in
+  let printer_print_msg msg =
+    print_string ((camlstring_of_coqstring !loc_state) ^ "": "" ^ (camlstring_of_coqstring msg) ^ ""\n"")
+  in
+  let printer_get_loc = fun _ -> !loc_state in
+  { printer_set_loc;
+    printer_print_msg;
+    printer_get_loc; }
+  ".
 
 (* OCaml pervasive types ---------------------------------------------------- *)
 (* Extract Inlined Constant LLVMAst.int => "int". *)

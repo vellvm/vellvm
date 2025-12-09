@@ -379,7 +379,8 @@ Section ExpInd.
   Hypothesis IH_METADATA_Node : forall (ms:list (metadata T)), (forall m, In m ms -> Q m) -> Q (METADATA_Node ms).
   Hypothesis IH_METADATA_Pair : forall (m1 m2:metadata T), Q m1 -> Q m2 -> Q (METADATA_Pair m1 m2).
   Hypothesis IH_METADATA_Debug : forall (s t:string), Q (METADATA_Debug s t).
-
+  Hypothesis IH_METADATA_File_info : forall (f:file_info), Q (METADATA_File_info f).
+  
   Lemma exp_ind : forall (v:exp T), P v.
 Proof.    
 refine(  
@@ -425,7 +426,8 @@ with F0 (m : metadata T) : Q m :=
   | METADATA_Node mds => _
   | METADATA_Pair md1 md2 => IH_METADATA_Pair md1 md2 (F0 md1) (F0 md2)
   | METADATA_Debug DIstr contents => IH_METADATA_Debug DIstr contents
-  end
+  | METADATA_File_info f => IH_METADATA_File_info f
+    end
 for
 F).
 - apply IH_Cstring.
@@ -510,6 +512,7 @@ with F0 (m : metadata T) : Q m :=
   | METADATA_Node mds => _
   | METADATA_Pair md1 md2 => IH_METADATA_Pair md1 md2 (F0 md1) (F0 md2)                          
   | METADATA_Debug DIstr contents => IH_METADATA_Debug DIstr contents
+  | METADATA_File_info f => IH_METADATA_File_info f
   end
 for
 F0).
@@ -837,3 +840,33 @@ Proof using.
   intros * EQ; inv EQ; auto.
 Qed.
 
+(* File information - line numbers and error messages.
+   The parser associates a METADATA_File_info value with every instruction of the AST.
+ *)
+
+Definition is_METADATA_File_info {T} (m:metadata T) : option file_info :=
+  match m with
+  | METADATA_File_info f => Some f
+  | _ => None
+  end.
+
+Fixpoint get_file_info {T} (l : list (metadata T)) : option file_info :=
+  match l with
+  | [] => None
+  | m::rest => match is_METADATA_File_info m with
+             | Some f => Some f
+             | None => get_file_info rest
+             end
+  end.
+
+Definition no_loc_string : string := "[??:??.??-??.??]".
+
+Definition location_string (fo : option file_info) : string :=
+  match fo with
+  | None => no_loc_string
+  | Some f => "[" ++ f.(filename) ++ ":" ++ (show f.(start_line)) ++ "." ++ (show f.(start_col))
+                 ++ "-" ++ (show f.(end_line)) ++ "." ++ (show f.(end_col)) ++ "]"                 
+  end.
+
+Definition location_error_string {T} (l : list (metadata T)) : string :=
+  location_string (get_file_info l).

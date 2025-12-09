@@ -24,10 +24,29 @@
 (*  ------------------------------------------------------------------------- *)
 
 
-
+open Lexing
 open LLVMAst
 open ParserHelper
 open ParseUtil
+
+(* Compute a METADATA_File_info value from the current parser state. *)
+let pos_of_lexpos (p : position) =
+  (p.pos_lnum,  (p.pos_cnum - p.pos_bol))
+
+let metadata_file_info (startpos:Lexing.position) (endpos:Lexing.position) =
+  let filename = str startpos.pos_fname in
+  let start_line = coq_of_int startpos.pos_lnum in
+  let start_col = coq_of_int (startpos.pos_cnum - startpos.pos_bol) in
+  let end_line = coq_of_int endpos.pos_lnum in
+  let end_col = coq_of_int (endpos.pos_cnum - endpos.pos_bol) in
+  METADATA_File_info {
+      filename ;
+      start_line ;
+      start_col ;
+      end_line ;
+      end_col ;
+      }
+      
 
 (* normalize_float_size :
    - LLVM floating point literals need different interpretations depending
@@ -1057,8 +1076,9 @@ block_instrs_and_term:
 
 phi:
   | KW_PHI t=typ ps=phi_suffix
-    { let (table, md) = ps in 
-      (Phi (t, List.map (fun (l,v) -> (l, v t)) table), md) }
+    { let (table, md) = ps in
+      let f_info = metadata_file_info $startpos $endpos in
+      (Phi (t, List.map (fun (l,v) -> (l, v t)) table), f_info::md) }
 
 phi_suffix:
   | te=phi_table_entry COMMA ps=phi_suffix
@@ -1479,17 +1499,20 @@ expr_op:
 
 instr_path:
   | KW_EXTRACTVALUE tv=texp im=comma_path_with_instr_metadata(INTEGER)
-    { let (idx, md) = im in 
-      (INSTR_Op (OP_ExtractValue (tv, idx)), md) }
+    { let f_info = metadata_file_info $startpos $endpos in
+      let (idx, md) = im in 
+      (INSTR_Op (OP_ExtractValue (tv, idx)), f_info::md) }
 
   | KW_INSERTVALUE agg=texp COMMA new_val=texp im=comma_path_with_instr_metadata(INTEGER)
-    { let (idx, md) = im in
-      (INSTR_Op (OP_InsertValue (agg, new_val, idx)), md) }
+    { let f_info = metadata_file_info $startpos $endpos in
+      let (idx, md) = im in
+      (INSTR_Op (OP_InsertValue (agg, new_val, idx)), f_info::md) }
 
     (* SAZ: TODO - record the inbounds, nuw, nusw flags, also allow inrange(S,E) *) 
   | KW_GETELEMENTPTR KW_INBOUNDS? KW_NUSW? KW_NUW? t=typ COMMA ptr=texp im=comma_path_with_instr_metadata(texp)
-    { let (idx, md) = im in
-      (INSTR_Op(OP_GetElementPtr (t, ptr, idx)), md) }
+    { let f_info = metadata_file_info $startpos $endpos in
+      let (idx, md) = im in
+      (INSTR_Op(OP_GetElementPtr (t, ptr, idx)), f_info::md) }
 
 
 expr_val:
@@ -1569,7 +1592,9 @@ operand_bundles:
 
 instr:
   | eo=instr_op md=instr_metadata
-     { (INSTR_Op eo, md)  }
+    { 
+      let f_info = metadata_file_info $startpos $endpos in
+      (INSTR_Op eo, f_info::md)  }
 
   | ep=instr_path
      { ep }
@@ -1577,7 +1602,9 @@ instr:
   | t=tailcall? KW_CALL fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
     f=call_exp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
     fa=list(fn_attr) ops=operand_bundles? md=instr_metadata
-    { let atts =
+    {
+      let f_info = metadata_file_info $startpos $endpos in
+      let atts =
 	(opt_list t)
 	@ (List.map (fun f -> ANN_fast_math_flag f) fm)
 	@ (opt_list cc)
@@ -1590,36 +1617,44 @@ instr:
 		| Some ops -> ops
 		end
       in
-      (INSTR_Call (f, a, atts, ops), md) }
+      (INSTR_Call (f, a, atts, ops), f_info::md) }
 
   | KW_ALLOCA ia=KW_INALLOCA? t=typ am=alloca_anns
-    { let a = ann_opt ia ANN_inalloca in
+    {
+      let f_info = metadata_file_info $startpos $endpos in     
+      let a = ann_opt ia ANN_inalloca in
       let (anns, md) = am in
-      (INSTR_Alloca (t, a@anns), md) }
+      (INSTR_Alloca (t, a@anns), f_info::md) }
 
   | KW_LOAD at=KW_ATOMIC? vol=KW_VOLATILE? t=typ COMMA tv=texp ss=syncscope? o=ordering? am=ls_anns
-    { let at_ann = ann_opt at ANN_atomic in
+    { let f_info = metadata_file_info $startpos $endpos in     
+      let at_ann = ann_opt at ANN_atomic in
       let v = ann_opt vol ANN_volatile in
       let (a, md) = am in
       let (ss_ann : typ annotation list) = opt_list ss in
       let ord_ann = List.map (fun x -> ANN_ordering x) (opt_list o) in
-      (INSTR_Load (t, tv, at_ann@v@ss_ann@ord_ann@a), md) } 
+      (INSTR_Load (t, tv, at_ann@v@ss_ann@ord_ann@a), f_info::md) } 
 
 
-  | KW_VAARG tv=texp COMMA t=typ md=instr_metadata { (INSTR_VAArg (tv, t), md)  }
+  | KW_VAARG tv=texp COMMA t=typ md=instr_metadata
+    { let f_info = metadata_file_info $startpos $endpos in     
+      (INSTR_VAArg (tv, t), f_info::md)
+    }
 
   | KW_STORE at=KW_ATOMIC? vol=KW_VOLATILE? all=texp COMMA ptr=texp ss=syncscope? o=ordering? am=ls_anns
-    { let at_ann = ann_opt at ANN_atomic in
+    { let f_info = metadata_file_info $startpos $endpos in     
+      let at_ann = ann_opt at ANN_atomic in
       let v = ann_opt vol ANN_volatile in
       let (a, md) = am in
       let (ss_ann : typ annotation list) = opt_list ss in
       let ord_ann = List.map (fun x -> ANN_ordering x) (opt_list o) in
-      (INSTR_Store (all, ptr, at_ann@v@ss_ann@ord_ann@a), md) }
+      (INSTR_Store (all, ptr, at_ann@v@ss_ann@ord_ann@a), f_info::md) }
 
   | KW_ATOMICCMPXCHG c_weak=KW_WEAK? c_volatile=KW_VOLATILE?
     c_ptr=texp COMMA c_cmp=texp COMMA c_new=texp ss=syncscope?
     c_success_ordering=ordering c_failure_ordering=ordering c_align=comma_align?
-    { let c_syncscope =
+    { let f_info = metadata_file_info $startpos $endpos in     
+      let c_syncscope =
 	       begin match ss with
                | Some (ANN_syncscope s) -> Some s
 	       | Some _ -> failwith "impossible: syncscope not found"
@@ -1638,12 +1673,13 @@ instr:
 	   c_failure_ordering;	   
 	   c_align;
 	 }
-      , [])
+      , [f_info])
     }
       
   | KW_ATOMICRMW a_volatile=KW_VOLATILE? a_operation=atomicrmw_op
     a_ptr=texp COMMA a_val=texp ss=syncscope? a_ordering=ordering a_align=comma_align?
-    { let a_syncscope = begin match ss with
+    { let f_info = metadata_file_info $startpos $endpos in     
+      let a_syncscope = begin match ss with
                | Some (ANN_syncscope s) -> Some s
 	       | Some _ -> failwith "impossible: syncscope not found"
 	       | _ -> None
@@ -1658,23 +1694,26 @@ instr:
 	  a_ordering;
 	  a_align;
 	}
-      , [])
+      , [f_info])
     }
 
   | KW_FENCE ss=syncscope? a_ordering=ordering
-    { let a_syncscope = begin match ss with
+    { let f_info = metadata_file_info $startpos $endpos in     
+      let a_syncscope = begin match ss with
                | Some (ANN_syncscope s) -> Some s
 	       | Some _ -> failwith "impossible: syncscope not found"
 	       | _ -> None
 	       end
       in
-      (INSTR_Fence(a_syncscope, a_ordering), [])
+      (INSTR_Fence(a_syncscope, a_ordering), [f_info])
     }
   | KW_LANDINGPAD t=typ KW_CLEANUP cs=clause* md=instr_metadata
-    { (INSTR_LandingPad (t, true, cs), md) }
+    { let f_info = metadata_file_info $startpos $endpos in     
+      (INSTR_LandingPad (t, true, cs), f_info::md) }
 
   | KW_LANDINGPAD t=typ cs=clause+ md=instr_metadata
-    { (INSTR_LandingPad (t, false, cs), md) }
+    { let f_info = metadata_file_info $startpos $endpos in     
+      (INSTR_LandingPad (t, false, cs), f_info::md) }
 
 syncscope:
   KW_SYNCSCOPE LPAREN s=STRING RPAREN
@@ -1725,27 +1764,34 @@ branch_label:
 %inline
 terminator:
   | KW_RET tv=texp md=instr_metadata
-    { ((TERM_Ret tv), md) }
+    { let f_info = metadata_file_info $startpos $endpos in     
+      ((TERM_Ret tv), f_info::md) }
 
   | KW_RET KW_VOID md=instr_metadata
-    { (TERM_Ret_void, md) }
+    { let f_info = metadata_file_info $startpos $endpos in     
+      (TERM_Ret_void, f_info::md) }
 
   | KW_BR c=texp COMMA o1=branch_label COMMA o2=branch_label md=instr_metadata
-    { (TERM_Br (c, o1, o2), md) }
+    { let f_info = metadata_file_info $startpos $endpos in     
+      (TERM_Br (c, o1, o2), f_info::md) }
 
   | KW_BR b=branch_label md=instr_metadata
-    { (TERM_Br_1 b, md) }
+    { let f_info = metadata_file_info $startpos $endpos in     
+      (TERM_Br_1 b, f_info::md) }
 
   | KW_SWITCH c=texp COMMA
     def=branch_label LSQUARE table=list(switch_table_entry) RSQUARE md=instr_metadata
-    { (TERM_Switch (c, def, table), md) }
+    { let f_info = metadata_file_info $startpos $endpos in     
+      (TERM_Switch (c, def, table), f_info::md) }
 
   | KW_INDIRECTBR tv=texp
     COMMA LSQUARE til=separated_list(csep, branch_label)  RSQUARE md=instr_metadata
-    { (TERM_IndirectBr (tv, til), md) }
+    { let f_info = metadata_file_info $startpos $endpos in     
+      (TERM_IndirectBr (tv, til), f_info::md) }
 
   | KW_RESUME tv=texp md=instr_metadata
-    { (TERM_Resume tv, md) }
+    { let f_info = metadata_file_info $startpos $endpos in
+      (TERM_Resume tv, f_info::md) }
 
   | KW_INVOKE fm=list(fast_math) cc=cconv? ra=list(param_attr) addr=addrspace?
     f=call_exp  a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
@@ -1755,7 +1801,8 @@ terminator:
     KW_UNWIND l2=branch_label
     md=instr_metadata
 
-    { let atts =
+    { let f_info = metadata_file_info $startpos $endpos in
+      let atts =
 	  (List.map (fun f -> ANN_fast_math_flag f) fm)
 	@ (opt_list cc)
         @ (List.map (fun r -> ANN_ret_attribute r) ra)
@@ -1767,10 +1814,11 @@ terminator:
 		| Some ops -> ops
 		end
       in
-      (TERM_Invoke(f, a, l1, l2, atts, ops), md)  }
+      (TERM_Invoke(f, a, l1, l2, atts, ops), f_info::md)  }
 
   | KW_UNREACHABLE md=instr_metadata
-    { (TERM_Unreachable, md) }
+    { let f_info = metadata_file_info $startpos $endpos in
+      (TERM_Unreachable, f_info::md) }
 
 comma_align:
   | COMMA KW_ALIGN n=INTEGER { n }

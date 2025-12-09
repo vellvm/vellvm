@@ -194,7 +194,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
      Expressions are denoted as itrees that return a [uvalue].
    *)
 
-  Fixpoint denote_exp'
+  Fixpoint denote_exp' 
            (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
     let eval_texp '(dt,ex) := denote_exp' (Some dt) ex
     in
@@ -206,7 +206,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     | EXP_Integer x =>
       match top with
-      | None                => raise "denote_exp given untyped EXP_Integer"
+      | None                => raise ("denote_exp given untyped EXP_Integer")
       | Some (DTYPE_I bits) => fmap dvalue_to_uvalue (coerce_integer_to_int (Some bits) x)
       | Some DTYPE_IPTR     => fmap dvalue_to_uvalue (coerce_integer_to_int None x)
       | Some typ            => raise ("bad type for constant int: " ++ to_string typ)
@@ -214,24 +214,24 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     | EXP_Float x =>
       match top with
-      | None              => raise "denote_exp given untyped EXP_Float"
+      | None              => raise ("denote_exp given untyped EXP_Float")
       | Some DTYPE_Float  => ret (UVALUE_Float x)
-      | _                 => raise "bad type for constant float"
+      | _                 => raise ("bad type for constant float")
       end
 
     | EXP_Double x =>
       match top with
-      | None              => raise "denote_exp given untyped EXP_Double"
+      | None              => raise ("denote_exp given untyped EXP_Double")
       | Some DTYPE_Double => ret (UVALUE_Double x)
-      | _                 => raise "bad type for constant double"
+      | _                 => raise ("bad type for constant double")
       end
 
     | EXP_Hex x =>
       match top with
-      | None              => raise "denote_exp given untyped EXP_Hex"
+      | None              => raise ("denote_exp given untyped EXP_Hex")
       | Some DTYPE_Float  => ret (UVALUE_Float (Float32.of_double x))
       | Some DTYPE_Double => ret (UVALUE_Double x)
-      | _                 => raise "bad type for constant hex float"
+      | _                 => raise ("bad type for constant hex float")
       end
 
     | EXP_Bool b =>
@@ -244,7 +244,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     | EXP_Zero_initializer =>
       match top with
-      | None   => raise "denote_exp given untyped EXP_Zero_initializer"
+      | None   => raise ("denote_exp given untyped EXP_Zero_initializer")
       | Some t => lift_err ret (fmap dvalue_to_uvalue (dv_zero_initializer t))
       end
 
@@ -254,13 +254,13 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     | EXP_Undef =>
       match top with
-      | None   => raise "denote_exp given untyped EXP_Undef"
+      | None   => raise ("denote_exp given untyped EXP_Undef")
       | Some t => ret (UVALUE_Undef t)
       end
 
     | EXP_Poison =>
       match top with
-      | None   => raise "denote_exp given untyped EXP_Poison"
+      | None   => raise ("denote_exp given untyped EXP_Poison")
       | Some t => ret (UVALUE_Poison t)
       end
 
@@ -273,11 +273,11 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     (* Option 2: do a little bit of typechecking *)
     | EXP_Packed_struct es =>
       match top with
-      | None => raise "denote_exp given untyped EXP_Struct"
+      | None => raise ("denote_exp given untyped EXP_Struct")
       | Some (DTYPE_Packed_struct _) =>
         vs <- map_monad eval_texp es ;;
         ret (UVALUE_Packed_struct vs)
-      | _ => raise "bad type for VALUE_Packed_struct"
+      | _ => raise ("bad type for VALUE_Packed_struct")
       end
 
     | EXP_Array t es =>
@@ -371,6 +371,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
         | METADATA_Node _ => ret UVALUE_None
         | METADATA_Pair _ _ => ret UVALUE_None
         | METADATA_Debug _ _ => ret UVALUE_None
+        | METADATA_File_info _ => ret UVALUE_None
         end
     end.
 
@@ -378,7 +379,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     := uv <- denote_exp' top o;;
        concretize_if_no_undef_or_poison uv.
 
-  Arguments denote_exp _ : simpl nomatch.
+  Arguments denote_exp _ _ : simpl nomatch.
 
   Definition denote_op (o:exp dtyp) : itree exp_E uvalue :=
     denote_exp None o.
@@ -474,11 +475,11 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
             let ret_uv := UVALUE_Struct [loaded_uv; @UVALUE_I 1 zero] in
             trigger (LocalWrite id ret_uv);;
             ret tt
-      | DVALUE_Poison dt => raiseUB "comparing poison in atomiccmpxchg."
-      | _ => raise "Br got non-bool value"
+      | DVALUE_Poison dt => raiseUB ("comparing poison in atomiccmpxchg.")
+      | _ => raise ("Br got non-bool value")
       end
     else 
-      raise "Ill-typed atomiccmpxchg".
+      raise ("Ill-typed atomiccmpxchg").
 
 
   (* Implement the atomic modify operations in terms of Vellvm uvalues.
@@ -514,7 +515,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
             ret (UVALUE_IBinop (Sub false false)
                    (@UVALUE_I sz (@repr (@bit_int sz) _ (@max_unsigned (@bit_int sz) _)))
                    (UVALUE_IBinop And pv val))            
-        | _ => raise "atomicrmw nand of non-integer value"
+        | _ => raise ("atomicrmw nand of non-integer value")
         end
     | Afadd =>
         (* fadd: *ptr = *ptr + val (using floating point arithmetic) *)
@@ -533,7 +534,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | Auinc_wrap
     | Audec_wrap
     | Ausub_cond
-    | Ausub_sat => raise "Unsupported atomicrwm operation"
+    | Ausub_sat => raise ("Unsupported atomicrwm operation")
     end.
     
   
@@ -564,6 +565,14 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   Definition denote_instr
     (i: (instr_id * instr dtyp * list (metadata dtyp))) (varargs : option ADDR.addr) : itree instr_E unit :=
     let '(i, md) := i in
+    (* The following two lines set up file location information. *)
+    (* extract it from the metadata: *)
+    let err_loc := location_error_string md in
+    (* imperatively set the flag for printing of exceptions
+       [set_loc] extracts in such a way as to change the behavior of [print_msg]
+     *)
+    let bogus := set_loc err_loc in
+    let err_loc := (bogus ++ err_loc) in
     match i with
     (* Pure operations *)
 
@@ -617,12 +626,12 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       (* Store addresses must be unique *)
       da <- concretize_or_pick_unique ua ;;
       match da with
-      | DVALUE_Poison dt => raiseUB "Store to poisoned address."
+      | DVALUE_Poison dt => raiseUB (err_loc ++ ": Store to poisoned address.")
       | _ => trigger (Store dt da uv)
       end;;
       ret tt
 
-    | (_, INSTR_Store _ _ _) => raise "ILL-FORMED itree ERROR: Store to non-void ID"
+    | (_, INSTR_Store _ _ _) => raise (err_loc ++ ": ILL-FORMED itree ERROR: Store to non-void ID")
 
     (* Call *)
     (* TODO: technically operand bundles can affect semantics *)                                     
@@ -639,11 +648,11 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
                 ua <- translate exp_to_instr (denote_exp (Some t) e);;
                 da <- concretize_or_pick_unique ua;;
                 match da with
-                | DVALUE_Poison dt => raiseUB "Store to poisoned address."
+                | DVALUE_Poison dt => raiseUB ("Store to poisoned address.")
                 | _ => trigger (Store DTYPE_Pointer da (UVALUE_Addr varargs));;
                       ret UVALUE_None
                 end
-            | _, _ => raise "va_start invalid arguments"
+            | _, _ => raise (err_loc ++ ": va_start invalid arguments")
             end
           else
             if String.eqb s "llvm.va_copy"
@@ -657,7 +666,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
                   vargs <- trigger (Load DTYPE_Pointer dsrc);;
                   trigger (Store DTYPE_Pointer ddest vargs);;
                   ret UVALUE_None
-              | _ => raise "va_copy invalid arguments"
+              | _ => raise (err_loc ++ ": va_copy invalid arguments")
               end
             else
               if String.eqb s "llvm.va_end"
@@ -712,9 +721,9 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | (_, INSTR_Fence _ _) => ret tt
                        
     (* Currently unhandled itree instructions *)
-    | (_, INSTR_LandingPad _ _ _) => raise "Unsupported INSTR_Landingpad"
+    | (_, INSTR_LandingPad _ _ _) => raise (err_loc ++ ": Unsupported INSTR_Landingpad")
     (* Error states *)
-    | (_, _) => raise "ID / Instr mismatch void / non-void"
+    | (_, _) => raise (err_loc ++ ": ID / Instr mismatch void / non-void")
     end.
 
   (* Computes the label to be returned by a switch terminator, after evaluation of values
@@ -744,7 +753,10 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
          or jumps to a new [block_id]. *)
 
   Definition denote_terminator (trm: (instr_id * terminator dtyp * list (metadata dtyp))): itree instr_E (block_id + uvalue) :=
-    let '(iid, t, _) := trm in
+    let '(iid, t, md) := trm in
+    let err_loc := location_error_string md in
+    let bogus := set_loc err_loc in
+    let err_loc := (bogus ++ err_loc) in
     match t with
 
     | TERM_Ret (dt, op) =>
@@ -763,8 +775,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
           ret (inl br1)
         else
           ret (inl br2)
-      | DVALUE_Poison dt => raiseUB "Branching on poison."
-      | _ => raise "Br got non-bool value"
+      | DVALUE_Poison dt => raiseUB (err_loc ++ ": Branching on poison.")
+      | _ => raise (err_loc ++ ": Br got non-bool value")
       end
 
     | TERM_Br_1 br => ret (inl br)
@@ -774,7 +786,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       (* Selection on [undef] is UB *)
       selector <- concretize_or_pick_unique uselector;;
       if dvalue_is_poison selector
-      then raiseUB "Switching on poison."
+      then raiseUB (err_loc ++ ": Switching on poison.")
       else (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
         switches <- map_monad
                      (fun '((TInt_Literal sz x),id) =>
@@ -783,7 +795,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
                      dests;;
         lift_err (fun b => ret (inl b)) (select_switch selector default_br switches)
 
-    | TERM_Unreachable => raiseUB "IMPOSSIBLE: unreachable in reachable position"
+    | TERM_Unreachable => raiseUB (err_loc ++ ": IMPOSSIBLE: unreachable in reachable position")
 
       (* TODO: technically operand bundles can affect the semantics of invoke *)
     | TERM_Invoke (dt, fnptrval) args to_label unwind_label anns _ =>
@@ -809,7 +821,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       raiseLLVM exn
 
     (* Currently unhandled VIR terminators *)
-    | TERM_IndirectBr _ _ => raise "Unsupport itree terminator"
+    | TERM_IndirectBr _ _ => raise (err_loc ++ ": Unsupport itree terminator")
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
@@ -817,12 +829,15 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     map_monad_ (fun i => denote_instr i varargs) c.
 
   Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : itree exp_E (local_id * uvalue) :=
-    let '(id, Phi dt args, _) := id_p in
+    let '(id, Phi dt args, md) := id_p in
+    let err_loc := location_error_string md in
+    let bogus := set_loc err_loc in
+    let err_loc := (bogus ++ err_loc) in
     match assoc bid_from args with
     | Some op =>
       uv <- denote_exp (Some dt) op ;;
       ret (id,uv)
-    | None => raise ("jump: phi node doesn't include block ")
+    | None => raise (err_loc ++ ": jump: phi node doesn't include block ")
     end.
 
   Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp * (list (metadata dtyp)))): itree instr_E unit :=

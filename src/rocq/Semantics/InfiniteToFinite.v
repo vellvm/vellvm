@@ -26933,11 +26933,11 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod store_id (pro
               }
               2: {
                 pstep; red; cbn.
-                change ((VisF (subevent void (ThrowOOM (print_msg "")))
+                change ((VisF (subevent void (ThrowOOM tt))
                            (fun x : void =>
                               ITree.subst
                                 (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM tt))
                                                                                (fun x : void =>
                                                                                   ITree.subst
                                                                                     (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
@@ -27092,11 +27092,11 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod store_id (pro
               }
               2: {
                 pstep; red; cbn.
-                change ((VisF (subevent void (ThrowOOM (print_msg "")))
+                change ((VisF (subevent void (ThrowOOM tt))
                            (fun x : void =>
                               ITree.subst
                                 (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM tt))
                                                                                (fun x : void =>
                                                                                   ITree.subst
                                                                                     (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
@@ -27310,11 +27310,11 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod store_id (pro
               }
               2: {
                 pstep; red; cbn.
-                change ((VisF (subevent void (ThrowOOM (print_msg "")))
+                change ((VisF (subevent void (ThrowOOM tt))
                            (fun x : void =>
                               ITree.subst
                                 (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM tt))
                                                                                (fun x : void =>
                                                                                   ITree.subst
                                                                                     (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
@@ -27511,11 +27511,11 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod store_id (pro
               }
               2: {
                 pstep; red; cbn.
-                change ((VisF (subevent void (ThrowOOM (print_msg "")))
+                change ((VisF (subevent void (ThrowOOM tt))
                            (fun x : void =>
                               ITree.subst
                                 (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM tt))
                                                                                (fun x : void =>
                                                                                   ITree.subst
                                                                                     (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
@@ -27858,11 +27858,11 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod store_id (pro
               }
               2: {
                 pstep; red; cbn.
-                change ((VisF (subevent void (ThrowOOM (print_msg "")))
+                change ((VisF (subevent void (ThrowOOM tt))
                            (fun x : void =>
                               ITree.subst
                                 (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM tt))
                                                                                (fun x : void =>
                                                                                   ITree.subst
                                                                                     (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
@@ -28054,18 +28054,18 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod store_id (pro
                            (fun x : void =>
                               ITree.subst
                                 (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM tt))
                                                                                (fun x : void =>
                                                                                   ITree.subst
                                                                                     (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
                                                                                                   end) (Ret x)))).
-              change (VisF (subevent void (Throw (print_msg "")))
+              change (VisF (subevent void (Throw tt))
        (fun x : void =>
         ITree.subst
           (fun v1 : void => match v1 return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
                          end) (Ret x)))
                 with
-                (observe (Vis (subevent void (Throw (print_msg "")))
+                (observe (Vis (subevent void (Throw tt))
        (fun x : void =>
         ITree.subst
           (fun v1 : void => match v1 return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
@@ -28209,11 +28209,11 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod store_id (pro
               }
               2: {
                 pstep; red; cbn.
-                change ((VisF (subevent void (ThrowOOM (print_msg "")))
+                change ((VisF (subevent void (ThrowOOM tt))
                            (fun x : void =>
                               ITree.subst
                                 (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                              end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM tt))
                                                                                (fun x : void =>
                                                                                   ITree.subst
                                                                                     (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
@@ -29233,11 +29233,11 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod store_id (pro
           }
           2: {
             pstep; red; cbn.
-            change ((VisF (subevent void (ThrowOOM (print_msg "")))
+            change ((VisF (subevent void (ThrowOOM tt))
                        (fun x : void =>
                           ITree.subst
                             (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
-                                          end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+                                          end) (Ret x)))) with (observe (Vis (subevent void (ThrowOOM tt))
                                                                            (fun x : void =>
                                                                               ITree.subst
                                                                                 (fun v : void => match v return (itree InfLP.Events.L3 TopLevelBigIntptr.res_L6) with
