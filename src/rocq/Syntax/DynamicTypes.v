@@ -323,6 +323,32 @@ Section hiding_notation.
   #[global] Instance serialize_dtyp : Serialize dtyp := serialize_dtyp'.
 End hiding_notation.
 
+  Fixpoint dtyp_to_string (dt:dtyp) : string :=
+    match dt with
+    | DTYPE_I sz     => ("i" ++ to_string (Npos sz))%string
+    | DTYPE_IPTR     => ("iptr")%string
+    | DTYPE_Pointer  => "ptr"
+    | DTYPE_Void     => "dvoid"
+    | DTYPE_Half     => "half"
+    | DTYPE_Float    => "float"
+    | DTYPE_Double   => "double"
+    | DTYPE_X86_fp80 => "x86_fp80"
+    | DTYPE_Fp128    => "fp128"
+    | DTYPE_Ppc_fp128 => "ppc_fp128"
+    | DTYPE_Metadata  => "metadata"
+    | DTYPE_X86_mmx   => "x86_mmx"
+    | DTYPE_Array sz t
+      => "[" ++ to_string sz ++ " x " ++  dtyp_to_string t ++ "]"%string
+    | DTYPE_Struct fields
+      => "{ [Struct Field Types Elided] }"
+    | DTYPE_Packed_struct fields
+      => "packed{ [Struct Field Types Elided] }"
+    | DTYPE_Opaque => "opaque"
+    | DTYPE_Vector sz t
+      => "<" ++ to_string sz ++ " x " ++  dtyp_to_string t ++ ">"%string                   
+    end.
+
+
 (* TODO: This probably should live somewhere else... *)
 #[refine]#[local] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
     Decidable_witness := N.eqb x y

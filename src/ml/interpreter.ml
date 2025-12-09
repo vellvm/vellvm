@@ -98,6 +98,9 @@ let debug (msg : string) =
     Calling `step` could either loop forever, return an error,
     or return the dvalue result returned from the itree.
  *)
+
+let current_line = ref (Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()))
+
 let rec step
     (m :
       ( 'a coq_L4
@@ -108,7 +111,15 @@ let rec step
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
-  | TauF x -> step x
+  | TauF x ->
+     if !debug_flag then begin
+         let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
+         if loc_str <> !current_line then begin 
+             Printf.printf "%s\n%!" loc_str;
+             current_line := loc_str
+           end
+     end;
+     step x
   (* SAZ: Could inspect the memory or stack here too. *)
   (* We finished the computation *)
   | RetF (_, (_, (_, (_, v)))) -> Ok v
