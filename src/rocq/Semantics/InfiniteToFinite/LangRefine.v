@@ -20078,7 +20078,8 @@ Qed.
               | LLVMAst.METADATA_Id _ 
               | LLVMAst.METADATA_Node _
               | LLVMAst.METADATA_Pair _ _
-              | LLVMAst.METADATA_Debug _ _ => True
+              | LLVMAst.METADATA_Debug _ _
+              | LLVMAst.METADATA_File_info _ => True
               | LLVMAst.METADATA_Const (t, v) =>
                   orutt exp_E_refine_strict
                     exp_E_res_refine_strict uvalue_refine_strict
@@ -20531,6 +20532,7 @@ Qed.
     - destruct te.
       simpl in IHe.
       apply IHe.
+    - auto.
     - auto.
     - auto.
     - auto.

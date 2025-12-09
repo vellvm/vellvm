@@ -88,6 +88,16 @@ Section ReprInstances.
 
   Local Open Scope string.
 
+  Definition repr_file_info (f : file_info) : string :=
+    "(mk_file_info " ++ """" ++ f.(filename) ++ """ "
+                     ++ (repr f.(start_line)) ++ " "
+                     ++ (repr f.(start_col))  ++ " "
+                     ++ (repr f.(end_line)) ++ " "
+                     ++ (repr f.(end_col)) ++ ")".
+  
+  #[global]
+   Instance reprFile_info : Repr file_info := {| repr := repr_file_info |}.
+  
   Fixpoint repr_dtyp (t : dtyp) : string :=
     match t with
     | DTYPE_I sz => "(DTYPE_I " ++ repr sz ++ ")"
@@ -343,6 +353,7 @@ Section ReprInstances.
     | METADATA_Node mds => "(METADATA_Node [" ++ (contents id (List.map repr_metadata mds)) ++ "])"
     | METADATA_Pair md1 md2 => "(METADATA_Pair " ++ (repr_metadata md1) ++ " " ++ (repr_metadata md2) ++ ")"
     | METADATA_Debug s1 s2 => "(METADATA_Debug " ++ repr s1 ++ ", " ++ repr s2 ++ ")"
+    | METADATA_File_info f => "(METADATA_File_info " ++ (repr f) ++ ")"
     end.
 
   #[global]

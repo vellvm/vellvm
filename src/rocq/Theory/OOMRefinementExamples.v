@@ -667,7 +667,7 @@ Module Infinite.
           * pstep; red; cbn.
 
             change
-              (VisF (subevent void (ThrowOOM (print_msg "")))
+              (VisF (subevent void (ThrowOOM tt))
                  (fun x : void =>
                     match
                       x
@@ -833,7 +833,7 @@ Module Infinite.
           * reflexivity.
           * pstep; red; cbn.
             change
-              (VisF (subevent void (ThrowOOM (print_msg "")))
+              (VisF (subevent void (ThrowOOM tt))
                  (fun x : void =>
                     match
                       x
@@ -843,7 +843,7 @@ Module Infinite.
                          (MMEP.MMSP.MemState * (store_id * (stack_frame uvalue * Stack.stack uvalue * res_L1))))
                     with
                     end)) with
-              (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+              (observe (Vis (subevent void (ThrowOOM tt))
                           (fun x : void =>
                              match
                                x
@@ -1049,11 +1049,11 @@ Module Infinite.
     red in H0. cbn in *. rewrite itree_eta, (itree_eta t3).
     do 2 red.
     punfold H0. red in H0; cbn in H0.
-    remember (VisF (subevent void (ThrowOOM (print_msg oom_msg)))
+    remember (VisF (subevent void (ThrowOOM tt))
             (fun x : void =>
              ITree.bind match x return (itree _ R) with
                         end (fun x0 : R => k1 x0))).
-    remember (VisF (subevent void (ThrowOOM (print_msg oom_msg)))
+    remember (VisF (subevent void (ThrowOOM tt))
            (fun x : void =>
             match
               x
@@ -1173,7 +1173,7 @@ Module Infinite.
           * reflexivity.
           * pstep; red; cbn.
             change
-              (VisF (subevent void (ThrowOOM (print_msg "")))
+              (VisF (subevent void (ThrowOOM tt))
                  (fun x0 : void =>
                     match
                       x0
@@ -1183,7 +1183,7 @@ Module Infinite.
                          (MMEP.MMSP.MemState * (store_id * (stack_frame uvalue * Stack.stack uvalue * res_L1))))
                     with
                     end)) with
-              (observe (Vis (subevent void (ThrowOOM (print_msg "")))
+              (observe (Vis (subevent void (ThrowOOM tt))
                           (fun x0 : void =>
                              match
                                x0
@@ -1619,11 +1619,11 @@ Module Finite.
     red in H0. cbn in *. rewrite itree_eta, (itree_eta t3).
     do 2 red.
     punfold H0. red in H0; cbn in H0.
-    remember (VisF (subevent void (ThrowOOM (print_msg oom_msg)))
+    remember (VisF (subevent void (ThrowOOM tt))
             (fun x : void =>
              ITree.bind match x return (itree _ R) with
                         end (fun x0 : R => k1 x0))).
-    remember (VisF (subevent void (ThrowOOM (print_msg oom_msg)))
+    remember (VisF (subevent void (ThrowOOM tt))
            (fun x : void =>
             match
               x

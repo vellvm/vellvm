@@ -726,6 +726,8 @@ Section ShowInstances.
                             @@ sd "}"
     | METADATA_Pair md1 md2 => dshow_metadata md1 @@ sd " " @@ dshow_metadata md2
     | METADATA_Debug ds s => sd ("!DI" ++ ds ++ "(" ++ s ++ ")")
+    (* File info never gets printed *)                                    
+    | METADATA_File_info _ => DList_empty
     end.
   
   #[global] Instance dshowExp : DShow (exp T) :=
@@ -1082,11 +1084,19 @@ tag ::= string constant
 
   #[global] Instance dshowInstrId : DShow instr_id
     := {| dshow := dshow_instr_id |}.
+
+  Fixpoint remove_file_info (md : list (metadata T)) : list (metadata T) :=
+    match md with
+    | [] => []
+    | m::rest => if is_METADATA_File_info m then remove_file_info rest else
+                 m::(remove_file_info rest)
+    end.
   
   Definition dshow_metadata_suffix (md : list (metadata T)) : DString :=
-    match md with
+    let md' := remove_file_info md in
+    match md' with
     | [] => DList_empty
-    | _ => DList_join (map (fun m => sd ", " @@ (dshow_metadata m)) md)
+    | _ => DList_join (map (fun m => sd ", " @@ (dshow_metadata m)) md')
     end.
   
   Definition dshow_id_instr_metadata (inst : instr_id * instr T * list (metadata T)) : DString :=

@@ -89,9 +89,19 @@ Set Contextual Implicit.
   Definition raiseLLVM {E EXC} {A} `{LLVMExcE EXC -< E} (e : EXC) : itree E A :=
     v <- trigger (LLVMExc e);; match v: void with end.
 
-  (* This function can be replaced with print_string during extraction
-     to print the error messages of Throw and (indirectly) ThrowUB. *)
-  Definition print_msg (msg : string) : unit := tt.
+  (* See src/ml/Extract.v for the special handling of these operation. *)
+  (* This function can be replaced with print operations  during extraction
+     to print the error messages of Throw and (indirectly) ThrowUB.
+      - set_loc imperatively sets a string that will be prefixed onto the msg
+        it returns the empty string, but we need to use its result to
+        force extraction 
+      - print_msg call `print_string`
+   *)
+  Definition printer_object : (string -> string) * (string -> unit) :=
+    (fun (_:string) => "", fun (_:string) => tt).
+
+  Definition set_loc : string -> string := (fst printer_object).
+  Definition print_msg : string -> unit := (snd printer_object).
 
   (* Undefined behaviour carries a string. *)
   Variant UBE : Type -> Type :=
@@ -112,7 +122,7 @@ Set Contextual Implicit.
   Variant OOME : Type -> Type :=
   | ThrowOOM : unit -> OOME void.
 
-  (** Since the output type of [ThrowUB] is [void], we can make it an action
+  (** Since the output type of [ThrowOOM] is [void], we can make it an action
     with any return type. *)
   Definition raiseOOM {E : Type -> Type} `{OOME -< E} {X}
              (e : string)

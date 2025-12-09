@@ -29,8 +29,21 @@ let output_ast ast channel =
   let open Ast_printer in
   toplevel_entities channel ast
 
+
+let reset_lexbuf (filename:string) (lnum:int) lexbuf : unit =
+  lexbuf.Lexing.lex_curr_p <- {
+      pos_fname = filename;
+      pos_cnum = 0;
+      pos_bol = 0;
+      pos_lnum = lnum;
+    }
+
 let parse_file filename =
-  read_file filename |> Lexing.from_string |> Llvm_lexer.parse
+  let lexbuf = read_file filename |> 
+               Lexing.from_string
+  in
+  reset_lexbuf filename 1 lexbuf;  (* set the filename *)  
+  Llvm_lexer.parse lexbuf
 
 let ll_files_of_dir path : string list =
   let tmp_file = gen_name "." ".ll_files" ".tmp" in

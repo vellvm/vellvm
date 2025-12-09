@@ -26,7 +26,8 @@ From Vellvm.Handlers Require Export
      UndefinedBehaviour.
 
 From Stdlib Require Import
-  Morphisms.
+  Morphisms
+  String.
 
 (* end hide *)
 

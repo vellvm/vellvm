@@ -171,6 +171,7 @@ Section Endo.
         | METADATA_Node mds => METADATA_Node (List.map endo_metadata mds)
         | METADATA_Pair md1 md2 => METADATA_Pair (endo_metadata md1) (endo_metadata md2)                                            
         | METADATA_Debug sd d => METADATA_Debug (endo sd) (endo d)
+        | METADATA_File_info f => METADATA_File_info f
         end.
 
     
@@ -570,6 +571,7 @@ Section TFunctor.
         | METADATA_Node mds => METADATA_Node (map (ft_metadata U V f) mds)
         | METADATA_Pair md1 md2 => METADATA_Pair (ft_metadata U V f md1) (ft_metadata U V f md2)         
         | METADATA_Debug ds s => METADATA_Debug ds s
+        | METADATA_File_info f => METADATA_File_info f
         end.
           
                

@@ -23,7 +23,22 @@
 (*  ------------------------------------------------------------------------- *)
 
 {
+  open Lexing
   open Llvm_parser
+
+  let reset_lexbuf (filename:string) (lnum:int) lexbuf : unit =
+    lexbuf.lex_curr_p <- {
+      pos_fname = filename;
+      pos_cnum = 0;
+      pos_bol = 0;
+      pos_lnum = lnum;
+    }
+
+  let newline lexbuf =
+    lexbuf.lex_curr_p <- { (lexeme_end_p lexbuf) with
+      pos_lnum = (lexeme_end_p lexbuf).pos_lnum + 1;
+      pos_bol = (lexeme_end lexbuf) }
+
   let str = Camlcoq.coqstring_of_camlstring
   let of_str = Camlcoq.camlstring_of_coqstring
   let coq_N_of_int = Camlcoq.N.of_int
