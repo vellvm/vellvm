@@ -97,11 +97,18 @@ Set Contextual Implicit.
         force extraction 
       - print_msg call `print_string`
    *)
-  Definition printer_object : (string -> string) * (string -> unit) :=
-    (fun (_:string) => "", fun (_:string) => tt).
-
-  Definition set_loc : string -> string := (fst printer_object).
-  Definition print_msg : string -> unit := (snd printer_object).
+  Record printer := mk_printer {
+      printer_set_loc : string -> string ;
+      printer_print_msg : string -> unit ;
+      printer_get_loc : unit -> string ;
+    }.
+  
+  Definition printer_object : printer :=
+    mk_printer (fun (_:string) => "") (fun (_:string) => tt) (fun (_:unit) => "").
+  
+  Definition set_loc : string -> string := printer_object.(printer_set_loc).
+  Definition print_msg : string -> unit := printer_object.(printer_print_msg).
+  Definition get_loc : unit -> string := printer_object.(printer_get_loc).
 
   (* Undefined behaviour carries a string. *)
   Variant UBE : Type -> Type :=

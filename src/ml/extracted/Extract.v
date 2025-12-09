@@ -73,11 +73,14 @@ Extract Constant printer_object => "
       | c :: s -> Bytes.set r pos c; fill (pos + 1) s
     in Bytes.to_string (fill 0 s)
   in
-  let set_loc loc = (loc_state := loc; []) in
-  let print_msg msg =
+  let printer_set_loc loc = (loc_state := loc; []) in
+  let printer_print_msg msg =
     print_string ((camlstring_of_coqstring !loc_state) ^ "": "" ^ (camlstring_of_coqstring msg) ^ ""\n"")
   in
-  (set_loc, print_msg)
+  let printer_get_loc = fun _ -> !loc_state in
+  { printer_set_loc;
+    printer_print_msg;
+    printer_get_loc; }
   ".
 
 (* OCaml pervasive types ---------------------------------------------------- *)

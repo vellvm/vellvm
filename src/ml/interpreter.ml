@@ -114,9 +114,12 @@ let rec step
   | RetF (_, (_, (_, (_, v)))) -> Ok v
   (* The ExternalCallE effect *)
   | VisF (Sum.Coq_inl1 (ExternalCall (t, _, dvs)), _) ->
-      Error (UninterpretedCall ("Call with return type "
-       ^ (Camlcoq.camlstring_of_coqstring (ReprAST.repr_dtyp t))
-       ^ ", " ^ (string_of_int (List.length dvs)) ^ " dvalues."))
+     let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
+     let typ_str = Camlcoq.camlstring_of_coqstring (ReprAST.repr_dtyp t) in
+     let args_str = string_of_int (List.length dvs) in
+     Error (UninterpretedCall
+              (Printf.sprintf "%s: Call with return type %s, %s dvalues."
+                 loc_str typ_str args_str))
   (* Still TODO: Integrate 2nd argument *)
   (* The IO_stdout effect *)
   | VisF (Sum.Coq_inl1 (IO_stdout bytes), k) ->
@@ -130,24 +133,29 @@ let rec step
       step (k (Obj.magic ()))
   (* The OOME effect *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 _msg), _k) ->
-     Error (OutOfMemory "")
+     let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
+     Error (OutOfMemory loc_str)
 
   (* LLVM Exception event *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 _uv)), _k) ->
-     Error (LLVMException "")
+     let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
+     Error (LLVMException loc_str)
 
   (* UBE event *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 _msg))), _k) ->
-     Error (UndefinedBehavior "")
+     let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
+     Error (UndefinedBehavior loc_str)
 
   (* The DebugE effect *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 _msg)))), k) ->
-     (debug "";
+     let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
+     (debug loc_str;
       step (k (Obj.magic DV.DVALUE_None)))
 
   (* The FailureE effect is a failure *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 _msg)))), _) ->
-     Error (Failed "")
+     let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
+     Error (Failed loc_str)
 
 (* The only visible effects from LLVMIO that should propagate to the
    interpreter are: - Call to external functions - Debug *)
