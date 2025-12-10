@@ -273,11 +273,12 @@ define {i32, i1} @llvm.ssub.with.overflow.i32(i32 noundef %0, i32 noundef %1) lo
 
 define {i64, i1} @llvm.ssub.with.overflow.i64(i64 noundef %0, i64 noundef %1) local_unnamed_addr {
   %3 = sub i64 %0, %1
-  %overflow = call i1 @llvm.vellvm.internal.suboverflow.i32(i64 %0, i64 %1)
+  %overflow = call i1 @llvm.vellvm.internal.suboverflow.i64(i64 %0, i64 %1)
   %base = insertvalue {i64, i1} {i64 0, i1 0}, i64 %3, 0
   %fullres = insertvalue {i64, i1} %base, i1 %overflow, 1
   ret {i64, i1} %fullres
 }
+
 
 define void @llvm.lifetime.start.p0i8(i64 %blah, i8* nonnull %foo) {
      ret void
