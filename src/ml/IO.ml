@@ -43,7 +43,8 @@ let parse_file filename =
                Lexing.from_string
   in
   reset_lexbuf filename 1 lexbuf;  (* set the filename *)  
-  Llvm_lexer.parse lexbuf
+  try Llvm_lexer.parse lexbuf with
+  | Failure err -> failwith (Printf.sprintf "Error in file %s: " filename ^ err)
 
 let ll_files_of_dir path : string list =
   let tmp_file = gen_name "." ".ll_files" ".tmp" in
