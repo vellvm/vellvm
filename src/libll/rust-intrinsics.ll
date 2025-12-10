@@ -1135,3 +1135,71 @@ define float @llvm.fmuladd.f32(float %a, float %b, float %c) {
        %y = fadd float %x, %c
        ret float %y
 }
+
+define { i64, i1 } @llvm.usub.with.overflow.i64(i64 noundef %0, i64 noundef %1) local_unnamed_addr {
+  %overflow = icmp ugt i64 %1, %0
+  %res = sub i64 %0, %1
+  %base = insertvalue {i64, i1} {i64 0, i1 0}, i64 %res, 0
+  %fullres = insertvalue {i64, i1} %base, i1 %overflow, 1
+  ret {i64, i1} %fullres
+}
+
+define { i32, i1 } @llvm.usub.with.overflow.i32(i32 noundef %0, i32 noundef %1) local_unnamed_addr {
+  %overflow = icmp ugt i32 %1, %0
+  %res = sub i32 %0, %1
+  %base = insertvalue {i32, i1} {i32 0, i1 0}, i32 %res, 0
+  %fullres = insertvalue {i32, i1} %base, i1 %overflow, 1
+  ret {i32, i1} %fullres
+}
+
+define { i16, i1 } @llvm.usub.with.overflow.i16(i16 noundef %0, i16 noundef %1) local_unnamed_addr {
+  %overflow = icmp ugt i16 %1, %0
+  %res = sub i16 %0, %1
+  %base = insertvalue {i16, i1} {i16 0, i1 0}, i16 %res, 0
+  %fullres = insertvalue {i16, i1} %base, i1 %overflow, 1
+  ret {i16, i1} %fullres
+}
+
+define { i8, i1 } @llvm.usub.with.overflow.i8(i8 noundef %0, i8 noundef %1) local_unnamed_addr {
+  %overflow = icmp ugt i8 %1, %0
+  %res = sub i8 %0, %1
+  %base = insertvalue {i8, i1} {i8 0, i1 0}, i8 %res, 0
+  %fullres = insertvalue {i8, i1} %base, i1 %overflow, 1
+  ret {i8, i1} %fullres
+}
+
+define { i64, i1 } @llvm.uadd.with.overflow.i64(i64 noundef %0, i64 noundef %1) local_unnamed_addr {
+  %max = sub i64 18446744073709551615, %0
+  %overflow = icmp ugt i64 %1, %max
+  %res = add i64 %0, %1
+  %base = insertvalue {i64, i1} {i64 0, i1 0}, i64 %res, 0
+  %fullres = insertvalue {i64, i1} %base, i1 %overflow, 1
+  ret {i64, i1} %fullres
+}
+
+define { i32, i1 } @llvm.uadd.with.overflow.i32(i32 noundef %0, i32 noundef %1) local_unnamed_addr {
+  %max = sub i32 4294967295, %0
+  %overflow = icmp ugt i32 %1, %max
+  %res = add i32 %0, %1
+  %base = insertvalue {i32, i1} {i32 0, i1 0}, i32 %res, 0
+  %fullres = insertvalue {i32, i1} %base, i1 %overflow, 1
+  ret {i32, i1} %fullres
+}
+
+define { i16, i1 } @llvm.uadd.with.overflow.i16(i16 noundef %0, i16 noundef %1) local_unnamed_addr {
+  %max = sub i16 65535, %0
+  %overflow = icmp ugt i16 %1, %max
+  %res = add i16 %0, %1
+  %base = insertvalue {i16, i1} {i16 0, i1 0}, i16 %res, 0
+  %fullres = insertvalue {i16, i1} %base, i1 %overflow, 1
+  ret {i16, i1} %fullres
+}
+
+define { i8, i1 } @llvm.uadd.with.overflow.i8(i8 noundef %0, i8 noundef %1) local_unnamed_addr {
+  %max = sub i8 255, %0
+  %overflow = icmp ugt i8 %1, %max
+  %res = add i8 %0, %1
+  %base = insertvalue {i8, i1} {i8 0, i1 0}, i8 %res, 0
+  %fullres = insertvalue {i8, i1} %base, i1 %overflow, 1
+  ret {i8, i1} %fullres
+}
