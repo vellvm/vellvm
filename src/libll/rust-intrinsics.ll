@@ -65,7 +65,7 @@ define i1 @llvm.vellvm.internal.smuloverflow.i32(i32 noundef %0, i32 noundef %1)
   %12 = sext i32 %1 to i64
   %13 = udiv i32 -2147483648, %0
   %14 = zext i32 %13 to i64
-  %15 = sub nsw i64 0, %14
+  %15 = sub i64 0, %14
   %16 = icmp ugt i64 %15, %12
   br label %34
 
@@ -81,7 +81,7 @@ define i1 @llvm.vellvm.internal.smuloverflow.i32(i32 noundef %0, i32 noundef %1)
   %22 = sext i32 %0 to i64
   %23 = udiv i32 -2147483648, %1
   %24 = zext i32 %23 to i64
-  %25 = sub nsw i64 0, %24
+  %25 = sub i64 0, %24
   %26 = icmp ugt i64 %25, %22
   br label %34
 
@@ -92,7 +92,7 @@ define i1 @llvm.vellvm.internal.smuloverflow.i32(i32 noundef %0, i32 noundef %1)
 29:                                               ; preds = %27
   %30 = sub i32 0, %1
   %31 = udiv i32 2147483647, %30
-  %32 = sub nsw i32 0, %31
+  %32 = sub i32 0, %31
   %33 = icmp sgt i32 %32, %0
   br label %34
 
@@ -145,7 +145,7 @@ define i1 @llvm.vellvm.internal.smuloverflow.i64(i64 noundef %0, i64 noundef %1)
 25:                                               ; preds = %23
   %26 = sub i64 0, %1
   %27 = udiv i64 9223372036854775807, %26
-  %28 = sub nsw i64 0, %27
+  %28 = sub i64 0, %27
   %29 = icmp sgt i64 %28, %0
   br label %30
 
@@ -179,7 +179,7 @@ define i1 @llvm.vellvm.internal.saddoverflow.i32(i32 noundef %0, i32 noundef %1)
 
 7:                                                ; preds = %2
   %8 = icmp slt i32 %1, 0
-  %9 = sub nsw i32 -2147483648, %1
+  %9 = sub i32 -2147483648, %1
   %10 = icmp sgt i32 %9, %0
   %11 = select i1 %8, i1 %10, i1 false
   br label %12
@@ -198,7 +198,7 @@ define i1 @llvm.vellvm.internal.saddoverflow.i64(i64 noundef %0, i64 noundef %1)
 
 7:                                                ; preds = %2
   %8 = icmp slt i64 %1, 0
-  %9 = sub nsw i64 -9223372036854775808, %1
+  %9 = sub i64 -9223372036854775808, %1
   %10 = icmp sgt i64 %9, %0
   %11 = select i1 %8, i1 %10, i1 false
   br label %12
@@ -227,14 +227,14 @@ define {i64, i1} @llvm.sadd.with.overflow.i64(i64 noundef %0, i64 noundef %1) {
 define i1 @llvm.vellvm.internal.suboverflow.i32(i32 noundef %0, i32 noundef %1) {
 2:
   %3 = icmp slt i32 %1, 0
-  %4 = add nsw i32 %1, 2147483647
+  %4 = add i32 %1, 2147483647
   %5 = icmp slt i32 %4, %0
   %6 = select i1 %3, i1 %5, i1 false
   br i1 %6, label %13, label %7
 
 7:                                                ; preds = %2
   %8 = icmp sgt i32 %1, 0
-  %9 = add nsw i32 %1, -2147483648
+  %9 = add i32 %1, -2147483648
   %10 = icmp sgt i32 %9, %0
   %11 = select i1 %8, i1 %10, i1 false
   br label %12
@@ -246,7 +246,7 @@ define i1 @llvm.vellvm.internal.suboverflow.i32(i32 noundef %0, i32 noundef %1) 
 
 define i1 @llvm.vellvm.internal.suboverflow.i64(i64 noundef %0, i64 noundef %1) {
   %3 = icmp slt i64 %1, 0
-  %4 = add nsw i64 %1, 9223372036854775807
+  %4 = add i64 %1, 9223372036854775807
   %5 = icmp slt i64 %4, %0
   %6 = select i1 %3, i1 %5, i1 false
   br i1 %6, label %13, label %7
