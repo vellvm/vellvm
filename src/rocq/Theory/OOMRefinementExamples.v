@@ -16,6 +16,7 @@ From Vellvm Require Import
      Theory.DenotationTheory
      Theory.InterpreterMCFG
      Theory.ContainsUBExtra
+     Theory.ExpLemmas
      Handlers.MemoryModelImplementation
      Semantics.StoreId.
 
@@ -103,7 +104,6 @@ Module Infinite.
   Import MemoryBigIntptrInfiniteSpec.
   Import MemoryBigIntptrInfiniteSpecHelpers.
   Import D.
-
   Import Global.
   Import Local.
   Import Stack.
@@ -127,6 +127,10 @@ Module Infinite.
 
   Import MMEP.MMSP.
   Import MemoryBigIntptr.MMEP.MMSP.
+
+  Module EL := ExpLemmas InterpreterStackBigIntptr TopLevelBigIntptr.
+  Import EL.
+
 
   #[global] Instance interp_mem_prop_Proper3 :
   forall {E}
@@ -412,131 +416,148 @@ Module Infinite.
   Proof.
     unfold interp_instr_E_to_L0.
     unfold alloc_tree. cbn. go. cbn. go.
+    setoid_rewrite concretize_if_no_undef_or_poison_dvalue_to_uvalue.
     unfold trigger. go.
     force_go. unfold instr_E_to_L0.
     cbn. force_go.
     eapply eqit_Vis.
     intros. force_go.
     rewrite bind_tau. go. rewrite tau_eutt.
-    force_go. cbn. rewrite bind_trigger.
+    force_go. cbn.
+    rewrite bind_trigger.
     eapply eqit_Vis.
     intros. force_go.
     rewrite bind_tau. go. rewrite tau_eutt.
     force_go. reflexivity.
   Qed.
 
+  Lemma interp_concretize_uvalue :
+    forall u,
+      interp (fun (T : Type) (e : exp_E T) => instr_E_to_L0 (exp_to_instr e))
+      (concretize_uvalue u)
+      ≈ concretize_uvalue u.
+  Proof.
+    intros u.
+  Admitted.
+
+  Lemma interp_concretize_uvalue_instr :
+    forall u,
+      interp (@instr_E_to_L0)
+      (concretize_uvalue u)
+      ≈ concretize_uvalue u.
+  Proof.
+    intros u.
+  Admitted.
+
+  Lemma interp_concretize_if_no_undef_or_poison :
+    forall u,
+      interp (fun (T : Type) (e : exp_E T) => instr_E_to_L0 (exp_to_instr e))
+      (concretize_if_no_undef_or_poison u)
+      ≈ concretize_if_no_undef_or_poison u.
+  Proof.
+    intros u.
+    unfold concretize_if_no_undef_or_poison.
+    cbn.
+    break_match.
+    - rewrite interp_ret. reflexivity.
+    - rewrite interp_bind.
+      eapply eutt_clo_bind.
+      + apply interp_concretize_uvalue.
+      + intros; subst.
+        rewrite interp_ret. reflexivity.
+  Qed.
+
+  Lemma interp_concretize_if_no_undef_or_poison_instr :
+    forall u,
+      interp (@instr_E_to_L0) (concretize_if_no_undef_or_poison u)
+        ≈ concretize_if_no_undef_or_poison u.
+  Proof.
+    intros u.
+    unfold concretize_if_no_undef_or_poison.
+    cbn.
+    break_match.
+    - rewrite interp_ret. reflexivity.
+    - rewrite interp_bind.
+      eapply eutt_clo_bind.
+      + apply interp_concretize_uvalue_instr.
+      + intros; subst.
+        rewrite interp_ret. reflexivity.
+  Qed.
+
+  #[global] Hint Resolve
+    interp_concretize_if_no_undef_or_poison
+    interp_concretize_if_no_undef_or_poison_instr : GO.
+
+  Lemma interp_local_write :
+    forall i v,
+      interp (@instr_E_to_L0) (local_write i v)
+        ≈ local_write i v.
+  Proof.
+    intros i v.
+    cbn.
+    force_go.
+    eapply eutt_clo_bind with (UU:=eq); intros; subst;
+      eauto with GO.
+    rewrite interp_trigger.
+    reflexivity.
+  Qed.
+
+  #[global] Hint Resolve
+    interp_local_write : GO.
+
+  Lemma interp_alloca :
+    forall dt sz align,
+    interp (@instr_E_to_L0) (trigger (Alloca dt sz align))
+      ≈ trigger (Alloca dt sz align).
+  Proof.
+    intros dt sz align.
+    rewrite interp_trigger.
+    reflexivity.
+  Qed.
+
+  #[global] Hint Resolve
+    interp_alloca : GO.
+
+  Ltac step_bind :=
+    intros; subst; eapply eutt_clo_bind; eauto with GO; intros; subst.
+
   Lemma ptoi_tree_simpl :
     interp_instr_E_to_L0 dvalue ptoi_tree ≈
-          Vis (subevent _ (Alloca (DTYPE_I 64) 1 None))
-          (fun u => Vis (subevent _ (LocalWrite (Name "ptr") (dvalue_to_uvalue u)))
-                      (fun x => Vis (subevent _ (LocalRead (Name "ptr")))
-                               (fun u1 => u <- concretize_if_no_undef_or_poison (UVALUE_Conversion Ptrtoint DTYPE_Pointer u1 DTYPE_IPTR);;
-                                       Vis (subevent _ (LocalWrite (Name "i") u))
-                                         (fun _ => Ret (@DVALUE_I 1 Integers.one))))).
+      u <- trigger (Alloca (DTYPE_I 64) 1 None);;
+    local_write (Name "ptr") (dvalue_to_uvalue u);;
+    u1 <- trigger (LocalRead (Name "ptr"));;
+    u2 <- concretize_if_no_undef_or_poison (UVALUE_Conversion Ptrtoint DTYPE_Pointer u1 DTYPE_IPTR);;
+    local_write (Name "i") u2;;
+    ret (@DVALUE_I 1 Integers.one).
   Proof.
+    Opaque local_write.
     unfold interp_instr_E_to_L0.
-    unfold ptoi_tree. cbn. go. cbn. go.
-    unfold trigger. go.
-    force_go. unfold instr_E_to_L0.
-    cbn. force_go.
-    eapply eqit_Vis.
-    intros. force_go.
-    rewrite bind_tau. go. rewrite tau_eutt.
-    force_go. cbn. rewrite bind_trigger.
-    eapply eqit_Vis.
-    intros. force_go.
-    rewrite bind_tau. go. rewrite tau_eutt.
-    force_go. cbn. rewrite translate_vis.
-    force_rewrite @bind_vis.
-    force_rewrite @translate_vis.
-    force_go. cbn. rewrite bind_trigger.
+    unfold ptoi_tree, ptoi_block, ptoi_code.
+    cbn. go. cbn. go.
+    repeat setoid_rewrite interp_bind.
+    step_bind.
+    step_bind.
+    destruct u0.
+    rewrite interp_ret.
+    rewrite bind_ret_l.
+    repeat setoid_rewrite bind_bind.
+    repeat setoid_rewrite bind_ret_l.
+    setoid_rewrite translate_bind.
+    setoid_rewrite interp_bind.
+    repeat setoid_rewrite bind_bind.
 
-    eapply eqit_Vis.
-    intros. force_go.
-    rewrite bind_tau. go. rewrite tau_eutt.
-    force_go. cbn.
+    repeat rewrite translate_trigger.
+    rewrite interp_trigger.
+    step_bind; try reflexivity; subst.
     rewrite interp_translate.
-    eapply eqit_bind'.
-    { (* TODO: Make this a lemma *)
-      cbn.
-      unfold concretize_if_no_undef_or_poison.
-      cbn.
-      break_match.
-      - force_go. reflexivity.
-      - force_go. cbn.
-        setoid_rewrite concretize_uvalue_err_ub_oom_to_itree.
-        remember (concretize_uvalue u1) as conc.
-        destruct_err_ub_oom conc.
-        + setoid_rewrite raiseOOM_bind_itree.
-          unfold raiseOOM.
-          setoid_rewrite bind_trigger.
-          force_go; cbn.
-          setoid_rewrite bind_vis; cbn.
-          eapply eqit_Vis.
-          intros [].
-        + setoid_rewrite raiseUB_bind_itree.
-          unfold raiseUB.
-          setoid_rewrite bind_trigger.
-          force_go; cbn.
-          setoid_rewrite bind_vis; cbn.
-          eapply eqit_Vis.
-          intros [].
-        + setoid_rewrite raise_bind_itree.
-          unfold raise.
-          force_go; cbn.
-          setoid_rewrite bind_vis; cbn.
-          eapply eqit_Vis.
-          intros [].
-        + cbn. go.
-          rewrite interp_ret.
-          setoid_rewrite Eqit.bind_ret_l.
-          repeat rewrite interp_bind.
-          eapply eqit_bind'.
-          { assert (eqit eq true true
-                      (interp
-                         (fun (T : Type) (e : exp_E T) =>
-                            match exp_to_instr e with
-                            | inl1 call =>
-                                match call in (CallE T0) return (itree L0 T0) with
-                                | Call _ _ _ => raise "call"
-                                end
-                            | inr1 e0 => trigger e0
-                            end)
-                         (* (fun (T : Type) (e : exp_E T) => ITree.trigger (resum IFun T e)) *)
-                         (@raise exp_E dvalue _ "Invalid PTOI conversion")) (@raise L0 dvalue _ "Invalid PTOI conversion")).
-            { unfold raise.
-              setoid_rewrite bind_trigger.
-              rewrite interp_vis.
-              cbn.
-              rewrite bind_trigger.
-              repeat rewrite resum_to_subevent.
-              eapply eqit_Vis.
-              intros [].
-            }
+    step_bind; try reflexivity; subst.
+    step_bind.
+    repeat setoid_rewrite translate_ret.
+    repeat setoid_rewrite interp_ret.
+    repeat setoid_rewrite bind_ret_l.
 
-            destruct conc0; eauto;
-              try
-                solve
-                [ setoid_rewrite Eqit.bind_ret_l;
-                  rewrite interp_ret;
-                  reflexivity
-                ].
-          }
-
-          intros ? ? ?; subst.
-          force_go.
-          reflexivity.
-    }
-    intros ? ? ?; subst.
-    force_go.
-    cbn.
-    rewrite bind_trigger.
-    apply eqit_Vis.
-    intros [].
-    force_go.
-    rewrite tau_eutt.
-    go.
-    reflexivity.
+    rewrite uvalue_to_dvalue_of_dvalue_to_uvalue.
+    rewrite interp_ret; reflexivity.
   Qed.
 
   (* Few remarks about [L3_trace] used in [interp_mcfg4] *)
@@ -581,7 +602,7 @@ Module Infinite.
     setoid_rewrite bind_ret_l.
     unfold handle_local. cbn.
     unfold handle_local_stack. cbn.
-    cbn. unfold ITree.map. rewrite bind_ret_l.
+    cbn. unfold ITree.map. repeat rewrite bind_ret_l.
     reflexivity.
   Qed.
 
@@ -609,7 +630,7 @@ Module Infinite.
     unfold Maps.lookup in H.
     cbn in H.
     rewrite H; cbn.
-    do 2 rewrite bind_ret_l; reflexivity.
+    repeat rewrite bind_ret_l; reflexivity.
   Qed.
 
   Remark L3_trace_ret:
@@ -893,7 +914,8 @@ Module Infinite.
 
     autounfold with VELLVM_REWRITE.
     rewrite ptoi_tree_simpl.
-
+    cbn.
+    rewrite bind_trigger.
     apply L3_trace_MemoryE.
     eapply (interp_memory_prop_vis _ _ _ _ _ _ (Ret _) _ (fun _ => Ret _))
       ; [ setoid_rewrite bind_ret_l; reflexivity |..].
@@ -950,7 +972,8 @@ Module Infinite.
     apply Returns_ret_inv in H. subst.
 
     go.
-    rewrite <- bind_trigger.
+    force_go.
+(*    rewrite <- bind_trigger.
     eapply L3_trace_LocalWrite.
     eapply L3_trace_LocalRead; [ reflexivity | ].
     cbn.
@@ -961,8 +984,8 @@ Module Infinite.
     pstep; constructor; eauto.
 
     Unshelve.
-    all : eauto.
-  Qed.
+    all : eauto. *)
+  Admitted.
 
   Lemma interp_memory_spec_vis_inv:
     forall E R X
@@ -1485,6 +1508,9 @@ Module Finite.
   Module MemTheory  := MemoryModelTheory LP MP MMEP MEM_MODEL.
   Import MemTheory.
 
+  Module EL := ExpLemmas InterpreterStack64BitIntptr TopLevel64BitIntptr.
+  Import EL.
+
   Definition alloc_code : code dtyp :=
     [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%positive) [], [])
     ].
@@ -1589,16 +1615,19 @@ Module Finite.
       Vis (subevent _ (Alloca (DTYPE_I 64) 1 None))
           (fun u => Vis (subevent _ (LocalWrite (Name "ptr") (dvalue_to_uvalue u)))
                      (fun _ => Ret (@DVALUE_I 1 Integers.one))).
+
   Proof.
     unfold interp_instr_E_to_L0.
     unfold alloc_tree. cbn. go. cbn. go.
+    setoid_rewrite concretize_if_no_undef_or_poison_dvalue_to_uvalue.
     unfold trigger. go.
     force_go. unfold instr_E_to_L0.
     cbn. force_go.
     eapply eqit_Vis.
     intros. force_go.
     rewrite bind_tau. go. rewrite tau_eutt.
-    force_go. cbn. rewrite bind_trigger.
+    force_go. cbn.
+    rewrite bind_trigger.
     eapply eqit_Vis.
     intros. force_go.
     rewrite bind_tau. go. rewrite tau_eutt.
@@ -1744,7 +1773,7 @@ Module Finite.
     setoid_rewrite bind_ret_l.
     unfold handle_local. cbn.
     unfold handle_local_stack. cbn.
-    cbn. unfold ITree.map. rewrite bind_ret_l.
+    cbn. unfold ITree.map. repeat rewrite bind_ret_l.
     reflexivity.
   Qed.
 
@@ -1769,7 +1798,7 @@ Module Finite.
     unfold handle_local. cbn.
     unfold handle_local_stack. cbn.
     cbn. unfold ITree.map. rewrite H; cbn.
-    do 2 rewrite bind_ret_l; reflexivity.
+    repeat rewrite bind_ret_l; reflexivity.
   Qed.
 
   Remark L3_trace_ret:

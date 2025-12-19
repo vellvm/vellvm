@@ -83,6 +83,46 @@ Extract Constant printer_object => "
     printer_get_loc; }
   ".
 
+Extract Constant fast_mode_object => "
+  let fast_mode_state = ref false in
+  let fast_mode_set b = (fast_mode_state := b) in
+  let fast_mode_get = fun _ -> !fast_mode_state in
+  { fast_mode_set;
+    fast_mode_get;
+  }
+  ".
+
+Extract Constant globals_object => "
+  let globals_ref = ref [] in
+  let globals_set gs = (globals_ref := gs; ()) in
+  let globals_get = fun _ -> !globals_ref in
+  Obj.magic(fun _ -> { globals_set;
+    globals_get;
+  })
+  ".
+
+Extract Constant locals_object => "
+  let locals_ref = ref [] in
+  let locals_set ls = (locals_ref := ls; ()) in
+  let locals_get = fun _ -> !locals_ref in
+  Obj.magic(fun _ -> { locals_set;
+    locals_get;
+  })
+  ".
+
+Extract Constant local_stack_object => "
+  let local_stack_ref = ref [{ stack_vars = []; stack_handler = None; stack_exc = None; stack_loc = None }] in
+  let local_stack_set ls = (local_stack_ref := match !local_stack_ref with [] -> Stdlib.failwith ""Empty stack, can't set"" | _::xs -> ls :: xs) in
+  let local_stack_get = fun _ -> !local_stack_ref in
+  let local_stack_push ls = local_stack_ref := ls :: !local_stack_ref in
+  let local_stack_pop = fun _ -> local_stack_ref := List.tl !local_stack_ref in
+  Obj.magic({ local_stack_set;
+    local_stack_get;
+    local_stack_push;
+    local_stack_pop;
+  })
+  ".
+
 (* OCaml pervasive types ---------------------------------------------------- *)
 (* Extract Inlined Constant LLVMAst.int => "int". *)
 (* Extract Inlined Constant LLVMAst.float => "float". *)

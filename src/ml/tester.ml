@@ -1,6 +1,6 @@
 (* A main harness for Coq-extracted LLVM Transformations *)
 open Arg
-open Base
+open Vellvm_base
 open Result
 open Driver
 

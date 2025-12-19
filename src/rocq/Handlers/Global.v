@@ -52,6 +52,25 @@ Section Globals.
         end
       end.
 
+  (* See src/ml/Extract.v for the special handling of these operation. *)
+  Record debug_globals := mk_debug_globals {
+      globals_set : map -> unit ;
+      globals_get : unit -> map;
+    }.
+
+  Definition globals_object : debug_globals :=
+    mk_debug_globals (fun (_:map) => tt) (fun (_:unit) => (Maps.empty : map)).
+
+  Definition update_globals_ref {M} `{HM: Monad M} {T} (e : GlobalE k v T) : stateT map M unit :=
+    (gs <- MonadState.get;;
+    ret (globals_object.(globals_set) gs))%monad.
+ 
+  Definition handle_global_debug {E} `{FailureE -< E} : (GlobalE k v) ~> stateT map (itree E) :=
+    fun _ e =>
+      (res <- handle_global e;;
+      update_globals_ref e;;
+      ret res)%monad.
+
   Open Scope monad_scope.
   Section PARAMS.
     Variable (E F G H : Type -> Type).
@@ -68,7 +87,7 @@ Section Globals.
     Definition G_trigger {M} : forall R , G R -> (stateT M (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition interp_global_h := (case_ E_trigger (case_ F_trigger (case_ handle_global G_trigger))).
+    Definition interp_global_h := (case_ E_trigger (case_ F_trigger (case_ handle_global_debug G_trigger))).
     Definition interp_global  : itree Effin ~> stateT map (itree Effout) :=
       interp_state interp_global_h.
 

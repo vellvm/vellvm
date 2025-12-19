@@ -61,6 +61,15 @@ Open Scope N_scope.
 
 (* end hide *)
 
+(* See src/ml/Extract.v for the special handling of these operation. *)
+Record fast_mode := mk_fast_mode {
+                        fast_mode_set : bool -> unit ;
+                        fast_mode_get : unit -> bool ;
+                      }.
+
+Definition fast_mode_object : fast_mode :=
+  mk_fast_mode (fun (_:bool) => tt) (fun (_:unit) => false).
+
 (** ** Uninterpreted denotation
     In this file, we define the first layer of denotation of _VIR_.
 
@@ -170,7 +179,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
   (* Concretize values that are trivially deterministic *)
   Definition concretize_if_no_undef_or_poison {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} (uv : uvalue) : M uvalue
-    := if contains_undef_or_poison uv
+    := if negb (fast_mode_object.(fast_mode_get) tt) && contains_undef_or_poison uv
        then ret uv
        else
          (* Since this `uvalue` is deterministic it should not matter
@@ -194,7 +203,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
      Expressions are denoted as itrees that return a [uvalue].
    *)
 
-  Fixpoint denote_exp' 
+  Fixpoint denote_exp'
            (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
     let eval_texp '(dt,ex) := denote_exp' (Some dt) ex
     in
@@ -445,7 +454,12 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       := interp_either catch_llvm_exc_L0_h.
 
   Definition catch_llvm_exc_L0' : itree L0' ~> eitherT uvalue (itree L0')
-      := interp_either catch_llvm_exc_L0'_h.
+    := interp_either catch_llvm_exc_L0'_h.
+
+  Definition local_write {E} `{LocalE raw_id uvalue -< E} `{FailureE -< E} `{UBE -< E} `{OOME -< E}
+    (id : raw_id) (uv : uvalue) : itree E unit :=
+    uv' <- concretize_if_no_undef_or_poison uv;;
+    trigger (LocalWrite id uv').
 
   Definition denote_cmpxchg id cpx : itree instr_E unit :=
     (* SAZ: This will have to be revisited when we have a truly concurrent semantics. *)
@@ -458,12 +472,12 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
            the types are the same, but doesn't check their specific type.
      *)
     if (dtyp_eq_dec cmp_ty new_ty) then
-      
+
       (* evaluate the arguments to the instruction *)
       ptr_uv <- translate exp_to_instr (denote_exp (Some ptr_ty) ptr_val) ;;
       cmp_uv <- translate exp_to_instr (denote_exp' (Some cmp_ty) cmp_val) ;;
       new_uv <- translate exp_to_instr (denote_exp' (Some cmp_ty) new_val) ;;
-      
+
       (* Perform the load - load addresses must be unique *)
       ptr_dv <- concretize_or_pick_unique ptr_uv;;
       loaded_uv <- trigger (Load cmp_ty ptr_dv);;
@@ -474,23 +488,21 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       match dv with
       | @DVALUE_I 1 comparison_bit =>
           if equ comparison_bit one then
-            
+
             (* They compared as equal: perform the write to memory *)
             trigger (Store cmp_ty ptr_dv new_uv) ;;
             (* return a struct with the loaded value and "true" *)
             let ret_uv := UVALUE_Struct [loaded_uv; @UVALUE_I 1 one] in
-            trigger (LocalWrite id ret_uv);;
-            ret tt
+            local_write id ret_uv
           else
             (* They compared as distinct: do not perform the write to memory *)
-            (* return a struct with the loaded value and "false" *)                
+            (* return a struct with the loaded value and "false" *)
             let ret_uv := UVALUE_Struct [loaded_uv; @UVALUE_I 1 zero] in
-            trigger (LocalWrite id ret_uv);;
-            ret tt
+            local_write id ret_uv
       | DVALUE_Poison dt => raiseUB ("comparing poison in atomiccmpxchg.")
       | _ => raise ("Br got non-bool value")
       end
-    else 
+    else
       raise ("Ill-typed atomiccmpxchg").
 
 
@@ -502,10 +514,10 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
            so we set it to false.
   *)
   Definition denote_atomic_rmw_operation a_op (pv : uvalue) (val : uvalue) : itree instr_E uvalue :=
-    match a_op with      
+    match a_op with
     | Axchg =>
         (* xchg: *ptr = val *)
-        ret val   
+        ret val
     | Aadd =>
         (* add: *ptr = *ptr + val *)
         ret (UVALUE_IBinop (Add false false) pv val)
@@ -528,7 +540,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
             (* SAZ: Is this the best way to get a UValue with 0xFFFF..FFFF bit pattern? *)
             ret (UVALUE_IBinop (Sub false false)
                    (@UVALUE_I sz (@repr (@bit_int sz) _ (@max_unsigned (@bit_int sz) _)))
-                   (UVALUE_IBinop And pv val))            
+                   (UVALUE_IBinop And pv val))
         | _ => raise ("atomicrmw nand of non-integer value")
         end
     | Afadd =>
@@ -550,8 +562,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | Ausub_cond
     | Ausub_sat => raise ("Unsupported atomicrwm operation")
     end.
-    
-  
+
   Definition denote_atomicrmw id armw : itree instr_E unit :=
     let '(ptr_ty, ptr_val) := armw.(a_ptr) in
     let '(a_ty, a_val) := armw.(a_val) in
@@ -560,7 +571,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     (* evaluate the arguments to the instruction *)
     ptr_uv <- translate exp_to_instr (denote_exp (Some ptr_ty) ptr_val) ;;
     a_uv <- translate exp_to_instr (denote_exp' (Some a_ty) a_val) ;;
-    
+
     (* Perform the load - load addresses must be unique *)
     ptr_dv <- concretize_or_pick_unique ptr_uv;;
     loaded_uv <- trigger (Load a_ty ptr_dv);;
@@ -569,12 +580,12 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     (* Perform the store *)
     trigger (Store a_ty ptr_dv stored_uv) ;;
-    
+
     (* The result is the original value loaded from ptr before the modification *)
-    trigger (LocalWrite id loaded_uv);;
+    local_write id loaded_uv;;
     ret tt.
 
-  
+
   (* An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
     (i: (instr_id * instr dtyp * list (metadata dtyp))) (varargs : option ADDR.addr) : itree instr_E unit :=
@@ -592,7 +603,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     | (IId id, INSTR_Op op) =>
         uv <- translate exp_to_instr (denote_op op) ;;
-        trigger (LocalWrite id uv) ;;
+        local_write id uv ;;
         ret tt
     (* Allocation *)
     | (IId id, INSTR_Alloca dt annotations) =>
@@ -615,12 +626,12 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
         match num_elements with
         | None =>
             dv <- trigger (Alloca dt 1 align);;
-            trigger (LocalWrite id (dvalue_to_uvalue dv))
+            local_write id (dvalue_to_uvalue dv)
         | Some (t, num_exp) =>
             un <- translate exp_to_instr (denote_exp (Some t) num_exp);;
             n <- concretize_or_pick_unique un;;
             dv <- trigger (Alloca dt (Z.to_N (dvalue_int_unsigned n)) align);;
-            trigger (LocalWrite id (dvalue_to_uvalue dv))
+            local_write id (dvalue_to_uvalue dv)
         end;;
         ret tt
 
@@ -630,7 +641,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       (* Load addresses must be unique *)
       da <- concretize_or_pick_unique ua;;
       uv <- trigger (Load dt da);;
-      trigger (LocalWrite id uv) ;;
+      local_write id uv ;;
       ret tt
 
     (* Store *)
@@ -648,7 +659,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     | (_, INSTR_Store _ _ _) => raise (err_loc ++ ": ILL-FORMED itree ERROR: Store to non-void ID")
 
     (* Call *)
-    (* TODO: technically operand bundles can affect semantics *)                                     
+    (* TODO: technically operand bundles can affect semantics *)
     | (pt, INSTR_Call (dt, f) args _ _) =>
       uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) (List.map fst args) ;;
       returned_value <-
@@ -704,7 +715,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       | IVoid _ =>
           ret tt
       | IId id  =>
-          trigger (LocalWrite id returned_value);;
+          local_write id returned_value;;
           ret tt
       end
 
@@ -721,10 +732,10 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
         trigger (Store DTYPE_Pointer ptr_to_args (dvalue_to_uvalue args'));;
         match pt with
         | IVoid _ => ret tt
-        | IId id  => trigger (LocalWrite id retv);;
+        | IId id  => local_write id retv;;
                      ret tt
         end
-          
+
     | (IId id, INSTR_AtomicCmpXchg cpx) =>
         denote_cmpxchg id cpx
 
@@ -733,7 +744,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       (* TODO: revisit with a proper concurrenc model *)
 
     | (_, INSTR_Fence _ _) => ret tt
-                       
+
     (* Currently unhandled itree instructions *)
     | (_, INSTR_LandingPad _ _ _) => raise (err_loc ++ ": Unsupported INSTR_Landingpad")
     (* Error states *)
@@ -825,12 +836,12 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       | inr returned_value =>
           match iid with
           | IVoid _ => ret tt
-          | IId id  => trigger (LocalWrite id returned_value)
+          | IId id  => local_write id returned_value
           end;;
           ret (inl to_label)
       end
 
-    | TERM_Resume (t, expr) => 
+    | TERM_Resume (t, expr) =>
       exn <- translate exp_to_instr (denote_exp (Some t) expr);;
       raiseLLVM exn
 
@@ -858,7 +869,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     dvs <- map_monad
              (fun x => translate exp_to_instr (denote_phi bid_from x))
              phis;;
-    map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
+    map_monad (fun '(id,dv) => local_write id dv) dvs;;
     ret tt.
 
   (* A block ends with a terminator, it either jumps to another block,

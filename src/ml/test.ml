@@ -8,7 +8,7 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-open Base
+open Vellvm_base
 open Driver
 
 open Assert

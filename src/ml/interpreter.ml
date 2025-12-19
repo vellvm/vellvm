@@ -101,13 +101,16 @@ let debug (msg : string) =
 
 let current_line = ref (Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()))
 
-let rec step
-    (m :
+let single_step (m :
       ( 'a coq_L4
       , MMEP.MMSP.coq_MemState
         * ( StoreId.store_id
           * ((lstack_frame * lstack) * (global_env * DV.dvalue)) ) )
-      itree ) : (DV.dvalue, exit_condition) result =
+        itree ) : (( 'a coq_L4
+      , MMEP.MMSP.coq_MemState
+        * ( StoreId.store_id
+          * ((lstack_frame * lstack) * (global_env * DV.dvalue)) ) )
+        itree, (DV.dvalue, exit_condition) result) Either.t =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
@@ -119,62 +122,67 @@ let rec step
              current_line := loc_str
            end
      end;
-     step x
+     Either.left x
   (* SAZ: Could inspect the memory or stack here too. *)
   (* We finished the computation *)
-  | RetF (_, (_, (_, (_, v)))) -> Ok v
+  | RetF (_, (_, (_, (_, v)))) -> Either.right (Ok v)
   (* The ExternalCallE effect *)
   | VisF (Sum.Coq_inl1 (ExternalCall (t, _, dvs)), _) ->
      let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
      let typ_str = Camlcoq.camlstring_of_coqstring (ReprAST.repr_dtyp t) in
      let args_str = string_of_int (List.length dvs) in
-     Error (UninterpretedCall
-              (Printf.sprintf "%s: Call with return type %s, %s dvalues."
-                 loc_str typ_str args_str))
+     Either.right
+       (Error (UninterpretedCall
+                 (Printf.sprintf "%s: Call with return type %s, %s dvalues."
+                    loc_str typ_str args_str)))
   (* Still TODO: Integrate 2nd argument *)
   (* The IO_stdout effect *)
   | VisF (Sum.Coq_inl1 (IO_stdout bytes), k) ->
       let str = string_of_bytes bytes in
       output_bytes stdout str ;
-      step (k (Obj.magic ()))
+      Either.left (k (Obj.magic ()))
   (* The IO_stderr effect *)
   | VisF (Sum.Coq_inl1 (IO_stderr bytes), k) ->
       let str = string_of_bytes bytes in
       output_bytes stderr str ;
-      step (k (Obj.magic ()))
+      Either.left (k (Obj.magic ()))
   (* The OOME effect *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 _msg), _k) ->
      let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
-     Error (OutOfMemory loc_str)
+     Either.right (Error (OutOfMemory loc_str))
 
   (* LLVM Exception event *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 _uv)), _k) ->
      let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
-     Error (LLVMException loc_str)
+     Either.right (Error (LLVMException loc_str))
 
   (* UBE event *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 _msg))), _k) ->
      let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
-     Error (UndefinedBehavior loc_str)
+     Either.right (Error (UndefinedBehavior loc_str))
 
   (* The DebugE effect *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 _msg)))), k) ->
      let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
      (debug loc_str;
-      step (k (Obj.magic DV.DVALUE_None)))
+      Either.left ((k (Obj.magic DV.DVALUE_None))))
 
   (* The FailureE effect is a failure *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 _msg)))), _) ->
      let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
-     Error (Failed loc_str)
+     Either.right (Error (Failed loc_str))
 
-(* The only visible effects from LLVMIO that should propagate to the
-   interpreter are: - Call to external functions - Debug *)
-
-(* | Call(_, f, _) ->
- *   (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n"
- *      (Camlcoq.camlstring_of_coqstring f));
- *   step (k (Obj.magic (DV.DVALUE_I64 VellvmIntegers.Int64.zero))) *)
+let rec step
+    (m :
+      ( 'a coq_L4
+      , MMEP.MMSP.coq_MemState
+        * ( StoreId.store_id
+          * ((lstack_frame * lstack) * (global_env * DV.dvalue)) ) )
+      itree ) : (DV.dvalue, exit_condition) result =
+  let open ITreeDefinition in
+  match single_step m with
+  | Either.Left x -> step x
+  | Either.Right res -> res
 
 (** Interpret an LLVM program, returning a result that contains either the
     dvalue result returned by the LLVM program, or an error message.

@@ -42,6 +42,8 @@ From Vellvm Require Import
      Utils.MonadExcLaws
      QC.ShowAST.
 
+Import DList.
+
 Require Import Stdlib.Program.Equality.
 Require Import Vellvm.Utils.VellvmRelations.
 
@@ -139,16 +141,16 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
   Fixpoint show_dvalue (dv : dvalue) : string :=
     match dv with
-    | DVALUE_Addr a => "<addr>"
+    | DVALUE_Addr a => "addr " ++ A.show_addr a
     | DVALUE_I sz x => "i" ++ show (Zpos sz) ++ " " ++ show (unsigned x)
-    | DVALUE_IPTR x => "<intptr>"
+    | DVALUE_IPTR x => "intptr " ++ show (IP.to_Z x)
     | DVALUE_Double x => "double " ++ show x
     | DVALUE_Float x => "float " ++ show x
     | DVALUE_Poison t => "poison[" ++ show_dtyp t ++ "]"
     | DVALUE_Oom t => "oom[" ++ show_dtyp t ++ "]"
     | DVALUE_None => "none"
     | DVALUE_Struct fields => "{" ++ String.concat ", " (map show_dvalue fields) ++ "}"
-    | DVALUE_Packed_struct fields => "{<" ++ String.concat ", " (map show_dvalue fields) ++ ">}"
+    | DVALUE_Packed_struct fields => "<{" ++ String.concat ", " (map show_dvalue fields) ++ "}>"
     | DVALUE_Array _ elts => "["  ++ String.concat ", " (map show_dvalue elts) ++ "]"
     | DVALUE_Vector _ elts => "<"  ++ String.concat ", " (map show_dvalue elts) ++ ">"
     end.
@@ -593,6 +595,70 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_ConcatBytes      (uvs : list uvalue) (dt : dtyp)
   .
   Set Elimination Schemes.
+
+  (* TODO: Move this *)
+  Definition sd := string_to_DString.
+
+  (* TODO: Move this *)
+  Instance DShow_Z : DShow Z.
+  split.
+  intros x.
+  apply (sd (show x)).
+  Defined.
+
+  (* TODO: Move this *)
+  Instance DShow_dtyp : DShow dtyp.
+  split.
+  intros x.
+  apply (sd (show_dtyp x)).
+  Defined.
+
+  #[global] Instance DShow_N : DShow N.
+  split; intros x.
+  apply (sd (show x)).
+  Defined.
+
+  Fixpoint dshow_uvalue (uv : uvalue) : DString :=
+    match uv with
+    | UVALUE_Addr a => sd "ptr " @@ sd (A.show_addr a)
+    | UVALUE_I sz x => sd "i" @@ dshow (Zpos sz) @@ sd " " @@ dshow (unsigned x)
+    | UVALUE_IPTR x => sd "intptr " @@ dshow (IP.to_Z x)
+    | UVALUE_Double x => sd "double " @@ sd (show x)
+    | UVALUE_Float x => sd "float " @@ sd (show x)
+    | UVALUE_Undef t => sd "undef[" @@ dshow t @@ sd "]"
+    | UVALUE_Poison t => sd "poison[" @@ dshow t @@ sd "]"
+    | UVALUE_Oom t => sd "oom[" @@ dshow t @@ sd "]"
+    | UVALUE_None => sd "none"
+    | UVALUE_Struct fields => sd "{" @@ dconcat (sd ", ") (map dshow_uvalue fields) @@ sd "}"
+    | UVALUE_Packed_struct fields => sd "<{" @@ dconcat (sd ", ") (map dshow_uvalue fields) @@ sd "}>"
+    | UVALUE_Array t elts => sd "[" @@ dconcat (sd ", ") (map dshow_uvalue elts) @@ sd "]"
+    | UVALUE_Vector t elts => sd "<" @@ dconcat (sd ", ") (map dshow_uvalue elts) @@ sd ">"
+    | UVALUE_IBinop iop v1 v2 => sd (show_ibinop iop) @@ sd " " @@ dshow_uvalue v1 @@ sd " " @@ dshow_uvalue v2
+    | UVALUE_ICmp s cmp v1 v2 => sd (show_icmp cmp) @@ sd " " @@ sd (show s) @@ sd " " @@ dshow_uvalue v1 @@ sd " " @@ dshow_uvalue v2
+    | UVALUE_FBinop fop fm v1 v2 => sd (show_fbinop fop) @@ sd " " @@ dshow_uvalue v1 @@ sd " " @@ dshow_uvalue v2
+    | UVALUE_FCmp cmp v1 v2 => sd (show_fcmp cmp) @@ sd " " @@ dshow_uvalue v1 @@ sd " " @@ dshow_uvalue v2
+    | UVALUE_Conversion conv t_from v t_to => sd (show_conversion_type conv) @@ sd " " @@ dshow t_from @@ sd " " @@ dshow_uvalue v @@ sd " " @@ dshow t_to
+    | UVALUE_GetElementPtr t ptrval idxs =>
+        sd "getelementptr " @@ dshow t @@ sd " " @@ dshow_uvalue ptrval @@ sd " ["  @@ dconcat (sd ", ") (map dshow_uvalue idxs) @@ sd "]"
+    | UVALUE_ExtractElement vec_typ vec idx =>
+        sd "extractelement " @@ dshow vec_typ @@ sd " " @@ dshow_uvalue vec @@ sd " " @@ dshow_uvalue idx
+    | UVALUE_InsertElement vec_typ vec elt idx =>
+        sd "insertelement " @@ dshow vec_typ @@ sd " " @@ dshow_uvalue vec @@ sd " " @@ dshow_uvalue elt @@ sd " " @@ dshow_uvalue idx
+    | UVALUE_ShuffleVector vec_typ vec1 vec2 idxmask =>
+        sd "shufflevector " @@ dshow vec_typ @@ sd " " @@ dshow_uvalue vec1 @@ sd " " @@ dshow_uvalue vec2 @@ sd " " @@ dshow_uvalue idxmask
+    | UVALUE_ExtractValue vec_typ vec idxs =>
+        sd "extractvalue " @@ dshow vec_typ @@ sd " " @@ dshow_uvalue vec @@ sd " " @@ dshow idxs
+    | UVALUE_InsertValue vec_typ vec elt_typ elt idxs =>
+        sd "insertvalue " @@ dshow vec_typ @@ sd " " @@ dshow_uvalue vec @@ sd " " @@ dshow elt_typ @@ sd " " @@ dshow_uvalue elt @@ sd " " @@ dshow idxs
+    | UVALUE_Select cnd v1 v2 =>
+        sd "select " @@ dshow_uvalue cnd @@ sd " " @@ dshow_uvalue v1 @@ sd " " @@ dshow_uvalue v2
+    | UVALUE_ExtractByte uv dt idx sid =>
+        sd "extractbyte " @@ dshow_uvalue uv @@ sd " " @@ dshow dt @@ sd " " @@ dshow idx @@ sd " " @@ dshow sid
+    | UVALUE_ConcatBytes uvs dt =>
+        sd "concatbytes " @@ dshow dt @@ sd " [" @@ dconcat (sd ", ") (map dshow_uvalue uvs) @@ sd "]"
+    end.
+  
+  Definition show_uvalue (uv : uvalue) : string := DString_to_string (dshow_uvalue uv).
 
   Fixpoint uvalue_measure (uv : uvalue) : nat :=
     match uv with

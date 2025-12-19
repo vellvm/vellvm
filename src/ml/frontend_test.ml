@@ -1,6 +1,6 @@
-;; open Base.Assert
-;; open Base.Platform
-;; open Base.IO
+;; open Vellvm_base.Assert
+;; open Vellvm_base.Platform
+;; open Vellvm_base.IO
 
 let parse_pp_test path =
   let _ = verb @@ Printf.sprintf "* processing file: %s\n" path in

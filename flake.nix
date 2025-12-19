@@ -86,6 +86,7 @@
             buildInputs = [ clang
                             pkgs.coq # Needed to make proof general happy for development.
                             libllvm
+                            pkgs.lldb
                             rocq.ocamlPackages.utop
                             rocq.ocamlPackages.bisect_ppx
                             rocq.ocamlPackages.ppxlib

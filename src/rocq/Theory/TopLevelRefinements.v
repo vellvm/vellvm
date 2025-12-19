@@ -238,19 +238,19 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Definition model_to_L2 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs2 L0_trace [] (Build_stack_frame [] None None,[]).
+      ℑs2 L0_trace [] (Build_stack_frame [] None None None,[]).
 
     Definition model_to_L3 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs3 (refine_res2) L0_trace [] (Build_stack_frame [] None None,[]) 0 initial_memory_state.
+      ℑs3 (refine_res2) L0_trace [] (Build_stack_frame [] None None None,[]) 0 initial_memory_state.
 
     Definition model_to_L4 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs4 (refine_res2) (refine_res3) L0_trace [] (Build_stack_frame [] None None,[]) 0 initial_memory_state.
+      ℑs4 (refine_res2) (refine_res3) L0_trace [] (Build_stack_frame [] None None None,[]) 0 initial_memory_state.
 
     Definition model_to_L5 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs5 (refine_res2) (refine_res3) L0_trace [] (Build_stack_frame [] None None,[]) 0 initial_memory_state.
+      ℑs5 (refine_res2) (refine_res3) L0_trace [] (Build_stack_frame [] None None None,[]) 0 initial_memory_state.
 
     (**
    Which leads to five notion of equivalence of [mcfg]s.

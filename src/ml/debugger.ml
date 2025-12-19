@@ -1,0 +1,228 @@
+open InterpretationStack.InterpreterStackBigIntptr.LLVM.MEM
+
+open InterpretationStack.InterpreterStackBigIntptr.LLVM.Stack
+
+open InterpretationStack.InterpreterStackBigIntptr.LLVM.Global
+
+open InterpretationStack.InterpreterStackBigIntptr.LP.Events
+
+open Format
+open ITreeDefinition
+open Result
+open Interpreter
+
+let string_of_dvalue (d : DV.dvalue) = Camlcoq.camlstring_of_coqstring (DV.show_dvalue d)
+let string_of_uvalue (d : DV.uvalue) = Camlcoq.camlstring_of_coqstring (DV.show_uvalue d)
+
+type file_location =
+  { file : string;
+    line_start : int option;
+    column_start : int option;
+    line_end : int option;
+    column_end : int option;
+  }
+
+let show_int_option lo =
+  match lo with
+  | None -> ""
+  | Some x -> string_of_int x
+
+let show_file_location fl =
+  match fl with
+  | { file; line_start; column_start; line_end; column_end } ->
+      file ^ ":" ^ show_int_option line_start ^ "." ^ show_int_option column_start ^ "-" ^ show_int_option line_end ^ "." ^ show_int_option column_end
+
+type breakpoint = BreakpointLoc of file_location
+
+let show_breakpoint bp =
+  match bp with
+  | BreakpointLoc fl -> show_file_location fl
+
+type debug_state =
+  { breakpoints : (int, breakpoint) Hashtbl.t;
+    mutable max_breakpoint : int;
+  }
+
+let last_line = ref (Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()))
+let current_line = ref (Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()))
+let state = ref { breakpoints = Hashtbl.create 0; max_breakpoint = 0; }
+
+let debug_raw_step m =
+  (match single_step m with
+  | Either.Left x ->
+     let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
+     last_line := !current_line;
+     current_line := loc_str;
+     Either.Left x
+  | res -> res)
+
+(* Step will step into function calls *)
+let rec step m =
+  (match debug_raw_step m with
+  | Either.Left x ->
+     if !current_line = "" || !current_line = !last_line
+     then step x
+     else Either.Left x
+  | res -> res)
+
+(* Next will skip over function calls *)
+let rec next_helper level m =
+  match step m with
+  | Either.Left x ->
+     let new_stack_level = List.length (Stack.local_stack_object.local_stack_get ()) in
+     if new_stack_level = level
+     then Either.Left x
+     else next_helper level x
+  | res -> res
+
+let rec next m =
+  let stack_level = List.length (Stack.local_stack_object.local_stack_get ()) in
+  next_helper stack_level m
+
+let location_parse loc =
+  let r = Str.regexp {|^\[\([^:]*\):\([0-9]+\)\.\([0-9]+\)-\([0-9]+\)\.\([0-9]+\)\]$|} in
+  if Str.string_match r loc 0
+  then
+    (* Successful parse *)
+    Some { file = Str.matched_group 1 loc
+         ; line_start = Some (int_of_string (Str.matched_group 2 loc))
+         ; column_start = Some (int_of_string (Str.matched_group 3 loc))
+         ; line_end = Some (int_of_string (Str.matched_group 4 loc))
+         ; column_end = Some (int_of_string (Str.matched_group 5 loc))
+      }
+  else None
+
+let option_wild_match x y =
+  match x with
+  | Some _ -> x = y
+  | None -> true
+
+let file_location_match bp l =
+  bp.file = l.file &&
+    option_wild_match bp.line_start l.line_start &&
+    option_wild_match bp.column_start l.column_start &&
+    option_wild_match bp.line_end l.line_end &&
+    option_wild_match bp.column_end l.column_end
+
+(* Check if the current line matches any active breakpoints *)
+let breakpoint_match loc =
+  match location_parse loc with
+  | Some l ->
+     let bps = Hashtbl.to_seq_values !state.breakpoints in
+     Stdlib.Seq.exists
+       (fun x ->
+         match x with
+         | BreakpointLoc bp ->
+            file_location_match bp l) bps
+  | None -> false
+
+let rec continue m =
+  (* Use next to skip past any current breakpoints *)
+  (match next m with
+  | Either.Left x ->
+     if breakpoint_match !current_line
+     then Either.Left x
+     else continue x
+  | res -> res)
+
+type debug_command =
+  Next | Step | Continue | Quit | AddBreakpoint of (string * int) |
+  PrintGlobals | PrintLocals | PrintBreakpoints | RemoveBreakpoint of int |
+  StackTrace
+
+let rec read_command () =
+  Printf.printf ("(vellvm)> ");
+  let str = read_line () in
+  match str with
+  | "n" -> Next
+  | "s" -> Step
+  | "c" -> Continue
+  | "q" -> Quit
+  | "pg" -> PrintGlobals
+  | "pl" -> PrintLocals
+  | "pb" -> PrintBreakpoints
+  | "bt" -> StackTrace
+  | "st" -> StackTrace
+  | "rb" ->
+     let bp = read_int () in
+     RemoveBreakpoint bp
+  | "b" ->
+     let file = read_line () in
+     let line = read_int () in
+     AddBreakpoint (file, line)
+  | _ -> Printf.printf "Invalid command.\n"; read_command ()
+
+let print_stack_frame_vars (sf : (DV.dvalue, (LLVMAst.raw_id * DV.uvalue) list) Stack.stack_frame) =
+  List.iter (fun (k, v) ->
+      Printf.printf "%s -> %s\n" (Camlcoq.camlstring_of_coqstring (ShowAST.show_raw_id k)) (string_of_uvalue v)) sf.stack_vars
+
+let print_stack_vars (s : ((DV.dvalue, (LLVMAst.raw_id * DV.uvalue) list) Stack.stack_frame) list) =
+  List.iteri (fun n (sf : (DV.dvalue, (LLVMAst.raw_id * DV.uvalue) list) Stack.stack_frame) ->
+      Printf.printf "Stack frame #%d (%s):\n" n (match sf.stack_loc with None -> "_" | Some l -> Camlcoq.camlstring_of_coqstring l);
+      print_stack_frame_vars sf) s
+
+let print_stack_frames s =
+  List.iteri (fun n (sf : (DV.dvalue, (LLVMAst.raw_id * DV.uvalue) list) Stack.stack_frame) ->
+      Printf.printf "#%d: %s\n" n (match sf.stack_loc with None -> "_" | Some l -> Camlcoq.camlstring_of_coqstring l)) s
+
+let rec debugger
+    (m :
+      ( 'a coq_L4
+      , MMEP.MMSP.coq_MemState
+        * ( StoreId.store_id
+          * ((lstack_frame * lstack) * (global_env * DV.dvalue)) ) )
+        itree ) : (DV.dvalue, exit_condition) result =
+  let command = read_command () in
+  match command with
+  | Next ->
+     (match next m with
+     | Either.Left x -> debugger x
+     | Either.Right res -> res)
+  | Step ->
+     (match step m with
+     | Either.Left x -> debugger x
+     | Either.Right res -> res)
+  | Continue ->
+     (match continue m with
+     | Either.Left x -> debugger x
+     | Either.Right res -> res)
+  | PrintGlobals ->
+     List.fold_left (fun _ p ->
+         match p with
+         | (k, v) ->
+            Printf.printf "%s -> %s\n" (Camlcoq.camlstring_of_coqstring (ShowAST.show_raw_id k)) (string_of_dvalue v)) () ((Global.globals_object (FMapAList.coq_Map_alist AstLib.eq_dec_raw_id)).globals_get ());
+     debugger m
+  | PrintLocals ->
+     let stack = Stack.local_stack_object.local_stack_get () in
+     print_stack_vars stack;
+     debugger m
+  | StackTrace ->
+     let stack = Stack.local_stack_object.local_stack_get () in
+     print_stack_frames stack;
+     debugger m
+  | AddBreakpoint (file, line) ->
+     Hashtbl.add !state.breakpoints !state.max_breakpoint (BreakpointLoc { file = file; line_start = Some line; column_start = None; line_end = None; column_end = None });
+     Printf.printf "Added breakpoint %d\n" !state.max_breakpoint;
+     !state.max_breakpoint <- !state.max_breakpoint + 1;
+     debugger m
+  | RemoveBreakpoint bp ->
+     Hashtbl.remove !state.breakpoints bp;
+     debugger m
+  | PrintBreakpoints ->
+     let bps = Hashtbl.to_seq !state.breakpoints in
+     Stdlib.Seq.iter (fun (k, v) -> Printf.printf "%s -> %s\n" (string_of_int k) (show_breakpoint v)) bps;
+     debugger m
+  | Quit -> Error (Failed "Quitting")
+
+let vellvm_debugger
+      (args : string list)
+      (prog :
+         ( LLVMAst.typ
+         , LLVMAst.typ LLVMAst.block * LLVMAst.typ LLVMAst.block list )
+           LLVMAst.toplevel_entity
+           list )
+    : (DV.dvalue, exit_condition) result =
+  Out_channel.set_buffered stdout false;
+  Out_channel.set_buffered stderr false;
+  let prog = (TopLevel.TopLevelBigIntptr.interpreter (List.map Camlcoq.coqstring_of_camlstring args) prog) in
+  debugger prog

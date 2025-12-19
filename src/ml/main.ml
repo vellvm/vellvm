@@ -10,7 +10,7 @@
 
 (* A main harness for Coq-extracted LLVM Transformations *)
 open Arg
-open Base
+open Vellvm_base
 open Result
 open Assert
 open Driver
@@ -75,18 +75,11 @@ let compare_tgt_for_poison src tgt : unit =
 (* TODO: This could be reformated to make it cleaner - move some of it to
    assertion.ml?. *)
 (* SAZ: why does this duplicate a lot of code in tester.ml? *)
-let make_test name ll_ast t : (string * assertion) option =
+let make_test_h run name ll_ast t : (string * assertion) option =
   let open Format in
   (* TODO: ll_ast is of type list (toplevel_entity typ (block typ * list
      (block typ))) *)
   (* Can just replace this with the newer ones? *)
-  let run dtyp entry args ll_ast =
-    let linked_ast = (TopLevel.TopLevelBigIntptr.link_all !Driver.link_files ll_ast) in
-    Interpreter.step
-      (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp
-         entry
-         (Monad.ret (Obj.magic ITreeDefinition.coq_Monad_itree) args) linked_ast )
-  in
   let run_to_value dtyp entry args ll_ast () : DV.dvalue =
     match run dtyp entry args ll_ast with
     | Ok dv -> dv
@@ -205,7 +198,27 @@ let make_test name ll_ast t : (string * assertion) option =
         in
         Some (str, assertion)
       else None
-      
+
+let make_test name ll_ast t : (string * assertion) option =
+  let run dtyp entry args ll_ast =
+    let linked_ast = (TopLevel.TopLevelBigIntptr.link_all !Driver.link_files ll_ast) in
+    Interpreter.step
+      (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp
+         entry
+         (Monad.ret (Obj.magic ITreeDefinition.coq_Monad_itree) args) linked_ast )
+  in
+  make_test_h run name ll_ast t
+
+let make_test_debug name ll_ast t : (string * assertion) option =
+  let run dtyp entry args ll_ast =
+    let linked_ast = (TopLevel.TopLevelBigIntptr.link_all !Driver.link_files ll_ast) in
+    Debugger.debugger
+      (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp
+         entry
+         (Monad.ret (Obj.magic ITreeDefinition.coq_Monad_itree) args) linked_ast )
+  in
+  make_test_h run name ll_ast t
+
 let test_pp_dir dir =
   let _ = Printf.printf "===> RUNNING PRETTY PRINTING TESTS IN: %s\n%!" dir in
   Platform.configure () ;
@@ -245,7 +258,7 @@ let link_dir dir =
   let files = Test.ll_files_of_dir dir in
   List.iter Driver.add_link_file files
 
-let test_file path =
+let test_file_h make_test path =
   Platform.configure () ;
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
   let _file, ext = Platform.path_to_basename_ext path in
@@ -260,6 +273,9 @@ let test_file path =
       Printf.printf "%s\n" (outcome_to_string outcome) ;
       raise (Ran_tests (successful outcome))
   | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
+
+let test_file path = test_file_h make_test path
+let test_file_debug path = test_file_h make_test_debug path
 
 let test_dir dir =
   Printf.printf "===> TESTING ASSERTIONS IN: %s\n" dir ;
@@ -349,7 +365,7 @@ let runCSmith () =
       Printf.printf "%s\n" (Result.string_of_exit_condition exit_cond)
 
 let command_line_args = ref ["todo"]
-
+let fast_mode_flag = ref false
 
 let args =
   [ ( "-set-test-dir"
@@ -368,6 +384,7 @@ let args =
     , Unit exec_tests
     , "run the test suite, ignoring later inputs" )
   ; ("-test-file", String test_file, "run the assertions in a given file")
+  ; ("-test-file-debug", String test_file_debug, "run the assertions in a given file under the debugger")
   ; ("-test-dir", String test_dir, "run all .ll files in the given directory")
   ; ( "-test-dir2"
     , String Tester.test_dir
@@ -408,7 +425,9 @@ let args =
     , Set Driver.interpret
     , "interpret ll program starting from 'main' (same as -interpret)" )
   ; ("-debug", Set Interpreter.debug_flag, "enable debugging trace output")
+  ; ("-debugger", Set Driver.debugger, "debug an ll program")
   ; ("-v", Set Platform.verbose, "enables more verbose compilation output")
+  ; ("-fast", Set fast_mode_flag, "Enable faster execution by disabling symbolic execution of undef values.")
   ; ( "-genalive2"
     , Unit test_genAlive2
     , "Run the alive 2 generator and get some sample" ) ]
@@ -423,6 +442,7 @@ let _ =
       (fun filename -> files := filename :: !files)
       "USAGE: ./vellvm [options] <files>\n" ;
     Platform.configure () ;
+    Denotation.fast_mode_object.fast_mode_set !fast_mode_flag ;
     process_files !command_line_args !files 
   with
   | Ran_tests true -> exit 0

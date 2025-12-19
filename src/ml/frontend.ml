@@ -10,7 +10,7 @@
 
 (* A harness for testing Parsing and Pretty Printing of LLVM IR code. *)
 open Arg
-open Base
+open Vellvm_base
 open Assert
 
 (* test harness ------------------------------------------------------------- *)

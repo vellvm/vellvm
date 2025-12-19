@@ -1400,6 +1400,7 @@ Lemma lift_memory_convert_mem_byte :
     - eapply fmap.
       2: apply stack_exc.
       apply fin_to_inf_uvalue.
+    - apply stack_loc.
   Defined.
 
   Definition lift_stack (stack : InterpreterStack64BitIntptr.LLVM.Stack.lstack) : InterpreterStackBigIntptr.LLVM.Stack.lstack.
