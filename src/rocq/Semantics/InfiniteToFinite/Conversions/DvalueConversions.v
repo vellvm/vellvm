@@ -512,10 +512,10 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
            v1' <- uvalue_convert_strict v1;;
            v2' <- uvalue_convert_strict v2;;
            ret (DV2.UVALUE_IBinop iop v1' v2')
-       | DV1.UVALUE_ICmp cmp v1 v2 =>
+       | DV1.UVALUE_ICmp ss cmp v1 v2 =>
            v1' <- uvalue_convert_strict v1;;
            v2' <- uvalue_convert_strict v2;;
-           ret (DV2.UVALUE_ICmp cmp v1' v2')
+           ret (DV2.UVALUE_ICmp ss cmp v1' v2')
        | DV1.UVALUE_FBinop fop fm v1 v2 =>
            v1' <- uvalue_convert_strict v1;;
            v2' <- uvalue_convert_strict v2;;
@@ -871,10 +871,10 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
           uvalue_convert_strict uv2' = NoOom uv2.
 
   Parameter uvalue_convert_strict_icmp_inv :
-    forall x icmp uv1 uv2,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_ICmp icmp uv1 uv2) ->
+    forall x ss icmp uv1 uv2,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_ICmp ss icmp uv1 uv2) ->
       exists uv1' uv2',
-        x = DV1.UVALUE_ICmp icmp uv1' uv2' /\
+        x = DV1.UVALUE_ICmp ss icmp uv1' uv2' /\
           uvalue_convert_strict uv1' = NoOom uv1 /\
           uvalue_convert_strict uv2' = NoOom uv2.
 
@@ -1876,10 +1876,10 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
            v1' <- uvalue_convert_strict v1;;
            v2' <- uvalue_convert_strict v2;;
            ret (DV2.UVALUE_IBinop iop v1' v2')
-       | DV1.UVALUE_ICmp cmp v1 v2 =>
+       | DV1.UVALUE_ICmp ss cmp v1 v2 =>
            v1' <- uvalue_convert_strict v1;;
            v2' <- uvalue_convert_strict v2;;
-           ret (DV2.UVALUE_ICmp cmp v1' v2')
+           ret (DV2.UVALUE_ICmp ss cmp v1' v2')
        | DV1.UVALUE_FBinop fop fm v1 v2 =>
            v1' <- uvalue_convert_strict v1;;
            v2' <- uvalue_convert_strict v2;;
@@ -4133,10 +4133,10 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
   Qed.
 
   Lemma uvalue_convert_strict_icmp_inv :
-    forall x icmp uv1 uv2,
-      uvalue_convert_strict x = NoOom (DV2.UVALUE_ICmp icmp uv1 uv2) ->
+    forall x ss icmp uv1 uv2,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_ICmp ss icmp uv1 uv2) ->
       exists uv1' uv2',
-        x = DV1.UVALUE_ICmp icmp uv1' uv2' /\
+        x = DV1.UVALUE_ICmp ss icmp uv1' uv2' /\
           uvalue_convert_strict uv1' = NoOom uv1 /\
           uvalue_convert_strict uv2' = NoOom uv2.
   Proof.

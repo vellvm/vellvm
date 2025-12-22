@@ -298,10 +298,10 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       v2 <- denote_exp' (Some dt) op2 ;;
       ret (UVALUE_IBinop iop v1 v2)
 
-    | OP_ICmp cmp dt op1 op2 =>
+    | OP_ICmp samesign cmp dt op1 op2 =>
       v1 <- denote_exp' (Some dt) op1 ;;
       v2 <- denote_exp' (Some dt) op2 ;;
-      ret (UVALUE_ICmp cmp v1 v2)
+      ret (UVALUE_ICmp samesign cmp v1 v2)
 
     | OP_FBinop fop fm dt op1 op2 =>
       v1 <- denote_exp' (Some dt) op1 ;;
@@ -469,7 +469,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       loaded_uv <- trigger (Load cmp_ty ptr_dv);;
 
       (* Perform the comparison - again we have to concretize the results *)
-      dv <- concretize_or_pick_unique (UVALUE_ICmp Eq loaded_uv cmp_uv);;
+      (* SAZ: not clear whether this comparison implies "samesign" or not *)
+      dv <- concretize_or_pick_unique (UVALUE_ICmp false Eq loaded_uv cmp_uv);;
       match dv with
       | @DVALUE_I 1 comparison_bit =>
           if equ comparison_bit one then

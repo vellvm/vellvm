@@ -14,7 +14,8 @@ Class VMemInt I : Type :=
     mequ : I -> I -> bool;
     mcmp : Numeric.Integers.comparison -> I -> I -> bool;
     mcmpu : Numeric.Integers.comparison -> I -> I -> bool;
-
+    msamesign : I -> I -> bool;
+    
     (* Constants *)
     mbitwidth : option positive;
     mzero : I;
@@ -86,10 +87,14 @@ Definition mcmpu_Z (c : Numeric.Integers.comparison) (x y : Z) : bool :=
   | Cge => Z.geb x y
   end.
 
+Definition msamesign_Z (x y : Z) : bool :=
+  ((Z.geb x 0%Z) && (Z.geb y 0%Z)) || ((Z.ltb x 0%Z) && Z.ltb y 0%Z).
+
 #[global] Instance VMemInt_Z : VMemInt Z :=
   { mequ  := Z.eqb;
     mcmp  := mcmp_Z;
     mcmpu := mcmpu_Z;
+    msamesign := msamesign_Z;
 
     mbitwidth := None;
     mzero     := 0%Z;
@@ -147,7 +152,8 @@ Class VInt I : Type :=
     equ : I -> I -> bool;
     cmp : comparison -> I -> I -> bool;
     cmpu : comparison -> I -> I -> bool;
-
+    samesign : I -> I -> bool;
+    
     (* Constants *)
     bitwidth : positive;
     zero : I;
@@ -198,6 +204,12 @@ Class VInt I : Type :=
     equ := @Integers.eq sz;
     cmp := @Integers.cmp sz;
     cmpu := @Integers.cmpu sz;
+    samesign :=
+      (fun x y =>
+        ((@Integers.cmp sz Cge x (@Integers.zero sz)) &&
+           (@Integers.cmp sz Cge y (@Integers.zero sz)))
+        || ((@Integers.cmp sz Clt x (@Integers.zero sz)) &&
+           (@Integers.cmp sz Clt y (@Integers.zero sz))))%bool;
 
     bitwidth := sz;
 
@@ -250,6 +262,7 @@ Class VInt I : Type :=
     mequ := equ;
     mcmp := cmp;
     mcmpu := cmpu;
+    msamesign := samesign;
 
     (* Constants *)
     mbitwidth := ret bitwidth;

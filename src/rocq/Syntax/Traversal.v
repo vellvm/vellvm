@@ -115,8 +115,8 @@ Section Endo.
           EXP_Vector (endo t) (List.map (fun '(t,e) => (endo t, f_exp e)) elts)
       | OP_IBinop iop t v1 v2 =>
           OP_IBinop (endo iop) (endo t) (f_exp v1) (f_exp v2)
-      | OP_ICmp cmp t v1 v2 =>
-          OP_ICmp (endo cmp) (endo t) (f_exp v1) (f_exp v2)
+      | OP_ICmp s cmp t v1 v2 =>
+          OP_ICmp s (endo cmp) (endo t) (f_exp v1) (f_exp v2)
       | OP_FBinop fop fm t v1 v2 =>
           OP_FBinop (endo fop) fm (endo t) (f_exp v1) (f_exp v2)
       | OP_FCmp cmp t v1 v2 =>
@@ -542,7 +542,7 @@ Section TFunctor.
         | EXP_Array t elts                   => EXP_Array (f t) (tfmap ftexp elts)
         | EXP_Vector t elts                  => EXP_Vector (f t) (tfmap ftexp elts)
         | OP_IBinop iop t v1 v2              => OP_IBinop (endo iop) (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
-        | OP_ICmp cmp t v1 v2                => OP_ICmp (endo cmp) (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
+        | OP_ICmp s cmp t v1 v2              => OP_ICmp s (endo cmp) (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
         | OP_FBinop fop fm t v1 v2           => OP_FBinop (endo fop) fm (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
         | OP_FCmp cmp t v1 v2                => OP_FCmp (endo cmp) (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
         | OP_Conversion conv t_from v t_to   => OP_Conversion conv (f t_from) (ft_exp U V f  v) (f t_to)

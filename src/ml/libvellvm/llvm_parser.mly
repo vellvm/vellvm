@@ -464,6 +464,7 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 
 %token KW_RANGE
 %token KW_SPLAT
+%token KW_SAMESIGN
 
 %token<string> KW_UNKNOWN
 
@@ -1425,8 +1426,8 @@ instr_op:
   | op=ibinop t=typ o1=exp COMMA o2=exp
     { OP_IBinop (op, t, o1 t, o2 t) }
 
-  | KW_ICMP op=icmp t=typ o1=exp COMMA o2=exp
-    { OP_ICmp (op, t, o1 t, o2 t) }
+  | KW_ICMP s=KW_SAMESIGN? op=icmp t=typ o1=exp COMMA o2=exp
+    { OP_ICmp (opt_bool s, op, t, o1 t, o2 t) }
 
   | op=fbinop f=fast_math* t=typ o1=exp COMMA o2=exp
     { OP_FBinop (op, f, t, o1 t, o2 t) }
@@ -1461,8 +1462,8 @@ expr_op:
   | op=ibinop LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
     { OP_IBinop (op, t, o1 t, o2 t) }
 
-  | KW_ICMP op=icmp LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
-    { OP_ICmp (op, t, o1 t, o2 t) }
+  | KW_ICMP s=KW_SAMESIGN? op=icmp LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
+    { OP_ICmp (opt_bool s, op, t, o1 t, o2 t) }
 
   | op=fbinop f=fast_math* LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
     { OP_FBinop (op, f, t, o1 t, o2 t) }

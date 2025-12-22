@@ -326,6 +326,7 @@
   ("sge"            , KW_SGE);
   ("slt"            , KW_SLT);
   ("sle"            , KW_SLE);
+  ("samesign"       , KW_SAMESIGN);
 
   (* fcmp. true and false are already handled later.
    * some are already handled in icmp *)

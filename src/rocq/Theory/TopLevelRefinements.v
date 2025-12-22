@@ -799,9 +799,9 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Lemma eval_icmp_err_ub_oom_to_itree :
       forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E}
-        x y icmp,
-        (@eval_icmp (itree E) _ _ icmp x y) ≈
-          match eval_icmp icmp x y with
+        ss x y icmp,
+        (@eval_icmp (itree E) _ _ ss icmp x y) ≈
+          match eval_icmp ss icmp x y with
           | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
               match m with
               | inl (OOM_message x) => raiseOOM x
@@ -811,7 +811,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
               end
           end.
     Proof.
-      intros E H H0 H1 x y icmp.
+      intros E H H0 H1 ss x y icmp.
       destruct x, y; cbn; subst;
         try solve
           [ reflexivity
@@ -2160,7 +2160,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
         rewrite eval_icmp_err_ub_oom_to_itree.
         cbn.
-        remember (eval_icmp cmp u1r0 u2r0).
+        remember (eval_icmp samesign cmp u1r0 u2r0).
         destruct_err_ub_oom y; cbn; reflexivity.
       - (* FBinop *)
         unfold concretize_uvalue.

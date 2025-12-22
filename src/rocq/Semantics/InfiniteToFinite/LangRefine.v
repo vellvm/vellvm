@@ -330,6 +330,13 @@ Module Type VMemInt_Refine (IP_INF : INTPTR) (IP_FIN : INTPTR).
       IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
       @mcmpu _ IP_FIN.VMemInt_intptr icmp x_fin y_fin = @mcmpu _ IP_INF.VMemInt_intptr icmp x_inf y_inf.
 
+  Parameter msamesign_refine :
+    forall x_fin y_fin x_inf y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @msamesign _ IP_FIN.VMemInt_intptr x_fin y_fin = 
+        @msamesign _ IP_INF.VMemInt_intptr x_inf y_inf. 
+  
 End VMemInt_Refine.
 
 Module VMemInt_Intptr_Properties_Inf : VMemInt_Intptr_Properties InterpreterStackBigIntptr.LP.IP.
@@ -1031,6 +1038,21 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
       break_match_goal; lia.
   Qed.
 
+  Lemma msamesign_refine :
+    forall x_fin y_fin x_inf y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @msamesign _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = @msamesign _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf.
+  Proof.
+    intros x_fin y_fin x_inf y_inf X Y.
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z,
+      InterpreterStackBigIntptr.LP.IP.to_Z in *;
+      subst.
+    cbn in *. unfold msamesign_Z.
+    pose proof Integers.unsigned_range x_fin.
+    pose proof Integers.unsigned_range y_fin.
+    lia.
+  Qed.
 End VMemInt_Refine_InfFin.
 
 Module Type Sizeof_Refine (SZ_INF : Sizeof) (SZ_FIN : Sizeof).
@@ -5639,17 +5661,38 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Lemma eval_int_icmp_fin_inf :
-    forall {Int} {VMInt : VellvmIntegers.VMemInt Int} icmp a b res_fin,
+    forall {Int} {VMInt : VellvmIntegers.VMemInt Int} ss icmp a b res_fin,
       @eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt icmp a b = ret res_fin  ->
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt ss icmp a b = ret res_fin  ->
       @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt icmp a b = ret (fin_to_inf_dvalue res_fin).
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt ss icmp a b = ret (fin_to_inf_dvalue res_fin).
   Proof.
-    intros Int VMInt icmp a b res_fin FIN.
+    intros Int VMInt ss icmp a b res_fin FIN.
     unfold eval_int_icmp, IS1.LP.Events.DV.eval_int_icmp.
-    destruct icmp;
+    unfold eval_int_icmp in FIN.
+    destruct ss.
+    - destruct (true && negb (msamesign a b))%bool.
+      + destruct icmp;
+          cbn in *;
+          repeat break_match_hyp_inv;
+          cbn;
+          rewrite_fin_to_inf_dvalue; auto;
+         try inversion FIN;
+          rewrite_fin_to_inf_dvalue; reflexivity.
+      + try solve
+          [ cbn in *;
+            break_match_hyp_inv;
+            rewrite_fin_to_inf_dvalue;
+            eauto
+          | cbn in *;
+            repeat break_match_hyp_inv; inv Heqs;
+            cbn;
+            break_match_goal;
+            rewrite_fin_to_inf_dvalue; auto
+          ].
+    - destruct icmp;
       try solve
         [ cbn in *;
           break_match_hyp_inv;
@@ -5665,12 +5708,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   (* TODO: Move this *)
   Lemma eval_int_icmp_iptr_fin_inf :
-    forall v1_fin v2_fin v1_inf v2_inf icmp res_fin res_inf,
+    forall v1_fin v2_fin v1_inf v2_inf ss icmp res_fin res_inf,
       @eval_int_icmp err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         IP.intptr
         VMemInt_intptr'
-        icmp v1_fin v2_fin = success_unERR_UB_OOM res_fin ->
+        ss icmp v1_fin v2_fin = success_unERR_UB_OOM res_fin ->
       IS1.LP.IP.from_Z (IP.to_Z v1_fin) = NoOom v1_inf ->
       IS1.LP.IP.from_Z (IP.to_Z v2_fin) = NoOom v2_inf ->
       DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
@@ -5679,9 +5722,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         IS1.LP.IP.intptr
         IS1.LP.Events.DV.VMemInt_intptr'
-        icmp v1_inf v2_inf = success_unERR_UB_OOM res_inf.
+        ss icmp v1_inf v2_inf = success_unERR_UB_OOM res_inf.
   Proof.
-    intros v1_fin v2_fin v1_inf v2_inf icmp res_fin res_inf EVAL LIFT1 LIFT2 CONV.
+    intros v1_fin v2_fin v1_inf v2_inf ss icmp res_fin res_inf EVAL LIFT1 LIFT2 CONV.
 
     assert (IP.to_Z v1_fin = IS1.LP.IP.to_Z v1_inf) as V1.
     { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
@@ -5689,7 +5732,37 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     assert (IP.to_Z v2_fin = IS1.LP.IP.to_Z v2_inf) as V2.
     { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
 
-    destruct icmp;
+    destruct ss.
+    - destruct icmp;
+      try
+        solve
+        [ cbn in *;
+          erewrite <- VMEM_REF.mcmpu_refine; eauto;
+          break_match_hyp_inv;
+          setoid_rewrite Heqb;
+          cbn in CONV; inv CONV; auto
+        | cbn in *;
+          setoid_rewrite IP.VMemInt_intptr_dtyp in EVAL;
+          setoid_rewrite dtyp_eqb_refl in EVAL;
+          inv EVAL
+        ].
+
+      all: cbn in *;
+        erewrite <- VMEM_REF.msamesign_refine; eauto;
+        unfold VMemInt_intptr' in *;
+        break_match_goal; rename Heqb into Heqb';
+        [ inv EVAL;
+           cbn in *;
+           inv CONV;
+          reflexivity
+        |
+          cbn in *;
+          erewrite <- VMEM_REF.mcmpu_refine; eauto;
+          break_match_hyp_inv;
+          try setoid_rewrite Heqb;
+          cbn in CONV; inv CONV; auto
+        ].
+    - destruct icmp;
       try
         solve
         [ cbn in *;
@@ -5706,18 +5779,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   (* TODO: Move this / generalize monad? *)
   Lemma eval_icmp_fin_inf :
-    forall dv1_fin dv2_fin res_fin icmp dv1_inf dv2_inf,
+    forall dv1_fin dv2_fin res_fin samesign icmp dv1_inf dv2_inf,
       @eval_icmp err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        icmp dv1_fin dv2_fin = ret res_fin ->
+        samesign icmp dv1_fin dv2_fin = ret res_fin ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
       @IS1.MEM.CP.CONC.eval_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        icmp dv1_inf dv2_inf = ret (fin_to_inf_dvalue res_fin).
+        samesign icmp dv1_inf dv2_inf = ret (fin_to_inf_dvalue res_fin).
   Proof.
-    intros dv1_fin dv2_fin res_fin icmp dv1_inf dv2_inf EVAL LIFT1 LIFT2.
+    intros dv1_fin dv2_fin res_fin samesign icmp dv1_inf dv2_inf EVAL LIFT1 LIFT2.
     Opaque IS1.LP.Events.DV.eval_int_icmp
       eval_int_icmp.
     unfold eval_icmp in EVAL.
@@ -10218,7 +10291,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       specialize (H3 _ eq_refl).
       rewrite <- H3 in H6, H2.
 
-      remember (eval_icmp cmp x1 x3) as x1x3.
+      remember (eval_icmp samesign cmp x1 x3) as x1x3.
       destruct_err_ub_oom x1x3; inv H6.
       cbn in H2.
 
@@ -12062,15 +12135,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Hint Resolve eval_iop_err_fin_inf : EVAL_INT_FIN_INF.
 
   Lemma eval_int_icmp_ub_fin_inf :
-    forall {Int} {VMInt : VellvmIntegers.VMemInt Int} icmp a b ub_msg,
+    forall {Int} {VMInt : VellvmIntegers.VMemInt Int} samesign icmp a b ub_msg,
       @eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt icmp a b = UB_unERR_UB_OOM ub_msg  ->
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt samesign icmp a b = UB_unERR_UB_OOM ub_msg  ->
       @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt icmp a b = UB_unERR_UB_OOM ub_msg.
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt samesign icmp a b = UB_unERR_UB_OOM ub_msg.
   Proof.
-    intros Int VMInt icmp a b ub_msg FIN.
+    intros Int VMInt samesign icmp a b ub_msg FIN.
     Transparent eval_int_icmp IS1.LP.Events.DV.eval_int_icmp.
     unfold eval_int_icmp, IS1.LP.Events.DV.eval_int_icmp.
     destruct icmp;
@@ -12089,12 +12162,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   (* TODO: Move this *)
   Lemma eval_int_icmp_iptr_ub_fin_inf :
-    forall v1_fin v2_fin v1_inf v2_inf icmp ub_msg,
+    forall v1_fin v2_fin v1_inf v2_inf samesign icmp ub_msg,
       @eval_int_icmp err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         IP.intptr
         VMemInt_intptr'
-        icmp v1_fin v2_fin = UB_unERR_UB_OOM ub_msg ->
+        samesign icmp v1_fin v2_fin = UB_unERR_UB_OOM ub_msg ->
       IS1.LP.IP.from_Z (IP.to_Z v1_fin) = NoOom v1_inf ->
       IS1.LP.IP.from_Z (IP.to_Z v2_fin) = NoOom v2_inf ->
       @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
@@ -12102,9 +12175,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         IS1.LP.IP.intptr
         IS1.LP.Events.DV.VMemInt_intptr'
-        icmp v1_inf v2_inf = UB_unERR_UB_OOM ub_msg.
+        samesign icmp v1_inf v2_inf = UB_unERR_UB_OOM ub_msg.
   Proof.
-    intros v1_fin v2_fin v1_inf v2_inf icmp ub_msg EVAL LIFT1 LIFT2.
+    intros v1_fin v2_fin v1_inf v2_inf samesign icmp ub_msg EVAL LIFT1 LIFT2.
 
     assert (IP.to_Z v1_fin = IS1.LP.IP.to_Z v1_inf) as V1.
     { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
@@ -12129,12 +12202,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   (* TODO: Move this *)
   Lemma eval_int_icmp_iptr_err_fin_inf :
-    forall v1_fin v2_fin v1_inf v2_inf icmp err_msg,
+    forall v1_fin v2_fin v1_inf v2_inf samesign icmp err_msg,
       @eval_int_icmp err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         IP.intptr
         VMemInt_intptr'
-        icmp v1_fin v2_fin = ERR_unERR_UB_OOM err_msg ->
+        samesign icmp v1_fin v2_fin = ERR_unERR_UB_OOM err_msg ->
       IS1.LP.IP.from_Z (IP.to_Z v1_fin) = NoOom v1_inf ->
       IS1.LP.IP.from_Z (IP.to_Z v2_fin) = NoOom v2_inf ->
       @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
@@ -12142,9 +12215,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         IS1.LP.IP.intptr
         IS1.LP.Events.DV.VMemInt_intptr'
-        icmp v1_inf v2_inf = ERR_unERR_UB_OOM err_msg.
+        samesign icmp v1_inf v2_inf = ERR_unERR_UB_OOM err_msg.
   Proof.
-    intros v1_fin v2_fin v1_inf v2_inf icmp err_msg EVAL LIFT1 LIFT2.
+    intros v1_fin v2_fin v1_inf v2_inf samesign icmp err_msg EVAL LIFT1 LIFT2.
 
     assert (IP.to_Z v1_fin = IS1.LP.IP.to_Z v1_inf) as V1.
     { erewrite IS1.LP.IP.from_Z_to_Z; eauto. }
@@ -12172,18 +12245,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   (* TODO: Move this / generalize monad? *)
   Lemma eval_icmp_ub_fin_inf :
-    forall dv1_fin dv2_fin ub_msg icmp dv1_inf dv2_inf,
+    forall dv1_fin dv2_fin ub_msg samesign icmp dv1_inf dv2_inf,
       @eval_icmp err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        icmp dv1_fin dv2_fin = UB_unERR_UB_OOM ub_msg ->
+        samesign icmp dv1_fin dv2_fin = UB_unERR_UB_OOM ub_msg ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
       @IS1.MEM.CP.CONC.eval_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        icmp dv1_inf dv2_inf = UB_unERR_UB_OOM ub_msg.
+        samesign icmp dv1_inf dv2_inf = UB_unERR_UB_OOM ub_msg.
   Proof.
-    intros dv1_fin dv2_fin ub_msg icmp dv1_inf dv2_inf EVAL LIFT1 LIFT2.
+    intros dv1_fin dv2_fin ub_msg samesign icmp dv1_inf dv2_inf EVAL LIFT1 LIFT2.
     Opaque IS1.LP.Events.DV.eval_int_icmp
       eval_int_icmp.
     unfold eval_icmp in EVAL.
@@ -12230,15 +12303,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Lemma eval_int_icmp_err_fin_inf :
-    forall {Int} {VMInt : VellvmIntegers.VMemInt Int} icmp a b err_msg,
+    forall {Int} {VMInt : VellvmIntegers.VMemInt Int} samesign icmp a b err_msg,
       @eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt icmp a b = ERR_unERR_UB_OOM err_msg  ->
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt samesign icmp a b = ERR_unERR_UB_OOM err_msg  ->
       @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt icmp a b = ERR_unERR_UB_OOM err_msg.
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt samesign icmp a b = ERR_unERR_UB_OOM err_msg.
   Proof.
-    intros Int VMInt icmp a b err_msg FIN.
+    intros Int VMInt samesign icmp a b err_msg FIN.
     Transparent eval_int_icmp IS1.LP.Events.DV.eval_int_icmp.
     unfold eval_int_icmp, IS1.LP.Events.DV.eval_int_icmp.
     destruct icmp;
@@ -12285,18 +12358,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   (* TODO: Move this / generalize monad? *)
   Lemma eval_icmp_err_fin_inf :
-    forall dv1_fin dv2_fin err_msg icmp dv1_inf dv2_inf,
+    forall dv1_fin dv2_fin err_msg samesign icmp dv1_inf dv2_inf,
       @eval_icmp err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        icmp dv1_fin dv2_fin = ERR_unERR_UB_OOM err_msg ->
+        samesign icmp dv1_fin dv2_fin = ERR_unERR_UB_OOM err_msg ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
       @IS1.MEM.CP.CONC.eval_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-        icmp dv1_inf dv2_inf = ERR_unERR_UB_OOM err_msg.
+        samesign icmp dv1_inf dv2_inf = ERR_unERR_UB_OOM err_msg.
   Proof.
-    intros dv1_fin dv2_fin err_msg icmp dv1_inf dv2_inf EVAL LIFT1 LIFT2.
+    intros dv1_fin dv2_fin err_msg samesign icmp dv1_inf dv2_inf EVAL LIFT1 LIFT2.
     Opaque IS1.LP.Events.DV.eval_int_icmp
       eval_int_icmp
       IS1.LP.Events.DV.show_dvalue
@@ -13832,7 +13905,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       forward H2; [cbn; auto|].
       rewrite <- H2 in H5.
 
-      remember (eval_icmp cmp x1 x3) as res.
+      remember (eval_icmp samesign cmp x1 x3) as res.
       destruct_err_ub_oom res; inv H5.
 
       exists (ret (fin_to_inf_dvalue x1)).
@@ -15978,7 +16051,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       forward H2; [cbn; auto|].
       rewrite <- H2 in H5.
 
-      remember (eval_icmp cmp x1 x3) as res.
+      remember (eval_icmp samesign cmp x1 x3) as res.
       destruct_err_ub_oom res; inv H5.
 
       exists (ret (fin_to_inf_dvalue x1)).
@@ -18722,18 +18795,18 @@ Qed.
   Qed.
 
   Lemma orutt_eval_icmp :
-    forall cmp dv1_1 dv2_1 dv1_2 dv2_2,
+    forall samesign cmp dv1_1 dv2_1 dv1_2 dv2_2,
       dvalue_refine_strict dv1_1 dv1_2 ->
       dvalue_refine_strict dv2_1 dv2_2 ->
       orutt exp_E_refine_strict exp_E_res_refine_strict dvalue_refine_strict
-        (IS1.MEM.CP.CONC.eval_icmp cmp dv1_1 dv2_1) (eval_icmp cmp dv1_2 dv2_2)
+        (IS1.MEM.CP.CONC.eval_icmp samesign cmp dv1_1 dv2_1) (eval_icmp samesign cmp dv1_2 dv2_2)
         (OOM:=OOME).
   Proof.
-    intros cmp dv1_1 dv2_1 dv1_2 dv2_2 H H0.
+    intros samesign cmp dv1_1 dv2_1 dv1_2 dv2_2 H H0.
     rewrite eval_icmp_err_ub_oom_to_itree,
       TLR1.eval_icmp_err_ub_oom_to_itree.
 
-    remember (eval_icmp cmp dv1_2 dv2_2) as e.
+    remember (eval_icmp samesign cmp dv1_2 dv2_2) as e.
     destruct_err_ub_oom e; symmetry in Heqe.
     - apply orutt_raiseOOM.
     - erewrite eval_icmp_ub_fin_inf; cbn; eauto;

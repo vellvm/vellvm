@@ -148,7 +148,7 @@ Section Helpers.
   Definition well_formed_op (typ_ctx : list (ident * typ)) (op : exp typ) : bool :=
     match op with
     | OP_IBinop iop t v1 v2              => true
-    | OP_ICmp cmp t v1 v2                => true
+    | OP_ICmp ss cmp t v1 v2             => true
     | OP_FBinop fop fm t v1 v2           => true
     | OP_FCmp cmp t v1 v2                => true
     | OP_Conversion conv t_from v t_to   => true
@@ -2288,7 +2288,7 @@ Section ExpGenerators.
   with
   gen_icmp_exp_typ (gen_global_of_typ : typ -> GenLLVM (option ident)) (gen_ident_of_typ : typ -> GenLLVM (option ident)) (t : typ) {struct t} : GenLLVM (exp typ)
   := cmp <- lift gen_icmp;;
-     ret (OP_ICmp cmp) <*> ret t <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat t <*> gen_non_zero_exp_size 0%nat t
+     ret (OP_ICmp false cmp) <*> ret t <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat t <*> gen_non_zero_exp_size 0%nat t
   with
   gen_fcmp_exp_typ (gen_global_of_typ : typ -> GenLLVM (option ident)) (gen_ident_of_typ : typ -> GenLLVM (option ident)) (t : typ) {struct t} : GenLLVM (exp typ)
   := cmp <- lift gen_fcmp;;
@@ -3162,7 +3162,7 @@ Section InstrGenerators.
          bound' <- lift_GenLLVM (choose (0, bound));;
          let gen_icmp (τ : typ) : GenLLVM (instr_id * instr typ) :=
            iid <- genInstrId (TYPE_I 1);;
-           ret (iid, INSTR_Op (OP_ICmp Ule τ (EXP_Ident (ID_Local loop_init_instr_raw_id)) (EXP_Integer bound')))
+           ret (iid, INSTR_Op (OP_ICmp false Ule τ (EXP_Ident (ID_Local loop_init_instr_raw_id)) (EXP_Integer bound')))
          in
          '(loop_cmp_id, loop_cmp) <- gen_icmp (TYPE_I 32);; (* TODO: big ints *)
          let loop_cmp_raw_id := instr_id_to_raw_id "loop_cmp_id" loop_cmp_id in
@@ -3176,7 +3176,7 @@ Section InstrGenerators.
          '(select_id, select_instr) <- gen_select (TYPE_I 32);;
          let loop_final_init_id_raw := instr_id_to_raw_id "loop iterator id" select_id in
          '(loop_cond_id, loop_cond) <-
-           (let loop_cond_exp := INSTR_Op (OP_ICmp Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local loop_final_init_id_raw)) (EXP_Integer 0)) in
+           (let loop_cond_exp := INSTR_Op (OP_ICmp false Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local loop_final_init_id_raw)) (EXP_Integer 0)) in
            iid <- genInstrId (TYPE_I 1);;
            ret (iid, loop_cond_exp));;
 
@@ -3200,7 +3200,7 @@ Section InstrGenerators.
                    let next_instr_raw_id := instr_id_to_raw_id "next_exp" next_instr_id in
 
                    '(next_cond_id, next_cond) <-
-                     (let next_cond_exp := OP_ICmp Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local next_instr_raw_id)) (EXP_Integer 0) in
+                     (let next_cond_exp := OP_ICmp false Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local next_instr_raw_id)) (EXP_Integer 0) in
                       iid <- genInstrId (TYPE_I 1);;
                       ret (iid, INSTR_Op next_cond_exp));;
                    let next_cond_raw_id := instr_id_to_raw_id "next_cond_exp" next_cond_id in
