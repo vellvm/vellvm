@@ -462,6 +462,8 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_ACQ_REL
 %token KW_SEQ_CST
 
+%token KW_RANGE
+
 %token<string> KW_UNKNOWN
 
 (* METADATA constants *)
@@ -525,6 +527,7 @@ metadata_id:
   | KW_NONNULL                   { METADATA_Id (Name (str "nonnull")) }
   | KW_NOUNDEF                   { METADATA_Id (Name (str "noundef")) }
   | KW_ALIGN                     { METADATA_Id (Name (str "align")) }
+  | KW_RANGE                     { METADATA_Id (Name (str "range")) }
   | s=STRING                     { METADATA_Id (Name (str ("\"" ^ s ^ "\""))) } (* preserve quotes *)
   | mid=INTEGER                  { METADATA_Id (Anon mid) }
   | mid=KW_UNKNOWN               { METADATA_Id (Name (str mid)) }
@@ -1188,6 +1191,7 @@ param_attr:
   | KW_WRITEONLY                         { PARAMATTR_Writeonly                 }
   | KW_WRITABLE                          { PARAMATTR_Writable                  }
   | KW_DEADONUNWIND                      { PARAMATTR_Dead_on_unwind            }
+  | KW_RANGE LPAREN t=typ a=INTEGER COMMA b=INTEGER RPAREN { PARAMATTR_Range(t, a, b) }
 
  (* TODO: This loses information when metadata is used as an argument *)
 call_arg:

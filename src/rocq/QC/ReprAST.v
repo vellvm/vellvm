@@ -417,6 +417,7 @@ Section ReprInstances.
     | PARAMATTR_Writeonly => "PARAMATTR_Writeonly"
     | PARAMATTR_Writable => "PARAMATTR_Writable"
     | PARAMATTR_Dead_on_unwind => "PARAMATTR_Dead_on_unwind"
+    | PARAMATTR_Range t a b => "(PARAMATTR_Range " ++ repr t ++ " " ++ repr a ++ " " ++ repr b ++ ")"
     end.
 
   #[global]

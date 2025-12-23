@@ -404,6 +404,7 @@
   ("poison", KW_POISON);
   ("zeroinitializer" , KW_ZEROINITIALIZER);
   ("c" , KW_C);
+  ("range", KW_RANGE);
 
   (* metadata *)
 (*  

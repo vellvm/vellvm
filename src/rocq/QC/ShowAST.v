@@ -281,6 +281,10 @@ Section ShowInstances.
     | PARAMATTR_Writeonly => sd "writeonly"
     | PARAMATTR_Writable => sd "writable"
     | PARAMATTR_Dead_on_unwind => sd "dead_on_unwind"
+    | PARAMATTR_Range t a b => sd "range(" @@ sd (show t)
+                                          @@ sd " "
+                                          @@ sd (show a) @@ sd ", " 
+                                          @@ sd (show b) @@ sd ")"
     end.
 
   #[global] Instance dshowParamAttr : DShow param_attr
