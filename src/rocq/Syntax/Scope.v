@@ -265,6 +265,7 @@ Section REGISTER_OPERATIONS.
 
                       | OP_GetElementPtr _ (_,e) l
                         => f e +++ set_flat_map (fun x => f (snd x)) l
+                      | EXP_Splat (_,e) => f e
                       end
       |}.
 

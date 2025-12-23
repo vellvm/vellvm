@@ -20527,6 +20527,28 @@ Qed.
       reflexivity.
       destruct tv.
       assumption.
+    - destruct elt.
+      cbn in *.
+      destruct odt as [dt | ];
+        cbn;
+        try solve [
+            solve_orutt_raise
+          ].
+      destruct dt;
+        cbn;
+        try solve [
+            solve_orutt_raise
+          ].
+      eapply orutt_bind with (RR:=uvalue_refine_strict); eauto.
+      intros r0 r3 H0.
+      apply orutt_Ret.
+      rewrite uvalue_refine_strict_equation; cbn; auto.
+      remember (N.to_nat sz) as n.
+      clear Heqn.
+      induction n; cbn; auto.
+      rewrite H0.
+      break_match_hyp_inv.
+      reflexivity.
     - auto.
     - auto.
     - destruct te.

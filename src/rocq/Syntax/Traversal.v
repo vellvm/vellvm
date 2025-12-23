@@ -153,6 +153,7 @@ Section Endo.
       | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
           EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints
       | EXP_Metadata m => EXP_Metadata (@endo_metadata _ _ _ _ _ _ _ m)
+      | EXP_Splat elt => EXP_Splat (endo (fst elt), f_exp (snd elt))
       end
     with endo_metadata
       `{Endo T}
@@ -556,6 +557,7 @@ Section TFunctor.
         | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
             EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints
         | EXP_Metadata m => EXP_Metadata (ft_metadata U V f m)
+        | EXP_Splat elt                      => EXP_Splat (ftexp elt)
         end
     with ft_metadata
       `{Endo raw_id}

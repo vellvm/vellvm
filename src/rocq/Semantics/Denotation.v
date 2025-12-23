@@ -373,6 +373,17 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
         | METADATA_Debug _ _ => ret UVALUE_None
         | METADATA_File_info _ => ret UVALUE_None
         end
+
+    | EXP_Splat elt =>
+        match top with
+        | None => raise ("denote_exp given untyped EXP_Splat")
+        | Some (DTYPE_Vector sz t) =>
+            (* use the type from the splat elt *)
+            v <- eval_texp elt ;;
+            (* this could be very expensive if the vector is big *)
+            ret (UVALUE_Vector t (List.repeat v (N.to_nat sz)))
+        | Some _ => raise ("denote_exp given EXP_Splat with non-vector type")
+        end
     end.
 
   Definition denote_exp (top:option dtyp) (o:exp dtyp) : itree exp_E uvalue
