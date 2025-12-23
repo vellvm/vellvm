@@ -80,7 +80,7 @@ $(EXTRACTDIR)/STAMP: $(EXEC_VFILES) $(EXEC_VOFILES) $(EXTRACTDIR)/Extract.v
 	bash fix-extraction.sh
 	touch $(EXTRACTDIR)/STAMP
 
-$(VELLVM_EXE): extracted ml/dune ml/extracted/dune ml/testing/dune
+$(VELLVM_EXE): extracted ml/dune ml/extracted/dune ml/testing/dune 
 	@echo "Compiling Vellvm"
 	dune build ml/main.exe
 

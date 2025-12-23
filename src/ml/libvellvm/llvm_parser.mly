@@ -338,6 +338,7 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_ASHR
 %token KW_AND
 %token KW_OR
+%token KW_DISJOINT
 %token KW_XOR
 %token KW_ICMP
 %token KW_FCMP
@@ -1337,7 +1338,7 @@ ibinop_no_opt: (* can not appear with any keyword *)
   | KW_UREM { URem }
   | KW_SREM { SRem }
   | KW_AND  { And  }
-  | KW_OR   { Or   }
+  | KW_OR dj=KW_DISJOINT?  { Or (opt_bool dj)  }
   | KW_XOR  { Xor  }
 
 icmp:

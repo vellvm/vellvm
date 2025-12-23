@@ -262,6 +262,7 @@
   ("ashr"           , KW_ASHR);
   ("and"            , KW_AND);
   ("or"             , KW_OR);
+  ("disjoint"       , KW_DISJOINT);
   ("xor"            , KW_XOR);
   ("icmp"           , KW_ICMP);
   ("fcmp"           , KW_FCMP);

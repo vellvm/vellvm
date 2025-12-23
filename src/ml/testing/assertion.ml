@@ -121,7 +121,8 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
   | TYPE_Packed_struct _, EXP_Packed_struct elts ->
       DVALUE_Packed_struct (List.map texp_to_dvalue elts)
   | TYPE_Vector _, EXP_Vector (t, elts) ->
-      DVALUE_Vector (typ_to_dtyp t, (List.map texp_to_dvalue elts))
+     DVALUE_Vector (typ_to_dtyp t, (List.map texp_to_dvalue elts))
+  | _, EXP_Poison -> (DVALUE_Poison (typ_to_dtyp typ))
   | _, _ ->
       failwith
         (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"
@@ -145,7 +146,8 @@ let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
   | TYPE_Packed_struct _, EXP_Packed_struct elts ->
       UVALUE_Packed_struct (List.map texp_to_uvalue elts)
   | TYPE_Vector _, EXP_Vector (t, elts) ->
-      UVALUE_Vector (typ_to_dtyp t, (List.map texp_to_uvalue elts))
+     UVALUE_Vector (typ_to_dtyp t, (List.map texp_to_uvalue elts))
+  | _, EXP_Poison -> (UVALUE_Poison (typ_to_dtyp typ))
   | _, _ ->
       failwith
         (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"

@@ -166,7 +166,7 @@ Section ReprInstances.
        | URem    => "URem"
        | SRem    => "SRem"
        | And     => "And"
-       | Or      => "Or"
+       | Or dj   => "(Or " ++ repr dj ++ ")"
        | Xor     => "Xor"
        end.
 
@@ -304,8 +304,8 @@ Section ReprInstances.
     | EXP_Vector t fields => "(EXP_vector (" ++ repr t ++ ")" ++ " [" ++ (contents id (List.map texp fields)) ++ "])"
     | OP_IBinop iop t v1 v2 =>
       "(OP_IBinop " ++ repr iop ++ " " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
-    | OP_ICmp cmp s t v1 v2 =>
-        "(OP_ICmp " ++ repr s ++ repr cmp ++ " " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
+    | OP_ICmp s cmp t v1 v2 =>
+        "(OP_ICmp " ++ repr s ++ " " ++ repr cmp ++ " " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
     | OP_FBinop fop fm t v1 v2 =>
         "(OP_FBinop " ++ repr fop ++ " [" ++ (contents id (List.map repr_fast_math fm)) ++
                       "] " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"

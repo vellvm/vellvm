@@ -610,7 +610,7 @@ Section hiding_notation.
       | AShr flag => Atom "ashr"
       | URem | SRem => Atom "rem"
       | And => Atom "and"
-      | Or => Atom "or"
+      | Or dj => Atom "or"
       | Xor => Atom "xor"
       end.
 

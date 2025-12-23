@@ -3506,7 +3506,16 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       | And =>
           ret (to_dvalue (mand x y))
 
-      | Or =>
+      | Or b =>
+          if b then
+            (* TODO: disjoint causes poison for non-disjoint `or` inputs
+               I've currently implemented the disjointness check by
+               seeing whether `or` and `xor` give the same result.  
+             *)
+            if mequ (mor x y) (mxor x y) then
+              ret (to_dvalue (mor x y))
+            else ret (DVALUE_Poison mdtyp_of_int) 
+          else 
           ret (to_dvalue (mor x y))
 
       | Xor =>

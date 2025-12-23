@@ -498,6 +498,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
      Note: Langref doesn't seem to specifiy whether the arithmetic operations should be treated
            as having (or not) the signed/wrapping flags activated.  Here we (arbitrarily?)
            set them to false.
+           Similarly, it does not state whether the `disjoint` flag for `or` can be applied,
+           so we set it to false.
   *)
   Definition denote_atomic_rmw_operation a_op (pv : uvalue) (val : uvalue) : itree instr_E uvalue :=
     match a_op with      
@@ -515,7 +517,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
         ret (UVALUE_IBinop And pv val)
     | Aor =>
         (* or: *ptr = *ptr | val *)
-        ret (UVALUE_IBinop Or pv val)
+        ret (UVALUE_IBinop (Or false) pv val)
     | Axor =>
         (* xor: *ptr = *ptr ^ val *)
         ret (UVALUE_IBinop Xor pv val)
