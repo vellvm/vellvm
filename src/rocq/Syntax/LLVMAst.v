@@ -172,7 +172,7 @@ Variant param_attr : Set :=
 | PARAMATTR_Writeonly
 | PARAMATTR_Writable
 | PARAMATTR_Dead_on_unwind      
-(* | PARAMATTR_Range (t : typ) a b (* MISSING: range qualifiers *) *)    
+| PARAMATTR_Range (t : typ) (a b : int_ast)
 .
 
 Variant frame_pointer_val : Set :=
