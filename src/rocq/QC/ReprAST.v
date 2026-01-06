@@ -341,6 +341,8 @@ Section ReprInstances.
           """" ++ operand_constraints ++ """)"
     | EXP_Metadata md =>
         "(EXP_Metadata " ++ repr_metadata md ++ ")"
+    | EXP_Splat elt =>
+        "(EXP_splt " ++ texp elt ++ ")"
     end with
   repr_metadata (m : metadata typ) : string :=
     let texp (te : (typ * exp typ)) : string :=

@@ -406,6 +406,8 @@
   ("c" , KW_C);
   ("range", KW_RANGE);
 
+  ("splat", KW_SPLAT);
+
   (* metadata *)
 (*  
   ("nontemporal"             , META_NONTEMPORAL);

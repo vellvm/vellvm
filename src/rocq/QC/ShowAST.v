@@ -719,6 +719,9 @@ Section ShowInstances.
           @@ sd """" @@ sd template @@ sd """, "
           @@ sd """" @@ sd operand_constraints @@ sd """"
     | EXP_Metadata m => (dshow_metadata m)
+    | EXP_Splat elt =>
+        let (tp, exp) := elt in
+        sd "splat (" @@ dshow tp @@ sd " " @@ dshow_exp false exp @@ sd ")"
     end
   with dshow_metadata (md : metadata T)  : DString :=
          match md with

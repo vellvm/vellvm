@@ -409,7 +409,8 @@ Inductive exp : Set :=
 | OP_Freeze           (v:(T * exp))
 | EXP_Asm             (sideffect:bool) (alignstack:bool) (inteldialect:bool) (unwind:bool) (template:string) (operand_constraints:string)
 | EXP_Metadata        (m:metadata)
-
+| EXP_Splat           (elt:(T * exp))
+                      
 with metadata : Set :=
 (* METADATA_Id covers all metadata values of the form:
     !id (without quotes), including, !invariant.load  !nontemporal, etc.

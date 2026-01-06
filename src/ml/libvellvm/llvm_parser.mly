@@ -463,6 +463,7 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_SEQ_CST
 
 %token KW_RANGE
+%token KW_SPLAT
 
 %token<string> KW_UNKNOWN
 
@@ -1548,6 +1549,11 @@ expr_val:
 		   }
   | m=metadata_value { fun _ -> EXP_Metadata m }
 
+  (* Note: we could pull the same trick as for parsing vectors to annotate splat with the
+     full vector type rather than just the (local) element type.  That might mean that
+     Denotation becomes simpler?
+  *)
+  | KW_SPLAT LPAREN elt=texp RPAREN                   { fun _ -> EXP_Splat(elt) }
 
 a_num_elts:
   | csep t=texp lm=a_align

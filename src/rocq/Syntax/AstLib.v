@@ -372,7 +372,8 @@ Section ExpInd.
   Hypothesis IH_Asm           : forall (sideffect:bool) (alignstack:bool) (inteldialect:bool) (unwind:bool) (template:string) (operand_constraints:string), P(EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints).
 
   Hypothesis IH_Metadata      : forall (m:metadata T), Q m -> P (EXP_Metadata m).
-
+  Hypothesis IH_Splat         : forall (elt:(T * exp T)), P (snd elt) -> P (EXP_Splat elt).
+  
   Hypothesis IH_METADATA_Null : Q(METADATA_Null).
   Hypothesis IH_METADATA_Id   : forall (id:raw_id), Q (METADATA_Id id).
   Hypothesis IH_METADATA_Const : forall (te:T * exp T), P (snd te) -> Q (METADATA_Const te).
@@ -417,6 +418,7 @@ refine(
   | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
       IH_Asm sideffect alignstack inteldialect unwind template operand_constraints
   | EXP_Metadata m => IH_Metadata m (F0 m)
+  | EXP_Splat elt => IH_Splat elt (F (snd elt))
   end
 with F0 (m : metadata T) : Q m :=
     match m as m0 return (Q m0) with
@@ -503,6 +505,7 @@ refine(
   | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
       IH_Asm sideffect alignstack inteldialect unwind template operand_constraints
   | EXP_Metadata m => IH_Metadata m (F0 m)
+  | EXP_Splat elt => IH_Splat elt (F (snd elt))
   end
 with F0 (m : metadata T) : Q m :=
   match m as m0 return (Q m0) with
