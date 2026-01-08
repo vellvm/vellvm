@@ -245,7 +245,7 @@ Section REGISTER_OPERATIONS.
                         => f e
 
                       | OP_IBinop _ _ e1 e2
-                      | OP_ICmp _ _ e1 e2
+                      | OP_ICmp _ _ _ e1 e2
                       | OP_FBinop _ _ _ e1 e2
                       | OP_FCmp _ _ e1 e2
                       | OP_ExtractElement (_,e1) (_,e2)

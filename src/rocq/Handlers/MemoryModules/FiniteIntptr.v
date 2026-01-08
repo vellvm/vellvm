@@ -173,7 +173,8 @@ Instance VMemInt_intptr_ix {sz : positive} : VMemInt (@bit_int sz)
     mequ := @Integers.eq sz;
     mcmp := @Integers.cmp sz;
     mcmpu := @Integers.cmpu sz;
-
+    msamesign := fun _ _ => true;
+      
     (* Constants *)
     mbitwidth := Some sz;
     mzero := @Integers.zero sz;

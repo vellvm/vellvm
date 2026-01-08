@@ -645,12 +645,16 @@ Section ShowInstances.
           else dshow_exp true v2
        in sd (show iop) @@ sd " " @@ add_parens b (dshow t @@ sd " " @@ dshow_exp true v1 @@ sd ", " @@ second_expression)
 
-    | OP_ICmp cmp t v1 v2 =>
+    | OP_ICmp s cmp t v1 v2 =>
         let second_expression :=
           if b
           then dshow t @@ sd " " @@ dshow_exp true v2
           else dshow_exp true v2
-        in list_to_DString ["icmp " ; show cmp ; " "] @@ add_parens b (dshow t @@ sd " " @@ dshow_exp true v1 @@ sd ", " @@ second_expression)
+        in
+        let ss :=
+          if s then "samesign " else ""
+        in
+        list_to_DString ["icmp " ; ss; show cmp ; " "] @@ add_parens b (dshow t @@ sd " " @@ dshow_exp true v1 @@ sd ", " @@ second_expression)
 
     | OP_FBinop fop fmath t v1 v2 =>
         let fmath_string :=

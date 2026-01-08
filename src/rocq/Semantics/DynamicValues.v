@@ -574,8 +574,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_Packed_struct (fields: list uvalue)
   | UVALUE_Array         (t : dtyp) (elts: list uvalue)
   | UVALUE_Vector        (t : dtyp) (elts: list uvalue)
-  | UVALUE_IBinop           (iop:ibinop) (v1:uvalue) (v2:uvalue)
-  | UVALUE_ICmp             (cmp:icmp)   (v1:uvalue) (v2:uvalue)
+  | UVALUE_IBinop        (iop:ibinop) (v1:uvalue) (v2:uvalue)
+  | UVALUE_ICmp          (samesign:bool) (cmp:icmp)   (v1:uvalue) (v2:uvalue)
   | UVALUE_FBinop           (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue)
   | UVALUE_FCmp             (cmp:fcmp)   (v1:uvalue) (v2:uvalue)
   | UVALUE_Conversion       (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp)
@@ -610,7 +610,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_Array t elts => S (S (list_sum (map uvalue_measure elts)))
     | UVALUE_Vector t elts => S (S (list_sum (map uvalue_measure elts)))
     | UVALUE_IBinop _ v1 v2
-    | UVALUE_ICmp _ v1 v2
+    | UVALUE_ICmp _ _ v1 v2
     | UVALUE_FBinop _ _ v1 v2
     | UVALUE_FCmp _ v1 v2 =>
         S (uvalue_measure v1 + uvalue_measure v2)
@@ -702,8 +702,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_Vector_subterm : forall t elt elts, In elt elts -> uvalue_direct_subterm elt (UVALUE_Vector t elts)
   | UVALUE_IBinop_subterm_l : forall iop uv1 uv2, uvalue_direct_subterm uv1 (UVALUE_IBinop iop uv1 uv2)
   | UVALUE_IBinop_subterm_r : forall iop uv1 uv2, uvalue_direct_subterm uv2 (UVALUE_IBinop iop uv1 uv2)
-  | UVALUE_ICmp_subterm_l : forall icmp uv1 uv2, uvalue_direct_subterm uv1 (UVALUE_ICmp icmp uv1 uv2)
-  | UVALUE_ICmp_subterm_r : forall icmp uv1 uv2, uvalue_direct_subterm uv2 (UVALUE_ICmp icmp uv1 uv2)
+  | UVALUE_ICmp_subterm_l : forall ss icmp uv1 uv2, uvalue_direct_subterm uv1 (UVALUE_ICmp ss icmp uv1 uv2)
+  | UVALUE_ICmp_subterm_r : forall ss icmp uv1 uv2, uvalue_direct_subterm uv2 (UVALUE_ICmp ss icmp uv1 uv2)
   | UVALUE_FBinop_subterm_l : forall fop flags uv1 uv2, uvalue_direct_subterm uv1 (UVALUE_FBinop fop flags uv1 uv2)
   | UVALUE_FBinop_subterm_r : forall fop flags uv1 uv2, uvalue_direct_subterm uv2 (UVALUE_FBinop fop flags uv1 uv2)
   | UVALUE_FCmp_subterm_l : forall fcmp uv1 uv2, uvalue_direct_subterm uv1 (UVALUE_FCmp fcmp uv1 uv2)
@@ -747,7 +747,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Array          : forall t (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Array t elts).
     Hypothesis IH_Vector         : forall t (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Vector t elts).
     Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
-    Hypothesis IH_ICmp           : forall (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp cmp v1 v2).
+    Hypothesis IH_ICmp           : forall (samesign:bool) (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp samesign cmp v1 v2).
     Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
     Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
     Hypothesis IH_Conversion     : forall (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv t_from v t_to).
@@ -1866,7 +1866,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Array          : forall t (elts: list uvalue), (forall e, InT e elts -> P e) -> P (UVALUE_Array t elts).
     Hypothesis IH_Vector         : forall t (elts: list uvalue), (forall e, InT e elts -> P e) -> P (UVALUE_Vector t elts).
     Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
-    Hypothesis IH_ICmp           : forall (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp cmp v1 v2).
+    Hypothesis IH_ICmp           : forall (samesign:bool) (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp samesign cmp v1 v2).
     Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
     Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
     Hypothesis IH_Conversion     : forall (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv t_from v t_to).
@@ -2041,7 +2041,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Array          : forall t (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Array t elts).
     Hypothesis IH_Vector         : forall t (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Vector t elts).
     Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
-    Hypothesis IH_ICmp           : forall (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp cmp v1 v2).
+    Hypothesis IH_ICmp           : forall (samesign:bool) (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp samesign cmp v1 v2).
     Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
     Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
     Hypothesis IH_Conversion     : forall (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv t_from v t_to).
@@ -2325,7 +2325,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Array          : forall t (elts: list uvalue), (forall e, InT e elts -> P e) -> P (UVALUE_Array t elts).
     Hypothesis IH_Vector         : forall t (elts: list uvalue), (forall e, InT e elts -> P e) -> P (UVALUE_Vector t elts).
     Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
-    Hypothesis IH_ICmp           : forall (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp cmp v1 v2).
+    Hypothesis IH_ICmp           : forall (samesign: bool) (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp samesign cmp v1 v2).
     Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
     Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
     Hypothesis IH_Conversion     : forall (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv t_from v t_to).
@@ -2635,7 +2635,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         anyb contains_undef_or_poison elts
     | UVALUE_IBinop iop v1 v2 =>
         contains_undef_or_poison v1 || contains_undef_or_poison v2
-    | UVALUE_ICmp cmp v1 v2 =>
+    | UVALUE_ICmp samesign cmp v1 v2 =>
         contains_undef_or_poison v1 || contains_undef_or_poison v2
     | UVALUE_FBinop fop fm v1 v2 =>
         contains_undef_or_poison v1 || contains_undef_or_poison v2
@@ -2855,7 +2855,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         => [Atom "<" ; to_sexp (List.map (serialize_uvalue' "" ",") elts) ; Atom ">"]
       | UVALUE_Undef t => [Atom "undef(" ; to_sexp t ; Atom ")"]
       | UVALUE_IBinop iop v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp iop ; serialize_uvalue' "" ")" v2]
-      | UVALUE_ICmp cmp v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp cmp; serialize_uvalue' "" ")" v2]
+      | UVALUE_ICmp samesign cmp v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp cmp; serialize_uvalue' "" ")" v2]
       | UVALUE_FBinop fop _ v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp fop; serialize_uvalue' "" ")" v2]
       | UVALUE_FCmp cmp v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp cmp; serialize_uvalue' "" ")" v2]
       | _ => Atom "TODO: show_uvalue"
@@ -3104,7 +3104,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 | UVALUE_Array t1 f1, UVALUE_Array t2 f2 => _
                 | UVALUE_Vector t1 f1, UVALUE_Vector t2 f2 => _
                 | UVALUE_IBinop op uv1 uv2, UVALUE_IBinop op' uv1' uv2' => _
-                | UVALUE_ICmp op uv1 uv2, UVALUE_ICmp op' uv1' uv2' => _
+                | UVALUE_ICmp ss op uv1 uv2, UVALUE_ICmp ss' op' uv1' uv2' => _
                 | UVALUE_FBinop op fm uv1 uv2, UVALUE_FBinop op' fm' uv1' uv2' => _
                 | UVALUE_FCmp op uv1 uv2, UVALUE_FCmp op' uv1' uv2' => _
                 | UVALUE_Conversion ct tf u t, UVALUE_Conversion ct' tf' u' t' => _
@@ -3134,7 +3134,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       - destruct (ibinop_eq_dec op op')...
         destruct (f uv1 uv1')...
         destruct (f uv2 uv2')...
-      - destruct (icmp_eq_dec op op')...
+      - destruct (EquivDec.bool_eqdec ss ss')... destruct e.
+        destruct (icmp_eq_dec op op')...
         destruct (f uv1 uv1')...
         destruct (f uv2 uv2')...
       - destruct (fbinop_eq_dec op op')...
@@ -3599,7 +3600,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     end.
   Arguments eval_iop _ _ _ : simpl nomatch.
 
-  Definition eval_int_icmp {M} `{Monad M} `{RAISE_ERROR M} {Int} `{VMI : VMemInt Int} icmp (x y : Int) : M dvalue :=
+  Definition eval_int_icmp {M} `{Monad M} `{RAISE_ERROR M} {Int} `{VMI : VMemInt Int} (samesign:bool) icmp (x y : Int) : M dvalue :=
     c <- match icmp with
         | Eq => ret (mcmpu Ceq x y)
         | Ne => ret (mcmpu Cne x y)
@@ -3624,10 +3625,13 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
             then raise_error "Signed '>' comparison on iptr type."
             else ret (mcmp Cle x y)
         end;;
-    ret (if c
-         then @DVALUE_I 1 (Integers.one)
-         else @DVALUE_I 1 (Integers.zero)).
-  Arguments eval_int_icmp _ _ _ : simpl nomatch.
+    ret ((* Check for sign *)
+        if samesign && negb (msamesign x y) then
+          @DVALUE_Poison (DTYPE_I 1)
+        else if c
+             then @DVALUE_I 1 (Integers.one)
+             else @DVALUE_I 1 (Integers.zero)).
+  Arguments eval_int_icmp _ _ _ _ : simpl nomatch.
 
   Definition double_op {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} (fop:fbinop) (v1:ll_double) (v2:ll_double) : M dvalue :=
     match fop with
@@ -4398,16 +4402,16 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       uvalue_has_dtyp (UVALUE_IBinop op x y) (DTYPE_Vector vsz dt)
 
   | UVALUE_ICmp_typ :
-      forall x y op sz,
+      forall ss x y op sz,
         ((uvalue_has_dtyp x (DTYPE_I sz) /\ uvalue_has_dtyp y (DTYPE_I sz))
          \/
            (uvalue_has_dtyp x DTYPE_IPTR /\ uvalue_has_dtyp y DTYPE_IPTR)
          \/
          (uvalue_has_dtyp x DTYPE_Pointer /\ uvalue_has_dtyp y DTYPE_Pointer)) ->
-        uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_I 1)
+        uvalue_has_dtyp (UVALUE_ICmp ss op x y) (DTYPE_I 1)
 
   | UVALUE_ICmp_vector_typ :
-      forall x y vsz isz op,
+      forall ss x y vsz isz op,
         ((uvalue_has_dtyp x (DTYPE_Vector vsz (DTYPE_I isz)) /\
             uvalue_has_dtyp y (DTYPE_Vector vsz (DTYPE_I isz)))
          \/
@@ -4417,7 +4421,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
            (uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_Pointer) /\
               uvalue_has_dtyp y (DTYPE_Vector vsz DTYPE_Pointer))
         ) ->
-      uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1))
+      uvalue_has_dtyp (UVALUE_ICmp ss op x y) (DTYPE_Vector vsz (DTYPE_I 1))
 
   | UVALUE_FBinop_typ :
     forall x y op fms dt,
@@ -4572,15 +4576,15 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         P (UVALUE_IBinop op x y) (DTYPE_Vector vsz dt).
 
     Hypothesis IH_ICmp :
-          forall x y op sz,
+          forall ss x y op sz,
         ((P x (DTYPE_I sz) /\ P y (DTYPE_I sz))
          \/
            (P x DTYPE_IPTR /\ P y DTYPE_IPTR)
          \/
          (P x DTYPE_Pointer /\ P y DTYPE_Pointer)) ->
-        P (UVALUE_ICmp op x y) (DTYPE_I 1).
+        P (UVALUE_ICmp ss op x y) (DTYPE_I 1).
 
-    Hypothesis IH_ICmp_vector : forall x y vsz isz op,
+    Hypothesis IH_ICmp_vector : forall ss x y vsz isz op,
         ((P x (DTYPE_Vector vsz (DTYPE_I isz)) /\
             P y (DTYPE_Vector vsz (DTYPE_I isz)))
          \/
@@ -4590,7 +4594,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
            (P x (DTYPE_Vector vsz DTYPE_Pointer) /\
               P y (DTYPE_Vector vsz DTYPE_Pointer))
         ) ->
-      P (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1)).
+      P (UVALUE_ICmp ss op x y) (DTYPE_Vector vsz (DTYPE_I 1)).
 
     Hypothesis IH_FBinop : forall (x y : uvalue) (op : fbinop) (fms : list fast_math) dt,
         (dt = DTYPE_Double \/ dt = DTYPE_Float) ->
@@ -4869,7 +4873,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         then ret t1
         else inl "dtyp_of_uvalue_fun: mismatched ibinop types"
 
-    | UVALUE_ICmp op x y =>
+    | UVALUE_ICmp ss op x y =>
         t1 <- dtyp_of_uvalue_fun x;;
         t2 <- dtyp_of_uvalue_fun y;;
         if dtyp_eqb t1 t2 && valid_icmp_type t1
@@ -6062,7 +6066,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
        | UVALUE_Array t elts => "UVALUE_Array"
        | UVALUE_Vector t elts => "UVALUE_Vector"
        | UVALUE_IBinop iop v1 v2 => "UVALUE_IBinop"
-       | UVALUE_ICmp cmp v1 v2 => "UVALUE_ICmp"
+       | UVALUE_ICmp ss cmp v1 v2 => "UVALUE_ICmp"
        | UVALUE_FBinop fop fm v1 v2 => "UVALUE_FBinop"
        | UVALUE_FCmp cmp v1 v2 => "UVALUE_FCmp"
        | UVALUE_Conversion conv t_from v t_to => "UVALUE_Conversion"

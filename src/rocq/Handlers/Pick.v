@@ -1796,7 +1796,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
         destruct_err_ub_oom e; cbn; split; auto.
         right.
         intros ? ?; subst.
-        remember (eval_icmp cmp a a0).
+        remember (eval_icmp samesign cmp a a0).
         destruct_err_ub_oom y; reflexivity.
       }
 

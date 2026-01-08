@@ -259,14 +259,14 @@ Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (Byte : Byte
   (*   end. *)
 
   Lemma eval_icmp_err_ub_oom_to_M :
-    forall {M} `{HM : Monad M} `{HME : RAISE_ERROR M} op a b res,
+    forall {M} `{HM : Monad M} `{HME : RAISE_ERROR M} samesign op a b res,
       (forall {A B} (a : A) (k : A -> M B), @bind M HM _ _ (@ret M HM _ a) k = k a) ->
       @eval_icmp err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-                 (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) op a b =
+                 (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) samesign op a b =
         success_unERR_UB_OOM res ->
-      @eval_icmp M HM HME op a b = @ret M HM dvalue res.
+      @eval_icmp M HM HME samesign op a b = @ret M HM dvalue res.
   Proof.
-    intros M HM HME op a b res BIND_RET_L EVAL.
+    intros M HM HME samesign op a b res BIND_RET_L EVAL.
     destruct op; cbn in *;
     destruct a, b; cbn in *; inv EVAL;
       try first
@@ -383,18 +383,18 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
   Abort.
 
   Lemma concretize_icmp_inv:
-    forall {M} `{HM: Monad M} `{HME: RAISE_ERROR M} op x y dv,
+    forall {M} `{HM: Monad M} `{HME: RAISE_ERROR M} samesign op x y dv,
       (forall {A B} (a : A) (k : A -> M B), @bind M HM _ _ (@ret M HM _ a) k = k a) ->
-      concretize_succeeds (UVALUE_ICmp op x y) ->
-      concretize (UVALUE_ICmp op x y) dv ->
+      concretize_succeeds (UVALUE_ICmp samesign op x y) ->
+      concretize (UVALUE_ICmp samesign op x y) dv ->
       exists dx dy,
         concretize_succeeds x /\
         concretize x dx /\
         concretize_succeeds y /\
         concretize y dy /\
-        @eval_icmp M HM HME op dx dy = ret dv.
+        @eval_icmp M HM HME samesign op dx dy = ret dv.
   Proof.
-    intros M HM HME op x y dv BIND_RET_L SUCC CONC.
+    intros M HM HME samesign op x y dv BIND_RET_L SUCC CONC.
 
     rewrite concretize_equation in CONC.
     red in CONC.
@@ -436,7 +436,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
     forward REST; [reflexivity|].
 
     rewrite <- REST in H1.
-    destruct (eval_icmp op a b) as [[[[[[[oom_z] | [[ub_z] | [[err_z] | z]]]]]]]] eqn:Hmz;
+    destruct (eval_icmp samesign op a b) as [[[[[[[oom_z] | [[ub_z] | [[err_z] | z]]]]]]]] eqn:Hmz;
       cbn in H1; inv H1.
 
     exists b.

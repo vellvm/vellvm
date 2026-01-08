@@ -353,7 +353,7 @@ Section ExpInd.
   Hypothesis IH_Array   : forall t (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Array t elts)).
   Hypothesis IH_Vector  : forall t (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Vector t elts)).
   Hypothesis IH_IBinop  : forall (iop:ibinop) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_IBinop iop t v1 v2)).
-  Hypothesis IH_ICmp    : forall (cmp:icmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_ICmp cmp t v1 v2)).
+  Hypothesis IH_ICmp    : forall (samesign:bool) (cmp:icmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_ICmp samesign cmp t v1 v2)).
   Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FBinop fop fm t v1 v2)).
   Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FCmp cmp t v1 v2)).
   Hypothesis IH_Conversion : forall (conv:conversion_type) (t_from:T) (v:exp T) (t_to:T), P v -> P ((OP_Conversion conv t_from v t_to)).
@@ -403,7 +403,7 @@ refine(
   | EXP_Array t elts => _
   | EXP_Vector t elts => _
   | OP_IBinop iop t v1 v2 => @IH_IBinop iop t v1 v2 (F v1) (F v2)
-  | OP_ICmp cmp t v1 v2 => IH_ICmp cmp t v1 v2 (F v1) (F v2)
+  | OP_ICmp cmp s t v1 v2 => IH_ICmp cmp s t v1 v2 (F v1) (F v2)
   | OP_FBinop fop fm t v1 v2 => IH_FBinop fop fm t v1 v2 (F v1) (F v2)
   | OP_FCmp cmp t v1 v2 => IH_FCmp cmp t v1 v2 (F v1) (F v2)
   | OP_Conversion conv t_from v t_to => IH_Conversion conv t_from v t_to (F v) 
@@ -490,7 +490,7 @@ refine(
   | EXP_Array t elts => _
   | EXP_Vector t elts => _
   | OP_IBinop iop t v1 v2 => @IH_IBinop iop t v1 v2 (F v1) (F v2)
-  | OP_ICmp cmp t v1 v2 => IH_ICmp cmp t v1 v2 (F v1) (F v2)
+  | OP_ICmp s cmp t v1 v2 => IH_ICmp s cmp t v1 v2 (F v1) (F v2)
   | OP_FBinop fop fm t v1 v2 => IH_FBinop fop fm t v1 v2 (F v1) (F v2)
   | OP_FCmp cmp t v1 v2 => IH_FCmp cmp t v1 v2 (F v1) (F v2)
   | OP_Conversion conv t_from v t_to => IH_Conversion conv t_from v t_to (F v) 
@@ -708,8 +708,8 @@ Section hiding_notation.
         [to_sexp iop ; to_sexp t
                     ; serialize_exp' v1
                     ; serialize_exp' v2]
-      | OP_ICmp cmp t v1 v2 =>
-        [to_sexp cmp ; to_sexp t
+      | OP_ICmp s cmp t v1 v2 =>
+        [to_sexp cmp ; to_sexp s ; to_sexp t
                     ; serialize_exp' v1
                     ; serialize_exp' v2]
       | OP_GetElementPtr t ptrval idxs =>

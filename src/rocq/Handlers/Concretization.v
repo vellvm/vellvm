@@ -76,26 +76,27 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
   Module MemHelpers := MemoryHelpers LP MP Byte.
   Import MemHelpers.
 
-  Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} (icmp : icmp) (v1 v2 : dvalue) : M dvalue.
+  Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} (samesign:bool) (icmp : icmp) (v1 v2 : dvalue) : M dvalue.
     refine
       (match v1, v2 with
        | @DVALUE_I sz1 i1, @DVALUE_I sz2 i2 =>
            _
-       | DVALUE_IPTR i1, DVALUE_IPTR i2 => eval_int_icmp icmp i1 i2
+       | DVALUE_IPTR i1, DVALUE_IPTR i2 => eval_int_icmp samesign icmp i1 i2
        | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
        | DVALUE_Poison t, _ => if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
        | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
        | DVALUE_Addr a1, DVALUE_Addr a2 =>
            let i1 := ptr_to_int a1 in
            let i2 := ptr_to_int a2 in
-           eval_int_icmp icmp i1 i2
+           (* Treat addresses as unsigned, so not generating poison. *)
+           eval_int_icmp false icmp i1 i2
        | _, _ => raise_error ("ill_typed-icmp: " ++ show_dvalue v1 ++ ", " ++ show_dvalue v2)
        end).
     destruct (Pos.eq_dec sz1 sz2); subst.
-    - apply (eval_int_icmp icmp i1 i2).
+    - apply (eval_int_icmp samesign icmp i1 i2).
     - apply (raise_error ("ill_typed-icmp: " ++ show_dvalue v1 ++ ", " ++ show_dvalue v2)).
   Defined.
-  Arguments eval_icmp _ _ _ : simpl nomatch.
+  Arguments eval_icmp _ _ _ _ : simpl nomatch.
 
   Section CONVERSIONS.
 
@@ -603,9 +604,9 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalueM M undef_handler ERR_M lift_ue v1 ;;
                                                     dv2 <- concretize_uvalueM M undef_handler ERR_M lift_ue v2 ;;
                                                     lift_ue _ (eval_iop iop dv1 dv2)
-        | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalueM M undef_handler ERR_M lift_ue v1 ;;
+        | UVALUE_ICmp ss cmp v1 v2                  => dv1 <- concretize_uvalueM M undef_handler ERR_M lift_ue v1 ;;
                                                     dv2 <- concretize_uvalueM M undef_handler ERR_M lift_ue v2 ;;
-                                                    lift_ue _ (eval_icmp cmp dv1 dv2)
+                                                    lift_ue _ (eval_icmp ss cmp dv1 dv2)
         | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalueM M undef_handler ERR_M lift_ue v1 ;;
                                                     dv2 <- concretize_uvalueM M undef_handler ERR_M lift_ue v2 ;;
                                                     lift_ue _ (eval_fop fop dv1 dv2)
@@ -931,26 +932,26 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
   Module MemHelpers := MemoryHelpers LP MP Byte.
   Import MemHelpers.
 
-  Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} (icmp : icmp) (v1 v2 : dvalue) : M dvalue.
+  Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} (samesign:bool) (icmp : icmp) (v1 v2 : dvalue) : M dvalue.
     refine
       (match v1, v2 with
        | @DVALUE_I sz1 i1, @DVALUE_I sz2 i2 =>
            _
-       | DVALUE_IPTR i1, DVALUE_IPTR i2 => eval_int_icmp icmp i1 i2
+       | DVALUE_IPTR i1, DVALUE_IPTR i2 => eval_int_icmp samesign icmp i1 i2
        | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
        | DVALUE_Poison t, _ => if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
        | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
        | DVALUE_Addr a1, DVALUE_Addr a2 =>
            let i1 := ptr_to_int a1 in
            let i2 := ptr_to_int a2 in
-           eval_int_icmp icmp i1 i2
+           eval_int_icmp false icmp i1 i2
        | _, _ => raise_error ("ill_typed-icmp: " ++ show_dvalue v1 ++ ", " ++ show_dvalue v2)
        end).
     destruct (Pos.eq_dec sz1 sz2); subst.
-    - exact (eval_int_icmp icmp i1 i2).
+    - exact (eval_int_icmp samesign icmp i1 i2).
     - exact (raise_error ("ill_typed-icmp: " ++ show_dvalue v1 ++ ", " ++ show_dvalue v2)).
   Defined.
-  Arguments eval_icmp _ _ _ : simpl nomatch.
+  Arguments eval_icmp _ _ _ _ : simpl nomatch.
 
   Section CONVERSIONS.
 
@@ -1552,9 +1553,9 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalueM v1 ;;
                                                     dv2 <- concretize_uvalueM v2 ;;
                                                     lift_ue (eval_iop iop dv1 dv2)
-        | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
+        | UVALUE_ICmp ss cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
                                                     dv2 <- concretize_uvalueM v2 ;;
-                                                    lift_ue (eval_icmp cmp dv1 dv2)
+                                                    lift_ue (eval_icmp ss cmp dv1 dv2)
         | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalueM v1 ;;
                                                     dv2 <- concretize_uvalueM v2 ;;
                                                     lift_ue (eval_fop fop dv1 dv2)
@@ -1773,9 +1774,9 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
             | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalueM v1 ;;
                                                        dv2 <- concretize_uvalueM v2 ;;
                                                        lift_ue (eval_iop iop dv1 dv2)
-            | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
+            | UVALUE_ICmp ss cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
                                                        dv2 <- concretize_uvalueM v2 ;;
-                                                       lift_ue (eval_icmp cmp dv1 dv2)
+                                                       lift_ue (eval_icmp ss cmp dv1 dv2)
             | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalueM v1 ;;
                                                        dv2 <- concretize_uvalueM v2 ;;
                                                        lift_ue (eval_fop fop dv1 dv2)
