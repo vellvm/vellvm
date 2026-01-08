@@ -470,7 +470,7 @@ Section ShowInstances.
        | URem    => "urem"
        | SRem    => "srem"
        | And     => "and"
-       | Or      => "or"
+       | Or b    => if b then "or disjoint" else "or"
        | Xor     => "xor"
        end.
 

@@ -1674,7 +1674,7 @@ Section ExpGenerators.
            ; ret URem
            ; ret SRem
            ; ret And
-           ; ret Or
+           ; ret (Or false)
            ; ret Xor
            ].
 

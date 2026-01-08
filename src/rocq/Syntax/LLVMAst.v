@@ -322,7 +322,7 @@ Variant ibinop : Set :=
 | SDiv (exact:bool)
 | LShr (exact:bool)
 | AShr (exact:bool)
-| URem | SRem | And | Or | Xor
+| URem | SRem | And | Or (disjoint:bool) | Xor
 .
 
 Variant fbinop : Set :=

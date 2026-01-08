@@ -330,6 +330,12 @@ Module Type VMemInt_Refine (IP_INF : INTPTR) (IP_FIN : INTPTR).
       IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
       @mcmpu _ IP_FIN.VMemInt_intptr icmp x_fin y_fin = @mcmpu _ IP_INF.VMemInt_intptr icmp x_inf y_inf.
 
+  Parameter mequ_refine :
+    forall x_fin x_inf y_fin y_inf,
+      IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
+      IP_FIN.to_Z y_fin = IP_INF.to_Z y_inf ->
+      @mequ _ IP_FIN.VMemInt_intptr x_fin y_fin = @mequ _ IP_INF.VMemInt_intptr x_inf y_inf.
+
   Parameter msamesign_refine :
     forall x_fin y_fin x_inf y_inf,
       IP_FIN.to_Z x_fin = IP_INF.to_Z x_inf ->
@@ -1036,6 +1042,21 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
     - (* ge *)
       unfold Integers.ltu.
       break_match_goal; lia.
+  Qed.
+
+  Lemma mequ_refine :
+    forall x_fin x_inf y_fin y_inf,
+      InterpreterStack64BitIntptr.LP.IP.to_Z x_fin = InterpreterStackBigIntptr.LP.IP.to_Z x_inf ->
+      InterpreterStack64BitIntptr.LP.IP.to_Z y_fin = InterpreterStackBigIntptr.LP.IP.to_Z y_inf ->
+      @mequ _ InterpreterStack64BitIntptr.LP.IP.VMemInt_intptr x_fin y_fin = @mequ _ InterpreterStackBigIntptr.LP.IP.VMemInt_intptr x_inf y_inf.
+  Proof.
+    intros x_fin x_inf y_fin y_inf X Y.
+    unfold InterpreterStack64BitIntptr.LP.IP.to_Z,
+      InterpreterStackBigIntptr.LP.IP.to_Z in *;
+      subst.
+    cbn.
+    unfold Integers.eq.
+    break_match_goal; lia.
   Qed.
 
   Lemma msamesign_refine :
@@ -5383,6 +5404,27 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       reflexivity.
     - (* Or *)
       cbn in *; inv EVAL.
+      destruct disjoint.
+      + epose proof VMEM_REF.mor_refine _ _ _ v1_inf v2_inf V1 V2 (eq_refl) as (?&?&?).
+        setoid_rewrite H.
+        epose proof VMEM_REF.mxor_refine _ _ _ v1_inf v2_inf V1 V2 (eq_refl) as (?&?&?).
+        setoid_rewrite H2.
+        subst.
+        erewrite <- VMEM_REF.mequ_refine; eauto.
+        pose proof intptr_convert_succeeds (mor v1_fin v2_fin) as (?&?).
+        break_match_goal; setoid_rewrite Heqb in H0; inv H0; cbn in CONV.
+        * rewrite e in CONV.
+          inv CONV.
+          setoid_rewrite H1 in e.
+          rewrite IS1.LP.IP.to_Z_from_Z in e.
+          inv e.
+          reflexivity.
+        * inv CONV.
+          setoid_rewrite IP.VMemInt_intptr_dtyp.
+          setoid_rewrite IS1.LP.IP.VMemInt_intptr_dtyp.
+          reflexivity.
+      +
+      inversion H0. subst. clear H0.
       remember (mor v1_fin v2_fin) as res_fin.
       symmetry in Heqres_fin.
 
@@ -11538,7 +11580,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     - (* And *)
       cbn in *; inv EVAL.
     - (* Or *)
+      destruct disjoint; 
       cbn in *; inv EVAL.
+      + epose proof VMEM_REF.mor_refine _ _ _ v1_inf v2_inf V1 V2 (eq_refl) as (?&?&?).
+        setoid_rewrite H.
+        epose proof VMEM_REF.mxor_refine _ _ _ v1_inf v2_inf V1 V2 (eq_refl) as (?&?&?).
+        setoid_rewrite H2.
+        subst.
+        erewrite <- VMEM_REF.mequ_refine; eauto.
+        pose proof intptr_convert_succeeds (mor v1_fin v2_fin) as (?&?).
+        break_match_goal; setoid_rewrite Heqb in H0; inv H0; cbn in CONV.
     - (* Xor *)
       cbn in *; inv EVAL.
   Qed.
@@ -11763,7 +11814,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     - (* And *)
       cbn in *; inv EVAL.
     - (* Or *)
+      destruct disjoint; 
       cbn in *; inv EVAL.
+      + epose proof VMEM_REF.mor_refine _ _ _ v1_inf v2_inf V1 V2 (eq_refl) as (?&?&?).
+        setoid_rewrite H.
+        epose proof VMEM_REF.mxor_refine _ _ _ v1_inf v2_inf V1 V2 (eq_refl) as (?&?&?).
+        setoid_rewrite H2.
+        subst.
+        erewrite <- VMEM_REF.mequ_refine; eauto.
+        pose proof intptr_convert_succeeds (mor v1_fin v2_fin) as (?&?).
+        break_match_goal; setoid_rewrite Heqb in H0; inv H0; cbn in CONV.
     - (* Xor *)
       cbn in *; inv EVAL.
   Qed.
