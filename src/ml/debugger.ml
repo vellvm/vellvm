@@ -6,7 +6,6 @@ open InterpretationStack.InterpreterStackBigIntptr.LLVM.Global
 
 open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 
-open Format
 open ITreeDefinition
 open Result
 open Interpreter
@@ -75,7 +74,7 @@ let rec next_helper level m =
      else next_helper level x
   | res -> res
 
-let rec next m =
+let next m =
   let stack_level = List.length (Stack.local_stack_object.local_stack_get ()) in
   next_helper stack_level m
 
