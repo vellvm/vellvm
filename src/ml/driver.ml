@@ -90,9 +90,7 @@ let process_ll_file command_line_arguments path file =
 let process_file command_line_arguments path =
   let _ = Printf.printf "Processing: %s\n" path in
   let basename, ext = Platform.path_to_basename_ext path in
-  match ext with
-  | "ll" -> process_ll_file command_line_arguments path basename
-  | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
+  process_ll_file command_line_arguments path basename
 
 let process_files command_line_args files =
   List.iter (process_file command_line_args) files
