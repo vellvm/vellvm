@@ -29,6 +29,9 @@ jobs:
           coq_version: ${{ matrix.coq_version }}
           ocaml_version: ${{ matrix.ocaml_version }}
           before_install: |
+            startGroup "Set stack limits"
+              ulimit -s; ulimit -s unlimited; ulimit -s
+            endGroup
             startGroup "Print opam config"
               opam config list; opam repo list; opam list
             endGroup

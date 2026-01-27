@@ -44,9 +44,6 @@ Require ExtrOcamlIntConv.
 Extraction Language OCaml.
 Extraction Blacklist String List Char Core Z Format.
 
-Require Import mathcomp.ssreflect.ssreflect.
-From mathcomp Require Import ssreflect ssrnat ssrbool div eqtype.
-
 (* strings ------------------------------------------------------------------ *)
 (*
 Extract Inductive ascii => char

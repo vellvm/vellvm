@@ -37,9 +37,7 @@
         with rocqPkgs;
         with coqPkgs;
         with rocq.ocamlPackages;
-        [ mathcomp
-          mathcomp-ssreflect
-          ExtLib
+        [ ExtLib
           paco
           ITree
           flocq
