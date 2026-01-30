@@ -407,6 +407,7 @@
   ("zeroinitializer" , KW_ZEROINITIALIZER);
   ("c" , KW_C);
   ("range", KW_RANGE);
+  ("initializes", KW_INITIALIZES);
 
   ("splat", KW_SPLAT);
 

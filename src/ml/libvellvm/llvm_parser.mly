@@ -464,6 +464,7 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_SEQ_CST
 
 %token KW_RANGE
+%token KW_INITIALIZES
 %token KW_SPLAT
 %token KW_SAMESIGN
 
@@ -1195,6 +1196,10 @@ param_attr:
   | KW_WRITABLE                          { PARAMATTR_Writable                  }
   | KW_DEADONUNWIND                      { PARAMATTR_Dead_on_unwind            }
   | KW_RANGE LPAREN t=typ a=INTEGER COMMA b=INTEGER RPAREN { PARAMATTR_Range(t, a, b) }
+  | KW_INITIALIZES LPAREN l=list(int_pair) RPAREN { PARAMATTR_Initializes(l) }
+
+int_pair:
+  | LPAREN i1=INTEGER COMMA i2=INTEGER RPAREN { (i1, i2) }
 
  (* TODO: This loses information when metadata is used as an argument *)
 call_arg:
