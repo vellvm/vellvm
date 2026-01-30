@@ -1665,6 +1665,7 @@ instr:
   | KW_ATOMICCMPXCHG c_weak=KW_WEAK? c_volatile=KW_VOLATILE?
     c_ptr=texp COMMA c_cmp=texp COMMA c_new=texp ss=syncscope?
     c_success_ordering=ordering c_failure_ordering=ordering c_align=comma_align?
+    md=instr_metadata
     { let f_info = metadata_file_info $startpos $endpos in     
       let c_syncscope =
 	       begin match ss with
@@ -1685,11 +1686,12 @@ instr:
 	   c_failure_ordering;	   
 	   c_align;
 	 }
-      , [f_info])
+      , f_info::md)
     }
       
   | KW_ATOMICRMW a_volatile=KW_VOLATILE? a_operation=atomicrmw_op
     a_ptr=texp COMMA a_val=texp ss=syncscope? a_ordering=ordering a_align=comma_align?
+    md=instr_metadata
     { let f_info = metadata_file_info $startpos $endpos in     
       let a_syncscope = begin match ss with
                | Some (ANN_syncscope s) -> Some s
@@ -1706,7 +1708,7 @@ instr:
 	  a_ordering;
 	  a_align;
 	}
-      , [f_info])
+      , f_info::md)
     }
 
   | KW_FENCE ss=syncscope? a_ordering=ordering
