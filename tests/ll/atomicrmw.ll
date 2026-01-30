@@ -100,5 +100,19 @@ define i8 @atomicrmw_i8_nand(i8 %x, i8 %y) {
 
 ; ASSERT EQ: i8 127 = call i8 @atomicrmw_i8_nand(i8 255, i8 128)
 
+define i8 @atomicrmw_annotations(ptr %ptr) {
+  %1 = atomicrmw sub ptr %ptr, i64 1 release, align 8, !noalias !5
+  ret i8 0
+}
 
+; Two scope domains:
+!0 = !{!0}
+!1 = !{!1}
 
+; Some scopes in these domains:
+!2 = !{!2, !0}
+!3 = !{!3, !0}
+!4 = !{!4, !1}
+
+; Some scope lists:
+!5 = !{!4} ; A list containing only scope !4

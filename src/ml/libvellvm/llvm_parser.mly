@@ -77,6 +77,12 @@ let opt_list (m:'a option) : 'a list =
   | None -> []
   | Some x -> [x]
 
+let list_opt (m : 'a list) : 'a option =
+  match m with
+  | [] -> None
+  | [x] -> Some x
+  | _ -> failwith "Should Not Happen: too many list elements"
+
 let opt_bool (m:'a option) : bool =
   match m with
   | None -> false
@@ -1581,6 +1587,12 @@ ls_anns:
     { ([a], md) }
   | md=instr_metadata { ([], md) }
 
+ax_anns:
+  | a=comma_align md=instr_metadata
+    { (Some a, md) }
+  | md=instr_metadata { (None, md) }
+
+
 
 tailcall:
   | KW_TAIL { ANN_tail Tail }
@@ -1664,8 +1676,9 @@ instr:
 
   | KW_ATOMICCMPXCHG c_weak=KW_WEAK? c_volatile=KW_VOLATILE?
     c_ptr=texp COMMA c_cmp=texp COMMA c_new=texp ss=syncscope?
-    c_success_ordering=ordering c_failure_ordering=ordering c_align=comma_align?
-    { let f_info = metadata_file_info $startpos $endpos in     
+    c_success_ordering=ordering c_failure_ordering=ordering am=ax_anns
+    { let f_info = metadata_file_info $startpos $endpos in
+      let (c_align, md) = am in
       let c_syncscope =
 	       begin match ss with
                | Some (ANN_syncscope s) -> Some s
@@ -1685,12 +1698,13 @@ instr:
 	   c_failure_ordering;	   
 	   c_align;
 	 }
-      , [f_info])
+      , f_info::md)
     }
       
   | KW_ATOMICRMW a_volatile=KW_VOLATILE? a_operation=atomicrmw_op
-    a_ptr=texp COMMA a_val=texp ss=syncscope? a_ordering=ordering a_align=comma_align?
-    { let f_info = metadata_file_info $startpos $endpos in     
+    a_ptr=texp COMMA a_val=texp ss=syncscope? a_ordering=ordering am=ax_anns;
+    { let f_info = metadata_file_info $startpos $endpos in
+      let (a_align, md) = am in      
       let a_syncscope = begin match ss with
                | Some (ANN_syncscope s) -> Some s
 	       | Some _ -> failwith "impossible: syncscope not found"
@@ -1706,7 +1720,7 @@ instr:
 	  a_ordering;
 	  a_align;
 	}
-      , [f_info])
+      , f_info::md)
     }
 
   | KW_FENCE ss=syncscope? a_ordering=ordering
