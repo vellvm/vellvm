@@ -173,6 +173,7 @@ Variant param_attr : Set :=
 | PARAMATTR_Writable
 | PARAMATTR_Dead_on_unwind      
 | PARAMATTR_Range (t : typ) (a b : int_ast)
+| PARAMATTR_Initializes (l : list (int_ast * int_ast))
 .
 
 Variant frame_pointer_val : Set :=

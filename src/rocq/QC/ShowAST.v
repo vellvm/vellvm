@@ -248,6 +248,9 @@ Section ShowInstances.
   #[global] Instance showSum {A B} `{Show A} `{Show B} : Show (A + B)
     := {| show := show_sum |}.
 
+  Definition dshow_pair_list {A} `{Show A} (l:list (A*A)) : DString :=
+    dconcat (sd ", ") (List.map (fun x => sd (show x)) l).
+
   Definition show_param_attr (p : param_attr) : DString :=
     match p with
     | PARAMATTR_Zeroext => sd "zeroext"
@@ -285,6 +288,7 @@ Section ShowInstances.
                                           @@ sd " "
                                           @@ sd (show a) @@ sd ", " 
                                           @@ sd (show b) @@ sd ")"
+    | PARAMATTR_Initializes l => sd "initializes(" @@ (dshow_pair_list l) @@ sd ")"
     end.
 
   #[global] Instance dshowParamAttr : DShow param_attr
