@@ -829,6 +829,7 @@ Definition is_void_instr (i:instr typ) : bool :=
   match i with
   | INSTR_Comment _ => true
   | INSTR_Call (t,_) _ _ _ => is_void_typ t
+  | INSTR_Fence _ _ => true
   | INSTR_Store _ _ _ => true
   | _ => false
   end.
