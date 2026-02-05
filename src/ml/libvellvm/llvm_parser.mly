@@ -1202,7 +1202,7 @@ param_attr:
   | KW_WRITABLE                          { PARAMATTR_Writable                  }
   | KW_DEADONUNWIND                      { PARAMATTR_Dead_on_unwind            }
   | KW_RANGE LPAREN t=typ a=INTEGER COMMA b=INTEGER RPAREN { PARAMATTR_Range(t, a, b) }
-  | KW_INITIALIZES LPAREN l=list(int_pair) RPAREN { PARAMATTR_Initializes(l) }
+  | KW_INITIALIZES LPAREN l=separated_list(csep, int_pair) RPAREN { PARAMATTR_Initializes(l) }
 
 int_pair:
   | LPAREN i1=INTEGER COMMA i2=INTEGER RPAREN { (i1, i2) }
