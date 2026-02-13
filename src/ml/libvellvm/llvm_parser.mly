@@ -1728,7 +1728,7 @@ instr:
       , f_info::md)
     }
 
-  | KW_FENCE ss=syncscope? a_ordering=ordering
+  | KW_FENCE ss=syncscope? a_ordering=ordering md=instr_metadata
     { let f_info = metadata_file_info $startpos $endpos in     
       let a_syncscope = begin match ss with
                | Some (ANN_syncscope s) -> Some s
@@ -1736,7 +1736,7 @@ instr:
 	       | _ -> None
 	       end
       in
-      (INSTR_Fence(a_syncscope, a_ordering), [f_info])
+      (INSTR_Fence(a_syncscope, a_ordering), f_info::md)
     }
   | KW_LANDINGPAD t=typ KW_CLEANUP cs=clause* md=instr_metadata
     { let f_info = metadata_file_info $startpos $endpos in     
