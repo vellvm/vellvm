@@ -506,6 +506,8 @@ rule token = parse
   | ('-'? digit+) as d            { INTEGER (z_of_ocaml_Z (Z.of_string d)) }
   | ('-'? digit* '.' digit*) as d { FLOAT d }
   | ('-'? digit ('.' digit*)? 'e' ('+'|'-') digit+) as d { FLOAT d }
+  (* HexIntConstant  [us]0x[0-9A-Fa-f]+ *)
+
   | ('0''x' hexdigit+) as d     { HEXCONSTANT (coqfloat_of_float (Int64.float_of_bits (Int64.of_string d))) }
   | '"'                         { STRING (string (Buffer.create 10) lexbuf) }
 

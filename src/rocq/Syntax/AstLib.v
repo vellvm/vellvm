@@ -1,7 +1,8 @@
 (* begin hide *)
 From Stdlib Require Import
      ZArith.ZArith
-     String.
+     String
+     Number.
 
 From Vellvm Require Import
      Utilities
@@ -75,7 +76,6 @@ Module RawIDOrd <: UsualOrderedType.
     Hint Resolve
     Zcompare_antisym
     Z.compare_eq
-    Zaux.Zcompare_Lt
     String_as_OT.cmp_antisym
     String_as_OT.cmp_eq
     String_as_OT.cmp_lt : CMP.
@@ -218,12 +218,9 @@ Hypothesis IH_IPTR       : P TYPE_IPTR.
 Hypothesis IH_Pointer    : forall t, P t -> P(TYPE_Pointer (Some t)).
 Hypothesis IH_Opaque_Pointer : P (TYPE_Pointer None).
 Hypothesis IH_Void       : P(TYPE_Void).
-Hypothesis IH_Half       : P(TYPE_Half).
-Hypothesis IH_Float      : P(TYPE_Float).
-Hypothesis IH_Double     : P(TYPE_Double).
-Hypothesis IH_X86_fp80   : P(TYPE_X86_fp80).
-Hypothesis IH_Fp128      : P(TYPE_Fp128).
-Hypothesis IH_Ppc_fp128  : P(TYPE_Ppc_fp128).
+Hypothesis IH_FP         : forall fp, P(TYPE_FP fp).
+Hypothesis IH_Label      : P(TYPE_Label).
+Hypothesis IH_Token      : P(TYPE_Token).
 Hypothesis IH_Metadata   : P(TYPE_Metadata).
 Hypothesis IH_X86_mmx    : P(TYPE_X86_mmx).
 Hypothesis IH_Array      : forall sz t, P t -> P(TYPE_Array sz t).
@@ -243,12 +240,9 @@ Lemma typ_ind : forall (t:typ), P t.
     + apply IH_Pointer. apply IH.
     + apply IH_Opaque_Pointer.
   - apply IH_Void.
-  - apply IH_Half.
-  - apply IH_Float.
-  - apply IH_Double.
-  - apply IH_X86_fp80.
-  - apply IH_Fp128.
-  - apply IH_Ppc_fp128.
+  - apply IH_FP.
+  - apply IH_Label.
+  - apply IH_Token.
   - apply IH_Metadata.
   - apply IH_X86_mmx.
   - apply IH_Array. apply IH.
@@ -282,12 +276,9 @@ Hypothesis IH_IPTR       : P TYPE_IPTR.
 Hypothesis IH_Pointer    : forall t, P t -> P(TYPE_Pointer (Some t)).
 Hypothesis IH_Opaque_Pointer: P (TYPE_Pointer None).
 Hypothesis IH_Void       : P(TYPE_Void).
-Hypothesis IH_Half       : P(TYPE_Half).
-Hypothesis IH_Float      : P(TYPE_Float).
-Hypothesis IH_Double     : P(TYPE_Double).
-Hypothesis IH_X86_fp80   : P(TYPE_X86_fp80).
-Hypothesis IH_Fp128      : P(TYPE_Fp128).
-Hypothesis IH_Ppc_fp128  : P(TYPE_Ppc_fp128).
+Hypothesis IH_FP         : forall fp, P (TYPE_FP fp).
+Hypothesis IH_Label      : P(TYPE_Label).
+Hypothesis IH_Token      : P(TYPE_Token).
 Hypothesis IH_Metadata   : P(TYPE_Metadata).
 Hypothesis IH_X86_mmx    : P(TYPE_X86_mmx).
 Hypothesis IH_Array      : forall sz t, P t -> P(TYPE_Array sz t).
@@ -307,12 +298,9 @@ Lemma typ_rect' : forall (t:typ), P t.
     + apply IH_Pointer. apply IH.
     + apply IH_Opaque_Pointer.
   - apply IH_Void.
-  - apply IH_Half.
-  - apply IH_Float.
-  - apply IH_Double.
-  - apply IH_X86_fp80.
-  - apply IH_Fp128.
-  - apply IH_Ppc_fp128.
+  - apply IH_FP.
+  - apply IH_Label.
+  - apply IH_Token.
   - apply IH_Metadata.
   - apply IH_X86_mmx.
   - apply IH_Array. apply IH.
@@ -338,10 +326,8 @@ Section ExpInd.
   Variable P : (exp T) -> Prop.
   Variable Q : (metadata T) -> Prop.
   Hypothesis IH_Ident   : forall (id:ident), P ((EXP_Ident id)).
-  Hypothesis IH_Integer : forall (x:int_ast), P ((EXP_Integer x)).
-  Hypothesis IH_Float   : forall (f:float32), P ((EXP_Float f)).
-  Hypothesis IH_Double  : forall (f:float), P ((EXP_Double f)).
-  Hypothesis IH_Hex     : forall (h:float), P ((EXP_Hex h)).
+  Hypothesis IH_Integer : forall (x:Number.signed_int), P ((EXP_Integer x)).
+  Hypothesis IH_Float   : forall (f:float_syntax), P ((EXP_Float f)).
   Hypothesis IH_Bool    : forall (b:bool), P ((EXP_Bool b)).
   Hypothesis IH_Null    : P ((EXP_Null)).
   Hypothesis IH_Zero_initializer : P ((EXP_Zero_initializer)).
@@ -353,6 +339,7 @@ Section ExpInd.
   Hypothesis IH_Array   : forall t (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Array t elts)).
   Hypothesis IH_Vector  : forall t (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Vector t elts)).
   Hypothesis IH_IBinop  : forall (iop:ibinop) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_IBinop iop t v1 v2)).
+  Hypothesis IH_Fneg    : forall (flags:list fast_math) (v:(T*exp T)), P(snd v) -> P (OP_Fneg flags v).
   Hypothesis IH_ICmp    : forall (samesign:bool) (cmp:icmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_ICmp samesign cmp t v1 v2)).
   Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FBinop fop fm t v1 v2)).
   Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FCmp cmp t v1 v2)).
@@ -389,9 +376,7 @@ refine(
   match e as e0 return (P e0) with
   | EXP_Ident id => IH_Ident id
   | EXP_Integer x => IH_Integer x
-  | EXP_Float f33 => IH_Float f33
-  | EXP_Double f33 => IH_Double f33
-  | EXP_Hex f33 => IH_Hex f33
+  | EXP_Float f => IH_Float f
   | EXP_Bool b => IH_Bool b
   | EXP_Null => IH_Null
   | EXP_Zero_initializer => IH_Zero_initializer
@@ -405,6 +390,7 @@ refine(
   | OP_IBinop iop t v1 v2 => @IH_IBinop iop t v1 v2 (F v1) (F v2)
   | OP_ICmp cmp s t v1 v2 => IH_ICmp cmp s t v1 v2 (F v1) (F v2)
   | OP_FBinop fop fm t v1 v2 => IH_FBinop fop fm t v1 v2 (F v1) (F v2)
+  | OP_Fneg flags v => IH_Fneg flags v (F (snd v))
   | OP_FCmp cmp t v1 v2 => IH_FCmp cmp t v1 v2 (F v1) (F v2)
   | OP_Conversion conv t_from v t_to => IH_Conversion conv t_from v t_to (F v) 
   | OP_GetElementPtr t ptrval idxs => _
@@ -476,9 +462,7 @@ refine(
   match e as e0 return (P e0) with
   | EXP_Ident id => IH_Ident id
   | EXP_Integer x => IH_Integer x
-  | EXP_Float f33 => IH_Float f33
-  | EXP_Double f33 => IH_Double f33
-  | EXP_Hex f33 => IH_Hex f33
+  | EXP_Float f => IH_Float f
   | EXP_Bool b => IH_Bool b
   | EXP_Null => IH_Null
   | EXP_Zero_initializer => IH_Zero_initializer
@@ -492,6 +476,7 @@ refine(
   | OP_IBinop iop t v1 v2 => @IH_IBinop iop t v1 v2 (F v1) (F v2)
   | OP_ICmp s cmp t v1 v2 => IH_ICmp s cmp t v1 v2 (F v1) (F v2)
   | OP_FBinop fop fm t v1 v2 => IH_FBinop fop fm t v1 v2 (F v1) (F v2)
+  | OP_Fneg flags v => IH_Fneg flags v (F (snd v))
   | OP_FCmp cmp t v1 v2 => IH_FCmp cmp t v1 v2 (F v1) (F v2)
   | OP_Conversion conv t_from v t_to => IH_Conversion conv t_from v t_to (F v) 
   | OP_GetElementPtr t ptrval idxs => _
@@ -563,250 +548,6 @@ Lemma exp_metadata_mut_ind : (forall (e:exp T), P e) /\ (forall (m:metadata T), 
 Qed.  
 
 End ExpInd.
-
-
-(* Display *)
-(* SAZ: Aug. 2025 - this serialization stuff is very out of date an probably
-   not used anymore. *)
-Require Import Ceres.Ceres.
-
-Section hiding_notation.
-  #[local] Open Scope sexp_scope.
-
-  Definition serialize_raw_id (prefix: string): Serialize raw_id :=
-    fun r =>
-      match r with
-      | Name s => Atom (prefix ++ s)%string
-      | Anon n => Atom (show_Z n)
-      | LLVMAst.Raw n => Atom ("_RAW_" ++ show_Z n)%string
-      end.
-
-  #[global] Instance serialize_raw_id': Serialize raw_id := serialize_raw_id "".
-
-  #[global] Instance serialize_ident : Serialize ident :=
-    fun id =>
-      match id with
-      | ID_Global r => serialize_raw_id "@" r
-      | ID_Local  r => serialize_raw_id "%" r
-      end.
-
-  #[global] Instance serialize_instr_id : Serialize instr_id :=
-    fun ins =>
-      match ins with
-      | IId id => serialize_raw_id "%" id
-      | IVoid n => Atom ("void<" ++ show_Z n ++ ">")%string
-      end.
-
-  #[global] Instance serialize_ibinop : Serialize ibinop :=
-    fun binop =>
-      match binop with
-      | LLVMAst.Add nuw nsw => Atom "add"
-      | Sub nuw nsw => Atom "sub"
-      | Mul nuw nsw => Atom "mul"
-      | Shl nuw nsw => Atom "shl"
-      | UDiv flag => Atom "udiv"
-      | SDiv flag => Atom "sdiv"
-      | LShr flag => Atom "lshr"
-      | AShr flag => Atom "ashr"
-      | URem | SRem => Atom "rem"
-      | And => Atom "and"
-      | Or dj => Atom "or"
-      | Xor => Atom "xor"
-      end.
-
-  #[global] Instance serialize_fbinop : Serialize fbinop :=
-    fun fbinop =>
-      match fbinop with
-      | FAdd => Atom "fadd"
-      | FSub => Atom "fsub"
-      | FMul => Atom "fmul"
-      | FDiv => Atom "fdiv"
-      | FRem => Atom "frem"
-      end.
-
-  #[global] Instance serialize_icmp : Serialize icmp :=
-    fun cmp =>
-      Atom ("icmp "
-             ++
-             match cmp with
-             | Eq => "eq"
-             | Ne => "ne"
-             | Ugt => "ugt"
-             | Uge => "uge"
-             | Ult => "ult"
-             | Ule => "ule"
-             | Sgt => "sgt"
-             | Sge => "sge"
-             | Slt => "slt"
-             | Sle => "sle"
-             end)%string.
-
-  #[global] Instance serialize_fcmp : Serialize fcmp :=
-    fun cmp =>
-      Atom ("fcmp "
-             ++
-             match cmp with
-               FFalse => "ffalse"
-             | FOeq => "foeq"
-             | FOgt => "fogt"
-             | FOge => "foge"
-             | FOlt => "folt"
-             | FOle => "fole"
-             | FOne => "fone"
-             | FOrd => "ford"
-             | FUno => "funo"
-             | FUeq => "fueq"
-             | FUgt => "fugt"
-             | FUge => "fuge"
-             | FUlt => "fult"
-             | FUle => "fule"
-             | FUne => "fune"
-             | FTrue => "ftrue"
-             end)%string.
-
-  (* I need show_ZVellvm here because Ceres segfaults on extraction for
-  showing integers for some reason *)
-  Fixpoint serialize_typ' typ: sexp :=
-    match typ with
-    | TYPE_I sz => Atom ("i" ++ show_N (Npos sz))%string
-    | TYPE_IPTR => Atom ("iptr")%string
-    | TYPE_Pointer (Some t) => [serialize_typ' t ; Atom "*"]
-    | TYPE_Pointer None => Atom "ptr"
-    | TYPE_Void => Atom "void"
-    | TYPE_Half => Atom "half"
-    | TYPE_Float => Atom "float"
-    | TYPE_Double => Atom "double"
-    | TYPE_X86_fp80 => Atom "x86_fp80"
-    | TYPE_Fp128 => Atom "fp128"
-    | TYPE_Ppc_fp128 => Atom "ppc_fp128"
-    | TYPE_Metadata => Atom "metadata"
-    | TYPE_X86_mmx => Atom "x86_mmx"
-    | TYPE_Array sz t => [Atom "["; Atom (show_N sz); Atom "x"; serialize_typ' t; Atom "]"]
-    | TYPE_Function ret args varargs => [serialize_typ' ret; Atom "("; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexp (serialize_typ' x)) args)); Atom ")"]
-    | TYPE_Struct fields => [Atom "{"; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexp (serialize_typ' x)) fields)); Atom "}"]
-    | TYPE_Packed_struct fields => [Atom "<{"; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexp (serialize_typ' x)) fields)); Atom "}>"]
-    | TYPE_Opaque => Atom "opaque"
-    | TYPE_Vector sz t => [Atom "<"; Atom (show_N sz); Atom "x"; serialize_typ' t; Atom ">"]
-    | TYPE_Identified id => Atom (to_string id)
-    end.
-
-  #[global] Instance serialize_typ : Serialize typ := serialize_typ'.
-
-  Section WithSerializeT.
-    Variable (T:Set).
-    Context `{serializeT : Serialize T}.
-
-    Fixpoint serialize_exp' (v : exp T) :=
-      match v with
-      | EXP_Ident id => to_sexp id
-      | EXP_Integer x => Atom (show_Z x)
-      | EXP_Bool b => to_sexp b
-      | EXP_Null => Atom "null"
-      | EXP_Zero_initializer => Atom "zero initializer"
-      | EXP_Undef => Atom "undef"
-      | OP_IBinop iop t v1 v2 =>
-        [to_sexp iop ; to_sexp t
-                    ; serialize_exp' v1
-                    ; serialize_exp' v2]
-      | OP_ICmp s cmp t v1 v2 =>
-        [to_sexp cmp ; to_sexp s ; to_sexp t
-                    ; serialize_exp' v1
-                    ; serialize_exp' v2]
-      | OP_GetElementPtr t ptrval idxs =>
-        Atom "getelementptr"
-      | _ => Atom "to_sexp_exp todo"
-      end.
-
-    #[global] Instance serialize_exp : Serialize (exp T) := serialize_exp'.
-    #[global] Instance serialize_int : Serialize int_ast := fun i => Atom (show_Z i).
-
-    #[global] Instance serialize_texp : Serialize (texp T) :=
-      fun '(t, e) =>
-          [to_sexp t ; Atom " " ; to_sexp e ].
-
-    Definition serialize_opt {A:Type} `{AS:Serialize A} (s:string) : Serialize (option A) :=
-      fun x =>
-        match x with
-        | None => Atom ""
-        | Some a => [Atom s ; to_sexp a]
-        end.
-
-    #[global] Instance serialize_metadata : Serialize (metadata T) := fun m => Atom "to_sexp_metadata todo".
-    
-    #[global] Instance serialize_instr : Serialize (instr T) :=
-      fun instr =>
-        match instr with
-          (* SAZ: OUT OF DATE *)
-        (*
-        | INSTR_Op op => to_sexp op
-
-        | INSTR_Load t ptr anns =>
-          [Atom "load" ; to_sexp t ; to_sexp ptr ]
-
-        | INSTR_Store tval ptr anns =>
-          [Atom "store" ; to_sexp tval; to_sexp ptr
-           ; @serialize_opt _ serialize_int ", align" align]
-
-        | INSTR_Alloca t anns (* TODO: add anns *)=>
-          [Atom "alloca" ; to_sexp t]
-
-           | INSTR_Call
-           | INSTR_Phi
-           | INSTR_Alloca
-         *)
-        | _ => Atom "string_of_instr todo"
-        end.
-
-    #[global] Instance serialize_terminator : Serialize (terminator T) :=
-      fun t =>
-        match t with
-        | TERM_Ret v => [Atom "ret " ; to_sexp v]
-        | TERM_Ret_void => Atom "ret"
-        | TERM_Br te b1 b2 =>
-          [Atom "br"; to_sexp te; Atom ", label "; to_sexp b1; Atom ", label "; to_sexp b2]
-        | TERM_Br_1 b => [Atom "br label"; to_sexp b]
-        | _ => Atom "string_of_terminator todo"
-        end.
-
-    #[global] Instance serialize_instr_id_instr : Serialize (instr_id * (instr T)) :=
-      fun '(iid, i) =>
-        match iid with
-        | IId _ =>
-          [to_sexp iid ; Atom "=" ; to_sexp i]
-        | IVoid n =>
-          [to_sexp i]
-        end.
-
-    #[global] Instance serialize_block : Serialize (block T) :=
-      fun block =>
-        [to_sexp (blk_id block) ; Atom ":\n" ;
-        (* TODO: add indentation *)
-        to_sexp (blk_code block); to_sexp (blk_term block)].
-  End WithSerializeT.
-
-  (* TODO: What is this SerializeTyp stuff about? Why use ceres? *)
-  Section SerializeTyp.
-    #[global] Instance serialize_definition_list_block : Serialize (definition typ (list (block typ))) :=
-      fun defn =>
-        match defn.(df_prototype).(dc_type) with
-        | TYPE_Function ret_t args_t varargs
-          => let name  := defn.(df_prototype).(dc_name) in
-             [Atom "define"; to_sexp ret_t; to_sexp name;
-             Atom " {\n";
-             (* TODO: Add prefix for indentation? *)
-             to_sexp (df_instrs defn);
-             Atom "}\n"]
-        | _ => Atom "Invalid type on function"
-        end.
-
-    #[global] Instance serialize_tle_list_block : Serialize (toplevel_entity typ (list (block typ))) :=
-      fun tle =>
-        match tle with
-        | TLE_Definition defn => to_sexp defn
-        | _ => Atom "string_of_tle_list_block todo"
-        end.
-  End SerializeTyp.
-End hiding_notation.
 
 
 (* Utility function to determine whether a typ is void or is a function type returning void.

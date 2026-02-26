@@ -1,9 +1,11 @@
 (* begin hide *)
-Require Import Floats.
 From Stdlib Require Import
      List
      String
-     ZArith.
+     ZArith
+     Number
+     Decimal
+     Hexadecimal.
 From Vellvm Require Import
      Utilities.
 
@@ -31,8 +33,6 @@ Open Scope list_scope.
  *)
 
 Definition int_ast := Z.
-Definition float := Floats.float.  (* 64-bit floating point value *)
-Definition float32 := Floats.float32.
 
 (* File Information - this is used by the Vellvm-only 
    METADATA_File_info "virtual" metadata value to record source information.
@@ -65,20 +65,28 @@ Variant ident : Set :=
 .
 
 
+(* Floating point variants *)
+Variant floating_point_variant : Set :=
+| FP_half       (* 16-bit IEEE 754 binary 16 *)
+| FP_bfloat     (* 16-bit with 7-bit significand *)
+| FP_float      (* 32-bit IEEE 754 binary 32 *)
+| FP_double     (* 64-bit IEEE 754 binary 64 *)
+| FP_fp128      (* 128-bit IEEE 754 binary 128 *)
+| FP_x86_fp80   (* 80-bit x87 floating-point-value *)
+| FP_ppc_fp128  (* 128-bit floating-point value (two 64-bits) ? *)
+.  
+
+Scheme Equality for floating_point_variant.
+
 Unset Elimination Schemes.
 Inductive typ : Set :=
 | TYPE_I (sz:positive)
 | TYPE_IPTR
 | TYPE_Pointer (t: option typ)
 | TYPE_Void
-| TYPE_Half
-| TYPE_Float
-| TYPE_Double
-| TYPE_X86_fp80
-| TYPE_Fp128
-| TYPE_Ppc_fp128
-(* | TYPE_Label  type of block labels, currently unsupported *)
-(* | TYPE_Token  used with exceptions *)
+| TYPE_FP (fp:floating_point_variant)
+| TYPE_Label  (* type of block labels *)
+| TYPE_Token  (* used with exceptions *)
 | TYPE_Metadata
 | TYPE_X86_mmx
 | TYPE_Array (sz:N) (t:typ)
@@ -374,19 +382,45 @@ Section TypedSyntax.
 
 Unset Elimination Schemes.
 
+(* Representation for parsed integer literals:
+    - IntDecimal (Pos d)    for 1234
+    - IntDecimal (Neg d)    for -1234
+    - IntHexadecimal (Pos h) for u0x8000  is 32768
+    - IntHexadecimal (Neg h) for s0x8000  is -32768
+    NB: LLVM IR uses `u` and `s` to stand for "signed" and "unsigned" but maybe they
+    mean "positive" and "negative"?  e.g. according to LangRef:
+
+      "Note that hexadecimal integers are sign extended from the number of active
+       bits, i.e., the bit width minus the number of leading zeros. So
+       ‘s0x0001’ of type ‘i16’ will be -1, not 1."  *)
+Definition int_syntax := Number.signed_int.
+
+
+(* Representation for parse float literals *)
+Variant float_hex_type :=
+  | FH_X (* 0xABCD0000ABCD0000 Should be 16 digits, but is also used for bfloat, half, float and double? *)
+  | FH_K (* 0xKABCD0000ABCD0000ABCD Should be 20 digits. used for x86 *)
+  | FH_L (* 0xL...  Should be 32 digits. used for f128 *)
+  | FH_M (* 0xMABCD0000ABCD0000ABCD0000ABCD0000 Should be 32 digits. used for power pc *)
+  | FH_H (* 0xHABCD Should be 4 digits. used for half  *)
+  | FH_R (* 0xRABCD should be 4 digits. used for bfloat "brain float" *)
+  .
+
+Variant float_syntax :=
+  | FS_decimal (d:Decimal.decimal)  (* 123.45    -23.45e-17 etc.  *)
+  | FS_hex (t:float_hex_type) (u:Hexadecimal.uint).
+
 Inductive exp : Set :=
 | EXP_Ident   (id:ident)
-| EXP_Integer (x:int_ast)
-| EXP_Float   (f:float32)  (* 32-bit floating point values *)
-| EXP_Double  (f:float)    (* 64-bit floating point values *)
-| EXP_Hex     (f:float)    (* See LLVM documentation about hex float constants. *)
+| EXP_Integer (x:int_syntax)
+| EXP_Float   (f:float_syntax)  
 | EXP_Bool    (b:bool)
 | EXP_Null
 | EXP_Zero_initializer
     (* change type of Cstring to string *)
 | EXP_Cstring         (elts: list (T * exp))
                       (* parsing guarantees that the elts of a Cstring will be of the form
-                         ((TYPE_I 8), Exp_Integer <byte>)
+                         ((TYPE_I 8), Exp_Integer (IntDecimal (Pos <byte>)))
                       *)
 
 | EXP_Undef
@@ -398,6 +432,7 @@ Inductive exp : Set :=
 | OP_IBinop           (iop:ibinop) (t:T) (v1:exp) (v2:exp)
 | OP_ICmp             (samesign:bool) (cmp:icmp)   (t:T) (v1:exp) (v2:exp)
 | OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp) (v2:exp)
+| OP_Fneg             (flags:list fast_math) (v:(T * exp))
 | OP_FCmp             (cmp:fcmp)   (t:T) (v1:exp) (v2:exp)
 | OP_Conversion       (conv:conversion_type) (t_from:T) (v:exp) (t_to:T)
 | OP_GetElementPtr    (t:T) (ptrval:(T * exp)) (idxs:list (T * exp))
@@ -459,7 +494,7 @@ Definition texp : Set := T * exp.
 
 (* Used in switch branches which insist on integer literals *)
 Variant tint_literal : Set :=
-  | TInt_Literal (sz:positive) (x:int_ast).
+  | TInt_Literal (sz:positive) (x:int_syntax).
 
 Variant instr_id : Set :=
   | IId   (id:raw_id)    (* "Anonymous" or explicitly named instructions *)

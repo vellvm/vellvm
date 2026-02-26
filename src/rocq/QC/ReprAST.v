@@ -97,6 +97,10 @@ Section ReprInstances.
   
   #[global]
    Instance reprFile_info : Repr file_info := {| repr := repr_file_info |}.
+
+  #[global]
+  Instance repr_floating_point_variant : Repr floating_point_variant
+   := {| repr := show |}.                                              
   
   Fixpoint repr_dtyp (t : dtyp) : string :=
     match t with
@@ -104,12 +108,9 @@ Section ReprInstances.
     | DTYPE_IPTR => "DTYPE_IPTR"
     | DTYPE_Pointer => "DTYPE_Pointer"
     | DTYPE_Void => "DTYPE_Void"
-    | DTYPE_Half => "DTYPE_Half"
-    | DTYPE_Float => "DTYPE_Float"
-    | DTYPE_Double => "DTYPE_Double"
-    | DTYPE_X86_fp80 => "DTYPE_X86_fp80"
-    | DTYPE_Fp128 => "DTYPE_Fp128"
-    | DTYPE_Ppc_fp128 => "DTYPE_Ppc_fp128"
+    | DTYPE_FP fp => "(DTYPE_FP " ++ repr fp ++ ")"
+    | DTYPE_Label => "DTYPE_Label"
+    | DTYPE_Token => "DTYPE_Token"
     | DTYPE_Metadata => "DTYPE_Metadata"
     | DTYPE_X86_mmx => "DTYPE_X86_mmx"
     | DTYPE_Array sz t => "(DTYPE_Array (" ++ repr sz ++ ") (" ++ repr_dtyp t ++ "))"
@@ -126,12 +127,9 @@ Section ReprInstances.
     | TYPE_Pointer (Some t)     => "(TYPE_Pointer (Some " ++ repr_typ t ++ "))"
     | TYPE_Pointer None         => "(TYPE_Pointer None)"
     | TYPE_Void                 => "TYPE_Void"
-    | TYPE_Half                 => "TYPE_Half"
-    | TYPE_Float                => "TYPE_Float"
-    | TYPE_Double               => "TYPE_Double"
-    | TYPE_X86_fp80             => "TYPE_X86_fp80"
-    | TYPE_Fp128                => "TYPE_Fp128"
-    | TYPE_Ppc_fp128            => "TYPE_Ppc_fp128"
+    | TYPE_FP fp                => "(TYPE_FP " ++ repr fp ++ ")"
+    | TYPE_Label                => "TYPE_Label"
+    | TYPE_Token                => "TYPE_Token"
     | TYPE_Metadata             => "TYPE_Metadata"
     | TYPE_X86_mmx              => "TYPE_X86_mmx"
     | TYPE_Array sz t           => "(TYPE_Array (" ++ repr sz ++ ") (" ++ repr_typ t ++ "))"
@@ -282,6 +280,123 @@ Section ReprInstances.
    Instance reprFCmp : Repr fcmp :=
     {| repr := repr_fcmp |}.
 
+  Fixpoint repr_Decimal_uint (u:Decimal.uint) : string :=
+    match u with
+    | Decimal.Nil => "Decimal.Nil"
+    | Decimal.D0 u => "(Decimal.D0 " ++ repr_Decimal_uint u ++ ")"
+    | Decimal.D1 u => "(Decimal.D1 " ++ repr_Decimal_uint u ++ ")"                                    
+    | Decimal.D2 u => "(Decimal.D2 " ++ repr_Decimal_uint u ++ ")"
+    | Decimal.D3 u => "(Decimal.D3 " ++ repr_Decimal_uint u ++ ")"
+    | Decimal.D4 u => "(Decimal.D4 " ++ repr_Decimal_uint u ++ ")"
+    | Decimal.D5 u => "(Decimal.D5 " ++ repr_Decimal_uint u ++ ")"
+    | Decimal.D6 u => "(Decimal.D6 " ++ repr_Decimal_uint u ++ ")"
+    | Decimal.D7 u => "(Decimal.D7 " ++ repr_Decimal_uint u ++ ")"
+    | Decimal.D8 u => "(Decimal.D8 " ++ repr_Decimal_uint u ++ ")"
+    | Decimal.D9 u => "(Decimal.D9 " ++ repr_Decimal_uint u ++ ")"
+    end.
+
+  #[global]
+    Instance reprDecimalUINT : Repr (Decimal.uint) :=
+    {| repr := repr_Decimal_uint |}.
+  
+  Definition repr_Decimal_signed_int (d : Decimal.signed_int) : string :=
+    match d with
+    | Decimal.Pos u => "(Decimal.Pos " ++ repr u ++ ")"
+    | Decimal.Neg u => "(Decimal.Neg " ++ repr u ++ ")"
+    end.
+
+  #[global]
+    Instance reprDecimalSignedInt : Repr (Decimal.signed_int) :=
+    {| repr := repr_Decimal_signed_int |}.
+
+  
+  Definition repr_Decimal_decimal (d : Decimal.decimal) : string :=
+    match d with
+    | Decimal.Decimal i f => "(Decimal.Decimal " ++ repr i ++ " " ++ repr f ++ ")"
+    | Decimal.DecimalExp i f e => "(Decimal.Neg " ++ repr i ++ " " ++ repr f ++ " " ++ repr e ++ ")"
+    end.
+
+  #[global]
+    Instance reprDecimalDecimal : Repr (Decimal.decimal) :=
+    {| repr := repr_Decimal_decimal |}.
+
+
+  Fixpoint repr_Hexadecimal_uint (u:Hexadecimal.uint) : string :=
+    match u with
+    | Hexadecimal.Nil => "Hexadecimal.Nil"
+    | Hexadecimal.D0 u => "(Hexadecimal.D0 " ++ repr_Hexadecimal_uint u ++ ")"
+    | Hexadecimal.D1 u => "(Hexadecimal.D1 " ++ repr_Hexadecimal_uint u ++ ")"                                    
+    | Hexadecimal.D2 u => "(Hexadecimal.D2 " ++ repr_Hexadecimal_uint u ++ ")"
+    | Hexadecimal.D3 u => "(Hexadecimal.D3 " ++ repr_Hexadecimal_uint u ++ ")"
+    | Hexadecimal.D4 u => "(Hexadecimal.D4 " ++ repr_Hexadecimal_uint u ++ ")"
+    | Hexadecimal.D5 u => "(Hexadecimal.D5 " ++ repr_Hexadecimal_uint u ++ ")"
+    | Hexadecimal.D6 u => "(Hexadecimal.D6 " ++ repr_Hexadecimal_uint u ++ ")"
+    | Hexadecimal.D7 u => "(Hexadecimal.D7 " ++ repr_Hexadecimal_uint u ++ ")"
+    | Hexadecimal.D8 u => "(Hexadecimal.D8 " ++ repr_Hexadecimal_uint u ++ ")"
+    | Hexadecimal.D9 u => "(Hexadecimal.D9 " ++ repr_Hexadecimal_uint u ++ ")"
+    | Hexadecimal.Da u => "(Hexadecimal.Da " ++ repr_Hexadecimal_uint u ++ ")"
+    | Hexadecimal.Db u => "(Hexadecimal.Db " ++ repr_Hexadecimal_uint u ++ ")"
+    | Hexadecimal.Dc u => "(Hexadecimal.Dc " ++ repr_Hexadecimal_uint u ++ ")"
+    | Hexadecimal.Dd u => "(Hexadecimal.Dd " ++ repr_Hexadecimal_uint u ++ ")"
+    | Hexadecimal.De u => "(Hexadecimal.De " ++ repr_Hexadecimal_uint u ++ ")"
+    | Hexadecimal.Df u => "(Hexadecimal.Df " ++ repr_Hexadecimal_uint u ++ ")"                                            
+    end.
+
+  #[global]
+    Instance reprHexadecimalUINT : Repr (Hexadecimal.uint) :=
+    {| repr := repr_Hexadecimal_uint |}.
+  
+  Definition repr_Hexadecimal_signed_int (d : Hexadecimal.signed_int) : string :=
+    match d with
+    | Hexadecimal.Pos u => "(Hexadecimal.Pos " ++ repr u ++ ")"
+    | Hexadecimal.Neg u => "(Hexadecimal.Neg " ++ repr u ++ ")"
+    end.
+
+  #[global]
+    Instance reprHexadecimalSignedInt : Repr (Hexadecimal.signed_int) :=
+    {| repr := repr_Hexadecimal_signed_int |}.
+
+  Definition repr_Number_signed_int (n : Number.signed_int): string :=
+    match n with
+    | Number.IntDecimal i => "(Number.IntDecimal " ++ repr i ++ ")"
+    | Number.IntHexadecimal i => "(Number.IntHexadecimal " ++ repr i ++ ")"
+    end.
+
+  #[global]
+    Instance reprNumberSignedInt : Repr Number.signed_int :=
+    {| repr := repr_Number_signed_int |}.
+  
+  Definition repr_int_syntax (n : int_syntax) := repr_Number_signed_int n.
+
+  #[global]
+    Instance reprIntSyntax : Repr int_syntax :=
+    {| repr := repr_int_syntax |}.
+  
+  Definition repr_float_hex_type (fp : float_hex_type) : string :=
+    match fp with
+    | FH_X => "FH_X"
+    | FH_K => "FH_K"
+    | FH_L => "FH_L"
+    | FH_M => "FH_M"
+    | FH_H => "FH_H"
+    | FH_R => "FH_R"
+    end.
+
+  #[global]
+    Instance reprFloatHexType : Repr float_hex_type :=
+    {| repr := repr_float_hex_type |}.
+
+
+  Definition repr_float_syntax (f : float_syntax) : string :=
+    match f with
+    | FS_decimal d => "(FS_decimal " ++ repr d ++ ")"
+    | FS_hex t u => "(FS_hex " ++ repr t ++ " " ++ repr u ++ ")"
+    end.
+
+  #[global]
+    Instance reprFloatSyntax : Repr float_syntax :=
+    {| repr := repr_float_syntax |}.
+  
   Fixpoint repr_exp (v : exp typ) : string :=
     let texp (te : (typ * exp typ)) : string :=
       let '(t, e) := te in "(" ++ repr_typ t ++ ", " ++ repr_exp e ++ ")"
@@ -289,9 +404,7 @@ Section ReprInstances.
     match v with
     | EXP_Ident id => "(EXP_Ident " ++ repr id ++ ")"
     | EXP_Integer x => "(EXP_Integer " ++ repr x ++ ")"
-    | EXP_Float f  => "(EXP_Float  (Float.of_bits (@Integers.repr 32 " ++ show f ++ ")))"
-    | EXP_Double f => "(EXP_Double (Float.of_bits (@Integers.repr 64 " ++ show f ++ ")))"
-    | EXP_Hex f => "(EXP_Hex (Float.of_bits (@Integers.repr 64 " ++ show f ++ ")))"
+    | EXP_Float f  => "(EXP_Float " ++ repr f ++ ")"
     | EXP_Bool b => "(EXP_Bool " ++ repr b ++ ")"
     | EXP_Null => "EXP_Null"
     | EXP_Zero_initializer => "EXP_Zero_initializer"
@@ -309,6 +422,8 @@ Section ReprInstances.
     | OP_FBinop fop fm t v1 v2 =>
         "(OP_FBinop " ++ repr fop ++ " [" ++ (contents id (List.map repr_fast_math fm)) ++
                       "] " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
+    | OP_Fneg fm v =>
+        "(OP_Fneg [" ++ (contents id (List.map repr_fast_math fm)) ++ "] " ++ texp v ++")"
     | OP_FCmp cmp t v1 v2 =>
         "(OP_FCmp " ++ repr cmp ++ " " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
     | OP_Conversion c from v to =>
