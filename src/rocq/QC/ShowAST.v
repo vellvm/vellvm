@@ -4,19 +4,31 @@
     program should give you a string that can be read by clang.
  *)
 
-From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG DynamicTypes DList.
+From Vellvm Require Import
+  LLVMAst
+  Utilities
+  AstLib
+  Syntax.CFG
+  DynamicTypes
+  DList.
 
-Require Import Integers Floats.
-
-From Stdlib Require Import List.
+From Stdlib Require Import
+  List.
 
 Import ListNotations.
 
 Import DList.
 
 From Stdlib Require Import
-     ZArith String Bool.Bool Numbers.HexadecimalString
-     Strings.Ascii.
+  ZArith
+  String
+  Bool.Bool
+  Numbers.HexadecimalString
+  Numbers.DecimalString
+  Strings.Ascii.
+
+
+
 From QuickChick Require Import Show.
 (* Import QcDefaultNotation. Open Scope qc_scope. *)
 Set Warnings "-extraction-opaque-accessed,-extraction".
@@ -110,6 +122,26 @@ Section ShowInstances.
   #[global] Instance dshowIdent : DShow ident
     := {| dshow := dshow_ident |}.
 
+  Definition show_floating_point_variant (fp:floating_point_variant) : string :=
+    match fp with
+    | FP_half => "half"
+    | FP_bfloat => "bfloat"
+    | FP_float  => "float"
+    | FP_double => "double"
+    | FP_fp128 => "fp128"
+    | FP_x86_fp80 => "x86_fp80"
+    | FP_ppc_fp128 => "ppc_fp128"
+    end.
+
+  #[global] Instance showFloatingPointVariant : Show floating_point_variant :=
+    {| show := show_floating_point_variant |}.
+  
+  Definition dshow_floating_point_variant (fp:floating_point_variant) : DString :=
+    sd (show_floating_point_variant fp).
+  
+  #[global] Instance dshowFLoatingPointVariant : DShow floating_point_variant 
+    := {| dshow := dshow_floating_point_variant |}.
+  
   Fixpoint dshow_typ (t : typ) : DString  :=
     match t with
     | TYPE_I sz                 => sd "i" @@ sd (show sz)
@@ -117,12 +149,9 @@ Section ShowInstances.
     | TYPE_Pointer (Some t)     => dshow_typ t @@ sd "*"
     | TYPE_Pointer None         => sd "ptr"
     | TYPE_Void                 => sd "void"
-    | TYPE_Half                 => sd "half"
-    | TYPE_Float                => sd "float"
-    | TYPE_Double               => sd "double"
-    | TYPE_X86_fp80             => sd "x86_fp80"
-    | TYPE_Fp128                => sd "fp128"
-    | TYPE_Ppc_fp128            => sd "ppc_fp128"
+    | TYPE_FP fp                => dshow fp
+    | TYPE_Label                => sd "label"
+    | TYPE_Token                => sd "token"
     | TYPE_Metadata             => sd "metadata"
     | TYPE_X86_mmx              => sd "x86_mmx"
     | TYPE_Array sz t           =>
@@ -162,16 +191,13 @@ Section ShowInstances.
 
   Definition show_dtyp (t : dtyp) : string
     := match t with
-       | DTYPE_I sz                 => "Integer" ++ (show sz)
+       | DTYPE_I sz                 => "i" ++ (show sz)
        | DTYPE_IPTR                 => "iptr"
        | DTYPE_Pointer              => "Pointer"
        | DTYPE_Void                 => "Void"
-       | DTYPE_Half                 => "Half"
-       | DTYPE_Float                => "Float"
-       | DTYPE_Double               => "Double"
-       | DTYPE_X86_fp80             => "x86 fp80"
-       | DTYPE_Fp128                => "Fp128"
-       | DTYPE_Ppc_fp128            => "Ppc_fp128"
+       | DTYPE_FP fp                => (show fp)
+       | DTYPE_Label                => "label"
+       | DTYPE_Token                => "token"
        | DTYPE_Metadata             => "Metadata"
        | DTYPE_X86_mmx              => "X86_mmx"
        | DTYPE_Array sz t           => "Array"
@@ -494,23 +520,23 @@ Section ShowInstances.
   #[global] Instance showFBinop : Show fbinop
     := {| show := show_fbinop |}.
 
-  Definition double_to_hex_string (f : float) : string
-    := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (@unsigned 64 (Float.to_bits f)))).
+  (* Definition double_to_hex_string (f : float) : string *)
+  (*   := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (@unsigned 64 (Float.to_bits f)))). *)
 
-  Definition float_to_hex_string (f : float32) : string
-    := double_to_hex_string (Float32.to_double f).
+  (* Definition float_to_hex_string (f : float32) : string *)
+  (*   := double_to_hex_string (Float32.to_double f). *)
 
-  #[global] Instance showFloat : Show float
-    := {| show := double_to_hex_string |}.
+  (* #[global] Instance showFloat : Show float *)
+  (*   := {| show := double_to_hex_string |}. *)
 
-  #[global] Instance showFloat32 : Show float32
-    := {| show := float_to_hex_string |}.
+  (* #[global] Instance showFloat32 : Show float32 *)
+  (*   := {| show := float_to_hex_string |}. *)
 
-  Definition show_int {sz} (x : @bit_int sz) : string
-    := show (unsigned x).
+  (* Definition show_int {sz} (x : @bit_int sz) : string *)
+  (*   := show (unsigned x). *)
 
-  #[global] Instance Show_Int {sz} : Show (@bit_int sz)
-    := {| show := show_int|}.
+  (* #[global] Instance Show_Int {sz} : Show (@bit_int sz) *)
+  (*   := {| show := show_int|}. *)
 
   Definition show_fast_math (fm : fast_math) : string
     := match fm with
@@ -548,16 +574,17 @@ Section ShowInstances.
   #[global] Instance ShowConversionType : Show conversion_type
     := {| show := show_conversion_type |}.
 
+  (* SAZ: TODO - revisit c_string parsing to do better than this *)
   Definition ex_to_nat (ex : exp T) : nat :=
     match ex with
-    |EXP_Integer x => (Z.to_nat x)
+    |EXP_Integer x => (Z.to_nat (Z.of_num_int x))
     | _ => 0 (* This is arbitrary, it's never going to hit this case anyway *)
     end.
 
 
   Definition ex_to_int (ex : exp T) : Z :=
     match ex with
-    |EXP_Integer x => x
+    |EXP_Integer x => Z.of_num_int x
     | _ => 0%Z (* This is arbitrary, it's never going to hit this case anyway *)
     end.
 
@@ -565,7 +592,7 @@ Section ShowInstances.
     let n : nat := ex_to_nat ex in
     let x : Z := ex_to_int ex in
     if ((n <? 32) || (126 <? n))%nat then (
-        let conversion :=  NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N  x)) in
+        let conversion :=  HexadecimalString.NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N  x)) in
         if ((length (conversion)) =? (Z.to_nat 1))%nat then  "\0" ++ conversion
         else "\" ++ conversion
       )
@@ -578,33 +605,76 @@ Section ShowInstances.
   Definition dshow_c_string (ex : exp T) : DString :=
     sd (show_c_string ex).
     
-  Definition is_op (e : exp T) : bool :=
-    match e with
-    | EXP_Integer x => false
-    | EXP_Float f =>  false
-    | EXP_Double f =>   false
-    | EXP_Hex f =>   false
-    | EXP_Bool b =>     false
-    | EXP_Null =>      false
-    | EXP_Zero_initializer =>    false
-    (* see notes on cstring on LLVMAst.v *)
-    (* I'm using string_of_list_ascii bc I couldn't find any other function that converted asciis to strings  *)
-    | EXP_Cstring elts =>     false
-    | EXP_Undef =>         false
-    | EXP_Struct fields =>    false
-    | EXP_Packed_struct fields =>     false
-    | EXP_Array t elts =>               false
-    | EXP_Vector t elts =>        false
-    | EXP_Asm _ _ _ _ _ _ => false
-    | EXP_Metadata _ => false
-    | _ => true
-    end.
+  (* Definition is_op (e : exp T) : bool := *)
+  (*   match e with *)
+  (*   | EXP_Ident _ *)
+  (*   | EXP_Integer _ => false *)
+  (*   | EXP_Float _ =>  false *)
+  (*   | EXP_Bool _ =>     false *)
+  (*   | EXP_Null =>      false *)
+  (*   | EXP_Zero_initializer =>    false *)
+  (*   (* see notes on cstring on LLVMAst.v *) *)
+  (*   (* I'm using string_of_list_ascii bc I couldn't find any other function that converted asciis to strings  *) *)
+  (*   | EXP_Cstring elts =>     false *)
+  (*   | EXP_Undef =>         false *)
+  (*   | EXP_Struct fields =>    false *)
+  (*   | EXP_Packed_struct fields =>     false *)
+  (*   | EXP_Array t elts =>               false *)
+  (*   | EXP_Vector t elts =>        false *)
+  (*   | EXP_Asm _ _ _ _ _ _ => false *)
+  (*   | EXP_Metadata _ => false *)
+  (*   | _ => true *)
+  (*   end. *)
 
   Definition add_parens (b : bool) (ds : DString) : DString :=
     if b then sd "(" @@ ds @@ sd ")" else ds.
 
   Definition dshow_bool (b : bool) (s : string) : DString :=
     if b then (sd s) else DList_empty.
+
+  (*
+    - IntDecimal (Pos d)    for 1234
+    - IntDecimal (Neg d)    for -1234
+    - IntHexadecimal (Pos h) for u0x8000  is 32768
+    - IntHexadecimal (Neg h) for s0x8000  is -32768
+   *) 
+  Definition show_int_syntax (d : int_syntax) : string :=
+    match d with
+    | Number.IntDecimal d => (NilEmpty.string_of_int d)
+    | Number.IntHexadecimal (Hexadecimal.Pos h) => "u0x" ++ (HexadecimalString.NilEmpty.string_of_uint h)
+    | Number.IntHexadecimal (Hexadecimal.Neg h) => "s0x" ++ (HexadecimalString.NilEmpty.string_of_uint h)
+    end.
+
+  #[global] Instance showIntSyntax : Show int_syntax
+    := {| show := show_int_syntax |}.
+
+  Definition show_float_hex_type (ht : float_hex_type) : string :=
+    match ht with
+    | FH_X => "0x"
+    | FH_K => "0xK"
+    | FH_L => "0xL"
+    | FH_M => "0xM"
+    | FH_H => "0xH"
+    | FH_R => "0xR"
+    end.
+  
+  Definition show_float_syntax (f : float_syntax) : string :=
+    match f with
+    | FS_decimal (Decimal.Decimal i f) => (DecimalString.NilEmpty.string_of_int i) ++ "." ++ (DecimalString.NilEmpty.string_of_uint f)
+    | FS_decimal (Decimal.DecimalExp i f e) => (DecimalString.NilEmpty.string_of_int i) ++ "." ++ (DecimalString.NilEmpty.string_of_uint f) ++ "e" ++
+                                                (DecimalString.NilEmpty.string_of_int e)
+    | FS_hex ht u => (show_float_hex_type ht) ++ (HexadecimalString.NilEmpty.string_of_uint u)
+    end.
+
+  #[global] Instance showFloatSyntax : Show float_syntax
+    := {| show := show_float_syntax |}.                                            
+
+  Definition fast_math_list_to_dstring (fmath : list fast_math) : DString :=
+    sd
+      match fmath with
+      | nil => " "
+      | _ =>  " " ++ concat " " (map (fun x => show x) fmath) ++  " "
+      end.
   
   Fixpoint dshow_exp (b: bool) (v : exp T) : DString :=
     let comma_sep vals :=
@@ -617,8 +687,6 @@ Section ShowInstances.
     | EXP_Ident id => dshow id
     | EXP_Integer x => sd (show x)
     | EXP_Float f => sd (show f)
-    | EXP_Double f => sd (show f)
-    | EXP_Hex f => sd (double_to_hex_string f)
     | EXP_Bool b => sd (show b)
     | EXP_Null => sd "null"
     | EXP_Zero_initializer => sd "zeroinitializer"
@@ -661,14 +729,15 @@ Section ShowInstances.
         list_to_DString ["icmp " ; ss; show cmp ; " "] @@ add_parens b (dshow t @@ sd " " @@ dshow_exp true v1 @@ sd ", " @@ second_expression)
 
     | OP_FBinop fop fmath t v1 v2 =>
-        let fmath_string :=
-          sd
-            match fmath with
-            | nil => " "
-            | _ =>  " " ++ concat " " (map (fun x => show x) fmath) ++  " "
-            end
-        in list_to_DString [show fop ; " "] @@ add_parens b (fmath_string @@ dshow t @@ sd " " @@  dshow_exp true v1 @@ sd ", " @@ dshow_exp true v2)
+        let fmath_string := fast_math_list_to_dstring fmath in
+        list_to_DString [show fop ; " "] @@ add_parens b (fmath_string @@ dshow t @@ sd " " @@  dshow_exp true v1 @@ sd ", " @@ dshow_exp true v2)
 
+    | OP_Fneg fmath v =>
+        let fmath_string := fast_math_list_to_dstring fmath in
+        let (t, exp) := v in
+        list_to_DString ["fneg" ; " "] @@ add_parens b (fmath_string @@ dshow t @@ sd " " @@  dshow_exp true exp)
+
+                        
     | OP_FCmp cmp t v1 v2 =>
         sd "fcmp " @@ add_parens b (list_to_DString [show cmp ; " "] @@ dshow t @@ sd " " @@ dshow_exp true v1 @@
                                                  sd ", " @@ dshow_exp true v2)

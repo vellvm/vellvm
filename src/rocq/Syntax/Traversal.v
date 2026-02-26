@@ -96,8 +96,6 @@ Section Endo.
       | EXP_Ident id => EXP_Ident (endo id)
       | EXP_Integer _
       | EXP_Float   _
-      | EXP_Double  _
-      | EXP_Hex     _
       | EXP_Bool    _
       | EXP_Null
       | EXP_Zero_initializer
@@ -119,6 +117,8 @@ Section Endo.
           OP_ICmp s (endo cmp) (endo t) (f_exp v1) (f_exp v2)
       | OP_FBinop fop fm t v1 v2 =>
           OP_FBinop (endo fop) fm (endo t) (f_exp v1) (f_exp v2)
+      | OP_Fneg flags v =>
+          OP_Fneg flags (endo (fst v), f_exp (snd v))
       | OP_FCmp cmp t v1 v2 =>
           OP_FCmp (endo cmp) (endo t) (f_exp v1) (f_exp v2)
       | OP_Conversion conv t_from v t_to =>
@@ -529,8 +529,6 @@ Section TFunctor.
         | EXP_Ident id                       => EXP_Ident (endo id)
         | EXP_Integer n                      => EXP_Integer n
         | EXP_Float   f                      => EXP_Float   f
-        | EXP_Double  d                      => EXP_Double  d
-        | EXP_Hex     f                      => EXP_Hex     f
         | EXP_Bool    b                      => EXP_Bool    b
         | EXP_Null                           => EXP_Null
         | EXP_Zero_initializer               => EXP_Zero_initializer
@@ -544,6 +542,7 @@ Section TFunctor.
         | OP_IBinop iop t v1 v2              => OP_IBinop (endo iop) (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
         | OP_ICmp s cmp t v1 v2              => OP_ICmp s (endo cmp) (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
         | OP_FBinop fop fm t v1 v2           => OP_FBinop (endo fop) fm (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
+        | OP_Fneg flags v                    => OP_Fneg flags (ftexp v)
         | OP_FCmp cmp t v1 v2                => OP_FCmp (endo cmp) (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
         | OP_Conversion conv t_from v t_to   => OP_Conversion conv (f t_from) (ft_exp U V f  v) (f t_to)
         | OP_GetElementPtr t ptr idxs        => OP_GetElementPtr (f t) (ftexp ptr) (tfmap ftexp idxs)

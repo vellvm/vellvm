@@ -129,13 +129,10 @@ Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List
   | TYPE_I sz => DTYPE_I sz
   | TYPE_IPTR => DTYPE_IPTR
   | TYPE_Pointer t' => DTYPE_Pointer
+  | TYPE_Label => DTYPE_Label
+  | TYPE_Token => DTYPE_Token
   | TYPE_Void => DTYPE_Void
-  | TYPE_Half => DTYPE_Half
-  | TYPE_Float => DTYPE_Float
-  | TYPE_Double => DTYPE_Double
-  | TYPE_X86_fp80 => DTYPE_X86_fp80
-  | TYPE_Fp128 => DTYPE_Fp128
-  | TYPE_Ppc_fp128 => DTYPE_Ppc_fp128
+  | TYPE_FP fp => DTYPE_FP fp
   | TYPE_Metadata => DTYPE_Metadata
   | TYPE_X86_mmx => DTYPE_X86_mmx
   | TYPE_Opaque => DTYPE_Opaque
@@ -181,12 +178,9 @@ Lemma typ_to_dtyp_equation  : forall env t,
     | TYPE_IPTR => DTYPE_IPTR
     | TYPE_Pointer t' => DTYPE_Pointer
     | TYPE_Void => DTYPE_Void
-    | TYPE_Half => DTYPE_Half
-    | TYPE_Float => DTYPE_Float
-    | TYPE_Double => DTYPE_Double
-    | TYPE_X86_fp80 => DTYPE_X86_fp80
-    | TYPE_Fp128 => DTYPE_Fp128
-    | TYPE_Ppc_fp128 => DTYPE_Ppc_fp128
+    | TYPE_FP f => DTYPE_FP f
+    | TYPE_Label => DTYPE_Label
+    | TYPE_Token => DTYPE_Token
     | TYPE_Metadata => DTYPE_Metadata
     | TYPE_X86_mmx => DTYPE_X86_mmx
     | TYPE_Opaque => DTYPE_Opaque
@@ -208,7 +202,7 @@ Proof using.
   intros; rewrite typ_to_dtyp_equation; reflexivity.
 Qed.
 
-Lemma typ_to_dtyp_D : forall s, typ_to_dtyp s TYPE_Double = DTYPE_Double.
+Lemma typ_to_dtyp_D : forall s fp, typ_to_dtyp s (TYPE_FP fp) = DTYPE_FP fp.
 Proof using.
   intros; rewrite typ_to_dtyp_equation; reflexivity.
 Qed.
@@ -221,7 +215,7 @@ Proof using.
   apply typ_to_dtyp_equation.
 Qed.
 
-Lemma typ_to_dtyp_D_array : forall n s, typ_to_dtyp s (TYPE_Array n TYPE_Double) = DTYPE_Array n DTYPE_Double.
+Lemma typ_to_dtyp_D_array : forall n s fp, typ_to_dtyp s (TYPE_Array n (TYPE_FP fp)) = DTYPE_Array n (DTYPE_FP fp).
 Proof using.
   intros.
   rewrite typ_to_dtyp_equation.

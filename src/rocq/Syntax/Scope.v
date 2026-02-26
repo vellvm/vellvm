@@ -227,8 +227,6 @@ Section REGISTER_OPERATIONS.
 
                       | EXP_Integer _
                       | EXP_Float _
-                      | EXP_Double _
-                      | EXP_Hex _
                       | EXP_Bool _
                       | EXP_Null
                       | EXP_Zero_initializer
@@ -251,7 +249,8 @@ Section REGISTER_OPERATIONS.
                       | OP_ExtractElement (_,e1) (_,e2)
                       | OP_InsertValue (_,e1) (_,e2) _
                         => f e1 +++ f e2
-
+                      | OP_Fneg _ (_,e1) => f e1
+                            
                       | OP_InsertElement (_,e1) (_,e2) (_,e3)
                       | OP_ShuffleVector (_,e1) (_,e2) (_,e3)
                       | OP_Select (_,e1) (_,e2) (_,e3)

@@ -7,7 +7,8 @@ From Stdlib Require Import
      String
      Bool.Bool
      Lia
-     Program.Wf.
+     Program.Wf
+     Numbers.HexadecimalString.
 
 Import BinInt.
 
@@ -92,6 +93,7 @@ Definition inttyp (x:N) : Type :=
 apply N.eqb_eq.
 Qed.
 
+(* SAZ - TODO make this into typeclasses the way we did with bitint? *)
 Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
 
@@ -102,16 +104,11 @@ Definition ll_double := Floats.float.
   Proof using.
     intros t.
     induction t;
-      try
-        solve
+      try  solve
         [ left; constructor; eauto
         | left; firstorder
-        | right;
-          intros CONTRA;
-          red in CONTRA;
-          destruct CONTRA as [[n CONTRA] | CONTRA]; try discriminate;
-          repeat (destruct CONTRA as [CONTRA | CONTRA]; try discriminate)
-        ].
+        | right; intros CONTRA; red in CONTRA;
+          destruct CONTRA as [[n CONTRA] | [CONTRA | [CONTRA | [pf CONTRA]]]]; try discriminate].
   Qed.
 
 
@@ -127,6 +124,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | DVALUE_Addr (a:A.addr)
   | DVALUE_I (sz : positive) (x:@bit_int sz)
   | DVALUE_IPTR (x:intptr)
+(* TODO - this version | DVALUE_FP (fp:floating_point_variant) (x:@float_val fp) *)
   | DVALUE_Double (x:ll_double)
   | DVALUE_Float (x:ll_float)
   | DVALUE_Poison (t:dtyp)
@@ -139,6 +137,18 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   .
   Set Elimination Schemes.
 
+  Definition double_to_hex_string (f : float) : string
+    := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (unsigned (Float.to_bits f)))).
+
+  Definition float_to_hex_string (f : float32) : string
+    := double_to_hex_string (Float32.to_double f).
+
+  #[global] Instance showFloat : Show float
+    := {| show := double_to_hex_string |}.
+
+  #[global] Instance showFloat32 : Show float32
+    := {| show := float_to_hex_string |}.
+  
   Fixpoint show_dvalue (dv : dvalue) : string :=
     match dv with
     | DVALUE_Addr a => "addr " ++ A.show_addr a
@@ -155,6 +165,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Vector _ elts => "<"  ++ String.concat ", " (map show_dvalue elts) ++ ">"
     end.
 
+  #[global] Instance showDValue : Show dvalue
+   := {| show := show_dvalue |}.                                       
+  
   Fixpoint dvalue_measure (dv : dvalue) : nat :=
     match dv with
     | DVALUE_Addr a => 1
@@ -579,6 +592,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_IBinop        (iop:ibinop) (v1:uvalue) (v2:uvalue)
   | UVALUE_ICmp          (samesign:bool) (cmp:icmp)   (v1:uvalue) (v2:uvalue)
   | UVALUE_FBinop           (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue)
+  | UVALUE_Fneg             (fm:list fast_math) (t:dtyp) (v:uvalue)                            
   | UVALUE_FCmp             (cmp:fcmp)   (v1:uvalue) (v2:uvalue)
   | UVALUE_Conversion       (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp)
   | UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)) (* TODO: do we ever need this? GEP raises an event? *)
@@ -636,6 +650,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_IBinop iop v1 v2 => sd (show_ibinop iop) @@ sd " " @@ dshow_uvalue v1 @@ sd " " @@ dshow_uvalue v2
     | UVALUE_ICmp s cmp v1 v2 => sd (show_icmp cmp) @@ sd " " @@ sd (show s) @@ sd " " @@ dshow_uvalue v1 @@ sd " " @@ dshow_uvalue v2
     | UVALUE_FBinop fop fm v1 v2 => sd (show_fbinop fop) @@ sd " " @@ dshow_uvalue v1 @@ sd " " @@ dshow_uvalue v2
+    | UVALUE_Fneg fm t v => sd "fneg " @@ dshow_uvalue v
     | UVALUE_FCmp cmp v1 v2 => sd (show_fcmp cmp) @@ sd " " @@ dshow_uvalue v1 @@ sd " " @@ dshow_uvalue v2
     | UVALUE_Conversion conv t_from v t_to => sd (show_conversion_type conv) @@ sd " " @@ dshow t_from @@ sd " " @@ dshow_uvalue v @@ sd " " @@ dshow t_to
     | UVALUE_GetElementPtr t ptrval idxs =>
@@ -680,6 +695,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_FBinop _ _ v1 v2
     | UVALUE_FCmp _ v1 v2 =>
         S (uvalue_measure v1 + uvalue_measure v2)
+    | UVALUE_Fneg _ _ v =>
+        S (uvalue_measure v)
     | UVALUE_Conversion conv t_from v t_to =>
         S (uvalue_measure v)
     | UVALUE_GetElementPtr t ptrval idxs =>
@@ -772,6 +789,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_ICmp_subterm_r : forall ss icmp uv1 uv2, uvalue_direct_subterm uv2 (UVALUE_ICmp ss icmp uv1 uv2)
   | UVALUE_FBinop_subterm_l : forall fop flags uv1 uv2, uvalue_direct_subterm uv1 (UVALUE_FBinop fop flags uv1 uv2)
   | UVALUE_FBinop_subterm_r : forall fop flags uv1 uv2, uvalue_direct_subterm uv2 (UVALUE_FBinop fop flags uv1 uv2)
+  | UVALUE_Fneg_subterm : forall flags t uv, uvalue_direct_subterm uv (UVALUE_Fneg flags t uv)
   | UVALUE_FCmp_subterm_l : forall fcmp uv1 uv2, uvalue_direct_subterm uv1 (UVALUE_FCmp fcmp uv1 uv2)
   | UVALUE_FCmp_subterm_r : forall fcmp uv1 uv2, uvalue_direct_subterm uv2 (UVALUE_FCmp fcmp uv1 uv2)
   | UVALUE_Conversion_subterm : forall conv_type dt_from uv dt_to, uvalue_direct_subterm uv (UVALUE_Conversion conv_type dt_from uv dt_to)
@@ -815,6 +833,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
     Hypothesis IH_ICmp           : forall (samesign:bool) (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp samesign cmp v1 v2).
     Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
+    Hypothesis IH_Fneg           : forall (fm:list fast_math) (t:dtyp) (v:uvalue), P v -> P(UVALUE_Fneg fm t v).
     Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
     Hypothesis IH_Conversion     : forall (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv t_from v t_to).
     Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, In idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
@@ -856,6 +875,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       - apply IH_IBinop; auto.
       - apply IH_ICmp; auto.
       - apply IH_FBinop; auto.
+      - apply IH_Fneg; auto.
       - apply IH_FCmp; auto.
       - apply IH_Conversion; auto.
       - apply IH_GetElementPtr. apply IH.
@@ -1934,6 +1954,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
     Hypothesis IH_ICmp           : forall (samesign:bool) (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp samesign cmp v1 v2).
     Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
+    Hypothesis IH_Fneg           : forall (fm:list fast_math) (t:dtyp) (v:uvalue), P v -> P (UVALUE_Fneg fm t v).
     Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
     Hypothesis IH_Conversion     : forall (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv t_from v t_to).
     Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, InT idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
@@ -1975,6 +1996,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       - apply IH_IBinop; auto.
       - apply IH_ICmp; auto.
       - apply IH_FBinop; auto.
+      - apply IH_Fneg; auto.
       - apply IH_FCmp; auto.
       - apply IH_Conversion; auto.
       - apply IH_GetElementPtr. apply IH.
@@ -2109,6 +2131,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
     Hypothesis IH_ICmp           : forall (samesign:bool) (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp samesign cmp v1 v2).
     Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
+    Hypothesis IH_Fneg           : forall (fm:list fast_math) (t:dtyp) (v:uvalue), P v -> P (UVALUE_Fneg fm t v).    
     Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
     Hypothesis IH_Conversion     : forall (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv t_from v t_to).
     Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, In idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
@@ -2260,6 +2283,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       - apply IH_IBinop; auto.
       - apply IH_ICmp; auto.
       - apply IH_FBinop; auto.
+      - apply IH_Fneg; auto.
       - apply IH_FCmp; auto.
       - apply IH_Conversion; auto.
       - apply IH_GetElementPtr. apply IH.
@@ -2393,6 +2417,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
     Hypothesis IH_ICmp           : forall (samesign: bool) (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp samesign cmp v1 v2).
     Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
+    Hypothesis IH_Fneg           : forall (fm:list fast_math) (t:dtyp) (v:uvalue), P v -> P (UVALUE_Fneg fm t v).    
     Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
     Hypothesis IH_Conversion     : forall (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv t_from v t_to).
     Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, InT idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
@@ -2544,6 +2569,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       - apply IH_IBinop; auto.
       - apply IH_ICmp; auto.
       - apply IH_FBinop; auto.
+      - apply IH_Fneg; auto.
       - apply IH_FCmp; auto.
       - apply IH_Conversion; auto.
       - apply IH_GetElementPtr. apply IH.
@@ -2705,6 +2731,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         contains_undef_or_poison v1 || contains_undef_or_poison v2
     | UVALUE_FBinop fop fm v1 v2 =>
         contains_undef_or_poison v1 || contains_undef_or_poison v2
+    | UVALUE_Fneg _ _ v =>
+        contains_undef_or_poison v
     | UVALUE_FCmp cmp v1 v2 =>
         contains_undef_or_poison v1 || contains_undef_or_poison v2
     | UVALUE_Conversion conv t_from v t_to =>
@@ -2878,6 +2906,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       eapply H; eauto.
   Qed.
 
+(* TODO: DELETE  
   Section hiding_notation.
     #[local] Open Scope sexp_scope.
 
@@ -2930,7 +2959,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     #[global] Instance serialize_uvalue : Serialize (uvalue) := serialize_uvalue' "" "".
 
   End hiding_notation.
-
+*)
+  
   Ltac dec_dvalue :=
     match goal with
     | [ |- { ?X ?a = ?X ?b} + { ?X ?a <> ?X ?b} ] => idtac
@@ -3172,6 +3202,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 | UVALUE_IBinop op uv1 uv2, UVALUE_IBinop op' uv1' uv2' => _
                 | UVALUE_ICmp ss op uv1 uv2, UVALUE_ICmp ss' op' uv1' uv2' => _
                 | UVALUE_FBinop op fm uv1 uv2, UVALUE_FBinop op' fm' uv1' uv2' => _
+                | UVALUE_Fneg fm t uv, UVALUE_Fneg fm' t' uv' => _
                 | UVALUE_FCmp op uv1 uv2, UVALUE_FCmp op' uv1' uv2' => _
                 | UVALUE_Conversion ct tf u t, UVALUE_Conversion ct' tf' u' t' => _
                 | UVALUE_GetElementPtr t u l, UVALUE_GetElementPtr t' u' l' => _
@@ -3208,6 +3239,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         destruct (list_eq_dec fast_math_eq_dec fm fm')...
         destruct (f uv1 uv1')...
         destruct (f uv2 uv2')...
+      - destruct (list_eq_dec fast_math_eq_dec fm fm')...
+        destruct (dtyp_eq_dec t t')...
+        destruct (f uv uv')...
       - destruct (fcmp_eq_dec op op')...
         destruct (f uv1 uv1')...
         destruct (f uv2 uv2')...
@@ -3739,11 +3773,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         else ret (DVALUE_Poison t)
     | _, _                               =>
         raise_error ("ill_typed-fop: " ++
-                       (to_string fop) ++
+                       (show fop) ++
                        " " ++
-                       (to_string v1) ++
+                       (show v1) ++
                        " " ++
-                       (to_string v2))
+                       (show v2))
     end.
 
   Definition not_nan32 (f:ll_float) : bool :=
@@ -3968,8 +4002,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | DVALUE_Addr_typ   : forall a, dvalue_has_dtyp (DVALUE_Addr a) DTYPE_Pointer
   | DVALUE_I_typ      : forall sz x, dvalue_has_dtyp (@DVALUE_I sz x) (DTYPE_I sz)
   | DVALUE_IPTR_typ   : forall x, dvalue_has_dtyp (DVALUE_IPTR x) DTYPE_IPTR
-  | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
-  | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
+  | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) (DTYPE_FP FP_double)
+  | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) (DTYPE_FP FP_float)
   | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
   | DVALUE_Poison_typ  : forall τ, NO_VOID τ -> dvalue_has_dtyp (DVALUE_Poison τ) τ
   | DVALUE_Oom_typ  : forall τ, NO_VOID τ -> dvalue_has_dtyp (DVALUE_Oom τ) τ
@@ -4012,8 +4046,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x) DTYPE_IPTR.
     Hypothesis IH_Poison         : forall t (NV: NO_VOID t), P (DVALUE_Poison t) t.
     Hypothesis IH_Oom            : forall t (NV: NO_VOID t), P (DVALUE_Oom t) t.
-    Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
-    Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
+    Hypothesis IH_Double         : forall x, P (DVALUE_Double x) (DTYPE_FP FP_double).
+    Hypothesis IH_Float          : forall x, P (DVALUE_Float x) (DTYPE_FP FP_float).
     Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
 
     Hypothesis IH_Struct :
@@ -4124,10 +4158,10 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         if dtyp_eq_dec dt (DTYPE_IPTR) then true else false
 
     | DVALUE_Double x =>
-        if dtyp_eq_dec dt (DTYPE_Double) then true else false
+        if dtyp_eq_dec dt (DTYPE_FP FP_double) then true else false
 
     | DVALUE_Float x =>
-        if dtyp_eq_dec dt (DTYPE_Float) then true else false
+        if dtyp_eq_dec dt (DTYPE_FP FP_float) then true else false
 
     | DVALUE_Poison t
     | DVALUE_Oom t =>
@@ -4429,8 +4463,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | UVALUE_Addr_typ   : forall a, uvalue_has_dtyp (UVALUE_Addr a) DTYPE_Pointer
   | UVALUE_I_typ      : forall sz x, uvalue_has_dtyp (@UVALUE_I sz x) (DTYPE_I sz)
   | UVALUE_IPTR_typ    : forall x, uvalue_has_dtyp (UVALUE_IPTR x) (DTYPE_IPTR)
-  | UVALUE_Double_typ : forall x, uvalue_has_dtyp (UVALUE_Double x) DTYPE_Double
-  | UVALUE_Float_typ  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Float
+  | UVALUE_Double_typ : forall x, uvalue_has_dtyp (UVALUE_Double x) (DTYPE_FP FP_double)
+  | UVALUE_Float_typ  : forall x, uvalue_has_dtyp (UVALUE_Float x) (DTYPE_FP FP_float)
   | UVALUE_None_typ   : uvalue_has_dtyp UVALUE_None DTYPE_Void
   | UVALUE_Poison_typ : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Poison τ) τ
   | UVALUE_Oom_typ    : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Oom τ) τ
@@ -4499,33 +4533,42 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       uvalue_has_dtyp (UVALUE_ICmp ss op x y) (DTYPE_Vector vsz (DTYPE_I 1))
 
   | UVALUE_FBinop_typ :
-    forall x y op fms dt,
-      (dt = DTYPE_Double \/ dt = DTYPE_Float) ->
+    forall x y op fms dt fp,
+      (dt = DTYPE_FP fp) ->
       uvalue_has_dtyp x dt ->
       uvalue_has_dtyp y dt ->
       uvalue_has_dtyp (UVALUE_FBinop op fms x y) dt
 
   | UVALUE_FBinop_vector_typ :
-    forall x y vsz op fms dt,
-      (dt = DTYPE_Double \/ dt = DTYPE_Float) ->
+    forall x y vsz op fms dt fp,
+      (dt = DTYPE_FP fp) ->
       uvalue_has_dtyp x (DTYPE_Vector vsz dt) ->
       uvalue_has_dtyp y (DTYPE_Vector vsz dt) ->
       uvalue_has_dtyp (UVALUE_FBinop op fms x y) (DTYPE_Vector vsz dt)
 
+  |  UVALUE_Fneg_typ :
+    forall x fms dt fp,
+      (dt = DTYPE_FP fp) ->
+      uvalue_has_dtyp x dt ->
+      uvalue_has_dtyp (UVALUE_Fneg fms dt x) dt
+
+  |  UVALUE_Fneg_vector_typ :
+    forall x vsz fms dt fp,
+      (dt = DTYPE_Vector vsz (DTYPE_FP fp)) ->
+      uvalue_has_dtyp x dt ->
+      uvalue_has_dtyp (UVALUE_Fneg fms dt x) dt
+                      
   | UVALUE_FCmp_typ :
-    forall x y op dt,
-      (dt = DTYPE_Double \/ dt = DTYPE_Float) ->
+    forall x y op dt fp,
+      (dt = DTYPE_FP fp) ->
       uvalue_has_dtyp x dt ->
       uvalue_has_dtyp y dt ->
       uvalue_has_dtyp (UVALUE_FCmp op x y) (DTYPE_I 1)
 
   | UVALUE_FCmp_vector_typ :
-      forall x y vsz op,
-        ((uvalue_has_dtyp x (DTYPE_Vector vsz (DTYPE_Double)) /\
-            uvalue_has_dtyp y (DTYPE_Vector vsz (DTYPE_Double)))
-         \/
-           (uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_Float) /\
-              uvalue_has_dtyp y (DTYPE_Vector vsz DTYPE_Float))
+      forall x y vsz op fp,
+        ((uvalue_has_dtyp x (DTYPE_Vector vsz (DTYPE_FP fp)) /\
+            uvalue_has_dtyp y (DTYPE_Vector vsz (DTYPE_FP fp)))
         ) ->
       uvalue_has_dtyp (UVALUE_FCmp op x y) (DTYPE_Vector vsz (DTYPE_I 1))
 
@@ -4607,8 +4650,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a) DTYPE_Pointer.
     Hypothesis IH_I              : forall sz x, P (@UVALUE_I sz x) (DTYPE_I sz).
     Hypothesis IH_IPTR           : forall x, P (UVALUE_IPTR x) DTYPE_IPTR.
-    Hypothesis IH_Double         : forall x, P (UVALUE_Double x) DTYPE_Double.
-    Hypothesis IH_Float          : forall x, P (UVALUE_Float x) DTYPE_Float.
+    Hypothesis IH_Double         : forall x, P (UVALUE_Double x) (DTYPE_FP FP_double).
+    Hypothesis IH_Float          : forall x, P (UVALUE_Float x) (DTYPE_FP FP_float).
     Hypothesis IH_None           : P UVALUE_None DTYPE_Void.
     Hypothesis IH_Poison         : forall τ, NO_VOID τ -> P (UVALUE_Poison τ) τ.
     Hypothesis IH_Oom            : forall τ, NO_VOID τ -> P (UVALUE_Oom τ) τ.
@@ -4671,26 +4714,36 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         ) ->
       P (UVALUE_ICmp ss op x y) (DTYPE_Vector vsz (DTYPE_I 1)).
 
-    Hypothesis IH_FBinop : forall (x y : uvalue) (op : fbinop) (fms : list fast_math) dt,
-        (dt = DTYPE_Double \/ dt = DTYPE_Float) ->
+    Hypothesis IH_FBinop : forall (x y : uvalue) (op : fbinop) (fms : list fast_math) dt fp,
+        (dt = DTYPE_FP fp) ->
         P x dt ->
         P y dt ->
         P (UVALUE_FBinop op fms x y) dt.
 
-    Hypothesis IH_FBinop_vector : forall (x y : uvalue) vsz (op : fbinop) (fms : list fast_math) dt,
-        (dt = DTYPE_Double \/ dt = DTYPE_Float) ->
+    Hypothesis IH_FBinop_vector : forall (x y : uvalue) vsz (op : fbinop) (fms : list fast_math) dt fp,
+        (dt = DTYPE_FP fp) ->
         P x (DTYPE_Vector vsz dt) ->
         P y (DTYPE_Vector vsz dt) ->
         P (UVALUE_FBinop op fms x y) (DTYPE_Vector vsz dt).
 
-    Hypothesis IH_FCmp : forall (x y : uvalue) (op : fcmp) dt,
-        (dt = DTYPE_Double \/ dt = DTYPE_Float) ->
+    Hypothesis IH_Fneg : forall (x : uvalue) (fms : list fast_math) dt fp,
+        (dt = DTYPE_FP fp) ->
+        P x dt ->
+        P (UVALUE_Fneg fms dt x) dt.
+
+    Hypothesis IH_Fneg_vector : forall (x : uvalue) vsz (fms : list fast_math) dt fp,
+        (dt = (DTYPE_Vector vsz (DTYPE_FP fp))) ->
+        P x dt ->
+        P (UVALUE_Fneg fms dt x) dt.
+    
+    Hypothesis IH_FCmp : forall (x y : uvalue) (op : fcmp) dt fp,
+        (dt = DTYPE_FP fp) ->
         P x dt ->
         P y dt ->
         P (UVALUE_FCmp op x y) (DTYPE_I 1).
 
-    Hypothesis IH_FCmp_vector : forall (x y : uvalue) vsz (op : fcmp) dt,
-        (dt = DTYPE_Double \/ dt = DTYPE_Float) ->
+    Hypothesis IH_FCmp_vector : forall (x y : uvalue) vsz (op : fcmp) dt fp,
+        (dt = DTYPE_FP fp) -> 
         P x (DTYPE_Vector vsz dt) ->
         P y (DTYPE_Vector vsz dt) ->
         P (UVALUE_FCmp op x y) (DTYPE_Vector vsz (DTYPE_I 1)).
@@ -4840,9 +4893,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         + right. left; split; eauto.
         + right. right; split; eauto.
 
-      - destruct H as [[HX HY]|[HX HY]].
-        + eapply IH_FCmp_vector with (dt:=DTYPE_Double); auto.
-        + eapply IH_FCmp_vector with (dt:=DTYPE_Float); auto.
+      - destruct H as [HX HY].
+        eapply IH_FCmp_vector with (dt:=DTYPE_FP fp); auto.
 
       - eapply IH_ExtractElement with (sz:=sz); auto.
         destruct H as [HI | HI].
@@ -4884,10 +4936,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
   Definition valid_fbinop_type (t : dtyp) : bool :=
     match t with
-    | DTYPE_Float
-    | DTYPE_Double
-    | DTYPE_Vector _ DTYPE_Float
-    | DTYPE_Vector _ DTYPE_Double =>
+    | DTYPE_FP fp
+    | DTYPE_Vector _ (DTYPE_FP fp) =>
         true
     | _ => false
     end.
@@ -4908,8 +4958,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | UVALUE_Addr a => ret DTYPE_Pointer  
     | @UVALUE_I sz x => ret (DTYPE_I sz)
     | UVALUE_IPTR x => ret DTYPE_IPTR
-    | UVALUE_Double x => ret DTYPE_Double
-    | UVALUE_Float x => ret DTYPE_Float
+    | UVALUE_Double x => ret (DTYPE_FP FP_double)
+    | UVALUE_Float x => ret (DTYPE_FP FP_float)
     | UVALUE_Undef t
     | UVALUE_Poison t
     | UVALUE_Oom t =>
@@ -4968,6 +5018,13 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         then ret t1
         else inl "dtyp_of_uvalue_fun: mismatched fbinop types"
 
+    | UVALUE_Fneg fms t x  =>
+        t1 <- dtyp_of_uvalue_fun x;;
+        if dtyp_eqb t t1 && valid_fbinop_type t1
+        then
+          ret t1
+        else inl "dtyp_of_uvalue_fun: invalied fneg type"
+                 
     | UVALUE_FCmp op x y =>
         t1 <- dtyp_of_uvalue_fun x;;
         t2 <- dtyp_of_uvalue_fun y;;
@@ -5082,13 +5139,10 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     forall uv dt,
       dtyp_of_uvalue_fun uv = inr dt -> uvalue_has_dtyp uv dt.
   Proof using.
-    induction uv; intros dtx HX;
-      try solve [
-          unfold uvalue_has_dtyp_fun, dtyp_of_uvalue_fun in HX;
-          cbn in HX; try inv HX;
-          repeat break_match_hyp_inv;
-          econstructor; eauto with uvalue
-        ].
+    induction uv; intros dtx HX.
+
+    1-5,9,20,27: try solve [cbn in HX; try inv HX; econstructor; eauto with uvalue].
+    1-3: try solve [cbn in HX; break_match_hyp_inv; econstructor; eauto with uvalue].
 
     - assert (exists ts, dtx = DTYPE_Struct ts).
       { unfold dtyp_of_uvalue_fun in HX;
@@ -5269,6 +5323,20 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
       all: try solve [econstructor; eauto with uvalue].
 
+    - (* Fneg *)
+      cbn in HX; repeat break_match_hyp_inv; invert_bools.
+        unfold valid_fbinop_type in *;
+        repeat break_match_hyp_inv;
+        repeat match goal with
+          | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+        repeat match goal with
+          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
+                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2
+          end.
+      all: try solve [econstructor; eauto with uvalue].
+      
     - (*FCmp *)
       cbn in HX.
       do 3 break_match_hyp_inv.
@@ -5286,10 +5354,10 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           end.
 
       all: try solve [econstructor; eauto with uvalue].
-      + eapply UVALUE_FCmp_typ; try left; eauto with uvalue.
-      + break_match_hyp_inv.
-        * eapply UVALUE_FCmp_vector_typ; eauto with uvalue.
-        * eapply UVALUE_FCmp_vector_typ; left; eauto with uvalue.
+      assert (exists fp, d = DTYPE_FP fp).
+      { destruct d; inversion H2. exists fp. reflexivity. }
+      destruct H as [pf HEq]. subst. 
+      eapply UVALUE_FCmp_vector_typ; try left; eauto with uvalue.
 
     - (* Conversion *)
       cbn in HX;
@@ -5308,6 +5376,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
       all: try solve [econstructor; eauto with uvalue].
 
+    - (* Extract Element *)
+      cbn in HX; repeat break_match_hyp_inv; econstructor; eauto.
+      
     - (* InsertElement *)
       cbn in HX;
         repeat break_match_hyp_inv;
@@ -5345,24 +5416,10 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       
       all: try solve [econstructor; eauto with uvalue].
 
-    - (* ShuffleVector *)
-      cbn in HX;
-        repeat break_match_hyp_inv;
-        invert_bools;
-        unfold valid_ibinop_type in *;
-        repeat break_match_hyp_inv;
-        repeat match goal with
-          | H: dtyp_eqb _ _ = true |- _ =>
-              apply dtyp_eqb_eq in H; subst
-          end;
-        repeat match goal with
-          | [ H1 : (forall dt, uvalue_has_dtyp_fun ?UV dt = true -> _),
-                H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2
-          end.
-
-      constructor; eauto with uvalue.
-      apply check_fetch_extract_path; auto.
-
+    - (* Extract Value *)
+      cbn in HX; repeat break_match_hyp_inv; econstructor; eauto.
+      unfold check_extract_path. rewrite H1. apply dtyp_eqb_refl.
+      
     - (* InsertValue *)
       cbn in HX;
         repeat break_match_hyp_inv;
@@ -5378,7 +5435,12 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                 H2 : uvalue_has_dtyp_fun ?UV _ = true |- _] => apply H1 in H2
           end.
 
-      constructor; auto with uvalue.
+      constructor; eauto with uvalue.
+
+    - (* Select *)
+      cbn in HX; repeat break_match_hyp_inv.
+      + econstructor; eauto.
+      + eapply UVALUE_Select_vect; eauto.
 
     - (* ConcatBytes *)
       cbn in HX;
@@ -5405,25 +5467,10 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       uvalue_has_dtyp uv dt -> uvalue_has_dtyp_fun uv dt = true.
   Proof using.
     intros uv dt TYPE.
-    induction TYPE; auto;
-      try solve [
-          unfold uvalue_has_dtyp_fun;
-          cbn;
-          repeat break_inner_match_goal;
-          solve
-            [ apply dtyp_eqb_refl
-            | contradiction
-            ]
-        | cbn; induction H; forward_bools; auto
-        | cbn; repeat break_match_goal; auto; try contradiction;
-          forward_bools; [rewrite forallb_forall; auto | apply Nat.eqb_eq; auto]
-        | cbn; repeat break_match_goal; auto
-        | cbn;
-          repeat break_match_goal; invert_hyps; subst;
-          try (inversion H0; subst; try contradiction);
-          try (solve [inversion H]);
-          forward_bools; auto
-        ].
+    induction TYPE; auto.
+
+    1: unfold uvalue_has_dtyp_fun; cbn; apply dtyp_eqb_refl.
+    1-3: unfold uvalue_has_dtyp_fun; cbn; break_inner_match_goal; [apply dtyp_eqb_refl | contradiction ].
 
     - unfold uvalue_has_dtyp_fun.
       induction H; cbn; auto.
@@ -5529,7 +5576,29 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         try setoid_rewrite dtyp_eqb_refl;
         cbn; auto;
         apply dtyp_eqb_refl.
-    - destruct H as [H | H]; subst;
+    - invert_hyps; subst; cbn;
+      unfold uvalue_has_dtyp_fun in *.
+      cbn. 
+      repeat break_match_hyp_inv.
+        repeat match goal with
+               | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+          try setoid_rewrite dtyp_eqb_refl.
+        cbn.
+        apply dtyp_eqb_refl.
+    - subst; cbn.
+      unfold uvalue_has_dtyp_fun in *.
+      cbn. 
+      repeat break_match_hyp_inv.
+        repeat match goal with
+               | H: dtyp_eqb _ _ = true |- _ =>
+              apply dtyp_eqb_eq in H; subst
+          end;
+          try setoid_rewrite dtyp_eqb_refl.
+        cbn.
+        apply dtyp_eqb_refl.
+    -  subst;
         try solve [unfold uvalue_has_dtyp_fun in *; cbn in *;
         repeat break_match_hyp_inv;
         repeat match goal with
@@ -5537,8 +5606,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
               apply dtyp_eqb_eq in H; subst
           end;
         try setoid_rewrite dtyp_eqb_refl;
-        cbn; auto].
-    - destruct H as [H | H]; subst;
+                   cbn; auto].
+
+    -  subst;
       try solve [unfold uvalue_has_dtyp_fun in *; cbn in *;
         repeat break_match_hyp_inv;
         repeat match goal with
@@ -5983,12 +6053,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DTYPE_IPTR => ret (DVALUE_IPTR IP.zero)
     | DTYPE_Pointer => ret (DVALUE_Addr A.null)
     | DTYPE_Void => failwith "DTYPE_Void is not a true LLVM value"
-    | DTYPE_Half => failwith "Unimplemented default type: half"
-    | DTYPE_Float => ret (DVALUE_Float Float32.zero)
-    | DTYPE_Double => ret (DVALUE_Double (Float32.to_double Float32.zero))
-    | DTYPE_X86_fp80 => failwith "Unimplemented default type: x86_fp80"
-    | DTYPE_Fp128 => failwith "Unimplemented default type: fp128"
-    | DTYPE_Ppc_fp128 => failwith "Unimplemented default type: ppc_fp128"
+    | DTYPE_FP FP_float => ret (DVALUE_Float Float32.zero)
+    | DTYPE_FP FP_double => ret (DVALUE_Double (Float32.to_double Float32.zero))
+    | DTYPE_FP fp => failwith ("Unimplemented default type: floating point " ++ show fp)
+    | DTYPE_Label => failwith "Unimplemented default type: label"
+    | DTYPE_Token => failwith "Unimplemented default type: token"                             
     | DTYPE_Metadata => failwith "Unimplemented default type: metadata"
     | DTYPE_X86_mmx => failwith "Unimplemented default type: x86_mmx"
     | DTYPE_Opaque => failwith "Unimplemented default type: opaque"
@@ -6005,10 +6074,10 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     (*   else *)
     (*     failwith ("Negative array length for generating default value" ++ *)
     (*     "of DTYPE_Array or DTYPE_Vector") *)
-    | DTYPE_Vector sz (DTYPE_Float) =>
+    | DTYPE_Vector sz (DTYPE_FP FP_float) =>
         ret (DVALUE_Vector dt
                (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))
-    | DTYPE_Vector sz (DTYPE_Double) =>
+    | DTYPE_Vector sz (DTYPE_FP FP_double) =>
         ret (DVALUE_Vector dt
                (repeat (DVALUE_Double (Float32.to_double Float32.zero))
                        (N.to_nat sz)))
@@ -6083,6 +6152,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     intros t v. revert v.
     induction t; try do_it;
       try (intros; subst; inversion H; constructor).
+    - intros; destruct f; simpl in *; inversion H; econstructor.
     - intros. subst. inversion H. clear H.
       break_match_hyp_inv.
       constructor.
@@ -6123,6 +6193,10 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
           ].
       + unfold vector_dtyp.
         left. exists sz0; auto.
+      + unfold vector_dtyp.
+        right. right. right. exists FP_float. auto.
+      + unfold vector_dtyp.
+        right. right. right. exists FP_double. auto.
   Qed.
 
   Definition uvalue_constructor_string (u : uvalue) : string
@@ -6143,6 +6217,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
        | UVALUE_IBinop iop v1 v2 => "UVALUE_IBinop"
        | UVALUE_ICmp ss cmp v1 v2 => "UVALUE_ICmp"
        | UVALUE_FBinop fop fm v1 v2 => "UVALUE_FBinop"
+       | UVALUE_Fneg _ _ _ => "UVALUE_Fneg"
        | UVALUE_FCmp cmp v1 v2 => "UVALUE_FCmp"
        | UVALUE_Conversion conv t_from v t_to => "UVALUE_Conversion"
        | UVALUE_GetElementPtr t ptrval idxs => "UVALUE_GetElementPtr"

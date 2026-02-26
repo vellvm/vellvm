@@ -14,6 +14,7 @@ From Vellvm Require Import
      Utilities
      Syntax.LLVMAst.
 
+
 Require Import Ceres.Ceres.
 
 Set Implicit Arguments.
@@ -37,12 +38,9 @@ Inductive dtyp : Set :=
 | DTYPE_IPTR
 | DTYPE_Pointer
 | DTYPE_Void
-| DTYPE_Half
-| DTYPE_Float
-| DTYPE_Double
-| DTYPE_X86_fp80
-| DTYPE_Fp128
-| DTYPE_Ppc_fp128
+| DTYPE_FP (fp:floating_point_variant)
+| DTYPE_Label
+| DTYPE_Token
 | DTYPE_Metadata
 | DTYPE_X86_mmx
 | DTYPE_Array (sz:N) (t:dtyp)
@@ -52,6 +50,7 @@ Inductive dtyp : Set :=
 | DTYPE_Vector (sz:N) (t:dtyp)     (* t must be integer, floating point, or pointer type *)
 .
 Set Elimination Schemes.
+
 
 Ltac dec_dtyp :=
   match goal with
@@ -69,12 +68,9 @@ Lemma dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
             | DTYPE_IPTR , DTYPE_IPTR => _
             | DTYPE_Pointer, DTYPE_Pointer => _
             | DTYPE_Void, DTYPE_Void => _
-            | DTYPE_Half, DTYPE_Half => _
-            | DTYPE_Float, DTYPE_Float => _
-            | DTYPE_Double, DTYPE_Double => _
-            | DTYPE_Fp128, DTYPE_Fp128 => _
-            | DTYPE_X86_fp80, DTYPE_X86_fp80 => _
-            | DTYPE_Ppc_fp128, DTYPE_Ppc_fp128 => _
+            | DTYPE_FP f1, DTYPE_FP f2 => _
+            | DTYPE_Label, DTYPE_Label => _
+            | DTYPE_Token, DTYPE_Token => _
             | DTYPE_Metadata, DTYPE_Metadata => _
             | DTYPE_X86_mmx, DTYPE_X86_mmx => _
             | DTYPE_Array n t, DTYPE_Array m t' => _
@@ -87,6 +83,9 @@ Lemma dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
   - destruct (Pos.eq_dec n m).
     * left; subst; reflexivity.
     * right; intros H; inversion H. contradiction.
+  - destruct (floating_point_variant_eq_dec f1 f2).
+    + left; subst; auto.
+    + right; intros H; inversion H; contradiction.
   - destruct (N.eq_dec n m).
     * destruct (f t t').
     + left; subst; reflexivity.
@@ -133,8 +132,7 @@ Proof using.
 Qed.
 
 Definition vector_dtyp dt :=
-  (exists n, dt = DTYPE_I n) \/ dt = DTYPE_IPTR \/ dt = DTYPE_Pointer \/ dt = DTYPE_Half \/ dt = DTYPE_Float \/
-  dt = DTYPE_Double \/ dt = DTYPE_X86_fp80 \/ dt = DTYPE_Fp128 \/ dt = DTYPE_Ppc_fp128.
+  (exists n, dt = DTYPE_I n) \/ dt = DTYPE_IPTR \/ dt = DTYPE_Pointer \/ (exists fp, dt = DTYPE_FP fp).
 
 Section DtypInd.
   Variable P : dtyp -> Prop.
@@ -142,12 +140,9 @@ Section DtypInd.
   Hypothesis IH_IPTR          : P (DTYPE_IPTR).
   Hypothesis IH_Pointer       : P DTYPE_Pointer.
   Hypothesis IH_Void          : P DTYPE_Void.
-  Hypothesis IH_Half          : P DTYPE_Half.
-  Hypothesis IH_Float         : P DTYPE_Float.
-  Hypothesis IH_Double        : P DTYPE_Double.
-  Hypothesis IH_X86_fp80      : P DTYPE_X86_fp80.
-  Hypothesis IH_Fp128         : P DTYPE_Fp128.
-  Hypothesis IH_Ppc_fp128     : P DTYPE_Ppc_fp128.
+  Hypothesis IH_Float         : forall f, P (DTYPE_FP f).
+  Hypothesis IH_Label         : P DTYPE_Label.
+  Hypothesis IH_Token         : P DTYPE_Token.
   Hypothesis IH_Metadata      : P DTYPE_Metadata.
   Hypothesis IH_X86_mmx       : P DTYPE_X86_mmx.
   Hypothesis IH_Array         : forall sz t, P t -> P (DTYPE_Array sz t).
@@ -181,12 +176,9 @@ Section DtypRec.
   Hypothesis IH_IPTR          : P (DTYPE_IPTR).
   Hypothesis IH_Pointer       : P DTYPE_Pointer.
   Hypothesis IH_Void          : P DTYPE_Void.
-  Hypothesis IH_Half          : P DTYPE_Half.
-  Hypothesis IH_Float         : P DTYPE_Float.
-  Hypothesis IH_Double        : P DTYPE_Double.
-  Hypothesis IH_X86_fp80      : P DTYPE_X86_fp80.
-  Hypothesis IH_Fp128         : P DTYPE_Fp128.
-  Hypothesis IH_Ppc_fp128     : P DTYPE_Ppc_fp128.
+  Hypothesis IH_Float         : forall f, P (DTYPE_FP f).
+  Hypothesis IH_Label         : P DTYPE_Label.
+  Hypothesis IH_Token         : P DTYPE_Token.    
   Hypothesis IH_Metadata      : P DTYPE_Metadata.
   Hypothesis IH_X86_mmx       : P DTYPE_X86_mmx.
   Hypothesis IH_Array         : forall sz t, P t -> P (DTYPE_Array sz t).
@@ -229,12 +221,9 @@ Section WF_dtyp.
   | Wf_IPTR : well_formed_dtyp DTYPE_IPTR
   | Wf_Pointer : well_formed_dtyp DTYPE_Pointer
   | Wf_Void : well_formed_dtyp DTYPE_Void
-  | Wf_Half : well_formed_dtyp DTYPE_Half
-  | Wf_Float : well_formed_dtyp DTYPE_Float
-  | Wf_Double : well_formed_dtyp DTYPE_Double
-  | Wf_X86_fp80 : well_formed_dtyp DTYPE_X86_fp80
-  | Wf_Fp128 : well_formed_dtyp DTYPE_Fp128
-  | Wf_Ppc_fp128 : well_formed_dtyp DTYPE_Ppc_fp128
+  | Wf_Float : forall f, well_formed_dtyp (DTYPE_FP f)
+  | Wf_Label : well_formed_dtyp DTYPE_Label
+  | Wf_Token : well_formed_dtyp DTYPE_Token                                                                     
   | Wf_Metadata : well_formed_dtyp DTYPE_Metadata
   | Wf_X86_mmx : well_formed_dtyp DTYPE_X86_mmx
   | Wf_Opaque : well_formed_dtyp DTYPE_Opaque
@@ -269,12 +258,9 @@ Fixpoint dtyp_measure (t : dtyp) : nat :=
   | DTYPE_IPTR => 1
   | DTYPE_Pointer => 1
   | DTYPE_Void => 1
-  | DTYPE_Half => 1
-  | DTYPE_Float => 1
-  | DTYPE_Double => 1
-  | DTYPE_X86_fp80 => 1
-  | DTYPE_Fp128 => 1
-  | DTYPE_Ppc_fp128 => 1
+  | DTYPE_FP _ => 1
+  | DTYPE_Label => 1
+  | DTYPE_Token => 1
   | DTYPE_Metadata => 1
   | DTYPE_X86_mmx => 1
   | DTYPE_Array sz t => S (S (dtyp_measure t))
@@ -292,63 +278,6 @@ Proof using.
   all: apply Nat.lt_0_succ.
 Qed.
 
-Section hiding_notation.
-  #[local] Open Scope sexp_scope.
-
-  Fixpoint serialize_dtyp' (dt:dtyp): sexp :=
-    match dt with
-    | DTYPE_I sz     => Atom ("i" ++ to_string (Npos sz))%string
-    | DTYPE_IPTR     => Atom ("iptr")%string
-    | DTYPE_Pointer  => Atom "ptr"
-    | DTYPE_Void     => Atom "dvoid"
-    | DTYPE_Half     => Atom "half"
-    | DTYPE_Float    => Atom "float"
-    | DTYPE_Double   => Atom "double"
-    | DTYPE_X86_fp80 => Atom "x86_fp80"
-    | DTYPE_Fp128    => Atom "fp128"
-    | DTYPE_Ppc_fp128 => Atom "ppc_fp128"
-    | DTYPE_Metadata  => Atom "metadata"
-    | DTYPE_X86_mmx   => Atom "x86_mmx"
-    | DTYPE_Array sz t
-      => [Atom ("[" ++ to_string sz) ; Atom "x" ; serialize_dtyp' t ; Atom "]"]%string
-    | DTYPE_Struct fields
-      => [Atom "{" ; to_sexp (List.map (fun x => [serialize_dtyp' x ; Atom ","]) fields) ; Atom "}"]
-    | DTYPE_Packed_struct fields
-      => [Atom "packed{" ; to_sexp (List.map (fun x => [serialize_dtyp' x ; Atom ","]) fields) ; Atom "}"]
-    | DTYPE_Opaque => Atom "opaque"
-    | DTYPE_Vector sz t
-      => [Atom ("<" ++ to_string sz) ; Atom "x" ; serialize_dtyp' t ; Atom ">"]%string  (* TODO: right notation? *)
-    end.
-
-  #[global] Instance serialize_dtyp : Serialize dtyp := serialize_dtyp'.
-End hiding_notation.
-
-  Fixpoint dtyp_to_string (dt:dtyp) : string :=
-    match dt with
-    | DTYPE_I sz     => ("i" ++ to_string (Npos sz))%string
-    | DTYPE_IPTR     => ("iptr")%string
-    | DTYPE_Pointer  => "ptr"
-    | DTYPE_Void     => "dvoid"
-    | DTYPE_Half     => "half"
-    | DTYPE_Float    => "float"
-    | DTYPE_Double   => "double"
-    | DTYPE_X86_fp80 => "x86_fp80"
-    | DTYPE_Fp128    => "fp128"
-    | DTYPE_Ppc_fp128 => "ppc_fp128"
-    | DTYPE_Metadata  => "metadata"
-    | DTYPE_X86_mmx   => "x86_mmx"
-    | DTYPE_Array sz t
-      => "[" ++ to_string sz ++ " x " ++  dtyp_to_string t ++ "]"%string
-    | DTYPE_Struct fields
-      => "{ [Struct Field Types Elided] }"
-    | DTYPE_Packed_struct fields
-      => "packed{ [Struct Field Types Elided] }"
-    | DTYPE_Opaque => "opaque"
-    | DTYPE_Vector sz t
-      => "<" ++ to_string sz ++ " x " ++  dtyp_to_string t ++ ">"%string                   
-    end.
-
-
 (* TODO: This probably should live somewhere else... *)
 #[refine]#[local] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
     Decidable_witness := N.eqb x y
@@ -361,12 +290,9 @@ Fixpoint NO_VOID (dt : dtyp) : Prop
      | DTYPE_I _
      | DTYPE_IPTR
      | DTYPE_Pointer
-     | DTYPE_Half
-     | DTYPE_Float
-     | DTYPE_Double
-     | DTYPE_X86_fp80
-     | DTYPE_Fp128
-     | DTYPE_Ppc_fp128
+     | DTYPE_FP _
+     | DTYPE_Label
+     | DTYPE_Token
      | DTYPE_Metadata
      | DTYPE_X86_mmx
      | DTYPE_Opaque =>
