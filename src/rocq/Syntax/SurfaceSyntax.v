@@ -41,8 +41,6 @@ Module VIR_Notations.
   Notation "i" := (EXP_Ident i)   (at level 10,only printing).
   Notation "e" := (EXP_Integer e) (at level 10,only printing).
   Notation "f" := (EXP_Float f)   (at level 10,only printing).
-  Notation "d" := (EXP_Double d)   (at level 10,only printing).
-  Notation "h" := (EXP_Hex h)   (at level 10,only printing).
   Notation "b" := (EXP_Bool b)   (at level 10,only printing).
   Notation "'null'" := (EXP_Null)   (at level 10,only printing).
   Notation "'zeroinitializer'" := (EXP_Zero_initializer)   (at level 10,only printing).
@@ -262,8 +260,8 @@ Section SurfaceSyntaxTest.
                                                          {|
                                                            blk_id := (Anon 0%Z);
                                                            blk_phis := [];
-                                                           blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%positive) (EXP_Integer (5)%Z) (EXP_Integer (9)%Z))), []);
-                                                                        (IId (Anon 2%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%positive) (EXP_Ident (ID_Local (Anon 1%Z))) (EXP_Integer (15)%Z))), [])];
+                                                           blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%positive) (EXP_Integer (Z.to_num_int (5)%Z)) (EXP_Integer (Z.to_num_int (9)%Z)))), []);
+                                                                        (IId (Anon 2%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%positive) (EXP_Ident (ID_Local (Anon 1%Z))) (EXP_Integer (Z.to_num_int (15)%Z)))), [])];
                                                            blk_term := (IVoid 0%Z, TERM_Ret ((TYPE_I 32%positive), (EXP_Ident (ID_Local (Anon 2%Z)))), []);
                                                            blk_comments := None
                                                          |}

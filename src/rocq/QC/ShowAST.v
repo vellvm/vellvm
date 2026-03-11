@@ -96,6 +96,23 @@ Section StringOps.
 End StringOps.
   
 
+  (*
+    - IntDecimal (Pos d)    for 1234
+    - IntDecimal (Neg d)    for -1234
+    - IntHexadecimal (Pos h) for u0x8000  is 32768
+    - IntHexadecimal (Neg h) for s0x8000  is -32768
+   *) 
+  Definition show_int_syntax (d : int_syntax) : string :=
+    match d with
+    | Number.IntDecimal d => (NilEmpty.string_of_int d)
+    | Number.IntHexadecimal (Hexadecimal.Pos h) => "u0x" ++ (HexadecimalString.NilEmpty.string_of_uint h)
+    | Number.IntHexadecimal (Hexadecimal.Neg h) => "s0x" ++ (HexadecimalString.NilEmpty.string_of_uint h)
+    end.
+
+  #[global] Instance showIntSyntax : Show int_syntax
+    := {| show := show_int_syntax |}.
+
+
 
 Section ShowInstances.
   Local Open Scope string.
@@ -635,21 +652,6 @@ Section ShowInstances.
   Definition dshow_bool (b : bool) (s : string) : DString :=
     if b then (sd s) else DList_empty.
 
-  (*
-    - IntDecimal (Pos d)    for 1234
-    - IntDecimal (Neg d)    for -1234
-    - IntHexadecimal (Pos h) for u0x8000  is 32768
-    - IntHexadecimal (Neg h) for s0x8000  is -32768
-   *) 
-  Definition show_int_syntax (d : int_syntax) : string :=
-    match d with
-    | Number.IntDecimal d => (NilEmpty.string_of_int d)
-    | Number.IntHexadecimal (Hexadecimal.Pos h) => "u0x" ++ (HexadecimalString.NilEmpty.string_of_uint h)
-    | Number.IntHexadecimal (Hexadecimal.Neg h) => "s0x" ++ (HexadecimalString.NilEmpty.string_of_uint h)
-    end.
-
-  #[global] Instance showIntSyntax : Show int_syntax
-    := {| show := show_int_syntax |}.
 
   Definition show_float_hex_type (ht : float_hex_type) : string :=
     match ht with

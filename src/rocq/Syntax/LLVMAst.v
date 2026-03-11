@@ -32,7 +32,27 @@ Open Scope list_scope.
 
  *)
 
+(* [int_ast] - type used for internal numeric values. *)
 Definition int_ast := Z.
+
+(* Representation for parsed integer literals:
+    - IntDecimal (Pos d)    for 1234
+    - IntDecimal (Neg d)    for -1234
+    - IntHexadecimal (Pos h) for u0x8000  is 32768
+    - IntHexadecimal (Neg h) for s0x8000  is -32768
+    NB: LLVM IR uses `u` and `s` to stand for "signed" and "unsigned" but maybe they
+    mean "positive" and "negative"?  e.g. according to LangRef:
+
+      "Note that hexadecimal integers are sign extended from the number of active
+       bits, i.e., the bit width minus the number of leading zeros. So
+       ‘s0x0001’ of type ‘i16’ will be -1, not 1."
+
+   In many places we use
+        [BinIntDef.Z.of_num_int x]
+   to recover a [Z] from parsed syntax.
+ *)
+Definition int_syntax := Number.signed_int.
+
 
 (* File Information - this is used by the Vellvm-only 
    METADATA_File_info "virtual" metadata value to record source information.
@@ -53,10 +73,11 @@ Record file_info : Set :=
     }.
 
 
+(* SAZ: NB - the [int_ast] of [Anon] could be [int_syntax], but that is annoying to work out. *)
 Variant raw_id : Set :=
-| Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)
-| Anon (n:int_ast)    (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
-| Raw  (n:int_ast)    (* Used for code generation -- serializes as %_RAW_0 %_RAW_1 etc. *)
+| Name (s:string)        (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)
+| Anon (n:int_ast)       (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
+| Raw  (n:int_ast)       (* Used for code generation -- serializes as %_RAW_0 %_RAW_1 etc. *)
 .
 
 Variant ident : Set :=
@@ -135,7 +156,7 @@ Variant cconv : Set :=
 | CC_Ccc
 | CC_Fastcc
 | CC_Coldcc
-| CC_Cc (cc:int_ast)
+| CC_Cc (cc:int_syntax)
 | CC_Webkit_jscc
 | CC_Anyregcc
 | CC_Preserve_mostcc
@@ -157,22 +178,22 @@ Variant param_attr : Set :=
 | PARAMATTR_Inalloca (t : typ)
 | PARAMATTR_Sret (t : typ)
 | PARAMATTR_Elementtype (t : typ)
-| PARAMATTR_Align (a:int_ast)
+| PARAMATTR_Align (a:int_syntax)
 | PARAMATTR_Noalias
 | PARAMATTR_Nocapture
 | PARAMATTR_Nofree
 | PARAMATTR_Nest
 | PARAMATTR_Returned
 | PARAMATTR_Nonnull
-| PARAMATTR_Dereferenceable (a:int_ast)
-| PARAMATTR_Dereferenceable_or_null (a : int_ast)
+| PARAMATTR_Dereferenceable (a:int_syntax)
+| PARAMATTR_Dereferenceable_or_null (a : int_syntax)
 | PARAMATTR_Swiftself
 | PARAMATTR_Swiftasync
 | PARAMATTR_Swifterror
 | PARAMATTR_Immarg
 | PARAMATTR_Noundef
 (* | PARAMATTR_Nofpclass (* MISSING: floating point class *) *) 
-| PARAMATTR_Alignstack (a : int_ast)
+| PARAMATTR_Alignstack (a : int_syntax)
 | PARAMATTR_Allocalign
 | PARAMATTR_Allocptr
 | PARAMATTR_Readnone      
@@ -180,8 +201,8 @@ Variant param_attr : Set :=
 | PARAMATTR_Writeonly
 | PARAMATTR_Writable
 | PARAMATTR_Dead_on_unwind      
-| PARAMATTR_Range (t : typ) (a b : int_ast)
-| PARAMATTR_Initializes (l : list (int_ast * int_ast))
+| PARAMATTR_Range (t : typ) (a b : int_syntax)
+| PARAMATTR_Initializes (l : list (int_syntax * int_syntax))
 .
 
 Variant frame_pointer_val : Set :=
@@ -205,10 +226,10 @@ Variant mem_access_kind : Set :=
 .
     
 Variant fn_attr : Set :=
-| FNATTR_Alignstack (a:int_ast)
+| FNATTR_Alignstack (a:int_syntax)
 (* | FNATTR_Alloc_family (fam : string) - FNATTR_KeyValue *)
 | FNATTR_Allockind (kind : string)
-| FNATTR_Allocsize (a1 : int_ast) (a2 : option int_ast)
+| FNATTR_Allocsize (a1 : int_syntax) (a2 : option int_syntax)
 | FNATTR_Alwaysinline
 | FNATTR_Builtin
 | FNATTR_Cold
@@ -278,8 +299,8 @@ Variant fn_attr : Set :=
 | FNATTR_Shadowcallstack
 | FNATTR_Mustprogress
 (* | FNATTR_Warn_stack_size (th : int) - FNATTR_KeyValue *)
-| FNATTR_Vscale_range (min : int_ast) (max : option int_ast)
-(* | FNATTR_Min_legal_vector_width  (size : int_ast) - FNATTR_KeyValue *)
+| FNATTR_Vscale_range (min : int_syntax) (max : option int_syntax)
+(* | FNATTR_Min_legal_vector_width  (size : int_syntax) - FNATTR_KeyValue *)
 | FNATTR_String (s:string)   (* See the comments above for cases covered by FNATTR_String *)
 | FNATTR_Key_value (kv : string * string) (* See the comments above for cases covered by FNATTR_KeyValue *)
 | FNATTR_Attr_grp (g:int_ast)
@@ -382,18 +403,6 @@ Section TypedSyntax.
 
 Unset Elimination Schemes.
 
-(* Representation for parsed integer literals:
-    - IntDecimal (Pos d)    for 1234
-    - IntDecimal (Neg d)    for -1234
-    - IntHexadecimal (Pos h) for u0x8000  is 32768
-    - IntHexadecimal (Neg h) for s0x8000  is -32768
-    NB: LLVM IR uses `u` and `s` to stand for "signed" and "unsigned" but maybe they
-    mean "positive" and "negative"?  e.g. according to LangRef:
-
-      "Note that hexadecimal integers are sign extended from the number of active
-       bits, i.e., the bit width minus the number of leading zeros. So
-       ‘s0x0001’ of type ‘i16’ will be -1, not 1."  *)
-Definition int_syntax := Number.signed_int.
 
 
 (* Representation for parse float literals *)
@@ -439,8 +448,8 @@ Inductive exp : Set :=
 | OP_ExtractElement   (vec:(T * exp)) (idx:(T * exp))
 | OP_InsertElement    (vec:(T * exp)) (elt:(T * exp)) (idx:(T * exp))
 | OP_ShuffleVector    (vec1:(T * exp)) (vec2:(T * exp)) (idxmask:(T * exp))
-| OP_ExtractValue     (vec:(T * exp)) (idxs:list int_ast)
-| OP_InsertValue      (vec:(T * exp)) (elt:(T * exp)) (idxs:list int_ast)
+| OP_ExtractValue     (vec:(T * exp)) (idxs:list int_syntax)
+| OP_InsertValue      (vec:(T * exp)) (elt:(T * exp)) (idxs:list int_syntax)
 | OP_Select           (cnd:(T * exp)) (v1:(T * exp)) (v2:(T * exp)) (* if * then * else *)
 | OP_Freeze           (v:(T * exp))
 | EXP_Asm             (sideffect:bool) (alignstack:bool) (inteldialect:bool) (unwind:bool) (template:string) (operand_constraints:string)
@@ -525,7 +534,7 @@ Record cmpxchg : Set :=
       c_syncscope            : option string;
       c_success_ordering     : ordering;
       c_failure_ordering     : ordering;
-      c_align                : option int_ast;
+      c_align                : option int_syntax;
     }.
 
 Variant atomic_rmw_operation : Set :=
@@ -560,7 +569,7 @@ Record atomicrmw : Set :=
       a_val                  : texp;
       a_syncscope            : option string;
       a_ordering             : ordering;
-      a_align                : option int_ast;
+      a_align                : option int_syntax;
     }.
 
 
@@ -590,11 +599,11 @@ Variant annotation : Set :=
   | ANN_dll_storage (d:dll_storage)
   | ANN_thread_local_storage (t:thread_local_storage)
   | ANN_unnamed_addr (u:unnamed_addr)
-  | ANN_addrspace (n:int_ast)
+  | ANN_addrspace (n:int_syntax)
   | ANN_section (s:string)
   | ANN_partition (s:string)
   | ANN_comdat (l:local_id)
-  | ANN_align (n:int_ast)
+  | ANN_align (n:int_syntax)
   | ANN_no_sanitize
   | ANN_no_sanitize_address
   | ANN_no_sanitize_hwaddress
@@ -653,7 +662,7 @@ Definition ann_unnamed_addr (a:annotation) : option unnamed_addr :=
   | _ => None
   end.
 
-Definition ann_addrspace (a:annotation) : option int_ast :=
+Definition ann_addrspace (a:annotation) : option int_syntax :=
   match a with
   | ANN_addrspace a => Some a
   | _ => None
@@ -677,7 +686,7 @@ Definition ann_comdat (a:annotation) : option local_id :=
   | _ => None
   end.
 
-Definition ann_align (a:annotation) : option int_ast :=
+Definition ann_align (a:annotation) : option int_syntax :=
   match a with
   | ANN_align n => Some n
   | _ => None
@@ -877,7 +886,7 @@ Definition g_thread_local_storage (g:global) : option thread_local_storage :=
 Definition g_unnamed_addr (g:global) : option unnamed_addr :=
   find_option ann_unnamed_addr (g_annotations g).
 
-Definition g_addrspace (g:global) : option int_ast :=
+Definition g_addrspace (g:global) : option int_syntax :=
   find_option ann_addrspace (g_annotations g).
 
 Definition g_section (g:global) : option string :=
@@ -889,7 +898,7 @@ Definition g_partition (g:global) : option string :=
 Definition g_comdat (g:global) : option local_id :=
   find_option ann_comdat (g_annotations g).
 
-Definition g_align (g:global) : option int_ast :=
+Definition g_align (g:global) : option int_syntax :=
   find_option ann_align (g_annotations g).
 
 Definition g_no_sanitize (g:global) : option unit :=
@@ -932,7 +941,7 @@ Definition dc_thread_local_storage (d:declaration) : option thread_local_storage
 Definition dc_unnamed_addr (d:declaration) : option unnamed_addr :=
   find_option ann_unnamed_addr (dc_annotations d).
 
-Definition dc_addrspace (d:declaration) : option int_ast :=
+Definition dc_addrspace (d:declaration) : option int_syntax :=
   find_option ann_addrspace (dc_annotations d).
 
 Definition dc_section (d:declaration) : option string :=
@@ -944,7 +953,7 @@ Definition dc_partition (d:declaration) : option string :=
 Definition dc_comdat (d:declaration) : option local_id :=
   find_option ann_comdat (dc_annotations d).
 
-Definition dc_align (d:declaration) : option int_ast :=
+Definition dc_align (d:declaration) : option int_syntax :=
   find_option ann_align (dc_annotations d).
 
 Definition dc_cconv (d:declaration) : option cconv :=

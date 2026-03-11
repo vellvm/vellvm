@@ -10,6 +10,7 @@ open Llvm_printer
 open Either
 module GA = Generate.GA
 open List
+open VellvmFloats
 
 type raw_assertion_string =
   | Eq of {lhs: string; rhs: string}
@@ -91,8 +92,8 @@ let rec typ_to_dtyp (typ : LLVMAst.typ) : DynamicTypes.dtyp =
   match typ with
   | TYPE_Void -> DTYPE_Void
   | TYPE_I i -> DTYPE_I i
-  | TYPE_Float -> DTYPE_Float
-  | TYPE_Double -> DTYPE_Double
+  | TYPE_FP FP_float -> DTYPE_FP FP_float
+  | TYPE_FP FP_double -> DTYPE_FP FP_double
   | TYPE_Array (sz, dtyp) -> DTYPE_Array (sz, typ_to_dtyp dtyp)
   | TYPE_Struct dtyps -> DTYPE_Struct (List.map typ_to_dtyp dtyps)
   | TYPE_Packed_struct dtyps ->
@@ -110,10 +111,17 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
   | TYPE_Pointer _, EXP_Null ->
       DVALUE_Addr InterpretationStack.InterpreterStackBigIntptr.LP.ADDR.null
   | TYPE_I i, EXP_Integer x ->
-     DVALUE_I (i, x)
-  | TYPE_Float, EXP_Float f -> DVALUE_Float f
-  | TYPE_Double, EXP_Double f -> DVALUE_Double f
-  | TYPE_Double, EXP_Hex f -> DVALUE_Double f
+     DVALUE_I (i, BinIntDef.Z.of_num_int x)
+  | TYPE_FP FP_float, EXP_Float f ->
+     begin match float32_of_float_syntax f with
+     | Some v ->  DVALUE_Float v
+     | None -> failwith "assertion.ml: texp_to_dvalue failed float32 conversion"
+     end
+  | TYPE_FP FP_double, EXP_Float f ->
+     begin match float_of_float_syntax f with
+     | Some v ->  DVALUE_Double v
+     | None -> failwith "assertion.ml: texp_to_dvalue failed float conversion"
+     end
   | TYPE_Array _, EXP_Array (t, elts) ->
       DVALUE_Array (typ_to_dtyp t, (List.map texp_to_dvalue elts))
   | TYPE_Struct _, EXP_Struct elts ->
@@ -135,10 +143,17 @@ let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
   | TYPE_Pointer _, EXP_Null ->
       UVALUE_Addr InterpretationStack.InterpreterStackBigIntptr.LP.ADDR.null
   | TYPE_I i, EXP_Integer x ->
-     UVALUE_I (i, x)
-  | TYPE_Float, EXP_Float f -> UVALUE_Float f
-  | TYPE_Double, EXP_Double f -> UVALUE_Double f
-  | TYPE_Double, EXP_Hex f -> UVALUE_Double f
+     UVALUE_I (i, BinIntDef.Z.of_num_int x)
+  | TYPE_FP FP_float, EXP_Float f ->
+     begin match float32_of_float_syntax f with
+     | Some v ->  UVALUE_Float v
+     | None -> failwith "assertion.ml: texp_to_uvalue failed float32 conversion"
+     end
+  | TYPE_FP FP_double, EXP_Float f ->
+     begin match float_of_float_syntax f with
+     | Some v ->  UVALUE_Double v
+     | None -> failwith "assertion.ml: texp_to_uvalue failed float conversion"
+     end
   | TYPE_Array _, EXP_Array (t, elts) ->
       UVALUE_Array (typ_to_dtyp t, (List.map texp_to_uvalue elts))
   | TYPE_Struct _, EXP_Struct elts ->

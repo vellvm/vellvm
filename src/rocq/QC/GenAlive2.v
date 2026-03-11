@@ -519,7 +519,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
         (* Assumption is that src have already been created, either undef or not *)
         e_src <- gen_exp_ident tgt;;
         e_input <- gen_exp_size 0 t';;
-        let exp := OP_InsertValue (tgt, e_src) (t', e_input) [Z.of_nat index] in
+        let exp := OP_InsertValue (tgt, e_src) (t', e_input) [Nat.to_num_int index] in
         ins <- add_id_to_instr (tgt, INSTR_Op exp);;
         match e_src with
         | EXP_Ident id => remove_fst_from_local_ctx id;;
@@ -534,7 +534,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
               | _ => failGen "Out of Bounds"
               end;;
         e_input <- gen_exp_size 0 t';;
-        let exp := OP_InsertValue (tgt, e_src) (t', e_input) [Z.of_nat index] in
+        let exp := OP_InsertValue (tgt, e_src) (t', e_input) [Nat.to_num_int index] in
         ins <- add_id_to_instr (tgt, INSTR_Op exp);;
         match e_src with
         | EXP_Ident id => remove_fst_from_local_ctx id;;
@@ -548,7 +548,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
               | _ => failGen "Out of Bounds"
               end;;
         e_input <- gen_exp_size 0 t';;
-        let exp := OP_InsertValue (tgt, e_src) (t', e_input) [Z.of_nat index] in
+        let exp := OP_InsertValue (tgt, e_src) (t', e_input) [Nat.to_num_int index] in
         ins <- add_id_to_instr (tgt, INSTR_Op exp);;
         match e_src with
         | EXP_Ident id => remove_fst_from_local_ctx id;;
@@ -718,7 +718,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
          then
            INSTR_Op (OP_InsertElement (t, e_src) (t', e_input) (TYPE_I 32, e_index))
          else
-           INSTR_Op (OP_InsertValue (t, e_src) (t', e_input) (map (Z.of_nat) [0%nat; index]))
+           INSTR_Op (OP_InsertValue (t, e_src) (t', e_input) (map (Nat.to_num_int) [0%nat; index]))
            in
        (* Need to remove the old one *)
        remove_fst_from_local_ctx src_id;;

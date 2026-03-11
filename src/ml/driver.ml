@@ -89,7 +89,7 @@ let process_ll_file command_line_arguments path file =
 
 let process_file command_line_arguments path =
   let _ = Printf.printf "Processing: %s\n" path in
-  let basename, ext = Platform.path_to_basename_ext path in
+  let basename, _ = Platform.path_to_basename_ext path in
   process_ll_file command_line_arguments path basename
 
 let process_files command_line_args files =

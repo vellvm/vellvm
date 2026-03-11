@@ -179,7 +179,6 @@ let rec step
         * ( StoreId.store_id
           * ((lstack_frame * lstack) * (global_env * DV.dvalue)) ) )
       itree ) : (DV.dvalue, exit_condition) result =
-  let open ITreeDefinition in
   match single_step m with
   | Either.Left x -> step x
   | Either.Right res -> res

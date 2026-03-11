@@ -33,6 +33,7 @@ From Vellvm Require Import
      Utils.InterpEither
      Syntax
      Semantics.VellvmIntegers
+     Semantics.VellvmFloats
      Semantics.LLVMEvents
      Semantics.LLVMParams
      Semantics.MemoryParams
@@ -209,10 +210,12 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     BinIntDef.Z.of_num_int x.
 
   (* TODO: cleanup with typeclasses *)
-  Definition denote_float_syntax_as_float32 (f:float_syntax) : option float32 := None.
+  Definition denote_float_syntax_as_float32 (f:float_syntax) : option float32 :=
+    float32_of_float_syntax f.
     
-  Definition denote_float_syntax_as_float (f:float_syntax) : option float := None.
-      
+  Definition denote_float_syntax_as_float (f:float_syntax) : option float := 
+    float_of_float_syntax f.
+  
   Fixpoint denote_exp'
            (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
     let eval_texp '(dt,ex) := denote_exp' (Some dt) ex
@@ -360,12 +363,12 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
 
     | OP_ExtractValue (dt, str) idxs =>
         str <- denote_exp' (Some dt) str ;;
-        ret (UVALUE_ExtractValue dt str idxs)
+        ret (UVALUE_ExtractValue dt str (List.map denote_int_syntax idxs))
 
     | OP_InsertValue (dt_str, strop) (dt_elt, eltop) idxs =>
         str <- denote_exp' (Some dt_str) strop ;;
         elt <- denote_exp' (Some dt_elt) eltop ;;
-        ret (UVALUE_InsertValue dt_str str dt_elt elt idxs)
+        ret (UVALUE_InsertValue dt_str str dt_elt elt (List.map denote_int_syntax idxs))
 
     | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
         cnd <- denote_exp' (Some dt) cnd ;;
@@ -629,7 +632,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
           match find
                   (fun x => match x with | ANN_align _ => true | _ => false end)
                   annotations with
-          | Some (ANN_align a) => Some a
+          | Some (ANN_align a) => Some (denote_int_syntax a)
           | _ => None
           end
         in

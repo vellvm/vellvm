@@ -351,8 +351,8 @@ Section ExpInd.
       P (snd vec) -> P (snd elt) -> P (snd idx) -> P ((OP_InsertElement vec elt idx)).
   Hypothesis IH_ShuffleVector : forall (vec1:(T * exp T)) (vec2:(T * exp T)) (idxmask:(T * exp T)),
       P (snd vec1) -> P (snd vec2 ) -> P (snd idxmask) -> P ((OP_ShuffleVector vec1 vec2 idxmask)).
-  Hypothesis IH_ExtractValue  : forall (vec:(T * exp T)) (idxs:list int_ast), P (snd vec) -> P ((OP_ExtractValue vec idxs)).
-  Hypothesis IH_InsertValue   : forall (vec:(T * exp T)) (elt:(T * exp T)) (idxs:list int_ast), P (snd vec) -> P (snd elt) -> P ((OP_InsertValue vec elt idxs)).
+  Hypothesis IH_ExtractValue  : forall (vec:(T * exp T)) (idxs:list int_syntax), P (snd vec) -> P ((OP_ExtractValue vec idxs)).
+  Hypothesis IH_InsertValue   : forall (vec:(T * exp T)) (elt:(T * exp T)) (idxs:list int_syntax), P (snd vec) -> P (snd elt) -> P ((OP_InsertValue vec elt idxs)).
   Hypothesis IH_Select        : forall (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select cnd v1 v2)).
   Hypothesis IH_Freeze        : forall (v:(T * exp T)), P (snd v) -> P ((OP_Freeze v)).
 

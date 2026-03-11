@@ -5,7 +5,7 @@
   * Copyright (c) 2012 INRIA - Raphaël Proust <raphlalou@gmail.com>          *
   * Copyright (c) 2012 ENS - Raphaël Proust <raphlalou@gmail.com>            *
   * Copyright (c) 2014 OCamlPro - Julien Sagot <ju.sagot@gmail.com>          *
-  * Copyright (c) 2017 U. Penn. Steve Zdancewic <stevez@cis.upenn.edu>       *
+  * Copyright (c) 2026 U. Penn. Steve Zdancewic <stevez@cis.upenn.edu>       *
   *                                                                          *
   * Permission to use, copy, modify, and distribute this software for any    *
   * purpose with or without fee is hereby granted, provided that the above   *
@@ -56,6 +56,9 @@ let metadata_file_info (startpos:Lexing.position) (endpos:Lexing.position) =
      EXP_Double 64-bit literal, or
      EXP_Float 32-bit literal depending on the type annotation t
  *)
+(*
+SAZ: This should no longer be necessary, since it is handled in Rocq now.
+TODO: Delete
 let normalize_float_literal (t:typ) (d:string) =
   match t with
   | TYPE_Double -> EXP_Double (coqfloat_of_string d)
@@ -70,7 +73,7 @@ let normalize_float_literal (t:typ) (d:string) =
            in
            failwith ("Illegal 32-bit floating point literal: " ^ dbg)
   | _ -> failwith "normalize_float_literal called with non-float type"
-
+*)
 
 let opt_list (m:'a option) : 'a list =
   match m with
@@ -111,8 +114,8 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token<string> COMMENT
 %token<string> COMMENT_EOF (* Special case of comment that ends in eof and not a line break. *)
 %token<string> STRING
-%token<Camlcoq.Z.t> INTEGER
-%token<string> FLOAT
+%token<LLVMAst.int_syntax> INTEGER
+%token<LLVMAst.float_syntax> FLOAT
 %token<Floats.float> HEXCONSTANT
 %token KW_NULL
 %token KW_UNDEF
@@ -532,6 +535,10 @@ tle_metadata:
   | KW_METADATA m=metadata_node
     { m }
 
+
+(* integer literal syntax *)
+
+
 metadata_id:
   | KW_NOALIAS                   { METADATA_Id (Name (str "noalias")) }
   | KW_NONNULL                   { METADATA_Id (Name (str "nonnull")) }
@@ -539,7 +546,7 @@ metadata_id:
   | KW_ALIGN                     { METADATA_Id (Name (str "align")) }
   | KW_RANGE                     { METADATA_Id (Name (str "range")) }
   | s=STRING                     { METADATA_Id (Name (str ("\"" ^ s ^ "\""))) } (* preserve quotes *)
-  | mid=INTEGER                  { METADATA_Id (Anon mid) }
+  | mid=INTEGER                  { METADATA_Id (Anon (BinIntDef.Z.of_num_int mid)) }
   | mid=KW_UNKNOWN               { METADATA_Id (Name (str mid)) }
 
 
@@ -1150,19 +1157,19 @@ non_function_type:
   | n=I                                               { TYPE_I n              }
   | KW_IPTR                                           { TYPE_IPTR             }
   | KW_PTR                                            { TYPE_Pointer (None)   }
-  | KW_HALF                                           { TYPE_Half             }
-  | KW_FLOAT                                          { TYPE_Float            }
-  | KW_DOUBLE                                         { TYPE_Double           }
-  | KW_X86_FP80                                       { TYPE_X86_fp80         }
-  | KW_FP128                                          { TYPE_Fp128            }
-  | KW_PPC_FP128                                      { TYPE_Ppc_fp128        }
+  | KW_HALF                                           { TYPE_FP FP_half       }
+  | KW_FLOAT                                          { TYPE_FP FP_float      }
+  | KW_DOUBLE                                         { TYPE_FP FP_double     }
+  | KW_X86_FP80                                       { TYPE_FP FP_x86_fp80   }
+  | KW_FP128                                          { TYPE_FP FP_fp128      }
+  | KW_PPC_FP128                                      { TYPE_FP FP_ppc_fp128  }
   | KW_X86_MMX                                        { TYPE_X86_mmx          }
   | t=typ STAR                                        { TYPE_Pointer (Some t) }
-  | LSQUARE n=INTEGER KW_X t=typ RSQUARE              { TYPE_Array (n_of_z n, t)  }
+  | LSQUARE n=INTEGER KW_X t=typ RSQUARE              { TYPE_Array (n_of_int_syntax n, t)  }
   | LCURLY ts=separated_list(csep, typ) RCURLY        { TYPE_Struct ts        }
   | LTLCURLY ts=separated_list(csep, typ) RCURLYGT    { TYPE_Packed_struct ts }
   | KW_OPAQUE                                         { TYPE_Opaque           }
-  | LT n=INTEGER KW_X t=typ GT                        { TYPE_Vector (n_of_z n, t) }
+  | LT n=INTEGER KW_X t=typ GT                        { TYPE_Vector (n_of_int_syntax n, t) }
   | l=lident                                          { TYPE_Identified (ID_Local l)  }
 
 param_attr:
@@ -1446,7 +1453,7 @@ instr_op:
 
     // special case, coerced to fsub
   | KW_FNEG f=fast_math* t=typ o=exp 
-     { OP_FBinop (FSub, f, t, EXP_Double Floats.Float32.zero, o t) }
+     { OP_Fneg(f, (t,o t)) }
 
   | KW_FCMP op=fcmp t=typ o1=exp COMMA o2=exp 
     { OP_FCmp (op, t, o1 t, o2 t) }
@@ -1482,7 +1489,7 @@ expr_op:
 
   // special case, coerced to fsub
   | KW_FNEG f=fast_math* t=typ o=exp
-     { OP_FBinop (FSub, f, t, EXP_Double Floats.Float32.zero, o t) }
+     { OP_Fneg(f, (t, o t)) }
 
   | KW_FCMP op=fcmp LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
     { OP_FCmp (op, t, o1 t, o2 t) }
@@ -1535,8 +1542,7 @@ instr_path:
 
 expr_val:
   | i=INTEGER                                         { fun _ -> EXP_Integer i        }
-  | f=FLOAT                                           { fun t -> normalize_float_literal t f }
-  | f=HEXCONSTANT                                     { fun _ -> EXP_Hex f            }
+  | f=FLOAT                                           { fun _ -> EXP_Float f          }
   | KW_TRUE                                           { fun _ -> EXP_Bool true        }
   | KW_FALSE                                          { fun _ -> EXP_Bool false       }
   | KW_NULL                                           { fun _ -> EXP_Null             } 
