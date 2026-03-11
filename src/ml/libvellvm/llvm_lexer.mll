@@ -61,6 +61,71 @@
     if n > (Z.of_int 0) then Camlcoq.Z.Zpos (p_of_ocaml_Z n)
     else Camlcoq.Z.Zneg (p_of_ocaml_Z (Z.neg n))
 
+  let explode_string s : char list = List.init (String.length s) (String.get s)
+
+  (* Strings to Rocq Decimal *)
+  let string_to_uint (s:string) : Decimal.uint =
+    let open Decimal in
+    let rec helper acc (c:char) =
+      match c with
+      | '0' -> D0 acc
+      | '1' -> D1 acc
+      | '2' -> D2 acc
+      | '3' -> D3 acc
+      | '4' -> D4 acc
+      | '5' -> D5 acc
+      | '6' -> D6 acc
+      | '7' -> D7 acc
+      | '8' -> D8 acc
+      | '9' -> D9 acc
+      | c -> failwith (Printf.sprintf "string_to_uint got bad character %c" c)
+   in
+     List.fold_left helper Nil (List.rev (explode_string s))
+
+  let int_decimal_syntax (is_neg : bool) (s:string) : Number.signed_int =
+    if is_neg then
+       Number.IntDecimal (Decimal.Neg (string_to_uint s))
+    else		  
+       Number.IntDecimal (Decimal.Pos (string_to_uint s))
+
+  (* Strings to Rocq Hexadecimal.uint *)
+  let string_to_hex_uint (s:string) : Hexadecimal.uint =
+    let open Hexadecimal in
+    let rec helper acc c =
+      match c with
+      | '0' -> D0 acc
+      | '1' -> D1 acc
+      | '2' -> D2 acc
+      | '3' -> D3 acc
+      | '4' -> D4 acc
+      | '5' -> D5 acc
+      | '6' -> D6 acc
+      | '7' -> D7 acc
+      | '8' -> D8 acc
+      | '9' -> D9 acc
+      | 'a' -> Da acc
+      | 'A' -> Da acc      
+      | 'b' -> Db acc
+      | 'B' -> Db acc      
+      | 'c' -> Dc acc
+      | 'C' -> Dc acc      
+      | 'd' -> Dd acc
+      | 'D' -> Dd acc      
+      | 'e' -> De acc
+      | 'E' -> De acc      
+      | 'f' -> Df acc
+      | 'F' -> Df acc      
+      | c -> failwith (Printf.sprintf "string_to_hex_uint got bad character %c" c)
+   in
+     List.fold_left helper Nil (List.rev (explode_string s))
+
+
+  let int_hexadecimal_syntax (is_signed:bool) (s:string) : Number.signed_int =
+    if is_signed then
+       Number.IntHexadecimal (Hexadecimal.Neg (string_to_hex_uint s))
+    else		      
+       Number.IntHexadecimal (Hexadecimal.Pos (string_to_hex_uint s))
+
   exception Lex_error_unterminated_string of Lexing.position
 
   let reserved_words = [
@@ -502,14 +567,16 @@ rule token = parse
 
   | "#dbg" kwletter* '(' { gobble_debug 1 lexbuf } (* ignore input until next closing paren *)
 
-  (* constants *)
-  | ('-'? digit+) as d            { INTEGER (z_of_ocaml_Z (Z.of_string d)) }
-  | ('-'? digit* '.' digit*) as d { FLOAT d }
-  | ('-'? digit ('.' digit*)? 'e' ('+'|'-') digit+) as d { FLOAT d }
-  (* HexIntConstant  [us]0x[0-9A-Fa-f]+ *)
+  (* Integer Decimal constants *)
+  | '-' (digit+ as d)   { INTEGER(int_decimal_syntax true d) }   (* negative *)
+  | (digit+ as d)       { INTEGER(int_decimal_syntax false d) }  (* positive *)
+
+  (* Integer Hexadecimal constants -- [us]0x[0-9A-Fa-f]+ *)
+  | "s0x" (hexdigit+) as d  { INTEGER(int_hexadecimal_syntax true d) } (* signed *)  
+  | "u0x" (hexdigit+) as d  { INTEGER(int_hexadecimal_syntax false d) } (* unsigned *)
 
   (* HexFloatConstants *)
-  (*   *)
+  
   | ('0''x' hexdigit+) as d     { HEXCONSTANT (coqfloat_of_float (Int64.float_of_bits (Int64.of_string d))) }
   | '"'                         { STRING (string (Buffer.create 10) lexbuf) }
 

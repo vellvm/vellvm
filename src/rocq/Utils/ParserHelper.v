@@ -1,8 +1,12 @@
-From Stdlib Require Import ZArith Lia Basics RelationClasses Program.
+From Stdlib Require Import ZArith Lia Basics RelationClasses Program
+  PArith.BinPosDef.
+  
 Require Import SpecFloat.
 Require Import Flocq.IEEE754.Binary Flocq.Core.Defs Flocq.Core.Zaux.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.OptionMonad.
 Require Import Floats.
+
+Definition N_of_uint (u:Decimal.uint) : N := Pos.of_uint u.
 
 Open Scope Z.
 

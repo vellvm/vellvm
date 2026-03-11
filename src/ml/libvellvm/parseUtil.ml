@@ -10,14 +10,95 @@ let pos_to_int = Camlcoq.P.to_int
 let n_of_z z = Camlcoq.N.of_int64 (Camlcoq.Z.to_int64 z)
 let pos_of_z z = Camlcoq.P.of_int64 (Camlcoq.Z.to_int64 z)
 
+(* fails if the represenation isn't a positive decimal integer *)
+let n_of_int_syntax (z:Number.signed_int) =
+  match z with
+  | Number.IntDecimal (Decimal.Pos u) -> ParserHelper.coq_N_of_uint u
+  | _ -> failwith "n_of_int_syntax got invalid syntax"
+
+
+let append_hexdigit (h:int64) (acc:Hexadecimal.uint) : Hexadecimal.uint =
+  let open Hexadecimal in 
+  begin match h with
+  | 0x0L -> D0 acc
+  | 0x1L -> D1 acc
+  | 0x2L -> D2 acc
+  | 0x3L -> D3 acc
+  | 0x4L -> D4 acc
+  | 0x5L -> D5 acc
+  | 0x6L -> D6 acc
+  | 0x7L -> D7 acc
+  | 0x8L -> D8 acc
+  | 0x9L -> D9 acc
+  | 0xaL -> Da acc
+  | 0xbL -> Db acc
+  | 0xcL -> Dc acc
+  | 0xdL -> Dd acc
+  | 0xeL -> De acc
+  | 0xfL -> Df acc
+  | _ -> failwith "append_hexdigit got non-hex int value"
+  end
+
+
+let hexadecimal_uint_to_int64 (h:Hexadecimal.uint) : int64 =
+  let open Hexadecimal in
+  let open Int64 in
+
+  let rec helper (h:Hexadecimal.uint) (acc:int64) : int64 =
+    let acc' = shift_left acc 4 in 
+    match h with
+    | Nil -> acc
+    | D0 u -> helper u (add acc' 0x0L)
+    | D1 u -> helper u (add acc' 0x1L)
+    | D2 u -> helper u (add acc' 0x2L)
+    | D3 u -> helper u (add acc' 0x3L)
+    | D4 u -> helper u (add acc' 0x4L)
+    | D5 u -> helper u (add acc' 0x5L)
+    | D6 u -> helper u (add acc' 0x6L)
+    | D7 u -> helper u (add acc' 0x7L)
+    | D8 u -> helper u (add acc' 0x8L)
+    | D9 u -> helper u (add acc' 0x9L)
+    | Da u -> helper u (add acc' 0xaL)
+    | Db u -> helper u (add acc' 0xbL)
+    | Dc u -> helper u (add acc' 0xcL)
+    | Dd u -> helper u (add acc' 0xdL)
+    | De u -> helper u (add acc' 0xeL)
+    | Df u -> helper u (add acc' 0xfL)
+  in
+  helper h 0x0L
+
+(* Prepends the [d]th hexadecimal digit of the int64 [x] onto [acc].  
+   0 <= d < 16  digits are numbered so that digit 0 is the least signicant
+   bits and digit 16 is the most significant.
+
+ *)
+let int_to_coq_hexadecimal_uint (x:int64) (d:int) (acc:Hexadecimal.uint) : Hexadecimal.uint =
+  if d < 0 || d >= 16 then failwith (Printf.sprintf "int_to_coq_hexadecimal got bad digit: %d" d)
+  else
+    let open Int64 in
+    (* right-shift x by 4 * d bits *)
+    let x_shifted = shift_right_logical x (4*d) in
+    let x_masked = logand x_shifted 0xfL in
+    append_hexdigit x_masked acc 
+    
+
+(* byte to hexadecimal *)
+let byte_to_coq_hexadecimal_uint (b:char) : Hexadecimal.uint =
+  let b_int64 = Int64.of_int (Char.code b) in
+  int_to_coq_hexadecimal_uint b_int64 1 (
+      int_to_coq_hexadecimal_uint b_int64 0
+        Hexadecimal.Nil)
+
+
+(* SAZ: Need to audit the string handling.*)
 let byte_to_i8 (b:char) =
-  (LLVMAst.TYPE_I (pos_of_z (coq_of_int 8)), LLVMAst.EXP_Integer (coq_of_int (int_of_char b)))
+  (LLVMAst.TYPE_I (pos_of_z (coq_of_int 8)), LLVMAst.EXP_Integer (Number.IntHexadecimal (Hexadecimal.Pos (byte_to_coq_hexadecimal_uint b))))
 
 let i8_to_byte (typ, exp) =
   begin match (typ, exp) with
-  | LLVMAst.TYPE_I sz, LLVMAst.EXP_Integer z ->
+  | LLVMAst.TYPE_I sz, LLVMAst.EXP_Integer (Number.IntHexadecimal (Hexadecimal.Pos u)) ->
      if (pos_to_int sz) <> 8 then failwith "i8_to_byte failed with non-byte type annotation"
-     else Char.chr (to_int z)
+     else Char.chr (Int64.to_int (hexadecimal_uint_to_int64 u))
   | _ -> failwith "i8_to_byte failed with incorrect type/value"
   end
 

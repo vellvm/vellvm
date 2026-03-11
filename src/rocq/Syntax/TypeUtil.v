@@ -35,29 +35,9 @@ Inductive sized_typ : list (ident * typ) -> typ -> Prop :=
     forall (defs : list (ident * typ)) (t : option typ),
       sized_typ defs (TYPE_Pointer t)
 
-| sized_typ_Half :
-    forall (defs : list (ident * typ)),
-      sized_typ defs TYPE_Half
-
 | sized_typ_Float :
-    forall (defs : list (ident * typ)),
-      sized_typ defs TYPE_Float
-
-| sized_typ_Double :
-    forall (defs : list (ident * typ)),
-      sized_typ defs TYPE_Double
-
-| sized_typ_X86_fp80 :
-    forall (defs : list (ident * typ)),
-      sized_typ defs TYPE_X86_fp80
-
-| sized_typ_Fp128 :
-    forall (defs : list (ident * typ)),
-      sized_typ defs TYPE_Fp128
-
-| sized_typ_Ppc_fp128 :
-    forall (defs : list (ident * typ)),
-      sized_typ defs TYPE_Ppc_fp128
+    forall (defs : list (ident * typ)) fp,
+      sized_typ defs (TYPE_FP fp)
 
 | sized_typ_Metadata :
     forall (defs : list (ident * typ)),
@@ -97,12 +77,7 @@ Inductive sized_typ : list (ident * typ) -> typ -> Prop :=
 Inductive element_typ : typ -> Prop :=
 | element_typ_Pointer : forall (t : option typ), element_typ (TYPE_Pointer t)
 | element_typ_I : forall (sz : positive), element_typ (TYPE_I sz)
-| element_typ_Half : element_typ TYPE_Half
-| element_typ_Float : element_typ TYPE_Float
-| element_typ_Double : element_typ TYPE_Double
-| element_typ_X86_fp80 : element_typ TYPE_X86_fp80
-| element_typ_Fp128 : element_typ TYPE_Fp128
-| element_typ_Ppc_fp128 : element_typ TYPE_Ppc_fp128
+| element_typ_Float : forall fp, element_typ (TYPE_FP fp)
 .
 
 
@@ -120,29 +95,9 @@ Inductive guarded_typ : ident -> list (ident * typ) -> typ -> Prop :=
     forall (id : ident) (env : list (ident * typ)),
       guarded_typ id env TYPE_Void
 
-| guarded_typ_Half :
-    forall (id : ident) (env : list (ident * typ)),
-      guarded_typ id env TYPE_Half
-
 | guarded_typ_Float :
-    forall (id : ident) (env : list (ident * typ)),
-      guarded_typ id env TYPE_Float
-
-| guarded_typ_Double :
-    forall (id : ident) (env : list (ident * typ)),
-      guarded_typ id env TYPE_Double
-
-| guarded_typ_X86_fp80 :
-    forall (id : ident) (env : list (ident * typ)),
-      guarded_typ id env TYPE_X86_fp80
-
-| guarded_typ_Fp128 :
-    forall (id : ident) (env : list (ident * typ)),
-      guarded_typ id env TYPE_Fp128
-
-| guarded_typ_Ppc_fp128 :
-    forall (id : ident) (env : list (ident * typ)),
-      guarded_typ id env TYPE_Ppc_fp128
+    forall (id : ident) (env : list (ident * typ)) fp,
+      guarded_typ id env (TYPE_FP fp)
 
 | guarded_typ_Metadata :
     forall (id : ident) (env : list (ident * typ)),
@@ -200,12 +155,7 @@ Inductive first_class_typ : typ -> Prop :=
 | first_class_I : forall sz, first_class_typ (TYPE_I sz)
 | first_class_Pointer : forall t, first_class_typ (TYPE_Pointer t)
 | first_class_Void : first_class_typ TYPE_Void
-| first_class_Half : first_class_typ TYPE_Half
-| first_class_Float : first_class_typ TYPE_Float
-| first_class_Double : first_class_typ TYPE_Double
-| first_class_X86_fp80 : first_class_typ TYPE_X86_fp80
-| first_class_Fp128 : first_class_typ TYPE_Fp128
-| first_class_Ppc_fp128 : first_class_typ TYPE_Ppc_fp128
+| first_class_Float : forall fp, first_class_typ (TYPE_FP fp)
 | first_class_Metadata : first_class_typ TYPE_Metadata
 | first_class_X86_mmx : first_class_typ TYPE_X86_mmx
 | first_class_Array : forall sz t, first_class_typ (TYPE_Array sz t)
@@ -254,29 +204,9 @@ Inductive wf_typ : list (ident * typ) -> typ -> Prop :=
     forall (defs : list (ident * typ)),
       wf_typ defs TYPE_Void
 
-| wf_typ_Half :
-    forall (defs : list (ident * typ)),
-      wf_typ defs TYPE_Half
-
 | wf_typ_Float :
-    forall (defs : list (ident * typ)),
-      wf_typ defs TYPE_Float
-
-| wf_typ_Double :
-    forall (defs : list (ident * typ)),
-      wf_typ defs TYPE_Double
-
-| wf_typ_X86_fp80 :
-    forall (defs : list (ident * typ)),
-      wf_typ defs TYPE_X86_fp80
-
-| wf_typ_Fp128 :
-    forall (defs : list (ident * typ)),
-      wf_typ defs TYPE_Fp128
-
-| wf_typ_Ppc_fp128 :
-    forall (defs : list (ident * typ)),
-      wf_typ defs TYPE_Ppc_fp128
+    forall (defs : list (ident * typ)) fp,
+      wf_typ defs (TYPE_FP fp)
 
 | wf_typ_Metadata :
     forall (defs : list (ident * typ)),
@@ -355,29 +285,9 @@ Inductive guarded_wf_typ : list (ident * typ) -> typ -> Prop :=
     forall (defs : list (ident * typ)),
       guarded_wf_typ defs TYPE_Void
 
-| guarded_wf_typ_Half :
-    forall (defs : list (ident * typ)),
-      guarded_wf_typ defs TYPE_Half
-
 | guarded_wf_typ_Float :
-    forall (defs : list (ident * typ)),
-      guarded_wf_typ defs TYPE_Float
-
-| guarded_wf_typ_Double :
-    forall (defs : list (ident * typ)),
-      guarded_wf_typ defs TYPE_Double
-
-| guarded_wf_typ_X86_fp80 :
-    forall (defs : list (ident * typ)),
-      guarded_wf_typ defs TYPE_X86_fp80
-
-| guarded_wf_typ_Fp128 :
-    forall (defs : list (ident * typ)),
-      guarded_wf_typ defs TYPE_Fp128
-
-| guarded_wf_typ_Ppc_fp128 :
-    forall (defs : list (ident * typ)),
-      guarded_wf_typ defs TYPE_Ppc_fp128
+    forall (defs : list (ident * typ)) fp,
+      guarded_wf_typ defs (TYPE_FP fp)
 
 | guarded_wf_typ_Metadata :
     forall (defs : list (ident * typ)),
@@ -465,24 +375,16 @@ Inductive unrolled_typ : typ -> Prop :=
 | unrolled_typ_Void :
     unrolled_typ TYPE_Void
 
-| unrolled_typ_Half :
-    unrolled_typ TYPE_Half
-
 | unrolled_typ_Float :
-    unrolled_typ TYPE_Float
+  forall fp,
+    unrolled_typ (TYPE_FP fp)
 
-| unrolled_typ_Double :
-    unrolled_typ TYPE_Double
+| unrolled_typ_Label :
+  unrolled_typ TYPE_Label
 
-| unrolled_typ_X86_fp80 :
-    unrolled_typ TYPE_X86_fp80
-
-| unrolled_typ_Fp128 :
-    unrolled_typ TYPE_Fp128
-
-| unrolled_typ_Ppc_fp128 :
-    unrolled_typ TYPE_Ppc_fp128
-
+| unrolled_typ_Token :
+  unrolled_typ TYPE_Token
+                 
 | unrolled_typ_Metadata :
     unrolled_typ TYPE_Metadata
 
@@ -741,12 +643,9 @@ Program Fixpoint normalize_type (env : list (ident * typ)) (t : typ) {measure (L
   | TYPE_IPTR => t
   | TYPE_Pointer t' => t
   | TYPE_Void => t
-  | TYPE_Half => t
-  | TYPE_Float => t
-  | TYPE_Double => t
-  | TYPE_X86_fp80 => t
-  | TYPE_Fp128 => t
-  | TYPE_Ppc_fp128 => t
+  | TYPE_FP fp => t
+  | TYPE_Label => t
+  | TYPE_Token => t
   | TYPE_Metadata => t
   | TYPE_X86_mmx => t
   | TYPE_Opaque => t
@@ -795,12 +694,9 @@ Lemma normalize_type_equation : forall env t,
   | TYPE_IPTR => TYPE_IPTR
   | TYPE_Pointer t' => TYPE_Pointer t'
   | TYPE_Void => TYPE_Void
-  | TYPE_Half => TYPE_Half
-  | TYPE_Float => TYPE_Float
-  | TYPE_Double => TYPE_Double
-  | TYPE_X86_fp80 => TYPE_X86_fp80
-  | TYPE_Fp128 => TYPE_Fp128
-  | TYPE_Ppc_fp128 => TYPE_Ppc_fp128
+  | TYPE_FP fp => TYPE_FP fp
+  | TYPE_Label => TYPE_Label
+  | TYPE_Token => TYPE_Token
   | TYPE_Metadata => TYPE_Metadata
   | TYPE_X86_mmx => TYPE_X86_mmx
   | TYPE_Opaque => TYPE_Opaque
@@ -935,12 +831,9 @@ Inductive simple_typ : typ -> Prop :=
 | simple_typ_Pointer : forall t, simple_typ t -> simple_typ (TYPE_Pointer (Some (t)))
 | simple_typ_Opaque_Pointer : simple_typ (TYPE_Pointer None)
 | simple_typ_Void : simple_typ (TYPE_Void)
-| simple_typ_Half : simple_typ (TYPE_Half)
-| simple_typ_Float : simple_typ (TYPE_Float)
-| simple_typ_Double : simple_typ (TYPE_Double)
-| simple_typ_X86_fp80 : simple_typ (TYPE_X86_fp80)
-| simple_typ_Fp128 : simple_typ (TYPE_Fp128)
-| simple_typ_Ppc_fp128 : simple_typ (TYPE_Ppc_fp128)
+| simple_typ_Float : forall fp, simple_typ (TYPE_FP fp)
+| simple_typ_Label : simple_typ TYPE_Label
+| simple_typ_Token : simple_typ TYPE_Token                                
 | simple_typ_Metadata : simple_typ (TYPE_Metadata)
 | simple_typ_X86_mmx : simple_typ (TYPE_X86_mmx)
 | simple_typ_Array : forall sz t, simple_typ t -> simple_typ (TYPE_Array sz t)
