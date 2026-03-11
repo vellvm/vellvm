@@ -82,6 +82,7 @@
 ./rocq/Semantics/Printfdefn.v
 ./rocq/Semantics/TopLevel.v
 ./rocq/Semantics/VellvmIntegers.v
+./rocq/Semantics/VellvmFloats.v
 ./rocq/Syntax.v
 ./rocq/Syntax/AstLib.v
 ./rocq/Syntax/CFG.v

@@ -204,7 +204,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
     Proof.
       intros t d t' H.
       destruct t; cbn in *; inv H; subst;
-        try break_match_hyp_inv; try discriminate.
+        try repeat break_match_hyp_inv; try discriminate.
     Qed.
 
     Lemma map_monad_concretize_u_concretize_uvalue :

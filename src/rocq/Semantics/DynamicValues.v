@@ -2906,7 +2906,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       eapply H; eauto.
   Qed.
 
-(* TODO: DELETE  
+
   Section hiding_notation.
     #[local] Open Scope sexp_scope.
 
@@ -2932,6 +2932,9 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
     #[global] Instance serialize_dvalue : Serialize dvalue := serialize_dvalue'.
 
+    #[global] Instance seralize_show {A} `{Show A} : Serialize A :=
+      fun x => Atom (show x).
+    
     Fixpoint serialize_uvalue' (pre post: string) (uv:uvalue): sexp :=
       match uv with
       | UVALUE_Addr a => Atom (pre ++ "address" ++ post)%string (* TODO: insist that memory models can print addresses? *)
@@ -2959,7 +2962,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     #[global] Instance serialize_uvalue : Serialize (uvalue) := serialize_uvalue' "" "".
 
   End hiding_notation.
-*)
+
   
   Ltac dec_dvalue :=
     match goal with

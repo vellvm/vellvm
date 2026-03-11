@@ -117,7 +117,7 @@ Definition va_copy_decl: declaration typ :=
 Definition fabs_32_decl: declaration typ :=
   {|
     dc_name        := Name "llvm.fabs.f32";
-    dc_type        := TYPE_Function TYPE_Float [TYPE_Float] false;
+    dc_type        := TYPE_Function (TYPE_FP FP_float) [(TYPE_FP FP_float)] false;
     dc_param_attrs := ([], [[]]);
     dc_attrs       := [];
     dc_annotations  := []
@@ -127,7 +127,7 @@ Definition fabs_32_decl: declaration typ :=
 Definition fabs_64_decl: declaration typ :=
   {|
     dc_name        := Name "llvm.fabs.f64";
-    dc_type        := TYPE_Function TYPE_Double [TYPE_Double] false;
+    dc_type        := TYPE_Function (TYPE_FP FP_double) [(TYPE_FP FP_double)] false;
     dc_param_attrs := ([], [[]]);
     dc_attrs       := [];
     dc_annotations  := []
@@ -207,7 +207,7 @@ Definition free_decl: declaration typ :=
 Definition maxnum_64_decl: declaration typ :=
   {|
     dc_name        := Name "llvm.maxnum.f64";
-    dc_type        := TYPE_Function TYPE_Double [TYPE_Double;TYPE_Double] false;
+    dc_type        := TYPE_Function (TYPE_FP FP_double) [(TYPE_FP FP_double);(TYPE_FP FP_double)] false;
     dc_param_attrs := ([], [[];[]]);
     dc_attrs       := [];
     dc_annotations  := []
@@ -216,7 +216,7 @@ Definition maxnum_64_decl: declaration typ :=
 Definition minimum_64_decl: declaration typ :=
   {|
     dc_name        := Name "llvm.minimum.f64";
-    dc_type        := TYPE_Function TYPE_Double [TYPE_Double;TYPE_Double] false;
+    dc_type        := TYPE_Function (TYPE_FP FP_double) [(TYPE_FP FP_double);(TYPE_FP FP_double)] false;
     dc_param_attrs := ([], [[];[]]);
     dc_attrs       := [];
     dc_annotations  := []
@@ -225,7 +225,7 @@ Definition minimum_64_decl: declaration typ :=
 Definition maxnum_32_decl: declaration typ :=
   {|
     dc_name        := Name "llvm.maxnum.f32";
-    dc_type        := TYPE_Function TYPE_Float [TYPE_Float;TYPE_Float] false;
+    dc_type        := TYPE_Function (TYPE_FP FP_float) [(TYPE_FP FP_float);(TYPE_FP FP_float)] false;
     dc_param_attrs := ([], [[];[]]);
     dc_attrs       := [];
     dc_annotations  := []
@@ -234,7 +234,7 @@ Definition maxnum_32_decl: declaration typ :=
 Definition minimum_32_decl: declaration typ :=
   {|
     dc_name        := Name "minimum.f32";
-    dc_type        := TYPE_Function TYPE_Float [TYPE_Float;TYPE_Float] false;
+    dc_type        := TYPE_Function (TYPE_FP FP_float) [(TYPE_FP FP_float);(TYPE_FP FP_float)] false;
     dc_param_attrs := ([], [[];[]]);
     dc_attrs       := [];
     dc_annotations  := []

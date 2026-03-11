@@ -44,6 +44,8 @@ From Vellvm Require Import
      Handlers.Concretization
      Handlers.LLVMExceptions.
 
+From QuickChick Require Import Show.
+
 Require Import Ceres.Ceres.
 
 Import Sum.
@@ -203,6 +205,14 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
      Expressions are denoted as itrees that return a [uvalue].
    *)
 
+  Definition denote_int_syntax (x:int_syntax) : Z := 
+    BinIntDef.Z.of_num_int x.
+
+  (* TODO: cleanup with typeclasses *)
+  Definition denote_float_syntax_as_float32 (f:float_syntax) : option float32 := None.
+    
+  Definition denote_float_syntax_as_float (f:float_syntax) : option float := None.
+      
   Fixpoint denote_exp'
            (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
     let eval_texp '(dt,ex) := denote_exp' (Some dt) ex
@@ -212,35 +222,31 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
     (* The translation injects the [lookup_E] interface used by [lookup_id] to the ambient one *)
     | EXP_Ident i =>
       translate LU_to_exp (lookup_id i)
-
+                
     | EXP_Integer x =>
       match top with
       | None                => raise ("denote_exp given untyped EXP_Integer")
-      | Some (DTYPE_I bits) => fmap dvalue_to_uvalue (coerce_integer_to_int (Some bits) x)
-      | Some DTYPE_IPTR     => fmap dvalue_to_uvalue (coerce_integer_to_int None x)
-      | Some typ            => raise ("bad type for constant int: " ++ to_string typ)
+      | Some (DTYPE_I bits) => fmap dvalue_to_uvalue (coerce_integer_to_int (Some bits) (denote_int_syntax x))
+      | Some DTYPE_IPTR     => fmap dvalue_to_uvalue (coerce_integer_to_int None (denote_int_syntax x))
+      | Some typ            => raise ("bad type for constant int: " ++ show typ)
       end
-
+        
+    (* TODO: define a typeclass for handling all floating point representations *)
     | EXP_Float x =>
       match top with
-      | None              => raise ("denote_exp given untyped EXP_Float")
-      | Some DTYPE_Float  => ret (UVALUE_Float x)
-      | _                 => raise ("bad type for constant float")
-      end
-
-    | EXP_Double x =>
-      match top with
-      | None              => raise ("denote_exp given untyped EXP_Double")
-      | Some DTYPE_Double => ret (UVALUE_Double x)
-      | _                 => raise ("bad type for constant double")
-      end
-
-    | EXP_Hex x =>
-      match top with
-      | None              => raise ("denote_exp given untyped EXP_Hex")
-      | Some DTYPE_Float  => ret (UVALUE_Float (Float32.of_double x))
-      | Some DTYPE_Double => ret (UVALUE_Double x)
-      | _                 => raise ("bad type for constant hex float")
+      | None                      => raise ("denote_exp given untyped EXP_Float")
+      | Some (DTYPE_FP FP_float)  =>
+          match denote_float_syntax_as_float32 x with
+          | Some f => ret (UVALUE_Float f)
+          | None => raise ("bad float literal")
+          end
+      | Some (DTYPE_FP FP_double) =>
+          match denote_float_syntax_as_float x with
+          | Some f => ret (UVALUE_Double f)
+          | None => raise ("bad double literal")
+          end
+      | Some (DTYPE_FP _)        => raise ("unsupported float type")
+      | _                        => raise ("bad type for constant float")
       end
 
     | EXP_Bool b =>
@@ -248,7 +254,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       | true  => ret (@UVALUE_I 1 VellvmIntegers.one)
       | false => ret (@UVALUE_I 1 VellvmIntegers.zero)
       end
-
+        
     | EXP_Null => ret (UVALUE_Addr ADDR.null)
 
     | EXP_Zero_initializer =>
@@ -317,6 +323,10 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       v2 <- denote_exp' (Some dt) op2 ;;
       ret (UVALUE_FBinop fop fm v1 v2)
 
+    | OP_Fneg tm (dt, op) =>
+      v <- denote_exp' (Some dt) op ;;
+      ret (UVALUE_Fneg tm dt v)
+          
     | OP_FCmp fcmp dt op1 op2 =>
       v1 <- denote_exp' (Some dt) op1 ;;
       v2 <- denote_exp' (Some dt) op2 ;;
@@ -805,7 +815,8 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       end
 
     | TERM_Br_1 br => ret (inl br)
-
+                        
+                         
     | TERM_Switch (dt,e) default_br dests =>
       uselector <- (translate exp_to_instr (denote_exp (Some dt) e));;
       (* Selection on [undef] is UB *)
@@ -815,13 +826,15 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
       else (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
         switches <- map_monad
                      (fun '((TInt_Literal sz x),id) =>
-                        s <- (coerce_integer_to_int (Some sz) x);;
+                        s <- (coerce_integer_to_int (Some sz) (denote_int_syntax x));;
                         ret (s,id))
                      dests;;
         lift_err (fun b => ret (inl b)) (select_switch selector default_br switches)
 
     | TERM_Unreachable => raiseUB (err_loc ++ ": IMPOSSIBLE: unreachable in reachable position")
 
+
+                                 
       (* TODO: technically operand bundles can affect the semantics of invoke *)
     | TERM_Invoke (dt, fnptrval) args to_label unwind_label anns _ =>
       uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) (List.map fst args) ;;
@@ -909,7 +922,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP
   Definition denote_cfg (f: cfg dtyp) (varargs : option ADDR.addr) : itree instr_E uvalue :=
     r <- denote_ocfg (blks f) varargs (init f,init f) ;;
     match r with
-    | inl bid => raise ("Can't find block in denote_cfg " ++ to_string (snd bid))
+    | inl bid => raise ("Can't find block in denote_cfg " ++ show (snd bid))
     | inr uv  => ret uv
     end.
 

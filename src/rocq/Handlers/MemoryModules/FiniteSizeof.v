@@ -7,6 +7,7 @@ From Vellvm.Utils Require Import
      ListUtil.
 
 From Vellvm.Syntax Require Import
+     LLVMAst
      DynamicTypes.
 
 From Vellvm.Semantics Require Import
@@ -34,12 +35,15 @@ Module FinSizeof : Sizeof.
        | DTYPE_IPTR => Build_alignment 8 8
        | DTYPE_Pointer => Build_alignment 8 8
        | DTYPE_Void => Build_alignment 1 1
-       | DTYPE_Half => Build_alignment 2 2
-       | DTYPE_Float => Build_alignment 4 4
-       | DTYPE_Double => Build_alignment 8 8
-       | DTYPE_X86_fp80 => Build_alignment 16 16  (* Not sure if this is right *)
-       | DTYPE_Fp128 => Build_alignment 16 16
-       | DTYPE_Ppc_fp128 => Build_alignment 16 16
+       | DTYPE_FP FP_half => Build_alignment 2 2
+       | DTYPE_FP FP_bfloat => Build_alignment 2 2  (* same as for half? *)
+       | DTYPE_FP FP_float => Build_alignment 4 4
+       | DTYPE_FP FP_double => Build_alignment 8 8
+       | DTYPE_FP FP_x86_fp80 => Build_alignment 16 16  (* Not sure if this is right *)
+       | DTYPE_FP FP_fp128 => Build_alignment 16 16
+       | DTYPE_FP FP_ppc_fp128 => Build_alignment 16 16
+       | DTYPE_Label => Build_alignment 8 8 (* treat labels as pointers? *)
+       | DTYPE_Token => Build_alignment 8 8 (* not sure what alignment for token values *)
        | DTYPE_Metadata => Build_alignment 1 1
        | DTYPE_X86_mmx => Build_alignment 8 8 (* I assume these are 64-bit, but I'm not sure *)
        | DTYPE_Array sz t => Build_alignment 8 8
@@ -64,18 +68,30 @@ Module FinSizeof : Sizeof.
     then 0
     else (((n - 1) / 8) + 1) * 8.
 
+
+  Definition byte_sizeof_floating_point_variant (fp : floating_point_variant) : N :=
+    match fp with
+    | FP_half => 2
+    | FP_bfloat => 2
+    | FP_float => 4
+    | FP_double => 8
+    | FP_x86_fp80 => 10
+    | FP_fp128 => 16
+    | FP_ppc_fp128 => 16
+    end.
+
+  Definition bit_sizeof_floating_point_variant (fp : floating_point_variant) : N :=
+    8 * (byte_sizeof_floating_point_variant fp).
+  
   Fixpoint bit_sizeof_dtyp (ty : dtyp) : N :=
     match ty with
     | DTYPE_I sz => Npos sz
     | DTYPE_IPTR => 64 (* TODO: probably kind of a lie... *)
     | DTYPE_Pointer => 64
     | DTYPE_Void => 0
-    | DTYPE_Half => 16
-    | DTYPE_Float => 32
-    | DTYPE_Double => 64
-    | DTYPE_X86_fp80 => 80
-    | DTYPE_Fp128 => 128
-    | DTYPE_Ppc_fp128 => 128
+    | DTYPE_FP fp => bit_sizeof_floating_point_variant fp
+    | DTYPE_Label => 64
+    | DTYPE_Token => 64 (* ??? *)
     | DTYPE_Metadata => 0
     | DTYPE_X86_mmx => 64
     | DTYPE_Array sz t => sz * (round_up_to_eight (bit_sizeof_dtyp t))
@@ -91,6 +107,7 @@ Module FinSizeof : Sizeof.
 
   Fixpoint sizeof_dtyp (ty:dtyp) : N :=
     match ty with
+    | DTYPE_Void         => 0
     | DTYPE_I sz         => N.max 1 (N.div (Npos sz) 8)
     | DTYPE_IPTR         => N.of_nat ptr_size
     | DTYPE_Pointer      => N.of_nat ptr_size
@@ -103,16 +120,12 @@ Module FinSizeof : Sizeof.
     | DTYPE_Vector sz ty'  (* TODO: Vector sizeof currently invalid for sub-bytesize / non-byte aligned elements. Changing this involves changing serialization. *)
     | DTYPE_Array sz ty' =>
         sz * (sizeof_dtyp ty')
-    | DTYPE_Float        => 4
-    | DTYPE_Double       => 8
-    | DTYPE_Half         => 4
-    | DTYPE_X86_fp80     => 10 (* TODO: Unsupported, currently modeled by Float32 *)
-    | DTYPE_Fp128        => 16 (* TODO: Unsupported, currently modeled by Float32 *)
-    | DTYPE_Ppc_fp128    => 16 (* TODO: Unsupported, currently modeled by Float32 *)
+    | DTYPE_FP fp        => byte_sizeof_floating_point_variant fp
+    | DTYPE_Label        => 8
+    | DTYPE_Token        => 8
     | DTYPE_Metadata     => 0
     | DTYPE_X86_mmx      => 8 (* TODO: Unsupported *)
     | DTYPE_Opaque       => 0 (* TODO: Unsupported *)
-    | _                  => 0 (* TODO: add support for more types as necessary *)
     end.
 
   Lemma sizeof_dtyp_void :

@@ -15,7 +15,8 @@ From Vellvm Require Import
   Utils.Oomable
   Utils.Poisonable
   Utils.ErrOomPoison
-  Utils.ListUtil.
+  Utils.ListUtil
+  Syntax.LLVMAst.
 
 From ExtLib Require Import
      Structures.Monads
@@ -431,20 +432,26 @@ Module Type DvalueByte (LP : LLVMParams).
            end
        | DTYPE_Void =>
            raise_error "dvalue_bytes_to_dvalue on void type."
-       | DTYPE_Half =>
-           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Half."
-       | DTYPE_Float =>
+       | DTYPE_FP FP_half =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported half."
+       | DTYPE_FP FP_bfloat =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported bfloat"
+       | DTYPE_FP FP_float =>
            zs <- map_monad dvalue_byte_value dbs;;
            ret (DVALUE_Float (Float32.of_bits (concat_bytes_Z_vint zs)))
-       | DTYPE_Double =>
+       | DTYPE_FP FP_double =>
            zs <- map_monad dvalue_byte_value dbs;;
            ret (DVALUE_Double (Float.of_bits (concat_bytes_Z_vint zs)))
-       | DTYPE_X86_fp80 =>
-           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_fp80."
-       | DTYPE_Fp128 =>
-           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Fp128."
-       | DTYPE_Ppc_fp128 =>
-           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Ppc_fp128."
+       | DTYPE_FP FP_x86_fp80 =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported X86_fp80."
+       | DTYPE_FP FP_fp128 =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported fp128."
+       | DTYPE_FP FP_ppc_fp128 =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported ppc_fp128."
+       | DTYPE_Label =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Label."
+       | DTYPE_Token =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Token."
        | DTYPE_Metadata =>
            raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Metadata."
        | DTYPE_X86_mmx =>
@@ -523,20 +530,26 @@ Module Type DvalueByte (LP : LLVMParams).
            end
        | DTYPE_Void =>
            raise_error "dvalue_bytes_to_dvalue on void type."
-       | DTYPE_Half =>
-           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Half."
-       | DTYPE_Float =>
+       | DTYPE_FP FP_half =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported half."
+       | DTYPE_FP FP_bfloat =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported bfloat"
+       | DTYPE_FP FP_float =>
            zs <- map_monad dvalue_byte_value dbs;;
            ret (DVALUE_Float (Float32.of_bits (concat_bytes_Z_vint zs)))
-       | DTYPE_Double =>
+       | DTYPE_FP FP_double =>
            zs <- map_monad dvalue_byte_value dbs;;
            ret (DVALUE_Double (Float.of_bits (concat_bytes_Z_vint zs)))
-       | DTYPE_X86_fp80 =>
-           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_fp80."
-       | DTYPE_Fp128 =>
-           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Fp128."
-       | DTYPE_Ppc_fp128 =>
-           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Ppc_fp128."
+       | DTYPE_FP FP_x86_fp80 =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported X86_fp80."
+       | DTYPE_FP FP_fp128 =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported fp128."
+       | DTYPE_FP FP_ppc_fp128 =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported ppc_fp128."
+       | DTYPE_Label =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Label."
+       | DTYPE_Token =>
+           raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Token."
        | DTYPE_Metadata =>
            raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Metadata."
        | DTYPE_X86_mmx =>
