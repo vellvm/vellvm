@@ -1,6 +1,7 @@
 From Vellvm.Syntax Require Import
      DataLayout
-     DynamicTypes.
+     DynamicTypes
+     LLVMAst.
 
 From Vellvm.Semantics Require Import
      MemoryAddress
@@ -104,8 +105,8 @@ Inductive is_supported : dtyp -> Prop :=
 | is_supported_DTYPE_I64 : is_supported (DTYPE_I 64)
 | is_supported_DTYPE_Pointer : is_supported (DTYPE_Pointer)
 | is_supported_DTYPE_Void : is_supported (DTYPE_Void)
-| is_supported_DTYPE_Float : is_supported (DTYPE_Float)
-| is_supported_DTYPE_Double : is_supported (DTYPE_Double)
+| is_supported_DTYPE_Float : is_supported (DTYPE_FP FP_float)
+| is_supported_DTYPE_Double : is_supported (DTYPE_FP FP_double)
 | is_supported_DTYPE_Array : forall sz τ, is_supported τ -> is_supported (DTYPE_Array sz τ)
 | is_supported_DTYPE_Struct : forall fields, Forall is_supported fields -> is_supported (DTYPE_Struct fields)
 | is_supported_DTYPE_Packed_struct : forall fields, Forall is_supported fields -> is_supported (DTYPE_Packed_struct fields)

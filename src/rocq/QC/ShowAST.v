@@ -207,6 +207,9 @@ Section ShowInstances.
        | DTYPE_Vector sz t          => "Vector"
        end.
 
+  #[global] Instance dshowDTyp : Show dtyp :=
+    {| show := show_dtyp |}.
+  
   Definition show_linkage (l : linkage) : string :=
     match l with
     | LINKAGE_Private => "private "

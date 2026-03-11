@@ -21,7 +21,9 @@ Require Import ExtLib.Structures.Monads.
 Require Import ExtLib.Data.Monads.EitherMonad.
 Require Export ExtLib.Structures.Functor.
 
-From Stdlib Require Import List.
+From Stdlib Require Import
+  List
+  Number. 
 
 Import ListNotations.
 Import MonadNotation.
@@ -244,15 +246,60 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE
     let i_sz := Z.of_N sz in
     if i_sz <=? 8 then lift_GenALIVE2 (choose (0, 2 ^ i_sz - 1)) else ret 10000.
 
+  Definition gen_int_exp (sz : N) : GenALIVE2 (exp typ) :=
+    i_val <- gen_int sz;;
+    (ret (EXP_Integer (BinIntDef.Z.to_num_int i_val))).
+
   Definition gen_float32 : GenALIVE2 float32 :=
     lift_GenALIVE2 fing32.
 
-  Definition gen_int_exp (sz : N) : GenALIVE2 (exp typ) :=
-    i_val <- gen_int sz;;
-    (ret (EXP_Integer i_val)).
+  (* Generates a random string of hex digits of length len *)
+  Fixpoint gen_hex (len : nat) : G Hexadecimal.uint :=
+    match len with
+    | 0 => ret (Hexadecimal.Nil)
+    | S n =>
+        r <- gen_hex n ;;
+        oneof
+           (ret (Hexadecimal.D0 r)) [
+            ret (Hexadecimal.D1 r) 
+          ; ret (Hexadecimal.D2 r)
+          ; ret (Hexadecimal.D3 r)                   
+          ; ret (Hexadecimal.D4 r)
+          ; ret (Hexadecimal.D5 r)                   
+          ; ret (Hexadecimal.D6 r)
+          ; ret (Hexadecimal.D7 r)                   
+          ; ret (Hexadecimal.D8 r)
+          ; ret (Hexadecimal.D9 r)                   
+          ; ret (Hexadecimal.Da r)
+          ; ret (Hexadecimal.Db r)                   
+          ; ret (Hexadecimal.Dc r)
+          ; ret (Hexadecimal.Dd r)                   
+          ; ret (Hexadecimal.De r)
+          ; ret (Hexadecimal.Df r)                   
+          ]
+    end%nat.
 
+  (* SAZ: with the new representation of floating point syntax, these could probably be done with typeclasses *)
+  Definition gen_float32_syntax : GenALIVE2 float_syntax :=
+    h <- lift_GenALIVE2 (gen_hex 8) ;;
+    ret (FS_hex FH_X h).
+
+  Definition gen_double_syntax : GenALIVE2 float_syntax :=
+    h <- lift_GenALIVE2 (gen_hex 16) ;;
+    ret (FS_hex FH_X h).
+  
   Definition gen_float_exp : GenALIVE2 (exp typ) :=
-    ret EXP_Float <*> gen_float32.
+    ret EXP_Float <*> gen_float32_syntax.
+
+  Definition gen_double_exp : GenALIVE2 (exp typ) :=
+    ret EXP_Float <*> gen_double_syntax.
+
+  Definition zero_hex : float_syntax :=
+    FS_hex FH_X (Hexadecimal.D0 (Hexadecimal.Nil)).
+
+  Definition zero_int : int_syntax :=
+    BinIntDef.Z.to_num_int 0.
+      
 
   (* size is the max depth of the data structure
      int, float, double -> 0
@@ -297,36 +344,21 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
          | TYPE_Void => true
          | _ => false
          end
-       | TYPE_Half =>
+       | TYPE_FP f1 =>
          match b with
-         | TYPE_Half => true
+         | TYPE_FP f2 => if floating_point_variant_eq_dec f1 f2 then true else false 
          | _ => false
          end
-       | TYPE_Float =>
+       | TYPE_Label =>
          match b with
-         | TYPE_Float => true
+         | TYPE_Label => true
          | _ => false
-         end
-       | TYPE_Double =>
+         end 
+       | TYPE_Token =>
          match b with
-         | TYPE_Double => true
+         | TYPE_Token => true
          | _ => false
-         end
-       | TYPE_X86_fp80 =>
-         match b with
-         | TYPE_X86_fp80 => true
-         | _ => false
-         end
-       | TYPE_Fp128 =>
-         match b with
-         | TYPE_Fp128 => true
-         | _ => false
-         end
-       | TYPE_Ppc_fp128 =>
-         match b with
-         | TYPE_Ppc_fp128 => true
-         | _ => false
-         end
+         end 
        | TYPE_Metadata =>
          match b with
          | TYPE_Metadata => true
@@ -399,11 +431,10 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
           match ty with
           | TYPE_I sz =>
               ret (Npos sz) >>= gen_int_exp
-          | TYPE_Float =>
+          | TYPE_FP FP_float =>
               gen_float_exp
-          | TYPE_Double =>
-              f32 <- gen_float32;;
-              ret (EXP_Double (Float.of_single f32))
+          | TYPE_FP FP_double =>
+              gen_double_exp
           | TYPE_Array n t =>
               es <- vectorOf_ALIVE2 (N.to_nat n) (gen_exp_size 0 t);;
               ret (EXP_Array (TYPE_Array n t) (map (fun e => (t, e)) es))
@@ -427,11 +458,9 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     | (S z)%nat => (* Generate instruction-like expression *)
         match t with
         | TYPE_I sz =>
-            ret (OP_IBinop (LLVMAst.Add false false)) <*> ret t <*> gen_exp_size 0 t <*> ret (EXP_Integer 0)
-        | TYPE_Float =>
-            ret (OP_FBinop (LLVMAst.FAdd) []) <*> ret t <*> gen_exp_size 0 t <*> ret (EXP_Float Float32.zero)
-        | TYPE_Double =>
-            ret (OP_FBinop (LLVMAst.FAdd) []) <*> ret t <*> gen_exp_size 0 t <*> ret (EXP_Double Float.zero)
+            ret (OP_IBinop (LLVMAst.Add false false)) <*> ret t <*> gen_exp_size 0 t <*> ret (EXP_Integer zero_int)
+        | TYPE_FP fp =>
+            ret (OP_FBinop (LLVMAst.FAdd) []) <*> ret t <*> gen_exp_size 0 t <*> ret (EXP_Float zero_hex)
         | _ => failGen "Unimplemented"
         end
     end.
@@ -469,16 +498,16 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     | TYPE_I _ =>
         exp <- gen_exp_size 1 tgt;;
         (add_id_to_instr (tgt, INSTR_Op exp))
-    | TYPE_Float =>
+    | TYPE_FP FP_float =>
         exp <- gen_exp_size 1 tgt;;
         add_id_to_instr (tgt, INSTR_Op exp)
-    | TYPE_Double =>
+    | TYPE_FP FP_double =>
         exp <- gen_exp_size 1 tgt;;
         add_id_to_instr (tgt, INSTR_Op exp)
     | TYPE_Vector sz t' =>
         e_src <- gen_exp_size 0 tgt;;
         e_input <- gen_exp_size 0 t';;
-        let e_index := EXP_Integer (Z.of_nat index) in
+        let e_index := EXP_Integer (BinInt.Z.to_num_int (Z.of_nat index)) in
         let exp := OP_InsertElement (tgt, e_src) (t', e_input) (TYPE_I 8, e_index) in
         ins <- add_id_to_instr (tgt, INSTR_Op exp);;
         match e_src with
@@ -578,8 +607,8 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     | TYPE_I _ =>
         inst <- gen_instantiate_instr 0 t;;
         ret [inst]
-    | TYPE_Float
-    | TYPE_Double =>
+    | TYPE_FP FP_float
+    | TYPE_FP FP_double =>
         inst <- gen_instantiate_instr 0 t;;
         ret [inst]
     | TYPE_Vector sz t' =>
@@ -683,7 +712,7 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
        let src_id := ID_Local accid in
        let e_src := EXP_Ident src_id in
        e_input <- gen_exp_ident t';;
-       let e_index := EXP_Integer (Z.of_nat index) in
+       let e_index := EXP_Integer (BinInt.Z.to_num_int (Z.of_nat index)) in
        let set_instr :=
          if is_insertelement
          then
@@ -862,9 +891,9 @@ Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     match t with
     | @TYPE_I sz =>
         ret (@UVALUE_I sz) <*> (ret repr <*> lift_GenALIVE2 (choose (0, Z.min (2^(Zpos sz) - 1) 10000)))
-    | TYPE_Float =>
+    | TYPE_FP FP_float =>
         ret UVALUE_Float <*> lift_GenALIVE2 fing32
-    | TYPE_Double =>
+    | TYPE_FP FP_double =>
         failGen "Generating UValue Double - Not supported"
     | TYPE_Void => ret UVALUE_None
     | TYPE_Vector sz subtyp =>
