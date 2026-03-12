@@ -64,7 +64,7 @@
   let explode_string s : char list = List.init (String.length s) (String.get s)
 
   (* Strings to Rocq Decimal *)
-  let string_to_uint (s:string) : Decimal.uint =
+  let string_to_decimal_uint (s:string) : Decimal.uint =
     let open Decimal in
     let rec helper acc (c:char) =
       match c with
@@ -78,15 +78,17 @@
       | '7' -> D7 acc
       | '8' -> D8 acc
       | '9' -> D9 acc
-      | c -> failwith (Printf.sprintf "string_to_uint got bad character %c" c)
+      | c -> failwith (Printf.sprintf "string_to_decimal_uint got bad character %c" c)
    in
      List.fold_left helper Nil (List.rev (explode_string s))
 
-  let int_decimal_syntax (is_neg : bool) (s:string) : Number.signed_int =
-    if is_neg then
-       Number.IntDecimal (Decimal.Neg (string_to_uint s))
-    else		  
-       Number.IntDecimal (Decimal.Pos (string_to_uint s))
+  let string_to_decimal_int (sign : string) (s:string) =
+    match sign with
+    | ""
+    | "+" -> Decimal.Pos (string_to_decimal_uint s)
+    | "-" -> Decimal.Neg (string_to_decimal_uint s)
+    | _ -> assert false 
+
 
   (* Strings to Rocq Hexadecimal.uint *)
   let string_to_hex_uint (s:string) : Hexadecimal.uint =
@@ -527,6 +529,7 @@ let ident_fst  = letter   | ['-' '$' '.' '_']
 let ident_nxt  = alphanum | ['-' '$' '.' '_']
 let label_char = alphanum | ['-' '$' '.' '_'] 
 let kwletter   = alphanum | ['_' '$' '.' '_']
+let sign = ('+' | '-')
 
 rule token = parse
   (* seps and stuff *)
@@ -568,16 +571,32 @@ rule token = parse
   | "#dbg" kwletter* '(' { gobble_debug 1 lexbuf } (* ignore input until next closing paren *)
 
   (* Integer Decimal constants *)
-  | '-' (digit+ as d)   { INTEGER(int_decimal_syntax true d) }   (* negative *)
-  | (digit+ as d)       { INTEGER(int_decimal_syntax false d) }  (* positive *)
+  | (sign? as s) (digit+ as d)   { INTEGER(Number.IntDecimal(string_to_decimal_int s d)) }
 
   (* Integer Hexadecimal constants -- [us]0x[0-9A-Fa-f]+ *)
-  | "s0x" (hexdigit+) as d  { INTEGER(int_hexadecimal_syntax true d) } (* signed *)  
-  | "u0x" (hexdigit+) as d  { INTEGER(int_hexadecimal_syntax false d) } (* unsigned *)
+  | "s0x" (hexdigit+ as d)  { INTEGER(int_hexadecimal_syntax true d) } (* signed *)  
+  | "u0x" (hexdigit+ as d)  { INTEGER(int_hexadecimal_syntax false d) } (* unsigned *)
 
-  (* HexFloatConstants *)
-  
-  | ('0''x' hexdigit+) as d     { HEXCONSTANT (coqfloat_of_float (Int64.float_of_bits (Int64.of_string d))) }
+  (* Floating point Decimal constants *)
+  | (sign? as s) (digit+ as integral) '.' (digit* as fractional)
+      { FLOAT(FS_decimal(Decimal.Decimal(string_to_decimal_int s integral,
+                          string_to_decimal_uint fractional))) }
+
+  | (sign? as s1) (digit+ as integral) '.' (digit* as fractional) ('e'|'E') (sign? as s2) (digit+ as exp)
+      { FLOAT(FS_decimal(Decimal.DecimalExp(
+           string_to_decimal_int s1 integral,
+	   string_to_decimal_uint fractional,
+	   string_to_decimal_int s2 exp))) }
+
+  (* Floating point Hexadecimal constants *)
+  | "0x"  (hexdigit+ as d)     { FLOAT(FS_hex(FH_X, string_to_hex_uint d)) }
+  | "0xK" (hexdigit+ as d)     { FLOAT(FS_hex(FH_K, string_to_hex_uint d)) }
+  | "0xL" (hexdigit+ as d)     { FLOAT(FS_hex(FH_L, string_to_hex_uint d)) }
+  | "0xM" (hexdigit+ as d)     { FLOAT(FS_hex(FH_M, string_to_hex_uint d)) }
+  | "0xH" (hexdigit+ as d)     { FLOAT(FS_hex(FH_H, string_to_hex_uint d)) }
+  | "0xR" (hexdigit+ as d)     { FLOAT(FS_hex(FH_R, string_to_hex_uint d)) }      
+
+  (* strings *)
   | '"'                         { STRING (string (Buffer.create 10) lexbuf) }
 
   (* types *)

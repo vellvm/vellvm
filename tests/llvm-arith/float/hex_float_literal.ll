@@ -1,6 +1,19 @@
-define float @main(i8 %argc, i8** %arcv) {
-  ret float 0x42faa3d700000000
+define double @foo() {
+  ret double 0x42faa3d700000000
 }
 
-; ASSERT EQ: float 468655825485824. = call float @main(i64 0, i8** null)
+
+define double @bar() {
+  ret double 0x31
+}
+
+
+; ASSERT EQ: double 468655825485824. = call float @foo()
+; ASSERT EQ: double 0x42faa3d700000000 = call float @foo()
+
+
+; ASSERT EQ: double 0x31 = call float @bar()
+
+
+
 
