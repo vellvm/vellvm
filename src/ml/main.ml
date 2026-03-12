@@ -219,6 +219,10 @@ let make_test_debug name ll_ast t : (string * assertion) option =
   in
   make_test_h run name ll_ast t
 
+let test_pp_file path =
+  Platform.configure ();
+  Test.parse_pp_test path
+
 let test_pp_dir dir =
   let _ = Printf.printf "===> RUNNING PRETTY PRINTING TESTS IN: %s\n%!" dir in
   Platform.configure () ;
@@ -389,6 +393,9 @@ let args =
   ; ( "-test-dir2"
     , String Tester.test_dir
     , "run all .ll files in the given directory and aggregate stats" )
+  ; ( "-test-pp-file"
+    , String test_pp_file
+    , "run the parsing/pretty-printing tests on the given .ll" )
   ; ( "-test-pp-dir"
     , String test_pp_dir
     , "run the parsing/pretty-printing tests on all .ll files in the given \

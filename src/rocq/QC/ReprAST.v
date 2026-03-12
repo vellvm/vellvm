@@ -98,9 +98,21 @@ Section ReprInstances.
   #[global]
    Instance reprFile_info : Repr file_info := {| repr := repr_file_info |}.
 
+  Definition repr_fp_variant (fp:floating_point_variant) : string :=
+    match fp with
+    | FP_half => "FP_half"
+    | FP_bfloat => "FP_bfloat"
+    | FP_float  => "FP_float"
+    | FP_double => "FP_double"
+    | FP_fp128 => "FP_fp128"
+    | FP_x86_fp80 => "FP_x86_fp80"
+    | FP_ppc_fp128 => "FP_ppc_fp128"
+    end.
+
+  
   #[global]
   Instance repr_floating_point_variant : Repr floating_point_variant
-   := {| repr := show |}.                                              
+   := {| repr := repr_fp_variant |}.                                              
   
   Fixpoint repr_dtyp (t : dtyp) : string :=
     match t with
@@ -313,7 +325,7 @@ Section ReprInstances.
   Definition repr_Decimal_decimal (d : Decimal.decimal) : string :=
     match d with
     | Decimal.Decimal i f => "(Decimal.Decimal " ++ repr i ++ " " ++ repr f ++ ")"
-    | Decimal.DecimalExp i f e => "(Decimal.Neg " ++ repr i ++ " " ++ repr f ++ " " ++ repr e ++ ")"
+    | Decimal.DecimalExp i f e => "(Decimal.DecimalExp " ++ repr i ++ " " ++ repr f ++ " " ++ repr e ++ ")"
     end.
 
   #[global]
@@ -392,10 +404,11 @@ Section ReprInstances.
     | FS_decimal d => "(FS_decimal " ++ repr d ++ ")"
     | FS_hex t u => "(FS_hex " ++ repr t ++ " " ++ repr u ++ ")"
     end.
-
+  
   #[global]
     Instance reprFloatSyntax : Repr float_syntax :=
     {| repr := repr_float_syntax |}.
+
   
   Fixpoint repr_exp (v : exp typ) : string :=
     let texp (te : (typ * exp typ)) : string :=

@@ -574,7 +574,7 @@ rule token = parse
   | (sign? as s) (digit+ as d)   { INTEGER(Number.IntDecimal(string_to_decimal_int s d)) }
 
   (* Integer Hexadecimal constants -- [us]0x[0-9A-Fa-f]+ *)
-  | "s0x" (hexdigit+ as d)  { INTEGER(int_hexadecimal_syntax true d) } (* signed *)  
+  | "s0x" (hexdigit+ as d)  { INTEGER(int_hexadecimal_syntax true d) }  (* signed *)  
   | "u0x" (hexdigit+ as d)  { INTEGER(int_hexadecimal_syntax false d) } (* unsigned *)
 
   (* Floating point Decimal constants *)
