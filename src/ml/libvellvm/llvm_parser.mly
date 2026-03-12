@@ -312,7 +312,7 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 (* keywords that can be followed by `:` with no space:
    memory(default: foo)
    memory(default : foo)
-   memory(defaul :foo)
+   memory(default :foo)
 *)
 %token KW_DEFAULT_COLON
 %token KW_ARGMEM_COLON
@@ -1059,6 +1059,18 @@ block_label:
 
   | lbl=LABEL 
     { Some lbl }
+
+  | KW_DEFAULT_COLON
+    { Some "default" }
+
+  | KW_ARGMEM_COLON
+    { Some "argmem" }
+
+  | KW_INACCESSIBLEMEM_COLON
+    { Some "inaccessiblemem" }
+
+  | KW_ERRNOMEM_COLON
+    { Some "errnomem" }
 
   | str=STRING COLON
     { Some ("\"" ^ str ^ "\"")}

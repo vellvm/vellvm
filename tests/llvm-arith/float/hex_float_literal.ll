@@ -1,3 +1,8 @@
+define double @main(i8 %argc, i8** %argv) {
+  ret double 0x42faa3d700000000
+}
+
+
 define double @foo() {
   ret double 0x42faa3d700000000
 }

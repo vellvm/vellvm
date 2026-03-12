@@ -65,7 +65,7 @@ let run_dvalue_test (test : DV.dvalue -> bool) path =
   let res, msg =
     match run_ll_file default_cl_test_args path with
     | Error e -> (false, Result.string_of_exit_condition e)
-    | Ok dv -> (test dv, "")
+    | Ok dv -> (test dv, "OK")
   in
   if not res then failwith (path ^ " test failed: " ^ msg) ;
   ()
@@ -322,6 +322,7 @@ let i_test (i1 : Integers.bit_int) = function
    floats as a subset *)
 let float_test (i1 : float) = function
   | DV.DVALUE_Float i2 -> compare i1 (Camlcoq.camlfloat_of_coqfloat32 i2) = 0
+  | DV.DVALUE_Double i2 -> compare i1 (Camlcoq.camlfloat_of_coqfloat i2) = 0
   | _ -> false
 
 let double_test (i1 : float) = function

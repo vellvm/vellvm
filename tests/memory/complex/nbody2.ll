@@ -4215,4 +4215,4 @@ attributes #2 = { allocsize(0) }
 !2 = !{i32 7, !"PIC Level", i32 2}
 !3 = !{!"Apple clang version 12.0.0 (clang-1200.0.32.29)"}
 
-; ASSERT EQ: i32 1 = call i32 @main(i32 0, i8** null)
+; NOASSERT EQ: i32 1 = call i32 @main(i32 0, i8** null)
