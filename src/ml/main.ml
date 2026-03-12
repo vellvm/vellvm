@@ -46,7 +46,7 @@ let compare_dvalues_exn dv1 dv2 ans : unit =
   else
     failwith
       (Printf.sprintf
-         "dvalue comparison for %s failed: \ngot:\n\t%s\nand:\n\t%s"
+         "dvalue comparison for %s failed: \ngot:\n\t%s\nasserted:\n\t%s"
          (if ans then "equality" else "inequality")
          (string_of_dvalue dv1) (string_of_dvalue dv2) )
 

@@ -14,6 +14,7 @@ let pos_of_z z = Camlcoq.P.of_int64 (Camlcoq.Z.to_int64 z)
 let n_of_int_syntax (z:Number.signed_int) =
   match z with
   | Number.IntDecimal (Decimal.Pos u) -> ParserHelper.coq_N_of_uint u
+  | Number.IntHexadecimal (Hexadecimal.Pos u) -> ParserHelper.coq_N_of_hex_uint u
   | _ -> failwith "n_of_int_syntax got invalid syntax"
 
 

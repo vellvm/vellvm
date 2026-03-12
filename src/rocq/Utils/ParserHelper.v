@@ -7,6 +7,7 @@ Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.OptionMonad.
 Require Import Floats.
 
 Definition N_of_uint (u:Decimal.uint) : N := Pos.of_uint u.
+Definition N_of_hex_uint (u:Hexadecimal.uint) : N := Pos.of_hex_uint u.
 
 Open Scope Z.
 

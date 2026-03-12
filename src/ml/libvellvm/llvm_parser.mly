@@ -116,7 +116,6 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token<string> STRING
 %token<LLVMAst.int_syntax> INTEGER
 %token<LLVMAst.float_syntax> FLOAT
-%token<Floats.float> HEXCONSTANT
 %token KW_NULL
 %token KW_UNDEF
 %token KW_POISON
