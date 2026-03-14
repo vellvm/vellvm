@@ -15,7 +15,8 @@ Require Import Ceres.Ceres.
 From Vellvm.Syntax Require Import
   CFG
   TypeUtil
-  TypToDtyp.
+  TypToDtyp
+  DynamicTypes.
 
 From Vellvm.Handlers Require Import
   Handlers.
@@ -38,6 +39,7 @@ From Vellvm.QC Require Import
   ECS
   Lens
   GenMetadata.
+
 
 Require Import Integers.
 
@@ -100,12 +102,9 @@ Section Helpers.
        | TYPE_Pointer (Some t) => is_sized_type_h t
        | TYPE_Pointer None => true
        | TYPE_Void => false
-       | TYPE_Half => true
-       | TYPE_Float => true
-       | TYPE_Double => true
-       | TYPE_X86_fp80 => true
-       | TYPE_Fp128 => true
-       | TYPE_Ppc_fp128 => true
+       | TYPE_FP _ => true
+       | TYPE_Label => true
+       | TYPE_Token => true                          
        | TYPE_Metadata => true (* Not sure if this is right *)
        | TYPE_X86_mmx => true
        | TYPE_Array sz t => is_sized_type_h t
@@ -977,12 +976,9 @@ Section TypGenerators.
         ret (TYPE_Pointer (Some pt))
     | TYPE_Pointer None => ret t
     | TYPE_Void => ret t
-    | TYPE_Half => ret t
-    | TYPE_Float => ret t
-    | TYPE_Double => ret t
-    | TYPE_X86_fp80 => ret t
-    | TYPE_Fp128 => ret t
-    | TYPE_Ppc_fp128 => ret t
+    | TYPE_FP fp => ret t
+    | TYPE_Label => ret t
+    | TYPE_Token => ret t
     | TYPE_Metadata => ret t
     | TYPE_X86_mmx => ret t
     | TYPE_Opaque => ret t
@@ -1383,8 +1379,7 @@ Section TypGenerators.
                (if enable_float_generation
                 then
                  [ (* TODO: Generate floats and stuff *)
-                   TYPE_Float
-                   (* ; TYPE_Double *)
+                   TYPE_FP FP_float
                  ]
                else
                  [])
@@ -1436,7 +1431,7 @@ Section TypGenerators.
         ; ret (TYPE_I 16)
         ; ret (TYPE_I 32)
         ; ret (TYPE_I 64)
-        ] ++ if enable_float_generation then [ret (TYPE_Float) (* ; ret TYPE_DOUBLE *)] else []).
+        ] ++ if enable_float_generation then [ret (TYPE_FP FP_float) (* ; ret TYPE_DOUBLE *)] else []).
 
   Definition sized_aggregate_typ_gens (subg : nat -> GenLLVM typ) (sz : nat) :  list (unit -> GenLLVM typ)
     := [ (fun _ => gen_sized_typ_0)
@@ -1531,7 +1526,7 @@ Section TypGenerators.
                    (if enable_float_generation
                     then
                       [ (* TODO: Generate floats and stuff *)
-                        TYPE_Float
+                        TYPE_FP FP_float
                           (* ; TYPE_Double *)
                           (* ; TYPE_Half *)
                           (* ; TYPE_X86_fp80 *)
@@ -1585,7 +1580,7 @@ Section TypGenerators.
               ] ++ (if enable_float_generation
                     then
                       [ (* TODO: Generate floats and stuff *)
-                        TYPE_Float
+                        TYPE_FP FP_float
                           (* ; TYPE_Double *)
                           (* ; TYPE_Half *)
                           (* ; TYPE_X86_fp80 *)
@@ -1624,7 +1619,7 @@ Section TypGenerators.
            ] ++ (if enable_float_generation
                  then
                    [ (* TODO: Generate floats and stuff *)
-                     TYPE_Float
+                     TYPE_FP FP_float
                        (* ; TYPE_Double *)
                        (* ; TYPE_Half *)
                        (* ; TYPE_X86_fp80 *)
@@ -1647,7 +1642,7 @@ Section TypGenerators.
   (* TODO: look up identifiers *)
   Definition gen_float_typ : GenLLVM typ :=
     elems_LLVM
-      [ TYPE_Float
+      [ TYPE_FP FP_float
         (* ; TYPE_Double *)
       ].
 
@@ -1707,56 +1702,7 @@ Section ExpGenerators.
   (* TODO: generate conversions? *)
 
   (* TODO: Move this*)
-  Fixpoint dtyp_eq (a : dtyp) (b : dtyp) {struct a} : bool
-    := match a, b with
-       | DTYPE_I sz, DTYPE_I sz' =>
-         if Pos.eq_dec sz sz' then true else false
-       | DTYPE_I _, _ => false
-       | DTYPE_IPTR, DTYPE_IPTR => true
-       | DTYPE_IPTR, _ => false
-       | DTYPE_Pointer, DTYPE_Pointer => true
-       | DTYPE_Pointer, _ => false
-       | DTYPE_Void, DTYPE_Void => true
-       | DTYPE_Void, _ => false
-       | DTYPE_Half, DTYPE_Half => true
-       | DTYPE_Half, _ => false
-       | DTYPE_Float, DTYPE_Float => true
-       | DTYPE_Float, _ => false
-       | DTYPE_Double, DTYPE_Double => true
-       | DTYPE_Double, _ => false
-       | DTYPE_X86_fp80, DTYPE_X86_fp80 => true
-       | DTYPE_X86_fp80, _ => false
-       | DTYPE_Fp128, DTYPE_Fp128 => true
-       | DTYPE_Fp128, _ => false
-       | DTYPE_Ppc_fp128, DTYPE_Ppc_fp128 => true
-       | DTYPE_Ppc_fp128, _ => false
-       | DTYPE_Metadata, DTYPE_Metadata => true
-       | DTYPE_Metadata, _ => false
-       | DTYPE_X86_mmx, DTYPE_X86_mmx => true
-       | DTYPE_X86_mmx, _ => false
-       | DTYPE_Array sz t, DTYPE_Array sz' t' =>
-           if N.eq_dec sz sz'
-           then dtyp_eq t t'
-           else false
-       | DTYPE_Array _ _, _ => false
-       | DTYPE_Struct fields, DTYPE_Struct fields' =>
-         if Nat.eqb (Datatypes.length fields) (Datatypes.length fields')
-         then forallb id (map_In (zip fields fields') (fun '(a, b) HIn => dtyp_eq a b))
-         else false
-       | DTYPE_Struct _, _ => false
-       | DTYPE_Packed_struct fields, DTYPE_Packed_struct fields' =>
-         if Nat.eqb (Datatypes.length fields) (Datatypes.length fields')
-         then forallb id (map_In (zip fields fields') (fun '(a, b) HIn => dtyp_eq a b))
-         else false
-       | DTYPE_Packed_struct _, _ => false
-       | DTYPE_Opaque, DTYPE_Opaque => false (* TODO: Unsure if this should compare equal *)
-       | DTYPE_Opaque, _ => false
-       | DTYPE_Vector sz t, DTYPE_Vector sz' t' =>
-           if N.eq_dec sz sz'
-           then dtyp_eq t t'
-           else false
-       | DTYPE_Vector _ _, _ => false
-       end.
+  Definition dtyp_eq := DynamicTypes.dtyp_eqb.
 
   (* TODO: Move this*)
   (* This only returns what you expect on normalized typs *)
@@ -1764,6 +1710,7 @@ Section ExpGenerators.
            identified types... It should be conservative and say that
            the types are *not* equal always, though.
    *)
+  
   Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
     := match a with
        | TYPE_I sz =>
@@ -1791,34 +1738,19 @@ Section ExpGenerators.
          | TYPE_Void => true
          | _ => false
          end
-       | TYPE_Half =>
+       | TYPE_FP fp1 =>
          match b with
-         | TYPE_Half => true
+         | TYPE_FP fp2 => floating_point_variant_beq fp1 fp2
          | _ => false
          end
-       | TYPE_Float =>
+       | TYPE_Label =>
          match b with
-         | TYPE_Float => true
+         | TYPE_Label => true
          | _ => false
          end
-       | TYPE_Double =>
+       | TYPE_Token =>
          match b with
-         | TYPE_Double => true
-         | _ => false
-         end
-       | TYPE_X86_fp80 =>
-         match b with
-         | TYPE_X86_fp80 => true
-         | _ => false
-         end
-       | TYPE_Fp128 =>
-         match b with
-         | TYPE_Fp128 => true
-         | _ => false
-         end
-       | TYPE_Ppc_fp128 =>
-         match b with
-         | TYPE_Ppc_fp128 => true
+         | TYPE_Token => true
          | _ => false
          end
        | TYPE_Metadata =>
@@ -1911,12 +1843,9 @@ Section ExpGenerators.
         end
     | TYPE_IPTR
     | TYPE_Pointer None
-    | TYPE_Half
-    | TYPE_Float
-    | TYPE_Double
-    | TYPE_X86_fp80
-    | TYPE_Fp128
-    | TYPE_Ppc_fp128
+    | TYPE_FP _
+    | TYPE_Label
+    | TYPE_Token
     | TYPE_Metadata
     | TYPE_X86_mmx => normalized_typ_eq t_from t
     | TYPE_Pointer (Some subtyp) =>
@@ -1983,6 +1912,15 @@ Section ExpGenerators.
   (* Can't use choose for these functions because it gets extracted to
      ocaml's Random.State.int function which has small bounds. *)
 
+  
+  Definition gen_int (sz : N) : G Z :=
+    let i_sz := Z.of_N sz in
+    if (i_sz <=? 8)%Z then (choose (0, 2 ^ i_sz - 1)) else ret 10000.
+
+  Definition gen_int_exp (sz : N) : G (exp typ) :=
+    i_val <- gen_int sz;;
+    (ret (EXP_Integer (BinIntDef.Z.to_num_int i_val))).
+
   Definition gen_bitZ : G Z :=
     b <- (arbitrary : G bool);;
     if b then ret 1 else ret 0.
@@ -2043,22 +1981,72 @@ Section ExpGenerators.
                ret (1 + Z.modulo n (2^zhalf - 1))
        end.
 
+  Definition gen_non_zero_exp bitwidth : G (exp typ) :=
+    i_val <- gen_non_zero bitwidth;;
+    (ret (EXP_Integer (BinIntDef.Z.to_num_int i_val))).
+
+  Definition gen_gt_zero_exp (bitwidth : option positive) : G (exp typ) :=
+    i_val <- gen_gt_zero bitwidth;;
+    (ret (EXP_Integer (BinIntDef.Z.to_num_int i_val))).
+    
+  (* Generates a random string of hex digits of length len *)
+  Fixpoint gen_hex (len : nat) : G Hexadecimal.uint :=
+    match len with
+    | 0 => ret (Hexadecimal.Nil)
+    | S n =>
+        r <- gen_hex n ;;
+        oneof
+           (ret (Hexadecimal.D0 r)) [
+            ret (Hexadecimal.D1 r) 
+          ; ret (Hexadecimal.D2 r)
+          ; ret (Hexadecimal.D3 r)                   
+          ; ret (Hexadecimal.D4 r)
+          ; ret (Hexadecimal.D5 r)                   
+          ; ret (Hexadecimal.D6 r)
+          ; ret (Hexadecimal.D7 r)                   
+          ; ret (Hexadecimal.D8 r)
+          ; ret (Hexadecimal.D9 r)                   
+          ; ret (Hexadecimal.Da r)
+          ; ret (Hexadecimal.Db r)                   
+          ; ret (Hexadecimal.Dc r)
+          ; ret (Hexadecimal.Dd r)                   
+          ; ret (Hexadecimal.De r)
+          ; ret (Hexadecimal.Df r)                   
+          ]
+    end%nat.
+
+  (* SAZ: with the new representation of floating point syntax, these could probably be done with typeclasses *)
+  Definition gen_float32_syntax : G float_syntax :=
+    h <- gen_hex 8 ;;
+    ret (FS_hex FH_X h).
+
+  Definition gen_double_syntax : G float_syntax :=
+    h <- gen_hex 16 ;;
+    ret (FS_hex FH_X h).
+  
+  Definition gen_float32_exp : G (exp typ) :=
+    ret EXP_Float <*> gen_float32_syntax.
+
+  Definition gen_double_exp : G (exp typ) :=
+    ret EXP_Float <*> gen_double_syntax.
+
+  
   (* TODO: make this more complex using metadata *)
-  Definition gen_non_zero_exp_size (sz : nat) (t : typ) : GenLLVM (exp typ)
-    := match t with
-       | TYPE_I n => ret EXP_Integer <*> lift (gen_non_zero (Some n))
-       | TYPE_IPTR => ret EXP_Integer <*> lift (gen_non_zero None)
-       | TYPE_Float => ret EXP_Float <*> lift fing32 (* TODO: is this actually non-zero...? *)
-       | TYPE_Double => ret EXP_Double <*> lift fing64 (*TODO : Fix generator for double*)
+  Definition gen_non_zero_exp_size (sz : nat) (t : typ) : GenLLVM (exp typ) :=
+    match t with
+       | TYPE_I n => lift (gen_non_zero_exp (Some n))
+       | TYPE_IPTR => lift (gen_non_zero_exp None)
+       | TYPE_FP FP_float => lift gen_float32_exp (* TODO: is this actually non-zero...? *)
+       | TYPE_FP FP_double => lift gen_double_exp (* TODO: is this actually non-zero...? *)
        | _ => failGen "gen_non_zero_exp_size"
        end.
 
   Definition gen_gt_zero_exp_size (sz : nat) (t : typ) : GenLLVM (exp typ)
     := match t with
-       | TYPE_I n => ret EXP_Integer <*> lift (gen_gt_zero (Some n))
-       | TYPE_IPTR => ret EXP_Integer <*> lift (gen_gt_zero None)
-       | TYPE_Float => failGen "gen_gt_zero_exp_size TYPE_Float"
-       | TYPE_Double => failGen "gen_gt_zero_exp_size TYPE_Double"(*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
+       | TYPE_I n => lift (gen_gt_zero_exp (Some n))
+       | TYPE_IPTR => lift (gen_gt_zero_exp None)
+       | TYPE_FP FP_float => failGen "gen_gt_zero_exp_size float"
+       | TYPE_FP FP_double => failGen "gen_gt_zero_exp_size double" (*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
        | _ => failGen "gen_gt_zero_exp_size"
        end.
 
@@ -2118,10 +2106,12 @@ Section ExpGenerators.
           match t with
           | TYPE_I n                  =>
               z <- lift (gen_unsigned_bitwidth n);;
-              ret (EXP_Integer z)
+              ret (EXP_Integer (BinIntDef.Z.to_num_int z))
           (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x)) *)
           (*  (* TODO: should the integer be forced to be in bounds? *) *)
-          | TYPE_IPTR => ret EXP_Integer <*> lift (arbitrary : G Z)
+          | TYPE_IPTR =>
+              z <- lift (arbitrary : G Z) ;;
+              ret (EXP_Integer (BinIntDef.Z.to_num_int z))
           | TYPE_Pointer _       => failGen "gen_exp_size TYPE_Pointer"
           (* Only pointer type expressions might be conversions? Maybe GEP? *)
           | TYPE_Void                 => failGen "gen_exp_size TYPE_Void" (* There should be no expressions of type void *)
@@ -2154,12 +2144,11 @@ Section ExpGenerators.
                         else mzero));;
               gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat t
           (* Not generating these types for now *)
-          | TYPE_Half                 => failGen "gen_exp_size TYPE_Half"
-          | TYPE_Float                => ret EXP_Float <*> lift fing32(* referred to genarators in flocq-quickchick*)
-          | TYPE_Double               => ret EXP_Double <*> lift fing64 (* TODO: Fix generator for double*)
-          | TYPE_X86_fp80             => failGen "gen_exp_size TYPE_X86_fp80"
-          | TYPE_Fp128                => failGen "gen_exp_size TYPE_Fp128"
-          | TYPE_Ppc_fp128            => failGen "gen_exp_size TYPE_Ppc_fp128"
+          | TYPE_FP FP_float          => lift gen_float32_exp 
+          | TYPE_FP FP_double         => lift gen_double_exp 
+          | TYPE_FP _                 => failGen "gen_exp_size TYPE_FP"
+          | TYPE_Label                => failGen "gen_exp_size TYPE_Label"
+          | TYPE_Token                => failGen "gen_exp_size TYPE_Token"
           | TYPE_Metadata             => failGen "gen_exp_size TYPE_Metadata"
           | TYPE_X86_mmx              => failGen "gen_exp_size TYPE_X86_mmx"
           end in
@@ -2218,13 +2207,12 @@ Section ExpGenerators.
           | TYPE_Void              => [failGen "gen_exp_size TYPE_VOID list"] (* No void type expressions *)
           | TYPE_Function ret args _ => [failGen "gen_exp_size TYPE_Function list"] (* These shouldn't exist, I think *)
           | TYPE_Opaque            => [failGen "gen_exp_size TYPE_Opaque list"] (* TODO: not sure what these should be... *)
-          | TYPE_Half              => [failGen "gen_exp_size TYPE_Half list" ]
-          | TYPE_Float             => [gen_fbinop_exp gen_global_of_typ gen_ident_of_typ TYPE_Float]
-          | TYPE_Double            => [gen_fbinop_exp gen_global_of_typ gen_ident_of_typ TYPE_Double]
-          | TYPE_X86_fp80          => [failGen "gen_exp_size TYPE_X86_fp80 list"]
-          | TYPE_Fp128             => [failGen "gen_exp_size TYPE_Fp128 list"]
-          | TYPE_Ppc_fp128         => [failGen "gen_exp_size TYPE_Ppc_fp128 list"]
+          | TYPE_FP FP_float       => [gen_fbinop_exp gen_global_of_typ gen_ident_of_typ (TYPE_FP FP_float)]
+          | TYPE_FP FP_double      => [gen_fbinop_exp gen_global_of_typ gen_ident_of_typ (TYPE_FP FP_double)]
+          | TYPE_FP _              => [failGen "gen_exp_size TYPE_FP list"]
           | TYPE_Metadata          => [failGen "gen_exp_size TYPE_Metadata list"]
+          | TYPE_Label             => [failGen "gen_exp_size TYPE_Label list"]                                       
+          | TYPE_Token             => [failGen "gen_exp_size TYPE_Token list"]
           | TYPE_X86_mmx           => [failGen "gen_exp_size TYPE_X86_mmx list"]
           | TYPE_Identified id     =>
               [ t <- def_option_GenLLVM (failGen "gen_exp_size TYPE_Identified")
@@ -2263,7 +2251,7 @@ Section ExpGenerators.
             | _ => 0%Z
             end in
           x <- lift (choose (0%Z, max_shift_size));;
-          let exp_value2 : exp typ := EXP_Integer x in
+          let exp_value2 : exp typ := EXP_Integer ((BinIntDef.Z.to_num_int x)) in
           ret (OP_IBinop ibinop t exp_value exp_value2)
         else ret (OP_IBinop ibinop t exp_value) <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat t
   with
@@ -2275,11 +2263,11 @@ Section ExpGenerators.
   gen_fbinop_exp (gen_global_of_typ : typ -> GenLLVM (option ident)) (gen_ident_of_typ : typ -> GenLLVM (option ident)) (ty: typ) {struct ty} : GenLLVM (exp typ)
   :=
     match ty with
-    | TYPE_Float => fbinop <- lift gen_fbinop;;
+    | TYPE_FP FP_float => fbinop <- lift gen_fbinop;;
                    if (Handlers.LLVMEvents.DV.fop_is_div fbinop)
                    then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty
                    else ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty
-    | TYPE_Double => fbinop <- lift gen_fbinop;;
+    | TYPE_FP FP_double => fbinop <- lift gen_fbinop;;
                     if (Handlers.LLVMEvents.DV.fop_is_div fbinop)
                     then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty
                     else ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty
@@ -2361,8 +2349,8 @@ Section ExpGenerators.
                     ]
                 else
                   gen_ibinop_exp gen_deterministic_global_ident gen_deterministic_ident isz
-            | TYPE_Float => gen_fbinop_exp gen_deterministic_global_ident gen_deterministic_ident TYPE_Float
-            | TYPE_Double => gen_fbinop_exp gen_deterministic_global_ident gen_deterministic_ident TYPE_Double
+            | TYPE_FP FP_float => gen_fbinop_exp gen_deterministic_global_ident gen_deterministic_ident (TYPE_FP FP_float)
+            | TYPE_FP FP_double => gen_fbinop_exp gen_deterministic_global_ident gen_deterministic_ident (TYPE_FP FP_double)
             | _ => failGen "gen_op"
             end).
 
@@ -2524,7 +2512,7 @@ Section InstrGenerators.
        eptr <- gen_exp_sz0 tptr;;
        let paths_in_ptr := get_index_paths_ptr t_in_ptr in (* Inner paths: Paths after removing the outer pointer *)
        '(ret_t, path) <- elems_LLVM paths_in_ptr;; (* Select one path from the paths *)
-       let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer (x))) path in (* Turning the path to integer *)
+       let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer ((BinIntDef.Z.to_num_int x)))) path in (* Turning the path to integer *)
        '(id, e) <- genInstrIdEnt (TYPE_Pointer (Some ret_t));;
        (* Default to non-deterministic for now. Need a way to look up whether the base pointer was deterministic *)
        (gen_context' .@ entl e .@ deterministic') .= false;;
@@ -2537,7 +2525,7 @@ Section InstrGenerators.
        let paths_in_agg := get_index_paths_agg ntagg in
        '(t, path_for_extractvalue) <- elems_LLVM paths_in_agg;;
        id <- genInstrId t;;
-       ret (id, INSTR_Op (OP_ExtractValue (tagg, eagg) path_for_extractvalue))).
+       ret (id, INSTR_Op (OP_ExtractValue (tagg, eagg) (List.map (BinIntDef.Z.to_num_int) path_for_extractvalue)))).
 
   Definition gen_insertvalue (tagg: typ): GenLLVM (instr_id * instr typ) :=
     annotate "gen_insertvalue"
@@ -2550,7 +2538,7 @@ Section InstrGenerators.
        esub <- hide_ctx (gen_exp_sz0 tsub);;
        (* Generate all of the type*)
        id <- genInstrId tagg;;
-       ret (id, INSTR_Op (OP_InsertValue (tagg, eagg) (tsub, esub) path_for_insertvalue))).
+       ret (id, INSTR_Op (OP_InsertValue (tagg, eagg) (tsub, esub) (List.map (BinIntDef.Z.to_num_int) path_for_insertvalue)))).
 
   (* ExtractElement *)
   Definition gen_extractelement (tvec : typ): GenLLVM (instr_id * instr typ) :=
@@ -2564,7 +2552,7 @@ Section InstrGenerators.
        let '(sz, t_in_vec) := get_size_ty tvec in
        index_for_extractelement <- lift_GenLLVM (choose (0, Z.of_N sz - 1)%Z);;
        id <- genInstrId t_in_vec;;
-       ret (id, INSTR_Op (OP_ExtractElement (tvec, evec) (TYPE_I 32, EXP_Integer index_for_extractelement)))).
+       ret (id, INSTR_Op (OP_ExtractElement (tvec, evec) (TYPE_I 32, EXP_Integer (BinIntDef.Z.to_num_int index_for_extractelement))))).
 
   Definition gen_insertelement (tvec : typ) : GenLLVM (instr_id * instr typ) :=
     annotate "gen_insertelement"
@@ -2578,7 +2566,7 @@ Section InstrGenerators.
        value <- gen_exp_sz0 t_in_vec;;
        index <- lift_GenLLVM (choose (0, Z.of_N (sz - 1)));;
        id <- genInstrId tvec;;
-       ret (id, INSTR_Op (OP_InsertElement (tvec, evec) (t_in_vec, value) (TYPE_I 32, EXP_Integer index)))).
+       ret (id, INSTR_Op (OP_InsertElement (tvec, evec) (t_in_vec, value) (TYPE_I 32, EXP_Integer (BinIntDef.Z.to_num_int index))))).
 
   Definition round_up_to_eight (n : N) : N :=
     if N.eqb 0 n
@@ -2591,12 +2579,15 @@ Section InstrGenerators.
     | TYPE_IPTR => 64 (* TODO: probably kind of a lie... *)
     | TYPE_Pointer t => 64
     | TYPE_Void => 0
-    | TYPE_Half => 16
-    | TYPE_Float => 32
-    | TYPE_Double => 64
-    | TYPE_X86_fp80 => 80
-    | TYPE_Fp128 => 128
-    | TYPE_Ppc_fp128 => 128
+    | TYPE_FP FP_half => 16
+    | TYPE_FP FP_bfloat => 16
+    | TYPE_FP FP_float => 32                           
+    | TYPE_FP FP_double => 64
+    | TYPE_FP FP_x86_fp80 => 80
+    | TYPE_FP FP_fp128 => 128
+    | TYPE_FP FP_ppc_fp128 => 128
+    | TYPE_Label => 8
+    | TYPE_Token => 0 (* ? *)
     | TYPE_Metadata => 0
     | TYPE_X86_mmx => 64
     | TYPE_Array sz t => sz * (round_up_to_eight (get_bit_size_from_typ t))
@@ -2615,13 +2606,13 @@ Section InstrGenerators.
   (* Assuming max_byte_sz for this function is greater than 0 *)
   Definition get_prim_typ_le_size (max_byte_sz: N) : list (GenLLVM typ) :=
     (if (1 <=? max_byte_sz)%N then [ret (TYPE_I 1); ret (TYPE_I 8)] else []) ++
-      (if (4 <=? max_byte_sz)%N then [ret (TYPE_I 32); ret TYPE_Float] else []) ++
+      (if (4 <=? max_byte_sz)%N then [ret (TYPE_I 32); ret (TYPE_FP FP_float)] else []) ++
       (if (8 <=? max_byte_sz)%N then [ret (TYPE_I 64) (* ; ret TYPE_Double *)] else []).
 
   (* Version without problematic i1 type *)
   Definition get_prim_vector_typ_le_size (max_byte_sz: N) : list (GenLLVM typ) :=
     (if (1 <=? max_byte_sz)%N then [ret (TYPE_I 8)] else []) ++
-      (if (4 <=? max_byte_sz)%N then [ret (TYPE_I 32); ret TYPE_Float] else []) ++
+      (if (4 <=? max_byte_sz)%N then [ret (TYPE_I 32); ret (TYPE_FP FP_float)] else []) ++
       (if (8 <=? max_byte_sz)%N then [ret (TYPE_I 64) (* ; ret TYPE_Double *)] else []).
 
   (* Main method, it will generate based on the max_byte_sz
@@ -2747,11 +2738,11 @@ Section InstrGenerators.
       | TYPE_I 16 =>
           ret [TYPE_I 16; TYPE_Vector 2 (TYPE_I 8) (* ; TYPE_Vector 8 (TYPE_I 1) *)]
       | TYPE_I 32
-      | TYPE_Float =>
-          ret [TYPE_I 32; TYPE_Float; TYPE_Vector 4 (TYPE_I 8); TYPE_Vector 2 (TYPE_I 16); TYPE_Vector 1 (TYPE_I 32); TYPE_Vector 1 TYPE_Float (* ; TYPE_Vector 32 (TYPE_I 1) *)]
+      | (TYPE_FP FP_float) =>
+          ret [TYPE_I 32; TYPE_FP FP_float; TYPE_Vector 4 (TYPE_I 8); TYPE_Vector 2 (TYPE_I 16); TYPE_Vector 1 (TYPE_I 32); TYPE_Vector 1 (TYPE_FP FP_float) (* ; TYPE_Vector 32 (TYPE_I 1) *)]
       | TYPE_I 64
-      | TYPE_Double =>
-          ret [TYPE_I 64; (* TYPE_Double; *) TYPE_Vector 8 (TYPE_I 8); TYPE_Vector 4 (TYPE_I 16); TYPE_Vector 2 (TYPE_I 32); TYPE_Vector 2 (TYPE_Float) (* ; TYPE_Vector 64 (TYPE_I 1) *)]
+      | TYPE_FP FP_double =>
+          ret [TYPE_I 64; (* TYPE_Double; *) TYPE_Vector 8 (TYPE_I 8); TYPE_Vector 4 (TYPE_I 16); TYPE_Vector 2 (TYPE_I 32); TYPE_Vector 2 (TYPE_FP FP_float) (* ; TYPE_Vector 64 (TYPE_I 1) *)]
       | TYPE_Vector sz subtyp =>
           match subtyp with
           | TYPE_Pointer _ =>
@@ -2759,7 +2750,7 @@ Section InstrGenerators.
               (* new_subtyp <- gen_bitcast_typ subtyp;; *)
               ret [TYPE_Vector sz subtyp]
           | _subtyp =>
-              let trivial_typs := [(* (1%N, TYPE_I 1); *) (8%N, TYPE_I 8); (32%N, TYPE_I 32); (32%N, TYPE_Float); (64%N, TYPE_I 64) (* ; (64%N, TYPE_Double) *)] in
+              let trivial_typs := [(* (1%N, TYPE_I 1); *) (8%N, TYPE_I 8); (32%N, TYPE_I 32); (32%N, TYPE_FP FP_float); (64%N, TYPE_I 64) (* ; (64%N, TYPE_Double) *)] in
               let size_of_vec := get_bit_size_from_typ t_from in
               let choices := fold_left (fun acc '(s,t) => let sz' := (size_of_vec / s)%N in
                                                        let rem := (size_of_vec mod s)%N in
@@ -2794,7 +2785,7 @@ Section InstrGenerators.
                 ; ret (TYPE_I 16)
                 ; ret (TYPE_I 32)
                 ; ret (TYPE_I 64)
-                ; ret (TYPE_Float)
+                ; ret (TYPE_FP FP_float)
                 (* ; ret (TYPE_Double) *)
                 ; ret TYPE_Vector <*> lift_GenLLVM genPosN <*> gen_primitive_typ].
 
@@ -2893,7 +2884,7 @@ Section InstrGenerators.
           e <- (gen_exp_sz0 t);;
           let val := (t, e) in
           id <- genVoid;;
-          ret (id, INSTR_Store val ptr [ANN_align 1])
+          ret (id, INSTR_Store val ptr [ANN_align (BinIntDef.Z.to_num_int 1)])
       | _ => failGen "gen_store_to"
       end.
 
@@ -3162,21 +3153,21 @@ Section InstrGenerators.
          bound' <- lift_GenLLVM (choose (0, bound));;
          let gen_icmp (τ : typ) : GenLLVM (instr_id * instr typ) :=
            iid <- genInstrId (TYPE_I 1);;
-           ret (iid, INSTR_Op (OP_ICmp false Ule τ (EXP_Ident (ID_Local loop_init_instr_raw_id)) (EXP_Integer bound')))
+           ret (iid, INSTR_Op (OP_ICmp false Ule τ (EXP_Ident (ID_Local loop_init_instr_raw_id)) (EXP_Integer (BinIntDef.Z.to_num_int bound'))))
          in
          '(loop_cmp_id, loop_cmp) <- gen_icmp (TYPE_I 32);; (* TODO: big ints *)
          let loop_cmp_raw_id := instr_id_to_raw_id "loop_cmp_id" loop_cmp_id in
          let gen_select (τ : typ) : GenLLVM (instr_id * instr typ) :=
            let lower_exp := OP_Select (TYPE_I 1, (EXP_Ident (ID_Local loop_cmp_raw_id)))
                               (τ, (EXP_Ident (ID_Local loop_init_instr_raw_id)))
-                              (τ, EXP_Integer bound') in
+                              (τ, EXP_Integer (BinIntDef.Z.to_num_int bound')) in
            iid <- genInstrId τ;;
            ret (iid, INSTR_Op lower_exp)
          in
          '(select_id, select_instr) <- gen_select (TYPE_I 32);;
          let loop_final_init_id_raw := instr_id_to_raw_id "loop iterator id" select_id in
          '(loop_cond_id, loop_cond) <-
-           (let loop_cond_exp := INSTR_Op (OP_ICmp false Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local loop_final_init_id_raw)) (EXP_Integer 0)) in
+           (let loop_cond_exp := INSTR_Op (OP_ICmp false Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local loop_final_init_id_raw)) (EXP_Integer (BinIntDef.Z.to_num_int 0))) in
            iid <- genInstrId (TYPE_I 1);;
            ret (iid, loop_cond_exp));;
 
@@ -3195,12 +3186,12 @@ Section InstrGenerators.
                    (* Block for controlling the next iteration of the loop *)
                    '(next_instr_id, next_instr) <-
                      (iid <- genLocal (TYPE_I 32);;
-                      let next_exp := OP_IBinop (Sub false false) (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local phi_id)) (EXP_Integer 1) in
+                      let next_exp := OP_IBinop (Sub false false) (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local phi_id)) (EXP_Integer (BinIntDef.Z.to_num_int 1)) in
                       ret (IId (ident_to_raw_id iid), INSTR_Op next_exp));;
                    let next_instr_raw_id := instr_id_to_raw_id "next_exp" next_instr_id in
 
                    '(next_cond_id, next_cond) <-
-                     (let next_cond_exp := OP_ICmp false Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local next_instr_raw_id)) (EXP_Integer 0) in
+                     (let next_cond_exp := OP_ICmp false Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local next_instr_raw_id)) (EXP_Integer ((BinIntDef.Z.to_num_int 0))) in
                       iid <- genInstrId (TYPE_I 1);;
                       ret (iid, INSTR_Op next_cond_exp));;
                    let next_cond_raw_id := instr_id_to_raw_id "next_cond_exp" next_cond_id in

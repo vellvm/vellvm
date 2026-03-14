@@ -4351,6 +4351,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       erewrite IHd_inf1; eauto.
       erewrite IHd_inf2; eauto.
+    - (* Fneg *)
+      cbn in *; break_match_hyp; inv H.
+      cbn in *; inv e.
+      cbn in *; break_match_hyp; inv H0.
+      cbn in *; break_match_hyp; inv e0.
+      
+      erewrite IHd_inf; eauto.
     - (* FCmp *)
       cbn in *; break_match_hyp; inv H.
       cbn in *; break_match_hyp; inv H1.
@@ -5896,6 +5903,52 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       inv REF; reflexivity.
   Qed.
 
+  (*
+  x : ll_double
+  x1 : DVCrev.DV2.dvalue
+  e1 : dvalue_convert_strict x1 = NoOom (DVALUE_Double (Floats.Float.neg x))
+  ============================
+  IS1.LP.Events.DV.eval_fneg (DVCrev.DV2.DVALUE_Double x) = success_unERR_UB_OOM x1
+
+*)
+
+  
+  Lemma double_neg_fin_inf :
+    forall f res_fin,
+      dvalue_convert_strict res_fin = NoOom (DVALUE_Double (Floats.Float.neg f)) ->
+      IS1.LP.Events.DV.eval_fneg (IS1.LP.Events.DV.DVALUE_Double f) = success_unERR_UB_OOM res_fin.
+  Proof.
+    intros f res_fin  EVAL.
+    cbn in *; inv EVAL.
+    destruct res_fin; cbn in *; try break_match_hyp_inv; try inversion H0.
+    reflexivity.
+  Qed.
+
+
+  Lemma float_neg_fin_inf :
+    forall f res_fin,
+      dvalue_convert_strict res_fin = NoOom (DVALUE_Float (Floats.Float32.neg f)) ->
+      IS1.LP.Events.DV.eval_fneg (IS1.LP.Events.DV.DVALUE_Float f) = success_unERR_UB_OOM res_fin.
+  Proof.
+    intros f res_fin  EVAL.
+    cbn in *; inv EVAL.
+    destruct res_fin; cbn in *; try break_match_hyp_inv; try inversion H0.
+    reflexivity.
+  Qed.
+
+  Lemma poison_neg_fin_inf :
+    forall t res_fin res_inf,
+      eval_fneg (DVALUE_Poison t) = success_unERR_UB_OOM res_fin -> 
+      DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
+      IS1.LP.Events.DV.eval_fneg (IS1.LP.Events.DV.DVALUE_Poison t) = success_unERR_UB_OOM res_inf.
+  Proof.
+    intros t res_fin res_inf EVAL REF.
+    cbn in *; inv EVAL;
+      cbn in REF;
+      inv REF; reflexivity.
+  Qed.
+
+
   Lemma float_op_fin_inf :
     forall fop a b res_fin res_inf,
       float_op fop a b = success_unERR_UB_OOM res_fin ->
@@ -5987,6 +6040,50 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       cbn. reflexivity.
     }
   Qed.
+
+  Lemma eval_fneg_fin_inf :
+    forall dv1_fin res_fin dv1_inf,
+      @eval_fneg err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        dv1_fin  = ret res_fin ->
+      fin_to_inf_dvalue dv1_fin = dv1_inf ->
+      @IS1.LP.Events.DV.eval_fneg err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        dv1_inf = ret (fin_to_inf_dvalue res_fin).
+  Proof.
+    intros dv1_fin res_fin dv1_inf EVAL LIFT1.
+    unfold eval_fneg in EVAL.
+
+    break_match_hyp_inv.
+    { (* dv1: Double *)
+      cbn. 
+      unfold fin_to_inf_dvalue.
+      break_match_goal; clear Heqs; destruct p; clear e0.
+      break_match_goal; clear Heqs; destruct p; clear e0.
+      cbn in e. inversion e. 
+      eapply double_neg_fin_inf. auto.
+    }
+
+    { (* dv1: Float *)
+      cbn.
+      unfold fin_to_inf_dvalue.
+      break_match_goal; clear Heqs; destruct p; clear e0.
+      break_match_goal; clear Heqs; destruct p; clear e0.
+      cbn in e. inversion e.
+      eapply float_neg_fin_inf. auto.
+    }
+
+    { cbn.
+      unfold fin_to_inf_dvalue.
+      break_match_goal; clear Heqs; destruct p; clear e0.
+      cbn in e. inversion e.
+      reflexivity.
+    } 
+  Qed.
+
 
   Lemma double_cmp_fin_inf :
     forall fcmp a b res_fin res_inf,
@@ -9733,7 +9830,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               reflexivity
             ].
 
-        21: {
+        22: {
           cbn in *.
           rename uvs into uv_bytes_inf.
           unfold uvalue_concretize_fin_inf_inclusion in *.
@@ -10382,9 +10479,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       specialize (IHuv_inf1 u Heqo).
       specialize (IHuv_inf2 u0 Heqo0).
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
-      red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
 
       rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
       red in CONC_FIN.
@@ -10410,6 +10504,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       apply IHuv_inf1 in H0.
       apply IHuv_inf2 in H1.
 
+      rewrite IS1.MEM.CP.CONC.concretize_equation.
+      red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
+      
       repeat red.
       exists (ret (fin_to_inf_dvalue x1)).
       exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 x1))).
@@ -10434,6 +10533,52 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       intros a0 H5.
 
       eapply eval_fop_fin_inf; eauto.
+
+    - (* Fneg *)
+      red; intros dv_fin CONC_FIN.
+      red in REF.
+      cbn in REF.
+      break_match_hyp_inv.
+      unfold uvalue_concretize_fin_inf_inclusion in H.
+      
+      pose proof (H uv_inf) as IHuv_inf.
+      forward IHuv_inf; [constructor; constructor; auto|].
+
+      specialize (IHuv_inf u Heqo).
+
+      
+      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
+      red in CONC_FIN.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
+      cbn in CONC_FIN.
+      repeat red in CONC_FIN. 
+
+      destruct CONC_FIN as (?&?&?&?&?).
+      destruct_err_ub_oom x; cbn in H1; inv H1.
+      destruct H2 as [[] | H2].
+      specialize (H2 _ eq_refl).
+      
+      apply IHuv_inf in H0.
+      rewrite <- H2 in H4.
+      remember (eval_fneg x1) as x1h.
+      destruct_err_ub_oom x1h; inv H4.
+
+      rewrite IS1.MEM.CP.CONC.concretize_equation.
+      red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+      cbn.
+      repeat red.
+      exists (ret (fin_to_inf_dvalue x1)).
+      exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 x1))).
+      rewrite <- H2.
+      cbn.
+      split; eauto.
+      split; eauto.
+      right.
+      intros a0 H4.
+      rewrite <- H4.
+      eapply eval_fneg_fin_inf; eauto.
+      
     - (* fcmp *)
       red; intros dv_fin CONC_FIN.
       red in REF.
@@ -12622,6 +12767,27 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Qed.
 
+
+  Lemma eval_fneg_ub_fin_inf :
+    forall dv1_fin ub_msg dv1_inf,
+      @eval_fneg err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        dv1_fin  = UB_unERR_UB_OOM ub_msg ->
+      fin_to_inf_dvalue dv1_fin = dv1_inf ->
+      @IS1.LP.Events.DV.eval_fneg err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        dv1_inf = UB_unERR_UB_OOM ub_msg.
+  Proof.
+    intros dv1_fin ub_msg dv1_inf EVAL LIFT1.
+    unfold eval_fneg in EVAL.
+    (* Nasty case analysis... *)
+    break_match_hyp_inv.
+  Qed.
+
+  
   Lemma ceres_to_sexp_fin_inf :
     forall dv_fin dv_inf,
       dvalue_refine_strict dv_inf dv_fin ->
@@ -14082,6 +14248,52 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       intros a H3; subst.
       eapply eval_fop_ub_fin_inf; eauto.
+
+    - rename H into IH.
+      unfold_uvalue_refine_strict_in REF.
+      repeat break_match_hyp_inv.
+
+      repeat red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+      cbn. 
+      
+      repeat red in UB.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
+
+      repeat red in UB.
+      destruct UB as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H0.
+      { (* UB when concretizing first operand *)
+        eapply IH in H; eauto.
+        repeat red.
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split; cbn; eauto.
+        repeat constructor.
+      }
+
+      destruct H1 as [[] | H1].
+      specialize (H1 x1).
+      forward H1; [cbn; auto|].
+      rewrite <- H1 in H3.
+
+      remember (eval_fneg x1) as res.
+      destruct_err_ub_oom res; inv H3.
+
+      red.
+
+      exists (ret (fin_to_inf_dvalue x1)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; cbn; eauto.
+      right.
+
+      intros a Ha.
+      subst.
+      eapply eval_fneg_ub_fin_inf; eauto.
+      
     - (* UVALUE_FCmp *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
@@ -14848,6 +15060,31 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       eapply concretize_ub_fin_inf; eauto.
   Qed.
 
+  Lemma eval_fneg_err_fin_inf :
+    forall dv1_fin err_msg dv1_inf,
+      @eval_fneg err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        dv1_fin = ERR_unERR_UB_OOM err_msg ->
+      fin_to_inf_dvalue dv1_fin = dv1_inf ->
+      @IS1.LP.Events.DV.eval_fneg err_ub_oom
+        (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+        (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
+        dv1_inf = ERR_unERR_UB_OOM err_msg.
+  Proof.
+    intros dv1_fin err_msg dv1_inf EVAL LIFT1.
+    unfold eval_fneg in EVAL.
+    (* Nasty case analysis... *)
+    break_match_hyp_inv;
+      repeat rewrite_fin_to_inf_dvalue;
+      repeat erewrite ceres_to_string_fin_inf;
+      try apply fin_to_inf_dvalue_refine_strict;
+      repeat rewrite_fin_to_inf_dvalue;
+      cbn; eauto.
+  Qed.     
+
+  
   Lemma dvalue_bytes_to_dvalue_err_fin_inf :
     forall τ dvbs_inf dvbs_fin err_msg,
       dvalue_bytes_refine dvbs_inf dvbs_fin ->
@@ -16228,6 +16465,52 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       intros a H3; subst.
       eapply eval_fop_err_fin_inf; eauto.
+
+    - (* UVALUE_Fneg *)
+      rename H into IH.
+      unfold_uvalue_refine_strict_in REF.
+      repeat break_match_hyp_inv.
+
+      repeat red.
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+      cbn. 
+
+      repeat red in ERR.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
+
+      repeat red in ERR.
+      destruct ERR as (?&?&?&?&?).
+      destruct_err_ub_oom x; inv H0.
+      { (* ERR when concretizing first operand *)
+        eapply IH in H; eauto.
+        repeat red.
+        exists (ERR_unERR_UB_OOM err_msg).
+        exists (fun _ => ERR_unERR_UB_OOM err_msg).
+        split; cbn; eauto.
+        repeat constructor.
+      }
+
+      (* No ERR on first operand. *)
+      destruct H1 as [[] | H1].
+      specialize (H1 x1).
+      forward H1; [cbn; auto|].
+      rewrite <- H1 in H3.
+
+      remember (eval_fneg x1) as res.
+      destruct_err_ub_oom res; inv H3.
+      red.
+
+      exists (ret (fin_to_inf_dvalue x1)).
+      exists (fun _ => ERR_unERR_UB_OOM err_msg).
+
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; cbn; eauto.
+      right.
+
+      intros a Ha.
+      eapply eval_fneg_err_fin_inf; eauto.
+      
     - (* UVALUE_FCmp *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
@@ -17673,6 +17956,46 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     orutt_eval_fop
     : ORUTT.
 
+  Lemma orutt_eval_fneg :
+    forall E1 E2
+      `{OOM1 : OOME -< E1} `{OOM2 : OOME -< E2}
+      `{UB1 : UBE -< E1} `{UB2 : UBE -< E2}
+      `{ERR1: FailureE -< E1} `{ERR2: FailureE -< E2}
+      (pre : prerel E1 E2) (post : postrel E1 E2)
+      (UBDISC : forall e1 e2, @subevent UBE E2 UB2 void e1 <> @subevent OOME E2 OOM2 void e2)
+      (ERRDISC : forall e1 e2, @subevent FailureE E2 ERR2 void e1 <> @subevent OOME E2 OOM2 void e2)
+      (UBINJ : pre void void (@subevent UBE E1 UB1 void (ThrowUB tt)) (@subevent UBE E2 UB2 void (ThrowUB tt)))
+      (ERRINJ : pre void void (@subevent FailureE E1 ERR1 void (Throw tt)) (@subevent FailureE E2 ERR2 void (Throw tt)))
+      dv1_1 dv1_2,
+      dvalue_refine_strict dv1_1 dv1_2 ->
+      orutt pre post dvalue_refine_strict
+        (IS1.LP.Events.DV.eval_fneg dv1_1) (eval_fneg dv1_2)
+        (OOM:=OOME).
+  Proof.
+    intros E1 E2 OOM1 OOM2 UB1 UB2 ERR1 ERR2 pre post UBDISC ERRDISC UBINJ ERRINJ
+      dv1_1 dv1_2  H.
+    rewrite eval_neg_err_ub_oom_to_itree,
+      TLR1.eval_neg_err_ub_oom_to_itree.
+
+    remember (eval_fneg dv1_2) as e.
+    destruct_err_ub_oom e; symmetry in Heqe.
+    - apply orutt_raiseOOM.
+    - erewrite eval_fneg_ub_fin_inf; cbn; eauto;
+        try erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
+      apply orutt_raiseUB; cbn; auto.
+    - erewrite eval_fneg_err_fin_inf; cbn; eauto;
+        try erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
+      apply orutt_raise; cbn; auto.
+    - erewrite eval_fneg_fin_inf; cbn; eauto; subst.
+      2: try erewrite <- fin_to_inf_dvalue_refine_strict'; eauto.
+      apply orutt_Ret; cbn; eauto.
+      apply fin_to_inf_dvalue_refine_strict.
+  Qed.
+
+  #[global] Hint Resolve
+    orutt_eval_fneg
+    : ORUTT.
+
   Lemma orutt_eval_fcmp :
     forall E1 E2
       `{OOM1 : OOME -< E1} `{OOM2 : OOME -< E2}
@@ -18583,6 +18906,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           [ eapply H; eauto; repeat constructor | ].
         intros ? ? ?.
         apply orutt_eval_fop; auto.
+
+      + cbn.
+        eapply orutt_bind;
+          [ eapply H; eauto; repeat constructor | ].
+        intros ? ? ?.
+        apply orutt_eval_fneg; auto.
+        
       + (* FCmp *)
         cbn.
         eapply orutt_bind;
@@ -19126,8 +19456,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             rewrite IS2.LP.IP.VMemInt_intptr_mrepr_from_Z in Heqo0.
 
             pose proof intptr_convert_succeeds i as [i2 CONV].
-            rewrite IP.from_Z_to_Z with (i:=i) (z:=x) in CONV; eauto.
-            rewrite Heqo in CONV. inv CONV.
+            rewrite IP.from_Z_to_Z with (i:=i) (z:=(denote_int_syntax x)) in CONV; eauto.
+            unfold IS1.LLVM.D.denote_int_syntax in Heqo.
+            unfold denote_int_syntax in CONV.
+            rewrite Heqo in CONV.
+            inversion CONV.
           - apply orutt_raise_oom.
         }
 
@@ -19140,6 +19473,17 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         rewrite H.
         rewrite IP.to_Z_from_Z; auto.
 
+    - simplify_expr odt.
+      destruct fp; cbn; try solve_orutt_raise.
+      + unfold IS1.LLVM.D.denote_float_syntax_as_float32, denote_float_syntax_as_float32.
+        break_match; try solve_orutt_raise.
+        apply orutt_Ret.
+        rewrite uvalue_refine_strict_equation; cbn.  reflexivity.
+      + unfold IS1.LLVM.D.denote_float_syntax_as_float, denote_float_syntax_as_float.
+        break_match; try solve_orutt_raise.
+        apply orutt_Ret.
+        rewrite uvalue_refine_strict_equation; cbn.  reflexivity.
+        
     - apply orutt_denote_exp'_Zero_initializer.
 
     - (* CStrings *)
@@ -19328,6 +19672,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           rewrite HC in HX.
           inversion HX.
 
+    -  destruct v.
+       eapply orutt_bind; eauto.
+       intros r1 r2 H.
+       eapply orutt_Ret.
+       rewrite uvalue_refine_strict_equation; cbn;
+         rewrite uvalue_refine_strict_equation in H.
+       rewrite H.
+       reflexivity.
+          
     - (* Conversion *)
       cbn.
       eapply orutt_bind; eauto.
@@ -20914,6 +21267,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           erewrite H in H5; cbn; eauto.
           eapply forallb_forall with (x:=x1) in H4; auto.
           rewrite H4 in H5; discriminate.
+    - cbn.
+      erewrite IHuv_fin; eauto.
     - cbn.
       erewrite IHuv_fin; eauto.
     - cbn.

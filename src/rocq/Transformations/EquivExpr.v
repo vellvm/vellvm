@@ -704,14 +704,13 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
       simpl in H. unfold eq1 in H.
       Admitted.
 
-
+(*
   Lemma add_zero : forall b1 b2 (e:exp dtyp),
     (OP_IBinop (Add b1 b2) (DTYPE_I 32) (EXP_Integer (0)%Z) e) ≐ [DTYPE_I 32] e.
   Proof.
     unfold eq_l2.
     intros.
     cbn. (* SAZ: Something about the new monad stuff broke the automation. *)
-(*
     norm.
     cbn.
     bind_ret_r2.          (* <- note how this adds a "ret" on the right *)
@@ -726,9 +725,9 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
     unfold uvalue_eq.
     split.
     -
-    (* TODO: Need some facts about [refine_uvalue]. *) *)
+    (* TODO: Need some facts about [refine_uvalue]. *) 
   Abort.
-
+*)
 
   (** * Commutative expressions *)
   (*  *)

@@ -913,6 +913,30 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       apply float_op_err_ub_oom_to_itree.
     Qed.
 
+    Lemma eval_neg_err_ub_oom_to_itree :
+      forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E}
+        x,
+        (@eval_fneg (itree E) _ _ _ x) ≈
+          match eval_fneg x with
+          | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
+              match m with
+              | inl (OOM_message x) => raiseOOM x
+              | inr (inl (UB_message x)) => raiseUB x
+              | inr (inr (inl (ERR_message x))) => raise x
+              | inr (inr (inr x)) => ret x
+              end
+          end.
+    Proof.
+      intros E H H0 H1 x.
+      unfold eval_fneg.
+      destruct x; cbn;
+        try solve
+          [ reflexivity
+          | break_match; reflexivity
+          ].
+    Qed.
+
+    
     Lemma eval_fcmp_err_ub_oom_to_itree :
       forall {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E}
         x y cmp,
@@ -1758,6 +1782,28 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       }
 
       destruct u; try reflexivity.
+
+      9: { (* Fneg *)
+        unfold concretize_uvalue.
+        rewrite concretize_uvalueM_equation.
+        cbn.
+        setoid_rewrite H.
+        2: repeat constructor.
+        
+        unfold concretize_uvalue.
+        remember (concretize_uvalueM (err_ub_oom_T ident)
+        (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
+        (err_ub_oom_T ident) (fun (A : Type) (x : err_ub_oom_T ident A) => x) u) as ur.
+
+        destruct_err_ub_oom ur; cbn;
+          repeat setoid_rewrite Raise.raiseOOM_bind_itree;
+          repeat setoid_rewrite Raise.raiseUB_bind_itree;
+          repeat setoid_rewrite Raise.raise_bind_itree;
+          repeat rewrite bind_ret_l; try reflexivity.
+
+        destruct ur0; try solve [reflexivity | break_match; reflexivity].
+      } 
+      
       10: { (* Conversion *)
         idtac.
         unfold concretize_uvalue.
