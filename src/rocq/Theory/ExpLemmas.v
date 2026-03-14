@@ -5,7 +5,7 @@ From Stdlib Require Import
 From Stdlib Require Import List.
 
 Import ListNotations.
-From Stdlib Require Import ZArith.
+From Stdlib Require Import ZArith BinIntDef.
 
 Require Import Stdlib.micromega.Lia.
 
@@ -360,20 +360,34 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     (*   reflexivity. *)
     (* Qed. *)
 
+    (* SAZ: TODO - we need some basic library functions about the new integer syntax representations. *)
+    Lemma Z_of_uint_Pos_to_uint : forall p, Z.of_uint (Pos.to_uint p) = Z.pos p.
+    Proof.
+    Admitted.
+      
+    Lemma Z_to_int_from_int : forall (z:Z), Z.of_int (Z.to_int z) = z.
+    Proof.
+      intros z.
+      destruct z.
+      - reflexivity.
+      - simpl. apply Z_of_uint_Pos_to_uint.
+      - admit.
+    Admitted.
+      
     Lemma denote_exp_ix :forall {sz : positive} t g l,
-        ⟦ EXP_Integer (@Integers.intval sz t) at (DTYPE_I sz) ⟧e2 g l
+        ⟦ EXP_Integer (BinIntDef.Z.to_num_int (@Integers.intval sz t)) at (DTYPE_I sz) ⟧e2 g l
                                                                  ≈
                                                                  Ret (l, (g, @UVALUE_I sz t)).
     Proof using.
-      intros; cbn.
+      intros; cbn. 
       go.
-      rewrite repr_intval.
+      rewrite Z_to_int_from_int.
       rewrite map_ret.
       go.
       rewrite concretize_if_no_undef_or_poison_dvalue_to_uvalue.
-      go.
-      cbn.
+      cbn. 
       rewrite translate_ret.
+      rewrite repr_intval.
       go.
       reflexivity.
     Qed.
@@ -381,7 +395,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Lemma denote_exp_ix_repr :forall {sz} t g l,
         ⟦ EXP_Integer t at (DTYPE_I sz) ⟧e2 g l
                                          ≈
-                                         Ret (l, (g, @UVALUE_I sz (repr t))).
+                                         Ret (l, (g, @UVALUE_I sz (repr (BinIntDef.Z.of_num_int t)))).
     Proof using.
       intros; cbn.
       go.
@@ -395,10 +409,11 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       reflexivity.
     Qed.
 
+    (*
     Lemma denote_exp_double :forall t g l,
-        ⟦ EXP_Double t at DTYPE_Double ⟧e2 g l
+        ⟦ EXP_Float t at (DTYPE_FP FP_double) ⟧e2 g l
                                         ≈
-                                        Ret (l, (g, UVALUE_Double t)).
+                                        Ret (l, (g, UVALUE_Float t)).
     Proof using.
       intros; cbn.
       go.
@@ -407,6 +422,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       cbn.
       reflexivity.
     Qed.
+    *)
 
     (* Lemma denote_conversion_concrete : *)
     (*   forall (conv : conversion_type) τ1 τ2 e g l m x a av, *)

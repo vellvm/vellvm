@@ -3775,14 +3775,17 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         then raise_ub "Division by poison."
         else ret (DVALUE_Poison t)
     | _, _                               =>
-        raise_error ("ill_typed-fop: " ++
-                       (show fop) ++
-                       " " ++
-                       (show v1) ++
-                       " " ++
-                       (show v2))
+        raise_error ("ill_typed-fop: " ++ (show fop))
     end.
 
+  Definition eval_fneg {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} (v:dvalue) : M dvalue :=
+    match v with
+    | DVALUE_Float f  => ret (DVALUE_Float (Float32.neg f))
+    | DVALUE_Double f => ret (DVALUE_Double (Float.neg f))
+    | DVALUE_Poison t => ret (DVALUE_Poison t)
+    | _ => raise_error ("ill_typed-fneg ")
+    end.
+  
   Definition not_nan32 (f:ll_float) : bool :=
     negb (Flocq.IEEE754.Binary.is_nan _ _ f).
 

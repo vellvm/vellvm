@@ -1842,6 +1842,32 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR 
         destruct_err_ub_oom y; reflexivity.
       }
 
+      { (* Fneg *)
+        cbn.
+        unfold concretize_u, concretize_uvalue in *.
+        match goal with
+        | [ |- context [ match ?X with _ => _ end ] ] =>
+            remember X
+        end.
+        match goal with
+        | H : _ |- bind_ErrUbOomProp ?ma ?k ?res =>
+            exists e; exists (fun _ => res)
+        end.
+        split.
+
+        subst.
+        apply H.
+        repeat constructor.
+
+        destruct_err_ub_oom e; cbn; split; auto.
+        right.
+        intros a H0; subst.
+
+        remember (eval_fneg a).
+        destruct_err_ub_oom y; reflexivity.
+      }
+
+      
       { (* FCmp *)
         cbn.
         unfold concretize_u, concretize_uvalue in *.

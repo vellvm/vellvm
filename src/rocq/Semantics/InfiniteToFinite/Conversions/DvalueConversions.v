@@ -520,6 +520,9 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
            v1' <- uvalue_convert_strict v1;;
            v2' <- uvalue_convert_strict v2;;
            ret (DV2.UVALUE_FBinop fop fm v1' v2')
+       | DV1.UVALUE_Fneg fm t v =>
+           v' <- uvalue_convert_strict v;;
+           ret (DV2.UVALUE_Fneg fm t v')
        | DV1.UVALUE_FCmp cmp v1 v2 =>
            v1' <- uvalue_convert_strict v1;;
            v2' <- uvalue_convert_strict v2;;
@@ -886,6 +889,13 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
           uvalue_convert_strict uv1' = NoOom uv1 /\
           uvalue_convert_strict uv2' = NoOom uv2.
 
+  Parameter uvalue_convert_strict_fneg_inv :
+    forall x flags t uv1,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Fneg flags t uv1) ->
+      exists uv1',
+        x = DV1.UVALUE_Fneg flags t uv1' /\
+          uvalue_convert_strict uv1' = NoOom uv1.
+  
   Parameter uvalue_convert_strict_fcmp_inv :
     forall x fcmp uv1 uv2,
       uvalue_convert_strict x = NoOom (DV2.UVALUE_FCmp fcmp uv1 uv2) ->
@@ -991,6 +1001,7 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
       | apply uvalue_convert_strict_ibinop_inv in H
       | apply uvalue_convert_strict_icmp_inv in H
       | apply uvalue_convert_strict_fbinop_inv in H
+      | apply uvalue_convert_strict_fneg_inv in H                                                    
       | apply uvalue_convert_strict_fcmp_inv in H
       | apply uvalue_convert_strict_conversion_inv in H
       | apply uvalue_convert_strict_gep_inv in H
@@ -1884,6 +1895,9 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
            v1' <- uvalue_convert_strict v1;;
            v2' <- uvalue_convert_strict v2;;
            ret (DV2.UVALUE_FBinop fop fm v1' v2')
+       | DV1.UVALUE_Fneg fm t v =>
+           v' <- uvalue_convert_strict v;;
+           ret (DV2.UVALUE_Fneg fm t v')
        | DV1.UVALUE_FCmp cmp v1 v2 =>
            v1' <- uvalue_convert_strict v1;;
            v2' <- uvalue_convert_strict v2;;
@@ -3117,6 +3131,9 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       cbn.
       rewrite addr_convert_null.
       reflexivity.
+    - cbn in *; inv V1.
+      break_match_hyp_inv;
+      eexists; split; reflexivity.
     - (* Arrays *)
       cbn in *.
       break_match_hyp_inv.
@@ -3302,6 +3319,8 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       cbn.
       rewrite addr_convert_null.
       reflexivity.
+    - cbn in *.
+      break_match_hyp_inv; eexists; split; eauto.
     - (* Arrays *)
       cbn in *.
       break_match_hyp; inv V2.
@@ -3478,6 +3497,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
     split; intros S.
     { induction dt; cbn in *;
         try solve [inv S; auto].
+      - break_match_hyp_inv; auto.
       - rewrite IHdt; auto.
         break_match_hyp; inv S; auto.
       - (* Structs *)
@@ -3524,10 +3544,12 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           auto.
       - (* Vectors *)
         destruct dt; inv S; auto.
+        destruct fp; inv H0; auto.
     }
 
     { induction dt; cbn in *;
         try solve [inv S; auto].
+      - destruct f; inv S; auto.
       - rewrite IHdt; auto.
         break_match_hyp; inv S; auto.
       - (* Structs *)
@@ -3574,6 +3596,7 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
           auto.
       - (* Vectors *)
         destruct dt; inv S; auto.
+        destruct fp; inv H0; auto.
     }
   Qed.
 
@@ -4164,6 +4187,21 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
       eauto.
   Qed.
 
+  Lemma uvalue_convert_strict_fneg_inv :
+    forall x flags t uv1,
+      uvalue_convert_strict x = NoOom (DV2.UVALUE_Fneg flags t uv1) ->
+      exists uv1',
+        x = DV1.UVALUE_Fneg flags t uv1' /\
+          uvalue_convert_strict uv1' = NoOom uv1.
+  Proof.
+    intros x * H.
+    induction x;
+      repeat red in H; cbn in H;
+      repeat break_match_hyp_inv;
+      try inv H;
+      eauto.
+  Qed.    
+  
   Lemma uvalue_convert_strict_fcmp_inv :
     forall x fcmp uv1 uv2,
       uvalue_convert_strict x = NoOom (DV2.UVALUE_FCmp fcmp uv1 uv2) ->

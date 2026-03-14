@@ -608,6 +608,8 @@ Module Type ConcretizationBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : 
         | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalueM M undef_handler ERR_M lift_ue v1 ;;
                                                     dv2 <- concretize_uvalueM M undef_handler ERR_M lift_ue v2 ;;
                                                     lift_ue _ (eval_fop fop dv1 dv2)
+        | UVALUE_Fneg fm t v                     => dv <- concretize_uvalueM M undef_handler ERR_M lift_ue v ;;
+                                                    lift_ue _ (eval_fneg dv)
         | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalueM M undef_handler ERR_M lift_ue v1 ;;
                                                     dv2 <- concretize_uvalueM M undef_handler ERR_M lift_ue v2 ;;
                                                     lift_ue _ (eval_fcmp cmp dv1 dv2)
@@ -1555,6 +1557,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
         | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalueM v1 ;;
                                                     dv2 <- concretize_uvalueM v2 ;;
                                                     lift_ue (eval_fop fop dv1 dv2)
+        | UVALUE_Fneg fm t v                       => dv <- concretize_uvalueM v ;;
+                                                    lift_ue (eval_fneg dv)
         | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
                                                     dv2 <- concretize_uvalueM v2 ;;
                                                     lift_ue (eval_fcmp cmp dv1 dv2)
@@ -1776,7 +1780,9 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.A
             | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalueM v1 ;;
                                                        dv2 <- concretize_uvalueM v2 ;;
                                                        lift_ue (eval_fop fop dv1 dv2)
-            | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
+            | UVALUE_Fneg fm t v                     => dv <- concretize_uvalueM v ;;
+                                                       lift_ue (eval_fneg dv)
+| UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
                                                        dv2 <- concretize_uvalueM v2 ;;
                                                        lift_ue (eval_fcmp cmp dv1 dv2)
 
