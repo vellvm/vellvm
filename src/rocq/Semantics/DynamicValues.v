@@ -113,9 +113,9 @@ Definition ll_double := Floats.float.
 
 
 (* Sizeof is needed for for ConcatBytes case *)
-Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.MemoryAddress.INTPTR)(SIZEOF:Sizeof).
+Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.MemoryAddress.INTPTR)(S:SIZEOF).
 
-  Import SIZEOF.
+  Import S.
   Import IP.
 
   (* The set of dynamic values manipulated by an LLVM program. *)
@@ -3358,38 +3358,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
        | _ => 0
        end.
 
-  (* Check if this is an instruction which can trigger UB with division by 0. *)
-  Definition iop_is_div (iop : ibinop) : bool :=
-    match iop with
-    | UDiv _ => true
-    | SDiv _ => true
-    | URem   => true
-    | SRem   => true
-    | _      => false
-    end.
-
-  Definition iop_is_signed (iop : ibinop) : bool :=
-    match iop with
-    | SDiv _ => true
-    | SRem   => true
-    | _      => false
-    end.
-
-  Definition iop_is_shift (iop : ibinop) : bool :=
-    match iop with
-    | Shl _ _ => true
-    | LShr _ => true
-    | AShr _ => true
-    | _ => false
-    end.
-
-  (* Check if this is an instruction which can trigger UB with division by 0. *)
-  Definition fop_is_div (fop : fbinop) : bool :=
-    match fop with
-    | FDiv => true
-    | FRem => true
-    | _    => false
-    end.
 
   Definition undef_i1 : uvalue  := UVALUE_Undef (DTYPE_I 1).
   Definition undef_i8 : uvalue  := UVALUE_Undef (DTYPE_I 8).

@@ -18,41 +18,41 @@ function replace () {
 for f in "${FILENAMES[@]}"
 do
     # BigIntptr mismatches
-    replace "s/MemoryModelImplementation.LLVMParamsBigIntptr.Events.DV/LP.Events.DV/g" $f
-    replace "s/LLVMParamsBigIntptr.Events.DV/LP.Events.DV/g" $f
+    replace "s/MemoryModelImplementation.LLVMParamsBigIntptr.DV/LP.DV/g" $f
+    replace "s/LLVMParamsBigIntptr.DV/LP.DV/g" $f
     replace "s/MemoryModelImplementation.LLVMParamsBigIntptr.ADDR.addr/LP.ADDR.addr/g" $f
     replace "s/LLVMParamsBigIntptr.ADDR.addr/LP.ADDR.addr/g" $f
     replace "s/MemoryModelImplementation.LLVMParamsBigIntptr.IP/LP.IP/g" $f
     replace "s/LLVMParamsBigIntptr.IP/LP.IP/g" $f
     replace "s/MemoryModelImplementation.LLVMParamsBigIntptr.PROV/LP.PROV/g" $f
     replace "s/LLVMParamsBigIntptr.PROV/LP.PROV/g" $f
-    replace "s/MemoryModelImplementation.LLVMParamsBigIntptr.Events/LP.Events/g" $f
-    replace "s/LLVMParamsBigIntptr.Events/LP.Events/g" $f
-    replace "s/^(\s*)type dvalue_byte = MemoryBigIntptr.CP.CONCBASE.dvalue_byte =\n(\s*)\| DVALUE_ExtractByte of LP.Events.DV.dvalue/\1type dvalue_byte = MemoryBigIntptr.CP.CONCBASE.dvalue_byte =\n\2\| DVALUE_ExtractByte of LLVMParamsBigIntptr.Events.DV.dvalue/gm" $f
+    # replace "s/MemoryModelImplementation.LLVMParamsBigIntptr.Events/LP.Events/g" $f
+    # replace "s/LLVMParamsBigIntptr.Events/LP.Events/g" $f
+    # replace "s/^(\s*)type dvalue_byte = MemoryBigIntptr.CP.CONCBASE.dvalue_byte =\n(\s*)\| DVALUE_ExtractByte of LP.Events.DV.dvalue/\1type dvalue_byte = MemoryBigIntptr.CP.CONCBASE.dvalue_byte =\n\2\| DVALUE_ExtractByte of LLVMParamsBigIntptr.Events.DV.dvalue/gm" $f
 
     # 64BitIntptr mismatches
-    replace "s/MemoryModelImplementation.LLVMParams64BitIntptr.Events.DV/LP.Events.DV/g" $f
-    replace "s/LLVMParams64BitIntptr.Events.DV/LP.Events.DV/g" $f
+    replace "s/MemoryModelImplementation.LLVMParams64BitIntptr.DV/LP.DV/g" $f
+    replace "s/LLVMParams64BitIntptr.DV/LP.DV/g" $f
     replace "s/MemoryModelImplementation.LLVMParams64BitIntptr.ADDR.addr/LP.ADDR.addr/g" $f
     replace "s/LLVMParams64BitIntptr.ADDR.addr/LP.ADDR.addr/g" $f
     replace "s/MemoryModelImplementation.LLVMParams64BitIntptr.IP/LP.IP/g" $f
     replace "s/LLVMParams64BitIntptr.IP/LP.IP/g" $f
     replace "s/MemoryModelImplementation.LLVMParams64BitIntptr.PROV/LP.PROV/g" $f
     replace "s/LLVMParams64BitIntptr.PROV/LP.PROV/g" $f
-    replace "s/MemoryModelImplementation.LLVMParams64BitIntptr.Events/LP.Events/g" $f
-    replace "s/LLVMParams64BitIntptr.Events/LP.Events/g" $f
-    replace "s/^(\s*)type dvalue_byte = Memory64BitIntptr.CP.CONCBASE.dvalue_byte =\n(\s*)\| DVALUE_ExtractByte of LP.Events.DV.dvalue/\1type dvalue_byte = Memory64BitIntptr.CP.CONCBASE.dvalue_byte =\n\2\| DVALUE_ExtractByte of LLVMParams64BitIntptr.Events.DV.dvalue/gm" $f
+    # replace "s/MemoryModelImplementation.LLVMParams64BitIntptr.Events/LP.Events/g" $f
+    # replace "s/LLVMParams64BitIntptr.Events/LP.Events/g" $f
+    # replace "s/^(\s*)type dvalue_byte = Memory64BitIntptr.CP.CONCBASE.dvalue_byte =\n(\s*)\| DVALUE_ExtractByte of LP.Events.DV.dvalue/\1type dvalue_byte = Memory64BitIntptr.CP.CONCBASE.dvalue_byte =\n\2\| DVALUE_ExtractByte of LLVMParams64BitIntptr.Events.DV.dvalue/gm" $f
 
     # Extra stuff
-    replace "s/^(\s*)type dvalue_byte = MEM'.CP.CONCBASE.dvalue_byte =\n(\s*)\| DVALUE_ExtractByte of LP.Events.DV.dvalue/\1type dvalue_byte = MEM'.CP.CONCBASE.dvalue_byte =\n\2\| DVALUE_ExtractByte of LP'.Events.DV.dvalue/gm" $f
+    # replace "s/^(\s*)type dvalue_byte = MEM'.CP.CONCBASE.dvalue_byte =\n(\s*)\| DVALUE_ExtractByte of LP.Events.DV.dvalue/\1type dvalue_byte = MEM'.CP.CONCBASE.dvalue_byte =\n\2\| DVALUE_ExtractByte of LP'.Events.DV.dvalue/gm" $f
 done
 
 for f in "${MEMORYFILES[@]}"
 do
-    replace "s/^(\s*)type dvalue = LLVMParamsBigIntptr.Events.DV.dvalue =\n(\s*)\| DVALUE_Addr of ADDR.addr/\1type dvalue = LLVMParamsBigIntptr.Events.DV.dvalue =\n\2\| DVALUE_Addr of LLVMParamsBigIntptr.ADDR.addr/gm" $f
-    replace "s/^(\s*)type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =\n(\s*)\| UVALUE_Addr of ADDR.addr/\1type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =\n\2\| UVALUE_Addr of LLVMParamsBigIntptr.ADDR.addr/gm" $f
-    replace "s/(^\s*type dvalue = LLVMParamsBigIntptr.Events.DV.dvalue =(\n|.)*?DVALUE_IPTR of )IP.intptr/\1LLVMParamsBigIntptr.IP.intptr/gm" $f
-    replace "s/(^\s*type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =(\n|.)*?UVALUE_IPTR of )IP.intptr/\1LLVMParamsBigIntptr.IP.intptr/gm" $f
+    # replace "s/^(\s*)type dvalue = LLVMParamsBigIntptr.Events.DV.dvalue =\n(\s*)\| DVALUE_Addr of ADDR.addr/\1type dvalue = LLVMParamsBigIntptr.Events.DV.dvalue =\n\2\| DVALUE_Addr of LLVMParamsBigIntptr.ADDR.addr/gm" $f
+    # replace "s/^(\s*)type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =\n(\s*)\| UVALUE_Addr of ADDR.addr/\1type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =\n\2\| UVALUE_Addr of LLVMParamsBigIntptr.ADDR.addr/gm" $f
+    # replace "s/(^\s*type dvalue = LLVMParamsBigIntptr.Events.DV.dvalue =(\n|.)*?DVALUE_IPTR of )IP.intptr/\1LLVMParamsBigIntptr.IP.intptr/gm" $f
+    # replace "s/(^\s*type uvalue = LLVMParamsBigIntptr.Events.DV.uvalue =(\n|.)*?UVALUE_IPTR of )IP.intptr/\1LLVMParamsBigIntptr.IP.intptr/gm" $f
     replace "s/val ptr_to_int : InfAddr.addr -> coq_Z/val ptr_to_int : ADDR.addr -> coq_Z/g" $f
     replace "s/val ptr_to_int : FinAddr.addr -> coq_Z/val ptr_to_int : ADDR.addr -> coq_Z/g" $f
     replace "s/val address_provenance : InfAddr.addr -> coq_Prov/val address_provenance : ADDR.addr -> coq_Prov/g" $f

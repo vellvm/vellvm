@@ -14,7 +14,9 @@ open InterpretationStack.InterpreterStackBigIntptr.LLVM.Stack
 
 open InterpretationStack.InterpreterStackBigIntptr.LLVM.Global
 
-open InterpretationStack.InterpreterStackBigIntptr.LP.Events
+open InterpretationStack.InterpreterStackBigIntptr.LP
+
+open LLVMEvents
 
 open Format
 open ITreeDefinition
@@ -102,11 +104,11 @@ let debug (msg : string) =
 let current_line = ref (Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()))
 
 let single_step (m :
-      ( 'a coq_L4
+      ( ('a, 'b, 'c) coq_L4
       , MMEP.MMSP.coq_MemState
         * ( StoreId.store_id
           * ((lstack_frame * lstack) * (global_env * DV.dvalue)) ) )
-        itree ) : (( 'a coq_L4
+        itree ) : (( ('a, 'b, 'c) coq_L4
       , MMEP.MMSP.coq_MemState
         * ( StoreId.store_id
           * ((lstack_frame * lstack) * (global_env * DV.dvalue)) ) )
@@ -174,7 +176,7 @@ let single_step (m :
 
 let rec step
     (m :
-      ( 'a coq_L4
+      ( ('a, 'b, 'c) coq_L4
       , MMEP.MMSP.coq_MemState
         * ( StoreId.store_id
           * ((lstack_frame * lstack) * (global_env * DV.dvalue)) ) )

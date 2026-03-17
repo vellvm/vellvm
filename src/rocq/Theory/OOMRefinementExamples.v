@@ -130,7 +130,7 @@ Module Infinite.
 
   Module EL := ExpLemmas InterpreterStackBigIntptr TopLevelBigIntptr.
   Import EL.
-
+  Import InterpreterStackBigIntptr.LP.DV.
 
   #[global] Instance interp_mem_prop_Proper3 :
   forall {E}
@@ -383,17 +383,17 @@ Module Infinite.
   Definition denote_program prog :=
     block_to_dvalue (denote_block prog (Name "blk") None).
 
-  Definition alloc_tree : itree instr_E dvalue :=
+  Definition alloc_tree : itree (instr_E dvalue uvalue) dvalue :=
     denote_program alloc_block.
 
-  Definition ptoi_tree : itree instr_E dvalue :=
+  Definition ptoi_tree : itree (instr_E dvalue uvalue) dvalue :=
     denote_program ptoi_block.
 
-  Definition ret_tree : itree instr_E dvalue :=
+  Definition ret_tree : itree (instr_E dvalue uvalue) dvalue :=
     denote_program ret_block.
 
-  Definition instr_E_to_L0 {T : Type} : instr_E T -> itree L0 T :=
-    fun (e : instr_E T) =>
+  Definition instr_E_to_L0 {T : Type} : (instr_E dvalue uvalue) T -> itree (L0 dvalue uvalue) T :=
+    fun (e : (instr_E dvalue uvalue) T) =>
       match e with
       | inl1 call =>
           match call with
@@ -433,7 +433,7 @@ Module Infinite.
 
   Lemma interp_concretize_uvalue :
     forall u,
-      interp (fun (T : Type) (e : exp_E T) => instr_E_to_L0 (exp_to_instr e))
+      interp (fun (T : Type) (e : exp_E dvalue uvalue T) => instr_E_to_L0 (exp_to_instr e))
       (concretize_uvalue u)
       ≈ concretize_uvalue u.
   Proof.
@@ -451,7 +451,7 @@ Module Infinite.
 
   Lemma interp_concretize_if_no_undef_or_poison :
     forall u,
-      interp (fun (T : Type) (e : exp_E T) => instr_E_to_L0 (exp_to_instr e))
+      interp (fun (T : Type) (e : exp_E dvalue uvalue T) => instr_E_to_L0 (exp_to_instr e))
       (concretize_if_no_undef_or_poison u)
       ≈ concretize_if_no_undef_or_poison u.
   Proof.
@@ -562,7 +562,7 @@ Module Infinite.
 
   (* Few remarks about [L3_trace] used in [interp_mcfg4] *)
   Remark L3_trace_MemoryE:
-    forall R X (g : global_env) (l : lstack_frame * lstack) sid m (e : MemoryE X) (k : X -> itree L0 R) t,
+    forall R X (g : global_env) (l : lstack_frame * lstack) sid m (e : MemoryE dvalue uvalue X) (k : X -> itree (L0 dvalue uvalue) R) t,
       interp_memory_spec eq
         (vis e (fun x : X => interp_local_stack (interp_global (interp_intrinsics (k x)) g) l)) sid m t <->
       interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (vis e k)) g) l) sid m t.
@@ -582,7 +582,7 @@ Module Infinite.
   Qed.
 
   Remark L3_trace_LocalWrite:
-    forall R (g : global_env) (l : lstack_frame) (s : lstack) sid m (k : itree L0 R) t id dv,
+    forall R (g : global_env) (l : lstack_frame) (s : lstack) sid m (k : itree (L0 dvalue uvalue) R) t id dv,
       interp_memory_spec eq
         (interp_local_stack (interp_global (interp_intrinsics k) g) (Maps.add id dv l, s)) sid m t <->
       interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (trigger (LocalWrite id dv);; k)) g) (l, s)) sid m t.
@@ -607,7 +607,7 @@ Module Infinite.
   Qed.
 
   Remark L3_trace_LocalRead:
-    forall R (g : global_env) (l : lstack_frame) (s : lstack) sid m (k: _ -> itree L0 R) t id x,
+    forall R (g : global_env) (l : lstack_frame) (s : lstack) sid m (k: _ -> itree (L0 dvalue uvalue) R) t id x,
       Maps.lookup id l = ret x ->
       (interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (k (snd (l, s, x)))) g) (fst (l, s, x)))
         sid m t <->
@@ -635,7 +635,7 @@ Module Infinite.
 
   Remark L3_trace_ret:
     forall R (g : global_env) (l : lstack_frame * lstack) sid m r
-      (t : itree (ExternalCallE +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' LLVMExcE _ +' UBE +' DebugE +' FailureE)
+      (t : itree (ExternalCallE dvalue uvalue +' PickUvalueE dvalue uvalue +' OOME +' LLVMExcE _ +' UBE +' DebugE +' FailureE)
             (_ * (store_id * (lstack_frame * lstack * (FMapAList.alist raw_id dvalue * R))))),
       interp_memory_spec eq (Ret2 g l r) sid m t <->
       interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (ret r)) g) l) sid m t.
@@ -694,7 +694,7 @@ Module Infinite.
                       x
                       return
                       (itree
-                         (ExternalCallE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                         (ExternalCallE dvalue uvalue +' PickUvalueE dvalue uvalue +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
                          (MMEP.MMSP.MemState * (store_id * (stack_frame uvalue * Stack.stack uvalue * res_L1))))
                     with
                     end)) with
@@ -704,7 +704,7 @@ Module Infinite.
                                x
                                return
                                (itree
-                                  (ExternalCallE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                                  (ExternalCallE dvalue uvalue +' PickUvalueE dvalue uvalue +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
                                   (MMEP.MMSP.MemState * (store_id * (lstack_frame * lstack * res_L1))))
                              with
                              end))).
@@ -860,7 +860,7 @@ Module Infinite.
                       x
                       return
                       (itree
-                         (ExternalCallE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                         (ExternalCallE dvalue uvalue +' PickUvalueE dvalue uvalue +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
                          (MMEP.MMSP.MemState * (store_id * (stack_frame uvalue * Stack.stack uvalue * res_L1))))
                     with
                     end)) with
@@ -870,7 +870,7 @@ Module Infinite.
                                x
                                return
                                (itree
-                                  (ExternalCallE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                                  (ExternalCallE dvalue uvalue +' PickUvalueE dvalue uvalue +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
                                   (MMEP.MMSP.MemState * (store_id * (lstack_frame * lstack * res_L1))))
                              with
                              end))).
@@ -989,15 +989,15 @@ Module Infinite.
 
   Lemma interp_memory_spec_vis_inv:
     forall E R X
-      (e : (E +' LLVMParamsBigIntptr.Events.IntrinsicE +' LLVMParamsBigIntptr.Events.MemoryE +' LLVMParamsBigIntptr.Events.PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) X)
+      (e : (E +' IntrinsicE dvalue uvalue +' MemoryE dvalue uvalue +' PickUvalueE dvalue uvalue +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) X)
       k sid m t,
       interp_memory_spec (E:=E) (R2 := R) eq (Vis e k) sid m t ->
       ((exists ta k2 s1 s2 ,
            eutt (MMEP.MemSpec.MemState_eqv × eq) t (a <- ta;; k2 a) /\
              interp_memory_spec_h e s1 s2 ta /\
              (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
-                 @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' _ +' UBE +' DebugE +' FailureE) X a (trigger e) ->
-                 @Returns (E +' PickUvalueE +' OOME +' _ +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
+                 @Returns (E +' IntrinsicE dvalue uvalue +' MemoryE dvalue uvalue +' PickUvalueE dvalue uvalue +' OOME +' _ +' UBE +' DebugE +' FailureE) X a (trigger e) ->
+                 @Returns (E +' PickUvalueE dvalue uvalue +' OOME +' _ +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
                  a = snd (snd b) ->
                  interp_memory_spec (E := E) eq (k a) sid m (k2 b))) \/
          (exists ta s1 s2, interp_memory_spec_h e s1 s2 ta /\ contains_UB_Extra ta)%type \/
@@ -1060,9 +1060,9 @@ Module Infinite.
 
   Lemma refine_OOM_h_model_undef_h_raise_OOM:
     forall R t1 oom_msg (k1 : R -> _) t3,
-      refine_OOM_h (E := L4) refine_res3 t1 (raiseOOM oom_msg) ->
+      refine_OOM_h (E := L4 dvalue uvalue) refine_res3 t1 (raiseOOM oom_msg) ->
       model_undef_h (prod_rel MemoryBigIntptr.MMEP.MemSpec.MemState_eqv eq) (x <- Error.raise_oom oom_msg;; k1 x) t3 ->
-      refine_OOM_h (E := L4) refine_res3 t1 t3.
+      refine_OOM_h (E := L4 dvalue uvalue) refine_res3 t1 t3.
   Proof.
     intros. punfold H. red in H.
     unfold Error.raise_oom, RAISE_OOM_ITREE_OOME, bind, Monad_itree, raiseOOM in *.
@@ -1126,9 +1126,9 @@ Module Infinite.
 
   Lemma refine_OOM_h_model_undef_h_raise_ret:
     forall t1 t3 r,
-      refine_OOM_h (E := L4) refine_res3 t1 (ret r) ->
+      refine_OOM_h (E := L4 dvalue uvalue) refine_res3 t1 (ret r) ->
       model_undef_h (prod_rel MemoryBigIntptr.MMEP.MemSpec.MemState_eqv eq) (ret r) t3 ->
-      refine_OOM_h (E := L4) refine_res3 t1 t3.
+      refine_OOM_h (E := L4 dvalue uvalue) refine_res3 t1 t3.
   Proof.
     intros.
     eapply interp_prop_oom_ret_inv in H0.
@@ -1202,7 +1202,7 @@ Module Infinite.
                       x0
                       return
                       (itree
-                         (ExternalCallE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                         (ExternalCallE dvalue uvalue +' PickUvalueE dvalue uvalue +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
                          (MMEP.MMSP.MemState * (store_id * (stack_frame uvalue * Stack.stack uvalue * res_L1))))
                     with
                     end)) with
@@ -1212,7 +1212,7 @@ Module Infinite.
                                x0
                                return
                                (itree
-                                  (ExternalCallE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                                  (ExternalCallE dvalue uvalue +' PickUvalueE dvalue uvalue +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
                                   (MMEP.MMSP.MemState * (store_id * (lstack_frame * lstack * res_L1))))
                              with
                              end))).
@@ -1375,10 +1375,10 @@ Module Infinite.
 
     assert (alloca_returns:
              forall x, Returns
-                    (E := ExternalCallE +'
-                        LLVMParamsBigIntptr.Events.IntrinsicE +'
-                        LLVMParamsBigIntptr.Events.MemoryE +'
-                        LLVMParamsBigIntptr.Events.PickUvalueE +'
+                    (E := ExternalCallE dvalue uvalue +'
+                        IntrinsicE dvalue uvalue +'
+                        MemoryE dvalue uvalue +'
+                        PickUvalueE dvalue uvalue +'
                         OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
                                    x (trigger (Alloca (DTYPE_I 64) 1 None))).
     { intros. unfold trigger.
@@ -1510,6 +1510,7 @@ Module Finite.
 
   Module EL := ExpLemmas InterpreterStack64BitIntptr TopLevel64BitIntptr.
   Import EL.
+  Import InterpreterStack64BitIntptr.LP.DV.
 
   Definition alloc_code : code dtyp :=
     [ (IId (Name "ptr"), INSTR_Alloca (DTYPE_I 64%positive) [], [])
@@ -1565,23 +1566,23 @@ Module Finite.
   Definition denote_program prog :=
     block_to_dvalue (denote_block prog (Name "blk") None).
 
-  Definition alloc_tree : itree instr_E dvalue :=
+  Definition alloc_tree : itree (instr_E dvalue uvalue) dvalue :=
     denote_program alloc_block.
 
-  Definition ptoi_tree : itree instr_E dvalue :=
+  Definition ptoi_tree : itree (instr_E dvalue uvalue) dvalue :=
     denote_program ptoi_block.
 
-  Definition ret_tree : itree instr_E dvalue :=
+  Definition ret_tree : itree (instr_E dvalue uvalue) dvalue :=
     denote_program ret_block.
 
-  Definition t_alloc : itree L0 dvalue
+  Definition t_alloc : itree (L0 dvalue uvalue) dvalue
     := trigger (Alloca (DTYPE_I 64%positive) 1 None);; ret (@DVALUE_I 1 one).
 
-  Definition t_ret : itree L0 dvalue
+  Definition t_ret : itree (L0 dvalue uvalue) dvalue
     := ret (@DVALUE_I 1 one).
-
-  Definition instr_E_to_L0 {T : Type} : instr_E T -> itree L0 T :=
-    fun (e : instr_E T) =>
+  
+  Definition instr_E_to_L0 {T : Type} : (instr_E dvalue uvalue) T -> itree (L0 dvalue uvalue) T :=
+    fun (e : (instr_E dvalue uvalue) T) =>
       match e with
       | inl1 call =>
           match call with
@@ -1636,9 +1637,9 @@ Module Finite.
 
   Lemma refine_OOM_h_model_undef_h_raise_OOM:
     forall R t1 oom_msg (k1 : R -> _) t3,
-      refine_OOM_h (E := L4) refine_res3 t1 (raiseOOM oom_msg) ->
+      refine_OOM_h (E := (L4 dvalue uvalue)) refine_res3 t1 (raiseOOM oom_msg) ->
       model_undef_h (prod_rel Memory64BitIntptr.MMEP.MemSpec.MemState_eqv eq) (x <- Error.raise_oom oom_msg;; k1 x) t3 ->
-      refine_OOM_h (E := L4) refine_res3 t1 t3.
+      refine_OOM_h (E := (L4 dvalue uvalue)) refine_res3 t1 t3.
   Proof.
     intros. punfold H. red in H.
     unfold Error.raise_oom, RAISE_OOM_ITREE_OOME, bind, Monad_itree, raiseOOM in *.
@@ -1702,9 +1703,9 @@ Module Finite.
 
   Lemma refine_OOM_h_model_undef_h_raise_ret:
     forall t1 t3 r,
-      refine_OOM_h (E := L4) refine_res3 t1 (ret r) ->
+      refine_OOM_h (E := (L4 dvalue uvalue)) refine_res3 t1 (ret r) ->
       model_undef_h (prod_rel Memory64BitIntptr.MMEP.MemSpec.MemState_eqv eq) (ret r) t3 ->
-      refine_OOM_h (E := L4) refine_res3 t1 t3.
+      refine_OOM_h (E := (L4 dvalue uvalue)) refine_res3 t1 t3.
   Proof.
     intros.
     eapply interp_prop_oom_ret_inv in H0.
@@ -1735,7 +1736,7 @@ Module Finite.
 
   (* Few remarks about [L3_trace] used in [interp_mcfg4] *)
   Remark L3_trace_MemoryE:
-    forall R X (g : global_env) (l : lstack_frame * lstack) sid m (e : MemoryE X) (k : X -> itree L0 R) t,
+    forall R X (g : global_env) (l : lstack_frame * lstack) sid m (e : MemoryE dvalue uvalue X) (k : X -> itree (L0 dvalue uvalue) R) t,
       interp_memory_spec eq
             (vis e (fun x : X => interp_local_stack (interp_global (interp_intrinsics (k x)) g) l)) sid m t <->
       interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (vis e k)) g) l) sid m t.
@@ -1755,7 +1756,7 @@ Module Finite.
   Qed.
 
   Remark L3_trace_LocalWrite:
-    forall R (g : global_env) (l : lstack_frame) (s : lstack) sid m (k : unit -> itree L0 R) t id dv,
+    forall R (g : global_env) (l : lstack_frame) (s : lstack) sid m (k : unit -> itree (L0 dvalue uvalue) R) t id dv,
       interp_memory_spec eq
         (interp_local_stack (interp_global (interp_intrinsics (k tt)) g) (Maps.add id dv l, s)) sid m t <->
       interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (vis (LocalWrite id dv) k)) g) (l, s)) sid m t.
@@ -1778,7 +1779,7 @@ Module Finite.
   Qed.
 
   Remark L3_trace_LocalRead:
-    forall R (g : global_env) (l : lstack_frame) (s : lstack) sid m (k: _ -> itree L0 R) t id x,
+    forall R (g : global_env) (l : lstack_frame) (s : lstack) sid m (k: _ -> itree (L0 dvalue uvalue) R) t id x,
       Maps.lookup id l = ret x ->
       (interp_memory_spec eq (interp_local_stack (interp_global (interp_intrinsics (k (snd (l, s, x)))) g) (fst (l, s, x)))
         sid m t <->
@@ -1803,7 +1804,7 @@ Module Finite.
 
   Remark L3_trace_ret:
     forall R g l sid m (r : R)
-       (t : itree (ExternalCallE +' LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+       (t : itree (ExternalCallE dvalue uvalue +' PickUvalueE dvalue uvalue +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
          (MMEP.MMSP.MemState *
           (store_id * (lstack_frame * lstack * (FMapAList.alist raw_id dvalue * R))))),
       interp_memory_spec eq (Ret2 g l r) sid m t <->
@@ -1817,15 +1818,15 @@ Module Finite.
 
   Lemma interp_memory_spec_vis_inv:
     forall E R X
-      (e : (E +' LLVMParams64BitIntptr.Events.IntrinsicE +' LLVMParams64BitIntptr.Events.MemoryE +' LLVMParams64BitIntptr.Events.PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) X)
+      (e : (E +' IntrinsicE dvalue uvalue +' MemoryE dvalue uvalue  +' PickUvalueE dvalue uvalue +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) X)
       k sid m t,
       interp_memory_spec (E:=E) (R2 := R) eq (Vis e k) sid m t ->
       ((exists ta k2 s1 s2 ,
            eutt (MMEP.MemSpec.MemState_eqv × eq) t (a <- ta;; k2 a) /\
              interp_memory_spec_h e s1 s2 ta /\
              (forall (a : X) (b : MMEP.MMSP.MemState * (store_id * X)),
-                 @Returns (E +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' _ +' UBE +' DebugE +' FailureE) X a (trigger e) ->
-                 @Returns (E +' PickUvalueE +' OOME +' _ +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
+                 @Returns (E +' IntrinsicE dvalue uvalue +' MemoryE dvalue uvalue +' PickUvalueE dvalue uvalue +' OOME +' _ +' UBE +' DebugE +' FailureE) X a (trigger e) ->
+                 @Returns (E +' PickUvalueE dvalue uvalue +' OOME +' _ +' UBE +' DebugE +' FailureE) (MMEP.MMSP.MemState * (store_id * X)) b ta ->
                  a = snd (snd b) ->
                  interp_memory_spec (E := E) eq (k a) sid m (k2 b))) \/
          (exists ta s1 s2, interp_memory_spec_h e s1 s2 ta /\ contains_UB_Extra ta)%type \/
@@ -2217,10 +2218,10 @@ Module Finite.
 
     assert (alloca_returns:
              forall x, Returns
-                    (E := ExternalCallE +'
-                        LLVMParams64BitIntptr.Events.IntrinsicE +'
-                        LLVMParams64BitIntptr.Events.MemoryE +'
-                        LLVMParams64BitIntptr.Events.PickUvalueE +'
+                    (E := ExternalCallE dvalue uvalue +'
+                        IntrinsicE dvalue uvalue +'
+                        MemoryE dvalue uvalue +'
+                        PickUvalueE dvalue uvalue +'
                         OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
                                    x (trigger (Alloca (DTYPE_I 64) 1 None))).
     { intros. unfold trigger.

@@ -31,8 +31,6 @@ From ITree Require Import
 From Vellvm Require Import
      Utilities
      Syntax
-     Semantics.Memory.Sizeof
-     Semantics.DynamicValues
      Semantics.VellvmIntegers.
 
 Import ITreeNotations.
@@ -180,19 +178,13 @@ Set Contextual Implicit.
       end
     end.
 
-
+(* REFACTOR: This should not be a module type.  DynamicValues should not be instantiated here.   *)
 (* TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism not functors. *)
-Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZEOF : Sizeof).
-
-  #[global] Instance eq_dec_addr : RelDec (@eq ADDR.addr) := RelDec_from_dec _ ADDR.eq_dec.
-  #[global] Instance Eqv_addr : Eqv ADDR.addr := (@eq ADDR.addr).
-
-  Module DV := DynamicValues.DVALUE(ADDR)(IP)(SIZEOF).
-  Export DV.
-
   Section Events.
     Variable memory : Type.
-
+    Variable dvalue : Set.
+    Variable uvalue : Type.
+    
     (* Generic calls, refined by [denote_mcfg] *)
     Variant CallE : Type -> Type :=
     | Call        : forall (t:dtyp) (f:uvalue) (args:list uvalue), CallE (uvalue + uvalue).
@@ -310,12 +302,371 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
 
   Definition FUBO_to_L4 : (FailureE +' UBE +' OOME) ~> L4:= subevent.
 
+
+  
+  (* Event Inclusions -------------------------------- *)
+
+  #[global]
+    Instance Global_lookup : GlobalE raw_id dvalue -< lookup_E :=
+    inl1.
+
+  #[global]
+    Instance Local_lookup : LocalE raw_id uvalue -< lookup_E :=
+    inr1.
+
+  
+  (* expE *)
+  (*   Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE. *)
+  #[global]
+    Instance Failure_expE : `{FailureE -< exp_E} := 
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e)))))))).
+
+  #[global]
+    Instance DebugE_expE : `{DebugE -< exp_E} := 
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))).
+
+  #[global]
+    Instance UBE_expE : `{UBE -< exp_E} := 
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))).
+
+  #[global]
+    Instance LLVMExcE_expE : `{LLVMExcE uvalue -< exp_E} := 
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))).
+  
+  #[global]
+    Instance OOME_expE : `{OOME -< exp_E} := 
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inl1 e))))).
+
+  #[global]
+    Instance PickE_expE : `{PickE -< exp_E} := 
+    fun T e => (inr1 (inr1 (inr1 (inl1 e)))).
+
+  #[global]
+    Instance MemoryE_expE : `{MemoryE -< exp_E} := 
+    fun T e => (inr1 (inr1 (inl1 e))).
+
+  #[global]
+    Instance LLVMEnvE_expE : `{LLVMEnvE -< exp_E} := 
+    fun T e => (inr1 (inl1 e)).
+
+  #[global]
+    Instance LLVMGEnvE_expE : `{LLVMGEnvE -< exp_E} := 
+    fun T e => (inl1 e).
+
+  (* instr_E *)
+  
+  #[global]
+    Instance Failure_instrE : `{FailureE -< instr_E} := 
+    fun T e => (inr1 (inr1 (Failure_expE e))).
+
+  #[global]
+    Instance DebugE_instrE : `{DebugE -< instr_E} := 
+    fun T e => (inr1 (inr1 (DebugE_expE e))).
+  
+  #[global]
+    Instance UBE_instrE : `{UBE -< instr_E} := 
+    fun T e => (inr1 (inr1 (UBE_expE e))).
+
+  #[global]
+    Instance LLVMExcE_instrE : `{LLVMExcE uvalue -< instr_E } := 
+    fun T e => (inr1 (inr1 (LLVMExcE_expE e))).
+  
+  #[global]
+    Instance OOME_instrE : `{OOME -< instr_E} := 
+    fun T e => (inr1 (inr1 (OOME_expE e))).
+
+  #[global]
+    Instance PickE_instrE : `{PickE -< instr_E} := 
+    fun T e => (inr1 (inr1 (PickE_expE e))).
+
+  #[global]
+    Instance MemoryE_instrE : `{MemoryE -< instr_E} := 
+    fun T e => (inr1 (inr1 (MemoryE_expE e))).
+
+  #[global]
+    Instance LLVMEnvE_instrE : `{LLVMEnvE -< instr_E } := 
+    fun T e => (inr1 (inr1 (LLVMEnvE_expE e))).
+  
+  #[global]
+    Instance LLVMGEnvE_instrE : `{LLVMGEnvE -< instr_E } := 
+    fun T e => (inr1 (inr1 (LLVMGEnvE_expE e))).
+
+  #[global]
+    Instance IntrinsicE_instrE : `{IntrinsicE -< instr_E } := 
+    fun T e => (inr1 (inl1 e)).
+
+  #[global]
+    Instance CallE_instrE : `{CallE -< instr_E} := 
+    fun T e => (inl1 e).
+
+  (* L0' *)
+  (*   Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE. *)
+
+  #[global]
+    Instance FailureE_L0' : `{FailureE -< L0'} := 
+    fun T e => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e)))))))))).
+
+  #[global]
+    Instance DebugE_L0' : `{DebugE -< L0'} := 
+    fun T e => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))))).
+  
+  #[global]
+    Instance UBE_L0' : UBE -< L0' :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))))).
+
+  #[global]
+    Instance LLVMExcE_L0' : LLVMExcE uvalue -< L0' :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))))).
+  
+  #[global]
+    Instance OOME_L0' : OOME -< L0' :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))).
+
+  #[global]
+    Instance PickE_L0' : PickE -< L0' :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))).
+  
+    #[global]
+    Instance MemoryE_L0' : `{MemoryE -< L0'} := 
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))).
+
+  #[global]
+    Instance LLVMEnvE_L0' : `{LLVMEnvE  -< L0'} := 
+    fun T e => inr1 (inr1 (inr1 (inr1 (inl1 (inl1 e))))).
+
+  #[global]
+    Instance StackE_L0' : `{StackE local_id uvalue _  -< L0'} := 
+    fun T e => inr1 (inr1 (inr1 (inr1 (inl1 (inr1 e))))).
+
+  #[global]
+    Instance GEnvE_L0' : `{LLVMGEnvE  -< L0'} := 
+    fun T e => (inr1 (inr1 (inr1 (inl1 e)))).
+
+  #[global]
+    Instance IntrinsicE_L0' : `{IntrinsicE  -< L0'} := 
+    fun T e => (inr1 (inr1 (inl1 e))).
+
+  #[global]
+    Instance ExternalCallE_L0' : `{ExternalCallE  -< L0'} := 
+    fun T e => (inr1 (inl1 e)).
+
+  #[global]
+    Instance CallE_L0' : `{CallE  -< L0'} := 
+    fun T e => (inl1 e).
+
+  (* L0 *)
+  (*   Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE. *)
+
+  #[global]
+    Instance FailureE_L0 : FailureE -< L0 :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e)))))))))).
+
+  #[global]
+    Instance DebugE_L0 : DebugE -< L0 :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))))).
+
+  #[global]
+    Instance UBE_L0 : UBE -< L0 :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))))).
+
+  #[global]
+    Instance LLVMExcE_L0 : LLVMExcE uvalue -< L0 :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))).
+  
+  #[global]
+    Instance OOME_L0 : OOME -< L0  :=
+    fun T e => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))).
+
+  #[global]
+    Instance PickE_L0 : PickE -< L0 :=
+    fun T e => inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))).
+  
+  #[global]
+    Instance MemoryE_L0 : MemoryE  -< L0 :=
+    fun T e => inr1 (inr1 (inr1 (inr1 (inl1 e)))).
+
+  #[global]
+    Instance LocalE_expE_L0 : LocalE raw_id uvalue -< L0 :=
+    fun T e => inr1 (inr1 (inr1 (inl1 (inl1 e)))).
+
+  #[global]
+    Instance StackE_expE_L0 : StackE raw_id uvalue uvalue -< L0 :=
+    fun T e => inr1 (inr1 (inr1 (inl1 (inr1 e)))).
+  
+  #[global]
+    Instance GlobalE_L0 : GlobalE raw_id dvalue -< L0 :=
+    fun T e => (inr1 (inr1 (inl1 e))).
+
+  #[global]
+    Instance IntrinsincE_L0 : IntrinsicE -< L0 :=
+    fun T e => (inr1 (inl1 e)).
+
+  #[global]
+    Instance ExternalCallE_L0 : ExternalCallE -< L0 :=
+    fun T e => (inl1 e).
+
+
+  #[global]
+    Instance IntrinsiceE_expE_L0 : IntrinsicE  +' exp_E -< L0  :=
+    fun T e =>
+      match e with
+      | inl1 e => inr1 (inl1 e)
+      | inr1 e => exp_to_L0 e
+      end.
+
+
+  (* L1 *)
+  (*     Definition L1 := ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE. *)
+
+  #[global]
+    Instance FailureE_L1 : FailureE -< L1 :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e))))))))).
+
+  #[global]
+    Instance DebugE_L1 : DebugE -< L1 :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))))).
+
+  #[global]
+    Instance UBE_L1 : UBE -< L1 :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))).
+
+  #[global]
+    Instance LLVMExcE_L1 : LLVMExcE uvalue -< L1 :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))).
+  
+  #[global]
+    Instance OOME_L1 : OOME -< L1  :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))).
+
+  #[global]
+    Instance PickE_L1 : PickE -< L1 :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inl1 e))))).
+  
+  #[global]
+    Instance MemoryE_L1 : MemoryE  -< L1 :=
+    fun T e => (inr1 (inr1 (inr1 (inl1 e)))).
+
+  #[global]
+    Instance LocalE_expE_L1 : LocalE raw_id uvalue -< L1 :=
+    fun T e => (inr1 (inr1 (inl1 (inl1 e)))).
+
+  #[global]
+    Instance StackE_expE_L1 : StackE raw_id uvalue uvalue -< L1 :=
+    fun T e =>  (inr1 (inr1 (inl1 (inr1 e)))).
+  
+  #[global]
+    Instance IntrinsincE_L1 : IntrinsicE -< L1 :=
+    fun T e => (inr1 (inl1 e)).
+
+  #[global]
+    Instance ExternalCallE_L1 : ExternalCallE -< L1 :=
+    fun T e => (inl1 e).
+
+  (* L2 *)
+  (* ExternalCallE +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.    *)
+
+  #[global]
+    Instance FailureE_L2 : FailureE -< L2 :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e)))))))).
+
+  #[global]
+    Instance DebugE_L2 : DebugE -< L2 :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))).
+
+  #[global]
+    Instance UBE_L2 : UBE -< L2 :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))).
+
+  #[global]
+    Instance LLVMExcE_L2 : LLVMExcE uvalue -< L2 :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))).
+  
+  #[global]
+    Instance OOME_L2 : OOME -< L2  :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inl1 e))))).
+
+  #[global]
+    Instance PickE_L2 : PickE -< L2 :=
+    fun T e => (inr1 (inr1 (inr1 (inl1 e)))).
+  
+  #[global]
+    Instance MemoryE_L2 : MemoryE  -< L2 :=
+    fun T e => (inr1 (inr1 (inl1 e))).
+
+  #[global]
+    Instance IntrinsincE_L2 : IntrinsicE -< L2 :=
+    fun T e => (inr1 (inl1 e)).
+
+  #[global]
+    Instance ExternalCallE_L2 : ExternalCallE -< L2 :=
+    fun T e => (inl1 e).
+
+
+    (* L3 *)
+  (* ExternalCallE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE. *)
+
+  #[global]
+    Instance FailureE_L3 : FailureE -< L3 :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e)))))).
+
+  #[global]
+    Instance DebugE_L3 : DebugE -< L3 :=
+    fun T e =>  (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))).
+
+  #[global]
+    Instance UBE_L3 : UBE -< L3 :=
+    fun T e =>  (inr1 (inr1 (inr1 (inr1 (inl1 e))))).
+
+  #[global]
+    Instance LLVMExcE_L3 : LLVMExcE uvalue -< L3 :=
+    fun T e =>  (inr1 (inr1 (inr1 (inl1 e)))).
+  
+  #[global]
+    Instance OOME_L3 : OOME -< L3  :=
+    fun T e =>  (inr1 (inr1 (inl1 e))).
+
+  #[global]
+    Instance PickE_L3 : PickE -< L3 :=
+    fun T e =>  (inr1 (inl1 e)).
+  
+  #[global]
+    Instance ExternalCallE_L3 : ExternalCallE -< L3 :=
+    fun T e => (inl1 e).
+
+    (* L4 *)
+  (* ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE. *)
+
+  #[global]
+    Instance FailureE_L4 : FailureE -< (ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) :=
+    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 e))))).
+
+  #[global]
+    Instance DebugE_L4 : DebugE -< (ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) :=
+    fun T e =>  (inr1 (inr1 (inr1 (inr1 (inl1 e))))).
+
+  #[global]
+    Instance UBE_L4 : UBE -< (ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) :=
+    fun T e =>  (inr1 (inr1 (inr1 (inl1 e)))).
+
+  #[global]
+    Instance LLVMExcE_L4 : LLVMExcE uvalue -< (ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) :=
+    fun T e =>  (inr1 (inr1 (inl1 e))).
+  
+  #[global]
+    Instance OOME_L4 : OOME -< (ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) :=
+    fun T e =>  (inr1 (inl1 e)).
+
+  #[global]
+    Instance ExternalCallE_L4 : ExternalCallE -< (ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) :=
+    fun T e => (inl1 e).
+  
   End Events.
 
-  #[export] Hint Unfold L0 L0' L1 L2 L3 L4 L5 L6 : core.
+  #[export] Hint Unfold L0 L0' L1 L2 L4 L4 L5 L6 : core.
 
-End LLVM_INTERACTIONS.
-
+  
+(*
 Module Make(ADDR : MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF : Sizeof) <: LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF).
 Include LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF).
 End Make.
+*)

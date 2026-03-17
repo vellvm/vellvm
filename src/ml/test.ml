@@ -13,7 +13,7 @@ open Driver
 
 open Assert
 
-open InterpretationStack.InterpreterStackBigIntptr.LP.Events
+open InterpretationStack.InterpreterStackBigIntptr.LP
 
 let default_cl_test_args = []
 

@@ -7,7 +7,7 @@ From ExtLib Require Import
 From Vellvm Require Import
   DynamicTypes
   VellvmIntegers
-  LLVMEvents
+  Semantics.LLVMParams
   Semantics.MemoryAddress
   Semantics.Memory.Sizeof
   Utils.Error
@@ -16,15 +16,14 @@ From Vellvm Require Import
 Import ListNotations.
 Import MonadNotation.
 
-Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITOP : ITOP Addr PROV PTOI) (IP:INTPTR) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
-  Import LLVMEvents.
-  Import DV.
-  Import PROV.
-  Import Addr.
-  Import PTOI.
-  Import ITOP.
-  Import IP.
-  Import SIZEOF.
+Module Type GEPM (LP:LLVMParams).
+  Import LP.DV.
+  Import LP.PROV.
+  Import LP.ADDR.
+  Import LP.PTOI.
+  Import LP.ITOP.
+  Import LP.IP.
+  Import LP.SZ.
 
   (** ** Get Element Pointer
       Retrieve the address of a subelement of an indexable (i.e. aggregate) [dtyp] [t] (i.e. vector, array, struct, packed struct).
@@ -84,7 +83,7 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
         | _ => failwith ("non-i64-indexable type")
         end
       | DVALUE_IPTR i =>
-        let k := IP.to_Z i in
+        let k := to_Z i in
         let n := BinIntDef.Z.to_nat k in
         match t with
         | DTYPE_Array _ ta
@@ -115,7 +114,7 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
       ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
       ret (int_to_ptr ptr' prov)
     | DVALUE_IPTR i :: vs' =>
-      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (IP.to_Z i)) vs' ;;
+      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (to_Z i)) vs' ;;
       ret (int_to_ptr ptr' prov)
     | [] => failwith "handle_gep_addr: no indices"
     | _ => failwith "handle_gep_addr: unsupported index type"
@@ -123,11 +122,11 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
 
   Lemma handle_gep_addr_0 :
     forall (dt : dtyp) (p : addr),
-      handle_gep_addr dt p [DVALUE_IPTR IP.zero] = inr (ret p).
+      handle_gep_addr dt p [DVALUE_IPTR zero] = inr (ret p).
   Proof.
     intros dt p.
     cbn.
-    rewrite IP.to_Z_0.
+    rewrite to_Z_0.
     replace (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * 0)%Z with (ptr_to_int p) by lia.
     rewrite int_to_ptr_ptr_to_int; auto.
   Qed.
@@ -143,7 +142,7 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
   Lemma handle_gep_addr_ix :
     forall (dt : dtyp) (p p' : addr) ix,
       handle_gep_addr dt p [DVALUE_IPTR ix] = inr (ret p') ->
-      ptr_to_int p' = (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z.
+      ptr_to_int p' = (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z.
   Proof.
     intros dt p p' ix GEP.
     cbn in *.
@@ -155,7 +154,7 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
     forall (dt : dtyp) (p p' : addr) ix msg,
       handle_gep_addr dt p [DVALUE_IPTR ix] = inr (Oom msg) ->
       exists msg',
-        int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z (address_provenance p) = Oom msg'.
+        int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (address_provenance p) = Oom msg'.
   Proof.
     intros dt p p' ix msg GEP.
     cbn in *.
@@ -166,7 +165,7 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
 
   Lemma handle_gep_addr_ix' :
     forall (dt : dtyp) (p p' : addr) ix,
-      ret p' = int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z (address_provenance p) ->
+      ret p' = int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (address_provenance p) ->
       handle_gep_addr dt p [DVALUE_IPTR ix] = inr (ret p').
   Proof.
     intros dt p p' ix IX.
@@ -177,7 +176,7 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
 
   Lemma handle_gep_addr_ix'_OOM :
     forall (dt : dtyp) (p p' : addr) ix msg,
-      int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z (address_provenance p) = Oom msg ->
+      int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (address_provenance p) = Oom msg ->
       exists msg', handle_gep_addr dt p [DVALUE_IPTR ix] = inr (Oom msg').
   Proof.
     intros dt p p' ix msg IX.
@@ -311,14 +310,6 @@ Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (ITO
     end.
 End GEPM.
 
-Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERACTIONS(ADDR)(IP)(SIZE)) (PTOI : PTOI ADDR) (PROV : PROVENANCE ADDR) (ITOP : ITOP ADDR PROV PTOI) <: GEPM(ADDR)(PTOI)(PROV)(ITOP)(IP)(SIZE)(Events).
-  Import ADDR.
-  Import Events.
-  Import DV.
-  Import SIZE.
-  Import PTOI.
-  Import ITOP.
-  Import PROV.
-
-  Include GEPM (ADDR)(PTOI)(PROV)(ITOP)(IP)(SIZE)(Events).
+Module Make (LP:LLVMParams) <: GEPM(LP).
+  Include GEPM LP.
 End Make.

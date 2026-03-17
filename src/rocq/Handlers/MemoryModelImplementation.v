@@ -120,14 +120,14 @@ Module IP64Bit := FiniteIntptr.IP64Bit.
 Module BigIP := FiniteIntptr.BigIP.
 Module FinSizeof := FiniteSizeof.FinSizeof.
 
-Module MakeFiniteMemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
+Module MakeFiniteMemoryModelSpec (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
   Module FMSP := FiniteMemoryModelSpecPrimitives LP MP.
   Module FMS := MakeMemoryModelSpec LP MP FMSP.
 
   Export FMSP FMS.
 End MakeFiniteMemoryModelSpec.
 
-Module MakeFiniteMemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP).
+Module MakeFiniteMemoryModelExec (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
   Module FMEP := FiniteMemoryModelExecPrimitives LP MP.
   Module FME := MakeMemoryModelExec LP MP FMEP.
 End MakeFiniteMemoryModelExec.
@@ -135,8 +135,8 @@ End MakeFiniteMemoryModelExec.
 Module MakeFiniteMemory (LP : LLVMParams) <: Memory LP.
   Import LP.
 
-  Module GEP := GepM.Make ADDR IP SIZEOF Events PTOI PROV ITOP.
-  Module Byte := FinByte ADDR IP SIZEOF Events.
+  Module GEP := GepM.Make LP.
+  Module Byte := FinByte LP.
   Module DVALUE_BYTE := DvalueBytes.Make LP.
 
   Module MP := MemoryParams.Make LP GEP Byte DVALUE_BYTE.
@@ -147,7 +147,7 @@ Module MakeFiniteMemory (LP : LLVMParams) <: Memory LP.
   Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
 
   (* Concretization *)
-  Module ByteM := MemBytes.Byte ADDR IP SIZEOF LP.Events MP.BYTE_IMPL.
+  Module ByteM := MemBytes.Byte LP MP.BYTE_IMPL.
   Module CP := ConcretizationParams.Make LP MP ByteM.
 
   Export GEP Byte MP MEM_MODEL CP.
@@ -180,7 +180,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Module MMS := MemoryBigIntptr.MMEP.MemSpec.
   Module MME := MemoryBigIntptr.MEM_MODEL.
 
-  Import LP.Events.
+  Import LP.DV.
   Import LP.ITOP.
   Import LP.PTOI.
   Import LP.IP_BIG.
@@ -188,7 +188,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Import LP.IP.
   Import LP.ADDR.
   Import LP.PROV.
-  Import LP.SIZEOF.
+  Import LP.SZ.
 
   Import MMSP.
   Import MMS.
@@ -215,7 +215,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
   Import ExecInterp.
 
   #[local] Parameter (E : Type -> Type).
-  Notation Eff := (E +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE).
+  Notation Eff := (E +' PickUvalueE dvalue uvalue +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE).
 
   Import Eq.
   Import MMSP.
@@ -428,7 +428,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       cbn in REST.
       destruct (map_monad
                   (fun ix : IP.intptr =>
-                     GEP.handle_gep_addr (DTYPE_I 8) a [Events.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
+                     GEP.handle_gep_addr (DTYPE_I 8) a [LP.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
 
       { (* Error, should be contradiction *)
         cbn in REST.
@@ -518,7 +518,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       cbn in REST.
       destruct (map_monad
                   (fun ix : IP.intptr =>
-                     GEP.handle_gep_addr (DTYPE_I 8) a [Events.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
+                     GEP.handle_gep_addr (DTYPE_I 8) a [LP.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
 
       { (* Error, should be contradiction *)
         cbn in REST.
@@ -629,7 +629,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
 
     destruct (map_monad
                 (fun ix : IP.intptr =>
-                   GEP.handle_gep_addr (DTYPE_I 8) a [Events.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
+                   GEP.handle_gep_addr (DTYPE_I 8) a [LP.DV.DVALUE_IPTR ix]) seq) eqn:HMAPM.
 
     { (* Error *)
       cbn in HMAPM.

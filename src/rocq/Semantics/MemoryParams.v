@@ -4,13 +4,13 @@ From Vellvm Require Import
      Semantics.Memory.MemBytes
      Semantics.Memory.DvalueBytes.
 
-Module Type MemoryParams (LP : LLVMParams).
-  Declare Module GEP : GEPM LP.ADDR LP.PTOI LP.PROV LP.ITOP LP.IP LP.SIZEOF LP.Events.
-  Declare Module BYTE_IMPL : ByteImpl LP.ADDR LP.IP LP.SIZEOF LP.Events.
+Module Type MEMORY_PARAMS (LP : LLVMParams).
+  Declare Module GEP : GEPM LP.
+  Declare Module BYTE_IMPL : ByteImpl LP.
   Declare Module DVALUE_BYTES : DvalueByte LP.
-End MemoryParams.
+End MEMORY_PARAMS.
 
-Module Make (LP' : LLVMParams) (GEP' : GEPM LP'.ADDR LP'.PTOI LP'.PROV LP'.ITOP LP'.IP LP'.SIZEOF LP'.Events) (BYTE_IMPL' : ByteImpl LP'.ADDR LP'.IP LP'.SIZEOF LP'.Events) (DVALUE_BYTES' : DvalueByte LP') : MemoryParams LP'
+Module Make (LP : LLVMParams) (GEP' : GEPM LP) (BYTE_IMPL' : ByteImpl LP) (DVALUE_BYTES' : DvalueByte LP) : MEMORY_PARAMS LP
 with Module GEP := GEP'
 with Module BYTE_IMPL := BYTE_IMPL'
 with Module DVALUE_BYTES := DVALUE_BYTES'.

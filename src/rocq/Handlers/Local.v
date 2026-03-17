@@ -18,6 +18,7 @@ From Vellvm Require Import
   Utils.Error
   Utils.Tactics
   Semantics.LLVMEvents
+  Semantics.LLVMParams
   Semantics.Memory.Sizeof.
 
 Require Import Ceres.Ceres.
@@ -200,8 +201,7 @@ End Locals.
 
 
 From Vellvm Require Import
-     LLVMAst
-     MemoryAddress.
+     LLVMAst.
 
 (* YZ TODO : Undecided about the status of this over-generalization of these events over domains of keys and values.
    The interface needs to be specialized anyway in [LLVMEvents].
@@ -209,6 +209,6 @@ From Vellvm Require Import
    it until [TopLevel] either.
    So exposing the specialization here, but it is awkward.
  *)
-Module Make (A : ADDRESS)(IP : INTPTR)(SIZEOF : Sizeof)(LLVMEvents : LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
-  Definition local_env := FMapAList.alist raw_id LLVMEvents.DV.uvalue.
+Module Make (LP:LLVMParams). 
+  Definition local_env := FMapAList.alist raw_id LP.DV.uvalue.
 End Make.

@@ -955,3 +955,458 @@ split.
 intros m M conv s.
 apply (IM.Raw.fold (fun k _ acc => monoid_plus M (conv k) acc) s (monoid_unit M)).
 Defined.
+
+
+
+  Lemma filter_dom_map_eq :
+    forall {A B} (f : IntMaps.IM.key -> bool) (g : A -> B) (m : IntMaps.IntMap A) ,
+      forall k e,
+        IntMaps.IM.MapsTo k e (IntMaps.IM.map g (IntMaps.IP.filter_dom f m))
+        <->
+          IntMaps.IM.MapsTo k e (IntMaps.IP.filter_dom f (IntMaps.IM.map g m)).
+  Proof.
+    intros.
+    unfold IntMaps.IP.filter_dom.
+    split; intros H.
+    - rewrite IntMaps.IP.filter_iff.
+      apply IntMaps.IP.F.map_mapsto_iff in H.
+      destruct H as [a [EQ HM]].
+      apply IntMaps.IP.filter_iff in HM.
+      destruct HM.
+      split; auto.
+      apply IntMaps.IP.F.map_mapsto_iff.
+      exists a. tauto.
+      repeat red; intros; subst; auto.
+      repeat red; intros; subst; auto.
+    - rewrite IntMaps.IP.filter_iff in H.
+      destruct H.
+      apply IntMaps.IP.F.map_mapsto_iff in H.
+      destruct H as [a [EQ HM]].
+      apply IntMaps.IP.F.map_mapsto_iff.
+      exists a. split; auto.
+      apply IntMaps.IP.filter_iff; auto.
+      repeat red; intros; subst; auto.
+      repeat red; intros; subst; auto.
+  Qed.
+
+  Lemma MapsTo_filter_true :
+    forall {A} (f : IntMaps.IM.key -> A -> bool) m,
+    forall k e,
+       (f k e = true /\ IntMaps.IM.MapsTo k e m) <->
+        IntMaps.IM.MapsTo k e (IntMaps.IP.filter f m).
+  Proof.
+    intros.
+    split; intros.
+    - apply IntMaps.IP.filter_iff.
+      + repeat red; intros; subst; auto.
+      + tauto.
+    - apply IntMaps.IP.filter_iff in H.
+      + tauto.
+      + repeat red; intros; subst; auto.
+  Qed.
+
+  Lemma MapsTo_filter_subset :
+    forall {A} (f : IntMaps.IM.key -> A -> bool) m,
+    forall k e,
+      IntMaps.IM.MapsTo k e (IntMaps.IP.filter f m) ->
+      IntMaps.IM.MapsTo k e m.
+  Proof.
+    intros.
+    apply IntMaps.IP.filter_iff in H.
+    + tauto.
+    + repeat red; intros; subst; auto.
+  Qed.
+
+  Lemma not_MapsTo_filter :
+    forall {A} (f : IntMaps.IM.key -> A -> bool) m,
+    forall k e,
+      ~ IntMaps.IM.MapsTo k e m ->
+      ~ IntMaps.IM.MapsTo k e (IntMaps.IP.filter f m).
+  Proof.
+    intros.
+    intro C.
+    apply H.
+    eapply MapsTo_filter_subset.
+    eauto.
+  Qed.
+
+  Lemma MapsTo_filter_dom_true :
+    forall {A} (f : IntMaps.IM.key -> bool) (m : IntMaps.IntMap A),
+    forall k e,
+      (f k = true /\ IntMaps.IM.MapsTo k e m) <->
+        IntMaps.IM.MapsTo k e (IntMaps.IP.filter_dom f m).
+  Proof.
+    intros.
+    unfold IntMaps.IP.filter_dom.
+    rewrite <- MapsTo_filter_true.
+    tauto.
+  Qed.
+
+  Lemma MapsTo_filter_dom_subset :
+    forall {A} (f : IntMaps.IM.key -> bool) (m : IntMaps.IntMap A),
+    forall k e,
+      IntMaps.IM.MapsTo k e (IntMaps.IP.filter_dom f m) ->
+      IntMaps.IM.MapsTo k e m.
+  Proof.
+    intros.
+    unfold IntMaps.IP.filter_dom.
+    eapply MapsTo_filter_subset.
+    eauto.
+  Qed.
+
+  Lemma not_MapsTo_filter_dom :
+    forall {A} (f : IntMaps.IM.key -> bool) (m : IntMaps.IntMap A),
+    forall k e,
+      ~ IntMaps.IM.MapsTo k e m ->
+      ~ IntMaps.IM.MapsTo k e (IntMaps.IP.filter_dom f m).
+  Proof.
+    intros.
+    intro C.
+    apply H.
+    eapply MapsTo_filter_dom_subset.
+    eauto.
+  Qed.
+
+  Lemma find_filter_true :
+    forall {A} (f : IntMaps.IM.key -> A -> bool) (m : IntMaps.IntMap A),
+      forall k a,
+        IntMaps.IM.find k (IntMaps.IP.filter f m) = Some a <->
+          IntMaps.IM.find k m = Some a /\ (f k a = true).
+  Proof.
+    intros.
+    split; intros H.
+    - apply IntMaps.IP.F.find_mapsto_iff in H.
+      apply IntMaps.IP.filter_iff in H.
+      destruct H.
+      split; auto.
+      apply IntMaps.IP.F.find_mapsto_iff. assumption.
+      repeat red; intros; subst; auto.
+    - destruct H.
+      apply IntMaps.IP.F.find_mapsto_iff.
+      apply IntMaps.IP.filter_iff.
+      repeat red; intros; subst; auto.
+      apply IntMaps.IP.F.find_mapsto_iff in H.
+      split; auto.
+  Qed.
+
+  Lemma find_filter_dom_true :
+    forall {A} (f : IntMaps.IM.key -> bool) (m : IntMaps.IntMap A),
+      forall k a,
+        IntMaps.IM.find k (IntMaps.IP.filter_dom f m) = Some a <->
+          IntMaps.IM.find k m = Some a /\ (f k = true).
+  Proof.
+    intros.
+    unfold IntMaps.IP.filter_dom.
+    apply find_filter_true.
+  Qed.
+
+  Lemma IntMaps_find_None :
+    forall {A} (k : IntMaps.IM.key) (m:IntMaps.IntMap A),
+      IntMaps.IM.find k m = None <-> forall e, ~ IntMaps.IM.MapsTo k e m.
+  Proof.
+    intros.
+    split; intros H.
+    - intros. intro C.
+      apply IntMaps.IP.F.find_mapsto_iff in C.
+      rewrite H in C. inversion C.
+    - destruct (IntMaps.IM.find k m) eqn:EQ; auto.
+      apply IntMaps.IP.F.find_mapsto_iff in EQ.
+      apply H in EQ.
+      contradiction.
+  Qed.
+
+  Lemma find_filter_None :
+    forall {A} (f : IntMaps.IM.key -> A -> bool) (m : IntMaps.IntMap A),
+    forall k,
+      IntMaps.IM.find k m = None ->
+        IntMaps.IM.find k (IntMaps.IP.filter f m) = None.
+  Proof.
+    intros.
+    rewrite IntMaps_find_None.
+    intros e C.
+    rewrite IntMaps_find_None in H.
+    specialize (H e).
+    apply H.
+    apply (MapsTo_filter_subset f m).
+    auto.
+  Qed.
+
+  Lemma find_filter_dom_None :
+    forall {A} (f : IntMaps.IM.key -> bool) (m : IntMaps.IntMap A),
+    forall k,
+      IntMaps.IM.find k m = None ->
+        IntMaps.IM.find k (IntMaps.IP.filter_dom f m) = None.
+  Proof.
+    intros.
+    unfold IntMaps.IP.filter_dom.
+    apply find_filter_None.
+    assumption.
+  Qed.
+
+  Lemma find_filter_dom_false :
+    forall {elt m k f},
+      f k = false ->
+      IntMaps.IM.find (elt:=elt) k (IntMaps.IP.filter_dom f m) = None.
+  Proof.
+    intros elt m k f F.
+    unfold IntMaps.IP.filter_dom.
+    apply IntMaps_find_None.
+    intros e CONTRA.
+    apply IntMaps.IP.filter_iff in CONTRA; try typeclasses eauto.
+    destruct CONTRA as [_ CONTRA].
+    rewrite F in CONTRA; inv CONTRA.
+  Qed.
+
+  #[global] Instance filter_dom_Proper {elt f} :
+    Proper (IntMaps.IM.Equal (elt:=elt) ==> IntMaps.IM.Equal) (IntMaps.IP.filter_dom f).
+  Proof.
+    unfold Proper, respectful.
+    intros x y EQ.
+    red.
+    intros y0.
+    destruct (IntMaps.IM.find (elt:=elt) y0 (IntMaps.IP.filter_dom f x)) eqn:FIND.
+    - apply find_filter_dom_true in FIND as (FIND&TRUE).
+      red in EQ.
+      rewrite EQ in FIND.
+      symmetry.
+      apply find_filter_dom_true.
+      split; auto.
+    - (* Two ways for this to be none... Either y0 was filtered out,
+           or y0 was not in the original map *)
+      destruct (IntMaps.IM.find (elt:=elt) y0 x) eqn:FIND'.
+      + destruct (f y0) eqn:F.
+        * epose proof find_filter_dom_true f x y0 e.
+          destruct H.
+          forward H0; auto.
+          rewrite FIND in H0.
+          discriminate.
+        * symmetry.
+          apply find_filter_dom_false; auto.
+      + symmetry.
+        apply find_filter_dom_None.
+        rewrite <- EQ.
+        auto.
+  Qed.
+
+  Lemma IntMaps_map_empty_Equal :
+    forall {A B} (f : A -> B),
+      IntMaps.IM.Equal (IntMaps.IM.map f (IntMaps.IM.empty A)) (IntMaps.IM.empty B).
+  Proof.
+    intros A B f.
+    red.
+    intros y.
+    cbn; auto.
+  Qed.
+
+  Lemma IntMaps_map_id_Equal :
+    forall {A} (m : IntMaps.IntMap A),
+      IntMaps.IM.Equal (IntMaps.IM.map id m) m.
+  Proof.
+    intros A B f.
+    destruct (IntMaps.IM.find (elt:=A) f B) eqn:FIND.
+    - apply IntMaps.IP.F.find_mapsto_iff.
+      apply IntMaps.IP.F.find_mapsto_iff in FIND.
+      apply IntMaps.IP.F.map_mapsto_iff.
+      exists a.
+      split; cbn; eauto.
+    - eapply IntMaps_find_None.
+      intros e CONTRA.
+      apply IntMaps_find_None with (e:=e) in FIND.
+      apply FIND.
+      apply IntMaps.IP.F.map_mapsto_iff in CONTRA.
+      destruct CONTRA as (a & H & CONTRA); subst; auto.
+  Qed.
+
+  Lemma IntMaps_map_compose_Equal :
+    forall {A B C} (f : A -> B) (g : B -> C) (m : IntMaps.IntMap A),
+      IntMaps.IM.Equal (IntMaps.IM.map (fun a => g (f a)) m) (IntMaps.IM.map g (IntMaps.IM.map f m)).
+  Proof.
+    intros A B C f g m.
+    red.
+    intros y.
+    destruct (IntMaps.IM.find (elt:=C) y (IntMaps.IM.map g (IntMaps.IM.map f m))) eqn:FIND.
+    - apply IntMaps.IP.F.find_mapsto_iff.
+      apply IntMaps.IP.F.find_mapsto_iff in FIND.
+      apply IntMaps.IP.F.map_mapsto_iff in FIND.
+      destruct FIND as (?&?&FIND).
+      apply IntMaps.IP.F.map_mapsto_iff in FIND.
+      destruct FIND as (?&?&?).
+      subst.
+      apply IntMaps.IP.F.map_mapsto_iff.
+      exists x0.
+      split; cbn; eauto.
+    - eapply IntMaps_find_None.
+      intros e CONTRA.
+      apply IntMaps_find_None with (e:=e) in FIND.
+      apply FIND.
+      apply IntMaps.IP.F.map_mapsto_iff in CONTRA.
+      destruct CONTRA as (a & H & CONTRA); subst; auto.
+      apply IntMaps.IP.F.map_mapsto_iff.
+      exists (f a).
+      split; eauto.
+      apply IntMaps.IP.F.map_mapsto_iff.
+      exists a.
+      split; eauto.
+  Qed.
+
+  Lemma IntMaps_map_add_Equal :
+    forall {A B} (f : A -> B) (m : IntMaps.IntMap A) k a,
+      IntMaps.IM.Equal (IntMaps.IM.map f (IntMaps.IM.add k a m))
+        (IntMaps.IM.add k (f a) (IntMaps.IM.map f m)).
+  Proof.
+    intros A B f m k a.
+    red.
+    intros y.
+    destruct (IntMaps.IM.find (elt:=B) y (IntMaps.IM.add k (f a) (IntMaps.IM.map f m))) eqn:FIND.
+    - pose proof (Z.eq_dec y k) as [EQ | NEQ]; subst.
+      + rewrite IntMaps.IP.F.add_eq_o in FIND; eauto.
+        inv FIND.
+        apply IntMaps.IP.F.find_mapsto_iff.
+        apply IntMaps.IP.F.map_mapsto_iff.
+        exists a.
+        split; eauto.
+        apply IntMaps.IP.F.add_mapsto_iff;
+          eauto.
+      + rewrite IntMaps.IP.F.add_neq_o in FIND; eauto.
+        apply IntMaps.IP.F.find_mapsto_iff in FIND.
+        eapply IntMaps.IP.F.map_mapsto_iff in FIND.
+        destruct FIND as (?&?&?); subst.
+
+        apply IntMaps.IP.F.find_mapsto_iff.
+        apply IntMaps.IP.F.map_mapsto_iff.
+        exists x.
+        split; eauto.
+        apply IntMaps.IP.F.add_mapsto_iff;
+          eauto.
+    - pose proof (Z.eq_dec y k) as [EQ | NEQ]; subst.
+      + rewrite IntMaps.IP.F.add_eq_o in FIND; eauto.
+        discriminate.
+      + rewrite IntMaps.IP.F.add_neq_o in FIND; eauto.
+        eapply IntMaps_find_None.
+        intros e CONTRA.
+        apply IntMaps_find_None with (e:=e) in FIND.
+        apply FIND.
+        apply IntMaps.IP.F.map_mapsto_iff in CONTRA.
+        destruct CONTRA as (a' & H & CONTRA); subst; auto.        
+        apply IntMaps.IP.F.map_mapsto_iff.
+        exists a'.
+        split; eauto.
+        apply IntMaps.IP.F.add_neq_mapsto_iff in CONTRA; eauto.
+  Qed.
+
+  Lemma IntMaps_map_list_map_Equal :
+    forall {A B} (f : A -> B) l,
+      IntMaps.IM.Equal (IntMaps.IM.map f (IntMaps.IP.of_list l)) (IntMaps.IP.of_list (List.map (fun '(i, x) => (i, f x)) l)).
+  Proof.
+    intros A B f l.
+    induction l.
+    - cbn.
+      apply IntMaps_map_empty_Equal.
+    - cbn.
+      unfold IntMaps.IP.uncurry in *.
+      destruct a.
+      cbn in *.
+      rewrite <- IHl.
+      eapply IntMaps_map_add_Equal.
+  Qed.
+
+  Lemma IntMaps_filter_dom_add_true_Equal :
+    forall {A} f k (a : A) m,
+      f k = true ->
+      IntMaps.IM.Equal
+        (IntMaps.IP.filter_dom f (IntMaps.IM.add k a m))
+        (IntMaps.IM.add k a (IntMaps.IP.filter_dom f m)).
+  Proof.
+    intros A f k a m F.
+    red.
+    intros y.
+    destruct (IntMaps.IM.find (elt:=A) y (IntMaps.IM.add k a (IntMaps.IP.filter_dom f m))) eqn:FIND.
+    - pose proof (Z.eq_dec y k) as [EQ | NEQ]; subst.
+      + rewrite IntMaps.IP.F.add_eq_o in FIND; eauto.
+        inv FIND.
+        apply find_filter_dom_true.
+        split; eauto.
+        rewrite IntMaps.IP.F.add_eq_o; eauto.
+      + rewrite IntMaps.IP.F.add_neq_o in FIND; eauto.
+        apply find_filter_dom_true in FIND.
+        destruct FIND.
+        apply find_filter_dom_true.
+        split; eauto.
+        rewrite IntMaps.IP.F.add_neq_o; eauto.
+    - pose proof (Z.eq_dec y k) as [EQ | NEQ]; subst.
+      + rewrite IntMaps.IP.F.add_eq_o in FIND; eauto.
+        discriminate.
+      + rewrite IntMaps.IP.F.add_neq_o in FIND; eauto.
+        destruct (IntMaps.IM.find (elt:=A) y m) eqn:FIND'.
+        * destruct (f y) eqn:FY.
+          { pose proof conj FIND' FY.
+            apply find_filter_dom_true in H.
+            rewrite FIND in H.
+            discriminate.
+          }
+
+          eapply find_filter_dom_false; eauto.
+        * eapply find_filter_dom_None.
+          rewrite IntMaps.IP.F.add_neq_o; eauto.
+  Qed.
+
+  Lemma IntMaps_filter_dom_add_false_Equal :
+    forall {A} f k (a : A) m,
+      f k = false ->
+      IntMaps.IM.Equal
+        (IntMaps.IP.filter_dom f (IntMaps.IM.add k a m))
+        (IntMaps.IP.filter_dom f m).
+  Proof.
+    intros A f k a m F.
+    intros y.
+    destruct (IntMaps.IM.find (elt:=A) y (IntMaps.IP.filter_dom f m)) eqn:FIND.
+    - apply find_filter_dom_true in FIND.
+      destruct FIND.
+
+      pose proof (Z.eq_dec y k) as [EQ | NEQ]; subst.
+      + rewrite F in H0; inv H0.
+      + apply find_filter_dom_true.
+        rewrite IntMaps.IP.F.add_neq_o; eauto.
+    - pose proof (Z.eq_dec y k) as [EQ | NEQ]; subst.
+      + eapply find_filter_dom_false; eauto.
+      + destruct (IntMaps.IM.find (elt:=A) y m) eqn:FIND'.
+        * destruct (f y) eqn:FY.
+          { pose proof conj FIND' FY.
+            apply find_filter_dom_true in H.
+            rewrite FIND in H.
+            discriminate.
+          }
+          eapply find_filter_dom_false; eauto.
+        * eapply find_filter_dom_None.
+          rewrite IntMaps.IP.F.add_neq_o; eauto.
+  Qed.
+
+  Lemma IntMaps_filter_dom_list_filter_Equal :
+    forall {A : Type} (f : IntMaps.IM.key -> bool) (l : list (IntMaps.IM.key * A)),
+      IntMaps.IM.Equal (IntMaps.IP.filter_dom f (IntMaps.IP.of_list l))
+        (IntMaps.IP.of_list (List.filter (fun '(i, x) => f i) l)).
+  Proof.
+    intros A f l.
+    induction l.
+    - cbn.
+      reflexivity.
+    - Opaque IntMaps.IM.Equal.
+      Opaque IntMaps.IP.filter_dom.
+      destruct a; cbn.
+      break_match_goal.
+      + cbn.
+        unfold IntMaps.IP.uncurry in *.
+        cbn.
+        rewrite IntMaps_filter_dom_add_true_Equal; eauto.
+        rewrite IHl.
+        reflexivity.
+      + cbn.
+        unfold IntMaps.IP.uncurry in *.
+        cbn.
+        rewrite IntMaps_filter_dom_add_false_Equal; eauto.
+
+        Transparent IntMaps.IM.Equal.
+        Transparent IntMaps.IP.filter_dom.
+  Qed.
+
+

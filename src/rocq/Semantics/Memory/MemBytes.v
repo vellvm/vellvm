@@ -7,7 +7,7 @@ From Vellvm Require Import
      Semantics.DynamicValues
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
-     Semantics.LLVMEvents
+     Semantics.LLVMParams
      Semantics.StoreId
      Utils.Monads
      Utils.OptionUtil
@@ -22,9 +22,8 @@ Import Basics.Basics.Monads.
 Import ListNotations.
 Import MonadNotation.
 
-Module Type ByteImpl(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
-  Import LLVMEvents.
-  Import DV.
+Module Type ByteImpl (LP:LLVMParams).
+  Import LP.DV.
 
   Parameter SByte : Set.
 
@@ -51,11 +50,10 @@ Module Type ByteImpl(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents: LLVM_IN
       sbyte_to_extractbyte (uvalue_sbyte uv dt idx sid) =  UVALUE_ExtractByte uv dt idx sid.
 End ByteImpl.
 
-Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(Byte:ByteImpl(Addr)(IP)(SIZEOF)(LLVMEvents)).
+Module Type ByteModule (LP:LLVMParams)(Byte:ByteImpl(LP)).
   Export Byte.
-  Import LLVMEvents.
-  Import DV.
-  Import SIZEOF.
+  Import LP.DV.
+  Import LP.SZ.
 
   Fixpoint all_bytes_from_uvalue_helper (idx' : N) (sid' : store_id) (parent : uvalue) (bytes : list SByte) : option uvalue
     := match bytes with
@@ -207,6 +205,6 @@ Module Type ByteModule(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_I
     end.
 End ByteModule.
 
-Module Byte (Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(Byte:ByteImpl(Addr)(IP)(SIZEOF)(LLVMEvents)) : ByteModule Addr IP SIZEOF LLVMEvents Byte.
-  Include (ByteModule Addr IP SIZEOF LLVMEvents Byte).
+Module Byte (LP:LLVMParams)(Byte:ByteImpl LP). 
+  Include (ByteModule LP Byte).
 End Byte.

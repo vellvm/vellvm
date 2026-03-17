@@ -44,14 +44,14 @@ Set Warnings "-extraction-opaque-accessed,-extraction".
 
 Unset Guard Checking.
 
-Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZEOF : Sizeof).
+Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SZ : SIZEOF).
   Definition is_nil {A} (l : list A) : bool :=
     match l with
     | nil => true
     | _ => false
     end.
 
-  Module DV := DynamicValues.DVALUE(ADDR)(IP)(SIZEOF).
+  Module DV := DynamicValues.DVALUE(ADDR)(IP)(SZ).
   Import DV.
   Definition var_context := list (ident * typ).
   Record GenState :=

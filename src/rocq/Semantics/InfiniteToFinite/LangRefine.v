@@ -1076,7 +1076,7 @@ Module VMemInt_Refine_InfFin : VMemInt_Refine InterpreterStackBigIntptr.LP.IP In
   Qed.
 End VMemInt_Refine_InfFin.
 
-Module Type Sizeof_Refine (SZ_INF : Sizeof) (SZ_FIN : Sizeof).
+Module Type Sizeof_Refine (SZ_INF : SIZEOF) (SZ_FIN : SIZEOF).
   Parameter bit_sizeof_dtyp_fin_inf :
     forall t,
       SZ_INF.bit_sizeof_dtyp t = SZ_FIN.bit_sizeof_dtyp t.
@@ -1094,33 +1094,33 @@ Module Type Sizeof_Refine (SZ_INF : Sizeof) (SZ_FIN : Sizeof).
       SZ_INF.max_preferred_dtyp_alignment dts = SZ_FIN.max_preferred_dtyp_alignment dts.
 End Sizeof_Refine.
 
-Module Sizeof_Refine_InfFin : Sizeof_Refine InterpreterStackBigIntptr.LP.SIZEOF InterpreterStack64BitIntptr.LP.SIZEOF.
+Module Sizeof_Refine_InfFin : Sizeof_Refine InterpreterStackBigIntptr.LP.SZ InterpreterStack64BitIntptr.LP.SZ.
   Lemma bit_sizeof_dtyp_fin_inf :
     forall t,
-      InterpreterStackBigIntptr.LP.SIZEOF.bit_sizeof_dtyp t = InterpreterStack64BitIntptr.LP.SIZEOF.bit_sizeof_dtyp t.
+      InterpreterStackBigIntptr.LP.SZ.bit_sizeof_dtyp t = InterpreterStack64BitIntptr.LP.SZ.bit_sizeof_dtyp t.
   Proof.
     intros t.
-    unfold InterpreterStackBigIntptr.LP.SIZEOF.bit_sizeof_dtyp.
+    unfold InterpreterStackBigIntptr.LP.SZ.bit_sizeof_dtyp.
     reflexivity.
   Qed.
 
   Lemma sizeof_dtyp_fin_inf :
     forall t,
-      InterpreterStackBigIntptr.LP.SIZEOF.sizeof_dtyp t = InterpreterStack64BitIntptr.LP.SIZEOF.sizeof_dtyp t.
+      InterpreterStackBigIntptr.LP.SZ.sizeof_dtyp t = InterpreterStack64BitIntptr.LP.SZ.sizeof_dtyp t.
   Proof.
     reflexivity.
   Qed.
 
   Lemma dtyp_alignment_fin_inf :
     forall t,
-      InterpreterStackBigIntptr.LP.SIZEOF.dtyp_alignment t = InterpreterStack64BitIntptr.LP.SIZEOF.dtyp_alignment t.
+      InterpreterStackBigIntptr.LP.SZ.dtyp_alignment t = InterpreterStack64BitIntptr.LP.SZ.dtyp_alignment t.
   Proof.
     reflexivity.
   Qed.
 
   Lemma max_preferred_dtyp_alignment_fin_inf :
     forall dts,
-      InterpreterStackBigIntptr.LP.SIZEOF.max_preferred_dtyp_alignment dts = InterpreterStack64BitIntptr.LP.SIZEOF.max_preferred_dtyp_alignment dts.
+      InterpreterStackBigIntptr.LP.SZ.max_preferred_dtyp_alignment dts = InterpreterStack64BitIntptr.LP.SZ.max_preferred_dtyp_alignment dts.
   Proof.
     reflexivity.
   Qed.
@@ -1215,7 +1215,25 @@ Module ItoP_Refine_InfFin : ItoP_Refine InterpreterStackBigIntptr InterpreterSta
   Qed.
 End ItoP_Refine_InfFin.
 
-Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI) (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR1 : TopLevelRefinements IS1 LLVM1) (TLR2 : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC) (VMEM_IP_PROP1 : VMemInt_Intptr_Properties IS1.LP.IP) (VMEM_IP_PROP2 : VMemInt_Intptr_Properties IS2.LP.IP) (VMEM_REF : VMemInt_Refine IS1.LP.IP IS2.LP.IP) (SIZEOF_REF : Sizeof_Refine IS1.LP.SIZEOF IS2.LP.SIZEOF) (ITOP_REF : ItoP_Refine IS1 IS2 AC1 AC2).
+Module Type LangRefine
+  (IS1 : InterpreterStack)
+  (IS2 : InterpreterStack)
+  (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI)
+  (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI)
+  (LLVM1 : LLVMTopLevel IS1)
+  (LLVM2 : LLVMTopLevel IS2)
+  (TLR1 : TopLevelRefinements IS1 LLVM1)
+  (TLR2 : TopLevelRefinements IS2 LLVM2)
+  (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP)
+  (ACS : AddrConvertSafe IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI AC2 AC1)
+  (DVC : DVConvert IS1.LP IS2.LP AC1)
+  (DVCrev : DVConvert IS2.LP IS1.LP AC2)
+  (EC : EventConvert IS1.LP IS2.LP AC1 AC2 DVC DVCrev)
+  (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC)
+  (VMEM_IP_PROP1 : VMemInt_Intptr_Properties IS1.LP.IP)
+  (VMEM_IP_PROP2 : VMemInt_Intptr_Properties IS2.LP.IP)
+  (VMEM_REF : VMemInt_Refine IS1.LP.IP IS2.LP.IP)
+  (SIZEOF_REF : Sizeof_Refine IS1.LP.SZ IS2.LP.SZ) (ITOP_REF : ItoP_Refine IS1 IS2 AC1 AC2).
   Import TLR2.
 
   Import TC.
@@ -1226,7 +1244,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Import SIZEOF_REF.
   Import ITOP_REF.
 
-  Module DVCSafe := DVConvertSafe IS2.LP IS1.LP AC2 AC1 ACS IPS IS2.LP.Events IS1.LP.Events DVCrev DVC.
+  Module DVCSafe := DVConvertSafe IS2.LP IS1.LP AC2 AC1 ACS IPS DVCrev DVC.
   Import DVCSafe.
 
   Module MBT := MemBytesTheory IS2.LP IS2.LLVM.MEM.MP ByteM IS2.LLVM.MEM.CP.
@@ -1426,7 +1444,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (** OOM Refinements *)
   Lemma Returns_ExternalCall_L0 :
     forall d f t args,
-      @Returns E1.L0 E1.DV.dvalue d (trigger (E1.ExternalCall t f args)).
+      @Returns L01 DV1.dvalue d (trigger (ExternalCall t f args)).
   Proof.
     intros d f t args.
 
@@ -1460,34 +1478,35 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (** Model *)
   Import DynamicTypes TypToDtyp CFG.
 
-  Definition external_call_refine_strict {A B} (e1 : E1.ExternalCallE A) (e2 : E2.ExternalCallE B) : Prop.
+  
+  Definition external_call_refine_strict {A B} (e1 : ExternalCallE DV1.dvalue DV1.uvalue A) (e2 : ExternalCallE DV2.dvalue DV2.uvalue B) : Prop.
     (* External Calls *)
     refine (match e1, e2 with
-            | E1.ExternalCall dt1 f1 args1, E2.ExternalCall dt2 f2 args2 =>
+            | ExternalCall dt1 f1 args1, ExternalCall dt2 f2 args2 =>
                 (* Doesn't say anything about return value... *)
                 dt1 = dt2 /\
                   uvalue_refine_strict f1 f2 /\
                   Forall2 dvalue_refine_strict args1 args2
-            | E1.IO_stdout msg1, E2.IO_stdout msg2 =>
+            | IO_stdout msg1, IO_stdout msg2 =>
                 msg1 = msg2
-            | E1.IO_stderr msg1, E2.IO_stderr msg2 =>
+            | IO_stderr msg1, IO_stderr msg2 =>
                 msg1 = msg2
             | _, _ =>
                 False
             end).
   Defined.
 
-  Definition intrinsic_refine_strict {A B} (e1 : E1.IntrinsicE A) (e2 : E2.IntrinsicE B) : Prop.
+  Definition intrinsic_refine_strict {A B} (e1 : IntrinsicE DV1.dvalue DV1.uvalue A) (e2 : IntrinsicE DV2.dvalue DV2.uvalue B) : Prop.
     refine
       (match e1, e2 with
-       | E1.Intrinsic dt1 name1 args1, E2.Intrinsic dt2 name2 args2 =>
+       | Intrinsic dt1 name1 args1, Intrinsic dt2 name2 args2 =>
            dt1 = dt2 /\
              name1 = name2 /\
              Forall2 dvalue_refine_strict args1 args2
        end).
   Defined.
 
-  Definition globalE_refine_strict {A B} (e1 : GlobalE LLVMAst.raw_id E1.DV.dvalue A) (e2 : GlobalE LLVMAst.raw_id E2.DV.dvalue B) : Prop.
+  Definition globalE_refine_strict {A B} (e1 : GlobalE LLVMAst.raw_id DV1.dvalue A) (e2 : GlobalE LLVMAst.raw_id DV2.dvalue B) : Prop.
     (* Globals *)
     { inversion e1.
       - (* Global write *)
@@ -1502,7 +1521,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition localE_refine_strict {A B} (e1 : LocalE LLVMAst.raw_id E1.DV.uvalue A) (e2 : LocalE LLVMAst.raw_id E2.DV.uvalue B) : Prop.
+  Definition localE_refine_strict {A B} (e1 : LocalE LLVMAst.raw_id DV1.uvalue A) (e2 : LocalE LLVMAst.raw_id DV2.uvalue B) : Prop.
     (* Locals *)
     { inversion e1.
       - (* Local write *)
@@ -1517,7 +1536,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition stackE_refine_strict {A B} (e1 : StackE LLVMAst.raw_id E1.DV.uvalue E1.DV.uvalue A) (e2 : StackE LLVMAst.raw_id E2.DV.uvalue E2.DV.uvalue B) : Prop.
+  Definition stackE_refine_strict {A B} (e1 : StackE LLVMAst.raw_id DV1.uvalue DV1.uvalue A) (e2 : StackE LLVMAst.raw_id DV2.uvalue DV2.uvalue B) : Prop.
     (* Stack *)
     { inversion e1.
       - (* Stack Push *)
@@ -1547,7 +1566,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition memoryE_refine_strict {A B} (e1 : E1.MemoryE A) (e2 : E2.MemoryE B) : Prop.
+  Definition memoryE_refine_strict {A B} (e1 : MemoryE DV1.dvalue DV1.uvalue A) (e2 : MemoryE DV2.dvalue DV2.uvalue B) : Prop.
     (* MemoryE *)
     { inversion e1.
       - (* MemPush *)
@@ -1581,7 +1600,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition pickE_refine_strict {A B} (e1 : E1.PickUvalueE A) (e2 : E2.PickUvalueE B) : Prop.
+  Definition pickE_refine_strict {A B} (e1 : PickUvalueE DV1.dvalue DV1.uvalue A) (e2 : PickUvalueE DV2.dvalue DV2.uvalue B) : Prop.
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
       inversion e1.
@@ -1612,7 +1631,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition llvmExcE_refine_strict {A B} (e1 : LLVMExcE E1.DV.uvalue A) (e2 : LLVMExcE E2.DV.uvalue B) : Prop.
+  Definition llvmExcE_refine_strict {A B} (e1 : LLVMExcE DV1.uvalue A) (e2 : LLVMExcE DV2.uvalue B) : Prop.
     (* LLVMExcE *)
     { destruct e1 as [exc1].
       destruct e2 as [exc2].
@@ -1644,7 +1663,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition event_refine_strict A B (e1 : IS1.LP.Events.L0 A) (e2 : IS2.LP.Events.L0 B) : Prop.
+  Definition event_refine_strict A B (e1 : L0 DV1.dvalue DV1.uvalue A) (e2 : L0 DV2.dvalue DV2.uvalue B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -1677,7 +1696,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             end).
   Defined.
 
-  Definition L1_refine_strict A B (e1 : IS1.LP.Events.L1 A) (e2 : IS2.LP.Events.L1 B) : Prop.
+  Definition L1_refine_strict A B (e1 : L1 DV1.dvalue DV1.uvalue A) (e2 : L1 DV2.dvalue DV2.uvalue B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -1708,7 +1727,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             end).
   Defined.
 
-  Definition L2_refine_strict A B (e1 : IS1.LP.Events.L2 A) (e2 : IS2.LP.Events.L2 B) : Prop.
+  Definition L2_refine_strict A B (e1 : L2 DV1.dvalue DV1.uvalue A) (e2 : L2 DV2.dvalue DV2.uvalue B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -1735,7 +1754,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             end).
   Defined.
 
-  Definition L3_refine_strict A B (e1 : IS1.LP.Events.L3 A) (e2 : IS2.LP.Events.L3 B) : Prop.
+  Definition L3_refine_strict A B (e1 : L3 DV1.dvalue DV1.uvalue A) (e2 : L3 DV2.dvalue DV2.uvalue B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -1758,7 +1777,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             end).
   Defined.
 
-  Definition L4_refine_strict A B (e1 : IS1.LP.Events.L4 A) (e2 : IS2.LP.Events.L4 B) : Prop.
+  Definition L4_refine_strict A B (e1 : L4 DV1.dvalue DV1.uvalue A) (e2 : L4 DV2.dvalue DV2.uvalue B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -1780,7 +1799,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Defined.
 
 
-  Definition external_call_res_refine_strict {A B} (e1 : E1.ExternalCallE A) (res1 : A) (e2 : E2.ExternalCallE B) (res2 : B) : Prop.
+  Definition external_call_res_refine_strict {A B} (e1 : ExternalCallE DV1.dvalue DV1.uvalue A) (res1 : A) (e2 : ExternalCallE DV2.dvalue DV2.uvalue B) (res2 : B) : Prop.
     (* External Calls *)
     inv e1.
     - (* ExternalCall *)
@@ -1806,7 +1825,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       all: exact False. (* Mismatch of event types *)
   Defined.
 
-  Definition intrinsic_res_refine_strict {A B} (e1 : E1.IntrinsicE A) (res1 : A) (e2 : E2.IntrinsicE B) (res2 : B) : Prop.
+  Definition intrinsic_res_refine_strict {A B} (e1 : IntrinsicE DV1.dvalue DV1.uvalue A) (res1 : A) (e2 : IntrinsicE DV2.dvalue DV2.uvalue B) (res2 : B) : Prop.
     (* Intrinsics *)
     inv e1.
     inv e2.
@@ -1817,7 +1836,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           ).
   Defined.
 
-  Definition globalE_res_refine_strict {A B} (e1 : GlobalE LLVMAst.raw_id E1.DV.dvalue A) (res1 : A) (e2 : GlobalE LLVMAst.raw_id E2.DV.dvalue B) (res2 : B) : Prop.
+  Definition globalE_res_refine_strict {A B} (e1 : GlobalE LLVMAst.raw_id DV1.dvalue A) (res1 : A) (e2 : GlobalE LLVMAst.raw_id DV2.dvalue B) (res2 : B) : Prop.
     (* Globals *)
     { inversion e1; subst.
       - (* Global write *)
@@ -1834,7 +1853,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition localE_res_refine_strict {A B} (e1 : LocalE LLVMAst.raw_id E1.DV.uvalue A) (res1 : A) (e2 : LocalE LLVMAst.raw_id E2.DV.uvalue B) (res2 : B) : Prop.
+  Definition localE_res_refine_strict {A B} (e1 : LocalE LLVMAst.raw_id DV1.uvalue A) (res1 : A) (e2 : LocalE LLVMAst.raw_id DV2.uvalue B) (res2 : B) : Prop.
     (* Locals *)
     { inversion e1; subst.
       - (* Local write *)
@@ -1850,7 +1869,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition stackE_res_refine_strict {A B} (e1 : StackE LLVMAst.raw_id E1.DV.uvalue E1.DV.uvalue A) (res1 : A) (e2 : StackE LLVMAst.raw_id E2.DV.uvalue E2.DV.uvalue B) (res2 : B) : Prop.
+  Definition stackE_res_refine_strict {A B} (e1 : StackE LLVMAst.raw_id DV1.uvalue DV1.uvalue A) (res1 : A) (e2 : StackE LLVMAst.raw_id DV2.uvalue DV2.uvalue B) (res2 : B) : Prop.
     (* Stack *)
     { inversion e1.
       - (* Stack Push *)
@@ -1880,7 +1899,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition memoryE_res_refine_strict {A B} (e1 : E1.MemoryE A) (res1 : A) (e2 : E2.MemoryE B) (res2 : B) : Prop.
+  Definition memoryE_res_refine_strict {A B} (e1 : MemoryE DV1.dvalue DV1.uvalue A) (res1 : A) (e2 : MemoryE DV2.dvalue DV2.uvalue B) (res2 : B) : Prop.
     (* MemoryE *)
     { inversion e1; subst.
       - (* MemPush *)
@@ -1916,7 +1935,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition pickE_res_refine_strict {A B} (e1 : E1.PickUvalueE A) (res1 : A) (e2 : E2.PickUvalueE B) (res2 : B) : Prop.
+  Definition pickE_res_refine_strict {A B} (e1 : PickUvalueE DV1.dvalue DV1.uvalue A) (res1 : A) (e2 : PickUvalueE DV2.dvalue DV2.uvalue B) (res2 : B) : Prop.
     (* PickE *)
     { (* TODO: confirm whether this is sane... *)
       inversion e1.
@@ -1950,7 +1969,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition llvmExcE_res_refine_strict {A B} (e1 : LLVMExcE E1.DV.uvalue A) (res1 : A) (e2 : LLVMExcE E2.DV.uvalue B) (res2 : B) : Prop.
+  Definition llvmExcE_res_refine_strict {A B} (e1 : LLVMExcE DV1.uvalue A) (res1 : A) (e2 : LLVMExcE DV2.uvalue B) (res2 : B) : Prop.
     (* LLVMExcE *)
     { inversion e1; inversion e2; subst.
       apply (uvalue_refine_strict H H1).
@@ -1980,7 +1999,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Lemma external_call_res_refine_strict_external_call_refine_strict {A B} (e1 : E1.ExternalCallE A) (res1 : A) (e2 : E2.ExternalCallE B) (res2 : B) :
+  Lemma external_call_res_refine_strict_external_call_refine_strict {A B} (e1 : ExternalCallE DV1.dvalue DV1.uvalue A) (res1 : A) (e2 : ExternalCallE DV2.dvalue DV2.uvalue B) (res2 : B) :
     external_call_res_refine_strict e1 res1 e2 res2 -> external_call_refine_strict e1 e2.
   Proof.
     intros RES; red; red in RES.
@@ -1988,7 +2007,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       tauto.
   Qed.
   
-  Lemma intrinsic_res_refine_strict_intrinsic_refine_strict {A B} (e1 : E1.IntrinsicE A) (res1 : A) (e2 : E2.IntrinsicE B) (res2 : B) :
+  Lemma intrinsic_res_refine_strict_intrinsic_refine_strict {A B} (e1 : IntrinsicE DV1.dvalue DV1.uvalue A) (res1 : A) (e2 : IntrinsicE DV2.dvalue DV2.uvalue B) (res2 : B) :
     intrinsic_res_refine_strict e1 res1 e2 res2 -> intrinsic_refine_strict e1 e2.
   Proof.
     intros RES; red; red in RES.
@@ -1996,7 +2015,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       tauto.
   Qed.
 
-  Lemma globalE_res_refine_strict_globalE_refine_strict {A B} (e1 : GlobalE LLVMAst.raw_id E1.DV.dvalue A) (res1 : A) (e2 : GlobalE LLVMAst.raw_id E2.DV.dvalue B) (res2 : B) :
+  Lemma globalE_res_refine_strict_globalE_refine_strict {A B} (e1 : GlobalE LLVMAst.raw_id DV1.dvalue A) (res1 : A) (e2 : GlobalE LLVMAst.raw_id DV2.dvalue B) (res2 : B) :
     globalE_res_refine_strict e1 res1 e2 res2 -> globalE_refine_strict e1 e2.
   Proof.
     intros RES; red; red in RES.
@@ -2004,7 +2023,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       tauto.
   Qed.
 
-  Lemma localE_res_refine_strict_localE_refine_strict {A B} (e1 : LocalE LLVMAst.raw_id E1.DV.uvalue A) (res1 : A) (e2 : LocalE LLVMAst.raw_id E2.DV.uvalue B) (res2 : B) :
+  Lemma localE_res_refine_strict_localE_refine_strict {A B} (e1 : LocalE LLVMAst.raw_id DV1.uvalue A) (res1 : A) (e2 : LocalE LLVMAst.raw_id DV2.uvalue B) (res2 : B) :
     localE_res_refine_strict e1 res1 e2 res2 -> localE_refine_strict e1 e2.
   Proof.
     intros RES; red; red in RES.
@@ -2012,7 +2031,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       tauto.
   Qed.
 
-  Lemma stackE_res_refine_strict_stackE_refine_strict {A B} (e1 : StackE LLVMAst.raw_id E1.DV.uvalue E1.DV.uvalue A) (res1 : A) (e2 : StackE LLVMAst.raw_id E2.DV.uvalue E2.DV.uvalue B) (res2 : B) :
+  Lemma stackE_res_refine_strict_stackE_refine_strict {A B} (e1 : StackE LLVMAst.raw_id DV1.uvalue DV1.uvalue A) (res1 : A) (e2 : StackE LLVMAst.raw_id DV2.uvalue DV2.uvalue B) (res2 : B) :
     stackE_res_refine_strict e1 res1 e2 res2 -> stackE_refine_strict e1 e2.
   Proof.
     intros RES; red; red in RES.
@@ -2020,7 +2039,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       tauto.
   Qed.
 
-  Lemma memoryE_res_refine_strict_memoryE_refine_strict {A B} (e1 : E1.MemoryE A) (res1 : A) (e2 : E2.MemoryE B) (res2 : B) :
+  Lemma memoryE_res_refine_strict_memoryE_refine_strict {A B} (e1 : MemoryE DV1.dvalue DV1.uvalue A) (res1 : A) (e2 : MemoryE DV2.dvalue DV2.uvalue B) (res2 : B) :
     memoryE_res_refine_strict e1 res1 e2 res2 -> memoryE_refine_strict e1 e2.
   Proof.
     intros RES; red; red in RES.
@@ -2028,7 +2047,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       tauto.
   Qed.
 
-  Lemma pickE_res_refine_strict_pickE_refine_strict {A B} (e1 : E1.PickUvalueE A) (res1 : A) (e2 : E2.PickUvalueE B) (res2 : B) :
+  Lemma pickE_res_refine_strict_pickE_refine_strict {A B} (e1 : PickUvalueE DV1.dvalue DV1.uvalue A) (res1 : A) (e2 : PickUvalueE DV2.dvalue DV2.uvalue B) (res2 : B) :
     pickE_res_refine_strict e1 res1 e2 res2 -> pickE_refine_strict e1 e2.
   Proof.
     destruct e1, e2; destruct res1, res2; cbn in *;
@@ -2045,7 +2064,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       tauto.
   Qed.
 
-  Lemma llvmExcE_res_refine_strict_llvmExcE_refine_strict {A B} (e1 : LLVMExcE E1.DV.uvalue A) (res1 : A) (e2 : LLVMExcE E2.DV.uvalue B) (res2 : B) :
+  Lemma llvmExcE_res_refine_strict_llvmExcE_refine_strict {A B} (e1 : LLVMExcE DV1.uvalue A) (res1 : A) (e2 : LLVMExcE DV2.uvalue B) (res2 : B) :
     llvmExcE_res_refine_strict e1 res1 e2 res2 -> llvmExcE_refine_strict e1 e2.
   Proof.
     intros RES; red; red in RES.
@@ -2091,7 +2110,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     debugE_res_refine_strict_debugE_refine_strict
     failureE_res_refine_strict_failureE_refine_strict : REFINE_DB.   
 
-  Definition event_res_refine_strict A B (e1 : IS1.LP.Events.L0 A) (res1 : A) (e2 : IS2.LP.Events.L0 B) (res2 : B) : Prop.
+  Definition event_res_refine_strict A B (e1 : L0 DV1.dvalue DV1.uvalue A) (res1 : A) (e2 : L0 DV2.dvalue DV2.uvalue B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -2124,7 +2143,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             end).
   Defined.
 
-  Definition L1_res_refine_strict A B (e1 : IS1.LP.Events.L1 A) (res1 : A) (e2 : IS2.LP.Events.L1 B) (res2 : B) : Prop.
+  Definition L1_res_refine_strict A B (e1 : L1 DV1.dvalue DV1.uvalue A) (res1 : A) (e2 :L1 DV2.dvalue DV2.uvalue B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -2155,7 +2174,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             end).
   Defined.
 
-  Definition L2_res_refine_strict A B (e1 : IS1.LP.Events.L2 A) (res1 : A) (e2 : IS2.LP.Events.L2 B) (res2 : B) : Prop.
+  Definition L2_res_refine_strict A B (e1 : L2 DV1.dvalue DV1.uvalue A) (res1 : A) (e2 : L2 DV2.dvalue DV2.uvalue B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -2182,7 +2201,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             end).
   Defined.
 
-  Definition L3_res_refine_strict A B (e1 : IS1.LP.Events.L3 A) (res1 : A) (e2 : IS2.LP.Events.L3 B) (res2 : B) : Prop.
+  Definition L3_res_refine_strict A B (e1 : L3 DV1.dvalue DV1.uvalue A) (res1 : A) (e2 : L3 DV2.dvalue DV2.uvalue B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -2205,7 +2224,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             end).
   Defined.
 
-  Definition L4_res_refine_strict A B (e1 : IS1.LP.Events.L4 A) (res1 : A) (e2 : IS2.LP.Events.L4 B) (res2 : B) : Prop.
+  Definition L4_res_refine_strict A B (e1 : L4 DV1.dvalue DV1.uvalue A) (res1 : A) (e2 : L4 DV2.dvalue DV2.uvalue B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -2226,7 +2245,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             end).
   Defined.
 
-  Definition call_refine_strict (A B : Type) (c1 : IS1.LP.Events.CallE A) (c2 : CallE B) : Prop.
+  Definition call_refine_strict (A B : Type) (c1 : CallE DV1.uvalue A) (c2 : CallE DV2.uvalue B) : Prop.
   Proof.
     (* Calls *)
     { (* Doesn't say anything about return value... *)
@@ -2238,7 +2257,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Definition call_res_refine_strict (A B : Type) (c1 : IS1.LP.Events.CallE A) (res1 : A) (c2 : CallE B) (res2 : B) : Prop.
+  Definition call_res_refine_strict (A B : Type) (c1 : CallE DV1.uvalue A) (res1 : A) (c2 : CallE DV2.uvalue B) (res2 : B) : Prop.
   Proof.
     (* Calls *)
     { inv c1.
@@ -2250,7 +2269,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     }
   Defined.
 
-  Lemma call_res_refine_strict_call_refine_strict {A B : Type} (c1 : IS1.LP.Events.CallE A) (res1 : A) (c2 : CallE B) (res2 : B) :
+  Lemma call_res_refine_strict_call_refine_strict {A B : Type} (c1 : CallE DV1.uvalue A) (res1 : A) (c2 : CallE DV2.uvalue B) (res2 : B) :
     call_res_refine_strict _ _ c1 res1 c2 res2 -> call_refine_strict _ _ c1 c2.
   Proof.
     intros H; red in H; red.
@@ -2259,13 +2278,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   #[global] Hint Resolve call_res_refine_strict_call_refine_strict : REFINE_DB.
 
-  Definition L0'_refine_strict A B (e1 : IS1.LP.Events.L0' A) (e2 : IS2.LP.Events.L0' B) : Prop
+  Definition L0'_refine_strict A B (e1 : L0' DV1.dvalue DV1.uvalue A) (e2 : L0' _ _ B) : Prop
     := (sum_prerel call_refine_strict event_refine_strict) _ _ e1 e2.
 
-  Definition L0'_res_refine_strict A B (e1 : IS1.LP.Events.L0' A) (res1 : A) (e2 : IS2.LP.Events.L0' B) (res2 : B) : Prop
+  Definition L0'_res_refine_strict A B (e1 : L0' _ _ A) (res1 : A) (e2 : L0' _ _ B) (res2 : B) : Prop
     := (sum_postrel call_res_refine_strict event_res_refine_strict) _ _ e1 res1 e2 res2.
 
-  Definition exp_E_refine_strict A B (e1 : IS1.LP.Events.exp_E A) (e2 : IS2.LP.Events.exp_E B) : Prop.
+  Definition exp_E_refine_strict A B (e1 : exp_E DV1.dvalue DV1.uvalue A) (e2 : exp_E DV2.dvalue DV2.uvalue B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -2292,7 +2311,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             end).
   Defined.
 
-  Definition exp_E_res_refine_strict A B (e1 : IS1.LP.Events.exp_E A) (res1 : A) (e2 : IS2.LP.Events.exp_E B) (res2 : B) : Prop.
+  Definition exp_E_res_refine_strict A B (e1 : exp_E DV1.dvalue DV1.uvalue A) (res1 : A) (e2 : exp_E DV2.dvalue DV2.uvalue B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -2319,7 +2338,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             end).
   Defined.
 
-  Definition instr_E_refine_strict A B (e1 : IS1.LP.Events.instr_E A) (e2 : IS2.LP.Events.instr_E B) : Prop.
+  Definition instr_E_refine_strict A B (e1 : instr_E DV1.dvalue DV1.uvalue A) (e2 : instr_E DV2.dvalue DV2.uvalue B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -2334,7 +2353,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             end).
   Defined.
 
-  Definition instr_E_res_refine_strict A B (e1 : IS1.LP.Events.instr_E A) (res1 : A) (e2 : IS2.LP.Events.instr_E B) (res2 : B) : Prop.
+  Definition instr_E_res_refine_strict A B (e1 : instr_E DV1.dvalue DV1.uvalue A) (res1 : A) (e2 : instr_E DV2.dvalue DV2.uvalue B) (res2 : B) : Prop.
   Proof.
     refine (match e1, e2 with
             | inl1 e1, inl1 e2 =>
@@ -2393,7 +2412,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma trigger_alloca_E1E2_rutt_strict_sound :
     forall dt n osz,
       rutt event_refine_strict event_res_refine_strict dvalue_refine_strict
-        (trigger (IS1.LP.Events.Alloca dt n osz)) (trigger (Alloca dt n osz)).
+        (trigger (@Alloca _ _ dt n osz)) (trigger (@Alloca _ _ dt n osz)).
   Proof.
     intros dt n osz.
     apply rutt_trigger.
@@ -2505,9 +2524,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Lemma exp_E_refine_strict_event_refine_strict :
-    forall A B (e1 : IS1.LP.Events.exp_E A) (e2 : exp_E B),
+    forall A B (e1 : exp_E DV1.dvalue DV1.uvalue A) (e2 : exp_E DV2.dvalue DV2.uvalue B),
       exp_E_refine_strict A B e1 e2 ->
-      event_refine_strict A B (IS1.LP.Events.exp_to_L0 e1) (exp_to_L0 e2).
+      event_refine_strict A B (exp_to_L0 e1) (exp_to_L0 e2).
   Proof.
     intros A B e1 e2 H.
     destruct e1, e2.
@@ -2572,9 +2591,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Lemma exp_E_refine_strict_instr_E_refine_strict :
-    forall A B (e1 : IS1.LP.Events.exp_E A) (e2 : exp_E B),
+    forall A B (e1 : exp_E DV1.dvalue DV1.uvalue A) (e2 : exp_E _ _ B),
       exp_E_refine_strict A B e1 e2 ->
-      instr_E_refine_strict A B (IS1.LP.Events.exp_to_instr e1) (exp_to_instr e2).
+      instr_E_refine_strict A B (exp_to_instr e1) (exp_to_instr e2).
   Proof.
     intros A B e1 e2 H.
     destruct e1, e2.
@@ -2638,9 +2657,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Lemma instr_E_refine_strict_L0'_refine_strict :
-    forall A B (e1 : IS1.LP.Events.instr_E A) (e2 : instr_E B),
+    forall A B (e1 : instr_E DV1.dvalue DV1.uvalue A) (e2 : instr_E _ _ B),
       instr_E_refine_strict A B e1 e2 ->
-      L0'_refine_strict A B (IS1.LP.Events.instr_to_L0' e1) (instr_to_L0' e2).
+      L0'_refine_strict A B (instr_to_L0' e1) (instr_to_L0' e2).
   Proof.
     intros A B e1 e2 H.
     unfold L0'_refine_strict.
@@ -2707,8 +2726,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Lemma event_refine_strict_exp_E_refine_strict_inv :
-    forall A B (e1 : IS1.LP.Events.exp_E A) (e2 : exp_E B) a b,
-      event_res_refine_strict A B (IS1.LP.Events.exp_to_L0 e1) a (exp_to_L0 e2) b ->
+    forall A B (e1 : exp_E DV1.dvalue DV1.uvalue A) (e2 : exp_E _ _ B) a b,
+      event_res_refine_strict A B (exp_to_L0 e1) a (exp_to_L0 e2) b ->
       exp_E_refine_strict A B e1 e2.
   Proof.
     intros A B e1 e2 a b H.
@@ -2719,8 +2738,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Lemma event_res_refine_strict_exp_E_res_refine_strict_inv :
-    forall A B (e1 : IS1.LP.Events.exp_E A) (e2 : exp_E B) a b,
-      event_res_refine_strict A B (IS1.LP.Events.exp_to_L0 e1) a (exp_to_L0 e2) b ->
+    forall A B (e1 : exp_E DV1.dvalue DV1.uvalue A) (e2 : exp_E _ _ B) a b,
+      event_res_refine_strict A B (exp_to_L0 e1) a (exp_to_L0 e2) b ->
       exp_E_res_refine_strict A B e1 a e2 b.
   Proof.
     intros A B e1 e2 a b H.
@@ -2731,8 +2750,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Lemma L0'_res_refine_strict_instr_E_res_refine_strict_inv :
-    forall A B (e1 : IS1.LP.Events.instr_E A) (e2 : instr_E B) a b,
-      L0'_res_refine_strict A B (IS1.LP.Events.instr_to_L0' e1) a (instr_to_L0' e2) b ->
+    forall A B (e1 : instr_E DV1.dvalue DV1.uvalue A) (e2 : instr_E _ _ B) a b,
+      L0'_res_refine_strict A B (instr_to_L0' e1) a (instr_to_L0' e2) b ->
       instr_E_res_refine_strict A B e1 a e2 b.
   Proof.
     intros A B e1 e2 a b H.
@@ -2748,8 +2767,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         t1
         t2 ->
       rutt event_refine_strict event_res_refine_strict RR
-        (translate IS1.LP.Events.exp_to_L0 t1)
-        (translate exp_to_L0 t2).
+        (translate (@exp_to_L0 DV1.dvalue DV1.uvalue) t1)
+        (translate (@exp_to_L0 DV2.dvalue DV2.uvalue) t2).
   Proof.
     intros *.
     revert t1 t2.
@@ -2796,8 +2815,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         t2
         (OOM:=OOME) ->
       orutt event_refine_strict event_res_refine_strict RR
-        (translate IS1.LP.Events.exp_to_L0 t1)
-        (translate exp_to_L0 t2)
+        (translate (@exp_to_L0 DV1.dvalue DV1.uvalue) t1)
+        (translate (@exp_to_L0 _ _) t2)
         (OOM:=OOME).
   Proof.
     intros *.
@@ -2850,8 +2869,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Lemma instr_E_res_refine_strict_exp_E_res_refine_strict_inv :
-    forall A B (e1 : IS1.LP.Events.exp_E A) (e2 : exp_E B) a b,
-      instr_E_res_refine_strict A B (IS1.LP.Events.exp_to_instr e1) a (exp_to_instr e2) b ->
+    forall A B (e1 : exp_E DV1.dvalue DV1.uvalue A) (e2 : exp_E _ _ B) a b,
+      instr_E_res_refine_strict A B (exp_to_instr e1) a (exp_to_instr e2) b ->
       exp_E_res_refine_strict A B e1 a e2 b.
   Proof.
     intros A B e1 e2 a b H.
@@ -2865,8 +2884,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     forall {R1 R2} {RR : R1 -> R2 -> Prop} t1 t2,
       rutt instr_E_refine_strict instr_E_res_refine_strict RR t1 t2 ->
       rutt L0'_refine_strict L0'_res_refine_strict RR
-        (translate IS1.LP.Events.instr_to_L0' t1)
-        (translate instr_to_L0' t2).
+        (translate (@instr_to_L0' DV1.dvalue DV1.uvalue) t1)
+        (translate (@instr_to_L0' _ _) t2).
   Proof.
     intros *.
     revert t1 t2.
@@ -2907,8 +2926,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     forall {R1 R2} {RR : R1 -> R2 -> Prop} t1 t2,
       orutt instr_E_refine_strict instr_E_res_refine_strict RR t1 t2 (OOM:=OOME) ->
       orutt L0'_refine_strict L0'_res_refine_strict RR
-        (translate IS1.LP.Events.instr_to_L0' t1)
-        (translate instr_to_L0' t2)
+        (translate (@instr_to_L0' DV1.dvalue DV1.uvalue) t1)
+        (translate (@instr_to_L0' _ _) t2)
         (OOM:=OOME).
   Proof.
     intros *.
@@ -2946,8 +2965,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       intros o CONTRA.
       eapply H1.
       unfold instr_to_L0' in CONTRA.
-      unfold_subevents.
-      repeat break_match_hyp_inv; auto.
+      unfold_subevents. unfold OOME_L0' in *. 
+      repeat break_match_hyp_inv; auto. reflexivity.
     - gstep; eauto.
       red.
       cbn.
@@ -2966,8 +2985,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     forall {R1 R2} {RR : R1 -> R2 -> Prop} t1 t2,
       rutt exp_E_refine_strict exp_E_res_refine_strict RR t1 t2 ->
       rutt instr_E_refine_strict instr_E_res_refine_strict RR
-        (translate IS1.LP.Events.exp_to_instr t1)
-        (translate exp_to_instr t2).
+        (translate (@exp_to_instr DV1.dvalue DV1.uvalue) t1)
+        (translate (@exp_to_instr _ _)t2).
   Proof.
     intros *.
     revert t1 t2.
@@ -3008,8 +3027,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     forall {R1 R2} {RR : R1 -> R2 -> Prop} t1 t2,
       orutt exp_E_refine_strict exp_E_res_refine_strict RR t1 t2 (OOM:=OOME) ->
       orutt instr_E_refine_strict instr_E_res_refine_strict RR
-        (translate IS1.LP.Events.exp_to_instr t1)
-        (translate exp_to_instr t2)
+        (translate (@exp_to_instr DV1.dvalue DV1.uvalue) t1)
+        (translate (@exp_to_instr _ _) t2)
         (OOM:=OOME).
   Proof.
     intros *.
@@ -3048,7 +3067,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       eapply H1.
       unfold exp_to_instr in *.
       unfold_subevents.
-      repeat break_match_hyp_inv; auto.
+      repeat break_match_hyp_inv; auto. reflexivity.
     - gstep; eauto.
       red.
       cbn.
@@ -3066,7 +3085,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma translate_LU_to_exp_lookup_id_orutt :
     forall id : LLVMAst.ident,
       orutt exp_E_refine_strict exp_E_res_refine_strict uvalue_refine_strict
-        (translate IS1.LP.Events.LU_to_exp (IS1.LLVM.D.lookup_id id)) (translate LU_to_exp (lookup_id id))
+        (translate (@LU_to_exp _ _) (IS1.LLVM.D.lookup_id id)) (translate (@LU_to_exp _ _) (lookup_id id))
         (OOM:=OOME).
   Proof.
     intros id.
@@ -3131,7 +3150,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma is_concrete_l:
     forall (l : list DV1.uvalue) (l' : list DV2.uvalue),
       Forall2 (fun (a : DV1.uvalue) (b : DV2.uvalue) => uvalue_convert_strict a = NoOom b) l l' ->
-      forallb IS1.LP.Events.DV.is_concrete l = true ->
+      forallb DV1.is_concrete l = true ->
       forallb is_concrete l' = true.
   Proof.
     intros l l' H.
@@ -3149,7 +3168,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma is_concrete_l_false:
     forall (fields : list DV1.uvalue) (l : list DV2.uvalue),
       Forall2 (fun (a : DV1.uvalue) (b : DV2.uvalue) => uvalue_convert_strict a = NoOom b) fields l ->
-      forallb IS1.LP.Events.DV.is_concrete fields = false ->
+      forallb DV1.is_concrete fields = false ->
       forallb is_concrete l = true
       -> False.
   Proof.
@@ -3170,10 +3189,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma map_dvalue_convert_strict_succeeds:
     forall (fields : list DV1.uvalue) (l : list DV2.uvalue),
       Forall2 (fun (a : DV1.uvalue) (b : DV2.uvalue) => uvalue_convert_strict a = NoOom b) fields l ->
-      forall l0 : list IS1.LP.Events.DV.dvalue,
+      forall l0 : list DV1.dvalue,
         Forall2
-          (fun (a : IS1.LP.Events.DV.uvalue) (b : IS1.LP.Events.DV.dvalue) =>
-             IS1.LP.Events.DV.uvalue_to_dvalue a = inr b) fields l0 ->
+          (fun (a : DV1.uvalue) (b : DV1.dvalue) =>
+             DV1.uvalue_to_dvalue a = inr b) fields l0 ->
         forall l1 : list dvalue,
           map_monad uvalue_to_dvalue l = inr l1 -> map_monad dvalue_convert_strict l0 = NoOom l1.
   Proof.
@@ -3641,7 +3660,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma contains_undef_or_poison_E1_E2 :
     forall u2 u1,
       uvalue_refine_strict u1 u2 ->
-      IS1.LP.Events.DV.contains_undef_or_poison u1 = contains_undef_or_poison u2.
+      DV1.contains_undef_or_poison u1 = contains_undef_or_poison u2.
   Proof.
     intros u2.
     induction u2; intros u1 REF;
@@ -4092,7 +4111,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma dvalue_has_dtyp_fin_to_inf_dvalue :
     forall dv_fin t,
       dvalue_has_dtyp dv_fin t ->
-      IS1.LP.Events.DV.dvalue_has_dtyp (fin_to_inf_dvalue dv_fin) t.
+      DV1.dvalue_has_dtyp (fin_to_inf_dvalue dv_fin) t.
   Proof.
     intros dv_fin t TYP.
     induction TYP;
@@ -4747,7 +4766,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma dvalue_convert_strict_struct_map :
     forall fields_fin res,
       DVCrev.dvalue_convert_strict (DVALUE_Struct fields_fin) = NoOom res ->
-      res = (IS1.LP.Events.DV.DVALUE_Struct (map fin_to_inf_dvalue fields_fin)).
+      res = (DV1.DVALUE_Struct (map fin_to_inf_dvalue fields_fin)).
   Proof.
     intros fields_fin res CONV.
     cbn in CONV.
@@ -4766,7 +4785,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma dvalue_convert_strict_packed_struct_map :
     forall fields_fin res,
       DVCrev.dvalue_convert_strict (DVALUE_Packed_struct fields_fin) = NoOom res ->
-      res = (IS1.LP.Events.DV.DVALUE_Packed_struct (map fin_to_inf_dvalue fields_fin)).
+      res = (DV1.DVALUE_Packed_struct (map fin_to_inf_dvalue fields_fin)).
   Proof.
     intros fields_fin res CONV.
     cbn in CONV.
@@ -4785,7 +4804,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma dvalue_convert_strict_array_map :
     forall fields_fin res t,
       DVCrev.dvalue_convert_strict (DVALUE_Array t fields_fin) = NoOom res ->
-      res = (IS1.LP.Events.DV.DVALUE_Array t (map fin_to_inf_dvalue fields_fin)).
+      res = (DV1.DVALUE_Array t (map fin_to_inf_dvalue fields_fin)).
   Proof.
     intros fields_fin res t CONV.
     cbn in CONV.
@@ -4804,7 +4823,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma dvalue_convert_strict_vector_map :
     forall fields_fin res t,
       DVCrev.dvalue_convert_strict (DVALUE_Vector t fields_fin) = NoOom res ->
-      res = (IS1.LP.Events.DV.DVALUE_Vector t (map fin_to_inf_dvalue fields_fin)).
+      res = (DV1.DVALUE_Vector t (map fin_to_inf_dvalue fields_fin)).
   Proof.
     intros fields_fin res t CONV.
     cbn in CONV.
@@ -4996,8 +5015,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       dvalue_refine_strict r1 r2 ->
       uvalue_refine_strict r3 r4 ->
       rutt exp_E_refine_strict exp_E_res_refine_strict eq
-        (trigger (IS1.LP.Events.Store dt r1 r3))
-        (trigger (IS2.LP.Events.Store dt r2 r4)).
+        (trigger (@Store DV1.dvalue DV1.uvalue dt r1 r3))
+        (trigger (@Store _ _ dt r2 r4)).
   Proof.
     intros dt r1 r2 r3 r4 R1R2 R3R4.
     apply rutt_trigger.
@@ -5010,7 +5029,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (* TODO: move this! Probably somewhere that I get a version for each language? *)
   Ltac solve_dec_oom :=
     let s := fresh "s" in
-    first [intros ? s | intros s];
+    first [intros ? ? ? s | intros s];
     repeat destruct s;
     try solve
       [
@@ -5022,21 +5041,21 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     eexists; reflexivity.
 
   Lemma exp_E_dec_oom :
-    forall A (e : exp_E A), {forall o : OOME A, e <> subevent _ o} + {exists o : OOME A, e = subevent _ o}.
+    forall A d u (e : @exp_E d u A), {forall o : OOME A, e <> subevent _ o} + {exists o : OOME A, e = subevent _ o}.
   Proof.
     solve_dec_oom.
   Qed.
 
   (* TODO: move this! *)
   Lemma L0'_dec_oom :
-    forall A (e : L0' A), {forall o : OOME A, e <> subevent _ o} + {exists o : OOME A, e = subevent _ o}.
+    forall A d u (e : @L0' d u A), {forall o : OOME A, e <> subevent _ o} + {exists o : OOME A, e = subevent _ o}.
   Proof.
     solve_dec_oom.
   Qed.
 
   (* TODO: move this! *)
   Lemma L0_dec_oom :
-    forall A (e : L0 A), {forall o : OOME A, e <> subevent _ o} + {exists o : OOME A, e = subevent _ o}.
+    forall A d u (e : @L0 d u A), {forall o : OOME A, e <> subevent _ o} + {exists o : OOME A, e = subevent _ o}.
   Proof.
     solve_dec_oom.
   Qed.
@@ -5066,12 +5085,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (@VIntVMemInt (@Integers.bit_int sz) (@VInt_Bounded sz)) (@ToDvalue_Int sz)
         iop v1 v2 = success_unERR_UB_OOM res_fin ->
       DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom (@Integers.bit_int sz)
+      @DV1.eval_int_op err_ub_oom (@Integers.bit_int sz)
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt (@Integers.bit_int sz) (@VInt_Bounded sz)) (@IS1.LP.Events.DV.ToDvalue_Int sz)
+        (@VIntVMemInt (@Integers.bit_int sz) (@VInt_Bounded sz)) (@DV1.ToDvalue_Int sz)
         iop v1 v2 = success_unERR_UB_OOM res_inf.
   Proof.
     intros sz v1 v2 iop res_fin res_inf EVAL CONV.
@@ -5129,12 +5148,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       IS1.LP.IP.from_Z (IP.to_Z v1_fin) = NoOom v1_inf ->
       IS1.LP.IP.from_Z (IP.to_Z v2_fin) = NoOom v2_inf ->
       DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom IS1.LP.IP.intptr
+      @DV1.eval_int_op err_ub_oom IS1.LP.IP.intptr
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        IS1.LP.Events.DV.VMemInt_intptr' IS1.LP.Events.DV.ToDvalue_intptr
+        DV1.VMemInt_intptr' DV1.ToDvalue_intptr
         iop v1_inf v2_inf = success_unERR_UB_OOM res_inf.
   Proof.
     intros v1_fin v2_fin v1_inf v2_inf iop res_fin res_inf
@@ -5486,7 +5505,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         iop dv1_fin dv2_fin = ret res_fin ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
-      @IS1.LP.Events.DV.eval_iop_integer_h err_ub_oom
+      @DV1.eval_iop_integer_h err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -5572,7 +5591,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           fin_to_inf_dvalue dv2_fin = dv2_inf ->
           f_inf dv1_inf dv2_inf = ret (fin_to_inf_dvalue res_fin)) ->
       @vec_loop _ err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) f_fin (combine xs ys) = ret res ->
-      @IS1.LP.Events.DV.vec_loop _ err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) f_inf (combine (map fin_to_inf_dvalue xs) (map fin_to_inf_dvalue ys)) = ret (map fin_to_inf_dvalue res).
+      @DV1.vec_loop _ err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) f_inf (combine (map fin_to_inf_dvalue xs) (map fin_to_inf_dvalue ys)) = ret (map fin_to_inf_dvalue res).
   Proof.
     intros f_fin f_inf xs ys res F RES.
 
@@ -5627,7 +5646,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         iop dv1_fin dv2_fin = ret res_fin ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
-      @IS1.LP.Events.DV.eval_iop err_ub_oom
+      @DV1.eval_iop err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -5714,12 +5733,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       @eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt ss icmp a b = ret res_fin  ->
-      @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
+      @DV1.eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt ss icmp a b = ret (fin_to_inf_dvalue res_fin).
   Proof.
     intros Int VMInt ss icmp a b res_fin FIN.
-    unfold eval_int_icmp, IS1.LP.Events.DV.eval_int_icmp.
+    unfold eval_int_icmp, DV1.eval_int_icmp.
     unfold eval_int_icmp in FIN.
     destruct ss.
     - destruct (true && negb (msamesign a b))%bool.
@@ -5766,11 +5785,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       IS1.LP.IP.from_Z (IP.to_Z v1_fin) = NoOom v1_inf ->
       IS1.LP.IP.from_Z (IP.to_Z v2_fin) = NoOom v2_inf ->
       DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
-      @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
+      @DV1.eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         IS1.LP.IP.intptr
-        IS1.LP.Events.DV.VMemInt_intptr'
+        DV1.VMemInt_intptr'
         ss icmp v1_inf v2_inf = success_unERR_UB_OOM res_inf.
   Proof.
     intros v1_fin v2_fin v1_inf v2_inf ss icmp res_fin res_inf EVAL LIFT1 LIFT2 CONV.
@@ -5840,7 +5859,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         samesign icmp dv1_inf dv2_inf = ret (fin_to_inf_dvalue res_fin).
   Proof.
     intros dv1_fin dv2_fin res_fin samesign icmp dv1_inf dv2_inf EVAL LIFT1 LIFT2.
-    Opaque IS1.LP.Events.DV.eval_int_icmp
+    Opaque DV1.eval_int_icmp
       eval_int_icmp.
     unfold eval_icmp in EVAL.
     (* Nasty case analysis... *)
@@ -5895,7 +5914,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     forall fop a b res_fin res_inf,
       double_op fop a b = success_unERR_UB_OOM res_fin ->
       DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
-      IS1.LP.Events.DV.double_op fop a b = success_unERR_UB_OOM res_inf.
+      DV1.double_op fop a b = success_unERR_UB_OOM res_inf.
   Proof.
     intros fop a b res_fin res_inf EVAL REF.
     destruct fop; cbn in *; inv EVAL;
@@ -5908,7 +5927,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   x1 : DVCrev.DV2.dvalue
   e1 : dvalue_convert_strict x1 = NoOom (DVALUE_Double (Floats.Float.neg x))
   ============================
-  IS1.LP.Events.DV.eval_fneg (DVCrev.DV2.DVALUE_Double x) = success_unERR_UB_OOM x1
+  DV1.eval_fneg (DVCrev.DV2.DVALUE_Double x) = success_unERR_UB_OOM x1
 
 *)
 
@@ -5916,7 +5935,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma double_neg_fin_inf :
     forall f res_fin,
       dvalue_convert_strict res_fin = NoOom (DVALUE_Double (Floats.Float.neg f)) ->
-      IS1.LP.Events.DV.eval_fneg (IS1.LP.Events.DV.DVALUE_Double f) = success_unERR_UB_OOM res_fin.
+      DV1.eval_fneg (DV1.DVALUE_Double f) = success_unERR_UB_OOM res_fin.
   Proof.
     intros f res_fin  EVAL.
     cbn in *; inv EVAL.
@@ -5928,7 +5947,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma float_neg_fin_inf :
     forall f res_fin,
       dvalue_convert_strict res_fin = NoOom (DVALUE_Float (Floats.Float32.neg f)) ->
-      IS1.LP.Events.DV.eval_fneg (IS1.LP.Events.DV.DVALUE_Float f) = success_unERR_UB_OOM res_fin.
+      DV1.eval_fneg (DV1.DVALUE_Float f) = success_unERR_UB_OOM res_fin.
   Proof.
     intros f res_fin  EVAL.
     cbn in *; inv EVAL.
@@ -5940,7 +5959,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     forall t res_fin res_inf,
       eval_fneg (DVALUE_Poison t) = success_unERR_UB_OOM res_fin -> 
       DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
-      IS1.LP.Events.DV.eval_fneg (IS1.LP.Events.DV.DVALUE_Poison t) = success_unERR_UB_OOM res_inf.
+      DV1.eval_fneg (DV1.DVALUE_Poison t) = success_unERR_UB_OOM res_inf.
   Proof.
     intros t res_fin res_inf EVAL REF.
     cbn in *; inv EVAL;
@@ -5953,7 +5972,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     forall fop a b res_fin res_inf,
       float_op fop a b = success_unERR_UB_OOM res_fin ->
       DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
-      IS1.LP.Events.DV.float_op fop a b = success_unERR_UB_OOM res_inf.
+      DV1.float_op fop a b = success_unERR_UB_OOM res_inf.
   Proof.
     intros fop a b res_fin res_inf EVAL REF.
     destruct fop; cbn in *; inv EVAL;
@@ -5970,7 +5989,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         fop dv1_fin dv2_fin = ret res_fin ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
-      @IS1.LP.Events.DV.eval_fop err_ub_oom
+      @DV1.eval_fop err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -5991,8 +6010,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn.
 
         (* These should be the same... *)
-        unfold IS1.LP.Events.DV.fop_is_div.
-        unfold fop_is_div in Heqb.
+        unfold AstLib.fop_is_div in *.
         rewrite Heqb.
         reflexivity.
       }
@@ -6017,8 +6035,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn.
 
         (* These should be the same... *)
-        unfold IS1.LP.Events.DV.fop_is_div.
-        unfold fop_is_div in Heqb.
+        unfold AstLib.fop_is_div in *.
         rewrite Heqb.
         reflexivity.
       }
@@ -6048,7 +6065,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         dv1_fin  = ret res_fin ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
-      @IS1.LP.Events.DV.eval_fneg err_ub_oom
+      @DV1.eval_fneg err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -6089,14 +6106,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     forall fcmp a b res_fin res_inf,
       double_cmp fcmp a b = res_fin ->
       DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
-      IS1.LP.Events.DV.double_cmp fcmp a b = res_inf.
+      DV1.double_cmp fcmp a b = res_inf.
   Proof.
     intros fcmp a b res_fin res_inf EVAL REF.
     destruct fcmp; cbn in *; subst;
       cbn in REF;
       inv REF; auto;
       solve
-        [ unfold double_cmp, IS1.LP.Events.DV.double_cmp in *;
+        [ unfold double_cmp, DV1.double_cmp in *;
           repeat break_match_hyp_inv; auto;
           setoid_rewrite Heqb0; reflexivity
         ].
@@ -6106,14 +6123,14 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     forall fcmp a b res_fin res_inf,
       float_cmp fcmp a b = res_fin ->
       DVCrev.dvalue_convert_strict res_fin = NoOom res_inf ->
-      IS1.LP.Events.DV.float_cmp fcmp a b = res_inf.
+      DV1.float_cmp fcmp a b = res_inf.
   Proof.
     intros fcmp a b res_fin res_inf EVAL REF.
     destruct fcmp; cbn in *; subst;
       cbn in REF;
       inv REF; auto;
       solve
-        [ unfold float_cmp, IS1.LP.Events.DV.float_cmp in *;
+        [ unfold float_cmp, DV1.float_cmp in *;
           repeat break_match_hyp_inv; auto;
           setoid_rewrite Heqb0; reflexivity
         ].
@@ -6127,7 +6144,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         fcmp dv1_fin dv2_fin = ret res_fin ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
-      @IS1.LP.Events.DV.eval_fcmp err_ub_oom
+      @DV1.eval_fcmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         fcmp dv1_inf dv2_inf = ret (fin_to_inf_dvalue res_fin).
@@ -6543,7 +6560,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         dvalue_refine_strict_inv REF; auto.
         rename fields0 into dts.
         rewrite max_preferred_dtyp_alignment_fin_inf.
-        generalize (SIZEOF.max_preferred_dtyp_alignment dts) as struct_padding.
+        generalize (SZ.max_preferred_dtyp_alignment dts) as struct_padding.
         revert dts idx.
         eapply map_monad_oom_Forall2 in H1.
         revert x H1.
@@ -6560,7 +6577,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           + forward IHfields; intros; auto.
             apply H; cbn; auto.
             cbn in IHfields.
-            specialize (IHfields (offset + pad_amount (preferred_alignment (SIZEOF.dtyp_alignment d)) offset + SIZEOF.sizeof_dtyp d) l H5 dts (idx - Z.of_N (pad_amount (preferred_alignment (SIZEOF.dtyp_alignment d)) offset) - Z.of_N (SIZEOF.sizeof_dtyp d))%Z struct_padding).
+            specialize (IHfields (offset + pad_amount (preferred_alignment (SZ.dtyp_alignment d)) offset + SZ.sizeof_dtyp d) l H5 dts (idx - Z.of_N (pad_amount (preferred_alignment (SZ.dtyp_alignment d)) offset) - Z.of_N (SZ.sizeof_dtyp d))%Z struct_padding).
             cbn in *.
             erewrite IHfields; intros; eauto.
       } 
@@ -6596,7 +6613,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         - reflexivity.
         - cbn.
           rewrite sizeof_dtyp_fin_inf.
-          destruct (idx <? Z.of_N (SIZEOF.sizeof_dtyp dt))%Z.
+          destruct (idx <? Z.of_N (SZ.sizeof_dtyp dt))%Z.
           + apply H. repeat constructor. apply H4.
           + erewrite IHelts; intros; eauto.
             apply H; cbn; auto.
@@ -6612,7 +6629,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         - reflexivity.
         - cbn.
           rewrite sizeof_dtyp_fin_inf.
-          destruct (idx <? Z.of_N (SIZEOF.sizeof_dtyp dt))%Z.
+          destruct (idx <? Z.of_N (SZ.sizeof_dtyp dt))%Z.
           + apply H. repeat constructor. apply H4.
           + apply IHelts; intros; auto.
             apply H; auto.
@@ -6828,11 +6845,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
          | (dt::dts) =>
              let padding :=
                if pad
-               then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset
+               then pad_amount (preferred_alignment (SZ.dtyp_alignment dt)) offset
                else 0%N
              in
              let zpadding := Z.of_N padding in
-             let sz := SIZEOF.sizeof_dtyp dt in
+             let sz := SZ.sizeof_dtyp dt in
              (* Skip any padding bytes *)
              let dbs' := drop padding dbs in
              let init_bytes := take sz dbs' in
@@ -6851,11 +6868,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
          | (dt::dts) =>
              let padding :=
                if pad
-               then pad_amount (preferred_alignment (IS1.LP.SIZEOF.dtyp_alignment dt)) offset
+               then pad_amount (preferred_alignment (IS1.LP.SZ.dtyp_alignment dt)) offset
                else 0%N
              in
              let zpadding := Z.of_N padding in
-             let sz := IS1.LP.SIZEOF.sizeof_dtyp dt in
+             let sz := IS1.LP.SZ.sizeof_dtyp dt in
              (* Skip any padding bytes *)
              let dbs' := drop padding dbs in
              let init_bytes := take sz dbs' in
@@ -6888,8 +6905,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       }
 
       remember (dvalue_bytes_to_dvalue
-                  (take (SIZEOF.sizeof_dtyp a)
-                     (drop (if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment a)) offset else 0)
+                  (take (SZ.sizeof_dtyp a)
+                     (drop (if pad then pad_amount (preferred_alignment (SZ.dtyp_alignment a)) offset else 0)
                         dvbs_fin)) a) as init.
       destruct_err_oom_poison init;
         try solve [subst; cbn; eauto].
@@ -6902,29 +6919,29 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             | dt :: dts0 =>
                 f0 <-
                   dvalue_bytes_to_dvalue
-                    (take (SIZEOF.sizeof_dtyp dt)
+                    (take (SZ.sizeof_dtyp dt)
                        (drop
                           (if pad
-                           then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset
+                           then pad_amount (preferred_alignment (SZ.dtyp_alignment dt)) offset
                            else 0) dbs)) dt;;
                 rest <-
                   go
                     (offset +
-                       (if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset else 0) +
-                       SIZEOF.sizeof_dtyp dt) dts0
-                    (drop (SIZEOF.sizeof_dtyp dt)
+                       (if pad then pad_amount (preferred_alignment (SZ.dtyp_alignment dt)) offset else 0) +
+                       SZ.sizeof_dtyp dt) dts0
+                    (drop (SZ.sizeof_dtyp dt)
                        (drop
                           (if pad
-                           then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset
+                           then pad_amount (preferred_alignment (SZ.dtyp_alignment dt)) offset
                            else 0) dbs));;
                 {|
                   EitherMonad.unEitherT := {| unMkOomableT := Unpoisoned (Unoomed (inr (f0 :: rest))) |}
                 |}
             end)
-           (offset + (if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment a)) offset else 0) +
-              SIZEOF.sizeof_dtyp a) dts
-           (drop (SIZEOF.sizeof_dtyp a)
-              (drop (if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment a)) offset else 0)
+           (offset + (if pad then pad_amount (preferred_alignment (SZ.dtyp_alignment a)) offset else 0) +
+              SZ.sizeof_dtyp a) dts
+           (drop (SZ.sizeof_dtyp a)
+              (drop (if pad then pad_amount (preferred_alignment (SZ.dtyp_alignment a)) offset else 0)
                  dvbs_fin))) as rest.
 
       erewrite IHdts with (res:=rest).
@@ -7090,7 +7107,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       Opaque IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue
         dvalue_bytes_to_dvalue.
       cbn in *.
-      destruct ((SIZEOF.sizeof_dtyp dt =? 0)%N) eqn:HSIZE.
+      destruct ((SZ.sizeof_dtyp dt =? 0)%N) eqn:HSIZE.
       { clear - IHdt NOOM.
         induction sz using N.peano_ind.
         - cbn.
@@ -7144,8 +7161,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             reflexivity.
       }
 
-      remember (split_every_nil (SIZEOF.sizeof_dtyp dt) dvbs_fin) as split_fin.
-      remember (split_every_nil (SIZEOF.sizeof_dtyp dt) dvbs_inf) as split_inf.
+      remember (split_every_nil (SZ.sizeof_dtyp dt) dvbs_fin) as split_fin.
+      remember (split_every_nil (SZ.sizeof_dtyp dt) dvbs_inf) as split_inf.
       symmetry in Heqsplit_fin, Heqsplit_inf.
 
       pose proof split_every_nil_Forall2 _ _ _ _ _ _ REF Heqsplit_inf Heqsplit_fin as ALL.
@@ -7221,16 +7238,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       remember
         (fun pad : option N => fix go
            (offset : N) (dts : list dtyp) (dbs : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte) {struct dts} :
-          ErrOOMPoison (list IS1.LP.Events.DV.dvalue) :=
+          ErrOOMPoison (list DV1.dvalue) :=
            match dts with
            | [] => ret []
            | dt :: dts0 =>
                let padding :=
                  if pad
-                 then pad_amount (preferred_alignment (IS1.LP.SIZEOF.dtyp_alignment dt)) offset
+                 then pad_amount (preferred_alignment (IS1.LP.SZ.dtyp_alignment dt)) offset
                  else 0 in
                let zpadding := Z.of_N padding in
-               let sz := IS1.LP.SIZEOF.sizeof_dtyp dt in
+               let sz := IS1.LP.SZ.sizeof_dtyp dt in
                let dbs' := drop padding dbs in
                let init_bytes := take sz dbs' in
                let rest_bytes := drop sz dbs' in
@@ -7247,10 +7264,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
            | [] => ret []
            | dt :: dts0 =>
                let padding :=
-                 if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset else 0
+                 if pad then pad_amount (preferred_alignment (SZ.dtyp_alignment dt)) offset else 0
                in
                let zpadding := Z.of_N padding in
-               let sz := SIZEOF.sizeof_dtyp dt in
+               let sz := SZ.sizeof_dtyp dt in
                let dbs' := drop padding dbs in
                let init_bytes := take sz dbs' in
                let rest_bytes := drop sz dbs' in
@@ -7269,9 +7286,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
            match dts with
            | [] => ret []
            | dt :: dts0 =>
-               let padding := pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset in
+               let padding := pad_amount (preferred_alignment (SZ.dtyp_alignment dt)) offset in
                let zpadding := Z.of_N padding in
-               let sz := SIZEOF.sizeof_dtyp dt in
+               let sz := SZ.sizeof_dtyp dt in
                let dbs' := drop padding dbs in
                let init_bytes := take sz dbs' in
                let rest_bytes := drop sz dbs' in
@@ -7296,16 +7313,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
            | [] => ret []
            | dt :: dts0 =>
                let padding :=
-                 if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset else 0 in
+                 if pad then pad_amount (preferred_alignment (SZ.dtyp_alignment dt)) offset else 0 in
                let zpadding := Z.of_N padding in
-               let sz := SIZEOF.sizeof_dtyp dt in
+               let sz := SZ.sizeof_dtyp dt in
                let dbs' := drop padding dbs in
                let init_bytes := take sz dbs' in
                let rest_bytes := drop sz dbs' in
                let offset' := offset + padding in
                f <- dvalue_bytes_to_dvalue init_bytes dt;;
                rest <- go (offset' + sz) dts0 rest_bytes;; ret (f :: rest)
-           end) (Some (SIZEOF.max_preferred_dtyp_alignment fields)) 0 fields dvbs_fin) as res.
+           end) (Some (SZ.max_preferred_dtyp_alignment fields)) 0 fields dvbs_fin) as res.
       destruct_err_oom_poison res; inv CONTRA; cbn in *; auto;
       setoid_rewrite H1;
       cbn;
@@ -7323,16 +7340,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       remember
         (fun pad : option N => fix go
            (offset : N) (dts : list dtyp) (dbs : list IS1.LLVM.MEM.DVALUE_BYTE.dvalue_byte) {struct dts} :
-          ErrOOMPoison (list IS1.LP.Events.DV.dvalue) :=
+          ErrOOMPoison (list DV1.dvalue) :=
            match dts with
            | [] => ret []
            | dt :: dts0 =>
                let padding :=
                  if pad
-                 then pad_amount (preferred_alignment (IS1.LP.SIZEOF.dtyp_alignment dt)) offset
+                 then pad_amount (preferred_alignment (IS1.LP.SZ.dtyp_alignment dt)) offset
                  else 0 in
                let zpadding := Z.of_N padding in
-               let sz := IS1.LP.SIZEOF.sizeof_dtyp dt in
+               let sz := IS1.LP.SZ.sizeof_dtyp dt in
                let dbs' := drop padding dbs in
                let init_bytes := take sz dbs' in
                let rest_bytes := drop sz dbs' in
@@ -7349,10 +7366,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
            | [] => ret []
            | dt :: dts0 =>
                let padding :=
-                 if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset else 0
+                 if pad then pad_amount (preferred_alignment (SZ.dtyp_alignment dt)) offset else 0
                in
                let zpadding := Z.of_N padding in
-               let sz := SIZEOF.sizeof_dtyp dt in
+               let sz := SZ.sizeof_dtyp dt in
                let dbs' := drop padding dbs in
                let init_bytes := take sz dbs' in
                let rest_bytes := drop sz dbs' in
@@ -7373,7 +7390,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
            | dt :: dts0 =>
                let padding := 0 in
                let zpadding := Z.of_N padding in
-               let sz := SIZEOF.sizeof_dtyp dt in
+               let sz := SZ.sizeof_dtyp dt in
                let dbs' := drop padding dbs in
                let init_bytes := take sz dbs' in
                let rest_bytes := drop sz dbs' in
@@ -7398,9 +7415,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
            | [] => ret []
            | dt :: dts0 =>
                let padding :=
-                 if pad then pad_amount (preferred_alignment (SIZEOF.dtyp_alignment dt)) offset else 0 in
+                 if pad then pad_amount (preferred_alignment (SZ.dtyp_alignment dt)) offset else 0 in
                let zpadding := Z.of_N padding in
-               let sz := SIZEOF.sizeof_dtyp dt in
+               let sz := SZ.sizeof_dtyp dt in
                let dbs' := drop padding dbs in
                let init_bytes := take sz dbs' in
                let rest_bytes := drop sz dbs' in
@@ -7422,7 +7439,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       Opaque IS1.LLVM.MEM.DVALUE_BYTE.dvalue_bytes_to_dvalue
         dvalue_bytes_to_dvalue.
       cbn in *.
-      destruct ((SIZEOF.sizeof_dtyp dt =? 0)%N) eqn:HSIZE.
+      destruct ((SZ.sizeof_dtyp dt =? 0)%N) eqn:HSIZE.
       { clear - IHdt NOOM.
         induction sz using N.peano_ind.
         - cbn.
@@ -7476,8 +7493,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
             reflexivity.
       }
 
-      remember (split_every_nil (SIZEOF.sizeof_dtyp dt) dvbs_fin) as split_fin.
-      remember (split_every_nil (SIZEOF.sizeof_dtyp dt) dvbs_inf) as split_inf.
+      remember (split_every_nil (SZ.sizeof_dtyp dt) dvbs_fin) as split_fin.
+      remember (split_every_nil (SZ.sizeof_dtyp dt) dvbs_inf) as split_inf.
       symmetry in Heqsplit_fin, Heqsplit_inf.
 
       pose proof split_every_nil_Forall2 _ _ _ _ _ _ REF Heqsplit_inf Heqsplit_fin as ALL.
@@ -7555,7 +7572,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        IS1.LP.Events.DV.dvalue IS1.LP.Events.DV.DVALUE_Poison (IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_bytes_to_dvalue dvbs_inf τ) = success_unERR_UB_OOM (fin_to_inf_dvalue res).
+        DV1.dvalue DV1.DVALUE_Poison (IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_bytes_to_dvalue dvbs_inf τ) = success_unERR_UB_OOM (fin_to_inf_dvalue res).
   Proof.
     intros τ dvbs_inf dvbs_fin res H H0.
     remember (@DVALUE_BYTES.dvalue_bytes_to_dvalue ErrOOMPoison
@@ -7671,7 +7688,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma get_conv_case_pure_fin_inf:
     forall conv t_from dv t_to res,
       get_conv_case conv t_from dv t_to = Conv_Pure res ->
-      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = IS1.LP.Events.DV.Conv_Pure (fin_to_inf_dvalue res).
+      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = DV1.Conv_Pure (fin_to_inf_dvalue res).
   Proof.
     intros conv t_from dv t_to res CONV.
     destruct conv.
@@ -7806,7 +7823,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma get_conv_case_itop_fin_inf:
     forall conv t_from dv t_to res,
       get_conv_case conv t_from dv t_to = Conv_ItoP res ->
-      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = IS1.LP.Events.DV.Conv_ItoP (fin_to_inf_dvalue res).
+      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = DV1.Conv_ItoP (fin_to_inf_dvalue res).
   Proof.
     intros conv t_from dv t_to res CONV.
     destruct conv.
@@ -7916,7 +7933,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma get_conv_case_ptoi_fin_inf:
     forall conv t_from dv t_to res,
       get_conv_case conv t_from dv t_to = Conv_PtoI res ->
-      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = IS1.LP.Events.DV.Conv_PtoI (fin_to_inf_dvalue res).
+      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = DV1.Conv_PtoI (fin_to_inf_dvalue res).
   Proof.
     intros conv t_from dv t_to res CONV.
     destruct conv.
@@ -8058,8 +8075,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
         - cbn.
           replace
-            (fun (acc : N) (t : dtyp) => pad_to_align (IS1.LP.SIZEOF.dtyp_alignment t) acc + IS1.LP.SIZEOF.sizeof_dtyp t)%N with
-              (fun (acc : N) (t : dtyp) => pad_to_align (SIZEOF.dtyp_alignment t) acc + SIZEOF.sizeof_dtyp t)%N; eauto.
+            (fun (acc : N) (t : dtyp) => pad_to_align (IS1.LP.SZ.dtyp_alignment t) acc + IS1.LP.SZ.sizeof_dtyp t)%N with
+              (fun (acc : N) (t : dtyp) => pad_to_align (SZ.dtyp_alignment t) acc + SZ.sizeof_dtyp t)%N; eauto.
 
           apply FunctionalExtensionality.functional_extensionality.
           intros.
@@ -8069,8 +8086,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           rewrite dtyp_alignment_fin_inf.
           auto.
         - replace
-            (fun (acc : N) (t : dtyp) => acc + IS1.LP.SIZEOF.sizeof_dtyp t) with
-            (fun (acc : N) (t : dtyp) => acc + SIZEOF.sizeof_dtyp t); eauto.
+            (fun (acc : N) (t : dtyp) => acc + IS1.LP.SZ.sizeof_dtyp t) with
+            (fun (acc : N) (t : dtyp) => acc + SZ.sizeof_dtyp t); eauto.
 
           apply FunctionalExtensionality.functional_extensionality.
           intros.
@@ -8136,7 +8153,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     forall t vec idx res,
       @index_into_vec_dv err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) t vec idx = ret res ->
-      @IS1.LP.Events.DV.index_into_vec_dv err_ub_oom
+      @DV1.index_into_vec_dv err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) t
         (fin_to_inf_dvalue vec) (fin_to_inf_dvalue idx) =
@@ -8144,7 +8161,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Proof.
     intros t vec idx res INDEX.
     unfold index_into_vec_dv in INDEX.
-    unfold IS1.LP.Events.DV.index_into_vec_dv.
+    unfold DV1.index_into_vec_dv.
 
     break_match_hyp_inv.
     { (* Arrays *)
@@ -8468,7 +8485,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
       fin_to_inf_dvalue dv3_fin = dv3_inf ->
-      @IS1.LP.Events.DV.insert_into_vec_dv err_ub_oom
+      @DV1.insert_into_vec_dv err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         t dv1_inf dv2_inf dv3_inf = ret (fin_to_inf_dvalue res_fin).
@@ -8476,7 +8493,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros dv1_fin dv2_fin dv3_fin res_fin dv1_inf dv2_inf dv3_inf t INSERT LIFT1 LIFT2 LIFT3.
     subst.
     unfold insert_into_vec_dv in INSERT.
-    unfold IS1.LP.Events.DV.insert_into_vec_dv.
+    unfold DV1.insert_into_vec_dv.
 
     break_match_hyp_inv.
     { (* Arrays *)
@@ -8581,10 +8598,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma index_into_str_dv_fin_inf :
     forall {v idx} {res : err_ub_oom dvalue},
       index_into_str_dv v idx = res ->
-      E1.DV.index_into_str_dv (fin_to_inf_dvalue v) idx = fmap fin_to_inf_dvalue res.
+      DV1.index_into_str_dv (fin_to_inf_dvalue v) idx = fmap fin_to_inf_dvalue res.
   Proof.
     intros v idx res H.
-    unfold E1.DV.index_into_str_dv, index_into_str_dv in *.
+    unfold DV1.index_into_str_dv, index_into_str_dv in *.
     break_match_hyp;
       try solve
         [ unfold fin_to_inf_dvalue; break_match_goal; break_match_hyp_inv; clear Heqs; destruct p; clear e0;
@@ -8629,7 +8646,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
          match idxs with
          | [] => ret str
          | i :: tl =>
-             v <- E1.DV.index_into_str_dv str i ;;
+             v <- DV1.index_into_str_dv str i ;;
              loop v tl
          end) (fin_to_inf_dvalue str) idxs = ret (fin_to_inf_dvalue res).
   Proof.
@@ -8706,7 +8723,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma insert_into_str_fin_inf :
     forall {str v i} {res : err_ub_oom dvalue},
       insert_into_str str v i = res ->
-      E1.DV.insert_into_str (fin_to_inf_dvalue str) (fin_to_inf_dvalue v) i = fmap fin_to_inf_dvalue res.
+      DV1.insert_into_str (fin_to_inf_dvalue str) (fin_to_inf_dvalue v) i = fmap fin_to_inf_dvalue res.
   Proof.
     intros str v i res INSERT.
     destruct str;
@@ -8721,7 +8738,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
     - (* Structs *)
       rewrite fin_to_inf_dvalue_struct;
-        unfold E1.DV.insert_into_str, insert_into_str in *.
+        unfold DV1.insert_into_str, insert_into_str in *.
       cbn in INSERT.
       break_match_hyp.
       rewrite <- fmap_map.
@@ -8739,7 +8756,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       reflexivity.
     - (* Packed Structs *)
       rewrite fin_to_inf_dvalue_packed_struct;
-        unfold E1.DV.insert_into_str, insert_into_str in *.
+        unfold DV1.insert_into_str, insert_into_str in *.
       cbn in INSERT.
       break_match_hyp.
       rewrite <- fmap_map.
@@ -8757,7 +8774,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       reflexivity.
     - (* Array *)
       rewrite fin_to_inf_dvalue_array;
-        unfold E1.DV.insert_into_str, insert_into_str in *.
+        unfold DV1.insert_into_str, insert_into_str in *.
       cbn in INSERT.
       break_match_hyp.
       rewrite <- fmap_map.
@@ -8804,12 +8821,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
          match idxs with
          | [] => raise_error "Index was not provided"
          | i :: nil =>
-             v <- E1.DV.insert_into_str str (fin_to_inf_dvalue elt) i;;
+             v <- DV1.insert_into_str str (fin_to_inf_dvalue elt) i;;
              ret v
          | i :: tl =>
-             subfield <- E1.DV.index_into_str_dv str i;;
+             subfield <- DV1.index_into_str_dv str i;;
              modified_subfield <- loop subfield tl;;
-             E1.DV.insert_into_str str modified_subfield i
+             DV1.insert_into_str str modified_subfield i
          end) (fin_to_inf_dvalue str) idxs = fmap fin_to_inf_dvalue res.
   Proof.
     induction idxs;
@@ -8868,11 +8885,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1." = ue
       end x ->
       match fin_to_inf_dvalue a with
-      | @E1.DV.DVALUE_I 1 i =>
+      | @DV1.DVALUE_I 1 i =>
           if (@Integers.unsigned 1 i =? 1)%Z
           then fun y : err_ub_oom DVCrev.DV2.dvalue => success_unERR_UB_OOM (fin_to_inf_dvalue d) = y
           else fun y : err_ub_oom DVCrev.DV2.dvalue => success_unERR_UB_OOM (fin_to_inf_dvalue d0) = y
-      | E1.DV.DVALUE_Poison t => fun y : err_ub_oom DVCrev.DV2.dvalue => success_unERR_UB_OOM (E1.DV.DVALUE_Poison t) = y
+      | DV1.DVALUE_Poison t => fun y : err_ub_oom DVCrev.DV2.dvalue => success_unERR_UB_OOM (DV1.DVALUE_Poison t) = y
       | _ =>
           fun ue : err_ub_oom DVCrev.DV2.dvalue =>
             ERR_unERR_UB_OOM
@@ -8939,10 +8956,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
          | (c::conds), (x::xs), (y::ys) =>
              @bind ErrUbOomProp Monad_ErrUbOomProp _ _
                (match c with
-                | IS1.LP.Events.DV.DVALUE_Poison t =>
+                | DV1.DVALUE_Poison t =>
                     (* TODO: Should be the type of the result of the select... *)
-                    @ret ErrUbOomProp Monad_ErrUbOomProp _ (IS1.LP.Events.DV.DVALUE_Poison t)
-                | @IS1.LP.Events.DV.DVALUE_I 1 i =>
+                    @ret ErrUbOomProp Monad_ErrUbOomProp _ (DV1.DVALUE_Poison t)
+                | @DV1.DVALUE_I 1 i =>
                     if (@Integers.unsigned 1 i =? 1)%Z
                     then @ret ErrUbOomProp Monad_ErrUbOomProp _ x
                     else @ret ErrUbOomProp Monad_ErrUbOomProp _ y
@@ -9088,7 +9105,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                    EitherMonad.unEitherT :=
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
-             |} => E1.DV.dvalue_has_dtyp dv dt /\ dv <> E1.DV.DVALUE_Poison dt
+             |} => DV1.dvalue_has_dtyp dv dt /\ dv <> DV1.DVALUE_Poison dt
            | _ => True
            end) err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -9268,7 +9285,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       do 2 rewrite fin_to_inf_dvalue_vector.
       repeat red.
       exists (fmap (map fin_to_inf_dvalue) x).
-      exists (fun elts => ret (IS1.LP.Events.DV.DVALUE_Vector t0 elts)).
+      exists (fun elts => ret (DV1.DVALUE_Vector t0 elts)).
       split; eauto.
       split; eauto.
 
@@ -9287,7 +9304,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma fin_to_inf_dvalue_not_poison :
     forall dv_fin t,
       dv_fin <> DVALUE_Poison t ->
-      fin_to_inf_dvalue dv_fin <> IS1.LP.Events.DV.DVALUE_Poison t.
+      fin_to_inf_dvalue dv_fin <> DV1.DVALUE_Poison t.
   Proof.
     intros dv_fin t NPOISON CONTRA.
     eapply NPOISON.
@@ -9300,18 +9317,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     auto.
   Qed.
 
-  Definition concretization_list_refine : (list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)) -> (list (uvalue * dvalue)) -> Prop
+  Definition concretization_list_refine : (list (DV1.uvalue * DV1.dvalue)) -> (list (uvalue * dvalue)) -> Prop
     :=
     Forall2 (uvalue_refine_strict × dvalue_refine_strict).
 
   Definition concretization_map_refine
-    (inf_map : NMap (list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)))
+    (inf_map : NMap (list (DV1.uvalue * DV1.dvalue)))
     (fin_map : NMap (list (uvalue * dvalue))) : Prop
     :=
     NM_Refine concretization_list_refine inf_map fin_map.
 
   Lemma concretization_map_refine_empty :
-    concretization_map_refine (NM.empty (list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue))) (NM.empty (list (uvalue * dvalue))).
+    concretization_map_refine (NM.empty (list (DV1.uvalue * DV1.dvalue))) (NM.empty (list (uvalue * dvalue))).
   Proof.
     repeat red.
     split.
@@ -9326,7 +9343,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma concretize_map_refine_find_none_inf_fin :
     forall acc_inf acc_fin sid,
       concretization_map_refine acc_inf acc_fin ->
-      NM.find (elt:=list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)) sid acc_inf = None ->
+      NM.find (elt:=list (DV1.uvalue * DV1.dvalue)) sid acc_inf = None ->
       NM.find (elt:=list (uvalue * dvalue)) sid acc_fin = None.
   Proof.
     intros acc_inf acc_fin sid ACC_REF FIND.
@@ -9343,7 +9360,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma concretize_map_refine_find_some_inf_fin :
     forall acc_inf acc_fin sid conc_list_inf,
       concretization_map_refine acc_inf acc_fin ->
-      NM.find (elt:=list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)) sid acc_inf = Some conc_list_inf ->
+      NM.find (elt:=list (DV1.uvalue * DV1.dvalue)) sid acc_inf = Some conc_list_inf ->
       exists conc_list_fin,
         NM.find (elt:=list (uvalue * dvalue)) sid acc_fin = Some conc_list_fin /\
           concretization_list_refine conc_list_inf conc_list_fin.
@@ -9473,7 +9490,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         new_concretized_byte in *.
       red.
       pose proof ACC_REF as [_ ACC_MAPS].
-      destruct (NM.find (elt:=list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)) sid acc_inf) eqn:FIND_INF.
+      destruct (NM.find (elt:=list (DV1.uvalue * DV1.dvalue)) sid acc_inf) eqn:FIND_INF.
       - eapply concretize_map_refine_find_some_inf_fin in FIND_INF; eauto.
         destruct FIND_INF as (?&?&?).
         rewrite H in MAPS2.
@@ -9588,15 +9605,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (fun (A : Type) (x ue : err_ub_oom A) => x = ue) acc_fin uvs_fin (ret res) ->
       @IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalue_bytes_helper ErrUbOomProp Monad_ErrUbOomProp
-        (fun (dt0 : dtyp) (edv : err_ub_oom IS1.LP.Events.DV.dvalue) =>
-           match @unERR_UB_OOM IdentityMonad.ident IS1.LP.Events.DV.dvalue edv with
+        (fun (dt0 : dtyp) (edv : err_ub_oom DV1.dvalue) =>
+           match @unERR_UB_OOM IdentityMonad.ident DV1.dvalue edv with
            | {|
                EitherMonad.unEitherT :=
                  {|
                    EitherMonad.unEitherT :=
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
-             |} => IS1.LP.Events.DV.dvalue_has_dtyp dv dt0 /\ dv <> IS1.LP.Events.DV.DVALUE_Poison dt0
+             |} => DV1.dvalue_has_dtyp dv dt0 /\ dv <> DV1.DVALUE_Poison dt0
            | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -9698,7 +9715,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma dvalue_int_unsigned_E1E2 :
     forall x y,
       dvalue_refine_strict x y ->
-      IS1.LP.Events.DV.dvalue_int_unsigned x = dvalue_int_unsigned y.
+      DV1.dvalue_int_unsigned x = dvalue_int_unsigned y.
   Proof.
     induction x; intros y REF;
       try
@@ -10055,7 +10072,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
           repeat red.
           exists (ret (map fin_to_inf_dvalue x1)).
-          exists (fun fields => ret (IS1.LP.Events.DV.DVALUE_Struct fields)).
+          exists (fun fields => ret (DV1.DVALUE_Struct fields)).
           split.
           { eapply map_monad_ErrUbOomProp_forall2.
             apply Util.Forall2_forall.
@@ -10129,7 +10146,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
           repeat red.
           exists (ret (map fin_to_inf_dvalue x1)).
-          exists (fun fields => ret (IS1.LP.Events.DV.DVALUE_Packed_struct fields)).
+          exists (fun fields => ret (DV1.DVALUE_Packed_struct fields)).
           split.
           { eapply map_monad_ErrUbOomProp_forall2.
             apply Util.Forall2_forall.
@@ -10203,7 +10220,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       repeat red.
       exists (ret (map fin_to_inf_dvalue x1)).
-      exists (fun fields => ret (IS1.LP.Events.DV.DVALUE_Array t fields)).
+      exists (fun fields => ret (DV1.DVALUE_Array t fields)).
       split.
       { eapply map_monad_ErrUbOomProp_forall2.
         apply Util.Forall2_forall.
@@ -10277,7 +10294,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
       repeat red.
       exists (ret (map fin_to_inf_dvalue x1)).
-      exists (fun fields => ret (IS1.LP.Events.DV.DVALUE_Vector t fields)).
+      exists (fun fields => ret (DV1.DVALUE_Vector t fields)).
       split.
       { eapply map_monad_ErrUbOomProp_forall2.
         apply Util.Forall2_forall.
@@ -11452,7 +11469,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma concretize_fails_inf_fin :
     forall uv_inf uv_fin
       (REF : uvalue_refine_strict uv_inf uv_fin)
-      (FAILS : forall dv : IS1.LP.Events.DV.dvalue, ~ IS1.LLVM.MEM.CP.CONC.concretize uv_inf dv),
+      (FAILS : forall dv : DV1.dvalue, ~ IS1.LLVM.MEM.CP.CONC.concretize uv_inf dv),
     forall dv : dvalue, ~ concretize uv_fin dv.
   Proof.
     intros uv_inf uv_fin REF FAILS dv CONC.
@@ -11526,12 +11543,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@VIntVMemInt (@Integers.bit_int sz) (@VInt_Bounded sz)) (@ToDvalue_Int sz)
         iop v1 v2 = UB_unERR_UB_OOM ub_msg ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom (@Integers.bit_int sz)
+      @DV1.eval_int_op err_ub_oom (@Integers.bit_int sz)
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt (@Integers.bit_int sz) (@VInt_Bounded sz)) (@IS1.LP.Events.DV.ToDvalue_Int sz)
+        (@VIntVMemInt (@Integers.bit_int sz) (@VInt_Bounded sz)) (@DV1.ToDvalue_Int sz)
         iop v1 v2 = UB_unERR_UB_OOM ub_msg.
   Proof.
     intros sz v1 v2 iop ub_msg EVAL.
@@ -11561,12 +11578,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         iop v1_fin v2_fin = UB_unERR_UB_OOM ub_msg ->
       IS1.LP.IP.from_Z (IP.to_Z v1_fin) = NoOom v1_inf ->
       IS1.LP.IP.from_Z (IP.to_Z v2_fin) = NoOom v2_inf ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom IS1.LP.IP.intptr
+      @DV1.eval_int_op err_ub_oom IS1.LP.IP.intptr
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        IS1.LP.Events.DV.VMemInt_intptr' IS1.LP.Events.DV.ToDvalue_intptr
+        DV1.VMemInt_intptr' DV1.ToDvalue_intptr
         iop v1_inf v2_inf = UB_unERR_UB_OOM ub_msg.
   Proof.
     intros v1_fin v2_fin v1_inf v2_inf iop ub_msg
@@ -11753,12 +11770,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@VIntVMemInt (@Integers.bit_int sz) (@VInt_Bounded sz)) (@ToDvalue_Int sz)
         iop v1 v2 = ERR_unERR_UB_OOM err_msg ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom (@Integers.bit_int sz)
+      @DV1.eval_int_op err_ub_oom (@Integers.bit_int sz)
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        (@VIntVMemInt (@Integers.bit_int sz) (@VInt_Bounded sz)) (@IS1.LP.Events.DV.ToDvalue_Int sz)
+        (@VIntVMemInt (@Integers.bit_int sz) (@VInt_Bounded sz)) (@DV1.ToDvalue_Int sz)
         iop v1 v2 = ERR_unERR_UB_OOM err_msg.
   Proof.
     intros sz v1 v2 iop ub_msg EVAL.
@@ -11788,12 +11805,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         iop v1_fin v2_fin = ERR_unERR_UB_OOM err_msg ->
       IS1.LP.IP.from_Z (IP.to_Z v1_fin) = NoOom v1_inf ->
       IS1.LP.IP.from_Z (IP.to_Z v2_fin) = NoOom v2_inf ->
-      @IS1.LP.Events.DV.eval_int_op err_ub_oom IS1.LP.IP.intptr
+      @DV1.eval_int_op err_ub_oom IS1.LP.IP.intptr
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        IS1.LP.Events.DV.VMemInt_intptr' IS1.LP.Events.DV.ToDvalue_intptr
+        DV1.VMemInt_intptr' DV1.ToDvalue_intptr
         iop v1_inf v2_inf = ERR_unERR_UB_OOM err_msg.
   Proof.
     intros v1_fin v2_fin v1_inf v2_inf iop err_msg
@@ -11991,7 +12008,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           fin_to_inf_dvalue dv2_fin = dv2_inf ->
           f_inf dv1_inf dv2_inf = UB_unERR_UB_OOM ub_msg) ->
       @vec_loop _ err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) f_fin (combine xs ys) = UB_unERR_UB_OOM ub_msg ->
-      @IS1.LP.Events.DV.vec_loop _ err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) f_inf (combine (map fin_to_inf_dvalue xs) (map fin_to_inf_dvalue ys)) = UB_unERR_UB_OOM ub_msg.
+      @DV1.vec_loop _ err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) f_inf (combine (map fin_to_inf_dvalue xs) (map fin_to_inf_dvalue ys)) = UB_unERR_UB_OOM ub_msg.
   Proof.
     intros f_fin f_inf xs ys res SUCCESS UB RES.
 
@@ -12020,7 +12037,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn in RES; inv RES;
         symmetry in Heqres'.
       { specialize (IHZIP res eq_refl).
-        unfold IS1.LP.Events.DV.vec_loop in *.
+        unfold DV1.vec_loop in *.
         unfold vec_loop.
         rewrite IHZIP; reflexivity.
       }
@@ -12049,7 +12066,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           fin_to_inf_dvalue dv2_fin = dv2_inf ->
           f_inf dv1_inf dv2_inf = ERR_unERR_UB_OOM ub_msg) ->
       @vec_loop _ err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) f_fin (combine xs ys) = ERR_unERR_UB_OOM err_msg ->
-      @IS1.LP.Events.DV.vec_loop _ err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) f_inf (combine (map fin_to_inf_dvalue xs) (map fin_to_inf_dvalue ys)) = ERR_unERR_UB_OOM err_msg.
+      @DV1.vec_loop _ err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) f_inf (combine (map fin_to_inf_dvalue xs) (map fin_to_inf_dvalue ys)) = ERR_unERR_UB_OOM err_msg.
   Proof.
     intros f_fin f_inf xs ys res SUCCESS UB RES.
 
@@ -12078,7 +12095,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn in RES; inv RES;
         symmetry in Heqres'.
       { specialize (IHZIP res eq_refl).
-        unfold IS1.LP.Events.DV.vec_loop in *.
+        unfold DV1.vec_loop in *.
         unfold vec_loop.
         rewrite IHZIP; reflexivity.
       }
@@ -12104,7 +12121,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         iop dv1_fin dv2_fin = UB_unERR_UB_OOM ub_msg ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
-      @IS1.LP.Events.DV.eval_iop_integer_h err_ub_oom
+      @DV1.eval_iop_integer_h err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -12163,7 +12180,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         iop dv1_fin dv2_fin = ERR_unERR_UB_OOM ub_msg ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
-      @IS1.LP.Events.DV.eval_iop_integer_h err_ub_oom
+      @DV1.eval_iop_integer_h err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -12215,7 +12232,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         iop dv1_fin dv2_fin = UB_unERR_UB_OOM ub_msg ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
-      @IS1.LP.Events.DV.eval_iop err_ub_oom
+      @DV1.eval_iop err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -12285,7 +12302,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         iop dv1_fin dv2_fin = ERR_unERR_UB_OOM err_msg ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
-      @IS1.LP.Events.DV.eval_iop err_ub_oom
+      @DV1.eval_iop err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -12344,13 +12361,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       @eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt samesign icmp a b = UB_unERR_UB_OOM ub_msg  ->
-      @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
+      @DV1.eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt samesign icmp a b = UB_unERR_UB_OOM ub_msg.
   Proof.
     intros Int VMInt samesign icmp a b ub_msg FIN.
-    Transparent eval_int_icmp IS1.LP.Events.DV.eval_int_icmp.
-    unfold eval_int_icmp, IS1.LP.Events.DV.eval_int_icmp.
+    Transparent eval_int_icmp DV1.eval_int_icmp.
+    unfold eval_int_icmp, DV1.eval_int_icmp.
     destruct icmp;
       try solve
         [ cbn in *;
@@ -12375,11 +12392,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         samesign icmp v1_fin v2_fin = UB_unERR_UB_OOM ub_msg ->
       IS1.LP.IP.from_Z (IP.to_Z v1_fin) = NoOom v1_inf ->
       IS1.LP.IP.from_Z (IP.to_Z v2_fin) = NoOom v2_inf ->
-      @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
+      @DV1.eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         IS1.LP.IP.intptr
-        IS1.LP.Events.DV.VMemInt_intptr'
+        DV1.VMemInt_intptr'
         samesign icmp v1_inf v2_inf = UB_unERR_UB_OOM ub_msg.
   Proof.
     intros v1_fin v2_fin v1_inf v2_inf samesign icmp ub_msg EVAL LIFT1 LIFT2.
@@ -12415,11 +12432,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         samesign icmp v1_fin v2_fin = ERR_unERR_UB_OOM err_msg ->
       IS1.LP.IP.from_Z (IP.to_Z v1_fin) = NoOom v1_inf ->
       IS1.LP.IP.from_Z (IP.to_Z v2_fin) = NoOom v2_inf ->
-      @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
+      @DV1.eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         IS1.LP.IP.intptr
-        IS1.LP.Events.DV.VMemInt_intptr'
+        DV1.VMemInt_intptr'
         samesign icmp v1_inf v2_inf = ERR_unERR_UB_OOM err_msg.
   Proof.
     intros v1_fin v2_fin v1_inf v2_inf samesign icmp err_msg EVAL LIFT1 LIFT2.
@@ -12462,7 +12479,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         samesign icmp dv1_inf dv2_inf = UB_unERR_UB_OOM ub_msg.
   Proof.
     intros dv1_fin dv2_fin ub_msg samesign icmp dv1_inf dv2_inf EVAL LIFT1 LIFT2.
-    Opaque IS1.LP.Events.DV.eval_int_icmp
+    Opaque DV1.eval_int_icmp
       eval_int_icmp.
     unfold eval_icmp in EVAL.
     (* Nasty case analysis... *)
@@ -12512,13 +12529,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       @eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt samesign icmp a b = ERR_unERR_UB_OOM err_msg  ->
-      @IS1.LP.Events.DV.eval_int_icmp err_ub_oom
+      @DV1.eval_int_icmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) Int VMInt samesign icmp a b = ERR_unERR_UB_OOM err_msg.
   Proof.
     intros Int VMInt samesign icmp a b err_msg FIN.
-    Transparent eval_int_icmp IS1.LP.Events.DV.eval_int_icmp.
-    unfold eval_int_icmp, IS1.LP.Events.DV.eval_int_icmp.
+    Transparent eval_int_icmp DV1.eval_int_icmp.
+    unfold eval_int_icmp, DV1.eval_int_icmp.
     destruct icmp;
       try solve
         [ cbn in *;
@@ -12539,8 +12556,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     forall fields,
       (forall dv,
           In dv fields ->
-          show_dvalue dv = IS1.LP.Events.DV.show_dvalue (fin_to_inf_dvalue dv)) ->
-      map show_dvalue fields = map IS1.LP.Events.DV.show_dvalue (map fin_to_inf_dvalue fields).
+          show_dvalue dv = DV1.show_dvalue (fin_to_inf_dvalue dv)) ->
+      map show_dvalue fields = map DV1.show_dvalue (map fin_to_inf_dvalue fields).
   Proof.
     induction fields; intros SHOW.
     - reflexivity.
@@ -12569,7 +12586,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Lemma show_dvalue_fin_inf :
     forall dv,
-      show_dvalue dv = IS1.LP.Events.DV.show_dvalue (fin_to_inf_dvalue dv).
+      show_dvalue dv = DV1.show_dvalue (fin_to_inf_dvalue dv).
   Proof.
     intros dv.
     induction dv; cbn; rewrite_fin_to_inf_dvalue; cbn; auto;
@@ -12593,9 +12610,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         samesign icmp dv1_inf dv2_inf = ERR_unERR_UB_OOM err_msg.
   Proof.
     intros dv1_fin dv2_fin err_msg samesign icmp dv1_inf dv2_inf EVAL LIFT1 LIFT2.
-    Opaque IS1.LP.Events.DV.eval_int_icmp
+    Opaque DV1.eval_int_icmp
       eval_int_icmp
-      IS1.LP.Events.DV.show_dvalue
+      DV1.show_dvalue
       show_dvalue.
 
     unfold eval_icmp in EVAL.
@@ -12664,7 +12681,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma double_op_ub_fin_inf :
     forall fop a b ub_msg,
       double_op fop a b = UB_unERR_UB_OOM ub_msg ->
-      IS1.LP.Events.DV.double_op fop a b = UB_unERR_UB_OOM ub_msg.
+      DV1.double_op fop a b = UB_unERR_UB_OOM ub_msg.
   Proof.
     intros fop a b ub_msg EVAL.
     destruct fop; cbn in *; inv EVAL.
@@ -12673,7 +12690,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma float_op_ub_fin_inf :
     forall fop a b ub_msg,
       float_op fop a b = UB_unERR_UB_OOM ub_msg ->
-      IS1.LP.Events.DV.float_op fop a b = UB_unERR_UB_OOM ub_msg.
+      DV1.float_op fop a b = UB_unERR_UB_OOM ub_msg.
   Proof.
     intros fop a b ub_msg EVAL.
     destruct fop; cbn in *; inv EVAL.
@@ -12682,7 +12699,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma double_op_err_fin_inf :
     forall fop a b err_msg,
       double_op fop a b = ERR_unERR_UB_OOM err_msg ->
-      IS1.LP.Events.DV.double_op fop a b = ERR_unERR_UB_OOM err_msg.
+      DV1.double_op fop a b = ERR_unERR_UB_OOM err_msg.
   Proof.
     intros fop a b err_msg EVAL.
     destruct fop; cbn in *; inv EVAL; auto.
@@ -12691,7 +12708,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma float_op_err_fin_inf :
     forall fop a b err_msg,
       float_op fop a b = ERR_unERR_UB_OOM err_msg ->
-      IS1.LP.Events.DV.float_op fop a b = ERR_unERR_UB_OOM err_msg.
+      DV1.float_op fop a b = ERR_unERR_UB_OOM err_msg.
   Proof.
     intros fop a b err_msg EVAL.
     destruct fop; cbn in *; inv EVAL; auto.
@@ -12706,7 +12723,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         fop dv1_fin dv2_fin = UB_unERR_UB_OOM ub_msg ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
-      @IS1.LP.Events.DV.eval_fop err_ub_oom
+      @DV1.eval_fop err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -12727,8 +12744,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn.
 
         (* These should be the same... *)
-        unfold IS1.LP.Events.DV.fop_is_div.
-        unfold fop_is_div in Heqb.
+        unfold AstLib.fop_is_div in *.
         rewrite Heqb.
         reflexivity.
       }
@@ -12752,8 +12768,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         cbn.
 
         (* These should be the same... *)
-        unfold IS1.LP.Events.DV.fop_is_div.
-        unfold fop_is_div in Heqb.
+        unfold AstLib.fop_is_div in *.
         rewrite Heqb.
         reflexivity.
       }
@@ -12775,7 +12790,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         dv1_fin  = UB_unERR_UB_OOM ub_msg ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
-      @IS1.LP.Events.DV.eval_fneg err_ub_oom
+      @DV1.eval_fneg err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -12805,10 +12820,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     - (* Structs *)
       cbn.
       assert ((map
-         (fun x0 : E2.DV.dvalue =>
+         (fun x0 : DV2.dvalue =>
             CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) fields) =
                 (map
-         (fun x0 : E1.DV.dvalue =>
+         (fun x0 : DV1.dvalue =>
             CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) x)).
       { generalize dependent fields.
         induction x; intros fields H H1;
@@ -12840,10 +12855,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     - (* Packed structs *)
       cbn.
       assert ((map
-         (fun x0 : E2.DV.dvalue =>
+         (fun x0 : DV2.dvalue =>
             CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) fields) =
                 (map
-         (fun x0 : E1.DV.dvalue =>
+         (fun x0 : DV1.dvalue =>
             CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) x)).
       { generalize dependent fields.
         induction x; intros fields H H1;
@@ -12875,10 +12890,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     - (* Arrays *)
       cbn.
       assert ((map
-         (fun x0 : E2.DV.dvalue =>
+         (fun x0 : DV2.dvalue =>
             CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) elts) =
                 (map
-         (fun x0 : E1.DV.dvalue =>
+         (fun x0 : DV1.dvalue =>
             CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) x)).
       { generalize dependent elts.
         induction x; intros elts H H1;
@@ -12910,10 +12925,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     - (* Vectors *)
       cbn.
       assert ((map
-         (fun x0 : E2.DV.dvalue =>
+         (fun x0 : DV2.dvalue =>
             CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) elts) =
                 (map
-         (fun x0 : E1.DV.dvalue =>
+         (fun x0 : DV1.dvalue =>
             CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) x)).
       { generalize dependent elts.
         induction x; intros elts H H1;
@@ -12963,7 +12978,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         fop dv1_fin dv2_fin = ERR_unERR_UB_OOM err_msg ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
-      @IS1.LP.Events.DV.eval_fop err_ub_oom
+      @DV1.eval_fop err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -13012,7 +13027,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         fcmp dv1_fin dv2_fin = UB_unERR_UB_OOM ub_msg ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
-      @IS1.LP.Events.DV.eval_fcmp err_ub_oom
+      @DV1.eval_fcmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         fcmp dv1_inf dv2_inf = UB_unERR_UB_OOM ub_msg.
@@ -13030,7 +13045,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         fcmp dv1_fin dv2_fin = ERR_unERR_UB_OOM err_msg ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
-      @IS1.LP.Events.DV.eval_fcmp err_ub_oom
+      @DV1.eval_fcmp err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         fcmp dv1_inf dv2_inf = ERR_unERR_UB_OOM err_msg.
@@ -13087,7 +13102,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   (* TODO: Move this / generalize monad? *)
-  (* TODO: Prove this *)
   Lemma insert_into_vec_dv_no_ub_fin_inf :
     forall dv1_fin dv2_fin dv3_fin ub_msg t,
       @insert_into_vec_dv err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -13135,7 +13149,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                    EitherMonad.unEitherT :=
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
-             |} => E1.DV.dvalue_has_dtyp dv dt /\ dv <> E1.DV.DVALUE_Poison dt
+             |} => DV1.dvalue_has_dtyp dv dt /\ dv <> DV1.DVALUE_Poison dt
            | _ => True
            end) err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -13285,15 +13299,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (fun (A : Type) (x ue : err_ub_oom A) => x = ue) acc_fin uvs_fin (UB_unERR_UB_OOM ub_msg) ->
       @IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalue_bytes_helper ErrUbOomProp Monad_ErrUbOomProp
-        (fun (dt0 : dtyp) (edv : err_ub_oom IS1.LP.Events.DV.dvalue) =>
-           match @unERR_UB_OOM IdentityMonad.ident IS1.LP.Events.DV.dvalue edv with
+        (fun (dt0 : dtyp) (edv : err_ub_oom DV1.dvalue) =>
+           match @unERR_UB_OOM IdentityMonad.ident DV1.dvalue edv with
            | {|
                EitherMonad.unEitherT :=
                  {|
                    EitherMonad.unEitherT :=
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
-             |} => IS1.LP.Events.DV.dvalue_has_dtyp dv dt0 /\ dv <> IS1.LP.Events.DV.DVALUE_Poison dt0
+             |} => DV1.dvalue_has_dtyp dv dt0 /\ dv <> DV1.DVALUE_Poison dt0
            | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -13403,15 +13417,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (*       (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident) *)
   (*       (fun (A : Type) (x ue : err_ub_oom A) => x = ue) uvs_fin (UB_unERR_UB_OOM ub_msg) -> *)
   (*     @IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalue_bytes ErrUbOomProp Monad_ErrUbOomProp *)
-  (*       (fun (dt0 : dtyp) (edv : err_ub_oom IS1.LP.Events.DV.dvalue) => *)
-  (*          match @unERR_UB_OOM IdentityMonad.ident IS1.LP.Events.DV.dvalue edv with *)
+  (*       (fun (dt0 : dtyp) (edv : err_ub_oom DV1.dvalue) => *)
+  (*          match @unERR_UB_OOM IdentityMonad.ident DV1.dvalue edv with *)
   (*          | {| *)
   (*              EitherMonad.unEitherT := *)
   (*                {| *)
   (*                  EitherMonad.unEitherT := *)
   (*                    {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |} *)
   (*                |} *)
-  (*            |} => IS1.LP.Events.DV.dvalue_has_dtyp dv dt0 /\ dv <> IS1.LP.Events.DV.DVALUE_Poison dt0 *)
+  (*            |} => DV1.dvalue_has_dtyp dv dt0 /\ dv <> DV1.DVALUE_Poison dt0 *)
   (*          | _ => True *)
   (*          end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) *)
   (*       (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) *)
@@ -13438,7 +13452,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        IS1.LP.Events.DV.dvalue IS1.LP.Events.DV.DVALUE_Poison (IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_bytes_to_dvalue dvbs_inf τ) = UB_unERR_UB_OOM ub_msg.
+        DV1.dvalue DV1.DVALUE_Poison (IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_bytes_to_dvalue dvbs_inf τ) = UB_unERR_UB_OOM ub_msg.
   Proof.
     intros τ dvbs_inf dvbs_fin ub_msg H H0.
     remember (@DVALUE_BYTES.dvalue_bytes_to_dvalue ErrOOMPoison
@@ -13491,15 +13505,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   (*       (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident) *)
   (*       (fun (A : Type) (x ue : err_ub_oom A) => x = ue) l dt (UB_unERR_UB_OOM ub_msg) -> *)
   (*     @IS1.LLVM.MEM.CP.CONCBASE.extractbytes_to_dvalue ErrUbOomProp Monad_ErrUbOomProp *)
-  (*       (fun (dt0 : dtyp) (edv : err_ub_oom IS1.LP.Events.DV.dvalue) => *)
-  (*          match @unERR_UB_OOM IdentityMonad.ident IS1.LP.Events.DV.dvalue edv with *)
+  (*       (fun (dt0 : dtyp) (edv : err_ub_oom DV1.dvalue) => *)
+  (*          match @unERR_UB_OOM IdentityMonad.ident DV1.dvalue edv with *)
   (*          | {| *)
   (*              EitherMonad.unEitherT := *)
   (*                {| *)
   (*                  EitherMonad.unEitherT := *)
   (*                    {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |} *)
   (*                |} *)
-  (*            |} => IS1.LP.Events.DV.dvalue_has_dtyp dv dt0 /\ dv <> IS1.LP.Events.DV.DVALUE_Poison dt0 *)
+  (*            |} => DV1.dvalue_has_dtyp dv dt0 /\ dv <> DV1.DVALUE_Poison dt0 *)
   (*          | _ => True *)
   (*          end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) *)
   (*       (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) *)
@@ -14954,7 +14968,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
           intros u H0 uv_fin H2 ub_msg0 H3.
           eapply IH; eauto.
-          eapply IS1.LP.Events.DV.uvalue_concat_bytes_strict_subterm; eauto.
+          eapply DV1.uvalue_concat_bytes_strict_subterm; eauto.
         }
 
         destruct H1 as [[] | H1].
@@ -15001,7 +15015,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
         uvalue_convert_strict_inv Heqo1.
         eapply IH; eauto.
-        eapply IS1.LP.Events.DV.uvalue_concat_bytes_strict_subterm; eauto.
+        eapply DV1.uvalue_concat_bytes_strict_subterm; eauto.
         repeat constructor.
       }
 
@@ -15067,7 +15081,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         dv1_fin = ERR_unERR_UB_OOM err_msg ->
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
-      @IS1.LP.Events.DV.eval_fneg err_ub_oom
+      @DV1.eval_fneg err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_UB_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -15097,7 +15111,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
-        IS1.LP.Events.DV.dvalue IS1.LP.Events.DV.DVALUE_Poison (IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_bytes_to_dvalue dvbs_inf τ) = ERR_unERR_UB_OOM err_msg.
+        DV1.dvalue DV1.DVALUE_Poison (IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_bytes_to_dvalue dvbs_inf τ) = ERR_unERR_UB_OOM err_msg.
   Proof.
     intros τ dvbs_inf dvbs_fin err_msg H H0.
     remember (@DVALUE_BYTES.dvalue_bytes_to_dvalue ErrOOMPoison
@@ -15134,7 +15148,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       (msg : string)
       (CONV : get_conv_case LLVMAst.Bitcast t_from dv t_to = Conv_Illegal msg),
       IS1.LLVM.MEM.CP.CONC.get_conv_case LLVMAst.Bitcast t_from (fin_to_inf_dvalue dv) t_to =
-        IS1.LP.Events.DV.Conv_Illegal msg.
+        DV1.Conv_Illegal msg.
   Proof.
     intros t_from dv t_to msg CONV.
     cbn in *; inv CONV; auto.
@@ -15164,7 +15178,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma get_conv_case_illegal_fin_inf:
     forall conv t_from dv t_to msg,
       get_conv_case conv t_from dv t_to = Conv_Illegal msg ->
-      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = IS1.LP.Events.DV.Conv_Illegal msg.
+      IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = DV1.Conv_Illegal msg.
   Proof.
     intros conv t_from dv t_to msg CONV.
     destruct conv;
@@ -15214,8 +15228,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                    repeat setoid_rewrite padding_fin_inf; eauto
                   | break_match_hyp_inv; auto;
                     erewrite IHidxs_fin; eauto;
-                    replace (fun (acc : Z) (t : dtyp) => (pad_to_align (IS1.LP.SIZEOF.dtyp_alignment t) acc + IS1.LP.SIZEOF.sizeof_dtyp t))%Z with
-                      (fun (acc : Z) (t : dtyp) => (pad_to_align (SIZEOF.dtyp_alignment t) acc + SIZEOF.sizeof_dtyp t)%Z); eauto;
+                    replace (fun (acc : Z) (t : dtyp) => (pad_to_align (IS1.LP.SZ.dtyp_alignment t) acc + IS1.LP.SZ.sizeof_dtyp t))%Z with
+                      (fun (acc : Z) (t : dtyp) => (pad_to_align (SZ.dtyp_alignment t) acc + SZ.sizeof_dtyp t)%Z); eauto;
                     apply FunctionalExtensionality.functional_extensionality;
                     intros;
                     apply FunctionalExtensionality.functional_extensionality;
@@ -15236,9 +15250,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
         replace
           (fun (acc : N) (t : dtyp) =>
-             pad_to_align (IS1.LP.SIZEOF.dtyp_alignment t) acc + IS1.LP.SIZEOF.sizeof_dtyp t) with
+             pad_to_align (IS1.LP.SZ.dtyp_alignment t) acc + IS1.LP.SZ.sizeof_dtyp t) with
           (fun (acc : N) (t : dtyp) =>
-             pad_to_align (SIZEOF.dtyp_alignment t) acc + SIZEOF.sizeof_dtyp t); eauto;
+             pad_to_align (SZ.dtyp_alignment t) acc + SZ.sizeof_dtyp t); eauto;
           apply FunctionalExtensionality.functional_extensionality;
           intros;
           apply FunctionalExtensionality.functional_extensionality;
@@ -15250,9 +15264,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
         replace
           (fun (acc : N) (t : dtyp) =>
-             acc + IS1.LP.SIZEOF.sizeof_dtyp t) with
+             acc + IS1.LP.SZ.sizeof_dtyp t) with
           (fun (acc : N) (t : dtyp) =>
-             acc + SIZEOF.sizeof_dtyp t); eauto;
+             acc + SZ.sizeof_dtyp t); eauto;
           apply FunctionalExtensionality.functional_extensionality;
           intros;
           apply FunctionalExtensionality.functional_extensionality;
@@ -15320,11 +15334,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma index_into_vec_dv_err_fin_inf:
     forall (t : dtyp) (vec idx : dvalue) err_msg,
       index_into_vec_dv t vec idx = ERR_unERR_UB_OOM err_msg ->
-      IS1.LP.Events.DV.index_into_vec_dv t (fin_to_inf_dvalue vec) (fin_to_inf_dvalue idx) = ERR_unERR_UB_OOM err_msg.
+      DV1.index_into_vec_dv t (fin_to_inf_dvalue vec) (fin_to_inf_dvalue idx) = ERR_unERR_UB_OOM err_msg.
   Proof.
     intros t vec idx err_msg INDEX.
     unfold index_into_vec_dv in INDEX.
-    unfold IS1.LP.Events.DV.index_into_vec_dv.
+    unfold DV1.index_into_vec_dv.
 
     break_match_hyp_inv; rewrite_fin_to_inf_dvalue; auto.
     { (* Arrays *)
@@ -15380,7 +15394,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       fin_to_inf_dvalue dv1_fin = dv1_inf ->
       fin_to_inf_dvalue dv2_fin = dv2_inf ->
       fin_to_inf_dvalue dv3_fin = dv3_inf ->
-      @IS1.LP.Events.DV.insert_into_vec_dv err_ub_oom
+      @DV1.insert_into_vec_dv err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         t dv1_inf dv2_inf dv3_inf = ERR_unERR_UB_OOM msg.
@@ -15388,7 +15402,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros dv1_fin dv2_fin dv3_fin msg dv1_inf dv2_inf dv3_inf t INSERT LIFT1 LIFT2 LIFT3.
     subst.
     unfold insert_into_vec_dv in INSERT.
-    unfold IS1.LP.Events.DV.insert_into_vec_dv.
+    unfold DV1.insert_into_vec_dv.
 
     break_match_hyp_inv; rewrite_fin_to_inf_dvalue; auto.
     { (* Arrays *)
@@ -15447,7 +15461,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
          match idxs with
          | [] => ret str
          | i :: tl =>
-             v <- E1.DV.index_into_str_dv str i ;;
+             v <- DV1.index_into_str_dv str i ;;
              loop v tl
          end) (fin_to_inf_dvalue str) idxs = ERR_unERR_UB_OOM msg.
   Proof.
@@ -15520,7 +15534,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                    EitherMonad.unEitherT :=
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
-             |} => E1.DV.dvalue_has_dtyp dv dt /\ dv <> E1.DV.DVALUE_Poison dt
+             |} => DV1.dvalue_has_dtyp dv dt /\ dv <> DV1.DVALUE_Poison dt
            | _ => True
            end) err_ub_oom
         (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -15671,15 +15685,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (@RAISE_OOM_err_ub_oom_T IdentityMonad.ident IdentityMonad.Monad_ident)
         (fun (A : Type) (x ue : err_ub_oom A) => x = ue) acc_fin uvs_fin (ERR_unERR_UB_OOM msg) ->
       @IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalue_bytes_helper ErrUbOomProp Monad_ErrUbOomProp
-        (fun (dt0 : dtyp) (edv : err_ub_oom IS1.LP.Events.DV.dvalue) =>
-           match @unERR_UB_OOM IdentityMonad.ident IS1.LP.Events.DV.dvalue edv with
+        (fun (dt0 : dtyp) (edv : err_ub_oom DV1.dvalue) =>
+           match @unERR_UB_OOM IdentityMonad.ident DV1.dvalue edv with
            | {|
                EitherMonad.unEitherT :=
                  {|
                    EitherMonad.unEitherT :=
                      {| EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr dv)) |} |}
                  |}
-             |} => IS1.LP.Events.DV.dvalue_has_dtyp dv dt0 /\ dv <> IS1.LP.Events.DV.DVALUE_Poison dt0
+             |} => DV1.dvalue_has_dtyp dv dt0 /\ dv <> DV1.DVALUE_Poison dt0
            | _ => True
            end) err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
         (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -17277,7 +17291,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
           intros u H0 uv_fin H2 ub_msg0 H3.
           eapply IH; eauto.
-          eapply IS1.LP.Events.DV.uvalue_concat_bytes_strict_subterm; eauto.
+          eapply DV1.uvalue_concat_bytes_strict_subterm; eauto.
         }
 
         destruct H1 as [[] | H1].
@@ -17324,7 +17338,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
         uvalue_convert_strict_inv Heqo1.
         eapply IH; eauto.
-        eapply IS1.LP.Events.DV.uvalue_concat_bytes_strict_subterm; eauto.
+        eapply DV1.uvalue_concat_bytes_strict_subterm; eauto.
         repeat constructor.
       }
 
@@ -17451,7 +17465,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros dt CONTRA.
     eapply (NON_POISON_INF dt).
 
-    replace (IS1.LP.Events.DV.DVALUE_Poison dt) with
+    replace (DV1.DVALUE_Poison dt) with
       (fin_to_inf_dvalue (DVALUE_Poison dt)).
     2: {
       unfold fin_to_inf_dvalue.
@@ -17473,7 +17487,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     forall uv1 uv2,
       uvalue_refine_strict uv1 uv2 ->
       rutt (sum_prerel call_refine_strict event_refine_strict) (sum_postrel call_res_refine_strict event_res_refine_strict) dvalue_refine_strict
-        (LLVMEvents.lift_err (fun x : IS1.LP.Events.DV.dvalue => Ret x) (IS1.LP.Events.DV.uvalue_to_dvalue uv1))
+        (LLVMEvents.lift_err (fun x : DV1.dvalue => Ret x) (DV1.uvalue_to_dvalue uv1))
         (LLVMEvents.lift_err (fun x : dvalue => Ret x) (uvalue_to_dvalue uv2)).
   Proof.
     intros uv1 uv2 H.
@@ -17767,13 +17781,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       uv1 uv2,
       uvalue_refine_strict uv1 uv2 ->
       orutt pre post dvalue_refine_strict
-        (LLVMEvents.lift_err (fun x : IS1.LP.Events.DV.dvalue => Ret x) (IS1.LP.Events.DV.uvalue_to_dvalue uv1))
+        (LLVMEvents.lift_err (fun x : DV1.dvalue => Ret x) (DV1.uvalue_to_dvalue uv1))
         (LLVMEvents.lift_err (fun x : dvalue => Ret x) (uvalue_to_dvalue uv2))
         (OOM:=OOME).
   Proof.
     intros E1 E2 OOM1 OOM2 ERR1 ERR2 pre post ERRDISC ERRPRE uv1 uv2 H.
     apply lift_err_orutt_strict; try typeclasses eauto; eauto; repeat constructor.
-    destruct (IS1.LP.Events.DV.uvalue_to_dvalue uv1) eqn:Huv1.
+    destruct (DV1.uvalue_to_dvalue uv1) eqn:Huv1.
     - pose proof Huv1 as Huv1'.
       eapply uvalue_to_dvalue_dvalue_refine_strict_error in Huv1; eauto.
       destruct Huv1 as (?&Huv1); rewrite Huv1.
@@ -17792,17 +17806,17 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     forall E1 E2
       `{OOM1 : OOME -< E1} `{OOM2 : OOME -< E2}
       `{ERR1: FailureE -< E1} `{ERR2: FailureE -< E2}
-      `{PICK1: IS1.LP.Events.PickE -< E1} `{PICK2: PickE -< E2}
+      `{PICK1: PickE -< E1} `{PICK2: PickE -< E2}
       (pre : prerel E1 E2) (post : postrel E1 E2)
       (ERRDISC : forall e1 e2, @subevent FailureE E2 ERR2 void e1 <> @subevent OOME E2 OOM2 void e2)
       (PICKDISC : forall e1 e2, @subevent PickE E2 PICK2 {_ : dvalue | True} e1 <> @subevent OOME E2 OOM2 {_ : dvalue | True} e2)
       (ERRPRE : pre void void (@subevent FailureE E1 ERR1 void (Throw tt)) (@subevent FailureE E2 ERR2 void (Throw tt)))
-      (PICKPRE : forall uv1 uv2, uvalue_refine_strict uv1 uv2 -> pre {_ : IS1.LP.Events.DV.dvalue | True} {_ : dvalue | True}     
-    (subevent {_ : IS1.LP.Events.DV.dvalue | True} (IS1.LLVM.MEM.CP.CONC.pick_unique_uvalue uv1))
+      (PICKPRE : forall uv1 uv2, uvalue_refine_strict uv1 uv2 -> pre {_ : DV1.dvalue | True} {_ : dvalue | True}     
+    (subevent {_ : DV1.dvalue | True} (IS1.LLVM.MEM.CP.CONC.pick_unique_uvalue uv1))
     (subevent {_ : dvalue | True} (pick_unique_uvalue uv2)))
-(POSTREF : forall uv1 uv2 dv1 dv2, post {_ : IS1.LP.Events.DV.dvalue | True} {_ : dvalue | True}
-      (subevent {_ : IS1.LP.Events.DV.dvalue | True} (IS1.LLVM.MEM.CP.CONC.pick_unique_uvalue uv1))
-      (exist (fun _ : IS1.LP.Events.DV.dvalue => True) dv1 I)
+(POSTREF : forall uv1 uv2 dv1 dv2, post {_ : DV1.dvalue | True} {_ : dvalue | True}
+      (subevent {_ : DV1.dvalue | True} (IS1.LLVM.MEM.CP.CONC.pick_unique_uvalue uv1))
+      (exist (fun _ : DV1.dvalue => True) dv1 I)
       (subevent {_ : dvalue | True} (pick_unique_uvalue uv2)) (exist (fun _ : dvalue => True) dv2 I) -> dvalue_refine_strict dv1 dv2)
       uv1 uv2,
       uvalue_refine_strict uv1 uv2 ->
@@ -17850,7 +17864,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       (pre void void (@subevent UBE E1 UB1 void (ThrowUB tt)) (@subevent UBE E2 UB2 void (ThrowUB tt))) ->
       (pre void void (@subevent FailureE E1 ERR1 void (Throw tt)) (@subevent FailureE E2 ERR2 void (Throw tt))) ->
       orutt pre post dvalue_refine_strict
-        (IS1.LP.Events.DV.eval_iop iop dv1_1 dv2_1) (eval_iop iop dv1_2 dv2_2)
+        (DV1.eval_iop iop dv1_1 dv2_1) (eval_iop iop dv1_2 dv2_2)
         (OOM:=OOME).
   Proof.
     intros E1 E2 ? ? ? ? ? ? pre post iop dv1_1 dv2_1 dv1_2 dv2_2 H H0 OOMDISC ERRDISC UBPRE ERRPRE.
@@ -17930,7 +17944,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       dvalue_refine_strict dv1_1 dv1_2 ->
       dvalue_refine_strict dv2_1 dv2_2 ->
       orutt pre post dvalue_refine_strict
-        (IS1.LP.Events.DV.eval_fop fop dv1_1 dv2_1) (eval_fop fop dv1_2 dv2_2)
+        (DV1.eval_fop fop dv1_1 dv2_1) (eval_fop fop dv1_2 dv2_2)
         (OOM:=OOME).
   Proof.
     intros E1 E2 OOM1 OOM2 UB1 UB2 ERR1 ERR2 pre post UBDISC ERRDISC UBINJ ERRINJ fop dv1_1 dv2_1 dv1_2 dv2_2 H H0.
@@ -17969,7 +17983,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       dv1_1 dv1_2,
       dvalue_refine_strict dv1_1 dv1_2 ->
       orutt pre post dvalue_refine_strict
-        (IS1.LP.Events.DV.eval_fneg dv1_1) (eval_fneg dv1_2)
+        (DV1.eval_fneg dv1_1) (eval_fneg dv1_2)
         (OOM:=OOME).
   Proof.
     intros E1 E2 OOM1 OOM2 UB1 UB2 ERR1 ERR2 pre post UBDISC ERRDISC UBINJ ERRINJ
@@ -18010,7 +18024,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       dvalue_refine_strict dv1_1 dv1_2 ->
       dvalue_refine_strict dv2_1 dv2_2 ->
       orutt pre post dvalue_refine_strict
-        (IS1.LP.Events.DV.eval_fcmp cmp dv1_1 dv2_1) (eval_fcmp cmp dv1_2 dv2_2)
+        (DV1.eval_fcmp cmp dv1_1 dv2_1) (eval_fcmp cmp dv1_2 dv2_2)
         (OOM:=OOME).
   Proof.
     intros E1 E2 OOM1 OOM2 UB1 UB2 ERR1 ERR2 pre post UBDISC ERRDISC UBINJ ERRINJ cmp dv1_1 dv2_1 dv1_2 dv2_2 H
@@ -18039,7 +18053,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Lemma fin_to_inf_dvalue_dvalue_int_unsigned :
     forall dv,
-      IS1.LP.Events.DV.dvalue_int_unsigned (fin_to_inf_dvalue dv) = dvalue_int_unsigned dv.
+      DV1.dvalue_int_unsigned (fin_to_inf_dvalue dv) = dvalue_int_unsigned dv.
   Proof.
     intros dv.
     destruct dv; cbn;
@@ -18107,7 +18121,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       dvalue_refine_strict dv1_1 dv1_2 ->
       dvalue_refine_strict dv2_1 dv2_2 ->
       orutt pre post dvalue_refine_strict
-        (IS1.LP.Events.DV.index_into_vec_dv τ dv1_1 dv2_1) (index_into_vec_dv τ dv1_2 dv2_2)
+        (DV1.index_into_vec_dv τ dv1_1 dv2_1) (index_into_vec_dv τ dv1_2 dv2_2)
         (OOM:=OOME).
   Proof.
     intros E1 E2 OOM1 OOM2 UB1 UB2 ERR1 ERR2 pre post UBDISC ERRDISC UBINJ ERRINJ τ dv1_1 dv2_1 dv1_2 dv2_2 REF1 REF2.
@@ -18149,7 +18163,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       dvalue_refine_strict dv2_1 dv2_2 ->
       dvalue_refine_strict dv3_1 dv3_2 ->
       orutt pre post dvalue_refine_strict
-        (IS1.LP.Events.DV.insert_into_vec_dv τ dv1_1 dv2_1 dv3_1) (insert_into_vec_dv τ dv1_2 dv2_2 dv3_2)
+        (DV1.insert_into_vec_dv τ dv1_1 dv2_1 dv3_1) (insert_into_vec_dv τ dv1_2 dv2_2 dv3_2)
         (OOM:=OOME).
   Proof.
     intros E1 E2 OOM1 OOM2 UB1 UB2 ERR1 ERR2 pre post UBDISC ERRDISC UBINJ ERRINJ τ dv1_1 dv2_1 dv3_1 dv1_2 dv2_2 dv3_2 REF1 REF2 REF3.
@@ -18240,13 +18254,13 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       dv1 dv2 idxs,
       dvalue_refine_strict dv1 dv2 ->
       orutt pre post dvalue_refine_strict
-        ((fix loop (str : IS1.LP.Events.DV.dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} :
-           itree _ IS1.LP.Events.DV.dvalue :=
+        ((fix loop (str : DV1.dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} :
+           itree _ DV1.dvalue :=
             match idxs0 with
             | [] => Ret str
             | i :: tl =>
-                ITree.bind (IS1.LP.Events.DV.index_into_str_dv str i)
-                  (fun v : IS1.LP.Events.DV.dvalue => loop v tl)
+                ITree.bind (DV1.index_into_str_dv str i)
+                  (fun v : DV1.dvalue => loop v tl)
             end) dv1 idxs)
         ((fix loop (str : dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} : itree _ dvalue :=
             match idxs0 with
@@ -18292,19 +18306,19 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       dvalue_refine_strict dv1 dv2 ->
       dvalue_refine_strict dv1' dv2' ->
       orutt pre post dvalue_refine_strict
-        ((fix loop (str : IS1.LP.Events.DV.dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} :
-           itree _ IS1.LP.Events.DV.dvalue :=
+        ((fix loop (str : DV1.dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} :
+           itree _ DV1.dvalue :=
             match idxs0 with
             | [] => LLVMEvents.raise "Index was not provided"
             | [i] =>
-                ITree.bind (IS1.LP.Events.DV.insert_into_str str dv1' i)
-                  (fun v : IS1.LP.Events.DV.dvalue => Ret v)
+                ITree.bind (DV1.insert_into_str str dv1' i)
+                  (fun v : DV1.dvalue => Ret v)
             | i :: (_ :: _) as tl =>
-                ITree.bind (IS1.LP.Events.DV.index_into_str_dv str i)
-                  (fun subfield : IS1.LP.Events.DV.dvalue =>
+                ITree.bind (DV1.index_into_str_dv str i)
+                  (fun subfield : DV1.dvalue =>
                      ITree.bind (loop subfield tl)
-                       (fun modified_subfield : IS1.LP.Events.DV.dvalue =>
-                          IS1.LP.Events.DV.insert_into_str str modified_subfield i))
+                       (fun modified_subfield : DV1.dvalue =>
+                          DV1.insert_into_str str modified_subfield i))
             end) dv1 idxs)
         ((fix loop (str : dvalue) (idxs0 : list LLVMAst.int_ast) {struct idxs0} : itree _ dvalue :=
             match idxs0 with
@@ -18357,7 +18371,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       dt (r1 : list IS1.MEM.DVALUE_BYTE.dvalue_byte) (r2 : list dvalue_byte),
       dvalue_bytes_refine r1 r2 ->
       orutt (OOM:=OOME) pre post dvalue_refine_strict
-        (ErrOOMPoison_handle_poison_and_oom IS1.LP.Events.DV.DVALUE_Poison
+        (ErrOOMPoison_handle_poison_and_oom DV1.DVALUE_Poison
            (IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_bytes_to_dvalue r1 dt))
         (ErrOOMPoison_handle_poison_and_oom DVALUE_Poison (DVALUE_BYTES.dvalue_bytes_to_dvalue r2 dt)).
   Proof.
@@ -18396,20 +18410,20 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       map_monad dvalue_convert_strict xs1 = NoOom xs2 ->
       map_monad dvalue_convert_strict ys1 = NoOom ys2 ->
       orutt (OOM:=OOME) pre post (Forall2 dvalue_refine_strict)
-        ((fix loop (conds xs ys : list IS1.LP.Events.DV.dvalue) {struct conds} :
-           itree _ (list IS1.LP.Events.DV.dvalue) :=
+        ((fix loop (conds xs ys : list DV1.dvalue) {struct conds} :
+           itree _ (list DV1.dvalue) :=
             match conds with
             | [] =>
                 match xs with
                 | [] =>
-                    fun ys0 : list IS1.LP.Events.DV.dvalue =>
+                    fun ys0 : list DV1.dvalue =>
                       match ys0 with
                       | [] => Ret []
                       | _ :: _ =>
                           LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
                       end
                 | _ :: _ =>
-                    fun _ : list IS1.LP.Events.DV.dvalue =>
+                    fun _ : list DV1.dvalue =>
                       LLVMEvents.raise "concretize_uvalueM: ill-typed vector select, length mismatch."
                 end ys
             | c :: conds0 =>
@@ -18422,16 +18436,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                     | y :: ys0 =>
                         ITree.bind
                           match c with
-                          | @IS1.LP.Events.DV.DVALUE_I 1 i =>
+                          | @DV1.DVALUE_I 1 i =>
                               if (@Integers.unsigned 1 i =? 1)%Z then Ret x5 else Ret y
-                          | IS1.LP.Events.DV.DVALUE_Poison t => Ret (IS1.LP.Events.DV.DVALUE_Poison t)
+                          | DV1.DVALUE_Poison t => Ret (DV1.DVALUE_Poison t)
                           | _ =>
                               LLVMEvents.raise
                                 "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1."
                           end
-                          (fun selected : IS1.LP.Events.DV.dvalue =>
+                          (fun selected : DV1.dvalue =>
                              ITree.bind (loop conds0 xs0 ys0)
-                               (fun rest : list IS1.LP.Events.DV.dvalue => Ret (selected :: rest)))
+                               (fun rest : list DV1.dvalue => Ret (selected :: rest)))
                     end
                 end
             end) cnds1 xs1 ys1)
@@ -18525,15 +18539,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       concretization_map_refine acc1 acc2 ->
       orutt (OOM:=OOME) pre post dvalue_bytes_refine
         ((fix concretize_uvalue_bytes_helper
-            (acc : NMap (list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)))
-            (uvs0 : list IS1.LP.Events.DV.uvalue) {struct uvs0} :
+            (acc : NMap (list (DV1.uvalue * DV1.dvalue)))
+            (uvs0 : list DV1.uvalue) {struct uvs0} :
            itree E1 (list IS1.LLVM.MEM.MP.DVALUE_BYTES.dvalue_byte) :=
             match uvs0 with
             | [] => Ret []
-            | IS1.LP.Events.DV.UVALUE_ExtractByte byte_uv dt0 idx sid :: uvs1 =>
+            | DV1.UVALUE_ExtractByte byte_uv dt0 idx sid :: uvs1 =>
                 match
                   match
-                    NM.find (elt:=list (IS1.LP.Events.DV.uvalue * IS1.LP.Events.DV.dvalue)) sid acc
+                    NM.find (elt:=list (DV1.uvalue * DV1.dvalue)) sid acc
                   with
                   | Some v => Util.assoc byte_uv v
                   | None => None
@@ -18547,10 +18561,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                     ITree.bind
                       (IS1.LLVM.MEM.CP.CONC.concretize_uvalueM (itree E1)
                          (fun dt1 : dtyp =>
-                            lift_err_RAISE_ERROR (IS1.LP.Events.DV.default_dvalue_of_dtyp dt1))
+                            lift_err_RAISE_ERROR (DV1.default_dvalue_of_dtyp dt1))
                          (itree E1)
                          (fun (A : Type) (x0 : itree E1 A) => x0) byte_uv)
-                      (fun dv : IS1.LP.Events.DV.dvalue =>
+                      (fun dv : DV1.dvalue =>
                          ITree.bind
                            (concretize_uvalue_bytes_helper
                               (IS1.LLVM.MEM.CP.CONCBASE.new_concretized_byte acc byte_uv dv sid) uvs1)
@@ -19959,16 +19973,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma Store_E1E2_orutt :
     forall E1 E2
       `{OOM1 : OOME -< E1} `{OOM2 : OOME -< E2}
-      `{MEM1 : IS1.LP.Events.MemoryE -< E1} `{MEM2 : IS2.LP.Events.MemoryE -< E2}
+      `{MEM1 : MemoryE DV1.dvalue DV1.uvalue -< E1} `{MEM2 : MemoryE _ _ -< E2}
       (pre : prerel E1 E2) (post : postrel E1 E2)
-      (MEMPRE : forall dt r1 r2 r3 r4, dvalue_refine_strict r1 r3 -> uvalue_refine_strict r2 r4 -> pre unit unit (MEM1 unit (IS1.LP.Events.Store dt r1 r2)) (MEM2 unit (Store dt r3 r4)))
+      (MEMPRE : forall dt r1 r2 r3 r4, dvalue_refine_strict r1 r3 -> uvalue_refine_strict r2 r4 -> pre unit unit (MEM1 unit (Store dt r1 r2)) (MEM2 unit (Store dt r3 r4)))
       (MEMDISC : forall e (o : OOME unit), MEM2 unit e <> subevent unit o)
        dt r1 r2 r3 r4,
       dvalue_refine_strict r1 r2 ->
       uvalue_refine_strict r3 r4 ->
       orutt (OOM:=OOME) pre post eq
-        (trigger (IS1.LP.Events.Store dt r1 r3))
-        (trigger (IS2.LP.Events.Store dt r2 r4)).
+        (trigger (Store dt r1 r3))
+        (trigger (Store dt r2 r4)).
   Proof.
     intros E1 E2 OOM1 OOM2 MEM1 MEM2 pre post MEMPRE MEMDISC dt r1 r2 r3 r4 R1R2 R3R4.
     apply orutt_trigger; eauto.
@@ -19997,24 +20011,31 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     : ORUTT.
 
   #[global] Hint Extern 1 (uvalue_refine_strict _ _) => solve_uvalue_refine_strict : ORUTT.
-  Hint Extern 1 (forall _ _ _,   ReSum_inr _ _ _ _ _ _ _ <> subevent _ _) => solve [intros * CONTRA; inv CONTRA] : ORUTT.
-  Hint Extern 1 (forall _ _,   ReSum_inr _ _ _ _ _ _ _ <> subevent _ _) => solve [intros * CONTRA; inv CONTRA] : ORUTT.
+  Hint Extern 1 (forall _ _ _, _ <> subevent _ _) => solve [intros * CONTRA; inv CONTRA] : ORUTT.
+  Hint Extern 1 (forall _ _,  _ _ <> subevent _ _) => solve [intros * CONTRA; inv CONTRA] : ORUTT.
   Hint Extern 1 (forall _ _ _, _ -> (instr_E_refine_strict _ _ _ _)) => solve [repeat constructor; auto].
   Hint Extern 1 (_ -< _) => typeclasses eauto.
+  Hint Extern 1 (forall (dt : dtyp) (r4 : DV1.dvalue) (r5 : DV1.uvalue) (r6 : DV2.dvalue) (r7 : DV2.uvalue),
+        dvalue_refine_strict r4 r6 ->
+        uvalue_refine_strict r5 r7 ->
+        exp_E_refine_strict unit unit (_ (Store dt r4 r5)) (_ (Store dt r6 r7)))
+       => cbn;intros;tauto : ORUTT.
+   (*
   Hint Extern 1 (forall (dt : dtyp) (r4 : DV1.dvalue) (r5 : DV1.uvalue) (r6 : DV2.dvalue) (r7 : DV2.uvalue),
   dvalue_refine_strict r4 r6 ->
   uvalue_refine_strict r5 r7 ->
   exp_E_refine_strict unit unit
-    (ReSum_inr IFun sum1 IS1.LP.Events.MemoryE
-       (IS1.LP.Events.LLVMEnvE +'
-        IS1.LP.Events.MemoryE +'
-        IS1.LP.Events.PickUvalueE +'
-        OOME +' LLVMExcE IS1.LP.Events.DV.uvalue +' UBE +' DebugE +' FailureE)
-       IS1.LP.Events.LLVMGEnvE unit (IS1.LP.Events.Store dt r4 r5))
-    (ReSum_inr IFun sum1 MemoryE
-       (LLVMEnvE +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
-       LLVMGEnvE unit (Store dt r6 r7))) => cbn; intros; tauto.
-
+    (ReSum_inr IFun sum1 (MemoryE DV1.dvalue DV1.uvalue)
+       (LLVMEnvE DV1.uvalue +'
+        MemoryE DV1.dvalue DV1.uvalue +'
+        PickUvalueE DV1.dvalue DV1.uvalue +'
+        OOME +' LLVMExcE DV1.uvalue +' UBE +' DebugE +' FailureE)
+       LLVMGEnvE DV1.dvalue unit (Store dt r4 r5))
+    (ReSum_inr IFun sum1 (MemoryE DV2.dvalue DV2.uvalue)
+       (LLVMEnvE DV2.uvalue +' MemoryE DV2.dvalue DV2.uvalue +' PickUvalueE DV2.dvalue DV2.uvalue +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+       LLVMGEnvE DV2.dvalue unit (Store dt r6 r7))) => cbn; intros; tauto : ORUTT.
+ *)
+  
   Lemma initialize_global_E1E2_orutt :
     forall g,
       orutt exp_E_refine_strict exp_E_res_refine_strict eq
@@ -20023,7 +20044,6 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         (OOM:=OOME).
   Proof.
     intros g.
-    cbn.
     unfold LLVM1.initialize_global, initialize_global.
     repeat break_match_goal; cbn; eauto 6 with ORUTT.
   Qed.
@@ -20080,12 +20100,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     cbn.
     repeat run_orutt_bind; eauto with ORUTT.
     - (* In the future this allocate_one_E1E2_rutt_strict_sound lemma may be orutt *)
-      apply rutt_orutt; [| apply L0_dec_oom].
+      apply rutt_orutt; [| intros; apply L0_dec_oom].
       apply allocate_one_E1E2_rutt_strict_sound.
     - intros [] [] _.
       repeat run_orutt_bind; eauto with ORUTT.
 
-      apply rutt_orutt; [| apply L0_dec_oom].
+      apply rutt_orutt; [| intros; apply L0_dec_oom].
       apply allocate_globals_E1E2_rutt_strict_sound.
   Qed.
 
@@ -20115,10 +20135,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     forall phis bid_from,
       orutt instr_E_refine_strict instr_E_res_refine_strict (Forall2 (eq × uvalue_refine_strict))
         (map_monad
-           (fun x => translate IS1.LP.Events.exp_to_instr (IS1.LLVM.D.denote_phi bid_from x))
+           (fun x => translate (@exp_to_instr DV1.dvalue DV1.uvalue) (IS1.LLVM.D.denote_phi bid_from x))
            phis)
         (map_monad
-           (fun x => translate exp_to_instr (denote_phi bid_from x))
+           (fun x => translate (@exp_to_instr _ _) (denote_phi bid_from x))
            phis)
         (OOM:=OOME).
   Proof.
@@ -20146,6 +20166,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   #[global] Hint Resolve
    orutt_trigger_LocalWrite : ORUTT.
 
+
+  
   Lemma denote_phis_orutt_strict :
     forall phis bid_from,
       orutt instr_E_refine_strict instr_E_res_refine_strict eq
@@ -20165,9 +20187,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         run_orutt_bind; eauto 10 with ORUTT.
         solve_orutt_denote_concretize_if_no_undef_or_poison.
 
-        intros [] [] _.
-        run_orutt_bind; eauto with ORUTT.
         intros r1 r2 EQ; subst; eauto with ORUTT.
+        run_orutt_bind; eauto with ORUTT.
+        intros r1 r3 EQ; subst; eauto with ORUTT.
     }
   Qed.
 
@@ -20204,27 +20226,27 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   #[global] Hint Extern 1 (instr_E_refine_strict _ _ _ _) => solve [repeat constructor; auto] : ORUTT.
 
   #[global] Hint Extern 1 (forall _ _ _ _,
-        instr_E_res_refine_strict {_ : IS1.LP.Events.DV.dvalue | True} {_ : dvalue | True}
-          (subevent {_ : IS1.LP.Events.DV.dvalue | True} (IS1.LLVM.MEM.CP.CONC.pick_unique_uvalue _))
-          (exist (fun _ : IS1.LP.Events.DV.dvalue => True) _ I)
+        instr_E_res_refine_strict {_ : DV1.dvalue | True} {_ : dvalue | True}
+          (subevent {_ : DV1.dvalue | True} (IS1.LLVM.MEM.CP.CONC.pick_unique_uvalue _))
+          (exist (fun _ : DV1.dvalue => True) _ I)
           (subevent {_ : dvalue | True} (pick_unique_uvalue _)) (exist (fun _ : dvalue => True) _ I) ->
-        dvalue_refine_strict _ _) => intros *; cbn in *; tauto.
+        dvalue_refine_strict _ _) => intros *; cbn in *; tauto : ORUTT.
 
   Lemma orutt_trigger_Load :
     forall E1 E2
       `{OOM1 : OOME -< E1} `{OOM2 : OOME -< E2}
-      `{MEM1 : IS1.LP.Events.MemoryE -< E1} `{MEM2 : IS2.LP.Events.MemoryE -< E2}
+      `{MEM1 : MemoryE DV1.dvalue DV1.uvalue -< E1} `{MEM2 : MemoryE _ _ -< E2}
       (pre : prerel E1 E2) (post : postrel E1 E2)
-      (MEMPRE : forall dt dv1 dv2, dvalue_refine_strict dv1 dv2 -> pre DV1.uvalue DV2.uvalue (MEM1 DV1.uvalue (IS1.LP.Events.Load dt dv1)) (MEM2 DV2.uvalue (Load dt dv2)))
+      (MEMPRE : forall dt dv1 dv2, dvalue_refine_strict dv1 dv2 -> pre DV1.uvalue DV2.uvalue (MEM1 DV1.uvalue (@Load DV1.dvalue DV1.uvalue dt dv1)) (MEM2 DV2.uvalue (Load dt dv2)))
       (MEMPOST : forall dt dv1 dv2 (t1 : DV1.uvalue) (t2 : DV2.uvalue),
-          post DV1.uvalue DV2.uvalue (MEM1 DV1.uvalue (IS1.LP.Events.Load dt dv1)) t1
+          post DV1.uvalue DV2.uvalue (MEM1 DV1.uvalue (@Load DV1.dvalue DV1.uvalue dt dv1)) t1
             (MEM2 DV2.uvalue (Load dt dv2)) t2 ->
           uvalue_refine_strict t1 t2)
       (MEMDISC : forall dt dv2 (o : OOME DV2.uvalue), MEM2 DV2.uvalue (Load dt dv2) <> subevent DV2.uvalue o)
       dt
       (dv1 : DV1.dvalue) (dv2 : DV2.dvalue)
       (REF: dvalue_refine_strict dv1 dv2),
-      orutt (OOM:=OOME) pre post uvalue_refine_strict (trigger (IS1.LP.Events.Load dt dv1)) (trigger (Load dt dv2)).
+      orutt (OOM:=OOME) pre post uvalue_refine_strict (trigger (@Load _ _ dt dv1)) (trigger (Load dt dv2)).
   Proof.
     intros E1 E2 OOM1 OOM2 MEM1 MEM2 pre post MEMPRE MEMPOST MEMDISC dt dv1 dv2 REF.
     apply orutt_trigger; eauto.
@@ -20232,11 +20254,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   #[global] Hint Resolve
    orutt_trigger_Load : ORUTT.
-  #[global] Hint Extern 1 (forall (dt : dtyp) (dv1 : IS1.LP.Events.DV.dvalue) (dv2 : dvalue) (t1 : DV1.uvalue)
+  #[global] Hint Extern 1 (forall (dt : dtyp) (dv1 : DV1.dvalue) (dv2 : dvalue) (t1 : DV1.uvalue)
     (t2 : DV2.uvalue),
   instr_E_res_refine_strict DV1.uvalue DV2.uvalue
-    (ReSum_inr IFun sum1 IS1.LP.Events.MemoryE (IS1.LP.Events.IntrinsicE +' IS1.LP.Events.exp_E)
-       IS1.LP.Events.CallE DV1.uvalue (IS1.LP.Events.Load dt dv1))
+    (ReSum_inr IFun sum1 (@MemoryE DV1.dvalue DV1.uvalue) (@IntrinsicE DV1.dvalue DV1.uvalue +' exp_E DV1.dvalue DV1.uvalue)
+       CallE DV1.uvalue (@Load DV1.dvalue DV1.uvalue dt dv1))
     t1 (ReSum_inr IFun sum1 MemoryE (IntrinsicE +' exp_E) CallE DV2.uvalue (Load dt dv2)) t2 ->
   uvalue_refine_strict t1 t2) => 
     intros ? ? ? ? ? ?; cbn in *; tauto : ORUTT.
@@ -20268,6 +20290,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros r6 r7 H2.
     run_orutt_bind; [eauto with ORUTT|].
 
+    apply orutt_trigger_Load; eauto with ORUTT.
+    intros; eauto. cbn in *. tauto.
+
+    
     intros r8 r9 H3.
     repeat rewrite bind_bind.
     setoid_rewrite bind_ret_l.
@@ -20311,23 +20337,11 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                     ].
     break_match_goal.
     { apply orutt_bind with (RR:=eq); eauto with ORUTT.
-      intros [] [] ?.
-      apply orutt_bind with (RR:=uvalue_refine_strict).
-      eapply orutt_denote_concretize_if_no_undef_or_poison;
-        try solve [ intros * CONTRA; inv CONTRA | constructor | auto ].
+      intros; eauto with ORUTT.
+      run_orutt_bind; eauto with ORUTT.
+      eapply orutt_denote_concretize_if_no_undef_or_poison; eauto with ORUTT.
       rewrite uvalue_refine_strict_equation; cbn.
-      rewrite H3; auto.
-
-      intros r10 r11 R10R11.
-      { apply orutt_trigger; cbn; unfold uvalue_refine_strict;
-          repeat setoid_rewrite H3; cbn; auto.
-
-        intros [] [] ?; auto.
-
-        intros o CONTRA.
-        unfold_subevents.
-        inv CONTRA.
-      }
+    rewrite H3; auto.
     }
 
     apply orutt_bind with (RR:=uvalue_refine_strict); eauto with ORUTT.
@@ -20381,6 +20395,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         ].
   Qed.
 
+  #[global] Hint Extern 1 ( forall (dt : dtyp) (dv1 : DV1.dvalue) (dv2 : DV2.dvalue) (t1 : DV1.uvalue) (t2 : DV2.uvalue),
+  instr_E_res_refine_strict DV1.uvalue DV2.uvalue (MemoryE_instrE (Load dt dv1)) t1 (MemoryE_instrE (Load dt dv2)) t2 -> uvalue_refine_strict t1 t2) => cbn; tauto : ORUTT.
+  
   #[global] Hint Extern 1 (forall x y, x=y -> (orutt _ _ _ (bind _ _) (bind _ _))) => intros ? ? ?; subst : ORUTT.
   #[global] Hint Resolve denote_atomic_rmw_operation_orutt_strict : ORUTT.
   Lemma denote_atomicrmw_orutt_strict :
@@ -20391,7 +20408,19 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros id a.
     destruct a, a_ptr, a_val.
     cbn.
-    eauto 20 with ORUTT.
+    run_orutt_bind. eauto with ORUTT.
+    intros.
+    run_orutt_bind. eauto with ORUTT.
+    intros.
+    run_orutt_bind. eauto with ORUTT.
+    intros.
+    run_orutt_bind. eauto with ORUTT.
+    intros.
+    run_orutt_bind. eauto with ORUTT.
+    intros.
+    run_orutt_bind; eauto with ORUTT. 
+    intros.
+    run_orutt_bind; eauto with ORUTT. 
   Qed.
 
   #[global] Hint Resolve denote_atomicrmw_orutt_strict : ORUTT.
@@ -20399,20 +20428,20 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma orutt_trigger_Intrinsic :
     forall E1 E2
       `{OOM1 : OOME -< E1} `{OOM2 : OOME -< E2}
-      `{INT1 : IS1.LP.Events.IntrinsicE -< E1} `{INT2 : IS2.LP.Events.IntrinsicE -< E2}
+      `{INT1 : IntrinsicE DV1.dvalue DV1.uvalue -< E1} `{INT2 : IntrinsicE DV2.dvalue DV2.uvalue -< E2}
       (pre : prerel E1 E2) (post : postrel E1 E2)
       (INTDISC : forall e (o : OOME _), INT2 _ e <> subevent (DV2.uvalue + DV2.dvalue) o)
       dt s
       (args1 : list DV1.dvalue) (args2 : list DV2.dvalue)
       (REF: pre (DV1.uvalue + DV1.dvalue)%type (DV2.uvalue + DV2.dvalue)%type
-                                    (INT1 (DV1.uvalue + DV1.dvalue)%type (IS1.LP.Events.Intrinsic dt s args1))
-                                    (INT2 (DV2.uvalue + DV2.dvalue)%type (Intrinsic dt s args2)))
+                                    (INT1 (DV1.uvalue + DV1.dvalue)%type (@Intrinsic DV1.dvalue DV1.uvalue dt s args1))
+                                    (INT2 (DV2.uvalue + DV2.dvalue)%type (@Intrinsic _ _ dt s args2)))
       (POST: forall dt s (t1 : DV1.uvalue + DV1.dvalue) (t2 : DV2.uvalue + DV2.dvalue),
           post (DV1.uvalue + DV1.dvalue)%type (DV2.uvalue + DV2.dvalue)%type
-            (INT1 (DV1.uvalue + DV1.dvalue)%type (IS1.LP.Events.Intrinsic dt s args1)) t1
-            (INT2 (DV2.uvalue + DV2.dvalue)%type (Intrinsic dt s args2)) t2 ->
+            (INT1 (DV1.uvalue + DV1.dvalue)%type (@Intrinsic _ _ dt s args1)) t1
+            (INT2 (DV2.uvalue + DV2.dvalue)%type (@Intrinsic _ _ dt s args2)) t2 ->
           sum_rel uvalue_refine_strict dvalue_refine_strict t1 t2),
-      orutt (OOM:=OOME) pre post (sum_rel uvalue_refine_strict dvalue_refine_strict) (trigger (IS1.LP.Events.Intrinsic dt s args1))
+      orutt (OOM:=OOME) pre post (sum_rel uvalue_refine_strict dvalue_refine_strict) (trigger (@Intrinsic _ _ dt s args1))
     (trigger (Intrinsic dt s args2)).
   Proof.
     intros.
@@ -20422,21 +20451,23 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma orutt_trigger_Call :
     forall E1 E2
       `{OOM1 : OOME -< E1} `{OOM2 : OOME -< E2}
-      `{CALL1 : IS1.LP.Events.CallE -< E1} `{CALL2 : IS2.LP.Events.CallE -< E2}
+      `{CALL1 : CallE DV1.uvalue -< E1} `{CALL2 : CallE DV2.uvalue -< E2}
       (pre : prerel E1 E2) (post : postrel E1 E2)
       (CALLDISC : forall e (o : OOME _), CALL2 _ e <> subevent (DV2.uvalue + DV2.uvalue) o)
       dt (f1 : DV1.uvalue) (f2 : DV2.uvalue)
       (args1 : list DV1.uvalue) (args2 : list DV2.uvalue)
       (REF: pre (DV1.uvalue + DV1.uvalue)%type (DV2.uvalue + DV2.uvalue)%type
-                                    (CALL1 (DV1.uvalue + DV1.uvalue)%type (IS1.LP.Events.Call dt f1 args1))
-                                    (CALL2 (DV2.uvalue + DV2.uvalue)%type (Call dt f2 args2)))
+              (CALL1 (DV1.uvalue + DV1.uvalue)%type (LLVMEvents.Call dt f1 args1))
+              (CALL2 (DV2.uvalue + DV2.uvalue)%type (LLVMEvents.Call dt f2 args2)))
       (POST: forall dt f1 f2 (t1 : DV1.uvalue + DV1.uvalue) (t2 : DV2.uvalue + DV2.uvalue),
           post (DV1.uvalue + DV1.uvalue)%type (DV2.uvalue + DV2.uvalue)%type
-            (CALL1 (DV1.uvalue + DV1.uvalue)%type (IS1.LP.Events.Call dt f1 args1)) t1
-            (CALL2 (DV2.uvalue + DV2.uvalue)%type (Call dt f2 args2)) t2 ->
+            (CALL1 (DV1.uvalue + DV1.uvalue)%type (LLVMEvents.Call dt f1 args1)) t1
+            (CALL2 (DV2.uvalue + DV2.uvalue)%type (LLVMEvents.Call dt f2 args2)) t2 ->
           sum_rel uvalue_refine_strict uvalue_refine_strict t1 t2),
-      orutt (OOM:=OOME) pre post (sum_rel uvalue_refine_strict uvalue_refine_strict) (trigger (IS1.LP.Events.Call dt f1 args1))
-    (trigger (Call dt f2 args2)).
+      orutt (OOM:=OOME) pre post
+        (sum_rel uvalue_refine_strict uvalue_refine_strict)
+        (trigger (LLVMEvents.Call dt f1 args1))
+        (trigger (LLVMEvents.Call dt f2 args2)).
   Proof.
     intros.
     apply orutt_trigger; eauto.
@@ -20449,8 +20480,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   #[global] Hint Extern 1 (forall (dt : dtyp) (s0 : string) (t1 : DV1.uvalue + DV1.dvalue) (t2 : DV2.uvalue + DV2.dvalue),
   instr_E_res_refine_strict (DV1.uvalue + DV1.dvalue) (DV2.uvalue + DV2.dvalue)
-    (ReSum_inr IFun sum1 IS1.LP.Events.IntrinsicE (IS1.LP.Events.IntrinsicE +' IS1.LP.Events.exp_E)
-       IS1.LP.Events.CallE (DV1.uvalue + DV1.dvalue)%type (IS1.LP.Events.Intrinsic dt s0 _))
+    (ReSum_inr IFun sum1 (IntrinsicE DV1.dvalue DV1.uvalue)  (IntrinsicE DV1.dvalue DV1.uvalue +' exp_E DV1.dvalue DV1.uvalue)
+       CallE (DV1.uvalue + DV1.dvalue)%type (Intrinsic dt s0 _))
     t1
     (ReSum_inr IFun sum1 IntrinsicE (IntrinsicE +' exp_E) CallE (DV2.uvalue + DV2.dvalue)%type
        (Intrinsic dt s0 _))
@@ -20460,12 +20491,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   #[global] Hint Extern 1 (forall _ _ , ReSum_inl _ _ _ _ _ _ _ <> subevent _ _) => solve [intros * CONTRA; inv CONTRA] : ORUTT.
 
 #[global] Hint Extern 1
-  (forall (dt : dtyp) (f1 : IS1.LP.Events.DV.uvalue) (f2 : uvalue) (t1 : DV1.uvalue + DV1.uvalue)
+  (forall (dt : dtyp) (f1 : DV1.uvalue) (f2 : uvalue) (t1 : DV1.uvalue + DV1.uvalue)
    (t2 : DV2.uvalue + DV2.uvalue),
  instr_E_res_refine_strict (DV1.uvalue + DV1.uvalue) (DV2.uvalue + DV2.uvalue)
-   (ReSum_inl IFun sum1 IS1.LP.Events.CallE IS1.LP.Events.CallE
-      (IS1.LP.Events.IntrinsicE +' IS1.LP.Events.exp_E) (DV1.uvalue + DV1.uvalue)%type
-      (IS1.LP.Events.Call dt f1 _))
+   (ReSum_inl IFun sum1 (CallE DV1.uvalue) (CallE DV1.uvalue)
+      (IntrinsicE DV1.dvalue DV1.uvalue +' exp_E DV1.dvalue DV1.uvalue) (DV1.uvalue + DV1.uvalue)%type
+      (LLVMEvents.Call dt f1 _))
    t1
    (ReSum_inl IFun sum1 CallE CallE (IntrinsicE +' exp_E) (DV2.uvalue + DV2.uvalue)%type
       (Call dt f2 _))
@@ -20515,16 +20546,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma orutt_trigger_Alloca :
     forall E1 E2
       `{OOM1 : OOME -< E1} `{OOM2 : OOME -< E2}
-      `{MEM1 : IS1.LP.Events.MemoryE -< E1} `{MEM2 : IS2.LP.Events.MemoryE -< E2}
+      `{MEM1 : MemoryE DV1.dvalue DV1.uvalue -< E1} `{MEM2 : MemoryE DV2.dvalue DV2.uvalue -< E2}
       (pre : prerel E1 E2) (post : postrel E1 E2)
       (MEMPOST : forall dt sz align (t1 : DV1.dvalue) (t2 : DV2.dvalue),
-          post DV1.dvalue DV2.dvalue (MEM1 DV1.dvalue (IS1.LP.Events.Alloca dt sz align)) t1
+          post DV1.dvalue DV2.dvalue (MEM1 DV1.dvalue (Alloca dt sz align)) t1
             (MEM2 DV2.dvalue (Alloca dt sz align)) t2 ->
           dvalue_refine_strict t1 t2)
       (MEMDISC : forall e (o : OOME DV2.dvalue), MEM2 DV2.dvalue e <> subevent DV2.dvalue o)
       dt sz align
-      (MEMPRE : pre DV1.dvalue DV2.dvalue (MEM1 DV1.dvalue (IS1.LP.Events.Alloca dt sz align)) (MEM2 DV2.dvalue (Alloca dt sz align))),
-      orutt (OOM:=OOME) pre post dvalue_refine_strict (trigger (IS1.LP.Events.Alloca dt sz align)) (trigger (Alloca dt sz align)).
+      (MEMPRE : pre DV1.dvalue DV2.dvalue (MEM1 DV1.dvalue (Alloca dt sz align)) (MEM2 DV2.dvalue (Alloca dt sz align))),
+      orutt (OOM:=OOME) pre post dvalue_refine_strict (trigger (Alloca dt sz align)) (trigger (Alloca dt sz align)).
   Proof.
     intros.
     apply orutt_trigger; eauto.
@@ -20601,19 +20632,24 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
               eauto 200 with ORUTT.
           - (* va_end *)
             eauto 200 with ORUTT.
-          - run_orutt_bind; eauto 200 with ORUTT.
-            run_orutt_bind; eauto 200 with ORUTT.
+          - run_orutt_bind; eauto 10 with ORUTT.
+            run_orutt_bind; eauto 10 with ORUTT.
             intros r0 r3 H0.
             run_orutt_bind; eauto 200 with ORUTT.
+            eapply orutt_trigger_Intrinsic; eauto with ORUTT.
+
+            intros ? ? [? | ?] [? | ?] ?; cbn; inv H1; eauto with ORUTT; tauto.
             intros [? | ?] [? | ?] ?; cbn; inv H1; eauto with ORUTT.
         }
 
-        run_orutt_bind; eauto 200 with ORUTT.
-        run_orutt_bind; eauto 200 with ORUTT.
+        run_orutt_bind; eauto 10 with ORUTT.
+        run_orutt_bind; eauto 10 with ORUTT.
         intros r0 r3 H0.
-        run_orutt_bind; eauto 200 with ORUTT.
-
+        run_orutt_bind; eauto 10 with ORUTT.
+        eapply orutt_trigger_Call; eauto with ORUTT.
+        intros ? ? ? [? | ?] [? | ?] ?; cbn; inv H1; eauto with ORUTT; tauto.
         intros [? | ?] [? | ?] ?; cbn; inv H1; eauto with ORUTT.
+
       - break_inner_match.
         { run_orutt_bind; eauto 200 with ORUTT.
           break_match.
@@ -20732,10 +20768,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           - (* va_end *)
             eauto 200 with ORUTT.
           - repeat (intros; run_orutt_bind; eauto 200 with ORUTT).
+            eapply orutt_trigger_Intrinsic; eauto with ORUTT.
+            intros ? ? [? | ?] [? | ?] ? ; cbn; inv H1; eauto with ORUTT; tauto.
             intros [? | ?] [? | ?] ?; cbn; inv H1; eauto with ORUTT.
         }
 
         repeat (intros; run_orutt_bind; eauto 200 with ORUTT).
+        eapply orutt_trigger_Call; eauto with ORUTT.
+        intros ? ? ? [? | ?] [? | ?] ? ; cbn; inv H1; eauto with ORUTT; tauto.
+        
         intros [? | ?] [? | ?] ?; cbn; inv H1; eauto with ORUTT.
       - destruct val, ptr.
         repeat (intros; run_orutt_bind; eauto 200 with ORUTT).
@@ -20977,7 +21018,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         intros [dt ex].
         eauto with ORUTT.
       }
-
+      eapply orutt_trigger_Call; eauto with ORUTT.
+      intros ? ? ? [? | ?] [? | ?] ?; cbn; inv H1; eauto with ORUTT; tauto.
       intros [? | ?] [? | ?] ?; cbn; inv H1; eauto 10 with ORUTT.
       destruct i; cbn; eauto 10 with ORUTT.
   Qed.
@@ -21087,7 +21129,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Lemma dtyp_of_uvalue_fun_fin_inf :
     forall uv_fin uv_inf,
       uvalue_refine_strict uv_inf uv_fin ->
-      IS1.LP.Events.DV.dtyp_of_uvalue_fun uv_inf = dtyp_of_uvalue_fun uv_fin.
+      DV1.dtyp_of_uvalue_fun uv_inf = dtyp_of_uvalue_fun uv_fin.
   Proof.
     intros uv_fin.
     induction uv_fin using uvalue_ind;
@@ -21315,7 +21357,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
           destruct (uvalue_convert_strict x) eqn:?; inv H0.
           cbn in Heqb0.
           rewrite <- H1, H4, Heqb0, sizeof_dtyp_fin_inf in IHForall2.
-          destruct ((N.of_nat (Datatypes.length l) =? SIZEOF.sizeof_dtyp dt)%N); inv IHForall2.
+          destruct ((N.of_nat (Datatypes.length l) =? SZ.sizeof_dtyp dt)%N); inv IHForall2.
           apply forallb_false in Heqb0 as (?&?&?).
           eapply Forall2_In_exists2 in FORALL; eauto.
           destruct FORALL as (?&?&?).
@@ -21345,7 +21387,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     cbn.
     eapply orutt_bind with (RR:=dvalue_refine_strict).
     apply rutt_orutt. apply GlobalRead_L0_E1E2_rutt.
-    solve_dec_oom.
+    { intros ? s. repeat destruct s; try (solve [ left; intros o CONTRA; inv CONTRA ]); right; eexists; reflexivity. } 
 
     intros r1 r2 R1R2.
     destruct r2;
@@ -21758,7 +21800,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Lemma catch_llvm_exc_L0'_orutt :
-    forall (t1 : itree IS1.LP.Events.L0' DV1.uvalue) (t2 : itree IS2.LP.Events.L0' DV2.uvalue),
+    forall (t1 : itree (L0' DV1.dvalue DV1.uvalue) DV1.uvalue) (t2 : itree (L0' _ _) DV2.uvalue),
       orutt (OOM:=OOME) L0'_refine_strict L0'_res_refine_strict uvalue_refine_strict t1 t2 ->
       orutt (OOM:=OOME) L0'_refine_strict L0'_res_refine_strict (sum_rel uvalue_refine_strict uvalue_refine_strict)
         (EitherMonad.unEitherT (IS1.LLVM.D.catch_llvm_exc_L0' t1))
@@ -21828,33 +21870,36 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         setoid_rewrite bind_trigger.
         cbn.
         pstep; red; cbn.
-        change (@subevent L0' L0' (@ReSum_id (Type -> Type) IFun Id_IFun L0') B
-          (@inr1 CallE L0 B
-             (@inr1 ExternalCallE
-                (IntrinsicE +'
-                 LLVMGEnvE +'
-                 (LLVMEnvE +' LLVMStackE) +'
-                 MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+        change (@subevent (L0' dvalue uvalue) (L0' dvalue uvalue) (@ReSum_id (forall _ : Type, Type) IFun Id_IFun (L0' dvalue uvalue)) B
+          (@inr1 (CallE DV2.uvalue) (L0 DV2.dvalue DV2.uvalue) B
+             (@inr1 (ExternalCallE DV2.dvalue DV2.uvalue)
+                (sum1 (IntrinsicE DV2.dvalue DV2.uvalue)
+                   (sum1 (LLVMGEnvE DV2.dvalue)
+                      (sum1 (sum1 (LLVMEnvE DV2.uvalue) (LLVMStackE DV2.uvalue))
+                         (sum1 (MemoryE DV2.dvalue DV2.uvalue)
+                            (sum1 (PickUvalueE DV2.dvalue DV2.uvalue) (sum1 OOME (sum1 (LLVMExcE DV2.uvalue) (sum1 UBE (sum1 DebugE FailureE)))))))))
                 B
-                (@inr1 IntrinsicE
-                   (LLVMGEnvE +'
-                    (LLVMEnvE +' LLVMStackE) +'
-                    MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                (@inr1 (IntrinsicE DV2.dvalue DV2.uvalue)
+                   (sum1 (LLVMGEnvE DV2.dvalue)
+                      (sum1 (sum1 (LLVMEnvE DV2.uvalue) (LLVMStackE DV2.uvalue))
+                         (sum1 (MemoryE DV2.dvalue DV2.uvalue)
+                            (sum1 (PickUvalueE DV2.dvalue DV2.uvalue) (sum1 OOME (sum1 (LLVMExcE DV2.uvalue) (sum1 UBE (sum1 DebugE FailureE))))))))
                    B
-                   (@inr1 LLVMGEnvE
-                      ((LLVMEnvE +' LLVMStackE) +'
-                       MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                   (@inr1 (LLVMGEnvE DV2.dvalue)
+                      (sum1 (sum1 (LLVMEnvE DV2.uvalue) (LLVMStackE DV2.uvalue))
+                         (sum1 (MemoryE DV2.dvalue DV2.uvalue)
+                            (sum1 (PickUvalueE DV2.dvalue DV2.uvalue) (sum1 OOME (sum1 (LLVMExcE DV2.uvalue) (sum1 UBE (sum1 DebugE FailureE)))))))
                       B
-                      (@inr1 (LLVMEnvE +' LLVMStackE)
-                         (MemoryE +'
-                          PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                      (@inr1 (sum1 (LLVMEnvE DV2.uvalue) (LLVMStackE DV2.uvalue))
+                         (sum1 (MemoryE DV2.dvalue DV2.uvalue)
+                            (sum1 (PickUvalueE DV2.dvalue DV2.uvalue) (sum1 OOME (sum1 (LLVMExcE DV2.uvalue) (sum1 UBE (sum1 DebugE FailureE))))))
                          B
-                         (@inr1 MemoryE
-                            (PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) B
-                            (@inr1 PickUvalueE (OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
-                               B (@inl1 OOME (LLVMExcE uvalue +' UBE +' DebugE +' FailureE) B o0)))))))))
+                         (@inr1 (MemoryE DV2.dvalue DV2.uvalue)
+                            (sum1 (PickUvalueE DV2.dvalue DV2.uvalue) (sum1 OOME (sum1 (LLVMExcE DV2.uvalue) (sum1 UBE (sum1 DebugE FailureE))))) B
+                            (@inr1 (PickUvalueE DV2.dvalue DV2.uvalue) (sum1 OOME (sum1 (LLVMExcE DV2.uvalue) (sum1 UBE (sum1 DebugE FailureE)))) B
+                               (@inl1 OOME (sum1 (LLVMExcE DV2.uvalue) (sum1 UBE (sum1 DebugE FailureE))) B o0)))))))))
           with
-          (@subevent OOME L0' _ B o0).
+          (@subevent OOME (L0' dvalue uvalue) _ B o0).                 
         eapply EqVisOOM.
       }
 
@@ -21881,8 +21926,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       IM_Refine function_denotation_refine_strict dfns1 dfns2 ->
       (uvalue_refine_strict f1 f2) ->
       (Forall2 uvalue_refine_strict args1 args2) ->
-      call_refine_strict _ _ (IS1.LP.Events.Call dt f1 args1) (Call dt f2 args2) ->
-      orutt event_refine_strict event_res_refine_strict (fun res1 res2 => call_res_refine_strict _ _ (IS1.LP.Events.Call dt f1 args1) res1 (Call dt f2 args2) res2)
+      call_refine_strict _ _ (LLVMEvents.Call dt f1 args1) (LLVMEvents.Call dt f2 args2) ->
+      orutt event_refine_strict event_res_refine_strict (fun res1 res2 => call_res_refine_strict _ _ (LLVMEvents.Call dt f1 args1) res1 (LLVMEvents.Call dt f2 args2) res2)
         (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
         (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2)
         (OOM:=OOME).
@@ -21999,7 +22044,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Lemma denote_mcfg_E1E2_orutt'_orutt :
     forall dfns1 dfns2 dt f1 f2 args1 args2,
-      orutt event_refine_strict event_res_refine_strict (fun res1 res2 => call_res_refine_strict (IS1.LP.Events.DV.uvalue + IS1.LP.Events.DV.uvalue) (IS2.LP.Events.DV.uvalue + IS2.LP.Events.DV.uvalue) (IS1.LP.Events.Call dt f1 args1) res1 (Call dt f2 args2) res2)
+      orutt event_refine_strict event_res_refine_strict (fun res1 res2 => call_res_refine_strict (DV1.uvalue + DV1.uvalue) (DV2.uvalue + DV2.uvalue) (LLVMEvents.Call dt f1 args1) res1 (LLVMEvents.Call dt f2 args2) res2)
         (IS1.LLVM.D.denote_mcfg dfns1 dt f1 args1)
         (IS2.LLVM.D.denote_mcfg dfns2 dt f2 args2)
         (OOM:=OOME) ->
@@ -22085,7 +22130,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       }
 
       (* Finite conversion *)
-      destruct (ITOP.int_to_ptr (PTOI.ptr_to_int addr2 + Z.of_N (SIZEOF.sizeof_dtyp (DTYPE_I 8)) * IP.to_Z r2)
+      destruct (ITOP.int_to_ptr (PTOI.ptr_to_int addr2 + Z.of_N (SZ.sizeof_dtyp (DTYPE_I 8)) * IP.to_Z r2)
                   (PROV.address_provenance addr2)) eqn:HITOP.
       2: apply orutt_raiseOOM.
 
@@ -22150,7 +22195,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       dvalue_refine_strict r1 r2 ->
       orutt (OOM:=OOME) L0'_refine_strict L0'_res_refine_strict uvalue_refine_strict
         match r1 with
-        | IS1.LP.Events.DV.DVALUE_Addr strptr =>
+        | DV1.DVALUE_Addr strptr =>
             ITree.bind (LLVM1.i8_str_index strptr 0)
               (fun (char : @Integers.bit_int 8) =>
                  ITree.bind
@@ -22163,8 +22208,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
                              (fun (next_char : @Integers.bit_int 8) => Ret (inl (next_char, c :: bytes, (offset + 1)%Z))))
                       (char, [], 1%Z))
                    (fun (bytes : list int8) =>
-                      ITree.bind (trigger (IS1.LP.Events.IO_stdout (DList.rev_tail_rec bytes)))
-                        (fun _ : unit => Ret (@IS1.LP.Events.DV.UVALUE_I 8 (@Integers.zero 8)))))
+                      ITree.bind (trigger (LLVMEvents.IO_stdout (DList.rev_tail_rec bytes)))
+                        (fun _ : unit => Ret (@DV1.UVALUE_I 8 (@Integers.zero 8)))))
         | _ => raiseUB "puts got non-address argument"
         end
         match r2 with
@@ -22503,7 +22548,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Qed.
 
   Lemma model_E1E2_L0_orutt_strict_sound
-    (args1 : list IS1.LP.Events.DV.uvalue)
+    (args1 : list DV1.uvalue)
     (args2 : list uvalue)
     (ARGS : Forall2 uvalue_refine_strict args1 args2)
     (p : list
@@ -22527,7 +22572,17 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     intros r1 r2 R1R2.
     eapply orutt_bind;
       [apply rutt_orutt;
-       [try apply GlobalRead_L0_E1E2_rutt | solve_dec_oom]|].
+       [try apply GlobalRead_L0_E1E2_rutt | idtac]|].
+    intros ? s; repeat destruct s;
+    try solve
+      [
+        left;
+        intros o CONTRA;
+        inv CONTRA
+      ];
+    right;
+    eexists; reflexivity.
+
 
     intros r3 r4 R3R4.
     eapply orutt_bind.
@@ -22984,15 +23039,16 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
         setoid_rewrite bind_trigger.
         cbn.
         pstep; red; cbn.
-        change 
-          (@subevent ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
-             (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) ExternalCallE
-                (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) IntrinsicE
-                   (@ReSum_id (Type -> Type) IFun Id_IFun ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE))))
+        (* SAZ: There has got to be a better way !*)
+           change 
+          (@subevent ((LLVMEnvE _ +' LLVMStackE _) +' MemoryE _ _ +' PickUvalueE _ _ +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (ExternalCallE _ _ +' IntrinsicE _ _ +' (LLVMEnvE _ +' LLVMStackE _) +' MemoryE _ _ +' PickUvalueE _ _+' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+             (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 ((LLVMEnvE _ +' LLVMStackE _) +' MemoryE _ _ +' PickUvalueE _ _ +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (IntrinsicE _ _ +' (LLVMEnvE _ +' LLVMStackE _) +' MemoryE _ _ +' PickUvalueE _ _ +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (ExternalCallE _ _)
+                (@ReSum_inr (Type -> Type) IFun sum1 Cat_IFun Inr_sum1 ((LLVMEnvE _ +' LLVMStackE _) +' MemoryE _ _ +' PickUvalueE _ _ +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) ((LLVMEnvE _ +' LLVMStackE _) +' MemoryE _ _ +' PickUvalueE _ _ +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) (IntrinsicE _ _)
+                   (@ReSum_id (Type -> Type) IFun Id_IFun ((LLVMEnvE _ +' LLVMStackE _) +' MemoryE _ _ +' PickUvalueE _ _ +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE))))
              void
-             (@inr1 (LLVMEnvE +' LLVMStackE) (MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) void
-                (@inr1 MemoryE (PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) void (@inr1 PickUvalueE (OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) void (@inl1 OOME (LLVMExcE uvalue +' UBE +' DebugE +' FailureE) void o0)))))
-          with (@subevent OOME (ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) _ _ o0).
+             (@inr1 (LLVMEnvE _ +' LLVMStackE _) (MemoryE _ _ +' PickUvalueE _ _ +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) void
+                (@inr1 (MemoryE _ _) (PickUvalueE _ _ +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) void (@inr1 (PickUvalueE _ _) (OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) void (@inl1 OOME (LLVMExcE uvalue +' UBE +' DebugE +' FailureE) void o0)))))
+          with (@subevent OOME (@L1 DV2.dvalue DV2.uvalue) _ _ o0).
 
         apply EqVisOOM.
       }
@@ -24126,8 +24182,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       pstep; red; cbn.
       change (inr1 (inr1 (inr1 (inr1 (inl1 o0))))) with
         (@subevent _ _ (ReSum_inr IFun sum1 OOME
-                          ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
-                          LLVMGEnvE
+                          ((LLVMEnvE DV2.uvalue +' LLVMStackE DV2.uvalue) +' (MemoryE DV2.dvalue DV2.uvalue) +' (PickUvalueE DV2.dvalue DV2.uvalue) +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                          (@LLVMGEnvE DV2.dvalue)
 
            ) B o0).
       rewrite subevent_subevent.
@@ -24139,17 +24195,18 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       pstep; red; cbn.
       change (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 u0))))))) with
         (@subevent _ _ (ReSum_inr IFun sum1 UBE
-                          ((LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
-                          LLVMGEnvE
+                          ((LLVMEnvE DV2.uvalue +' LLVMStackE DV2.uvalue) +' (MemoryE DV2.dvalue DV2.uvalue) +' (PickUvalueE DV2.dvalue DV2.uvalue) +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                          (@LLVMGEnvE DV2.dvalue)
 
            ) B u0).
       rewrite subevent_subevent.
       change (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 u))))))) with
         (@subevent _ _ (ReSum_inr IFun sum1 UBE
-                                  ((IS1.LP.Events.LLVMEnvE +' IS1.LP.Events.LLVMStackE) +'
-  IS1.LP.Events.MemoryE +'
-  IS1.LP.Events.PickUvalueE +' OOME +' LLVMExcE IS1.LP.Events.DV.uvalue +' UBE +' DebugE +' FailureE)
-                          IS1.LP.Events.LLVMGEnvE
+                          ((LLVMEnvE DV1.uvalue +'
+                            LLVMStackE DV1.uvalue ) +'
+                           (MemoryE DV1.dvalue DV1.uvalue) +'
+                                                                                                            (PickUvalueE DV1.dvalue DV1.uvalue) +' OOME +' LLVMExcE DV1.uvalue +' UBE +' DebugE +' FailureE)
+                          (LLVMGEnvE DV1.dvalue)
 
            ) A u).
       rewrite subevent_subevent.
@@ -24271,7 +24328,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       `{OOME -< E2}
       `{FailureE -< E1} `{FailureE -< E2}
       (NOOM : forall A (e : FailureE A) (o : OOME A), @subevent FailureE E2 _ _ e <> @subevent OOME E2 _ _ o)
-      (l1 : LocalE LLVMAst.raw_id E1.DV.uvalue A) (l2 : LocalE LLVMAst.raw_id E2.DV.uvalue B)
+      (l1 : LocalE LLVMAst.raw_id DV1.uvalue A) (l2 : LocalE LLVMAst.raw_id DV2.uvalue B)
       (REF : localE_refine_strict l1 l2)
       (s1 : IS1.LLVM.Stack.lstack_frame) (s2 : IS2.LLVM.Stack.lstack_frame)
       (SREF : stack_frame_refine_strict s1 s2)
@@ -24325,7 +24382,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       `{OOME -< E2}
       `{FailureE -< E1} `{FailureE -< E2}
       (NOOM : forall A (e : FailureE A) (o : OOME A), @subevent FailureE E2 _ _ e <> @subevent OOME E2 _ _ o)
-      (e1 : StackE LLVMAst.raw_id E1.DV.uvalue E1.DV.uvalue A) (e2 : StackE LLVMAst.raw_id E2.DV.uvalue E2.DV.uvalue B)
+      (e1 : StackE LLVMAst.raw_id DV1.uvalue DV1.uvalue A) (e2 : StackE LLVMAst.raw_id DV2.uvalue DV2.uvalue B)
       (REF : stackE_refine_strict e1 e2)
       (s1 : IS1.LLVM.Stack.lstack_frame * IS1.LLVM.Stack.lstack) (s2 : IS2.LLVM.Stack.lstack_frame * IS2.LLVM.Stack.lstack)
       (SREF : (prod_rel stack_frame_refine_strict stack_refine_strict) s1 s2)
@@ -24390,7 +24447,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       orutt L2_refine_strict L2_res_refine_strict
         (fun '(s0, a) '(s3, b) =>
            L1_res_refine_strict A B e1 a e2 b /\ (stack_frame_refine_strict × stack_refine_strict) s0 s3)
-        (interp_local_stack_h (handle_local (v:=IS1.LP.Events.DV.uvalue)) e1 ls1)
+        (interp_local_stack_h (handle_local (v:=DV1.uvalue)) e1 ls1)
         (interp_local_stack_h (handle_local (v:=uvalue)) e2 ls2)
         (OOM:=OOME).
   Proof.
@@ -24484,8 +24541,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       pstep; red; cbn.
       change (inr1 (inr1 (inl1 o0))) with
         (@subevent _ _ (ReSum_inr IFun sum1 OOME
-                          (PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
-                          MemoryE
+                          ((PickUvalueE DV2.dvalue DV2.uvalue) +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                          (MemoryE DV2.dvalue DV2.uvalue)
 
            ) B o0).
       rewrite subevent_subevent.
@@ -24529,7 +24586,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       orutt L2_refine_strict L2_res_refine_strict
         (fun '(s0, a) '(s3, b) =>
            L1_res_refine_strict A B e1 a e2 b /\ (stack_frame_refine_strict × stack_refine_strict) s0 s3)
-        (interp_local_stack_h (handle_local_debug_stack (exc:=IS1.LP.Events.DV.uvalue)) e1 ls1)
+        (interp_local_stack_h (handle_local_debug_stack (exc:=DV1.uvalue)) e1 ls1)
         (interp_local_stack_h (handle_local_debug_stack (exc:=uvalue)) e2 ls2)
         (OOM:=OOME).
   Proof.
@@ -24626,8 +24683,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       pstep; red; cbn.
       change (inr1 (inr1 (inl1 o0))) with
         (@subevent _ _ (ReSum_inr IFun sum1 OOME
-                          (PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
-                          MemoryE
+                          (PickUvalueE DV2.dvalue DV2.uvalue +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE)
+                          (MemoryE DV2.dvalue DV2.uvalue)
 
            ) B o0).
       rewrite subevent_subevent.
@@ -24698,8 +24755,8 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       dvalue_refine_strict r1 r2 ->
       uvalue_refine_strict r3 r4 ->
       rutt event_refine_strict event_res_refine_strict eq
-        (trigger (IS1.LP.Events.Store dt r1 r3))
-        (trigger (IS2.LP.Events.Store dt r2 r4)).
+        (trigger (Store dt r1 r3))
+        (trigger (Store dt r2 r4)).
   Proof.
     intros dt r1 r2 r3 r4 R1R2 R3R4.
     apply rutt_trigger.
@@ -24775,12 +24832,12 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
       intros r0 r3 H0.
       eapply rutt_bind.
       { apply Store_E1E2_rutt'; auto.
-        change ((IS1.LP.Events.DV.UVALUE_Array (DTYPE_Array (N.of_nat (Datatypes.length args)) DTYPE_Pointer)
-                   (map IS1.LP.Events.DV.dvalue_to_uvalue r0))) with
-          (IS1.LP.Events.DV.dvalue_to_uvalue (IS1.LP.Events.DV.DVALUE_Array (DTYPE_Array (N.of_nat (Datatypes.length args)) DTYPE_Pointer) r0)).
+        change ((DV1.UVALUE_Array (DTYPE_Array (N.of_nat (Datatypes.length args)) DTYPE_Pointer)
+                   (map DV1.dvalue_to_uvalue r0))) with
+          (DV1.dvalue_to_uvalue (DV1.DVALUE_Array (DTYPE_Array (N.of_nat (Datatypes.length args)) DTYPE_Pointer) r0)).
         change (UVALUE_Array (DTYPE_Array (N.of_nat (Datatypes.length args)) DTYPE_Pointer)
                   (map dvalue_to_uvalue r3)) with
-          (IS2.LP.Events.DV.dvalue_to_uvalue
+          (DV2.dvalue_to_uvalue
              (DVALUE_Array (DTYPE_Array (N.of_nat (Datatypes.length args)) DTYPE_Pointer)
                 r3)).
         apply dvalue_refine_strict_dvalue_to_uvalue.
@@ -24820,7 +24877,15 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     - eapply orutt_bind with (RR:=Forall2 uvalue_refine_strict).
       + apply rutt_orutt.
         apply build_main_args_fin_inf.
-        solve_dec_oom.
+        intros ? s. repeat destruct s;
+    try solve
+      [
+        left;
+        intros o CONTRA;
+        inv CONTRA
+      ];
+    right;
+    eexists; reflexivity.
       + intros r1 r2 H.
         intros *; apply model_E1E2_L0_orutt_strict_sound; auto.
     - apply global_refine_strict_empty.
@@ -24843,8 +24908,23 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 End LangRefine.
 
 Module MakeLangRefine
-  (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI) (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR1 : TopLevelRefinements IS1 LLVM1) (TLR2 : TopLevelRefinements IS2 LLVM2) (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP) (ACS : AddrConvertSafe IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI AC2 AC1) (DVC : DVConvert IS1.LP IS2.LP AC1 IS1.LP.Events IS2.LP.Events) (DVCrev : DVConvert IS2.LP IS1.LP AC2 IS2.LP.Events IS1.LP.Events) (EC : EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events IS2.LP.Events DVC DVCrev) (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC) (VMEM_IP_PROP1 : VMemInt_Intptr_Properties IS1.LP.IP) (VMEM_IP_PROP2 : VMemInt_Intptr_Properties IS2.LP.IP) (VMEM_REF : VMemInt_Refine IS1.LP.IP IS2.LP.IP) (SIZEOF_REF : Sizeof_Refine IS1.LP.SIZEOF IS2.LP.SIZEOF) (ITOP_REF : ItoP_Refine IS1 IS2 AC1 AC2) : LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR1 TLR2 IPS ACS DVC DVCrev EC TC VMEM_IP_PROP1 VMEM_IP_PROP2 VMEM_REF SIZEOF_REF ITOP_REF.
-  Include LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR1 TLR2 IPS ACS DVC DVCrev EC TC VMEM_IP_PROP1 VMEM_IP_PROP2 VMEM_REF SIZEOF_REF ITOP_REF.
+  (IS1 : InterpreterStack) (IS2 : InterpreterStack)
+  (AC1 : AddrConvert IS1.LP.ADDR IS1.LP.PTOI IS2.LP.ADDR IS2.LP.PTOI)
+  (AC2 : AddrConvert IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI)
+  (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2)
+  (TLR1 : TopLevelRefinements IS1 LLVM1) (TLR2 : TopLevelRefinements IS2 LLVM2)
+  (IPS : IPConvertSafe IS2.LP.IP IS1.LP.IP)
+  (ACS : AddrConvertSafe IS2.LP.ADDR IS2.LP.PTOI IS1.LP.ADDR IS1.LP.PTOI AC2 AC1)
+  (DVC : DVConvert IS1.LP IS2.LP AC1)
+  (DVCrev : DVConvert IS2.LP IS1.LP AC2)
+  (EC : EventConvert IS1.LP IS2.LP AC1 AC2 DVC DVCrev)
+  (TC : TreeConvert IS1 IS2 AC1 AC2 DVC DVCrev EC)
+  (VMEM_IP_PROP1 : VMemInt_Intptr_Properties IS1.LP.IP)
+  (VMEM_IP_PROP2 : VMemInt_Intptr_Properties IS2.LP.IP)
+  (VMEM_REF : VMemInt_Refine IS1.LP.IP IS2.LP.IP)
+  (SZ_REF : Sizeof_Refine IS1.LP.SZ IS2.LP.SZ)
+  (ITOP_REF : ItoP_Refine IS1 IS2 AC1 AC2) : LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR1 TLR2 IPS ACS DVC DVCrev EC TC VMEM_IP_PROP1 VMEM_IP_PROP2 VMEM_REF SZ_REF ITOP_REF.
+  Include LangRefine IS1 IS2 AC1 AC2 LLVM1 LLVM2 TLR1 TLR2 IPS ACS DVC DVCrev EC TC VMEM_IP_PROP1 VMEM_IP_PROP2 VMEM_REF SZ_REF ITOP_REF.
 End MakeLangRefine.
 
 Module InfFinLangRefine := MakeLangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr InfToFinAddrConvert FinToInfAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinementsBigIntptr TopLevelRefinements64BitIntptr FinToInfIntptrConvertSafe FinToInfAddrConvertSafe DVCInfFin DVCFinInf ECInfFin TCInfFin VMemInt_Intptr_Properties_Inf VMemInt_Intptr_Properties_Fin VMemInt_Refine_InfFin Sizeof_Refine_InfFin ItoP_Refine_InfFin.

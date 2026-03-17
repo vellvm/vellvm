@@ -575,6 +575,40 @@ Definition is_void_instr (i:instr typ) : bool :=
   | _ => false
   end.
 
+  (* Check if this is an instruction which can trigger UB with division by 0. *)
+  Definition iop_is_div (iop : ibinop) : bool :=
+    match iop with
+    | UDiv _ => true
+    | SDiv _ => true
+    | URem   => true
+    | SRem   => true
+    | _      => false
+    end.
+
+  Definition iop_is_signed (iop : ibinop) : bool :=
+    match iop with
+    | SDiv _ => true
+    | SRem   => true
+    | _      => false
+    end.
+
+  Definition iop_is_shift (iop : ibinop) : bool :=
+    match iop with
+    | Shl _ _ => true
+    | LShr _ => true
+    | AShr _ => true
+    | _ => false
+    end.
+
+  (* Check if this is an instruction which can trigger UB with division by 0. *)
+  Definition fop_is_div (fop : fbinop) : bool :=
+    match fop with
+    | FDiv => true
+    | FRem => true
+    | _    => false
+    end.
+
+
 Ltac unfold_eqv :=
   repeat (unfold eqv in *; unfold eqv_raw_id in *; unfold eqv_instr_id in * ).
 

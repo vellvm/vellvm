@@ -21,7 +21,7 @@ From ExtLib Require Import
 From Vellvm Require Import
      Utilities
      Syntax
-     Semantics.LLVMEvents
+     Semantics.LLVMParams
      Semantics.Memory.Sizeof
      Numeric.Rocqlib
      Numeric.Integers
@@ -375,11 +375,10 @@ Definition intrinsic_exp {T} (e:exp T) : option string :=
    any other effects.
 
 *)
-Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLVMIO: LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
+Module Make(LP:LLVMParams).
   Open Scope string_scope.
 
-  Import LLVMIO.
-  Import DV.
+  Import LP.DV.
   Import VellvmIntegers.
 
   (* Each (pure) intrinsic is defined by a function of the following type.

@@ -60,11 +60,11 @@ Import MonadNotation.
 Import ListNotations.
 
 
-Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).
+Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI).
   Import AC.
 
-  Module DV1 := Events1.DV.
-  Module DV2 := Events2.DV.
+  Module DV1 := LP1.DV.
+  Module DV2 := LP2.DV.
 
 (* TODO: Move into Dvalue *)
   Ltac solve_dvalue_measure :=
@@ -1039,12 +1039,12 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
    *)
 End DVConvert.
 
-Module DVConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) : DVConvert LP1 LP2 AC Events1 Events2
-with Module DV1 := Events1.DV
-with Module DV2 := Events2.DV.
+Module DVConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI) : DVConvert LP1 LP2 AC 
+with Module DV1 := LP1.DV
+with Module DV2 := LP2.DV.
   Import AC.
-  Module DV1 := Events1.DV.
-  Module DV2 := Events2.DV.
+  Module DV1 := LP1.DV.
+  Module DV2 := LP2.DV.
 
   (* TODO: Move into Dvalue *)
   Ltac solve_dvalue_measure :=
@@ -4442,16 +4442,15 @@ Lemma dvalue_refine_lazy_dvalue_convert_lazy :
 
 End DVConvertMake.
 
-Module DVCFinInf := DVConvertMake InterpreterStack64BitIntptr.LP InterpreterStackBigIntptr.LP FinToInfAddrConvert InterpreterStack64BitIntptr.LP.Events InterpreterStackBigIntptr.LP.Events.
-Module DVCInfFin := DVConvertMake InterpreterStackBigIntptr.LP InterpreterStack64BitIntptr.LP InfToFinAddrConvert InterpreterStackBigIntptr.LP.Events InterpreterStack64BitIntptr.LP.Events.
+Module DVCFinInf := DVConvertMake InterpreterStack64BitIntptr.LP InterpreterStackBigIntptr.LP FinToInfAddrConvert.
+Module DVCInfFin := DVConvertMake InterpreterStackBigIntptr.LP InterpreterStack64BitIntptr.LP InfToFinAddrConvert.
 
 Module DVConvertSafe
   (LP1 : LLVMParams) (LP2 : LLVMParams)
   (AC1 : AddrConvert LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI) (AC2 : AddrConvert LP2.ADDR LP2.PTOI LP1.ADDR LP1.PTOI)
   (ACSafe : AddrConvertSafe LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI AC1 AC2)
   (IPSafe : IPConvertSafe LP1.IP LP2.IP)
-  (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF)
-  (DVC1 : DVConvert LP1 LP2 AC1 Events1 Events2) (DVC2 : DVConvert LP2 LP1 AC2 Events2 Events1).
+  (DVC1 : DVConvert LP1 LP2 AC1) (DVC2 : DVConvert LP2 LP1 AC2).
   Import ACSafe.
   Import IPSafe.
 

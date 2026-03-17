@@ -73,15 +73,14 @@ Open Scope monad_scope.
 
 #[local] Open Scope Z_scope.
 
-Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) <: MemoryModelExecPrimitives LP MP.
+Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MEMORY_PARAMS LP) <: MemoryModelExecPrimitives LP MP.
   Module MMSP := FiniteMemoryModelSpecPrimitives LP MP.
   Module MemSpec := MakeMemoryModelSpec LP MP MMSP.
   Module MemExecM := MakeMemoryExecMonad LP MP MMSP MemSpec.
   Import MemExecM.
 
-  Import LP.
   Import LP.ADDR.
-  Import LP.SIZEOF.
+  Import LP.SZ.
   Import LP.PROV.
   Import LP.PTOI.
   Import LP.ITOP.
@@ -3345,6 +3344,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       }
     Qed.
 
+
+    Import LP.
+    
     (* TODO: move this? *)
     Lemma MemMonad_run_get_consecutive_ptrs:
       forall {M RunM : Type -> Type} {MM : Monad M} {MRun : Monad RunM}
@@ -3380,7 +3382,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
         destruct
           (map_monad
-             (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix])
+             (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DV.DVALUE_IPTR ix])
              NOOM_seq) eqn:HMAPM.
         + cbn.
           rewrite MemMonad_run_bind.
@@ -3769,7 +3771,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       exists ms2. exists l.
       split; auto.
 
-      destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) eqn:HMAPM; cbn in *.
+      destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [LP.DV.DVALUE_IPTR ix]) l) eqn:HMAPM; cbn in *.
       destruct MAPM as [_ [_ [[] _]]].
       destruct MAPM as [sab [a [[EQSAB EQA] SEQUENCE]]]; subst.
       exists ms2. exists l0.
@@ -3790,7 +3792,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       destruct CONSEC as [ms' [ixs [SEQ MAPM]]].
       destruct (intptr_seq 0 len) eqn:HSEQ; cbn in SEQ; inv SEQ.
       cbn.
-      destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) eqn:HMAPM; cbn in *.
+      destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DV.DVALUE_IPTR ix]) l) eqn:HMAPM; cbn in *.
       destruct MAPM as [_ [_ [[] _]]].
       destruct MAPM as [sab [a [[EQSAB EQA] SEQUENCE]]]; subst.
       destruct (Monads.sequence l0) eqn:HSEQUENCE;
@@ -3809,7 +3811,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       destruct CONSEC as [ms' [ixs [SEQ MAPM]]].
       destruct (intptr_seq 0 len) eqn:HSEQ; cbn in SEQ; inv SEQ.
       destruct (map_monad
-                  (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) eqn:HMAPM.
+                  (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DV.DVALUE_IPTR ix]) l) eqn:HMAPM.
       destruct MAPM as [_ [_ [[] _]]].
       destruct MAPM as [sab [a [[EQSAB EQA] SEQUENCE]]]; subst.
       destruct (Monads.sequence l0) eqn:HSEQUENCE.
