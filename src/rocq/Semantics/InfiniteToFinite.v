@@ -17062,11 +17062,6 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod store_id (pro
     - repeat break_match_hyp_inv.
       econstructor; intuition auto with *.
 
-    - destruct H;
-      subst; repeat break_match_hyp_inv.
-      econstructor; intuition auto with *; subst; eauto.
-      econstructor; try right; auto; subst; eauto.
-
     - break_match_hyp_inv.
       constructor; auto.
       + intros.
@@ -17170,13 +17165,6 @@ cofix CIH (t_fin2 : itree L3 (prod FinMem.MMEP.MMSP.MemState (prod store_id (pro
         * destruct H.
           econstructor; eauto.
           right; right; split; eauto.
-    - DVC1.uvalue_convert_strict_inv H1.
-      destruct H.
-      + econstructor; eauto.
-        destruct H.
-        left; eauto.
-      + subst.
-        econstructor; eauto.
     - DVC1.uvalue_convert_strict_inv H1.
       destruct H.
       + econstructor; eauto.
