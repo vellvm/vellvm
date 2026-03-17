@@ -23,7 +23,7 @@ Definition pad_to_align (align : alignment) (sz : N) :=
 Definition pad_to_align_bitwise (align : alignment) (sz : N) :=
   pad_to ((preferred_alignment align) * 8) sz.
 
-Module Type Sizeof.
+Module Type SIZEOF.
   (** ** Size of a dynamic type in bits *)
   Parameter bit_sizeof_dtyp : dtyp -> N.
 
@@ -64,11 +64,11 @@ Module Type Sizeof.
 
   Parameter sizeof_dtyp_i8 :
     sizeof_dtyp (DTYPE_I 8) = 1%N.
-End Sizeof.
+End SIZEOF.
 
 (* Derived functions / constants on Sizeof. *)
-Module Sizeof_helpers(SIZEOF:Sizeof).
-  Import SIZEOF.
+Module SizeofHelpers(S:SIZEOF).
+  Import S.
 
   Definition ptr_size : N := sizeof_dtyp DTYPE_Pointer.
-End Sizeof_helpers.
+End SizeofHelpers.

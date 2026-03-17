@@ -50,65 +50,66 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Import SemNotations.
 
   Section Translations.
+    (* SAZ: TODO -- these are all generic in [dvalue] [uvalue], move to the llvm events module? *)
 
     (* Technicality: translations by [lookup_E_to_exp_E] and [exp_E_to_instr_E] leave these events unphased *)
 
-    Lemma LU_to_exp_Global : forall {X} (e : LLVMGEnvE X),
-        subevent X (LU_to_exp (subevent X e)) = subevent (F:=exp_E) X e.
+    Lemma LU_to_exp_Global : forall {X} (e : (LLVMGEnvE dvalue) X),
+        subevent X (LU_to_exp (subevent X e)) = subevent (F:=(exp_E dvalue uvalue)) X e.
     Proof using.
       reflexivity.
     Qed.
 
-    Lemma exp_to_instr_Global : forall {X} (e : LLVMGEnvE X),
-        subevent X (exp_to_instr (subevent X e)) = subevent (F:=instr_E) X e.
+    Lemma exp_to_instr_Global : forall {X} (e : (LLVMGEnvE dvalue) X),
+        subevent X (exp_to_instr (subevent X e)) = subevent (F:=(instr_E dvalue uvalue)) X e.
     Proof using.
       reflexivity.
     Qed.
 
-    Lemma LU_to_exp_Local : forall {X} (e : LLVMEnvE X),
-        subevent X (LU_to_exp (subevent X e)) = subevent (F:=exp_E) X e.
+    Lemma LU_to_exp_Local : forall {X} (e : (LLVMEnvE uvalue) X),
+        subevent X (LU_to_exp (subevent X e)) = subevent (F:=(exp_E dvalue uvalue)) X e.
     Proof using.
       reflexivity.
     Qed.
 
-    Lemma exp_to_instr_Local : forall {X} (e : LLVMEnvE X),
-        subevent X (exp_to_instr (subevent X e)) = subevent (F:=instr_E) X e.
+    Lemma exp_to_instr_Local : forall {X} (e : (LLVMEnvE uvalue) X),
+        subevent X (exp_to_instr (subevent X e)) = subevent (F:=(instr_E dvalue uvalue)) X e.
     Proof using.
       reflexivity.
     Qed.
 
-    Lemma exp_to_instr_Memory : forall {X} (e : MemoryE X),
-        subevent X (exp_to_instr (subevent X e)) = subevent (F:=instr_E) X e.
+    Lemma exp_to_instr_Memory : forall {X} (e : (MemoryE dvalue uvalue) X),
+        subevent X (exp_to_instr (subevent X e)) = subevent (F:=(instr_E dvalue uvalue)) X e.
     Proof using.
       reflexivity.
     Qed.
 
     Lemma exp_to_instr_Pick : forall {X} (e : PickE X),
-        subevent X (exp_to_instr (subevent X e)) = subevent (F:=instr_E) X e.
+        subevent X (exp_to_instr (subevent X e)) = subevent (F:=(instr_E dvalue uvalue)) X e.
     Proof using.
       reflexivity.
     Qed.
 
     Lemma exp_to_instr_UB : forall {X} (e : UBE X),
-        subevent X (exp_to_instr (subevent X e)) = subevent (F:=instr_E) X e.
+        subevent X (exp_to_instr (subevent X e)) = subevent (F:=(instr_E dvalue uvalue)) X e.
     Proof using.
       reflexivity.
     Qed.
 
     Lemma exp_to_instr_Fail : forall {X} (e : FailureE X),
-        subevent X (exp_to_instr (subevent X e)) = subevent (F:=instr_E) X e.
+        subevent X (exp_to_instr (subevent X e)) = subevent (F:=(instr_E dvalue uvalue)) X e.
     Proof using.
       reflexivity.
     Qed.
 
     Lemma FUB_to_exp_UB : forall {X} (e : UBE X),
-        subevent X (FUB_to_exp (subevent X e)) = subevent (F:=exp_E) X e.
+        subevent X (FUB_to_exp (subevent X e)) = subevent (F:=(exp_E dvalue uvalue)) X e.
     Proof using.
       reflexivity.
     Qed.
 
     Lemma FUB_to_exp_Fail : forall {X} (e : FailureE X),
-        subevent X (FUB_to_exp (subevent X e)) = subevent (F:=exp_E) X e.
+        subevent X (FUB_to_exp (subevent X e)) = subevent (F:=(exp_E dvalue uvalue)) X e.
     Proof using.
       reflexivity.
     Qed.
@@ -322,6 +323,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       reflexivity.
     Qed.
 
+    (* TYPECLASS resolution breaks for this 
     Lemma denote_exp_GR :forall g l id v τ,
         Maps.lookup id g = Some v ->
         ⟦ EXP_Ident (ID_Global id) at τ ⟧e2 g l
@@ -340,6 +342,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       reflexivity.
     Qed.
 
+     *)
     (* This doesn't necessarily hold because we don't know if `v` was
        concretized eagerly. We should know that `v` is equivalent to
        the value on the left-hand-side, though.

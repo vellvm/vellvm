@@ -13,9 +13,8 @@ From Vellvm Require Import
      Utils.UBAndErrors
      Semantics.MemoryAddress
      Semantics.DynamicValues
-     Semantics.LLVMEvents
+     Semantics.LLVMParams
      Semantics.Memory.FiniteProvenance
-     Semantics.Memory.Sizeof
      Semantics.StoreId
      Utils.StateMonads
      Utils.Monads
@@ -30,8 +29,8 @@ Import Basics.Basics.Monads.
 Import MonadNotation.
 
 (* TODO: Provenance is an issue... *)
-Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr)).
-  Import PROV.
+Module ERRSID (LP:LLVMParams).
+  Import LP.PROV.
 
   (* Need failure, UB, state for store_ids, and state for provenances *)
   Inductive ErrSID_T M A := mkErrSID_T { unErrSID_T : @err_ub_oom_T (stateT store_id (stateT Provenance M)) A }.

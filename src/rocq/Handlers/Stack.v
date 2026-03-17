@@ -22,6 +22,7 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
      Semantics.DynamicValues
+     Semantics.LLVMParams
      Semantics.LLVMEvents
      Handlers.Local.
 
@@ -226,8 +227,7 @@ From ExtLib Require Import
    it until [TopLevel] either.
    We are hence exposing the specialization here, but it is slightly awkward.
  *)
-Module Make (A : ADDRESS)(IP : INTPTR)(SIZEOF : Sizeof)(LLVMEvents : LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
-  Definition lstack_frame := @stack_frame LLVMEvents.DV.uvalue (list (raw_id * LLVMEvents.DV.uvalue)).
-  Definition lstack := @stack LLVMEvents.DV.uvalue (list (raw_id * LLVMEvents.DV.uvalue)).
+Module Make (LP:LLVMParams).
+  Definition lstack_frame := @stack_frame LP.DV.uvalue (list (raw_id * LP.DV.uvalue)).
+  Definition lstack := @stack LP.DV.uvalue (list (raw_id * LP.DV.uvalue)).
 End Make.
-Set Printing Implicit.

@@ -1836,6 +1836,17 @@ Proof.
 Qed.
 
 
+  Lemma Forall2_cons_inversion :
+    forall {A B} f (x:A) (y:B) xs ys,
+      Forall2 f (x::xs) (y::ys) -> f x y /\ Forall2 f xs ys.
+  Proof.
+    intros.
+    inversion H; subst.
+    tauto.
+  Qed.
+
+
+
 Lemma Forall2_repeat_OOM : forall {A B} (f : A -> OOM B) (a:A) (b:B) n (l:list B),
     f a = ret b ->
     Forall2 (fun a b => f a = ret b) (repeat a n) l ->
@@ -1910,6 +1921,7 @@ Proof.
       destruct (IH _ _ _ HL x X0) as [c [HFC HR]].
       exists c. split; auto. right. assumption.
 Qed.
+
 
 
 (*

@@ -4,7 +4,7 @@
 open LLVMAst
 open TopLevel
 
-open InterpretationStack.InterpreterStackBigIntptr.LP.Events
+open InterpretationStack.InterpreterStackBigIntptr.LP
 
 open Llvm_printer
 open Either

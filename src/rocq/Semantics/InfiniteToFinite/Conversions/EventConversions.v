@@ -58,9 +58,60 @@ Import InterpFacts.
 Import MonadNotation.
 Import ListNotations.
 
-Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI) (AC2 : AddrConvert LP2.ADDR LP2.PTOI LP1.ADDR LP1.PTOI) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) (DVC : DVConvert LP1 LP2 AC E1 E2) (DVCrev : DVConvert LP2 LP1 AC2 E2 E1).
+Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI) (AC2 : AddrConvert LP2.ADDR LP2.PTOI LP1.ADDR LP1.PTOI) (DVC : DVConvert LP1 LP2 AC) (DVCrev : DVConvert LP2 LP1 AC2).
   Import DVC.
 
+  Module DV1 := LP1.DV.
+  Module DV2 := LP2.DV.
+
+  #[global]
+    Notation ExternalCallE1 := (ExternalCallE DV1.dvalue DV1.uvalue).
+  #[global]  
+    Notation ExternalCallE2 := (ExternalCallE DV2.dvalue DV2.uvalue).
+
+  #[global]  
+    Notation IntrinsicE1 := (IntrinsicE DV1.dvalue DV1.uvalue).  
+  #[global]
+    Notation IntrinsicE2 := (IntrinsicE DV2.dvalue DV2.uvalue).
+  #[global]
+    Notation MemoryE1 := (MemoryE DV1.dvalue DV1.uvalue).  
+  #[global]
+    Notation MemoryE2 := (MemoryE DV2.dvalue DV2.uvalue).
+  #[global]
+    Notation PickUvalueE1 := (PickUvalueE DV1.dvalue DV1.uvalue).  
+  #[global]
+    Notation PickUvalueE2 := (PickUvalueE DV2.dvalue DV2.uvalue).
+
+  #[global]
+    Notation L01 := (L0 DV1.dvalue DV1.uvalue).
+  #[global]  
+    Notation L02 := (L0 DV2.dvalue DV2.uvalue).
+  #[global]
+    Notation L11 := (L1 DV1.dvalue DV1.uvalue).
+  #[global]  
+    Notation L12 := (L1 DV2.dvalue DV2.uvalue).
+  #[global]
+    Notation L21 := (L2 DV1.dvalue DV1.uvalue).
+  #[global]  
+    Notation L22 := (L2 DV2.dvalue DV2.uvalue).
+  #[global]  
+    Notation L31 := (L3 DV1.dvalue DV1.uvalue).
+  #[global]  
+    Notation L32 := (L3 DV2.dvalue DV2.uvalue).
+  #[global]  
+    Notation L41 := (L4 DV1.dvalue DV1.uvalue).
+  #[global]
+    Notation L42 := (L4 DV2.dvalue DV2.uvalue).
+  #[global]
+    Notation L51 := (L5 DV1.dvalue DV1.uvalue).
+  #[global]
+    Notation L52 := (L5 DV2.dvalue DV2.uvalue).
+  #[global]
+    Notation L61 := (L6 DV1.dvalue DV1.uvalue).
+  #[global]
+    Notation L62 := (L6 DV2.dvalue DV2.uvalue).
+
+  
   Section CONVERSIONS.
     Context
       (dvalue_convert : DV1.dvalue -> OOM DV2.dvalue)
@@ -71,26 +122,26 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
     Section HANDLER_CONVERSIONS.
       Context {E} `{OOM_E : OOME -< E}.
 
-      Definition external_call_handler_convert `{E2.ExternalCallE -< E} : E1.ExternalCallE ~> itree E.
+      Definition external_call_handler_convert `{ExternalCallE2 -< E} : ExternalCallE1 ~> itree E.
         intros T e0.
         destruct e0.
         - (* ExternalCall *)
           refine (f' <- lift_OOM (uvalue_convert f);;
                   args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
-                  dv <- trigger (E2.ExternalCall t f' args');;
+                  dv <- trigger (ExternalCall t f' args');;
                   _).
           apply (lift_OOM (rev_dvalue_convert dv)).
         - (* Stdout *)
-          apply (trigger (E2.IO_stdout str)).
+          apply (trigger (IO_stdout str)).
         - (* Stderr *)
-          apply (trigger (E2.IO_stderr str)).
+          apply (trigger (IO_stderr str)).
       Defined.
 
-      Definition intrinsic_handler_convert `{E2.IntrinsicE -< E} : E1.IntrinsicE ~> itree E.
+      Definition intrinsic_handler_convert `{IntrinsicE2 -< E} : IntrinsicE1 ~> itree E.
         intros T i.
         inversion i; subst.
         refine (args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
-                rv <- trigger (E2.Intrinsic t f args');;
+                rv <- trigger (Intrinsic t f args');;
                 match rv with
                 | inl exc =>
                     exc' <- lift_OOM (rev_uvalue_convert exc);;
@@ -101,7 +152,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
                 end).
       Defined.
 
-      Definition global_handler_convert `{GlobalE LLVMAst.raw_id E2.DV.dvalue -< E} : GlobalE LLVMAst.raw_id E1.DV.dvalue ~> itree E.
+      Definition global_handler_convert `{GlobalE LLVMAst.raw_id DV2.dvalue -< E} : GlobalE LLVMAst.raw_id DV1.dvalue ~> itree E.
         (* Globals *)
         intros T e0.
         inversion e0.
@@ -113,7 +164,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
                  lift_OOM (rev_dvalue_convert dv)).
       Defined.
 
-      Definition local_handler_convert `{LocalE LLVMAst.raw_id E2.DV.uvalue -< E} : LocalE LLVMAst.raw_id E1.DV.uvalue ~> itree E.
+      Definition local_handler_convert `{LocalE LLVMAst.raw_id DV2.uvalue -< E} : LocalE LLVMAst.raw_id DV1.uvalue ~> itree E.
         (* Locals *)
         intros T e0.
         inversion e0.
@@ -126,8 +177,8 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
       Defined.
 
       Definition stack_handler_convert
-        `{StackE LLVMAst.raw_id E2.DV.uvalue E2.DV.uvalue -< E} :
-        StackE LLVMAst.raw_id E1.DV.uvalue E1.DV.uvalue ~> itree E.
+        `{StackE LLVMAst.raw_id DV2.uvalue DV2.uvalue -< E} :
+        StackE LLVMAst.raw_id DV1.uvalue DV1.uvalue ~> itree E.
         (* Stack *)
         intros T e0.
         inversion e0.
@@ -158,31 +209,31 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
       Defined.
 
       Definition memory_handler_convert
-        `{E2.MemoryE -< E} :
-        E1.MemoryE ~> itree E.
+        `{MemoryE2 -< E} :
+        MemoryE1 ~> itree E.
         (* MemoryE *)
         intros T e0.
         inversion e0.
         - (* MemPush *)
-          apply (trigger E2.MemPush).
+          apply (trigger MemPush).
         - (* MemPop *)
-          apply (trigger E2.MemPop).
+          apply (trigger MemPop).
         - (* Alloca *)
-          apply (ptr <- trigger (E2.Alloca t num_elements align);;
+          apply (ptr <- trigger (Alloca t num_elements align);;
                  lift_OOM (rev_dvalue_convert ptr)).
         - (* Load *)
           apply (a' <- lift_OOM (dvalue_convert a);;
-                 uv <- trigger (E2.Load t a');;
+                 uv <- trigger (Load t a');;
                  lift_OOM (rev_uvalue_convert uv)).
         - (* Store *)
           apply (a' <- lift_OOM (dvalue_convert a);;
                  v' <- lift_OOM (uvalue_convert v);;
-                 trigger (E2.Store t a' v')).
+                 trigger (Store t a' v')).
       Defined.
 
       Definition pick_handler_convert
-        `{E2.PickUvalueE -< E} :
-        E1.PickUvalueE ~> itree E.
+        `{PickUvalueE2 -< E} :
+        PickUvalueE1 ~> itree E.
         intros T e0.
         (* PickE *)
         (* TODO: confirm whether this is sane... *)
@@ -190,7 +241,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
         - (* pickUnique *)
           subst.
           refine (x' <- lift_OOM (uvalue_convert x);;
-                  dv <- trigger (E2.pickUnique x');;
+                  dv <- trigger (pickUnique x');;
                   _).
           destruct dv as [res _].
           apply (res' <- lift_OOM (rev_dvalue_convert res);;
@@ -198,7 +249,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
         - (* pickNonPoison *)
           subst.
           refine (x' <- lift_OOM (uvalue_convert x);;
-                  dv <- trigger (E2.pickNonPoison x');;
+                  dv <- trigger (pickNonPoison x');;
                   _).
           destruct dv as [res _].
           apply (res' <- lift_OOM (rev_dvalue_convert res);;
@@ -206,7 +257,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
         - (* pick *)
           subst.
           refine (x' <- lift_OOM (uvalue_convert x);;
-                  dv <- trigger (E2.pick x');;
+                  dv <- trigger (pick x');;
                   _).
           destruct dv as [res _].
           apply (res' <- lift_OOM (rev_dvalue_convert res);;
@@ -223,8 +274,8 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
       Defined.
 
       Definition llvm_exc_handler_convert
-        `{LLVMExcE E2.DV.uvalue -< E} :
-        LLVMExcE E1.DV.uvalue ~> itree E.
+        `{LLVMExcE DV2.uvalue -< E} :
+        LLVMExcE DV1.uvalue ~> itree E.
         (* LLVMExcE *)
         intros T e0.
         inversion e0.
@@ -259,8 +310,10 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
       Defined.
     End HANDLER_CONVERSIONS.
 
+
+    
     Definition L0_convert_helper
-      : Handler E1.L0 E2.L0.
+      : Handler L01 L02.
       refine (fun A e => _).
 
       refine (match e with
@@ -291,8 +344,10 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
               end).
     Defined.
 
+
+
     Definition L1_convert_helper
-      : Handler E1.L1 E2.L1.
+      : Handler L11 L12.
       refine (fun A e => _).
 
       refine (match e with
@@ -321,8 +376,9 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
               end).
     Defined.
 
+    
     Definition L2_convert_helper
-      : Handler E1.L2 E2.L2.
+      : Handler L21 L22.
       refine (fun A e => _).
 
       refine (match e with
@@ -347,8 +403,9 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
               end).
     Defined.
 
+    
     Definition L3_convert_helper
-      : Handler E1.L3 E2.L3.
+      : Handler L31 L32.
       refine (fun A e => _).
 
       refine (match e with
@@ -369,8 +426,9 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
               end).
     Defined.
 
+    
     Definition L4_convert_helper
-      : Handler E1.L4 E2.L4.
+      : Handler L41 L42.
       refine (fun A e => _).
 
       refine (match e with
@@ -389,11 +447,13 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
               end).
     Defined.
 
+    
     Definition L5_convert_helper
-      : Handler E1.L5 E2.L5 := L4_convert_helper.
+      : Handler L51 L52 := L4_convert_helper.
+
 
     Definition L6_convert_helper
-      : Handler E1.L6 E2.L6 := L5_convert_helper.
+      : Handler L61 L62 := L4_convert_helper.
   End CONVERSIONS.
 
     (*
@@ -406,30 +466,29 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
   Definition L6_convert_lazy : Handler E1.L6 E2.L6 := L6_convert_helper (ret ∘ dvalue_convert_lazy) (ret ∘ uvalue_convert_lazy) (ret ∘ DVCrev.dvalue_convert_lazy) (ret ∘ DVCrev.uvalue_convert_lazy).
      *)
 
-    Definition L0_convert_strict : Handler E1.L0 E2.L0 := L0_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict DVCrev.uvalue_convert_strict.
-    Definition L1_convert_strict : Handler E1.L1 E2.L1 := L1_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict DVCrev.uvalue_convert_strict.
-    Definition L2_convert_strict : Handler E1.L2 E2.L2 := L2_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict DVCrev.uvalue_convert_strict.
-    Definition L3_convert_strict : Handler E1.L3 E2.L3 := L3_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict.
-    Definition L4_convert_strict : Handler E1.L4 E2.L4 := L4_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict.
-    Definition L5_convert_strict : Handler E1.L5 E2.L5 := L5_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict.
-    Definition L6_convert_strict : Handler E1.L6 E2.L6 := L6_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict.
+    Definition L0_convert_strict : Handler L01 L02 := L0_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict DVCrev.uvalue_convert_strict.
+    Definition L1_convert_strict : Handler L11 L12 := L1_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict DVCrev.uvalue_convert_strict.
+    Definition L2_convert_strict : Handler L21 L22 := L2_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict DVCrev.uvalue_convert_strict.
+    Definition L3_convert_strict : Handler L31 L32 := L3_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict.
+    Definition L4_convert_strict : Handler L41 L42 := L4_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict.
+    Definition L5_convert_strict : Handler L51 L52 := L5_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict.
+    Definition L6_convert_strict : Handler L61 L62 := L6_convert_helper dvalue_convert_strict uvalue_convert_strict DVCrev.dvalue_convert_strict.
 End EventConvert.
 
-Module EventConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI) (AC2 : AddrConvert LP2.ADDR LP2.PTOI LP1.ADDR LP1.PTOI) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) (DVC : DVConvert LP1 LP2 AC E1 E2) (DVCrev : DVConvert LP2 LP1 AC2 E2 E1) : EventConvert LP1 LP2 AC AC2 E1 E2 DVC DVCrev.
-  Include EventConvert LP1 LP2 AC AC2 E1 E2 DVC DVCrev.
+Module EventConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI) (AC2 : AddrConvert LP2.ADDR LP2.PTOI LP1.ADDR LP1.PTOI) (DVC : DVConvert LP1 LP2 AC) (DVCrev : DVConvert LP2 LP1 AC2) : EventConvert LP1 LP2 AC AC2 DVC DVCrev.
+  Include EventConvert LP1 LP2 AC AC2 DVC DVCrev.
 End EventConvertMake.
 
-Module ECFinInf := EventConvertMake InterpreterStack64BitIntptr.LP InterpreterStackBigIntptr.LP FinToInfAddrConvert InfToFinAddrConvert InterpreterStack64BitIntptr.LP.Events InterpreterStackBigIntptr.LP.Events DVCFinInf DVCInfFin.
-Module ECInfFin := EventConvertMake InterpreterStackBigIntptr.LP InterpreterStack64BitIntptr.LP InfToFinAddrConvert FinToInfAddrConvert InterpreterStackBigIntptr.LP.Events InterpreterStack64BitIntptr.LP.Events DVCInfFin DVCFinInf.
+Module ECFinInf := EventConvertMake InterpreterStack64BitIntptr.LP InterpreterStackBigIntptr.LP FinToInfAddrConvert InfToFinAddrConvert DVCFinInf DVCInfFin.
+Module ECInfFin := EventConvertMake InterpreterStackBigIntptr.LP InterpreterStack64BitIntptr.LP InfToFinAddrConvert FinToInfAddrConvert DVCInfFin DVCFinInf.
 
 Module EventConvertSafe
   (LP1 : LLVMParams) (LP2 : LLVMParams)
   (AC1 : AddrConvert LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI) (AC2 : AddrConvert LP2.ADDR LP2.PTOI LP1.ADDR LP1.PTOI)
   (ACSafe : AddrConvertSafe LP1.ADDR LP1.PTOI LP2.ADDR LP2.PTOI AC1 AC2)
   (IPSafe : IPConvertSafe LP1.IP LP2.IP)
-  (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF)
-  (DVC : DVConvert LP1 LP2 AC1 Events1 Events2) (DVCrev : DVConvert LP2 LP1 AC2 Events2 Events1) (EC : EventConvert LP1 LP2 AC1 AC2 Events1 Events2 DVC DVCrev).
-  Module DVCSafe := DVConvertSafe LP1 LP2 AC1 AC2 ACSafe IPSafe Events1 Events2 DVC DVCrev.
+  (DVC : DVConvert LP1 LP2 AC1) (DVCrev : DVConvert LP2 LP1 AC2) (EC : EventConvert LP1 LP2 AC1 AC2 DVC DVCrev).
+  Module DVCSafe := DVConvertSafe LP1 LP2 AC1 AC2 ACSafe IPSafe DVC DVCrev.
 
   (* Converting finite events to infinite events... *)
   Module DV1 := DVC.DV1. (* Finite *)
@@ -469,6 +528,4 @@ Module EventConvertSafe
   Definition rev_uvalue_convert (uv : DV2.uvalue) : OOM DV1.uvalue
     := DVCrev.uvalue_convert_strict uv.
 
-  Module E1 := Events1.
-  Module E2 := Events2.
 End EventConvertSafe.

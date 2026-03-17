@@ -456,9 +456,9 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     #[global] Instance adhoc_Proper F E A e `{UBE -< F}  `{FailureE -< F}  `{OOME -< F} :
 @Proper (forall _ : itree (sum1 E F) A, Prop)
         (@respectful (itree (sum1 E F) A) Prop (@eutt (sum1 E F) A A (@eq A)) (@flip Prop Prop Prop impl))
-        (@case_ (forall _ : Type, Type) IFun sum1 Case_sum1 E (sum1 PickUvalueE F)
+        (@case_ (forall _ : Type, Type) IFun sum1 Case_sum1 E (sum1 (PickUvalueE dvalue uvalue) F)
            (fun T : Type => forall _ : itree (sum1 E F) T, Prop) (@E_trigger_prop E F)
-           (@case_ (forall _ : Type, Type) IFun sum1 Case_sum1 PickUvalueE F
+           (@case_ (forall _ : Type, Type) IFun sum1 Case_sum1 (PickUvalueE dvalue uvalue) F
               (fun T : Type => forall _ : itree (sum1 E F) T, Prop)
               (@PickUvalue_handler (sum1 E F)
                  (@ReSum_inr (forall _ : Type, Type) IFun sum1 Cat_IFun Inr_sum1 FailureE F E H0)
@@ -2743,7 +2743,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (** We hence can also commute them at the various levels of interpretation *)
 
   Lemma interp2_bind:
-    forall {R S} (t: itree L0 R) (k: R -> itree L0 S) s1 s2,
+    forall {R S} (t: itree (L0 dvalue uvalue) R) (k: R -> itree (L0 dvalue uvalue) S) s1 s2,
       ℑs2 (ITree.bind t k) s1 s2 ≈
           (ITree.bind (ℑs2 t s1 s2) (fun '(s1',(s2',x)) => ℑs2 (k x) s2' s1')).
   Proof using.
@@ -2761,7 +2761,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     rewrite interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret; reflexivity.
   Qed.
 
-  Definition interp_cfg {R: Type} (trace: itree instr_E R) (g : global_env) (l : local_env) sid m :=
+  Definition interp_cfg {R: Type} (trace: itree (instr_E dvalue uvalue) R) (g : global_env) (l : local_env) sid m :=
     let uvalue_trace   := interp_intrinsics trace in
     let L1_trace       := interp_global uvalue_trace g in
     let L2_trace       := interp_local L1_trace l in
@@ -2773,7 +2773,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     let trace := denote_cfg prog varargs in
     interp_cfg trace [] [] 0 initial_memory_state.
 
-  Definition refine_cfg_ret: relation (PropT L5 (MemState * (local_env * (global_env * uvalue)))) :=
+  Definition refine_cfg_ret: relation (PropT (L5 dvalue uvalue) (MemState * (local_env * (global_env * uvalue)))) :=
     fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt  (TT × (TT × (TT × refine_uvalue))) t t'.
 
 End TopLevelRefinements.

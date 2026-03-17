@@ -16,7 +16,8 @@ From Vellvm Require Import
   Utils.Poisonable
   Utils.ErrOomPoison
   Utils.ListUtil
-  Syntax.LLVMAst.
+  Syntax.LLVMAst
+  Memory.Sizeof.
 
 From ExtLib Require Import
      Structures.Monads
@@ -103,9 +104,8 @@ Module Type DvalueByte (LP : LLVMParams).
   Import PTOI.
   Import ITOP.
   Import PROV.
-  Import SIZEOF.
-  Import Events.DV.
-  Import Sizeof.
+  Import SZ.
+  Import DV.
 
   (* Walk through a list *)
   (* Returns field index + number of bytes remaining *)
@@ -149,7 +149,7 @@ Module Type DvalueByte (LP : LLVMParams).
             let padding :=
               match pad with
               | Some max_pad
-                => pad_amount max_pad offset
+                => Sizeof.pad_amount max_pad offset
               | None =>
                   0%N
               end

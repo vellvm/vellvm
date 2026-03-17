@@ -94,7 +94,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     repeat (autorewrite with VELLVM_REWRITE; cbn).
 
   Lemma interp_cfg1_bind :
-    forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g,
+    forall {R S} (t: itree (instr_E dvalue uvalue) R) (k: R -> itree (instr_E dvalue uvalue) S) g,
       ℑ1 (t >>= k) g ≈ '(g',x) <- ℑ1 t g ;; ℑ1 (k x) g'.
   Proof.
     intros.
@@ -115,7 +115,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     : VELLVM_REWRITE.
 
   Lemma interp_cfg2_bind :
-    forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g l,
+    forall {R S} (t: itree (instr_E dvalue uvalue) R) (k: R -> itree (instr_E dvalue uvalue) S) g l,
       ℑ2 (t >>= k) g l ≈ '(g',(l',x)) <- ℑ2 t g l ;; ℑ2 (k x) l' g'.
   Proof.
     intros.
@@ -131,7 +131,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   (* Lemma interp_cfg3_bind : *)
-  (*   forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g l m, *)
+  (*   forall {R S} (t: itree (instr_E dvalue uvalue) R) (k: R -> itree (instr_E dvalue uvalue) S) g l m, *)
   (*     ℑ3 (t >>= k) g l m ≈ *)
   (*        '(m',(l',(g',x))) <- ℑ3 t g l m ;; ℑ3 (k x) g' l' m'. *)
   (* Proof. *)
@@ -176,7 +176,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (* Qed. *)
 
   Lemma interp_cfg2_vis :
-    forall T R (e : instr_E T) (k : T -> itree instr_E R) g l,
+    forall T R (e : (instr_E dvalue uvalue) T) (k : T -> itree (instr_E dvalue uvalue) R) g l,
       ℑ2 (Vis e k) g l ≈ '(l, (g, x)) <- ℑ2 (trigger e) g l;; ℑ2 (k x) g l.
   Proof.
     intros.
@@ -188,7 +188,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Lemma interp_cfg2_bind_trigger :
-    forall T R (e : instr_E T) (k : T -> itree instr_E R) g l,
+    forall T R (e : (instr_E dvalue uvalue) T) (k : T -> itree (instr_E dvalue uvalue) R) g l,
       ℑ2 (trigger e >>= k) g l ≈
          '(l, (g, x)) <- ℑ2 (trigger e) g l ;; ℑ2 (k x) g l.
   Proof.

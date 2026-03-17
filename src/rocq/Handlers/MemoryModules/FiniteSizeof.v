@@ -12,12 +12,12 @@ From Vellvm.Syntax Require Import
 
 From Vellvm.Semantics Require Import
      DynamicValues
-     LLVMEvents
+     LLVMParams
      Memory.MemBytes
      Memory.Sizeof
      StoreId.
 
-Module FinSizeof : Sizeof.
+Module FinSizeof : SIZEOF.
   (* TODO: make parameter? *)
   Definition ptr_size : nat := 8.
 
@@ -178,11 +178,10 @@ End FinSizeof.
 Inductive UByte (uvalue : Type) :=
 | mkUByte (uv : uvalue) (dt : dtyp) (idx : N) (sid : store_id) : UByte uvalue.
 
-Module FinByte (ADDR : MemoryAddress.ADDRESS) (IP : MemoryAddress.INTPTR) (SIZEOF : Sizeof) (LLVMEvents:LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF)) : ByteImpl(ADDR)(IP)(SIZEOF)(LLVMEvents)
-with  Definition SByte := UByte LLVMEvents.DV.uvalue
-with  Definition uvalue_sbyte := mkUByte LLVMEvents.DV.uvalue.
-  Import LLVMEvents.
-  Import DV.
+Module FinByte (LP:LLVMParams) : ByteImpl(LP)
+with  Definition SByte := UByte LP.DV.uvalue
+with  Definition uvalue_sbyte := mkUByte LP.DV.uvalue.
+  Import LP.DV.
 
   Definition SByte := UByte uvalue.
 

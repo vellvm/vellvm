@@ -11,7 +11,7 @@
 open Printf
 open Vellvm_base
 
-open InterpretationStack.InterpreterStackBigIntptr.LP.Events
+open InterpretationStack.InterpreterStackBigIntptr.LP
 
 let of_str = Camlcoq.camlstring_of_coqstring
 

@@ -344,7 +344,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Qed.
 
       Lemma exp_optim_correct_phi : forall phi f g l,
-          ℑ2 (translate exp_to_instr ⟦ phi ⟧Φ (f)) g l ≈ ℑ2 (translate exp_to_instr ⟦ endo phi ⟧Φ (f)) g l.
+          ℑ2 (translate (@exp_to_instr dvalue uvalue) ⟦ phi ⟧Φ (f)) g l ≈ ℑ2 (translate (@exp_to_instr dvalue uvalue) ⟦ endo phi ⟧Φ (f)) g l.
       Proof using opt_correct.
         intros [[id []] md] f.
         induction args as [| [] args IH]; intros; [reflexivity |].
@@ -451,7 +451,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Qed.
 
       Lemma interp_cfg2_bind_eq_itree :
-        forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g l,
+        forall {R S} (t: itree (instr_E dvalue uvalue) R) (k: R -> itree (instr_E dvalue uvalue) S) g l,
           ℑ2 (t >>= k) g l ≅
              '(l',(g',x)) <- ℑ2 t g l ;; ℑ2 (k x) g' l'.
       Proof using Type.
@@ -462,7 +462,7 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Qed.
 
       Lemma interp_cfg2_Tau :
-        forall {R} (t: itree instr_E R) g l,
+        forall {R} (t: itree (instr_E dvalue uvalue) R) g l,
           ℑ2 (Tau t) g l ≅ Tau (ℑ2 t g l).
       Proof using Type.
         intros.

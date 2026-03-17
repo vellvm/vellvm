@@ -15,8 +15,8 @@ From Vellvm Require Import
   Module Type Memory (LP: LLVMParams).
     Import LP.
 
-    Declare Module GEP  : GEPM ADDR PTOI PROV ITOP IP SIZEOF Events.
-    Declare Module Byte : ByteImpl ADDR IP SIZEOF Events.
+    Declare Module GEP  : GEPM LP.
+    Declare Module Byte : ByteImpl LP.
     Declare Module DVALUE_BYTE : DvalueByte LP.
 
     Module MP := MemoryParams.Make LP GEP Byte DVALUE_BYTE.
@@ -27,7 +27,7 @@ From Vellvm Require Import
     Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
 
     (* Concretization *)
-    Module ByteM := MemBytes.Byte ADDR IP SIZEOF LP.Events MP.BYTE_IMPL.
+    Module ByteM := MemBytes.Byte LP MP.BYTE_IMPL.
     Module CP := ConcretizationParams.Make LP MP ByteM.
 
     Export GEP Byte DVALUE_BYTE MP MEM_MODEL CP.
@@ -37,10 +37,10 @@ From Vellvm Require Import
     Export LP.
 
     (* Handlers *)
-    Module Global     := Global.Make ADDR IP SIZEOF LP.Events.
-    Module Local      := Local.Make ADDR IP SIZEOF LP.Events.
-    Module Stack      := Stack.Make ADDR IP SIZEOF LP.Events.
-    Module Intrinsics := Intrinsics.Make ADDR IP SIZEOF LP.Events.
+    Module Global     := Global.Make LP.
+    Module Local      := Local.Make LP.
+    Module Stack      := Stack.Make LP.
+    Module Intrinsics := Intrinsics.Make LP.
 
     (* Memory *)
     Declare Module MEM : Memory LP.
@@ -52,7 +52,7 @@ From Vellvm Require Import
     (* Denotation *)
     Module D := Denotation LP MP ByteM CP.
 
-    Export Events Events.DV Global Local Stack Pick Intrinsics
+    Export DV Global Local Stack Pick Intrinsics
            CP.CONC D.
   End Lang.
 

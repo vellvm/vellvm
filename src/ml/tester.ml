@@ -4,7 +4,7 @@ open Vellvm_base
 open Result
 open Driver
 
-module DV = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV
+module DV = InterpretationStack.InterpreterStackBigIntptr.LP.DV
 
 (* test result location
    ------------------------------------------------------------- *)
@@ -194,8 +194,7 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
 
   | Assertion.POISONTest (dtyp, entry, args) ->
       let expected =
-        InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV
-        .DVALUE_Poison
+        DV.DVALUE_Poison
           dtyp
       in
       let strs =

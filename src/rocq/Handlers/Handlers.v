@@ -25,19 +25,20 @@ From Vellvm.Handlers Require Export
      Intrinsics
      Pick
      UndefinedBehaviour
-     MemoryModelImplementation
      OOM
-     Concretization.
+     Concretization
+     MemoryModelImplementation.
+
+
 
 From Vellvm.Semantics Require Import Memory.Sizeof Memory.MemBytes GepM.
 
 (* Handlers get instantiated over the domain of addresses provided by the memory model *)
-Module LLVMEvents64 := LLVMEvents.Make(MemoryModelImplementation.FinAddr)(MemoryModelImplementation.IP64Bit)(MemoryModelImplementation.FinSizeof).
-Module Global64 := Global.Make MemoryModelImplementation.FinAddr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof LLVMEvents64.
-Module Local64  := Local.Make  MemoryModelImplementation.FinAddr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof LLVMEvents64.
-Module Stack64  := Stack.Make  MemoryModelImplementation.FinAddr MemoryModelImplementation.IP64Bit MemoryModelImplementation.FinSizeof LLVMEvents64.
 
-Module LLVMEvents := LLVMEvents.Make(MemoryModelImplementation.InfAddr)(MemoryModelImplementation.BigIP)(MemoryModelImplementation.FinSizeof).
-Module Global := Global.Make MemoryModelImplementation.InfAddr MemoryModelImplementation.BigIP MemoryModelImplementation.FinSizeof LLVMEvents.
-Module Local  := Local.Make  MemoryModelImplementation.InfAddr MemoryModelImplementation.BigIP MemoryModelImplementation.FinSizeof LLVMEvents.
-Module Stack  := Stack.Make  MemoryModelImplementation.InfAddr MemoryModelImplementation.BigIP MemoryModelImplementation.FinSizeof LLVMEvents.
+Module Global64 := Global.Make MemoryModelImplementation.LLVMParams64BitIntptr.
+Module Local64  := Local.Make MemoryModelImplementation.LLVMParams64BitIntptr.
+Module Stack64  := Stack.Make MemoryModelImplementation.LLVMParams64BitIntptr.
+
+Module Global := Global.Make MemoryModelImplementation.LLVMParamsBigIntptr.
+Module Local  := Local.Make MemoryModelImplementation.LLVMParamsBigIntptr.
+Module Stack  := Stack.Make MemoryModelImplementation.LLVMParamsBigIntptr.

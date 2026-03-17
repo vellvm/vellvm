@@ -16,7 +16,7 @@ open Assert
 open Driver
 open ShowAST
 
-module DV = InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV
+module DV = InterpretationStack.InterpreterStackBigIntptr.LP.DV
 
 let string_of_function_id id : string =
   LLVMAst.( match id with
@@ -116,8 +116,7 @@ let make_test_h run name ll_ast t : (string * assertion) option =
      if !poison_test_flag
      then
        let expected =
-         InterpretationStack.InterpreterStackBigIntptr.LP.Events.DV
-           .DVALUE_Poison
+           DV.DVALUE_Poison
            dtyp
        in
        let str =

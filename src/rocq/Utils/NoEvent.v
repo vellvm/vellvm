@@ -1138,13 +1138,14 @@ Section DeterministicSingleton.
   Proof using. Admitted.
 *)
 End DeterministicSingleton.
-
+(*
 Require Import MemoryAddress.
 Require Import Sizeof.
 
-Module PICK_REMOVE (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERACTIONS ADDR IP SIZE).
+Module PICK_REMOVE (ADDR : ADDRESS) (IP : INTPTR) (SZ : SIZEOF) (Events : LLVM_INTERACTIONS ADDR IP SIZE).
   Import Events.
 
   #[local] Parameter remove_pick_ub : itree (ExternalCallE +' PickUvalueE +' UBE +' DebugE +' FailureE) ~> itree (ExternalCallE +' DebugE +' FailureE).
   #[local] Parameter deterministic_vellvm : forall R, itree L0 R -> Prop.
 End PICK_REMOVE.
+*)

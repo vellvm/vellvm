@@ -50,21 +50,19 @@ Open Scope monad_scope.
 
 #[local] Open Scope Z_scope.
 
-Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) <: MemoryModelSpecPrimitives LP MP.
-  Import LP.
-  Import LP.Events.
+Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MEMORY_PARAMS LP) <: MemoryModelSpecPrimitives LP MP.
+  Import LP.DV.
   Import LP.ADDR.
-  Import LP.SIZEOF.
+  Import LP.SZ.
   Import LP.PROV.
-  Import PTOI.
-  Import ITOP.
+  Import LP.PTOI.
+  Import LP.ITOP.
   Import MP.
   Import GEP.
 
   Import MemBytes.
-  Module MemByte := Byte LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL.
+  Module MemByte := Byte LP MP.BYTE_IMPL.
   Import MemByte.
-  Import LP.SIZEOF.
 
 
   Section Datatype_Definition.

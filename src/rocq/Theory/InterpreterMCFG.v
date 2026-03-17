@@ -122,7 +122,7 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Import MCFGTactics.
 
   Lemma interp1_bind :
-    forall {R S} (t: itree L0 R) (k: R -> itree L0 S) g, 
+    forall {R S} (t: itree (L0 dvalue uvalue) R) (k: R -> itree (L0 dvalue uvalue) S) g, 
       ℑs1 (t >>= k) g ≈ '(g',x) <- ℑs1 t g ;; ℑs1 (k x) g'.
   Proof.
     intros; unfold ℑs1.
@@ -137,7 +137,7 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Lemma interp2_bind :
-    forall {R S} (t: itree L0 R) (k: R -> itree L0 S) g l,
+    forall {R S} (t: itree (L0 dvalue uvalue) R) (k: R -> itree (L0 dvalue uvalue) S) g l,
       ℑs2 (t >>= k) g l ≈ '(g',(l',x)) <- ℑs2 t g l;; ℑs2 (k x) l' g'.
   Proof.
     intros; unfold ℑs2.
@@ -153,7 +153,7 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   (* Lemma interp3_bind : *)
-  (*   forall {R S} (t: itree L0 R) (k: R -> itree L0 S) g l m, *)
+  (*   forall {R S} (t: itree (L0 dvalue uvalue) R) (k: R -> itree (L0 dvalue uvalue) S) g l m, *)
   (*     ℑs3 (t >>= k) g l m ≈ '(m',(l',(g',x))) <- ℑs3 t g l m;; ℑs3 (k x) g' l' m'. *)
   (* Proof. *)
   (*   intros. *)
@@ -200,7 +200,7 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (* Qed. *)
 
   (* Lemma interp3_vis:  *)
-  (*   forall T R (e : L0 T) (k : T -> itree L0 R) g l m, *)
+  (*   forall T R (e : (L0 dvalue uvalue) T) (k : T -> itree (L0 dvalue uvalue) R) g l m, *)
   (*     ℑs3 (Vis e k) g l m ≈  *)
   (*         '(m, (l, (g, x))) <- ℑs3 (trigger e) g l m;; ℑs3 (k x) g l m. *)
   (* Proof. *)
@@ -215,7 +215,7 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (* Qed. *)
 
   (* Lemma interp3_bind_trigger : *)
-  (*   forall T R (e : L0 T) (k : T -> itree L0 R) g l m, *)
+  (*   forall T R (e : (L0 dvalue uvalue) T) (k : T -> itree (L0 dvalue uvalue) R) g l m, *)
   (*     ℑs3 (trigger e >>= k) g l m ≈  *)
   (*         '(m, (l, (g, x))) <- ℑs3 (trigger e) g l m;; ℑs3 (k x) g l m. *)
   (* Proof. *)

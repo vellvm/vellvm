@@ -49,7 +49,7 @@ Open Scope string_scope.
  *)
 Module Type LLVMTopLevel (IS : InterpreterStack).
   Export IS.
-  Export IS.LP.Events.
+  Export IS.LP.DV.
   Export IS.LLVM.D.
   Export IS.LLVM.MEM.
   Export IS.LLVM.MEM.MEM_MODEL.
@@ -91,9 +91,10 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     the character comes in as an i32, so the function truncates to an i8
     to match types with IO_stdout. *)
 
+  
   Definition putchar_denotation : function_denotation.
     refine
-      (let putchar_body (u_char:uvalue) : itree L0' uvalue :=
+      (let putchar_body (u_char:uvalue) : itree (L0' dvalue uvalue) uvalue :=
          dv <- concretize_or_pick u_char ;;
          match dv with
          | @DVALUE_I sz x32 =>
@@ -118,22 +119,20 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
          | char::[] => putchar_body char
          | _ => raise "putc called with zero or more than one arguments"
          end).
-
     subst.
     exact (trigger (IO_stdout [x8])).
   Defined.
-
 
   (** A semantic function to read an i8 value at [strptr + index] from the memory.
       Propagates all memory failures and raises a Vellvm "Failure" if the
       value read does not concretize to a DVALUE_I8.
    *)
-  Definition i8_str_index (strptr : addr) (index : Z) : itree L0' (@Integers.bit_int 8) :=
-    iptr <- (@lift_OOM (itree L0') _ _ _ (LP.IP.from_Z index)) ;;
+  Definition i8_str_index (strptr : addr) (index : Z) : itree (L0' dvalue uvalue) (@Integers.bit_int 8) :=
+    iptr <- (@lift_OOM (itree (L0' dvalue uvalue)) _ _ _ (LP.IP.from_Z index)) ;;
     addr <-
       match handle_gep_addr (DTYPE_I 8) strptr [DVALUE_IPTR iptr] with
             | inl msg => raise msg
-            | inr c => @lift_OOM (itree L0') _ _ _ c
+            | inr c => @lift_OOM (itree (L0' dvalue uvalue)) _ _ _ c
             end ;;
     u_byte <- trigger (Load (DTYPE_I 8) (DVALUE_Addr addr)) ;;
     d_byte <- concretize_or_pick u_byte;;
@@ -148,7 +147,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       - triggers an IO_stdout event with the bytes plus a newline
    *)
   Definition puts_denotation : function_denotation :=
-    let puts_body (u_strptr:uvalue) : itree L0' uvalue :=
+    let puts_body (u_strptr:uvalue) : itree (L0' dvalue uvalue) uvalue :=
       dv <- concretize_or_pick u_strptr;;
       match dv with
       | DVALUE_Addr strptr =>
@@ -363,8 +362,8 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       (tl is a Definition with name n /\ tl' is a Declaration with name n)
 
       Will write tomorrow if so.  *)
-
-
+  
+    
   (** * Initialization
 
     The initialization phase allocates and initializes globals, and allocates
@@ -372,7 +371,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
    is an [itree] as any other.  *)
 
   (** Allocate space for a global *)
-  Definition allocate_global (g:global dtyp) : itree L0 unit :=
+  Definition allocate_global (g:global dtyp) : itree (L0 dvalue uvalue) unit :=
     if (g_alias g) then
       (* Aliases don't allocate new storage space. *)
       ret tt 
@@ -380,7 +379,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
       v <- trigger (Alloca (g_typ g) 1%N None);;
       trigger (GlobalWrite (g_ident g) v).
 
-  Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
+  Definition allocate_globals (gs:list (global dtyp)) : itree (L0 dvalue uvalue) unit :=
     map_monad_ allocate_global gs.
 
   Definition i8 : dtyp := DTYPE_I 8%positive.
@@ -397,14 +396,14 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
             Stdlib.Strings.Ascii.N_of_ascii ) (Stdlib.Strings.String.list_ascii_of_string s))
             [@UVALUE_I 8%positive (@Integers.zero 8%positive)]).
 
-  Definition allocate_arg (arg : string) : itree L0 dvalue :=
+  Definition allocate_arg (arg : string) : itree (L0 dvalue uvalue) dvalue :=
     let len := N.of_nat (String.length arg) + 1%N in
     (* tl;dr allocating the string in a C-like manner; + 1 for null terminator *)
     v <- trigger (Alloca i8 len None);;
     trigger (Store (DTYPE_Array len i8) v (i8_array_of_string arg));;
     ret v.
 
-  Definition allocate_args (args : list string) : itree L0 dvalue :=
+  Definition allocate_args (args : list string) : itree (L0 dvalue uvalue) dvalue :=
     let len := N.of_nat (Datatypes.length args) in
       v <- trigger (Alloca DTYPE_Pointer len None);;
       arg_addrs <- map_monad allocate_arg args;;
@@ -413,10 +412,10 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
                                    (map dvalue_to_uvalue arg_addrs)));;
       ret v.
 
-  Definition build_main_args (args : list string) : itree L0 (list uvalue) :=
+  Definition build_main_args (args : list string) : itree (L0 dvalue uvalue) (list uvalue) :=
     v <- allocate_args args;;
     let main_args :=
-      [@DV.UVALUE_I 32 ((@Integers.repr 32%positive ∘ Z.of_nat) (List.length args)); dvalue_to_uvalue v]
+      [@LP.DV.UVALUE_I 32 ((@Integers.repr 32%positive ∘ Z.of_nat) (List.length args)); dvalue_to_uvalue v]
     in
     ret main_args.
 
@@ -428,7 +427,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
        combines two mcfgs coherently
    *)
 
-  Definition allocate_declaration (d:declaration dtyp) : itree L0 unit :=
+  Definition allocate_declaration (d:declaration dtyp) : itree (L0 dvalue uvalue) unit :=
     match lookup_intrinsic_declaration (dc_name d) with
     | Some _ => Ret tt (* Don't allocate pointers for LLVM intrinsics declarations *)
     | None =>
@@ -436,14 +435,14 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
         trigger (GlobalWrite (dc_name d) v)
     end.
 
-  Definition allocate_declarations (ds:list (declaration dtyp)) : itree L0 unit :=
+  Definition allocate_declarations (ds:list (declaration dtyp)) : itree (L0 dvalue uvalue) unit :=
     map_monad_ allocate_declaration ds.
 
   (* We have to initialize the global definitions after allocating them because they
      might be mutually recursive.  It is possible to declare cyclic data structures
      statically at the global level in LLVM.
    *)
-  Definition initialize_global (g:global dtyp) : itree exp_E unit :=
+  Definition initialize_global (g:global dtyp) : itree (exp_E dvalue uvalue) unit :=
     if (g_alias g) then
       (* aliases simply populate the global ID map *)
       match (g_exp g) with
@@ -463,13 +462,13 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
          end ;;
     trigger (Store dt a uv).
 
-  Definition initialize_globals (gs:list (global dtyp)): itree exp_E unit :=
+  Definition initialize_globals (gs:list (global dtyp)): itree (exp_E dvalue uvalue) unit :=
     map_monad_ initialize_global gs.
 
-  Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree L0 unit :=
+  Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree (L0 dvalue uvalue) unit :=
     allocate_declarations ((m_declarations CFG) ++ (List.map (df_prototype) (m_definitions CFG)));;
     allocate_globals (m_globals CFG) ;;
-    translate exp_to_L0 (initialize_globals (m_globals CFG)).
+    translate (@exp_to_L0 dvalue uvalue) (initialize_globals (m_globals CFG)).
 
   (** Local environment implementation
     The map-based handlers are defined parameterized over a domain of key and value.
@@ -484,7 +483,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
    *)
 
   Definition address_one_function (df : definition dtyp (CFG.cfg dtyp))
-    : itree L0 (Z * function_denotation) :=
+    : itree (L0 dvalue uvalue) (Z * function_denotation) :=
     let fid := (dc_name (df_prototype df)) in
     fv <- trigger (GlobalRead fid) ;;
     match fv with
@@ -497,7 +496,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
    Denotes a builtin function
    *)
   Definition address_one_builtin_function (builtin : function_id * function_denotation)
-    : itree L0 (Z * function_denotation) :=
+    : itree (L0 dvalue uvalue) (Z * function_denotation) :=
     let (fid, den) := builtin in
     fv <- trigger (GlobalRead fid) ;;
     match fv with
@@ -541,7 +540,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (ret_typ : dtyp)
              (entry : function_id)
              (args : list uvalue)
-             (mcfg : CFG.mcfg dtyp) : itree L0 dvalue :=
+             (mcfg : CFG.mcfg dtyp) : itree (L0 dvalue uvalue) dvalue :=
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
     'builtins <- map_monad address_one_builtin_function (built_in_functions (m_declarations mcfg));;
@@ -579,9 +578,9 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Definition interpreter_gen
     (ret_typ : dtyp)
     (entry : function_id)
-    (arg_gen : itree L0 (list uvalue))
+    (arg_gen : itree (L0 dvalue uvalue) (list uvalue))
     (prog: ll_toplevel_entities)
-    : itree L4 res_L4 :=
+    : itree (L4 dvalue uvalue) res_L4 :=
     let t :=
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
@@ -595,7 +594,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Definition interpreter
              (args : list string)
              (prog : ll_toplevel_entities)
-              : itree L4 res_L4
+              : itree (L4 dvalue uvalue) res_L4
     :=
     interpreter_gen (DTYPE_I 32%positive) (Name "main") (build_main_args args) prog.
 
@@ -613,9 +612,9 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Definition model_gen
              (ret_typ : dtyp)
              (entry : function_id)
-             (arg_gen : itree L0 (list uvalue))
+             (arg_gen : itree (L0 dvalue uvalue) (list uvalue))
              (prog: ll_toplevel_entities)
-    : PropT L4 res_L4 :=
+    : PropT (L4 dvalue uvalue) res_L4 :=
     let t :=
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
@@ -625,9 +624,9 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Definition model_gen_oom
              (ret_typ : dtyp)
              (entry : function_id)
-             (arg_gen : itree L0 (list uvalue))
+             (arg_gen : itree (L0 dvalue uvalue) (list uvalue))
              (prog: ll_toplevel_entities)
-    : PropT L4 res_L4 :=
+    : PropT (L4 dvalue uvalue) res_L4 :=
     let t :=
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
@@ -637,9 +636,9 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Definition model_gen_oom_L1
              (ret_typ : dtyp)
              (entry : function_id)
-             (arg_gen : itree L0 (list uvalue))
+             (arg_gen : itree (L0 dvalue uvalue) (list uvalue))
              (prog: ll_toplevel_entities)
-    : itree L1 res_L1 :=
+    : itree (L1 dvalue uvalue) res_L1 :=
     let t :=
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
@@ -649,9 +648,9 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Definition model_gen_oom_L2
              (ret_typ : dtyp)
              (entry : function_id)
-             (arg_gen : itree L0 (list uvalue))
+             (arg_gen : itree (L0 dvalue uvalue) (list uvalue))
              (prog: ll_toplevel_entities)
-    : itree L2 res_L2 :=
+    : itree (L2 dvalue uvalue) res_L2 :=
     let t :=
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
@@ -662,9 +661,9 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     (RR : relation res_L2)
     (ret_typ : dtyp)
     (entry : function_id)
-    (arg_gen : itree L0 (list uvalue))
+    (arg_gen : itree (L0 dvalue uvalue) (list uvalue))
     (prog: ll_toplevel_entities)
-    : PropT L3 res_L3 :=
+    : PropT (L3 dvalue uvalue) res_L3 :=
     let t :=
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
@@ -676,9 +675,9 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     RR_pick
     (ret_typ : dtyp)
     (entry : function_id)
-    (arg_gen : itree L0 (list uvalue))
+    (arg_gen : itree (L0 dvalue uvalue) (list uvalue))
     (prog: ll_toplevel_entities)
-    : PropT L4 res_L4 :=
+    : PropT (L4 dvalue uvalue) res_L4 :=
     let t :=
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
@@ -690,9 +689,9 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     RR_pick
     (ret_typ : dtyp)
     (entry : function_id)
-    (arg_gen : itree L0 (list uvalue))
+    (arg_gen : itree (L0 dvalue uvalue) (list uvalue))
     (prog: ll_toplevel_entities)
-    : PropT L5 res_L5 :=
+    : PropT (L5 dvalue uvalue) res_L5 :=
     let t :=
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
@@ -705,9 +704,9 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     RR_oom
     (ret_typ : dtyp)
     (entry : function_id)
-    (arg_gen : itree L0 (list uvalue))
+    (arg_gen : itree (L0 dvalue uvalue) (list uvalue))
     (prog: ll_toplevel_entities)
-    : PropT L6 res_L6 :=
+    : PropT (L6 dvalue uvalue) res_L6 :=
     let t :=
       args <- arg_gen;;
       denote_vellvm ret_typ entry args

@@ -4,7 +4,7 @@ Require Import Vellvm.Semantics.MemoryAddress.
 Require Import Vellvm.Semantics.Memory.Sizeof.
 From Vellvm Require Import DynamicTypes.
 
-Module Type Overlaps (Addr:MemoryAddress.ADDRESS).
+Module Type OVERLAPS (Addr:MemoryAddress.ADDRESS).
   Import Addr.
 
   (** Do two memory regions overlap each other?
@@ -17,12 +17,12 @@ Module Type Overlaps (Addr:MemoryAddress.ADDRESS).
 
   Parameter overlaps :
     forall (a1 : addr) (sz1 : Z) (a2 : addr) (sz2 : Z), bool.
-End Overlaps.
+End OVERLAPS.
 
-Module OverlapHelpers (Addr : MemoryAddress.ADDRESS) (Size : Sizeof) (Over : Overlaps Addr).
+Module OverlapHelpers (Addr : MemoryAddress.ADDRESS) (S : SIZEOF) (O : OVERLAPS Addr).
   Import Addr.
-  Import Over.
-  Import Size.
+  Import O.
+  Import S.
 
   (** Checks if two regions of memory overlap each other. The types
    *τ1* and *τ2* are used to determine the size of the two memory
@@ -43,10 +43,10 @@ Module OverlapHelpers (Addr : MemoryAddress.ADDRESS) (Size : Sizeof) (Over : Ove
 End OverlapHelpers.
 
 (* Define overlapping of memory addresses when PTOI is defined. *)
-Module PTOIOverlaps (Addr:MemoryAddress.ADDRESS) (PTOI:PTOI(Addr)) (Size:Sizeof).
+Module PTOIOverlaps (Addr:MemoryAddress.ADDRESS) (PTOI:PTOI(Addr)) (S:SIZEOF).
   Import Addr.
   Import PTOI.
-  Import Size.
+  Import S.
 
   Local Open Scope Z.
 

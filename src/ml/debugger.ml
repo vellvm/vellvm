@@ -4,7 +4,9 @@ open InterpretationStack.InterpreterStackBigIntptr.LLVM.Stack
 
 open InterpretationStack.InterpreterStackBigIntptr.LLVM.Global
 
-open InterpretationStack.InterpreterStackBigIntptr.LP.Events
+open InterpretationStack.InterpreterStackBigIntptr.LP
+
+open LLVMEvents
 
 open ITreeDefinition
 open Result
@@ -166,7 +168,7 @@ let print_stack_frames s =
 
 let rec debugger
     (m :
-      ( 'a coq_L4
+      ( ('a, 'b, 'c) coq_L4
       , MMEP.MMSP.coq_MemState
         * ( StoreId.store_id
           * ((lstack_frame * lstack) * (global_env * DV.dvalue)) ) )

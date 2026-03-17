@@ -73,16 +73,15 @@ Import EitherMonad.
 From Stdlib Require Import FunctionalExtensionality.
 Import Logic.
 
-Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
-  Import LP.Events.
+Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
+  Import LP.DV.
   Import LP.ADDR.
-  Import LP.SIZEOF.
+  Import LP.SZ.
   Import LP.PROV.
 
   Import MemBytes.
-  Module MemByte := Byte LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL.
+  Module MemByte := Byte LP MP.BYTE_IMPL.
   Import MemByte.
-  Import LP.SIZEOF.
 
   (*** Internal state of memory *)
   Parameter MemState : Type.
@@ -233,30 +232,29 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
 End MemoryModelSpecPrimitives.
 
-Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL).
+Module MemoryHelpers (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModule LP MP.BYTE_IMPL).
   (*** Other helpers *)
   Import MP.GEP.
   Import MP.BYTE_IMPL.
-  Import LP.
   Import LP.ADDR.
-  Import LP.Events.
-  Import LP.SIZEOF.
+  Import LP.DV.
+  Import LP.SZ.
   Import LP.PTOI.
   Import LP.ITOP.
   Import LP.PROV.
-  Import IP.
+  Import LP.IP.
   Import Byte.
   Import Util.
 
   (* TODO: Move this? *)
-  Definition intptr_seq (start : Z) (len : nat) : OOM (list IP.intptr)
-    := map_monad (IP.from_Z) (Zseq start len).
+  Definition intptr_seq (start : Z) (len : nat) : OOM (list intptr)
+    := map_monad (from_Z) (Zseq start len).
 
   (* TODO: Move this? *)
   Lemma intptr_seq_succ :
     forall off n,
       intptr_seq off (S n) =
-        hd <- IP.from_Z off;;
+        hd <- from_Z off;;
         tail <- intptr_seq (Z.succ off) n;;
         ret (hd :: tail).
   Proof.
@@ -269,7 +267,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     forall start len seq ix ixip,
       intptr_seq start len = NoOom seq ->
       Util.Nth seq ix ixip ->
-      IP.from_Z (start + (Z.of_nat ix)) = NoOom ixip.
+      from_Z (start + (Z.of_nat ix)) = NoOom ixip.
   Proof.
     intros start len seq. revert start len.
     induction seq; intros start len ix ixip SEQ NTH.
@@ -297,21 +295,21 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     forall start len seq x,
       intptr_seq start len = NoOom seq ->
       In x seq ->
-      (IP.to_Z x >= start)%Z.
+      (to_Z x >= start)%Z.
   Proof.
     intros start len seq x SEQ IN.
     apply In_nth_error in IN.
     destruct IN as [n IN].
 
     pose proof (intptr_seq_nth start len seq n x SEQ IN) as IX.
-    erewrite IP.from_Z_to_Z; eauto.
+    erewrite from_Z_to_Z; eauto.
     lia.
   Qed.
 
   Lemma in_intptr_seq :
     forall len start n seq,
       intptr_seq start len = NoOom seq ->
-      In n seq <-> (start <= IP.to_Z n < start + Z.of_nat len)%Z.
+      In n seq <-> (start <= to_Z n < start + Z.of_nat len)%Z.
   Proof.
   intros len start.
   revert start. induction len as [|len IHlen]; simpl; intros start n seq SEQ.
@@ -325,7 +323,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     split.
     + intros [IN | IN].
       * subst.
-        apply IP.from_Z_to_Z in Heqo; subst.
+        apply from_Z_to_Z in Heqo; subst.
         lia.
       * pose proof (IHlen (Z.succ start) n l Heqo0) as [A B].
         specialize (A IN).
@@ -333,17 +331,17 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         lia.
     + intros BOUND.
       cbn.
-      destruct (IP.eq_dec i n) as [EQ | NEQ]; auto.
+      destruct (eq_dec i n) as [EQ | NEQ]; auto.
       right.
 
       pose proof (IHlen (Z.succ start) n l Heqo0) as [A B].
-      apply IP.from_Z_to_Z in Heqo; subst.
-      assert (IP.to_Z i <> IP.to_Z n).
+      apply from_Z_to_Z in Heqo; subst.
+      assert (to_Z i <> to_Z n).
       { intros EQ.
-        apply IP.to_Z_inj in EQ; auto.
+        apply to_Z_inj in EQ; auto.
       }
 
-      assert ((Z.succ (IP.to_Z i) <= IP.to_Z n < Z.succ (IP.to_Z i) + Z.of_nat len)%Z) as BOUND' by lia.
+      assert ((Z.succ (to_Z i) <= to_Z n < Z.succ (to_Z i) + Z.of_nat len)%Z) as BOUND' by lia.
       specialize (B BOUND').
       auto.
   Qed.
@@ -353,7 +351,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       intptr_seq start len = NoOom seq ->
       (forall x,
           (start <= x < start + Z.of_nat len)%Z ->
-          exists ipx, IP.from_Z x = NoOom ipx /\ In ipx seq).
+          exists ipx, from_Z x = NoOom ipx /\ In ipx seq).
   Proof.
     intros start len; revert start;
       induction len;
@@ -397,12 +395,12 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Proof.
     intros start len SEQ.
     unfold intptr_seq in SEQ.
-    assert (MReturns [] (map_monad IP.from_Z (Zseq start len))) as RET.
+    assert (MReturns [] (map_monad from_Z (Zseq start len))) as RET.
     { cbn. unfold OOMReturns.
       rewrite SEQ.
       reflexivity.
     }
-    pose proof (@map_monad_ret_nil_inv OOM _ _ _ _ _ _ _ IP.from_Z _ RET) as SEQLEN.
+    pose proof (@map_monad_ret_nil_inv OOM _ _ _ _ _ _ _ from_Z _ RET) as SEQLEN.
     eapply Zseq_nil_len; eauto.
   Qed.
 
@@ -418,13 +416,13 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       break_match_hyp; [| solve [inv SEQ]].
       inv SEQ.
 
-      assert (MReturns [] (map_monad IP.from_Z (Zseq (Z.succ off) len))) as RET.
+      assert (MReturns [] (map_monad from_Z (Zseq (Z.succ off) len))) as RET.
       { cbn. unfold OOMReturns.
         rewrite Heqo0.
         reflexivity.
       }
 
-      pose proof (@map_monad_ret_nil_inv OOM _ _ _ _ _ _ _ IP.from_Z _ RET) as SEQLEN.
+      pose proof (@map_monad_ret_nil_inv OOM _ _ _ _ _ _ _ from_Z _ RET) as SEQLEN.
       apply Zseq_nil_len in SEQLEN.
       subst.
       cbn.
@@ -450,7 +448,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Lemma intptr_seq_succ_last' :
     forall l off len x,
       intptr_seq off len = NoOom l ->
-      IP.from_Z (off + Z.of_nat len) = NoOom x ->
+      from_Z (off + Z.of_nat len) = NoOom x ->
       intptr_seq off (S len) = NoOom (l ++ [x]).
   Proof.
     induction l as [ | i l']; intros off len x SEQ EQ.
@@ -492,7 +490,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     forall len l,
       intptr_seq 1 len = NoOom l ->
       exists l', intptr_seq 0 len = NoOom l' /\
-              NoOom l = map_monad (fun ip => IP.from_Z (IP.to_Z ip + 1)) l'.
+              NoOom l = map_monad (fun ip => from_Z (to_Z ip + 1)) l'.
   Proof.
     intros len l SEQ.
     revert SEQ. revert len.
@@ -527,7 +525,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       pose proof ALL_SHIFTED as NTH_SHIFTED.
       eapply Forall2_forall in NTH_SHIFTED as [LEN_SHIFTED NTH_SHIFTED].
 
-      assert (exists y, IP.from_Z (IP.to_Z x - 1) = NoOom y) as [y YEQ].
+      assert (exists y, from_Z (to_Z x - 1) = NoOom y) as [y YEQ].
       { (* I know this because...??? *)
         (* shiftZ is the start, x is the final element in the sequence.
 
@@ -543,29 +541,29 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
         pose proof (Nth_last l x) as NTH.
         pose proof (intptr_seq_nth _ _ _ _ _ SEQ NTH) as SEQNTH.
-        apply IP.from_Z_to_Z in SEQNTH.
+        apply from_Z_to_Z in SEQNTH.
         rewrite SEQNTH.
 
         (* When len' is 0, y is just 0 *)
         destruct l using rev_ind.
-        - exists IP.zero.
+        - exists zero.
           cbn in SEQ_CUT.
           inv SEQ_CUT.
           cbn.
-          apply IP.from_Z_0.
+          apply from_Z_0.
         - clear IHl0.
           exists x0.
 
           pose proof (Nth_last l x0) as NTH'.
           pose proof (intptr_seq_nth _ _ _ _ _ SEQ_CUT NTH') as SEQNTH'.
-          apply IP.from_Z_to_Z in SEQNTH'.
+          apply from_Z_to_Z in SEQNTH'.
           rewrite length_app.
           rewrite Nat2Z.inj_add.
           replace ((1 + (Z.of_nat (Datatypes.length l) + Z.of_nat (Datatypes.length [x0])) - 1))%Z with ((Z.of_nat (Datatypes.length l) + Z.of_nat (Datatypes.length [x0])))%Z by lia.
           cbn.
           replace (Z.of_nat (length l) + 1)%Z with (1 + Z.of_nat (length l))%Z by lia.
           rewrite <- SEQNTH'.
-          apply IP.to_Z_from_Z.
+          apply to_Z_from_Z.
       }
 
       exists (l_shifted ++ [y]).
@@ -577,7 +575,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         -- cbn in *.
            inv SEQ_CUT.
            break_match_hyp; inv SEQ.
-           erewrite IP.from_Z_to_Z in YEQ; eauto.
+           erewrite from_Z_to_Z in YEQ; eauto.
            cbn in YEQ.
            auto.
         -- (* I know that x = S S len' *)
@@ -588,19 +586,19 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
             eapply Nth_last.
           }
 
-          erewrite IP.from_Z_to_Z in YEQ; eauto.
+          erewrite from_Z_to_Z in YEQ; eauto.
           replace (1 + Z.of_nat (S len') - 1)%Z with (Z.of_nat (S len'))%Z in YEQ by lia.
           auto.
-      + assert (Monad.eq1 (NoOom (l ++ [x])) (map_monad (fun ip : IP.intptr => IP.from_Z (IP.to_Z ip + 1)) (l_shifted ++ [y]))) as EQ.
+      + assert (Monad.eq1 (NoOom (l ++ [x])) (map_monad (fun ip : intptr => from_Z (to_Z ip + 1)) (l_shifted ++ [y]))) as EQ.
         { rewrite map_monad_app.
           cbn.
           rewrite <- MAP_SHIFTED.
           (* Must be some way to prove that this match gives NoOom x... *)
-          assert (IP.from_Z (IP.to_Z y + 1) = NoOom x) as EQ.
-          { erewrite IP.from_Z_to_Z; eauto.
-            assert (IP.to_Z x - 1 + 1 = IP.to_Z x)%Z as EQ by lia.
+          assert (from_Z (to_Z y + 1) = NoOom x) as EQ.
+          { erewrite from_Z_to_Z; eauto.
+            assert (to_Z x - 1 + 1 = to_Z x)%Z as EQ by lia.
             rewrite EQ.
-            apply IP.to_Z_from_Z.
+            apply to_Z_from_Z.
           }
 
           rewrite EQ.
@@ -696,7 +694,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       setoid_rewrite Monad.bind_ret_l in CONSEC.
 
       (* rewrite bind_ret_l in CONSEC. *)
-      destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix]) l) eqn:HMAPM.
+      destruct (map_monad (fun ix : intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix]) l) eqn:HMAPM.
       + (* Error: should be a contradiction *)
         (* TODO: need inversion lemma. *)
         cbn in CONSEC.
@@ -709,7 +707,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         destruct (sequence l0) eqn:HSEQUENCE.
         { cbn in CONSEC.
           apply within_ret_ret in CONSEC; auto.
-          assert (MReturns l0 (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix]) l)) as RETS.
+          assert (MReturns l0 (map_monad (fun ix : intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix]) l)) as RETS.
           { auto. }
 
           epose proof MapMonadExtra.map_monad_length l _ _ RETS as LEN.
@@ -760,8 +758,8 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       setoid_rewrite Monad.bind_ret_l in CONSEC.
 
       destruct (map_monad
-                  (fun ix : IP.intptr =>
-                     MP.GEP.handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix])
+                  (fun ix : intptr =>
+                     MP.GEP.handle_gep_addr (DTYPE_I 8) ptr [LP.DV.DVALUE_IPTR ix])
                   l) eqn:HMAPM.
       + cbn in CONSEC.
         setoid_rewrite rbm_raise_bind in CONSEC; auto.
@@ -812,7 +810,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
             subst.
 
             rewrite sizeof_dtyp_i8 in GEP.
-            erewrite IP.from_Z_to_Z in GEP; [|apply FROMZ].
+            erewrite from_Z_to_Z in GEP; [|apply FROMZ].
             lia.
 
             unfold sequence in HSEQUENCE.
@@ -910,7 +908,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       inv SEQ.
 
       cbn in *.
-      rewrite IP.from_Z_0 in Heqo.
+      rewrite from_Z_0 in Heqo.
       inv Heqo.
       rewrite handle_gep_addr_0 in *.
 
@@ -969,13 +967,13 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           (* Need something about sequences *)
       (* Since len is the length, `intptr_seq 1 len` is basically just `map (+1) (intptr_seq 0 len)` *)
       (* Unfortunately, I don't think I have a lemma that gives me
-         `IP.from_Z (x+1) = NoOom (i+1) -> IP.from_Z (x+1) = NoOom i`
+         `from_Z (x+1) = NoOom (i+1) -> from_Z (x+1) = NoOom i`
 
          Maybe something like this should be an axiom, but I think it
          gets messy because memory is bounded in the + and -
          direction.
 
-         I *DO* know that `IP.from_Z 0 = NoOom zero`, however, and all of the other elements in
+         I *DO* know that `from_Z 0 = NoOom zero`, however, and all of the other elements in
          `intptr_seq 0 len` are in `intptr_seq 1 len`.
 
          `intptr_seq 1 len =
@@ -1166,7 +1164,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       inv SEQ.
 
       cbn in *.
-      rewrite IP.from_Z_0 in Heqo.
+      rewrite from_Z_0 in Heqo.
       inv Heqo.
       rewrite handle_gep_addr_0 in *.
 
@@ -1226,13 +1224,13 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           (* Need something about sequences *)
       (* Since len is the length, `intptr_seq 1 len` is basically just `map (+1) (intptr_seq 0 len)` *)
       (* Unfortunately, I don't think I have a lemma that gives me
-         `IP.from_Z (x+1) = NoOom (i+1) -> IP.from_Z (x+1) = NoOom i`
+         `from_Z (x+1) = NoOom (i+1) -> from_Z (x+1) = NoOom i`
 
          Maybe something like this should be an axiom, but I think it
          gets messy because memory is bounded in the + and -
          direction.
 
-         I *DO* know that `IP.from_Z 0 = NoOom zero`, however, and all of the other elements in
+         I *DO* know that `from_Z 0 = NoOom zero`, however, and all of the other elements in
          `intptr_seq 0 len` are in `intptr_seq 1 len`.
 
          `intptr_seq 1 len =
@@ -1443,7 +1441,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         {
           unfold get_consecutive_ptrs in CONSEC'.
           cbn in CONSEC'.
-          rewrite IP.from_Z_0 in CONSEC'.
+          rewrite from_Z_0 in CONSEC'.
           break_match_hyp.
           2: {
             cbn in CONSEC'.
@@ -1500,7 +1498,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
           inv CONSEC'.
 
           rewrite sizeof_dtyp_i8 in *.
-          erewrite IP.from_Z_to_Z in Heqs1; eauto.
+          erewrite from_Z_to_Z in Heqs1; eauto.
           break_match_hyp; inv Heqo.
           lia.
         }
@@ -1627,7 +1625,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
           cbn in CONSEC'.
           setoid_rewrite bind_ret_l in CONSEC'.
-          destruct (map_monad (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
+          destruct (map_monad (fun ix : intptr => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
                               (i :: l)) eqn:HMAPM.
           { cbn in CONSEC'.
             setoid_rewrite rbm_raise_bind in CONSEC'; [|typeclasses eauto].
@@ -1666,7 +1664,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
 
           apply handle_gep_addr_ix in Heqs1.
           rewrite sizeof_dtyp_i8 in Heqs1.
-          rewrite (IP.from_Z_to_Z _ _ Heqo1) in Heqs1.
+          rewrite (from_Z_to_Z _ _ Heqo1) in Heqs1.
           cbn in HSEQUENCE.
           break_match_hyp; inv HSEQUENCE.
           break_match_hyp; inv Heqo2.
@@ -1724,8 +1722,8 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       (forall p ix_nat,
           Util.Nth ptrs ix_nat p ->
           exists ix,
-            NoOom ix = IP.from_Z (Z.of_nat ix_nat) /\
-              handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix] = inr (ret p)).
+            NoOom ix = from_Z (Z.of_nat ix_nat) /\
+              handle_gep_addr (DTYPE_I 8) ptr [LP.DV.DVALUE_IPTR ix] = inr (ret p)).
   Proof.
     intros M HM EQM EQV Pre Post B MB WM WRET OOM ERR LAWS RAISE_OOM RAISE_ERR RWOOM RWERR
       ptr len ptrs CONSEC p ix_nat NTH.
@@ -1743,7 +1741,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     cbn in CONSEC.
     setoid_rewrite bind_ret_l in CONSEC.
     destruct (map_monad
-                (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) eqn:MAP.
+                (fun ix : intptr => handle_gep_addr (DTYPE_I 8) ptr [LP.DV.DVALUE_IPTR ix]) l) eqn:MAP.
     { cbn in CONSEC.
       setoid_rewrite rbm_raise_bind in CONSEC; auto.
       apply rw_ret_nin_raise in CONSEC; try contradiction; auto.
@@ -1789,8 +1787,8 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       (forall p ix_nat,
           Util.Nth ptrs ix_nat p ->
           exists ix,
-            NoOom ix = IP.from_Z (Z.of_nat ix_nat) /\
-              handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix] = inr (ret p)).
+            NoOom ix = from_Z (Z.of_nat ix_nat) /\
+              handle_gep_addr (DTYPE_I 8) ptr [LP.DV.DVALUE_IPTR ix] = inr (ret p)).
   Proof.
     intros M HM EQM EQV EQRET OOM ERR LAWS RAISE_OOM RAISE_ERR
       ptr len ptrs CONSEC p ix_nat NTH.
@@ -1875,10 +1873,10 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     unfold get_consecutive_ptrs.
     destruct (intptr_seq 0 len) eqn:HSEQ.
     - pose proof (map_monad_err_succeeds
-                    (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) as HMAPM.
+                    (fun ix : intptr => handle_gep_addr (DTYPE_I 8) ptr [LP.DV.DVALUE_IPTR ix]) l) as HMAPM.
       forward HMAPM.
       { intros a IN.
-        destruct (int_to_ptr (ptr_to_int ptr + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * IP.to_Z a)%Z (address_provenance ptr)) eqn:IX.
+        destruct (int_to_ptr (ptr_to_int ptr + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * to_Z a)%Z (address_provenance ptr)) eqn:IX.
         - exists (ret a0).
           apply handle_gep_addr_ix'; cbn; auto.
         - eapply handle_gep_addr_ix'_OOM in IX; auto.
@@ -1955,10 +1953,10 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     setoid_rewrite bind_ret_l in CONTRA.
 
     pose proof (map_monad_err_succeeds
-                  (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) as HMAPM.
+                  (fun ix : intptr => handle_gep_addr (DTYPE_I 8) ptr [LP.DV.DVALUE_IPTR ix]) l) as HMAPM.
       forward HMAPM.
       { intros a IN.
-        destruct (int_to_ptr (ptr_to_int ptr + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * IP.to_Z a)%Z (address_provenance ptr)) eqn:IX.
+        destruct (int_to_ptr (ptr_to_int ptr + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * to_Z a)%Z (address_provenance ptr)) eqn:IX.
         - exists (ret a0).
           apply handle_gep_addr_ix'; cbn; auto.
         - eapply handle_gep_addr_ix'_OOM in IX; auto.
@@ -2004,10 +2002,10 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     unfold get_consecutive_ptrs in *.
     destruct (intptr_seq 0 len) eqn:HSEQ.
     - pose proof (map_monad_err_succeeds
-                    (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix]) l) as HMAPM.
+                    (fun ix : intptr => handle_gep_addr (DTYPE_I 8) ptr [LP.DV.DVALUE_IPTR ix]) l) as HMAPM.
       forward HMAPM.
       { intros a IN.
-        destruct (int_to_ptr (ptr_to_int ptr + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * IP.to_Z a)%Z (address_provenance ptr)) eqn:IX.
+        destruct (int_to_ptr (ptr_to_int ptr + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * to_Z a)%Z (address_provenance ptr)) eqn:IX.
         - exists (ret a0).
           apply handle_gep_addr_ix'; cbn; auto.
         - eapply handle_gep_addr_ix'_OOM in IX; auto.
@@ -2672,18 +2670,17 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   End Serialization.
 End MemoryHelpers.
 
-Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP).
-  Import LP.
-  Import LP.Events.
+Module Type MemoryModelSpec (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MMSP : MemoryModelSpecPrimitives LP MP).
+  Import LP.DV.
   Import LP.ADDR.
-  Import LP.SIZEOF.
+  Import LP.SZ.
   Import LP.PROV.
   Import LP.PTOI.
   Import MMSP.
 
-  Module OVER := PTOIOverlaps ADDR PTOI SIZEOF.
+  Module OVER := PTOIOverlaps LP.ADDR LP.PTOI LP.SZ.
   Import OVER.
-  Module OVER_H := OverlapHelpers ADDR SIZEOF OVER.
+  Module OVER_H := OverlapHelpers LP.ADDR LP.SZ OVER.
   Import OVER_H.
 
   Import MemByte.
@@ -3622,7 +3619,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   (*** Handling memory events *)
   Section Handlers.
-    Definition handle_memory_prop : MemoryE ~> MemPropT MemState
+    Definition handle_memory_prop : MemoryE dvalue uvalue ~> MemPropT MemState
       := fun T m =>
            match m with
            (* Unimplemented *)
@@ -3658,7 +3655,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
                     DVALUE_Addr src ::
                     DVALUE_IPTR len ::
                     @DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
-          memcpy_spec src dst (IP.to_Z len) (equ volatile VellvmIntegers.one)
+          memcpy_spec src dst (LP.IP.to_Z len) (equ volatile VellvmIntegers.one)
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
@@ -3688,7 +3685,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
           malloc_bytes_spec_MemPropT bytes
       | [DVALUE_IPTR sz] =>
           sid <- fresh_sid;;
-          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (IP.to_unsigned sz)) (DTYPE_I 8) sid);;
+          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (LP.IP.to_unsigned sz)) (DTYPE_I 8) sid);;
           malloc_bytes_spec_MemPropT bytes
       | _ => raise_error "Malloc: invalid arguments."
       end.
@@ -3700,7 +3697,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       | _ => raise_error "Free: invalid arguments."
       end.
 
-    Definition handle_intrinsic_prop : IntrinsicE ~> MemPropT MemState
+    Definition handle_intrinsic_prop : IntrinsicE dvalue uvalue ~> MemPropT MemState
       := fun T e =>
            match e with
            | Intrinsic t name args =>
@@ -4106,11 +4103,11 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
 End MemoryModelSpec.
 
-Module MakeMemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) <: MemoryModelSpec LP MP MMSP.
+Module MakeMemoryModelSpec (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MMSP : MemoryModelSpecPrimitives LP MP) <: MemoryModelSpec LP MP MMSP.
   Include MemoryModelSpec LP MP MMSP.
 End MakeMemoryModelSpec.
 
-Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
+Module Type MemoryExecMonad (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
   Import LP.
   Import MMS.
   Import PROV.
@@ -5167,7 +5164,7 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
            length addrs = len /\ ms = ms' /\ st = st').
   #[global] Hint Unfold get_consecutive_ptrs_post : core.
 
-  Definition intptr_seq_post len : exec_correct_post (list IP.intptr) :=
+  Definition intptr_seq_post len : exec_correct_post (list LP.IP.intptr) :=
     (fun ms st ips ms' st' => length ips = len /\ ms = ms' /\ st = st').
   #[global] Hint Unfold intptr_seq_post : core.
 
@@ -5450,14 +5447,14 @@ Module Type MemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
 End MemoryExecMonad.
 
-Module MakeMemoryExecMonad (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP) <: MemoryExecMonad LP MP MMSP MMS.
+Module MakeMemoryExecMonad (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP) <: MemoryExecMonad LP MP MMSP MMS.
   Include MemoryExecMonad LP MP MMSP MMS.
 End MakeMemoryExecMonad.
 
-Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
+Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
   Import LP.
   Import LP.ADDR.
-  Import LP.SIZEOF.
+  Import LP.SZ.
   Import LP.PROV.
   Import MP.
 
@@ -5600,13 +5597,12 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   End MemoryPrimitives.
 End MemoryModelExecPrimitives.
 
-Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP).
-  Import LP.
+Module Type MemoryModelExec (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MMEP : MemoryModelExecPrimitives LP MP).
   Import LP.ADDR.
-  Import LP.SIZEOF.
+  Import LP.SZ.
   Import LP.PROV.
   Import LP.PTOI.
-  Import LP.Events.
+  Import LP.DV.
   Import MP.
   Import MMEP.
   Import MemExecM.
@@ -5615,9 +5611,9 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
   Import MMEP.MemSpec.
   Import MemHelpers.
 
-  Module OVER := PTOIOverlaps ADDR PTOI SIZEOF.
+  Module OVER := PTOIOverlaps LP.ADDR LP.PTOI LP.SZ.
   Import OVER.
-  Module OVER_H := OverlapHelpers ADDR SIZEOF OVER.
+  Module OVER_H := OverlapHelpers LP.ADDR LP.SZ OVER.
   Import OVER_H.
 
   (*** Handling memory events *)
@@ -5705,7 +5701,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
         let byte := uvalue_sbyte (@UVALUE_I 8 val) (DTYPE_I 8) 0 sid in
         write_bytes dst (repeatN (Z.to_N len) byte).
 
-    Definition handle_memory `{MemMonad MemM (itree Eff)} : MemoryE ~> MemM
+    Definition handle_memory `{MemMonad MemM (itree Eff)} : MemoryE dvalue uvalue ~> MemM
       := fun T m =>
            match m with
            (* Unimplemented *)
@@ -5743,7 +5739,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
                     DVALUE_Addr src ::
                     DVALUE_IPTR len ::
                     @DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
-          memcpy src dst (IP.to_Z len) (equ volatile VellvmIntegers.one)
+          memcpy src dst (LP.IP.to_Z len) (equ volatile VellvmIntegers.one)
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
@@ -5772,7 +5768,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
           malloc_bytes bytes
       | [DVALUE_IPTR sz] =>
           sid <- fresh_sid;;
-          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (IP.to_unsigned sz)) (DTYPE_I 8) sid);;
+          bytes <- lift_OOM (generate_num_undef_bytes (Z.to_N (LP.IP.to_unsigned sz)) (DTYPE_I 8) sid);;
           malloc_bytes bytes
       | _ => raise_error "Malloc: invalid arguments."
       end.
@@ -5784,7 +5780,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       | _ => raise_error "Free: invalid arguments."
       end.
 
-    Definition handle_intrinsic `{MemMonad MemM (itree Eff)} : IntrinsicE ~> MemM
+    Definition handle_intrinsic `{MemMonad MemM (itree Eff)} : IntrinsicE dvalue uvalue ~> MemM
       := fun T e =>
            match e with
            | Intrinsic t name args =>
@@ -5819,18 +5815,18 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
   End Handlers.
 End MemoryModelExec.
 
-Module MakeMemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP) <: MemoryModelExec LP MP MMEP.
+Module MakeMemoryModelExec (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MMEP : MemoryModelExecPrimitives LP MP) <: MemoryModelExec LP MP MMEP.
   Include MemoryModelExec LP MP MMEP.
 End MakeMemoryModelExec.
 
-Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP) (MME : MemoryModelExec LP MP MMEP).
+Module MemoryModelTheory (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MMEP : MemoryModelExecPrimitives LP MP) (MME : MemoryModelExec LP MP MMEP).
   Import MMEP.
   Import MME.
   Import MemSpec.
   Import MMSP.
   Import MemExecM.
   Import MemHelpers.
-  Import LP.Events.
+  Import LP.DV.
 
   (* TODO: move this *)
   Lemma zip_cons :
@@ -6059,7 +6055,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       forall dt ptr pre,
         exec_correct pre (read_uvalue dt ptr) (read_uvalue_spec dt ptr)
           (a0 <-
-             (_ <- get_consecutive_ptrs ptr (N.to_nat (LP.SIZEOF.sizeof_dtyp dt));;
+             (_ <- get_consecutive_ptrs ptr (N.to_nat (LP.SZ.sizeof_dtyp dt));;
               (fun (ms0 : MemState) (st0 : store_id) (bytes : list MP.BYTE_IMPL.SByte) 
                  (ms'0 : MemState) (st'0 : store_id) =>
                  Forall
@@ -6077,7 +6073,6 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
     (* TODO: move this? *)
     Import MP.
-    Import LP.
     Import GEP.
     Lemma MemMonad_run_get_consecutive_ptrs:
       forall {M RunM : Type -> Type} {MM : Monad M} {MRun : Monad RunM}
@@ -6114,7 +6109,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
         destruct
           (map_monad
-             (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [Events.DV.DVALUE_IPTR ix])
+             (fun ix : LP.IP.intptr => handle_gep_addr (DTYPE_I 8) ptr [LP.DV.DVALUE_IPTR ix])
              NOOM_seq) eqn:HMAPM.
         + cbn.
           rewrite MemMonad_run_bind.
@@ -6341,6 +6336,8 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       apply exec_correct_ret.
     Qed.
 
+    Import LP.
+    
     Lemma get_consecutive_ptrs_preserves_state :
       forall st ms st' ms' ptr bytes a,
         @within MemM EQM err_ub_oom (prod store_id MemState) (prod store_id MemState)
@@ -6349,7 +6346,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
                 RunOOM EQM EQRI MLAWS MM) MRun
              (@MemMonad_eq1_runm_equiv MemM (itree Eff) MM0 MRun MPROV MSID MMS MERR MUB MOOM RunERR
                 RunUB RunOOM EQM EQRI MLAWS MM) RunERR RunUB RunOOM MM0 MRun MPROV MSID MMS MERR MUB
-             MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MM) (list ADDR.addr)
+             MOOM RunERR RunUB RunOOM EQM EQRI MLAWS MM) (list LP.ADDR.addr)
           (@get_consecutive_ptrs MemM MM0 MOOM MERR ptr (@Datatypes.length BYTE_IMPL.SByte bytes))
           (@pair store_id MemState st ms)
           (@ret err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
@@ -6382,22 +6379,25 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
       auto.
     Qed.
 
+
+    Import IP.
+    
     Lemma write_bytes_correct :
       forall ptr bytes,
         exec_correct
           (fun ms st => Forall (fun byte => exists s, MemByte.sbyte_sid byte = inr s /\ (s < st)%N) bytes)
           (write_bytes ptr bytes) (write_bytes_spec ptr bytes)
           (@exec_correct_post_bind (list ADDR.addr) unit
-             (@exec_correct_post_bind (list IP.intptr) (list ADDR.addr)
+             (@exec_correct_post_bind (list intptr) (list ADDR.addr)
                 (@lift_OOM exec_correct_post Monad_exec_correct_post RAISE_OOM_exec_correct_post
-                   (list IP.intptr) (intptr_seq 0 (@Datatypes.length BYTE_IMPL.SByte bytes)))
-                (fun ixs : list IP.intptr =>
+                   (list intptr) (intptr_seq 0 (@Datatypes.length BYTE_IMPL.SByte bytes)))
+                (fun ixs : list intptr =>
                    @exec_correct_post_bind (list (OOM ADDR.addr)) (list ADDR.addr)
                      (@lift_err_RAISE_ERROR (list (OOM ADDR.addr)) exec_correct_post Monad_exec_correct_post
                         RAISE_ERROR_exec_correct_post
-                        (@map_monad (sum string) (EitherMonad.Monad_either string) IP.intptr
+                        (@map_monad (sum string) (EitherMonad.Monad_either string) intptr
                            (OOM ADDR.addr)
-                           (fun ix : IP.intptr =>
+                           (fun ix : intptr =>
                               handle_gep_addr (DTYPE_I 8) ptr (@cons dvalue (DVALUE_IPTR ix) (@nil dvalue)))
                            ixs))
                      (fun addrs : list (OOM ADDR.addr) =>
@@ -6493,7 +6493,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Proof.
       intros uv dt sid st H.
       apply Forall_map.
-      remember (N.to_nat (SIZEOF.sizeof_dtyp dt)) as n.
+      remember (N.to_nat (SZ.sizeof_dtyp dt)) as n.
       clear Heqn.
       remember 0 as start.
       clear Heqstart.
@@ -6518,16 +6518,16 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
              (fun a : list BYTE_IMPL.SByte =>
                 (fun a0 : list BYTE_IMPL.SByte =>
                    @exec_correct_post_bind (list ADDR.addr) unit
-                     (@exec_correct_post_bind (list IP.intptr) (list ADDR.addr)
+                     (@exec_correct_post_bind (list intptr) (list ADDR.addr)
                         (@lift_OOM exec_correct_post Monad_exec_correct_post RAISE_OOM_exec_correct_post
-                           (list IP.intptr) (intptr_seq 0 (@Datatypes.length BYTE_IMPL.SByte a0)))
-                        (fun ixs : list IP.intptr =>
+                           (list intptr) (intptr_seq 0 (@Datatypes.length BYTE_IMPL.SByte a0)))
+                        (fun ixs : list intptr =>
                            @exec_correct_post_bind (list (OOM ADDR.addr)) (list ADDR.addr)
                              (@lift_err_RAISE_ERROR (list (OOM ADDR.addr)) exec_correct_post
                                 Monad_exec_correct_post RAISE_ERROR_exec_correct_post
-                                (@map_monad (sum string) (EitherMonad.Monad_either string) IP.intptr
+                                (@map_monad (sum string) (EitherMonad.Monad_either string) intptr
                                    (OOM ADDR.addr)
-                                   (fun ix : IP.intptr =>
+                                   (fun ix : intptr =>
                                       handle_gep_addr (DTYPE_I 8) ptr (@cons dvalue (DVALUE_IPTR ix) (@nil dvalue)))
                                    ixs))
                              (fun addrs : list (OOM ADDR.addr) =>
@@ -7013,16 +7013,16 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
                    ms0 = ms'0 /\ st0 = st'0));;
            (fun a1 : list BYTE_IMPL.SByte =>
               @exec_correct_post_bind (list ADDR.addr) unit
-                (@exec_correct_post_bind (list IP.intptr) (list ADDR.addr)
+                (@exec_correct_post_bind (list intptr) (list ADDR.addr)
                    (@lift_OOM exec_correct_post Monad_exec_correct_post RAISE_OOM_exec_correct_post
-                      (list IP.intptr) (intptr_seq 0 (@Datatypes.length BYTE_IMPL.SByte a1)))
-                   (fun ixs : list IP.intptr =>
+                      (list intptr) (intptr_seq 0 (@Datatypes.length BYTE_IMPL.SByte a1)))
+                   (fun ixs : list intptr =>
                       @exec_correct_post_bind (list (OOM ADDR.addr)) (list ADDR.addr)
                         (@lift_err_RAISE_ERROR (list (OOM ADDR.addr)) exec_correct_post Monad_exec_correct_post
                            RAISE_ERROR_exec_correct_post
-                           (@map_monad err (EitherMonad.Monad_either string) IP.intptr 
+                           (@map_monad err (EitherMonad.Monad_either string) intptr 
                               (OOM ADDR.addr)
-                              (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) dst [DVALUE_IPTR ix]) ixs))
+                              (fun ix : intptr => handle_gep_addr (DTYPE_I 8) dst [DVALUE_IPTR ix]) ixs))
                         (fun addrs : list (OOM ADDR.addr) =>
                            @lift_OOM exec_correct_post Monad_exec_correct_post RAISE_OOM_exec_correct_post
                              (list ADDR.addr) (@sequence OOM MonadOOM ADDR.addr addrs))))
@@ -7086,19 +7086,19 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
           (fun ms st => sid < st)
           (memset dst val len sid volatile) (memset_spec dst val len sid volatile)
           (@exec_correct_post_bind (list ADDR.addr) unit
-             (@exec_correct_post_bind (list IP.intptr) (list ADDR.addr)
+             (@exec_correct_post_bind (list intptr) (list ADDR.addr)
                 (@lift_OOM exec_correct_post Monad_exec_correct_post RAISE_OOM_exec_correct_post
-                   (list IP.intptr)
+                   (list intptr)
                    (intptr_seq 0
                       (@Datatypes.length BYTE_IMPL.SByte
                          (@repeatN BYTE_IMPL.SByte (Z.to_N len)
                             (BYTE_IMPL.uvalue_sbyte (@UVALUE_I 8 val) (DTYPE_I 8) 0 sid)))))
-                (fun ixs : list IP.intptr =>
+                (fun ixs : list intptr =>
                    @exec_correct_post_bind (list (OOM ADDR.addr)) (list ADDR.addr)
                      (@lift_err_RAISE_ERROR (list (OOM ADDR.addr)) exec_correct_post Monad_exec_correct_post
                         RAISE_ERROR_exec_correct_post
-                        (@map_monad err (EitherMonad.Monad_either string) IP.intptr (OOM ADDR.addr)
-                           (fun ix : IP.intptr => handle_gep_addr (DTYPE_I 8) dst [DVALUE_IPTR ix]) ixs))
+                        (@map_monad err (EitherMonad.Monad_either string) intptr (OOM ADDR.addr)
+                           (fun ix : intptr => handle_gep_addr (DTYPE_I 8) dst [DVALUE_IPTR ix]) ixs))
                      (fun addrs : list (OOM ADDR.addr) =>
                         @lift_OOM exec_correct_post Monad_exec_correct_post RAISE_OOM_exec_correct_post
                           (list ADDR.addr) (@sequence OOM MonadOOM ADDR.addr addrs))))
@@ -7132,7 +7132,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Qed.
 
     Lemma handle_memory_correct :
-      forall T (m : MemoryE T) pre,
+      forall T (m : MemoryE dvalue uvalue T) pre,
         exec_correct pre (handle_memory T m) (handle_memory_prop T m) exec_correct_id_post.
     Proof using Type.
       intros T m pre.
@@ -7355,7 +7355,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
     Qed.
 
     Lemma handle_intrinsic_correct:
-      forall T (e : IntrinsicE T) pre,
+      forall T (e : IntrinsicE dvalue uvalue T) pre,
         exec_correct pre (handle_intrinsic T e) (handle_intrinsic_prop T e) exec_correct_id_post.
     Proof using Type.
       intros T e pre.
@@ -7410,7 +7410,7 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
   End Correctness.
 
   Import LP.PROV.
-  Import LP.SIZEOF.
+  Import LP.SZ.
   Import LP.ADDR.
 
   Lemma find_free_block_inv :
@@ -7666,16 +7666,16 @@ Module MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Memory
 
 End MemoryModelTheory.
 
-Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
+Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MEMORY_PARAMS LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
   (* Intptrs are "big" *)
-  Import LP.Events.
+  Import LP.DV.
   Import LP.ITOP.
   Import LP.PTOI.
   Import LP.IP_BIG.
-  Import LP.IP.
+  Import LP.
   Import LP.ADDR.
   Import LP.PROV.
-  Import LP.SIZEOF.
+  Import LP.SZ.
 
   Import MMSP.
   Import MMS.
@@ -7749,13 +7749,13 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
     cbn.
 
     pose proof map_monad_err_succeeds
-         (fun ix : intptr =>
-            handle_gep_addr (DTYPE_I 8) ptr [LP.Events.DV.DVALUE_IPTR ix])
+         (fun ix : IP.intptr =>
+            handle_gep_addr (DTYPE_I 8) ptr [DV.DVALUE_IPTR ix])
          ips as HMAPM.
 
     forward HMAPM.
     { intros a IN.
-      destruct (int_to_ptr (ptr_to_int ptr + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * LP.IP.to_Z a)%Z (address_provenance ptr)) eqn:IX.
+      destruct (int_to_ptr (ptr_to_int ptr + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * IP.to_Z a)%Z (address_provenance ptr)) eqn:IX.
       - exists (ret a0).
         apply handle_gep_addr_ix'; cbn; auto.
       - eapply handle_gep_addr_ix'_OOM in IX; auto.
@@ -7783,7 +7783,7 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
       apply handle_gep_addr_ix_OOM in GEP; auto.
       destruct GEP as [msg' GEP].
       pose proof
-        (LP.I2P_BIG.int_to_ptr_safe (ptr_to_int ptr + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * to_Z ix)
+        (LP.I2P_BIG.int_to_ptr_safe (ptr_to_int ptr + Z.of_N (sizeof_dtyp (DTYPE_I 8)) * IP.to_Z ix)
            (address_provenance ptr)) as SAFE.
       rewrite GEP in SAFE.
       contradiction.
@@ -7792,16 +7792,9 @@ Module MemStateInfiniteHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP
 
 End MemStateInfiniteHelpers.
 
-Module Type MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
+Module Type MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MEMORY_PARAMS LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP).
   (* Intptrs are "big" *)
-  Import LP.Events.
-  Import LP.ITOP.
-  Import LP.PTOI.
-  Import LP.IP_BIG.
-  Import LP.IP.
-  Import LP.ADDR.
   Import LP.PROV.
-  Import LP.SIZEOF.
 
   Import MMSP.
   Import MMS.
@@ -7825,15 +7818,15 @@ Module Type MemoryModelInfiniteSpec (LP : LLVMParamsBig) (MP : MemoryParams LP) 
 
 End MemoryModelInfiniteSpec.
 
-Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP) (MMIS : MemoryModelInfiniteSpec LP MP MMSP MMS).
-  Import LP.Events.
+Module MemoryModelInfiniteSpecHelpers (LP : LLVMParamsBig) (MP : MEMORY_PARAMS LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMS : MemoryModelSpec LP MP MMSP) (MMIS : MemoryModelInfiniteSpec LP MP MMSP MMS).
+  Import LP.DV.
   Import LP.ITOP.
   Import LP.PTOI.
   Import LP.IP_BIG.
   Import LP.IP.
   Import LP.ADDR.
   Import LP.PROV.
-  Import LP.SIZEOF.
+  Import LP.SZ.
 
   Import MMSP.
   Import MMS.

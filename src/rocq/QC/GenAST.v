@@ -18,9 +18,6 @@ From Vellvm.Syntax Require Import
   TypToDtyp
   DynamicTypes.
 
-From Vellvm.Handlers Require Import
-  Handlers.
-
 From Vellvm.Semantics Require Import
   TopLevel.
 
@@ -2234,16 +2231,16 @@ Section ExpGenerators.
   gen_ibinop_exp_typ (gen_global_of_typ : typ -> GenLLVM (option ident)) (gen_ident_of_typ : typ -> GenLLVM (option ident)) (t : typ) {struct t} : GenLLVM (exp typ)
   := ibinop <- lift gen_ibinop;;
 
-    if Handlers.LLVMEvents.DV.iop_is_div ibinop && Handlers.LLVMEvents.DV.iop_is_signed ibinop
+    if AstLib.iop_is_div ibinop && AstLib.iop_is_signed ibinop
     then
       ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat t <*> gen_non_zero_exp_size 0%nat t
     else
-      if Handlers.LLVMEvents.DV.iop_is_div ibinop
+      if AstLib.iop_is_div ibinop
       then
         ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat t <*> gen_gt_zero_exp_size 0%nat t
       else
         exp_value <- gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat t;;
-        if Handlers.LLVMEvents.DV.iop_is_shift ibinop
+        if AstLib.iop_is_shift ibinop
         then
           let max_shift_size :=
             match t with
@@ -2264,11 +2261,11 @@ Section ExpGenerators.
   :=
     match ty with
     | TYPE_FP FP_float => fbinop <- lift gen_fbinop;;
-                   if (Handlers.LLVMEvents.DV.fop_is_div fbinop)
+                   if (AstLib.fop_is_div fbinop)
                    then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty
                    else ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty
     | TYPE_FP FP_double => fbinop <- lift gen_fbinop;;
-                    if (Handlers.LLVMEvents.DV.fop_is_div fbinop)
+                    if (AstLib.fop_is_div fbinop)
                     then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty
                     else ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty <*> gen_exp_size' gen_global_of_typ gen_ident_of_typ 0%nat ty
     | _ => failGen "gen_fbinop_exp"
@@ -2363,16 +2360,10 @@ End ExpGenerators.
 
 Require Import Semantics.LLVMEvents.
 Require Import Semantics.InterpretationStack.
-Require Import Handlers.Handlers.
 From ITree Require Import
   ITree
   Interp.Recursion
   Events.Exception.
-
-Import TopLevel64BitIntptr.
-Import DV.
-Import MemoryModelImplementation.LLVMParams64BitIntptr.Events.
-
 
 Section InstrGenerators.
 
