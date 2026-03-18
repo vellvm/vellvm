@@ -3,7 +3,7 @@ From Stdlib Require Import
 
 From Stdlib Require Import List.
 Import ListNotations.
-From Stdlib Require Import ZArith.
+From Stdlib Require Import ZArith BinIntDef.
 Import ZArith.BinInt.
 
 From Vellvm Require
@@ -41,4 +41,4 @@ Extract Inlined Constant Archi.ppc64 => "false".
 (* NOTE: assumes that this file is compiled from /src *)
 Cd "ml/extracted".
 
-Separate Extraction Integers Transform LLVMAst AstLib ExtrOcamlIntConv ParserHelper ShowAST ReprAST Floats BinNums BinPos.
+Separate Extraction Integers Transform LLVMAst AstLib ExtrOcamlIntConv ParserHelper ShowAST ReprAST Floats BinNums BinPos BinIntDef.Z.
