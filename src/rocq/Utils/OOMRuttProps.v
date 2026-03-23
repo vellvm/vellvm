@@ -16,7 +16,8 @@ From ITree Require Import
   Props.Leaf.
 
 From Vellvm Require Import
-  Utils.OOMRutt.
+  Utils.OOMRutt
+  Utils.VellvmRelations.
 
 (* Extra construction lemmas *)
 
@@ -694,3 +695,385 @@ Proof using.
   intros r1 r2 H1.
   apply orutt_Ret; auto.
 Qed.
+
+Lemma orutt_interp :
+  forall {E1 E2 F1 F2 OOM1 OOME1 OOM2 OOME2 R1 R2 pre1 post1 pre2 post2 RR}
+    (h1 : forall T, E1 T -> itree F1 T)
+    (h2 : forall T, E2 T -> itree F2 T)
+    t1 t2,
+    @orutt E1 E2 OOM1 OOME1 R1 R2 pre1 post1 RR t1 t2 ->
+    (forall A B e1 e2,
+        pre1 A B e1 e2 ->
+        @orutt F1 F2 OOM2 OOME2 A B pre2 post2 (fun a b => post1 A B e1 a e2 b) (h1 A e1) (h2 B e2)) ->
+    (* OOM Spec... Probably too strong right now, but easier to rewrite this way. *)
+    (forall A (o : OOM1 A), exists (o' : OOM2 A) k, h2 A (subevent A o) = (vis o' k)) ->
+    @orutt F1 F2 OOM2 OOME2 R1 R2 pre2 post2 RR (interp h1 t1) (interp h2 t2).
+Proof.
+  intros E1 E2 F1 F2 OOM1 OOME1 OOM2 OOME2 R1 R2 pre1 post1 pre2 post2 RR h1 h2 t1 t2 EQ HANDLER OOMSPEC.
+  revert EQ. revert t1 t2.
+  ginit. gcofix CIH.
+  intros t1 t2 EQ.
+  punfold EQ; red in EQ.
+  dependent induction EQ; subst; setoid_rewrite unfold_interp.
+  - rewrite <- x, <- x0.
+    cbn; gstep; red; cbn.
+    constructor; auto.
+  - rewrite <- x, <- x0.
+    cbn; gstep; red; cbn.
+    constructor; auto.
+    gbase; pclearbot.
+    eapply CIH; eauto.
+  - rename H0 into KEQ.
+    (* KEQ may be what I need to relate the continuations after the handler *)
+    (* I may need to know something about how pre1 / pre2 and post1 / post2 relate to each other *)
+    pose proof H as HSPEC.
+    apply HANDLER in HSPEC.
+    punfold HSPEC; red in HSPEC.
+    revert HSPEC.
+    gcofix CIH2.
+    intros HSPEC.
+    dependent induction HSPEC.
+    + cbn in *.
+      rewrite <- x0, <- x1.
+      cbn. do 2 rewrite unfold_bind.
+      rewrite <- x, <- x2.
+      gstep; red; cbn.
+      constructor.
+      gbase.
+      eapply CIH; eauto.
+      specialize (KEQ _ _ H0).
+      pclearbot.
+      eauto.
+    + cbn in *.
+      rewrite <- x0, <- x1.
+      cbn. do 2 rewrite unfold_bind.
+      rewrite <- x, <- x2.
+      gstep; red; cbn.
+      constructor.
+      pclearbot.
+      eapply gpaco2_uclo; [|eapply orutt_clo_bind|]; eauto with paco.
+      econstructor; eauto. intros ? ? ?.
+      * gstep.
+        red; cbn.
+        constructor.
+        gbase.
+        eapply CIH; eauto.
+        cbn in *.
+        apply KEQ in H2.
+        pclearbot.
+        eauto.
+    + cbn in *.
+      rewrite <- x0, <- x1.
+      cbn. do 2 rewrite unfold_bind.
+      rewrite <- x, <- x2.
+      gstep; red; cbn.
+      constructor; eauto.
+      intros a b H8.
+      eapply gpaco2_uclo; [|eapply orutt_clo_bind|]; eauto with paco.
+      econstructor; eauto.
+
+      apply H0 in H8.
+      pclearbot.
+      eauto.
+
+      intros u1 u2 H9.
+      cbn in *.
+      gstep; red; cbn.
+      constructor; eauto.
+      gbase.
+      eapply CIH; eauto.
+      apply KEQ in H9.
+      pclearbot; eauto.
+    + (* OOM *)
+      cbn in *.
+      rewrite <- x0, <- x1.
+      cbn. do 2 rewrite unfold_bind.
+      rewrite <- x.
+      gstep; red; cbn.
+      constructor.
+    + (* TauL *)
+      cbn in *.
+      rewrite <- x0, <- x1.
+      eapply gpaco2_uclo; [|eapply orutt_clo_bind|]; eauto with paco.
+      econstructor; eauto. intros ? ? ?.
+      * gstep.
+        red; cbn.
+        constructor.
+        gbase.
+        eapply CIH; eauto.
+        cbn in *.
+        apply KEQ in H0.
+        pclearbot.
+        eauto.
+    + (* TauR *)
+      cbn in *.
+      rewrite <- x0, <- x1.
+      eapply gpaco2_uclo; [|eapply orutt_clo_bind|]; eauto with paco.
+      econstructor; eauto. intros ? ? ?.
+      * gstep.
+        red; cbn.
+        constructor.
+        gbase.
+        eapply CIH; eauto.
+        cbn in *.
+        apply KEQ in H0.
+        pclearbot.
+        eauto.
+  - (* OOM *)
+    specialize (OOMSPEC _ e).
+    destruct OOMSPEC as [o' [k OOMEQ]].
+    rewrite <- x.
+    cbn.
+    rewrite OOMEQ.
+    rewrite bind_vis.
+    gstep; red; cbn.
+    constructor.
+  - (* TauL *)
+    cbn in *.
+    rewrite <- x.
+    cbn.
+    rewrite tau_euttge.
+    rewrite <- unfold_interp.
+    eapply IHEQ; eauto.
+  - (* TauR *)
+    cbn in *.
+    rewrite <- x.
+    cbn.
+    rewrite tau_euttge.
+    rewrite <- unfold_interp.
+    eapply IHEQ; eauto.
+Qed.
+
+Lemma orutt_interp_state :
+  forall {E1 E2 F1 F2 OOM1 OOME1 OOM2 OOME2 R1 R2 RR S1 S2}
+    {SS : S1 -> S2 -> Prop}
+    {pre1 : prerel E1 E2} {post1 : postrel E1 E2} {pre2 : prerel F1 F2} {post2 : postrel F1 F2}
+    (h1 : forall T, E1 T -> Monads.stateT S1 (itree F1) T)
+    (h2 : forall T, E2 T -> Monads.stateT S2 (itree F2) T)
+    t1 t2 s1 s2,
+    @orutt E1 E2 OOM1 OOME1 R1 R2 pre1 post1 RR t1 t2 ->
+    SS s1 s2 ->
+    (forall A B e1 e2 s1 s2,
+        pre1 A B e1 e2 ->
+        SS s1 s2 ->
+        @orutt F1 F2 OOM2 OOME2 (S1 * A)%type (S2 * B)%type pre2 post2 (fun '(s1, a) '(s2, b) => post1 A B e1 a e2 b /\ SS s1 s2) (h1 A e1 s1) (h2 B e2 s2)) ->
+    (* OOM Spec... *)
+    (forall A (o : OOM1 A) s, exists (o' : OOM2 A) k, h2 A (subevent A o) s ≈ (vis o' k)) ->
+    @orutt F1 F2 OOM2 OOME2 (S1 * R1)%type (S2 * R2)%type pre2 post2 (SS × RR) (State.interp_state h1 t1 s1) (State.interp_state h2 t2 s2).
+Proof.
+  intros E1 E2 F1 F2 OOM1 OOME1 OOM2 OOME2 R1 R2 RR S1 S2 SS pre1 post1 pre2 post2 h1 h2 t1 t2 s1 s2 EQ SSINIT HANDLER OOMSPEC.
+  revert EQ SSINIT. revert t1 t2 s1 s2.
+  ginit. gcofix CIH.
+  intros t1 t2 s1 s2 EQ SSINIT.
+  punfold EQ; red in EQ.
+  dependent induction EQ; subst; setoid_rewrite StateFacts.unfold_interp_state.
+  - rewrite <- x, <- x0.
+    cbn; gstep; red; cbn.
+    constructor; constructor; cbn; auto.
+  - rewrite <- x, <- x0.
+    cbn; gstep; red; cbn.
+    constructor; auto.
+    gbase; pclearbot.
+    eapply CIH; eauto.
+  - rename H0 into KEQ.
+    (* KEQ may be what I need to relate the continuations after the handler *)
+    (* I may need to know something about how pre1 / pre2 and post1 / post2 relate to each other *)
+    pose proof H as HSPEC.
+    eapply HANDLER in HSPEC; eauto.
+    punfold HSPEC; red in HSPEC.
+    revert HSPEC.
+    gcofix CIH2.
+    intros HSPEC.
+    dependent induction HSPEC.
+    + cbn in *.
+      rewrite <- x0, <- x1.
+      cbn. do 2 rewrite unfold_bind.
+      rewrite <- x, <- x2.
+      gstep; red; cbn.
+      constructor.
+      gbase.
+      destruct r1, r2.
+      destruct H0.
+      eapply CIH; eauto.
+      specialize (KEQ _ _ H0).
+      pclearbot.
+      eauto.
+    + cbn in *.
+      rewrite <- x0, <- x1.
+      cbn. do 2 rewrite unfold_bind.
+      rewrite <- x, <- x2.
+      gstep; red; cbn.
+      constructor.
+      pclearbot.
+      eapply gpaco2_uclo; [|eapply orutt_clo_bind|]; eauto with paco.
+      econstructor; eauto. intros ? ? ?.
+      * gstep.
+        red; cbn.
+        constructor.
+        gbase.
+        destruct u1, u2, H2.
+        eapply CIH; eauto.
+        cbn in *.
+        apply KEQ in H2.
+        pclearbot.
+        eauto.
+    + cbn in *.
+      rewrite <- x0, <- x1.
+      cbn. do 2 rewrite unfold_bind.
+      rewrite <- x, <- x2.
+      gstep; red; cbn.
+      constructor; eauto.
+      intros a b H8.
+      eapply gpaco2_uclo; [|eapply orutt_clo_bind|]; eauto with paco.
+      econstructor; eauto.
+
+      apply H0 in H8.
+      pclearbot.
+      eauto.
+
+      intros u1 u2 H9.
+      cbn in *.
+      gstep; red; cbn.
+      constructor; eauto.
+      gbase.
+      destruct u1, u2, H9.
+      eapply CIH; eauto.
+      eapply KEQ in H4; eauto.
+      pclearbot; eauto.
+    + (* OOM *)
+      cbn in *.
+      rewrite <- x0, <- x1.
+      cbn. do 2 rewrite unfold_bind.
+      rewrite <- x.
+      gstep; red; cbn.
+      constructor.
+    + (* TauL *)
+      cbn in *.
+      rewrite <- x0, <- x1.
+      eapply gpaco2_uclo; [|eapply orutt_clo_bind|]; eauto with paco.
+      econstructor; eauto. intros ? ? ?.
+      * gstep.
+        red; cbn.
+        constructor.
+        gbase.
+        destruct u1, u2, H0; cbn in *.
+        eapply CIH; eauto.
+        cbn in *.
+        apply KEQ in H0.
+        pclearbot.
+        eauto.
+    + (* TauR *)
+      cbn in *.
+      rewrite <- x0, <- x1.
+      eapply gpaco2_uclo; [|eapply orutt_clo_bind|]; eauto with paco.
+      econstructor; eauto. intros ? ? ?.
+      * gstep.
+        red; cbn.
+        constructor.
+        gbase.
+        destruct u1, u2, H0.
+        eapply CIH; eauto.
+        cbn in *.
+        apply KEQ in H0.
+        pclearbot.
+        eauto.
+  - (* OOM *)
+    specialize (OOMSPEC _ e s2).
+    destruct OOMSPEC as [o' [k OOMEQ]].
+    rewrite <- x.
+    cbn.
+
+    eapply gpaco2_final.
+    apply orutt_monot.
+    right.
+
+    eapply paco2_mon_bot; eauto.
+    eapply orutt_cong_eutt2.
+    2: {
+      rewrite OOMEQ.
+      rewrite bind_vis.
+      cbn.
+      reflexivity.
+    }
+
+    pstep; red; cbn.
+    constructor.
+  - (* TauL *)
+    cbn in *.
+    rewrite <- x.
+    cbn.
+    rewrite tau_euttge.
+    rewrite <- StateFacts.unfold_interp_state.
+    eapply IHEQ; eauto.
+  - (* TauR *)
+    cbn in *.
+    rewrite <- x.
+    cbn.
+    rewrite tau_euttge.
+    rewrite <- StateFacts.unfold_interp_state.
+    eapply IHEQ; eauto.
+Qed.
+
+Lemma orutt_translate :
+  forall {E1 E1' E2 E2' OOM : Type -> Type} `{OOME : OOM -< E2} `{OOME' : OOM -< E2'} (h1 : E1 ~> E1') (h2 : E2 ~> E2')
+    {PRE1 : prerel E1 E2} {POST1 : postrel E1 E2}
+    {PRE2 : prerel E1' E2'} {POST2 : postrel E1' E2'}
+    {R1 R2 : Type} {RR : R1 -> R2 -> Prop} t1 t2,
+    (forall A B e1 e2, PRE1 A B e1 e2 -> PRE2 A B (h1 _ e1) (h2 _ e2)) ->
+    (forall A B e1 a e2 b, POST2 A B (h1 A e1) a (h2 B e2) b -> POST1 A B e1 a e2 b) ->
+    (forall A (e : E2 A) (o : OOM _), e <> @subevent OOM E2 OOME A o -> h2 _ e <> @subevent OOM E2' OOME' A o) ->
+    (forall A (e : E2 A) (o : OOM _), e = @subevent OOM E2 OOME A o -> h2 _ e = @subevent OOM E2' OOME' A o) ->
+    orutt PRE1 POST1 RR
+      t1
+      t2
+      (OOM:=OOM) ->
+    orutt PRE2 POST2 RR
+      (translate h1 t1)
+      (translate h2 t2)
+      (OOM:=OOM).
+Proof.
+  intros * PRE POST NOOM OOMOOM.
+  revert t1 t2.
+  ginit.
+  gcofix CIH.
+  intros * RUTT.
+  rewrite !unfold_translate. punfold RUTT. red in RUTT.
+  induction RUTT; intros; subst; simpl; pclearbot.
+  - gstep.
+    constructor.
+    auto.
+  - gstep.
+    red.
+    constructor.
+    gbase.
+    apply CIH.
+    auto.
+  - gstep; eauto.
+    red.
+    constructor; eauto.
+    intros a b H2.
+    apply POST in H2.
+    eapply H0 in H2.
+    gbase.
+    apply CIH; auto.
+  - gstep; eauto.
+    red.
+    cbn.
+    erewrite OOMOOM; try reflexivity.
+    apply EqVisOOM.
+  - rewrite tau_euttge, unfold_translate. eauto with itree.
+  - rewrite tau_euttge, unfold_translate. eauto with itree.
+Qed.
+
+#[global] Hint Resolve
+  orutt_bind
+  orutt_trigger
+  orutt_Ret
+  orutt_raiseLLVM
+  orutt_raiseUB
+  orutt_raiseOOM
+  orutt_raise
+  orutt_interp_state
+  orutt_interp
+  orutt_translate
+  : ORUTT.

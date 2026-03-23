@@ -952,6 +952,26 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     }
   Qed.
 
+  Lemma uvalue_strict_subterm_gep_cons :
+    forall τ1 τ2 u uv_addr uv_idx uv_idxs,
+      uvalue_strict_subterm u (UVALUE_GetElementPtr τ1 uv_addr uv_idxs) ->
+      uvalue_strict_subterm u (UVALUE_GetElementPtr τ2 uv_addr (uv_idx :: uv_idxs)).
+  Proof.
+    intros τ1 τ2 u uv_addr uv_idx uv_idxs H.
+    dependent induction H.
+    - inv H.
+      repeat constructor.
+      eapply uvalue_getelementptr_strict_subterm.
+      apply Exists_In.
+      exists x.
+      split; cbn; auto.
+      apply rt_refl.
+    - specialize (IHclos_trans2 τ1 uv_addr uv_idxs eq_refl).
+      eapply t_trans.
+      apply H.
+      apply IHclos_trans2.
+  Qed.
+
   Lemma uvalue_struct_strict_subterm :
     forall u uvs,
       Exists (uvalue_subterm u) uvs ->
@@ -3620,6 +3640,19 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                         ret (val :: acc)
                      ) elts [].
 
+  Lemma vec_loop_cons :
+    forall {A M} `{HM : Monad M}
+      (f : A -> A -> M A)
+      a b xs,
+      @vec_loop A M HM f ((a,b) :: xs) =
+        res <- @vec_loop A M HM f xs;;
+        val <- f a b;;
+        ret (val :: res).
+  Proof.
+    intros A M HM f a b xs.
+    cbn.
+    reflexivity.
+  Qed.
 
   (* Integer iop evaluation, called from eval_iop.
      Here the values must be integers. Helper defined

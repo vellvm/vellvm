@@ -620,6 +620,9 @@ Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP
              ]
       ].
 
+  #[global] Hint Extern 1 (uvalue_refine_strict _ _) => solve_uvalue_refine_strict : ORUTT.
+  #[global] Hint Extern 1 (dvalue_refine_strict _ _) => solve_dvalue_refine_strict : ORUTT.
+
   (** Parameters about is_concrete *)
 
   (*

@@ -16,6 +16,7 @@ From Vellvm.Utils Require Import
 
 From ExtLib Require Import
   Structures.Monads
+  Structures.Functor
   Structures.Foldable
   Data.List.
 
@@ -2277,3 +2278,35 @@ split.
 intros m M conv l.
 apply (fold_left (fun acc x => monoid_plus M (conv x) acc) l (monoid_unit M)).
 Defined.
+
+Lemma forallb_false :
+  forall A (f : A -> bool) xs,
+    forallb f xs = false ->
+    exists x, In x xs /\ f x = false.
+Proof.
+  intros A f xs.
+  induction xs; intros FORALL.
+  - inv FORALL.
+  - cbn in FORALL.
+    apply Bool.andb_false_iff in FORALL.
+    destruct FORALL as [F | F].
+    + exists a; cbn; auto.
+    + specialize (IHxs F).
+      destruct IHxs as (?&?&?).
+      exists x; cbn; auto.
+Qed.
+
+Lemma fmap_map :
+  forall {A B} (f : A -> B) (l : list A),
+    fmap f l = map f l.
+Proof.
+  intros A B f l.
+  reflexivity.
+Qed.
+
+Lemma combine_cons :
+  forall {X Y} (x : X) (y : Y) xs ys,
+    combine (x :: xs) (y :: ys) = (x,y) :: combine xs ys.
+Proof.
+  cbn; auto.
+Qed.

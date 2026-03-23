@@ -12,6 +12,7 @@ From ITree Require Import
 From Vellvm Require Import
   Utilities
   Utils.VellvmRelations
+  Utils.ListUtil
   Syntax
   Semantics
   Theory.Refinement
@@ -38,6 +39,8 @@ From Stdlib Require Import Program.Equality.
 
 Import ListNotations.
 Import ITree.Basics.Basics.Monads.
+
+Import MonadNotation.
 
 Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Export TOP.
@@ -657,30 +660,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           repeat setoid_rewrite Raise.raiseUB_bind_itree;
           repeat setoid_rewrite Raise.raise_bind_itree;
           repeat rewrite bind_ret_l; try reflexivity.
-    Qed.
-
-    (* TODO: Move this *)
-    Lemma combine_cons :
-      forall {X Y} (x : X) (y : Y) xs ys,
-        combine (x :: xs) (y :: ys) = (x,y) :: combine xs ys.
-    Proof.
-      cbn; auto.
-    Qed.
-
-    (* TODO: Move this *)
-    Import MonadNotation.
-    Lemma vec_loop_cons :
-      forall {A M} `{HM : Monad M}
-        (f : A -> A -> M A)
-        a b xs,
-        @vec_loop A M HM f ((a,b) :: xs) =
-          res <- @vec_loop A M HM f xs;;
-          val <- f a b;;
-          ret (val :: res).
-    Proof.
-      intros A M HM f a b xs.
-      cbn.
-      reflexivity.
     Qed.
 
     Lemma eval_iop_integer_h_err_ub_oom_to_itree :
