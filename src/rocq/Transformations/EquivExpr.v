@@ -687,22 +687,12 @@ eq1 (bind f l (fun ys=> ret (DValue_Struct ys))) (ret xs) ->
       concretize (dvalue_to_uvalue d) d' -> d = d'.
   Proof.
     (* clean attempt *)
-    intros. induction d.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - admit.
-    - unfold concretize in H.
-      unfold concretize_u in H.
-      rewrite concretize_uvalueM_equation in H.
-      simpl in H. unfold eq1 in H.
-      Admitted.
+    induction d; intros.
+    1-8 : cbn in H; inversion H; subst; reflexivity.
+    - induction fields.
+      + cbn in H0.
+        admit.
+  Admitted.
 
 (*
   Lemma add_zero : forall b1 b2 (e:exp dtyp),

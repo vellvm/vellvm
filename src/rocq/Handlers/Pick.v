@@ -375,8 +375,7 @@ Module Make (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModule LP MP.B
     Proof.
       induction uvs;
         intros acc IH; try reflexivity.
-      setoid_rewrite CONCBASE.concretize_uvalue_bytes_helper_equation.
-      rewrite (@CONCBASE.concretize_uvalue_bytes_helper_equation ErrUbOomProp).
+      simpl. 
       destruct a; try reflexivity.
       break_match.
       - (* Pare-concretization exists *)
@@ -439,7 +438,7 @@ Module Make (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModule LP MP.B
                     (fun (A : Type) (x : err_ub_oom A) => x) (CONCBASE.new_concretized_byte acc a a0 sid) uvs).
         destruct_err_ub_oom e; cbn; auto.
         split; eauto.
-
+        
         right.
         intros a1 H; subst.
         reflexivity.
@@ -518,6 +517,8 @@ Module Make (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModule LP MP.B
     (*   destruct_err_ub_oom y; reflexivity. *)
     (* Qed. *)
 
+
+    (* TODO: SAZ - there has got to be a nicer way to do this *)
     Lemma eval_select_loop_eval_select_loop :
       forall elts elts0 elts1,
         ((fix loop (conds xs ys : list dvalue) {struct conds} : ErrUbOomProp (list dvalue) :=
@@ -1531,8 +1532,7 @@ Module Make (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModule LP MP.B
              (fun (A : Type) (x : err_ub_oom A) => x) cnd x y).
     Proof.
       intros cnd x y X Y.
-      rewrite eval_select_equation.
-      rewrite (@eval_select_equation err_ub_oom).
+      unfold eval_select.
       destruct cnd; try reflexivity.
       - break_match; auto; break_match.
         + apply X.
@@ -2156,8 +2156,6 @@ Module Make (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModule LP MP.B
       }
 
       { (* Select *)
-        rewrite concretize_uvalueM_equation.
-        rewrite (@concretize_uvalueM_equation err_ub_oom).
         cbn.
 
         (* Evaluate the condition *)
@@ -2264,7 +2262,7 @@ Module Make (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModule LP MP.B
       }
 
       { (* ConcatBytes *)
-        repeat rewrite CONCBASE.concretize_uvalueM_equation.
+        cbn. 
         break_match.
         { break_match; cbn.
           pose proof Heqo.

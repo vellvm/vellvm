@@ -1503,12 +1503,10 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Proof.
       intros E H H0 H1 cnd x y X Y.
       destruct cnd; try reflexivity.
-      - (* i1 *)
-        repeat rewrite eval_select_equation.
+      - cbn. (* i1 *)
         break_match; cbn; try reflexivity.
         break_match; eauto.
       - (* Vector *)
-        setoid_rewrite eval_select_equation.
         cbn.
         setoid_rewrite X.
         setoid_rewrite Y.
@@ -1611,7 +1609,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Proof.
       intros E H H0 H1 uvs.
       induction uvs; intros acc IH; try reflexivity.
-      setoid_rewrite CONCBASE.concretize_uvalue_bytes_helper_equation.
+      cbn. 
       destruct a; try reflexivity.
       break_match.
       - cbn.
@@ -1775,9 +1773,9 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         end.
     Proof using.
       intros E OOM FAIL UB.
-      induction u using uvalue_strong_ind; unfold concretize_uvalue at 2; rewrite concretize_uvalueM_equation;
-        try solve [unfold concretize_uvalue; rewrite concretize_uvalueM_equation; reflexivity].
-      { unfold concretize_uvalue; rewrite concretize_uvalueM_equation.
+      induction u using uvalue_strong_ind; unfold concretize_uvalue at 2; 
+        try solve [unfold concretize_uvalue; reflexivity].
+      { unfold concretize_uvalue. cbn.
         destruct (default_dvalue_of_dtyp t); cbn in *; reflexivity.
       }
 
@@ -1785,7 +1783,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
       9: { (* Fneg *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
         cbn.
         setoid_rewrite H.
         2: repeat constructor.
@@ -1807,11 +1804,11 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       10: { (* Conversion *)
         idtac.
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
         unfold concretize_uvalue in H.
         specialize (H u).
         forward H.
         repeat constructor.
+        cbn. 
 
         remember (concretize_uvalueM (err_ub_oom_T ident)
            (fun dt : dtyp => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt))
@@ -1823,7 +1820,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           repeat setoid_rewrite Raise.raise_bind_itree;
           repeat rewrite bind_ret_l; try reflexivity.
 
-        break_match; cbn; try reflexivity.
+        cbn; break_match; cbn; try reflexivity.
         - break_match; cbn; try reflexivity.
         - break_match; cbn; try reflexivity.
           break_match; cbn; try reflexivity.
@@ -1838,7 +1835,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
       16: { (* ConcatBytes *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
+        cbn. 
         break_match.
         - break_match.
           + cbn.
@@ -1914,7 +1911,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         destruct (default_dvalue_of_dtyp t); reflexivity.
       - (* Struct *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
+        cbn. 
         induction fields.
         + cbn.
           rewrite bind_ret_l.
@@ -1972,7 +1969,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                reflexivity.
       - (* Packed Struct *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
+        cbn. 
         induction fields.
         + cbn.
           rewrite bind_ret_l.
@@ -2030,7 +2027,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                reflexivity.
       - (* Arrays *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
+        cbn. 
         induction elts.
         + cbn.
           rewrite bind_ret_l.
@@ -2089,7 +2086,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                reflexivity.
       - (* Vectors *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
+        cbn. 
         induction elts.
         + cbn.
           rewrite bind_ret_l.
@@ -2148,7 +2145,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                reflexivity.
       - (* IBinop *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
         cbn.
         setoid_rewrite H.
         2-3: repeat constructor.
@@ -2179,7 +2175,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         destruct_err_ub_oom y; cbn; reflexivity.
       - (* ICmp *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
         cbn.
         setoid_rewrite H.
         2-3: repeat constructor.
@@ -2210,7 +2205,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         destruct_err_ub_oom y; cbn; reflexivity.
       - (* FBinop *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
         cbn.
         setoid_rewrite H.
         2-3: repeat constructor.
@@ -2241,7 +2235,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         destruct_err_ub_oom y; cbn; reflexivity.
       - (* FCmp *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
         cbn.
         setoid_rewrite H.
         2-3: repeat constructor.
@@ -2272,7 +2265,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         destruct_err_ub_oom y; cbn; reflexivity.
       - (* GEP *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
         cbn.
         setoid_rewrite H.
         2: repeat constructor.
@@ -2324,7 +2316,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           repeat rewrite bind_ret_l; try reflexivity.
       - (* ExtractElement *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
         cbn.
         setoid_rewrite H.
         2-3: repeat constructor.
@@ -2361,7 +2352,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         destruct_err_ub_oom y; cbn; reflexivity.
       - (* InsertElement *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
         cbn.
         setoid_rewrite H.
         2-4: repeat constructor.
@@ -2402,7 +2392,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         destruct_err_ub_oom y; cbn; reflexivity.
       - (* ExtractValue *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
         cbn.
         setoid_rewrite H.
         2: repeat constructor.
@@ -2427,7 +2416,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         destruct_err_ub_oom res; reflexivity.
       - (* InsertValue *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
         cbn.
         setoid_rewrite H.
         2-3: repeat constructor.
@@ -2465,7 +2453,6 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         destruct_err_ub_oom e; reflexivity.
       - (* Select *)
         unfold concretize_uvalue.
-        rewrite concretize_uvalueM_equation.
         cbn.
         setoid_rewrite H.
         2: repeat constructor.

@@ -120,9 +120,9 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
 
   (* TODO: move this? *)
   Ltac red_concretize :=
-    unfold concretize, concretize_u; rewrite concretize_uvalueM_equation.
+    unfold concretize, concretize_u.
   Ltac red_concretize_in H :=
-    unfold concretize, concretize_u in H; rewrite concretize_uvalueM_equation in H.
+    unfold concretize, concretize_u in H.
 
   Ltac normalize_array_vector_dtyp :=
     match goal with

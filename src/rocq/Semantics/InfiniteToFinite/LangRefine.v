@@ -9123,9 +9123,7 @@ Module Type LangRefine
     }
 
     { (* i1 conditional *)
-      rewrite eval_select_equation in *.
-      rewrite IS1.MEM.CP.CONC.eval_select_equation.
-      rewrite fin_to_inf_dvalue_ix.
+      rewrite fin_to_inf_dvalue_ix. simpl in *.
 
       break_match; try inv EVAL.
       break_match.
@@ -9156,8 +9154,7 @@ Module Type LangRefine
     }
 
     { (* Vector conditional *)
-      rewrite eval_select_equation in *.
-      rewrite IS1.MEM.CP.CONC.eval_select_equation.
+      simpl in *.
 
       repeat red in EVAL.
       destruct EVAL as (?&?&?&?&?).
@@ -9628,8 +9625,7 @@ Module Type LangRefine
       cbn in CONC; inv CONC; cbn.
       reflexivity.
     - inv REF.
-      rewrite concretize_uvalue_bytes_helper_equation in CONC.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalue_bytes_helper_equation.
+      simpl in *.
       destruct y; uvalue_refine_strict_inv H1; try inv CONC.
       rewrite pre_concretized_fin_inf with (uv_fin:=y) (acc_fin:=acc_fin); eauto.
       break_match_hyp_inv; repeat red.
@@ -9749,14 +9745,10 @@ Module Type LangRefine
           red in REF;
           cbn in REF; inv REF;
 
-          rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN;
           red in CONC_FIN;
-          rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN;
           cbn in CONC_FIN; inv CONC_FIN;
 
-          rewrite IS1.MEM.CP.CONC.concretize_equation;
           red;
-          rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
           cbn;
           unfold fin_to_inf_dvalue;
           break_match_goal; clear Heqs; destruct p; clear e0;
@@ -9768,14 +9760,11 @@ Module Type LangRefine
       red in REF.
       cbn in REF.
       break_match_hyp_inv.
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
       red in CONC_FIN.
-      rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN.
       cbn in CONC_FIN; inv CONC_FIN.
 
       rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
       cbn.
       unfold fin_to_inf_dvalue.
       break_match_goal.
@@ -9793,7 +9782,6 @@ Module Type LangRefine
 
       rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
       cbn.
       unfold fin_to_inf_dvalue.
       break_match_goal.
@@ -9812,13 +9800,10 @@ Module Type LangRefine
       cbn in REF; inv REF.
 
       rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN.
       cbn in CONC_FIN.
 
       rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
       cbn.
 
       destruct CONC_FIN.
@@ -9831,15 +9816,7 @@ Module Type LangRefine
             [ red; intros dv_fin CONC_FIN;
               red in REF;
               cbn in REF; inv REF;
-
-              rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN;
-              red in CONC_FIN;
-              rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN;
               cbn in CONC_FIN; inv CONC_FIN;
-
-              rewrite IS1.MEM.CP.CONC.concretize_equation;
-              red;
-              rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
               cbn;
               unfold fin_to_inf_dvalue;
               break_match_goal; clear Heqs; destruct p; clear e0;
@@ -9860,13 +9837,9 @@ Module Type LangRefine
 
           Opaque Datatypes.length N.eqb.
 
-          rewrite IS1.MEM.CP.CONC.concretize_equation;
-            red; rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
-            cbn; repeat red.
+          cbn; repeat red.
 
-          rewrite IS2.MEM.CP.CONC.concretize_equation in H0;
-            red in H0; rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in H0;
-            cbn in H0; repeat red in H0.
+          cbn in H0; repeat red in H0.
 
           replace (Datatypes.length uv_bytes_inf) with (Datatypes.length uv_bytes_fin).
           2: {
@@ -9985,14 +9958,10 @@ Module Type LangRefine
           red in REF.
           cbn in REF.
           break_match_hyp_inv.
-          rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-          red in CONC_FIN.
-          rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN.
           cbn in CONC_FIN; inv CONC_FIN.
 
-          rewrite IS1.MEM.CP.CONC.concretize_equation.
+
           red.
-          rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
           cbn.
           unfold fin_to_inf_dvalue.
           break_match_goal.
@@ -10008,9 +9977,7 @@ Module Type LangRefine
           cbn in REF.
           break_match_hyp_inv.
 
-          rewrite IS1.MEM.CP.CONC.concretize_equation.
           red.
-          rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
           cbn.
           unfold fin_to_inf_dvalue.
           break_match_goal.
@@ -10028,16 +9995,10 @@ Module Type LangRefine
           red in REF.
           cbn in REF; inv REF.
 
-          rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
           red in CONC_FIN.
-          rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN.
           cbn in CONC_FIN.
 
-          rewrite IS1.MEM.CP.CONC.concretize_equation.
-          red.
-          rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
           cbn.
-
           destruct CONC_FIN.
           split.
           eapply dvalue_has_dtyp_fin_to_inf_dvalue; eauto.
@@ -10051,14 +10012,8 @@ Module Type LangRefine
           unfold uvalue_concretize_fin_inf_inclusion in H.
           apply map_monad_oom_Forall2 in Heqo.
 
-          rewrite IS1.MEM.CP.CONC.concretize_equation.
           red.
-          rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-          rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
           red in CONC_FIN.
-          rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-
           repeat red in CONC_FIN.
           destruct CONC_FIN as (?&?&?&?&?).
           destruct_err_ub_oom x; cbn in H1; inv H1.
@@ -10125,13 +10080,7 @@ Module Type LangRefine
           unfold uvalue_concretize_fin_inf_inclusion in H.
           apply map_monad_oom_Forall2 in Heqo.
 
-          rewrite IS1.MEM.CP.CONC.concretize_equation.
           red.
-          rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-          rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-          red in CONC_FIN.
-          rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
 
           repeat red in CONC_FIN.
           destruct CONC_FIN as (?&?&?&?&?).
@@ -10199,13 +10148,7 @@ Module Type LangRefine
       unfold uvalue_concretize_fin_inf_inclusion in H.
       apply map_monad_oom_Forall2 in Heqo.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
 
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
@@ -10273,13 +10216,7 @@ Module Type LangRefine
       unfold uvalue_concretize_fin_inf_inclusion in H.
       apply map_monad_oom_Forall2 in Heqo.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
 
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
@@ -10356,13 +10293,7 @@ Module Type LangRefine
       specialize (IHuv_inf1 u Heqo).
       specialize (IHuv_inf2 u0 Heqo0).
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
 
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
@@ -10426,13 +10357,7 @@ Module Type LangRefine
       specialize (IHuv_inf1 u Heqo).
       specialize (IHuv_inf2 u0 Heqo0).
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
 
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
@@ -10496,11 +10421,6 @@ Module Type LangRefine
       specialize (IHuv_inf1 u Heqo).
       specialize (IHuv_inf2 u0 Heqo0).
 
-
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H1; inv H1.
@@ -10522,10 +10442,7 @@ Module Type LangRefine
       apply IHuv_inf2 in H1.
 
       rewrite IS1.MEM.CP.CONC.concretize_equation.
-      red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
 
-      
       repeat red.
       exists (ret (fin_to_inf_dvalue x1)).
       exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 x1))).
@@ -10563,11 +10480,6 @@ Module Type LangRefine
 
       specialize (IHuv_inf u Heqo).
 
-      
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-      cbn in CONC_FIN.
       repeat red in CONC_FIN. 
 
       destruct CONC_FIN as (?&?&?&?&?).
@@ -10580,10 +10492,6 @@ Module Type LangRefine
       remember (eval_fneg x1) as x1h.
       destruct_err_ub_oom x1h; inv H4.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
-      red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-      cbn.
       repeat red.
       exists (ret (fin_to_inf_dvalue x1)).
       exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 x1))).
@@ -10614,13 +10522,8 @@ Module Type LangRefine
       specialize (IHuv_inf1 u Heqo).
       specialize (IHuv_inf2 u0 Heqo0).
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
-      red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
+      red.
 
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
@@ -10679,13 +10582,7 @@ Module Type LangRefine
       specialize (IHuv_inf _ Heqo).
       unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
 
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
@@ -10782,10 +10679,6 @@ Module Type LangRefine
       pose proof (IHuv_inf u Heqo) as IHuv_inf_u.
       unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf_u.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H0; inv H0.
@@ -10809,10 +10702,6 @@ Module Type LangRefine
       pose proof addr_convert_succeeds a as (a'&AA').
       pose proof addr_convert_succeeds a0 as (a0'&A0A0').
       epose proof (handle_gep_addr_fin_inf _ _ _ _ _ _ _ Heqs AA' A0A0' eq_refl).
-
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
-      red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
 
       repeat red.
       exists (ret (fin_to_inf_dvalue (DVALUE_Addr a))).
@@ -10940,10 +10829,6 @@ Module Type LangRefine
 
       unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf_u, IHuv_inf_u0.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
@@ -10972,10 +10857,6 @@ Module Type LangRefine
 
       specialize (IHuv_inf_u _ H).
       specialize (IHuv_inf_u0 _ H0).
-
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
-      red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
 
       repeat red.
       exists (ret (fin_to_inf_dvalue x1)).
@@ -11033,10 +10914,6 @@ Module Type LangRefine
 
       unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf_u, IHuv_inf_u0, IHuv_inf_u1.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
@@ -11065,10 +10942,6 @@ Module Type LangRefine
       specialize (IHuv_inf_u _ H).
       specialize (IHuv_inf_u0 _ H2).
       specialize (IHuv_inf_u1 _ H0).
-
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
-      red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
 
       repeat red.
       exists (ret (fin_to_inf_dvalue x1)).
@@ -11125,9 +10998,6 @@ Module Type LangRefine
 
       unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf_u, IHuv_inf_u0, IHuv_inf_u1.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
       inv CONC_FIN.
     - (* ExtractValue *)
       rename H into IH.
@@ -11136,10 +11006,6 @@ Module Type LangRefine
       cbn in REF.
       break_match_hyp_inv.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-      cbn in CONC_FIN.
       repeat red in CONC_FIN.
 
       destruct CONC_FIN as (?&?&?&?&?).
@@ -11151,10 +11017,7 @@ Module Type LangRefine
       destruct_err_ub_oom x0x1; inv H3.
       apply extract_value_loop_fin_inf_succeeds in H1.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation;
-        red; rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
-        cbn; repeat red.
-
+      repeat red.
       exists (ret (fin_to_inf_dvalue x1)).
       exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 x1))).
       cbn; rewrite <- Heqx0x1; cbn.
@@ -11184,11 +11047,6 @@ Module Type LangRefine
       pose proof (IHuv_inf2 u0 Heqo0) as IHuv_inf_u0.
       red in IHuv_inf_u, IHuv_inf_u0.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-      cbn in CONC_FIN.
-
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
@@ -11206,9 +11064,7 @@ Module Type LangRefine
       specialize (IHuv_inf_u _ H).
       specialize (IHuv_inf_u0 _ H0).
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation;
-        red; rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
-        cbn; repeat red.
+      repeat red.
 
       exists (ret (fin_to_inf_dvalue x1)).
       exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 x1))).
@@ -11256,11 +11112,6 @@ Module Type LangRefine
       pose proof (IHuv_inf3 u1 Heqo1) as IHuv_inf_u1.
       red in IHuv_inf_u, IHuv_inf_u0, IHuv_inf_u1.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-      cbn in CONC_FIN.
-
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
@@ -11272,13 +11123,11 @@ Module Type LangRefine
       pose proof eval_select_fin_inf x1 u0 u1 _ _ dv_fin IHuv_inf_u0 IHuv_inf_u1 as EVAL.
       forward EVAL.
       { cbn.
-        rewrite eval_select_equation.
+        red.
         apply H1.
       }
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation;
-        red; rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
-        cbn; repeat red.
+      repeat red.
 
       specialize (IHuv_inf_u _ H).
 
@@ -11289,7 +11138,7 @@ Module Type LangRefine
 
       right.
       intros a ?; subst.
-      rewrite IS1.MEM.CP.CONC.eval_select_equation in EVAL.
+      red in EVAL.
       apply EVAL.
     - (* ExtractByte *)
       red; intros dv_fin CONC_FIN.
@@ -13167,13 +13016,14 @@ Module Type LangRefine
     }
 
     { (* i1 conditional *)
-      rewrite eval_select_equation in *.
-      rewrite IS1.MEM.CP.CONC.eval_select_equation.
+
+      red.
       rewrite fin_to_inf_dvalue_ix.
+      cbn in EVAL.
 
       break_match; try inv EVAL.
       break_match.
-      - eapply IH1; eauto.
+      - eapply IH1; eauto.  
       - eapply IH2; eauto.
     }
 
@@ -13193,9 +13043,7 @@ Module Type LangRefine
            ].
 
     { (* Vector conditional *)
-      rewrite eval_select_equation in *.
-      rewrite IS1.MEM.CP.CONC.eval_select_equation.
-
+      red. 
       rewrite_fin_to_inf_dvalue.
       repeat red.
 
@@ -13321,11 +13169,11 @@ Module Type LangRefine
     - inv REF.
       cbn in CONC; inv CONC; cbn.
     - inv REF.
-      rewrite concretize_uvalue_bytes_helper_equation in CONC.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalue_bytes_helper_equation.
+      simpl in CONC.
+      simpl. 
       destruct y; uvalue_refine_strict_inv H1; try inv CONC.
       rewrite pre_concretized_fin_inf with (uv_fin:=y) (acc_fin:=acc_fin); eauto.
-      break_match_hyp_inv; repeat red.
+      break_match_hyp_inv; repeat red.      
       + (* pre-concretization exists *)
         destruct H as (?&?&?&?).
         destruct_err_ub_oom x0; inv H1.
@@ -13573,7 +13421,7 @@ Module Type LangRefine
           try inv REF;
           repeat break_match_hyp_inv;
           repeat red in UB;
-          rewrite CONC.concretize_uvalueM_equation in UB; inv UB
+          inv UB
         | cbn; auto
         ].
 
@@ -13584,7 +13432,7 @@ Module Type LangRefine
           try inv REF;
           repeat break_match_hyp_inv;
           repeat red in UB;
-          rewrite CONC.concretize_uvalueM_equation in UB; inv UB
+          inv UB
         | cbn; auto
         ].
 
@@ -13594,11 +13442,6 @@ Module Type LangRefine
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
-
       repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H1; inv H1.
@@ -13705,12 +13548,8 @@ Module Type LangRefine
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H1; inv H1.
       { (* UB when concretizing l *)
@@ -13817,12 +13656,8 @@ Module Type LangRefine
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H1; inv H1.
       { (* UB when concretizing l *)
@@ -13927,12 +13762,8 @@ Module Type LangRefine
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H1; inv H1.
       { (* UB when concretizing l *)
@@ -14037,12 +13868,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
@@ -14114,12 +13941,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
@@ -14191,12 +14014,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
@@ -14268,12 +14087,7 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-      cbn. 
       
-      repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
-
       repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
@@ -14294,8 +14108,6 @@ Module Type LangRefine
       remember (eval_fneg x1) as res.
       destruct_err_ub_oom res; inv H3.
 
-      red.
-
       exists (ret (fin_to_inf_dvalue x1)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
 
@@ -14314,12 +14126,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
@@ -14391,12 +14199,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing uv *)
@@ -14457,12 +14261,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing base address *)
@@ -14590,12 +14390,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
@@ -14656,12 +14452,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
@@ -14752,12 +14544,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
@@ -14819,12 +14607,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
@@ -14893,12 +14677,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* UB when concretizing first operand *)
@@ -14931,23 +14711,15 @@ Module Type LangRefine
       forward EVAL; [intros ? ?; eapply IH; eauto; repeat constructor|].
       forward EVAL; eauto.
       forward EVAL; eauto.
-      forward EVAL.
-      { rewrite eval_select_equation.
-        eauto.
-      }
-
-      rewrite IS1.MEM.CP.CONC.eval_select_equation in EVAL.
-      auto.
+      forward EVAL; eauto.
+      
     - (* UVALUE_ConcatBytes *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
       erewrite map_monad_oom_length; eauto.
       erewrite sizeof_dtyp_fin_inf; eauto.
@@ -15552,9 +15324,9 @@ Module Type LangRefine
     }
 
     { (* integer conditional *)
-      rewrite eval_select_equation in *.
-      rewrite IS1.MEM.CP.CONC.eval_select_equation.
+      simpl in *.
       rewrite fin_to_inf_dvalue_ix.
+      cbn. 
 
       repeat break_match_hyp; cbn in *;
         try inv EVAL; auto.
@@ -15578,8 +15350,7 @@ Module Type LangRefine
            ].
 
     { (* Vector conditional *)
-      rewrite eval_select_equation in *.
-      rewrite IS1.MEM.CP.CONC.eval_select_equation.
+      simpl in *.
 
       rewrite_fin_to_inf_dvalue.
       repeat red.
@@ -15707,8 +15478,7 @@ Module Type LangRefine
     - inv REF.
       cbn in CONC; inv CONC; cbn.
     - inv REF.
-      rewrite concretize_uvalue_bytes_helper_equation in CONC.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalue_bytes_helper_equation.
+      simpl in *.
       destruct y; uvalue_refine_strict_inv H1; try inv CONC; auto.
       rewrite pre_concretized_fin_inf with (uv_fin:=y) (acc_fin:=acc_fin); eauto.
       break_match_hyp_inv; repeat red.
@@ -15790,7 +15560,7 @@ Module Type LangRefine
           try inv REF;
           repeat break_match_hyp_inv;
           repeat red in ERR;
-          rewrite CONC.concretize_uvalueM_equation in ERR; inv ERR
+          inv ERR
         | cbn; auto
         ].
 
@@ -15801,7 +15571,7 @@ Module Type LangRefine
           try inv REF;
           repeat break_match_hyp_inv;
           repeat red in ERR;
-          rewrite CONC.concretize_uvalueM_equation in ERR; inv ERR
+          inv ERR
         | cbn; auto
         ].
 
@@ -15811,12 +15581,8 @@ Module Type LangRefine
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H1; inv H1.
       { (* ERR when concretizing l *)
@@ -15922,12 +15688,8 @@ Module Type LangRefine
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H1; inv H1.
       { (* ERR when concretizing l *)
@@ -16034,12 +15796,8 @@ Module Type LangRefine
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H1; inv H1.
       { (* ERR when concretizing l *)
@@ -16144,12 +15902,8 @@ Module Type LangRefine
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H1; inv H1.
       { (* ERR when concretizing l *)
@@ -16254,12 +16008,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
@@ -16331,12 +16081,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
@@ -16408,12 +16154,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
@@ -16486,13 +16228,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-      cbn. 
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
@@ -16512,7 +16249,6 @@ Module Type LangRefine
 
       remember (eval_fneg x1) as res.
       destruct_err_ub_oom res; inv H3.
-      red.
 
       exists (ret (fin_to_inf_dvalue x1)).
       exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16531,12 +16267,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
@@ -16608,12 +16340,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing uv *)
@@ -16677,12 +16405,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing base address *)
@@ -16893,12 +16617,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
@@ -16981,12 +16701,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
@@ -17077,11 +16793,6 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
-
       repeat red in ERR; inv ERR.
       reflexivity.
     - (* UVALUE_ExtractValue *)
@@ -17090,12 +16801,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
@@ -17131,12 +16838,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
@@ -17204,12 +16907,8 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
@@ -17241,23 +16940,16 @@ Module Type LangRefine
       forward EVAL; [intros ? ?; eapply IH; eauto; repeat constructor|].
       forward EVAL; eauto.
       forward EVAL; eauto.
-      forward EVAL.
-      { rewrite eval_select_equation.
-        cbn in *; eauto.
-      }
+      forward EVAL; eauto.  
 
-      rewrite IS1.MEM.CP.CONC.eval_select_equation in EVAL.
-      auto.
     - (* UVALUE_ExtractByte *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
+
       inv ERR.
       cbn. auto.
     - (* UVALUE_ConcatBytes *)
@@ -17266,10 +16958,7 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
       auto.
 
       erewrite map_monad_oom_length; eauto.

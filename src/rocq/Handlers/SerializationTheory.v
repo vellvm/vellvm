@@ -396,7 +396,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
 
     rewrite concretize_equation in CONC.
     red in CONC.
-    rewrite concretize_uvalueM_equation in CONC.
+
 
     cbn in CONC.
     destruct CONC as (ma & k' & pama & eqm & REST).
@@ -413,7 +413,6 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
     destruct REST as (mb & kb & pbmb & eqmb & REST).
 
     unfold concretize_succeeds, concretize_fails, concretize_u in SUCC.
-    rewrite concretize_uvalueM_equation in SUCC.
     cbn in SUCC.
     unfold bind_RefineProp in SUCC.
 
@@ -493,9 +492,6 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
 
     rewrite concretize_equation in CONC.
     red in CONC.
-    rewrite concretize_uvalueM_equation in CONC.
-
-    cbn in CONC.
     destruct CONC as (ma & k' & pama & eqm & REST).
 
     cbn in eqm.
@@ -510,10 +506,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
     destruct REST as (mb & kb & pbmb & eqmb & REST).
 
     unfold concretize_succeeds, concretize_fails, concretize_u in SUCC.
-    rewrite concretize_uvalueM_equation in SUCC.
     cbn in SUCC.
-    unfold bind_RefineProp in SUCC.
-
     exists a.
 
     destruct mb as [[[[[[[oom_mb] | [[ub_mb] | [[err_mb] | b]]]]]]]] eqn:Hmb;
@@ -583,7 +576,6 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
   Proof.
     induction dt;
       unfold concretize_succeeds, concretize_fails, concretize_u;
-      rewrite concretize_uvalueM_equation;
       cbn; auto.
 
     all: intros CONTRA; discriminate.
