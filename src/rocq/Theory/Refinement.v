@@ -290,7 +290,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
           specialize (H (DVALUE_Addr b)).
           forward H.
 
-          unfold concretize, concretize_u; rewrite concretize_uvalueM_equation.
+          unfold concretize, concretize_u.
           cbn.
 
           Set Nested Proofs Allowed.

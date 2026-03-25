@@ -394,10 +394,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
   Proof.
     intros M HM HME samesign op x y dv BIND_RET_L SUCC CONC.
 
-    rewrite concretize_equation in CONC.
     red in CONC.
-
-
     cbn in CONC.
     destruct CONC as (ma & k' & pama & eqm & REST).
 
@@ -490,7 +487,6 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
   Proof.
     intros op x y dv SUCC CONC.
 
-    rewrite concretize_equation in CONC.
     red in CONC.
     destruct CONC as (ma & k' & pama & eqm & REST).
 

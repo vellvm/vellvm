@@ -91,22 +91,17 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
 
     all:
       try solve [red in CONC;
-                 rewrite concretize_uvalueM_equation in CONC;
                  inversion CONC].
 
     (* IBinop *)
     5: {
       red in CONC.
-      rewrite concretize_uvalueM_equation in CONC.
-
       destruct CONC as (ma & k' & CONC' & mbeq & REST).
 
       cbn in mbeq.
       destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma.
       - (* OOM from uv1 *)
         do 2 red.
-        rewrite concretize_uvalueM_equation.
-
         cbn.
         unfold bind_RefineProp.
 
@@ -123,8 +118,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         left; cbn; auto.
       - (* UB in uv1 *)
         do 2 red.
-        rewrite concretize_uvalueM_equation.
-
         cbn.
         unfold bind_RefineProp.
 
@@ -139,7 +132,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         split; auto.
       - (* Failure in uv1 *)
         do 2 red.
-        rewrite concretize_uvalueM_equation.
 
         cbn.
         unfold bind_RefineProp.
@@ -155,7 +147,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         split; auto.
       - (* uv1 succeeds *)
         do 2 red.
-        rewrite concretize_uvalueM_equation.
 
         destruct REST as [FAILS | REST].
         solve [inversion FAILS].
@@ -279,7 +270,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     (* Structs *)
     { induction fields.
       - red in CONC.
-        rewrite concretize_uvalueM_equation in CONC.
         cbn in CONC.
 
         destruct CONC as (ma & k' & CONC' & mbeq & REST).
@@ -296,9 +286,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         destruct (k' nil) as [[[[[[[oom_k'nil] | [[ub_k'nil] | [[err_k'nil] | k'nil]]]]]]]] eqn:Hk'nil; contradiction.
       - (* Multiple fields *)
         do 2 red.
-        rewrite concretize_uvalueM_equation.
         red in CONC.
-        rewrite concretize_uvalueM_equation in CONC.
 
 
         Import Util.
@@ -339,9 +327,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     eapply UndefPoison.
     2: constructor.
 
-    rewrite concretize_equation.
     red.
-    rewrite concretize_uvalueM_equation.
     cbn.
 
     match goal with
@@ -357,7 +343,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
 
     (* pa ma *)
     split.
-    rewrite concretize_uvalueM_equation.
     reflexivity.
 
     (* Monad.eq1 mb (x <- ma;; k' x) *)
@@ -404,7 +389,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
       try solve [unfold concretize_succeeds, concretize_fails; right;
              intros CONTRA;
              red in CONTRA;
-             rewrite concretize_uvalueM_equation in CONTRA;
              cbn in CONTRA;
              contradiction
         ].
@@ -412,7 +396,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
       + unfold concretize_succeeds, concretize_fails; right.
         intros CONTRA.
         red in CONTRA.
-        rewrite concretize_uvalueM_equation in CONTRA.
         cbn in CONTRA.
 
         (* Move this *)
@@ -436,7 +419,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
       + unfold concretize_succeeds, concretize_fails; right.
         intros CONTRA.
         red in CONTRA.
-        rewrite concretize_uvalueM_equation in CONTRA.
         cbn in CONTRA.
 
         destruct CONTRA as (ma & k' & CONC' & mbeq & REST).
@@ -473,7 +455,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
       epose proof Concretize_IBinop op y (ret dv1) v2 (ret dv2) _ Conc2.
       cbn in H.
 
-      rewrite concretize_equation.
       rewrite <- EVAL.
       cbn.
       replace (        {|
@@ -501,7 +482,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
       epose proof Concretize_IBinop op (UVALUE_Poison dt) _ v2 _.
 
       red.
-      rewrite concretize_uvalueM_equation.
       cbn.
 
       unfold bind_RefineProp.
@@ -528,7 +508,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
 
       inversion Ryx; subst.
       + red. red.
-        rewrite concretize_uvalueM_equation.
         cbn.
         unfold bind_MPropT.
         eexists. exists (fun _ => ret dv0).
@@ -555,7 +534,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         { destruct v2.
 
 
-          rewrite concretize_uvalueM_equation.
           cbn.
 
             rewrite c
@@ -602,7 +580,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     intros CONTRA; inversion CONTRA.
 
     intros dv H.
-    rewrite concretize_equation in *.
     red in H; red.
     cbn in H.
 
@@ -643,7 +620,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     assert (refine_uvalue (UVALUE_Undef (DTYPE_I 64)) (UVALUE_I64 one)).
     { constructor; intuition.
       inversion H.
-      rewrite concretize_equation in *.
       red in H.
       red.
       cbn in *.

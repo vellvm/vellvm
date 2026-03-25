@@ -9763,7 +9763,6 @@ Module Type LangRefine
       red in CONC_FIN.
       cbn in CONC_FIN; inv CONC_FIN.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
       cbn.
       unfold fin_to_inf_dvalue.
@@ -9780,7 +9779,6 @@ Module Type LangRefine
       cbn in REF.
       break_match_hyp_inv.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
       cbn.
       unfold fin_to_inf_dvalue.
@@ -9799,10 +9797,8 @@ Module Type LangRefine
       red in REF.
       cbn in REF; inv REF.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
       cbn in CONC_FIN.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
       cbn.
 
@@ -10440,8 +10436,6 @@ Module Type LangRefine
 
       apply IHuv_inf1 in H0.
       apply IHuv_inf2 in H1.
-
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
 
       repeat red.
       exists (ret (fin_to_inf_dvalue x1)).
