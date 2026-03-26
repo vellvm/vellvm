@@ -12,7 +12,7 @@
       let
         pkgs = import nixpkgs { inherit system; };
         lib = pkgs.lib;
-        rocq = pkgs.rocq-core;
+        rocq = rocqPkgs.rocq-core;
         rocqPkgs = pkgs.rocqPackages_9_1;
         coqPkgs = pkgs.coqPackages_9_1;
         libllvm = pkgs.llvmPackages_20.libllvm;
@@ -20,7 +20,7 @@
         version = "vellvm:master";
       in rec {
         packages = {
-          default = (pkgs.callPackage ./release.nix ({ nix-filter = nix-filter.lib; perl = pkgs.perl; coq = pkgs.coq; inherit rocq version rocqPkgs coqPkgs; })).vellvm;
+          default = (pkgs.callPackage ./release.nix ({ nix-filter = nix-filter.lib; perl = pkgs.perl; coq = coqPkgs.coq; inherit rocq version rocqPkgs coqPkgs; })).vellvm;
         };
 
         defaultPackage = packages.default;
@@ -84,7 +84,7 @@
           default = pkgs.mkShell {
             inputsFrom = [ packages.default];
             buildInputs = [ clang
-                            pkgs.coq # Needed to make proof general happy for development.
+                            coqPkgs.coq # Needed to make proof general happy for development.
                             libllvm
                             pkgs.lldb
                             rocq.ocamlPackages.utop
