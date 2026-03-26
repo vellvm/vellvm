@@ -13,8 +13,8 @@
         pkgs = import nixpkgs { inherit system; };
         lib = pkgs.lib;
         rocq = pkgs.rocq-core;
-        rocqPkgs = pkgs.rocqPackages_9_0;
-        coqPkgs = pkgs.coqPackages_9_0;
+        rocqPkgs = pkgs.rocqPackages_9_1;
+        coqPkgs = pkgs.coqPackages_9_1;
         libllvm = pkgs.llvmPackages_20.libllvm;
         clang = pkgs.clang_20;
         version = "vellvm:master";

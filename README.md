@@ -140,7 +140,7 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 
 ## Assumes:
   - OCaml 4.14.1 (typically installed via `opam`, see below)
-  - Rocq 9.0.0
+  - Rocq 9.1.1
   - opam  2.0.0+
   - Clang 14.0.1+ (available for Mac OSX in XCode 4.2+, or installed via, e.g. `sudo apt-get install clang`)
   - `gnu-sed`
@@ -175,7 +175,7 @@ Then:
    `opam repo add rocq-released https://rocq-prover.org/opam/released`.
 
 4. Install Rocq:
-   `opam pin add rocq-core 9.0.0`
+   `opam pin add rocq-core 9.1.1`
 
 5. Install opam dependencies (run in the root directory of the project):
    `opam install -y --verbose --deps-only .`
