@@ -14,9 +14,6 @@ From Vellvm Require Import
      Utilities
      Syntax.LLVMAst.
 
-
-Require Import Ceres.Ceres.
-
 Set Implicit Arguments.
 Set Contextual Implicit.
 (* end hide *)
@@ -134,6 +131,8 @@ Qed.
 Definition vector_dtyp dt :=
   (exists n, dt = DTYPE_I n) \/ dt = DTYPE_IPTR \/ dt = DTYPE_Pointer \/ (exists fp, dt = DTYPE_FP fp).
 
+
+
 Section DtypInd.
   Variable P : dtyp -> Prop.
   Hypothesis IH_I             : forall a, P (DTYPE_I a).
@@ -214,6 +213,7 @@ Section DtypRec.
   Qed.
 End DtypRec.
 
+
 Section WF_dtyp.
 
   Inductive well_formed_dtyp : dtyp -> Prop :=
@@ -251,6 +251,21 @@ Section WF_dtyp.
   .
 
 End WF_dtyp.
+
+
+Lemma vector_dtyp_dec :
+  forall t,
+    {vector_dtyp t} + {~ vector_dtyp t}.
+Proof using.
+  intros t.
+  induction t;
+    try  solve
+      [ left; constructor; eauto
+      | left; firstorder
+      | right; intros CONTRA; red in CONTRA;
+        destruct CONTRA as [[n CONTRA] | [CONTRA | [CONTRA | [pf CONTRA]]]]; try discriminate].
+Qed.
+
 
 Fixpoint dtyp_measure (t : dtyp) : nat :=
   match t with

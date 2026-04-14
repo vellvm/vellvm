@@ -66,6 +66,8 @@ From ITree Require Import
      Eq.Eqit
      Eq.EqAxiom.
 
+From QuickChick Require Import Show.
+
 Require Import Stdlib.Program.Equality.
 Require Import Paco.paco.
 
@@ -12802,7 +12804,7 @@ Module Type LangRefine
     break_match_hyp_inv.
   Qed.
 
-  
+  (*
   Lemma ceres_to_sexp_fin_inf :
     forall dv_fin dv_inf,
       dvalue_refine_strict dv_inf dv_fin ->
@@ -12968,7 +12970,8 @@ Module Type LangRefine
     unfold CeresSerialize.to_string.
     erewrite ceres_to_sexp_fin_inf; eauto.
   Qed.
-
+   *)
+  
   (* TODO: Move this / generalize monad? *)
   Lemma eval_fop_err_fin_inf :
     forall dv1_fin dv2_fin err_msg fop dv1_inf dv2_inf,
@@ -12989,7 +12992,6 @@ Module Type LangRefine
     (* Nasty case analysis... *)
     break_match_hyp_inv;
       repeat rewrite_fin_to_inf_dvalue;
-      repeat erewrite ceres_to_string_fin_inf;
       try apply fin_to_inf_dvalue_refine_strict;
       repeat rewrite_fin_to_inf_dvalue;
       cbn; eauto.
@@ -12997,7 +12999,6 @@ Module Type LangRefine
     { (* dv1: Double *)
       break_match_hyp_inv;
         repeat rewrite_fin_to_inf_dvalue;
-        repeat erewrite ceres_to_string_fin_inf;
         try apply fin_to_inf_dvalue_refine_strict;
         repeat rewrite_fin_to_inf_dvalue;
         cbn; eauto.
@@ -13009,7 +13010,6 @@ Module Type LangRefine
     { (* dv1: Float *)
       break_match_hyp_inv;
         repeat rewrite_fin_to_inf_dvalue;
-        repeat erewrite ceres_to_string_fin_inf;
         try apply fin_to_inf_dvalue_refine_strict;
         repeat rewrite_fin_to_inf_dvalue;
         cbn; eauto.
@@ -13055,7 +13055,6 @@ Module Type LangRefine
     (* Nasty case analysis... *)
     repeat break_match_hyp_inv;
       repeat rewrite_fin_to_inf_dvalue;
-      repeat erewrite ceres_to_string_fin_inf;
       try apply fin_to_inf_dvalue_refine_strict;
       repeat rewrite_fin_to_inf_dvalue;
       cbn; eauto.
@@ -15092,7 +15091,6 @@ Module Type LangRefine
     (* Nasty case analysis... *)
     break_match_hyp_inv;
       repeat rewrite_fin_to_inf_dvalue;
-      repeat erewrite ceres_to_string_fin_inf;
       try apply fin_to_inf_dvalue_refine_strict;
       repeat rewrite_fin_to_inf_dvalue;
       cbn; eauto.

@@ -26,7 +26,7 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Handlers.Local.
 
-Require Import Ceres.Ceres.
+From QuickChick Require Import Show.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -45,7 +45,7 @@ Section StackMap.
   Variable (k v exc :Type).
   Context {map : Type}.
   Context {M: Map k v map}.
-  Context {SK : Serialize k}.
+  Context {S : Show k}.
 
   Record stack_frame :=
     { stack_vars : map;

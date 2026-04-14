@@ -14,6 +14,8 @@ From ITree Require Import
 From Vellvm Require Import
      Semantics.
 
+From QuickChick Require Import Show.
+
 Import ITreeNotations.
 
 (* end hide *)
@@ -241,7 +243,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   Lemma interp_cfg2_GR_fail : forall id g l,
       Maps.lookup id g = None ->
-      ℑ2 (trigger (GlobalRead id)) g l ≈ raise ("Could not look up global id " ++ CeresSerialize.to_string id).
+      ℑ2 (trigger (GlobalRead id)) g l ≈ raise ("Could not look up global id " ++ show id).
   Proof.
     intros * LU.
     unfold interp_cfg2.
@@ -254,7 +256,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   Lemma interp_cfg2_LR_fail : forall id g l,
       Maps.lookup id l = None ->
-      ℑ2 (trigger (LocalRead id)) g l ≈ raise ("Could not look up id " ++ CeresSerialize.to_string id).
+      ℑ2 (trigger (LocalRead id)) g l ≈ raise ("Could not look up id " ++ show id).
   Proof.
     intros * LU.
     unfold interp_cfg2.

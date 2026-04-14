@@ -10,7 +10,6 @@
 
     See vellvm-quickchick-overview.org in the root of the project for
     more details. *)
-Require Import Ceres.Ceres.
 
 From Vellvm.Syntax Require Import
   CFG
