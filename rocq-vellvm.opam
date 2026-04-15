@@ -30,7 +30,6 @@ depends: [
   "rocq-stdlib" {>= "9.0.0" & < "9.2~"}
   "coq-ext-lib" {>= "0.13.0" & < "0.14~"}
   "coq-paco"  {>= "4.2.3" & < "4.3~"}
-  "coq-ceres"
   "coq-flocq" {>= "4.2.0"}
   ( "coq-hierarchy-builder" { >= "1.9.1" } & "coq-elpi" { < "3.0.0" } | "coq-hierarchy-builder" { > "1.9.1" } )
   "coq-simple-io"

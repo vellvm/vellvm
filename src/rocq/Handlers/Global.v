@@ -21,7 +21,7 @@ From Vellvm Require Import
      Semantics.LLVMParams
      Semantics.LLVMEvents.
 
-Require Import Ceres.Ceres.
+From QuickChick Require Import Show.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -39,8 +39,8 @@ Section Globals.
   Variable (k v:Type).
   Context {map : Type}.
   Context {M: Map k v map}.
-  Context {SK : Serialize k}.
-
+  Context {S : Show k}.
+  
   Definition handle_global {E} `{FailureE -< E} : (GlobalE k v) ~> stateT map (itree E) :=
     fun _ e env =>
       match e with
@@ -48,7 +48,7 @@ Section Globals.
       | GlobalRead k =>
         match Maps.lookup k env with
         | Some v => Ret (env, v)
-        | None => raise ("Could not look up global id " ++ to_string k)
+        | None => raise ("Could not look up global id " ++ show k)
         end
       end.
 

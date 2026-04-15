@@ -35,6 +35,7 @@ From Stdlib Require Import
 
 Require Import QuickChick.Generators.
 Require Import QuickChick.Producer.
+From QuickChick Require Import Show.
 
 From ExtLib.Structures Require Export Functor.
 (* Import QcDefaultNotation. *)
@@ -116,7 +117,7 @@ Module GEN_ALIVE2 (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SZ :
   Definition new_raw_id : GenALIVE2 raw_id
     := n <- gets get_raw;;
        modify increment_raw;;
-       ret (Name ("v" ++ CeresString.string_of_N n)).
+       ret (Name ("v" ++ show n)).
 
   Definition get_local_ctx : GenALIVE2 var_context
     := gets (fun gs => gs.(gen_local_ctx)).

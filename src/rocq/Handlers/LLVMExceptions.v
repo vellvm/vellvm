@@ -20,8 +20,6 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Semantics.Memory.Sizeof.
 
-Require Import Ceres.Ceres.
-
 Set Implicit Arguments.
 Set Contextual Implicit.
 

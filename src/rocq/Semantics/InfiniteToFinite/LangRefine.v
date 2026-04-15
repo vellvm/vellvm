@@ -66,6 +66,8 @@ From ITree Require Import
      Eq.Eqit
      Eq.EqAxiom.
 
+From QuickChick Require Import Show.
+
 Require Import Stdlib.Program.Equality.
 Require Import Paco.paco.
 
@@ -12803,172 +12805,6 @@ Module Type LangRefine
   Qed.
 
   
-  Lemma ceres_to_sexp_fin_inf :
-    forall dv_fin dv_inf,
-      dvalue_refine_strict dv_inf dv_fin ->
-      CeresSerialize.to_sexp dv_fin = CeresSerialize.to_sexp dv_inf.
-  Proof.
-    induction dv_fin using DV2.dvalue_strong_ind;
-      intros dv_inf REF;
-      try dvalue_refine_strict_inv REF;
-      try reflexivity.
-
-    destruct dv_fin;
-      try dvalue_refine_strict_inv REF;
-      try reflexivity.
-
-    - (* Structs *)
-      cbn.
-      assert ((map
-         (fun x0 : DV2.dvalue =>
-            CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) fields) =
-                (map
-         (fun x0 : DV1.dvalue =>
-            CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) x)).
-      { generalize dependent fields.
-        induction x; intros fields H H1;
-          cbn in H1; inv H1; auto.
-
-        repeat break_match_hyp_inv.
-        cbn.
-        erewrite H; eauto.
-        2: repeat constructor.
-
-        rewrite IHx; eauto.
-
-        intros u H0 dv_inf H1.
-        eapply H; eauto.
-        clear - H0.
-        dependent induction H0.
-        - inv H.
-          constructor.
-          constructor.
-          right; auto.
-        - specialize (IHclos_trans2 _ eq_refl).
-          eapply t_trans.
-          apply H0_.
-          apply IHclos_trans2.        
-      }
-
-      rewrite H0.
-      reflexivity.
-    - (* Packed structs *)
-      cbn.
-      assert ((map
-         (fun x0 : DV2.dvalue =>
-            CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) fields) =
-                (map
-         (fun x0 : DV1.dvalue =>
-            CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) x)).
-      { generalize dependent fields.
-        induction x; intros fields H H1;
-          cbn in H1; inv H1; auto.
-
-        repeat break_match_hyp_inv.
-        cbn.
-        erewrite H; eauto.
-        2: repeat constructor.
-
-        rewrite IHx; eauto.
-
-        intros u H0 dv_inf H1.
-        eapply H; eauto.
-        clear - H0.
-        dependent induction H0.
-        - inv H.
-          constructor.
-          constructor.
-          right; auto.
-        - specialize (IHclos_trans2 _ eq_refl).
-          eapply t_trans.
-          apply H0_.
-          apply IHclos_trans2.        
-      }
-
-      rewrite H0.
-      reflexivity.
-    - (* Arrays *)
-      cbn.
-      assert ((map
-         (fun x0 : DV2.dvalue =>
-            CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) elts) =
-                (map
-         (fun x0 : DV1.dvalue =>
-            CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) x)).
-      { generalize dependent elts.
-        induction x; intros elts H H1;
-          cbn in H1; inv H1; auto.
-
-        repeat break_match_hyp_inv.
-        cbn.
-        erewrite H; eauto.
-        2: repeat constructor.
-
-        rewrite IHx; eauto.
-
-        intros u H0 dv_inf H1.
-        eapply H; eauto.
-        clear - H0.
-        dependent induction H0.
-        - inv H.
-          constructor.
-          constructor.
-          right; auto.
-        - specialize (IHclos_trans2 t _ eq_refl).
-          eapply t_trans.
-          apply H0_.
-          apply IHclos_trans2.        
-      }
-
-      rewrite H0.
-      reflexivity.
-    - (* Vectors *)
-      cbn.
-      assert ((map
-         (fun x0 : DV2.dvalue =>
-            CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) elts) =
-                (map
-         (fun x0 : DV1.dvalue =>
-            CeresS.List [CeresSerialize.to_sexp x0; CeresS.Atom_ (CeresS.Raw ",")]) x)).
-      { generalize dependent elts.
-        induction x; intros elts H H1;
-          cbn in H1; inv H1; auto.
-
-        repeat break_match_hyp_inv.
-        cbn.
-        erewrite H; eauto.
-        2: repeat constructor.
-
-        rewrite IHx; eauto.
-
-        intros u H0 dv_inf H1.
-        eapply H; eauto.
-        clear - H0.
-        dependent induction H0.
-        - inv H.
-          constructor.
-          constructor.
-          right; auto.
-        - specialize (IHclos_trans2 t _ eq_refl).
-          eapply t_trans.
-          apply H0_.
-          apply IHclos_trans2.        
-      }
-
-      rewrite H0.
-      reflexivity.
-  Qed.
-
-  Lemma ceres_to_string_fin_inf :
-    forall dv_fin dv_inf,
-      dvalue_refine_strict dv_inf dv_fin ->
-      CeresSerialize.to_string dv_fin = CeresSerialize.to_string dv_inf.
-  Proof.
-    intros dv_fin dv_inf REF.
-    unfold CeresSerialize.to_string.
-    erewrite ceres_to_sexp_fin_inf; eauto.
-  Qed.
-
   (* TODO: Move this / generalize monad? *)
   Lemma eval_fop_err_fin_inf :
     forall dv1_fin dv2_fin err_msg fop dv1_inf dv2_inf,
@@ -12989,7 +12825,6 @@ Module Type LangRefine
     (* Nasty case analysis... *)
     break_match_hyp_inv;
       repeat rewrite_fin_to_inf_dvalue;
-      repeat erewrite ceres_to_string_fin_inf;
       try apply fin_to_inf_dvalue_refine_strict;
       repeat rewrite_fin_to_inf_dvalue;
       cbn; eauto.
@@ -12997,7 +12832,6 @@ Module Type LangRefine
     { (* dv1: Double *)
       break_match_hyp_inv;
         repeat rewrite_fin_to_inf_dvalue;
-        repeat erewrite ceres_to_string_fin_inf;
         try apply fin_to_inf_dvalue_refine_strict;
         repeat rewrite_fin_to_inf_dvalue;
         cbn; eauto.
@@ -13009,7 +12843,6 @@ Module Type LangRefine
     { (* dv1: Float *)
       break_match_hyp_inv;
         repeat rewrite_fin_to_inf_dvalue;
-        repeat erewrite ceres_to_string_fin_inf;
         try apply fin_to_inf_dvalue_refine_strict;
         repeat rewrite_fin_to_inf_dvalue;
         cbn; eauto.
@@ -13055,7 +12888,6 @@ Module Type LangRefine
     (* Nasty case analysis... *)
     repeat break_match_hyp_inv;
       repeat rewrite_fin_to_inf_dvalue;
-      repeat erewrite ceres_to_string_fin_inf;
       try apply fin_to_inf_dvalue_refine_strict;
       repeat rewrite_fin_to_inf_dvalue;
       cbn; eauto.
@@ -15092,7 +14924,6 @@ Module Type LangRefine
     (* Nasty case analysis... *)
     break_match_hyp_inv;
       repeat rewrite_fin_to_inf_dvalue;
-      repeat erewrite ceres_to_string_fin_inf;
       try apply fin_to_inf_dvalue_refine_strict;
       repeat rewrite_fin_to_inf_dvalue;
       cbn; eauto.

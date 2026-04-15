@@ -12,8 +12,6 @@ From Stdlib Require Import
 
 Import BinInt.
 
-Require Import Ceres.Ceres.
-
 Require Import Integers Floats.
 
 From Flocq.IEEE754 Require Import
@@ -96,20 +94,6 @@ Qed.
 (* SAZ - TODO make this into typeclasses the way we did with bitint? *)
 Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
-
-  (* TODO: Move this *)
-  Lemma vector_dtyp_dec :
-    forall t,
-      {vector_dtyp t} + {~ vector_dtyp t}.
-  Proof using.
-    intros t.
-    induction t;
-      try  solve
-        [ left; constructor; eauto
-        | left; firstorder
-        | right; intros CONTRA; red in CONTRA;
-          destruct CONTRA as [[n CONTRA] | [CONTRA | [CONTRA | [pf CONTRA]]]]; try discriminate].
-  Qed.
 
 
 (* Sizeof is needed for for ConcatBytes case *)
@@ -2905,63 +2889,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       intros u IN (dv' & CONV').
       eapply H; eauto.
   Qed.
-
-
-  Section hiding_notation.
-    #[local] Open Scope sexp_scope.
-
-    Fixpoint serialize_dvalue' (dv:dvalue): sexp :=
-      match dv with
-      | DVALUE_Addr a => Atom "address" (* TODO: insist that memory models can print addresses? *)
-      | DVALUE_I sz x => Atom ("dvalue(i" ++ show (Zpos sz) ++ ")")%string
-      | DVALUE_IPTR x => Atom "dvalue(iptr)"
-      | DVALUE_Double x => Atom "dvalue(double)"
-      | DVALUE_Float x => Atom "dvalue(float)"
-      | DVALUE_Poison t => Atom "poison"
-      | DVALUE_Oom t => Atom "oom"
-      | DVALUE_None => Atom "none"
-      | DVALUE_Struct fields
-        => [Atom "{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) fields) ; Atom "}"]
-      | DVALUE_Packed_struct fields
-        => [Atom "packed{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) fields) ; Atom "}"]
-      | DVALUE_Array t elts
-        => [Atom "[" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) elts) ; Atom "]"]
-      | DVALUE_Vector t elts
-        => [Atom "<" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom  ","]) elts) ; Atom ">"]
-      end.
-
-    #[global] Instance serialize_dvalue : Serialize dvalue := serialize_dvalue'.
-
-    #[global] Instance seralize_show {A} `{Show A} : Serialize A :=
-      fun x => Atom (show x).
-    
-    Fixpoint serialize_uvalue' (pre post: string) (uv:uvalue): sexp :=
-      match uv with
-      | UVALUE_Addr a => Atom (pre ++ "address" ++ post)%string (* TODO: insist that memory models can print addresses? *)
-      | UVALUE_I sz x => Atom (pre ++ "uvalue(i" ++ show (Zpos sz) ++")" ++ post)%string
-      | UVALUE_Double x => Atom (pre ++ "uvalue(double)" ++ post)%string
-      | UVALUE_Float x => Atom (pre ++ "uvalue(float)" ++ post)%string
-      | UVALUE_Poison t => Atom (pre ++ "poison" ++ post)%string
-      | UVALUE_None => Atom (pre ++ "none" ++ post)%string
-      | UVALUE_Struct fields
-        => [Atom "{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; Atom "}"]
-      | UVALUE_Packed_struct fields
-        => [Atom "packed{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; Atom "}"]
-      | UVALUE_Array t elts
-        => [Atom "[" ; to_sexp (List.map (serialize_uvalue' "" ",") elts) ; Atom "]"]
-      | UVALUE_Vector t elts
-        => [Atom "<" ; to_sexp (List.map (serialize_uvalue' "" ",") elts) ; Atom ">"]
-      | UVALUE_Undef t => [Atom "undef(" ; to_sexp t ; Atom ")"]
-      | UVALUE_IBinop iop v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp iop ; serialize_uvalue' "" ")" v2]
-      | UVALUE_ICmp samesign cmp v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp cmp; serialize_uvalue' "" ")" v2]
-      | UVALUE_FBinop fop _ v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp fop; serialize_uvalue' "" ")" v2]
-      | UVALUE_FCmp cmp v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp cmp; serialize_uvalue' "" ")" v2]
-      | _ => Atom "TODO: show_uvalue"
-      end.
-
-    #[global] Instance serialize_uvalue : Serialize (uvalue) := serialize_uvalue' "" "".
-
-  End hiding_notation.
 
   
   Ltac dec_dvalue :=

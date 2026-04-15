@@ -21,7 +21,7 @@ From Vellvm Require Import
   Semantics.LLVMParams
   Semantics.Memory.Sizeof.
 
-Require Import Ceres.Ceres.
+From QuickChick Require Import Show.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -39,7 +39,7 @@ Section Locals.
   Variable (k v:Type).
   Context {map : Type}.
   Context {M: Map k v map}.
-  Context {SK : Serialize k}.
+  Context {S : Show k}.
   Definition handle_local {E} `{FailureE -< E} : (LocalE k v) ~> stateT map (itree E) :=
     fun _ e env =>
       match e with
@@ -47,7 +47,7 @@ Section Locals.
       | LocalRead k =>
         match Maps.lookup k env with
         | Some v => Ret (env, v)
-        | None => raise ("Could not look up id " ++ to_string k)
+        | None => raise ("Could not look up id " ++ show k)
         end
       end.
 

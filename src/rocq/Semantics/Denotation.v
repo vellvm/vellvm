@@ -47,8 +47,6 @@ From Vellvm Require Import
 
 From QuickChick Require Import Show.
 
-Require Import Ceres.Ceres.
-
 Import Sum.
 Import Subevent.
 Import EqvNotation.

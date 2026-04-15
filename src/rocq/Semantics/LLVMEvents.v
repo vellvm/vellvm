@@ -181,7 +181,6 @@ Set Contextual Implicit.
 (* REFACTOR: This should not be a module type.  DynamicValues should not be instantiated here.   *)
 (* TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism not functors. *)
   Section Events.
-    Variable memory : Type.
     Variable dvalue : Set.
     Variable uvalue : Type.
     
