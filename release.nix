@@ -41,7 +41,6 @@
           paco
           ITree
           flocq
-          ceres
           simple-io
           zarith
           QuickChick
