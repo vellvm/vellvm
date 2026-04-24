@@ -8871,18 +8871,18 @@ Module Type LangRefine
 
     repeat red in LOOP.
     destruct LOOP as (?&?&?&?&?).
-    repeat red.
+
 
     exists (fmap fin_to_inf_dvalue x).
     exists (fun _ => fmap (fmap fin_to_inf_dvalue) res).
     split.
     apply (eval_select_cond_fin_inf _ _ _ _ H).
     split.
-    subst; cbn.
+    subst.
     { destruct_err_ub_oom x; cbn; auto. }
 
-    destruct_err_ub_oom x; cbn; auto.
-    right; intros a0 ?; subst.
+    Error.destruct_err_ub_oom x; subst; cbn; auto.
+    right; intros a1 ?; subst.
     repeat red.
 
     destruct H1 as [[] | H1].
@@ -8944,8 +8944,8 @@ Module Type LangRefine
                    |}
                |}
         |}).
-    exists (fun elts => fmap (fmap fin_to_inf_dvalue) (x0 x1)).
-    { destruct_err_ub_oom x; cbn; rewrite <- H1; cbn; auto.
+    exists (fun elts => fmap (fmap fin_to_inf_dvalue) (x0 a0)).
+    { Error.destruct_err_ub_oom x; subst; cbn; rewrite <- H1; cbn; auto.
       split; eauto.
       cbn in H1.
       split; eauto.
