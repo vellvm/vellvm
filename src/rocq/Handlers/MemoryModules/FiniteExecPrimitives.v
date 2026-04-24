@@ -3826,7 +3826,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MEMORY_PARAMS LP)
       red.
       intros ms x.
       split; intros CONSEC.
-      - destruct_err_ub_oom x.
+      - destruct_err_ub_oom x; subst.
         + destruct CONSEC as [[] | CONSEC].
           destruct CONSEC as [ms_ [ixs [[EQ1 EQ2] MAPM2]]].
           inv EQ1.
@@ -3856,7 +3856,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MEMORY_PARAMS LP)
           rewrite HSEQUENCE in SEQUENCE'.
           cbn in *.
           auto.
-        + destruct x0.
+        + destruct a.
           destruct CONSEC as [ms_ [ixs [[EQ1 EQ2] MAPM2]]].
           inv EQ1.
           rewrite HMAPM in MAPM2.
@@ -3866,8 +3866,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MEMORY_PARAMS LP)
           inv SEQUENCE.
           inv SEQUENCE'.
           auto.
-      - destruct_err_ub_oom x; try inv CONSEC.
-        destruct x0.
+      - destruct_err_ub_oom x; subst; try inv CONSEC.
+        destruct a.
         inv CONSEC.
         exists ms. exists l.
         split; auto.

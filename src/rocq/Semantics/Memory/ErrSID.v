@@ -92,7 +92,7 @@ Module ERRSID (LP:LLVMParams).
       intros s.
       unfold Monad.eq1.
       intros pr.
-      unfold Eq1_ident.
+      unfold Eq1_ident. cbn. 
 
       destruct (e s pr) as [[pr' [s' e']]]; cbn.
       destruct e' as [e_OOM | [e_UB | [[e_ERR] | a]]]; auto.
@@ -111,7 +111,7 @@ Module ERRSID (LP:LLVMParams).
       intros s.
       unfold Monad.eq1.
       intros pr.
-      unfold Eq1_ident.
+      unfold Eq1_ident. cbn. 
 
       destruct (e s pr) as [[pr' [s' e']]]; cbn.
       destruct e' as [e_OOM | [e_UB | [[e_ERR] | a]]]; cbn; auto.
@@ -124,38 +124,28 @@ Module ERRSID (LP:LLVMParams).
     - (* Proper bind *)
       unfold Proper, respectful.
       intros A B x y XY x0 y0 POINTWISE.
-      unfold pointwise_relation in POINTWISE.
+      unfold pointwise_relation in POINTWISE. 
 
       destruct x as [[[[[x]]]]].
       destruct y as [[[[[y]]]]].
-      cbn in *.
+      cbn in XY. 
 
-      unfold Monad.eq1, EqM_eitherT; cbn.
-      unfold Monad.eq1, MonadState.Eq1_stateTM; cbn.
-      unfold pointwise_relation.
+      unfold Monad.eq1, EqM_eitherT in *. 
+      red in XY. cbn in XY. unfold Monad.eq1 in XY. red in XY. unfold Monad.eq1 in XY.
+      red in XY. unfold Monad.eq1 in XY. repeat red in XY.  cbn in XY. red in POINTWISE.
 
       intros s.
       unfold Monad.eq1.
       intros pr.
-      unfold Eq1_ident.
+      specialize (XY s pr). 
 
-      unfold Monad.eq1, EqM_eitherT, Monad.eq1, MonadState.Eq1_stateTM, pointwise_relation, Monad.eq1, MonadState.Eq1_stateTM, pointwise_relation, Eq1_ident in XY.
-      cbn in XY.
-
-      unfold unIdent.
-      destruct (x s pr) as [[prx [sx x']]] eqn:Hx; cbn.
+      unfold Monad.eq1, Eq1_ident. cbn.
+      rewrite XY.
       destruct (y s pr) as [[pry [sy y']]] eqn:Hy; cbn.
-      destruct x' as [x_OOM | [x_UB | [[x_ERR] | x']]]; cbn; auto;
-        destruct y' as [y_OOM | [y_UB | [[y_ERR] | y']]]; cbn; auto;
-      assert (x s pr = y s pr) as XY' by auto;
-        rewrite Hx, Hy in XY';
-        inversion XY'; auto.
-
-      unfold Monad.eq1, Monad_EQ1_ErrSID_T in POINTWISE.
+        destruct y' as [y_OOM | [y_UB | [[y_ERR] | y']]]; cbn; auto. 
       specialize (POINTWISE y').
       destruct (x0 y') as [[x0y']].
       destruct (y0 y') as [[y0y']].
-      specialize (POINTWISE sy pry).
       apply POINTWISE.
   Defined.
 

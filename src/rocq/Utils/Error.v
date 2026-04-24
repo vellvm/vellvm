@@ -13,6 +13,7 @@ From ITree Require Import
      ITree.
 
 From Vellvm.Utils Require Import
+     Monads
      MonadReturnsLaws
      MonadEq1Laws
      Tactics.
@@ -425,6 +426,7 @@ Definition err_ub_oom : Type -> Type
 Arguments ERR_UB_OOM {_ _} _.
 Arguments unERR_UB_OOM {_ _} _.
 
+
 Definition run_err_ub_oom_T {M : Type -> Type} {A} (euo : err_ub_oom_T M A) : M (OOM_MESSAGE + (UB_MESSAGE + (ERR_MESSAGE + A)))%type :=
        match euo with
        | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT x))) =>
@@ -441,6 +443,8 @@ Proof using.
   refine (ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT _)))).
   exact (fmap (fun v => inr (inr (inr v))) mt).
 Defined.
+
+
 
 Notation OOM_unERR_UB_OOM oom_msg :=
   ({| unERR_UB_OOM :=
@@ -463,6 +467,7 @@ Notation UB_unERR_UB_OOM ub_msg :=
          EitherMonad.unEitherT :=
          {|
            EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inl (UB_message ub_msg)) |}
+
          |}
        |}
      |}
@@ -495,57 +500,14 @@ Notation success_unERR_UB_OOM v :=
    |}).
 
 Import MonadNotation.
-Import Utils.Monads.
+
 
 Section err_ub_oom_monad.
   Variable (M : Type -> Type).
   Context {HM : Monad M}.
 
-  #[global] Instance EqM_err_ub_oom : Monad.Eq1 err_ub_oom.
-  Proof using.
-    (* refine (fun T mt1 mt2 => _). *)
-    (* destruct mt1, mt2. *)
-    (* apply (Monad.eq1 unERR_UB_OOM0 unERR_UB_OOM1). *)
-
-    refine (fun T mt1 mt2 => _).
-
-    (* mt2 should be a refinement of mt1 *)
-    destruct mt1 as [[[[[[oom_mt1 | [ub_mt1 | [err_mt1 | t1]]]]]]]].
-    - (* OOM can only refine to OOM *)
-      destruct mt2 as [[[[[[oom_mt2 | [ub_mt2 | [err_mt2 | t2]]]]]]]].
-      + exact True.
-      + exact False.
-      + exact False.
-      + exact False.
-    - (* UB *)
-      exact True.
-    - (* Error *)
-      exact True.
-    - (* Success *)
-      destruct mt2 as [[[[[[oom_mt2 | [ub_mt2 | [err_mt2 | t2]]]]]]]].
-      + (* OOM refines everything *)
-        exact True.
-      + exact False.
-      + exact False.
-      + exact (t1 = t2).
-  Defined.
-
-  #[global] Instance Reflexive_err_ub_oom_eq1 {A : Type} : Reflexive (@eq1 err_ub_oom _ A).
-  Proof using.
-    unfold Reflexive.
-    intros x.
-    destruct x as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x']]]]]]]] eqn:Hx; cbn; auto.
-  Defined.
-
-  #[global] Instance Transitive_err_ub_oom_eq1 {A : Type} : Transitive (@eq1 err_ub_oom _ A).
-  Proof using.
-    unfold Transitive.
-    intros x y z XY YZ.
-    destruct x as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x']]]]]]]] eqn:Hx;
-      destruct y as [[[[[[[oom_y] | [[ub_y] | [[err_y] | y']]]]]]]] eqn:Hy;
-      destruct z as [[[[[[[oom_z] | [[ub_z] | [[err_z] | z']]]]]]]] eqn:Hz;
-      cbn in *; subst; auto; try contradiction.
-  Defined.
+  #[global]
+    Instance Eq_err_ub_oom : Monad.Eq1 err_ub_oom := (fun A => @eq (err_ub_oom A)).
 
   #[global] Instance Monad_err_ub_oom : Monad (err_ub_oom_T M).
   Proof using HM M.
@@ -564,48 +526,29 @@ Section err_ub_oom_monad.
     - exact (fun A B f ema =>
                ERR_UB_OOM (fmap f (unERR_UB_OOM ema))).
   Defined.
+
 End err_ub_oom_monad.
 
 Section err_ub_oom_extra.
-  #[global] Instance MonadLawsE_err_ub_oom : MonadLawsE err_ub_oom.
-  Proof using.
-    split.
-    - intros A B f x.
-      cbn.
-      destruct (f x) as [[[[[[oom_fx | [ub_fx | [err_fx | fx]]]]]]]]; cbn; auto.
+  #[global]
+    Instance MonadLawsE_err_ub_oom : MonadLawsE err_ub_oom.
+split.
+    - intros A B f x. cbn. red. red. 
+      destruct (f x) as [[[[[[oom_fx | [ub_fx | [err_fx | fx]]]]]]]]; reflexivity.
     - intros A x.
-      destruct x as [[[[[[oom_x | [ub_x | [err_x | x]]]]]]]]; cbn; auto.
+      destruct x as [[[[[[oom_x | [ub_x | [err_x | x]]]]]]]]; reflexivity.
     - intros A B C x f g.
-      cbn.
-      destruct x as [[[[[[oom_x | [ub_x | [err_x | x]]]]]]]]; cbn; auto.
-      destruct (f x) as [[[[[[oom_fx | [ub_fx | [err_fx | fx]]]]]]]]; cbn; auto.
-      destruct (g fx) as [[[[[[oom_gfx | [ub_gfx | [err_gfx | gfx]]]]]]]]; cbn; auto.
+      destruct x as [[[[[[oom_x | [ub_x | [err_x | x]]]]]]]]; try reflexivity.
+      cbn. 
+      destruct (f x) as [[[[[[oom_fx | [ub_fx | [err_fx | fx]]]]]]]]; cbn; try reflexivity.
     - intros A B.
-      unfold Proper, respectful.
+      unfold Morphisms.Proper, Morphisms.respectful.
       intros x y H x0 y0 H0.
+      inversion H. subst.
 
-      destruct x as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x]]]]]]]]; cbn; auto.
-      destruct y as [[[[[[[oom_y] | [[ub_y] | [[err_y] | y]]]]]]]]; cbn; auto; inversion H.
-      destruct y as [[[[[[[oom_y] | [[ub_y] | [[err_y] | y]]]]]]]]; cbn; auto; inversion H.
-
-      destruct (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (x0 x)))));
-      destruct unIdent; auto; destruct s; auto; destruct s; auto.
-
-      subst.
-
-      destruct (x0 y) as [[[[[[oom_x0y | [ub_x0y | [err_x0y | x0y]]]]]]]] eqn:Hx0y; cbn; auto;
-        unfold pointwise_relation in H0;
-        specialize (H0 y);
-
-        unfold EqM_err_ub_oom in *;
-        cbn in *;
-
-        unfold eq1 in H0;
-        rewrite Hx0y in H0;
-
-        destruct (y0 y) as [[[[[[oom_y0y | [ub_y0y | [err_y0y | y0y]]]]]]]]; cbn; auto.
+      destruct y as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x]]]]]]]]; cbn; try reflexivity; auto.
+      red in H0. specialize (H0 x). inversion H0. reflexivity.
   Defined.
-
 
   #[global] Instance RAISE_ERROR_err_ub_oom {M : Type -> Type} `{Monad M} : RAISE_ERROR (err_ub_oom_T M)
     := { raise_error := fun _ msg => ERR_UB_OOM (raise_error msg) }.
@@ -720,7 +663,7 @@ Section err_ub_oom_extra.
     Proof using.
       intros * Hma.
       destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | ma]]]]]]]];
-        cbn in *; auto; try contradiction.
+        cbn in *; auto; inversion Hma; auto.
     Qed.
 
     Lemma ErrUBOOMReturns_ret_inv :
@@ -752,7 +695,88 @@ Section err_ub_oom_extra.
        | inr a => ret a
        | inl e => raise_error e
        end.
+
+  Lemma err_ub_oom_bind_ret_l_eq :
+    forall {A B} (x : A) (k : A -> err_ub_oom B),
+      x <- ret x;;
+      k x = k x.
+  Proof.
+    intros A B x k.
+    cbn.
+    remember (k x) as kx.
+    destruct kx as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | ma]]]]]]]]; auto.
+  Qed.
+
+
+  Variant err_ub_oom_cases {A} (m : err_ub_oom A) : Prop :=
+    | OOMCase : forall oom_msg (EQM: m = OOM_unERR_UB_OOM oom_msg), err_ub_oom_cases m
+    | UBCase  : forall err_msg (EQM: m = UB_unERR_UB_OOM err_msg), err_ub_oom_cases m
+    | ERRCase : forall err_msg (EQM: m = ERR_unERR_UB_OOM err_msg), err_ub_oom_cases m 
+    | RetCase : forall (a:A) (EQM: m = ret a), err_ub_oom_cases m.
+
+  (* Prove the cases once: *)
+  Lemma err_ub_oom_inversion : forall {A} (m : err_ub_oom A),
+      err_ub_oom_cases m.
+  Proof.
+    intros A m.
+    destruct m as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | ma]]]]]]]]; auto.
+    - eapply OOMCase. reflexivity. 
+    - eapply UBCase.  reflexivity. 
+    - eapply ERRCase. reflexivity. 
+    - eapply RetCase. reflexivity.
+  Qed.
+
+  (* A tactic for helping do the destruction *)
+  Ltac destruct_err_ub_oom m := destruct (err_ub_oom_inversion m).
+  
+  Lemma err_ub_oom_bind_oom : forall {A B} oom_msg (k : A -> err_ub_oom B),
+      (x <- OOM_unERR_UB_OOM oom_msg ;; k x) = OOM_unERR_UB_OOM oom_msg.
+  Proof.
+    intros. reflexivity.
+  Qed.
+
+  Lemma err_ub_oom_bind_ub : forall {A B} err_msg (k : A -> err_ub_oom B),
+      (x <- UB_unERR_UB_OOM err_msg ;; k x) = UB_unERR_UB_OOM err_msg.
+  Proof.
+    intros. reflexivity.
+  Qed.
+  
+  Lemma err_ub_oom_bind_err : forall {A B} err_msg (k : A -> err_ub_oom B),
+      (x <- ERR_unERR_UB_OOM err_msg ;; k x) = ERR_unERR_UB_OOM err_msg.
+  Proof.
+    intros. reflexivity.
+  Qed.
+
+  (* A specialized variant for when the case analysis is in a bind. *)
+  Variant err_ub_oom_bind_cases {A B} (m : err_ub_oom A) (k : A -> err_ub_oom B) : Prop :=
+  | OOMCaseB : forall oom_msg (EQM: m = OOM_unERR_UB_OOM oom_msg)  (EQB : (x <- m ;; k x) = OOM_unERR_UB_OOM oom_msg), err_ub_oom_bind_cases m k
+  | UBCaseB : forall err_msg (EQM: m = UB_unERR_UB_OOM err_msg)  (EQB : (x <- m ;; k x) = UB_unERR_UB_OOM err_msg), err_ub_oom_bind_cases m k
+  | ERRCaseB : forall err_msg (EQM: m = ERR_unERR_UB_OOM err_msg)  (EQB : (x <- m ;; k x) = ERR_unERR_UB_OOM err_msg), err_ub_oom_bind_cases m k
+  | RetCaseB : forall (a:A) (EQM: m = ret a) (EQB : x <- m ;; k x = k a), err_ub_oom_bind_cases m k.
+  
+(* Prove the cases once: *)
+  Lemma err_ub_oom_bind_inversion : forall {A B} (m : err_ub_oom A) (k : A -> err_ub_oom B),
+      err_ub_oom_bind_cases m k.
+  Proof.
+    intros A B m k.
+    destruct_err_ub_oom m; subst.
+    - eapply OOMCaseB; reflexivity.
+    - eapply UBCaseB; reflexivity.
+    - eapply ERRCaseB; reflexivity.
+    - eapply RetCaseB.
+      reflexivity.
+      rewrite bind_ret_l. reflexivity.
+  Qed.
+
 End err_ub_oom_extra.
+
+Ltac destruct_err_ub_oom m := destruct (err_ub_oom_inversion m).
+
+Ltac destruct_err_ub_oom_bind m :=
+  match goal with
+  | [ H : context[ @bind err_ub_oom _ _ _ m ?K] |- _ ] => destruct (err_ub_oom_bind_inversion m K)
+  end.
+
 
 Ltac inv_err_ub_oom :=
   match goal with

@@ -396,12 +396,12 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
     repeat rewrite bind_ret_l in REST.
     cbn in REST.
 
-    destruct_err_ub_oom res.
+    destruct_err_ub_oom res; subst.
 
     { (* OOM *)
       exfalso.
       cbn in *.
-      destruct IN as [oom_msg TPTRS].
+      destruct IN as [oom_msg' TPTRS].
       rewrite TPTRS in REST.
       setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in REST.
       pose proof (int_to_ptr_safe
@@ -491,7 +491,7 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
 
     { (* Success *)
       cbn in *.
-      destruct res0 as [ptr ptrs].
+      destruct a as [ptr ptrs].
       exists ptr. exists ptrs.
       rewrite IN in REST.
       pose proof (int_to_ptr_safe
@@ -639,11 +639,11 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
       cbn in ALLOC_EXEC.
       repeat setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_Fail _)) in ALLOC_EXEC.
 
-      destruct_err_ub_oom res.
+      destruct_err_ub_oom res; subst.
       - (* OOM *)
         exfalso.
         cbn in RES_T_ALLOC.
-        destruct RES_T_ALLOC as [oom_msg RES_T_ALLOC].
+        destruct RES_T_ALLOC as [oom_msg' RES_T_ALLOC].
         rewrite RES_T_ALLOC in ALLOC_EXEC.
         setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in ALLOC_EXEC.
         raise_abs: ALLOC_EXEC.
@@ -702,10 +702,10 @@ Module MemoryBigIntptrInfiniteSpec <: MemoryModelInfiniteSpec LLVMParamsBigIntpt
 
       rewrite map_ret in ALLOC_EXEC.
 
-      destruct_err_ub_oom res.
+      destruct_err_ub_oom res; subst.
       - (* OOM *)
         cbn in RES_T_ALLOC.
-        destruct RES_T_ALLOC as [oom_msg RES_T_ALLOC].
+        destruct RES_T_ALLOC as [oom_msg' RES_T_ALLOC].
         rewrite RES_T_ALLOC in ALLOC_EXEC.
         setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in ALLOC_EXEC.
         symmetry in ALLOC_EXEC.

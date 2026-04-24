@@ -1508,6 +1508,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Qed.
   End UvalueStrongInd.
 
+  
   Section UvalueStrongInd.
     Variable P : uvalue -> Prop.
     Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a).
