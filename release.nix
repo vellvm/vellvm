@@ -91,7 +91,7 @@
       buildPhase = ''
   runHook preBuild
   unset COQPATH
-  make -C src/
+  make -C src/ all-release
   make -C src/ frontend
   runHook postBuild
   '';
