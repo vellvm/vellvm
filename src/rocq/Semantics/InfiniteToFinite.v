@@ -40,6 +40,7 @@ From Vellvm Require Import
   Utils.OOMRutt
   Utils.OOMRuttProps
   Utils.InterpPropOOM
+  Utils.ErrUbOomProp
   Handlers.MemoryModules.FiniteAddresses
   Handlers.MemoryModules.InfiniteAddresses
   Handlers.MemoryModelImplementation.

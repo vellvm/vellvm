@@ -14786,7 +14786,6 @@ Module Type LangRefine
     intros t_from dv t_to msg CONV.
     unfold get_conv_case in CONV.
     unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
-    rewrite <- Lock.lock in *.
     unfold MemHelpers.dtyp_eqb,
       IS1.LLVM.MEM.CP.CONC.MemHelpers.dtyp_eqb in *.
     break_match_hyp_inv.
@@ -14818,8 +14817,6 @@ Module Type LangRefine
     intros conv t_from dv t_to msg CONV.
     unfold get_conv_case in CONV.
     unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
-    rewrite <- Lock.lock in *.
-  
     destruct conv;
       try solve
         [ cbn in *;
@@ -15469,6 +15466,9 @@ Module Type LangRefine
             forward H2.
             repeat constructor.
             specialize (H2 y err_msg H1 H0).
+
+            rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
             rewrite map_monad_unfold.
             repeat red.
             exists (ERR_unERR_UB_OOM err_msg).
@@ -15577,6 +15577,7 @@ Module Type LangRefine
             repeat constructor.
             specialize (H2 y err_msg H1 H0).
 
+            rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
             rewrite map_monad_unfold.
             repeat red.
             exists (ERR_unERR_UB_OOM err_msg).
@@ -15684,6 +15685,7 @@ Module Type LangRefine
             forward H2.
             repeat constructor.
             specialize (H2 y err_msg H1 H0).
+            rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.            
             rewrite map_monad_unfold.
             repeat red.
             exists (ERR_unERR_UB_OOM err_msg).
@@ -15790,6 +15792,7 @@ Module Type LangRefine
             forward H2.
             repeat constructor.
             specialize (H2 y err_msg H1 H0).
+            rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.            
             rewrite map_monad_unfold.
             repeat red.
             exists (ERR_unERR_UB_OOM err_msg).
@@ -15884,7 +15887,7 @@ Module Type LangRefine
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -15902,7 +15905,7 @@ Module Type LangRefine
       destruct_err_ub_oom x; inv H3.
 
       { (* ERR in second operand *)
-        eapply IH in H0; eauto.
+        eapply IH in Heqo0; eauto.
         repeat red.
         exists (ret (fin_to_inf_dvalue x1)).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -15957,7 +15960,7 @@ Module Type LangRefine
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -15975,7 +15978,7 @@ Module Type LangRefine
       destruct_err_ub_oom x; inv H3.
 
       { (* ERR in second operand *)
-        eapply IH in H0; eauto.
+        eapply IH in Heqo0; eauto.
         repeat red.
         exists (ret (fin_to_inf_dvalue x1)).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16030,7 +16033,7 @@ Module Type LangRefine
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16048,7 +16051,7 @@ Module Type LangRefine
       destruct_err_ub_oom x; inv H3.
 
       { (* ERR in second operand *)
-        eapply IH in H0; eauto.
+        eapply IH in Heqo0; eauto.
         repeat red.
         exists (ret (fin_to_inf_dvalue x1)).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16104,7 +16107,7 @@ Module Type LangRefine
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16143,7 +16146,7 @@ Module Type LangRefine
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16161,7 +16164,7 @@ Module Type LangRefine
       destruct_err_ub_oom x; inv H3.
 
       { (* ERR in second operand *)
-        eapply IH in H0; eauto.
+        eapply IH in Heqo0; eauto.
         repeat red.
         exists (ret (fin_to_inf_dvalue x1)).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16216,7 +16219,7 @@ Module Type LangRefine
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing uv *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16281,7 +16284,7 @@ Module Type LangRefine
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing base address *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16493,7 +16496,7 @@ Module Type LangRefine
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16520,7 +16523,7 @@ Module Type LangRefine
       destruct_err_ub_oom x; inv H3.
 
       { (* ERR in second operand *)
-        eapply IH in H0; eauto.
+        eapply IH in Heqo0; eauto.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
         split; cbn; eauto.
@@ -16577,7 +16580,7 @@ Module Type LangRefine
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16604,7 +16607,7 @@ Module Type LangRefine
       destruct_err_ub_oom x; inv H3.
 
       { (* ERR uv_inf3 *)
-        eapply IH in H0; eauto.
+        eapply IH in Heqo1; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16677,7 +16680,7 @@ Module Type LangRefine
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16714,7 +16717,7 @@ Module Type LangRefine
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16783,7 +16786,7 @@ Module Type LangRefine
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16817,12 +16820,11 @@ Module Type LangRefine
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
-
-      repeat red.
       repeat red in ERR.
 
       inv ERR.
-      cbn. auto.
+      reflexivity.
+      
     - (* UVALUE_ConcatBytes *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
@@ -16831,10 +16833,11 @@ Module Type LangRefine
       repeat red.
       repeat red in ERR.
       auto.
-
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.            
       erewrite map_monad_oom_length; eauto.
       erewrite sizeof_dtyp_fin_inf; eauto.
       erewrite all_extract_bytes_from_uvalue_fin_inf; eauto.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.      
       break_match_hyp.
       2: {
         cbn.
@@ -22003,7 +22006,6 @@ Module Type LangRefine
         eapply orutt_bind; subst; cbn; eauto with ORUTT.
 
       + unfold IS1.LLVM.MEM.CP.CONC.get_conv_case, CONC.get_conv_case.
-        repeat rewrite <- Lock.lock.
         cbn.
         break_match; try contradiction; subst; cbn.
 
