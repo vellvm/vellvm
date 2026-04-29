@@ -8,6 +8,16 @@ From Stdlib Require Import
 
 Require Import Stdlib.Logic.ProofIrrelevance.
 
+From ITree Require Import
+     ITree
+     Basics
+     Basics.HeterogeneousRelations
+     Eq.Rutt
+     Eq.RuttFacts
+     Eq.Eqit
+     Eq.EqAxiom.
+
+
 From Vellvm Require Import
      Semantics.InterpretationStack
      Semantics.LLVMEvents
@@ -57,14 +67,6 @@ From ExtLib Require Import
      Structures.Monads
      Structures.Functor.
 
-From ITree Require Import
-     ITree
-     Basics
-     Basics.HeterogeneousRelations
-     Eq.Rutt
-     Eq.RuttFacts
-     Eq.Eqit
-     Eq.EqAxiom.
 
 From QuickChick Require Import Show.
 
@@ -1251,6 +1253,16 @@ Module Type LangRefine
 
   Module MBT := MemBytesTheory IS2.LP IS2.LLVM.MEM.MP ByteM IS2.LLVM.MEM.CP.
   Import MBT.
+
+  (*  Control unfolding of big definitions.  *)
+
+  Arguments IS1.LLVM.MEM.CP.CONC.concretize_uvalueM _ _ _ _ _ _ _ _ _ _ : simpl never.
+  Arguments IS2.LLVM.MEM.CP.CONC.concretize_uvalueM _ _ _ _ _ _ _ _ _ _ : simpl never.  
+  Arguments concretize_uvalueM _ _ _ _ _ _ _ _ _ _ : simpl never.  
+
+  Arguments IS1.LLVM.MEM.CP.CONC.get_conv_case _ _ _ _ : simpl never.
+  Arguments IS2.LLVM.MEM.CP.CONC.get_conv_case _ _ _ _ : simpl never.
+  Arguments get_conv_case _ _ _ _ : simpl never.
 
   (**  Converting state between the two languages *)
 
@@ -4840,6 +4852,12 @@ Module Type LangRefine
       reflexivity.
   Qed.
 
+  Ltac step_err_ub_oom_bind H :=
+    first [ rewrite err_ub_oom_bind_oom in H
+          | rewrite err_ub_oom_bind_ub in H
+          | rewrite err_ub_oom_bind_err in H
+          | rewrite Monad.bind_ret_l in H ].
+                                            
   (* TODO: move / generalize these *)
   Lemma map_monad_ErrUbOomProp_forall2 :
     forall {A B} (f : A -> ErrUbOomProp B) l res,
@@ -4860,31 +4878,27 @@ Module Type LangRefine
         repeat red in MAP.
         destruct MAP as (?&?&?&?&?).
 
-        cbn in H0.
-        destruct_err_ub_oom x; cbn in *; subst; inv H0.
+        destruct_err_ub_oom_bind x; subst; try step_err_ub_oom_bind H0; inversion H0.
 
         destruct H1 as [[] | H1].
-        specialize (H1 x1 eq_refl).
+        specialize (H1 a0 eq_refl).
         repeat red in H1.
         destruct H1 as (?&?&?&?&?).
-        cbn in H1.
 
-        destruct_err_ub_oom x; cbn in *; subst; inv H1;
-          rewrite <- H5 in H3; inv H3.
-
-        destruct H2 as [[] | H2].
-        specialize (H2 x3 eq_refl).
-        rewrite <- H2 in H5.
-        cbn in H5.
-        rewrite H2 in H5.
-        rewrite <- H2 in H4.
-        cbn in H4.
-        inv H4.
-
+        rewrite H0 in H2.
+        destruct_err_ub_oom x; subst; try step_err_ub_oom_bind H2; inversion H2.
+        
+        replace (success_unERR_UB_OOM x2) with (@ret err_ub_oom _ _ x2) in H2 by reflexivity.        
+        rewrite Monad.bind_ret_l in H2. 
+        
+        destruct H4 as [[] | H4].
+        specialize (H4 x2 eq_refl).
+        rewrite H2 in H4.
+        inversion H4.
         constructor.
         2: {
           apply IHl.
-          apply H0.
+          apply H1.
         }
 
         auto.
@@ -7694,100 +7708,115 @@ Module Type LangRefine
   Proof.
     intros conv t_from dv t_to res CONV.
     destruct conv.
-    { cbn in *;
-        repeat break_match_hyp_inv;
+    { unfold get_conv_case in CONV;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+
+      repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
         unfold fin_to_inf_uvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
+        break_match_goal; 
+        break_match_hyp; clear Heqs; destruct p; clear e0; inv e; try discriminate.
         try (inv H0; subst_existT; try rewrite Heqb; auto; break_match_goal; clear Heqs; destruct p; clear e0;
              cbn in e; inv e; reflexivity).
+        reflexivity.
     }
 
-    { cbn in *;
-        repeat break_match_hyp_inv;
+    { unfold get_conv_case in CONV;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+
+      repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
         unfold fin_to_inf_uvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
+        break_match_goal; 
+        break_match_hyp; clear Heqs; destruct p; clear e0; inv e; try discriminate.
         try (inv H0; subst_existT; try rewrite Heqb; auto; break_match_goal; clear Heqs; destruct p; clear e0;
              cbn in e; inv e; reflexivity).
+        reflexivity.
     }
 
-    { cbn in *;
-        repeat break_match_hyp_inv;
+    { unfold get_conv_case in CONV;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+
+      repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
         unfold fin_to_inf_uvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
+        break_match_goal; 
+        break_match_hyp; clear Heqs; destruct p; clear e0; inv e; try discriminate.
         try (inv H0; subst_existT; try rewrite Heqb; auto; break_match_goal; clear Heqs; destruct p; clear e0;
              cbn in e; inv e; reflexivity).
+        reflexivity.
     }
 
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue, fin_to_inf_uvalue; inv CONV.
+    { unfold get_conv_case in CONV;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+      inv CONV.
+    } 
+
+    { unfold get_conv_case in CONV;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+      inv CONV.
     }
 
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue, fin_to_inf_uvalue; inv CONV.
-    }
+    { unfold get_conv_case in CONV;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
 
-    { cbn in *;
-        repeat break_match_hyp_inv;
+      repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
         unfold fin_to_inf_uvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
+        break_match_goal; 
+        break_match_hyp; clear Heqs; destruct p; clear e0; inv e; try discriminate.
         try (inv H0; subst_existT; try rewrite Heqb; auto; break_match_goal; clear Heqs; destruct p; clear e0;
              cbn in e; inv e; reflexivity).
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        unfold fin_to_inf_uvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
         try (inv H0; subst_existT; try rewrite Heqb; auto; break_match_goal; clear Heqs; destruct p; clear e0;
              cbn in e; inv e; reflexivity).
+        reflexivity.
     }
 
-    { cbn in *;
-        repeat break_match_hyp_inv;
+    { unfold get_conv_case in CONV;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+
+      repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
         unfold fin_to_inf_uvalue;
-        inv CONV.
+        break_match_goal; 
+        break_match_hyp; clear Heqs; destruct p; clear e0; inv e; try discriminate.
+        try (inv H0; subst_existT; try rewrite Heqb; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+             cbn in e; inv e; reflexivity).
+        try (inv H0; subst_existT; try rewrite Heqb; auto; break_match_goal; clear Heqs; destruct p; clear e0;
+             cbn in e; inv e; reflexivity).
+        reflexivity.
     }
 
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        unfold fin_to_inf_uvalue;
-        inv CONV.
+    { unfold get_conv_case in CONV;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+      inv CONV.
     }
 
-    { cbn in *;
-        repeat break_match_hyp_inv;
+    { unfold get_conv_case in CONV;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+      inv CONV.
+    }
+    
+    
+    { unfold get_conv_case in CONV;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+
+      repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
         unfold fin_to_inf_uvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
+        break_match_goal; 
+        break_match_hyp; clear Heqs; destruct p; clear e0; inv e; try discriminate.
     }
 
-    { cbn in *;
-        repeat break_match_hyp_inv;
+
+    { unfold get_conv_case in CONV;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+
+      repeat break_match_hyp_inv;
         unfold fin_to_inf_dvalue;
         unfold fin_to_inf_uvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
+        break_match_goal; 
+        break_match_hyp; clear Heqs; destruct p; clear e0; inv e; try discriminate.
     }
 
     { (* Conversions... *)
@@ -7829,106 +7858,47 @@ Module Type LangRefine
   Proof.
     intros conv t_from dv t_to res CONV.
     destruct conv.
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
 
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
+    1-3 :  unfold get_conv_case in CONV;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case;
+      repeat break_match_hyp_inv;
+        break_match_goal; 
+        break_match_hyp; clear Heqs; destruct p; clear e0; inv e; try discriminate.
+
+
+    1-10 : inv CONV.
+
+    { unfold get_conv_case in H0;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case;
+      repeat break_match_hyp_inv;
+        break_match_goal; 
+        break_match_hyp; clear Heqs; destruct p; clear e0; inv e; try discriminate.
     }
 
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
+    { unfold get_conv_case in H0;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case;
+      repeat break_match_hyp_inv;
+        break_match_goal; 
+        break_match_hyp; clear Heqs; destruct p; clear e0; inv e; try discriminate.
     }
 
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue; inv CONV.
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue; inv CONV.
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        inv CONV.
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        inv CONV.
-    }
-
-    { (* inttoptr *)
-      cbn in *.
-      repeat break_match_hyp_inv; reflexivity.
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
-    }
-
-    { (* Conversions... *)
-      unfold get_conv_case in CONV.
+    { unfold get_conv_case in H0;
       unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
-
-      repeat rewrite bit_sizeof_dtyp_fin_inf.
-      repeat break_match_hyp_inv.
+      repeat break_match_hyp_inv; reflexivity. 
     }
 
-    { (* Addrspacecast *)
-      cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; inv CONV.
+    { unfold get_conv_case in H0;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case;
+      repeat break_match_hyp_inv;
+        break_match_goal; 
+        break_match_hyp; clear Heqs; destruct p; clear e0; inv e; try discriminate.
+    }
+
+    { unfold get_conv_case in H0;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case;
+      repeat break_match_hyp_inv;
+        break_match_goal; 
+        break_match_hyp; clear Heqs; destruct p; clear e0; inv e; try discriminate.
     }
   Qed.
 
@@ -7939,101 +7909,31 @@ Module Type LangRefine
   Proof.
     intros conv t_from dv t_to res CONV.
     destruct conv.
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
 
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
-    }
+    1 - 13 : inv CONV.
 
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
+    1 - 5 :
+      unfold get_conv_case in H0;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case;
+      repeat break_match_hyp_inv;
+        break_match_goal; 
+        break_match_hyp; clear Heqs; destruct p; clear e0; inv e; try discriminate.
 
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue; inv CONV.
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue; inv CONV.
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; break_match_hyp; clear Heqs; destruct p; clear e0;
-        cbn in e; inv e; try discriminate;
-
-        try (inv H0; auto; break_match_goal; clear Heqs; destruct p; clear e0;
-              cbn in e; inv e; reflexivity).
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        inv CONV.
-    }
-
-    { cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        inv CONV.
-    }
-
-    { (* inttoptr *)
-      cbn in *.
-      repeat break_match_hyp_inv; reflexivity.
-    }
-
-    { cbn in *.
-      repeat break_match_hyp_inv; auto.
-    }
-
-    { (* Conversions... *)
-      unfold get_conv_case in CONV.
+    { unfold get_conv_case in H0;
       unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
-
-      repeat rewrite bit_sizeof_dtyp_fin_inf.
-      repeat break_match_hyp_inv.
+      repeat break_match_hyp_inv; reflexivity. 
     }
 
-    { (* Addrspacecast *)
-      cbn in *;
-        repeat break_match_hyp_inv;
-        unfold fin_to_inf_dvalue;
-        break_match_goal; inv CONV.
+    { unfold get_conv_case in H0;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+      repeat break_match_hyp_inv; reflexivity. 
     }
+
+    { unfold get_conv_case in H0;
+      unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
+      repeat break_match_hyp_inv; reflexivity. 
+    }
+    
   Qed.
 
   Lemma handle_gep_h_fin_inf :
@@ -8794,17 +8694,6 @@ Module Type LangRefine
       reflexivity.
   Qed.
 
-  (* TODO: Move this and consider making err_ub_oom use eq for Eq1... *)
-  Lemma err_ub_oom_bind_ret_l_eq :
-    forall {A B} (x : A) (k : A -> err_ub_oom B),
-      x <- ret x;;
-      k x = k x.
-  Proof.
-    intros A B x k.
-    cbn.
-    remember (k x) as kx.
-    destruct_err_ub_oom kx; auto.
-  Qed.
 
   Lemma insert_value_loop_fin_inf_succeeds :
     forall idxs str elt res,
@@ -8984,18 +8873,18 @@ Module Type LangRefine
 
     repeat red in LOOP.
     destruct LOOP as (?&?&?&?&?).
-    repeat red.
+
 
     exists (fmap fin_to_inf_dvalue x).
     exists (fun _ => fmap (fmap fin_to_inf_dvalue) res).
     split.
     apply (eval_select_cond_fin_inf _ _ _ _ H).
     split.
-    subst; cbn.
+    subst.
     { destruct_err_ub_oom x; cbn; auto. }
 
-    destruct_err_ub_oom x; cbn; auto.
-    right; intros a0 ?; subst.
+    Error.destruct_err_ub_oom x; subst; cbn; auto.
+    right; intros a1 ?; subst.
     repeat red.
 
     destruct H1 as [[] | H1].
@@ -9057,8 +8946,8 @@ Module Type LangRefine
                    |}
                |}
         |}).
-    exists (fun elts => fmap (fmap fin_to_inf_dvalue) (x0 x1)).
-    { destruct_err_ub_oom x; cbn; rewrite <- H1; cbn; auto.
+    exists (fun elts => fmap (fmap fin_to_inf_dvalue) (x0 a0)).
+    { Error.destruct_err_ub_oom x; subst; cbn; rewrite <- H1; cbn; auto.
       split; eauto.
       cbn in H1.
       split; eauto.
@@ -9125,9 +9014,7 @@ Module Type LangRefine
     }
 
     { (* i1 conditional *)
-      rewrite eval_select_equation in *.
-      rewrite IS1.MEM.CP.CONC.eval_select_equation.
-      rewrite fin_to_inf_dvalue_ix.
+      rewrite fin_to_inf_dvalue_ix. simpl in *.
 
       break_match; try inv EVAL.
       break_match.
@@ -9158,8 +9045,7 @@ Module Type LangRefine
     }
 
     { (* Vector conditional *)
-      rewrite eval_select_equation in *.
-      rewrite IS1.MEM.CP.CONC.eval_select_equation.
+      simpl in *.
 
       repeat red in EVAL.
       destruct EVAL as (?&?&?&?&?).
@@ -9630,8 +9516,7 @@ Module Type LangRefine
       cbn in CONC; inv CONC; cbn.
       reflexivity.
     - inv REF.
-      rewrite concretize_uvalue_bytes_helper_equation in CONC.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalue_bytes_helper_equation.
+      simpl in *.
       destruct y; uvalue_refine_strict_inv H1; try inv CONC.
       rewrite pre_concretized_fin_inf with (uv_fin:=y) (acc_fin:=acc_fin); eauto.
       break_match_hyp_inv; repeat red.
@@ -9751,14 +9636,10 @@ Module Type LangRefine
           red in REF;
           cbn in REF; inv REF;
 
-          rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN;
           red in CONC_FIN;
-          rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN;
           cbn in CONC_FIN; inv CONC_FIN;
 
-          rewrite IS1.MEM.CP.CONC.concretize_equation;
           red;
-          rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
           cbn;
           unfold fin_to_inf_dvalue;
           break_match_goal; clear Heqs; destruct p; clear e0;
@@ -9770,14 +9651,10 @@ Module Type LangRefine
       red in REF.
       cbn in REF.
       break_match_hyp_inv.
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
       red in CONC_FIN.
-      rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN.
       cbn in CONC_FIN; inv CONC_FIN.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
       cbn.
       unfold fin_to_inf_dvalue.
       break_match_goal.
@@ -9793,9 +9670,7 @@ Module Type LangRefine
       cbn in REF.
       break_match_hyp_inv.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
       cbn.
       unfold fin_to_inf_dvalue.
       break_match_goal.
@@ -9813,14 +9688,9 @@ Module Type LangRefine
       red in REF.
       cbn in REF; inv REF.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN.
       cbn in CONC_FIN.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
       cbn.
 
       destruct CONC_FIN.
@@ -9833,15 +9703,7 @@ Module Type LangRefine
             [ red; intros dv_fin CONC_FIN;
               red in REF;
               cbn in REF; inv REF;
-
-              rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN;
-              red in CONC_FIN;
-              rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN;
               cbn in CONC_FIN; inv CONC_FIN;
-
-              rewrite IS1.MEM.CP.CONC.concretize_equation;
-              red;
-              rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
               cbn;
               unfold fin_to_inf_dvalue;
               break_match_goal; clear Heqs; destruct p; clear e0;
@@ -9850,7 +9712,6 @@ Module Type LangRefine
             ].
 
         22: {
-          cbn in *.
           rename uvs into uv_bytes_inf.
           unfold uvalue_concretize_fin_inf_inclusion in *.
           intros dv_fin H0.
@@ -9862,13 +9723,10 @@ Module Type LangRefine
 
           Opaque Datatypes.length N.eqb.
 
-          rewrite IS1.MEM.CP.CONC.concretize_equation;
-            red; rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
-            cbn; repeat red.
+          red. red. 
 
-          rewrite IS2.MEM.CP.CONC.concretize_equation in H0;
-            red in H0; rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in H0;
-            cbn in H0; repeat red in H0.
+          repeat red in H0.
+          rewrite IS1.MEM.CP.CONC.concretize_uvalueM_equation.
 
           replace (Datatypes.length uv_bytes_inf) with (Datatypes.length uv_bytes_fin).
           2: {
@@ -9876,6 +9734,7 @@ Module Type LangRefine
             symmetry.
             eapply map_monad_oom_length; eauto.
           }
+          rewrite IS2.MEM.CP.CONC.concretize_uvalueM_equation in H0.
           rewrite sizeof_dtyp_fin_inf.
 
           break_match_hyp.
@@ -9987,14 +9846,10 @@ Module Type LangRefine
           red in REF.
           cbn in REF.
           break_match_hyp_inv.
-          rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-          red in CONC_FIN.
-          rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN.
           cbn in CONC_FIN; inv CONC_FIN.
 
-          rewrite IS1.MEM.CP.CONC.concretize_equation.
+
           red.
-          rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
           cbn.
           unfold fin_to_inf_dvalue.
           break_match_goal.
@@ -10010,9 +9865,7 @@ Module Type LangRefine
           cbn in REF.
           break_match_hyp_inv.
 
-          rewrite IS1.MEM.CP.CONC.concretize_equation.
           red.
-          rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
           cbn.
           unfold fin_to_inf_dvalue.
           break_match_goal.
@@ -10030,16 +9883,10 @@ Module Type LangRefine
           red in REF.
           cbn in REF; inv REF.
 
-          rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
           red in CONC_FIN.
-          rewrite CONCBASE.concretize_uvalueM_equation in CONC_FIN.
           cbn in CONC_FIN.
 
-          rewrite IS1.MEM.CP.CONC.concretize_equation.
-          red.
-          rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
           cbn.
-
           destruct CONC_FIN.
           split.
           eapply dvalue_has_dtyp_fin_to_inf_dvalue; eauto.
@@ -10053,14 +9900,8 @@ Module Type LangRefine
           unfold uvalue_concretize_fin_inf_inclusion in H.
           apply map_monad_oom_Forall2 in Heqo.
 
-          rewrite IS1.MEM.CP.CONC.concretize_equation.
           red.
-          rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-          rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
           red in CONC_FIN.
-          rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-
           repeat red in CONC_FIN.
           destruct CONC_FIN as (?&?&?&?&?).
           destruct_err_ub_oom x; cbn in H1; inv H1.
@@ -10127,13 +9968,7 @@ Module Type LangRefine
           unfold uvalue_concretize_fin_inf_inclusion in H.
           apply map_monad_oom_Forall2 in Heqo.
 
-          rewrite IS1.MEM.CP.CONC.concretize_equation.
           red.
-          rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-          rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-          red in CONC_FIN.
-          rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
 
           repeat red in CONC_FIN.
           destruct CONC_FIN as (?&?&?&?&?).
@@ -10201,13 +10036,7 @@ Module Type LangRefine
       unfold uvalue_concretize_fin_inf_inclusion in H.
       apply map_monad_oom_Forall2 in Heqo.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
 
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
@@ -10275,13 +10104,7 @@ Module Type LangRefine
       unfold uvalue_concretize_fin_inf_inclusion in H.
       apply map_monad_oom_Forall2 in Heqo.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
 
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
@@ -10358,13 +10181,7 @@ Module Type LangRefine
       specialize (IHuv_inf1 u Heqo).
       specialize (IHuv_inf2 u0 Heqo0).
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
 
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
@@ -10428,13 +10245,7 @@ Module Type LangRefine
       specialize (IHuv_inf1 u Heqo).
       specialize (IHuv_inf2 u0 Heqo0).
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
 
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
@@ -10498,11 +10309,6 @@ Module Type LangRefine
       specialize (IHuv_inf1 u Heqo).
       specialize (IHuv_inf2 u0 Heqo0).
 
-
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H1; inv H1.
@@ -10523,11 +10329,6 @@ Module Type LangRefine
       apply IHuv_inf1 in H0.
       apply IHuv_inf2 in H1.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
-      red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      
       repeat red.
       exists (ret (fin_to_inf_dvalue x1)).
       exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 x1))).
@@ -10565,11 +10366,6 @@ Module Type LangRefine
 
       specialize (IHuv_inf u Heqo).
 
-      
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-      cbn in CONC_FIN.
       repeat red in CONC_FIN. 
 
       destruct CONC_FIN as (?&?&?&?&?).
@@ -10582,10 +10378,6 @@ Module Type LangRefine
       remember (eval_fneg x1) as x1h.
       destruct_err_ub_oom x1h; inv H4.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
-      red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-      cbn.
       repeat red.
       exists (ret (fin_to_inf_dvalue x1)).
       exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 x1))).
@@ -10616,13 +10408,8 @@ Module Type LangRefine
       specialize (IHuv_inf1 u Heqo).
       specialize (IHuv_inf2 u0 Heqo0).
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
-      red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
+      red.
 
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
@@ -10681,13 +10468,7 @@ Module Type LangRefine
       specialize (IHuv_inf _ Heqo).
       unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
       red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
 
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
@@ -10784,10 +10565,6 @@ Module Type LangRefine
       pose proof (IHuv_inf u Heqo) as IHuv_inf_u.
       unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf_u.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H0; inv H0.
@@ -10811,10 +10588,6 @@ Module Type LangRefine
       pose proof addr_convert_succeeds a as (a'&AA').
       pose proof addr_convert_succeeds a0 as (a0'&A0A0').
       epose proof (handle_gep_addr_fin_inf _ _ _ _ _ _ _ Heqs AA' A0A0' eq_refl).
-
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
-      red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
 
       repeat red.
       exists (ret (fin_to_inf_dvalue (DVALUE_Addr a))).
@@ -10942,10 +10715,6 @@ Module Type LangRefine
 
       unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf_u, IHuv_inf_u0.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
@@ -10974,10 +10743,6 @@ Module Type LangRefine
 
       specialize (IHuv_inf_u _ H).
       specialize (IHuv_inf_u0 _ H0).
-
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
-      red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
 
       repeat red.
       exists (ret (fin_to_inf_dvalue x1)).
@@ -11035,10 +10800,6 @@ Module Type LangRefine
 
       unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf_u, IHuv_inf_u0, IHuv_inf_u1.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
@@ -11067,10 +10828,6 @@ Module Type LangRefine
       specialize (IHuv_inf_u _ H).
       specialize (IHuv_inf_u0 _ H2).
       specialize (IHuv_inf_u1 _ H0).
-
-      rewrite IS1.MEM.CP.CONC.concretize_equation.
-      red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
 
       repeat red.
       exists (ret (fin_to_inf_dvalue x1)).
@@ -11127,9 +10884,6 @@ Module Type LangRefine
 
       unfold uvalue_concretize_fin_inf_inclusion in IHuv_inf_u, IHuv_inf_u0, IHuv_inf_u1.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
       inv CONC_FIN.
     - (* ExtractValue *)
       rename H into IH.
@@ -11138,10 +10892,6 @@ Module Type LangRefine
       cbn in REF.
       break_match_hyp_inv.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-      cbn in CONC_FIN.
       repeat red in CONC_FIN.
 
       destruct CONC_FIN as (?&?&?&?&?).
@@ -11153,10 +10903,7 @@ Module Type LangRefine
       destruct_err_ub_oom x0x1; inv H3.
       apply extract_value_loop_fin_inf_succeeds in H1.
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation;
-        red; rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
-        cbn; repeat red.
-
+      repeat red.
       exists (ret (fin_to_inf_dvalue x1)).
       exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 x1))).
       cbn; rewrite <- Heqx0x1; cbn.
@@ -11186,11 +10933,6 @@ Module Type LangRefine
       pose proof (IHuv_inf2 u0 Heqo0) as IHuv_inf_u0.
       red in IHuv_inf_u, IHuv_inf_u0.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-      cbn in CONC_FIN.
-
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
@@ -11208,9 +10950,7 @@ Module Type LangRefine
       specialize (IHuv_inf_u _ H).
       specialize (IHuv_inf_u0 _ H0).
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation;
-        red; rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
-        cbn; repeat red.
+      repeat red.
 
       exists (ret (fin_to_inf_dvalue x1)).
       exists (fun dv_inf => (fmap fin_to_inf_dvalue (x0 x1))).
@@ -11258,11 +10998,6 @@ Module Type LangRefine
       pose proof (IHuv_inf3 u1 Heqo1) as IHuv_inf_u1.
       red in IHuv_inf_u, IHuv_inf_u0, IHuv_inf_u1.
 
-      rewrite IS2.MEM.CP.CONC.concretize_equation in CONC_FIN.
-      red in CONC_FIN.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in CONC_FIN.
-      cbn in CONC_FIN.
-
       repeat red in CONC_FIN.
       destruct CONC_FIN as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
@@ -11274,13 +11009,11 @@ Module Type LangRefine
       pose proof eval_select_fin_inf x1 u0 u1 _ _ dv_fin IHuv_inf_u0 IHuv_inf_u1 as EVAL.
       forward EVAL.
       { cbn.
-        rewrite eval_select_equation.
+        red.
         apply H1.
       }
 
-      rewrite IS1.MEM.CP.CONC.concretize_equation;
-        red; rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation;
-        cbn; repeat red.
+      repeat red.
 
       specialize (IHuv_inf_u _ H).
 
@@ -11291,7 +11024,7 @@ Module Type LangRefine
 
       right.
       intros a ?; subst.
-      rewrite IS1.MEM.CP.CONC.eval_select_equation in EVAL.
+      red in EVAL.
       apply EVAL.
     - (* ExtractByte *)
       red; intros dv_fin CONC_FIN.
@@ -11303,6 +11036,7 @@ Module Type LangRefine
       }
   Qed.
 
+  
   Lemma fin_to_inf_dvalue_injective :
     forall dv1 dv2,
       fin_to_inf_dvalue dv1 = fin_to_inf_dvalue dv2 ->
@@ -12999,13 +12733,14 @@ Module Type LangRefine
     }
 
     { (* i1 conditional *)
-      rewrite eval_select_equation in *.
-      rewrite IS1.MEM.CP.CONC.eval_select_equation.
+
+      red. red. 
       rewrite fin_to_inf_dvalue_ix.
+      cbn in EVAL.
 
       break_match; try inv EVAL.
       break_match.
-      - eapply IH1; eauto.
+      - eapply IH1; eauto.  
       - eapply IH2; eauto.
     }
 
@@ -13025,9 +12760,7 @@ Module Type LangRefine
            ].
 
     { (* Vector conditional *)
-      rewrite eval_select_equation in *.
-      rewrite IS1.MEM.CP.CONC.eval_select_equation.
-
+      red.  red. 
       rewrite_fin_to_inf_dvalue.
       repeat red.
 
@@ -13153,11 +12886,11 @@ Module Type LangRefine
     - inv REF.
       cbn in CONC; inv CONC; cbn.
     - inv REF.
-      rewrite concretize_uvalue_bytes_helper_equation in CONC.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalue_bytes_helper_equation.
+      simpl in CONC.
+      simpl. 
       destruct y; uvalue_refine_strict_inv H1; try inv CONC.
       rewrite pre_concretized_fin_inf with (uv_fin:=y) (acc_fin:=acc_fin); eauto.
-      break_match_hyp_inv; repeat red.
+      break_match_hyp_inv; repeat red.      
       + (* pre-concretization exists *)
         destruct H as (?&?&?&?).
         destruct_err_ub_oom x0; inv H1.
@@ -13405,10 +13138,12 @@ Module Type LangRefine
           try inv REF;
           repeat break_match_hyp_inv;
           repeat red in UB;
-          rewrite CONC.concretize_uvalueM_equation in UB; inv UB
-        | cbn; auto
+          inv UB
+        | unfold IS1.LLVM.MEM.CP.CONC.concretize_u;
+          unfold IS1.LLVM.MEM.CP.CONC.concretize_uvalueM;
+          cbn; auto
         ].
-
+    
     destruct uv_inf;
       try
         solve
@@ -13416,8 +13151,10 @@ Module Type LangRefine
           try inv REF;
           repeat break_match_hyp_inv;
           repeat red in UB;
-          rewrite CONC.concretize_uvalueM_equation in UB; inv UB
-        | cbn; auto
+          inv UB
+        | unfold IS1.LLVM.MEM.CP.CONC.concretize_u;
+          unfold IS1.LLVM.MEM.CP.CONC.concretize_uvalueM;
+          cbn; auto
         ].
 
     - (* Structs *)
@@ -13426,27 +13163,23 @@ Module Type LangRefine
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
-
       repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; cbn in H1; inv H1.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H1; inversion H1; subst.
       { (* UB when concretizing l *)
-        clear H2.
+        clear H1 H2.
         induction Heqo.
         - cbn in H0; inv H0.
         - rewrite map_monad_unfold in H0.
           repeat red in H0.
           destruct H0 as (?&?&?&?&?).
-          destruct_err_ub_oom x1; inv H2.
-          { clear H3.
+          destruct_err_ub_oom_bind x1; subst; step_err_ub_oom_bind H2; inversion H2; subst.
+          { clear H2 H3.
             pose proof (H x).
             forward H2.
             repeat constructor.
             specialize (H2 y ub_msg H1 H0).
+            red. red. 
             rewrite map_monad_unfold.
             repeat red.
             exists (UB_unERR_UB_OOM ub_msg).
@@ -13461,21 +13194,20 @@ Module Type LangRefine
 
           (* No UB on first element *)
           destruct H3 as [[] | H3].
-          specialize (H3 x3).
+          specialize (H3 a).
           forward H3; [cbn; auto|].
           destruct H3 as (?&?&?&?&?).
-          rewrite <- H3 in H5.
-          destruct_err_ub_oom x1; inv H5.
+          rewrite <- H4 in H5.
+          destruct_err_ub_oom_bind x1; subst; step_err_ub_oom_bind H5; inv H5; subst.
           2: {
-            destruct H4 as [[] | H4].
-            specialize (H4 x5); forward H4; [cbn;auto|].
+            destruct H6 as [[] | H6].
+            specialize (H6 a0); forward H6; [cbn;auto|].
 
-            cbn in H4.
-            rewrite <- H4 in H7.
-            inv H7.
+            cbn in H6.
+            rewrite <- H6 in H8.
+            inv H8.
           }
 
-          repeat red.
           exists (UB_unERR_UB_OOM ub_msg).
           exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
           split; cbn; eauto.
@@ -13485,12 +13217,12 @@ Module Type LangRefine
           red in INC.
           specialize (INC _ H0).
 
-          exists (ret (fin_to_inf_dvalue x3)).
+          exists (ret (fin_to_inf_dvalue a)).
           exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
           split; cbn; eauto.
           split; cbn; eauto.
           right.
-          intros a H5; subst.
+          intros a' H5; subst.
 
           repeat red.
           exists (UB_unERR_UB_OOM ub_msg).
@@ -13512,13 +13244,14 @@ Module Type LangRefine
               apply IHclos_trans2.
           }
 
-          forward IHHeqo; eauto.
-          repeat red in IHHeqo.
-          destruct IHHeqo as (?&?&?&?&?).
-          destruct_err_ub_oom x1; inv H6; eauto.
+          apply IHHeqo in H3. clear IHHeqo.
+          repeat red in H3.
+          destruct H3 as (?&?&?&?&?).
+          destruct_err_ub_oom_bind x1; subst; step_err_ub_oom_bind H5; inv H5; subst.
+          apply H3.
 
           destruct H7 as [[] | H7].
-          specialize (H7 x6); forward H7; [cbn;auto|].
+          specialize (H7 a0); forward H7; [cbn;auto|].
 
           cbn in H7.
           rewrite <- H7 in H9.
@@ -13527,7 +13260,7 @@ Module Type LangRefine
 
       (* Concretizing fields succeeds, should be a contradiction *)
       destruct H2 as [[] | H2].
-      specialize (H2 x1 eq_refl).
+      specialize (H2 a eq_refl).
       cbn in H2.
       rewrite <- H2 in H4.
       cbn in H4. inv H4.
@@ -13537,28 +13270,23 @@ Module Type LangRefine
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
-
       repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; cbn in H1; inv H1.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H1; inversion H1; subst.
       { (* UB when concretizing l *)
-        clear H2.
+        clear H1 H2.
         induction Heqo.
         - cbn in H0; inv H0.
         - rewrite map_monad_unfold in H0.
           repeat red in H0.
           destruct H0 as (?&?&?&?&?).
-          destruct_err_ub_oom x1; inv H2.
-          { clear H3.
+          destruct_err_ub_oom_bind x1; subst; step_err_ub_oom_bind H2; inversion H2; subst.
+          { clear H2 H3.
             pose proof (H x).
             forward H2.
             repeat constructor.
             specialize (H2 y ub_msg H1 H0).
-
+            red. red. 
             rewrite map_monad_unfold.
             repeat red.
             exists (UB_unERR_UB_OOM ub_msg).
@@ -13573,21 +13301,20 @@ Module Type LangRefine
 
           (* No UB on first element *)
           destruct H3 as [[] | H3].
-          specialize (H3 x3).
+          specialize (H3 a).
           forward H3; [cbn; auto|].
           destruct H3 as (?&?&?&?&?).
-          rewrite <- H3 in H5.
-          destruct_err_ub_oom x1; inv H5.
+          rewrite <- H4 in H5.
+          destruct_err_ub_oom_bind x1; subst; step_err_ub_oom_bind H5; inv H5; subst.
           2: {
-            destruct H4 as [[] | H4].
-            specialize (H4 x5); forward H4; [cbn;auto|].
+            destruct H6 as [[] | H6].
+            specialize (H6 a0); forward H6; [cbn;auto|].
 
-            cbn in H4.
-            rewrite <- H4 in H7.
-            inv H7.
+            cbn in H6.
+            rewrite <- H6 in H8.
+            inv H8.
           }
 
-          repeat red.
           exists (UB_unERR_UB_OOM ub_msg).
           exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
           split; cbn; eauto.
@@ -13597,12 +13324,12 @@ Module Type LangRefine
           red in INC.
           specialize (INC _ H0).
 
-          exists (ret (fin_to_inf_dvalue x3)).
+          exists (ret (fin_to_inf_dvalue a)).
           exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
           split; cbn; eauto.
           split; cbn; eauto.
           right.
-          intros a H5; subst.
+          intros a' H5; subst.
 
           repeat red.
           exists (UB_unERR_UB_OOM ub_msg).
@@ -13624,13 +13351,14 @@ Module Type LangRefine
               apply IHclos_trans2.
           }
 
-          forward IHHeqo; eauto.
-          repeat red in IHHeqo.
-          destruct IHHeqo as (?&?&?&?&?).
-          destruct_err_ub_oom x1; inv H6; eauto.
+          apply IHHeqo in H3. clear IHHeqo.
+          repeat red in H3.
+          destruct H3 as (?&?&?&?&?).
+          destruct_err_ub_oom_bind x1; subst; step_err_ub_oom_bind H5; inv H5; subst.
+          apply H3.
 
           destruct H7 as [[] | H7].
-          specialize (H7 x6); forward H7; [cbn;auto|].
+          specialize (H7 a0); forward H7; [cbn;auto|].
 
           cbn in H7.
           rewrite <- H7 in H9.
@@ -13639,7 +13367,7 @@ Module Type LangRefine
 
       (* Concretizing fields succeeds, should be a contradiction *)
       destruct H2 as [[] | H2].
-      specialize (H2 x1 eq_refl).
+      specialize (H2 a eq_refl).
       cbn in H2.
       rewrite <- H2 in H4.
       cbn in H4. inv H4.
@@ -13649,27 +13377,23 @@ Module Type LangRefine
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
-
       repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; cbn in H1; inv H1.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H1; inversion H1; subst.
       { (* UB when concretizing l *)
-        clear H2.
+        clear H1 H2.
         induction Heqo.
         - cbn in H0; inv H0.
         - rewrite map_monad_unfold in H0.
           repeat red in H0.
           destruct H0 as (?&?&?&?&?).
-          destruct_err_ub_oom x1; inv H2.
-          { clear H3.
+          destruct_err_ub_oom_bind x1; subst; step_err_ub_oom_bind H2; inversion H2; subst.
+          { clear H2 H3.
             pose proof (H x).
             forward H2.
             repeat constructor.
             specialize (H2 y ub_msg H1 H0).
+            red. red. 
             rewrite map_monad_unfold.
             repeat red.
             exists (UB_unERR_UB_OOM ub_msg).
@@ -13684,21 +13408,20 @@ Module Type LangRefine
 
           (* No UB on first element *)
           destruct H3 as [[] | H3].
-          specialize (H3 x3).
+          specialize (H3 a).
           forward H3; [cbn; auto|].
           destruct H3 as (?&?&?&?&?).
-          rewrite <- H3 in H5.
-          destruct_err_ub_oom x1; inv H5.
+          rewrite <- H4 in H5.
+          destruct_err_ub_oom_bind x1; subst; step_err_ub_oom_bind H5; inv H5; subst.
           2: {
-            destruct H4 as [[] | H4].
-            specialize (H4 x5); forward H4; [cbn;auto|].
+            destruct H6 as [[] | H6].
+            specialize (H6 a0); forward H6; [cbn;auto|].
 
-            cbn in H4.
-            rewrite <- H4 in H7.
-            inv H7.
+            cbn in H6.
+            rewrite <- H6 in H8.
+            inv H8.
           }
 
-          repeat red.
           exists (UB_unERR_UB_OOM ub_msg).
           exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
           split; cbn; eauto.
@@ -13708,12 +13431,12 @@ Module Type LangRefine
           red in INC.
           specialize (INC _ H0).
 
-          exists (ret (fin_to_inf_dvalue x3)).
+          exists (ret (fin_to_inf_dvalue a)).
           exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
           split; cbn; eauto.
           split; cbn; eauto.
           right.
-          intros a H5; subst.
+          intros a' H5; subst.
 
           repeat red.
           exists (UB_unERR_UB_OOM ub_msg).
@@ -13734,13 +13457,15 @@ Module Type LangRefine
               apply H5_.
               apply IHclos_trans2.
           }
-          forward IHHeqo; eauto.
-          repeat red in IHHeqo.
-          destruct IHHeqo as (?&?&?&?&?).
-          destruct_err_ub_oom x1; inv H6; eauto.
+
+          apply IHHeqo in H3. clear IHHeqo.
+          repeat red in H3.
+          destruct H3 as (?&?&?&?&?).
+          destruct_err_ub_oom_bind x1; subst; step_err_ub_oom_bind H5; inv H5; subst.
+          apply H3.
 
           destruct H7 as [[] | H7].
-          specialize (H7 x6); forward H7; [cbn;auto|].
+          specialize (H7 a0); forward H7; [cbn;auto|].
 
           cbn in H7.
           rewrite <- H7 in H9.
@@ -13749,37 +13474,34 @@ Module Type LangRefine
 
       (* Concretizing fields succeeds, should be a contradiction *)
       destruct H2 as [[] | H2].
-      specialize (H2 x1 eq_refl).
+      specialize (H2 a eq_refl).
       cbn in H2.
       rewrite <- H2 in H4.
       cbn in H4. inv H4.
+      
     - (* Vectors *)
       unfold_uvalue_refine_strict_in REF.
       break_match_hyp_inv.
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
-
       repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; cbn in H1; inv H1.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H1; inversion H1; subst.
       { (* UB when concretizing l *)
-        clear H2.
+        clear H1 H2.
         induction Heqo.
         - cbn in H0; inv H0.
         - rewrite map_monad_unfold in H0.
           repeat red in H0.
           destruct H0 as (?&?&?&?&?).
-          destruct_err_ub_oom x1; inv H2.
-          { clear H3.
+          destruct_err_ub_oom_bind x1; subst; step_err_ub_oom_bind H2; inversion H2; subst.
+          { clear H2 H3.
             pose proof (H x).
             forward H2.
             repeat constructor.
             specialize (H2 y ub_msg H1 H0).
+            red. red. 
             rewrite map_monad_unfold.
             repeat red.
             exists (UB_unERR_UB_OOM ub_msg).
@@ -13794,21 +13516,20 @@ Module Type LangRefine
 
           (* No UB on first element *)
           destruct H3 as [[] | H3].
-          specialize (H3 x3).
+          specialize (H3 a).
           forward H3; [cbn; auto|].
           destruct H3 as (?&?&?&?&?).
-          rewrite <- H3 in H5.
-          destruct_err_ub_oom x1; inv H5.
+          rewrite <- H4 in H5.
+          destruct_err_ub_oom_bind x1; subst; step_err_ub_oom_bind H5; inv H5; subst.
           2: {
-            destruct H4 as [[] | H4].
-            specialize (H4 x5); forward H4; [cbn;auto|].
+            destruct H6 as [[] | H6].
+            specialize (H6 a0); forward H6; [cbn;auto|].
 
-            cbn in H4.
-            rewrite <- H4 in H7.
-            inv H7.
+            cbn in H6.
+            rewrite <- H6 in H8.
+            inv H8.
           }
 
-          repeat red.
           exists (UB_unERR_UB_OOM ub_msg).
           exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
           split; cbn; eauto.
@@ -13818,12 +13539,12 @@ Module Type LangRefine
           red in INC.
           specialize (INC _ H0).
 
-          exists (ret (fin_to_inf_dvalue x3)).
+          exists (ret (fin_to_inf_dvalue a)).
           exists (fun _ => (UB_unERR_UB_OOM ub_msg)).
           split; cbn; eauto.
           split; cbn; eauto.
           right.
-          intros a H5; subst.
+          intros a' H5; subst.
 
           repeat red.
           exists (UB_unERR_UB_OOM ub_msg).
@@ -13844,13 +13565,15 @@ Module Type LangRefine
               apply H5_.
               apply IHclos_trans2.
           }
-          forward IHHeqo; eauto.
-          repeat red in IHHeqo.
-          destruct IHHeqo as (?&?&?&?&?).
-          destruct_err_ub_oom x1; inv H6; eauto.
+
+          apply IHHeqo in H3. clear IHHeqo.
+          repeat red in H3.
+          destruct H3 as (?&?&?&?&?).
+          destruct_err_ub_oom_bind x1; subst; step_err_ub_oom_bind H5; inv H5; subst.
+          apply H3.
 
           destruct H7 as [[] | H7].
-          specialize (H7 x6); forward H7; [cbn;auto|].
+          specialize (H7 a0); forward H7; [cbn;auto|].
 
           cbn in H7.
           rewrite <- H7 in H9.
@@ -13859,26 +13582,24 @@ Module Type LangRefine
 
       (* Concretizing fields succeeds, should be a contradiction *)
       destruct H2 as [[] | H2].
-      specialize (H2 x1 eq_refl).
+      specialize (H2 a eq_refl).
       cbn in H2.
       rewrite <- H2 in H4.
       cbn in H4. inv H4.
-    - (* UVALUE_ICmp *)
+
+
+    - (* UVALUE_Binop *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; inv H0.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H0; inv H0; subst.
       { (* UB when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto. 
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -13888,24 +13609,24 @@ Module Type LangRefine
 
       (* No UB on first operand. *)
       destruct H1 as [[] | H1].
-      specialize (H1 x1).
+      specialize (H1 a).
       forward H1; [cbn; auto|].
       repeat red in H1.
       destruct H1 as (?&?&?&?&?).
       rewrite <- H1 in H3.
-      destruct_err_ub_oom x; inv H3.
-
+      exists (ret (fin_to_inf_dvalue a)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; eauto.
+      right.
+      intros a' H4.
+      subst.
+      red. 
+      
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H3; inv H3; subst.
       { (* UB in second operand *)
-        eapply IH in H0; eauto.
-        repeat red.
-        exists (ret (fin_to_inf_dvalue x1)).
-        exists (fun _ => UB_unERR_UB_OOM ub_msg).
-        split; cbn; eauto.
-        eapply uvalue_concretize_strict_concretize_inclusion; eauto.
-        split; eauto.
-        right.
-        intros a H3.
-        repeat red.
+        eapply IH in Heqo0; eauto.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
@@ -13914,14 +13635,14 @@ Module Type LangRefine
 
       (* UB in evaluating operation? *)
       destruct H2 as [[] | H2].
-      specialize (H2 x3).
+      specialize (H2 a0).
       forward H2; [cbn; auto|].
       rewrite <- H2 in H5.
 
-      remember (eval_iop iop x1 x3) as res.
+      remember (eval_iop iop a a0) as res.
       destruct_err_ub_oom res; inv H5.
 
-      exists (ret (fin_to_inf_dvalue x1)).
+      exists (ret (fin_to_inf_dvalue a0)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
 
       split; cbn; eauto.
@@ -13929,16 +13650,7 @@ Module Type LangRefine
       split; cbn; eauto.
       right.
 
-      intros a H3; subst.
-      exists (ret (fin_to_inf_dvalue x3)).
-      exists (fun _ => UB_unERR_UB_OOM ub_msg).
-
-      split; cbn; eauto.
-      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
-      split; cbn; eauto.
-      right.
-
-      intros a H3; subst.
+      intros a' H3; subst.
       eapply eval_iop_ub_fin_inf; eauto.
     - (* UVALUE_ICmp *)
       rename H into IH.
@@ -13946,16 +13658,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; inv H0.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H0; inv H0; subst.
       { (* UB when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -13965,24 +13673,24 @@ Module Type LangRefine
 
       (* No UB on first operand. *)
       destruct H1 as [[] | H1].
-      specialize (H1 x1).
+      specialize (H1 a).
       forward H1; [cbn; auto|].
       repeat red in H1.
       destruct H1 as (?&?&?&?&?).
       rewrite <- H1 in H3.
-      destruct_err_ub_oom x; inv H3.
+      repeat red.
+      exists (ret (fin_to_inf_dvalue a)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; eauto.
+      right. 
+      intros a' H4. subst.
+      repeat red.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H3; inv H3; subst.
 
       { (* UB in second operand *)
-        eapply IH in H0; eauto.
-        repeat red.
-        exists (ret (fin_to_inf_dvalue x1)).
-        exists (fun _ => UB_unERR_UB_OOM ub_msg).
-        split; cbn; eauto.
-        eapply uvalue_concretize_strict_concretize_inclusion; eauto.
-        split; eauto.
-        right.
-        intros a H3.
-        repeat red.
+        eapply IH in Heqo0; eauto.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
@@ -13991,14 +13699,11 @@ Module Type LangRefine
 
       (* UB in evaluating operation? *)
       destruct H2 as [[] | H2].
-      specialize (H2 x3).
+      specialize (H2 a0).
       forward H2; [cbn; auto|].
       rewrite <- H2 in H5.
 
-      remember (eval_icmp samesign cmp x1 x3) as res.
-      destruct_err_ub_oom res; inv H5.
-
-      exists (ret (fin_to_inf_dvalue x1)).
+      exists (ret (fin_to_inf_dvalue a0)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
 
       split; cbn; eauto.
@@ -14006,33 +13711,21 @@ Module Type LangRefine
       split; cbn; eauto.
       right.
 
-      intros a H3; subst.
-      exists (ret (fin_to_inf_dvalue x3)).
-      exists (fun _ => UB_unERR_UB_OOM ub_msg).
-
-      split; cbn; eauto.
-      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
-      split; cbn; eauto.
-      right.
-
-      intros a H3; subst.
+      intros a' H3; subst.
       eapply eval_icmp_ub_fin_inf; eauto.
+      
     - (* UVALUE_FBinop *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; inv H0.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H0; inv H0; subst.
       { (* UB when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto. 
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -14042,24 +13735,24 @@ Module Type LangRefine
 
       (* No UB on first operand. *)
       destruct H1 as [[] | H1].
-      specialize (H1 x1).
+      specialize (H1 a).
       forward H1; [cbn; auto|].
       repeat red in H1.
       destruct H1 as (?&?&?&?&?).
       rewrite <- H1 in H3.
-      destruct_err_ub_oom x; inv H3.
-
+      exists (ret (fin_to_inf_dvalue a)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; eauto.
+      right.
+      intros a' H4.
+      subst.
+      red. 
+      
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H3; inv H3; subst.
       { (* UB in second operand *)
-        eapply IH in H0; eauto.
-        repeat red.
-        exists (ret (fin_to_inf_dvalue x1)).
-        exists (fun _ => UB_unERR_UB_OOM ub_msg).
-        split; cbn; eauto.
-        eapply uvalue_concretize_strict_concretize_inclusion; eauto.
-        split; eauto.
-        right.
-        intros a H3.
-        repeat red.
+        eapply IH in Heqo0; eauto.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
@@ -14068,14 +13761,14 @@ Module Type LangRefine
 
       (* UB in evaluating operation? *)
       destruct H2 as [[] | H2].
-      specialize (H2 x3).
+      specialize (H2 a0).
       forward H2; [cbn; auto|].
       rewrite <- H2 in H5.
 
-      remember (eval_fop fop x1 x3) as res.
+      remember (eval_fop fop a a0) as res.
       destruct_err_ub_oom res; inv H5.
 
-      exists (ret (fin_to_inf_dvalue x1)).
+      exists (ret (fin_to_inf_dvalue a0)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
 
       split; cbn; eauto.
@@ -14083,35 +13776,20 @@ Module Type LangRefine
       split; cbn; eauto.
       right.
 
-      intros a H3; subst.
-      exists (ret (fin_to_inf_dvalue x3)).
-      exists (fun _ => UB_unERR_UB_OOM ub_msg).
-
-      split; cbn; eauto.
-      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
-      split; cbn; eauto.
-      right.
-
-      intros a H3; subst.
-      eapply eval_fop_ub_fin_inf; eauto.
+      intros a' H3; subst.
+      eapply eval_fop_ub_fin_inf; eauto.      
 
     - rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-      cbn. 
       
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
-
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; inv H0.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H0; inv H0.
       { (* UB when concretizing first operand *)
-        eapply IH in H; eauto.
-        repeat red.
+        eapply IH in Heqo; eauto.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
@@ -14119,24 +13797,20 @@ Module Type LangRefine
       }
 
       destruct H1 as [[] | H1].
-      specialize (H1 x1).
+      specialize (H1 a).
       forward H1; [cbn; auto|].
-      rewrite <- H1 in H3.
-
-      remember (eval_fneg x1) as res.
-      destruct_err_ub_oom res; inv H3.
-
-      red.
-
-      exists (ret (fin_to_inf_dvalue x1)).
+      exists (ret (fin_to_inf_dvalue a)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
 
+      rewrite <- H1 in H3.
+      remember (eval_fneg a) as res.
+      destruct_err_ub_oom res; inv H3.
       split; cbn; eauto.
       eapply uvalue_concretize_strict_concretize_inclusion; eauto.
       split; cbn; eauto.
       right.
 
-      intros a Ha.
+      intros a' Ha.
       subst.
       eapply eval_fneg_ub_fin_inf; eauto.
       
@@ -14146,16 +13820,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; inv H0.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H0; inv H0; subst.
       { (* UB when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto. 
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -14165,24 +13835,24 @@ Module Type LangRefine
 
       (* No UB on first operand. *)
       destruct H1 as [[] | H1].
-      specialize (H1 x1).
+      specialize (H1 a).
       forward H1; [cbn; auto|].
       repeat red in H1.
       destruct H1 as (?&?&?&?&?).
       rewrite <- H1 in H3.
-      destruct_err_ub_oom x; inv H3.
-
+      exists (ret (fin_to_inf_dvalue a)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; eauto.
+      right.
+      intros a' H4.
+      subst.
+      red. 
+      
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H3; inv H3; subst.
       { (* UB in second operand *)
-        eapply IH in H0; eauto.
-        repeat red.
-        exists (ret (fin_to_inf_dvalue x1)).
-        exists (fun _ => UB_unERR_UB_OOM ub_msg).
-        split; cbn; eauto.
-        eapply uvalue_concretize_strict_concretize_inclusion; eauto.
-        split; eauto.
-        right.
-        intros a H3.
-        repeat red.
+        eapply IH in Heqo0; eauto.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
@@ -14191,14 +13861,14 @@ Module Type LangRefine
 
       (* UB in evaluating operation? *)
       destruct H2 as [[] | H2].
-      specialize (H2 x3).
+      specialize (H2 a0).
       forward H2; [cbn; auto|].
       rewrite <- H2 in H5.
 
-      remember (eval_fcmp cmp x1 x3) as res.
+      remember (eval_fcmp cmp a a0) as res.
       destruct_err_ub_oom res; inv H5.
 
-      exists (ret (fin_to_inf_dvalue x1)).
+      exists (ret (fin_to_inf_dvalue a0)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
 
       split; cbn; eauto.
@@ -14206,52 +13876,40 @@ Module Type LangRefine
       split; cbn; eauto.
       right.
 
-      intros a H3; subst.
-      exists (ret (fin_to_inf_dvalue x3)).
-      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      intros a' H3; subst.
+      eapply eval_fcmp_ub_fin_inf; eauto.      
 
-      split; cbn; eauto.
-      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
-      split; cbn; eauto.
-      right.
-
-      intros a H3; subst.
-      eapply eval_fcmp_ub_fin_inf; eauto.
     - (* UVALUE_Conversion *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; inv H0.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H0; inv H0; subst.
       { (* UB when concretizing uv *)
-        eapply IH in H; eauto.
-        repeat red.
+        eapply IH in Heqo; eauto.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
         repeat constructor.
       }
 
-      (* No UB on concretizing uv. *)
-      destruct H1 as [[] | H1].
-      specialize (H1 x1).
-      forward H1; [cbn; auto|].
-
-      exists (ret (fin_to_inf_dvalue x1)).
+      (* No UB on concretizing uv. *)      
+      exists (ret (fin_to_inf_dvalue a)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
       split.
       eapply uvalue_concretize_strict_concretize_inclusion; eauto.
-      split; cbn; eauto.
+      split; eauto.
       right.
-      intros a H0; subst.
+      intros a' H0; subst.
+      
+      destruct H1 as [[] | H1].
+      specialize (H1 a).
+      forward H1; [cbn; auto|].
+
       break_match_hyp.
 
       { (* Pure *)
@@ -14283,23 +13941,19 @@ Module Type LangRefine
       { (* Illegal *)
         rewrite <- H1 in H3; inv H3.
       }
+
     - (* UVALUE_GetElementPtr *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; inv H0.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H0; inv H0; subst.
       { (* UB when concretizing base address *)
-        eapply IH in H; eauto.
-        repeat red.
+        eapply IH in Heqo; eauto.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
@@ -14307,24 +13961,32 @@ Module Type LangRefine
       }
 
       (* No UB on base address. *)
-      destruct H1 as [[] | H1].
-      specialize (H1 x1).
-      exists (ret (fin_to_inf_dvalue x1)).
+      
+      exists (ret (fin_to_inf_dvalue a)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
       split; eauto.
       eapply uvalue_concretize_strict_concretize_inclusion; eauto.
       split; cbn; eauto.
       right.
-      intros a ?; subst.
+      
+      destruct H1 as [[] | H1].
+      specialize (H1 a).
+      intros a' ?; subst.
       repeat red.
 
       forward H1; [cbn; auto|].
       repeat red in H1.
       destruct H1 as (?&?&?&?&?).
       rewrite <- H1 in H3.
-      destruct_err_ub_oom x; inv H3.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H3; inv H3; subst.
 
       { (* UB in concretization of indices *)
+        exists (UB_unERR_UB_OOM ub_msg).
+        exists (fun _ => UB_unERR_UB_OOM ub_msg).
+        split.
+        2 : { split; eauto. left. cbn; auto. }
+        clear H2 H.
+
         generalize dependent l.
         induction idxs; intros l H3 Heqo0.
         - inv Heqo0. cbn in H3. inv H3.
@@ -14349,89 +14011,61 @@ Module Type LangRefine
           cbn in Heqo0.
           repeat break_match_hyp_inv.
           rewrite map_monad_unfold in H3.
-          cbn in H3.
-          repeat red in H3.
           destruct H3 as (?&?&?&?&?).
-          destruct_err_ub_oom x; inv H3.
+          destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H0; inv H0; subst.
           + (* UB in first index *)
             exists (UB_unERR_UB_OOM ub_msg).
             exists (fun _ => UB_unERR_UB_OOM ub_msg).
-            split.
-            * rewrite map_monad_unfold.
-              cbn.
-              exists (UB_unERR_UB_OOM ub_msg).
-              exists (fun _ => UB_unERR_UB_OOM ub_msg).
-              split.
-              eapply IH; cbn; eauto.
-              repeat constructor.
-              split; cbn; eauto.
-            * split; cbn; eauto.
+            split. eapply IH in Heqo1; eauto.
+            repeat constructor.
+            split; eauto. left. repeat red.  auto.
+            
           + (* No UB on first index *)
-            destruct H4 as [[] | H4].
-            specialize (H4 x4).
-            forward H4; [cbn; auto|].
-            repeat red in H4.
-            destruct H4 as (?&?&?&?&?).
-            rewrite <- H4 in H6.
+            destruct H2 as [[] | H2].
+            specialize (H2 a1).
+            forward H2; [cbn; auto|].
+            repeat red in H2.
+            destruct H2 as (?&?&?&?&?).
+            rewrite <- H2 in H4.
 
             rewrite map_monad_unfold.
-            exists (UB_unERR_UB_OOM ub_msg).
-            exists (fun _ => UB_unERR_UB_OOM ub_msg).
-            split; cbn; eauto.
-
-            exists (ret (fin_to_inf_dvalue x4)).
+            exists (ret (fin_to_inf_dvalue a1)).
             exists (fun _ => UB_unERR_UB_OOM ub_msg).
             split; cbn; eauto.
             eapply uvalue_concretize_strict_concretize_inclusion; eauto.
-            split; cbn; eauto.
+            split; eauto.            
             right.
-            intros a0 H8; subst.
-            destruct_err_ub_oom x; inv H6.
+            intros a2 H8; subst.
+            destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H4; inv H4; subst.
             * (* UB in map *)
-              specialize (IHidxs l0 H3 eq_refl).
-              destruct IHidxs as (?&?&?&?&?).
-              destruct_err_ub_oom x; inv H7.
-              { exists (UB_unERR_UB_OOM ub_msg).
-                exists (fun _ => UB_unERR_UB_OOM ub_msg).
-                split; cbn; eauto.
-              }
-              destruct H8 as [[] | H8].
-              specialize (H8 x7).
-              forward H8; [cbn; auto|].
-              destruct (IS1.LLVM.MEM.MP.GEP.handle_gep t (fin_to_inf_dvalue x1) x7);
-                try rewrite <- H8 in H10; try inv H10.
-              destruct o;
-                rewrite <- H8 in H9; inv H9.
-            * destruct H5 as [[] | H5].
-              specialize (H5 x6).
-              forward H5; [cbn; auto|].
-              rewrite <- H5 in H8.
-              inv H8.
-      }
+              specialize (IHidxs l0 H0 eq_refl).
+              exists (UB_unERR_UB_OOM ub_msg).
+              exists (fun _ => UB_unERR_UB_OOM ub_msg).
+              split; cbn; eauto.
 
-      (* No UB when concretizing indices... *)
+            * destruct H3 as [[] | H3].
+              specialize (H3 a2 eq_refl). repeat red in H3.
+              rewrite <- H3 in H6. inversion H6.
+      }
       exfalso.
       destruct H2 as [[] | H2].
-      specialize (H2 x3).
+      specialize (H2 a0).
       forward H2; [cbn; auto|].
       repeat break_match_hyp;
         rewrite <- H2 in H5; inv H5.
+
     - (* UVALUE_ExtractElement *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; inv H0.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H0; inv H0; subst.
       { (* UB when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto. 
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -14441,24 +14075,24 @@ Module Type LangRefine
 
       (* No UB on first operand. *)
       destruct H1 as [[] | H1].
-      specialize (H1 x1).
+      specialize (H1 a).
       forward H1; [cbn; auto|].
       repeat red in H1.
       destruct H1 as (?&?&?&?&?).
       rewrite <- H1 in H3.
-      destruct_err_ub_oom x; inv H3.
-
+      exists (ret (fin_to_inf_dvalue a)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; eauto.
+      right.
+      intros a' H4.
+      subst.
+      red. 
+      
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H3; inv H3; subst.
       { (* UB in second operand *)
-        eapply IH in H0; eauto.
-        repeat red.
-        exists (ret (fin_to_inf_dvalue x1)).
-        exists (fun _ => UB_unERR_UB_OOM ub_msg).
-        split; cbn; eauto.
-        eapply uvalue_concretize_strict_concretize_inclusion; eauto.
-        split; eauto.
-        right.
-        intros a H3.
-        repeat red.
+        eapply IH in Heqo0; eauto.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
@@ -14467,64 +14101,77 @@ Module Type LangRefine
 
       (* UB in evaluating operation? *)
       destruct H2 as [[] | H2].
-      specialize (H2 x3).
+      specialize (H2 a0).
       forward H2; [cbn; auto|].
-      repeat red in H2.
-      destruct H2 as (?&?&?&?&?).
-      rewrite <- H3 in H5.
-      destruct vec_typ; inv H2; inv H5.
 
+      exists (ret (fin_to_inf_dvalue a0)).
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split; cbn; eauto.
+      eapply uvalue_concretize_strict_concretize_inclusion; eauto.
+      split; cbn; eauto.
+      right.
+
+      intros a1 HA. subst.
+      rewrite H5 in H2.
+      red.
+      destruct H2 as (?&?&?&?&?).
+
+      exists x.
+      exists (fun _ => UB_unERR_UB_OOM ub_msg).
+      split. auto.
+
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H3; inv H3; subst.
+      { split; auto. left; cbn; auto. }
+      split; auto.
+      right.
+      intros t HT.
+      cbn in HT. subst.
       destruct H4 as [[] | H4].
-      specialize (H4 vec_typ).
-      forward H4; [cbn; auto|].
-      remember (index_into_vec_dv vec_typ x1 x3) as res.
-      rewrite <- H4 in H6.
-      destruct_err_ub_oom res; inv H6.
-      symmetry in Heqres.
-      eapply index_into_vec_dv_no_ub in Heqres; contradiction.
+      specialize (H4 t eq_refl).
+      rewrite <- H4 in H7.
+      destruct vec_typ; inversion H2. subst.
+      remember (index_into_vec_dv t a a0) as res.
+      Error.destruct_err_ub_oom res; rewrite EQM in H7; inv H7; subst.
+      eapply index_into_vec_dv_no_ub in EQM; contradiction.
+      
     - (* UVALUE_InsertElement *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; inv H0.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H0; inv H0; subst.
       { (* UB when concretizing first operand *)
-        eapply IH in H; eauto.
-        repeat red.
+        eapply IH in Heqo; eauto.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
         repeat constructor.
       }
 
-      exists (ret (fin_to_inf_dvalue x1)).
+      exists (ret (fin_to_inf_dvalue a)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
       split; eauto.
       eapply uvalue_concretize_strict_concretize_inclusion; eauto.
       split; eauto.
       right.
-      intros a H0.
+      intros a' H0.
       inv H0.
 
       (* No UB on first operand. *)
       destruct H1 as [[] | H1].
-      specialize (H1 x1).
+      specialize (H1 a).
       forward H1; [cbn; auto|].
       repeat red in H1.
       destruct H1 as (?&?&?&?&?).
       rewrite <- H1 in H3.
-      destruct_err_ub_oom x; inv H3.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H3; inv H3; subst.
 
       { (* UB uv_inf3 *)
-        eapply IH in H0; eauto.
+        eapply IH in Heqo1; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -14533,25 +14180,25 @@ Module Type LangRefine
       }
 
       (* No UB on uv_inf3 *)
-      exists (ret (fin_to_inf_dvalue x3)).
+      exists (ret (fin_to_inf_dvalue a0)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
       split; eauto.
       eapply uvalue_concretize_strict_concretize_inclusion; eauto.
       split; eauto.
       right.
-      intros a ?.
+      intros a' ?.
       inv H3.
 
       destruct H2 as [[] | H2].
-      specialize (H2 x3).
+      specialize (H2 a0).
       forward H2; [cbn; auto|].
       repeat red in H2.
       destruct H2 as (?&?&?&?&?).
       rewrite <- H3 in H5.
-      destruct_err_ub_oom x; inv H5.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H5; inv H5.
 
       { (* UB in uv_inf2 *)
-        eapply IH in H2; eauto.
+        eapply IH in Heqo0; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -14560,40 +14207,35 @@ Module Type LangRefine
       }
 
       (* No UB on uv_inf2 *)
-      exists (ret (fin_to_inf_dvalue x5)).
+      exists (ret (fin_to_inf_dvalue a1)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
       split; eauto.
       eapply uvalue_concretize_strict_concretize_inclusion; eauto.
       split; eauto.
       right.
-      intros a ?.
+      intros a' ?.
       inv H5.
 
       (* UB in evaluating... *)
       destruct H4 as [[] | H4].
-      specialize (H4 x5).
+      specialize (H4 a1).
       forward H4; [cbn; auto|].
       rewrite <- H4 in H7.
-      remember (insert_into_vec_dv vec_typ x1 x5 x3) as res.
-      destruct_err_ub_oom res; inv H7.
-      symmetry in Heqres.
-      eapply insert_into_vec_dv_no_ub_fin_inf in Heqres; contradiction.
+      remember (insert_into_vec_dv vec_typ a a1 a0) as res.
+      Error.destruct_err_ub_oom res; rewrite H7 in EQM; inversion EQM; subst.
+      eapply insert_into_vec_dv_no_ub_fin_inf in H7; contradiction.
     - (* UVALUE_ExtractValue *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; inv H0.
+      destruct_err_ub_oom_bind x; subst; try step_err_ub_oom_bind H0; inv H0.
       { (* UB when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -14601,18 +14243,18 @@ Module Type LangRefine
         repeat constructor.
       }
 
-      exists (ret (fin_to_inf_dvalue x1)).
+      exists (ret (fin_to_inf_dvalue a)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
       split; eauto.
       eapply uvalue_concretize_strict_concretize_inclusion; eauto.
       split; eauto.
       right.
-      intros a H0.
+      intros a' H0.
       inv H0.
 
       (* No UB on first operand. *)
       destruct H1 as [[] | H1].
-      specialize (H1 x1).
+      specialize (H1 a).
       forward H1; [cbn; auto|].
       rewrite <- H1 in H3.
       remember (((fix loop (str : dvalue) (idxs : list LLVMAst.int_ast) {struct idxs} :
@@ -14620,17 +14262,17 @@ Module Type LangRefine
                       match idxs with
                       | [] => ret str
                       | i :: tl => v <- index_into_str_dv str i;; loop v tl
-                      end) x1 idxs)) as res.
-      destruct_err_ub_oom res; inv H3.
+                      end) a idxs)) as res.
+      Error.destruct_err_ub_oom res; rewrite H3 in EQM; inversion EQM; subst.
       (* Here's should be a contradiction --- no way to get UB *)
-      clear - Heqres.
-      symmetry in Heqres.
+      clear - H3.
+      symmetry in H3.
       exfalso.
 
-      generalize dependent x1.
-      induction idxs; intros x1 CONTRA.
+      generalize dependent a.
+      induction idxs; intros a1 CONTRA.
       + inv CONTRA.
-      + remember (index_into_str_dv x1 a) as init.
+      + remember (index_into_str_dv a1 a) as init.
         remember (fix loop (str : dvalue) (idxs : list LLVMAst.int_ast) {struct idxs} : err_ub_oom dvalue :=
                     match idxs with
                     | [] => ret str
@@ -14651,16 +14293,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; inv H0.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H0; inv H0; subst.
       { (* UB when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -14669,25 +14307,26 @@ Module Type LangRefine
       }
 
       (* No UB on first operand. *)
-      exists (ret (fin_to_inf_dvalue x1)).
+      exists (ret (fin_to_inf_dvalue a)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
-      split; cbn; eauto.
+      split; eauto.
       eapply uvalue_concretize_strict_concretize_inclusion; eauto.
       split; eauto.
       right.
-      intros a ?; subst.
+      intros a' ?; subst.
       repeat red.
 
       destruct H1 as [[] | H1].
-      specialize (H1 x1).
+      specialize (H1 a).
       forward H1; [cbn; auto|].
       repeat red in H1.
       destruct H1 as (?&?&?&?&?).
-      rewrite <- H1 in H3.
-      destruct_err_ub_oom x; inv H3.
+      inversion H0; subst.
+      rewrite <- H2 in H3.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H3; inv H3; subst.
 
       { (* UB in second operand *)
-        eapply IH in H0; eauto.
+        eapply IH in Heqo0; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -14696,28 +14335,26 @@ Module Type LangRefine
       }
 
       (* No UB on second operand. *)
-      exists (ret (fin_to_inf_dvalue x3)).
+      exists (ret (fin_to_inf_dvalue a0)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
       split; cbn; eauto.
       eapply uvalue_concretize_strict_concretize_inclusion; eauto.
       split; eauto.
       right.
-      intros a ?; subst.
-      repeat red.
-
+      intros a' ?; subst.
 
       (* UB in evaluating operation? *)
-      destruct H2 as [[] | H2].
-      specialize (H2 x3).
-      forward H2; [cbn; auto|].
-      repeat red in H2.
+      destruct H4 as [[] | H4].
+      specialize (H4 a0).
+      forward H4; [cbn; auto|].
+      repeat red in H4.
 
-      pose proof H2 as LOOP.
+      pose proof H4 as LOOP.
       apply insert_value_loop_fin_inf_succeeds in LOOP.
       cbn in LOOP.
       rewrite LOOP.
-      remember (x2 x3) as res.
-      destruct_err_ub_oom res; inv H5.
+      remember (x1 a0) as res.
+      destruct_err_ub_oom res; inv H6.
       reflexivity.
     - (* UVALUE_Select *)
       rename H into IH.
@@ -14725,16 +14362,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in UB.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in UB.
 
-      repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; inv H0.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H0;  inv H0; subst.
       { (* UB when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
@@ -14742,34 +14375,32 @@ Module Type LangRefine
         repeat constructor.
       }
 
-      exists (ret (fin_to_inf_dvalue x1)).
+      exists (ret (fin_to_inf_dvalue a)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
       split; eauto.
       eapply uvalue_concretize_strict_concretize_inclusion; eauto.
       split; eauto.
       right.
-      intros a H0.
+      intros a' H0.
       inv H0.
 
       (* No UB on first operand. *)
       destruct H1 as [[] | H1].
-      specialize (H1 x1).
+      specialize (H1 a).
       forward H1; [cbn; auto|].
-      remember (x0 x1) as res.
-      destruct_err_ub_oom res; inv H3; eauto.
+      remember (x0 a)  as res.
+      Error.destruct_err_ub_oom res; rewrite H3 in EQM; inversion EQM; subst.
+      rewrite H3 in H1.
+      
+     
 
-      epose proof eval_select_ub_fin_inf x1 u0 u1 uv_inf2 uv_inf3 _ as EVAL.
+      epose proof eval_select_ub_fin_inf a u0 u1 uv_inf2 uv_inf3 _ as EVAL.
       forward EVAL; [intros ? ?; eapply IH; eauto; repeat constructor|].
       forward EVAL; [intros ? ?; eapply IH; eauto; repeat constructor|].
       forward EVAL; eauto.
       forward EVAL; eauto.
-      forward EVAL.
-      { rewrite eval_select_equation.
-        eauto.
-      }
+      forward EVAL; eauto.
 
-      rewrite IS1.MEM.CP.CONC.eval_select_equation in EVAL.
-      auto.
     - (* UVALUE_ConcatBytes *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
@@ -14790,7 +14421,7 @@ Module Type LangRefine
         cbn in UB.
         repeat red in UB.
         destruct UB as (?&?&?&?&?).
-        destruct_err_ub_oom x; inv H0.
+        destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H0; inv H0; subst.
         { exists (UB_unERR_UB_OOM ub_msg).
           exists (fun _ => UB_unERR_UB_OOM ub_msg).
           split; cbn; eauto.
@@ -14804,10 +14435,11 @@ Module Type LangRefine
         }
 
         destruct H1 as [[] | H1].
-        specialize (H1 x1).
+        specialize (H1 a).
         forward H1; [cbn; auto|].
-        remember (x0 x1) as x0x1.
-        destruct_err_ub_oom x0x1; inv H3.
+        remember (x0 a) as ret.
+        Error.destruct_err_ub_oom ret; rewrite EQM in H3; inv H3.
+        rewrite EQM in H1.
 
         eapply concretize_uvalue_bytes_helper_fin_inf in H; eauto.
         3: eapply map_monad_oom_Forall2; eauto.
@@ -14816,12 +14448,12 @@ Module Type LangRefine
           eapply uvalue_concretize_strict_concretize_inclusion; eauto.
         }
 
-        exists (ret (fin_to_inf_dvalue_bytes x1)).
+        exists (ret (fin_to_inf_dvalue_bytes a)).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; eauto.
         split; eauto.
         right.
-        intros a RETa.
+        intros a' RETa.
         inv RETa.
         eapply dvalue_bytes_to_dvalue_ub_fin_inf; eauto.
         apply dvalue_bytes_refine_fin_to_inf_dvalue_bytes.
@@ -14855,7 +14487,7 @@ Module Type LangRefine
       cbn in UB.
       repeat red in UB.
       destruct UB as (?&?&?&?&?).
-      destruct_err_ub_oom x; inv H0.
+      destruct_err_ub_oom_bind x; subst; step_err_ub_oom_bind H0; inv H0; subst.
       { exists (UB_unERR_UB_OOM ub_msg).
         exists (fun _ => UB_unERR_UB_OOM ub_msg).
         split; cbn; eauto.
@@ -14869,24 +14501,25 @@ Module Type LangRefine
       }
 
       destruct H1 as [[] | H1].
-      specialize (H1 x1).
+      specialize (H1 a).
       forward H1; [cbn; auto|].
-      remember (x0 x1) as x0x1.
-      destruct_err_ub_oom x0x1; inv H3.
+      remember (x0 a) as x0x1.
+      Error.destruct_err_ub_oom x0x1; rewrite EQM in H3; inv H3. 
+      rewrite EQM in H1.
 
       eapply concretize_uvalue_bytes_helper_fin_inf in H; eauto.
       3: eapply map_monad_oom_Forall2; eauto.
       2: {
-        intros u H0 uv_fin H2 dv_fin H3.
+        intros u H0 uv_fin H3 dv_fin H4.
         eapply uvalue_concretize_strict_concretize_inclusion; eauto.
       }
 
-      exists (ret (fin_to_inf_dvalue_bytes x1)).
+      exists (ret (fin_to_inf_dvalue_bytes a)).
       exists (fun _ => UB_unERR_UB_OOM ub_msg).
       split; eauto.
       split; eauto.
       right.
-      intros a RETa.
+      intros a' RETa.
       inv RETa.
       eapply dvalue_bytes_to_dvalue_ub_fin_inf; eauto.
       apply dvalue_bytes_refine_fin_to_inf_dvalue_bytes.
@@ -14982,8 +14615,8 @@ Module Type LangRefine
         DV1.Conv_Illegal msg.
   Proof.
     intros t_from dv t_to msg CONV.
-    cbn in *; inv CONV; auto.
-
+    unfold get_conv_case in CONV.
+    unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
     unfold MemHelpers.dtyp_eqb,
       IS1.LLVM.MEM.CP.CONC.MemHelpers.dtyp_eqb in *.
     break_match_hyp_inv.
@@ -14992,9 +14625,10 @@ Module Type LangRefine
     remember (ErrOOMPoison_handle_poison_and_oom DVALUE_Poison
                           (DVALUE_BYTES.dvalue_bytes_to_dvalue
                              (DVALUE_BYTES.dvalue_to_dvalue_bytes dv t_from) t_to)) as res.
-    destruct_err_ub_oom res; inv H0; cbn in *.
+    destruct_err_ub_oom res; inv H1; cbn in *.
     { erewrite dvalue_bytes_to_dvalue_ub_fin_inf; eauto.
       cbn. auto.
+      
       rewrite dvalue_to_dvalue_bytes_fin_to_inf_dvalue.
       apply dvalue_bytes_refine_fin_to_inf_dvalue_bytes.
     }
@@ -15012,6 +14646,8 @@ Module Type LangRefine
       IS1.LLVM.MEM.CP.CONC.get_conv_case conv t_from (fin_to_inf_dvalue dv) t_to = DV1.Conv_Illegal msg.
   Proof.
     intros conv t_from dv t_to msg CONV.
+    unfold get_conv_case in CONV.
+    unfold IS1.LLVM.MEM.CP.CONC.get_conv_case.
     destruct conv;
       try solve
         [ cbn in *;
@@ -15383,9 +15019,9 @@ Module Type LangRefine
     }
 
     { (* integer conditional *)
-      rewrite eval_select_equation in *.
-      rewrite IS1.MEM.CP.CONC.eval_select_equation.
+      simpl in *.
       rewrite fin_to_inf_dvalue_ix.
+      cbn. 
 
       repeat break_match_hyp; cbn in *;
         try inv EVAL; auto.
@@ -15409,8 +15045,7 @@ Module Type LangRefine
            ].
 
     { (* Vector conditional *)
-      rewrite eval_select_equation in *.
-      rewrite IS1.MEM.CP.CONC.eval_select_equation.
+      simpl in *.
 
       rewrite_fin_to_inf_dvalue.
       repeat red.
@@ -15538,8 +15173,7 @@ Module Type LangRefine
     - inv REF.
       cbn in CONC; inv CONC; cbn.
     - inv REF.
-      rewrite concretize_uvalue_bytes_helper_equation in CONC.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalue_bytes_helper_equation.
+      simpl in *.
       destruct y; uvalue_refine_strict_inv H1; try inv CONC; auto.
       rewrite pre_concretized_fin_inf with (uv_fin:=y) (acc_fin:=acc_fin); eauto.
       break_match_hyp_inv; repeat red.
@@ -15621,10 +15255,12 @@ Module Type LangRefine
           try inv REF;
           repeat break_match_hyp_inv;
           repeat red in ERR;
-          rewrite CONC.concretize_uvalueM_equation in ERR; inv ERR
-        | cbn; auto
+          inv ERR
+        | unfold IS1.LLVM.MEM.CP.CONC.concretize_u;
+          unfold IS1.LLVM.MEM.CP.CONC.concretize_uvalueM;
+          cbn; auto
         ].
-
+    
     destruct uv_inf;
       try
         solve
@@ -15632,8 +15268,10 @@ Module Type LangRefine
           try inv REF;
           repeat break_match_hyp_inv;
           repeat red in ERR;
-          rewrite CONC.concretize_uvalueM_equation in ERR; inv ERR
-        | cbn; auto
+          inv ERR
+        | unfold IS1.LLVM.MEM.CP.CONC.concretize_u;
+          unfold IS1.LLVM.MEM.CP.CONC.concretize_uvalueM;
+          cbn; auto
         ].
 
     - (* Structs *)
@@ -15642,12 +15280,8 @@ Module Type LangRefine
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H1; inv H1.
       { (* ERR when concretizing l *)
@@ -15663,6 +15297,9 @@ Module Type LangRefine
             forward H2.
             repeat constructor.
             specialize (H2 y err_msg H1 H0).
+
+            rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
+
             rewrite map_monad_unfold.
             repeat red.
             exists (ERR_unERR_UB_OOM err_msg).
@@ -15753,12 +15390,8 @@ Module Type LangRefine
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H1; inv H1.
       { (* ERR when concretizing l *)
@@ -15775,6 +15408,7 @@ Module Type LangRefine
             repeat constructor.
             specialize (H2 y err_msg H1 H0).
 
+            rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
             rewrite map_monad_unfold.
             repeat red.
             exists (ERR_unERR_UB_OOM err_msg).
@@ -15865,12 +15499,8 @@ Module Type LangRefine
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H1; inv H1.
       { (* ERR when concretizing l *)
@@ -15886,6 +15516,7 @@ Module Type LangRefine
             forward H2.
             repeat constructor.
             specialize (H2 y err_msg H1 H0).
+            rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.            
             rewrite map_monad_unfold.
             repeat red.
             exists (ERR_unERR_UB_OOM err_msg).
@@ -15975,12 +15606,8 @@ Module Type LangRefine
       eapply map_monad_oom_Forall2 in Heqo.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; cbn in H1; inv H1.
       { (* ERR when concretizing l *)
@@ -15996,6 +15623,7 @@ Module Type LangRefine
             forward H2.
             repeat constructor.
             specialize (H2 y err_msg H1 H0).
+            rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.            
             rewrite map_monad_unfold.
             repeat red.
             exists (ERR_unERR_UB_OOM err_msg).
@@ -16085,16 +15713,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16112,7 +15736,7 @@ Module Type LangRefine
       destruct_err_ub_oom x; inv H3.
 
       { (* ERR in second operand *)
-        eapply IH in H0; eauto.
+        eapply IH in Heqo0; eauto.
         repeat red.
         exists (ret (fin_to_inf_dvalue x1)).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16162,16 +15786,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16189,7 +15809,7 @@ Module Type LangRefine
       destruct_err_ub_oom x; inv H3.
 
       { (* ERR in second operand *)
-        eapply IH in H0; eauto.
+        eapply IH in Heqo0; eauto.
         repeat red.
         exists (ret (fin_to_inf_dvalue x1)).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16239,16 +15859,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16266,7 +15882,7 @@ Module Type LangRefine
       destruct_err_ub_oom x; inv H3.
 
       { (* ERR in second operand *)
-        eapply IH in H0; eauto.
+        eapply IH in Heqo0; eauto.
         repeat red.
         exists (ret (fin_to_inf_dvalue x1)).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16317,17 +15933,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-      cbn. 
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16343,7 +15954,6 @@ Module Type LangRefine
 
       remember (eval_fneg x1) as res.
       destruct_err_ub_oom res; inv H3.
-      red.
 
       exists (ret (fin_to_inf_dvalue x1)).
       exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16362,16 +15972,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16389,7 +15995,7 @@ Module Type LangRefine
       destruct_err_ub_oom x; inv H3.
 
       { (* ERR in second operand *)
-        eapply IH in H0; eauto.
+        eapply IH in Heqo0; eauto.
         repeat red.
         exists (ret (fin_to_inf_dvalue x1)).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16439,16 +16045,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing uv *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16508,16 +16110,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing base address *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16724,16 +16322,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16760,7 +16354,7 @@ Module Type LangRefine
       destruct_err_ub_oom x; inv H3.
 
       { (* ERR in second operand *)
-        eapply IH in H0; eauto.
+        eapply IH in Heqo0; eauto.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
         split; cbn; eauto.
@@ -16812,16 +16406,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16848,7 +16438,7 @@ Module Type LangRefine
       destruct_err_ub_oom x; inv H3.
 
       { (* ERR uv_inf3 *)
-        eapply IH in H0; eauto.
+        eapply IH in Heqo1; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16908,11 +16498,6 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
-      repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
-
       repeat red in ERR; inv ERR.
       reflexivity.
     - (* UVALUE_ExtractValue *)
@@ -16921,16 +16506,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -16962,16 +16543,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -17035,16 +16612,12 @@ Module Type LangRefine
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
 
-      repeat red in ERR.
       destruct ERR as (?&?&?&?&?).
       destruct_err_ub_oom x; inv H0.
       { (* ERR when concretizing first operand *)
-        eapply IH in H; eauto.
+        eapply IH in Heqo; eauto.
         repeat red.
         exists (ERR_unERR_UB_OOM err_msg).
         exists (fun _ => ERR_unERR_UB_OOM err_msg).
@@ -17072,40 +16645,30 @@ Module Type LangRefine
       forward EVAL; [intros ? ?; eapply IH; eauto; repeat constructor|].
       forward EVAL; eauto.
       forward EVAL; eauto.
-      forward EVAL.
-      { rewrite eval_select_equation.
-        cbn in *; eauto.
-      }
+      forward EVAL; eauto.  
 
-      rewrite IS1.MEM.CP.CONC.eval_select_equation in EVAL.
-      auto.
     - (* UVALUE_ExtractByte *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
-
-      repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
+
       inv ERR.
-      cbn. auto.
+      reflexivity.
+      
     - (* UVALUE_ConcatBytes *)
       rename H into IH.
       unfold_uvalue_refine_strict_in REF.
       repeat break_match_hyp_inv.
 
       repeat red.
-      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.
-
       repeat red in ERR.
-      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.
       auto.
-
+      rewrite IS1.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation.            
       erewrite map_monad_oom_length; eauto.
       erewrite sizeof_dtyp_fin_inf; eauto.
       erewrite all_extract_bytes_from_uvalue_fin_inf; eauto.
+      rewrite IS2.LLVM.MEM.CP.CONCBASE.concretize_uvalueM_equation in ERR.      
       break_match_hyp.
       2: {
         cbn.
@@ -18551,9 +18114,9 @@ Module Type LangRefine
           rewrite dvalue_refine_strict_equation;
           cbn; try rewrite H; auto
         ].
-    - cbn.
+    - unfold IS1.LLVM.MEM.CP.CONC.concretize_uvalue, IS1.LLVM.MEM.CP.CONC.concretize_uvalueM;
+      unfold concretize_uvalue, CONC.concretize_uvalueM;        
       unfold lift_err_RAISE_ERROR.
-      cbn.
       break_match.
       + apply DVCrev.default_dvalue_of_dtyp_dv1_dv2_same_error in Heqs.
         rewrite Heqs.
@@ -18562,7 +18125,9 @@ Module Type LangRefine
         destruct Heqs as (?&?&?).
         rewrite H.
         apply orutt_Ret; auto.
-    - destruct u2;
+    - unfold IS1.LLVM.MEM.CP.CONC.concretize_uvalue, IS1.LLVM.MEM.CP.CONC.concretize_uvalueM;
+      unfold concretize_uvalue, CONC.concretize_uvalueM;        
+      destruct u2;
         try DVC.uvalue_refine_strict_inv REF;
         try solve
           [ cbn;
@@ -22236,7 +21801,7 @@ Module Type LangRefine
   Proof.
     red.
     intros args1 args2 ARGS.
-    induction ARGS.
+    destruct ARGS.
     - cbn.
       apply orutt_raise.
       + intros [] o CONTRA.
@@ -22254,68 +21819,35 @@ Module Type LangRefine
           constructor.
           cbn; auto.
       }
+      unfold LLVM1.putchar_denotation.
+      unfold putchar_denotation.
 
-      destruct y; uvalue_refine_strict_inv H.
-      all:
-        try solve
-          [ eapply orutt_bind with (RR:=dvalue_refine_strict);
-            solve [ eapply orutt_bind with (RR:=fun r1 r2 => dvalue_refine_strict (proj1_sig r1) (proj1_sig r2));
-                    [ apply orutt_trigger;
-                      [ repeat constructor; cbn;
-                        rewrite uvalue_refine_strict_equation; cbn;
-                        try rewrite H0; try rewrite H1; try rewrite H2; reflexivity
-                      | intros [dv1 []] [dv2 []] REF;
-                        inv REF; subst_existT; cbn;
-                        match goal with
-                        | H: event_res_refine_strict _ _ _ _ _ _ |- _ =>
-                            apply H
-                        end
-                      | intros ? CONTRA; inv CONTRA
-                      ]
-                    | intros [dv1 []] [dv2 []] REF;
-                      eapply orutt_Ret; eauto; solve_uvalue_refine_strict
-                    ]
-                  | intros r1 r2 REF;
-                    destruct r2; dvalue_refine_strict_inv REF;
-                    try destruct (Pos.eq_dec 32 sz);
+      eapply orutt_bind with (RR:=dvalue_refine_strict).
+
+      eapply concretize_or_pick_L0'_orutt_strict. assumption.
+      intros r1 r2 REF.
+
+      destruct r2; dvalue_refine_strict_inv REF;
                     try (eapply orutt_raiseUB;
                          [ intros ? ? CONTRA; inv CONTRA
                          | repeat constructor
-                      ]);
-                    eapply orutt_bind with (RR:=eq); subst; cbn; eauto with ORUTT;
-                    break_match; try contradiction; subst; cbn;
-                    dependent destruction e; cbn;
+                      ]).
+      
+      destruct (Pos.eq_dec 32 sz). cbn. 
+        eapply orutt_bind; subst; cbn; eauto with ORUTT.
+
+      + unfold IS1.LLVM.MEM.CP.CONC.get_conv_case, CONC.get_conv_case.
+        cbn.
+        break_match; try contradiction; subst; cbn.
+
+        
+        dependent destruction e; cbn;
                     eapply orutt_trigger; eauto with ORUTT;
                     [ repeat constructor
                     | intros [] [] ?; reflexivity
                     | intros ? CONTRA; inv CONTRA
-                    ]
-                  | cbn;
-                    eapply concretize_or_pick_L0'_orutt_strict;
-                    rewrite uvalue_refine_strict_equation; cbn; rewrite H0; reflexivity
-              ]
-          ].
-
-      all:
-        try solve [ cbn;
-                    setoid_rewrite bind_ret_l;
-                    eapply orutt_raiseUB; [intros * CONTRA; inv CONTRA | constructor; constructor]
-          ].
-
-      cbn.
-      repeat rewrite bind_ret_l.
-      break_match_goal; subst; cbn;
-        try solve [eapply orutt_raiseUB; [intros * CONTRA; inv CONTRA | constructor; constructor]].
-
-      break_match_goal; subst; try contradiction; cbn.
-      dependent destruction e; cbn.
-      eapply orutt_bind with (RR:=eq); eauto with ORUTT.
-      { apply orutt_trigger;
-          [ solve [repeat constructor]
-          | intros [] [] ?; reflexivity
-          | intros ? CONTRA; inv CONTRA
-          ].
-      }
+                    ].
+      + eapply orutt_raiseUB; [intros * CONTRA; inv CONTRA | constructor; constructor].
   Qed.
 
   Lemma address_one_builtin_functions_E1E2_orutt :

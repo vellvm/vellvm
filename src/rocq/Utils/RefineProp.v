@@ -44,11 +44,11 @@ Proof.
 
   exists (ret x). (* (mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr x))))))). *)
   exists (fun _ => ma).
-  split; cbn; eauto.
+  split; cbn; auto. reflexivity.
   cbn.
   split.
-  + destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma;
-      cbn; intuition; inversion H0; subst; auto.
+  + destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma; 
+    subst; cbn; reflexivity. 
   + right; intros a XA; subst; auto.
 Qed.
 
@@ -82,63 +82,63 @@ Proof.
   intros ec H.
   destruct H as (ea & k' & paea & ea_eq_ec & REST).
 
-  destruct ea as [[[[[[[oom_ea] | [[ub_ea] | [[err_ea] | a]]]]]]]] eqn:Hea.
+  destruct_err_ub_oom ea; subst.
 
   { (* oom *)
-    cbn in *.
-
-    exists (raise_oom "").
+    exists (raise_oom oom_msg).
     exists (fun b => ec).
     split.
 
     { eexists.
-      exists (fun a => raise_oom "").
-
+      exists (fun a => raise_oom oom_msg).
       split.
       apply paea.
-      cbn.
       split; eauto.
+      reflexivity.
+      right. intros. inversion H.
     }
 
-    cbn.
     split; intros; eauto; try contradiction.
+    right; intros. inversion H.
   }
 
   { (* The 'a' action raises ub *)
-    exists (raise_ub "blah").
+    exists (raise_ub err_msg).
     exists (fun b => ec).
     split.
 
     { eexists.
-      exists (fun a => raise_ub "bogus").
+      exists (fun a => raise_ub err_msg).
 
       split.
       apply paea.
-      cbn.
       split; auto.
+      reflexivity.
+      left; reflexivity.
     }
 
-    split; auto.
+    split; auto. left; reflexivity.
   }
 
   { (* The 'a' action raises a failure *)
-    exists (raise_error "blah").
+    exists (raise_error err_msg).
     exists (fun b => ec).
     split.
 
     { eexists.
-      exists (fun a => raise_error "bogus").
+      exists (fun a => raise_error err_msg).
 
       split.
       apply paea.
-      cbn.
-      split; auto.
+      split; auto. reflexivity. left. reflexivity.
     }
 
-    split; auto.
+    split; auto. left; reflexivity.
   }
 
-  { (* The 'a' action actually returns a value *)
+  {
+    rewrite bind_ret_l in ea_eq_ec.
+    (* The 'a' action actually returns a value *)
     destruct REST as [CONTRA | REST]; [contradiction|].
     specialize (REST a).
     forward REST; [reflexivity|].
@@ -148,38 +148,27 @@ Proof.
     exists kb.
 
     split.
-    { exists ea.
+    { exists (ret a).
       exists (fun _ => mb).
 
       split; subst; auto.
       split.
-      destruct mb as [[[[[[[oom_mb] | [[ub_mb] | [[err_mb] | b]]]]]]]] eqn:Hmb; cbn; split; auto.
+      rewrite bind_ret_l. reflexivity.
 
       right.
       intros a' RETSa.
       cbn in RETSa; subst; auto.
     }
 
-    split.
-    { destruct mb as [[[[[[[oom_mb] | [[ub_mb] | [[err_mb] | b]]]]]]]] eqn:Hmb; cbn; auto.
-      { destruct ec as [[[[[[[oom_ec] | [[ub_ec] | [[err_ec] | ec]]]]]]]]; auto;
-
-          cbn in ea_eq_ec;
-          destruct (k' a) as [[[[[[[oom_k'a] | [[ub_k'a] | [[err_k'a] | k'a]]]]]]]] eqn:Hk'a; cbn in ea_eq_ec; try contradiction.
-      }
-
-      { destruct (kb b) as [[[[[[[oom_kbb] | [[ub_kbb] | [[err_kbb] | kbb]]]]]]]] eqn:Hkbb; cbn in eqkb; subst; cbn; auto; subst; rewrite Hkbb in eqkb; cbn in eqkb;
-
-        destruct ec as [[[[[[[oom_ec] | [[ub_ec] | [[err_ec] | ec]]]]]]]]; auto;
-
-        cbn in ea_eq_ec, eqkb;
-        destruct (k' a) as [[[[[[[oom_k'a] | [[ub_k'a] | [[err_k'a] | k'a]]]]]]]]; cbn in ea_eq_ec; try contradiction;
-
-        subst; auto.
-      }
-    }
-
-    auto.
+    destruct_err_ub_oom mb; subst.
+    - split. rewrite <- ea_eq_ec. rewrite <- eqkb. reflexivity.
+      right. intros. inversion H.
+    - split. rewrite <- ea_eq_ec. rewrite <- eqkb. reflexivity.
+      left. reflexivity.
+    - split. rewrite <- ea_eq_ec. rewrite <- eqkb. reflexivity.
+      left. reflexivity.
+    - split. rewrite <- ea_eq_ec. rewrite <- eqkb. reflexivity.
+      right. intros.  inversion H. subst. destruct RETS. inversion H0. eapply H0. reflexivity.
   }
 Qed.
 

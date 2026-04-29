@@ -415,16 +415,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         rewrite concretize_uvalueM_equation in CONTRA.
         cbn in CONTRA.
 
-        (* Move this *)
-        Ltac destruct_err_ub_oom v :=
-          let oom_name := fresh "OOM" in
-          let ub_name := fresh "UB" in
-          let err_name := fresh "ERR" in
-          let success_name := fresh "SUCCESS" in
-          let H_name := fresh "H_ERR" in
-          destruct v as [[[[[[[oom_name] | [[ub_name] | [[err_name] | success_name]]]]]]]] eqn:H_name.
-
-
         unfold bind_RefineProp in CONTRA.
         destruct CONTRA as (ma & k' & CONC' & mbeq & REST).
         destruct REST as [FAILS | REST].

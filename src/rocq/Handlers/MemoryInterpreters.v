@@ -816,11 +816,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MME
       cbn in EXEC_IN.
       red in EXEC_IN.
 
-      destruct_err_ub_oom exec_res.
+      destruct_err_ub_oom exec_res; subst.
 
       { (* OOM *)
-        cbn in *.
-        destruct EXEC as [oom_msg EXEC].
+        destruct EXEC as [oom_msg' EXEC].
         rewrite EXEC in EXEC_IN.
 
         setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in EXEC_IN.
@@ -828,21 +827,23 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MME
 
         red.
         right; right; left.
-        exists oom_msg.
+        rewrite err_ub_oom_bind_oom in SPEC.
+        exists oom_msg'.
         split; auto.
-        exists oom_x; auto.
+        exists oom_msg; auto.
       }
 
       { (* UB events *)
         red.
         left.
-        exists ub_x.
+        rewrite err_ub_oom_bind_ub in SPEC.  
+        exists err_msg.
         auto.
       }
 
       { (* Error *)
         cbn in *.
-        destruct EXEC as [err_msg EXEC].
+        destruct EXEC as [err_msg' EXEC].
         rewrite EXEC in EXEC_IN.
         setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_Fail _)) in EXEC_IN.
         apply raise_map_itree_inv in EXEC_IN.
@@ -851,11 +852,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MME
         right; left.
         exists err_msg.
         split; auto.
-        exists err_x; auto.
+        exists err_msg; auto.
       }
 
       { (* Success *)
-        subst.
         cbn in *.
         rewrite EXEC in EXEC_IN.
         rewrite bind_ret_l in EXEC_IN.
@@ -907,11 +907,11 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MME
       cbn in EXEC_IN.
       red in EXEC_IN.
 
-      destruct_err_ub_oom exec_res.
+      destruct_err_ub_oom exec_res; subst.
 
       { (* OOM *)
         cbn in *.
-        destruct EXEC as [oom_msg EXEC].
+        destruct EXEC as [oom_msg' EXEC].
         rewrite EXEC in EXEC_IN.
 
         setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_OOM _)) in EXEC_IN.
@@ -919,21 +919,22 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MME
 
         red.
         right; right; left.
-        exists oom_msg.
+        exists oom_msg'.
         split; auto.
-        exists oom_x; auto.
+        exists oom_msg; auto.
       }
 
       { (* UB events *)
         red.
         left.
-        exists ub_x.
+        rewrite err_ub_oom_bind_ub in SPEC.
+        exists err_msg.
         auto.
       }
 
       { (* Error *)
         cbn in *.
-        destruct EXEC as [err_msg EXEC].
+        destruct EXEC as [err_msg' EXEC].
         rewrite EXEC in EXEC_IN.
         setoid_rewrite (@rbm_raise_bind _ _ _ _ _ (RaiseBindM_Fail _)) in EXEC_IN.
         apply raise_map_itree_inv in EXEC_IN.
@@ -942,7 +943,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MME
         right; left.
         exists err_msg.
         split; auto.
-        exists err_x; auto.
+        exists err_msg; auto.
       }
 
       { (* Success *)
