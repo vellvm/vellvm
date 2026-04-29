@@ -2040,24 +2040,24 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModul
       contradiction.
   Qed.
 
-  Definition generate_num_undef_bytes_h (start_ix : N) (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+  Definition generate_num_poison_bytes_h
+    (start_ix : N) (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
     N.recursion
       (fun (x : N) => ret [])
       (fun n mf x =>
          rest_bytes <- mf (N.succ x);;
-         let byte := uvalue_sbyte (UVALUE_Undef dt) dt x sid in
-         ret (byte :: rest_bytes))
+         ret (dvalue_sbyte (DVALUE_Poison dt) dt x sid :: rest_bytes))
       num start_ix.
 
-  Definition generate_num_undef_bytes (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
-    generate_num_undef_bytes_h 0 num dt sid.
+  Definition generate_num_poison_bytes (num : N) (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+    generate_num_poison_bytes_h 0 num dt sid.
 
-  Definition generate_undef_bytes (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
-    generate_num_undef_bytes (sizeof_dtyp dt) dt sid.
+  Definition generate_poison_bytes (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+    generate_num_poison_bytes (sizeof_dtyp dt) dt sid.
 
-  Lemma generate_num_undef_bytes_h_length :
+  Lemma generate_num_poison_bytes_h_length :
     forall num start_ix dt sid bytes,
-      generate_num_undef_bytes_h start_ix num dt sid = NoOom bytes ->
+      generate_num_poison_bytes_h start_ix num dt sid = NoOom bytes ->
       num = N.of_nat (length bytes).
   Proof.
     intros num.
@@ -2065,11 +2065,11 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModul
     - cbn in *.
       inv GEN.
       reflexivity.
-    - unfold generate_num_undef_bytes_h in GEN.
+    - unfold generate_num_poison_bytes_h in GEN.
       pose proof @N.recursion_succ (N -> OOM (list SByte)) eq (fun _ : N => ret [])
-           (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
-           rest_bytes <- mf (N.succ x);;
-           ret (uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes))
+           (fun n mf x =>
+              rest_bytes <- mf (N.succ x);;
+              ret (dvalue_sbyte (DVALUE_Poison dt) dt x sid :: rest_bytes))
            eq_refl.
       forward H.
       { unfold Proper, respectful.
@@ -2082,16 +2082,14 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModul
 
       destruct
         (N.recursion (fun _ : N => ret [])
-                     (fun (_ : N) (mf : N -> OOM (list SByte)) (x : N) =>
-                        rest_bytes <- mf (N.succ x);;
-                        ret (uvalue_sbyte (UVALUE_Undef dt) dt x sid :: rest_bytes)) num
-                     (N.succ start_ix)) eqn:HREC.
+           (fun n mf x =>
+              rest_bytes <- mf (N.succ x);;
+              ret (dvalue_sbyte (DVALUE_Poison dt) dt x sid :: rest_bytes)) num
+           (N.succ start_ix)) eqn:HREC.
       + (* No OOM *)
         cbn in GEN.
         inv GEN.
         cbn.
-
-        unfold generate_num_undef_bytes_h in IHnum.
         pose proof (IHnum (N.succ start_ix) dt sid l HREC) as IH.
         lia.
       + (* OOM *)
@@ -2099,30 +2097,29 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModul
         inv GEN.
   Qed.
 
-  Lemma generate_num_undef_bytes_length :
+  Lemma generate_num_poison_bytes_length :
     forall num dt sid bytes,
-      generate_num_undef_bytes num dt sid = NoOom bytes ->
+      generate_num_poison_bytes num dt sid = NoOom bytes ->
       num = N.of_nat (length bytes).
   Proof.
     intros num dt sid bytes GEN.
-    unfold generate_num_undef_bytes in *.
-    eapply generate_num_undef_bytes_h_length; eauto.
+    unfold generate_num_poison_bytes in *.
+    eapply generate_num_poison_bytes_h_length; eauto.
   Qed.
 
-  Lemma generate_undef_bytes_length :
+  Lemma generate_poison_bytes_length :
     forall dt sid bytes,
-      generate_undef_bytes dt sid = ret bytes ->
+      generate_poison_bytes dt sid = ret bytes ->
       sizeof_dtyp dt = N.of_nat (length bytes).
   Proof.
-    intros dt sid bytes GEN_UNDEF.
-    unfold generate_undef_bytes in *.
-    apply generate_num_undef_bytes_length in GEN_UNDEF; auto.
+    intros dt sid bytes GEN_POISON.
+    unfold generate_poison_bytes in *.
+    apply generate_num_poison_bytes_length in GEN_POISON; auto.
   Qed.
 
   Section Serialization.
     (** ** Serialization *)
-  (*      Conversion back and forth between values and their byte representation *)
-  (*    *)
+    (*  Conversion back and forth between values and their byte representation *)
     (* Given a little endian list of bytes, match the endianess of `e` *)
     Definition correct_endianess {BYTES : Type} (e : Endianess) (bytes : list BYTES)
       := match e with
@@ -2131,9 +2128,8 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModul
          end.
 
     (* Converts an integer [x] to its byte representation over [n] bytes. *)
-  (*    The representation is little endian. In particular, if [n] is too small, *)
-  (*    only the least significant bytes are returned. *)
-    (*    *)
+    (* The representation is little endian. In particular, if [n] is too small, *)
+    (* only the least significant bytes are returned. *)
     Fixpoint bytes_of_int_little_endian (n: nat) (x: Z) {struct n}: list (@bit_int 8) :=
       match n with
       | O => nil
@@ -2143,16 +2139,17 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModul
     Definition bytes_of_int (e : Endianess) (n : nat) (x : Z) : list (@bit_int 8) :=
       correct_endianess e (bytes_of_int_little_endian n x).
 
-    (* *)
   (* Definition sbytes_of_int (e : Endianess) (count:nat) (z:Z) : list SByte := *)
   (*   List.map Byte (bytes_of_int e count z). *)
 
-    Definition uvalue_bytes_little_endian (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
-      := map (fun n => UVALUE_ExtractByte uv dt n sid)
+    Definition dvalue_bytes_little_endian
+      (dv :  dvalue) (dt : dtyp) (sid : store_id) : list SByte
+      := map (fun n => dvalue_sbyte dv dt n sid)
            (Nseq 0 (N.to_nat (sizeof_dtyp DTYPE_Pointer))).
 
-    Definition uvalue_bytes (e : Endianess) (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
-      :=  (correct_endianess e) (uvalue_bytes_little_endian uv dt sid).
+    Definition dvalue_bytes
+      (e : Endianess) (uv :  dvalue) (dt : dtyp) (sid : store_id) : list SByte :=
+      (correct_endianess e) (dvalue_bytes_little_endian uv dt sid).
 
     (* TODO: move this *)
     Definition dtyp_eqb (dt1 dt2 : dtyp) : bool
@@ -2227,49 +2224,41 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModul
          | _ => inl "No fields."%string
          end.
 
-    Definition extract_byte_to_sbyte (uv : uvalue) : ERR SByte
-      := match uv with
-         | UVALUE_ExtractByte uv dt idx sid =>
-             ret (uvalue_sbyte uv dt idx sid)
-         | _ => inl (ERR_message "extract_byte_to_ubyte invalid conversion.")
-         end.
+    (* Definition extract_byte_to_sbyte (uv : uvalue) : ERR SByte *)
+    (*   := match uv with *)
+    (*      | UVALUE_ExtractByte uv dt idx sid => *)
+    (*          ret (uvalue_sbyte uv dt idx sid) *)
+    (*      | _ => inl (ERR_message "extract_byte_to_ubyte invalid conversion.") *)
+    (*      end. *)
 
-    Definition sbyte_sid_match (a b : SByte) : bool
-      := match sbyte_to_extractbyte a, sbyte_to_extractbyte b with
-         | UVALUE_ExtractByte uv dt idx sid, UVALUE_ExtractByte uv' dt' idx' sid' =>
-             N.eqb sid sid'
-         | _, _ => false
-         end.
-
+    Definition sbyte_sid_match (a b : SByte) : bool :=
+      let '(dvalue_sbyte _ _ _ sid, dvalue_sbyte _ _ _ sid') := (a,b) in
+      N.eqb sid sid'.
+    
     Definition replace_sid (sid : store_id) (ub : SByte) : SByte
-      := match sbyte_to_extractbyte ub with
-         | UVALUE_ExtractByte uv dt idx sid_old =>
-             uvalue_sbyte uv dt idx sid
-         | _ =>
-             ub (* Should not happen... *)
-         end.
-
-    Definition filter_sid_matches (byte : SByte) (sbytes : list (N * SByte)) : (list (N * SByte) * list (N * SByte))
+      :=
+      let '(dvalue_sbyte dv dt idx sid') := ub in
+      dvalue_sbyte dv dt idx sid.
+    
+    Definition filter_sid_matches
+      (byte : SByte) (sbytes : list (N * SByte)) : (list (N * SByte) * list (N * SByte))
       := filter_split (fun '(n, uv) => sbyte_sid_match byte uv) sbytes.
 
     (* TODO: should I move this? *)
     (* Assign fresh sids to ubytes while preserving entanglement *)
     (* Could potentially turn this into map (+max_sid) *)
-    Program Fixpoint re_sid_ubytes_helper {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M}
-            (bytes : list (N * SByte)) (acc : NMap SByte) {measure (length bytes)} : M (NMap SByte)
+    Program Fixpoint re_sid_sbytes_helper {M} `{Monad M} `{MonadStoreId M} 
+      (bytes : list (N * SByte)) (acc : NMap SByte) {measure (length bytes)}
+      : M (NMap SByte)
       := match bytes with
          | [] => ret acc
          | ((n, x)::xs) =>
-             match sbyte_to_extractbyte x with
-             | UVALUE_ExtractByte uv dt idx sid =>
-                 let '(ins, outs) := filter_sid_matches x xs in
-                 nsid <- fresh_sid;;
-                 let acc := @NM.add _ n (replace_sid nsid x) acc in
-                 (* Assign new sid to entangled bytes *)
-                 let acc := fold_left (fun acc '(n, ub) => @NM.add _ n (replace_sid nsid ub) acc) ins acc in
-                 re_sid_ubytes_helper outs acc
-             | _ => raise_error "re_sid_ubytes_helper: sbyte_to_extractbyte did not yield UVALUE_ExtractByte"
-             end
+             let '(ins, outs) := filter_sid_matches x xs in
+             nsid <- fresh_sid;;
+             let acc := @NM.add _ n (replace_sid nsid x) acc in
+             (* Assign new sid to entangled bytes *)
+             let acc := fold_left (fun acc '(n, ub) => @NM.add _ n (replace_sid nsid ub) acc) ins acc in
+             re_sid_sbytes_helper outs acc
          end.
     Next Obligation.
       cbn.
@@ -2278,42 +2267,37 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModul
       lia.
     Defined.
 
-    Lemma re_sid_ubytes_helper_equation {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M}
-          (bytes : list (N * SByte)) (acc : NMap SByte) :
-      re_sid_ubytes_helper bytes acc =
+    Lemma re_sid_ubytes_helper_equation {M} `{Monad M} `{MonadStoreId M}
+      (bytes : list (N * SByte)) (acc : NMap SByte) :
+      re_sid_sbytes_helper bytes acc =
         match bytes with
         | [] => ret acc
         | ((n, x)::xs) =>
-            match sbyte_to_extractbyte x with
-            | UVALUE_ExtractByte uv dt idx sid =>
-                let '(ins, outs) := filter_sid_matches x xs in
-                nsid <- fresh_sid;;
-                let acc := @NM.add _ n (replace_sid nsid x) acc in
-                (* Assign new sid to entangled bytes *)
-                let acc := fold_left (fun acc '(n, ub) => @NM.add _ n (replace_sid nsid ub) acc) ins acc in
-                re_sid_ubytes_helper outs acc
-            | _ => raise_error "re_sid_ubytes_helper: sbyte_to_extractbyte did not yield UVALUE_ExtractByte"
-            end
+            let '(ins, outs) := filter_sid_matches x xs in
+            nsid <- fresh_sid;;
+            let acc := @NM.add _ n (replace_sid nsid x) acc in
+            (* Assign new sid to entangled bytes *)
+            let acc := fold_left (fun acc '(n, ub) => @NM.add _ n (replace_sid nsid ub) acc) ins acc in
+            re_sid_sbytes_helper outs acc
         end.
     Proof.
-      unfold re_sid_ubytes_helper at 1.
-      unfold re_sid_ubytes_helper_func at 1.
+      unfold re_sid_sbytes_helper at 1.
+      unfold re_sid_sbytes_helper_func at 1.
       rewrite WfExtensionality.WfExtensionality.fix_sub_eq_ext.
       destruct bytes.
       - reflexivity.
       - simpl. destruct p.
-        destruct (sbyte_to_extractbyte s); try reflexivity.
         destruct (filter_sid_matches s bytes).
         apply f_equal.
         apply functional_extensionality.
         intros nsid.
-        unfold re_sid_ubytes_helper.
-        unfold re_sid_ubytes_helper_func.
+        unfold re_sid_sbytes_helper.
+        unfold re_sid_sbytes_helper_func.
         assert ((fun (acc : NM.t SByte) '(n, ub) => NM.add n (replace_sid nsid ub) acc) =
                   (fun (acc : NM.t SByte) (pat : NM.key * SByte) =>
-                       (let
-                        '(n, ub) as anonymous' := pat return (anonymous' = pat -> NM.t SByte) in
-                         fun _ : (n, ub) = pat => NM.add n (replace_sid nsid ub) acc) eq_refl)) as EQN.
+                     (let
+                         '(n, ub) as anonymous' := pat return (anonymous' = pat -> NM.t SByte) in
+                       fun _ : (n, ub) = pat => NM.add n (replace_sid nsid ub) acc) eq_refl)) as EQN.
         { apply functional_extensionality. intros.
           apply functional_extensionality. intros.
           destruct x0.
@@ -2338,36 +2322,37 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModul
       end.
      *)
 
-    Definition re_sid_ubytes {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M}
-               (bytes : list SByte) : M (list SByte)
+    Definition re_sid_sbytes {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M}
+      (bytes : list SByte) : M (list SByte)
       := let len := length bytes in
-         byte_map <- re_sid_ubytes_helper (zip (Nseq 0 len) bytes) (@NM.empty _);;
-         trywith_error "re_sid_ubytes: missing indices." (NM_find_many (Nseq 0 len) byte_map).
+         byte_map <- re_sid_sbytes_helper (zip (Nseq 0 len) bytes) (@NM.empty _);;
+         trywith_error "re_sid_sbytes: missing indices." (NM_find_many (Nseq 0 len) byte_map).
 
+    (* TODO MOVE *)
     Definition sigT_of_prod {A B : Type} (p : A * B) : {_ : A & B} :=
       let (a, b) := p in existT (fun _ : A => B) a b.
 
-    Definition uvalue_measure_rel (uv1 uv2 : uvalue) : Prop :=
-      (uvalue_measure uv1 < uvalue_measure uv2)%nat.
+    Definition dvalue_measure_rel (dv1 dv2 : dvalue) : Prop :=
+      (dvalue_measure dv1 < dvalue_measure dv2)%nat.
 
-    Lemma wf_uvalue_measure_rel :
-      @well_founded uvalue uvalue_measure_rel.
+    Lemma wf_dvalue_measure_rel :
+      @well_founded dvalue dvalue_measure_rel.
     Proof.
-      unfold uvalue_measure_rel.
+      unfold dvalue_measure_rel.
       apply wf_inverse_image.
       apply Wf_nat.lt_wf.
     Defined.
 
-    Definition lt_uvalue_dtyp (uvdt1 uvdt2 : (uvalue * dtyp)) : Prop :=
-      lexprod uvalue (fun uv => dtyp) uvalue_measure_rel (fun uv dt1f dt2f => dtyp_measure dt1f < dtyp_measure dt2f)%nat (sigT_of_prod uvdt1) (sigT_of_prod uvdt2).
+    Definition lt_dvalue_dtyp (uvdt1 uvdt2 : (dvalue * dtyp)) : Prop :=
+      lexprod dvalue (fun uv => dtyp) dvalue_measure_rel (fun uv dt1f dt2f => dtyp_measure dt1f < dtyp_measure dt2f)%nat (sigT_of_prod uvdt1) (sigT_of_prod uvdt2).
 
-    Lemma wf_lt_uvalue_dtyp : well_founded lt_uvalue_dtyp.
+    Lemma wf_lt_dvalue_dtyp : well_founded lt_dvalue_dtyp.
     Proof.
-      unfold lt_uvalue_dtyp.
+      unfold lt_dvalue_dtyp.
       apply wf_inverse_image.
       apply wf_lexprod.
       - unfold well_founded; intros a.
-        apply wf_uvalue_measure_rel.
+        apply wf_dvalue_measure_rel.
       - intros uv.
         apply wf_inverse_image.
         apply Wf_nat.lt_wf.
@@ -2386,17 +2371,17 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModul
     Qed.
 
     (* This is mostly to_ubytes, except it will also unwrap concatbytes *)
-    Obligation Tactic := try Tactics.program_simpl; try solve [solve_uvalue_dtyp_measure
-                                                              | intuition;
-                                                               match goal with
-                                                               | H: _ |- _ =>
-                                                                   try solve [inversion H]
-                                                               end
-                                                    ].
-
+    Obligation Tactic := try Tactics.program_simpl;
+    try solve [solve_dvalue_measure
+              | intuition;
+               match goal with
+               | H: _ |- _ =>
+                   try solve [inversion H]
+               end
+      ].
 
     Fixpoint serialize_by_dtyp {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M} `{RAISE_OOM M}
-      (CTR : dtyp -> uvalue)  (dt : dtyp) {struct dt} : M (list SByte) :=
+      (CTR : dtyp -> dvalue)  (dt : dtyp) {struct dt} : M (list SByte) :=
       match dt with
       | DTYPE_Struct ts =>
           l <- map_monad (serialize_by_dtyp CTR) ts ;;
@@ -2416,145 +2401,13 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModul
 
       | _ =>
           sid <- fresh_sid;;
-          ret (to_ubytes (CTR dt) dt sid)
+          ret (to_sbytes (CTR dt) dt sid)
       end.
 
     Definition serialize_sbytes {M} `{Monad M} `{MonadStoreId M}
-      (uv : uvalue) (dt : dtyp) : M (list SByte)
+      (uv : dvalue) (dt : dtyp) : M (list SByte)
       := sid <- fresh_sid;;
-         ret (to_ubytes uv dt sid).
-      (* match uv with *)
-      (* (* Base types *) *)
-      (* | UVALUE_Addr _ *)
-      (* | UVALUE_I1 _ *)
-      (* | UVALUE_I8 _ *)
-      (* | UVALUE_I32 _ *)
-      (* | UVALUE_I64 _ *)
-      (* | UVALUE_IPTR _ *)
-      (* | UVALUE_Float _ *)
-      (* | UVALUE_Double _ *)
-
-      (* (* Expressions *) *)
-      (* | UVALUE_IBinop _ _ _ *)
-      (* | UVALUE_ICmp _ _ _ *)
-      (* | UVALUE_FBinop _ _ _ _ *)
-      (* | UVALUE_FCmp _ _ _ *)
-      (* | UVALUE_Conversion _ _ _ _ *)
-      (* | UVALUE_GetElementPtr _ _ _ *)
-      (* | UVALUE_ExtractElement _ _ _ *)
-      (* | UVALUE_InsertElement _ _ _ _ *)
-      (* | UVALUE_ShuffleVector _ _ _ _ *)
-      (* | UVALUE_ExtractValue _ _ _ *)
-      (* | UVALUE_InsertValue _ _ _ _ _ *)
-      (* | UVALUE_Select _ _ _ => *)
-      (*     sid <- fresh_sid;; *)
-      (*     ret (to_ubytes uv dt sid) *)
-
-      (* | UVALUE_Undef _ => serialize_by_dtyp UVALUE_Undef dt *)
-      (* | UVALUE_Poison _ => serialize_by_dtyp UVALUE_Poison dt *)
-      (* | UVALUE_Oom _ => serialize_by_dtyp UVALUE_Oom dt *)
-      (* | UVALUE_Struct fields => *)
-      (*     match dt with *)
-      (*     | DTYPE_Struct ts => *)
-      (*         l <- map_monad2 serialize_sbytes fields ts ;; *)
-      (*         ret (concat l) *)
-      (*     | _ => *)
-      (*         raise_error "serialize_sbytes: UVALUE_Struct field / type mismatch." *)
-      (*     end *)
-      (* | UVALUE_Packed_struct fields => *)
-      (*     match dt with *)
-      (*     | DTYPE_Packed_struct ts => *)
-      (*         l <- map_monad2 serialize_sbytes fields ts ;; *)
-      (*         ret (concat l) *)
-      (*     | _ => *)
-      (*         raise_error "serialize_sbytes: UVALUE_Packed_struct field / type mismatch." *)
-      (*     end *)
-
-      (* | UVALUE_Array elts => *)
-      (*     match dt with *)
-      (*     | DTYPE_Array _ t => *)
-      (*         l <- map_monad (fun elt => serialize_sbytes elt t) elts;; *)
-      (*         ret (concat l) *)
-      (*     | _ => *)
-      (*         raise_error "serialize_sbytes: UVALUE_Array with incorrect type." *)
-      (*     end *)
-
-      (* | UVALUE_Vector elts => *)
-      (*     match dt with *)
-      (*     | DTYPE_Vector _ t => *)
-      (*         l <- map_monad (fun elt => serialize_sbytes elt t) elts;; *)
-      (*         ret (concat l) *)
-      (*     | _ => *)
-      (*         raise_error "serialize_sbytes: UVALUE_Vector with incorrect type." *)
-      (*     end *)
-
-      (* | UVALUE_None => ret nil *)
-
-      (* | UVALUE_ExtractByte uv dt' idx sid => *)
-      (*     raise_error "serialize_sbytes: UVALUE_ExtractByte not guarded by UVALUE_ConcatBytes." *)
-
-      (* | UVALUE_ConcatBytes bytes t => *)
-      (*     bytes' <- lift_ERR_RAISE_ERROR (map_monad extract_byte_to_sbyte bytes);; *)
-      (*     re_sid_ubytes bytes' *)
-      (* end. *)
-
-
-  (* deserialize_sbytes takes a list of SBytes and turns them into a uvalue. *)
-
-  (*    This relies on the similar, but different, from_ubytes function *)
-  (*    which given a set of bytes checks if all of the bytes are from *)
-  (*    the same uvalue, and if so returns the original uvalue, and *)
-  (*    otherwise returns a UVALUE_ConcatBytes value instead. *)
-
-  (*    The reason we also have deserialize_sbytes is in order to deal *)
-  (*    with aggregate data types. *)
-    Definition from_ubytes_extra :=
-      fun (bytes : list SByte) (dt : dtyp) =>
-        match split_n (N.to_nat (sizeof_dtyp dt)) bytes with
-        | inr (bs1, bs2) =>
-            (match all_bytes_from_uvalue dt bs1 with
-             | Some uv => uv
-             | None => UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt
-             end, bs2)
-        | inl _ =>
-            (UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt, [])
-        end.
-
-    Lemma from_ubytes_extra_from_ubytes :
-      forall bs dt uv,
-        from_ubytes_extra bs dt = (uv, []) ->
-          from_ubytes bs dt = uv.
-    Proof.
-      unfold from_ubytes_extra.
-      unfold from_ubytes.
-      intros.
-      break_inner_match_goal.
-        + break_match_hyp.
-          * assert (exists s, split_n (N.to_nat (sizeof_dtyp dt)) bs = inl s) by (eexists; eauto).
-            apply split_n_err in H0.
-            apply Neqb_ok in Heqb.
-            lia.
-          * destruct p.
-            apply split_n_correct in Heqs.
-            destruct Heqs as [_ EQ].
-            inversion H.
-            subst.
-            rewrite app_nil_r.
-            reflexivity.
-        + break_match_hyp.
-          * inversion H.
-            reflexivity.
-          * destruct p.
-            inversion H.
-            subst.
-            apply split_n_correct in Heqs.
-            destruct Heqs as [EQ1 EQ2].
-            rewrite app_nil_r in EQ2. subst.
-            rewrite EQ1 in Heqb.
-            rewrite Nnat.N2Nat.id in Heqb.
-            rewrite N.eqb_refl in Heqb.
-            inversion Heqb.
-    Qed.
+         ret (to_sbytes uv dt sid).
 
     (* Tries to deserialize a list of SBytes into a uvalue.
        - if [length bytes = size_of dt] then this always succeeds
@@ -2569,12 +2422,22 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModul
             + if [dt] is not aggregate, return a UVALUE_ConcatBytes with too many bytes
      *)
 
-    Definition deserialize_sbytes (bytes : list SByte) (dt : dtyp) : err uvalue :=
-      match dt with
-      | DTYPE_Void =>
+  (* Definition from_ubytes (bytes : list SByte) (dt : dtyp) : uvalue *)
+  (*   := *)
+  (*   match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), *)
+  (*         all_bytes_from_uvalue dt bytes with *)
+  (*     | true, Some uv => uv *)
+  (*     | _, _ => UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt *)
+  (*     end. *)
+
+    Import MP.DVALUE_BYTES.
+    Definition dtyp_is_void (dt : dtyp) : bool := match dt with | DTYPE_Void => true | _ => false end.
+
+    Definition deserialize_sbytes (bytes : list SByte) (dt : dtyp) : err dvalue.
+      refine (if dtyp_is_void dt then
           raise "deserialize_sbytes: Attempt to deserialize void."%string
-      | _ => ret (from_ubytes bytes dt)
-      end.
+                else _).
+      refine (let foo := dvalue_bytes_to_dvalue bytes dt in _). 
 
       (* let dsb_list : list SByte -> list dtyp -> err (list uvalue * list SByte) := *)
       (*   fix go (bytes : list SByte) (fields : list dtyp) : err (list uvalue * list SByte) :=  *)
@@ -2639,11 +2502,11 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModul
 
        dt should be the type of the thing you are casting to in the case of bitcasts.
      *)
-    Definition uvalue_to_concatbytes
-               {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M} `{RAISE_OOM M}
-               (uv : uvalue) (dt : dtyp) : M uvalue :=
-      bytes <- serialize_sbytes uv dt;;
-      ret (UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt).
+    (* Definition uvalue_to_concatbytes *)
+    (*            {M} `{Monad M} `{MonadStoreId M} `{RAISE_ERROR M} `{RAISE_OOM M} *)
+    (*            (uv : dvalue) (dt : dtyp) : M dvalue := *)
+    (*   bytes <- serialize_sbytes uv dt;; *)
+    (*   ret (UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt). *)
 
   (* (* TODO: *) *)
 
@@ -2772,7 +2635,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MMSP : Me
 
   (** Store ids *)
   Definition used_store_id_prop (ms : MemState) (sid : store_id) : Prop
-    := exists ptr byte, read_byte_prop ms ptr byte /\ sbyte_sid byte = inr sid.
+    := exists ptr byte, read_byte_prop ms ptr byte /\ sbyte_sid byte = sid.
 
   Definition fresh_store_id (ms : MemState) (new_sid : store_id) : Prop
     := ~ used_store_id_prop ms new_sid.
@@ -3561,11 +3424,13 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MMSP : Me
 
     (* Actually perform reads *)
     map_monad (fun ptr => read_byte_spec_MemPropT ptr) ptrs.
-
-  Definition read_uvalue_spec (dt : dtyp) (ptr : addr) : MemPropT MemState uvalue :=
+           
+  
+  Definition read_dvalue_spec (dt : dtyp) (ptr : addr) : MemPropT MemState dvalue.
+    refine (
     bytes <- read_bytes_spec ptr (N.to_nat (sizeof_dtyp dt));;
-    lift_err_RAISE_ERROR (deserialize_sbytes bytes dt).
-
+    lift_err_RAISE_ERROR  _). (deserialize_sbytes bytes dt).
+                          
   (** Writing uvalues *)
   Definition write_bytes_spec (ptr : addr) (bytes : list SByte) : MemPropT MemState unit :=
     ptrs <- get_consecutive_ptrs ptr (length bytes);;

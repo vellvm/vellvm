@@ -182,11 +182,10 @@ Set Contextual Implicit.
 (* TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism not functors. *)
   Section Events.
     Variable dvalue : Set.
-    Variable uvalue : Type.
     
     (* Generic calls, refined by [denote_mcfg] *)
     Variant CallE : Type -> Type :=
-    | Call        : forall (t:dtyp) (f:uvalue) (args:list uvalue), CallE (uvalue + uvalue).
+    | Call        : forall (t:dtyp) (f:dvalue) (args:list dvalue), CallE (dvalue + dvalue).
 
     (* ExternalCallE values are the "observable" events by which one should compare the 
        equivalence of two LLVM IR programs.  These should never be interpreted away
@@ -201,7 +200,7 @@ Set Contextual Implicit.
        The latter two are actually printed to the console by [interpreter.ml]
      *)
     Variant ExternalCallE : Type -> Type :=
-      | ExternalCall        : forall (t:dtyp) (f:uvalue) (args:list dvalue), ExternalCallE dvalue
+      | ExternalCall        : forall (t:dtyp) (f:dvalue) (args:list dvalue), ExternalCallE dvalue
 
       (* This event corresponds to writing to the [stdout] channel. ] *)                              
       | IO_stdout : forall (str : list int8), ExternalCallE unit
@@ -211,7 +210,7 @@ Set Contextual Implicit.
     (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
     (* Intrinsics may raise an exception by returning inl *)
     Variant IntrinsicE : Type -> Type :=
-    | Intrinsic : forall (t:dtyp) (f:string) (args:list dvalue), IntrinsicE (uvalue + dvalue).
+    | Intrinsic : forall (t:dtyp) (f:string) (args:list dvalue), IntrinsicE dvalue.
 
     (* Interactions with the memory *)
     Variant MemoryE : Type -> Type :=
@@ -219,9 +218,9 @@ Set Contextual Implicit.
     | MemPop  : MemoryE unit
     | Alloca  : forall (t:dtyp) (num_elements : N) (align : option Z),  (MemoryE dvalue)
     (* Load address should also be unique *)
-    | Load    : forall (t:dtyp) (a:dvalue),                    (MemoryE uvalue)
+    | Load    : forall (t:dtyp) (a:dvalue),                    (MemoryE dvalue)
     (* Store address should be unique... *)
-    | Store   : forall (t:dtyp) (a:dvalue) (v:uvalue),         (MemoryE unit).
+    | Store   : forall (t:dtyp) (a:dvalue) (v:dvalue),         (MemoryE unit).
 
   (* An event resolving the non-determinism induced by undef. The argument _P_
    is intended to be a predicate over the set of dvalues _u_ can take such that
@@ -232,7 +231,7 @@ Set Contextual Implicit.
     | pickNonPoison (x : X) : PickE ({y : Y | Post x y})
     | pick (x : X) : PickE ({y : Y | Post x y}).
 
-  Definition PickUvalueE := @PickE uvalue dvalue (fun _ _ => True).
+  Definition PickDvalueE := @PickE dvalue dvalue (fun _ _ => True).
 
   (* MOVE THIS *)
   Class RAISE_PICK {X Y Post} (M : Type -> Type) : Type :=
@@ -244,12 +243,12 @@ Set Contextual Implicit.
      At least TODO: remove these prefixes that are inconsistent with other names.
    *)
   Definition LLVMGEnvE := (GlobalE raw_id dvalue).
-  Definition LLVMEnvE := (LocalE raw_id uvalue).
-  Definition LLVMStackE := (StackE raw_id uvalue uvalue).
+  Definition LLVMEnvE := (LocalE raw_id dvalue).
+  Definition LLVMStackE := (StackE raw_id dvalue dvalue).
 
-  Definition conv_E := MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  Definition conv_E := MemoryE +' PickDvalueE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE.
   Definition lookup_E := LLVMGEnvE +' LLVMEnvE.
-  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickDvalueE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE.
 
   Definition LU_to_exp : lookup_E ~> exp_E :=
     fun T e =>
@@ -266,7 +265,7 @@ Set Contextual Implicit.
     fun T e => subevent _ e.
 
   (* Core effects. *)
-  Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickDvalueE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE.
 
   Definition instr_to_L0' : instr_E ~> L0' := subevent.
 
@@ -276,28 +275,28 @@ Set Contextual Implicit.
 
   Definition FUBO_to_exp : (FailureE +' UBE +' OOME) ~> exp_E := subevent.
 
-  Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickDvalueE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE.
 
   Definition exp_to_L0 : exp_E ~> L0 := subevent.
 
   (* For multiple CFG, after interpreting [GlobalE] *)
-  Definition L1 := ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  Definition L1 := ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickDvalueE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] *)
-  Definition L2 := ExternalCallE +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  Definition L2 := ExternalCallE +' IntrinsicE +' MemoryE +' PickDvalueE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
-  Definition L3 := ExternalCallE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  Definition L3 := ExternalCallE +' PickDvalueE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE.
 
-  (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [PickUvalueE]*)
-  (* Interprets [Pick] events: forcing evaluation of [uvalue]s, [UBE] has no semantic meaning *)
-  Definition L4 := ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [PickDvalueE]*)
+  (* Interprets [Pick] events: forcing evaluation of [dvalue]s, [UBE] has no semantic meaning *)
+  Definition L4 := ExternalCallE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE.
 
   (* [UBE] is still present in tree to identify failure, but the [model_UB] semantics allows [UB] to subsume all behavior *)
-  Definition L5 := ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  Definition L5 := ExternalCallE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE.
 
   (* [OOM] semantics is introduced through [interp_prop], so the semantic change is not apparent in the event signature *)
-  Definition L6 := ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.
+  Definition L6 := ExternalCallE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE.
 
   Definition FUBO_to_L4 : (FailureE +' UBE +' OOME) ~> L4:= subevent.
 
@@ -310,12 +309,12 @@ Set Contextual Implicit.
     inl1.
 
   #[global]
-    Instance Local_lookup : LocalE raw_id uvalue -< lookup_E :=
+    Instance Local_lookup : LocalE raw_id dvalue -< lookup_E :=
     inr1.
 
   
   (* expE *)
-  (*   Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE. *)
+  (*   Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickDvalueE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE. *)
   #[global]
     Instance Failure_expE : `{FailureE -< exp_E} := 
     fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e)))))))).
@@ -329,7 +328,7 @@ Set Contextual Implicit.
     fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))).
 
   #[global]
-    Instance LLVMExcE_expE : `{LLVMExcE uvalue -< exp_E} := 
+    Instance LLVMExcE_expE : `{LLVMExcE dvalue -< exp_E} := 
     fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))).
   
   #[global]
@@ -367,7 +366,7 @@ Set Contextual Implicit.
     fun T e => (inr1 (inr1 (UBE_expE e))).
 
   #[global]
-    Instance LLVMExcE_instrE : `{LLVMExcE uvalue -< instr_E } := 
+    Instance LLVMExcE_instrE : `{LLVMExcE dvalue -< instr_E } := 
     fun T e => (inr1 (inr1 (LLVMExcE_expE e))).
   
   #[global]
@@ -399,7 +398,7 @@ Set Contextual Implicit.
     fun T e => (inl1 e).
 
   (* L0' *)
-  (*   Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE. *)
+  (*   Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickDvalueE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE. *)
 
   #[global]
     Instance FailureE_L0' : `{FailureE -< L0'} := 
@@ -414,7 +413,7 @@ Set Contextual Implicit.
     fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))))).
 
   #[global]
-    Instance LLVMExcE_L0' : LLVMExcE uvalue -< L0' :=
+    Instance LLVMExcE_L0' : LLVMExcE dvalue -< L0' :=
     fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))))).
   
   #[global]
@@ -434,7 +433,7 @@ Set Contextual Implicit.
     fun T e => inr1 (inr1 (inr1 (inr1 (inl1 (inl1 e))))).
 
   #[global]
-    Instance StackE_L0' : `{StackE local_id uvalue _  -< L0'} := 
+    Instance StackE_L0' : `{StackE local_id dvalue _  -< L0'} := 
     fun T e => inr1 (inr1 (inr1 (inr1 (inl1 (inr1 e))))).
 
   #[global]
@@ -454,7 +453,7 @@ Set Contextual Implicit.
     fun T e => (inl1 e).
 
   (* L0 *)
-  (*   Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE. *)
+  (*   Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickDvalueE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE. *)
 
   #[global]
     Instance FailureE_L0 : FailureE -< L0 :=
@@ -469,7 +468,7 @@ Set Contextual Implicit.
     fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))))).
 
   #[global]
-    Instance LLVMExcE_L0 : LLVMExcE uvalue -< L0 :=
+    Instance LLVMExcE_L0 : LLVMExcE dvalue -< L0 :=
     fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))).
   
   #[global]
@@ -485,11 +484,11 @@ Set Contextual Implicit.
     fun T e => inr1 (inr1 (inr1 (inr1 (inl1 e)))).
 
   #[global]
-    Instance LocalE_expE_L0 : LocalE raw_id uvalue -< L0 :=
+    Instance LocalE_expE_L0 : LocalE raw_id dvalue -< L0 :=
     fun T e => inr1 (inr1 (inr1 (inl1 (inl1 e)))).
 
   #[global]
-    Instance StackE_expE_L0 : StackE raw_id uvalue uvalue -< L0 :=
+    Instance StackE_expE_L0 : StackE raw_id dvalue dvalue -< L0 :=
     fun T e => inr1 (inr1 (inr1 (inl1 (inr1 e)))).
   
   #[global]
@@ -515,7 +514,7 @@ Set Contextual Implicit.
 
 
   (* L1 *)
-  (*     Definition L1 := ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE. *)
+  (*     Definition L1 := ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickDvalueE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE. *)
 
   #[global]
     Instance FailureE_L1 : FailureE -< L1 :=
@@ -530,7 +529,7 @@ Set Contextual Implicit.
     fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))).
 
   #[global]
-    Instance LLVMExcE_L1 : LLVMExcE uvalue -< L1 :=
+    Instance LLVMExcE_L1 : LLVMExcE dvalue -< L1 :=
     fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))).
   
   #[global]
@@ -546,11 +545,11 @@ Set Contextual Implicit.
     fun T e => (inr1 (inr1 (inr1 (inl1 e)))).
 
   #[global]
-    Instance LocalE_expE_L1 : LocalE raw_id uvalue -< L1 :=
+    Instance LocalE_expE_L1 : LocalE raw_id dvalue -< L1 :=
     fun T e => (inr1 (inr1 (inl1 (inl1 e)))).
 
   #[global]
-    Instance StackE_expE_L1 : StackE raw_id uvalue uvalue -< L1 :=
+    Instance StackE_expE_L1 : StackE raw_id dvalue dvalue -< L1 :=
     fun T e =>  (inr1 (inr1 (inl1 (inr1 e)))).
   
   #[global]
@@ -562,7 +561,7 @@ Set Contextual Implicit.
     fun T e => (inl1 e).
 
   (* L2 *)
-  (* ExternalCallE +' IntrinsicE +' MemoryE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE.    *)
+  (* ExternalCallE +' IntrinsicE +' MemoryE +' PickDvalueE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE.    *)
 
   #[global]
     Instance FailureE_L2 : FailureE -< L2 :=
@@ -577,7 +576,7 @@ Set Contextual Implicit.
     fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))).
 
   #[global]
-    Instance LLVMExcE_L2 : LLVMExcE uvalue -< L2 :=
+    Instance LLVMExcE_L2 : LLVMExcE dvalue -< L2 :=
     fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))).
   
   #[global]
@@ -602,7 +601,7 @@ Set Contextual Implicit.
 
 
     (* L3 *)
-  (* ExternalCallE +' PickUvalueE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE. *)
+  (* ExternalCallE +' PickDvalueE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE. *)
 
   #[global]
     Instance FailureE_L3 : FailureE -< L3 :=
@@ -617,7 +616,7 @@ Set Contextual Implicit.
     fun T e =>  (inr1 (inr1 (inr1 (inr1 (inl1 e))))).
 
   #[global]
-    Instance LLVMExcE_L3 : LLVMExcE uvalue -< L3 :=
+    Instance LLVMExcE_L3 : LLVMExcE dvalue -< L3 :=
     fun T e =>  (inr1 (inr1 (inr1 (inl1 e)))).
   
   #[global]
@@ -633,30 +632,30 @@ Set Contextual Implicit.
     fun T e => (inl1 e).
 
     (* L4 *)
-  (* ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE. *)
+  (* ExternalCallE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE. *)
 
   #[global]
-    Instance FailureE_L4 : FailureE -< (ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) :=
+    Instance FailureE_L4 : FailureE -< (ExternalCallE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE) :=
     fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 e))))).
 
   #[global]
-    Instance DebugE_L4 : DebugE -< (ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) :=
+    Instance DebugE_L4 : DebugE -< (ExternalCallE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE) :=
     fun T e =>  (inr1 (inr1 (inr1 (inr1 (inl1 e))))).
 
   #[global]
-    Instance UBE_L4 : UBE -< (ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) :=
+    Instance UBE_L4 : UBE -< (ExternalCallE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE) :=
     fun T e =>  (inr1 (inr1 (inr1 (inl1 e)))).
 
   #[global]
-    Instance LLVMExcE_L4 : LLVMExcE uvalue -< (ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) :=
+    Instance LLVMExcE_L4 : LLVMExcE dvalue -< (ExternalCallE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE) :=
     fun T e =>  (inr1 (inr1 (inl1 e))).
   
   #[global]
-    Instance OOME_L4 : OOME -< (ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) :=
+    Instance OOME_L4 : OOME -< (ExternalCallE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE) :=
     fun T e =>  (inr1 (inl1 e)).
 
   #[global]
-    Instance ExternalCallE_L4 : ExternalCallE -< (ExternalCallE +' OOME +' LLVMExcE uvalue +' UBE +' DebugE +' FailureE) :=
+    Instance ExternalCallE_L4 : ExternalCallE -< (ExternalCallE +' OOME +' LLVMExcE dvalue +' UBE +' DebugE +' FailureE) :=
     fun T e => (inl1 e).
   
   End Events.

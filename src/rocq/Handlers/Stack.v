@@ -228,6 +228,6 @@ From ExtLib Require Import
    We are hence exposing the specialization here, but it is slightly awkward.
  *)
 Module Make (LP:LLVMParams).
-  Definition lstack_frame := @stack_frame LP.DV.uvalue (list (raw_id * LP.DV.uvalue)).
-  Definition lstack := @stack LP.DV.uvalue (list (raw_id * LP.DV.uvalue)).
+  Definition lstack_frame := @stack_frame LP.DV.dvalue (list (raw_id * LP.DV.dvalue)).
+  Definition lstack := @stack LP.DV.dvalue (list (raw_id * LP.DV.dvalue)).
 End Make.

@@ -28,7 +28,6 @@ From Vellvm Require Import
      Numeric.Floats.
 
 
-
 From Flocq.IEEE754 Require Import
   Binary
   Bits.
@@ -59,7 +58,7 @@ Set Contextual Implicit.
 
        Neither of which would be true of "real" intrinsics.
 
-    2. As a Rocq function that directly manipulates [VIR] [dvalue] or [uvalues].
+    2. As a Rocq function that directly manipulates [VIR] [dvalue].
        These are either defined below in this file _or_, like some memory
        intrinsics and varargs that interact with LLVM IR's effects, defined
        elsewhere.
@@ -392,7 +391,7 @@ Module Make(LP:LLVMParams).
 
    - The uvalue case is used to throw an exception.
    *)
-  Definition semantic_function := (list dvalue) -> err (uvalue + dvalue).
+  Definition semantic_function := (list dvalue) -> err dvalue.
 
   (* An association list mapping intrinsic names to their semantic definitions *)
   Definition intrinsic_definitions := list (declaration typ * semantic_function).
@@ -404,7 +403,7 @@ Module Make(LP:LLVMParams).
   Definition llvm_fabs_f32 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Float d] => ret (inr (DVALUE_Float (b32_abs d)))
+      | [DVALUE_Float d] => ret (DVALUE_Float (b32_abs d))
       | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed inputs"
       end.
 
@@ -412,7 +411,7 @@ Module Make(LP:LLVMParams).
   Definition llvm_fabs_f64 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Double d] => ret (inr (DVALUE_Double (b64_abs d)))
+      | [DVALUE_Double d] => inr (DVALUE_Double (b64_abs d))
       | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed inputs"
       end.
 
@@ -433,14 +432,14 @@ Module Make(LP:LLVMParams).
   Definition llvm_maxnum_f64 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Double a; DVALUE_Double b] => ret (inr (DVALUE_Double (Float_maxnum a b)))
+      | [DVALUE_Double a; DVALUE_Double b] => inr (DVALUE_Double (Float_maxnum a b))
       | _ => failwith "llvm_maxnum_f64 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_maxnum_f32 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Float a; DVALUE_Float b] => ret (inr (DVALUE_Float (Float32_maxnum a b)))
+      | [DVALUE_Float a; DVALUE_Float b] => inr (DVALUE_Float (Float32_maxnum a b))
       | _ => failwith "llvm_maxnum_f32 got incorrect / ill-typed inputs"
       end.
 
@@ -461,14 +460,14 @@ Module Make(LP:LLVMParams).
   Definition llvm_minimum_f64 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Double a; DVALUE_Double b] => ret (inr (DVALUE_Double (Float_minimum a b)))
+      | [DVALUE_Double a; DVALUE_Double b] => inr (DVALUE_Double (Float_minimum a b))
       | _ => failwith "llvm_minimum_f64 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_minimum_f32 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Float a; DVALUE_Float b] => ret (inr (DVALUE_Float (Float32_minimum a b)))
+      | [DVALUE_Float a; DVALUE_Float b] => inr (DVALUE_Float (Float32_minimum a b))
       | _ => failwith "llvm_minimum_f32 got incorrect / ill-typed inputs"
       end.
 
@@ -501,42 +500,42 @@ Module Make(LP:LLVMParams).
   Definition llvm_ushl_sat_1: semantic_function :=
     fun args =>
       match args with
-      | [@DVALUE_I 1 a; @DVALUE_I 1 b] => fmap inr (ushl_sat a b)
+      | [@DVALUE_I 1 a; @DVALUE_I 1 b] => ushl_sat a b
       | _ => failwith "llvm_ushl_sat_1 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_8: semantic_function :=
     fun args =>
       match args with
-      | [@DVALUE_I 8 a; @DVALUE_I 8 b] => fmap inr (ushl_sat a b)
+      | [@DVALUE_I 8 a; @DVALUE_I 8 b] => ushl_sat a b
       | _ => failwith "llvm_ushl_sat_8 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_16: semantic_function :=
     fun args =>
       match args with
-      | [@DVALUE_I 16 a; @DVALUE_I 16 b] => fmap inr (ushl_sat a b)
+      | [@DVALUE_I 16 a; @DVALUE_I 16 b] => ushl_sat a b
       | _ => failwith "llvm_ushl_sat_16 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_32: semantic_function :=
     fun args =>
       match args with
-      | [@DVALUE_I 32 a; @DVALUE_I 32 b] => fmap inr (ushl_sat a b)
+      | [@DVALUE_I 32 a; @DVALUE_I 32 b] => ushl_sat a b
       | _ => failwith "llvm_ushl_sat_32 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_64: semantic_function :=
     fun args =>
       match args with
-      | [@DVALUE_I 64 a; @DVALUE_I 64 b] => fmap inr (ushl_sat a b)
+      | [@DVALUE_I 64 a; @DVALUE_I 64 b] => ushl_sat a b
       | _ => failwith "llvm_ushl_sat_64 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_vellvm_internal_throw : semantic_function :=
     fun args =>
       match args with
-      | [] => ret (inl UVALUE_None)
+      | [] => ret DVALUE_None
       | _ => failwith "llvm_vellvm_internal_throw got incorrect / ill-typed inputs"
       end.
 

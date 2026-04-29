@@ -210,5 +210,5 @@ From Vellvm Require Import
    So exposing the specialization here, but it is awkward.
  *)
 Module Make (LP:LLVMParams). 
-  Definition local_env := FMapAList.alist raw_id LP.DV.uvalue.
+  Definition local_env := FMapAList.alist raw_id LP.DV.dvalue.
 End Make.

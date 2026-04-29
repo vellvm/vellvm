@@ -138,11 +138,16 @@ Module Type DvalueByte (LP : LLVMParams).
    *)
 (*  Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | solve_dvalue_measure]. *)
 
+  Variant DByte : Type := | DBPoison | DBV (n : Z).
+  Notation dbv n := (ret (DBV n)).
+  
   (* offset is the number of bytes indexed past so far *)
-  Fixpoint dvalue_extract_byte {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOMABLE M} (dv : dvalue) (dt : dtyp) (idx : Z) {struct dv} : M Z
+  Fixpoint dvalue_extract_byte
+    {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_OOMABLE M}
+    (dv : dvalue) (dt : dtyp) (idx : Z) {struct dv} : M DByte
     :=
-    let dvalue_extract_struct_bytes (pad : option N) :=
-      fix loop fields types (offset : N) (idx : Z) {struct fields}  :=
+    let dvalue_extract_struct_bytes (pad : option N) : list dvalue -> list dtyp -> N -> Z -> M DByte :=
+      fix loop fields types (offset : N) (idx : Z) {struct fields} : M DByte :=
         match fields, types with
         | [], [] =>
             (* Handle padding at the end of the structure *)
@@ -158,10 +163,10 @@ Module Type DvalueByte (LP : LLVMParams).
             if Z.ltb idx zpadding
             then
               (* Indexing into padding bytes *)
-              (* TODO: currently we just pad with 0 bytes. This
-                 prevents storing data in padding, though, which is
-                 technically allowed *)
-              ret 0%Z
+              (* TODO: currently we just pad with 0 bytes. This *)
+      (*            prevents storing data in padding, though, which is *)
+      (*            technically allowed *)
+              dbv 0%Z
             else
               raise_error "No fields left for byte-indexing..."
         | f::fs, dt::dts =>
@@ -176,10 +181,10 @@ Module Type DvalueByte (LP : LLVMParams).
             if Z.ltb idx zpadding
             then
               (* Indexing into padding bytes *)
-              (* TODO: currently we just pad with 0 bytes. This
-                 prevents storing data in padding, though, which is
-                 technically allowed *)
-              ret 0%Z
+              (* TODO: currently we just pad with 0 bytes. This *)
+      (*            prevents storing data in padding, though, which is *)
+      (*            technically allowed *)
+              dbv 0%Z
             else
               let offset' := (offset + padding)%N in
               let idx' := (idx - zpadding)%Z in
@@ -189,6 +194,7 @@ Module Type DvalueByte (LP : LLVMParams).
         | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
         end
     in
+
     let dvalue_extract_array_bytes :=
       fix loop elts dt (idx : Z) {struct elts}  :=
         match elts with
@@ -201,19 +207,20 @@ Module Type DvalueByte (LP : LLVMParams).
             else loop es dt (idx - zsz)%Z
         end
     in
+    
     match dv with
        | @DVALUE_I sz x =>
-           ret (extract_byte_vint x idx)
+           dbv (extract_byte_vint x idx)
        | DVALUE_IPTR x =>
-           ret (extract_byte_Z (IP.to_Z x) idx)
+           dbv (extract_byte_Z (IP.to_Z x) idx)
        | DVALUE_Addr addr =>
            (* Note: this throws away provenance *)
-           ret (extract_byte_Z (ptr_to_int addr) idx)
+           dbv (extract_byte_Z (ptr_to_int addr) idx)
        | DVALUE_Float f =>
-           ret (extract_byte_Z (unsigned (Float32.to_bits f)) idx)
+           dbv (extract_byte_Z (unsigned (Float32.to_bits f)) idx)
        | DVALUE_Double d =>
-           ret (extract_byte_Z (unsigned (Float.to_bits d)) idx)
-       | DVALUE_Poison dt => raise_poison dt
+           dbv (extract_byte_Z (unsigned (Float.to_bits d)) idx)
+       | DVALUE_Poison dt => ret DBPoison
        | DVALUE_Oom dt => raise_oomable dt
        | DVALUE_None =>
            (* TODO: Not sure if this should be an error, poison, or what. *)
@@ -249,121 +256,6 @@ Module Type DvalueByte (LP : LLVMParams).
                raise_error "dvalue_extract_byte: type mismatch on DVALUE_Vector."
            end
        end.
-
-  Lemma dvalue_extract_byte_equation {M} `{HM: Monad M} `{RE: RAISE_ERROR M} `{RP: RAISE_POISON M} `{RO: RAISE_OOMABLE M} (dv : dvalue) (dt : dtyp) (idx : Z) :
-    @dvalue_extract_byte M HM RE RP RO dv dt idx =
-    let dvalue_extract_struct_bytes (pad : option N) :=
-      fix loop fields types (offset : N) (idx : Z) {struct fields}  :=
-        match fields, types with
-        | [], [] =>
-            (* Handle padding at the end of the structure *)
-            let padding :=
-              match pad with
-              | Some max_pad
-                => pad_amount max_pad offset
-              | None =>
-                  0%N
-              end
-            in
-            let zpadding := Z.of_N padding in
-            if Z.ltb idx zpadding
-            then
-              (* Indexing into padding bytes *)
-              (* TODO: currently we just pad with 0 bytes. This
-                 prevents storing data in padding, though, which is
-                 technically allowed *)
-              ret 0%Z
-            else
-              raise_error "No fields left for byte-indexing..."
-        | f::fs, dt::dts =>
-            let padding :=
-              if pad
-              then pad_amount (preferred_alignment (dtyp_alignment dt)) offset
-              else 0%N
-            in
-            let zpadding := Z.of_N padding in
-            let sz := sizeof_dtyp dt in
-            let zsz := Z.of_N sz in
-            if Z.ltb idx zpadding
-            then
-              (* Indexing into padding bytes *)
-              (* TODO: currently we just pad with 0 bytes. This
-                 prevents storing data in padding, though, which is
-                 technically allowed *)
-              ret 0%Z
-            else
-              let offset' := (offset + padding)%N in
-              let idx' := (idx - zpadding)%Z in
-              if Z.ltb idx' zsz
-              then dvalue_extract_byte f dt idx'
-              else loop fs dts (offset' + sz)%N (idx' - zsz)%Z
-        | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
-        end
-    in
-    let dvalue_extract_array_bytes :=
-      fix loop elts dt (idx : Z) {struct elts}  :=
-        match elts with
-        | [] => raise_error "No fields left for byte-indexing..."
-        | e::es =>
-            let sz := sizeof_dtyp dt in
-            let zsz := Z.of_N sz in
-            if Z.ltb idx zsz
-            then dvalue_extract_byte e dt idx
-            else loop es dt (idx - zsz)%Z
-        end
-    in
-    match dv with
-       | @DVALUE_I sz x =>
-           ret (extract_byte_vint x idx)
-       | DVALUE_IPTR x =>
-           ret (extract_byte_Z (IP.to_Z x) idx)
-       | DVALUE_Addr addr =>
-           (* Note: this throws away provenance *)
-           ret (extract_byte_Z (ptr_to_int addr) idx)
-       | DVALUE_Float f =>
-           ret (extract_byte_Z (unsigned (Float32.to_bits f)) idx)
-       | DVALUE_Double d =>
-           ret (extract_byte_Z (unsigned (Float.to_bits d)) idx)
-       | DVALUE_Poison dt => raise_poison dt
-       | DVALUE_Oom dt => raise_oomable dt
-       | DVALUE_None =>
-           (* TODO: Not sure if this should be an error, poison, or what. *)
-           raise_error "dvalue_extract_byte on DVALUE_None"
-
-       | DVALUE_Struct fields =>
-           match dt with
-           | DTYPE_Struct dts =>
-               dvalue_extract_struct_bytes (Some (max_preferred_dtyp_alignment dts)) fields dts 0 idx
-           | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Struct."
-           end
-
-       | DVALUE_Packed_struct fields =>
-           match dt with
-           | DTYPE_Packed_struct dts =>
-               dvalue_extract_struct_bytes None fields dts 0 idx
-           | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
-           end
-
-       | DVALUE_Array _ elts =>
-           match dt with
-           | DTYPE_Array sz dt =>
-               dvalue_extract_array_bytes elts dt idx
-           | _ =>
-               raise_error "dvalue_extract_byte: type mismatch on DVALUE_Array."
-           end
-
-       | DVALUE_Vector _ elts =>
-           match dt with
-           | DTYPE_Vector sz dt =>
-               dvalue_extract_array_bytes elts dt idx
-           | _ =>
-               raise_error "dvalue_extract_byte: type mismatch on DVALUE_Vector."
-           end
-       end.
-  Proof.
-    unfold dvalue_extract_byte at 1.
-    destruct dv; try reflexivity.
-  Qed.
 
   (* Taking a byte out of a dvalue...
 
@@ -373,7 +265,7 @@ Module Type DvalueByte (LP : LLVMParams).
   | DVALUE_ExtractByte (dv : dvalue) (dt : dtyp) (idx : N) : dvalue_byte
   .
 
-  Definition dvalue_byte_value {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOMABLE M} (db : dvalue_byte) : M Z
+  Definition dvalue_byte_value {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_OOMABLE M} (db : dvalue_byte) : M DByte 
     := match db with
        | DVALUE_ExtractByte dv dt idx =>
            dvalue_extract_byte dv dt (Z.of_N idx)
@@ -385,7 +277,7 @@ Module Type DvalueByte (LP : LLVMParams).
          (Nseq 0 (N.to_nat (sizeof_dtyp dt))).
 
   #[local] Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia].
-  Fixpoint dvalue_bytes_to_dvalue {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOMABLE M} (dbs : list dvalue_byte) (dt : dtyp) : M dvalue
+  Fixpoint dvalue_bytes_to_dvalue {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_OOMABLE M} (dbs : list dvalue_byte) (dt : dtyp) : M dvalue
     :=
     let list_dvalue_bytes_to_dvalue (pad : option N) :=
       fix go (offset : N) dts dbs :=
@@ -414,8 +306,11 @@ Module Type DvalueByte (LP : LLVMParams).
     in
     match dt with
        | DTYPE_I sz =>
-           zs <- map_monad dvalue_byte_value dbs;;
-           ret (@DVALUE_I sz (concat_bytes_Z_vint zs))
+           zs <- map_monad (dvalue_byte_value) dbs;;
+           match zs with
+           | DBPoison => ret (DVALUE_Poison dt)
+           | DBV v    => ret (@DVALUE_I sz (concat_bytes_Z_vint v))
+           end
        | DTYPE_IPTR =>
            zs <- map_monad dvalue_byte_value dbs;;
            val <- lift_OOMABLE DTYPE_IPTR (IP.from_Z (concat_bytes_Z zs));;

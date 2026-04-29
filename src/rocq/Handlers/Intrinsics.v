@@ -84,11 +84,11 @@ Module Make(LP:LLVMParams).
                                   end
                                ) defined_intrinsics.
 
-  Definition handle_intrinsics {E} `{FailureE -< E} `{IntrinsicE dvalue uvalue -< E} :
-    (IntrinsicE dvalue uvalue) ~> itree E :=
+  Definition handle_intrinsics {E} `{FailureE -< E} `{IntrinsicE dvalue -< E} :
+    (IntrinsicE dvalue) ~> itree E :=
     (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
-    fun X (e : IntrinsicE dvalue uvalue X) =>
-      match e in IntrinsicE _ _ Y return X = Y -> itree E Y with
+    fun X (e : IntrinsicE dvalue X) =>
+      match e in IntrinsicE _ Y return X = Y -> itree E Y with
       | (Intrinsic _ fname args) =>
           match assoc fname defs_assoc with
           | Some f => fun pf =>
@@ -97,15 +97,15 @@ Module Make(LP:LLVMParams).
                        | inr result =>
                            Ret result
                        end
-          | None => fun pf => (eq_rect X (fun a => itree E a) (trigger e)) (uvalue + dvalue)%type pf
+          | None => fun pf => (eq_rect X (fun a => itree E a) (trigger e)) dvalue%type pf
           end
       end eq_refl.
 
   Section PARAMS.
     Variable (E F : Type -> Type).
     Context `{FailureE -< F}.
-    Context `{LLVMExcE uvalue -< F}.
-    Notation Eff := (E +' IntrinsicE dvalue uvalue +' F).
+    Context `{LLVMExcE dvalue -< F}.
+    Notation Eff := (E +' IntrinsicE dvalue +' F).
 
     Definition E_trigger : Handler E Eff := fun _ e => trigger e.
     Definition F_trigger : Handler F Eff := fun _ e => trigger e.
