@@ -3425,7 +3425,6 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (MMSP : Me
     (* Actually perform reads *)
     map_monad (fun ptr => read_byte_spec_MemPropT ptr) ptrs.
            
-  
   Definition read_dvalue_spec (dt : dtyp) (ptr : addr) : MemPropT MemState dvalue.
     refine (
     bytes <- read_bytes_spec ptr (N.to_nat (sizeof_dtyp dt));;
