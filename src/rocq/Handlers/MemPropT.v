@@ -25,46 +25,11 @@ From Vellvm.Handlers.MemoryModules Require Import
      Within.
 
 From Vellvm.Semantics Require Import
-  StoreId
   LLVMEvents.
 
 Import Basics.Basics.Monads.
 Import MonadNotation.
 Open Scope monad_scope.
-
-Class MonadStoreId (M : Type -> Type) : Type :=
-  { fresh_sid : M store_id;
-  }.
-
-(* M could use MemState, sid, sid_set, etc... *)
-Class StoreIdFreshness (S : Type) : Type :=
-  { used_store_id : S -> store_id -> Prop;
-    (* fresh_sid : M store_id; *)
-
-    (* run_sid_freshness {A} : M A -> S -> (S * A); *)
-
-    (* (* Doesn't match up with current usage... *)
-
-    (*    E.g., when allocating or writing to memory we call fresh_sid, *)
-    (*    then use that to create bytes, and then store those bytes in *)
-    (*    memory. The problem is if `used_store_id` is in terms of *)
-    (*    `MemState` the laws won't hold until the bytes are actually *)
-    (*    stored in `MemState` after the write... *)
-    (*  *) *)
-    (* fresh_sid_now_used : *)
-    (* forall s s' sid, *)
-    (*   run_sid_freshness fresh_sid s = (s', sid) -> *)
-
-    (*   (* Was not used *) *)
-    (*   forall s'', run_sid_freshness (used_store_id sid) s = (s'', false) /\ *)
-
-    (*   (* Freshly allocated one is now used *) *)
-    (*   forall s'', run_sid_freshness (used_store_id sid) s' = (s'', true) /\ *)
-
-    (*   (* Whether other sids are used is preserved *) *)
-    (*   forall sid' s'' s''' usedp, *)
-    (*     (sid' <> sid -> run_sid_freshness (used_store_id sid') s = (s'', usedp) -> run_sid_freshness (used_store_id sid') s' = (s''', usedp)); *)
-  }.
 
 Class AllocationIdFreshness (AllocationId : Type) (S : Type) : Type :=
   { used_allocation_id : S -> AllocationId -> Prop;

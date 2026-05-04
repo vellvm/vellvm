@@ -26,7 +26,6 @@ From Vellvm Require Import
   Semantics.IntrinsicsDefinitions
   Semantics.InterpretationStack
   Semantics.VellvmIntegers
-  Semantics.StoreId
   Semantics.Printfdefn
   QC.ShowAST.
 Import MonadNotation.

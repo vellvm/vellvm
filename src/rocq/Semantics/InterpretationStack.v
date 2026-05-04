@@ -9,8 +9,7 @@ From Vellvm Require Import
      Utilities
      Semantics.LLVMEvents
      Semantics.Lang
-     Semantics.LLVMParams
-     Semantics.StoreId.
+     Semantics.LLVMParams.
 
 From Vellvm.Handlers Require Export
      Global

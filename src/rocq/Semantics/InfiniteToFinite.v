@@ -15,7 +15,6 @@ From Vellvm Require Import
   Semantics.MemoryAddress
   Semantics.Memory.Sizeof
   Semantics.Lang
-  Semantics.StoreId
   Semantics.InterpretationStack
   Semantics.TopLevel
   Semantics.DynamicValues

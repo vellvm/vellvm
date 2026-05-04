@@ -55,7 +55,6 @@
 ./rocq/Semantics/Denotation.v
 ./rocq/Semantics/DynamicValues.v
 ./rocq/Semantics/GepM.v
-./rocq/Semantics/StoreId.v
 ./rocq/Semantics/InfiniteToFinite.v
 ./rocq/Semantics/InfiniteToFinite/Conversions/BaseConversions.v
 ./rocq/Semantics/InfiniteToFinite/Conversions/DvalueConversions.v
@@ -69,13 +68,10 @@
 ./rocq/Semantics/LLVMEvents.v
 ./rocq/Semantics/LLVMParams.v
 ./rocq/Semantics/Lang.v
-./rocq/Semantics/Memory/ErrSID.v
 ./rocq/Semantics/Memory/FiniteProvenance.v
-./rocq/Semantics/Memory/MemBytes.v
-./rocq/Semantics/Memory/DvalueBytes.v
+./rocq/Semantics/Memory/MemoryBytes.v
 ./rocq/Semantics/Memory/Overlaps.v
 ./rocq/Semantics/Memory/Sizeof.v
-./rocq/Semantics/Memory/StoreId.v
 ./rocq/Semantics/MemoryAddress.v
 ./rocq/Semantics/MemoryParams.v
 ./rocq/Semantics/RuttProps.v
@@ -148,9 +144,6 @@
 ./rocq/Utils/Raise.v
 ./rocq/Utils/RefineProp.v
 ./rocq/Utils/ErrUbOomProp.v
-./rocq/Utils/ErrOomPoison.v
-./rocq/Utils/Oomable.v
-./rocq/Utils/Poisonable.v
 ./rocq/Utils/VellvmRelations.v
 ./rocq/Utils/RuttPropsExtra.v
 ./rocq/Utils/StateMonads.v

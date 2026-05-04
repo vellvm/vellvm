@@ -34,7 +34,6 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
      Semantics.VellvmIntegers
-     Semantics.StoreId
      Utils.MapMonadExtra
      Utils.MonadEq1Laws
      Utils.MonadReturnsLaws
@@ -112,7 +111,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | DVALUE_Double (x:ll_double)
   | DVALUE_Float (x:ll_float)
   | DVALUE_Poison (t:dtyp)
-  | DVALUE_Oom (t:dtyp)
   | DVALUE_None
   | DVALUE_Struct        (fields: list dvalue)
   | DVALUE_Packed_struct (fields: list dvalue)
@@ -141,7 +139,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Double x => "double " ++ show x
     | DVALUE_Float x => "float " ++ show x
     | DVALUE_Poison t => "poison[" ++ show_dtyp t ++ "]"
-    | DVALUE_Oom t => "oom[" ++ show_dtyp t ++ "]"
     | DVALUE_None => "none"
     | DVALUE_Struct fields => "{" ++ String.concat ", " (map show_dvalue fields) ++ "}"
     | DVALUE_Packed_struct fields => "<{" ++ String.concat ", " (map show_dvalue fields) ++ "}>"
@@ -160,7 +157,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Double x => 1
     | DVALUE_Float x => 1
     | DVALUE_Poison t => 1
-    | DVALUE_Oom t => 1
     | DVALUE_None => 1
     | DVALUE_Struct fields => S (S (list_sum (map dvalue_measure fields)))
     | DVALUE_Packed_struct fields => S (S (list_sum (map dvalue_measure fields)))
@@ -204,7 +200,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
     Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
     Hypothesis IH_Poison        : forall t, P (DVALUE_Poison t).
-    Hypothesis IH_Oom           : forall t, P (DVALUE_Oom t).
     Hypothesis IH_None          : P DVALUE_None.
     Hypothesis IH_Struct        : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Struct fields).
     Hypothesis IH_Packed_Struct : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Packed_struct fields).
@@ -247,7 +242,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
     Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
     Hypothesis IH_Poison        : forall t, P (DVALUE_Poison t).
-    Hypothesis IH_Oom           : forall t, P (DVALUE_Oom t).
     Hypothesis IH_None          : P DVALUE_None.
     Hypothesis IH_Struct        : forall (fields: list dvalue), (forall u, InT u fields -> P u) -> P (DVALUE_Struct fields).
     Hypothesis IH_Packed_Struct : forall (fields: list dvalue), (forall u, InT u fields -> P u) -> P (DVALUE_Packed_struct fields).
@@ -321,7 +315,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
     Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
     Hypothesis IH_Poison        : forall t, P (DVALUE_Poison t).
-    Hypothesis IH_Oom           : forall t, P (DVALUE_Oom t).
     Hypothesis IH_None          : P DVALUE_None.
     Hypothesis IH_Subterm        : forall dv, (forall u, dvalue_strict_subterm u dv -> P u) -> P dv.
 
@@ -692,11 +685,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
                     | DVALUE_Poison _ => _
                     | _ => _
                     end
-                | DVALUE_Oom _ =>
-                    match d2 with
-                    | DVALUE_Oom _ => _
-                    | _ => _
-                    end
                 | DVALUE_None =>
                     match d2 with
                     | DVALUE_None => _
@@ -734,9 +722,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
         * left; subst; reflexivity.
         * right; intros H; inversion H. contradiction.
       - destruct (Float32.eq_dec x1 x2).
-        * left; subst; reflexivity.
-        * right; intros H; inversion H. contradiction.
-      - destruct (dtyp_eq_dec d d0).
         * left; subst; reflexivity.
         * right; intros H; inversion H. contradiction.
       - destruct (dtyp_eq_dec d d0).
@@ -889,7 +874,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | Conv_Pure    (x : dvalue)
     | Conv_ItoP    (x : dvalue)
     | Conv_PtoI    (x : dvalue)
-    | Conv_Oom     (s: string)
     | Conv_Illegal (s: string).
 
     Variant ptr_conv_cases : Set :=
@@ -1460,7 +1444,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
   | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) (DTYPE_FP FP_float)
   | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
   | DVALUE_Poison_typ  : forall τ, NO_VOID τ -> dvalue_has_dtyp (DVALUE_Poison τ) τ
-  | DVALUE_Oom_typ  : forall τ, NO_VOID τ -> dvalue_has_dtyp (DVALUE_Oom τ) τ
 
   | DVALUE_Struct_typ :
     forall fields dts,
@@ -1499,7 +1482,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Hypothesis IH_I              : forall sz x, P (@DVALUE_I sz x) (DTYPE_I sz).
     Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x) DTYPE_IPTR.
     Hypothesis IH_Poison         : forall t (NV: NO_VOID t), P (DVALUE_Poison t) t.
-    Hypothesis IH_Oom            : forall t (NV: NO_VOID t), P (DVALUE_Oom t) t.
     Hypothesis IH_Double         : forall x, P (DVALUE_Double x) (DTYPE_FP FP_double).
     Hypothesis IH_Float          : forall x, P (DVALUE_Float x) (DTYPE_FP FP_float).
     Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
@@ -1617,8 +1599,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DVALUE_Float x =>
         if dtyp_eq_dec dt (DTYPE_FP FP_float) then true else false
 
-    | DVALUE_Poison t
-    | DVALUE_Oom t =>
+    | DVALUE_Poison t =>
         if @NO_VOID_dec t then
           if dtyp_eq_dec dt t then true else false
         else false

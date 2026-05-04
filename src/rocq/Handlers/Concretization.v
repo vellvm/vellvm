@@ -27,7 +27,6 @@ From Vellvm Require Import
      Semantics.MemoryParams
      Semantics.LLVMEvents
      Semantics.LLVMParams
-     Semantics.StoreId
      Handlers.MemoryModel
      QC.ShowAST.
 

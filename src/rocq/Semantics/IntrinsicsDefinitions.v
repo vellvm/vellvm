@@ -27,7 +27,6 @@ From Vellvm Require Import
      Numeric.Integers
      Numeric.Floats.
 
-
 From Flocq.IEEE754 Require Import
   Binary
   Bits.

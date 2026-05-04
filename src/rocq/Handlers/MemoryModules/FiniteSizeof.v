@@ -13,9 +13,7 @@ From Vellvm.Syntax Require Import
 From Vellvm.Semantics Require Import
      DynamicValues
      LLVMParams
-     Memory.MemBytes
-     Memory.Sizeof
-     StoreId.
+     Memory.Sizeof.
 
 Module FinSizeof : SIZEOF.
   (* TODO: make parameter? *)
@@ -175,11 +173,3 @@ Module FinSizeof : SIZEOF.
   Qed.
 End FinSizeof.
 
-Inductive UByte (uvalue : Type) :=
-| mkUByte (uv : uvalue) (dt : dtyp) (idx : N) (sid : store_id) : UByte uvalue.
-
-Module FinByte (LP:LLVMParams) : ByteImpl(LP).
-  Import LP.DV.
-  Include ByteImpl LP.
-  
-End FinByte.
