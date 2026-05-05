@@ -26,6 +26,13 @@ Import MonadNotation.
 Open Scope N_scope.
 
 
+(* Variant mem_cmp : Type -> Type := *)
+(*   | Mfail (s : string) : mem_cmp void *)
+(*   | Moom : mem_cmp void *)
+(*   | Mub : mem_cmp void *)
+(*   | Mret {X} (x : X) : mem_cmp X. *)
+
+
 (* Convert a list of UVALUE_ExtractByte values into a dvalue of
          a given type.
 
