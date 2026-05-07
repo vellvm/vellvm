@@ -1,5 +1,5 @@
 From Stdlib Require Import
-  List Lia.
+  List Lia Program Recdef.
 
 From ITree Require Import
      Basics.Monad.
@@ -15,7 +15,6 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 
 (** * Collection of misc definitions and lemmas over lists *)
-
 
 (** *** Alternate [find] and [filter] where the predicate is replaced by a partial map *)
 Section FINDOPTION.
@@ -51,40 +50,6 @@ Section FINDOPTION.
       end.
 
 End FINDOPTION.
-
-(** *** Non-empty lists *)
-Section NONEMPTY.
-
-  Variant NonEmpty A :=
-    | nempty : A -> list A -> NonEmpty A
-  .
-
-  Arguments nempty {A}.
-
-  Definition head {A : Type} (ne : NonEmpty A) : A
-    := match ne with
-       | nempty x xs => x
-       end.
-
-  Definition tail {A : Type} (ne : NonEmpty A) : list A
-    := match ne with
-       | nempty x xs => xs
-       end.
-
-  Definition nth_error {A : Type} (ne : NonEmpty A) (n : nat) : option A
-    := match n with
-       | O => Some (head ne)
-       | S x => List.nth_error (tail ne) x
-       end.
-
-  Definition nth {A : Type} (n : nat) (ne : NonEmpty A) (def : A) : A
-    := match n with
-       | O => head ne
-       | S x => List.nth x (tail ne) def
-       end.
-
-End NONEMPTY.
-Arguments nempty {A}.
 
 (** *** Interactions between monadic computations and lists *)
 Section monad.
@@ -297,8 +262,83 @@ Section Standard.
     constructor. auto. cbn. apply IHn.
   Qed.
 
-End Standard.
+    Fixpoint Nseq (start : N) (len : nat) : list N :=
+    match len with
+    | O => []
+    | S x => start :: Nseq (N.succ start) x
+    end.
+  Fixpoint drop {A} (n : N) (l : list A) : list A
+    := match l with
+       | [] => []
+       | (x::xs) =>
+           if N.eqb 0 n
+           then l
+           else drop (N.pred n) xs
+       end.
 
+  Fixpoint take {A} (n : N) (l : list A) : list A
+    := match l with
+       | [] => []
+       | (x::xs) =>
+           if N.eqb 0 n
+           then []
+           else x :: take (N.pred n) xs
+       end.
+  
+  Definition repeatN {X} (n : N) (x : X) : list X
+    := N.recursion
+         []
+         (fun n xs => x :: xs)
+         n.
+
+  Lemma drop_length_le :
+    forall {A} (xs : list A) n,
+      (length (drop n xs) <= length xs)%nat.
+  Proof.
+    intros A xs.
+    induction xs;
+      intros n;
+      cbn; [lia|].
+    destruct n; cbn; [lia|].
+    rewrite IHxs.
+    lia.
+  Qed.
+
+  Lemma drop_length_lt :
+    forall {A} (xs : list A) n,
+      (n >= 1)%N ->
+      xs <> [] ->
+      (length (drop n xs) < length xs)%nat.
+  Proof.
+    intros A xs.
+    induction xs;
+      intros n N XS;
+      cbn; [contradiction|].
+    destruct n; cbn; [lia|].
+    pose proof drop_length_le xs (Pos.pred_N p).
+    lia.
+  Qed.
+
+  Function split_every_pos {A} (n : positive) (xs : list A) { measure length xs }: list (list A)
+    := match xs with
+       | [] => []
+       | (_::_) =>
+           @take A (Npos n) xs :: split_every_pos n (@drop A (Npos n)%N xs)
+       end.
+  Proof.
+    intros. apply drop_length_lt. lia.
+    intros D. inversion D.
+  Defined.
+
+  (* Like split_every, but default to the empty list in the n=0 case *)
+  Definition split_every_nil {A} (n : N) (xs : list A) : list (list A)
+    := match n with
+       | N0 => []
+       | Npos n =>
+           split_every_pos n xs
+       end.
+
+End Standard.
 
 (** *** Better behaved version of Forall that can be used in recursive functions *)
 Section FORALL.

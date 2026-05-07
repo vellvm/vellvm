@@ -29,7 +29,7 @@ From Vellvm Require Export
 
 From ITree Require Export
   Basics.Monad.
-From ExtLib Require Import Structures.Functor.
+From ExtLib Require Export Structures.Functor.
 Export Monads.
 
 Export ListNotations.

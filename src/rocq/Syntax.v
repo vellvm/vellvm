@@ -16,4 +16,5 @@ From Vellvm Require Export
      Syntax.Scope
      Syntax.Traversal
      Syntax.DynamicTypes
-     Syntax.TypToDtyp.
+     Syntax.TypToDtyp
+     Syntax.SurfaceSyntax.

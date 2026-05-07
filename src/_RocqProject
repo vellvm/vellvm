@@ -22,6 +22,7 @@
 ./rocq/Utils/RelationsUtil.v
 ./rocq/Utils/Default.v
 ./rocq/Utils/NMaps.v
+./rocq/Utils/NList.v
 ./rocq/Utils/EOB.v
 ./rocq/Utilities.v
 
@@ -33,6 +34,7 @@
 ./rocq/Syntax/Traversal.v
 ./rocq/Syntax/TypToDtyp.v
 ./rocq/Syntax/Scope.v
+./rocq/Syntax/SurfaceSyntax.v
 ./rocq/Syntax.v
 ./rocq/Syntax/ScopeTheory.v
 
@@ -45,10 +47,14 @@
 ./rocq/QC/ShowAST.v
 ./rocq/Semantics/DynamicValues.v
 ./rocq/Semantics/LLVMParams.v
+./rocq/Semantics/GepM.v
+./rocq/Semantics/Memory/MemoryBytes.v
+./rocq/Semantics/MemoryParams.v
+./rocq/Semantics/Compare.v
+./rocq/Semantics/Conversion.v
 ./rocq/Semantics/Denotation.v
 
 
-./rocq/Syntax/SurfaceSyntax.v
 
 
 
@@ -91,7 +97,6 @@
 ./rocq/QC/Utils.v
 ./rocq/Semantics.v
 ./rocq/Semantics/ConcretizationParams.v
-./rocq/Semantics/GepM.v
 ./rocq/Semantics/InfiniteToFinite.v
 ./rocq/Semantics/InfiniteToFinite/Conversions/BaseConversions.v
 ./rocq/Semantics/InfiniteToFinite/Conversions/DvalueConversions.v
@@ -104,10 +109,8 @@
 ./rocq/Semantics/ItreeRaiseMReturns.v
 ./rocq/Semantics/Lang.v
 ./rocq/Semantics/Memory/FiniteProvenance.v
-./rocq/Semantics/Memory/MemoryBytes.v
 ./rocq/Semantics/Memory/Overlaps.v
 ./rocq/Semantics/Memory/Sizeof.v
-./rocq/Semantics/MemoryParams.v
 ./rocq/Semantics/RuttProps.v
 ./rocq/Semantics/Printfdefn.v
 ./rocq/Semantics/TopLevel.v

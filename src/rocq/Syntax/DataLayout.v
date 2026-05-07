@@ -1,5 +1,6 @@
 From Vellvm Require Import
-  Utilities.
+  Utilities
+  Utils.NList.
 
 (* Memory model layout information... *)
 Variant Alignment : Type :=

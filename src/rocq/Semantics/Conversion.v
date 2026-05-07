@@ -2,20 +2,12 @@ From Vellvm Require Import
      Numeric.Rocqlib
      Numeric.Integers
      Numeric.Floats
-     Utils.Error
-     Utils.Monads
-     Syntax.DataLayout
-     Syntax.LLVMAst
-     Syntax.DynamicTypes
+     Utilities
+     Syntax
      Semantics.DynamicValues
      Semantics.MemoryParams
-     Semantics.LLVMParams
-     Semantics.EOB.
+     Semantics.LLVMParams.
 
-From ExtLib Require Import
-     Structures.Monads
-     EitherMonad.
- 
 Module CONVERT (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
   Import MP.
   Import LP.
@@ -81,12 +73,12 @@ Module CONVERT (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
         else if bit_sizeof_dtyp t1 =? bit_sizeof_dtyp t2
              then
                let bytes := dvalue_to_memory_bytes x t1 in
-               let dv_conv := memory_bytes_to_dvalue (M := EOB) bytes t2 in
+               let dv_conv := memory_bytes_to_dvalue bytes t2 in
                match dv_conv with
-               | do_err err => Conv_Illegal ("Bitcast failure: " ++ err)
-               | do_oom oom => Conv_Oom ("Bitcast OOM: " ++ oom)
-               | do_ub => Conv_Illegal ("Bitcast UB ")
-               | do_ret v => Conv_Pure v
+               | raise_error err => Conv_Illegal ("Bitcast failure: " ++ err)
+               | raise_oom oom => Conv_Oom ("Bitcast OOM: " ++ oom)
+               | raise_ub ub => Conv_Illegal ("Bitcast UB " ++ ub)
+               | raise_ret v => Conv_Pure v
                end
              else Conv_Illegal "unequal bitsize in cast"
 
@@ -149,7 +141,7 @@ Module CONVERT (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
   
   Arguments get_conv_case _ _ _ _ : simpl nomatch.
 
-  Definition convert {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_OOM M} `{RAISE_UB M} (conv : conversion_type) (t_from : dtyp) (dv : dvalue) (t_to : dtyp) : M dvalue :=
+  Definition convert (conv : conversion_type) (t_from : dtyp) (dv : dvalue) (t_to : dtyp) : EOB dvalue :=
     match get_conv_case conv t_from dv t_to with
     | Conv_PtoI x =>
         match x, t_to with
@@ -157,11 +149,11 @@ Module CONVERT (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
         | DVALUE_Addr addr, DTYPE_IPTR => coerce_integer_to_int None (ptr_to_int addr)
         | _, _ => raise_error "Invalid PTOI conversion"
         end
-    | Conv_ItoP x => 
-        match int_to_ptr (dvalue_int_unsigned x) wildcard_prov with
-        | NoOom a => ret (DVALUE_Addr a)
-        | Oom msg => raise_oom ("concretize_uvalueM OOM in Conv_ItoP: " ++ msg)
-        end
+    | Conv_ItoP x =>
+        (* Note: we lost part of the error message when raising UB in the [int_to_ptr]
+           computation here:
+           ("concretize_uvalueM OOM in Conv_ItoP: " ++ msg) *)
+        DVALUE_Addr <$> int_to_ptr (dvalue_int_unsigned x) wildcard_prov
     | Conv_Pure x => ret x
     | Conv_Oom s => raise_oom s
     | Conv_Illegal s => raise_error s

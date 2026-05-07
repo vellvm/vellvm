@@ -1,37 +1,14 @@
-From Stdlib Require Import
-  ZArith
-  List
-  String
-  Lia.
-
 From Vellvm Require Import
+  Utilities
+  Syntax
   Numeric.Floats
-  Utils.Monads
   LLVMParams
-  Error
-  DynamicTypes
   VellvmIntegers
-  Utils.ErrUbOomProp
-  Utils.ListUtil
-  Syntax.LLVMAst
   Memory.Sizeof.
 
 From ExtLib Require Import
-     Structures.Monads
      Data.Monads.EitherMonad.
-
-Import ListNotations.
-Import MonadNotation.
-
 Open Scope N_scope.
-
-
-(* Variant mem_cmp : Type -> Type := *)
-(*   | Mfail (s : string) : mem_cmp void *)
-(*   | Moom : mem_cmp void *)
-(*   | Mub : mem_cmp void *)
-(*   | Mret {X} (x : X) : mem_cmp X. *)
-
 
 (* Convert a list of UVALUE_ExtractByte values into a dvalue of
          a given type.
@@ -113,7 +90,7 @@ Module Type MemoryByte (LP : LLVMParams).
 
   (* Walk through a list *)
   (* Returns field index + number of bytes remaining *)
-  Fixpoint extract_field_byte_helper {M} `{Monad M} `{RAISE_ERROR M} (fields : list dtyp) (field_idx : N) (byte_idx : N) : M (dtyp * (N * N))%type
+  Fixpoint extract_field_byte_helper (fields : list dtyp) (field_idx : N) (byte_idx : N) : EOB (dtyp * (N * N))%type
     := match fields with
        | [] =>
            raise_error "No fields left for byte-indexing..."
@@ -124,7 +101,7 @@ Module Type MemoryByte (LP : LLVMParams).
               else extract_field_byte_helper xs (N.succ field_idx) (byte_idx - sz)
        end.
 
-  Definition extract_field_byte {M} `{Monad M} `{RAISE_ERROR M} (fields : list dtyp) (byte_idx : N) : M (dtyp * (N * N))%type
+  Definition extract_field_byte (fields : list dtyp) (byte_idx : N) : EOB (dtyp * (N * N))%type
     := extract_field_byte_helper fields 0 byte_idx.
 
   Fixpoint concat_bytes_vint {I} `{VInt I} (bytes : list I) : I
@@ -139,14 +116,31 @@ Module Type MemoryByte (LP : LLVMParams).
          It's not possible to use the dvalue alone, as DVALUE_Poison's
          size depends on the type.
    *)
-(*  Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | solve_dvalue_measure]. *)
 
+  (* This function may essentially compute poison, but without a dvalue to embed it into yet.
+     We take an adhoc lightweigh way to handle this currently with the following option return type.
+     It is also tied to how we treat the behavior of running map_monad to extract a list of bytes:
+     currently we want it to result into a Poison dvalue if any byte resulted in poison.
+     We are likely to follow a finer grained approach soon.
+   *)
+  Variant MaybePoison (A : Type) : Type := | Pois | NoPois (a : A).
+  Arguments Pois {A}.
+  Arguments NoPois {A}.
+  Definition EOBP Z := EOB (MaybePoison Z).
+  #[local] Instance EOBP_Monad : Monad EOBP :=
+    {| ret _ a := ret (NoPois a) ;
+      bind _ _ c k := 
+        bind (m := EOB) c (fun pov => match pov with
+                                   | Pois => ret Pois
+                                   | NoPois a => k a
+                                   end)
+    |}.
+  
   (* offset is the number of bytes indexed past so far *)
   Fixpoint dvalue_extract_byte
-    {M} `{Monad M} `{RAISE_ERROR M}
-    (dv : dvalue) (dt : dtyp) (idx : Z) {struct dv} : eitherT string M Z :=
-    let dvalue_extract_struct_bytes (pad : option N) : list dvalue -> list dtyp -> N -> Z -> eitherT string M Z :=
-      fix loop fields types (offset : N) (idx : Z) {struct fields} : eitherT string M Z :=
+    (dv : dvalue) (dt : dtyp) (idx : Z) {struct dv} : EOBP Z  :=
+    let dvalue_extract_struct_bytes (pad : option N) : list dvalue -> list dtyp -> N -> Z -> EOBP Z :=
+      fix loop fields types (offset : N) (idx : Z) {struct fields} : EOBP Z :=
         match fields, types with
         | [], [] =>
             (* Handle padding at the end of the structure *)
@@ -219,7 +213,7 @@ Module Type MemoryByte (LP : LLVMParams).
            ret (extract_byte_Z (unsigned (Float32.to_bits f)) idx)
        | DVALUE_Double d =>
            ret (extract_byte_Z (unsigned (Float.to_bits d)) idx)
-       | DVALUE_Poison dt => raise "Extracting poison byte"
+       | DVALUE_Poison dt => ret Pois
        | DVALUE_None =>
            (* TODO: Not sure if this should be an error, poison, or what. *)
            raise_error "dvalue_extract_byte on DVALUE_None"
@@ -255,15 +249,11 @@ Module Type MemoryByte (LP : LLVMParams).
            end
        end.
 
-  (* Taking a byte out of a dvalue...
-
-      Unlike UVALUE_ExtractByte, I don't think this needs an sid
-      (store id). There should be no nondeterminism in this value. *)
   Inductive memory_byte : Type :=
   | MByte (dv : dvalue) (dt : dtyp) (idx : N) : memory_byte
   .
 
-  Definition memory_byte_value {M} `{Monad M} `{RAISE_ERROR M} (db : memory_byte) : eitherT string M Z 
+  Definition memory_byte_value (db : memory_byte) : EOB (MaybePoison Z) 
     := match db with
        | MByte dv dt idx =>
            dvalue_extract_byte dv dt (Z.of_N idx)
@@ -276,129 +266,117 @@ Module Type MemoryByte (LP : LLVMParams).
 
   #[local] Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia].
 
-  (* Here, we essentially eliminate what used to be the `RAISE_POISON` constraint on [M] as it is not
-     needed at return type [dvale], and not satisfied in general by the concrete monads we will instantiate
-     it with (i.e., MemPropT MemState).
-     However, the unification freaks out if [M] is not passed explicitely to the monadic combinators around it.
-   *) 
-  Definition bind_down_cast {M T} `{Monad M} dt (c : eitherT string M T) (k : T -> M dvalue) : M dvalue :=
-    bind (m := M) (unEitherT c) (fun mp => match mp with
-                               | inl _ => ret (m := M) (DVALUE_Poison dt)
-                               | inr v => k v
-                               end). 
-  
   Definition dtyp_is_void (dt : dtyp) : bool := match dt with | DTYPE_Void => true | _ => false end.
+
+  Definition absorb_pois {A} dt (c : EOBP A) (k : A -> EOB dvalue) : EOB dvalue :=
+    x <- (c : EOB _) ;;
+    match x with
+    | Pois => ret (DVALUE_Poison dt)
+    | NoPois v => k v
+    end.
   
-  Fixpoint memory_bytes_to_dvalue
-    {M} {HM: Monad M} {HRM: RAISE_ERROR M} {HOM: RAISE_OOM M} (dbs : list memory_byte) (dt : dtyp) : M dvalue :=
+  Fixpoint memory_bytes_to_dvalue (dbs : list memory_byte) (dt : dtyp) : EOB dvalue :=
     if dtyp_is_void dt
     then raise_error "deserialize_sbytes: Attempt to deserialize void."%string
     else
-    let list_memory_bytes_to_dvalue (pad : option N) :=
-      fix go (offset : N) dts dbs :=
-        match dts with
-        | [] =>
-            (* TODO: should we check that we have the appropriate number of extra padding bytes here? *)
-            (* Long term we'll have to include padding bytes in the dvalue *)
-            ret []
-        | (dt::dts) =>
-            let padding :=
-              if pad
-              then pad_amount (preferred_alignment (dtyp_alignment dt)) offset
-              else 0%N
-            in
-            let zpadding := Z.of_N padding in
-            let sz := sizeof_dtyp dt in
-            (* Skip any padding bytes *)
-            let dbs' := drop padding dbs in
-            let init_bytes := take sz dbs' in
-            let rest_bytes := drop sz dbs' in
-            let offset' := offset + padding in
-            f <- memory_bytes_to_dvalue init_bytes dt ;;
-            rest <- go (offset' + sz) dts rest_bytes ;;
-            ret (f :: rest)
-        end
-    in
-    
-    match dt with
-    | DTYPE_I sz =>
-        bind_down_cast dt
-          (map_monad (memory_byte_value) dbs)
-          (fun v => ret (@DVALUE_I sz (concat_bytes_Z_vint v)))
-   
-    | DTYPE_IPTR =>
-        bind_down_cast dt
-        (map_monad memory_byte_value dbs)
-        (fun zs : list Z =>
-           match IP.from_Z (concat_bytes_Z zs) with
-           | NoOom val => ret (DVALUE_IPTR val)
-           | Oom s => raise_oom s
-           end) 
+      let list_memory_bytes_to_dvalue (pad : option N) :=
+        fix go (offset : N) dts dbs :=
+          match dts with
+          | [] =>
+              (* TODO: should we check that we have the appropriate number of extra padding bytes here? *)
+              (* Long term we'll have to include padding bytes in the dvalue *)
+              ret []
+          | (dt::dts) =>
+              let padding :=
+                if pad
+                then pad_amount (preferred_alignment (dtyp_alignment dt)) offset
+                else 0%N
+              in
+              let zpadding := Z.of_N padding in
+              let sz := sizeof_dtyp dt in
+              (* Skip any padding bytes *)
+              let dbs' := drop padding dbs in
+              let init_bytes := take sz dbs' in
+              let rest_bytes := drop sz dbs' in
+              let offset' := offset + padding in
+              f <- memory_bytes_to_dvalue init_bytes dt ;;
+              rest <- go (offset' + sz) dts rest_bytes ;;
+              ret (f :: rest)
+          end
+      in
 
-    | DTYPE_Pointer =>
-        (* TODO: not sure if this should be wildcard provenance.
-                TODO: not sure if this should truncate iptr value...
-         *)
-        (* TODO: not sure if this should be lazy OOM or not *)
-        bind_down_cast dt (map_monad memory_byte_value dbs)
-          (fun zs => match int_to_ptr (concat_bytes_Z zs) wildcard_prov with
-                  | NoOom a => ret (DVALUE_Addr a)
-                  | Oom msg => raise_oom "TODO: Not sure if this should be lazy oom or not?"
-                  end)
-            
-    | DTYPE_Void =>
-        raise_error "memory_bytes_to_dvalue on void type."
-    | DTYPE_FP FP_half =>
-        raise_error "memory_bytes_to_dvalue: unsupported half."
-    | DTYPE_FP FP_bfloat =>
-        raise_error "memory_bytes_to_dvalue: unsupported bfloat"
-    | DTYPE_FP FP_float =>
-        bind_down_cast dt (map_monad memory_byte_value dbs)
-          (fun zs => ret (DVALUE_Float (Float32.of_bits (concat_bytes_Z_vint zs))))
-    | DTYPE_FP FP_double => 
-        bind_down_cast dt (map_monad memory_byte_value dbs)
-          (fun zs => ret (DVALUE_Double (Float.of_bits (concat_bytes_Z_vint zs))))
-    | DTYPE_FP FP_x86_fp80 =>
-        raise_error "memory_bytes_to_dvalue: unsupported X86_fp80."
-    | DTYPE_FP FP_fp128 =>
-        raise_error "memory_bytes_to_dvalue: unsupported fp128."
-    | DTYPE_FP FP_ppc_fp128 =>
-        raise_error "memory_bytes_to_dvalue: unsupported ppc_fp128."
-    | DTYPE_Label =>
-        raise_error "memory_bytes_to_dvalue: unsupported DTYPE_Label."
-    | DTYPE_Token =>
-        raise_error "memory_bytes_to_dvalue: unsupported DTYPE_Token."
-    | DTYPE_Metadata =>
-        raise_error "memory_bytes_to_dvalue: unsupported DTYPE_Metadata."
-    | DTYPE_X86_mmx =>
-        raise_error "memory_bytes_to_dvalue: unsupported DTYPE_X86_mmx."
-    | DTYPE_Array sz t =>
-        let sz' := sizeof_dtyp t in
-        let elt_bytes :=
-          if N.eqb sz' 0
-          then repeatN sz []
-          else split_every_nil sz' dbs
-        in
-        elts <- map_monad (fun es => memory_bytes_to_dvalue es t) elt_bytes;;
-        ret (DVALUE_Array t elts)
-    | DTYPE_Vector sz t =>
-        let sz' := sizeof_dtyp t in
-        let elt_bytes :=
-          if N.eqb sz' 0
-          then repeatN sz []
-          else split_every_nil sz' dbs
-        in
-        elts <- map_monad (fun es => memory_bytes_to_dvalue es t) elt_bytes;;
-        ret (DVALUE_Vector t elts)
-    | DTYPE_Struct fields =>
-        Functor.fmap DVALUE_Struct (list_memory_bytes_to_dvalue (Some (max_preferred_dtyp_alignment fields)) 0 fields dbs)
-                     
-    | DTYPE_Packed_struct fields =>
-        Functor.fmap DVALUE_Packed_struct (list_memory_bytes_to_dvalue None 0 fields dbs)
-    | DTYPE_Opaque =>
-        raise_error "memory_bytes_to_dvalue: unsupported DTYPE_Opaque."
-    end.
+      match dt with
+      | DTYPE_I sz => 
+          absorb_pois dt
+            (map_monad (m := EOBP) (memory_byte_value) dbs)
+            (fun v => ret (@DVALUE_I sz (concat_bytes_Z_vint v)))
 
+      | DTYPE_IPTR =>
+          absorb_pois dt
+            (map_monad memory_byte_value dbs)
+            (fun zs => DVALUE_IPTR <$> IP.from_Z (concat_bytes_Z zs))
+
+      (* TODO: not sure if this should be wildcard provenance.
+           TODO: not sure if this should truncate iptr value... *)
+      (* TODO: not sure if this should be lazy OOM or not *)
+      | DTYPE_Pointer =>
+          absorb_pois dt (map_monad memory_byte_value dbs) 
+            (fun zs => DVALUE_Addr <$> int_to_ptr (concat_bytes_Z zs) wildcard_prov)
+      | DTYPE_Void =>
+          raise_error "memory_bytes_to_dvalue on void type."
+      | DTYPE_FP FP_half =>
+          raise_error "memory_bytes_to_dvalue: unsupported half."
+      | DTYPE_FP FP_bfloat =>
+          raise_error "memory_bytes_to_dvalue: unsupported bfloat"
+      | DTYPE_FP FP_float =>
+          absorb_pois dt (map_monad memory_byte_value dbs)
+            (fun zs => ret (DVALUE_Float (Float32.of_bits (concat_bytes_Z_vint zs))))
+      | DTYPE_FP FP_double => 
+          absorb_pois dt (map_monad memory_byte_value dbs)
+            (fun zs => ret (DVALUE_Double (Float.of_bits (concat_bytes_Z_vint zs))))
+      | DTYPE_FP FP_x86_fp80 =>
+          raise_error "memory_bytes_to_dvalue: unsupported X86_fp80."
+      | DTYPE_FP FP_fp128 =>
+          raise_error "memory_bytes_to_dvalue: unsupported fp128."
+      | DTYPE_FP FP_ppc_fp128 =>
+          raise_error "memory_bytes_to_dvalue: unsupported ppc_fp128."
+      | DTYPE_Label =>
+          raise_error "memory_bytes_to_dvalue: unsupported DTYPE_Label."
+      | DTYPE_Token =>
+          raise_error "memory_bytes_to_dvalue: unsupported DTYPE_Token."
+      | DTYPE_Metadata =>
+          raise_error "memory_bytes_to_dvalue: unsupported DTYPE_Metadata."
+      | DTYPE_X86_mmx =>
+          raise_error "memory_bytes_to_dvalue: unsupported DTYPE_X86_mmx."
+      | DTYPE_Array sz t =>
+          let sz' := sizeof_dtyp t in
+          let elt_bytes :=
+            if N.eqb sz' 0
+            then repeatN sz []
+            else split_every_nil sz' dbs
+          in
+          elts <- map_monad (fun es => memory_bytes_to_dvalue es t) elt_bytes;;
+          ret (DVALUE_Array t elts)
+
+      | DTYPE_Vector sz t =>
+          let sz' := sizeof_dtyp t in
+          let elt_bytes :=
+            if N.eqb sz' 0
+            then repeatN sz []
+            else split_every_nil sz' dbs
+          in
+          elts <- map_monad (fun es => memory_bytes_to_dvalue es t) elt_bytes;;
+          ret (DVALUE_Vector t elts)
+      | DTYPE_Struct fields =>
+          Functor.fmap DVALUE_Struct (list_memory_bytes_to_dvalue (Some (max_preferred_dtyp_alignment fields)) 0 fields dbs)
+                       
+      | DTYPE_Packed_struct fields =>
+          Functor.fmap DVALUE_Packed_struct (list_memory_bytes_to_dvalue None 0 fields dbs)
+      | DTYPE_Opaque =>
+          raise_error "memory_bytes_to_dvalue: unsupported DTYPE_Opaque."
+                      
+      end.
+  
 End MemoryByte.
 
 Module Make (LP : LLVMParams) <: MemoryByte LP.

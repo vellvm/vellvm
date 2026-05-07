@@ -5,6 +5,7 @@ From Vellvm Require Import
   Semantics.LLVMParams
   Semantics.MemoryAddress
   Semantics.Memory.Sizeof.
+Open Scope Z.
 
 Module Type GEPM (LP:LLVMParams).
   Import LP.DV.
@@ -27,62 +28,64 @@ Module Type GEPM (LP:LLVMParams).
   Fixpoint handle_gep_h (t:dtyp) (off:Z) (vs:list dvalue): EOB Z :=
     match vs with
     | v :: vs' =>
-      match v with
-      | @DVALUE_I 8 i =>
-        let k := signed i in
-        let n := BinIntDef.Z.to_nat k in
-        match t with
-        | DTYPE_Array _ ta
-        | DTYPE_Vector _ ta =>
-            handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
-        | _ => raise_error ("non-i8-indexable type")
-        end
-      | @DVALUE_I 32 i =>
-        let k := unsigned i in
-        let ks := signed i in
-        let n := BinIntDef.Z.to_nat k in
-        match t with
-        | DTYPE_Array _ ta
-        | DTYPE_Vector _ ta =>
-            handle_gep_h ta (off + ks * (Z.of_N (sizeof_dtyp ta))) vs'
-        | DTYPE_Struct ts =>
-            let offset := fold_left (fun acc t => pad_to_align (dtyp_alignment t) acc + sizeof_dtyp t)%N
-                            (firstn n ts) 0%N in
-            match nth_error ts n with
-            | None => raise_error "overflow"
-            | Some t' =>
-                handle_gep_h t' (off + Z.of_N offset) vs'
+        match v with
+        | @DVALUE_I 8 i =>
+            let k := signed i in
+            let n := BinIntDef.Z.to_nat k in
+            match t with
+            | DTYPE_Array _ ta
+            | DTYPE_Vector _ ta =>
+                handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+            | _ => raise_error ("non-i8-indexable type")
             end
-        | DTYPE_Packed_struct ts =>
-          let offset := fold_left (fun acc t => acc + sizeof_dtyp t)%N
-                                  (firstn n ts) 0%N in
-          match nth_error ts n with
-          | None => raise_error "overflow"
-          | Some t' =>
-            handle_gep_h t' (off + Z.of_N offset) vs'
-          end
-        | _ => raise_error ("non-i32-indexable type")
+        | @DVALUE_I 32 i =>
+            let k := unsigned i in
+            let ks := signed i in
+            let n := BinIntDef.Z.to_nat k in
+            match t with
+            | DTYPE_Array _ ta
+            | DTYPE_Vector _ ta =>
+                handle_gep_h ta (off + ks * (Z.of_N (sizeof_dtyp ta))) vs'
+            | DTYPE_Struct ts =>
+                let offset := fold_left (fun acc t => pad_to_align (dtyp_alignment t) acc + sizeof_dtyp t)%N (firstn n ts) 0%N in
+                match nth_error ts n with
+                | None => raise_error "overflow"
+                | Some t' =>
+                    handle_gep_h t' (off + Z.of_N offset) vs'
+                end
+            | DTYPE_Packed_struct ts =>
+                let offset := fold_left (fun acc t => acc + sizeof_dtyp t)%N
+                                (firstn n ts) 0%N in
+                match nth_error ts n with
+                | None => raise_error "overflow"
+                | Some t' =>
+                    handle_gep_h t' (off + Z.of_N offset) vs'
+                end
+
+            | _ => raise_error ("non-i32-indexable type")
+            end
+              
+        | @DVALUE_I 64 i =>
+            let k := signed i in
+            let n := BinIntDef.Z.to_nat k in
+            match t with
+            | DTYPE_Array _ ta
+            | DTYPE_Vector _ ta =>
+                handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+            | _ => raise_error ("non-i64-indexable type")
+            end
+        | DVALUE_IPTR i =>
+            let k := to_Z i in
+            let n := BinIntDef.Z.to_nat k in
+            match t with
+            | DTYPE_Array _ ta
+            | DTYPE_Vector _ ta =>
+                handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+            | _ => raise_error ("non-iptr-indexable type")
+            end
+              
+        | _ => raise_error "handle_gep_h: unsupported index type"
         end
-      | @DVALUE_I 64 i =>
-        let k := signed i in
-        let n := BinIntDef.Z.to_nat k in
-        match t with
-        | DTYPE_Array _ ta
-        | DTYPE_Vector _ ta =>
-            handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
-        | _ => raise_error ("non-i64-indexable type")
-        end
-      | DVALUE_IPTR i =>
-        let k := to_Z i in
-        let n := BinIntDef.Z.to_nat k in
-        match t with
-        | DTYPE_Array _ ta
-        | DTYPE_Vector _ ta =>
-            handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
-        | _ => raise_error ("non-iptr-indexable type")
-        end
-      | _ => raise_error "handle_gep_h: unsupported index type"
-      end
     | [] => ret off
     end.
 
@@ -90,29 +93,29 @@ Module Type GEPM (LP:LLVMParams).
      The pointer set the block into which we look, and the initial offset. The first index value add to the initial offset passed to [handle_gep_h] for the actual access to structured data.
    *)
   (* TODO: This should take into account padding too... May break get_consecutive_ptrs and friends. *)
-  Definition handle_gep_addr {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_OOM M} (t:dtyp) (a:addr) (vs:list dvalue) : M addr :=
+  Definition handle_gep_addr (t:dtyp) (a:addr) (vs:list dvalue) : EOB addr :=
     let ptr := ptr_to_int a in
     let prov := address_provenance a in
     match vs with
     | @DVALUE_I 8 i :: vs' =>
-      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
-      ret (int_to_ptr ptr' prov)
+        ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
+        int_to_ptr ptr' prov
     | @DVALUE_I 32 i :: vs' =>
-      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
-      ret (int_to_ptr ptr' prov)
+        ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
+        int_to_ptr ptr' prov
     | @DVALUE_I 64 i :: vs' =>
-      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
-      ret (int_to_ptr ptr' prov)
+        ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
+        int_to_ptr ptr' prov
     | DVALUE_IPTR i :: vs' =>
-      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (to_Z i)) vs' ;;
-      ret (int_to_ptr ptr' prov)
-    | [] => failwith "handle_gep_addr: no indices"
-    | _ => failwith "handle_gep_addr: unsupported index type"
+        ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (to_Z i)) vs' ;;
+        int_to_ptr ptr' prov
+    | [] => raise_error "handle_gep_addr: no indices"
+    | _ => raise_error "handle_gep_addr: unsupported index type"
     end.
 
   Lemma handle_gep_addr_0 :
     forall (dt : dtyp) (p : addr),
-      handle_gep_addr dt p [DVALUE_IPTR zero] = inr (ret p).
+      handle_gep_addr dt p [DVALUE_IPTR zero] = ret p.
   Proof.
     intros dt p.
     cbn.
@@ -123,7 +126,7 @@ Module Type GEPM (LP:LLVMParams).
 
   Lemma handle_gep_addr_nil :
     forall (dt : dtyp) (p : addr),
-      handle_gep_addr dt p [] = inl "handle_gep_addr: no indices"%string.
+      handle_gep_addr dt p [] = raise_error "handle_gep_addr: no indices"%string.
   Proof.
     intros dt p.
     cbn; auto.
@@ -131,7 +134,7 @@ Module Type GEPM (LP:LLVMParams).
 
   Lemma handle_gep_addr_ix :
     forall (dt : dtyp) (p p' : addr) ix,
-      handle_gep_addr dt p [DVALUE_IPTR ix] = inr (ret p') ->
+      handle_gep_addr dt p [DVALUE_IPTR ix] = ret p' ->
       ptr_to_int p' = (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z.
   Proof.
     intros dt p p' ix GEP.
@@ -142,9 +145,9 @@ Module Type GEPM (LP:LLVMParams).
 
   Lemma handle_gep_addr_ix_OOM :
     forall (dt : dtyp) (p p' : addr) ix msg,
-      handle_gep_addr dt p [DVALUE_IPTR ix] = inr (Oom msg) ->
+      handle_gep_addr dt p [DVALUE_IPTR ix] = raise_oom msg ->
       exists msg',
-        int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (address_provenance p) = Oom msg'.
+        int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (address_provenance p) = raise_oom msg'.
   Proof.
     intros dt p p' ix msg GEP.
     cbn in *.
@@ -156,7 +159,7 @@ Module Type GEPM (LP:LLVMParams).
   Lemma handle_gep_addr_ix' :
     forall (dt : dtyp) (p p' : addr) ix,
       ret p' = int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (address_provenance p) ->
-      handle_gep_addr dt p [DVALUE_IPTR ix] = inr (ret p').
+      handle_gep_addr dt p [DVALUE_IPTR ix] = ret p'.
   Proof.
     intros dt p p' ix IX.
     cbn in *.
@@ -166,8 +169,8 @@ Module Type GEPM (LP:LLVMParams).
 
   Lemma handle_gep_addr_ix'_OOM :
     forall (dt : dtyp) (p p' : addr) ix msg,
-      int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (address_provenance p) = Oom msg ->
-      exists msg', handle_gep_addr dt p [DVALUE_IPTR ix] = inr (Oom msg').
+      int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (address_provenance p) = raise_oom msg ->
+      exists msg', handle_gep_addr dt p [DVALUE_IPTR ix] = raise_oom msg'.
   Proof.
     intros dt p p' ix msg IX.
     cbn in *.
@@ -178,7 +181,7 @@ Module Type GEPM (LP:LLVMParams).
 
   Lemma handle_gep_addr_preserves_provenance :
     forall (dt : dtyp) ixs (p p' : addr),
-      handle_gep_addr dt p ixs = inr (ret p') ->
+      handle_gep_addr dt p ixs = ret p' ->
       address_provenance p = address_provenance p'.
   Proof.
     intros dt ixs.
@@ -193,10 +196,10 @@ Module Type GEPM (LP:LLVMParams).
       eapply int_to_ptr_provenance; eauto.
   Qed.
 
-  Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err (OOM dvalue) :=
+  Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : EOB dvalue :=
     match dv with
-    | DVALUE_Addr a => fmap (F:=err) (fmap DVALUE_Addr) (handle_gep_addr t a vs)
-    | _ => inl "non-address"%string
+    | DVALUE_Addr a => DVALUE_Addr <$> handle_gep_addr t a vs
+    | _ => raise_error "non-address"%string
     end.
 End GEPM.
 

@@ -8,9 +8,6 @@ From Vellvm Require Import
   Semantics.MemoryParams
   Semantics.LLVMParams.
 
-From ExtLib Require Import
-     Structures.Monads.
- 
 Module COMPARE (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
   Import MP.
   Import LP.
@@ -19,7 +16,7 @@ Module COMPARE (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
   Import MBYTES.
   Import PTOI.
   
-  Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} (samesign:bool) (icmp : icmp) (v1 v2 : dvalue) : M dvalue.
+  Definition eval_icmp (samesign:bool) (icmp : icmp) (v1 v2 : dvalue) : EOB dvalue.
     refine
       (match v1, v2 with
        | @DVALUE_I sz1 i1, @DVALUE_I sz2 i2 =>
