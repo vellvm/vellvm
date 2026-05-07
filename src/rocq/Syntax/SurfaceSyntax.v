@@ -1,15 +1,21 @@
 (* begin hide *)
 From Vellvm Require Import
   Utilities
-  Syntax.
+  Syntax.LLVMAst
+  Syntax.CFG
+  Syntax.DynamicTypes.
 Open Scope Z.
 
-(* The block printers below are defined in three variants sharing the
-   prefix [label ':' ...] (full / no-phis / no-phis-no-code). The
-   prefix overlap is benign because all three are [only printing] and
-   the printer dispatches via RHS specificity. Rocq's prefix-conflict
-   warning is parse-direction-only and re-fires at every [Import
-   VIR_Notations] site, so we suppress it file-wide. *)
+(* The three block printers (label-only / no-phis / full) share the
+   LHS prefix [label ':' ...]. Rocq's parser flags this with
+   [notation-incompatible-prefix] — but the warning is parse-direction
+   only, and our printers are [only printing], so the dispatch happens
+   via RHS pattern specificity, not LHS prefix matching. Restructuring
+   to distinct prefixes would require non-LLVM-IR keywords for the
+   block shapes (e.g. [label ':-'] for empty-phis), so we keep the
+   shared prefix and silence the warning. The suppression is at file
+   scope because Rocq re-runs the prefix check at every
+   [Import VIR_Notations] site, where local suppressions don't reach. *)
 Set Warnings "-notation-incompatible-prefix".
 (* end hide *)
 
@@ -22,6 +28,74 @@ Set Warnings "-notation-incompatible-prefix".
     a bit too audacious.
     This file is quite experimental.
  *)
+
+(** ** Known limitations and future work
+
+    The notations cover most of the AST surface area in current research
+    goals. Items below are open and could be picked up in any order; none
+    are blockers.
+
+    *** Constructors without a surface notation
+    - [EXP_Asm] (six-arg constructor): rare in research goals; falls
+      through to constr display.
+    - [TLE_Module_asm], [TLE_Comdat]: do not exist in the current AST
+      (mentioned in older versions). [TLE_Source_filename] etc. covered.
+    - [mk_modul]'s [m_type_defs : list (ident * T)] has no compact
+      list-printer dispatch.
+    - [mk_global] variants with non-empty annotations or [g_alias = true]
+      combined with annotations have no compact shape; fall through to
+      record-syntax display.
+    - Bodies of opaque records ([cmpxchg], [atomicrmw], [ordering],
+      [landingpad_clause]): the surrounding [INSTR_*] constructors have
+      tagged shapes ([cmpxchg c], [atomicrmw a], [fence o],
+      [landingpad t]) but the inner record fields display via
+      constr-escape.
+
+    *** Cosmetic display gaps
+    - Identifiers built via [Name "x"] display with the string quotes
+      (e.g. [%"a"], ["entry":]). Removing the quotes would require
+      overriding Rocq's string display, which is not localized to this
+      file.
+    - Phi-only blocks (phis non-empty, code [nil]) render the empty code
+      list as [{[]}] in the middle of the block. Adding a dedicated
+      "phis-only" block shape would conflict with the existing empty-phis
+      shape (Rocq forbids two notations with same LHS-token shape but
+      different custom-entry argument types).
+    - Lists separated by commas have no space after the comma in some
+      output (e.g. phi-args, GEP indices). Cosmetic; fixable via
+      [format] strings.
+    - Multi-annotation patterns like [[ANN_volatile; ANN_align 4]] take
+      the [vir_anns] general dispatch path but the format may need
+      tuning case-by-case.
+
+    *** Design considerations explored and deferred
+    - Bind Scope auto-dispatch to drop the visible [%X] prefix when
+      printing typed terms at constr level: Rocq's notation system
+      requires at least one literal token in the LHS of a constr-level
+      notation, so pure-metavariable bare-LHS rules don't fire. The [%X]
+      prefix is the unavoidable visible cost of dispatching into a
+      custom entry.
+    - The file-scope [Set Warnings "-notation-incompatible-prefix"] is
+      needed for the three block-printer shapes that share the
+      [label ':' ...] prefix. Restructuring would require non-LLVM-IR
+      keywords for the empty-shape variants.
+
+    *** Hygiene / known maintenance traps
+    - The wrapped-vs-bare integer literal trick ([Notation "n" :=
+      (EXP_Integer (Z.to_num_int n))] before [Notation "n" := (EXP_Integer n)])
+      is repeated for every constructor that takes [int_syntax]. Adding
+      a new such constructor (e.g. a future [ANN_*] taking [int_syntax])
+      requires the same dual-rule pattern.
+    - Notations with shared LHS prefix (block printers, fp-conversion
+      empty/non-empty fmf, alloca/load/store with multiple annotation
+      shapes) rely on RHS specificity for printer dispatch. If the
+      printer's specificity heuristic ever changes, these need
+      revisiting.
+    - Signature drift between the AST and the notations file is a real
+      risk: this file accumulated five drift bugs across constructors
+      ([OP_FBinop], [OP_ICmp], [func]'s declaration arity, [Or],
+      [mk_definition] arity) before being audited. New AST changes
+      should be cross-referenced against this file. *)
 
 Module VIR_Notations.
 
@@ -66,6 +140,7 @@ Module VIR_Notations.
   Declare Custom Entry vir_global_list. (* list of globals: m_globals *)
   Declare Custom Entry vir_tle_list.    (* list of toplevel entries *)
   Declare Custom Entry vir_block_list.  (* list of blocks: ocfg / cfg.blks *)
+  Declare Custom Entry vir_iidx_list.   (* integer index list: OP_Extract/InsertValue *)
 
   (** * Display prefixes — entry into surface-syntax sublanguages.
 
@@ -278,13 +353,56 @@ Module VIR_Notations.
     (in custom vir_exp at level 0, n constr at level 0, only printing).
   Notation "'null'"            := EXP_Null             (in custom vir_exp at level 0, only printing).
   Notation "'zeroinitializer'" := EXP_Zero_initializer (in custom vir_exp at level 0, only printing).
+  Notation "'poison'"          := EXP_Poison           (in custom vir_exp at level 0, only printing).
+  (** Floating-point literal. Uses a [fp] tag because the bare-LHS slot
+      in [vir_exp] is taken by [EXP_Integer]. The body of the literal
+      ([float_syntax]) displays through the constr-escape. *)
+  Notation "'fp' f" := (EXP_Float f)
+    (in custom vir_exp at level 0, f constr at level 0, only printing).
+  (** Metadata expression — opaque, displayed as bare constr. *)
+  Notation "'meta' m" := (EXP_Metadata m)
+    (in custom vir_exp at level 0, m constr at level 0, only printing).
+  (** Splat: replicate a single typed value across a vector. *)
+  Notation "'splat' τ v" := (EXP_Splat (τ, v))
+    (in custom vir_exp at level 5,
+     τ custom vir_typ at level 99,
+     v custom vir_exp at level 99,
+     only printing).
+  (** [EXP_Asm] (6 args, very rare in research goals) intentionally
+      not given a notation — falls through to constr display. *)
   (** Booleans: each maps to the literal value-keyed [EXP_Bool] case.
       No bare-LHS conflict because the LHS is a literal, not a metavar. *)
   Notation "'true'"  := (EXP_Bool true)  (in custom vir_exp at level 0, only printing).
   Notation "'false'" := (EXP_Bool false) (in custom vir_exp at level 0, only printing).
-  (** C-string literals. LLVM IR writes [c"hello"]; we space the [c]. *)
-  Notation "'c' s" := (EXP_Cstring s)
-    (in custom vir_exp at level 0, s constr at level 0, only printing).
+  (** C-string literals. The AST stores them as a [list (T * exp)] of
+      typed byte-values, so we dispatch the elements through
+      [vir_idx_list] (the [τ v] element rule shared with GEP indices). *)
+  Notation "'c' '[' elts ']'" := (EXP_Cstring elts)
+    (in custom vir_exp at level 0,
+     elts custom vir_idx_list at level 99,
+     only printing).
+
+  (** Composite literals. Same [vir_idx_list] dispatch for element
+      lists. Brackets follow LLVM IR conventions where they don't
+      collide with constr-level escape:
+        - struct        [{| f1, f2 |}]   (cannot reuse plain [{ }])
+        - packed struct [<{ f1, f2 }>]
+        - array         [[ e1, e2 ]]     ([t] is wildcarded; each elt
+                                          carries its own type)
+        - vector        [< e1, e2 >]     (same)
+   *)
+  Notation "'{|' fields '|}'" := (EXP_Struct fields)
+    (in custom vir_exp at level 0,
+     fields custom vir_idx_list at level 99, only printing).
+  Notation "'<{' fields '}>'" := (EXP_Packed_struct fields)
+    (in custom vir_exp at level 0,
+     fields custom vir_idx_list at level 99, only printing).
+  Notation "'[' elts ']'" := (EXP_Array _ elts)
+    (in custom vir_exp at level 0,
+     elts custom vir_idx_list at level 99, only printing).
+  Notation "'<' elts '>'" := (EXP_Vector _ elts)
+    (in custom vir_exp at level 0,
+     elts custom vir_idx_list at level 99, only printing).
 
   (** ** Integer arithmetic.
         Parametric-flag forms have been dropped (they only fire when the
@@ -351,7 +469,9 @@ Module VIR_Notations.
   Notation "'urem' e ',' f" := (OP_IBinop URem _ e f) (in custom vir_exp at level 20, only printing).
   Notation "'srem' e ',' f" := (OP_IBinop SRem _ e f) (in custom vir_exp at level 20, only printing).
   Notation "'and' e ',' f"  := (OP_IBinop And _ e f)  (in custom vir_exp at level 20, only printing).
-  Notation "'or' e ',' f"   := (OP_IBinop Or _ e f)   (in custom vir_exp at level 20, only printing).
+  (** [Or] takes a [disjoint:bool] flag now (was nullary). *)
+  Notation "'or' e ',' f"            := (OP_IBinop (Or false) _ e f) (in custom vir_exp at level 20, only printing).
+  Notation "'or' 'disjoint' e ',' f" := (OP_IBinop (Or true)  _ e f) (in custom vir_exp at level 20, only printing).
   Notation "'xor' e ',' f"  := (OP_IBinop Xor _ e f)  (in custom vir_exp at level 20, only printing).
 
   (** ** Integer comparison. [OP_ICmp] takes 5 args: [(samesign:bool)
@@ -526,6 +646,62 @@ Module VIR_Notations.
      idxs custom vir_idx_list at level 99,
      only printing).
 
+  (** ** Aggregate / vector ops. *)
+  Notation "'extractelement' τv vec ',' τi idx" :=
+    (OP_ExtractElement (τv, vec) (τi, idx))
+    (in custom vir_exp at level 20,
+     τv custom vir_typ at level 99, vec custom vir_exp at level 99,
+     τi custom vir_typ at level 99, idx custom vir_exp at level 99,
+     only printing).
+  Notation "'insertelement' τv vec ',' τe elt ',' τi idx" :=
+    (OP_InsertElement (τv, vec) (τe, elt) (τi, idx))
+    (in custom vir_exp at level 20,
+     τv custom vir_typ at level 99, vec custom vir_exp at level 99,
+     τe custom vir_typ at level 99, elt custom vir_exp at level 99,
+     τi custom vir_typ at level 99, idx custom vir_exp at level 99,
+     only printing).
+  Notation "'shufflevector' τ1 v1 ',' τ2 v2 ',' τm m" :=
+    (OP_ShuffleVector (τ1, v1) (τ2, v2) (τm, m))
+    (in custom vir_exp at level 20,
+     τ1 custom vir_typ at level 99, v1 custom vir_exp at level 99,
+     τ2 custom vir_typ at level 99, v2 custom vir_exp at level 99,
+     τm custom vir_typ at level 99, m  custom vir_exp at level 99,
+     only printing).
+
+  (** [extractvalue] / [insertvalue] take an [int_syntax] index list
+      (not typed). Dispatched through [vir_iidx_list]. *)
+  Notation "'extractvalue' τv vec ',' idxs" :=
+    (OP_ExtractValue (τv, vec) idxs)
+    (in custom vir_exp at level 20,
+     τv custom vir_typ at level 99, vec custom vir_exp at level 99,
+     idxs custom vir_iidx_list at level 99,
+     only printing).
+  Notation "'insertvalue' τv vec ',' τe elt ',' idxs" :=
+    (OP_InsertValue (τv, vec) (τe, elt) idxs)
+    (in custom vir_exp at level 20,
+     τv custom vir_typ at level 99, vec custom vir_exp at level 99,
+     τe custom vir_typ at level 99, elt custom vir_exp at level 99,
+     idxs custom vir_iidx_list at level 99,
+     only printing).
+
+  (** Float negation. Two shapes for empty / non-empty fast-math flags
+      (same recipe as [fptrunc]/[fpext]). *)
+  Notation "'fneg' τ v" := (OP_Fneg [] (τ, v))
+    (in custom vir_exp at level 20,
+     τ custom vir_typ at level 99, v custom vir_exp at level 99,
+     only printing).
+  Notation "'fneg' '[' fmf ']' τ v" := (OP_Fneg fmf (τ, v))
+    (in custom vir_exp at level 20,
+     fmf custom vir_fmf at level 99,
+     τ custom vir_typ at level 99, v custom vir_exp at level 99,
+     only printing).
+
+  (** Freeze. *)
+  Notation "'freeze' τ v" := (OP_Freeze (τ, v))
+    (in custom vir_exp at level 20,
+     τ custom vir_typ at level 99, v custom vir_exp at level 99,
+     only printing).
+
   (** * vir_instr — instructions
 
       Code entries are triples [(instr_id, instr, list metadata)]
@@ -673,6 +849,37 @@ Module VIR_Notations.
      anns custom vir_anns at level 99,
      only printing).
 
+  (** ** Less common instructions: comments, fences, atomics, varargs,
+        landing pads. Bodies of opaque records ([cmpxchg], [atomicrmw],
+        [ordering]) display via constr-escape. *)
+  Notation "'#comment' msg" :=
+    (_, INSTR_Comment msg, _)
+    (in custom vir_instr at level 30, msg constr at level 0, only printing).
+  Notation "'fence' o" :=
+    (_, INSTR_Fence _ o, _)
+    (in custom vir_instr at level 30, o constr at level 0, only printing).
+  Notation "r '=' 'cmpxchg' c" :=
+    (IId r, INSTR_AtomicCmpXchg c, _)
+    (in custom vir_instr at level 30,
+     r constr at level 0, c constr at level 0, only printing).
+  Notation "r '=' 'atomicrmw' a" :=
+    (IId r, INSTR_AtomicRMW a, _)
+    (in custom vir_instr at level 30,
+     r constr at level 0, a constr at level 0, only printing).
+  Notation "r '=' 'va_arg' τv v ',' τ" :=
+    (IId r, INSTR_VAArg (τv, v) τ, _)
+    (in custom vir_instr at level 30,
+     r constr at level 0,
+     τv custom vir_typ at level 99, v custom vir_exp at level 99,
+     τ custom vir_typ at level 99,
+     only printing).
+  Notation "r '=' 'landingpad' t" :=
+    (IId r, INSTR_LandingPad t _ _, _)
+    (in custom vir_instr at level 30,
+     r constr at level 0,
+     t custom vir_typ at level 99,
+     only printing).
+
   (** * vir_term — terminators
 
       Like code entries, [blk_term] is a triple [(instr_id, terminator,
@@ -718,6 +925,16 @@ Module VIR_Notations.
     (in custom vir_term at level 30,
      τ custom vir_typ at level 99, v custom vir_exp at level 99,
      brs custom vir_label_list at level 99,
+     only printing).
+  (** [TERM_Invoke] — six args; we wildcard the param-attr-laden args
+      list, the annotations, and the operand bundles. The function
+      pointer's type and value display through their respective custom
+      entries. *)
+  Notation "'invoke' τfn fn 'to' 'label' to_lbl 'unwind' 'label' unwind_lbl" :=
+    (_, TERM_Invoke (τfn, fn) _ to_lbl unwind_lbl _ _, _)
+    (in custom vir_term at level 30,
+     τfn custom vir_typ at level 99, fn custom vir_exp at level 99,
+     to_lbl constr at level 0, unwind_lbl constr at level 0,
      only printing).
 
   (** * vir_code — recursive printer for code lists.
@@ -1000,6 +1217,26 @@ Module VIR_Notations.
      only printing,
      format "g ';' '//' .. ';' '//' h").
 
+  (** vir_iidx_list — integer index list [list int_syntax] for
+      [extractvalue] / [insertvalue]. Each element is a bare integer;
+      the wrapped variant strips [Z.to_num_int] (same trick as
+      [EXP_Integer]). *)
+  Notation "( l )" := l
+    (in custom vir_iidx_list at level 0, l custom vir_iidx_list at level 99, only printing).
+  Notation "{ l }" := l
+    (in custom vir_iidx_list at level 0, l constr, only printing).
+  Notation "n" := (Z.to_num_int n)
+    (in custom vir_iidx_list at level 5, n constr at level 0, only printing).
+  Notation "n" := n
+    (in custom vir_iidx_list at level 5, n constr at level 0, only printing).
+  Notation "i ',' .. ',' j" :=
+    (cons i .. (cons j nil) ..)
+    (in custom vir_iidx_list at level 99,
+     i custom vir_iidx_list at level 5,
+     j custom vir_iidx_list at level 5,
+     only printing,
+     format "i ',' .. ',' j").
+
   (** vir_block_list — recursive printer for the [blks] field of a
       [cfg]. Without this dispatch, [blks] would render through Rocq's
       default list printer ([a ; b ; c] inline), running adjacent
@@ -1040,9 +1277,14 @@ Module VIR_Notations.
      only printing,
      format "'[v' 'modul'  '{' '//' decls '//'  '|' '//' defs '//' '}' ']'").
 
-  (** [mk_global] compact shape — most fields default-empty. The
-      common case is [g_ident] + [g_typ] + [g_constant] + [g_exp]
-      with no annotations. *)
+  (** [mk_global] compact shapes. The common cases:
+        - non-constant global with initializer: [global x : t := e]
+        - constant global with initializer:     [constant x : t := e]
+        - external (no initializer):            [extern x : t]
+        - global alias:                         [alias x : t := e]
+      Each variant assumes empty annotations and the relevant default
+      flags. Anything outside these shapes falls through to record
+      display. *)
   Notation "'global' x ':' t ':=' e" :=
     (mk_global x t false (Some e) false false nil)
     (at level 10, t custom vir_typ at level 99,
@@ -1052,6 +1294,25 @@ Module VIR_Notations.
     (mk_global x t true (Some e) false false nil)
     (at level 10, t custom vir_typ at level 99,
      e custom vir_exp at level 99,
+     only printing).
+  Notation "'extern' x ':' t" :=
+    (mk_global x t false None true false nil)
+    (at level 10, t custom vir_typ at level 99,
+     only printing).
+  Notation "'alias' x ':' t ':=' e" :=
+    (mk_global x t false (Some e) false true nil)
+    (at level 10, t custom vir_typ at level 99,
+     e custom vir_exp at level 99,
+     only printing).
+
+  (** [mk_declaration] compact shape. Used for external function
+      declarations in [m_declarations]. Param attrs / fn attrs /
+      annotations all wildcarded — the common case is just name+type. *)
+  Notation "'declare' x ':' t" :=
+    (mk_declaration x t _ _ _)
+    (at level 10,
+     x constr at level 0,
+     t custom vir_typ at level 99,
      only printing).
 
   (** Top-level entries. These appear in pre-reduction goals (before
@@ -1073,6 +1334,14 @@ Module VIR_Notations.
     (at level 10, only printing).
   Notation "'#comment' s"            := (TLE_Comment s)
     (at level 10, only printing).
+  Notation "'#metadata' id ',' distinct ',' md" := (TLE_Metadata id distinct md)
+    (at level 10,
+     id constr at level 0, distinct constr at level 0, md constr at level 0,
+     only printing).
+  Notation "'#attrgroup' i attrs" := (TLE_Attribute_group i attrs)
+    (at level 10,
+     i constr at level 0, attrs constr at level 0,
+     only printing).
 
   (** vir_tle_list — list of top-level entries (input to [mcfg_of_tle]). *)
   Notation "( l )" := l
