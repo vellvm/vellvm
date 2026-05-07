@@ -47,11 +47,12 @@
 ./rocq/QC/ShowAST.v
 ./rocq/Semantics/DynamicValues.v
 ./rocq/Semantics/LLVMParams.v
-./rocq/Semantics/GepM.v
-./rocq/Semantics/Memory/MemoryBytes.v
-./rocq/Semantics/MemoryParams.v
+./rocq/Semantics/Gep.v
+./rocq/Semantics/Select.v
 ./rocq/Semantics/Compare.v
+./rocq/Semantics/Memory/MemoryBytes.v
 ./rocq/Semantics/Conversion.v
+./rocq/Semantics/Operations.v
 ./rocq/Semantics/IntrinsicsDefinitions.v
 ./rocq/Semantics/Denotation.v
 

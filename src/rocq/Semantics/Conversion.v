@@ -5,11 +5,10 @@ From Vellvm Require Import
      Utilities
      Syntax
      Semantics.DynamicValues
-     Semantics.MemoryParams
-     Semantics.LLVMParams.
+     Semantics.LLVMParams
+     Semantics.Memory.MemoryBytes.
 
-Module CONVERT (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
-  Import MP.
+Module CONVERT (LP : LLVMParams) (MBYTES : MemoryByte LP).
   Import LP.
   Import SZ.
   Import DV.

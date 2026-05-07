@@ -7,7 +7,7 @@ From Vellvm Require Import
   Semantics.Memory.Sizeof.
 Open Scope Z.
 
-Module Type GEPM (LP:LLVMParams).
+Module GEP (LP:LLVMParams).
   Import LP.DV.
   Import LP.PROV.
   Import LP.ADDR.
@@ -196,13 +196,9 @@ Module Type GEPM (LP:LLVMParams).
       eapply int_to_ptr_provenance; eauto.
   Qed.
 
-  Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : EOB dvalue :=
+  Definition eval_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : EOB dvalue :=
     match dv with
     | DVALUE_Addr a => DVALUE_Addr <$> handle_gep_addr t a vs
     | _ => raise_error "non-address"%string
     end.
-End GEPM.
-
-Module Make (LP:LLVMParams) <: GEPM(LP).
-  Include GEPM LP.
-End Make.
+End GEP.

@@ -1,19 +1,12 @@
 From Vellvm Require Import
   Utilities
   Syntax
-  Numeric.Rocqlib
-  Numeric.Integers
-  Numeric.Floats
   Semantics.DynamicValues
-  Semantics.MemoryParams
   Semantics.LLVMParams.
 
-Module COMPARE (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
-  Import MP.
+Module COMPARE (LP : LLVMParams).
   Import LP.
-  Import SZ.
   Import DV.
-  Import MBYTES.
   Import PTOI.
   
   Definition eval_icmp (samesign:bool) (icmp : icmp) (v1 v2 : dvalue) : EOB dvalue.
