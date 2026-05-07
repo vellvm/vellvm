@@ -52,6 +52,7 @@
 ./rocq/Semantics/MemoryParams.v
 ./rocq/Semantics/Compare.v
 ./rocq/Semantics/Conversion.v
+./rocq/Semantics/IntrinsicsDefinitions.v
 ./rocq/Semantics/Denotation.v
 
 
@@ -105,7 +106,6 @@
 ./rocq/Semantics/InfiniteToFinite/LangRefine.v
 ./rocq/Semantics/InfiniteToFinite/R2Injective.v
 ./rocq/Semantics/InterpretationStack.v
-./rocq/Semantics/IntrinsicsDefinitions.v
 ./rocq/Semantics/ItreeRaiseMReturns.v
 ./rocq/Semantics/Lang.v
 ./rocq/Semantics/Memory/FiniteProvenance.v

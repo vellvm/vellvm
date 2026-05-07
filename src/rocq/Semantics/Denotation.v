@@ -28,8 +28,6 @@ From Vellvm Require Import
      Numeric.Integers
      Numeric.Floats
      Utilities
-     Utils.IntMaps
-     Utils.InterpEither
      Syntax
      Semantics.Compare
      Semantics.Conversion
@@ -38,22 +36,14 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Semantics.LLVMParams
      Semantics.MemoryParams
-     Semantics.ConcretizationParams
      Semantics.IntrinsicsDefinitions
-     Utils.ListUtil
-     DynamicValues
-     Handlers.LLVMExceptions.
+     Semantics.DynamicValues.
 
 From QuickChick Require Import Show.
 
 Import Sum.
 Import Subevent.
 Import EqvNotation.
-Import ListNotations.
-Import MonadNotation.
-
-Set Implicit Arguments.
-Set Contextual Implicit.
 
 Open Scope monad_scope.
 Open Scope string_scope.
@@ -130,7 +120,7 @@ Module Denotation (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
   Import CVRT.
   Import GEP.
   
-  Definition dv_zero_initializer (t:dtyp) : err dvalue :=
+  Definition dv_zero_initializer (t:dtyp) : EOB dvalue :=
     default_dvalue_of_dtyp t.
   
   (** ** Ident lookups
@@ -216,6 +206,12 @@ Module Denotation (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
   Definition denote_float_syntax_as_float (f:float_syntax) : option float := 
     float_of_float_syntax f.
 
+  (* WIP: need now to lift EOB into itrees with appropriate signatures.
+     See if want to use any signature containing the right operations,
+     or specialize it
+   *)
+  Definition lift {A}
+                  
   Fixpoint denote_exp'
     (top:option dtyp) (o:exp dtyp) {struct o} : itree (exp_E dvalue) dvalue.
     refine (
