@@ -10,7 +10,6 @@
 (* begin hide *)
 
 From Stdlib Require Import
-     ZArith String List
      FSets.FMapWeakList
      Bool.Bool.
 
@@ -32,17 +31,17 @@ From Vellvm Require Import
      Utils.IntMaps
      Utils.InterpEither
      Syntax
+     Semantics.Compare
+     Semantics.Conversion
      Semantics.VellvmIntegers
      Semantics.VellvmFloats
      Semantics.LLVMEvents
      Semantics.LLVMParams
      Semantics.MemoryParams
-     Semantics.Memory.MemBytes
      Semantics.ConcretizationParams
      Semantics.IntrinsicsDefinitions
      Utils.ListUtil
      DynamicValues
-     Handlers.Concretization
      Handlers.LLVMExceptions.
 
 From QuickChick Require Import Show.
@@ -121,13 +120,16 @@ Definition fast_mode_object : fast_mode :=
     itrees in the second phase.
  *)
 
-Module Denotation (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModule LP MP.BYTE_IMPL) (CP : ConcretizationParams LP MP Byte).
-  Import CP.
-  Import CONC.
+Module Denotation (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
   Import MP.
   Import LP.
   Import DV.
-
+  Module CMP := COMPARE LP MP.
+  Import CMP.
+  Module CVRT := CONVERT LP MP.
+  Import CVRT.
+  Import GEP.
+  
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
     default_dvalue_of_dtyp t.
   
@@ -137,9 +139,9 @@ Module Denotation (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModule L
       Note: global maps contain [dvalue]s, while local maps contain [uvalue]s.
       We perform the conversion here.
    *)
-  Definition lookup_id (i:ident) : itree (lookup_E dvalue uvalue) uvalue :=
+  Definition lookup_id (i:ident) : itree (lookup_E dvalue) dvalue :=
     match i with
-    | ID_Global x => dv <- trigger (GlobalRead x);; ret (dvalue_to_uvalue dv)
+    | ID_Global x => trigger (GlobalRead x)
     | ID_Local x  => trigger (LocalRead x)
     end.
 
@@ -158,36 +160,36 @@ Module Denotation (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModule L
   (* A trivially concrete [uvalue] does not need to go through a pick event to get concretize.
      This function therefore either triggers [pick], or perform a direct cast.
      The value of this "optimization" is debatable. *)
-  Definition concretize_or_pick {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue :=
-    if is_concrete uv
-    then lift_err ret (uvalue_to_dvalue uv)
-    else dv <- trigger (pick_uvalue uv);; ret (proj1_sig dv).
+  (* Definition concretize_or_pick {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : dvalue) : itree E dvalue := *)
+  (*   if is_concrete uv *)
+  (*   then lift_err ret (uvalue_to_dvalue uv) *)
+  (*   else dv <- trigger (pick_uvalue uv);; ret (proj1_sig dv). *)
 
-  (* Pick a possibly poison value, treating poison as nondeterminism.
-     This is used for freeze. *)
-  Definition pick_your_poison {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue :=
-    match uv with
-    | UVALUE_Poison dt => concretize_or_pick (UVALUE_Undef dt)
-    | _             => concretize_or_pick uv
-    end.
+  (* (* Pick a possibly poison value, treating poison as nondeterminism. *)
+  (*    This is used for freeze. *) *)
+  (* Definition pick_your_poison {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue := *)
+  (*   match uv with *)
+  (*   | UVALUE_Poison dt => concretize_or_pick (UVALUE_Undef dt) *)
+  (*   | _             => concretize_or_pick uv *)
+  (*   end. *)
 
-  (* A version of concretize_or_pick which forces uniqueness *)
-  Definition concretize_or_pick_unique {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue
-    :=
-    if is_concrete uv
-    then lift_err ret (uvalue_to_dvalue uv)
-    else dv <- trigger (pick_unique_uvalue uv);; ret (proj1_sig dv).
+  (* (* A version of concretize_or_pick which forces uniqueness *) *)
+  (* Definition concretize_or_pick_unique {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue *)
+  (*   := *)
+  (*   if is_concrete uv *)
+  (*   then lift_err ret (uvalue_to_dvalue uv) *)
+  (*   else dv <- trigger (pick_unique_uvalue uv);; ret (proj1_sig dv). *)
 
-  (* Concretize values that are trivially deterministic *)
-  Definition concretize_if_no_undef_or_poison {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} (uv : uvalue) : M uvalue
-    := if negb (fast_mode_object.(fast_mode_get) tt) && contains_undef_or_poison uv
-       then ret uv
-       else
-         (* Since this `uvalue` is deterministic it should not matter
-            that we'll just pick a default uvalue for undef /
-            poison... No non-determinism will be lost. *)
-         dv <- concretize_uvalue uv;;
-         ret (dvalue_to_uvalue dv).
+  (* (* Concretize values that are trivially deterministic *) *)
+  (* Definition concretize_if_no_undef_or_poison {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} (uv : uvalue) : M uvalue *)
+  (*   := if negb (fast_mode_object.(fast_mode_get) tt) && contains_undef_or_poison uv *)
+  (*      then ret uv *)
+  (*      else *)
+  (*        (* Since this `uvalue` is deterministic it should not matter *)
+  (*           that we'll just pick a default uvalue for undef / *)
+  (*           poison... No non-determinism will be lost. *) *)
+  (*        dv <- concretize_uvalue uv;; *)
+  (*        ret (dvalue_to_uvalue dv). *)
 
   (** ** Denotation of expressions
       [denote_exp top o] is the main entry point for evaluating itree expressions.
@@ -214,37 +216,37 @@ Module Denotation (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModule L
   Definition denote_float_syntax_as_float (f:float_syntax) : option float := 
     float_of_float_syntax f.
 
-
   Fixpoint denote_exp'
-           (top:option dtyp) (o:exp dtyp) {struct o} : itree (exp_E dvalue uvalue) uvalue :=
+    (top:option dtyp) (o:exp dtyp) {struct o} : itree (exp_E dvalue) dvalue.
+    refine (
     let eval_texp '(dt,ex) := denote_exp' (Some dt) ex
     in
     match o with
 
     (* The translation injects the [lookup_E] interface used by [lookup_id] to the ambient one *)
     | EXP_Ident i =>
-      translate (@LU_to_exp dvalue uvalue) (lookup_id i)
-                
+      translate (@LU_to_exp dvalue) (lookup_id i)
+               
     | EXP_Integer x =>
       match top with
       | None                => raise ("denote_exp given untyped EXP_Integer")
-      | Some (DTYPE_I bits) => fmap dvalue_to_uvalue (coerce_integer_to_int (Some bits) (denote_int_syntax x))
-      | Some DTYPE_IPTR     => fmap dvalue_to_uvalue (coerce_integer_to_int None (denote_int_syntax x))
+      | Some (DTYPE_I bits) => coerce_integer_to_int (Some bits) (denote_int_syntax x)
+      | Some DTYPE_IPTR     => coerce_integer_to_int None (denote_int_syntax x)
       | Some typ            => raise ("bad type for constant int: " ++ show typ)
       end
-        
+       
     (* TODO: define a typeclass for handling all floating point representations *)
     | EXP_Float x =>
       match top with
       | None                      => raise ("denote_exp given untyped EXP_Float")
       | Some (DTYPE_FP FP_float)  =>
           match denote_float_syntax_as_float32 x with
-          | Some f => ret (UVALUE_Float f)
+          | Some f => ret (DVALUE_Float f)
           | None => raise ("bad float literal")
           end
       | Some (DTYPE_FP FP_double) =>
           match denote_float_syntax_as_float x with
-          | Some f => ret (UVALUE_Double f)
+          | Some f => ret (DVALUE_Double f)
           | None => raise ("bad double literal")
           end
       | Some (DTYPE_FP _)        => raise ("unsupported float type")
@@ -253,39 +255,33 @@ Module Denotation (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModule L
 
     | EXP_Bool b =>
       match b with
-      | true  => ret (@UVALUE_I 1 VellvmIntegers.one)
-      | false => ret (@UVALUE_I 1 VellvmIntegers.zero)
+      | true  => ret (@DVALUE_I 1 VellvmIntegers.one)
+      | false => ret (@DVALUE_I 1 VellvmIntegers.zero)
       end
-        
-    | EXP_Null => ret (UVALUE_Addr ADDR.null)
+       
+    | EXP_Null => ret (DVALUE_Addr ADDR.null)
 
     | EXP_Zero_initializer =>
       match top with
       | None   => raise ("denote_exp given untyped EXP_Zero_initializer")
-      | Some t => lift_err ret (fmap dvalue_to_uvalue (dv_zero_initializer t))
+      | Some t => lift_err ret (dv_zero_initializer t)
       end
 
     | EXP_Cstring es =>
       vs <- map_monad eval_texp es ;;
-      ret (UVALUE_Array (@DTYPE_I 8) vs)
-
-    | EXP_Undef =>
-      match top with
-      | None   => raise ("denote_exp given untyped EXP_Undef")
-      | Some t => ret (UVALUE_Undef t)
-      end
+      ret (DVALUE_Array (@DTYPE_I 8) vs)
 
     | EXP_Poison =>
       match top with
       | None   => raise ("denote_exp given untyped EXP_Poison")
-      | Some t => ret (UVALUE_Poison t)
+      | Some t => ret (DVALUE_Poison t)
       end
 
     (* Question: should we do any typechecking for aggregate types here? *)
     (* Option 1: do no typechecking: *)
     | EXP_Struct es =>
       vs <- map_monad eval_texp es ;;
-      ret (UVALUE_Struct vs)
+      ret (DVALUE_Struct vs)
 
     (* Option 2: do a little bit of typechecking *)
     | EXP_Packed_struct es =>
@@ -293,87 +289,94 @@ Module Denotation (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModule L
       | None => raise ("denote_exp given untyped EXP_Struct")
       | Some (DTYPE_Packed_struct _) =>
         vs <- map_monad eval_texp es ;;
-        ret (UVALUE_Packed_struct vs)
+        ret (DVALUE_Packed_struct vs)
       | _ => raise ("bad type for VALUE_Packed_struct")
       end
 
     | EXP_Array t es =>
       vs <- map_monad eval_texp es ;;
-      ret (UVALUE_Array t vs)
+      ret (DVALUE_Array t vs)
 
     | EXP_Vector t es =>
       vs <- map_monad eval_texp es ;;
-      ret (UVALUE_Vector t vs)
+      ret (DVALUE_Vector t vs)
 
-    (* The semantics of operators is complicated by both uvalues and
-           undefined behaviors.
+    (* The semantics of operators is complicated by both uvalues and undefined behaviors.
            We denote each operands first, but the denotation of the operator itself
            depends on whether it may raise UB, and how.
      *)
     | OP_IBinop iop dt op1 op2 =>
       v1 <- denote_exp' (Some dt) op1 ;;
       v2 <- denote_exp' (Some dt) op2 ;;
-      ret (UVALUE_IBinop iop v1 v2)
-
+      eval_iop iop v1 v2
+ 
     | OP_ICmp samesign cmp dt op1 op2 =>
       v1 <- denote_exp' (Some dt) op1 ;;
       v2 <- denote_exp' (Some dt) op2 ;;
-      ret (UVALUE_ICmp samesign cmp v1 v2)
+      eval_icmp samesign cmp v1 v2
 
-    | OP_FBinop fop fm dt op1 op2 =>
-      v1 <- denote_exp' (Some dt) op1 ;;
-      v2 <- denote_exp' (Some dt) op2 ;;
-      ret (UVALUE_FBinop fop fm v1 v2)
+    (* TODO: fast_math? *)                
+    | OP_FBinop fop _ dt op1 op2 =>
+        v1 <- denote_exp' (Some dt) op1 ;;
+        v2 <- denote_exp' (Some dt) op2 ;;
+        eval_fop fop v1 v2
 
-    | OP_Fneg tm (dt, op) =>
-      v <- denote_exp' (Some dt) op ;;
-      ret (UVALUE_Fneg tm dt v)
-          
+    (* TODO: fast_math? **)
+    | OP_Fneg _ (dt, op) =>
+        v <- denote_exp' (Some dt) op ;;
+        eval_fneg v
+                  
     | OP_FCmp fcmp dt op1 op2 =>
       v1 <- denote_exp' (Some dt) op1 ;;
       v2 <- denote_exp' (Some dt) op2 ;;
-      ret (UVALUE_FCmp fcmp v1 v2)
+      eval_fcmp fcmp v1 v2
 
     | OP_Conversion conv dt_from op dt_to =>
       v <- denote_exp' (Some dt_from) op ;;
-      ret (UVALUE_Conversion conv dt_from v dt_to)
-
+      convert conv dt_from v dt_to
+        | _ => raise ("denote_exp encountered inlined asm template " )
+    end).
+ 
     | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
       vptr <- denote_exp' (Some dt2) ptrval ;;
       vs <- map_monad (fun '(dt, index) => denote_exp' (Some dt) index) idxs ;;
-      ret (UVALUE_GetElementPtr dt1 vptr vs)
+      handle_gep dt1 vptr vs
 
-    | OP_ExtractElement (dt_vec, vecop) (dt_idx, idx) =>
-        vec <- denote_exp' (Some dt_vec) vecop ;;
-        idx <- denote_exp' (Some dt_idx) idx ;;
-        ret (UVALUE_ExtractElement dt_vec vec idx)
+    (* | OP_ExtractElement (dt_vec, vecop) (dt_idx, idx) => *)
+    (*     vec <- denote_exp' (Some dt_vec) vecop ;; *)
+    (*     idx <- denote_exp' (Some dt_idx) idx ;; *)
+    (*     _ *)
+    (*     (* ret (DVALUE_ExtractElement dt_vec vec idx) *) *)
 
+    | _ => raise ("denote_exp encountered inlined asm template " )
+    end).
+  
     | OP_InsertElement (dt_vec, vecop) (dt_elt, eltop) (dt_idx, idx) =>
         vec <- denote_exp' (Some dt_vec) vecop ;;
         elt <- denote_exp' (Some dt_elt) eltop ;;
         idx <- denote_exp' (Some dt_idx) idx ;;
-        ret (UVALUE_InsertElement dt_vec vec elt idx)
+        ret (DVALUE_InsertElement dt_vec vec elt idx)
 
     | OP_ShuffleVector (dt_vec1, vecop1) (dt_vec2, vecop2) (dt_mask, idxmask) =>
         vec1 <- denote_exp' (Some dt_vec1) vecop1 ;;
         vec2 <- denote_exp' (Some dt_vec2) vecop2 ;;
         idxmask <- denote_exp' (Some dt_mask) idxmask;;
-        ret (UVALUE_ShuffleVector dt_vec1 vec1 vec2 idxmask)
+        ret (DVALUE_ShuffleVector dt_vec1 vec1 vec2 idxmask)
 
     | OP_ExtractValue (dt, str) idxs =>
         str <- denote_exp' (Some dt) str ;;
-        ret (UVALUE_ExtractValue dt str (List.map denote_int_syntax idxs))
+        ret (DVALUE_ExtractValue dt str (List.map denote_int_syntax idxs))
 
     | OP_InsertValue (dt_str, strop) (dt_elt, eltop) idxs =>
         str <- denote_exp' (Some dt_str) strop ;;
         elt <- denote_exp' (Some dt_elt) eltop ;;
-        ret (UVALUE_InsertValue dt_str str dt_elt elt (List.map denote_int_syntax idxs))
+        ret (DVALUE_InsertValue dt_str str dt_elt elt (List.map denote_int_syntax idxs))
 
     | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
         cnd <- denote_exp' (Some dt) cnd ;;
         v1  <- denote_exp' (Some dt1) op1 ;;
         v2  <- denote_exp' (Some dt2) op2 ;;
-        ret (UVALUE_Select cnd v1 v2)
+        ret (DVALUE_Select cnd v1 v2)
 
     | OP_Freeze (dt, e) =>
       uv <- denote_exp' (Some dt) e ;;
@@ -386,13 +389,13 @@ Module Denotation (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModule L
     | EXP_Metadata md =>
         (* METADATA TODO - it isn't clear what the denotations should be *)
         match md with
-        | METADATA_Null => ret (UVALUE_Addr ADDR.null)
-        | METADATA_Id _ => ret UVALUE_None
+        | METADATA_Null => ret (DVALUE_Addr ADDR.null)
+        | METADATA_Id _ => ret DVALUE_None
         | METADATA_Const tv => eval_texp tv
-        | METADATA_Node _ => ret UVALUE_None
-        | METADATA_Pair _ _ => ret UVALUE_None
-        | METADATA_Debug _ _ => ret UVALUE_None
-        | METADATA_File_info _ => ret UVALUE_None
+        | METADATA_Node _ => ret DVALUE_None
+        | METADATA_Pair _ _ => ret DVALUE_None
+        | METADATA_Debug _ _ => ret DVALUE_None
+        | METADATA_File_info _ => ret DVALUE_None
         end
 
     | EXP_Splat elt =>
@@ -402,7 +405,7 @@ Module Denotation (LP : LLVMParams) (MP : MEMORY_PARAMS LP) (Byte : ByteModule L
             (* use the type from the splat elt *)
             v <- eval_texp elt ;;
             (* this could be very expensive if the vector is big *)
-            ret (UVALUE_Vector t (List.repeat v (N.to_nat sz)))
+            ret (DVALUE_Vector t (List.repeat v (N.to_nat sz)))
         | Some _ => raise ("denote_exp given EXP_Splat with non-vector type")
         end
     end.

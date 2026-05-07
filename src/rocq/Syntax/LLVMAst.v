@@ -1,11 +1,6 @@
 (* begin hide *)
 From Stdlib Require Import
-     List
-     String
-     ZArith
-     Number
-     Decimal
-     Hexadecimal.
+     Number Decimal Hexadecimal.
 From Vellvm Require Import
      Utilities.
 
@@ -13,6 +8,7 @@ Import ListNotations.
 Open Scope string_scope.
 Open Scope list_scope.
 (* end hide *)
+
 
 (** * VIR front AST
 
@@ -432,7 +428,6 @@ Inductive exp : Set :=
                          ((TYPE_I 8), Exp_Integer (IntDecimal (Pos <byte>)))
                       *)
 
-| EXP_Undef
 | EXP_Poison
 | EXP_Struct          (fields: list (T * exp))
 | EXP_Packed_struct   (fields: list (T * exp))

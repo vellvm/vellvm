@@ -52,8 +52,7 @@ Fixpoint concat_str_sep (sep:string) (l : list string) : string :=
 
 (*  ------------------------------------------------------------------------- *)
 
-(* Make an abbreviation to make this more manageable *)
-Definition sd := string_to_DString.
+Notation sd := string_to_DString.
 
 #[global] Instance Show_Pos : Show positive.
 split.
@@ -700,7 +699,6 @@ Section ShowInstances.
     | EXP_Cstring elts => sd "c" @@ sd """" @@
                            DList_join (map (fun '(ty, ex) => (dshow_c_string ex)) elts) @@ sd  """"
 
-    | EXP_Undef => sd "undef"
     | EXP_Poison => sd "poison"
 
     | EXP_Struct fields =>
@@ -1052,8 +1050,6 @@ tag ::= string constant
     | SSA_value t => dshow_texp t
     | Metadata_string m => dshow_metadata m
     end.
-
-
   
   Definition show_operand_bundle (ob:operand_bundle) : DString :=
     (sd ("""" ++ ob_tag ob ++ """("))
@@ -1583,3 +1579,21 @@ Definition show_raw_id (id : raw_id) : string := show id.
 
 #[global] Instance showTyp : Show typ :=
   {| show := show_typ |}.
+
+Instance DShow_Z : DShow Z.
+split.
+intros x.
+apply (sd (show x)).
+Defined.
+
+Instance DShow_dtyp : DShow dtyp.
+split.
+intros x.
+apply (sd (show_dtyp x)).
+Defined.
+
+#[global] Instance DShow_N : DShow N.
+split; intros x.
+apply (sd (show x)).
+Defined.
+

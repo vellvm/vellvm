@@ -2,12 +2,10 @@ From Stdlib Require Import
   Number
   PArith.BinPosDef.
 
-From ExtLib Require Import Monad.
-
-From Vellvm Require Import 
+From Vellvm Require Import
+  Utilities
   Syntax.LLVMAst            
   Syntax.DynamicTypes
-  Utils.Error
   Numeric.Floats
   Numeric.IEEE754_extra.
 
@@ -216,7 +214,7 @@ Definition hexadecimal_uint_to_float (h:Hexadecimal.uint) : option float :=
 
 Definition h := Hexadecimal.D3 (Hexadecimal.D1 (Hexadecimal.Nil)).
 
-Eval vm_compute in hexadecimal_uint_to_float h.
+(* Eval vm_compute in hexadecimal_uint_to_float h. *)
 
 Definition float_of_float_syntax (fs:float_syntax) : option float :=
   match fs with

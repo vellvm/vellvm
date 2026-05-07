@@ -1,13 +1,10 @@
 (* begin hide *)
-From Stdlib Require Import List ZArith String.
-Import ListNotations.
-
-From ITree Require Import
-     ITree.
-
 From Vellvm Require Import
-     Syntax.CFG
-     Syntax.LLVMAst.
+  Utilities
+  Syntax.CFG
+  Syntax.LLVMAst.
+(* TODO: Only export what is relevant from the itree library (notation +' ?) *)
+From ITree Require Import ITree.
 (* end hide *)
 
 (** ** Definition of generic transformations on Vellvm's abstract syntax.
@@ -99,7 +96,6 @@ Section Endo.
       | EXP_Bool    _
       | EXP_Null
       | EXP_Zero_initializer
-      | EXP_Undef
       | EXP_Poison => e
       | EXP_Cstring elts =>
           EXP_Cstring (List.map (fun '(t,e) => (endo t, f_exp e)) elts)
@@ -377,8 +373,7 @@ Section Endo.
            `{Endo FnBody}
       : Endo (definition T FnBody) | 50 :=
       fun d =>
-        mk_definition _
-                      (endo (df_prototype d))
+        mk_definition (endo (df_prototype d))
                       (endo (df_args d))
                       (endo (df_instrs d)).
 
@@ -524,7 +519,7 @@ Section TFunctor.
       `{Endo fbinop}
       `{Endo fcmp}
       (U V: Set) (f: U -> V) (e:exp U) :=
-        let ftexp (te: U * exp U) := (f (fst te), ft_exp U V f (snd te)) in
+        let ftexp (te: U * exp U) := (f (fst te), ft_exp f (snd te)) in
         match e with
         | EXP_Ident id                       => EXP_Ident (endo id)
         | EXP_Integer n                      => EXP_Integer n
@@ -533,18 +528,17 @@ Section TFunctor.
         | EXP_Null                           => EXP_Null
         | EXP_Zero_initializer               => EXP_Zero_initializer
         | EXP_Cstring elts                   => EXP_Cstring (tfmap ftexp elts)
-        | EXP_Undef                          => EXP_Undef
         | EXP_Poison                         => EXP_Poison
         | EXP_Struct fields                  => EXP_Struct (tfmap ftexp fields)
         | EXP_Packed_struct fields           => EXP_Packed_struct (tfmap ftexp fields)
         | EXP_Array t elts                   => EXP_Array (f t) (tfmap ftexp elts)
         | EXP_Vector t elts                  => EXP_Vector (f t) (tfmap ftexp elts)
-        | OP_IBinop iop t v1 v2              => OP_IBinop (endo iop) (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
-        | OP_ICmp s cmp t v1 v2              => OP_ICmp s (endo cmp) (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
-        | OP_FBinop fop fm t v1 v2           => OP_FBinop (endo fop) fm (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
+        | OP_IBinop iop t v1 v2              => OP_IBinop (endo iop) (f t) (ft_exp f v1) (ft_exp f v2)
+        | OP_ICmp s cmp t v1 v2              => OP_ICmp s (endo cmp) (f t) (ft_exp f v1) (ft_exp f v2)
+        | OP_FBinop fop fm t v1 v2           => OP_FBinop (endo fop) fm (f t) (ft_exp f v1) (ft_exp f v2)
         | OP_Fneg flags v                    => OP_Fneg flags (ftexp v)
-        | OP_FCmp cmp t v1 v2                => OP_FCmp (endo cmp) (f t) (ft_exp U V f  v1) (ft_exp U V f  v2)
-        | OP_Conversion conv t_from v t_to   => OP_Conversion conv (f t_from) (ft_exp U V f  v) (f t_to)
+        | OP_FCmp cmp t v1 v2                => OP_FCmp (endo cmp) (f t) (ft_exp f v1) (ft_exp f v2)
+        | OP_Conversion conv t_from v t_to   => OP_Conversion conv (f t_from) (ft_exp f  v) (f t_to)
         | OP_GetElementPtr t ptr idxs        => OP_GetElementPtr (f t) (ftexp ptr) (tfmap ftexp idxs)
         | OP_ExtractElement vec idx          => OP_ExtractElement (ftexp vec) (ftexp idx)
         | OP_InsertElement vec elt idx       => OP_InsertElement (ftexp vec) (ftexp elt) (ftexp idx)
@@ -555,7 +549,7 @@ Section TFunctor.
         | OP_Freeze v                        => OP_Freeze (ftexp v)
         | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
             EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints
-        | EXP_Metadata m => EXP_Metadata (ft_metadata U V f m)
+        | EXP_Metadata m => EXP_Metadata (ft_metadata f m)
         | EXP_Splat elt                      => EXP_Splat (ftexp elt)
         end
     with ft_metadata
@@ -567,10 +561,10 @@ Section TFunctor.
            (U V : Set) (f : U -> V) (m : metadata U) :=
         match m with
         | METADATA_Null => METADATA_Null
-        | METADATA_Const tv => METADATA_Const (f (fst tv), ft_exp U V f (snd tv))
+        | METADATA_Const tv => METADATA_Const (f (fst tv), ft_exp f (snd tv))
         | METADATA_Id id => METADATA_Id (endo id)
-        | METADATA_Node mds => METADATA_Node (map (ft_metadata U V f) mds)
-        | METADATA_Pair md1 md2 => METADATA_Pair (ft_metadata U V f md1) (ft_metadata U V f md2)         
+        | METADATA_Node mds => METADATA_Node (map (ft_metadata f) mds)
+        | METADATA_Pair md1 md2 => METADATA_Pair (ft_metadata f md1) (ft_metadata f md2)         
         | METADATA_Debug ds s => METADATA_Debug ds s
         | METADATA_File_info f => METADATA_File_info f
         end.
@@ -583,14 +577,14 @@ Section TFunctor.
            `{Endo fbinop}
            `{Endo fcmp}
     : TFunctor exp | 50 :=
-      fun (U V: Set) (f: U -> V) => ft_exp U V f.
+      fun (U V: Set) (f: U -> V) => ft_exp f.
 
     #[global] Instance TFunctor_metadata
            `{TFunctor exp}
            `{Endo raw_id}
            `{Endo string}
       : TFunctor metadata | 50 :=
-      fun U V f => ft_metadata U V f.
+      fun U V f => ft_metadata f.
     
     #[global] Instance TFunctor_texp
            `{TFunctor exp}
@@ -830,8 +824,7 @@ Section TFunctor.
            `{TFunctor FnBody}
       : TFunctor (fun T => definition T (FnBody T)) | 50 :=
       fun U V f d =>
-        mk_definition _
-                      (tfmap f (df_prototype d))
+        mk_definition (tfmap f (df_prototype d))
                       (endo (df_args d))
                       (tfmap f (df_instrs d)).
 

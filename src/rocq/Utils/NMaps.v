@@ -8,7 +8,6 @@ From Stdlib Require Import
      Lia.
 
 From Vellvm Require Import
-  Utils.Monads
   Utils.Tactics
   ListUtil.
 

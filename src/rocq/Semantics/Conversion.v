@@ -2,64 +2,29 @@ From Vellvm Require Import
      Numeric.Rocqlib
      Numeric.Integers
      Numeric.Floats
-     Utils.Tactics
-     Utils.Util
-     Utils.OptionUtil
      Utils.Error
-     Utils.ListUtil
-     Utils.NonEmpty
-     Utils.NMaps
      Utils.Monads
-     Utils.MonadReturnsLaws
-     Utils.ErrUbOomProp
+     Syntax.DataLayout
      Syntax.LLVMAst
      Syntax.DynamicTypes
-     Syntax.DataLayout
-     Semantics.VellvmIntegers
      Semantics.DynamicValues
-     Semantics.MemoryAddress
-     Semantics.GepM
-     Semantics.Memory.Sizeof
      Semantics.MemoryParams
-     Semantics.LLVMEvents
      Semantics.LLVMParams
-     Handlers.MemoryModel
-     QC.ShowAST.
+     Semantics.EOB.
 
 From ExtLib Require Import
      Structures.Monads
-     Data.Monads.EitherMonad
-     StateMonad.
-
-From Stdlib Require Import Lia.
-
-Import IdentityMonad.
-
-Import ListNotations.
-Import MonadNotation.
-
-(* TODO: replace in the next iteration *)
-Definition err_oom := eitherT string (@sum string).
-Instance err_oom_error : RAISE_ERROR err_oom := {| raise_error _ s := raise s |}.
-Instance err_oom_oom : RAISE_OOM err_oom := {| raise_oom _ s := lift (raise s) |}.
-
-(* TODO: why can't this be inferred? *)
-#[global] Instance Monad_StateT_err_ub_oom : Monad (stateT N (err_ub_oom_T ident)).
-Proof.
-  eapply Monad_stateT; typeclasses eauto.
-Defined.
-
-Module Type CONVERSIONS (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
+     EitherMonad.
+ 
+Module CONVERT (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
   Import MP.
   Import LP.
-  Import PTOI.
-  Import ITOP.
-  Import PROV.
-  Import GEP.
   Import SZ.
   Import DV.
-  Import MP.MBYTES.
-  Import IP.
+  Import PROV.
+  Import PTOI.
+  Import ITOP.
+  Import MBYTES.
 
   (** ** Typed conversion
         Performs a dynamic conversion of a [dvalue] of type [t1] to one of type [t2].
@@ -116,11 +81,12 @@ Module Type CONVERSIONS (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
         else if bit_sizeof_dtyp t1 =? bit_sizeof_dtyp t2
              then
                let bytes := dvalue_to_memory_bytes x t1 in
-               let dv_conv :=  (memory_bytes_to_dvalue (M := err_oom) bytes t2) in
-               match unEitherT dv_conv with
-               | inl err => Conv_Illegal ("Bitcast failure: " ++ err)
-               | inr (inl oom) => Conv_Oom ("Bitcast OOM: " ++ oom)
-               | inr (inr v) => Conv_Pure v
+               let dv_conv := memory_bytes_to_dvalue (M := EOB) bytes t2 in
+               match dv_conv with
+               | do_err err => Conv_Illegal ("Bitcast failure: " ++ err)
+               | do_oom oom => Conv_Oom ("Bitcast OOM: " ++ oom)
+               | do_ub => Conv_Illegal ("Bitcast UB ")
+               | do_ret v => Conv_Pure v
                end
              else Conv_Illegal "unequal bitsize in cast"
 
@@ -183,5 +149,23 @@ Module Type CONVERSIONS (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
   
   Arguments get_conv_case _ _ _ _ : simpl nomatch.
 
-End CONVERSIONS.
+  Definition convert {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_OOM M} `{RAISE_UB M} (conv : conversion_type) (t_from : dtyp) (dv : dvalue) (t_to : dtyp) : M dvalue :=
+    match get_conv_case conv t_from dv t_to with
+    | Conv_PtoI x =>
+        match x, t_to with
+        | DVALUE_Addr addr, DTYPE_I sz => coerce_integer_to_int (Some sz) (ptr_to_int addr)
+        | DVALUE_Addr addr, DTYPE_IPTR => coerce_integer_to_int None (ptr_to_int addr)
+        | _, _ => raise_error "Invalid PTOI conversion"
+        end
+    | Conv_ItoP x => 
+        match int_to_ptr (dvalue_int_unsigned x) wildcard_prov with
+        | NoOom a => ret (DVALUE_Addr a)
+        | Oom msg => raise_oom ("concretize_uvalueM OOM in Conv_ItoP: " ++ msg)
+        end
+    | Conv_Pure x => ret x
+    | Conv_Oom s => raise_oom s
+    | Conv_Illegal s => raise_error s
+    end.
+
+End CONVERT.
 

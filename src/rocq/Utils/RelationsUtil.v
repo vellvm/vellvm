@@ -1,40 +1,7 @@
-From ITree Require Import
-  Basics.HeterogeneousRelations.
-
 From Stdlib Require Import
   Lia
-  RelationClasses
-  Relation_Definitions
   Relations
-  Relations.Relation_Operators
   Program.Equality.
-
-Infix"×" := prod_rel (at level 90, left associativity).
-
-Definition TT {A} : relation A := fun _ _ => True.
-
-#[global] Instance TT_Reflexive {A} : Reflexive (@TT A).
-Proof.
-  intro.
-  reflexivity.
-Qed.
-
-#[global] Instance TT_Transitive {A} : Transitive (@TT A).
-Proof.
-  intro.
-  auto.
-Qed.
-
-#[global] Instance TT_Symmetric {A} : Symmetric (@TT A).
-Proof.
-  intro.
-  auto.
-Qed.
-
-#[global] Instance TT_Equivalence {A} : Equivalence (@TT A).
-Proof.
-  split; typeclasses eauto.
-Qed.
 
 Lemma clos_t_rt :
   forall {A: Type} {R : relation A}
@@ -46,19 +13,6 @@ Proof.
   induction H.
   - apply rt_step; auto.
   - eapply rt_trans; eauto.
-Qed.
-
-Lemma clos_t_rt_t :
-  forall {A: Type} {R : relation A}
-    {x y z : A},
-    clos_trans A R x y ->
-    clos_refl_trans A R y z ->
-    clos_trans A R x z.
-Proof.
-  intros A R x y z T RT.
-  induction RT; subst; auto.
-  eapply t_trans; eauto.
-  apply t_step; auto.
 Qed.
 
 Lemma clos_t_rt_inv :
@@ -121,16 +75,6 @@ Proof.
   enough (m x < m y)%nat by lia; eauto.
 Qed.
 
-Lemma clos_trans_not_refl :
-  forall {A} {R : relation A} m,
-    (forall a b, R a b -> (m a < m b)%nat) ->
-    (forall a, ~ @clos_trans A R a a).
-Proof.
-  intros A R m NSYM a CONTRA.
-  eapply clos_trans_measure in CONTRA; eauto.
-  lia.
-Qed.
-
 Lemma clos_trans_not_sym :
   forall {A} {R : relation A} m,
     (forall a b, R a b -> (m a < m b)%nat) ->
@@ -164,3 +108,4 @@ Proof.
       eapply clos_trans_not_sym; eauto.
     + eapply clos_trans_not_sym; eauto.
 Qed.
+

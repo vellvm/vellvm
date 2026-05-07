@@ -1,10 +1,5 @@
 (* begin hide *)
-From Stdlib Require Import
-     List.
-Import ListNotations.
-
 From Vellvm Require Import
-     Numeric.Rocqlib
      Utilities
      Syntax.
 

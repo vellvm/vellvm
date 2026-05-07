@@ -1,10 +1,6 @@
-From Stdlib Require Import
-         ZArith
-         List.
-
 From Vellvm Require Import
-  DynamicTypes
-  Utils.ListUtil.
+  Utilities
+  Syntax.
 
 Definition pad_amount (alignment : N) (offset : N) :=
   ((alignment - (offset mod alignment)) mod alignment)%N.

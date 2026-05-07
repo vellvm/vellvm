@@ -1,8 +1,6 @@
 (* begin hide *)
 From Stdlib Require Import Equalities.
 
-From Stdlib Require Import ZArith List String.
-
 From Vellvm Require Import
      Utilities
      Syntax.LLVMAst
@@ -12,13 +10,7 @@ From ExtLib Require Import
      Programming.Eqv
      Structures.Monads.
 
-
-
-Import ListNotations.
 Import EqvNotation.
-Import MonadNotation.
-Open Scope list.
-Open Scope monad_scope.
 (* end hide *)
 
 (** * VIR internal AST
@@ -135,9 +127,9 @@ Section CFG.
 
   Definition modul_of_toplevel_entities {X} (tles : toplevel_entities T X) : @modul X :=
     {|
-      m_name := find_map filename_of tles;
-      m_target := find_map target_of tles;
-      m_datalayout := find_map datalayout_of tles;
+      m_name := find_option filename_of tles;
+      m_target := find_option target_of tles;
+      m_datalayout := find_option datalayout_of tles;
       m_type_defs := flat_map type_defs_of tles;
       m_globals := flat_map globals_of tles;
       m_declarations := flat_map declarations_of tles;
@@ -292,7 +284,7 @@ Section TLE_To_Modul.
       modul_defns_of_mcfg_defns (map (fun d => {|
                                           df_prototype := df_prototype d;
                                           df_args := df_args d;
-                                          df_instrs := cfg_of_definition T d
+                                          df_instrs := cfg_of_definition d
                                         |}) l) = Some l.
   Proof using.
     induction l; simpl; auto.

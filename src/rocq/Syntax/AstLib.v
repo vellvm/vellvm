@@ -1,7 +1,5 @@
 (* begin hide *)
 From Stdlib Require Import
-     ZArith.ZArith
-     String
      Number.
 
 From Vellvm Require Import
@@ -15,7 +13,6 @@ Require Import ExtLib.Core.RelDec ExtLib.Data.Z.
 Require Import ExtLib.Programming.Eqv.
 From Stdlib Require Import Ascii.
 
-Import ListNotations.
 Import EqvNotation.
 
 (* end hide *)
@@ -332,7 +329,6 @@ Section ExpInd.
   Hypothesis IH_Null    : P ((EXP_Null)).
   Hypothesis IH_Zero_initializer : P ((EXP_Zero_initializer)).
   Hypothesis IH_Cstring : forall (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Cstring elts)).
-  Hypothesis IH_Undef   : P ((EXP_Undef)).
   Hypothesis IH_Poison  : P ((EXP_Poison)).
   Hypothesis IH_Struct  : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Struct fields)).
   Hypothesis IH_Packed_struct : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Packed_struct fields)).
@@ -381,18 +377,17 @@ refine(
   | EXP_Null => IH_Null
   | EXP_Zero_initializer => IH_Zero_initializer
   | EXP_Cstring elts => _
-  | EXP_Undef => IH_Undef
   | EXP_Poison => IH_Poison
   | EXP_Struct fields => _
   | EXP_Packed_struct fields => _
   | EXP_Array t elts => _
   | EXP_Vector t elts => _
-  | OP_IBinop iop t v1 v2 => @IH_IBinop iop t v1 v2 (F v1) (F v2)
-  | OP_ICmp cmp s t v1 v2 => IH_ICmp cmp s t v1 v2 (F v1) (F v2)
-  | OP_FBinop fop fm t v1 v2 => IH_FBinop fop fm t v1 v2 (F v1) (F v2)
+  | OP_IBinop iop t v1 v2 => IH_IBinop iop t (F v1) (F v2)
+  | OP_ICmp cmp s t v1 v2 => IH_ICmp cmp s t (F v1) (F v2)
+  | OP_FBinop fop fm t v1 v2 => IH_FBinop fop fm t (F v1) (F v2)
   | OP_Fneg flags v => IH_Fneg flags v (F (snd v))
-  | OP_FCmp cmp t v1 v2 => IH_FCmp cmp t v1 v2 (F v1) (F v2)
-  | OP_Conversion conv t_from v t_to => IH_Conversion conv t_from v t_to (F v) 
+  | OP_FCmp cmp t v1 v2 => IH_FCmp cmp t (F v1) (F v2)
+  | OP_Conversion conv t_from v t_to => IH_Conversion conv t_from t_to (F v) 
   | OP_GetElementPtr t ptrval idxs => _
   | OP_ExtractElement vec idx => IH_ExtractElement vec idx (F (snd vec)) (F (snd idx))
   | OP_InsertElement vec elt idx => IH_InsertElement vec elt idx (F (snd vec)) (F (snd elt)) (F (snd idx))
@@ -403,7 +398,7 @@ refine(
   | OP_Freeze v => IH_Freeze v (F (snd v))
   | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
       IH_Asm sideffect alignstack inteldialect unwind template operand_constraints
-  | EXP_Metadata m => IH_Metadata m (F0 m)
+  | EXP_Metadata m => IH_Metadata (F0 m)
   | EXP_Splat elt => IH_Splat elt (F (snd elt))
   end
 with F0 (m : metadata T) : Q m :=
@@ -412,7 +407,7 @@ with F0 (m : metadata T) : Q m :=
   | METADATA_Id id => IH_METADATA_Id id
   | METADATA_Const tv => IH_METADATA_Const tv (F (snd tv))
   | METADATA_Node mds => _
-  | METADATA_Pair md1 md2 => IH_METADATA_Pair md1 md2 (F0 md1) (F0 md2)
+  | METADATA_Pair md1 md2 => IH_METADATA_Pair (F0 md1) (F0 md2)
   | METADATA_Debug DIstr contents => IH_METADATA_Debug DIstr contents
   | METADATA_File_info f => IH_METADATA_File_info f
     end
@@ -467,18 +462,17 @@ refine(
   | EXP_Null => IH_Null
   | EXP_Zero_initializer => IH_Zero_initializer
   | EXP_Cstring elts => _
-  | EXP_Undef => IH_Undef
   | EXP_Poison => IH_Poison
   | EXP_Struct fields => _
   | EXP_Packed_struct fields => _
   | EXP_Array t elts => _
   | EXP_Vector t elts => _
-  | OP_IBinop iop t v1 v2 => @IH_IBinop iop t v1 v2 (F v1) (F v2)
-  | OP_ICmp s cmp t v1 v2 => IH_ICmp s cmp t v1 v2 (F v1) (F v2)
-  | OP_FBinop fop fm t v1 v2 => IH_FBinop fop fm t v1 v2 (F v1) (F v2)
+  | OP_IBinop iop t v1 v2 => IH_IBinop iop t (F v1) (F v2)
+  | OP_ICmp s cmp t v1 v2 => IH_ICmp s cmp t (F v1) (F v2)
+  | OP_FBinop fop fm t v1 v2 => IH_FBinop fop fm t (F v1) (F v2)
   | OP_Fneg flags v => IH_Fneg flags v (F (snd v))
-  | OP_FCmp cmp t v1 v2 => IH_FCmp cmp t v1 v2 (F v1) (F v2)
-  | OP_Conversion conv t_from v t_to => IH_Conversion conv t_from v t_to (F v) 
+  | OP_FCmp cmp t v1 v2 => IH_FCmp cmp t (F v1) (F v2)
+  | OP_Conversion conv t_from v t_to => IH_Conversion conv t_from t_to (F v) 
   | OP_GetElementPtr t ptrval idxs => _
   | OP_ExtractElement vec idx => IH_ExtractElement vec idx (F (snd vec)) (F (snd idx))
   | OP_InsertElement vec elt idx => IH_InsertElement vec elt idx (F (snd vec)) (F (snd elt)) (F (snd idx))
@@ -489,7 +483,7 @@ refine(
   | OP_Freeze v => IH_Freeze v (F (snd v))
   | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
       IH_Asm sideffect alignstack inteldialect unwind template operand_constraints
-  | EXP_Metadata m => IH_Metadata m (F0 m)
+  | EXP_Metadata m => IH_Metadata (F0 m)
   | EXP_Splat elt => IH_Splat elt (F (snd elt))
   end
 with F0 (m : metadata T) : Q m :=
@@ -498,7 +492,7 @@ with F0 (m : metadata T) : Q m :=
   | METADATA_Id id => IH_METADATA_Id id
   | METADATA_Const tv => IH_METADATA_Const tv (F (snd tv))
   | METADATA_Node mds => _
-  | METADATA_Pair md1 md2 => IH_METADATA_Pair md1 md2 (F0 md1) (F0 md2)                          
+  | METADATA_Pair md1 md2 => IH_METADATA_Pair (F0 md1) (F0 md2)                          
   | METADATA_Debug DIstr contents => IH_METADATA_Debug DIstr contents
   | METADATA_File_info f => IH_METADATA_File_info f
   end

@@ -1,11 +1,7 @@
 (* begin hide *)
 From Stdlib Require Import
-     ZArith
-     List
-     String
      Setoid
      Morphisms
-     Lia
      DecidableClass
      Classes.RelationClasses
      Program.Wf.
@@ -13,9 +9,8 @@ From Stdlib Require Import
 From Vellvm Require Import
      Utilities
      Syntax.LLVMAst.
+Open Scope nat.
 
-Set Implicit Arguments.
-Set Contextual Implicit.
 (* end hide *)
 
 (** * Dynamic types
@@ -28,6 +23,7 @@ Set Contextual Implicit.
     - type variables have been resolved.
     The conversion from static types to dynamic types is defined in the module [TypToDtyp].
  *)
+
 
 Unset Elimination Schemes.
 Inductive dtyp : Set :=
@@ -195,7 +191,7 @@ Section DtypRec.
       { revert fields.
         fix IHfields 1. intros [|u fields']. intros. inversion H.
         intros u' Hin.
-        pose proof In_cons_dec _ _ _ dtyp_eq_dec Hin.
+        pose proof In_cons_dec dtyp_eq_dec Hin.
         destruct H.
         subst. apply IH.
         eapply IHfields. apply i.
@@ -204,7 +200,7 @@ Section DtypRec.
       { revert fields.
         fix IHfields 1. intros [|u fields']. intros. inversion H.
         intros u' Hin.
-        pose proof In_cons_dec _ _ _ dtyp_eq_dec Hin.
+        pose proof In_cons_dec dtyp_eq_dec Hin.
         destruct H.
         subst. apply IH.
         eapply IHfields. apply i.

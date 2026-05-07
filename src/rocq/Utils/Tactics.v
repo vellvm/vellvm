@@ -332,3 +332,42 @@ Ltac subst_cont :=
   | h: visible_cont _ |- _ =>
     destruct h; subst
   end.
+
+(* This exists in the stdlib as [ProofIrrelevance.inj_pair2], but we reprove
+   it to not depend on proof irrelevance (we use axiom [JMeq.JMeq_eq] instead).
+   The itree library now avoids as much as possible using this axiom, we may want
+   to see if it's possible to do so here.
+ *)
+Lemma inj_pair2 :
+  forall (U : Type) (P : U -> Type) (p : U) (x y : P p),
+    existT P p x = existT P p y -> x = y.
+Proof using.
+  intros. apply JMeq.JMeq_eq.
+  refine (
+      match H in _ = w return JMeq.JMeq x (projT2 w) with
+      | eq_refl => JMeq.JMeq_refl
+      end).
+Qed.
+
+Ltac inj_pair2_existT :=
+  repeat
+      match goal with
+      | H : _ |- _ => apply inj_pair2 in H
+      end.
+
+Ltac subst_existT :=
+  inj_pair2_existT; subst.
+
+Ltac abs_eq :=
+  match goal with
+  | h : _ = _ |- _ => try now (exfalso; inv h)
+  end.
+
+Ltac do_it := constructor; cbn; auto; fail.
+
+Ltac rw_match :=
+  match goal with
+  | h: ?a = _ |- context [match ?a with _ => _ end] =>
+      rewrite h end.
+
+

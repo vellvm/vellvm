@@ -9,21 +9,12 @@
  ---------------------------------------------------------------------------- *)
 
 (* begin hide *)
-From Stdlib Require Import String.
 From Stdlib Require Import OrderedType OrderedTypeEx.
-From Stdlib Require Import ZArith.
-Require Import Rocqlib.
 
 From Vellvm Require Import
-     Syntax.DynamicTypes
-     Semantics.VellvmIntegers
-     Utils.Error.
-
-From ExtLib Require Import
-     Structures.Monads.
-
-Import MonadNotation.
-Open Scope monad_scope.
+  Utilities
+  Syntax.DynamicTypes
+  Semantics.VellvmIntegers.
 (* end hide *)
 
 (** * Signature for addresses
@@ -54,25 +45,25 @@ Module Type INTPTR.
 
   Parameter to_Z : forall (a : intptr), Z.
   Parameter to_unsigned : forall (a : intptr), Z.
-  Parameter from_Z : Z -> OOM intptr.
+  Parameter from_Z : Z -> EOB intptr.
 
   Parameter from_Z_to_Z :
     forall (z : Z) (i : intptr),
-      from_Z z = NoOom i ->
+      from_Z z = ret i ->
       to_Z i = z.
 
   Parameter from_Z_injective :
     forall (z1 z2 : Z) (i : intptr),
-      from_Z z1 = NoOom i ->
-      from_Z z2 = NoOom i ->
+      from_Z z1 = ret i ->
+      from_Z z2 = ret i ->
       z1 = z2.
 
   Parameter to_Z_from_Z :
     forall (i : intptr),
-      from_Z (to_Z i) = NoOom i.
+      from_Z (to_Z i) = ret i.
 
   Parameter from_Z_0 :
-    from_Z 0 = NoOom zero.
+    from_Z 0 = ret zero.
 
   Parameter to_Z_0 :
     to_Z zero = 0%Z.
@@ -100,8 +91,8 @@ Module Type INTPTR_BIG (IP : INTPTR).
   Parameter from_Z_safe :
     forall z,
       match from_Z z with
-      | NoOom _ => True
-      | Oom _ => False
+      | raise_ret _ => True
+      | _ => False
       end.
 End INTPTR_BIG.
 
@@ -261,7 +252,7 @@ Module Type ITOP (Addr:MemoryAddress.ADDRESS) (PROV:PROVENANCE(Addr)) (PTOI:PTOI
   Import PTOI.
   Import Addr.
 
-  Parameter int_to_ptr : Z -> Prov -> OOM addr.
+  Parameter int_to_ptr : Z -> Prov -> EOB addr.
   Parameter int_to_ptr_provenance :
     forall (x : Z) (p : Prov) (a : addr),
       int_to_ptr x p = ret a ->
@@ -291,7 +282,7 @@ Module Type ITOP_BIG (Addr:MemoryAddress.ADDRESS) (PROV:PROVENANCE(Addr)) (PTOI:
   Parameter int_to_ptr_safe :
     forall z pr,
       match int_to_ptr z pr with
-      | NoOom _ => True
-      | Oom _ => False
+      | raise_ret _ => True
+      | _ => False
       end.
 End ITOP_BIG.

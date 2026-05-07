@@ -1,16 +1,9 @@
 (* begin hide *)
-From Stdlib Require Import
-     List.
-Import ListNotations.
-
 From Vellvm Require Import
-     Numeric.Rocqlib
      Utilities
      Syntax.LLVMAst
      Syntax.CFG
      Syntax.TypToDtyp.
-
-
 (* end hide *)
 
 (** * Scoping
@@ -231,7 +224,6 @@ Section REGISTER_OPERATIONS.
                       | EXP_Null
                       | EXP_Zero_initializer
                       | EXP_Cstring _
-                      | EXP_Undef
                       | EXP_Poison
                       | EXP_Asm _ _ _ _ _ _ (* Technically: probably need to parse operand_constraint string *)
                       | EXP_Metadata _

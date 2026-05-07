@@ -1,21 +1,13 @@
 (* begin hide *)
-
-
 From Vellvm Require Import
-     Utils.Util
-     Utils.ListUtil
-     Utils.Tactics
+     Utilities
      Syntax.LLVMAst
      Syntax.AstLib
      Syntax.CFG
      Syntax.Traversal
      Syntax.DynamicTypes.
 
-Require Import Rocqlib.
-
 Import CFGNotations.
-Import ListNotations.
-Open Scope list_scope.
 (* end hide *)
 
 (** * Conversion from static to dynamic types

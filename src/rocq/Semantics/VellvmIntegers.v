@@ -1,10 +1,7 @@
-From Stdlib Require Import
-  ZArith
-  Zbool.
-
-From ExtLib Require Import Monad.
-
-From Vellvm Require Import Numeric.Integers Syntax.DynamicTypes Utils.Error.
+From Vellvm Require Import
+  Utilities
+  Numeric.Integers
+  Syntax.DynamicTypes.
 
 (* Integers that can run out of memory... Necessary for handling
      finite memory compilation. *)
@@ -22,27 +19,27 @@ Class VMemInt I : Type :=
     mone : I;
 
     (* Arithmetic *)
-    madd : I -> I -> OOM I;
+    madd : I -> I -> EOB I;
     madd_carry : I -> I -> I -> I;
     madd_overflow : I -> I -> I -> I;
 
-    msub : I -> I -> OOM I;
+    msub : I -> I -> EOB I;
     msub_borrow : I -> I -> I -> I;
     msub_overflow : I -> I -> I -> I;
 
-    mmul : I -> I -> OOM I;
+    mmul : I -> I -> EOB I;
 
     mdivu : I -> I -> I; (* Can this overflow? *)
-    mdivs : I -> I -> OOM I;
+    mdivs : I -> I -> EOB I;
 
     mmodu : I -> I -> I; (* Can this overflow / underflow *)
-    mmods : I -> I -> OOM I; (* I suspect this can sort of overflow in the division by -1 case... Even though it really can't *)
+    mmods : I -> I -> EOB I; (* I suspect this can sort of overflow in the division by -1 case... Even though it really can't *)
 
-    mshl : I -> I -> OOM I;
+    mshl : I -> I -> EOB I;
     mshr : I -> I -> I;  (* Can this overflow? *)
     mshru : I -> I -> I; (* Can this overflow? *)
 
-    mnegative : I -> OOM I;
+    mnegative : I -> EOB I;
 
     (* Logic *)
     mand : I -> I -> I;
@@ -58,7 +55,7 @@ Class VMemInt I : Type :=
     munsigned : I -> Z;
     msigned : I -> Z;
 
-    mrepr : Z -> OOM I; (* Not sure if we should even have this *)
+    mrepr : Z -> EOB I; (* Not sure if we should even have this *)
 
     (* dtyp *)
     mdtyp_of_int : dtyp
@@ -306,7 +303,7 @@ Class VInt I : Type :=
     munsigned := unsigned;
     msigned := signed;
 
-    mrepr := fun x => NoOom (repr x);
+    mrepr := fun x => ret (repr x);
 
     (* dtyp *)
     mdtyp_of_int := DTYPE_I bitwidth

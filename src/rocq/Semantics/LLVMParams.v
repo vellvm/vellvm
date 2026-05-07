@@ -1,13 +1,13 @@
 From Vellvm Require Import
-     Semantics.LLVMEvents
-     Semantics.MemoryAddress
-     Semantics.Memory.Sizeof
-     Semantics.DynamicValues.
+  Utilities
+  Semantics.LLVMEvents
+  Semantics.MemoryAddress
+  Semantics.Memory.Sizeof
+  Semantics.DynamicValues.
 
 From ExtLib Require Import
   Core.RelDec
   Programming.Eqv.  
-
 
 (** Parameters for LLVM instances. *)
 Module Type LLVMParams.

@@ -10,9 +10,6 @@
 
 (* begin hide *)
 From Stdlib Require Import
-     ZArith
-     List
-     String
      Setoid
      Morphisms
      Classes.RelationClasses.
@@ -119,10 +116,6 @@ Set Contextual Implicit.
     : itree E X
     := v <- trigger (ThrowUB (print_msg e));; match v: void with end.
 
-  #[global] Instance RAISE_UB_ITREE_UB {E : Type -> Type} `{UBE -< E} : RAISE_UB (itree E) :=
-  { raise_ub := fun A e => raiseUB e
-  }.
-
   (* Out of memory / abort. Carries a string for a message. *)
   Variant OOME : Type -> Type :=
   | ThrowOOM : unit -> OOME void.
@@ -133,10 +126,6 @@ Set Contextual Implicit.
              (e : string)
     : itree E X
     := v <- trigger (ThrowOOM (print_msg e));; match v: void with end.
-
-  #[global] Instance RAISE_OOM_ITREE_OOME {E : Type -> Type} `{OOME -< E} : RAISE_OOM (itree E) :=
-  { raise_oom := fun A => raiseOOM
-  }.
 
   (* Debug is identical to the "Trace" effect from the itrees library,
    but debug is probably a less confusing name for us. *)
@@ -153,30 +142,6 @@ Set Contextual Implicit.
 
   Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
     v <- trigger (Throw (print_msg msg));; match v: void with end.
-
-  #[global] Instance RAISE_ERR_ITREE_FAILUREE {E : Type -> Type} `{FailureE -< E} : RAISE_ERROR (itree E) :=
-  { raise_error := fun A e => raise e
-  }.
-
-  Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m:err A) : itree E B :=
-    match m with
-    | inl x => raise x
-    | inr x => f x
-    end.
-
-  Definition lift_pure_err {A} {E} `{FailureE -< E} (m:err A) : itree E A :=
-    lift_err ret m.
-
-  Definition lift_err_ub_oom {A B} {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} (f : A -> itree E B) (m:err_ub_oom A) : itree E B :=
-    match m with
-    | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
-        match m with
-        | inl (OOM_message x) => raiseOOM x
-        | inr (inl (UB_message x)) => raiseUB x
-        | inr (inr (inl (ERR_message x))) => raise x
-        | inr (inr (inr x)) => f x
-      end
-    end.
 
 (* REFACTOR: This should not be a module type.  DynamicValues should not be instantiated here.   *)
 (* TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism not functors. *)
