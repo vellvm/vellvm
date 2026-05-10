@@ -2,6 +2,12 @@ From Stdlib Require Import
   Lia
   Relations
   Program.Equality.
+From ITree Require Import
+  Basics.HeterogeneousRelations.
+
+Infix"×" := prod_rel (at level 90, left associativity).
+
+Definition TT {A} : relation A := fun _ _ => True.
 
 Lemma clos_t_rt :
   forall {A: Type} {R : relation A}

@@ -149,8 +149,9 @@ Set Contextual Implicit.
     Variable dvalue : Set.
     
     (* Generic calls, refined by [denote_mcfg] *)
+    (* TODO: reincorporate exceptions *)
     Variant CallE : Type -> Type :=
-    | Call        : forall (t:dtyp) (f:dvalue) (args:list dvalue), CallE (dvalue + dvalue).
+    | Call        : forall (t:dtyp) (f:dvalue) (args:list dvalue), CallE dvalue.
 
     (* ExternalCallE values are the "observable" events by which one should compare the 
        equivalence of two LLVM IR programs.  These should never be interpreted away
@@ -174,6 +175,7 @@ Set Contextual Implicit.
 
     (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
     (* Intrinsics may raise an exception by returning inl *)
+    (* TODO: reincorporate exceptions *)
     Variant IntrinsicE : Type -> Type :=
     | Intrinsic : forall (t:dtyp) (f:string) (args:list dvalue), IntrinsicE dvalue.
 

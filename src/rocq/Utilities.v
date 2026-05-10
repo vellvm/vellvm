@@ -7,7 +7,6 @@
  *)
 
 From Stdlib Require Export
-  ZArith
   List
   String
   Lia.
@@ -15,9 +14,9 @@ From Stdlib Require Export
 From Vellvm Require Export
   Numeric.Rocqlib
   Utils.Tactics
-  Utils.Util
   Utils.EOB
   Utils.ListUtil
+  Utils.IntMaps
   Utils.NMaps
   Utils.StringUtil
   Utils.BoolUtil

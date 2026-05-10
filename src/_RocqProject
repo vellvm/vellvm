@@ -14,13 +14,13 @@
 
 ./rocq/Utils/ParserHelper.v
 ./rocq/Utils/Tactics.v
-./rocq/Utils/Util.v
 ./rocq/Utils/ListUtil.v
 ./rocq/Utils/StringUtil.v
 ./rocq/Utils/BoolUtil.v
 ./rocq/Utils/OptionUtil.v
 ./rocq/Utils/RelationsUtil.v
 ./rocq/Utils/Default.v
+./rocq/Utils/IntMaps.v
 ./rocq/Utils/NMaps.v
 ./rocq/Utils/NList.v
 ./rocq/Utils/EOB.v
@@ -54,6 +54,7 @@
 ./rocq/Semantics/Conversion.v
 ./rocq/Semantics/Operations.v
 ./rocq/Semantics/IntrinsicsDefinitions.v
+./rocq/Utils/Assoc.v
 ./rocq/Semantics/Denotation.v
 
 
