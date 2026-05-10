@@ -10,31 +10,26 @@
 
 (* begin hide *)
 From Stdlib Require Import
-     ZArith List String Morphisms.
+  Morphisms.
 
 From ExtLib Require Import
-     Structures.Monads
-     Programming.Eqv
-     Data.String.
+  Programming.Eqv
+  Data.String.
 
 From Vellvm Require Import
-     Utils.Util
-     Syntax.LLVMAst
-     Semantics.LLVMParams
-     Semantics.LLVMEvents
-     Semantics.IntrinsicsDefinitions.
+  Utilities
+  Utils.Assoc
+  Syntax
+  Semantics.LLVMParams
+  Semantics.LLVMEvents
+  Semantics.IntrinsicsDefinitions.
 
 From ITree Require Import
-     ITree
-     InterpFacts
-     Eq.Eqit.
+  ITree
+  InterpFacts
+  Eq.Eqit.
 
-Import MonadNotation.
 Import EqvNotation.
-Import ListNotations.
-
-Set Implicit Arguments.
-Set Contextual Implicit.
 (* end hide *)
 
 (** * Handler for intrinsics
@@ -93,9 +88,9 @@ Module Make(LP:LLVMParams).
           match assoc fname defs_assoc with
           | Some f => fun pf =>
                        match f args with
-                       | inl msg => raise msg
-                       | inr result =>
-                           Ret result
+                       | raise_error msg => raise msg
+                       | raise_ret result => Ret result
+                       | _ => raise "Absurd case in handle_intrinsics." 
                        end
           | None => fun pf => (eq_rect X (fun a => itree E a) (trigger e)) dvalue%type pf
           end

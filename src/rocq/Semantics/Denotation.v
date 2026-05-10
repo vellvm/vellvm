@@ -674,7 +674,7 @@ Module Denotation (LP : LLVMParams).
 
     | (IId id, INSTR_AtomicRMW armw) =>
         denote_atomicrmw id armw
-    (* TODO: revisit with a proper concurrenc model *)
+    (* TODO: revisit with a proper concurrency model *)
 
     | (_, INSTR_Fence _ _) => ret tt
 
@@ -875,7 +875,6 @@ Module Denotation (LP : LLVMParams).
   Definition pop_call_frame {E k v exc} `{MemoryE dvalue -< E} `{StackE k v exc -< E} : itree E unit :=
     trigger StackPop;;
     trigger MemPop.
-
   
   Fixpoint dtyp_of_dvalue (v:dvalue) : EOB dtyp :=
     let list_dtyps :=

@@ -1,64 +1,38 @@
-From Vellvm.Numeric Require Import
-     Integers.
-
-From Vellvm.Syntax Require Import
-     DataLayout
-     DynamicTypes.
+From Vellvm Require Import
+  Numeric.Integers
+  Utilities
+  Syntax.
 
 From ITree Require Import
-     ITree
-     Basics.Basics
-     Events.Exception
-     Eq.Eqit
-     Events.StateFacts
-     Events.State.
+  ITree
+  Basics.Basics
+  Events.Exception
+  Eq.Eqit
+  Events.StateFacts
+  Events.State.
 
 From Vellvm.Semantics Require Import
   DynamicValues
   VellvmIntegers
   MemoryAddress
-  MemoryParams
-  Memory.Overlaps
   LLVMParams
   LLVMEvents
-  ItreeRaiseMReturns.
-
-From Vellvm.Handlers Require Import
-  MemPropT
-  MemoryModules.Within.
-
-From Vellvm.Utils Require Import
-     Error
-     PropT
-     Util
-     NMaps
-     Tactics
-     Raise
-     Monads
-     MapMonadExtra
-     MonadReturnsLaws
-     MonadEq1Laws
-     MonadExcLaws
-     Inhabited.
+  Operations.
 
 From ExtLib Require Import
-     Structures.Monads
-     Structures.Functor.
+  Structures.Functor.
 
 From Stdlib Require Import
-     ZArith
-     Strings.String
-     List
-     Lia
-     Relations
-     RelationClasses
-     Wellfounded.
+  ZArith
+  Strings.String
+  Relations
+  RelationClasses
+  Wellfounded.
 
 Require Import Morphisms.
 
 Import ListNotations.
 Import ListUtil.
-Import Utils.Monads.
 
 Import Basics.Basics.Monads.
 Import MonadNotation.
@@ -69,13 +43,13 @@ Import EitherMonad.
 From Stdlib Require Import FunctionalExtensionality.
 Import Logic.
 
-Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MEMORY_PARAMS LP).
-  Import MP.MBYTES.
-  Import LP.DV.
-  Import LP.ADDR.
-  Import LP.SZ.
-  Import LP.PROV.
-
+Module Type MemoryModelSpecPrimitives (LP : LLVMParams).
+  Import LP.
+  Import DV ADDR SZ PROV.
+  Module OP := Operations LP.
+  Import OP.
+  Import GEP SELECT COMPARE MBYTES CONVERT.
+  
   (*** Internal state of memory *)
   Parameter MemState : Type.
   Parameter memory_stack : Type.

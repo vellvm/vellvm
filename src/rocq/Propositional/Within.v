@@ -1,8 +1,6 @@
-From Vellvm.Utils Require Import
-  Error
-  Raise
-  Monads
-  Inhabited.
+From Vellvm Require Import
+  Utilities
+  Utils.Inhabited.
 
 From ExtLib Require Import
      Structures.Monads.
@@ -10,7 +8,7 @@ From ExtLib Require Import
 From Stdlib Require Import
      Morphisms.
 
-Require Import MonadEq1Laws.
+(* Require Import MonadEq1Laws. *)
 Import String.
 
 Import Monad.
@@ -229,81 +227,48 @@ Proof using.
   eapply reflexive_within_eq1_Proper; eauto.
 Defined.
 
-#[global] Instance Reflexive_Within_ret_inv
-  {Pre Post} {M} `{MM : Monad M}
-  `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM}
-  `{EQR : @Eq1_ret_inv M EQM MM} `{IPRE : Inhabited Pre} `{IPOST : Inhabited Post}:
-  @Within_ret_inv M M Pre Post MM MM EQM (@Reflexive_Within Pre Post M MM EQM EQV).
-Proof using.
-  split.
-  - intros A x y RET.
-    cbn in RET.
-    destruct RET.
-    destruct H.
-    cbn in H.
-    red in H.
-    eapply eq1_ret_ret in H; eauto.
-  - intros A x.
-    inversion IPRE.
-    inversion IPOST.
-    cbn.
-    exists inhabitant.
-    exists inhabitant0.
-    red.
-    reflexivity.
-Defined.
+(* #[global] Instance Reflexive_Within_ret_inv *)
+(*   {Pre Post} {M} `{MM : Monad M} *)
+(*   `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM} *)
+(*   `{EQR : @Eq1_ret_inv M EQM MM} `{IPRE : Inhabited Pre} `{IPOST : Inhabited Post}: *)
+(*   @Within_ret_inv M M Pre Post MM MM EQM (@Reflexive_Within Pre Post M MM EQM EQV). *)
+(* Proof using. *)
+(*   split. *)
+(*   - intros A x y RET. *)
+(*     cbn in RET. *)
+(*     destruct RET. *)
+(*     destruct H. *)
+(*     cbn in H. *)
+(*     red in H. *)
+(*     eapply eq1_ret_ret in H; eauto. *)
+(*   - intros A x. *)
+(*     inversion IPRE. *)
+(*     inversion IPOST. *)
+(*     cbn. *)
+(*     exists inhabitant. *)
+(*     exists inhabitant0. *)
+(*     red. *)
+(*     reflexivity. *)
+(* Defined. *)
 
-#[global] Instance Reflexive_Within_ret_pre_post_inv
-  {Pre} {M} `{MM : Monad M}
-  `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM}
-  `{EQR : @Eq1_ret_inv M EQM MM}:
-  @Within_ret_pre_post_inv M M Pre MM MM EQM (@Reflexive_Within Pre Pre M MM EQM EQV).
-Proof using.
-  split.
-  - intros A pre post x y RET.
-    cbn in RET.
-    unfold reflexive_within in *.
-    eapply eq1_ret_ret in RET; eauto.
-  - intros A pre x.
-    cbn.
-    red.
-    reflexivity.
-  - intros A pre1 post1 pre2 post2 x y z w H H0.
-    cbn in *.
-    red. red in H, H0.
-    congruence.
-Defined.
+(* #[global] Instance Reflexive_Within_ret_pre_post_inv *)
+(*   {Pre} {M} `{MM : Monad M} *)
+(*   `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM} *)
+(*   `{EQR : @Eq1_ret_inv M EQM MM}: *)
+(*   @Within_ret_pre_post_inv M M Pre MM MM EQM (@Reflexive_Within Pre Pre M MM EQM EQV). *)
+(* Proof using. *)
+(*   split. *)
+(*   - intros A pre post x y RET. *)
+(*     cbn in RET. *)
+(*     unfold reflexive_within in *. *)
+(*     eapply eq1_ret_ret in RET; eauto. *)
+(*   - intros A pre x. *)
+(*     cbn. *)
+(*     red. *)
+(*     reflexivity. *)
+(*   - intros A pre1 post1 pre2 post2 x y z w H H0. *)
+(*     cbn in *. *)
+(*     red. red in H, H0. *)
+(*     congruence. *)
+(* Defined. *)
 
-#[global] Instance Reflexive_OOM_RaiseWithin
-  {Pre Post} {M} `{MM : Monad M}
-  `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM}
-  `{EQR : @Eq1_ret_inv M EQM MM}
-  `{OOM : RAISE_OOM M}
-  `{RBMOOM : @RaiseBindM M MM EQM string (@raise_oom M OOM)} :
-  @RaiseWithin M M Pre Post MM EQM (@Reflexive_Within Pre Post M MM EQM EQV) string (@raise_oom M OOM).
-Proof using.
-  split.
-  intros X msg x.
-  red.
-  intros [pre [post CONTRA]].
-  cbn in CONTRA.
-  red in CONTRA.
-  eapply rbm_raise_ret_inv; eauto.
-Defined.
-
-#[global] Instance Reflexive_ERROR_RaiseWithin
-  {Pre Post} {M} `{MM : Monad M}
-  `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M MM EQM}
-  `{EQR : @Eq1_ret_inv M EQM MM}
-  `{ERR : RAISE_ERROR M}
-  `{RBMOOM : @RaiseBindM M MM EQM string (@raise_error M ERR)} :
-  @RaiseWithin M M Pre Post MM EQM (@Reflexive_Within Pre Post M MM EQM EQV) string (@raise_error M ERR).
-Proof using.
-  split.
-  intros X msg x.
-  red.
-  intros [pre [post CONTRA]].
-  cbn in CONTRA.
-  red in CONTRA.
-  eapply rbm_raise_ret_inv; eauto.
-Defined.

@@ -1,12 +1,4 @@
 (* begin hide *)
-From Stdlib Require Import
-     List
-     String.
-
-From ExtLib Require Import
-     Structures.Monads
-     Structures.Maps.
-
 From ITree Require Import
      ITree
      Events.StateFacts
@@ -14,11 +6,8 @@ From ITree Require Import
      Events.State.
 
 From Vellvm Require Import
-     Utils.Util
-     Utils.Error
-     Utils.Tactics
-     Syntax.LLVMAst
-     Syntax.AstLib
+     Utilities
+     Syntax
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
      Semantics.DynamicValues
@@ -26,13 +15,10 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Handlers.Local.
 
+From ExtLib Require Import
+     Structures.Maps.
+
 From QuickChick Require Import Show.
-
-Set Implicit Arguments.
-Set Contextual Implicit.
-
-Import ListNotations.
-Import MonadNotation.
 
 Import ITree.Basics.Basics.Monads.
 (* end hide *)
@@ -70,20 +56,20 @@ Section StackMap.
                Build_stack_frame var_union handler_union exc_union loc_union
   }.
 
-  (* See src/ml/Extract.v for the special handling of these operation. *)
-  Record debug_local_stack := mk_debug_local_stack {
-      local_stack_set : stack_frame -> unit ;
-      local_stack_get : unit -> stack ;
-      local_stack_push : stack_frame -> unit ;
-      local_stack_pop : unit -> unit;
-    }.
+  (* (* See src/ml/Extract.v for the special handling of these operation. *) *)
+  (* Record debug_local_stack := mk_debug_local_stack { *)
+  (*     local_stack_set : stack_frame -> unit ; *)
+  (*     local_stack_get : unit -> stack ; *)
+  (*     local_stack_push : stack_frame -> unit ; *)
+  (*     local_stack_pop : unit -> unit; *)
+  (*   }. *)
 
-  Definition local_stack_object : debug_local_stack :=
-    mk_debug_local_stack (fun (_:stack_frame) => tt) (fun (_:unit) => []) (fun (_:stack_frame) => tt) (fun (_:unit) => tt).
+  (* Definition local_stack_object : debug_local_stack := *)
+  (*   mk_debug_local_stack (fun (_:stack_frame) => tt) (fun (_:unit) => []) (fun (_:stack_frame) => tt) (fun (_:unit) => tt). *)
 
-  Definition update_local_stack_ref {M} `{HM: Monad M} {T} (e : LocalE k v T) : stateT stack_frame M unit :=
-    (sf <- MonadState.get;;
-    ret (local_stack_object.(local_stack_set) sf))%monad.
+  (* Definition update_local_stack_ref {M} `{HM: Monad M} {T} (e : LocalE k v T) : stateT stack_frame M unit := *)
+  (*   (sf <- MonadState.get;; *)
+  (*   ret (local_stack_object.(local_stack_set) sf))%monad. *)
 
   Definition handle_stack {E} `{FailureE -< E} : (StackE k v exc) ~> stateT (stack_frame * stack) (itree E) :=
     fun _ e '(env, stk) =>
@@ -92,14 +78,14 @@ Section StackMap.
           let init := List.fold_right (fun '(x,dv) => Maps.add x dv) Maps.empty args in
           let frame := Build_stack_frame init None None (Some (printer_object.(printer_get_loc) tt)) in
           (* Push stack for debugger *)
-          ret (local_stack_object.(local_stack_push) frame);;
+          (* ret (local_stack_object.(local_stack_push) frame);; *)
           Ret ((frame, env::stk), tt)
       | StackPop =>
           match stk with
           | [] => raise "Tried to pop too many stack frames."
           | (env'::stk') =>
               (* Pop stack for debugger *)
-              ret (local_stack_object.(local_stack_pop) tt);;
+              (* ret (local_stack_object.(local_stack_pop) tt);; *)
               Ret ((env',stk'), tt)
           end
       | StackSetHandler handler =>
@@ -120,17 +106,21 @@ Section StackMap.
           end
       end.
 
-    (* Transform a local handler that works on maps to one that works on stacks *)
-    Definition handle_local_stack {E} `{FailureE -< E} (h:(LocalE k v) ~> stateT stack_frame (itree E)) :
-      LocalE k v ~> stateT (stack_frame * stack) (itree E)
-      :=
-      fun _ e '(env, stk) => ITree.map (fun '(env',r) => ((env',stk), r)) (h _ e env).
+  (* Transform a local handler that works on maps to one that works on stacks *)
+  Definition handle_local_stack {E} `{FailureE -< E}
+    (h : LocalE k v ~> stateT stack_frame (itree E)) :
+    LocalE k v ~> stateT (stack_frame * stack) (itree E) :=
+    fun _ e '(env, stk) => ITree.map (fun '(env',r) => ((env',stk), r)) (h _ e env).
 
-  Definition handle_local_debug_stack {E} `{FailureE -< E} : (LocalE k v) ~> stateT stack_frame (itree E) :=
-    fun _ e =>
-      (res <- handle_local e;;
-      update_local_stack_ref e;;
-      ret res)%monad.
+  Definition handle_local_with_stack
+    {E} `{FailureE -< E} : (LocalE k v) ~> stateT stack_frame (itree E) :=
+    fun _ e => handle_local e.
+
+  (* Definition handle_local_debug_stack {E} `{FailureE -< E} : (LocalE k v) ~> stateT stack_frame (itree E) := *)
+  (*   fun _ e => *)
+  (*     (res <- handle_local e;; *)
+  (*     update_local_stack_ref e;; *)
+  (*     ret res)%monad. *)
 
   Open Scope monad_scope.
   Section PARAMS.
@@ -148,7 +138,8 @@ Section StackMap.
     Definition G_trigger {S} : forall R , G R -> (stateT S (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition  interp_local_stack_h (h:(LocalE k v) ~> stateT stack_frame (itree Effout)) :=
+    Definition interp_local_stack_h
+      (h : LocalE k v ~> stateT stack_frame (itree Effout)) :=
       (case_ E_trigger
              (case_ F_trigger
                     (case_ (case_ (handle_local_stack h)
@@ -156,8 +147,8 @@ Section StackMap.
                            G_trigger))).
 
     Definition interp_local_stack `{FailureE -< E +' F +' G}  :
-      (itree Effin) ~>  stateT (stack_frame * stack) (itree Effout) :=
-      interp_state (interp_local_stack_h handle_local_debug_stack).
+      (itree Effin) ~> stateT (stack_frame * stack) (itree Effout) :=
+      interp_state (interp_local_stack_h handle_local_with_stack).
 
     Section Structural_Lemmas.
 
@@ -185,7 +176,7 @@ Section StackMap.
 
       Lemma interp_local_stack_vis_eqit:
         forall (ls : stack_frame * stack) S X (kk : X -> itree Effin S) (e : Effin X),
-          interp_local_stack (Vis e kk) ls ≅ ITree.bind (interp_local_stack_h handle_local_debug_stack e ls) (fun (sx : stack_frame * stack * X) => Tau (interp_local_stack (kk (snd sx)) (fst sx))).
+          interp_local_stack (Vis e kk) ls ≅ ITree.bind (interp_local_stack_h handle_local_with_stack e ls) (fun (sx : stack_frame * stack * X) => Tau (interp_local_stack (kk (snd sx)) (fst sx))).
       Proof using.
         intros.
         unfold interp_local_stack.
@@ -195,7 +186,7 @@ Section StackMap.
 
       Lemma interp_local_stack_vis:
         forall (ls : (stack_frame * stack)) S X (kk : X -> itree Effin S) (e : Effin X),
-          interp_local_stack (Vis e kk) ls ≈ ITree.bind (interp_local_stack_h handle_local_debug_stack e ls) (fun (sx : stack_frame * stack * X) => interp_local_stack (kk (snd sx)) (fst sx)).
+          interp_local_stack (Vis e kk) ls ≈ ITree.bind (interp_local_stack_h handle_local_with_stack e ls) (fun (sx : stack_frame * stack * X) => interp_local_stack (kk (snd sx)) (fst sx)).
       Proof using.
         intros.
         rewrite interp_local_stack_vis_eqit.
@@ -204,7 +195,7 @@ Section StackMap.
       Qed.
 
       Lemma interp_local_stack_trigger ls X (e : Effin X):
-          interp_local_stack (ITree.trigger e) ls ≈ interp_local_stack_h handle_local_debug_stack e ls.
+          interp_local_stack (ITree.trigger e) ls ≈ interp_local_stack_h handle_local_with_stack e ls.
       Proof using.
         unfold interp_local_stack.
         rewrite interp_state_trigger.

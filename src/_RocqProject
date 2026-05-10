@@ -21,6 +21,7 @@
 ./rocq/Utils/RelationsUtil.v
 ./rocq/Utils/Default.v
 ./rocq/Utils/IntMaps.v
+./rocq/Utils/Assoc.v
 ./rocq/Utils/NMaps.v
 ./rocq/Utils/NList.v
 ./rocq/Utils/EOB.v
@@ -54,10 +55,16 @@
 ./rocq/Semantics/Conversion.v
 ./rocq/Semantics/Operations.v
 ./rocq/Semantics/IntrinsicsDefinitions.v
-./rocq/Utils/Assoc.v
 ./rocq/Semantics/Denotation.v
 
+./rocq/Handlers/Global.v
+./rocq/Handlers/Local.v
+./rocq/Handlers/Stack.v
+./rocq/Handlers/Intrinsics.v
 
+./rocq/Utils/Inhabited.v
+./rocq/Propositional/PropT.v
+./rocq/Propositional/Within.v
 
 
 
@@ -68,11 +75,8 @@
 ./rocq/Analysis/Kildall.v
 ./rocq/Analysis/ssa.v
 ./rocq/Handlers/Concretization.v
-./rocq/Handlers/Global.v
 ./rocq/Handlers/Handlers.v
-./rocq/Handlers/Intrinsics.v
 ./rocq/Handlers/LLVMExceptions.v
-./rocq/Handlers/Local.v
 ./rocq/Handlers/MemPropT.v
 ./rocq/Handlers/MemoryInterpreters.v
 ./rocq/Handlers/MemoryModel.v
@@ -87,7 +91,6 @@
 ./rocq/Handlers/OOM.v
 ./rocq/Handlers/Pick.v
 ./rocq/Handlers/SerializationTheory.v
-./rocq/Handlers/Stack.v
 ./rocq/Handlers/UndefinedBehaviour.v
 
 ./rocq/QC/GenAST.v

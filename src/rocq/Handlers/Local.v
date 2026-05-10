@@ -4,19 +4,18 @@ From Stdlib Require Import
   Morphisms.
 
 From ExtLib Require Import
-  Structures.Monads
-  Structures.Maps.
+  Structures.Maps
+  Data.Map.FMapAList.
 
 From ITree Require Import
   ITree
   Eq.Eqit
   Events.State
-  Events.StateFacts.
+  Events.StateFacts
+  Basics.MonadState.
 
 From Vellvm Require Import
-  Utils.Util
-  Utils.Error
-  Utils.Tactics
+  Utilities
   Semantics.LLVMEvents
   Semantics.LLVMParams
   Semantics.Memory.Sizeof.
@@ -51,24 +50,24 @@ Section Locals.
         end
       end.
 
-  (* See src/ml/Extract.v for the special handling of these operation. *)
-  Record debug_locals := mk_debug_locals {
-      locals_set : map -> unit ;
-      locals_get : unit -> map;
-    }.
+  (* (* See src/ml/Extract.v for the special handling of these operation. *) *)
+  (* Record debug_locals := mk_debug_locals { *)
+  (*     locals_set : map -> unit ; *)
+  (*     locals_get : unit -> map; *)
+  (*   }. *)
 
-  Definition locals_object : debug_locals :=
-    mk_debug_locals (fun (_:map) => tt) (fun (_:unit) => (Maps.empty : map)).
+  (* Definition locals_object : debug_locals := *)
+  (*   mk_debug_locals (fun (_:map) => tt) (fun (_:unit) => (Maps.empty : map)). *)
 
-  Definition update_locals_ref {M} `{HM: Monad M} {T} (e : LocalE k v T) : stateT map M unit :=
-    (gs <- MonadState.get;;
-    ret (locals_object.(locals_set) gs))%monad.
+  (* Definition update_locals_ref {M} `{HM: Monad M} {T} (e : LocalE k v T) : stateT map M unit := *)
+  (*   (gs <- MonadState.get;; *)
+  (*   ret (locals_object.(locals_set) gs))%monad. *)
  
-  Definition handle_local_debug {E} `{FailureE -< E} : (LocalE k v) ~> stateT map (itree E) :=
-    fun _ e =>
-      (res <- handle_local e;;
-      update_locals_ref e;;
-      ret res)%monad.
+  (* Definition handle_local_debug {E} `{FailureE -< E} : (LocalE k v) ~> stateT map (itree E) := *)
+  (*   fun _ e => *)
+  (*     (res <- handle_local e;; *)
+  (*     update_locals_ref e;; *)
+  (*     ret res)%monad. *)
 
   Open Scope monad_scope.
   Section PARAMS.
@@ -86,7 +85,7 @@ Section Locals.
     Definition G_trigger {M} : forall R , G R -> (stateT M (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition interp_local_h := (case_ E_trigger (case_ F_trigger (case_ handle_local_debug G_trigger))).
+    Definition interp_local_h := (case_ E_trigger (case_ F_trigger (case_ handle_local(* handle_local_debug *) G_trigger))).
     Definition interp_local : itree Effin ~> stateT map (itree Effout) :=
       interp_state interp_local_h.
 
@@ -198,7 +197,6 @@ Section Locals.
   End PARAMS.
 
 End Locals.
-
 
 From Vellvm Require Import
      LLVMAst.
