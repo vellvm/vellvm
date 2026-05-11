@@ -68,12 +68,6 @@
 
 
 
-./rocq/Analysis/Dom.v
-./rocq/Analysis/DomId.v
-./rocq/Analysis/DomKildall.v
-./rocq/Analysis/Iteration.v
-./rocq/Analysis/Kildall.v
-./rocq/Analysis/ssa.v
 ./rocq/Handlers/Concretization.v
 ./rocq/Handlers/Handlers.v
 ./rocq/Handlers/LLVMExceptions.v
@@ -93,50 +87,12 @@
 ./rocq/Handlers/SerializationTheory.v
 ./rocq/Handlers/UndefinedBehaviour.v
 
-./rocq/QC/GenAST.v
-./rocq/QC/GenMetadata.v
-./rocq/QC/ECS.v
-./rocq/QC/Lens.v
-./rocq/QC/GenAlive2.v
-./rocq/QC/Generators.v
-./rocq/QC/ReprAST.v
-./rocq/QC/Utils.v
 ./rocq/Semantics.v
 ./rocq/Semantics/ConcretizationParams.v
-./rocq/Semantics/InfiniteToFinite.v
-./rocq/Semantics/InfiniteToFinite/Conversions/BaseConversions.v
-./rocq/Semantics/InfiniteToFinite/Conversions/DvalueConversions.v
-./rocq/Semantics/InfiniteToFinite/Conversions/EventConversions.v
-./rocq/Semantics/InfiniteToFinite/Conversions/TreeConversions.v
-./rocq/Semantics/InfiniteToFinite/LangRefine.v
-./rocq/Semantics/InfiniteToFinite/R2Injective.v
 ./rocq/Semantics/InterpretationStack.v
-./rocq/Semantics/ItreeRaiseMReturns.v
 ./rocq/Semantics/Lang.v
 ./rocq/Semantics/Memory/FiniteProvenance.v
 ./rocq/Semantics/Memory/Overlaps.v
 ./rocq/Semantics/Memory/Sizeof.v
-./rocq/Semantics/RuttProps.v
 ./rocq/Semantics/Printfdefn.v
 ./rocq/Semantics/TopLevel.v
-
-./rocq/Theory.v
-./rocq/Theory/ContainsUB.v
-./rocq/Theory/ContainsUBExtra.v
-./rocq/Theory/ContainsUBOriginal.v
-./rocq/Theory/DenotationTheory.v
-./rocq/Theory/ExpLemmas.v
-./rocq/Theory/InstrLemmas.v
-./rocq/Theory/InterpreterCFG.v
-./rocq/Theory/InterpreterMCFG.v
-./rocq/Theory/LocalFrame.v
-./rocq/Theory/OOMRefinementExamples.v
-./rocq/Theory/Refinement.v
-./rocq/Theory/StatePredicates.v
-./rocq/Theory/SymbolicInterpreter.v
-./rocq/Theory/TopLevelRefinements.v
-./rocq/Transformations/BlockFusion.v
-./rocq/Transformations/DeadCodeElimination.v
-./rocq/Transformations/EquivExpr.v
-./rocq/Transformations/Peephole.v
-./rocq/Transformations/Transform.v
