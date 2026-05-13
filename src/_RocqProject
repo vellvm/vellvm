@@ -63,36 +63,5 @@
 ./rocq/Handlers/Intrinsics.v
 
 ./rocq/Utils/Inhabited.v
-./rocq/Propositional/PropT.v
-./rocq/Propositional/Within.v
 
 
-
-./rocq/Handlers/Concretization.v
-./rocq/Handlers/Handlers.v
-./rocq/Handlers/LLVMExceptions.v
-./rocq/Handlers/MemPropT.v
-./rocq/Handlers/MemoryInterpreters.v
-./rocq/Handlers/MemoryModel.v
-./rocq/Handlers/MemoryModelImplementation.v
-./rocq/Handlers/MemoryModules/FiniteAddresses.v
-./rocq/Handlers/MemoryModules/FiniteExecPrimitives.v
-./rocq/Handlers/MemoryModules/FiniteIntptr.v
-./rocq/Handlers/MemoryModules/FiniteSizeof.v
-./rocq/Handlers/MemoryModules/FiniteSpecPrimitives.v
-./rocq/Handlers/MemoryModules/InfiniteAddresses.v
-./rocq/Handlers/MemoryModules/Within.v
-./rocq/Handlers/OOM.v
-./rocq/Handlers/Pick.v
-./rocq/Handlers/SerializationTheory.v
-./rocq/Handlers/UndefinedBehaviour.v
-
-./rocq/Semantics.v
-./rocq/Semantics/ConcretizationParams.v
-./rocq/Semantics/InterpretationStack.v
-./rocq/Semantics/Lang.v
-./rocq/Semantics/Memory/FiniteProvenance.v
-./rocq/Semantics/Memory/Overlaps.v
-./rocq/Semantics/Memory/Sizeof.v
-./rocq/Semantics/Printfdefn.v
-./rocq/Semantics/TopLevel.v
