@@ -220,18 +220,18 @@ Module Type MemoryModelPrimitives (LP : LLVMParams).
       malloc_bytes_with_pr init_bytes pr.
 
     (* (** Handle memcpy *) *)
-    (* Definition memcpy (src dst : addr) (len : Z) (volatile : bool) : memM unit := *)
-    (*   if Z.ltb len 0 *)
-    (*   then *)
-    (*     merr "memcpy given negative length." *)
-    (*   else *)
-    (*     (* From LangRef: The ‘llvm.memcpy.*’ intrinsics copy a block of *)
-    (*    memory from the source location to the destination location, which *)
-    (*    must either be equal or non-overlapping. *)
-    (*      *) *)
-    (*     if orb (no_overlap dst len src len) *)
-    (*            (Z.eqb (ptr_to_int src) (ptr_to_int dst)) *)
-    (*     then *)
+    Definition memcpy (src dst : addr) (len : Z) (volatile : bool) : memM unit.
+      refine (if Z.ltb len 0
+      then
+        mub "memcpy given negative length."
+      else
+        (* From LangRef: The ‘llvm.memcpy.*’ intrinsics copy a block of
+           memory from the source location to the destination location, which
+           must either be equal or non-overlapping. *)
+    
+        if orb (no_overlap dst len src len)
+               (Z.eqb (ptr_to_int src) (ptr_to_int dst))
+        then _ else _).
     (*       src_bytes <- read_bytes src (Z.to_nat len);; *)
 
     (*       (* TODO: Double check that this is correct... Should we check if all writes are allowed first? *) *)

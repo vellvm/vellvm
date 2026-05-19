@@ -1,23 +1,13 @@
-From Stdlib Require Import
-  Lia
-  Morphisms.
-
 From Vellvm Require Import
   Numeric.Rocqlib
-  Utils.Error.
+  Utilities.
 
 From Vellvm.Semantics Require Import
-  MemoryAddress
+  Params.Address
   Memory.FiniteProvenance
   VellvmIntegers.
 
 From QuickChick Require Import Show.
-
-From ExtLib Require Import
-  Structures.Functor
-  Structures.Monads.
-
-Import ListNotations.
 
 (** ** Type of pointers
     Implementation of the notion of pointer used: an address and an offset.

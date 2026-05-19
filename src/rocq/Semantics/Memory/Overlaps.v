@@ -1,7 +1,7 @@
-From Stdlib Require Import ZArith.
+From Vellvm Require Import
+  Semantics.MemoryAddress
+  Semantics.Memory.Sizeof.
 
-Require Import Vellvm.Semantics.MemoryAddress.
-Require Import Vellvm.Semantics.Memory.Sizeof.
 From Vellvm Require Import DynamicTypes.
 
 Module Type OVERLAPS (Addr:MemoryAddress.ADDRESS).

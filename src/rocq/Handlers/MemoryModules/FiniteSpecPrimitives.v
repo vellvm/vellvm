@@ -286,6 +286,10 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MEMORY_PARAMS LP)
   Definition mem_state_heap (ms : MemState) : Heap
     := memory_stack_heap ms.(ms_memory_stack).
 
+  Definition mem_byte := (SByte * AllocationId)%type.
+    Definition memory_stack := memory_stack'.
+
+
   Definition read_byte_prop_memory (ptr : addr) (mem_stack : memory_stack) (byte : SByte) : Prop :=
     let addr := ptr_to_int ptr in
     let pr := address_provenance ptr in

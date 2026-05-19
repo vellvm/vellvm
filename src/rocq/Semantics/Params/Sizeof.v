@@ -63,7 +63,7 @@ Module Type SIZEOF.
 End SIZEOF.
 
 (* Derived functions / constants on Sizeof. *)
-Module SizeofHelpers(S:SIZEOF).
+Module SizeofHelpers (S : SIZEOF).
   Import S.
 
   Definition ptr_size : N := sizeof_dtyp DTYPE_Pointer.

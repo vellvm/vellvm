@@ -12,8 +12,8 @@ From ExtLib Require Import
 (** Parameters for LLVM instances. *)
 Module Type LLVMParams.
   Declare Module ADDR : ADDRESS.
-  Declare Module IP : INTPTR.
-  Declare Module SZ : SIZEOF.
+  Declare Module IP   : INTPTR.
+  Declare Module SZ   : SIZEOF.
   Declare Module PTOI : PTOI ADDR.
   Declare Module PROV : PROVENANCE ADDR.
   Declare Module ITOP : ITOP ADDR PROV PTOI.

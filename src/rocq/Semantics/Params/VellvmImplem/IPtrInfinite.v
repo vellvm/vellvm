@@ -1,41 +1,16 @@
-From Stdlib Require Import
-     ZArith
-     List
-     Lia.
+From Vellvm Require Import
+  Utilities
+  Syntax.
 
-From Vellvm.Numeric Require Import
-     Rocqlib
-     Integers.
+From Vellvm Require Import
+  IPtr
+  Integers
+  VellvmIntegers.
 
-From Vellvm.Utils Require Import
-     Error
-     Tactics.
+From QuickChick Require Import Show.
 
-From Vellvm.Syntax Require Import
-     DynamicTypes.
-
-From Vellvm.Semantics Require Import
-     MemoryAddress
-     Memory.FiniteProvenance
-     DynamicValues
-     VellvmIntegers.
-
-From ExtLib Require Import
-     Structures.Monads.
-
-Import ListNotations.
-Import MonadNotation.
-Open Scope monad_scope.
-
-#[local] Open Scope Z_scope.
-
-
-Module BigIP : MemoryAddress.INTPTR with
-Definition intptr := Z with
-  Definition zero := 0%Z with
-Definition from_Z := (fun (x : Z) => ret x : OOM Z) with
-Definition to_Z := fun (x : Z) => x with
-Definition VMemInt_intptr := VMemInt_Z.
+Module IPZ : IPTR.
+ 
   Definition intptr := Z.
   Definition zero := 0%Z.
 
@@ -48,11 +23,13 @@ Definition VMemInt_intptr := VMemInt_Z.
 
   (* TODO: negatives.... ???? *)
   Definition to_unsigned := to_Z.
-  Definition from_Z (x : Z) : OOM intptr := ret x.
+  Definition from_Z (x : Z) : EOB intptr := ret x.
 
+  Definition show_intptr (p : intptr) : string := show p.
+  
   Lemma from_Z_to_Z :
     forall (z : Z) (i : intptr),
-      from_Z z = NoOom i ->
+      from_Z z = ret i ->
       to_Z i = z.
   Proof.
     intros z i FROM.
@@ -61,8 +38,8 @@ Definition VMemInt_intptr := VMemInt_Z.
 
   Lemma from_Z_injective :
     forall (z1 z2 : Z) (i : intptr),
-      from_Z z1 = NoOom i ->
-      from_Z z2 = NoOom i ->
+      from_Z z1 = ret i ->
+      from_Z z2 = ret i ->
       z1 = z2.
   Proof.
     intros z1 z2 i Z1 Z2.
@@ -71,7 +48,7 @@ Definition VMemInt_intptr := VMemInt_Z.
 
   Lemma to_Z_from_Z :
     forall (i : intptr),
-      from_Z (to_Z i) = NoOom i.
+      from_Z (to_Z i) = ret i.
   Proof.
     intros i.
     cbn.
@@ -80,7 +57,7 @@ Definition VMemInt_intptr := VMemInt_Z.
   Qed.
 
   Lemma from_Z_0 :
-    from_Z 0 = NoOom zero.
+    from_Z 0 = ret zero.
   Proof.
     auto.
   Qed.
@@ -144,21 +121,5 @@ Definition VMemInt_intptr := VMemInt_Z.
     reflexivity.
   Qed.
 
-End BigIP.
-
-Module BigIP_BIG : MemoryAddress.INTPTR_BIG BigIP.
-  Import BigIP.
-
-  Lemma from_Z_safe :
-    forall z,
-      match from_Z z with
-      | NoOom _ => True
-      | Oom _ => False
-      end.
-  Proof.
-    intros z.
-    unfold from_Z.
-    reflexivity.
-  Qed.
-End BigIP_BIG.
+End IPZ.
 

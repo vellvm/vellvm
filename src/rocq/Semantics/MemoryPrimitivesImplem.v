@@ -1,51 +1,5 @@
-From Vellvm Require Import
-  Numeric.Integers
-  Utilities
-  Syntax.
 
-From ITree Require Import
-  ITree
-  Basics.Basics
-  Events.Exception
-  Eq.Eqit
-  Events.StateFacts
-  Events.State.
-
-From Vellvm.Semantics Require Import
-  DynamicValues
-  VellvmIntegers
-  MemoryAddress
-  LLVMParams
-  LLVMEvents
-  Operations.
-
-From ExtLib Require Import
-  Structures.Functor.
-
-From Stdlib Require Import
-  ZArith
-  Strings.String
-  Relations
-  RelationClasses
-  Wellfounded.
-
-Require Import Morphisms.
-
-Import ListNotations.
-Import ListUtil.
-
-Import Basics.Basics.Monads.
-Import MonadNotation.
-
-Import Monad.
-Import EitherMonad.
-
-From Stdlib Require Import FunctionalExtensionality.
-Import Logic.
-
-Open Scope Z.
-
-Module MemoryModelPrimitives (LP : LLVMParams).
+Module MemoryModelPrimitivesLLVM (LP : LLVMParams) :> MemoryModelPrimitives LP.
   Import LP.
   Import DV ADDR SZ PROV PTOI.
   Module OP := Operations LP.
@@ -148,42 +102,4 @@ Module MemoryModelPrimitives (LP : LLVMParams).
     | Some (byte, aid') =>
         aid_eq_dec aid aid'
     end.
-
-
-  Definition ptr_in_frame_prop (f : Frame) (ptr : addr) : bool :=
-    In (ptr_to_int ptr) (map ptr_to_int f).
-
-
-
-  Definition mem_state_memory (ms : state) : memory
-    := memory_stack_memory (state_get_memory ms).
-
-  Definition mem_state_provenance (ms : state) : Provenance
-    := ms.(ms_provenance).
-
-  Definition mem_state_frame_stack (ms : state) : FrameStack
-    := memory_stack_frame_stack ms.(ms_memory_stack).
-
-  Definition mem_state_heap (ms : state) : Heap
-    := memory_stack_heap ms.(ms_memory_stack).
-
-
-
-
-Variant FOO : Type -> Type :=
-  | ret x
-  | fail
-  | oom
-  | ub
-  | pick_fresh : FOO addr
-  | BIND 
- . 
-
-(*  Should FOO already be stateful? *)
-Definition MemM X :=
-
-
-
-
-
 

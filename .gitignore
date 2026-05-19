@@ -53,3 +53,5 @@ RocqMakefile
 .RocqMakefile.d
 RocqMakefile.conf
 .#*
+
+CLAUDE.md

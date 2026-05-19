@@ -27,8 +27,8 @@ From ExtLib Require Import
 From Vellvm Require Import
      Utilities
      Syntax
-     Semantics.MemoryAddress
-     Semantics.Memory.Sizeof
+     Semantics.Params.Address
+     Semantics.Params.Sizeof
      Semantics.VellvmIntegers
      QC.ShowAST.
 
@@ -82,9 +82,8 @@ Qed.
 Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
 
-
 (* Sizeof is needed for for ConcatBytes case *)
-Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.MemoryAddress.INTPTR)(S:SIZEOF).
+Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
 
   Import S.
   Import IP.

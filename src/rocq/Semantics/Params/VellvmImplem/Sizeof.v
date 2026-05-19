@@ -1,19 +1,10 @@
-From Stdlib Require Import
-     List
-     Lia
-     ZArith.
-
-From Vellvm.Utils Require Import
-     ListUtil.
-
-From Vellvm.Syntax Require Import
-     LLVMAst
-     DynamicTypes.
+From Vellvm Require Import
+  Utilities
+  Syntax.
 
 From Vellvm.Semantics Require Import
-     DynamicValues
-     LLVMParams
-     Memory.Sizeof.
+  DynamicValues
+  Params.Sizeof.
 
 Module FinSizeof : SIZEOF.
   (* TODO: make parameter? *)
@@ -171,5 +162,6 @@ Module FinSizeof : SIZEOF.
   Proof.
     reflexivity.
   Qed.
+  
 End FinSizeof.
 

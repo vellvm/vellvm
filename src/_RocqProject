@@ -42,8 +42,14 @@
 ./rocq/Semantics/VellvmIntegers.v
 ./rocq/Semantics/VellvmFloats.v
 ./rocq/Semantics/LLVMEvents.v
-./rocq/Semantics/MemoryAddress.v
-./rocq/Semantics/Memory/Sizeof.v
+./rocq/Semantics/Params/IPtr.v
+./rocq/Semantics/Params/Provenance.v
+./rocq/Semantics/Params/Address.v
+./rocq/Semantics/Params/Sizeof.v
+./rocq/Semantics/Params/VellvmImplem/IPtrFinite.v
+./rocq/Semantics/Params/VellvmImplem/IPtrInfinite.v
+./rocq/Semantics/Params/VellvmImplem/Provenance.v
+./rocq/Semantics/Params/VellvmImplem/Address.v
 ./rocq/QC/DList.v
 ./rocq/QC/ShowAST.v
 ./rocq/Semantics/DynamicValues.v
