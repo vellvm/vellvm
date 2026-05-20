@@ -15,136 +15,132 @@ Class MonadProvenance (Provenance : Type) (M : Type -> Type) : Type :=
 (* TODO: move this?
    TODO: Have I crammed too much into this?
  *)
-Module Type PROVENANCE.
-  (* Types *)
-  (* Morally:
+Class Provenance :=
+  {
+    (* Types *)
+    (* Morally:
 
-     - Provenance is the base identifier for provenances.
+     - Provenance is the base identifier for provenances;
      - AllocationId is the provenance associated with bytes /
        locations in memory
        + This could additionally allow for wildcard provenance for
-         memory locations, for instance.
-     - Prov is the provenance for a pointer.
-       + May have wildcard provenance, or a set of provenances (e.g.,
+         memory locations, for instance;
+     - Prov is the provenance for a pointer;
+       + May have wildcard provenance, or a set of provenances (e;g;,
          this pointer may be allowed to access several different blocks
-         of memory, but not all).
-  *)
-  Parameter Provenance : Set.
-  Parameter AllocationId : Set.
-  Parameter Prov : Set.
+         of memory, but not all);
+     *)
+    provenance : Set;
+    allocationId : Set;
+    prov : Set;
 
-  Parameter wildcard_prov : Prov.
-  Parameter nil_prov : Prov.
+    wildcard_prov : prov;
+    nil_prov : prov;
 
-  (* Does the provenance set pr allow for access to aid? *)
-  Parameter access_allowed : Prov -> AllocationId -> bool.
+    (* Does the provenance set pr allow for access to aid? *)
+    access_allowed : prov -> allocationId -> bool;
 
-  (* Does the first AllocationId have access to the second? *)
-  Parameter aid_access_allowed : AllocationId -> AllocationId -> bool.
+    (* Does the first AllocationId have access to the second? *)
+    aid_access_allowed : allocationId -> allocationId -> bool;
 
-  (* Conversions *)
-  Parameter allocation_id_to_prov : AllocationId -> Prov.
-  Parameter provenance_to_allocation_id : Provenance -> AllocationId.
-  Parameter provenance_to_prov : Provenance -> Prov.
+    (* Conversions *)
+    allocation_id_to_prov : allocationId -> prov;
+    provenance_to_allocation_id : provenance -> allocationId;
+    provenance_to_prov : provenance -> prov;
 
-  (* Provenance allocation *)
-  Parameter initial_provenance : Provenance.
-  Parameter next_provenance : Provenance -> Provenance.
+    (* provenance allocation *)
+    initial_provenance : provenance;
+    next_provenance : provenance -> provenance;
 
-  Parameter eq_dec :
-    forall (pr pr' : Provenance),
-      {pr = pr'} + {pr <> pr'}.
+    eq_dec_provenance :
+    forall (pr pr' : provenance),
+      {pr = pr'} + {pr <> pr'};
 
+    eq_dec_aid :
+    forall (aid aid' : allocationId),
+      {aid = aid'} + {aid <> aid'};
 
-  (* (* Way easier to keep track of provenances in use if they're ordered... *) *)
-  (* Parameter provenance_lt : Provenance -> Provenance -> Prop. *)
+    (* Way easier to keep track of provenances in use if they're ordered;;; *)
+    provenance_lt : provenance -> provenance -> Prop;
+    
+    show_prov : prov -> string;
+    show_provenance : provenance -> string;
+    show_allocation_id : allocationId -> string;
+  }.
 
-  (* (* Lemmas *) *)
-  (* Parameter aid_access_allowed_refl : *)
-  (*   forall aid, aid_access_allowed aid aid = true. *)
+Class ProvenanceTheory {P : Provenance} : Prop :=
+  {
+   
+    (* Lemmas *)
+    aid_access_allowed_refl :
+      forall aid, aid_access_allowed aid aid = true;
 
-  (* Parameter access_allowed_refl : *)
-  (*   forall aid, *)
-  (*     access_allowed (allocation_id_to_prov aid) aid = true. *)
+    access_allowed_refl :
+      forall aid,
+        access_allowed (allocation_id_to_prov aid) aid = true;
 
-  (* Parameter allocation_id_to_prov_inv: *)
-  (*   forall aid aid', *)
-  (*     allocation_id_to_prov aid = allocation_id_to_prov aid' -> *)
-  (*     aid = aid'. *)
+    allocation_id_to_prov_inv:
+      forall aid aid',
+        allocation_id_to_prov aid = allocation_id_to_prov aid' ->
+        aid = aid';
 
-  (* Parameter provenance_to_allocation_id_inv : *)
-  (*   forall pr pr', *)
-  (*     provenance_to_allocation_id pr = provenance_to_allocation_id pr' -> *)
-  (*     pr = pr'. *)
+    provenance_to_allocation_id_inv :
+      forall pr pr',
+        provenance_to_allocation_id pr = provenance_to_allocation_id pr' ->
+        pr = pr';
 
-  (* Parameter allocation_id_to_prov_provenance_to_allocation_id : *)
-  (*   forall pr, *)
-  (*     allocation_id_to_prov (provenance_to_allocation_id pr) = provenance_to_prov pr. *)
+    allocation_id_to_prov_provenance_to_allocation_id :
+      forall pr,
+        allocation_id_to_prov (provenance_to_allocation_id pr) = provenance_to_prov pr;
 
-  (* Parameter provenance_eq_dec_refl : *)
-  (*   forall (pr : Provenance), *)
-  (*     true = (provenance_eq_dec pr pr). *)
+    provenance_eq_dec_refl :
+      forall (pr : provenance),
+        true = (eq_dec_provenance pr pr);
 
-  (* Parameter aid_eq_dec : *)
-  (*   forall (aid aid' : AllocationId), *)
-  (*     {aid = aid'} + {aid <> aid'}. *)
+    aid_eq_dec_refl :
+      forall (aid : allocationId),
+        true = (eq_dec_aid aid aid);
 
-  (* Parameter aid_eq_dec_refl : *)
-  (*   forall (aid : AllocationId), *)
-  (*     true = (aid_eq_dec aid aid). *)
+    access_allowed_Proper :
+      Proper (eq ==> (fun aid aid' => true = (eq_dec_aid aid aid')) ==> eq) access_allowed;
 
-  (* Parameter access_allowed_Proper : *)
-  (*   Proper (eq ==> (fun aid aid' => true = (aid_eq_dec aid aid')) ==> eq) access_allowed. *)
+    provenance_lt_trans : Transitive provenance_lt;
 
-  (* Parameter provenance_lt_trans : Transitive provenance_lt. *)
+    provenance_lt_next_provenance :
+      forall pr,
+        provenance_lt pr (next_provenance pr);
 
-  (* Parameter provenance_lt_next_provenance : *)
-  (*   forall pr, *)
-  (*     provenance_lt pr (next_provenance pr). *)
+    provenance_lt_nrefl :
+      forall pr,
+        ~ provenance_lt pr pr;
 
-  (* Parameter provenance_lt_nrefl : *)
-  (*   forall pr, *)
-  (*     ~ provenance_lt pr pr. *)
+    provenance_lt_antisym : Antisymmetric provenance eq provenance_lt;
 
-  (* Parameter provenance_lt_antisym : Antisymmetric Provenance eq provenance_lt. *)
-
-  (* Parameter next_provenance_neq : *)
-  (*   forall pr, *)
-  (*     pr <> next_provenance pr. *)
-
-  (* Debug *)
-  Parameter show_prov : Prov -> string.
-  Parameter show_provenance : Provenance -> string.
-  Parameter show_allocation_id : AllocationId -> string.
-
-  (* (* Hints *) *)
-  (* Hint Resolve *)
-  (*      provenance_lt_trans *)
-  (*      provenance_lt_next_provenance *)
-  (*      provenance_lt_nrefl : PROVENANCE_LT. *)
-  
-End PROVENANCE.
+    next_provenance_neq :
+      forall pr,
+        pr <> next_provenance pr;
+  }.
 
 
-(* (* Derived functions on provenances. *) *)
-(* Module PROV_FUNCS(Addr : ADDRESS) (PROV : PROVENANCE(Addr)). *)
-(*   Import PROV. *)
+  (* (* Derived functions on provenances. *) *)
+  (* Module PROV_FUNCS(Addr : ADDRESS) (PROV : PROVENANCE(Addr)). *)
+  (*   Import PROV. *)
 
-(*   Definition all_accesses_allowed (pr : Prov) (aids : list AllocationId) : bool *)
-(*     := forallb (access_allowed pr) aids. *)
+  (*   Definition all_accesses_allowed (pr : prov) (aids : list AllocationId) : bool *)
+  (*     := forallb (access_allowed pr) aids. *)
 
-(*   Definition all_aid_accesses_allowed (pr : AllocationId) (aids : list AllocationId) : bool *)
-(*     := forallb (aid_access_allowed pr) aids. *)
+  (*   Definition all_aid_accesses_allowed (pr : AllocationId) (aids : list AllocationId) : bool *)
+  (*     := forallb (aid_access_allowed pr) aids. *)
 
-(*   Lemma allocation_id_to_prov_provenance_to_allocation_id_inv : *)
-(*     forall pr pr', *)
-(*       allocation_id_to_prov (provenance_to_allocation_id pr) = allocation_id_to_prov (provenance_to_allocation_id pr') -> *)
-(*       pr = pr'. *)
-(*   Proof. *)
-(*     intros pr pr' H. *)
-(*     apply provenance_to_allocation_id_inv. *)
-(*     apply allocation_id_to_prov_inv. *)
-(*     auto. *)
-(*   Qed. *)
-(* End PROV_FUNCS. *)
+  (*   Lemma allocation_id_to_prov_provenance_to_allocation_id_inv : *)
+  (*     forall pr pr', *)
+  (*       allocation_id_to_prov (provenance_to_allocation_id pr) = allocation_id_to_prov (provenance_to_allocation_id pr') -> *)
+  (*       pr = pr'. *)
+  (*   Proof. *)
+  (*     intros pr pr' H. *)
+  (*     apply provenance_to_allocation_id_inv. *)
+  (*     apply allocation_id_to_prov_inv. *)
+  (*     auto. *)
+  (*   Qed. *)
+  (* End PROV_FUNCS. *)
 

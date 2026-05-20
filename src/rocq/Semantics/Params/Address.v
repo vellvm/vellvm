@@ -21,18 +21,19 @@ From Vellvm Require Import
     memory model. This allows us to easily plug different memory models.
     This module is concretely implemented currently in [Handlers/Memory.v].
  *)
-Module Type ADDRESS (P : PROVENANCE).
-  Parameter addr : Set.
-  Parameter null : addr.
+Class Address {P : Provenance} :=
+  {
+    addr : Set;
+    null : addr;
 
-  (* Coq's logical equality on the pointer data type *)
-  Parameter eq_dec : forall (a b : addr), {a = b} + {a <> b}.
-  (* Parameter different_addrs : forall (a : addr), exists (b : addr), a <> b. *)
+    (* Coq's logical equality on the pointer data type *)
+    eq_dec_addr : forall (a b : addr), {a = b} + {a <> b};
+    (* different_addrs : forall (a : addr), exists (b : addr), a <> b; *)
 
-  (* Access the provenance for an address *)
-  Parameter address_provenance : addr -> P.Prov.
+    (* Access the provenance for an address *)
+    address_provenance : addr -> prov;
 
-  (* Debug *)
-  Parameter show_addr : addr -> string.
-End ADDRESS.
+    (* Debug *)
+    show_addr : addr -> string;
+  }.
 

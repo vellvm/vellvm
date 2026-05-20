@@ -10,65 +10,102 @@ From Vellvm Require Import
 
 From QuickChick Require Import Show.
 
-Module Provenance <: PROVENANCE.
+(* TODO: look into how to use decidable equality more uniformaly and cleanly *)
+Definition eq_dec_option [A]
+  (dec : forall (a b : A), {a = b} + {a <> b}) :
+  forall (a b : option A), {a = b} + {a <> b}.
+  refine (fun a b => match a,b with
+                  | Some a, Some b =>
+                      match dec a b with
+                      | left e => _
+                      | right ne => _
+                      end
+                  | None, None => left eq_refl
+                  | _, _ => _
+                  end).
+  left; f_equal; exact e.
+  right; intros abs; apply ne; inv abs; reflexivity. 
+  right; intros abs; inv abs.
+  right; intros abs; inv abs.
+Defined. 
+  
+Instance ProvenanceV : Provenance :=
+  {|
+    provenance := N ;
+    allocationId := option N; (* None is wildcard *)
+    (* TODO: Should probably make this an NSet, but it gives universe inconsistency with Module addr *)
+    prov := option (list N); (* provenance *)
 
-  Definition Provenance := N.
-  Definition AllocationId := option Provenance. (* None is wildcard *)
-  (* TODO: Should probably make this an NSet, but it gives universe inconsistency with Module addr *)
-  Definition Prov := option (list Provenance). (* Provenance *)
+    wildcard_prov := None;
+    nil_prov := Some [];
 
-  Definition wildcard_prov : Prov := None.
-  Definition nil_prov : Prov := Some [].
-
-  (* Does the provenance set pr allow for access to aid? *)
-  Definition access_allowed (pr : Prov) (aid : AllocationId) : bool
-    := match pr with
-       | None => true (* Wildcard can access anything. *)
+    (* Does the provenance set pr allow for access to aid? *)
+    access_allowed pr aid :=
+      match pr with
+       | None => true (* Wildcard can access anything; *)
        | Some prset =>
-         match aid with
-         | None => true (* Wildcard, can be accessed by anything. *)
-         | Some aid =>
-           existsb (N.eqb aid) prset
-         end
-       end.
+           match aid with
+           | None => true (* Wildcard, can be accessed by anything; *)
+           | Some aid =>
+               existsb (N.eqb aid) prset
+           end
+       end;
 
-  Definition aid_access_allowed (pr : AllocationId) (aid : AllocationId) : bool
-    := match pr with
+    aid_access_allowed pr aid :=
+      match pr with
        | None => true
        | Some pr =>
-         match aid with
-         | None => true
-         | Some aid =>
-           N.eqb pr aid
-         end
-       end.
+           match aid with
+           | None => true
+           | Some aid =>
+               N.eqb pr aid
+           end
+       end;
 
-  Definition allocation_id_to_prov (aid : AllocationId) : Prov
-    := fmap (fun x => [x]) aid.
+    allocation_id_to_prov aid := fmap (fun x => [x]) aid;
 
-  Definition provenance_to_allocation_id (pr : Provenance) : AllocationId
-    := Some pr.
+    provenance_to_allocation_id pr := Some pr;
 
-  Definition provenance_to_prov (pr : Provenance) : Prov
-    := Some [pr].
+    provenance_to_prov pr := Some [pr];
 
-  Definition next_provenance (pr : Provenance) : Provenance
-    := N.succ pr.
+    initial_provenance := 0%N;
+    next_provenance pr := N.succ pr;
 
-  Definition initial_provenance : Provenance
-    := 0%N.
+    eq_dec_provenance  := N.eq_dec ;
+    eq_dec_aid := eq_dec_option N.eq_dec;
 
-  Lemma eq_dec :
-    forall (pr pr' : Provenance),
-      {pr = pr'} + {pr <> pr'}.
-  Proof.
-    exact N.eq_dec.
-  Defined.
-
+    provenance_lt := N.lt;
+    
     (* Debug *)
-  Definition show_prov (pr : Prov) := Show.show pr.
-  Definition show_provenance (pr : Provenance) := Show.show pr.
-  Definition show_allocation_id (aid : AllocationId) := Show.show aid.
+    show_prov pr  := Show.show pr;
+    show_provenance pr := Show.show pr;
+    show_allocation_id aid := Show.show aid;
 
-End Provenance.
+  |}.
+
+Instance ProvenanceVTheory : ProvenanceTheory.
+Proof.
+  constructor; auto.
+  - intros; cbn; break_match; auto.
+    now rewrite N.eqb_refl.
+  - intros []; cbn; auto.
+    cbn; now rewrite N.eqb_refl.
+  - cbn; intros; repeat break_match_hyp; congruence.
+  - cbn; intros; congruence.
+  - cbn; intros. 
+    destruct N.eq_dec; auto; congruence.
+  - intros aid; destruct (eq_dec_aid aid aid); auto; congruence.
+  - intros x y H x0 y0 H0.
+    subst.
+    cbn.
+    symmetry in H0.
+    eapply proj_sumbool_true in H0.
+    subst.
+    reflexivity.
+  - cbn; repeat intro; lia.
+  - cbn; repeat intro; lia.
+  - cbn; repeat intro; lia.
+  - cbn; repeat intro; lia.
+  - cbn; repeat intro; lia.
+Qed.
 

@@ -15,56 +15,61 @@ From Vellvm Require Import
   Semantics.VellvmIntegers.
 (* end hide *)
 
-Module Type IPTR.
-  Parameter intptr : Type.
-  Parameter zero : intptr.
+Class IPtr : Type :=
+  {
+    iptr : Set;
+    zero_iptr : iptr;
 
-  Parameter VMemInt_intptr : VMemInt intptr.
+    VMemInt_iptr : VMemInt iptr;
 
-  Parameter eq_dec : forall (a b : intptr), {a = b} + {a <> b}.
-  Parameter eqb : forall (a b : intptr), bool.
+    eq_dec_iptr : forall (a b : iptr), {a = b} + {a <> b};
+    eqb_iptr : forall (a b : iptr), bool;
 
-  Parameter to_Z : forall (a : intptr), Z.
-  Parameter to_unsigned : forall (a : intptr), Z.
-  Parameter from_Z : Z -> EOB intptr.
+    to_Z : forall (a : iptr), Z;
+    to_unsigned : forall (a : iptr), Z;
+    from_Z : Z -> EOB iptr;
 
-  Parameter show_intptr : intptr -> string.
-  
-  Parameter from_Z_to_Z :
-    forall (z : Z) (i : intptr),
+    show_iptr : iptr -> string;
+    
+  }.
+
+Class IPtr_Theory {IP : IPtr} :=
+  {
+    from_Z_to_Z :
+    forall (z : Z) (i : iptr),
       from_Z z = ret i ->
-      to_Z i = z.
+      to_Z i = z;
 
-  Parameter from_Z_injective :
-    forall (z1 z2 : Z) (i : intptr),
+    from_Z_injective :
+    forall (z1 z2 : Z) (i : iptr),
       from_Z z1 = ret i ->
       from_Z z2 = ret i ->
-      z1 = z2.
+      z1 = z2;
 
-  Parameter to_Z_from_Z :
-    forall (i : intptr),
-      from_Z (to_Z i) = ret i.
+    to_Z_from_Z :
+    forall (i : iptr),
+      from_Z (to_Z i) = ret i;
 
-  Parameter from_Z_0 :
-    from_Z 0 = ret zero.
+    from_Z_0 :
+    from_Z 0 = ret zero_iptr;
 
-  Parameter to_Z_0 :
-    to_Z zero = 0%Z.
+    to_Z_0 :
+    to_Z zero_iptr = 0%Z;
 
-  Parameter to_Z_inj :
+    to_Z_inj :
     forall x y,
       to_Z x = to_Z y ->
-      x = y.
+      x = y;
 
-  Parameter VMemInt_intptr_dtyp :
-    @mdtyp_of_int intptr VMemInt_intptr = DTYPE_IPTR.
+    VMemInt_iptr_dtyp :
+    @mdtyp_of_int iptr VMemInt_iptr = DTYPE_IPTR;
 
-  Parameter VMemInt_intptr_mrepr_from_Z :
+    VMemInt_iptr_mrepr_from_Z :
     forall x,
-      @mrepr intptr VMemInt_intptr x = from_Z x.
+      @mrepr iptr VMemInt_iptr x = from_Z x;
 
-  Parameter to_Z_to_unsigned :
+    to_Z_to_unsigned :
     forall x,
-      to_Z x = to_unsigned x.
-End IPTR.
-
+      to_Z x = to_unsigned x;
+    
+  }.
