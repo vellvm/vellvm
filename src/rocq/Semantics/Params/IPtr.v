@@ -33,7 +33,7 @@ Class IPtr : Type :=
     
   }.
 
-Class IPtr_Theory {IP : IPtr} :=
+Class IPtrTheory {IP : IPtr} :=
   {
     from_Z_to_Z :
     forall (z : Z) (i : iptr),

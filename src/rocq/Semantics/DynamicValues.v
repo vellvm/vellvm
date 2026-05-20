@@ -27,6 +27,8 @@ From ExtLib Require Import
 From Vellvm Require Import
      Utilities
      Syntax
+     Semantics.Params.IPtr
+     Semantics.Params.Provenance
      Semantics.Params.Address
      Semantics.Params.Sizeof
      Semantics.VellvmIntegers
@@ -83,17 +85,18 @@ Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
 
 (* Sizeof is needed for for ConcatBytes case *)
-Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
+(* Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF). *)
+Section DValue.
 
-  Import S.
-  Import IP.
+  (* TODO: package *)
+  Context {Pr : Provenance} {Ad : Address} {IP : IPtr} {IPT : @IPtr_Theory IP} {Si : Sizeof}.
 
   (* The set of dynamic values manipulated by an LLVM program. *)
   Unset Elimination Schemes.
   Inductive dvalue : Set :=
-  | DVALUE_Addr (a:A.addr)
+  | DVALUE_Addr (a:addr)
   | DVALUE_I (sz : positive) (x:@bit_int sz)
-  | DVALUE_IPTR (x:intptr)
+  | DVALUE_IPTR (x:iptr)
 (* TODO - this version | DVALUE_FP (fp:floating_point_variant) (x:@float_val fp) *)
   | DVALUE_Double (x:ll_double)
   | DVALUE_Float (x:ll_float)
@@ -120,9 +123,9 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
   
   Fixpoint show_dvalue (dv : dvalue) : string :=
     match dv with
-    | DVALUE_Addr a => "addr " ++ A.show_addr a
+    | DVALUE_Addr a => "addr " ++ show_addr a
     | DVALUE_I sz x => "i" ++ show (Zpos sz) ++ " " ++ show (unsigned x)
-    | DVALUE_IPTR x => "intptr " ++ show (IP.to_Z x)
+    | DVALUE_IPTR x => "intptr " ++ show (to_Z x)
     | DVALUE_Double x => "double " ++ show x
     | DVALUE_Float x => "float " ++ show x
     | DVALUE_Poison t => "poison[" ++ show_dtyp t ++ "]"
@@ -267,7 +270,7 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
             | _ : _ |- forall s, dvalue_subterm s ?DV -> P s =>
                 intros s H;
                 assert (s = DV);
-                [ dependent induction H; auto; inv H
+                [ dependent induction H; eauto; inv H
                 | subst; auto
                 ]
             end
@@ -304,7 +307,7 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
                                                             |- P ?x =>
                     clear IHSTRICT1;
                     specialize (IHSTRICT2 fields);
-                    repeat (forward IHSTRICT2; auto);
+                    repeat (forward IHSTRICT2; eauto);
                     pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
                     eapply dvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
                     inv DIRECT;
@@ -358,7 +361,7 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
                                                             |- P ?x =>
                     clear IHSTRICT1;
                     specialize (IHSTRICT2 t fields);
-                    repeat (forward IHSTRICT2; auto);
+                    repeat (forward IHSTRICT2; eauto);
                     pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
                     eapply dvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
                     inv DIRECT;
@@ -380,10 +383,57 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
               end
             ]
           ].
+      - intros s H'; dependent induction H'.
+        + (* rt_step *)
+          match goal with
+          | H: dvalue_direct_subterm ?x _,
+              IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                        |- P ?x => 
+              inv H ;
+              apply IH_Subterm; eauto;
+              intros; eapply IH; eauto;
+              apply clos_t_rt; eauto
+          end.
+        + (* rt_refl *)
+          apply IH_Subterm;
+            intros * STRICT;
+            dependent induction STRICT.
+          * (* t_step *)
+            match goal with
+            | H: dvalue_direct_subterm ?x _,
+                IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                          |- P ?x =>
+                inv H;
+                eapply IH; eauto;
+                apply rt_refl
+            end.
+          * (* t_trans *)
+            clear IHSTRICT1.
+            do 8 (forward IHSTRICT2; eauto).
+            pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3.
+            eapply dvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB).
+            inv DIRECT.
+            match goal with
+            | IH : forall u : dvalue, In u ?fields -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                              |- P ?x =>
+               eapply IH; eauto
+            end.
+        + (* rt_trans *)
+          match goal with
+          | XY : clos_refl_trans dvalue dvalue_direct_subterm ?x ?y,
+              YZ : clos_refl_trans dvalue dvalue_direct_subterm ?y ?z,
+                IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                          |- _ =>
+              pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
+              apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
+             [ subst; pose proof dvalue_subterm_antisymmetric XY YZ; subst; eapply IHH'2; eauto
+                  | inv R; eapply IH; eauto
+                  ] 
+          end.
 
-      { intros s H'.
+      - intros s H'.
         dependent induction H'.
-        - (* rt_step *)
+        + (* rt_step *)
           match goal with
           | H: dvalue_direct_subterm ?x _,
             IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s |- P ?x =>
@@ -392,11 +442,11 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
               intros; eapply IH; eauto;
               apply clos_t_rt; eauto
           end.
-        - (* rt_refl *)
+        + (* rt_refl *)
           apply IH_Subterm.
           intros * STRICT;
             dependent induction STRICT.
-          + (* t_step *)
+          * (* t_step *)
               match goal with
               | H: dvalue_direct_subterm ?x _,
                   IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
@@ -405,7 +455,7 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
                   eapply IH; eauto;
                   apply rt_refl
               end.
-          + (* t_trans *)
+          * (* t_trans *)
             match goal with
             | IH : forall u : dvalue, In u ?fields -> forall s : dvalue, dvalue_subterm s u -> P s
                                                               |- P ?x =>
@@ -416,7 +466,7 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
                 inv DIRECT;
                 eapply IH; eauto
             end.
-        - (* rt_trans *)
+        + (* rt_trans *)
           match goal with
           | XY : clos_refl_trans dvalue dvalue_direct_subterm ?x ?y,
               YZ : clos_refl_trans dvalue dvalue_direct_subterm ?y ?z,
@@ -425,15 +475,13 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
               pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
               apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
               [ subst;
-                pose proof dvalue_subterm_antisymmetric XY YZ; subst; eauto
+                pose proof dvalue_subterm_antisymmetric XY YZ; subst; eapply IHH'2; eauto
               | inv R; eapply IH; eauto
               ]
           end.
-      }
-
-      { intros s H'.
+      - intros s H'.
         dependent induction H'.
-        - (* rt_step *)
+        + (* rt_step *)
           match goal with
           | H: dvalue_direct_subterm ?x _,
               IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
@@ -443,11 +491,11 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
               intros; eapply IH; eauto;
               apply clos_t_rt; eauto
           end.
-        - (* rt_refl *)
+        + (* rt_refl *)
           apply IH_Subterm.
           intros * STRICT;
             dependent induction STRICT.
-          + (* t_step *)
+          * (* t_step *)
               match goal with
               | H: dvalue_direct_subterm ?x _,
                   IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
@@ -456,19 +504,18 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
                   eapply IH; eauto;
                   apply rt_refl
               end.
-          + (* t_trans *)
+          * (* t_trans *)
             match goal with
             | IH : forall u : dvalue, In u ?fields -> forall s : dvalue, dvalue_subterm s u -> P s
                                                               |- P ?x =>
                 clear IHSTRICT1;
-                specialize (IHSTRICT2 t fields);
-                repeat (forward IHSTRICT2; auto);
+                do 8 (forward IHSTRICT2; eauto);
                 pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
                 eapply dvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
                 inv DIRECT;
                 eapply IH; eauto
             end.
-        - (* rt_trans *)
+        + (* rt_trans *)
           match goal with
           | XY : clos_refl_trans dvalue dvalue_direct_subterm ?x ?y,
               YZ : clos_refl_trans dvalue dvalue_direct_subterm ?y ?z,
@@ -477,11 +524,59 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
               pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
               apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
               [ subst;
-                pose proof dvalue_subterm_antisymmetric XY YZ; subst; eauto
+                pose proof dvalue_subterm_antisymmetric XY YZ; subst; eapply IHH'2; eauto
               | inv R; eapply IH; eauto
               ]
           end.
-      }
+       - intros s H'.
+        dependent induction H'.
+        + (* rt_step *)
+          match goal with
+          | H: dvalue_direct_subterm ?x _,
+              IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                        |- P ?x =>
+              inv H;
+              apply IH_Subterm; eauto;
+              intros; eapply IH; eauto;
+              apply clos_t_rt; eauto
+          end.
+        + (* rt_refl *)
+          apply IH_Subterm.
+          intros * STRICT;
+            dependent induction STRICT.
+          * (* t_step *)
+              match goal with
+              | H: dvalue_direct_subterm ?x _,
+                  IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                            |- P ?x =>
+                  inv H;
+                  eapply IH; eauto;
+                  apply rt_refl
+              end.
+          * (* t_trans *)
+            match goal with
+            | IH : forall u : dvalue, In u ?fields -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                              |- P ?x =>
+                clear IHSTRICT1;
+                do 8 (forward IHSTRICT2; eauto);
+                pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3;
+                eapply dvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB);
+                inv DIRECT;
+                eapply IH; eauto
+            end.
+        + (* rt_trans *)
+          match goal with
+          | XY : clos_refl_trans dvalue dvalue_direct_subterm ?x ?y,
+              YZ : clos_refl_trans dvalue dvalue_direct_subterm ?y ?z,
+                IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
+                                                          |- _ =>
+              pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
+              apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
+              [ subst;
+                pose proof dvalue_subterm_antisymmetric XY YZ; subst; eapply IHH'2; eauto
+              | inv R; eapply IH; eauto
+              ]
+          end.
     Qed.
   End DvalueStrongInd.
 
@@ -535,7 +630,7 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
       let lsteq := list_eqb (Build_RelDec eq dvalue_eqb) in
       match d1, d2 with
       | DVALUE_Addr a1, DVALUE_Addr a2 =>
-          if A.eq_dec a1 a2 then true else false
+          if eq_dec_addr a1 a2 then true else false
       | @DVALUE_I sz1 x1, @DVALUE_I sz2 x2 =>
           dvalue_int_cmp d1 d2
       | DVALUE_Double x1, DVALUE_Double x2 =>
@@ -624,11 +719,11 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
                     | _ => _
                     end
                 end);  try solve[ltac:(dec_dvalue)].
-      - destruct (A.eq_dec a1 a2).
+      - destruct (eq_dec_addr a1 a2).
         * left; subst; reflexivity.
         * right; intros H; inversion H. contradiction.
       - apply dvalue_int_eq_dec_helper.
-      - destruct (IP.eq_dec x1 x2).
+      - destruct (eq_dec_iptr x1 x2).
         * left; subst; reflexivity.
         * right; intros H; inversion H. contradiction.
       - destruct (Float.eq_dec x1 x2).
@@ -746,11 +841,9 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
     { to_dvalue : I -> dvalue;
     }.
 
-  #[global] Instance VMemInt_intptr' : VMemInt intptr.
-  apply VMemInt_intptr.
-  Defined.
+  #[global] Existing Instance VMemInt_iptr.
 
-  #[global] Instance ToDvalue_intptr : ToDvalue intptr :=
+  #[global] Instance ToDvalue_iptr : ToDvalue iptr :=
     { to_dvalue := DVALUE_IPTR }.
 
   #[global] Instance ToDvalue_Int `{sz : positive} : ToDvalue (@bit_int sz) :=
@@ -759,7 +852,7 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
   Definition dvalue_int_unsigned (dv : dvalue) : Z
     := match dv with
        | @DVALUE_I sz x => unsigned x
-       | DVALUE_IPTR x => IP.to_unsigned x
+       | DVALUE_IPTR x => to_unsigned x
        | _ => 0
        end.
 
@@ -1362,7 +1455,6 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
   .
   Set Elimination Schemes.
 
-  #[global]
   Hint Constructors dvalue_has_dtyp : dvalue.
 
   Section dvalue_has_dtyp_ind.
@@ -1547,7 +1639,7 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
   Lemma dvalue_has_dtyp_fun_sound :
     forall dv dt,
       dvalue_has_dtyp_fun dv dt = true -> dvalue_has_dtyp dv dt.
-  Proof using.
+  Proof.
     induction dv; intros dtx HX;
       try solve [
           cbn in HX;
@@ -1660,7 +1752,7 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
   Lemma dvalue_has_dtyp_dec :
     forall dv dt,
       {dvalue_has_dtyp dv dt} + {~ dvalue_has_dtyp dv dt}.
-  Proof using.
+  Proof.
     intros.
     destruct (dvalue_has_dtyp_fun dv dt) eqn:H.
     left. apply dvalue_has_dtyp_fun_sound; auto.
@@ -1867,11 +1959,11 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
         rewrite <- (Nnat.N2Nat.id sz)
     end.
 
-  #[global] Hint Resolve forall_repeat_true : DVALUE_HAS_DTYP.
-  #[global] Hint Constructors dvalue_has_dtyp : DVALUE_HAS_DTYP.
-  #[global] Hint Rewrite Nnat.Nat2N.id : DVALUE_HAS_DTYP.
-  #[global] Hint Resolve List.repeat_length : DVALUE_HAS_DTYP.
-  #[global] Hint Extern 1 (NO_VOID _) => solve_no_void : DVALUE_HAS_DTYP.
+  Hint Resolve forall_repeat_true : DVALUE_HAS_DTYP.
+  Hint Constructors dvalue_has_dtyp : DVALUE_HAS_DTYP.
+  Hint Rewrite Nnat.Nat2N.id : DVALUE_HAS_DTYP.
+  Hint Resolve List.repeat_length : DVALUE_HAS_DTYP.
+  Hint Extern 1 (NO_VOID _) => solve_no_void : DVALUE_HAS_DTYP.
 
   Ltac solve_dvalue_has_dtyp :=
     try normalize_array_vector_dtyp;
@@ -1922,7 +2014,8 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
       destruct op; cbn in EVAL; repeat break_match_hyp.
       all: abs_eq.
       all: inv EVAL; try (constructor; now cbn).
-      all: unfold VMemInt_intptr'; rewrite VMemInt_intptr_dtyp; constructor; now cbn.
+      Set Printing All.
+      all: rewrite VMemInt_iptr_dtyp; constructor; now cbn.
     Qed.
     
     Lemma eval_iop_dtyp_iptr :
@@ -1949,8 +2042,8 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
   Fixpoint default_dvalue_of_dtyp (dt : dtyp) : EOB dvalue :=
     match dt with
     | DTYPE_I sz => ret (default_dvalue_of_dtyp_i sz)
-    | DTYPE_IPTR => ret (DVALUE_IPTR IP.zero)
-    | DTYPE_Pointer => ret (DVALUE_Addr A.null)
+    | DTYPE_IPTR => ret (DVALUE_IPTR zero_iptr)
+    | DTYPE_Pointer => ret (DVALUE_Addr null)
     | DTYPE_Void => raise_error "DTYPE_Void is not a true LLVM value"
     | DTYPE_FP FP_float => ret (DVALUE_Float Float32.zero)
     | DTYPE_FP FP_double => ret (DVALUE_Double (Float32.to_double Float32.zero))
@@ -1999,10 +2092,10 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
         ret (DVALUE_Vector dt (repeat v (N.to_nat sz)))
 
     | DTYPE_Vector sz DTYPE_Pointer =>
-        ret (DVALUE_Vector dt (repeat (DVALUE_Addr A.null) (N.to_nat sz)))
+        ret (DVALUE_Vector dt (repeat (DVALUE_Addr null) (N.to_nat sz)))
 
     | DTYPE_Vector sz DTYPE_IPTR =>
-        ret (DVALUE_Vector dt (repeat (DVALUE_IPTR zero) (N.to_nat sz)))
+        ret (DVALUE_Vector dt (repeat (DVALUE_IPTR zero_iptr) (N.to_nat sz)))
 
     | DTYPE_Vector _ _ => raise_error ("Non-valid or unsupported vector type when generating default vector")
     | DTYPE_Struct fields =>
@@ -2092,4 +2185,12 @@ Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF).
         right. right. right. exists FP_double. auto.
   Qed.
 
-End DVALUE.
+End DValue.
+
+#[global] Hint Constructors dvalue_has_dtyp : dvalue.
+#[global] Hint Resolve forall_repeat_true : DVALUE_HAS_DTYP.
+#[global] Hint Constructors dvalue_has_dtyp : DVALUE_HAS_DTYP.
+#[global] Hint Rewrite Nnat.Nat2N.id : DVALUE_HAS_DTYP.
+#[global] Hint Resolve List.repeat_length : DVALUE_HAS_DTYP.
+#[global] Hint Extern 1 (NO_VOID _) => solve_no_void : DVALUE_HAS_DTYP.
+

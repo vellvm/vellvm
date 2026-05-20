@@ -19,52 +19,50 @@ Definition pad_to_align (align : alignment) (sz : N) :=
 Definition pad_to_align_bitwise (align : alignment) (sz : N) :=
   pad_to ((preferred_alignment align) * 8) sz.
 
-Module Type SIZEOF.
-  (** ** Size of a dynamic type in bits *)
-  Parameter bit_sizeof_dtyp : dtyp -> N.
+Definition max_preferred_dtyp_alignment dtyp_alignment (dts : list dtyp) : N :=
+  match
+    maximumByOpt (fun dt1 dt2 => preferred_alignment (dtyp_alignment dt1) <? preferred_alignment (dtyp_alignment dt1))%N dts with
+  | Some dt =>
+      preferred_alignment (dtyp_alignment dt)
+  | None => 1
+  end.
 
-  (** ** Size of a dynamic type
-      Computes the byte size of a [dtyp]. *)
-  Parameter sizeof_dtyp : dtyp -> N.
+Class Sizeof : Type :=
+  {
+    (** ** Size of a dynamic type in bits *)
+    bit_sizeof_dtyp : dtyp -> N;
 
-  Parameter sizeof_dtyp_void : sizeof_dtyp DTYPE_Void = 0%N.
-  Parameter sizeof_dtyp_pos :
+    (** ** Size of a dynamic type
+      Computes the byte size of a [dtyp]; *)
+    sizeof_dtyp : dtyp -> N;
+
+    sizeof_dtyp_void : sizeof_dtyp DTYPE_Void = 0%N;
+    sizeof_dtyp_pos :
     forall dt,
-      (0 <= sizeof_dtyp dt)%N.
+      (0 <= sizeof_dtyp dt)%N;
 
-  (** Alignment of a dtyp *)
-  Parameter dtyp_alignment : dtyp -> alignment.
+    (** Alignment of a dtyp *)
+    dtyp_alignment : dtyp -> alignment;
 
-  Definition max_preferred_dtyp_alignment (dts : list dtyp) : N :=
-    match maximumByOpt (fun dt1 dt2 => preferred_alignment (dtyp_alignment dt1) <? preferred_alignment (dtyp_alignment dt1))%N dts with
-    | Some dt =>
-        preferred_alignment (dtyp_alignment dt)
-    | None => 1
-    end.
-
-  Parameter sizeof_dtyp_Struct :
+    sizeof_dtyp_Struct :
     forall dts,
-      sizeof_dtyp (DTYPE_Struct dts) = pad_to (max_preferred_dtyp_alignment dts) (List.fold_left (fun acc dt => N.add (pad_to_align (dtyp_alignment dt) acc) (sizeof_dtyp dt)) dts 0%N).
-    
-  Parameter sizeof_dtyp_Packed_struct :
+      sizeof_dtyp (DTYPE_Struct dts) = pad_to (max_preferred_dtyp_alignment dtyp_alignment dts) (List.fold_left (fun acc dt => N.add (pad_to_align (dtyp_alignment dt) acc) (sizeof_dtyp dt)) dts 0%N);
+
+    sizeof_dtyp_Packed_struct :
     forall dts,
-      sizeof_dtyp (DTYPE_Packed_struct dts) = List.fold_left (fun acc dt => N.add acc (sizeof_dtyp dt)) dts 0%N.
+      sizeof_dtyp (DTYPE_Packed_struct dts) = List.fold_left (fun acc dt => N.add acc (sizeof_dtyp dt)) dts 0%N;
 
-  Parameter sizeof_dtyp_array :
+    sizeof_dtyp_array :
     forall sz t,
-      sizeof_dtyp (DTYPE_Array sz t) = (sz * sizeof_dtyp t)%N.
+      sizeof_dtyp (DTYPE_Array sz t) = (sz * sizeof_dtyp t)%N;
 
-  Parameter sizeof_dtyp_vector :
+    sizeof_dtyp_vector :
     forall sz t,
-      sizeof_dtyp (DTYPE_Vector sz t) = (sz * sizeof_dtyp t)%N.
+      sizeof_dtyp (DTYPE_Vector sz t) = (sz * sizeof_dtyp t)%N;
 
-  Parameter sizeof_dtyp_i8 :
-    sizeof_dtyp (DTYPE_I 8) = 1%N.
-End SIZEOF.
+    sizeof_dtyp_i8 :
+    sizeof_dtyp (DTYPE_I 8) = 1%N;
+  }.
 
-(* Derived functions / constants on Sizeof. *)
-Module SizeofHelpers (S : SIZEOF).
-  Import S.
+Definition ptr_size `{Sizeof} : N := sizeof_dtyp DTYPE_Pointer.
 
-  Definition ptr_size : N := sizeof_dtyp DTYPE_Pointer.
-End SizeofHelpers.

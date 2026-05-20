@@ -11,8 +11,8 @@ From Vellvm Require Import
   VellvmIntegers.
 
 From QuickChick Require Import Show.
-Set Printing Universes.
 
+(* TODO: move this *)
 Instance showIptr {IP : IPtr} : Show iptr := {| show := show_iptr |}.
 
 #[refine] Instance AddressV {IP : IPtr} : @Address ProvenanceV :=

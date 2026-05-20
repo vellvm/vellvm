@@ -6,7 +6,7 @@ From Vellvm.Semantics Require Import
   DynamicValues
   Params.Sizeof.
 
-Module FinSizeof : SIZEOF.
+Instance SizeofV : Sizeof.
   (* TODO: make parameter? *)
   Definition ptr_size : nat := 8.
 
