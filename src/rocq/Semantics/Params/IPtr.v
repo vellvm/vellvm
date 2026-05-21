@@ -73,3 +73,7 @@ Class IPtrTheory {IP : IPtr} :=
       to_Z x = to_unsigned x;
     
   }.
+
+Definition intptr_seq {IP : IPtr} (start : Z) (len : nat) : EOB (list iptr)
+  := map_monad from_Z (Zseq start len).
+

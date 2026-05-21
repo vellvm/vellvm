@@ -6,15 +6,6 @@ From Vellvm Require Import
   Syntax.
 (* end hide *)
 
-(* TODO: Should provenance just be a typeclass? *)
-(* Monad class *)
-Class MonadProvenance (Provenance : Type) (M : Type -> Type) : Type :=
-  { fresh_provenance : M Provenance;
-  }.
-
-(* TODO: move this?
-   TODO: Have I crammed too much into this?
- *)
 Class Provenance :=
   {
     (* Types *)
