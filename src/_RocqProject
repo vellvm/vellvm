@@ -50,12 +50,12 @@
 ./rocq/QC/ShowAST.v
 ./rocq/Semantics/DynamicValues.v
 ./rocq/Semantics/LLVMEvents.v
-./rocq/Semantics/LLVMParams.v
 
 ./rocq/Semantics/Params/VellvmImplem/IPtrFinite.v
 ./rocq/Semantics/Params/VellvmImplem/IPtrInfinite.v
 ./rocq/Semantics/Params/VellvmImplem/Provenance.v
 ./rocq/Semantics/Params/VellvmImplem/Address.v
+./rocq/Semantics/Params/VellvmImplem/Sizeof.v
 
 ./rocq/Semantics/Gep.v
 ./rocq/Semantics/Select.v
