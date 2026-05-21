@@ -17,16 +17,13 @@ From ExtLib Require Import
 
 From Vellvm Require Import
   Utilities
-  Utils.IntMaps
   Syntax
-  Syntax.LLVMAst
-  Syntax.AstLib
   Semantics.LLVMEvents
   Semantics.Denotation
   Semantics.IntrinsicsDefinitions
   Semantics.InterpretationStack
   Semantics.VellvmIntegers
-  Semantics.Printfdefn
+  (* Semantics.Printfdefn *)
   QC.ShowAST.
 Import MonadNotation.
 Import ListNotations.

@@ -15,32 +15,35 @@ From QuickChick Require Import Show.
 Section withIPtr.
   Context {IP : IPtr}.
   
-(* TODO: move this *)
-Instance showIptr {IP : IPtr} : Show iptr := {| show := show_iptr |}.
+  (* TODO: move this *)
+  Instance showIptr {IP : IPtr} : Show iptr := {| show := show_iptr |}.
 
-#[refine] Instance AddressV {IP : IPtr} : @Address ProvenanceV :=
-  {|
-    addr := (iptr * prov);
-    null := (zero_iptr, nil_prov)%Z;
-    address_provenance := snd;
-    show_addr a := show a;
-  |}.
-Proof.
-intros [a1 a2] [b1 b2].
-destruct (eq_dec_iptr a1 b1); destruct (option_eq (list_eq_dec N.eq_dec) a2 b2); subst.
-- left; reflexivity.
-- right. intros H. inversion H; subst. apply n. reflexivity.
-- right. intros H. inversion H; subst. apply n. reflexivity.
-- right. intros H. inversion H; subst. apply n. reflexivity.
-Defined.
+  #[refine] Instance AddressV {IP : IPtr} : @Address ProvenanceV :=
+    {|
+      addr := (iptr * prov);
+      null := (zero_iptr, nil_prov)%Z;
+      address_provenance := snd;
+      show_addr a := show a;
+    |}.
+  Proof.
+    intros [a1 a2] [b1 b2].
+    destruct (eq_dec_iptr a1 b1); destruct (option_eq (list_eq_dec N.eq_dec) a2 b2); subst.
+    - left; reflexivity.
+    - right. intros H. inversion H; subst. apply n. reflexivity.
+    - right. intros H. inversion H; subst. apply n. reflexivity.
+    - right. intros H. inversion H; subst. apply n. reflexivity.
+  Defined.
 
-Instance PIV : @PI ProvenanceV (AddressV) :=
-  {|
-    ptr_to_int p := to_Z (fst p);
-    int_to_ptr i pr :=
-      if (i <? 0)%Z || (i >=? @Integers.modulus 64)%Z
-      then raise_oom ("FinITOP.int_to_ptr: out of range (" ++ show i ++ ").")
-      else p <- from_Z i ;; ret (p,pr)
-  |}
-.
+  Instance PIV : @PI ProvenanceV AddressV :=
+    {|
+      ptr_to_int p := to_Z (fst p);
+      int_to_ptr i pr :=
+        if (i <? 0)%Z || (i >=? @Integers.modulus 64)%Z
+        then raise_oom ("FinITOP.int_to_ptr: out of range (" ++ show i ++ ").")
+        else p <- from_Z i ;; ret (p,pr)
+    |}
+  .
+
+  Existing Instance overlaps_ptoi.
+
 End withIPtr.

@@ -8,8 +8,7 @@ From ITree Require Import
 From Vellvm Require Import
      Utilities
      Semantics.LLVMEvents
-     Semantics.Lang
-     Semantics.LLVMParams.
+     Params.
 
 From Vellvm.Handlers Require Export
      Global

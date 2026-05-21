@@ -12,7 +12,6 @@ From Vellvm Require Import
   Semantics.LLVMEvents
   Semantics.Denotation
   Semantics.IntrinsicsDefinitions
-  Semantics.InterpretationStack
   Semantics.VellvmIntegers.
 
 Import ListNotations.

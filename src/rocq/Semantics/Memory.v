@@ -129,6 +129,10 @@ Class MemoryModelPrimitives {Pa : Params} :=
     (** Heap operations *)
     malloc_bytes_with_pr : list memory_byte -> provenance -> memM addr ;
 
+    (** Frame stacks *)
+    mempush : memM unit ;
+    mempop  : memM unit ;
+
   }.
 
 (* TODO: Move this *)
@@ -146,7 +150,6 @@ Fixpoint zipWith {A B C} (f : A -> B -> C) (xs : list A) (ys : list B) : list C
 Definition zip {X Y} (xs : list X) (ys : list Y) := zipWith (fun a b => (a, b)) xs ys.
 
 Section MemoryModel.
-
   Context {Pa : Params} {MMP : @MemoryModelPrimitives Pa}.
 
   Definition get_consecutive_ptrs (ptr : addr) (len : nat) : EOB (list addr) :=
@@ -208,34 +211,121 @@ Section MemoryModel.
     malloc_bytes_with_pr init_bytes pr.
 
   (* (** Handle memcpy *) *)
-  Definition memcpy (src dst : addr) (len : Z) (volatile : bool) : memM unit.
-    refine (if Z.ltb len 0
-            then
-              mub "memcpy given negative length."
-            else
-              (* From LangRef: The ‘llvm.memcpy.*’ intrinsics copy a block of
+  Definition memcpy (src dst : addr) (len : Z) (volatile : bool) : memM unit :=
+    if Z.ltb len 0
+    then
+      mub "memcpy given negative length."
+    else
+      (* From LangRef: The ‘llvm.memcpy.*’ intrinsics copy a block of
            memory from the source location to the destination location, which
            must either be equal or non-overlapping. *)
-              
-        if orb (no_overlap dst len src len)
-               (Z.eqb (ptr_to_int src) (ptr_to_int dst))
-        then _ else _).
-    (*       src_bytes <- read_bytes src (Z.to_nat len);; *)
+      
+      if orb (no_overlap dst len src len)
+           (Z.eqb (ptr_to_int src) (ptr_to_int dst))
+      then 
+        src_bytes <- read_bytes src (Z.to_nat len);;
+        (* TODO: Double check that this is correct... Should we check if all writes are allowed first? *)
+        write_bytes dst src_bytes
+      else
+        mub "memcpy with overlapping or non-equal src and dst memory locations.".
 
-    (*       (* TODO: Double check that this is correct... Should we check if all writes are allowed first? *) *)
-    (*       write_bytes dst src_bytes *)
-    (*     else *)
-    (*       raise_ub "memcpy with overlapping or non-equal src and dst memory locations.". *)
+  (** memset spec *)
+  Definition memset
+    (dst : addr) (val : int8) (len : Z) (volatile : bool) : memM unit :=
+    if Z.ltb len 0
+    then
+      mub "memset given negative length."
+    else
+      let byte := MByte (DVALUE_I 8 val) (DTYPE_I 8) 0 in
+      write_bytes dst (repeatN (Z.to_N len) byte).
 
-    (* (** memset spec *) *)
-    (* Definition memset `{MemMonad MemM (itree Eff)} *)
-    (*   (dst : addr) (val : int8) (len : Z) (sid : store_id) (volatile : bool) : MemM unit := *)
-    (*   if Z.ltb len 0 *)
-    (*   then *)
-    (*     raise_ub "memset given negative length." *)
-    (*   else *)
-    (*     let byte := uvalue_sbyte (@UVALUE_I 8 val) (DTYPE_I 8) 0 sid in *)
-    (*     write_bytes dst (repeatN (Z.to_N len) byte). *)
+  Definition handle_memory : MemoryE ~> memM :=
+    fun T m =>
+      match m with
+      | MemPush => mempush
+      | MemPop => mempop
+      | Alloca t n align =>
+          addr <- allocate_dtyp t n;;
+          ret (DVALUE_Addr addr)
+      | Load t a =>
+          match a with
+          | DVALUE_Addr a =>
+              read_dvalue t a
+          | _ => mub "Loading from something that isn't an address."
+          end
+      | Store t a v =>
+          match a with
+          | DVALUE_Addr a =>
+              write_dvalue t a v
+          | _ => mub "Writing something to somewhere that isn't an address."
+          end
+      end.
+
+End MemoryModel.
+
+Section Implementation.
+  Context {Pa : Params}.
+  
+  Definition byte := (memory_byte * allocationId)%type.
+  Definition memory := IntMap byte.
+  (** ** Frame and Stack frames
+      A frame contains the list of block ids that need to be freed when popped,
+      i.e. when the function returns.
+      A [frame_stack] is a list of such frames.
+   *)
+  Definition Frame := list addr.
+  Inductive Framestack : Type :=
+  | Singleton (f : Frame)
+  | Snoc (s : Framestack) (f : Frame).
+
+  (** ** Heaps *)
+  Definition block := list addr.
+  Definition Heap := IntMap block.
+
+  (** ** Memory stack
+      The full notion of state manipulated by the monad is a pair of a [memory] and a [mem_stack].
+   *)
+  Record Memory_stack : Type :=
+    mkMemoryStack
+      { Memory_stack_memory : memory;
+        Memory_stack_frame_stack : Framestack;
+        Memory_stack_heap : Heap;
+      }.
+
+  Definition memory_empty : memory := IntMaps.empty.
+  Definition frame_empty : Framestack := Singleton [].
+  Definition heap_empty : Heap := IntMaps.empty.
+  Definition empty_memory_stack : Memory_stack :=
+    mkMemoryStack memory_empty frame_empty heap_empty.
+
+  (** ** MemState
+      A memory stack enriched with a provenance
+   *)
+  Record State :=
+    mkState
+      { state_memory_stack : Memory_stack;
+        (* Used to keep track of allocation ids in use *)
+        state_provenance : provenance;
+      }.
+
+  (* #[refine] Instance MemoryModelPrimitivesV {Pa : Params} : MemoryModelState := *)
+  Instance MemoryModelPrimitivesV : @MemoryModelState Pa :=
+    {|
+      memory_stack := Memory_stack ;
+      state := State ;
+      frame := Frame ;
+      framestack := Framestack ;
+      heap := Heap ;
+      state_get_memory := state_memory_stack ;
+      state_get_provenance := state_provenance ;
+      memory_stack_framestack := Memory_stack_frame_stack ;
+      memory_stack_heap  := Memory_stack_heap ;
+      state_put_memory s m := let '(mkState m' p) := s in mkState m p ;
+      initial_state := mkState empty_memory_stack initial_provenance ;
+      initial_frame := [] ;
+      initial_heap := heap_empty ;
+    |}.
+
+End Implementation.
 
 
-End MemoryModelPrimitives.

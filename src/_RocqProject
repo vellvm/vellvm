@@ -43,8 +43,8 @@
 ./rocq/Semantics/VellvmFloats.v
 ./rocq/Semantics/Params/IPtr.v
 ./rocq/Semantics/Params/Provenance.v
-./rocq/Semantics/Params/Address.v
 ./rocq/Semantics/Params/Sizeof.v
+./rocq/Semantics/Params/Address.v
 ./rocq/Semantics/Params.v
 ./rocq/QC/DList.v
 ./rocq/QC/ShowAST.v
@@ -56,7 +56,6 @@
 ./rocq/Semantics/Params/VellvmImplem/IPtrInfinite.v
 ./rocq/Semantics/Params/VellvmImplem/Provenance.v
 ./rocq/Semantics/Params/VellvmImplem/Address.v
-
 
 ./rocq/Semantics/Gep.v
 ./rocq/Semantics/Select.v
@@ -71,7 +70,6 @@
 ./rocq/Handlers/Local.v
 ./rocq/Handlers/Stack.v
 ./rocq/Handlers/Intrinsics.v
-
-./rocq/Utils/Inhabited.v
+./rocq/Semantics/Memory.v
 
 
