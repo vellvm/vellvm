@@ -5,18 +5,12 @@ From Vellvm Require Import
      Utilities
      Syntax
      Semantics.DynamicValues
-     Semantics.LLVMParams
+     Params
      Semantics.Memory.MemoryBytes.
 
-Module CONVERT (LP : LLVMParams) (MBYTES : MemoryByte LP).
-  Import LP.
-  Import SZ.
-  Import DV.
-  Import PROV.
-  Import PTOI.
-  Import ITOP.
-  Import MBYTES.
-
+Section Convert.
+  Context {Pa : Params}.
+  
   (** ** Typed conversion
         Performs a dynamic conversion of a [dvalue] of type [t1] to one of type [t2].
         For instance, convert an integer over 8 bits to one over 1 bit by truncation.
@@ -29,9 +23,9 @@ Module CONVERT (LP : LLVMParams) (MBYTES : MemoryByte LP).
     match conv with
     | Trunc nuw nsb => (* TODO: handle the nuw and nsb flags *)
         match t1, x, t2 with
-        | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_I sz_to =>
+        | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_I sz_to =>
             if Pos.eqb sz_t sz_from && (sz_to <? sz_from)%positive
-            then Conv_Pure (@DVALUE_I sz_to (repr (unsigned i1)))
+            then Conv_Pure (DVALUE_I sz_to (repr (unsigned i1)))
             else Conv_Illegal "i-to-i ill-typed Trunc"
 
         | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
@@ -42,9 +36,9 @@ Module CONVERT (LP : LLVMParams) (MBYTES : MemoryByte LP).
 
     | Zext nneg => (* TODO: handle the nneg flag *)
         match t1, x, t2 with
-        | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_I sz_to =>
+        | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_I sz_to =>
             if Pos.eqb sz_t sz_from && (sz_from <? sz_to)%positive
-            then Conv_Pure (@DVALUE_I sz_to (repr (unsigned i1)))
+            then Conv_Pure (DVALUE_I sz_to (repr (unsigned i1)))
             else Conv_Illegal "i-to-i ill-typed Zext"
 
         | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
@@ -55,9 +49,9 @@ Module CONVERT (LP : LLVMParams) (MBYTES : MemoryByte LP).
 
     | Sext =>
         match t1, x, t2 with
-        | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_I sz_to =>
+        | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_I sz_to =>
             if Pos.eqb sz_t sz_from && (sz_from <? sz_to)%positive
-            then Conv_Pure (@DVALUE_I sz_to (repr (signed i1)))
+            then Conv_Pure (DVALUE_I sz_to (repr (signed i1)))
             else Conv_Illegal "i-to-i ill-typed Sext"
 
         | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
@@ -83,12 +77,12 @@ Module CONVERT (LP : LLVMParams) (MBYTES : MemoryByte LP).
 
     | Uitofp nneg => (* TODO: handle the nneg flag *)
         match t1, x, t2 with
-        | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_FP FP_float =>
+        | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_FP FP_float =>
             if Pos.eqb sz_t sz_from
             then Conv_Pure (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
             else Conv_Illegal "i-to-float ill-typed Uitofp"
 
-        | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_FP FP_double =>
+        | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_FP FP_double =>
             if Pos.eqb sz_t sz_from
             then Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
             else Conv_Illegal "i-to-double ill-typed Uitofp"
@@ -101,12 +95,12 @@ Module CONVERT (LP : LLVMParams) (MBYTES : MemoryByte LP).
 
     | Sitofp =>
         match t1, x, t2 with
-        | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_FP FP_float =>
+        | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_FP FP_float =>
             if Pos.eqb sz_t sz_from
             then Conv_Pure (DVALUE_Float (Float32.of_intu (repr (signed i1))))
             else Conv_Illegal "i-to-float ill-typed Sitofp"
 
-        | DTYPE_I sz_t, @DVALUE_I sz_from i1, DTYPE_FP FP_double =>
+        | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_FP FP_double =>
             if Pos.eqb sz_t sz_from
             then Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
             else Conv_Illegal "i-to-double ill-typed Sitofp"
@@ -158,5 +152,5 @@ Module CONVERT (LP : LLVMParams) (MBYTES : MemoryByte LP).
     | Conv_Illegal s => raise_error s
     end.
 
-End CONVERT.
+End Convert.
 

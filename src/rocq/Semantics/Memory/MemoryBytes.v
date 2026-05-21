@@ -1,10 +1,10 @@
 From Vellvm Require Import
   Utilities
   Syntax
+  Params
+  Semantics.DynamicValues
   Numeric.Floats
-  LLVMParams
-  VellvmIntegers
-  Memory.Sizeof.
+  VellvmIntegers.
 
 From ExtLib Require Import
      Data.Monads.EitherMonad.
@@ -80,14 +80,9 @@ Fixpoint concat_bytes_Z (bytes : list Z) : Z
          byte + (Z.shiftl (concat_bytes_Z bytes) 8)
      end.
 
-Module Type MemoryByte (LP : LLVMParams).
-  Import LP.
-  Import PTOI.
-  Import ITOP.
-  Import PROV.
-  Import SZ.
-  Import DV.
-
+Section MemoryByte.
+  Context {Pa : Params}.
+  
   (* Walk through a list *)
   (* Returns field index + number of bytes remaining *)
   Fixpoint extract_field_byte_helper (fields : list dtyp) (field_idx : N) (byte_idx : N) : EOB (dtyp * (N * N))%type
@@ -103,13 +98,6 @@ Module Type MemoryByte (LP : LLVMParams).
 
   Definition extract_field_byte (fields : list dtyp) (byte_idx : N) : EOB (dtyp * (N * N))%type
     := extract_field_byte_helper fields 0 byte_idx.
-
-  Fixpoint concat_bytes_vint {I} `{VInt I} (bytes : list I) : I
-    := match bytes with
-       | [] => repr 0
-       | (byte::bytes) =>
-           add byte (shl (concat_bytes_vint bytes) (repr 8))
-       end.
 
   (* Need the type of the dvalue in order to know how big fields and array elements are.
 
@@ -202,10 +190,10 @@ Module Type MemoryByte (LP : LLVMParams).
     in
     
     match dv with
-       | @DVALUE_I sz x =>
+       | DVALUE_I sz x =>
            ret (extract_byte_vint x idx)
        | DVALUE_IPTR x =>
-           ret (extract_byte_Z (IP.to_Z x) idx)
+           ret (extract_byte_Z (to_Z x) idx)
        | DVALUE_Addr addr =>
            (* Note: this throws away provenance *)
            ret (extract_byte_Z (ptr_to_int addr) idx)
@@ -309,12 +297,12 @@ Module Type MemoryByte (LP : LLVMParams).
       | DTYPE_I sz => 
           absorb_pois dt
             (map_monad (m := EOBP) (memory_byte_value) dbs)
-            (fun v => ret (@DVALUE_I sz (concat_bytes_Z_vint v)))
+            (fun v => ret (DVALUE_I sz (concat_bytes_Z_vint v)))
 
       | DTYPE_IPTR =>
           absorb_pois dt
             (map_monad memory_byte_value dbs)
-            (fun zs => DVALUE_IPTR <$> IP.from_Z (concat_bytes_Z zs))
+            (fun zs => DVALUE_IPTR <$> from_Z (concat_bytes_Z zs))
 
       (* TODO: not sure if this should be wildcard provenance.
            TODO: not sure if this should truncate iptr value... *)
@@ -379,6 +367,3 @@ Module Type MemoryByte (LP : LLVMParams).
   
 End MemoryByte.
 
-Module Make (LP : LLVMParams) <: MemoryByte LP.
-  Include (MemoryByte LP).
-End Make.

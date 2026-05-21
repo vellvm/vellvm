@@ -27,10 +27,7 @@ From ExtLib Require Import
 From Vellvm Require Import
      Utilities
      Syntax
-     Semantics.Params.IPtr
-     Semantics.Params.Provenance
-     Semantics.Params.Address
-     Semantics.Params.Sizeof
+     Semantics.Params
      Semantics.VellvmIntegers
      QC.ShowAST.
 
@@ -42,9 +39,6 @@ Require Import Stdlib.Program.Equality.
 From QuickChick Require Import Show.
 (* Import EqvNotation. *)
 Import Logic.
-
-Set Implicit Arguments.
-Set Contextual Implicit.
 
 Open Scope N_scope.
 (* end hide *)
@@ -87,9 +81,7 @@ Definition ll_double := Floats.float.
 (* Sizeof is needed for for ConcatBytes case *)
 (* Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF). *)
 Section DValue.
-
-  (* TODO: package *)
-  Context {Pr : Provenance} {Ad : Address} {IP : IPtr} {IPT : @IPtr_Theory IP} {Si : Sizeof}.
+  Context {Pa : Params}.
 
   (* The set of dynamic values manipulated by an LLVM program. *)
   Unset Elimination Schemes.
@@ -2187,6 +2179,7 @@ Section DValue.
 
 End DValue.
 
+Arguments DVALUE_I {Pa} sz.
 #[global] Hint Constructors dvalue_has_dtyp : dvalue.
 #[global] Hint Resolve forall_repeat_true : DVALUE_HAS_DTYP.
 #[global] Hint Constructors dvalue_has_dtyp : DVALUE_HAS_DTYP.

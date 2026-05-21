@@ -109,8 +109,7 @@ Definition from_Z_bits {sz : positive} : Z -> EOB (@bit_int sz) :=
 
   |}.
 
-
-#[local]Instance IP64BitTheory : IPtr_Theory.
+#[local]Instance IP64BitTheory : IPtrTheory.
 Proof.
   constructor; auto.
   - intros z i FROM.

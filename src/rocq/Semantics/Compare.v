@@ -2,17 +2,15 @@ From Vellvm Require Import
   Utilities
   Syntax
   Semantics.DynamicValues
-  Semantics.LLVMParams.
+  Params.
 
-Module COMPARE (LP : LLVMParams).
-  Import LP.
-  Import DV.
-  Import PTOI.
+Section Compare.
+  Context {Pa : Params}.
   
   Definition eval_icmp (samesign:bool) (icmp : icmp) (v1 v2 : dvalue) : EOB dvalue.
     refine
       (match v1, v2 with
-       | @DVALUE_I sz1 i1, @DVALUE_I sz2 i2 =>
+       | DVALUE_I sz1 i1, DVALUE_I sz2 i2 =>
            _
        | DVALUE_IPTR i1, DVALUE_IPTR i2 => eval_int_icmp samesign icmp i1 i2
        | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
@@ -30,4 +28,4 @@ Module COMPARE (LP : LLVMParams).
   Defined.
   Arguments eval_icmp _ _ _ _ : simpl nomatch.
 
-End COMPARE.
+End Compare.

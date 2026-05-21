@@ -16,8 +16,9 @@ From ExtLib Require Import
 From Vellvm Require Import
   Utilities
   Syntax
-  Semantics.LLVMParams
-  Semantics.Memory.Sizeof
+  Params
+  Semantics.DynamicValues
+  VellvmIntegers
   Numeric.Rocqlib
   Numeric.Integers
   Numeric.Floats.
@@ -363,11 +364,10 @@ Definition intrinsic_exp {T} (e:exp T) : option string :=
    any other effects.
 
 *)
-Module Make(LP:LLVMParams).
+Section Intrinsics.
+  Context {Pa : Params}.
+ 
   Open Scope string_scope.
-
-  Import LP.DV.
-  Import VellvmIntegers.
 
   (* Each (pure) intrinsic is defined by a function of the following type.
 
@@ -380,7 +380,7 @@ Module Make(LP:LLVMParams).
 
    - The uvalue case is used to throw an exception.
    *)
-  Definition semantic_function := (list dvalue) -> EOB dvalue.
+  Definition semantic_function := (list dvalue) -> EOB (dvalue + dvalue).
 
   (* An association list mapping intrinsic names to their semantic definitions *)
   Definition intrinsic_definitions := list (declaration typ * semantic_function).
@@ -388,11 +388,12 @@ Module Make(LP:LLVMParams).
 
   (* Intrinsics semantic functions -------------------------------------------- *)
 
+  #[local] Notation retr x := (ret (inr x)).
   (* Absolute value for Float. *)
   Definition llvm_fabs_f32 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Float d] => ret (DVALUE_Float (b32_abs d))
+      | [DVALUE_Float d] => retr (DVALUE_Float (b32_abs d))
       | _ => raise_error "llvm_fabs_f64 got incorrect / ill-typed inputs"
       end.
 
@@ -400,7 +401,7 @@ Module Make(LP:LLVMParams).
   Definition llvm_fabs_f64 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Double d] => ret (DVALUE_Double (b64_abs d))
+      | [DVALUE_Double d] => retr (DVALUE_Double (b64_abs d))
       | _ => raise_error "llvm_fabs_f64 got incorrect / ill-typed inputs"
       end.
 
@@ -421,14 +422,14 @@ Module Make(LP:LLVMParams).
   Definition llvm_maxnum_f64 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Double a; DVALUE_Double b] => ret (DVALUE_Double (Float_maxnum a b))
+      | [DVALUE_Double a; DVALUE_Double b] => retr (DVALUE_Double (Float_maxnum a b))
       | _ => raise_error "llvm_maxnum_f64 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_maxnum_f32 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Float a; DVALUE_Float b] => ret (DVALUE_Float (Float32_maxnum a b))
+      | [DVALUE_Float a; DVALUE_Float b] => retr (DVALUE_Float (Float32_maxnum a b))
       | _ => raise_error "llvm_maxnum_f32 got incorrect / ill-typed inputs"
       end.
 
@@ -449,14 +450,14 @@ Module Make(LP:LLVMParams).
   Definition llvm_minimum_f64 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Double a; DVALUE_Double b] => ret (DVALUE_Double (Float_minimum a b))
+      | [DVALUE_Double a; DVALUE_Double b] => retr (DVALUE_Double (Float_minimum a b))
       | _ => raise_error "llvm_minimum_f64 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_minimum_f32 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Float a; DVALUE_Float b] => ret (DVALUE_Float (Float32_minimum a b))
+      | [DVALUE_Float a; DVALUE_Float b] => retr (DVALUE_Float (Float32_minimum a b))
       | _ => raise_error "llvm_minimum_f32 got incorrect / ill-typed inputs"
       end.
 
@@ -486,42 +487,42 @@ Module Make(LP:LLVMParams).
   Definition llvm_ushl_sat_1: semantic_function :=
     fun args =>
       match args with
-      | [@DVALUE_I 1 a; @DVALUE_I 1 b] => ushl_sat a b
+      | [DVALUE_I 1 a; DVALUE_I 1 b] => inr <$> ushl_sat a b
       | _ => raise_error "llvm_ushl_sat_1 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_8: semantic_function :=
     fun args =>
       match args with
-      | [@DVALUE_I 8 a; @DVALUE_I 8 b] => ushl_sat a b
+      | [DVALUE_I 8 a; DVALUE_I 8 b] => inr <$> ushl_sat a b
       | _ => raise_error "llvm_ushl_sat_8 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_16: semantic_function :=
     fun args =>
       match args with
-      | [@DVALUE_I 16 a; @DVALUE_I 16 b] => ushl_sat a b
+      | [DVALUE_I 16 a; DVALUE_I 16 b] => inr <$> ushl_sat a b
       | _ => raise_error "llvm_ushl_sat_16 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_32: semantic_function :=
     fun args =>
       match args with
-      | [@DVALUE_I 32 a; @DVALUE_I 32 b] => ushl_sat a b
+      | [DVALUE_I 32 a; DVALUE_I 32 b] => inr <$> ushl_sat a b
       | _ => raise_error "llvm_ushl_sat_32 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_ushl_sat_64: semantic_function :=
     fun args =>
       match args with
-      | [@DVALUE_I 64 a; @DVALUE_I 64 b] => ushl_sat a b
+      | [DVALUE_I 64 a; DVALUE_I 64 b] => inr <$> ushl_sat a b
       | _ => raise_error "llvm_ushl_sat_64 got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_vellvm_internal_throw : semantic_function :=
     fun args =>
       match args with
-      | [] => ret DVALUE_None
+      | [] => retr DVALUE_None
       | _ => raise_error "llvm_vellvm_internal_throw got incorrect / ill-typed inputs"
       end.
 
@@ -542,4 +543,4 @@ Module Make(LP:LLVMParams).
       (vellvm_internal_throw_decl, llvm_vellvm_internal_throw)
     ].
 
-End Make.
+End Intrinsics.

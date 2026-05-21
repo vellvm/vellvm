@@ -2,19 +2,12 @@ From Vellvm Require Import
   Utilities
   Syntax
   VellvmIntegers
-  Semantics.LLVMParams
-  Semantics.MemoryAddress
-  Semantics.Memory.Sizeof.
+  Params
+  DynamicValues.
 Open Scope Z.
 
-Module GEP (LP:LLVMParams).
-  Import LP.DV.
-  Import LP.PROV.
-  Import LP.ADDR.
-  Import LP.PTOI.
-  Import LP.ITOP.
-  Import LP.IP.
-  Import LP.SZ.
+Section GEP.
+  Context {Pa : Params}.
 
   (** ** Get Element Pointer
       Retrieve the address of a subelement of an indexable (i.e. aggregate) [dtyp] [t] (i.e. vector, array, struct, packed struct).
@@ -29,7 +22,7 @@ Module GEP (LP:LLVMParams).
     match vs with
     | v :: vs' =>
         match v with
-        | @DVALUE_I 8 i =>
+        | DVALUE_I 8 i =>
             let k := signed i in
             let n := BinIntDef.Z.to_nat k in
             match t with
@@ -38,7 +31,7 @@ Module GEP (LP:LLVMParams).
                 handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
             | _ => raise_error ("non-i8-indexable type")
             end
-        | @DVALUE_I 32 i =>
+        | DVALUE_I 32 i =>
             let k := unsigned i in
             let ks := signed i in
             let n := BinIntDef.Z.to_nat k in
@@ -65,7 +58,7 @@ Module GEP (LP:LLVMParams).
             | _ => raise_error ("non-i32-indexable type")
             end
               
-        | @DVALUE_I 64 i =>
+        | DVALUE_I 64 i =>
             let k := signed i in
             let n := BinIntDef.Z.to_nat k in
             match t with
@@ -97,13 +90,13 @@ Module GEP (LP:LLVMParams).
     let ptr := ptr_to_int a in
     let prov := address_provenance a in
     match vs with
-    | @DVALUE_I 8 i :: vs' =>
+    | DVALUE_I 8 i :: vs' =>
         ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
         int_to_ptr ptr' prov
-    | @DVALUE_I 32 i :: vs' =>
+    | DVALUE_I 32 i :: vs' =>
         ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
         int_to_ptr ptr' prov
-    | @DVALUE_I 64 i :: vs' =>
+    | DVALUE_I 64 i :: vs' =>
         ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
         int_to_ptr ptr' prov
     | DVALUE_IPTR i :: vs' =>
@@ -115,7 +108,7 @@ Module GEP (LP:LLVMParams).
 
   Lemma handle_gep_addr_0 :
     forall (dt : dtyp) (p : addr),
-      handle_gep_addr dt p [DVALUE_IPTR zero] = ret p.
+      handle_gep_addr dt p [DVALUE_IPTR zero_iptr] = ret p.
   Proof.
     intros dt p.
     cbn.

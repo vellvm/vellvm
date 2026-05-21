@@ -41,15 +41,23 @@
 
 ./rocq/Semantics/VellvmIntegers.v
 ./rocq/Semantics/VellvmFloats.v
-./rocq/Semantics/LLVMEvents.v
 ./rocq/Semantics/Params/IPtr.v
 ./rocq/Semantics/Params/Provenance.v
 ./rocq/Semantics/Params/Address.v
 ./rocq/Semantics/Params/Sizeof.v
+./rocq/Semantics/Params.v
 ./rocq/QC/DList.v
 ./rocq/QC/ShowAST.v
 ./rocq/Semantics/DynamicValues.v
+./rocq/Semantics/LLVMEvents.v
 ./rocq/Semantics/LLVMParams.v
+
+./rocq/Semantics/Params/VellvmImplem/IPtrFinite.v
+./rocq/Semantics/Params/VellvmImplem/IPtrInfinite.v
+./rocq/Semantics/Params/VellvmImplem/Provenance.v
+./rocq/Semantics/Params/VellvmImplem/Address.v
+
+
 ./rocq/Semantics/Gep.v
 ./rocq/Semantics/Select.v
 ./rocq/Semantics/Compare.v
@@ -58,11 +66,6 @@
 ./rocq/Semantics/Operations.v
 ./rocq/Semantics/IntrinsicsDefinitions.v
 ./rocq/Semantics/Denotation.v
-
-./rocq/Semantics/Params/VellvmImplem/IPtrFinite.v
-./rocq/Semantics/Params/VellvmImplem/IPtrInfinite.v
-./rocq/Semantics/Params/VellvmImplem/Provenance.v
-./rocq/Semantics/Params/VellvmImplem/Address.v
 
 ./rocq/Handlers/Global.v
 ./rocq/Handlers/Local.v

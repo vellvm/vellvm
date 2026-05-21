@@ -33,7 +33,7 @@ MISSING  := $(foreach f,$(VFILES_ALL),$(if $(wildcard $(f)),,$(f)))
 
 VOFILES := $(VFILES:.v=.vo)
 
-.PHONY: all depend clean report
+.PHONY: all depend clean clean-% report
 
 all: report $(VOFILES)
 
@@ -61,4 +61,11 @@ endif
 clean:
 	@find rocq \( -name '*.vo'  -o -name '*.vos' -o -name '*.vok' \
 	           -o -name '*.glob' -o -name '.*.aux' \) -delete 2>/dev/null || true
+	@rm -f .depend
+
+# Targeted clean: `make -f Makefile.minimal clean-Semantics` cleans rocq/Semantics/
+# (recursively). Also removes .depend so the next build regenerates the dep graph.
+clean-%:
+	@find rocq/$* \( -name '*.vo'  -o -name '*.vos' -o -name '*.vok' \
+	              -o -name '*.glob' -o -name '.*.aux' \) -delete 2>/dev/null || true
 	@rm -f .depend

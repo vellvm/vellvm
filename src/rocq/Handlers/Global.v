@@ -1,28 +1,27 @@
 (* begin hide *)
 From Stdlib Require Import
-     Morphisms
-     String.
+  Morphisms
+  String.
 
 From ExtLib Require Import
-     Structures.Maps
-     Data.Map.FMapAList.
+  Structures.Maps
+  Data.Map.FMapAList.
 
 From ITree Require Import
-     ITree
-     Events.State
-     Eq.Eqit
-     Events.StateFacts
-     InterpFacts.
+  ITree
+  Events.State
+  Eq.Eqit
+  Events.StateFacts
+  InterpFacts.
 
 From Vellvm Require Import
-     Utilities
-     Semantics.LLVMParams
-     Semantics.LLVMEvents.
+  Utilities
+  Syntax
+  Params
+  Semantics.LLVMEvents
+  Semantics.DynamicValues.
 
 From QuickChick Require Import Show.
-
-Set Implicit Arguments.
-Set Contextual Implicit.
 
 Import ITree.Basics.Basics.Monads.
 (* end hide *)
@@ -32,20 +31,19 @@ Import ITree.Basics.Basics.Monads.
 *)
 
 Section Globals.
-  Variable (k v:Type).
-  Context {map : Type}.
-  Context {M: Map k v map}.
-  Context {S : Show k}.
+  Context {Pa : Params}.
+  Definition global_env := FMapAList.alist raw_id dvalue.
+  #[local] Notation map := (global_env).
   
-  Definition handle_global {E} `{FailureE -< E} : (GlobalE k v) ~> stateT map (itree E) :=
+  Definition handle_global {E} `{FailureE -< E} : GlobalE ~> stateT map (itree E) :=
     fun _ e env =>
       match e with
       | GlobalWrite k v => ret (Maps.add k v env, tt)
       | GlobalRead k =>
-        match Maps.lookup k env with
-        | Some v => Ret (env, v)
-        | None => raise ("Could not look up global id " ++ show k)
-        end
+          match Maps.lookup k env with
+          | Some v => Ret (env, v)
+          | None => raise ("Could not look up global id " ++ show k)
+          end
       end.
 
   (* (* See src/ml/Extract.v for the special handling of these operation. *) *)
@@ -61,7 +59,7 @@ Section Globals.
   (*   (gs <- MonadState.get;; *)
   (*    ret (globals_object.(globals_set) gs))%monad. *)
   
-  (* Definition handle_global_debug {E} `{FailureE -< E} : (GlobalE k v) ~> stateT map (itree E) := *)
+  (* Definition handle_global_debug {E} `{FailureE -< E} : GlobalE ~> stateT map (itree E) := *)
   (*   fun _ e => *)
   (*     (res <- handle_global e;; *)
   (*     update_globals_ref e;; *)
@@ -70,7 +68,7 @@ Section Globals.
   Section PARAMS.
     Variable (E F G H : Type -> Type).
     Context `{FailureE -< G}.
-    Notation Effin := (E +' F +' (GlobalE k v) +' G).
+    Notation Effin := (E +' F +' GlobalE +' G).
     Notation Effout := (E +' F +' G).
 
     Definition E_trigger {M} : forall R, E R -> (stateT M (itree Effout) R) :=
@@ -187,17 +185,3 @@ Section Globals.
 
 End Globals.
 
-
-From Vellvm Require Import
-     LLVMAst.
-
-
-(* YZ TODO : Undecided about the status of this over-generalization of these events over domains of keys and values.
-   The interface needs to be specialized anyway in [LLVMEvents].
-   We want to have access to the specialized type both in [InterpreterMCFG] and [InterpreterCFG] so we cannot delay
-   it until [TopLevel] either.
-   So exposing the specialization here, but it is awkward.
- *)
-Module Make (LP:LLVMParams).
-  Definition global_env := FMapAList.alist raw_id LP.DV.dvalue.
-End Make.

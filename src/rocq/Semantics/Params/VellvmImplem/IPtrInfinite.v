@@ -27,7 +27,7 @@ From QuickChick Require Import Show.
     show_iptr p := show p;
   |}.
 
-#[local]Instance IPZTheory : IPtr_Theory.
+#[local]Instance IPZTheory : IPtrTheory.
 Proof.
   constructor; cbn; auto.
   - intros z i FROM; inversion FROM; auto.

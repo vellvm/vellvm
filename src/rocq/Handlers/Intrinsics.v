@@ -20,8 +20,9 @@ From Vellvm Require Import
   Utilities
   Utils.Assoc
   Syntax
-  Semantics.LLVMParams
+  Params
   Semantics.LLVMEvents
+  Semantics.DynamicValues
   Semantics.IntrinsicsDefinitions.
 
 From ITree Require Import
@@ -61,12 +62,8 @@ Import EqvNotation.
    exception.  Unknown Calls (either to other intrinsics or external calls) are
    passed through unchanged.
 *)
-Module Make(LP:LLVMParams).
-
-  Module IS := IntrinsicsDefinitions.Make(LP).
-  Include IS.
-  Import LP.DV.
-
+Section Intrinsics.
+  Context {Pa : Params}.
 
   (* Interprets Call events found in the given association list by their
      semantic functions.
@@ -79,28 +76,28 @@ Module Make(LP:LLVMParams).
                                   end
                                ) defined_intrinsics.
 
-  Definition handle_intrinsics {E} `{FailureE -< E} `{IntrinsicE dvalue -< E} :
-    (IntrinsicE dvalue) ~> itree E :=
+  Definition handle_intrinsics {E} `{FailureE -< E} `{IntrinsicE -< E} :
+    IntrinsicE ~> itree E :=
     (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
-    fun X (e : IntrinsicE dvalue X) =>
-      match e in IntrinsicE _ Y return X = Y -> itree E Y with
-      | (Intrinsic _ fname args) =>
+    fun X (e : IntrinsicE X) =>
+      match e in IntrinsicE Y return X = Y -> itree E Y with
+      | Intrinsic _ fname args =>
           match assoc fname defs_assoc with
           | Some f => fun pf =>
                        match f args with
                        | raise_error msg => raise msg
                        | raise_ret result => Ret result
-                       | _ => raise "Absurd case in handle_intrinsics." 
+                       | _ => raise "Absurd case in handle_intrinsics."
                        end
-          | None => fun pf => (eq_rect X (fun a => itree E a) (trigger e)) dvalue%type pf
+          | None => fun pf => (eq_rect X (fun a => itree E a) (trigger e)) _ pf
           end
       end eq_refl.
 
   Section PARAMS.
     Variable (E F : Type -> Type).
     Context `{FailureE -< F}.
-    Context `{LLVMExcE dvalue -< F}.
-    Notation Eff := (E +' IntrinsicE dvalue +' F).
+    Context `{LLVMExcE -< F}.
+    Notation Eff := (E +' IntrinsicE +' F).
 
     Definition E_trigger : Handler E Eff := fun _ e => trigger e.
     Definition F_trigger : Handler F Eff := fun _ e => trigger e.
@@ -205,4 +202,4 @@ Module Make(LP:LLVMParams).
 
   End PARAMS.
 
-End Make.
+End Intrinsics.

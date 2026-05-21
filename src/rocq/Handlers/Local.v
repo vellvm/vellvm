@@ -16,18 +16,14 @@ From ITree Require Import
 
 From Vellvm Require Import
   Utilities
+  Syntax
+  Params
   Semantics.LLVMEvents
-  Semantics.LLVMParams
-  Semantics.Memory.Sizeof.
+  Semantics.DynamicValues.
 
 From QuickChick Require Import Show.
 
-Set Implicit Arguments.
-Set Contextual Implicit.
-
-Import MonadNotation.
 Import ITree.Basics.Basics.Monads.
-Open Scope string_scope.
 (* end hide *)
 
 (** * Local handler
@@ -35,11 +31,11 @@ Open Scope string_scope.
 *)
 
 Section Locals.
-  Variable (k v:Type).
-  Context {map : Type}.
-  Context {M: Map k v map}.
-  Context {S : Show k}.
-  Definition handle_local {E} `{FailureE -< E} : (LocalE k v) ~> stateT map (itree E) :=
+  Context {Pa : Params}.
+  Definition local_env := FMapAList.alist raw_id dvalue.
+  #[local] Notation map := (local_env).
+
+  Definition handle_local {E} `{FailureE -< E} : LocalE ~> stateT map (itree E) :=
     fun _ e env =>
       match e with
       | LocalWrite k v => ret (Maps.add k v env, tt)
@@ -63,7 +59,7 @@ Section Locals.
   (*   (gs <- MonadState.get;; *)
   (*   ret (locals_object.(locals_set) gs))%monad. *)
  
-  (* Definition handle_local_debug {E} `{FailureE -< E} : (LocalE k v) ~> stateT map (itree E) := *)
+  (* Definition handle_local_debug {E} `{FailureE -< E} : LocalE ~> stateT map (itree E) := *)
   (*   fun _ e => *)
   (*     (res <- handle_local e;; *)
   (*     update_locals_ref e;; *)
@@ -73,7 +69,7 @@ Section Locals.
   Section PARAMS.
     Variable (E F G H: Type -> Type).
     Context `{FailureE -< G}.
-    Notation Effin := (E +' F +' (LocalE k v) +' G).
+    Notation Effin := (E +' F +' LocalE +' G).
     Notation Effout := (E +' F +' G).
 
     Definition E_trigger {M} : forall R, E R -> (stateT M (itree Effout) R) :=
@@ -198,15 +194,3 @@ Section Locals.
 
 End Locals.
 
-From Vellvm Require Import
-     LLVMAst.
-
-(* YZ TODO : Undecided about the status of this over-generalization of these events over domains of keys and values.
-   The interface needs to be specialized anyway in [LLVMEvents].
-   We want to have access to the specialized type both in [InterpreterMCFG] and [InterpreterCFG] so we cannot delay
-   it until [TopLevel] either.
-   So exposing the specialization here, but it is awkward.
- *)
-Module Make (LP:LLVMParams). 
-  Definition local_env := FMapAList.alist raw_id LP.DV.dvalue.
-End Make.

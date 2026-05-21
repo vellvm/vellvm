@@ -1,10 +1,11 @@
 From Vellvm Require Import
   Utilities
   Syntax
-  Semantics.LLVMParams.
+  Params
+  DynamicValues.
 
-Module SELECT (LP:LLVMParams).
-  Import LP.DV.
+Section Select.
+  Context {Pa : Params}.
 
   Definition eval_select
     (cnd : dvalue) (v1 v2 : dvalue) : EOB dvalue
@@ -12,7 +13,7 @@ Module SELECT (LP:LLVMParams).
        | DVALUE_Poison t =>
            (* TODO: Should be the type of the result of the select... *)
            ret (DVALUE_Poison t)
-       | @DVALUE_I 1 i =>
+       | DVALUE_I 1 i =>
            if (@Integers.unsigned 1 i =? 1)%Z
            then ret v1
            else ret v2
@@ -25,7 +26,7 @@ Module SELECT (LP:LLVMParams).
                             | DVALUE_Poison t =>
                                 (* TODO: Should be the type of the result of the select... *)
                                 ret (DVALUE_Poison t)
-                            | @DVALUE_I 1 i =>
+                            | DVALUE_I 1 i =>
                                 if (@Integers.unsigned 1 i =? 1)%Z
                                 then ret x
                                 else ret y
@@ -52,4 +53,4 @@ Module SELECT (LP:LLVMParams).
        | _ => raise_error "concretize_uvalueM: ill-typed select."
        end.
 
-End SELECT.
+End Select.

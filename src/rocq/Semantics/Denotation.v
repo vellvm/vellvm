@@ -27,7 +27,7 @@ From Vellvm Require Import
   Semantics.VellvmIntegers
   Semantics.VellvmFloats
   Semantics.LLVMEvents
-  Semantics.LLVMParams
+  Params
   Semantics.Operations
   Semantics.IntrinsicsDefinitions
   Semantics.DynamicValues.
@@ -105,11 +105,8 @@ Definition fast_mode_object : fast_mode :=
     itrees in the second phase.
  *)
 
-Module Denotation (LP : LLVMParams).
-  Module Ops := Operations.Operations LP.
-  Import Ops.
-  Import GEP SELECT COMPARE MBYTES CONVERT.
-  Import LP LP.DV.
+Section Denotation.
+  Context {Pa : Params}.
   
   Definition dv_zero_initializer (t:dtyp) : EOB dvalue :=
     default_dvalue_of_dtyp t.
@@ -120,7 +117,7 @@ Module Denotation (LP : LLVMParams).
       Note: global maps contain [dvalue]s, while local maps contain [uvalue]s.
       We perform the conversion here.
    *)
-  Definition lookup_id (i:ident) : itree (lookup_E dvalue) dvalue :=
+  Definition lookup_id (i:ident) : itree lookup_E dvalue :=
     match i with
     | ID_Global x => trigger (GlobalRead x)
     | ID_Local x  => trigger (LocalRead x)
@@ -129,8 +126,8 @@ Module Denotation (LP : LLVMParams).
   (* Predicate testing whether a [dvalue] is equal to zero at its type *)
   Definition dvalue_is_zero (dv : dvalue) : Prop :=
     match dv with
-    | @DVALUE_I sz x   => x = VellvmIntegers.zero
-    | DVALUE_IPTR x    => x = IP.zero
+    | DVALUE_I sz x   => x = VellvmIntegers.zero
+    | DVALUE_IPTR x    => x = zero_iptr
     | DVALUE_Double x  => x = Float.zero
     | DVALUE_Float x   => x = Float32.zero
     | _               => False
@@ -179,14 +176,14 @@ Module Denotation (LP : LLVMParams).
     end.
   
   Fixpoint denote_exp'
-    (top:option dtyp) (o:exp dtyp) {struct o} : itree (exp_E dvalue) dvalue :=
+    (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E dvalue :=
     let eval_texp '(dt,ex) := denote_exp' (Some dt) ex
     in
     match o with
 
     (* The translation injects the [lookup_E] interface used by [lookup_id] to the ambient one *)
     | EXP_Ident i =>
-      translate (@LU_to_exp dvalue) (lookup_id i)
+      translate LU_to_exp (lookup_id i)
                 
     | EXP_Integer x =>
         match top with
@@ -216,11 +213,11 @@ Module Denotation (LP : LLVMParams).
 
     | EXP_Bool b =>
       match b with
-      | true  => ret (@DVALUE_I 1 VellvmIntegers.one)
-      | false => ret (@DVALUE_I 1 VellvmIntegers.zero)
+      | true  => ret (DVALUE_I 1 VellvmIntegers.one)
+      | false => ret (DVALUE_I 1 VellvmIntegers.zero)
       end
  
-    | EXP_Null => ret (DVALUE_Addr ADDR.null)
+    | EXP_Null => ret (DVALUE_Addr null)
                      
     | EXP_Zero_initializer =>
       match top with
@@ -360,7 +357,7 @@ Module Denotation (LP : LLVMParams).
     | EXP_Metadata md =>
         (* METADATA TODO - it isn't clear what the denotations should be *)
         match md with
-        | METADATA_Null => ret (DVALUE_Addr ADDR.null)
+        | METADATA_Null => ret (DVALUE_Addr null)
         | METADATA_Id _ => ret DVALUE_None
         | METADATA_Const tv => eval_texp tv
         | METADATA_Node _ => ret DVALUE_None
@@ -388,19 +385,19 @@ Module Denotation (LP : LLVMParams).
         freeze dv
     end.
 
-  Definition denote_exp (top:option dtyp) (o:exp dtyp) : itree (exp_E dvalue) dvalue
+  Definition denote_exp (top:option dtyp) (o:exp dtyp) : itree exp_E dvalue
     := denote_exp' top o.
   Arguments denote_exp _ _ : simpl nomatch.
 
-  Definition denote_op (o:exp dtyp) : itree (exp_E dvalue) dvalue :=
+  Definition denote_op (o:exp dtyp) : itree exp_E dvalue :=
     denote_exp None o.
   Arguments denote_op _ : simpl nomatch.
 
-  Definition local_write {E} `{LocalE raw_id dvalue -< E}
+  Definition local_write {E} `{LocalE -< E}
     (id : raw_id) (dv : dvalue) : itree E unit :=
     trigger (LocalWrite id dv).
 
-  Definition denote_cmpxchg (id : raw_id) (cpx : cmpxchg dtyp) : itree (instr_E dvalue) unit :=
+  Definition denote_cmpxchg (id : raw_id) (cpx : cmpxchg dtyp) : itree instr_E unit :=
     (* SAZ: This will have to be revisited when we have a truly concurrent semantics. *)
     let '(ptr_ty, ptr_val) := cpx.(c_ptr) in
     let '(cmp_ty, cmp_val) := cpx.(c_cmp) in
@@ -414,9 +411,9 @@ Module Denotation (LP : LLVMParams).
 
 
       (* evaluate the arguments to the instruction *)
-      ptr_v <- translate (@exp_to_instr dvalue) (denote_exp (Some ptr_ty) ptr_val) ;;
-      cmp_v <- translate (@exp_to_instr dvalue) (denote_exp' (Some cmp_ty) cmp_val) ;;
-      new_v <- translate (@exp_to_instr dvalue) (denote_exp' (Some cmp_ty) new_val) ;;
+      ptr_v <- translate exp_to_instr (denote_exp (Some ptr_ty) ptr_val) ;;
+      cmp_v <- translate exp_to_instr (denote_exp' (Some cmp_ty) cmp_val) ;;
+      new_v <- translate exp_to_instr (denote_exp' (Some cmp_ty) new_val) ;;
 
       (* Perform the load *)
       loaded_v <- trigger (Load cmp_ty ptr_v);;
@@ -425,17 +422,17 @@ Module Denotation (LP : LLVMParams).
       dv <- lift (eval_icmp false Eq loaded_v cmp_v);;
       match dv with
       (* TODO: Shouldn't the size argument be explicit? *)
-      | @DVALUE_I 1 comparison_bit =>
+      | DVALUE_I 1 comparison_bit =>
           if equ comparison_bit one then
             (* They compared as equal: perform the write to memory *)
             trigger (Store cmp_ty ptr_v new_v) ;;
             (* return a struct with the loaded value and "true" *)
-            let ret_v := DVALUE_Struct [loaded_v; @DVALUE_I 1 one] in
+            let ret_v := DVALUE_Struct [loaded_v; DVALUE_I 1 one] in
             local_write id ret_v
           else
             (* They compared as distinct: do not perform the write to memory *)
             (* return a struct with the loaded value and "false" *)
-            let ret_v := DVALUE_Struct [loaded_v; @DVALUE_I 1 zero] in
+            let ret_v := DVALUE_Struct [loaded_v; DVALUE_I 1 zero] in
             local_write id ret_v
       | DVALUE_Poison dt => raiseUB ("comparing poison in atomiccmpxchg.")
       | _ => raise ("Br got non-bool value")
@@ -450,7 +447,7 @@ Module Denotation (LP : LLVMParams).
            Similarly, it does not state whether the `disjoint` flag for `or` can be applied,
            so we set it to false.
   *)
-  Definition denote_atomic_rmw_operation a_op (pv : dvalue) (val : dvalue) : itree (instr_E dvalue) dvalue :=
+  Definition denote_atomic_rmw_operation a_op (pv : dvalue) (val : dvalue) : itree instr_E dvalue :=
     match a_op with
     | Axchg =>
         (* xchg: *ptr = val *)
@@ -478,7 +475,7 @@ Module Denotation (LP : LLVMParams).
             (* YZ: Same question, but over dvalues *)
             lift
               (and_v <- eval_iop And pv val;;
-               eval_iop (Sub false false) (@DVALUE_I sz (@repr (@bit_int sz) _ (@max_unsigned (@bit_int sz) _))) and_v)
+               eval_iop (Sub false false) (DVALUE_I sz (@repr (@bit_int sz) _ (@max_unsigned (@bit_int sz) _))) and_v)
         | _ => raise ("atomicrmw nand of non-integer value")
         end
     | Afadd =>
@@ -501,14 +498,14 @@ Module Denotation (LP : LLVMParams).
     | Ausub_sat => raise ("Unsupported atomicrwm operation")
     end.
 
-  Definition denote_atomicrmw id armw : itree (instr_E dvalue) unit :=
+  Definition denote_atomicrmw id armw : itree instr_E unit :=
     let '(ptr_ty, ptr_val) := armw.(a_ptr) in
     let '(a_ty, a_val) := armw.(a_val) in
     let a_op := armw.(a_operation) in
 
     (* evaluate the arguments to the instruction *)
-    ptr_v <- translate (@exp_to_instr dvalue) (denote_exp (Some ptr_ty) ptr_val) ;;
-    a_v <- translate (@exp_to_instr dvalue) (denote_exp' (Some a_ty) a_val) ;;
+    ptr_v <- translate exp_to_instr (denote_exp (Some ptr_ty) ptr_val) ;;
+    a_v <- translate exp_to_instr (denote_exp' (Some a_ty) a_val) ;;
 
     (* Perform the load - load addresses must be unique *)
     loaded_v <- trigger (Load a_ty ptr_v);;
@@ -527,7 +524,8 @@ Module Denotation (LP : LLVMParams).
    *)
   (* An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
-    (i: (instr_id * instr dtyp * list (metadata dtyp))) (varargs : option ADDR.addr) : itree (instr_E dvalue) unit :=
+    (i: (instr_id * instr dtyp * list (metadata dtyp))) (varargs : option addr) : itree instr_E unit :=
+    
     let '(i, md) := i in
     (* The following two lines set up file location information. *)
     (* extract it from the metadata: *)
@@ -541,7 +539,7 @@ Module Denotation (LP : LLVMParams).
     (* Pure operations *)
 
     | (IId id, INSTR_Op op) =>
-        uv <- translate (@exp_to_instr dvalue) (denote_op op) ;;
+        uv <- translate exp_to_instr (denote_op op) ;;
         local_write id uv ;;
         ret tt
     (* Allocation *)
@@ -567,7 +565,7 @@ Module Denotation (LP : LLVMParams).
             v <- trigger (Alloca dt 1 align);;
             local_write id v
         | Some (t, num_exp) =>
-            n <- translate (@exp_to_instr dvalue) (denote_exp (Some t) num_exp);;
+            n <- translate exp_to_instr (denote_exp (Some t) num_exp);;
             v <- trigger (Alloca dt (Z.to_N (dvalue_int_unsigned n)) align);;
             local_write id v
         end;;
@@ -575,15 +573,15 @@ Module Denotation (LP : LLVMParams).
 
     (* Load *)
     | (IId id, INSTR_Load dt (du,ptr) _) =>
-      a <- translate (@exp_to_instr dvalue)  (denote_exp (Some du) ptr);;
+      a <- translate exp_to_instr (denote_exp (Some du) ptr);;
       (* Load addresses must be unique *)
       v <- trigger (Load dt a);;
       local_write id v
 
     (* Store *)
     | (IVoid _, INSTR_Store (dt, val) (du, ptr) _) =>
-      v <- translate (@exp_to_instr dvalue)  (denote_exp (Some dt) val) ;;
-      a <- translate (@exp_to_instr dvalue)  (denote_exp (Some du) ptr) ;;
+      v <- translate exp_to_instr (denote_exp (Some dt) val) ;;
+      a <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
       (* Store addresses must be unique *)
       match a with
       | DVALUE_Poison dt => raiseUB (err_loc ++ ": Store to poisoned address.")
@@ -597,7 +595,7 @@ Module Denotation (LP : LLVMParams).
     (* TODO: technically operand bundles can affect semantics *)
     (* TODO: This should not be so complex, need to pull some code out *) 
     | (pt, INSTR_Call (dt, f) args _ _) =>
-        vs <- map_monad (fun '(t, op) => (translate (@exp_to_instr dvalue) (denote_exp (Some t) op))) (List.map fst args) ;;
+        vs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) (List.map fst args) ;;
         returned_value <-
           match intrinsic_exp f with
           (* TODO: look at whether these can be moved to IntrinsicsDefinitions.v *)
@@ -606,7 +604,7 @@ Module Denotation (LP : LLVMParams).
               then
                 match args, varargs with
                 | [ ((t, e), _) ], Some varargs =>
-                    a <- translate (@exp_to_instr dvalue) (denote_exp (Some t) e);;
+                    a <- translate exp_to_instr (denote_exp (Some t) e);;
                     match a with
                     | DVALUE_Poison dt => raiseUB ("Store to poisoned address.")
                     | _ => trigger (Store DTYPE_Pointer a (DVALUE_Addr varargs));;
@@ -620,8 +618,8 @@ Module Denotation (LP : LLVMParams).
                 then
                   match args with
                   | [((DTYPE_Pointer, exp_dest), _); ((DTYPE_Pointer, exp_src), _)] =>
-                      src <- translate (@exp_to_instr dvalue) (denote_exp (Some DTYPE_Pointer) exp_src);;
-                      dest <- translate (@exp_to_instr dvalue)  (denote_exp (Some DTYPE_Pointer) exp_dest);;
+                      src <- translate exp_to_instr (denote_exp (Some DTYPE_Pointer) exp_src);;
+                      dest <- translate exp_to_instr  (denote_exp (Some DTYPE_Pointer) exp_dest);;
                       vargs <- trigger (Load DTYPE_Pointer src);;
                       trigger (Store DTYPE_Pointer dest vargs);;
                       ret DVALUE_None
@@ -630,22 +628,20 @@ Module Denotation (LP : LLVMParams).
                 else
                   if String.eqb s "llvm.va_end"
                   then ret DVALUE_None
-                  else (* TODO: replug in the possibility for intrinsics to raise exceptions *)
-                    trigger (Intrinsic dt s vs)
-                      (* match res with *)
-                      (* | inl exc => raiseLLVM exc *)
-                      (* | inr dv => ret dv *)
-                      (* end *)
+                  else 
+                    res <- trigger (Intrinsic dt s vs) ;;
+                    match res with
+                    | inl exc => raiseLLVM exc
+                    | inr dv => ret dv
+                    end
                       
           | None =>
-              fv <- translate (@exp_to_instr dvalue) (denote_exp None f);;
-              trigger (Call dt fv vs)
-              (* TODO: Exceptions handling *)
-              (* res <- trigger (Call dt fv uvs);; *)
-              (* match res with *)
-              (* | inl exc => raiseLLVM exc *)
-              (* | inr uv => ret uv *)
-              (* end *)
+              fv <- translate exp_to_instr (denote_exp None f);;
+              res <- trigger (Call dt fv vs);;
+              match res with
+              | inl exc => raiseLLVM exc
+              | inr uv => ret uv
+              end
           end
         ;;
         match pt with
@@ -658,10 +654,10 @@ Module Denotation (LP : LLVMParams).
     | (IVoid _, INSTR_Comment _) => ret tt
 
     | (pt, INSTR_VAArg (t, ptr_to_args_exp) argty) =>
-        ptr_to_args <- translate (@exp_to_instr dvalue) (denote_exp (Some DTYPE_Pointer) ptr_to_args_exp);;
+        ptr_to_args <- translate exp_to_instr (denote_exp (Some DTYPE_Pointer) ptr_to_args_exp);;
         args <- trigger (Load DTYPE_Pointer ptr_to_args);;
         retv <- trigger (Load argty args);;
-        ix <- lift (IP.from_Z 1);;
+        ix <- lift (from_Z 1);;
         args' <- lift (eval_gep argty args [DVALUE_IPTR ix]);;
         trigger (Store DTYPE_Pointer ptr_to_args args');;
         match pt with
@@ -695,7 +691,7 @@ Module Denotation (LP : LLVMParams).
        | [] => ret default_dest
        | (v,id):: switches =>
            match value, v with
-           | @DVALUE_I sz1 i1, @DVALUE_I sz2 i2
+           | DVALUE_I sz1 i1, DVALUE_I sz2 i2
              => _
            | _,_ => raise_error "Ill-typed switch."
            end
@@ -712,7 +708,7 @@ Module Denotation (LP : LLVMParams).
          or jumps to a new [block_id]. *)
 
   Definition denote_terminator
-    (trm: (instr_id * terminator dtyp * list (metadata dtyp))) : itree (instr_E dvalue) (block_id + dvalue) :=
+    (trm: (instr_id * terminator dtyp * list (metadata dtyp))) : itree instr_E (block_id + dvalue) :=
     let '(iid, t, md) := trm in
     let err_loc := location_error_string md in
     let bogus := set_loc err_loc in
@@ -720,16 +716,16 @@ Module Denotation (LP : LLVMParams).
     match t with
 
     | TERM_Ret (dt, op) =>
-      dv <- (translate (@exp_to_instr dvalue)  (denote_exp (Some dt) op)) ;;
+      dv <- (translate exp_to_instr (denote_exp (Some dt) op)) ;;
       ret (inr dv)
 
     | TERM_Ret_void =>
         ret (inr DVALUE_None)
 
     | TERM_Br (dt,op) br1 br2 =>
-      v <- (translate (@exp_to_instr dvalue)  (denote_exp (Some dt) op)) ;;
+      v <- (translate exp_to_instr (denote_exp (Some dt) op)) ;;
       match v with
-      | @DVALUE_I 1 comparison_bit =>
+      | DVALUE_I 1 comparison_bit =>
         if equ comparison_bit one then
           ret (inl br1)
         else
@@ -739,10 +735,9 @@ Module Denotation (LP : LLVMParams).
       end
 
     | TERM_Br_1 br => ret (inl br)
-                        
                          
     | TERM_Switch (dt,e) default_br dests =>
-      selector <- (translate (@exp_to_instr dvalue)  (denote_exp (Some dt) e));;
+      selector <- (translate exp_to_instr (denote_exp (Some dt) e));;
       (* Selection on [undef] is UB *)
       if dvalue_is_poison selector
       then raiseUB (err_loc ++ ": Switching on poison.")
@@ -756,34 +751,26 @@ Module Denotation (LP : LLVMParams).
 
     | TERM_Unreachable => raiseUB (err_loc ++ ": IMPOSSIBLE: unreachable in reachable position")
 
-      (* TODO: technically operand bundles can affect the semantics of invoke *)
+    (* TODO: technically operand bundles can affect the semantics of invoke *)
     | TERM_Invoke (dt, fnptrval) args to_label unwind_label anns _ =>
-      uvs <- map_monad (fun '(t, op) => (translate (@exp_to_instr dvalue)  (denote_exp (Some t) op))) (List.map fst args) ;;
-      fv <- (translate (@exp_to_instr dvalue)  (denote_exp None fnptrval)) ;;
-      returned_value <- trigger (Call dt fv uvs) ;;
+      uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) (List.map fst args) ;;
+      fv <- (translate exp_to_instr (denote_exp None fnptrval)) ;;
+      rv <- trigger (Call dt fv uvs) ;;
       (* branch to to_label *)
-      match iid with
-      | IVoid _ => ret tt
-      | IId id  => local_write id returned_value
-      end;;
-      ret (inl to_label)
+      match rv with
+      | inl exn =>
+          (* Exception case. Need to jump to unwind label *)
+          ret (inl unwind_label)
+      | inr returned_value =>
+          match iid with
+          | IVoid _ => ret tt
+          | IId id  => local_write id returned_value
+          end;;
+          ret (inl to_label)
+      end
           
-      (* (* TODO: replug exceptions *)  *)
-      (* match rv with *)
-      (* | inl exc => *)
-      (*     (* Exception case. Need to jump to unwind label *) *)
-      (*     (* TODO: Need to pass exception value to somewhere *) *)
-      (*     ret (inl unwind_label) *)
-      (* | inr returned_value => *)
-      (*     match iid with *)
-      (*     | IVoid _ => ret tt *)
-      (*     | IId id  => local_write id returned_value *)
-      (*     end;; *)
-      (*     ret (inl to_label) *)
-      (* end *)
-
     | TERM_Resume (t, expr) =>
-      exn <- translate (@exp_to_instr dvalue)  (denote_exp (Some t) expr);;
+      exn <- translate exp_to_instr (denote_exp (Some t) expr);;
       raiseLLVM exn
 
     (* Currently unhandled VIR terminators *)
@@ -791,10 +778,10 @@ Module Denotation (LP : LLVMParams).
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
-  Definition denote_code (c: code dtyp) (varargs : option ADDR.addr) : itree (instr_E dvalue) unit :=
+  Definition denote_code (c: code dtyp) (varargs : option addr) : itree instr_E unit :=
     map_monad_ (fun i => denote_instr i varargs) c.
 
-   Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : itree (exp_E dvalue) (local_id * dvalue) :=
+   Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : itree exp_E (local_id * dvalue) :=
     let '(id, Phi dt args, md) := id_p in
     let err_loc := location_error_string md in
     let bogus := set_loc err_loc in
@@ -806,16 +793,16 @@ Module Denotation (LP : LLVMParams).
     | None => raise (err_loc ++ ": jump: phi node doesn't include block ")
     end.
 
-  Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp * (list (metadata dtyp)))): itree (instr_E dvalue) unit :=
+  Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp * (list (metadata dtyp)))): itree instr_E unit :=
     dvs <- map_monad
-             (fun x => translate (@exp_to_instr dvalue) (denote_phi bid_from x))
+             (fun x => translate exp_to_instr (denote_phi bid_from x))
              phis;;
     map_monad (fun '(id,dv) => local_write id dv) dvs;;
     ret tt.
 
   (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-  Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option ADDR.addr) : itree (instr_E dvalue) (block_id + dvalue) :=
+  Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option addr) : itree instr_E (block_id + dvalue) :=
     denote_phis bid_from (blk_phis b);;
     denote_code (blk_code b) varargs;;
     denote_terminator (blk_term b).
@@ -834,8 +821,8 @@ Module Denotation (LP : LLVMParams).
          If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
    *)
 
-  Definition denote_ocfg (bks: ocfg dtyp) (varargs : option ADDR.addr)
-    : (block_id * block_id) -> itree (instr_E dvalue) ((block_id * block_id) + dvalue) :=
+  Definition denote_ocfg (bks: ocfg dtyp) (varargs : option addr)
+    : (block_id * block_id) -> itree instr_E ((block_id * block_id) + dvalue) :=
     ITree.iter
       (fun '((bid_from,bid_src) : block_id * block_id) =>
          match find_block bks bid_src with
@@ -848,7 +835,7 @@ Module Denotation (LP : LLVMParams).
              end
          end).
 
-  Definition denote_cfg (f: cfg dtyp) (varargs : option ADDR.addr) : itree (instr_E dvalue) dvalue :=
+  Definition denote_cfg (f: cfg dtyp) (varargs : option addr) : itree instr_E dvalue :=
     r <- denote_ocfg (blks f) varargs (init f,init f) ;;
     match r with
     | inl bid => raise ("Can't find block in denote_cfg " ++ show (snd bid))
@@ -858,7 +845,7 @@ Module Denotation (LP : LLVMParams).
   (* The denotation of an itree function is a coq function that takes
          a list of uvalues and returns the appropriate semantics. *)
   Definition function_denotation : Type :=
-    list dvalue -> itree (L0' dvalue) dvalue.
+    list dvalue -> itree L0' dvalue.
 
   Fixpoint combine_lists_varargs {A B:Type} (l1:list A) (l2:list B) : EOB (list (A * B) * list B) :=
     match l1, l2 with
@@ -872,7 +859,7 @@ Module Denotation (LP : LLVMParams).
         ret ([], vargs)
     end.
 
-  Definition pop_call_frame {E k v exc} `{MemoryE dvalue -< E} `{StackE k v exc -< E} : itree E unit :=
+  Definition pop_call_frame {E} `{MemoryE -< E} `{StackE -< E} : itree E unit :=
     trigger StackPop;;
     trigger MemPop.
   
@@ -889,7 +876,7 @@ Module Denotation (LP : LLVMParams).
           in
      match v with
            | DVALUE_Addr a => ret DTYPE_Pointer
-           | @DVALUE_I sz x => ret (DTYPE_I sz)
+           | DVALUE_I sz x => ret (DTYPE_I sz)
            | DVALUE_IPTR x => ret DTYPE_IPTR
            | DVALUE_Double x => ret (DTYPE_FP FP_double)
            | DVALUE_Float x => ret (DTYPE_FP FP_float)
@@ -930,13 +917,13 @@ Module Denotation (LP : LLVMParams).
 
 
   (* Push call frame, return varargs address *)
-  Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list dvalue) : itree (L0' dvalue) ADDR.addr :=
+  Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list dvalue) : itree L0' addr :=
     (* We match the arguments variables to the inputs *)
     '(bs, vs) <- lift (combine_lists_varargs (df_args df) args) ;;
     dts <- lift (map_monad dtyp_of_dvalue vs);;
     let dt := DTYPE_Packed_struct dts in
     (* generate the corresponding writes to the local stack frame *)
-    trigger (@MemPush dvalue) ;;
+    trigger MemPush ;;
     trigger (StackPush bs) ;;
     varargs <- trigger (Alloca dt 1 None);;
     trigger (Store dt varargs (DVALUE_Packed_struct vs));;
@@ -949,7 +936,7 @@ Module Denotation (LP : LLVMParams).
   Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
     fun (args : list dvalue) =>
       varg <- push_call_frame df args;;
-      rv <- translate (@instr_to_L0' dvalue) (denote_cfg (df_instrs df) (Some varg));;
+      rv <- translate instr_to_L0' (denote_cfg (df_instrs df) (Some varg));;
       pop_call_frame;;
       ret rv.
 
@@ -970,23 +957,21 @@ Module Denotation (LP : LLVMParams).
   Definition lookup_defn (dv : dvalue) (m : IntMap function_denotation) : option function_denotation
     := match dv with
        | DVALUE_Addr addr =>
-           lookup (PTOI.ptr_to_int addr) m
+           lookup (ptr_to_int addr) m
        | _ => None
        end.
 
   Definition denote_mcfg
     (fundefs : IntMap function_denotation) (dt : dtyp)
-    (f_value : dvalue) (args : list dvalue) : itree (L0 dvalue) dvalue :=
-    @mrec (@CallE dvalue) (ExternalCallE dvalue +' _)
+    (f_value : dvalue) (args : list dvalue) : itree L0 (dvalue + dvalue) :=
+    @mrec CallE (ExternalCallE +' _)
       (fun T call =>
          match call with
          | Call dt fv args =>
              match lookup_defn fv fundefs with
              | Some f_den => (* If the call is internal *)
-                 f_den args
-             (* unEitherT (catch_llvm_exc_L0' (f_den args)) *)
-             | None =>
-                 trigger (ExternalCall dt fv args)
+                 inr <$> f_den args
+             | None => inr <$> trigger (ExternalCall dt fv args)
              end
          end) _ (Call dt f_value args).
   

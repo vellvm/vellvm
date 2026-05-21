@@ -19,14 +19,6 @@ Definition pad_to_align (align : alignment) (sz : N) :=
 Definition pad_to_align_bitwise (align : alignment) (sz : N) :=
   pad_to ((preferred_alignment align) * 8) sz.
 
-Definition max_preferred_dtyp_alignment dtyp_alignment (dts : list dtyp) : N :=
-  match
-    maximumByOpt (fun dt1 dt2 => preferred_alignment (dtyp_alignment dt1) <? preferred_alignment (dtyp_alignment dt1))%N dts with
-  | Some dt =>
-      preferred_alignment (dtyp_alignment dt)
-  | None => 1
-  end.
-
 Class Sizeof : Type :=
   {
     (** ** Size of a dynamic type in bits *)
@@ -43,10 +35,23 @@ Class Sizeof : Type :=
 
     (** Alignment of a dtyp *)
     dtyp_alignment : dtyp -> alignment;
+  }.
 
+Definition max_preferred_dtyp_alignment {S : Sizeof} (dts : list dtyp) : N :=
+  match
+    maximumByOpt (fun dt1 dt2 => preferred_alignment (dtyp_alignment dt1) <? preferred_alignment (dtyp_alignment dt1))%N dts with
+  | Some dt =>
+      preferred_alignment (dtyp_alignment dt)
+  | None => 1
+  end.
+
+Definition ptr_size `{Sizeof} : N := sizeof_dtyp DTYPE_Pointer.
+
+Class SizeofTheory {S : Sizeof} : Prop :=
+  {
     sizeof_dtyp_Struct :
     forall dts,
-      sizeof_dtyp (DTYPE_Struct dts) = pad_to (max_preferred_dtyp_alignment dtyp_alignment dts) (List.fold_left (fun acc dt => N.add (pad_to_align (dtyp_alignment dt) acc) (sizeof_dtyp dt)) dts 0%N);
+      sizeof_dtyp (DTYPE_Struct dts) = pad_to (max_preferred_dtyp_alignment dts) (List.fold_left (fun acc dt => N.add (pad_to_align (dtyp_alignment dt) acc) (sizeof_dtyp dt)) dts 0%N);
 
     sizeof_dtyp_Packed_struct :
     forall dts,
@@ -64,5 +69,4 @@ Class Sizeof : Type :=
     sizeof_dtyp (DTYPE_I 8) = 1%N;
   }.
 
-Definition ptr_size `{Sizeof} : N := sizeof_dtyp DTYPE_Pointer.
 
