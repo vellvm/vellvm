@@ -28,11 +28,6 @@ Class Sizeof : Type :=
       Computes the byte size of a [dtyp]; *)
     sizeof_dtyp : dtyp -> N;
 
-    sizeof_dtyp_void : sizeof_dtyp DTYPE_Void = 0%N;
-    sizeof_dtyp_pos :
-    forall dt,
-      (0 <= sizeof_dtyp dt)%N;
-
     (** Alignment of a dtyp *)
     dtyp_alignment : dtyp -> alignment;
   }.
@@ -49,6 +44,10 @@ Definition ptr_size `{Sizeof} : N := sizeof_dtyp DTYPE_Pointer.
 
 Class SizeofTheory {S : Sizeof} : Prop :=
   {
+    sizeof_dtyp_void : sizeof_dtyp DTYPE_Void = 0%N;
+    sizeof_dtyp_pos :
+    forall dt, (0 <= sizeof_dtyp dt)%N;
+
     sizeof_dtyp_Struct :
     forall dts,
       sizeof_dtyp (DTYPE_Struct dts) = pad_to (max_preferred_dtyp_alignment dts) (List.fold_left (fun acc dt => N.add (pad_to_align (dtyp_alignment dt) acc) (sizeof_dtyp dt)) dts 0%N);

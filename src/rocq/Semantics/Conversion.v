@@ -6,7 +6,7 @@ From Vellvm Require Import
      Syntax
      Semantics.DynamicValues
      Params
-     Semantics.Memory.MemoryBytes.
+     Semantics.MemoryBytes.
 
 Section Convert.
   Context {Pa : Params}.

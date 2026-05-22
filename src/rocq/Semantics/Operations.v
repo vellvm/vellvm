@@ -4,4 +4,4 @@ From Vellvm Require Export
   Semantics.Select
   Semantics.Compare
   Semantics.Conversion
-  Semantics.Memory.MemoryBytes.
+  Semantics.MemoryBytes.

@@ -60,7 +60,7 @@
 ./rocq/Semantics/Gep.v
 ./rocq/Semantics/Select.v
 ./rocq/Semantics/Compare.v
-./rocq/Semantics/Memory/MemoryBytes.v
+./rocq/Semantics/MemoryBytes.v
 ./rocq/Semantics/Conversion.v
 ./rocq/Semantics/Operations.v
 ./rocq/Semantics/IntrinsicsDefinitions.v
