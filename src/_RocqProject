@@ -66,10 +66,13 @@
 ./rocq/Semantics/IntrinsicsDefinitions.v
 ./rocq/Semantics/Denotation.v
 
+./rocq/Semantics/Params/Memory.v
+./rocq/Semantics/Params/VellvmImplem/Memory.v
+
 ./rocq/Handlers/Global.v
 ./rocq/Handlers/Local.v
 ./rocq/Handlers/Stack.v
 ./rocq/Handlers/Intrinsics.v
-./rocq/Semantics/Memory.v
+./rocq/Handlers/Memory.v
 
 
