@@ -28,7 +28,7 @@ Definition eq_dec_option [A]
   right; intros abs; inv abs.
   right; intros abs; inv abs.
 Defined. 
-  
+
 Instance ProvenanceV : Provenance :=
   {|
     provenance := N ;

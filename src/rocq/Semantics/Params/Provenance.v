@@ -41,6 +41,7 @@ Class Provenance :=
 
     (* provenance allocation *)
     initial_provenance : provenance;
+    (* TODO: this field contains already in itself the deterministic instance, which is weird *)
     next_provenance : provenance -> provenance;
 
     eq_dec_provenance :

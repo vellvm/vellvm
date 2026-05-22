@@ -30,32 +30,40 @@ Section withParams.
 
   Existing Instance MemoryModelPrimitivesV.
   
-  Definition handle_memory {E} (h : memM ~> itree E) : MemoryE ~> itree E.
-    Set Printing Implicit.
-    refine (fun T e => h _ _).
-    refine (@handle_memoryM Pa (@MemoryModelPrimitivesV Pa) T _).
-    refine (fun T e => h _ (handle_memoryM e)).
-    fun T m =>
-      match m with
-      | MemPush => mempush
-      | MemPop => mempop
-      | Alloca t n align =>
-          addr <- allocate_dtyp t n;;
-          ret (DVALUE_Addr addr)
-      | Load t a =>
-          match a with
-          | DVALUE_Addr a =>
-              read_dvalue t a
-          | _ => mub "Loading from something that isn't an address."
-          end
-      | Store t a v =>
-          match a with
-          | DVALUE_Addr a =>
-              write_dvalue t a v
-          | _ => mub "Writing something to somewhere that isn't an address."
-          end
-      end.
+  Definition handle_memory {E} (h : memM ~> itree E) : MemoryE ~> itree E :=
+    fun T e => h _ (handle_memoryM e).
 
- 
+  (* Hmmm may have made a mistake somewhere: how do I access the current state?
+     It is stored in the event, but not at the top level... *)
+  Fixpoint memM_interp {E}
+    `{FailureE -< E}
+    `{UBE -< E}
+    `{OOME -< E}
+    : memM ~> itree E.
+    refine (fun T m => match m with
+                    | Mret x => ret x
+                    | Moom s => raiseOOM s
+                    | Mub s => raiseUB s
+                    | Merr s => raise s
+                    | Mfresh_addr σ k => _
+                    | Mfresh_prov σ k => _
+                    end
+           ).
+      
+  Definition mem_state_fresh_provenance (ms : state) : (Provenance * state) :=
+    match ms with
+    | mkMemState mem_stack pr =>
+        let pr' := next_provenance pr in
+        (pr', mkMemState mem_stack pr')
+    end.
+
+
+  Definition memM_model {E} : memM ~> itree E.
+    intros T e.
+    induction e.
+  
 End withParams.
+
+
+
 

@@ -1,19 +1,9 @@
 (** * Plugging the pieces together: executable and propositional semantics for Vellvm *)
 
 (* begin hide *)
-From Stdlib Require Import
-     Ensembles List String ZArith
-     Lists.ListSet
-     Relations.
-
 From ITree Require Import
      ITree
      Events.State.
-
-From ExtLib Require Import
-     Structures.Functor
-     Structures.Monads
-     Data.Map.FMapAList.
 
 From Vellvm Require Import
   Utilities
@@ -21,15 +11,9 @@ From Vellvm Require Import
   Semantics.LLVMEvents
   Semantics.Denotation
   Semantics.IntrinsicsDefinitions
-  Semantics.InterpretationStack
+  (* Semantics.InterpretationStack *)
   Semantics.VellvmIntegers
-  (* Semantics.Printfdefn *)
   QC.ShowAST.
-Import MonadNotation.
-Import ListNotations.
-Import Monads.
-Open Scope string_scope.
-
 (* end hide *)
 
 (** * Top Level
@@ -43,6 +27,10 @@ Open Scope string_scope.
    monad; and an executable one, that arbitrarily interpret under-defined values
    by setting its bits to 0.
  *)
+
+Section withParams.
+  Context {Pa : Params}.
+
 Module Type LLVMTopLevel (IS : InterpreterStack).
   Export IS.
   Export IS.LP.DV.
