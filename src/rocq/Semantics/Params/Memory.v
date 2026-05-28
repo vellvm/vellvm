@@ -98,27 +98,27 @@ Definition fresh_prov {S A P} : memS S A P P := Mfresh_prov (fun p => ret p).
 Class MemoryModelState {Pa : Params} :=
   {
     
+    state        : Type;
     memory_stack : Type;
-    state : Type;
     (* Type for frames and frame stacks *)
-    frame : Type;
-    framestack : Type;
+    frame        : Type;
+    framestack   : Type;
     (* Heaps *)
-    heap : Type;
+    heap         : Type;
     
     (* Accessors *)
-    state_get_memory : state -> memory_stack;
-    state_get_provenance : state -> provenance;
+    state_get_memory        : state -> memory_stack;
+    state_get_provenance    : state -> provenance;
     memory_stack_framestack : memory_stack -> framestack;
-    memory_stack_heap : memory_stack -> heap;
+    memory_stack_heap       : memory_stack -> heap;
 
     (* Update *)
-    state_put_memory : state -> memory_stack -> state;
+    state_put_memory        : state -> memory_stack -> state;
 
     (* Initial state *)
-    initial_state : state;
-    initial_frame : frame;
-    initial_heap : heap;
+    initial_state           : state;
+    initial_frame           : frame;
+    initial_heap            : heap;
 
   }.
 
@@ -153,6 +153,12 @@ Class MemoryModelPrimitives {Pa : Params} :=
     (** Heap operations *)
     malloc_bytes_with_pr : list memory_byte -> provenance -> memM addr ;
 
+    (* The free intrinsics is implementation specific to avoid exposing
+       in the interface both the lookup from heap to blocs, and an iterator
+       over them. TODO: rethink if we are happy with it.
+     *)
+    free : addr -> memM unit ;
+      
     (** Frame stacks *)
     mempush : memM unit ;
     mempop  : memM unit ;

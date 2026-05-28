@@ -107,6 +107,30 @@ Section MemoryModel.
          let bytes := List.concat element_bytes in
          allocate_bytes bytes.
 
+  Definition handle_memoryM : MemoryE ~> memM :=
+    fun T m =>
+      match m with
+      | MemPush => mempush
+      | MemPop => mempop
+      | Alloca t n align =>
+          addr <- allocate_dtyp t n;;
+          ret (DVALUE_Addr addr)
+      | Load t a =>
+          match a with
+          | DVALUE_Addr a =>
+              read_dvalue t a
+          | _ => mub "Loading from something that isn't an address."
+          end
+      | Store t a v =>
+          match a with
+          | DVALUE_Addr a =>
+              write_dvalue t a v
+          | _ => mub "Writing something to somewhere that isn't an address."
+          end
+      end.
+
+(** ** Memory-sensitive intrinsics *)
+  
   (** Malloc *)
   Definition malloc_bytes (init_bytes : list memory_byte) : memM addr :=
     pr <- fresh_prov;;
@@ -140,27 +164,108 @@ Section MemoryModel.
     else
       let byte := MByte (DVALUE_I 8 val) (DTYPE_I 8) 0 in
       write_bytes dst (repeatN (Z.to_N len) byte).
+  
+  (** Free from heap *)
+  (* Definition free (ptr : addr) : memM unit. *)
+  (*   refine (s <- get ;; *)
+  (*           let h := memory_stack_heap (state_get_memory s) in *)
+  (*           let raw_addr := ptr_to_int ptr in *)
+  (*           match lookup raw_addr h with *)
+  (*           | None => mub "Attempt to free non-heap allocated address." *)
+  (*           | Some block => _ *)
+  (*               (* let mem' := free_block_memory block mem in *) *)
+  (*               (* let h' := delete raw_addr h in *) *)
+  (*               (* let pr := mem_state_provenance ms in *) *)
+  (*               (* let ms' := mkMemState (mkMemoryStack mem' fs h') pr in *) *)
+  (*               (* put_mem_state ms' *) *)
+  (*           end *)
+  (*          ). *)
+  (*           let h := memory_stack_heap *)
+  (*           h <- get_heap ;; *)
+  (*           _). *)
+  (*   ms <- get_mem_state;; *)
+  (*   let '(mkMemoryStack mem fs h) := ms_memory_stack ms in *)
+  (*   | Some block => *)
+  (*  end). *)
 
-  Definition handle_memoryM : MemoryE ~> memM :=
-    fun T m =>
-      match m with
-      | MemPush => mempush
-      | MemPop => mempop
-      | Alloca t n align =>
-          addr <- allocate_dtyp t n;;
-          ret (DVALUE_Addr addr)
-      | Load t a =>
-          match a with
-          | DVALUE_Addr a =>
-              read_dvalue t a
-          | _ => mub "Loading from something that isn't an address."
-          end
-      | Store t a v =>
-          match a with
-          | DVALUE_Addr a =>
-              write_dvalue t a v
-          | _ => mub "Writing something to somewhere that isn't an address."
-          end
+
+  Definition handle_memcpy (args : list dvalue) : memM unit :=
+    match args with
+    | DVALUE_Addr dst ::
+        DVALUE_Addr src ::
+        DVALUE_I sz len ::
+        DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
+        memcpy src dst (unsigned len) (equ volatile VellvmIntegers.one)
+    | DVALUE_Addr dst ::
+        DVALUE_Addr src ::
+        DVALUE_IPTR len ::
+        DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
+        memcpy src dst (to_Z len) (equ volatile VellvmIntegers.one)
+    | _ => merr "Unsupported arguments to memcpy."
+    end.
+  
+  Definition handle_memset (args : list dvalue) : memM unit.
+    refine
+      (match args with
+       | DVALUE_Addr dst ::
+           DVALUE_I sz_val val ::
+           DVALUE_I sz_len len ::
+           DVALUE_I sz_vol volatile :: [] (* volatile ignored *)  =>
+           _
+       | _ => merr "Unsupported arguments to memset."
+       end).
+
+    destruct (Pos.eq_dec sz_val 8); subst.
+    - exact
+        (memset dst val (unsigned len) (equ volatile VellvmIntegers.one)).
+    - exact (merr "Unsupported arguments to memset.").
+  Defined. 
+
+  Definition handle_malloc (args : list dvalue) : memM addr :=
+    match args with
+    | [DVALUE_I bitwidth sz] =>
+        malloc_bytes (generate_num_poison_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8))
+    | [DVALUE_IPTR sz] =>
+        malloc_bytes (generate_num_poison_bytes (Z.to_N (to_unsigned sz)) (DTYPE_I 8))
+    | _ => merr "Malloc: invalid arguments."
+    end.
+
+  Definition handle_free (args : list dvalue) : memM unit :=
+    match args with
+    | [DVALUE_Addr ptr] => free ptr
+    | _ => merr "Free: invalid arguments."
+    end.
+
+  Definition handle_intrinsicM : IntrinsicE ~> memM :=
+    fun T e =>
+      match e with
+      | Intrinsic t name args =>
+          (* Pick all arguments, they should all be unique. *)
+          (* TODO: add more variants to memcpy *)
+          (* FIXME: use reldec typeclass? *)
+          if orb (Rocqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i32"))
+               (Rocqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i64"))
+          then
+            handle_memcpy args;;
+            ret (inr DVALUE_None)
+          else
+            if orb (Rocqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i32"))
+                 (Rocqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i64"))
+            then
+              handle_memset args;;
+              ret (inr DVALUE_None)
+            else
+              if (Rocqlib.proj_sumbool (string_dec name "malloc"))
+              then
+                addr <- handle_malloc args;;
+                ret (inr (DVALUE_Addr addr))
+              else
+                if (Rocqlib.proj_sumbool (string_dec name "free"))
+                then
+                  handle_free args;;
+                  ret (inr DVALUE_None)
+                else
+                  merr ("Unknown intrinsic: " ++ name)
       end.
 
 End MemoryModel.
@@ -212,8 +317,8 @@ Section Implementation.
 
   Instance MemoryModelStateV : @MemoryModelState Pa :=
     {|
-      memory_stack := Memory_stack ;
       state := State ;
+      memory_stack := Memory_stack ;
       frame := Frame ;
       framestack := Framestack ;
       heap := Heap ;
@@ -284,6 +389,9 @@ Section Implementation.
   Definition get_provenance : memM provenance :=
     s <- get ;;
     ret (state_get_provenance s).
+  Definition get_heap : memM heap :=
+    s <- get ;;
+    ret (Memory_stack_heap (state_get_memory s)).
   Definition app_provenance (f : provenance -> provenance) : memM unit :=
     s <- get ;;
     put {| state_memory_stack := s.(state_memory_stack) ;
@@ -306,6 +414,15 @@ Section Implementation.
              |};
            state_provenance := state_provenance s |}.
   Definition upd_mem (m : memory) : memM unit := app_mem (fun _ => m).
+  Definition app_heap (f : heap -> heap) : memM unit :=
+    s <- get ;;
+    put {| state_memory_stack :=
+             {| Memory_stack_memory     := s.(state_memory_stack).(Memory_stack_memory) ;
+               Memory_stack_frame_stack := s.(state_memory_stack).(Memory_stack_frame_stack);
+               Memory_stack_heap        := f s.(state_memory_stack).(Memory_stack_heap)
+             |};
+           state_provenance := state_provenance s |}.
+  Definition upd_heap (h : heap) : memM unit := app_heap (fun _ => h).
   Definition app_frame_stack (f : Framestack -> Framestack) : memM unit :=
     s <- get ;;
     put {| state_memory_stack :=
@@ -421,6 +538,20 @@ Section Implementation.
     app_frame_stack_eob pop_frame_stack;;
     app_mem (free_frame_memory f).
 
+  Definition free_block_memory (b : block) (m : memory) : memory :=
+    fold_left (fun m key => free_byte (ptr_to_int key) m) b m.
+
+  Definition Free (ptr : addr) : memM unit :=
+    let raw_addr := ptr_to_int ptr in
+    h <- get_heap ;;
+    match lookup raw_addr h with
+    | None => mub "Attempt to free non-heap allocated address."
+    | Some block =>
+        let h' := delete raw_addr h in
+        app_mem (free_block_memory block);;
+        upd_heap h'
+    end.
+  
   Instance MemoryModelPrimitivesV : @MemoryModelPrimitives Pa :=
     {|
       mm_state := MemoryModelStateV ;
@@ -430,6 +561,7 @@ Section Implementation.
       malloc_bytes_with_pr := Malloc_bytes_with_pr ;
       mempush := Mempush ;
       mempop := Mempop ;
+      free := Free
     |}.
   
 End Implementation.

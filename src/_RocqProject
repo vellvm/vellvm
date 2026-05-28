@@ -74,5 +74,7 @@
 ./rocq/Handlers/Stack.v
 ./rocq/Handlers/Intrinsics.v
 ./rocq/Handlers/Memory.v
-
-
+./rocq/Handlers/Draw.v
+./rocq/Handlers.v
+./rocq/Semantics/InterpretationStack.v
+./rocq/Semantics/TopLevel.v

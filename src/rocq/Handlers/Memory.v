@@ -55,7 +55,7 @@ Section withParams.
               | Mfresh_prov k => '(σ',p) <- fresh_provenance σ ;; memM_interp (k p) σ'
               end
   .
-
+ 
 (* TODO: Same signature for the model,
    but branching based on ctrees instead. *)
   (*   Fixpoint memM_model *)
@@ -71,7 +71,11 @@ Section withParams.
   (*             | Mfresh_prov k => *)
   (*             end *)
   (* . *)
- 
+  
+  Definition handle_intrinsic {E} (h : memM ~> stateT state (itree E))
+    : IntrinsicE ~> stateT state (itree E) :=
+    fun T e => h _ (handle_intrinsicM e).
+
 End withParams.
 
 Section PARAMS.
@@ -80,20 +84,18 @@ Section PARAMS.
   
   Variable (E F G: Type -> Type).
   Context  `{FailureE -< G} `{UBE -< G} `{OOME -< G}.
-  Notation Effin := (E +' F +' MemoryE +' G).
-  Notation Effout := (E +' F +' G).
+  Notation Effin := (E +' IntrinsicE +' MemoryE +' G).
+  Notation Effout := (E +' G).
 
   Definition E_trigger {M} : forall R, E R -> (stateT M (itree Effout) R) :=
-    fun R e m => r <- trigger e ;; ret (m, r).
-
-  Definition F_trigger {M} : forall R, F R -> (stateT M (itree Effout) R) :=
     fun R e m => r <- trigger e ;; ret (m, r).
 
   Definition G_trigger {M} : forall R, G R -> (stateT M (itree Effout) R) :=
     fun R e m => r <- trigger e ;; ret (m, r).
   
   Definition interp_memory_h : Effin ~> stateT state (itree Effout) :=
-    case_ E_trigger (case_ F_trigger (case_ (handle_memory memM_interp) G_trigger)).
+    case_ E_trigger
+      (case_ (handle_intrinsic memM_interp) (case_ (handle_memory memM_interp) G_trigger)).
   
   Definition interp_memory : itree Effin ~> stateT state (itree Effout) :=
     interp_state interp_memory_h.

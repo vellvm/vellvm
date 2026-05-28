@@ -27,7 +27,7 @@ VELLVM_BC =_build/default/ml/main.bc
 FRONTEND_EXE=_build/default/ml/frontend.exe
 AGGREGATE_EXE=_build/default/ml/aggregate.exe
 ROCQFILES_FRONTEND := Transformations/Transform QC/ShowAST QC/ReprAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib
-ROCQFILES_EXEC := QC/ShowAST QC/ReprAST QC/GenAlive2 Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib Semantics/Printfdefn Semantics/TopLevel Transformations/Transform Handlers/Handlers Theory/Refinement Utilities Numeric/Floats
+ROCQFILES_EXEC := QC/ShowAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib Semantics/TopLevel Handlers Utilities Numeric/Floats
 ROCQFILES_QC := QC/GenAST QC/GenMetadata QC/ECS QC/Lens QC/GenAlive2 QC/Generators QC/ReprAST QC/ShowAST QC/Utils QC/DList
 FRONTEND_VOFILES := $(ROCQFILES_FRONTEND:%=rocq/%.vo)
 EXEC_VFILES := $(ROCQFILES_EXEC:%=rocq/%.v)

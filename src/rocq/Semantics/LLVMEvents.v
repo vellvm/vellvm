@@ -200,28 +200,28 @@ Section withParams.
     Variant DrawE : Type -> Type :=
       | draw (dt : dtyp) : DrawE dvalue.
     
-  (* The signatures for computations that we will use during the successive stages of the interpretation of LLVM programs *)
-  (* TODO: The events and handlers are parameterized by the types of key and value.
+    (* The signatures for computations that we will use during the successive stages of the interpretation of LLVM programs *)
+    (* TODO: The events and handlers are parameterized by the types of key and value.
      It's weird for it to be the case if the events are concretely instantiated right here.
      At least TODO: remove these prefixes that are inconsistent with other names.
-   *)
-  Definition conv_E := MemoryE +' DrawE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
-  Definition lookup_E := GlobalE +' LocalE.
-  Definition exp_E := GlobalE +' LocalE +' MemoryE +' DrawE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
+     *)
+    Definition conv_E := MemoryE +' DrawE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
+    Definition lookup_E := GlobalE +' LocalE.
+    Definition exp_E := GlobalE +' LocalE +' MemoryE +' DrawE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
 
-  Definition LU_to_exp : lookup_E ~> exp_E :=
-    fun T e =>
-      match e with
-      | inl1 e => inl1 e
-      | inr1 e => inr1 (inl1 e)
-      end.
+    Definition LU_to_exp : lookup_E ~> exp_E :=
+      fun T e =>
+        match e with
+        | inl1 e => inl1 e
+        | inr1 e => inr1 (inl1 e)
+        end.
 
-  Definition conv_to_exp : conv_E ~> exp_E :=
-    fun T e => inr1 (inr1 e).
+    Definition conv_to_exp : conv_E ~> exp_E :=
+      fun T e => inr1 (inr1 e).
 
-  Definition instr_E := CallE +' IntrinsicE +' exp_E.
-  Definition exp_to_instr : exp_E ~> instr_E :=
-    fun T e => subevent _ e.
+    Definition instr_E := CallE +' IntrinsicE +' exp_E.
+    Definition exp_to_instr : exp_E ~> instr_E :=
+      fun T e => subevent _ e.
 
   (* Core effects. *)
   Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' GlobalE +' (LocalE +' StackE) +' MemoryE +' DrawE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
