@@ -16,7 +16,7 @@ open Assert
 open Driver
 open ShowAST
 
-module DV = InterpretationStack.InterpreterStackBigIntptr.LP.DV
+module DV = DynamicValues
 
 let string_of_function_id id : string =
   LLVMAst.( match id with
@@ -42,7 +42,7 @@ let exec_tests () =
   raise (Ran_tests (successful outcome))
 
 let compare_dvalues_exn dv1 dv2 ans : unit =
-  if DV.dvalue_eqb dv1 dv2 = ans then ()
+  if (Stdlib.compare dv1 dv2 = 0) = ans then ()
   else
     failwith
       (Printf.sprintf
@@ -200,19 +200,9 @@ let make_test_h run name ll_ast t : (string * assertion) option =
 
 let make_test name ll_ast t : (string * assertion) option =
   let run dtyp entry args ll_ast =
-    let linked_ast = (TopLevel.TopLevelBigIntptr.link_all !Driver.link_files ll_ast) in
+    let linked_ast = TopLevel.link_all !Driver.link_files ll_ast in
     Interpreter.step
-      (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp
-         entry
-         (Monad.ret (Obj.magic ITreeDefinition.coq_Monad_itree) args) linked_ast )
-  in
-  make_test_h run name ll_ast t
-
-let make_test_debug name ll_ast t : (string * assertion) option =
-  let run dtyp entry args ll_ast =
-    let linked_ast = (TopLevel.TopLevelBigIntptr.link_all !Driver.link_files ll_ast) in
-    Debugger.debugger
-      (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp
+      (TopLevel.interpreter_gen Interpreter.params dtyp
          entry
          (Monad.ret (Obj.magic ITreeDefinition.coq_Monad_itree) args) linked_ast )
   in
@@ -278,7 +268,6 @@ let test_file_h make_test path =
   | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
 
 let test_file path = test_file_h make_test path
-let test_file_debug path = test_file_h make_test_debug path
 
 let test_dir dir =
   Printf.printf "===> TESTING ASSERTIONS IN: %s\n" dir ;
@@ -332,18 +321,18 @@ let _test_all' () =
   let b3 = try Tester.test_dir !test_directory with Ran_tests b -> b in
   raise (Ran_tests (b1 && b2 && b3 && b4))
 
-let test_genAlive2 () =
-  let _ =
-    Printf.printf "============== RUNNING GENALIVE2 ==============\n"
-  in
-  let es = Generate.sample_exp 10 in
-  let output_charlist : char list =
-    (coq_DShowShow (coq_DShowList (dshow_exp dshow_typ false))) es
-  in
-  let buf = Buffer.create 16 in
-  List.iter (Buffer.add_char buf) output_charlist ;
-  Printf.printf "%s\n" (Buffer.contents buf)
-(* () *)
+(* let test_genAlive2 () = *)
+(*   let _ = *)
+(*     Printf.printf "============== RUNNING GENALIVE2 ==============\n" *)
+(*   in *)
+(*   let es = Generate.sample_exp 10 in *)
+(*   let output_charlist : char list = *)
+(*     (coq_DShowShow (coq_DShowList (dshow_exp dshow_typ false))) es *)
+(*   in *)
+(*   let buf = Buffer.create 16 in *)
+(*   List.iter (Buffer.add_char buf) output_charlist ; *)
+(*   Printf.printf "%s\n" (Buffer.contents buf) *)
+(* (\* () *\) *)
 
 let get_csmith_dir_name () = "generators/csmith/"
 
@@ -387,7 +376,6 @@ let args =
     , Unit exec_tests
     , "run the test suite, ignoring later inputs" )
   ; ("-test-file", String test_file, "run the assertions in a given file")
-  ; ("-test-file-debug", String test_file_debug, "run the assertions in a given file under the debugger")
   ; ("-test-dir", String test_dir, "run all .ll files in the given directory")
   ; ( "-test-dir2"
     , String Tester.test_dir
@@ -431,12 +419,11 @@ let args =
     , Set Driver.interpret
     , "interpret ll program starting from 'main' (same as -interpret)" )
   ; ("-debug", Set Interpreter.debug_flag, "enable debugging trace output")
-  ; ("-debugger", Set Driver.debugger, "debug an ll program")
   ; ("-v", Set Platform.verbose, "enables more verbose compilation output")
   ; ("-fast", Set fast_mode_flag, "Enable faster execution by disabling symbolic execution of undef values.")
-  ; ( "-genalive2"
-    , Unit test_genAlive2
-    , "Run the alive 2 generator and get some sample" ) ]
+   (* ; ( "-genalive2" *)
+    (* , Unit test_genAlive2 *)
+    (* , "Run the alive 2 generator and get some sample" ) *) ]
 
 
     let files = ref []
@@ -448,8 +435,8 @@ let _ =
       (fun filename -> files := filename :: !files)
       "USAGE: ./vellvm [options] <files>\n" ;
     Platform.configure () ;
-    Denotation.fast_mode_object.fast_mode_set !fast_mode_flag ;
-    process_files !command_line_args !files 
+    ignore !fast_mode_flag ;
+    process_files !command_line_args !files
   with
   | Ran_tests true -> exit 0
   | Ran_tests false -> exit 1

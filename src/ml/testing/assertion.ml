@@ -4,7 +4,9 @@
 open LLVMAst
 open TopLevel
 
-open InterpretationStack.InterpreterStackBigIntptr.LP
+module DV = DynamicValues
+open DV
+let addr_v = Address0.coq_AddressV IPtrInfinite.coq_IPZ
 
 open Llvm_printer
 open Either
@@ -69,22 +71,22 @@ let show_src_tgt_mode = function
 
 type test =
   (* expected dvalue, dynamic type, entry, arguments *)
-  | EQTest of DV.dvalue * DynamicTypes.dtyp * function_id * DV.uvalue list
-  | SuccessTest of function_id * DV.uvalue list
+  | EQTest of DV.dvalue * DynamicTypes.dtyp * function_id * DV.dvalue list
+  | SuccessTest of function_id * DV.dvalue list
   (* dynamic type, entry, arguments *)
-  | POISONTest of DynamicTypes.dtyp * function_id * DV.uvalue list
+  | POISONTest of DynamicTypes.dtyp * function_id * DV.dvalue list
   (* Find a better name for this *)
   (* retty, args for src, (t, args) for arguments to source and test *)
   (* Source target mode, dynamic type, Left is arguments and right is AST*)
   | SRCTGTTest of
       src_tgt_mode
       * DynamicTypes.dtyp
-      * ( (LLVMAst.typ * DV.uvalue) list
+      * ( (LLVMAst.typ * DV.dvalue) list
         , (LLVMAst.typ, GA.runnable_blocks) LLVMAst.toplevel_entity list )
         Either.t
 
 (* DVALUE equality *)
-let rec eq_dvalue (l : DV.dvalue) (r : DV.dvalue) : bool = DV.dvalue_eqb l r
+let rec eq_dvalue (l : DV.dvalue) (r : DV.dvalue) : bool = Stdlib.compare l r = 0
 
 (* Directly converts a piece of syntax to a dvalue without going through
    semantic interpretation. Only works on literals. *)
@@ -109,7 +111,7 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
   match (typ, exp) with
   (* Allow null pointers literals *)
   | TYPE_Pointer _, EXP_Null ->
-      DVALUE_Addr InterpretationStack.InterpreterStackBigIntptr.LP.ADDR.null
+      DVALUE_Addr addr_v.null
   | TYPE_I i, EXP_Integer x ->
      DVALUE_I (i, BinIntDef.Z.of_num_int x)
   | TYPE_FP FP_float, EXP_Float f ->
@@ -137,32 +139,32 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
            (string_of_typ typ) (string_of_exp exp) )
 
 let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
-    DV.uvalue =
+    DV.dvalue =
   match (typ, exp) with
   (* Allow null pointers literals *)
   | TYPE_Pointer _, EXP_Null ->
-      UVALUE_Addr InterpretationStack.InterpreterStackBigIntptr.LP.ADDR.null
+      DVALUE_Addr addr_v.null
   | TYPE_I i, EXP_Integer x ->
-     UVALUE_I (i, BinIntDef.Z.of_num_int x)
+     DVALUE_I (i, BinIntDef.Z.of_num_int x)
   | TYPE_FP FP_float, EXP_Float f ->
      begin match float32_of_float_syntax f with
-     | Some v ->  UVALUE_Float v
+     | Some v ->  DVALUE_Float v
      | None -> failwith "assertion.ml: texp_to_uvalue failed float32 conversion"
      end
   | TYPE_FP FP_double, EXP_Float f ->
      begin match float_of_float_syntax f with
-     | Some v ->  UVALUE_Double v
+     | Some v ->  DVALUE_Double v
      | None -> failwith "assertion.ml: texp_to_uvalue failed float conversion"
      end
   | TYPE_Array _, EXP_Array (t, elts) ->
-      UVALUE_Array (typ_to_dtyp t, (List.map texp_to_uvalue elts))
+      DVALUE_Array (typ_to_dtyp t, (List.map texp_to_uvalue elts))
   | TYPE_Struct _, EXP_Struct elts ->
-      UVALUE_Struct (List.map texp_to_uvalue elts)
+      DVALUE_Struct (List.map texp_to_uvalue elts)
   | TYPE_Packed_struct _, EXP_Packed_struct elts ->
-      UVALUE_Packed_struct (List.map texp_to_uvalue elts)
+      DVALUE_Packed_struct (List.map texp_to_uvalue elts)
   | TYPE_Vector _, EXP_Vector (t, elts) ->
-     UVALUE_Vector (typ_to_dtyp t, (List.map texp_to_uvalue elts))
-  | _, EXP_Poison -> (UVALUE_Poison (typ_to_dtyp typ))
+     DVALUE_Vector (typ_to_dtyp t, (List.map texp_to_uvalue elts))
+  | _, EXP_Poison -> (DVALUE_Poison (typ_to_dtyp typ))
   | _, _ ->
       failwith
         (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"
@@ -335,7 +337,7 @@ and parse_srctgt_assertion (filename : string) (line : string) : test list =
         | true ->
             (* TODO: Need to replace the following command with generate
                program and do SRCTGTTEST with it -> type to dtype*)
-            let generated_args : (LLVMAst.typ * DV.uvalue) list list =
+            let generated_args : (LLVMAst.typ * DV.dvalue) list list =
               Generate.generate_n_args num_trials (fst src_t)
             in
             (* tgt_t is args_t * ret_t*)

@@ -1,4 +1,3 @@
-
 From Stdlib Require Import
      Morphisms String.
 
@@ -16,8 +15,7 @@ From Vellvm Require Import
      Utilities
      Syntax
      Semantics
-     Handlers.Handlers
-     Theory.Refinement.
+     Handlers.
 
 Import ITreeNotations.
 
@@ -25,7 +23,6 @@ Import ListNotations.
 
 From Vellvm Require
      Semantics.TopLevel
-     Transformations.Transform
      Utils.ParserHelper
      QC.ShowAST
      QC.ReprAST
@@ -35,7 +32,7 @@ Set Extraction AccessOpaque.
 
 From QuickChick Require Import RandomQC.
                            
-From Vellvm Require QC.GenAlive2.
+(* From Vellvm Require QC.GenAlive2. *)
 
 Require ExtrOcamlBasic.
 Require ExtrOcamlString.
@@ -89,37 +86,6 @@ Extract Constant fast_mode_object => "
   }
   ".
 
-Extract Constant globals_object => "
-  let globals_ref = ref [] in
-  let globals_set gs = (globals_ref := gs; ()) in
-  let globals_get = fun _ -> !globals_ref in
-  Obj.magic(fun _ -> { globals_set;
-    globals_get;
-  })
-  ".
-
-Extract Constant locals_object => "
-  let locals_ref = ref [] in
-  let locals_set ls = (locals_ref := ls; ()) in
-  let locals_get = fun _ -> !locals_ref in
-  Obj.magic(fun _ -> { locals_set;
-    locals_get;
-  })
-  ".
-
-Extract Constant local_stack_object => "
-  let local_stack_ref = ref [{ stack_vars = []; stack_handler = None; stack_exc = None; stack_loc = None }] in
-  let local_stack_set ls = (local_stack_ref := match !local_stack_ref with [] -> Stdlib.failwith ""Empty stack, can't set"" | _::xs -> ls :: xs) in
-  let local_stack_get = fun _ -> !local_stack_ref in
-  let local_stack_push ls = local_stack_ref := ls :: !local_stack_ref in
-  let local_stack_pop = fun _ -> local_stack_ref := List.tl !local_stack_ref in
-  Obj.magic({ local_stack_set;
-    local_stack_get;
-    local_stack_push;
-    local_stack_pop;
-  })
-  ".
-
 (* OCaml pervasive types ---------------------------------------------------- *)
 (* Extract Inlined Constant LLVMAst.int => "int". *)
 (* Extract Inlined Constant LLVMAst.float => "float". *)
@@ -153,4 +119,4 @@ Extract Constant randomRN =>
 Extract Constant randomRNat =>
   "(fun (x,y) r -> let yint = ExtrOcamlIntConv.int_of_nat y in let xint = ExtrOcamlIntConv.int_of_nat x in if yint < xint then failwith ""choose called with unordered arguments"" else  (ExtrOcamlIntConv.nat_of_int (xint + (Random.State.int r (yint - xint + 1))), r))".
 
-Separate Extraction TopLevelBigIntptr ExtrOcamlIntConv TopLevel AstLib Transform ParserHelper ShowAST ReprAST Handlers GenAlive2 Numeric.Floats BinNums BinPos (* QCVellvm *).
+Separate Extraction ExtrOcamlIntConv TopLevel AstLib ParserHelper ShowAST ReprAST Handlers Numeric.Floats BinNums BinPos (* QCVellvm *).

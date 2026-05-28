@@ -8,13 +8,11 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-open InterpretationStack.InterpreterStackBigIntptr.LLVM.MEM
+module DV = DynamicValues
 
-open InterpretationStack.InterpreterStackBigIntptr.LLVM.Stack
-
-open InterpretationStack.InterpreterStackBigIntptr.LLVM.Global
-
-open InterpretationStack.InterpreterStackBigIntptr.LP
+let iptr   = IPtrInfinite.coq_IPZ
+let params = ParamsV.coq_ParamsV iptr
+let addr_v = Address0.coq_AddressV iptr
 
 open LLVMEvents
 
@@ -24,8 +22,8 @@ open Result
 
 (* TODO: probably should be part of ADDRESS module interface*)
 let pp_addr :
-    Format.formatter -> MemoryModelImplementation.InfAddr.addr -> unit =
- fun ppf _ -> fprintf ppf "UVALUE_Addr(?)"
+    Format.formatter -> Address.addr -> unit =
+ fun ppf _ -> fprintf ppf "DVALUE_Addr(?)"
 
 (* Converts `float` to a `string` at max precision. Both OCaml `printf` and
    `string_of_float` truncate and do not print all significat digits. *)
@@ -35,44 +33,42 @@ let string_of_float_full f =
   let s = sprintf "%.350f" f in
   Str.global_replace (Str.regexp "0+$") "" s
 
-let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
+let rec pp_uvalue : Format.formatter -> DV.dvalue -> unit =
   let open Camlcoq in
+  let open DV in
   let pp_comma_space ppf () = pp_print_string ppf ", " in
   fun ppf -> function
-    | UVALUE_Addr _x -> fprintf ppf "UVALUE_Addr"
-    | UVALUE_I (sz, x) ->
-        fprintf ppf "UVALUE_I%d(%d)"
+    | DVALUE_Addr _x -> fprintf ppf "DVALUE_Addr"
+    | DVALUE_I (sz, x) ->
+        fprintf ppf "DVALUE_I%d(%d)"
           (Camlcoq.P.to_int sz) (Camlcoq.Z.to_int (Integers.unsigned sz x))
-    | UVALUE_IPTR x ->
-        fprintf ppf "UVALUE_IPTR(%d)"
-          (Camlcoq.Z.to_int
-             (InterpretationStack.InterpreterStackBigIntptr.LP.IP.to_Z x) )
-    | UVALUE_Double x ->
-        fprintf ppf "UVALUE_Double(%s)"
+    | DVALUE_IPTR x ->
+        fprintf ppf "DVALUE_IPTR(%d)"
+          (Camlcoq.Z.to_int (iptr.to_Z x))
+    | DVALUE_Double x ->
+        fprintf ppf "DVALUE_Double(%s)"
           (string_of_float_full (camlfloat_of_coqfloat x))
-    | UVALUE_Float x ->
-        fprintf ppf "UVALUE_Float(%s)"
+    | DVALUE_Float x ->
+        fprintf ppf "DVALUE_Float(%s)"
           (string_of_float_full (camlfloat_of_coqfloat32 x))
-    | UVALUE_Poison _ -> fprintf ppf "UVALUE_Poison"
-    | UVALUE_None -> fprintf ppf "UVALUE_None"
-    | UVALUE_Undef _ -> fprintf ppf "UVALUE_Undef"
-    | UVALUE_Struct l ->
-        fprintf ppf "UVALUE_Struct(%a)"
+    | DVALUE_Poison _ -> fprintf ppf "DVALUE_Poison"
+    | DVALUE_None -> fprintf ppf "DVALUE_None"
+    | DVALUE_Struct l ->
+        fprintf ppf "DVALUE_Struct(%a)"
           (pp_print_list ~pp_sep:pp_comma_space pp_uvalue)
           l
-    | UVALUE_Packed_struct l ->
-        fprintf ppf "UVALUE_Packet_struct(%a)"
+    | DVALUE_Packed_struct l ->
+        fprintf ppf "DVALUE_Packet_struct(%a)"
           (pp_print_list ~pp_sep:pp_comma_space pp_uvalue)
           l
-    | UVALUE_Array (_, l) ->
-        fprintf ppf "UVALUE_Array(%a)"
+    | DVALUE_Array (_, l) ->
+        fprintf ppf "DVALUE_Array(%a)"
           (pp_print_list ~pp_sep:pp_comma_space pp_uvalue)
           l
-    | UVALUE_Vector (_, l) ->
-        fprintf ppf "UVALUE_Vector(%a)"
+    | DVALUE_Vector (_, l) ->
+        fprintf ppf "DVALUE_Vector(%a)"
           (pp_print_list ~pp_sep:pp_comma_space pp_uvalue)
           l
-    | _ -> fprintf ppf "pp_uvalue: todo"
 
 let char_of_I8 x =
   char_of_int (Camlcoq.Z.to_int (Integers.unsigned (Camlcoq.P.of_int 8) x))
@@ -103,23 +99,19 @@ let debug (msg : string) =
 
 let current_line = ref (Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()))
 
-let single_step (m :
-      ( ('a, 'b, 'c) coq_L4
-      , MMEP.MMSP.coq_MemState
-        * ( StoreId.store_id
-          * ((lstack_frame * lstack) * (global_env * DV.dvalue)) ) )
-        itree ) : (( ('a, 'b, 'c) coq_L4
-      , MMEP.MMSP.coq_MemState
-        * ( StoreId.store_id
-          * ((lstack_frame * lstack) * (global_env * DV.dvalue)) ) )
-        itree, (DV.dvalue, exit_condition) result) Either.t =
+type interp_state =
+  Memory.state * ((Stack.stack_frame * Stack.stack) * (Global.global_env * DV.dvalue))
+
+let single_step (m : (__ coq_L4, interp_state) itree)
+    : ((__ coq_L4, interp_state) itree,
+       (DV.dvalue, exit_condition) result) Either.t =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
   | TauF x ->
      if !debug_flag then begin
          let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
-         if loc_str <> !current_line then begin 
+         if loc_str <> !current_line then begin
              Printf.printf "%s\n%!" loc_str;
              current_line := loc_str
            end
@@ -127,7 +119,7 @@ let single_step (m :
      Either.left x
   (* SAZ: Could inspect the memory or stack here too. *)
   (* We finished the computation *)
-  | RetF (_, (_, (_, (_, v)))) -> Either.right (Ok v)
+  | RetF (_, ((_, _), (_, v))) -> Either.right (Ok v)
   (* The ExternalCallE effect *)
   | VisF (Sum.Coq_inl1 (ExternalCall (t, _, dvs)), _) ->
      let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
@@ -174,13 +166,8 @@ let single_step (m :
      let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
      Either.right (Error (Failed loc_str))
 
-let rec step
-    (m :
-      ( ('a, 'b, 'c) coq_L4
-      , MMEP.MMSP.coq_MemState
-        * ( StoreId.store_id
-          * ((lstack_frame * lstack) * (global_env * DV.dvalue)) ) )
-      itree ) : (DV.dvalue, exit_condition) result =
+let rec step (m : (__ coq_L4, interp_state) itree)
+    : (DV.dvalue, exit_condition) result =
   match single_step m with
   | Either.Left x -> step x
   | Either.Right res -> res
@@ -201,4 +188,4 @@ let interpret
     : (DV.dvalue, exit_condition) result =
   Out_channel.set_buffered stdout false;
   Out_channel.set_buffered stderr false;
-  step (TopLevel.TopLevelBigIntptr.interpreter (List.map Camlcoq.coqstring_of_camlstring args) prog)
+  step (TopLevel.interpreter (List.map Camlcoq.coqstring_of_camlstring args) prog)

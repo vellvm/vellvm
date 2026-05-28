@@ -8,6 +8,7 @@
 (library
   (name testing)
   (wrapped false)
+  (modules assertion generate)
   (libraries extracted libvellvm str qcheck)
   (synopsis "Vellvm Testing Library")
   )

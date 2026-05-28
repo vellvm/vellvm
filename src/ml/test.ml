@@ -13,7 +13,7 @@ open Driver
 
 open Assert
 
-open InterpretationStack.InterpreterStackBigIntptr.LP
+module DV = DynamicValues
 
 let default_cl_test_args = []
 

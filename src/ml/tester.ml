@@ -4,7 +4,7 @@ open Vellvm_base
 open Result
 open Driver
 
-module DV = InterpretationStack.InterpreterStackBigIntptr.LP.DV
+module DV = DynamicValues
 
 (* test result location
    ------------------------------------------------------------- *)
@@ -28,7 +28,7 @@ let suite = ref Test.suite
 (* Given two dvalues and an answer, return whether or not they equal the
    answer*)
 let compare_dvalues_exn dv1 dv2 ans : (doc, unit) Either.t =
-  match DV.dvalue_eqb dv1 dv2 = ans with
+  match (Stdlib.compare dv1 dv2 = 0) = ans with
   | true -> Right ()
   | false ->
       Left
@@ -71,7 +71,7 @@ let string_of_function_id id : string =
 
 let run dtyp entry args ll_ast =
   Interpreter.step
-    (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp
+    (TopLevel.interpreter_gen Interpreter.params dtyp
        entry
        (Monad.ret (Obj.magic ITreeDefinition.coq_Monad_itree) args) ll_ast )
 
@@ -107,7 +107,7 @@ let eval_POISONTest (name : string) (got : unit -> DV.dvalue)
    src_tgt_error_side * string -> test_result*)
 
 let eval_SRCTGTTest (name : string) (expected_rett : DynamicTypes.dtyp)
-    (tgt_fn_str : LLVMAst.function_id) (src_fn_str : LLVMAst.function_id) (v_args : DV.uvalue list)
+    (tgt_fn_str : LLVMAst.function_id) (src_fn_str : LLVMAst.function_id) (v_args : DV.dvalue list)
     (mode : Assertion.src_tgt_mode) (sum_ast : Result.ast) () : result_sum =
   let res_tgt = run expected_rett tgt_fn_str v_args sum_ast in
   let res_src = run expected_rett src_fn_str v_args sum_ast in
