@@ -232,10 +232,8 @@ Section Implementation.
     IM.find phys_addr mem.
   Definition set_byte_raw_mem  (mem : memory) (phys_addr : Z) (byte : byte) : memory :=
     IM.add phys_addr byte mem.
-  Definition next_key_mem (mem : memory) : Z :=
-    next_key mem.
-
-  (** Add block to memory with a given allocation id *)
+  
+ (** Add block to memory with a given allocation id *)
   Definition memory_bytes_to_bytes
     (aid : allocationId) (bytes : list memory_byte) : list byte :=
     map (fun b => (b, aid)) bytes.
@@ -270,41 +268,52 @@ Section Implementation.
        end.
 
   Definition get_frame_stack : memM Framestack :=
-    fun s => ret (s,Memory_stack_frame_stack (state_get_memory s)).
+    s <- get ;;
+    ret (Memory_stack_frame_stack (state_get_memory s)).
   Definition get_frame : memM Frame :=
     fs <- get_frame_stack ;;
     match fs with
     | Singleton f | Snoc _ f => ret f
     end. 
   Definition get_mem : memM memory :=
-    fun s => ret (s,Memory_stack_memory (state_get_memory s)).
+    s <- get ;;
+    ret (Memory_stack_memory (state_get_memory s)).
   Definition get_framestack : memM Framestack :=
-    fun s => ret (s,Memory_stack_frame_stack (state_get_memory s)).
-  
-  Definition app_state : (state -> state) -> memM unit :=
-    fun f s => ret (f s, tt).
-  Definition app_mem_stack : (Memory_stack -> Memory_stack) -> memM unit :=
-    fun f s =>
-      ret ({| state_memory_stack := f s.(state_memory_stack) ;
-             state_provenance := state_provenance s |},tt).
+    s <- get ;;
+    ret (Memory_stack_frame_stack (state_get_memory s)).
+  Definition get_provenance : memM provenance :=
+    s <- get ;;
+    ret (state_get_provenance s).
+  Definition app_provenance (f : provenance -> provenance) : memM unit :=
+    s <- get ;;
+    put {| state_memory_stack := s.(state_memory_stack) ;
+          state_provenance := f s.(state_provenance) |}.
+   Definition app_state (f : state -> state) : memM unit :=
+    s <- get ;;
+    put (f s). 
+  Definition app_mem_stack (f : Memory_stack -> Memory_stack) : memM unit :=
+    s <- get ;;
+    put {| state_memory_stack := f s.(state_memory_stack) ;
+          state_provenance := state_provenance s |}.
+  Definition upd_provenance (p : provenance) : memM unit := app_provenance (fun _ => p).
   Definition upd_mem_stack (m : Memory_stack) : memM unit := app_mem_stack (fun _ => m).
-  Definition app_mem : (memory -> memory) -> memM unit :=
-    fun f s =>
-      ret ({| state_memory_stack :=
-               {| Memory_stack_memory     := f s.(state_memory_stack).(Memory_stack_memory) ;
-                 Memory_stack_frame_stack := s.(state_memory_stack).(Memory_stack_frame_stack);
-                 Memory_stack_heap        := s.(state_memory_stack).(Memory_stack_heap)
-               |};
-             state_provenance := state_provenance s |},tt).
+  Definition app_mem (f : memory -> memory) : memM unit :=
+    s <- get ;;
+    put {| state_memory_stack :=
+             {| Memory_stack_memory     := f s.(state_memory_stack).(Memory_stack_memory) ;
+               Memory_stack_frame_stack := s.(state_memory_stack).(Memory_stack_frame_stack);
+               Memory_stack_heap        := s.(state_memory_stack).(Memory_stack_heap)
+             |};
+           state_provenance := state_provenance s |}.
   Definition upd_mem (m : memory) : memM unit := app_mem (fun _ => m).
-  Definition app_frame_stack : (Framestack -> Framestack) -> memM unit :=
-    fun f s =>
-      ret ({| state_memory_stack :=
+  Definition app_frame_stack (f : Framestack -> Framestack) : memM unit :=
+    s <- get ;;
+    put {| state_memory_stack :=
                {| Memory_stack_memory     := s.(state_memory_stack).(Memory_stack_memory) ;
                  Memory_stack_frame_stack := f s.(state_memory_stack).(Memory_stack_frame_stack);
                  Memory_stack_heap        := s.(state_memory_stack).(Memory_stack_heap)
                |};
-             state_provenance := state_provenance s |},tt).
+             state_provenance := state_provenance s |}.
   Definition upd_frame_stack (fs : Framestack) : memM unit := app_frame_stack (fun _ => fs).
   Definition app_frame_stack_eob : (Framestack -> EOB Framestack) -> memM unit :=
     fun f =>
@@ -312,10 +321,6 @@ Section Implementation.
       f' <- lift (f fs) ;;
       upd_frame_stack f'.
   
-  Definition next_key : memM Z :=
-    m <- get_mem ;;
-    ret (next_key_mem m).
-
   Definition push_frame_stack (f : Frame) (fs : Framestack) : Framestack :=
     Snoc fs f.
   Definition pop_frame_stack (fs : Framestack) : EOB Framestack :=
@@ -325,11 +330,11 @@ Section Implementation.
     end.
 
   Definition read_byte_raw (msg : string) (phys_addr : Z) : memM byte :=
-    fun s =>
-      match read_byte_raw_mem (Memory_stack_memory (state_get_memory s)) phys_addr with
-      | Some b => ret (s,b)
-      | None => Mub msg
-      end.
+    s <- get ;;
+    match read_byte_raw_mem (Memory_stack_memory (state_get_memory s)) phys_addr with
+    | Some b => ret b
+    | None => Mub msg
+    end.
   
   Definition set_byte_raw (phys_addr : Z) (byte : byte) : memM unit :=
     m <- get_mem ;;

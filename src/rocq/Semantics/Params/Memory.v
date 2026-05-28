@@ -38,47 +38,58 @@ Import Logic.
 
 Open Scope Z.
 
-Inductive memB {S A P : Type} (X : Type) : Type :=
-| Mret (x : X) : memB X
-| Moom (s : string) : memB X
-| Mub  (s : string) : memB X
-| Merr (s : string) : memB X
-| Mfresh_addr (σ : S) (k : A -> memB X) : memB X
-| Mfresh_prov (σ : S) (k : P -> memB X) : memB X.
+Inductive memS {S A P : Type} (X : Type) : Type :=
+| Mret (x : X) : memS X
+| Moom (s : string) : memS X
+| Mub  (s : string) : memS X
+| Merr (s : string) : memS X
+| Mget (k : S -> memS X) : memS X
+| Mput (σ : S) (k : memS X) : memS X
+(* | Mfresh_addr (k : A -> memS X) : memS X *)
+| Mnext_key (k : Z -> memS X) : memS X
+| Mfresh_prov (k : P -> memS X) : memS X.
 
-Arguments memB : clear implicits.
+Arguments memS : clear implicits.
 Arguments Moom {S A P} [X].
 Arguments Mub  {S A P} [X].
 Arguments Merr {S A P} [X].
-Arguments Mfresh_addr {S A P} [X].
+Arguments Mget {S A P} [X].
+Arguments Mput {S A P} [X].
+(* Arguments Mfresh_addr {S A P} [X]. *)
+Arguments Mnext_key {S A P} [X].
 Arguments Mfresh_prov {S A P} [X].
-Fixpoint memB_bind {S A P X Y} (c : memB S A P X) (k : X -> memB S A P Y) : memB S A P Y :=
+Fixpoint memS_bind {S A P X Y} (c : memS S A P X) (k : X -> memS S A P Y) : memS S A P Y :=
   match c with
   | Mret x => k x
   | Moom s => Moom s
   | Mub s => Mub s
   | Merr s => Merr s
-  | Mfresh_addr σ g => Mfresh_addr σ (fun a => memB_bind (g a) k)
-  | Mfresh_prov σ g => Mfresh_prov σ (fun a => memB_bind (g a) k)
+  | Mget g => Mget (fun σ => memS_bind (g σ) k)
+  | Mput σ g => Mput σ (memS_bind g k)
+  (* | Mfresh_addr g => Mfresh_addr (fun a => memS_bind (g a) k) *)
+  | Mnext_key g => Mnext_key (fun a => memS_bind (g a) k)
+  | Mfresh_prov g => Mfresh_prov (fun a => memS_bind (g a) k)
   end.
 
-#[global] Instance memB_mon {S A P} : Monad (memB S A P) :=
+#[global] Instance memS_mon {S A P} : Monad (memS S A P) :=
   {| ret _ x := Mret x ;
-    bind _ _ c k := memB_bind c k |}.
+    bind _ _ c k := memS_bind c k |}.
 
-Definition memS S A P := stateT S (memB S A P).
+(* Definition memS S A P := stateT S (memB S A P). *)
 Definition lift {S A P} : EOB ~> memS S A P :=
   fun _ c => match c with
           | raise_ret x => ret x
-          | raise_oom s   => fun σ => Moom s
-          | raise_ub s    => fun σ => Mub  s
-          | raise_error s => fun σ => Merr s
+          | raise_oom s   => Moom s
+          | raise_ub s    => Mub  s
+          | raise_error s => Merr s
           end.
-Definition mub        {S A P X} s : memS S A P X := fun σ => Mub s.
-Definition merr       {S A P X} s : memS S A P X := fun σ => Merr s.
-Definition moom       {S A P X} s : memS S A P X := fun σ => Moom s.
-Definition fresh_addr {S A P}     : memS S A P A := fun σ => Mfresh_addr σ (fun a => ret (σ,a)). 
-Definition fresh_prov {S A P}     : memS S A P P := fun σ => Mfresh_prov σ (fun p => ret (σ,p)). 
+Definition mub        {S A P X} s : memS S A P X := Mub s.
+Definition merr       {S A P X} s : memS S A P X := Merr s.
+Definition moom       {S A P X} s : memS S A P X := Moom s.
+Definition put {S A P} (σ: S) : memS S A P unit := Mput σ (ret tt).
+Definition get {S A P}  : memS S A P S := Mget (fun σ => ret σ).
+Definition next_key {S A P} : memS S A P Z := Mnext_key (fun a => ret a). 
+Definition fresh_prov {S A P} : memS S A P P := Mfresh_prov (fun p => ret p). 
 
 (*** Internal state of memory *)
 (* TODO: MemoryModelPrimitives feels fairly reasonable, but what is exposed
@@ -116,8 +127,8 @@ Section MemM.
 
   Definition memM := memS state addr provenance.
 
-  Definition get_state  : memM state := fun s => ret (s,s).
-  Definition get_memory : memM memory_stack := fun s => ret (s, state_get_memory s).
+  (* Definition get_state  : memM state := fun s => ret (s,s). *)
+  (* Definition get_memory : memM memory_stack := fun s => ret (s, state_get_memory s). *)
 
 End MemM.
 
@@ -133,6 +144,10 @@ Class MemoryModelPrimitives {Pa : Params} :=
     write_byte : addr -> memory_byte -> memM unit ;
 
     (** Stack allocations *)
+    (* TOOD: The list of bytes get huge in practice when allocating big chunk of memory.
+       For performance reasons, it might be better to take a different representation here
+       ([Fin n -> memory_byte] for [n] the length of the list?)
+     *)
     allocate_bytes_with_pr : list memory_byte -> provenance -> memM addr ;
 
     (** Heap operations *)

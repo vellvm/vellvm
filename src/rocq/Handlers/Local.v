@@ -67,7 +67,7 @@ Section Locals.
 
   Open Scope monad_scope.
   Section PARAMS.
-    Variable (E F G H: Type -> Type).
+    Variable (E F G: Type -> Type).
     Context `{FailureE -< G}.
     Notation Effin := (E +' F +' LocalE +' G).
     Notation Effout := (E +' F +' G).
@@ -176,7 +176,7 @@ Section Locals.
         do 3 red.
         intros a.
         do 2 red.
-        destruct b; try setoid_rewrite H1; try reflexivity.
+        destruct b; try setoid_rewrite H0; try reflexivity.
       Qed.
 
       #[global] Instance Proper_interp_local_pointwise {T} {b} :
@@ -184,7 +184,7 @@ Section Locals.
       Proof.
         intros ? ? ? ? ? ?; subst.
         unfold interp_local.
-        destruct b; rewrite H1;
+        destruct b; rewrite H0;
           reflexivity.
       Qed.
 

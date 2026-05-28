@@ -29,7 +29,7 @@ Section StackMap.
   Context {Pa : Params}.
 
   Record stack_frame :=
-    { stack_vars : list (raw_id * dvalue);
+    { stack_vars : FMapAList.alist raw_id dvalue;
       stack_handler : option block_id;
       stack_exc : option dvalue;
       stack_loc : option string;
@@ -37,19 +37,19 @@ Section StackMap.
   
   Definition stack := list stack_frame.
 
-  #[global] Instance Map_stack_frame : Map raw_id dvalue stack_frame :=
-  { empty := Build_stack_frame Maps.empty None None None;
-    add := fun k v stack_frame => Build_stack_frame (add k v stack_frame.(stack_vars)) stack_frame.(stack_handler) stack_frame.(stack_exc) stack_frame.(stack_loc);
-    remove := fun k stack_frame => Build_stack_frame (remove k stack_frame.(stack_vars)) stack_frame.(stack_handler) stack_frame.(stack_exc) stack_frame.(stack_loc);
-    lookup := fun k stack_frame => lookup k stack_frame.(stack_vars);
-    union := fun s1 s2 =>
-               let var_union := union s1.(stack_vars) s2.(stack_vars) in
-               (* Not sure of the order these should merge in... *)
-               let handler_union := CFG.opt_first s2.(stack_handler) s1.(stack_handler) in
-               let exc_union := CFG.opt_first s2.(stack_exc) s1.(stack_exc) in
-               let loc_union := CFG.opt_first s1.(stack_loc) s2.(stack_loc) in
-               Build_stack_frame var_union handler_union exc_union loc_union
-  }.
+  (* #[global] Instance Map_stack_frame : Map raw_id dvalue stack_frame := *)
+  (* { empty := Build_stack_frame Maps.empty None None None; *)
+  (*   add := fun k v stack_frame => Build_stack_frame (add k v stack_frame.(stack_vars)) stack_frame.(stack_handler) stack_frame.(stack_exc) stack_frame.(stack_loc); *)
+  (*   remove := fun k stack_frame => Build_stack_frame (remove k stack_frame.(stack_vars)) stack_frame.(stack_handler) stack_frame.(stack_exc) stack_frame.(stack_loc); *)
+  (*   lookup := fun k stack_frame => lookup k stack_frame.(stack_vars); *)
+  (*   union := fun s1 s2 => *)
+  (*              let var_union := union s1.(stack_vars) s2.(stack_vars) in *)
+  (*              (* Not sure of the order these should merge in... *) *)
+  (*              let handler_union := CFG.opt_first s2.(stack_handler) s1.(stack_handler) in *)
+  (*              let exc_union := CFG.opt_first s2.(stack_exc) s1.(stack_exc) in *)
+  (*              let loc_union := CFG.opt_first s1.(stack_loc) s2.(stack_loc) in *)
+  (*              Build_stack_frame var_union handler_union exc_union loc_union *)
+  (* }. *)
 
   (* (* See src/ml/Extract.v for the special handling of these operation. *) *)
   (* Record debug_local_stack := mk_debug_local_stack { *)
@@ -101,105 +101,52 @@ Section StackMap.
           end
       end.
 
+  Definition upd_local_sf (env : stack_frame) (l : local_env) : stack_frame :=
+    {|
+      stack_vars := l ;
+      stack_handler := env.(stack_handler) ;
+      stack_exc := env.(stack_exc) ;
+      stack_loc := env.(stack_loc)
+    |}.
+  
   (* Transform a local handler that works on maps to one that works on stacks *)
   Definition handle_local_stack {E} `{FailureE -< E}
-    (h : LocalE ~> stateT stack_frame (itree E)) :
+    (h : LocalE ~> stateT local_env (itree E)) :
     LocalE ~> stateT (stack_frame * stack) (itree E) :=
-    fun _ e '(env, stk) => ITree.map (fun '(env',r) => ((env',stk), r)) (h _ e env).
+    fun _ e '(env, stk) =>
+      ITree.map
+        (fun '(lenv,r) => ((upd_local_sf env lenv,stk), r))
+        (h _ e env.(stack_vars)).
 
-  (* Definition handle_local_with_stack *)
-  (*   {E} `{FailureE -< E} : (LocalE k v) ~> stateT stack_frame (itree E) := *)
-  (*   fun _ e => handle_local e. *)
+  Open Scope monad_scope.
+  Section PARAMS.
+    Variable (E F G : Type -> Type).
+    Context `{FailureE -< E +' F +' G}.
+    Notation Effin := (E +' F +' (LocalE +' StackE) +' G).
+    Notation Effout := (E +' F +' G).
 
-  (* Definition handle_local_debug_stack {E} `{FailureE -< E} : (LocalE k v) ~> stateT stack_frame (itree E) := *)
-  (*   fun _ e => *)
-  (*     (res <- handle_local e;; *)
-  (*     update_local_stack_ref e;; *)
-  (*     ret res)%monad. *)
+    Definition E_trigger {S} : forall R, E R -> (stateT S (itree Effout) R) :=
+      fun R e m => r <- trigger e ;; ret (m, r).
 
-  (* Open Scope monad_scope. *)
-  (* Section PARAMS. *)
-  (*   Variable (E F G : Type -> Type). *)
-  (*   Context `{FailureE -< E +' F +' G}. *)
-  (*   Notation Effin := (E +' F +' (LocalE k v +' StackE k v exc) +' G). *)
-  (*   Notation Effout := (E +' F +' G). *)
+    Definition F_trigger {S} : forall R, F R -> (stateT S (itree Effout) R) :=
+      fun R e m => r <- trigger e ;; ret (m, r).
 
-  (*   Definition E_trigger {S} : forall R, E R -> (stateT S (itree Effout) R) := *)
-  (*     fun R e m => r <- trigger e ;; ret (m, r). *)
+    Definition G_trigger {S} : forall R , G R -> (stateT S (itree Effout) R) :=
+      fun R e m => r <- trigger e ;; ret (m, r).
 
-  (*   Definition F_trigger {S} : forall R, F R -> (stateT S (itree Effout) R) := *)
-  (*     fun R e m => r <- trigger e ;; ret (m, r). *)
+    Definition interp_local_stack_h
+      (h : LocalE ~> stateT local_env (itree Effout)) :=
+      (case_ E_trigger
+             (case_ F_trigger
+                    (case_ (case_ (handle_local_stack h)
+                                  handle_stack)
+                           G_trigger))).
 
-  (*   Definition G_trigger {S} : forall R , G R -> (stateT S (itree Effout) R) := *)
-  (*     fun R e m => r <- trigger e ;; ret (m, r). *)
+    Definition interp_local_stack  :
+      (itree Effin) ~> stateT (stack_frame * stack) (itree Effout) :=
+      interp_state (interp_local_stack_h handle_local).
 
-  (*   Definition interp_local_stack_h *)
-  (*     (h : LocalE k v ~> stateT stack_frame (itree Effout)) := *)
-  (*     (case_ E_trigger *)
-  (*            (case_ F_trigger *)
-  (*                   (case_ (case_ (handle_local_stack h) *)
-  (*                                 handle_stack) *)
-  (*                          G_trigger))). *)
-
-  (*   Definition interp_local_stack `{FailureE -< E +' F +' G}  : *)
-  (*     (itree Effin) ~> stateT (stack_frame * stack) (itree Effout) := *)
-  (*     interp_state (interp_local_stack_h handle_local_with_stack). *)
-
-  (*   Section Structural_Lemmas. *)
-
-  (*     Lemma interp_local_stack_bind : *)
-  (*       forall (R S: Type) (t : itree Effin _) (k : R -> itree Effin S) s, *)
-  (*         interp_local_stack (ITree.bind t k) s ≅ *)
-  (*                            ITree.bind (interp_local_stack t s) *)
-  (*                            (fun '(s',r) => interp_local_stack (k r) s'). *)
-  (*     Proof using. *)
-  (*       intros. *)
-  (*       unfold interp_local_stack. *)
-  (*       setoid_rewrite interp_state_bind. *)
-  (*       apply eq_itree_clo_bind with (UU := Logic.eq). *)
-  (*       reflexivity. *)
-  (*       intros [] [] EQ; inversion EQ; reflexivity. *)
-  (*     Qed. *)
-
-  (*     Lemma interp_local_stack_ret : *)
-  (*       forall (R : Type) l (x: R), *)
-  (*         interp_local_stack (Ret x: itree Effin R) l ≅ Ret (l,x). *)
-  (*     Proof using. *)
-  (*       intros; unfold interp_local_stack. *)
-  (*       apply interp_state_ret. *)
-  (*     Qed. *)
-
-  (*     Lemma interp_local_stack_vis_eqit: *)
-  (*       forall (ls : stack_frame * stack) S X (kk : X -> itree Effin S) (e : Effin X), *)
-  (*         interp_local_stack (Vis e kk) ls ≅ ITree.bind (interp_local_stack_h handle_local_with_stack e ls) (fun (sx : stack_frame * stack * X) => Tau (interp_local_stack (kk (snd sx)) (fst sx))). *)
-  (*     Proof using. *)
-  (*       intros. *)
-  (*       unfold interp_local_stack. *)
-  (*       setoid_rewrite interp_state_vis. *)
-  (*       reflexivity. *)
-  (*     Qed. *)
-
-  (*     Lemma interp_local_stack_vis: *)
-  (*       forall (ls : (stack_frame * stack)) S X (kk : X -> itree Effin S) (e : Effin X), *)
-  (*         interp_local_stack (Vis e kk) ls ≈ ITree.bind (interp_local_stack_h handle_local_with_stack e ls) (fun (sx : stack_frame * stack * X) => interp_local_stack (kk (snd sx)) (fst sx)). *)
-  (*     Proof using. *)
-  (*       intros. *)
-  (*       rewrite interp_local_stack_vis_eqit. *)
-  (*       apply eutt_eq_bind. *)
-  (*       intros ?; tau_steps; reflexivity. *)
-  (*     Qed. *)
-
-  (*     Lemma interp_local_stack_trigger ls X (e : Effin X): *)
-  (*         interp_local_stack (ITree.trigger e) ls ≈ interp_local_stack_h handle_local_with_stack e ls. *)
-  (*     Proof using. *)
-  (*       unfold interp_local_stack. *)
-  (*       rewrite interp_state_trigger. *)
-  (*       reflexivity. *)
-  (*     Qed. *)
-
-  (*   End Structural_Lemmas. *)
-
-  (* End PARAMS. *)
+  End PARAMS.
 
 End StackMap.
 
