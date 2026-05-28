@@ -8,7 +8,7 @@
  *)
 
 From Vellvm Require Export
-     Handlers.Handlers
+     Handlers
      Semantics.Denotation
      Semantics.TopLevel
      Semantics.DynamicValues

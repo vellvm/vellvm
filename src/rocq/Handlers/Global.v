@@ -46,25 +46,6 @@ Section Globals.
           end
       end.
 
-  (* (* See src/ml/Extract.v for the special handling of these operation. *) *)
-  (* Record debug_globals := mk_debug_globals { *)
-  (*     globals_set : map -> unit ; *)
-  (*     globals_get : unit -> map; *)
-  (*   }. *)
-
-  (* Definition globals_object : debug_globals := *)
-  (*   mk_debug_globals (fun (_:map) => tt) (fun (_:unit) => (Maps.empty : map)). *)
-
-  (* Definition update_globals_ref {M} `{HM: Monad M} {T} (e : GlobalE k v T) : stateT map M unit := *)
-  (*   (gs <- MonadState.get;; *)
-  (*    ret (globals_object.(globals_set) gs))%monad. *)
-  
-  (* Definition handle_global_debug {E} `{FailureE -< E} : GlobalE ~> stateT map (itree E) := *)
-  (*   fun _ e => *)
-  (*     (res <- handle_global e;; *)
-  (*     update_globals_ref e;; *)
-  (*     ret res)%monad. *)
-
   Section PARAMS.
     Variable (E F G H : Type -> Type).
     Context `{FailureE -< G}.

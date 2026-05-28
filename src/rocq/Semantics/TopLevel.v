@@ -37,7 +37,6 @@ From Vellvm Require Import
 Section withParams.
   Context {Pa : Params}.
 
-
   (* IO & built-in functions -------------------------------------------------------------------- *)
   (* SAZ: Is there a better location to put this information? It depends on many of the
      modules that are in scope at this point.
@@ -555,136 +554,13 @@ Section withParams.
      Finally, the reference interpreter assumes no user-defined intrinsics and starts
      from "main" using bogus initial inputs.
    *)
-  Definition interpreter
+  Definition interpreter_param
              (args : list string)
              (prog : ll_toplevel_entities)
               : itree L4 res_L4
     := interpreter_gen (DTYPE_I 32%positive) (Name "main") (build_main_args args) prog.
 
-  (**
-     We now turn to the definition of our _model_ of vellvm's semantics. The
-     process is extremely similar to the one for defining the executable
-     semantics, except that we use, where relevant, the handlers capturing
-     all allowed behaviors into the [Prop] monad.
-   *)
-  (**
-     The model simply performs the syntactic conversion from [toplevel_entity]
-     to [mcfg], normalizes the types, denotes the [mcfg] and finally interprets the tree
-     starting from empty environments.
-   *)
-  (* Definition model_gen *)
-  (*            (ret_typ : dtyp) *)
-  (*            (entry : function_id) *)
-  (*            (arg_gen : itree L0 (list dvalue)) *)
-  (*            (prog: ll_toplevel_entities) *)
-  (*   : PropT (L4 dvalue dvalue) res_L4 := *)
-  (*   let t := *)
-  (*     args <- arg_gen;; *)
-  (*     denote_vellvm ret_typ entry args *)
-  (*       (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in *)
-  (*   ℑs eq eq t [] (Build_stack_frame [] None None None,[]) 0 initial_memory_state. *)
-
-  (* Definition model_gen_oom *)
-  (*            (ret_typ : dtyp) *)
-  (*            (entry : function_id) *)
-  (*            (arg_gen : itree L0 (list dvalue)) *)
-  (*            (prog: ll_toplevel_entities) *)
-  (*   : PropT (L4 dvalue dvalue) res_L4 := *)
-  (*   let t := *)
-  (*     args <- arg_gen;; *)
-  (*     denote_vellvm ret_typ entry args *)
-  (*       (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in *)
-  (*   ℑs6 eq eq eq t [] (Build_stack_frame [] None None None,[]) 0 initial_memory_state. *)
-
-  (* Definition model_gen_oom_L1 *)
-  (*            (ret_typ : dtyp) *)
-  (*            (entry : function_id) *)
-  (*            (arg_gen : itree L0 (list dvalue)) *)
-  (*            (prog: ll_toplevel_entities) *)
-  (*   : itree (L1 dvalue dvalue) res_L1 := *)
-  (*   let t := *)
-  (*     args <- arg_gen;; *)
-  (*     denote_vellvm ret_typ entry args *)
-  (*       (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in *)
-  (*   ℑs1 t []. *)
-
-  (* Definition model_gen_oom_L2 *)
-  (*            (ret_typ : dtyp) *)
-  (*            (entry : function_id) *)
-  (*            (arg_gen : itree L0 (list dvalue)) *)
-  (*            (prog: ll_toplevel_entities) *)
-  (*   : itree (L2 dvalue dvalue) res_L2 := *)
-  (*   let t := *)
-  (*     args <- arg_gen;; *)
-  (*     denote_vellvm ret_typ entry args *)
-  (*       (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in *)
-  (*   ℑs2 t [] (Build_stack_frame [] None None None, []). *)
-
-  (* Definition model_gen_oom_L3 *)
-  (*   (RR : relation res_L2) *)
-  (*   (ret_typ : dtyp) *)
-  (*   (entry : function_id) *)
-  (*   (arg_gen : itree L0 (list dvalue)) *)
-  (*   (prog: ll_toplevel_entities) *)
-  (*   : PropT (L3 dvalue dvalue) res_L3 := *)
-  (*   let t := *)
-  (*     args <- arg_gen;; *)
-  (*     denote_vellvm ret_typ entry args *)
-  (*       (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in *)
-  (*   ℑs3 RR t [] (Build_stack_frame [] None None None, []) 0 initial_memory_state. *)
-
-  (* Definition model_gen_oom_L4 *)
-  (*   RR_mem *)
-  (*   RR_pick *)
-  (*   (ret_typ : dtyp) *)
-  (*   (entry : function_id) *)
-  (*   (arg_gen : itree L0 (list dvalue)) *)
-  (*   (prog: ll_toplevel_entities) *)
-  (*   : PropT (L4 dvalue dvalue) res_L4 := *)
-  (*   let t := *)
-  (*     args <- arg_gen;; *)
-  (*     denote_vellvm ret_typ entry args *)
-  (*       (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in *)
-  (*   ℑs4 RR_mem RR_pick t [] (Build_stack_frame [] None None None, []) 0 initial_memory_state. *)
-
-  (* Definition model_gen_oom_L5 *)
-  (*   RR_mem *)
-  (*   RR_pick *)
-  (*   (ret_typ : dtyp) *)
-  (*   (entry : function_id) *)
-  (*   (arg_gen : itree L0 (list dvalue)) *)
-  (*   (prog: ll_toplevel_entities) *)
-  (*   : PropT (L5 dvalue dvalue) res_L5 := *)
-  (*   let t := *)
-  (*     args <- arg_gen;; *)
-  (*     denote_vellvm ret_typ entry args *)
-  (*       (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in *)
-  (*   ℑs5 RR_mem RR_pick t [] (Build_stack_frame [] None None None, []) 0 initial_memory_state. *)
-
-  (* Definition model_gen_oom_L6 *)
-  (*   RR_mem *)
-  (*   RR_pick *)
-  (*   RR_oom *)
-  (*   (ret_typ : dtyp) *)
-  (*   (entry : function_id) *)
-  (*   (arg_gen : itree L0 (list dvalue)) *)
-  (*   (prog: ll_toplevel_entities) *)
-  (*   : PropT (L6 dvalue dvalue) res_L6 := *)
-  (*   let t := *)
-  (*     args <- arg_gen;; *)
-  (*     denote_vellvm ret_typ entry args *)
-  (*       (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog))) in *)
-  (*   ℑs6 RR_mem RR_pick RR_oom t [] (Build_stack_frame [] None None None, []) 0 initial_memory_state. *)
-
-  (* (** *)
-  (*    Finally, the official model assumes no user-defined intrinsics. *)
-  (*  *) *)
-  (* Definition model args := model_gen (DTYPE_I 32%positive) (Name "main") (build_main_args args). *)
-  (* Definition model_oom args := model_gen_oom (DTYPE_I 32%positive) (Name "main") (build_main_args args). *)
-  (* Definition model_oom_L1 args := model_gen_oom_L1 (DTYPE_I 32%positive) (Name "main") (build_main_args args). *)
-  (* Definition model_oom_L2 args := model_gen_oom_L2 (DTYPE_I 32%positive) (Name "main") (build_main_args args). *)
-  (* Definition model_oom_L3 RR_mem args := model_gen_oom_L3 RR_mem (DTYPE_I 32%positive) (Name "main") (build_main_args args). *)
-  (* Definition model_oom_L4 RR_mem RR_pick args := model_gen_oom_L4 RR_mem RR_pick (DTYPE_I 32%positive) (Name "main") (build_main_args args). *)
-  (* Definition model_oom_L5 RR_mem RR_pick args := model_gen_oom_L5 RR_mem RR_pick (DTYPE_I 32%positive) (Name "main") (build_main_args args). *)
-  (* Definition model_oom_L6 RR_mem RR_pick RR_oom args := model_gen_oom_L6 RR_mem RR_pick RR_oom (DTYPE_I 32%positive) (Name "main") (build_main_args args). *)
 End withParams.
+
+From Vellvm Require Import ParamsV IPtrInfinite.
+Definition interpreter := interpreter_param (Pa := @ParamsV IPZ IPZTheory).

@@ -19,7 +19,6 @@
 ./rocq/Utils/BoolUtil.v
 ./rocq/Utils/OptionUtil.v
 ./rocq/Utils/RelationsUtil.v
-./rocq/Utils/Default.v
 ./rocq/Utils/IntMaps.v
 ./rocq/Utils/Assoc.v
 ./rocq/Utils/NMaps.v
@@ -56,6 +55,7 @@
 ./rocq/Semantics/Params/VellvmImplem/Provenance.v
 ./rocq/Semantics/Params/VellvmImplem/Address.v
 ./rocq/Semantics/Params/VellvmImplem/Sizeof.v
+./rocq/Semantics/Params/VellvmImplem/ParamsV.v
 
 ./rocq/Semantics/Gep.v
 ./rocq/Semantics/Select.v
@@ -78,3 +78,6 @@
 ./rocq/Handlers.v
 ./rocq/Semantics/InterpretationStack.v
 ./rocq/Semantics/TopLevel.v
+./rocq/Semantics.v
+
+./rocq/QC/ReprAST.v
