@@ -626,7 +626,7 @@ define internal noundef zeroext i1 @_ZN4core3fmt5write17hcd15d2c673b5a9c1E({}* n
   br label %80, !dbg !80844
 
 80:                                               ; preds = %75, %70, %69, %54
-  %81 = phi i64 [ %67, %69 ], [ undef, %54 ], [ %79, %75 ], [ undef, %70 ]
+  %81 = phi i64 [ %67, %69 ], [ poison, %54 ], [ %79, %75 ], [ poison, %70 ]
   %82 = phi i64 [ 1, %69 ], [ 0, %54 ], [ 1, %75 ], [ 0, %70 ]
   store i64 %82, i64* %9, align 8, !dbg !80846, !alias.scope !80787, !noalias !80800
   store i64 %81, i64* %43, align 8, !dbg !80846, !alias.scope !80787, !noalias !80800
@@ -663,7 +663,7 @@ define internal noundef zeroext i1 @_ZN4core3fmt5write17hcd15d2c673b5a9c1E({}* n
   br label %99, !dbg !80870
 
 99:                                               ; preds = %94, %89, %88, %80
-  %100 = phi i64 [ %86, %88 ], [ undef, %80 ], [ %98, %94 ], [ undef, %89 ]
+  %100 = phi i64 [ %86, %88 ], [ poison, %80 ], [ %98, %94 ], [ poison, %89 ]
   %101 = phi i64 [ 1, %88 ], [ 0, %80 ], [ 1, %94 ], [ 0, %89 ]
   store i64 %101, i64* %10, align 8, !dbg !80872, !alias.scope !80787, !noalias !80800
   store i64 %100, i64* %44, align 8, !dbg !80872, !alias.scope !80787, !noalias !80800
