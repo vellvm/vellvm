@@ -28,7 +28,7 @@ let suite = ref Test.suite
 (* Given two dvalues and an answer, return whether or not they equal the
    answer*)
 let compare_dvalues_exn dv1 dv2 ans : (doc, unit) Either.t =
-  match (Stdlib.compare dv1 dv2 = 0) = ans with
+  match TopLevel.dvalue_eqb dv1 dv2 = ans with
   | true -> Right ()
   | false ->
       Left

@@ -564,3 +564,4 @@ End withParams.
 
 From Vellvm Require Import ParamsV IPtrInfinite.
 Definition interpreter := interpreter_param (Pa := @ParamsV IPZ IPZTheory).
+Definition dvalue_eqb := @DynamicValues.dvalue_eqb (@ParamsV IPZ IPZTheory).

@@ -42,7 +42,7 @@ let exec_tests () =
   raise (Ran_tests (successful outcome))
 
 let compare_dvalues_exn dv1 dv2 ans : unit =
-  if (Stdlib.compare dv1 dv2 = 0) = ans then ()
+  if TopLevel.dvalue_eqb dv1 dv2 = ans then ()
   else
     failwith
       (Printf.sprintf

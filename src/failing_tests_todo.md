@@ -8,7 +8,16 @@ Snapshot taken 2026-05-29, after restoring `make vellvm` linkage.
 |---|---|---:|---:|
 | 1 | Built-in `Test.suite` (`exec_tests`) | 149/153 | 4 |
 | 2 | Pretty-printing round-trip (`test_pp_dir ../tests`) | 679/742 | 63 |
-| 3 | Assertion tests (`test_dir ../tests`) | 259/264 | 5 |
+| 3 | Assertion tests (`test_dir ../tests`) | 260/264 | 4 |
+
+> **Update 2026-05-29:** Category B is resolved. `TopLevel.dvalue_eqb` is now
+> extracted (closed instantiation in `TopLevel.v`) and used in the three OCaml
+> call sites. Resolving it also surfaced a real bug in
+> `ml/testing/assertion.ml::texp_to_dvalue / texp_to_uvalue`, which had been
+> writing the whole array/vector type into `DVALUE_Array`/`DVALUE_Vector`'s
+> dtype slot; the Rocq convention (see `MemoryBytes.v:347`, `Denotation.v:230`)
+> is **element** dtype. Both are now fixed; `loadAndStore.ll @testAlloca`
+> passes. Phase 3 dropped from 5 to 4 failures.
 
 ## Category A — Pretty-printer bug: `null` for non-pointer types  (~63 phase-2 + 1 phase-3)
 

@@ -86,7 +86,7 @@ type test =
         Either.t
 
 (* DVALUE equality *)
-let rec eq_dvalue (l : DV.dvalue) (r : DV.dvalue) : bool = Stdlib.compare l r = 0
+let rec eq_dvalue (l : DV.dvalue) (r : DV.dvalue) : bool = TopLevel.dvalue_eqb l r
 
 (* Directly converts a piece of syntax to a dvalue without going through
    semantic interpretation. Only works on literals. *)
@@ -125,13 +125,15 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
      | None -> failwith "assertion.ml: texp_to_dvalue failed float conversion"
      end
   | TYPE_Array _, EXP_Array (t, elts) ->
-      DVALUE_Array (typ_to_dtyp t, (List.map texp_to_dvalue elts))
+      let elt_typ = match t with TYPE_Array (_, et) -> et | _ -> t in
+      DVALUE_Array (typ_to_dtyp elt_typ, (List.map texp_to_dvalue elts))
   | TYPE_Struct _, EXP_Struct elts ->
       DVALUE_Struct (List.map texp_to_dvalue elts)
   | TYPE_Packed_struct _, EXP_Packed_struct elts ->
       DVALUE_Packed_struct (List.map texp_to_dvalue elts)
   | TYPE_Vector _, EXP_Vector (t, elts) ->
-     DVALUE_Vector (typ_to_dtyp t, (List.map texp_to_dvalue elts))
+      let elt_typ = match t with TYPE_Vector (_, et) -> et | _ -> t in
+      DVALUE_Vector (typ_to_dtyp elt_typ, (List.map texp_to_dvalue elts))
   | _, EXP_Poison -> (DVALUE_Poison (typ_to_dtyp typ))
   | _, _ ->
       failwith
@@ -157,13 +159,15 @@ let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
      | None -> failwith "assertion.ml: texp_to_uvalue failed float conversion"
      end
   | TYPE_Array _, EXP_Array (t, elts) ->
-      DVALUE_Array (typ_to_dtyp t, (List.map texp_to_uvalue elts))
+      let elt_typ = match t with TYPE_Array (_, et) -> et | _ -> t in
+      DVALUE_Array (typ_to_dtyp elt_typ, (List.map texp_to_uvalue elts))
   | TYPE_Struct _, EXP_Struct elts ->
       DVALUE_Struct (List.map texp_to_uvalue elts)
   | TYPE_Packed_struct _, EXP_Packed_struct elts ->
       DVALUE_Packed_struct (List.map texp_to_uvalue elts)
   | TYPE_Vector _, EXP_Vector (t, elts) ->
-     DVALUE_Vector (typ_to_dtyp t, (List.map texp_to_uvalue elts))
+      let elt_typ = match t with TYPE_Vector (_, et) -> et | _ -> t in
+      DVALUE_Vector (typ_to_dtyp elt_typ, (List.map texp_to_uvalue elts))
   | _, EXP_Poison -> (DVALUE_Poison (typ_to_dtyp typ))
   | _, _ ->
       failwith
