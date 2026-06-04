@@ -419,6 +419,7 @@ let args =
     , Set Driver.interpret
     , "interpret ll program starting from 'main' (same as -interpret)" )
   ; ("-debug", Set Interpreter.debug_flag, "enable debugging trace output")
+  ; ("-debugger", Set Driver.debugger, "debug an ll program")
   ; ("-v", Set Platform.verbose, "enables more verbose compilation output")
   ; ("-fast", Set fast_mode_flag, "Enable faster execution by disabling symbolic execution of undef values.")
    (* ; ( "-genalive2" *)

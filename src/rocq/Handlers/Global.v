@@ -12,7 +12,8 @@ From ITree Require Import
   Events.State
   Eq.Eqit
   Events.StateFacts
-  InterpFacts.
+  InterpFacts
+  Basics.MonadState.
 
 From Vellvm Require Import
   Utilities
@@ -46,6 +47,27 @@ Section Globals.
           end
       end.
 
+  (* See [src/ml/extracted/Extract.v] for the OCaml-side patching: in
+     extraction [globals_set]/[globals_get] become a mutable ref-cell that
+     gives the OCaml debugger live access to the current globals. The
+     Rocq-level defaults below are pure no-ops. *)
+  Record debug_globals := mk_debug_globals {
+      globals_set : map -> unit ;
+      globals_get : unit -> map;
+    }.
+
+  Definition globals_object : debug_globals :=
+    mk_debug_globals (fun (_:map) => tt) (fun (_:unit) => (Maps.empty : map)).
+
+  Definition update_globals_ref {E} `{FailureE -< E} [T] (e : GlobalE T) : stateT map (itree E) unit :=
+    fun gs => ret (gs, globals_object.(globals_set) gs).
+
+  Definition handle_global_debug {E} `{FailureE -< E} : GlobalE ~> stateT map (itree E) :=
+    fun _ e =>
+      (res <- handle_global e;;
+      update_globals_ref e;;
+      ret res)%monad.
+
   Section PARAMS.
     Variable (E F G H : Type -> Type).
     Context `{FailureE -< G}.
@@ -61,7 +83,7 @@ Section Globals.
     Definition G_trigger {M} : forall R , G R -> (stateT M (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition interp_global_h := (case_ E_trigger (case_ F_trigger (case_ handle_global(* handle_global_debug *) G_trigger))).
+    Definition interp_global_h := (case_ E_trigger (case_ F_trigger (case_ handle_global_debug G_trigger))).
     Definition interp_global  : itree Effin ~> stateT map (itree Effout) :=
       interp_state interp_global_h.
 

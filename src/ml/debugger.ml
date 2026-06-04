@@ -1,10 +1,4 @@
-open InterpretationStack.InterpreterStackBigIntptr.LLVM.MEM
-
-open InterpretationStack.InterpreterStackBigIntptr.LLVM.Stack
-
-open InterpretationStack.InterpreterStackBigIntptr.LLVM.Global
-
-open InterpretationStack.InterpreterStackBigIntptr.LP
+module DV = DynamicValues
 
 open LLVMEvents
 
@@ -12,8 +6,10 @@ open ITreeDefinition
 open Result
 open Interpreter
 
-let string_of_dvalue (d : DV.dvalue) = Camlcoq.camlstring_of_coqstring (DV.show_dvalue d)
-let string_of_uvalue (d : DV.uvalue) = Camlcoq.camlstring_of_coqstring (DV.show_uvalue d)
+type __ = Obj.t
+
+let string_of_dvalue (d : DV.dvalue) =
+  Camlcoq.camlstring_of_coqstring (DV.show_dvalue Interpreter.params d)
 
 type file_location =
   { file : string;
@@ -70,14 +66,14 @@ let rec step m =
 let rec next_helper level m =
   match step m with
   | Either.Left x ->
-     let new_stack_level = List.length (Stack.local_stack_object.local_stack_get ()) in
+     let new_stack_level = List.length ((Stack.local_stack_object Interpreter.params).local_stack_get ()) in
      if new_stack_level = level
      then Either.Left x
      else next_helper level x
   | res -> res
 
 let next m =
-  let stack_level = List.length (Stack.local_stack_object.local_stack_get ()) in
+  let stack_level = List.length ((Stack.local_stack_object Interpreter.params).local_stack_get ()) in
   next_helper stack_level m
 
 let location_parse loc =
@@ -153,26 +149,22 @@ let rec read_command () =
      AddBreakpoint (file, line)
   | _ -> Printf.printf "Invalid command.\n"; read_command ()
 
-let print_stack_frame_vars (sf : (DV.dvalue, (LLVMAst.raw_id * DV.uvalue) list) Stack.stack_frame) =
+let print_stack_frame_vars (sf : Stack.stack_frame) =
   List.iter (fun (k, v) ->
-      Printf.printf "%s -> %s\n" (Camlcoq.camlstring_of_coqstring (ShowAST.show_raw_id k)) (string_of_uvalue v)) sf.stack_vars
+      Printf.printf "%s -> %s\n" (Camlcoq.camlstring_of_coqstring (ShowAST.show_raw_id k)) (string_of_dvalue v)) sf.stack_vars
 
-let print_stack_vars (s : ((DV.dvalue, (LLVMAst.raw_id * DV.uvalue) list) Stack.stack_frame) list) =
-  List.iteri (fun n (sf : (DV.dvalue, (LLVMAst.raw_id * DV.uvalue) list) Stack.stack_frame) ->
+let print_stack_vars (s : Stack.stack_frame list) =
+  List.iteri (fun n (sf : Stack.stack_frame) ->
       Printf.printf "Stack frame #%d (%s):\n" n (match sf.stack_loc with None -> "_" | Some l -> Camlcoq.camlstring_of_coqstring l);
       print_stack_frame_vars sf) s
 
-let print_stack_frames s =
-  List.iteri (fun n (sf : (DV.dvalue, (LLVMAst.raw_id * DV.uvalue) list) Stack.stack_frame) ->
+let print_stack_frames (s : Stack.stack_frame list) =
+  List.iteri (fun n (sf : Stack.stack_frame) ->
       Printf.printf "#%d: %s\n" n (match sf.stack_loc with None -> "_" | Some l -> Camlcoq.camlstring_of_coqstring l)) s
 
 let rec debugger
-    (m :
-      ( ('a, 'b, 'c) coq_L4
-      , MMEP.MMSP.coq_MemState
-        * ( StoreId.store_id
-          * ((lstack_frame * lstack) * (global_env * DV.dvalue)) ) )
-        itree ) : (DV.dvalue, exit_condition) result =
+    (m : (__ coq_L4, Interpreter.interp_state) itree)
+    : (DV.dvalue, exit_condition) result =
   let command = read_command () in
   match command with
   | Next ->
@@ -191,14 +183,14 @@ let rec debugger
      List.fold_left (fun _ p ->
          match p with
          | (k, v) ->
-            Printf.printf "%s -> %s\n" (Camlcoq.camlstring_of_coqstring (ShowAST.show_raw_id k)) (string_of_dvalue v)) () ((Global.globals_object (FMapAList.coq_Map_alist AstLib.eq_dec_raw_id)).globals_get ());
+            Printf.printf "%s -> %s\n" (Camlcoq.camlstring_of_coqstring (ShowAST.show_raw_id k)) (string_of_dvalue v)) () ((Global.globals_object Interpreter.params).globals_get ());
      debugger m
   | PrintLocals ->
-     let stack = Stack.local_stack_object.local_stack_get () in
+     let stack = (Stack.local_stack_object Interpreter.params).local_stack_get () in
      print_stack_vars stack;
      debugger m
   | StackTrace ->
-     let stack = Stack.local_stack_object.local_stack_get () in
+     let stack = (Stack.local_stack_object Interpreter.params).local_stack_get () in
      print_stack_frames stack;
      debugger m
   | AddBreakpoint (file, line) ->
@@ -225,5 +217,5 @@ let vellvm_debugger
     : (DV.dvalue, exit_condition) result =
   Out_channel.set_buffered stdout false;
   Out_channel.set_buffered stderr false;
-  let prog = (TopLevel.TopLevelBigIntptr.interpreter (List.map Camlcoq.coqstring_of_camlstring args) prog) in
+  let prog = (TopLevel.interpreter (List.map Camlcoq.coqstring_of_camlstring args) prog) in
   debugger prog

@@ -19,6 +19,7 @@ let string_of_dvalue (d : DV.dvalue) =
   of_str (DV.show_dvalue Interpreter.params d)
 
 let interpret = ref false
+let debugger = ref false
 
 let transform
     (prog :
@@ -75,6 +76,12 @@ let process_ll_file command_line_arguments path file =
       | Ok dv ->
           Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv)
       | Error e -> failwith (Result.string_of_exit_condition e)
+    else if !debugger then
+      (Interpreter.debug_flag := true;
+       match Debugger.vellvm_debugger command_line_arguments (TopLevel.link_all !link_files ll_ast) with
+       | Ok dv ->
+           Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv)
+       | Error e -> failwith (Result.string_of_exit_condition e))
   in
   let ll_ast' = transform ll_ast in
   let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in

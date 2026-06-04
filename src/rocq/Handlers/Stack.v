@@ -51,20 +51,19 @@ Section StackMap.
   (*              Build_stack_frame var_union handler_union exc_union loc_union *)
   (* }. *)
 
-  (* (* See src/ml/Extract.v for the special handling of these operation. *) *)
-  (* Record debug_local_stack := mk_debug_local_stack { *)
-  (*     local_stack_set : stack_frame -> unit ; *)
-  (*     local_stack_get : unit -> stack ; *)
-  (*     local_stack_push : stack_frame -> unit ; *)
-  (*     local_stack_pop : unit -> unit; *)
-  (*   }. *)
+  (* See [src/ml/extracted/Extract.v] for the OCaml-side patching: in
+     extraction these hooks become a mutable ref-cell that backs the OCaml
+     debugger's view of the call stack. Default Rocq implementations are
+     pure no-ops. *)
+  Record debug_local_stack := mk_debug_local_stack {
+      local_stack_set : stack_frame -> unit ;
+      local_stack_get : unit -> stack ;
+      local_stack_push : stack_frame -> unit ;
+      local_stack_pop : unit -> unit;
+    }.
 
-  (* Definition local_stack_object : debug_local_stack := *)
-  (*   mk_debug_local_stack (fun (_:stack_frame) => tt) (fun (_:unit) => []) (fun (_:stack_frame) => tt) (fun (_:unit) => tt). *)
-
-  (* Definition update_local_stack_ref {M} `{HM: Monad M} {T} (e : LocalE k v T) : stateT stack_frame M unit := *)
-  (*   (sf <- MonadState.get;; *)
-  (*   ret (local_stack_object.(local_stack_set) sf))%monad. *)
+  Definition local_stack_object : debug_local_stack :=
+    mk_debug_local_stack (fun (_:stack_frame) => tt) (fun (_:unit) => []) (fun (_:stack_frame) => tt) (fun (_:unit) => tt).
 
   Definition handle_stack {E} `{FailureE -< E} : StackE ~> stateT (stack_frame * stack) (itree E) :=
     fun _ e '(env, stk) =>
@@ -72,15 +71,13 @@ Section StackMap.
       | StackPush args =>
           let init := List.fold_right (fun '(x,dv) => Maps.add x dv) Maps.empty args in
           let frame := Build_stack_frame init None None (Some (printer_object.(printer_get_loc) tt)) in
-          (* Push stack for debugger *)
-          (* ret (local_stack_object.(local_stack_push) frame);; *)
+          ret (local_stack_object.(local_stack_push) frame);;
           Ret ((frame, env::stk), tt)
       | StackPop =>
           match stk with
           | [] => raise "Tried to pop too many stack frames."
           | (env'::stk') =>
-              (* Pop stack for debugger *)
-              (* ret (local_stack_object.(local_stack_pop) tt);; *)
+              ret (local_stack_object.(local_stack_pop) tt);;
               Ret ((env',stk'), tt)
           end
       | StackSetHandler handler =>
@@ -109,14 +106,19 @@ Section StackMap.
       stack_loc := env.(stack_loc)
     |}.
   
-  (* Transform a local handler that works on maps to one that works on stacks *)
+  (* Transform a local handler that works on maps to one that works on stacks.
+     Also sync the OCaml-side [local_stack_object] on every local event so the
+     debugger sees an up-to-date top frame. The sync is a no-op in pure Rocq
+     (see [local_stack_object]) and is replaced by a ref-cell update on
+     extraction. *)
   Definition handle_local_stack {E} `{FailureE -< E}
     (h : LocalE ~> stateT local_env (itree E)) :
     LocalE ~> stateT (stack_frame * stack) (itree E) :=
     fun _ e '(env, stk) =>
-      ITree.map
-        (fun '(lenv,r) => ((upd_local_sf env lenv,stk), r))
-        (h _ e env.(stack_vars)).
+      ('(lenv, r) <- h _ e env.(stack_vars);;
+       let new_frame := upd_local_sf env lenv in
+       ret (local_stack_object.(local_stack_set) new_frame);;
+       ret ((new_frame, stk), r))%monad.
 
   Open Scope monad_scope.
   Section PARAMS.
@@ -144,7 +146,7 @@ Section StackMap.
 
     Definition interp_local_stack  :
       (itree Effin) ~> stateT (stack_frame * stack) (itree Effout) :=
-      interp_state (interp_local_stack_h handle_local).
+      interp_state (interp_local_stack_h handle_local_debug).
 
   End PARAMS.
 
