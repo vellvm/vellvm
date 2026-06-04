@@ -117,7 +117,7 @@ Section Denotation.
       Note: global maps contain [dvalue]s, while local maps contain [uvalue]s.
       We perform the conversion here.
    *)
-  Definition lookup_id (i:ident) : itree lookup_E dvalue :=
+  Definition lookup_id (i:ident) : itree L0 dvalue :=
     match i with
     | ID_Global x => trigger (GlobalRead x)
     | ID_Local x  => trigger (LocalRead x)
@@ -175,15 +175,13 @@ Section Denotation.
     | _ => ret dv
     end.
   
-  Fixpoint denote_exp'
-    (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E dvalue :=
-    let eval_texp '(dt,ex) := denote_exp' (Some dt) ex
+  Fixpoint denote_exp
+    (top:option dtyp) (o:exp dtyp) {struct o} : itree L0 dvalue :=
+    let eval_texp '(dt,ex) := denote_exp (Some dt) ex
     in
     match o with
-
     (* The translation injects the [lookup_E] interface used by [lookup_id] to the ambient one *)
-    | EXP_Ident i =>
-      translate LU_to_exp (lookup_id i)
+    | EXP_Ident i => lookup_id i
                 
     | EXP_Integer x =>
         match top with
@@ -264,43 +262,43 @@ Section Denotation.
            depends on whether it may raise UB, and how.
      *)
     | OP_IBinop iop dt op1 op2 =>
-      v1 <- denote_exp' (Some dt) op1 ;;
-      v2 <- denote_exp' (Some dt) op2 ;;
+      v1 <- denote_exp (Some dt) op1 ;;
+      v2 <- denote_exp (Some dt) op2 ;;
       lift (eval_iop iop v1 v2)
 
     | OP_ICmp samesign cmp dt op1 op2 =>
-        v1 <- denote_exp' (Some dt) op1 ;;
-        v2 <- denote_exp' (Some dt) op2 ;;
+        v1 <- denote_exp (Some dt) op1 ;;
+        v2 <- denote_exp (Some dt) op2 ;;
         lift (eval_icmp samesign cmp v1 v2)
 
     (* TODO: fast_math? *)                
     | OP_FBinop fop _ dt op1 op2 =>
-        v1 <- denote_exp' (Some dt) op1 ;;
-        v2 <- denote_exp' (Some dt) op2 ;;
+        v1 <- denote_exp (Some dt) op1 ;;
+        v2 <- denote_exp (Some dt) op2 ;;
         lift (eval_fop fop v1 v2)
              
     (* TODO: fast_math? **)
     | OP_Fneg _ (dt, op) =>
-        v <- denote_exp' (Some dt) op ;;
+        v <- denote_exp (Some dt) op ;;
         lift (eval_fneg v)
              
     | OP_FCmp fcmp dt op1 op2 =>
-        v1 <- denote_exp' (Some dt) op1 ;;
-        v2 <- denote_exp' (Some dt) op2 ;;
+        v1 <- denote_exp (Some dt) op1 ;;
+        v2 <- denote_exp (Some dt) op2 ;;
         lift (eval_fcmp fcmp v1 v2)
 
     | OP_Conversion conv dt_from op dt_to =>
-        v <- denote_exp' (Some dt_from) op ;;
+        v <- denote_exp (Some dt_from) op ;;
         lift (convert conv dt_from v dt_to)
 
     | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
-        vptr <- denote_exp' (Some dt2) ptrval ;;
-        vs <- map_monad (fun '(dt, index) => denote_exp' (Some dt) index) idxs ;;
+        vptr <- denote_exp (Some dt2) ptrval ;;
+        vs <- map_monad (fun '(dt, index) => denote_exp (Some dt) index) idxs ;;
         lift (eval_gep dt1 vptr vs)
 
      | OP_ExtractElement (dt_vec, vecop) (dt_idx, idx) =>
-        vec <- denote_exp' (Some dt_vec) vecop ;;
-        idx <- denote_exp' (Some dt_idx) idx ;;
+        vec <- denote_exp (Some dt_vec) vecop ;;
+        idx <- denote_exp (Some dt_idx) idx ;;
         elt_typ <- match dt_vec with
                       | DTYPE_Vector _ t => ret t
                       | _ => raise "Invalid vector type for ExtractElement"
@@ -308,20 +306,20 @@ Section Denotation.
         lift (index_into_vec_dv elt_typ vec idx)
 
     | OP_InsertElement (dt_vec, vecop) (dt_elt, eltop) (dt_idx, idx) =>
-        vec <- denote_exp' (Some dt_vec) vecop ;;
-        elt <- denote_exp' (Some dt_elt) eltop ;;
-        idx <- denote_exp' (Some dt_idx) idx ;;
+        vec <- denote_exp (Some dt_vec) vecop ;;
+        elt <- denote_exp (Some dt_elt) eltop ;;
+        idx <- denote_exp (Some dt_idx) idx ;;
         lift (insert_into_vec_dv dt_vec vec elt idx)
 
     | OP_ShuffleVector (dt_vec1, vecop1) (dt_vec2, vecop2) (dt_mask, idxmask) =>
-        vec1 <- denote_exp' (Some dt_vec1) vecop1 ;;
-        vec2 <- denote_exp' (Some dt_vec2) vecop2 ;;
-        idxmask <- denote_exp' (Some dt_mask) idxmask;;
+        vec1 <- denote_exp (Some dt_vec1) vecop1 ;;
+        vec2 <- denote_exp (Some dt_vec2) vecop2 ;;
+        idxmask <- denote_exp (Some dt_mask) idxmask;;
         raise ("todo: implement shuffle_vector" )
         (* ret (UVALUE_ShuffleVector dt_vec1 vec1 vec2 idxmask) *)
 
     | OP_ExtractValue (dt, str) idxs =>
-        str <- denote_exp' (Some dt) str ;;
+        str <- denote_exp (Some dt) str ;;
         (* Should this be pulled out into a definition? *)
         let fix loop str idxs : EOB dvalue :=
           match idxs with
@@ -334,8 +332,8 @@ Section Denotation.
         lift (loop str (List.map denote_int_syntax idxs))
 
     | OP_InsertValue (dt_str, strop) (dt_elt, eltop) idxs =>
-        str <- denote_exp' (Some dt_str) strop ;;
-        elt <- denote_exp' (Some dt_elt) eltop ;;
+        str <- denote_exp (Some dt_str) strop ;;
+        elt <- denote_exp (Some dt_elt) eltop ;;
         let fix loop str idxs : EOB dvalue :=
           match idxs with
           | [] => raise_error "Index was not provided"
@@ -349,9 +347,9 @@ Section Denotation.
         lift (loop str (List.map denote_int_syntax idxs))
 
     | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
-        dcond <- denote_exp' (Some dt) cnd ;;
-        v1    <- denote_exp' (Some dt1) op1 ;;
-        v2    <- denote_exp' (Some dt2) op2 ;;
+        dcond <- denote_exp (Some dt) cnd ;;
+        v1    <- denote_exp (Some dt1) op1 ;;
+        v2    <- denote_exp (Some dt2) op2 ;;
         lift (eval_select dcond v1 v2)
 
     | EXP_Metadata md =>
@@ -381,23 +379,23 @@ Section Denotation.
         end
           
     | OP_Freeze (dt, e) =>
-        dv <- denote_exp' (Some dt) e ;;
+        dv <- denote_exp (Some dt) e ;;
         freeze dv
     end.
-
-  Definition denote_exp (top:option dtyp) (o:exp dtyp) : itree exp_E dvalue
-    := denote_exp' top o.
   Arguments denote_exp _ _ : simpl nomatch.
 
-  Definition denote_op (o:exp dtyp) : itree exp_E dvalue :=
-    denote_exp None o.
+  Definition withCall : itree L0 ~> itree L0' := translate inr1.
+  Definition denote_exp' t e := withCall (denote_exp t e).
+  
+  Definition denote_op (o:exp dtyp) : itree L0' dvalue :=
+    denote_exp' None o.
   Arguments denote_op _ : simpl nomatch.
 
   Definition local_write {E} `{LocalE -< E}
     (id : raw_id) (dv : dvalue) : itree E unit :=
     trigger (LocalWrite id dv).
 
-  Definition denote_cmpxchg (id : raw_id) (cpx : cmpxchg dtyp) : itree instr_E unit :=
+  Definition denote_cmpxchg (id : raw_id) (cpx : cmpxchg dtyp) : itree L0' unit :=
     (* SAZ: This will have to be revisited when we have a truly concurrent semantics. *)
     let '(ptr_ty, ptr_val) := cpx.(c_ptr) in
     let '(cmp_ty, cmp_val) := cpx.(c_cmp) in
@@ -411,9 +409,9 @@ Section Denotation.
 
 
       (* evaluate the arguments to the instruction *)
-      ptr_v <- translate exp_to_instr (denote_exp (Some ptr_ty) ptr_val) ;;
-      cmp_v <- translate exp_to_instr (denote_exp' (Some cmp_ty) cmp_val) ;;
-      new_v <- translate exp_to_instr (denote_exp' (Some cmp_ty) new_val) ;;
+      ptr_v <- denote_exp' (Some ptr_ty) ptr_val ;;
+      cmp_v <- denote_exp' (Some cmp_ty) cmp_val ;;
+      new_v <- denote_exp' (Some cmp_ty) new_val ;;
 
       (* Perform the load *)
       loaded_v <- trigger (Load cmp_ty ptr_v);;
@@ -447,7 +445,7 @@ Section Denotation.
            Similarly, it does not state whether the `disjoint` flag for `or` can be applied,
            so we set it to false.
   *)
-  Definition denote_atomic_rmw_operation a_op (pv : dvalue) (val : dvalue) : itree instr_E dvalue :=
+  Definition denote_atomic_rmw_operation a_op (pv : dvalue) (val : dvalue) : itree L0' dvalue :=
     match a_op with
     | Axchg =>
         (* xchg: *ptr = val *)
@@ -498,14 +496,14 @@ Section Denotation.
     | Ausub_sat => raise ("Unsupported atomicrwm operation")
     end.
 
-  Definition denote_atomicrmw id armw : itree instr_E unit :=
+  Definition denote_atomicrmw id armw : itree L0' unit :=
     let '(ptr_ty, ptr_val) := armw.(a_ptr) in
     let '(a_ty, a_val) := armw.(a_val) in
     let a_op := armw.(a_operation) in
 
     (* evaluate the arguments to the instruction *)
-    ptr_v <- translate exp_to_instr (denote_exp (Some ptr_ty) ptr_val) ;;
-    a_v <- translate exp_to_instr (denote_exp' (Some a_ty) a_val) ;;
+    ptr_v <- denote_exp' (Some ptr_ty) ptr_val ;;
+    a_v <- denote_exp' (Some a_ty) a_val ;;
 
     (* Perform the load - load addresses must be unique *)
     loaded_v <- trigger (Load a_ty ptr_v);;
@@ -518,13 +516,14 @@ Section Denotation.
     (* The result is the original value loaded from ptr before the modification *)
     local_write id loaded_v;;
     ret tt.
-  
+
+   
   (* TODO: Maybe reverse the order in the pair we match on so that
      we don't have to analyse on the id when irrelavant to the semantics?
    *)
   (* An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
-    (i: (instr_id * instr dtyp * list (metadata dtyp))) (varargs : option addr) : itree instr_E unit :=
+    (i: (instr_id * instr dtyp * list (metadata dtyp))) (varargs : option addr) : itree L0' unit :=
     
     let '(i, md) := i in
     (* The following two lines set up file location information. *)
@@ -539,7 +538,7 @@ Section Denotation.
     (* Pure operations *)
 
     | (IId id, INSTR_Op op) =>
-        uv <- translate exp_to_instr (denote_op op) ;;
+        uv <- denote_op op ;;
         local_write id uv ;;
         ret tt
     (* Allocation *)
@@ -565,7 +564,7 @@ Section Denotation.
             v <- trigger (Alloca dt 1 align);;
             local_write id v
         | Some (t, num_exp) =>
-            n <- translate exp_to_instr (denote_exp (Some t) num_exp);;
+            n <- denote_exp' (Some t) num_exp;;
             v <- trigger (Alloca dt (Z.to_N (dvalue_int_unsigned n)) align);;
             local_write id v
         end;;
@@ -573,15 +572,15 @@ Section Denotation.
 
     (* Load *)
     | (IId id, INSTR_Load dt (du,ptr) _) =>
-      a <- translate exp_to_instr (denote_exp (Some du) ptr);;
+      a <- denote_exp' (Some du) ptr;;
       (* Load addresses must be unique *)
       v <- trigger (Load dt a);;
       local_write id v
 
     (* Store *)
     | (IVoid _, INSTR_Store (dt, val) (du, ptr) _) =>
-      v <- translate exp_to_instr (denote_exp (Some dt) val) ;;
-      a <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
+      v <- denote_exp' (Some dt) val ;;
+      a <- denote_exp' (Some du) ptr ;;
       (* Store addresses must be unique *)
       match a with
       | DVALUE_Poison dt => raiseUB (err_loc ++ ": Store to poisoned address.")
@@ -595,7 +594,7 @@ Section Denotation.
     (* TODO: technically operand bundles can affect semantics *)
     (* TODO: This should not be so complex, need to pull some code out *) 
     | (pt, INSTR_Call (dt, f) args _ _) =>
-        vs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) (List.map fst args) ;;
+        vs <- map_monad (fun '(t, op) => denote_exp' (Some t) op) (List.map fst args) ;;
         returned_value <-
           match intrinsic_exp f with
           (* TODO: look at whether these can be moved to IntrinsicsDefinitions.v *)
@@ -604,7 +603,7 @@ Section Denotation.
               then
                 match args, varargs with
                 | [ ((t, e), _) ], Some varargs =>
-                    a <- translate exp_to_instr (denote_exp (Some t) e);;
+                    a <- denote_exp' (Some t) e;;
                     match a with
                     | DVALUE_Poison dt => raiseUB ("Store to poisoned address.")
                     | _ => trigger (Store DTYPE_Pointer a (DVALUE_Addr varargs));;
@@ -618,8 +617,8 @@ Section Denotation.
                 then
                   match args with
                   | [((DTYPE_Pointer, exp_dest), _); ((DTYPE_Pointer, exp_src), _)] =>
-                      src <- translate exp_to_instr (denote_exp (Some DTYPE_Pointer) exp_src);;
-                      dest <- translate exp_to_instr  (denote_exp (Some DTYPE_Pointer) exp_dest);;
+                      src <- denote_exp' (Some DTYPE_Pointer) exp_src;;
+                      dest <- denote_exp' (Some DTYPE_Pointer) exp_dest;;
                       vargs <- trigger (Load DTYPE_Pointer src);;
                       trigger (Store DTYPE_Pointer dest vargs);;
                       ret DVALUE_None
@@ -636,7 +635,7 @@ Section Denotation.
                     end
                       
           | None =>
-              fv <- translate exp_to_instr (denote_exp None f);;
+              fv <- denote_exp' None f;;
               res <- trigger (Call dt fv vs);;
               match res with
               | inl exc => raiseLLVM exc
@@ -654,7 +653,7 @@ Section Denotation.
     | (IVoid _, INSTR_Comment _) => ret tt
 
     | (pt, INSTR_VAArg (t, ptr_to_args_exp) argty) =>
-        ptr_to_args <- translate exp_to_instr (denote_exp (Some DTYPE_Pointer) ptr_to_args_exp);;
+        ptr_to_args <- denote_exp' (Some DTYPE_Pointer) ptr_to_args_exp;;
         args <- trigger (Load DTYPE_Pointer ptr_to_args);;
         retv <- trigger (Load argty args);;
         ix <- lift (from_Z 1);;
@@ -708,7 +707,7 @@ Section Denotation.
          or jumps to a new [block_id]. *)
 
   Definition denote_terminator
-    (trm: (instr_id * terminator dtyp * list (metadata dtyp))) : itree instr_E (block_id + dvalue) :=
+    (trm: (instr_id * terminator dtyp * list (metadata dtyp))) : itree L0' (block_id + dvalue) :=
     let '(iid, t, md) := trm in
     let err_loc := location_error_string md in
     let bogus := set_loc err_loc in
@@ -716,14 +715,14 @@ Section Denotation.
     match t with
 
     | TERM_Ret (dt, op) =>
-      dv <- (translate exp_to_instr (denote_exp (Some dt) op)) ;;
+      dv <- denote_exp' (Some dt) op ;;
       ret (inr dv)
 
     | TERM_Ret_void =>
         ret (inr DVALUE_None)
 
     | TERM_Br (dt,op) br1 br2 =>
-      v <- (translate exp_to_instr (denote_exp (Some dt) op)) ;;
+      v <- denote_exp' (Some dt) op ;;
       match v with
       | DVALUE_I 1 comparison_bit =>
         if equ comparison_bit one then
@@ -737,7 +736,7 @@ Section Denotation.
     | TERM_Br_1 br => ret (inl br)
                          
     | TERM_Switch (dt,e) default_br dests =>
-      selector <- (translate exp_to_instr (denote_exp (Some dt) e));;
+      selector <- denote_exp' (Some dt) e;;
       (* Selection on [undef] is UB *)
       if dvalue_is_poison selector
       then raiseUB (err_loc ++ ": Switching on poison.")
@@ -753,8 +752,8 @@ Section Denotation.
 
     (* TODO: technically operand bundles can affect the semantics of invoke *)
     | TERM_Invoke (dt, fnptrval) args to_label unwind_label anns _ =>
-      uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) (List.map fst args) ;;
-      fv <- (translate exp_to_instr (denote_exp None fnptrval)) ;;
+      uvs <- map_monad (fun '(t, op) => denote_exp' (Some t) op) (List.map fst args) ;;
+      fv <- denote_exp' None fnptrval ;;
       rv <- trigger (Call dt fv uvs) ;;
       (* branch to to_label *)
       match rv with
@@ -770,7 +769,7 @@ Section Denotation.
       end
           
     | TERM_Resume (t, expr) =>
-      exn <- translate exp_to_instr (denote_exp (Some t) expr);;
+      exn <- denote_exp' (Some t) expr;;
       raiseLLVM exn
 
     (* Currently unhandled VIR terminators *)
@@ -778,31 +777,31 @@ Section Denotation.
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
-  Definition denote_code (c: code dtyp) (varargs : option addr) : itree instr_E unit :=
+  Definition denote_code (c: code dtyp) (varargs : option addr) : itree L0' unit :=
     map_monad_ (fun i => denote_instr i varargs) c.
 
-   Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : itree exp_E (local_id * dvalue) :=
+  Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : itree L0' (local_id * dvalue) :=
     let '(id, Phi dt args, md) := id_p in
     let err_loc := location_error_string md in
     let bogus := set_loc err_loc in
     let err_loc := (bogus ++ err_loc) in
     match assoc bid_from args with
     | Some op =>
-      uv <- denote_exp (Some dt) op ;;
-      ret (id,uv)
+        uv <- denote_exp' (Some dt) op ;;
+        ret (id,uv)
     | None => raise (err_loc ++ ": jump: phi node doesn't include block ")
     end.
 
-  Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp * (list (metadata dtyp)))): itree instr_E unit :=
+  Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp * (list (metadata dtyp)))): itree L0' unit :=
     dvs <- map_monad
-             (fun x => translate exp_to_instr (denote_phi bid_from x))
+             (denote_phi bid_from)
              phis;;
     map_monad (fun '(id,dv) => local_write id dv) dvs;;
     ret tt.
 
   (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-  Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option addr) : itree instr_E (block_id + dvalue) :=
+  Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option addr) : itree L0' (block_id + dvalue) :=
     denote_phis bid_from (blk_phis b);;
     denote_code (blk_code b) varargs;;
     denote_terminator (blk_term b).
@@ -822,7 +821,7 @@ Section Denotation.
    *)
 
   Definition denote_ocfg (bks: ocfg dtyp) (varargs : option addr)
-    : (block_id * block_id) -> itree instr_E ((block_id * block_id) + dvalue) :=
+    : (block_id * block_id) -> itree L0' ((block_id * block_id) + dvalue) :=
     ITree.iter
       (fun '((bid_from,bid_src) : block_id * block_id) =>
          match find_block bks bid_src with
@@ -835,7 +834,7 @@ Section Denotation.
              end
          end).
 
-  Definition denote_cfg (f: cfg dtyp) (varargs : option addr) : itree instr_E dvalue :=
+  Definition denote_cfg (f: cfg dtyp) (varargs : option addr) : itree L0' dvalue :=
     r <- denote_ocfg (blks f) varargs (init f,init f) ;;
     match r with
     | inl bid => raise ("Can't find block in denote_cfg " ++ show (snd bid))
@@ -936,7 +935,7 @@ Section Denotation.
   Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
     fun (args : list dvalue) =>
       varg <- push_call_frame df args;;
-      rv <- translate instr_to_L0' (denote_cfg (df_instrs df) (Some varg));;
+      rv <- denote_cfg (df_instrs df) (Some varg);;
       pop_call_frame;;
       ret rv.
 

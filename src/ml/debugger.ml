@@ -163,7 +163,7 @@ let print_stack_frames (s : Stack.stack_frame list) =
       Printf.printf "#%d: %s\n" n (match sf.stack_loc with None -> "_" | Some l -> Camlcoq.camlstring_of_coqstring l)) s
 
 let rec debugger
-    (m : (__ coq_L4, Interpreter.interp_state) itree)
+    (m : (__ coq_L1, Interpreter.interp_state) itree)
     : (DV.dvalue, exit_condition) result =
   let command = read_command () in
   match command with

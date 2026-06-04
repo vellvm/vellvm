@@ -69,33 +69,142 @@ Caused by the `Stdlib.compare ... = 0` substitute introduced in `ml/main.ml`, `m
 
 **Fix:** re-add `printf` (and `puts`) to the predefined-functions table, in the same spirit as the existing `putchar_denotation` / `puts_denotation` already defined in `TopLevel.v`.
 
-## Category D — Minimal-interpreter semantic gaps  (4 phase-1 + 2 phase-3)
+## Category D — Minimal-interpreter semantic gaps  (4 phase-1)
 
-All match deferred work documented in `ctrees_minimal_todos.md`.
+> Phase 3 originally had two Category-D failures (`insertAndExtractValue.ll`
+> `@testExtractX` / `@testExtractY` — `insert_into_str: invalid aggregate
+> data`); that file contains `undef` and is now in the quarantine
+> (`tests-quarantine-undef/memory/insertAndExtractValue.ll`). It still needs
+> a real fix when the quarantine is revisited.
 
-Phase 1:
-- `tests/ll/bitcast2.ll` — `Undefined Behavior: Division by poison`.
-- `tests/ll/extract_value_undef.ll` — `Undefined Behavior: Division by poison`.
-- `tests/ll/gep_undef.ll` — `handle_gep_h: unsupported index type`.
+The four phase-1 failures split into two families. **D.1–D.2** are the same
+root cause (eager-UB on poison operand), expressed in two different places.
+**D.3** is the exception machinery — TODO #1 of `ctrees_minimal_todos.md`.
 
-  The first two used to propagate poison; the new minimal semantics traps the
-  division as UB. The third has GEP with an `undef` index. All three are direct
-  consequences of the "no undef / single concrete monad" simplification.
+### D.1 — sdiv-by-poison traps UB  (`bitcast2.ll`, `extract_value_undef.ll`)
 
-- `tests/ll/invoke_throw.ll` — invoke/throw machinery. Exactly TODO #1 in
-  `ctrees_minimal_todos.md` ("Re-introduce exception handling").
+Both files run the same skeleton:
 
-Phase 3:
-- `tests/memory/insertAndExtractValue.ll @testExtractX` and `@testExtractY` —
-  `insert_into_str: invalid aggregate data`. The serialization / aggregate path
-  in the new minimal memory model rejects an `insertvalue` shape that the old
-  model accepted. Aggregate-handling regression worth investigating alongside
-  the broader minimal-memory work.
+```llvm
+%1 = alloca T               ; T = double or [5 x i64]
+%2 = load T, T* %1          ; ← uninitialized, → poison
+%3 = ...derive_i64_from %2  ; bitcast / extractvalue
+%5 = select i1 (icmp eq i64 %3, 0) → i64 1 vs %3
+%6 = sdiv i64 10, %5        ; ← traps UB here, but %6 is DEAD
+ret i64 0                   ; never reached, expected return value
+```
+
+Runtime chain:
+1. `alloca` → `allocate_dtyp`
+   (`rocq/Semantics/Params/VellvmImplem/Memory.v:103-108`) initializes the
+   block with `generate_poison_bytes`.
+2. `load` deserializes poison bytes to `DVALUE_Poison DTYPE_<…>`.
+3. `bitcast` / `extractvalue` / `icmp` / `select` propagate poison correctly.
+4. **`sdiv 10, poison`** hits the eager-UB arm at
+   `rocq/Semantics/DynamicValues.v:1111-1114`:
+   ```coq
+   | _, DVALUE_Poison t =>
+       if iop_is_div iop
+       then raise_ub "Division by poison."
+       else ret (DVALUE_Poison t)
+   ```
+
+LLVM LangRef: binop operands that are poison yield a poison *result*; UB only
+arises when poison reaches an explicitly UB-triggering use (branch, dereference,
+external call argument, etc.). The minimal semantics is **strictly stricter**
+than LangRef here.
+
+**Fix sketch.** In `rocq/Semantics/DynamicValues.v`, change three eager-UB
+arms to propagate poison:
+- Line 1106: `raise_ub "Signed division poison overflow"` (the symmetric
+  `DVALUE_Poison, _` case for `sdiv`) → `ret (DVALUE_Poison t)`.
+- Line 1113: `raise_ub "Division by poison."` (`_, DVALUE_Poison`) →
+  `ret (DVALUE_Poison t)`.
+- Line 1204: corresponding eager-UB on `udiv`/`urem` — same change.
+
+After this, `bitcast2.ll` and `extract_value_undef.ll` should pass: `%6`
+becomes poison, is unused, and `ret i64 0` runs.
+
+### D.2 — GEP with poison index hard-errors  (`gep_undef.ll`)
+
+```llvm
+%2 = alloca i32
+%3 = load i32, i32* %2                                       ; → DVALUE_Poison DTYPE_I 32
+%4 = getelementptr [5 x i64], [5 x i64]* %1, i32 0, i32 %3   ; ← errors here
+```
+
+`rocq/Semantics/Gep.v::handle_gep_h` (lines 21-83) enumerates supported index
+dvalues as `DVALUE_I 8`, `DVALUE_I 32`, `DVALUE_I 64`, `DVALUE_IPTR`. Anything
+else — including `DVALUE_Poison _` — falls through to:
+```coq
+| _ => raise_error "handle_gep_h: unsupported index type"      (line 80)
+```
+Note this is `raise_error`, not `raise_ub`: a hard interpreter error, not a
+LangRef-style UB. The original design simply didn't enumerate poison among
+valid index inputs. LangRef: a GEP whose index is poison yields a poison
+pointer.
+
+**Fix sketch.** Either:
+- Add a `DVALUE_Poison _ => ret <suitable-marker>` arm to `handle_gep_h`, or
+- Short-circuit at the entry of `handle_gep` (`rocq/Semantics/Gep.v:86+`) when
+  the pointer or any index is poison, and return `DVALUE_Poison DTYPE_Pointer`.
+
+The second is one match arm and is sufficient for this test.
+
+### D.3 — `invoke` / unwind machinery missing  (`invoke_throw.ll`)
+
+```llvm
+define void @raise2() { call void @llvm.vellvm.internal.throw() ret void }
+define void @raise()  { call void @raise2() ret void }
+define i32 @main(...) {
+  invoke void @raise() to label %foo unwind label %blah
+  foo:  ret i32 1
+  blah: ret i32 2
+}
+```
+
+Uses two LLVM features that are not modelled on this branch:
+- The `@llvm.vellvm.internal.throw()` intrinsic (project-specific marker for
+  an unwind).
+- The `invoke … to label %ok unwind label %unwind` terminator and its
+  `landingpad` counterpart.
+
+These would hook into the `LLVMExcE` / stack-handler machinery
+(`StackSetHandler`, `StackHandler`, `StackRaise`, `StackGetExc`) in
+`rocq/Semantics/LLVMEvents.v`. Per `ctrees_minimal_todos.md` TODO #1:
+
+> `LLVMEvents.v` near line 152 already has a `TODO: reincorporate exceptions`
+> next to `CallE` (constructor was simplified to return `dvalue` instead of
+> `dvalue + dvalue`). The full LLVM exception/landingpad machinery
+> (`LLVMExcE`, `StackSetHandler`, `StackHandler`, `StackRaise`,
+> `StackGetExc`) needs to be wired back into the denotation.
+
+The harness reports `test failed: OK`, meaning the program ran to completion
+but did not produce the expected result. Without `invoke`/unwind machinery,
+the `invoke` falls through as a plain call and the function returns `1` via
+the normal-return label, while the test expects `2` from the unwind label.
+
+This is the big rebuild from TODO #1 of the branch notes, not a small fix.
+
+### Suggested ordering within D
+
+1. **D.1** — three single-line edits in `DynamicValues.v` (eager-UB arms →
+   propagate poison). Picks up 2 tests in ~5 minutes. → phase 1 = 151/153.
+2. **D.2** — one short-circuit arm at `handle_gep` entry. Picks up 1 test.
+   → phase 1 = 152/153.
+3. **D.3** — exception/landingpad rewire; merge with TODO #1. Out of scope
+   for a quick fix.
 
 ## Suggested order of attack
 
-1. **Category A** — single printer fix, clears 63+ failures at once.
-2. **Category B** — re-extract `dvalue_eqb` (small Rocq + extraction change).
+1. ~~**Category A**~~ — done (quarantine + parser refusal).
+2. ~~**Category B**~~ — done (`dvalue_eqb` extracted).
 3. **Category C** — re-add `printf`/`puts` denotations (small Rocq change).
-4. **Category D** — branch-debt items; revisit when the minimal stack is more
-   stable (poison propagation, exception machinery, aggregate insertvalue).
+4. **Category D**:
+   - **D.1** (poison-propagation in binops) — three line edits in
+     `DynamicValues.v`. Clears `bitcast2.ll` and `extract_value_undef.ll`.
+   - **D.2** (poison-propagation in GEP) — one short-circuit at
+     `handle_gep` entry. Clears `gep_undef.ll`.
+   - **D.3** (`invoke`/landingpad) — branch-debt; merge with TODO #1.
+   - **D.aggregate** (quarantined `insertAndExtractValue.ll`) — revisit with
+     the quarantine.

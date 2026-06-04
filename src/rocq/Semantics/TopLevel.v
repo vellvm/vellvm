@@ -406,7 +406,7 @@ Section withParams.
      might be mutually recursive.  It is possible to declare cyclic data structures
      statically at the global level in LLVM.
    *)
-  Definition initialize_global (g:global dtyp) : itree exp_E unit :=
+  Definition initialize_global (g:global dtyp) : itree L0 unit :=
     if (g_alias g) then
       (* aliases simply populate the global ID map *)
       match (g_exp g) with
@@ -422,17 +422,17 @@ Section withParams.
     a <- trigger (GlobalRead (g_ident g));;
     uv <- match (g_exp g) with
          | None => ret (DVALUE_Poison dt)
-         | Some e =>  denote_exp (Some dt) e
+         | Some e => denote_exp (Some dt) e
          end ;;
     trigger (Store dt a uv).
 
-  Definition initialize_globals (gs:list (global dtyp)): itree exp_E unit :=
+  Definition initialize_globals (gs:list (global dtyp)): itree L0 unit :=
     map_monad_ initialize_global gs.
 
   Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree L0 unit :=
     allocate_declarations ((m_declarations CFG) ++ (List.map (df_prototype) (m_definitions CFG)));;
     allocate_globals (m_globals CFG) ;;
-    translate exp_to_L0 (initialize_globals (m_globals CFG)).
+    initialize_globals (m_globals CFG).
 
   (** Local environment implementation
     The map-based handlers are defined parameterized over a domain of key and value.
@@ -543,12 +543,12 @@ Section withParams.
     (entry : function_id)
     (arg_gen : itree L0 (list dvalue))
     (prog: ll_toplevel_entities)
-    : itree L4 res_L4 :=
+    : itree _ _ :=
     let t :=
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
         (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog)))
-    in interp_mcfg4 t [] (Build_stack_frame [] None None None,[]) initial_state.
+    in interp_mcfg t [] (Build_stack_frame [] None None None,[]) initial_state.
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts
@@ -557,7 +557,7 @@ Section withParams.
   Definition interpreter_param
              (args : list string)
              (prog : ll_toplevel_entities)
-              : itree L4 res_L4
+              : itree _ _ 
     := interpreter_gen (DTYPE_I 32%positive) (Name "main") (build_main_args args) prog.
 
 End withParams.
