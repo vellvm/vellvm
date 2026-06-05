@@ -659,9 +659,9 @@ and string buf = parse
   | _ as c { Buffer.add_char buf c; string buf lexbuf }
 
 and lexed_id = parse
-  | ident_fst ident_nxt* as i { ParseUtil.Named i }
-  | digit+ as i               { ParseUtil.Anonymous (int_of_string i) }
-  | '"'                       { ParseUtil.Named ("\"" ^ string (Buffer.create 10) lexbuf ^ "\"") }
+  | ident_fst ident_nxt* as i { Parse_util.Named i }
+  | digit+ as i               { Parse_util.Anonymous (int_of_string i) }
+  | '"'                       { Parse_util.Named ("\"" ^ string (Buffer.create 10) lexbuf ^ "\"") }
 
 {
 

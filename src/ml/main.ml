@@ -93,7 +93,7 @@ let make_test_h run name ll_ast t : (string * assertion) option =
         let args_str : doc =
           pp_print_list
             ~pp_sep:(fun f () -> pp_print_string f ", ")
-            Interpreter.pp_uvalue str_formatter args ;
+            Interpreter.pp_dvalue str_formatter args ;
           flush_str_formatter ()
         in
         Printf.sprintf "%s = %s(%s)" expected_str (string_of_function_id entry) args_str
@@ -105,7 +105,7 @@ let make_test_h run name ll_ast t : (string * assertion) option =
         let args_str : doc =
           pp_print_list
             ~pp_sep:(fun f () -> pp_print_string f ", ")
-            Interpreter.pp_uvalue str_formatter args ;
+            Interpreter.pp_dvalue str_formatter args ;
           flush_str_formatter ()
         in
         Printf.sprintf "%s(%s)" (string_of_function_id entry) args_str
@@ -124,7 +124,7 @@ let make_test_h run name ll_ast t : (string * assertion) option =
          let args_str =
            pp_print_list
              ~pp_sep:(fun f () -> pp_print_string f ", ")
-             Interpreter.pp_uvalue str_formatter args ;
+             Interpreter.pp_dvalue str_formatter args ;
            flush_str_formatter ()
          in
          Printf.sprintf "%s = %s(%s)" expected_str (string_of_function_id entry) args_str
@@ -190,7 +190,7 @@ let make_test_h run name ll_ast t : (string * assertion) option =
           let args_str : doc =
             pp_print_list
               ~pp_sep:(fun f () -> pp_print_string f ", ")
-              Interpreter.pp_uvalue str_formatter v_args ;
+              Interpreter.pp_dvalue str_formatter v_args ;
             flush_str_formatter ()
           in
           Printf.sprintf "src = tgt on generated input (%s)" args_str
@@ -282,7 +282,7 @@ let test_dir dir =
           | "ll" -> Some (path, IO.parse_file path, parse_tests path)
           | _ -> None
         with
-        | Failure s | ParseUtil.InvalidAnonymousId s ->
+        | Failure s | Parse_util.InvalidAnonymousId s ->
             let _ = Printf.printf "FAILURE %s\n\t%s\n%!" path s in
             None
         | _ ->
@@ -336,7 +336,7 @@ let _test_all' () =
 
 let get_csmith_dir_name () = "generators/csmith/"
 
-let runCSmith () =
+let run_csmith () =
   let c_file_name : string =
     Filename.(concat (get_csmith_dir_name ()) "temporary_csmith.c")
   in
@@ -414,7 +414,7 @@ let args =
   ; ( "-interpret"
     , Set Driver.interpret
     , "interpret ll program starting from 'main'" )
-  ; ("-csmith", Unit runCSmith, "Run CSmith and run Vellvm")
+  ; ("-csmith", Unit run_csmith, "Run CSmith and run Vellvm")
   ; ( "-i"
     , Set Driver.interpret
     , "interpret ll program starting from 'main' (same as -interpret)" )

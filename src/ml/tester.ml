@@ -164,7 +164,7 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
   let args_str args : doc =
     pp_print_list
       ~pp_sep:(fun f () -> pp_print_string f ", ")
-      Interpreter.pp_uvalue str_formatter args ;
+      Interpreter.pp_dvalue str_formatter args ;
     flush_str_formatter ()
   in
   match t with
@@ -202,7 +202,7 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
         let args_str =
           pp_print_list
             ~pp_sep:(fun f () -> pp_print_string f ", ")
-            Interpreter.pp_uvalue str_formatter args ;
+            Interpreter.pp_dvalue str_formatter args ;
           flush_str_formatter ()
         in
         let lhs = expected_str in
@@ -225,7 +225,7 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
         let args_str : doc =
           pp_print_list
             ~pp_sep:(fun f () -> pp_print_string f ",\n   ")
-            Interpreter.pp_uvalue str_formatter v_args ;
+            Interpreter.pp_dvalue str_formatter v_args ;
           flush_str_formatter ()
         in
         Printf.sprintf "src = tgt on generated input (%s)" args_str
@@ -365,7 +365,7 @@ let test_dir dir =
           | "ll" -> Some (path, IO.parse_file path, parse_tests path)
           | _ -> None
         with
-        | Failure s | ParseUtil.InvalidAnonymousId s ->
+        | Failure s | Parse_util.InvalidAnonymousId s ->
             let _ = Printf.printf "FAILURE %s\n\t%s\n%!" path s in
             None
         | _ ->

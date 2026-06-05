@@ -33,7 +33,7 @@ let string_of_float_full f =
   let s = sprintf "%.350f" f in
   Str.global_replace (Str.regexp "0+$") "" s
 
-let rec pp_uvalue : Format.formatter -> DV.dvalue -> unit =
+let rec pp_dvalue : Format.formatter -> DV.dvalue -> unit =
   let open Camlcoq in
   let open DV in
   let pp_comma_space ppf () = pp_print_string ppf ", " in
@@ -55,19 +55,19 @@ let rec pp_uvalue : Format.formatter -> DV.dvalue -> unit =
     | DVALUE_None -> fprintf ppf "DVALUE_None"
     | DVALUE_Struct l ->
         fprintf ppf "DVALUE_Struct(%a)"
-          (pp_print_list ~pp_sep:pp_comma_space pp_uvalue)
+          (pp_print_list ~pp_sep:pp_comma_space pp_dvalue)
           l
     | DVALUE_Packed_struct l ->
         fprintf ppf "DVALUE_Packet_struct(%a)"
-          (pp_print_list ~pp_sep:pp_comma_space pp_uvalue)
+          (pp_print_list ~pp_sep:pp_comma_space pp_dvalue)
           l
     | DVALUE_Array (_, l) ->
         fprintf ppf "DVALUE_Array(%a)"
-          (pp_print_list ~pp_sep:pp_comma_space pp_uvalue)
+          (pp_print_list ~pp_sep:pp_comma_space pp_dvalue)
           l
     | DVALUE_Vector (_, l) ->
         fprintf ppf "DVALUE_Vector(%a)"
-          (pp_print_list ~pp_sep:pp_comma_space pp_uvalue)
+          (pp_print_list ~pp_sep:pp_comma_space pp_dvalue)
           l
 
 let char_of_I8 x =

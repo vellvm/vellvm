@@ -27,7 +27,7 @@
 open Lexing
 open LLVMAst
 open ParserHelper
-open ParseUtil
+open Parse_util
 
 (* Compute a METADATA_File_info value from the current parser state. *)
 let pos_of_lexpos (p : position) =
@@ -108,7 +108,7 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 
 %}
 
-%token<ParseUtil.lexed_id> GLOBAL LOCAL
+%token<Parse_util.lexed_id> GLOBAL LOCAL
 %token LPAREN RPAREN LCURLY RCURLY LTLCURLY RCURLYGT LSQUARE RSQUARE LT GT EQ COMMA EOF STAR COLON DOTDOTDOT
 
 %token<string> COMMENT
