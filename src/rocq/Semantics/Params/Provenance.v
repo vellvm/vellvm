@@ -114,25 +114,3 @@ Class ProvenanceTheory {P : Provenance} : Prop :=
   }.
 
 
-  (* (* Derived functions on provenances. *) *)
-  (* Module PROV_FUNCS(Addr : ADDRESS) (PROV : PROVENANCE(Addr)). *)
-  (*   Import PROV. *)
-
-  (*   Definition all_accesses_allowed (pr : prov) (aids : list AllocationId) : bool *)
-  (*     := forallb (access_allowed pr) aids. *)
-
-  (*   Definition all_aid_accesses_allowed (pr : AllocationId) (aids : list AllocationId) : bool *)
-  (*     := forallb (aid_access_allowed pr) aids. *)
-
-  (*   Lemma allocation_id_to_prov_provenance_to_allocation_id_inv : *)
-  (*     forall pr pr', *)
-  (*       allocation_id_to_prov (provenance_to_allocation_id pr) = allocation_id_to_prov (provenance_to_allocation_id pr') -> *)
-  (*       pr = pr'. *)
-  (*   Proof. *)
-  (*     intros pr pr' H. *)
-  (*     apply provenance_to_allocation_id_inv. *)
-  (*     apply allocation_id_to_prov_inv. *)
-  (*     auto. *)
-  (*   Qed. *)
-  (* End PROV_FUNCS. *)
-

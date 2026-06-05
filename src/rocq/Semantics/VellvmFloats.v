@@ -235,19 +235,3 @@ Definition float_of_float_syntax (fs:float_syntax) : option float :=
   | FS_hex _ _ => None
   end.
 
-(*
-Definition uint_ex := (Hexadecimal.D4 (Hexadecimal.D2 (Hexadecimal.Df (Hexadecimal.Da (Hexadecimal.Da (Hexadecimal.D3 (Hexadecimal.Dd (Hexadecimal.D7 (Hexadecimal.D0 (Hexadecimal.D0 (Hexadecimal.D0 (Hexadecimal.D0 (Hexadecimal.D0 (Hexadecimal.D0 (Hexadecimal.D0 (Hexadecimal.D0 Hexadecimal.Nil)))))))))))))))).
-
-Definition example :=
-  (FS_hex FH_X uint_ex).
-
-Eval vm_compute in (float_of_float_syntax example).
-Eval vm_compute in (BinPos.Pos.of_hex_uint uint_ex).
-
-Definition v := Npos 468655825485824.
-
-Eval vm_compute in (Bits.b64_of_bits (BinInt.Z.of_N v)).
-
-Definition u := Npos 4826350094494203904.
-Eval vm_compute in (Bits.b64_of_bits (BinInt.Z.of_N u)).
-*)

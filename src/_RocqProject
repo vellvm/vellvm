@@ -22,14 +22,12 @@
 ./rocq/Utils/IntMaps.v
 ./rocq/Utils/Assoc.v
 ./rocq/Utils/NMaps.v
-./rocq/Utils/NList.v
 ./rocq/Utils/EOB.v
 ./rocq/Utilities.v
 
 ./rocq/Syntax/LLVMAst.v
 ./rocq/Syntax/AstLib.v
 ./rocq/Syntax/CFG.v
-./rocq/Syntax/DataLayout.v
 ./rocq/Syntax/DynamicTypes.v
 ./rocq/Syntax/Traversal.v
 ./rocq/Syntax/TypToDtyp.v
