@@ -378,7 +378,7 @@ Section Intrinsics.
    - error should be returned only in the case that the LLVM program is ill-formed
      (e.g. if the wrong number and/or type of arguments is given to the intrinsic)
 
-   - The uvalue case is used to throw an exception.
+   - The right-hand [dvalue] of the [+] result is used to throw an exception.
    *)
   Definition semantic_function := (list dvalue) -> EOB (dvalue + dvalue).
 

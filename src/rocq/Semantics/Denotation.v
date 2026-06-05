@@ -114,8 +114,6 @@ Section Denotation.
   (** ** Ident lookups
       Look-ups depend on the nature of the [ident], that may be local or global.
       In each case, we simply trigger the corresponding read event.
-      Note: global maps contain [dvalue]s, while local maps contain [uvalue]s.
-      We perform the conversion here.
    *)
   Definition lookup_id (i:ident) : itree L0 dvalue :=
     match i with
@@ -147,7 +145,7 @@ Section Denotation.
      Note that when top is Some t, the resulting dvalue can never be a function pointer
      for a well-typed itree program.
 
-     Expressions are denoted as itrees that return a [uvalue].
+     Expressions are denoted as itrees that return a [dvalue].
    *)
 
   Definition denote_int_syntax (x:int_syntax) : Z := 
@@ -256,11 +254,7 @@ Section Denotation.
     | EXP_Vector t es =>
       vs <- map_monad eval_texp es ;;
       ret (DVALUE_Vector t vs)
-          
-    (* The semantics of operators is complicated by both uvalues and undefined behaviors.
-           We denote each operands first, but the denotation of the operator itself
-           depends on whether it may raise UB, and how.
-     *)
+
     | OP_IBinop iop dt op1 op2 =>
       v1 <- denote_exp (Some dt) op1 ;;
       v2 <- denote_exp (Some dt) op2 ;;
@@ -316,7 +310,6 @@ Section Denotation.
         vec2 <- denote_exp (Some dt_vec2) vecop2 ;;
         idxmask <- denote_exp (Some dt_mask) idxmask;;
         raise ("todo: implement shuffle_vector" )
-        (* ret (UVALUE_ShuffleVector dt_vec1 vec1 vec2 idxmask) *)
 
     | OP_ExtractValue (dt, str) idxs =>
         str <- denote_exp (Some dt) str ;;
@@ -438,7 +431,7 @@ Section Denotation.
     else
       raise ("Ill-typed atomiccmpxchg").
                        
-  (* Implement the atomic modify operations in terms of Vellvm uvalues.
+  (* Implement the atomic modify operations in terms of Vellvm dvalues.
      Note: Langref doesn't seem to specifiy whether the arithmetic operations should be treated
            as having (or not) the signed/wrapping flags activated.  Here we (arbitrarily?)
            set them to false.
@@ -842,7 +835,7 @@ Section Denotation.
     end.
 
   (* The denotation of an itree function is a coq function that takes
-         a list of uvalues and returns the appropriate semantics. *)
+         a list of dvalues and returns the appropriate semantics. *)
   Definition function_denotation : Type :=
     list dvalue -> itree L0' dvalue.
 
@@ -895,8 +888,8 @@ Section Denotation.
                                    | _ => false end) elts
                     && N.eqb sz (N.of_nat (length elts))
                  then ret (DTYPE_Array (N.of_nat (length elts)) t)
-                 else raise_error "dtyp_of_uvalue_fun: mismatched element type in array"
-               else raise_error "dtyp_of_uvalue_fun: void in array type"
+                 else raise_error "dtyp_of_dvalue: mismatched element type in array"
+               else raise_error "dtyp_of_dvalue: void in array type"
            | DVALUE_Vector (DTYPE_Vector sz t) elts =>
                if @NO_VOID_dec t
                then
@@ -907,11 +900,11 @@ Section Denotation.
                  then
                    if @vector_dtyp_dec t
                    then ret (DTYPE_Vector (N.of_nat (length elts)) t)
-                   else raise_error "dtyp_of_uvalue_fun: invalid element type for vector"
-                 else raise_error "dtyp_of_uvalue_fun: mismatched element type in vector"
-               else raise_error "dtyp_of_uvalue_fun: void in vector type"
+                   else raise_error "dtyp_of_dvalue: invalid element type for vector"
+                 else raise_error "dtyp_of_dvalue: mismatched element type in vector"
+               else raise_error "dtyp_of_dvalue: void in vector type"
                         
-    | _ => raise_error "dtyp_of_uvalue_fun: missing case"
+    | _ => raise_error "dtyp_of_dvalue: missing case"
            end.
 
 

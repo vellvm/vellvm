@@ -143,9 +143,6 @@ Section Convert.
         | _, _ => raise_error "Invalid PTOI conversion"
         end
     | Conv_ItoP x =>
-        (* Note: we lost part of the error message when raising UB in the [int_to_ptr]
-           computation here:
-           ("concretize_uvalueM OOM in Conv_ItoP: " ++ msg) *)
         DVALUE_Addr <$> int_to_ptr (dvalue_int_unsigned x) wildcard_prov
     | Conv_Pure x => ret x
     | Conv_Oom s => raise_oom s

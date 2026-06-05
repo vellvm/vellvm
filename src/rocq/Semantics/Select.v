@@ -30,11 +30,11 @@ Section Select.
                                 if (@Integers.unsigned 1 i =? 1)%Z
                                 then ret x
                                 else ret y
-                            | _ => raise_error "concretize_uvalueM: ill-typed select, condition in vector was not poison or i1."
+                            | _ => raise_error "eval_select: ill-typed select, condition in vector was not poison or i1."
                             end;;
                  rest <- loop conds xs ys;;
                  ret (selected :: rest)
-             | _, _, _ => raise_error "concretize_uvalueM: ill-typed vector select, length mismatch."
+             | _, _, _ => raise_error "eval_select: ill-typed vector select, length mismatch."
              end in
            (* TODO: lazily concretize these vectors to avoid
                    evaluating elements that aren't chosen? *)
@@ -48,9 +48,9 @@ Section Select.
            | DVALUE_Vector t xs, DVALUE_Vector _ ys =>
                selected <- loop conds xs ys;;
                ret (DVALUE_Vector t selected)
-           | _, _ => raise_error "concretize_uvalueM: ill-typed vector select, non-vector arguments"
+           | _, _ => raise_error "eval_select: ill-typed vector select, non-vector arguments"
            end
-       | _ => raise_error "concretize_uvalueM: ill-typed select."
+       | _ => raise_error "eval_select: ill-typed select."
        end.
 
 End Select.

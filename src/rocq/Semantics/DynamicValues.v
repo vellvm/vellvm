@@ -45,11 +45,6 @@ Open Scope N_scope.
 
 (** * Dynamic values
     Definition of the dynamic values manipulated by VIR.
-    They come in two flavors:
-    - [dvalue] are the concrete notion of values computed.
-    - [uvalue] (_under-defined values_) are an extension of [dvalue] as symbolic values:
-      + a special [undef τ] value modeling LLVM's "undef"
-      + delayed numerical operations.
  *)
 
 #[global] Instance Eqv_nat : Eqv nat := (@eq nat).
@@ -1122,16 +1117,6 @@ Section DValue.
   (* I split the definition between the vector and other evaluations because
      otherwise eval_iop should be recursive to allow for vector calculations,
      but coq can't find a fixpoint. *)
-  (* Here is where we want to add the case distinction  for uvalues
-
-       - this should check for "determined" uvalues and then use eval_iop_integer_h
-         otherwise leave the op symbolic
-
-       - this should use the inclusion of dvalue into uvalue in the case that
-         eval_iop_integer_h is calle
-
-   *)
-
   Definition eval_iop iop v1 v2 : EOB dvalue :=
     match v1, v2 with
     | (DVALUE_Vector t elts1), (DVALUE_Vector _ elts2) =>

@@ -10,44 +10,6 @@ From ExtLib Require Import
      Data.Monads.EitherMonad.
 Open Scope N_scope.
 
-(* Convert a list of UVALUE_ExtractByte values into a dvalue of
-         a given type.
-
-         Assumes bytes are in little endian form...
-
-         Note: I believe this function has to be endianess aware.
-
-         This probably also needs to be mutually recursive with
-         concretize_uvalue...
-
-         Idea:
-
-         For each byte in the list, find uvalues that are from the
-         same store.
-
-         - Can I have bytes that are from the same store, but
-           different uvalues?  + Might not be possible, actually,
-           because if I store a concatbytes I get the old sids...  +
-           TODO: Getting the old sids might be a problem,
-           though. Should be new, but entangled wherever they were
-           entangled before. This needs to be changed in serialize...
-           * I.e., If I load bytes from one store, and then store them
-           beside them... It should have a different sid, allowing the
-           bytes from that store to vary independently.  * ALSO bytes
-           that are entangled should *stay* entangled.
-
-         The above is largely an issue with serialize_sbytes...
-
-         The idea here should be to take equal uvalues in our byte
-         list with the same sid and concretize the uvalue exactly
-         once.
-
-         After all uvalues in our list are concretized we then need to
-         convert the corresponding byte extractions into a single
-         dvalue.
-
- *)
-
 (* TODO: probably move this *)
 (* TODO: Make these take endianess into account.
 
