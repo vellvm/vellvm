@@ -13,6 +13,12 @@ From Vellvm Require Import
   Semantics.DynamicValues.
 Import ITree.Basics.Basics.Monads.
 
+(** * Draw handler
+    Interpretation of [DrawE] (draw an arbitrary dvalue of a given type).
+    The executable handler returns the canonical default; the propositional
+    spec layer (when wired) makes this non-deterministic.
+*)
+
 (* TODO: move in the right place *)
 Definition EOB_to_itree {E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} : EOB ~> itree E :=
   fun T m => match m with

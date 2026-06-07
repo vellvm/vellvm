@@ -42,6 +42,12 @@ Open Scope N_scope.
 
 (* end hide *)
 
+(** * Denotation of VIR
+    Layered [itree]-based denotation of VIR programs. Entry point of the
+    semantics pipeline: VIR AST → uninterpreted [itree] over [L0].
+    Handlers in [rocq/Handlers/] then strip events layer by layer.
+*)
+
 (* See src/ml/Extract.v for the special handling of these operation. *)
 Record fast_mode := mk_fast_mode {
                         fast_mode_set : bool -> unit ;
