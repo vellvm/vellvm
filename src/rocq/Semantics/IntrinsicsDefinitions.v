@@ -13,6 +13,8 @@ From ExtLib Require Import
   Programming.Eqv
   Data.String.
 
+From ITree Require Import ITree.
+
 From Vellvm Require Import
   Utilities
   Syntax
@@ -21,7 +23,8 @@ From Vellvm Require Import
   VellvmIntegers
   Numeric.Rocqlib
   Numeric.Integers
-  Numeric.Floats.
+  Numeric.Floats
+  LLVMEvents.
 
 From Flocq.IEEE754 Require Import
   Binary
@@ -369,6 +372,8 @@ Section Intrinsics.
  
   Open Scope string_scope.
 
+  Context {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} `{MemoryE -< E}.
+    
   (* Each (pure) intrinsic is defined by a function of the following type.
 
    - each intrinsic should "morally" be a total function: assuming the LLVM program
@@ -380,7 +385,8 @@ Section Intrinsics.
 
    - The right-hand [dvalue] of the [+] result is used to throw an exception.
    *)
-  Definition semantic_function := (list dvalue) -> EOB (dvalue + dvalue).
+  Definition pure_function     := list dvalue -> EOB (dvalue + dvalue).
+  Definition semantic_function := list dvalue -> option addr -> itree E (dvalue + dvalue).
 
   (* An association list mapping intrinsic names to their semantic definitions *)
   Definition intrinsic_definitions := list (declaration typ * semantic_function).
@@ -390,7 +396,7 @@ Section Intrinsics.
 
   #[local] Notation retr x := (ret (inr x)).
   (* Absolute value for Float. *)
-  Definition llvm_fabs_f32 : semantic_function :=
+  Definition llvm_fabs_f32 : pure_function :=
     fun args =>
       match args with
       | [DVALUE_Float d] => retr (DVALUE_Float (b32_abs d))
@@ -398,7 +404,7 @@ Section Intrinsics.
       end.
 
   (* Abosulute value for Doubles. *)
-  Definition llvm_fabs_f64 : semantic_function :=
+  Definition llvm_fabs_f64 : pure_function :=
     fun args =>
       match args with
       | [DVALUE_Double d] => retr (DVALUE_Double (b64_abs d))
@@ -419,14 +425,14 @@ Section Intrinsics.
       if Float32.cmp Clt a b then b else a
     end.
 
-  Definition llvm_maxnum_f64 : semantic_function :=
+  Definition llvm_maxnum_f64 : pure_function :=
     fun args =>
       match args with
       | [DVALUE_Double a; DVALUE_Double b] => retr (DVALUE_Double (Float_maxnum a b))
       | _ => raise_error "llvm_maxnum_f64 got incorrect / ill-typed inputs"
       end.
 
-  Definition llvm_maxnum_f32 : semantic_function :=
+  Definition llvm_maxnum_f32 : pure_function :=
     fun args =>
       match args with
       | [DVALUE_Float a; DVALUE_Float b] => retr (DVALUE_Float (Float32_maxnum a b))
@@ -447,14 +453,14 @@ Section Intrinsics.
       if Float32.cmp Clt a b then a else b
     end.
 
-  Definition llvm_minimum_f64 : semantic_function :=
+  Definition llvm_minimum_f64 : pure_function :=
     fun args =>
       match args with
       | [DVALUE_Double a; DVALUE_Double b] => retr (DVALUE_Double (Float_minimum a b))
       | _ => raise_error "llvm_minimum_f64 got incorrect / ill-typed inputs"
       end.
 
-  Definition llvm_minimum_f32 : semantic_function :=
+  Definition llvm_minimum_f32 : pure_function :=
     fun args =>
       match args with
       | [DVALUE_Float a; DVALUE_Float b] => retr (DVALUE_Float (Float32_minimum a b))
@@ -484,63 +490,95 @@ Section Intrinsics.
         end
       else ret (to_dvalue res).
 
-  Definition llvm_ushl_sat_1: semantic_function :=
+  Definition llvm_ushl_sat_1: pure_function :=
     fun args =>
       match args with
       | [DVALUE_I 1 a; DVALUE_I 1 b] => inr <$> ushl_sat a b
       | _ => raise_error "llvm_ushl_sat_1 got incorrect / ill-typed inputs"
       end.
 
-  Definition llvm_ushl_sat_8: semantic_function :=
+  Definition llvm_ushl_sat_8: pure_function :=
     fun args =>
       match args with
       | [DVALUE_I 8 a; DVALUE_I 8 b] => inr <$> ushl_sat a b
       | _ => raise_error "llvm_ushl_sat_8 got incorrect / ill-typed inputs"
       end.
 
-  Definition llvm_ushl_sat_16: semantic_function :=
+  Definition llvm_ushl_sat_16: pure_function :=
     fun args =>
       match args with
       | [DVALUE_I 16 a; DVALUE_I 16 b] => inr <$> ushl_sat a b
       | _ => raise_error "llvm_ushl_sat_16 got incorrect / ill-typed inputs"
       end.
 
-  Definition llvm_ushl_sat_32: semantic_function :=
+  Definition llvm_ushl_sat_32: pure_function :=
     fun args =>
       match args with
       | [DVALUE_I 32 a; DVALUE_I 32 b] => inr <$> ushl_sat a b
       | _ => raise_error "llvm_ushl_sat_32 got incorrect / ill-typed inputs"
       end.
 
-  Definition llvm_ushl_sat_64: semantic_function :=
+  Definition llvm_ushl_sat_64: pure_function :=
     fun args =>
       match args with
       | [DVALUE_I 64 a; DVALUE_I 64 b] => inr <$> ushl_sat a b
       | _ => raise_error "llvm_ushl_sat_64 got incorrect / ill-typed inputs"
       end.
 
-  Definition llvm_vellvm_internal_throw : semantic_function :=
+  Definition llvm_vellvm_internal_throw : pure_function :=
     fun args =>
       match args with
       | [] => retr DVALUE_None
       | _ => raise_error "llvm_vellvm_internal_throw got incorrect / ill-typed inputs"
       end.
 
+  Definition llvm_va_start : semantic_function :=
+    fun args varargs =>
+      match args, varargs with
+    | [ a ], Some varargs =>
+        match a with
+        | DVALUE_Poison dt => raiseUB ("Store to poisoned address in va_start.")
+        | _ => trigger (Store DTYPE_Pointer a (DVALUE_Addr varargs));;
+              retr DVALUE_None
+        end
+    | _, _ => raise "va_start: invalid arguments."
+    end.
+  
+  Definition llvm_va_copy : semantic_function :=
+    fun args varargs =>
+      match args with
+      | [dest; src] =>
+          vargs <- trigger (Load DTYPE_Pointer src);;
+          trigger (Store DTYPE_Pointer dest vargs);;
+          retr DVALUE_None
+      | _ => raise ": va_copy invalid arguments"
+      end.
+
+  Definition llvm_va_end  : semantic_function :=
+    fun args varargs =>
+      retr DVALUE_None.
+
+  Definition pure_to_semantic : pure_function -> semantic_function :=
+    fun f args _ => LLVMEvents.lift (f args).
+
   (* Clients of Vellvm can register the names of their own intrinsics
      definitions here. *)
   Definition defined_intrinsics : intrinsic_definitions :=
-    [ (fabs_32_decl, llvm_fabs_f32) ;
-      (fabs_64_decl, llvm_fabs_f64) ;
-      (maxnum_32_decl , llvm_maxnum_f32) ;
-      (maxnum_64_decl , llvm_maxnum_f64);
-      (minimum_32_decl, llvm_minimum_f32);
-      (minimum_64_decl, llvm_minimum_f64);
-      (ushl_sat_1_decl, llvm_ushl_sat_1);
-      (ushl_sat_8_decl, llvm_ushl_sat_8);
-      (ushl_sat_16_decl, llvm_ushl_sat_16);
-      (ushl_sat_32_decl, llvm_ushl_sat_32);
-      (ushl_sat_64_decl, llvm_ushl_sat_64);
-      (vellvm_internal_throw_decl, llvm_vellvm_internal_throw)
+    [ (fabs_32_decl, pure_to_semantic llvm_fabs_f32) ;
+      (fabs_64_decl, pure_to_semantic llvm_fabs_f64) ;
+      (maxnum_32_decl , pure_to_semantic llvm_maxnum_f32) ;
+      (maxnum_64_decl , pure_to_semantic llvm_maxnum_f64);
+      (minimum_32_decl, pure_to_semantic llvm_minimum_f32);
+      (minimum_64_decl, pure_to_semantic llvm_minimum_f64);
+      (ushl_sat_1_decl, pure_to_semantic llvm_ushl_sat_1);
+      (ushl_sat_8_decl, pure_to_semantic llvm_ushl_sat_8);
+      (ushl_sat_16_decl, pure_to_semantic llvm_ushl_sat_16);
+      (ushl_sat_32_decl, pure_to_semantic llvm_ushl_sat_32);
+      (ushl_sat_64_decl, pure_to_semantic llvm_ushl_sat_64);
+      (vellvm_internal_throw_decl, pure_to_semantic llvm_vellvm_internal_throw);
+      (va_start_decl, llvm_va_start);
+      (va_end_decl, llvm_va_end);
+      (va_copy_decl, llvm_va_copy)
     ].
 
 End Intrinsics.

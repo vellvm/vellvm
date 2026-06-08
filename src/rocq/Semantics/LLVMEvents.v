@@ -131,7 +131,7 @@ Section withParams.
   (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
   (* Intrinsics may raise an exception by returning inl *)
   Variant IntrinsicE : Type -> Type :=
-    | Intrinsic (t : dtyp) (f : string) (args : list dvalue) :
+    | Intrinsic (t : dtyp) (f : string) (args : list dvalue) (vararg : option addr) :
       IntrinsicE (exc + dvalue).
   
   (* LLVM exceptions *)
@@ -306,6 +306,16 @@ Section withParams.
     fun T e => (inl1 e).
   
 End withParams.
+
+
+Definition lift {E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} :
+  EOB ~> itree E :=
+  fun _ x => match x with
+          | raise_error s => raise s
+          | raise_oom   s => raiseOOM s
+          | raise_ub    s => raiseUB s
+          | raise_ret   v => ret v
+          end.
 
 Arguments DrawE {_} _.
 

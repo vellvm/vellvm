@@ -157,26 +157,26 @@ Section Denotation.
   Definition denote_int_syntax (x:int_syntax) : Z := 
     BinIntDef.Z.of_num_int x.
 
-  (* TODO: cleanup with typeclasses *)
-  Definition denote_float_syntax_as_float32 (f:float_syntax) : option float32 :=
-    float32_of_float_syntax f.
-    
-  Definition denote_float_syntax_as_float (f:float_syntax) : option float := 
-    float_of_float_syntax f.
-
-  Definition lift {E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} :
-    EOB ~> itree E :=
-    fun _ x => match x with
-            | raise_error s => raise s
-            | raise_oom   s => raiseOOM s
-            | raise_ub    s => raiseUB s
-            | raise_ret   v => ret v
-            end.
-
   Definition freeze {E} `{DrawE -< E} (dv : dvalue) : itree E dvalue :=
     match dv with
     | DVALUE_Poison dt => trigger (draw dt)
     | _ => ret dv
+    end.
+
+  Definition denote_float_syntax_as_float
+    (fpv : floating_point_variant) (f : float_syntax) : EOB dvalue :=
+    match fpv with
+    | FP_float =>
+        match float32_of_float_syntax f with
+        | None   => raise_error "bad float literal"
+        | Some f => ret (DVALUE_Float f)
+        end
+    | FP_double =>
+        match float_of_float_syntax f with
+        | None   => raise_error "bad double literal"
+        | Some f => ret (DVALUE_Double f)
+        end
+    | _ => raise_error "unsupported float type"
     end.
   
   Fixpoint denote_exp
@@ -184,7 +184,6 @@ Section Denotation.
     let eval_texp '(dt,ex) := denote_exp (Some dt) ex
     in
     match o with
-    (* The translation injects the [lookup_E] interface used by [lookup_id] to the ambient one *)
     | EXP_Ident i => lookup_id i
                 
     | EXP_Integer x =>
@@ -195,22 +194,11 @@ Section Denotation.
         | Some typ            => raise ("bad type for constant int: " ++ show typ)
         end
 
-    (* TODO: define a typeclass for handling all floating point representations *)
     | EXP_Float x =>
         match top with
         | None                      => raise ("denote_exp given untyped EXP_Float")
-        | Some (DTYPE_FP FP_float)  =>
-            match denote_float_syntax_as_float32 x with
-            | Some f => ret (DVALUE_Float f)
-            | None => raise ("bad float literal")
-            end
-        | Some (DTYPE_FP FP_double) =>
-            match denote_float_syntax_as_float x with
-            | Some f => ret (DVALUE_Double f)
-            | None => raise ("bad double literal")
-            end
-        | Some (DTYPE_FP _)        => raise ("unsupported float type")
-        | _                        => raise ("bad type for constant float")
+        | Some (DTYPE_FP FP_float)  => lift (denote_float_syntax_as_float FP_float x)
+        | _                         => raise ("bad type for constant float")
         end
 
     | EXP_Bool b =>
@@ -418,7 +406,6 @@ Section Denotation.
       (* SAZ: not clear whether this comparison implies "samesign" or not *)
       dv <- lift (eval_icmp false Eq loaded_v cmp_v);;
       match dv with
-      (* TODO: Shouldn't the size argument be explicit? *)
       | DVALUE_I 1 comparison_bit =>
           if equ comparison_bit one then
             (* They compared as equal: perform the write to memory *)
@@ -596,43 +583,13 @@ Section Denotation.
         vs <- map_monad (fun '(t, op) => denote_exp' (Some t) op) (List.map fst args) ;;
         returned_value <-
           match intrinsic_exp f with
-          (* TODO: look at whether these can be moved to IntrinsicsDefinitions.v *)
           | Some s =>
-              if String.eqb s "llvm.va_start"
-              then
-                match args, varargs with
-                | [ ((t, e), _) ], Some varargs =>
-                    a <- denote_exp' (Some t) e;;
-                    match a with
-                    | DVALUE_Poison dt => raiseUB ("Store to poisoned address.")
-                    | _ => trigger (Store DTYPE_Pointer a (DVALUE_Addr varargs));;
-                          ret DVALUE_None
-                    end
-                | _, _ => raise (err_loc ++ ": va_start invalid arguments")
-                end
-                  
-              else
-                if String.eqb s "llvm.va_copy"
-                then
-                  match args with
-                  | [((DTYPE_Pointer, exp_dest), _); ((DTYPE_Pointer, exp_src), _)] =>
-                      src <- denote_exp' (Some DTYPE_Pointer) exp_src;;
-                      dest <- denote_exp' (Some DTYPE_Pointer) exp_dest;;
-                      vargs <- trigger (Load DTYPE_Pointer src);;
-                      trigger (Store DTYPE_Pointer dest vargs);;
-                      ret DVALUE_None
-                  | _ => raise (err_loc ++ ": va_copy invalid arguments")
-                  end
-                else
-                  if String.eqb s "llvm.va_end"
-                  then ret DVALUE_None
-                  else 
-                    res <- trigger (Intrinsic dt s vs) ;;
-                    match res with
-                    | inl exc => raiseLLVM exc
-                    | inr dv => ret dv
-                    end
-                      
+              res <- trigger (Intrinsic dt s vs varargs) ;;
+              match res with
+              | inl exc => raiseLLVM exc
+              | inr dv => ret dv
+              end
+                
           | None =>
               fv <- denote_exp' None f;;
               res <- trigger (Call dt fv vs);;
