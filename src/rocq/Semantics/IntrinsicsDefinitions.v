@@ -24,7 +24,8 @@ From Vellvm Require Import
   Numeric.Rocqlib
   Numeric.Integers
   Numeric.Floats
-  LLVMEvents.
+  LLVMEvents
+  Conversion.
 
 From Flocq.IEEE754 Require Import
   Binary
@@ -372,7 +373,7 @@ Section Intrinsics.
  
   Open Scope string_scope.
 
-  Context {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} `{MemoryE -< E}.
+  Context {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} `{ExternalCallE -< E} `{MemoryE -< E}.
     
   (* Each (pure) intrinsic is defined by a function of the following type.
 

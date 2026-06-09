@@ -19,6 +19,7 @@ From Vellvm Require Import
   Semantics.IntrinsicsDefinitions
   Semantics.InterpretationStack
   Semantics.VellvmIntegers
+  Semantics.Libraries
   QC.ShowAST.
 (* end hide *)
 
@@ -36,143 +37,6 @@ From Vellvm Require Import
 
 Section withParams.
   Context {Pa : Params}.
-
-  (* IO & built-in functions -------------------------------------------------------------------- *)
-  (* SAZ: Is there a better location to put this information? It depends on many of the
-     modules that are in scope at this point.
-  *)
-  (** * puts
-        [int  puts(const char *s);]
-        The function puts() writes the string s, and a terminating newline character, to the stream stdout.
-        The functions fputs() and puts() return a nonnegative integer on success and EOF on error.
-
-      * putchar
-      [int putchar (int c);]
-      The function putchar() writes the character c to the stream stdout.
-      The functions fputc() and putc() return the value written on success and EOF on error.
-
-      SAZ/RAB: it isn't clear what kinds of errors count as "errors" for puts and
-      putchar. Our implementation will never explicitly return EOF (since that
-      seems to be a stdout stream error.  It will only ever raise "semantic"
-      errors.
-   *)
-
-(** Semantic function that triggers a single IO_stdout event to print
-    the passed-in character.
-    the character comes in as an i32, so the function truncates to an i8
-    to match types with IO_stdout. *)
-  
-  Definition putchar_denotation : function_denotation.
-    refine
-      (let putchar_body (u_char:dvalue) : CFGtop dvalue :=
-         match u_char with
-         | DVALUE_I sz x32 =>
-             if Pos.eq_dec 32 sz
-             then
-               match get_conv_case (Trunc false false) (DTYPE_I 32) u_char (DTYPE_I 8) with
-               | Conv_Pure (DVALUE_I sz x8) =>
-                   if Pos.eq_dec 8 sz
-                   then _
-                   else raise "conversion from i32 to i8 in putchar gave unexpected conversion type"
-               | _ => raise "conversion from i32 to i8 in putchar gave unexpected conversion type"
-               end ;;
-               ret u_char
-             else
-               raiseUB ("putc got non-i32 integer argument")
-         | bad => raiseUB ("putc got non-i32 argument " ++ show_dvalue bad)
-         end
-       in
-
-       fun (args : list dvalue) =>
-         match args with
-         | char::[] => putchar_body char
-         | _ => raise "putc called with zero or more than one arguments"
-         end).
-    subst.
-    exact (io_stdout [x8]).
-  Defined.
-
-  (** A semantic function to read an i8 value at [strptr + index] from the memory.
-      Propagates all memory failures and raises a Vellvm "Failure" if the
-      value read does not concretize to a DVALUE_I8.
-   *)
-  Definition i8_str_index (strptr : addr) (index : Z) : CFGtop (@Integers.bit_int 8) :=
-    iptr <- EOB_to_itree (from_Z index) ;;
-    addr <- EOB_to_itree (handle_gep_addr (DTYPE_I 8) strptr [DVALUE_IPTR iptr]) ;;
-    d_byte <- load (DTYPE_I 8) (DVALUE_Addr addr) ;;
-    match d_byte with
-    | DVALUE_I 8 b => ret b
-    | bad => raise ("i8_str_index failed with non-DVALUE_I8 " ++ show_dvalue bad)
-    end.
-
-  (** Semantic function that treats [u_strptr] as a C-style string pointer:
-      - reads i8 values from memory until it encounters a null-terminator (i8 0)
-      - triggers an IO_stdout event with the bytes plus a newline
-   *)
-  Definition puts_denotation : function_denotation :=
-    let puts_body (u_strptr : dvalue) : CFGtop dvalue :=
-      match u_strptr with
-      | DVALUE_Addr strptr =>
-          char <- i8_str_index strptr 0%Z ;;
-          bytes <-
-            ITree.iter
-              (fun '(c, bytes, offset) =>
-                 if @Integers.eq 8 c (@Integers.zero 8) then
-                   (* null terminated string so end the iteration, add the newline *)
-                   ret (inr ((@Integers.repr 8 10) :: bytes))
-                 else
-                   next_char <- i8_str_index strptr offset ;;
-                   ret (inl (next_char, c::bytes, (offset + 1)%Z))
-              )
-              (char, [], 1%Z) ;;
-          v <- io_stdout (DList.rev_tail_rec bytes) ;;
-          ret (DVALUE_I 8 (@Integers.zero 8))
-      | bad => raiseUB ("puts got non-address argument " ++ show_dvalue bad)
-      end
-    in
-
-    fun (args : list dvalue) =>
-      match args with
-      | strptr::[] => puts_body strptr
-      | _ => raise "puts called with zero or more than one arguments"
-      end.
-
-  (* *********DO NOT USE DIRECTLY*********
-  Program should ONLY use `built_in_functions`, defined below, which filters
-  out unused functions from _BUILTINS.
-
-  Lists all functions built-in by default. As vellvm gains more, they should
-  go into this list.
-*)
-
-  Definition _BUILTINS : list (function_id * function_denotation) :=
-    [(Name "puts", puts_denotation);
-     (Name "putchar", putchar_denotation)].
-
-  (** * [built_in_functions]
-
-      This is a list of standard library functions whose semantics can/must be
-      expressed directly in the semantic model.  They are not LLVM intrinsics, so
-      they _do_ get addresses.
-
-      These definitions assume that the built-in functions are declared in the .ll file
-      but that their semantics as itrees are defined here.  Note that the type at which
-      the function is declared in the ll file should match that used for the semantics,
-      but there is no check about that.
-
-      For example, to use the C [<stdio.h> puts] function, one would include the
-      following declaration as part of the ll file:
-      [declare i32 puts(i8* %str)]
-      See /tests/io for some examples.
-   *)
-
-  Definition built_in_functions (decls : list (declaration dtyp)) :
-    list (function_id * function_denotation) :=
-    filter (fun '(n, d) =>
-              existsb (fun s => Rocqlib.proj_sumbool (Syntax.AstLib.RawIDOrd.eq_dec s n))
-                (List.map (@dc_name dtyp) decls))
-      (* if we have many builtins, pull out this List.map to a let-bind for explicit optimization *)
-      _BUILTINS.
 
 
   (* SAZ: commenting this out for now, since it's trickier than we wanted *)
@@ -370,16 +234,16 @@ Section withParams.
     end.
 
   (**
-   Denotes a builtin function
+   Denotes a library function
    *)
-  Definition address_one_builtin_function (builtin : function_id * function_denotation)
+  Definition address_one_library_function (libfun : function_id * function_denotation)
     : MCFGtop (Z * function_denotation) :=
-    let (fid, den) := builtin in
+    let (fid, den) := libfun in
     fv <- gread fid ;;
     match fv with
     | DVALUE_Addr addr =>
         ret (ptr_to_int addr, den)
-    | _ => raise "address_one_builtin_function: invalid address, should not happen."
+    | _ => raise "address_one_library_function: invalid address, should not happen."
     end.
 
   (**
@@ -392,18 +256,10 @@ Section withParams.
    In order to limit bloated type signature, we name the successive return types.
    *)
 
-  (* TODO MOVE? *)
-  Notation res_L1 := (global_env * dvalue)%type.
-  Notation res_L2 := (stack_frame * stack * res_L1)%type.
-  Notation res_L3 := (state * res_L2)%type.
-  Notation res_L4 := (state * (stack_frame * stack * (global_env * dvalue)))%type.
-  Notation res_L5 := (state * (stack_frame * stack * (global_env * dvalue)))%type.
-  Notation res_L6 := (state * (stack_frame * stack * (global_env * dvalue)))%type.
-
   (**
      Full denotation of a Vellvm program as an interaction tree:
      * initialize the global environment;
-     * pointwise denote each function (and builtin)
+     * pointwise denote each function (and libraries)
      * retrieve the address of the entry point function;
      * tie the mutually recursive knot and run it starting from the
      * entry point
@@ -421,9 +277,9 @@ Section withParams.
              (mcfg : CFG.mcfg dtyp) : MCFGtop dvalue :=
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
-    'builtins <- map_monad address_one_builtin_function (built_in_functions (m_declarations mcfg));;
+    'libraries <- map_monad address_one_library_function (library_functions (m_declarations mcfg));;
     'addr <- gread entry ;;
-    'rv <- denote_mcfg (IP.of_list (defns ++ builtins)) ret_typ addr args;;
+    'rv <- denote_mcfg (IP.of_list (defns ++ libraries)) ret_typ addr args;;
     match rv with
     | inl exc => raiseLLVM exc
     | inr rv => ret rv
@@ -440,8 +296,7 @@ Section withParams.
     (ret_typ : dtyp)
     (entry : function_id)
     (arg_gen : MCFGtop (list dvalue))
-    (prog: ll_toplevel_entities)
-    : itree _ _ :=
+    (prog: ll_toplevel_entities) : MCFGbot (Res dvalue) :=
     let t :=
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
@@ -455,7 +310,7 @@ Section withParams.
   Definition interpreter_param
              (args : list string)
              (prog : ll_toplevel_entities)
-              : itree _ _ 
+              : MCFGbot _ 
     := interpreter_gen (DTYPE_I 32%positive) (Name "main") (build_main_args args) prog.
 
 End withParams.
