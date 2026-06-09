@@ -64,7 +64,7 @@ Section withParams.
   
   Definition putchar_denotation : function_denotation.
     refine
-      (let putchar_body (u_char:dvalue) : itree L0' dvalue :=
+      (let putchar_body (u_char:dvalue) : CFGtop dvalue :=
          match u_char with
          | DVALUE_I sz x32 =>
              if Pos.eq_dec 32 sz
@@ -96,7 +96,7 @@ Section withParams.
       Propagates all memory failures and raises a Vellvm "Failure" if the
       value read does not concretize to a DVALUE_I8.
    *)
-  Definition i8_str_index (strptr : addr) (index : Z) : itree L0' (@Integers.bit_int 8) :=
+  Definition i8_str_index (strptr : addr) (index : Z) : CFGtop (@Integers.bit_int 8) :=
     iptr <- EOB_to_itree (from_Z index) ;;
     addr <- EOB_to_itree (handle_gep_addr (DTYPE_I 8) strptr [DVALUE_IPTR iptr]) ;;
     d_byte <- load (DTYPE_I 8) (DVALUE_Addr addr) ;;
@@ -110,7 +110,7 @@ Section withParams.
       - triggers an IO_stdout event with the bytes plus a newline
    *)
   Definition puts_denotation : function_denotation :=
-    let puts_body (u_strptr : dvalue) : itree L0' dvalue :=
+    let puts_body (u_strptr : dvalue) : CFGtop dvalue :=
       match u_strptr with
       | DVALUE_Addr strptr =>
           char <- i8_str_index strptr 0%Z ;;
@@ -257,7 +257,7 @@ Section withParams.
    is an [itree] as any other.  *)
 
   (** Allocate space for a global *)
-  Definition allocate_global (g:global dtyp) : itree L0 unit :=
+  Definition allocate_global (g:global dtyp) : MCFGtop unit :=
     if (g_alias g) then
       (* Aliases don't allocate new storage space. *)
       ret tt 
@@ -265,7 +265,7 @@ Section withParams.
       v <- alloca (g_typ g) 1%N None;;
       gwrite (g_ident g) v.
 
-  Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
+  Definition allocate_globals (gs:list (global dtyp)) : MCFGtop unit :=
     map_monad_ allocate_global gs.
 
   Definition i8 : dtyp := DTYPE_I 8%positive.
@@ -282,14 +282,14 @@ Section withParams.
             Stdlib.Strings.Ascii.N_of_ascii ) (Stdlib.Strings.String.list_ascii_of_string s))
             [DVALUE_I 8%positive (@Integers.zero 8%positive)]).
 
-  Definition allocate_arg (arg : string) : itree L0 dvalue :=
+  Definition allocate_arg (arg : string) : MCFGtop dvalue :=
     let len := N.of_nat (String.length arg) + 1%N in
     (* tl;dr allocating the string in a C-like manner; + 1 for null terminator *)
     v <- alloca i8 len None;;
     store (DTYPE_Array len i8) v (i8_array_of_string arg);;
     ret v.
 
-  Definition allocate_args (args : list string) : itree L0 dvalue :=
+  Definition allocate_args (args : list string) : MCFGtop dvalue :=
     let len := N.of_nat (Datatypes.length args) in
       v <- alloca DTYPE_Pointer len None;;
       arg_addrs <- map_monad allocate_arg args;;
@@ -297,7 +297,7 @@ Section withParams.
             (DVALUE_Array (DTYPE_Array len DTYPE_Pointer) arg_addrs);;
       ret v.
 
-  Definition build_main_args (args : list string) : itree L0 (list dvalue) :=
+  Definition build_main_args (args : list string) : MCFGtop (list dvalue) :=
     v <- allocate_args args;;
     let main_args :=
       [DVALUE_I 32 ((@Integers.repr 32%positive ∘ Z.of_nat) (List.length args)); v]
@@ -312,7 +312,7 @@ Section withParams.
        combines two mcfgs coherently
    *)
 
-  Definition allocate_declaration (d:declaration dtyp) : itree L0 unit :=
+  Definition allocate_declaration (d:declaration dtyp) : MCFGtop unit :=
     match lookup_intrinsic_declaration (dc_name d) with
     | Some _ => Ret tt (* Don't allocate pointers for LLVM intrinsics declarations *)
     | None =>
@@ -320,14 +320,14 @@ Section withParams.
         gwrite (dc_name d) v
     end.
 
-  Definition allocate_declarations (ds:list (declaration dtyp)) : itree L0 unit :=
+  Definition allocate_declarations (ds:list (declaration dtyp)) : MCFGtop unit :=
     map_monad_ allocate_declaration ds.
 
   (* We have to initialize the global definitions after allocating them because they
      might be mutually recursive.  It is possible to declare cyclic data structures
      statically at the global level in LLVM.
    *)
-  Definition initialize_global (g:global dtyp) : itree L0 unit :=
+  Definition initialize_global (g:global dtyp) : MCFGtop unit :=
     if (g_alias g) then
       (* aliases simply populate the global ID map *)
       match (g_exp g) with
@@ -347,20 +347,20 @@ Section withParams.
          end ;;
     store dt a uv.
 
-  Definition initialize_globals (gs:list (global dtyp)): itree L0 unit :=
+  Definition initialize_globals (gs:list (global dtyp)): MCFGtop unit :=
     map_monad_ initialize_global gs.
 
-  Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree L0 unit :=
-    allocate_declarations ((m_declarations CFG) ++ (List.map (df_prototype) (m_definitions CFG)));;
-    allocate_globals (m_globals CFG) ;;
-    initialize_globals (m_globals CFG).
+  Definition build_global_environment (CFGtop : CFG.mcfg dtyp) : MCFGtop unit :=
+    allocate_declarations ((m_declarations CFGtop) ++ (List.map (df_prototype) (m_definitions CFGtop)));;
+    allocate_globals (m_globals CFGtop) ;;
+    initialize_globals (m_globals CFGtop).
 
   (**
    Denotes a function and returns its pointer.
    *)
 
   Definition address_one_function (df : definition dtyp (CFG.cfg dtyp))
-    : itree L0 (Z * function_denotation) :=
+    : MCFGtop (Z * function_denotation) :=
     let fid := (dc_name (df_prototype df)) in
     fv <- gread fid ;;
     match fv with
@@ -373,7 +373,7 @@ Section withParams.
    Denotes a builtin function
    *)
   Definition address_one_builtin_function (builtin : function_id * function_denotation)
-    : itree L0 (Z * function_denotation) :=
+    : MCFGtop (Z * function_denotation) :=
     let (fid, den) := builtin in
     fv <- gread fid ;;
     match fv with
@@ -418,7 +418,7 @@ Section withParams.
              (ret_typ : dtyp)
              (entry : function_id)
              (args : list dvalue)
-             (mcfg : CFG.mcfg dtyp) : itree L0 dvalue :=
+             (mcfg : CFG.mcfg dtyp) : MCFGtop dvalue :=
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
     'builtins <- map_monad address_one_builtin_function (built_in_functions (m_declarations mcfg));;
@@ -439,7 +439,7 @@ Section withParams.
   Definition interpreter_gen
     (ret_typ : dtyp)
     (entry : function_id)
-    (arg_gen : itree L0 (list dvalue))
+    (arg_gen : MCFGtop (list dvalue))
     (prog: ll_toplevel_entities)
     : itree _ _ :=
     let t :=

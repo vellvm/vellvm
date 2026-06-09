@@ -61,7 +61,7 @@ Section withParams.
   Context {Pa : Params}.
 
   (* Exceptions are carried around as [dvalue]s *)
-  Notation exc := dvalue.
+  Definition exc := dvalue.
   
   (* Interactions with global variables for the LLVM IR *)
   (* Note: Globals are read-only, except for the initialization. We could want to reflect this in the events themselves. *)
@@ -221,116 +221,21 @@ Section withParams.
     trigger (Debug (print_msg msg)).
 
   (* Core effects. *)
-  Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' GlobalE +' (LocalE +' StackE) +' MemoryE +' DrawE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
-  Definition L0  :=          ExternalCallE +' IntrinsicE +' GlobalE +' (LocalE +' StackE) +' MemoryE +' DrawE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
-  Definition withCall : itree L0 ~> itree L0' := translate inr1.
+  Definition CFGEtop  := CallE +' ExternalCallE +' IntrinsicE +' GlobalE +' (LocalE +' StackE) +' MemoryE +' DrawE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
+  Definition MCFGEtop :=          ExternalCallE +' IntrinsicE +' GlobalE +' (LocalE +' StackE) +' MemoryE +' DrawE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
+  Definition CFGtop   := itree CFGEtop.
+  Definition MCFGtop  := itree MCFGEtop.
+  Definition withCall : MCFGtop ~> CFGtop := translate inr1.
   
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [DrawE]*)
-  Definition L1 := ExternalCallE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
+  Definition MCFGEbot := ExternalCallE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
+  Definition MCFGbot  := itree MCFGEbot.
 
-  (* TODO: Test if these have any sensible impact *)
-  #[global] Instance FailureE_L0' : `{FailureE -< L0'} := 
-    fun T e => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e)))))))))).
-
-  #[global] Instance DebugE_L0' : `{DebugE -< L0'} := 
-    fun T e => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))))).
-  
-  #[global] Instance UBE_L0' : UBE -< L0' :=
-    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))))).
-
-  #[global] Instance LLVMExcE_L0' : LLVMExcE -< L0' :=
-    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))))).
-  
-  #[global] Instance OOME_L0' : OOME -< L0' :=
-    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))).
-
-  #[global] Instance DrawE_L0' : DrawE -< L0' :=
-    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))).
-  
-  #[global] Instance MemoryE_L0' : `{MemoryE -< L0'} := 
-    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))).
-
-  #[global] Instance LocalE_L0' : `{LocalE  -< L0'} := 
-    fun T e => inr1 (inr1 (inr1 (inr1 (inl1 (inl1 e))))).
-
-  #[global] Instance StackE_L0' : `{StackE  -< L0'} := 
-    fun T e => inr1 (inr1 (inr1 (inr1 (inl1 (inr1 e))))).
-
-  #[global] Instance GEnvE_L0' : `{GlobalE  -< L0'} := 
-    fun T e => (inr1 (inr1 (inr1 (inl1 e)))).
-
-  #[global] Instance IntrinsicE_L0' : `{IntrinsicE  -< L0'} := 
-    fun T e => (inr1 (inr1 (inl1 e))).
-
-  #[global] Instance ExternalCallE_L0' : `{ExternalCallE  -< L0'} := 
-    fun T e => (inr1 (inl1 e)).
-
-  #[global] Instance CallE_L0' : `{CallE  -< L0'} := 
-    fun T e => (inl1 e).
-
-  (* L0 *)
-
-  #[global] Instance FailureE_L0 : FailureE -< L0 :=
-    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e)))))))))).
-
-  #[global] Instance DebugE_L0 : DebugE -< L0 :=
-    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))))).
-
-  #[global] Instance UBE_L0 : UBE -< L0 :=
-    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))))).
-
-  #[global] Instance LLVMExcE_L0 : LLVMExcE -< L0 :=
-    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))).
-  
-  #[global] Instance OOME_L0 : OOME -< L0  :=
-    fun T e => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))).
-
-  #[global] Instance DrawE_L0 : DrawE -< L0 :=
-    fun T e => inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))).
-  
-  #[global] Instance MemoryE_L0 : MemoryE  -< L0 :=
-    fun T e => inr1 (inr1 (inr1 (inr1 (inl1 e)))).
-
-  #[global] Instance LocalE_expE_L0 : LocalE -< L0 :=
-    fun T e => inr1 (inr1 (inr1 (inl1 (inl1 e)))).
-
-  #[global] Instance StackE_expE_L0 : StackE -< L0 :=
-    fun T e => inr1 (inr1 (inr1 (inl1 (inr1 e)))).
-  
-  #[global] Instance GlobalE_L0 : GlobalE -< L0 :=
-    fun T e => (inr1 (inr1 (inl1 e))).
-
-  #[global] Instance IntrinsincE_L0 : IntrinsicE -< L0 :=
-    fun T e => (inr1 (inl1 e)).
-
-  #[global] Instance ExternalCallE_L0 : ExternalCallE -< L0 :=
-    fun T e => (inl1 e).
-  
-  (* L1 *)
-
-  #[global] Instance FailureE_L4 : FailureE -< (ExternalCallE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE) :=
-    fun T e => (inr1 (inr1 (inr1 (inr1 (inr1 e))))).
-
-  #[global] Instance DebugE_L4 : DebugE -< (ExternalCallE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE) :=
-    fun T e =>  (inr1 (inr1 (inr1 (inr1 (inl1 e))))).
-
-  #[global] Instance UBE_L4 : UBE -< (ExternalCallE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE) :=
-    fun T e =>  (inr1 (inr1 (inr1 (inl1 e)))).
-
-  #[global] Instance LLVMExcE_L4 : LLVMExcE -< (ExternalCallE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE) :=
-    fun T e =>  (inr1 (inr1 (inl1 e))).
-  
-  #[global] Instance OOME_L4 : OOME -< (ExternalCallE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE) :=
-    fun T e =>  (inr1 (inl1 e)).
-
-  #[global] Instance ExternalCallE_L4 : ExternalCallE -< (ExternalCallE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE) :=
-    fun T e => (inl1 e).
-  
 End withParams.
 
 Arguments DrawE {_} _.
 
-#[export] Hint Unfold L0 L0' L1 : core.
+#[export] Hint Unfold CFGEtop CFGtop MCFGEtop MCFGtop MCFGEbot MCFGbot : core.
 
 Definition EOB_to_itree {E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} :
   EOB ~> itree E :=

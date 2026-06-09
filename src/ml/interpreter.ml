@@ -102,8 +102,8 @@ let current_line = ref (Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_obje
 type interp_state =
   Memory.state * ((Stack.stack_frame * Stack.stack) * (Global.global_env * DV.dvalue))
 
-let single_step (m : (__ coq_L1, interp_state) itree)
-    : ((__ coq_L1, interp_state) itree,
+let single_step (m : (__ coq_MCFGEbot, interp_state) itree)
+    : ((__ coq_MCFGEbot, interp_state) itree,
        (DV.dvalue, exit_condition) result) Either.t =
   let open ITreeDefinition in
   match observe m with
@@ -166,7 +166,7 @@ let single_step (m : (__ coq_L1, interp_state) itree)
      let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in
      Either.right (Error (Failed loc_str))
 
-let rec step (m : (__ coq_L1, interp_state) itree)
+let rec step (m : (__ coq_MCFGEbot, interp_state) itree)
     : (DV.dvalue, exit_condition) result =
   match single_step m with
   | Either.Left x -> step x

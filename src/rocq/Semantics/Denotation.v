@@ -44,7 +44,7 @@ Open Scope N_scope.
 
 (** * Denotation of VIR
     Layered [itree]-based denotation of VIR programs. Entry point of the
-    semantics pipeline: VIR AST → uninterpreted [itree] over [L0].
+    semantics pipeline: VIR AST → uninterpreted [itree] over [MCFGtopE].
     Handlers in [rocq/Handlers/] then strip events layer by layer.
 *)
 
@@ -115,7 +115,7 @@ Section Denotation.
       Look-ups depend on the nature of the [ident], that may be local or global.
       In each case, we simply trigger the corresponding read event.
    *)
-  Definition lookup_id (i:ident) : itree L0 dvalue :=
+  Definition lookup_id (i:ident) : MCFGtop dvalue :=
     match i with
     | ID_Global x => gread x
     | ID_Local x  => lread x
@@ -163,7 +163,7 @@ Section Denotation.
     end.
 
   Fixpoint denote_exp
-    (top:option dtyp) (o:exp dtyp) {struct o} : itree L0 dvalue :=
+    (top:option dtyp) (o:exp dtyp) {struct o} : MCFGtop dvalue :=
     let eval_texp '(dt,ex) := denote_exp (Some dt) ex
     in
     match o with
@@ -357,7 +357,7 @@ Section Denotation.
   Definition denote_exp' t e := withCall (denote_exp t e).
   Arguments denote_exp' _ _ : simpl nomatch.
 
-  Definition denote_cmpxchg (id : raw_id) (cpx : cmpxchg dtyp) : itree L0' unit :=
+  Definition denote_cmpxchg (id : raw_id) (cpx : cmpxchg dtyp) : CFGtop unit :=
     (* SAZ: This will have to be revisited when we have a truly concurrent semantics. *)
     let '(ptr_ty, ptr_val) := cpx.(c_ptr) in
     let '(cmp_ty, cmp_val) := cpx.(c_cmp) in
@@ -406,7 +406,7 @@ Section Denotation.
            Similarly, it does not state whether the `disjoint` flag for `or` can be applied,
            so we set it to false.
   *)
-  Definition denote_atomic_rmw_operation a_op (pv : dvalue) (val : dvalue) : itree L0' dvalue :=
+  Definition denote_atomic_rmw_operation a_op (pv : dvalue) (val : dvalue) : CFGtop dvalue :=
     match a_op with
     | Axchg =>
         (* xchg: *ptr = val *)
@@ -457,7 +457,7 @@ Section Denotation.
     | Ausub_sat => raise ("Unsupported atomicrwm operation")
     end.
 
-  Definition denote_atomicrmw id armw : itree L0' unit :=
+  Definition denote_atomicrmw id armw : CFGtop unit :=
     let '(ptr_ty, ptr_val) := armw.(a_ptr) in
     let '(a_ty, a_val) := armw.(a_val) in
     let a_op := armw.(a_operation) in
@@ -480,7 +480,7 @@ Section Denotation.
 
   (* An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
-    (i: (instr_id * instr dtyp * list (metadata dtyp))) (varargs : option addr) : itree L0' unit :=
+    (i: (instr_id * instr dtyp * list (metadata dtyp))) (varargs : option addr) : CFGtop unit :=
     
     let '(i, md) := i in
     (* The following two lines set up file location information. *)
@@ -631,7 +631,7 @@ Section Denotation.
   (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
   Definition denote_terminator
-    (trm: (instr_id * terminator dtyp * list (metadata dtyp))) : itree L0' (block_id + dvalue) :=
+    (trm: (instr_id * terminator dtyp * list (metadata dtyp))) : CFGtop (block_id + dvalue) :=
     let '(iid, t, md) := trm in
     let err_loc := location_error_string md in
     let bogus := set_loc err_loc in
@@ -700,10 +700,10 @@ Section Denotation.
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
-  Definition denote_code (c: code dtyp) (varargs : option addr) : itree L0' unit :=
+  Definition denote_code (c: code dtyp) (varargs : option addr) : CFGtop unit :=
     map_monad_ (fun i => denote_instr i varargs) c.
 
-  Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : itree L0' (local_id * dvalue) :=
+  Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : CFGtop (local_id * dvalue) :=
     let '(id, Phi dt args, md) := id_p in
     let err_loc := location_error_string md in
     let bogus := set_loc err_loc in
@@ -715,7 +715,7 @@ Section Denotation.
     | None => raise (err_loc ++ ": jump: phi node doesn't include block ")
     end.
 
-  Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp * (list (metadata dtyp)))): itree L0' unit :=
+  Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp * (list (metadata dtyp)))): CFGtop unit :=
     dvs <- map_monad
              (denote_phi bid_from)
              phis;;
@@ -724,7 +724,7 @@ Section Denotation.
 
   (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-  Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option addr) : itree L0' (block_id + dvalue) :=
+  Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option addr) : CFGtop (block_id + dvalue) :=
     denote_phis bid_from (blk_phis b);;
     denote_code (blk_code b) varargs;;
     denote_terminator (blk_term b).
@@ -744,7 +744,7 @@ Section Denotation.
    *)
 
   Definition denote_ocfg (bks: ocfg dtyp) (varargs : option addr)
-    : (block_id * block_id) -> itree L0' ((block_id * block_id) + dvalue) :=
+    : (block_id * block_id) -> CFGtop ((block_id * block_id) + dvalue) :=
     ITree.iter
       (fun '((bid_from,bid_src) : block_id * block_id) =>
          match find_block bks bid_src with
@@ -757,7 +757,7 @@ Section Denotation.
              end
          end).
 
-  Definition denote_cfg (f: cfg dtyp) (varargs : option addr) : itree L0' dvalue :=
+  Definition denote_cfg (f: cfg dtyp) (varargs : option addr) : CFGtop dvalue :=
     r <- denote_ocfg (blks f) varargs (init f,init f) ;;
     match r with
     | inl bid => raise ("Can't find block in denote_cfg " ++ show (snd bid))
@@ -767,7 +767,7 @@ Section Denotation.
   (* The denotation of an itree function is a coq function that takes
      a list of dvalues and returns the appropriate semantics. *)
   Definition function_denotation : Type :=
-    list dvalue -> itree L0' dvalue.
+    list dvalue -> CFGtop dvalue.
 
   Fixpoint combine_lists_varargs {A B:Type} (l1:list A) (l2:list B) : EOB (list (A * B) * list B) :=
     match l1, l2 with
@@ -786,7 +786,7 @@ Section Denotation.
     mem_pop.
   
   (* Push call frame, return varargs address *)
-  Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list dvalue) : itree L0' addr :=
+  Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list dvalue) : CFGtop addr :=
     (* We match the arguments variables to the inputs *)
     '(bs, vs) <- lift (combine_lists_varargs (df_args df) args) ;;
     dts <- lift (map_monad dtyp_of_dvalue vs);;
@@ -820,7 +820,7 @@ Section Denotation.
          be kept uninterpreted for now.
          Since the type of [mrec] forces us to get rid of the [CallE] family of events that we
          interpret, we therefore cast external calls into an isomorphic family of events
-         that life in the "right" injection of the [_CFG_INTERNAL] effect
+         that life in the "right" injection of the [_CFGtop_INTERNAL] effect
    *)
 
   Definition lookup_defn (dv : dvalue) (m : IntMap function_denotation) : option function_denotation
@@ -832,7 +832,7 @@ Section Denotation.
 
   Definition denote_mcfg
     (fundefs : IntMap function_denotation) (dt : dtyp)
-    (f_value : dvalue) (args : list dvalue) : itree L0 (dvalue + dvalue) :=
+    (f_value : dvalue) (args : list dvalue) : MCFGtop (dvalue + dvalue) :=
     @mrec CallE (ExternalCallE +' _)
       (fun T call =>
          match call with
