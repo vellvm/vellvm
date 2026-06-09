@@ -10,8 +10,8 @@ From Vellvm Require Import Handlers.
 From Vellvm Require Import
   Utilities
   Syntax
-  Semantics.Params
-  Semantics.Params.Memory
+  Params
+  Interfaces.Memory
   Semantics.DynamicValues
   Semantics.LLVMEvents
   Semantics.Denotation

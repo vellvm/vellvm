@@ -6,11 +6,11 @@
     a [coq_Params] function argument on each definition that mentions it.
 *)
 
-From Vellvm Require Export
-  Params.IPtr
-  Params.Provenance
-  Params.Address
-  Params.Sizeof.
+From Vellvm.Semantics.Interfaces Require Export
+  IPtr
+  Provenance
+  Address
+  Sizeof.
 
 Class Params := {
     IPTR :: IPtr;

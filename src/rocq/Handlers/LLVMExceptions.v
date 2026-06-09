@@ -25,7 +25,7 @@ Import ITree.Basics.Basics.Monads.
 *)
 
 Section Exceptions.
-  Context {EXC : Type}.
+  Context {Pa : Param}.
 
   Definition handle_LLVMExcE {E} : LLVMExcE ~> eitherT exc (itree E) :=
     fun X e =>  

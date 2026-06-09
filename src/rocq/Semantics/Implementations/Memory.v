@@ -32,7 +32,7 @@ From Vellvm.Semantics Require Import
   VellvmIntegers
   Params
   LLVMEvents
-  Params.Memory
+  Interfaces.Memory
   Operations.
 From Stdlib Require Import FunctionalExtensionality.
 Import Logic.

@@ -4,10 +4,10 @@ From Vellvm Require Import
 
 From Vellvm Require Import
   Rocqlib
-  Params.IPtr
-  Params.Address
-  Params.Provenance
-  VellvmImplem.Provenance
+  Interfaces.IPtr
+  Interfaces.Address
+  Interfaces.Provenance
+  Implementations.Provenance
   VellvmIntegers.
 
 From QuickChick Require Import Show.

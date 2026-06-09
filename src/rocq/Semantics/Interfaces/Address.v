@@ -13,7 +13,9 @@ From Stdlib Require Import OrderedType OrderedTypeEx.
 
 From Vellvm Require Import
   Utilities
-  Params.Provenance.
+  DynamicTypes
+  Interfaces.Provenance
+  Interfaces.Sizeof.
 
 (* end hide *)
 
@@ -86,9 +88,6 @@ Class PITheory {P : Provenance} {A : @Address P} {P2I : @PI P A} :=
       ptr_to_int a = x;
   }.
 
-From Vellvm Require Import
-  DynamicTypes
-  Params.Sizeof.
 Open Scope Z.
 
 Instance overlaps_ptoi {P : Provenance} {Ad : @Address P} {PI : @PI P Ad} :

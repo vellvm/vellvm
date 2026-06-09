@@ -4,7 +4,7 @@ From Vellvm Require Import
 
 From Vellvm.Semantics Require Import
   DynamicValues
-  Params.Sizeof.
+  Interfaces.Sizeof.
 
 (* TODO: make parameter? *)
 Definition ptr_size : nat := 8.
@@ -129,5 +129,4 @@ Proof.
   constructor; eauto.
   lia.
 Qed.
-
 

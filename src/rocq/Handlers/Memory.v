@@ -22,8 +22,8 @@ From Vellvm Require Import
   Params
   Semantics.LLVMEvents
   Semantics.DynamicValues
-  Semantics.Params.Memory
-  Semantics.Params.VellvmImplem.Memory.
+  Interfaces.Memory
+  Implementations.Memory.
 
 From QuickChick Require Import Show.
 (* end hide *)

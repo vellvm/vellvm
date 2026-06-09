@@ -10,8 +10,8 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Semantics.DynamicValues
      Params
-     Params.Memory
-     Params.VellvmImplem.Memory.
+     Interfaces.Memory
+     Implementations.Memory.
 
 From Vellvm Require Import
   Handlers.

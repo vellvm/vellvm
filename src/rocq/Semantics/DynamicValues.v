@@ -27,8 +27,8 @@ From ExtLib Require Import
 From Vellvm Require Import
      Utilities
      Syntax
-     Semantics.Params
-     Semantics.VellvmIntegers
+     Params
+     VellvmIntegers
      QC.ShowAST.
 
 Import DList.

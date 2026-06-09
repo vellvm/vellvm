@@ -3,8 +3,8 @@ From Vellvm Require Import
   Syntax.
 
 From Vellvm Require Import
-  Params.IPtr
-  Params.Provenance
+  Interfaces.IPtr
+  Interfaces.Provenance
   Integers
   VellvmIntegers.
 

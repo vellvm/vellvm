@@ -8,12 +8,12 @@ From Vellvm Require Import Handlers.
 From Vellvm Require Import
   Utilities
   Syntax
-  Semantics.Params
-  Semantics.Params.Memory
-  Semantics.DynamicValues
-  Semantics.LLVMEvents
-  Semantics.Denotation
-  Semantics.Operations
+  Params
+  Implementations.Memory
+  DynamicValues
+  LLVMEvents
+  Denotation
+  Operations
   Semantics.IntrinsicsDefinitions
   Semantics.InterpretationStack
   Semantics.VellvmIntegers

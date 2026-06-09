@@ -1,7 +1,7 @@
 From Vellvm Require Export
-  Semantics.Params
-  Semantics.Gep
-  Semantics.Select
-  Semantics.Compare
-  Semantics.Conversion
-  Semantics.MemoryBytes.
+  Params
+  Gep
+  Select
+  Compare
+  Conversion
+  MemoryBytes.
