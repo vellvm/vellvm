@@ -559,7 +559,7 @@ Section Intrinsics.
       retr DVALUE_None.
 
   Definition pure_to_semantic : pure_function -> semantic_function :=
-    fun f args _ => LLVMEvents.lift (f args).
+    fun f args _ => EOB_to_itree (f args).
 
   (* Clients of Vellvm can register the names of their own intrinsics
      definitions here. *)

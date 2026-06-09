@@ -36,8 +36,6 @@ Section Select.
                  ret (selected :: rest)
              | _, _, _ => raise_error "eval_select: ill-typed vector select, length mismatch."
              end in
-           (* TODO: lazily concretize these vectors to avoid
-                   evaluating elements that aren't chosen? *)
            match v1, v2 with
            | DVALUE_Poison t, _ =>
                (* TODO: Should we make sure t is a vector type...? *)

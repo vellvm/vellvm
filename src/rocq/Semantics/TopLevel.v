@@ -97,8 +97,8 @@ Section withParams.
       value read does not concretize to a DVALUE_I8.
    *)
   Definition i8_str_index (strptr : addr) (index : Z) : itree L0' (@Integers.bit_int 8) :=
-    iptr <- lift (from_Z index) ;;
-    addr <- lift (handle_gep_addr (DTYPE_I 8) strptr [DVALUE_IPTR iptr]) ;;
+    iptr <- EOB_to_itree (from_Z index) ;;
+    addr <- EOB_to_itree (handle_gep_addr (DTYPE_I 8) strptr [DVALUE_IPTR iptr]) ;;
     d_byte <- trigger (Load (DTYPE_I 8) (DVALUE_Addr addr)) ;;
     match d_byte with
     | DVALUE_I 8 b => ret b

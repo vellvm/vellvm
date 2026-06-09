@@ -113,6 +113,7 @@ Definition fast_mode_object : fast_mode :=
 
 Section Denotation.
   Context {Pa : Params}.
+  #[local] Notation lift := EOB_to_itree.
   
   Definition dv_zero_initializer (t:dtyp) : EOB dvalue :=
     default_dvalue_of_dtyp t.

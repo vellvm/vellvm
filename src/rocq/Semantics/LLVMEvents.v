@@ -308,7 +308,7 @@ Section withParams.
 End withParams.
 
 
-Definition lift {E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} :
+Definition EOB_to_itree {E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} :
   EOB ~> itree E :=
   fun _ x => match x with
           | raise_error s => raise s

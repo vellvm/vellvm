@@ -19,20 +19,9 @@ Import ITree.Basics.Basics.Monads.
     spec layer (when wired) makes this non-deterministic.
 *)
 
-(* TODO: move in the right place *)
-Definition EOB_to_itree {E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} : EOB ~> itree E :=
-  fun T m => match m with
-          | raise_oom s => raiseOOM s
-          | raise_ub s => raiseUB s
-          | raise_error s => raise s
-          | raise_ret x => ret x
-          end.
-
 Section PARAMS.
   Context {Pa : Params}.
-  (* Definition handle_draw {E M} `{FailureE -< E} `{OOME -< E} `{UBE -< E} : DrawE ~> stateT M (itree E) := *)
-  (*   fun T '(draw τ) => *)
-  (*     fun s => (fun x => (s,x)) <$> EOB_to_itree (default_dvalue_of_dtyp τ). *)
+  
   Definition handle_draw {E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} :
     DrawE ~> itree E :=
     fun T '(draw τ) => EOB_to_itree (default_dvalue_of_dtyp τ).
