@@ -124,18 +124,6 @@ Section Denotation.
     | ID_Local x  => lread x
     end.
 
-  (* Predicate testing whether a [dvalue] is equal to zero at its type *)
-  Definition dvalue_is_zero (dv : dvalue) : Prop :=
-    match dv with
-    | DVALUE_I sz x   => x = VellvmIntegers.zero
-    | DVALUE_IPTR x    => x = zero_iptr
-    | DVALUE_Double x  => x = Float.zero
-    | DVALUE_Float x   => x = Float32.zero
-    | _               => False
-    end.
-
-  Definition dvalue_not_zero dv := ~ (dvalue_is_zero dv).
-
   (** ** Denotation of expressions
       [denote_exp top o] is the main entry point for evaluating itree expressions.
       top : the type at which the expression should be evaluated (if any)
@@ -368,16 +356,11 @@ Section Denotation.
     end.
   Arguments denote_exp _ _ : simpl nomatch.
 
-  Definition withCall : itree L0 ~> itree L0' := translate inr1.
   Definition denote_exp' t e := withCall (denote_exp t e).
   
   Definition denote_op (o:exp dtyp) : itree L0' dvalue :=
     denote_exp' None o.
   Arguments denote_op _ : simpl nomatch.
-
-  Definition local_write {E} `{LocalE -< E}
-    (id : raw_id) (dv : dvalue) : itree E unit :=
-    lwrite id dv.
 
   Definition denote_cmpxchg (id : raw_id) (cpx : cmpxchg dtyp) : itree L0' unit :=
     (* SAZ: This will have to be revisited when we have a truly concurrent semantics. *)
@@ -409,12 +392,12 @@ Section Denotation.
             store cmp_ty ptr_v new_v ;;
             (* return a struct with the loaded value and "true" *)
             let ret_v := DVALUE_Struct [loaded_v; DVALUE_I 1 one] in
-            local_write id ret_v
+            lwrite id ret_v
           else
             (* They compared as distinct: do not perform the write to memory *)
             (* return a struct with the loaded value and "false" *)
             let ret_v := DVALUE_Struct [loaded_v; DVALUE_I 1 zero] in
-            local_write id ret_v
+            lwrite id ret_v
       | DVALUE_Poison dt => raiseUB ("comparing poison in atomiccmpxchg.")
       | _ => raise ("Br got non-bool value")
       end
@@ -497,13 +480,9 @@ Section Denotation.
     store a_ty ptr_v stored_v ;;
 
     (* The result is the original value loaded from ptr before the modification *)
-    local_write id loaded_v;;
+    lwrite id loaded_v;;
     ret tt.
 
-   
-  (* TODO: Maybe reverse the order in the pair we match on so that
-     we don't have to analyse on the id when irrelavant to the semantics?
-   *)
   (* An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
     (i: (instr_id * instr dtyp * list (metadata dtyp))) (varargs : option addr) : itree L0' unit :=
@@ -518,12 +497,13 @@ Section Denotation.
     let bogus := set_loc err_loc in
     let err_loc := (bogus ++ err_loc) in
     match i with
+      
     (* Pure operations *)
-
     | (IId id, INSTR_Op op) =>
         uv <- denote_op op ;;
-        local_write id uv ;;
+        lwrite id uv ;;
         ret tt
+            
     (* Allocation *)
     | (IId id, INSTR_Alloca dt annotations) =>
         let num_elements :=
@@ -545,26 +525,24 @@ Section Denotation.
         match num_elements with
         | None =>
             v <- alloca dt 1 align;;
-            local_write id v
+            lwrite id v
         | Some (t, num_exp) =>
             n <- denote_exp' (Some t) num_exp;;
             v <- alloca dt (Z.to_N (dvalue_int_unsigned n)) align;;
-            local_write id v
+            lwrite id v
         end;;
         ret tt
 
     (* Load *)
     | (IId id, INSTR_Load dt (du,ptr) _) =>
       a <- denote_exp' (Some du) ptr;;
-      (* Load addresses must be unique *)
       v <- load dt a;;
-      local_write id v
+      lwrite id v
 
     (* Store *)
     | (IVoid _, INSTR_Store (dt, val) (du, ptr) _) =>
       v <- denote_exp' (Some dt) val ;;
       a <- denote_exp' (Some du) ptr ;;
-      (* Store addresses must be unique *)
       match a with
       | DVALUE_Poison dt => raiseUB (err_loc ++ ": Store to poisoned address.")
       | _ => store dt a v
@@ -599,7 +577,7 @@ Section Denotation.
         | IVoid _ =>
             ret tt
         | IId id  =>
-            local_write id returned_value
+            lwrite id returned_value
         end
 
     | (IVoid _, INSTR_Comment _) => ret tt
@@ -613,7 +591,7 @@ Section Denotation.
         store DTYPE_Pointer ptr_to_args args';;
         match pt with
         | IVoid _ => ret tt
-        | IId id  => local_write id retv
+        | IId id  => lwrite id retv
         end
 
     | (IId id, INSTR_AtomicCmpXchg cpx) =>
@@ -657,7 +635,6 @@ Section Denotation.
 
   (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
-
   Definition denote_terminator
     (trm: (instr_id * terminator dtyp * list (metadata dtyp))) : itree L0' (block_id + dvalue) :=
     let '(iid, t, md) := trm in
@@ -689,7 +666,6 @@ Section Denotation.
                          
     | TERM_Switch (dt,e) default_br dests =>
       selector <- denote_exp' (Some dt) e;;
-      (* Selection on [undef] is UB *)
       if dvalue_is_poison selector
       then raiseUB (err_loc ++ ": Switching on poison.")
       else (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
@@ -715,7 +691,7 @@ Section Denotation.
       | inr returned_value =>
           match iid with
           | IVoid _ => ret tt
-          | IId id  => local_write id returned_value
+          | IId id  => lwrite id returned_value
           end;;
           ret (inl to_label)
       end
@@ -748,7 +724,7 @@ Section Denotation.
     dvs <- map_monad
              (denote_phi bid_from)
              phis;;
-    map_monad (fun '(id,dv) => local_write id dv) dvs;;
+    map_monad (fun '(id,dv) => lwrite id dv) dvs;;
     ret tt.
 
   (* A block ends with a terminator, it either jumps to another block,
@@ -759,17 +735,17 @@ Section Denotation.
     denote_terminator (blk_term b).
 
   (* Our denotation currently contains two kinds of indirections: jumps to labels, internal to
-         a cfg, and calls to functions, that jump from a cfg to another.
-         In order to denote a single [cfg], we tie the first knot by linking together all the blocks
-         contain in the [cfg].
-         Note that contrary to calls, no events have been explicitely introduced for internal jumps.
-         This is due to the _tail recursive_ nature of these jumps: they only occur as the last
-         instruction of blocks. We hence can use a [loop] operator to do the linking, as opposed
-         to the more general [mrec] operator that will be used to link internal calls.
+     a cfg, and calls to functions, that jump from a cfg to another.
+     In order to denote a single [cfg], we tie the first knot by linking together all the blocks
+     contain in the [cfg].
+     Note that contrary to calls, no events have been explicitely introduced for internal jumps.
+     This is due to the _tail recursive_ nature of these jumps: they only occur as the last
+     instruction of blocks. We hence can use a [loop] operator to do the linking, as opposed
+     to the more general [mrec] operator that will be used to link internal calls.
 
-         The idea here is simply to enter the body through the [init] [block_id] of the [cfg].
-         As long as the computation returns a new label to jump to, we feed it back to the loop.
-         If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
+     The idea here is simply to enter the body through the [init] [block_id] of the [cfg].
+     As long as the computation returns a new label to jump to, we feed it back to the loop.
+     If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
    *)
 
   Definition denote_ocfg (bks: ocfg dtyp) (varargs : option addr)
@@ -794,7 +770,7 @@ Section Denotation.
     end.
 
   (* The denotation of an itree function is a coq function that takes
-         a list of dvalues and returns the appropriate semantics. *)
+     a list of dvalues and returns the appropriate semantics. *)
   Definition function_denotation : Type :=
     list dvalue -> itree L0' dvalue.
 
@@ -814,59 +790,6 @@ Section Denotation.
     stack_pop;;
     mem_pop.
   
-  Fixpoint dtyp_of_dvalue (v:dvalue) : EOB dtyp :=
-    let list_dtyps :=
-      fix go (uvs : list dvalue) : EOB (list dtyp) :=
-        match uvs with
-        | [] => ret []
-        | v::tl =>
-            dt <- dtyp_of_dvalue v;;
-            dts <- go tl;;
-            ret (dt :: dts)
-        end
-          in
-     match v with
-           | DVALUE_Addr a => ret DTYPE_Pointer
-           | DVALUE_I sz x => ret (DTYPE_I sz)
-           | DVALUE_IPTR x => ret DTYPE_IPTR
-           | DVALUE_Double x => ret (DTYPE_FP FP_double)
-           | DVALUE_Float x => ret (DTYPE_FP FP_float)
-           | DVALUE_Poison t => ret t
-           | DVALUE_None => ret DTYPE_Void
-           | DVALUE_Struct fields =>
-               dts <- list_dtyps fields;;
-               ret (DTYPE_Struct dts)
-           | DVALUE_Packed_struct fields =>
-               dts <- list_dtyps fields;;
-               ret (DTYPE_Packed_struct dts)
-           | DVALUE_Array (DTYPE_Array sz t) elts =>
-               if @NO_VOID_dec t
-               then
-                 if forallb (fun e => match dtyp_of_dvalue e with
-                                   | raise_ret t' => dtyp_eqb t t'
-                                   | _ => false end) elts
-                    && N.eqb sz (N.of_nat (length elts))
-                 then ret (DTYPE_Array (N.of_nat (length elts)) t)
-                 else raise_error "dtyp_of_dvalue: mismatched element type in array"
-               else raise_error "dtyp_of_dvalue: void in array type"
-           | DVALUE_Vector (DTYPE_Vector sz t) elts =>
-               if @NO_VOID_dec t
-               then
-                 if forallb (fun e => match dtyp_of_dvalue e with
-                                   | raise_ret t' => dtyp_eqb t t'
-                                   | _ => false end) elts
-                    && N.eqb sz (N.of_nat (length elts))
-                 then
-                   if @vector_dtyp_dec t
-                   then ret (DTYPE_Vector (N.of_nat (length elts)) t)
-                   else raise_error "dtyp_of_dvalue: invalid element type for vector"
-                 else raise_error "dtyp_of_dvalue: mismatched element type in vector"
-               else raise_error "dtyp_of_dvalue: void in vector type"
-                        
-    | _ => raise_error "dtyp_of_dvalue: missing case"
-           end.
-
-
   (* Push call frame, return varargs address *)
   Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list dvalue) : itree L0' addr :=
     (* We match the arguments variables to the inputs *)

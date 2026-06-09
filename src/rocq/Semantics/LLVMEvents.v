@@ -223,9 +223,9 @@ Section withParams.
   (* Core effects. *)
   Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' GlobalE +' (LocalE +' StackE) +' MemoryE +' DrawE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
   Definition L0  :=          ExternalCallE +' IntrinsicE +' GlobalE +' (LocalE +' StackE) +' MemoryE +' DrawE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
-
+  Definition withCall : itree L0 ~> itree L0' := translate inr1.
+  
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [DrawE]*)
-  (* Interprets [Draw] events: forcing evaluation of [dvalue]s, [UBE] has no semantic meaning *)
   Definition L1 := ExternalCallE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
 
   (* TODO: Test if these have any sensible impact *)
