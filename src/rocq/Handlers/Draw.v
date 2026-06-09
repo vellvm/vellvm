@@ -24,7 +24,7 @@ Section PARAMS.
   
   Definition handle_draw {E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} :
     DrawE ~> itree E :=
-    fun T '(draw τ) => EOB_to_itree (default_dvalue_of_dtyp τ).
+    fun T '(Draw τ) => EOB_to_itree (default_dvalue_of_dtyp τ).
   
   Variable (E G: Type -> Type).
   Notation Effin := (E +' DrawE +' G).

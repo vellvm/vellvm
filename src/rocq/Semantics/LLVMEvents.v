@@ -68,12 +68,16 @@ Section withParams.
   Variant GlobalE : Type -> Type :=
     | GlobalWrite (id: raw_id) (dv: dvalue) : GlobalE unit
     | GlobalRead  (id: raw_id)              : GlobalE dvalue.
-
+  Definition gwrite {E} `{GlobalE -< E} id dv : itree E _ := trigger (GlobalWrite id dv).
+  Definition gread  {E} `{GlobalE -< E} id    : itree E _ := trigger (GlobalRead id).
+  
   (* Interactions with local variables for the LLVM IR *)
   Variant LocalE : Type -> Type :=
     | LocalWrite (id: raw_id) (dv: dvalue) : LocalE unit
     | LocalRead  (id: raw_id)              : LocalE dvalue.
-
+  Definition lwrite {E} `{LocalE -< E} id dv : itree E _ := trigger (LocalWrite id dv).
+  Definition lread  {E} `{LocalE -< E} id    : itree E _ := trigger (LocalRead id).
+ 
   Variant StackE : Type -> Type :=
     | StackPush (args : list (raw_id * dvalue))
                       : StackE unit                   (* Pushes a fresh environment during a call *)
@@ -82,7 +86,13 @@ Section withParams.
     | StackHandler    : StackE (option block_id)      (* Get exception handler for current frame *)
     | StackRaise      : exc -> StackE unit             (* Place exception onto the stack, does not pop *)
     | StackGetExc     : StackE (option exc).          (* Fetches the currently raised exception if there is one *)
-
+  Definition stack_push        {E} `{StackE -< E} args : itree E _ := trigger (StackPush args).
+  Definition stack_pop         {E} `{StackE -< E}      : itree E _ := trigger StackPop.
+  Definition stack_set_handler {E} `{StackE -< E} ob   : itree E _ := trigger (StackSetHandler ob).
+  Definition stack_handler     {E} `{StackE -< E}      : itree E _ := trigger StackHandler.
+  Definition stack_raise       {E} `{StackE -< E} e    : itree E _ := trigger (StackRaise e).
+  Definition stack_get_exc     {E} `{StackE -< E}      : itree E _ := trigger StackGetExc.
+ 
   (* Interactions with the memory *)
   Variant MemoryE : Type -> Type :=
     | MemPush : MemoryE unit
@@ -95,16 +105,23 @@ Section withParams.
     (* Store address should be unique... *)
     | Store (t : dtyp) (a : dvalue) (v : dvalue) :
       MemoryE unit.
+  Definition mem_push {E} `{MemoryE -< E}                      : itree E _ := trigger MemPush.
+  Definition mem_pop  {E} `{MemoryE -< E}                      : itree E _ := trigger MemPop.
+  Definition alloca   {E} `{MemoryE -< E} t num_elements align : itree E _ := trigger (Alloca t num_elements align).
+  Definition load     {E} `{MemoryE -< E} t a                  : itree E _ := trigger (Load t a).
+  Definition store    {E} `{MemoryE -< E} t a v                : itree E _ := trigger (Store t a v).
 
   (* An event resolving the non-determinism induced by undef. The argument _P_
    is intended to be a predicate over the set of dvalues _u_ can take such that
    if it is not satisfied, the only possible execution is to raise _UB_. *)
   Variant DrawE : Type -> Type :=
-    | draw (dt : dtyp) : DrawE dvalue.
+    | Draw (dt : dtyp) : DrawE dvalue.
+  Definition draw {E} `{DrawE -< E} dt : itree E _ := trigger (Draw dt).
 
     (* Generic calls, refined by [denote_mcfg] *)
   Variant CallE : Type -> Type :=
     | Call        : forall (t:dtyp) (f:dvalue) (args:list dvalue), CallE (exc + dvalue).
+  Definition call {E} `{CallE -< E} t f args : itree E _ := trigger (Call t f args).
 
   (* ExternalCallE values are the "observable" events by which one should compare the 
        equivalence of two LLVM IR programs.  These should never be interpreted away
@@ -124,15 +141,19 @@ Section withParams.
     (* This event corresponds to writing to the [stdout] channel. ] *)                              
     | IO_stdout (str : list int8) :
       ExternalCallE unit
-    (* This event corresponds to writing to the [stderr] channel. ] *)                              
+    (* This event corresponds to writing to the [stderr] channel. ] *)
     | IO_stderr (str : list int8) :
       ExternalCallE unit.
+  Definition external_call {E} `{ExternalCallE -< E} t f args : itree E _ := trigger (ExternalCall t f args).
+  Definition io_stdout     {E} `{ExternalCallE -< E} str      : itree E _ := trigger (IO_stdout str).
+  Definition io_stderr     {E} `{ExternalCallE -< E} str      : itree E _ := trigger (IO_stderr str).
 
   (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
   (* Intrinsics may raise an exception by returning inl *)
   Variant IntrinsicE : Type -> Type :=
     | Intrinsic (t : dtyp) (f : string) (args : list dvalue) (vararg : option addr) :
       IntrinsicE (exc + dvalue).
+  Definition intrinsic {E} `{IntrinsicE -< E} t f args vararg : itree E _ := trigger (Intrinsic t f args vararg).
   
   (* LLVM exceptions *)
   Variant LLVMExcE : Type -> Type :=
@@ -307,6 +328,9 @@ Section withParams.
   
 End withParams.
 
+Arguments DrawE {_} _.
+
+#[export] Hint Unfold L0 L0' L1 : core.
 
 Definition EOB_to_itree {E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} :
   EOB ~> itree E :=
@@ -317,6 +341,3 @@ Definition EOB_to_itree {E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} :
           | raise_ret   v => ret v
           end.
 
-Arguments DrawE {_} _.
-
-#[export] Hint Unfold L0 L0' L1 : core.

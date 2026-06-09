@@ -538,7 +538,7 @@ Section Intrinsics.
     | [ a ], Some varargs =>
         match a with
         | DVALUE_Poison dt => raiseUB ("Store to poisoned address in va_start.")
-        | _ => trigger (Store DTYPE_Pointer a (DVALUE_Addr varargs));;
+        | _ => store DTYPE_Pointer a (DVALUE_Addr varargs);;
               retr DVALUE_None
         end
     | _, _ => raise "va_start: invalid arguments."
@@ -548,8 +548,8 @@ Section Intrinsics.
     fun args varargs =>
       match args with
       | [dest; src] =>
-          vargs <- trigger (Load DTYPE_Pointer src);;
-          trigger (Store DTYPE_Pointer dest vargs);;
+          vargs <- load DTYPE_Pointer src;;
+          store DTYPE_Pointer dest vargs;;
           retr DVALUE_None
       | _ => raise ": va_copy invalid arguments"
       end.

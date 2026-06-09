@@ -57,10 +57,6 @@ Record fast_mode := mk_fast_mode {
 Definition fast_mode_object : fast_mode :=
   mk_fast_mode (fun (_:bool) => tt) (fun (_:unit) => false).
 
-(* TODO: define notations to hide trigger *)
-(* TODO: Should lift from EOB to itree be a coercion? *)
-(* TODO: Reconsider minimizing the number of translations? *)
-
 (** ** Uninterpreted denotation
     In this file, we define the first layer of denotation of _VIR_.
 
@@ -124,8 +120,8 @@ Section Denotation.
    *)
   Definition lookup_id (i:ident) : itree L0 dvalue :=
     match i with
-    | ID_Global x => trigger (GlobalRead x)
-    | ID_Local x  => trigger (LocalRead x)
+    | ID_Global x => gread x
+    | ID_Local x  => lread x
     end.
 
   (* Predicate testing whether a [dvalue] is equal to zero at its type *)
@@ -160,7 +156,7 @@ Section Denotation.
 
   Definition freeze {E} `{DrawE -< E} (dv : dvalue) : itree E dvalue :=
     match dv with
-    | DVALUE_Poison dt => trigger (draw dt)
+    | DVALUE_Poison dt => draw dt
     | _ => ret dv
     end.
 
@@ -381,7 +377,7 @@ Section Denotation.
 
   Definition local_write {E} `{LocalE -< E}
     (id : raw_id) (dv : dvalue) : itree E unit :=
-    trigger (LocalWrite id dv).
+    lwrite id dv.
 
   Definition denote_cmpxchg (id : raw_id) (cpx : cmpxchg dtyp) : itree L0' unit :=
     (* SAZ: This will have to be revisited when we have a truly concurrent semantics. *)
@@ -402,7 +398,7 @@ Section Denotation.
       new_v <- denote_exp' (Some cmp_ty) new_val ;;
 
       (* Perform the load *)
-      loaded_v <- trigger (Load cmp_ty ptr_v);;
+      loaded_v <- load cmp_ty ptr_v;;
       (* Perform the comparison *)
       (* SAZ: not clear whether this comparison implies "samesign" or not *)
       dv <- lift (eval_icmp false Eq loaded_v cmp_v);;
@@ -410,7 +406,7 @@ Section Denotation.
       | DVALUE_I 1 comparison_bit =>
           if equ comparison_bit one then
             (* They compared as equal: perform the write to memory *)
-            trigger (Store cmp_ty ptr_v new_v) ;;
+            store cmp_ty ptr_v new_v ;;
             (* return a struct with the loaded value and "true" *)
             let ret_v := DVALUE_Struct [loaded_v; DVALUE_I 1 one] in
             local_write id ret_v
@@ -493,12 +489,12 @@ Section Denotation.
     a_v <- denote_exp' (Some a_ty) a_val ;;
 
     (* Perform the load - load addresses must be unique *)
-    loaded_v <- trigger (Load a_ty ptr_v);;
+    loaded_v <- load a_ty ptr_v;;
 
     stored_v <- denote_atomic_rmw_operation a_op loaded_v a_v ;;
 
     (* Perform the store *)
-    trigger (Store a_ty ptr_v stored_v) ;;
+    store a_ty ptr_v stored_v ;;
 
     (* The result is the original value loaded from ptr before the modification *)
     local_write id loaded_v;;
@@ -548,11 +544,11 @@ Section Denotation.
         in
         match num_elements with
         | None =>
-            v <- trigger (Alloca dt 1 align);;
+            v <- alloca dt 1 align;;
             local_write id v
         | Some (t, num_exp) =>
             n <- denote_exp' (Some t) num_exp;;
-            v <- trigger (Alloca dt (Z.to_N (dvalue_int_unsigned n)) align);;
+            v <- alloca dt (Z.to_N (dvalue_int_unsigned n)) align;;
             local_write id v
         end;;
         ret tt
@@ -561,7 +557,7 @@ Section Denotation.
     | (IId id, INSTR_Load dt (du,ptr) _) =>
       a <- denote_exp' (Some du) ptr;;
       (* Load addresses must be unique *)
-      v <- trigger (Load dt a);;
+      v <- load dt a;;
       local_write id v
 
     (* Store *)
@@ -571,7 +567,7 @@ Section Denotation.
       (* Store addresses must be unique *)
       match a with
       | DVALUE_Poison dt => raiseUB (err_loc ++ ": Store to poisoned address.")
-      | _ => trigger (Store dt a v)
+      | _ => store dt a v
       end;;
       ret tt
 
@@ -579,13 +575,12 @@ Section Denotation.
 
     (* Call *)
     (* TODO: technically operand bundles can affect semantics *)
-    (* TODO: This should not be so complex, need to pull some code out *) 
     | (pt, INSTR_Call (dt, f) args _ _) =>
         vs <- map_monad (fun '(t, op) => denote_exp' (Some t) op) (List.map fst args) ;;
         returned_value <-
           match intrinsic_exp f with
           | Some s =>
-              res <- trigger (Intrinsic dt s vs varargs) ;;
+              res <- intrinsic dt s vs varargs ;;
               match res with
               | inl exc => raiseLLVM exc
               | inr dv => ret dv
@@ -593,7 +588,7 @@ Section Denotation.
                 
           | None =>
               fv <- denote_exp' None f;;
-              res <- trigger (Call dt fv vs);;
+              res <- call dt fv vs;;
               match res with
               | inl exc => raiseLLVM exc
               | inr uv => ret uv
@@ -611,11 +606,11 @@ Section Denotation.
 
     | (pt, INSTR_VAArg (t, ptr_to_args_exp) argty) =>
         ptr_to_args <- denote_exp' (Some DTYPE_Pointer) ptr_to_args_exp;;
-        args <- trigger (Load DTYPE_Pointer ptr_to_args);;
-        retv <- trigger (Load argty args);;
+        args <- load DTYPE_Pointer ptr_to_args;;
+        retv <- load argty args;;
         ix <- lift (from_Z 1);;
         args' <- lift (eval_gep argty args [DVALUE_IPTR ix]);;
-        trigger (Store DTYPE_Pointer ptr_to_args args');;
+        store DTYPE_Pointer ptr_to_args args';;
         match pt with
         | IVoid _ => ret tt
         | IId id  => local_write id retv
@@ -711,7 +706,7 @@ Section Denotation.
     | TERM_Invoke (dt, fnptrval) args to_label unwind_label anns _ =>
       uvs <- map_monad (fun '(t, op) => denote_exp' (Some t) op) (List.map fst args) ;;
       fv <- denote_exp' None fnptrval ;;
-      rv <- trigger (Call dt fv uvs) ;;
+      rv <- call dt fv uvs ;;
       (* branch to to_label *)
       match rv with
       | inl exn =>
@@ -816,8 +811,8 @@ Section Denotation.
     end.
 
   Definition pop_call_frame {E} `{MemoryE -< E} `{StackE -< E} : itree E unit :=
-    trigger StackPop;;
-    trigger MemPop.
+    stack_pop;;
+    mem_pop.
   
   Fixpoint dtyp_of_dvalue (v:dvalue) : EOB dtyp :=
     let list_dtyps :=
@@ -879,10 +874,10 @@ Section Denotation.
     dts <- lift (map_monad dtyp_of_dvalue vs);;
     let dt := DTYPE_Packed_struct dts in
     (* generate the corresponding writes to the local stack frame *)
-    trigger MemPush ;;
-    trigger (StackPush bs) ;;
-    varargs <- trigger (Alloca dt 1 None);;
-    trigger (Store dt varargs (DVALUE_Packed_struct vs));;
+    mem_push ;;
+    stack_push bs ;;
+    varargs <- alloca dt 1 None;;
+    store dt varargs (DVALUE_Packed_struct vs);;
     match varargs with
     | DVALUE_Addr varg =>
         ret varg
@@ -927,7 +922,7 @@ Section Denotation.
              match lookup_defn fv fundefs with
              | Some f_den => (* If the call is internal *)
                  inr <$> f_den args
-             | None => inr <$> trigger (ExternalCall dt fv args)
+             | None => inr <$> external_call dt fv args
              end
          end) _ (Call dt f_value args).
   
