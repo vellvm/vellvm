@@ -37,20 +37,6 @@ From Vellvm.Semantics Require Import
 From Stdlib Require Import FunctionalExtensionality.
 Import Logic.
 
-(* TODO: Move this *)
-Definition repeatMN {A m} `{Monad m} (n : N) (ma : m A) : m (list A)
-  := sequence (repeatN n ma).
-
-(* TODO: Move. Also, do I really have to define this? *)
-Fixpoint zipWith {A B C} (f : A -> B -> C) (xs : list A) (ys : list B) : list C
-  := match xs, ys with
-     | [], _        => []
-     | _, []        => []
-     | a::xs', b::ys' => f a b :: zipWith f xs' ys'
-     end.
-
-Definition zip {X Y} (xs : list X) (ys : list Y) := zipWith (fun a b => (a, b)) xs ys.
-
 Section MemoryModel.
   Context {Pa : Params} {MMP : @MemoryModelPrimitives Pa}.
 

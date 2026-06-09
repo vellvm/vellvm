@@ -10,7 +10,6 @@ From ExtLib Require Import
      Data.Monads.EitherMonad.
 Open Scope N_scope.
 
-(* TODO: probably move this *)
 (* TODO: Make these take endianess into account.
 
          Can probably use bitwidth from VInt to do big-endian...

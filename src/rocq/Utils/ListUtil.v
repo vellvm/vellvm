@@ -16,126 +16,6 @@ Set Contextual Implicit.
 
 (** * Collection of misc definitions and lemmas over lists *)
 
-(** *** Alternate [find] and [filter] where the predicate is replaced by a partial map *)
-Section FINDOPTION.
-  Context {A B:Type}.
-
-  Fixpoint find_option (f: A -> option B) (l:list A) : option B :=
-    match l with
-    | [] => None
-    | x::xs => match f x with
-             | None => find_option f xs
-             | Some b => Some b
-             end
-    end.
-
-  Fixpoint filter_option (f : A -> option B) (l:list A) : list B :=
-    match l with
-    | [] => []
-    | x::xs => match f x with
-             | None => filter_option f xs
-             | Some y => y :: filter_option f xs
-             end
-    end.
-
-  Definition map_option (f : A -> option B) : list A -> option (list B) :=
-    fix loop l :=
-      match l with
-      | [] => Some []
-      | a::l' =>
-          match f a, loop l' with
-          | Some b, Some bl => Some (b::bl)
-          | _, _ => None
-          end
-      end.
-
-End FINDOPTION.
-
-(** *** Interactions between monadic computations and lists *)
-Section monad.
-  Variable m : Type -> Type.
-  Variable M : Monad m.
-
-  Fixpoint monad_fold_right {A B} (f : B -> A -> m B) (l:list A) (b : B) : m B :=
-    match l with
-    | [] => ret b
-    | x::xs =>
-        r <- monad_fold_right f xs b ;;
-        f r x
-    end.
-
-  Definition monad_app_fst {A B C} (f : A -> m C) (p:A * B) : m (C * B)%type :=
-    let '(x,y) := p in
-    z <- f x ;;
-    ret (z,y).
-
-  Definition monad_app_snd {A B C} (f : B -> m C) (p:A * B) : m (A * C)%type :=
-    let '(x,y) := p in
-    z <- f y ;;
-    ret (x,z).
-
-  Definition map_monad {A B} (f:A -> m B) : list A -> m (list B) :=
-    fix loop l :=
-      match l with
-      | [] => ret []
-      | a::l' =>
-          b <- f a ;;
-          bs <- loop l' ;;
-          ret (b::bs)
-      end.
-
-  Definition map_monad_ {A B}
-    (f: A -> m B) (l: list A): m unit :=
-    map_monad f l;; ret tt.
-
-  Definition sequence {a} (ms : list (m a)) : m (list a)
-    := map_monad id ms.
-
-  Lemma sequence_cons :
-    forall {a} (ma : m a) (mas : list (m a)),
-      sequence (ma :: mas) =
-        a <- ma;;
-        rest <- sequence mas;;
-        ret (a :: rest).
-  Proof using.
-    intros a ma mas.
-    unfold sequence.
-    cbn.
-    unfold id.
-    reflexivity.
-  Qed.
-
-  Fixpoint foldM {a b} (f : b -> a -> m b ) (acc : b) (l : list a) : m b
-    := match l with
-       | [] => ret acc
-       | (x :: xs) =>
-           b <- f acc x;;
-           foldM f b xs
-       end.
-
-  Definition repeatM {A} (n : nat) (ma : m A) : m (list A)
-    := sequence (repeat ma n).
-
-  (* Helper for looping 2 argument evaluation over vectors, producing a vector *)
-
-  Definition vec_loop {A : Type}
-    (f : A -> A -> m A)
-    (elts : list (A * A)) : m (list A) :=
-    monad_fold_right (fun acc '(e1, e2) =>
-                        val <- f e1 e2 ;;
-                        ret (val :: acc)
-      ) elts [].
-
-End monad.
-Arguments monad_fold_right {_ _ _ _}.
-Arguments monad_app_fst {_ _ _ _ _}.
-Arguments monad_app_snd {_ _ _ _ _}.
-Arguments map_monad {_ _ _ _}.
-Arguments map_monad_ {_ _ _ _}.
-Arguments sequence {_ _ _}.
-Arguments foldM {_ _ _ _}.
-Arguments vec_loop {_ _ _}.
-
 (** *** Standard lemmas over standard lists *)
 Section Standard.
   
@@ -361,7 +241,138 @@ Section Standard.
            split_every_pos n xs
        end.
 
+  Fixpoint zipWith {A B C} (f : A -> B -> C) (xs : list A) (ys : list B) : list C
+    := match xs, ys with
+       | [], _        => []
+       | _, []        => []
+       | a::xs', b::ys' => f a b :: zipWith f xs' ys'
+       end.
+
+  Definition zip {X Y} (xs : list X) (ys : list Y) := zipWith (fun a b => (a, b)) xs ys.
+
 End Standard.
+
+(** *** Alternate [find] and [filter] where the predicate is replaced by a partial map *)
+Section FINDOPTION.
+  Context {A B:Type}.
+
+  Fixpoint find_option (f: A -> option B) (l:list A) : option B :=
+    match l with
+    | [] => None
+    | x::xs => match f x with
+             | None => find_option f xs
+             | Some b => Some b
+             end
+    end.
+
+  Fixpoint filter_option (f : A -> option B) (l:list A) : list B :=
+    match l with
+    | [] => []
+    | x::xs => match f x with
+             | None => filter_option f xs
+             | Some y => y :: filter_option f xs
+             end
+    end.
+
+  Definition map_option (f : A -> option B) : list A -> option (list B) :=
+    fix loop l :=
+      match l with
+      | [] => Some []
+      | a::l' =>
+          match f a, loop l' with
+          | Some b, Some bl => Some (b::bl)
+          | _, _ => None
+          end
+      end.
+
+End FINDOPTION.
+
+(** *** Interactions between monadic computations and lists *)
+Section monad.
+  Variable m : Type -> Type.
+  Variable M : Monad m.
+
+  Fixpoint monad_fold_right {A B} (f : B -> A -> m B) (l:list A) (b : B) : m B :=
+    match l with
+    | [] => ret b
+    | x::xs =>
+        r <- monad_fold_right f xs b ;;
+        f r x
+    end.
+
+  Definition monad_app_fst {A B C} (f : A -> m C) (p:A * B) : m (C * B)%type :=
+    let '(x,y) := p in
+    z <- f x ;;
+    ret (z,y).
+
+  Definition monad_app_snd {A B C} (f : B -> m C) (p:A * B) : m (A * C)%type :=
+    let '(x,y) := p in
+    z <- f y ;;
+    ret (x,z).
+
+  Definition map_monad {A B} (f:A -> m B) : list A -> m (list B) :=
+    fix loop l :=
+      match l with
+      | [] => ret []
+      | a::l' =>
+          b <- f a ;;
+          bs <- loop l' ;;
+          ret (b::bs)
+      end.
+
+  Definition map_monad_ {A B}
+    (f: A -> m B) (l: list A): m unit :=
+    map_monad f l;; ret tt.
+
+  Definition sequence {a} (ms : list (m a)) : m (list a)
+    := map_monad id ms.
+
+  Lemma sequence_cons :
+    forall {a} (ma : m a) (mas : list (m a)),
+      sequence (ma :: mas) =
+        a <- ma;;
+        rest <- sequence mas;;
+        ret (a :: rest).
+  Proof using.
+    intros a ma mas.
+    unfold sequence.
+    cbn.
+    unfold id.
+    reflexivity.
+  Qed.
+
+  Fixpoint foldM {a b} (f : b -> a -> m b ) (acc : b) (l : list a) : m b
+    := match l with
+       | [] => ret acc
+       | (x :: xs) =>
+           b <- f acc x;;
+           foldM f b xs
+       end.
+
+  Definition repeatM {A} (n : nat) (ma : m A) : m (list A)
+    := sequence (repeat ma n).
+
+  (* Helper for looping 2 argument evaluation over vectors, producing a vector *)
+
+  Definition vec_loop {A : Type}
+    (f : A -> A -> m A)
+    (elts : list (A * A)) : m (list A) :=
+    monad_fold_right (fun acc '(e1, e2) =>
+                        val <- f e1 e2 ;;
+                        ret (val :: acc)
+      ) elts [].
+
+End monad.
+Arguments monad_fold_right {_ _ _ _}.
+Arguments monad_app_fst {_ _ _ _ _}.
+Arguments monad_app_snd {_ _ _ _ _}.
+Arguments map_monad {_ _ _ _}.
+Arguments map_monad_ {_ _ _ _}.
+Arguments sequence {_ _ _}.
+Arguments foldM {_ _ _ _}.
+Arguments vec_loop {_ _ _}.
+Definition repeatMN {A m} `{Monad m} (n : N) (ma : m A) : m (list A)
+  := sequence (repeatN n ma).
 
 (** *** Better behaved version of Forall that can be used in recursive functions *)
 Section FORALL.
