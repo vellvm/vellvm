@@ -96,6 +96,58 @@ Section DValue.
   .
   Set Elimination Schemes.
 
+  Fixpoint dtyp_of_dvalue (v:dvalue) : EOB dtyp :=
+    let list_dtyps :=
+      fix go (uvs : list dvalue) : EOB (list dtyp) :=
+        match uvs with
+        | [] => ret []
+        | v::tl =>
+            dt <- dtyp_of_dvalue v;;
+            dts <- go tl;;
+            ret (dt :: dts)
+        end
+    in
+    match v with
+    | DVALUE_Addr a => ret DTYPE_Pointer
+    | DVALUE_I sz x => ret (DTYPE_I sz)
+    | DVALUE_IPTR x => ret DTYPE_IPTR
+    | DVALUE_Double x => ret (DTYPE_FP FP_double)
+    | DVALUE_Float x => ret (DTYPE_FP FP_float)
+    | DVALUE_Poison t => ret t
+    | DVALUE_None => ret DTYPE_Void
+    | DVALUE_Struct fields =>
+        dts <- list_dtyps fields;;
+        ret (DTYPE_Struct dts)
+    | DVALUE_Packed_struct fields =>
+        dts <- list_dtyps fields;;
+        ret (DTYPE_Packed_struct dts)
+    | DVALUE_Array (DTYPE_Array sz t) elts =>
+        if @NO_VOID_dec t
+        then
+          if forallb (fun e => match dtyp_of_dvalue e with
+                            | raise_ret t' => dtyp_eqb t t'
+                            | _ => false end) elts
+             && N.eqb sz (N.of_nat (length elts))
+          then ret (DTYPE_Array (N.of_nat (length elts)) t)
+          else raise_error "dtyp_of_dvalue: mismatched element type in array"
+        else raise_error "dtyp_of_dvalue: void in array type"
+    | DVALUE_Vector (DTYPE_Vector sz t) elts =>
+        if @NO_VOID_dec t
+        then
+          if forallb (fun e => match dtyp_of_dvalue e with
+                            | raise_ret t' => dtyp_eqb t t'
+                            | _ => false end) elts
+             && N.eqb sz (N.of_nat (length elts))
+          then
+            if @vector_dtyp_dec t
+            then ret (DTYPE_Vector (N.of_nat (length elts)) t)
+            else raise_error "dtyp_of_dvalue: invalid element type for vector"
+          else raise_error "dtyp_of_dvalue: mismatched element type in vector"
+        else raise_error "dtyp_of_dvalue: void in vector type"
+                         
+    | _ => raise_error "dtyp_of_dvalue: missing case"
+    end.
+
   Definition double_to_hex_string (f : float) : string
     := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (unsigned (Float.to_bits f)))).
 

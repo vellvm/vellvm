@@ -5,9 +5,6 @@ From ExtLib Require Import
 From Vellvm.Utils Require Import
   ListUtil Tactics.
 
-Definition empty_elim (X : Type) : Empty_set -> X :=
-  fun abs => match abs with end.
-
 Variant EOB {X : Type} : Type :=
   | raise_oom (s : string) : EOB
   | raise_ub (s : string) : EOB

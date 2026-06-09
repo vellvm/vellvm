@@ -26,7 +26,12 @@ From Vellvm Require Import
   Semantics.Params.VellvmImplem.Memory.
 
 From QuickChick Require Import Show.
+(* end hide *)
 
+(** * Memory handler
+    Interpretation of [MemoryE] events into a state monad over the
+    memory model.
+*)
 
 Section withParams.
   Context {Pa : Params}.

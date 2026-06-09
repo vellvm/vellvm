@@ -1,3 +1,11 @@
+(** * Vellvm parameter bundle
+    [Params] aggregates the parametric components shared across the
+    semantics (intptr representation, provenance, sizeof, address, and
+    their theories). Most semantics-side definitions take a
+    [Context {Pa : Params}]; on extraction, Section closure lifts this to
+    a [coq_Params] function argument on each definition that mentions it.
+*)
+
 From Vellvm Require Export
   Params.IPtr
   Params.Provenance

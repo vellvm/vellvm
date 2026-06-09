@@ -1,32 +1,22 @@
 (* begin hide *)
 From Stdlib Require Import
-     Morphisms
-     String.
+  Morphisms
+  String.
 
 From ExtLib Require Import
   Structures.Monads
   EitherMonad.
 
 From ITree Require Import
-     ITree
-     Eq.Eqit
-     InterpFacts.
+  ITree
+  Eq.Eqit
+  InterpFacts.
 
 From Vellvm Require Import
-     Utils.Util
-     Utils.Error
-     Utils.Tactics
-     Utils.InterpEither
-     Semantics.LLVMEvents
-     Semantics.Memory.Sizeof.
+  Utilities
+  LLVMEvents.
 
-Set Implicit Arguments.
-Set Contextual Implicit.
-
-Import MonadNotation.
 Import ITree.Basics.Basics.Monads.
-Open Scope string_scope.
-Open Scope monad.
 (* end hide *)
 
 
@@ -37,7 +27,7 @@ Open Scope monad.
 Section Exceptions.
   Context {EXC : Type}.
 
-  Definition handle_LLVMExcE {m} `{HM: Monad m} : LLVMExcE EXC ~> eitherT EXC m :=
+  Definition handle_LLVMExcE {E} : LLVMExcE ~> eitherT exc (itree E) :=
     fun X e =>  
       match e with
       | LLVMExc x => mkEitherT (ret (inl x))

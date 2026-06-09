@@ -37,20 +37,6 @@ Section StackMap.
   
   Definition stack := list stack_frame.
 
-  (* #[global] Instance Map_stack_frame : Map raw_id dvalue stack_frame := *)
-  (* { empty := Build_stack_frame Maps.empty None None None; *)
-  (*   add := fun k v stack_frame => Build_stack_frame (add k v stack_frame.(stack_vars)) stack_frame.(stack_handler) stack_frame.(stack_exc) stack_frame.(stack_loc); *)
-  (*   remove := fun k stack_frame => Build_stack_frame (remove k stack_frame.(stack_vars)) stack_frame.(stack_handler) stack_frame.(stack_exc) stack_frame.(stack_loc); *)
-  (*   lookup := fun k stack_frame => lookup k stack_frame.(stack_vars); *)
-  (*   union := fun s1 s2 => *)
-  (*              let var_union := union s1.(stack_vars) s2.(stack_vars) in *)
-  (*              (* Not sure of the order these should merge in... *) *)
-  (*              let handler_union := CFG.opt_first s2.(stack_handler) s1.(stack_handler) in *)
-  (*              let exc_union := CFG.opt_first s2.(stack_exc) s1.(stack_exc) in *)
-  (*              let loc_union := CFG.opt_first s1.(stack_loc) s2.(stack_loc) in *)
-  (*              Build_stack_frame var_union handler_union exc_union loc_union *)
-  (* }. *)
-
   (* See [src/ml/extracted/Extract.v] for the OCaml-side patching: in
      extraction these hooks become a mutable ref-cell that backs the OCaml
      debugger's view of the call stack. Default Rocq implementations are

@@ -24,7 +24,6 @@ Section GEP.
         match v with
         | DVALUE_I 8 i =>
             let k := signed i in
-            let n := BinIntDef.Z.to_nat k in
             match t with
             | DTYPE_Array _ ta
             | DTYPE_Vector _ ta =>
@@ -60,7 +59,6 @@ Section GEP.
               
         | DVALUE_I 64 i =>
             let k := signed i in
-            let n := BinIntDef.Z.to_nat k in
             match t with
             | DTYPE_Array _ ta
             | DTYPE_Vector _ ta =>
@@ -69,7 +67,6 @@ Section GEP.
             end
         | DVALUE_IPTR i =>
             let k := to_Z i in
-            let n := BinIntDef.Z.to_nat k in
             match t with
             | DTYPE_Array _ ta
             | DTYPE_Vector _ ta =>

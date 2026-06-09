@@ -64,7 +64,7 @@ Section withParams.
   
   Definition putchar_denotation : function_denotation.
     refine
-      (let putchar_body (u_char:dvalue) : itree L0' dvalue :=
+      (let putchar_body (u_char:dvalue) : CFGtop dvalue :=
          match u_char with
          | DVALUE_I sz x32 =>
              if Pos.eq_dec 32 sz
@@ -89,17 +89,17 @@ Section withParams.
          | _ => raise "putc called with zero or more than one arguments"
          end).
     subst.
-    exact (trigger (IO_stdout [x8])).
+    exact (io_stdout [x8]).
   Defined.
 
   (** A semantic function to read an i8 value at [strptr + index] from the memory.
       Propagates all memory failures and raises a Vellvm "Failure" if the
       value read does not concretize to a DVALUE_I8.
    *)
-  Definition i8_str_index (strptr : addr) (index : Z) : itree L0' (@Integers.bit_int 8) :=
-    iptr <- lift (from_Z index) ;;
-    addr <- lift (handle_gep_addr (DTYPE_I 8) strptr [DVALUE_IPTR iptr]) ;;
-    d_byte <- trigger (Load (DTYPE_I 8) (DVALUE_Addr addr)) ;;
+  Definition i8_str_index (strptr : addr) (index : Z) : CFGtop (@Integers.bit_int 8) :=
+    iptr <- EOB_to_itree (from_Z index) ;;
+    addr <- EOB_to_itree (handle_gep_addr (DTYPE_I 8) strptr [DVALUE_IPTR iptr]) ;;
+    d_byte <- load (DTYPE_I 8) (DVALUE_Addr addr) ;;
     match d_byte with
     | DVALUE_I 8 b => ret b
     | bad => raise ("i8_str_index failed with non-DVALUE_I8 " ++ show_dvalue bad)
@@ -110,7 +110,7 @@ Section withParams.
       - triggers an IO_stdout event with the bytes plus a newline
    *)
   Definition puts_denotation : function_denotation :=
-    let puts_body (u_strptr : dvalue) : itree L0' dvalue :=
+    let puts_body (u_strptr : dvalue) : CFGtop dvalue :=
       match u_strptr with
       | DVALUE_Addr strptr =>
           char <- i8_str_index strptr 0%Z ;;
@@ -125,7 +125,7 @@ Section withParams.
                    ret (inl (next_char, c::bytes, (offset + 1)%Z))
               )
               (char, [], 1%Z) ;;
-          v <- trigger (IO_stdout (DList.rev_tail_rec bytes)) ;;
+          v <- io_stdout (DList.rev_tail_rec bytes) ;;
           ret (DVALUE_I 8 (@Integers.zero 8))
       | bad => raiseUB ("puts got non-address argument " ++ show_dvalue bad)
       end
@@ -257,15 +257,15 @@ Section withParams.
    is an [itree] as any other.  *)
 
   (** Allocate space for a global *)
-  Definition allocate_global (g:global dtyp) : itree L0 unit :=
+  Definition allocate_global (g:global dtyp) : MCFGtop unit :=
     if (g_alias g) then
       (* Aliases don't allocate new storage space. *)
       ret tt 
     else
-      v <- trigger (Alloca (g_typ g) 1%N None);;
-      trigger (GlobalWrite (g_ident g) v).
+      v <- alloca (g_typ g) 1%N None;;
+      gwrite (g_ident g) v.
 
-  Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
+  Definition allocate_globals (gs:list (global dtyp)) : MCFGtop unit :=
     map_monad_ allocate_global gs.
 
   Definition i8 : dtyp := DTYPE_I 8%positive.
@@ -282,22 +282,22 @@ Section withParams.
             Stdlib.Strings.Ascii.N_of_ascii ) (Stdlib.Strings.String.list_ascii_of_string s))
             [DVALUE_I 8%positive (@Integers.zero 8%positive)]).
 
-  Definition allocate_arg (arg : string) : itree L0 dvalue :=
+  Definition allocate_arg (arg : string) : MCFGtop dvalue :=
     let len := N.of_nat (String.length arg) + 1%N in
     (* tl;dr allocating the string in a C-like manner; + 1 for null terminator *)
-    v <- trigger (Alloca i8 len None);;
-    trigger (Store (DTYPE_Array len i8) v (i8_array_of_string arg));;
+    v <- alloca i8 len None;;
+    store (DTYPE_Array len i8) v (i8_array_of_string arg);;
     ret v.
 
-  Definition allocate_args (args : list string) : itree L0 dvalue :=
+  Definition allocate_args (args : list string) : MCFGtop dvalue :=
     let len := N.of_nat (Datatypes.length args) in
-      v <- trigger (Alloca DTYPE_Pointer len None);;
+      v <- alloca DTYPE_Pointer len None;;
       arg_addrs <- map_monad allocate_arg args;;
-      trigger (Store (DTYPE_Array len DTYPE_Pointer) v
-                     (DVALUE_Array (DTYPE_Array len DTYPE_Pointer) arg_addrs));;
+      store (DTYPE_Array len DTYPE_Pointer) v
+            (DVALUE_Array (DTYPE_Array len DTYPE_Pointer) arg_addrs);;
       ret v.
 
-  Definition build_main_args (args : list string) : itree L0 (list dvalue) :=
+  Definition build_main_args (args : list string) : MCFGtop (list dvalue) :=
     v <- allocate_args args;;
     let main_args :=
       [DVALUE_I 32 ((@Integers.repr 32%positive ∘ Z.of_nat) (List.length args)); v]
@@ -312,65 +312,57 @@ Section withParams.
        combines two mcfgs coherently
    *)
 
-  Definition allocate_declaration (d:declaration dtyp) : itree L0 unit :=
+  Definition allocate_declaration (d:declaration dtyp) : MCFGtop unit :=
     match lookup_intrinsic_declaration (dc_name d) with
     | Some _ => Ret tt (* Don't allocate pointers for LLVM intrinsics declarations *)
     | None =>
-        'v <- trigger (Alloca DTYPE_Pointer 1%N None);;
-        trigger (GlobalWrite (dc_name d) v)
+        'v <- alloca DTYPE_Pointer 1%N None;;
+        gwrite (dc_name d) v
     end.
 
-  Definition allocate_declarations (ds:list (declaration dtyp)) : itree L0 unit :=
+  Definition allocate_declarations (ds:list (declaration dtyp)) : MCFGtop unit :=
     map_monad_ allocate_declaration ds.
 
   (* We have to initialize the global definitions after allocating them because they
      might be mutually recursive.  It is possible to declare cyclic data structures
      statically at the global level in LLVM.
    *)
-  Definition initialize_global (g:global dtyp) : itree L0 unit :=
+  Definition initialize_global (g:global dtyp) : MCFGtop unit :=
     if (g_alias g) then
       (* aliases simply populate the global ID map *)
       match (g_exp g) with
       | Some (EXP_Ident (ID_Global g_source)) =>
-          addr <- trigger (GlobalRead g_source);;
-          trigger (GlobalWrite (g_ident g) addr)
+          addr <- gread g_source;;
+          gwrite (g_ident g) addr
       | Some _ => raiseUB ("alias " ++ (show_raw_id (g_ident g)) ++ " has bad initializer expression")
       | None => raiseUB ("alias " ++ (show_raw_id (g_ident g)) ++ " not initialized")
       end
     else
       (* non-aliases are intialized by storing values *)
     let dt := (g_typ g) in
-    a <- trigger (GlobalRead (g_ident g));;
+    a <- gread (g_ident g);;
     uv <- match (g_exp g) with
          | None => ret (DVALUE_Poison dt)
          | Some e => denote_exp (Some dt) e
          end ;;
-    trigger (Store dt a uv).
+    store dt a uv.
 
-  Definition initialize_globals (gs:list (global dtyp)): itree L0 unit :=
+  Definition initialize_globals (gs:list (global dtyp)): MCFGtop unit :=
     map_monad_ initialize_global gs.
 
-  Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree L0 unit :=
-    allocate_declarations ((m_declarations CFG) ++ (List.map (df_prototype) (m_definitions CFG)));;
-    allocate_globals (m_globals CFG) ;;
-    initialize_globals (m_globals CFG).
-
-  (** Local environment implementation
-    The map-based handlers are defined parameterized over a domain of key and value.
-    We now pick concrete such domain.
-    Note that while local environments may store under-defined values,
-    global environments are statically guaranteed to store [dvalue]s.
-   *)
-  Definition function_env := FMapAList.alist dvalue function_denotation.
+  Definition build_global_environment (CFGtop : CFG.mcfg dtyp) : MCFGtop unit :=
+    allocate_declarations ((m_declarations CFGtop) ++ (List.map (df_prototype) (m_definitions CFGtop)));;
+    allocate_globals (m_globals CFGtop) ;;
+    initialize_globals (m_globals CFGtop).
 
   (**
    Denotes a function and returns its pointer.
    *)
 
   Definition address_one_function (df : definition dtyp (CFG.cfg dtyp))
-    : itree L0 (Z * function_denotation) :=
+    : MCFGtop (Z * function_denotation) :=
     let fid := (dc_name (df_prototype df)) in
-    fv <- trigger (GlobalRead fid) ;;
+    fv <- gread fid ;;
     match fv with
     | DVALUE_Addr addr =>
         ret (ptr_to_int addr, denote_function df)
@@ -381,9 +373,9 @@ Section withParams.
    Denotes a builtin function
    *)
   Definition address_one_builtin_function (builtin : function_id * function_denotation)
-    : itree L0 (Z * function_denotation) :=
+    : MCFGtop (Z * function_denotation) :=
     let (fid, den) := builtin in
-    fv <- trigger (GlobalRead fid) ;;
+    fv <- gread fid ;;
     match fv with
     | DVALUE_Addr addr =>
         ret (ptr_to_int addr, den)
@@ -426,27 +418,16 @@ Section withParams.
              (ret_typ : dtyp)
              (entry : function_id)
              (args : list dvalue)
-             (mcfg : CFG.mcfg dtyp) : itree L0 dvalue :=
+             (mcfg : CFG.mcfg dtyp) : MCFGtop dvalue :=
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
     'builtins <- map_monad address_one_builtin_function (built_in_functions (m_declarations mcfg));;
-    'addr <- trigger (GlobalRead entry) ;;
+    'addr <- gread entry ;;
     'rv <- denote_mcfg (IP.of_list (defns ++ builtins)) ret_typ addr args;;
     match rv with
     | inl exc => raiseLLVM exc
     | inr rv => ret rv
     end.
-
-  (* default_main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them
-     For backwards compatibility.
-   *)
-  (* (for now) assume that [main (i64 argc, i8** argv)]
-    pass in 0 and null as the arguments to main
-    Note: this isn't compliant with standard C semantics, but integrating the actual
-    inputs from the command line is nontrivial since we have to martial C-level strings
-    into the Vellvm memory.
-   *)
-  Definition default_main_args : list string := [].
 
   (**
      Now that we know how to denote a whole llvm program, we can _interpret_
@@ -458,7 +439,7 @@ Section withParams.
   Definition interpreter_gen
     (ret_typ : dtyp)
     (entry : function_id)
-    (arg_gen : itree L0 (list dvalue))
+    (arg_gen : MCFGtop (list dvalue))
     (prog: ll_toplevel_entities)
     : itree _ _ :=
     let t :=

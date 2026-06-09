@@ -13,23 +13,18 @@ From Vellvm Require Import
   Semantics.DynamicValues.
 Import ITree.Basics.Basics.Monads.
 
-(* TODO: move in the right place *)
-Definition EOB_to_itree {E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} : EOB ~> itree E :=
-  fun T m => match m with
-          | raise_oom s => raiseOOM s
-          | raise_ub s => raiseUB s
-          | raise_error s => raise s
-          | raise_ret x => ret x
-          end.
+(** * Draw handler
+    Interpretation of [DrawE] (draw an arbitrary dvalue of a given type).
+    The executable handler returns the canonical default; the propositional
+    spec layer (when wired) makes this non-deterministic.
+*)
 
 Section PARAMS.
   Context {Pa : Params}.
-  (* Definition handle_draw {E M} `{FailureE -< E} `{OOME -< E} `{UBE -< E} : DrawE ~> stateT M (itree E) := *)
-  (*   fun T '(draw τ) => *)
-  (*     fun s => (fun x => (s,x)) <$> EOB_to_itree (default_dvalue_of_dtyp τ). *)
+  
   Definition handle_draw {E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} :
     DrawE ~> itree E :=
-    fun T '(draw τ) => EOB_to_itree (default_dvalue_of_dtyp τ).
+    fun T '(Draw τ) => EOB_to_itree (default_dvalue_of_dtyp τ).
   
   Variable (E G: Type -> Type).
   Notation Effin := (E +' DrawE +' G).

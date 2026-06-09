@@ -239,7 +239,7 @@ Section MemoryModel.
   Definition handle_intrinsicM : IntrinsicE ~> memM :=
     fun T e =>
       match e with
-      | Intrinsic t name args =>
+      | Intrinsic t name args _ =>
           (* Pick all arguments, they should all be unique. *)
           (* TODO: add more variants to memcpy *)
           (* FIXME: use reldec typeclass? *)

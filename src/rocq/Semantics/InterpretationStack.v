@@ -31,7 +31,7 @@ Section withParams.
 
   Definition Res X := (state * (stack_frame * stack * (global_env * X)))%type.
   
-  Definition interp_mcfg {R} (t: itree L0 R) g l m : itree L1 (Res R)  :=
+  Definition interp_mcfg {R} (t: MCFGtop R) g l m : MCFGbot (Res R)  :=
     let t0 := interp_intrinsics t in
     let t1 := interp_global t0 g in
     let t2 := interp_local_stack t1 l in
