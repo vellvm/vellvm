@@ -1,5 +1,7 @@
+(* (block typ * list (block typ) *)
+
 type ast =
-  (LLVMAst.typ, Generate.GA.runnable_blocks) LLVMAst.toplevel_entity list
+  (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) * (LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list
 
 type 'a test = Test of string * (string * 'a) list
 
