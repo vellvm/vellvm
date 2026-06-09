@@ -76,7 +76,7 @@ Definition fast_mode_object : fast_mode :=
      - Manipulation of the local environment          (LLVMEnvE)
      - Manipulation of the stack of local environment (LLVMStackE)
      - Manipulation of the memory                     (MemoryE)
-     - Determination of undef                         (PickE)
+     - Determination of freeze                        (DrawE)
      - Undefined behavior                             (UBE)
      - Failure                                        (FailureE)
      - Debugging                                      (DebugE)
@@ -110,10 +110,7 @@ Definition fast_mode_object : fast_mode :=
 Section Denotation.
   Context {Pa : Params}.
   #[local] Notation lift := EOB_to_itree.
-  
-  Definition dv_zero_initializer (t:dtyp) : EOB dvalue :=
-    default_dvalue_of_dtyp t.
-  
+
   (** ** Ident lookups
       Look-ups depend on the nature of the [ident], that may be local or global.
       In each case, we simply trigger the corresponding read event.
@@ -139,14 +136,9 @@ Section Denotation.
      Expressions are denoted as itrees that return a [dvalue].
    *)
 
+  (* TODO: move these two guys? *)
   Definition denote_int_syntax (x:int_syntax) : Z := 
     BinIntDef.Z.of_num_int x.
-
-  Definition freeze {E} `{DrawE -< E} (dv : dvalue) : itree E dvalue :=
-    match dv with
-    | DVALUE_Poison dt => draw dt
-    | _ => ret dv
-    end.
 
   Definition denote_float_syntax_as_float
     (fpv : floating_point_variant) (f : float_syntax) : EOB dvalue :=
@@ -164,6 +156,12 @@ Section Denotation.
     | _ => raise_error "unsupported float type"
     end.
   
+  Definition freeze {E} `{DrawE -< E} (dv : dvalue) : itree E dvalue :=
+    match dv with
+    | DVALUE_Poison dt => draw dt
+    | _ => ret dv
+    end.
+
   Fixpoint denote_exp
     (top:option dtyp) (o:exp dtyp) {struct o} : itree L0 dvalue :=
     let eval_texp '(dt,ex) := denote_exp (Some dt) ex
@@ -197,7 +195,7 @@ Section Denotation.
     | EXP_Zero_initializer =>
       match top with
       | None   => raise ("denote_exp given untyped EXP_Zero_initializer")
-      | Some t => lift (dv_zero_initializer t)
+      | Some t => lift (default_dvalue_of_dtyp t)
       end
 
     | EXP_Cstring es =>
@@ -357,10 +355,7 @@ Section Denotation.
   Arguments denote_exp _ _ : simpl nomatch.
 
   Definition denote_exp' t e := withCall (denote_exp t e).
-  
-  Definition denote_op (o:exp dtyp) : itree L0' dvalue :=
-    denote_exp' None o.
-  Arguments denote_op _ : simpl nomatch.
+  Arguments denote_exp' _ _ : simpl nomatch.
 
   Definition denote_cmpxchg (id : raw_id) (cpx : cmpxchg dtyp) : itree L0' unit :=
     (* SAZ: This will have to be revisited when we have a truly concurrent semantics. *)
@@ -500,7 +495,7 @@ Section Denotation.
       
     (* Pure operations *)
     | (IId id, INSTR_Op op) =>
-        uv <- denote_op op ;;
+        uv <- denote_exp' None op ;;
         lwrite id uv ;;
         ret tt
             

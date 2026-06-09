@@ -77,7 +77,7 @@ Section withParams.
     | LocalRead  (id: raw_id)              : LocalE dvalue.
   Definition lwrite {E} `{LocalE -< E} id dv : itree E _ := trigger (LocalWrite id dv).
   Definition lread  {E} `{LocalE -< E} id    : itree E _ := trigger (LocalRead id).
- 
+
   Variant StackE : Type -> Type :=
     | StackPush (args : list (raw_id * dvalue))
                       : StackE unit                   (* Pushes a fresh environment during a call *)
@@ -92,7 +92,7 @@ Section withParams.
   Definition stack_handler     {E} `{StackE -< E}      : itree E _ := trigger StackHandler.
   Definition stack_raise       {E} `{StackE -< E} e    : itree E _ := trigger (StackRaise e).
   Definition stack_get_exc     {E} `{StackE -< E}      : itree E _ := trigger StackGetExc.
- 
+
   (* Interactions with the memory *)
   Variant MemoryE : Type -> Type :=
     | MemPush : MemoryE unit

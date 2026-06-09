@@ -355,14 +355,6 @@ Section withParams.
     allocate_globals (m_globals CFG) ;;
     initialize_globals (m_globals CFG).
 
-  (** Local environment implementation
-    The map-based handlers are defined parameterized over a domain of key and value.
-    We now pick concrete such domain.
-    Note that while local environments may store under-defined values,
-    global environments are statically guaranteed to store [dvalue]s.
-   *)
-  Definition function_env := FMapAList.alist dvalue function_denotation.
-
   (**
    Denotes a function and returns its pointer.
    *)
@@ -436,17 +428,6 @@ Section withParams.
     | inl exc => raiseLLVM exc
     | inr rv => ret rv
     end.
-
-  (* default_main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them
-     For backwards compatibility.
-   *)
-  (* (for now) assume that [main (i64 argc, i8** argv)]
-    pass in 0 and null as the arguments to main
-    Note: this isn't compliant with standard C semantics, but integrating the actual
-    inputs from the command line is nontrivial since we have to martial C-level strings
-    into the Vellvm memory.
-   *)
-  Definition default_main_args : list string := [].
 
   (**
      Now that we know how to denote a whole llvm program, we can _interpret_
