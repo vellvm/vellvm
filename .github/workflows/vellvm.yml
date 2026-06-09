@@ -1,8 +1,14 @@
 name: Vellvm Compilation Test
 
 on:
-  - pull_request
-  - push
+  pull_request:
+    paths-ignore:
+      - 'web/**'
+  push:
+    branches:
+      - dev
+    paths-ignore:
+      - 'web/**'
 
 jobs:
   build:
