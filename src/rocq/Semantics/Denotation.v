@@ -19,18 +19,17 @@ From ITree Require Import
   Events.Exception.
 
 From Vellvm Require Import
-  Numeric.Integers
-  Numeric.Floats
-  Utils.Assoc
+  Numeric
   Utilities
   Syntax
-  Semantics.VellvmIntegers
-  Semantics.VellvmFloats
-  Semantics.LLVMEvents
   Params
-  Semantics.Operations
-  Semantics.IntrinsicsDefinitions
-  Semantics.DynamicValues.
+  EOU
+  VellvmIntegers
+  VellvmFloats
+  LLVMEvents
+  Operations
+  IntrinsicsDefinitions
+  DynamicValues.
 
 From QuickChick Require Import Show.
 
@@ -109,7 +108,7 @@ Definition fast_mode_object : fast_mode :=
 
 Section Denotation.
   Context {Pa : Params}.
-  #[local] Notation lift := EOB_to_itree.
+  #[local] Notation lift := EOU_to_itree.
 
   (** ** Ident lookups
       Look-ups depend on the nature of the [ident], that may be local or global.
@@ -141,7 +140,7 @@ Section Denotation.
     BinIntDef.Z.of_num_int x.
 
   Definition denote_float_syntax_as_float
-    (fpv : floating_point_variant) (f : float_syntax) : EOB dvalue :=
+    (fpv : floating_point_variant) (f : float_syntax) : EOU dvalue :=
     match fpv with
     | FP_float =>
         match float32_of_float_syntax f with
@@ -291,7 +290,7 @@ Section Denotation.
     | OP_ExtractValue (dt, str) idxs =>
         str <- denote_exp (Some dt) str ;;
         (* Should this be pulled out into a definition? *)
-        let fix loop str idxs : EOB dvalue :=
+        let fix loop str idxs : EOU dvalue :=
           match idxs with
           | [] => ret str
           | i :: tl =>
@@ -304,7 +303,7 @@ Section Denotation.
     | OP_InsertValue (dt_str, strop) (dt_elt, eltop) idxs =>
         str <- denote_exp (Some dt_str) strop ;;
         elt <- denote_exp (Some dt_elt) eltop ;;
-        let fix loop str idxs : EOB dvalue :=
+        let fix loop str idxs : EOU dvalue :=
           match idxs with
           | [] => raise_error "Index was not provided"
           | i :: nil =>
@@ -609,7 +608,7 @@ Section Denotation.
          assuming already neither poison nor undef for the selector *)
   Fixpoint select_switch
            (value : dvalue) (default_dest : block_id)
-           (switches : list (dvalue * block_id)) : EOB block_id.
+           (switches : list (dvalue * block_id)) : EOU block_id.
     refine
       (match switches with
        | [] => ret default_dest
@@ -769,7 +768,7 @@ Section Denotation.
   Definition function_denotation : Type :=
     list dvalue -> CFGtop dvalue.
 
-  Fixpoint combine_lists_varargs {A B:Type} (l1:list A) (l2:list B) : EOB (list (A * B) * list B) :=
+  Fixpoint combine_lists_varargs {A B:Type} (l1:list A) (l2:list B) : EOU (list (A * B) * list B) :=
     match l1, l2 with
     | [], [] => ret ([], [])
     | x::xs, y::ys =>

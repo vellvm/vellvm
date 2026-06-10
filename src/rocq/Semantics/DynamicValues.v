@@ -1,35 +1,34 @@
 (* begin hide *)
 From Stdlib Require Import
-     Relations
-     DecidableClass
-     Program.Wf
-     Numbers.HexadecimalString.
+  Relations
+  DecidableClass
+  Program.Wf
+  Numbers.HexadecimalString.
 
 Import BinInt.
 
-From Vellvm.Numeric Require Import
-  Integers Floats.
-
 From Flocq.IEEE754 Require Import
-     Bits
-     BinarySingleNaN
-     Binary.
+  Bits
+  BinarySingleNaN
+  Binary.
 
 From ExtLib Require Import
-     Core.RelDec
-     Programming.Eqv
-     Structures.Monads
-     Data.Monads.EitherMonad
-     Structures.Functor
-     Data.Nat
-     Data.List.
+  Core.RelDec
+  Programming.Eqv
+  Structures.Monads
+  Data.Monads.EitherMonad
+  Structures.Functor
+  Data.Nat
+  Data.List.
 
 From Vellvm Require Import
-     Utilities
-     Syntax
-     Params
-     VellvmIntegers
-     QC.ShowAST.
+  Numeric
+  Utilities
+  Syntax
+  Params
+  EOU
+  VellvmIntegers
+  QC.ShowAST.
 
 Import DList.
 
@@ -96,9 +95,9 @@ Section DValue.
   .
   Set Elimination Schemes.
 
-  Fixpoint dtyp_of_dvalue (v:dvalue) : EOB dtyp :=
+  Fixpoint dtyp_of_dvalue (v:dvalue) : EOU dtyp :=
     let list_dtyps :=
-      fix go (uvs : list dvalue) : EOB (list dtyp) :=
+      fix go (uvs : list dvalue) : EOU (list dtyp) :=
         match uvs with
         | [] => ret []
         | v::tl =>
@@ -956,7 +955,7 @@ Section DValue.
 
      *)
 
-    Definition eval_int_op {Int} `{VMemInt Int} `{ToDvalue Int} (iop:ibinop) (x y: Int) : EOB dvalue :=
+    Definition eval_int_op {Int} `{VMemInt Int} `{ToDvalue Int} (iop:ibinop) (x y: Int) : EOU dvalue :=
       match iop with
       | Add nuw nsw =>
           if orb (andb nuw (mequ (madd_carry x y mzero) mone))
@@ -1114,13 +1113,13 @@ Section DValue.
     Arguments eval_int_op _ _ _ : simpl nomatch.
 
     (* Evaluate the given iop on the given arguments according to the bitsize *)
-    Definition integer_op (bits:positive) (iop:ibinop) (x y:@bit_int bits) : EOB dvalue :=
+    Definition integer_op (bits:positive) (iop:ibinop) (x y:@bit_int bits) : EOU dvalue :=
       eval_int_op iop x y.
     Arguments integer_op _ _ _ _ : simpl nomatch.
 
   (* Convert written integer constant to corresponding integer with bitsize bits.
      Takes the integer modulo 2^bits. *)
-  Definition coerce_integer_to_int (bits:option positive) (i:Z) : EOB dvalue :=
+  Definition coerce_integer_to_int (bits:option positive) (i:Z) : EOU dvalue :=
     match bits with
     | Some sz  => ret (@DVALUE_I sz (repr i))
     | None    =>
@@ -1132,7 +1131,7 @@ Section DValue.
   (* Integer iop evaluation, called from eval_iop.
      Here the values must be integers. Helper defined
      in order to prevent eval_iop from being recursive. *)
-  Definition eval_iop_integer_h (iop : ibinop) (v1 v2 : dvalue) : EOB dvalue.
+  Definition eval_iop_integer_h (iop : ibinop) (v1 v2 : dvalue) : EOU dvalue.
     refine
       (match v1, v2 with
        | @DVALUE_I sz1 i1, @DVALUE_I sz2 i2 =>
@@ -1169,7 +1168,7 @@ Section DValue.
   (* I split the definition between the vector and other evaluations because
      otherwise eval_iop should be recursive to allow for vector calculations,
      but coq can't find a fixpoint. *)
-  Definition eval_iop iop v1 v2 : EOB dvalue :=
+  Definition eval_iop iop v1 v2 : EOU dvalue :=
     match v1, v2 with
     | (DVALUE_Vector t elts1), (DVALUE_Vector _ elts2) =>
       val <- vec_loop (eval_iop_integer_h iop) (List.combine elts1 elts2) ;;
@@ -1178,7 +1177,7 @@ Section DValue.
     end.
   Arguments eval_iop _ _ _ : simpl nomatch.
 
-  Definition eval_int_icmp {Int} `{VMI : VMemInt Int} (samesign:bool) icmp (x y : Int) : EOB dvalue :=
+  Definition eval_int_icmp {Int} `{VMI : VMemInt Int} (samesign:bool) icmp (x y : Int) : EOU dvalue :=
     c <- match icmp with
         | Eq => ret (mcmpu Ceq x y)
         | Ne => ret (mcmpu Cne x y)
@@ -1211,7 +1210,7 @@ Section DValue.
              else @DVALUE_I 1 (Integers.zero)).
   Arguments eval_int_icmp _ _ _ _ : simpl nomatch.
 
-  Definition double_op (fop:fbinop) (v1:ll_double) (v2:ll_double) : EOB dvalue :=
+  Definition double_op (fop:fbinop) (v1:ll_double) (v2:ll_double) : EOU dvalue :=
     match fop with
     | FAdd => ret (DVALUE_Double (b64_plus FT_Rounding v1 v2))
     | FSub => ret (DVALUE_Double (b64_minus FT_Rounding v1 v2))
@@ -1220,7 +1219,7 @@ Section DValue.
     | FRem => raise_error "unimplemented double operation"
     end.
 
-  Definition float_op (fop:fbinop) (v1:ll_float) (v2:ll_float) : EOB dvalue :=
+  Definition float_op (fop:fbinop) (v1:ll_float) (v2:ll_float) : EOU dvalue :=
     match fop with
     | FAdd => ret (DVALUE_Float (b32_plus FT_Rounding v1 v2))
     | FSub => ret (DVALUE_Float (b32_minus FT_Rounding v1 v2))
@@ -1229,7 +1228,7 @@ Section DValue.
     | FRem => raise_error "unimplemented float operation"
     end.
 
-  Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : EOB dvalue :=
+  Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : EOU dvalue :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2   => float_op fop f1 f2
     | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
@@ -1244,7 +1243,7 @@ Section DValue.
         raise_error ("ill_typed-fop: " ++ (show fop))
     end.
 
-  Definition eval_fneg (v:dvalue) : EOB dvalue :=
+  Definition eval_fneg (v:dvalue) : EOU dvalue :=
     match v with
     | DVALUE_Float f  => ret (DVALUE_Float (Float32.neg f))
     | DVALUE_Double f => ret (DVALUE_Double (Float.neg f))
@@ -1308,7 +1307,7 @@ Section DValue.
     then @DVALUE_I 1 Integers.one else @DVALUE_I 1 Integers.zero.
     Arguments double_cmp _ _ _ : simpl nomatch.
 
-  Definition eval_fcmp (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : EOB dvalue :=
+  Definition eval_fcmp (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : EOU dvalue :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2 => ret (float_cmp fcmp f1 f2)
     | DVALUE_Double f1, DVALUE_Double f2 => ret (double_cmp fcmp f1 f2)
@@ -1324,7 +1323,7 @@ Section DValue.
 
   (* Helper function for indexing into a structured datatype
      for extractvalue and insertvalue *)
-  Definition index_into_str_dv (v:dvalue) (idx:LLVMAst.int_ast) : EOB dvalue :=
+  Definition index_into_str_dv (v:dvalue) (idx:LLVMAst.int_ast) : EOU dvalue :=
     let fix loop elts i :=
         match elts with
         | [] => raise_error "index_into_str_dv: index out of bounds"
@@ -1340,7 +1339,7 @@ Section DValue.
   Arguments index_into_str_dv _ _ : simpl nomatch.
 
   (* Helper function for inserting into a structured datatype for insertvalue *)
-  Definition insert_into_str (str:dvalue) (v:dvalue) (idx:LLVMAst.int_ast) : EOB dvalue :=
+  Definition insert_into_str (str:dvalue) (v:dvalue) (idx:LLVMAst.int_ast) : EOU dvalue :=
     let fix loop (acc elts:list dvalue) (i:LLVMAst.int_ast) :=
         match elts with
         | [] => raise_error "insert_into_str: index out of bounds"
@@ -1365,7 +1364,7 @@ Section DValue.
     end.
   Arguments insert_into_str _ _ _ : simpl nomatch.
 
-  Definition index_into_vec_dv (elt_typ : dtyp) (v:dvalue) (idx:dvalue) : EOB dvalue.
+  Definition index_into_vec_dv (elt_typ : dtyp) (v:dvalue) (idx:dvalue) : EOU dvalue.
     refine
       (let fix loop dt (elts : list dvalue) i :=
          match elts with
@@ -1392,7 +1391,7 @@ Section DValue.
   Defined.
   Arguments index_into_vec_dv _ _ : simpl nomatch.
 
-  Definition insert_into_vec_dv (vec_typ : dtyp) (vec:dvalue) (v:dvalue) (idx:dvalue) : EOB dvalue :=
+  Definition insert_into_vec_dv (vec_typ : dtyp) (vec:dvalue) (v:dvalue) (idx:dvalue) : EOU dvalue :=
     let fix loop (acc elts:list dvalue) (i:LLVMAst.int_ast) :=
         match elts with
         | [] => None (* LangRef: if idx exceeds the length of val for a fixed-length vector, the result is a poison value *)
@@ -1845,7 +1844,7 @@ Section DValue.
      The function returns true iff the type at the index is equal to [dt]
 
   *)
-  Fixpoint fetch_extract_path l dt_src : EOB dtyp :=
+  Fixpoint fetch_extract_path l dt_src : EOU dtyp :=
     match l with
     | [] => raise_error "fetch_extract_path: no path"
     | [idx] =>
@@ -2068,7 +2067,7 @@ Section DValue.
   (* Handler for PickE which concretizes everything to 0 *)
   (* If this succeeds the dvalue returned should agree with
      dvalue_has_dtyp for the sake of the dvalue_default lemma. *)
-  Fixpoint default_dvalue_of_dtyp (dt : dtyp) : EOB dvalue :=
+  Fixpoint default_dvalue_of_dtyp (dt : dtyp) : EOU dvalue :=
     match dt with
     | DTYPE_I sz => ret (default_dvalue_of_dtyp_i sz)
     | DTYPE_IPTR => ret (DVALUE_IPTR zero_iptr)
@@ -2149,13 +2148,13 @@ Section DValue.
       rewrite FORALL_forall.
       rewrite Forall_forall.
       intros.
-      edestruct map_monad_EOB_success; eauto.
+      edestruct map_monad_EOU_success; eauto.
     - cbn in *.
       break_match_hyp_inv.
       rewrite FORALL_forall.
       rewrite Forall_forall.
       intros.
-      edestruct map_monad_EOB_success; eauto.
+      edestruct map_monad_EOU_success; eauto.
     - cbn in H.
       repeat break_match_hyp_inv; cbn; auto.
   Qed.
@@ -2178,7 +2177,7 @@ Section DValue.
       cbn in H0.
       repeat break_match_hyp_inv.
       constructor.
-      apply map_monad_EOB_Forall2 in Heqe.
+      apply map_monad_EOU_Forall2 in Heqe.
       (* could be prettier *)
       induction Heqe; auto.
       constructor.
@@ -2190,7 +2189,7 @@ Section DValue.
       cbn in H0.
       repeat break_match_hyp_inv.
       constructor.
-      apply map_monad_EOB_Forall2 in Heqe.
+      apply map_monad_EOU_Forall2 in Heqe.
       (* could be prettier *)
       induction Heqe; auto.
       constructor.

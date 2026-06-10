@@ -11,8 +11,9 @@
 (* begin hide *)
 From Vellvm Require Import
   Utilities
-  Syntax.DynamicTypes
-  Semantics.VellvmIntegers.
+  Syntax
+  EOU
+  VellvmIntegers.
 (* end hide *)
 
 Class IPtr : Type :=
@@ -27,7 +28,7 @@ Class IPtr : Type :=
 
     to_Z : forall (a : iptr), Z;
     to_unsigned : forall (a : iptr), Z;
-    from_Z : Z -> EOB iptr;
+    from_Z : Z -> EOU iptr;
 
     show_iptr : iptr -> string;
     
@@ -74,6 +75,6 @@ Class IPtrTheory {IP : IPtr} :=
     
   }.
 
-Definition intptr_seq {IP : IPtr} (start : Z) (len : nat) : EOB (list iptr)
+Definition intptr_seq {IP : IPtr} (start : Z) (len : nat) : EOU (list iptr)
   := map_monad from_Z (Zseq start len).
 

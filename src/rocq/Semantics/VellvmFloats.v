@@ -4,10 +4,8 @@ From Stdlib Require Import
 
 From Vellvm Require Import
   Utilities
-  Syntax.LLVMAst            
-  Syntax.DynamicTypes
-  Numeric.Floats
-  Numeric.IEEE754_extra.
+  Syntax
+  Numeric.
 
 Class VFloat FP : Type :=
   {

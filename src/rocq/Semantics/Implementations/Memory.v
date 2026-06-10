@@ -1,7 +1,7 @@
 Require Import Morphisms.
 
 From Vellvm Require Import
-  Numeric.Integers
+  Numeric
   Utilities
   Syntax.
 
@@ -29,6 +29,7 @@ Import EitherMonad.
 
 From Vellvm.Semantics Require Import
   DynamicValues
+  EOU
   VellvmIntegers
   Params
   LLVMEvents
@@ -40,7 +41,7 @@ Import Logic.
 Section MemoryModel.
   Context {Pa : Params} {MMP : @MemoryModelPrimitives Pa}.
 
-  Definition get_consecutive_ptrs (ptr : addr) (len : nat) : EOB (list addr) :=
+  Definition get_consecutive_ptrs (ptr : addr) (len : nat) : EOU (list addr) :=
     ixs <- intptr_seq 0 len;;
     map_monad
       (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
@@ -418,7 +419,7 @@ Section Implementation.
                |};
              state_provenance := state_provenance s |}.
   Definition upd_frame_stack (fs : Framestack) : memM unit := app_frame_stack (fun _ => fs).
-  Definition app_frame_stack_eob : (Framestack -> EOB Framestack) -> memM unit :=
+  Definition app_frame_stack_eob : (Framestack -> EOU Framestack) -> memM unit :=
     fun f =>
       fs <- get_framestack ;;
       f' <- lift (f fs) ;;
@@ -426,7 +427,7 @@ Section Implementation.
   
   Definition push_frame_stack (f : Frame) (fs : Framestack) : Framestack :=
     Snoc fs f.
-  Definition pop_frame_stack (fs : Framestack) : EOB Framestack :=
+  Definition pop_frame_stack (fs : Framestack) : EOU Framestack :=
     match fs with
     | Singleton f => raise_error "Last frame, cannot pop."%string
     | Snoc s f => ret s

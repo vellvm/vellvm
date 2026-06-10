@@ -3,16 +3,15 @@ From Stdlib Require Import ProofIrrelevance.
 
 From Vellvm Require Import
   Utilities
-  Syntax.
-
-From Vellvm Require Import
+  Syntax
+  EOU
   IPtr
   Integers
   VellvmIntegers.
 
 From QuickChick Require Import Show.
 
-Definition from_Z_bits {sz : positive} : Z -> EOB (@bit_int sz) :=
+Definition from_Z_bits {sz : positive} : Z -> EOU (@bit_int sz) :=
   (fun (x : Z) =>
      if (x <=? @Integers.max_unsigned sz)%Z && (x >=? 0)%Z
      then ret (@Integers.repr sz x)

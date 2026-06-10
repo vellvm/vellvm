@@ -14,6 +14,7 @@ From Stdlib Require Import OrderedType OrderedTypeEx.
 From Vellvm Require Import
   Utilities
   DynamicTypes
+  EOU
   Interfaces.Provenance
   Interfaces.Sizeof.
 
@@ -60,7 +61,7 @@ Class PI {P : Provenance} {A : @Address P} :=
   {
     ptr_to_int : addr -> Z;
 
-    int_to_ptr : Z -> prov -> EOB addr;
+    int_to_ptr : Z -> prov -> EOU addr;
   }.
 
 Class PITheory {P : Provenance} {A : @Address P} {P2I : @PI P A} :=

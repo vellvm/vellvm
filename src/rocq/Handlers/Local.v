@@ -88,7 +88,6 @@ Section Locals.
     Definition interp_local : itree Effin ~> stateT map (itree Effout) :=
       interp_state interp_local_h.
 
-
     Section Structural_Lemmas.
 
       Lemma interp_local_bind :

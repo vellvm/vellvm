@@ -1,7 +1,8 @@
 From Vellvm Require Import
   Utilities
-  Numeric.Integers
-  Syntax.DynamicTypes.
+  Numeric
+  Syntax
+  EOU.
 
 (* Integers that can run out of memory... Necessary for handling
      finite memory compilation. *)
@@ -9,8 +10,8 @@ Class VMemInt I : Type :=
   {
     (* Comparisons *)
     mequ : I -> I -> bool;
-    mcmp : Numeric.Integers.comparison -> I -> I -> bool;
-    mcmpu : Numeric.Integers.comparison -> I -> I -> bool;
+    mcmp : Integers.comparison -> I -> I -> bool;
+    mcmpu : Integers.comparison -> I -> I -> bool;
     msamesign : I -> I -> bool;
     
     (* Constants *)
@@ -19,27 +20,27 @@ Class VMemInt I : Type :=
     mone : I;
 
     (* Arithmetic *)
-    madd : I -> I -> EOB I;
+    madd : I -> I -> EOU I;
     madd_carry : I -> I -> I -> I;
     madd_overflow : I -> I -> I -> I;
 
-    msub : I -> I -> EOB I;
+    msub : I -> I -> EOU I;
     msub_borrow : I -> I -> I -> I;
     msub_overflow : I -> I -> I -> I;
 
-    mmul : I -> I -> EOB I;
+    mmul : I -> I -> EOU I;
 
     mdivu : I -> I -> I; (* Can this overflow? *)
-    mdivs : I -> I -> EOB I;
+    mdivs : I -> I -> EOU I;
 
     mmodu : I -> I -> I; (* Can this overflow / underflow *)
-    mmods : I -> I -> EOB I; (* I suspect this can sort of overflow in the division by -1 case... Even though it really can't *)
+    mmods : I -> I -> EOU I; (* I suspect this can sort of overflow in the division by -1 case... Even though it really can't *)
 
-    mshl : I -> I -> EOB I;
+    mshl : I -> I -> EOU I;
     mshr : I -> I -> I;  (* Can this overflow? *)
     mshru : I -> I -> I; (* Can this overflow? *)
 
-    mnegative : I -> EOB I;
+    mnegative : I -> EOU I;
 
     (* Logic *)
     mand : I -> I -> I;
@@ -55,7 +56,7 @@ Class VMemInt I : Type :=
     munsigned : I -> Z;
     msigned : I -> Z;
 
-    mrepr : Z -> EOB I; (* Not sure if we should even have this *)
+    mrepr : Z -> EOU I; (* Not sure if we should even have this *)
 
     (* dtyp *)
     mdtyp_of_int : dtyp
@@ -64,7 +65,7 @@ Class VMemInt I : Type :=
 Definition mequ_Z (x y : Z) : bool :=
   Z.eqb x y.
 
-Definition mcmp_Z (c : Numeric.Integers.comparison) (x y : Z) : bool :=
+Definition mcmp_Z (c : Integers.comparison) (x y : Z) : bool :=
   match c with
   | Ceq => Z.eqb x y
   | Cne => negb (Z.eqb x y)
@@ -74,7 +75,7 @@ Definition mcmp_Z (c : Numeric.Integers.comparison) (x y : Z) : bool :=
   | Cge => Z.geb x y
   end.
 
-Definition mcmpu_Z (c : Numeric.Integers.comparison) (x y : Z) : bool :=
+Definition mcmpu_Z (c : Integers.comparison) (x y : Z) : bool :=
   match c with
   | Ceq => Z.eqb x y
   | Cne => negb (Z.eqb x y)

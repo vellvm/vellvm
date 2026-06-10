@@ -4,6 +4,7 @@ From Vellvm Require Import
 
 From Vellvm Require Import
   Rocqlib
+  EOU
   Interfaces.IPtr
   Interfaces.Address
   Interfaces.Provenance

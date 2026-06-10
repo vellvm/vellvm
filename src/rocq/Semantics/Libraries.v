@@ -23,7 +23,7 @@ From Vellvm Require Import
 Section withParams.
   Context {Pa : Params}.
 
-  (* IO & built-in functions -------------------------------------------------------------------- *)
+  (* IO & library functions -------------------------------------------------------------------- *)
   (** * puts
         [int  puts(const char *s);]
         The function puts() writes the string s, and a terminating newline character, to the stream stdout.
@@ -44,8 +44,8 @@ Section withParams.
       value read does not concretize to a DVALUE_I8.
    *)
   Definition i8_str_index (strptr : addr) (index : Z) : CFGtop (@Integers.bit_int 8) :=
-    iptr <- EOB_to_itree (from_Z index) ;;
-    addr <- EOB_to_itree (handle_gep_addr (DTYPE_I 8) strptr [DVALUE_IPTR iptr]) ;;
+    iptr <- EOU_to_itree (from_Z index) ;;
+    addr <- EOU_to_itree (handle_gep_addr (DTYPE_I 8) strptr [DVALUE_IPTR iptr]) ;;
     d_byte <- load (DTYPE_I 8) (DVALUE_Addr addr) ;;
     match d_byte with
     | DVALUE_I 8 b => ret b

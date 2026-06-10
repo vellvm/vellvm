@@ -2,8 +2,9 @@ From Vellvm Require Import
   Utilities
   Syntax
   VellvmIntegers
-  Params
-  DynamicValues.
+  EOU
+  DynamicValues
+  Params.
 Open Scope Z.
 
 Section GEP.
@@ -18,7 +19,7 @@ Section GEP.
       The offset is therefore incremented by this index times the size of the type of elements stored. Finally, a recursive call
       at this new offset allows for deeper unbundling of a nested structure.
    *)
-  Fixpoint handle_gep_h (t:dtyp) (off:Z) (vs:list dvalue): EOB Z :=
+  Fixpoint handle_gep_h (t:dtyp) (off:Z) (vs:list dvalue): EOU Z :=
     match vs with
     | v :: vs' =>
         match v with
@@ -83,7 +84,7 @@ Section GEP.
      The pointer set the block into which we look, and the initial offset. The first index value add to the initial offset passed to [handle_gep_h] for the actual access to structured data.
    *)
   (* TODO: This should take into account padding too... May break get_consecutive_ptrs and friends. *)
-  Definition handle_gep_addr (t:dtyp) (a:addr) (vs:list dvalue) : EOB addr :=
+  Definition handle_gep_addr (t:dtyp) (a:addr) (vs:list dvalue) : EOU addr :=
     let ptr := ptr_to_int a in
     let prov := address_provenance a in
     match vs with
@@ -186,7 +187,7 @@ Section GEP.
       eapply int_to_ptr_provenance; eauto.
   Qed.
 
-  Definition eval_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : EOB dvalue :=
+  Definition eval_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : EOU dvalue :=
     match dv with
     | DVALUE_Addr a => DVALUE_Addr <$> handle_gep_addr t a vs
     | _ => raise_error "non-address"%string

@@ -1,13 +1,14 @@
 From Vellvm Require Import
   Utilities
   Syntax
-  Semantics.DynamicValues
+  EOU
+  DynamicValues
   Params.
 
 Section Compare.
   Context {Pa : Params}.
   
-  Definition eval_icmp (samesign:bool) (icmp : icmp) (v1 v2 : dvalue) : EOB dvalue.
+  Definition eval_icmp (samesign:bool) (icmp : icmp) (v1 v2 : dvalue) : EOU dvalue.
     refine
       (match v1, v2 with
        | DVALUE_I sz1 i1, DVALUE_I sz2 i2 =>

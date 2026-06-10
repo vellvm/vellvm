@@ -21,11 +21,10 @@ From Vellvm Require Import
   Params
   Semantics.DynamicValues
   VellvmIntegers
-  Numeric.Rocqlib
-  Numeric.Integers
-  Numeric.Floats
+  Numeric
   LLVMEvents
-  Conversion.
+  Conversion
+  EOU.
 
 From Flocq.IEEE754 Require Import
   Binary
@@ -386,7 +385,7 @@ Section Intrinsics.
 
    - The right-hand [dvalue] of the [+] result is used to throw an exception.
    *)
-  Definition pure_function     := list dvalue -> EOB (dvalue + dvalue).
+  Definition pure_function     := list dvalue -> EOU (dvalue + dvalue).
   Definition semantic_function := list dvalue -> option addr -> itree E (dvalue + dvalue).
 
   (* An association list mapping intrinsic names to their semantic definitions *)
@@ -469,7 +468,7 @@ Section Intrinsics.
       end.
 
   (* Saturated arithmetic: https://llvm.org/docs/LangRef.html#saturation-arithmetic-intrinsics *)
-  Definition ushl_sat {I : Type} `{TDI : ToDvalue I} `{VMI : VMemInt I} (x y : I) : EOB dvalue :=
+  Definition ushl_sat {I : Type} `{TDI : ToDvalue I} `{VMI : VMemInt I} (x y : I) : EOU dvalue :=
     res <- mshl x y;;
     let res_u := munsigned res in
     let res_u' := Z.shiftl (munsigned x) (munsigned y) in
@@ -560,7 +559,7 @@ Section Intrinsics.
       retr DVALUE_None.
 
   Definition pure_to_semantic : pure_function -> semantic_function :=
-    fun f args _ => EOB_to_itree (f args).
+    fun f args _ => EOU_to_itree (f args).
 
   (* Clients of Vellvm can register the names of their own intrinsics
      definitions here. *)

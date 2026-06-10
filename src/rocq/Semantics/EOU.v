@@ -5,14 +5,14 @@ From ExtLib Require Import
 From Vellvm.Utils Require Import
   ListUtil Tactics.
 
-Variant EOB {X : Type} : Type :=
-  | raise_oom (s : string) : EOB
-  | raise_ub (s : string) : EOB
-  | raise_error (s : string): EOB
-  | raise_ret (x : X) : EOB.
-Arguments EOB: clear implicits.
+Variant EOU {X : Type} : Type :=
+  | raise_error (s : string): EOU
+  | raise_oom (s : string) : EOU
+  | raise_ub (s : string) : EOU
+  | raise_ret (x : X) : EOU.
+Arguments EOU: clear implicits.
 
-#[global] Instance EOB_monad : Monad EOB :=
+#[global] Instance EOU_monad : Monad EOU :=
   {| ret := @raise_ret ;
     bind _ _ c k :=
       match c with
@@ -23,8 +23,8 @@ Arguments EOB: clear implicits.
       end
   |}.
 
-Lemma map_monad_EOB_Forall2 :
-  forall {A B} (f : A -> EOB B) l res,
+Lemma map_monad_EOU_Forall2 :
+  forall {A B} (f : A -> EOU B) l res,
     map_monad f l = ret res <->
       Forall2 (fun a b => f a = ret b) l res.
 Proof.
@@ -44,11 +44,11 @@ Proof.
       rw_match; auto.
 Qed.
 
-Lemma map_monad_EOB_success A B (f : A -> EOB B) (l : list A) b :
+Lemma map_monad_EOU_success A B (f : A -> EOU B) (l : list A) b :
   map_monad f l = ret b ->
   forall a, In a l -> exists b, f a = ret b.
 Proof.
-  intros EQ; apply map_monad_EOB_Forall2 in EQ.
+  intros EQ; apply map_monad_EOU_Forall2 in EQ.
   induction EQ.
   - cbn; easy.
   - intros ? [<- | IN]; eauto.

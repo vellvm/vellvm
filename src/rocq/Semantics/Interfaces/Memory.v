@@ -1,7 +1,7 @@
 Require Import Morphisms.
 
 From Vellvm Require Import
-  Numeric.Integers
+  Numeric
   Utilities
   Syntax.
 
@@ -14,6 +14,7 @@ From ITree Require Import
   Events.State.
 
 From Vellvm.Semantics Require Import
+  EOU
   DynamicValues
   VellvmIntegers
   Params
@@ -76,7 +77,7 @@ Fixpoint memS_bind {S A P X Y} (c : memS S A P X) (k : X -> memS S A P Y) : memS
     bind _ _ c k := memS_bind c k |}.
 
 (* Definition memS S A P := stateT S (memB S A P). *)
-Definition lift {S A P} : EOB ~> memS S A P :=
+Definition lift {S A P} : EOU ~> memS S A P :=
   fun _ c => match c with
           | raise_ret x => ret x
           | raise_oom s   => Moom s

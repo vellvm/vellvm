@@ -30,6 +30,7 @@ From Vellvm Require Import
      Syntax
      Params
      DynamicValues
+     EOU
      VellvmIntegers.
 
 Import ITreeNotations.
@@ -237,8 +238,8 @@ Arguments DrawE {_} _.
 
 #[export] Hint Unfold CFGEtop CFGtop MCFGEtop MCFGtop MCFGEbot MCFGbot : core.
 
-Definition EOB_to_itree {E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} :
-  EOB ~> itree E :=
+Definition EOU_to_itree {E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} :
+  EOU ~> itree E :=
   fun _ x => match x with
           | raise_error s => raise s
           | raise_oom   s => raiseOOM s

@@ -1,12 +1,11 @@
 From Vellvm Require Import
-     Numeric.Rocqlib
-     Numeric.Integers
-     Numeric.Floats
+     Numeric
      Utilities
      Syntax
-     Semantics.DynamicValues
      Params
-     Semantics.MemoryBytes.
+     EOU
+     DynamicValues
+     MemoryBytes.
 
 Section Convert.
   Context {Pa : Params}.
@@ -134,7 +133,7 @@ Section Convert.
   
   Arguments get_conv_case _ _ _ _ : simpl nomatch.
 
-  Definition convert (conv : conversion_type) (t_from : dtyp) (dv : dvalue) (t_to : dtyp) : EOB dvalue :=
+  Definition convert (conv : conversion_type) (t_from : dtyp) (dv : dvalue) (t_to : dtyp) : EOU dvalue :=
     match get_conv_case conv t_from dv t_to with
     | Conv_PtoI x =>
         match x, t_to with

@@ -1,13 +1,14 @@
 From Vellvm Require Import
   Utilities
+  Numeric
   Syntax
   Params
-  Semantics.DynamicValues
-  Numeric.Floats
+  DynamicValues
+  EOU
   VellvmIntegers.
 
 From ExtLib Require Import
-     Data.Monads.EitherMonad.
+  Data.Monads.EitherMonad.
 Open Scope N_scope.
 
 (* TODO: Make these take endianess into account.
@@ -46,7 +47,7 @@ Section MemoryByte.
   
   (* Walk through a list *)
   (* Returns field index + number of bytes remaining *)
-  Fixpoint extract_field_byte_helper (fields : list dtyp) (field_idx : N) (byte_idx : N) : EOB (dtyp * (N * N))%type
+  Fixpoint extract_field_byte_helper (fields : list dtyp) (field_idx : N) (byte_idx : N) : EOU (dtyp * (N * N))%type
     := match fields with
        | [] =>
            raise_error "No fields left for byte-indexing..."
@@ -57,7 +58,7 @@ Section MemoryByte.
               else extract_field_byte_helper xs (N.succ field_idx) (byte_idx - sz)
        end.
 
-  Definition extract_field_byte (fields : list dtyp) (byte_idx : N) : EOB (dtyp * (N * N))%type
+  Definition extract_field_byte (fields : list dtyp) (byte_idx : N) : EOU (dtyp * (N * N))%type
     := extract_field_byte_helper fields 0 byte_idx.
 
   (* Need the type of the dvalue in order to know how big fields and array elements are.
@@ -75,11 +76,11 @@ Section MemoryByte.
   Variant MaybePoison (A : Type) : Type := | Pois | NoPois (a : A).
   Arguments Pois {A}.
   Arguments NoPois {A}.
-  Definition EOBP Z := EOB (MaybePoison Z).
-  #[local] Instance EOBP_Monad : Monad EOBP :=
+  Definition EOUP Z := EOU (MaybePoison Z).
+  #[local] Instance EOUP_Monad : Monad EOUP :=
     {| ret _ a := ret (NoPois a) ;
       bind _ _ c k := 
-        bind (m := EOB) c (fun pov => match pov with
+        bind (m := EOU) c (fun pov => match pov with
                                    | Pois => ret Pois
                                    | NoPois a => k a
                                    end)
@@ -87,9 +88,9 @@ Section MemoryByte.
   
   (* offset is the number of bytes indexed past so far *)
   Fixpoint dvalue_extract_byte
-    (dv : dvalue) (dt : dtyp) (idx : Z) {struct dv} : EOBP Z  :=
-    let dvalue_extract_struct_bytes (pad : option N) : list dvalue -> list dtyp -> N -> Z -> EOBP Z :=
-      fix loop fields types (offset : N) (idx : Z) {struct fields} : EOBP Z :=
+    (dv : dvalue) (dt : dtyp) (idx : Z) {struct dv} : EOUP Z  :=
+    let dvalue_extract_struct_bytes (pad : option N) : list dvalue -> list dtyp -> N -> Z -> EOUP Z :=
+      fix loop fields types (offset : N) (idx : Z) {struct fields} : EOUP Z :=
         match fields, types with
         | [], [] =>
             (* Handle padding at the end of the structure *)
@@ -202,7 +203,7 @@ Section MemoryByte.
   | MByte (dv : dvalue) (dt : dtyp) (idx : N) : memory_byte
   .
 
-  Definition memory_byte_value (db : memory_byte) : EOB (MaybePoison Z) 
+  Definition memory_byte_value (db : memory_byte) : EOU (MaybePoison Z) 
     := match db with
        | MByte dv dt idx =>
            dvalue_extract_byte dv dt (Z.of_N idx)
@@ -217,14 +218,14 @@ Section MemoryByte.
 
   Definition dtyp_is_void (dt : dtyp) : bool := match dt with | DTYPE_Void => true | _ => false end.
 
-  Definition absorb_pois {A} dt (c : EOBP A) (k : A -> EOB dvalue) : EOB dvalue :=
-    x <- (c : EOB _) ;;
+  Definition absorb_pois {A} dt (c : EOUP A) (k : A -> EOU dvalue) : EOU dvalue :=
+    x <- (c : EOU _) ;;
     match x with
     | Pois => ret (DVALUE_Poison dt)
     | NoPois v => k v
     end.
   
-  Fixpoint memory_bytes_to_dvalue (dbs : list memory_byte) (dt : dtyp) : EOB dvalue :=
+  Fixpoint memory_bytes_to_dvalue (dbs : list memory_byte) (dt : dtyp) : EOU dvalue :=
     if dtyp_is_void dt
     then raise_error "deserialize_sbytes: Attempt to deserialize void."%string
     else
@@ -257,7 +258,7 @@ Section MemoryByte.
       match dt with
       | DTYPE_I sz => 
           absorb_pois dt
-            (map_monad (m := EOBP) (memory_byte_value) dbs)
+            (map_monad (m := EOUP) (memory_byte_value) dbs)
             (fun v => ret (DVALUE_I sz (concat_bytes_Z_vint v)))
 
       | DTYPE_IPTR =>

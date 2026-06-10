@@ -14,7 +14,7 @@ From Stdlib Require Export
 From Vellvm Require Export
   Numeric.Rocqlib
   Utils.Tactics
-  Utils.EOB
+  Utils.Assoc
   Utils.ListUtil
   Utils.IntMaps
   Utils.NMaps

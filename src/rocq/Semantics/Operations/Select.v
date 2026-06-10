@@ -1,14 +1,15 @@
 From Vellvm Require Import
   Utilities
   Syntax
-  Params
-  DynamicValues.
+  EOU
+  DynamicValues
+  Params.
 
 Section Select.
   Context {Pa : Params}.
 
   Definition eval_select
-    (cnd : dvalue) (v1 v2 : dvalue) : EOB dvalue
+    (cnd : dvalue) (v1 v2 : dvalue) : EOU dvalue
     := match cnd with
        | DVALUE_Poison t =>
            (* TODO: Should be the type of the result of the select... *)
@@ -18,7 +19,7 @@ Section Select.
            then ret v1
            else ret v2
        | DVALUE_Vector _ conds =>
-           let fix loop conds xs ys : EOB (list dvalue) :=
+           let fix loop conds xs ys : EOU (list dvalue) :=
              match conds, xs, ys with
              | [], [], [] => ret []
              | (c::conds), (x::xs), (y::ys) =>

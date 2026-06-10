@@ -11,6 +11,7 @@
 ./rocq/Numeric/IEEE754_extra.v
 ./rocq/Numeric/Integers.v
 ./rocq/Numeric/Floats.v
+./rocq/Numeric.v
 
 ./rocq/Utils/ParserHelper.v
 ./rocq/Utils/Tactics.v
@@ -21,7 +22,6 @@
 ./rocq/Utils/RelationsUtil.v
 ./rocq/Utils/IntMaps.v
 ./rocq/Utils/Assoc.v
-./rocq/Utils/EOB.v
 ./rocq/Utilities.v
 
 ./rocq/Syntax/LLVMAst.v
@@ -35,6 +35,7 @@
 ./rocq/Syntax.v
 ./rocq/Syntax/ScopeTheory.v
 
+./rocq/Semantics/EOU.v
 ./rocq/Semantics/VellvmIntegers.v
 ./rocq/Semantics/VellvmFloats.v
 ./rocq/Semantics/Interfaces/IPtr.v
