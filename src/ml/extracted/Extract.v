@@ -25,14 +25,9 @@ From Vellvm Require
      Semantics.TopLevel
      Utils.ParserHelper
      QC.ShowAST
-     QC.ReprAST
-     (* QC.QCVellvm *).
+     QC.ReprAST.
 
 Set Extraction AccessOpaque.
-
-From QuickChick Require Import RandomQC.
-                           
-(* From Vellvm Require QC.GenAlive2. *)
 
 Require ExtrOcamlBasic.
 Require ExtrOcamlString.
@@ -137,17 +132,5 @@ Extract Inlined Constant Archi.ppc64 => "false".
 
 (* (* NOTE: assumes that this file is compiled from /src *) *)
 Cd "ml/extracted".
-
-Extract Constant RandomSeed   => "Random.State.t".
-Extract Constant randomSplit  => "(fun x -> (x,x))".
-Extract Constant newRandomSeed => "(Random.State.make_self_init ())".
-
-Extract Constant randomRBool => "(fun _ r -> Random.State.bool r, r)".
-Extract Constant randomRInt  =>
-  "(fun (x,y) r -> let yint = coqZ2Int y in let xint = coqZ2Int x in if (yint < xint) then failwith ""choose called with unordered arguments"" else (int2CoqZ (xint + (Random.State.int r (yint - xint + 1))), r))".
-Extract Constant randomRN =>
-  "(fun (x,y) r -> let yint = coqN2Int y in let xint = coqN2Int x in if yint < xint then failwith ""choose called with unordered arguments"" else  (int2CoqN (xint + (Random.State.int r (yint - xint + 1))), r))".
-Extract Constant randomRNat =>
-  "(fun (x,y) r -> let yint = ExtrOcamlIntConv.int_of_nat y in let xint = ExtrOcamlIntConv.int_of_nat x in if yint < xint then failwith ""choose called with unordered arguments"" else  (ExtrOcamlIntConv.nat_of_int (xint + (Random.State.int r (yint - xint + 1))), r))".
 
 Separate Extraction ExtrOcamlIntConv TopLevel AstLib ParserHelper ShowAST ReprAST Handlers Numeric.Floats BinNums BinPos (* QCVellvm *).

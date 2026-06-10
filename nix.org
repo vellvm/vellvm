@@ -49,9 +49,6 @@ cd src
 make
 #+end_src
 
-*Note:* It is important to use ~git clone --recursive~, otherwise you
-will be missing the custom QuickChick submodules.
-
 *NOTE:* If you have cloned before it is important to do ~make
 update-submodules~ when you pull. Otherwise you may have an old
 version of the git submodules checked out and vellvm will fail to
@@ -94,10 +91,6 @@ Or you can build and run the executable with:
 nix run ".?submodules=1" -- --help
 #+end_src
 
-*Note:* It is important to use the ~?submodules=1~ option, otherwise
-nix flakes ignore the git submodules that we currently use for some
-custom QuickChick libraries.
-
 *** Building and running without cloning using nix flakes
 
 You can build vellvm with:
@@ -111,10 +104,6 @@ Or just run it with:
 #+begin_src sh
 nix run "git+https://github.com/vellvm/vellvm?submodules=1" -- --help
 #+end_src
-
-*Note:* It is important to use the ~?submodules=1~ option, otherwise
-nix flakes ignore the git submodules that we currently use for some
-custom QuickChick libraries.
 
 ** Cachix
 

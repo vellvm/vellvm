@@ -24,8 +24,6 @@ From Vellvm Require Import
   Semantics.DynamicValues
   Interfaces.Memory
   Implementations.Memory.
-
-From QuickChick Require Import Show.
 (* end hide *)
 
 (** * Memory handler

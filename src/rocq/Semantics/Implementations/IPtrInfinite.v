@@ -7,8 +7,6 @@ From Vellvm Require Import
   Integers
   VellvmIntegers.
 
-From QuickChick Require Import Show.
-
 #[local]Instance IPZ : IPtr :=
   {|
     iptr := Z;

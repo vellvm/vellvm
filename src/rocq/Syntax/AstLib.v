@@ -6,8 +6,6 @@ From Vellvm Require Import
      Utilities
      Syntax.LLVMAst.
 
-From QuickChick Require Import Show.
-
 From Stdlib Require Import Equalities OrderedType OrderedTypeEx.
 Require Import ExtLib.Core.RelDec ExtLib.Data.Z.
 Require Import ExtLib.Programming.Eqv.

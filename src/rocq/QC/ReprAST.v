@@ -10,16 +10,13 @@
 
 From Vellvm Require Import LLVMAst ShowAST Utilities DynamicTypes.
 
-
 From Stdlib Require Import List.
-
 
 Import ListNotations.
 
 From Stdlib Require Import
      ZArith String.
 
-From QuickChick Require Import Show.
 Set Warnings "-extraction-opaque-accessed,-extraction".
 
 (* Class for the Coq representation of a structure. *)
@@ -29,6 +26,7 @@ Class Repr A : Type :=
   }.
 
 Section ReprInstances.
+
   #[global]
    Instance reprList (A : Type) `{Repr A} : Repr (list A) :=
     {

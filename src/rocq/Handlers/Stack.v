@@ -16,8 +16,6 @@ From Vellvm Require Import
 From ExtLib Require Import
   Structures.Maps.
 
-From QuickChick Require Import Show.
-
 Import ITree.Basics.Basics.Monads.
 (* end hide *)
 

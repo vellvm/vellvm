@@ -34,8 +34,6 @@ Import DList.
 
 Require Import Stdlib.Program.Equality.
 
-(* TODO: when/if we cut ties to QC, change this import *)
-From QuickChick Require Import Show.
 (* Import EqvNotation. *)
 Import Logic.
 

@@ -27,9 +27,6 @@ From Stdlib Require Import
   Numbers.DecimalString
   Strings.Ascii.
 
-
-
-From QuickChick Require Import Show.
 (* Import QcDefaultNotation. Open Scope qc_scope. *)
 Set Warnings "-extraction-opaque-accessed,-extraction".
 

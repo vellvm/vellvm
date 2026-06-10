@@ -21,8 +21,6 @@ From Vellvm Require Import
   Semantics.LLVMEvents
   Semantics.DynamicValues.
 
-From QuickChick Require Import Show.
-
 Import ITree.Basics.Basics.Monads.
 (* end hide *)
 

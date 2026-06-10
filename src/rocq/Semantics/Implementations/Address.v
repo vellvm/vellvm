@@ -11,8 +11,6 @@ From Vellvm Require Import
   Implementations.Provenance
   VellvmIntegers.
 
-From QuickChick Require Import Show.
-
 Section withIPtr.
   Context {IP : IPtr}.
   

@@ -31,8 +31,6 @@ From Vellvm Require Import
   IntrinsicsDefinitions
   DynamicValues.
 
-From QuickChick Require Import Show.
-
 Import Sum.
 Import Subevent.
 

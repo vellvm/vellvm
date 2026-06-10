@@ -34,7 +34,6 @@ depends: [
   ( "coq-hierarchy-builder" { >= "1.9.1" } & "coq-elpi" { < "3.0.0" } | "coq-hierarchy-builder" { > "1.9.1" } )
   "coq-simple-io"
   "coq-itree" {>= "5.2.0" & < "5.3~"}
-  "coq-quickchick" {>= "2.1.0" & < "2.2~"}
 ]
 
 tags: [

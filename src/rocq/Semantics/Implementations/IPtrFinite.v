@@ -9,8 +9,6 @@ From Vellvm Require Import
   Integers
   VellvmIntegers.
 
-From QuickChick Require Import Show.
-
 Definition from_Z_bits {sz : positive} : Z -> EOU (@bit_int sz) :=
   (fun (x : Z) =>
      if (x <=? @Integers.max_unsigned sz)%Z && (x >=? 0)%Z

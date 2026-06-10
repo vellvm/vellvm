@@ -18,7 +18,6 @@
       buildInputs =
         with rocq.ocamlPackages;
         [ rocq
-          coq # Needed to make QuickChick happy for now...
           dune_3
           perl
         ] ++
@@ -43,7 +42,6 @@
           flocq
           simple-io
           zarith
-          QuickChick
         ] ++
         # These ocaml packages have to come from rocq.ocamlPackages to
         # avoid disagreements between ocaml compiler versions.

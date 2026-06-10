@@ -134,7 +134,6 @@ Section withParams.
 
   Definition i8 : dtyp := DTYPE_I 8%positive.
 
-
   Definition i8_array_of_string (s : string) : dvalue :=
     let len := N.of_nat (String.length s) + 1%N in
       DVALUE_Array

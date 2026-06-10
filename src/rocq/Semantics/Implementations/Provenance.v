@@ -8,8 +8,6 @@ From Vellvm Require Import
   Integers
   VellvmIntegers.
 
-From QuickChick Require Import Show.
-
 (* TODO: look into how to use decidable equality more uniformaly and cleanly *)
 Definition eq_dec_option [A]
   (dec : forall (a b : A), {a = b} + {a <> b}) :
@@ -77,9 +75,9 @@ Instance ProvenanceV : Provenance :=
     provenance_lt := N.lt;
     
     (* Debug *)
-    show_prov pr  := Show.show pr;
-    show_provenance pr := Show.show pr;
-    show_allocation_id aid := Show.show aid;
+    show_prov pr  := show pr;
+    show_provenance pr := show pr;
+    show_allocation_id aid := show aid;
 
   |}.
 
