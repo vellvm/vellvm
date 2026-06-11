@@ -152,30 +152,6 @@ Section MemoryModel.
       let byte := MByte (DVALUE_I 8 val) (DTYPE_I 8) 0 in
       write_bytes dst (repeatN (Z.to_N len) byte).
   
-  (** Free from heap *)
-  (* Definition free (ptr : addr) : memM unit. *)
-  (*   refine (s <- get ;; *)
-  (*           let h := memory_stack_heap (state_get_memory s) in *)
-  (*           let raw_addr := ptr_to_int ptr in *)
-  (*           match lookup raw_addr h with *)
-  (*           | None => mub "Attempt to free non-heap allocated address." *)
-  (*           | Some block => _ *)
-  (*               (* let mem' := free_block_memory block mem in *) *)
-  (*               (* let h' := delete raw_addr h in *) *)
-  (*               (* let pr := mem_state_provenance ms in *) *)
-  (*               (* let ms' := mkMemState (mkMemoryStack mem' fs h') pr in *) *)
-  (*               (* put_mem_state ms' *) *)
-  (*           end *)
-  (*          ). *)
-  (*           let h := memory_stack_heap *)
-  (*           h <- get_heap ;; *)
-  (*           _). *)
-  (*   ms <- get_mem_state;; *)
-  (*   let '(mkMemoryStack mem fs h) := ms_memory_stack ms in *)
-  (*   | Some block => *)
-  (*  end). *)
-
-
   Definition handle_memcpy (args : list dvalue) : memM unit :=
     match args with
     | DVALUE_Addr dst ::

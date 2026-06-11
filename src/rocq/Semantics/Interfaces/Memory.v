@@ -15,7 +15,6 @@ From ITree Require Import
 
 From Vellvm.Semantics Require Import
   EOU
-  DynamicValues
   VellvmIntegers
   Params
   Operations.
