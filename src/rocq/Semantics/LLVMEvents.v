@@ -158,7 +158,8 @@ Section withParams.
   
   (* LLVM exceptions *)
   Variant LLVMExcE : Type -> Type :=
-    | LLVMExc : exc -> LLVMExcE void.
+    | raiseExc : exc -> LLVMExcE void
+    | invokeExc : exc -> LLVMExcE block_id.
 
   Definition raiseLLVM {E} {A} `{LLVMExcE -< E} (e : exc) : itree E A :=
     v <- trigger (LLVMExc e);; match v: void with end.

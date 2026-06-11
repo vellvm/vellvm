@@ -203,7 +203,7 @@ Section Denotation.
     | EXP_Undef =>
         match top with
         | None   => raise ("denote_exp given untyped EXP_Undef")
-        | Some t => ret (DVALUE_Poison t)
+        | Some t => freeze (DVALUE_Poison t)
         end
 
     | EXP_Poison =>
