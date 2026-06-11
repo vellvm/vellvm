@@ -327,6 +327,7 @@ Section ExpInd.
   Hypothesis IH_Null    : P ((EXP_Null)).
   Hypothesis IH_Zero_initializer : P ((EXP_Zero_initializer)).
   Hypothesis IH_Cstring : forall (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Cstring elts)).
+  Hypothesis IH_Undef   : P ((EXP_Undef)).
   Hypothesis IH_Poison  : P ((EXP_Poison)).
   Hypothesis IH_Struct  : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Struct fields)).
   Hypothesis IH_Packed_struct : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Packed_struct fields)).
@@ -375,6 +376,7 @@ refine(
   | EXP_Null => IH_Null
   | EXP_Zero_initializer => IH_Zero_initializer
   | EXP_Cstring elts => _
+  | EXP_Undef => IH_Undef
   | EXP_Poison => IH_Poison
   | EXP_Struct fields => _
   | EXP_Packed_struct fields => _
@@ -460,6 +462,7 @@ refine(
   | EXP_Null => IH_Null
   | EXP_Zero_initializer => IH_Zero_initializer
   | EXP_Cstring elts => _
+  | EXP_Undef => IH_Undef
   | EXP_Poison => IH_Poison
   | EXP_Struct fields => _
   | EXP_Packed_struct fields => _

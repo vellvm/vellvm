@@ -134,6 +134,8 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
   | TYPE_Vector _, EXP_Vector (t, elts) ->
       let elt_typ = match t with TYPE_Vector (_, et) -> et | _ -> t in
       DVALUE_Vector (typ_to_dtyp elt_typ, (List.map texp_to_dvalue elts))
+  (* [undef] is treated semantically as [poison] on this branch. *)
+  | _, EXP_Undef -> (DVALUE_Poison (typ_to_dtyp typ))
   | _, EXP_Poison -> (DVALUE_Poison (typ_to_dtyp typ))
   | _, _ ->
       failwith
@@ -168,6 +170,8 @@ let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) :
   | TYPE_Vector _, EXP_Vector (t, elts) ->
       let elt_typ = match t with TYPE_Vector (_, et) -> et | _ -> t in
       DVALUE_Vector (typ_to_dtyp elt_typ, (List.map texp_to_uvalue elts))
+  (* [undef] is treated semantically as [poison] on this branch. *)
+  | _, EXP_Undef -> (DVALUE_Poison (typ_to_dtyp typ))
   | _, EXP_Poison -> (DVALUE_Poison (typ_to_dtyp typ))
   | _, _ ->
       failwith

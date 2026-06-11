@@ -199,6 +199,13 @@ Section Denotation.
       vs <- map_monad eval_texp es ;;
       ret (DVALUE_Array (@DTYPE_I 8) vs)
 
+    (* [undef] is treated semantically as [poison] on this branch. *)
+    | EXP_Undef =>
+        match top with
+        | None   => raise ("denote_exp given untyped EXP_Undef")
+        | Some t => ret (DVALUE_Poison t)
+        end
+
     | EXP_Poison =>
         match top with
         | None   => raise ("denote_exp given untyped EXP_Poison")

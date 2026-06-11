@@ -428,6 +428,10 @@ Inductive exp : Set :=
                          ((TYPE_I 8), Exp_Integer (IntDecimal (Pos <byte>)))
                       *)
 
+(* [undef] is still accepted by the parser, but the minimal semantics has no
+   dedicated undef value: [EXP_Undef] is denoted semantically as [poison]
+   (see [denote_exp] in Semantics/Denotation.v). *)
+| EXP_Undef
 | EXP_Poison
 | EXP_Struct          (fields: list (T * exp))
 | EXP_Packed_struct   (fields: list (T * exp))

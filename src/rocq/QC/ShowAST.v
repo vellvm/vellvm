@@ -696,6 +696,8 @@ Section ShowInstances.
     | EXP_Cstring elts => sd "c" @@ sd """" @@
                            DList_join (map (fun '(ty, ex) => (dshow_c_string ex)) elts) @@ sd  """"
 
+    | EXP_Undef => sd "undef"
+
     | EXP_Poison => sd "poison"
 
     | EXP_Struct fields =>

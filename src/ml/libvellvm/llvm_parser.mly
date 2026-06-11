@@ -1557,7 +1557,10 @@ expr_val:
   | KW_TRUE                                           { fun _ -> EXP_Bool true        }
   | KW_FALSE                                          { fun _ -> EXP_Bool false       }
   | KW_NULL                                           { fun _ -> EXP_Null             } 
-  | KW_UNDEF                                          { fun _ -> failwith "Vellvm parser: the `undef` keyword is no longer supported on this branch (the minimal semantics dropped it). Use `null` on pointer types, `zeroinitializer` on aggregates/integers, or `poison` where intended." }
+  (* We still accept `undef`, but the minimal semantics has no dedicated
+     undef value: it is parsed into [EXP_Undef] and denotes as [poison]
+     (see [denote_exp] in src/rocq/Semantics/Denotation.v). *)
+  | KW_UNDEF                                          { fun _ -> EXP_Undef            }
   | KW_POISON                                         { fun _ -> EXP_Poison           }
   | KW_ZEROINITIALIZER                                { fun _ -> EXP_Zero_initializer }
   | LCURLY l=separated_list(csep, tconst) RCURLY      { fun _ -> EXP_Struct l         }

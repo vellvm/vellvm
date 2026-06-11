@@ -353,6 +353,7 @@ Module VIR_Notations.
     (in custom vir_exp at level 0, n constr at level 0, only printing).
   Notation "'null'"            := EXP_Null             (in custom vir_exp at level 0, only printing).
   Notation "'zeroinitializer'" := EXP_Zero_initializer (in custom vir_exp at level 0, only printing).
+  Notation "'undef'"           := EXP_Undef            (in custom vir_exp at level 0, only printing).
   Notation "'poison'"          := EXP_Poison           (in custom vir_exp at level 0, only printing).
   (** Floating-point literal. Uses a [fp] tag because the bare-LHS slot
       in [vir_exp] is taken by [EXP_Integer]. The body of the literal
