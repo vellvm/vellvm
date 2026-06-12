@@ -53,3 +53,4 @@ RocqMakefile
 .RocqMakefile.d
 RocqMakefile.conf
 .#*
+/.agent-shell/
