@@ -14,7 +14,6 @@ open Vellvm_base
 open Result
 open Assert
 open Driver
-open ShowAST
 
 module DV = DynamicValues
 
