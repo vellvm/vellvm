@@ -5,9 +5,14 @@ title: "Research"
 
 # Related Publications
 
+ - "Vellvm: Formalizing the informal LLVM (Experience Report)", ([NFM25](http://www.cis.upenn.edu/~stevez/papers/nfm25.pdf)) Calvin Beck, Hanxi Chen, and Steve Zdancewic. 
+
  - "Choice trees: Representing and reasoning about nondeterministic, recursive, and impure programs in Rocq" ([JFP'25](https://www.cambridge.org/core/journals/journal-of-functional-programming/article/choice-trees-representing-and-reasoning-about-nondeterministic-recursive-and-impure-programs-in-rocq/797B95A45813CAE54CFFFA3D7B163BA4)), Nicolas Chappe, Paul He, Ludovic Henrio, Eleftherios Ioannidis, Yannick Zakowski, and Steve Zdancewic. 
 
  - "A Two-Phase Infinite/Finite Low-Level Memory Model" ([ICFP'24](https://icfp24.sigplan.org/details/icfp-2024-papers/28/A-Two-Phase-Infinite-Finite-Low-Level-Memory-Model-Reconciling-Integer-Pointer-Casts)), Calvin Beck, Irene Yoon, Hanxi Chen, Yannick Zakowski, Steve Zdancewic
+
+- "Choice Trees: Representing Nondeterministic, Recursive, and Impure Programs in Coq
+ ([POPL'23](http://www.cis.upenn.edu/~stevez/papers/CHHZZ23.pdf)) Nicolas Chappe, Paul He, Ludovic Henrio, Yannick Zakowski, and Steve Zdancewic
 
  - "Formal Reasoning About Layered Monadic Interpreters" ([ICFP'22](https://doi.org/10.1145/3547630)), Irene Yoon, Yannick Zakowski, and Steve Zdancewic.
 
@@ -42,34 +47,57 @@ title: "Research"
 
   - Vellvm started as an outgrowth of the SoftBound and CETS projects.
 
-  - The "original" Vellvm development code base (called Vellvm-legacy) is [available here](https://github.com/vellvm/vellvm-legacy). But the code is quite bitrotted.
+  - The "original" Vellvm development code base (called Vellvm-legacy) was built by Jianzhou Zhao and is [available here](https://github.com/vellvm/vellvm-legacy). (But the code is quite bitrotted.)
 
   - Vellvm was a component of the [DeepSpec NSF Expedition](http://www.deepspec.org).
 
-
-
 # Past Contributors
 
-Vellvm has had many contributors over the years.  Thanks to all of them for their work on this project!
+Vellvm has had many contributors over the years. Some contributed to the "legacy" Vellvm project and some contributed to its modern incarnation.  Thanks to all of them!
 
+ - Calvin Beck
+ - Roger Burtonpatel
+ - Hanxi (Gary) Chen
+ - Noé de Santo
  - Vivien Durey
  - Dmitri Garbuzov
  - Eduardo Gonzalez
  - Olek Gierczak
+ - Nicolas Koh
  - William Mansky
  - Milo Martin
  - Joel McCarthy
  - Santosh Nagarakatte
  - Emmett Neyman
  - Christine Rizkallah
+ - Valentin Robert
  - Zak Sines
  - Nathan Sobotka
+ - Alix Trieu
+ - Vighnesh Vijay
+ - Irene Yoon
  - Robert Zajac
  - Ilia Zaichuk
+ - Yannick Zakowski
  - Vadim Zaliva
  - Richard Zhang
  - Jianzhou Zhao
 
 # Funding
+
+- NSF Grant 1521539 Collaborative Research: Expeditions in Computing: *The Science of Deep Specification*
+
+- NSF Grant XPS 1337174 CLCCA: *Improving Parallel Program Reliability Through Novel Approaches to Precise Dynamic Data Race Detection*
+
+- Supported by NSF Grant 1065166: *Validating Program Transformations in a Mechanized LLVM*
+
+- DARPA *MACCHIATO* (with Peraton Labs)
+
+- DARPA TRACTOR: *CRISP - C to Rust for Idiomatic and Safe Programming* with Galois Inc
+
+- NSF *Secure and Formally-verified Low-level Languages*
+
+{{< img src="images/NSF_Official_logo_Med_Res_600ppi.png" style="height:120px" >}}
+{{< img src="images/Darpa-logo-2026.png" style="height:110px" >}}
 
 

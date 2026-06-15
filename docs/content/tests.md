@@ -1,11 +1,19 @@
 ---
-title: "Excecuting Tests"
+title: "Tests"
 ---
 
 # Running Vellvm
 
-After successfully building the project, the `vellvm` executable shou
+The `vellvm` executable can be used to run LLVM IR code in `.ll` files by using the `-i` or `-interpret` flags.  By default the interpeter will look for an entry point called `main` (but note that does not accept command-line arguments).
 
+```bash
+~/vellvm> vellvm -i tests/ll/factorial.ll 
+(* -------- Vellvm Test Harness -------- *)
+Processing: tests/ll/factorial.ll
+Program terminated with: i64 120
+```
+
+You can "link" several `.ll` files together by using the `-l` or `-L` flags.  The `src/libll` directory contains some minimal library support for C and Rust programs, along with an implementation of `printf`.
 
 # Adding a new test case
 
