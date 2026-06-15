@@ -13,15 +13,51 @@ Processing: tests/ll/factorial.ll
 Program terminated with: i64 120
 ```
 
-You can "link" several `.ll` files together by using the `-l` or `-L` flags.  The `src/libll` directory contains some minimal library support for C and Rust programs, along with an implementation of `printf`.
+You can "link" several `.ll` files together by using the `-l` or `-L` flags.  The `src/libll` directory contains some minimal library support for C and Rust programs.
+
+## EXAMPLE of Undefined Behavior Detection
+
+If `demo.c` contains the following C code:
+
+```c
+#include<stdio.h>
+
+int main(int argc, char** argv) {
+  char x[6] = {'h', 'e', 'l', 'l', 'o', '\0'};
+  char y[6] = {'w', 'o', 'r', 'l', 'd', '\0'};
+
+  /* Buffer overflow */
+  for(int i=0; i<25; i++) {
+    y[i] = 'X';
+  } 
+    
+  printf("x is %s\n", x);
+  printf("y is %s\n", y);
+}
+```
+
+We can compile it with Clang, but the resulting executable exhibits **undefined behavior**:
+
+```bash
+~/demo> clang -o demo.exe demo.c
+                                                                                                                                               
+~/demo> ./demo.exe              
+x is hello
+y is XXXXXXXXhello
+```
+
+If, instead, we generate the LLVM IR code and run it using Vellvm, we get:
+
+```bash
+~/demo> clang -emit-llvm demo.c
+~/demo> 
+```
 
 # Adding a new test case
 
 One way to create new test cases for Vellvm is to compile a C program using `clang` and then add assertions to turn it in to an executable for adding assertions.  The steps below illustrate this process:
 
 1. Create a C program (e.g. in the directory `tests/c`), for instance, `example.c`.
-
- - The C program should not use C libraries (yet!), which are not part of the LLVM IR standard, but the program should be able to use general C language features.
 
 For example: the following C program contains a simple function called `foo` that multiplies its input by 3:
 

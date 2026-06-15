@@ -41,15 +41,22 @@ title: "Research"
 
  - "Mechanized Verification of Computing Dominators for Formalizing Compilers" ([CPP'12](http://www.cis.upenn.edu/~stevez/papers/ZZ12.pdf)), Jianzhou Zhao and Steve Zdancewic.
 
+ - "CETS: Compiler-Enforced Temporal Safety for C" ([ISMM'10](http://www.cis.upenn.edu/~stevez/papers/NZMZ10.pdf)), Santosh Nagarakatte, Jianzhou Zhao, Milo M. K. Martin, and Steve Zdancewic
+
+ - "SoftBound: Highly Compatible and Complete Spatial Memory Safety for C" ([PLDI'09](http://www.cis.upenn.edu/~stevez/papers/NZMZ09.pdf)), Santosh Nagarakatte, Jianzhou Zhao, Milo M. K. Martin, and Steve Zdancewic. 
 
 
 # Vellvm History
 
-  - Vellvm started as an outgrowth of the SoftBound and CETS projects.
+  - Vellvm started as an outgrowth of the SoftBound and CETS projects around 2010.
 
   - The "original" Vellvm development code base (called Vellvm-legacy) was built by Jianzhou Zhao and is [available here](https://github.com/vellvm/vellvm-legacy). (But the code is quite bitrotted.)
 
   - Vellvm was a component of the [DeepSpec NSF Expedition](http://www.deepspec.org).
+
+{{< img src="images/vellvm-logo.png" style="height:120px" >}}
+
+{{< img src="images/deepspec-logo-300dpi.png" style="height:110px" >}}
 
 # Past Contributors
 
