@@ -46,6 +46,9 @@ src/coq/.lia.cache
 lib/.FLOCQQUICKCHICK_STAMP
 lib/.QUICKCHICK_STAMP
 
+docs/public
+docs/.hugo_build.lock
+
 CoqMakefile
 .CoqMakefile.d
 CoqMakefile.conf
@@ -53,3 +56,4 @@ RocqMakefile
 .RocqMakefile.d
 RocqMakefile.conf
 .#*
+/.agent-shell/

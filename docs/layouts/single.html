@@ -1,0 +1,25 @@
+{{ partial "header.html" . }}
+
+<div class="banner" align="left" margin-bottom="0pt">
+  <img src="../logo/vellvm-logo.png" width="100px" alt="Vellvm" style="float:left; padding-right:50px"/>
+{{if not .IsHome }}
+<h1>{{ .Title | markdownify }}</h1>
+{{ end }}
+
+{{ partial "nav.html" . }}
+
+  <table class="banner" border="0" width="800px" cellspacing="1" cellpadding="10">
+    <tbody>
+    <tr>
+    <td align="left">
+      <div>
+	<main>
+	  {{ .Content }}
+	</main>
+      </div>
+    </td>
+    </tr>
+    </tbody>
+  </table>
+
+{{ partial "footer.html" . }}

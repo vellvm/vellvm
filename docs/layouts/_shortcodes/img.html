@@ -1,0 +1,5 @@
+{{- with .Get "src" -}}
+<img src="{{ . | relURL }}" style="{{ $.Get "style" }}">
+{{- end -}}
+
+

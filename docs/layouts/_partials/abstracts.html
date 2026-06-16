@@ -1,0 +1,3948 @@
+<h3>Journal Articles</h3>
+
+<!-- This document was automatically generated with bibtex2html 1.99
+     (see http://www.lri.fr/~filliatr/bibtex2html/),
+     with the following command:
+     bibtex2html -d -r -nodoc -nobibsource -both -nf ps PS -nf pdf PDF -citefile hjournal.keys -s bold-title -o hjournal /Users/stevez/Work/professional/resume/content/zdancewic.bib  -->
+
+
+<table>
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="VAKZ26">1</a>]
+</td>
+<td class="bibtexitem">
+Joey Velev-Ginorio, Nada Amin, Konrad Kording, and Steve Zdancewic.
+ <b>Compiling to Linear Neurons</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, 10(POPL),
+  2026.
+[&nbsp;<a href="https://doi.org/10.1145/3776677">DOI</a>&nbsp;| 
+<a href="https://doi.org/10.1145/3776677">http</a>&nbsp;]
+<blockquote><font size="-1">
+We don’t program neural networks directly. Instead, we rely on an indirect style where learning algorithms, like gradient descent, determine a neural network’s function by learning from data. This indirect style is often a virtue; it empowers us to solve problems that were previously impossible. But it lacks discrete structure. We can’t compile most algorithms into a neural network—even if these algorithms could help the network learn. This limitation occurs because discrete algorithms are not obviously differentiable, making them incompatible with the gradient-based learning algorithms that determine a neural network’s function. To address this, we introduce Cajal: a typed, higher-order and linear programming language intended to be a minimal vehicle for exploring a direct style of programming neural networks. We prove Cajal programs compile to linear neurons, allowing discrete algorithms to be expressed in a differentiable form compatible with gradient-based learning. With our implementation of Cajal, we conduct several experiments where we link these linear neurons against other neural networks to determine part of their function prior to learning. Linking with these neurons allows networks to learn faster, with greater data-efficiency, and in a way that’s easier to debug. A key lesson is that linear programming languages provide a path towards directly programming neural networks, enabling a rich interplay between learning and the discrete structures of ordinary programming.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="IZZS25">2</a>]
+</td>
+<td class="bibtexitem">
+Eleftherios Ioannidis, Yannick Zakowski, Steve Zdancewic, and Sebastian Angel.
+ <b>Structural Temporal Logic for Mechanized Program
+  Verification</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, 9(OOPSLA2),
+  October 2025.
+[&nbsp;<a href="https://doi.org/10.1145/3763091">DOI</a>&nbsp;| 
+<a href="https://doi.org/10.1145/3763091">http</a>&nbsp;]
+<blockquote><font size="-1">
+Mechanized verification of liveness properties for infinite programs with effects and nondeterminism is   challenging. Existing temporal reasoning frameworks operate at the level of models such as traces and   automata. Reasoning happens at a very low-level, requiring complex nested (co-)inductive proof techniques   and familiarity with proof assistant mechanics (e.g., the guardedness checker). Further, reasoning at the level   of models instead of program constructs creates a verification gap that loses the benefits of modularity and   composition enjoyed by structural program logics such as Hoare Logic. To address this verification gap, and the   lack of compositional proof techniques for temporal specifications, we propose Ticl, a new structural temporal   logic. Using Ticl, we encode complex (co-)inductive proof techniques as structural lemmas and focus our   reasoning on variants and invariants. We show that it is possible to perform compositional proofs of general   temporal properties in a proof assistant, while working at a high level of abstraction. We demonstrate the   benefits of Ticl by giving mechanized proofs of safety and liveness properties for programs with scheduling,   concurrent shared memory, and distributed consensus, demonstrating a low proof-to-code ratio.
+</font></blockquote>
+<blockquote><font size="-1">
+Keywords: Formal Verification, Program Verification, Proof Assistant, Semantics, Systems Verification, Temporal Logic
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MKZO">3</a>]
+</td>
+<td class="bibtexitem">
+Stephen Mell, Konstantinos Kallas, Steve Zdancewic, and Osbert Bastani.
+ <b>Opportunistically Parallel Lambda Calculus</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, 9(OOPSLA2),
+  October 2025.
+[&nbsp;<a href="https://doi.org/10.1145/3763143">DOI</a>&nbsp;| 
+<a href="https://doi.org/10.1145/3763143">http</a>&nbsp;]
+<blockquote><font size="-1">
+Scripting languages are widely used to compose external calls such as native libraries and network services. In such scripts, execution time is often dominated by waiting for these external calls, rendering traditional single-language optimizations ineffective. To address this, we propose a novel opportunistic evaluation strategy for scripting languages based on a core lambda calculus that automatically dispatches independent external calls in parallel and streams their results. We prove that our approach is confluent, ensuring that it preserves the programmer’s original intent, and that it eventually executes every external call. We implement this approach in a scripting language called Opal. We demonstrate the versatility and performance of Opal, focusing on programs that invoke heavy external computation through the use of large language models (LLMs) and other APIs. Across five scripts, we compare to several state-of-the-art baselines and show that opportunistic evaluation improves total running time (up to 6.2) and latency (up to 12.7) compared to standard sequential Python, while performing very close (between 1.3% and 18.5% running time overhead) to hand-tuned manually optimized asynchronous Rust. For Tree-of-Thoughts, a prominent LLM reasoning approach, we achieve a 6.2 performance improvement over the authors’ own implementation.
+</font></blockquote>
+<blockquote><font size="-1">
+Keywords: LLM agents, concurrency, parallelization, scripting, streaming
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="RZ25">4</a>]
+</td>
+<td class="bibtexitem">
+Nick Rioux and Steve Zdancewic.
+ <b>Functional Meaning for Parallel Streaming</b>.
+ <em>Proceedings of the ACM on Programming Languages (PACMPL)</em>,
+  9(PLDI), 2025.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/RZ25.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Nondeterminism introduced by race conditions and message reorderings makes parallel and distributed programming hard. Nevertheless, promising approaches such as LVars and CRDTs address this problem by introducing a partial order structure on shared state that describes how the state evolves over time. Monotone programs that respect the order are deterministic. Datalog-inspired languages incorporate this idea of monotonicity in a first-class way but they are not general-purpose. We would like parallel and distributed languages to be as natural to use as any functional language, without sacrificing expressivity, and with a formal basis of study as appealing as the lambda calculus.<p>
+This paper presents &lambda;<sub>V</sub>, a core language for deterministic parallelism that embodies the ideas above. In &lambda;<sub>V</sub>, values may increase over time according to a streaming order and all computations are monotone with respect to that order. The streaming order coincides with the approximation order found in Scott semantics and so unifies the foundations of functional programming with the foundations of deterministic distributed computation. The resulting lambda calculus has a computationally adequate model rooted in domain theory. It integrates the compositionality and power of abstraction characteristic of functional programming with the declarative nature of Datalog.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="DTZ25">5</a>]
+</td>
+<td class="bibtexitem">
+Lawrence Dunn, Val Tannen, and Steve Zdancewic.
+ <b>Structured Monads for Generic First-Order Syntax Metatheory</b>.
+ <em>Journal of Automated Reasoning (JAR)</em>, 69(22), 2025.
+[&nbsp;<a href="https://doi.org/10.1007/s10817-025-09731-y">DOI</a>&nbsp;| 
+<a href="https://rdcu.be/eAkdC">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+Reasoning about substitution remains one of the most tedious and error-prone aspects of formal metatheory. We present Tealeaves, a framework implemented in Coq for developing such infrastructure generically and modularly. Tealeaves is centered on a novel categorical abstraction, decorated traversable monads (DTMs), which provide a unifying foundation for first-order syntax and enable local, compositional reasoning about syntactic operations, such as substitution, that are defined purely by their effect on individual variable occurrences. Within this framework, Tealeaves supports extensible backend modules, each implementing the metatheory of a specific concrete strategy for representing binders. Our current backends include implementations of de Bruijn indices in the style of Autosubst, as well as locally nameless in the style of LNgen. Tealeaves goes further by providing a certified translation between these representations, illustrating how DTMs reconcile their underlying structures. The framework also accommodates challenging features such as variadic and mutually-recursive binders, which are often overlooked by both theoretical treatments and practical tools. We describe the implementation and use of Tealeaves’ backends in formalized language developments, introduce the equational axioms that characterize DTMs, and conclude with a presentation of those axioms instantiated for the lambda calculus extended with a variadic binding constructor.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="CHH+25">6</a>]
+</td>
+<td class="bibtexitem">
+Nicolas Chappe, Paul He, Ludovic Henrio, Eleftherios Ioannidis, Yannick
+  Zakowski, and Steve Zdancewic.
+ <b>Choice trees: Representing and reasoning about
+  nondeterministic, recursive, and impure programs in Rocq</b>.
+ <em>Journal of Functional Programming</em>, 35, 2025.
+[&nbsp;<a href="https://doi.org/10.1017/S0956796825100105">DOI</a>&nbsp;]
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MZB24">7</a>]
+</td>
+<td class="bibtexitem">
+Stephen Mell, Steve Zdancewic, and Osbert Bastani.
+ <b>Optimal Program Synthesis via Abstract Interpretation</b>.
+ 8(POPL), 2024.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/MZB24.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+We consider the problem of synthesizing programs with numerical constants that optimize a quantitative objective, such as accuracy, over a set of input-output examples. We propose a general framework for optimal synthesis of such programs in a given DSL, with provable optimality guarantees. Our framework enumerates programs in a general search graph, where nodes represent subsets of concrete programs. To improve scalability, it uses A* search in conjunction with a search heuristic based on abstract interpretation; intuitively, this heuristic establishes upper bounds on the value of subtrees in the search graph, enabling the synthesizer to identify and prune subtrees that are provably suboptimal. In addition, we propose a natural strategy for constructing abstract transformers for monotonic semantics, which is a common property for components in neurosymbolic DSLs. Finally, we implement our approach in the context of two existing DSLs for data classification, demonstrating that our algorithm is more scalable than existing optimal synthesizers.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="vellvm-memory-model">8</a>]
+</td>
+<td class="bibtexitem">
+Calvin Beck, Irene Yoon, Hanxi Chen, Yannick Zakowski, and Steve Zdancewic.
+ <b>A Two-Phase Infinite/Finite Low-Level Memory Model: Reconciling
+  Integer-Pointer Casts, Finite Space, and undef at the LLVM IR Level of
+  Abstraction</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, 8(ICFP), 2024.
+[&nbsp;<a href="https://doi.org/10.1145/3674652">DOI</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/BHCZ+24.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+This paper provides a novel approach to reconciling complex low-level memory model features, such as pointer–integer casts, with desired refinements that are needed to justify the correctness of program transformations. The idea is to use a “two-phase” memory model, one with an unbounded memory and corresponding unbounded integer type, and one with a finite memory; the connection between the two levels is made explicit by a notion of refinement that handles out-of-memory behaviors. This approach allows for more optimizations to be performed and establishes a clear boundary between the idealized semantics of a program and the implementation of that program on finite hardware.<p>
+The two-phase memory model has been incorporated into an LLVM IR semantics, demonstrating its utility in practice in the context of a low-level language with features like <tt>undef</tt> and <tt>bitcast</tt>. This yields infinite and finite memory versions of the language semantics that are proven to be in refinement with respect to out-of-memory behaviors. Each semantics is accompanied by a verified executable reference interpreter. The semantics justify optimizations, such as dead-alloca-elimination, that were previously impossible or difficult to prove correct.
+ 
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="CHHZZ23">9</a>]
+</td>
+<td class="bibtexitem">
+Nicolas Chappe, Paul He, Ludovic Henrio, Yannick Zakowski, and Steve Zdancewic.
+ <b>Choice Trees: Representing Nondeterministic, Recursive, and
+  Impure Programs in Coq</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, 7(POPL), 2023.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/CHHZZ23.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+ This paper introduces Choice Trees (CTrees), a monad for modeling
+                  nondeterministic, recursive, and impure programs in Coq.
+                  Inspired by Xia et al.'s ITrees, this novel data structure
+                  embeds computations into coinductive trees with three kind of
+                  nodes: external events, and two variants of nondeterministic
+                  branching.  This apparent redundancy allows us to provide
+                  shallow embedding of denotational models with internal choice
+                  in the style of CCS, while recovering an inductive LTS view of
+                  the computation.  CTrees inherit a vast collection of
+                  bisimulation and refinement tools, with respect to which we
+                  establish a rich equational theory.  We connect CTrees to the
+                  ITrees infrastructure by showing how a monad morphism
+                  embedding the former into the latter permits to use CTrees to
+                  implement nondeterministic effects.  We demonstrate the
+                  utility of CTrees by using them to model concurrency semantics
+                  in two case studies: CCS and cooperative multithreading.  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="RHOZ23">10</a>]
+</td>
+<td class="bibtexitem">
+Nick Rioux, Xuejing Huang, Bruno&nbsp;C. d.&nbsp;S.&nbsp;Oliviera, and Steve Zdancewic.
+ <b>A Bowtie for a Beast: Overloading, Eta Expansion, and
+  Extensible Data Types in F</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, 7(POPL), 2023.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/RHOZ23.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+The typed merge operator offers the promise of a compositional style of statically-typed programming in which solutions to the expression problem arise naturally. This approach, dubbed compositional programming, has recently been demonstrated by Zhang et al.<p>
+Unfortunately, the merge operator is an unwieldy beast. Merging values from overlapping types may be ambiguous, so disjointness relations have been introduced to rule out undesired nondeterminism and obtain a well-behaved semantics. Past type systems using a disjoint merge operator rely on intersection types, but extending such systems to include union types or overloaded functions is problematic: naively adding either reintroduces ambiguity. In a nutshell: the elimination forms of unions and overloaded functions require values to be distinguishable by case analysis, but the merge operator can create exotic values that violate that requirement.<p>
+This paper presents F, a core language that demonstrates how unions, intersections, and overloading can all coexist with a tame merge operator. The key is an underlying design principle that states that any two inhabited types can support either the deterministic merging of their values, or the ability to distinguish their values, but never both. To realize this invariant, we decompose previously studied notions of disjointness into two new, dual relations that permit the operation that best suits each pair of types. This duality respects the polarization of the type structure, yielding an expressive language that we prove to be both type safe and deterministic.<p>
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="LX+22">11</a>]
+</td>
+<td class="bibtexitem">
+Mohsen Lesani, Li-Yao Xia, Anders Kaseorg, Christian&nbsp;J. Bell, Adam Chlipala,
+  Benjamin&nbsp;C. Pierce, and Steve Zdancewic.
+ <b>C4: Verified Transactional Objects</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, OOPSLA, 2022.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/LX+22.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+  Transactional objects combine the performance of classical concurrent objects with the high-level programmability of transactional memory. However, verifying the correctness of transactional objects is tricky, requiring
+reasoning simultaneously about classical concurrent objects, which guarantee the atomicity of individual
+methodsÐthe property known as linearizabilityÐand about software-transactional-memory libraries, which
+guarantee the atomicity of user-defined sequences of method callsÐor serializability.
+We present a formal-verification framework called C4, built up from the familiar notion of linearizability
+and its compositional properties, that allows proof of both kinds of libraries, along with composition of
+theorems from both styles to prove correctness of applications or further libraries. We apply the framework
+in a significant case study, verifying a transactional set object built out of both classical and transactional
+components following the technique of transactional predication; the proof is modular, reasoning separately
+about the transactional and nontransactional parts of the implementation. Central to our approach is the use
+of syntactic transformers on interaction treesÐi.e., transactional libraries that transform client code to enforce
+particular synchronization disciplines. Our framework and case studies are mechanized in Coq.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="YZZ22">12</a>]
+</td>
+<td class="bibtexitem">
+Irene Yoon, Yannick Zakowski, and Steve Zdancewic.
+ <b>Formal Reasoning About Layered Monadic Interpreters</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, 6(ICFP), 2022.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/YZZ22.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+Monadic computations built by interpreting, or &ldquo;handling,&rdquo; operations of a
+  free monad, are a compelling formalism for modeling language semantics and
+  defining the behaviors of effectful systems, especially in dependent type
+  theories such as Coq's.  The resulting layered semantics offer the promise of
+  modular reasoning principles based on the equational theory of the underlying
+  monads. However, there are a number of obstacles to using such layered
+  interpreters in practice. With more layers comes more boilerplate and glue
+  code needed to define the monads and interpreters involved. That overhead is
+  compounded by the need to define (and justify) the relational reasoning
+  principles that characterize the equivalences at each layer.<p>
+  This paper addresses these problems by significantly extending the
+  capabilities of the Coq <i>interaction trees</i> (ITrees) library, which
+  supports layered monadic interpreters.  We characterize a rich class of
+  &ldquo;interpretable monads&rdquo;---obtained by applying monad transformers to
+  ITrees---and show how to generically lift interpreters through them.  We
+  also introduce a corresponding framework for relational reasoning about
+  &ldquo;equivalence of monads up to a relation <em>R</em>.&rdquo; This collection of
+  typeclasses, instances, new reasoning principles, and tactics greatly
+  generalizes the existing theory of the ITrees library, eliminating large
+  amounts of unwieldy boilerplate code and dramatically simplifying proofs.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="SZ21">13</a>]
+</td>
+<td class="bibtexitem">
+Lucas Silver and Steve Zdancewic.
+ <b>Dijkstra Monads Forever: Termination-Sensitive Specifications
+  for Interaction Trees</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, 5(POPL),
+  January 2021.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/SZ21.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+This paper extends the Dijkstra monad framework, designed for writing specifications over effectful programs using monadic effects, to handle termination sensitive specifications over interactive programs. We achieve this by introducing base specification monads for non-terminating programs with uninterpreted events. We model such programs using interaction trees, a coinductive datatype for representing programs with algebraic effects in Coq, which we further develop by adding trace semantics. We show that this approach subsumes typical, simple proof principles. The framework is implemented as an extension of the Interaction Trees Coq library.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZB+21">14</a>]
+</td>
+<td class="bibtexitem">
+Yannick Zakowski, Calvin Beck, Irene Yoon, Ilya Zaichuk, Vadim Zaliva, and
+  Steve Zdancewic.
+ <b>Modular, Compositional, and Executable Formal Semantics for
+  LLVM IR</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, 5(ICFP), 2021.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZB+21.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+This paper presents a novel formal semantics, mechanized in Coq, for a large, sequential subset of the LLVM IR. In contrast to previous approaches, which use relationally-specified operational semantics, this new semantics is based on monadic interpretation of <i>interaction trees</i>, a structure that provides a more compositional approach to defining language semantics while retaining the ability to extract an executable interpreter. Our semantics handles many of the LLVM IR’s non-trivial language features and is constructed modularly in terms of <i>event handlers</i>, including those that deal with nondeterminism in the specification. We show how this semantics admits compositional reasoning principles derived from the interaction trees equational theory of weak bisimulation, which we extend here to better deal with nondeterminism, and we use them to prove that the extracted reference interpreter faithfully refines the semantic model. We validate the correctness of the semantics by evaluating it on unit tests and LLVM IR programs generated by HELIX.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="HW+21">15</a>]
+</td>
+<td class="bibtexitem">
+Paul He, Eddy Westbrook, Brent Carmer, Chris Phifer, Valentin Robert, Karl
+  Smeltzer, Andrei&nbsp;Andrei &#x015E;tef&#x103;nescu, Aaron Tomb, Adam Wick, Matthew
+  Yacavone, and Steve Zdancewic.
+ <b>A Type System for Extracting Functional Specifications from
+  Memory-Safe Imperative Programs</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, OOPSLA, 2021.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/HW+21.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+  Verifying imperative programs is hard. A key difficulty is that the specification of what an imperative program does is often intertwined with details about pointers and imperative state. Although there are a number of powerful separation logics that allow the details of imperative state to be captured and managed, these details are complicated and reasoning about them requires significant time and expertise. In this paper, we take a different approach: a memory-safe type system that, as part of type-checking, extracts functional specifications from imperative programs. This disentangles imperative state, which is handled by the type system, from functional specifications, which can be verified without reference to pointers. A key difficulty is that sometimes memory safety depends crucially on the functional specification of a program; e.g., an array index is only memory-safe if the index is in bounds. To handle this case, our specification extraction inserts dynamic checks into the specification. Verification then requires the additional proof that none of these checks fail. However, these checks are in a purely functional language, and so this proof also requires no reasoning about pointers.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="XZHH+20">16</a>]
+</td>
+<td class="bibtexitem">
+Li-yao Xia, Yannick Zakowski, Paul He, Chung-Kil Hur, Gregory Malecha,
+  Benjamin&nbsp;C. Pierce, and Steve Zdancewic.
+ <b>Interaction Trees</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, 4(POPL),
+  January 2020.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/XZHH+20.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+<i>Interaction trees</i> (ITrees) are a general-purpose data structure for representing the behaviors of recursive programs that interact with their environments. A coinductive variant of &ldquo;free monads,&rdquo; ITrees are built out of uninterpreted events and their continuations. They support compositional construction of interpreters from <i>event handlers</i>, which give meaning to events by defining their semantics as monadic actions. ITrees are expressive enough to represent impure and potentially nonterminating, mutually recursive computations, while admitting a rich equational theory of equivalence up to weak bisimulation. In contrast to other approaches such as relationally specified operational semantics, ITrees are executable via code extraction, making them suitable for debugging, testing, and implementing software artifacts that are amenable to formal verification.
+We have implemented ITrees and their associated theory as a Coq library, mechanizing classic domain- and category-theoretic results about program semantics, iteration, monadic structures, and equational reasoning. Although the internals of the library rely heavily on coinductive proofs, the interface hides these details so that clients can use and reason about ITrees without explicit use of Coq’s coinduction tactics.
+To showcase the utility of our theory, we prove the termination-sensitive correctness of a compiler from a simple imperative source language to an assembly-like target whose meanings are given in an ITree-based denotational semantics. Unlike previous results using operational techniques, our bisimulation proof follows straightforwardly by structural induction and elementary rewriting via an equational theory of combinators for control-flow graphs.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="RZ20">17</a>]
+</td>
+<td class="bibtexitem">
+Nick Rioux and Steve Zdancewic.
+ <b>Computation Focusing</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, 5(ICFP), 2020.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/RZ20.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+Focusing is a technique from proof theory that exploits type
+                  information to prune inessential nondeterminism from proof
+                  search procedures. Viewed through the lens of the Curry-Howard
+                  correspondence, a focused typing derivation yields terms in
+                  normal form. This paper explores how to exploit focusing for
+                  reasoning about contextual equivalences and full
+                  abstraction. We present a focused polymorphic
+                  call-by-push-value calculus and prove a computational
+                  completeness result: for every well-typed term, there exists a
+                  focused term that is &beta;&eta;-equivalent to it. This completeness
+                  result yields a powerful way to refine the context lemmas for
+                  establishing contextual equivalences, cutting down the set
+                  that must be considered to just focused contexts. The paper
+                  demonstrates the application of focusing to establish program
+                  equivalences, including free theorems. It also uses focusing
+                  to prove full abstraction of a translation of the pure, total
+                  call-by-push-value language into a language with divergence
+                  and simple effect types, yielding a novel solution to a
+                  simple-to-state, but hitherto difficult to solve problem.  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MM+19">18</a>]
+</td>
+<td class="bibtexitem">
+Anders Miltner, Solomon Maina, Kathleen Fisher, Benjamin&nbsp;C. Pierce, David
+  Walker, and Steve Zdancewic.
+ <b>Synthesizing Symmetric Lenses</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, 3(ICFP), 2019.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/MM+19.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Lenses are programs that can be run both "front to back" and "back to front," allowing updates to either their source or their target data to be transferred in both directions. Since their introduction by Foster et al., lenses have been extensively studied, extended, and applied. Recent work has also demonstrated how techniques from type-directed program synthesis can be used to efficiently synthesize a simple class of lenses—so-called bijective lenses over string data—given a pair of types (regular expressions) and a small number of examples.<p>
+We extend this synthesis algorithm to a much broader class of lenses, called simple symmetric lenses, including all bijective lenses, all of the popular category of "asymmetric" lenses, and a rich subset of the more powerful “symmetric lenses” proposed by Hofmann et al. Intuitively, simple symmetric lenses allow some information to be present on one side but not the other and vice versa. They are of independent theoretical interest, being the largest class of symmetric lenses that do not rely on persistent internal state.<p>
+Synthesizing simple symmetric lenses is substantially more challenging than synthesizing bijective lenses: Since some of the information on each side can be “disconnected” from the other side, there will, in general, be many lenses that agree with a given example. To guide the search process, we use stochastic regular expressions and ideas from information theory to estimate the amount of information propagated by a candidate lens, generally preferring lenses that propagate more information, as well as user annotations marking parts of the source and target data structures as either irrelevant or essential.<p>
+We describe an implementation of simple symmetric lenses and our synthesis procedure as extensions to the Boomerang language. We evaluate its performance on 48 benchmark examples drawn from Flash Fill, Augeas, the bidirectional programming literature, and electronic file format synchronization tasks. Our implementation can synthesize each of these lenses in under 30 seconds.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MFP+17">19</a>]
+</td>
+<td class="bibtexitem">
+Anders Miltner, Kathleen Fisher, Benjamin&nbsp;C. Pierce, David Walker, and Steve
+  Zdancewic.
+ <b>Synthesizing Bijective Lenses</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, 2(POPL),
+  January 2018.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/MFP+17.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Bidirectional transformations between different data representations
+occur frequently in modern software systems.  They appear as serializers and
+deserializers, as parsers and pretty printers, as database views and view
+updaters, and as a multitude of different kinds of ad hoc data converters. 
+Manually building bidirectional transformations---by writing two separate
+functions that are intended to be inverses---is tedious and error prone.
+A better approach is to use a domain-specific language in
+which both directions can be written as a single expression.  However,
+these domain-specific languages can be difficult to program in, requiring
+programmers to manage fiddly details while working in a complex type system.<p>
+We present an alternative approach.  
+Instead of coding transformations manually, we synthesize them from
+declarative format descriptions and examples.
+Specifically,
+we present <em><em>Optician</em></em>, a tool for type-directed synthesis of bijective
+string transformers.   The inputs to Optician are a pair of ordinary
+regular expressions representing two data formats
+and a few concrete examples for disambiguation.  The output is a well-typed
+program in Boomerang (a bidirectional language based on the
+theory of <em>lenses</em>).
+The main technical challenge involves navigating the vast program search
+space efficiently.  In particular, and unlike most prior work on type-directed 
+synthesis, our system operates in the context of a language with a rich equivalence
+relation on types (the theory of regular expressions).  Consequently, program
+synthesis requires search in two dimensions:  First, our synthesis algorithm must
+find a pair of &ldquo;syntactically compatible types,&rdquo; and second, using the structure
+of those types, it must find a type- and example-compliant term.  Our key insight is
+that it is possible to
+reduce the size of this search space <em>without losing any computational power</em>
+by defining a new language of lenses designed
+specifically for synthesis.  The new language is free from arbitrary function
+composition and operates only over types and terms in a new disjunctive normal form.
+We prove (1) our new language
+is just as powerful as a more natural, compositional, and declarative
+language and (2) our synthesis algorithm is sound and complete with respect to the
+new language.  We also demonstrate empirically
+that our new language changes the synthesis problem from
+one that admits intractable solutions to one that admits 
+highly efficient solutions, able to synthesize intricate lenses
+between complex file formats in seconds.  
+We evaluate <em>Optician</em> on a benchmark suite of 39 examples
+that includes both microbenchmarks and realistic examples derived from
+other data management systems including Flash Fill, a tool
+for synthesizing string transformations in spreadsheets, and Augeas, a tool
+for bidirectional processing of Linux system configuration files.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MMF+18">20</a>]
+</td>
+<td class="bibtexitem">
+Solomon Maina, Anders Miltner, Kathleen Fisher, Benjamin&nbsp;C. Pierce, David
+  Walker, and Steve Zdancewic.
+ <b>Synthesizing Quotient Lenses</b>.
+ <em>Proceedings of the ACM on Programming Languages</em>, 2(ICFP), 2018.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/MMF+18.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+<em>Quotient lenses</em> are bidirectional transformations whose correctness
+laws are &ldquo;loosened&rdquo; by specified equivalence relations, allowing
+inessential details in concrete data formats to be suppressed. 
+For example, a programmer could use a quotient lens to define 
+a transformation that ignores the order of fields in XML data, so
+that two XML files with the same fields but in different orders would be
+considered the same, allowing a single, simple program to handle them both. 
+Building on a recently published algorithm for synthesizing plain bijective
+lenses from high-level specifications, we show how to synthesize bijective
+quotient lenses in three steps. First, we introduce <em>quotient regular
+  expressions</em> (QREs), annotated regular expressions that conveniently mark
+inessential aspects of string data formats; each QRE specifies,
+simulteneously, a regular language and an equivalence relation on it.
+Second, we introduce <em>QRE lenses</em>, i.e., lenses mapping between QREs.
+Our key technical result is a proof that every QRE lens can be transformed
+into a functionally equivalent lens that canonizes source and target data just
+at the &ldquo;edges&rdquo; and that uses a bijective lens to map between the respective
+canonical elements; no internal canonization occurs in a lens in this normal
+form. Third, we leverage this normalization theorem to <em>synthesize</em> QRE
+lenses from a pair of QREs and example input-output pairs, reusing earlier work
+on synthesizing plain bijective lenses. We have implemented QREs and QRE lens
+synthesis as an extension to the bidirectional programming language Boomerang.
+We evaluate the effectiveness of our approach by synthesizing QRE lenses
+between various real-world data formats in the Optician benchmark suite.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ABCP+17">21</a>]
+</td>
+<td class="bibtexitem">
+Andrew&nbsp;W. Appel, Lennart Beringer, Adam Chlipala, Benjamin&nbsp;C. Pierce, Zhong
+  Shao, Stephanie Weirich, and Steve Zdancewic.
+ <b>Position paper: The Science of Deep Specification</b>.
+ <em>Philosophical Transactions of the Royal Society of London A:
+  Mathematical, Physical and Engineering Sciences</em>, 375(2104), 2017.
+[&nbsp;<a href="https://doi.org/10.1098/rsta.2016.0331">DOI</a>&nbsp;| 
+<a href="http://rsta.royalsocietypublishing.org/content/375/2104/20160331">http</a>&nbsp;]
+<blockquote><font size="-1">
+We introduce our efforts within the project "The science of deep specification" to work out the key formal underpinnings of industrial-scale formal specifications of software and hardware components, anticipating a world where large verified systems are routinely built out of smaller verified components that are also used by many other projects. We identify an important class of specification that has already been used in a few experiments that connect strong component-correctness theorems across the work of different teams. To help popularize the unique advantages of that style, we dub it deep specification, and we say that it encompasses specifications that are rich, two-sided, formal and live (terms that we define in the article). Our core team is developing a proof-of-concept system (based on the Coq proof assistant) whose specification and verification work is divided across largely decoupled subteams at our four institutions, encompassing hardware microarchitecture, compilers, operating systems and applications, along with cross-cutting principles and tools for effective specification. We also aim to catalyse interest in the approach, not just by basic researchers but also by users in industry.This article is part of the themed issue "Verified trustworthy software systems".
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="VZ14a">22</a>]
+</td>
+<td class="bibtexitem">
+B.&nbsp;Valiron and S.&nbsp;Zdancewic.
+ <b>Modeling Simply-Typed Lambda Calculi in the Category of Finite
+  Vector Spaces</b>.
+ <em>Scientific Annals of Computer Science</em>, 24(2):325--368, 2014.
+[&nbsp;<a href="https://doi.org/10.7561/SACS.2014.2.325">DOI</a>&nbsp;| 
+<a href="http://www.infoiasi.ro/bin/download/Annals/XXIV2/XXIV2_5.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+ In this paper we use finite vector spaces (finite
+                  dimension, over finite fields) as a non-standard
+                  computational model of linear logic. We first define
+                  a simple, finite PCF-like lambda-calculus with
+                  booleans, and then we discuss two finite models, one
+                  based on finite sets and the other on finite vector
+                  spaces. The first model is shown to be fully
+                  complete with respect to the operational semantics
+                  of the language, while the second model is not. We
+                  then develop an algebraic extension of the finite
+                  lambda calculus and study two operational semantics:
+                  a call-by-name and a call-by-value. These
+                  operational semantics are matched with their
+                  corresponding natural denotational semantics based
+                  on finite vector spaces. The relationship between
+                  the various semantics is analyzed, and several
+                  examples based on Church numerals are presented.  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="LZ10">23</a>]
+</td>
+<td class="bibtexitem">
+Peng Li and Steve Zdancewic.
+ <b>Arrows for Secure Information Flow</b>.
+ <em>Theoretical Computer Science</em>, 411(19):1974--1994, 2010.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/LZ10.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+This paper presents an embedded security sublanguage for enforcing information- 
+flow policies in the standard Haskell programming language. The sublanguage pro- 
+vides useful information-flow control mechanisms including dynamic security lat- 
+tices, run-time code privileges and declassification all without modifying the base 
+language. This design avoids the redundant work of producing new languages, low- 
+ers the threshold for adopting security-typed languages, and also provides great 
+flexibility and modularity for using security-policy frameworks. <p>
+The embedded security sublanguage is designed using a standard combinator in- 
+terface called <i>arrows</i>. Computations constructed in the sublanguage have static and 
+explicit control-flow components, making it possible to implement information-flow 
+control using static-analysis techniques at run time, while providing strong secu- 
+rity guarantees. This paper presents a formal proof that our embedded sublanguage 
+provides noninterference, a concrete Haskell implementation and an example appli- 
+cation demonstrating the proposed techniques.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="TZ08">24</a>]
+</td>
+<td class="bibtexitem">
+Stephen Tse and Steve Zdancewic.
+ <b>Run-time principals in information-flow type systems</b>.
+ <em>Transactions on Programming Languages and Systems</em>, 30(1):6,
+  2008.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/TZ08.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+  Information-flow type systems are a promising approach for enforcing
+  strong end-to-end confidentiality and integrity policies. Such
+  policies, however, are usually specified in terms of static
+  information---data is labeled  _high_ or _low_ security at
+  compile time.  In practice, the confidentiality of data may depend
+  on information available only while the system is running.
+  
+  This paper studies language support for _run-time principals_,
+  a mechanism for specifying security policies that depend on which
+  principals interact with the system.  We establish the basic
+  property of noninterference for programs written in such language,
+  and use run-time principals for specifying run-time authority in
+  downgrading mechanisms such as declassification.
+  
+  In addition to allowing more expressive security policies, run-time
+  principals enable the integration of language-based security
+  mechanisms with other existing approaches such as Java stack
+  inspection and public key infrastructures. We sketch an
+  implementation of run-time principals via public keys such that
+  principal delegation is verified by certificate chains.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MSZ06">25</a>]
+</td>
+<td class="bibtexitem">
+Andrew&nbsp;C. Myers, Andrei Sabelfeld, and Steve Zdancewic.
+ <b>Enforcing Robust Declassification and Qualified Robustness</b>.
+ <em>Journal of Computer Security</em>, 14(2):157--196, 2006.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/MSZ06.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+  Noninterference requires that there
+  is no information flow from sensitive to public data in a given
+  system. However, many systems 
+  release sensitive information as part of their
+  intended function and therefore violate noninterference.
+  To control information flow while permitting
+  information release, some systems have a downgrading or
+  declassification mechanism, but this creates the danger
+  that it may cause unintentional information release.
+  This paper shows that a robustness property
+  can be used to characterize programs in which declassification mechanisms
+  cannot be controlled by attackers to release more information than
+  intended. It describes a simple way to provably enforce this robustness
+  property through a type-based compile-time program analysis. The paper also
+  presents a generalization of robustness that
+  supports upgrading (endorsing) data integrity.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="LWZ06">26</a>]
+</td>
+<td class="bibtexitem">
+Jay Ligatti, David Walker, and Steve Zdancewic.
+ <b>A Type-theoretic Interpretation of Pointcuts and Advice</b>.
+ <em>Science of Computer Programming: Special Issue on Foundations of
+  Aspect-Oriented Programming</em>, pages 240--266, 2006.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/LWZ06.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+This paper defines the semantics of MinAML, an idealized
+aspect-oriented programming language, by giving a type-directed
+translation from a user-friendly external language to a compact,
+well-defined core language. We argue that our framework is an
+effective way to give semantics to aspect-oriented programming
+languages in general because the translation eliminates shallow
+syntactic differences between related constructs and permits
+definition of a simple and elegant core language.<p>
+The core language extends the simply-typed lambda calculus with two
+central new abstractions: explicitly labeled program points and
+first-class advice.  The labels serve both to trigger advice and to
+mark continuations that the advice may return to.  These constructs
+are defined orthogonally to the other features of the language and
+we show that our abstractions can be used in both functional and
+object-oriented contexts.  We prove Preservation and Progress lemmas
+for our core language and show that the translation from MinAML source
+into core is type-preserving.  We also consider several extensions to
+our basic framework including a general mechanism for analyzing the
+current call stack. 
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZZNM02">27</a>]
+</td>
+<td class="bibtexitem">
+Steve Zdancewic, Lantian Zheng, Nathaniel Nystrom, and Andrew&nbsp;C. Myers.
+ <b>Secure Program Partitioning</b>.
+ <em>Transactions on Computer Systems</em>, 20(3):283--328, 2002.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZZNM02.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/ZZNM02.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+This paper presents secure program partitioning, a language-based
+technique for protecting confidential data during computation in
+distributed systems containing mutually untrusted hosts. Confidentiality
+and integrity policies can be expressed by annotating programs with
+security types that constrain information flow; these programs can then
+be partitioned automatically to run securely on heterogeneously trusted
+hosts. The resulting communicating subprograms collectively implement
+the original program, yet the system as a whole satisfies the security
+requirements of participating principals without requiring a universally
+trusted host machine.  The experience in applying this methodology and
+the performance of the resulting distributed code suggest that this is a
+promising way to obtain secure distributed computation.<p>
+This article is an expanded version of the published paper &ldquo;Untrusted
+Hosts and Confidentiality: Secure Program Partitioning&rdquo;.
+The main difference between the two is Appendix A, which
+contains a correctness proof for the control-transfer protocols described
+in Section 5.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZM02">28</a>]
+</td>
+<td class="bibtexitem">
+Steve Zdancewic and Andrew&nbsp;C. Myers.
+ <b>Secure Information Flow via Linear Continuations</b>.
+ <em>Higher Order and Symbolic Computation</em>, 15(2/3):209--234, 2002.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZM02.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/ZM02.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+<em>Security-typed languages</em> enforce secrecy or integrity policies by
+type-checking.  This paper investigates continuation-passing style (CPS) as a
+means of proving that such languages enforce noninterference and as a first
+step towards understanding their compilation.  We present a low-level, secure
+calculus with higher-order, imperative features and <em>linear
+continuations</em>.<p>
+Linear continuations impose a stack discipline on the control flow of
+programs.  This additional structure in the type system lets us establish a
+strong information-flow security property called <em>noninterference</em>.  We prove
+that our CPS target language enjoys the noninterference property and we show
+how to translate secure high-level programs to this low-level
+language.  This noninterference proof is the first of its kind for a
+language with higher-order functions and state.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="GMZ00">29</a>]
+</td>
+<td class="bibtexitem">
+Dan Grossman, Greg Morrisett, and Steve Zdancewic.
+ <b>Syntactic Type Abstraction</b>.
+ <em>Transactions on Programming Languages and Systems</em>,
+  22(6):1037--1080, November 2000.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/GMZ00.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/GMZ00.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+Software developers often structure programs in such a
+way that different pieces of code constitute distinct
+principals. Types help define the protocol by which these principals
+interact. In particular, abstract types allow a principal to make
+strong assumptions about how well-typed clients use the facilities
+that it provides. We show how the notions of principals and type
+abstraction can be formalized within a language. Different principals
+can know the implementation of different abstract types. We use
+additional syntax to track the flow of values with abstract types
+during the evaluation of a program and demonstrate how this framework
+supports syntactic proofs (in the style of subject reduction) for
+type-abstraction properties. Such properties have traditionally
+required semantic arguments; using syntax avoids the need to build a
+model for the language. We present various typed lambda calculi with
+principals, including versions that have mutable state and recursive types.
+</font></blockquote>
+
+</td>
+</tr>
+</table>
+
+
+<h3>Invited Papers</h3>
+
+<!-- This document was automatically generated with bibtex2html 1.99
+     (see http://www.lri.fr/~filliatr/bibtex2html/),
+     with the following command:
+     bibtex2html -d -r -nodoc -nobibsource -both -nf ps PS -nf pdf PDF -citefile hinvited.keys -s bold-title -o hinvited /Users/stevez/Work/professional/resume/content/zdancewic.bib  -->
+
+
+<table>
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="Zda04">1</a>]
+</td>
+<td class="bibtexitem">
+Steve Zdancewic.
+ <b>Challenges for Information-flow Security</b>.
+ In <em>Proceedings of the 1st International Workshop on the
+  Programming Language Interference and Dependence (PLID'04)</em>, 2004.
+ (5 pages).
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/Zda04.pdf">PDF</a>&nbsp;]
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="Zda03">2</a>]
+</td>
+<td class="bibtexitem">
+Steve Zdancewic.
+ <b>A Type System for Robust Declassification</b>.
+ In <em>Proceedings of the Nineteenth Conference on the Mathematical
+  Foundations of Programming Semantics (MFPS)</em>. Electronic Notes in Theoretical
+  Computer Science, March 2003.
+ (16 pages).
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/Zda03.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/Zda03.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+Language-based approaches to information security have led to the
+  development of <em>security type systems</em> that permit the
+  programmer to describe confidentiality policies on data.  Security
+  type systems are usually intended to enforce <em>noninterference</em>,
+  a property that requires that high-security information not affect
+  low-security computation.  However, in practice, noninterference is
+  often too restrictive---the desired policy does permit some
+  information leakage.<p>
+  
+  To compensate for the strictness of noninterference, practical
+  approaches include some mechanism for <em>declassifying</em>
+  high-security information.  But such declassification is potentially
+  dangerous, and its use should be restricted to prevent unintended
+  information leaks. Zdancewic and Myers previously introduced the
+  notion of <em>robust declassification</em> in an attempt to capture
+  the desired restrictions on declassification, but that work did not
+  propose a method for determining when a program satisfies the robust
+  declassification condition.<p>
+  This paper motivates robust declassification and shows that a simple
+  change to a security type system can enforce it.  The idea is to
+  extend the lattice of security labels to include <em>integrity</em>
+  constraints as well as confidentiality constraints and then require
+  that the decision to perform a declassification have high
+  integrity.
+</font></blockquote>
+
+</td>
+</tr>
+</table>
+
+
+<h3>Conference and Selective Workshop Papers</h3>
+
+<!-- This document was automatically generated with bibtex2html 1.99
+     (see http://www.lri.fr/~filliatr/bibtex2html/),
+     with the following command:
+     bibtex2html -d -r -nodoc -nobibsource -both -nf ps PS -nf pdf PDF -citefile hsconf.keys -s bold-title -o hsconf /Users/stevez/Work/professional/resume/content/zdancewic.bib  -->
+
+
+<table>
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="BCZ25">1</a>]
+</td>
+<td class="bibtexitem">
+Calvin Beck, Hanxi Chen, and Steve Zdancewic.
+ <b>Vellvm: Formalizing the informal LLVM (Experience Report)</b>.
+ In <em>Proceedings of the 17th NASA Formal Methods Symposium</em>,
+  2025.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/nfm25.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+  This report presents our methodology for and experience with
+  formalizing a specification of LLVM IR in the Verified LLVM Project
+  (Vellvm). Vellvm provides a specification for a large, practical
+  subset of LLVM IR in the Rocq Proof Assistant in the support of
+  verified compilers and program transformations. Program
+  transformations often rely on the subtle details, and as a result
+  Vellvm's semantics are quite comprehensive: for instance we provide a
+  sophisticated low-level memory model to support low-level
+  operations, such as casts between pointers and integers, and justify
+  optimizations in their presence. Our
+  approach implements the semantics via <i>monadic interpreters</i>,
+  which rely on a coinductively-defined data structure called
+  <em>ITrees</em>. Crucially, this methodology supports the extraction
+  of an executable interpreter, proved to refine the specification.
+  We use the reference interpreter to validate the accuracy of the
+  formalization, employing random differential testing between Clang
+  and Vellvm implemented in our own LLVM IR program generator
+  (GenLLVM), as well as via state-of-the-art C compiler testing
+  frameworks (and ). Such testing has found bugs in
+  both the Vellvm semantics and Clang. We believe that tools from the
+  Vellvm project can be useful for other LLVM IR-related projects, and
+  that the overall methodology applies to other formal verification
+  efforts.
+ 
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="KY+25">2</a>]
+</td>
+<td class="bibtexitem">
+Kean Chen, Yuhao Liu, Wang Fang, Jennifer Paykin, Xin-Chuan Wu, Albert Schmitz,
+  Steve Zdancewic, and Gushu Li.
+ <b>Verifying Fault-Tolerance of Quantum Error Correction Codes</b>.
+ In Ruzica Piskac and Zvonimir Rakamari&#x107;, editors, <em>Computer
+  Aided Verification</em>, pages 3--27, Cham, 2025. Springer Nature Switzerland.
+[&nbsp;<a href="https://arxiv.org/pdf/2501.14380">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+Quantum computers have advanced rapidly in qubit count and gate fidelity. However, large-scale fault-tolerant quantum computing still relies on quantum error correction code (QECC) to suppress noise. Manually or experimentally verifying the fault-tolerance property of complex QECC implementation is impractical due to the vast error combinations. This paper formalizes the fault-tolerance of QECC implementations within the language of quantum programs. By incorporating the techniques of quantum symbolic execution, we provide an automatic verification tool for quantum fault-tolerance. We evaluate and demonstrate the effectiveness of our tool on a universal set of logical operations across different QECCs.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="SH+23">3</a>]
+</td>
+<td class="bibtexitem">
+Lucas Silver, Paul He, Ethan Cecchetti, Andrew&nbsp;K. Hirsch, and Steve Zdancewic.
+ <b>Semantics for Noninterference with Interaction Trees</b>.
+ In <em>Proceedings of the 37th Annual European Conference on
+  Object-Oriented Programming (ECOOP 2023)</em>, 2023.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/SH+23.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+  <em>Noninterference</em> is the strong information-security property that a program does not leak secrets through publicly-visible behavior. In the presence of effects such as nontermination, state, and exceptions, reasoning about noninterference quickly becomes subtle. We advocate using <em>interaction trees (ITrees)</em> to provide compositional mechanized proofs of noninterference for multi-language, effectful, nonterminating programs, while retaining executability of the semantics. We develop important foundations for security analysis with ITrees: two <em>indistinguishability</em> relations, leading to two standard notions of noninterference with adversaries of different strength, along with metatheory libraries for reasoning about each. We demonstrate the utility of our results using a simple imperative language with embedded assembly, along with a compiler into that assembly language.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MBZB23">4</a>]
+</td>
+<td class="bibtexitem">
+Stephen Mell, Favyen Bastani, Steve Zdancewic, and Osbert Bastani.
+ <b>Synthesizing Trajectory Queries from Examples</b>.
+ In <em>Computer Aided Verification - 35th International Conference,
+  CAV</em>, 2023.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/MBZB23.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+Data scientists often need to write programs to process pre-
+dictions of machine learning models, such as object detections and trajec-
+tories in video data. However, writing such queries can be challenging due
+to the fuzzy nature of real-world data; in particular, they often include
+real-valued parameters that must be tuned by hand. We propose a novel
+framework called Quivr that synthesizes trajectory queries matching a
+given set of examples. To efficiently synthesize parameters, we introduce
+a novel technique for pruning the parameter space and a novel quanti-
+tative semantics that makes this more efficient. We evaluate Quivr on
+a benchmark of 17 tasks, including several from prior work, and show
+both that it can synthesize accurate queries for each task and that our
+optimizations substantially reduce synthesis time.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="DTZ23b">5</a>]
+</td>
+<td class="bibtexitem">
+Lawrence Dunn, Val Tannen, and Steve Zdancewic.
+ <b>Syntax Monads for the Working Formal Metatheorist</b>.
+ In <em>Proceedings of the 6th International Conference on Applied
+  Category Theory (ACT)</em>, 2023.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/DTZ23b.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Formally verifying the properties of formal systems using a proof assistant requires justifying numerous minor lemmas about capture-avoiding substitution. Despite work on category-theoretic accounts
+of syntax and variable binding, <i>raw</i>, <i>first-order</i> representations of syntax, the kind considered by
+many practitioners and compiler frontends, have received relatively little attention. Therefore applications miss out on the benefits of category theory, such as the deeply attractive promise of reusing
+formalized infrastructural lemmas between implementations of different systems. Our Coq framework Tealeaves provides libraries of reusable infrastructure for first-order representations of variable
+binding, such as de Bruijn indices and locally nameless. In this paper we give a string-diagrammatic
+account of <i>decorated traversable monads</i> (DTMs), the key abstraction implemented by Tealeaves.
+We define DTMs as monoids of structured endofunctors before proving a representation theorem à
+la Kleisli.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="DTZ23a">6</a>]
+</td>
+<td class="bibtexitem">
+Lawrence Dunn, Val Tannen, and Steve Zdancewic.
+ <b>Tealeaves: Structured Monads for Generic First-Order Abstract
+  Syntax Infrastructure</b>.
+ In <em>14th International Conference on Interactive Theorem Proving
+  (ITP)</em>, 2023.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/DTZ23a.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Verifying the metatheory of a formal system in Coq involves a lot of tedious" infrastructural" reasoning about variable binders. We present Tealeaves, a generic framework for first-order representations of variable binding that can be used to develop this sort of infrastructure once and for all. Given a particular strategy for representing binders concretely, such as locally nameless or de Bruijn indices, Tealeaves allows developers to implement modules of generic infrastructure called backends that end users can simply instantiate to their own syntax. Our framework rests on a novel abstraction of first-order abstract syntax called a decorated traversable monad (DTM) whose equational theory provides reasoning principles that replace tedious induction on terms. To evaluate Tealeaves, we have implemented a multisorted locally nameless backend providing generic versions of the lemmas generated by LNgen. We discuss case studies where we instantiate this generic infrastructure to simply-typed and polymorphic lambda calculi, comparing our approach to other utilities.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="TMZB22">7</a>]
+</td>
+<td class="bibtexitem">
+George Tolkachev, Stephen Mell, Steve Zdancewic, and Osbert Bastani.
+ <b>Counterfactual Explanations for Natural Language Interfaces</b>.
+ In <em>60th Annual Meeting of the Association for Computational
+  Linguistics (ACL)</em>, 2022.
+ (short paper).
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/TMZB22.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+  A key challenge facing natural language interfaces is enabling users to understand the capabilities of the underlying system. We propose a novel approach for generating explanations of a natural language interface based on semantic parsing. We focus on counterfactual explanations, which are post-hoc explanations that describe to the user how they could have minimally modified their utterance to achieve their desired goal. In particular, the user provides an utterance along with a demonstration of their desired goal; then, our algorithm synthesizes a paraphrase of their utterance that is guaranteed to achieve their goal. In two user studies, we demonstrate that our approach substantially improves user performance, and that it generates explanations that more closely match the user's intent compared to two ablations.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MBZ22">8</a>]
+</td>
+<td class="bibtexitem">
+Stephen Mell, Osbert Bastani, and Steve Zdancewic.
+ <b>Ideograph: A Language for Expressing and Manipulating
+  Structured Data</b>.
+ In <em>Proceedings Twelfth International Workshop on Computing with
+  Terms and Graphs (TERMGRAPH 2022)</em>, pages 65--84. Electronic Proceedings in
+  Theoretical Computer Science, 2022.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/MBZ22.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+We introduce Ideograph, a language for expressing and manipulating structured data. Its types describe kinds of structures, such as natural numbers, lists, multisets, binary trees, syntax trees with variable binding, directed multigraphs, and relational databases. Fully normalized terms of a type correspond exactly to members of the structure, analogous to a Church-encoding. Moreover, definable operations over these structures are guaranteed to respect the structures' equivalences. In this paper, we give the syntax and semantics of the non-polymorphic subset of Ideograph, and we demonstrate how it can represent and manipulate several interesting structures.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZHK+21">9</a>]
+</td>
+<td class="bibtexitem">
+Hengchu Zhang, Wolf Honor&eacute;, Nicolas Koh, Yao Li, Yishuai Li, Li-Yao Xia,
+  Lennart Beringer, William Mansky, Benjamin Pierce, and Steve Zdancewic.
+ <b>Verifying an HTTP Key-Value Server with Interaction Trees and
+  VST</b>.
+ In Liron Cohen and Cezary Kaliszyk, editors, <em>12th International
+  Conference on Interactive Theorem Proving (ITP 2021)</em>, volume 193 of <em>
+  Leibniz International Proceedings in Informatics (LIPIcs)</em>, pages
+  32:1--32:19, Dagstuhl, Germany, 2021. Schloss Dagstuhl -- Leibniz-Zentrum
+  f&uuml;r Informatik.
+[&nbsp;<a href="https://doi.org/10.4230/LIPIcs.ITP.2021.32">DOI</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/LHK+21.pdf">PDF</a>&nbsp;| 
+<a href="https://drops.dagstuhl.de/opus/volltexte/2021/13927">http</a>&nbsp;]
+<blockquote><font size="-1">
+
+  We present a networked key-value server, implemented in C and formally verified in Coq. The server
+interacts with clients using a subset of the HTTP/1.1 protocol and is specified and verified using
+interaction trees and the Verified Software Toolchain. The codebase includes a reusable and fully
+verified C string library that provides 17 standard POSIX string functions and 17 general purpose
+non-POSIX string functions. For the KVServer socket system calls, we establish a refinement relation
+between specifications at user-space level and at CertiKOS kernel-space level.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="LPZ21">10</a>]
+</td>
+<td class="bibtexitem">
+Yishuai Li, Benjamin Pierce, and Steve Zdancewic.
+ <b>Model-Based Testing of Networked Applications</b>.
+ In <em>The ACM SIGSOFT International Symposium on Software Testing
+  and Analysis (ISSTA)</em>, 2021.
+<blockquote><font size="-1">
+
+We present a principled automatic testing framework for application-layer protocols. The key innovation is a domain-specific embedded language for writing nondeterministic models of the behavior of networked servers. These models are defined within the Coq interactive theorem prover, supporting a smooth transition from testing to formal verification.
+Given a server model, we show how to automatically derive a tester that probes the server for unexpected behaviors. We address the uncertainties caused by both the server's internal choices and the network delaying messages nondeterministically. The derived tester accepts server implementations whose possible behaviors are a subset of those allowed by the nondeterministic model.
+We demonstrate the effectiveness of this framework by using it to specify and test a fragment of the HTTP/1.1 protocol, showing that the automatically derived tester can capture RFC violations in buggy server implementations, including the latest versions of Apache and Nginx.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZHHZ20">11</a>]
+</td>
+<td class="bibtexitem">
+Yannick Zakowski, Paul He, Chung-Kil Hur, and Steve Zdancewic.
+ <b>An Equational Theory for Weak Bisimulation via Generalized
+  Parameterized Coinduction</b>.
+ In <em>Proceedings of the 9th ACM SIGPLAN International Conference
+  on Certified Programs and Proofs (CPP)</em>, January 2020.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZHHZ20.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Coinductive reasoning about infinitary structures such as streams is widely applicable. However, practical frameworks for developing coinductive proofs and finding reasoning principles that help structure such proofs remain a challenge, especially in the context of machine-checked formalization.<p>
+This paper gives a novel presentation of an equational theory for reasoning about structures up to weak bisimula- tion. The theory is both compositional, making it suitable for defining general-purpose lemmas, and also incremental, meaning that the bisimulation can be created interactively. To prove the theory’s soundness, this paper also introduces generalized parameterized coinduction, which addresses ex- pressivity problems of earlier works and provides a practical framework for coinductive reasoning. The paper presents the resulting equational theory for streams, but the technique applies to other structures too.<p>
+All of the results in this paper have been proved in Coq, and the generalized parameterized coinduction framework is available as a Coq library.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="KLL+19">12</a>]
+</td>
+<td class="bibtexitem">
+Nicolas Koh, Yao Li, Yishuai Li, Li&nbsp;yao Xia, Lennart Beringer, Wolf Honor&eacute;,
+  William Mansky, Benjamin&nbsp;C. Pierce, and Steve Zdancewic.
+ <b>From C to Interaction Trees: Specifying, Verifying, and Testing
+  a Networked Server</b>.
+ In <em>Proceedings of the 8th ACM SIGPLAN International Conference
+  on Certified Programs and Proofs (CPP)</em>, January 2019.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/KLL+19.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+We present the first formal verification of a networked server implemented
+in C.  <em>Interaction trees</em>, a general structure for representing
+reactive computations, are used to tie together disparate verification and
+testing tools (Coq, VST, and QuickChick) and to axiomatize the behavior of
+the operating system on which the server runs (CertiKOS).  The main theorem
+connects a specification of acceptable server behaviors, written in a
+straightforward &ldquo;one client at a time&rdquo; style, with the
+CompCert semantics of the C program.  The variability
+introduced by low-level buffering of messages and interleaving of multiple
+TCP connections is captured using <em>network refinement</em>, a variant of
+observational refinement.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="HHNZ19">13</a>]
+</td>
+<td class="bibtexitem">
+Marcella Hastings, Brett Hemenway, Daniel Noble, and Steve Zdancewic.
+ <b>SoK: General Purpose Compilers for Secure Multi-Party
+  Computation</b>.
+ In <em>IEEE 2019 Symposium on Security and Privacy (Oakland)</em>,
+  2019.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/HHNZ19.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Secure multi-party computation (MPC) allows a group of mutually distrustful parties to compute a joint function on their inputs 
+without revealing any information beyond the result of the computation. 
+This type of computation is extremely powerful and has wide-ranging applications in academia, industry, and government.
+Protocols for secure computation have existed for decades, but only recently have general-purpose compilers for executing MPC on arbitrary functions been developed.
+These projects rapidly improved the state of the art, and began to make MPC accessible to non-expert users. 
+However, the field is changing so rapidly that it is difficult even for experts to keep track of the varied capabilities of modern frameworks.<p>
+In this work, we survey general-purpose compilers for secure multi-party computation. 
+These tools provide high-level abstractions to describe arbitrary functions and execute secure computation protocols.
+We consider eleven systems: EMP-toolkit, Obliv-C, ObliVM, TinyGarble, SCALE-MAMBA (formerly SPDZ), Wysteria, Sharemind, PICCO, ABY, 
+Frigate and CBMC-GC.
+We evaluate these systems on a range of criteria, including language expressibility, capabilities of the cryptographic back-end, and accessibility to developers. 
+We advocate for improved documentation of MPC frameworks, standardization within the community, and make recommendations for future directions in compiler development.
+Installing and running these systems can be challenging, and for each system, we also provide a complete virtual environment (Docker container) with all the necessary dependencies 
+to run the compiler and our example programs.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="PZ19a">14</a>]
+</td>
+<td class="bibtexitem">
+Jennifer Paykin and Steve Zdancewic.
+ <b>A HoTT Quantum Equational Theory</b>.
+ In <em>The 16th International Conference on Quantum Physics and
+  Logic (QPL)</em>, 2019.
+ extended version available on arXiv.
+[&nbsp;<a href="https://arxiv.org/abs/1904.04371">http</a>&nbsp;]
+<blockquote><font size="-1">
+
+This paper presents an equational theory for the QRAM model of quantum computation, formulated as an embedded language inside of homotopy type theory. The embedded language approach is highly expressive, and reflects the style of state-of-the art quantum languages like Quipper and QWIRE. The embedding takes advantage of features of homotopy type theory to encode unitary transformations as higher inductive paths, simplifying the presentation of an equational theory. We prove that this equational theory is sound and complete with respect to established models of quantum computation.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="RGZ18">15</a>]
+</td>
+<td class="bibtexitem">
+Christine Rizkallah, Dmitri Garbuzov, and Steve Zdancewic.
+ <b>A Formal Equational Theory for Call-By-Push-Value</b>.
+ In <em>9th International Conference on Interactive Theorem Proving
+  (ITP)</em>, 2018.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/RGZ18.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+  Establishing that two programs are contextually equivalent is hard, yet
+  essential for reasoning about 
+  semantics preserving program
+  transformations such as compiler optimizations.  
+  We adapt Lassen's normal form bisimulations technique to establish the soundness of equational
+  theories for both an untyped
+  call-by-value &lambda;-calculus and a variant of Levy's call-by-push-value
+  language. We demonstrate that our equational theory significantly simplifies the verification of optimizations.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="RPLZ18">16</a>]
+</td>
+<td class="bibtexitem">
+Robert Rand, Jennifer Paykin, Dong-Ho Lee, and Steve Zdancewic.
+ <b>REQUIRE: Reasoning about Reversible Quantum Circuits</b>.
+ In <em>The 15th International Conference on Quantum Physics and
+  Logic (QPL)</em>, 2018.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/RPLZ18.pdf">PDF</a>&nbsp;]
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="PRZ17">17</a>]
+</td>
+<td class="bibtexitem">
+Jennifer Paykin, Robert Rand, and Steve Zdancewic.
+ <b>QWire: A Core Language for Quantum Circuits</b>.
+ In <em>Proc. of the ACM Symposium on Principles of Programming
+  Languages (POPL)</em>, 2017.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/PRZ17.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+  This paper introduces QWire (&ldquo;choir&rdquo;), a language for defining quantum
+  circuits and an interface for manipulating them inside of an arbitrary
+  classical host language. QWire is minimal---it contains only a
+  few primitives---and sound with respect to the physical properties entailed by
+  quantum mechanics. At the same time, QWire is expressive and highly modular
+  due to its relationship with the host language, mirroring the QRAM model
+  of computation that places a quantum computer (controlled by circuits)
+  alongside a classical computer (controlled by the host language).<p>
+  We present QWire along with its type system and operational semantics, which
+  we prove is safe and strongly normalizing whenever the host language is. We
+  give circuits a denotational semantics in terms of density matrices. Throughout, we
+  investigate examples that demonstrate the expressive power of QWire, including
+  extensions to the host language that (1) expose a general analysis framework
+  for circuits, and (2) provide dependent types.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MPZD17">18</a>]
+</td>
+<td class="bibtexitem">
+William Mansky, Yuanfeng Peng, Steve Zdancewic, and Joseph Devietti.
+ <b>Verifying Dynamic Race Detection</b>.
+ In <em>The 6th ACM SIGPLAN Conference on Certified Programs and
+  Proofs (CPP 2017)</em>, 2017.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/MPZD17.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+ 
+Writing race-free concurrent code is notoriously difficult, and data races can result in bugs that are difficult to isolate and reproduce. Dynamic race detection can catch data races that cannot (easily) be detected statically. One approach to dynamic race detection is to instrument the potentially racy code with operations that store and compare metadata, where the metadata implements some known race detection algorithm (e.g. vector-clock race detection). In this paper, we describe the process of formally verifying several algorithms for dynamic race detection. We then turn to implementations, laying out an instrumentation pass for race detection in a simple language and presenting a mechanized formal proof of its correctness: all races in a program will be caught by the instrumentation, and all races detected by the instrumentation are possible in the original program.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="RPZ17">19</a>]
+</td>
+<td class="bibtexitem">
+Robert Rand, Jennifer Paykin, and Steve Zdancewic.
+ <b><em>Q</em>wire Practice: Formal Verification of
+  Quantum Circuits in Coq</b>.
+ In <em>The 14th International Conference on Quantum Physics and
+  Logic (QPL)</em>, 2017.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/RPZ17.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+We describe an embedding of the QWIRE quantum circuit language in the Coq proof assistant. This
+allows programmers to write quantum circuits using high-level abstractions and to prove properties of
+those circuits using Coq’s theorem proving features. The implementation uses higher-order abstract
+syntax to represent variable binding and provides a type-checking algorithm for linear wire types,
+ensuring that quantum circuits are well-formed. We formalize a denotational semantics that interprets
+QWIRE circuits as superoperators on density matrices, and prove the correctness of some simple
+quantum programs.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="PZ17">20</a>]
+</td>
+<td class="bibtexitem">
+Jennifer Paykin and Steve Zdancewic.
+ <b>The Linearity Monad</b>.
+ In <em>Proceedings of the 10th ACM SIGPLAN International Haskell
+  Symposium</em>, 2017.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/PZ17.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+We introduce a technique for programming with domain-specific
+linear languages using the monad that arises from the theory of
+linear/non-linear logic. In this work we interpret the linear/nonlinear
+model as a simple, effectful linear language embedded inside
+an existing non-linear host language. We implement a modular
+framework for defining these linear EDSLs in Haskell, allowing
+both shallow and deep embeddings. To demonstrate the effectiveness
+of the framework and the linearity monad, we implement
+languages for file handles, mutable arrays, session types, and quantum
+computing.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="FOWZ16">21</a>]
+</td>
+<td class="bibtexitem">
+Jonathan Frankle, Peter-Michael Osera, David Walker, and Steve Zdancewic.
+ <b>Example-Directed Synthesis: A Type-Theoretic Interpretation</b>.
+ In <em>Proc. of the ACM Symposium on Principles of Programming
+  Languages (POPL)</em>, 2016.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/FOWZ16.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Input-output examples have emerged as a practical and user-friendly
+specification mechanism for program synthesis in many environments.
+While example-driven tools have demonstrated tangible impact that has
+inspired adoption in industry, their underlying semantics are less well-understood:
+what are &ldquo;examples&rdquo; and how do they 
+relate to other kinds of specifications?  This paper 
+demonstrates that examples can, in general, be interpreted 
+as refinement types.  Seen in this light, program 
+synthesis is the task of finding an inhabitant of 
+such a type.  This insight provides an immediate 
+semantic interpretation for examples.  Moreover,
+it enables us to exploit decades of research in type theory as 
+well as its correspondence with intuitionistic logic rather 
+than designing ad hoc theoretical frameworks for synthesis from scratch.<p>
+We put this observation into practice by formalizing synthesis 
+as proof search in a sequent calculus with 
+intersection and union refinements that we prove
+to be sound with respect to a conventional type system.
+In addition, we show how to handle negative examples, 
+which arise from user feedback or counterexample-guided loops. 
+This theory serves as the basis for a prototype 
+implementation that extends our core language to 
+support ML-style algebraic data types and structurally 
+inductive functions.  Users can also specify
+synthesis goals using polymorphic refinements and
+import monomorphic libraries.
+The prototype serves as a vehicle
+for empirically evaluating a number of different 
+strategies for resolving the nondeterminism of the sequent
+ calculus---bottom-up theorem-proving, 
+term enumeration with refinement type checking, and 
+combinations of both---the results of which classify, explain, and
+validate the design choices of existing synthesis systems.
+It also provides a platform for measuring the practical
+value of a specification language that combines
+&ldquo;examples&rdquo; with the more general expressiveness of refinements.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="PZ16">22</a>]
+</td>
+<td class="bibtexitem">
+Jennifer Paykin and Steve Zdancewic.
+ <b>Linear &lambda;&mu; is CP (more or less)</b>.
+ In <em>A List of Successes to Change the World (Wadlerfest)</em>,
+  2016.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/PZ16.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+In this paper we compare Wadler's CP calculus for classical
+linear processes to a linear version of Parigot's &lambda;&mu; calculus
+for classical logic. We conclude that linear &lambda;&mu; is &ldquo;more or less&rdquo; CP, in that it equationally corresponds to a polarized
+version of CP. The comparison is made by extending a technique
+from Melli&egrave;s and Tabareau's tensor logic that correlates negation
+with polarization. The polarized CP, which is written CP<sup>+-</sup>
+and pronounced &ldquo;CP more or less,&rdquo; is an interesting bridge in
+the landscape of Curry-Howard interpretations of logic.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="OZ15">23</a>]
+</td>
+<td class="bibtexitem">
+Peter-Michael Osera and Steve Zdancewic.
+ <b>Type-and-Example-Directed Program Synthesis</b>.
+ In <em>Proc. 2015 ACM SIGPLAN Conference on Programming Languages
+  Design and Implementation (PLDI)</em>, 2015.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/OZ15.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+    This paper presents an algorithm for synthesizing recursive
+functions that process algebraic datatypes. It is founded on
+proof-theoretic techniques that exploit both type information and
+input--output examples to prune the search space. The algorithm uses
+<i>refinement trees</i>, a data structure that succinctly
+represents constraints on the shape of generated code.  We evaluate
+the algorithm by using a prototype implementation to synthesize more
+than 40 benchmarks and several non-trivial larger examples.  Our
+results demonstrate that the approach meets or outperforms the
+state-of-the-art for this domain, in terms of synthesis time or
+attainable size of the generated programs.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="KHM+15">24</a>]
+</td>
+<td class="bibtexitem">
+Jeehoon Kang, Chung-Kil Hur, William Mansky, Dmitri Garbuzov, Steve Zdancewic,
+  and Viktor Vafeiadis.
+ <b>A Formal C Memory Model Supporting Integer-Pointer Casts</b>.
+ In <em>Proc. 2015 ACM SIGPLAN Conference on Programming Languages
+  Design and Implementation (PLDI)</em>, 2015.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/KHM+15.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+  The ISO C standard does not specify the semantics of many valid programs that
+  use non-portable idioms such as integer-pointer casts. Recent efforts at
+  formal definitions and verified implementation of the C language inherit this
+  feature. By adopting high-level abstract memory models, they validate common
+  optimizations. On the other hand, this prevents reasoning about much low-level
+  code relying on the behavior of common implementations, where formal
+  verification has many applications.<p>
+  We present the first formal memory model that allows many common optimizations
+  and <em>fully</em> supports operations on the representation of pointers. All
+  arithmetic operations are well-defined for pointers that have been cast to
+  integers. Crucially, our model is also simple to understand and program with. All our results are fully formalized in Coq.
+ 
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MGZ15">25</a>]
+</td>
+<td class="bibtexitem">
+William Mansky, Dmitri Garbuzov, and Steve Zdancewic.
+ <b>An Axiomatic Specification for Sequential Memory Models</b>.
+ In <em>Computer Aided Verification - 27th International Conference,
+  CAV 2015</em>, 2015.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/MGZ15.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Formalizations of concurrent memory models often represent memory behavior in terms of sequences of operations, where operations are either reads, writes, or synchronizations. More concrete models of (sequential) memory behavior may include allocation and free operations, but also include details of memory layout or data representation. We present an abstract specification for sequential memory models with allocation and free operations, in the form of a set of axioms that provide enough information to reason about memory without overly constraining the behavior of implementations. We characterize a set of &ldquo;well-behaved&rdquo; programs that behave uniformly on all instances of the specification. We show that the specification is both feasible---the CompCert memory model implements it---and usable---we can use the axioms to prove the correctness of an optimization that changes the memory behavior of programs in an LLVM-like language.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="NMZ15">26</a>]
+</td>
+<td class="bibtexitem">
+Santosh Nagarakatte, Milo M.&nbsp;K. Martin, and Steve Zdancewic.
+ <b>Everything You Want to Know About Pointer-Based Checking</b>.
+ In <em>1st Summit on Advances in Programming Languages, SNAPL
+  2015, May 3-6, 2015, Asilomar, California, USA</em>, pages 190--208, 2015.
+[&nbsp;<a href="https://doi.org/10.4230/LIPIcs.SNAPL.2015.190">DOI</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/NMZ15.pdf">PDF</a>&nbsp;| 
+<a href="http://dx.doi.org/10.4230/LIPIcs.SNAPL.2015.190">http</a>&nbsp;]
+<blockquote><font size="-1">
+
+Lack of memory safety in C/C++ has resulted in numerous security vulnerabilities and serious bugs in large software systems. This paper highlights the challenges in enforcing memory safety for C/C++ programs and progress made as part of the SoftBoundCETS project. We have been exploring memory safety enforcement at various levels - in hardware, in the compiler, and as a hardware-compiler hybrid - in this project. Our research has identified that maintaining metadata with pointers in a disjoint metadata space and performing bounds and use-after-free checking can provide comprehensive memory safety. We describe the rationale behind the design decisions and its ramifications on various dimensions, our experience with the various variants that we explored in this project, and the lessons learned in the process. We also describe and analyze the forthcoming Intel Memory Protection Extensions (MPX) that provides hardware acceleration for disjoint metadata and pointer checking in mainstream hardware, which is expected to be available later this year.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="RZ15">27</a>]
+</td>
+<td class="bibtexitem">
+Robert Rand and Steve Zdancewic.
+ <b>VPHL: A Verified Partial-Correctness Logic for Probabilistic
+  Programs</b>.
+ In <em>Mathematical Foundations of Program Semantics (MFPS)</em>, 2015.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/RZ15.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+ We introduce a Hoare-style logic for probabilistic
+                  programs, called VPHL, that has been formally
+                  verified in the Coq proof assistant. VPHL features
+                  propositional, rather than additive, assertions and
+                  a simple set of rules for reasoning about these
+                  assertions using the standard axioms of probability
+                  theory. 's assertions are <em>partial
+                  correctness assertions</em>, meaning that their
+                  conclusions are dependent upon (deterministic)
+                  program termination. The underlying simple
+                  probabilistic imperative language, PRIMP, includes
+                  a probabilistic toss operator, probabilistic guards
+                  and potentially-non-terminating while loops.  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="NMZ14">28</a>]
+</td>
+<td class="bibtexitem">
+Santosh Nagarakatte, Milo M.&nbsp;K. Martin, and Steve Zdancewic.
+ <b>WatchdogLite: Hardware-Accelerated Compiler-Based Pointer
+  Checking</b>.
+ In <em>Proceedings of Annual IEEE/ACM International Symposium on
+  Code Generation and Optimization</em>, CGO '14, pages 175:175--175:184. ACM,
+  2014.
+[&nbsp;<a href="https://doi.org/10.1145/2544137.2544147">DOI</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/NMZ14.pdf">PDF</a>&nbsp;| 
+<a href="http://doi.acm.org/10.1145/2544137.2544147">http</a>&nbsp;]
+<blockquote><font size="-1">
+<p>
+Lack of memory safety in C is the root cause of a multitude of serious bugs and security vulnerabilities. Numerous software-only and hardware-based schemes have been proposed to enforce memory safety. Among these approaches, pointer-based checking, which maintains per-pointer metadata in a disjoint metadata space, has been recognized as providing comprehensive memory safety. Software approaches for pointer-based checking have high performance overheads. In contrast, hardware approaches introduce a myriad of hardware structures and widgets to mitigate those performance overheads.<p>
+This paper proposes WatchdogLite, an ISA extension that provides hardware acceleration for a compiler implementation of pointer-based checking. This division of labor between the compiler and the hardware allows for hardware acceleration while using only preexisting architectural registers. By leveraging the compiler to identify pointers, perform check elimination, and insert the new instructions, this approach attains performance similar to prior hardware-intensive approaches without adding any hardware structures for tracking metadata.
+ 
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="BGMZ14">29</a>]
+</td>
+<td class="bibtexitem">
+Alo&iuml;s Brunel, Marco Gaboardi, Damiano Mazza, and Steve Zdancewic.
+ <b>A Core Quantitative Coeffect Calculus</b>.
+ In <em>Proc. of the 23rd European Symposium on Programming (ESOP)</em>,
+  volume 8410, pages 351--370, 2014.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/BGMZ14.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Linear logic is well known for its resource-awareness, which has
+inspired the design of several resource management mechanisms in
+programming language design. Its resource-awareness arises
+from the distinction between linear, single-use data and
+non-linear, reusable data. The latter is marked by the so-called
+exponential modality, which, from the categorical viewpoint, is a
+(monoidal) comonad.<p>
+Monadic notions of computation are well-established
+mechanisms used to express effects in pure functional
+languages. Less well-established is the notion of comonadic
+computation. However, recent works have shown the usefulness of
+comonads to structure context dependent computations. 
+In this work, we present a language lrPCF inspired by a
+generalized interpretation of the exponential modality. In lrPCF the
+exponential modality carries a label---an element of a
+semiring <em>R</em>---that provides
+additional information on how a program uses its context. 
+This additional structure is used
+to express comonadic type analysis. 
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="VZ14">30</a>]
+</td>
+<td class="bibtexitem">
+Beno&icirc;t Valiron and Steve Zdancewic.
+ <b>Finite vector spaces as model of simply-typed lambda-calculi</b>.
+ In <em>Proceedings of the 11th International Colloquium on
+  Theoretical Aspects of Computing (ICTAC 14)</em>, 2014.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/VZ14.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+In this paper we use finite vector spaces (finite dimension, over
+finite fields) as a non-standard computational model of linear
+logic. We first define a simple, finite PCF-like lambda-calculus with
+booleans, and then we discuss two finite models, one based on finite
+sets and the other on finite vector spaces. The first model is shown
+to be fully complete with respect to the operational semantics of the
+language. The second model is not complete, but we develop an
+algebraic extension of the finite lambda calculus that recovers
+completeness. The relationship between the two semantics is described,
+and several examples based on Church numerals are presented.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="NMZ13">31</a>]
+</td>
+<td class="bibtexitem">
+Santosh Nagarakatte, Milo M&nbsp;K Martin, and Steve Zdancewic.
+ <b>Hardware-enforced Comprehensive Memory Safety</b>.
+ <em>IEEE MICRO's "Top Picks of Architecture Conferences of 2012"
+  Issue (Micro Top Picks'2013)</em>, May/June 2013.
+[&nbsp;<a href="http://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=6487479">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+The lack of memory safety in languages such as C and C++ is a root
+                  source of exploitable security vulnerabilities. This
+                  article presents Watchdog, a hardware approach that
+                  eliminates such vulnerabilities by enforcing
+                  comprehensive memory safety. Inspired by prior
+                  software-only mechanisms, Watchdog maintains bounds
+                  and identifier metadata with pointers, propagates
+                  them on pointer operations, and checks them on
+                  pointer dereferences. Checking this bounds and
+                  identifier metadata provides both precise,
+                  byte-granularity buffer-overflow protection and
+                  protection from use-after-free errors, even in the
+                  presence of reallocations. Watchdog stores pointer
+                  metadata in a disjoint shadow space to provide
+                  comprehensive protection and ensure compatibility
+                  with existing code. To streamline implementation and
+                  reduce runtime overhead, Watchdog uses
+                  micro-operations to implement metadata access and
+                  checking, eliminates metadata copies via a register
+                  renaming scheme, and uses a dedicated identifier
+                  cache to reduce checking overhead.  
+ 
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZNMZ13">32</a>]
+</td>
+<td class="bibtexitem">
+Jianzhou Zhao, Santosh Nagarakatte, Milo M.&nbsp;K. Martin, and Steve Zdancewic.
+ <b>Formal Verification of SSA-Based Optimizations for LLVM</b>.
+ In <em>Proc. 2013 ACM SIGPLAN Conference on Programming Languages
+  Design and Implementation (PLDI)</em>, 2013.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZNMZ13.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Modern compilers, such as LLVM and GCC, use a <em>static single assignment</em>
+(SSA) intermediate representation (IR) to simplify and enable many advanced
+optimizations. However, formally verifying the correctness of SSA-based
+optimizations is challenging because SSA properties depend on a function's
+entire control-flow graph.   <p>
+This paper addresses this challenge by developing a proof technique
+for proving SSA-based program invariants and compiler optimizations.
+We use this technique in the Coq proof assistant to create
+mechanized correctness proofs of several &ldquo;micro&rdquo; transformations
+that form the building blocks for larger SSA optimizations.  To demonstrate
+the utility of this approach, we formally verify a variant of LLVM's
+<tt>memtoreg</tt> transformation in Vellvm, a Coq-based formal
+semantics of the LLVM IR. The extracted implementation generates code with performance
+comparable to that of LLVM's unverified implementation.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="DENO+13">33</a>]
+</td>
+<td class="bibtexitem">
+Christian DeLozier, Richard Eisenberg, Santosh Nagarakatte, Peter-Michael
+  Osera, Milo M.&nbsp;K. Martin, and Steve Zdancewic.
+ <b>Ironclad C++: A Library-Augmented Type-Safe Subset of
+  C++</b>.
+ In <em>Proceedings of the 28th Annual ACM SIGPLAN Conference on
+  Object-Oriented Programming, Systems, Languages, and Applications, (OOPSLA)</em>,
+  2013.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/DENO+13.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+The C++ programming language remains widely used, despite inheriting
+many unsafe features from C---features that often lead to failures of
+type or memory safety that manifest as buffer overflows,
+use-after-free vulnerabilities, or abstraction violations. Malicious
+attackers can exploit such violations to compromise application and
+system security.<p>
+This paper introduces Ironclad C++, an approach to bringing the
+benefits of type and memory safety to C++. Ironclad C++ is, in
+essence, a library-augmented, type-safe subset of C++. All Ironclad
+C++ programs are valid C++ programs that can be compiled using
+standard, off-the-shelf C++ compilers. However, not all valid C++
+programs are valid Ironclad C++ programs: a syntactic source-code
+validator statically prevents the use of unsafe C++ features. To
+enforce safety properties that are difficult to check statically,
+Ironclad C++ applies dynamic checks via templated &ldquo;smart pointer&rdquo;
+classes. <p>
+Using a semi-automatic refactoring tool, we have ported nearly 50K
+lines of code to Ironclad C++. These benchmarks incur a performance
+overhead of 12% on average, compared to the original unsafe C++
+code.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="NMZ12">34</a>]
+</td>
+<td class="bibtexitem">
+Santosh Nagarakatte, Milo M.&nbsp;K. Martin, and Steve Zdancewic.
+ <b>Watchdog: Hardware for Safe and Secure Manual Memory Management
+  and Full Memory Safety</b>.
+ In <em>Proceedings of the 39th International Symposium on Computer
+  Architecture (ISCA)</em>, June 2012.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/NMZ12.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Languages such as C and C++ use unsafe manual memory
+    management, allowing simple bugs (<i>i.e.</i>, accesses to an object after
+    deallocation) to become the root cause of exploitable security
+    vulnerabilities.  This paper proposes Watchdog, a hardware-based
+    approach for ensuring safe and secure manual memory management.
+    Inspired by prior software-only proposals, Watchdog generates a
+    unique identifier for each memory allocation, associates these
+    identifiers with pointers, and checks to ensure that the
+    identifier is still valid on every memory access. This use of
+    identifiers and checks enables Watchdog to detect errors even in
+    the presence of reallocations.  
+    Watchdog stores these pointer identifiers in a disjoint shadow
+    space to provide comprehensive protection and ensure compatibility
+    with existing code.
+    To streamline the implementation
+    and reduce runtime overhead: Watchdog (1) uses micro-ops to
+    access metadata and perform checks, (2) eliminates metadata
+    copies among registers via modified register renaming, and (3)
+    uses a dedicated metadata cache to reduce checking overhead.
+    Furthermore, this paper extends Watchdog's mechanisms to detect
+    bounds errors, thereby providing full hardware-enforced memory
+    safety at low overheads.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZNMZ12">35</a>]
+</td>
+<td class="bibtexitem">
+Jianzhou Zhao, Santosh Nagarakatte, Milo M.&nbsp;K. Martin, and Steve Zdancewic.
+ <b>Formalizing the LLVM Intermediate Representation for Verified
+  Program Transformations</b>.
+ In <em>Proc. of the ACM Symposium on Principles of Programming
+  Languages (POPL)</em>, 2012.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZNMZ12.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+This paper presents Vellvm (<i>verified LLVM</i>), a framework
+for reasoning about programs expressed in LLVM's intermediate
+representation and transformations that operate on it.  Vellvm
+provides a mechanized formal semantics of LLVM's intermediate
+representation, its type system, and properties of its SSA form.
+The framework is built using the Coq interactive theorem prover.  
+It includes multiple operational semantics and proves relations among
+them to facilitate different reasoning styles and proof
+techniques.<p>
+To validate Vellvm's design, we extract an interpreter from the Coq
+formal semantics that can execute programs from LLVM test suite and 
+thus be compared against LLVM reference implementations.
+To demonstrate Vellvm's practicality, we formalize and verify a
+previously proposed transformation that hardens C programs against
+spatial memory safety violations.  Vellvm's tools allow us to extract
+a new, verified implementation of the transformation pass that plugs
+into the real LLVM infrastructure; its performance is competitive with
+the non-verified, ad-hoc original.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZZ12">36</a>]
+</td>
+<td class="bibtexitem">
+Jianzhou Zhao and Steve Zdancewic.
+ <b>Mechanized Verification of Computing Dominators for Formalizing
+  Compilers</b>.
+ In <em>The Second International Conference on Certified Programs and
+  Proofs (CPP)</em>, Lecture Notes in Computer Science, pages 27--42, 2012.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZZ12.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+One prerequisite to the formal verification of modern compilers is to formalize
+computing dominators, which enable SSA forms, advanced optimizations, and
+analysis. This paper provides an abstract specification of dominance
+analysis that is sufficient for formalizing modern compilers; it describes a
+certified implementation and instance of the specification that is simple to
+design and reason about, and also reasonably efficient. The paper also presents
+applications of dominance analysis: an SSA-form type checker, verifying
+SSA-based optimizations, and constructing dominator trees. This development is a
+part of the Vellvm project. All proofs and implementation have been carried
+out in Coq.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="WVPJZ11">37</a>]
+</td>
+<td class="bibtexitem">
+Stephanie Weirich, Dimitrios Vytiniotis, Simon Peyton Jones, and Steve
+  Zdancewic.
+ <b>Generative Type Abstraction and Type-level Computation</b>.
+ In <em>Proc. of the ACM Symposium on Principles of Programming
+  Languages (POPL)</em>, 2011.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/WVPJZ11.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Modular languages support <em>generative type abstraction</em>,
+ensuring that an abstract type is distinct from its
+representation, except inside the implementation where the
+two are synonymous.  We show that this well-established
+feature is in tension with the <em>non-parametric features</em>
+of newer type systems, such as indexed type families and GADTs.
+In this paper we solve the problem by using kinds to 
+distinguish between parametric and non-parametric contexts.
+The result is directly applicable to Haskell, which is rapidly
+developing support for type-level computation, but the same
+issues should arise whenever generativity and non-parametric features
+are combined.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MZ10">38</a>]
+</td>
+<td class="bibtexitem">
+Karl Mazurak and Steve Zdancewic.
+ <b>Lolliproc: to Concurrency from Classical Linear Logic via
+  Curry-Howard and Control</b>.
+ In <em>Proc. of the 15th ACM SIGPLAN International Conference on
+  Functional Programming (ICFP)</em>, 2010.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/MZ10.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+While many type systems
+based on the intuitionistic fragment of linear logic have been
+proposed, applications in programming languages of the full power of
+linear logic---including double-negation elimination---have remained
+elusive.  Meanwhile, linearity has been used in many type systems for
+concurrent programs---e.g., session types---which suggests
+applicability to the problems of concurrent programming, but the ways
+in which linearity has interacted with concurrency primitives in
+lambda calculi have remained somewhat ad-hoc.  In this paper we
+connect classical linear logic and concurrent functional programming
+in the language Lolliproc, which provides simple primitives for
+concurrency that have a direct logical interpretation and that combine
+to provide the functionality of session types.  Lolliproc features a
+simple process calculus &ldquo;under the hood&rdquo; but hides the machinery of
+processes from programmers.  We illustrate Lolliproc by example and
+prove soundness, strong normalization, and confluence results, which,
+among other things, guarantees freedom from deadlocks and race
+conditions.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="NZMZ10">39</a>]
+</td>
+<td class="bibtexitem">
+Santosh Nagarakatte, Jianzhou Zhao, Milo M.&nbsp;K. Martin, and Steve Zdancewic.
+ <b>CETS: Compiler-Enforced Temporal Safety for C</b>.
+ In <em>Proceedings of the ACM International Symposium on Memory
+  Management (ISMM)</em>, 2010.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/NZMZ10.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Temporal memory safety errors, such as dangling pointer dereferences and
+double frees, are a prevalent source of software bugs in unmanaged
+languages such as C.  Existing schemes that attempt to retrofit temporal
+safety for such languages have high runtime overheads and/or are
+incomplete, thereby limiting their effectiveness as debugging aids.
+This paper presents CETS, a compile-time transformation for detecting
+all violations of temporal safety in C programs. Inspired by existing
+approaches, CETS maintains a unique identifier with each object,
+associates this metadata with the pointers in a disjoint metadata space
+to retain memory layout compatibility, and checks that the object is
+still allocated on pointer dereferences.  A formal proof shows that this
+is sufficient to provide temporal safety even in the presence of
+arbitrary casts if the program contains no spatial safety violations.
+Our CETS prototype employs both temporal check removal optimizations
+and traditional compiler optimizations to achieve a runtime overhead of
+just 48% on average.  When combined with a
+spatial-checking system, the average overall overhead is 116%
+for complete memory safety.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZZZ10">40</a>]
+</td>
+<td class="bibtexitem">
+Jianzhou Zhao, Qi&nbsp;Zhang, and Steve Zdancewic.
+ <b>Relational Parametricity for Polymorphic Linear Lambda
+  Calculus</b>.
+ In <em>Proceedings of the Eighth ASIAN Symposium on Programming
+  Languages and Systems (APLAS)</em>, 2010.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZZZ10.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+This paper presents a novel syntactic logical relation for a polymorphic
+linear lambda-calculus that treats all types as linear and introduces the
+constructor ! to account for intuitionistic terms, and Fo---an
+extension of System F that uses kinds to distinguish linear from intuitionistic
+types. We define a logical relation for open values under both open linear and
+intuitionistic contexts, then extend it for open terms with evaluation and
+open relation substitutions. Relations that instantiate type quantifiers are
+for open terms and types. We demonstrate the applicability of this logical
+relation through its soundness with respect to contextual equivalence, along
+with free theorems for linearity that are difficult to achieve by closed
+logical relations. When interpreting types on only closed terms, the model
+defaults to a closed logical relation that is both sound and complete with
+respect to contextual equivalence and is sufficient to reason about
+isomorphisms of type encodings. All of our results have been mechanically
+verified in Coq.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="NZMZ09">41</a>]
+</td>
+<td class="bibtexitem">
+Santosh Nagarakatte, Jianzhou Zhao, Milo M.&nbsp;K. Martin, and Steve Zdancewic.
+ <b>SoftBound: Highly Compatible and Complete Spatial Memory
+  Safety for C</b>.
+ In <em>Proc. 2009 ACM SIGPLAN Conference on Programming Languages
+  Design and Implementation (PLDI)</em>, 2009.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/NZMZ09.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+The serious bugs and security vulnerabilities facilitated by C/C++'s
+lack of bounds checking are well known, yet C and C++ remain in
+widespread use.  Unfortunately, C's arbitrary pointer arithmetic,
+conflation of pointers and arrays, and programmer-visible memory layout
+make retrofitting C/C++ with spatial safety guarantees extremely
+challenging.  Existing approaches suffer from incompleteness, have high
+runtime overhead, or require non-trivial changes to the C source code.
+Thus far, these deficiencies have prevented widespread adoption of such
+techniques.<p>
+This paper proposes SoftBound, a compile-time transformation for
+enforcing spatial safety of C.  Inspired by HardBound, a
+previously proposed hardware-assisted approach, SoftBound similarly
+records base and bound information for every pointer as disjoint
+metadata.  This decoupling enables SoftBound to provide
+spatial safety without requiring changes to C source code.  Unlike
+HardBound, SoftBound is a software-only approach and performs
+metadata manipulation only when loading or storing pointer values.  A
+formal proof shows that this is sufficient to provide spatial safety
+even in the presence of arbitrary casts.  SoftBound's full checking
+mode provides complete spatial violation detection with 67%
+runtime overhead on average.  To further reduce overheads, SoftBound
+has a store-only checking mode that successfully detects all the
+security vulnerabilities in a test suite at the cost of only
+22% runtime overhead on average.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="FPZ09">42</a>]
+</td>
+<td class="bibtexitem">
+J.&nbsp;Nathan Foster, Benjamin&nbsp;C. Pierce, and Steve Zdancewic.
+ <b>Updatable Security Views</b>.
+ In <em>Proc. of 22nd IEEE Computer Security Foundations Symposium
+  (CSF)</em>, 2009.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/FPZ09.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Security views are a flexible and effective mechanism for controlling
+access to confidential information.  Rather than allowing untrusted
+users to access source data directly, they are instead provided with a
+restricted view, from which all confidential information has been
+removed.  The program that generates the view effectively embodies a
+confidentiality policy for the underlying source data. However, this
+approach has a significant drawback: it prevents users from updating
+the data in the view.<p>
+To address the &ldquo;view update problem&rdquo; in general, a number of
+bidirectional languages have been proposed. Programs in these
+languages---often called lenses---can be run in two directions: read
+from left to right, they map sources to views; from right to left,
+they map updated views back to updated sources. However, existing
+bidirectional languages do not deal adequately with security.  In
+particular, they do not provide a way to ensure the integrity of
+source data as it is manipulated by untrusted users of the view.<p>
+We propose a novel framework of secure lenses that addresses these
+shortcomings. We enrich the types of basic lenses with equivalence
+relations capturing notions of confidentiality and integrity, and
+formulate the essential security conditions as non-interference
+properties. We then instantiate this framework in the domain of string
+transformations, developing syntax for bidirectional string
+combinators with security-annotated regular expressions as their
+types.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="BPSW+09">43</a>]
+</td>
+<td class="bibtexitem">
+Aaron Bohannon, Benjamin&nbsp;C. Pierce, Vilhelm Sj&ouml;berg, Stephanie Weirich, and
+  Steve Zdancewic.
+ <b>Reactive Noninterference</b>.
+ In <em>ACM Computer and Communications Security Conference (CCS)</em>,
+  2009.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/BPSW+09.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Many programs operate reactively---patiently waiting for user input, running
+for a while producing output, and eventually returning to a state where they
+are ready to accept another input (or occasionally diverging).  When a
+reactive program communicates with multiple parties, we would like to be
+sure that it can be given secret information by one without leaking it to
+others.<p>
+Motivated by web browsers and client-side web applications,
+we explore definitions of noninterference for reactive programs and
+identify two of special interest---one corresponding to
+termination-insensitive noninterference for a simple sequential language,
+the other to termination-sensitive noninterference.  We focus on the former
+and develop a proof technique for showing that program behaviors are secure
+according to this definition.  To demonstrate the viability of the approach,
+we define a simple reactive language with an information-flow type system
+and apply our proof technique to show that well-typed programs are secure.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="JVMZ+08">44</a>]
+</td>
+<td class="bibtexitem">
+Limin Jia, Jeffrey&nbsp;A. Vaughan, Karl Mazurak, Jianzhou Zhao, Luke Zarko, Joseph
+  Schorr, and Steve Zdancewic.
+ <b>AURA: A Programming Language for Authorization and Audit</b>.
+ In <em>Proc. of the 13th ACM SIGPLAN International Conference on
+  Functional Programming (ICFP)</em>, Victoria, British Columbia, Canada, September
+  2008.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/JVMZ08.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+This paper presents AURA, a programming language for access control that
+treats ordinary programming constructs (e.g., integers and recursive functions) 
+and authorization logic constructs (e.g., principals and access control
+policies) in a uniform way.
+AURA is based on polymorphic DCC and uses dependent types to
+permit assertions that refer directly to AURA values while keeping
+computation out of the assertion level to ensure tractability.
+The main technical results of this paper include fully mechanically
+verified proofs of the decidability and soundness
+for AURA's type system, and a prototype typechecker and interpreter.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="DBMZ08">45</a>]
+</td>
+<td class="bibtexitem">
+Joe Devietti, Colin Blundell, Milo&nbsp;M.K. Martin, and Steve Zdancewic.
+ <b>HardBound: Architectural Support for Spatial Safety of the C
+  Programming Language</b>.
+ In <em>International Conference on Architectural Support for
+  Programming Languages and Operating Systems (ASPLOS)</em>, March 2008.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/DBMZ08.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+The C programming language is at least as well known for its absence of
+spatial memory safety guarantees (i.e., lack of bounds checking) as it is
+for its high performance.  C's unchecked pointer arithmetic and
+array indexing allow simple programming mistakes to lead to erroneous
+executions, silent data corruption, and security vulnerabilities.  Many
+prior proposals have tackled enforcing spatial safety in C programs by
+checking pointer and array accesses.  However, existing software-only
+proposals have significant drawbacks that may prevent wide
+adoption, including: unacceptably high runtime overheads, lack of
+completeness, incompatible pointer representations, or need for
+non-trivial changes to existing C source code and compiler
+infrastructure.<p>
+Inspired by the promise of these software-only approaches, this paper
+proposes a <i>hardware bounded pointer</i> architectural primitive
+that supports cooperative hardware/software enforcement of spatial
+memory safety for C programs.  This bounded pointer is a new hardware
+primitive datatype for pointers that leaves the standard C pointer
+representation intact, but augments it with bounds information
+maintained separately and invisibly by the hardware. The bounds are
+initialized by the software, and they are then propagated and enforced
+transparently by the hardware, which automatically checks a pointer's
+bounds before it is dereferenced.  One mode of use requires
+instrumenting only <tt>malloc</tt>, which enables enforcement of
+per-allocation spatial safety for heap-allocated objects for existing
+binaries.  When combined with simple intra-procedural compiler
+instrumentation, hardware bounded pointers enable a low-overhead
+approach for enforcing complete spatial memory safety in unmodified C
+programs.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="VJMZ08">46</a>]
+</td>
+<td class="bibtexitem">
+Jeffrey&nbsp;A. Vaughan, Limin Jia, Karl Mazurak, and Steve Zdancewic.
+ <b>Evidence-based Audit</b>.
+ In <em>Proc. of 21st IEEE Computer Security Foundations Symposium
+  (CSF)</em>, pages 177--191. IEEE Computer Society Press, 2008.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/VJMZ08.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Authorization logics provide a principled and flexible approach to
+specifying access control policies.  One of their compelling benefits
+is that a proof in the logic is <em>evidence</em> that an access-control
+decision has been made in accordance with policy.  Using such proofs
+for auditing reduces the trusted computing base and enables the ability to
+detect flaws in complex authorization policies. Moreover, the proof
+structure is itself useful, because proof
+normalization can yield information about the relevance of policy
+statements. Untrusted, but well-typed, applications that access
+resources through an appropriate interface must obey the access
+control policy and create proofs useful for audit.<p>
+This paper presents AURA, an authorization logic based on a
+dependently-typed variant of DCC and proves the metatheoretic
+properties of subject-reduction and normalization.  It shows the
+utility of proof-based auditing in a number of examples and discusses
+several pragmatic issues that must be addressed in this context.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="LZ07">47</a>]
+</td>
+<td class="bibtexitem">
+Peng Li and Steve Zdancewic.
+ <b>Combining Events And Threads For Scalable Network Services</b>.
+ In <em>Proc. 2007 ACM SIGPLAN Conference on Programming Languages
+  Design and Implementation (PLDI)</em>, pages 189--199, 2007.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/LZ07.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+
+This paper proposes to combine two seemingly opposed programming
+models for building massively concurrent network services: the
+event-driven model and the multithreaded model.  The result is a
+hybrid design that offers the best of both worlds---the ease of use
+and expressiveness of threads and the flexibility and performance of
+events.<p>
+This paper shows how the hybrid model can be implemented entirely at
+the application level using <em>concurrency monads</em> in Haskell,
+which provides type-safe abstractions for both events and threads.
+This approach simplifies the development of massively concurrent
+software in a way that scales to real-world network services.  The
+Haskell implementation supports exceptions, symmetrical multiprocessing,
+software transactional memory, asynchronous I/O mechanisms and
+application-level network protocol stacks.  Experimental results
+demonstrate that this monad-based approach has good performance: the
+threads are extremely lightweight (scaling to ten million threads),
+and the I/O performance compares favorably to that of Linux NPTL.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="VZ07">48</a>]
+</td>
+<td class="bibtexitem">
+Jeffrey&nbsp;A. Vaughan and Steve Zdancewic.
+ <b>A Cryptographic Decentralized Label Model</b>.
+ In <em>IEEE 2007 Symposium on Security and Privacy (Oakland)</em>,
+  pages 192--206, 2007.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/VZ07.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/VZ07.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+
+  Information-flow security policies are an appealing way of
+  specifying confidentiality and integrity policies in information
+  systems. Most previous work on language-based security has assumed
+  that programs run in a closed, managed environment and that they use
+  potentially unsafe constructs, such as <em>declassification</em>, to
+  interface to external communication channels, perhaps after
+  encrypting data to preserve its confidentiality.  This situation is
+  unsatisfactory for systems that need to communicate over untrusted
+  channels or use untrusted persistent storage, since the connection
+  between the cryptographic mechanisms used in the untrusted
+  environment and the abstract security labels used in the trusted
+  language environment is ad hoc and unclear.  <p>
+  This paper addresses this problem in three ways: First, it presents
+  a simple, security-typed language with a novel mechanism called
+  <i>packages</i> that provides an abstract means for creating
+  opaque objects and associating them with security labels; well-typed
+  programs in this language enforce noninterference.  Second, it shows
+  how to implement these packages using public-key cryptography.  This
+  implementation strategy uses a variant of Myers and Liskov's
+  <i>decentralized label model</i>, which supports a rich label
+  structure in which mutually distrusting data owners can specify
+  independent confidentiality and integrity requirements.  Third, it
+  demonstrates that this implementation of packages is sound with
+  respect to Dolev-Yao style attackers---such an attacker cannot
+  determine the contents of a package without possessing the
+  appropriate keys, as determined by the security label on the
+  package. 
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="SHTZ06">49</a>]
+</td>
+<td class="bibtexitem">
+Nikhil Swamy, Michael Hicks, Stephen Tse, and Steve Zdancewic.
+ <b>Managing Policy Updates in Security-Typed Languages</b>.
+ In <em>Proc. of 19th IEEE Computer Security Foundations Workshop
+  (CSFW)</em>, pages 202--216. IEEE Computer Society Press, 2006.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/SHTZ06.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+This paper presents RX, a new security-typed
+programming language with features intended to make the management of
+information-flow policies more practical.  Security labels in RX,
+in contrast to prior approaches, are defined in terms of <em>owned
+roles</em>, as found in the RT role-based trust-management framework.
+Role-based security policies allow flexible delegation, and our
+language RX provides constructs through which programs can robustly
+update policies and react to policy updates dynamically.  Our dynamic
+semantics use statically verified transactions to eliminate
+illegal information flows across updates, which we call 
+transitive flows.  Because policy updates can be observed
+through dynamic queries, policy updates can potentially reveal
+sensitive information.  As such, RX considers policy statements
+themselves to be potentially confidential information and subject to
+information-flow metapolicies.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="LZ06a">50</a>]
+</td>
+<td class="bibtexitem">
+Peng Li and Steve Zdancewic.
+ <b>Encoding Information Flow in Haskell</b>.
+ In <em>Proc. of 19th IEEE Computer Security Foundations Workshop
+  (CSFW)</em>, pages 16--27. IEEE Computer Society Press, 2006.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/LZ06a.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+  This paper presents an embedded security sublanguage for enforcing
+  information-flow policies in the standard Haskell programming
+  language.  The sublanguage provides useful information-flow control
+  mechanisms including dynamic security lattices, run-time code
+  privileges and declassification, without modifying the base
+  language. This design avoids the redundant work of producing new
+  languages, lowers the threshold for adopting security-typed
+  languages, and also provides great flexibility and modularity for
+  using security-policy frameworks.
+  
+  The embedded security sublanguage is designed using a standard
+  combinator interface called arrows.  Computations constructed
+  in the sublanguage have static and explicit control-flow components,
+  making it possible to implement information-flow control using
+  static-analysis techniques at run time, while providing strong
+  security guarantees.  This paper presents a concrete Haskell
+  implementation and an example application demonstrating the proposed
+  techniques.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ACZ06">51</a>]
+</td>
+<td class="bibtexitem">
+Rajeev Alur, Pavol &#x010C;ern&yacute;, and Steve Zdancewic.
+ <b>Preserving Secrecy under Refinement</b>.
+ In <em>Proc. of 33rd International Colloquium on Automata, Languages
+  and Programming (ICALP)</em>, pages 107--118, 2006.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ACZ06.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+We propose a general framework of secrecy and 
+preservation of secrecy for labeled transition systems. Our
+definition of secrecy is parameterized by the distinguishing power of
+the observer, the properties to be kept secret, and the executions of
+interest, and captures a multitude of definitions in the literature.
+We define a notion of secrecy preserving refinement between
+systems by strengthening the classical trace-based refinement so that
+the implementation leaks a secret only when the specification also
+leaks it.  We show that secrecy is in general not definable in
+mu-calculus, and thus not expressible in specification logics
+supported by standard model-checkers.  However, we develop a
+simulation-based proof technique for establishing secrecy preserving
+refinement.  This result shows how existing refinement checkers can be
+used to show correctness of an implementation with respect to a
+specification.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="LZ05">52</a>]
+</td>
+<td class="bibtexitem">
+Peng Li and Steve Zdancewic.
+ <b>Downgrading Policies and Relaxed Noninterference</b>.
+ In <em>Proc. 32nd ACM Symp. on Principles of Programming Languages
+  (POPL)</em>, pages 158--170, January 2005.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/LZ05a.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+ In traditional information-flow type systems, the
+    security policy is often formalized as noninterference properties.
+    However, noninterference alone is too strong to express security
+    properties useful in practice.  If we allow downgrading in such
+    systems, it is challenging to formalize the security policy as an
+    extensional property of the system.<p>
+    This paper presents a generalized framework of downgrading
+  policies.  Such policies can be specified in a simple and tracable
+  language and can be statically enforced by mechanisms such as type
+  systems.  The security guarantee is then formalized as a concise
+  extensional property using program equivalences.  This
+  <i>relaxed noninterference</i> generalizes traditional pure
+  noninterference and precisely characterizes the information released
+  due to downgrading.  
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="LZ05b">53</a>]
+</td>
+<td class="bibtexitem">
+Peng Li and Steve Zdancewic.
+ <b>Practical Information-flow Control in Web-based Information
+  Systems</b>.
+ In <em>Proc. of 18th IEEE Computer Security Foundations Workshop
+  (CSFW)</em>, pages 2--15, 2005.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/LZ05b.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+This paper presents a practical application of
+  language-based information-flow control, namely, a domain-specific
+  web scripting language designed for interfacing with databases.  The
+  primary goal is to provide strong enforcement of confidentiality and
+  integrity policies: confidential data can be released only in
+  permitted ways and trustworthy data must result from expected
+  computations or conform to expected patterns.  Such security
+  policies are specified in the database layer and statically enforced
+  for the rest of the system in an end-to-end fashion.<p>
+  In contrast with existing web-scripting languages, which provide
+  only ad hoc mechanisms for information security, the scripting
+  language described here uses principles based on the well-studied
+  techniques in information-flow type systems.  However, because web
+  scrips often need to downgrade confidential data and manipulate
+  untrusted user input, they require practical and convenient ways of
+  downgrading secure data.  To achieve this goal, the language allows
+  safe downgrading according to <em>downgrading policies</em> specified
+  by the programmer.  This novel, pattern-based approach provides a
+  practical instance of recent work on <em>delimited release</em> and
+  <em>relaxed noninterference</em> and extends that work by accounting
+  for integrity policies.  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="TZ05a">54</a>]
+</td>
+<td class="bibtexitem">
+Stephen Tse and Steve Zdancewic.
+ <b>Designing a Security-typed Language with Certificate-based
+  Declassification</b>.
+ In <em>Proc. of the 14th European Symposium on Programming (ESOP)</em>,
+  volume 3444, pages 279--294, 2005.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/TZ05a.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+This paper presents a calculus that supports information-flow
+  security policies and certificate-based declassification. The
+  decentralized label model and its downgrading mechanisms are
+  concisely expressed in the polymorphic lambda calculus with
+  subtyping (System F-Sub).  We prove a conditioned version of the
+  noninterference theorem such that authorization for declassification
+  is justified by digital certificates from public-key
+  infrastructures.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ABFF05">55</a>]
+</td>
+<td class="bibtexitem">
+Brian&nbsp;E. Aydemir, Aaron Bohannon, Matthew Fairbairn, J.&nbsp;Nathan Foster,
+  Benjamin&nbsp;C. Pierce, Peter Sewell, Dimitrios Vytiniotis, Geoffrey Washburn,
+  Stephanie Weirich, and Steve Zdancewic.
+ <b>Mechanized Metatheory for the Masses: The POPLMark Challenge</b>.
+ In <em>International Conference on Theorem Proving in Higher Order
+  Logics (TPHOLs)</em>, pages 50--65, 2005.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ABFF05.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+ How close are we to a world where every paper on
+  programming languages is accompanied by an electronic appendix with
+  machine-checked proofs?<p>
+  We propose an initial set of benchmarks for measuring progress in
+  this area.  Based on the metatheory of System F-Sub, a typed
+  lambda-calculus with second-order polymorphism, subtyping, and
+  records, these benchmarks embody many aspects of programming
+  languages that are challenging to formalize: variable binding at
+  both the term and type levels, syntactic forms with variable numbers
+  of components (including binders), and proofs demanding complex
+  induction principles.  We hope that these benchmarks will help
+  clarify the current state of the art, provide a basis for comparing
+  competing technologies, and motivate further research.  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="LZ04a">56</a>]
+</td>
+<td class="bibtexitem">
+Peng Li and Steve Zdancewic.
+ <b>Advanced Control Flow in Java Card Programming</b>.
+ In <em>Proceedings of the 2004 ACM SIGPLAN/SIGBED Conference on
+  Languages, Compilers, and Tools for Embedded Systems (LCTES)</em>, pages
+  165--174, June 2004.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/LZ04a.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Java Card technology simplifies the development of smart card
+applications by providing a high-level programming language similar to
+Java.  However, the master-slave programming model used in current
+Java Card platform creates control flow difficulties when writing
+complex card programs, making it inconvenient, tedious, and
+error-prone to implement Java Card applications. This paper examines
+these drawbacks of the master-slave model and proposes a concurrent
+thread model for developing future Java Card programs, which is much
+closer to conventional Java network programming.  This paper also
+presents a code translation algorithm and a corresponding tool that
+makes it possible to write card programs in the concurrent thread
+model without losing compatibility with the existing Java Card API.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="TZ04a">57</a>]
+</td>
+<td class="bibtexitem">
+Stephen Tse and Steve Zdancewic.
+ <b>Run-time Principals in Information-flow Type Systems</b>.
+ In <em>IEEE 2004 Symposium on Security and Privacy (Oakland)</em>, pages
+  179--193. IEEE Computer Society Press, May 2004.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/TZ04a.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/TZ04a.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+
+  Information-flow type systems are a promising approach for enforcing
+  strong end-to-end confidentiality and integrity policies. Such
+  policies, however, are usually specified in term of static
+  information--data is labeled <i>high</i> or <i>low</i> security at
+  compile time.  In practice, the confidentiality of data may depend
+  on information available only while the system is running
+  <p>
+  This paper studies language support for <i>run-time principals</i>, a
+  mechanism for specifying information-flow security policies that
+  depend on which principals interact with the system.  We establish
+  the basic property of noninterference for programs written in such
+  language, and use run-time principals for specifying run-time
+  authority in downgrading mechanisms such as declassification.
+  <p>
+  In addition to allowing more expressive security policies, run-time
+  principals enable the integration of language-based security
+  mechanisms with other existing approaches such as Java stack
+  inspection and public key infrastructures. We sketch an
+  implementation of run-time principals via public keys such that
+  principal delegation is verified by certificate chains.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="TZ04b">58</a>]
+</td>
+<td class="bibtexitem">
+Stephen Tse and Steve Zdancewic.
+ <b>Translating Dependency into Parametricity</b>.
+ In <em>Proc. of the 9th ACM SIGPLAN International Conference on
+  Functional Programming (ICFP)</em>, 2004.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/TZ04b.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/TZ04b.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+
+Abadi et al. introduced the <i>dependency core calculus</i> (DCC) as a unifying framework to study many important program analyses such as binding time, information flow, slicing, and function call tracking. DCC uses a lattice of monads and a nonstandard typing rule for their associated <i>bind</i> operations to describe the dependency of computations in a program. Abadi et al. proved a <i>noninterference</i> theorem that establishes the correctness of DCC’s type system and thus the correctness of the type systems for the analyses above.<p>
+In this paper, we study the relationship between DCC and the Girard-Reynolds polymorphic lambda calculus (System F). We encode the recursion-free fragment of DCC into F via a type-directed translation. Our main theoretical result is that, following from the correctness of the translation, the parametricity theorem for F implies the noninterference theorem for DCC. In addition, the translation provides in- sights into DCC’s type system and suggests implementation strategies of dependency calculi in polymorphic languages.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MSZ04">59</a>]
+</td>
+<td class="bibtexitem">
+Andrew&nbsp;C. Myers, Andrei Sabelfeld, and Steve Zdancewic.
+ <b>Enforcing Robust Declassification</b>.
+ In <em>Proc. of 17th IEEE Computer Security Foundations Workshop
+  (CSFW)</em>, pages 172--186, 2004.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/MSZ04.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+Noninterference requires that there is no information
+  flow from sensitive to public data in a given system.  However, many
+  systems perform intentional release of sensitive information as part
+  of their correct functioning and therefore violate noninterference.
+  To control information flow while permitting intentional information
+  release, some systems have a downgrading or declassification
+  mechanism.  A major danger of such a mechanism is that it may cause
+  unintentional information release.  This paper shows that a
+  robustness property can be used to characterize programs in which
+  declassification mechanisms cannot be exploited by attackers to
+  release more information than intended.  It describes a simple way
+  to provably enforce this robustness property through a type-based
+  compile-time program analysis.  The paper also presents a
+  generalization of robustness that supports upgrading (endorsing)
+  data integrity.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="WZL03">60</a>]
+</td>
+<td class="bibtexitem">
+David Walker, Steve Zdancewic, and Jay Ligatti.
+ <b>A Theory of Aspects</b>.
+ In <em>Proc. of the 8th ACM SIGPLAN International Conference on
+  Functional Programming (ICFP)</em>, pages 127--139, Upsala, Sweden, August 2003.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/WZL03.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/WZL03.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+This paper define the semantics of MinAML, an idealized
+aspect-oriented programming language, by giving 
+a type-directed translation from its user-friendly external language
+to its compact, well-defined core language.
+We argue that our framework is an effective way
+to give semantics to aspect-oriented programming languages in
+general because the translation eliminates shallow syntactic differences
+between related constructs and permits definition of a clean,
+easy-to-understand, and easy-to-reason-about core language.<p>
+The core language extends the simply-typed lambda
+calculus with two central new abstractions: explicitly labeled program
+points and first-class advice.  The labels serve both to trigger
+advice and to mark continuations that the advice may return to.  These
+constructs are defined orthogonally to the other features of the
+language and we show that our abstractions can be used in both
+functional and object-oriented contexts.  The labels are well-scoped
+and the language as a whole is well-typed.  Consequently, programmers
+can use lexical scoping in the standard way to prevent aspects from
+interfering with local program invariants.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZM03">61</a>]
+</td>
+<td class="bibtexitem">
+Steve Zdancewic and Andrew&nbsp;C. Myers.
+ <b>Observational Determinism for Concurrent Program Security</b>.
+ In <em>Proc. of 16th IEEE Computer Security Foundations Workshop
+  (CSFW)</em>, pages 29--45, Asilomar, CA, July 2003.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZM03.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/ZM03.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+Noninterference is a property of sequential programs that is useful
+for expressing security policies for data confidentiality and
+integrity. However, extending noninterference to concurrent programs has
+proved problematic. In this paper we present a relatively expressive
+secure concurrent language. This language, based on existing
+concurrent calculi, provides first-class channels, higher-order
+functions, and an unbounded number of threads.  Well-typed programs
+obey a generalization of noninterference that ensures
+immunity to internal
+timing attacks and to attacks that exploit information about the thread
+scheduler. Elimination of these refinement attacks is possible because
+the enforced security property extends noninterference with
+observational determinism. Although the security property is strong,
+it also avoids some of the restrictiveness imposed on 
+previous security-typed concurrent languages.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZCZM03">62</a>]
+</td>
+<td class="bibtexitem">
+Lantian Zheng, Stephen Chong, Steve Zdancewic, and Andrew&nbsp;C. Myers.
+ <b>Building Secure Distributed Systems Using Replication and
+  Partitioning</b>.
+ In <em>IEEE 2003 Symposium on Security and Privacy (Oakland)</em>,
+  pages 236--250. IEEE Computer Society Press, 2003.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZCZM03.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/ZCZM03.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+A challenging unsolved security problem is how to
+specify and enforce system-wide security policies; this problem is
+even more acute in distributed systems with mutual distrust. This
+paper describes a way to enforce policies for data confidentiality and
+integrity in such an environment. Programs annotated with security
+specifications are statically checked and then transformed by the
+compiler to run securely on a distributed system with untrusted
+hosts. The code and data of the computation are partitioned across the
+available hosts in accordance with the security specification.  The
+key contribution is automatic replication of code and data to increase
+assurance of integrity---without harming confidentiality, and without
+placing undue trust in any host.  The compiler automatically generates
+secure run-time protocols for communication among the replicated code
+partitions. Results are given from a prototype implementation applied
+to various distributed programs.  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZZNM01">63</a>]
+</td>
+<td class="bibtexitem">
+Steve Zdancewic, Lantian Zheng, Nathaniel Nystrom, and Andrew&nbsp;C. Myers.
+ <b>Untrusted Hosts and Confidentiality: Secure Program
+  Partitioning</b>.
+ In <em>Proc. 18th ACM Symp. on Operating System Principles
+  (SOSP)</em>, volume 35(5) of <em>Operating Systems Review</em>, pages 1--14, Banff,
+  Canada, October 2001.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZZNM01.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/ZZNM01.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+This paper presents secure program partitioning, a
+  language-based technique for protecting confidential data during
+  computation in distributed systems containing mutually untrusted
+  hosts. Confidentiality and integrity policies can be expressed by
+  annotating programs with security types that constrain information
+  flow; these programs can then be partitioned automatically to run
+  securely on heterogeneously trusted hosts. The resulting
+  communicating subprograms collectively implement the original
+  program, yet the system as a whole satisfies the security
+  requirements of participating principals without requiring a
+  universally trusted host machine. The experience in applying this
+  methodology and the performance of the resulting distributed code
+  suggest that this is a promising way to obtain secure distributed
+  computation. 
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZM01b">64</a>]
+</td>
+<td class="bibtexitem">
+Steve Zdancewic and Andrew&nbsp;C. Myers.
+ <b>Robust Declassification</b>.
+ In <em>Proc. of 14th IEEE Computer Security Foundations Workshop
+  (CSFW)</em>, pages 15--23, Cape Breton, Canada, June 2001.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZM01b.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/ZM01b.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+ Security properties based on information flow, such as
+  noninterference, provide strong guarantees that confidentiality is
+  maintained. However, programs often need to leak some amount of
+  confidential information in order to serve their intended purpose,
+  and thus violate noninterference. Real systems that control
+  information flow often include mechanisms for downgrading or
+  declassifying information; however, declassification can easily
+  result in the unexpected release of confidential information.<p>
+This paper introduces a formal model of information flow in systems
+that include intentional information leaks and shows how to
+characterize what information leaks. Further, we define a notion of
+robustness for systems that include information leaks introduced by
+declassification. Robust systems have the property that an attacker is
+unable to exploit declassification channels to obtain more
+confidential information than was intended to be released. We show
+that all systems satisfying a noninterference-like property are
+robust; for other systems, robustness involves a nontrivial
+interaction between confidentiality and integrity properties. We
+expect this model to provide new tools for the characterization of
+information flow properties in the presence of intentional information
+leaks. 
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZM01">65</a>]
+</td>
+<td class="bibtexitem">
+Steve Zdancewic and Andrew&nbsp;C. Myers.
+ <b>Secure Information Flow and CPS</b>.
+ In <em>Proc. of the 10th European Symposium on Programming (ESOP)</em>,
+  volume 2028 of <em>Lecture Notes in Computer Science</em>, pages 46--61, April
+  2001.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZM01.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/ZM01.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+Security-typed languages enforce secrecy or integrity
+  policies by type-checking. This paper investigates
+  continuation-passing style as a means of proving that such languages
+  enforce non-interference and as a first step towards understanding
+  their compilation. We present a low-level, secure calculus with
+  higher-order, imperative features. Our type system makes novel use
+  of ordered linear continuations.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZGM99">66</a>]
+</td>
+<td class="bibtexitem">
+Steve Zdancewic, Dan Grossman, and Greg Morrisett.
+ <b>Principals in Programming Languages: A Syntactic Proof
+  Technique</b>.
+ In <em>Proc. of the 4th ACM SIGPLAN International Conference on
+  Functional Programming (ICFP)</em>, pages 197--207, Paris, France, September
+  1999.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZGM99.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/ZGM99.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+Programs are often structured around the idea that
+  different pieces of code comprise distinct principals, each with a
+  view of its environment. Typical examples include the modules of a
+  large program, a host and its clients, or a collection of
+  interactive agents.<p>
+In this paper, we formalize this notion of principal in the
+programming language itself. The result is a language in which
+intuitive statements such as, &ldquo;the client must call open to obtain a
+file handle&rdquo;, can be phrased and proven formally.<p>
+We add principals to variants of the simply-typed lambda-calculus and
+show how we can track the code corresponding to each principal
+throughout evaluation. This multiagent calculus yields syntactic
+proofs of some type abstraction properties that traditionally require
+semantic arguments.
+</font></blockquote>
+
+</td>
+</tr>
+</table>
+
+
+<h3>Workshop Papers</h3>
+
+<!-- This document was automatically generated with bibtex2html 1.99
+     (see http://www.lri.fr/~filliatr/bibtex2html/),
+     with the following command:
+     bibtex2html -d -r -nodoc -nobibsource -both -nf ps PS -nf pdf PDF -citefile hconf.keys -s bold-title -o hconf /Users/stevez/Work/professional/resume/content/zdancewic.bib  -->
+
+
+<table>
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="KPZ15">1</a>]
+</td>
+<td class="bibtexitem">
+Neelakantan&nbsp;R. Krishnaswami, Jennifer Paykin, and Steve Zdancewic.
+ <b>Curry-Howard for GUIs</b>.
+ In <em>POPL Off the Beaten Track (OBT)</em>, 2015.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/KPZ15.pdf">PDF</a>&nbsp;]
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="PZ14">2</a>]
+</td>
+<td class="bibtexitem">
+Jennifer Paykin and Steve Zdancewic.
+ <b>A Linear/Producer/Consumer model of Classical Linear Logic
+  (extended abstract)</b>.
+ In <em>Third International Workshop on Linearity</em>, LINEARITY, 2014.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/PZ14.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+This paper defines a new proof- and category-theoretic framework for
+<i>classical linear logic</i> that separates reasoning into one linear regime
+and two persistent regimes corresponding to ! and ?. The resulting
+linear/producer/consumer (LPC) logic puts the three classes of
+propositions on the same semantic footing, following Benton's
+linear/non-linear formulation of intuitionistic linear logic.
+Semantically, LPC corresponds to a system of three categories
+connected by adjunctions reflecting the linear/producer/consumer
+structure. The paper's metatheoretic results include admissibility
+theorems for the cut and duality rules, and a translation of the LPC
+logic into category theory. The work also presents several
+concrete instances of the LPC model.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="OSZ12">3</a>]
+</td>
+<td class="bibtexitem">
+Peter-Michael Osera, Vilhelm Sj&ouml;berg, and Steve Zdancewic.
+ <b>Dependent Ineroperability</b>.
+ In <em>The Sixth ACM SIGPLAN Workshop on Programming Languages meets
+  Program Verification (PLPV)</em>, 2012.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/OSZ12.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+In this paper we study the problem of <i>interoperability</i>---combining
+constructs from two separate programming languages within one program---in the
+case where one of the two languages is dependently typed and the other is simply
+typed.  We present a core calculus called SD, which combines dependently-
+and simply-typed sub-languages and supports user-defined (dependent) datatypes,
+among other standard features. SD has &ldquo;boundary terms&rdquo; that mediate the
+interaction between the two sub-languages.  The operational semantics of SD
+demonstrates how the necessary dynamic checks, which must be done when passing a
+value from the simply-typed world to the dependently typed world, can be
+extracted from the dependent type constructors themselves, modulo user-defined
+functions for marshaling values across the boundary.  We establish type-safety
+and other meta-theoretic properties of SD, and contrast this approach to
+others in the literature.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MZZ10">4</a>]
+</td>
+<td class="bibtexitem">
+Karl Mazurak, Jianzhou Zhao, and Steve Zdancewic.
+ <b>Lightweight linear types in System F<sup>o</sup></b>.
+ In <em>ACM SIGPLAN International Workshop on Types in Languages
+  Design and Implementation (TLDI)</em>, pages 77--88, 2010.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/MZZ10.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+We present F<sup>o</sup>, an extension of System F that uses
+<em>kinds</em> to distinguish between linear and unrestricted types,
+simplifying the use of linearity for general-purpose programming. We
+demonstrate through examples how F<sup>o</sup> can elegantly express many
+useful protocols, and we prove that any protocol representable
+as a DFA can be encoded as an F<sup>o</sup> type.  We supply
+mechanized proofs of F<sup>o</sup>'s
+soundness and parametricity properties, along with a
+nonstandard operational semantics that formalizes common intuitions
+about linearity and aids in reasoning about protocols.<p>
+We compare F<sup>o</sup> to other linear systems, noting that the simplicity of our
+kind-based approach leads to a more explicit account of what linearity
+is meant to capture, allowing otherwise-conflicting interpretations of
+linearity (in particular, restrictions on <em>aliasing</em> versus
+restrictions on resource <em>usage</em>) to coexist peacefully.
+We also discuss extensions to F<sup>o</sup> aimed at making the
+core language more practical, including the additive fragment of
+linear logic, algebraic datatypes, and recursion.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="JZ09">5</a>]
+</td>
+<td class="bibtexitem">
+Limin Jia and Steve Zdancewic.
+ <b>Encoding information flow in Aura</b>.
+ In <em>Proceedings of the 2009 Workshop on Programming Languages and
+  Analysis for Security (PLAS)</em>, pages 17--29, 2009.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/JZ09.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+  Two of the main ways to protect security-sensitive
+  resources in computer systems are to enforce access-control policies
+  and information-flow policies. In this paper, we show how to enforce
+  information-flow policies in AURA, which is a programming
+  language for access control. When augmented with this mechanism for
+  enforcing information-flow polices, AURA can further improve the
+  security of reference monitors that implement access control.<p>
+  We show how to encode security types
+  and lattices of security labels using AURA's existing constructs
+  for authorization logic. We prove a noninterference theorem for
+  this encoding.  We also investigate how to use expressive
+  access-control policies specified in authorization logic as the policies
+  for information declassification.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MGLZ09">6</a>]
+</td>
+<td class="bibtexitem">
+Michael&nbsp;J. May, Carl&nbsp;A. Gunter, Insup Lee, and Steve Zdancewic.
+ <b>Strong and Weak Policy Relations</b>.
+ In <em>POLICY 2009, IEEE International Symposium on Policies for
+  Distributed Systems and Networks</em>, pages 33--36, 2009.
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MZ07">7</a>]
+</td>
+<td class="bibtexitem">
+Karl Mazurak and Steve Zdancewic.
+ <b>ABash: Finding Bugs in Bash Scripts</b>.
+ In <em>ACM SIGPLAN Workshop on Programming Languages and Analysis
+  for Security (PLAS)</em>, June 2007.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/MZ07.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+  This paper describes the design and implementation of ABash, a
+  tool for statically analyzing programs written in the <tt>bash</tt> scripting
+  language.  Although it makes no formal guarantees against missed errors
+  or spurious warnings (largely due to
+  the highly dynamic nature of <tt>bash</tt> scripts), ABash is useful for
+  detecting certain common program errors that may lead to security
+  vulnerabilities.  In experiments with 49 <tt>bash</tt> scripts taken
+  from popular Internet repositories,
+  ABash was able to identify 20 of them as containing bugs of varying
+  severity while yielding only a reasonable number of spurious warnings on
+  both these scripts and the generally bug-free initialization scripts of
+  the Ubuntu Linux distribution.  ABash works by performing
+  <i>abstract interpretation</i> of a <tt>bash</tt> script via an abstract
+  semantics that accounts for shell variable expansion.
+  The analysis is also parameterized by a collection of
+  signatures that describe external program interfaces (for Unix
+  commands, etc.), yielding an easily configurable and extensible
+  framework for finding bugs in <tt>bash</tt> scripts.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="LZ05c">8</a>]
+</td>
+<td class="bibtexitem">
+Peng Li and Steve Zdancewic.
+ <b>Unifying Confidentiality and Integrity in Downgrading
+  Policies</b>.
+ In <em>Proc. of Foundations of Computer Security Workshop (FCS)</em>,
+  2005.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/LZ05c.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+Confidentiality and integrity are often treated as dual
+  properties in formal models of information-flow control, access
+  control and many other areas in computer security. However, in
+  contrast to confidentiality policies, integrity policies are less
+  formally studied in the information-flow control literature. One
+  important reason is that traditional noninterference-based
+  information-flow control approaches give very weak integrity
+  guarantees for untrusted code. Integrity and confidentiality
+  policies are also different with respect to implicit information
+  channels. <p>
+  This paper studies integrity downgrading policies in
+  information-flow control and compares them with their
+  confidentiality counterparts. We examine the drawbacks of integrity
+  policies based on noninterference formalizations and study the
+  integrity policies in the framework of downgrading policies and
+  program equivalences. We give semantic interpretations for
+  traditional security levels for integrity, namely, tainted and
+  untainted, and explain the interesting relations between
+  confidentiality and integrity in this framework.  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="HTHZ05">9</a>]
+</td>
+<td class="bibtexitem">
+Michael Hicks, Stephen Tse, Boniface Hicks, and Steve Zdancewic.
+ <b>Dynamic updating of information-flow policies</b>.
+ In <em>Proc. of Foundations of Computer Security Workshop (FCS)</em>,
+  2005.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/HTHZ05.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+ Applications that manipulate sensitive information
+  should ensure <em>end-to-end</em> security by satisfying two
+  properties: <em>sound execution</em> and some form of
+  <em>noninterference</em>.  By the former, we mean the program should
+  always perform actions in keeping with its current policy, and by
+  the latter we mean that these actions should never cause
+  high-security information to be visible to a low-security observer.
+  Over the last decade, security-typed languages have been developed
+  that exhibit these properties, increasingly improving so as to model
+  important features of real programs.<p>
+  No current security-typed language, however, permits general changes
+  to security policies in use by running programs.  This paper
+  presents a simple information flow type system for that allows for
+  dynamic security policy updates while ensuring sound execution and a
+  relaxed form of noninterference we term <em>noninterference
+  between updates</em>.  We see this work as an important step toward
+  using language-based techniques to ensure end-to-end security for
+  realistic applications.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="LMZ03">10</a>]
+</td>
+<td class="bibtexitem">
+Peng Li, Yun Mao, and Steve Zdancewic.
+ <b>Information Integrity Policies</b>.
+ In <em>Proceedings of the Workshop on Formal Aspects in Security &amp;
+  Trust (FAST)</em>, September 2003.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/LMZ03.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/LMZ03.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+Information integrity policies are traditionally enforced by
+  access control mechanisms that prevent unauthorized users from
+  modifying data.  However, access control does not provide end-to-end
+  assurance of integrity.  For that reason, integrity guarantees in
+  the form of noninterference assertions have been proposed.  Despite
+  the appeals of such information-flow based approaches to integrity,
+  that solution is also unsatisfactory because it leads to a weaker
+  notion of integrity than needed in practice.
+  <p>
+  This paper attempts to clarify integrity policies by
+  comparing and contrasting access control vs. information flow,
+  integrity vs. confidentiality policies, and
+  integrity vs. availability policies.  The paper also examines data
+  invariants as a way to strengthen integrity.  The result is a better
+  classification of information-integrity policies.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="SSDK03">11</a>]
+</td>
+<td class="bibtexitem">
+Usa Sammapun, Raman Sharykin, Margaret Delap, Myong Kim, and Steve Zdancewic.
+ <b>Formalizing Java-MaC</b>.
+ In <em>Proceedings of the Third Runtime Verification Workshop</em>,
+  pages 171--190. Electronic Notes in Theoretical Computer Science, July 2003.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/SSDK03.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/SSDK03.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+The Java-MaC framework is a run-time verification system for Java
+  programs that can be used to dynamically test and enforce safety
+  policies.  This paper presents a formal model of the Java-MaC safety
+  properties in terms of an operational semantics for Middleweight
+  Java, a realistic subset of full Java.  This model is intended to be
+  used as a framework for studying the correctness of Java-MaC program
+  instrumentation, optimizations, and future experimentation with
+  run-time monitor expressiveness.  As a preliminary demonstration of this model's
+  applicability for these tasks, the paper sketches a correctness result
+  for a simple program instrumentation scheme.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="GGKS03">12</a>]
+</td>
+<td class="bibtexitem">
+Michael Greenwald, Carl&nbsp;A. Gunter, Bj&ouml;rn Knutsson, Andre Scedrov,
+  Jonathan&nbsp;M. Smith, and Steve Zdancewic.
+ <b>Computer Security is Not a Science (but it should be)</b>.
+ In <em>Proceedings of the Large-Scale Network Security Workshop</em>,
+  March 2003.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/GGKS03.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/GGKS03.ps">PS</a>&nbsp;]
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="MCGG99">13</a>]
+</td>
+<td class="bibtexitem">
+Greg Morrisett, Karl Crary, Neal Glew, Dan Grossman, Richard Samuels, Frederick
+  Smith, David Walker, Stephanie Weirich, and Steve Zdancewic.
+ <b>TALx86: A Realistic Typed Assembly Language</b>.
+ In <em>2nd ACM SIGPLAN Workshop on Compiler Support for System
+  Software</em>, pages 25--35, 1999.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/MCGG99.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/MCGG99.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+The goal of typed assembly language (TAL) is to provide
+  a low-level, statically typed target language that is better suited
+  than Java bytecodes for supporting a wide variety of source
+  languages and a number of important optimizations. In previous work,
+  we formalized idealized versions of TAL and proved important safety
+  properties about them. In this paper, we present our progress in
+  defining and implementing a realistic typed assembly language called
+  TALx86. The TALx86 instructions comprise a relatively complete
+  fragment of the Intel IA32 (32-bit 80x86 flat model) assembly
+  language and are thus executable on processors such as the Intel
+  Pentium. The type system for the language incorporates a number of
+  advanced features necessary for safely compiling large programs to
+  good code.<p>
+To motivate the design of the type system, we demonstrate how various
+high-level language features are compiled to TALx86. For this purpose,
+we present a type-safe C-like language called Popcorn.
+</font></blockquote>
+
+</td>
+</tr>
+</table>
+
+
+<h3>Edited Volumes</h3>
+
+<!-- This document was automatically generated with bibtex2html 1.99
+     (see http://www.lri.fr/~filliatr/bibtex2html/),
+     with the following command:
+     bibtex2html -d -r -nodoc -nobibsource -both -nf ps PS -nf pdf PDF -citefile hedit.keys -s bold-title -o hedit /Users/stevez/Work/professional/resume/content/zdancewic.bib  -->
+
+
+<table>
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="DKVZ08">1</a>]
+</td>
+<td class="bibtexitem">
+Pierpaolo Degano, Ralf K&uuml;sters, Luca Vigan&ograve;, and Steve Zdancewic,
+  editors.
+ <b>Joint workshop on foundations of computer security and automated
+  reasoning for security protocol analysis (FCS-ARSPA '06)</b>, volume 206 of <em>
+  Information and Computation</em>.
+ Elsevier, 2008.
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="SZ06">2</a>]
+</td>
+<td class="bibtexitem">
+Vugranam&nbsp;C. Shreedhar and Steve Zdancewic, editors.
+ <b>Proceedings of the 2006 Workshop on Programming Languages and
+  Analysis for Security (PLAS)</b>.
+ ACM, 2006.
+
+</td>
+</tr>
+</table>
+
+
+<h3>Technical Reports, Work in Progress, and Unpublished Papers</h3>
+
+<!-- This document was automatically generated with bibtex2html 1.99
+     (see http://www.lri.fr/~filliatr/bibtex2html/),
+     with the following command:
+     bibtex2html -d -r -nodoc -nobibsource -both -nf ps PS -nf pdf PDF -citefile htr.keys -s bold-title -o htr /Users/stevez/Work/professional/resume/content/zdancewic.bib  -->
+
+
+<table>
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZZZ+26">1</a>]
+</td>
+<td class="bibtexitem">
+Vadim Zaliva, Yannick Zakowski, Ilia Zaichuk, Valerii Huhnin, Calvin Beck,
+  Irene Yoon, and Steve Zdancewic.
+ <b>HELIX: Verified compilation of cyber-physical control systems
+  to LLVM IR</b>, 2026.
+[&nbsp;<a href="http://arxiv.org/abs/2604.18593">arXiv</a>&nbsp;| 
+<a href="https://arxiv.org/abs/2604.18593">http</a>&nbsp;]
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="PZ19">2</a>]
+</td>
+<td class="bibtexitem">
+Jennifer Paykin and Steve Zdancewic.
+ <b>A HoTT Quantum Equational Theory (Extended Version)</b>.
+ available on arXiv, 2019.
+[&nbsp;<a href="https://arxiv.org/abs/1904.04371">http</a>&nbsp;]
+<blockquote><font size="-1">
+
+This paper presents an equational theory for the QRAM model of quantum computation, formulated as an embedded language inside of homotopy type theory. The embedded language approach is highly expressive, and reflects the style of state-of-the art quantum languages like Quipper and QWIRE. The embedding takes advantage of features of homotopy type theory to encode unitary transformations as higher inductive paths, simplifying the presentation of an equational theory. We prove that this equational theory is sound and complete with respect to established models of quantum computation.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="GMRZ18">3</a>]
+</td>
+<td class="bibtexitem">
+Dmitri Garbuzov, William Mansky, Christine Rizkallah, and Steve Zdancewic.
+ <b>Structural Operational Semantics for Control Flow Graph
+  Machines</b>, 2018.
+[&nbsp;<a href="http://arxiv.org/abs/1805.05400">arXiv</a>&nbsp;| 
+<a href="https://arxiv.org/pdf/1805.05400">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+Compilers use control flow graph (CFG) representations of low-level programs because they are suited to program
+analysis and optimizations. However, formalizing the behavior and metatheory of CFG programs is non-trivial: CFG
+programs don’t compose well, their semantics depends on auxiliary state, and, as a consequence, they do not enjoy a simple equational theory that can be used for reasoning about the correctness of program transformations. Lambdacalculus-based intermediate representations, in contrast, have well-understood operational semantics and metatheory, including rich equational theories, all of which makes them amenable to formal verification.<p>
+This paper establishes a tight equivalence between (a variant of) Levy’s call-by-push-value (CBPV) calculus and
+a control flow graph machine whose instructions are in static single assignment (SSA) form. The correspondence is
+made precise via a series of abstract machines that align the transitions of the structural operational semantics of the CBPV language with the computation steps of the SSA form.<p>
+The target machine, which is derived from the CBPV language, accurately captures the execution model of control
+flow graphs, including direct jumps, mutually recursive code blocks, and multi-argument function calls, and the closurefree subset is similar to the SSA intermediate representations found in modern compilers such as LLVM and GCC. The definitions of all the language/abstract machine semantics and the theorems relating them are fully verified in Coq.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="PZ14tr">4</a>]
+</td>
+<td class="bibtexitem">
+Jennifer Paykin and Steve Zdancewic.
+ <b>A Linear/Producer/Consumer model of Classical Linear Logic</b>.
+ Technical report, University of Pennsylvania, 2014.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/PZ14tr.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+ 
+This paper defines a new proof- and category-theoretic framework for
+classical linear logic that separates reasoning into one linear regime
+and two persistent regimes corresponding to ! and ?. The resulting
+linear/producer/consumer (LPC) logic puts the three classes of
+propositions on the same semantic footing, following Benton's
+linear/non-linear formulation of intuitionistic linear logic.
+Semantically, LPC corresponds to a system of three categories
+connected by adjunctions that reflect the linear/producer/consumer
+structure. The paper's metatheoretic results include admissibility
+theorems for the cut and duality rules, and a translation of the LPC
+logic into the category theory. The work also presents several
+concrete instances of the LPC model, including one based on finite
+vector spaces.
+
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="DEN+13">5</a>]
+</td>
+<td class="bibtexitem">
+Christian DeLozier, Richard Eisenberg, Santosh Nagarakatte, Peter-Michael
+  Osera, Milo&nbsp;M.K. Martin, and Steve Zdancewic.
+ <b>Ironclad C++: A library-Augmented Type-Safe Subset of
+  C++</b>.
+ Technical Report MS-CIS-13-05, University of Pennsylvania, March
+  2013.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/DEN+13.pdf">PDF</a>&nbsp;]
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZZZ10tr">6</a>]
+</td>
+<td class="bibtexitem">
+Jianzhou Zhao, Qi&nbsp;Zhang, and Steve Zdancewic.
+ <b>Relational Parametricity for Polymorphic Linear Lambda Calculus
+  (Extended TR)</b>.
+ 2010.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZZZ10tr.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+This is the technical report for the corrsponding APLAS 2010 paper.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="VJMZ08tr">7</a>]
+</td>
+<td class="bibtexitem">
+Jeffrey&nbsp;C. Vaughan, Limin Jia, Karl Mazurak, and Steve Zdancewic.
+ <b>Evidence-based Audit, Technical Appendix</b>.
+ Technical Report MS-CIS-08-09, University of Pennsylvania, 2008.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/VJMZ08tr.pdf">PDF</a>&nbsp;]
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="JVMZ+08tr">8</a>]
+</td>
+<td class="bibtexitem">
+Limin Jia, Jeffrey&nbsp;A. Vaughan, Karl Mazurak, Jianzhou Zhao, Luke Zarko, Joseph
+  Schorr, and Steve Zdancewic.
+ <b>AURA:Preliminary Technical Results</b>.
+ Technical Report MS-CIS-08-10, University of Pennsylvania, 2008.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/JVMZ08tr.pdf">PDF</a>&nbsp;]
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="TZ08tr">9</a>]
+</td>
+<td class="bibtexitem">
+Stephen Tse and Steve Zdancewic.
+ <b>Concise Concrete Syntax</b>.
+ Technical Report MS-CIS-08-11, University of Pennsylvania, 2008.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/TZ08tr.pdf">PDF</a>&nbsp;]
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="AWZ08">10</a>]
+</td>
+<td class="bibtexitem">
+Brian Aydemir, Stephanie Weirich, and Steve Zdancewic.
+ <b>Abstracting Syntax</b>.
+ (15 pages), 2008.
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="TZ06a">11</a>]
+</td>
+<td class="bibtexitem">
+Stephen Tse and Steve Zdancewic.
+ <b>Translating Dependency into Parametricity</b>.
+ (33 pages) Accepted to <em>Journal of Functional Programming</em>,
+  pending revisions, 2006.
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="TZ04c">12</a>]
+</td>
+<td class="bibtexitem">
+Stephen Tse and Steve Zdancewic.
+ <b>Translating Dependency into Parametricity</b>.
+ Technical Report MIS-CIS-04-01, University of Pennsylvania, 2004.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/TZ04btr.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+
+  The <i>dependency core calculus</i> (DCC) was introduced by Abadi
+  et al. as a unifying formal framework in which to study a variety of
+  important program analyses including binding-time, information-flow,
+  slicing, and function call tracking. The novel feature of DCC is a
+  lattice of monads and a nonstandard typing rule for their associated
+  <tt>bind</tt> operations.  Intuitively, the lattice structure describes
+  which computations in a program may depend on each other.  Abadi et
+  al.  prove a <i>noninterference</i> result that establishes the
+  correctness of DCC's type system, and they use that result to show
+  that type systems for the above-mentioned analyses are correct.
+  
+  In this paper, we study the relationship between DCC and the
+  Girard--Reynolds polymorphic lambda calculus (System F).  In
+  particular, we show how to encode the recursion-free fragment of DCC
+  into F via a type-directed translation.  The main theorem we present
+  uses this translation to derive the noninterference result for DCC
+  from the standard parametricity theorem of System F.  In addition to
+  providing insight into DCC's type system, the hope is that the
+  translation presented here may yield implementation strategies for
+  non-standard type systems (e.g. for information flow security) in
+  languages that have parametric polymorphism.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="TZ05atr">13</a>]
+</td>
+<td class="bibtexitem">
+Stephen Tse and Steve Zdancewic.
+ <b>Designing a Security-typed Language with Certificate-based
+  Declassification</b>.
+ Technical Report MIS-CIS-04-16, University of Pennsylvania, 2004.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/TZ05atr.pdf">PDF</a>&nbsp;]
+<blockquote><font size="-1">
+This paper presents the design of a programming language that
+  supports information-flow security policies and certificate-based
+  declassification.<p>
+  
+  The language uses monadic information-flow annotations in the style
+  of Abadi et al.'s dependency core calculus, and has an effects
+  system and fixpoints. The type system conflates security concepts
+  such as labels, principals, and privileges with abstract types,
+  allowing a uniform treatment of lattice structures throughout the
+  language.  Myers' and Liskov's decentralized label model is encoded
+  using type constructors that describe confidentiality and integrity
+  policies, and label refinements and principal groups follow
+  naturally from intersection and union types.  Singleton types,
+  combined with bounded universal and existential quantifications,
+  connect the type system with public-key infrastructures whose
+  digital certificates provide authorization for privileged operations
+  such as declassification.  These features allow specification of
+  security policies in term of dynamic entities such as run-time user
+  identities and file access permissions.<p>
+  
+  Besides showing that the language is sound, we present a security
+  theorem that generalizes standard noninterference to account for
+  information flows introduced by declassification.  Although this
+  result gives only a coarse approximation to the information
+  potentially leaked, it captures our intuitions about
+  certificate-based declassification.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="TZ03">14</a>]
+</td>
+<td class="bibtexitem">
+Stephen Tse and Steve Zdancewic.
+ <b>Run-time Principals in Information-flow Type Systems</b>.
+ Technical Report MS-CIS-03-39, University of Pennsylvania, 2003.
+ The conference version appears in IEEE Security and Privacy 2004.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/TZ03.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/TZ03.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+
+  Information-flow type systems are a promising approach for enforcing
+  strong end-to-end confidentiality and integrity policies. Such
+  policies, however, are usually specified in term of static
+  information--data is labeled <i>high</i> or <i>low</i> security at
+  compile time.  In practice, the confidentiality of data may depend
+  on information available only while the system is running<p>
+  
+  This paper studies language support for <i>run-time principals</i>, a
+  mechanism for specifying information-flow security policies that
+  depend on which principals interact with the system.  We establish
+  the basic property of noninterference for programs written in such
+  language, and use run-time principals for specifying run-time
+  authority in downgrading mechanisms such as declassification.<p>
+  
+  In addition to allowing more expressive security policies, run-time
+  principals enable the integration of language-based security
+  mechanisms with other existing approaches such as Java stack
+  inspection and public key infrastructures. We sketch an
+  implementation of run-time principals via public keys such that
+  principal delegation is verified by certificate chains.
+  
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="Zda02">15</a>]
+</td>
+<td class="bibtexitem">
+Stephan&nbsp;A. Zdancewic.
+ <b>Programming Languages for Information Security</b>.
+ PhD thesis, Cornell University, August 2002.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/Zda02.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/Zda02.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+Our society's widespread dependence on networked information systems
+for everything from personal finance to military communications makes
+it essential to improve the security of software.  Standard security
+mechanisms such as access control and encryption are essential
+components for protecting information, but they do not provide
+end-to-end guarantees.  Programming-languages research has
+demonstrated that security concerns can be addressed by using both
+program analysis and program rewriting as powerful and flexible
+enforcement mechanisms.<p>
+This thesis investigates  <em>security-typed
+programming languages</em>, which use static typing to enforce
+information-flow security policies.  These languages allow the
+programmer to specify confidentiality and integrity constraints on the
+data used in a program; the compiler verifies that the
+program satisfies the constraints.<p>
+Previous theoretical security-typed languages research has focused on
+simple models of computation and unrealistically idealized security
+policies.  The existing practical security-typed languages have not
+been proved to guarantee security.  This thesis addresses these
+limitations in several ways.<p>
+First, it establishes <em>noninterference</em>, a basic information-flow
+policy, for languages richer than those previously considered.  The
+languages studied here include recursive, higher-order functions,
+structured state, and concurrency.  These results narrow the gap
+between the theory and the practice of security-typed languages.<p>
+Next, this thesis considers more practical security policies.
+Noninterference is often too restrictive for real-world programming.
+To compensate, a restricted form of declassification is introduced,
+allowing programmers to specify a richer set of information-flow
+policies.  Previous work on information-flow security also assumed
+that all computation occurs on equally trusted machines.  To overcome
+this unrealistic premise, additional security constraints for systems
+distributed among heterogeneously trusted hosts are considered.<p>
+Finally, this thesis describes Jif/split, a prototype implementation
+of <em>secure program partitioning</em>, in which a program can automatically
+be partitioned to run securely on heterogeneously trusted hosts. The
+resulting communicating subprograms collectively implement the
+original program, yet the system as a whole satisfies the security
+requirements without needing a universally trusted machine.  The
+theoretical results developed earlier in the thesis justify
+Jif/split's run-time enforcement mechanisms.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZZNM01b">16</a>]
+</td>
+<td class="bibtexitem">
+Steve Zdancewic, Lantian Zheng, Nathaniel Nystrom, and Andrew&nbsp;C. Myers.
+ <b>Secure Program Partitioning</b>.
+ Technical Report 2001-1846, Computer Science Dept., Cornell
+  University, 2001.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZZNM01b.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/ZZNM01b.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+This paper presents secure program partitioning, a
+  language-based technique for protecting confidential data during
+  computation in distributed systems containing mutually untrusted
+  hosts. Confidentiality and integrity policies can be expressed by
+  annotating programs with security types that constrain information
+  flow; these programs can then be partitioned automatically to run
+  securely on heterogeneously trusted hosts. The resulting
+  communicating subprograms collectively implement the original
+  program, yet the system as a whole satisfies the security
+  requirements of participating principals without requiring a
+  universally trusted host machine. The experience in applying this
+  methodology and the performance of the resulting distributed code
+  suggest that this is a promising way to obtain secure distributed
+  computation.<p>
+This Technical Report is an expanded version of the published paper
+&ldquo;Untrusted Hosts and Confidentiality: Secure Program Partitioning&rdquo;.
+The main difference between the two is Appendix A, which contains a
+correctness proof for the control-transfer protocols described in
+Section 5.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZM00">17</a>]
+</td>
+<td class="bibtexitem">
+Steve Zdancewic and Andrew&nbsp;C. Myers.
+ <b>Confidentiality and Integrity with Untrusted Hosts</b>.
+ Technical Report 2000-1810, Computer Science Dept., Cornell
+  University, 2000.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZM00.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/ZM00.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+Several <em>security-typed languages</em> have recently been proposed to enforce
+security properties such as confidentiality or integrity by type checking.
+We propose a new security-typed language, Spl@, that
+addresses two important limitations of previous approaches.<p>
+First, existing languages assume that the underlying execution platform
+is trusted; this assumption does not scale to distributed computation in
+which a variety of differently trusted hosts are available to execute
+programs. Our new approach, <em>secure program partitioning</em>, translates
+programs written assuming complete trust in a single executing host into
+programs that execute using a collection of variously trusted hosts to
+perform computation.  As the trust configuration of a distributed system
+evolves, this translation can be performed as necessary for security.<p>
+Second, many common program transformations do not work in existing
+security-typed languages; although they produce equivalent
+programs, these programs are rejected because of <em>apparent</em> information
+flows. Spl@ uses a novel mechanism
+based on <em>ordered linear continuations</em> to permit a richer class of program
+transformations, including secure program partitioning.
+</font></blockquote>
+
+</td>
+</tr>
+
+
+<tr valign="top">
+<td align="right" class="bibtexnumber">
+[<a name="ZG99">18</a>]
+</td>
+<td class="bibtexitem">
+Steve Zdancewic and Dan Grossman.
+ <b>Principals in Programming Languages: Technical Results</b>.
+ Technical Report TR99-1752, Computer Science Dept., Cornell
+  University, June 1999.
+[&nbsp;<a href="http://www.cis.upenn.edu/~stevez/papers/ZG99.pdf">PDF</a>&nbsp;| 
+<a href="http://www.cis.upenn.edu/~stevez/papers/ZG99.ps">PS</a>&nbsp;]
+<blockquote><font size="-1">
+This is the companion technical report for &ldquo;Principals
+  in Programming Languages: A Syntactic Proof Technique.&rdquo; See that
+  document for a more readable version of these results.<p>
+In this paper, we describe two variants of the simply typed
+lambda-calculus extended with a notion of principal. The results are
+languages in which intuitive statements like &ldquo;the client must call
+open to obtain a file handle&rdquo; can be phrased and proven formally.<p>
+The first language is a two-agent calculus with references and
+recursive types, while the second language explores the possibility of
+multiple agents with varying amounts of type information. We use these
+calculi to give syntactic proofs of some type abstraction results that
+traditionally require semantic arguments. 
+</font></blockquote>
+
+</td>
+</tr>
+</table>
+
+
