@@ -3,12 +3,12 @@ name: Vellvm Compilation Test
 on:
   pull_request:
     paths-ignore:
-      - 'web/**'
+      - 'docs/**'
   push:
     branches:
       - dev
     paths-ignore:
-      - 'web/**'
+      - 'docs/**'
 
 jobs:
   build:
