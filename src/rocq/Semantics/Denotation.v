@@ -603,7 +603,18 @@ Section Denotation.
     | (_, INSTR_Fence _ _) => ret tt
 
     (* Currently unhandled itree instructions *)
-    | (_, INSTR_LandingPad _ _ _) => raise (err_loc ++ ": Unsupported INSTR_Landingpad")
+    (* Landingpad: bind the in-flight exception payload (parked in this frame by
+       the [invoke] that diverted here) to the result. For the Rust panic subset
+       the clauses are irrelevant: [cleanup] and a catch-all [catch ptr null]
+       behave identically, both just delivering the payload. *)
+    | (IId id, INSTR_LandingPad _ _ _) =>
+        oe <- stack_get_exc ;;
+        match oe with
+        | Some e => lwrite id e
+        | None   => raise (err_loc ++ ": landingpad reached with no in-flight exception")
+        end
+    | (IVoid _, INSTR_LandingPad _ _ _) =>
+        raise (err_loc ++ ": landingpad must define a value")
 
     (* Error states *)
     | (_, _) => raise (err_loc ++ ": ID / Instr mismatch void / non-void")
@@ -685,7 +696,9 @@ Section Denotation.
       (* branch to to_label *)
       match rv with
       | inl exn =>
-          (* Exception case. Need to jump to unwind label *)
+          (* Exception case: stash the payload in this frame so the landingpad
+             at [unwind_label] can retrieve it, then divert there. *)
+          stack_raise exn ;;
           ret (inl unwind_label)
       | inr returned_value =>
           match iid with
@@ -768,10 +781,45 @@ Section Denotation.
     | inr uv  => ret uv
     end.
 
-  (* The denotation of an itree function is a coq function that takes
-     a list of dvalues and returns the appropriate semantics. *)
+  (** ** Catching a frame-local unwind
+      [run_exc t] runs [t]; if it raises an [LLVMExc] (the abortive [LLVMExcE]
+      event, produced by [resume] or by [denote_instr] re-raising an unwinding
+      callee) it reifies the payload as [inl e]; a normal return becomes
+      [inr a]. Every other event, including the abortive [OOME]/[UBE]/[FailureE],
+      is passed through unchanged. Cf. [ITree.Events.Exception.throw_prefix].
+
+      This is applied once per function, at the [denote_function] boundary, to
+      convert that frame's unwind into the [exc + dvalue] *value* returned by
+      its [Call]. The value (not an abortive event) is what crosses the [mrec]
+      knot, so a caller's [invoke]/[call] can observe a callee's unwind — see
+      the design note in todonotes.md on why an abortive event cannot.
+
+      [exc_of_event] selects the [LLVMExcE] summand at its current position in
+      [CFGEtop] (9th summand); keep the [inr1 .. inl1] depth in sync. *)
+  Definition exc_of_event {X} (e : CFGEtop X) : option exc :=
+    match e with
+    | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 (LLVMExc x))))))))) => Some x
+    | _ => None
+    end.
+
+  Definition run_exc {A} (t : CFGtop A) : CFGtop (exc + A) :=
+    ITree.iter
+      (fun u =>
+         match observe u with
+         | RetF a  => Ret (inr (inr a))
+         | TauF u' => Ret (inl u')
+         | VisF X e k =>
+             match exc_of_event e with
+             | Some x => Ret (inr (inl x))
+             | None   => Vis e (fun y => Ret (inl (k y)))
+             end
+         end) t.
+
+  (* The denotation of an itree function is a coq function that takes a list of
+     dvalues and returns the appropriate semantics: a function either returns
+     normally with a [dvalue] or unwinds with an exception [exc]. *)
   Definition function_denotation : Type :=
-    list dvalue -> CFGtop dvalue.
+    list dvalue -> CFGtop (exc + dvalue).
 
   Fixpoint combine_lists_varargs {A B:Type} (l1:list A) (l2:list B) : EOU (list (A * B) * list B) :=
     match l1, l2 with
@@ -809,7 +857,10 @@ Section Denotation.
   Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
     fun (args : list dvalue) =>
       varg <- push_call_frame df args;;
-      rv <- denote_cfg (df_instrs df) (Some varg);;
+      (* Catch a frame-local unwind so the result surfaces as [exc + dvalue].
+         [pop_call_frame] runs on both the normal and the unwinding path, so the
+         frame is always torn down before the (value-carried) unwind continues. *)
+      rv <- run_exc (denote_cfg (df_instrs df) (Some varg));;
       pop_call_frame;;
       ret rv.
 
@@ -843,7 +894,9 @@ Section Denotation.
          | Call dt fv args =>
              match lookup_defn fv fundefs with
              | Some f_den => (* If the call is internal *)
-                 inr <$> f_den args
+                 (* [f_den] already produces [exc + dvalue] (see [denote_function]),
+                    so the callee's unwind crosses the [mrec] knot as this value. *)
+                 f_den args
              | None => inr <$> external_call dt fv args
              end
          end) _ (Call dt f_value args).

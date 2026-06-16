@@ -528,7 +528,10 @@ Section Intrinsics.
   Definition llvm_vellvm_internal_throw : pure_function :=
     fun args =>
       match args with
-      | [] => retr DVALUE_None
+      (* Raise: the [inl] branch of the intrinsic's [exc + dvalue] result is
+         turned into an abortive [LLVMExc] by [denote_instr]. The payload is a
+         placeholder panic object, treated opaquely by the unwind machinery. *)
+      | [] => ret (inl DVALUE_None)
       | _ => raise_error "llvm_vellvm_internal_throw got incorrect / ill-typed inputs"
       end.
 
