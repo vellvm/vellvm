@@ -6,7 +6,7 @@ title: "FAQ"
 
 ## What version of LLVM IR does Vellvm support?
 
-LLVM IR is a rapidly moving target.  Vellvm aims to provide _parsing_ support for all of LLVM IR as of {{}}.  However, the vellvm formal semantics and interpreter may not support all of LLVM IR's features.  See below for more details.
+LLVM IR is a rapidly moving target.  Vellvm aims to provide _parsing_ support for all of LLVM IR as of at least Clang version 17.  However, the Vellvm formal semantics and interpreter may not support all of LLVM IR's features.  See below for more details.
 
 ## What features of LLVM IR does Vellvm support?
 
@@ -23,13 +23,18 @@ LLVM IR is a rapidly moving target.  Vellvm aims to provide _parsing_ support fo
 
 ## What about `undef`?
 
- The Vellvm _semantic model_ currently includes `undef` as a source of nondeterminism, so the meaning of an LLVM IR program is a _set_ of possible behaviors.  The Vellvm _executable interpreter_ currently picks a default value for `undef` depending on its type.
+The Vellvm _semantic model_ currently includes `undef` as a source of nondeterminism, so the meaning of an LLVM IR program is a _set_ of possible behaviors.  The Vellvm _executable interpreter_ currently picks a default value for `undef` depending on its type.
+
+## What about Undefined Behaviors (UB)?
+
+LLVM IR semantics characterize many operations as resulting in **unedefined behavior**.  For instance, storing to an address in a stack frame that has been deallocated yield UB.  The Vellvm semantics tries to clarify and define the situations in which UB can occur.  The executable with fail with an assertion when it encounters UB.  However, the notion of _refinement_ needed to prove the correctness of optimizations allows _any_ behavior to refine UB.
 
 ##  What computation features are _not_ supported?
  - full C++-style exceptions via the `landing_pad` and related instructions
  - architecture-specific floatint point values
  - inlined assembly
  - concurrency and concurrency-related instructions
+ - some semantics-relevant instruction annotations
 
 ## What about instruction annotations?
  
