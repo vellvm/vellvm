@@ -19,6 +19,8 @@ title: "Research"
  - "Modular, Compositional, and Executable Formal Semantics for LLVM IR" ([ICFP'21](https://icfp21.sigplan.org/details/icfp-2021-papers/6/Modular-Compositional-and-Executable-Formal-Semantics-for-LLVM-IR)),
     Yannick Zakowski, Calvin Beck, Irene Yoon, Ilia Zaichuk, Vadim Zaliva, Steve Zdancewic
 
+ - "An Equational Theory for Weak Bisimulation via Generalized Parameterized Coinduction" ([CPP'20](http://www.cis.upenn.edu/~stevez/papers/ZHHZ20.pdf)) Yannick Zakowski, Paul He, Chung-Kil Hur, and Steve Zdancewic.
+
  - "Interaction Trees" ([POPL'20](http://www.cis.upenn.edu/~stevez/papers/XZHH+20.pdf)), Li-yao Xia, Yannick Zakowski, Paul He, Chung-Kil Hur, Gregory Malecha, Benjamin C. Pierce, and Steve Zdancewic.
 
  - "Verifying Dynamic Race Detection" ([CPP'17](http://www.cis.upenn.edu/~stevez/papers/MPZD17.pdf))
