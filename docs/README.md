@@ -4,6 +4,10 @@ This part of the repo holds the source for the web pages hosted at [https://vell
 
 It is set up to use [Hugo](https://gohugo.io/)
 
+## Testing locally
+
+You should be able to host a local version of the web site (useful for testing) by running `hugo server` from this directory.
+
 
 ## Key components:
 
@@ -25,6 +29,5 @@ It is set up to use [Hugo](https://gohugo.io/)
 
 
 ## Changing the style:
-
 
 - See the `docs/static/css/style.css` file

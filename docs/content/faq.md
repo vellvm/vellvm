@@ -12,7 +12,7 @@ LLVM IR is a rapidly moving target.  Vellvm aims to provide _parsing_ support fo
 
  Vellvm covers most features of the core *sequential* fragment of LLVM IR as per its informal specification in [LangRef](https://llvm.org/docs/LangRef.html).
 
- - basic operations on 1-, 8-, 32-, and 64-bit integers
+ - basic operations on arbitrary bit-width integers
  - doubles, floats, structs, arrays, pointers
  - casts
  - `undef` and `poison`
@@ -23,29 +23,28 @@ LLVM IR is a rapidly moving target.  Vellvm aims to provide _parsing_ support fo
 
 ## What about `undef`?
 
- The Vellvm _semantic model_ includes `undef` as a source of nondeterminism, so the meaning of an LLVM IR program is a _set_ of possible behaviors.  The Vellvm _executable interpreter_ currently picks a default value for `undef` depending on its type.
+ The Vellvm _semantic model_ currently includes `undef` as a source of nondeterminism, so the meaning of an LLVM IR program is a _set_ of possible behaviors.  The Vellvm _executable interpreter_ currently picks a default value for `undef` depending on its type.
 
 ##  What computation features are _not_ supported?
- - full C++-style exceptions `landing_pad` 
- - architecture-specific floats
+ - full C++-style exceptions via the `landing_pad` and related instructions
+ - architecture-specific floatint point values
  - inlined assembly
  - concurrency and concurrency-related instructions
 
-
 ## What about instruction annotations?
  
-Many LLVM IR instructions support various annotations (such as `noalias`) that are intended to allow the semantics to trigger **undefined behavior** under certain circumstances.  While Vellvm aims to support as many of these as it can, the set of annotations changes often and the intended meaning can sometimes be unclear.  
+Many LLVM IR instructions support various annotations (such as `noalias`) that are intended to allow the semantics to trigger **undefined behavior** under certain circumstances.  While Vellvm aims to support as many of these as it can, the set of annotations changes often and the intended meaning can sometimes be unclear, so we try to support them in a _best effort_ but sound way.  (That is, we won't rule a behavior as UB unless it actually is---"true" LLVM IR may exhibit more UB than Vellvm semantics.
 
 
 ## What about libraries?
 
- Vellvm does not yet provide support for many C standard library functions, but it does support:
+ Vellvm does not yet provide support for many C standard library functions, but it does support some basics:
  
  - `puts`
  - `printf` 
  - `malloc`
  
- Additionally, any code that can be expressed a an LLVM IR `.ll` file can be linked into the Vellvm interpreter.  See the information about [running tests](../tests) for an example.
+ Additionally, any code that can be expressed a an LLVM IR `.ll` file can be linked into the Vellvm interpreter.  See the code in the `src/libll` folder and information about [running tests](../tests) for an example.
 
 
 

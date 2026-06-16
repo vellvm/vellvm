@@ -1,5 +1,5 @@
 ---
-title: "Tests"
+title: "Running Vellvm Tests"
 ---
 
 # Running Vellvm
@@ -46,11 +46,14 @@ x is hello
 y is XXXXXXXXhello
 ```
 
-If, instead, we generate the LLVM IR code and run it using Vellvm, we get:
+If, instead, we generate the LLVM IR code and run it using Vellvm, we get the following, which identifies the source of UB:
 
 ```bash
-~/demo> clang -emit-llvm demo.c
-~/demo> 
+~/demo> vellvm -i -L ~/vellvm/src/libll demo.ll
+(* -------- Vellvm Test Harness -------- *)
+Processing: demo.ll
+[demo.ll:36.2-36.31]: Trying to write to memory with invalid provenance
+Fatal error: exception Failure("Undefined Behavior: [demo.ll:36.2-36.31]")
 ```
 
 # Adding a new test case

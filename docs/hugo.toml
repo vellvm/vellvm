@@ -28,7 +28,7 @@ lastmod = [':git', ':fileModTime']
     url = 'https://www.github.com/vellvm/vellvm'
     weight = 20
   [[menu.main]]
-    name = 'Tests'
+    name = 'Running Tests'
     url = '/tests/'
     weight = 30
 [[menu.main]]

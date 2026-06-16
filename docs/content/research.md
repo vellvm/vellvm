@@ -48,15 +48,16 @@ title: "Research"
 
 # Vellvm History
 
-  - Vellvm started as an outgrowth of the SoftBound and CETS projects around 2010.
+{{< img src="images/vellvm-logo.png" style="height:120px" >}}
+
+{{< img src="images/deepspec-logo-300dpi.png" style="height:110px" >}}
+
+  - Vellvm started as an outgrowth of the [SoftBound and CETS](https://github.com/santoshn/softboundcets-34) projects around 2010.  See a [more modern implementation](https://github.com/Fraunhofer-AISEC/softboundcets) by Orthen et. al. of those ideas.
 
   - The "original" Vellvm development code base (called Vellvm-legacy) was built by Jianzhou Zhao and is [available here](https://github.com/vellvm/vellvm-legacy). (But the code is quite bitrotted.)
 
   - Vellvm was a component of the [DeepSpec NSF Expedition](http://www.deepspec.org).
 
-{{< img src="images/vellvm-logo.png" style="height:120px" >}}
-
-{{< img src="images/deepspec-logo-300dpi.png" style="height:110px" >}}
 
 # Past Contributors
 
@@ -96,13 +97,17 @@ Vellvm has had many contributors over the years. Some contributed to the "legacy
 
 - NSF Grant XPS 1337174 CLCCA: *Improving Parallel Program Reliability Through Novel Approaches to Precise Dynamic Data Race Detection*
 
-- Supported by NSF Grant 1065166: *Validating Program Transformations in a Mechanized LLVM*
+- NSF Grant 1065166: *Validating Program Transformations in a Mechanized LLVM*
 
-- DARPA *MACCHIATO* (with Peraton Labs)
+- NSF Grant 2247088 *Secure and Formally-verified Low-level Languages*
 
-- DARPA TRACTOR: *CRISP - C to Rust for Idiomatic and Safe Programming* with Galois Inc
+- DARPA HR001124S0035 *MACCHIATO: Machine-Learning Assisted Compilers for
+Computationally Heterogeneous Infrastructures with Automated
+Transformations and Optimizations* (with Peraton Labs)
 
-- NSF *Secure and Formally-verified Low-level Languages*
+- DARPA TRACTOR: *CLEAR: Concurrent LLVM Equivalence Analysis through Refinement*
+
+- NSF REU Grant CNS-2244494 *Research Experience in Programming Languages (REPL)* 
 
 {{< img src="images/NSF_Official_logo_Med_Res_600ppi.png" style="height:120px" >}}
 {{< img src="images/Darpa-logo-2026.png" style="height:110px" >}}
