@@ -63,7 +63,16 @@ Section withParams.
 
   (* Exceptions are carried around as [dvalue]s *)
   Definition exc := dvalue.
-  
+
+  (* The control-flow outcome of a terminated block, as resolved by the stack
+     handler ([StackDispatch]): jump to a block, return a value, or unwind the
+     current frame. Lives here (not in Denotation) because [StackDispatch]
+     returns it. *)
+  Variant block_out :=
+  | BJump   (bid : block_id)
+  | BRet    (dv  : dvalue)
+  | BUnwind (e   : exc).
+
   (* Interactions with global variables for the LLVM IR *)
   (* Note: Globals are read-only, except for the initialization. We could want to reflect this in the events themselves. *)
   Variant GlobalE : Type -> Type :=
@@ -82,17 +91,27 @@ Section withParams.
   Variant StackE : Type -> Type :=
     | StackPush (args : list (raw_id * dvalue))
                       : StackE unit                   (* Pushes a fresh environment during a call *)
-    | StackPop        : StackE unit                   (* Pops it back during a ret *)
+    | StackPop        : StackE unit                   (* Pops it back during a ret; propagates an in-flight unwind to the caller *)
     | StackSetHandler : option block_id -> StackE unit (* Insert / remove landingpad for exception *)
     | StackHandler    : StackE (option block_id)      (* Get exception handler for current frame *)
     | StackRaise      : exc -> StackE unit             (* Place exception onto the stack, does not pop *)
-    | StackGetExc     : StackE (option exc).          (* Fetches the currently raised exception if there is one *)
+    | StackGetExc     : StackE (option exc)           (* Fetches the in-flight / caught payload of the current frame *)
+    (* Exception-handling (design B / handler-state): *)
+    | StackThrow      : exc -> StackE unit            (* Mark the current frame as unwinding with this payload *)
+    | StackPending    : StackE bool                   (* Is the current frame unwinding? *)
+    | StackDispatch   : (block_id + dvalue) -> StackE block_out.
+                                                      (* Given the terminator's intended outcome, resolve the
+                                                         actual one: route to the landingpad if unwinding-and-handled,
+                                                         keep unwinding if unhandled, else pass the intended through. *)
   Definition stack_push        {E} `{StackE -< E} args : itree E _ := trigger (StackPush args).
   Definition stack_pop         {E} `{StackE -< E}      : itree E _ := trigger StackPop.
   Definition stack_set_handler {E} `{StackE -< E} ob   : itree E _ := trigger (StackSetHandler ob).
   Definition stack_handler     {E} `{StackE -< E}      : itree E _ := trigger StackHandler.
   Definition stack_raise       {E} `{StackE -< E} e    : itree E _ := trigger (StackRaise e).
   Definition stack_get_exc     {E} `{StackE -< E}      : itree E _ := trigger StackGetExc.
+  Definition stack_throw       {E} `{StackE -< E} e    : itree E _ := trigger (StackThrow e).
+  Definition stack_pending     {E} `{StackE -< E}      : itree E _ := trigger StackPending.
+  Definition stack_dispatch    {E} `{StackE -< E} o    : itree E _ := trigger (StackDispatch o).
 
   (* Interactions with the memory *)
   Variant MemoryE : Type -> Type :=
@@ -121,7 +140,7 @@ Section withParams.
 
     (* Generic calls, refined by [denote_mcfg] *)
   Variant CallE : Type -> Type :=
-    | Call        : forall (t:dtyp) (f:dvalue) (args:list dvalue), CallE (exc + dvalue).
+    | Call        : forall (t:dtyp) (f:dvalue) (args:list dvalue), CallE dvalue.
   Definition call {E} `{CallE -< E} t f args : itree E _ := trigger (Call t f args).
 
   (* ExternalCallE values are the "observable" events by which one should compare the 

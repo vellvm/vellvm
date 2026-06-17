@@ -482,11 +482,11 @@ Section Denotation.
     lwrite id loaded_v;;
     ret tt.
 
-  (* An instruction either completes (returning [None]) or unwinds the current
-     frame (returning [Some e]). Only a [call] / a throwing intrinsic can unwind;
-     every other arm ends in [ret None]. *)
+  (* An instruction has only side-effects (returns [unit]). A [call] / throwing
+     intrinsic may mark the current frame as unwinding ([stack_throw]); the
+     enclosing [denote_code] notices via [stack_pending] and stops. *)
   Definition denote_instr
-    (i: (instr_id * instr dtyp * list (metadata dtyp))) (varargs : option addr) : CFGtop (option exc) :=
+    (i: (instr_id * instr dtyp * list (metadata dtyp))) (varargs : option addr) : CFGtop unit :=
 
     let '(i, md) := i in
     (* The following two lines set up file location information. *)
@@ -503,7 +503,7 @@ Section Denotation.
     | (IId id, INSTR_Op op) =>
         uv <- denote_exp' None op ;;
         lwrite id uv ;;
-        ret None
+        ret tt
             
     (* Allocation *)
     | (IId id, INSTR_Alloca dt annotations) =>
@@ -532,14 +532,13 @@ Section Denotation.
             v <- alloca dt (Z.to_N (dvalue_int_unsigned n)) align;;
             lwrite id v
         end;;
-        ret None
+        ret tt
 
     (* Load *)
     | (IId id, INSTR_Load dt (du,ptr) _) =>
       a <- denote_exp' (Some du) ptr;;
       v <- load dt a;;
-      lwrite id v ;;
-      ret None
+      lwrite id v
 
     (* Store *)
     | (IVoid _, INSTR_Store (dt, val) (du, ptr) _) =>
@@ -549,7 +548,7 @@ Section Denotation.
       | DVALUE_Poison dt => raiseUB (err_loc ++ ": Store to poisoned address.")
       | _ => store dt a v
       end;;
-      ret None
+      ret tt
 
     | (_, INSTR_Store _ _ _) => raise (err_loc ++ ": ILL-FORMED itree ERROR: Store to non-void ID")
 
@@ -557,23 +556,27 @@ Section Denotation.
     (* TODO: technically operand bundles can affect semantics *)
     | (pt, INSTR_Call (dt, f) args _ _) =>
         vs <- map_monad (fun '(t, op) => denote_exp' (Some t) op) (List.map fst args) ;;
-        res <-
+        returned_value <-
           match intrinsic_exp f with
-          | Some s => intrinsic dt s vs varargs
-          | None   => fv <- denote_exp' None f;; call dt fv vs
-          end ;;                                  (* res : exc + dvalue *)
-        (* The callee's unwind is carried as the [inl] value; propagate it. *)
-        match res with
-        | inl exc => ret (Some exc)
-        | inr returned_value =>
-            (match pt with
-             | IVoid _ => ret tt
-             | IId id  => lwrite id returned_value
-             end);;
-            ret None
+          | Some s =>
+              (* an intrinsic signals an unwind via [inl]; turn it into a throw *)
+              res <- intrinsic dt s vs varargs ;;
+              match res with
+              | inl exc => stack_throw exc ;; ret DVALUE_None
+              | inr dv  => ret dv
+              end
+          | None =>
+              (* a plain [call] returns a [dvalue]; if the callee unwound, the
+                 frame is already marked unwinding (propagated on its pop), which
+                 [denote_code] observes after this instruction. *)
+              fv <- denote_exp' None f;; call dt fv vs
+          end ;;
+        match pt with
+        | IVoid _ => ret tt
+        | IId id  => lwrite id returned_value
         end
 
-    | (IVoid _, INSTR_Comment _) => ret None
+    | (IVoid _, INSTR_Comment _) => ret tt
 
     | (pt, INSTR_VAArg (t, ptr_to_args_exp) argty) =>
         ptr_to_args <- denote_exp' (Some DTYPE_Pointer) ptr_to_args_exp;;
@@ -582,20 +585,19 @@ Section Denotation.
         ix <- lift (from_Z 1);;
         args' <- lift (eval_gep argty args [DVALUE_IPTR ix]);;
         store DTYPE_Pointer ptr_to_args args';;
-        (match pt with
-         | IVoid _ => ret tt
-         | IId id  => lwrite id retv
-         end);;
-        ret None
+        match pt with
+        | IVoid _ => ret tt
+        | IId id  => lwrite id retv
+        end
 
     | (IId id, INSTR_AtomicCmpXchg cpx) =>
-        denote_cmpxchg id cpx ;; ret None
+        denote_cmpxchg id cpx
 
     | (IId id, INSTR_AtomicRMW armw) =>
-        denote_atomicrmw id armw ;; ret None
+        denote_atomicrmw id armw
     (* TODO: revisit with a proper concurrency model *)
 
-    | (_, INSTR_Fence _ _) => ret None
+    | (_, INSTR_Fence _ _) => ret tt
 
     (* Currently unhandled itree instructions *)
     (* Landingpad: bind the in-flight exception payload (parked in this frame by
@@ -604,11 +606,10 @@ Section Denotation.
        behave identically, both just delivering the payload. *)
     | (IId id, INSTR_LandingPad _ _ _) =>
         oe <- stack_get_exc ;;
-        (match oe with
-         | Some e => lwrite id e
-         | None   => raise (err_loc ++ ": landingpad reached with no in-flight exception")
-         end);;
-        ret None
+        match oe with
+        | Some e => lwrite id e
+        | None   => raise (err_loc ++ ": landingpad reached with no in-flight exception")
+        end
     | (IVoid _, INSTR_LandingPad _ _ _) =>
         raise (err_loc ++ ": landingpad must define a value")
 
@@ -639,17 +640,14 @@ Section Denotation.
     - exact (raise_error "Ill-typed switch.").
   Defined.
 
-  (* The control-flow outcome of a terminated block: jump to another block,
-     return a value from the function, or unwind the current frame. *)
-  Variant block_out :=
-  | BJump   (bid : block_id)
-  | BRet    (dv  : dvalue)
-  | BUnwind (e   : exc).
-
-  (* A [terminator] jumps to a new block ([BJump]), returns a [dvalue]
-     ([BRet]), or unwinds the current frame with a payload ([BUnwind]). *)
+  (* A [terminator] produces an *intended* outcome ([block_id + dvalue]: jump
+     or return). The actual outcome is resolved by [stack_dispatch] in
+     [denote_block], which may divert to a landingpad or unwind if the frame is
+     marked unwinding. [invoke] registers a handler and, on a callee unwind,
+     leaves the frame unwinding for the dispatch to catch; [resume] marks the
+     frame unwinding. *)
   Definition denote_terminator
-    (trm: (instr_id * terminator dtyp * list (metadata dtyp))) : CFGtop block_out :=
+    (trm: (instr_id * terminator dtyp * list (metadata dtyp))) : CFGtop (block_id + dvalue) :=
     let '(iid, t, md) := trm in
     let err_loc := location_error_string md in
     let bogus := set_loc err_loc in
@@ -658,24 +656,24 @@ Section Denotation.
 
     | TERM_Ret (dt, op) =>
       dv <- denote_exp' (Some dt) op ;;
-      ret (BRet dv)
+      ret (inr dv)
 
     | TERM_Ret_void =>
-        ret (BRet DVALUE_None)
+        ret (inr DVALUE_None)
 
     | TERM_Br (dt,op) br1 br2 =>
       v <- denote_exp' (Some dt) op ;;
       match v with
       | DVALUE_I 1 comparison_bit =>
         if equ comparison_bit one then
-          ret (BJump br1)
+          ret (inl br1)
         else
-          ret (BJump br2)
+          ret (inl br2)
       | DVALUE_Poison dt => raiseUB (err_loc ++ ": Branching on poison.")
       | _ => raise (err_loc ++ ": Br got non-bool value")
       end
 
-    | TERM_Br_1 br => ret (BJump br)
+    | TERM_Br_1 br => ret (inl br)
 
     | TERM_Switch (dt,e) default_br dests =>
       selector <- denote_exp' (Some dt) e;;
@@ -687,7 +685,7 @@ Section Denotation.
                         s <- lift (coerce_integer_to_int (Some sz) (denote_int_syntax x));;
                         ret (s,id))
                      dests;;
-        BJump <$> lift (select_switch selector default_br switches)
+        inl <$> lift (select_switch selector default_br switches)
 
     | TERM_Unreachable => raiseUB (err_loc ++ ": IMPOSSIBLE: unreachable in reachable position")
 
@@ -695,43 +693,47 @@ Section Denotation.
     | TERM_Invoke (dt, fnptrval) args to_label unwind_label anns _ =>
       uvs <- map_monad (fun '(t, op) => denote_exp' (Some t) op) (List.map fst args) ;;
       fv <- denote_exp' None fnptrval ;;
-      rv <- call dt fv uvs ;;                       (* exc + dvalue *)
-      match rv with
-      | inl exn =>
-          (* Callee unwound: stash the payload in this frame so the landingpad
-             at [unwind_label] can retrieve it, then divert there. *)
-          stack_raise exn ;;
-          ret (BJump unwind_label)
-      | inr returned_value =>
-          (match iid with
-           | IVoid _ => ret tt
-           | IId id  => lwrite id returned_value
-           end);;
-          ret (BJump to_label)
-      end
+      stack_set_handler (Some unwind_label) ;;
+      rv <- call dt fv uvs ;;                       (* dvalue *)
+      p  <- stack_pending ;;
+      if (p : bool)
+      then
+        (* The callee unwound: leave the handler in place and the frame marked
+           unwinding; the [stack_dispatch] in [denote_block] diverts to
+           [unwind_label]. (The intended [to_label] is overridden.) *)
+        ret (inl to_label)
+      else
+        (* Normal return: deregister the handler, bind the result, fall through. *)
+        stack_set_handler None ;;
+        (match iid with
+         | IVoid _ => ret tt
+         | IId id  => lwrite id rv
+         end);;
+        ret (inl to_label)
 
     | TERM_Resume (t, expr) =>
-      (* Unwind the current frame with the given payload, as a value. *)
+      (* Mark the frame as unwinding with the given payload; the dispatch then
+         propagates (the handler having been cleared when this pad was entered).
+         The returned value is a placeholder, overridden by the dispatch. *)
       exn <- denote_exp' (Some t) expr;;
-      ret (BUnwind exn)
+      stack_throw exn ;;
+      ret (inr DVALUE_None)
 
     (* Currently unhandled VIR terminators *)
     | TERM_IndirectBr _ _ => raise (err_loc ++ ": Unsupport itree terminator")
     end.
 
-  (* Denote a list of instructions, short-circuiting on the first one that
-     unwinds ([Some e]); otherwise the code completes ([None]). *)
-  Definition denote_code (c: code dtyp) (varargs : option addr) : CFGtop (option exc) :=
+  (* Denote a list of instructions, stopping as soon as one marks the frame as
+     unwinding (observed via [stack_pending]); the rest of the block is skipped. *)
+  Definition denote_code (c: code dtyp) (varargs : option addr) : CFGtop unit :=
     ITree.iter
       (fun rest =>
          match rest with
-         | [] => ret (inr None)
+         | [] => ret (inr tt)
          | i :: rest' =>
-             oe <- denote_instr i varargs ;;
-             match oe with
-             | Some e => ret (inr (Some e))
-             | None   => ret (inl rest')
-             end
+             denote_instr i varargs ;;
+             p <- stack_pending ;;
+             if (p : bool) then ret (inr tt) else ret (inl rest')
          end) c.
 
   Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : CFGtop (local_id * dvalue) :=
@@ -753,15 +755,17 @@ Section Denotation.
     map_monad (fun '(id,dv) => lwrite id dv) dvs;;
     ret tt.
 
-  (* A block runs its phis and code, then either unwinds (if the code did) or
-     evaluates its terminator. *)
+  (* A block runs its phis and code; if the code did not unwind it evaluates the
+     terminator. Either way the (intended) outcome is resolved by [stack_dispatch],
+     which diverts to a landingpad or unwinds if the frame is marked unwinding. *)
   Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option addr) : CFGtop block_out :=
     denote_phis bid_from (blk_phis b);;
-    oe <- denote_code (blk_code b) varargs;;
-    match oe with
-    | Some e => ret (BUnwind e)
-    | None   => denote_terminator (blk_term b)
-    end.
+    denote_code (blk_code b) varargs;;
+    p <- stack_pending ;;
+    intended <- (if (p : bool)
+                 then ret (inr DVALUE_None)   (* code unwound: skip the terminator *)
+                 else denote_terminator (blk_term b)) ;;
+    stack_dispatch intended.
 
   (* Our denotation currently contains two kinds of indirections: jumps to labels, internal to
      a cfg, and calls to functions, that jump from a cfg to another.
@@ -777,10 +781,12 @@ Section Denotation.
      If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
    *)
 
-  (* The ocfg iteration now carries a third outcome: a block may unwind, in
-     which case the whole cfg unwinds with that payload ([inr (inl e)]). *)
+  (* [denote_block] returns the dispatch-resolved [block_out]. On [BUnwind] the
+     frame is unwinding (the payload is held in [stack_exc] / propagated on pop),
+     so the cfg simply exits with a neutral [dvalue] — the unwind itself is
+     carried by the stack-handler state, not by this value. *)
   Definition denote_ocfg (bks: ocfg dtyp) (varargs : option addr)
-    : (block_id * block_id) -> CFGtop ((block_id * block_id) + (exc + dvalue)) :=
+    : (block_id * block_id) -> CFGtop ((block_id * block_id) + dvalue) :=
     ITree.iter
       (fun '((bid_from,bid_src) : block_id * block_id) =>
          match find_block bks bid_src with
@@ -789,28 +795,25 @@ Section Denotation.
              bd <- denote_block block_src bid_from varargs;;
              match bd with
              | BJump bid_target => ret (inl (bid_src,bid_target))
-             | BRet dv          => ret (inr (inr (inr dv)))
-             | BUnwind e         => ret (inr (inr (inl e)))
+             | BRet dv          => ret (inr (inr dv))
+             | BUnwind _         => ret (inr (inr DVALUE_None))
              end
          end).
 
-  Definition denote_cfg (f: cfg dtyp) (varargs : option addr) : CFGtop (exc + dvalue) :=
+  Definition denote_cfg (f: cfg dtyp) (varargs : option addr) : CFGtop dvalue :=
     r <- denote_ocfg (blks f) varargs (init f,init f) ;;
     match r with
     | inl bid => raise ("Can't find block in denote_cfg " ++ show (snd bid))
-    | inr ed  => ret ed
+    | inr uv  => ret uv
     end.
 
-  (* The denotation of an itree function is a coq function that takes a list of
-     dvalues and returns the appropriate semantics: a function either returns
-     normally with a [dvalue] or unwinds with an exception [exc]. This [exc +
-     dvalue] is the value carried by [CallE], so a callee's unwind crosses the
-     [mrec] knot and a caller's [invoke]/[call] can observe it as a value.
-     There is no abortive exception event in the denotation (cf. the design note
-     in todonotes.md): unwinding is threaded explicitly via [denote_instr]'s
-     [option exc], [block_out], and [denote_cfg]'s [exc + dvalue]. *)
+  (* The denotation of an itree function is a coq function returning a [dvalue].
+     A function that unwinds returns a neutral [dvalue]; the unwind is carried by
+     the stack-handler state ([stack_unwinding]/[stack_exc]), which survives the
+     frame pop (propagated to the caller) and crosses the [mrec] knot. There is
+     no exception value in the denotation's types (design B; cf. todonotes.md). *)
   Definition function_denotation : Type :=
-    list dvalue -> CFGtop (exc + dvalue).
+    list dvalue -> CFGtop dvalue.
 
   Fixpoint combine_lists_varargs {A B:Type} (l1:list A) (l2:list B) : EOU (list (A * B) * list B) :=
     match l1, l2 with
@@ -848,9 +851,9 @@ Section Denotation.
   Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
     fun (args : list dvalue) =>
       varg <- push_call_frame df args;;
-      (* [denote_cfg] already yields [exc + dvalue]; [pop_call_frame] runs on
-         both the normal and the unwinding path, so the frame is always torn
-         down before the (value-carried) unwind continues to the caller. *)
+      (* [pop_call_frame] runs on both the normal and the unwinding path; on an
+         unwind, [StackPop] propagates [stack_unwinding]/[stack_exc] to the
+         caller frame, so the caller observes the in-flight unwind. *)
       rv <- denote_cfg (df_instrs df) (Some varg);;
       pop_call_frame;;
       ret rv.
@@ -878,17 +881,15 @@ Section Denotation.
 
   Definition denote_mcfg
     (fundefs : IntMap function_denotation) (dt : dtyp)
-    (f_value : dvalue) (args : list dvalue) : MCFGtop (dvalue + dvalue) :=
+    (f_value : dvalue) (args : list dvalue) : MCFGtop dvalue :=
     @mrec CallE (ExternalCallE +' _)
       (fun T call =>
          match call with
          | Call dt fv args =>
              match lookup_defn fv fundefs with
              | Some f_den => (* If the call is internal *)
-                 (* [f_den] already produces [exc + dvalue] (see [denote_function]),
-                    so the callee's unwind crosses the [mrec] knot as this value. *)
                  f_den args
-             | None => inr <$> external_call dt fv args
+             | None => external_call dt fv args
              end
          end) _ (Call dt f_value args).
   

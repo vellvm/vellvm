@@ -28,8 +28,9 @@ Section StackMap.
 
   Record stack_frame :=
     { stack_vars : FMapAList.alist raw_id dvalue;
-      stack_handler : option block_id;
-      stack_exc : option dvalue;
+      stack_handler : option block_id;   (* active landingpad target, set by [invoke] *)
+      stack_exc : option dvalue;          (* in-flight / caught exception payload *)
+      stack_unwinding : bool;             (* is this frame currently propagating an unwind? *)
       stack_loc : option string;
     }.
   
@@ -54,7 +55,7 @@ Section StackMap.
       match e with
       | StackPush args =>
           let init := List.fold_right (fun '(x,dv) => Maps.add x dv) Maps.empty args in
-          let frame := Build_stack_frame init None None (Some (printer_object.(printer_get_loc) tt)) in
+          let frame := Build_stack_frame init None None false (Some (printer_object.(printer_get_loc) tt)) in
           ret (local_stack_object.(local_stack_push) frame);;
           Ret ((frame, env::stk), tt)
       | StackPop =>
@@ -62,24 +63,46 @@ Section StackMap.
           | [] => raise "Tried to pop too many stack frames."
           | (env'::stk') =>
               ret (local_stack_object.(local_stack_pop) tt);;
-              Ret ((env',stk'), tt)
+              (* If the frame being popped is unwinding, propagate the unwind
+                 (and its payload) to the caller frame so the caller observes it. *)
+              let env'' :=
+                if env.(stack_unwinding)
+                then Build_stack_frame env'.(stack_vars) env'.(stack_handler) env.(stack_exc) true env'.(stack_loc)
+                else env' in
+              Ret ((env'',stk'), tt)
           end
       | StackSetHandler handler =>
-          let new_frame := Build_stack_frame env.(stack_vars) handler env.(stack_exc) env.(stack_loc) in
+          let new_frame := Build_stack_frame env.(stack_vars) handler env.(stack_exc) env.(stack_unwinding) env.(stack_loc) in
           Ret ((new_frame, stk), tt)
-      | StackHandler =>
-          match env with
-          | Build_stack_frame stack_vars stack_handler stack_exc stack_loc =>
-              Ret ((env, stk), stack_handler)
-          end
+      | StackHandler => Ret ((env, stk), env.(stack_handler))
       | StackRaise x =>
-          let new_frame := Build_stack_frame env.(stack_vars) env.(stack_handler) (Some x) env.(stack_loc) in
+          let new_frame := Build_stack_frame env.(stack_vars) env.(stack_handler) (Some x) env.(stack_unwinding) env.(stack_loc) in
           Ret ((new_frame, stk), tt)
-      | StackGetExc =>
-          match env with
-          | Build_stack_frame stack_vars stack_handler stack_exc stack_loc =>
-              Ret ((env, stk), stack_exc)
-          end
+      | StackGetExc => Ret ((env, stk), env.(stack_exc))
+      | StackThrow x =>
+          (* Mark the current frame as unwinding with payload [x]. *)
+          let new_frame := Build_stack_frame env.(stack_vars) env.(stack_handler) (Some x) true env.(stack_loc) in
+          Ret ((new_frame, stk), tt)
+      | StackPending => Ret ((env, stk), env.(stack_unwinding))
+      | StackDispatch intended =>
+          if env.(stack_unwinding)
+          then
+            match env.(stack_handler) with
+            | Some hbid =>
+                (* Caught: stop unwinding, keep [stack_exc] as the payload for the
+                   landingpad, clear the handler (one-shot), divert to [hbid]. *)
+                let new_frame := Build_stack_frame env.(stack_vars) None env.(stack_exc) false env.(stack_loc) in
+                Ret ((new_frame, stk), BJump hbid)
+            | None =>
+                (* No handler here: keep unwinding and propagate. *)
+                let x := match env.(stack_exc) with Some x => x | None => DVALUE_None end in
+                Ret ((env, stk), BUnwind x)
+            end
+          else
+            Ret ((env, stk), match intended with
+                             | inl bid => BJump bid
+                             | inr dv  => BRet dv
+                             end)
       end.
 
   Definition upd_local_sf (env : stack_frame) (l : local_env) : stack_frame :=
@@ -87,6 +110,7 @@ Section StackMap.
       stack_vars := l ;
       stack_handler := env.(stack_handler) ;
       stack_exc := env.(stack_exc) ;
+      stack_unwinding := env.(stack_unwinding) ;
       stack_loc := env.(stack_loc)
     |}.
   

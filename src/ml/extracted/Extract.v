@@ -100,7 +100,7 @@ Extract Constant globals_object => "
   ".
 
 Extract Constant local_stack_object => "
-  let local_stack_ref = ref [{ stack_vars = []; stack_handler = None; stack_exc = None; stack_loc = None }] in
+  let local_stack_ref = ref [{ stack_vars = []; stack_handler = None; stack_exc = None; stack_unwinding = false; stack_loc = None }] in
   let local_stack_set ls = (local_stack_ref := match !local_stack_ref with [] -> Stdlib.failwith ""Empty stack, can't set"" | _::xs -> ls :: xs) in
   let local_stack_get = fun _ -> !local_stack_ref in
   let local_stack_push ls = local_stack_ref := ls :: !local_stack_ref in

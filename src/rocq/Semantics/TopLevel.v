@@ -278,11 +278,18 @@ Section withParams.
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
     'libraries <- map_monad address_one_library_function (library_functions (m_declarations mcfg));;
     'addr <- gread entry ;;
-    'rv <- denote_mcfg (IP.of_list (defns ++ libraries)) ret_typ addr args;;
-    match rv with
-    | inl exc => raiseLLVM exc
-    | inr rv => ret rv
-    end.
+    rv <- denote_mcfg (IP.of_list (defns ++ libraries)) ret_typ addr args;;
+    (* An uncaught panic leaves the (top) frame marked unwinding, with the
+       payload in [stack_exc]; surface it as an [LLVMExc] (the only use of that
+       event now — internal unwinding is entirely handler-state). *)
+    p <- stack_pending ;;
+    if (p : bool)
+    then oe <- stack_get_exc ;;
+         match oe with
+         | Some e => raiseLLVM e
+         | None   => raiseLLVM DVALUE_None
+         end
+    else ret rv.
 
   (**
      Now that we know how to denote a whole llvm program, we can _interpret_
@@ -300,7 +307,7 @@ Section withParams.
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
         (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog)))
-    in interp_mcfg t [] (Build_stack_frame [] None None None,[]) initial_state.
+    in interp_mcfg t [] (Build_stack_frame [] None None false None,[]) initial_state.
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts
