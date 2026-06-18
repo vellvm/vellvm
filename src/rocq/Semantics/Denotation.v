@@ -726,17 +726,15 @@ Section Denotation.
 
   (* Denote a list of instructions, stopping as soon as one marks the frame as
      unwinding (observed via [stack_pending]); the rest of the block is skipped. *)
-  Definition denote_code (c: code dtyp) (varargs : option addr) : CFGtop unit :=
-    ITree.iter
-      (fun rest =>
-         match rest with
-         | [] => ret (inr tt)
-         | i :: rest' =>
-             denote_instr i varargs ;;
-             p <- stack_pending ;;
-             if (p : bool) then ret (inr tt) else ret (inl rest')
-         end) c.
-
+  Fixpoint denote_code (c: code dtyp) (varargs : option addr) : CFGtop unit :=
+    match c with
+    | [] => ret tt
+    | i :: c' =>
+        denote_instr i varargs ;;
+        p <- stack_pending ;;
+        if (p : bool) then ret tt else denote_code c' varargs
+    end.
+  
   Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : CFGtop (local_id * dvalue) :=
     let '(id, Phi dt args, md) := id_p in
     let err_loc := location_error_string md in
