@@ -11,9 +11,6 @@
 ;     (mirrors a Rust frame running drop glue, then re-raising)
 ;   - @run catches it in a catch-all landingpad and stops the unwind
 ;     (mirrors a `catch_unwind` boundary)
-;
-; NOTE: not yet runnable — depends on exception semantics that are still TODO.
-; Kept here so the unwind path is exercised once that support lands.
 
 declare void @llvm.vellvm.internal.throw()
 

@@ -699,9 +699,10 @@ Section Denotation.
       if (p : bool)
       then
         (* The callee unwound: leave the handler in place and the frame marked
-           unwinding; the [stack_dispatch] in [denote_block] diverts to
-           [unwind_label]. (The intended [to_label] is overridden.) *)
-        ret (inl to_label)
+           unwinding. [stack_dispatch] in [denote_block] ignores this intended
+           outcome and diverts to [unwind_label] via the installed handler, so
+           the value below is a dead placeholder (see [StackDispatch]). *)
+        ret (inr DVALUE_None)
       else
         (* Normal return: deregister the handler, bind the result, fall through. *)
         stack_set_handler None ;;
