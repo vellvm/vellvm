@@ -31,7 +31,7 @@ LLVM IR semantics characterize many operations as resulting in **unedefined beha
 
 ##  What computation features are _not_ supported?
  - full C++-style exceptions via the `landing_pad` and related instructions
- - architecture-specific floatint point values
+ - architecture-specific floating point values
  - inlined assembly
  - concurrency and concurrency-related instructions
  - some semantics-relevant instruction annotations
