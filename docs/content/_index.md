@@ -25,6 +25,8 @@ Program terminated with: i64 120
 
 - Find the [Vellvm source on github](https://github.com/vellvm/vellvm/) {{< img src="images/git-icon.svg" style="height:15px" >}} 
 
+- Find out more [about the Vellvm framework](about)
+
 - Learn how to [run and add test cases](tests)
 
 - Understand the [structure of the semantics](structure)

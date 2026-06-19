@@ -24,6 +24,10 @@ lastmod = [':git', ':fileModTime']
     url = ''
     weight = 10
   [[menu.main]]
+    name = 'About'
+    url = '/about/'
+    weight = 15
+  [[menu.main]]
     name = 'Github'
     url = 'https://www.github.com/vellvm/vellvm'
     weight = 20
