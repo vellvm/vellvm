@@ -74,10 +74,6 @@ Section StackMap.
       | StackSetHandler handler =>
           let new_frame := Build_stack_frame env.(stack_vars) handler env.(stack_exc) env.(stack_unwinding) env.(stack_loc) in
           Ret ((new_frame, stk), tt)
-      | StackHandler => Ret ((env, stk), env.(stack_handler))
-      | StackRaise x =>
-          let new_frame := Build_stack_frame env.(stack_vars) env.(stack_handler) (Some x) env.(stack_unwinding) env.(stack_loc) in
-          Ret ((new_frame, stk), tt)
       | StackGetExc => Ret ((env, stk), env.(stack_exc))
       | StackThrow x =>
           (* Mark the current frame as unwinding with payload [x]. *)
