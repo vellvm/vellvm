@@ -19,6 +19,7 @@ From Vellvm Require Import
   Semantics.IntrinsicsDefinitions
   Semantics.InterpretationStack
   Semantics.VellvmIntegers
+  Semantics.Printfdefn
   Semantics.Libraries
   QC.ShowAST.
 (* end hide *)
@@ -71,7 +72,7 @@ Section withParams.
   (* TODO: link against printf's llvm ir code directly. If impossible, revive
      the printf_definition hack
    *)
-  Definition PREDEFINED_FUNCTIONS : ll_toplevel_entities := List.concat [].
+  Definition PREDEFINED_FUNCTIONS : ll_toplevel_entities := List.concat [printf_definition].
 
   (* Example ensure_functions_defined : negb (Nat.eqb (List.length PREDEFINED_FUNCTIONS) O) .  *)
   (* Proof. reflexivity. Qed.   *)
