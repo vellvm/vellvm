@@ -1,14 +1,30 @@
 # `make test` failures on the `ctrees-minimal` branch
 
-Snapshot taken 2026-05-29, after restoring `make vellvm` linkage.
+Snapshot re-run 2026-06-20 (original snapshot 2026-05-29, after restoring
+`make vellvm` linkage).
 
 `./vellvm -l libll/rust-intrinsics.ll -test` runs three phases. Totals:
 
 | Phase | Suite | Passed | Failed |
 |---|---|---:|---:|
 | 1 | Built-in `Test.suite` (`exec_tests`) | 149/153 | 4 |
-| 2 | Pretty-printing round-trip (`test_pp_dir ../tests`) | 665/665 | 0 |
-| 3 | Assertion tests (`test_dir ../tests`) | 257/259 | 2 |
+| 2 | Pretty-printing round-trip (`test_pp_dir ../tests`) | 427/427 | 0 |
+| 3 | Assertion tests (`test_dir ../tests`) | 229/235 | 6 |
+
+> **Note (2026-06-20):** Categories A and B below are resolved (see the update
+> banners that follow). The test corpus has grown since the original
+> 2026-05-29 snapshot — notably new `../tests/exceptions/` (invoke / landingpad
+> / unwind) and `../tests/llvm-arith/{double,float}/` (NaN / hex-float-literal)
+> suites. A float/NaN-handling fix (2026-06-20) eliminated the entire
+> `llvm-arith` failure family, and re-plugging `printf`/`puts` (2026-06-20,
+> see Category C) cleared `ll/hello.ll` and `ll/printf.ll`. The remaining
+> failures now all fall under **Category D**:
+>
+> - **Phase 1 (4):** `bitcast2.ll`, `extract_value_undef.ll` → **D.1**;
+>   `gep_undef.ll` → **D.2**; `invoke_throw.ll` → **D.3**.
+> - **Phase 3 (6):** the six `exceptions/*.ll` tests (`locals_across_catch`,
+>   `invoke_resume_landingpad`, `recover_and_continue`, `conditional_catch`,
+>   `invoke_result`, `deep_unwind`) → **D.3** (same invoke/unwind gap).
 
 > **Update 2026-05-29:** Category B is resolved. `TopLevel.dvalue_eqb` is now
 > extracted (closed instantiation in `TopLevel.v`) and used in the three OCaml
@@ -60,16 +76,31 @@ Caused by the `Stdlib.compare ... = 0` substitute introduced in `ml/main.ml`, `m
 
 **Fix:** re-export `dvalue_eqb` from `rocq/Semantics/DynamicValues.v` (add it to `Separate Extraction` in `Extract.v`), or write a structural OCaml comparator that does not compare opaque address bytes.
 
-## Category C — External function / intrinsic coverage gap  (2 phase-3)
+## Category C — External function / intrinsic coverage gap  (RESOLVED 2026-06-20)
+
+> **Update 2026-06-20:** Resolved. Both `tests/ll/hello.ll` and
+> `tests/ll/printf.ll` now pass (verified: `hello.ll` prints `Hello`,
+> `printf.ll` prints `Some format strings: 42`).
+>
+> - `printf` is re-plugged via `PREDEFINED_FUNCTIONS := List.concat
+>   [printf_definition]` (`rocq/Semantics/TopLevel.v:75`), linked into every
+>   user program at `TopLevel.v:303` (`link PREDEFINED_FUNCTIONS prog`).
+>   `printf_definition` is the LLVM-IR definition in
+>   `rocq/Semantics/Printfdefn.v:34`.
+> - `puts`/`putchar` are provided as native denotations in
+>   `rocq/Semantics/Libraries.v:130` (`_LIBRARIES`) and wired through
+>   `library_functions` at `TopLevel.v:280`.
+
+**Original symptom (for the record):**
 
 - `tests/ll/hello.ll` — `Could not look up global id printf`.
 - `tests/ll/printf.ll` — `Uninterpreted Call: ... DTYPE_Pointer, 1 dvalues`.
 
-`TopLevel.PREDEFINED_FUNCTIONS` is now `List.concat []` in `rocq/Semantics/TopLevel.v:278` (the `printf_definition` entry is commented out), so `printf` is unknown to the linker pass and reaches the interpreter as an external call.
+`TopLevel.PREDEFINED_FUNCTIONS` was `List.concat []` (the `printf_definition`
+entry was commented out), so `printf` was unknown to the linker pass and
+reached the interpreter as an external call.
 
-**Fix:** re-add `printf` (and `puts`) to the predefined-functions table, in the same spirit as the existing `putchar_denotation` / `puts_denotation` already defined in `TopLevel.v`.
-
-## Category D — Minimal-interpreter semantic gaps  (4 phase-1)
+## Category D — Minimal-interpreter semantic gaps  (4 phase-1 + 6 phase-3)
 
 > Phase 3 originally had two Category-D failures (`insertAndExtractValue.ll`
 > `@testExtractX` / `@testExtractY` — `insert_into_str: invalid aggregate
@@ -151,7 +182,14 @@ pointer.
 
 The second is one match arm and is sufficient for this test.
 
-### D.3 — `invoke` / unwind machinery missing  (`invoke_throw.ll`)
+### D.3 — `invoke` / unwind machinery missing  (`invoke_throw.ll` + 6 phase-3 `exceptions/*.ll`)
+
+> **Update 2026-06-20:** This gap now also accounts for the entire new
+> `../tests/exceptions/` phase-3 suite: `locals_across_catch.ll`,
+> `invoke_resume_landingpad.ll`, `recover_and_continue.ll`,
+> `conditional_catch.ll`, `invoke_result.ll`, `deep_unwind.ll`. All exercise
+> `invoke`/`landingpad`/`resume`, so they share the `invoke_throw.ll` root
+> cause below and will be cleared together by the TODO #1 rewire.
 
 ```llvm
 define void @raise2() { call void @llvm.vellvm.internal.throw() ret void }
@@ -199,7 +237,8 @@ This is the big rebuild from TODO #1 of the branch notes, not a small fix.
 
 1. ~~**Category A**~~ — done (quarantine + parser refusal).
 2. ~~**Category B**~~ — done (`dvalue_eqb` extracted).
-3. **Category C** — re-add `printf`/`puts` denotations (small Rocq change).
+3. ~~**Category C**~~ — done (`printf` re-linked via `PREDEFINED_FUNCTIONS`,
+   `puts`/`putchar` via `_LIBRARIES`).
 4. **Category D**:
    - **D.1** (poison-propagation in binops) — three line edits in
      `DynamicValues.v`. Clears `bitcast2.ll` and `extract_value_undef.ll`.
