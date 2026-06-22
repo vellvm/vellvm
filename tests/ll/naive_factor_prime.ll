@@ -47,3 +47,5 @@ define i64 @main(i64 %argc, i8** %arcv) {
   %result = call i64 @naive_prime(i64 19)
   ret i64 %result
 }
+
+; ASSERT EQ: i64 1 = call i64 @main(i64 0, i8** null)

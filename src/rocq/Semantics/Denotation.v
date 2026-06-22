@@ -177,7 +177,7 @@ Section Denotation.
     | EXP_Float x =>
         match top with
         | None                      => raise ("denote_exp given untyped EXP_Float")
-        | Some (DTYPE_FP FP_float)  => lift (denote_float_syntax_as_float FP_float x)
+        | Some (DTYPE_FP fpv)       => lift (denote_float_syntax_as_float fpv x)
         | _                         => raise ("bad type for constant float")
         end
 

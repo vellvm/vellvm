@@ -30,3 +30,5 @@ define i64 @main(i64 %argc, i8** %argv) {
   %1 = call i64 @sum_tree(%struct.Node* @test)
   ret i64 %1
 }
+
+; ASSERT EQ: i64 116 = call i64 @main(i64 0, i8** null)

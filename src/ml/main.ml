@@ -25,20 +25,10 @@ let string_of_function_id id : string =
   )
 
 
-(* test harness
-   ------------------------------------------------------------- *)
+(* test harness ------------------------------------------------------------- *)
 exception Ran_tests of bool
 
-let suite = ref Test.suite
-
-let poison_test_flag = ref false
 let srctgt_test_flag = ref false
-
-let exec_tests () =
-  Platform.configure () ;
-  let outcome = run_suite !suite in
-  Printf.printf "%s\n" (outcome_to_string outcome) ;
-  raise (Ran_tests (successful outcome))
 
 let compare_dvalues_exn dv1 dv2 ans : unit =
   if TopLevel.dvalue_eqb dv1 dv2 = ans then ()
@@ -112,8 +102,6 @@ let make_test_h run name ll_ast t : (string * assertion) option =
       let t_void = Assertion.typ_to_dtyp (LLVMAst.TYPE_Void) in
       Some (str, (fun () -> ignore (run_to_value t_void entry args ll_ast ())))
   | Assertion.POISONTest (dtyp, entry, args) ->
-     if !poison_test_flag
-     then
        let expected =
            DV.DVALUE_Poison
            dtyp
@@ -130,8 +118,7 @@ let make_test_h run name ll_ast t : (string * assertion) option =
        in
        let result = run_to_value dtyp entry args ll_ast in
        Some (str, dvalue_eq_assertion name result (fun () -> expected))
-     else
-       None
+
   | Assertion.SRCTGTTest (mode, expected_rett, generated_args) ->
       let v_args, src_fn_str, tgt_fn_str, sum_ast =
         match generated_args with
@@ -240,11 +227,6 @@ let ast_pp_file_inner path =
 
 let ast_pp_file path = Platform.configure () ; ast_pp_file_inner path
 
-let ast_pp_dir dir =
-  Platform.configure () ;
-  let files = Test.ll_files_of_dir dir in
-  List.iter ast_pp_file_inner files
-
 let link_dir dir =
   Platform.configure () ;
   let files = Test.ll_files_of_dir dir in
@@ -299,102 +281,39 @@ let test_dir dir =
   Printf.printf "%s\n" (outcome_to_string outcome) ;
   raise (Ran_tests (successful outcome))
 
-let test_directory = ref "../tests"
-
 let test_all () =
+  let test_directory = "../tests" in
   let _ =
     Printf.printf "============== RUNNING TEST SUITE ==============\n"
   in
-  let b1 = try exec_tests () with Ran_tests b -> b in
-  let b2 = try test_pp_dir !test_directory with Ran_tests b -> b in
-  let b3 = try test_dir !test_directory with Ran_tests b -> b in
-  raise (Ran_tests (b1 && b2 && b3))
-
-let _test_all' () =
-  let _ =
-    Printf.printf "============== RUNNING TEST SUITE ==============\n"
-  in
-  let b1 = try exec_tests () with Ran_tests b -> b in
-  let b2 = try test_pp_dir !test_directory with Ran_tests b -> b in
-  let b4 = try test_dir !test_directory with Ran_tests b -> b in
-  let b3 = try Tester.test_dir !test_directory with Ran_tests b -> b in
-  raise (Ran_tests (b1 && b2 && b3 && b4))
-
-(* let test_genAlive2 () = *)
-(*   let _ = *)
-(*     Printf.printf "============== RUNNING GENALIVE2 ==============\n" *)
-(*   in *)
-(*   let es = Generate.sample_exp 10 in *)
-(*   let output_charlist : char list = *)
-(*     (coq_DShowShow (coq_DShowList (dshow_exp dshow_typ false))) es *)
-(*   in *)
-(*   let buf = Buffer.create 16 in *)
-(*   List.iter (Buffer.add_char buf) output_charlist ; *)
-(*   Printf.printf "%s\n" (Buffer.contents buf) *)
-(* (\* () *\) *)
-
-let get_csmith_dir_name () = "generators/csmith/"
-
-let run_csmith () =
-  let c_file_name : string =
-    Filename.(concat (get_csmith_dir_name ()) "temporary_csmith.c")
-  in
-  let llvm_file_name : string =
-    Filename.(concat (get_csmith_dir_name ()) "temporary_csmith.ll")
-  in
-  let command1 : string = "./generators/csmith/csmith > " ^ c_file_name in
-  let command2 =
-    "clang -emit-llvm -S -I./generators/csmith/runtime -O0 -std=c99 "
-    ^ c_file_name ^ " -o " ^ llvm_file_name
-  in
-  let _ = Sys.command (command1 ^ "; " ^ command2) in
-  (* let _ = Sys.command command2 in *)
-  let res = Driver.run_ll_file [] llvm_file_name in
-  match res with
-  | Ok dval -> Printf.printf "%s\n" (string_of_dvalue dval)
-  | Error exit_cond ->
-      Printf.printf "%s\n" (Result.string_of_exit_condition exit_cond)
+  let b1 = try test_pp_dir test_directory with Ran_tests b -> b in
+  let b2 = try test_dir test_directory with Ran_tests b -> b in
+  raise (Ran_tests (b1 && b2))
 
 let command_line_args = ref ["todo"]
-let fast_mode_flag = ref false
 
 let args =
-  [ ( "-set-test-dir"
-    , Set_string test_directory
-    , "set the path to the tests directory [default='../tests']" )
-  ; ( "-test"
+  [ ( "-test"
     , Unit test_all
-    , "run comprehensive test case:\n\
-       \tequivalent to running three times with\n\
-       \t -test-suite, then\n\
+    , "run comprehensive test suite\n\
+       \tequivalent to running:\n\
        \t -test-pp-dir ../tests, then\n\
        \t -test-dir ../tests" )
-  ; ("-enable-poison-tests", Set poison_test_flag, "enable poison test cases")
-  ; ("-enable-srctgt-tests", Set srctgt_test_flag, "enable non-deterministic srctgt alive2 test cases")
-  ; ( "-test-suite"
-    , Unit exec_tests
-    , "run the test suite, ignoring later inputs" )
-  ; ("-test-file", String test_file, "run the assertions in a given file")
-  ; ("-test-dir", String test_dir, "run all .ll files in the given directory")
-  ; ( "-test-dir2"
-    , String Tester.test_dir
-    , "run all .ll files in the given directory and aggregate stats" )
-  ; ( "-test-pp-file"
-    , String test_pp_file
+
+  ; ( "-test-file", String test_file, "run the assertions in a given file")
+  ; ( "-test-dir", String test_dir, "run all .ll files in the given directory")
+
+  ; ( "-test-pp-file", String test_pp_file
     , "run the parsing/pretty-printing tests on the given .ll" )
-  ; ( "-test-pp-dir"
-    , String test_pp_dir
+  ; ( "-test-pp-dir", String test_pp_dir
     , "run the parsing/pretty-printing tests on all .ll files in the given \
        directory" )
+
   ; ( "-print-ast"
     , String ast_pp_file
     , "run the parsing on the given .ll file and write its internal ast \
        representation to a .v.ast file in the output directory." )
-  ; ( "-print-ast-dir"
-    , String ast_pp_dir
-    , "run the parsing on the given directory and write its internal ast \
-       and domination tree to a .v.ast file in the output directory (see \
-       -op)" )
+
   ; ( "-args"
     , Rest_all (fun args -> command_line_args := args)
     , "interpret the rest of the command line arguments as 'argv' for 
@@ -404,39 +323,39 @@ let args =
   ; ( "-op"
     , Set_string Platform.output_path
     , "set the path to the output files directory  [default='output']" )
+
   ; ( "-L"
     , String link_dir
     , "Link all .ll files in the given directory" )
-  ; ( "-l"
-    , String Driver.add_link_file
-    , "Specify LLVM files to link against." )
+
   ; ( "-interpret"
     , Set Driver.interpret
     , "interpret ll program starting from 'main'" )
-  ; ("-csmith", Unit run_csmith, "Run CSmith and run Vellvm")
   ; ( "-i"
     , Set Driver.interpret
     , "interpret ll program starting from 'main' (same as -interpret)" )
+
   ; ("-debug", Set Interpreter.debug_flag, "enable debugging trace output")
   ; ("-debugger", Set Driver.debugger, "debug an ll program")
+
   ; ("-v", Set Platform.verbose, "enables more verbose compilation output")
-  ; ("-fast", Set fast_mode_flag, "Enable faster execution by disabling symbolic execution of undef values.")
-   (* ; ( "-genalive2" *)
-    (* , Unit test_genAlive2 *)
-    (* , "Run the alive 2 generator and get some sample" ) *) ]
+ ]
 
-
-    let files = ref []
-
-let _ =
-  Printf.printf "(* -------- Vellvm Test Harness -------- *)\n%!" ;
-  try
-    Arg.parse args
-      (fun filename -> files := filename :: !files)
-      "USAGE: ./vellvm [options] <files>\n" ;
+let main () =
+  let files = ref [] in
+  let _ =
     Platform.configure () ;
-    ignore !fast_mode_flag ;
-    process_files !command_line_args !files
-  with
-  | Ran_tests true -> exit 0
-  | Ran_tests false -> exit 1
+    Printf.printf "(* -------- Vellvm Test Harness -------- *)\n%!" ;
+    try
+      Arg.parse args
+        (fun filename -> files := filename :: !files)
+        "USAGE: ./vellvm [options] <files>\n" ;
+      process_files !command_line_args !files
+    with
+    | Ran_tests true -> exit 0
+    | Ran_tests false -> exit 1
+  in
+  ()
+
+
+;; main ()

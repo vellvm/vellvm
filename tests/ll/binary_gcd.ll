@@ -72,3 +72,5 @@ define i64 @main(i64 %argc, i8** %argv) {
   %1 = call i64 @binary_gcd(i64 21, i64 15)
   ret i64 %1
 }
+
+; ASSERT EQ: i64 3 = call i64 @main(i64 0, i8** null)

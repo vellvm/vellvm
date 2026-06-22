@@ -12,3 +12,5 @@ merge:
   %x = phi i64 [0, %then], [1, %else]
   ret i64 %x
 }  
+
+; ASSERT EQ: i64 0 = call i64 @main(i64 0, i8** null)

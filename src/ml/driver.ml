@@ -89,17 +89,9 @@ let process_ll_file command_line_arguments path file =
   ()
 
 let process_file command_line_arguments path =
-  let _ = Printf.printf "Processing: %s\n" path in
   let basename, _ = Platform.path_to_basename_ext path in
   process_ll_file command_line_arguments path basename
 
 let process_files command_line_args files =
   List.iter (process_file command_line_args) files
 
-(* file running ---------------------------------------------------------- *)
-(* Parses and runs the ll file at the given path, returning the dvalue
-   produced. *)
-let run_ll_file command_line_arguments path : (DV.dvalue, Result.exit_condition) result =
-  let _ = Platform.verb @@ Printf.sprintf "* running file: %s\n" path in
-  let ll_ast = IO.parse_file path in
-  Interpreter.interpret command_line_arguments ll_ast
