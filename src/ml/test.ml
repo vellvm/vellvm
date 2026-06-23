@@ -9,7 +9,6 @@
  ---------------------------------------------------------------------------- *)
 
 open VellvmLib
-open Driver
 open Assert
 
 module DV = DynamicValues
@@ -220,27 +219,6 @@ let make_test name ll_ast t : (string * assertion) option =
   in
   make_test_h run name ll_ast t
 
-
-(* Ugly duplication. TODO: reuse more existing facility *)
-let ast_pp_file_inner path =
-  let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
-  let file, ext = Platform.path_to_basename_ext path in
-  match ext with
-  | "ll" ->
-      let ll_ast = IO.parse_file path in
-      let ll_ast' = transform ll_ast in
-      let vast_file =
-        Platform.gen_name !Platform.output_path file ".v.ast"
-      in
-      (* Prints the original llvm program *)
-      let perm = [Open_append; Open_creat] in
-      let channel = open_out_gen perm 0o640 vast_file in
-      let oc = Format.formatter_of_out_channel channel in
-      let _ = IO.output_ast ll_ast' oc in
-      close_out channel
-  | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
-
-let ast_pp_file path = Platform.configure () ; ast_pp_file_inner path
 
 let test_file_h make_test path =
   Platform.configure () ;
