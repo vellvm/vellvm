@@ -1,5 +1,3 @@
-open Platform
-
 let read_file (file : string) : string =
   let lines = ref [] in
   let channel = open_in file in
@@ -45,22 +43,6 @@ let parse_file filename =
   reset_lexbuf filename 1 lexbuf;  (* set the filename *)  
   try Llvm_lexer.parse lexbuf with
   | Failure err -> failwith (Printf.sprintf "Error in file %s: " filename ^ err)
-
-let ll_files_of_dir path : string list =
-  let tmp_file = gen_name "." ".ll_files" ".tmp" in
-  let cmd =
-    Printf.sprintf "find %s -name \"*.ll\" -print > %s" path tmp_file
-  in
-  let () = sh cmd raise_error in
-  let fhandle = open_in tmp_file in
-  let rec loop paths =
-    try loop (input_line fhandle :: paths) with End_of_file -> paths
-  in
-  let ans = loop [] in
-  close_in fhandle ;
-  let rm_cmd = Printf.sprintf "rm %s" tmp_file in
-  let () = sh rm_cmd raise_error in
-  ans
 
 let get_test_name (filename : string) =
   String.sub filename 0 (String.length filename - 3)

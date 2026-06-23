@@ -205,3 +205,19 @@ let rec rec_dir_configure (base : string) (l : string list) () : unit =
       rec_dir_configure subpath xs ()
 
 let append_loc : string -> string -> string = Printf.sprintf "%s/%s"
+
+let ll_files_of_dir path : string list =
+  let tmp_file = gen_name "." ".ll_files" ".tmp" in
+  let cmd =
+    Printf.sprintf "find %s -name \"*.ll\" -print > %s" path tmp_file
+  in
+  let () = sh cmd raise_error in
+  let fhandle = open_in tmp_file in
+  let rec loop paths =
+    try loop (input_line fhandle :: paths) with End_of_file -> paths
+  in
+  let ans = loop [] in
+  close_in fhandle ;
+  let rm_cmd = Printf.sprintf "rm %s" tmp_file in
+  let () = sh rm_cmd raise_error in
+  ans

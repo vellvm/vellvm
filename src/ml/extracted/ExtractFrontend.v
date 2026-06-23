@@ -9,7 +9,6 @@ Import ZArith.BinInt.
 From Vellvm Require
   Utils.ParserHelper
   Numeric.Integers
-  Transformations.Transform
   QC.ShowAST
   QC.ReprAST.
 
@@ -41,4 +40,4 @@ Extract Inlined Constant Archi.ppc64 => "false".
 (* NOTE: assumes that this file is compiled from /src *)
 Cd "ml/extracted".
 
-Separate Extraction Integers Transform LLVMAst AstLib ExtrOcamlIntConv ParserHelper ShowAST ReprAST Floats BinNums BinPos BinIntDef.Z.
+Separate Extraction Integers LLVMAst AstLib ExtrOcamlIntConv ParserHelper ShowAST ReprAST Floats BinNums BinPos BinIntDef.Z.

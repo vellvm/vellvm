@@ -6,8 +6,7 @@ open Driver
 
 module DV = DynamicValues
 
-(* test result location
-   ------------------------------------------------------------- *)
+(* test result location ----------------------------------------------------- *)
 
 let stats_output_file_name =
   ref (Printf.sprintf "%s/%s" !Platform.result_dir_path "test_result.txt")
@@ -15,8 +14,7 @@ let stats_output_file_name =
 let result_output_file_name =
   ref (Printf.sprintf "%s/%s" !Platform.result_dir_path "result.txt")
 
-(* test harness
-   ------------------------------------------------------------- *)
+(* test harness ------------------------------------------------------------- *)
 exception Ran_tests of bool
 
 let suite = ref Test.suite

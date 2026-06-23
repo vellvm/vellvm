@@ -8,18 +8,7 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-open Printf
-open Vellvm_base
-
-module DV = DynamicValues
-
-let of_str = Camlcoq.camlstring_of_coqstring
-
-let string_of_dvalue (d : DV.dvalue) =
-  of_str (DV.show_dvalue Interpreter.params d)
-
-let interpret = ref false
-let debugger = ref false
+open VellvmLib
 
 let transform
     (prog :
@@ -29,69 +18,22 @@ let transform
       list ) :
     ( LLVMAst.typ
     , LLVMAst.typ LLVMAst.block * LLVMAst.typ LLVMAst.block list )
-    LLVMAst.toplevel_entity
-    list =
+    LLVMAst.toplevel_entity list =
   prog
 
-let print_banner s =
-  let rec dashes n = if n = 0 then "" else "-" ^ dashes (n - 1) in
-  printf "%s %s\n%!" (dashes (79 - String.length s)) s
-
-(* Todo add line count information *)
-let parse_tests filename =
-  let assertions = ref [] in
-  let channel = open_in filename in
-  Assertion.reset_parsing_mode () ;
-  (* Put the parser into "NormalMode" *)
-  try
-    while true do
-      let line = input_line channel in
-      assertions := Assertion.parse_assertion filename line @ !assertions
-    done ;
-    []
-  with End_of_file -> close_in channel ; List.rev !assertions
-
-let string_of_file (f : in_channel) : string =
-  let rec _string_of_file (stream : string list) (f : in_channel) :
-      string list =
-    try
-      let s = input_line f in
-      _string_of_file (s :: stream) f
-    with End_of_file -> stream
-  in
-  String.concat "\n" (List.rev (_string_of_file [] f))
-
-(* file processing
-   ---------------------------------------------------------- *)
+(* Files linked by reference to a directory via -L *)
 let link_files : TopLevel.ll_toplevel_entities list ref = ref []
 
-let add_link_file path = link_files := IO.parse_file path :: !link_files
+let add_link_ast ast =
+  link_files := ast :: !link_files
 
-let process_ll_file command_line_arguments path file =
-  let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
-  let ll_ast = IO.parse_file path in
-  let _ =
-    if !interpret then
-      match Interpreter.interpret command_line_arguments (TopLevel.link_all !link_files ll_ast) with
-      | Ok dv ->
-          Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv)
-      | Error e -> failwith (Result.string_of_exit_condition e)
-    else if !debugger then
-      (Interpreter.debug_flag := true;
-       match Debugger.vellvm_debugger command_line_arguments (TopLevel.link_all !link_files ll_ast) with
-       | Ok dv ->
-           Printf.printf "Program terminated with: %s\n" (string_of_dvalue dv)
-       | Error e -> failwith (Result.string_of_exit_condition e))
-  in
-  let ll_ast' = transform ll_ast in
-  let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in
-  let _ = IO.output_file vll_file ll_ast' in
-  ()
+let add_link_file path =
+  add_link_ast (IO.parse_file path)
 
-let process_file command_line_arguments path =
-  let basename, _ = Platform.path_to_basename_ext path in
-  process_ll_file command_line_arguments path basename
+(* Include all .ll files from the given directory *)
+let link_dir dir =
+  let files = Platform.ll_files_of_dir dir in
+  List.iter add_link_file files
 
-let process_files command_line_args files =
-  List.iter (process_file command_line_args) files
+
 

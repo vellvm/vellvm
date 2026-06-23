@@ -36,6 +36,8 @@ type result = Pass | Fail of string
 
 type outcome = result test list
 
+exception Ran_tests of bool
+
 let run_assertion (f : assertion) : result =
   try f () ; Pass with
   | Failure m -> Fail m
