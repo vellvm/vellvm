@@ -144,7 +144,7 @@ Class MemoryModelPrimitives {Pa : Params} :=
     write_byte : addr -> memory_byte -> memM unit ;
 
     (** Stack allocations *)
-    (* TOOD: The list of bytes get huge in practice when allocating big chunk of memory.
+    (* TODO: The list of bytes get huge in practice when allocating big chunk of memory.
        For performance reasons, it might be better to take a different representation here
        ([Fin n -> memory_byte] for [n] the length of the list?)
      *)

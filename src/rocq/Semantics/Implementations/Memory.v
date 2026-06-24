@@ -116,14 +116,14 @@ Section MemoryModel.
           end
       end.
 
-(** ** Memory-sensitive intrinsics *)
+  (** ** Memory-sensitive intrinsics *)
   
   (** Malloc *)
   Definition malloc_bytes (init_bytes : list memory_byte) : memM addr :=
     pr <- fresh_prov;;
     malloc_bytes_with_pr init_bytes pr.
 
-  (* (** Handle memcpy *) *)
+  (** Handle memcpy *)
   Definition memcpy (src dst : addr) (len : Z) (volatile : bool) : memM unit :=
     if Z.ltb len 0
     then
@@ -464,6 +464,7 @@ Section Implementation.
     then set_byte_raw addr (byte,aid)
     else mub "Trying to write to memory with invalid provenance".
 
+  (* TODO: next_key needs to take the length parameter *)
   Definition get_free_block (len : nat) (pr : provenance) : memM (addr * list addr) :=
     let aid := provenance_to_allocation_id pr in
     addr <- next_key ;;

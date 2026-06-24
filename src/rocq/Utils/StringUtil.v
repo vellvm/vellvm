@@ -3,6 +3,12 @@ From Vellvm.Utils Require Import ListUtil.
 Import ListNotations.
 Open Scope string.
 
+(* Reduction on a string of the shape ["foo" ++ show(i) ++ ...]
+   breaks "foo" into a sequence of [Chars], rendering the goal unreadable.
+   We prevent reduction in [append] as a quick fix.
+ *)
+Arguments append : simpl never.
+
 Fixpoint string_fold_left {A} (f : A -> ascii -> A) (s:string) (acc:A) : A :=
   match s with
   | EmptyString => acc

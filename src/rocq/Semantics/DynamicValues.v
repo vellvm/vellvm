@@ -71,7 +71,6 @@ Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
 
 (* Sizeof is needed for for ConcatBytes case *)
-(* Module DVALUE (A : ADDRESS) (IP : INTPTR) (S : SIZEOF). *)
 Section DValue.
   Context {Pa : Params}.
 

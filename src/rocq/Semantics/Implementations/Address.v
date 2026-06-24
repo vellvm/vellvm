@@ -11,6 +11,7 @@ From Vellvm Require Import
   Implementations.Provenance
   VellvmIntegers.
 
+
 Section withIPtr.
   Context {IP : IPtr}.
   
@@ -43,9 +44,15 @@ Section withIPtr.
     |}
   .
 
+  Goal forall i : Z,
+      ("FinITOP.int_to_ptr: out of range (" ++ show i ++ ").")%string = "".
+
+    
   (* TODO *)
   Instance PITheoryV : @PITheory ProvenanceV AddressV PIV.
-  Admitted.
+  Proof.
+    constructor.
+    - simpl.
   
   Existing Instance overlaps_ptoi.
 
