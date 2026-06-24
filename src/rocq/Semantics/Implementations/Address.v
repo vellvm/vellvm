@@ -44,16 +44,10 @@ Section withIPtr.
     |}
   .
 
-  Goal forall i : Z,
-      ("FinITOP.int_to_ptr: out of range (" ++ show i ++ ").")%string = "".
-
-    
   (* TODO *)
   Instance PITheoryV : @PITheory ProvenanceV AddressV PIV.
-  Proof.
-    constructor.
-    - simpl.
-  
+  Admitted.
+ 
   Existing Instance overlaps_ptoi.
 
 End withIPtr.
