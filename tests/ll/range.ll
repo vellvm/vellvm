@@ -8,5 +8,5 @@ define i64 @main(i64 %argc, i8** %arcv) {
 }
 
 ; ASSERT EQ: i64 6 = call i64 @foo(i64 6)
-; ASSERT POISON: call i64 @foo(i64 0)
-; ASSERT POISON: call i64 @foo(i64 500)
+; ASSERT EQ i64 poison = call i64 @foo(i64 0)
+; ASSERT EQ i64 poison = call i64 @foo(i64 500)

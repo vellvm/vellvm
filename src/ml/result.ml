@@ -31,65 +31,30 @@ let string_of_exit_condition e =
 
 (* Serve as the key for the mapping *)
 type test_result =
-  | STOk : Assertion.src_tgt_mode -> test_result
-  | STNOk : Assertion.src_tgt_mode -> test_result
-  | STErr : src_tgt_error_side -> test_result
   | EQOk
   | EQNOk
-  | SuccessOk
-  | SuccessNOk
-  | POIOk
-  | POINOk
   | UNSOLVED
   | NOASSERT
 
 let string_of_test_result = function
-  | STOk mode ->
-      Printf.sprintf "Src Tgt Correct (%s)"
-        (Assertion.show_src_tgt_mode mode)
-  | STNOk mode ->
-      Printf.sprintf "Src Tgt Incorrect (%s)"
-        (Assertion.show_src_tgt_mode mode)
-  | STErr side ->
-      Printf.sprintf "%s Error" (string_of_src_tgt_error_side side)
   | EQOk -> "Equality Correct"
   | EQNOk -> "Equality Incorrect"
-  | SuccessOk -> "Success Correct"
-  | SuccessNOk -> "Success Incorrect"
-  | POIOk -> "Poison Correct"
-  | POINOk -> "Poison Incorrect"
   | UNSOLVED -> "Not Runnable"
   | NOASSERT -> "NO ASSERT"
 
 (* enum function for the OrdType*)
 let int_of_test_result = function
-  | STOk _ -> 1
-  | STNOk _ -> 2
-  | STErr _ -> 3
   | EQOk -> 4
   | EQNOk -> 5
-  | POIOk -> 6
-  | POINOk -> 7
   | UNSOLVED -> 8
   | NOASSERT -> 9
-  | SuccessOk -> 10
-  | SuccessNOk -> 11
 (* The first string is always file name *)
 
 module Test_Result_Key = struct
   type t = test_result
 
   let compare tr1 tr2 =
-    match (tr1, tr2) with
-    | STOk mode1, STOk mode2 ->
-        Assertion.int_of_src_tgt_mode mode1
-        - Assertion.int_of_src_tgt_mode mode2
-    | STNOk mode1, STNOk mode2 ->
-        Assertion.int_of_src_tgt_mode mode1
-        - Assertion.int_of_src_tgt_mode mode2
-    | STErr side1, STErr side2 ->
-        int_of_src_tgt_error_side side1 - int_of_src_tgt_error_side side2
-    | _, _ -> int_of_test_result tr1 - int_of_test_result tr2
+    int_of_test_result tr1 - int_of_test_result tr2
 end
 
 (* The value that is stored in the map *)

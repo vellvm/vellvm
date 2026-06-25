@@ -42,12 +42,11 @@ let string_of_function_id id : string =
 let parse_tests filename =
   let assertions = ref [] in
   let channel = open_in filename in
-  Assertion.reset_parsing_mode () ;
   (* Put the parser into "NormalMode" *)
   try
     while true do
       let line = input_line channel in
-      assertions := Assertion.parse_assertion filename line @ !assertions
+      assertions := Assertion.parse_assertion line @ !assertions
     done ;
     []
   with End_of_file -> close_in channel ; List.rev !assertions
@@ -114,18 +113,6 @@ let make_test_h run name ll_ast t : (string * assertion) option =
       in
       let result = run_to_value dtyp entry args ll_ast in
       Some (str, dvalue_eq_assertion name result (fun () -> expected))
-  | Assertion.SuccessTest ( entry, args) ->
-      let str =
-        let args_str : string =
-          pp_print_list
-            ~pp_sep:(fun f () -> pp_print_string f ", ")
-            Interpreter.pp_dvalue str_formatter args ;
-          flush_str_formatter ()
-        in
-        Printf.sprintf "%s(%s)" (string_of_function_id entry) args_str
-      in
-      let t_void = Assertion.typ_to_dtyp (LLVMAst.TYPE_Void) in
-      Some (str, (fun () -> ignore (run_to_value t_void entry args ll_ast ())))
   | Assertion.POISONTest (dtyp, entry, args) ->
        let expected =
            DV.DVALUE_Poison
@@ -144,74 +131,10 @@ let make_test_h run name ll_ast t : (string * assertion) option =
        let result = run_to_value dtyp entry args ll_ast in
        Some (str, dvalue_eq_assertion name result (fun () -> expected))
 
-  | Assertion.SRCTGTTest (mode, expected_rett, generated_args) ->
-      let v_args, src_fn_str, tgt_fn_str, sum_ast =
-        match generated_args with
-        | Left g_args ->
-            let _t_args, v_args = List.split g_args in
-            (v_args, "src", "tgt", ll_ast)
-        | Right g_ast ->
-            ([], "runnersrc", "runnertgt", List.append ll_ast g_ast)
-      in
-      let assertion () =
-        (* let buf = Buffer.create 16 in List.iter (Buffer.add_char buf)
-           (showProg sum_ast); Printf.printf "%s\n" (Buffer.contents buf); *)
-        let tgt_fn_id = LLVMAst.Name (Camlcoq.coqstring_of_camlstring tgt_fn_str) in
-        let src_fn_id = LLVMAst.Name (Camlcoq.coqstring_of_camlstring src_fn_str) in      
-        let res_tgt = run expected_rett tgt_fn_id v_args sum_ast in
-        let res_src = run expected_rett src_fn_id v_args sum_ast in
-        match res_tgt with
-        | Error (UndefinedBehavior _) ->
-            () (* If the target is UB then the src can be anything! *)
-        | Error (UninterpretedCall _) ->
-            Platform.verb
-              (Printf.sprintf
-                 "  src-tgt test %s passed due to uninterpreted call\n" name )
-        | Ok v_tgt -> (
-          match res_src with
-          | Ok v_src -> (
-              Assertion.(
-                match mode with
-                | NormalEquality -> compare_dvalues_exn v_src v_tgt true
-                | ValueMismatch -> compare_dvalues_exn v_src v_tgt false
-                | TargetMorePoisonous -> compare_tgt_for_poison v_src v_tgt
-                | TargetMoreUndefined -> failwith "todo: TargetMoreUndefined"
-                | SourceMoreDefined -> failwith "todo: SourceMoreDefined"
-                | MismatchInMemory -> failwith "todo: MismatchInMemory" ) )
-          | Error (UninterpretedCall _) ->
-              Platform.verb
-                (Printf.sprintf
-                   "  src-tgt test %s passed due to uninterpreted call\n"
-                   name )
-          | Error e ->
-              failwith
-                (Printf.sprintf "src - %s"
-                   (Result.string_of_exit_condition e) ) )
-        | Error e ->
-            (* let buf = Buffer.create 16 in List.iter (Buffer.add_char buf)
-               (showProg sum_ast); Printf.printf "%s\n" (Buffer.contents
-               buf); *)
-            failwith
-              (Printf.sprintf "tgt - %s"
-                 (Result.string_of_exit_condition e) )
-      in
-      if !srctgt_test_flag
-      then
-        let str =
-          let args_str : string =
-            pp_print_list
-              ~pp_sep:(fun f () -> pp_print_string f ", ")
-              Interpreter.pp_dvalue str_formatter v_args ;
-            flush_str_formatter ()
-          in
-          Printf.sprintf "src = tgt on generated input (%s)" args_str
-        in
-        Some (str, assertion)
-      else None
 
-let make_test name ll_ast t : (string * assertion) option =
+let make_test name link_files ll_ast t : (string * assertion) option =
   let run dtyp entry args ll_ast =
-    let linked_ast = TopLevel.link_all !Driver.link_files ll_ast in
+    let linked_ast = TopLevel.link_all link_files ll_ast in
     Interpreter.step
       (TopLevel.interpreter_gen Interpreter.params dtyp
          entry
@@ -220,7 +143,7 @@ let make_test name ll_ast t : (string * assertion) option =
   make_test_h run name ll_ast t
 
 
-let test_file_h make_test path =
+let test_file_h make_test link_files path =
   Platform.configure () ;
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
   let _file, ext = Platform.path_to_basename_ext path in
@@ -230,15 +153,15 @@ let test_file_h make_test path =
       let _ = Printf.printf "Parsed successfully\n" in
       let ll_ast = IO.parse_file path in
       let _ = Printf.printf "AST retrieved successfully\n" in
-      let suite = Test (path, List.filter_map (make_test path ll_ast) tests) in
+      let suite = Test (path, List.filter_map (make_test path link_files ll_ast) tests) in
       let outcome = run_suite [suite] in
       Printf.printf "%s\n" (outcome_to_string outcome) ;
       raise (Ran_tests (successful outcome))
   | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
 
-let test_file path = test_file_h make_test path
+let test_file link_files path = test_file_h make_test link_files path
 
-let test_dir dir =
+let test_dir link_files dir =
   Printf.printf "===> TESTING ASSERTIONS IN: %s\n" dir ;
   Platform.configure () ;
   let pathlist = Platform.ll_files_of_dir dir in
@@ -262,19 +185,19 @@ let test_dir dir =
   let suite =
     List.map
       (fun (file, ast, tests) ->
-        Test (file, List.filter_map (make_test file ast) tests) )
+        Test (file, List.filter_map (make_test file link_files ast) tests) )
       files
   in
   let outcome = run_suite suite in
   Printf.printf "%s\n" (outcome_to_string outcome) ;
   raise (Ran_tests (successful outcome))
 
-let test_all () =
+let test_all link_files =
   let test_directory = "../tests" in
   let _ =
     Printf.printf "============== RUNNING TEST SUITE ==============\n"
   in
   let b1 = try FrontendTest.test_pp_dir test_directory with Ran_tests b -> b in
-  let b2 = try test_dir test_directory with Ran_tests b -> b in
+  let b2 = try test_dir link_files test_directory with Ran_tests b -> b in
   raise (Ran_tests (b1 && b2))
 

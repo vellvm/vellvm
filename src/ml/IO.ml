@@ -47,10 +47,3 @@ let parse_file filename =
 let get_test_name (filename : string) =
   String.sub filename 0 (String.length filename - 3)
 
-(* getting rid of the header ".." and "tests". Then split the file name into
-   foldername and filename*)
-let unzip_filename (filename : string) : string list * string =
-  ( List.filter
-      (fun x -> not (List.mem x [".."; "tests"; ""]))
-      (String.split_on_char '/' (Filename.dirname filename))
-  , get_test_name (Filename.basename filename) )
