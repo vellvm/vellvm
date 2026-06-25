@@ -37,17 +37,22 @@ Section withIPtr.
   Instance PIV : @PI ProvenanceV AddressV :=
     {|
       ptr_to_int p := to_Z (fst p);
-      int_to_ptr i pr :=
-        if (i <? 0)%Z || (i >=? @Integers.modulus 64)%Z
-        then raise_oom ("FinITOP.int_to_ptr: out of range (" ++ show i ++ ").")
-        else p <- from_Z i ;; ret (p,pr)
+      int_to_ptr i pr := a <- from_Z i ;; ret (a, pr) 
     |}
   .
 
   (* TODO *)
   Instance PITheoryV : @PITheory ProvenanceV AddressV PIV.
-  Admitted.
- 
+  Proof.
+    constructor.
+    - cbn; intros * EQ.
+      repeat break_match; abs_eq.
+      destruct a; abs_eq.
+      now inv EQ.
+    - intros [a p'] * <-; cbn.
+      break_match.
+      cbn.
+      
   Existing Instance overlaps_ptoi.
 
 End withIPtr.
