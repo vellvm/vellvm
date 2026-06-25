@@ -2,15 +2,12 @@
 
   See README.md for more details. *)
 open LLVMAst
-open TopLevel
 
 module DV = DynamicValues
 open DV
 let addr_v = Address0.coq_AddressV IPtrInfinite.coq_IPZ
 
 open Llvm_printer
-open Either
-module GA = Generate.GA
 open List
 open VellvmFloats
 
@@ -54,9 +51,6 @@ type test =
   (* dynamic type, entry, arguments *)
   | POISONTest of DynamicTypes.dtyp * function_id * DV.dvalue list
 
-
-(* DVALUE equality *)
-let rec eq_dvalue (l : DV.dvalue) (r : DV.dvalue) : bool = TopLevel.dvalue_eqb l r
 
 (* Directly converts a piece of syntax to a dtyp without going through
    semantic interpretation. Only works on literals. *)

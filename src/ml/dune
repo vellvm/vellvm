@@ -20,5 +20,5 @@
 (executables
  (names main)
  (modes byte exe)
- (modules main driver result interpreter test frontendTest tester debugger)
- (libraries vellvmLib extracted libvellvm testing unix str))
+ (modules main driver result interpreter assertion test frontendTest debugger)
+ (libraries vellvmLib extracted libvellvm unix str))

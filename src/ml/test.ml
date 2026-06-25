@@ -20,15 +20,6 @@ let of_str = Camlcoq.camlstring_of_coqstring
 let string_of_dvalue (d : DV.dvalue) =
   of_str (DV.show_dvalue Interpreter.params d)
 
-
-(* https://www.rosettacode.org/wiki/String_matching#OCaml *)
-let string_begins_with s1 s2 =
-  let len1 = String.length s1 and len2 = String.length s2 in
-  if len1 < len2 then false
-  else
-    let sub = String.sub s1 0 len2 in
-    sub = s2
-
 let string_of_function_id id : string =
   LLVMAst.( match id with
   | Name n -> "@" ^ (Camlcoq.camlstring_of_coqstring n)
@@ -51,8 +42,6 @@ let parse_tests filename =
     []
   with End_of_file -> close_in channel ; List.rev !assertions
 
-
-let srctgt_test_flag = ref false
 
 let compare_dvalues_exn dv1 dv2 ans : unit =
   if TopLevel.dvalue_eqb dv1 dv2 = ans then ()
