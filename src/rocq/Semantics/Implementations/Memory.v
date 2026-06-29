@@ -41,25 +41,33 @@ Import Logic.
 Section MemoryModel.
   Context {Pa : Params} {MMP : @MemoryModelPrimitives Pa}.
 
-  Definition get_consecutive_ptrs (ptr : addr) (len : nat) : EOU (list addr) :=
-    ixs <- intptr_seq 0 len;;
+  (* We would like a better representation than a list *)
+  Definition get_consecutive_ptrs (ptr : addr) (size : N) : EOU (list addr) :=
+    ixs <- intptr_seq 0 size;;
     map_monad
       (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
       ixs.
 
   (** Reading dvalues *)
-  Definition read_bytes (ptr : addr) (len : nat) : memM (list memory_byte) :=
-    ptrs <- lift (get_consecutive_ptrs ptr len);;
+  Definition read_bytes (ptr : addr) (size : N) : memM (list memory_byte) :=
+    ptrs <- lift (get_consecutive_ptrs ptr size);;
     (* Actually perform reads *)
     map_monad read_byte ptrs.
   
   Definition read_dvalue (dt : dtyp) (ptr : addr) : memM dvalue :=
-    bytes <- read_bytes ptr (N.to_nat (sizeof_dtyp dt));;
+    bytes <- read_bytes ptr (sizeof_dtyp dt);;
     lift (memory_bytes_to_dvalue bytes dt).
 
+  (* TODO: Move *)
+  Fixpoint length {A} (l : list A) : N :=
+    match l with
+    | [] => 0
+    | _ :: l => 1 + length l
+    end.
+  
   (** Writing dvalues *)
   Definition write_bytes (ptr : addr) (bytes : list memory_byte) : memM unit :=
-    ptrs <- lift (get_consecutive_ptrs ptr (List.length bytes));;
+    ptrs <- lift (get_consecutive_ptrs ptr (length bytes));;
     let ptr_bytes := zip ptrs bytes in
     (* Actually perform writes *)
     map_monad_ (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
@@ -83,16 +91,16 @@ Section MemoryModel.
     generate_num_poison_bytes (sizeof_dtyp dt) dt.
 
   (** Allocating dtyps *)
-  Definition allocate_bytes (init_bytes : list memory_byte) : memM addr :=
+  Definition allocate_bytes (init_bytes : list memory_byte) (align : N) : memM addr :=
     pr <- fresh_prov;;
-    allocate_bytes_with_pr init_bytes pr.
+    allocate_bytes_with_pr init_bytes align pr.
 
-  Definition allocate_dtyp (dt : dtyp) (num_elements : N) : memM addr :=
+  Definition allocate_dtyp (dt : dtyp) (num_elements : N) (align : N) : memM addr :=
     if dtyp_eqb dt DTYPE_Void
     then mub "allocating void type"
     else element_bytes <- repeatMN num_elements (ret (generate_poison_bytes dt));;
          let bytes := List.concat element_bytes in
-         allocate_bytes bytes.
+         allocate_bytes bytes align.
 
   Definition handle_memoryM : MemoryE ~> memM :=
     fun T m =>
@@ -100,7 +108,12 @@ Section MemoryModel.
       | MemPush => mempush
       | MemPop => mempop
       | Alloca t n align =>
-          addr <- allocate_dtyp t n;;
+          let align :=
+            match align with
+            | None => 8%N
+            | Some align => align
+            end in
+          addr <- allocate_dtyp t n align;;
           ret (DVALUE_Addr addr)
       | Load t a =>
           match a with
@@ -119,13 +132,13 @@ Section MemoryModel.
   (** ** Memory-sensitive intrinsics *)
   
   (** Malloc *)
-  Definition malloc_bytes (init_bytes : list memory_byte) : memM addr :=
+  Definition malloc_bytes (init_bytes : list memory_byte) (align : N) : memM addr :=
     pr <- fresh_prov;;
-    malloc_bytes_with_pr init_bytes pr.
+    malloc_bytes_with_pr init_bytes align pr.
 
   (** Handle memcpy *)
-  Definition memcpy (src dst : addr) (len : Z) (volatile : bool) : memM unit :=
-    if Z.ltb len 0
+  Definition memcpy (src dst : addr) (size : N) (volatile : bool) : memM unit :=
+    if N.ltb size 0
     then
       mub "memcpy given negative length."
     else
@@ -133,10 +146,10 @@ Section MemoryModel.
            memory from the source location to the destination location, which
            must either be equal or non-overlapping. *)
       
-      if orb (no_overlap dst len src len)
+      if orb (no_overlap dst size src size)
            (Z.eqb (ptr_to_int src) (ptr_to_int dst))
       then 
-        src_bytes <- read_bytes src (Z.to_nat len);;
+        src_bytes <- read_bytes src size;;
         (* TODO: Double check that this is correct... Should we check if all writes are allowed first? *)
         write_bytes dst src_bytes
       else
@@ -156,14 +169,14 @@ Section MemoryModel.
     match args with
     | DVALUE_Addr dst ::
         DVALUE_Addr src ::
-        DVALUE_I sz len ::
+        DVALUE_I sz size ::
         DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
-        memcpy src dst (unsigned len) (equ volatile VellvmIntegers.one)
+        memcpy src dst (Z.to_N (unsigned size)) (equ volatile VellvmIntegers.one)
     | DVALUE_Addr dst ::
         DVALUE_Addr src ::
-        DVALUE_IPTR len ::
+        DVALUE_IPTR size ::
         DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
-        memcpy src dst (to_Z len) (equ volatile VellvmIntegers.one)
+        memcpy src dst (Z.to_N (to_Z size)) (equ volatile VellvmIntegers.one)
     | _ => merr "Unsupported arguments to memcpy."
     end.
   
@@ -184,12 +197,12 @@ Section MemoryModel.
     - exact (merr "Unsupported arguments to memset.").
   Defined. 
 
-  Definition handle_malloc (args : list dvalue) : memM addr :=
+  Definition handle_malloc (args : list dvalue) (align : N) : memM addr :=
     match args with
     | [DVALUE_I bitwidth sz] =>
-        malloc_bytes (generate_num_poison_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8))
+        malloc_bytes (generate_num_poison_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8)) align
     | [DVALUE_IPTR sz] =>
-        malloc_bytes (generate_num_poison_bytes (Z.to_N (to_unsigned sz)) (DTYPE_I 8))
+        malloc_bytes (generate_num_poison_bytes (Z.to_N (to_unsigned sz)) (DTYPE_I 8)) align
     | _ => merr "Malloc: invalid arguments."
     end.
 
@@ -220,7 +233,11 @@ Section MemoryModel.
             else
               if (Rocqlib.proj_sumbool (string_dec name "malloc"))
               then
-                addr <- handle_malloc args;;
+                (* NOTE: We are defaulting to 64 for now,
+                   it should be implemented as the best alignment
+                   given the size.
+                 *)
+                addr <- handle_malloc args 8%N;;
                 ret (inr (DVALUE_Addr addr))
               else
                 if (Rocqlib.proj_sumbool (string_dec name "free"))
@@ -464,26 +481,25 @@ Section Implementation.
     then set_byte_raw addr (byte,aid)
     else mub "Trying to write to memory with invalid provenance".
 
-  (* TODO: next_key needs to take the length parameter *)
-  Definition get_free_block (len : nat) (pr : provenance) : memM (addr * list addr) :=
+  Definition get_free_block (size : N) (align : N) (pr : provenance) : memM (addr * list addr) :=
     let aid := provenance_to_allocation_id pr in
-    addr <- next_key ;;
+    addr <- next_key size align ;;
     ptr <- lift (int_to_ptr addr (allocation_id_to_prov aid)) ;;
-    ptrs <- lift (get_consecutive_ptrs ptr len);;
+    ptrs <- lift (get_consecutive_ptrs ptr size);;
     ret (ptr,ptrs).
 
-  Definition Allocate_bytes_with_pr (init_bytes : list memory_byte) (pr : provenance) : memM addr :=
-    let len := List.length init_bytes in
+  Definition Allocate_bytes_with_pr (init_bytes : list memory_byte) (align : N) (pr : provenance) : memM addr :=
+    let size := length init_bytes in
     let aid := provenance_to_allocation_id pr in
-    '(ptr, ptrs) <- get_free_block len pr;;
+    '(ptr, ptrs) <- get_free_block size align pr;;
     add_block_to_stack aid ptr ptrs init_bytes;;
     ret ptr.
 
   (** Heap allocation *)
-  Definition Malloc_bytes_with_pr (init_bytes : list memory_byte) (pr : provenance) : memM addr :=
-    let len := List.length init_bytes in
+  Definition Malloc_bytes_with_pr (init_bytes : list memory_byte) (align : N) (pr : provenance) : memM addr :=
+    let size := length init_bytes in
     let aid := provenance_to_allocation_id pr in
-    '(ptr, ptrs) <- get_free_block len pr;;
+    '(ptr, ptrs) <- get_free_block size align pr;;
     add_block_to_heap aid ptr ptrs init_bytes;;
     ret ptr.
 

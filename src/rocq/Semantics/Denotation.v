@@ -517,7 +517,7 @@ Section Denotation.
           match find
                   (fun x => match x with | ANN_align _ => true | _ => false end)
                   annotations with
-          | Some (ANN_align a) => Some (denote_int_syntax a)
+          | Some (ANN_align a) => Some (Z.to_N (denote_int_syntax a))
           | _ => None
           end
         in
