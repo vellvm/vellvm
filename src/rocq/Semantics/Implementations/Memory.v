@@ -138,22 +138,18 @@ Section MemoryModel.
 
   (** Handle memcpy *)
   Definition memcpy (src dst : addr) (size : N) (volatile : bool) : memM unit :=
-    if N.ltb size 0
-    then
-      mub "memcpy given negative length."
-    else
-      (* From LangRef: The ‘llvm.memcpy.*’ intrinsics copy a block of
+    (* From LangRef: The ‘llvm.memcpy.*’ intrinsics copy a block of
            memory from the source location to the destination location, which
            must either be equal or non-overlapping. *)
-      
-      if orb (no_overlap dst size src size)
-           (Z.eqb (ptr_to_int src) (ptr_to_int dst))
-      then 
-        src_bytes <- read_bytes src size;;
-        (* TODO: Double check that this is correct... Should we check if all writes are allowed first? *)
-        write_bytes dst src_bytes
-      else
-        mub "memcpy with overlapping or non-equal src and dst memory locations.".
+    
+    if orb (no_overlap dst size src size)
+         (Z.eqb (ptr_to_int src) (ptr_to_int dst))
+    then 
+      src_bytes <- read_bytes src size;;
+      (* TODO: Double check that this is correct... Should we check if all writes are allowed first? *)
+      write_bytes dst src_bytes
+    else
+      mub "memcpy with overlapping or non-equal src and dst memory locations.".
 
   (** memset spec *)
   Definition memset

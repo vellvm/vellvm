@@ -212,7 +212,7 @@ Section MemoryByte.
   Definition dvalue_to_memory_bytes (dv : dvalue) (dt : dtyp) : list memory_byte
     := map
          (fun idx => (MByte dv dt idx))
-         (Nseq 0 (sizeof_dtyp dt)).
+         (Nseq 0 (N.to_nat (sizeof_dtyp dt))).
 
   #[local] Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia].
 

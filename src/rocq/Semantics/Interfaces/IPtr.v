@@ -78,9 +78,6 @@ Class IPtrTheory {IP : IPtr} :=
 From Stdlib Require Import Basics.
 Open Scope program_scope.
 
-Definition Nseq (start size : N) : list N :=
-  N.recursion [] (fun _ rec => start :: rec) size.
-
 Definition intptr_seq {IP : IPtr} (start size : N) : EOU (list iptr)
-  := map_monad (from_Z ∘ Z.of_N) (Nseq start size).
+  := map_monad (from_Z ∘ Z.of_N) (ListUtil.Nseq start (N.to_nat size)).
 
