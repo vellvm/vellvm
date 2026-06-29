@@ -8,414 +8,199 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-open Vellvm_base
-open Driver
-
+open VellvmLib
 open Assert
 
 module DV = DynamicValues
 
 let default_cl_test_args = []
 
-(* Vellvm test cases
-   -------------------------------------------------------- *)
+let of_str = Camlcoq.camlstring_of_coqstring
 
-let parse_pp_test path =
-  let open Platform in
-  let _ = verb @@ Printf.sprintf "* processing file: %s\n" path in
-  let filename, _ = path_to_basename_ext path in
-  let vll_file = gen_name !output_path filename ".v.ll" in
-  let dot_s = gen_name !output_path filename ".s" in
+let string_of_dvalue (d : DV.dvalue) =
+  of_str (DV.show_dvalue Interpreter.params d)
+
+let string_of_function_id id : string =
+  LLVMAst.( match id with
+  | Name n -> "@" ^ (Camlcoq.camlstring_of_coqstring n)
+  | Anon z -> "@" ^ (Camlcoq.Z.to_string z)
+  | Raw z ->  "_RAW_" ^  (Camlcoq.Z.to_string z)
+  )
+
+
+(* test harness ------------------------------------------------------------- *)
+(* Todo add line count information *)
+let parse_tests filename =
+  let assertions = ref [] in
+  let channel = open_in filename in
   try
-    let _ = clang_parse path dot_s in
-    let prog = IO.parse_file path in
-    let _ = IO.output_file vll_file prog in
-    try
-      let _ = clang_parse vll_file dot_s in
-      ()
-    with PlatformError _ ->
-      failwith (Printf.sprintf "vellvm output bad file: %s" vll_file)
-  with PlatformError _ -> ()
+    while true do
+      let line = input_line channel in
+      assertions := Assertion.parse_assertion line @ !assertions
+    done ;
+    []
+  with End_of_file -> close_in channel ; List.rev !assertions
 
-let ll_files_of_dir path : string list =
-  let open Platform in
-  let tmp_file = gen_name "." ".ll_files" ".tmp" in
-  let cmd =
-    Printf.sprintf "find %s -name \"*.ll\" -print > %s" path tmp_file
-  in
-  let () = sh cmd raise_error in
-  let fhandle = open_in tmp_file in
-  let rec loop paths =
-    try loop (input_line fhandle :: paths) with End_of_file -> paths
-  in
-  let ans = loop [] in
-  close_in fhandle ;
-  let rm_cmd = Printf.sprintf "rm %s" tmp_file in
-  let () = sh rm_cmd raise_error in
-  ans
 
-let pp_test_of_dir dir =
-  Test
-    ( "Parsing files in: " ^ dir ^ "\n"
-    , List.map
-        (fun f -> (f, fun () -> parse_pp_test f))
-        (ll_files_of_dir dir) )
+(* Semantics of ASSERT EQ ty expected = call @f(args):
 
-let run_dvalue_test (test : DV.dvalue -> bool) path =
-  let res, msg =
-    match run_ll_file default_cl_test_args path with
-    | Error e -> (false, Result.string_of_exit_condition e)
-    | Ok dv -> (test dv, "OK")
-  in
-  if not res then failwith (path ^ " test failed: " ^ msg) ;
-  ()
+   If expected is `poison` then the call should result in poison.
 
-(* https://www.rosettacode.org/wiki/String_matching#OCaml *)
-let string_begins_with s1 s2 =
-  let len1 = String.length s1 and len2 = String.length s2 in
-  if len1 < len2 then false
+   If ty is an integral type, then use LLVM's `icmp eq` as the comparison.
+
+   If ty is a floating point type, then use LLVM's `fcmp ueq` as the comparison.
+ *)
+
+
+(* "Syntactic comparison" of dynamic values -- does not take
+   the semantic content into account.  *)
+let compare_dvalues_exn expected got msg : unit =
+  if TopLevel.dvalue_eqb expected got then ()
   else
-    let sub = String.sub s1 0 len2 in
-    sub = s2
+    failwith msg
 
-let run_parsefail_test path prefix =
-  let failed, msg =
-    try
-      ignore (run_ll_file default_cl_test_args path) ;
-      (false, "")
-    with Failure msg -> (string_begins_with msg prefix, msg)
+let dvalue_i1_to_bool (dv : DV.dvalue) : bool =
+  match dv with 
+  | DV.DVALUE_I (sz,bitint) ->  Integers.eq sz bitint (Integers.one sz)
+  | _ -> failwith "non-i1 value"
+
+
+
+let dvalue_eq_assertion name ty (expected : DV.dvalue) (got : unit -> DV.dvalue) () =
+  let open DynamicTypes in
+  Platform.verb (Printf.sprintf "running ASSERT in %s\n" name) ;  
+  let result = got () in
+  let msg =
+    Printf.sprintf "ASSERT EQ failed: \ngot:\n\t%s\nasserted:\n\t%s"
+         (string_of_dvalue result) (string_of_dvalue expected) 
   in
-  if not failed then
-    failwith
-      ( path
-      ^ " test failed to produce expected parsing error. Got ubstead: " ^ msg
-      ) ;
-  ()
+  begin match expected with
+  | DV.DVALUE_Poison _ -> compare_dvalues_exn expected result msg
+  | _ ->
+     begin match ty with
+     | DTYPE_I _ 
+     | DTYPE_IPTR
+     | DTYPE_Pointer ->
+        (* integral comparison *)
+        let v = Assertion.ocaml_of_EOU @@ Compare.eval_icmp Interpreter.params false Eq expected result in
+        if dvalue_i1_to_bool v then () else
+          failwith msg
+     (* | DTYPE_FP _ -> (\* floating point comparison *\) *)
+     (*    (\* compare_dvalues_exn expected result msg         *\) *)
+     (*    let v = Assertion.ocaml_of_EOU @@ DV.eval_fcmp Interpreter.params FOeq expected result in *)
+     (*    if dvalue_i1_to_bool v then () else *)
+     (*      failwith msg *)
+     (* | DTYPE_Vector _  -> failwith "TODO: comparison on vectors" *)
+     | _ -> (* Best effort comparison of other types *)
+        compare_dvalues_exn expected result msg
+     end
+  end
 
-let must_fail_tests =
-  [ ( "../tests/must-fail/float-literal-size.ll"
-    , "Illegal 32-bit floating point literal" ) ]
 
-let poison_tests =
-  [ "../tests/llvm-arith/i1/add_nsw.ll"
-  ; "../tests/llvm-arith/i1/add_nuw.ll"
-  ; "../tests/llvm-arith/i1/sub_nsw.ll"
-  ; "../tests/llvm-arith/i1/sub_nuw.ll"
-  ; "../tests/llvm-arith/i32/add_nsw.ll"
-  ; "../tests/llvm-arith/i32/add_nuw.ll"
-  ; "../tests/llvm-arith/i32/ashr_ex.ll"
-  ; "../tests/llvm-arith/i32/lshr_ex.ll"
-  ; "../tests/llvm-arith/i32/mul_nsw.ll"
-  ; "../tests/llvm-arith/i32/mul_nuw.ll"
-  ; "../tests/llvm-arith/i32/sdiv_ex.ll"
-  ; "../tests/llvm-arith/i32/shl_nsw.ll"
-  ; "../tests/llvm-arith/i32/shl_nuw.ll"
-  ; "../tests/llvm-arith/i32/sub_nsw.ll"
-  ; "../tests/llvm-arith/i32/sub_nuw.ll"
-  ; "../tests/llvm-arith/i32/udiv_ex.ll"
-  ; "../tests/llvm-arith/i8/add_nsw.ll"
-  ; "../tests/llvm-arith/i8/add_nuw.ll"
-  ; "../tests/llvm-arith/i8/ashr_ex.ll"
-  ; "../tests/llvm-arith/i8/lshr_ex.ll"
-  ; "../tests/llvm-arith/i8/mul_nsw.ll"
-  ; "../tests/llvm-arith/i8/mul_nuw.ll"
-  ; "../tests/llvm-arith/i8/sdiv_ex.ll"
-  ; "../tests/llvm-arith/i8/shl_nsw.ll"
-  ; "../tests/llvm-arith/i8/shl_nuw.ll"
-  ; "../tests/llvm-arith/i8/sub_nsw.ll"
-  ; "../tests/llvm-arith/i8/sub_nuw.ll"
-  ; "../tests/llvm-arith/i8/udiv_ex.ll"
-  ; "../tests/llvm-arith/i64/add_nsw.ll"
-  ; "../tests/llvm-arith/i64/add_nuw.ll"
-  ; "../tests/llvm-arith/i64/ashr_ex.ll"
-  ; "../tests/llvm-arith/i64/lshr_ex.ll"
-  ; "../tests/llvm-arith/i64/mul_nsw.ll"
-  ; "../tests/llvm-arith/i64/mul_nuw.ll"
-  ; "../tests/llvm-arith/i64/sdiv_ex.ll"
-  ; "../tests/llvm-arith/i64/shl_nsw.ll"
-  ; "../tests/llvm-arith/i64/shl_nuw.ll"
-  ; "../tests/llvm-arith/i64/sub_nsw.ll"
-  ; "../tests/llvm-arith/i64/sub_nuw.ll"
-  ; "../tests/llvm-arith/i64/udiv_ex.ll" ]
+let make_test_h run name ll_ast t : (string * assertion) option =
+  let open Format in
+  (* TODO: ll_ast is of type list (toplevel_entity typ (block typ * list (block typ))) *)
+  (* Can just replace this with the newer ones? *)
+  let run_to_value dtyp entry args ll_ast () : DV.dvalue =
+    match run dtyp entry args ll_ast with
+    | Ok dv -> dv
+    | Error e -> failwith (Result.string_of_exit_condition e)
+  in
+  let args_str args =
+    pp_print_list
+      ~pp_sep:(fun f () -> pp_print_string f ", ")
+      Interpreter.pp_dvalue str_formatter args ;
+    flush_str_formatter ()
+  in
+  (* let _ = Printf.printf "I can get here\n" in *)
+  match t with
+  | Assertion.EQTest (expected, dtyp, entry, args) ->
+      let str =
+        let expected_str = string_of_dvalue expected in
+        let args_str = args_str args in
+        Printf.sprintf "%s = %s(%s)" expected_str (string_of_function_id entry) args_str
+      in
+      let result = run_to_value dtyp entry args ll_ast in
+      Some (str, dvalue_eq_assertion name dtyp expected result)
 
-let i1_tests : (string * int) list =
-  [ ("../tests/llvm-arith/i1/xor.ll", 0)
-  ; ("../tests/llvm-arith/i1/udiv.ll", 1)
-  ; ("../tests/llvm-arith/i1/srem.ll", 0)
-  ; ("../tests/llvm-arith/i1/or.ll", 1)
-  ; ("../tests/llvm-arith/i1/mul.ll", 0)
-  ; ("../tests/llvm-arith/i1/and.ll", 0)
-  ; ("../tests/llvm-arith/i1/add_twice.ll", 1)
-  ; ("../tests/llvm-arith/i1/urem.ll", 0)
-  ; ("../tests/llvm-arith/i1/sub.ll", 0)
-  ; ("../tests/llvm-arith/i1/mul_safe.ll", 0)
-  ; ("../tests/llvm-arith/i1/arith_combo.ll", 0)
-  ; ("../tests/llvm-arith/i1/add_twice_named.ll", 1)
-  ; ("../tests/llvm-arith/i1/add_safe.ll", 1) ]
+  | Assertion.SuccessTest ( entry, args) ->
+     let str =
+       let args_str  =
+         pp_print_list
+           ~pp_sep:(fun f () -> pp_print_string f ", ")
+           Interpreter.pp_dvalue str_formatter args ;
+         flush_str_formatter ()
+       in
+       Printf.sprintf "%s(%s)" (string_of_function_id entry) args_str
+     in
+     let t_void = Assertion.typ_to_dtyp (LLVMAst.TYPE_Void) in
+     Some (str, (fun () -> ignore (run_to_value t_void entry args ll_ast ())))
 
-let i32_tests : (string * int) list = []
+let make_test name link_files ll_ast t : (string * assertion) option =
+  let run dtyp entry args ll_ast =
+    let linked_ast = TopLevel.link_all link_files ll_ast in
+    Interpreter.step
+      (TopLevel.interpreter_gen Interpreter.params dtyp
+         entry
+         (Monad.ret (Obj.magic ITreeDefinition.coq_Monad_itree) args) linked_ast )
+  in
+  make_test_h run name ll_ast t
 
-let i64_tests : (string * int) list =
-  [ (* ("../tests/ll/gep1.ll", 6); (* need CString support for this *)*)
-    ("../tests/ll/gep2.ll", 4)
-  ; ("../tests/ll/gep3.ll", 1)
-  ; ("../tests/ll/gep4.ll", 2)
-  ; ("../tests/ll/gep5.ll", 4)
-  ; ("../tests/ll/gep6.ll", 7)
-  ; ("../tests/ll/gep7.ll", 7)
-  ; ("../tests/ll/gep8.ll", 2)
-  ; ("../tests/ll/gep9.ll", 5) ]
 
-let float_tests : (string * float) list =
-  [ ("../tests/llvm-arith/float/float_literal.ll", 125.31999969482421875)
-  ; ("../tests/llvm-arith/float/hex_float_literal.ll", 468655825485824.)
-  ; ("../tests/llvm-arith/float/i8_uitofp_float.ll", 10.0) ]
+let test_file_h make_test link_files path =
+  Platform.configure () ;
+  let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
+  let _file, ext = Platform.path_to_basename_ext path in
+  match ext with
+  | "ll" ->
+      let tests = parse_tests path in
+      let _ = Printf.printf "Parsed successfully\n" in
+      let ll_ast = IO.parse_file path in
+      let _ = Printf.printf "AST retrieved successfully\n" in
+      let suite = Test (path, List.filter_map (make_test path link_files ll_ast) tests) in
+      let outcome = run_suite [suite] in
+      Printf.printf "%s\n" (outcome_to_string outcome) ;
+      raise (Ran_tests (successful outcome))
+  | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
 
-let snan =
-  Stdlib.Int64.float_of_bits (Stdlib.Int64.of_string "0x7FF0000000000001")
+let test_file link_files path = test_file_h make_test link_files path
 
-let qnan =
-  Stdlib.Int64.float_of_bits (Stdlib.Int64.of_string "0x7FF8000000000000")
+let test_dir link_files dir =
+  Printf.printf "===> TESTING ASSERTIONS IN: %s\n" dir ;
+  let pathlist = Platform.ll_files_of_dir dir in
+  let files =
+    List.filter_map
+      (fun path ->
+        let _file, ext = Platform.path_to_basename_ext path in
+        try
+          match ext with
+          | "ll" -> Some (path, IO.parse_file path, parse_tests path)
+          | _ -> None
+        with
+        | Failure s | Parse_util.InvalidAnonymousId s ->
+            let _ = Printf.printf "FAILURE %s\n\t%s\n%!" path s in
+            None
+        | _ ->
+            let _ = Printf.printf "FAILURE %s\n%!" path in
+            None )
+      pathlist
+  in
+  let suite =
+    List.map
+      (fun (file, ast, tests) ->
+        Test (file, List.filter_map (make_test file link_files ast) tests) )
+      files
+  in
+  let outcome = run_suite suite in
+  Printf.printf "%s\n" (outcome_to_string outcome) ;
+  raise (Ran_tests (successful outcome))
 
-let double_tests : (string * float) list =
-  [ ( "../tests/llvm-arith/double/double_literal.ll"
-    , 125.31999999999999317878973670303821563720703125 )
-  ; ("../tests/llvm-arith/double/i8_uitofp_double.ll", 255.0)
-  ; ("../tests/llvm-arith/double/snan.ll", snan)
-  ; ("../tests/llvm-arith/double/qnan.ll", qnan)
-  ; ("../tests/llvm-arith/double/max.ll", 2.0)
-  ; ("../tests/llvm-arith/double/max1.ll", qnan)
-  ; ("../tests/llvm-arith/double/max2.ll", qnan)
-  ; ("../tests/llvm-arith/double/max3.ll", qnan)
-  ; ("../tests/llvm-arith/double/max4.ll", qnan)
-  ; ("../tests/llvm-arith/double/min.ll", 1.0)
-  ; ("../tests/llvm-arith/double/min4.ll", qnan) ]
+let test_all link_files =
+  let test_directory = "../tests" in
+  let _ =
+    Printf.printf "============== RUNNING TEST SUITE ==============\n"
+  in
+  let b1 = try FrontendTest.test_pp_dir test_directory with Ran_tests b -> b in
+  let b2 = try test_dir link_files test_directory with Ran_tests b -> b in
+  raise (Ran_tests (b1 && b2))
 
-let arith_tests : (string * int) list =
-  [ ("../tests/ll/add.ll", 14)
-  ; ("../tests/ll/sub.ll", 1)
-  ; ("../tests/ll/mul.ll", 45)
-  ; ("../tests/ll/and.ll", 0)
-  ; ("../tests/ll/or.ll", 1)
-  ; ("../tests/ll/xor.ll", 0)
-  ; ("../tests/ll/shl.ll", 168)
-  ; ("../tests/ll/lshr.ll", 10)
-  ; ("../tests/ll/ashr.ll", 5) ]
-  @ [ ("../tests/ll/add_twice.ll", 29)
-    ; ( "../tests/ll/sub_neg.ll"
-      , -1 (* Why, oh why, does the termianl only report the last byte? *) )
-    ; ("../tests/ll/arith_combo.ll", 4)
-    ; ("../tests/ll/return_intermediate.ll", 18) ]
-
-let calling_convention_tests =
-  [ ("../tests/ll/call.ll", 42)
-  ; ("../tests/ll/call1.ll", 17)
-  ; ("../tests/ll/call2.ll", 19)
-  ; ("../tests/ll/call3.ll", 34)
-  ; ("../tests/ll/call4.ll", 34)
-  ; ("../tests/ll/call5.ll", 24)
-  ; ("../tests/ll/call6.ll", 26)
-  ; ("../tests/ll/call-cast.ll", 3)
-  ]
-
-let memory_tests =
-  [ ("../tests/ll/alloca1.ll", 17)
-  ; ("../tests/ll/alloca2.ll", 17)
-  ; ("../tests/ll/global1.ll", 12) ]
-
-let phi_tests =
-  [ ("../tests/ll/phi0.ll", 0)
-  ; ("../tests/ll/phi1.ll", 1)
-  ; ("../tests/ll/phi2.ll", 0)
-  ; ("../tests/ll/phi3.ll", 1) ]
-
-let terminator_tests =
-  [ ("../tests/ll/return.ll", 0)
-  ; ("../tests/ll/return42.ll", 42)
-  ; ("../tests/ll/br1.ll", 9)
-  ; ("../tests/ll/br2.ll", 17)
-  ; ("../tests/ll/cbr1.ll", 7)
-  ; ("../tests/ll/cbr2.ll", 9)
-  ; ("../tests/ll/duplicate_lbl.ll", 1)
-  ; ("../tests/ll/switch1.ll", 0)
-  ; ("../tests/ll/switch2.ll", 0)
-  ; ("../tests/ll/switch3.ll", 0) ]
-
-let bitcast_tests =
-  [("../tests/ll/bitcast1.ll", 3); ("../tests/ll/bitcast2.ll", 0)]
-
-let larger_memory_tests =
-  [ ("../tests/memory/arrayloadandsum.ll", 15)
-  ; ("../tests/memory/structloadandsum.ll", 116)
-  ; ("../tests/ll/gep_undef.ll", 0)
-  ; ("../tests/ll/extract_value_undef.ll", 0) ]
-
-let c_tests = [("../tests/c/average.ll", 2)]
-
-let exception_tests =
-  [ ("../tests/ll/invoke_landingpad.ll", 5)
-  ; ("../tests/ll/invoke_landingpad_void.ll", 42)
-  ; ("../tests/ll/invoke_throw.ll", 2)
-  ]
-
-let other_tests =
-  arith_tests @ calling_convention_tests @ memory_tests @ phi_tests
-  @ terminator_tests @ bitcast_tests
-
-let sum_tree_tests = [("../tests/ll/sum_tree.ll", 116)]
-
-let gcd_euclidian_tests = [("../tests/ll/gcd_euclidian.ll", 2)]
-
-let binary_search_tests = [("../tests/ll/binarysearch.ll", 8)]
-
-let gep_5_deep_tests = [("../tests/ll/qtree.ll", 3)]
-
-let binary_gcd_tests = [("../tests/ll/binary_gcd.ll", 3)]
-
-let linear_search_tests = [("../tests/ll/linear_search.ll", 1)]
-
-let lfsr_tests = [("../tests/ll/lfsr.ll", 108)]
-
-let naive_factor_tests =
-  [ ("../tests/ll/naive_factor_prime.ll", 1)
-  ; ("../tests/ll/naive_factor_nonprime.ll", 0) ]
-
-let euclid_recursive_test = [("../tests/ll/euclid.ll", 2)]
-
-let matmul_tests = [("../tests/ll/matmul.ll", 0)]
-
-(* STUBWITH *)
-
-let larger_tests =
-  sum_tree_tests @ gcd_euclidian_tests @ binary_search_tests
-  @ gep_5_deep_tests @ binary_gcd_tests @ linear_search_tests @ lfsr_tests
-  @ naive_factor_tests @ euclid_recursive_test @ matmul_tests
-
-let large_tests =
-  [ ("../tests/ll/list1.ll", 3)
-  ; ("../tests/ll/cbr.ll", 42)
-  ; ("../tests/ll/factorial.ll", 120)
-  ; ("../tests/ll/factrect.ll", 120)
-  ; ("../tests/ll/duplicate_factorial.ll", 240) ]
-
-let intrinsics_tests : (string * float) list =
-  [("../tests/intrinsics/llvm_fabs_f64.ll", 1.0)]
-
-let parse_files = []
-
-let test_dirs =
-  [ "../tests/ll/"
-  ; "../tests/llvm-arith/i1/"
-  ; "../tests/llvm-arith/i8/"
-  ; "../tests/llvm-arith/i32/"
-  ; "../tests/llvm-arith/i64/"
-  ; "../tests/llvm-arith/float/"
-  ; "../tests/llvm-arith/double/" ]
-
-let poison_test = function DV.DVALUE_Poison _ -> true | _ -> false
-
-let i_test (i1 : Integers.bit_int) = function
-  | DV.DVALUE_I (sz, i2) -> Integers.eq sz i1 i2
-  | _ -> false
-
-(* NOTE: OCaml's floats are actually 64-bit doubles, but contain 32-bit
-   floats as a subset *)
-let float_test (i1 : float) = function
-  | DV.DVALUE_Float i2 -> compare i1 (Camlcoq.camlfloat_of_coqfloat32 i2) = 0
-  | DV.DVALUE_Double i2 -> compare i1 (Camlcoq.camlfloat_of_coqfloat i2) = 0
-  | _ -> false
-
-let double_test (i1 : float) = function
-  | DV.DVALUE_Double i2 -> compare i1 (Camlcoq.camlfloat_of_coqfloat i2) = 0
-  | _ -> false
-
-let i_of_int sz i = Integers.repr sz (Camlcoq.Z.of_sint i)
-
-let i1_of_int i = i_of_int (Camlcoq.P.of_int 1) i
-let i8_of_int i = i_of_int (Camlcoq.P.of_int 8) i
-let i16_of_int i = i_of_int (Camlcoq.P.of_int 16) i
-let i32_of_int i = i_of_int (Camlcoq.P.of_int 32) i
-let i64_of_int i = i_of_int (Camlcoq.P.of_int 64) i
-
-let suite =
-  [ Test
-      ( "Poison"
-      , List.map
-          (fun f -> (f, fun () -> run_dvalue_test poison_test f))
-          poison_tests )
-  ; Test
-      ( "I1-arith"
-      , List.map
-          (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i_test (i1_of_int i)) f) )
-          i1_tests )
-  ; Test
-      ( "I8-arith"
-      , List.map
-          (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i_test (i8_of_int i)) f) )
-          i1_tests )
-  ; Test
-      ( "I32-arith"
-      , List.map
-          (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i_test (i32_of_int i)) f) )
-          i32_tests )
-  ; Test
-      ( "I64-arith"
-      , List.map
-          (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i_test (i64_of_int i)) f) )
-          i64_tests )
-  ; Test
-      ( "Float-arith"
-      , List.map
-          (fun (f, i) -> (f, fun () -> run_dvalue_test (float_test i) f))
-          float_tests )
-  ; Test
-      ( "Double-arith"
-      , List.map
-          (fun (f, i) -> (f, fun () -> run_dvalue_test (double_test i) f))
-          double_tests )
-  ; Test
-      ( "Other Tests"
-      , List.map
-          (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i_test (i64_of_int i)) f) )
-          other_tests )
-  ; Test
-      ( "Larger Tests"
-      , List.map
-          (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i_test (i64_of_int i)) f) )
-          (larger_tests @ large_tests) )
-  ; Test
-      ( "Memory Tests"
-      , List.map
-          (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i_test (i64_of_int i)) f) )
-          larger_memory_tests )
-  ; Test
-      ( "C Tests"
-      , List.map
-          (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i_test (i32_of_int i)) f) )
-          c_tests )
-  ; Test
-      ( "Exception Tests"
-      , List.map
-          (fun (f, i) ->
-            (f, fun () -> run_dvalue_test (i_test (i64_of_int i)) f) )
-          exception_tests )
-  ; (* Test ("Parsing-Must-fail",
-     *       List.map (fun (f, p) ->
-     *           (f, (fun () -> run_parsefail_test f p)))
-     *         must_fail_tests); *)
-    Test
-      ( "Intrinsics"
-      , List.map
-          (fun (f, i) -> (f, fun () -> run_dvalue_test (double_test i) f))
-          intrinsics_tests ) ]
-
-(* @
- *   (List.map pp_test_of_dir test_dirs) *)

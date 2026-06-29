@@ -33,9 +33,9 @@ define i1 @icmp_samesign_eq(i32 %x, i32 %y) {
 
 ; ASSERT EQ: i1 1 = call i1 @icmp_samesign_eq(i32 0, i32 0)
 ; ASSERT EQ: i1 0 = call i1 @icmp_samesign_eq(i32 0, i32 17)
-; ASSERT POISON: call i1 @icmp_samesign_eq(i32 -1, i32 17)
+; ASSERT EQ i1 poison = call i1 @icmp_samesign_eq(i32 -1, i32 17)
 ; ASSERT EQ: i1 0 = call i1 @icmp_samesign_eq(i32 -25, i32 -17)
-; ASSERT POISON: call i1 @icmp_samesign_eq(i32 -25, i32 17)
+; ASSERT EQ i1 poison = call i1 @icmp_samesign_eq(i32 -25, i32 17)
 
 
 

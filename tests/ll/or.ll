@@ -14,10 +14,12 @@ define i32 @or_disjoint(i32 %x, i32 %y) {
 
 ; ASSERT EQ: i32 0  = call i32 @or_disjoint(i32 0, i32 0)
 ; ASSERT EQ: i32 17 = call i32 @or_disjoint(i32 0, i32 17)
-; ASSERT POISON: call i32 @or_disjoint(i32 7, i32 17)
+; ASSERT EQ: i32 poison = call i32 @or_disjoint(i32 7, i32 17)
 
 
 define i64 @main(i64 %argc, i8** %arcv) {
   %1 = or i64 1, 0
   ret i64 %1
 }
+
+; ASSERT EQ: i64 1 = call i64 @main(i64 0, i8** null)

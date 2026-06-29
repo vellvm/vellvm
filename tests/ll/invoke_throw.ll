@@ -30,3 +30,5 @@ attributes #0 = { noinline nounwind optnone uwtable "correctly-rounded-divide-sq
 !0 = !{i32 1, !"wchar_size", i32 4}
 !1 = !{!"clang version 8.0.1 (tags/RELEASE_801/final)"}
 
+
+; ASSERT EQ: i32 2 = call i32 @main(i32 0, i8** null)

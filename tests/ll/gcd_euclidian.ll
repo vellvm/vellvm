@@ -38,3 +38,5 @@ ret_b:
   %12 = load i64, i64* %2
   ret i64 %12
 }
+
+; ASSERT EQ: i64 2 = call i64 @main(i64 0, i8** null)

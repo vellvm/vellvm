@@ -1,10 +1,11 @@
 module DV = DynamicValues
-
 open LLVMEvents
 
 open ITreeDefinition
 open Result
 open Interpreter
+
+(* Vellvm debugger ---------------------------------------------------------- *)
 
 type __ = Obj.t
 
@@ -125,7 +126,7 @@ let rec continue m =
 type debug_command =
   Next | Step | Continue | Quit | AddBreakpoint of (string * int) |
   PrintGlobals | PrintLocals | PrintBreakpoints | RemoveBreakpoint of int |
-  StackTrace
+  StackTrace | Help
 
 let rec read_command () =
   Printf.printf ("(vellvm)> ");
@@ -147,6 +148,7 @@ let rec read_command () =
      let file = read_line () in
      let line = read_int () in
      AddBreakpoint (file, line)
+  | "h" -> Help
   | _ -> Printf.printf "Invalid command.\n"; read_command ()
 
 let print_stack_frame_vars (sf : Stack.stack_frame) =
@@ -161,6 +163,26 @@ let print_stack_vars (s : Stack.stack_frame list) =
 let print_stack_frames (s : Stack.stack_frame list) =
   List.iteri (fun n (sf : Stack.stack_frame) ->
       Printf.printf "#%d: %s\n" n (match sf.stack_loc with None -> "_" | Some l -> Camlcoq.camlstring_of_coqstring l)) s
+
+let print_globals g =
+  List.iter  (fun (k, v) ->
+      Printf.printf "%s -> %s\n" (Camlcoq.camlstring_of_coqstring (ShowAST.show_raw_id k)) (string_of_dvalue v)) g
+
+
+let help_msg : string =
+  "Vellvm Debugger Commands:  \n" ^
+    "\t n : run until next breakpoint\n" ^
+    "\t s : step\n" ^
+    "\t c : continue\n" ^
+    "\t q : quit\n" ^
+    "\t pg : print global values\n" ^                
+    "\t pl : print local values\n" ^
+    "\t pb : print breakpoints\n" ^
+    "\t bt : print stack trace\n" ^
+    "\t st : print stack trace\n" ^
+    "\t rb n: remove breakpoint number n\n" ^
+    "\t b n : add breakpoint with number n\n" ^
+    "\t h : display this help message\n"
 
 let rec debugger
     (m : (__ coq_MCFGEbot, Interpreter.interp_state) itree)
@@ -180,10 +202,8 @@ let rec debugger
      | Either.Left x -> debugger x
      | Either.Right res -> res)
   | PrintGlobals ->
-     List.fold_left (fun _ p ->
-         match p with
-         | (k, v) ->
-            Printf.printf "%s -> %s\n" (Camlcoq.camlstring_of_coqstring (ShowAST.show_raw_id k)) (string_of_dvalue v)) () ((Global.globals_object Interpreter.params).globals_get ());
+     let globals = ((Global.globals_object Interpreter.params).globals_get ()) in
+     print_globals globals;
      debugger m
   | PrintLocals ->
      let stack = (Stack.local_stack_object Interpreter.params).local_stack_get () in
@@ -204,6 +224,9 @@ let rec debugger
   | PrintBreakpoints ->
      let bps = Hashtbl.to_seq !state.breakpoints in
      Stdlib.Seq.iter (fun (k, v) -> Printf.printf "%s -> %s\n" (string_of_int k) (show_breakpoint v)) bps;
+     debugger m
+  | Help ->
+     Printf.printf "%s\n" help_msg;
      debugger m
   | Quit -> Error (Failed "Quitting")
 

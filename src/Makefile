@@ -24,9 +24,8 @@ VELLVM_BC =_build/default/ml/main.bc
 
 ######## The "frontend" is only the parser/pretty-printer
 FRONTEND_EXE=_build/default/ml/frontend.exe
-AGGREGATE_EXE=_build/default/ml/aggregate.exe
-ROCQFILES_FRONTEND := Transformations/Transform QC/ShowAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib
-ROCQFILES_EXEC := QC/ShowAST QC/ReprAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib Semantics/TopLevel Handlers Utilities Numeric/Floats
+ROCQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib
+ROCQFILES_EXEC := $(ROCQFILES_FRONTEND) Semantics
 FRONTEND_VOFILES := $(ROCQFILES_FRONTEND:%=rocq/%.vo)
 EXEC_VFILES := $(ROCQFILES_EXEC:%=rocq/%.v)
 EXEC_VOFILES := $(ROCQFILES_EXEC:%=rocq/%.vo)
@@ -83,7 +82,7 @@ vellvm: $(VELLVM_EXE)
 
 .PHONY: test
 test: vellvm
-	./vellvm -l libll/rust-intrinsics.ll -test
+	./vellvm -L libll -test
 
 .PHONY: check
 check: test

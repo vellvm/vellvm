@@ -9,3 +9,4 @@ define  i64 @main() {
     %res = call i64 (i64) %fptr(i64 0)
     ret i64 %res
 }
+; ASSERT EQ: i64 3 = call i64 @main()

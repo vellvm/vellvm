@@ -29,3 +29,5 @@ end:
   %6 = load i64, i64* %1
   ret i64 %6
 }
+
+; ASSERT EQ: i64 42 = call i64 @main(i64 0, i8** null)
