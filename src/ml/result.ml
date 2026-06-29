@@ -6,13 +6,6 @@ type ast =
 type 'a test = Test of string * (string * 'a) list
 
 
-type src_tgt_error_side = Src | Tgt
-
-let string_of_src_tgt_error_side = function Src -> "Src" | Tgt -> "Tgt"
-
-(* enum function for the OrdType*)
-let int_of_src_tgt_error_side = function Src -> 1 | Tgt -> 2
-
 (* Move test_error from Assertion.ml to here *)
 type exit_condition =
   | UninterpretedCall of string
@@ -63,7 +56,6 @@ type test_outcome =
   | AST_TEST_ERR : ast * exit_condition -> test_outcome
   | AST_CORRECT : ast -> test_outcome
   | ERR_MSG : string -> test_outcome
-  | RAW_STR : Assertion.raw_assertion_string -> test_outcome
   | NO_ASSERT : test_outcome
 
 type test_sum = TEST_SUM : string * test_outcome -> test_sum
@@ -119,15 +111,7 @@ let string_of_test_outcome (with_ast : bool) (outcome : test_outcome) :
       if with_ast then Printf.sprintf "Correct: %s" (show_ast sum_ast)
       else "Correct"
   | ERR_MSG msg -> Printf.sprintf "Error Message: %s" msg
-  | RAW_STR rs ->
-      Printf.sprintf "Raw Assertion String: %s"
-        (Assertion.string_of_raw_assertion_string rs)
   | NO_ASSERT -> "NO ASSERT"
-
-(* TODO: Need helper function for printing out the map ? *)
-(* TODO: Add function in assert.ml to output the map in specific location *)
-(* TODO: Call it from main.ml*)
-(* Then DONE!!*)
 
 let string_of_test_sum (with_ast : bool) (ts : test_sum) : string =
   let msg outcome =

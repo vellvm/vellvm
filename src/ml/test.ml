@@ -33,7 +33,6 @@ let string_of_function_id id : string =
 let parse_tests filename =
   let assertions = ref [] in
   let channel = open_in filename in
-  (* Put the parser into "NormalMode" *)
   try
     while true do
       let line = input_line channel in
@@ -43,83 +42,99 @@ let parse_tests filename =
   with End_of_file -> close_in channel ; List.rev !assertions
 
 
-let compare_dvalues_exn dv1 dv2 ans : unit =
-  if TopLevel.dvalue_eqb dv1 dv2 = ans then ()
+(* Semantics of ASSERT EQ ty expected = call @f(args):
+
+   If expected is `poison` then the call should result in poison.
+
+   If ty is an integral type, then use LLVM's `icmp eq` as the comparison.
+
+   If ty is a floating point type, then use LLVM's `fcmp ueq` as the comparison.
+ *)
+
+
+(* "Syntactic comparison" of dynamic values -- does not take
+   the semantic content into account.  *)
+let compare_dvalues_exn expected got msg : unit =
+  if TopLevel.dvalue_eqb expected got then ()
   else
-    failwith
-      (Printf.sprintf
-         "dvalue comparison for %s failed: \ngot:\n\t%s\nasserted:\n\t%s"
-         (if ans then "equality" else "inequality")
-         (string_of_dvalue dv1) (string_of_dvalue dv2) )
+    failwith msg
 
-let dvalue_eq_assertion name (got : unit -> DV.dvalue)
-    (expected : unit -> DV.dvalue) () =
-  Platform.verb (Printf.sprintf "running ASSERT in %s\n" name) ;
-  let dv1 = got () in
-  let dv2 = expected () in
-  compare_dvalues_exn dv1 dv2 true
+let dvalue_i1_to_bool (dv : DV.dvalue) : bool =
+  match dv with 
+  | DV.DVALUE_I (sz,bitint) ->  Integers.eq sz bitint (Integers.one sz)
+  | _ -> failwith "non-i1 value"
 
-let compare_tgt_for_poison src tgt : unit =
-  match tgt with
-  | DV.DVALUE_Poison _ -> (
-    match src with
-    | DV.DVALUE_Poison _ ->
-        failwith
-          "TargetMorePoisonous: expected src to be non-poison value, but \
-           got poison"
-    | _ -> () )
+
+
+let dvalue_eq_assertion name ty (expected : DV.dvalue) (got : unit -> DV.dvalue) () =
+  let open DynamicTypes in
+  Platform.verb (Printf.sprintf "running ASSERT in %s\n" name) ;  
+  let result = got () in
+  let msg =
+    Printf.sprintf "ASSERT EQ failed: \ngot:\n\t%s\nasserted:\n\t%s"
+         (string_of_dvalue result) (string_of_dvalue expected) 
+  in
+  begin match expected with
+  | DV.DVALUE_Poison _ -> compare_dvalues_exn expected result msg
   | _ ->
-      failwith
-        (Printf.sprintf
-           "TargetMorePoisonous: expected tgt to be poison but got %s"
-           (string_of_dvalue tgt) )
+     begin match ty with
+     | DTYPE_I _ 
+     | DTYPE_IPTR
+     | DTYPE_Pointer ->
+        (* integral comparison *)
+        let v = Assertion.ocaml_of_EOU @@ Compare.eval_icmp Interpreter.params false Eq expected result in
+        if dvalue_i1_to_bool v then () else
+          failwith msg
+     (* | DTYPE_FP _ -> (\* floating point comparison *\) *)
+     (*    (\* compare_dvalues_exn expected result msg         *\) *)
+     (*    let v = Assertion.ocaml_of_EOU @@ DV.eval_fcmp Interpreter.params FOeq expected result in *)
+     (*    if dvalue_i1_to_bool v then () else *)
+     (*      failwith msg *)
+     (* | DTYPE_Vector _  -> failwith "TODO: comparison on vectors" *)
+     | _ -> (* Best effort comparison of other types *)
+        compare_dvalues_exn expected result msg
+     end
+  end
 
-(* TODO: This could be reformated to make it cleaner - move some of it to
-   assertion.ml?. *)
-(* SAZ: why does this duplicate a lot of code in tester.ml? *)
+
 let make_test_h run name ll_ast t : (string * assertion) option =
   let open Format in
-  (* TODO: ll_ast is of type list (toplevel_entity typ (block typ * list
-     (block typ))) *)
+  (* TODO: ll_ast is of type list (toplevel_entity typ (block typ * list (block typ))) *)
   (* Can just replace this with the newer ones? *)
   let run_to_value dtyp entry args ll_ast () : DV.dvalue =
     match run dtyp entry args ll_ast with
     | Ok dv -> dv
     | Error e -> failwith (Result.string_of_exit_condition e)
   in
+  let args_str args =
+    pp_print_list
+      ~pp_sep:(fun f () -> pp_print_string f ", ")
+      Interpreter.pp_dvalue str_formatter args ;
+    flush_str_formatter ()
+  in
   (* let _ = Printf.printf "I can get here\n" in *)
   match t with
   | Assertion.EQTest (expected, dtyp, entry, args) ->
       let str =
         let expected_str = string_of_dvalue expected in
-        let args_str : string =
-          pp_print_list
-            ~pp_sep:(fun f () -> pp_print_string f ", ")
-            Interpreter.pp_dvalue str_formatter args ;
-          flush_str_formatter ()
-        in
+        let args_str = args_str args in
         Printf.sprintf "%s = %s(%s)" expected_str (string_of_function_id entry) args_str
       in
       let result = run_to_value dtyp entry args ll_ast in
-      Some (str, dvalue_eq_assertion name result (fun () -> expected))
-  | Assertion.POISONTest (dtyp, entry, args) ->
-       let expected =
-           DV.DVALUE_Poison
-           dtyp
-       in
-       let str =
-         let expected_str = string_of_dvalue expected in
-         let args_str =
-           pp_print_list
-             ~pp_sep:(fun f () -> pp_print_string f ", ")
-             Interpreter.pp_dvalue str_formatter args ;
-           flush_str_formatter ()
-         in
-         Printf.sprintf "%s = %s(%s)" expected_str (string_of_function_id entry) args_str
-       in
-       let result = run_to_value dtyp entry args ll_ast in
-       Some (str, dvalue_eq_assertion name result (fun () -> expected))
+      Some (str, dvalue_eq_assertion name dtyp expected result)
 
+  | Assertion.SuccessTest ( entry, args) ->
+     let str =
+       let args_str  =
+         pp_print_list
+           ~pp_sep:(fun f () -> pp_print_string f ", ")
+           Interpreter.pp_dvalue str_formatter args ;
+         flush_str_formatter ()
+       in
+       Printf.sprintf "%s(%s)" (string_of_function_id entry) args_str
+     in
+     let t_void = Assertion.typ_to_dtyp (LLVMAst.TYPE_Void) in
+     Some (str, (fun () -> ignore (run_to_value t_void entry args ll_ast ())))
 
 let make_test name link_files ll_ast t : (string * assertion) option =
   let run dtyp entry args ll_ast =
@@ -152,7 +167,6 @@ let test_file link_files path = test_file_h make_test link_files path
 
 let test_dir link_files dir =
   Printf.printf "===> TESTING ASSERTIONS IN: %s\n" dir ;
-  Platform.configure () ;
   let pathlist = Platform.ll_files_of_dir dir in
   let files =
     List.filter_map

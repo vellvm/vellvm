@@ -7,7 +7,8 @@ From Vellvm Require Import
 
 Section Compare.
   Context {Pa : Params}.
-  
+
+  (* TODO: This should also work on vectors of integer types *)
   Definition eval_icmp (samesign:bool) (icmp : icmp) (v1 v2 : dvalue) : EOU dvalue.
     refine
       (match v1, v2 with
