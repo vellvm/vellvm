@@ -142,12 +142,12 @@ Section Denotation.
     match fpv with
     | FP_float =>
         match float32_of_float_syntax f with
-        | None   => raise_error "bad float literal"
+        | None   => raise_error ("bad float literal: " ++ (show f))
         | Some f => ret (DVALUE_Float f)
         end
     | FP_double =>
         match float_of_float_syntax f with
-        | None   => raise_error "bad double literal"
+        | None   => raise_error ("bad double literal: " ++ (show f))
         | Some f => ret (DVALUE_Double f)
         end
     | _ => raise_error "unsupported float type"

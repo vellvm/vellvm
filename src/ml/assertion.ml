@@ -55,12 +55,16 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
   | TYPE_FP FP_float, EXP_Float f ->
      begin match float32_of_float_syntax f with
      | Some v ->  DVALUE_Float v
-     | None -> failwith "assertion.ml: texp_to_dvalue failed float32 conversion"
+     | None ->
+        let s = Camlcoq.camlstring_of_coqstring (ShowAST.show_float_syntax f) in
+        failwith @@ Printf.sprintf "assertion.ml: texp_to_dvalue failed float32 conversion: %s" s
      end
   | TYPE_FP FP_double, EXP_Float f ->
      begin match float_of_float_syntax f with
      | Some v ->  DVALUE_Double v
-     | None -> failwith "assertion.ml: texp_to_dvalue failed float conversion"
+     | None ->
+        let s = Camlcoq.camlstring_of_coqstring (ShowAST.show_float_syntax f) in
+        failwith @@ Printf.sprintf "assertion.ml: texp_to_dvalue failed float conversion: %s" s
      end
   | TYPE_Array _, EXP_Array (t, elts) ->
       let elt_typ = match t with TYPE_Array (_, et) -> et | _ -> t in
@@ -118,11 +122,15 @@ and parse_eq_assertion (line : string) : test list =
     (* let _ = print_endline ("LHS: " ^ lhs) in *)
     let rhs = Str.matched_group 2 line in
     (* let _ = print_endline ("RHS: " ^ rhs) in *)
-    let l = Llvm_lexer.parse_texp (Lexing.from_string lhs) in
+    let l =
+      try 
+        Llvm_lexer.parse_texp (Lexing.from_string lhs)
+      with _ -> failwith (Printf.sprintf "Ill-formed ASSERT EQ left-hand-side: %s" lhs)
+    in
     (* let _ = print_endline "PARSED LHS" in *)
     let r =
       try Llvm_lexer.parse_test_call (Lexing.from_string rhs)
-      with _ -> failwith (Printf.sprintf "Ill-formed ASSERT EQ: %s" rhs)
+      with _ -> failwith (Printf.sprintf "Ill-formed ASSERT EQ right-hand-side: %s" rhs)
     in
     (* let _ = print_endline "PARSED RHS" in *)
     let uv = texp_to_dvalue l in
