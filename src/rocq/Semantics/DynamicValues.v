@@ -1225,7 +1225,7 @@ Section DValue.
     | FRem => raise_error "unimplemented float operation"
     end.
 
-  Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : EOU dvalue :=
+  Definition eval_fop_h (fop:fbinop) (v1:dvalue) (v2:dvalue) : EOU dvalue :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2   => float_op fop f1 f2
     | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
@@ -1237,15 +1237,31 @@ Section DValue.
         then raise_ub "Division by poison."
         else ret (DVALUE_Poison t)
     | _, _                               =>
-        raise_error ("ill_typed-fop: " ++ (show fop))
+        raise_error ("ill_typed-fop: " ++ (show fop) ++ " " ++ (show v1) ++ " " ++ (show v2))
     end.
 
-  Definition eval_fneg (v:dvalue) : EOU dvalue :=
+  Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : EOU dvalue :=
+    match v1, v2 with
+    | (DVALUE_Vector t elts1), (DVALUE_Vector _ elts2) =>
+      val <- vec_loop (eval_fop_h fop) (List.combine elts1 elts2) ;;
+      ret (DVALUE_Vector t val)
+    | _, _ => eval_fop_h fop v1 v2
+    end.
+  
+  Definition eval_fneg_h (v:dvalue) : EOU dvalue :=
     match v with
     | DVALUE_Float f  => ret (DVALUE_Float (Float32.neg f))
     | DVALUE_Double f => ret (DVALUE_Double (Float.neg f))
     | DVALUE_Poison t => ret (DVALUE_Poison t)
     | _ => raise_error ("ill_typed-fneg ")
+    end.
+
+  Definition eval_fneg (v:dvalue) : EOU dvalue :=
+    match v with
+    | DVALUE_Vector t elts =>
+      val <- map_monad (eval_fneg_h) elts;;
+      ret (DVALUE_Vector t val)
+    | _ => eval_fneg_h v
     end.
   
   Definition not_nan32 (f:ll_float) : bool :=
