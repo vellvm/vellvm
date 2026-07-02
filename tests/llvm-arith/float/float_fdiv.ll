@@ -1,4 +1,3 @@
-; ASSERT EQ: float 0x3a800000 = call float @make_float1()
 ; ASSERT EQ: float 0x3a80000000000000 = call float @make_float1()
 define float @make_float1() {
   ret float 0x3a80000000000000

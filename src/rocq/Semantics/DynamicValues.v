@@ -1377,6 +1377,71 @@ Section DValue.
     end.
   Arguments insert_into_str _ _ _ : simpl nomatch.
 
+  Fixpoint split {A} (pre:list A) (idx:Z) (l : list A) : EOU (list A * A * list A) :=
+    match l with
+    | [] => raise_error "split: index out of bounds"
+    | h::tl =>
+        (if idx =? 0 then ret (pre, h, tl)
+         else split (pre ++ [h]) (idx-1) tl)%Z
+    end%list.
+                       
+  Fixpoint insert_value (str : dvalue) (elt : dvalue) (idxs : list Z) : EOU dvalue :=
+    match idxs with
+    | [] => ret elt
+    | i::tl => 
+        match str with
+        | DVALUE_Struct elts =>
+            '(pre,sub,post) <- split [] i elts ;;
+            modified_subfield <- insert_value sub elt tl ;;
+            ret (DVALUE_Struct (pre ++ [modified_subfield] ++ post)%list)
+    
+        | DVALUE_Packed_struct elts =>
+            '(pre,sub,post) <- split [] i elts ;;
+            modified_subfield <- insert_value sub elt tl ;;
+            ret (DVALUE_Packed_struct (pre ++ [modified_subfield] ++ post))
+
+        | DVALUE_Array t elts =>
+            '(pre,sub,post) <- split [] i elts ;;
+            modified_subfield <- insert_value sub elt tl ;;
+            ret (DVALUE_Array t (pre ++ [modified_subfield] ++ post))
+
+        | DVALUE_Poison (DTYPE_Struct ts) =>
+            '(pre_t, sub_t, post_t) <- split [] i ts ;;
+            let pre_dv := List.map DVALUE_Poison pre_t in
+            let post_dv := List.map DVALUE_Poison post_t in
+            modified_subfield <- insert_value (DVALUE_Poison sub_t) elt tl ;;
+            ret (DVALUE_Struct (pre_dv ++ [modified_subfield] ++ post_dv))
+                
+        | _ => raise_error "insert_value: non-aggregate type"
+        end
+    end.
+
+  Fixpoint extract_value (str : dvalue) (idxs : list Z) : EOU dvalue :=
+    match idxs with
+    | [] => ret str
+    | i::tl => 
+        match str with
+        | DVALUE_Struct elts =>
+            '(pre,sub,post) <- split [] i elts ;;
+            extract_value sub tl 
+    
+        | DVALUE_Packed_struct elts =>
+            '(pre,sub,post) <- split [] i elts ;;
+            extract_value sub tl
+
+        | DVALUE_Array t elts =>
+            '(pre,sub,post) <- split [] i elts ;;
+            extract_value sub tl 
+
+        | DVALUE_Poison (DTYPE_Struct ts) =>
+            '(pre_t, sub_t, post_t) <- split [] i ts ;;
+            extract_value (DVALUE_Poison sub_t) tl 
+                
+        | _ => raise_error "insert_value: non-aggregate type"
+        end
+    end.
+  
+  
   Definition index_into_vec_dv (elt_typ : dtyp) (v:dvalue) (idx:dvalue) : EOU dvalue.
     refine
       (let fix loop dt (elts : list dvalue) i :=

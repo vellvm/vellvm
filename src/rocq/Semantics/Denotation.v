@@ -294,31 +294,12 @@ Section Denotation.
 
     | OP_ExtractValue (dt, str) idxs =>
         str <- denote_exp (Some dt) str ;;
-        (* Should this be pulled out into a definition? *)
-        let fix loop str idxs : EOU dvalue :=
-          match idxs with
-          | [] => ret str
-          | i :: tl =>
-              v <- index_into_str_dv str i ;;
-              loop v tl
-          end
-        in
-        lift (loop str (List.map denote_int_syntax idxs))
+        lift (extract_value str (List.map denote_int_syntax idxs))
 
     | OP_InsertValue (dt_str, strop) (dt_elt, eltop) idxs =>
         str <- denote_exp (Some dt_str) strop ;;
         elt <- denote_exp (Some dt_elt) eltop ;;
-        let fix loop str idxs : EOU dvalue :=
-          match idxs with
-          | [] => raise_error "Index was not provided"
-          | i :: nil =>
-              insert_into_str str elt i
-          | i :: tl =>
-              subfield <- index_into_str_dv str i;;
-              modified_subfield <- loop subfield tl;;
-              insert_into_str str modified_subfield i
-          end in
-        lift (loop str (List.map denote_int_syntax idxs))
+        lift (insert_value str elt (List.map denote_int_syntax idxs))
 
     | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
         dcond <- denote_exp (Some dt) cnd ;;

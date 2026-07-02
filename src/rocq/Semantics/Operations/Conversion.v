@@ -227,18 +227,32 @@ Section Convert.
     | _, _ => None
     end.
 
-  
+
+  (* SAZ: TODO - clean up this logic? Is there a cleaner way, and do we really need
+     the conversion cases stuff?
+   *)
   Definition convert (conv : conversion_type) (t_from : dtyp) (dv : dvalue) (t_to : dtyp) : EOU dvalue :=
-    match dv with
-    | (DVALUE_Vector t elts1) =>
-        match get_vec_conversion_type t_from t_to with
-        | Some (t_from', t_to') =>
-            val <- map_monad (fun v => convert_h conv t_from' v t_to') elts1 ;;
-            ret (DVALUE_Vector t_to' val)
-        | None =>
-            raise_error "vector conversion at incompatible types or vector lengths"
+    match conv with
+    | Bitcast =>
+        if dtyp_eqb t_from t_to
+        then ret dv
+        else if bit_sizeof_dtyp t_from =? bit_sizeof_dtyp t_to
+             then
+               let bytes := dvalue_to_memory_bytes dv t_from in
+                memory_bytes_to_dvalue bytes t_to 
+             else raise_error "unequal bitsize in cast"
+    | _ => 
+        match dv with
+        | (DVALUE_Vector t elts1) =>
+            match get_vec_conversion_type t_from t_to with
+            | Some (t_from', t_to') =>
+                val <- map_monad (fun v => convert_h conv t_from' v t_to') elts1 ;;
+                ret (DVALUE_Vector t_to' val)
+            | None =>
+                raise_error "vector conversion at incompatible types or vector lengths"
+            end
+        | _ => convert_h conv t_from dv t_to
         end
-    | _ => convert_h conv t_from dv t_to 
     end.
 
   
