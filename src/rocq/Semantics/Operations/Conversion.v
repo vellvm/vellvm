@@ -205,7 +205,7 @@ Section Convert.
   
   Arguments get_conv_case _ _ _ _ : simpl nomatch.
 
-  Definition convert (conv : conversion_type) (t_from : dtyp) (dv : dvalue) (t_to : dtyp) : EOU dvalue :=
+  Definition convert_h (conv : conversion_type) (t_from : dtyp) (dv : dvalue) (t_to : dtyp) : EOU dvalue :=
     match get_conv_case conv t_from dv t_to with
     | Conv_PtoI x =>
         match x, t_to with
@@ -220,5 +220,27 @@ Section Convert.
     | Conv_Illegal s => raise_error s
     end.
 
+  Definition get_vec_conversion_type (t_from t_to : dtyp) : option (dtyp * dtyp) :=
+    match t_from, t_to with
+    | DTYPE_Vector n t_from', DTYPE_Vector m t_to' =>
+        if N.eqb n m then Some (t_from', t_to') else None
+    | _, _ => None
+    end.
+
+  
+  Definition convert (conv : conversion_type) (t_from : dtyp) (dv : dvalue) (t_to : dtyp) : EOU dvalue :=
+    match dv with
+    | (DVALUE_Vector t elts1) =>
+        match get_vec_conversion_type t_from t_to with
+        | Some (t_from', t_to') =>
+            val <- map_monad (fun v => convert_h conv t_from' v t_to') elts1 ;;
+            ret (DVALUE_Vector t_to' val)
+        | None =>
+            raise_error "vector conversion at incompatible types or vector lengths"
+        end
+    | _ => convert_h conv t_from dv t_to 
+    end.
+
+  
 End Convert.
 
