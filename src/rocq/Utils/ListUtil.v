@@ -14,6 +14,18 @@ Open Scope monad.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
+Module N.
+  (* Standard library things in [N] rather than [nat] *)
+  
+  Fixpoint length {A} (l : list A) : N :=
+    match l with
+    | [] => 0
+    | _ :: l => 1 + length l
+    end.
+End N.
+  
+
+
 (** * Collection of misc definitions and lemmas over lists *)
 
 (** *** Standard lemmas over standard lists *)
@@ -194,6 +206,7 @@ Section Standard.
          (fun n xs => x :: xs)
          n.
 
+  
   Lemma drop_length_le :
     forall {A} (xs : list A) n,
       (length (drop n xs) <= length xs)%nat.

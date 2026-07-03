@@ -274,17 +274,13 @@ Section Denotation.
      | OP_ExtractElement (dt_vec, vecop) (dt_idx, idx) =>
         vec <- denote_exp (Some dt_vec) vecop ;;
         idx <- denote_exp (Some dt_idx) idx ;;
-        elt_typ <- match dt_vec with
-                      | DTYPE_Vector _ t => ret t
-                      | _ => raise "Invalid vector type for ExtractElement"
-                  end;;
-        lift (index_into_vec_dv elt_typ vec idx)
+        lift (extract_element vec idx)
 
     | OP_InsertElement (dt_vec, vecop) (dt_elt, eltop) (dt_idx, idx) =>
         vec <- denote_exp (Some dt_vec) vecop ;;
         elt <- denote_exp (Some dt_elt) eltop ;;
         idx <- denote_exp (Some dt_idx) idx ;;
-        lift (insert_into_vec_dv dt_vec vec elt idx)
+        lift (insert_element vec elt idx)
 
     | OP_ShuffleVector (dt_vec1, vecop1) (dt_vec2, vecop2) (dt_mask, idxmask) =>
         vec1 <- denote_exp (Some dt_vec1) vecop1 ;;

@@ -54,3 +54,9 @@ Proof.
   - intros ? [<- | IN]; eauto.
 Qed.
 
+Definition option_ub {X : Type} (s : string) (x : option X) :=
+  match x with
+  | None => raise_ub s
+  | Some v => ret v
+  end.
+

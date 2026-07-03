@@ -167,8 +167,8 @@ Section DValue.
     | DVALUE_None => "none"
     | DVALUE_Struct fields => "{" ++ String.concat ", " (map show_dvalue fields) ++ "}"
     | DVALUE_Packed_struct fields => "<{" ++ String.concat ", " (map show_dvalue fields) ++ "}>"
-    | DVALUE_Array _ elts => "["  ++ String.concat ", " (map show_dvalue elts) ++ "]"
-    | DVALUE_Vector _ elts => "<"  ++ String.concat ", " (map show_dvalue elts) ++ ">"
+    | DVALUE_Array t elts => show_dtyp t ++ " [" ++ String.concat ", " (map show_dvalue elts) ++ "]"
+    | DVALUE_Vector t elts => show_dtyp t ++ " < " ++ String.concat ", " (map show_dvalue elts) ++ ">"
     end.
 
   #[global] Instance showDValue : Show dvalue
@@ -1168,8 +1168,13 @@ Section DValue.
   Definition eval_iop iop v1 v2 : EOU dvalue :=
     match v1, v2 with
     | (DVALUE_Vector t elts1), (DVALUE_Vector _ elts2) =>
-      val <- vec_loop (eval_iop_integer_h iop) (List.combine elts1 elts2) ;;
-      ret (DVALUE_Vector t val)
+        let n := N.length elts1 in
+        let m := N.length elts2 in
+        if n =? m  then 
+          val <- vec_loop (eval_iop_integer_h iop) (List.combine elts1 elts2) ;;
+          ret (DVALUE_Vector t val)
+        else
+          raise_ub ("iop: " ++ (show iop) ++  " of different-length vectors")
     | _, _ => eval_iop_integer_h iop v1 v2
     end.
   Arguments eval_iop _ _ _ : simpl nomatch.
@@ -1243,8 +1248,15 @@ Section DValue.
   Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : EOU dvalue :=
     match v1, v2 with
     | (DVALUE_Vector t elts1), (DVALUE_Vector _ elts2) =>
-      val <- vec_loop (eval_fop_h fop) (List.combine elts1 elts2) ;;
-      ret (DVALUE_Vector t val)
+        let n := N.length elts1 in
+        let m := N.length elts2 in
+        if n =? m  then
+          val <- vec_loop (eval_fop_h fop) (List.combine elts1 elts2) ;;
+          ret (DVALUE_Vector t val)
+        else
+        raise_ub ("fop: " ++ (show fop) ++  " different-length vectors of type "
+                    ++ (show t) ++ "v1 = " ++ (show v1) ++ "v2 = " ++ (show v2)
+          )
     | _, _ => eval_fop_h fop v1 v2
     end.
   
@@ -1320,7 +1332,7 @@ Section DValue.
     then @DVALUE_I 1 Integers.one else @DVALUE_I 1 Integers.zero.
     Arguments double_cmp _ _ _ : simpl nomatch.
 
-  Definition eval_fcmp (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : EOU dvalue :=
+  Definition eval_fcmp_h (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : EOU dvalue :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2 => ret (float_cmp fcmp f1 f2)
     | DVALUE_Double f1, DVALUE_Double f2 => ret (double_cmp fcmp f1 f2)
@@ -1332,87 +1344,69 @@ Section DValue.
     | _, _ => raise_error "ill_typed-fcmp"
     end.
 
+  Definition eval_fcmp (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : EOU dvalue :=
+    match v1, v2 with
+    | (DVALUE_Vector t elts1), (DVALUE_Vector _ elts2) =>
+        let n := N.length elts1 in
+        let m := N.length elts2 in
+        if n =? m  then 
+          val <- vec_loop (eval_fcmp_h fcmp) (List.combine elts1 elts2) ;;
+          ret (DVALUE_Vector (DTYPE_Vector n (DTYPE_I 1)) val)
+        else
+          raise_ub "fcmp of different-length vectors"
+    | _, _ => eval_fcmp_h fcmp v1 v2
+    end.
+
+  
   End ARITHMETIC.
 
-  (* Helper function for indexing into a structured datatype
-     for extractvalue and insertvalue *)
-  Definition index_into_str_dv (v:dvalue) (idx:LLVMAst.int_ast) : EOU dvalue :=
-    let fix loop elts i :=
-        match elts with
-        | [] => raise_error "index_into_str_dv: index out of bounds"
-        | h :: tl =>
-          if (i =? 0)%Z then ret h else loop tl (i-1)%Z
-        end in
-    match v with
-    | DVALUE_Struct f => loop f idx
-    | DVALUE_Packed_struct f => loop f idx
-    | DVALUE_Array t e => loop e idx
-    | _ => raise_error "index_into_str_dv: invalid aggregate data"
-    end.
-  Arguments index_into_str_dv _ _ : simpl nomatch.
+  (* monadically split a list into a prefix, an element, and a tail
 
-  (* Helper function for inserting into a structured datatype for insertvalue *)
-  Definition insert_into_str (str:dvalue) (v:dvalue) (idx:LLVMAst.int_ast) : EOU dvalue :=
-    let fix loop (acc elts:list dvalue) (i:LLVMAst.int_ast) :=
-        match elts with
-        | [] => raise_error "insert_into_str: index out of bounds"
-        | h :: tl =>
-          (if i =? 0 then ret (acc ++ (v :: tl))
-          else loop (acc ++ [h]) tl (i-1))%Z
-        end%list in
-    match str with
-    | DVALUE_Struct f =>
-      v <- (loop [] f idx) ;;
-      ret (DVALUE_Struct v)
-
-    | DVALUE_Packed_struct f =>
-      v <- (loop [] f idx) ;;
-      ret (DVALUE_Packed_struct v)
-
-    | DVALUE_Array t e =>
-      v <- (loop [] e idx) ;;
-      ret (DVALUE_Array t v)
-
-    | _ => raise_error "insert_into_str: invalid aggregate data"
-    end.
-  Arguments insert_into_str _ _ _ : simpl nomatch.
-
-  Fixpoint split {A} (pre:list A) (idx:Z) (l : list A) : EOU (list A * A * list A) :=
+      Should satisfy: [split err pre idx l] = [Some (xs, x, tl)] then (pre ++ l) = (xs ++ [x] ++ tl)
+      and ((length pre) + idx) = (length xs)  so if pre = [] then idx = length xs
+   *)
+  Fixpoint split_h {A} (pre:list A) (idx:Z) (l : list A) : option (list A * A * list A) :=
     match l with
-    | [] => raise_error "split: index out of bounds"
+    | [] => None
     | h::tl =>
-        (if idx =? 0 then ret (pre, h, tl)
-         else split (pre ++ [h]) (idx-1) tl)%Z
+        (if idx =? 0 then Some (pre, h, tl)
+         else split_h (pre ++ [h]) (idx-1) tl)%Z
     end%list.
-                       
+
+  Definition split {A} (pre:list A) (idx:Z) (l : list A) : option (list A * A * list A) :=
+    if (idx <? 0)%Z then
+      None
+    else
+      split_h pre idx l.
+    
   Fixpoint insert_value (str : dvalue) (elt : dvalue) (idxs : list Z) : EOU dvalue :=
     match idxs with
     | [] => ret elt
     | i::tl => 
         match str with
         | DVALUE_Struct elts =>
-            '(pre,sub,post) <- split [] i elts ;;
+            '(pre,sub,post) <- option_ub "insertvalue struct index out of bounds" (split [] i elts) ;;
             modified_subfield <- insert_value sub elt tl ;;
             ret (DVALUE_Struct (pre ++ [modified_subfield] ++ post)%list)
     
         | DVALUE_Packed_struct elts =>
-            '(pre,sub,post) <- split [] i elts ;;
+            '(pre,sub,post) <- option_ub "insertvalue packed struct index out of bounds" (split [] i elts) ;;
             modified_subfield <- insert_value sub elt tl ;;
             ret (DVALUE_Packed_struct (pre ++ [modified_subfield] ++ post))
 
         | DVALUE_Array t elts =>
-            '(pre,sub,post) <- split [] i elts ;;
+            '(pre,sub,post) <- option_ub "insertvalue array index out of bounds" (split [] i elts) ;;
             modified_subfield <- insert_value sub elt tl ;;
             ret (DVALUE_Array t (pre ++ [modified_subfield] ++ post))
 
         | DVALUE_Poison (DTYPE_Struct ts) =>
-            '(pre_t, sub_t, post_t) <- split [] i ts ;;
+            '(pre_t, sub_t, post_t) <- option_ub "insertvalue poison index out of bounds" (split [] i ts) ;;
             let pre_dv := List.map DVALUE_Poison pre_t in
             let post_dv := List.map DVALUE_Poison post_t in
             modified_subfield <- insert_value (DVALUE_Poison sub_t) elt tl ;;
             ret (DVALUE_Struct (pre_dv ++ [modified_subfield] ++ post_dv))
                 
-        | _ => raise_error "insert_value: non-aggregate type"
+        | _ => raise_error "insertvalue: non-aggregate type"
         end
     end.
 
@@ -1422,103 +1416,71 @@ Section DValue.
     | i::tl => 
         match str with
         | DVALUE_Struct elts =>
-            '(pre,sub,post) <- split [] i elts ;;
+            '(pre,sub,post) <- option_ub "extractvalue struct index out of bounds" (split [] i elts) ;;
             extract_value sub tl 
     
         | DVALUE_Packed_struct elts =>
-            '(pre,sub,post) <- split [] i elts ;;
+            '(pre,sub,post) <- option_ub "extractvalue packed struct index out of bounds" (split [] i elts) ;;
             extract_value sub tl
 
         | DVALUE_Array t elts =>
-            '(pre,sub,post) <- split [] i elts ;;
+            '(pre,sub,post) <- option_ub "extractvalue array index out of bounds" (split [] i elts) ;;
             extract_value sub tl 
 
         | DVALUE_Poison (DTYPE_Struct ts) =>
-            '(pre_t, sub_t, post_t) <- split [] i ts ;;
+            '(pre_t, sub_t, post_t) <- option_ub "extractvalue poison index out of bounds" (split [] i ts) ;;
             extract_value (DVALUE_Poison sub_t) tl 
                 
-        | _ => raise_error "insert_value: non-aggregate type"
+        | _ => raise_error "extractvalue: non-aggregate type"
         end
     end.
-  
-  
-  Definition index_into_vec_dv (elt_typ : dtyp) (v:dvalue) (idx:dvalue) : EOU dvalue.
-    refine
-      (let fix loop dt (elts : list dvalue) i :=
-         match elts with
-         | [] => ret (DVALUE_Poison dt) (* LangRef: if idx exceeds the length of val for a fixed-length vector, the result is a poison value *)
-         | h :: tl =>
-             if (i =? 0)%Z then ret h else loop dt tl (i-1)%Z
-         end in
-       match v with
-       | DVALUE_Array t e
-       | DVALUE_Vector t e =>
-           match idx with
-           | @DVALUE_I sz i2 =>
-               (* TODO: should this be restricted to 32 / 64-bit integers? *)
-               let iZ := signed i2 in
-               match iZ with
-               | Zneg _ =>
-                   raise_error "index_into_vec_dv: negative index."
-               | _ => loop elt_typ e iZ
-               end
-           | _ => raise_error "index_into_vec_dv: non-integer dvalue index."
-           end
-       | _ => raise_error "index_into_vec_dv: not a vector or array."
-       end).
-  Defined.
-  Arguments index_into_vec_dv _ _ : simpl nomatch.
 
-  Definition insert_into_vec_dv (vec_typ : dtyp) (vec:dvalue) (v:dvalue) (idx:dvalue) : EOU dvalue :=
-    let fix loop (acc elts:list dvalue) (i:LLVMAst.int_ast) :=
-        match elts with
-        | [] => None (* LangRef: if idx exceeds the length of val for a fixed-length vector, the result is a poison value *)
-        | h :: tl =>
-          (if i =? 0 then ret (acc ++ (v :: tl))
-          else loop (acc ++ [h]) tl (i-1))%Z
-        end%list in
-    match vec with
-    | DVALUE_Vector t e =>
-        match idx with
-        | @DVALUE_I _ i2 =>
-            (* TODO: should this be restricted to 32 / 64-bit integers? *)
-            let iZ := signed i2 in
-            match iZ with
-            | Zneg _ =>
-                raise_error "insert_into_vec_dv: negative index"
-            | _ =>
-                match loop [] e iZ with
-                | None =>
-                    ret (DVALUE_Poison vec_typ)
-                | Some elts =>
-                    ret (DVALUE_Vector t elts)
-                end
-            end
-        | _ =>
-            raise_error "insert_into_vec_dv: non-integer dvalue index."
-        end
-    | DVALUE_Array t e =>
-        match idx with
-        | @DVALUE_I _ i2 =>
-            (* TODO: should this be restricted to 32 / 64-bit integers? *)
-            let iZ := signed i2 in
-            match iZ with
-            | Zneg _ =>
-                raise_error "insert_into_vec_dv: negative index"
-            | _ =>
-                match loop [] e iZ with
-                | None =>
-                    ret (DVALUE_Poison vec_typ)
-                | Some elts =>
-                    ret (DVALUE_Array t elts)
-                end
-            end
-        | _ =>
-            raise_error "insert_into_vec_dv: non-integer dvalue index."
-        end
-    | _ => raise_error "insert_into_vec_dv: not a vector or array."
+  Definition dvalue_to_Z (dv : dvalue) : option Z :=
+    match dv with
+    (* TODO: should this be restricted to 32 / 64-bit integers? *)      
+    | @DVALUE_I sz i2 => Some (signed i2)
+    | _ => None
     end.
-  Arguments insert_into_vec_dv _ _ _ : simpl nomatch.
+  
+  (* get the idx'th element of a vector, return [poison] if not in bounds. *)
+  (* LANGREF? : What is the behavior if [vex] is poison?  UB or return poision?  *)
+  Definition extract_element (vec:dvalue) (idx:dvalue) : EOU dvalue :=
+    match vec with
+    | DVALUE_Vector (DTYPE_Vector _ dt) elts =>
+        match dvalue_to_Z idx with
+        | Some i =>
+            match split [] i elts with
+            | None => ret (DVALUE_Poison dt)
+            | Some (pre, elt, post) =>  ret elt
+            end
+        | None => raise_error "extractelemnt: non-integer index"
+        end
+    | _ => raise_error "extractelement: non-vector type"
+    end.
+
+  Definition insert_element (vec : dvalue) (elt : dvalue) (idx : dvalue) : EOU dvalue :=
+    match vec with
+    | DVALUE_Vector (DTYPE_Vector sz dt) elts =>
+        match dvalue_to_Z idx with
+        | Some i =>
+            match split [] i elts with
+            | None => ret (DVALUE_Poison (DTYPE_Vector sz dt))
+            | Some (pre, _, post) =>  ret (DVALUE_Vector (DTYPE_Vector sz dt) (pre ++ [elt] ++ post))
+            end
+        | None => raise_error "insertelement: non-integer index"
+        end
+    | DVALUE_Poison (DTYPE_Vector sz dt) =>
+        let elts := repeat (DVALUE_Poison dt) (N.to_nat sz) in
+        match dvalue_to_Z idx with
+        | Some i =>
+            match split [] i elts with
+            | None => ret (DVALUE_Poison (DTYPE_Vector sz dt))
+            | Some (pre, _, post) =>  ret (DVALUE_Vector (DTYPE_Vector sz dt) (pre ++ [elt] ++ post))
+            end
+        | None => raise_error "insertelement: non-integer index"
+        end
+    | _ => raise_error ("insertelement: non-vector type " ++ (show vec))%string
+    end.
 
 (*  ------------------------------------------------------------------------- *)
 

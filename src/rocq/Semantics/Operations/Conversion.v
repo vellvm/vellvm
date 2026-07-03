@@ -243,14 +243,16 @@ Section Convert.
              else raise_error "unequal bitsize in cast"
     | _ => 
         match dv with
-        | (DVALUE_Vector t elts1) =>
+        | (DVALUE_Vector (DTYPE_Vector sz t) elts1) =>
             match get_vec_conversion_type t_from t_to with
             | Some (t_from', t_to') =>
                 val <- map_monad (fun v => convert_h conv t_from' v t_to') elts1 ;;
-                ret (DVALUE_Vector t_to' val)
+                ret (DVALUE_Vector (DTYPE_Vector sz t_to') val)
             | None =>
                 raise_error "vector conversion at incompatible types or vector lengths"
             end
+        | (DVALUE_Vector _ _) =>
+            raise_error "convert: vector type annotation violates invariant"
         | _ => convert_h conv t_from dv t_to
         end
     end.

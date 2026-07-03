@@ -79,7 +79,23 @@ define <4 x double> @vec_neg() {
    ret <4 x double> %ans
 }
 
+define i32 @main() {
+  %v1 = call <4 x double> @vec_sub()
+  %e0 = extractelement <4 x double> %v1, i32 0
+  %e1 = extractelement <4 x double> %v1, i32 1
+  %e2 = extractelement <4 x double> %v1, i32 2
+  %e3 = extractelement <4 x double> %v1, i32 3
+  %i1 = fcmp ueq double %e0, 1.0
+  br i1 %i1, label %good, label %bad
 
+good:
+  ret i32 0
+
+bad:
+  ret i32 1
+}
+
+; ASSERT EQ: i32 0 = call i32 @main()
 
 ; ASSERT EQ: <4 x double> <double 1.0, double 3.0, double 6.0, double 11.0> = call <4 x double> @vec_add()
 ; ASSERT EQ: <4 x double> <double 0.0, double 2.0, double 8.0, double 24.0> = call <4 x double> @vec_mul()

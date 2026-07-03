@@ -298,6 +298,10 @@ Section MemoryByte.
           raise_error "memory_bytes_to_dvalue: unsupported DTYPE_Metadata."
       | DTYPE_X86_mmx =>
           raise_error "memory_bytes_to_dvalue: unsupported DTYPE_X86_mmx."
+
+      (* NOTE: arrays and vectors are decorated with their whole type, which contains
+         necessary size information.
+       *)
       | DTYPE_Array sz t =>
           let sz' := sizeof_dtyp t in
           let elt_bytes :=
@@ -306,7 +310,7 @@ Section MemoryByte.
             else split_every_nil sz' dbs
           in
           elts <- map_monad (fun es => memory_bytes_to_dvalue es t) elt_bytes;;
-          ret (DVALUE_Array t elts)
+          ret (DVALUE_Array (DTYPE_Array sz t) elts)
 
       | DTYPE_Vector sz t =>
           let sz' := sizeof_dtyp t in
@@ -316,7 +320,7 @@ Section MemoryByte.
             else split_every_nil sz' dbs
           in
           elts <- map_monad (fun es => memory_bytes_to_dvalue es t) elt_bytes;;
-          ret (DVALUE_Vector t elts)
+          ret (DVALUE_Vector (DTYPE_Vector sz t) elts)
       | DTYPE_Struct fields =>
           Functor.fmap DVALUE_Struct (list_memory_bytes_to_dvalue (Some (max_preferred_dtyp_alignment fields)) 0 fields dbs)
                        

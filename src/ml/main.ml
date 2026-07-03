@@ -177,13 +177,13 @@ let main () =
     if !interpret then
       match Interpreter.interpret !command_line_args prog with
       | Ok dv ->
-         Printf.printf "Program terminated with: %s\n" (Test.string_of_dvalue dv)
+         Printf.printf "Program terminated with: %s\n" (Interpreter.string_of_dvalue dv)
       | Error e -> failwith (Result.string_of_exit_condition e)
     else if !debugger then
       (Interpreter.debug_flag := true;
        match Debugger.vellvm_debugger !command_line_args prog with
        | Ok dv ->
-          Printf.printf "Program terminated with: %s\n" (Test.string_of_dvalue dv)
+          Printf.printf "Program terminated with: %s\n" (Interpreter.string_of_dvalue dv)
        | Error e -> failwith (Result.string_of_exit_condition e))
   with
   | Assert.Ran_tests true -> exit 0

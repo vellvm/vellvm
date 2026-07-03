@@ -202,23 +202,23 @@ Section ShowInstances.
   #[global] Instance dshowTyp : DShow typ :=
     {| dshow := dshow_typ |}.
 
-  Definition show_dtyp (t : dtyp) : string
-    := match t with
-       | DTYPE_I sz                 => "i" ++ (show sz)
-       | DTYPE_IPTR                 => "iptr"
-       | DTYPE_Pointer              => "Pointer"
-       | DTYPE_Void                 => "Void"
-       | DTYPE_FP fp                => (show fp)
-       | DTYPE_Label                => "label"
-       | DTYPE_Token                => "token"
-       | DTYPE_Metadata             => "Metadata"
-       | DTYPE_X86_mmx              => "X86_mmx"
-       | DTYPE_Array sz t           => "Array"
-       | DTYPE_Struct fields        => "Struct"
-       | DTYPE_Packed_struct fields => "Packed struct"
-       | DTYPE_Opaque               => "Opaque"
-       | DTYPE_Vector sz t          => "Vector"
-       end.
+  Fixpoint show_dtyp (t : dtyp) : string :=
+    match t with
+    | DTYPE_I sz                 => "i" ++ (show sz)
+    | DTYPE_IPTR                 => "iptr"
+    | DTYPE_Pointer              => "ptr"
+    | DTYPE_Void                 => "void"
+    | DTYPE_FP fp                => (show fp)
+    | DTYPE_Label                => "label"
+    | DTYPE_Token                => "token"
+    | DTYPE_Metadata             => "metadata"
+    | DTYPE_X86_mmx              => "X86_mmx"
+    | DTYPE_Array sz t           => "[" ++ (show sz) ++ " x " ++ show_dtyp t ++ "]"
+    | DTYPE_Struct fields        => "{" ++ (String.concat ", " (map show_dtyp fields)) ++ "}"
+    | DTYPE_Packed_struct fields => "<{" ++ (String.concat ", " (map show_dtyp fields)) ++ "}>"
+    | DTYPE_Opaque               => "Opaque"
+    | DTYPE_Vector sz t          => "<" ++ (show sz) ++ " x " ++ show_dtyp t ++ ">"
+    end.
 
   #[global] Instance dshowDTyp : Show dtyp :=
     {| show := show_dtyp |}.
