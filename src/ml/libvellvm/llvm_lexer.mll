@@ -596,7 +596,7 @@ rule token = parse
 	   string_to_decimal_int s2 exp))) }
 
   (* Floating point Hexadecimal constants *)
-  | "0x"  (hexdigit+ as d)     { FLOAT(FS_hex(FH_X, string_to_hex_uint (Some 16) d)) }
+  | "0x"  (hexdigit+ as d)     { FLOAT(FS_hex(FH_X, string_to_hex_uint None d)) }
   | "0xK" (hexdigit+ as d)     { FLOAT(FS_hex(FH_K, string_to_hex_uint (Some 20) d)) }
   | "0xL" (hexdigit+ as d)     { FLOAT(FS_hex(FH_L, string_to_hex_uint (Some 32) d)) }
   | "0xM" (hexdigit+ as d)     { FLOAT(FS_hex(FH_M, string_to_hex_uint (Some 32) d)) }
