@@ -99,7 +99,8 @@ Hint Constructors ruttF : itree.
 Lemma rutt_inv_Tau_l :
 forall {E1 E2 : Type -> Type} {R1 R2 : Type} Rcutr Rcutl REv RAns {RR : R1 -> R2 -> Prop}
   (t1 : itree E1 R1) (t2 : itree E2 R2),
-rutt Rcutr Rcutl REv RAns RR (Tau t1) t2 -> rutt Rcutr Rcutl REv RAns RR t1 t2.
+  rutt Rcutl Rcutr REv RAns RR (Tau t1) t2 ->
+  rutt Rcutl Rcutr REv RAns RR t1 t2.
 Proof.
   intros * EQ.
   punfold EQ; red in EQ; cbn in EQ.
@@ -120,7 +121,8 @@ Qed.
 Lemma rutt_inv_Tau_r :
 forall {E1 E2 : Type -> Type} {R1 R2 : Type} Rcutr Rcutl REv RAns {RR : R1 -> R2 -> Prop}
   (t1 : itree E1 R1) (t2 : itree E2 R2),
-rutt Rcutr Rcutl REv RAns RR t1 (Tau t2) -> rutt Rcutr Rcutl REv RAns RR t1 t2.
+  rutt Rcutl Rcutr REv RAns RR t1 (Tau t2) ->
+  rutt Rcutl Rcutr REv RAns RR t1 t2.
 Proof.
   intros * EQ.
   punfold EQ; red in EQ; cbn in EQ.
@@ -141,7 +143,8 @@ Qed.
 Lemma rutt_inv_Tau :
 forall {E1 E2 : Type -> Type} {R1 R2 : Type} Rcutr Rcutl REv RAns {RR : R1 -> R2 -> Prop}
   (t1 : itree E1 R1) (t2 : itree E2 R2),
-rutt Rcutr Rcutl REv RAns RR (Tau t1) (Tau t2) -> rutt Rcutr Rcutl REv RAns RR t1 t2.
+  rutt Rcutl Rcutr REv RAns RR (Tau t1) (Tau t2) ->
+  rutt Rcutl Rcutr REv RAns RR t1 t2.
 Proof.
   intros.
   now apply rutt_inv_Tau_l, rutt_inv_Tau_r.
@@ -149,12 +152,12 @@ Qed.
 
 Lemma rutt_eutt_l {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} t1 t2 t3
       (INL: eutt eq t1 t2)
-      (INR: @rutt E1 E2 R1 R2 Rcutr  Rcutl REv RAns RR t2 t3):
-  rutt Rcutr  Rcutl REv RAns RR t1 t3.
+      (INR: @rutt E1 E2 R1 R2 Rcutl Rcutr REv RAns RR t2 t3):
+  rutt Rcutl Rcutr REv RAns RR t1 t3.
 Proof.
   revert_until RR. pcofix CIH. intros.
   pstep. punfold INL. punfold INR. red in INL, INR |- *. genobs_clear t1 ot1.
-  hinduction INR before CIH; intros; subst; clear t2 t3.
+  hinduction INR before CIH; intros; subst; clear t2 t3; eauto with itree.
   - remember (RetF r1) as ot.
     hinduction INL before CIH; intros; inv Heqot; eauto with paco itree.
   - (* t2 = τ m1 , t3 = τ m2 *)
@@ -195,30 +198,90 @@ Proof.
         forward H0.
         now pfold.
         punfold H0.
-  - admit. 
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-Admitted.
+  - pclearbot.
+    dependent induction INL; eauto with itree.
+    red in REL; pclearbot.
+    constructor; auto.
+    intros; right.
+    eapply CIH. apply REL.
+    now apply H0.
+  - apply IHINR.
+    assert (eutt eq (go ot1) (Tau t1)) by (pfold; apply INL).
+    rewrite tau_eutt in H.
+    punfold H.
+  - dependent induction INL; eauto with itree.
+Qed.
 
+Lemma rutt_eutt_r {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} t1 t2 t3
+      (INR: eutt eq t2 t3)
+      (INL: @rutt E1 E2 R1 R2 Rcutl Rcutr REv RAns RR t1 t2):
+  rutt Rcutl Rcutr REv RAns RR t1 t3.
+Proof.
+  revert_until RR. pcofix CIH. intros.
+  pstep. punfold INL. punfold INR. red in INL, INR |- *. genobs_clear t3 ot3.
+  hinduction INL before CIH; intros; subst; clear t1 t2; eauto with itree.
+  - remember (RetF r2) as ot.
+    hinduction INR before CIH; intros; inv Heqot; eauto with paco itree.
+  - (* t1 = τ m1 , t2 = τ m2 *)
+    pclearbot.
+    assert (DEC: (exists m3, ot3 = TauF m3) \/ (forall m3, ot3 <> TauF m3)).
+    { destruct ot3; eauto; right; red; intros ? abs; inv abs. }
+    destruct DEC as [EQ | EQ].
+    + destruct EQ as [m3 ?]; subst.
+      econstructor. right. pclearbot. eapply CIH; eauto with paco.
+      eapply eqit_inv_Tau. pfold; apply INR.
+    + (* t3 <> τ ..*)
+      inv INR; try (exfalso; eapply EQ; eauto; fail).
+      econstructor.
+      punfold H; red in H.
+      hinduction REL before CIH; intros; try (exfalso; eapply EQ; eauto; fail).
+      * clear EQ CHECK.
+        subst.
+        induction H; pclearbot; eauto with itree.
+        constructor; left; eapply paco2_mon; eauto; intuition.
+        constructor; auto.
+        intros; left; eapply paco2_mon; eauto; intuition.
+      * clear EQ CHECK.
+        unfold id in REL; pclearbot.
+        remember (VisF e k1) as ot.
+        hinduction H before CIH; intros; try discriminate; eauto with itree.
+        ** inv_Vis.
+           constructor; auto.
+           pclearbot. 
+           intros.
+           right; eapply CIH.
+           apply REL.
+           apply H0; eauto.
+        ** inv_Vis.
+           eapply EqCutR; auto.
+      * clear CHECK0.
+        apply IHREL; auto.
+        pose proof rutt_inv_Tau_r (RR := RR) Rcutr Rcutl REv RAns m1 t1.
+        forward H0.
+        now pfold.
+        punfold H0.
+  - pclearbot.
+    dependent induction INR; eauto with itree.
+    red in REL; pclearbot.
+    constructor; auto.
+    intros; right.
+    eapply CIH. apply REL.
+    now apply H0.
+  - apply IHINL.
+    assert (eutt eq (Tau t0) (go ot3)) by (pfold; apply INR).
+    rewrite tau_eutt in H.
+    punfold H.
+  - dependent induction INR; eauto with itree.
+Qed.
 
-(* Lemma rutt_eutt {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} : *)
-(*   Proper (eutt eq ==> eutt eq ==> iff) (@rutt E1 E2 R1 R2 Rcutr Rcutl REv RAns RR). *)
-(* Proof. *)
-(*   intros ?? EQ1 ?? EQ2; split; intros EQ. *)
-(*   - pcofix cih. *)
-(*     punfold EQ; punfold EQ1; punfold EQ2. *)
-(*     red in EQ,EQ1,EQ2. *)
-(*     induction EQ. *)
-(*     + pfold; red. *)
-(*       dependent induction EQ1; rewrite <- x. *)
-(*       * dependent induction EQ2; rewrite <- x. *)
-(*         ** eauto with itree. *)
-(*         ** constructor. *)
-(*            eapply IHEQ2; eauto. *)
-(*       * constructor. *)
-(*         eapply IHEQ1; eauto. *)
-(*     + pclearbot. *)
-      
+From Stdlib Require Import Setoid Morphisms.
+
+Lemma rutt_eutt {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} :
+  Proper (eutt eq ==> eutt eq ==> iff) (@rutt E1 E2 R1 R2 Rcutr Rcutl REv RAns RR).
+Proof.
+  intros ?? EQ1 ?? EQ2; split; intros EQ.
+  eapply rutt_eutt_l, rutt_eutt_r; eauto; symmetry; eauto.
+  eapply rutt_eutt_l, rutt_eutt_r; eauto; symmetry; eauto.
+Qed.
+
   
