@@ -44,7 +44,19 @@ Section withParams.
     fun σ => let p' := next_provenance σ.(state_provenance) in
           ret ({| state_memory_stack := σ.(state_memory_stack) ;
                  state_provenance := p' |} ,p').
- 
+
+  Definition pad_amount (align : N) (offset : N) :=
+    ((align - (offset mod align)) mod align)%N.
+
+  Definition pad_to (align : N) (sz : N) :=
+    (sz + pad_amount align sz)%N.
+
+  Definition next_key_with_alignment {A} (m : IntMap A) (align : N) : Z :=
+    match IM_greatest_key m with
+    | Some k => Z.of_N (pad_to align (1 + Z.to_N k))
+    | None => 0
+    end.
+
   Fixpoint memM_interp
     : memM ~> stateT state (itree E) :=
     fun T m σ => match m with
@@ -54,7 +66,10 @@ Section withParams.
               | Merr s => raise s
               | Mget   k => memM_interp (k σ) σ
               | Mput σ' k => memM_interp k σ'
-              | Mnext_key k => memM_interp (k (IntMaps.next_key σ.(state_memory_stack).(Memory_stack_memory))) σ
+              | Mnext_key _ align k =>
+                  memM_interp
+                    (k (next_key_with_alignment σ.(state_memory_stack).(Memory_stack_memory) align))
+                    σ
               | Mfresh_prov k => '(σ',p) <- fresh_provenance σ ;; memM_interp (k p) σ'
               end
   .

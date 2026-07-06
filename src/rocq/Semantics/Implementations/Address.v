@@ -11,8 +11,10 @@ From Vellvm Require Import
   Implementations.Provenance
   VellvmIntegers.
 
+
 Section withIPtr.
   Context {IP : IPtr}.
+  Context {IPT : @IPtrTheory IP}.
   
   (* TODO: move this *)
   Instance showIptr {IP : IPtr} : Show iptr := {| show := show_iptr |}.
@@ -36,16 +38,27 @@ Section withIPtr.
   Instance PIV : @PI ProvenanceV AddressV :=
     {|
       ptr_to_int p := to_Z (fst p);
-      int_to_ptr i pr :=
-        if (i <? 0)%Z || (i >=? @Integers.modulus 64)%Z
-        then raise_oom ("FinITOP.int_to_ptr: out of range (" ++ show i ++ ").")
-        else p <- from_Z i ;; ret (p,pr)
+      int_to_ptr i pr := a <- from_Z i ;; ret (a, pr) 
     |}
   .
 
-  (* TODO *)
   Instance PITheoryV : @PITheory ProvenanceV AddressV PIV.
-  Admitted.
+  Proof.
+    constructor.
+    - cbn; intros * EQ.
+      repeat break_match; abs_eq.
+      destruct a; abs_eq.
+      now inv EQ.
+    - intros [a p'] * <-; cbn.
+      now rewrite to_Z_from_Z.
+    - intros [i p'] p; exists (i,p).
+      cbn; now rewrite to_Z_from_Z.
+    - intros ?? [i p'].
+      cbn.
+      intros ?; break_match; abs_eq.
+      inv H.
+      now apply from_Z_to_Z.
+  Qed.
   
   Existing Instance overlaps_ptoi.
 

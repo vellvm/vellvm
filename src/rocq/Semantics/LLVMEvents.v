@@ -94,7 +94,7 @@ Section withParams.
   Variant MemoryE : Type -> Type :=
     | MemPush : MemoryE unit
     | MemPop  : MemoryE unit
-    | Alloca  (t : dtyp) (num_elements : N) (align : option Z) :
+    | Alloca  (t : dtyp) (num_elements : N) (align : option N) :
       MemoryE dvalue
     (* Load address should also be unique *)
     | Load   (t : dtyp) (a : dvalue) :

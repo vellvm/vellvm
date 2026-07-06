@@ -110,3 +110,5 @@ endi1:
   %rv1 = load i64, i64* %r
   ret i64 %rv1
 }
+
+; ASSERT EQ: i64 0 = call i64 @main(i64 0, i8** null)

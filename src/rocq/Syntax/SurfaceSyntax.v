@@ -219,7 +219,7 @@ Module VIR_Notations.
   Notation "'ppc_fp128'" := (DTYPE_FP FP_ppc_fp128) (in custom vir_typ at level 5, only printing).
 
   (** Other simple atomic types. *)
-  Notation "'iptr'"     := TYPE_IPTR     (in custom vir_typ at level 5, only printing).
+  Notation "'iptr'"     := TYPE_Iptr     (in custom vir_typ at level 5, only printing).
   Notation "'label'"    := TYPE_Label    (in custom vir_typ at level 5, only printing).
   Notation "'label'"    := DTYPE_Label   (in custom vir_typ at level 5, only printing).
   Notation "'token'"    := TYPE_Token    (in custom vir_typ at level 5, only printing).

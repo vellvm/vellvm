@@ -45,7 +45,7 @@ Section withParams.
    *)
   Definition i8_str_index (strptr : addr) (index : Z) : CFGtop (@Integers.bit_int 8) :=
     iptr <- EOU_to_itree (from_Z index) ;;
-    addr <- EOU_to_itree (handle_gep_addr (DTYPE_I 8) strptr [DVALUE_IPTR iptr]) ;;
+    addr <- EOU_to_itree (handle_gep_addr (DTYPE_I 8) strptr [DVALUE_Iptr iptr]) ;;
     d_byte <- load (DTYPE_I 8) (DVALUE_Addr addr) ;;
     match d_byte with
     | DVALUE_I 8 b => ret b

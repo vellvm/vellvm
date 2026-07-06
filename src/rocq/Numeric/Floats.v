@@ -33,6 +33,46 @@ Set Asymmetric Patterns.
 Definition float := binary64. (**r the type of IEE754 double-precision FP numbers *)
 Definition float32 := binary32. (**r the type of IEE754 single-precision FP numbers *)
 
+(** Checks whether a 64-bit float value is representable exactly as a 32-bit float *)
+Definition is_float_representable_as_float32 (f : binary_float 53 1024) : bool :=
+  match f with
+  | B754_zero _ => true
+  | B754_infinity _ => true
+  (* IEEE-754 defines a specific injection, which is all we care about? *)
+  | B754_nan _ _ _ => true
+  | B754_finite s m e_minus_52 _ =>
+      (* Flocq stores the exponents offset by some amount, 52 for float64 *)
+      let e := e_minus_52 + 52 in
+      (* Concisely, a float64 is exactly representable as a float32 when both of these conditions
+        hold:
+        1. the effective exponent is between -149 and 127 (capturing both the subnormal and normal
+           cases),
+        2. the lower (max 29 (-97 - e)) bits of the mantissa are zero (capturing both the subnormal
+           and normal cases).
+        Why max 29 (-97 - e)?
+        - For large enough e (e ∈ [-126, 127]), the number is normal in float32, and this reduces to
+        29, the number of bits that ought to be zero so that the mantissa fits in 23 bits (52 = 29 +
+        23)
+        - For smaller e (e ∈ [-149, -127]), the number must be subnormal in float32, and the smaller
+        the exponent, the fewer effective mantissa bits are left for the subnormal.
+        When e = -127, we have 22 bits left in the mantissa.
+        When e = -128, we have 23 bits left in the mantissa.
+        ...
+        When e = -148, we have 1 bit left in the mantissa.
+        When e = -149, we have no bit left in the mantissa.
+        *)
+      let necessary_mantissa_zero_bits := (Z.max 29 (-97 - e)%Z) in
+      (-149 <=? e)%Z && (e <=? 127)%Z
+      && ((Z.pos m mod Z.pow 2 53) mod 2^necessary_mantissa_zero_bits =? 0)%Z
+  end.
+
+(** Converts a 64-bit float value to a 32-bit float, or fails if not exactly representable *)
+Definition float_to_float32 (f : float) : option float32 :=
+  if is_float_representable_as_float32 f
+  then Some (Bconv 53 1024 24 128 eq_refl eq_refl
+        (fun f => exist _ (B754_nan 24 128 false 1 eq_refl) eq_refl) mode_NE f)
+  else None.
+
 Lemma integer_representable_n :
   forall n : Z, - 2 ^ 53 <= n <= 2 ^ 53 -> integer_representable 53 1024 n.
 Proof.

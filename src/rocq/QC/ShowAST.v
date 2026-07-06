@@ -158,7 +158,7 @@ Section ShowInstances.
   Fixpoint dshow_typ (t : typ) : DString  :=
     match t with
     | TYPE_I sz                 => sd "i" @@ sd (show sz)
-    | TYPE_IPTR                 => sd "iptr"
+    | TYPE_Iptr                 => sd "iptr"
     | TYPE_Pointer (Some t)     => dshow_typ t @@ sd "*"
     | TYPE_Pointer None         => sd "ptr"
     | TYPE_Void                 => sd "void"
@@ -202,23 +202,23 @@ Section ShowInstances.
   #[global] Instance dshowTyp : DShow typ :=
     {| dshow := dshow_typ |}.
 
-  Definition show_dtyp (t : dtyp) : string
-    := match t with
-       | DTYPE_I sz                 => "i" ++ (show sz)
-       | DTYPE_IPTR                 => "iptr"
-       | DTYPE_Pointer              => "Pointer"
-       | DTYPE_Void                 => "Void"
-       | DTYPE_FP fp                => (show fp)
-       | DTYPE_Label                => "label"
-       | DTYPE_Token                => "token"
-       | DTYPE_Metadata             => "Metadata"
-       | DTYPE_X86_mmx              => "X86_mmx"
-       | DTYPE_Array sz t           => "Array"
-       | DTYPE_Struct fields        => "Struct"
-       | DTYPE_Packed_struct fields => "Packed struct"
-       | DTYPE_Opaque               => "Opaque"
-       | DTYPE_Vector sz t          => "Vector"
-       end.
+  Fixpoint show_dtyp (t : dtyp) : string :=
+    match t with
+    | DTYPE_I sz                 => "i" ++ (show sz)
+    | DTYPE_Iptr                 => "iptr"
+    | DTYPE_Pointer              => "ptr"
+    | DTYPE_Void                 => "void"
+    | DTYPE_FP fp                => (show fp)
+    | DTYPE_Label                => "label"
+    | DTYPE_Token                => "token"
+    | DTYPE_Metadata             => "metadata"
+    | DTYPE_X86_mmx              => "X86_mmx"
+    | DTYPE_Array sz t           => "[" ++ (show sz) ++ " x " ++ show_dtyp t ++ "]"
+    | DTYPE_Struct fields        => "{" ++ (String.concat ", " (map show_dtyp fields)) ++ "}"
+    | DTYPE_Packed_struct fields => "<{" ++ (String.concat ", " (map show_dtyp fields)) ++ "}>"
+    | DTYPE_Opaque               => "Opaque"
+    | DTYPE_Vector sz t          => "<" ++ (show sz) ++ " x " ++ show_dtyp t ++ ">"
+    end.
 
   #[global] Instance dshowDTyp : Show dtyp :=
     {| show := show_dtyp |}.

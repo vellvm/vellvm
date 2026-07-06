@@ -142,12 +142,12 @@ Section Denotation.
     match fpv with
     | FP_float =>
         match float32_of_float_syntax f with
-        | None   => raise_error "bad float literal"
+        | None   => raise_error ("bad float literal: " ++ (show f))
         | Some f => ret (DVALUE_Float f)
         end
     | FP_double =>
         match float_of_float_syntax f with
-        | None   => raise_error "bad double literal"
+        | None   => raise_error ("bad double literal: " ++ (show f))
         | Some f => ret (DVALUE_Double f)
         end
     | _ => raise_error "unsupported float type"
@@ -170,15 +170,15 @@ Section Denotation.
         match top with
         | None                => raise ("denote_exp given untyped EXP_Integer")
         | Some (DTYPE_I bits) => lift (coerce_integer_to_int (Some bits) (denote_int_syntax x))
-        | Some DTYPE_IPTR     => lift (coerce_integer_to_int None (denote_int_syntax x))
+        | Some DTYPE_Iptr     => lift (coerce_integer_to_int None (denote_int_syntax x))
         | Some typ            => raise ("bad type for constant int: " ++ show typ)
         end
 
     | EXP_Float x =>
         match top with
-        | None                      => raise ("denote_exp given untyped EXP_Float")
-        | Some (DTYPE_FP FP_float)  => lift (denote_float_syntax_as_float FP_float x)
-        | _                         => raise ("bad type for constant float")
+        | None                 => raise ("denote_exp given untyped EXP_Float")
+        | Some (DTYPE_FP fpv)  => lift (denote_float_syntax_as_float fpv x)
+        | _                    => raise ("bad type for constant float")
         end
 
     | EXP_Bool b =>
@@ -274,17 +274,13 @@ Section Denotation.
      | OP_ExtractElement (dt_vec, vecop) (dt_idx, idx) =>
         vec <- denote_exp (Some dt_vec) vecop ;;
         idx <- denote_exp (Some dt_idx) idx ;;
-        elt_typ <- match dt_vec with
-                      | DTYPE_Vector _ t => ret t
-                      | _ => raise "Invalid vector type for ExtractElement"
-                  end;;
-        lift (index_into_vec_dv elt_typ vec idx)
+        lift (extract_element vec idx)
 
     | OP_InsertElement (dt_vec, vecop) (dt_elt, eltop) (dt_idx, idx) =>
         vec <- denote_exp (Some dt_vec) vecop ;;
         elt <- denote_exp (Some dt_elt) eltop ;;
         idx <- denote_exp (Some dt_idx) idx ;;
-        lift (insert_into_vec_dv dt_vec vec elt idx)
+        lift (insert_element vec elt idx)
 
     | OP_ShuffleVector (dt_vec1, vecop1) (dt_vec2, vecop2) (dt_mask, idxmask) =>
         vec1 <- denote_exp (Some dt_vec1) vecop1 ;;
@@ -294,31 +290,12 @@ Section Denotation.
 
     | OP_ExtractValue (dt, str) idxs =>
         str <- denote_exp (Some dt) str ;;
-        (* Should this be pulled out into a definition? *)
-        let fix loop str idxs : EOU dvalue :=
-          match idxs with
-          | [] => ret str
-          | i :: tl =>
-              v <- index_into_str_dv str i ;;
-              loop v tl
-          end
-        in
-        lift (loop str (List.map denote_int_syntax idxs))
+        lift (extract_value str (List.map denote_int_syntax idxs))
 
     | OP_InsertValue (dt_str, strop) (dt_elt, eltop) idxs =>
         str <- denote_exp (Some dt_str) strop ;;
         elt <- denote_exp (Some dt_elt) eltop ;;
-        let fix loop str idxs : EOU dvalue :=
-          match idxs with
-          | [] => raise_error "Index was not provided"
-          | i :: nil =>
-              insert_into_str str elt i
-          | i :: tl =>
-              subfield <- index_into_str_dv str i;;
-              modified_subfield <- loop subfield tl;;
-              insert_into_str str modified_subfield i
-          end in
-        lift (loop str (List.map denote_int_syntax idxs))
+        lift (insert_value str elt (List.map denote_int_syntax idxs))
 
     | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
         dcond <- denote_exp (Some dt) cnd ;;
@@ -518,7 +495,7 @@ Section Denotation.
           match find
                   (fun x => match x with | ANN_align _ => true | _ => false end)
                   annotations with
-          | Some (ANN_align a) => Some (denote_int_syntax a)
+          | Some (ANN_align a) => Some (Z.to_N (denote_int_syntax a))
           | _ => None
           end
         in
@@ -587,7 +564,7 @@ Section Denotation.
         args <- load DTYPE_Pointer ptr_to_args;;
         retv <- load argty args;;
         ix <- lift (from_Z 1);;
-        args' <- lift (eval_gep argty args [DVALUE_IPTR ix]);;
+        args' <- lift (eval_gep argty args [DVALUE_Iptr ix]);;
         store DTYPE_Pointer ptr_to_args args';;
         match pt with
         | IVoid _ => ret tt

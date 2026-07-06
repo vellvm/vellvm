@@ -1,3 +1,5 @@
+declare i32 @printf(i8*, ...)
+
 @.str = private unnamed_addr constant [7 x i8] c"Hello\0A\00", align 1
 
 ; Function Attrs: noinline nounwind optnone uwtable

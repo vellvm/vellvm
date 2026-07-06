@@ -154,7 +154,7 @@ Section MemoryByte.
     match dv with
        | DVALUE_I sz x =>
            ret (extract_byte_vint x idx)
-       | DVALUE_IPTR x =>
+       | DVALUE_Iptr x =>
            ret (extract_byte_Z (to_Z x) idx)
        | DVALUE_Addr addr =>
            (* Note: this throws away provenance *)
@@ -261,10 +261,10 @@ Section MemoryByte.
             (map_monad (m := EOUP) (memory_byte_value) dbs)
             (fun v => ret (DVALUE_I sz (concat_bytes_Z_vint v)))
 
-      | DTYPE_IPTR =>
+      | DTYPE_Iptr =>
           absorb_pois dt
             (map_monad memory_byte_value dbs)
-            (fun zs => DVALUE_IPTR <$> from_Z (concat_bytes_Z zs))
+            (fun zs => DVALUE_Iptr <$> from_Z (concat_bytes_Z zs))
 
       (* TODO: not sure if this should be wildcard provenance.
            TODO: not sure if this should truncate iptr value... *)
@@ -298,6 +298,10 @@ Section MemoryByte.
           raise_error "memory_bytes_to_dvalue: unsupported DTYPE_Metadata."
       | DTYPE_X86_mmx =>
           raise_error "memory_bytes_to_dvalue: unsupported DTYPE_X86_mmx."
+
+      (* NOTE: arrays and vectors are decorated with their whole type, which contains
+         necessary size information.
+       *)
       | DTYPE_Array sz t =>
           let sz' := sizeof_dtyp t in
           let elt_bytes :=
@@ -306,7 +310,7 @@ Section MemoryByte.
             else split_every_nil sz' dbs
           in
           elts <- map_monad (fun es => memory_bytes_to_dvalue es t) elt_bytes;;
-          ret (DVALUE_Array t elts)
+          ret (DVALUE_Array (DTYPE_Array sz t) elts)
 
       | DTYPE_Vector sz t =>
           let sz' := sizeof_dtyp t in
@@ -316,7 +320,7 @@ Section MemoryByte.
             else split_every_nil sz' dbs
           in
           elts <- map_monad (fun es => memory_bytes_to_dvalue es t) elt_bytes;;
-          ret (DVALUE_Vector t elts)
+          ret (DVALUE_Vector (DTYPE_Vector sz t) elts)
       | DTYPE_Struct fields =>
           Functor.fmap DVALUE_Struct (list_memory_bytes_to_dvalue (Some (max_preferred_dtyp_alignment fields)) 0 fields dbs)
                        

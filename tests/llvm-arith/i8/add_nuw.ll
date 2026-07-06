@@ -3,4 +3,4 @@ define i8 @main(i8 %argc, i8** %arcv) {
   ret i8 %1
 }
 
-; ASSERT POISON: call i8 @main(i8 1, i8** null)
+; ASSERT EQ i8 poison = call i8 @main(i8 1, i8** null)

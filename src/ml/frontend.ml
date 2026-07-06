@@ -10,24 +10,14 @@
 
 (* A harness for testing Parsing and Pretty Printing of LLVM IR code. *)
 open Arg
-open Vellvm_base
+open VellvmLib
 open Assert
 
 (* test harness ------------------------------------------------------------- *)
-exception Ran_tests of bool
-
 let test_pp = ref false
 
-let test_pp_dir dir =
-  let _ = Printf.printf "===> RUNNING PRETTY PRINTING TESTS IN: %s\n" dir in  
-  Platform.configure();
-  let suite = [Frontend_test.pp_test_of_dir dir] in
-  let outcome = run_suite suite in
-  Printf.printf "%s\n" (outcome_to_string outcome);
-  raise (Ran_tests (successful outcome))
-
 let process_test_pp file =
-  Frontend_test.parse_pp_test file
+  FrontendTest.parse_pp_test file
 
 let histogram_only = ref false
 
@@ -59,18 +49,6 @@ let process_histogram path =
     | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
   end
 
-let transform
-    (prog :
-      ( LLVMAst.typ
-      , LLVMAst.typ LLVMAst.block * LLVMAst.typ LLVMAst.block list )
-      LLVMAst.toplevel_entity
-      list ) :
-    ( LLVMAst.typ
-    , LLVMAst.typ LLVMAst.block * LLVMAst.typ LLVMAst.block list )
-    LLVMAst.toplevel_entity
-    list =
-  Transform.transform prog
-
 (* Ugly duplication. TODO: reuse more existing facility *)
 let ast_pp_file_inner path =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
@@ -78,12 +56,11 @@ let ast_pp_file_inner path =
   match ext with
   | "ll" ->
       let ll_ast = IO.parse_file path in
-      let ll_ast' = transform ll_ast in
       let vast_file =
         Platform.gen_name !Platform.output_path file ".v.ast"
       in
       (* Prints the original llvm program *)
-      let _ = IO.output_file vast_file ll_ast' in
+      let _ = IO.output_file vast_file ll_ast in
       let perm = [Open_append; Open_creat] in
       let channel = open_out_gen perm 0o640 vast_file in
       let oc = Format.formatter_of_out_channel channel in
@@ -93,7 +70,7 @@ let ast_pp_file_inner path =
       Format.pp_print_string oc "Internal Coq representation of the ast:" ;
       Format.pp_force_newline oc () ;
       Format.pp_force_newline oc () ;
-      let _ = IO.output_ast ll_ast' oc in
+      let _ = IO.output_ast ll_ast oc in
       close_out channel
   | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
 
@@ -104,7 +81,7 @@ let ast_pp_file path =
 
 let ast_pp_dir dir =
   Platform.configure();
-  let files = IO.ll_files_of_dir dir in
+  let files = Platform.ll_files_of_dir dir in
   List.iter ast_pp_file_inner files
 
 let test_directory = ref "../tests"
@@ -120,14 +97,14 @@ let process_files files =
 
 let test_all () =
   let _ = Printf.printf "============== RUNNING TEST SUITE ==============\n" in
-  let b2 = try test_pp_dir (!test_directory) with Ran_tests b -> b in
+  let b2 = try FrontendTest.test_pp_dir (!test_directory) with Ran_tests b -> b in
   raise (Ran_tests (b2))
 
 let args =
   [
     ("-set-test-dir", Set_string test_directory, "set the path to the tests directory [default='../tests']")
   ; ("-test", Unit test_all, "run comprehensive parsing test suite:\n\tequivalent to running with -test-pp-dir <test-dir> (default '../tests')")
-  ; ("-test-pp-dir", String test_pp_dir, "run the parsing/pretty-printing tests on all .ll files in the given directory")    
+  ; ("-test-pp-dir", String FrontendTest.test_pp_dir, "run the parsing/pretty-printing tests on all .ll files in the given directory")    
   ; ("-test-pp", Set test_pp, "run the parsing/pretty-printing tests on the provided .ll files (overrides histogram)")
   ; ("-print-ast", String ast_pp_file, "run the parsing on the given .ll file and write its internal ast and domination tree to a .v.ast file in the output directory (see -op)")
   ; ("-histogram-only", Set histogram_only, "create only the .hist file for each of the .ll inputs")

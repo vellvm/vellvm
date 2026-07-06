@@ -9,7 +9,8 @@
  ---------------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------------- *)
-(** Assembling and linking for X86.  Depends on the underlying OS platform    *)
+(* Shell scripts / code for interacting with system commands.
+   Depends on the underlying OS platform  *)
 
 open Printf
 open Unix
@@ -59,8 +60,7 @@ let verbose = ref false
 
 let verb msg = if !verbose then print_string msg
 
-(* paths
-   -------------------------------------------------------------------- *)
+(* paths -------------------------------------------------------------------- *)
 
 let path_sep = "/"
 
@@ -95,8 +95,7 @@ let configure () =
       verb @@ Printf.sprintf "creating output directory: %s\n" !output_path ;
       mkdir !output_path 0o755
 
-(* filename munging
-   --------------------------------------------------------- *)
+(* filename munging --------------------------------------------------------- *)
 let path_to_basename_ext (path : string) : string * string =
   (* The path is of the form ... "foo/bar/baz/<file>.ext" *)
   let paths = Str.split (Str.regexp_string path_sep) path in
@@ -112,8 +111,7 @@ let path_to_basename_ext (path : string) : string * string =
     | [] -> failwith "path_to_basename_ext got bad path"
     | ext :: rst -> (String.concat "" (List.rev rst), ext) )
 
-(* compilation and shell
-   commands-------------------------------------------- *)
+(* compilation and shell commands ------------------------------------------- *)
 
 (* Platform independent shell command *)
 let sh (cmd : string) (ret : string -> int -> 'a) : 'a =
@@ -123,7 +121,7 @@ let sh (cmd : string) (ret : string -> int -> 'a) : 'a =
   | WSIGNALED i -> raise (PlatformError (cmd, sprintf "Signaled with %d." i))
   | WSTOPPED i -> raise (PlatformError (cmd, sprintf "Stopped with %d." i))
 
-(* Generate a name that does not already exist. basedir includes the path
+(* Generate a filename that does not already exist. basedir includes the path
    separator *)
 let gen_name (basedir : string) (basen : string) (baseext : string) : string
     =
@@ -205,3 +203,19 @@ let rec rec_dir_configure (base : string) (l : string list) () : unit =
       rec_dir_configure subpath xs ()
 
 let append_loc : string -> string -> string = Printf.sprintf "%s/%s"
+
+let ll_files_of_dir path : string list =
+  let tmp_file = gen_name "." ".ll_files" ".tmp" in
+  let cmd =
+    Printf.sprintf "find %s -name \"*.ll\" -print > %s" path tmp_file
+  in
+  let () = sh cmd raise_error in
+  let fhandle = open_in tmp_file in
+  let rec loop paths =
+    try loop (input_line fhandle :: paths) with End_of_file -> paths
+  in
+  let ans = loop [] in
+  close_in fhandle ;
+  let rm_cmd = Printf.sprintf "rm %s" tmp_file in
+  let () = sh rm_cmd raise_error in
+  ans

@@ -63,7 +63,7 @@ Class IPtrTheory {IP : IPtr} :=
       x = y;
 
     VMemInt_iptr_dtyp :
-    @mdtyp_of_int iptr VMemInt_iptr = DTYPE_IPTR;
+    @mdtyp_of_int iptr VMemInt_iptr = DTYPE_Iptr;
 
     VMemInt_iptr_mrepr_from_Z :
     forall x,
@@ -75,6 +75,9 @@ Class IPtrTheory {IP : IPtr} :=
     
   }.
 
-Definition intptr_seq {IP : IPtr} (start : Z) (len : nat) : EOU (list iptr)
-  := map_monad from_Z (Zseq start len).
+From Stdlib Require Import Basics.
+Open Scope program_scope.
+
+Definition intptr_seq {IP : IPtr} (start size : N) : EOU (list iptr)
+  := map_monad (from_Z ∘ Z.of_N) (ListUtil.Nseq start (N.to_nat size)).
 

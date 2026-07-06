@@ -91,7 +91,14 @@
 
 
   (* Strings to Rocq Hexadecimal.uint *)
-  let string_to_hex_uint (s:string) : Hexadecimal.uint =
+  (* len - optional required length of the hex digits
+           any length is allowed, if None  *)
+  let string_to_hex_uint (len:int option) (s:string) : Hexadecimal.uint =
+    (match len with
+     | Some l ->
+        if String.length s <> l then failwith @@ Printf.sprintf "got ill-sized hex literal: %s" s
+     | None -> ()
+    );
     let open Hexadecimal in
     let rec helper acc c =
       match c with
@@ -124,9 +131,9 @@
 
   let int_hexadecimal_syntax (is_signed:bool) (s:string) : Number.signed_int =
     if is_signed then
-       Number.IntHexadecimal (Hexadecimal.Neg (string_to_hex_uint s))
+       Number.IntHexadecimal (Hexadecimal.Neg (string_to_hex_uint None s))
     else		      
-       Number.IntHexadecimal (Hexadecimal.Pos (string_to_hex_uint s))
+       Number.IntHexadecimal (Hexadecimal.Pos (string_to_hex_uint None s))
 
   exception Lex_error_unterminated_string of Lexing.position
 
@@ -589,12 +596,12 @@ rule token = parse
 	   string_to_decimal_int s2 exp))) }
 
   (* Floating point Hexadecimal constants *)
-  | "0x"  (hexdigit+ as d)     { FLOAT(FS_hex(FH_X, string_to_hex_uint d)) }
-  | "0xK" (hexdigit+ as d)     { FLOAT(FS_hex(FH_K, string_to_hex_uint d)) }
-  | "0xL" (hexdigit+ as d)     { FLOAT(FS_hex(FH_L, string_to_hex_uint d)) }
-  | "0xM" (hexdigit+ as d)     { FLOAT(FS_hex(FH_M, string_to_hex_uint d)) }
-  | "0xH" (hexdigit+ as d)     { FLOAT(FS_hex(FH_H, string_to_hex_uint d)) }
-  | "0xR" (hexdigit+ as d)     { FLOAT(FS_hex(FH_R, string_to_hex_uint d)) }      
+  | "0x"  (hexdigit+ as d)     { FLOAT(FS_hex(FH_X, string_to_hex_uint None d)) }
+  | "0xK" (hexdigit+ as d)     { FLOAT(FS_hex(FH_K, string_to_hex_uint (Some 20) d)) }
+  | "0xL" (hexdigit+ as d)     { FLOAT(FS_hex(FH_L, string_to_hex_uint (Some 32) d)) }
+  | "0xM" (hexdigit+ as d)     { FLOAT(FS_hex(FH_M, string_to_hex_uint (Some 32) d)) }
+  | "0xH" (hexdigit+ as d)     { FLOAT(FS_hex(FH_H, string_to_hex_uint (Some 4) d)) }
+  | "0xR" (hexdigit+ as d)     { FLOAT(FS_hex(FH_R, string_to_hex_uint (Some 4) d)) }      
 
   (* strings *)
   | '"'                         { STRING (string (Buffer.create 10) lexbuf) }

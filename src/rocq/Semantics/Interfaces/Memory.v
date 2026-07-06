@@ -45,8 +45,8 @@ Inductive memS {S A P : Type} (X : Type) : Type :=
 | Merr (s : string) : memS X
 | Mget (k : S -> memS X) : memS X
 | Mput (σ : S) (k : memS X) : memS X
-(* | Mfresh_addr (k : A -> memS X) : memS X *)
-| Mnext_key (k : Z -> memS X) : memS X
+(* | Mcheck_align (p : addr) (align : N) : memS bool *)
+| Mnext_key (size : N) (align : N) (k : Z -> memS X) : memS X
 | Mfresh_prov (k : P -> memS X) : memS X.
 
 Arguments memS : clear implicits.
@@ -55,7 +55,6 @@ Arguments Mub  {S A P} [X].
 Arguments Merr {S A P} [X].
 Arguments Mget {S A P} [X].
 Arguments Mput {S A P} [X].
-(* Arguments Mfresh_addr {S A P} [X]. *)
 Arguments Mnext_key {S A P} [X].
 Arguments Mfresh_prov {S A P} [X].
 Fixpoint memS_bind {S A P X Y} (c : memS S A P X) (k : X -> memS S A P Y) : memS S A P Y :=
@@ -66,8 +65,7 @@ Fixpoint memS_bind {S A P X Y} (c : memS S A P X) (k : X -> memS S A P Y) : memS
   | Merr s => Merr s
   | Mget g => Mget (fun σ => memS_bind (g σ) k)
   | Mput σ g => Mput σ (memS_bind g k)
-  (* | Mfresh_addr g => Mfresh_addr (fun a => memS_bind (g a) k) *)
-  | Mnext_key g => Mnext_key (fun a => memS_bind (g a) k)
+  | Mnext_key size align g => Mnext_key size align (fun a => memS_bind (g a) k)
   | Mfresh_prov g => Mfresh_prov (fun a => memS_bind (g a) k)
   end.
 
@@ -88,7 +86,7 @@ Definition merr       {S A P X} s : memS S A P X := Merr s.
 Definition moom       {S A P X} s : memS S A P X := Moom s.
 Definition put {S A P} (σ: S) : memS S A P unit := Mput σ (ret tt).
 Definition get {S A P}  : memS S A P S := Mget (fun σ => ret σ).
-Definition next_key {S A P} : memS S A P Z := Mnext_key (fun a => ret a). 
+Definition next_key {S A P} size align : memS S A P Z := Mnext_key size align (fun a => ret a). 
 Definition fresh_prov {S A P} : memS S A P P := Mfresh_prov (fun p => ret p). 
 
 (*** Internal state of memory *)
@@ -144,14 +142,14 @@ Class MemoryModelPrimitives {Pa : Params} :=
     write_byte : addr -> memory_byte -> memM unit ;
 
     (** Stack allocations *)
-    (* TOOD: The list of bytes get huge in practice when allocating big chunk of memory.
+    (* TODO: The list of bytes get huge in practice when allocating big chunk of memory.
        For performance reasons, it might be better to take a different representation here
        ([Fin n -> memory_byte] for [n] the length of the list?)
      *)
-    allocate_bytes_with_pr : list memory_byte -> provenance -> memM addr ;
+    allocate_bytes_with_pr : list memory_byte -> N -> provenance -> memM addr ;
 
     (** Heap operations *)
-    malloc_bytes_with_pr : list memory_byte -> provenance -> memM addr ;
+    malloc_bytes_with_pr : list memory_byte -> N -> provenance -> memM addr ;
 
     (* The free intrinsics is implementation specific to avoid exposing
        in the interface both the lookup from heap to blocs, and an iterator
