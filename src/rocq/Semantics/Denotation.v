@@ -153,12 +153,24 @@ Section Denotation.
     | _ => raise_error "unsupported float type"
     end.
   
-  Definition freeze {E} `{DrawE -< E} (dv : dvalue) : itree E dvalue :=
+  Fixpoint freeze {E} `{DrawE -< E} (dv : dvalue) : itree E dvalue :=
     match dv with
     | DVALUE_Poison dt => draw dt
+    | DVALUE_Struct fields => 
+        val <- map_monad freeze fields;;
+        ret (DVALUE_Struct val)
+    | DVALUE_Packed_struct fields => 
+        val <- map_monad freeze fields;;
+        ret (DVALUE_Packed_struct val)
+    | DVALUE_Array τ elts => 
+        val <- map_monad freeze elts;;
+        ret (DVALUE_Array τ val)
+    | DVALUE_Vector τ elts =>
+        val <- map_monad freeze elts;;
+        ret (DVALUE_Vector τ val)
     | _ => ret dv
     end.
-
+  
   Fixpoint denote_exp
     (top:option dtyp) (o:exp dtyp) {struct o} : MCFGtop dvalue :=
     let eval_texp '(dt,ex) := denote_exp (Some dt) ex
@@ -514,7 +526,8 @@ Section Denotation.
     | (IId id, INSTR_Load dt (du,ptr) _) =>
       a <- denote_exp' (Some du) ptr;;
       v <- load dt a;;
-      lwrite id v
+      v' <- freeze v;;
+      lwrite id v'
 
     (* Store *)
     | (IVoid _, INSTR_Store (dt, val) (du, ptr) _) =>
