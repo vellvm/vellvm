@@ -66,7 +66,7 @@ Section GEP.
                 handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
             | _ => raise_error ("non-i64-indexable type")
             end
-        | DVALUE_IPTR i =>
+        | DVALUE_Iptr i =>
             let k := to_Z i in
             match t with
             | DTYPE_Array _ ta
@@ -97,7 +97,7 @@ Section GEP.
     | DVALUE_I 64 i :: vs' =>
         ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
         int_to_ptr ptr' prov
-    | DVALUE_IPTR i :: vs' =>
+    | DVALUE_Iptr i :: vs' =>
         ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (to_Z i)) vs' ;;
         int_to_ptr ptr' prov
     | [] => raise_error "handle_gep_addr: no indices"
@@ -106,7 +106,7 @@ Section GEP.
 
   Lemma handle_gep_addr_0 :
     forall (dt : dtyp) (p : addr),
-      handle_gep_addr dt p [DVALUE_IPTR zero_iptr] = ret p.
+      handle_gep_addr dt p [DVALUE_Iptr zero_iptr] = ret p.
   Proof.
     intros dt p.
     cbn.
@@ -125,7 +125,7 @@ Section GEP.
 
   Lemma handle_gep_addr_ix :
     forall (dt : dtyp) (p p' : addr) ix,
-      handle_gep_addr dt p [DVALUE_IPTR ix] = ret p' ->
+      handle_gep_addr dt p [DVALUE_Iptr ix] = ret p' ->
       ptr_to_int p' = (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z.
   Proof.
     intros dt p p' ix GEP.
@@ -136,7 +136,7 @@ Section GEP.
 
   Lemma handle_gep_addr_ix_OOM :
     forall (dt : dtyp) (p p' : addr) ix msg,
-      handle_gep_addr dt p [DVALUE_IPTR ix] = raise_oom msg ->
+      handle_gep_addr dt p [DVALUE_Iptr ix] = raise_oom msg ->
       exists msg',
         int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (address_provenance p) = raise_oom msg'.
   Proof.
@@ -150,7 +150,7 @@ Section GEP.
   Lemma handle_gep_addr_ix' :
     forall (dt : dtyp) (p p' : addr) ix,
       ret p' = int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (address_provenance p) ->
-      handle_gep_addr dt p [DVALUE_IPTR ix] = ret p'.
+      handle_gep_addr dt p [DVALUE_Iptr ix] = ret p'.
   Proof.
     intros dt p p' ix IX.
     cbn in *.
@@ -161,7 +161,7 @@ Section GEP.
   Lemma handle_gep_addr_ix'_OOM :
     forall (dt : dtyp) (p p' : addr) ix msg,
       int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (address_provenance p) = raise_oom msg ->
-      exists msg', handle_gep_addr dt p [DVALUE_IPTR ix] = raise_oom msg'.
+      exists msg', handle_gep_addr dt p [DVALUE_Iptr ix] = raise_oom msg'.
   Proof.
     intros dt p p' ix msg IX.
     cbn in *.

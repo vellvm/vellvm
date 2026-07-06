@@ -63,7 +63,7 @@ Class IPtrTheory {IP : IPtr} :=
       x = y;
 
     VMemInt_iptr_dtyp :
-    @mdtyp_of_int iptr VMemInt_iptr = DTYPE_IPTR;
+    @mdtyp_of_int iptr VMemInt_iptr = DTYPE_Iptr;
 
     VMemInt_iptr_mrepr_from_Z :
     forall x,

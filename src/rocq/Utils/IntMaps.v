@@ -184,13 +184,6 @@ Section Map_Operations.
        | None => 0
        end.
 
-  Definition next_key_with_alignment {A} (m : IntMap A) (align : N) : Z
-    := match IM_greatest_key m with
-       | Some k => 1 + k
-       | None => 0
-       end.
-
-
   Definition next_key_old {A} (m : IntMap A) : Z
     := let keys := map fst (IM.elements m) in
        1 + maximumBy Z.leb (-1)%Z keys.

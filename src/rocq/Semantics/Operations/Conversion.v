@@ -132,13 +132,13 @@ Section Convert.
     | Inttoptr =>
         match t1, t2 with
         | DTYPE_I _, DTYPE_Pointer => Conv_ItoP x
-        | DTYPE_IPTR , DTYPE_Pointer => Conv_ItoP x
+        | DTYPE_Iptr , DTYPE_Pointer => Conv_ItoP x
         | _, _ => Conv_Illegal "Inttoptr got illegal arguments"
         end
     | Ptrtoint =>
         match t1, t2 with
         | DTYPE_Pointer, DTYPE_I _ => Conv_PtoI x
-        | DTYPE_Pointer, DTYPE_IPTR => Conv_PtoI x
+        | DTYPE_Pointer, DTYPE_Iptr => Conv_PtoI x
         | _, _ => Conv_Illegal "Ptrtoint got illegal arguments"
         end
 
@@ -210,7 +210,7 @@ Section Convert.
     | Conv_PtoI x =>
         match x, t_to with
         | DVALUE_Addr addr, DTYPE_I sz => coerce_integer_to_int (Some sz) (ptr_to_int addr)
-        | DVALUE_Addr addr, DTYPE_IPTR => coerce_integer_to_int None (ptr_to_int addr)
+        | DVALUE_Addr addr, DTYPE_Iptr => coerce_integer_to_int None (ptr_to_int addr)
         | _, _ => raise_error "Invalid PTOI conversion"
         end
     | Conv_ItoP x =>

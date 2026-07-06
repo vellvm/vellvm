@@ -28,7 +28,6 @@ let parse_tests filename =
     []
   with End_of_file -> close_in channel ; List.rev !assertions
 
-
 let make_test name link_files ll_ast t : (string * assertion) option =
   let run dtyp entry args ll_ast =
     let linked_ast = TopLevel.link_all link_files ll_ast in

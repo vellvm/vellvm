@@ -135,7 +135,7 @@ Definition msamesign_Z (x y : Z) : bool :=
 
     mrepr := fun x => ret x;
 
-    mdtyp_of_int := DTYPE_IPTR
+    mdtyp_of_int := DTYPE_Iptr
   }.
 
 Definition int1 := @bit_int 1.

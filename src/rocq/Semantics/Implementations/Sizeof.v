@@ -20,7 +20,7 @@ Definition Dtyp_alignment (dt : dtyp) : alignment
               else if Pos.leb sz 32
                    then Build_alignment 4 4
                    else Build_alignment 4 8
-     | DTYPE_IPTR => Build_alignment 8 8
+     | DTYPE_Iptr => Build_alignment 8 8
      | DTYPE_Pointer => Build_alignment 8 8
      | DTYPE_Void => Build_alignment 1 1
      | DTYPE_FP FP_half => Build_alignment 2 2
@@ -74,7 +74,7 @@ Definition bit_sizeof_floating_point_variant (fp : floating_point_variant) : N :
 Fixpoint Bit_sizeof_dtyp (ty : dtyp) : N :=
   match ty with
   | DTYPE_I sz => Npos sz
-  | DTYPE_IPTR => 64 (* TODO: probably kind of a lie... *)
+  | DTYPE_Iptr => 64 (* TODO: probably kind of a lie... *)
   | DTYPE_Pointer => 64
   | DTYPE_Void => 0
   | DTYPE_FP fp => bit_sizeof_floating_point_variant fp
@@ -97,7 +97,7 @@ Fixpoint Sizeof_dtyp (ty:dtyp) : N :=
   match ty with
   | DTYPE_Void         => 0
   | DTYPE_I sz         => N.max 1 (N.div (Npos sz) 8)
-  | DTYPE_IPTR         => N.of_nat ptr_size
+  | DTYPE_Iptr         => N.of_nat ptr_size
   | DTYPE_Pointer      => N.of_nat ptr_size
   | DTYPE_Packed_struct l =>
       fold_left (fun acc x => (acc + Sizeof_dtyp x)%N) l 0%N

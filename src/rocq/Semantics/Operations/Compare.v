@@ -13,7 +13,7 @@ Section Compare.
       (match v1, v2 with
        | DVALUE_I sz1 i1, DVALUE_I sz2 i2 =>
            _
-       | DVALUE_IPTR i1, DVALUE_IPTR i2 => eval_int_icmp samesign icmp i1 i2
+       | DVALUE_Iptr i1, DVALUE_Iptr i2 => eval_int_icmp samesign icmp i1 i2
        | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
        | DVALUE_Poison t, _ => if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
        | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"

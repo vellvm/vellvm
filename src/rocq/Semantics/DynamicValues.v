@@ -79,7 +79,7 @@ Section DValue.
   Inductive dvalue : Set :=
   | DVALUE_Addr (a:addr)
   | DVALUE_I (sz : positive) (x:@bit_int sz)
-  | DVALUE_IPTR (x:iptr)
+  | DVALUE_Iptr (x:iptr)
 (* TODO - this version | DVALUE_FP (fp:floating_point_variant) (x:@float_val fp) *)
   | DVALUE_Double (x:ll_double)
   | DVALUE_Float (x:ll_float)
@@ -106,7 +106,7 @@ Section DValue.
     match v with
     | DVALUE_Addr a => ret DTYPE_Pointer
     | DVALUE_I sz x => ret (DTYPE_I sz)
-    | DVALUE_IPTR x => ret DTYPE_IPTR
+    | DVALUE_Iptr x => ret DTYPE_Iptr
     | DVALUE_Double x => ret (DTYPE_FP FP_double)
     | DVALUE_Float x => ret (DTYPE_FP FP_float)
     | DVALUE_Poison t => ret t
@@ -160,7 +160,7 @@ Section DValue.
     match dv with
     | DVALUE_Addr a => "addr " ++ show_addr a
     | DVALUE_I sz x => "i" ++ show (Zpos sz) ++ " " ++ show (unsigned x)
-    | DVALUE_IPTR x => "intptr " ++ show (to_Z x)
+    | DVALUE_Iptr x => "intptr " ++ show (to_Z x)
     | DVALUE_Double x => "double " ++ show x
     | DVALUE_Float x => "float " ++ show x
     | DVALUE_Poison t => "poison[" ++ show_dtyp t ++ "]"
@@ -187,15 +187,15 @@ Section DValue.
     Variable P : dvalue -> Prop.
     Hypothesis IH_Addr          : forall a, P (DVALUE_Addr a).
     Hypothesis IH_I             : forall sz (x : @bit_int sz), P (@DVALUE_I sz x).
-    Hypothesis IH_IPTR          : forall x, P (DVALUE_IPTR x).
+    Hypothesis IH_Iptr          : forall x, P (DVALUE_Iptr x).
     Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
     Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
     Hypothesis IH_Poison        : forall t, P (DVALUE_Poison t).
     Hypothesis IH_None          : P DVALUE_None.
-    Hypothesis IH_Struct        : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Struct fields).
-    Hypothesis IH_Packed_Struct : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Packed_struct fields).
-    Hypothesis IH_Array         : forall t (elts: list dvalue), (forall e, In e elts -> P e) -> P (DVALUE_Array t elts).
-    Hypothesis IH_Vector        : forall t (elts: list dvalue), (forall e, In e elts -> P e) -> P (DVALUE_Vector t elts).
+    Hypothesis IH_Struct        : forall (fields: list dvalue), Forall P fields -> P (DVALUE_Struct fields).
+    Hypothesis IH_Packed_Struct : forall (fields: list dvalue), Forall P fields -> P (DVALUE_Packed_struct fields).
+    Hypothesis IH_Array         : forall t (elts: list dvalue), Forall P elts -> P (DVALUE_Array t elts).
+    Hypothesis IH_Vector        : forall t (elts: list dvalue), Forall P elts -> P (DVALUE_Vector t elts).
 
     Lemma dvalue_ind : forall (dv:dvalue), P dv.
     Proof using All.
@@ -203,25 +203,13 @@ Section DValue.
       remember P as P0 in IH.
       destruct dv; auto; subst.
       - apply IH_Struct.
-        { revert fields.
-          fix IHfields 1. intros [|u fields']. intros. inversion H.
-          intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
-        }
+        induction fields; eauto.
       - apply IH_Packed_Struct.
-        { revert fields.
-          fix IHfields 1. intros [|u fields']. intros. inversion H.
-          intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
-        }
+        induction fields; eauto.
       - apply IH_Array.
-        { revert elts.
-          fix IHelts 1. intros [|u elts']. intros. inversion H.
-          intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
-        }
+        induction elts; eauto.
       - apply IH_Vector.
-        { revert elts.
-          fix IHelts 1. intros [|u elts']. intros. inversion H.
-          intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
-        }
+        induction elts; eauto.
     Qed.
   End DvalueInd.
   
@@ -229,7 +217,7 @@ Section DValue.
     match dv with
     | DVALUE_Addr a => 1
     | DVALUE_I sz x => 1
-    | DVALUE_IPTR x => 1
+    | DVALUE_Iptr x => 1
     | DVALUE_Double x => 1
     | DVALUE_Float x => 1
     | DVALUE_Poison t => 1
@@ -286,7 +274,7 @@ Section DValue.
     Variable P : dvalue -> Prop.
     Hypothesis IH_Addr          : forall a, P (DVALUE_Addr a).
     Hypothesis IH_I             : forall sz (x : @bit_int sz), P (@DVALUE_I sz x).
-    Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x).
+    Hypothesis IH_Iptr           : forall x, P (DVALUE_Iptr x).
     Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
     Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
     Hypothesis IH_Poison        : forall t, P (DVALUE_Poison t).
@@ -420,6 +408,7 @@ Section DValue.
           ].
       - intros s H'; dependent induction H'.
         + (* rt_step *)
+          rewrite Forall_forall in H.
           match goal with
           | H: dvalue_direct_subterm ?x _,
               IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
@@ -434,6 +423,7 @@ Section DValue.
             intros * STRICT;
             dependent induction STRICT.
           * (* t_step *)
+            rewrite Forall_forall in H.
             match goal with
             | H: dvalue_direct_subterm ?x _,
                 IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
@@ -448,12 +438,15 @@ Section DValue.
             pose proof t_trans _ _ _ _ _ STRICT1 STRICT2 as STRICT3.
             eapply dvalue_strict_subterm_inv in STRICT3 as (s&DIRECT&SUB).
             inv DIRECT.
+            rewrite Forall_forall in H.
             match goal with
             | IH : forall u : dvalue, In u ?fields -> forall s : dvalue, dvalue_subterm s u -> P s
                                                               |- P ?x =>
                eapply IH; eauto
             end.
         + (* rt_trans *)
+          rewrite Forall_forall in H.
+          setoid_rewrite Forall_forall in IHH'2.
           match goal with
           | XY : clos_refl_trans dvalue dvalue_direct_subterm ?x ?y,
               YZ : clos_refl_trans dvalue dvalue_direct_subterm ?y ?z,
@@ -461,14 +454,16 @@ Section DValue.
                                                           |- _ =>
               pose proof rt_trans _ _ _ _ _ XY YZ as XZ;
               apply clos_rt_inv in XZ as [EQ | [w [R TRANS]]];
-             [ subst; pose proof dvalue_subterm_antisymmetric XY YZ; subst; eapply IHH'2; eauto
+              [subst; pose proof dvalue_subterm_antisymmetric XY YZ; subst;
+                          eapply IHH'2; eauto
                   | inv R; eapply IH; eauto
                   ] 
           end.
-
+                                                                                       
       - intros s H'.
         dependent induction H'.
         + (* rt_step *)
+          rewrite Forall_forall in H.
           match goal with
           | H: dvalue_direct_subterm ?x _,
             IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s |- P ?x =>
@@ -482,6 +477,7 @@ Section DValue.
           intros * STRICT;
             dependent induction STRICT.
           * (* t_step *)
+            rewrite Forall_forall in H.
               match goal with
               | H: dvalue_direct_subterm ?x _,
                   IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
@@ -491,6 +487,7 @@ Section DValue.
                   apply rt_refl
               end.
           * (* t_trans *)
+          rewrite Forall_forall in H.
             match goal with
             | IH : forall u : dvalue, In u ?fields -> forall s : dvalue, dvalue_subterm s u -> P s
                                                               |- P ?x =>
@@ -502,6 +499,8 @@ Section DValue.
                 eapply IH; eauto
             end.
         + (* rt_trans *)
+          rewrite Forall_forall in H.
+          setoid_rewrite Forall_forall in IHH'2.
           match goal with
           | XY : clos_refl_trans dvalue dvalue_direct_subterm ?x ?y,
               YZ : clos_refl_trans dvalue dvalue_direct_subterm ?y ?z,
@@ -517,6 +516,7 @@ Section DValue.
       - intros s H'.
         dependent induction H'.
         + (* rt_step *)
+          rewrite Forall_forall in H.
           match goal with
           | H: dvalue_direct_subterm ?x _,
               IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
@@ -531,6 +531,7 @@ Section DValue.
           intros * STRICT;
             dependent induction STRICT.
           * (* t_step *)
+            rewrite Forall_forall in H.
               match goal with
               | H: dvalue_direct_subterm ?x _,
                   IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
@@ -540,6 +541,7 @@ Section DValue.
                   apply rt_refl
               end.
           * (* t_trans *)
+          rewrite Forall_forall in H.
             match goal with
             | IH : forall u : dvalue, In u ?fields -> forall s : dvalue, dvalue_subterm s u -> P s
                                                               |- P ?x =>
@@ -551,6 +553,8 @@ Section DValue.
                 eapply IH; eauto
             end.
         + (* rt_trans *)
+          rewrite Forall_forall in H.
+          setoid_rewrite Forall_forall in IHH'2.
           match goal with
           | XY : clos_refl_trans dvalue dvalue_direct_subterm ?x ?y,
               YZ : clos_refl_trans dvalue dvalue_direct_subterm ?y ?z,
@@ -566,6 +570,7 @@ Section DValue.
        - intros s H'.
         dependent induction H'.
         + (* rt_step *)
+          rewrite Forall_forall in H.
           match goal with
           | H: dvalue_direct_subterm ?x _,
               IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
@@ -580,6 +585,7 @@ Section DValue.
           intros * STRICT;
             dependent induction STRICT.
           * (* t_step *)
+          rewrite Forall_forall in H.
               match goal with
               | H: dvalue_direct_subterm ?x _,
                   IH : forall u : dvalue, In u _ -> forall s : dvalue, dvalue_subterm s u -> P s
@@ -589,6 +595,7 @@ Section DValue.
                   apply rt_refl
               end.
           * (* t_trans *)
+          rewrite Forall_forall in H.
             match goal with
             | IH : forall u : dvalue, In u ?fields -> forall s : dvalue, dvalue_subterm s u -> P s
                                                               |- P ?x =>
@@ -600,6 +607,8 @@ Section DValue.
                 eapply IH; eauto
             end.
         + (* rt_trans *)
+          rewrite Forall_forall in H.
+          setoid_rewrite Forall_forall in IHH'2.
           match goal with
           | XY : clos_refl_trans dvalue dvalue_direct_subterm ?x ?y,
               YZ : clos_refl_trans dvalue dvalue_direct_subterm ?y ?z,
@@ -651,7 +660,7 @@ Section DValue.
 
     Program Definition dvalue_int_cmp (d1 d2:dvalue) : bool :=
       match d1, d2 with
-      | @DVALUE_I sz1 x1, @DVALUE_I sz2 x2 =>
+      | DVALUE_I sz1 x1, DVALUE_I sz2 x2 =>
           _
       | _, _ => false
       end.
@@ -666,7 +675,7 @@ Section DValue.
       match d1, d2 with
       | DVALUE_Addr a1, DVALUE_Addr a2 =>
           if eq_dec_addr a1 a2 then true else false
-      | @DVALUE_I sz1 x1, @DVALUE_I sz2 x2 =>
+      | DVALUE_I sz1 x1, DVALUE_I sz2 x2 =>
           dvalue_int_cmp d1 d2
       | DVALUE_Double x1, DVALUE_Double x2 =>
           if Float.eq_dec x1 x2 then true else false
@@ -708,9 +717,9 @@ Section DValue.
                     | DVALUE_I sz2 x2 => _
                     | _ => _
                     end
-                | DVALUE_IPTR x1 =>
+                | DVALUE_Iptr x1 =>
                     match d2 with
-                    | DVALUE_IPTR x2 => _
+                    | DVALUE_Iptr x2 => _
                     | _ => _
                     end
                 | DVALUE_Double x1 =>
@@ -838,37 +847,37 @@ Section DValue.
 
   Definition is_DVALUE_I1 (d:dvalue) : bool :=
     match d with
-    | @DVALUE_I 1 _ => true
+    | DVALUE_I 1 _ => true
     | _ => false
     end.
 
   Definition is_DVALUE_I8 (d:dvalue) : bool :=
     match d with
-    | @DVALUE_I 8 _ => true
+    | DVALUE_I 8 _ => true
     | _ => false
     end.
 
   Definition is_DVALUE_I16 (d:dvalue) : bool :=
     match d with
-    | @DVALUE_I 16 _ => true
+    | DVALUE_I 16 _ => true
     | _ => false
     end.
 
   Definition is_DVALUE_I32 (d:dvalue) : bool :=
     match d with
-    | @DVALUE_I 32 _ => true
+    | DVALUE_I 32 _ => true
     | _ => false
     end.
 
   Definition is_DVALUE_I64 (d:dvalue) : bool :=
     match d with
-    | @DVALUE_I 64 _ => true
+    | DVALUE_I 64 _ => true
     | _ => false
     end.
 
   Definition is_DVALUE_IX (d:dvalue) : bool :=
     match d with
-    | @DVALUE_I _ _ => true
+    | DVALUE_I _ _ => true
     | _ => false
     end.
 
@@ -879,15 +888,15 @@ Section DValue.
   #[global] Existing Instance VMemInt_iptr.
 
   #[global] Instance ToDvalue_iptr : ToDvalue iptr :=
-    { to_dvalue := DVALUE_IPTR }.
+    { to_dvalue := DVALUE_Iptr }.
 
   #[global] Instance ToDvalue_Int `{sz : positive} : ToDvalue (@bit_int sz) :=
     { to_dvalue := @DVALUE_I sz }.
 
   Definition dvalue_int_unsigned (dv : dvalue) : Z
     := match dv with
-       | @DVALUE_I sz x => unsigned x
-       | DVALUE_IPTR x => to_unsigned x
+       | DVALUE_I sz x => unsigned x
+       | DVALUE_Iptr x => to_unsigned x
        | _ => 0
        end.
 
@@ -928,13 +937,13 @@ Section DValue.
          | Inttoptr =>
            match t1, t2 with
            | DTYPE_I 64, DTYPE_Pointer => PtrConv_ItoP
-           | DTYPE_IPTR, DTYPE_Pointer => PtrConv_ItoP
+           | DTYPE_Iptr, DTYPE_Pointer => PtrConv_ItoP
            | _, _ => PtrConv_Neither
            end
          | Ptrtoint =>
            match t1, t2 with
            | DTYPE_Pointer, DTYPE_I _ => PtrConv_PtoI
-           | DTYPE_Pointer, DTYPE_IPTR => PtrConv_PtoI
+           | DTYPE_Pointer, DTYPE_Iptr => PtrConv_PtoI
            | _, _ => PtrConv_Neither
            end
          | _ => PtrConv_Neither
@@ -985,7 +994,7 @@ Section DValue.
                                | Some x => x
                                end in
 
-            if dtyp_eqb mdtyp_of_int DTYPE_IPTR
+            if dtyp_eqb mdtyp_of_int DTYPE_Iptr
             then
               if (res_u' >? munsigned res)
               then raise_oom "Multiplication overflow on iptr."
@@ -1002,7 +1011,7 @@ Section DValue.
           let res_u := munsigned res in
           let res_u' := Z.shiftl (munsigned x) (munsigned y) in
 
-          if dtyp_eqb (@mdtyp_of_int Int _) DTYPE_IPTR
+          if dtyp_eqb (@mdtyp_of_int Int _) DTYPE_Iptr
           then
             (* TODO: Do we need to check for the unsigned case? Return result anyway? *)
             if (res_u' >? res_u)
@@ -1044,7 +1053,7 @@ Section DValue.
                else ret (to_dvalue (mdivu x y))
 
       | SDiv ex =>
-          if dtyp_eqb mdtyp_of_int DTYPE_IPTR
+          if dtyp_eqb mdtyp_of_int DTYPE_Iptr
           then raise_error "Signed division for iptr."
           else
             (* What does signed i1 mean? *)
@@ -1058,7 +1067,7 @@ Section DValue.
                    else to_dvalue <$> mdivs x y
 
       | LShr ex =>
-          if option_pred (fun bw => (munsigned y) >=? Zpos bw) mbitwidth && negb (dtyp_eqb mdtyp_of_int DTYPE_IPTR)
+          if option_pred (fun bw => (munsigned y) >=? Zpos bw) mbitwidth && negb (dtyp_eqb mdtyp_of_int DTYPE_Iptr)
           then ret (DVALUE_Poison mdtyp_of_int)
           else if andb ex (negb ((munsigned x)
                                    mod (Z.pow 2 (munsigned y)) =? 0))%Z
@@ -1066,7 +1075,7 @@ Section DValue.
                else ret (to_dvalue (mshru x y))
 
       | AShr ex =>
-          if dtyp_eqb mdtyp_of_int DTYPE_IPTR
+          if dtyp_eqb mdtyp_of_int DTYPE_Iptr
           then raise_error "Arithmetic shift for iptr."
           else
             if option_pred (fun bw => (munsigned y) >=? Zpos bw) mbitwidth
@@ -1082,7 +1091,7 @@ Section DValue.
           else ret (to_dvalue (mmodu x y))
 
       | SRem =>
-          if dtyp_eqb mdtyp_of_int DTYPE_IPTR
+          if dtyp_eqb mdtyp_of_int DTYPE_Iptr
           then raise_error "Signed division for iptr."
           else
             if (msigned y =? 0)%Z
@@ -1121,7 +1130,7 @@ Section DValue.
     | Some sz  => ret (@DVALUE_I sz (repr i))
     | None    =>
         i' <- mrepr i;;
-        ret (DVALUE_IPTR i')
+        ret (DVALUE_Iptr i')
     end.
   Arguments coerce_integer_to_int _ _ : simpl nomatch.
 
@@ -1131,17 +1140,17 @@ Section DValue.
   Definition eval_iop_integer_h (iop : ibinop) (v1 v2 : dvalue) : EOU dvalue.
     refine
       (match v1, v2 with
-       | @DVALUE_I sz1 i1, @DVALUE_I sz2 i2 =>
+       | DVALUE_I sz1 i1, DVALUE_I sz2 i2 =>
            _
-       | DVALUE_IPTR i1, DVALUE_IPTR i2 =>
+       | DVALUE_Iptr i1, DVALUE_Iptr i2 =>
            eval_int_op iop i1 i2
        | DVALUE_Poison t, _             =>
            match iop with
            | SDiv _ =>
                x <- match v2 with
-                   | @DVALUE_I sz2 i2 =>
+                   | DVALUE_I sz2 i2 =>
                        ret (@Integers.signed sz2 i2)
-                   | DVALUE_IPTR i2 =>
+                   | DVALUE_Iptr i2 =>
                        ret (to_Z i2)
                    | _ => raise_error "ill_typed-iop: sdiv"
                    end;;
@@ -1188,19 +1197,19 @@ Section DValue.
         | Ult => ret (mcmpu Clt x y)
         | Ule => ret (mcmpu Cle x y)
         | Sgt =>
-            if dtyp_eqb (@mdtyp_of_int Int VMI) DTYPE_IPTR
+            if dtyp_eqb (@mdtyp_of_int Int VMI) DTYPE_Iptr
             then raise_error "Signed '>' comparison on iptr type."
             else ret (mcmp Cgt x y)
         | Sge =>
-            if dtyp_eqb (@mdtyp_of_int Int VMI) DTYPE_IPTR
+            if dtyp_eqb (@mdtyp_of_int Int VMI) DTYPE_Iptr
             then raise_error "Signed '>=' comparison on iptr type."
             else ret (mcmp Cge x y)
         | Slt =>
-            if dtyp_eqb (@mdtyp_of_int Int VMI) DTYPE_IPTR
+            if dtyp_eqb (@mdtyp_of_int Int VMI) DTYPE_Iptr
             then raise_error "Signed '<' comparison on iptr type."
             else ret (mcmp Clt x y)
         | Sle =>
-            if dtyp_eqb (@mdtyp_of_int Int VMI) DTYPE_IPTR
+            if dtyp_eqb (@mdtyp_of_int Int VMI) DTYPE_Iptr
             then raise_error "Signed '>' comparison on iptr type."
             else ret (mcmp Cle x y)
         end;;
@@ -1489,7 +1498,7 @@ Section DValue.
   Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
   | DVALUE_Addr_typ   : forall a, dvalue_has_dtyp (DVALUE_Addr a) DTYPE_Pointer
   | DVALUE_I_typ      : forall sz x, dvalue_has_dtyp (@DVALUE_I sz x) (DTYPE_I sz)
-  | DVALUE_IPTR_typ   : forall x, dvalue_has_dtyp (DVALUE_IPTR x) DTYPE_IPTR
+  | DVALUE_Iptr_typ   : forall x, dvalue_has_dtyp (@DVALUE_Iptr x) DTYPE_Iptr
   | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) (DTYPE_FP FP_double)
   | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) (DTYPE_FP FP_float)
   | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
@@ -1529,7 +1538,7 @@ Section DValue.
     Variable P : dvalue -> dtyp -> Prop.
     Hypothesis IH_Addr           : forall a, P (DVALUE_Addr a) DTYPE_Pointer.
     Hypothesis IH_I              : forall sz x, P (@DVALUE_I sz x) (DTYPE_I sz).
-    Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x) DTYPE_IPTR.
+    Hypothesis IH_Iptr           : forall x, P (@DVALUE_Iptr x) DTYPE_Iptr.
     Hypothesis IH_Poison         : forall t (NV: NO_VOID t), P (DVALUE_Poison t) t.
     Hypothesis IH_Double         : forall x, P (DVALUE_Double x) (DTYPE_FP FP_double).
     Hypothesis IH_Float          : forall x, P (DVALUE_Float x) (DTYPE_FP FP_float).
@@ -1639,8 +1648,8 @@ Section DValue.
     | @DVALUE_I sz x =>
         if dtyp_eq_dec dt (DTYPE_I sz) then true else false
 
-    | DVALUE_IPTR x =>
-        if dtyp_eq_dec dt (DTYPE_IPTR) then true else false
+    | @DVALUE_Iptr x =>
+        if dtyp_eq_dec dt (DTYPE_Iptr) then true else false
 
     | DVALUE_Double x =>
         if dtyp_eq_dec dt (DTYPE_FP FP_double) then true else false
@@ -1703,7 +1712,6 @@ Section DValue.
       | [ H : ((?X || ?Y) = true) |- _ ] => apply orb_true_iff in H; destruct H
     end.
 
-
   Lemma dvalue_has_dtyp_fun_sound :
     forall dv dt,
       dvalue_has_dtyp_fun dv dt = true -> dvalue_has_dtyp dv dt.
@@ -1726,11 +1734,10 @@ Section DValue.
       + subst. break_match_hyp_inv.
         invert_bools.
         constructor.
-        eapply H; eauto. constructor. reflexivity.
+        rewrite Forall_forall in H.
+        eapply H; cbn; eauto.
         eapply IHfields; auto.
-        intros.
-        eapply H.
-        right.  assumption. assumption.
+        eapply Forall_cons_iff,H.
 
     - cbn in HX.
       repeat break_match_hyp_inv.
@@ -1742,11 +1749,10 @@ Section DValue.
       + subst. break_match_hyp_inv.
         invert_bools.
         constructor.
-        eapply H; eauto. constructor. reflexivity.
+        rewrite Forall_forall in H.
+        eapply H; cbn; eauto.
         eapply IHfields; auto.
-        intros.
-        eapply H.
-        right.  assumption. assumption.
+        eapply Forall_cons_iff,H.
 
     - cbn in HX.
       repeat break_match_hyp_inv.
@@ -1759,11 +1765,11 @@ Section DValue.
       + cbn in H0.
         invert_bools.
         constructor.
-        eapply H; auto. left; auto.
-        apply IHelts; auto.
-        intros.
-        eapply H. right; auto.
-        assumption.
+        rewrite Forall_forall in H.
+        eapply H; cbn; eauto.
+        eapply IHelts; auto.
+        eapply Forall_cons_iff,H.
+        
       + apply Nat.eqb_eq in H2.
         assumption.
     - cbn in HX.
@@ -1777,11 +1783,10 @@ Section DValue.
       + cbn in H0.
         invert_bools.
         constructor.
-        eapply H; auto. left; auto.
-        apply IHelts; auto.
-        intros.
-        eapply H. right; auto.
-        assumption.
+        rewrite Forall_forall in H.
+        eapply H; cbn; eauto.
+        eapply IHelts; auto.
+        eapply Forall_cons_iff,H.
       + apply Nat.eqb_eq in H2.
         assumption.
   Qed.
@@ -1835,7 +1840,7 @@ Section DValue.
         | DTYPE_I to_sz => Pos.ltb to_sz from_sz
         | _ => false
         end
-    | DTYPE_IPTR =>
+    | DTYPE_Iptr =>
         match to_dt with
         | DTYPE_I to_sz =>
             (* TODO: This is a little dodgy... Can we always truncate? What about finite iptrs? *)
@@ -1861,7 +1866,7 @@ Section DValue.
     | DTYPE_I from_sz =>
         match to_dt with
         | DTYPE_I to_sz => Pos.ltb from_sz to_sz
-        | DTYPE_IPTR =>
+        | DTYPE_Iptr =>
             (* TODO: A little dodgy too... *)
             true
         | _ => false
@@ -1944,9 +1949,9 @@ Section DValue.
   Definition valid_ibinop_type (t : dtyp) : bool :=
     match t with
     | DTYPE_I _
-    | DTYPE_IPTR
+    | DTYPE_Iptr
     | DTYPE_Vector _ (DTYPE_I _)
-    | DTYPE_Vector _ (DTYPE_IPTR) =>
+    | DTYPE_Vector _ (DTYPE_Iptr) =>
         true
     | _ => false
     end.
@@ -1954,11 +1959,11 @@ Section DValue.
   Definition valid_icmp_type (t : dtyp) : bool :=
     match t with
     | DTYPE_I _
-    | DTYPE_IPTR
+    | DTYPE_Iptr
     | DTYPE_Pointer
     | DTYPE_Vector _ (DTYPE_I _)
     | DTYPE_Vector _ (DTYPE_Pointer)
-    | DTYPE_Vector _ (DTYPE_IPTR) =>
+    | DTYPE_Vector _ (DTYPE_Iptr) =>
         true
     | _ => false
     end.
@@ -2071,10 +2076,10 @@ Section DValue.
 
     Lemma eval_iop_integer_h_dtyp_iptr :
       forall dx dy dv op,
-        dvalue_has_dtyp dx DTYPE_IPTR ->
-        dvalue_has_dtyp dy DTYPE_IPTR ->
+        dvalue_has_dtyp dx DTYPE_Iptr ->
+        dvalue_has_dtyp dy DTYPE_Iptr ->
         eval_iop_integer_h op dx dy = ret dv ->
-        dvalue_has_dtyp dv DTYPE_IPTR.
+        dvalue_has_dtyp dv DTYPE_Iptr.
     Proof.
       intros dx dy dv op TYPx TYPy EVAL.
       inversion TYPx; inversion TYPy; subst.
@@ -2088,10 +2093,10 @@ Section DValue.
     
     Lemma eval_iop_dtyp_iptr :
       forall dx dy dv op,
-        dvalue_has_dtyp dx DTYPE_IPTR ->
-        dvalue_has_dtyp dy DTYPE_IPTR ->
+        dvalue_has_dtyp dx DTYPE_Iptr ->
+        dvalue_has_dtyp dy DTYPE_Iptr ->
         eval_iop op dx dy = ret dv ->
-        dvalue_has_dtyp dv DTYPE_IPTR.
+        dvalue_has_dtyp dv DTYPE_Iptr.
     Proof.
       intros dx dy dv op TYPx TYPy EVAL.
       unfold eval_iop in EVAL.
@@ -2110,7 +2115,7 @@ Section DValue.
   Fixpoint default_dvalue_of_dtyp (dt : dtyp) : EOU dvalue :=
     match dt with
     | DTYPE_I sz => ret (default_dvalue_of_dtyp_i sz)
-    | DTYPE_IPTR => ret (DVALUE_IPTR zero_iptr)
+    | DTYPE_Iptr => ret (@DVALUE_Iptr zero_iptr)
     | DTYPE_Pointer => ret (DVALUE_Addr null)
     | DTYPE_Void => raise_error "DTYPE_Void is not a true LLVM value"
     | DTYPE_FP FP_float => ret (DVALUE_Float Float32.zero)
@@ -2162,8 +2167,8 @@ Section DValue.
     | DTYPE_Vector sz DTYPE_Pointer =>
         ret (DVALUE_Vector dt (repeat (DVALUE_Addr null) (N.to_nat sz)))
 
-    | DTYPE_Vector sz DTYPE_IPTR =>
-        ret (DVALUE_Vector dt (repeat (DVALUE_IPTR zero_iptr) (N.to_nat sz)))
+    | DTYPE_Vector sz DTYPE_Iptr =>
+        ret (DVALUE_Vector dt (repeat (@DVALUE_Iptr zero_iptr) (N.to_nat sz)))
 
     | DTYPE_Vector _ _ => raise_error ("Non-valid or unsupported vector type when generating default vector")
     | DTYPE_Struct fields =>
