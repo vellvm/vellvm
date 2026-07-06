@@ -1,0 +1,49 @@
+baseURL       = 'https://vellvm.github.io/vellvm/'
+locale 	      = 'en-us'
+title 	      = 'Vellvm'
+disableKinds  = ['taxonomy', 'term']
+enableGitInfo = true
+
+[params]
+  llvmVersion = 'Clang 17'
+
+[frontmatter]
+lastmod = [':git', ':fileModTime']
+
+[caches]
+  [caches.images]
+    dir = ':cacheDir/images'
+
+[markup]
+  [markup.highlight]
+    style = 'monokailight'
+
+[menu]
+  [[menu.main]]
+    name = 'Home'
+    url = ''
+    weight = 10
+  [[menu.main]]
+    name = 'About'
+    url = '/about/'
+    weight = 15
+  [[menu.main]]
+    name = 'Github'
+    url = 'https://www.github.com/vellvm/vellvm'
+    weight = 20
+  [[menu.main]]
+    name = 'Running Tests'
+    url = '/tests/'
+    weight = 30
+[[menu.main]]
+    name = 'Structure'
+    url = '/structure/'
+    weight = 40
+[[menu.main]]
+    name = 'Research'
+    url = '/research/'
+    weight = 50
+[[menu.main]]
+    name = 'FAQ'
+    url = '/faq/'
+    weight = 60

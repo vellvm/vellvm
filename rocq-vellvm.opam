@@ -14,7 +14,7 @@ authors: [
   "Irene Yoon <euisuny@cis.upenn.edu>"
   "Gary (Hanxi) Chen <hanxic@seas.upenn.edu>"
 ]
-license: "GPL-3.0-or-later"
+license: "MIT"
 
 
 build: [make "-C" "src" "all" "-j%{jobs}%"]

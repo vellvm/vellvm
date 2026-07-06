@@ -3,7 +3,7 @@
 
 cff-version: 1.2.0
 title: Vellvm
-url: "https://github.com/vellvm/vellvm"
+url: "https://vellvm.github.io/vellvm/"
 message: >-
   If you use this software, please cite it using the
   metadata from this file.
@@ -14,7 +14,7 @@ authors:
     affiliation: University of Pennsylvania
     orcid: 'https://orcid.org/0000-0002-3516-1512'
   - given-names: Yannick
-    family-names: Zakowsky
+    family-names: Zakowski
     affiliation: Inria
     orcid: 'https://orcid.org/0000-0003-4585-6470'
   - given-names: Calvin
@@ -47,4 +47,4 @@ keywords:
   - Coq
   - Compilers
   - Semantics
-license: GPL-3.0
+license: MIT

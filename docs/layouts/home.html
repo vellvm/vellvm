@@ -1,0 +1,24 @@
+{{ partial "header.html" . }}
+<div class="banner" align="center" margin-bottom="0pt">
+  <img src="logo/vellvm-logo-scroll2.png" width="400px" alt="Vellvm"/>
+
+{{ partial "nav.html" . }}
+  
+  <table class="banner" border="0" width="800px" cellspacing="1" cellpadding="10">
+    <tbody>
+    <tr>
+    <td align="left">
+      <div>
+	<main>
+	  {{ .Content }}
+	</main>
+      </div>
+    </td>
+    </tr>
+    </tbody>
+  </table>
+</div>
+{{ partial "footer.html" . }}
+
+
+  
