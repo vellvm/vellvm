@@ -28,7 +28,7 @@ Open Scope nat.
 Unset Elimination Schemes.
 Inductive dtyp : Set :=
 | DTYPE_I (sz:positive)
-| DTYPE_IPTR
+| DTYPE_Iptr
 | DTYPE_Pointer
 | DTYPE_Void
 | DTYPE_FP (fp:floating_point_variant)
@@ -58,7 +58,7 @@ Lemma dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
             let lsteq_dec := list_eq_dec f in
             match t1, t2 with
             | DTYPE_I n, DTYPE_I m => _
-            | DTYPE_IPTR , DTYPE_IPTR => _
+            | DTYPE_Iptr , DTYPE_Iptr => _
             | DTYPE_Pointer, DTYPE_Pointer => _
             | DTYPE_Void, DTYPE_Void => _
             | DTYPE_FP f1, DTYPE_FP f2 => _
@@ -125,14 +125,14 @@ Proof using.
 Qed.
 
 Definition vector_dtyp dt :=
-  (exists n, dt = DTYPE_I n) \/ dt = DTYPE_IPTR \/ dt = DTYPE_Pointer \/ (exists fp, dt = DTYPE_FP fp).
+  (exists n, dt = DTYPE_I n) \/ dt = DTYPE_Iptr \/ dt = DTYPE_Pointer \/ (exists fp, dt = DTYPE_FP fp).
 
 
 
 Section DtypInd.
   Variable P : dtyp -> Prop.
   Hypothesis IH_I             : forall a, P (DTYPE_I a).
-  Hypothesis IH_IPTR          : P (DTYPE_IPTR).
+  Hypothesis IH_Iptr          : P (DTYPE_Iptr).
   Hypothesis IH_Pointer       : P DTYPE_Pointer.
   Hypothesis IH_Void          : P DTYPE_Void.
   Hypothesis IH_Float         : forall f, P (DTYPE_FP f).
@@ -168,7 +168,7 @@ End DtypInd.
 Section DtypRec.
   Variable P : dtyp -> Set.
   Hypothesis IH_I             : forall a, P (DTYPE_I a).
-  Hypothesis IH_IPTR          : P (DTYPE_IPTR).
+  Hypothesis IH_Iptr          : P (DTYPE_Iptr).
   Hypothesis IH_Pointer       : P DTYPE_Pointer.
   Hypothesis IH_Void          : P DTYPE_Void.
   Hypothesis IH_Float         : forall f, P (DTYPE_FP f).
@@ -214,7 +214,7 @@ Section WF_dtyp.
 
   Inductive well_formed_dtyp : dtyp -> Prop :=
   | Wf_I : forall sz, well_formed_dtyp (DTYPE_I sz)
-  | Wf_IPTR : well_formed_dtyp DTYPE_IPTR
+  | Wf_Iptr : well_formed_dtyp DTYPE_Iptr
   | Wf_Pointer : well_formed_dtyp DTYPE_Pointer
   | Wf_Void : well_formed_dtyp DTYPE_Void
   | Wf_Float : forall f, well_formed_dtyp (DTYPE_FP f)
@@ -266,7 +266,7 @@ Qed.
 Fixpoint dtyp_measure (t : dtyp) : nat :=
   match t with
   | DTYPE_I sz => 1
-  | DTYPE_IPTR => 1
+  | DTYPE_Iptr => 1
   | DTYPE_Pointer => 1
   | DTYPE_Void => 1
   | DTYPE_FP _ => 1
@@ -299,7 +299,7 @@ Qed.
 Fixpoint NO_VOID (dt : dtyp) : Prop
   := match dt with
      | DTYPE_I _
-     | DTYPE_IPTR
+     | DTYPE_Iptr
      | DTYPE_Pointer
      | DTYPE_FP _
      | DTYPE_Label

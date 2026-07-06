@@ -83,7 +83,7 @@ Definition from_Z_bits {sz : positive} : Z -> EOU (@bit_int sz) :=
 
     mrepr := @from_Z_bits sz;
 
-    mdtyp_of_int := DTYPE_IPTR
+    mdtyp_of_int := DTYPE_Iptr
   }.
 
 #[local]Instance IP64Bit : IPtr :=

@@ -79,7 +79,7 @@ let dvalue_eq_assertion name ty (expected : DV.dvalue) (got : unit -> DV.dvalue)
   | _ ->
      begin match ty with
      | DTYPE_I _ 
-     | DTYPE_IPTR
+     | DTYPE_Iptr
      | DTYPE_Pointer ->
         (* integral comparison *)
         let v = Assertion.ocaml_of_EOU @@ Compare.eval_icmp Interpreter.params false Eq expected result in

@@ -42,7 +42,7 @@ let rec pp_dvalue : Format.formatter -> DV.dvalue -> unit =
     | DVALUE_I (sz, x) ->
         fprintf ppf "DVALUE_I%d(%d)"
           (Camlcoq.P.to_int sz) (Camlcoq.Z.to_int (Integers.unsigned sz x))
-    | DVALUE_IPTR x ->
+    | DVALUE_Iptr x ->
         fprintf ppf "DVALUE_IPTR(%d)"
           (Camlcoq.Z.to_int (iptr.to_Z x))
     | DVALUE_Double x ->

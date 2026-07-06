@@ -1166,7 +1166,7 @@ non_metadata_type:
 
 non_function_type:
   | n=I                                               { TYPE_I n              }
-  | KW_IPTR                                           { TYPE_IPTR             }
+  | KW_IPTR                                           { TYPE_Iptr             }
   | KW_PTR                                            { TYPE_Pointer (None)   }
   | KW_HALF                                           { TYPE_FP FP_half       }
   | KW_FLOAT                                          { TYPE_FP FP_float      }

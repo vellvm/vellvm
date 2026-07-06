@@ -170,7 +170,7 @@ Section Denotation.
         match top with
         | None                => raise ("denote_exp given untyped EXP_Integer")
         | Some (DTYPE_I bits) => lift (coerce_integer_to_int (Some bits) (denote_int_syntax x))
-        | Some DTYPE_IPTR     => lift (coerce_integer_to_int None (denote_int_syntax x))
+        | Some DTYPE_Iptr     => lift (coerce_integer_to_int None (denote_int_syntax x))
         | Some typ            => raise ("bad type for constant int: " ++ show typ)
         end
 
@@ -586,7 +586,7 @@ Section Denotation.
         args <- load DTYPE_Pointer ptr_to_args;;
         retv <- load argty args;;
         ix <- lift (from_Z 1);;
-        args' <- lift (eval_gep argty args [DVALUE_IPTR ix]);;
+        args' <- lift (eval_gep argty args [DVALUE_Iptr ix]);;
         store DTYPE_Pointer ptr_to_args args';;
         match pt with
         | IVoid _ => ret tt

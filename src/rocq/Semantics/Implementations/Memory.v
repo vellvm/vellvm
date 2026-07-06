@@ -45,7 +45,7 @@ Section MemoryModel.
   Definition get_consecutive_ptrs (ptr : addr) (size : N) : EOU (list addr) :=
     ixs <- intptr_seq 0 size;;
     map_monad
-      (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
+      (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_Iptr ix])
       ixs.
 
   (** Reading dvalues *)
@@ -170,7 +170,7 @@ Section MemoryModel.
         memcpy src dst (Z.to_N (unsigned size)) (equ volatile VellvmIntegers.one)
     | DVALUE_Addr dst ::
         DVALUE_Addr src ::
-        DVALUE_IPTR size ::
+        DVALUE_Iptr size ::
         DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
         memcpy src dst (Z.to_N (to_Z size)) (equ volatile VellvmIntegers.one)
     | _ => merr "Unsupported arguments to memcpy."
@@ -197,7 +197,7 @@ Section MemoryModel.
     match args with
     | [DVALUE_I bitwidth sz] =>
         malloc_bytes (generate_num_poison_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8)) align
-    | [DVALUE_IPTR sz] =>
+    | [DVALUE_Iptr sz] =>
         malloc_bytes (generate_num_poison_bytes (Z.to_N (to_unsigned sz)) (DTYPE_I 8)) align
     | _ => merr "Malloc: invalid arguments."
     end.

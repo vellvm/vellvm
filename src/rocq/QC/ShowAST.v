@@ -158,7 +158,7 @@ Section ShowInstances.
   Fixpoint dshow_typ (t : typ) : DString  :=
     match t with
     | TYPE_I sz                 => sd "i" @@ sd (show sz)
-    | TYPE_IPTR                 => sd "iptr"
+    | TYPE_Iptr                 => sd "iptr"
     | TYPE_Pointer (Some t)     => dshow_typ t @@ sd "*"
     | TYPE_Pointer None         => sd "ptr"
     | TYPE_Void                 => sd "void"
@@ -205,7 +205,7 @@ Section ShowInstances.
   Definition show_dtyp (t : dtyp) : string
     := match t with
        | DTYPE_I sz                 => "i" ++ (show sz)
-       | DTYPE_IPTR                 => "iptr"
+       | DTYPE_Iptr                 => "iptr"
        | DTYPE_Pointer              => "Pointer"
        | DTYPE_Void                 => "Void"
        | DTYPE_FP fp                => (show fp)

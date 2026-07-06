@@ -154,7 +154,7 @@ Section MemoryByte.
     match dv with
        | DVALUE_I sz x =>
            ret (extract_byte_vint x idx)
-       | DVALUE_IPTR x =>
+       | DVALUE_Iptr x =>
            ret (extract_byte_Z (to_Z x) idx)
        | DVALUE_Addr addr =>
            (* Note: this throws away provenance *)
@@ -261,10 +261,10 @@ Section MemoryByte.
             (map_monad (m := EOUP) (memory_byte_value) dbs)
             (fun v => ret (DVALUE_I sz (concat_bytes_Z_vint v)))
 
-      | DTYPE_IPTR =>
+      | DTYPE_Iptr =>
           absorb_pois dt
             (map_monad memory_byte_value dbs)
-            (fun zs => DVALUE_IPTR <$> from_Z (concat_bytes_Z zs))
+            (fun zs => DVALUE_Iptr <$> from_Z (concat_bytes_Z zs))
 
       (* TODO: not sure if this should be wildcard provenance.
            TODO: not sure if this should truncate iptr value... *)
