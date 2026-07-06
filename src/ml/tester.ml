@@ -94,6 +94,16 @@ let eval_SuccessTest (name : string) result (fun_str:string) () :
   | _ ->
      Result.make_singleton SuccessNOk name (RAW_STR (Success fun_str))
 
+(* Dual of [eval_SuccessTest]: the test passes iff running the call fails. *)
+let eval_FAILSTest (name : string) result (fun_str:string) () :
+    result_sum =
+  try
+    let _ = result () in
+    Result.make_singleton SuccessNOk name (RAW_STR (Success fun_str))
+  with
+  | _ ->
+     Result.make_singleton SuccessOk name (RAW_STR (Success fun_str))
+
 (* This function takes in a name, a got and expected function, and function
    call name. It will lift the result into the test result class *)
 let eval_POISONTest (name : string) (got : unit -> DV.dvalue)
@@ -191,6 +201,17 @@ let make_test name ll_ast t : string * (unit -> result_sum) =
       let str = Printf.sprintf "Succeeds: %s" fun_str in
       ( str
       , eval_SuccessTest name result fun_str)
+
+  | Assertion.FAILSTest (entry, args) ->
+      let fun_str =
+        let args_str : doc = args_str args in
+        Printf.sprintf "%s(%s)" (string_of_function_id entry) args_str
+      in
+      let t_void = Assertion.typ_to_dtyp (LLVMAst.TYPE_Void) in
+      let result = run_to_value t_void entry args ll_ast in
+      let str = Printf.sprintf "Fails: %s" fun_str in
+      ( str
+      , eval_FAILSTest name result fun_str)
 
   | Assertion.POISONTest (dtyp, entry, args) ->
       let expected =

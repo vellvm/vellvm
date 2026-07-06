@@ -300,7 +300,7 @@ Section withParams.
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
         (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog)))
-    in interp_mcfg t [] (Build_stack_frame [] None None None,[]) initial_state.
+    in interp_mcfg t [] (Build_stack_frame [] None None,[]) initial_state.
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts

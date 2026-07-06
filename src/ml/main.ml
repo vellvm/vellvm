@@ -111,6 +111,27 @@ let make_test_h run name ll_ast t : (string * assertion) option =
       in
       let t_void = Assertion.typ_to_dtyp (LLVMAst.TYPE_Void) in
       Some (str, (fun () -> ignore (run_to_value t_void entry args ll_ast ())))
+  | Assertion.FAILSTest (entry, args) ->
+      let str =
+        let args_str : doc =
+          pp_print_list
+            ~pp_sep:(fun f () -> pp_print_string f ", ")
+            Interpreter.pp_dvalue str_formatter args ;
+          flush_str_formatter ()
+        in
+        Printf.sprintf "FAILS %s(%s)" (string_of_function_id entry) args_str
+      in
+      let t_void = Assertion.typ_to_dtyp (LLVMAst.TYPE_Void) in
+      Some
+        ( str
+        , fun () ->
+            match run t_void entry args ll_ast with
+            | Error _ -> ()
+            | exception _ -> ()
+            | Ok dv ->
+                failwith
+                  (Printf.sprintf "expected failure, but got %s"
+                     (string_of_dvalue dv) ) )
   | Assertion.POISONTest (dtyp, entry, args) ->
      if !poison_test_flag
      then

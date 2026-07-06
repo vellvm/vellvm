@@ -83,14 +83,10 @@ Section withParams.
     | StackPush (args : list (raw_id * dvalue))
                       : StackE unit                   (* Pushes a fresh environment during a call *)
     | StackPop        : StackE unit                   (* Pops it back during a ret *)
-    | StackSetHandler : option block_id -> StackE unit (* Insert / remove landingpad for exception *)
-    | StackHandler    : StackE (option block_id)      (* Get exception handler for current frame *)
     | StackRaise      : exc -> StackE unit             (* Place exception onto the stack, does not pop *)
-    | StackGetExc     : StackE (option exc).          (* Fetches the currently raised exception if there is one *)
+    | StackGetExc     : StackE (option exc).          (* Fetches and clears the currently raised exception if there is one *)
   Definition stack_push        {E} `{StackE -< E} args : itree E _ := trigger (StackPush args).
   Definition stack_pop         {E} `{StackE -< E}      : itree E _ := trigger StackPop.
-  Definition stack_set_handler {E} `{StackE -< E} ob   : itree E _ := trigger (StackSetHandler ob).
-  Definition stack_handler     {E} `{StackE -< E}      : itree E _ := trigger StackHandler.
   Definition stack_raise       {E} `{StackE -< E} e    : itree E _ := trigger (StackRaise e).
   Definition stack_get_exc     {E} `{StackE -< E}      : itree E _ := trigger StackGetExc.
 

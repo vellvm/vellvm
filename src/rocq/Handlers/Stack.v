@@ -28,7 +28,6 @@ Section StackMap.
 
   Record stack_frame :=
     { stack_vars : FMapAList.alist raw_id dvalue;
-      stack_handler : option block_id;
       stack_exc : option dvalue;
       stack_loc : option string;
     }.
@@ -54,7 +53,7 @@ Section StackMap.
       match e with
       | StackPush args =>
           let init := List.fold_right (fun '(x,dv) => Maps.add x dv) Maps.empty args in
-          let frame := Build_stack_frame init None None (Some (printer_object.(printer_get_loc) tt)) in
+          let frame := Build_stack_frame init None (Some (printer_object.(printer_get_loc) tt)) in
           ret (local_stack_object.(local_stack_push) frame);;
           Ret ((frame, env::stk), tt)
       | StackPop =>
@@ -64,28 +63,19 @@ Section StackMap.
               ret (local_stack_object.(local_stack_pop) tt);;
               Ret ((env',stk'), tt)
           end
-      | StackSetHandler handler =>
-          let new_frame := Build_stack_frame env.(stack_vars) handler env.(stack_exc) env.(stack_loc) in
-          Ret ((new_frame, stk), tt)
-      | StackHandler =>
-          match env with
-          | Build_stack_frame stack_vars stack_handler stack_exc stack_loc =>
-              Ret ((env, stk), stack_handler)
-          end
       | StackRaise x =>
-          let new_frame := Build_stack_frame env.(stack_vars) env.(stack_handler) (Some x) env.(stack_loc) in
+          let new_frame := Build_stack_frame env.(stack_vars) (Some x) env.(stack_loc) in
           Ret ((new_frame, stk), tt)
       | StackGetExc =>
-          match env with
-          | Build_stack_frame stack_vars stack_handler stack_exc stack_loc =>
-              Ret ((env, stk), stack_exc)
-          end
+          (* Consuming read: clear the slot so a landingpad reached without a
+             fresh [StackRaise] errors out instead of seeing a stale payload. *)
+          let new_frame := Build_stack_frame env.(stack_vars) None env.(stack_loc) in
+          Ret ((new_frame, stk), env.(stack_exc))
       end.
 
   Definition upd_local_sf (env : stack_frame) (l : local_env) : stack_frame :=
     {|
       stack_vars := l ;
-      stack_handler := env.(stack_handler) ;
       stack_exc := env.(stack_exc) ;
       stack_loc := env.(stack_loc)
     |}.

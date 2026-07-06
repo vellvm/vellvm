@@ -484,7 +484,8 @@ Section Denotation.
 
   (* An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
-    (i: (instr_id * instr dtyp * list (metadata dtyp))) (varargs : option addr) : CFGtop unit :=
+    (i: (instr_id * instr dtyp * list (metadata dtyp)))
+    (varargs : option addr) : CFGtop unit :=
     
     let '(i, md) := i in
     (* The following two lines set up file location information. *)
@@ -604,9 +605,11 @@ Section Denotation.
 
     (* Currently unhandled itree instructions *)
     (* Landingpad: bind the in-flight exception payload (parked in this frame by
-       the [invoke] that diverted here) to the result. For the Rust panic subset
-       the clauses are irrelevant: [cleanup] and a catch-all [catch ptr null]
-       behave identically, both just delivering the payload. *)
+       the [invoke] that diverted here) to the result, consuming it — a
+       landingpad reached without a fresh raise is an error, not a stale read.
+       For the Rust panic subset the clauses are irrelevant: [cleanup] and a
+       catch-all [catch ptr null] behave identically, both just delivering the
+       payload. *)
     | (IId id, INSTR_LandingPad _ _ _) =>
         oe <- stack_get_exc ;;
         match oe with

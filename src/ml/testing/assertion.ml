@@ -73,6 +73,7 @@ type test =
   (* expected dvalue, dynamic type, entry, arguments *)
   | EQTest of DV.dvalue * DynamicTypes.dtyp * function_id * DV.dvalue list
   | SuccessTest of function_id * DV.dvalue list
+  | FAILSTest of function_id * DV.dvalue list
   (* dynamic type, entry, arguments *)
   | POISONTest of DynamicTypes.dtyp * function_id * DV.dvalue list
   (* Find a better name for this *)
@@ -216,6 +217,7 @@ let rec parse_assertion (filename : string) (line : string) : test list =
       [ parse_poison_assertion line
       ; parse_eq_assertion line
       ; parse_succeeds_assertion line
+      ; parse_fails_assertion line
       ; parse_srctgt_assertion filename line ]
     in
     List.flatten assertions
@@ -287,6 +289,18 @@ and parse_succeeds_assertion (line : string) : test list =
     let fn, args = instr_to_call_data r in
     [SuccessTest (fn, args)]
 
+and parse_fails_assertion (line : string) : test list =
+  (* ws* "ASSERT" ws+ "FAILS" ws* ':' ws*  (anything+ as r) *)
+  let regex = "^[ \t]*;[ \t]*ASSERT[ \t]+FAILS[ \t]*:[ \t]*\\(.*\\)" in
+  if not (Str.string_match (Str.regexp regex) line 0) then []
+  else
+    let rhs = Str.matched_group 1 line in
+    let r =
+      try Llvm_lexer.parse_test_call (Lexing.from_string rhs)
+      with _ -> failwith (Printf.sprintf "Ill-formed ASSERT FAILS: %s" rhs)
+    in
+    let fn, args = instr_to_call_data r in
+    [FAILSTest (fn, args)]
 
 and parse_srctgt_assertion (filename : string) (line : string) : test list =
   (* ws* ; ws* "ASSERT" ws+ "SRCTGT" ws+ (some optional number) *)
