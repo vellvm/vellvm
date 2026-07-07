@@ -20,6 +20,7 @@ You should be able to host a local version of the web site (useful for testing) 
    - `structure.md` - overview of the Rocq development
    - `research.md` - pointers to papers and history
    - `faq.md` - commonly asked questions
+   - `news` - transient news announcements
 
 - `docs/static/*`: folders for images, logos, static `css` code, etc.
 
@@ -27,6 +28,19 @@ You should be able to host a local version of the web site (useful for testing) 
 
 - `docs/layouts/single.html`: HTML template for the other pages
 
+## Adding "news"
+
+- Add an appropriately named `.md` file to the `content/news` directory.
+- Put (at a minimum) a title and date field in the header of the file.
+
+For example, the `release-2026-07-07.md` file has this header:
+
+```
+---
+title: "Vellvm 3.0 Released!"
+date: 2026-07-07
+---
+```
 
 ## Changing the style:
 
