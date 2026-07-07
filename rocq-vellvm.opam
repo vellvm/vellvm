@@ -18,7 +18,7 @@ license: "MIT"
 
 build: [make "-C" "src" "all" "-j%{jobs}%"]
 install: [make "-C" "src" "install"]
-
+    
 depends: [
   "ocaml" {>= "4.14.0"}
   "dune" {>= "3.14.0"}

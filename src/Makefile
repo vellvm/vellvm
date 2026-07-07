@@ -78,7 +78,7 @@ vellvm: $(VELLVM_EXE)
 	cp $(VELLVM_EXE) vellvm
 	chmod u+w vellvm
 
-######## testing the Vellvm interperter
+######## testing the Vellvm interpreter
 
 .PHONY: test
 test: vellvm
