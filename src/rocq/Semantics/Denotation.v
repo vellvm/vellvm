@@ -799,7 +799,7 @@ Section Denotation.
              end
          end) t.
 
-  (* The denotation of an itree function is a coq function that takes a list of
+  (* The denotation of an itree function is a rocq function that takes a list of
      dvalues and returns the appropriate semantics: a function either returns
      normally with a [dvalue] or unwinds with an exception [exc]. *)
   Definition function_denotation : Type :=

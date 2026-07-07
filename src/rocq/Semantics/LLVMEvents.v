@@ -112,7 +112,7 @@ Section withParams.
 
   (* ExternalCallE values are the "observable" events by which one should compare the 
        equivalence of two LLVM IR programs.  These should never be interpreted away
-       by the Coq semantics. However, for practicality, we _do_ interpet some calls that
+       by the rocq semantics. However, for practicality, we _do_ interpet some calls that
        generate outputs to [stdout] (SAZ: and eventuall[stderr]).  The stream of bytes
        visible in [IO_stdout] events is the data printed to [stdout].
 

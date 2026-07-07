@@ -1,11 +1,8 @@
 (**
     These "Repr" instances for Vellvm should serialize Vellvm ASTs
-    into a Coq string which represents the AST, allowing ASTs to be
-    serialized and read back into Coq later.
+    into a Rocq string which represents the AST, allowing ASTs to be
+    serialized and read back into Rocq later.
 
-    One potential use for this is for test case generation with
-    QuickChick. It may be worthwhile to serialize a counterexample
-    into a format that it can be imported into Coq for debugging.
 *)
 
 From Vellvm Require Import LLVMAst ShowAST Utilities DynamicTypes.
@@ -19,7 +16,7 @@ From Stdlib Require Import
 
 Set Warnings "-extraction-opaque-accessed,-extraction".
 
-(* Class for the Coq representation of a structure. *)
+(* Class for the Rocq representation of a structure. *)
 Class Repr A : Type :=
   {
     repr : A -> string

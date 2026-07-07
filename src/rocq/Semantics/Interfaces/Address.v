@@ -20,7 +20,7 @@ Class Address {P : Provenance} :=
     addr : Set;
     null : addr;
 
-    (* Coq's logical equality on the pointer data type *)
+    (* Rocq's logical equality on the pointer data type *)
     eq_dec_addr : forall (a b : addr), {a = b} + {a <> b};
     (* different_addrs : forall (a : addr), exists (b : addr), a <> b; *)
 

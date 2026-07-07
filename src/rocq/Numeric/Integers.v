@@ -95,7 +95,7 @@ Qed.
 
 (** * Representation of machine integers *)
 
-(** A machine integer (type [int]) is represented as a Coq arbitrary-precision
+(** A machine integer (type [int]) is represented as a Rocq arbitrary-precision
   integer (type [Z]) plus a proof that it is in the range 0 (included) to
   [modulus] (excluded). *)
 
@@ -197,7 +197,7 @@ Proof.
       lia.
 Qed.
 
-(** The [unsigned] and [signed] functions return the Coq integer corresponding
+(** The [unsigned] and [signed] functions return the Rocq integer corresponding
   to the given machine integer, interpreted as unsigned or signed
   respectively. *)
 
@@ -207,7 +207,7 @@ Definition signed (n: bit_int) : Z :=
   let x := unsigned n in
   if zlt x half_modulus then x else x - modulus.
 
-(** Conversely, [repr] takes a Coq integer and returns the corresponding
+(** Conversely, [repr] takes a Rocq integer and returns the corresponding
   machine integer.  The argument is treated modulo [modulus]. *)
 
 Definition repr (x: Z) : bit_int :=
@@ -348,7 +348,7 @@ Definition Zshiftin (b: bool) (x: Z) : Z :=
 >>
   We encode this [nat]-like recursion using the [Z.iter] iteration
   function, in order to make the [Zzero_ext] and [Zsign_ext]
-  functions efficiently executable within Coq.
+  functions efficiently executable within Rocq.
 *)
 
 Definition Zzero_ext (n: Z) (x: Z) : Z :=

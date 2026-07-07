@@ -1,5 +1,5 @@
 This folder contains the files related to the internal syntax of VIR programs.
-Its content gets re-exported in `/coq` as a module `Syntax` for easier external use.
+Its content gets re-exported in `/rocq` as a module `Syntax` for easier external use.
 
 - `LLVMAst.v`       the VIR front AST. Our parser of native llvm syntax returns an element of this AST
 - `CFG.v`           the VIR internal AST as used for the semantics.

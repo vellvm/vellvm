@@ -56,7 +56,7 @@ Import EqvNotation.
           [defined_intrinsics]
 
         - _if_ it is impure, i.e. depends on the memory, as is the case for
-          [memcpy], its implementation must be provided in [src/coq/Handlers/Memory.v]
+          [memcpy], its implementation must be provided in [src/rocq/Semantics/Implementations/Memory.v]
           and an equality test on its name added to [handle_intrinsic].
  *)
 

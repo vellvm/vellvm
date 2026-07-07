@@ -42,7 +42,7 @@ Section withParams.
   (* SAZ: commenting this out for now, since it's trickier than we wanted *)
   (* Command-line arguments----------------------------------------------------------------------- *)
 
-  (* To support command-line arguments we convert a list of Coq strings into a preamble of
+  (* To support command-line arguments we convert a list of Rocq strings into a preamble of
      global declarations with a form illustrated in tests/io/args_vellvm.ll.  Given N strings
      s_arg0, s_arg1, ..., s_argN.
 

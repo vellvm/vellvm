@@ -21,10 +21,10 @@ Open Scope list_scope.
     All changes to this file must naturally be mirrored in:
     - the parser:
        "/src/ml/libvellvm/llvm_parser.mly"
-    - the Coq Representation
-       "/src/coq/QC/ReprAST.v"
+    - the Rocq Representation
+       "/src/rocq/Syntax/ReprAST.v"
     - the prettyprinter
-       "/src/coq/QC/ShowAST.v"
+       "/src/rocq/Syntax/ShowAST.v"
 
  *)
 
