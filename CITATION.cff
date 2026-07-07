@@ -32,7 +32,7 @@ authors:
     orcid: 'https://orcid.org/0009-0006-4486-7222'
 abstract: >-
   Vellvm is an ongoing project aiming at the formal
-  verification in the Coq proof assistant of a compilation
+  verification in the Rocq proof assistant of a compilation
   infrastructure inspired by the LLVM compiler.
 
 
@@ -40,11 +40,10 @@ abstract: >-
   Coq formalization of the semantics of (a subset of) the
   LLVM IR that is intended for formal verification of
   LLVM-based software. It is being developed at the
-  University of Pennsylvania as part of the DeepSpec
-  project.
+  University of Pennsylvania and at Inria.
 keywords:
   - LLVM
-  - Coq
+  - Rocq
   - Compilers
   - Semantics
 license: MIT

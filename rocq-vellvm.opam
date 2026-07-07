@@ -4,7 +4,7 @@ version: "dev"
 maintainer: "stevez@cis.upenn.edu"
 synopsis: "Rocq library implementing (executable) semantics for LLVM IR"
 
-homepage: "https://github.com/vellvm/vellvm"
+homepage: "https://vellvm.github.io/vellvm/"
 dev-repo: "git+https://github.com/vellvm/vellvm.git"
 bug-reports: "https://github.com/vellvm/vellvm/issues"
 authors: [
@@ -25,19 +25,16 @@ depends: [
   "cppo"
   "dune" {>= "3.14.0"}
   "menhir"
-  "qcheck"
   "rocq-core" {>= "9.0.0" & < "9.2~"}
   "rocq-stdlib" {>= "9.0.0" & < "9.2~"}
   "coq-ext-lib" {>= "0.13.0" & < "0.14~"}
   "coq-paco"  {>= "4.2.3" & < "4.3~"}
   "coq-flocq" {>= "4.2.0"}
-  ( "coq-hierarchy-builder" { >= "1.9.1" } & "coq-elpi" { < "3.0.0" } | "coq-hierarchy-builder" { > "1.9.1" } )
-  "coq-simple-io"
   "coq-itree" {>= "5.2.0" & < "5.3~"}
 ]
 
 tags: [
-  "date:2023-03-04"
+  "date:2026-07-06"
 
   "category:Computer Science/Programming Languages/Formal Definitions and Theory"
   "category:Computer Science/Semantics and Compilation/Compilation"
