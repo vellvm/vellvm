@@ -6,7 +6,7 @@
 
 From Vellvm Require Import
   LLVMAst
-  Utilities
+  Utils
   AstLib
   Syntax.CFG
   DynamicTypes

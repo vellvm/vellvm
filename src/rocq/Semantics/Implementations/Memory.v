@@ -2,7 +2,7 @@ Require Import Morphisms.
 
 From Vellvm Require Import
   Numeric
-  Utilities
+  Utils
   Syntax.
 
 From ITree Require Import

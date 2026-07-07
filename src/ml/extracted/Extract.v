@@ -12,7 +12,7 @@ From ITree Require Import
      Eq.Eqit.
 
 From Vellvm Require Import
-     Utilities
+     Utils
      Syntax
      Semantics
      Handlers.

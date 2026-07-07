@@ -1,5 +1,5 @@
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax.
 
 From Vellvm Require Import

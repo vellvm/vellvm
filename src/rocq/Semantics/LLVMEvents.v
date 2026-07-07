@@ -16,7 +16,7 @@ From ITree Require Import
      Events.Exception.
 
 From Vellvm Require Import
-     Utilities
+     Utils
      Syntax
      Params
      DynamicValues

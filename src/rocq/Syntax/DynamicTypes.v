@@ -7,7 +7,7 @@ From Stdlib Require Import
      Program.Wf.
 
 From Vellvm Require Import
-     Utilities
+     Utils
      Syntax.LLVMAst.
 Open Scope nat.
 

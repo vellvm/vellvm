@@ -7,7 +7,7 @@ From ExtLib Require Import
   Data.String.
 
 From Vellvm Require Import
-  Utilities
+  Utils
   Utils.Assoc
   Syntax
   Params

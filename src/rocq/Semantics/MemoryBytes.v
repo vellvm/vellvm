@@ -1,5 +1,5 @@
 From Vellvm Require Import
-  Utilities
+  Utils
   Numeric
   Syntax
   Params

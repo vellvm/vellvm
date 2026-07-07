@@ -8,7 +8,7 @@ From ITree Require Import
 
 From Vellvm Require Import Handlers.
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax
   Params
   Interfaces.Memory

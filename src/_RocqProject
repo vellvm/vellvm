@@ -22,7 +22,7 @@
 ./rocq/Utils/RelationsUtil.v
 ./rocq/Utils/IntMaps.v
 ./rocq/Utils/Assoc.v
-./rocq/Utilities.v
+./rocq/Utils.v
 
 ./rocq/Syntax/LLVMAst.v
 ./rocq/Syntax/AstLib.v
@@ -68,13 +68,13 @@
 ./rocq/Semantics/Interfaces/Memory.v
 ./rocq/Semantics/Implementations/Memory.v
 
-./rocq/Handlers/Global.v
-./rocq/Handlers/Local.v
-./rocq/Handlers/Stack.v
-./rocq/Handlers/Intrinsics.v
-./rocq/Handlers/Memory.v
-./rocq/Handlers/Draw.v
-./rocq/Handlers.v
+./rocq/Semantics/Handlers/Global.v
+./rocq/Semantics/Handlers/Local.v
+./rocq/Semantics/Handlers/Stack.v
+./rocq/Semantics/Handlers/Intrinsics.v
+./rocq/Semantics/Handlers/Memory.v
+./rocq/Semantics/Handlers/Draw.v
+./rocq/Semantics/Handlers.v
 ./rocq/Semantics/InterpretationStack.v
 ./rocq/Semantics/Libraries.v
 ./rocq/Semantics/Printfdefn.v

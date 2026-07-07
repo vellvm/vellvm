@@ -6,7 +6,7 @@ From ITree Require Import
   Events.State.
 
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax
   Params
   Semantics.LLVMEvents

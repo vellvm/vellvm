@@ -6,7 +6,7 @@ From ExtLib Require Import
 From ITree Require Import ITree.
 
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax
   Params
   Semantics.DynamicValues

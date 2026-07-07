@@ -4,7 +4,7 @@ From Stdlib Require Import
      String
      ZArith.
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax.
 
 Import ListNotations.
