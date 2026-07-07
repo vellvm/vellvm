@@ -46,6 +46,8 @@ src/coq/.lia.cache
 *a.out
 lib/.FLOCQQUICKCHICK_STAMP
 lib/.QUICKCHICK_STAMP
+docs/public
+docs/.hugo_build.lock
 
 CoqMakefile
 .CoqMakefile.d

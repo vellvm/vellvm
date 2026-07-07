@@ -2,8 +2,6 @@
 title: "Vellvm"
 ---
 
-[Vellvm](https://github.com/vellvm/vellvm) is a specification of [LLVM IR](https://www.llvm.org/) implemented in [Rocq](https://rocq-prover.org). The Vellvm framework provides an abstract semantics aimed at _formal verification_ of LLVM-based software and optimizations passes, along with an _executable interpreter_ suitable for running LLVM IR code for testing purposes. The interpreter is proved to be a valid refinement of the spec.
-
 # Getting Started
 
 1. Follow the installation instructions in the [`README`](https://github.com/vellvm/vellvm/blob/dev/README.md) to get the `vellvm` executable and add it to your `$PATH`.
