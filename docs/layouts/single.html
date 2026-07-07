@@ -1,7 +1,7 @@
 {{ partial "header.html" . }}
 
 <div class="banner" align="left" margin-bottom="0pt">
-  <img src="../logo/vellvm-logo-scroll2.png" width="200px" alt="Vellvm" style="float:left; padding-right:10px"/>
+  <img src={{ relURL "logo/vellvm-logo-scroll2.png" }} width="200px" alt="Vellvm" style="float:left; padding-right:10px"/>
   {{if not .IsHome }}
 <center>
   <h1>{{ .Title | markdownify }}</h1>
