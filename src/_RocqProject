@@ -77,6 +77,5 @@
 ./rocq/Semantics/Handlers.v
 ./rocq/Semantics/InterpretationStack.v
 ./rocq/Semantics/Libraries.v
-./rocq/Semantics/Printfdefn.v
 ./rocq/Semantics/TopLevel.v
 ./rocq/Semantics.v
