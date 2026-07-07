@@ -23,6 +23,13 @@
 
 - Various bug fixes around the semantics of floats.
 
+- New stepping debugger available with the interpreter.
+
+- Meta-theory is temporarily unplugged, and intended to be progressively
+  reincorporated in upcoming releases.
+
+- New website! Sources in the `docs` directory, hosted at [vellvm.github.io/vellvm](https://vellvm.github.io/vellvm/).
+
 ### Minor Changes
 
 - Cutting off some dependencies: QuickChick, QuickCheck, Ceres.

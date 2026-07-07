@@ -16,13 +16,11 @@ authors: [
 ]
 license: "MIT"
 
-
 build: [make "-C" "src" "all" "-j%{jobs}%"]
 install: [make "-C" "src" "install"]
 
 depends: [
   "ocaml" {>= "4.14.0"}
-  "cppo"
   "dune" {>= "3.14.0"}
   "menhir"
   "rocq-core" {>= "9.0.0" & < "9.2~"}
@@ -30,7 +28,7 @@ depends: [
   "coq-ext-lib" {>= "0.13.0" & < "0.14~"}
   "coq-paco"  {>= "4.2.3" & < "4.3~"}
   "coq-flocq" {>= "4.2.0"}
-  "coq-itree" {>= "5.2.0" & < "5.3~"}
+  "coq-itree" {>= "5.2.1" & < "5.3~"}
 ]
 
 tags: [
