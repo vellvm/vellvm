@@ -16,13 +16,13 @@ From Vellvm Require Import
   Implementations.ParamsV
   Denotation.
 
+From Vellvm Require Import
+  Theory.rutt_cutoff.
+
 Section Refinement.
   
   Definition PInf : Params := @ParamsV IPZ IPZTheory.
   Definition PFin : Params := @ParamsV IP64Bit IP64BitTheory.
-  (* Notation fin x := (@x PFin) *)
-
-  Set Printing Implicit.
 
   Definition I2F_Iptr : @iptr IPZ -> @iptr IP64Bit -> Prop :=
     fun z i => z = unsigned i.
@@ -105,16 +105,17 @@ Section Refinement.
    .
      
 
-  Lemma denote_ok : Prop.
-    refine (forall i oa oa', rutt I2FE _ _ (@denote_instr PInf i oa) (@denote_instr PFin i (_ oa))).
-    3: refine (fmap _).
-    3: refine (fun '(a,p) => _).
-   3:{ cbn.
+  (* Lemma denote_ok : Prop. *)
+  (*   refine (forall i oa oa', rutt I2FE _ _ (@denote_instr PInf i oa) (@denote_instr PFin i (_ oa))). *)
+  (*   3: refine (fmap _). *)
+  (*   3: refine (fun '(a,p) => _). *)
+  (*  3:{ cbn. *)
     
   
-  Lemma handle_memory_refine : Prop.
-    refine (forall {X} (e : @MemoryE PInf X), _ : Prop).
-      @handle_memoryM PIn
+  (* Lemma handle_memory_refine : Prop. *)
+  (*   refine (forall {X} (e : @MemoryE PInf X), _ : Prop). *)
+  (*     @handle_memoryM PIn *)
 
 
  
+End Refinement.

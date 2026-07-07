@@ -17,8 +17,7 @@
 
 From Vellvm Require Import Tactics.
 From Stdlib Require Import
-  Program
-.
+  Program Setoid Morphisms.
 
 From ExtLib Require Import
      Structures.Monad.
@@ -273,8 +272,6 @@ Proof.
     punfold H.
   - dependent induction INR; eauto with itree.
 Qed.
-
-From Stdlib Require Import Setoid Morphisms.
 
 Lemma rutt_eutt {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} :
   Proper (eutt eq ==> eutt eq ==> iff) (@rutt E1 E2 R1 R2 Rcutr Rcutl REv RAns RR).
