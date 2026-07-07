@@ -8,7 +8,7 @@ From ITree Require Import
 
 From Vellvm Require Import Handlers.
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax
   Params
   Interfaces.Memory
@@ -19,7 +19,6 @@ From Vellvm Require Import
   Semantics.IntrinsicsDefinitions
   Semantics.InterpretationStack
   Semantics.VellvmIntegers
-  Semantics.Printfdefn
   Semantics.Libraries.
 (* end hide *)
 
@@ -61,17 +60,18 @@ Section withParams.
   (** * Linking
 
     We first need to link external definitions. Currently, these definitions are
-   only functions we hard-code into the environment for their usefulness--
-   most notably `printf`. Linking occurs at the `toplevel_definition` level. *)
+    only functions we hard-code into the environment for their usefulness.
+    Linking occurs at the `toplevel_definition` level.
+
+    NOTE: If we do not need to reason about these functions, linking can be done
+    directly against the source .ll file via the `-L` flag of the interpreter.
+   *)
 
   Definition ll_toplevel_entity := (toplevel_entity typ (block typ * list (block typ))).
 
   Definition ll_toplevel_entities := toplevel_entities typ (block typ * list (block typ)).
 
-  (* TODO: link against printf's llvm ir code directly. If impossible, revive
-     the printf_definition hack
-   *)
-  Definition PREDEFINED_FUNCTIONS : ll_toplevel_entities := List.concat [printf_definition].
+  Definition PREDEFINED_FUNCTIONS : ll_toplevel_entities := List.concat [].
 
   (* Example ensure_functions_defined : negb (Nat.eqb (List.length PREDEFINED_FUNCTIONS) O) .  *)
   (* Proof. reflexivity. Qed.   *)

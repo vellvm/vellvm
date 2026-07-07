@@ -5,7 +5,7 @@
 
 *)
 
-From Vellvm Require Import LLVMAst ShowAST Utilities DynamicTypes.
+From Vellvm Require Import LLVMAst ShowAST Utils DynamicTypes.
 
 From Stdlib Require Import List.
 

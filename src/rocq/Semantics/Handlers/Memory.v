@@ -17,7 +17,7 @@ From ITree Require Import
 Import Basics.Basics.Monads.
 
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax
   Params
   Semantics.LLVMEvents

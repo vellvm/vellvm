@@ -1,5 +1,5 @@
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax.
 
 Definition pad_amount (alignment : N) (offset : N) :=

@@ -2,7 +2,7 @@
 From Stdlib Require Import OrderedType OrderedTypeEx.
 
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax.
 (* end hide *)
 

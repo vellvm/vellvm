@@ -13,7 +13,7 @@ From ITree Require Import
   InterpFacts.
 
 From Vellvm Require Import
-  Utilities
+  Utils
   LLVMEvents.
 
 Import ITree.Basics.Basics.Monads.

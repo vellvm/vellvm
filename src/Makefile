@@ -40,7 +40,7 @@ KNOWNTARGETS := RocqMakefile invoke-rocqmakefile rocq extracted $(EXTRACTDIR)/ST
 KNOWNFILES := Makefile _RocqProject
 
 RocqMakefile: _RocqProject
-	$(ROCQMAKEFILE) -docroot ../doc -f _RocqProject -o RocqMakefile
+	$(ROCQMAKEFILE) -docroot ../docs -f _RocqProject -o RocqMakefile
 
 ######## defer to RocqMakefile for anything not in $(KNOWNTARGETS)
 .PHONY: invoke-rocqmakefile
@@ -78,7 +78,7 @@ vellvm: $(VELLVM_EXE)
 	cp $(VELLVM_EXE) vellvm
 	chmod u+w vellvm
 
-######## testing the Vellvm interperter
+######## testing the Vellvm interpreter
 
 .PHONY: test
 test: vellvm
@@ -91,13 +91,11 @@ check: test
 
 .PHONY: clean
 clean: extractedclean clean-rocqmakefile
-	rm -rf doc/html doc/*.glob
 	rm -rf output
 	find rocq  \( -name "*.vo" -o -name "*.vos" -o -name "*.vok" -o -name "*.glob" -o -name ".*.aux" \)  -delete
 	rm -f vellvm
 	rm -f frontend
 	rm -f aggregate
-	rm -f doc/rocq2html.ml doc/rocq2html doc/*.cm? doc/*.o
 	dune clean
 
 .PHONY: extractedclean
@@ -106,14 +104,6 @@ extractedclean:
 
 clean-rocqmakefile: RocqMakefile
 	$(MAKE) -j --no-print-directory -f RocqMakefile clean
-
-######## documentation
-
-.PHONY: documentation
-documentation: $(VFILES)
-	mkdir -p doc/html
-	rm -f doc/html/*.html
-	rocq2html -d doc/html $^
 
 ####### Facilities for building only the frontend - parser and pretty printer
 

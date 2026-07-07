@@ -11,7 +11,7 @@ From ITree Require Import
 
 From Vellvm Require Import
   Numeric
-  Utilities
+  Utils
   Syntax
   Params
   EOU

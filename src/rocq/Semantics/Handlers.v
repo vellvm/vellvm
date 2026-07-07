@@ -1,3 +1,3 @@
-From Vellvm.Handlers Require Export
+From Vellvm.Semantics.Handlers Require Export
   Local Global Stack Memory Draw Intrinsics.
                      

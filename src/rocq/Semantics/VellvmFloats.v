@@ -3,7 +3,7 @@ From Stdlib Require Import
   PArith.BinPosDef.
 
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax
   Numeric.
 

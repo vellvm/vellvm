@@ -2,7 +2,7 @@
 From Stdlib Require Import
      Number Decimal Hexadecimal.
 From Vellvm Require Import
-     Utilities.
+     Utils.
 
 Import ListNotations.
 Open Scope string_scope.

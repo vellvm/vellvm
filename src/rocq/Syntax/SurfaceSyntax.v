@@ -1,6 +1,6 @@
 (* begin hide *)
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax.LLVMAst
   Syntax.CFG
   Syntax.DynamicTypes.

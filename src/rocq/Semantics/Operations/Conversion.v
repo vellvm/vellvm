@@ -1,7 +1,7 @@
 From Vellvm Require Import
      Syntax
      Numeric
-     Utilities
+     Utils
      Params
      EOU
      DynamicValues
