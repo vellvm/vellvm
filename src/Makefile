@@ -40,7 +40,7 @@ KNOWNTARGETS := RocqMakefile invoke-rocqmakefile rocq extracted $(EXTRACTDIR)/ST
 KNOWNFILES := Makefile _RocqProject
 
 RocqMakefile: _RocqProject
-	$(ROCQMAKEFILE) -docroot ../docs -f _RocqProject -o RocqMakefile
+	$(ROCQMAKEFILE) -f _RocqProject -o RocqMakefile
 
 ######## defer to RocqMakefile for anything not in $(KNOWNTARGETS)
 .PHONY: invoke-rocqmakefile
