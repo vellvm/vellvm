@@ -16,8 +16,7 @@ From Vellvm Require Import
   Operations
   Semantics.IntrinsicsDefinitions
   Semantics.InterpretationStack
-  Semantics.VellvmIntegers
-  QC.ShowAST.
+  Semantics.VellvmIntegers.
 (* end hide *)
 
 Section withParams.

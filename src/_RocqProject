@@ -34,6 +34,9 @@
 ./rocq/Syntax/SurfaceSyntax.v
 ./rocq/Syntax.v
 ./rocq/Syntax/ScopeTheory.v
+./rocq/Utils/DList.v
+./rocq/Syntax/ShowAST.v
+./rocq/Syntax/ReprAST.v
 
 ./rocq/Semantics/EOU.v
 ./rocq/Semantics/VellvmIntegers.v
@@ -43,8 +46,6 @@
 ./rocq/Semantics/Interfaces/Sizeof.v
 ./rocq/Semantics/Interfaces/Address.v
 ./rocq/Semantics/Interfaces/Params.v
-./rocq/QC/DList.v
-./rocq/QC/ShowAST.v
 ./rocq/Semantics/DynamicValues.v
 ./rocq/Semantics/LLVMEvents.v
 
@@ -76,9 +77,6 @@
 ./rocq/Handlers.v
 ./rocq/Semantics/InterpretationStack.v
 ./rocq/Semantics/Libraries.v
+./rocq/Semantics/Printfdefn.v
 ./rocq/Semantics/TopLevel.v
 ./rocq/Semantics.v
-
-./rocq/QC/ReprAST.v
-
-./rocq/Semantics/Printfdefn.v

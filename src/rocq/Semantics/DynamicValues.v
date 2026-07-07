@@ -27,8 +27,7 @@ From Vellvm Require Import
   Syntax
   Params
   EOU
-  VellvmIntegers
-  QC.ShowAST.
+  VellvmIntegers.
 
 Import DList.
 

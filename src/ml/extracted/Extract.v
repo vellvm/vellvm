@@ -24,8 +24,8 @@ Import ListNotations.
 From Vellvm Require
      Semantics.TopLevel
      Utils.ParserHelper
-     QC.ShowAST
-     QC.ReprAST.
+     Syntax.ShowAST
+     Syntax.ReprAST.
 
 Set Extraction AccessOpaque.
 

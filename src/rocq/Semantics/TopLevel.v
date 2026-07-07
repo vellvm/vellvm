@@ -20,8 +20,7 @@ From Vellvm Require Import
   Semantics.InterpretationStack
   Semantics.VellvmIntegers
   Semantics.Printfdefn
-  Semantics.Libraries
-  QC.ShowAST.
+  Semantics.Libraries.
 (* end hide *)
 
 (** * Top Level

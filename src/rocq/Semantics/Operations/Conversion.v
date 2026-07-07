@@ -1,7 +1,7 @@
 From Vellvm Require Import
+     Syntax
      Numeric
      Utilities
-     Syntax
      Params
      EOU
      DynamicValues
@@ -28,7 +28,7 @@ Section Convert.
    *)
   Program Definition float_to_double (f : ll_float) : ll_double :=
     Bconv _ _ _ _ eq_refl eq_refl (fun _ => default_nan_64) BinarySingleNaN.mode_NE f.
-  
+
   (** ** Typed conversion
         Performs a dynamic conversion of a [dvalue] of type [t1] to one of type [t2].
         For instance, convert an integer over 8 bits to one over 1 bit by truncation.
