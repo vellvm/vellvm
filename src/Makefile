@@ -93,6 +93,7 @@ check: test
 clean: extractedclean clean-rocqmakefile
 	rm -rf doc/html doc/*.glob
 	rm -rf output
+	find rocq  \( -name "*.vo" -o -name "*.vos" -o -name "*.vok" -o -name "*.glob" -o -name ".*.aux" \)  -delete
 	rm -f vellvm
 	rm -f frontend
 	rm -f aggregate
@@ -155,6 +156,8 @@ print-includes:
 .PHONY: c2rust-tests
 c2rust-tests:
 	make -C ../tractor/c2rust-tests
+
+
 
 ######## Any other target gets "forwarded" to the generated RocqMakefile
 %: invoke-rocqmakefile
