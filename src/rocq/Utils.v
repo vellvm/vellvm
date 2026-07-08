@@ -20,7 +20,8 @@ From Vellvm Require Export
   Utils.StringUtil
   Utils.BoolUtil
   Utils.OptionUtil
-  Utils.RelationsUtil.
+  Utils.RelationsUtil
+  Utils.ITreeUtil.
 
 #[export] Set Implicit Arguments.
 (* #[export] Set Contextual Implicit. *)

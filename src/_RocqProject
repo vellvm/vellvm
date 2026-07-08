@@ -22,6 +22,7 @@
 ./rocq/Utils/RelationsUtil.v
 ./rocq/Utils/IntMaps.v
 ./rocq/Utils/Assoc.v
+./rocq/Utils/ITreeUtil.v
 ./rocq/Utils.v
 
 ./rocq/Syntax/LLVMAst.v

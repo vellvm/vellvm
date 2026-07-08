@@ -15,7 +15,7 @@
 
 (** [rutt] is used to define the [trace_refine] relation in [ITree.ITrace.ITraceDefinition]. *)
 
-From Vellvm Require Import Tactics.
+From Vellvm Require Import Tactics Utils.ITreeUtil.
 From Stdlib Require Import
   Program Setoid Morphisms.
 
@@ -28,6 +28,7 @@ From ITree Require Import
      ITree
      Eq
      Basics
+     HeterogeneousRelations
 .
 
 From Paco Require Import paco.
@@ -290,4 +291,17 @@ Proof.
   intros.
   left; pfold; constructor; auto.
 Qed. 
+
+Lemma ruttc_trigger_cast {E1 E2 : Type -> Type} {Rcutr Rcutl} {REv : prerel E1 E2} {RAns A1 A2 RR} (e1 : E1 void) (e2 : E2 void):
+  REv void void e1 e2 ->
+  @ruttc E1 E2 A1 A2 Rcutr Rcutl REv RAns RR
+    (trigger_cast' e1) (trigger_cast' e2).
+Proof.
+  intros.
+  pfold.
+  unfold trigger_cast.
+  red; cbn.
+  constructor; auto; intros [].
+Qed. 
+
 

@@ -1,4 +1,6 @@
-From ITree Require Import ITree Eq Rutt HeterogeneousRelations.
+From Equations Require Import Equations.
+
+From ITree Require Import ITree Eq HeterogeneousRelations.
 
 From Vellvm Require Import
   Utils
@@ -97,111 +99,74 @@ Section Refinement.
       the [unit] messages of the abortive events) are shared between the
       two instantiations, hence required equal. *)
 
-  Variant I2FE_Call : prerel (@CallE PInf) (@CallE PFin) :=
-    | I2FE_call τ f1 args1 f2 args2 :
-      I2F_dvalue f1 f2 ->
-      Forall2 I2F_dvalue args1 args2 ->
-      I2FE_Call (@Call PInf τ f1 args1) (@Call PFin τ f2 args2)
-  .
+  Equations I2FE_Call : prerel (@CallE PInf) (@CallE PFin) :=
+    I2FE_Call (@Call PInf τ1 f1 args1) (@Call PFin τ2 f2 args2) :=
+      τ1 = τ2 /\ I2F_dvalue f1 f2 /\ Forall2 I2F_dvalue args1 args2.
 
-  Variant I2FE_ExternalCall : prerel (@ExternalCallE PInf) (@ExternalCallE PFin) :=
-    | I2FE_extcall τ f1 args1 f2 args2 :
-      I2F_dvalue f1 f2 ->
-      Forall2 I2F_dvalue args1 args2 ->
-      I2FE_ExternalCall (@ExternalCall PInf τ f1 args1) (@ExternalCall PFin τ f2 args2)
-    | I2FE_stdout str :
-      I2FE_ExternalCall (@IO_stdout PInf str) (@IO_stdout PFin str)
-    | I2FE_stderr str :
-      I2FE_ExternalCall (@IO_stderr PInf str) (@IO_stderr PFin str)
-  .
+  Equations I2FE_ExternalCall : prerel (@ExternalCallE PInf) (@ExternalCallE PFin) :=
+    I2FE_ExternalCall (@ExternalCall PInf τ1 f1 args1) (@ExternalCall PFin τ2 f2 args2) :=
+      τ1 = τ2 /\ I2F_dvalue f1 f2 /\ Forall2 I2F_dvalue args1 args2;
+    I2FE_ExternalCall (@IO_stdout PInf str1) (@IO_stdout PFin str2) := str1 = str2;
+    I2FE_ExternalCall (@IO_stderr PInf str1) (@IO_stderr PFin str2) := str1 = str2;
+    I2FE_ExternalCall _ _ := False.
 
-  Variant I2FE_Intrinsic : prerel (@IntrinsicE PInf) (@IntrinsicE PFin) :=
-    | I2FE_intrinsic τ f args1 va1 args2 va2 :
-      Forall2 I2F_dvalue args1 args2 ->
-      option_rel I2F_Addr va1 va2 ->
-      I2FE_Intrinsic (@Intrinsic PInf τ f args1 va1) (@Intrinsic PFin τ f args2 va2)
-  .
+  Equations I2FE_Intrinsic : prerel (@IntrinsicE PInf) (@IntrinsicE PFin) :=
+    I2FE_Intrinsic (@Intrinsic PInf τ1 f1 args1 va1) (@Intrinsic PFin τ2 f2 args2 va2) :=
+      τ1 = τ2 /\ f1 = f2 /\ Forall2 I2F_dvalue args1 args2 /\ option_rel I2F_Addr va1 va2.
 
-  Variant I2FE_Global : prerel (@GlobalE PInf) (@GlobalE PFin) :=
-    | I2FE_gwrite x dv1 dv2 :
-      I2F_dvalue dv1 dv2 ->
-      I2FE_Global (@GlobalWrite PInf x dv1) (@GlobalWrite PFin x dv2)
-    | I2FE_gread x :
-      I2FE_Global (@GlobalRead PInf x) (@GlobalRead PFin x)
-  .
+  Equations I2FE_Global : prerel (@GlobalE PInf) (@GlobalE PFin) :=
+    I2FE_Global (@GlobalWrite PInf x1 dv1) (@GlobalWrite PFin x2 dv2) :=
+      x1 = x2 /\ I2F_dvalue dv1 dv2;
+    I2FE_Global (@GlobalRead PInf x1) (@GlobalRead PFin x2) := x1 = x2;
+    I2FE_Global _ _ := False.
 
-  Variant I2FE_Local : prerel (@LocalE PInf) (@LocalE PFin) :=
-    | I2FE_lwrite x dv1 dv2 :
-      I2F_dvalue dv1 dv2 ->
-      I2FE_Local (@LocalWrite PInf x dv1) (@LocalWrite PFin x dv2)
-    | I2FE_lread x :
-      I2FE_Local (@LocalRead PInf x) (@LocalRead PFin x)
-  .
+  Equations I2FE_Local : prerel (@LocalE PInf) (@LocalE PFin) :=
+    I2FE_Local (@LocalWrite PInf x1 dv1) (@LocalWrite PFin x2 dv2) :=
+      x1 = x2 /\ I2F_dvalue dv1 dv2;
+    I2FE_Local (@LocalRead PInf x1) (@LocalRead PFin x2) := x1 = x2;
+    I2FE_Local _ _ := False.
 
-  Variant I2FE_Stack : prerel (@StackE PInf) (@StackE PFin) :=
-    | I2FE_spush args1 args2 :
-      Forall2 (prod_rel Logic.eq I2F_dvalue) args1 args2 ->
-      I2FE_Stack (@StackPush PInf args1) (@StackPush PFin args2)
-    | I2FE_spop :
-      I2FE_Stack (@StackPop PInf) (@StackPop PFin)
-    | I2FE_sraise exc1 exc2 :
-      I2F_dvalue exc1 exc2 ->
-      I2FE_Stack (@StackRaise PInf exc1) (@StackRaise PFin exc2)
-    | I2FE_sgetexc :
-      I2FE_Stack (@StackGetExc PInf) (@StackGetExc PFin)
-  .
+  Equations I2FE_Stack : prerel (@StackE PInf) (@StackE PFin) :=
+    I2FE_Stack (@StackPush PInf args1) (@StackPush PFin args2) :=
+      Forall2 (prod_rel Logic.eq I2F_dvalue) args1 args2;
+    I2FE_Stack (@StackPop PInf) (@StackPop PFin) := True;
+    I2FE_Stack (@StackRaise PInf exc1) (@StackRaise PFin exc2) := I2F_dvalue exc1 exc2;
+    I2FE_Stack (@StackGetExc PInf) (@StackGetExc PFin) := True;
+    I2FE_Stack _ _ := False.
 
-  Variant I2FE_Memory : prerel (@MemoryE PInf) (@MemoryE PFin) :=
-    | I2FE_mempush :
-      I2FE_Memory (@MemPush PInf) (@MemPush PFin)
-    | I2FE_mempop :
-      I2FE_Memory (@MemPop PInf) (@MemPop PFin)
-    | I2FE_alloca τ n align :
-      I2FE_Memory (@Alloca PInf τ n align) (@Alloca PFin τ n align)
-    | I2FE_load τ a1 a2 :
-      I2F_dvalue a1 a2 ->
-      I2FE_Memory (@Load PInf τ a1) (@Load PFin τ a2)
-    | I2FE_store τ a1 v1 a2 v2 :
-      I2F_dvalue a1 a2 ->
-      I2F_dvalue v1 v2 ->
-      I2FE_Memory (@Store PInf τ a1 v1) (@Store PFin τ a2 v2)
-  .
+  Equations I2FE_Memory : prerel (@MemoryE PInf) (@MemoryE PFin) :=
+    I2FE_Memory (@MemPush PInf) (@MemPush PFin) := True;
+    I2FE_Memory (@MemPop PInf) (@MemPop PFin) := True;
+    I2FE_Memory (@Alloca PInf τ1 n1 align1) (@Alloca PFin τ2 n2 align2) :=
+      τ1 = τ2 /\ n1 = n2 /\ align1 = align2;
+    I2FE_Memory (@Load PInf τ1 a1) (@Load PFin τ2 a2) :=
+      τ1 = τ2 /\ I2F_dvalue a1 a2;
+    I2FE_Memory (@Store PInf τ1 a1 v1) (@Store PFin τ2 a2 v2) :=
+      τ1 = τ2 /\ I2F_dvalue a1 a2 /\ I2F_dvalue v1 v2;
+    I2FE_Memory _ _ := False.
 
-  Variant I2FE_Draw : prerel (@DrawE PInf) (@DrawE PFin) :=
-    | I2FE_draw τ :
-      I2FE_Draw (@Draw PInf τ) (@Draw PFin τ)
-  .
+  Equations I2FE_Draw : prerel (@DrawE PInf) (@DrawE PFin) :=
+    I2FE_Draw (@Draw PInf τ1) (@Draw PFin τ2) := τ1 = τ2.
 
-  Variant I2FE_Exc : prerel (@LLVMExcE PInf) (@LLVMExcE PFin) :=
-    | I2FE_exc exc1 exc2 :
-      I2F_dvalue exc1 exc2 ->
-      I2FE_Exc (@LLVMExc PInf exc1) (@LLVMExc PFin exc2)
-  .
+  Equations I2FE_Exc : prerel (@LLVMExcE PInf) (@LLVMExcE PFin) :=
+    I2FE_Exc (@LLVMExc PInf exc1) (@LLVMExc PFin exc2) := I2F_dvalue exc1 exc2.
 
   (* [OOME], [UBE], [DebugE], [FailureE] do not mention values: they are
      shared by both instantiations. Note that pairs of related [OOME]
      (resp. [UBE]) events can alternatively be discharged by the cut
      mechanism of [ruttc] --- see [I2F_refine] below. *)
 
-  Variant I2FE_OOM : prerel OOME OOME :=
-    | I2FE_throwOOM u1 u2 :
-      I2FE_OOM (ThrowOOM u1) (ThrowOOM u2)
-  .
+  Equations I2FE_OOM : prerel OOME OOME :=
+    I2FE_OOM (ThrowOOM u1) (ThrowOOM u2) := True.
 
-  Variant I2FE_UB : prerel UBE UBE :=
-    | I2FE_throwUB u1 u2 :
-      I2FE_UB (ThrowUB u1) (ThrowUB u2)
-  .
+  Equations I2FE_UB : prerel UBE UBE :=
+    I2FE_UB (ThrowUB u1) (ThrowUB u2) := True.
 
-  Variant I2FE_Debug : prerel DebugE DebugE :=
-    | I2FE_debug u1 u2 :
-      I2FE_Debug (Debug u1) (Debug u2)
-  .
+  Equations I2FE_Debug : prerel DebugE DebugE :=
+    I2FE_Debug (Debug u1) (Debug u2) := True.
 
-  Variant I2FE_Failure : prerel FailureE FailureE :=
-    | I2FE_throw u1 u2 :
-      I2FE_Failure (Throw u1) (Throw u2)
-  .
+  Equations I2FE_Failure : prerel FailureE FailureE :=
+    I2FE_Failure (Throw u1) (Throw u2) := True.
 
   (** * Answer relations, one per event family
 
@@ -216,106 +181,66 @@ Section Refinement.
       answers, trivial on [unit], and vacuous on [void] (abortive events
       never answer). *)
 
-  Variant I2FA_Call : postrel (@CallE PInf) (@CallE PFin) :=
-    | I2FA_call τ1 f1 args1 τ2 f2 args2 r1 r2 :
-      I2F_exc_dvalue r1 r2 ->
-      I2FA_Call (@Call PInf τ1 f1 args1) r1 (@Call PFin τ2 f2 args2) r2
-  .
+  Equations I2FA_Call : postrel (@CallE PInf) (@CallE PFin) :=
+    I2FA_Call (@Call PInf τ1 f1 args1) r1 (@Call PFin τ2 f2 args2) r2 := I2F_exc_dvalue r1 r2.
 
-  Variant I2FA_ExternalCall : postrel (@ExternalCallE PInf) (@ExternalCallE PFin) :=
-    | I2FA_extcall τ1 f1 args1 τ2 f2 args2 dv1 dv2 :
-      I2F_dvalue dv1 dv2 ->
-      I2FA_ExternalCall (@ExternalCall PInf τ1 f1 args1) dv1 (@ExternalCall PFin τ2 f2 args2) dv2
-    | I2FA_stdout str1 str2 (a b : unit) :
-      I2FA_ExternalCall (@IO_stdout PInf str1) a (@IO_stdout PFin str2) b
-    | I2FA_stderr str1 str2 (a b : unit) :
-      I2FA_ExternalCall (@IO_stderr PInf str1) a (@IO_stderr PFin str2) b
-  .
+  Equations I2FA_ExternalCall : postrel (@ExternalCallE PInf) (@ExternalCallE PFin) :=
+    I2FA_ExternalCall (@ExternalCall PInf τ1 f1 args1) dv1 (@ExternalCall PFin τ2 f2 args2) dv2 := I2F_dvalue dv1 dv2;
+    I2FA_ExternalCall (@IO_stdout PInf str1) a (@IO_stdout PFin str2) b := True;
+    I2FA_ExternalCall (@IO_stderr PInf str1) a (@IO_stderr PFin str2) b := True;
+    I2FA_ExternalCall _ _ _ _ := False.
 
-  Variant I2FA_Intrinsic : postrel (@IntrinsicE PInf) (@IntrinsicE PFin) :=
-    | I2FA_intrinsic τ1 f1 args1 va1 τ2 f2 args2 va2 r1 r2 :
-      I2F_exc_dvalue r1 r2 ->
-      I2FA_Intrinsic (@Intrinsic PInf τ1 f1 args1 va1) r1 (@Intrinsic PFin τ2 f2 args2 va2) r2
-  .
+  Equations I2FA_Intrinsic : postrel (@IntrinsicE PInf) (@IntrinsicE PFin) :=
+    I2FA_Intrinsic (@Intrinsic PInf τ1 f1 args1 va1) r1 (@Intrinsic PFin τ2 f2 args2 va2) r2 := I2F_exc_dvalue r1 r2.
 
-  Variant I2FA_Global : postrel (@GlobalE PInf) (@GlobalE PFin) :=
-    | I2FA_gwrite x1 dv1 x2 dv2 (a b : unit) :
-      I2FA_Global (@GlobalWrite PInf x1 dv1) a (@GlobalWrite PFin x2 dv2) b
-    | I2FA_gread x1 x2 dv1 dv2 :
-      I2F_dvalue dv1 dv2 ->
-      I2FA_Global (@GlobalRead PInf x1) dv1 (@GlobalRead PFin x2) dv2
-  .
+  Equations I2FA_Global : postrel (@GlobalE PInf) (@GlobalE PFin) :=
+    I2FA_Global (@GlobalWrite PInf x1 dv1) a (@GlobalWrite PFin x2 dv2) b := True;
+    I2FA_Global (@GlobalRead PInf x1) dv1 (@GlobalRead PFin x2) dv2 := I2F_dvalue dv1 dv2 ;
+    I2FA_Global _ _ _ _ := False.
+  
+  Equations I2FA_Local : postrel (@LocalE PInf) (@LocalE PFin) :=
+    I2FA_Local (@LocalWrite PInf x1 dv1) a (@LocalWrite PFin x2 dv2) b := True;
+    I2FA_Local (@LocalRead PInf x1) dv1 (@LocalRead PFin x2) dv2 := I2F_dvalue dv1 dv2;
+    I2FA_Local _ _ _ _ := False.
 
-  Variant I2FA_Local : postrel (@LocalE PInf) (@LocalE PFin) :=
-    | I2FA_lwrite x1 dv1 x2 dv2 (a b : unit) :
-      I2FA_Local (@LocalWrite PInf x1 dv1) a (@LocalWrite PFin x2 dv2) b
-    | I2FA_lread x1 x2 dv1 dv2 :
-      I2F_dvalue dv1 dv2 ->
-      I2FA_Local (@LocalRead PInf x1) dv1 (@LocalRead PFin x2) dv2
-  .
+  Equations I2FA_Stack : postrel (@StackE PInf) (@StackE PFin) :=
+    I2FA_Stack (@StackPush PInf args1) a (@StackPush PFin args2) b := True;
+    I2FA_Stack (@StackPop PInf) a (@StackPop PFin) b := True;
+    I2FA_Stack (@StackRaise PInf exc1) a (@StackRaise PFin exc2) b := True;
+    I2FA_Stack (@StackGetExc PInf) oe1 (@StackGetExc PFin) oe2 := option_rel I2F_dvalue oe1 oe2;
+    I2FA_Stack _ _ _ _ := False.
 
-  Variant I2FA_Stack : postrel (@StackE PInf) (@StackE PFin) :=
-    | I2FA_spush args1 args2 (a b : unit) :
-      I2FA_Stack (@StackPush PInf args1) a (@StackPush PFin args2) b
-    | I2FA_spop (a b : unit) :
-      I2FA_Stack (@StackPop PInf) a (@StackPop PFin) b
-    | I2FA_sraise exc1 exc2 (a b : unit) :
-      I2FA_Stack (@StackRaise PInf exc1) a (@StackRaise PFin exc2) b
-    | I2FA_sgetexc oe1 oe2 :
-      option_rel I2F_dvalue oe1 oe2 ->
-      I2FA_Stack (@StackGetExc PInf) oe1 (@StackGetExc PFin) oe2
-  .
+  (* [Alloca] answers with the fresh address wrapped as a [dvalue]:
+     the two memories allocate at [I2F_Addr]-related addresses. *)
+  Equations I2FA_Memory : postrel (@MemoryE PInf) (@MemoryE PFin) :=
+    I2FA_Memory (@MemPush PInf) a (@MemPush PFin) b := True;
+    I2FA_Memory (@MemPop PInf) a (@MemPop PFin) b := True;
+    I2FA_Memory (@Alloca PInf τ1 n1 align1) dv1 (@Alloca PFin τ2 n2 align2) dv2 := I2F_dvalue dv1 dv2;
+    I2FA_Memory (@Load PInf τ1 a1) dv1 (@Load PFin τ2 a2) dv2 := I2F_dvalue dv1 dv2;
+    I2FA_Memory (@Store PInf τ1 a1 v1) a (@Store PFin τ2 a2 v2) b := True;
+    I2FA_Memory _ _ _ _ := False.
 
-  Variant I2FA_Memory : postrel (@MemoryE PInf) (@MemoryE PFin) :=
-    | I2FA_mempush (a b : unit) :
-      I2FA_Memory (@MemPush PInf) a (@MemPush PFin) b
-    | I2FA_mempop (a b : unit) :
-      I2FA_Memory (@MemPop PInf) a (@MemPop PFin) b
-    (* [Alloca] answers with the fresh address wrapped as a [dvalue]:
-       the two memories allocate at [I2F_Addr]-related addresses. *)
-    | I2FA_alloca τ1 n1 align1 τ2 n2 align2 dv1 dv2 :
-      I2F_dvalue dv1 dv2 ->
-      I2FA_Memory (@Alloca PInf τ1 n1 align1) dv1 (@Alloca PFin τ2 n2 align2) dv2
-    | I2FA_load τ1 a1 τ2 a2 dv1 dv2 :
-      I2F_dvalue dv1 dv2 ->
-      I2FA_Memory (@Load PInf τ1 a1) dv1 (@Load PFin τ2 a2) dv2
-    | I2FA_store τ1 a1 v1 τ2 a2 v2 (a b : unit) :
-      I2FA_Memory (@Store PInf τ1 a1 v1) a (@Store PFin τ2 a2 v2) b
-  .
-
-  Variant I2FA_Draw : postrel (@DrawE PInf) (@DrawE PFin) :=
-    | I2FA_draw τ1 τ2 dv1 dv2 :
-      I2F_dvalue dv1 dv2 ->
-      I2FA_Draw (@Draw PInf τ1) dv1 (@Draw PFin τ2) dv2
-  .
+  Equations I2FA_Draw : postrel (@DrawE PInf) (@DrawE PFin) :=
+    I2FA_Draw (@Draw PInf τ1) dv1 (@Draw PFin τ2) dv2 := I2F_dvalue dv1 dv2.
 
   (* The abortive events answer in [void]: their answer relations are
-     vacuous, and so are the associated continuation proof obligations. *)
+     vacuous ([False] bodies), and so are the associated continuation
+     proof obligations. *)
 
-  Variant I2FA_Exc : postrel (@LLVMExcE PInf) (@LLVMExcE PFin) :=
-    | I2FA_exc exc1 exc2 (a b : void) :
-      I2FA_Exc (@LLVMExc PInf exc1) a (@LLVMExc PFin exc2) b
-  .
+  Equations I2FA_Exc : postrel (@LLVMExcE PInf) (@LLVMExcE PFin) :=
+    I2FA_Exc (@LLVMExc PInf exc1) a (@LLVMExc PFin exc2) b := False.
 
-  Variant I2FA_OOM : postrel OOME OOME :=
-    | I2FA_throwOOM u1 u2 (a b : void) :
-      I2FA_OOM (ThrowOOM u1) a (ThrowOOM u2) b
-  .
+  Equations I2FA_OOM : postrel OOME OOME :=
+    I2FA_OOM (ThrowOOM u1) a (ThrowOOM u2) b := False.
 
-  Variant I2FA_UB : postrel UBE UBE :=
-    | I2FA_throwUB u1 u2 (a b : void) :
-      I2FA_UB (ThrowUB u1) a (ThrowUB u2) b
-  .
+  Equations I2FA_UB : postrel UBE UBE :=
+    I2FA_UB (ThrowUB u1) a (ThrowUB u2) b := False.
 
-  Variant I2FA_Debug : postrel DebugE DebugE :=
-    | I2FA_debug u1 u2 (a b : unit) :
-      I2FA_Debug (Debug u1) a (Debug u2) b
-  .
+  Equations I2FA_Debug : postrel DebugE DebugE :=
+    I2FA_Debug (Debug u1) a (Debug u2) b := True.
 
-  Variant I2FA_Failure : postrel FailureE FailureE :=
-    | I2FA_throw u1 u2 (a b : void) :
-      I2FA_Failure (Throw u1) a (Throw u2) b
-  .
+  Equations I2FA_Failure : postrel FailureE FailureE :=
+    I2FA_Failure (Throw u1) a (Throw u2) b := False.
 
   (** * Combined relations on [MCFGEtop] and [CFGEtop]
 
@@ -388,35 +313,39 @@ Section Refinement.
 (* Proof. *)
 (*   intros; apply ruttc_trigger; auto. *)
    
-  Hint Constructors I2FA_Local.
-Require Import Stdlib.Program.Equality.
-  Lemma denote_expr :
+  (* Hint Constructors I2FA_Local. *) (* I2FA_Local is now an Equations definition, no constructors *)
+
+  Tactic Notation "simp_id" := cbn; cbv[resum ReSum_id id_ Id_IFun].
+  Tactic Notation "simp_id" "in" ident(H) := cbn in H; cbv[resum ReSum_id id_ Id_IFun] in H.
+
+  Tactic Notation "simp!" :=
+    simp I2FE_Call I2FE_ExternalCall I2FE_Intrinsic I2FE_Global I2FE_Local I2FE_Stack I2FE_Memory I2FE_Draw
+         in *.
+
+  Ltac rew H :=
+    autorewrite with
+      I2FE_Call I2FE_ExternalCall I2FE_Intrinsic
+      I2FE_Global I2FE_Local
+      I2FE_Stack I2FE_Memory I2FE_Draw
+      I2FE_Failure I2FE_OOM I2FE_UB
+      (* I2FA_Call I2FA_AxternalCall I2FA_Intrinsic I2FA_Global I2FA_Local I2FA_Stack I2FA_Memory I2FA_Draw *)
+      in H.
+  
+  Lemma I2F_denote_expr :
     forall (e : exp dtyp) τ, I2F_refine (@denote_exp PInf τ e) (@denote_exp PFin τ e).
   Proof.
-    apply (@exp_ind dtyp (fun e => forall τ, I2F_refine (@denote_exp PInf τ e) (@denote_exp PFin τ e)) (fun _ => True)); auto.
+    apply (@exp_ind_full dtyp (fun e => forall τ, I2F_refine (@denote_exp PInf τ e) (@denote_exp PFin τ e)) (fun _ => True)); auto.
     - intros; cbn.
       destruct id; cbn.
-      + apply ruttc_trigger.
-        constructor.
-        cbn.
-        intros.
-        dependent induction H; subst; auto.
-
-      apply I2F_refine_MCFG_trigger.
-    intros e.
-    induction e with (Q := fun _ => True).
-
-  (* Lemma denote_ok : Prop. *)
-  (*   refine (forall i oa oa', rutt I2FE (@denote_instr PInf i oa) (@denote_instr PFin i (_ oa))). *)
-  (*   3: refine (fmap _). *)
-  (*   3: refine (fun '(a,p) => _). *)
-  (*  3:{ cbn. *)
-
-
-  (* Lemma handle_memory_refine : Prop. *)
-  (*   refine (forall {X} (e : @MemoryE PInf X), _ : Prop). *)
-  (*     @handle_memoryM PIn *)
-
+      + apply ruttc_trigger; easy.
+      + apply ruttc_trigger; easy.
+    - intros ? []; cbn.
+      2: apply ruttc_trigger_cast; easy.
+      destruct d.
+(* 14 goals, but only three distinct output.
+   Use some kind of view?
+ *)
+Admitted.      
 
 
 End Refinement.

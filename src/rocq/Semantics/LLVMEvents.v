@@ -147,7 +147,7 @@ Section withParams.
     | LLVMExc : exc -> LLVMExcE void.
 
   Definition raiseLLVM {E} {A} `{LLVMExcE -< E} (e : exc) : itree E A :=
-    v <- trigger (LLVMExc e);; match v: void with end.
+    trigger_cast (LLVMExc e).
 
   (* See src/ml/Extract.v for the special handling of these operation. *)
   (* This function can be replaced with print operations  during extraction
@@ -178,15 +178,15 @@ Section withParams.
   (** Since the output type of [ThrowUB] is [void], we can make it an action
     with any return type. *)
   Definition raiseUB {E : Type -> Type} `{UBE -< E} {X}
-    (e : string) : itree E X :=
-    v <- trigger (ThrowUB (print_msg e));; match v: void with end.
+    (msg : string) : itree E X :=
+    trigger_cast (ThrowUB (print_msg msg)).
 
   (* Failure. Carries a string for a message. *)
   Variant FailureE : Type -> Type :=
     | Throw : unit -> FailureE void.
 
   Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
-    v <- trigger (Throw (print_msg msg));; match v: void with end.
+    trigger_cast (Throw (print_msg msg)).
 
   (* Out of memory / abort. Carries a string for a message. *)
   Variant OOME : Type -> Type :=
@@ -195,8 +195,8 @@ Section withParams.
   (** Since the output type of [ThrowOOM] is [void], we can make it an action
     with any return type. *)
   Definition raiseOOM {E : Type -> Type} `{OOME -< E} {X}
-    (e : string) : itree E X :=
-    v <- trigger (ThrowOOM (print_msg e));; match v: void with end.
+    (msg : string) : itree E X :=
+    trigger_cast (ThrowOOM (print_msg msg)).
 
   (* Debug is identical to the "Trace" effect from the itrees library,
    but debug is probably a less confusing name for us. *)
