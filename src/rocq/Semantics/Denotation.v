@@ -129,19 +129,27 @@ Section Denotation.
     BinIntDef.Z.of_num_int x.
 
   Definition denote_float_syntax_as_float
-    (fpv : floating_point_variant) (f : float_syntax) : EOU dvalue :=
-    match fpv with
-    | FP_float =>
+    (t : dtyp) (f : float_syntax) : EOU dvalue :=
+    match t with
+    | DTYPE_FP FP_float =>
         match float32_of_float_syntax f with
         | None   => raise_error ("bad float literal: " ++ (show f))
         | Some f => ret (DVALUE_Float f)
         end
-    | FP_double =>
+    | DTYPE_FP FP_double =>
         match float_of_float_syntax f with
         | None   => raise_error ("bad double literal: " ++ (show f))
         | Some f => ret (DVALUE_Double f)
         end
-    | _ => raise_error "unsupported float type"
+    | DTYPE_FP _ => raise_error "unsupported float type"
+    | _ => raise_error "bad type for constant float"
+    end.
+
+  Definition denote_int_syntax_as_int (t : dtyp) (x : int_syntax) : EOU dvalue :=
+    match t with
+    | DTYPE_I bits => coerce_integer_to_int (Some bits) (denote_int_syntax x)
+    | DTYPE_Iptr   => coerce_integer_to_int None (denote_int_syntax x)
+    | typ          => raise_error ("bad type for constant int: " ++ show typ)
     end.
   
   Fixpoint freeze {E} `{DrawE -< E} (dv : dvalue) : itree E dvalue :=
@@ -171,17 +179,14 @@ Section Denotation.
                 
     | EXP_Integer x =>
         match top with
-        | None                => raise ("denote_exp given untyped EXP_Integer")
-        | Some (DTYPE_I bits) => lift (coerce_integer_to_int (Some bits) (denote_int_syntax x))
-        | Some DTYPE_Iptr     => lift (coerce_integer_to_int None (denote_int_syntax x))
-        | Some typ            => raise ("bad type for constant int: " ++ show typ)
+        | None   => raise ("denote_exp given untyped EXP_Integer")
+        | Some t => lift (denote_int_syntax_as_int t x)
         end
 
     | EXP_Float x =>
         match top with
-        | None                 => raise ("denote_exp given untyped EXP_Float")
-        | Some (DTYPE_FP fpv)  => lift (denote_float_syntax_as_float fpv x)
-        | _                    => raise ("bad type for constant float")
+        | None   => raise ("denote_exp given untyped EXP_Float")
+        | Some t => lift (denote_float_syntax_as_float t x)
         end
 
     | EXP_Bool b =>

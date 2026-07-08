@@ -304,4 +304,10 @@ Proof.
   constructor; auto; intros [].
 Qed. 
 
+Lemma ruttc_ret {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} (v1 : R1) (v2 : R2):
+  RR v1 v2 ->
+  @ruttc E1 E2 R1 R2 Rcutr Rcutl REv RAns RR (Ret v1) (Ret v2).
+Proof.
+  pfold; constructor; auto.
+Qed. 
 
