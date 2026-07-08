@@ -364,7 +364,7 @@ Section ExpInd.
   Hypothesis IH_METADATA_Debug : forall (s t:string), Q (METADATA_Debug s t).
   Hypothesis IH_METADATA_File_info : forall (f:file_info), Q (METADATA_File_info f).
   
-  Lemma exp_ind : forall (v:exp T), P v.
+  Lemma exp_ind_full : forall (v:exp T), P v.
 Proof.    
 refine(  
   fix F (e : exp T) : P e :=
@@ -538,7 +538,7 @@ Qed.
 
 Lemma exp_metadata_mut_ind : (forall (e:exp T), P e) /\ (forall (m:metadata T), Q m).
   split.
-  - apply exp_ind; auto.
+  - apply exp_ind_full; auto.
   - apply metadata_ind; auto.
 Qed.  
 

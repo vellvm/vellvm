@@ -36,7 +36,7 @@ Import Monads.
 Import MonadNotation.
 Local Open Scope monad_scope.
 
-Section RuttF.
+Section RuttcF.
 
   Context {E1 E2 : Type -> Type}.
   Context {R1 R2 : Type}.
@@ -53,53 +53,53 @@ Section RuttF.
   Arguments REv {A} {B}.
   Arguments RAns {A} {B}.
 
-  Inductive ruttF (sim : itree E1 R1 -> itree E2 R2 -> Prop) : itree' E1 R1 -> itree' E2 R2 -> Prop :=
+  Inductive ruttcF (sim : itree E1 R1 -> itree E2 R2 -> Prop) : itree' E1 R1 -> itree' E2 R2 -> Prop :=
   | EqRet : forall (r1 : R1) (r2 : R2),
       RR r1 r2 ->
-      ruttF sim (RetF r1) (RetF r2)
+      ruttcF sim (RetF r1) (RetF r2)
   | EqTau : forall (m1 : itree E1 R1) (m2 : itree E2 R2),
       sim m1 m2 ->
-      ruttF sim (TauF m1) (TauF m2)
+      ruttcF sim (TauF m1) (TauF m2)
   | EqVis : forall (A B : Type) (e1 : E1 A) (e2 : E2 B ) (k1 : A -> itree E1 R1) (k2 : B -> itree E2 R2),
       REv e1 e2 ->
       (forall (a : A) (b : B), RAns e1 a e2 b -> sim (k1 a) (k2 b)) ->
-      ruttF sim (VisF e1 k1) (VisF e2 k2)
+      ruttcF sim (VisF e1 k1) (VisF e2 k2)
   | EqTauL : forall (t1 : itree E1 R1) (ot2 : itree' E2 R2),
-      ruttF sim (observe t1) ot2 ->
-      ruttF sim (TauF t1) ot2
+      ruttcF sim (observe t1) ot2 ->
+      ruttcF sim (TauF t1) ot2
   | EqTauR : forall (ot1 : itree' E1 R1) (t2 : itree E2 R2),
-      ruttF sim ot1 (observe t2) ->
-      ruttF sim ot1 (TauF t2)
+      ruttcF sim ot1 (observe t2) ->
+      ruttcF sim ot1 (TauF t2)
   | EqCutL : forall (A : Type) (e : E1 A) k t,
       Rcutl e ->
-      ruttF sim (VisF e k) t
+      ruttcF sim (VisF e k) t
   | EqCutR : forall (B : Type) (e : E2 B) k t,
       Rcutr e ->
-      ruttF sim t (VisF e k).
-  Hint Constructors ruttF : itree.
+      ruttcF sim t (VisF e k).
+  Hint Constructors ruttcF : itree.
 
-  Definition rutt_ (sim : itree E1 R1 -> itree E2 R2 -> Prop)
+  Definition ruttc_ (sim : itree E1 R1 -> itree E2 R2 -> Prop)
              (t1 : itree E1 R1) (t2 : itree E2 R2) :=
-    ruttF sim (observe t1) (observe t2).
-  Hint Unfold rutt_ : itree.
+    ruttcF sim (observe t1) (observe t2).
+  Hint Unfold ruttc_ : itree.
 
-  Lemma rutt_monot : monotone2 rutt_.
+  Lemma ruttc_monot : monotone2 ruttc_.
   Proof.
     red. intros. red; induction IN; eauto with itree.
   Qed.
 
-  Definition rutt : itree E1 R1 -> itree E2 R2 -> Prop := paco2 rutt_ bot2.
-  Hint Unfold rutt : itree.
+  Definition ruttc : itree E1 R1 -> itree E2 R2 -> Prop := paco2 ruttc_ bot2.
+  Hint Unfold ruttc : itree.
 
-End RuttF.
-Hint Resolve rutt_monot : paco.
-Hint Constructors ruttF : itree.
+End RuttcF.
+Hint Resolve ruttc_monot : paco.
+Hint Constructors ruttcF : itree.
 
-Lemma rutt_inv_Tau_l :
+Lemma ruttc_inv_Tau_l :
 forall {E1 E2 : Type -> Type} {R1 R2 : Type} Rcutr Rcutl REv RAns {RR : R1 -> R2 -> Prop}
   (t1 : itree E1 R1) (t2 : itree E2 R2),
-  rutt Rcutl Rcutr REv RAns RR (Tau t1) t2 ->
-  rutt Rcutl Rcutr REv RAns RR t1 t2.
+  ruttc Rcutl Rcutr REv RAns RR (Tau t1) t2 ->
+  ruttc Rcutl Rcutr REv RAns RR t1 t2.
 Proof.
   intros * EQ.
   punfold EQ; red in EQ; cbn in EQ.
@@ -117,11 +117,11 @@ Proof.
     now constructor.
 Qed.
 
-Lemma rutt_inv_Tau_r :
+Lemma ruttc_inv_Tau_r :
 forall {E1 E2 : Type -> Type} {R1 R2 : Type} Rcutr Rcutl REv RAns {RR : R1 -> R2 -> Prop}
   (t1 : itree E1 R1) (t2 : itree E2 R2),
-  rutt Rcutl Rcutr REv RAns RR t1 (Tau t2) ->
-  rutt Rcutl Rcutr REv RAns RR t1 t2.
+  ruttc Rcutl Rcutr REv RAns RR t1 (Tau t2) ->
+  ruttc Rcutl Rcutr REv RAns RR t1 t2.
 Proof.
   intros * EQ.
   punfold EQ; red in EQ; cbn in EQ.
@@ -139,20 +139,20 @@ Proof.
     now constructor.
 Qed.
 
-Lemma rutt_inv_Tau :
+Lemma ruttc_inv_Tau :
 forall {E1 E2 : Type -> Type} {R1 R2 : Type} Rcutr Rcutl REv RAns {RR : R1 -> R2 -> Prop}
   (t1 : itree E1 R1) (t2 : itree E2 R2),
-  rutt Rcutl Rcutr REv RAns RR (Tau t1) (Tau t2) ->
-  rutt Rcutl Rcutr REv RAns RR t1 t2.
+  ruttc Rcutl Rcutr REv RAns RR (Tau t1) (Tau t2) ->
+  ruttc Rcutl Rcutr REv RAns RR t1 t2.
 Proof.
   intros.
-  now apply rutt_inv_Tau_l, rutt_inv_Tau_r.
+  now apply ruttc_inv_Tau_l, ruttc_inv_Tau_r.
 Qed.  
 
-Lemma rutt_eutt_l {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} t1 t2 t3
+Lemma ruttc_eutt_l {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} t1 t2 t3
       (INL: eutt eq t1 t2)
-      (INR: @rutt E1 E2 R1 R2 Rcutl Rcutr REv RAns RR t2 t3):
-  rutt Rcutl Rcutr REv RAns RR t1 t3.
+      (INR: @ruttc E1 E2 R1 R2 Rcutl Rcutr REv RAns RR t2 t3):
+  ruttc Rcutl Rcutr REv RAns RR t1 t3.
 Proof.
   revert_until RR. pcofix CIH. intros.
   pstep. punfold INL. punfold INR. red in INL, INR |- *. genobs_clear t1 ot1.
@@ -193,7 +193,7 @@ Proof.
            eapply EqCutL; auto.
       * clear CHECK0.
         apply IHREL; auto.
-        pose proof rutt_inv_Tau_l (RR := RR) Rcutr Rcutl REv RAns t2 m2.
+        pose proof ruttc_inv_Tau_l (RR := RR) Rcutr Rcutl REv RAns t2 m2.
         forward H0.
         now pfold.
         punfold H0.
@@ -211,10 +211,10 @@ Proof.
   - dependent induction INL; eauto with itree.
 Qed.
 
-Lemma rutt_eutt_r {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} t1 t2 t3
+Lemma ruttc_eutt_r {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} t1 t2 t3
       (INR: eutt eq t2 t3)
-      (INL: @rutt E1 E2 R1 R2 Rcutl Rcutr REv RAns RR t1 t2):
-  rutt Rcutl Rcutr REv RAns RR t1 t3.
+      (INL: @ruttc E1 E2 R1 R2 Rcutl Rcutr REv RAns RR t1 t2):
+  ruttc Rcutl Rcutr REv RAns RR t1 t3.
 Proof.
   revert_until RR. pcofix CIH. intros.
   pstep. punfold INL. punfold INR. red in INL, INR |- *. genobs_clear t3 ot3.
@@ -255,7 +255,7 @@ Proof.
            eapply EqCutR; auto.
       * clear CHECK0.
         apply IHREL; auto.
-        pose proof rutt_inv_Tau_r (RR := RR) Rcutr Rcutl REv RAns m1 t1.
+        pose proof ruttc_inv_Tau_r (RR := RR) Rcutr Rcutl REv RAns m1 t1.
         forward H0.
         now pfold.
         punfold H0.
@@ -273,12 +273,21 @@ Proof.
   - dependent induction INR; eauto with itree.
 Qed.
 
-Lemma rutt_eutt {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} :
-  Proper (eutt eq ==> eutt eq ==> iff) (@rutt E1 E2 R1 R2 Rcutr Rcutl REv RAns RR).
+Lemma ruttc_eutt {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} :
+  Proper (eutt eq ==> eutt eq ==> iff) (@ruttc E1 E2 R1 R2 Rcutr Rcutl REv RAns RR).
 Proof.
   intros ?? EQ1 ?? EQ2; split; intros EQ.
-  eapply rutt_eutt_l, rutt_eutt_r; eauto; symmetry; eauto.
-  eapply rutt_eutt_l, rutt_eutt_r; eauto; symmetry; eauto.
+  eapply ruttc_eutt_l, ruttc_eutt_r; eauto; symmetry; eauto.
+  eapply ruttc_eutt_l, ruttc_eutt_r; eauto; symmetry; eauto.
 Qed.
 
-  
+Lemma ruttc_trigger {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} (e1 : E1 R1) (e2 : E2 R2):
+  REv R1 R2 e1 e2 ->
+  (forall a b, RAns R1 R2 e1 a e2 b -> RR a b) ->
+  @ruttc E1 E2 R1 R2 Rcutr Rcutl REv RAns RR (ITree.trigger e1) (ITree.trigger e2).
+Proof.
+  pfold; constructor; auto.
+  intros.
+  left; pfold; constructor; auto.
+Qed. 
+
