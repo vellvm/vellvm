@@ -20,10 +20,17 @@ open Format
 open ITreeDefinition
 open Result
 
-(* TODO: probably should be part of ADDRESS module interface*)
-let pp_addr :
-    Format.formatter -> Address.addr -> unit =
- fun ppf _ -> fprintf ppf "DVALUE_Addr(?)"
+let ocaml_str = Camlcoq.camlstring_of_coqstring
+
+let string_of_dvalue (d : DV.dvalue) =
+  ocaml_str (DV.show_dvalue params d)
+
+let string_of_function_id id : string =
+  LLVMAst.( match id with
+  | Name n -> "@" ^ (Camlcoq.camlstring_of_coqstring n)
+  | Anon z -> "@" ^ (Camlcoq.Z.to_string z)
+  | Raw z ->  "_RAW_" ^  (Camlcoq.Z.to_string z)
+  )
 
 (* Converts `float` to a `string` at max precision. Both OCaml `printf` and
    `string_of_float` truncate and do not print all significat digits. *)
@@ -32,43 +39,6 @@ let string_of_float_full f =
      maximal precision is 324. See Wikipedia. *)
   let s = sprintf "%.350f" f in
   Str.global_replace (Str.regexp "0+$") "" s
-
-let rec pp_dvalue : Format.formatter -> DV.dvalue -> unit =
-  let open Camlcoq in
-  let open DV in
-  let pp_comma_space ppf () = pp_print_string ppf ", " in
-  fun ppf -> function
-    | DVALUE_Addr _x -> fprintf ppf "DVALUE_Addr"
-    | DVALUE_I (sz, x) ->
-        fprintf ppf "DVALUE_I%d(%d)"
-          (Camlcoq.P.to_int sz) (Camlcoq.Z.to_int (Integers.unsigned sz x))
-    | DVALUE_Iptr x ->
-        fprintf ppf "DVALUE_IPTR(%d)"
-          (Camlcoq.Z.to_int (iptr.to_Z x))
-    | DVALUE_Double x ->
-        fprintf ppf "DVALUE_Double(%s)"
-          (string_of_float_full (camlfloat_of_coqfloat x))
-    | DVALUE_Float x ->
-        fprintf ppf "DVALUE_Float(%s)"
-          (string_of_float_full (camlfloat_of_coqfloat32 x))
-    | DVALUE_Poison _ -> fprintf ppf "DVALUE_Poison"
-    | DVALUE_None -> fprintf ppf "DVALUE_None"
-    | DVALUE_Struct l ->
-        fprintf ppf "DVALUE_Struct(%a)"
-          (pp_print_list ~pp_sep:pp_comma_space pp_dvalue)
-          l
-    | DVALUE_Packed_struct l ->
-        fprintf ppf "DVALUE_Packet_struct(%a)"
-          (pp_print_list ~pp_sep:pp_comma_space pp_dvalue)
-          l
-    | DVALUE_Array (_, l) ->
-        fprintf ppf "DVALUE_Array(%a)"
-          (pp_print_list ~pp_sep:pp_comma_space pp_dvalue)
-          l
-    | DVALUE_Vector (_, l) ->
-        fprintf ppf "DVALUE_Vector(%a)"
-          (pp_print_list ~pp_sep:pp_comma_space pp_dvalue)
-          l
 
 let char_of_I8 x =
   char_of_int (Camlcoq.Z.to_int (Integers.unsigned (Camlcoq.P.of_int 8) x))

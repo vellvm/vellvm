@@ -1,13 +1,3 @@
-(* -------------------------------------------------------------------------- *
- *                     Vellvm - the Verified LLVM project                     *
- *                                                                            *
- *     Copyright (c) 2017 Steve Zdancewic <stevez@cis.upenn.edu>              *
- *                                                                            *
- *   This file is distributed under the terms of the GNU General Public       *
- *   License as published by the Free Software Foundation, either version     *
- *   3 of the License, or (at your option) any later version.                 *
- ---------------------------------------------------------------------------- *)
-
 (* begin hide *)
 From Stdlib Require Import
      Setoid
@@ -26,7 +16,7 @@ From ITree Require Import
      Events.Exception.
 
 From Vellvm Require Import
-     Utilities
+     Utils
      Syntax
      Params
      DynamicValues
@@ -83,14 +73,10 @@ Section withParams.
     | StackPush (args : list (raw_id * dvalue))
                       : StackE unit                   (* Pushes a fresh environment during a call *)
     | StackPop        : StackE unit                   (* Pops it back during a ret *)
-    | StackSetHandler : option block_id -> StackE unit (* Insert / remove landingpad for exception *)
-    | StackHandler    : StackE (option block_id)      (* Get exception handler for current frame *)
     | StackRaise      : exc -> StackE unit             (* Place exception onto the stack, does not pop *)
-    | StackGetExc     : StackE (option exc).          (* Fetches the currently raised exception if there is one *)
+    | StackGetExc     : StackE (option exc).          (* Fetches and clears the currently raised exception if there is one *)
   Definition stack_push        {E} `{StackE -< E} args : itree E _ := trigger (StackPush args).
   Definition stack_pop         {E} `{StackE -< E}      : itree E _ := trigger StackPop.
-  Definition stack_set_handler {E} `{StackE -< E} ob   : itree E _ := trigger (StackSetHandler ob).
-  Definition stack_handler     {E} `{StackE -< E}      : itree E _ := trigger StackHandler.
   Definition stack_raise       {E} `{StackE -< E} e    : itree E _ := trigger (StackRaise e).
   Definition stack_get_exc     {E} `{StackE -< E}      : itree E _ := trigger StackGetExc.
 
@@ -126,7 +112,7 @@ Section withParams.
 
   (* ExternalCallE values are the "observable" events by which one should compare the 
        equivalence of two LLVM IR programs.  These should never be interpreted away
-       by the Coq semantics. However, for practicality, we _do_ interpet some calls that
+       by the rocq semantics. However, for practicality, we _do_ interpet some calls that
        generate outputs to [stdout] (SAZ: and eventuall[stderr]).  The stream of bytes
        visible in [IO_stdout] events is the data printed to [stdout].
 

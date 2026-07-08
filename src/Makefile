@@ -24,7 +24,7 @@ VELLVM_BC =_build/default/ml/main.bc
 
 ######## The "frontend" is only the parser/pretty-printer
 FRONTEND_EXE=_build/default/ml/frontend.exe
-ROCQFILES_FRONTEND := QC/ShowAST QC/ReprAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib
+ROCQFILES_FRONTEND := Syntax/ShowAST Syntax/ReprAST Utils/ParserHelper Syntax/LLVMAst Syntax/AstLib
 ROCQFILES_EXEC := $(ROCQFILES_FRONTEND) Semantics
 FRONTEND_VOFILES := $(ROCQFILES_FRONTEND:%=rocq/%.vo)
 EXEC_VFILES := $(ROCQFILES_EXEC:%=rocq/%.v)
@@ -40,7 +40,7 @@ KNOWNTARGETS := RocqMakefile invoke-rocqmakefile rocq extracted $(EXTRACTDIR)/ST
 KNOWNFILES := Makefile _RocqProject
 
 RocqMakefile: _RocqProject
-	$(ROCQMAKEFILE) -docroot ../doc -f _RocqProject -o RocqMakefile
+	$(ROCQMAKEFILE) -f _RocqProject -o RocqMakefile
 
 ######## defer to RocqMakefile for anything not in $(KNOWNTARGETS)
 .PHONY: invoke-rocqmakefile
@@ -78,7 +78,7 @@ vellvm: $(VELLVM_EXE)
 	cp $(VELLVM_EXE) vellvm
 	chmod u+w vellvm
 
-######## testing the Vellvm interperter
+######## testing the Vellvm interpreter
 
 .PHONY: test
 test: vellvm
@@ -91,12 +91,11 @@ check: test
 
 .PHONY: clean
 clean: extractedclean clean-rocqmakefile
-	rm -rf doc/html doc/*.glob
 	rm -rf output
+	find rocq  \( -name "*.vo" -o -name "*.vos" -o -name "*.vok" -o -name "*.glob" -o -name ".*.aux" \)  -delete
 	rm -f vellvm
 	rm -f frontend
 	rm -f aggregate
-	rm -f doc/rocq2html.ml doc/rocq2html doc/*.cm? doc/*.o
 	dune clean
 
 .PHONY: extractedclean
@@ -105,14 +104,6 @@ extractedclean:
 
 clean-rocqmakefile: RocqMakefile
 	$(MAKE) -j --no-print-directory -f RocqMakefile clean
-
-######## documentation
-
-.PHONY: documentation
-documentation: $(VFILES)
-	mkdir -p doc/html
-	rm -f doc/html/*.html
-	rocq2html -d doc/html $^
 
 ####### Facilities for building only the frontend - parser and pretty printer
 
@@ -155,6 +146,8 @@ print-includes:
 .PHONY: c2rust-tests
 c2rust-tests:
 	make -C ../tractor/c2rust-tests
+
+
 
 ######## Any other target gets "forwarded" to the generated RocqMakefile
 %: invoke-rocqmakefile

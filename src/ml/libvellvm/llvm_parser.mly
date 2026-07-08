@@ -200,7 +200,6 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_ELEMENTTYPE
 %token KW_ALIGN
 %token KW_NOALIAS
-%token KW_NOALIASSCOPE
 %token KW_NOCAPTURE
 %token KW_READONLY
 %token KW_NOFREE
@@ -308,7 +307,6 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_ARGMEM
 %token KW_INACCESSIBLEMEM
 %token KW_ERRNOMEM
-%token KW_ALIASSCOPE
 (* keywords that can be followed by `:` with no space:
    memory(default: foo)
    memory(default : foo)
@@ -481,8 +479,6 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 (* METADATA constants *)
 
 (* for load instructions *)
-%token META_NONTEMPORAL
-%token META_INVARIANT_GROUP
 
 %token<(string * string)> METADATA_DEBUG
 

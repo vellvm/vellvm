@@ -2,7 +2,7 @@ Require Import Morphisms.
 
 From Vellvm Require Import
   Numeric
-  Utilities
+  Utils
   Syntax.
 
 From ITree Require Import
@@ -58,16 +58,9 @@ Section MemoryModel.
     bytes <- read_bytes ptr (sizeof_dtyp dt);;
     lift (memory_bytes_to_dvalue bytes dt).
 
-  (* TODO: Move *)
-  Fixpoint length {A} (l : list A) : N :=
-    match l with
-    | [] => 0
-    | _ :: l => 1 + length l
-    end.
-  
   (** Writing dvalues *)
   Definition write_bytes (ptr : addr) (bytes : list memory_byte) : memM unit :=
-    ptrs <- lift (get_consecutive_ptrs ptr (length bytes));;
+    ptrs <- lift (get_consecutive_ptrs ptr (N.length bytes));;
     let ptr_bytes := zip ptrs bytes in
     (* Actually perform writes *)
     map_monad_ (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
@@ -485,7 +478,7 @@ Section Implementation.
     ret (ptr,ptrs).
 
   Definition Allocate_bytes_with_pr (init_bytes : list memory_byte) (align : N) (pr : provenance) : memM addr :=
-    let size := length init_bytes in
+    let size := N.length init_bytes in
     let aid := provenance_to_allocation_id pr in
     '(ptr, ptrs) <- get_free_block size align pr;;
     add_block_to_stack aid ptr ptrs init_bytes;;
@@ -493,7 +486,7 @@ Section Implementation.
 
   (** Heap allocation *)
   Definition Malloc_bytes_with_pr (init_bytes : list memory_byte) (align : N) (pr : provenance) : memM addr :=
-    let size := length init_bytes in
+    let size := N.length init_bytes in
     let aid := provenance_to_allocation_id pr in
     '(ptr, ptrs) <- get_free_block size align pr;;
     add_block_to_heap aid ptr ptrs init_bytes;;

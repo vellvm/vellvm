@@ -1,6 +1,6 @@
 (* begin hide *)
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax.CFG
   Syntax.LLVMAst.
 (* TODO: Only export what is relevant from the itree library (notation +' ?) *)

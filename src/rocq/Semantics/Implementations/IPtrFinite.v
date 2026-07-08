@@ -2,7 +2,7 @@
 From Stdlib Require Import ProofIrrelevance.
 
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax
   EOU
   IPtr

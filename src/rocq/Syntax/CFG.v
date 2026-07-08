@@ -2,7 +2,7 @@
 From Stdlib Require Import Equalities.
 
 From Vellvm Require Import
-     Utilities
+     Utils
      Syntax.LLVMAst
      Syntax.AstLib.
 

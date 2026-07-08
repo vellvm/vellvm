@@ -3,7 +3,7 @@ From Stdlib Require Import
   PArith.BinPosDef.
 
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax
   Numeric.
 
@@ -118,6 +118,7 @@ Definition positive_decimal_decimal_signed_to_float32 (xs ys : Decimal.uint) (ex
       end
   end.
 
+
 (* Same as above, but with the exponent set to 0, so that we get 123.4565 *)
 Definition positive_decimal_decimal_to_float32 (xs ys : Decimal.uint) : float32 :=
   positive_decimal_decimal_signed_to_float32 xs ys (Nat.to_int 0).
@@ -167,8 +168,8 @@ Definition positive_decimal_decimal_to_float (xs ys : Decimal.uint) : float :=
 
 
 (* Converting hexadecimal to float is much easier. *)
-Definition hexadecimal_uint_to_float32 (h:Hexadecimal.uint) : float32 :=
-  Bits.b32_of_bits (BinInt.Z.of_hex_uint h).
+Definition hexadecimal_uint_to_float32 (h:Hexadecimal.uint) : option float32 :=
+  float_to_float32 (Bits.b64_of_bits (BinInt.Z.of_hex_uint h)). 
 
 
 Definition float32_of_float_syntax (fs:float_syntax) : option float32 :=
@@ -185,7 +186,7 @@ Definition float32_of_float_syntax (fs:float_syntax) : option float32 :=
   | FS_decimal (Decimal.DecimalExp (Decimal.Neg i) ui exp) =>
       Some (Float32.neg (positive_decimal_decimal_signed_to_float32 i ui exp))
            
-  | FS_hex FH_X u => Some (hexadecimal_uint_to_float32 u)
+  | FS_hex FH_X u => hexadecimal_uint_to_float32 u
 
   | FS_hex _ _ => None
   end.

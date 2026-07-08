@@ -1,13 +1,3 @@
-(* -------------------------------------------------------------------------- *
- *                     Vellvm - the Verified LLVM project                     *
- *                                                                            *
- *     Copyright (c) 2018 Steve Zdancewic <stevez@cis.upenn.edu>              *
- *                                                                            *
- *   This file is distributed under the terms of the GNU General Public       *
- *   License as published by the Free Software Foundation, either version     *
- *   3 of the License, or (at your option) any later version.                 *
- ---------------------------------------------------------------------------- *)
-
 (* begin hide *)
 From ExtLib Require Import
   Programming.Eqv
@@ -16,7 +6,7 @@ From ExtLib Require Import
 From ITree Require Import ITree.
 
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax
   Params
   Semantics.DynamicValues
@@ -66,7 +56,7 @@ Import EqvNotation.
           [defined_intrinsics]
 
         - _if_ it is impure, i.e. depends on the memory, as is the case for
-          [memcpy], its implementation must be provided in [src/coq/Handlers/Memory.v]
+          [memcpy], its implementation must be provided in [src/rocq/Semantics/Implementations/Memory.v]
           and an equality test on its name added to [handle_intrinsic].
  *)
 
@@ -528,7 +518,10 @@ Section Intrinsics.
   Definition llvm_vellvm_internal_throw : pure_function :=
     fun args =>
       match args with
-      | [] => retr DVALUE_None
+      (* Raise: the [inl] branch of the intrinsic's [exc + dvalue] result is
+         turned into an abortive [LLVMExc] by [denote_instr]. The payload is a
+         placeholder panic object, treated opaquely by the unwind machinery. *)
+      | [] => ret (inl DVALUE_None)
       | _ => raise_error "llvm_vellvm_internal_throw got incorrect / ill-typed inputs"
       end.
 

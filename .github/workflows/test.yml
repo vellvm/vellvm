@@ -2,12 +2,12 @@ name: "Nix build for vellvm"
 on:
   pull_request:
     branches:
-      - dev
+      - main
     paths-ignore:
       - 'web/**'
   push:
     branches:
-      - dev
+      - main
     paths-ignore:
       - 'web/**'
 

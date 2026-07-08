@@ -3,7 +3,7 @@
 
 cff-version: 1.2.0
 title: Vellvm
-url: "https://github.com/vellvm/vellvm"
+url: "https://vellvm.github.io/vellvm/"
 message: >-
   If you use this software, please cite it using the
   metadata from this file.
@@ -14,7 +14,7 @@ authors:
     affiliation: University of Pennsylvania
     orcid: 'https://orcid.org/0000-0002-3516-1512'
   - given-names: Yannick
-    family-names: Zakowsky
+    family-names: Zakowski
     affiliation: Inria
     orcid: 'https://orcid.org/0000-0003-4585-6470'
   - given-names: Calvin
@@ -32,7 +32,7 @@ authors:
     orcid: 'https://orcid.org/0009-0006-4486-7222'
 abstract: >-
   Vellvm is an ongoing project aiming at the formal
-  verification in the Coq proof assistant of a compilation
+  verification in the Rocq proof assistant of a compilation
   infrastructure inspired by the LLVM compiler.
 
 
@@ -40,11 +40,10 @@ abstract: >-
   Coq formalization of the semantics of (a subset of) the
   LLVM IR that is intended for formal verification of
   LLVM-based software. It is being developed at the
-  University of Pennsylvania as part of the DeepSpec
-  project.
+  University of Pennsylvania and at Inria.
 keywords:
   - LLVM
-  - Coq
+  - Rocq
   - Compilers
   - Semantics
-license: GPL-3.0
+license: MIT

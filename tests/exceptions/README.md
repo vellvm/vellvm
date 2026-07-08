@@ -30,6 +30,7 @@ Run them with:
 | `recover_and_continue.ll` | `catch_unwind` that recovers and returns normally; caller consumes the value via a plain `call` and keeps computing. |
 | `invoke_result.ll` | `%v = invoke …` binding a **non-void result** on the normal path, then using it. |
 | `locals_across_catch.ll` | A local computed before the invoke, read in the landingpad block (frame-local state survives the catch). |
+| `stale_payload.ll` | Negative test (`ASSERT FAILS`): a landingpad reached by a *normal* branch after a catch must error, not deliver the stale payload (`StackGetExc` is consuming). |
 
 ## Not covered by the current semantics
 

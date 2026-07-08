@@ -1,0 +1,119 @@
+body {
+  max-width: 800px;
+  margin: auto;
+  line-height: 1em;
+  background: #ffffff;
+  font-family: "Roboto", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 300;
+  font-style: normal;
+  font-variation-settings:
+    "wdth" 100;
+}
+
+a            {
+    font-weight: 400;
+    color: #260085;
+    text-decoration: none
+}
+
+a:active     {
+    color: #260085;
+    text-decoration: underline
+}
+a:hover      {
+    text-decoration: underline
+}
+
+/* header and footer areas */
+.menu {
+    text-align: center;
+    background-color: #ffffff;
+    margin: 0;
+}
+.menu li { display: inline-block; }
+.menu a {
+  text-decoration: none;
+  background: #eee;
+  padding: 3px;
+  border-radius: 5px;
+}
+.menu a:hover {
+    text-decoration: underline
+}			 
+
+
+hr {
+  border-style: dashed;
+  color: #eeeeee;
+}
+
+.banner { 
+    background-color: #ffffff;
+    border-width: 1px;
+    border-style: solid;
+    border-color: #ffffff;
+}
+
+
+h1 {
+    font-size: 125%;
+}
+
+h2 {
+    font-size: 110%;
+}
+
+h3 {
+    font-size: 100%;
+}
+
+/* code */
+code {
+  font-family: "Hack", monospace;
+  font-optical-sizing: auto;
+  font-weight: 300;
+  font-style: normal;
+  background: #f9f9f9;
+}
+
+pre {
+    font-weight: 300
+    background: #fdfefe;
+    border: 1px solid #ddd;
+    box-shadow: 5px 5px 5px #eee;
+    padding: 1em;
+    overflow-x: auto;
+}
+
+/* misc elements */
+img, iframe, video { max-width: 100%; }
+
+main { hyphens: auto; }
+
+blockquote {
+  background: #f9f9f9;
+  border-left: 5px solid #ccc;
+  padding: 3px 1em 3px;
+}
+
+table {
+    table-layout: fixed;
+    margin: auto;
+    border-top: 1px solid #666;
+    border-bottom: 1px solid #666;
+}
+table thead th {
+    border-bottom: 1px solid #ddd;
+}
+th, td {
+    padding: 5px;
+    word-wrap: break-word;
+}
+thead, tfoot, tr:nth-child(even) { background: #ffffff; }
+
+footer {
+    font-weight: 100;
+    font-size: 25%; 
+    text-decoration: none;
+}

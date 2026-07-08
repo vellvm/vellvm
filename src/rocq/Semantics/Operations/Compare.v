@@ -1,5 +1,5 @@
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax
   EOU
   DynamicValues
@@ -8,8 +8,7 @@ From Vellvm Require Import
 Section Compare.
   Context {Pa : Params}.
 
-  (* TODO: This should also work on vectors of integer types *)
-  Definition eval_icmp (samesign:bool) (icmp : icmp) (v1 v2 : dvalue) : EOU dvalue.
+  Definition eval_icmp_h (samesign:bool) (icmp : icmp) (v1 v2 : dvalue) : EOU dvalue.
     refine
       (match v1, v2 with
        | DVALUE_I sz1 i1, DVALUE_I sz2 i2 =>
@@ -28,6 +27,21 @@ Section Compare.
     - exact (eval_int_icmp samesign icmp i1 i2).
     - exact (raise_error ("ill_typed-icmp: " ++ show_dvalue v1 ++ ", " ++ show_dvalue v2)).
   Defined.
-  Arguments eval_icmp _ _ _ _ : simpl nomatch.
+  Arguments eval_icmp_h _ _ _ _ : simpl nomatch.
 
+  Definition eval_icmp (samesign:bool) (icmp : icmp) (v1 v2 : dvalue) : EOU dvalue :=
+    match v1, v2 with
+    | (DVALUE_Vector t elts1), (DVALUE_Vector _ elts2) =>
+        let n := N.length elts1 in
+        let m := N.length elts2 in
+        if (n =? m)%N  then 
+          val <- vec_loop (eval_icmp_h samesign icmp) (List.combine elts1 elts2) ;;
+          ret (DVALUE_Vector (DTYPE_Vector n (DTYPE_I 1)) val)
+        else
+          raise_ub "icmp of different-length vectors"
+    | _, _ => eval_icmp_h samesign icmp v1 v2
+    end.
+
+  Arguments eval_icmp _ _ _ _ : simpl nomatch.
+    
 End Compare.

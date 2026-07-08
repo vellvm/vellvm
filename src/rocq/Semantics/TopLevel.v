@@ -8,7 +8,7 @@ From ITree Require Import
 
 From Vellvm Require Import Handlers.
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax
   Params
   Interfaces.Memory
@@ -19,9 +19,7 @@ From Vellvm Require Import
   Semantics.IntrinsicsDefinitions
   Semantics.InterpretationStack
   Semantics.VellvmIntegers
-  Semantics.Printfdefn
-  Semantics.Libraries
-  QC.ShowAST.
+  Semantics.Libraries.
 (* end hide *)
 
 (** * Top Level
@@ -43,7 +41,7 @@ Section withParams.
   (* SAZ: commenting this out for now, since it's trickier than we wanted *)
   (* Command-line arguments----------------------------------------------------------------------- *)
 
-  (* To support command-line arguments we convert a list of Coq strings into a preamble of
+  (* To support command-line arguments we convert a list of Rocq strings into a preamble of
      global declarations with a form illustrated in tests/io/args_vellvm.ll.  Given N strings
      s_arg0, s_arg1, ..., s_argN.
 
@@ -62,17 +60,18 @@ Section withParams.
   (** * Linking
 
     We first need to link external definitions. Currently, these definitions are
-   only functions we hard-code into the environment for their usefulness--
-   most notably `printf`. Linking occurs at the `toplevel_definition` level. *)
+    only functions we hard-code into the environment for their usefulness.
+    Linking occurs at the `toplevel_definition` level.
+
+    NOTE: If we do not need to reason about these functions, linking can be done
+    directly against the source .ll file via the `-L` flag of the interpreter.
+   *)
 
   Definition ll_toplevel_entity := (toplevel_entity typ (block typ * list (block typ))).
 
   Definition ll_toplevel_entities := toplevel_entities typ (block typ * list (block typ)).
 
-  (* TODO: link against printf's llvm ir code directly. If impossible, revive
-     the printf_definition hack
-   *)
-  Definition PREDEFINED_FUNCTIONS : ll_toplevel_entities := List.concat [printf_definition].
+  Definition PREDEFINED_FUNCTIONS : ll_toplevel_entities := List.concat [].
 
   (* Example ensure_functions_defined : negb (Nat.eqb (List.length PREDEFINED_FUNCTIONS) O) .  *)
   (* Proof. reflexivity. Qed.   *)
@@ -301,7 +300,7 @@ Section withParams.
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
         (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog)))
-    in interp_mcfg t [] (Build_stack_frame [] None None None,[]) initial_state.
+    in interp_mcfg t [] (Build_stack_frame [] None None,[]) initial_state.
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts

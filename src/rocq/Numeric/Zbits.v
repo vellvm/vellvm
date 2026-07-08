@@ -546,7 +546,7 @@ Qed.
 >>
   We encode this [nat]-like recursion using the [Z.iter] iteration
   function, in order to make the [Zzero_ext] and [Zsign_ext]
-  functions efficiently executable within Coq.
+  functions efficiently executable within Rocq.
 *)
 
 Definition Zzero_ext (n: Z) (x: Z) : Z :=

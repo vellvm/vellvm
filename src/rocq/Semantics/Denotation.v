@@ -1,12 +1,3 @@
-(* -------------------------------------------------------------------------- *
- *                     Vellvm - the Verified LLVM project                     *
- *                                                                            *
- *     Copyright (c) 2017 Steve Zdancewic <stevez@cis.upenn.edu>              *
- *                                                                            *
- *   This file is distributed under the terms of the GNU General Public       *
- *   License as published by the Free Software Foundation, either version     *
- *   3 of the License, or (at your option) any later version.                 *
- ---------------------------------------------------------------------------- *)
 (* begin hide *)
 
 From Stdlib Require Import
@@ -20,7 +11,7 @@ From ITree Require Import
 
 From Vellvm Require Import
   Numeric
-  Utilities
+  Utils
   Syntax
   Params
   EOU
@@ -142,23 +133,35 @@ Section Denotation.
     match fpv with
     | FP_float =>
         match float32_of_float_syntax f with
-        | None   => raise_error "bad float literal"
+        | None   => raise_error ("bad float literal: " ++ (show f))
         | Some f => ret (DVALUE_Float f)
         end
     | FP_double =>
         match float_of_float_syntax f with
-        | None   => raise_error "bad double literal"
+        | None   => raise_error ("bad double literal: " ++ (show f))
         | Some f => ret (DVALUE_Double f)
         end
     | _ => raise_error "unsupported float type"
     end.
   
-  Definition freeze {E} `{DrawE -< E} (dv : dvalue) : itree E dvalue :=
+  Fixpoint freeze {E} `{DrawE -< E} (dv : dvalue) : itree E dvalue :=
     match dv with
     | DVALUE_Poison dt => draw dt
+    | DVALUE_Struct fields => 
+        val <- map_monad freeze fields;;
+        ret (DVALUE_Struct val)
+    | DVALUE_Packed_struct fields => 
+        val <- map_monad freeze fields;;
+        ret (DVALUE_Packed_struct val)
+    | DVALUE_Array τ elts => 
+        val <- map_monad freeze elts;;
+        ret (DVALUE_Array τ val)
+    | DVALUE_Vector τ elts =>
+        val <- map_monad freeze elts;;
+        ret (DVALUE_Vector τ val)
     | _ => ret dv
     end.
-
+  
   Fixpoint denote_exp
     (top:option dtyp) (o:exp dtyp) {struct o} : MCFGtop dvalue :=
     let eval_texp '(dt,ex) := denote_exp (Some dt) ex
@@ -274,17 +277,13 @@ Section Denotation.
      | OP_ExtractElement (dt_vec, vecop) (dt_idx, idx) =>
         vec <- denote_exp (Some dt_vec) vecop ;;
         idx <- denote_exp (Some dt_idx) idx ;;
-        elt_typ <- match dt_vec with
-                      | DTYPE_Vector _ t => ret t
-                      | _ => raise "Invalid vector type for ExtractElement"
-                  end;;
-        lift (index_into_vec_dv elt_typ vec idx)
+        lift (extract_element vec idx)
 
     | OP_InsertElement (dt_vec, vecop) (dt_elt, eltop) (dt_idx, idx) =>
         vec <- denote_exp (Some dt_vec) vecop ;;
         elt <- denote_exp (Some dt_elt) eltop ;;
         idx <- denote_exp (Some dt_idx) idx ;;
-        lift (insert_into_vec_dv dt_vec vec elt idx)
+        lift (insert_element vec elt idx)
 
     | OP_ShuffleVector (dt_vec1, vecop1) (dt_vec2, vecop2) (dt_mask, idxmask) =>
         vec1 <- denote_exp (Some dt_vec1) vecop1 ;;
@@ -294,31 +293,12 @@ Section Denotation.
 
     | OP_ExtractValue (dt, str) idxs =>
         str <- denote_exp (Some dt) str ;;
-        (* Should this be pulled out into a definition? *)
-        let fix loop str idxs : EOU dvalue :=
-          match idxs with
-          | [] => ret str
-          | i :: tl =>
-              v <- index_into_str_dv str i ;;
-              loop v tl
-          end
-        in
-        lift (loop str (List.map denote_int_syntax idxs))
+        lift (extract_value str (List.map denote_int_syntax idxs))
 
     | OP_InsertValue (dt_str, strop) (dt_elt, eltop) idxs =>
         str <- denote_exp (Some dt_str) strop ;;
         elt <- denote_exp (Some dt_elt) eltop ;;
-        let fix loop str idxs : EOU dvalue :=
-          match idxs with
-          | [] => raise_error "Index was not provided"
-          | i :: nil =>
-              insert_into_str str elt i
-          | i :: tl =>
-              subfield <- index_into_str_dv str i;;
-              modified_subfield <- loop subfield tl;;
-              insert_into_str str modified_subfield i
-          end in
-        lift (loop str (List.map denote_int_syntax idxs))
+        lift (insert_value str elt (List.map denote_int_syntax idxs))
 
     | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
         dcond <- denote_exp (Some dt) cnd ;;
@@ -484,7 +464,8 @@ Section Denotation.
 
   (* An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
-    (i: (instr_id * instr dtyp * list (metadata dtyp))) (varargs : option addr) : CFGtop unit :=
+    (i: (instr_id * instr dtyp * list (metadata dtyp)))
+    (varargs : option addr) : CFGtop unit :=
     
     let '(i, md) := i in
     (* The following two lines set up file location information. *)
@@ -536,7 +517,8 @@ Section Denotation.
     | (IId id, INSTR_Load dt (du,ptr) _) =>
       a <- denote_exp' (Some du) ptr;;
       v <- load dt a;;
-      lwrite id v
+      v' <- freeze v;;
+      lwrite id v'
 
     (* Store *)
     | (IVoid _, INSTR_Store (dt, val) (du, ptr) _) =>
@@ -603,7 +585,20 @@ Section Denotation.
     | (_, INSTR_Fence _ _) => ret tt
 
     (* Currently unhandled itree instructions *)
-    | (_, INSTR_LandingPad _ _ _) => raise (err_loc ++ ": Unsupported INSTR_Landingpad")
+    (* Landingpad: bind the in-flight exception payload (parked in this frame by
+       the [invoke] that diverted here) to the result, consuming it — a
+       landingpad reached without a fresh raise is an error, not a stale read.
+       For the Rust panic subset the clauses are irrelevant: [cleanup] and a
+       catch-all [catch ptr null] behave identically, both just delivering the
+       payload. *)
+    | (IId id, INSTR_LandingPad _ _ _) =>
+        oe <- stack_get_exc ;;
+        match oe with
+        | Some e => lwrite id e
+        | None   => raise (err_loc ++ ": landingpad reached with no in-flight exception")
+        end
+    | (IVoid _, INSTR_LandingPad _ _ _) =>
+        raise (err_loc ++ ": landingpad must define a value")
 
     (* Error states *)
     | (_, _) => raise (err_loc ++ ": ID / Instr mismatch void / non-void")
@@ -685,7 +680,9 @@ Section Denotation.
       (* branch to to_label *)
       match rv with
       | inl exn =>
-          (* Exception case. Need to jump to unwind label *)
+          (* Exception case: stash the payload in this frame so the landingpad
+             at [unwind_label] can retrieve it, then divert there. *)
+          stack_raise exn ;;
           ret (inl unwind_label)
       | inr returned_value =>
           match iid with
@@ -768,10 +765,45 @@ Section Denotation.
     | inr uv  => ret uv
     end.
 
-  (* The denotation of an itree function is a coq function that takes
-     a list of dvalues and returns the appropriate semantics. *)
+  (** ** Catching a frame-local unwind
+      [run_exc t] runs [t]; if it raises an [LLVMExc] (the abortive [LLVMExcE]
+      event, produced by [resume] or by [denote_instr] re-raising an unwinding
+      callee) it reifies the payload as [inl e]; a normal return becomes
+      [inr a]. Every other event, including the abortive [OOME]/[UBE]/[FailureE],
+      is passed through unchanged. Cf. [ITree.Events.Exception.throw_prefix].
+
+      This is applied once per function, at the [denote_function] boundary, to
+      convert that frame's unwind into the [exc + dvalue] *value* returned by
+      its [Call]. The value (not an abortive event) is what crosses the [mrec]
+      knot, so a caller's [invoke]/[call] can observe a callee's unwind — see
+      the design note in todonotes.md on why an abortive event cannot.
+
+      [exc_of_event] selects the [LLVMExcE] summand at its current position in
+      [CFGEtop] (9th summand); keep the [inr1 .. inl1] depth in sync. *)
+  Definition exc_of_event {X} (e : CFGEtop X) : option exc :=
+    match e with
+    | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 (LLVMExc x))))))))) => Some x
+    | _ => None
+    end.
+
+  Definition run_exc {A} (t : CFGtop A) : CFGtop (exc + A) :=
+    ITree.iter
+      (fun u =>
+         match observe u with
+         | RetF a  => Ret (inr (inr a))
+         | TauF u' => Ret (inl u')
+         | VisF X e k =>
+             match exc_of_event e with
+             | Some x => Ret (inr (inl x))
+             | None   => Vis e (fun y => Ret (inl (k y)))
+             end
+         end) t.
+
+  (* The denotation of an itree function is a rocq function that takes a list of
+     dvalues and returns the appropriate semantics: a function either returns
+     normally with a [dvalue] or unwinds with an exception [exc]. *)
   Definition function_denotation : Type :=
-    list dvalue -> CFGtop dvalue.
+    list dvalue -> CFGtop (exc + dvalue).
 
   Fixpoint combine_lists_varargs {A B:Type} (l1:list A) (l2:list B) : EOU (list (A * B) * list B) :=
     match l1, l2 with
@@ -809,7 +841,10 @@ Section Denotation.
   Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
     fun (args : list dvalue) =>
       varg <- push_call_frame df args;;
-      rv <- denote_cfg (df_instrs df) (Some varg);;
+      (* Catch a frame-local unwind so the result surfaces as [exc + dvalue].
+         [pop_call_frame] runs on both the normal and the unwinding path, so the
+         frame is always torn down before the (value-carried) unwind continues. *)
+      rv <- run_exc (denote_cfg (df_instrs df) (Some varg));;
       pop_call_frame;;
       ret rv.
 
@@ -843,7 +878,9 @@ Section Denotation.
          | Call dt fv args =>
              match lookup_defn fv fundefs with
              | Some f_den => (* If the call is internal *)
-                 inr <$> f_den args
+                 (* [f_den] already produces [exc + dvalue] (see [denote_function]),
+                    so the callee's unwind crosses the [mrec] knot as this value. *)
+                 f_den args
              | None => inr <$> external_call dt fv args
              end
          end) _ (Call dt f_value args).

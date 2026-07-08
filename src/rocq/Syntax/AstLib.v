@@ -3,7 +3,7 @@ From Stdlib Require Import
      Number.
 
 From Vellvm Require Import
-     Utilities
+     Utils
      Syntax.LLVMAst.
 
 From Stdlib Require Import Equalities OrderedType OrderedTypeEx.

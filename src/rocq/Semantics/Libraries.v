@@ -6,7 +6,7 @@ From ITree Require Import
 
 From Vellvm Require Import Handlers.
 From Vellvm Require Import
-  Utilities
+  Utils
   Syntax
   Params
   Implementations.Memory
@@ -16,8 +16,7 @@ From Vellvm Require Import
   Operations
   Semantics.IntrinsicsDefinitions
   Semantics.InterpretationStack
-  Semantics.VellvmIntegers
-  QC.ShowAST.
+  Semantics.VellvmIntegers.
 (* end hide *)
 
 Section withParams.
@@ -80,7 +79,7 @@ Section withParams.
 
        fun (args : list dvalue) =>
          match args with
-         | char::[] => putchar_body char
+         | char::[] => inr <$> putchar_body char
          | _ => raise "putc called with zero or more than one arguments"
          end).
     subst.
@@ -115,7 +114,7 @@ Section withParams.
 
     fun (args : list dvalue) =>
       match args with
-      | strptr::[] => puts_body strptr
+      | strptr::[] => inr <$> puts_body strptr
       | _ => raise "puts called with zero or more than one arguments"
       end.
 

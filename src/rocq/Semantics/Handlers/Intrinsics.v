@@ -1,0 +1,193 @@
+(* begin hide *)
+From Stdlib Require Import
+  Morphisms.
+
+From ExtLib Require Import
+  Programming.Eqv
+  Data.String.
+
+From Vellvm Require Import
+  Utils
+  Utils.Assoc
+  Syntax
+  Params
+  Semantics.LLVMEvents
+  Semantics.DynamicValues
+  Semantics.IntrinsicsDefinitions.
+
+From ITree Require Import
+  ITree
+  InterpFacts
+  Eq.Eqit.
+
+Import EqvNotation.
+(* end hide *)
+
+(** * Handler for intrinsics
+
+   LLVM _intrinsic_ functions are used like ordinary function calls, but
+   they have a special interpretation.
+
+     - any global identifier that starts with the prefix "llvm." is
+       considered to be an intrinsic function
+
+     - intrinsic functions must be delared in the global scope (to ascribe them types)
+
+     - it is _illegal_ to take the address of an intrinsic function (they do not
+       always map directly to external functions, e.g. arithmetic intrinsics may
+       be lowered directly to in-lined assembly on platforms that support the
+       operations natively.
+
+   As a consequence of the above, it is possible to _statically_ determine
+   that a call is an invocation of an intrinsic by looking for instructions
+   of the form:
+        call t @llvm._ (args...)
+*)
+
+
+(* (Pure) Intrinsics -------------------------------------------------------- *)
+
+(* The intrinsics interpreter looks for Calls to intrinsics defined by its
+   argument and runs their semantic function, raising an error in case of
+   exception.  Unknown Calls (either to other intrinsics or external calls) are
+   passed through unchanged.
+*)
+Section Intrinsics.
+  Context {Pa : Params}.
+  Context {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} `{MemoryE -< E} `{IntrinsicE -< E}.
+
+  (* Interprets Call events found in the given association list by their
+     semantic functions.
+   *)
+
+  Definition defs_assoc :=
+    List.map (fun '(a,b) =>
+                match dc_name a with
+                | Name s => (s,b)
+                | _ => ("",b)
+                end
+      ) (defined_intrinsics (E := E)).
+
+  Definition handle_intrinsics :
+    IntrinsicE ~> itree E :=
+    (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
+    fun X (e : IntrinsicE X) =>
+      match e in IntrinsicE Y return X = Y -> itree E Y with
+      | Intrinsic _ fname args varargs =>
+          match assoc fname defs_assoc with
+          | Some f => fun pf => f args varargs
+          | None => fun pf => (eq_rect X (fun a => itree E a) (trigger e)) _ pf
+          end
+      end eq_refl.
+
+End Intrinsics.
+
+Section PARAMS.
+  Context {Pa : Params}.
+  Variable (E F : Type -> Type).
+  Context `{MemoryE -< F} `{FailureE -< F} `{UBE -< F} `{OOME -< F} `{LLVMExcE -< F}.
+  Notation Eff := (E +' IntrinsicE +' F).
+
+  Definition E_trigger : Handler E Eff := fun _ e => trigger e.
+  Definition F_trigger : Handler F Eff := fun _ e => trigger e.
+
+  Definition interp_intrinsics_h :=
+    (case_ E_trigger (case_ handle_intrinsics F_trigger)).
+
+  Definition interp_intrinsics :
+    forall R, itree Eff R -> itree Eff R :=
+    interp interp_intrinsics_h.
+
+  Section Structural_Lemmas.
+
+    Lemma interp_intrinsics_bind :
+      forall (R S : Type) (t : itree Eff R) (k : R -> itree _ S),
+        interp_intrinsics (ITree.bind t k) ≅ ITree.bind (interp_intrinsics t) (fun r : R => interp_intrinsics (k r)).
+    Proof using.
+      intros; apply interp_bind.
+    Qed.
+
+    Lemma interp_intrinsics_ret :
+      forall (R : Type) (x: R),
+        interp_intrinsics (Ret x: itree Eff _) ≅ Ret x.
+    Proof using.
+      intros; apply interp_ret.
+    Qed.
+
+    Lemma interp_intrinsics_Tau :
+      forall {R} (t: itree Eff R),
+        interp_intrinsics (Tau t) ≅ Tau (interp_intrinsics t).
+    Proof using.
+      intros.
+      unfold interp_intrinsics; rewrite interp_tau; reflexivity.
+    Qed.
+
+    Lemma interp_intrinsics_vis_eqit:
+      forall {X R} (e : Eff X)
+        (kk : X -> itree Eff R),
+        interp_intrinsics (Vis e kk) ≅
+          ITree.bind (interp_intrinsics_h e) (fun x : X => Tau (interp_intrinsics (kk x))).
+    Proof using.
+      intros.
+      unfold interp_intrinsics.
+      rewrite interp_vis.
+      reflexivity.
+    Qed.
+
+    Lemma interp_intrinsics_vis:
+      forall X R (e : Eff X)
+        (kk : X -> itree Eff R),
+        interp_intrinsics (Vis e kk) ≈
+          ITree.bind (interp_intrinsics_h e) (fun x : X => interp_intrinsics (kk x)).
+    Proof using.
+      intros.
+      rewrite interp_intrinsics_vis_eqit.
+      apply eutt_eq_bind.
+      intros ?; tau_steps; reflexivity.
+    Qed.
+
+    Lemma interp_intrinsics_trigger:
+      forall X (e : Eff X),
+        interp_intrinsics (ITree.trigger e) ≈ interp_intrinsics_h e.
+    Proof using.
+      intros *.
+      unfold interp_intrinsics.
+      rewrite interp_trigger.
+      reflexivity.
+    Qed.
+
+    Lemma interp_intrinsics_bind_trigger_eqit:
+      forall X R (e : Eff X) (kk : X -> itree Eff R),
+        interp_intrinsics (ITree.bind (trigger e) kk) ≅
+          ITree.bind (interp_intrinsics_h e) (fun x : X => Tau (interp_intrinsics (kk x))).
+    Proof using.
+      intros *.
+      unfold interp_intrinsics.
+      rewrite bind_trigger.
+      rewrite interp_vis.
+      reflexivity.
+    Qed.
+
+    Lemma interp_intrinsics_bind_trigger:
+      forall X R (e : Eff X) (kk : X -> itree Eff R),
+        interp_intrinsics (ITree.bind (trigger e) kk) ≈
+          ITree.bind (interp_intrinsics_h e) (fun x : X => interp_intrinsics (kk x)).
+    Proof using.
+      intros.
+      rewrite interp_intrinsics_bind_trigger_eqit.
+      apply eutt_eq_bind.
+      intros ?; tau_steps; reflexivity.
+    Qed.
+
+    #[global] Instance eutt_interp_intrinsics {R} {b} :
+      Proper (eqit Logic.eq b b ==> eqit Logic.eq b b) (@interp_intrinsics R).
+    Proof using.
+      do 2 red; intros * EQ.
+      unfold interp_intrinsics.
+      destruct b; try rewrite EQ; try reflexivity.
+    Qed.
+
+  End Structural_Lemmas.
+
+End PARAMS.
+

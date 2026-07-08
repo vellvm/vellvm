@@ -1,0 +1,41 @@
+{{ partial "header.html" . }}
+<div class="banner" align="center" margin-bottom="0pt">
+  <img src="logo/vellvm-logo-scroll2.png" width="400px" alt="Vellvm"/>
+
+{{ partial "nav.html" . }}
+
+
+    
+  <table class="banner" border="0" width="800px" cellspacing="1" cellpadding="10">
+    <tbody>
+    <tr>
+    <td align="left">
+      <div>
+	<main>
+
+<a href="https://github.com/vellvm/vellvm">Vellvm</a> is a specification of <a href="https://www.llvm.org/">LLVM IR</a> implemented in <a href="https://rocq-prover.org">Rocq</a>. The Vellvm framework provides an abstract semantics aimed at <i>formal verification</i> of LLVM-based software and optimizations passes, along with an <i>executable interpreter</i> suitable for running LLVM IR code for testing purposes. The interpreter is proved to be a valid refinement of the spec.
+
+<section class="news-bullets">
+  <h1>Recent News</h2>
+  <ul>
+    {{/* Change "news" to match the folder name of your news section */}}
+    {{ range first 5 (where site.RegularPages "Section" "news") }}
+      <li> <time date="{{ .Date | time.Format ":date_medium" }}">{{ .Date | time.Format ":date_medium" }}</time>
+        - <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+      </li>
+    {{ end }}
+  </ul>
+</section>
+	  
+	  {{ .Content }}
+	</main>
+      </div>
+    </td>
+    </tr>
+    </tbody>
+  </table>
+</div>
+{{ partial "footer.html" . }}
+
+
+  
