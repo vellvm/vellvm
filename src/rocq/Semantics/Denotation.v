@@ -151,6 +151,17 @@ Section Denotation.
     | DTYPE_Iptr   => coerce_integer_to_int None (denote_int_syntax x)
     | typ          => raise_error ("bad type for constant int: " ++ show typ)
     end.
+
+  (* Pure type guard for [EXP_Packed_struct]: keeping the [dtyp] dispatch
+     inside [EOU] (rather than at the itree level) lets proofs treat it as
+     an opaque pure computation. It mentions no value, so it is the same
+     computation in every instantiation of [Params]. *)
+  Definition assert_packed_struct_typ (top : option dtyp) : EOU unit :=
+    match top with
+    | None => raise_error "denote_exp given untyped EXP_Struct"
+    | Some (DTYPE_Packed_struct _) => ret tt
+    | _ => raise_error "bad type for VALUE_Packed_struct"
+    end.
   
   Fixpoint freeze {E} `{DrawE -< E} (dv : dvalue) : itree E dvalue :=
     match dv with
@@ -228,13 +239,9 @@ Section Denotation.
 
     (* Option 2: do a little bit of typechecking *)
     | EXP_Packed_struct es =>
-        match top with
-        | None => raise ("denote_exp given untyped EXP_Struct")
-        | Some (DTYPE_Packed_struct _) =>
-            vs <- map_monad eval_texp es ;;
-            ret (DVALUE_Packed_struct vs)
-        | _ => raise ("bad type for VALUE_Packed_struct")
-        end
+        lift (assert_packed_struct_typ top) ;;
+        vs <- map_monad eval_texp es ;;
+        ret (DVALUE_Packed_struct vs)
 
     | EXP_Array t es =>
       vs <- map_monad eval_texp es ;;

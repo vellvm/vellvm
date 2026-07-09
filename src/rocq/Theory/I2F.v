@@ -13,6 +13,7 @@ From Vellvm Require Import
   DynamicValues
   EOU
   LLVMEvents
+  Semantics.Operations
   Interfaces.IPtr
   Interfaces.Params
   Implementations.Address
@@ -402,6 +403,14 @@ Section Refinement.
     repeat (break_match_goal; cbn); now repeat constructor.
   Qed.
 
+  (** [I2F_EOU] is reflexive at [eq]: parameter-independent pure
+      computations (e.g. type guards, which mention no value) are related
+      to themselves for free, with no case analysis on their input. *)
+  Lemma I2F_EOU_refl {A} (m : EOU A) : I2F_EOU Logic.eq m m.
+  Proof.
+    destruct m; auto.
+  Qed.
+
   (** Compatibility of [I2F_EOU] with the monadic structure of [EOU]. *)
   Lemma I2F_EOU_bind {A1 A2 B1 B2} (RA : A1 -> A2 -> Prop) (RB : B1 -> B2 -> Prop)
         (m1 : EOU A1) (m2 : EOU A2) (k1 : A1 -> EOU B1) (k2 : A2 -> EOU B2) :
@@ -479,36 +488,123 @@ Section Refinement.
         unfold default_dvalue_of_dtyp_i; auto 6.
   Qed.
 
+  Lemma I2F_eval_iop a1 a2 b1 b2 iop :
+    I2F_dvalue a1 b1 ->
+    I2F_dvalue a2 b2 ->
+    I2F_EOU I2F_dvalue (eval_iop iop a1 a2) (eval_iop iop b1 b2).
+  Proof.
+    intros.
+  Admitted.
+ 
+  Lemma I2F_eval_fneg a b :
+    I2F_dvalue a b ->
+    I2F_EOU I2F_dvalue (eval_fneg a) (eval_fneg b).
+  Proof.
+  Admitted.
+
+  Lemma I2F_eval_icmp a1 a2 b1 b2 samesign cmp :
+    I2F_dvalue a1 b1 ->
+    I2F_dvalue a2 b2 ->
+    I2F_EOU I2F_dvalue (eval_icmp samesign cmp a1 a2)
+      (eval_icmp samesign cmp b1 b2).
+  Proof.
+  Admitted.
+ 
+  Lemma I2F_eval_fop a1 a2 b1 b2 fop :
+    I2F_dvalue a1 b1 ->
+    I2F_dvalue a2 b2 ->
+    I2F_EOU I2F_dvalue (eval_fop fop a1 a2) (eval_fop fop b1 b2).
+  Proof.
+  Admitted.
+ 
+  Lemma I2F_eval_fcmp a1 a2 b1 b2 cmp :
+    I2F_dvalue a1 b1 ->
+    I2F_dvalue a2 b2 ->
+    I2F_EOU I2F_dvalue (eval_fcmp cmp a1 a2)
+      (eval_fcmp cmp b1 b2).
+  Proof.
+  Admitted.
+ 
+  Ltac rstep :=
+    first [apply ruttc_trigger |
+           apply ruttc_trigger_cast |
+           apply ruttc_ret 
+      ].
   Lemma I2F_denote_expr :
     forall (e : exp dtyp) τ, I2F_refine (@denote_exp PInf τ e) (@denote_exp PFin τ e).
-  Proof.
+  Proof with try now (rstep; try (easy); eauto).
     induction e.
     - intros; cbn.
-      destruct id; cbn.
-      + apply ruttc_trigger; easy.
-      + apply ruttc_trigger; easy.
-    - intros [d|]; cbn.
-      2: apply ruttc_trigger_cast; easy.
+      destruct id; cbn...
+    - intros [d|]; cbn...
       apply I2F_refine_lift, I2F_denote_int_syntax_as_int.
-    - intros [d|]; cbn.
-      2: apply ruttc_trigger_cast; easy.
+    - intros [d|]; cbn...
       apply I2F_refine_lift, I2F_denote_float_syntax_as_float.
-    - destruct b; intros ?; cbn; apply ruttc_ret; eauto.
-    - intros; cbn; apply ruttc_ret.
-      constructor; cbn; intuition; reflexivity.
+    - destruct b; intros ?; cbn...
+    - intros; cbn... 
     - (* initializer *)
-      intros [d|]; cbn.
-      2: apply ruttc_trigger_cast; easy.
+      intros [d|]; cbn...
       apply I2F_refine_lift, I2F_default_dvalue_of_dtyp.
     - cbn.
       intros. 
       eapply ruttc_bind.
       + apply ruttc_map_monad.
         intros [] HIN; now apply (H (d,e)).
-      + intros * HF.
-        apply ruttc_ret; eauto.
-
-Admitted.      
-
+      + intros * HF...
+    - cbn; intros []...
+    - cbn; intros []...
+    - cbn.
+      intros. 
+      eapply ruttc_bind.
+      + apply ruttc_map_monad.
+        intros [] HIN; now apply (H (d,e)).
+      + intros * HF...
+    - (* EXP_Packed_struct: the [dtyp] guard is a pure, parameter-free
+         computation, related to itself by reflexivity of [I2F_EOU] ---
+         no case analysis on the type. *)
+      cbn; intros.
+      eapply ruttc_bind.
+      + apply I2F_refine_lift, I2F_EOU_refl.
+      + intros [] [] _.
+        eapply ruttc_bind.
+        * apply ruttc_map_monad.
+          intros [] HIN; now apply (H (d,e)).
+        * intros * HF...
+    - cbn; intros.
+      eapply ruttc_bind.
+      + apply ruttc_map_monad.
+        intros [] HIN; now apply (H (d,e)).
+      + intros * HF...
+    - cbn; intros.
+      eapply ruttc_bind.
+      + apply ruttc_map_monad.
+        intros [] HIN; now apply (H (d,e)).
+      + intros * HF...
+    - cbn; intros.
+      eapply ruttc_bind; [apply IHe1 |].
+      intros; eapply ruttc_bind; [apply IHe2 |].
+      intros; apply I2F_refine_lift.
+      now apply I2F_eval_iop.
+    - destruct v; cbn; intros.
+      eapply ruttc_bind; [apply IHe |].
+      intros; apply I2F_refine_lift.
+      now apply I2F_eval_fneg.
+    - cbn; intros.
+      eapply ruttc_bind; [apply IHe1 |].
+      intros; eapply ruttc_bind; [apply IHe2 |].
+      intros; apply I2F_refine_lift.
+      now apply I2F_eval_icmp.
+    - cbn; intros.
+      eapply ruttc_bind; [apply IHe1 |].
+      intros; eapply ruttc_bind; [apply IHe2 |].
+      intros; apply I2F_refine_lift.
+      now apply I2F_eval_fop.
+    - cbn; intros.
+      eapply ruttc_bind; [apply IHe1 |].
+      intros; eapply ruttc_bind; [apply IHe2 |].
+      intros; apply I2F_refine_lift.
+      now apply I2F_eval_fcmp.
+     
+  Admitted.      
 
 End Refinement.
