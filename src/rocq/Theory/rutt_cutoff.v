@@ -22,13 +22,14 @@ From ExtLib Require Import
      Structures.Monad.
 
 From ITree Require Import
-     Basics.Utils
-     Axioms
-     ITree
-     Eq
-     Basics
-     HeterogeneousRelations
-     Rutt
+  Basics.Utils
+  Axioms
+  ITree
+  Eq
+  Basics
+  HeterogeneousRelations
+  Rutt
+  RecursionFacts
 .
 
 From Paco Require Import paco.
@@ -45,8 +46,8 @@ Section RuttcF.
   Context (Rcutl : forall (A : Type), E1 A -> Prop ).
   (* Cutoff on the right *)
   Context (Rcutr : forall (B : Type), E2 B -> Prop ).
-  Context (REv : forall (A B : Type), E1 A -> E2 B -> Prop ).
-  Context (RAns : forall (A B : Type), E1 A -> A -> E2 B -> B -> Prop ).
+  Context (REv : prerel E1 E2 ).
+  Context (RAns : postrel E1 E2 ).
   Context (RR : R1 -> R2 -> Prop).
   Arguments Rcutl {A}.
   Arguments Rcutr {B}.
@@ -100,8 +101,8 @@ Hint Constructors ruttcF : itree.
 Lemma euttge_trans_clo_wcompat E1 E2 R1 R2
   (Rcutl : forall A, E1 A -> Prop)
   (Rcutr : forall B, E2 B -> Prop)
-  (REv : forall A B, E1 A -> E2 B -> Prop)
-  (RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop )
+  (REv : prerel E1 E2)
+  (RAns : postrel E1 E2 )
   (RR : R1 -> R2 -> Prop) :
   wcompatible2
     (ruttc_ Rcutl Rcutr REv RAns RR)
@@ -155,8 +156,8 @@ Lemma gruttc_cong_eqit_gen
   {R1 R2 : Type} {E1 E2 : Type -> Type}
   {Rcutl : forall A, E1 A -> Prop}
   {Rcutr : forall B, E2 B -> Prop}
-  {REv : forall A B, E1 A -> E2 B -> Prop}
-  {RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop}
+  {REv : prerel E1 E2}
+  {RAns : postrel E1 E2}
   {RR1 RR2} {RR : R1 -> R2 -> Prop} b r rg
   (LERR1: forall x x' y, (RR1 x x': Prop) -> (RR x' y: Prop) -> RR x y)
   (LERR2: forall x y y', (RR2 y y': Prop) -> RR x y' -> RR x y) :
@@ -172,8 +173,8 @@ Qed.
   {R1 R2 : Type} {E1 E2 : Type -> Type}
   {Rcutl : forall A, E1 A -> Prop}
   {Rcutr : forall B, E2 B -> Prop}
-  {REv : forall A B, E1 A -> E2 B -> Prop}
-  {RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop}
+  {REv : prerel E1 E2}
+  {RAns : postrel E1 E2}
   {RR : R1 -> R2 -> Prop} r rg :
   Proper (eq_itree eq ==> eq_itree eq ==> flip impl)
     (gpaco2 (ruttc_ Rcutl Rcutr REv RAns RR) (euttge_trans_clo RR) r rg).
@@ -186,8 +187,8 @@ Qed.
   {R1 R2 : Type} {E1 E2 : Type -> Type}
   {Rcutl : forall A, E1 A -> Prop}
   {Rcutr : forall B, E2 B -> Prop}
-  {REv : forall A B, E1 A -> E2 B -> Prop}
-  {RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop}
+  {REv : prerel E1 E2}
+  {RAns : postrel E1 E2}
   {RR : R1 -> R2 -> Prop} r rg :
   Proper (euttge eq ==> euttge eq ==> flip impl)
     (gpaco2 (ruttc_ Rcutl Rcutr REv RAns RR) (euttge_trans_clo RR) r rg).
@@ -201,8 +202,8 @@ Section RuttcBind.
   Context {R1 R2 : Type}.
   Context (Rcutl : forall (A : Type), E1 A -> Prop ).
   Context (Rcutr : forall (B : Type), E2 B -> Prop ).
-  Context (REv : forall (A B : Type), E1 A -> E2 B -> Prop).
-  Context (RAns : forall (A B : Type), E1 A -> A -> E2 B -> B -> Prop).
+  Context (REv : prerel E1 E2).
+  Context (RAns : postrel E1 E2).
   Context (RR : R1 -> R2 -> Prop).
 
   Inductive ruttc_bind_clo (r : itree E1 R1 -> itree E2 R2 -> Prop) :
@@ -245,8 +246,8 @@ End RuttcBind.
 Lemma ruttc_bind {E1 E2 R1 R2 T1 T2}
   (Rcutl : forall (A : Type), E1 A -> Prop )
   (Rcutr : forall (B : Type), E2 B -> Prop )
-  (REv : forall A B, E1 A -> E2 B -> Prop)
-  (RAns: forall A B, E1 A -> A -> E2 B -> B -> Prop)
+  (REv : prerel E1 E2)
+  (RAns: postrel E1 E2)
   (RR: R1 -> R2 -> Prop) (RT: T1 -> T2 -> Prop) t1 t2 k1 k2:
   ruttc Rcutl Rcutr REv RAns RR t1 t2 ->
   (forall r1 r2,
@@ -298,8 +299,8 @@ Qed.
 Lemma ruttc_map_monad {E1 E2 R1 R2 A}
   (Rcutl : forall (A : Type), E1 A -> Prop )
   (Rcutr : forall (B : Type), E2 B -> Prop )
-  (REv : forall A B, E1 A -> E2 B -> Prop)
-  (RAns: forall A B, E1 A -> A -> E2 B -> B -> Prop)
+  (REv : prerel E1 E2)
+  (RAns: postrel E1 E2)
   (RR: R1 -> R2 -> Prop)
   (f1 : A -> itree E1 R1) (f2 : A -> itree E2 R2) l:
   (forall a, In a l -> ruttc Rcutl Rcutr REv RAns RR (f1 a) (f2 a)) ->
@@ -321,8 +322,8 @@ Qed.
 Lemma ruttc_iter {E1 E2 I1 I2 R1 R2}
   (Rcutl : forall (A : Type), E1 A -> Prop )
   (Rcutr : forall (B : Type), E2 B -> Prop )
-  (REv : forall A B, E1 A -> E2 B -> Prop)
-  (RAns: forall A B, E1 A -> A -> E2 B -> B -> Prop)
+  (REv : prerel E1 E2)
+  (RAns: postrel E1 E2)
   (RR: R1 -> R2 -> Prop)
   (II: I1 -> I2 -> Prop)
   (f1 : I1 -> itree E1 (I1 + R1))
@@ -349,7 +350,87 @@ Proof.
   gstep; constructor; eauto.
 Qed.  
 
+Definition pred1 (E : Type -> Type) := forall A, E A -> Prop.
+Variant sum_pred1 {E1 E2 : Type -> Type} (P1 : pred1 E1) (P2 : pred1 E2) : pred1 (E1 +' E2) :=
+  | sum_pred1_inl {A} (e : E1 A) : P1 _ e -> sum_pred1 P1 P2 _ (inl1 e)
+  | sum_pred1_inr {A} (e : E2 A) : P2 _ e -> sum_pred1 P1 P2 _ (inr1 e). 
+Definition TT1 {E}: pred1 E := fun _ _ => True.
+Definition FF1 {E}: pred1 E := fun _ _ => False.
 
+(* mrec *)
+Lemma ruttc_interp_mrec {D1 D2 E1 E2 R1 R2}
+  (Rcutl : forall (A : Type), E1 A -> Prop )
+  (Rcutr : forall (B : Type), E2 B -> Prop )
+  (REv : prerel E1 E2)
+  (RCall : prerel D1 D2)
+  (RCall' : postrel D1 D2)
+  (RAns: postrel E1 E2)
+  (RR: R1 -> R2 -> Prop)
+  (bodies1 : D1 ~> itree (D1 +' E1))
+  (bodies2 : D2 ~> itree (D2 +' E2))
+
+  (HInd : forall A B (d1 : D1 A) (d2 : D2 B), 
+      RCall A B d1 d2 -> 
+      ruttc (sum_pred1 FF1 Rcutl) (sum_pred1 FF1 Rcutr) (sum_prerel RCall REv) (sum_postrel RCall' RAns)
+        (fun (a : A) (b : B) => RCall' A B d1 a d2 b)
+        (bodies1 A d1) (bodies2 B d2))
+  t1 t2 :
+  ruttc (sum_pred1 FF1 Rcutl) (sum_pred1 FF1 Rcutr) (sum_prerel RCall REv) (sum_postrel RCall' RAns) RR t1 t2 ->
+  ruttc Rcutl Rcutr REv RAns RR (interp_mrec bodies1 t1) (interp_mrec bodies2 t2).
+Proof.
+  revert t1 t2.
+  ginit. gcofix CIH.
+  intros * EQ.
+  rewrite 2 unfold_interp_mrec.
+  punfold EQ; red in EQ.
+  induction EQ; cbn; pclearbot.
+  - now gstep; constructor.
+  - gstep; constructor; eauto with paco.
+  - dependent induction H.
+    + gstep; constructor.
+      gfinal; left; apply CIH.
+      eapply ruttc_bind.
+      now apply HInd.
+      now intros; apply H0; constructor.
+    + gstep; constructor; intros; auto.
+      gstep; constructor; intros; auto.
+      gfinal; left; apply CIH, H0; constructor; auto.
+  - rewrite tau_euttge.
+    rewrite unfold_interp_mrec; apply IHEQ.
+  - rewrite tau_euttge.
+    rewrite unfold_interp_mrec; apply IHEQ.
+  - dependent induction H.
+    + destruct H.
+    + gstep; constructor; auto.
+  - dependent induction H.
+    + destruct H.
+    + gstep; constructor; auto.
+Qed.
+
+
+(* mrec *)
+Lemma ruttc_mrec {D1 D2 E1 E2 R1 R2}
+  (Rcutl : forall (A : Type), E1 A -> Prop )
+  (Rcutr : forall (B : Type), E2 B -> Prop )
+  (REv : prerel E1 E2)
+  (RCall : prerel D1 D2)
+  (RCall' : postrel D1 D2)
+  (RAns: postrel E1 E2)
+  (RR: R1 -> R2 -> Prop)
+  (bodies1 : D1 ~> itree (D1 +' E1))
+  (bodies2 : D2 ~> itree (D2 +' E2))
+
+  (HInd : forall A B (d1 : D1 A) (d2 : D2 B), 
+      RCall A B d1 d2 -> 
+      ruttc (sum_pred1 FF1 Rcutl) (sum_pred1 FF1 Rcutr) (sum_prerel RCall REv) (sum_postrel RCall' RAns)
+        (fun (a : A) (b : B) => RCall' A B d1 a d2 b)
+        (bodies1 A d1) (bodies2 B d2))
+  {A B} (d1 : D1 A) (d2 : D2 B) :
+  RCall A B d1 d2 ->
+  ruttc Rcutl Rcutr REv RAns (fun (a : A) (b : B) => RCall' A B d1 a d2 b) (mrec bodies1 d1) (mrec bodies2 d2).
+Proof.
+  intros. eapply ruttc_interp_mrec; eauto.
+Qed.
 
 Lemma ruttc_inv_Tau_l :
 forall {E1 E2 : Type -> Type} {R1 R2 : Type} Rcutr Rcutl REv RAns {RR : R1 -> R2 -> Prop}
