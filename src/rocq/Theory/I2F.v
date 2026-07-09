@@ -503,9 +503,10 @@ Section Refinement.
     - cbn.
       intros. 
       eapply ruttc_bind.
-      apply ruttc_map_monad.
-      intros [] ?.
-      (* eapply H. *)
+      + apply ruttc_map_monad.
+        intros [] HIN; now apply (H (d,e)).
+      + intros * HF.
+        apply ruttc_ret; eauto.
 
 Admitted.      
 

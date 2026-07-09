@@ -10,9 +10,13 @@
     Things get quite verbose, but it's overall straightforwards.
  *)
 
-From Vellvm Require Import Tactics Utils.ITreeUtil.
+From Vellvm Require Import
+  Tactics
+  Utils.ITreeUtil
+  Utils.ListUtil.
+
 From Stdlib Require Import
-  Program Setoid Morphisms.
+  Program Setoid Morphisms List.
 
 From ExtLib Require Import
      Structures.Monad.
@@ -236,7 +240,27 @@ Proof.
   constructor; auto; intros [].
 Qed. 
 
-
+Lemma ruttc_map_monad {E1 E2 R1 R2 A}
+  (Rcutl : forall (A : Type), E1 A -> Prop )
+  (Rcutr : forall (B : Type), E2 B -> Prop )
+  (REv : forall A B, E1 A -> E2 B -> Prop)
+  (RAns: forall A B, E1 A -> A -> E2 B -> B -> Prop)
+  (RR: R1 -> R2 -> Prop)
+  (f1 : A -> itree E1 R1) (f2 : A -> itree E2 R2) l:
+  (forall a, In a l -> ruttc Rcutl Rcutr REv RAns RR (f1 a) (f2 a)) ->
+  ruttc Rcutl Rcutr REv RAns (Forall2 RR)
+    (map_monad f1 l)
+    (map_monad f2 l).
+Proof.
+  induction l as [| a l IH]; intros HIN; cbn.
+  - now apply ruttc_ret.
+  - eapply ruttc_bind; [apply HIN; now left |].
+    intros r1 r2 HR.
+    eapply ruttc_bind; [apply IH; intros; apply HIN; now right|].
+    intros bs1 bs2 HBS.
+    apply ruttc_ret.
+    now constructor.
+Qed.
 
 Lemma ruttc_inv_Tau_l :
 forall {E1 E2 : Type -> Type} {R1 R2 : Type} Rcutr Rcutl REv RAns {RR : R1 -> R2 -> Prop}
