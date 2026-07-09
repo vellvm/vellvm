@@ -41,6 +41,14 @@ Definition sum_prerel {E1 E2 D1 D2 : Type -> Type} (PR1 : prerel E1 D1 ) (PR2 : 
     end
 .
 
+Definition inl_prerel {E1 E2 D1 D2 : Type -> Type}
+  (PR : prerel (E1 +' E2) (D1 +' D2)) : prerel E1 D1 :=
+  fun A B e1 e2 => PR _ _ (inl1 e1) (inl1 e2).
+
+Definition inr_prerel {E1 E2 D1 D2 : Type -> Type}
+  (PR : prerel (E1 +' E2) (D1 +' D2)) : prerel E2 D2 :=
+  fun A B e1 e2 => PR _ _ (inr1 e1) (inr1 e2).
+
 Definition sum_postrel {E1 E2 D1 D2 : Type -> Type} (PR1 : postrel E1 D1 ) (PR2 : postrel E2 D2) 
   : postrel (E1 +' E2) (D1 +' D2) :=
   fun A B e1 a e2 b => 
@@ -50,6 +58,14 @@ Definition sum_postrel {E1 E2 D1 D2 : Type -> Type} (PR1 : postrel E1 D1 ) (PR2 
     | _,_ => False
     end
 .
+
+Definition inl_postrel {E1 E2 D1 D2 : Type -> Type}
+  (PR : postrel (E1 +' E2) (D1 +' D2)) : postrel E1 D1 :=
+  fun A B e1 a e2 b => PR _ _ (inl1 e1) a (inl1 e2) b.
+
+Definition inr_postrel {E1 E2 D1 D2 : Type -> Type}
+  (PR : postrel (E1 +' E2) (D1 +' D2)) : postrel E2 D2 :=
+  fun A B e1 a e2 b => PR _ _ (inr1 e1) a (inr1 e2) b.
 
 Section Refinement.
 
@@ -1330,7 +1346,7 @@ Section Refinement.
     
   Admitted.
 
-  Lemma I2F_denote_expr :
+  Lemma I2F_denote_exp :
     forall (e : exp dtyp) τ, I2F_refine (@denote_exp PInf τ e) (@denote_exp PFin τ e).
   Proof with try now (rstep; try (easy); eauto).
     induction e.
@@ -1457,4 +1473,38 @@ Section Refinement.
       
   Admitted.      
 
+  Tactic Notation "rbind" uconstr(x) := eapply ruttc_bind with (RR := x).
+
+  Lemma I2F_denote_exp' :
+    forall e τ,
+      I2F_refine_CFG I2F_dvalue (@denote_exp' PInf τ e) (@denote_exp' PFin τ e).
+  Proof. 
+    unfold denote_exp', withCall.
+    intros.
+    unfold I2F_refine_CFG.
+    (* eapply ruttc_translate_inr. *)
+  Admitted.
+  
+  Lemma I2F_denote_instr :
+    forall i meta meta',
+      I2F_refine_CFG TT
+        (@denote_instr PInf i meta) (@denote_instr PFin i meta').
+  Proof with try now (rstep; try (easy); eauto).
+    intros [[x i] ?] ? ?.
+    destruct i.
+    - cbn; break_match...
+    - cbn; break_match...
+      subst.
+      rbind I2F_dvalue.
+      admit. (* withCall *)
+      intros.
+      rbind TT...
+      intros ???...
+    - destruct x, fn.
+      cbn.
+      rbind (Forall2 I2F_dvalue).
+      + apply ruttc_map_monad.
+        intros.
+  Admitted.
+  
 End Refinement.

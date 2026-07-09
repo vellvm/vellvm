@@ -29,7 +29,9 @@ From ITree Require Import
   Basics
   HeterogeneousRelations
   Rutt
+  Recursion
   RecursionFacts
+  TranslateFacts
 .
 
 From Paco Require Import paco.
@@ -356,6 +358,8 @@ Variant sum_pred1 {E1 E2 : Type -> Type} (P1 : pred1 E1) (P2 : pred1 E2) : pred1
   | sum_pred1_inr {A} (e : E2 A) : P2 _ e -> sum_pred1 P1 P2 _ (inr1 e). 
 Definition TT1 {E}: pred1 E := fun _ _ => True.
 Definition FF1 {E}: pred1 E := fun _ _ => False.
+Definition TT4 {E F} : prerel E F := fun _ _ _ _ => True.
+Definition TT6 {E F} : postrel E F := fun _ _  _ _ _ _ => True.
 
 (* mrec *)
 Lemma ruttc_interp_mrec {D1 D2 E1 E2 R1 R2}
@@ -407,7 +411,6 @@ Proof.
     + gstep; constructor; auto.
 Qed.
 
-
 (* mrec *)
 Lemma ruttc_mrec {D1 D2 E1 E2 R1 R2}
   (Rcutl : forall (A : Type), E1 A -> Prop )
@@ -431,6 +434,46 @@ Lemma ruttc_mrec {D1 D2 E1 E2 R1 R2}
 Proof.
   intros. eapply ruttc_interp_mrec; eauto.
 Qed.
+
+(* translate: characterizing the resulting relations generically
+   in terms of h1/h2 and the original relations is a pain. I will
+   do it if somebody need it, but in the mean time I'll restrict
+   to the case I'm interested in.
+ *)
+Lemma ruttc_translate_inr {E1 E2 F1 F2 R1 R2}
+  (Rcutl : forall (A : Type), E1 A -> Prop )
+  (Rcutr : forall (B : Type), E2 B -> Prop )
+  (REv : prerel E1 E2)
+  (RAns: postrel E1 E2)
+  (REv' : prerel F1 F2)
+  (RAns': postrel F1 F2)
+  (RR: R1 -> R2 -> Prop)
+  (t1 : itree E1 R1) (t2 : itree E2 R2) :
+  ruttc Rcutl Rcutr REv RAns RR t1 t2 ->
+  ruttc (sum_pred1 TT1 Rcutl) (sum_pred1 TT1 Rcutr)
+    (sum_prerel REv' REv)
+    (sum_postrel RAns' RAns)
+    RR (translate (inr1 (E1 := F1)) t1) (translate (inr1 (E1 := F2)) t2).
+Proof.
+  revert t1 t2.
+  ginit; gcofix cih.
+  intros * EQ.
+  punfold EQ; red in EQ.
+  rewrite 2 unfold_translate. 
+  induction EQ; cbn; pclearbot.
+  - now gstep; constructor.
+  - gstep; constructor; eauto with paco.
+  - gstep. constructor; auto.
+    constructor; auto.
+    intros; gfinal; left; eapply cih.
+    dependent induction H1; apply H0; auto.
+  - rewrite tau_euttge.
+    rewrite unfold_translate; apply IHEQ.
+  - rewrite tau_euttge.
+    rewrite unfold_translate; apply IHEQ.
+  - gstep; do 2 constructor; eauto.   
+  - gstep; do 2 constructor; eauto.   
+Qed. 
 
 Lemma ruttc_inv_Tau_l :
 forall {E1 E2 : Type -> Type} {R1 R2 : Type} Rcutr Rcutl REv RAns {RR : R1 -> R2 -> Prop}
