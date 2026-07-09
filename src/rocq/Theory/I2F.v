@@ -891,7 +891,63 @@ Section Refinement.
       (eval_fcmp cmp b1 b2).
   Proof.
   Admitted.
+
+  Lemma I2F_convert conv t_from t_to a b :
+    I2F_dvalue a b ->
+    I2F_EOU I2F_dvalue (convert conv t_from a t_to) (convert conv t_from b t_to).
+  Admitted. 
  
+  Lemma I2F_eval_gep t a1 a2 b1 b2 :
+    I2F_dvalue a1 b1 ->
+    Forall2 I2F_dvalue a2 b2 ->
+    I2F_EOU I2F_dvalue (eval_gep t a1 a2) (eval_gep t b1 b2).
+  Proof.
+  Admitted.
+
+  Lemma I2F_extract_element a1 a2 b1 b2 :
+    I2F_dvalue a1 b1 ->
+    I2F_dvalue a2 b2 ->
+    I2F_EOU I2F_dvalue (extract_element a1 a2) (extract_element b1 b2).
+  Proof.
+  Admitted.
+  
+  Lemma I2F_insert_element a1 a2 a3 b1 b2 b3 :
+    I2F_dvalue a1 b1 ->
+    I2F_dvalue a2 b2 ->
+    I2F_dvalue a3 b3 ->
+    I2F_EOU I2F_dvalue (insert_element a1 a2 a3) (insert_element b1 b2 b3).
+  Proof.
+  Admitted.
+
+  Lemma I2F_extract_value a b idxs :
+    I2F_dvalue a b ->
+    I2F_EOU I2F_dvalue (extract_value a (map denote_int_syntax idxs))
+      (extract_value b (map denote_int_syntax idxs)).
+  Proof.
+  Admitted.
+  
+  Lemma I2F_insert_value a1 a2 b1 b2 idxs :
+    I2F_dvalue a1 b1 ->
+    I2F_dvalue a2 b2 ->
+    I2F_EOU I2F_dvalue (insert_value a1 a2 (map denote_int_syntax idxs))
+      (insert_value b1 b2 (map denote_int_syntax idxs)).
+  Proof.
+  Admitted.
+   
+  Lemma I2F_eval_select a1 a2 a3 b1 b2 b3 :
+    I2F_dvalue a1 b1 ->
+    I2F_dvalue a2 b2 ->
+    I2F_dvalue a3 b3 ->
+    I2F_EOU I2F_dvalue (eval_select a1 a2 a3) (eval_select b1 b2 b3).
+  Proof.
+  Admitted.
+
+  Lemma I2F_freeze a b :
+    I2F_dvalue a b ->
+    I2F_refine (freeze a) (freeze b).
+  Proof.
+  Admitted.
+  
   Ltac rstep :=
     first [apply ruttc_trigger |
            apply ruttc_trigger_cast |
@@ -916,7 +972,7 @@ Section Refinement.
       intros. 
       eapply ruttc_bind.
       + apply ruttc_map_monad.
-        intros [] HIN; now apply (H (d,e)).
+        intros [d e] HIN; now apply (H (d,e)).
       + intros * HF...
     - cbn; intros []...
     - cbn; intros []...
@@ -924,7 +980,7 @@ Section Refinement.
       intros. 
       eapply ruttc_bind.
       + apply ruttc_map_monad.
-        intros [] HIN; now apply (H (d,e)).
+        intros [d e] HIN; now apply (H (d,e)).
       + intros * HF...
     - (* EXP_Packed_struct: the [dtyp] guard is a pure, parameter-free
          computation, related to itself by reflexivity of [I2F_EOU] ---
@@ -935,43 +991,93 @@ Section Refinement.
       + intros [] [] _.
         eapply ruttc_bind.
         * apply ruttc_map_monad.
-          intros [] HIN; now apply (H (d,e)).
+          intros [d e] HIN; now apply (H (d,e)).
         * intros * HF...
     - cbn; intros.
       eapply ruttc_bind.
       + apply ruttc_map_monad.
-        intros [] HIN; now apply (H (d,e)).
+        intros [d e] HIN; now apply (H (d,e)).
       + intros * HF...
     - cbn; intros.
       eapply ruttc_bind.
       + apply ruttc_map_monad.
-        intros [] HIN; now apply (H (d,e)).
+        intros [d e] HIN; now apply (H (d,e)).
       + intros * HF...
     - cbn; intros.
-      eapply ruttc_bind; [apply IHe1 |].
-      intros; eapply ruttc_bind; [apply IHe2 |].
-      intros; apply I2F_refine_lift.
+      eapply ruttc_bind; [apply IHe1 | intros].
+      eapply ruttc_bind; [apply IHe2 | intros].
+      apply I2F_refine_lift.
       now apply I2F_eval_iop.
     - destruct v; cbn; intros.
-      eapply ruttc_bind; [apply IHe |].
-      intros; apply I2F_refine_lift.
+      eapply ruttc_bind; [apply IHe | intros].
+      apply I2F_refine_lift.
       now apply I2F_eval_fneg.
     - cbn; intros.
-      eapply ruttc_bind; [apply IHe1 |].
-      intros; eapply ruttc_bind; [apply IHe2 |].
-      intros; apply I2F_refine_lift.
+      eapply ruttc_bind; [apply IHe1 | intros].
+      eapply ruttc_bind; [apply IHe2 | intros].
+      apply I2F_refine_lift.
       now apply I2F_eval_icmp.
     - cbn; intros.
-      eapply ruttc_bind; [apply IHe1 |].
-      intros; eapply ruttc_bind; [apply IHe2 |].
-      intros; apply I2F_refine_lift.
+      eapply ruttc_bind; [apply IHe1 | intros].
+      eapply ruttc_bind; [apply IHe2 | intros].
+      apply I2F_refine_lift.
       now apply I2F_eval_fop.
     - cbn; intros.
-      eapply ruttc_bind; [apply IHe1 |].
-      intros; eapply ruttc_bind; [apply IHe2 |].
-      intros; apply I2F_refine_lift.
+      eapply ruttc_bind; [apply IHe1 | intros].
+      eapply ruttc_bind; [apply IHe2 | intros].
+      apply I2F_refine_lift.
       now apply I2F_eval_fcmp.
-     
+    - cbn; intros _.
+      eapply ruttc_bind; [apply IHe | intros].
+      apply I2F_refine_lift.
+      now apply I2F_convert.
+    - destruct ptrval; cbn; intros _.
+      eapply ruttc_bind; [apply IHe | intros].
+      eapply ruttc_bind.
+      + apply ruttc_map_monad.
+        intros [x y] HIN; now apply (H (x,y)).
+      + intros; apply I2F_refine_lift.
+        now apply I2F_eval_gep.
+    - destruct vec, idx; cbn; intros _.
+      eapply ruttc_bind; [apply IHe | intros].
+      eapply ruttc_bind; [apply IHe0 | intros].
+      apply I2F_refine_lift.
+      now apply I2F_extract_element.
+    - destruct vec, elt, idx; cbn; intros _.
+      eapply ruttc_bind; [apply IHe | intros].
+      eapply ruttc_bind; [apply IHe0 | intros].
+      eapply ruttc_bind; [apply IHe1 | intros].
+      apply I2F_refine_lift.
+      now apply I2F_insert_element.
+    - destruct vec1,vec2,idxmask; cbn; intros _.
+      eapply ruttc_bind; [apply IHe | intros].
+      eapply ruttc_bind; [apply IHe0 | intros].
+      eapply ruttc_bind; [apply IHe1 | intros]...
+    - destruct vec; cbn; intros _.
+      eapply ruttc_bind; [apply IHe | intros].
+      apply I2F_refine_lift.
+      now apply I2F_extract_value.
+    - destruct vec, elt; cbn; intros _.
+      eapply ruttc_bind; [apply IHe | intros].
+      eapply ruttc_bind; [apply IHe0 | intros].
+      apply I2F_refine_lift.
+      now apply I2F_insert_value.
+    - destruct cnd,v1,v2; cbn; intros _.
+      eapply ruttc_bind; [apply IHe | intros].
+      eapply ruttc_bind; [apply IHe0 | intros].
+      eapply ruttc_bind; [apply IHe1 | intros].
+      apply I2F_refine_lift.
+      now apply I2F_eval_select.
+    - destruct v; cbn; intros _.
+      eapply ruttc_bind; [apply IHe | intros].
+      now apply I2F_freeze.
+    - cbn; intros _...
+    - cbn; intros _; destruct m...
+      destruct tv; cbn.
+      admit.
+    - (* should patch denotation to avoid case analysis at this level *)
+      admit.
+      
   Admitted.      
 
 End Refinement.
