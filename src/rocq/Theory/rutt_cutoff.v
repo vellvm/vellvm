@@ -147,6 +147,55 @@ Qed.
 
 #[global] Hint Resolve euttge_trans_clo_wcompat : paco.
 
+(* Overly general principle allowing for adjoining
+   non-eq but compatible post-conditions on the sides.
+   Incompatible with rewrite so we specialize right after.
+ *)
+Lemma gruttc_cong_eqit_gen
+  {R1 R2 : Type} {E1 E2 : Type -> Type}
+  {Rcutl : forall A, E1 A -> Prop}
+  {Rcutr : forall B, E2 B -> Prop}
+  {REv : forall A B, E1 A -> E2 B -> Prop}
+  {RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop}
+  {RR1 RR2} {RR : R1 -> R2 -> Prop} b r rg
+  (LERR1: forall x x' y, (RR1 x x': Prop) -> (RR x' y: Prop) -> RR x y)
+  (LERR2: forall x y y', (RR2 y y': Prop) -> RR x y' -> RR x y) :
+  Proper (eqit RR1 b false ==> eqit RR2 b false ==> flip impl)
+    (gpaco2 (ruttc_ Rcutl Rcutr REv RAns RR) (euttge_trans_clo RR) r rg).
+Proof.
+  repeat intro. gclo. econstructor; eauto;
+    try eapply eqit_mon; try apply H; try apply H0; auto.
+Qed.
+
+(* Rewriting [eq_itree eq] *)
+#[global] Instance gruttc_cong_eq_itree
+  {R1 R2 : Type} {E1 E2 : Type -> Type}
+  {Rcutl : forall A, E1 A -> Prop}
+  {Rcutr : forall B, E2 B -> Prop}
+  {REv : forall A B, E1 A -> E2 B -> Prop}
+  {RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop}
+  {RR : R1 -> R2 -> Prop} r rg :
+  Proper (eq_itree eq ==> eq_itree eq ==> flip impl)
+    (gpaco2 (ruttc_ Rcutl Rcutr REv RAns RR) (euttge_trans_clo RR) r rg).
+Proof.
+  repeat intro; eapply gruttc_cong_eqit_gen; eauto; intuition; subst; auto.
+Qed.
+
+(* Rewriting [euttge eq] *)
+#[global] Instance gruttc_cong_euttge
+  {R1 R2 : Type} {E1 E2 : Type -> Type}
+  {Rcutl : forall A, E1 A -> Prop}
+  {Rcutr : forall B, E2 B -> Prop}
+  {REv : forall A B, E1 A -> E2 B -> Prop}
+  {RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop}
+  {RR : R1 -> R2 -> Prop} r rg :
+  Proper (euttge eq ==> euttge eq ==> flip impl)
+    (gpaco2 (ruttc_ Rcutl Rcutr REv RAns RR) (euttge_trans_clo RR) r rg).
+Proof.
+  repeat intro; eapply gruttc_cong_eqit_gen; eauto; intuition; subst; auto.
+Qed.
+
+(* The usual up-to bind *)
 Section RuttcBind.
   Context {E1 E2 : Type -> Type}.
   Context {R1 R2 : Type}.
@@ -192,6 +241,7 @@ Section RuttcBind.
 
 End RuttcBind.
 
+(* Cut-rule derived from the up-to *)
 Lemma ruttc_bind {E1 E2 R1 R2 T1 T2}
   (Rcutl : forall (A : Type), E1 A -> Prop )
   (Rcutr : forall (B : Type), E2 B -> Prop )
@@ -211,6 +261,8 @@ Proof.
   econstructor; eauto. intros; subst. gfinal. right. apply H0. eauto.
 Qed.
 
+(* Proof rules *)
+(* ret *)
 Lemma ruttc_ret {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} (v1 : R1) (v2 : R2):
   RR v1 v2 ->
   @ruttc E1 E2 R1 R2 Rcutr Rcutl REv RAns RR (Ret v1) (Ret v2).
@@ -218,6 +270,7 @@ Proof.
   pfold; constructor; auto.
 Qed. 
 
+(* trigger *)
 Lemma ruttc_trigger {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} (e1 : E1 R1) (e2 : E2 R2):
   REv R1 R2 e1 e2 ->
   (forall a b, RAns R1 R2 e1 a e2 b -> RR a b) ->
@@ -228,6 +281,7 @@ Proof.
   left; pfold; constructor; auto.
 Qed. 
 
+(* trigger_cast *)
 Lemma ruttc_trigger_cast {E1 E2 : Type -> Type} {Rcutr Rcutl} {REv : prerel E1 E2} {RAns A1 A2 RR} (e1 : E1 void) (e2 : E2 void):
   REv void void e1 e2 ->
   @ruttc E1 E2 A1 A2 Rcutr Rcutl REv RAns RR
@@ -240,6 +294,7 @@ Proof.
   constructor; auto; intros [].
 Qed. 
 
+(* map_monad *)
 Lemma ruttc_map_monad {E1 E2 R1 R2 A}
   (Rcutl : forall (A : Type), E1 A -> Prop )
   (Rcutr : forall (B : Type), E2 B -> Prop )
@@ -261,6 +316,40 @@ Proof.
     apply ruttc_ret.
     now constructor.
 Qed.
+
+(* iter *)
+Lemma ruttc_iter {E1 E2 I1 I2 R1 R2}
+  (Rcutl : forall (A : Type), E1 A -> Prop )
+  (Rcutr : forall (B : Type), E2 B -> Prop )
+  (REv : forall A B, E1 A -> E2 B -> Prop)
+  (RAns: forall A B, E1 A -> A -> E2 B -> B -> Prop)
+  (RR: R1 -> R2 -> Prop)
+  (II: I1 -> I2 -> Prop)
+  (f1 : I1 -> itree E1 (I1 + R1))
+  (f2 : I2 -> itree E2 (I2 + R2))
+  (Hind: forall i1 i2, II i1 i2 ->
+                  ruttc Rcutl Rcutr REv RAns
+                    (sum_rel II RR) (f1 i1) (f2 i2))
+  i1 i2 :
+  II i1 i2 ->
+  ruttc Rcutl Rcutr REv RAns RR
+    (ITree.iter f1 i1)
+    (ITree.iter f2 i2).
+Proof.
+  ginit.
+  revert i1 i2.
+  gcofix cih.
+  intros * HI.
+  setoid_rewrite unfold_iter.
+  eapply gpaco2_uclo; [|eapply ruttc_clo_bind|]; eauto with paco.
+  econstructor.
+  now apply Hind.
+  clear i1 i2 HI; intros [|] [|] REL; inv REL.
+  gstep; constructor; eauto with paco.
+  gstep; constructor; eauto.
+Qed.  
+
+
 
 Lemma ruttc_inv_Tau_l :
 forall {E1 E2 : Type -> Type} {R1 R2 : Type} Rcutr Rcutl REv RAns {RR : R1 -> R2 -> Prop}
