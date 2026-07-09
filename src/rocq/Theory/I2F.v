@@ -482,18 +482,18 @@ Section Refinement.
   Lemma I2F_denote_expr :
     forall (e : exp dtyp) τ, I2F_refine (@denote_exp PInf τ e) (@denote_exp PFin τ e).
   Proof.
-    apply (@exp_ind_full dtyp (fun e => forall τ, I2F_refine (@denote_exp PInf τ e) (@denote_exp PFin τ e)) (fun _ => True)); auto.
+    induction e.
     - intros; cbn.
       destruct id; cbn.
       + apply ruttc_trigger; easy.
       + apply ruttc_trigger; easy.
-    - intros x [d|]; cbn.
+    - intros [d|]; cbn.
       2: apply ruttc_trigger_cast; easy.
       apply I2F_refine_lift, I2F_denote_int_syntax_as_int.
-    - intros x [d|]; cbn.
+    - intros [d|]; cbn.
       2: apply ruttc_trigger_cast; easy.
       apply I2F_refine_lift, I2F_denote_float_syntax_as_float.
-    - intros [] ?; cbn; apply ruttc_ret; eauto.
+    - destruct b; intros ?; cbn; apply ruttc_ret; eauto.
     - intros; cbn; apply ruttc_ret.
       constructor; cbn; intuition; reflexivity.
     - (* initializer *)
@@ -502,7 +502,11 @@ Section Refinement.
       apply I2F_refine_lift, I2F_default_dvalue_of_dtyp.
     - cbn.
       intros. 
-      apply ruttc_bind.
+      eapply ruttc_bind.
+      apply ruttc_map_monad.
+      intros [] ?.
+      (* eapply H. *)
+
 Admitted.      
 
 

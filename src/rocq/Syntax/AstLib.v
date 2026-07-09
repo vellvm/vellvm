@@ -315,7 +315,7 @@ Qed.
 
 End TypRect.
 
-Section ExpInd.
+Section ExpIndFull.
 
   Variable T : Set.
   Variable P : (exp T) -> Prop.
@@ -542,8 +542,54 @@ Lemma exp_metadata_mut_ind : (forall (e:exp T), P e) /\ (forall (m:metadata T), 
   - apply metadata_ind; auto.
 Qed.  
 
-End ExpInd.
+End ExpIndFull.
 
+Section ExpInd.
+
+  Variable T : Set.
+  Variable P : (exp T) -> Prop.
+  Hypothesis IH_Ident   : forall (id:ident), P ((EXP_Ident id)).
+  Hypothesis IH_Integer : forall (x:Number.signed_int), P ((EXP_Integer x)).
+  Hypothesis IH_Float   : forall (f:float_syntax), P ((EXP_Float f)).
+  Hypothesis IH_Bool    : forall (b:bool), P ((EXP_Bool b)).
+  Hypothesis IH_Null    : P ((EXP_Null)).
+  Hypothesis IH_Zero_initializer : P ((EXP_Zero_initializer)).
+  Hypothesis IH_Cstring : forall (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Cstring elts)).
+  Hypothesis IH_Undef   : P ((EXP_Undef)).
+  Hypothesis IH_Poison  : P ((EXP_Poison)).
+  Hypothesis IH_Struct  : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Struct fields)).
+  Hypothesis IH_Packed_struct : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Packed_struct fields)).
+  Hypothesis IH_Array   : forall t (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Array t elts)).
+  Hypothesis IH_Vector  : forall t (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Vector t elts)).
+  Hypothesis IH_IBinop  : forall (iop:ibinop) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_IBinop iop t v1 v2)).
+  Hypothesis IH_Fneg    : forall (flags:list fast_math) (v:(T*exp T)), P(snd v) -> P (OP_Fneg flags v).
+  Hypothesis IH_ICmp    : forall (samesign:bool) (cmp:icmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_ICmp samesign cmp t v1 v2)).
+  Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FBinop fop fm t v1 v2)).
+  Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FCmp cmp t v1 v2)).
+  Hypothesis IH_Conversion : forall (conv:conversion_type) (t_from:T) (v:exp T) (t_to:T), P v -> P ((OP_Conversion conv t_from v t_to)).
+  Hypothesis IH_GetElementPtr : forall (t:T) (ptrval:(T * exp T)) (idxs:list (T * exp T)),
+      P (snd ptrval) -> (forall p, In p idxs -> P (snd p)) -> P ((OP_GetElementPtr t ptrval idxs)).
+  Hypothesis IH_ExtractElement: forall (vec:(T * exp T)) (idx:(T * exp T)), P (snd vec) -> P (snd idx) -> P ((OP_ExtractElement vec idx)).
+  Hypothesis IH_InsertElement : forall (vec:(T * exp T)) (elt:(T * exp T)) (idx:(T * exp T)),
+      P (snd vec) -> P (snd elt) -> P (snd idx) -> P ((OP_InsertElement vec elt idx)).
+  Hypothesis IH_ShuffleVector : forall (vec1:(T * exp T)) (vec2:(T * exp T)) (idxmask:(T * exp T)),
+      P (snd vec1) -> P (snd vec2 ) -> P (snd idxmask) -> P ((OP_ShuffleVector vec1 vec2 idxmask)).
+  Hypothesis IH_ExtractValue  : forall (vec:(T * exp T)) (idxs:list int_syntax), P (snd vec) -> P ((OP_ExtractValue vec idxs)).
+  Hypothesis IH_InsertValue   : forall (vec:(T * exp T)) (elt:(T * exp T)) (idxs:list int_syntax), P (snd vec) -> P (snd elt) -> P ((OP_InsertValue vec elt idxs)).
+  Hypothesis IH_Select        : forall (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select cnd v1 v2)).
+  Hypothesis IH_Freeze        : forall (v:(T * exp T)), P (snd v) -> P ((OP_Freeze v)).
+
+  Hypothesis IH_Asm           : forall (sideffect:bool) (alignstack:bool) (inteldialect:bool) (unwind:bool) (template:string) (operand_constraints:string), P(EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints).
+
+  Hypothesis IH_Metadata      : forall (m:metadata T), P (EXP_Metadata m).
+  Hypothesis IH_Splat         : forall (elt:(T * exp T)), P (snd elt) -> P (EXP_Splat elt).
+ 
+  Lemma exp_ind : forall (v:exp T), P v.
+  Proof.
+    apply exp_ind_full with (Q := fun _ => True); auto.
+  Qed.
+  
+End ExpInd.
 
 (* Utility function to determine whether a typ is void or is a function type returning void.
    This is needed in the parser to determine whether a function call instruction should
