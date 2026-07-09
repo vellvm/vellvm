@@ -1109,28 +1109,85 @@ Section Refinement.
   Proof.
   Admitted.
 
-  Lemma I2F_extract_element a1 a2 b1 b2 :
-    I2F_dvalue a1 b1 ->
-    I2F_dvalue a2 b2 ->
-    I2F_EOU I2F_dvalue (extract_element a1 a2) (extract_element b1 b2).
+  (* Keep [split] applications abstract in goals so they can be destructed
+     with occurrence abstraction. *)
+  #[local] Arguments split : simpl never.
+
+  (** Related aggregates split synchronously: either both indexings are out
+      of bounds (the shared UB guard), or the parts are pointwise
+      related. *)
+  Lemma Forall2_split_h {A B} (R : A -> B -> Prop) :
+    forall i (l1 : list A) (l2 : list B),
+      Forall2 R l1 l2 ->
+      forall pre1 pre2, Forall2 R pre1 pre2 ->
+      match split_h pre1 i l1, split_h pre2 i l2 with
+      | Some (p1, x1, q1), Some (p2, x2, q2) =>
+          Forall2 R p1 p2 /\ R x1 x2 /\ Forall2 R q1 q2
+      | None, None => True
+      | _, _ => False
+      end.
   Proof.
-  Admitted.
-  
-  Lemma I2F_insert_element a1 a2 a3 b1 b2 b3 :
-    I2F_dvalue a1 b1 ->
-    I2F_dvalue a2 b2 ->
-    I2F_dvalue a3 b3 ->
-    I2F_EOU I2F_dvalue (insert_element a1 a2 a3) (insert_element b1 b2 b3).
+    intros i l1 l2 F; revert i; induction F; intros i pre1 pre2 FP; cbn; auto.
+    destruct (i =? 0)%Z; cbn.
+    - repeat split; auto.
+    - apply IHF, Forall2_app; auto.
+  Qed.
+
+  Lemma Forall2_split {A B} (R : A -> B -> Prop) :
+    forall i (l1 : list A) (l2 : list B),
+      Forall2 R l1 l2 ->
+      match split [] i l1, split [] i l2 with
+      | Some (p1, x1, q1), Some (p2, x2, q2) =>
+          Forall2 R p1 p2 /\ R x1 x2 /\ Forall2 R q1 q2
+      | None, None => True
+      | _, _ => False
+      end.
   Proof.
-  Admitted.
+    intros i l1 l2 F; unfold split.
+    destruct (i <? 0)%Z; cbn; auto.
+    apply Forall2_split_h; auto.
+  Qed.
+
+  Lemma Forall2_map_Poison : forall ts,
+      Forall2 I2F_dvalue
+        (map (@DVALUE_Poison PInf) ts)
+        (map (@DVALUE_Poison PFin) ts).
+  Proof.
+    induction ts; cbn; auto.
+  Qed.
+
+  (* Split the two related aggregates of the goal synchronously: the
+     out-of-bounds UB is shared, the mixed cases are contradictory, and
+     [tac] finishes the successful case from the pointwise relations. *)
+  Ltac i2f_split_case i tac :=
+    match goal with
+    | F : Forall2 I2F_dvalue ?u ?v |- _ =>
+        let SP := fresh "SP" in
+        pose proof (Forall2_split i F) as SP; revert SP;
+        destruct (split [] i u) as [[[? ?] ?] |],
+                 (split [] i v) as [[[? ?] ?] |];
+        intros SP; cbn; try contradiction; auto;
+        destruct SP as (? & ? & ?); tac
+    end.
 
   Lemma I2F_extract_value a b idxs :
     I2F_dvalue a b ->
     I2F_EOU I2F_dvalue (extract_value a (map denote_int_syntax idxs))
       (extract_value b (map denote_int_syntax idxs)).
   Proof.
-  Admitted.
-  
+    intros R; revert a b R.
+    generalize (map denote_int_syntax idxs) as l; clear idxs.
+    induction l as [| i l IH]; intros a b R; cbn; auto.
+    inversion R; subst; cbn; try (now repeat constructor).
+    - (* Poison: at struct type, the split runs on the shared type list *)
+      destruct τ; cbn; try (now repeat constructor).
+      destruct (split [] i fields) as [[[? ?] ?] |]; cbn; auto.
+    (* Struct, Packed struct, Array *)
+    - i2f_split_case i ltac:(apply IH; auto).
+    - i2f_split_case i ltac:(apply IH; auto).
+    - i2f_split_case i ltac:(apply IH; auto).
+  Qed.
+
   Lemma I2F_insert_value idxs :
     forall a1 a2 b1 b2,
     I2F_dvalue a1 b1 ->
@@ -1138,13 +1195,107 @@ Section Refinement.
     I2F_EOU I2F_dvalue (insert_value a1 a2 (map denote_int_syntax idxs))
       (insert_value b1 b2 (map denote_int_syntax idxs)).
   Proof.
-    induction idxs as [| i idx IH]; [cbn; intros * R1 R2; eauto | intros * R1 R2].
-    inv R1; try now (cbn; eauto).
-    - cbn[map insert_value].
-      destruct τ; eauto.
-      eapply I2F_EOU_bind; eauto.
-  Admitted.
-   
+    generalize (map denote_int_syntax idxs) as l; clear idxs.
+    induction l as [| i l IH]; intros a1 a2 b1 b2 R1 R2; cbn; auto.
+    inversion R1; subst; cbn; try (now repeat constructor).
+    - (* Poison: split on the shared type list, rebuild with poisons *)
+      destruct τ; cbn; try (now repeat constructor).
+      destruct (split [] i fields) as [[[? ?] ?] |]; cbn; auto.
+      eapply I2F_EOU_bind; [apply IH; auto|].
+      intros; do 2 constructor.
+      apply Forall2_app; [apply Forall2_map_Poison |].
+      constructor; [auto | apply Forall2_map_Poison].
+    (* Struct, Packed struct, Array: split, modify the subfield
+       recursively, reassemble *)
+    - i2f_split_case i
+        ltac:(eapply I2F_EOU_bind; [apply IH; auto|];
+              intros; do 2 constructor;
+              apply Forall2_app; [auto | constructor; auto]).
+    - i2f_split_case i
+        ltac:(eapply I2F_EOU_bind; [apply IH; auto|];
+              intros; do 2 constructor;
+              apply Forall2_app; [auto | constructor; auto]).
+    - i2f_split_case i
+        ltac:(eapply I2F_EOU_bind; [apply IH; auto|];
+              intros; do 2 constructor;
+              apply Forall2_app; [auto | constructor; auto]).
+  Qed.
+
+  (* Related values have equal integer interpretations as indices: the
+     only convertible shape is [DVALUE_I], whose payload is shared. *)
+  Lemma I2F_dvalue_to_Z : forall v v',
+      I2F_dvalue v v' ->
+      @dvalue_to_Z PInf v = @dvalue_to_Z PFin v'.
+  Proof.
+    intros * H; inversion H; subst; cbn; auto.
+  Qed.
+
+  Lemma I2F_extract_element a1 a2 b1 b2 :
+    I2F_dvalue a1 b1 ->
+    I2F_dvalue a2 b2 ->
+    I2F_EOU I2F_dvalue (extract_element a1 a2) (extract_element b1 b2).
+  Proof.
+    intros R1 R2.
+    inversion R1; subst; cbn; try (now repeat constructor).
+    (* Vector *)
+    destruct τ; cbn; try (now repeat constructor).
+    rewrite (I2F_dvalue_to_Z R2).
+    destruct (dvalue_to_Z b2) as [i |]; cbn; try (now repeat constructor).
+    i2f_split_case i ltac:(auto).
+  Qed.
+
+  Lemma I2F_insert_element a1 a2 a3 b1 b2 b3 :
+    I2F_dvalue a1 b1 ->
+    I2F_dvalue a2 b2 ->
+    I2F_dvalue a3 b3 ->
+    I2F_EOU I2F_dvalue (insert_element a1 a2 a3) (insert_element b1 b2 b3).
+  Proof.
+    intros R1 R2 R3.
+    inversion R1; subst; cbn; try (now repeat constructor).
+    - (* Poison at vector type: both sides split a vector of poisons *)
+      destruct τ; cbn; try (now repeat constructor).
+      rewrite (I2F_dvalue_to_Z R3).
+      destruct (dvalue_to_Z b3) as [i |]; cbn; try (now repeat constructor).
+      match goal with
+      | |- context [repeat (DVALUE_Poison ?dt) ?n] =>
+          pose proof (Forall2_repeat _ _ _ n (I2F_dvalue_Poison dt)) as F
+      end.
+      i2f_split_case i
+        ltac:(do 2 constructor; apply Forall2_app; [auto | constructor; auto]).
+    - (* Vector *)
+      destruct τ; cbn; try (now repeat constructor).
+      rewrite (I2F_dvalue_to_Z R3).
+      destruct (dvalue_to_Z b3) as [i |]; cbn; try (now repeat constructor).
+      i2f_split_case i
+        ltac:(do 2 constructor; apply Forall2_app; [auto | constructor; auto]).
+  Qed.
+
+  (* Related conditions select related components pointwise; the length
+     mismatches synchronize as the lists are pairwise related. *)
+  Lemma I2F_select_loop : forall conds conds' xs xs' ys ys',
+      Forall2 I2F_dvalue conds conds' ->
+      Forall2 I2F_dvalue xs xs' ->
+      Forall2 I2F_dvalue ys ys' ->
+      I2F_EOU (Forall2 I2F_dvalue)
+        (@select_loop PInf conds xs ys)
+        (@select_loop PFin conds' xs' ys').
+  Proof.
+    intros * F; revert xs xs' ys ys'.
+    induction F; intros xs xs' ys ys' F2 F3;
+      inversion F2; subst; inversion F3; subst; cbn;
+      try (now repeat constructor).
+    (* cons: select the head, then recurse *)
+    eapply I2F_EOU_bind with (RA := I2F_dvalue).
+    - (* the head conditions have the same shape and payload *)
+      match goal with
+      | C : I2F_dvalue ?c ?c' |- context [match ?c with _ => _ end] =>
+          inversion C; subst; cbn; try (now repeat constructor)
+      end;
+      repeat (break_match_goal; cbn); auto.
+    - intros; eapply I2F_EOU_bind; [apply IHF; auto|].
+      intros; do 2 constructor; auto.
+  Qed.
+
   Lemma I2F_eval_select a1 a2 a3 b1 b2 b3 :
     I2F_dvalue a1 b1 ->
     I2F_dvalue a2 b2 ->
@@ -1152,11 +1303,16 @@ Section Refinement.
     I2F_EOU I2F_dvalue (eval_select a1 a2 a3) (eval_select b1 b2 b3).
   Proof.
     intros R1 R2 R3.
-    inv R1; cbn; eauto.
-    - repeat (break_match_goal; eauto).
-    - inv R2; cbn; eauto.
-      inv R3; cbn; eauto.
-  Admitted.
+    inversion R1; subst; cbn; try (now repeat constructor).
+    - (* Scalar condition: only [i1] selects, on a shared test *)
+      repeat (break_match_goal; cbn); auto.
+    - (* Vector of conditions *)
+      inversion R2; subst; cbn; try (now repeat constructor);
+        inversion R3; subst; cbn; try (now repeat constructor).
+      (* Vector × Vector *)
+      eapply I2F_EOU_bind; [apply I2F_select_loop; auto|].
+      intros; do 2 constructor; auto.
+  Qed.
 
   
   Ltac rstep :=
