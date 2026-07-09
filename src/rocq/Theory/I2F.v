@@ -500,6 +500,9 @@ Section Refinement.
       intros [d|]; cbn.
       2: apply ruttc_trigger_cast; easy.
       apply I2F_refine_lift, I2F_default_dvalue_of_dtyp.
+    - cbn.
+      intros. 
+      apply ruttc_bind.
 Admitted.      
 
 
