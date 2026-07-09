@@ -9,6 +9,7 @@ From ITree Require Import ITree Eq HeterogeneousRelations.
 From Vellvm Require Import
   Utils
   Syntax
+  VellvmIntegers
   Integers
   DynamicValues
   EOU
@@ -670,11 +671,42 @@ Section Refinement.
       - now rewrite Integers.eq_true in NC.
     Qed.
 
+    (* Comparison bridges: the finite unsigned comparisons coincide with
+       [mcmpu_Z] on the [unsigned] values. *)
+    Lemma ltu_unsigned_ltb : forall (x y : @bit_int sz),
+        Integers.ltu x y = (unsigned x <? unsigned y)%Z.
+    Proof.
+      intros; unfold Integers.ltu.
+      destruct (zlt _ _) as [l | g]; symmetry.
+      - now apply Z.ltb_lt.
+      - apply Z.ltb_ge; lia.
+    Qed.
+
+    Lemma cmpu_unsigned : forall c (x y : @bit_int sz),
+        Integers.cmpu c x y = mcmpu_Z c (unsigned x) (unsigned y).
+    Proof.
+      intros []; intros; cbv [Integers.cmpu mcmpu_Z];
+        rewrite ?eq_unsigned_eqb, ?ltu_unsigned_ltb; auto.
+      - now rewrite Z.leb_antisym.
+      - now rewrite Z.gtb_ltb.
+      - now rewrite Z.geb_leb, Z.leb_antisym.
+    Qed.
+
   End ArithBridge.
 
   Lemma Z_gtb_irrefl : forall z : Z, (z >? z)%Z = false.
   Proof.
     intros; rewrite Z.gtb_ltb; apply Z.ltb_irrefl.
+  Qed.
+
+  (* The infinite side's same-sign test is always true on unsigned values;
+     the finite side's is constantly true. *)
+  Lemma msamesign_Z_nonneg : forall x y : Z,
+      (0 <= x)%Z -> (0 <= y)%Z -> msamesign_Z x y = true.
+  Proof.
+    intros x y HX HY; unfold msamesign_Z.
+    apply Z.geb_le in HX; apply Z.geb_le in HY.
+    now rewrite HX, HY.
   Qed.
 
   (* Keep the overflow bounds abstract in goals rather than computed to
@@ -683,6 +715,7 @@ Section Refinement.
      [ArithBridge] lemmas apply syntactically. *)
   #[local] Arguments Integers.max_unsigned : simpl never.
   #[local] Arguments Integers.repr : simpl never.
+  #[local] Arguments msamesign_Z : simpl never.
 
   (** Layer 2: on [bit_int sz] arguments both sides run the very same
       computation; only the [dvalue] wrapper differs. *)
@@ -863,11 +896,110 @@ Section Refinement.
     - intros; do 2 constructor; auto.
   Qed.
  
+  (** [I2F_EOU_map_monad] generalized to two [Forall2]-related lists. *)
+  Lemma I2F_EOU_map_monad2 {A1 A2 B1 B2} (RA : A1 -> A2 -> Prop) (RB : B1 -> B2 -> Prop)
+        (f1 : A1 -> EOU B1) (f2 : A2 -> EOU B2) :
+    forall l1 l2,
+      Forall2 RA l1 l2 ->
+      (forall a1 a2, RA a1 a2 -> I2F_EOU RB (f1 a1) (f2 a2)) ->
+      I2F_EOU (Forall2 RB) (map_monad f1 l1) (map_monad f2 l2).
+  Proof.
+    intros l1 l2 F HF; induction F; cbn.
+    - do 2 constructor.
+    - eapply I2F_EOU_bind; [now apply HF|].
+      intros b1 b2 HB.
+      eapply I2F_EOU_bind; [apply IHF|].
+      intros bs1 bs2 HBS.
+      do 2 constructor; auto.
+  Qed.
+
+  (* The float operations are parameter-independent: related inputs have
+     synchronized shapes and identical payloads, so every leaf is
+     diagonal. *)
+  Lemma I2F_eval_fneg_h : forall v v',
+      I2F_dvalue v v' ->
+      I2F_EOU I2F_dvalue (@eval_fneg_h PInf v) (@eval_fneg_h PFin v').
+  Proof.
+    intros * H; inversion H; subst; cbn; now repeat constructor.
+  Qed.
+
   Lemma I2F_eval_fneg a b :
     I2F_dvalue a b ->
     I2F_EOU I2F_dvalue (eval_fneg a) (eval_fneg b).
   Proof.
-  Admitted.
+    intros H.
+    inversion H; subst;
+      try (now (apply I2F_eval_fneg_h; auto)).
+    (* Vector *)
+    cbn.
+    eapply I2F_EOU_bind.
+    - eapply I2F_EOU_map_monad2; eauto.
+      intros; now apply I2F_eval_fneg_h.
+    - intros; do 2 constructor; auto.
+  Qed.
+
+  (** Same-instance [eval_int_icmp]: no [ToDvalue] is involved and all
+      outputs are parameter-independent constructors, so one lemma covers
+      both the [bit_int sz] case and the [Z] case used for address
+      comparisons. *)
+  Lemma I2F_eval_int_icmp_refl : forall Int (VMI : VMemInt Int) samesign icmp (x y : Int),
+      I2F_EOU I2F_dvalue
+        (@eval_int_icmp PInf Int VMI samesign icmp x y)
+        (@eval_int_icmp PFin Int VMI samesign icmp x y).
+  Proof.
+    intros; destruct icmp; cbn;
+      repeat (break_match_goal; cbn); auto.
+  Qed.
+
+  (** [eval_int_icmp] at the intptr instantiations. The signed comparisons
+      are unsupported at iptr type on both sides; the unsigned ones agree
+      through the comparison bridges; the same-sign poison guard is vacuous
+      on both sides (unsigned values are nonnegative on the left, and the
+      finite [msamesign] is constantly [true]). *)
+  Lemma I2F_eval_int_icmp_iptr : forall samesign icmp (x y : @iptr IPZ) (x' y' : @iptr IP64Bit),
+      I2F_Iptr x x' -> I2F_Iptr y y' ->
+      I2F_EOU I2F_dvalue
+        (@eval_int_icmp PInf _ (@VMemInt_iptr IPZ) samesign icmp x y)
+        (@eval_int_icmp PFin _ (@VMemInt_iptr IP64Bit) samesign icmp x' y').
+  Proof.
+    intros * EQ1 EQ2; red in EQ1, EQ2; subst.
+    pose proof (Integers.unsigned_range x'); pose proof (Integers.unsigned_range y').
+    destruct icmp; cbn; try (now repeat constructor);
+      rewrite ?eq_unsigned_eqb, ?ltu_unsigned_ltb, ?Z.gtb_ltb, ?Z.geb_leb, ?Z.leb_antisym;
+      rewrite msamesign_Z_nonneg by lia;
+      cbn; rewrite ?Bool.andb_false_r; cbn;
+      break_match_goal; now repeat constructor.
+  Qed.
+
+  (** The scalar comparison dispatcher. *)
+  Lemma I2F_eval_icmp_h : forall samesign icmp v1 v2 v1' v2',
+      I2F_dvalue v1 v1' ->
+      I2F_dvalue v2 v2' ->
+      I2F_EOU I2F_dvalue
+        (@eval_icmp_h PInf samesign icmp v1 v2)
+        (@eval_icmp_h PFin samesign icmp v1' v2').
+  Proof.
+    intros * H1 H2.
+    inversion H1; subst; inversion H2; subst; cbn;
+      try (now repeat constructor).
+    (* Iptr × Iptr *)
+    all: try (now (apply I2F_eval_int_icmp_iptr; auto)).
+    (* Remaining synchronized rows: [I × I] (after eliminating the
+       bitwidth transport) and [Addr × Addr] (where [ptr_to_int] yields
+       equal integers) run the same computation on both sides, up to the
+       [dvalue] wrapper; close by symbolic execution of the shared tests. *)
+    all: repeat match goal with
+           | HA : I2F_Addr ?a ?b |- _ =>
+               destruct a, b; destruct HA as [HI ->]; red in HI; subst
+           end;
+      try (match goal with
+           | |- context [Pos.eq_dec ?a ?b] =>
+               destruct (Pos.eq_dec a b) as [e | n]; [destruct e|]
+           end);
+      cbv [eq_rec_r eq_rec eq_rect Logic.eq_sym];
+      destruct icmp; cbn;
+      repeat (break_match_goal; cbn); now repeat constructor.
+  Qed.
 
   Lemma I2F_eval_icmp a1 a2 b1 b2 samesign cmp :
     I2F_dvalue a1 b1 ->
@@ -875,22 +1007,95 @@ Section Refinement.
     I2F_EOU I2F_dvalue (eval_icmp samesign cmp a1 a2)
       (eval_icmp samesign cmp b1 b2).
   Proof.
-  Admitted.
+    intros H1 H2.
+    inversion H1; subst; inversion H2; subst;
+      try (now (apply I2F_eval_icmp_h; auto)).
+    (* Vector × Vector *)
+    cbn.
+    repeat match goal with
+           | F : Forall2 I2F_dvalue _ _ |- _ =>
+               rewrite (Forall2_length_N F); revert F
+           end.
+    intros F1 F2.
+    break_match_goal; cbn; auto.
+    eapply I2F_EOU_bind.
+    - apply I2F_EOU_vec_loop; [eapply Forall2_combine; eauto|].
+      intros; apply I2F_eval_icmp_h; auto.
+    - intros; do 2 constructor; auto.
+  Qed.
  
+  Lemma I2F_eval_fop_h : forall c v1 v2 v1' v2',
+      I2F_dvalue v1 v1' ->
+      I2F_dvalue v2 v2' ->
+      I2F_EOU I2F_dvalue
+        (@eval_fop_h PInf c v1 v2)
+        (@eval_fop_h PFin c v1' v2').
+  Proof.
+    intros * H1 H2.
+    inversion H1; subst; inversion H2; subst; cbn;
+      try (now repeat constructor);
+      destruct c; cbn;
+      try (break_match_goal; cbn); now repeat constructor.
+  Qed.
+
   Lemma I2F_eval_fop a1 a2 b1 b2 fop :
     I2F_dvalue a1 b1 ->
     I2F_dvalue a2 b2 ->
     I2F_EOU I2F_dvalue (eval_fop fop a1 a2) (eval_fop fop b1 b2).
   Proof.
-  Admitted.
- 
+    intros H1 H2.
+    inversion H1; subst; inversion H2; subst;
+      try (now (apply I2F_eval_fop_h; auto)).
+    (* Vector × Vector *)
+    cbn.
+    repeat match goal with
+           | F : Forall2 I2F_dvalue _ _ |- _ =>
+               rewrite (Forall2_length_N F); revert F
+           end.
+    intros F1 F2.
+    break_match_goal; cbn; auto.
+    eapply I2F_EOU_bind.
+    - apply I2F_EOU_vec_loop; [eapply Forall2_combine; eauto|].
+      intros; apply I2F_eval_fop_h; auto.
+    - intros; do 2 constructor; auto.
+  Qed.
+
+  Lemma I2F_eval_fcmp_h : forall c v1 v2 v1' v2',
+      I2F_dvalue v1 v1' ->
+      I2F_dvalue v2 v2' ->
+      I2F_EOU I2F_dvalue
+        (@eval_fcmp_h PInf c v1 v2)
+        (@eval_fcmp_h PFin c v1' v2').
+  Proof.
+    intros * H1 H2.
+    inversion H1; subst; inversion H2; subst; cbn;
+      try (now repeat constructor);
+      unfold float_cmp, double_cmp; destruct c; cbn;
+      repeat (break_match_goal; cbn); now repeat constructor.
+  Qed.
+
   Lemma I2F_eval_fcmp a1 a2 b1 b2 cmp :
     I2F_dvalue a1 b1 ->
     I2F_dvalue a2 b2 ->
     I2F_EOU I2F_dvalue (eval_fcmp cmp a1 a2)
       (eval_fcmp cmp b1 b2).
   Proof.
-  Admitted.
+    intros H1 H2.
+    inversion H1; subst; inversion H2; subst;
+      try (now (apply I2F_eval_fcmp_h; auto)).
+    (* Vector × Vector *)
+    cbn.
+    repeat match goal with
+           | F : Forall2 I2F_dvalue _ _ |- _ =>
+               rewrite (Forall2_length_N F); revert F
+           end.
+    intros F1 F2.
+    break_match_goal; cbn; auto.
+    eapply I2F_EOU_bind.
+    - apply I2F_EOU_vec_loop; [eapply Forall2_combine; eauto|].
+      intros; apply I2F_eval_fcmp_h; auto.
+    - intros; do 2 constructor; auto.
+  Qed.
 
   Lemma I2F_convert conv t_from t_to a b :
     I2F_dvalue a b ->
@@ -926,12 +1131,18 @@ Section Refinement.
   Proof.
   Admitted.
   
-  Lemma I2F_insert_value a1 a2 b1 b2 idxs :
+  Lemma I2F_insert_value idxs :
+    forall a1 a2 b1 b2,
     I2F_dvalue a1 b1 ->
     I2F_dvalue a2 b2 ->
     I2F_EOU I2F_dvalue (insert_value a1 a2 (map denote_int_syntax idxs))
       (insert_value b1 b2 (map denote_int_syntax idxs)).
   Proof.
+    induction idxs as [| i idx IH]; [cbn; intros * R1 R2; eauto | intros * R1 R2].
+    inv R1; try now (cbn; eauto).
+    - cbn[map insert_value].
+      destruct τ; eauto.
+      eapply I2F_EOU_bind; eauto.
   Admitted.
    
   Lemma I2F_eval_select a1 a2 a3 b1 b2 b3 :
@@ -940,19 +1151,29 @@ Section Refinement.
     I2F_dvalue a3 b3 ->
     I2F_EOU I2F_dvalue (eval_select a1 a2 a3) (eval_select b1 b2 b3).
   Proof.
+    intros R1 R2 R3.
+    inv R1; cbn; eauto.
+    - repeat (break_match_goal; eauto).
+    - inv R2; cbn; eauto.
+      inv R3; cbn; eauto.
   Admitted.
 
-  Lemma I2F_freeze a b :
-    I2F_dvalue a b ->
-    I2F_refine (freeze a) (freeze b).
-  Proof.
-  Admitted.
   
   Ltac rstep :=
     first [apply ruttc_trigger |
-           apply ruttc_trigger_cast |
-           apply ruttc_ret 
+            apply ruttc_trigger_cast |
+            apply ruttc_ret 
       ].
+  
+  Lemma I2F_freeze a b :
+    I2F_dvalue a b ->
+    I2F_refine (freeze a) (freeze b).
+  Proof with try now (rstep; try (easy); eauto).
+    intros HDV.
+    induction HDV; cbn...
+    
+  Admitted.
+
   Lemma I2F_denote_expr :
     forall (e : exp dtyp) τ, I2F_refine (@denote_exp PInf τ e) (@denote_exp PFin τ e).
   Proof with try now (rstep; try (easy); eauto).
