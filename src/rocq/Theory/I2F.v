@@ -1482,7 +1482,12 @@ Section Refinement.
     unfold denote_exp', withCall.
     intros.
     unfold I2F_refine_CFG.
-    (* eapply ruttc_translate_inr. *)
+    eapply ruttc_translate_inr'; cycle -1.
+    apply I2F_denote_exp.
+    admit.
+    admit.
+    admit.
+    admit.
   Admitted.
   
   Lemma I2F_denote_instr :

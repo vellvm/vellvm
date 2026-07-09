@@ -53,6 +53,14 @@ Definition TT4 {E F} : prerel E F := fun _ _ _ _ => True.
 Definition TT6 {E F} : postrel E F := fun _ _  _ _ _ _ => True.
 Definition FF6 {E F} : postrel E F := fun _ _  _ _ _ _ => False.
 
+#[global] Instance eq_REv_sum_prerel {E1 E2 D1 D2}:
+  Proper (eq_REv ==> eq_REv ==> eq_REv) (@sum_prerel E1 E2 D1 D2).
+Proof.
+  cbv; intuition.
+  dependent induction H1; constructor; [apply H | apply H0]; auto.
+  dependent induction H1; constructor; [apply H | apply H0]; auto.
+Qed.
+       
 Variant inl_prerel {E1 E2 D1 D2 : Type -> Type}
   (PR : prerel (E1 +' E2) (D1 +' D2)) : prerel E1 D1 :=
   | Inl_prerel A B (e1 : E1 A) (e2 : D1 B) :
@@ -62,6 +70,32 @@ Variant inr_prerel {E1 E2 D1 D2 : Type -> Type}
   (PR : prerel (E1 +' E2) (D1 +' D2)) : prerel E2 D2 :=
   | Inr_prerel A B (e1 : E2 A) (e2 : D2 B) :
     PR _ _ (inr1 e1) (inr1 e2) -> inr_prerel PR _ _ e1 e2.
+
+Lemma eq_REv_sum_rel_inl {E F G H} (RA : prerel E F) (RB : prerel G H) :
+  eq_REv (inl_prerel (sum_prerel RA RB)) RA.
+Proof.
+  cbv; intuition.
+  dependent induction H0; dependent induction H0; auto.
+  now do 2 constructor.
+Qed.
+ 
+Lemma eq_REv_sum_rel_inr {E F G H} (RA : prerel E F) (RB : prerel G H) :
+  eq_REv (inr_prerel (sum_prerel RA RB)) RB.
+Proof.
+  cbv; intuition.
+  dependent induction H0; dependent induction H0; auto.
+  now do 2 constructor.
+Qed.
+
+Variant inl_postrel {E1 E2 D1 D2 : Type -> Type}
+  (PR : postrel (E1 +' E2) (D1 +' D2)) : postrel E1 D1 :=
+  | Inl_postrel A B (e1 : E1 A) a (e2 : D1 B) b :
+    PR _ _ (inl1 e1) a (inl1 e2) b -> inl_postrel PR _ _ e1 a e2 b.
+       
+Variant inr_postrel {E1 E2 D1 D2 : Type -> Type}
+  (PR : postrel (E1 +' E2) (D1 +' D2)) : postrel E2 D2 :=
+  | Inr_postrel A B (e1 : E2 A) a (e2 : D2 B) b :
+    PR _ _ (inr1 e1) a (inr1 e2) b -> inr_postrel PR _ _ e1 a e2 b.
 
 Section RuttcF.
 
@@ -540,6 +574,11 @@ Proof.
   - gstep; do 2 constructor; eauto.   
 Qed. 
 
+(* I give up, there's a nicer proof somewhere by relaxing
+   [ruttc_Proper_R] to implication so that we can weaken
+   REv/RAns over Fi to False, but reproving from scratch
+   is easier.
+ *)
 Lemma ruttc_translate_inr' {E1 E2 F1 F2 R1 R2}
   (Rcutl : pred1 E1) 
   (Rcutr : pred1 E2) 
@@ -553,20 +592,39 @@ Lemma ruttc_translate_inr' {E1 E2 F1 F2 R1 R2}
   (HRcutl: eqp1 Rcutl' (sum_pred1 TT1 Rcutl))
   (HRcutr: eqp1 Rcutr' (sum_pred1 TT1 Rcutr))
   (HREv : eq_REv (inr_prerel REv') REv)
+  (HRAns : eq_RAns (inr_postrel RAns') RAns)
   (t1 : itree E1 R1) (t2 : itree E2 R2) :
   ruttc Rcutl Rcutr REv RAns RR t1 t2 ->
   ruttc Rcutl' Rcutr' REv' RAns'
     RR (translate (inr1 (E1 := F1)) t1) (translate (inr1 (E1 := F2)) t2).
 Proof.
-  intros.
-  eapply ruttc_Proper_R; cycle -1.
-  apply ruttc_translate_inr with (REv' := FF4) (RAns' := FF6); eauto.
-  all: auto.
-  3:reflexivity.
-  (* Should be nicely algebraic with enough infrastructure... *)
-
-Admitted.
-
+  revert t1 t2.
+  ginit; gcofix cih.
+  intros * EQ.
+  punfold EQ; red in EQ.
+  rewrite 2 unfold_translate. 
+  induction EQ; cbn; pclearbot.
+  - now gstep; constructor.
+  - gstep; constructor; eauto with paco.
+  - gstep. constructor; auto.
+    edestruct HREv as [_ HR].
+    specialize (HR e1 e2 H).
+    now dependent induction HR.
+    intros; gfinal; left; eapply cih.
+    apply H0.
+    edestruct HRAns as [HR _].
+    specialize (HR (e1,a) (e2,b)).
+    cbn in *; apply HR.
+    now constructor.
+  - rewrite tau_euttge.
+    rewrite unfold_translate; apply IHEQ.
+  - rewrite tau_euttge.
+    rewrite unfold_translate; apply IHEQ.
+  - gstep; constructor.
+    now apply HRcutl; constructor.
+  - gstep; constructor.
+    now apply HRcutr; constructor.
+Qed. 
 
 Lemma ruttc_inv_Tau_l :
 forall {E1 E2 : Type -> Type} {R1 R2 : Type} Rcutr Rcutl REv RAns {RR : R1 -> R2 -> Prop}
