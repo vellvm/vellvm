@@ -488,13 +488,380 @@ Section Refinement.
         unfold default_dvalue_of_dtyp_i; auto 6.
   Qed.
 
+  (** * Arithmetic bridge: [IPZ] vs [IP64Bit] under [I2F_Iptr]
+
+      [I2F_Iptr x x'] pins [x = unsigned x'], so after substitution both
+      sides of the integer operations compute on [unsigned x'],
+      [unsigned y']. The lemmas below characterize the [unsigned] value of
+      the finite operations on their success paths; the failure paths are
+      absorbed by the [I2F_EOU] cuts (OOM on the right, UB on the left) or
+      synchronize as equal booleans. *)
+
+  Section ArithBridge.
+    Context {sz : positive}.
+
+    Lemma unsigned_add_bounded : forall (x y : @bit_int sz),
+        (unsigned x + unsigned y < @Integers.modulus sz)%Z ->
+        unsigned (Integers.add x y) = (unsigned x + unsigned y)%Z.
+    Proof.
+      intros x y B.
+      pose proof (Integers.unsigned_range x); pose proof (Integers.unsigned_range y).
+      unfold Integers.add.
+      rewrite Integers.unsigned_repr_eq.
+      apply Zmod_small; lia.
+    Qed.
+
+    Lemma unsigned_sub_bounded : forall (x y : @bit_int sz),
+        (unsigned y <= unsigned x)%Z ->
+        unsigned (Integers.sub x y) = (unsigned x - unsigned y)%Z.
+    Proof.
+      intros x y B.
+      pose proof (Integers.unsigned_range x); pose proof (Integers.unsigned_range y).
+      unfold Integers.sub.
+      rewrite Integers.unsigned_repr_eq.
+      apply Zmod_small; lia.
+    Qed.
+
+    Lemma unsigned_divu : forall (x y : @bit_int sz),
+        unsigned y <> 0%Z ->
+        unsigned (Integers.divu x y) = (unsigned x / unsigned y)%Z.
+    Proof.
+      intros x y NZ.
+      pose proof (Integers.unsigned_range x); pose proof (Integers.unsigned_range y).
+      unfold Integers.divu.
+      rewrite Integers.unsigned_repr; auto.
+      unfold Integers.max_unsigned.
+      assert (0 <= unsigned x / unsigned y <= unsigned x)%Z; [| lia].
+      split.
+      - apply Z.div_pos; lia.
+      - apply Z.div_le_upper_bound; nia.
+    Qed.
+
+    Lemma unsigned_modu : forall (x y : @bit_int sz),
+        unsigned y <> 0%Z ->
+        unsigned (Integers.modu x y) = (unsigned x mod unsigned y)%Z.
+    Proof.
+      intros x y NZ.
+      pose proof (Integers.unsigned_range x); pose proof (Integers.unsigned_range y).
+      unfold Integers.modu.
+      rewrite Integers.unsigned_repr; auto.
+      pose proof (Z.mod_pos_bound (unsigned x) (unsigned y) ltac:(lia)).
+      unfold Integers.max_unsigned; lia.
+    Qed.
+
+    Lemma unsigned_shru : forall (x y : @bit_int sz),
+        unsigned (Integers.shru x y) = Z.shiftr (unsigned x) (unsigned y).
+    Proof.
+      intros x y.
+      pose proof (Integers.unsigned_range x); pose proof (Integers.unsigned_range y).
+      unfold Integers.shru.
+      rewrite Integers.unsigned_repr; auto.
+      rewrite Z.shiftr_div_pow2 by lia.
+      assert (0 < 2 ^ unsigned y)%Z by (apply Z.pow_pos_nonneg; lia).
+      unfold Integers.max_unsigned.
+      assert (0 <= unsigned x / 2 ^ unsigned y <= unsigned x)%Z; [| lia].
+      split.
+      - apply Z.div_pos; lia.
+      - apply Z.div_le_upper_bound; nia.
+    Qed.
+
+    (* Bitwise operations: the exact result already fits in [sz] bits. *)
+
+    Lemma unsigned_testbit_above : forall (x : @bit_int sz) i,
+        (Z.pos sz <= i)%Z -> Z.testbit (unsigned x) i = false.
+    Proof.
+      intros x i LE.
+      apply Ztestbit_above with (n := Pos.to_nat sz).
+      - pose proof (Integers.unsigned_range x) as R.
+        unfold Integers.modulus in R.
+        now rewrite <- two_power_pos_nat.
+      - rewrite positive_nat_Z; lia.
+    Qed.
+
+    Lemma max_unsigned_ones : @Integers.max_unsigned sz = Z.ones (Z.pos sz).
+    Proof.
+      unfold Integers.max_unsigned.
+      rewrite Integers.modulus_power, Z.ones_equiv, two_p_equiv.
+      unfold Integers.zwordsize; lia.
+    Qed.
+
+    Lemma Z_bits_range : forall z,
+        (0 <= z)%Z ->
+        (forall i, (Z.pos sz <= i)%Z -> Z.testbit z i = false) ->
+        (0 <= z <= @Integers.max_unsigned sz)%Z.
+    Proof.
+      intros z NN ABOVE; split; auto.
+      apply Ztestbit_le.
+      - pose proof (@Integers.modulus_pos sz).
+        unfold Integers.max_unsigned; lia.
+      - intros i POS TB.
+        rewrite max_unsigned_ones.
+        destruct (Z.ltb_spec i (Z.pos sz)) as [LT | GE].
+        + apply Z.ones_spec_low; lia.
+        + rewrite ABOVE in TB; [discriminate | lia].
+    Qed.
+
+    Lemma unsigned_and_land : forall (x y : @bit_int sz),
+        unsigned (Integers.and x y) = Z.land (unsigned x) (unsigned y).
+    Proof.
+      intros x y.
+      pose proof (Integers.unsigned_range x); pose proof (Integers.unsigned_range y).
+      unfold Integers.and.
+      rewrite Integers.unsigned_repr; auto.
+      apply Z_bits_range.
+      - apply Z.land_nonneg; lia.
+      - intros i LE.
+        rewrite Z.land_spec, !unsigned_testbit_above; auto.
+    Qed.
+
+    Lemma unsigned_or_lor : forall (x y : @bit_int sz),
+        unsigned (Integers.or x y) = Z.lor (unsigned x) (unsigned y).
+    Proof.
+      intros x y.
+      pose proof (Integers.unsigned_range x); pose proof (Integers.unsigned_range y).
+      unfold Integers.or.
+      rewrite Integers.unsigned_repr; auto.
+      apply Z_bits_range.
+      - apply Z.lor_nonneg; lia.
+      - intros i LE.
+        rewrite Z.lor_spec, !unsigned_testbit_above; auto.
+    Qed.
+
+    Lemma unsigned_xor_lxor : forall (x y : @bit_int sz),
+        unsigned (Integers.xor x y) = Z.lxor (unsigned x) (unsigned y).
+    Proof.
+      intros x y.
+      pose proof (Integers.unsigned_range x); pose proof (Integers.unsigned_range y).
+      unfold Integers.xor.
+      rewrite Integers.unsigned_repr; auto.
+      apply Z_bits_range.
+      - apply Z.lxor_nonneg; lia.
+      - intros i LE.
+        rewrite Z.lxor_spec, !unsigned_testbit_above; auto.
+    Qed.
+
+    Lemma eq_unsigned_eqb : forall (x y : @bit_int sz),
+        Integers.eq x y = (unsigned x =? unsigned y)%Z.
+    Proof.
+      intros; unfold Integers.eq.
+      destruct (zeq _ _) as [e | n]; symmetry.
+      - now apply Z.eqb_eq.
+      - now apply Z.eqb_neq.
+    Qed.
+
+    (* The always-[zero] overflow-flag functions of the intptr instances
+       make the poison guards vacuous. *)
+    Lemma eq_zero_one_false : @Integers.eq sz Integers.zero Integers.one = false.
+    Proof.
+      rewrite eq_unsigned_eqb, Integers.unsigned_zero, Integers.unsigned_one.
+      reflexivity.
+    Qed.
+
+    (* The success path of the finite [madd]. *)
+    Lemma unsigned_add_no_carry : forall (x y : @bit_int sz),
+        Integers.eq (Integers.add_carry x y Integers.zero) Integers.one = false ->
+        unsigned (Integers.add x y) = (unsigned x + unsigned y)%Z.
+    Proof.
+      intros x y NC.
+      unfold Integers.add_carry in NC.
+      rewrite Integers.unsigned_zero, Z.add_0_r in NC.
+      revert NC; destruct (zlt _ _) as [LT | GE]; intros NC.
+      - apply unsigned_add_bounded; auto.
+      - now rewrite Integers.eq_true in NC.
+    Qed.
+
+  End ArithBridge.
+
+  Lemma Z_gtb_irrefl : forall z : Z, (z >? z)%Z = false.
+  Proof.
+    intros; rewrite Z.gtb_ltb; apply Z.ltb_irrefl.
+  Qed.
+
+  (* Keep the overflow bounds abstract in goals rather than computed to
+     20-digit literals, and keep [unsigned (repr z)] from reducing to
+     [Z_mod_modulus z], so that explicit [destruct ... eqn:] and the
+     [ArithBridge] lemmas apply syntactically. *)
+  #[local] Arguments Integers.max_unsigned : simpl never.
+  #[local] Arguments Integers.repr : simpl never.
+
+  (** Layer 2: on [bit_int sz] arguments both sides run the very same
+      computation; only the [dvalue] wrapper differs. *)
+  Lemma I2F_eval_int_op_bit_int : forall (sz : positive) iop (x y : @bit_int sz),
+      I2F_EOU I2F_dvalue
+        (@eval_int_op PInf _ _ _ iop x y)
+        (@eval_int_op PFin _ _ _ iop x y).
+  Proof.
+    intros; destruct iop; cbn;
+      repeat (break_match_goal; cbn); auto.
+  Qed.
+
+  (** Layer 1: [eval_int_op] at the intptr instantiations, where the two
+      sides genuinely differ. The instances are pinned explicitly: at the
+      concrete parameters, [iptr IP64Bit] is definitionally [bit_int 64]
+      and inference would otherwise pick [ToDvalue_Int] rather than the
+      [ToDvalue_iptr] used (at abstract [Params]) by [eval_iop_integer_h]. *)
+  Lemma I2F_eval_int_op_iptr : forall iop (x y : @iptr IPZ) (x' y' : @iptr IP64Bit),
+      I2F_Iptr x x' -> I2F_Iptr y y' ->
+      I2F_EOU I2F_dvalue
+        (@eval_int_op PInf (@iptr IPZ) (@VMemInt_iptr IPZ) (@ToDvalue_iptr PInf) iop x y)
+        (@eval_int_op PFin (@iptr IP64Bit) (@VMemInt_iptr IP64Bit) (@ToDvalue_iptr PFin) iop x' y').
+  Proof.
+    intros * EQ1 EQ2; red in EQ1, EQ2; subst.
+    destruct iop; cbn.
+    - (* Add: the finite side OOMs on carry, else values agree *)
+      destruct nuw, nsw; cbn; rewrite ?eq_zero_one_false; cbn;
+        (destruct (Integers.eq (Integers.add_carry x' y' Integers.zero) Integers.one) eqn:NC;
+         cbn; auto;
+         do 2 constructor; red; rewrite unsigned_add_no_carry; auto).
+    - (* Sub: the finite side OOMs on underflow *)
+      destruct nuw, nsw; cbn; rewrite ?eq_zero_one_false; cbn;
+        (destruct ((unsigned y' >? unsigned x')%Z) eqn:B; cbn; auto;
+         rewrite Z.gtb_ltb, Z.ltb_ge in B;
+         do 2 constructor; red; rewrite unsigned_sub_bounded; auto).
+    - (* Mul: the finite side OOMs on overflow; the left side carries a
+         vacuous [z >? z] guard. *)
+      rewrite Z_gtb_irrefl; cbn.
+      destruct ((unsigned x' * unsigned y' >? @Integers.max_unsigned 64)%Z) eqn:B; cbn; auto.
+      rewrite Z.gtb_ltb, Z.ltb_ge in B.
+      assert (RANGE : (0 <= unsigned x' * unsigned y' <= @Integers.max_unsigned 64)%Z).
+      { pose proof (Integers.unsigned_range x'); pose proof (Integers.unsigned_range y'); nia. }
+      rewrite Integers.unsigned_repr; auto.
+      rewrite Z_gtb_irrefl; cbn.
+      do 2 constructor; red; rewrite Integers.unsigned_repr; auto.
+    - (* Shl: same shape as Mul *)
+      rewrite Z_gtb_irrefl; cbn.
+      destruct ((Z.shiftl (unsigned x') (unsigned y') >? @Integers.max_unsigned 64)%Z) eqn:B;
+        cbn; auto.
+      rewrite Z.gtb_ltb, Z.ltb_ge in B.
+      assert (RANGE : (0 <= Z.shiftl (unsigned x') (unsigned y') <= @Integers.max_unsigned 64)%Z).
+      { pose proof (Integers.unsigned_range x'); split; auto.
+        apply Z.shiftl_nonneg; lia. }
+      rewrite Integers.unsigned_repr; auto.
+      rewrite Z_gtb_irrefl; cbn.
+      do 2 constructor; red; rewrite Integers.unsigned_repr; auto.
+    - (* UDiv: division by zero raises UB on both sides (left cut) *)
+      destruct ((unsigned y' =? 0)%Z) eqn:Z0; cbn; auto.
+      apply Z.eqb_neq in Z0.
+      destruct exact; cbn.
+      + destruct ((unsigned x' mod unsigned y' =? 0)%Z) eqn:EX; cbn; auto.
+        do 2 constructor; red; rewrite unsigned_divu; auto.
+      + do 2 constructor; red; rewrite unsigned_divu; auto.
+    - (* SDiv: unsupported at iptr type on both sides *)
+      now repeat constructor.
+    - (* LShr *)
+      rewrite Bool.andb_false_r; cbn.
+      destruct exact; cbn.
+      + destruct ((unsigned x' mod 2 ^ unsigned y' =? 0)%Z) eqn:EX; cbn; auto.
+        do 2 constructor; red; now rewrite unsigned_shru.
+      + do 2 constructor; red; now rewrite unsigned_shru.
+    - (* AShr: unsupported at iptr type on both sides *)
+      now repeat constructor.
+    - (* URem *)
+      destruct ((unsigned y' =? 0)%Z) eqn:Z0; cbn; auto.
+      apply Z.eqb_neq in Z0.
+      do 2 constructor; red; rewrite unsigned_modu; auto.
+    - (* SRem: unsupported at iptr type on both sides *)
+      now repeat constructor.
+    - (* And *)
+      do 2 constructor; red; now rewrite unsigned_and_land.
+    - (* Or *)
+      destruct disjoint; cbn.
+      + rewrite eq_unsigned_eqb, unsigned_or_lor, unsigned_xor_lxor.
+        destruct ((Z.lor (unsigned x') (unsigned y') =? Z.lxor (unsigned x') (unsigned y'))%Z) eqn:D;
+          cbn.
+        * do 2 constructor; red; now rewrite unsigned_or_lor.
+        * now repeat constructor.
+      + do 2 constructor; red; now rewrite unsigned_or_lor.
+    - (* Xor *)
+      do 2 constructor; red; now rewrite unsigned_xor_lxor.
+  Qed.
+
+  (** Compatibility of [I2F_EOU] with [vec_loop] over pairwise-related
+      lists of pairs. *)
+  Lemma I2F_EOU_vec_loop {A1 A2} (R : A1 -> A2 -> Prop)
+        (f1 : A1 -> A1 -> EOU A1) (f2 : A2 -> A2 -> EOU A2) :
+    forall l1 l2,
+      Forall2 (prod_rel R R) l1 l2 ->
+      (forall a b a' b', R a a' -> R b b' -> I2F_EOU R (f1 a b) (f2 a' b')) ->
+      I2F_EOU (Forall2 R) (vec_loop f1 l1) (vec_loop f2 l2).
+  Proof.
+    intros l1 l2 F HF; induction F; cbn.
+    - do 2 constructor.
+    - destruct x as [a b], y as [a' b'], H as [Ha Hb]; cbn in *.
+      eapply I2F_EOU_bind; [apply IHF|].
+      intros acc1 acc2 HACC.
+      eapply I2F_EOU_bind; [now apply HF|].
+      intros v1 v2 HV.
+      do 2 constructor; auto.
+  Qed.
+
+  (* Pairwise-related lists combine to [prod_rel]-related pair lists. *)
+  Lemma Forall2_combine {A1 A2 B1 B2} (RA : A1 -> A2 -> Prop) (RB : B1 -> B2 -> Prop) :
+    forall l1 l2 k1 k2,
+      Forall2 RA l1 l2 -> Forall2 RB k1 k2 ->
+      Forall2 (prod_rel RA RB) (combine l1 k1) (combine l2 k2).
+  Proof.
+    intros l1 l2 k1 k2 F; revert k1 k2; induction F; cbn; intros k1 k2 FK; auto.
+    destruct FK; cbn; auto.
+  Qed.
+
+  Lemma Forall2_length_N {A B} (R : A -> B -> Prop) :
+    forall l1 l2, Forall2 R l1 l2 -> N.length l1 = N.length l2.
+  Proof.
+    intros l1 l2 F; induction F; cbn; auto.
+    now rewrite IHF.
+  Qed.
+
+  (** Layer 3: the scalar dispatcher. Inverting the two value relations
+      keeps the case analysis synchronized (11 shape pairs rather than
+      11²); the remaining cases dispatch to layers 1 and 2, or share
+      their guards. *)
+  Lemma I2F_eval_iop_integer_h : forall iop v1 v2 v1' v2',
+      I2F_dvalue v1 v1' ->
+      I2F_dvalue v2 v2' ->
+      I2F_EOU I2F_dvalue
+        (@eval_iop_integer_h PInf iop v1 v2)
+        (@eval_iop_integer_h PFin iop v1' v2').
+  Proof.
+    intros * H1 H2.
+    inversion H1; subst; inversion H2; subst; cbn;
+      try (now repeat constructor).
+    (* Iptr × Iptr: layer 1 *)
+    all: try (now (apply I2F_eval_int_op_iptr; auto)).
+    (* I sz × I sz0: the bitwidth test is shared, then layer 2 *)
+    all: try (break_match_goal;
+              [ match goal with e : _ = _ |- _ => destruct e end; cbn;
+                apply I2F_eval_int_op_bit_int
+              | now repeat constructor ]).
+    (* Poison rows: the guards are shared, up to [I2F_Iptr] on the payload *)
+    all: destruct iop; cbn; auto;
+      try (match goal with H : I2F_Iptr _ _ |- _ => red in H; subst end);
+      try (break_match_goal; cbn; now auto).
+  Qed.
+
+  (** Layer 4: [eval_iop] adds the pointwise vector case on top of the
+      scalar dispatcher. *)
   Lemma I2F_eval_iop a1 a2 b1 b2 iop :
     I2F_dvalue a1 b1 ->
     I2F_dvalue a2 b2 ->
     I2F_EOU I2F_dvalue (eval_iop iop a1 a2) (eval_iop iop b1 b2).
   Proof.
-    intros.
-  Admitted.
+    intros H1 H2.
+    inversion H1; subst; inversion H2; subst;
+      try (now (apply I2F_eval_iop_integer_h; auto)).
+    (* Vector × Vector *)
+    cbn.
+    repeat match goal with
+           | F : Forall2 I2F_dvalue _ _ |- _ =>
+               rewrite (Forall2_length_N F); revert F
+           end.
+    intros F1 F2.
+    break_match_goal; cbn; auto.
+    eapply I2F_EOU_bind.
+    - apply I2F_EOU_vec_loop; [eapply Forall2_combine; eauto|].
+      intros; apply I2F_eval_iop_integer_h; auto.
+    - intros; do 2 constructor; auto.
+  Qed.
  
   Lemma I2F_eval_fneg a b :
     I2F_dvalue a b ->
