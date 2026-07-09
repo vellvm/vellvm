@@ -1,19 +1,14 @@
-(** * Relation up to tau *)
+(** * Equivalence up to tau with relation on events and cutoffs *)
 
-(** [rutt] ("relation up to tau") is a generalization of [eutt] that may relate trees
-  indexed by different event type families [E]. *)
+(** [rutt] generalizes [eutt] by taking as parameter
+    a relation on the signatures of the related computations.
+    [ruttc] further refines it by allowing to treat some
+    events as valid cutoffs in the refinement: typically,
+    relating Undefined Behavior in the source to any
+    computation in the target.
 
-(** It corresponds roughly to the interpretation of "types as relations" from the relational
-  parametricity model by Reynolds (Types, Abstraction and Parametric Polymorphism).
-  Any polymorphic function [f : forall E R, itree E R -> ...] should respect this relation,
-  in the sense that for any relations [rE], [rR], the implication
-  [rutt rE rR t t' -> (f t ~~ f t')] should hold, where [~~] is some canonical relation on the
-  codomain of [f].
-
-  If we could actually quotient itrees "up to taus", and Coq could generate
-  parametricity ("free") theorems on demand, the above might be a free theorem. *)
-
-(** [rutt] is used to define the [trace_refine] relation in [ITree.ITrace.ITraceDefinition]. *)
+    Things get quite verbose, but it's overall straightforwards.
+ *)
 
 From Vellvm Require Import Tactics Utils.ITreeUtil.
 From Stdlib Require Import
@@ -29,6 +24,7 @@ From ITree Require Import
      Eq
      Basics
      HeterogeneousRelations
+     Rutt
 .
 
 From Paco Require Import paco.
@@ -41,10 +37,9 @@ Section RuttcF.
 
   Context {E1 E2 : Type -> Type}.
   Context {R1 R2 : Type}.
-  (* From the point of view of relational parametricity, it would be more fitting
-  to replace [(REv, RAns)] with one [REv : forall A1 A2, (A1 -> A2 -> Prop) -> (E1 A1 -> E2 A2 -> Prop)].
-  Contributions to that effect are welcome. *)
+  (* Cutoff on the left *)
   Context (Rcutl : forall (A : Type), E1 A -> Prop ).
+  (* Cutoff on the right *)
   Context (Rcutr : forall (B : Type), E2 B -> Prop ).
   Context (REv : forall (A B : Type), E1 A -> E2 B -> Prop ).
   Context (RAns : forall (A B : Type), E1 A -> A -> E2 B -> B -> Prop ).
@@ -71,6 +66,7 @@ Section RuttcF.
   | EqTauR : forall (ot1 : itree' E1 R1) (t2 : itree E2 R2),
       ruttcF sim ot1 (observe t2) ->
       ruttcF sim ot1 (TauF t2)
+  (* New constructors *)
   | EqCutL : forall (A : Type) (e : E1 A) k t,
       Rcutl e ->
       ruttcF sim (VisF e k) t
@@ -95,6 +91,152 @@ Section RuttcF.
 End RuttcF.
 Hint Resolve ruttc_monot : paco.
 Hint Constructors ruttcF : itree.
+
+(* Validity of the up-to [euttge] principle *)
+Lemma euttge_trans_clo_wcompat E1 E2 R1 R2
+  (Rcutl : forall A, E1 A -> Prop)
+  (Rcutr : forall B, E2 B -> Prop)
+  (REv : forall A B, E1 A -> E2 B -> Prop)
+  (RAns : forall A B, E1 A -> A -> E2 B -> B -> Prop )
+  (RR : R1 -> R2 -> Prop) :
+  wcompatible2
+    (ruttc_ Rcutl Rcutr REv RAns RR)
+    (euttge_trans_clo RR).
+Proof.
+  constructor; eauto with paco.
+  { red. intros. eapply euttge_trans_clo_mon; eauto. }
+  intros.
+  destruct PR. punfold EQVl. punfold EQVr. unfold_eqit.
+  hinduction REL before r; intros; clear t1' t2'.
+  - remember (RetF r1) as x. red.
+    hinduction EQVl before r; intros; subst; try inv Heqx; eauto; (try constructor; eauto).
+    remember (RetF r3) as x. hinduction EQVr before r; intros; subst; try inv Heqx; (try constructor; eauto).
+  - red. remember (TauF m1) as x.
+    hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; ( try (constructor; eauto; fail )).
+    remember (TauF m3) as y.
+    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; (try (constructor; eauto; fail)).
+    pclearbot. constructor. gclo. econstructor; eauto with paco.
+  - remember (VisF e1 k1) as x. red.
+    hinduction EQVl before r; intros; subst; try discriminate; try (constructor; eauto; fail).
+    remember (VisF e2 k3) as y.
+    hinduction EQVr before r; intros; subst; try discriminate; try (constructor; eauto; fail).
+    dependent destruction Heqx.
+    dependent destruction Heqy.
+    constructor; auto. intros. apply H0 in H1. pclearbot.
+    apply gpaco2_clo.
+    econstructor; eauto with itree.
+  - remember (TauF t1) as x. red.
+    hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; (try (constructor; eauto; fail)).
+    pclearbot. punfold REL. constructor. eapply IHREL; eauto.
+  - remember (TauF t2) as y. red.
+    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; (try (constructor; eauto; fail)).
+    pclearbot. punfold REL. constructor. eapply IHREL; eauto.
+  - remember (VisF e k) as x. red.
+    hinduction EQVl before r; intros; subst; try inv Heqx; try inv CHECK; (try (constructor; eauto; fail)).
+    dependent destruction H2.
+    now constructor.
+  - remember (VisF e k) as y. red.
+    hinduction EQVr before r; intros; subst; try inv Heqy; try inv CHECK; (try (constructor; eauto; fail)).
+    dependent destruction H2.
+    now constructor.
+Qed.
+
+#[global] Hint Resolve euttge_trans_clo_wcompat : paco.
+
+Section RuttcBind.
+  Context {E1 E2 : Type -> Type}.
+  Context {R1 R2 : Type}.
+  Context (Rcutl : forall (A : Type), E1 A -> Prop ).
+  Context (Rcutr : forall (B : Type), E2 B -> Prop ).
+  Context (REv : forall (A B : Type), E1 A -> E2 B -> Prop).
+  Context (RAns : forall (A B : Type), E1 A -> A -> E2 B -> B -> Prop).
+  Context (RR : R1 -> R2 -> Prop).
+
+  Inductive ruttc_bind_clo (r : itree E1 R1 -> itree E2 R2 -> Prop) :
+    itree E1 R1 -> itree E2 R2 -> Prop :=
+  | rbc_intro_h U1 U2 (RU : U1 -> U2 -> Prop) t1 t2 k1 k2
+      (EQV: ruttc Rcutl Rcutr REv RAns RU t1 t2)
+      (REL: forall u1 u2, RU u1 u2 -> r (k1 u1) (k2 u2))
+    : ruttc_bind_clo r (ITree.bind t1 k1) (ITree.bind t2 k2)
+  .
+  Hint Constructors ruttc_bind_clo: core.
+
+  Lemma ruttc_clo_bind :
+    ruttc_bind_clo <3= gupaco2 (ruttc_ Rcutl Rcutr REv RAns RR) (euttge_trans_clo RR).
+  Proof.
+    intros rr. gcofix CIH. intros. destruct PR.
+    gclo; econstructor; auto_ctrans_eq.
+    1,2: rewrite unfold_bind; reflexivity.
+    punfold EQV. unfold rutt_ in *.
+    hinduction EQV before CIH; intros; pclearbot; cbn;
+      repeat (change (ITree.subst ?k ?m) with (ITree.bind m k)).
+    - gclo. econstructor; auto_ctrans_eq.
+      1,2: reflexivity.
+      eauto with paco.
+    - gstep. econstructor. eauto 7 with paco.
+    - gstep. econstructor; eauto 7 with paco.
+      intros. specialize (H0 a b H1). pclearbot. eauto 7 with paco.
+    - gclo. econstructor; auto_ctrans_eq; cycle -1; eauto; try reflexivity.
+      eapply eqit_Tau_l. rewrite unfold_bind. reflexivity.
+    - gclo. econstructor; auto_ctrans_eq; cycle -1; eauto; try reflexivity.
+      eapply eqit_Tau_l. rewrite unfold_bind. reflexivity.
+    - gstep.
+      now constructor.
+    - gstep.
+      now constructor.
+   Qed.
+
+End RuttcBind.
+
+Lemma ruttc_bind {E1 E2 R1 R2 T1 T2}
+  (Rcutl : forall (A : Type), E1 A -> Prop )
+  (Rcutr : forall (B : Type), E2 B -> Prop )
+  (REv : forall A B, E1 A -> E2 B -> Prop)
+  (RAns: forall A B, E1 A -> A -> E2 B -> B -> Prop)
+  (RR: R1 -> R2 -> Prop) (RT: T1 -> T2 -> Prop) t1 t2 k1 k2:
+  ruttc Rcutl Rcutr REv RAns RR t1 t2 ->
+  (forall r1 r2,
+      RR r1 r2 ->
+      ruttc Rcutl Rcutr REv RAns RT (k1 r1) (k2 r2)) ->
+  ruttc Rcutl Rcutr REv RAns RT (ITree.bind t1 k1) (ITree.bind t2 k2).
+Proof.
+  intros. ginit.
+  (* For some reason [guclo] fails, apparently trying to infer the type in a
+     context with less information? *)
+  eapply gpaco2_uclo; [|eapply ruttc_clo_bind|]; eauto with paco.
+  econstructor; eauto. intros; subst. gfinal. right. apply H0. eauto.
+Qed.
+
+Lemma ruttc_ret {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} (v1 : R1) (v2 : R2):
+  RR v1 v2 ->
+  @ruttc E1 E2 R1 R2 Rcutr Rcutl REv RAns RR (Ret v1) (Ret v2).
+Proof.
+  pfold; constructor; auto.
+Qed. 
+
+Lemma ruttc_trigger {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} (e1 : E1 R1) (e2 : E2 R2):
+  REv R1 R2 e1 e2 ->
+  (forall a b, RAns R1 R2 e1 a e2 b -> RR a b) ->
+  @ruttc E1 E2 R1 R2 Rcutr Rcutl REv RAns RR (ITree.trigger e1) (ITree.trigger e2).
+Proof.
+  pfold; constructor; auto.
+  intros.
+  left; pfold; constructor; auto.
+Qed. 
+
+Lemma ruttc_trigger_cast {E1 E2 : Type -> Type} {Rcutr Rcutl} {REv : prerel E1 E2} {RAns A1 A2 RR} (e1 : E1 void) (e2 : E2 void):
+  REv void void e1 e2 ->
+  @ruttc E1 E2 A1 A2 Rcutr Rcutl REv RAns RR
+    (trigger_cast' e1) (trigger_cast' e2).
+Proof.
+  intros.
+  pfold.
+  unfold trigger_cast.
+  red; cbn.
+  constructor; auto; intros [].
+Qed. 
+
+
 
 Lemma ruttc_inv_Tau_l :
 forall {E1 E2 : Type -> Type} {R1 R2 : Type} Rcutr Rcutl REv RAns {RR : R1 -> R2 -> Prop}
@@ -176,9 +318,9 @@ Proof.
       * clear EQ CHECK.
         subst.
         induction H; pclearbot; eauto with itree.
-        constructor; left; eapply paco2_mon; eauto; intuition.
+        constructor; left; eapply paco2_mon; eauto; intuition easy.
         constructor; auto.
-        intros; left; eapply paco2_mon; eauto; intuition.
+        intros; left; eapply paco2_mon; eauto; intuition easy.
       * clear EQ CHECK.
         unfold id in REL; pclearbot.
         remember (VisF e k2) as ot.
@@ -238,9 +380,9 @@ Proof.
       * clear EQ CHECK.
         subst.
         induction H; pclearbot; eauto with itree.
-        constructor; left; eapply paco2_mon; eauto; intuition.
+        constructor; left; eapply paco2_mon; eauto; intuition easy.
         constructor; auto.
-        intros; left; eapply paco2_mon; eauto; intuition.
+        intros; left; eapply paco2_mon; eauto; intuition easy.
       * clear EQ CHECK.
         unfold id in REL; pclearbot.
         remember (VisF e k1) as ot.
@@ -281,33 +423,4 @@ Proof.
   eapply ruttc_eutt_l, ruttc_eutt_r; eauto; symmetry; eauto.
   eapply ruttc_eutt_l, ruttc_eutt_r; eauto; symmetry; eauto.
 Qed.
-
-Lemma ruttc_trigger {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} (e1 : E1 R1) (e2 : E2 R2):
-  REv R1 R2 e1 e2 ->
-  (forall a b, RAns R1 R2 e1 a e2 b -> RR a b) ->
-  @ruttc E1 E2 R1 R2 Rcutr Rcutl REv RAns RR (ITree.trigger e1) (ITree.trigger e2).
-Proof.
-  pfold; constructor; auto.
-  intros.
-  left; pfold; constructor; auto.
-Qed. 
-
-Lemma ruttc_trigger_cast {E1 E2 : Type -> Type} {Rcutr Rcutl} {REv : prerel E1 E2} {RAns A1 A2 RR} (e1 : E1 void) (e2 : E2 void):
-  REv void void e1 e2 ->
-  @ruttc E1 E2 A1 A2 Rcutr Rcutl REv RAns RR
-    (trigger_cast' e1) (trigger_cast' e2).
-Proof.
-  intros.
-  pfold.
-  unfold trigger_cast.
-  red; cbn.
-  constructor; auto; intros [].
-Qed. 
-
-Lemma ruttc_ret {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} (v1 : R1) (v2 : R2):
-  RR v1 v2 ->
-  @ruttc E1 E2 R1 R2 Rcutr Rcutl REv RAns RR (Ret v1) (Ret v2).
-Proof.
-  pfold; constructor; auto.
-Qed. 
 
