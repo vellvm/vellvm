@@ -162,6 +162,16 @@ Section Denotation.
     | Some (DTYPE_Packed_struct _) => ret tt
     | _ => raise_error "bad type for VALUE_Packed_struct"
     end.
+
+  (* Pure accessor for [EXP_Splat]'s vector type annotation; same rationale
+     as [assert_packed_struct_typ], except that the guard also extracts the
+     length and element type. *)
+  Definition assert_vector_typ (top : option dtyp) : EOU (N * dtyp) :=
+    match top with
+    | None => raise_error "denote_exp given untyped EXP_Splat"
+    | Some (DTYPE_Vector sz t) => ret (sz, t)
+    | Some _ => raise_error "denote_exp given EXP_Splat with non-vector type"
+    end.
   
   Fixpoint freeze {E} `{DrawE -< E} (dv : dvalue) : itree E dvalue :=
     match dv with
@@ -334,15 +344,12 @@ Section Denotation.
         raise ("denote_exp encountered inlined asm template " ++ template)
 
     | EXP_Splat elt =>
-        match top with
-        | None => raise ("denote_exp given untyped EXP_Splat")
-        | Some (DTYPE_Vector sz t) =>
-            (* use the type from the splat elt *)
-            v <- eval_texp elt ;;
-            (* this could be very expensive if the vector is big *)
-            ret (DVALUE_Vector t (List.repeat v (N.to_nat sz)))
-        | Some _ => raise ("denote_exp given EXP_Splat with non-vector type")
-        end
+        szt <- lift (assert_vector_typ top) ;;
+        let '(sz, t) := szt in
+        (* use the type from the splat elt *)
+        v <- eval_texp elt ;;
+        (* this could be very expensive if the vector is big *)
+        ret (DVALUE_Vector t (List.repeat v (N.to_nat sz)))
           
     | OP_Freeze (dt, e) =>
         dv <- denote_exp (Some dt) e ;;

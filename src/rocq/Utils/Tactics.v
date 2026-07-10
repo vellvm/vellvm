@@ -129,6 +129,22 @@ Ltac break_match_goal :=
     goal. *)
 Ltac break_match := break_match_goal || break_match_hyp.
 
+Ltac break_hyp_fast :=
+  match goal with
+    | [ H : context [ match ?X with _ => _ end ] |- _] => destruct X
+  end.
+
+(** [break_match_goal] looks for a [match] construct in your goal, and
+    destructs the discriminee, while retaining the information about
+    the discriminee's value leading to the branch being taken. *)
+Ltac break_goal_fast :=
+  match goal with
+    | [ |- context [ match ?X with _ => _ end ] ] =>
+        destruct X
+  end.
+
+Ltac break_fast := break_goal_fast || break_hyp_fast.
+
 (** [break_let] breaks a destructuring [let] for a pair. *)
 Ltac break_let :=
   match goal with

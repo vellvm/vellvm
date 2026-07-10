@@ -1113,17 +1113,302 @@ Section Refinement.
     - intros; do 2 constructor; auto.
   Qed.
 
+  (* Close an in-range [from_Z_bits] success branch: extract the bounds
+     from the guard, then relate [z] with [repr z] through
+     [unsigned_repr], wrapped either as an intptr value or as an
+     address. *)
+  Ltac i2f_in_range_case :=
+    match goal with
+    | B : ((_ <=? _)%Z && (_ >=? _)%Z)%bool = true |- _ =>
+        apply andb_prop in B as [LE GE];
+        apply Z.leb_le in LE; apply Z.geb_le in GE;
+        first
+          [ (* an intptr value *)
+            do 2 constructor; red;
+            rewrite Integers.unsigned_repr; [reflexivity | now split]
+          | (* an address value *)
+            do 2 constructor; split;
+            [ red; rewrite Integers.unsigned_repr; [reflexivity | now split]
+            | reflexivity ]
+          | (* a bare address pair *)
+            do 2 constructor;
+            [ red; rewrite Integers.unsigned_repr; [reflexivity | now split]
+            | reflexivity ] ]
+    end.
+
+  (* [break_match_goal], but refusing to destruct [EOU]-typed scrutinees
+     opaquely: on those the two sides must be reduced in lockstep, either
+     because the scrutinees are the same term or through a dedicated
+     lemma. Failing the outer candidate lets the goal-matching backtrack
+     to the inner (boolean, type) tests. *)
+  Ltac break_match_goal_safe :=
+    match goal with
+    | |- context [match ?X with _ => _ end] =>
+        lazymatch type of X with
+        | EOU _ => fail
+        | _ => destruct X eqn:?
+        end
+    end.
+
+  (** * Bitcast: relating the byte-serialization round-trip.
+
+      The byte-extraction side is parameter-free-valued
+      ([EOU (MaybePoison Z)]): related values expose *equal* bytes, since
+      the payloads are shared ([DVALUE_I], floats) or [to_Z]-equal
+      (intptrs, addresses --- provenance is discarded by design), and the
+      offset/padding arithmetic only reads the shared [dtyp]. *)
+
+  Lemma I2F_dvalue_extract_byte : forall v v',
+      I2F_dvalue v v' ->
+      forall dt idx,
+        @dvalue_extract_byte PInf v dt idx = @dvalue_extract_byte PFin v' dt idx.
+  Proof.
+    induction v using dvalue_ind; intros v' R; inversion R; subst; intros dt idx; cbn; auto.
+    - (* Addr *)
+      repeat match goal with
+        | HA : I2F_Addr ?a ?b |- _ =>
+            destruct a, b; destruct HA as [HI ->]; red in HI; subst
+             end; reflexivity.
+    - admit.
+    - (* Iptr *)
+      match goal with HI : I2F_Iptr _ _ |- _ => red in HI; subst end;
+      reflexivity.
+    - (* Struct: the padding accumulator is baked into the loops from the
+         whole field-type list; generalize it before inducting on the
+         related fields with the type list, offset and index universal *)
+      destruct dt; cbn; auto.
+      admit.
+      (* match goal with *)
+      (* | F : Forall2 I2F_dvalue _ _, IH : Forall _ _ *)
+      (*   |- context [Some (max_preferred_dtyp_alignment ?ts)] => *)
+      (*     generalize (Some (max_preferred_dtyp_alignment ts)) as pad; intros pad; *)
+      (*     revert idx; generalize 0%N as offset; revert pad; revert ts; revert IH; *)
+      (*     induction F; intros IH ts pad offset idx; cbn; *)
+      (*     inversion IH; subst; *)
+      (*     destruct ts; cbn; auto; *)
+      (*     repeat (break_match_goal; cbn); auto *)
+      (* end. *)
+    - (* Packed struct: same, without padding *)
+      destruct dt; cbn; auto.
+      admit.
+      (* match goal with *)
+      (* | F : Forall2 I2F_dvalue _ _, IH : Forall _ _ |- _ => *)
+      (*     revert idx; generalize 0%N as offset; revert fields1; revert IH; *)
+      (*     induction F; intros IH ts offset idx; cbn; *)
+      (*     inversion IH; subst; *)
+      (*     destruct ts; cbn; auto; *)
+      (*     repeat (break_match_goal; cbn); auto *)
+      (* end. *)
+    - (* Array *)
+      destruct dt; cbn; auto.
+      admit.
+      (* match goal with *)
+      (* | F : Forall2 I2F_dvalue _ _, IH : Forall _ _ |- _ => *)
+      (*     revert idx; revert IH; *)
+      (*     induction F; intros IH idx; cbn; auto; *)
+      (*     inversion IH; subst; *)
+      (*     break_match_goal; cbn; auto *)
+      (* end. *)
+    - (* Vector *)
+      destruct dt; cbn; auto.
+      admit.
+      (* match goal with *)
+      (* | F : Forall2 I2F_dvalue _ _, IH : Forall _ _ |- _ => *)
+      (*     revert idx; revert IH; *)
+      (*     induction F; intros IH idx; cbn; auto; *)
+      (*     inversion IH; subst; *)
+      (*     break_match_goal; cbn; auto *)
+      (* end. *)
+  Admitted.
+
+  (** Bitcast round-trips a value through its byte representation. *)
+  Lemma I2F_bitcast_bytes : forall v v' t_from t_to,
+      I2F_dvalue v v' ->
+      I2F_EOU I2F_dvalue
+        (@memory_bytes_to_dvalue PInf (@dvalue_to_memory_bytes PInf v t_from) t_to)
+        (@memory_bytes_to_dvalue PFin (@dvalue_to_memory_bytes PFin v' t_from) t_to).
+  Proof.
+  Admitted.
+
+  (** Related conversion cases: same constructor, related payloads.
+      A computing definition, so that the synchronized destruct in
+      [I2F_convert_h] reduces it by [cbn]. *)
+  Definition I2F_conv_case (c1 : @conv_case PInf) (c2 : @conv_case PFin) : Prop :=
+    match c1, c2 with
+    | Conv_Pure x1, Conv_Pure x2 => I2F_dvalue x1 x2
+    | Conv_ItoP x1, Conv_ItoP x2 => I2F_dvalue x1 x2
+    | Conv_PtoI x1, Conv_PtoI x2 => I2F_dvalue x1 x2
+    | Conv_Oom s1, Conv_Oom s2 => True
+    | Conv_Illegal s1, Conv_Illegal s2 => True
+    | _, _ => False
+    end.
+  
+  (** The single case analysis of the conversion pipeline: related inputs
+      classify into related conversion cases. The goals here are pure and
+      small (no [convert_h] body in sight), which keeps the case product
+      tractable. Bitcast is excluded: its classification runs the byte
+      round-trip (cf. [I2F_bitcast_bytes]), and [convert] intercepts it
+      before [convert_h] anyway. *)
+  Lemma I2F_get_conv_case : forall conv t_from t_to v v',
+      conv <> Bitcast ->
+      I2F_dvalue v v' ->
+      I2F_conv_case
+        (@get_conv_case PInf conv t_from v t_to)
+        (@get_conv_case PFin conv t_from v' t_to).
+  Proof.
+    intros * NB R.
+    destruct conv; try congruence; clear NB; cbn; auto.
+    all: destruct t_from; try constructor.
+    all: induction R; try constructor.
+    all: destruct t_to; try constructor.
+    all: repeat (break_fast; cbn); auto.
+  Qed.
+
+  (* Related values have equal integer interpretations: the convertible
+     shapes carry shared payloads ([DVALUE_I]) or [to_Z]-equal ones
+     ([DVALUE_Iptr]); everything else is interpreted as [0]. *)
+  Lemma I2F_dvalue_int_unsigned : forall v v',
+      I2F_dvalue v v' ->
+      @dvalue_int_unsigned PInf v = @dvalue_int_unsigned PFin v'.
+  Proof.
+    intros * H; inversion H; subst; cbn; auto.
+  Qed.
+
+  (** Scalar conversions, by a single destruct of the related conversion
+      cases: [Conv_Pure] payloads are related outright, [Conv_ItoP] and
+      [Conv_PtoI] go through equal integers ([dvalue_int_unsigned] and
+      [ptr_to_int] agree on related values) followed by the finite
+      [from_Z] in-range analysis, and the failure cases are diagonal. *)
+  Lemma I2F_convert_h : forall conv t_from t_to v v',
+      conv <> Bitcast ->
+      I2F_dvalue v v' ->
+      I2F_EOU I2F_dvalue
+        (@convert_h PInf conv t_from v t_to)
+        (@convert_h PFin conv t_from v' t_to).
+  Proof.
+    intros * NB R.
+    pose proof (I2F_get_conv_case t_from t_to NB R) as CC; revert CC.
+    unfold convert_h.
+    destruct (@get_conv_case PInf conv t_from v t_to),
+             (@get_conv_case PFin conv t_from v' t_to);
+      intros CC; cbn in CC; try contradiction; auto.
+    (* [Conv_Pure], [Conv_Oom] and [Conv_Illegal] are closed by [auto] *)
+    - (* Conv_ItoP: equal integers into [int_to_ptr] *)
+      rewrite (I2F_dvalue_int_unsigned CC); cbn.
+      unfold from_Z_bits.
+      repeat (break_match_goal_safe; cbn); auto.
+      i2f_in_range_case.
+    - (* Conv_PtoI: related addresses expose the same integer *)
+      inversion CC; subst; cbn;
+        repeat match goal with
+          | HA : I2F_Addr ?a ?b |- _ =>
+              destruct a, b; destruct HA as [HI ->]; red in HI; subst
+          end;
+        destruct t_to; cbn; try (now repeat constructor);
+        unfold from_Z_bits;
+        repeat (break_match_goal_safe; cbn); auto;
+        i2f_in_range_case.
+  Qed.
+
+  #[local] Arguments get_vec_conversion_type : simpl never.
+
   Lemma I2F_convert conv t_from t_to a b :
     I2F_dvalue a b ->
     I2F_EOU I2F_dvalue (convert conv t_from a t_to) (convert conv t_from b t_to).
-  Admitted. 
- 
+  Proof.
+    intros R.
+    destruct conv.
+    (* Bitcast: shared guards, then the byte-level round-trip *)
+    12: { cbn.
+          break_match_goal; cbn; auto.
+          break_match_goal; cbn; auto.
+          now apply I2F_bitcast_bytes. }
+    (* all others: pointwise on vectors, scalar [convert_h] otherwise
+       ([Fptrunc]/[Addrspacecast] reduce outright to diagonal errors) *)
+    all: inversion R; subst; cbn.
+    all: try (now (apply I2F_convert_h; [congruence | auto])).
+    all: repeat constructor.
+    all: destruct τ; cbn; try (now repeat constructor).
+    all: break_goal_fast; cbn; try (now repeat constructor).
+    all: break_goal_fast; cbn.
+    all: eapply I2F_EOU_bind;
+         [ eapply I2F_EOU_map_monad2;
+           [ eauto
+           | intros;
+             (* [Fptrunc]/[Addrspacecast] reduce to diagonal errors before
+                [I2F_convert_h] can be re-folded *)
+             first [ apply I2F_convert_h; [congruence | auto]
+                   | now repeat constructor ] ]
+         | intros; cbn; do 2 constructor; eauto ].
+  Qed.
+
+  (** GEP. The offset computation [handle_gep_h] lives in [EOU Z], a
+      parameter-free type: on related indices the two sides are literally
+      equal ([to_Z] agrees on related intptrs). *)
+  Lemma I2F_handle_gep_h : forall vs vs',
+      Forall2 I2F_dvalue vs vs' ->
+      forall t off,
+        @handle_gep_h PInf t off vs = @handle_gep_h PFin t off vs'.
+  Proof.
+    intros vs vs' F; induction F; intros t off; cbn; auto.
+    match goal with
+    | HC : I2F_dvalue ?c ?c' |- _ =>
+        inversion HC; subst; cbn; auto
+    end;
+      try (match goal with
+           | HI : I2F_Iptr _ _ |- _ => red in HI; subst
+           end);
+      repeat (break_goal_fast; cbn); auto.
+  Qed.
+
+  (* The two models share their [Sizeof] instance, but its uses appear
+     behind distinct [Params] projections; align them syntactically. *)
+  Lemma I2F_sizeof_dtyp : forall t,
+      @sizeof_dtyp (@SIZE PInf) t = @sizeof_dtyp (@SIZE PFin) t.
+  Proof. reflexivity. Qed.
+
+  Lemma I2F_handle_gep_addr : forall t a a' vs vs',
+      I2F_Addr a a' ->
+      Forall2 I2F_dvalue vs vs' ->
+      I2F_EOU I2F_Addr
+        (@handle_gep_addr PInf t a vs)
+        (@handle_gep_addr PFin t a' vs').
+  Proof.
+    intros * HA F.
+    destruct a, a'; destruct HA as [HI ->]; red in HI; subst.
+    inversion F; subst; cbn; [now repeat constructor|].
+    match goal with
+    | HC : I2F_dvalue ?c ?c' |- _ =>
+        inversion HC; subst; cbn; try (now repeat constructor)
+    end;
+      try (match goal with
+           | HI : I2F_Iptr _ _ |- _ => red in HI; subst
+           end);
+      unfold from_Z_bits;
+      (* bitwidth-literal dispatch first; the [EOU]-typed scrutinees are
+         skipped, exposing the offset computations at the top *)
+      repeat (break_match_goal_safe; cbn); auto;
+      (* align the two offset computations, then reduce them in lockstep *)
+      try (erewrite I2F_handle_gep_h by eauto;
+           match goal with
+           | |- context [match @handle_gep_h ?pa ?u ?o ?ws with _ => _ end] =>
+               destruct (@handle_gep_h pa u o ws); cbn; auto
+           end);
+      repeat (break_match_goal_safe; cbn); auto;
+      i2f_in_range_case.
+  Qed.
+
   Lemma I2F_eval_gep t a1 a2 b1 b2 :
     I2F_dvalue a1 b1 ->
     Forall2 I2F_dvalue a2 b2 ->
     I2F_EOU I2F_dvalue (eval_gep t a1 a2) (eval_gep t b1 b2).
   Proof.
-  Admitted.
+    intros R F.
+    inversion R; subst; cbn; try (now repeat constructor).
+    (* Addr *)
+    eapply I2F_EOU_bind; [now apply I2F_handle_gep_addr|].
+    intros; do 2 constructor; auto.
+  Qed.
 
   (* Keep [split] applications abstract in goals so they can be destructed
      with occurrence abstraction. *)
@@ -1267,7 +1552,7 @@ Section Refinement.
     I2F_EOU I2F_dvalue (insert_element a1 a2 a3) (insert_element b1 b2 b3).
   Proof.
     intros R1 R2 R3.
-    inversion R1; subst; cbn; try (now repeat constructor).
+    inversion R1; subst; cbn; repeat constructor.
     - (* Poison at vector type: both sides split a vector of poisons *)
       destruct τ; cbn; try (now repeat constructor).
       rewrite (I2F_dvalue_to_Z R3).
@@ -1299,7 +1584,7 @@ Section Refinement.
     intros * F; revert xs xs' ys ys'.
     induction F; intros xs xs' ys ys' F2 F3;
       inversion F2; subst; inversion F3; subst; cbn;
-      try (now repeat constructor).
+      repeat constructor.
     (* cons: select the head, then recurse *)
     eapply I2F_EOU_bind with (RA := I2F_dvalue).
     - (* the head conditions have the same shape and payload *)
@@ -1307,7 +1592,7 @@ Section Refinement.
       | C : I2F_dvalue ?c ?c' |- context [match ?c with _ => _ end] =>
           inversion C; subst; cbn; try (now repeat constructor)
       end;
-      repeat (break_match_goal; cbn); auto.
+      repeat (break_goal_fast; cbn); auto.
     - intros; eapply I2F_EOU_bind; [apply IHF; auto|].
       intros; do 2 constructor; auto.
   Qed.
@@ -1319,12 +1604,12 @@ Section Refinement.
     I2F_EOU I2F_dvalue (eval_select a1 a2 a3) (eval_select b1 b2 b3).
   Proof.
     intros R1 R2 R3.
-    inversion R1; subst; cbn; try (now repeat constructor).
+    inversion R1; subst; cbn; repeat constructor.
     - (* Scalar condition: only [i1] selects, on a shared test *)
       repeat (break_match_goal; cbn); auto.
     - (* Vector of conditions *)
-      inversion R2; subst; cbn; try (now repeat constructor);
-        inversion R3; subst; cbn; try (now repeat constructor).
+      inversion R2; subst; cbn; repeat constructor;
+        inversion R3; subst; cbn; repeat constructor.
       (* Vector × Vector *)
       eapply I2F_EOU_bind; [apply I2F_select_loop; auto|].
       intros; do 2 constructor; auto.
@@ -1468,9 +1753,18 @@ Section Refinement.
     - cbn; intros _; destruct m...
       destruct tv; cbn.
       admit.
-    - (* should patch denotation to avoid case analysis at this level *)
-      admit.
-      
+    - (* EXP_Splat: the vector-type accessor is a pure, parameter-free
+         computation, related to itself by reflexivity of [I2F_EOU] ---
+         no case analysis on the type. *)
+      destruct elt; cbn; intros.
+      eapply ruttc_bind.
+      + apply I2F_refine_lift, I2F_EOU_refl.
+      + intros [sz t'] ? <-; cbn.
+        eapply ruttc_bind; [apply IHe |].
+        intros; apply ruttc_ret.
+        constructor.
+        apply Forall2_repeat; auto.
+
   Admitted.      
 
   Tactic Notation "rbind" uconstr(x) := eapply ruttc_bind with (RR := x).
