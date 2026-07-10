@@ -581,12 +581,17 @@ Section ExpInd.
 
   Hypothesis IH_Asm           : forall (sideffect:bool) (alignstack:bool) (inteldialect:bool) (unwind:bool) (template:string) (operand_constraints:string), P(EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints).
 
-  Hypothesis IH_Metadata      : forall (m:metadata T), P (EXP_Metadata m).
+  Hypothesis IH_Metadata      : forall (m:metadata T), (forall t e, m = METADATA_Const (t,e) -> P e) -> P (EXP_Metadata m).
   Hypothesis IH_Splat         : forall (elt:(T * exp T)), P (snd elt) -> P (EXP_Splat elt).
  
   Lemma exp_ind : forall (v:exp T), P v.
   Proof.
-    apply exp_ind_full with (Q := fun _ => True); auto.
+    assert ((forall e, P e) /\ (forall m t e, m = METADATA_Const (t,e) -> P e)).
+    { apply exp_metadata_mut_ind; auto.
+      all: try congruence.
+      intros [] HP * EQ; inv EQ; auto.
+    }
+    apply H.
   Qed.
   
 End ExpInd.
