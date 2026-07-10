@@ -57,13 +57,13 @@ Lemma I2F_freeze' a b :
   I2F_refine_CFG I2F_dvalue (freeze a) (freeze b).
 Proof with try now (rstep; cbnn; try (easy); eauto).
   (* automation is different in this file from the expression one, to understand *)
-(*   intros HDV. *)
-(*   induction HDV; cbn... *)
-
-(*   all: eapply ruttc_bind; [apply ruttc_map_monad_gen; eauto |]; intros... *)
-(* Qed.  *)
-Admitted.
-
+  intros HDV.
+  induction HDV; cbn...
+  all: try (rstep; now constructor).
+  all: eapply ruttc_bind; [apply ruttc_map_monad_gen; eauto |]; intros...
+  all: try (rstep; now constructor).
+ Qed. 
+  
 Lemma I2F_refine_lift' {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
   I2F_EOU RR m1 m2 ->
   I2F_refine_CFG RR (EOU_to_itree m1) (EOU_to_itree m2).

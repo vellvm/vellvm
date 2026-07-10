@@ -97,6 +97,17 @@ Variant inr_postrel {E1 E2 D1 D2 : Type -> Type}
   | Inr_postrel A B (e1 : E2 A) a (e2 : D2 B) b :
     PR _ _ (inr1 e1) a (inr1 e2) b -> inr_postrel PR _ _ e1 a e2 b.
 
+Lemma eq_RAns_sum_rel_inr {E F G H} (RA : postrel E F) (RB : postrel G H) :
+  eq_RAns (inr_postrel (sum_postrel RA RB)) RB.
+Proof.
+  intros A B; split; intros [e1 a] [e2 b] HR; cbn in *.
+  - dependent induction HR.
+    match goal with
+    | HS : sum_postrel _ _ _ _ _ _ _ _ |- _ => dependent induction HS
+    end; auto.
+  - now do 2 constructor.
+Qed.
+
 Section RuttcF.
 
   Context {E1 E2 : Type -> Type}.
@@ -618,8 +629,8 @@ Lemma ruttc_translate_inr' {E1 E2 F1 F2 R1 R2}
   (REv' : prerel (F1 +' E1) (F2 +' E2))
   (RAns': postrel (F1 +' E1) (F2 +' E2))
   (RR: R1 -> R2 -> Prop)
-  (HRcutl: eqp1 Rcutl' (sum_pred1 TT1 Rcutl))
-  (HRcutr: eqp1 Rcutr' (sum_pred1 TT1 Rcutr))
+  (HRcutl: eqp1 Rcutl' (sum_pred1 FF1 Rcutl))
+  (HRcutr: eqp1 Rcutr' (sum_pred1 FF1 Rcutr))
   (HREv : eq_REv (inr_prerel REv') REv)
   (HRAns : eq_RAns (inr_postrel RAns') RAns)
   (t1 : itree E1 R1) (t2 : itree E2 R2) :

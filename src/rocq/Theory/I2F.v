@@ -1366,14 +1366,16 @@ Section Refinement.
       constructor.
       + apply Forall2_take; constructor; auto.
       + apply IHk.
-  (*       * match goal with *)
-  (*         | |- (length (drop _ (?x :: ?xs)) <= _)%nat => *)
-  (*             pose proof (drop_length_lt (x :: xs) (Npos n)) *)
-  (*         end; *)
-  (*         cbn in *; lia. *)
-  (*       * apply Forall2_drop; constructor; auto. *)
-  (* Qed. *)
-  Admitted.
+        * match goal with
+          | |- (length (drop _ (?x :: ?xs)) <= _)%nat =>
+              pose proof (@drop_length_lt _ (x :: xs) (Npos n))
+          end;
+          cbn in *.
+          forward H1; [lia|].
+          forward H1; [easy|].
+          lia.
+        * apply Forall2_drop; constructor; auto.
+  Qed.
   
   Lemma Forall2_split_every_nil {A B} (R : A -> B -> Prop) :
     forall n l l',
@@ -1381,10 +1383,158 @@ Section Refinement.
       Forall2 (Forall2 R) (split_every_nil n l) (split_every_nil n l').
   Proof.
     intros [|p] l l' F; cbn; [constructor|].
-    (* apply (Forall2_split_every_pos R p (length l)); auto. *)
-  (* Qed. *)
-  Admitted.
+    apply Forall2_split_every_pos with (k := length l); eauto.
+  Qed.
   
+  #[local] Arguments absorb_pois : simpl never.
+
+  (** Once the byte streams are aligned (they are parameter-free), the
+      two sides of [absorb_pois] share their scrutinee: the poison
+      short-circuit is diagonal and only the continuations differ. *)
+  Lemma I2F_absorb_pois {A} (dt : dtyp) (c : EOUP A)
+        (k1 : A -> EOU (@dvalue PInf)) (k2 : A -> EOU (@dvalue PFin)) :
+    (forall a, I2F_EOU I2F_dvalue (k1 a) (k2 a)) ->
+    I2F_EOU I2F_dvalue (@absorb_pois PInf A dt c k1) (@absorb_pois PFin A dt c k2).
+  Proof.
+    intros K; unfold absorb_pois.
+    eapply I2F_EOU_bind with (RA := Logic.eq); [apply I2F_EOU_refl|].
+    intros a ? <-; destruct a; cbn; [now repeat constructor | apply K].
+  Qed.
+
+  (** Deserialization: related byte lists deserialize to related values.
+      Every scalar arm funnels through the shared [EOUP] stream of
+      [memory_byte_value]s (equal by [I2F_mbyte]); [DTYPE_Iptr] and
+      [DTYPE_Pointer] then run the finite in-range analysis, aggregates
+      recurse through the [Forall2] list combinators. *)
+  Lemma I2F_memory_bytes_to_dvalue : forall t dbs dbs',
+      Forall2 I2F_mbyte dbs dbs' ->
+      I2F_EOU I2F_dvalue
+        (@memory_bytes_to_dvalue PInf dbs t)
+        (@memory_bytes_to_dvalue PFin dbs' t).
+  Proof.
+    intros t; induction t using dtyp_ind; intros dbs dbs' F.
+    - (* DTYPE_I *)
+      cbn; rewrite (I2F_map_monad_memory_byte_value F).
+      apply I2F_absorb_pois; intros v; now repeat constructor.
+    - (* DTYPE_Iptr *)
+      cbn; rewrite (I2F_map_monad_memory_byte_value F).
+      apply I2F_absorb_pois; intros v; cbn.
+      unfold from_Z_bits;
+        repeat (break_match_goal_safe; cbn); auto;
+        i2f_in_range_case.
+    - (* DTYPE_Pointer *)
+      cbn; rewrite (I2F_map_monad_memory_byte_value F).
+      apply I2F_absorb_pois; intros v; cbn.
+      unfold from_Z_bits;
+        repeat (break_match_goal_safe; cbn); auto;
+        i2f_in_range_case.
+    - (* DTYPE_Void *) cbn; auto.
+    - (* DTYPE_FP *)
+      destruct f; cbn; auto;
+        rewrite (I2F_map_monad_memory_byte_value F);
+        apply I2F_absorb_pois; intros v; now repeat constructor.
+    - (* DTYPE_Label *) cbn; auto.
+    - (* DTYPE_Token *) cbn; auto.
+    - (* DTYPE_Metadata *) cbn; auto.
+    - (* DTYPE_X86_mmx *) cbn; auto.
+    - (* DTYPE_Array *)
+      cbn.
+      break_match_goal_safe.
+      + eapply I2F_EOU_bind;
+          [ eapply I2F_EOU_map_monad2 with (RA := Forall2 I2F_mbyte);
+            [ apply Forall2_repeatN; constructor
+            | intros ? ? ?; auto ]
+          | intros ? ? ?; do 2 constructor; auto ].
+      + eapply I2F_EOU_bind;
+          [ eapply I2F_EOU_map_monad2 with (RA := Forall2 I2F_mbyte);
+            [ apply Forall2_split_every_nil; auto
+            | intros ? ? ?; auto ]
+          | intros ? ? ?; do 2 constructor; auto ].
+    - (* DTYPE_Struct *)
+      (* [cbn] normalizes both sides' paddings to the same terms: the
+         alignment payload is only tested for [Some]-ness, so it reduces
+         away entirely *)
+      cbn.
+      match goal with
+      | |- context [?L 0%N fields dbs] => set (goL := L)
+      end.
+      match goal with
+      | |- context [?R 0%N fields dbs'] => set (goR := R)
+      end.
+      assert (GO : forall offset xs ys,
+                 Forall2 I2F_mbyte xs ys ->
+                 I2F_EOU (Forall2 I2F_dvalue)
+                   (goL offset fields xs) (goR offset fields ys)).
+      { clear F.
+        match goal with
+        | IHu : forall u, In u fields -> _ |- _ => revert IHu
+        end.
+        induction fields as [| u fs IHf]; intros IH offset xs ys F.
+        - unfold goL, goR; cbn; now repeat constructor.
+        - unfold goL, goR; cbn; fold goL; fold goR.
+          eapply I2F_EOU_bind;
+            [ apply IH; [now left | apply Forall2_take, Forall2_drop; auto] |].
+          intros f1 f2 Hf.
+          eapply I2F_EOU_bind;
+            [ apply IHf;
+              [ intros u0 IN; apply IH; now right
+              | apply Forall2_drop, Forall2_drop; auto ]
+            |].
+          intros r1 r2 Hr.
+          do 2 constructor; auto.
+      }
+      specialize (GO 0%N dbs dbs' F).
+      revert GO; generalize (goL 0%N fields dbs) (goR 0%N fields dbs');
+        intros m1 m2 GO; destruct GO; cbn; auto.
+    - (* DTYPE_Packed_struct *)
+      cbn.
+      match goal with
+      | |- context [?L 0%N fields dbs] => set (goL := L)
+      end.
+      match goal with
+      | |- context [?R 0%N fields dbs'] => set (goR := R)
+      end.
+      assert (GO : forall offset xs ys,
+                 Forall2 I2F_mbyte xs ys ->
+                 I2F_EOU (Forall2 I2F_dvalue)
+                   (goL offset fields xs) (goR offset fields ys)).
+      { clear F.
+        match goal with
+        | IHu : forall u, In u fields -> _ |- _ => revert IHu
+        end.
+        induction fields as [| u fs IHf]; intros IH offset xs ys F.
+        - unfold goL, goR; cbn; now repeat constructor.
+        - unfold goL, goR; cbn; fold goL; fold goR.
+          eapply I2F_EOU_bind;
+            [ apply IH; [now left | apply Forall2_take, Forall2_drop; auto] |].
+          intros f1 f2 Hf.
+          eapply I2F_EOU_bind;
+            [ apply IHf;
+              [ intros u0 IN; apply IH; now right
+              | apply Forall2_drop, Forall2_drop; auto ]
+            |].
+          intros r1 r2 Hr.
+          do 2 constructor; auto.
+      }
+      specialize (GO 0%N dbs dbs' F).
+      revert GO; generalize (goL 0%N fields dbs) (goR 0%N fields dbs');
+        intros m1 m2 GO; destruct GO; cbn; auto.
+    - (* DTYPE_Opaque *) cbn; auto.
+    - (* DTYPE_Vector *)
+      cbn.
+      break_match_goal_safe.
+      + eapply I2F_EOU_bind;
+          [ eapply I2F_EOU_map_monad2 with (RA := Forall2 I2F_mbyte);
+            [ apply Forall2_repeatN; constructor
+            | intros ? ? ?; auto ]
+          | intros ? ? ?; do 2 constructor; auto ].
+      + eapply I2F_EOU_bind;
+          [ eapply I2F_EOU_map_monad2 with (RA := Forall2 I2F_mbyte);
+            [ apply Forall2_split_every_nil; auto
+            | intros ? ? ?; auto ]
+          | intros ? ? ?; do 2 constructor; auto ].
+  Qed.
+
   (** Bitcast round-trips a value through its byte representation. *)
   Lemma I2F_bitcast_bytes : forall v v' t_from t_to,
       I2F_dvalue v v' ->
@@ -1392,7 +1542,8 @@ Section Refinement.
         (@memory_bytes_to_dvalue PInf (@dvalue_to_memory_bytes PInf v t_from) t_to)
         (@memory_bytes_to_dvalue PFin (@dvalue_to_memory_bytes PFin v' t_from) t_to).
   Proof.
-  Admitted.
+    intros; apply I2F_memory_bytes_to_dvalue, I2F_dvalue_to_memory_bytes; auto.
+  Qed.
 
   (** Related conversion cases: same constructor, related payloads.
       A computing definition, so that the synchronized destruct in
@@ -1934,10 +2085,26 @@ Section Refinement.
     unfold I2F_refine_CFG.
     eapply ruttc_translate_inr'; cycle -1.
     apply I2F_denote_exp.
-    admit.
-    admit.
-    admit.
-    admit.
-  Admitted.
+    all:clear.
+    (* The cut predicates only concern the [MCFGEtop] component: the
+       [subevent] injections into [CFGEtop] land in [inr1], and on the
+       [CallE] component both sides are empty. *)
+    - intros A e; split; intros CUT.
+      + depelim CUT; now do 2 constructor.
+      + (* [constructor] fails: unification refuses to unfold the
+           [subevent] instance chain, but the two forms are convertible *)
+        destruct CUT as [? ? [] | ? ? HC]; depelim HC; exact (CutUB v).
+    - intros A e; split; intros CUT.
+      + depelim CUT; now do 2 constructor.
+      + destruct CUT as [? ? [] | ? ? HC]; depelim HC; exact (CutOOM v).
+    (* [rutt_cutoff.inr_prerel] of the (computing) sum is definitionally
+       its right component *)
+    - intros A B; split; intros e1 e2 HR.
+      + now destruct HR.
+      + now constructor.
+    - intros A B; split; intros [e1 a] [e2 b] HR.
+      + now destruct HR.
+      + now constructor.
+  Qed.
   
 End Refinement.
