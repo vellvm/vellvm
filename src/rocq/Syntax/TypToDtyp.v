@@ -159,7 +159,7 @@ Defined.
 
 Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List.length env, t) (lex_ord lt typ_order)} : dtyp :=
   match typ_to_dtyp_base_option env t with
-  | Some dt => DTYPE_Base dt
+  | Some dt => dt
   | None =>
       match t with
       | TYPE_Array sz t =>
@@ -179,27 +179,27 @@ Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List
           | Some dt =>
               if (vector_dtyp_base_dec dt)
               then DTYPE_Vector sz dt
-              else DTYPE_Base DTYPE_Void
-          | None => DTYPE_Base DTYPE_Void
+              else  DTYPE_Void
+          | None =>  DTYPE_Void
           end
       | TYPE_Identified id =>
           let opt := find (fun a => Ident.eq_dec id (fst a)) env in
           match opt with
-          | None => DTYPE_Base DTYPE_Void   (* TODO: should this be None? *)
+          | None =>  DTYPE_Void   (* TODO: should this be None? *)
           | Some (_, t) => typ_to_dtyp (remove_key Ident.eq_dec id env) t
           end
       (* These cases cannot happen *)
-      | TYPE_Function ret args varargs => DTYPE_Base DTYPE_Void
-      | TYPE_I sz => DTYPE_Base DTYPE_Void
-      | TYPE_Iptr => DTYPE_Base DTYPE_Void
-      | TYPE_Pointer t' => DTYPE_Base DTYPE_Void
-      | TYPE_Label => DTYPE_Base DTYPE_Void
-      | TYPE_Token => DTYPE_Base DTYPE_Void
-      | TYPE_Void => DTYPE_Base DTYPE_Void
-      | TYPE_FP fp => DTYPE_Base DTYPE_Void
-      | TYPE_Metadata => DTYPE_Base DTYPE_Void
-      | TYPE_X86_mmx => DTYPE_Base DTYPE_Void
-      | TYPE_Opaque => DTYPE_Base DTYPE_Void
+      | TYPE_Function ret args varargs =>  DTYPE_Void
+      | TYPE_I sz =>  DTYPE_Void
+      | TYPE_Iptr =>  DTYPE_Void
+      | TYPE_Pointer t' =>  DTYPE_Void
+      | TYPE_Label =>  DTYPE_Void
+      | TYPE_Token =>  DTYPE_Void
+      | TYPE_Void =>  DTYPE_Void
+      | TYPE_FP fp =>  DTYPE_Void
+      | TYPE_Metadata =>  DTYPE_Void
+      | TYPE_X86_mmx =>  DTYPE_Void
+      | TYPE_Opaque =>  DTYPE_Void
       end
   end.
 Next Obligation.
@@ -213,7 +213,7 @@ Defined.
 Lemma typ_to_dtyp_equation  : forall env t,
     typ_to_dtyp env t =
   match typ_to_dtyp_base_option env t with
-  | Some dt => DTYPE_Base dt
+  | Some dt =>  dt
   | None =>
       match t with
       | TYPE_Array sz t =>
@@ -233,27 +233,27 @@ Lemma typ_to_dtyp_equation  : forall env t,
           | Some dt =>
               if (vector_dtyp_base_dec dt)
               then DTYPE_Vector sz dt
-              else DTYPE_Base DTYPE_Void
-          | None => DTYPE_Base DTYPE_Void
+              else  DTYPE_Void
+          | None =>  DTYPE_Void
           end
       | TYPE_Identified id =>
           let opt := find (fun a => Ident.eq_dec id (fst a)) env in
           match opt with
-          | None => DTYPE_Base DTYPE_Void   (* TODO: should this be None? *)
+          | None =>  DTYPE_Void   (* TODO: should this be None? *)
           | Some (_, t) => typ_to_dtyp (remove_key Ident.eq_dec id env) t
           end
       (* These cases cannot happen *)
-      | TYPE_Function ret args varargs => DTYPE_Base DTYPE_Void
-      | TYPE_I sz => DTYPE_Base DTYPE_Void
-      | TYPE_Iptr => DTYPE_Base DTYPE_Void
-      | TYPE_Pointer t' => DTYPE_Base DTYPE_Void
-      | TYPE_Label => DTYPE_Base DTYPE_Void
-      | TYPE_Token => DTYPE_Base DTYPE_Void
-      | TYPE_Void => DTYPE_Base DTYPE_Void
-      | TYPE_FP fp => DTYPE_Base DTYPE_Void
-      | TYPE_Metadata => DTYPE_Base DTYPE_Void
-      | TYPE_X86_mmx => DTYPE_Base DTYPE_Void
-      | TYPE_Opaque => DTYPE_Base DTYPE_Void
+      | TYPE_Function ret args varargs =>  DTYPE_Void
+      | TYPE_I sz =>  DTYPE_Void
+      | TYPE_Iptr =>  DTYPE_Void
+      | TYPE_Pointer t' =>  DTYPE_Void
+      | TYPE_Label =>  DTYPE_Void
+      | TYPE_Token =>  DTYPE_Void
+      | TYPE_Void =>  DTYPE_Void
+      | TYPE_FP fp =>  DTYPE_Void
+      | TYPE_Metadata =>  DTYPE_Void
+      | TYPE_X86_mmx =>  DTYPE_Void
+      | TYPE_Opaque =>  DTYPE_Void
       end
   end.
 Proof using.
@@ -273,19 +273,19 @@ Defined.
 (* Specialized version of the characteristic equation for contexts where we don't want to compute *)
 (* SAZ: Not sure where these are needed. *)
 (*
-Lemma typ_to_dtyp_I : forall s i, typ_to_dtyp s (TYPE_I i) = DTYPE_Base (DTYPE_I i).
+Lemma typ_to_dtyp_I : forall s i, typ_to_dtyp s (TYPE_I i) =  (DTYPE_I i).
 Proof using.
   intros; rewrite typ_to_dtyp_equation; reflexivity.
 Qed.
 
-Lemma typ_to_dtyp_D : forall s fp, typ_to_dtyp s (TYPE_FP fp) = (DTYPE_Base (DTYPE_FP fp)).
+Lemma typ_to_dtyp_D : forall s fp, typ_to_dtyp s (TYPE_FP fp) = ( (DTYPE_FP fp)).
 Proof using.
   intros; rewrite typ_to_dtyp_equation; reflexivity.
 Qed.
 
 Lemma typ_to_dtyp_P :
   forall t s,
-    typ_to_dtyp s (TYPE_Pointer t) = (DTYPE_Base DTYPE_Pointer).
+    typ_to_dtyp s (TYPE_Pointer t) = ( DTYPE_Pointer).
 Proof using.
   intros t s.
   apply typ_to_dtyp_equation.

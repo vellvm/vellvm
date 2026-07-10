@@ -41,32 +41,32 @@ Import Logic.
 Section MemoryModel.
   Context {Pa : Params} {MMP : @MemoryModelPrimitives Pa}.
 
-  (* We would like a better representation than a list *)
-  Definition get_consecutive_ptrs (ptr : addr) (size : N) : EOU (list addr) :=
+  (* We would like a better representation than a list *) 
+  Definition get_consecutive_ptrs (p : ptr) (size : N) : EOU (list ptr) :=
     ixs <- intptr_seq 0 size;;
     map_monad
-      (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_Iptr ix])
+      (fun ix => handle_gep_ptr (DTYPE_I 8) p [DVALUE_Base (DVALUE_Iptr ix)])
       ixs.
 
   (** Reading dvalues *)
-  Definition read_bytes (ptr : addr) (size : N) : memM (list memory_byte) :=
-    ptrs <- lift (get_consecutive_ptrs ptr size);;
+  Definition read_bytes (p : ptr) (size : N) : memM (list memory_byte) :=
+    ptrs <- lift (get_consecutive_ptrs p size);;
     (* Actually perform reads *)
     map_monad read_byte ptrs.
   
-  Definition read_dvalue (dt : dtyp) (ptr : addr) : memM dvalue :=
-    bytes <- read_bytes ptr (sizeof_dtyp dt);;
+  Definition read_dvalue (dt : dtyp) (p : ptr) : memM dvalue :=
+    bytes <- read_bytes p (sizeof_dtyp dt);;
     lift (memory_bytes_to_dvalue bytes dt).
 
   (** Writing dvalues *)
-  Definition write_bytes (ptr : addr) (bytes : list memory_byte) : memM unit :=
-    ptrs <- lift (get_consecutive_ptrs ptr (N.length bytes));;
+  Definition write_bytes (p : ptr) (bytes : list memory_byte) : memM unit :=
+    ptrs <- lift (get_consecutive_ptrs p (N.length bytes));;
     let ptr_bytes := zip ptrs bytes in
     (* Actually perform writes *)
     map_monad_ (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
 
-  Definition write_dvalue (dt : dtyp) (ptr : addr) (v : dvalue) : memM unit :=
-    write_bytes ptr (dvalue_to_memory_bytes v dt).
+  Definition write_dvalue (dt : dtyp) (p : ptr) (v : dvalue) : memM unit :=
+    write_bytes p (dvalue_to_memory_bytes v dt).
 
   Definition generate_num_poison_bytes_h
     (start_ix : N) (num : N) (dt : dtyp) : list memory_byte :=
@@ -84,11 +84,11 @@ Section MemoryModel.
     generate_num_poison_bytes (sizeof_dtyp dt) dt.
 
   (** Allocating dtyps *)
-  Definition allocate_bytes (init_bytes : list memory_byte) (align : N) : memM addr :=
+  Definition allocate_bytes (init_bytes : list memory_byte) (align : N) : memM ptr :=
     pr <- fresh_prov;;
     allocate_bytes_with_pr init_bytes align pr.
 
-  Definition allocate_dtyp (dt : dtyp) (num_elements : N) (align : N) : memM addr :=
+  Definition allocate_dtyp (dt : dtyp) (num_elements : N) (align : N) : memM ptr :=
     if dtyp_eqb dt DTYPE_Void
     then mub "allocating void type"
     else element_bytes <- repeatMN num_elements (ret (generate_poison_bytes dt));;
@@ -106,17 +106,17 @@ Section MemoryModel.
             | None => 8%N
             | Some align => align
             end in
-          addr <- allocate_dtyp t n align;;
-          ret (DVALUE_Addr addr)
+          ptr <- allocate_dtyp t n align;;
+          ret (DVALUE_Base (DVALUE_Pointer ptr))
       | Load t a =>
           match a with
-          | DVALUE_Addr a =>
+          | DVALUE_Base (DVALUE_Pointer a) =>
               read_dvalue t a
-          | _ => mub "Loading from something that isn't an address."
+          | _ => mub "Loading from something that isn't an ptress."
           end
       | Store t a v =>
           match a with
-          | DVALUE_Addr a =>
+          | DVALUE_Base (DVALUE_Pointer a) =>
               write_dvalue t a v
           | _ => mub "Writing something to somewhere that isn't an address."
           end
@@ -125,12 +125,12 @@ Section MemoryModel.
   (** ** Memory-sensitive intrinsics *)
   
   (** Malloc *)
-  Definition malloc_bytes (init_bytes : list memory_byte) (align : N) : memM addr :=
+  Definition malloc_bytes (init_bytes : list memory_byte) (align : N) : memM ptr :=
     pr <- fresh_prov;;
     malloc_bytes_with_pr init_bytes align pr.
 
   (** Handle memcpy *)
-  Definition memcpy (src dst : addr) (size : N) (volatile : bool) : memM unit :=
+  Definition memcpy (src dst : ptr) (size : N) (volatile : bool) : memM unit :=
     (* From LangRef: The ‘llvm.memcpy.*’ intrinsics copy a block of
            memory from the source location to the destination location, which
            must either be equal or non-overlapping. *)
@@ -146,7 +146,7 @@ Section MemoryModel.
 
   (** memset spec *)
   Definition memset
-    (dst : addr) (val : int8) (len : Z) (volatile : bool) : memM unit :=
+    (dst : ptr) (val : int8) (len : Z) (volatile : bool) : memM unit :=
     if Z.ltb len 0
     then
       mub "memset given negative length."
@@ -154,25 +154,25 @@ Section MemoryModel.
       let byte := MByte (DVALUE_I 8 val) (DTYPE_I 8) 0 in
       write_bytes dst (repeatN (Z.to_N len) byte).
   
-  Definition handle_memcpy (args : list dvalue) : memM unit :=
+  Definition handle_memcpy (args : list dvalue_base) : memM unit :=
     match args with
-    | DVALUE_Addr dst ::
-        DVALUE_Addr src ::
+    | DVALUE_Pointer dst ::
+        DVALUE_Pointer src ::
         DVALUE_I sz size ::
         DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
         memcpy src dst (Z.to_N (unsigned size)) (equ volatile VellvmIntegers.one)
-    | DVALUE_Addr dst ::
-        DVALUE_Addr src ::
+    | DVALUE_Pointer dst ::
+        DVALUE_Pointer src ::
         DVALUE_Iptr size ::
         DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
         memcpy src dst (Z.to_N (to_Z size)) (equ volatile VellvmIntegers.one)
     | _ => merr "Unsupported arguments to memcpy."
     end.
   
-  Definition handle_memset (args : list dvalue) : memM unit.
+  Definition handle_memset (args : list dvalue_base) : memM unit.
     refine
       (match args with
-       | DVALUE_Addr dst ::
+       | DVALUE_Pointer dst ::
            DVALUE_I sz_val val ::
            DVALUE_I sz_len len ::
            DVALUE_I sz_vol volatile :: [] (* volatile ignored *)  =>
@@ -186,7 +186,7 @@ Section MemoryModel.
     - exact (merr "Unsupported arguments to memset.").
   Defined. 
 
-  Definition handle_malloc (args : list dvalue) (align : N) : memM addr :=
+  Definition handle_malloc (args : list dvalue_base) (align : N) : memM ptr :=
     match args with
     | [DVALUE_I bitwidth sz] =>
         malloc_bytes (generate_num_poison_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8)) align
@@ -195,30 +195,33 @@ Section MemoryModel.
     | _ => merr "Malloc: invalid arguments."
     end.
 
-  Definition handle_free (args : list dvalue) : memM unit :=
+  Definition handle_free (args : list dvalue_base) : memM unit :=
     match args with
-    | [DVALUE_Addr ptr] => free ptr
+    | [DVALUE_Pointer ptr] => free ptr
     | _ => merr "Free: invalid arguments."
     end.
 
+  Definition NONE := DVALUE_Base DVALUE_None.
+  
   Definition handle_intrinsicM : IntrinsicE ~> memM :=
     fun T e =>
       match e with
       | Intrinsic t name args _ =>
+          args' <- lift (map_monad dvalue_to_dvalue_base args) ;;
           (* Pick all arguments, they should all be unique. *)
           (* TODO: add more variants to memcpy *)
           (* FIXME: use reldec typeclass? *)
           if orb (Rocqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i32"))
                (Rocqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i64"))
           then
-            handle_memcpy args;;
-            ret (inr DVALUE_None)
+            handle_memcpy args' ;;
+            ret (inr NONE)
           else
             if orb (Rocqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i32"))
                  (Rocqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i64"))
             then
-              handle_memset args;;
-              ret (inr DVALUE_None)
+              handle_memset args' ;;
+              ret (inr NONE)
             else
               if (Rocqlib.proj_sumbool (string_dec name "malloc"))
               then
@@ -226,13 +229,13 @@ Section MemoryModel.
                    it should be implemented as the best alignment
                    given the size.
                  *)
-                addr <- handle_malloc args 8%N;;
-                ret (inr (DVALUE_Addr addr))
+                ptr <- handle_malloc args' 8%N;;
+                ret (inr (DVALUE_Base (DVALUE_Pointer ptr)))
               else
                 if (Rocqlib.proj_sumbool (string_dec name "free"))
                 then
-                  handle_free args;;
-                  ret (inr DVALUE_None)
+                  handle_free args' ;;
+                  ret (inr NONE)
                 else
                   merr ("Unknown intrinsic: " ++ name)
       end.
@@ -249,13 +252,13 @@ Section Implementation.
       i.e. when the function returns.
       A [frame_stack] is a list of such frames.
    *)
-  Definition Frame := list addr.
+  Definition Frame := list ptr.
   Inductive Framestack : Type :=
   | Singleton (f : Frame)
   | Snoc (s : Framestack) (f : Frame).
 
   (** ** Heaps *)
-  Definition block := list addr.
+  Definition block := list ptr.
   Definition Heap := IntMap block.
 
   (** ** Memory stack
@@ -302,18 +305,18 @@ Section Implementation.
     |}.
 
   (** Operations on memory *)
-  Definition read_byte_raw_mem (mem : memory) (phys_addr : Z) : option byte :=
-    IM.find phys_addr mem.
-  Definition set_byte_raw_mem  (mem : memory) (phys_addr : Z) (byte : byte) : memory :=
-    IM.add phys_addr byte mem.
+  Definition read_byte_raw_mem (mem : memory) (phys_ptr : Z) : option byte :=
+    IM.find phys_ptr mem.
+  Definition set_byte_raw_mem  (mem : memory) (phys_ptr : Z) (byte : byte) : memory :=
+    IM.add phys_ptr byte mem.
   
  (** Add block to memory with a given allocation id *)
   Definition memory_bytes_to_bytes
     (aid : allocationId) (bytes : list memory_byte) : list byte :=
     map (fun b => (b, aid)) bytes.
 
-  (* Register a concrete address in a frame *)
-  Definition add_to_frame (m : memory_stack) (k : addr) : memory_stack :=
+  (* Register a concrete ptress in a frame *)
+  Definition add_to_frame (m : memory_stack) (k : ptr) : memory_stack :=
     let '(mkMemoryStack m s h) := m in
     match s with
     | Singleton f => mkMemoryStack m (Singleton (k :: f)) h
@@ -321,20 +324,20 @@ Section Implementation.
     end.
 
   (* Register a list of concrete addresses in a frame *)
-  Definition add_all_to_frame (ks : list addr) (m : memory_stack) : memory_stack
+  Definition add_all_to_frame (ks : list ptr) (m : memory_stack) : memory_stack
     := fold_left (fun ms k => add_to_frame ms k) ks m.
 
   (* Register a ptr with the heap *)
-  Definition add_to_heap (m : memory_stack) (root : addr) (ptr : addr) : memory_stack :=
+  Definition add_to_heap (m : memory_stack) (root : ptr) (p : ptr) : memory_stack :=
     let '(mkMemoryStack m s h) := m in
-    let h' := add_with (ptr_to_int root) ptr ret cons h in
+    let h' := add_with (ptr_to_int root) p ret cons h in
     mkMemoryStack m s h'.
 
   (* Register a list of concrete addresses in the heap *)
-  Definition add_all_to_heap' (m : memory_stack) (root : addr) (ks : list addr) : memory_stack
+  Definition add_all_to_heap' (m : memory_stack) (root : ptr) (ks : list ptr) : memory_stack
     := fold_left (fun ms k => add_to_heap ms root k) ks m.
 
-  Definition add_all_to_heap (ks : list addr) (m : memory_stack) : memory_stack
+  Definition add_all_to_heap (ks : list ptr) (m : memory_stack) : memory_stack
     := match ks with
        | [] => m
        | (root :: _) =>
@@ -415,9 +418,9 @@ Section Implementation.
     | Snoc s f => ret s
     end.
 
-  Definition read_byte_raw (msg : string) (phys_addr : Z) : memM byte :=
+  Definition read_byte_raw (msg : string) (phys_ptr : Z) : memM byte :=
     s <- get ;;
-    match read_byte_raw_mem (Memory_stack_memory (state_get_memory s)) phys_addr with
+    match read_byte_raw_mem (Memory_stack_memory (state_get_memory s)) phys_ptr with
     | Some b => ret b
     | None => Mub msg
     end.
@@ -427,57 +430,57 @@ Section Implementation.
     upd_mem (set_byte_raw_mem m phys_addr byte).
 
   (** Add block to memory with a given allocation id *)
-  Definition add_block (aid : allocationId) (ptr : addr)
-    (ptrs : list addr) (init_bytes : list memory_byte) : memM unit :=
+  Definition add_block (aid : allocationId) (p : ptr)
+    (ptrs : list ptr) (init_bytes : list memory_byte) : memM unit :=
     let mem_bytes := memory_bytes_to_bytes aid init_bytes in
     m <- get_mem;;
-    upd_mem (add_all_index mem_bytes (ptr_to_int ptr) m).
+    upd_mem (add_all_index mem_bytes (ptr_to_int p) m).
 
   (** Add pointers to the stack frame *)
-  Definition add_ptrs_to_frame (ptrs : list addr) : memM unit :=
+  Definition add_ptrs_to_frame (ptrs : list ptr) : memM unit :=
     app_mem_stack (add_all_to_frame ptrs).
   
-  Definition add_ptrs_to_heap (ptrs : list addr) : memM unit :=
+  Definition add_ptrs_to_heap (ptrs : list ptr) : memM unit :=
     app_mem_stack (add_all_to_heap ptrs).
  
   (** Add a block of bytes to memory, and register it in the current stack frame. *)
-  Definition add_block_to_stack (aid : allocationId) (ptr : addr)
-    (ptrs : list addr) (init_bytes : list memory_byte) : memM unit :=
-    add_block aid ptr ptrs init_bytes;;
+  Definition add_block_to_stack (aid : allocationId) (p : ptr)
+    (ptrs : list ptr) (init_bytes : list memory_byte) : memM unit :=
+    add_block aid p ptrs init_bytes;;
     add_ptrs_to_frame ptrs.
 
   (** Add a block of bytes to memory, and register it in the heap. *)
   (* Should we make sure ptr (the root) is added even if ptrs is empty? *)
-  Definition add_block_to_heap (aid : allocationId) (ptr : addr)
-    (ptrs : list addr) (init_bytes : list memory_byte) : memM unit :=
-    add_block aid ptr ptrs init_bytes;;
+  Definition add_block_to_heap (aid : allocationId) (p : ptr)
+    (ptrs : list ptr) (init_bytes : list memory_byte) : memM unit :=
+    add_block aid p ptrs init_bytes;;
     add_ptrs_to_heap ptrs.
 
-  Definition Read_byte (ptr : addr) : memM memory_byte :=
-    let addr := ptr_to_int ptr in
-    let pr := address_provenance ptr in
+  Definition Read_byte (p : ptr) : memM memory_byte :=
+    let addr := ptr_to_int p in
+    let pr := ptr_provenance p in
     '(byte,aid) <- read_byte_raw "Reading from unallocated memory." addr;;
     if access_allowed pr aid
     then ret byte
     else mub ("Read from memory with invalid provenance").
 
   (** Writes *)
-  Definition Write_byte (ptr : addr) (byte : memory_byte) : memM unit :=
-    let addr := ptr_to_int ptr in
-    let pr := address_provenance ptr in
+  Definition Write_byte (p : ptr) (byte : memory_byte) : memM unit :=
+    let addr := ptr_to_int p in
+    let pr := ptr_provenance p in
     '(_,aid) <- read_byte_raw "Writing to unallocated memory" addr ;;
     if access_allowed pr aid
     then set_byte_raw addr (byte,aid)
     else mub "Trying to write to memory with invalid provenance".
 
-  Definition get_free_block (size : N) (align : N) (pr : provenance) : memM (addr * list addr) :=
+  Definition get_free_block (size : N) (align : N) (pr : provenance) : memM (ptr * list ptr) :=
     let aid := provenance_to_allocation_id pr in
     addr <- next_key size align ;;
     ptr <- lift (int_to_ptr addr (allocation_id_to_prov aid)) ;;
     ptrs <- lift (get_consecutive_ptrs ptr size);;
     ret (ptr,ptrs).
 
-  Definition Allocate_bytes_with_pr (init_bytes : list memory_byte) (align : N) (pr : provenance) : memM addr :=
+  Definition Allocate_bytes_with_pr (init_bytes : list memory_byte) (align : N) (pr : provenance) : memM ptr :=
     let size := N.length init_bytes in
     let aid := provenance_to_allocation_id pr in
     '(ptr, ptrs) <- get_free_block size align pr;;
@@ -485,7 +488,7 @@ Section Implementation.
     ret ptr.
 
   (** Heap allocation *)
-  Definition Malloc_bytes_with_pr (init_bytes : list memory_byte) (align : N) (pr : provenance) : memM addr :=
+  Definition Malloc_bytes_with_pr (init_bytes : list memory_byte) (align : N) (pr : provenance) : memM ptr :=
     let size := N.length init_bytes in
     let aid := provenance_to_allocation_id pr in
     '(ptr, ptrs) <- get_free_block size align pr;;
@@ -510,8 +513,8 @@ Section Implementation.
   Definition free_block_memory (b : block) (m : memory) : memory :=
     fold_left (fun m key => free_byte (ptr_to_int key) m) b m.
 
-  Definition Free (ptr : addr) : memM unit :=
-    let raw_addr := ptr_to_int ptr in
+  Definition Free (p : ptr) : memM unit :=
+    let raw_addr := ptr_to_int p in
     h <- get_heap ;;
     match lookup raw_addr h with
     | None => mub "Attempt to free non-heap allocated address."

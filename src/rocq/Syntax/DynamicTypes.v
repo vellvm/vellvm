@@ -48,6 +48,8 @@ Inductive dtyp : Set :=
 .
 Set Elimination Schemes.
 
+(*  NOTE: to cut down on clutter, we coerce dtyp_base to dtyp *)
+Coercion DTYPE_Base : dtyp_base >-> dtyp.
 
 Lemma dtyp_base_eq_dec : forall (t1 t2 : dtyp_base), {t1 = t2} + {t1 <> t2}.
 Proof.

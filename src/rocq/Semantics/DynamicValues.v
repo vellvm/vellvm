@@ -117,6 +117,16 @@ Section DValue.
   .
   Set Elimination Schemes.
 
+
+  Coercion DVALUE_Base : dvalue_base >-> dvalue.
+
+  (* Partial coercion in the other direction *)
+  Definition dvalue_to_dvalue_base (dv : dvalue) : EOU dvalue_base :=
+    match dv with
+    | DVALUE_Base d => ret d
+    | _ => raise_error "dvalue_to_dvalue_base: got non-base value"
+    end.
+  
   Definition dtyp_base_of_dvalue_base (v:dvalue_base) : option dtyp_base :=
     match v with
     | DVALUE_Pointer a => Some DTYPE_Pointer
@@ -135,14 +145,14 @@ Section DValue.
 
   Definition dtyp_of_dvalue_base (v:dvalue_base) : dtyp :=
     match v with
-    | DVALUE_Pointer a => DTYPE_Base DTYPE_Pointer
-    | DVALUE_I sz x => DTYPE_Base (DTYPE_I sz)
-    | DVALUE_Iptr x => DTYPE_Base (DTYPE_Iptr)
-    | DVALUE_Double x => DTYPE_Base (DTYPE_FP FP_double)
-    | DVALUE_Float x => DTYPE_Base (DTYPE_FP FP_float)
+    | DVALUE_Pointer a => DTYPE_Pointer
+    | DVALUE_I sz x => (DTYPE_I sz)
+    | DVALUE_Iptr x => (DTYPE_Iptr)
+    | DVALUE_Double x => (DTYPE_FP FP_double)
+    | DVALUE_Float x => (DTYPE_FP FP_float)
     | DVALUE_Poison t => t
-    | DVALUE_None => DTYPE_Base DTYPE_Void
-    | DVALUE_B sz bits => DTYPE_Base (DTYPE_B sz)
+    | DVALUE_None =>  DTYPE_Void
+    | DVALUE_B sz bits =>  (DTYPE_B sz)
     end.
   
   Fixpoint dtyp_of_dvalue (v:dvalue) : EOU dtyp :=
@@ -786,11 +796,6 @@ Section DValue.
             cbn in *; lia
       ].
 
-  Definition dvalue_is_poison (dv : dvalue) : bool :=
-    match dv with
-    | DVALUE_Poison dt => true
-    | _ => false
-    end.
 
   Section DecidableEquality.
 
@@ -950,6 +955,12 @@ Section DValue.
   
     Hint Unfold eqv_dvalue : core.
 
+    Definition dvalue_is_poison (dv : dvalue) : bool :=
+      match dv with
+      | DVALUE_Base (DVALUE_Poison dt) => true
+      | _ => false
+      end.
+    
     Lemma ibinop_eq_dec : forall (op1 op2:ibinop), {op1 = op2} + {op1 <> op2}.
       intros.
       repeat decide equality.

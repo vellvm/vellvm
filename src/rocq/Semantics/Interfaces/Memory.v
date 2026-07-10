@@ -123,7 +123,7 @@ Class MemoryModelState {Pa : Params} :=
 Section MemM.
   Context {Pa : Params} {MMS : @MemoryModelState Pa}.
 
-  Definition memM := memS state addr provenance.
+  Definition memM := memS state ptr provenance.
 
   (* Definition get_state  : memM state := fun s => ret (s,s). *)
   (* Definition get_memory : memM memory_stack := fun s => ret (s, state_get_memory s). *)
@@ -136,26 +136,26 @@ Class MemoryModelPrimitives {Pa : Params} :=
     mm_state :: @MemoryModelState Pa ;
 
     (** Reads *)
-    read_byte : addr -> memM memory_byte ;
+    read_byte : ptr -> memM memory_byte ;
 
     (** Writes *)
-    write_byte : addr -> memory_byte -> memM unit ;
+    write_byte : ptr -> memory_byte -> memM unit ;
 
     (** Stack allocations *)
     (* TODO: The list of bytes get huge in practice when allocating big chunk of memory.
        For performance reasons, it might be better to take a different representation here
        ([Fin n -> memory_byte] for [n] the length of the list?)
      *)
-    allocate_bytes_with_pr : list memory_byte -> N -> provenance -> memM addr ;
+    allocate_bytes_with_pr : list memory_byte -> N -> provenance -> memM ptr ;
 
     (** Heap operations *)
-    malloc_bytes_with_pr : list memory_byte -> N -> provenance -> memM addr ;
+    malloc_bytes_with_pr : list memory_byte -> N -> provenance -> memM ptr ;
 
     (* The free intrinsics is implementation specific to avoid exposing
        in the interface both the lookup from heap to blocs, and an iterator
        over them. TODO: rethink if we are happy with it.
      *)
-    free : addr -> memM unit ;
+    free : ptr -> memM unit ;
       
     (** Frame stacks *)
     mempush : memM unit ;
