@@ -90,44 +90,117 @@ Qed.
 #[export] Hint Resolve wf_lt_typ_order : core.
 #[export] Hint Constructors lex_ord : core.
 
-Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List.length env, t) (lex_ord lt typ_order)} : dtyp :=
+Program Fixpoint typ_to_dtyp_base_option (env : list (ident * typ)) (t : typ) {measure (List.length env) lt} : option dtyp_base :=
   match t with
-  | TYPE_Array sz t =>
-    let nt := typ_to_dtyp env t in
-    DTYPE_Array sz nt
-
-  | TYPE_Function ret args varargs =>
-    DTYPE_Pointer
-
-  | TYPE_Struct fields =>
-    let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
-    DTYPE_Struct nfields
-
-  | TYPE_Packed_struct fields =>
-    let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
-    DTYPE_Packed_struct nfields
-
-  | TYPE_Vector sz t =>
-    let nt := typ_to_dtyp env t in
-    DTYPE_Vector sz nt
-
+  | TYPE_Function ret args varargs => Some DTYPE_Pointer
   | TYPE_Identified id =>
     let opt := find (fun a => Ident.eq_dec id (fst a)) env in
     match opt with
-    | None => DTYPE_Void   (* TODO: should this be None? *)
-    | Some (_, t) => typ_to_dtyp (remove_key Ident.eq_dec id env) t
+    | None => None
+    | Some (_, t) => typ_to_dtyp_base_option (remove_key Ident.eq_dec id env) t
     end
+  | TYPE_I sz => Some (DTYPE_I sz)
+  | TYPE_Iptr => Some (DTYPE_Iptr)
+  | TYPE_Pointer t' => Some DTYPE_Pointer
+  | TYPE_Label => Some DTYPE_Label
+  | TYPE_Token => Some DTYPE_Token
+  | TYPE_Void => Some DTYPE_Void
+  | TYPE_FP fp => Some (DTYPE_FP fp)
+  | TYPE_Metadata => Some DTYPE_Metadata
+  | TYPE_X86_mmx => Some DTYPE_X86_mmx
+  | TYPE_Opaque => Some DTYPE_Opaque
+  | TYPE_Array _ _ => None
+  | TYPE_Struct _ => None
+  | TYPE_Vector _ _ => None
+  | TYPE_Packed_struct _ => None
+  end.
+Next Obligation.
+  symmetry in Heq_opt. apply find_some in Heq_opt. destruct Heq_opt as [Hin Heqb_ident].
+  simpl in Heqb_ident.
+  destruct (Ident.eq_dec id wildcard'). subst. eapply remove_key_in. apply Hin.
+  inversion Heqb_ident.
+Defined.
 
-  | TYPE_I sz => DTYPE_I sz
-  | TYPE_Iptr => DTYPE_Iptr
-  | TYPE_Pointer t' => DTYPE_Pointer
-  | TYPE_Label => DTYPE_Label
-  | TYPE_Token => DTYPE_Token
-  | TYPE_Void => DTYPE_Void
-  | TYPE_FP fp => DTYPE_FP fp
-  | TYPE_Metadata => DTYPE_Metadata
-  | TYPE_X86_mmx => DTYPE_X86_mmx
-  | TYPE_Opaque => DTYPE_Opaque
+Lemma typ_to_dtyp_base_option_equation  : forall env t,
+  typ_to_dtyp_base_option env t =
+  match t with
+  | TYPE_Function ret args varargs => Some DTYPE_Pointer
+  | TYPE_Identified id =>
+    let opt := find (fun a => Ident.eq_dec id (fst a)) env in
+    match opt with
+    | None => None
+    | Some (_, t) => typ_to_dtyp_base_option (remove_key Ident.eq_dec id env) t
+    end
+  | TYPE_I sz => Some (DTYPE_I sz)
+  | TYPE_Iptr => Some (DTYPE_Iptr)
+  | TYPE_Pointer t' => Some DTYPE_Pointer
+  | TYPE_Label => Some DTYPE_Label
+  | TYPE_Token => Some DTYPE_Token
+  | TYPE_Void => Some DTYPE_Void
+  | TYPE_FP fp => Some (DTYPE_FP fp)
+  | TYPE_Metadata => Some DTYPE_Metadata
+  | TYPE_X86_mmx => Some DTYPE_X86_mmx
+  | TYPE_Opaque => Some DTYPE_Opaque
+  | TYPE_Array _ _ => None
+  | TYPE_Struct _ => None
+  | TYPE_Vector _ _ => None
+  | TYPE_Packed_struct _ => None
+  end.
+Proof using.
+  intros env t.
+  unfold typ_to_dtyp_base_option.
+  unfold typ_to_dtyp_base_option_func at 1.
+  rewrite WfExtensionality.WfExtensionality.fix_sub_eq_ext. simpl.
+  destruct t; try reflexivity; simpl.
+  destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) env).
+  destruct p; simpl; eauto.
+  reflexivity.
+Defined.
+
+Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List.length env, t) (lex_ord lt typ_order)} : dtyp :=
+  match typ_to_dtyp_base_option env t with
+  | Some dt => DTYPE_Base dt
+  | None =>
+      match t with
+      | TYPE_Array sz t =>
+          let nt := typ_to_dtyp env t in
+          DTYPE_Array sz nt
+
+      | TYPE_Struct fields =>
+          let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
+          DTYPE_Struct false nfields
+
+      | TYPE_Packed_struct fields =>
+          let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
+          DTYPE_Struct true nfields
+
+      | TYPE_Vector sz t =>
+          match typ_to_dtyp_base_option env t with
+          | Some dt =>
+              if (vector_dtyp_base_dec dt)
+              then DTYPE_Vector sz dt
+              else DTYPE_Base DTYPE_Void
+          | None => DTYPE_Base DTYPE_Void
+          end
+      | TYPE_Identified id =>
+          let opt := find (fun a => Ident.eq_dec id (fst a)) env in
+          match opt with
+          | None => DTYPE_Base DTYPE_Void   (* TODO: should this be None? *)
+          | Some (_, t) => typ_to_dtyp (remove_key Ident.eq_dec id env) t
+          end
+      (* These cases cannot happen *)
+      | TYPE_Function ret args varargs => DTYPE_Base DTYPE_Void
+      | TYPE_I sz => DTYPE_Base DTYPE_Void
+      | TYPE_Iptr => DTYPE_Base DTYPE_Void
+      | TYPE_Pointer t' => DTYPE_Base DTYPE_Void
+      | TYPE_Label => DTYPE_Base DTYPE_Void
+      | TYPE_Token => DTYPE_Base DTYPE_Void
+      | TYPE_Void => DTYPE_Base DTYPE_Void
+      | TYPE_FP fp => DTYPE_Base DTYPE_Void
+      | TYPE_Metadata => DTYPE_Base DTYPE_Void
+      | TYPE_X86_mmx => DTYPE_Base DTYPE_Void
+      | TYPE_Opaque => DTYPE_Base DTYPE_Void
+      end
   end.
 Next Obligation.
   left.
@@ -139,69 +212,80 @@ Defined.
 
 Lemma typ_to_dtyp_equation  : forall env t,
     typ_to_dtyp env t =
-    match t with
-    | TYPE_Array sz t =>
-      let nt := typ_to_dtyp env t in
-      DTYPE_Array sz nt
+  match typ_to_dtyp_base_option env t with
+  | Some dt => DTYPE_Base dt
+  | None =>
+      match t with
+      | TYPE_Array sz t =>
+          let nt := typ_to_dtyp env t in
+          DTYPE_Array sz nt
 
-    | TYPE_Function ret args varargs =>
-      DTYPE_Pointer (* Function nret nargs *)
+      | TYPE_Struct fields =>
+          let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
+          DTYPE_Struct false nfields
 
-    | TYPE_Struct fields =>
-      let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
-      DTYPE_Struct nfields
+      | TYPE_Packed_struct fields =>
+          let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
+          DTYPE_Struct true nfields
 
-    | TYPE_Packed_struct fields =>
-      let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
-      DTYPE_Packed_struct nfields
-
-    | TYPE_Vector sz t =>
-      let nt := typ_to_dtyp env t in
-      DTYPE_Vector sz nt
-
-    | TYPE_Identified id =>
-      let opt := find (fun a => Ident.eq_dec id (fst a)) env in
-      match opt with
-      | None => DTYPE_Void   (* TODO: should this be None? *)
-      | Some (_, t) => typ_to_dtyp (remove_key Ident.eq_dec id env) t
+      | TYPE_Vector sz t =>
+          match typ_to_dtyp_base_option env t with
+          | Some dt =>
+              if (vector_dtyp_base_dec dt)
+              then DTYPE_Vector sz dt
+              else DTYPE_Base DTYPE_Void
+          | None => DTYPE_Base DTYPE_Void
+          end
+      | TYPE_Identified id =>
+          let opt := find (fun a => Ident.eq_dec id (fst a)) env in
+          match opt with
+          | None => DTYPE_Base DTYPE_Void   (* TODO: should this be None? *)
+          | Some (_, t) => typ_to_dtyp (remove_key Ident.eq_dec id env) t
+          end
+      (* These cases cannot happen *)
+      | TYPE_Function ret args varargs => DTYPE_Base DTYPE_Void
+      | TYPE_I sz => DTYPE_Base DTYPE_Void
+      | TYPE_Iptr => DTYPE_Base DTYPE_Void
+      | TYPE_Pointer t' => DTYPE_Base DTYPE_Void
+      | TYPE_Label => DTYPE_Base DTYPE_Void
+      | TYPE_Token => DTYPE_Base DTYPE_Void
+      | TYPE_Void => DTYPE_Base DTYPE_Void
+      | TYPE_FP fp => DTYPE_Base DTYPE_Void
+      | TYPE_Metadata => DTYPE_Base DTYPE_Void
+      | TYPE_X86_mmx => DTYPE_Base DTYPE_Void
+      | TYPE_Opaque => DTYPE_Base DTYPE_Void
       end
-
-    | TYPE_I sz => DTYPE_I sz
-    | TYPE_Iptr => DTYPE_Iptr
-    | TYPE_Pointer t' => DTYPE_Pointer
-    | TYPE_Void => DTYPE_Void
-    | TYPE_FP f => DTYPE_FP f
-    | TYPE_Label => DTYPE_Label
-    | TYPE_Token => DTYPE_Token
-    | TYPE_Metadata => DTYPE_Metadata
-    | TYPE_X86_mmx => DTYPE_X86_mmx
-    | TYPE_Opaque => DTYPE_Opaque
-    end.
+  end.
 Proof using.
   intros env t.
   unfold typ_to_dtyp.
   unfold typ_to_dtyp_func at 1.
-  rewrite WfExtensionality.WfExtensionality.fix_sub_eq_ext.
-  destruct t; try reflexivity. simpl.
-  destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) env).
-  destruct p; simpl; eauto.
+  rewrite WfExtensionality.WfExtensionality.fix_sub_eq_ext. simpl.
+  destruct t; try reflexivity; simpl.
+  - destruct (typ_to_dtyp_base_option env t); reflexivity.
+  - destruct (typ_to_dtyp_base_option env (TYPE_Identified id)); simpl.
+    + reflexivity.
+    + destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) env).
+      destruct p; simpl; eauto.
   reflexivity.
 Defined.
 
 (* Specialized version of the characteristic equation for contexts where we don't want to compute *)
-Lemma typ_to_dtyp_I : forall s i, typ_to_dtyp s (TYPE_I i) = DTYPE_I i.
+(* SAZ: Not sure where these are needed. *)
+(*
+Lemma typ_to_dtyp_I : forall s i, typ_to_dtyp s (TYPE_I i) = DTYPE_Base (DTYPE_I i).
 Proof using.
   intros; rewrite typ_to_dtyp_equation; reflexivity.
 Qed.
 
-Lemma typ_to_dtyp_D : forall s fp, typ_to_dtyp s (TYPE_FP fp) = DTYPE_FP fp.
+Lemma typ_to_dtyp_D : forall s fp, typ_to_dtyp s (TYPE_FP fp) = (DTYPE_Base (DTYPE_FP fp)).
 Proof using.
   intros; rewrite typ_to_dtyp_equation; reflexivity.
 Qed.
 
 Lemma typ_to_dtyp_P :
   forall t s,
-    typ_to_dtyp s (TYPE_Pointer t) = DTYPE_Pointer.
+    typ_to_dtyp s (TYPE_Pointer t) = (DTYPE_Base DTYPE_Pointer).
 Proof using.
   intros t s.
   apply typ_to_dtyp_equation.
@@ -214,6 +298,7 @@ Proof using.
   rewrite typ_to_dtyp_D.
   reflexivity.
 Qed.
+*)
 
 (** ** Conversion of syntactic components
 

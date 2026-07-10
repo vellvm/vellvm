@@ -1,7 +1,7 @@
 From Vellvm Require Import
   Params
   Implementations.Provenance
-  Implementations.Address
+  Implementations.Pointer
   Implementations.Sizeof.
 
 Instance ParamsV {IP : IPtr} {IPT : @IPtrTheory IP}: Params.

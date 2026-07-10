@@ -108,8 +108,8 @@ Section ReprInstances.
   #[global]
   Instance repr_floating_point_variant : Repr floating_point_variant
    := {| repr := repr_fp_variant |}.                                              
-  
-  Fixpoint repr_dtyp (t : dtyp) : string :=
+
+  Definition repr_dtyp_base (t : dtyp_base) : string :=
     match t with
     | DTYPE_I sz => "(DTYPE_I " ++ repr sz ++ ")"
     | DTYPE_Iptr => "DTYPE_Iptr"
@@ -120,11 +120,20 @@ Section ReprInstances.
     | DTYPE_Token => "DTYPE_Token"
     | DTYPE_Metadata => "DTYPE_Metadata"
     | DTYPE_X86_mmx => "DTYPE_X86_mmx"
-    | DTYPE_Array sz t => "(DTYPE_Array (" ++ repr sz ++ ") (" ++ repr_dtyp t ++ "))"
-    | DTYPE_Struct fields => "(DTYPE_Struct [" ++ (contents id (List.map repr_dtyp fields)) ++ "])"
-    | DTYPE_Packed_struct fields => "(DTYPE_Packed_struct [" ++ (contents id (List.map repr_dtyp fields)) ++ "])"
     | DTYPE_Opaque => "DTYPE_Opaque"
-    | DTYPE_Vector sz t => "(DTYPE_Vector (" ++ repr sz ++ ") (" ++ repr_dtyp t ++ "))"
+    | DTYPE_B sz => "(DTYPE_B " ++ repr sz ++ ")"
+    end.
+
+  #[global]
+  Instance repr_dtyp_base_Repr : Repr dtyp_base :=
+    {| repr := repr_dtyp_base |}.
+  
+  Fixpoint repr_dtyp (t : dtyp) : string :=
+    match t with
+    | DTYPE_Base t => "(DTYPE_Base (" ++ repr t ++ "))"
+    | DTYPE_Struct p fields => "(DTYPE_Struct " ++ repr p ++ " [" ++ (contents id (List.map repr_dtyp fields)) ++ "])"
+    | DTYPE_Array sz t => "(DTYPE_Array (" ++ repr sz ++ ") (" ++ repr_dtyp t ++ "))"
+    | DTYPE_Vector sz t => "(DTYPE_Vector (" ++ repr sz ++ ") (" ++ repr_dtyp_base t ++ "))"
     end.
 
   Fixpoint repr_typ (t : typ) : string :=

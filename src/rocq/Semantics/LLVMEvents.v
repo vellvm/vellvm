@@ -138,7 +138,7 @@ Section withParams.
   (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
   (* Intrinsics may raise an exception by returning inl *)
   Variant IntrinsicE : Type -> Type :=
-    | Intrinsic (t : dtyp) (f : string) (args : list dvalue) (vararg : option addr) :
+    | Intrinsic (t : dtyp) (f : string) (args : list dvalue) (vararg : option ptr) :
       IntrinsicE (exc + dvalue).
   Definition intrinsic {E} `{IntrinsicE -< E} t f args vararg : itree E _ := trigger (Intrinsic t f args vararg).
   

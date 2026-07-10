@@ -9,19 +9,19 @@
 From Vellvm.Semantics.Interfaces Require Export
   IPtr
   Provenance
-  Address
+  Pointer
   Sizeof.
 
 Class Params := {
     IPTR :: IPtr;
     PROV :: Provenance;
     SIZE :: Sizeof;
-    ADDR :: @Address PROV;
-    P2I  :: @PI PROV ADDR;
+    PTR  :: @Pointer PROV;
+    P2I  :: @PI PROV PTR;
 
     IPTRT :: @IPtrTheory IPTR;
     PROVT :: @ProvenanceTheory PROV;
     SIZET :: @SizeofTheory SIZE;
-    P2IT  :: @PITheory PROV ADDR P2I;
+    P2IT  :: @PITheory PROV PTR P2I;
   }.
 

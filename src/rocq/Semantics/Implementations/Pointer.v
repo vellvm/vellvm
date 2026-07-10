@@ -6,7 +6,7 @@ From Vellvm Require Import
   Rocqlib
   EOU
   Interfaces.IPtr
-  Interfaces.Address
+  Interfaces.Pointer
   Interfaces.Provenance
   Implementations.Provenance
   VellvmIntegers.
@@ -19,12 +19,12 @@ Section withIPtr.
   (* TODO: move this *)
   Instance showIptr {IP : IPtr} : Show iptr := {| show := show_iptr |}.
 
-  #[refine] Instance AddressV {IP : IPtr} : @Address ProvenanceV :=
+  #[refine] Instance PointerV {IP : IPtr} : @Pointer ProvenanceV :=
     {|
-      addr := (iptr * prov);
+      ptr := (iptr * prov);
       null := (zero_iptr, nil_prov)%Z;
-      address_provenance := snd;
-      show_addr a := show a;
+      ptr_provenance := snd;
+      show_ptr a := show a;
     |}.
   Proof.
     intros [a1 a2] [b1 b2].
@@ -35,14 +35,14 @@ Section withIPtr.
     - right. intros H. inversion H; subst. apply n. reflexivity.
   Defined.
 
-  Instance PIV : @PI ProvenanceV AddressV :=
+  Instance PIV : @PI ProvenanceV PointerV :=
     {|
       ptr_to_int p := to_Z (fst p);
       int_to_ptr i pr := a <- from_Z i ;; ret (a, pr) 
     |}
   .
 
-  Instance PITheoryV : @PITheory ProvenanceV AddressV PIV.
+  Instance PITheoryV : @PITheory ProvenanceV PointerV PIV.
   Proof.
     constructor.
     - cbn; intros * EQ.

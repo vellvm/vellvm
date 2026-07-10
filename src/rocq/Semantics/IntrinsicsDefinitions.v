@@ -376,7 +376,7 @@ Section Intrinsics.
    - The right-hand [dvalue] of the [+] result is used to throw an exception.
    *)
   Definition pure_function     := list dvalue -> EOU (dvalue + dvalue).
-  Definition semantic_function := list dvalue -> option addr -> itree E (dvalue + dvalue).
+  Definition semantic_function := list dvalue -> option ptr -> itree E (dvalue + dvalue).
 
   (* An association list mapping intrinsic names to their semantic definitions *)
   Definition intrinsic_definitions := list (declaration typ * semantic_function).

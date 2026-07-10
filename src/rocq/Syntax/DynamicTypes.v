@@ -26,7 +26,8 @@ Open Scope nat.
 
 
 Unset Elimination Schemes.
-Inductive dtyp : Set :=
+
+Variant dtyp_base : Set :=
 | DTYPE_I (sz:positive)
 | DTYPE_Iptr
 | DTYPE_Pointer
@@ -36,14 +37,22 @@ Inductive dtyp : Set :=
 | DTYPE_Token
 | DTYPE_Metadata
 | DTYPE_X86_mmx
-| DTYPE_Array (sz:N) (t:dtyp)
-| DTYPE_Struct (fields:list dtyp)
-| DTYPE_Packed_struct (fields:list dtyp)
 | DTYPE_Opaque
-| DTYPE_Vector (sz:N) (t:dtyp)     (* t must be integer, floating point, or pointer type *)
+| DTYPE_B (sz:positive).
+
+Inductive dtyp : Set :=
+| DTYPE_Base (dt:dtyp_base)
+| DTYPE_Struct (packed:bool) (fields:list dtyp)
+| DTYPE_Array (sz:N) (t:dtyp)
+| DTYPE_Vector (sz:N) (t:dtyp_base)
 .
 Set Elimination Schemes.
 
+
+Lemma dtyp_base_eq_dec : forall (t1 t2 : dtyp_base), {t1 = t2} + {t1 <> t2}.
+Proof.
+  repeat decide equality.
+Qed.
 
 Ltac dec_dtyp :=
   match goal with
@@ -53,56 +62,95 @@ Ltac dec_dtyp :=
   | [ |- { ?X = ?Y } + { ?X <> ?Y } ] => right; intros H; inversion H
   end.
 
+
 Lemma dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
+Proof.
   refine (fix f t1 t2 :=
             let lsteq_dec := list_eq_dec f in
             match t1, t2 with
-            | DTYPE_I n, DTYPE_I m => _
-            | DTYPE_Iptr , DTYPE_Iptr => _
-            | DTYPE_Pointer, DTYPE_Pointer => _
-            | DTYPE_Void, DTYPE_Void => _
-            | DTYPE_FP f1, DTYPE_FP f2 => _
-            | DTYPE_Label, DTYPE_Label => _
-            | DTYPE_Token, DTYPE_Token => _
-            | DTYPE_Metadata, DTYPE_Metadata => _
-            | DTYPE_X86_mmx, DTYPE_X86_mmx => _
-            | DTYPE_Array n t, DTYPE_Array m t' => _
-            | DTYPE_Struct l, DTYPE_Struct l' => _
-            | DTYPE_Packed_struct l, DTYPE_Packed_struct l' => _
-            | DTYPE_Opaque, DTYPE_Opaque => _
-            | DTYPE_Vector n t, DTYPE_Vector m t' => _
+            | DTYPE_Base t1, DTYPE_Base t2 => _
+            | DTYPE_Struct p l, DTYPE_Struct p' l' => _
+            | DTYPE_Array n t, DTYPE_Array n' t' => _
+            | DTYPE_Vector n t, DTYPE_Vector n' t' => _                                                     
             | _, _ => _
             end); try (ltac:(dec_dtyp); fail).
-  - destruct (Pos.eq_dec n m).
-    * left; subst; reflexivity.
-    * right; intros H; inversion H. contradiction.
-  - destruct (floating_point_variant_eq_dec f1 f2).
-    + left; subst; auto.
-    + right; intros H; inversion H; contradiction.
-  - destruct (N.eq_dec n m).
-    * destruct (f t t').
-    + left; subst; reflexivity.
-    + right; intros H; inversion H. contradiction.
-      * right; intros H; inversion H. contradiction.
-  - destruct (lsteq_dec l l').
+  - destruct (dtyp_base_eq_dec t1 t2).
     * left; subst; reflexivity.
     * right; intros H; inversion H. contradiction.
   - destruct (lsteq_dec l l').
-    * left; subst; reflexivity.
+    * destruct (bool_dec p p').
+      -- left; subst; reflexivity.
+      -- right; intros H; inversion H. contradiction.
     * right; intros H; inversion H. contradiction.
-  - destruct (N.eq_dec n m).
+  - destruct (N.eq_dec n n').
     * destruct (f t t').
-    + left; subst; reflexivity.
-    + right; intros H; inversion H. contradiction.
-      * right; intros H; inversion H. contradiction.
+      --  left; subst; reflexivity.
+      -- right; intros H; inversion H. contradiction.
+    * right; intros H; inversion H. contradiction.
+  - destruct (N.eq_dec n n').
+    * destruct (dtyp_base_eq_dec t t').
+      -- left; subst; reflexivity.
+      -- right; intros H; inversion H. contradiction.
+    * right; intros H; inversion H. contradiction.         
 Defined.
 Arguments dtyp_eq_dec: clear implicits.
 
-Definition dtyp_eqb (dt1 dt2 : dtyp) : bool
-  := match @dtyp_eq_dec dt1 dt2 with
-     | left x => true
-     | right x => false
-     end.
+Section DtypInd.
+  Variable P : dtyp -> Prop.
+  Hypothesis IH_Base   : forall t, P (DTYPE_Base t).
+  Hypothesis IH_Struct : forall (p:bool) (fields: list dtyp), (forall u, In u fields -> P u) -> P (DTYPE_Struct p fields).
+  Hypothesis IH_Array  : forall sz (t: dtyp), (P t) -> P (DTYPE_Array sz t).  
+  Hypothesis IH_Vector    : forall sz t, P (DTYPE_Vector sz t).
+
+  Lemma dtyp_ind : forall (dt:dtyp), P dt.
+    fix IH 1.
+    remember P as P0 in IH.
+    destruct dt; auto; subst.
+    - apply IH_Struct.
+      { revert fields.
+        fix IHfields 1. intros [|u fields']. intros. inversion H.
+        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
+      }
+    - eapply IH_Array. auto.
+  Qed.
+End DtypInd.
+
+Section DtypRec.
+  Variable P : dtyp -> Set.
+  Hypothesis IH_Base   : forall t, P (DTYPE_Base t).
+  Hypothesis IH_Struct : forall (p:bool) (fields: list dtyp), (forall u, In u fields -> P u) -> P (DTYPE_Struct p fields).
+  Hypothesis IH_Array  : forall sz (t: dtyp), (P t) -> P (DTYPE_Array sz t).  
+  Hypothesis IH_Vector    : forall sz t, P (DTYPE_Vector sz t).
+
+  Lemma dtyp_rec : forall (dt:dtyp), P dt.
+    fix IH 1.
+    remember P as P0 in IH.
+    destruct dt; auto; subst.
+    - apply IH_Struct.
+      { revert fields.
+        fix IHfields 1. intros [|u fields']. intros. inversion H.
+        intros u' Hin.
+        pose proof In_cons_dec dtyp_eq_dec Hin.
+        destruct H.
+        subst. apply IH.
+        eapply IHfields. apply i.
+      }
+    - apply IH_Array. auto.
+  Qed.
+
+End DtypRec.
+
+Definition dtyp_base_eqb (dt1 dt2 : dtyp_base) : bool :=
+  match @dtyp_base_eq_dec dt1 dt2 with
+  | left x => true
+  | right x => false
+  end.
+
+Definition dtyp_eqb (dt1 dt2 : dtyp) : bool :=
+  match @dtyp_eq_dec dt1 dt2 with
+  | left x => true
+  | right x => false
+  end.
 
 Lemma dtyp_eqb_refl :
   forall dt, dtyp_eqb dt dt = true.
@@ -124,92 +172,28 @@ Proof using.
   destruct (dtyp_eq_dec t1 t2); auto; discriminate.
 Qed.
 
-Definition vector_dtyp dt :=
-  (exists n, dt = DTYPE_I n) \/ dt = DTYPE_Iptr \/ dt = DTYPE_Pointer \/ (exists fp, dt = DTYPE_FP fp).
+
+Definition vector_dtyp_base (dt : dtyp_base) : Prop :=
+  match dt with
+  | DTYPE_I _
+  | DTYPE_Iptr 
+  | DTYPE_Pointer 
+  | DTYPE_FP _
+  | DTYPE_B _ => True 
+  | _ => False
+  end.
+
+Lemma vector_dtyp_base_dec :
+  forall t,
+    {vector_dtyp_base t} + {~ vector_dtyp_base t}.
+Proof.
+  intros t.
+  destruct t; simpl; auto.
+Qed.
 
 
-
-Section DtypInd.
-  Variable P : dtyp -> Prop.
-  Hypothesis IH_I             : forall a, P (DTYPE_I a).
-  Hypothesis IH_Iptr          : P (DTYPE_Iptr).
-  Hypothesis IH_Pointer       : P DTYPE_Pointer.
-  Hypothesis IH_Void          : P DTYPE_Void.
-  Hypothesis IH_Float         : forall f, P (DTYPE_FP f).
-  Hypothesis IH_Label         : P DTYPE_Label.
-  Hypothesis IH_Token         : P DTYPE_Token.
-  Hypothesis IH_Metadata      : P DTYPE_Metadata.
-  Hypothesis IH_X86_mmx       : P DTYPE_X86_mmx.
-  Hypothesis IH_Array         : forall sz t, P t -> P (DTYPE_Array sz t).
-  Hypothesis IH_Struct        : forall (fields: list dtyp), (forall u, In u fields -> P u) -> P (DTYPE_Struct fields).
-  Hypothesis IH_Packed_Struct : forall (fields: list dtyp), (forall u, In u fields -> P u) -> P (DTYPE_Packed_struct fields).
-  Hypothesis IH_Opaque        : P DTYPE_Opaque.
-  Hypothesis IH_Vector        : forall sz t, P t -> P (DTYPE_Vector sz t).
-
-  Lemma dtyp_ind : forall (dt:dtyp), P dt.
-    fix IH 1.
-    remember P as P0 in IH.
-    destruct dt; auto; subst.
-    - apply IH_Array. auto.
-    - apply IH_Struct.
-      { revert fields.
-        fix IHfields 1. intros [|u fields']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
-      }
-    - apply IH_Packed_Struct.
-      { revert fields.
-        fix IHfields 1. intros [|u fields']. intros. inversion H.
-        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
-      }
-    - apply IH_Vector. auto.
-  Qed.
-End DtypInd.
-
-Section DtypRec.
-  Variable P : dtyp -> Set.
-  Hypothesis IH_I             : forall a, P (DTYPE_I a).
-  Hypothesis IH_Iptr          : P (DTYPE_Iptr).
-  Hypothesis IH_Pointer       : P DTYPE_Pointer.
-  Hypothesis IH_Void          : P DTYPE_Void.
-  Hypothesis IH_Float         : forall f, P (DTYPE_FP f).
-  Hypothesis IH_Label         : P DTYPE_Label.
-  Hypothesis IH_Token         : P DTYPE_Token.    
-  Hypothesis IH_Metadata      : P DTYPE_Metadata.
-  Hypothesis IH_X86_mmx       : P DTYPE_X86_mmx.
-  Hypothesis IH_Array         : forall sz t, P t -> P (DTYPE_Array sz t).
-  Hypothesis IH_Struct        : forall (fields: list dtyp), (forall u, In u fields -> P u) -> P (DTYPE_Struct fields).
-  Hypothesis IH_Packed_Struct : forall (fields: list dtyp), (forall u, In u fields -> P u) -> P (DTYPE_Packed_struct fields).
-  Hypothesis IH_Opaque        : P DTYPE_Opaque.
-  Hypothesis IH_Vector        : forall sz t, P t -> P (DTYPE_Vector sz t).
-
-  Lemma dtyp_rec : forall (dt:dtyp), P dt.
-    fix IH 1.
-    remember P as P0 in IH.
-    destruct dt; auto; subst.
-    - apply IH_Array. auto.
-    - apply IH_Struct.
-      { revert fields.
-        fix IHfields 1. intros [|u fields']. intros. inversion H.
-        intros u' Hin.
-        pose proof In_cons_dec dtyp_eq_dec Hin.
-        destruct H.
-        subst. apply IH.
-        eapply IHfields. apply i.
-      }
-    - apply IH_Packed_Struct.
-      { revert fields.
-        fix IHfields 1. intros [|u fields']. intros. inversion H.
-        intros u' Hin.
-        pose proof In_cons_dec dtyp_eq_dec Hin.
-        destruct H.
-        subst. apply IH.
-        eapply IHfields. apply i.
-      }
-    - apply IH_Vector. auto.
-  Qed.
-End DtypRec.
-
-
+(* SAZ: TODO - is this dead code? *)
+(*
 Section WF_dtyp.
 
   Inductive well_formed_dtyp : dtyp -> Prop :=
@@ -247,38 +231,15 @@ Section WF_dtyp.
   .
 
 End WF_dtyp.
-
-
-Lemma vector_dtyp_dec :
-  forall t,
-    {vector_dtyp t} + {~ vector_dtyp t}.
-Proof using.
-  intros t.
-  induction t;
-    try  solve
-      [ left; constructor; eauto
-      | left; firstorder
-      | right; intros CONTRA; red in CONTRA;
-        destruct CONTRA as [[n CONTRA] | [CONTRA | [CONTRA | [pf CONTRA]]]]; try discriminate].
-Qed.
+*)
 
 
 Fixpoint dtyp_measure (t : dtyp) : nat :=
   match t with
-  | DTYPE_I sz => 1
-  | DTYPE_Iptr => 1
-  | DTYPE_Pointer => 1
-  | DTYPE_Void => 1
-  | DTYPE_FP _ => 1
-  | DTYPE_Label => 1
-  | DTYPE_Token => 1
-  | DTYPE_Metadata => 1
-  | DTYPE_X86_mmx => 1
+  | DTYPE_Base t => 1
+  | DTYPE_Struct p fields => S (S (list_sum (map dtyp_measure fields)))
   | DTYPE_Array sz t => S (S (dtyp_measure t))
-  | DTYPE_Struct fields => S (S (list_sum (map dtyp_measure fields)))
-  | DTYPE_Packed_struct fields => S (S (list_sum (map dtyp_measure fields)))
-  | DTYPE_Opaque => 1
-  | DTYPE_Vector sz t => S (S (dtyp_measure t))
+  | DTYPE_Vector sz t => 1
   end.
 
 Lemma dtyp_measure_gt_0 :
@@ -296,137 +257,104 @@ Qed.
 apply N.eqb_eq.
 Qed.
 
-Fixpoint NO_VOID (dt : dtyp) : Prop
-  := match dt with
-     | DTYPE_I _
-     | DTYPE_Iptr
-     | DTYPE_Pointer
-     | DTYPE_FP _
-     | DTYPE_Label
-     | DTYPE_Token
-     | DTYPE_Metadata
-     | DTYPE_X86_mmx
-     | DTYPE_Opaque =>
-         True
-     | DTYPE_Void => False
-     | DTYPE_Vector sz t
-     | DTYPE_Array sz t =>
-         NO_VOID t
-     | DTYPE_Struct dts
-     | DTYPE_Packed_struct dts => FORALL NO_VOID dts
-     end.
+
+Definition NO_VOID_base (dt : dtyp_base) : Prop :=
+  match dt with
+  | DTYPE_Void => False    
+  | _ => True
+  end.
+                   
+Fixpoint NO_VOID (dt : dtyp) : Prop:=
+  match dt with
+  | DTYPE_Base dt => NO_VOID_base dt
+  | DTYPE_Struct p dts => FORALL NO_VOID dts
+  | DTYPE_Array sz t => NO_VOID t
+  | DTYPE_Vector sz t => NO_VOID_base t
+  end.  
+
 
 Lemma NO_VOID_Struct_fields :
-  forall dts,
-    NO_VOID (DTYPE_Struct dts) ->
+  forall p dts,
+    NO_VOID (DTYPE_Struct p dts) ->
     (forall dt, In dt dts -> NO_VOID dt).
 Proof using.
-  intros dts NV dt IN.
+  intros p dts NV dt IN.
   cbn in NV.
   rewrite FORALL_forall in NV.
   rewrite Forall_forall in NV.
   apply NV; auto.
 Qed.
 
-Lemma NO_VOID_Packed_struct_fields :
-  forall dts,
-    NO_VOID (DTYPE_Packed_struct dts) ->
-    (forall dt, In dt dts -> NO_VOID dt).
-Proof using.
-  intros dts NV dt IN.
-  cbn in NV.
-  rewrite FORALL_forall in NV.
-  rewrite Forall_forall in NV.
-  apply NV; auto.
-Qed.
 
-Lemma NO_VOID_Struct_cons :
-  forall dt dts,
-    NO_VOID (DTYPE_Struct (dt :: dts)) ->
-    NO_VOID (DTYPE_Struct dts).
+Lemma NO_VOID_base_dec :
+  forall dt,
+    {NO_VOID_base dt} + {~NO_VOID_base dt}.
 Proof using.
-  intros dt dts H.
-  cbn in *.
-  intuition.
-Qed.
+  destruct dt; simpl; auto.
+Qed.  
   
-Lemma NO_VOID_Packed_struct_cons :
-  forall dt dts,
-    NO_VOID (DTYPE_Packed_struct (dt :: dts)) ->
-    NO_VOID (DTYPE_Packed_struct dts).
-Proof using.
-  intros dt dts H.
-  cbn in *.
-  intuition.
-Qed.
-
 Lemma NO_VOID_dec :
   forall dt,
     {NO_VOID dt} + {~NO_VOID dt}.
 Proof using.
   intros dt.
-  induction dt.
-  all:
-    try match goal with
-      | NV : {NO_VOID _} + {~ NO_VOID _} |- _ =>
-          destruct NV
-      end;
-    try rewrite NO_VOID_equation;
-    try solve [left; cbn; auto | right; cbn; auto].
-
-  all: cbn; apply FORALL_dec; assumption.  
+  induction dt; simpl.
+  - apply NO_VOID_base_dec.
+  - apply FORALL_dec; assumption.
+  - assumption.
+  - apply NO_VOID_base_dec.
 Qed.
 
-Lemma NO_VOID_neq_dtyp :
-  forall dt1 dt2,
-    NO_VOID dt1 ->
-    ~ NO_VOID dt2 ->
-    dt1 <> dt2.
-Proof using.
-  intros dt1 dt2 NV NNV.
-  intros EQ.
-  induction dt1, dt2; inversion EQ.
-  all: cbn in NNV; try contradiction.
+(* Lemma NO_VOID_neq_dtyp : *)
+(*   forall dt1 dt2, *)
+(*     NO_VOID dt1 -> *)
+(*     ~ NO_VOID dt2 -> *)
+(*     dt1 <> dt2. *)
+(* Proof using. *)
+(*   intros dt1 dt2 NV NNV. *)
+(*   intros EQ. *)
+(*   induction dt1, dt2; inversion EQ. *)
+(*   all: cbn in NNV; try contradiction. *)
 
-  all: inversion EQ; subst;
-    cbn in NV;
-    contradiction.
-Qed.
+(*   all: inversion EQ; subst; *)
+(*     cbn in NV; *)
+(*     contradiction. *)
+(* Qed. *)
 
-Lemma NO_VOID_Struct_cons_inv :
-  forall dt dts,
-    NO_VOID dt ->
-    NO_VOID (DTYPE_Struct dts) ->
-    NO_VOID (DTYPE_Struct (dt :: dts)).
-Proof using.
-  intros dt dts NVdt NVdts.
-  cbn in *.
-  intuition.
-Qed.
+(* Lemma NO_VOID_Struct_cons_inv : *)
+(*   forall dt dts, *)
+(*     NO_VOID dt -> *)
+(*     NO_VOID (DTYPE_Struct dts) -> *)
+(*     NO_VOID (DTYPE_Struct (dt :: dts)). *)
+(* Proof using. *)
+(*   intros dt dts NVdt NVdts. *)
+(*   cbn in *. *)
+(*   intuition. *)
+(* Qed. *)
 
-Lemma NO_VOID_Packed_struct_cons_inv :
-  forall dt dts,
-    NO_VOID dt ->
-    NO_VOID (DTYPE_Packed_struct dts) ->
-    NO_VOID (DTYPE_Packed_struct (dt :: dts)).
-Proof using.
-  intros dt dts NVdt NVdts.
-  cbn in *.
-  intuition.
-Qed.
+(* Lemma NO_VOID_Packed_struct_cons_inv : *)
+(*   forall dt dts, *)
+(*     NO_VOID dt -> *)
+(*     NO_VOID (DTYPE_Packed_struct dts) -> *)
+(*     NO_VOID (DTYPE_Packed_struct (dt :: dts)). *)
+(* Proof using. *)
+(*   intros dt dts NVdt NVdts. *)
+(*   cbn in *. *)
+(*   intuition. *)
+(* Qed. *)
 
-Ltac solve_Forall_HIn :=
-  solve [ constructor; auto].
+(* Ltac solve_Forall_HIn := *)
+(*   solve [ constructor; auto]. *)
 
-#[global] Hint Resolve NO_VOID_Struct_cons_inv : NO_VOID.
-#[global] Hint Resolve NO_VOID_Packed_struct_cons_inv : NO_VOID.
+(* #[global] Hint Resolve NO_VOID_Struct_cons_inv : NO_VOID. *)
+(* #[global] Hint Resolve NO_VOID_Packed_struct_cons_inv : NO_VOID. *)
 
-Ltac solve_no_void :=
-  solve
-    [ auto with NO_VOID
-    | match goal with
-      | H: NO_VOID _ /\ _ |- _
-        => destruct H; solve_no_void
-      end
-    | cbn; solve_no_void
-    ].
+(* Ltac solve_no_void := *)
+(*   solve *)
+(*     [ auto with NO_VOID *)
+(*     | match goal with *)
+(*       | H: NO_VOID _ /\ _ |- _ *)
+(*         => destruct H; solve_no_void *)
+(*       end *)
+(*     | cbn; solve_no_void *)
+(*     ]. *)
