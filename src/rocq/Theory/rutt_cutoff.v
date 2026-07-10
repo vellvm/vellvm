@@ -406,26 +406,54 @@ Proof.
 Qed. 
 
 (* map_monad *)
+Lemma ruttc_map_monad_gen {E1 E2 R1 R2 A1 A2}
+  (Rcutl : pred1 E1)
+  (Rcutr : pred1 E2)
+  (REv : prerel E1 E2)
+  (RAns: postrel E1 E2)
+  (RR: R1 -> R2 -> Prop)
+  (f1 : A1 -> itree E1 R1) (f2 : A2 -> itree E2 R2) (l1 : list A1) (l2 : list A2)
+  (HI : Forall2 (fun a1 a2 => ruttc Rcutl Rcutr REv RAns RR (f1 a1) (f2 a2)) l1 l2) :
+  ruttc Rcutl Rcutr REv RAns (Forall2 RR)
+    (map_monad f1 l1)
+    (map_monad f2 l2).
+Proof.
+  induction HI; cbn.
+  - now apply ruttc_ret.
+  - eapply ruttc_bind; [apply H; now left |].
+    intros r1 r2 HR.
+    eapply ruttc_bind; [apply IHHI; intros; apply HIN; now right|].
+    intros bs1 bs2 HBS.
+    apply ruttc_ret.
+    now constructor.
+Qed.
+
+Lemma Forall2_diag {A} P (l : list A):
+  Forall2 P l l <-> Forall (fun a => P a a) l.
+Proof.
+  split; intros HF.
+  - revert HF; induction l as [| x l IH]; cbn; auto.
+    intros HF; inv HF.
+    constructor; auto.
+  - revert HF; induction l as [| x l IH]; cbn; auto.
+    intros HF; inv HF.
+    constructor; auto.
+Qed.
+
 Lemma ruttc_map_monad {E1 E2 R1 R2 A}
   (Rcutl : pred1 E1)
   (Rcutr : pred1 E2)
   (REv : prerel E1 E2)
   (RAns: postrel E1 E2)
   (RR: R1 -> R2 -> Prop)
-  (f1 : A -> itree E1 R1) (f2 : A -> itree E2 R2) l:
-  (forall a, In a l -> ruttc Rcutl Rcutr REv RAns RR (f1 a) (f2 a)) ->
+  (f1 : A -> itree E1 R1) (f2 : A -> itree E2 R2) l
+  (HI : forall a, In a l -> ruttc Rcutl Rcutr REv RAns RR (f1 a) (f2 a)) :
   ruttc Rcutl Rcutr REv RAns (Forall2 RR)
     (map_monad f1 l)
     (map_monad f2 l).
 Proof.
-  induction l as [| a l IH]; intros HIN; cbn.
-  - now apply ruttc_ret.
-  - eapply ruttc_bind; [apply HIN; now left |].
-    intros r1 r2 HR.
-    eapply ruttc_bind; [apply IH; intros; apply HIN; now right|].
-    intros bs1 bs2 HBS.
-    apply ruttc_ret.
-    now constructor.
+  apply ruttc_map_monad_gen.
+  apply Forall2_diag, Forall_forall; auto.
 Qed.
 
 (* iter *)
