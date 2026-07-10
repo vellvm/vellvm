@@ -241,4 +241,157 @@ Lemma I2F_denote_instr :
       induction H...
 Qed.
 
+Lemma I2F_denote_code :
+  forall c va1 va2,
+    option_rel I2F_Addr va1 va2 ->
+    I2F_refine_CFG TT (@denote_code PInf c va1) (@denote_code PFin c va2).
+Proof.
+  intros.
+  unfold denote_code, map_monad_.
+  rbind TT; [| intros; now rstep].
+  induction c; cbn.
+  - now rstep.
+  - rbind TT; [apply I2F_denote_instr; auto | intros [] [] _].
+    rbind TT.
+    apply IHc.
+    intros; now rstep.
+Qed.
+
+Hint Constructors I2F_dvalue : core.
+Hint Unfold TT : core.
+
+Lemma I2F_dvalue_is_poison : forall v1 v2,
+    I2F_dvalue v1 v2 ->
+    @dvalue_is_poison PInf v1 = @dvalue_is_poison PFin v2.
+Proof.
+  intros * H; now destruct H.
+Qed.
+
+(** [select_switch] computes in the parameter-free [EOU block_id]: on
+    related selectors and switch tables the two sides are literally
+    equal (related [DVALUE_I]s carry equal payloads). *)
+Lemma I2F_select_switch :
+  forall v1 v2,
+    I2F_dvalue v1 v2 ->
+    forall sw1 sw2,
+      Forall2 (prod_rel I2F_dvalue Logic.eq) sw1 sw2 ->
+      forall db,
+        @select_switch PInf v1 db sw1 = @select_switch PFin v2 db sw2.
+Proof.
+  intros v1 v2 HV sw1 sw2 F; induction F; intros db; cbn; [reflexivity |].
+  destruct x as [xv xid], y as [yv yid].
+  destruct H as [HXY EQ]; cbn in HXY, EQ; subst.
+  inversion HV; subst; cbn; auto.
+  all: inversion HXY; subst; cbn; auto.
+  destruct (Pos.eq_dec _ _); [| reflexivity].
+  destruct e; cbv [eq_rec_r eq_rec eq_rect Logic.eq_sym].
+  break_match_goal; auto.
+Qed.
+
+Lemma I2F_denote_terminator :
+  forall t,
+    I2F_refine_CFG (sum_rel Logic.eq I2F_dvalue) (@denote_terminator PInf t) (@denote_terminator PFin t).
+Proof with try now (rstep; cbnn; try (easy); eauto).
+  destruct t as [[? []] ?]; cbn...
+  - destruct v; bind_exp...
+  - destruct v; bind_exp.
+    induction H...
+    repeat break_goal_fast...
+  - destruct v; bind_exp.
+    rewrite (I2F_dvalue_is_poison H).
+    break_match_goal...
+    rbind (Forall2 (prod_rel I2F_dvalue (@Logic.eq block_id))).
+    { apply ruttc_map_monad.
+      intros [[sz x] id] _; cbn.
+      rbind I2F_dvalue.
+      { first [ apply I2F_refine_lift'; now repeat constructor
+              | rstep; now repeat constructor ]. }
+      intros; rstep; now repeat constructor. }
+    intros sw1 sw2 HSW.
+    rbind (@Logic.eq block_id).
+    { apply I2F_refine_lift'.
+      erewrite I2F_select_switch; eauto.
+      apply I2F_EOU_refl. }
+    intros ?? <-...
+  - destruct v.
+    bind_exp...
+  - destruct fnptrval.
+    erbind.
+    apply ruttc_map_monad.
+    intros [] ?; apply I2F_denote_exp'.
+    intros.
+    bind_exp.
+    rbind (sum_rel I2F_dvalue I2F_dvalue)...
+    intros * HR.
+    induction HR.
+    rbind TT...
+    intros...
+    break_goal_fast...
+    rbind TT...
+    intros...
+    rewrite !Eqit.bind_ret_l...
+Qed.
+
+Lemma I2F_denote_phi :
+  forall from phi,
+    I2F_refine_CFG (prod_rel Logic.eq I2F_dvalue) (@denote_phi PInf from phi) (@denote_phi PFin from phi).
+Proof with try now (rstep; cbnn; try (easy); eauto).
+  intros ? [[? []] ?]; cbn.
+  break_goal_fast...
+  bind_exp...
+Qed.
+
+Lemma I2F_denote_phis :
+  forall from phis,
+    I2F_refine_CFG TT (@denote_phis PInf from phis) (@denote_phis PFin from phis).
+Proof with try now (rstep; cbnn; try (easy); eauto).
+  intros; cbn.
+  erbind.
+  apply ruttc_map_monad.
+  intros; apply I2F_denote_phi.
+  intros.
+  erbind.
+  unshelve apply ruttc_map_monad_gen.
+  exact TT.
+  2: intros...
+  induction H; cbn; auto.
+  constructor; auto.
+  destruct H,x,y; cbn in *; subst...
+Qed.
+
+Lemma I2F_denote_block :
+  forall from block a1 a2,
+    option_rel I2F_Addr a1 a2 ->
+    I2F_refine_CFG (sum_rel Logic.eq I2F_dvalue) (@denote_block PInf block from a1) (@denote_block PFin block from a2).
+Proof with try now (rstep; cbnn; try (easy); eauto).
+  intros.
+  erbind;[apply I2F_denote_phis| intros ???].
+  erbind;[apply I2F_denote_code; auto| intros ???].
+  apply I2F_denote_terminator.
+Qed.
+
+Lemma I2F_denote_ocfg :
+  forall ocfg ft a1 a2,
+    option_rel I2F_Addr a1 a2 ->
+    I2F_refine_CFG (sum_rel Logic.eq I2F_dvalue) (@denote_ocfg PInf ocfg a1 ft) (@denote_ocfg PFin ocfg a2 ft).
+Proof with try now (rstep; cbnn; try (easy); eauto).
+  intros.
+  apply ruttc_iter with Logic.eq; auto.
+  intros [] ? <-.
+  break_goal_fast...
+  erbind; [apply I2F_denote_block; auto |].
+  intros ?? HR; inv HR...
+Qed.
+
+Lemma I2F_denote_cfg :
+  forall ocfg a1 a2,
+    option_rel I2F_Addr a1 a2 ->
+    I2F_refine_CFG I2F_dvalue (@denote_cfg PInf ocfg a1) (@denote_cfg PFin ocfg a2).
+Proof with try now (rstep; cbnn; try (easy); eauto).
+  intros.
+  cbn.
+  erbind; [apply I2F_denote_ocfg; auto |].
+  intros ?? HR; inv HR...
+Qed.
+
 
