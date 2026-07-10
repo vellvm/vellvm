@@ -146,19 +146,20 @@ Lemma I2F_denote_instr :
         
     - destruct x; cbn[denote_instr].
       2: rstep; constructor.
-      admit.
-      (* break_match_goal. *)
-      (* + break_goal_fast. *)
-      (*   cbn. rewrite 2 Eqit.bind_bind. *)
-      (*   erbind; [apply I2F_denote_exp'| intros; rewrite ?Eqit.bind_bind]. *)
-      (*   rbind I2F_dvalue. *)
-      (*   { apply ruttc_trigger. *)
-      (*     constructor; intuition. *)
-      (*     2:{ cbn; intros... *)
-      (*     admit. *)
-      (*     (* cbn in *; unfold resum, ReSum_id, id_, Id_IFun. *) *)
-      (*     (* intros ??; rewrite I2FA_Memory_equation_13. *) *)
-      (*       (* in H0 *) *)
+      break_match_goal.
+      + break_goal_fast.
+        cbn; rewrite 2 Eqit.bind_bind.
+        bind_exp.
+        rewrite ?Eqit.bind_bind.
+        rbind I2F_dvalue; [rstep; [cbnn; constructor; intuition | cbnn; intros; simp I2FA_Memory in *; eauto] |].
+        pose proof I2F_dvalue_int_unsigned H as EQ; rewrite EQ; reflexivity.
+        intros.
+        rbind (fun _ _ => True); [rstep; cbnn; easy | intros]...
+      + cbn; rewrite 2 Eqit.bind_bind.
+        rbind I2F_dvalue; [rstep; [cbnn; constructor; intuition | cbnn; intros; simp I2FA_Memory in *; eauto] |].
+        intros.
+        rbind (fun _ _ => True); [rstep; cbnn; easy | intros]...
+        
     - destruct x; cbn...
       destruct ptr.
       bind_exp.
@@ -238,6 +239,6 @@ Lemma I2F_denote_instr :
       rbind (option_rel I2F_dvalue); [|intros].
       rstep; cbnn; [easy | intros; simp I2FA_Stack in *].
       induction H...
-Admitted.
+Qed.
 
 
