@@ -51,6 +51,7 @@ Qed.
 Ltac cbnn := cbn; unfold resum, ReSum_id, id_, Id_IFun.
 Ltac bind_exp := erbind; [apply I2F_denote_exp'| intros].
 
+(* Can we avoid these duplications? *)
 Lemma I2F_freeze' a b :
   I2F_dvalue a b ->
   I2F_refine_CFG I2F_dvalue (freeze a) (freeze b).
@@ -62,6 +63,19 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
 (*   all: eapply ruttc_bind; [apply ruttc_map_monad_gen; eauto |]; intros... *)
 (* Qed.  *)
 Admitted.
+
+Lemma I2F_refine_lift' {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
+  I2F_EOU RR m1 m2 ->
+  I2F_refine_CFG RR (EOU_to_itree m1) (EOU_to_itree m2).
+Proof.
+  intros []; cbn.
+  - pfold; constructor; auto.
+  - apply ruttc_trigger_cast; easy.
+  - pfold; red; cbn.
+    apply EqCutL; constructor.
+  - pfold; red; cbn.
+    apply EqCutR; constructor.
+Qed.
 
 Lemma I2F_denote_instr :
   forall i va1 va2,
@@ -148,8 +162,7 @@ Lemma I2F_denote_instr :
     - destruct x; cbn...
       destruct ptr.
       bind_exp.
-      erbind; [rstep; [cbnn; easy |] |].
-      cbnn; intros; simp I2FA_Memory in *; eauto.
+      erbind; [rstep; [cbnn; easy | cbnn; intros; simp I2FA_Memory in *; eauto] |].
       intros.
       erbind; [apply I2F_freeze'; auto | intros]...
     - destruct val,ptr, x; cbn...
@@ -158,7 +171,73 @@ Lemma I2F_denote_instr :
       induction H0...
       6: rbind (fun _ _ => False); [|intros _ _ []]...
       all: rbind (fun _ _ => True); [rstep; cbnn; [constructor; intuition; constructor; auto| cbn; auto] | intros [] [] _ ]; cbn...
-    -   
-     
-  Admitted.
- 
+    - destruct x; cbn...
+    - destruct x; cbn...
+      unfold denote_cmpxchg.
+      do 3 break_goal_fast.
+      break_match_goal...
+      do 3 bind_exp.
+      erbind; [rstep; [cbnn; easy | cbnn; intros; simp I2FA_Memory in *; eauto] |].
+      intros.
+      erbind.
+      apply I2F_refine_lift', I2F_eval_icmp; eauto.
+      intros.
+      induction H3...
+      break_goal_fast...
+      break_goal_fast...
+      rbind (fun _ _ => True); [rstep; [cbnn; easy | cbnn; intros; simp I2FA_Memory in *; eauto] |].
+      intros.
+      rstep; [cbnn; simp I2FE_Local; intuition | eauto].
+      repeat constructor; auto.
+      rstep; [cbnn; simp I2FE_Local; intuition | eauto].
+      repeat constructor; auto.
+    - destruct x; cbn...
+      unfold denote_atomicrmw.
+      repeat break_goal_fast.
+      bind_exp.
+      bind_exp.
+      erbind; [rstep; [cbnn; easy | cbnn; intros; simp I2FA_Memory in *; eauto] | intros].
+      unfold denote_atomic_rmw_operation.
+      break_goal_fast...
+      
+      cbn; erewrite 2 Eqit.bind_ret_l;
+      rbind (fun _ _ => True); [rstep; cbnn; easy | intros];
+        rbind (fun _ _ => True); [rstep; cbnn; easy | intros]...
+
+      all: try (cbn; erbind; [apply I2F_refine_lift', I2F_eval_iop; eauto | intros];
+      rbind (fun _ _ => True); [rstep; cbnn; easy | intros];
+        rbind (fun _ _ => True); [rstep; cbnn; easy | intros])...
+
+      2-5: rbind (fun _ _ => False); [|intros _ _ []]...
+      4-11: rbind (fun _ _ => False); [|intros _ _ []]...
+      { cbn; inversion H0...
+        1,3-11: rbind (fun _ _ => False); [|intros _ _ []]...
+        rbind I2F_dvalue.
+        2: intros;
+        rbind (fun _ _ => True); [rstep; cbnn; easy | intros];
+        rbind (fun _ _ => True); [rstep; cbnn; easy | intros]...
+        apply I2F_refine_lift'.
+        pose proof @I2F_eval_iop _ (DVALUE_I sz i) _ (DVALUE_I sz i) And H1.
+        forward H4; [constructor |].
+        inv H4; repeat constructor.
+        induction H7; repeat constructor.
+        break_goal_fast; repeat constructor.
+        subst; cbn; repeat constructor.
+      }
+      all: erbind; [apply I2F_refine_lift', I2F_eval_fop; eauto | intros].
+      all: rbind (fun _ _ => True); [rstep; cbnn; easy | intros].
+      all: rbind (fun _ _ => True); [rstep; cbnn; easy | intros]...
+    - destruct x, va_list_and_arg_list; cbn.
+      all: bind_exp.
+      all: rbind I2F_dvalue; [rstep; [cbnn; easy | cbnn; intros; simp I2FA_Memory in *; eauto] | intros].
+      all: rbind I2F_dvalue; [rstep; [cbnn; easy | cbnn; intros; simp I2FA_Memory in *; eauto] | intros].
+      all: rewrite 2 Eqit.bind_ret_l.
+      all: erbind; [apply I2F_refine_lift', I2F_eval_gep; eauto; repeat constructor | intros].
+      all: rbind (fun _ _ => True); [rstep; cbnn; easy | intros]...
+    - destruct x; cbn...
+      rbind (option_rel I2F_dvalue); [|intros].
+      rstep; cbnn; [easy | intros; simp I2FA_Stack in *].
+      induction H...
+Admitted.
+
+
