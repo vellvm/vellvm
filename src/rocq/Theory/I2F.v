@@ -80,6 +80,7 @@ Section Refinement.
   Definition I2F_Addr : @addr ProvenanceV (@AddressV IPZ) -> @addr ProvenanceV (@AddressV IP64Bit) -> Prop :=
     fun '(z,p) '(i,p') => I2F_Iptr z i /\ p = p'.
 
+  Unset Elimination Schemes.
   Inductive I2F_dvalue : @dvalue PInf -> @dvalue PFin -> Prop :=
   | I2F_dvalue_Addr a a' :
     I2F_Addr a a' ->
@@ -110,8 +111,43 @@ Section Refinement.
     Forall2 I2F_dvalue s1 s2 ->
     I2F_dvalue (DVALUE_Vector τ s1) (DVALUE_Vector τ s2)
   .
+  Set Elimination Schemes.
   Hint Constructors I2F_dvalue : core.
 
+  Lemma I2F_dvalue_ind :
+    forall P : @dvalue PInf -> @dvalue PFin -> Prop,
+      (forall a a' : addr, I2F_Addr a a' -> P (@DVALUE_Addr PInf a) (@DVALUE_Addr PFin a')) ->
+      (forall (sz : positive) (i : bit_int), P (DVALUE_I sz i) (DVALUE_I sz i)) ->
+      (forall p p' : iptr, I2F_Iptr p p' -> P (@DVALUE_Iptr PInf p) (@DVALUE_Iptr PFin p')) ->
+      (forall d : ll_double, P (DVALUE_Double d) (DVALUE_Double d)) ->
+      (forall f : ll_float, P (DVALUE_Float f) (DVALUE_Float f)) ->
+      (forall τ : dtyp, P (DVALUE_Poison τ) (DVALUE_Poison τ)) ->
+      P DVALUE_None DVALUE_None ->
+      (forall s1 s2 : list dvalue, Forall2 I2F_dvalue s1 s2 -> Forall2 P s1 s2 -> P (DVALUE_Struct s1) (DVALUE_Struct s2)) ->
+      (forall s1 s2 : list dvalue, Forall2 I2F_dvalue s1 s2 -> Forall2 P s1 s2 -> P (DVALUE_Packed_struct s1) (DVALUE_Packed_struct s2)) ->
+      (forall (τ : dtyp) (s1 s2 : list dvalue), Forall2 I2F_dvalue s1 s2 -> Forall2 P s1 s2 -> P (DVALUE_Array τ s1) (DVALUE_Array τ s2)) ->
+      (forall (τ : dtyp) (s1 s2 : list dvalue), Forall2 I2F_dvalue s1 s2 -> Forall2 P s1 s2 -> P (DVALUE_Vector τ s1) (DVALUE_Vector τ s2)) ->
+      forall [d d0 : dvalue], I2F_dvalue d d0 -> P d d0.
+  Proof.
+    intros.
+    revert d0 H10.
+    induction d using dvalue_ind.
+    all: intros ? HI; inv HI; auto.
+    - subst_existT; auto.
+    - apply H6; auto.
+      induction H12; auto.
+      inv H10; apply Forall2_cons; auto.
+    - apply H7; auto.
+      induction H12; auto.
+      inv H10; apply Forall2_cons; auto.
+    - apply H8; auto.
+      induction H14; auto.
+      inv H10; apply Forall2_cons; auto.
+    - apply H9; auto.
+      induction H14; auto.
+      inv H10; apply Forall2_cons; auto.
+  Qed.
+  
   (* Exceptions are dvalues, and calls/intrinsics answer in [exc + dvalue] *)
   Notation I2F_exc_dvalue := (sum_rel I2F_dvalue I2F_dvalue).
 
@@ -363,16 +399,8 @@ Section Refinement.
   (* [denote_exp] only ever applies [EOU_to_itree] to pure computations we
      relate through [I2F_refine_lift]; prevent [cbn] from unfolding it into
      a stuck match that would obstruct applying the lemma. *)
-  #[local] Arguments EOU_to_itree : simpl never.
-
-(* Lemma I2F_refine_MCFG_trigger {A B} (e : @MCFGEtop PInf A) (f : @MCFGEtop PFin B) RR : *)
-(*   I2FE_MCFG e f -> *)
-(*   I2F_refine_MCFG RR (ITree.trigger e) (ITree.trigger f). *)
-(* Proof. *)
-(*   intros; apply ruttc_trigger; auto. *)
-   
-  (* Hint Constructors I2FA_Local. *) (* I2FA_Local is now an Equations definition, no constructors *)
-
+  #[local] Arguments EOU_to_itree : simpl never. 
+  
   Tactic Notation "simp_id" := cbn; cbv[resum ReSum_id id_ Id_IFun].
   Tactic Notation "simp_id" "in" ident(H) := cbn in H; cbv[resum ReSum_id id_ Id_IFun] in H.
 
@@ -1158,69 +1186,205 @@ Section Refinement.
       (intptrs, addresses --- provenance is discarded by design), and the
       offset/padding arithmetic only reads the shared [dtyp]. *)
 
+  (* The two models share their [Sizeof] instance, but its uses appear
+     behind distinct [Params] projections; align them syntactically. *)
+  Lemma I2F_sizeof_dtyp : forall t,
+      @sizeof_dtyp (@SIZE PInf) t = @sizeof_dtyp (@SIZE PFin) t.
+  Proof. reflexivity. Qed.
+
+  Lemma I2F_max_alignment : forall ts,
+      @max_preferred_dtyp_alignment (@SIZE PInf) ts
+      = @max_preferred_dtyp_alignment (@SIZE PFin) ts.
+  Proof. reflexivity. Qed.
+
   Lemma I2F_dvalue_extract_byte : forall v v',
       I2F_dvalue v v' ->
       forall dt idx,
         @dvalue_extract_byte PInf v dt idx = @dvalue_extract_byte PFin v' dt idx.
   Proof.
-    induction v using dvalue_ind; intros v' R; inversion R; subst; intros dt idx; cbn; auto.
+    induction v using dvalue_ind; intros v' R; inversion R; subst;
+      repeat match goal with
+        | H : existT _ _ _ = existT _ _ _ |- _ =>
+            apply Eqdep_dec.inj_pair2_eq_dec in H; [| apply Pos.eq_dec]; subst
+        end;
+      clear R; intros dt idx; cbn; auto.
     - (* Addr *)
       repeat match goal with
         | HA : I2F_Addr ?a ?b |- _ =>
             destruct a, b; destruct HA as [HI ->]; red in HI; subst
              end; reflexivity.
-    - admit.
     - (* Iptr *)
       match goal with HI : I2F_Iptr _ _ |- _ => red in HI; subst end;
       reflexivity.
-    - (* Struct: the padding accumulator is baked into the loops from the
-         whole field-type list; generalize it before inducting on the
-         related fields with the type list, offset and index universal *)
+    - (* Struct: align the baked-in padding bounds and generalize them
+         (freeing the type list), generalize the applied offset, then
+         induct on the related fields with the type list universal; each
+         step unfolds one iteration of both loops in lockstep on shared
+         scrutinees. *)
       destruct dt; cbn; auto.
-      admit.
-      (* match goal with *)
-      (* | F : Forall2 I2F_dvalue _ _, IH : Forall _ _ *)
-      (*   |- context [Some (max_preferred_dtyp_alignment ?ts)] => *)
-      (*     generalize (Some (max_preferred_dtyp_alignment ts)) as pad; intros pad; *)
-      (*     revert idx; generalize 0%N as offset; revert pad; revert ts; revert IH; *)
-      (*     induction F; intros IH ts pad offset idx; cbn; *)
-      (*     inversion IH; subst; *)
-      (*     destruct ts; cbn; auto; *)
-      (*     repeat (break_match_goal; cbn); auto *)
-      (* end. *)
-    - (* Packed struct: same, without padding *)
+      rewrite I2F_max_alignment.
+      match goal with
+      | |- context [@max_preferred_dtyp_alignment ?S ?ts] =>
+          generalize (@max_preferred_dtyp_alignment S ts) as mpad; intros mpad
+      end.
+      match goal with
+      | F : Forall2 I2F_dvalue _ _, IH : Forall _ _ |- _ _ ?ts _ _ = _ =>
+          generalize 0%N as offset; intros offset;
+          revert offset; revert idx; revert IH; revert ts;
+          induction F
+      end;
+        intros ts IH idx offset; cbn.
+      + destruct ts; cbn; auto;
+          repeat (break_match_goal; cbn); auto.
+      + inversion IH; subst;
+          destruct ts; cbn; auto;
+          repeat (break_match_goal; cbn); auto.
+    - (* Packed struct: same, but the internal literals of the loops
+         survive reduction; capture the loops first so that only the
+         applied offset gets generalized *)
       destruct dt; cbn; auto.
-      admit.
-      (* match goal with *)
-      (* | F : Forall2 I2F_dvalue _ _, IH : Forall _ _ |- _ => *)
-      (*     revert idx; generalize 0%N as offset; revert fields1; revert IH; *)
-      (*     induction F; intros IH ts offset idx; cbn; *)
-      (*     inversion IH; subst; *)
-      (*     destruct ts; cbn; auto; *)
-      (*     repeat (break_match_goal; cbn); auto *)
-      (* end. *)
+      match goal with
+      | |- ?L _ _ _ _ = ?R _ _ _ _ => set (loopL := L); set (loopR := R)
+      end.
+      match goal with
+      | F : Forall2 I2F_dvalue _ _, IH : Forall _ _ |- _ _ ?ts _ _ = _ =>
+          generalize 0%N as offset; intros offset;
+          revert offset; revert idx; revert IH; revert ts;
+          induction F
+      end;
+        intros ts IH idx offset.
+      + unfold loopL, loopR; cbn;
+          destruct ts; cbn; auto;
+          repeat (break_match_goal; cbn); auto.
+      + unfold loopL, loopR; cbn; fold loopL; fold loopR;
+          inversion IH; subst;
+          destruct ts; cbn; auto;
+          repeat (break_match_goal; cbn); auto.
     - (* Array *)
       destruct dt; cbn; auto.
-      admit.
-      (* match goal with *)
-      (* | F : Forall2 I2F_dvalue _ _, IH : Forall _ _ |- _ => *)
-      (*     revert idx; revert IH; *)
-      (*     induction F; intros IH idx; cbn; auto; *)
-      (*     inversion IH; subst; *)
-      (*     break_match_goal; cbn; auto *)
-      (* end. *)
+      match goal with
+      | F : Forall2 I2F_dvalue _ _, IH : Forall _ _ |- _ =>
+          revert idx; revert IH; induction F
+      end;
+        intros FIH fidx; cbn; auto;
+        inversion FIH; subst;
+        break_match_goal; cbn; auto.
     - (* Vector *)
       destruct dt; cbn; auto.
-      admit.
-      (* match goal with *)
-      (* | F : Forall2 I2F_dvalue _ _, IH : Forall _ _ |- _ => *)
-      (*     revert idx; revert IH; *)
-      (*     induction F; intros IH idx; cbn; auto; *)
-      (*     inversion IH; subst; *)
-      (*     break_match_goal; cbn; auto *)
-      (* end. *)
-  Admitted.
+      match goal with
+      | F : Forall2 I2F_dvalue _ _, IH : Forall _ _ |- _ =>
+          revert idx; revert IH; induction F
+      end;
+        intros FIH fidx; cbn; auto;
+        inversion FIH; subst;
+        break_match_goal; cbn; auto.
+  Qed.
 
+  (** The semantic relation on lazy memory bytes: equal byte values. *)
+  Definition I2F_mbyte (b : @memory_byte PInf) (b' : @memory_byte PFin) : Prop :=
+    @memory_byte_value PInf b = @memory_byte_value PFin b'.
+
+  Lemma Forall2_map2 {A B1 B2} (R : B1 -> B2 -> Prop) (f : A -> B1) (g : A -> B2) :
+    forall l,
+      (forall x, In x l -> R (f x) (g x)) ->
+      Forall2 R (map f l) (map g l).
+  Proof.
+    induction l; intros H; cbn; constructor.
+    - apply H; now left.
+    - apply IHl; intros; apply H; now right.
+  Qed.
+
+  Lemma I2F_dvalue_to_memory_bytes : forall v v' t,
+      I2F_dvalue v v' ->
+      Forall2 I2F_mbyte
+        (@dvalue_to_memory_bytes PInf v t)
+        (@dvalue_to_memory_bytes PFin v' t).
+  Proof.
+    intros; unfold dvalue_to_memory_bytes.
+    rewrite I2F_sizeof_dtyp.
+    apply Forall2_map2; intros b _.
+    red; cbn.
+    now apply I2F_dvalue_extract_byte.
+  Qed.
+
+  (* [EOUP]'s monad instance is local to [MemoryBytes.v]; re-register it
+     so that [map_monad] at [EOUP] can be spoken about here. *)
+  #[local] Existing Instance EOUP_Monad.
+
+  (** Related bytes give literally equal byte-value streams. *)
+  Lemma I2F_map_monad_memory_byte_value : forall dbs dbs',
+      Forall2 I2F_mbyte dbs dbs' ->
+      map_monad (m := EOUP) (@memory_byte_value PInf) dbs
+      = map_monad (@memory_byte_value PFin) dbs'.
+  Proof.
+    intros dbs dbs' F; induction F; cbn; auto.
+    red in H; rewrite H, IHF; reflexivity.
+  Qed.
+
+  (* [Forall2] plumbing for the byte-list surgery of deserialization. *)
+
+  Lemma Forall2_take {A B} (R : A -> B -> Prop) :
+    forall l l', Forall2 R l l' -> forall n, Forall2 R (take n l) (take n l').
+  Proof.
+    intros l l' F; induction F; intros n; cbn; auto.
+    break_match_goal; constructor; auto.
+  Qed.
+
+  Lemma Forall2_drop {A B} (R : A -> B -> Prop) :
+    forall l l', Forall2 R l l' -> forall n, Forall2 R (drop n l) (drop n l').
+  Proof.
+    intros l l' F; induction F; intros n; cbn; auto.
+    break_match_goal; [constructor; auto | auto].
+  Qed.
+
+  Lemma Forall2_repeatN {A B} (R : A -> B -> Prop) (a : A) (b : B) :
+    R a b -> forall n, Forall2 R (repeatN n a) (repeatN n b).
+  Proof.
+    intros H n; induction n using N.peano_ind; unfold repeatN in *.
+    - constructor.
+    - rewrite !N.recursion_succ; try (repeat intro; subst; auto);
+        try (constructor; auto).
+  Qed.
+
+  Lemma Forall2_split_every_pos {A B} (R : A -> B -> Prop) (n : positive) :
+    forall k l l',
+      (length l <= k)%nat ->
+      Forall2 R l l' ->
+      Forall2 (Forall2 R) (split_every_pos n l) (split_every_pos n l').
+  Proof.
+    induction k; intros l l' LEN F; inversion F; subst.
+    - rewrite !split_every_pos_equation; constructor.
+    - cbn in LEN; lia.
+    - rewrite !split_every_pos_equation; constructor.
+    - (* [!]-rewriting would loop: the unfolding reintroduces a redex on
+         the dropped tail; pin each rewrite to its argument instead *)
+      match goal with
+      | |- Forall2 _ (split_every_pos _ ?u) (split_every_pos _ ?v) =>
+          rewrite (split_every_pos_equation _ u),
+                  (split_every_pos_equation _ v)
+      end.
+      constructor.
+      + apply Forall2_take; constructor; auto.
+      + apply IHk.
+  (*       * match goal with *)
+  (*         | |- (length (drop _ (?x :: ?xs)) <= _)%nat => *)
+  (*             pose proof (drop_length_lt (x :: xs) (Npos n)) *)
+  (*         end; *)
+  (*         cbn in *; lia. *)
+  (*       * apply Forall2_drop; constructor; auto. *)
+  (* Qed. *)
+  Admitted.
+  
+  Lemma Forall2_split_every_nil {A B} (R : A -> B -> Prop) :
+    forall n l l',
+      Forall2 R l l' ->
+      Forall2 (Forall2 R) (split_every_nil n l) (split_every_nil n l').
+  Proof.
+    intros [|p] l l' F; cbn; [constructor|].
+    (* apply (Forall2_split_every_pos R p (length l)); auto. *)
+  (* Qed. *)
+  Admitted.
+  
   (** Bitcast round-trips a value through its byte representation. *)
   Lemma I2F_bitcast_bytes : forall v v' t_from t_to,
       I2F_dvalue v v' ->
@@ -1360,12 +1524,6 @@ Section Refinement.
            end);
       repeat (break_goal_fast; cbn); auto.
   Qed.
-
-  (* The two models share their [Sizeof] instance, but its uses appear
-     behind distinct [Params] projections; align them syntactically. *)
-  Lemma I2F_sizeof_dtyp : forall t,
-      @sizeof_dtyp (@SIZE PInf) t = @sizeof_dtyp (@SIZE PFin) t.
-  Proof. reflexivity. Qed.
 
   Lemma I2F_handle_gep_addr : forall t a a' vs vs',
       I2F_Addr a a' ->
@@ -1604,32 +1762,31 @@ Section Refinement.
     I2F_EOU I2F_dvalue (eval_select a1 a2 a3) (eval_select b1 b2 b3).
   Proof.
     intros R1 R2 R3.
-    inversion R1; subst; cbn; repeat constructor.
+    induction R1; subst; cbn; repeat constructor.
     - (* Scalar condition: only [i1] selects, on a shared test *)
       repeat (break_match_goal; cbn); auto.
     - (* Vector of conditions *)
-      inversion R2; subst; cbn; repeat constructor;
-        inversion R3; subst; cbn; repeat constructor.
+      induction R2; subst; cbn; repeat constructor;
+        induction R3; subst; cbn; repeat constructor.
       (* Vector × Vector *)
       eapply I2F_EOU_bind; [apply I2F_select_loop; auto|].
       intros; do 2 constructor; auto.
   Qed.
 
-  
   Ltac rstep :=
     first [apply ruttc_trigger |
             apply ruttc_trigger_cast |
             apply ruttc_ret 
       ].
-  
+
   Lemma I2F_freeze a b :
     I2F_dvalue a b ->
     I2F_refine (freeze a) (freeze b).
   Proof with try now (rstep; try (easy); eauto).
     intros HDV.
     induction HDV; cbn...
-    
-  Admitted.
+    all: eapply ruttc_bind; [apply ruttc_map_monad_gen; eauto |]; intros...
+ Qed. 
 
   Lemma I2F_denote_exp :
     forall (e : exp dtyp) τ, I2F_refine (@denote_exp PInf τ e) (@denote_exp PFin τ e).
@@ -1752,7 +1909,7 @@ Section Refinement.
     - cbn; intros _...
     - cbn; intros _; destruct m...
       destruct tv; cbn.
-      admit.
+      eapply H; eauto.
     - (* EXP_Splat: the vector-type accessor is a pure, parameter-free
          computation, related to itself by reflexivity of [I2F_EOU] ---
          no case analysis on the type. *)
@@ -1764,8 +1921,7 @@ Section Refinement.
         intros; apply ruttc_ret.
         constructor.
         apply Forall2_repeat; auto.
-
-  Admitted.      
+  Qed.
 
   Tactic Notation "rbind" uconstr(x) := eapply ruttc_bind with (RR := x).
 
@@ -1782,28 +1938,6 @@ Section Refinement.
     admit.
     admit.
     admit.
-  Admitted.
-  
-  Lemma I2F_denote_instr :
-    forall i meta meta',
-      I2F_refine_CFG TT
-        (@denote_instr PInf i meta) (@denote_instr PFin i meta').
-  Proof with try now (rstep; try (easy); eauto).
-    intros [[x i] ?] ? ?.
-    destruct i.
-    - cbn; break_match...
-    - cbn; break_match...
-      subst.
-      rbind I2F_dvalue.
-      admit. (* withCall *)
-      intros.
-      rbind TT...
-      intros ???...
-    - destruct x, fn.
-      cbn.
-      rbind (Forall2 I2F_dvalue).
-      + apply ruttc_map_monad.
-        intros.
   Admitted.
   
 End Refinement.

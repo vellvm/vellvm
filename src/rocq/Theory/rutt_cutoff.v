@@ -428,6 +428,7 @@ Proof.
     now constructor.
 Qed.
 
+(* TODO move *)
 Lemma Forall2_diag {A} P (l : list A):
   Forall2 P l l <-> Forall (fun a => P a a) l.
 Proof.
@@ -832,7 +833,7 @@ Proof.
   - dependent induction INR; eauto with itree.
 Qed.
 
-Lemma ruttc_eutt {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} :
+#[global]Instance ruttc_eutt {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} :
   Proper (eutt eq ==> eutt eq ==> iff) (@ruttc E1 E2 R1 R2 Rcutr Rcutl REv RAns RR).
 Proof.
   intros ?? EQ1 ?? EQ2; split; intros EQ.
