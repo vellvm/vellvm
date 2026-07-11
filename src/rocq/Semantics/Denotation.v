@@ -658,17 +658,17 @@ Section Denotation.
       ret (inr dv)
 
     | TERM_Ret_void =>
-        ret (inr DVALUE_None)
+        ret (inr NONE)
 
     | TERM_Br (dt,op) br1 br2 =>
       v <- denote_exp' (Some dt) op ;;
       match v with
-      | DVALUE_I 1 comparison_bit =>
+      | DVALUE_Base (DVALUE_I 1 comparison_bit) =>
         if equ comparison_bit one then
           ret (inl br1)
         else
           ret (inl br2)
-      | DVALUE_Poison dt => raiseUB (err_loc ++ ": Branching on poison.")
+      | DVALUE_Base (DVALUE_Poison dt) => raiseUB (err_loc ++ ": Branching on poison.")
       | _ => raise (err_loc ++ ": Br got non-bool value")
       end
 
@@ -682,7 +682,7 @@ Section Denotation.
         switches <- map_monad
                      (fun '((TInt_Literal sz x),id) =>
                         s <- lift (coerce_integer_to_int (Some sz) (denote_int_syntax x));;
-                        ret (s,id))
+                        ret (DVALUE_Base s,id))
                      dests;; 
         inl <$> lift (select_switch selector default_br switches)
 
@@ -717,7 +717,7 @@ Section Denotation.
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
-  Definition denote_code (c: code dtyp) (varargs : option addr) : CFGtop unit :=
+  Definition denote_code (c: code dtyp) (varargs : option ptr) : CFGtop unit :=
     map_monad_ (fun i => denote_instr i varargs) c.
 
   Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : CFGtop (local_id * dvalue) :=
@@ -741,7 +741,7 @@ Section Denotation.
 
   (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-  Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option addr) : CFGtop (block_id + dvalue) :=
+  Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option ptr) : CFGtop (block_id + dvalue) :=
     denote_phis bid_from (blk_phis b);;
     denote_code (blk_code b) varargs;;
     denote_terminator (blk_term b).
@@ -760,7 +760,7 @@ Section Denotation.
      If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
    *)
 
-  Definition denote_ocfg (bks: ocfg dtyp) (varargs : option addr)
+  Definition denote_ocfg (bks: ocfg dtyp) (varargs : option ptr)
     : (block_id * block_id) -> CFGtop ((block_id * block_id) + dvalue) :=
     ITree.iter
       (fun '((bid_from,bid_src) : block_id * block_id) =>
@@ -774,7 +774,7 @@ Section Denotation.
              end
          end).
 
-  Definition denote_cfg (f: cfg dtyp) (varargs : option addr) : CFGtop dvalue :=
+  Definition denote_cfg (f: cfg dtyp) (varargs : option ptr) : CFGtop dvalue :=
     r <- denote_ocfg (blks f) varargs (init f,init f) ;;
     match r with
     | inl bid => raise ("Can't find block in denote_cfg " ++ show (snd bid))
@@ -838,18 +838,18 @@ Section Denotation.
     mem_pop.
   
   (* Push call frame, return varargs address *)
-  Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list dvalue) : CFGtop addr :=
+  Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list dvalue) : CFGtop ptr :=
     (* We match the arguments variables to the inputs *)
     '(bs, vs) <- lift (combine_lists_varargs (df_args df) args) ;;
     dts <- lift (map_monad dtyp_of_dvalue vs);;
-    let dt := DTYPE_Packed_struct dts in
+    let dt := DTYPE_Struct true dts in
     (* generate the corresponding writes to the local stack frame *)
     mem_push ;;
     stack_push bs ;;
     varargs <- alloca dt 1 None;;
-    store dt varargs (DVALUE_Packed_struct vs);;
+    store dt varargs (DVALUE_Struct true vs);;
     match varargs with
-    | DVALUE_Addr varg =>
+    | DVALUE_Base (DVALUE_Pointer varg) =>
         ret varg
     | _ => raise "Non-address returned from alloca of varargs"
     end.
@@ -880,7 +880,7 @@ Section Denotation.
 
   Definition lookup_defn (dv : dvalue) (m : IntMap function_denotation) : option function_denotation
     := match dv with
-       | DVALUE_Addr addr =>
+       | DVALUE_Base (DVALUE_Pointer addr) =>
            lookup (ptr_to_int addr) m
        | _ => None
        end.

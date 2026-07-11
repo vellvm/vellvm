@@ -326,11 +326,13 @@ Section DValue.
         * right; intros H; inversion H. contradiction.
     Defined.
 
+    Definition dvalue_eqb (dv1 dv2 : dvalue) : bool :=
+      if dvalue_eq_dec dv1 dv2 then true else false.
+    
     #[global] Instance eq_dec_dvalue : RelDec (@eq dvalue) := RelDec_from_dec (@eq dvalue) (@dvalue_eq_dec).
     #[global] Instance eqv_dvalue : Eqv dvalue := (@eq dvalue).
     Hint Unfold eqv_dvalue : core.
 
-    
   (*
   Inductive dvalue_direct_subterm : dvalue -> dvalue -> Prop :=
   | DVALUE_Struct_subterm : forall f fields, In f fields -> dvalue_direct_subterm f (DVALUE_Struct fields)

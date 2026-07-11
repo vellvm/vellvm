@@ -12,7 +12,7 @@ module DV = DynamicValues
 
 let iptr   = IPtrInfinite.coq_IPZ
 let params = ParamsV.coq_ParamsV iptr
-let addr_v = Address0.coq_AddressV iptr
+let pointer_v = Pointer0.coq_PointerV iptr
 
 open LLVMEvents
 

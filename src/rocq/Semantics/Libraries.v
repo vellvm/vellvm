@@ -42,12 +42,12 @@ Section withParams.
       Propagates all memory failures and raises a Vellvm "Failure" if the
       value read does not concretize to a DVALUE_I8.
    *)
-  Definition i8_str_index (strptr : addr) (index : Z) : CFGtop (@Integers.bit_int 8) :=
+  Definition i8_str_index (strptr : ptr) (index : Z) : CFGtop (@Integers.bit_int 8) :=
     iptr <- EOU_to_itree (from_Z index) ;;
-    addr <- EOU_to_itree (handle_gep_addr (DTYPE_I 8) strptr [DVALUE_Iptr iptr]) ;;
-    d_byte <- load (DTYPE_I 8) (DVALUE_Addr addr) ;;
+    addr <- EOU_to_itree (handle_gep_ptr (DTYPE_I 8) strptr [DVALUE_Base (DVALUE_Iptr iptr)]) ;;
+    d_byte <- load (DTYPE_I 8) (DVALUE_Pointer addr) ;;
     match d_byte with
-    | DVALUE_I 8 b => ret b
+    | DVALUE_Base (DVALUE_I 8 b) => ret b
     | bad => raise ("i8_str_index failed with non-DVALUE_I8 " ++ show_dvalue bad)
     end.
 
@@ -60,10 +60,10 @@ Section withParams.
     refine
       (let putchar_body (u_char:dvalue) : CFGtop dvalue :=
          match u_char with
-         | DVALUE_I sz x32 =>
+         | DVALUE_Base (DVALUE_I sz x32)  =>
              if Pos.eq_dec 32 sz
              then
-               match get_conv_case (Trunc false false) (DTYPE_I 32) u_char (DTYPE_I 8) with
+               match get_conv_case (Trunc false false) (DTYPE_I 32) (DVALUE_I sz x32) (DTYPE_I 8) with
                | Conv_Pure (DVALUE_I sz x8) =>
                    if Pos.eq_dec 8 sz
                    then _
@@ -93,7 +93,7 @@ Section withParams.
   Definition puts_denotation : function_denotation :=
     let puts_body (u_strptr : dvalue) : CFGtop dvalue :=
       match u_strptr with
-      | DVALUE_Addr strptr =>
+      | DVALUE_Base (DVALUE_Pointer strptr) =>
           char <- i8_str_index strptr 0%Z ;;
           bytes <-
             ITree.iter
@@ -107,7 +107,7 @@ Section withParams.
               )
               (char, [], 1%Z) ;;
           v <- io_stdout (DList.rev_tail_rec bytes) ;;
-          ret (DVALUE_I 8 (@Integers.zero 8))
+          ret (DVALUE_Base (DVALUE_I 8 (@Integers.zero 8)))
       | bad => raiseUB ("puts got non-address argument " ++ show_dvalue bad)
       end
     in
