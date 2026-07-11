@@ -205,6 +205,7 @@ let dvalue_eq_assertion name (ty:DynamicTypes.dtyp) (expected : DV.dvalue) (got 
   begin match expected with
   | DVALUE_Base (DV.DVALUE_Poison _) -> compare_dvalues_exn expected result msg
   | _ ->
+     (* Use the semantic "cmp eq" for these types *)
      begin match ty with
      | DTYPE_Base (DTYPE_I _)
      | DTYPE_Base DTYPE_Iptr
@@ -213,12 +214,6 @@ let dvalue_eq_assertion name (ty:DynamicTypes.dtyp) (expected : DV.dvalue) (got 
         let v = ocaml_of_EOU @@ Compare.eval_icmp Interpreter.params false Eq expected result in
         if dvalue_i1_to_bool v then () else
           failwith msg
-     (* | DTYPE_FP _ -> (\* floating point comparison *\) *)
-     (*    (\* compare_dvalues_exn expected result msg         *\) *)
-     (*    let v = Assertion.ocaml_of_EOU @@ DV.eval_fcmp Interpreter.params FOeq expected result in *)
-     (*    if dvalue_i1_to_bool v then () else *)
-     (*      failwith msg *)
-     (* | DTYPE_Vector _  -> failwith "TODO: comparison on vectors" *)
      | _ -> (* Best effort comparison of other types *)
         compare_dvalues_exn expected result msg
      end
