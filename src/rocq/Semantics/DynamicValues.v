@@ -108,12 +108,10 @@ Section DValue.
   Inductive dvalue : Set :=
   | DVALUE_Base (db : dvalue_base)      
   | DVALUE_Struct (packed:bool) (fields: list dvalue)
-
   (* REVISIT: DESIGN CHOICE:
      - Array and Vector values carry their "full" dtyp (which includes a length)
    *)                  
-  | DVALUE_Array (t:dtyp) (elts: list dvalue)
-  | DVALUE_Vector (t:dtyp) (elts: list dvalue_base)                 
+  | DVALUE_Array (vector:bool) (t:dtyp) (elts: list dvalue)
   .
   Set Elimination Schemes.
 
@@ -161,30 +159,16 @@ Section DValue.
     | DVALUE_Struct p fields =>
         dts <- map_monad dtyp_of_dvalue fields ;;
         ret (DTYPE_Struct p dts)
-    | DVALUE_Array (DTYPE_Array sz t) elts =>
+    | DVALUE_Array p (DTYPE_Array q sz t) elts =>
         if @NO_VOID_dec t
         then
           if forallb (fun e => match dtyp_of_dvalue e with
                             | raise_ret t' => dtyp_eqb t t'
                             | _ => false end) elts
              && N.eqb sz (N.of_nat (length elts))
-          then ret (DTYPE_Array (N.of_nat (length elts)) t)
+          then ret (DTYPE_Array p (N.of_nat (length elts)) t)
           else raise_error "dtyp_of_dvalue: mismatched element type in array"
         else raise_error "dtyp_of_dvalue: void in array type"
-    | DVALUE_Vector (DTYPE_Vector sz t) elts =>
-        if @NO_VOID_dec (DTYPE_Vector sz t)
-        then
-          if forallb (fun e => match dtyp_base_of_dvalue_base e with
-                            | Some t' => if dtyp_base_eq_dec t t' then true else false
-                            | None => false end) elts
-             && N.eqb sz (N.of_nat (length elts))
-          then
-            if @vector_dtyp_base_dec t
-            then ret (DTYPE_Vector (N.of_nat (length elts)) t)
-            else raise_error "dtyp_of_dvalue: invalid element type for vector"
-          else raise_error "dtyp_of_dvalue: mismatched element type in vector"
-        else raise_error "dtyp_of_dvalue: void in vector type"
-                         
     | _ => raise_error "dtyp_of_dvalue: missing case"
     end.
 
@@ -232,8 +216,8 @@ Section DValue.
         if p then
           "<{" ++ String.concat ", " (map show_dvalue fields) ++ "}>"
         else "{" ++ String.concat ", " (map show_dvalue fields) ++ "}"
-    | DVALUE_Array t elts => show_dtyp t ++ " [" ++ String.concat ", " (map show_dvalue elts) ++ "]"
-    | DVALUE_Vector t elts => show_dtyp t ++ " < " ++ String.concat ", " (map show_dvalue_base elts) ++ ">"
+    | DVALUE_Array false t elts => show_dtyp t ++ " [" ++ String.concat ", " (map show_dvalue elts) ++ "]"
+    | DVALUE_Array true t elts => show_dtyp t ++ " < " ++ String.concat ", " (map show_dvalue elts) ++ ">"
     end.
 
   #[global] Instance showDValue : Show dvalue
@@ -246,9 +230,7 @@ Section DValue.
     Variable P : dvalue -> Prop.
     Hypothesis IH_Base : forall dv, P (DVALUE_Base dv).
     Hypothesis IH_Struct        : forall p (fields: list dvalue), Forall P fields -> P (DVALUE_Struct p fields).
-    Hypothesis IH_Array         : forall t (elts: list dvalue), Forall P elts -> P (DVALUE_Array t elts).
-    Hypothesis IH_Vector        : forall t (elts: list dvalue_base), P (DVALUE_Vector t elts).
-
+    Hypothesis IH_Array         : forall v t (elts: list dvalue), Forall P elts -> P (DVALUE_Array v t elts).
     Lemma dvalue_ind : forall (dv:dvalue), P dv.
     Proof using All.
       fix IH 1.
@@ -303,27 +285,24 @@ Section DValue.
                 match v1, v2 with
                 | DVALUE_Base v1, DVALUE_Base v2 => _
                 | DVALUE_Struct p fields, DVALUE_Struct p' fields' => _
-                | DVALUE_Array t elts, DVALUE_Array t' elts' => _
-                | DVALUE_Vector t elts, DVALUE_Vector t' elts' => _                                                                | _, _ => _
+                | DVALUE_Array v t elts, DVALUE_Array v' t' elts' => _
+                | _, _ => _                                                                   
                 end); try (ltac:(dec_dtyp); fail).
       - destruct (dvalue_base_eq_dec v1 v2).
-        * left; subst; reflexivity.
-        * right; intros H; inversion H. contradiction.
-      - destruct (lsteq_dec fields fields').
-        * destruct (bool_dec p p').
-          -- left; subst; reflexivity.
-          -- right; intros H; inversion H. contradiction.
-        * right; intros H; inversion H. contradiction.
-      - destruct (lsteq_dec elts elts').
-        * destruct (dtyp_eq_dec t t').
-          --  left; subst; reflexivity.
-          -- right; intros H; inversion H. contradiction.
-        * right; intros H; inversion H. contradiction.
-      - destruct (list_eq_dec dvalue_base_eq_dec elts elts').
-        * destruct (dtyp_eq_dec t t').
-          --  left; subst; reflexivity.
-          -- right; intros H; inversion H. contradiction.
-        * right; intros H; inversion H. contradiction.
+        + left; subst; reflexivity.
+        + right; intros H; inversion H. contradiction.
+      - destruct (bool_dec p p').
+        + destruct (lsteq_dec fields fields').
+          * left; subst; reflexivity.
+          * right; intros H; inversion H. contradiction.
+        + right; intros H; inversion H. contradiction.
+      - destruct (bool_dec v v').
+        + destruct (dtyp_eq_dec t t').
+          * destruct (lsteq_dec elts elts').
+            --  left; subst; reflexivity.
+            -- right; intros H; inversion H. contradiction.
+          * right; intros H; inversion H. contradiction.
+        + right; intros H; inversion H. contradiction.            
     Defined.
 
     Definition dvalue_eqb (dv1 dv2 : dvalue) : bool :=
@@ -1294,16 +1273,19 @@ Section DValue.
   (* I split the definition between the vector and other evaluations because
      otherwise eval_iop should be recursive to allow for vector calculations,
      but rocq can't find a fixpoint. *)
-  Definition eval_iop iop v1 v2 : EOU dvalue :=
+  Fixpoint eval_iop iop v1 v2 : EOU dvalue :=
     match v1, v2 with
     | (DVALUE_Base v1), (DVALUE_Base v2) =>
         DVALUE_Base <$> (eval_iop_integer_base iop v1 v2)
                            
-    | (DVALUE_Vector t elts1), (DVALUE_Vector _ elts2) =>
+    | (DVALUE_Array true t elts1), (DVALUE_Array true _ elts2) =>
         let n := N.length elts1 in
         let m := N.length elts2 in
-        if n =? m  then 
-          (DVALUE_Vector t) <$> (vec_loop (eval_iop_integer_base iop) (List.combine elts1 elts2))
+        if n =? m  then
+          elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
+          elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
+          ans <- vec_loop (eval_iop_integer_base iop) (List.combine elts1' elts2') ;;
+          ret (DVALUE_Array true t (List.map DVALUE_Base ans))
         else
           raise_ub ("iop: " ++ (show iop) ++  " of different-length vectors")
 
@@ -1382,11 +1364,14 @@ Section DValue.
     | (DVALUE_Base dv1), (DVALUE_Base dv2) =>
         DVALUE_Base <$> (eval_fop_base fop dv1 dv2)
       
-    | (DVALUE_Vector t elts1), (DVALUE_Vector _ elts2) =>
+    | (DVALUE_Array true t elts1), (DVALUE_Array true _ elts2) =>
         let n := N.length elts1 in
         let m := N.length elts2 in
         if n =? m  then
-          (DVALUE_Vector t) <$> (vec_loop (eval_fop_base fop) (List.combine elts1 elts2))
+          elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
+          elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
+          ans <- vec_loop (eval_fop_base fop) (List.combine elts1' elts2') ;;
+          ret (DVALUE_Array true t (List.map DVALUE_Base ans))
         else
         raise_ub ("fop: " ++ (show fop) ++  " different-length vectors of type "
                     ++ (show t) ++ "v1 = " ++ (show v1) ++ "v2 = " ++ (show v2)
@@ -1407,8 +1392,10 @@ Section DValue.
     | DVALUE_Base db =>
         DVALUE_Base <$> (eval_fneg_base db)
                     
-    | DVALUE_Vector t elts =>
-        (DVALUE_Vector t) <$>  (map_monad (eval_fneg_base) elts)
+    | DVALUE_Array true t elts =>
+        elts' <- map_monad dvalue_to_dvalue_base elts ;;        
+        ans <- map_monad (eval_fneg_base) elts' ;;
+        ret (DVALUE_Array true t (List.map DVALUE_Base ans))
     | _ => raise_error "eval_fneg got illegal value"
     end.
   
@@ -1485,18 +1472,19 @@ Section DValue.
     | (DVALUE_Base dv1), (DVALUE_Base dv2) =>
         DVALUE_Base <$> (eval_fcmp_base fcmp dv1 dv2)
                     
-    | (DVALUE_Vector t elts1), (DVALUE_Vector _ elts2) =>
+    | (DVALUE_Array true t elts1), (DVALUE_Array true _ elts2) =>
         let n := N.length elts1 in
         let m := N.length elts2 in
-        if n =? m  then 
-          val <- vec_loop (eval_fcmp_base fcmp) (List.combine elts1 elts2) ;;
-          ret (DVALUE_Vector (DTYPE_Vector n (DTYPE_I 1)) val)
+        if n =? m  then
+          elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
+          elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
+          ans <- vec_loop (eval_fcmp_base fcmp) (List.combine elts1' elts2') ;;
+          ret (DVALUE_Array true (DTYPE_Array true n (DTYPE_I 1)) (List.map DVALUE_Base ans))
         else
           raise_ub "fcmp of different-length vectors"
     | _, _ => raise_error "eval_fcmp got illegal value"
     end.
 
-  
   End ARITHMETIC.
 
   (* monadically split a list into a prefix, an element, and a tail
@@ -1528,10 +1516,10 @@ Section DValue.
             modified_subfield <- insert_value sub elt tl ;;
             ret (DVALUE_Struct p (pre ++ [modified_subfield] ++ post)%list)
     
-        | DVALUE_Array t elts =>
+        | DVALUE_Array false t elts =>
             '(pre,sub,post) <- option_ub "insertvalue array index out of bounds" (split [] i elts) ;;
             modified_subfield <- insert_value sub elt tl ;;
-            ret (DVALUE_Array t (pre ++ [modified_subfield] ++ post))
+            ret (DVALUE_Array false t (pre ++ [modified_subfield] ++ post))
 
         | DVALUE_Base (DVALUE_Poison (DTYPE_Struct p ts)) =>
             '(pre_t, sub_t, post_t) <- option_ub "insertvalue poison index out of bounds" (split [] i ts) ;;
@@ -1553,7 +1541,7 @@ Section DValue.
             '(pre,sub,post) <- option_ub "extractvalue struct index out of bounds" (split [] i elts) ;;
             extract_value sub tl 
     
-        | DVALUE_Array t elts =>
+        | DVALUE_Array false t elts =>
             '(pre,sub,post) <- option_ub "extractvalue array index out of bounds" (split [] i elts) ;;
             extract_value sub tl 
 
@@ -1576,36 +1564,36 @@ Section DValue.
   (* LANGREF? : What is the behavior if [vex] is poison?  UB or return poision?  *)
   Definition extract_element (vec:dvalue) (idx:dvalue) : EOU dvalue :=
     match vec with
-    | DVALUE_Vector (DTYPE_Vector _ dt) elts =>
+    | DVALUE_Array true (DTYPE_Array true _ dt) elts =>
         match dvalue_to_Z idx with
         | Some i =>
             match split [] i elts with
-            | None => ret (DVALUE_Base (DVALUE_Poison (DTYPE_Base dt)))
-            | Some (pre, elt, post) =>  ret (DVALUE_Base elt)
+            | None => ret (DVALUE_Base (DVALUE_Poison dt))
+            | Some (pre, elt, post) =>  ret elt
             end
         | None => raise_error "extractelemnt: non-integer index"
         end
     | _ => raise_error "extractelement: non-vector type"
     end.
 
-  Definition insert_element (vec : dvalue) (elt : dvalue_base) (idx : dvalue) : EOU dvalue :=
+  Definition insert_element (vec : dvalue) (elt : dvalue) (idx : dvalue) : EOU dvalue :=
     match vec with
-    | DVALUE_Vector (DTYPE_Vector sz dt) elts =>
+    | DVALUE_Array true (DTYPE_Array true sz dt) elts =>
         match dvalue_to_Z idx with
         | Some i =>
             match split [] i elts with
-            | None => ret (DVALUE_Base (DVALUE_Poison (DTYPE_Vector sz dt)))
-            | Some (pre, _, post) =>  ret (DVALUE_Vector (DTYPE_Vector sz dt) (pre ++ [elt] ++ post))
+            | None => ret (DVALUE_Base (DVALUE_Poison (DTYPE_Array true sz dt)))
+            | Some (pre, _, post) =>  ret (DVALUE_Array true (DTYPE_Array true sz dt) (pre ++ [elt] ++ post))
             end
         | None => raise_error "insertelement: non-integer index"
         end
-    | DVALUE_Base (DVALUE_Poison (DTYPE_Vector sz dt)) =>
-        let elts : list dvalue_base := repeat (DVALUE_Poison (DTYPE_Base dt)) (N.to_nat sz) in
+    | DVALUE_Base (DVALUE_Poison (DTYPE_Array true sz dt)) =>
+        let elts : list dvalue := repeat (DVALUE_Base (DVALUE_Poison dt)) (N.to_nat sz) in
         match dvalue_to_Z idx with
         | Some i =>
             match split [] i elts with
-            | None => ret (DVALUE_Base (DVALUE_Poison (DTYPE_Vector sz dt)))
-            | Some (pre, _, post) =>  ret (DVALUE_Vector (DTYPE_Vector sz dt) (pre ++ [elt] ++ post))
+            | None => ret (DVALUE_Base (DVALUE_Poison (DTYPE_Array true sz dt)))
+            | Some (pre, _, post) =>  ret (DVALUE_Array true (DTYPE_Array true sz dt) (pre ++ [elt] ++ post))
             end
         | None => raise_error "insertelement: non-integer index"
         end
@@ -1645,19 +1633,11 @@ Section DValue.
 
   (* Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
   | DVALUE_Array_typ :
-    forall xs sz dt,
+    forall v xs sz dt,
       NO_VOID dt ->
       Forall (fun x => dvalue_has_dtyp x dt) xs ->
       length xs = (N.to_nat sz) ->
-      dvalue_has_dtyp (DVALUE_Array (DTYPE_Array sz dt) xs) (DTYPE_Array sz dt) 
-
-  | DVALUE_Vector_typ :
-      forall xs sz dt,
-      NO_VOID_base dt ->
-      Forall (fun x => dvalue_base_has_dtyp_base x dt) xs ->
-      length xs = (N.to_nat sz) ->
-      vector_dtyp_base dt ->
-      dvalue_has_dtyp (DVALUE_Vector (DTYPE_Vector sz dt) xs) (DTYPE_Vector sz dt)
+      dvalue_has_dtyp (DVALUE_Array v (DTYPE_Array v sz dt) xs) (DTYPE_Array v sz dt) 
   .
   Set Elimination Schemes.
 
@@ -2260,12 +2240,9 @@ Section DValue.
     | DTYPE_Struct p fields =>
         v <- map_monad default_dvalue_of_dtyp fields;;
         ret (DVALUE_Struct p v)
-    | DTYPE_Array sz t =>
-        v <- default_dvalue_of_dtyp t ;;
-        ret (DVALUE_Array dt (repeat v (N.to_nat sz)))
-    | DTYPE_Vector sz t =>
-        v <- default_dvalue_base_of_dtyp_base t ;;
-        ret (DVALUE_Vector dt (repeat v (N.to_nat sz)))
+    | DTYPE_Array v sz t =>
+        dv <- default_dvalue_of_dtyp t ;;
+        ret (DVALUE_Array v dt (repeat dv (N.to_nat sz)))
     end.
 
   Lemma dvalue_default_base_NO_VOID :
@@ -2291,9 +2268,6 @@ Section DValue.
     - cbn in H.
       break_match_hyp_inv.
       eapply IHt. reflexivity.
-    - simpl in H.
-      destruct (default_dvalue_base_of_dtyp_base t) eqn:HEQ; inversion H.
-      eapply dvalue_default_base_NO_VOID. eapply HEQ.
   Qed.
 
   (*

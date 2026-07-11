@@ -26,10 +26,8 @@ Section GEP.
         | DVALUE_Base (DVALUE_I 8 i) =>
             let k := signed i in
             match t with
-            | DTYPE_Array _ ta =>
+            | DTYPE_Array v _ ta =>
                 handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'                
-            | DTYPE_Vector _ ta =>
-                handle_gep_h (DTYPE_Base ta) (off + k * (Z.of_N (sizeof_dtyp (DTYPE_Base ta)))) vs'
             | _ => raise_error ("non-i8-indexable type")
             end
         | DVALUE_Base (DVALUE_I 32 i) =>
@@ -37,10 +35,8 @@ Section GEP.
             let ks := signed i in
             let n := BinIntDef.Z.to_nat k in
             match t with
-            | DTYPE_Array _ ta =>
+            | DTYPE_Array v _ ta =>
                 handle_gep_h ta (off + ks * (Z.of_N (sizeof_dtyp ta))) vs'                          
-            | DTYPE_Vector _ ta =>
-                handle_gep_h (DTYPE_Base ta) (off + ks * (Z.of_N (sizeof_dtyp (DTYPE_Base ta)))) vs'
             | DTYPE_Struct false ts =>
                 let offset := fold_left (fun acc t => pad_to_align (dtyp_alignment t) acc + sizeof_dtyp t)%N (firstn n ts) 0%N in
                 match nth_error ts n with
@@ -63,19 +59,17 @@ Section GEP.
         | DVALUE_Base (DVALUE_I 64 i) =>
             let k := signed i in
             match t with
-            | DTYPE_Array _ ta =>
+            | DTYPE_Array false _ ta =>
                 handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
-            | DTYPE_Vector _ ta =>
-                handle_gep_h (DTYPE_Base ta) (off + k * (Z.of_N (sizeof_dtyp (DTYPE_Base ta)))) vs'
+            | DTYPE_Array true _ ta =>
+                handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
             | _ => raise_error ("non-i64-indexable type")
             end
         | DVALUE_Base (DVALUE_Iptr i) =>
             let k := to_Z i in
             match t with
-            | DTYPE_Array _ ta =>
+            | DTYPE_Array v  _ ta =>
                 handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'                
-            | DTYPE_Vector _ ta =>
-                handle_gep_h (DTYPE_Base ta) (off + k * (Z.of_N (sizeof_dtyp (DTYPE_Base ta)))) vs'
             | _ => raise_error ("non-iptr-indexable type")
             end
               

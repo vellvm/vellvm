@@ -164,7 +164,7 @@ Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List
       match t with
       | TYPE_Array sz t =>
           let nt := typ_to_dtyp env t in
-          DTYPE_Array sz nt
+          DTYPE_Array false sz nt
 
       | TYPE_Struct fields =>
           let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
@@ -178,7 +178,7 @@ Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List
           match typ_to_dtyp_base_option env t with
           | Some dt =>
               if (vector_dtyp_base_dec dt)
-              then DTYPE_Vector sz dt
+              then DTYPE_Array true sz dt
               else  DTYPE_Void
           | None =>  DTYPE_Void
           end
@@ -218,7 +218,7 @@ Lemma typ_to_dtyp_equation  : forall env t,
       match t with
       | TYPE_Array sz t =>
           let nt := typ_to_dtyp env t in
-          DTYPE_Array sz nt
+          DTYPE_Array false sz nt
 
       | TYPE_Struct fields =>
           let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
@@ -232,7 +232,7 @@ Lemma typ_to_dtyp_equation  : forall env t,
           match typ_to_dtyp_base_option env t with
           | Some dt =>
               if (vector_dtyp_base_dec dt)
-              then DTYPE_Vector sz dt
+              then DTYPE_Array true sz dt
               else  DTYPE_Void
           | None =>  DTYPE_Void
           end

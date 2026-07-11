@@ -43,8 +43,7 @@ Variant dtyp_base : Set :=
 Inductive dtyp : Set :=
 | DTYPE_Base (dt:dtyp_base)
 | DTYPE_Struct (packed:bool) (fields:list dtyp)
-| DTYPE_Array (sz:N) (t:dtyp)
-| DTYPE_Vector (sz:N) (t:dtyp_base)
+| DTYPE_Array (vector:bool) (sz:N) (t:dtyp)
 .
 Set Elimination Schemes.
 
@@ -72,28 +71,24 @@ Proof.
             match t1, t2 with
             | DTYPE_Base t1, DTYPE_Base t2 => _
             | DTYPE_Struct p l, DTYPE_Struct p' l' => _
-            | DTYPE_Array n t, DTYPE_Array n' t' => _
-            | DTYPE_Vector n t, DTYPE_Vector n' t' => _                                                     
+            | DTYPE_Array v n t, DTYPE_Array v' n' t' => _
             | _, _ => _
             end); try (ltac:(dec_dtyp); fail).
   - destruct (dtyp_base_eq_dec t1 t2).
-    * left; subst; reflexivity.
-    * right; intros H; inversion H. contradiction.
-  - destruct (lsteq_dec l l').
-    * destruct (bool_dec p p').
-      -- left; subst; reflexivity.
-      -- right; intros H; inversion H. contradiction.
-    * right; intros H; inversion H. contradiction.
-  - destruct (N.eq_dec n n').
-    * destruct (f t t').
-      --  left; subst; reflexivity.
-      -- right; intros H; inversion H. contradiction.
-    * right; intros H; inversion H. contradiction.
-  - destruct (N.eq_dec n n').
-    * destruct (dtyp_base_eq_dec t t').
-      -- left; subst; reflexivity.
-      -- right; intros H; inversion H. contradiction.
-    * right; intros H; inversion H. contradiction.         
+    + left; subst; reflexivity.
+    + right; intros H; inversion H. contradiction.
+  - destruct (bool_dec p p').
+      + destruct (lsteq_dec l l').
+       * left; subst; reflexivity.
+       * right; intros H; inversion H. contradiction.
+      + right; intros H; inversion H. contradiction.
+  - destruct (bool_dec v v').
+    + destruct (N.eq_dec n n').
+      * destruct (f t t').
+        --  left; subst; reflexivity.
+        -- right; intros H; inversion H. contradiction.
+      * right; intros H; inversion H. contradiction.
+    + right; intros H; inversion H. contradiction.
 Defined.
 Arguments dtyp_eq_dec: clear implicits.
 
@@ -101,9 +96,7 @@ Section DtypInd.
   Variable P : dtyp -> Prop.
   Hypothesis IH_Base   : forall t, P (DTYPE_Base t).
   Hypothesis IH_Struct : forall (p:bool) (fields: list dtyp), (forall u, In u fields -> P u) -> P (DTYPE_Struct p fields).
-  Hypothesis IH_Array  : forall sz (t: dtyp), (P t) -> P (DTYPE_Array sz t).  
-  Hypothesis IH_Vector    : forall sz t, P (DTYPE_Vector sz t).
-
+  Hypothesis IH_Array  : forall (v:bool) sz (t: dtyp), (P t) -> P (DTYPE_Array v sz t).  
   Lemma dtyp_ind : forall (dt:dtyp), P dt.
     fix IH 1.
     remember P as P0 in IH.
@@ -121,9 +114,7 @@ Section DtypRec.
   Variable P : dtyp -> Set.
   Hypothesis IH_Base   : forall t, P (DTYPE_Base t).
   Hypothesis IH_Struct : forall (p:bool) (fields: list dtyp), (forall u, In u fields -> P u) -> P (DTYPE_Struct p fields).
-  Hypothesis IH_Array  : forall sz (t: dtyp), (P t) -> P (DTYPE_Array sz t).  
-  Hypothesis IH_Vector    : forall sz t, P (DTYPE_Vector sz t).
-
+  Hypothesis IH_Array  : forall (v:bool) sz (t: dtyp), (P t) -> P (DTYPE_Array v sz t).  
   Lemma dtyp_rec : forall (dt:dtyp), P dt.
     fix IH 1.
     remember P as P0 in IH.
@@ -139,7 +130,6 @@ Section DtypRec.
       }
     - apply IH_Array. auto.
   Qed.
-
 End DtypRec.
 
 Definition dtyp_base_eqb (dt1 dt2 : dtyp_base) : bool :=
@@ -173,7 +163,6 @@ Proof using.
   unfold dtyp_eqb in TYPE.
   destruct (dtyp_eq_dec t1 t2); auto; discriminate.
 Qed.
-
 
 Definition vector_dtyp_base (dt : dtyp_base) : Prop :=
   match dt with
@@ -240,8 +229,7 @@ Fixpoint dtyp_measure (t : dtyp) : nat :=
   match t with
   | DTYPE_Base t => 1
   | DTYPE_Struct p fields => S (S (list_sum (map dtyp_measure fields)))
-  | DTYPE_Array sz t => S (S (dtyp_measure t))
-  | DTYPE_Vector sz t => 1
+  | DTYPE_Array v sz t => S (S (dtyp_measure t))
   end.
 
 Lemma dtyp_measure_gt_0 :
@@ -270,8 +258,7 @@ Fixpoint NO_VOID (dt : dtyp) : Prop:=
   match dt with
   | DTYPE_Base dt => NO_VOID_base dt
   | DTYPE_Struct p dts => FORALL NO_VOID dts
-  | DTYPE_Array sz t => NO_VOID t
-  | DTYPE_Vector sz t => NO_VOID_base t
+  | DTYPE_Array v sz t => NO_VOID t
   end.  
 
 
@@ -304,7 +291,6 @@ Proof using.
   - apply NO_VOID_base_dec.
   - apply FORALL_dec; assumption.
   - assumption.
-  - apply NO_VOID_base_dec.
 Qed.
 
 (* Lemma NO_VOID_neq_dtyp : *)

@@ -228,19 +228,19 @@ Module VIR_Notations.
 
   (** Array, vector. LLVM IR uses [[N x T]] for arrays and [<N x T>]
       for vectors. *)
-  Notation "'[' sz 'x' t ']'" := (TYPE_Array sz t)
+  Notation "'[' sz 'x' t ']'" := (TYPE_Array false sz t)
     (in custom vir_typ at level 5,
      sz constr at level 0, t custom vir_typ at level 99,
      only printing).
-  Notation "'[' sz 'x' t ']'" := (DTYPE_Array sz t)
+  Notation "'[' sz 'x' t ']'" := (DTYPE_Array false sz t)
     (in custom vir_typ at level 5,
      sz constr at level 0, t custom vir_typ at level 99,
      only printing).
-  Notation "'<' sz 'x' t '>'" := (TYPE_Vector sz t)
+  Notation "'<' sz 'x' t '>'" := (TYPE_Array true sz t)
     (in custom vir_typ at level 5,
      sz constr at level 0, t custom vir_typ at level 99,
      only printing).
-  Notation "'<' sz 'x' t '>'" := (DTYPE_Vector sz t)
+  Notation "'<' sz 'x' t '>'" := (DTYPE_Array true sz t)
     (in custom vir_typ at level 5,
      sz constr at level 0, t custom vir_typ at level 99,
      only printing).

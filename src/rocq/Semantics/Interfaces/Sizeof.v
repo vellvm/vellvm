@@ -57,12 +57,8 @@ Class SizeofTheory {S : Sizeof} : Prop :=
       sizeof_dtyp (DTYPE_Struct true dts) = List.fold_left (fun acc dt => N.add acc (sizeof_dtyp dt)) dts 0%N;
 
     sizeof_dtyp_array :
-    forall sz t,
-      sizeof_dtyp (DTYPE_Array sz t) = (sz * sizeof_dtyp t)%N;
-
-    sizeof_dtyp_vector :
-    forall sz t,
-      sizeof_dtyp (DTYPE_Vector sz t) = (sz * sizeof_dtyp (DTYPE_Base t))%N;
+    forall v sz t,
+      sizeof_dtyp (DTYPE_Array v sz t) = (sz * sizeof_dtyp t)%N;
 
     (* SAZ - why is this not [sizeof_dtyp_i (DTYPE_Base (DTYPE_I sz)) = sz]  ?*)
     sizeof_dtyp_i8 :

@@ -225,8 +225,8 @@ Section ShowInstances.
           "<{" ++ (String.concat ", " (map show_dtyp fields)) ++ "}>"
         else
           "{" ++ (String.concat ", " (map show_dtyp fields)) ++ "}"
-    | DTYPE_Array sz t           => "[" ++ (show sz) ++ " x " ++ show_dtyp t ++ "]"
-    | DTYPE_Vector sz t          => "<" ++ (show sz) ++ " x " ++ show_dtyp_base t ++ ">"
+    | DTYPE_Array false sz t           => "[" ++ (show sz) ++ " x " ++ show_dtyp t ++ "]"
+    | DTYPE_Array true sz t          => "<" ++ (show sz) ++ " x " ++ show_dtyp t ++ ">"
     end.
 
   #[global] Instance dshowDTyp : Show dtyp :=

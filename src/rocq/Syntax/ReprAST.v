@@ -132,8 +132,7 @@ Section ReprInstances.
     match t with
     | DTYPE_Base t => "(DTYPE_Base (" ++ repr t ++ "))"
     | DTYPE_Struct p fields => "(DTYPE_Struct " ++ repr p ++ " [" ++ (contents id (List.map repr_dtyp fields)) ++ "])"
-    | DTYPE_Array sz t => "(DTYPE_Array (" ++ repr sz ++ ") (" ++ repr_dtyp t ++ "))"
-    | DTYPE_Vector sz t => "(DTYPE_Vector (" ++ repr sz ++ ") (" ++ repr_dtyp_base t ++ "))"
+    | DTYPE_Array v sz t => "(DTYPE_Array " ++ repr v ++ " (" ++ repr sz ++ ") (" ++ repr_dtyp t ++ "))"
     end.
 
   Fixpoint repr_typ (t : typ) : string :=
