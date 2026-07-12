@@ -171,20 +171,6 @@ Section MemoryByte.
             else loop es dt (idx - zsz)%Z
         end
     in
-
-    let dvalue_extract_vector_bytes :=
-      fix loop (elts : list dvalue_base) dt (idx : Z) {struct elts}  :=
-        match elts with
-        | [] => raise_error "No fields left for byte-indexing..."
-        | e::es =>
-            let sz := sizeof_dtyp dt in
-            let zsz := Z.of_N sz in
-            if Z.ltb idx zsz
-            then dvalue_base_extract_byte e idx
-            else loop es dt (idx - zsz)%Z
-        end
-    in
-
     match dv with
     | DVALUE_Base dv => dvalue_base_extract_byte dv idx
     | DVALUE_Struct false fields =>
@@ -201,20 +187,12 @@ Section MemoryByte.
         | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
         end
 
-    | DVALUE_Array _ elts =>
+    | DVALUE_Array v _ elts =>
         match dt with
-        | DTYPE_Array sz dt =>
+        | DTYPE_Array _ sz dt =>
             dvalue_extract_array_bytes elts dt idx
         | _ =>
             raise_error "dvalue_extract_byte: type mismatch on DVALUE_Array."
-        end
-
-    | DVALUE_Vector _ elts =>
-        match dt with
-        | DTYPE_Vector sz dt =>
-            dvalue_extract_vector_bytes elts (DTYPE_Base dt) idx
-        | _ =>
-            raise_error "dvalue_extract_byte: type mismatch on DVALUE_Vector."
         end
     end.
 
@@ -326,7 +304,7 @@ Section MemoryByte.
     (* NOTE: arrays and vectors are decorated with their whole type, which contains
          necessary size information.
      *)
-    | DTYPE_Array sz t =>
+    | DTYPE_Array v sz t =>
         let sz' := sizeof_dtyp t in
         let elt_bytes :=
           if N.eqb sz' 0
@@ -334,17 +312,8 @@ Section MemoryByte.
           else split_every_nil sz' dbs
         in
         elts <- map_monad (fun es => memory_bytes_to_dvalue es t) elt_bytes;;
-        ret (DVALUE_Array (DTYPE_Array sz t) elts)
+        ret (DVALUE_Array v (DTYPE_Array v sz t) elts)
 
-    | DTYPE_Vector sz t =>
-        let sz' := sizeof_dtyp (DTYPE_Base t) in
-        let elt_bytes :=
-          if N.eqb sz' 0
-          then repeatN sz []
-          else split_every_nil sz' dbs
-        in
-        elts <- map_monad (fun es => memory_bytes_to_dvalue_base es t) elt_bytes;;
-        ret (DVALUE_Vector (DTYPE_Vector sz t) elts)
     | DTYPE_Struct false fields =>
         (DVALUE_Struct false) <$> (list_memory_bytes_to_dvalue (Some (max_preferred_dtyp_alignment fields)) 0 fields dbs)
                      

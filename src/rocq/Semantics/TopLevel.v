@@ -136,8 +136,8 @@ Section withParams.
 
   Definition i8_array_of_string (s : string) : dvalue :=
     let len := N.of_nat (String.length s) + 1%N in
-      DVALUE_Array
-          (DTYPE_Array len i8)
+      DVALUE_Array false
+          (DTYPE_Array false len i8)
           (List.app
             (map (DVALUE_Base ∘ (DVALUE_I 8%positive) ∘
             @Integers.repr 8%positive ∘
@@ -149,15 +149,15 @@ Section withParams.
     let len := N.of_nat (String.length arg) + 1%N in
     (* tl;dr allocating the string in a C-like manner; + 1 for null terminator *)
     v <- alloca i8 len None;;
-    store (DTYPE_Array len i8) v (i8_array_of_string arg);;
+    store (DTYPE_Array false len i8) v (i8_array_of_string arg);;
     ret v.
 
   Definition allocate_args (args : list string) : MCFGtop dvalue :=
     let len := N.of_nat (Datatypes.length args) in
       v <- alloca DTYPE_Pointer len None;;
       arg_addrs <- map_monad allocate_arg args;;
-      store (DTYPE_Array len DTYPE_Pointer) v
-            (DVALUE_Array (DTYPE_Array len DTYPE_Pointer) arg_addrs);;
+      store (DTYPE_Array false len DTYPE_Pointer) v
+            (DVALUE_Array false (DTYPE_Array false len DTYPE_Pointer) arg_addrs);;
       ret v.
 
   Definition build_main_args (args : list string) : MCFGtop (list dvalue) :=

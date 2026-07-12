@@ -31,12 +31,14 @@ Section Compare.
 
   Definition eval_icmp (samesign:bool) (icmp : icmp) (v1 v2 : dvalue) : EOU dvalue :=
     match v1, v2 with
-    | (DVALUE_Vector t elts1), (DVALUE_Vector _ elts2) =>
+    | (DVALUE_Array true t elts1), (DVALUE_Array true _ elts2) =>
         let n := N.length elts1 in
         let m := N.length elts2 in
-        if (n =? m)%N  then 
-          val <- vec_loop (eval_icmp_base samesign icmp) (List.combine elts1 elts2) ;;
-          ret (DVALUE_Vector (DTYPE_Vector n (DTYPE_I 1)) val)
+        if (n =? m)%N  then
+          elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
+          elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
+          val <- vec_loop (eval_icmp_base samesign icmp) (List.combine elts1' elts2') ;;
+          ret (DVALUE_Array true (DTYPE_Array true n (DTYPE_I 1)) (List.map DVALUE_Base val))
         else
           raise_ub "icmp of different-length vectors"
     | DVALUE_Base v1, DVALUE_Base v2 => DVALUE_Base <$> (eval_icmp_base samesign icmp v1 v2)

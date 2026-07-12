@@ -158,12 +158,9 @@ Section Denotation.
     | DVALUE_Struct p fields => 
         val <- map_monad freeze fields;;
         ret (DVALUE_Struct p val)
-    | DVALUE_Array τ elts => 
+    | DVALUE_Array v τ elts => 
         val <- map_monad freeze elts;;
-        ret (DVALUE_Array τ val)
-    | DVALUE_Vector τ elts =>
-        val <- map_monad freeze_base elts;;
-        ret (DVALUE_Vector τ val)
+        ret (DVALUE_Array v τ val)
     | _ => ret dv
     end.
 
@@ -215,7 +212,7 @@ Section Denotation.
 
     | EXP_Cstring es =>
       vs <- map_monad eval_texp es ;;
-      ret (DVALUE_Array (@DTYPE_I 8) vs)
+      ret (DVALUE_Array false (@DTYPE_I 8) vs)
 
     (* [undef] is treated semantically as [poison] on this branch. *)
     | EXP_Undef =>
@@ -248,11 +245,11 @@ Section Denotation.
 
     | EXP_Array t es =>
       vs <- map_monad eval_texp es ;;
-      ret (DVALUE_Array t vs)
+      ret (DVALUE_Array false t vs)
 
     | EXP_Vector t es =>
-      vs <- map_monad eval_texp_base es ;;
-      ret (DVALUE_Vector t vs)
+      vs <- map_monad eval_texp es ;;
+      ret (DVALUE_Array true t vs)
 
     | OP_IBinop iop dt op1 op2 =>
       v1 <- denote_exp (Some dt) op1 ;;
@@ -339,11 +336,11 @@ Section Denotation.
     | EXP_Splat elt =>
         match top with
         | None => raise ("denote_exp given untyped EXP_Splat")
-        | Some (DTYPE_Vector sz t) =>
+        | Some (DTYPE_Array true sz t) =>
             (* use the type from the splat elt *)
-            v <- eval_texp_base elt ;;
+            v <- eval_texp elt ;;
             (* this could be very expensive if the vector is big *)
-            ret (DVALUE_Vector t (List.repeat v (N.to_nat sz)))
+            ret (DVALUE_Array true t (List.repeat v (N.to_nat sz)))
         | Some _ => raise ("denote_exp given EXP_Splat with non-vector type")
         end
           

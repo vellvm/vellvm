@@ -33,11 +33,11 @@ let typ_to_dtyp_base (typ : LLVMAst.typ) : DynamicTypes.dtyp_base =
 
 let rec typ_to_dtyp (typ : LLVMAst.typ) : DynamicTypes.dtyp =
   match typ with
-  | TYPE_Array (sz, dtyp) -> DTYPE_Array (sz, typ_to_dtyp dtyp)
   | TYPE_Struct dtyps -> DTYPE_Struct (false, List.map typ_to_dtyp dtyps)
   | TYPE_Packed_struct dtyps ->
       DTYPE_Struct (true, List.map typ_to_dtyp dtyps)
-  | TYPE_Vector (sz, dtyp) -> DTYPE_Vector (sz, typ_to_dtyp_base dtyp)
+  | TYPE_Array (sz, dtyp) -> DTYPE_Array (false, sz, typ_to_dtyp dtyp)
+  | TYPE_Vector (sz, dtyp) -> DTYPE_Array (true, sz, typ_to_dtyp dtyp)
   | _ -> DTYPE_Base (typ_to_dtyp_base typ)
 
 let ocaml_of_EOU (c : 'x EOU.coq_EOU) : 'x =
@@ -76,19 +76,16 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
         let s = Camlcoq.camlstring_of_coqstring (ShowAST.show_float_syntax f) in
         failwith @@ Printf.sprintf "assertion.ml: texp_to_dvalue failed float conversion: %s" s
      end
-  | TYPE_Array _, EXP_Array (t, elts) ->
-     let dt = typ_to_dtyp t in
-     DVALUE_Array (dt, (List.map texp_to_dvalue elts))
   | TYPE_Struct _, EXP_Struct elts ->
       DVALUE_Struct (false, List.map texp_to_dvalue elts)
   | TYPE_Packed_struct _, EXP_Packed_struct elts ->
       DVALUE_Struct (true, List.map texp_to_dvalue elts)
+  | TYPE_Array _, EXP_Array (t, elts) ->
+     let dt = typ_to_dtyp t in
+     DVALUE_Array (false, dt, (List.map texp_to_dvalue elts))
   | TYPE_Vector _, EXP_Vector (t, elts) ->
      let dt = typ_to_dtyp t in
-     DVALUE_Vector
-       (dt,
-        (List.map (fun x -> dvalue_to_dvalue_base_exn (texp_to_dvalue x)) elts)
-       )
+     DVALUE_Array (true, dt, (List.map texp_to_dvalue elts))
   | _, EXP_Poison -> (DVALUE_Base (DVALUE_Poison (typ_to_dtyp typ)))
   | _, _ ->
       failwith

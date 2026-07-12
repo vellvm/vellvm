@@ -48,12 +48,10 @@ Definition Dtyp_base_alignment (dt : dtyp_base) : alignment :=
 Definition Dtyp_alignment (dt : dtyp) : alignment :=
   match dt with
   | DTYPE_Base t => Dtyp_base_alignment t
-  | DTYPE_Array sz t => Build_alignment 8 8
-  | DTYPE_Struct p fields => Build_alignment 8 8
-  | DTYPE_Vector sz t =>
       (* Alignment depends on the size of the vector types *)
       (* TODO: 64-bit+ vectors should be 128-bit aligned *)
-      Build_alignment 8 8
+  | DTYPE_Struct p fields => Build_alignment 8 8
+  | DTYPE_Array v sz t => Build_alignment 8 8
   end.
 
 Definition max_preferred_dtyp_alignment (dts : list dtyp) : N :=
@@ -101,14 +99,14 @@ Definition Bit_sizeof_dtyp_base (ty : dtyp_base) : N :=
 Fixpoint Bit_sizeof_dtyp (ty : dtyp) : N :=
   match ty with
   | DTYPE_Base t => Bit_sizeof_dtyp_base t
-  | DTYPE_Array sz t => sz * (round_up_to_eight (Bit_sizeof_dtyp t))
   | DTYPE_Struct false fields =>
       let sz := fold_left (fun acc x => pad_to_align_bitwise (Dtyp_alignment x) acc + (Bit_sizeof_dtyp x)%N) fields 0%N in
       let max_align := 8 * (max_preferred_dtyp_alignment fields) in
       pad_to max_align sz
   | DTYPE_Struct true fields =>
       fold_left (fun acc x => (acc + round_up_to_eight (Bit_sizeof_dtyp x))%N) fields 0%N
-  | DTYPE_Vector sz t => sz * Bit_sizeof_dtyp_base t
+  | DTYPE_Array false sz t => sz * (round_up_to_eight (Bit_sizeof_dtyp t))
+  | DTYPE_Array true sz t => sz * Bit_sizeof_dtyp t
   end.
 
 Definition Sizeof_dtyp_base (ty:dtyp_base) : N :=
@@ -135,10 +133,10 @@ Fixpoint Sizeof_dtyp (ty:dtyp) : N :=
       let sz := fold_left (fun acc x => pad_to_align (Dtyp_alignment x) acc + (Sizeof_dtyp x)%N) l 0%N in
       let max_align := max_preferred_dtyp_alignment l in
       pad_to max_align sz
-  | DTYPE_Vector sz ty' =>
+  | DTYPE_Array false sz ty' =>
+      sz * (Sizeof_dtyp ty')
+  | DTYPE_Array true sz ty' =>
   (* TODO: Vector sizeof currently invalid for sub-bytesize / non-byte aligned elements. Changing this involves changing serialization. *)
-      sz * (Sizeof_dtyp_base ty')
-  | DTYPE_Array sz ty' =>
       sz * (Sizeof_dtyp ty')
   end.
 
@@ -153,5 +151,6 @@ Instance SizeofTheoryV : @SizeofTheory SizeofV.
 Proof.
   constructor; eauto.
   lia.
+  intros. destruct v; auto.
 Qed.
 

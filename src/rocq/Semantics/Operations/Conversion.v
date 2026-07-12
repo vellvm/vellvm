@@ -278,7 +278,7 @@ Section Convert.
     | DTYPE_Base t_from', DTYPE_Base t_to' =>
         Some (t_from', t_to')
 
-    | DTYPE_Vector n t_from', DTYPE_Vector m t_to' =>
+    | DTYPE_Array true n (DTYPE_Base t_from'), DTYPE_Array true m (DTYPE_Base t_to') =>
         if N.eqb n m
         then Some (t_from', t_to')
         else None
@@ -310,11 +310,12 @@ Section Convert.
                 raise_error "vector conversion at incompatible types or vector lengths"
             end
           
-        | (DVALUE_Vector (DTYPE_Vector sz t) elts1) =>
+        | (DVALUE_Array true (DTYPE_Array true sz t) elts1) =>
             match get_conversion_type t_from t_to with
             | Some (t_from', t_to') =>
-                val <- map_monad (fun v => convert_base conv t_from' v t_to') elts1 ;;
-                ret (DVALUE_Vector (DTYPE_Vector sz t_to') val)
+                elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
+                val <- map_monad (fun v => convert_base conv t_from' v t_to') elts1' ;;
+                ret (DVALUE_Array true (DTYPE_Array true sz t_to') (List.map DVALUE_Base val))
             | None =>
                 raise_error "vector conversion at incompatible types or vector lengths"
             end
