@@ -595,13 +595,6 @@ Proof.
   rewrite Eqit.bind_ret_l, tau_euttge; reflexivity.
 Qed.
 
-(* #[global] Instance run_exc_eq_itree Pa A : Proper (eq_itree Logic.eq ==> eq_itree Logic.eq) (@run_exc Pa A). *)
-(* Proof. *)
-(*   repeat intro. *)
-(*   unfold run_exc. *)
-(*   setoid_rewrite H. *)
-(* Admitted. *)
-
 Lemma cutUB_exc_of_event `{Params.Params} {X} (e : _ X) :
   cutUB e ->
   exc_of_event e = None.
@@ -688,26 +681,66 @@ Definition I2F_ctx
   (ctx1 : IntMap (@function_denotation PInf))
   (ctx2 : IntMap (@function_denotation PFin)) : Prop :=
   forall k, option_rel I2F_function_denotation (lookup k ctx1) (lookup k ctx2).
+
+(** Related function values look up related denotations: [ptr_to_int]
+    coincides on related addresses, and no other shape is a key. *)
+Lemma I2F_lookup_defn f1 f2 ctx1 ctx2 :
+  I2F_dvalue f1 f2 ->
+  I2F_ctx ctx1 ctx2 ->
+  option_rel I2F_function_denotation
+    (lookup_defn f1 ctx1) (lookup_defn f2 ctx2).
+Proof.
+  intros HF HC; inv HF; cbn; try constructor.
+  destruct a, a'; destruct H as [HI ->]; red in HI; subst.
+  apply HC.
+Qed.
     
 Lemma I2F_denote_mcfg :
   forall t ctx1 ctx2 f1 f2 args1 args2,
     I2F_dvalue f1 f2 ->
     Forall2 I2F_dvalue args1 args2 ->
-    (* I2F_function_denotation ctx1 ctx2 -> *)
     I2F_ctx ctx1 ctx2 ->
     I2F_refine_MCFG
       (sum_rel I2F_dvalue I2F_dvalue)
       (@denote_mcfg PInf ctx1 t f1 args1)
       (@denote_mcfg PFin ctx2 t f2 args2).
-Proof.
+Proof with try now (rstep; cbnn; try (easy); eauto).
   intros * HF Hargs Hctx.
-  red.
-  (* unfold denote_mcfg. *)
-  (* (* Set Printing Implicit. *) *)
-  (* epose proof *)
-  (*   @ruttc_mrec (@CallE PInf) (@CallE PFin) (@MCFGEtop PInf) (@MCFGEtop PFin) *)
-  (*   (@dvalue PInf + @dvalue PInf) (@dvalue PFin + @dvalue PFin) *)
-  (*   cutUB cutOOM I2FE_MCFG I2FA_MCFG _ _ _ _ _ _ _ _ (Call t f1 args1) (Call t f2 args2) _. *)
-  (* apply H. *)
-  
-Admitted.
+  red; unfold denote_mcfg.
+  (* [ruttc_mrec] concludes at the per-call answer relation
+     [fun a b => I2FA_Call d1 a d2 b]; weaken it into [sum_rel] (they
+     compute to each other), the other relations are untouched. *)
+  eapply ruttc_weaken; cycle -1.
+  { eapply ruttc_mrec with (RCall := I2FE_Call) (RCall' := I2FA_Call).
+    2: { simp I2FE_Call; repeat split; auto. }
+    (* the bodies: related calls dispatch through related contexts *)
+    intros A B [dt fv1 fas1] [dt' fv2 fas2] HC.
+    simp I2FE_Call in HC; destruct HC as (<- & HFv & HAs).
+    (* transport the CFG-level relations to the structural ones
+       demanded by [ruttc_mrec] *)
+    eapply ruttc_weaken with (RR := sum_rel I2F_dvalue I2F_dvalue).
+    { intros ? ? CUT; exact (proj1 (I2F_cutUB_CFG _) CUT). }
+    { intros ? ? CUT; exact (proj1 (I2F_cutOOM_CFG _) CUT). }
+    { intros * HE; exact (I2FE_CFG_sum _ _ HE). }
+    { intros * HA; exact (I2FA_CFG_sum HA). }
+    { intros ? ? HS; cbn; simp I2FA_Call; exact HS. }
+    cbn.
+    pose proof (I2F_lookup_defn HFv Hctx) as HL.
+    destruct (lookup_defn fv1 ctx1) eqn:L1, (lookup_defn fv2 ctx2) eqn:L2;
+      inv HL.
+    - (* internal call: the related denotations found in the contexts *)
+      match goal with
+      | HFD : I2F_function_denotation _ _ |- _ => now apply HFD
+      end.
+    - (* external call *)
+      unfold external_call.
+      rbind I2F_dvalue.
+      { rstep.
+        - cbnn; simp I2FE_ExternalCall; intuition.
+        - cbnn; intros; simp I2FA_ExternalCall in *; eauto. }
+      intros...
+  }
+  (* the four identity inclusions, and [sum_rel] from the [I2FA_Call]
+     instance (they are convertible) *)
+  all: auto.
+Qed.

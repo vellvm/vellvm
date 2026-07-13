@@ -317,6 +317,35 @@ Proof.
     + gstep; constructor; apply EQcutr; auto.
 Qed.
 
+(* Implication counterpart of [ruttc_Proper_R]: the cuts, [REv] and the
+   return relation may be weakened, [RAns] strengthened. *)
+Lemma ruttc_weaken {E1 E2 R1 R2}
+  (Rcutl Rcutl' : pred1 E1) (Rcutr Rcutr' : pred1 E2)
+  (REv REv' : prerel E1 E2) (RAns RAns' : postrel E1 E2)
+  (RR RR' : R1 -> R2 -> Prop)
+  (HCutl : forall A (e : E1 A), Rcutl A e -> Rcutl' A e)
+  (HCutr : forall B (e : E2 B), Rcutr B e -> Rcutr' B e)
+  (HREv : forall A B (e1 : E1 A) (e2 : E2 B), REv A B e1 e2 -> REv' A B e1 e2)
+  (HRAns : forall A B (e1 : E1 A) a (e2 : E2 B) b, RAns' A B e1 a e2 b -> RAns A B e1 a e2 b)
+  (HRR : forall r1 r2, RR r1 r2 -> RR' r1 r2) :
+  forall t1 t2,
+    ruttc Rcutl Rcutr REv RAns RR t1 t2 ->
+    ruttc Rcutl' Rcutr' REv' RAns' RR' t1 t2.
+Proof.
+  ginit; gcofix CIH; intros t1 t2 Hruttc.
+  rewrite (itree_eta t1), (itree_eta t2).
+  punfold Hruttc; red in Hruttc.
+  hinduction Hruttc before CIH; intros; pclearbot.
+  - gstep; constructor; auto.
+  - gstep; constructor; eauto with paco.
+  - gstep; constructor; auto.
+    intros; gfinal; left; apply CIH, H0, HRAns; auto.
+  - rewrite tau_euttge, itree_eta; apply IHHruttc.
+  - rewrite tau_euttge, (itree_eta t0); apply IHHruttc.
+  - gstep; constructor; auto.
+  - gstep; constructor; auto.
+Qed.
+
 (* The usual up-to bind *)
 Section RuttcBind.
   Context {E1 E2 : Type -> Type}.
@@ -551,14 +580,13 @@ Proof.
 Qed.
 
 (* mrec *)
-Lemma ruttc_mrec {D1 D2 E1 E2 R1 R2}
+Lemma ruttc_mrec {D1 D2 E1 E2}
   (Rcutl : pred1 E1)
   (Rcutr : pred1 E2)
   (REv : prerel E1 E2)
   (RAns: postrel E1 E2)
   (RCall : prerel D1 D2)
   (RCall' : postrel D1 D2)
-  (RR: R1 -> R2 -> Prop)
   (bodies1 : D1 ~> itree (D1 +' E1))
   (bodies2 : D2 ~> itree (D2 +' E2))
 

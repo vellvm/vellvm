@@ -362,6 +362,46 @@ Section Refinement.
   Variant cutOOM {E} `{OOME -< E} : forall [A], E A -> Prop :=
     | CutOOM v : cutOOM (subevent _ (ThrowOOM v)).
 
+  (** The [CFG]-level cut predicates against their structural
+      decomposition ([rutt_cutoff]'s combinators): the [subevent]
+      injections into [CFGEtop] land in [inr1], and on the [CallE]
+      component both sides are empty. This is the format expected by
+      the [mrec]/[translate] reasoning principles of [rutt_cutoff]. *)
+  Lemma I2F_cutUB_CFG :
+    eqp1 (@cutUB (@CFGEtop PInf) _) (sum_pred1 FF1 (@cutUB (@MCFGEtop PInf) _)).
+  Proof.
+    intros A e; split; intros CUT.
+    - depelim CUT; now do 2 constructor.
+    - (* [constructor] fails: unification refuses to unfold the
+         [subevent] instance chain, but the two forms are convertible *)
+      destruct CUT as [? ? [] | ? ? HC]; depelim HC; exact (CutUB v).
+  Qed.
+
+  Lemma I2F_cutOOM_CFG :
+    eqp1 (@cutOOM (@CFGEtop PFin) _) (sum_pred1 FF1 (@cutOOM (@MCFGEtop PFin) _)).
+  Proof.
+    intros A e; split; intros CUT.
+    - depelim CUT; now do 2 constructor.
+    - destruct CUT as [? ? [] | ? ? HC]; depelim HC; exact (CutOOM v).
+  Qed.
+
+  (** The combined [CFG]-level relations against their structural
+      decomposition, in the one-way forms consumed by [ruttc_weaken]
+      (our sums compute, [rutt_cutoff]'s are the itree Variants). *)
+  Lemma I2FE_CFG_sum : forall A B (e1 : @CFGEtop PInf A) (e2 : @CFGEtop PFin B),
+      I2FE_CFG e1 e2 ->
+      HeterogeneousRelations.sum_prerel I2FE_Call I2FE_MCFG A B e1 e2.
+  Proof.
+    intros * HR; destruct e1, e2; cbn in HR; try easy; now constructor.
+  Qed.
+
+  Lemma I2FA_CFG_sum : forall A B (e1 : @CFGEtop PInf A) a (e2 : @CFGEtop PFin B) b,
+      HeterogeneousRelations.sum_postrel I2FA_Call I2FA_MCFG A B e1 a e2 b ->
+      I2FA_CFG e1 a e2 b.
+  Proof.
+    intros * HR; now destruct HR.
+  Qed.
+
   (* The infinite computation (left) and the finite one (right) proceed in
      lockstep over [I2FE]-related events answered by [I2FA]-related values,
      except that the equivalence is short-circuited if the finite side runs
@@ -2086,17 +2126,8 @@ Section Refinement.
     eapply ruttc_translate_inr'; cycle -1.
     apply I2F_denote_exp.
     all:clear.
-    (* The cut predicates only concern the [MCFGEtop] component: the
-       [subevent] injections into [CFGEtop] land in [inr1], and on the
-       [CallE] component both sides are empty. *)
-    - intros A e; split; intros CUT.
-      + depelim CUT; now do 2 constructor.
-      + (* [constructor] fails: unification refuses to unfold the
-           [subevent] instance chain, but the two forms are convertible *)
-        destruct CUT as [? ? [] | ? ? HC]; depelim HC; exact (CutUB v).
-    - intros A e; split; intros CUT.
-      + depelim CUT; now do 2 constructor.
-      + destruct CUT as [? ? [] | ? ? HC]; depelim HC; exact (CutOOM v).
+    - exact I2F_cutUB_CFG.
+    - exact I2F_cutOOM_CFG.
     (* [rutt_cutoff.inr_prerel] of the (computing) sum is definitionally
        its right component *)
     - intros A B; split; intros e1 e2 HR.
