@@ -668,7 +668,7 @@ Section Refinement.
       apply Ztestbit_above with (n := Pos.to_nat sz).
       - pose proof (Integers.unsigned_range x) as R.
         unfold Integers.modulus in R.
-        now rewrite <- two_power_pos_nat.
+        now rewrite <- two_power_pos_nat, <- two_power_pos_memo_eq.
       - rewrite positive_nat_Z; lia.
     Qed.
 
