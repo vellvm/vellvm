@@ -9,8 +9,8 @@ Import ZArith.BinInt.
 From Vellvm Require
   Utils.ParserHelper
   Numeric.Integers
-  QC.ShowAST
-  QC.ReprAST.
+  Syntax.ShowAST
+  Syntax.ReprAST.
 
 Require ExtrOcamlBasic.
 Require ExtrOcamlString.
