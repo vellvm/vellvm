@@ -17,7 +17,7 @@ From Vellvm Require Import
   Semantics.Operations
   Interfaces.IPtr
   Interfaces.Params
-  Implementations.Address
+  Implementations.Pointer
   Implementations.Provenance
   Implementations.IPtrInfinite
   Implementations.IPtrFinite
@@ -59,9 +59,10 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
   (* automation is different in this file from the expression one, to understand *)
   intros HDV.
   induction HDV; cbn...
-  all: try (rstep; now constructor).
+  induction H; cbn...
+  all: try rstep; cbnn; repeat constructor; auto.
   all: eapply ruttc_bind; [apply ruttc_map_monad_gen; eauto |]; intros...
-  all: try (rstep; now constructor).
+  all: try (rstep; repeat constructor); auto.
  Qed. 
   
 Lemma I2F_refine_lift' {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
@@ -151,10 +152,12 @@ Lemma I2F_denote_instr :
         cbn; rewrite 2 Eqit.bind_bind.
         bind_exp.
         rewrite ?Eqit.bind_bind.
-        rbind I2F_dvalue; [rstep; [cbnn; constructor; intuition | cbnn; intros; simp I2FA_Memory in *; eauto] |].
-        pose proof I2F_dvalue_int_unsigned H as EQ; rewrite EQ; reflexivity.
+        rbind I2F_dvalue_base; [apply I2F_refine_lift', I2F_dvalue_to_dvalue_base; auto |].
         intros.
-        rbind (fun _ _ => True); [rstep; cbnn; easy | intros]...
+        rewrite 2 Eqit.bind_bind.
+        pose proof I2F_dvalue_base_int_unsigned H0 as EQ; rewrite EQ.
+        rbind I2F_dvalue; [rstep; cbnn; easy | intros]...
+        rbind (fun _ _ => True); [rstep; cbnn; repeat constructor; auto | intros]...
       + cbn; rewrite 2 Eqit.bind_bind.
         rbind I2F_dvalue; [rstep; [cbnn; constructor; intuition | cbnn; intros; simp I2FA_Memory in *; eauto] |].
         intros.
@@ -170,8 +173,9 @@ Lemma I2F_denote_instr :
       bind_exp.
       bind_exp.
       induction H0...
+      induction H0...
       6: rbind (fun _ _ => False); [|intros _ _ []]...
-      all: rbind (fun _ _ => True); [rstep; cbnn; [constructor; intuition; constructor; auto| cbn; auto] | intros [] [] _ ]; cbn...
+      all: rbind (fun _ _ => True); [rstep; cbnn; [constructor; intuition; repeat constructor; auto| cbn; auto] | intros [] [] _ ]; cbn...
     - destruct x; cbn...
     - destruct x; cbn...
       unfold denote_cmpxchg.
@@ -183,6 +187,7 @@ Lemma I2F_denote_instr :
       erbind.
       apply I2F_refine_lift', I2F_eval_icmp; eauto.
       intros.
+      induction H3...
       induction H3...
       break_goal_fast...
       break_goal_fast...
@@ -211,18 +216,18 @@ Lemma I2F_denote_instr :
 
       2-5: rbind (fun _ _ => False); [|intros _ _ []]...
       4-11: rbind (fun _ _ => False); [|intros _ _ []]...
-      { cbn; inversion H0...
-        1,3-11: rbind (fun _ _ => False); [|intros _ _ []]...
+      { cbn; inv H0; [inv H2 | |]...
+        1,3-10: rbind (fun _ _ => False); [|intros _ _ []]...
         rbind I2F_dvalue.
         2: intros;
         rbind (fun _ _ => True); [rstep; cbnn; easy | intros];
         rbind (fun _ _ => True); [rstep; cbnn; easy | intros]...
         apply I2F_refine_lift'.
         pose proof @I2F_eval_iop _ (DVALUE_I sz i) _ (DVALUE_I sz i) And H1.
-        forward H4; [constructor |].
-        inv H4; repeat constructor.
-        induction H7; repeat constructor.
-        break_goal_fast; repeat constructor.
+        forward H0; [repeat constructor |].
+        inv H0; [inv H4 |..]; repeat constructor.
+        induction H0; repeat constructor.
+        destruct (Pos.eq_dec sz sz0); repeat constructor.
         subst; cbn; repeat constructor.
       }
       all: erbind; [apply I2F_refine_lift', I2F_eval_fop; eauto | intros].
@@ -264,7 +269,7 @@ Lemma I2F_dvalue_is_poison : forall v1 v2,
     I2F_dvalue v1 v2 ->
     @dvalue_is_poison PInf v1 = @dvalue_is_poison PFin v2.
 Proof.
-  intros * H; now destruct H.
+  intros * H; destruct H; [destruct H |..]; auto.
 Qed.
 
 (** [select_switch] computes in the parameter-free [EOU block_id]: on
@@ -283,6 +288,8 @@ Proof.
   destruct H as [HXY EQ]; cbn in HXY, EQ; subst.
   inversion HV; subst; cbn; auto.
   all: inversion HXY; subst; cbn; auto.
+  all: inv H0; cbn; auto.
+  all: inv H; cbn; auto.
   destruct (Pos.eq_dec _ _); [| reflexivity].
   destruct e; cbv [eq_rec_r eq_rec eq_rect Logic.eq_sym].
   break_match_goal; auto.
@@ -294,8 +301,9 @@ Lemma I2F_denote_terminator :
 Proof with try now (rstep; cbnn; try (easy); eauto).
   destruct t as [[? []] ?]; cbn...
   - destruct v; bind_exp...
+  - rstep; repeat constructor.
   - destruct v; bind_exp.
-    induction H...
+    inv H; [induction H0 | |]...
     repeat break_goal_fast...
   - destruct v; bind_exp.
     rewrite (I2F_dvalue_is_poison H).
@@ -303,7 +311,7 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
     rbind (Forall2 (prod_rel I2F_dvalue (@Logic.eq block_id))).
     { apply ruttc_map_monad.
       intros [[sz x] id] _; cbn.
-      rbind I2F_dvalue.
+      rbind I2F_dvalue_base.
       { first [ apply I2F_refine_lift'; now repeat constructor
               | rstep; now repeat constructor ]. }
       intros; rstep; now repeat constructor. }
@@ -442,6 +450,7 @@ Proof.
           apply Eqdep_dec.inj_pair2_eq_dec in H; [| apply Pos.eq_dec]; subst
       end;
     clear R; cbn; auto.
+  - inv H0; reflexivity.
   - (* Struct *)
     match goal with
     | F2 : Forall2 I2F_dvalue fields ?l2 |- context [?L fields] =>
@@ -459,45 +468,7 @@ Proof.
     | HP : forall _, I2F_dvalue u _ -> _ |- _ => rewrite (HP _ HU)
     end.
     rewrite IHUS by assumption; reflexivity.
-  - (* Packed struct *)
-    match goal with
-    | F2 : Forall2 I2F_dvalue fields ?l2 |- context [?L fields] =>
-        match goal with
-        | |- context [?R l2] =>
-            assert (GO : L fields = R l2); [| rewrite GO; reflexivity]
-        end
-    end.
-    match goal with
-    | F2 : Forall2 I2F_dvalue fields _, IH : Forall _ fields |- _ =>
-        revert IH; induction F2 as [| u u' us us' HU HUS IHUS]
-    end; intros FIH; cbn; auto.
-    inversion FIH; subst.
-    match goal with
-    | HP : forall _, I2F_dvalue u _ -> _ |- _ => rewrite (HP _ HU)
-    end.
-    rewrite IHUS by assumption; reflexivity.
   - (* Array *)
-    break_match_goal; cbn; auto.
-    match goal with
-    | F2 : Forall2 I2F_dvalue elts ?l2 |- context [forallb ?f elts] =>
-        match goal with
-        | |- context [forallb ?g l2] =>
-            assert (FB : forallb f elts = forallb g l2);
-            [| assert (LEN : length elts = length l2)
-                 by (eapply Forall2_length; eauto);
-               rewrite FB, LEN; reflexivity ]
-        end
-    end.
-    match goal with
-    | F2 : Forall2 I2F_dvalue elts _, IH : Forall _ elts |- _ =>
-        revert IH; induction F2 as [| u u' us us' HU HUS IHUS]
-    end; intros FIH; cbn; auto.
-    inversion FIH; subst.
-    match goal with
-    | HP : forall _, I2F_dvalue u _ -> _ |- _ => rewrite (HP _ HU)
-    end.
-    rewrite IHUS by assumption; reflexivity.
-  - (* Vector *)
     break_match_goal; cbn; auto.
     match goal with
     | F2 : Forall2 I2F_dvalue elts ?l2 |- context [forallb ?f elts] =>
@@ -548,7 +519,7 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
   rstep; cbnn; try easy.
   constructor; intuition.
   intros _ _ _.
-  induction HR...
+  induction HR; [induction H0 | |]...
 Qed.
 
 Lemma unfold_run_exc_strong `{Params.Params} {A} (t : itree _ A) :
@@ -690,8 +661,8 @@ Lemma I2F_lookup_defn f1 f2 ctx1 ctx2 :
   option_rel I2F_function_denotation
     (lookup_defn f1 ctx1) (lookup_defn f2 ctx2).
 Proof.
-  intros HF HC; inv HF; cbn; try constructor.
-  destruct a, a'; destruct H as [HI ->]; red in HI; subst.
+  intros HF HC; inv HF; [inv H | |]; cbn; try constructor.
+  destruct p, p'; destruct H0 as [HI ->]; red in HI; subst.
   apply HC.
 Qed.
     
