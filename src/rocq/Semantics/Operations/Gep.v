@@ -23,30 +23,28 @@ Section GEP.
     match vs with
     | v :: vs' =>
         match v with
-        | DVALUE_I 8 i =>
+        | DVALUE_Base (DVALUE_I 8 i) =>
             let k := signed i in
             match t with
-            | DTYPE_Array _ ta
-            | DTYPE_Vector _ ta =>
-                handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+            | DTYPE_Array v _ ta =>
+                handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'                
             | _ => raise_error ("non-i8-indexable type")
             end
-        | DVALUE_I 32 i =>
+        | DVALUE_Base (DVALUE_I 32 i) =>
             let k := unsigned i in
             let ks := signed i in
             let n := BinIntDef.Z.to_nat k in
             match t with
-            | DTYPE_Array _ ta
-            | DTYPE_Vector _ ta =>
-                handle_gep_h ta (off + ks * (Z.of_N (sizeof_dtyp ta))) vs'
-            | DTYPE_Struct ts =>
+            | DTYPE_Array v _ ta =>
+                handle_gep_h ta (off + ks * (Z.of_N (sizeof_dtyp ta))) vs'                          
+            | DTYPE_Struct false ts =>
                 let offset := fold_left (fun acc t => pad_to_align (dtyp_alignment t) acc + sizeof_dtyp t)%N (firstn n ts) 0%N in
                 match nth_error ts n with
                 | None => raise_error "overflow"
                 | Some t' =>
                     handle_gep_h t' (off + Z.of_N offset) vs'
                 end
-            | DTYPE_Packed_struct ts =>
+            | DTYPE_Struct true ts =>
                 let offset := fold_left (fun acc t => acc + sizeof_dtyp t)%N
                                 (firstn n ts) 0%N in
                 match nth_error ts n with
@@ -58,20 +56,20 @@ Section GEP.
             | _ => raise_error ("non-i32-indexable type")
             end
               
-        | DVALUE_I 64 i =>
+        | DVALUE_Base (DVALUE_I 64 i) =>
             let k := signed i in
             match t with
-            | DTYPE_Array _ ta
-            | DTYPE_Vector _ ta =>
+            | DTYPE_Array false _ ta =>
+                handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+            | DTYPE_Array true _ ta =>
                 handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
             | _ => raise_error ("non-i64-indexable type")
             end
-        | DVALUE_Iptr i =>
+        | DVALUE_Base (DVALUE_Iptr i) =>
             let k := to_Z i in
             match t with
-            | DTYPE_Array _ ta
-            | DTYPE_Vector _ ta =>
-                handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+            | DTYPE_Array v  _ ta =>
+                handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'                
             | _ => raise_error ("non-iptr-indexable type")
             end
               
@@ -84,29 +82,29 @@ Section GEP.
      The pointer set the block into which we look, and the initial offset. The first index value add to the initial offset passed to [handle_gep_h] for the actual access to structured data.
    *)
   (* TODO: This should take into account padding too... May break get_consecutive_ptrs and friends. *)
-  Definition handle_gep_addr (t:dtyp) (a:addr) (vs:list dvalue) : EOU addr :=
+  Definition handle_gep_ptr (t:dtyp) (a:ptr) (vs:list dvalue) : EOU ptr :=
     let ptr := ptr_to_int a in
-    let prov := address_provenance a in
+    let prov := ptr_provenance a in
     match vs with
-    | DVALUE_I 8 i :: vs' =>
+    | DVALUE_Base (DVALUE_I 8 i) :: vs' =>
         ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
         int_to_ptr ptr' prov
-    | DVALUE_I 32 i :: vs' =>
+    | DVALUE_Base (DVALUE_I 32 i) :: vs' =>
         ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
         int_to_ptr ptr' prov
-    | DVALUE_I 64 i :: vs' =>
+    | DVALUE_Base (DVALUE_I 64 i) :: vs' =>
         ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
         int_to_ptr ptr' prov
-    | DVALUE_Iptr i :: vs' =>
+    | DVALUE_Base (DVALUE_Iptr i) :: vs' =>
         ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (to_Z i)) vs' ;;
         int_to_ptr ptr' prov
-    | [] => raise_error "handle_gep_addr: no indices"
-    | _ => raise_error "handle_gep_addr: unsupported index type"
+    | [] => raise_error "handle_gep_ptr: no indices"
+    | _ => raise_error "handle_gep_ptr: unsupported index type"
     end.
 
-  Lemma handle_gep_addr_0 :
-    forall (dt : dtyp) (p : addr),
-      handle_gep_addr dt p [DVALUE_Iptr zero_iptr] = ret p.
+  Lemma handle_gep_ptr_0 :
+    forall (dt : dtyp) (p : ptr),
+      handle_gep_ptr dt p [DVALUE_Base (DVALUE_Iptr zero_iptr)] = ret p.
   Proof.
     intros dt p.
     cbn.
@@ -115,17 +113,17 @@ Section GEP.
     rewrite int_to_ptr_ptr_to_int; auto.
   Qed.
 
-  Lemma handle_gep_addr_nil :
-    forall (dt : dtyp) (p : addr),
-      handle_gep_addr dt p [] = raise_error "handle_gep_addr: no indices"%string.
+  Lemma handle_gep_ptr_nil :
+    forall (dt : dtyp) (p : ptr),
+      handle_gep_ptr dt p [] = raise_error "handle_gep_ptr: no indices"%string.
   Proof.
     intros dt p.
     cbn; auto.
   Qed.
 
-  Lemma handle_gep_addr_ix :
-    forall (dt : dtyp) (p p' : addr) ix,
-      handle_gep_addr dt p [DVALUE_Iptr ix] = ret p' ->
+  Lemma handle_gep_ptr_ix :
+    forall (dt : dtyp) (p p' : ptr) ix,
+      handle_gep_ptr dt p [DVALUE_Base (DVALUE_Iptr ix)] = ret p' ->
       ptr_to_int p' = (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z.
   Proof.
     intros dt p p' ix GEP.
@@ -134,11 +132,11 @@ Section GEP.
     erewrite ptr_to_int_int_to_ptr; eauto.
   Qed.
 
-  Lemma handle_gep_addr_ix_OOM :
-    forall (dt : dtyp) (p p' : addr) ix msg,
-      handle_gep_addr dt p [DVALUE_Iptr ix] = raise_oom msg ->
+  Lemma handle_gep_ptr_ix_OOM :
+    forall (dt : dtyp) (p p' : ptr) ix msg,
+      handle_gep_ptr dt p [DVALUE_Base (DVALUE_Iptr ix)] = raise_oom msg ->
       exists msg',
-        int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (address_provenance p) = raise_oom msg'.
+        int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (ptr_provenance p) = raise_oom msg'.
   Proof.
     intros dt p p' ix msg GEP.
     cbn in *.
@@ -147,10 +145,10 @@ Section GEP.
     auto.
   Qed.
 
-  Lemma handle_gep_addr_ix' :
-    forall (dt : dtyp) (p p' : addr) ix,
-      ret p' = int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (address_provenance p) ->
-      handle_gep_addr dt p [DVALUE_Iptr ix] = ret p'.
+  Lemma handle_gep_ptr_ix' :
+    forall (dt : dtyp) (p p' : ptr) ix,
+      ret p' = int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (ptr_provenance p) ->
+      handle_gep_ptr dt p [DVALUE_Base (DVALUE_Iptr ix)] = ret p'.
   Proof.
     intros dt p p' ix IX.
     cbn in *.
@@ -158,10 +156,10 @@ Section GEP.
     reflexivity.
   Qed.
 
-  Lemma handle_gep_addr_ix'_OOM :
-    forall (dt : dtyp) (p p' : addr) ix msg,
-      int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (address_provenance p) = raise_oom msg ->
-      exists msg', handle_gep_addr dt p [DVALUE_Iptr ix] = raise_oom msg'.
+  Lemma handle_gep_ptr_ix'_OOM :
+    forall (dt : dtyp) (p p' : ptr) ix msg,
+      int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (ptr_provenance p) = raise_oom msg ->
+      exists msg', handle_gep_ptr dt p [DVALUE_Base (DVALUE_Iptr ix)] = raise_oom msg'.
   Proof.
     intros dt p p' ix msg IX.
     cbn in *.
@@ -170,10 +168,10 @@ Section GEP.
     auto.
   Qed.
 
-  Lemma handle_gep_addr_preserves_provenance :
-    forall (dt : dtyp) ixs (p p' : addr),
-      handle_gep_addr dt p ixs = ret p' ->
-      address_provenance p = address_provenance p'.
+  Lemma handle_gep_ptr_preserves_provenance :
+    forall (dt : dtyp) ixs (p p' : ptr),
+      handle_gep_ptr dt p ixs = ret p' ->
+      ptr_provenance p = ptr_provenance p'.
   Proof.
     intros dt ixs.
     induction ixs;
@@ -189,7 +187,7 @@ Section GEP.
 
   Definition eval_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : EOU dvalue :=
     match dv with
-    | DVALUE_Addr a => DVALUE_Addr <$> handle_gep_addr t a vs
-    | _ => raise_error "non-address"%string
+    | DVALUE_Base (DVALUE_Pointer a) => (fun x => DVALUE_Base (DVALUE_Pointer x)) <$> handle_gep_ptr t a vs
+    | _ => raise_error "non-ptr"%string
     end.
 End GEP.

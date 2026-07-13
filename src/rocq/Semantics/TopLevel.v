@@ -136,34 +136,34 @@ Section withParams.
 
   Definition i8_array_of_string (s : string) : dvalue :=
     let len := N.of_nat (String.length s) + 1%N in
-      DVALUE_Array
-          (DTYPE_Array len i8)
+      DVALUE_Array false
+          (DTYPE_Array false len i8)
           (List.app
-            (map ((DVALUE_I 8%positive) ∘
+            (map (DVALUE_Base ∘ (DVALUE_I 8%positive) ∘
             @Integers.repr 8%positive ∘
             Z.of_N ∘
             Stdlib.Strings.Ascii.N_of_ascii ) (Stdlib.Strings.String.list_ascii_of_string s))
-            [DVALUE_I 8%positive (@Integers.zero 8%positive)]).
+            [DVALUE_Base (DVALUE_I 8%positive (@Integers.zero 8%positive))]).
 
   Definition allocate_arg (arg : string) : MCFGtop dvalue :=
     let len := N.of_nat (String.length arg) + 1%N in
     (* tl;dr allocating the string in a C-like manner; + 1 for null terminator *)
     v <- alloca i8 len None;;
-    store (DTYPE_Array len i8) v (i8_array_of_string arg);;
+    store (DTYPE_Array false len i8) v (i8_array_of_string arg);;
     ret v.
 
   Definition allocate_args (args : list string) : MCFGtop dvalue :=
     let len := N.of_nat (Datatypes.length args) in
       v <- alloca DTYPE_Pointer len None;;
       arg_addrs <- map_monad allocate_arg args;;
-      store (DTYPE_Array len DTYPE_Pointer) v
-            (DVALUE_Array (DTYPE_Array len DTYPE_Pointer) arg_addrs);;
+      store (DTYPE_Array false len DTYPE_Pointer) v
+            (DVALUE_Array false (DTYPE_Array false len DTYPE_Pointer) arg_addrs);;
       ret v.
 
   Definition build_main_args (args : list string) : MCFGtop (list dvalue) :=
     v <- allocate_args args;;
     let main_args :=
-      [DVALUE_I 32 ((@Integers.repr 32%positive ∘ Z.of_nat) (List.length args)); v]
+      [DVALUE_Base (DVALUE_I 32 ((@Integers.repr 32%positive ∘ Z.of_nat) (List.length args))); v]
     in
     ret main_args.
 
@@ -195,8 +195,8 @@ Section withParams.
       (* aliases simply populate the global ID map *)
       match (g_exp g) with
       | Some (EXP_Ident (ID_Global g_source)) =>
-          addr <- gread g_source;;
-          gwrite (g_ident g) addr
+          p <- gread g_source;;
+          gwrite (g_ident g) p
       | Some _ => raiseUB ("alias " ++ (show_raw_id (g_ident g)) ++ " has bad initializer expression")
       | None => raiseUB ("alias " ++ (show_raw_id (g_ident g)) ++ " not initialized")
       end
@@ -205,7 +205,7 @@ Section withParams.
     let dt := (g_typ g) in
     a <- gread (g_ident g);;
     uv <- match (g_exp g) with
-         | None => ret (DVALUE_Poison dt)
+         | None => ret (DVALUE_Base (DVALUE_Poison dt))
          | Some e => denote_exp (Some dt) e
          end ;;
     store dt a uv.
@@ -227,8 +227,8 @@ Section withParams.
     let fid := (dc_name (df_prototype df)) in
     fv <- gread fid ;;
     match fv with
-    | DVALUE_Addr addr =>
-        ret (ptr_to_int addr, denote_function df)
+    | DVALUE_Base (DVALUE_Pointer p) =>
+        ret (ptr_to_int p, denote_function df)
     | _ => raise "address_one_function: invalid address, should not happen."
     end.
 
@@ -240,8 +240,8 @@ Section withParams.
     let (fid, den) := libfun in
     fv <- gread fid ;;
     match fv with
-    | DVALUE_Addr addr =>
-        ret (ptr_to_int addr, den)
+    | DVALUE_Base (DVALUE_Pointer p) =>
+        ret (ptr_to_int p, den)
     | _ => raise "address_one_library_function: invalid address, should not happen."
     end.
 

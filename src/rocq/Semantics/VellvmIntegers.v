@@ -59,7 +59,7 @@ Class VMemInt I : Type :=
     mrepr : Z -> EOU I; (* Not sure if we should even have this *)
 
     (* dtyp *)
-    mdtyp_of_int : dtyp
+    mdtyp_of_int : dtyp_base
   }.
 
 Definition mequ_Z (x y : Z) : bool :=

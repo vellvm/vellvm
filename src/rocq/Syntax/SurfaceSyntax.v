@@ -228,19 +228,19 @@ Module VIR_Notations.
 
   (** Array, vector. LLVM IR uses [[N x T]] for arrays and [<N x T>]
       for vectors. *)
-  Notation "'[' sz 'x' t ']'" := (TYPE_Array sz t)
+  Notation "'[' sz 'x' t ']'" := (TYPE_Array false sz t)
     (in custom vir_typ at level 5,
      sz constr at level 0, t custom vir_typ at level 99,
      only printing).
-  Notation "'[' sz 'x' t ']'" := (DTYPE_Array sz t)
+  Notation "'[' sz 'x' t ']'" := (DTYPE_Array false sz t)
     (in custom vir_typ at level 5,
      sz constr at level 0, t custom vir_typ at level 99,
      only printing).
-  Notation "'<' sz 'x' t '>'" := (TYPE_Vector sz t)
+  Notation "'<' sz 'x' t '>'" := (TYPE_Array true sz t)
     (in custom vir_typ at level 5,
      sz constr at level 0, t custom vir_typ at level 99,
      only printing).
-  Notation "'<' sz 'x' t '>'" := (DTYPE_Vector sz t)
+  Notation "'<' sz 'x' t '>'" := (DTYPE_Array true sz t)
     (in custom vir_typ at level 5,
      sz constr at level 0, t custom vir_typ at level 99,
      only printing).
@@ -252,23 +252,23 @@ Module VIR_Notations.
     (in custom vir_typ at level 5, only printing).
   Notation "'{|' '|}'" := (DTYPE_Struct nil)
     (in custom vir_typ at level 5, only printing).
-  Notation "'{|' fields '|}'" := (TYPE_Struct fields)
+  Notation "'{|' fields '|}'" := (TYPE_Struct false fields)
     (in custom vir_typ at level 5,
      fields custom vir_typ_list at level 99,
      only printing).
-  Notation "'{|' fields '|}'" := (DTYPE_Struct fields)
+  Notation "'{|' fields '|}'" := (DTYPE_Struct false fields)
     (in custom vir_typ at level 5,
      fields custom vir_typ_list at level 99,
      only printing).
   Notation "'<{' '}>'" := (TYPE_Packed_struct nil)
     (in custom vir_typ at level 5, only printing).
-  Notation "'<{' '}>'" := (DTYPE_Packed_struct nil)
+  Notation "'<{' '}>'" := (DTYPE_Struct true nil)
     (in custom vir_typ at level 5, only printing).
   Notation "'<{' fields '}>'" := (TYPE_Packed_struct fields)
     (in custom vir_typ at level 5,
      fields custom vir_typ_list at level 99,
      only printing).
-  Notation "'<{' fields '}>'" := (DTYPE_Packed_struct fields)
+  Notation "'<{' fields '}>'" := (DTYPE_Struct true fields)
     (in custom vir_typ at level 5,
      fields custom vir_typ_list at level 99,
      only printing).

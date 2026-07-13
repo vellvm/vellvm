@@ -7,9 +7,62 @@ From Vellvm Require Import
      DynamicValues
      MemoryBytes.
 
+
 Section Convert.
   Context {Pa : Params}.
 
+
+  Section CONVERSIONS.
+
+    (** ** Typed conversion
+        Performs a dynamic conversion of a [dvalue] of type [t1] to one of type [t2].
+        For instance, convert an integer over 8 bits to one over 1 bit by truncation.
+
+        The conversion function is not pure, i.e. in particular cannot live in [DynamicValues.v]
+        as would be natural, due to the [Int2Ptr] and [Ptr2Int] cases. At those types, the conversion
+        needs to cast between integers and pointers, which depends on the memory model.
+     *)
+
+    (* Note: Inferring the subevent instance takes a small but non-trivial amount of time,
+       and has to be done here hundreds and hundreds of times due to the brutal pattern matching on
+       several values. Factoring the inference upfront is therefore necessary.
+     *)
+
+    (* A trick avoiding proofs that involve thousands of cases: we split the conversion into
+      the composition of a huge case analysis that builds a value of [conv_case], and a function
+      with only four cases to actually build the tree.
+     *)
+    Variant conv_case : Set :=
+    | Conv_Pure    (x : dvalue_base)
+    | Conv_ItoP    (x : dvalue_base)
+    | Conv_PtoI    (x : dvalue_base)
+    | Conv_Oom     (s : string)
+    | Conv_Illegal (s: string).
+     
+    Variant ptr_conv_cases : Set :=
+    | PtrConv_ItoP
+    | PtrConv_PtoI
+    | PtrConv_Neither.
+
+    Definition get_conv_case_ptr conv (t1 : dtyp_base) (t2 : dtyp_base) : ptr_conv_cases
+      := match conv with
+         | Inttoptr =>
+           match t1, t2 with
+           | DTYPE_I 64, DTYPE_Pointer => PtrConv_ItoP
+           | DTYPE_Iptr, DTYPE_Pointer => PtrConv_ItoP
+           | _, _ => PtrConv_Neither
+           end
+         | Ptrtoint =>
+           match t1, t2 with
+           | DTYPE_Pointer, DTYPE_I _ => PtrConv_PtoI
+           | DTYPE_Pointer, DTYPE_Iptr => PtrConv_PtoI
+           | _, _ => PtrConv_Neither
+           end
+         | _ => PtrConv_Neither
+         end.
+  End CONVERSIONS.
+
+  
   (* Floating point extension *)
   (* SAZ: I'm not sure that this implementation does the right thing
      with respect to the rounding mode (maybe not a problem for extension)
@@ -37,7 +90,7 @@ Section Convert.
         as would be natural, due to the [Int2Ptr] and [Ptr2Int] cases. At those types, the conversion
         needs to cast between integers and pointers, which depends on the memory model.
    *)
-  Definition get_conv_case (conv : conversion_type) (t1:dtyp) (x:dvalue) (t2:dtyp) : conv_case :=
+  Definition get_conv_case (conv : conversion_type) (t1:dtyp_base) (x:dvalue_base) (t2:dtyp_base) : conv_case :=
     match conv with
     | Trunc nuw nsb => (* TODO: handle the nuw and nsb flags *)
         match t1, x, t2 with
@@ -47,7 +100,7 @@ Section Convert.
             else Conv_Illegal "i-to-i ill-typed Trunc"
 
         | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
-            Conv_Pure (DVALUE_Poison t2)
+            Conv_Pure (dvp t2)
 
         | _, _, _ => Conv_Illegal "ill-typed Trunc"
         end
@@ -60,7 +113,7 @@ Section Convert.
             else Conv_Illegal "i-to-i ill-typed Zext"
 
         | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
-            Conv_Pure (DVALUE_Poison t2)
+            Conv_Pure (dvp t2)
 
         | _, _, _ => Conv_Illegal "ill-typed Zext"
         end
@@ -73,18 +126,18 @@ Section Convert.
             else Conv_Illegal "i-to-i ill-typed Sext"
 
         | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
-            Conv_Pure (DVALUE_Poison t2)
+            Conv_Pure (dvp t2)
 
         | _, _, _ => Conv_Illegal "ill-typed Sext"
         end
 
     | Bitcast =>
-        if dtyp_eqb t1 t2
+        if dtyp_base_eqb t1 t2
         then Conv_Pure x
-        else if bit_sizeof_dtyp t1 =? bit_sizeof_dtyp t2
+        else if bit_sizeof_dtyp (DTYPE_Base t1) =? bit_sizeof_dtyp (DTYPE_Base t2)
              then
-               let bytes := dvalue_to_memory_bytes x t1 in
-               let dv_conv := memory_bytes_to_dvalue bytes t2 in
+               let bytes := dvalue_to_memory_bytes (DVALUE_Base x) (DTYPE_Base t1) in
+               let dv_conv := memory_bytes_to_dvalue_base bytes t2 in
                match dv_conv with
                | raise_error err => Conv_Illegal ("Bitcast failure: " ++ err)
                | raise_oom oom => Conv_Oom ("Bitcast OOM: " ++ oom)
@@ -106,7 +159,7 @@ Section Convert.
             else Conv_Illegal "i-to-double ill-typed Uitofp"
 
         | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_FP _ =>
-            Conv_Pure (DVALUE_Poison t2)
+            Conv_Pure (dvp t2)
 
         | _, _, _ => Conv_Illegal "ill-typed Uitofp"
         end
@@ -124,7 +177,7 @@ Section Convert.
             else Conv_Illegal "i-to-double ill-typed Sitofp"
 
         | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_FP _ =>
-            Conv_Pure (DVALUE_Poison t2)
+            Conv_Pure (dvp t2)
 
         | _, _, _ => Conv_Illegal "ill-typed Sitofp"
         end
@@ -149,18 +202,18 @@ Section Convert.
           value cannot fit in ty2, the result is a poison value. *)
         | DTYPE_FP FP_float, DVALUE_Float f, DTYPE_I sz_t =>
             match ZofB_range _ _ f (0%Z) (@max_unsigned sz_t) with
-            | None => Conv_Pure (DVALUE_Poison t2)
+            | None => Conv_Pure (dvp t2)
             | Some z => Conv_Pure (DVALUE_I sz_t (repr z))
             end
               
         | DTYPE_FP FP_double, DVALUE_Double f, DTYPE_I sz_t  =>
             match ZofB_range _ _ f (0%Z) (@max_unsigned sz_t) with
-            | None => Conv_Pure (DVALUE_Poison t2)
+            | None => Conv_Pure (dvp t2)
             | Some z => Conv_Pure (DVALUE_I sz_t (repr z))
             end
               
         | DTYPE_FP _, DVALUE_Poison t, DTYPE_I _ =>
-            Conv_Pure (DVALUE_Poison t2)
+            Conv_Pure (dvp t2)
 
         | _, _, _ => Conv_Illegal "ill-typed Fptoui"
         end
@@ -172,18 +225,18 @@ Section Convert.
           value cannot fit in ty2, the result is a poison value. *)
         | DTYPE_FP FP_float, DVALUE_Float f, DTYPE_I sz_t =>
             match ZofB_range _ _ f (@min_signed sz_t) (@max_signed sz_t) with
-            | None => Conv_Pure (DVALUE_Poison t2)
+            | None => Conv_Pure (dvp t2)
             | Some z => Conv_Pure (DVALUE_I sz_t (repr z))
             end
               
         | DTYPE_FP FP_double, DVALUE_Double f, DTYPE_I sz_t  =>
             match ZofB_range _ _ f (@min_signed sz_t) (@max_signed sz_t) with
-            | None => Conv_Pure (DVALUE_Poison t2)
+            | None => Conv_Pure (dvp t2)
             | Some z => Conv_Pure (DVALUE_I sz_t (repr z))
             end
               
         | DTYPE_FP _, DVALUE_Poison t, DTYPE_I _ =>
-            Conv_Pure (DVALUE_Poison t2)
+            Conv_Pure (dvp t2)
 
         | _, _, _ => Conv_Illegal "ill-typed Fptosi"
         end
@@ -205,28 +258,33 @@ Section Convert.
   
   Arguments get_conv_case _ _ _ _ : simpl nomatch.
 
-  Definition convert_h (conv : conversion_type) (t_from : dtyp) (dv : dvalue) (t_to : dtyp) : EOU dvalue :=
+  Definition convert_base (conv : conversion_type) (t_from : dtyp_base) (dv : dvalue_base) (t_to : dtyp_base) : EOU dvalue_base :=
     match get_conv_case conv t_from dv t_to with
     | Conv_PtoI x =>
         match x, t_to with
-        | DVALUE_Addr addr, DTYPE_I sz => coerce_integer_to_int (Some sz) (ptr_to_int addr)
-        | DVALUE_Addr addr, DTYPE_Iptr => coerce_integer_to_int None (ptr_to_int addr)
+        | DVALUE_Pointer ptr, DTYPE_I sz => coerce_integer_to_int (Some sz) (ptr_to_int ptr)
+        | DVALUE_Pointer ptr, DTYPE_Iptr => coerce_integer_to_int None (ptr_to_int ptr)
         | _, _ => raise_error "Invalid PTOI conversion"
         end
     | Conv_ItoP x =>
-        DVALUE_Addr <$> int_to_ptr (dvalue_int_unsigned x) wildcard_prov
+        DVALUE_Pointer <$> int_to_ptr (dvalue_base_int_unsigned x) wildcard_prov
     | Conv_Pure x => ret x
     | Conv_Oom s => raise_oom s
     | Conv_Illegal s => raise_error s
     end.
 
-  Definition get_vec_conversion_type (t_from t_to : dtyp) : option (dtyp * dtyp) :=
+  Definition get_conversion_type (t_from t_to : dtyp) : option (dtyp_base * dtyp_base) :=
     match t_from, t_to with
-    | DTYPE_Vector n t_from', DTYPE_Vector m t_to' =>
-        if N.eqb n m then Some (t_from', t_to') else None
+    | DTYPE_Base t_from', DTYPE_Base t_to' =>
+        Some (t_from', t_to')
+
+    | DTYPE_Array true n (DTYPE_Base t_from'), DTYPE_Array true m (DTYPE_Base t_to') =>
+        if N.eqb n m
+        then Some (t_from', t_to')
+        else None
+
     | _, _ => None
     end.
-
 
   (* SAZ: TODO - clean up this logic? Is there a cleaner way, and do we really need
      the conversion cases stuff?
@@ -239,21 +297,29 @@ Section Convert.
         else if bit_sizeof_dtyp t_from =? bit_sizeof_dtyp t_to
              then
                let bytes := dvalue_to_memory_bytes dv t_from in
-                memory_bytes_to_dvalue bytes t_to 
+               memory_bytes_to_dvalue bytes t_to 
              else raise_error "unequal bitsize in cast"
     | _ => 
         match dv with
-        | (DVALUE_Vector (DTYPE_Vector sz t) elts1) =>
-            match get_vec_conversion_type t_from t_to with
+        | (DVALUE_Base dv) =>
+            match get_conversion_type t_from t_to with
             | Some (t_from', t_to') =>
-                val <- map_monad (fun v => convert_h conv t_from' v t_to') elts1 ;;
-                ret (DVALUE_Vector (DTYPE_Vector sz t_to') val)
+                DVALUE_Base <$> (convert_base conv t_from' dv t_to')
+                            
             | None =>
                 raise_error "vector conversion at incompatible types or vector lengths"
             end
-        | (DVALUE_Vector _ _) =>
-            raise_error "convert: vector type annotation violates invariant"
-        | _ => convert_h conv t_from dv t_to
+          
+        | (DVALUE_Array true (DTYPE_Array true sz t) elts1) =>
+            match get_conversion_type t_from t_to with
+            | Some (t_from', t_to') =>
+                elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
+                val <- map_monad (fun v => convert_base conv t_from' v t_to') elts1' ;;
+                ret (DVALUE_Array true (DTYPE_Array true sz t_to') (List.map DVALUE_Base val))
+            | None =>
+                raise_error "vector conversion at incompatible types or vector lengths"
+            end
+        | _ => raise_error "convert: invalid input dvalue"
         end
     end.
 

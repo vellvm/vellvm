@@ -45,7 +45,7 @@
 ./rocq/Semantics/Interfaces/IPtr.v
 ./rocq/Semantics/Interfaces/Provenance.v
 ./rocq/Semantics/Interfaces/Sizeof.v
-./rocq/Semantics/Interfaces/Address.v
+./rocq/Semantics/Interfaces/Pointer.v
 ./rocq/Semantics/Interfaces/Params.v
 ./rocq/Semantics/DynamicValues.v
 ./rocq/Semantics/LLVMEvents.v
@@ -53,7 +53,7 @@
 ./rocq/Semantics/Implementations/IPtrFinite.v
 ./rocq/Semantics/Implementations/IPtrInfinite.v
 ./rocq/Semantics/Implementations/Provenance.v
-./rocq/Semantics/Implementations/Address.v
+./rocq/Semantics/Implementations/Pointer.v
 ./rocq/Semantics/Implementations/Sizeof.v
 ./rocq/Semantics/Implementations/ParamsV.v
 

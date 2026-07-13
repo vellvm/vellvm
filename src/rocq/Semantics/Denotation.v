@@ -134,12 +134,12 @@ Section Denotation.
     | DTYPE_FP FP_float =>
         match float32_of_float_syntax f with
         | None   => raise_error ("bad float literal: " ++ (show f))
-        | Some f => ret (DVALUE_Float f)
+        | Some f => ret (DVALUE_Base (DVALUE_Float f))
         end
     | DTYPE_FP FP_double =>
         match float_of_float_syntax f with
         | None   => raise_error ("bad double literal: " ++ (show f))
-        | Some f => ret (DVALUE_Double f)
+        | Some f => ret (DVALUE_Base (DVALUE_Double f))
         end
     | DTYPE_FP _ => raise_error "unsupported float type"
     | _ => raise_error "bad type for constant float"
@@ -147,8 +147,10 @@ Section Denotation.
 
   Definition denote_int_syntax_as_int (t : dtyp) (x : int_syntax) : EOU dvalue :=
     match t with
-    | DTYPE_I bits => coerce_integer_to_int (Some bits) (denote_int_syntax x)
-    | DTYPE_Iptr   => coerce_integer_to_int None (denote_int_syntax x)
+    | DTYPE_I bits => v <- coerce_integer_to_int (Some bits) (denote_int_syntax x) ;;
+                     ret (DVALUE_Base v)
+    | DTYPE_Iptr   => v <- coerce_integer_to_int None (denote_int_syntax x) ;;
+                     ret (DVALUE_Base v)
     | typ          => raise_error ("bad type for constant int: " ++ show typ)
     end.
 
@@ -159,7 +161,7 @@ Section Denotation.
   Definition assert_packed_struct_typ (top : option dtyp) : EOU unit :=
     match top with
     | None => raise_error "denote_exp given untyped EXP_Struct"
-    | Some (DTYPE_Packed_struct _) => ret tt
+    | Some (DTYPE_Struct true _) => ret tt
     | _ => raise_error "bad type for VALUE_Packed_struct"
     end.
 
@@ -169,31 +171,43 @@ Section Denotation.
   Definition assert_vector_typ (top : option dtyp) : EOU (N * dtyp) :=
     match top with
     | None => raise_error "denote_exp given untyped EXP_Splat"
-    | Some (DTYPE_Vector sz t) => ret (sz, t)
+    | Some (DTYPE_Array true sz t) => ret (sz, t)
     | Some _ => raise_error "denote_exp given EXP_Splat with non-vector type"
     end.
-  
-  Fixpoint freeze {E} `{DrawE -< E} (dv : dvalue) : itree E dvalue :=
+
+  Definition freeze_base {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dv : dvalue_base) : itree E dvalue_base :=
     match dv with
-    | DVALUE_Poison dt => draw dt
-    | DVALUE_Struct fields => 
-        val <- map_monad freeze fields;;
-        ret (DVALUE_Struct val)
-    | DVALUE_Packed_struct fields => 
-        val <- map_monad freeze fields;;
-        ret (DVALUE_Packed_struct val)
-    | DVALUE_Array τ elts => 
-        val <- map_monad freeze elts;;
-        ret (DVALUE_Array τ val)
-    | DVALUE_Vector τ elts =>
-        val <- map_monad freeze elts;;
-        ret (DVALUE_Vector τ val)
+    | DVALUE_Poison dt =>
+        dv <- draw dt ;;
+        lift (dvalue_to_dvalue_base dv)
     | _ => ret dv
     end.
+    
+  Fixpoint freeze {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dv : dvalue) : itree E dvalue :=
+    match dv with
+    | DVALUE_Base (DVALUE_Poison dt) => draw dt
+    | DVALUE_Struct p fields => 
+        val <- map_monad freeze fields;;
+        ret (DVALUE_Struct p val)
+    | DVALUE_Array v τ elts => 
+        val <- map_monad freeze elts;;
+        ret (DVALUE_Array v τ val)
+    | _ => ret dv
+    end.
+
+  Definition NONE := DVALUE_Base (DVALUE_None).
   
-  Fixpoint denote_exp
-    (top:option dtyp) (o:exp dtyp) {struct o} : MCFGtop dvalue :=
-    let eval_texp '(dt,ex) := denote_exp (Some dt) ex
+  Fixpoint denote_exp (top:option dtyp) (o:exp dtyp) {struct o} : MCFGtop dvalue :=
+    let denote_exp_base top o :=
+      x <- denote_exp top o ;;
+      lift (dvalue_to_dvalue_base x)
+    in
+    let eval_texp '(dt,ex) :=
+      denote_exp (Some dt) ex
+    in
+    let eval_texp_base '(dt, ex) :=
+      x <- denote_exp (Some dt) ex ;;
+      lift (dvalue_to_dvalue_base x)
     in
     match o with
     | EXP_Ident i => lookup_id i
@@ -212,11 +226,11 @@ Section Denotation.
 
     | EXP_Bool b =>
       match b with
-      | true  => ret (DVALUE_I 1 VellvmIntegers.one)
-      | false => ret (DVALUE_I 1 VellvmIntegers.zero)
+      | true  => ret (DVALUE_Base (DVALUE_I 1 VellvmIntegers.one))
+      | false => ret (DVALUE_Base (DVALUE_I 1 VellvmIntegers.zero))
       end
  
-    | EXP_Null => ret (DVALUE_Addr null)
+    | EXP_Null => ret (DVALUE_Base (DVALUE_Pointer null))
                      
     | EXP_Zero_initializer =>
       match top with
@@ -226,7 +240,7 @@ Section Denotation.
 
     | EXP_Cstring es =>
       vs <- map_monad eval_texp es ;;
-      ret (DVALUE_Array (@DTYPE_I 8) vs)
+      ret (DVALUE_Array false (@DTYPE_I 8) vs)
 
     (* [undef] is treated semantically as [poison] on this branch. *)
     | EXP_Undef =>
@@ -238,28 +252,28 @@ Section Denotation.
     | EXP_Poison =>
         match top with
         | None   => raise ("denote_exp given untyped EXP_Poison")
-        | Some t => ret (DVALUE_Poison t)
+        | Some t => ret (DVALUE_Base (DVALUE_Poison t))
         end
 
     (* Question: should we do any typechecking for aggregate types here? *)
     (* Option 1: do no typechecking: *)
     | EXP_Struct es =>
         vs <- map_monad eval_texp es ;;
-        ret (DVALUE_Struct vs)
+        ret (DVALUE_Struct false vs)
 
     (* Option 2: do a little bit of typechecking *)
     | EXP_Packed_struct es =>
         lift (assert_packed_struct_typ top) ;;
         vs <- map_monad eval_texp es ;;
-        ret (DVALUE_Packed_struct vs)
+        ret (DVALUE_Struct true vs)
 
     | EXP_Array t es =>
       vs <- map_monad eval_texp es ;;
-      ret (DVALUE_Array t vs)
+      ret (DVALUE_Array false t vs)
 
     | EXP_Vector t es =>
       vs <- map_monad eval_texp es ;;
-      ret (DVALUE_Vector t vs)
+      ret (DVALUE_Array true t vs)
 
     | OP_IBinop iop dt op1 op2 =>
       v1 <- denote_exp (Some dt) op1 ;;
@@ -303,7 +317,7 @@ Section Denotation.
 
     | OP_InsertElement (dt_vec, vecop) (dt_elt, eltop) (dt_idx, idx) =>
         vec <- denote_exp (Some dt_vec) vecop ;;
-        elt <- denote_exp (Some dt_elt) eltop ;;
+        elt <- denote_exp_base (Some dt_elt) eltop ;;
         idx <- denote_exp (Some dt_idx) idx ;;
         lift (insert_element vec elt idx)
 
@@ -331,13 +345,13 @@ Section Denotation.
     | EXP_Metadata md =>
         (* METADATA TODO - it isn't clear what the denotations should be *)
         match md with
-        | METADATA_Null => ret (DVALUE_Addr null)
-        | METADATA_Id _ => ret DVALUE_None
+        | METADATA_Null => ret (DVALUE_Base (DVALUE_Pointer null))
+        | METADATA_Id _ => ret NONE
         | METADATA_Const tv => eval_texp tv
-        | METADATA_Node _ => ret DVALUE_None
-        | METADATA_Pair _ _ => ret DVALUE_None
-        | METADATA_Debug _ _ => ret DVALUE_None
-        | METADATA_File_info _ => ret DVALUE_None
+        | METADATA_Node _ => ret NONE
+        | METADATA_Pair _ _ => ret NONE
+        | METADATA_Debug _ _ => ret NONE
+        | METADATA_File_info _ => ret NONE
         end
 
     | EXP_Asm _ _ _ _ template _ =>
@@ -349,7 +363,7 @@ Section Denotation.
         (* use the type from the splat elt *)
         v <- eval_texp elt ;;
         (* this could be very expensive if the vector is big *)
-        ret (DVALUE_Vector t (List.repeat v (N.to_nat sz)))
+        ret (DVALUE_Array true t (List.repeat v (N.to_nat sz)))
           
     | OP_Freeze (dt, e) =>
         dv <- denote_exp (Some dt) e ;;
@@ -384,19 +398,19 @@ Section Denotation.
       (* SAZ: not clear whether this comparison implies "samesign" or not *)
       dv <- lift (eval_icmp false Eq loaded_v cmp_v);;
       match dv with
-      | DVALUE_I 1 comparison_bit =>
+      | DVALUE_Base (DVALUE_I 1 comparison_bit) =>
           if equ comparison_bit one then
             (* They compared as equal: perform the write to memory *)
             store cmp_ty ptr_v new_v ;;
             (* return a struct with the loaded value and "true" *)
-            let ret_v := DVALUE_Struct [loaded_v; DVALUE_I 1 one] in
+            let ret_v := DVALUE_Struct false [loaded_v; DVALUE_Base (DVALUE_I 1 one)] in
             lwrite id ret_v
           else
             (* They compared as distinct: do not perform the write to memory *)
             (* return a struct with the loaded value and "false" *)
-            let ret_v := DVALUE_Struct [loaded_v; DVALUE_I 1 zero] in
+            let ret_v := DVALUE_Struct false [loaded_v; DVALUE_Base (DVALUE_I 1 zero)] in
             lwrite id ret_v
-      | DVALUE_Poison dt => raiseUB ("comparing poison in atomiccmpxchg.")
+      | DVALUE_Base (DVALUE_Poison dt) => raiseUB ("comparing poison in atomiccmpxchg.")
       | _ => raise ("Br got non-bool value")
       end
     else
@@ -484,7 +498,7 @@ Section Denotation.
   (* An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
     (i: (instr_id * instr dtyp * list (metadata dtyp)))
-    (varargs : option addr) : CFGtop unit :=
+    (varargs : option ptr) : CFGtop unit :=
     
     let '(i, md) := i in
     (* The following two lines set up file location information. *)
@@ -527,7 +541,8 @@ Section Denotation.
             lwrite id v
         | Some (t, num_exp) =>
             n <- denote_exp' (Some t) num_exp;;
-            v <- alloca dt (Z.to_N (dvalue_int_unsigned n)) align;;
+            n' <- (lift (dvalue_to_dvalue_base n)) ;;
+            v <- alloca dt (Z.to_N (dvalue_base_int_unsigned n')) align;;
             lwrite id v
         end;;
         ret tt
@@ -583,11 +598,11 @@ Section Denotation.
     | (IVoid _, INSTR_Comment _) => ret tt
 
     | (pt, INSTR_VAArg (t, ptr_to_args_exp) argty) =>
-        ptr_to_args <- denote_exp' (Some DTYPE_Pointer) ptr_to_args_exp;;
+        ptr_to_args <- denote_exp' (Some (DTYPE_Base DTYPE_Pointer)) ptr_to_args_exp;;
         args <- load DTYPE_Pointer ptr_to_args;;
         retv <- load argty args;;
         ix <- lift (from_Z 1);;
-        args' <- lift (eval_gep argty args [DVALUE_Iptr ix]);;
+        args' <- lift (eval_gep argty args [DVALUE_Base (DVALUE_Iptr ix)]);;
         store DTYPE_Pointer ptr_to_args args';;
         match pt with
         | IVoid _ => ret tt
@@ -661,17 +676,17 @@ Section Denotation.
       ret (inr dv)
 
     | TERM_Ret_void =>
-        ret (inr DVALUE_None)
+        ret (inr NONE)
 
     | TERM_Br (dt,op) br1 br2 =>
       v <- denote_exp' (Some dt) op ;;
       match v with
-      | DVALUE_I 1 comparison_bit =>
+      | DVALUE_Base (DVALUE_I 1 comparison_bit) =>
         if equ comparison_bit one then
           ret (inl br1)
         else
           ret (inl br2)
-      | DVALUE_Poison dt => raiseUB (err_loc ++ ": Branching on poison.")
+      | DVALUE_Base (DVALUE_Poison dt) => raiseUB (err_loc ++ ": Branching on poison.")
       | _ => raise (err_loc ++ ": Br got non-bool value")
       end
 
@@ -685,7 +700,7 @@ Section Denotation.
         switches <- map_monad
                      (fun '((TInt_Literal sz x),id) =>
                         s <- lift (coerce_integer_to_int (Some sz) (denote_int_syntax x));;
-                        ret (s,id))
+                        ret (DVALUE_Base s,id))
                      dests;; 
         inl <$> lift (select_switch selector default_br switches)
 
@@ -720,7 +735,7 @@ Section Denotation.
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
-  Definition denote_code (c: code dtyp) (varargs : option addr) : CFGtop unit :=
+  Definition denote_code (c: code dtyp) (varargs : option ptr) : CFGtop unit :=
     map_monad_ (fun i => denote_instr i varargs) c.
 
   Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : CFGtop (local_id * dvalue) :=
@@ -744,7 +759,7 @@ Section Denotation.
 
   (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-  Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option addr) : CFGtop (block_id + dvalue) :=
+  Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option ptr) : CFGtop (block_id + dvalue) :=
     denote_phis bid_from (blk_phis b);;
     denote_code (blk_code b) varargs;;
     denote_terminator (blk_term b).
@@ -763,7 +778,7 @@ Section Denotation.
      If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
    *)
 
-  Definition denote_ocfg (bks: ocfg dtyp) (varargs : option addr)
+  Definition denote_ocfg (bks: ocfg dtyp) (varargs : option ptr)
     : (block_id * block_id) -> CFGtop ((block_id * block_id) + dvalue) :=
     ITree.iter
       (fun '((bid_from,bid_src) : block_id * block_id) =>
@@ -777,7 +792,7 @@ Section Denotation.
              end
          end).
 
-  Definition denote_cfg (f: cfg dtyp) (varargs : option addr) : CFGtop dvalue :=
+  Definition denote_cfg (f: cfg dtyp) (varargs : option ptr) : CFGtop dvalue :=
     r <- denote_ocfg (blks f) varargs (init f,init f) ;;
     match r with
     | inl bid => raise ("Can't find block in denote_cfg " ++ show (snd bid))
@@ -841,18 +856,18 @@ Section Denotation.
     mem_pop.
   
   (* Push call frame, return varargs address *)
-  Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list dvalue) : CFGtop addr :=
+  Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list dvalue) : CFGtop ptr :=
     (* We match the arguments variables to the inputs *)
     '(bs, vs) <- lift (combine_lists_varargs (df_args df) args) ;;
     dts <- lift (map_monad dtyp_of_dvalue vs);;
-    let dt := DTYPE_Packed_struct dts in
+    let dt := DTYPE_Struct true dts in
     (* generate the corresponding writes to the local stack frame *)
     mem_push ;;
     stack_push bs ;;
     varargs <- alloca dt 1 None;;
-    store dt varargs (DVALUE_Packed_struct vs);;
+    store dt varargs (DVALUE_Struct true vs);;
     match varargs with
-    | DVALUE_Addr varg =>
+    | DVALUE_Base (DVALUE_Pointer varg) =>
         ret varg
     | _ => raise "Non-address returned from alloca of varargs"
     end.
@@ -883,7 +898,7 @@ Section Denotation.
 
   Definition lookup_defn (dv : dvalue) (m : IntMap function_denotation) : option function_denotation
     := match dv with
-       | DVALUE_Addr addr =>
+       | DVALUE_Base (DVALUE_Pointer addr) =>
            lookup (ptr_to_int addr) m
        | _ => None
        end.

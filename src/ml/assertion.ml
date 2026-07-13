@@ -20,24 +20,25 @@ type test =
 
 (* Directly converts a piece of syntax to a dtyp without going through
    semantic interpretation. Only works on literals. *)
-let rec typ_to_dtyp (typ : LLVMAst.typ) : DynamicTypes.dtyp =
+let typ_to_dtyp_base (typ : LLVMAst.typ) : DynamicTypes.dtyp_base =
   match typ with
   | TYPE_Void -> DTYPE_Void
   | TYPE_I i -> DTYPE_I i
   | TYPE_FP FP_float -> DTYPE_FP FP_float
   | TYPE_FP FP_double -> DTYPE_FP FP_double
-  | TYPE_Array (sz, dtyp) -> DTYPE_Array (sz, typ_to_dtyp dtyp)
-  | TYPE_Struct dtyps -> DTYPE_Struct (List.map typ_to_dtyp dtyps)
-  | TYPE_Packed_struct dtyps ->
-      DTYPE_Packed_struct (List.map typ_to_dtyp dtyps)
-  | TYPE_Vector (sz, dtyp) -> DTYPE_Vector (sz, typ_to_dtyp dtyp)
   | _ ->
       failwith
         (Printf.sprintf "Assertion includes unsupported type:\n\t %s"
            (string_of_typ typ) )
 
-
-let addr_v = Address0.coq_AddressV IPtrInfinite.coq_IPZ
+let rec typ_to_dtyp (typ : LLVMAst.typ) : DynamicTypes.dtyp =
+  match typ with
+  | TYPE_Struct dtyps -> DTYPE_Struct (false, List.map typ_to_dtyp dtyps)
+  | TYPE_Packed_struct dtyps ->
+      DTYPE_Struct (true, List.map typ_to_dtyp dtyps)
+  | TYPE_Array (sz, dtyp) -> DTYPE_Array (false, sz, typ_to_dtyp dtyp)
+  | TYPE_Vector (sz, dtyp) -> DTYPE_Array (true, sz, typ_to_dtyp dtyp)
+  | _ -> DTYPE_Base (typ_to_dtyp_base typ)
 
 let ocaml_of_EOU (c : 'x EOU.coq_EOU) : 'x =
   match c with
@@ -47,40 +48,45 @@ let ocaml_of_EOU (c : 'x EOU.coq_EOU) : 'x =
   | Coq_raise_ret x -> x
 
 
+let dvalue_to_dvalue_base_exn (dv : dvalue) : dvalue_base =
+  match dv with
+  | DVALUE_Base dv -> dv
+  | _ -> failwith "ocaml: dvalue_to_dvalue_base cast failed"
+
 let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV.dvalue =
   match (typ, exp) with
   (* Allow null pointers literals *)
   | TYPE_Pointer _, EXP_Null ->
-      DVALUE_Addr addr_v.null
+      DVALUE_Base (DVALUE_Pointer Interpreter.pointer_v.null)
   | TYPE_I bits, EXP_Integer x ->                 
-     ocaml_of_EOU
-       (DV.coerce_integer_to_int Interpreter.params (Some bits) (Denotation.denote_int_syntax x))
+     DVALUE_Base (ocaml_of_EOU
+       (DV.coerce_integer_to_int Interpreter.params (Some bits) (Denotation.denote_int_syntax x)))
 
   | TYPE_FP FP_float, EXP_Float f ->
      begin match float32_of_float_syntax f with
-     | Some v ->  DVALUE_Float v
+     | Some v ->  DVALUE_Base (DVALUE_Float v)
      | None ->
         let s = Camlcoq.camlstring_of_coqstring (ShowAST.show_float_syntax f) in
         failwith @@ Printf.sprintf "assertion.ml: texp_to_dvalue failed float32 conversion: %s" s
      end
   | TYPE_FP FP_double, EXP_Float f ->
      begin match float_of_float_syntax f with
-     | Some v ->  DVALUE_Double v
+     | Some v ->  DVALUE_Base (DVALUE_Double v)
      | None ->
         let s = Camlcoq.camlstring_of_coqstring (ShowAST.show_float_syntax f) in
         failwith @@ Printf.sprintf "assertion.ml: texp_to_dvalue failed float conversion: %s" s
      end
+  | TYPE_Struct _, EXP_Struct elts ->
+      DVALUE_Struct (false, List.map texp_to_dvalue elts)
+  | TYPE_Packed_struct _, EXP_Packed_struct elts ->
+      DVALUE_Struct (true, List.map texp_to_dvalue elts)
   | TYPE_Array _, EXP_Array (t, elts) ->
      let dt = typ_to_dtyp t in
-     DVALUE_Array (dt, (List.map texp_to_dvalue elts))
-  | TYPE_Struct _, EXP_Struct elts ->
-      DVALUE_Struct (List.map texp_to_dvalue elts)
-  | TYPE_Packed_struct _, EXP_Packed_struct elts ->
-      DVALUE_Packed_struct (List.map texp_to_dvalue elts)
+     DVALUE_Array (false, dt, (List.map texp_to_dvalue elts))
   | TYPE_Vector _, EXP_Vector (t, elts) ->
      let dt = typ_to_dtyp t in
-     DVALUE_Vector (dt, (List.map texp_to_dvalue elts))
-  | _, EXP_Poison -> (DVALUE_Poison (typ_to_dtyp typ))
+     DVALUE_Array (true, dt, (List.map texp_to_dvalue elts))
+  | _, EXP_Poison -> (DVALUE_Base (DVALUE_Poison (typ_to_dtyp typ)))
   | _, _ ->
       failwith
         (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"
@@ -181,11 +187,11 @@ let compare_dvalues_exn expected got msg : unit =
 
 let dvalue_i1_to_bool (dv : DV.dvalue) : bool =
   match dv with 
-  | DV.DVALUE_I (sz,bitint) ->  Integers.eq sz bitint (Integers.one sz)
+  | DVALUE_Base (DV.DVALUE_I (sz,bitint)) ->  Integers.eq sz bitint (Integers.one sz)
   | _ -> failwith "non-i1 value"
 
 
-let dvalue_eq_assertion name ty (expected : DV.dvalue) (got : unit -> DV.dvalue) () =
+let dvalue_eq_assertion name (ty:DynamicTypes.dtyp) (expected : DV.dvalue) (got : unit -> DV.dvalue) () =
   let open DynamicTypes in
   Platform.verb (Printf.sprintf "running ASSERT in %s\n" name) ;  
   let result = got () in
@@ -194,22 +200,17 @@ let dvalue_eq_assertion name ty (expected : DV.dvalue) (got : unit -> DV.dvalue)
       (Interpreter.string_of_dvalue result) (Interpreter.string_of_dvalue expected) 
   in
   begin match expected with
-  | DV.DVALUE_Poison _ -> compare_dvalues_exn expected result msg
+  | DVALUE_Base (DV.DVALUE_Poison _) -> compare_dvalues_exn expected result msg
   | _ ->
+     (* Use the semantic "cmp eq" for these types *)
      begin match ty with
-     | DTYPE_I _ 
-     | DTYPE_Iptr
-     | DTYPE_Pointer ->
+     | DTYPE_Base (DTYPE_I _)
+     | DTYPE_Base DTYPE_Iptr
+     | DTYPE_Base DTYPE_Pointer ->
         (* integral comparison *)
         let v = ocaml_of_EOU @@ Compare.eval_icmp Interpreter.params false Eq expected result in
         if dvalue_i1_to_bool v then () else
           failwith msg
-     (* | DTYPE_FP _ -> (\* floating point comparison *\) *)
-     (*    (\* compare_dvalues_exn expected result msg         *\) *)
-     (*    let v = Assertion.ocaml_of_EOU @@ DV.eval_fcmp Interpreter.params FOeq expected result in *)
-     (*    if dvalue_i1_to_bool v then () else *)
-     (*      failwith msg *)
-     (* | DTYPE_Vector _  -> failwith "TODO: comparison on vectors" *)
      | _ -> (* Best effort comparison of other types *)
         compare_dvalues_exn expected result msg
      end

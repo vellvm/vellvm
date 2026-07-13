@@ -40,32 +40,29 @@ Definition max_preferred_dtyp_alignment {S : Sizeof} (dts : list dtyp) : N :=
   | None => 1
   end.
 
-Definition ptr_size `{Sizeof} : N := sizeof_dtyp DTYPE_Pointer.
+Definition ptr_size `{Sizeof} : N := sizeof_dtyp (DTYPE_Base DTYPE_Pointer).
 
 Class SizeofTheory {S : Sizeof} : Prop :=
   {
-    sizeof_dtyp_void : sizeof_dtyp DTYPE_Void = 0%N;
+    sizeof_dtyp_void : sizeof_dtyp (DTYPE_Base DTYPE_Void) = 0%N;
     sizeof_dtyp_pos :
     forall dt, (0 <= sizeof_dtyp dt)%N;
 
     sizeof_dtyp_Struct :
     forall dts,
-      sizeof_dtyp (DTYPE_Struct dts) = pad_to (max_preferred_dtyp_alignment dts) (List.fold_left (fun acc dt => N.add (pad_to_align (dtyp_alignment dt) acc) (sizeof_dtyp dt)) dts 0%N);
+      sizeof_dtyp (DTYPE_Struct false dts) = pad_to (max_preferred_dtyp_alignment dts) (List.fold_left (fun acc dt => N.add (pad_to_align (dtyp_alignment dt) acc) (sizeof_dtyp dt)) dts 0%N);
 
     sizeof_dtyp_Packed_struct :
     forall dts,
-      sizeof_dtyp (DTYPE_Packed_struct dts) = List.fold_left (fun acc dt => N.add acc (sizeof_dtyp dt)) dts 0%N;
+      sizeof_dtyp (DTYPE_Struct true dts) = List.fold_left (fun acc dt => N.add acc (sizeof_dtyp dt)) dts 0%N;
 
     sizeof_dtyp_array :
-    forall sz t,
-      sizeof_dtyp (DTYPE_Array sz t) = (sz * sizeof_dtyp t)%N;
+    forall v sz t,
+      sizeof_dtyp (DTYPE_Array v sz t) = (sz * sizeof_dtyp t)%N;
 
-    sizeof_dtyp_vector :
-    forall sz t,
-      sizeof_dtyp (DTYPE_Vector sz t) = (sz * sizeof_dtyp t)%N;
-
+    (* SAZ - why is this not [sizeof_dtyp_i (DTYPE_Base (DTYPE_I sz)) = sz]  ?*)
     sizeof_dtyp_i8 :
-    sizeof_dtyp (DTYPE_I 8) = 1%N;
+    sizeof_dtyp (DTYPE_Base (DTYPE_I 8)) = 1%N;
   }.
 
 

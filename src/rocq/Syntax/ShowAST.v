@@ -202,7 +202,7 @@ Section ShowInstances.
   #[global] Instance dshowTyp : DShow typ :=
     {| dshow := dshow_typ |}.
 
-  Fixpoint show_dtyp (t : dtyp) : string :=
+  Definition show_dtyp_base (t : dtyp_base) : string :=
     match t with
     | DTYPE_I sz                 => "i" ++ (show sz)
     | DTYPE_Iptr                 => "iptr"
@@ -213,11 +213,20 @@ Section ShowInstances.
     | DTYPE_Token                => "token"
     | DTYPE_Metadata             => "metadata"
     | DTYPE_X86_mmx              => "X86_mmx"
-    | DTYPE_Array sz t           => "[" ++ (show sz) ++ " x " ++ show_dtyp t ++ "]"
-    | DTYPE_Struct fields        => "{" ++ (String.concat ", " (map show_dtyp fields)) ++ "}"
-    | DTYPE_Packed_struct fields => "<{" ++ (String.concat ", " (map show_dtyp fields)) ++ "}>"
     | DTYPE_Opaque               => "Opaque"
-    | DTYPE_Vector sz t          => "<" ++ (show sz) ++ " x " ++ show_dtyp t ++ ">"
+    | DTYPE_B sz                 => "b" ++ (show sz)
+    end.
+  
+  Fixpoint show_dtyp (t : dtyp) : string :=
+    match t with
+    | DTYPE_Base t => show_dtyp_base t
+    | DTYPE_Struct p fields  =>
+        if p then
+          "<{" ++ (String.concat ", " (map show_dtyp fields)) ++ "}>"
+        else
+          "{" ++ (String.concat ", " (map show_dtyp fields)) ++ "}"
+    | DTYPE_Array false sz t           => "[" ++ (show sz) ++ " x " ++ show_dtyp t ++ "]"
+    | DTYPE_Array true sz t          => "<" ++ (show sz) ++ " x " ++ show_dtyp t ++ ">"
     end.
 
   #[global] Instance dshowDTyp : Show dtyp :=

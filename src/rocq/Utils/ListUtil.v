@@ -367,14 +367,14 @@ Section monad.
 
   (* Helper for looping 2 argument evaluation over vectors, producing a vector *)
 
-  Definition vec_loop {A : Type}
-    (f : A -> A -> m A)
-    (elts : list (A * A)) : m (list A) :=
+  Definition vec_loop {A B C: Type}
+    (f : A -> B -> m C)
+    (elts : list (A * B)) : m (list C) :=
     monad_fold_right (fun acc '(e1, e2) =>
                         val <- f e1 e2 ;;
                         ret (val :: acc)
       ) elts [].
-
+  
 End monad.
 Arguments monad_fold_right {_ _ _ _}.
 Arguments monad_app_fst {_ _ _ _ _}.
@@ -383,7 +383,7 @@ Arguments map_monad {_ _ _ _}.
 Arguments map_monad_ {_ _ _ _}.
 Arguments sequence {_ _ _}.
 Arguments foldM {_ _ _ _}.
-Arguments vec_loop {_ _ _}.
+Arguments vec_loop {_ _ _ _ _}.
 Definition repeatMN {A m} `{Monad m} (n : N) (ma : m A) : m (list A)
   := sequence (repeatN n ma).
 
