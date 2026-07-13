@@ -27,7 +27,6 @@
           ocamlbuild
           findlib
           menhir
-          qcheck
           cppo
         ];
 
@@ -40,8 +39,8 @@
           paco
           ITree
           flocq
-          simple-io
           zarith
+          equations
         ] ++
         # These ocaml packages have to come from rocq.ocamlPackages to
         # avoid disagreements between ocaml compiler versions.
