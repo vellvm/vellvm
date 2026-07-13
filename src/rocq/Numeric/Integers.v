@@ -65,13 +65,102 @@ End WORDSIZE.
 Local Unset Elimination Schemes.
 Local Unset Case Analysis Schemes.
 
+(** * Memoized per-width constants
+
+  [Integers] is parameterized by a section variable [wordsize], so after
+  section closing the constants below extract to OCaml *functions* of the
+  width, recomputed at every call -- e.g. every [repr] rebuilds
+  [Pos.to_nat wordsize] (a unary nat) and every [signed] rebuilds
+  [two_power_pos wordsize].  The [*_memo] variants pattern-match the
+  common widths and return literals, which extraction compiles to
+  statically-allocated constants.  The [_eq] lemmas restore the original
+  definitional behaviour for proofs. *)
+
+Definition pos_to_nat_memo (w: positive) : nat :=
+  if Pos.eqb w 64 then 64%nat
+  else if Pos.eqb w 32 then 32%nat
+  else if Pos.eqb w 8 then 8%nat
+  else if Pos.eqb w 1 then 1%nat
+  else if Pos.eqb w 16 then 16%nat
+  else if Pos.eqb w 128 then 128%nat
+  else Pos.to_nat w.
+
+Lemma pos_to_nat_memo_eq: forall w, pos_to_nat_memo w = Pos.to_nat w.
+Proof.
+  intros w; unfold pos_to_nat_memo.
+  repeat match goal with
+         | |- context [Pos.eqb w ?c] =>
+             destruct (Pos.eqb w c) eqn:?H;
+             [apply Pos.eqb_eq in H; subst; reflexivity | clear H]
+         end.
+  reflexivity.
+Qed.
+
+Definition two_power_pos_memo (w: positive) : Z :=
+  if Pos.eqb w 64 then 18446744073709551616
+  else if Pos.eqb w 32 then 4294967296
+  else if Pos.eqb w 8 then 256
+  else if Pos.eqb w 1 then 2
+  else if Pos.eqb w 16 then 65536
+  else if Pos.eqb w 128 then 340282366920938463463374607431768211456
+  else two_power_pos w.
+
+Lemma two_power_pos_memo_eq: forall w, two_power_pos_memo w = two_power_pos w.
+Proof.
+  intros w; unfold two_power_pos_memo.
+  repeat match goal with
+         | |- context [Pos.eqb w ?c] =>
+             destruct (Pos.eqb w c) eqn:?H;
+             [apply Pos.eqb_eq in H; subst; reflexivity | clear H]
+         end.
+  reflexivity.
+Qed.
+
+Definition half_two_power_pos_memo (w: positive) : Z :=
+  if Pos.eqb w 64 then 9223372036854775808
+  else if Pos.eqb w 32 then 2147483648
+  else if Pos.eqb w 8 then 128
+  else if Pos.eqb w 1 then 1
+  else if Pos.eqb w 16 then 32768
+  else if Pos.eqb w 128 then 170141183460469231731687303715884105728
+  else two_power_pos w / 2.
+
+Lemma half_two_power_pos_memo_eq:
+  forall w, half_two_power_pos_memo w = two_power_pos w / 2.
+Proof.
+  intros w; unfold half_two_power_pos_memo.
+  repeat match goal with
+         | |- context [Pos.eqb w ?c] =>
+             destruct (Pos.eqb w c) eqn:?H;
+             [apply Pos.eqb_eq in H; subst; reflexivity | clear H]
+         end.
+  reflexivity.
+Qed.
+
 Section MakeInt.
 
 Context {wordsize: positive}.
 Definition zwordsize: Z := Zpos wordsize.
-Definition natwordsize: nat := Pos.to_nat wordsize.
-Definition modulus : Z := two_power_pos wordsize.
-Definition half_modulus : Z := modulus / 2.
+Definition natwordsize: nat := pos_to_nat_memo wordsize.
+Definition modulus : Z := two_power_pos_memo wordsize.
+Definition half_modulus : Z := half_two_power_pos_memo wordsize.
+
+Lemma natwordsize_def: natwordsize = Pos.to_nat wordsize.
+Proof. apply pos_to_nat_memo_eq. Qed.
+
+Lemma modulus_def: modulus = two_power_pos wordsize.
+Proof. apply two_power_pos_memo_eq. Qed.
+
+Lemma half_modulus_def: half_modulus = modulus / 2.
+Proof.
+  unfold half_modulus, modulus.
+  rewrite half_two_power_pos_memo_eq, two_power_pos_memo_eq. reflexivity.
+Qed.
+Lemma modulus_two_power_nat: modulus = two_power_nat natwordsize.
+Proof.
+  rewrite modulus_def, natwordsize_def. apply two_power_pos_nat.
+Qed.
+
 Definition max_unsigned : Z := modulus - 1.
 Definition max_signed : Z := half_modulus - 1.
 Definition min_signed : Z := - half_modulus.
@@ -83,7 +172,7 @@ Qed.
 
 Remark modulus_power: modulus = two_p zwordsize.
 Proof.
-  unfold modulus. rewrite two_power_pos_nat, two_power_nat_two_p.
+  rewrite modulus_def. rewrite two_power_pos_nat, two_power_nat_two_p.
   rewrite positive_nat_Z.
   reflexivity.
 Qed.
@@ -159,10 +248,9 @@ Proof.
   intros; unfold Z_mod_modulus.
   destruct x.
   - generalize modulus_pos; lia.
-  - setoid_rewrite two_power_pos_nat.
-    apply P_mod_two_p_range.
+  - rewrite modulus_two_power_nat. apply P_mod_two_p_range.
   - set (r := P_mod_two_p p natwordsize).
-    assert (0 <= r < modulus) by (setoid_rewrite two_power_pos_nat; apply P_mod_two_p_range).
+    assert (0 <= r < modulus) by (rewrite modulus_two_power_nat; apply P_mod_two_p_range).
     destruct (zeq r 0).
     + generalize modulus_pos; lia.
     + lia.
@@ -179,21 +267,17 @@ Lemma Z_mod_modulus_eq:
 Proof.
   intros. unfold Z_mod_modulus. destruct x.
   - rewrite Zmod_0_l. auto.
-  - setoid_rewrite two_power_pos_nat; apply P_mod_two_p_eq.
+  - rewrite modulus_two_power_nat; apply P_mod_two_p_eq.
   - generalize (P_mod_two_p_range natwordsize p) (P_mod_two_p_eq natwordsize p).
-    fold modulus. intros A B.
+    rewrite <- modulus_two_power_nat. intros A B.
     pose proof (Z_div_mod_eq_full (Zpos p) modulus) as C.
     set (q := Zpos p / modulus) in *.
     set (r := P_mod_two_p p natwordsize) in *.
-    setoid_rewrite two_power_pos_nat in C.
-    setoid_rewrite two_power_pos_nat.
-    unfold natwordsize in *.
     rewrite <- B in C.
     change (Z.neg p) with (- (Z.pos p)). destruct (zeq r 0).
     + symmetry. apply Zmod_unique with (-q). rewrite C; rewrite e. ring.
       generalize modulus_pos; lia.
-    + setoid_rewrite two_power_pos_nat.
-      symmetry. apply Zmod_unique with (-q - 1). rewrite C. ring.
+    + symmetry. apply Zmod_unique with (-q - 1). rewrite C. ring.
       lia.
 Qed.
 
@@ -434,7 +518,7 @@ Definition divmods2 (nhi nlo: bit_int) (d: bit_int) : option (bit_int * bit_int)
 Remark half_modulus_power:
   half_modulus = two_p (zwordsize - 1).
 Proof.
-  unfold half_modulus. rewrite modulus_power.
+  rewrite half_modulus_def, modulus_power.
   set (ws1 := zwordsize - 1).
   replace (zwordsize) with (Z.succ ws1).
   rewrite two_p_S. rewrite Z.mul_comm. apply Z_div_mult. lia.
@@ -790,7 +874,7 @@ Qed.
 Theorem unsigned_one: unsigned one = 1.
 Proof.
   unfold one; rewrite unsigned_repr_eq. apply Zmod_small. split. lia.
-  setoid_rewrite two_power_pos_nat.
+  rewrite modulus_two_power_nat, natwordsize_def.
   replace (Pos.to_nat wordsize) with (S(Init.Nat.pred (Pos.to_nat wordsize))).
   rewrite two_power_nat_S. generalize (two_power_nat_pos (Init.Nat.pred (Pos.to_nat wordsize))).
   lia.
@@ -1431,7 +1515,8 @@ Lemma eqm_same_bits:
   eqm x y.
 Proof.
   unfold eqm.
-  setoid_rewrite two_power_pos_nat.
+  setoid_rewrite modulus_two_power_nat.
+  setoid_rewrite natwordsize_def.
   intros x y H.
   eapply eqmod_same_bits.
   unfold zwordsize in *.
@@ -1468,7 +1553,8 @@ Lemma same_bits_eqm:
   Z.testbit x i = Z.testbit y i.
 Proof.
   unfold eqm.
-  setoid_rewrite two_power_pos_nat.
+  setoid_rewrite modulus_two_power_nat.
+  setoid_rewrite natwordsize_def.
   intros x y i H1 H2.
   eapply same_bits_eqmod; eauto.
   unfold zwordsize in H2.
@@ -1643,10 +1729,9 @@ Lemma bits_above:
 Proof.
   intros.
   apply Ztestbit_above with natwordsize; auto.
-  unfold natwordsize.
-  rewrite <- two_power_pos_nat.
+  rewrite <- modulus_two_power_nat.
   apply unsigned_range.
-  unfold natwordsize.
+  rewrite natwordsize_def.
   rewrite positive_nat_Z; auto.
 Qed.
 
@@ -1678,7 +1763,7 @@ Proof.
   intros. unfold testbit.
   set (ws1 := Init.Nat.pred natwordsize).
   assert (zwordsize - 1 = Z.of_nat ws1).
-  unfold zwordsize, ws1, natwordsize.
+  unfold zwordsize, ws1. rewrite natwordsize_def.
   lia.
   assert (half_modulus = two_power_nat ws1).
     rewrite two_power_nat_two_p. rewrite <- H. apply half_modulus_power.
@@ -1695,20 +1780,15 @@ Proof.
   destruct (zlt i zwordsize).
   - apply same_bits_eqm. apply eqm_signed_unsigned. lia.
   - unfold signed. rewrite sign_bit_of_unsigned. destruct (zlt (unsigned x) half_modulus).
-    + apply Ztestbit_above with natwordsize. unfold half_modulus in *.
-      unfold modulus in l.
-      rewrite two_power_pos_nat in l.
-      unfold natwordsize.
-      rewrite <- two_power_pos_nat.
+    + apply Ztestbit_above with natwordsize.
+      rewrite <- modulus_two_power_nat.
       apply unsigned_range.
-      unfold natwordsize.
+      rewrite natwordsize_def.
       rewrite positive_nat_Z; auto.
     + apply Ztestbit_above_neg with natwordsize.
-      fold modulus. generalize (unsigned_range x).
-      intros H0.
-      unfold modulus, half_modulus in *.
-      setoid_rewrite <- two_power_pos_nat.
-      lia.
+      rewrite <- modulus_two_power_nat.
+      generalize (unsigned_range x); intros; lia.
+      rewrite natwordsize_def.
       setoid_rewrite positive_nat_Z; auto.
 Qed.
 
@@ -2701,7 +2781,7 @@ Proof.
   }
   intros. rewrite <- H. change (two_p 0) with 1. lia.
   lia.
-  setoid_rewrite <- two_power_pos_nat.
+  rewrite <- modulus_two_power_nat.
   exact H0.
 Qed.
 
@@ -2721,6 +2801,7 @@ Proof.
   auto.
   }
   intros. generalize (H natwordsize x 0 i H0).
+  rewrite natwordsize_def.
   setoid_rewrite positive_nat_Z; auto.
 Qed.
 
@@ -2778,7 +2859,7 @@ Proof.
   generalize (two_p_monotone_strict _ _ H).
   unfold zwordsize in *.
   rewrite <- positive_nat_Z; auto.
-  unfold max_unsigned, modulus.
+  unfold max_unsigned. rewrite modulus_def.
   setoid_rewrite <- two_power_nat_two_p.
   rewrite <- positive_nat_Z in H.
   rewrite <- two_power_pos_nat.
@@ -2813,6 +2894,7 @@ Lemma is_power2_two_p:
 Proof.
   intros. unfold is_power2. rewrite unsigned_repr.
   rewrite Z_one_bits_two_p. auto.
+  rewrite natwordsize_def.
   setoid_rewrite positive_nat_Z.
   auto.
   apply two_p_range; auto.
@@ -3152,7 +3234,7 @@ Proof.
   assert (unsigned x mod two_p uy = sx mod two_p uy).
     apply eqmod_mod_eq; auto. apply eqmod_divides with modulus.
     fold eqm. unfold sx. apply eqm_sym. apply eqm_signed_unsigned.
-    unfold modulus. rewrite two_power_pos_two_p.
+    rewrite modulus_def, two_power_pos_two_p.
     exists (two_p (zwordsize - uy)). rewrite <- two_p_is_exp.
     f_equal. fold zwordsize; lia. lia. lia.
   rewrite H8. rewrite Zdiv_shift; auto.
@@ -3551,7 +3633,7 @@ Proof.
   intros. apply eqmod_trans with (unsigned (sign_ext n x)).
   apply eqmod_divides with modulus. apply eqm_signed_unsigned.
   exists (two_p (zwordsize - n)).
-  unfold modulus. rewrite two_power_pos_two_p. fold zwordsize.
+  rewrite modulus_def, two_power_pos_two_p. fold zwordsize.
   rewrite <- two_p_is_exp. f_equal. lia. lia. lia.
   apply eqmod_sign_ext'; auto.
 Qed.
