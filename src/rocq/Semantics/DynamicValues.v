@@ -1273,7 +1273,7 @@ Section DValue.
   (* I split the definition between the vector and other evaluations because
      otherwise eval_iop should be recursive to allow for vector calculations,
      but rocq can't find a fixpoint. *)
-  Fixpoint eval_iop iop v1 v2 : EOU dvalue :=
+  Definition eval_iop iop v1 v2 : EOU dvalue :=
     match v1, v2 with
     | (DVALUE_Base v1), (DVALUE_Base v2) =>
         DVALUE_Base <$> (eval_iop_integer_base iop v1 v2)

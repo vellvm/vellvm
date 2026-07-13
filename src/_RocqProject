@@ -81,6 +81,5 @@
 ./rocq/Semantics/TopLevel.v
 ./rocq/Semantics.v
 
-./rocq/Theory/rutt_cutoff.v
-./rocq/Theory/I2F.v
-./rocq/Theory/I2F_instr.v
+./rocq/Utils/rutt_cutoff.v
+./rocq/Theory/I2F/Refinement.v

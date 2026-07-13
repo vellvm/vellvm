@@ -2,10 +2,11 @@ From Stdlib Require Import
   List Lia Program Recdef.
 
 From ITree Require Import
-     Basics.Monad.
+     Basics.Monad Basics.HeterogeneousRelations.
 Import Monads.
 
 From Vellvm Require Import
+  Utils.Tactics
   Numeric.Rocqlib.
 
 Import ListNotations.
@@ -24,8 +25,6 @@ Module N.
     end.
 End N.
   
-
-
 (** * Collection of misc definitions and lemmas over lists *)
 
 (** *** Standard lemmas over standard lists *)
@@ -535,3 +534,78 @@ Section DISJOINT.
 
 End DISJOINT.
 #[global] Infix "⊍" := list_disjoint (at level 60).
+
+Section Forall2.
+
+  Lemma Forall2_repeat {A B} (R : A -> B -> Prop) a b n :
+    R a b -> Forall2 R (repeat a n) (repeat b n).
+  Proof.
+    induction n; cbn; intros; constructor; auto.
+  Qed.
+
+  Lemma Forall2_diag {A} P (l : list A):
+    Forall2 P l l <-> Forall (fun a => P a a) l.
+  Proof.
+    split; intros HF.
+    - revert HF; induction l as [| x l IH]; cbn; auto.
+      intros HF; inv HF.
+      constructor; auto.
+    - revert HF; induction l as [| x l IH]; cbn; auto.
+      intros HF; inv HF.
+      constructor; auto.
+  Qed.
+
+  (* Pairwise-related lists combine to [prod_rel]-related pair lists. *)
+  Lemma Forall2_combine {A1 A2 B1 B2} (RA : A1 -> A2 -> Prop) (RB : B1 -> B2 -> Prop) :
+    forall l1 l2 k1 k2,
+      Forall2 RA l1 l2 -> Forall2 RB k1 k2 ->
+      Forall2 (prod_rel RA RB) (combine l1 k1) (combine l2 k2).
+  Proof.
+    intros l1 l2 k1 k2 F; revert k1 k2; induction F; cbn; intros k1 k2 FK; auto.
+    destruct FK; cbn; auto.
+  Qed.
+
+  Lemma Forall2_length_N {A B} (R : A -> B -> Prop) :
+    forall l1 l2, Forall2 R l1 l2 -> N.length l1 = N.length l2.
+  Proof.
+    intros l1 l2 F; induction F; cbn; auto.
+    now rewrite IHF.
+  Qed.
+
+  Lemma Forall2_map2 {A B1 B2} (R : B1 -> B2 -> Prop) (f : A -> B1) (g : A -> B2) :
+    forall l,
+      (forall x, In x l -> R (f x) (g x)) ->
+      Forall2 R (map f l) (map g l).
+  Proof.
+    induction l; intros H; cbn; constructor.
+    - apply H; now left.
+    - apply IHl; intros; apply H; now right.
+  Qed.
+
+    (* [Forall2] plumbing for the byte-list surgery of deserialization. *)
+
+  Lemma Forall2_take {A B} (R : A -> B -> Prop) :
+    forall l l', Forall2 R l l' -> forall n, Forall2 R (take n l) (take n l').
+  Proof.
+    intros l l' F; induction F; intros n; cbn; auto.
+    break_match_goal; constructor; auto.
+  Qed.
+
+  Lemma Forall2_drop {A B} (R : A -> B -> Prop) :
+    forall l l', Forall2 R l l' -> forall n, Forall2 R (drop n l) (drop n l').
+  Proof.
+    intros l l' F; induction F; intros n; cbn; auto.
+    break_match_goal; [constructor; auto | auto].
+  Qed.
+
+  Lemma Forall2_repeatN {A B} (R : A -> B -> Prop) (a : A) (b : B) :
+    R a b -> forall n, Forall2 R (repeatN n a) (repeatN n b).
+  Proof.
+    intros H n; induction n using N.peano_ind; unfold repeatN in *.
+    - constructor.
+    - rewrite !N.recursion_succ; try (repeat intro; subst; auto);
+        try (constructor; auto).
+  Qed.
+
+End Forall2.
+
