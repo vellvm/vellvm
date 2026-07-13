@@ -39,7 +39,7 @@
               buildInputs = [packages.default libllvm clang];
               installPhase = ''
               cd src
-              ${packages.default}/bin/vellvm -l libll/rust-intrinsics.ll -test
+              ${packages.default}/bin/vellvm -L libll -test
               if [[ $? == 0 ]]; then
                 mkdir $out
               fi
