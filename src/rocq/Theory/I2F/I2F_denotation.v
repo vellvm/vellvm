@@ -4,17 +4,14 @@ From Stdlib Require Import Lia.
 
 From ExtLib Require Import Structures.Monads.
 
-From ITree Require Import ITree Eq HeterogeneousRelations.
-
+From ITree Require Import
+  ITree Eq HeterogeneousRelations.
 From Vellvm Require Import
   Utils
   Syntax
+  Semantics
   VellvmIntegers
   Integers
-  DynamicValues
-  EOU
-  LLVMEvents
-  Semantics.Operations
   Interfaces.IPtr
   Interfaces.Params
   Implementations.Pointer
@@ -22,32 +19,15 @@ From Vellvm Require Import
   Implementations.IPtrInfinite
   Implementations.IPtrFinite
   Implementations.Memory
-  Implementations.ParamsV
-  Denotation.
+  Implementations.ParamsV.
 
 From Vellvm Require Import
-  Theory.rutt_cutoff
-  Theory.I2F.
+  Utils.rutt_cutoff
+  Theory.I2F.Refinement
+  Theory.I2F.I2F_exp.
 
 From Paco Require Import paco.
-  Ltac rstep :=
-    first [apply ruttc_trigger |
-            apply ruttc_trigger_cast |
-            apply ruttc_ret 
-      ].
-
-Tactic Notation "rbind" uconstr(x) := eapply ruttc_bind with (RR := x).
-Tactic Notation "erbind" := eapply ruttc_bind.
-
-From Stdlib Require Import
-  Program Setoid Morphisms List.
-
-#[global]Instance ruttc_eq_itree {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} :
-  Proper (eq_itree Logic.eq ==> eq_itree Logic.eq ==> flip impl) (@ruttc E1 E2 R1 R2 Rcutr Rcutl REv RAns RR).
-Proof.
-  intros ?? EQ1 ?? EQ2; rewrite EQ1,EQ2; intuition eauto with *.
-Qed.
-
+(*
 Ltac cbnn := cbn; unfold resum, ReSum_id, id_, Id_IFun.
 Ltac bind_exp := erbind; [apply I2F_denote_exp'| intros].
 
@@ -709,3 +689,5 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
      instance (they are convertible) *)
   all: auto.
 Qed.
+
+*)

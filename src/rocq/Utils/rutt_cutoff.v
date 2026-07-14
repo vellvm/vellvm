@@ -867,3 +867,9 @@ Proof.
   eapply ruttc_eutt_l, ruttc_eutt_r; eauto; symmetry; eauto.
 Qed.
 
+#[global]Instance ruttc_eq_itree {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} :
+  Proper (eq_itree Logic.eq ==> eq_itree Logic.eq ==> flip impl) (@ruttc E1 E2 R1 R2 Rcutr Rcutl REv RAns RR).
+Proof.
+  intros ?? EQ1 ?? EQ2; rewrite EQ1,EQ2; intuition eauto with *.
+Qed.
+
