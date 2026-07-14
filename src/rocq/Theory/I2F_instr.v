@@ -430,12 +430,6 @@ Proof with cbn; eauto using I2F_EOU_error, I2F_EOU_ret, I2F_EOU_oom, I2F_EOU_ub.
     constructor; cbn...
 Qed.
 
-Lemma Forall2_eq {A} (l1 l2 : list A) :
-  Forall2 Logic.eq l1 l2 -> l1 = l2.
-Proof.
-  intros * HR; induction HR; subst; cbn; auto.
-Qed.
-
 (** [dtyp_of_dvalue] computes in the parameter-free [EOU dtyp]: on
     related values the two sides are literally equal (related scalars
     carry equal payloads, and aggregates share their annotations). *)
