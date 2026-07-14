@@ -299,93 +299,6 @@ Section FINDOPTION.
 
 End FINDOPTION.
 
-(** *** Interactions between monadic computations and lists *)
-Section monad.
-  Variable m : Type -> Type.
-  Variable M : Monad m.
-
-  Fixpoint monad_fold_right {A B} (f : B -> A -> m B) (l:list A) (b : B) : m B :=
-    match l with
-    | [] => ret b
-    | x::xs =>
-        r <- monad_fold_right f xs b ;;
-        f r x
-    end.
-
-  Definition monad_app_fst {A B C} (f : A -> m C) (p:A * B) : m (C * B)%type :=
-    let '(x,y) := p in
-    z <- f x ;;
-    ret (z,y).
-
-  Definition monad_app_snd {A B C} (f : B -> m C) (p:A * B) : m (A * C)%type :=
-    let '(x,y) := p in
-    z <- f y ;;
-    ret (x,z).
-
-  Definition map_monad {A B} (f:A -> m B) : list A -> m (list B) :=
-    fix loop l :=
-      match l with
-      | [] => ret []
-      | a::l' =>
-          b <- f a ;;
-          bs <- loop l' ;;
-          ret (b::bs)
-      end.
-
-  Definition map_monad_ {A B}
-    (f: A -> m B) (l: list A): m unit :=
-    map_monad f l;; ret tt.
-
-  Definition sequence {a} (ms : list (m a)) : m (list a)
-    := map_monad id ms.
-
-  Lemma sequence_cons :
-    forall {a} (ma : m a) (mas : list (m a)),
-      sequence (ma :: mas) =
-        a <- ma;;
-        rest <- sequence mas;;
-        ret (a :: rest).
-  Proof using.
-    intros a ma mas.
-    unfold sequence.
-    cbn.
-    unfold id.
-    reflexivity.
-  Qed.
-
-  Fixpoint foldM {a b} (f : b -> a -> m b ) (acc : b) (l : list a) : m b
-    := match l with
-       | [] => ret acc
-       | (x :: xs) =>
-           b <- f acc x;;
-           foldM f b xs
-       end.
-
-  Definition repeatM {A} (n : nat) (ma : m A) : m (list A)
-    := sequence (repeat ma n).
-
-  (* Helper for looping 2 argument evaluation over vectors, producing a vector *)
-
-  Definition vec_loop {A B C: Type}
-    (f : A -> B -> m C)
-    (elts : list (A * B)) : m (list C) :=
-    monad_fold_right (fun acc '(e1, e2) =>
-                        val <- f e1 e2 ;;
-                        ret (val :: acc)
-      ) elts [].
-  
-End monad.
-Arguments monad_fold_right {_ _ _ _}.
-Arguments monad_app_fst {_ _ _ _ _}.
-Arguments monad_app_snd {_ _ _ _ _}.
-Arguments map_monad {_ _ _ _}.
-Arguments map_monad_ {_ _ _ _}.
-Arguments sequence {_ _ _}.
-Arguments foldM {_ _ _ _}.
-Arguments vec_loop {_ _ _ _ _}.
-Definition repeatMN {A m} `{Monad m} (n : N) (ma : m A) : m (list A)
-  := sequence (repeatN n ma).
-
 (** *** Better behaved version of Forall that can be used in recursive functions *)
 Section FORALL.
   
@@ -607,5 +520,135 @@ Section Forall2.
         try (constructor; auto).
   Qed.
 
+  Lemma Forall2_eq {A} (l1 l2 : list A) :
+    Forall2 eq l1 l2 -> l1 = l2.
+  Proof.
+    intros * HR; induction HR; subst; cbn; auto.
+  Qed.
+
 End Forall2.
 
+(** *** Interactions between monadic computations and lists *)
+Section monad.
+  Variable m : Type -> Type.
+  Variable M : Monad m.
+
+  Fixpoint monad_fold_right {A B} (f : B -> A -> m B) (l:list A) (b : B) : m B :=
+    match l with
+    | [] => ret b
+    | x::xs =>
+        r <- monad_fold_right f xs b ;;
+        f r x
+    end.
+
+  Definition monad_app_fst {A B C} (f : A -> m C) (p:A * B) : m (C * B)%type :=
+    let '(x,y) := p in
+    z <- f x ;;
+    ret (z,y).
+
+  Definition monad_app_snd {A B C} (f : B -> m C) (p:A * B) : m (A * C)%type :=
+    let '(x,y) := p in
+    z <- f y ;;
+    ret (x,z).
+
+  Definition map_monad {A B} (f:A -> m B) : list A -> m (list B) :=
+    fix loop l :=
+      match l with
+      | [] => ret []
+      | a::l' =>
+          b <- f a ;;
+          bs <- loop l' ;;
+          ret (b::bs)
+      end.
+
+  Definition map_monad_ {A B}
+    (f: A -> m B) (l: list A): m unit :=
+    map_monad f l;; ret tt.
+
+  Definition sequence {a} (ms : list (m a)) : m (list a)
+    := map_monad id ms.
+
+  Lemma sequence_cons :
+    forall {a} (ma : m a) (mas : list (m a)),
+      sequence (ma :: mas) =
+        a <- ma;;
+        rest <- sequence mas;;
+        ret (a :: rest).
+  Proof using.
+    intros a ma mas.
+    unfold sequence.
+    cbn.
+    unfold id.
+    reflexivity.
+  Qed.
+
+  Fixpoint foldM {a b} (f : b -> a -> m b ) (acc : b) (l : list a) : m b
+    := match l with
+       | [] => ret acc
+       | (x :: xs) =>
+           b <- f acc x;;
+           foldM f b xs
+       end.
+
+  Definition repeatM {A} (n : nat) (ma : m A) : m (list A)
+    := sequence (repeat ma n).
+
+  (* Helper for looping 2 argument evaluation over vectors, producing a vector *)
+
+  Definition vec_loop {A B C: Type}
+    (f : A -> B -> m C)
+    (elts : list (A * B)) : m (list C) :=
+    monad_fold_right (fun acc '(e1, e2) =>
+                        val <- f e1 e2 ;;
+                        ret (val :: acc)
+      ) elts [].
+
+End monad.
+Arguments monad_fold_right {_ _ _ _}.
+Arguments monad_app_fst {_ _ _ _ _}.
+Arguments monad_app_snd {_ _ _ _ _}.
+Arguments map_monad {_ _ _ _}.
+Arguments map_monad_ {_ _ _ _}.
+Arguments sequence {_ _ _}.
+Arguments foldM {_ _ _ _}.
+Arguments vec_loop {_ _ _ _ _}.
+Definition repeatMN {A m} `{Monad m} (n : N) (ma : m A) : m (list A)
+  := sequence (repeatN n ma).
+
+From ITree Require Import ITree Eq.
+From Paco Require Import paco.
+ 
+Section map_monad_itree.
+  (* map_monad *)
+ Lemma eqit_map_monad {E R1 R2 A1 A2 b1 b2}
+    (RR: R1 -> R2 -> Prop)
+    (f1 : A1 -> itree E R1) (f2 : A2 -> itree E R2)
+    (l1 : list A1) (l2 : list A2)
+    (HI : Forall2 (fun a1 a2 => eqit RR b1 b2 (f1 a1) (f2 a2)) l1 l2) :
+    eqit (Forall2 RR) b1 b2
+      (map_monad f1 l1)
+      (map_monad f2 l2).
+  Proof.
+    induction HI; cbn.
+    - now apply eqit_Ret.
+    - eapply eqit_bind'; [apply H; now left |].
+      intros r1 r2 HR.
+      eapply eqit_bind'; [apply IHHI; intros; apply HIN; now right|].
+      intros bs1 bs2 HBS.
+      apply eqit_Ret.
+      now constructor.
+  Qed.
+
+  (* map_monad *)
+  Lemma eqit_map_monad' {E R A b1 b2}
+    (f1 : A -> itree E R) (f2 : A -> itree E R)
+    (l1 : list A) (l2 : list A)
+    (HI : Forall2 (fun a1 a2 => eqit Logic.eq b1 b2 (f1 a1) (f2 a2)) l1 l2) :
+    eqit Logic.eq b1 b2
+      (map_monad f1 l1)
+      (map_monad f2 l2).
+  Proof.
+    eapply (eqit_mon _ _ b1 b2 b1 b2); auto; [apply Forall2_eq | apply eqit_map_monad; eauto].
+  Qed.
+
+End map_monad_itree.
