@@ -800,12 +800,12 @@ Section DValue.
        | FOne => andb (ordered32 x y) (Float32.cmp Cne x y)
        | FOrd => ordered32 x y
        | FUno => negb (ordered32 x y)
-       | FUeq => (Float32.cmp Ceq x y)
-       | FUgt => (Float32.cmp Cgt x y)
-       | FUge => (Float32.cmp Cge x y)
-       | FUlt => (Float32.cmp Clt x y)
-       | FUle => (Float32.cmp Cle x y)
-       | FUne => (Float32.cmp Cne x y)
+       | FUeq => orb (negb (ordered32 x y)) (Float32.cmp Ceq x y)
+       | FUgt => orb (negb (ordered32 x y)) (Float32.cmp Cgt x y)
+       | FUge => orb (negb (ordered32 x y)) (Float32.cmp Cge x y)
+       | FUlt => orb (negb (ordered32 x y)) (Float32.cmp Clt x y)
+       | FUle => orb (negb (ordered32 x y)) (Float32.cmp Cle x y)
+       | FUne => orb (negb (ordered32 x y)) (Float32.cmp Cne x y)
        | FTrue => true
        end
     then @DVALUE_I 1 Integers.one else @DVALUE_I 1 Integers.zero.
@@ -822,12 +822,12 @@ Section DValue.
        | FOne => andb (ordered64 x y) (Float.cmp Cne x y)
        | FOrd => ordered64 x y
        | FUno => negb (ordered64 x y)
-       | FUeq => (Float.cmp Ceq x y)
-       | FUgt => (Float.cmp Cgt x y)
-       | FUge => (Float.cmp Cge x y)
-       | FUlt => (Float.cmp Clt x y)
-       | FUle => (Float.cmp Cle x y)
-       | FUne => (Float.cmp Cne x y)
+       | FUeq => orb (negb (ordered64 x y)) (Float.cmp Ceq x y)
+       | FUgt => orb (negb (ordered64 x y)) (Float.cmp Cgt x y)
+       | FUge => orb (negb (ordered64 x y)) (Float.cmp Cge x y)
+       | FUlt => orb (negb (ordered64 x y)) (Float.cmp Clt x y)
+       | FUle => orb (negb (ordered64 x y)) (Float.cmp Cle x y)
+       | FUne => orb (negb (ordered64 x y)) (Float.cmp Cne x y)
        | FTrue => true
        end
     then @DVALUE_I 1 Integers.one else @DVALUE_I 1 Integers.zero.
