@@ -35,7 +35,7 @@ VFILES := $(shell find rocq -name "*.v")
 
 ######## targets not in this "KNOWNTARGETS" list will be forwarded to RocqMakefile via invoke-rocqmakefile
 ######## WARNING - every target of *this* Makefile must be listed here
-KNOWNTARGETS := RocqMakefile invoke-rocqmakefile rocq extracted $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/Extract.v $(VELLVM_EXE) vellvm vellvmbc test check perf clean extractedclean clean-rocqmakefile doc/rocq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-rocq opam print-opam print-includes qc-files
+KNOWNTARGETS := RocqMakefile invoke-rocqmakefile rocq extracted $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/Extract.v $(VELLVM_EXE) vellvm vellvmbc interp timing test check perf clean extractedclean clean-rocqmakefile doc/rocq2html documentation $(EXTRACTDIR)/FRONTEND_STAMP $(FRONTEND_EXE) frontend frontend_exe pin-rocq opam print-opam print-includes qc-files
 
 KNOWNFILES := Makefile _RocqProject
 
@@ -77,6 +77,26 @@ $(VELLVM_EXE): extracted ml/dune ml/extracted/dune ml/testing/dune
 vellvm: $(VELLVM_EXE)
 	cp $(VELLVM_EXE) vellvm
 	chmod u+w vellvm
+
+######## building only the executable interpreter
+# Only compiles the Rocq files the extraction depends on (the closure of
+# $(EXEC_VOFILES): Syntax/Semantics/Handlers) — in particular rocq/Theory
+# is never compiled, unlike the default target.
+.PHONY: interp
+interp:
+	$(MAKE) $(EXEC_VOFILES)
+	$(MAKE) vellvm
+
+######## timing the Rocq compilation
+# Compiles sequentially (-j1), printing each file's compilation time as it
+# goes, then a summary table sorted by duration. Only out-of-date files are
+# recompiled; `make clean-rocqmakefile` first to time the whole library.
+# NB: the summary table requires GNU time (`brew install gnu-time` on macOS);
+# without it you still get the per-file times, but "No timing data" at the end.
+.PHONY: timing
+timing: RocqMakefile
+	rm -f time-of-build.log
+	$(MAKE) -j1 --no-print-directory -f RocqMakefile pretty-timed
 
 ######## testing the Vellvm interpreter
 

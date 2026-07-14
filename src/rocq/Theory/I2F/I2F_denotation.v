@@ -1,20 +1,17 @@
 From Equations Require Import Equations.
 
-From Stdlib Require Import Lia.
+From Stdlib Require Import Lia Program.
 
 From ExtLib Require Import Structures.Monads.
 
-From ITree Require Import ITree Eq HeterogeneousRelations.
-
+From ITree Require Import
+  ITree Eq HeterogeneousRelations.
 From Vellvm Require Import
   Utils
   Syntax
+  Semantics
   VellvmIntegers
   Integers
-  DynamicValues
-  EOU
-  LLVMEvents
-  Semantics.Operations
   Interfaces.IPtr
   Interfaces.Params
   Implementations.Pointer
@@ -22,49 +19,46 @@ From Vellvm Require Import
   Implementations.IPtrInfinite
   Implementations.IPtrFinite
   Implementations.Memory
-  Implementations.ParamsV
-  Denotation.
+  Implementations.ParamsV.
 
 From Vellvm Require Import
-  Theory.rutt_cutoff
-  Theory.I2F.
+  Utils.rutt_cutoff
+  Theory.I2F.Refinement
+  Theory.I2F.I2F_exp.
 
 From Paco Require Import paco.
-  Ltac rstep :=
-    first [apply ruttc_trigger |
-            apply ruttc_trigger_cast |
-            apply ruttc_ret 
-      ].
 
-Tactic Notation "rbind" uconstr(x) := eapply ruttc_bind with (RR := x).
-Tactic Notation "erbind" := eapply ruttc_bind.
-
-From Stdlib Require Import
-  Program Setoid Morphisms List.
-
-#[global]Instance ruttc_eq_itree {E1 E2 R1 R2 Rcutr Rcutl REv RAns RR} :
-  Proper (eq_itree Logic.eq ==> eq_itree Logic.eq ==> flip impl) (@ruttc E1 E2 R1 R2 Rcutr Rcutl REv RAns RR).
-Proof.
-  intros ?? EQ1 ?? EQ2; rewrite EQ1,EQ2; intuition eauto with *.
-Qed.
-
-Ltac cbnn := cbn; unfold resum, ReSum_id, id_, Id_IFun.
 Ltac bind_exp := erbind; [apply I2F_denote_exp'| intros].
 
 (* Can we avoid these duplications? *)
+Lemma refine_dvalue_base_map' t1 t2 :
+  I2F_refine_CFG I2F_dvalue_base t1 t2 ->
+  I2F_refine_CFG I2F_dvalue (ITree.map DVALUE_Base t1) (ITree.map DVALUE_Base t2).
+Proof.
+  intros; erbind; eauto.
+Qed.
+Hint Resolve refine_dvalue_base_map' : core.
+Hint Unfold I2F_refine_CFG : core.
+
+Lemma I2F_freeze_base' a b :
+  I2F_dvalue_base a b ->
+  I2F_refine_CFG I2F_dvalue (freeze_base a) (freeze_base b).
+Proof.
+  intros HDV.
+  induction HDV; cbn; eauto 8.
+  rstep.
+Qed.
+
 Lemma I2F_freeze' a b :
   I2F_dvalue a b ->
   I2F_refine_CFG I2F_dvalue (freeze a) (freeze b).
-Proof with try now (rstep; cbnn; try (easy); eauto).
-  (* automation is different in this file from the expression one, to understand *)
+Proof.
   intros HDV.
-  induction HDV; cbn...
-  induction H; cbn...
-  all: try rstep; cbnn; repeat constructor; auto.
-  all: eapply ruttc_bind; [apply ruttc_map_monad_gen; eauto |]; intros...
-  all: try (rstep; repeat constructor); auto.
- Qed. 
-  
+  induction HDV; cbn.
+  apply I2F_freeze_base'; eauto.
+  all: erbind; [apply ruttc_map_monad_gen; eauto | eauto ].
+Qed. 
+ 
 Lemma I2F_refine_lift' {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
   I2F_EOU RR m1 m2 ->
   I2F_refine_CFG RR (EOU_to_itree m1) (EOU_to_itree m2).
@@ -156,18 +150,16 @@ Lemma I2F_denote_instr :
         intros.
         rewrite 2 Eqit.bind_bind.
         pose proof I2F_dvalue_base_int_unsigned H0 as EQ; rewrite EQ.
-        rbind I2F_dvalue; [rstep; cbnn; easy | intros]...
-        rbind (fun _ _ => True); [rstep; cbnn; repeat constructor; auto | intros]...
+        rbind I2F_dvalue; [rstep | intros]...
+        rbind (fun _ _ => True); [rstep | intros]...
       + cbn; rewrite 2 Eqit.bind_bind.
-        rbind I2F_dvalue; [rstep; [cbnn; constructor; intuition | cbnn; intros; simp I2FA_Memory in *; eauto] |].
-        intros.
-        rbind (fun _ _ => True); [rstep; cbnn; easy | intros]...
+        rbind I2F_dvalue; [rstep | intros].
+        rbind (fun _ _ => True); [rstep | intros]...
         
     - destruct x; cbn...
       destruct ptr.
       bind_exp.
-      erbind; [rstep; [cbnn; easy | cbnn; intros; simp I2FA_Memory in *; eauto] |].
-      intros.
+      erbind; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
       erbind; [apply I2F_freeze'; auto | intros]...
     - destruct val,ptr, x; cbn...
       bind_exp.
@@ -175,14 +167,14 @@ Lemma I2F_denote_instr :
       induction H0...
       induction H0...
       6: rbind (fun _ _ => False); [|intros _ _ []]...
-      all: rbind (fun _ _ => True); [rstep; cbnn; [constructor; intuition; repeat constructor; auto| cbn; auto] | intros [] [] _ ]; cbn...
+      all: rbind (fun _ _ => True); [rstep; cbnn; simp I2FE_Memory; eauto| intros]...
     - destruct x; cbn...
     - destruct x; cbn...
       unfold denote_cmpxchg.
       do 3 break_goal_fast.
       break_match_goal...
       do 3 bind_exp.
-      erbind; [rstep; [cbnn; easy | cbnn; intros; simp I2FA_Memory in *; eauto] |].
+      erbind; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto |]. 
       intros.
       erbind.
       apply I2F_refine_lift', I2F_eval_icmp; eauto.
@@ -191,18 +183,16 @@ Lemma I2F_denote_instr :
       induction H3...
       break_goal_fast...
       break_goal_fast...
-      rbind (fun _ _ => True); [rstep; [cbnn; easy | cbnn; intros; simp I2FA_Memory in *; eauto] |].
+      rbind (fun _ _ => True); [rstep; cbnn; intros; simp I2FA_Memory in *; eauto |].
       intros.
-      rstep; [cbnn; simp I2FE_Local; intuition | eauto].
-      repeat constructor; auto.
-      rstep; [cbnn; simp I2FE_Local; intuition | eauto].
-      repeat constructor; auto.
+      rstep; cbnn; simp I2FE_Local; intuition.
+      rstep; cbnn; simp I2FE_Local; intuition.
     - destruct x; cbn...
       unfold denote_atomicrmw.
       repeat break_goal_fast.
       bind_exp.
       bind_exp.
-      erbind; [rstep; [cbnn; easy | cbnn; intros; simp I2FA_Memory in *; eauto] | intros].
+      erbind; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
       unfold denote_atomic_rmw_operation.
       break_goal_fast...
       
@@ -235,14 +225,14 @@ Lemma I2F_denote_instr :
       all: rbind (fun _ _ => True); [rstep; cbnn; easy | intros]...
     - destruct x, va_list_and_arg_list; cbn.
       all: bind_exp.
-      all: rbind I2F_dvalue; [rstep; [cbnn; easy | cbnn; intros; simp I2FA_Memory in *; eauto] | intros].
-      all: rbind I2F_dvalue; [rstep; [cbnn; easy | cbnn; intros; simp I2FA_Memory in *; eauto] | intros].
+      all: rbind I2F_dvalue; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
+      all: rbind I2F_dvalue; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
       all: rewrite 2 Eqit.bind_ret_l.
       all: erbind; [apply I2F_refine_lift', I2F_eval_gep; eauto; repeat constructor | intros].
-      all: rbind (fun _ _ => True); [rstep; cbnn; easy | intros]...
+      all: rbind (fun _ _ => True); [rstep | intros]...
     - destruct x; cbn...
       rbind (option_rel I2F_dvalue); [|intros].
-      rstep; cbnn; [easy | intros; simp I2FA_Stack in *].
+      rstep; cbnn.
       induction H...
 Qed.
 
@@ -428,12 +418,6 @@ Proof with cbn; eauto using I2F_EOU_error, I2F_EOU_ret, I2F_EOU_oom, I2F_EOU_ub.
     destruct a1,a2; constructor.
     inv H0.
     constructor; cbn...
-Qed.
-
-Lemma Forall2_eq {A} (l1 l2 : list A) :
-  Forall2 Logic.eq l1 l2 -> l1 = l2.
-Proof.
-  intros * HR; induction HR; subst; cbn; auto.
 Qed.
 
 (** [dtyp_of_dvalue] computes in the parameter-free [EOU dtyp]: on
@@ -705,13 +689,10 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
       end.
     - (* external call *)
       unfold external_call.
-      rbind I2F_dvalue.
-      { rstep.
-        - cbnn; simp I2FE_ExternalCall; intuition.
-        - cbnn; intros; simp I2FA_ExternalCall in *; eauto. }
-      intros...
+      rbind I2F_dvalue; [rstep |intros]...
   }
   (* the four identity inclusions, and [sum_rel] from the [I2FA_Call]
      instance (they are convertible) *)
   all: auto.
 Qed.
+
