@@ -175,26 +175,23 @@ Section Denotation.
     | Some _ => raise_error "denote_exp given EXP_Splat with non-vector type"
     end.
 
-  Definition freeze_base {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dv : dvalue_base) : itree E dvalue_base :=
+  Definition freeze_base {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dv : dvalue_base) : itree E dvalue :=
     match dv with
-    | DVALUE_Poison dt =>
-        dv <- draw dt ;;
-        lift (dvalue_to_dvalue_base dv)
-    | _ => ret dv
+    | DVALUE_Poison dt => draw dt
+    | _ => DVALUE_Base <$> ret dv
     end.
     
   Fixpoint freeze {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dv : dvalue) : itree E dvalue :=
     match dv with
-    | DVALUE_Base (DVALUE_Poison dt) => draw dt
+    | DVALUE_Base v => freeze_base v
     | DVALUE_Struct p fields => 
         val <- map_monad freeze fields;;
         ret (DVALUE_Struct p val)
     | DVALUE_Array v τ elts => 
         val <- map_monad freeze elts;;
         ret (DVALUE_Array v τ val)
-    | _ => ret dv
     end.
-
+     
   Definition NONE := DVALUE_Base (DVALUE_None).
   
   Fixpoint denote_exp (top:option dtyp) (o:exp dtyp) {struct o} : MCFGtop dvalue :=
