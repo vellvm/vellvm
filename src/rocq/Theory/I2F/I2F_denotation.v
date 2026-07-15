@@ -242,7 +242,7 @@ Lemma I2F_denote_code :
     I2F_refine_CFG TT (@denote_code PInf c va1) (@denote_code PFin c va2).
 Proof.
   intros.
-  unfold denote_code, map_monad_.
+  unfold denote_code, loop_monad.
   induction c; cbn.
   - now rstep.
   - rbind TT; [apply I2F_denote_instr; auto | intros [] [] _].

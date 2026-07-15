@@ -63,7 +63,7 @@ Section MemoryModel.
     ptrs <- lift (get_consecutive_ptrs p (N.length bytes));;
     let ptr_bytes := zip ptrs bytes in
     (* Actually perform writes *)
-    map_monad_ (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
+    loop_monad (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
 
   Definition write_dvalue (dt : dtyp) (p : ptr) (v : dvalue) : memM unit :=
     write_bytes p (dvalue_to_memory_bytes v dt).

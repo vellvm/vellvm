@@ -733,7 +733,7 @@ Section Denotation.
 
   (* Denoting a list of instruction simply binds the trees together *)
   Definition denote_code (c: code dtyp) (varargs : option ptr) : CFGtop unit :=
-    map_monad_ (fun i => denote_instr i varargs) c.
+    loop_monad (fun i => denote_instr i varargs) c.
 
   Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : CFGtop (local_id * dvalue) :=
     let '(id, Phi dt args, md) := id_p in

@@ -131,7 +131,7 @@ Section withParams.
       gwrite (g_ident g) v.
 
   Definition allocate_globals (gs:list (global dtyp)) : MCFGtop unit :=
-    map_monad_ allocate_global gs.
+    loop_monad allocate_global gs.
 
   Definition i8 : dtyp := DTYPE_I 8%positive.
 
@@ -185,7 +185,7 @@ Section withParams.
     end.
 
   Definition allocate_declarations (ds:list (declaration dtyp)) : MCFGtop unit :=
-    map_monad_ allocate_declaration ds.
+    loop_monad allocate_declaration ds.
 
   (* We have to initialize the global definitions after allocating them because they
      might be mutually recursive.  It is possible to declare cyclic data structures
@@ -212,7 +212,7 @@ Section withParams.
     store dt a uv.
 
   Definition initialize_globals (gs:list (global dtyp)): MCFGtop unit :=
-    map_monad_ initialize_global gs.
+    loop_monad initialize_global gs.
 
   Definition build_global_environment (CFGtop : CFG.mcfg dtyp) : MCFGtop unit :=
     allocate_declarations ((m_declarations CFGtop) ++ (List.map (df_prototype) (m_definitions CFGtop)));;

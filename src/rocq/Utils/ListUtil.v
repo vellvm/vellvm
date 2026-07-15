@@ -567,7 +567,7 @@ Section monad.
      through all of them — O(n) per step, O(n²) for a straight-line block
      (see perf/locals-chain.ll). The direct sequencing fold keeps the
      pending-bind depth constant. *)
-  Definition map_monad_ {A B}
+  Definition loop_monad {A B}
     (f: A -> m B) (l: list A): m unit :=
     (fix loop l :=
        match l with
@@ -618,7 +618,7 @@ Arguments monad_fold_right {_ _ _ _}.
 Arguments monad_app_fst {_ _ _ _ _}.
 Arguments monad_app_snd {_ _ _ _ _}.
 Arguments map_monad {_ _ _ _}.
-Arguments map_monad_ {_ _ _ _}.
+Arguments loop_monad {_ _ _ _}.
 Arguments sequence {_ _ _}.
 Arguments foldM {_ _ _ _}.
 Arguments vec_loop {_ _ _ _ _}.
