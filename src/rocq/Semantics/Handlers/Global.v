@@ -4,8 +4,7 @@ From Stdlib Require Import
   String.
 
 From ExtLib Require Import
-  Structures.Maps
-  Data.Map.FMapAList.
+  Structures.Maps.
 
 From ITree Require Import
   ITree
@@ -31,7 +30,7 @@ Import ITree.Basics.Basics.Monads.
 
 Section Globals.
   Context {Pa : Params}.
-  Definition global_env := FMapAList.alist raw_id dvalue.
+  Definition global_env := rmap dvalue.
   #[local] Notation map := (global_env).
   
   Definition handle_global {E} `{FailureE -< E} : GlobalE ~> stateT map (itree E) :=

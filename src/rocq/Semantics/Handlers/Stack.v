@@ -27,7 +27,7 @@ Section StackMap.
   Context {Pa : Params}.
 
   Record stack_frame :=
-    { stack_vars : FMapAList.alist raw_id dvalue;
+    { stack_vars : local_env;
       stack_exc : option dvalue;
       stack_loc : option string;
     }.
