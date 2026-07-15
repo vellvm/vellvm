@@ -85,7 +85,7 @@ Section MemoryModel.
 
   (** Allocating dtyps *)
   Definition allocate_bytes (init_bytes : list memory_byte) (align : N) : memM ptr :=
-    pr <- fresh_prov;;
+    pr <- fresh_prov tt;;
     allocate_bytes_with_pr init_bytes align pr.
 
   Definition allocate_dtyp (dt : dtyp) (num_elements : N) (align : N) : memM ptr :=
@@ -126,7 +126,7 @@ Section MemoryModel.
   
   (** Malloc *)
   Definition malloc_bytes (init_bytes : list memory_byte) (align : N) : memM ptr :=
-    pr <- fresh_prov;;
+    pr <- fresh_prov tt;;
     malloc_bytes_with_pr init_bytes align pr.
 
   (** Handle memcpy *)
