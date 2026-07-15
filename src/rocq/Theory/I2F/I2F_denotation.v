@@ -243,13 +243,10 @@ Lemma I2F_denote_code :
 Proof.
   intros.
   unfold denote_code, map_monad_.
-  rbind TT; [| intros; now rstep].
   induction c; cbn.
   - now rstep.
   - rbind TT; [apply I2F_denote_instr; auto | intros [] [] _].
-    rbind TT.
     apply IHc.
-    intros; now rstep.
 Qed.
 
 Hint Constructors I2F_dvalue : core.

@@ -561,9 +561,19 @@ Section monad.
           ret (b::bs)
       end.
 
+  (* Not defined as [map_monad f l;; ret tt]: collecting the results makes
+     every element executed so far a pending bind continuation, so each
+     subsequent step of an itree-interpreted computation re-associates
+     through all of them — O(n) per step, O(n²) for a straight-line block
+     (see perf/locals-chain.ll). The direct sequencing fold keeps the
+     pending-bind depth constant. *)
   Definition map_monad_ {A B}
     (f: A -> m B) (l: list A): m unit :=
-    map_monad f l;; ret tt.
+    (fix loop l :=
+       match l with
+       | [] => ret tt
+       | a::l' => f a;; loop l'
+       end) l.
 
   Definition sequence {a} (ms : list (m a)) : m (list a)
     := map_monad id ms.
