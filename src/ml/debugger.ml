@@ -153,7 +153,7 @@ let rec read_command () =
 
 let print_stack_frame_vars (sf : Stack.stack_frame) =
   List.iter (fun (k, v) ->
-      Printf.printf "%s -> %s\n" (Camlcoq.camlstring_of_coqstring (ShowAST.show_raw_id k)) (string_of_dvalue v)) sf.stack_vars
+      Printf.printf "%s -> %s\n" (Camlcoq.camlstring_of_coqstring (ShowAST.show_raw_id k)) (string_of_dvalue v)) (RawIdMaps.RM.elements sf.stack_vars)
 
 let print_stack_vars (s : Stack.stack_frame list) =
   List.iteri (fun n (sf : Stack.stack_frame) ->
@@ -166,7 +166,7 @@ let print_stack_frames (s : Stack.stack_frame list) =
 
 let print_globals g =
   List.iter  (fun (k, v) ->
-      Printf.printf "%s -> %s\n" (Camlcoq.camlstring_of_coqstring (ShowAST.show_raw_id k)) (string_of_dvalue v)) g
+      Printf.printf "%s -> %s\n" (Camlcoq.camlstring_of_coqstring (ShowAST.show_raw_id k)) (string_of_dvalue v)) (RawIdMaps.RM.elements g)
 
 
 let help_msg : string =

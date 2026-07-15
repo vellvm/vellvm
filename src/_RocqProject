@@ -27,6 +27,7 @@
 
 ./rocq/Syntax/LLVMAst.v
 ./rocq/Syntax/AstLib.v
+./rocq/Syntax/RawIdMaps.v
 ./rocq/Syntax/CFG.v
 ./rocq/Syntax/DynamicTypes.v
 ./rocq/Syntax/Traversal.v

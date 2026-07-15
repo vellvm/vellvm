@@ -68,7 +68,7 @@ Extract Constant fast_mode_object => "
   ".
 
 Extract Constant locals_object => "
-  let locals_ref = ref [] in
+  let locals_ref = ref RawIdMaps.RM.empty in
   let locals_set ls = (locals_ref := ls; ()) in
   let locals_get = fun _ -> !locals_ref in
   fun _ -> { locals_set;
@@ -77,7 +77,7 @@ Extract Constant locals_object => "
   ".
 
 Extract Constant globals_object => "
-  let globals_ref = ref [] in
+  let globals_ref = ref RawIdMaps.RM.empty in
   let globals_set gs = (globals_ref := gs; ()) in
   let globals_get = fun _ -> !globals_ref in
   fun _ -> { globals_set;
@@ -86,7 +86,7 @@ Extract Constant globals_object => "
   ".
 
 Extract Constant local_stack_object => "
-  let local_stack_ref = ref [{ stack_vars = []; stack_exc = None; stack_loc = None }] in
+  let local_stack_ref = ref [{ stack_vars = RawIdMaps.RM.empty; stack_exc = None; stack_loc = None }] in
   let local_stack_set ls = (local_stack_ref := match !local_stack_ref with [] -> Stdlib.failwith ""Empty stack, can't set"" | _::xs -> ls :: xs) in
   let local_stack_get = fun _ -> !local_stack_ref in
   let local_stack_push ls = local_stack_ref := ls :: !local_stack_ref in

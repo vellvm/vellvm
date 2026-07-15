@@ -33,12 +33,14 @@ the expected result; update the `ASSERT EQ` accordingly).
 | `iptr-roundtrip.ll` | `ptrtoint`/`inttoptr` round trips and loads through recovered pointers: the ITOP/PTOI + provenance machinery. | loop bound |
 | `undef-pick.ll` | the uvalue side: values kept symbolic (`undef` + select), stored (symbolic byte serialization) and branched on (Pick/concretization). | loop bound |
 
-Reference timings (Apple Silicon, July 2026, commit at suite creation):
-loop-phi-arith 6.6 s · calls-fib 6.9 s · mem-scan 5.0 s · mem-aggregate
-3.1 s · alloca-churn 2.0 s · iptr-roundtrip 4.1 s · undef-pick 3.5 s ·
-locals-chain 9.6 s. wide-arith: 6.1 s on the dvalue-refactor branch
-(July 2026), which introduced width-indexed integers; it does not run
-on older interpreters that lack arbitrary-width support. These are for
+Reference timings (Apple Silicon, July 2026, after switching the
+local/global envs to AVL maps and fixing the quadratic pending-bind
+accumulation in `map_monad_`/`denote_code`):
+loop-phi-arith 5.6 s · calls-fib 6.2 s · mem-scan 4.3 s · mem-aggregate
+2.3 s · alloca-churn 1.8 s · iptr-roundtrip 3.1 s · undef-pick 2.8 s ·
+wide-arith 4.3 s · locals-chain 0.24 s. locals-chain now scales linearly
+and no longer runs for seconds at N=10000 — regenerate with a larger N
+(`gen-locals-chain.py`) if you need it above startup noise. These are for
 orientation only — always re-measure the baseline on your own machine
 before comparing.
 

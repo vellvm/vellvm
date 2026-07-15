@@ -4,8 +4,7 @@ From Stdlib Require Import
   Morphisms.
 
 From ExtLib Require Import
-  Structures.Maps
-  Data.Map.FMapAList.
+  Structures.Maps.
 
 From ITree Require Import
   ITree
@@ -30,7 +29,7 @@ Import ITree.Basics.Basics.Monads.
 
 Section Locals.
   Context {Pa : Params}.
-  Definition local_env := FMapAList.alist raw_id dvalue.
+  Definition local_env := rmap dvalue.
   #[local] Notation map := (local_env).
 
   Definition handle_local {E} `{FailureE -< E} : LocalE ~> stateT map (itree E) :=
