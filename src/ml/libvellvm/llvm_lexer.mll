@@ -353,6 +353,8 @@
   ("fptosi"         , KW_FPTOSI);
   ("inttoptr"       , KW_INTTOPTR);
   ("ptrtoint"       , KW_PTRTOINT);
+  ("ptrtoaddr"      , KW_PTRTOADDR);
+  ("addrspacecast"  , KW_ADDRSPACECAST);    
   ("bitcast"        , KW_BITCAST);
   ("select"         , KW_SELECT);
   ("freeze"         , KW_FREEZE);

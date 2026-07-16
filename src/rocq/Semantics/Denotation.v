@@ -300,7 +300,7 @@ Section Denotation.
 
     | OP_Conversion ct dt_from op dt_to =>
         v <- denote_exp (Some dt_from) op ;;
-        convert conv dt_from v dt_to
+        convert ct dt_from v dt_to
              
     | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
         vptr <- denote_exp (Some dt2) ptrval ;;

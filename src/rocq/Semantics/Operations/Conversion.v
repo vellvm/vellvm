@@ -45,22 +45,23 @@ Section Convert.
     | PtrConv_PtoI
     | PtrConv_Neither.
 
-    Definition get_conv_case_ptr conv (t1 : dtyp_base) (t2 : dtyp_base) : ptr_conv_cases
+    Definition assert_conv_case_ptr conv (t1 : dtyp_base) (t2 : dtyp_base) : EOU unit
       := match conv with
          | Inttoptr =>
            match t1, t2 with
-           | DTYPE_I 64, DTYPE_Pointer => PtrConv_ItoP
-           | DTYPE_Iptr, DTYPE_Pointer => PtrConv_ItoP
-           | _, _ => PtrConv_Neither
+           | DTYPE_I 64, DTYPE_Pointer => ret tt
+           | DTYPE_Iptr, DTYPE_Pointer => ret tt
+           | _, _ => raise_error "bad"
            end
          | Ptrtoint =>
            match t1, t2 with
-           | DTYPE_Pointer, DTYPE_I _ => PtrConv_PtoI
-           | DTYPE_Pointer, DTYPE_Iptr => PtrConv_PtoI
-           | _, _ => PtrConv_Neither
+           | DTYPE_Pointer, DTYPE_I _ => ret tt
+           | DTYPE_Pointer, DTYPE_Iptr => ret tt
+           | _, _ => raise_error "bad"
            end
-         | _ => PtrConv_Neither
+         | _ => raise_error "bad"
          end.
+
   End CONVERSIONS.
  *)
   
