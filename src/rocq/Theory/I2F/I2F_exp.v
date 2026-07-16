@@ -1105,7 +1105,9 @@ Proof.
   all: repeat (break_fast; cbn); eauto.
 Qed.
 
-(* OLD Version - needed for impure casts *)
+(* OLD Version - needed for impure casts: retaining here, but will be neede
+   in the handlder.
+ *)
 (*
   destruct (@get_conv_case PInf conv t_from v t_to),
     (@get_conv_case PFin conv t_from v' t_to);
