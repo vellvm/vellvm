@@ -527,39 +527,39 @@ Module VIR_Notations.
         wildcarded for [Fptrunc]/[Fpext] flag lists (which would
         otherwise multiply rules unbounded). *)
   Notation "'trunc' τfrom v 'to' τto" :=
-    (OP_Conversion (Trunc false false) τfrom v τto)
+    (OP_Conversion (CONV_Pure (Trunc false false)) τfrom v τto)
     (in custom vir_exp at level 20,
      τfrom custom vir_typ at level 99, v custom vir_exp at level 99,
      τto   custom vir_typ at level 99, only printing).
   Notation "'trunc' 'nuw' τfrom v 'to' τto" :=
-    (OP_Conversion (Trunc true false) τfrom v τto)
+    (OP_Conversion (CONV_Pure (Trunc true false)) τfrom v τto)
     (in custom vir_exp at level 20,
      τfrom custom vir_typ at level 99, v custom vir_exp at level 99,
      τto   custom vir_typ at level 99, only printing).
   Notation "'trunc' 'nsw' τfrom v 'to' τto" :=
-    (OP_Conversion (Trunc false true) τfrom v τto)
+    (OP_Conversion (CONV_Pure (Trunc false true)) τfrom v τto)
     (in custom vir_exp at level 20,
      τfrom custom vir_typ at level 99, v custom vir_exp at level 99,
      τto   custom vir_typ at level 99, only printing).
   Notation "'trunc' 'nuw' 'nsw' τfrom v 'to' τto" :=
-    (OP_Conversion (Trunc true true) τfrom v τto)
+    (OP_Conversion (CONV_Pure (Trunc true true)) τfrom v τto)
     (in custom vir_exp at level 20,
      τfrom custom vir_typ at level 99, v custom vir_exp at level 99,
      τto   custom vir_typ at level 99, only printing).
 
   Notation "'zext' τfrom v 'to' τto" :=
-    (OP_Conversion (Zext false) τfrom v τto)
+    (OP_Conversion (CONV_Pure (Zext false)) τfrom v τto)
     (in custom vir_exp at level 20,
      τfrom custom vir_typ at level 99, v custom vir_exp at level 99,
      τto   custom vir_typ at level 99, only printing).
   Notation "'zext' 'nneg' τfrom v 'to' τto" :=
-    (OP_Conversion (Zext true) τfrom v τto)
+    (OP_Conversion (CONV_Pure (Zext true)) τfrom v τto)
     (in custom vir_exp at level 20,
      τfrom custom vir_typ at level 99, v custom vir_exp at level 99,
      τto   custom vir_typ at level 99, only printing).
 
   Notation "'sext' τfrom v 'to' τto" :=
-    (OP_Conversion Sext τfrom v τto)
+    (OP_Conversion (CONV_Pure Sext) τfrom v τto)
     (in custom vir_exp at level 20,
      τfrom custom vir_typ at level 99, v custom vir_exp at level 99,
      τto   custom vir_typ at level 99, only printing).
@@ -571,58 +571,61 @@ Module VIR_Notations.
       and Rocq emits a parse-conflict warning even for [only printing]
       notations. *)
   Notation "'fptrunc' τfrom v 'to' τto" :=
-    (OP_Conversion (Fptrunc []) τfrom v τto)
+    (OP_Conversion (CONV_Pure (Fptrunc [])) τfrom v τto)
     (in custom vir_exp at level 20,
      τfrom custom vir_typ at level 99, v custom vir_exp at level 99,
      τto   custom vir_typ at level 99, only printing).
   Notation "'fptrunc' '[' fmf ']' τfrom v 'to' τto" :=
-    (OP_Conversion (Fptrunc fmf) τfrom v τto)
+    (OP_Conversion (CONV_Pure (Fptrunc fmf)) τfrom v τto)
     (in custom vir_exp at level 20,
      fmf custom vir_fmf at level 99,
      τfrom custom vir_typ at level 99, v custom vir_exp at level 99,
      τto   custom vir_typ at level 99, only printing).
   Notation "'fpext' τfrom v 'to' τto" :=
-    (OP_Conversion (Fpext []) τfrom v τto)
+    (OP_Conversion (CONV_Pure (Fpext [])) τfrom v τto)
     (in custom vir_exp at level 20,
      τfrom custom vir_typ at level 99, v custom vir_exp at level 99,
      τto   custom vir_typ at level 99, only printing).
   Notation "'fpext' '[' fmf ']' τfrom v 'to' τto" :=
-    (OP_Conversion (Fpext fmf) τfrom v τto)
+    (OP_Conversion (CONV_Pure (Fpext fmf)) τfrom v τto)
     (in custom vir_exp at level 20,
      fmf custom vir_fmf at level 99,
      τfrom custom vir_typ at level 99, v custom vir_exp at level 99,
      τto   custom vir_typ at level 99, only printing).
 
   Notation "'uitofp' τfrom v 'to' τto" :=
-    (OP_Conversion (Uitofp false) τfrom v τto)
+    (OP_Conversion (CONV_Pure (Uitofp false)) τfrom v τto)
     (in custom vir_exp at level 20,
      τfrom custom vir_typ at level 99, v custom vir_exp at level 99,
      τto   custom vir_typ at level 99, only printing).
   Notation "'uitofp' 'nneg' τfrom v 'to' τto" :=
-    (OP_Conversion (Uitofp true) τfrom v τto)
+    (OP_Conversion (CONV_Pure (Uitofp true)) τfrom v τto)
     (in custom vir_exp at level 20,
      τfrom custom vir_typ at level 99, v custom vir_exp at level 99,
      τto   custom vir_typ at level 99, only printing).
 
-  Notation "'sitofp'    τfrom v 'to' τto" := (OP_Conversion Sitofp        τfrom v τto)
+  Notation "'sitofp'    τfrom v 'to' τto" := (OP_Conversion (CONV_Pure Sitofp)        τfrom v τto)
     (in custom vir_exp at level 20, τfrom custom vir_typ at level 99,
      v custom vir_exp at level 99, τto custom vir_typ at level 99, only printing).
-  Notation "'fptoui'    τfrom v 'to' τto" := (OP_Conversion Fptoui        τfrom v τto)
+  Notation "'fptoui'    τfrom v 'to' τto" := (OP_Conversion (CONV_Pure Fptoui)        τfrom v τto)
     (in custom vir_exp at level 20, τfrom custom vir_typ at level 99,
      v custom vir_exp at level 99, τto custom vir_typ at level 99, only printing).
-  Notation "'fptosi'    τfrom v 'to' τto" := (OP_Conversion Fptosi        τfrom v τto)
+  Notation "'fptosi'    τfrom v 'to' τto" := (OP_Conversion (CONV_Pure Fptosi)        τfrom v τto)
     (in custom vir_exp at level 20, τfrom custom vir_typ at level 99,
      v custom vir_exp at level 99, τto custom vir_typ at level 99, only printing).
-  Notation "'inttoptr'  τfrom v 'to' τto" := (OP_Conversion Inttoptr      τfrom v τto)
+  Notation "'inttoptr'  τfrom v 'to' τto" := (OP_Conversion (CONV_Impure Inttoptr)      τfrom v τto)
     (in custom vir_exp at level 20, τfrom custom vir_typ at level 99,
      v custom vir_exp at level 99, τto custom vir_typ at level 99, only printing).
-  Notation "'ptrtoint'  τfrom v 'to' τto" := (OP_Conversion Ptrtoint      τfrom v τto)
+  Notation "'ptrtoint'  τfrom v 'to' τto" := (OP_Conversion (CONV_Impure Ptrtoint)      τfrom v τto)
     (in custom vir_exp at level 20, τfrom custom vir_typ at level 99,
      v custom vir_exp at level 99, τto custom vir_typ at level 99, only printing).
-  Notation "'bitcast'   τfrom v 'to' τto" := (OP_Conversion Bitcast       τfrom v τto)
+  Notation "'ptrtoaddr'  τfrom v 'to' τto" := (OP_Conversion (CONV_Impure Ptrtoaddr)      τfrom v τto)
     (in custom vir_exp at level 20, τfrom custom vir_typ at level 99,
      v custom vir_exp at level 99, τto custom vir_typ at level 99, only printing).
-  Notation "'addrspacecast' τfrom v 'to' τto" := (OP_Conversion Addrspacecast τfrom v τto)
+  Notation "'bitcast'   τfrom v 'to' τto" := (OP_Conversion CONV_Bitcast       τfrom v τto)
+    (in custom vir_exp at level 20, τfrom custom vir_typ at level 99,
+     v custom vir_exp at level 99, τto custom vir_typ at level 99, only printing).
+  Notation "'addrspacecast' τfrom v 'to' τto" := (OP_Conversion (CONV_Impure Addrspacecast) τfrom v τto)
     (in custom vir_exp at level 20, τfrom custom vir_typ at level 99,
      v custom vir_exp at level 99, τto custom vir_typ at level 99, only printing).
 

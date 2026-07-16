@@ -298,10 +298,10 @@ Section Denotation.
         v2 <- denote_exp (Some dt) op2 ;;
         lift (eval_fcmp fcmp v1 v2)
 
-    | OP_Conversion conv dt_from op dt_to =>
+    | OP_Conversion ct dt_from op dt_to =>
         v <- denote_exp (Some dt_from) op ;;
-        lift (convert conv dt_from v dt_to)
-
+        convert conv dt_from v dt_to
+             
     | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
         vptr <- denote_exp (Some dt2) ptrval ;;
         vs <- map_monad (fun '(dt, index) => denote_exp (Some dt) index) idxs ;;

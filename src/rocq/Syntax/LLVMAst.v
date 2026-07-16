@@ -357,15 +357,30 @@ Variant fbinop : Set :=
 Variant fast_math : Set :=
   Nnan | Ninf | Nsz | Arcp | Contract | Afn | Reassoc | Fast.
 
-Variant conversion_type : Set :=
-  | Trunc (nuw:bool) (nsw:bool)
-  | Zext (nneg:bool)
-  | Sext
-  | Fptrunc (flags:list fast_math)
-  | Fpext (flags:list fast_math)
-  | Uitofp (nneg:bool)
-  | Sitofp | Fptoui | Fptosi | Inttoptr | Ptrtoint | Bitcast | Addrspacecast.
+(* Pure conversions - cannot interact with the memory model. *)
+Variant pure_conversion : Set :=
+| Trunc (nuw:bool) (nsw:bool)
+| Zext (nneg:bool)
+| Sext
+| Fptrunc (flags:list fast_math)
+| Fpext (flags:list fast_math)
+| Uitofp (nneg:bool)
+| Sitofp | Fptoui | Fptosi 
+.
 
+(* Impure conversions - might interact with the memory model.
+   NB: Addrspacecast might be "pure" but I included it here
+   since it *might* interact with the memory model.
+ *)
+Variant impure_conversion : Set :=
+  | Inttoptr | Ptrtoint | Ptrtoaddr | Addrspacecast.
+
+Variant conversion_type : Set :=
+  | CONV_Bitcast    (* kept separate because it does not work on vectors *)
+  | CONV_Pure (c : pure_conversion)
+  | CONV_Impure (c : impure_conversion)
+.
+                
 Section TypedSyntax.
 
   Context {T:Set}.

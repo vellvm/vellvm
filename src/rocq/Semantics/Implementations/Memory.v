@@ -28,8 +28,8 @@ Import Monad.
 Import EitherMonad.
 
 From Vellvm.Semantics Require Import
-  DynamicValues
   EOU
+  DynamicValues
   VellvmIntegers
   Params
   LLVMEvents
@@ -95,6 +95,76 @@ Section MemoryModel.
          let bytes := List.concat element_bytes in
          allocate_bytes bytes align.
 
+
+  Definition assert_inttoptr_types_ok (t_from : dtyp_base) (t_to : dtyp_base) : memM unit :=
+    match t_from, t_to with
+    | DTYPE_I 64, DTYPE_Pointer => ret tt
+    | DTYPE_Iptr, DTYPE_Pointer => ret tt
+    | _, _ => mub "inttoptr: illegal type cast"
+    end.
+
+  Definition assert_ptrtoint_types_ok (t_from : dtyp_base) (t_to : dtyp_base) : memM unit :=
+    match t1, t2 with
+    | DTYPE_Pointer, DTYPE_I _ => ret tt
+    | DTYPE_Pointer, DTYPE_Iptr => ret tt
+    | _, _ => mub "ptrtoint: illegal type cast"
+    end
+
+  
+  
+  Definition convert_impure (conv : impure_conversion) (t_from : dtyp_base) (dv : dvalue_base) (t_to : dtyp_base) : memM dvalue_base :=
+    match conv with
+    | Inttoptr =>
+        assert_inttoptr_types_ok t_from t_to ;;
+        lift (DVALUE_Pointer <$> (int_to_ptr (dvalue_base_int_unsigned dv) wildcard_prov))
+
+    | Ptrtoint | Ptrtoaddr => merr "todo"
+    (* In this memory model there is no difference because we don't (yet) "leak" any state by these casts *)                      
+                   
+    | _ => merr "todo" 
+    end.
+(*  
+  Definition convert_base (conv : conversion_type) (t_from : dtyp_base) (dv : dvalue_base) (t_to : dtyp_base) : EOU dvalue_base :=
+    match get_conv_case conv t_from dv t_to with
+    | Conv_PtoI x =>
+        match x, t_to with
+        | DVALUE_Pointer ptr, DTYPE_I sz => coerce_integer_to_int (Some sz) (ptr_to_int ptr)
+        | DVALUE_Pointer ptr, DTYPE_Iptr => coerce_integer_to_int None (ptr_to_int ptr)
+        | _, _ => raise_error "Invalid PTOI conversion"
+        end
+    | Conv_ItoP x =>
+        DVALUE_Pointer <$> int_to_ptr (dvalue_base_int_unsigned x) wildcard_prov
+    | Conv_Pure x => ret x
+    | Conv_Oom s => raise_oom s
+    | Conv_Illegal s => raise_error s
+    end.
+*)
+  
+  
+  Definition convert_impure (conv : impure_conversion) (t_from : dtyp) (dv : dvalue) (t_to : dtyp) : memM dvalue :=
+    match dv with
+    | (DVALUE_Base dv) =>
+        match get_base_conversion_type t_from t_to with
+        | Some (t_from', t_to') =>
+            DVALUE_Base <$> (convert_impure_base conv t_from' dv t_to')
+        | None =>
+            raise_error "convert_impure: type mismatch"
+        end
+          
+    | (DVALUE_Array true (DTYPE_Array true sz t) elts1) =>
+        match get_vector_conversion_type t_from t_to with
+        | Some (t_from', t_to') =>
+              elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
+              val <- map_monad (fun v => convert_impure_base conv t_from' v t_to') elts1' ;;
+              ret (DVALUE_Array true (DTYPE_Array true sz t_to') (List.map DVALUE_Base val))
+
+        | None =>
+            raise_error "convert_impure: type or vector size mismatch"
+        end
+    | _ => raise_error "convert_impure: invalid input dvalue"
+    end.
+
+  
   Definition handle_memoryM : MemoryE ~> memM :=
     fun T m =>
       match m with
@@ -120,6 +190,8 @@ Section MemoryModel.
               write_dvalue t a v
           | _ => mub "Writing something to somewhere that isn't an address."
           end
+      | Convert ct t_from v t_to =>
+          convert_impure ct t_from v t_to
       end.
 
   (** ** Memory-sensitive intrinsics *)
