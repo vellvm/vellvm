@@ -39,11 +39,19 @@ Import Logic.
 Open Scope Z.
 
 (* Memory choices *)
-Variant memC {P} : Type -> Type :=
-| Cnext_key (size:N) (align:N) : memC Z
-| Cfresh_prov : memC P
-| Cexposed_prov : memC (option P)
-.                         
+Variant memC : Type :=
+| Cnext_key (size:N) (align:N) : memC 
+| Cfresh_prov : memC 
+| Cexposed_prov : memC
+.
+
+Definition memCType {P:Type} : memC -> Type :=
+  fun mc => 
+  match mc with
+  | Cnext_key size align => Z
+  | Cfresh_prov => P
+  | Cexposed_prov => (option P) 
+  end.
 
 Inductive memS {S A P : Type} (X : Type) : Type :=
 | Mret (x : X) : memS X
@@ -52,7 +60,8 @@ Inductive memS {S A P : Type} (X : Type) : Type :=
 | Merr (s : string) : memS X
 | Mget (k : S -> memS X) : memS X
 | Mput (σ : S) (k : memS X) : memS X
-| Mchoose {R} (c:@memC P R) (k : R -> memS X) : memS X
+| Mchoose (c:@memC) (k : (@memCType P c) -> memS X) : memS X
+(* | Massert (c : S -> A -> P -> Prop) : memS unit ????? *) 
 .
 
 Arguments memS : clear implicits.
@@ -64,13 +73,13 @@ Arguments Mput {S A P} [X].
 Arguments Mchoose {S A P} [X].
 
 Definition Mnext_key {S A P} X (size:N) (align:N) (k : Z -> @memS S A P X) : @memS S A P X :=
-  Mchoose _ (Cnext_key size align) k.
+  Mchoose (Cnext_key size align) k.
 
 Definition Mfresh_prov {S A P} X (k : P -> @memS S A P X) : @memS S A P X :=
-  Mchoose _ Cfresh_prov k.
+  Mchoose Cfresh_prov k.
 
 Definition Mexposed_prov {S A P} X (k : (option P) -> @memS S A P X) : @memS S A P X :=
-  Mchoose _ Cexposed_prov k.
+  Mchoose Cexposed_prov k.
 
 Arguments Mnext_key {S A P} [X].
 Arguments Mfresh_prov {S A P} [X].
