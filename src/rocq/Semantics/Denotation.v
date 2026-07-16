@@ -775,11 +775,15 @@ Section Denotation.
      If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
    *)
 
-  Definition denote_ocfg (bks: ocfg dtyp) (varargs : option ptr)
+  (* Jumps look the target block up in a prebuilt AVL map (cf. [ocfg_map],
+     [ScopeTheory.ocfg_map_find_block]) rather than scanning the block list
+     with [find_block]. The map is passed in so [denote_function] can build
+     it once per function definition rather than once per call. *)
+  Definition denote_ocfg_map (bmap : rmap (block dtyp)) (varargs : option ptr)
     : (block_id * block_id) -> CFGtop ((block_id * block_id) + dvalue) :=
     ITree.iter
       (fun '((bid_from,bid_src) : block_id * block_id) =>
-         match find_block bks bid_src with
+         match RM.find bid_src bmap with
          | None => ret (inr (inl (bid_from,bid_src)))
          | Some block_src =>
              bd <- denote_block block_src bid_from varargs;;
@@ -789,12 +793,20 @@ Section Denotation.
              end
          end).
 
-  Definition denote_cfg (f: cfg dtyp) (varargs : option ptr) : CFGtop dvalue :=
-    r <- denote_ocfg (blks f) varargs (init f,init f) ;;
+  Definition denote_ocfg (bks: ocfg dtyp)
+    : option ptr -> (block_id * block_id) -> CFGtop ((block_id * block_id) + dvalue) :=
+    denote_ocfg_map (ocfg_map bks).
+
+  Definition denote_cfg_map (bmap : rmap (block dtyp)) (f: cfg dtyp) (varargs : option ptr)
+    : CFGtop dvalue :=
+    r <- denote_ocfg_map bmap varargs (init f,init f) ;;
     match r with
     | inl bid => raise ("Can't find block in denote_cfg " ++ show (snd bid))
     | inr uv  => ret uv
     end.
+
+  Definition denote_cfg (f: cfg dtyp) (varargs : option ptr) : CFGtop dvalue :=
+    denote_cfg_map (ocfg_map (blks f)) f varargs.
 
   (** ** Catching a frame-local unwind
       [run_exc t] runs [t]; if it raises an [LLVMExc] (the abortive [LLVMExcE]
@@ -870,12 +882,15 @@ Section Denotation.
     end.
 
   Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
+    (* Built outside the closure: one block map per definition (see
+       [TopLevel] building [fundefs]), shared by every call to it. *)
+    let bmap := ocfg_map (blks (df_instrs df)) in
     fun (args : list dvalue) =>
       varg <- push_call_frame df args;;
       (* Catch a frame-local unwind so the result surfaces as [exc + dvalue].
          [pop_call_frame] runs on both the normal and the unwinding path, so the
          frame is always torn down before the (value-carried) unwind continues. *)
-      rv <- run_exc (denote_cfg (df_instrs df) (Some varg));;
+      rv <- run_exc (denote_cfg_map bmap (df_instrs df) (Some varg));;
       pop_call_frame;;
       ret rv.
 
