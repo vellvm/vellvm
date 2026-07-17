@@ -361,6 +361,8 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_FPTOSI
 %token KW_INTTOPTR
 %token KW_PTRTOINT
+%token KW_PTRTOADDR
+%token KW_ADDRSPACECAST
 %token KW_BITCAST
 %token KW_SELECT
 %token KW_FREEZE
@@ -1398,11 +1400,11 @@ fcmp:
   | KW_TRUE  { FTrue  }
 
 
-conversion:
-  | KW_TRUNC                 { Trunc(false, false)   }
+conversion_pure:
+  | KW_TRUNC                 { Trunc(false, false)  }
   | KW_TRUNC KW_NSW          { Trunc(false, true)   }
   | KW_TRUNC KW_NUW          { Trunc(true, false)   }
-  | KW_TRUNC KW_NUW KW_NSW   { Trunc(true, true)   }
+  | KW_TRUNC KW_NUW KW_NSW   { Trunc(true, true)    }
   | KW_ZEXT n=KW_NNEG?       { Zext(match n with None -> false | Some _ -> true) }
   | KW_SEXT                  { Sext     }
   | KW_FPTRUNC f=fast_math*  { Fptrunc f }
@@ -1411,9 +1413,17 @@ conversion:
   | KW_SITOFP                { Sitofp   }
   | KW_FPTOUI                { Fptoui   }
   | KW_FPTOSI                { Fptosi   }
-  | KW_INTTOPTR              { Inttoptr }
-  | KW_PTRTOINT              { Ptrtoint }
-  | KW_BITCAST               { Bitcast  }
+
+conversion_impure:
+  | KW_INTTOPTR              { Inttoptr      }
+  | KW_PTRTOINT              { Ptrtoint      }
+  | KW_PTRTOADDR             { Ptrtoaddr     }
+  | KW_ADDRSPACECAST         { Addrspacecast }
+
+conversion:
+  | KW_BITCAST               { CONV_Bitcast  }
+  | c=conversion_pure        { CONV_Pure c   }
+  | c=conversion_impure      { CONV_Impure c } 
 
 ibinop:
   | op=ibinop_nuw_nsw_opt   { op false false }

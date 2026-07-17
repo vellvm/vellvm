@@ -84,20 +84,19 @@ Section withParams.
   Variant MemoryE : Type -> Type :=
     | MemPush : MemoryE unit
     | MemPop  : MemoryE unit
-    | Alloca  (t : dtyp) (num_elements : N) (align : option N) :
-      MemoryE dvalue
-    (* Load address should also be unique *)
-    | Load   (t : dtyp) (a : dvalue) :
-      MemoryE dvalue
-    (* Store address should be unique... *)
-    | Store (t : dtyp) (a : dvalue) (v : dvalue) :
-      MemoryE unit.
+    | Alloca  (t : dtyp) (num_elements : N) (align : option N) :  MemoryE dvalue
+    | Load   (t : dtyp) (a : dvalue) : MemoryE dvalue
+    | Store (t : dtyp) (a : dvalue) (v : dvalue) : MemoryE unit
+    | Conv (cv : impure_conversion) (t_from : dtyp) (v : dvalue) (t_to : dtyp) : MemoryE dvalue
+  .
+  
   Definition mem_push {E} `{MemoryE -< E}                      : itree E _ := trigger MemPush.
   Definition mem_pop  {E} `{MemoryE -< E}                      : itree E _ := trigger MemPop.
   Definition alloca   {E} `{MemoryE -< E} t num_elements align : itree E _ := trigger (Alloca t num_elements align).
   Definition load     {E} `{MemoryE -< E} t a                  : itree E _ := trigger (Load t a).
   Definition store    {E} `{MemoryE -< E} t a v                : itree E _ := trigger (Store t a v).
-
+  Definition conv  {E} `{MemoryE -< E} cv t_from v t_to     : itree E _ := trigger (Conv cv t_from v t_to).
+  
   (* An event resolving the non-determinism induced by undef. The argument _P_
    is intended to be a predicate over the set of dvalues _u_ can take such that
    if it is not satisfied, the only possible execution is to raise _UB_. *)

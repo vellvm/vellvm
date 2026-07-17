@@ -578,22 +578,38 @@ Section ShowInstances.
   #[global] Instance showFastMath : Show fast_math
     := {| show := show_fast_math |}.
 
-  (*These are Constant Expressions*)
+  Definition show_pure_conversion (ct : pure_conversion) : string :=
+    match ct with
+    | Trunc nuw nsw => show_op_nuw_nsw "trunc" nuw nsw
+    | Zext nneg => "zext" ++ (if nneg then " nneg" else "")
+    | Sext => "sext"
+    | Fptrunc flags => "fptrunc" ++ concatStr (List.map (fun f => " " ++ (show_fast_math f)) flags)
+    | Fpext flags => "fpext" ++ concatStr (List.map (fun f => " " ++ (show_fast_math f)) flags)
+    | Uitofp nneg => "uitofp" ++ (if nneg then " nneg" else "")
+    | Sitofp => "sitofp"
+    | Fptoui => "fptoui"
+    | Fptosi => "fptosi"
+    end.      
+
+  #[global] Instance ShowPureConversion : Show pure_conversion :=
+    {| show := show_pure_conversion |}.
+  
+  Definition show_impure_conversion (ct : impure_conversion) : string :=
+    match ct with
+    | Inttoptr => "inttoptr"
+    | Ptrtoint => "ptrtoint"
+    | Ptrtoaddr => "ptrtoaddr"                   
+    | Addrspacecast => "addrspacecast"
+    end.
+
+  #[global] Instance ShowImpureConversion : Show impure_conversion :=
+    {| show := show_impure_conversion |}.
+
   Definition show_conversion_type (ct : conversion_type) : string
     := match ct with
-       | Trunc nuw nsw => show_op_nuw_nsw "trunc" nuw nsw
-       | Zext nneg => "zext" ++ (if nneg then " nneg" else "")
-       | Sext => "sext"
-       | Fptrunc flags => "fptrunc" ++ concatStr (List.map (fun f => " " ++ (show_fast_math f)) flags)
-       | Fpext flags => "fpext" ++ concatStr (List.map (fun f => " " ++ (show_fast_math f)) flags)
-       | Uitofp nneg => "uitofp" ++ (if nneg then " nneg" else "")
-       | Sitofp => "sitofp"
-       | Fptoui => "fptoui"
-       | Fptosi => "fptosi"
-       | Inttoptr => "inttoptr"
-       | Ptrtoint => "ptrtoint"
-       | Bitcast => "bitcast"
-       | Addrspacecast => "addrspacecast"
+       | CONV_Bitcast => "bitcast"
+       | CONV_Pure ct => show ct
+       | CONV_Impure ct => show ct
        end.
 
   #[global] Instance ShowConversionType : Show conversion_type

@@ -28,8 +28,8 @@ Import Monad.
 Import EitherMonad.
 
 From Vellvm.Semantics Require Import
-  DynamicValues
   EOU
+  DynamicValues
   VellvmIntegers
   Params
   LLVMEvents
@@ -100,6 +100,55 @@ Section MemoryModel.
          let bytes := List.concat element_bytes in
          allocate_bytes bytes align.
 
+
+  Definition assert_inttoptr_types_ok (t_from : dtyp_base) (t_to : dtyp_base) : memM unit :=
+    match t_from, t_to with
+    | DTYPE_I _, DTYPE_Pointer => ret tt
+    | DTYPE_Iptr, DTYPE_Pointer => ret tt
+    | _, _ => mub "inttoptr: illegal type cast"
+    end.
+  
+  Definition convert_impure_base (conv : impure_conversion) (t_from : dtyp_base) (dv : dvalue_base) (t_to : dtyp_base) : memM dvalue_base :=
+    match conv with
+    | Inttoptr =>
+        assert_inttoptr_types_ok t_from t_to ;;
+        lift (DVALUE_Pointer <$> (int_to_ptr (dvalue_base_int_unsigned dv) wildcard_prov))
+                         
+    | Ptrtoint | Ptrtoaddr =>
+    (* In this memory model there is no difference because we don't (yet) "leak" any state by these casts *)                      
+       match dv, t_to with
+        | DVALUE_Pointer ptr, DTYPE_I sz => lift (coerce_integer_to_int (Some sz) (ptr_to_int ptr))
+        | DVALUE_Pointer ptr, DTYPE_Iptr => lift (coerce_integer_to_int None (ptr_to_int ptr))
+        | _, _ => mub "Invalid PTOI conversion"
+       end
+
+    | Addrspacecast => merr "convert_impure: addrspacecast unimplemented" 
+    end.
+
+  
+  Definition convert_impure (conv : impure_conversion) (t_from : dtyp) (dv : dvalue) (t_to : dtyp) : memM dvalue :=
+    match dv with
+    | (DVALUE_Base dv) =>
+        match get_base_conversion_type t_from t_to with
+        | Some (t_from', t_to') =>
+            DVALUE_Base <$> (convert_impure_base conv t_from' dv t_to')
+        | None =>
+            merr "convert_impure: type mismatch"
+        end
+          
+    | (DVALUE_Array true (DTYPE_Array true sz t) elts1) =>
+        match get_vector_conversion_type t_from t_to with
+        | Some (t_from', t_to') =>
+              elts1' <- lift (map_monad dvalue_to_dvalue_base elts1) ;;
+              val <- map_monad (fun v => convert_impure_base conv t_from' v t_to') elts1' ;;
+              ret (DVALUE_Array true (DTYPE_Array true sz t_to') (List.map DVALUE_Base val))
+
+        | None =>
+            merr "convert_impure: type or vector size mismatch"
+        end
+    | _ => merr "convert_impure: invalid input dvalue"
+    end.
+  
   Definition handle_memoryM : MemoryE ~> memM :=
     fun T m =>
       match m with
@@ -125,6 +174,8 @@ Section MemoryModel.
               write_dvalue t a v
           | _ => mub "Writing something to somewhere that isn't an address."
           end
+      | Conv ct t_from v t_to =>
+          convert_impure ct t_from v t_to
       end.
 
   (** ** Memory-sensitive intrinsics *)

@@ -237,8 +237,8 @@ Section ReprInstances.
       "(" ++ fa a ++ ", " ++ fb b ++ ")"
     end.
 
-  Definition repr_conversion_type (c:conversion_type) : string :=
-    match c with
+  Definition repr_pure_conversion (ct : pure_conversion) : string :=
+    match ct with
     | Trunc a b => "(Trunc " ++ repr a ++ " " ++ repr b ++ ")"
     | Zext a => "(Zext " ++ repr a ++ ")"
     | Sext => "Sext"
@@ -248,10 +248,27 @@ Section ReprInstances.
     | Sitofp => "Sitofp"
     | Fptoui => "Fptoui"
     | Fptosi => "Fptosi"
+    end.
+
+  #[global] Instance ReprPureConversion : Repr pure_conversion :=
+    {| repr := repr_pure_conversion |}.
+  
+  Definition repr_impure_conversion (ct : impure_conversion) : string :=
+    match ct with
     | Inttoptr  => "Inttoptr "
     | Ptrtoint => "Ptrtoint"
-    | Bitcast => "Bitcast"
+    | Ptrtoaddr => "Ptrtoaddr"
     | Addrspacecast => "Addrspacecast"
+    end.
+
+  #[global] Instance ReprImpureConversion : Repr impure_conversion :=
+    {| repr := repr_impure_conversion |}.
+  
+  Definition repr_conversion_type (ct:conversion_type) : string :=
+    match ct with
+    | CONV_Bitcast => "CONV_Bitcast"
+    | CONV_Pure ct => "(CONV_Pure " ++ repr ct ++ ")"
+    | CONV_Impure ct => "(CONV_Impure " ++ repr ct ++ ")"
     end.
 
   #[global]

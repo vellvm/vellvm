@@ -1052,19 +1052,7 @@ Proof.
   intros; apply I2F_memory_bytes_to_dvalue, I2F_dvalue_to_memory_bytes; auto.
 Qed.
 
-(** Related conversion cases: same constructor, related payloads.
-      A computing definition, so that the synchronized destruct in
-      [I2F_convert_h] reduces it by [cbn]. *)
-Definition I2F_conv_case (c1 : @conv_case PInf) (c2 : @conv_case PFin) : Prop :=
-  match c1, c2 with
-  | Conv_Pure x1, Conv_Pure x2 => I2F_dvalue_base x1 x2
-  | Conv_ItoP x1, Conv_ItoP x2 => I2F_dvalue_base x1 x2
-  | Conv_PtoI x1, Conv_PtoI x2 => I2F_dvalue_base x1 x2
-  | Conv_Oom s1, Conv_Oom s2 => True
-  | Conv_Illegal s1, Conv_Illegal s2 => True
-  | _, _ => False
-  end.
-
+(*
 (** The single case analysis of the conversion pipeline: related inputs
       classify into related conversion cases. The goals here are pure and
       small (no [convert_base] body in sight), which keeps the case
@@ -1085,7 +1073,7 @@ Proof.
   all: destruct t_to; try constructor.
   all: repeat (break_fast; cbn); eauto.
 Qed.
-
+*)
 (* Related base values have equal integer interpretations: the
      convertible shapes carry shared payloads ([DVALUE_I]) or
      [to_Z]-equal ones ([DVALUE_Iptr]); everything else is interpreted
@@ -1102,16 +1090,25 @@ Qed.
       [Conv_PtoI] go through equal integers ([dvalue_base_int_unsigned]
       and [ptr_to_int] agree on related values) followed by the finite
       [from_Z] in-range analysis, and the failure cases are diagonal. *)
-Lemma I2F_convert_base : forall conv t_from t_to v v',
-    conv <> Bitcast ->
+Lemma I2F_convert_pure_base : forall conv t_from t_to v v',
     I2F_dvalue_base v v' ->
     I2F_EOU I2F_dvalue_base
-      (@convert_base PInf conv t_from v t_to)
-      (@convert_base PFin conv t_from v' t_to).
+      (@convert_pure_base PInf conv t_from v t_to)
+      (@convert_pure_base PFin conv t_from v' t_to).
 Proof.
-  intros * NB R.
-  pose proof (I2F_get_conv_case t_from t_to NB R) as CC; revert CC.
-  unfold convert_base.
+  intros * R.
+  unfold convert_pure_base.
+  destruct conv; try congruence; cbn; auto.
+  all: destruct t_from; auto.
+  all: induction R; auto.
+  all: destruct t_to; auto.
+  all: repeat (break_fast; cbn); eauto.
+Qed.
+
+(* OLD Version - needed for impure casts: retaining here, but will be neede
+   in the handlder.
+ *)
+(*
   destruct (@get_conv_case PInf conv t_from v t_to),
     (@get_conv_case PFin conv t_from v' t_to);
     intros CC; cbn in CC; try contradiction; auto.
@@ -1131,50 +1128,50 @@ Proof.
       unfold from_Z_bits;
       repeat (break_match_goal_safe; cbn); auto;
       i2f_in_range_case.
-Qed.
+*)
 
-Lemma I2F_convert conv t_from t_to a b :
+Lemma I2F_convert_pure cv t_from t_to a b :
   I2F_dvalue a b ->
-  I2F_EOU I2F_dvalue (convert conv t_from a t_to) (convert conv t_from b t_to).
+  I2F_EOU I2F_dvalue (convert_pure cv t_from a t_to) (convert_pure cv t_from b t_to).
 Proof.
   intros R.
-  destruct conv.
-  (* Bitcast: shared guards, then the byte-level round-trip *)
-  12: { cbn.
-        repeat break_goal_fast; cbn; auto.
-        now apply I2F_bitcast_bytes. }
-  (* all others: the type classification is shared and pure; scalars go
-       through [convert_base], vectors pointwise so *)
-  all: inversion R; subst; cbn; repeat constructor.
-  (* scalar ([Fptrunc]/[Addrspacecast] reduce to diagonal errors before
-       [I2F_convert_base] can be re-folded) *)
-  all: try (destruct (get_conversion_type t_from t_to) as [[? ?]|]; cbn;
-            [ first
-                [ (eapply I2F_EOU_bind;
-                   [ apply I2F_convert_base; [congruence | auto] |]);
-                  intros; do 2 constructor; auto
-                | repeat constructor ]
-            | repeat constructor ]).
-  (* vector: the flags and the (shared) annotation dispatch first *)
-  all: i2f_vec_flags; cbn; repeat constructor.
-  all: break_match_goal; cbn; repeat constructor.
-  all: i2f_vec_flags; cbn; repeat constructor.
-  all: destruct (get_conversion_type t_from t_to) as [[? ?]|]; cbn;
-    [| repeat constructor].
-  (* {eapply I2F_EOU_bind; [ eapply I2F_EOU_map_monad2 |]. *)
-
-  all: (eapply I2F_EOU_bind;
+  inversion R; subst; cbn; auto.
+  - destruct (get_base_conversion_type t_from t_to) as [[? ?]|]; cbn; auto.
+    specialize (@I2F_convert_pure_base cv d d0 b0 b' H) as HV.
+    inversion HV; subst; auto.
+  - i2f_vec_flags; auto.
+    break_match_goal; auto.
+    destruct vector; auto.
+    destruct (get_vector_conversion_type t_from t_to) as [[? ?]|]; cbn; auto.
+    (eapply I2F_EOU_bind;
         [ eapply I2F_EOU_map_monad2;
-          [ eauto | intros; apply I2F_dvalue_to_dvalue_base; eauto ] |]);
-    intros ? ? ?;
-      (eapply I2F_EOU_bind;
-       [ eapply I2F_EOU_map_monad2 with (RB := I2F_dvalue_base);
-         [ eauto
-         | intros;
-           first [ apply I2F_convert_base; [congruence | auto]
-                 | repeat constructor ] ] |]);
-    intros; do 2 constructor; apply Forall2_map_Base; auto.
+          [ eauto | intros; apply I2F_dvalue_to_dvalue_base; eauto ] |]).
+    intros ? ? ?.
+    eapply I2F_EOU_bind;
+      [ eapply I2F_EOU_map_monad2 with (RB := I2F_dvalue_base); eauto |].
+    intros. apply I2F_convert_pure_base; auto.
+    intros. constructor. constructor.
+    apply Forall2_map_Base; auto.
 Qed.
+
+Lemma I2F_convert ct t_from t_to a b :
+  I2F_dvalue a b ->
+  I2F_refine (convert ct t_from a t_to) (convert ct t_from b t_to).
+Proof.
+  intros R.
+  destruct ct.
+  - cbn.
+    repeat break_match_goal; auto.
+    apply I2F_refine_lift.
+    apply I2F_bitcast_bytes; auto.
+    rstep. constructor.
+  - cbn.
+    apply I2F_refine_lift.
+    apply I2F_convert_pure; auto.
+  - cbn.
+    rstep.
+Qed.      
+
 
 (** * eval_gep *)
 (** GEP. The offset computation [handle_gep_h] lives in [EOU Z], a
@@ -1690,7 +1687,7 @@ Proof with try (rstep || cbnn; simp I2FE_Failure; reflexivity).
     apply I2F_refine_lift, I2F_eval_fcmp; eauto.
   - cbn; intros _.
     erbind; [apply IHe | intros].
-    apply I2F_refine_lift, I2F_convert; eauto.
+    apply I2F_convert; eauto.
   - destruct ptrval; cbn; intros _.
     erbind; [apply IHe | intros].
     erbind.

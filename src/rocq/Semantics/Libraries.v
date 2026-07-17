@@ -56,35 +56,25 @@ Section withParams.
     the character comes in as an i32, so the function truncates to an i8
     to match types with IO_stdout.
    *)
-  Definition putchar_denotation : function_denotation.
-    refine
-      (let putchar_body (u_char:dvalue) : CFGtop dvalue :=
+  Definition putchar_denotation : function_denotation :=
+      let putchar_body (u_char:dvalue) : CFGtop dvalue :=
          match u_char with
          | DVALUE_Base (DVALUE_I sz x32)  =>
              if Pos.eq_dec 32 sz
              then
-               match get_conv_case (Trunc false false) (DTYPE_I 32) (DVALUE_I sz x32) (DTYPE_I 8) with
-               | Conv_Pure (DVALUE_I sz x8) =>
-                   if Pos.eq_dec 8 sz
-                   then _
-                   else raise "conversion from i32 to i8 in putchar gave unexpected conversion type"
-               | _ => raise "conversion from i32 to i8 in putchar gave unexpected conversion type"
-               end ;;
-               ret u_char
+               let x8 : int8 := repr (unsigned x32) in
+               io_stdout [x8] ;;
+               ret (DVALUE_Base (DVALUE_I 8 x8))
              else
                raiseUB ("putc got non-i32 integer argument")
          | bad => raiseUB ("putc got non-i32 argument " ++ show_dvalue bad)
          end
        in
-
        fun (args : list dvalue) =>
          match args with
          | char::[] => inr <$> putchar_body char
          | _ => raise "putc called with zero or more than one arguments"
-         end).
-    subst.
-    exact (io_stdout [x8]).
-  Defined.
+         end.
 
   (** Semantic function that treats [u_strptr] as a C-style string pointer:
       - reads i8 values from memory until it encounters a null-terminator (i8 0)

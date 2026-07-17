@@ -210,6 +210,8 @@ Section Refinement.
       τ1 = τ2 /\ I2F_dvalue a1 a2;
     I2FE_Memory (@Store PInf τ1 a1 v1) (@Store PFin τ2 a2 v2) :=
       τ1 = τ2 /\ I2F_dvalue a1 a2 /\ I2F_dvalue v1 v2;
+    I2FE_Memory (@Conv PInf cv1 tf1 v1 tt1) (@Conv PFin cv2 tf2 v2 tt2) :=
+      cv1 = cv2 /\ tf1 = tf2 /\ I2F_dvalue v1 v2 /\ tt1 = tt2;
     I2FE_Memory _ _ := False.
 
   Equations I2FE_Draw : prerel (@DrawE PInf) (@DrawE PFin) :=
