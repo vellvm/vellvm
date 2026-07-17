@@ -45,10 +45,12 @@ the expected result; update the `ASSERT EQ` accordingly).
 Reference timings (Apple Silicon, July 2026, after switching the
 local/global envs to AVL maps, fixing the quadratic pending-bind
 accumulation in `map_monad_`/`denote_code`, switching `denote_ocfg`'s
-block lookups to a per-definition AVL block map, and fixing the
+block lookups to a per-definition AVL block map, fixing the
 quadratic bulk-read path with `map_monad_acc` in `read_bytes`/
-`get_consecutive_ptrs`):
-loop-phi-arith 5.6 s · calls-fib 6.2 s · mem-scan 4.3 s · mem-aggregate
+`get_consecutive_ptrs`, and deferring source-location string formatting
+to read time — [set_loc] now stores the raw [file_info], worth ~2% on
+instruction-dense tests):
+loop-phi-arith 5.3 s · calls-fib 5.8 s · mem-scan 4.3 s · mem-aggregate
 2.3 s · alloca-churn 1.8 s · iptr-roundtrip 3.1 s · undef-pick 2.8 s ·
 wide-arith 4.3 s · locals-chain 0.24 s · block-jumps 5.7 s ·
 calls-large-fn 2.7 s · calls-many-fns 3.7 s · switch-cases 3.5 s (was

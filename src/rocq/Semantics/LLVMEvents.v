@@ -151,22 +151,24 @@ Section withParams.
   (* See src/ml/Extract.v for the special handling of these operation. *)
   (* This function can be replaced with print operations  during extraction
      to print the error messages of Throw and (indirectly) ThrowUB.
-      - set_loc imperatively sets a string that will be prefixed onto the msg
-        it returns the empty string, but we need to use its result to
-        force extraction 
+      - set_loc imperatively records the current source location; it takes
+        the raw [file_info] (not a formatted string) so that the hot path
+        pays one pointer write — [get_loc] formats on demand
+        ([AstLib.location_string]). It returns the empty string, but we
+        need to use its result to force extraction
       - print_msg call `print_string`
    *)
   Record printer :=
     mk_printer {
-        printer_set_loc : string -> string ;
+        printer_set_loc : option file_info -> string ;
         printer_print_msg : string -> unit ;
         printer_get_loc : unit -> string ;
       }.
-  
+
   Definition printer_object : printer :=
-    mk_printer (fun (_:string) => "") (fun (_:string) => tt) (fun (_:unit) => "").
-  
-  Definition set_loc : string -> string := printer_object.(printer_set_loc).
+    mk_printer (fun (_:option file_info) => "") (fun (_:string) => tt) (fun (_:unit) => "").
+
+  Definition set_loc : option file_info -> string := printer_object.(printer_set_loc).
   Definition print_msg : string -> unit := printer_object.(printer_print_msg).
   Definition get_loc : unit -> string := printer_object.(printer_get_loc).
  
