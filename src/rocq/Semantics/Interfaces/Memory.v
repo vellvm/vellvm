@@ -38,6 +38,21 @@ Import Logic.
 
 Open Scope Z.
 
+(* Memory choices *)
+Variant memC : Type :=
+| Cnext_key (size:N) (align:N) : memC 
+| Cfresh_prov : memC 
+| Cexposed_prov : memC
+.
+
+Definition memCType {P:Type} : memC -> Type :=
+  fun mc => 
+  match mc with
+  | Cnext_key size align => Z
+  | Cfresh_prov => P
+  | Cexposed_prov => (option P) 
+  end.
+
 Inductive memS {S A P : Type} (X : Type) : Type :=
 | Mret (x : X) : memS X
 | Moom (s : string) : memS X
@@ -45,9 +60,9 @@ Inductive memS {S A P : Type} (X : Type) : Type :=
 | Merr (s : string) : memS X
 | Mget (k : S -> memS X) : memS X
 | Mput (σ : S) (k : memS X) : memS X
-(* | Mcheck_align (p : addr) (align : N) : memS bool *)
-| Mnext_key (size : N) (align : N) (k : Z -> memS X) : memS X
-| Mfresh_prov (k : P -> memS X) : memS X.
+| Mchoose (c:@memC) (k : (@memCType P c) -> memS X) : memS X
+(* | Massert (c : S -> A -> P -> Prop) : memS unit ????? *) 
+.
 
 Arguments memS : clear implicits.
 Arguments Moom {S A P} [X].
@@ -55,8 +70,21 @@ Arguments Mub  {S A P} [X].
 Arguments Merr {S A P} [X].
 Arguments Mget {S A P} [X].
 Arguments Mput {S A P} [X].
+Arguments Mchoose {S A P} [X].
+
+Definition Mnext_key {S A P} X (size:N) (align:N) (k : Z -> @memS S A P X) : @memS S A P X :=
+  Mchoose (Cnext_key size align) k.
+
+Definition Mfresh_prov {S A P} X (k : P -> @memS S A P X) : @memS S A P X :=
+  Mchoose Cfresh_prov k.
+
+Definition Mexposed_prov {S A P} X (k : (option P) -> @memS S A P X) : @memS S A P X :=
+  Mchoose Cexposed_prov k.
+
 Arguments Mnext_key {S A P} [X].
 Arguments Mfresh_prov {S A P} [X].
+Arguments Mexposed_prov {S A P} [X].
+
 Fixpoint memS_bind {S A P X Y} (c : memS S A P X) (k : X -> memS S A P Y) : memS S A P Y :=
   match c with
   | Mret x => k x
@@ -65,8 +93,7 @@ Fixpoint memS_bind {S A P X Y} (c : memS S A P X) (k : X -> memS S A P Y) : memS
   | Merr s => Merr s
   | Mget g => Mget (fun σ => memS_bind (g σ) k)
   | Mput σ g => Mput σ (memS_bind g k)
-  | Mnext_key size align g => Mnext_key size align (fun a => memS_bind (g a) k)
-  | Mfresh_prov g => Mfresh_prov (fun a => memS_bind (g a) k)
+  | Mchoose c g => Mchoose c (fun a => memS_bind (g a) k)
   end.
 
 #[global] Instance memS_mon {S A P} : Monad (memS S A P) :=
@@ -87,7 +114,8 @@ Definition moom       {S A P X} s : memS S A P X := Moom s.
 Definition put {S A P} (σ: S) : memS S A P unit := Mput σ (ret tt).
 Definition get {S A P}  : memS S A P S := Mget (fun σ => ret σ).
 Definition next_key {S A P} size align : memS S A P Z := Mnext_key size align (fun a => ret a). 
-Definition fresh_prov {S A P} : memS S A P P := Mfresh_prov (fun p => ret p). 
+Definition fresh_prov {S A P} : unit -> memS S A P P := fun _ => Mfresh_prov (fun p => ret p).
+Definition exposed_prov {S A P} : unit -> memS S A P (option P) := fun _ => Mexposed_prov (fun p => ret p). 
 
 (*** Internal state of memory *)
 (* TODO: MemoryModelPrimitives feels fairly reasonable, but what is exposed

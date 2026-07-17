@@ -66,11 +66,12 @@ Section withParams.
               | Merr s => raise s
               | Mget   k => memM_interp (k σ) σ
               | Mput σ' k => memM_interp k σ'
-              | Mnext_key _ align k =>
+              | Mchoose (Cnext_key _ align) k =>
                   memM_interp
                     (k (next_key_with_alignment σ.(state_memory_stack).(Memory_stack_memory) align))
                     σ
-              | Mfresh_prov k => '(σ',p) <- fresh_provenance σ ;; memM_interp (k p) σ'
+              | Mchoose Cfresh_prov k => '(σ',p) <- fresh_provenance σ ;; memM_interp (k p) σ'
+              (* TODO deal with provenance *)                                                                                  | Mchoose Cexposed_prov k => memM_interp (k None) σ
               end
   .
  
