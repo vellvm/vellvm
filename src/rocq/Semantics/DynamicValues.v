@@ -83,7 +83,17 @@ Section DValue.
   | Bit_psn                    (* poison *)
   | Bit_bit (b:@bit_int 1)     (* actual bit *)
   .    
-  
+
+  Variant dvalue_bv (sz:positive) :=
+  | BYTE_Pointer (p:ptr)
+  | BYTE_I (x:@bit_int sz)
+  | BYTE_Poison
+    (* Invariant: Byte_mixed _must_ not have all pointer / all poison / all bit values
+       otherwise one of the three representations above would work
+     *)        
+  | BYTE_Mixed (bits : list memory_bit)        
+  .
+               
   Variant dvalue_base : Set :=
   | DVALUE_Pointer (p:ptr)
   | DVALUE_I (sz : positive) (x:@bit_int sz)
@@ -99,7 +109,7 @@ Section DValue.
   | DVALUE_Poison (t:dtyp)
   | DVALUE_None
     (* Byte type carrier.  Invariant: length bits = sz *)
-  | DVALUE_B (sz : positive) (bits : list memory_bit)
+  | DVALUE_B (sz : positive) (bv : dvalue_bv sz)
   .
 
   
@@ -193,6 +203,20 @@ Section DValue.
 
   #[global] Instance showMemoryBit : Show memory_bit
     := {| show := show_memory_bit |}.                                          
+
+  Definition show_dvalue_bv {sz:positive} (bv : dvalue_bv sz) : string :=
+    match bv with
+    | BYTE_Pointer p => show_ptr p
+    | BYTE_I x => show (Zpos sz) ++ " " ++ show (unsigned x)
+    | BYTE_Poison => "poison"
+    (* Invariant: Byte_mixed _must_ not have all pointer / all poison / all bit values
+       otherwise one of the three representations above would work
+     *)        
+    | BYTE_Mixed bits => "[" ++ show bits ++ "]"
+    end.
+
+  #[global] Instance showDvalueBV {sz : positive } : Show (dvalue_bv sz) :=
+    {| show := show_dvalue_bv |}.                                          
   
   Definition show_dvalue_base (dv : dvalue_base) : string :=
     match dv with
@@ -203,7 +227,7 @@ Section DValue.
     | DVALUE_Float x => "float " ++ show x
     | DVALUE_Poison t => "poison[" ++ show_dtyp t ++ "]"
     | DVALUE_None => "none"
-    | DVALUE_B sz x => "b" ++ show (Zpos sz) ++ "[" ++ show x ++ "]"
+    | DVALUE_B sz x => "b" ++ show (Zpos sz) ++ " " ++ show x
     end.      
 
   #[global] Instance showDvalueBase : Show dvalue_base
@@ -253,6 +277,17 @@ Section DValue.
       - destruct (eq_dec_ptr p p0); subst; auto.
       - destruct (Integers.eq_dec b b0); subst; auto.
     Defined.
+
+    Lemma dvalue_bv_eq_dec : forall {sz} (bv1 bv2 : dvalue_bv sz), {bv1 = bv2} + {bv1 <> bv2}.
+      intros *.
+      destruct bv1; destruct bv2; try solve [right; intros H; inversion H].
+      - destruct (eq_dec_ptr p p0); subst; auto. right; intros H; inversion H; contradiction.
+      - destruct (Integers.eq_dec x x0); subst; auto.
+        right. intros H; inversion H. subst_existT. contradiction.
+      - left. reflexivity.
+      - destruct (list_eq_dec memory_bit_eq_dec bits bits0); subst; auto.
+         + right. intros H. inversion H. subst_existT. contradiction.
+    Qed.
       
     Lemma dvalue_base_eq_dec : forall (v1 v2 : dvalue_base), {v1 = v2} + {v1 <> v2}.
     Proof.
@@ -272,10 +307,10 @@ Section DValue.
       - destruct (dtyp_eq_dec t t0); subst; auto.
         right. intros H. inversion H. subst_existT. contradiction.
       - left; auto.
-      -  destruct (Pos.eq_dec sz sz0); subst; auto.
-         destruct (list_eq_dec memory_bit_eq_dec bits bits0); subst; auto.
-         + right. intros H. inversion H. subst_existT. contradiction.
-         + right. intros H. inversion H. subst_existT. contradiction.
+      - destruct (Pos.eq_dec sz sz0); subst.
+        + destruct (dvalue_bv_eq_dec bv bv0); subst; auto.
+          right. intros H. inversion H. subst_existT. contradiction.
+        + right. intros H. inversion H. subst_existT. contradiction.
     Defined.
 
     Lemma dvalue_eq_dec : forall (dv1 dv2 : dvalue), {dv1 = dv2} + {dv1 <> dv2}.
@@ -980,6 +1015,11 @@ Section DValue.
 
 (*  ------------------------------------------------------------------------- *)
 
+  Variant dvalue_bv_has_sz {sz : positive} : positive -> dvalue_bv sz -> Prop :=
+    | BYTE_Pointer_sz : forall x, sz = 64%positive -> dvalue_bv_has_sz 64 (BYTE_Pointer sz x)
+    | BYTE_Int_sz : forall sz' (x: @bit_int sz), sz = sz' -> dvalue_bv_has_sz sz' (BYTE_I x)
+    | BYTE_Poison_sz : forall sz', sz = sz' -> dvalue_bv_has_sz sz' (BYTE_Poison sz)
+    | BYTE_Mixed_sz bits : forall sz', length bits = (Pos.to_nat sz') -> sz = sz' -> dvalue_bv_has_sz sz' (BYTE_Mixed sz bits).
 
   Variant dvalue_base_has_dtyp_base : dvalue_base -> dtyp_base -> Prop :=
   | DVALUE_Pointer_typ   : forall a, dvalue_base_has_dtyp_base (DVALUE_Pointer a) DTYPE_Pointer
@@ -989,8 +1029,8 @@ Section DValue.
   | DVALUE_Float_typ  : forall x, dvalue_base_has_dtyp_base (DVALUE_Float x) (DTYPE_FP FP_float)
   | DVALUE_None_typ   : dvalue_base_has_dtyp_base DVALUE_None DTYPE_Void
   | DVALUE_Poison_typ : forall τ, NO_VOID_base τ -> dvalue_base_has_dtyp_base (DVALUE_Poison (DTYPE_Base τ)) τ
-  | DVALUE_B_typ      : forall sz bits, length bits = (Pos.to_nat sz) ->
-                                   dvalue_base_has_dtyp_base (@DVALUE_B sz bits) (DTYPE_B sz)
+  | DVALUE_B_typ      : forall sz bv, dvalue_bv_has_sz sz bv ->
+                                   dvalue_base_has_dtyp_base (@DVALUE_B sz bv) (DTYPE_B sz)
   .
   
   (* Poison not included because of concretize *)
@@ -1038,7 +1078,7 @@ Section DValue.
     | DTYPE_Metadata => raise_error "Unimplemented default type: metadata"
     | DTYPE_X86_mmx => raise_error "Unimplemented default type: x86_mmx"
     | DTYPE_Opaque => raise_error "Unimplemented default type: opaque"
-    | DTYPE_B sz => ret (DVALUE_B sz (repeat (Bit_bit zero) (Pos.to_nat sz)))
+    | DTYPE_B sz => ret (@DVALUE_B sz (BYTE_I zero))
     end.
   
   (* Handler for PickE which concretizes everything to 0 *)

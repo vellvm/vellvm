@@ -116,7 +116,8 @@ Proof.
          [DTYPE_B] relates the repeated zero bits pointwise *)
     destruct t; cbn;
       try (unfold default_dvalue_of_dtyp_i);
-      try (destruct fp; cbn); auto 7.
+      try (destruct fp; cbn); auto 8.
+    do 4 constructor.
   - (* DTYPE_Struct *)
     eapply I2F_EOU_bind; [apply I2F_EOU_map_monad; auto|].
     intros; do 2 constructor; auto.

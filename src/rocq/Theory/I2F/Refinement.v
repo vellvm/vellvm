@@ -69,6 +69,7 @@ Section Refinement.
   Definition I2F_Iptr : @iptr IPZ -> @iptr IP64Bit -> Prop :=
     fun z i => z = unsigned i.
 
+  (* TODO FIXME: "I2F_Addr" should be "I2F_Ptr" with new naming conventions. *)
   Definition I2F_Addr : @ptr ProvenanceV (@PointerV IPZ) -> @ptr ProvenanceV (@PointerV IP64Bit) -> Prop :=
     fun '(z,p) '(i,p') => I2F_Iptr z i /\ p = p'.
 
@@ -84,6 +85,18 @@ Section Refinement.
     I2F_memory_bit (@Bit_bit PInf b) (@Bit_bit PFin b)
   .
 
+  Variant I2F_dvalue_bv {sz} : @dvalue_bv PInf sz -> @dvalue_bv PFin sz -> Prop :=
+  | I2F_BYTE_I i :
+    I2F_dvalue_bv (BYTE_I i) (BYTE_I i)
+  | I2F_BYTE_Pointer p p' :
+    I2F_Addr p p' ->
+    I2F_dvalue_bv (@BYTE_Pointer PInf sz p) (@BYTE_Pointer PFin sz p')
+  | I2F_BYTE_Poison :
+    I2F_dvalue_bv (@BYTE_Poison PInf sz) (@BYTE_Poison PFin sz)      
+  | I2F_BYTE_Mixed bits bits':
+    Forall2 I2F_memory_bit bits bits' ->      
+    I2F_dvalue_bv (@BYTE_Mixed PInf sz bits) (@BYTE_Mixed PFin sz bits').
+      
   Variant I2F_dvalue_base : @dvalue_base PInf -> @dvalue_base PFin -> Prop :=
   | I2F_dvalue_Pointer p p' :
     I2F_Addr p p' ->
@@ -101,9 +114,9 @@ Section Refinement.
     I2F_dvalue_base (DVALUE_Poison τ) (DVALUE_Poison τ)
   | I2F_dvalue_None :
     I2F_dvalue_base DVALUE_None DVALUE_None
-  | I2F_dvalue_B sz bits bits' :
-    Forall2 I2F_memory_bit bits bits' ->
-    I2F_dvalue_base (DVALUE_B sz bits) (DVALUE_B sz bits')
+  | I2F_dvalue_B sz bv bv' :
+    I2F_dvalue_bv bv bv' ->
+    I2F_dvalue_base (@DVALUE_B PInf sz bv) (@DVALUE_B PFin sz bv')
   .
 
   Unset Elimination Schemes.
