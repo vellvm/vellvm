@@ -490,6 +490,24 @@ Section LABELS_THEORY.
     reflexivity.
   Qed.
 
+  (* [ocfg_map] agrees with [find_block] unconditionally: the [fold_right]
+     build lets earlier blocks overwrite later duplicates, reproducing
+     [find_block]'s first-match semantics even on ill-formed graphs. *)
+  Lemma ocfg_map_find_block :
+    forall (bks : ocfg T) b,
+      RM.find b (ocfg_map bks) = find_block bks b.
+  Proof using.
+    induction bks as [| bk bks IH]; intros b.
+    - apply RMF.F.empty_o.
+    - unfold ocfg_map; cbn [fold_right].
+      destruct (Eqv.eqv_dec_p (blk_id bk) b) as [EQ | INEQ].
+      + do 2 red in EQ.
+        rewrite find_block_eq; auto.
+        rewrite RMF.F.add_eq_o; auto.
+      + rewrite find_block_ineq; auto.
+        rewrite RMF.F.add_neq_o; auto.
+  Qed.
+
   Lemma wf_ocfg_bid_In_is_found :
     forall (bks : ocfg T) bk,
       wf_ocfg_bid bks ->

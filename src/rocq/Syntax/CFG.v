@@ -4,7 +4,8 @@ From Stdlib Require Import Equalities.
 From Vellvm Require Import
      Utils
      Syntax.LLVMAst
-     Syntax.AstLib.
+     Syntax.AstLib
+     Syntax.RawIdMaps.
 
 From ExtLib Require Import
      Programming.Eqv
@@ -218,6 +219,13 @@ Section CFG.
   Definition find_block (bs: list (block T)) block_id : option (block T) :=
     find (fun b => if (blk_id b) ~=? block_id then true else false) bs.
 
+  (* AVL map from block ids to blocks, giving [denote_ocfg] logarithmic
+     jumps where [find_block] scans linearly. Built with [fold_right] so
+     earlier blocks overwrite later duplicates, matching [find_block]'s
+     first-match semantics (cf. [ScopeTheory.ocfg_map_find_block]). *)
+  Definition ocfg_map (bs: list (block T)) : rmap (block T) :=
+    fold_right (fun b => RM.add (blk_id b) b) (RM.empty _) bs.
+
   Fixpoint modul_defns_of_mcfg_defns (ds: list (definition T cfg)): option (list (definition T (block T * list (block T)))) :=
     match ds with
     | [] => Some []
@@ -273,6 +281,7 @@ Arguments m_declarations {_ _}.
 Arguments m_definitions {_ _}.
 Arguments mkCFG {_}.
 Arguments find_block {_}.
+Arguments ocfg_map {_}.
 Arguments blks {_}.
 Arguments init {_}.
 Arguments args {_}.
