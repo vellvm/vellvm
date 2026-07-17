@@ -93,7 +93,7 @@ Fixpoint memS_bind {S A P X Y} (c : memS S A P X) (k : X -> memS S A P Y) : memS
   | Merr s => Merr s
   | Mget g => Mget (fun σ => memS_bind (g σ) k)
   | Mput σ g => Mput σ (memS_bind g k)
-  | Mchoose _ c g => Mchoose _ c (fun a => memS_bind (g a) k)
+  | Mchoose c g => Mchoose c (fun a => memS_bind (g a) k)
   end.
 
 #[global] Instance memS_mon {S A P} : Monad (memS S A P) :=
