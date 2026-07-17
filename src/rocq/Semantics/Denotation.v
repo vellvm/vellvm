@@ -693,13 +693,18 @@ Section Denotation.
       selector <- denote_exp' (Some dt) e;;
       if dvalue_is_poison selector
       then raiseUB (err_loc ++ ": Switching on poison.")
-      else (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
-        switches <- map_monad
-                     (fun '((TInt_Literal sz x),id) =>
-                        s <- lift (coerce_integer_to_int (Some sz) (denote_int_syntax x));;
-                        ret (DVALUE_Base s,id))
-                     dests;; 
-        inl <$> lift (select_switch selector default_br switches)
+      else (* We evaluate all the selectors. Note that they are enforced to be
+              constants, we could reflect this in the syntax and avoid this step.
+              The whole elaboration runs in EOU under a single [lift]: with the
+              [map_monad] in the itree monad, every case paid itree-bind
+              machinery on every execution (see perf/switch-cases.ll) *)
+        bid <- lift (switches <- map_monad
+                                  (fun '((TInt_Literal sz x),id) =>
+                                     s <- coerce_integer_to_int (Some sz) (denote_int_syntax x);;
+                                     ret (DVALUE_Base s,id))
+                                  dests;;
+                     select_switch selector default_br switches);;
+        ret (inl bid)
 
     | TERM_Unreachable => raiseUB (err_loc ++ ": IMPOSSIBLE: unreachable in reachable position")
 

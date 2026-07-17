@@ -295,18 +295,15 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
   - destruct v; bind_exp.
     rewrite (I2F_dvalue_is_poison H).
     break_match_goal...
-    rbind (Forall2 (prod_rel I2F_dvalue (@Logic.eq block_id))).
-    { apply ruttc_map_monad.
-      intros [[sz x] id] _; cbn.
-      rbind I2F_dvalue_base.
-      { first [ apply I2F_refine_lift'; now repeat constructor
-              | rstep; now repeat constructor ]. }
-      intros; rstep; now repeat constructor. }
-    intros sw1 sw2 HSW.
     rbind (@Logic.eq block_id).
     { apply I2F_refine_lift'.
-      erewrite I2F_select_switch; eauto.
-      apply I2F_EOU_refl. }
+      eapply I2F_EOU_bind with (RA := Forall2 (prod_rel I2F_dvalue (@Logic.eq block_id))).
+      - apply I2F_EOU_map_monad.
+        intros [[sz x] id] _; cbn.
+        now repeat constructor.
+      - intros sw1 sw2 HSW.
+        erewrite I2F_select_switch; eauto.
+        apply I2F_EOU_refl. }
     intros ?? <-...
   - destruct v.
     bind_exp...
