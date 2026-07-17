@@ -41,18 +41,23 @@ Import Logic.
 Section MemoryModel.
   Context {Pa : Params} {MMP : @MemoryModelPrimitives Pa}.
 
-  (* We would like a better representation than a list *) 
+  (* We would like a better representation than a list *)
+  (* [map_monad_acc] rather than [map_monad]: the list is as long as the
+     access is wide, and the collecting [map_monad] recurses that deep. *)
   Definition get_consecutive_ptrs (p : ptr) (size : N) : EOU (list ptr) :=
     ixs <- intptr_seq 0 size;;
-    map_monad
+    map_monad_acc
       (fun ix => handle_gep_ptr (DTYPE_I 8) p [DVALUE_Base (DVALUE_Iptr ix)])
       ixs.
 
   (** Reading dvalues *)
+  (* [map_monad_acc] rather than [map_monad]: under the free-monad
+     interpretation the collecting [map_monad] makes a bulk read quadratic
+     in its size (see perf/memcpy-chunk.ll). *)
   Definition read_bytes (p : ptr) (size : N) : memM (list memory_byte) :=
     ptrs <- lift (get_consecutive_ptrs p size);;
     (* Actually perform reads *)
-    map_monad read_byte ptrs.
+    map_monad_acc read_byte ptrs.
   
   Definition read_dvalue (dt : dtyp) (p : ptr) : memM dvalue :=
     bytes <- read_bytes p (sizeof_dtyp dt);;
@@ -91,7 +96,7 @@ Section MemoryModel.
   Definition allocate_dtyp (dt : dtyp) (num_elements : N) (align : N) : memM ptr :=
     if dtyp_eqb dt DTYPE_Void
     then mub "allocating void type"
-    else element_bytes <- repeatMN num_elements (ret (generate_poison_bytes dt));;
+    else let element_bytes := repeatN num_elements (generate_poison_bytes dt) in
          let bytes := List.concat element_bytes in
          allocate_bytes bytes align.
 

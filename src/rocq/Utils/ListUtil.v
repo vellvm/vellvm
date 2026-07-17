@@ -575,6 +575,22 @@ Section monad.
        | a::l' => f a;; loop l'
        end) l.
 
+  (* Value-collecting analogue of [loop_monad]: the recursive call is in
+     tail position of the bind, so the pending-bind depth stays constant
+     where [map_monad]'s (fun bs => ret (b::bs)) continuations pile up —
+     O(n) per step, O(n²) total under an itree/free-monad interpretation
+     (see perf/memcpy-chunk.ll). Also stack-safe in strict monads, where
+     [map_monad] recurses n deep. Agrees with [map_monad] in any monad
+     satisfying the monad laws. ([rev_append], not [rev]: stdlib [rev]
+     is the quadratic append-per-element one.) *)
+  Definition map_monad_acc {A B}
+    (f : A -> m B) (l : list A) : m (list B) :=
+    (fix loop acc l :=
+       match l with
+       | [] => ret (rev_append acc [])
+       | a::l' => b <- f a;; loop (b::acc) l'
+       end) [] l.
+
   Definition sequence {a} (ms : list (m a)) : m (list a)
     := map_monad id ms.
 
@@ -619,6 +635,7 @@ Arguments monad_app_fst {_ _ _ _ _}.
 Arguments monad_app_snd {_ _ _ _ _}.
 Arguments map_monad {_ _ _ _}.
 Arguments loop_monad {_ _ _ _}.
+Arguments map_monad_acc {_ _ _ _}.
 Arguments sequence {_ _ _}.
 Arguments foldM {_ _ _ _}.
 Arguments vec_loop {_ _ _ _ _}.
