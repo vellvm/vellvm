@@ -209,6 +209,7 @@ Section TypInd.
 
 Variable P : typ -> Prop.
 Hypothesis IH_I          : forall sz, P (TYPE_I sz).
+Hypothesis IH_B          : forall sz, P (TYPE_B sz).
 Hypothesis IH_Iptr       : P TYPE_Iptr.
 Hypothesis IH_Pointer    : forall t, P t -> P(TYPE_Pointer (Some t)).
 Hypothesis IH_Opaque_Pointer : P (TYPE_Pointer None).
@@ -230,6 +231,7 @@ Lemma typ_ind : forall (t:typ), P t.
   fix IH 1.
   destruct t.
   - apply IH_I.
+  - apply IH_B.
   - apply IH_Iptr.
   - destruct t.
     + apply IH_Pointer. apply IH.
@@ -267,6 +269,7 @@ Section TypRect.
 
 Variable P : typ -> Type.
 Hypothesis IH_I          : forall sz, P (TYPE_I sz).
+Hypothesis IH_B          : forall sz, P (TYPE_B sz).
 Hypothesis IH_Iptr       : P TYPE_Iptr.
 Hypothesis IH_Pointer    : forall t, P t -> P(TYPE_Pointer (Some t)).
 Hypothesis IH_Opaque_Pointer: P (TYPE_Pointer None).
@@ -288,6 +291,7 @@ Lemma typ_rect' : forall (t:typ), P t.
   fix IH 1.
   destruct t.
   - apply IH_I.
+  - apply IH_B.
   - apply IH_Iptr.
   - destruct t.
     + apply IH_Pointer. apply IH.

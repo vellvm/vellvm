@@ -401,6 +401,7 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_REASSOC
 %token KW_FAST
 %token<Camlcoq.P.t> I
+%token<Camlcoq.P.t> B
 %token KW_IPTR
 %token KW_PTR
 %token KW_VOID
@@ -1164,6 +1165,7 @@ non_metadata_type:
 
 non_function_type:
   | n=I                                               { TYPE_I n              }
+  | n=B                                               { TYPE_B n              }
   | KW_IPTR                                           { TYPE_Iptr             }
   | KW_PTR                                            { TYPE_Pointer (None)   }
   | KW_HALF                                           { TYPE_FP FP_half       }

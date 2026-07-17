@@ -158,6 +158,7 @@ Section ShowInstances.
   Fixpoint dshow_typ (t : typ) : DString  :=
     match t with
     | TYPE_I sz                 => sd "i" @@ sd (show sz)
+    | TYPE_B sz                 => sd "b" @@ sd (show sz)                                     
     | TYPE_Iptr                 => sd "iptr"
     | TYPE_Pointer (Some t)     => dshow_typ t @@ sd "*"
     | TYPE_Pointer None         => sd "ptr"

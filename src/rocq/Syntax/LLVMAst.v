@@ -97,7 +97,8 @@ Scheme Equality for floating_point_variant.
 
 Unset Elimination Schemes.
 Inductive typ : Set :=
-| TYPE_I (sz:positive)
+| TYPE_I (sz:positive)         (* int type of sz bits *)
+| TYPE_B (sz:positive)         (* byte type of sz bits *)
 | TYPE_Iptr
 | TYPE_Pointer (t: option typ)
 | TYPE_Void

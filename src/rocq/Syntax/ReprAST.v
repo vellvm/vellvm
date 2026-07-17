@@ -138,6 +138,7 @@ Section ReprInstances.
   Fixpoint repr_typ (t : typ) : string :=
     match t with
     | TYPE_I sz                 => "(TYPE_I " ++ repr sz ++ ")"
+    | TYPE_B sz                 => "(TYPE_B " ++ repr sz ++ ")"
     | TYPE_Iptr                 => "TYPE_Iptr"
     | TYPE_Pointer (Some t)     => "(TYPE_Pointer (Some " ++ repr_typ t ++ "))"
     | TYPE_Pointer None         => "(TYPE_Pointer None)"

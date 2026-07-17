@@ -610,6 +610,7 @@ rule token = parse
 
   (* types *)
   | 'i' (digit+ as i) { I (coq_P_of_int (int_of_string i)) }
+  | 'b' (digit+ as i) { B (coq_P_of_int (int_of_string i)) }  
   | '*' { STAR }
 
   (* labels *)
