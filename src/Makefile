@@ -101,7 +101,7 @@ timing: RocqMakefile
 ######## testing the Vellvm interpreter
 
 .PHONY: test-full
-test: vellvm
+test-full: vellvm
 	./vellvm -L libll -test
 
 .PHONY: test
