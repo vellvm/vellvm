@@ -20,6 +20,8 @@ CP=cp
 
 ######## The full vellvm executable
 VELLVM_EXE=_build/default/ml/main.exe
+# Override with `make DUNE_PROFILE=dev` for debug builds.
+DUNE_PROFILE?=release
 VELLVM_BC =_build/default/ml/main.bc
 
 ######## The "frontend" is only the parser/pretty-printer
@@ -68,11 +70,13 @@ $(EXTRACTDIR)/STAMP: $(EXEC_VFILES) $(EXEC_VOFILES) $(EXTRACTDIR)/Extract.v
 	make $(EXEC_VOFILES)
 	@echo "Extracting"
 	$(ROCQEXEC) $(EXTRACTDIR)/Extract.v
+	@echo "Post-processing extraction: unbox the itree node wrapper"
+	perl -i -pe 's/^(\| Coq_go of .* itreeF)$$/$$1 [\@\@unboxed]/' $(EXTRACTDIR)/ITreeDefinition.ml $(EXTRACTDIR)/ITreeDefinition.mli
 	touch $(EXTRACTDIR)/STAMP
 
 $(VELLVM_EXE): extracted ml/dune ml/extracted/dune ml/testing/dune 
 	@echo "Compiling Vellvm"
-	dune build ml/main.exe
+	dune build --profile $(DUNE_PROFILE) ml/main.exe
 
 vellvm: $(VELLVM_EXE)
 	cp $(VELLVM_EXE) vellvm
@@ -147,7 +151,7 @@ $(EXTRACTDIR)/FRONTEND_STAMP: $(FRONTEND_VOFILES) $(EXTRACTDIR)/ExtractFrontend.
 .PHONY: $(FRONTEND_EXE)
 $(FRONTEND_EXE): $(EXTRACTDIR)/FRONTEND_STAMP ml/dune ml/extracted/dune ml/testing/dune ml/frontend.ml ml/IO.ml
 	@echo "Compiling Vellvm (Frontend Only)"
-	dune build ml/frontend.exe
+	dune build --profile $(DUNE_PROFILE) ml/frontend.exe
 
 
 .PHONY: frontend
