@@ -498,14 +498,15 @@ Section Denotation.
     (varargs : option ptr) : CFGtop unit :=
     
     let '(i, md) := i in
-    (* The following two lines set up file location information. *)
-    (* extract it from the metadata: *)
-    let err_loc := location_error_string md in
-    (* imperatively set the flag for printing of exceptions
-       [set_loc] extracts in such a way as to change the behavior of [print_msg]
-     *)
-    let bogus := set_loc err_loc in
-    let err_loc := (bogus ++ err_loc) in
+    (* Record the current source location for the printer/debugger.
+       [set_loc] takes the raw [file_info] — one pointer write per
+       instruction; the location *string* is only built if an error branch
+       forces the [err_loc] thunk (extraction is strict, so building it
+       eagerly here taxed every executed instruction). [bogus] is used
+       under the thunk to keep the effectful [set_loc] alive through
+       extraction. *)
+    let bogus := set_loc (get_file_info md) in
+    let err_loc := fun (_:unit) => bogus ++ location_error_string md in
     match i with
       
     (* Pure operations *)
@@ -556,12 +557,12 @@ Section Denotation.
       v <- denote_exp' (Some dt) val ;;
       a <- denote_exp' (Some du) ptr ;;
       match a with
-      | DVALUE_Poison dt => raiseUB (err_loc ++ ": Store to poisoned address.")
+      | DVALUE_Poison dt => raiseUB (err_loc tt ++ ": Store to poisoned address.")
       | _ => store dt a v
       end;;
       ret tt
 
-    | (_, INSTR_Store _ _ _) => raise (err_loc ++ ": ILL-FORMED itree ERROR: Store to non-void ID")
+    | (_, INSTR_Store _ _ _) => raise (err_loc tt ++ ": ILL-FORMED itree ERROR: Store to non-void ID")
 
     (* Call *)
     (* TODO: technically operand bundles can affect semantics *)
@@ -626,13 +627,13 @@ Section Denotation.
         oe <- stack_get_exc ;;
         match oe with
         | Some e => lwrite id e
-        | None   => raise (err_loc ++ ": landingpad reached with no in-flight exception")
+        | None   => raise (err_loc tt ++ ": landingpad reached with no in-flight exception")
         end
     | (IVoid _, INSTR_LandingPad _ _ _) =>
-        raise (err_loc ++ ": landingpad must define a value")
+        raise (err_loc tt ++ ": landingpad must define a value")
 
     (* Error states *)
-    | (_, _) => raise (err_loc ++ ": ID / Instr mismatch void / non-void")
+    | (_, _) => raise (err_loc tt ++ ": ID / Instr mismatch void / non-void")
     end.
 
   (* Computes the label to be returned by a switch terminator, after evaluation of values
@@ -663,9 +664,9 @@ Section Denotation.
   Definition denote_terminator
     (trm: (instr_id * terminator dtyp * list (metadata dtyp))) : CFGtop (block_id + dvalue) :=
     let '(iid, t, md) := trm in
-    let err_loc := location_error_string md in
-    let bogus := set_loc err_loc in
-    let err_loc := (bogus ++ err_loc) in
+    (* Same lazy-location scheme as [denote_instr]. *)
+    let bogus := set_loc (get_file_info md) in
+    let err_loc := fun (_:unit) => bogus ++ location_error_string md in
     match t with
 
     | TERM_Ret (dt, op) =>
@@ -683,8 +684,8 @@ Section Denotation.
           ret (inl br1)
         else
           ret (inl br2)
-      | DVALUE_Base (DVALUE_Poison dt) => raiseUB (err_loc ++ ": Branching on poison.")
-      | _ => raise (err_loc ++ ": Br got non-bool value")
+      | DVALUE_Base (DVALUE_Poison dt) => raiseUB (err_loc tt ++ ": Branching on poison.")
+      | _ => raise (err_loc tt ++ ": Br got non-bool value")
       end
 
     | TERM_Br_1 br => ret (inl br)
@@ -692,16 +693,21 @@ Section Denotation.
     | TERM_Switch (dt,e) default_br dests =>
       selector <- denote_exp' (Some dt) e;;
       if dvalue_is_poison selector
-      then raiseUB (err_loc ++ ": Switching on poison.")
-      else (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
-        switches <- map_monad
-                     (fun '((TInt_Literal sz x),id) =>
-                        s <- lift (coerce_integer_to_int (Some sz) (denote_int_syntax x));;
-                        ret (DVALUE_Base s,id))
-                     dests;; 
-        inl <$> lift (select_switch selector default_br switches)
+      then raiseUB (err_loc tt ++ ": Switching on poison.")
+      else (* We evaluate all the selectors. Note that they are enforced to be
+              constants, we could reflect this in the syntax and avoid this step.
+              The whole elaboration runs in EOU under a single [lift]: with the
+              [map_monad] in the itree monad, every case paid itree-bind
+              machinery on every execution (see perf/switch-cases.ll) *)
+        bid <- lift (switches <- map_monad
+                                  (fun '((TInt_Literal sz x),id) =>
+                                     s <- coerce_integer_to_int (Some sz) (denote_int_syntax x);;
+                                     ret (DVALUE_Base s,id))
+                                  dests;;
+                     select_switch selector default_br switches);;
+        ret (inl bid)
 
-    | TERM_Unreachable => raiseUB (err_loc ++ ": IMPOSSIBLE: unreachable in reachable position")
+    | TERM_Unreachable => raiseUB (err_loc tt ++ ": IMPOSSIBLE: unreachable in reachable position")
 
     (* TODO: technically operand bundles can affect the semantics of invoke *)
     | TERM_Invoke (dt, fnptrval) args to_label unwind_label anns _ =>
@@ -728,7 +734,7 @@ Section Denotation.
       raiseLLVM exn
 
     (* Currently unhandled VIR terminators *)
-    | TERM_IndirectBr _ _ => raise (err_loc ++ ": Unsupport itree terminator")
+    | TERM_IndirectBr _ _ => raise (err_loc tt ++ ": Unsupport itree terminator")
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
@@ -737,14 +743,14 @@ Section Denotation.
 
   Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : CFGtop (local_id * dvalue) :=
     let '(id, Phi dt args, md) := id_p in
-    let err_loc := location_error_string md in
-    let bogus := set_loc err_loc in
-    let err_loc := (bogus ++ err_loc) in
+    (* Same lazy-location scheme as [denote_instr]. *)
+    let bogus := set_loc (get_file_info md) in
+    let err_loc := fun (_:unit) => bogus ++ location_error_string md in
     match assoc bid_from args with
     | Some op =>
         uv <- denote_exp' (Some dt) op ;;
         ret (id,uv)
-    | None => raise (err_loc ++ ": jump: phi node doesn't include block ")
+    | None => raise (err_loc tt ++ ": jump: phi node doesn't include block ")
     end.
 
   Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp * (list (metadata dtyp)))): CFGtop unit :=
