@@ -659,9 +659,31 @@ Section Denotation.
     - exact (raise_error "Ill-typed switch.").
   Defined.
 
+  (* Per-function, block_id-keyed map of pre-elaborated switch case
+     tables: for a block whose terminator is [TERM_Switch], the coercion
+     of every case literal (a total, pure function of the syntax — see
+     [coerce_int]) is computed once here rather than on every execution
+     of the switch (cf. perf/switch-cases.ll). Blocks without a switch
+     terminator get no entry. *)
+  Definition ocfg_switch_map (bs : list (block dtyp)) : rmap (list (dvalue * block_id)) :=
+    fold_right
+      (fun b m =>
+         let '(_, t, _) := blk_term b in
+         match t with
+         | TERM_Switch _ _ dests =>
+             RM.add (blk_id b)
+               (List.map (fun '(TInt_Literal sz x, id) => (DVALUE_Base (coerce_int sz (denote_int_syntax x)), id)) dests)
+               m
+         | _ => m
+         end)
+      (RM.empty _) bs.
+
   (* A [terminator] either returns from a function call, producing a [dvalue],
-         or jumps to a new [block_id]. *)
+         or jumps to a new [block_id]. [switches_opt] is this terminator's
+         entry (if any) in [ocfg_switch_map], threaded down from
+         [denote_block]/[denote_function]. *)
   Definition denote_terminator
+    (switches_opt : option (list (dvalue * block_id)))
     (trm: (instr_id * terminator dtyp * list (metadata dtyp))) : CFGtop (block_id + dvalue) :=
     let '(iid, t, md) := trm in
     (* Same lazy-location scheme as [denote_instr]. *)
@@ -694,17 +716,19 @@ Section Denotation.
       selector <- denote_exp' (Some dt) e;;
       if dvalue_is_poison selector
       then raiseUB (err_loc tt ++ ": Switching on poison.")
-      else (* We evaluate all the selectors. Note that they are enforced to be
-              constants, we could reflect this in the syntax and avoid this step.
-              The whole elaboration runs in EOU under a single [lift]: with the
-              [map_monad] in the itree monad, every case paid itree-bind
-              machinery on every execution (see perf/switch-cases.ll) *)
-        bid <- lift (switches <- map_monad
-                                  (fun '((TInt_Literal sz x),id) =>
-                                     s <- coerce_integer_to_int (Some sz) (denote_int_syntax x);;
-                                     ret (DVALUE_Base s,id))
-                                  dests;;
-                     select_switch selector default_br switches);;
+      else (* Case literals are enforced to be constants: [switches_opt],
+              when present, is this block's entry in [ocfg_switch_map],
+              elaborated once per function instead of once per visit
+              (see perf/switch-cases.ll). Falls back to on-the-fly
+              elaboration (now a pure map — [coerce_int] is total, no EOU
+              wrapping needed) if no precomputed table was threaded down. *)
+        let switches :=
+          match switches_opt with
+          | Some sw => sw
+          | None => List.map (fun '(TInt_Literal sz x,id) => (DVALUE_Base (coerce_int sz (denote_int_syntax x)), id)) dests
+          end
+        in
+        bid <- lift (select_switch selector default_br switches);;
         ret (inl bid)
 
     | TERM_Unreachable => raiseUB (err_loc tt ++ ": IMPOSSIBLE: unreachable in reachable position")
@@ -762,10 +786,11 @@ Section Denotation.
 
   (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-  Definition denote_block (b: block dtyp) (bid_from : block_id) (varargs : option ptr) : CFGtop (block_id + dvalue) :=
+  Definition denote_block (smap : rmap (list (dvalue * block_id)))
+    (b: block dtyp) (bid_from : block_id) (varargs : option ptr) : CFGtop (block_id + dvalue) :=
     denote_phis bid_from (blk_phis b);;
     denote_code (blk_code b) varargs;;
-    denote_terminator (blk_term b).
+    denote_terminator (RM.find (blk_id b) smap) (blk_term b).
 
   (* Our denotation currently contains two kinds of indirections: jumps to labels, internal to
      a cfg, and calls to functions, that jump from a cfg to another.
@@ -785,14 +810,14 @@ Section Denotation.
      [ScopeTheory.ocfg_map_find_block]) rather than scanning the block list
      with [find_block]. The map is passed in so [denote_function] can build
      it once per function definition rather than once per call. *)
-  Definition denote_ocfg_map (bmap : rmap (block dtyp)) (varargs : option ptr)
+  Definition denote_ocfg_map (bmap : rmap (block dtyp)) (smap : rmap (list (dvalue * block_id))) (varargs : option ptr)
     : (block_id * block_id) -> CFGtop ((block_id * block_id) + dvalue) :=
     ITree.iter
       (fun '((bid_from,bid_src) : block_id * block_id) =>
          match RM.find bid_src bmap with
          | None => ret (inr (inl (bid_from,bid_src)))
          | Some block_src =>
-             bd <- denote_block block_src bid_from varargs;;
+             bd <- denote_block smap block_src bid_from varargs;;
              match bd with
              | inr dv => ret (inr (inr dv))
              | inl bid_target => ret (inl (bid_src,bid_target))
@@ -801,18 +826,18 @@ Section Denotation.
 
   Definition denote_ocfg (bks: ocfg dtyp)
     : option ptr -> (block_id * block_id) -> CFGtop ((block_id * block_id) + dvalue) :=
-    denote_ocfg_map (ocfg_map bks).
+    denote_ocfg_map (ocfg_map bks) (ocfg_switch_map bks).
 
-  Definition denote_cfg_map (bmap : rmap (block dtyp)) (f: cfg dtyp) (varargs : option ptr)
+  Definition denote_cfg_map (bmap : rmap (block dtyp)) (smap : rmap (list (dvalue * block_id))) (f: cfg dtyp) (varargs : option ptr)
     : CFGtop dvalue :=
-    r <- denote_ocfg_map bmap varargs (init f,init f) ;;
+    r <- denote_ocfg_map bmap smap varargs (init f,init f) ;;
     match r with
     | inl bid => raise ("Can't find block in denote_cfg " ++ show (snd bid))
     | inr uv  => ret uv
     end.
 
   Definition denote_cfg (f: cfg dtyp) (varargs : option ptr) : CFGtop dvalue :=
-    denote_cfg_map (ocfg_map (blks f)) f varargs.
+    denote_cfg_map (ocfg_map (blks f)) (ocfg_switch_map (blks f)) f varargs.
 
   (** ** Catching a frame-local unwind
       [run_exc t] runs [t]; if it raises an [LLVMExc] (the abortive [LLVMExcE]
@@ -888,15 +913,17 @@ Section Denotation.
     end.
 
   Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
-    (* Built outside the closure: one block map per definition (see
-       [TopLevel] building [fundefs]), shared by every call to it. *)
+    (* Built outside the closure: one block map and one switch-case-table
+       map per definition (see [TopLevel] building [fundefs]), shared by
+       every call to it. *)
     let bmap := ocfg_map (blks (df_instrs df)) in
+    let smap := ocfg_switch_map (blks (df_instrs df)) in
     fun (args : list dvalue) =>
       varg <- push_call_frame df args;;
       (* Catch a frame-local unwind so the result surfaces as [exc + dvalue].
          [pop_call_frame] runs on both the normal and the unwinding path, so the
          frame is always torn down before the (value-carried) unwind continues. *)
-      rv <- run_exc (denote_cfg_map bmap (df_instrs df) (Some varg));;
+      rv <- run_exc (denote_cfg_map bmap smap (df_instrs df) (Some varg));;
       pop_call_frame;;
       ret rv.
 

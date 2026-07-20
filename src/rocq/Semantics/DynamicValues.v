@@ -600,11 +600,17 @@ Section DValue.
     (*   eval_int_op iop x y. *)
     (* Arguments integer_op _ _ _ _ : simpl nomatch. *)
 
+  (* The bounded-width case of [coerce_integer_to_int]: total (never
+     raises), so callers that only ever hit this branch (e.g. switch case
+     literals, always integer-typed) can precompute it outside the EOU
+     monad instead of paying the [repr]/[mod 2^bits] cost on every visit. *)
+  Definition coerce_int (sz : positive) (i : Z) : dvalue_base := @DVALUE_I sz (repr i).
+
   (* Convert written integer constant to corresponding integer with bitsize bits.
      Takes the integer modulo 2^bits. *)
   Definition coerce_integer_to_int (bits:option positive) (i:Z) : EOU dvalue_base :=
     match bits with
-    | Some sz  => ret (@DVALUE_I sz (repr i))
+    | Some sz  => ret (coerce_int sz i)
     | None    =>
         i' <- mrepr i;;
         ret (DVALUE_Iptr i')
