@@ -2,6 +2,7 @@
 
      ; ASSERT EQ: texp = <call>
      ; ASSERT SUCCEEDS: <call>
+     ; ASSERT FAILS: call i64 @run()
      
   See README.md for more details. *)
 open VellvmLib
@@ -16,6 +17,7 @@ type test =
   (* expected dvalue, dynamic type, entry, arguments *)
   | EQTest of DV.dvalue * DynamicTypes.dtyp * function_id * DV.dvalue list
   | SuccessTest of function_id * DV.dvalue list
+  | FailsTest of function_id * DV.dvalue list
 
 
 (* Directly converts a piece of syntax to a dtyp without going through
@@ -46,7 +48,6 @@ let ocaml_of_EOU (c : 'x EOU.coq_EOU) : 'x =
   | Coq_raise_oom err -> failwith @@ Printf.sprintf "OOM: %s" (Interpreter.ocaml_str err)
   | Coq_raise_ub err -> failwith @@ Printf.sprintf "UB: %s" (Interpreter.ocaml_str err)
   | Coq_raise_ret x -> x
-
 
 let dvalue_to_dvalue_base_exn (dv : dvalue) : dvalue_base =
   match dv with
@@ -92,9 +93,6 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
         (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"
            (string_of_typ typ) (string_of_exp exp) )
 
-
-
-
 let texp_to_function_id (_, exp) : function_id =
   match exp with
   | EXP_Ident (ID_Global id) -> id
@@ -118,6 +116,7 @@ let rec parse_assertion (line : string) : test list =
     let assertions =
       [ parse_eq_assertion line
       ; parse_succeeds_assertion line
+      ; parse_fails_assertion line
       ]
     in
     List.flatten assertions
@@ -155,19 +154,35 @@ and parse_succeeds_assertion (line : string) : test list =
   (* ws* "ASSERT" ws+ "SUCCEEDS" ws* ':' ws*  (anything+ as r) *)
   let regex = "^[ \t]*;[ \t]*ASSERT[ \t]+SUCCEEDS[ \t]*:[ \t]*\\(.*\\)" in
   if not (Str.string_match (Str.regexp regex) line 0) then
-    (* let _ = print_endline ("NO MATCH: " ^ line) in *)
+    (* let _ = print_endline ("no match: " ^ line) in *)
     []
   else
     let rhs = Str.matched_group 1 line in
-    (* let _ = print_endline ("RHS: " ^ rhs) in *)
+    (* let _ = print_endline ("rhs: " ^ rhs) in *)
     let r =
       try Llvm_lexer.parse_test_call (Lexing.from_string rhs)
-      with _ -> failwith (Printf.sprintf "Ill-formed ASSERT EQ: %s" rhs)
+      with _ -> failwith (Printf.sprintf "ill-formed assert succeeds: %s" rhs)
     in
-    (* let _ = print_endline "PARSED RHS" in *)
+    (* let _ = print_endline "parsed rhs" in *)
     let fn, args = instr_to_call_data r in
     [SuccessTest (fn, args)]
 
+and parse_fails_assertion (line : string) : test list =
+  (* ws* "ASSERT" ws+ "FAILS" ws* ':' ws*  (anything+ as r) *)
+  let regex = "^[ \t]*;[ \t]*ASSERT[ \t]+FAILS[ \t]*:[ \t]*\\(.*\\)" in
+  if not (Str.string_match (Str.regexp regex) line 0) then
+    (* let _ = print_endline ("no match: " ^ line) in *)
+    []
+  else
+    let rhs = Str.matched_group 1 line in
+    (* let _ = print_endline ("rhs: " ^ rhs) in *)
+    let r =
+      try Llvm_lexer.parse_test_call (Lexing.from_string rhs)
+      with _ -> failwith (Printf.sprintf "ill-formed assert fails: %s" rhs)
+    in
+    (* let _ = print_endline "parsed rhs" in *)
+    let fn, args = instr_to_call_data r in
+    [FailsTest (fn, args)]
 
 (* Semantics of ASSERT EQ ty expected = call @f(args):
 
@@ -243,7 +258,7 @@ let make_test_h run name ll_ast t : (string * Assert.assertion) option =
       let result = run_to_value dtyp entry args ll_ast in
       Some (str, dvalue_eq_assertion name dtyp expected result)
 
-  | SuccessTest ( entry, args) ->
+  | SuccessTest (entry, args) ->
      let str =
        let args_str  = args_str args 
        in
@@ -251,24 +266,18 @@ let make_test_h run name ll_ast t : (string * Assert.assertion) option =
      in
      let t_void = typ_to_dtyp (LLVMAst.TYPE_Void) in
      Some (str, (fun () -> ignore (run_to_value t_void entry args ll_ast ())))
-  (* | Assertion.FAILSTest (entry, args) -> *)
-  (*     let str = *)
-  (*       let args_str : doc = *)
-  (*         pp_print_list *)
-  (*           ~pp_sep:(fun f () -> pp_print_string f ", ") *)
-  (*           Interpreter.pp_dvalue str_formatter args ; *)
-  (*         flush_str_formatter () *)
-  (*       in *)
-  (*       Printf.sprintf "FAILS %s(%s)" (string_of_function_id entry) args_str *)
-  (*     in *)
-  (*     let t_void = Assertion.typ_to_dtyp (LLVMAst.TYPE_Void) in *)
-  (*     Some *)
-  (*       ( str *)
-  (*       , fun () -> *)
-  (*           match run t_void entry args ll_ast with *)
-  (*           | Error _ -> () *)
-  (*           | exception _ -> () *)
-  (*           | Ok dv -> *)
-  (*               failwith *)
-  (*                 (Printf.sprintf "expected failure, but got %s" *)
-  (*                    (string_of_dvalue dv) ) ) *)
+
+  | FailsTest (entry, args) ->
+      let str =
+        let args_str  = args_str args 
+        in
+        Printf.sprintf "FAILS %s(%s)" (Interpreter.string_of_function_id entry) args_str
+      in
+      let t_void = typ_to_dtyp (LLVMAst.TYPE_Void) in
+      Some (str, fun () ->
+                 match run t_void entry args ll_ast with
+                 | Error _ -> ()
+                 | exception _ -> ()
+                 | Ok dv ->
+                    failwith (Printf.sprintf "expected uncaught exception, but got %s" (Interpreter.string_of_dvalue dv))
+        )
