@@ -13,8 +13,6 @@ open Assert
 
 module DV = DynamicValues
 
-
-
 (* test harness ------------------------------------------------------------- *)
 (* Todo add line count information *)
 let parse_tests filename =
