@@ -1,3 +1,5 @@
+(** * Relating computations in the [memS] free monad *)
+
 From Vellvm Require Import
   Utils
   Semantics.EOU
@@ -5,27 +7,6 @@ From Vellvm Require Import
 
 From Vellvm Require Import
   Theory.I2F.Refinement.
-
-(** * Relating computations in the [memS] free monad
-
-    [memS S A P X] (see [Semantics/Interfaces/Memory.v]) is the free monad
-    underlying [memM]: a finite tree of [Mret]/[Merr]/[Mub]/[Moom] leaves,
-    [Mget]/[Mput] state-access nodes, and [Mchoose] non-deterministic
-    oracle nodes. [I2F_memS] relates such trees between two
-    instantiations sharing the same choice/provenance type [P] (the two
-    memory models always do: [P] is the single, IPtr-independent
-    [provenance] type), generalizing [I2F_EOU] (see [Refinement.v]) with
-    the extra constructors:
-    - [Mget]/[Mput] thread a state relation [RS] pointwise;
-    - [Mchoose] keeps the SAME choice [c] on both sides and demands the
-      continuations be related at every possible answer. This is sound
-      here because the two sides always run the same generic code
-      ([Implementations/Memory.v]), so [Mchoose] nodes occur in lockstep;
-      and because any two [I2F_State]-related states force equal
-      resolutions of a given choice (see [I2F_memory.v]), relating
-      continuations pointwise at ALL answers is not stronger than
-      relating them only at the answers that could actually arise.
-*)
 
 Section I2F_MemS.
   Context {S1 S2 A1 A2 P : Type}.

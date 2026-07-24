@@ -39,7 +39,7 @@ From Vellvm Require Import
   Theory.I2F.I2F_denotation
   Theory.I2F.I2F_MemS
   Theory.I2F.I2F_memory
-  Theory.I2F.I2F_state.
+  Theory.I2F.I2F_interp.
 
 Existing Instance MemoryModelStateV.
 Existing Instance MemoryModelPrimitivesV.

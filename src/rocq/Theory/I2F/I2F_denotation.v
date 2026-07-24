@@ -1,3 +1,5 @@
+(** * I2F invariant for the uninterpreted denotation *)
+
 From Equations Require Import Equations.
 
 From Stdlib Require Import Lia Program.

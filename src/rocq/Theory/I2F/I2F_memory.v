@@ -1,3 +1,5 @@
+(** * I2F invariant for the memory model, restricted to the memM monad *)
+
 From Equations Require Import Equations.
 
 From Stdlib Require Import
