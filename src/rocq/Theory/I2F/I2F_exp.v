@@ -41,6 +41,8 @@ Hint Unfold I2F_Addr: core.
 Hint Unfold I2F_Iptr : core.
 Hint Transparent dvp : core.
 Ltac cbnn := cbn; unfold resum, ReSum_id, id_, Id_IFun.
+Tactic Notation "cbnn" "in" ident(h) :=
+  cbn in h; unfold resum, ReSum_id, id_, Id_IFun in h.
 
 Lemma refine_dvalue_base_map t1 t2 :
   I2F_refine_MCFG I2F_dvalue_base t1 t2 ->

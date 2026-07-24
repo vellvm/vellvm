@@ -287,6 +287,7 @@ Section Refinement.
     I2FA_Memory (@Alloca PInf τ1 n1 align1) dv1 (@Alloca PFin τ2 n2 align2) dv2 := I2F_dvalue dv1 dv2;
     I2FA_Memory (@Load PInf τ1 a1) dv1 (@Load PFin τ2 a2) dv2 := I2F_dvalue dv1 dv2;
     I2FA_Memory (@Store PInf τ1 a1 v1) a (@Store PFin τ2 a2 v2) b := True;
+    I2FA_Memory (@Conv PInf cv1 tf1 v1 tt1) dv1 (@Conv PFin cv2 tf2 v2 tt2) dv2 := I2F_dvalue dv1 dv2;
     I2FA_Memory _ _ _ _ := False.
 
   Equations I2FA_Draw : postrel (@DrawE PInf) (@DrawE PFin) :=
@@ -351,6 +352,26 @@ Section Refinement.
   Definition I2FA_CFG : postrel (@CFGEtop PInf) (@CFGEtop PFin) :=
     sum_postrel I2FA_Call I2FA_MCFG.
 
+  (** [MCFGEbot] (`ExternalCallE +' OOME +' LLVMExcE +' UBE +' DebugE +'
+      FailureE`, [LLVMEvents.v:219]) is the residual event signature after
+      [interp_mcfg]'s fused pass has consumed Intrinsic/Global/(Local+Stack)
+      /Memory/Draw — i.e. exactly [MCFGEtop] with those five families
+      dropped. Glue the same six leaf relations already used inside
+      [I2FE_MCFG]/[I2FA_MCFG], in the same order. *)
+  Definition I2FE_MCFGbot : prerel (@MCFGEbot PInf) (@MCFGEbot PFin) :=
+    sum_prerel I2FE_ExternalCall
+      (sum_prerel I2FE_OOM
+         (sum_prerel I2FE_Exc
+            (sum_prerel I2FE_UB
+               (sum_prerel I2FE_Debug I2FE_Failure)))).
+
+  Definition I2FA_MCFGbot : postrel (@MCFGEbot PInf) (@MCFGEbot PFin) :=
+    sum_postrel I2FA_ExternalCall
+      (sum_postrel I2FA_OOM
+         (sum_postrel I2FA_Exc
+            (sum_postrel I2FA_UB
+               (sum_postrel I2FA_Debug I2FA_Failure)))).
+
   (** * The refinement relation *)
 
   Variant cutUB {E} `{UBE -< E} : forall [A], E A -> Prop :=
@@ -372,6 +393,10 @@ Section Refinement.
   Definition I2F_refine_CFG {R1 R2} (RR : R1 -> R2 -> Prop)
     : @CFGtop PInf R1 -> @CFGtop PFin R2 -> Prop :=
     ruttc cutUB cutOOM I2FE_CFG I2FA_CFG RR.
+
+  Definition I2F_refine_MCFGbot {R1 R2} (RR : R1 -> R2 -> Prop)
+    : @MCFGbot PInf R1 -> @MCFGbot PFin R2 -> Prop :=
+    ruttc cutUB cutOOM I2FE_MCFGbot I2FA_MCFGbot RR.
 
   Definition I2F_refine : @MCFGtop PInf (@dvalue PInf) -> @MCFGtop PFin (@dvalue PFin) -> Prop :=
     I2F_refine_MCFG I2F_dvalue.
@@ -435,6 +460,26 @@ Qed.
 Lemma I2F_refine_lift {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
   I2F_EOU RR m1 m2 ->
   I2F_refine_MCFG RR (EOU_to_itree m1) (EOU_to_itree m2).
+Proof.
+  intros []; cbn.
+  - pfold; constructor; auto.
+  - apply ruttc_trigger_cast; easy.
+  - pfold; red; cbn.
+    apply EqCutL; constructor.
+  - pfold; red; cbn.
+    apply EqCutR; constructor.
+Qed.
+
+(** Sibling of [I2F_refine_lift] for [MCFGEbot]/[I2F_refine_MCFGbot]
+      ([Theory/I2F/I2F_state.v]): identical proof, but the fully-abstract
+      generalization over [REv]/[RAns] doesn't typecheck as one shared
+      lemma — the [raise_error]/[raise_ub]/[raise_oom] cases need
+      [I2FE_Failure]/[I2FE_UB]/[I2FE_OOM]'s specific "any two such events
+      are related" triviality, which isn't derivable for a fully abstract
+      event relation. *)
+Lemma I2F_refine_lift_bot {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
+  I2F_EOU RR m1 m2 ->
+  I2F_refine_MCFGbot RR (EOU_to_itree m1) (EOU_to_itree m2).
 Proof.
   intros []; cbn.
   - pfold; constructor; auto.
@@ -512,5 +557,64 @@ Proof.
     eapply I2F_EOU_bind; [apply IHF|].
     intros bs1 bs2 HBS.
     do 2 constructor; auto.
+Qed.
+
+(** [I2F_EOU] is monotone in its result relation: massaging the
+      accumulator invariant of [I2F_EOU_map_monad_acc2] into the shape
+      expected at each recursive call needs nothing more than
+      strengthening the postcondition. *)
+Lemma I2F_EOU_mono {A1 A2} (RR RR' : A1 -> A2 -> Prop) (m1 : EOU A1) (m2 : EOU A2) :
+  (forall a1 a2, RR a1 a2 -> RR' a1 a2) ->
+  I2F_EOU RR m1 m2 -> I2F_EOU RR' m1 m2.
+Proof.
+  intros SUB []; constructor; auto.
+Qed.
+
+(** [I2F_EOU_map_monad2] for [map_monad_acc]: the tail-recursive,
+      accumulator-passing sibling of [map_monad] used by
+      [get_consecutive_ptrs]/[read_bytes] for performance
+      (see [Semantics/Implementations/Memory.v]). The accumulator
+      invariant tracks, for any pair of related accumulators, that the
+      result is the accumulator (reversed) followed by a [RB]-related
+      suffix; [rev_append (b :: acc) bs' = rev_append acc (b :: bs')]
+      holds by a single unfolding step of [rev_append], which is what
+      lets the induction thread through the accumulator update. *)
+Lemma I2F_EOU_map_monad_acc2 {A1 A2 B1 B2} (RA : A1 -> A2 -> Prop) (RB : B1 -> B2 -> Prop)
+  (f1 : A1 -> EOU B1) (f2 : A2 -> EOU B2) :
+  forall l1 l2,
+    Forall2 RA l1 l2 ->
+    (forall a1 a2, RA a1 a2 -> I2F_EOU RB (f1 a1) (f2 a2)) ->
+    I2F_EOU (Forall2 RB) (map_monad_acc f1 l1) (map_monad_acc f2 l2).
+Proof.
+  intros l1 l2 F HF.
+  unfold map_monad_acc.
+  assert (H : forall xs1 xs2, Forall2 RA xs1 xs2 -> forall acc1 acc2,
+             I2F_EOU
+               (fun r1 r2 =>
+                  exists bs1 bs2,
+                    r1 = rev_append acc1 bs1 /\
+                    r2 = rev_append acc2 bs2 /\
+                    Forall2 RB bs1 bs2)
+               ((fix loop acc l :=
+                   match l with
+                   | [] => ret (rev_append acc [])
+                   | a::l' => b <- f1 a;; loop (b::acc) l'
+                   end) acc1 xs1)
+               ((fix loop acc l :=
+                   match l with
+                   | [] => ret (rev_append acc [])
+                   | a::l' => b <- f2 a;; loop (b::acc) l'
+                   end) acc2 xs2)).
+  { intros xs1 xs2 FA; induction FA as [| x1 x2 xs1 xs2 Rx FA' IH]; intros acc1 acc2; cbn.
+    - constructor.
+      exists [], []; auto.
+    - eapply I2F_EOU_bind; [now apply HF |].
+      intros b1 b2 HB.
+      eapply I2F_EOU_mono; [| apply (IH (b1::acc1) (b2::acc2))].
+      intros r1 r2 (bs1 & bs2 & -> & -> & HBS).
+      exists (b1::bs1), (b2::bs2); auto.
+  }
+  eapply I2F_EOU_mono; [| apply (H l1 l2 F [] [])].
+  intros r1 r2 (bs1 & bs2 & -> & -> & HBS); auto.
 Qed.
 

@@ -526,6 +526,17 @@ Section Forall2.
     intros * HR; induction HR; subst; cbn; auto.
   Qed.
 
+  (* [filter] under agreeing predicates preserves [Forall2]-relatedness. *)
+  Lemma Forall2_filter {A B} (R : A -> B -> Prop) (p1 : A -> bool) (p2 : B -> bool)
+    (Hp : forall a b, R a b -> p1 a = p2 b) :
+    forall l1 l2, Forall2 R l1 l2 -> Forall2 R (filter p1 l1) (filter p2 l2).
+  Proof.
+    intros l1 l2 F; induction F as [| x y l1 l2 Rxy F' IH]; cbn.
+    - constructor.
+    - rewrite (Hp x y Rxy).
+      destruct (p2 y); [constructor; auto | auto].
+  Qed.
+
 End Forall2.
 
 (** *** Interactions between monadic computations and lists *)
