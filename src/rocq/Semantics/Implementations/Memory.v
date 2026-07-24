@@ -71,7 +71,8 @@ Section MemoryModel.
     loop_monad (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
 
   Definition write_dvalue (dt : dtyp) (p : ptr) (v : dvalue) : memM unit :=
-    write_bytes p (dvalue_to_memory_bytes v dt).
+    bytes <- lift (dvalue_to_memory_bytes v dt) ;;
+    write_bytes p bytes.
 
   Definition generate_num_poison_bytes_h
     (start_ix : N) (num : N) (dt : dtyp) : list memory_byte :=
@@ -79,7 +80,7 @@ Section MemoryModel.
       (fun (x : N) => [])
       (fun n mf x =>
          let rest_bytes := mf (N.succ x) in
-         MByte (DVALUE_Poison dt) dt x :: rest_bytes)
+         poison_memory_byte :: rest_bytes)
       num start_ix.
 
   Definition generate_num_poison_bytes (num : N) (dt : dtyp) : list memory_byte :=
@@ -207,7 +208,7 @@ Section MemoryModel.
     then
       mub "memset given negative length."
     else
-      let byte := MByte (DVALUE_I 8 val) (DTYPE_I 8) 0 in
+      let byte := BYTE_I (repr 0) in
       write_bytes dst (repeatN (Z.to_N len) byte).
   
   Definition handle_memcpy (args : list dvalue_base) : memM unit :=

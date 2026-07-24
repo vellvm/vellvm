@@ -70,7 +70,7 @@ Definition inttyp (x:N) : Type :=
 apply N.eqb_eq.
 Qed.
 
-(* SAZ - TODO make this into typeclasses the way we did with bitint? *)
+(* SAZ: TODO make this into typeclasses the way we did with bitint? *)
 Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
 
@@ -78,20 +78,61 @@ Definition ll_double := Floats.float.
 Section DValue.
   Context {Pa : Params}.
 
+  (* SAZ: TODO - move [memory_bit] and [dvalue_bv] to the memory model *)
   Variant memory_bit :=
   | Bit_ptr (p:ptr) (idx : N)  (* idx'th bit of pointer p *)
   | Bit_psn                    (* poison *)
   | Bit_bit (b:@bit_int 1)     (* actual bit *)
   .    
 
-  Variant dvalue_bv (sz:positive) :=
-  | BYTE_Pointer (p:ptr)
-  | BYTE_I (x:@bit_int sz)
-  | BYTE_Poison
-    (* Invariant: Byte_mixed _must_ not have all pointer / all poison / all bit values
-       otherwise one of the three representations above would work
-     *)        
-  | BYTE_Mixed (bits : list memory_bit)        
+  Definition Z_to_memory_bit (z:Z) :=
+    Bit_bit (repr z).
+  
+  (* On the LLVM SIDE there is an invariant:
+
+           Byte_mixed must _not_ have all pointer bits (otherwise BYTE_Pointer is canonical)
+        
+      for other sizes
+      values otherwise one of the two representations above, or DVALUE_Poison
+      (DTYPE_B sz) would work.
+
+   *)        
+  Variant dvalue_bv (bit_sz:positive) :=
+    (* Represents [bit_sz] continuous _bits_ of pointer [p] as laid out in
+       memory.  If [pointer_size] is the size of pointers in bytes, we have:
+         num_chunks := (8 * pointer_size / bit_sz) and 
+         0 <= idx < num_chunks is the index of this chunk of the
+       pointer when broken up into [bit_sz] sized chunks
+
+       For example, if [bit_sz] = 8 and pointer_size = 8 (bytes) then
+         num_chunks = 8 and 
+         0 <= idx < 8 and each BYTE_Pointer represents one byte of a full pointer value.  If
+       [bit_sz] = 64 and pointer_size = 8 (bytes) then 0 <= idx < 1 and there is only one
+       such chunk (at index 0).
+
+       None of the bits may be poison. *)
+    | BYTE_Pointer (p:ptr) (idx:N)
+
+    (* Reprsents [bit_sz] continuous _bits_ of binary data [x] as laid out in memory.
+       None of these bits may be poison. *)
+    | BYTE_I (x:@bit_int bit_sz)
+
+   (* Represents [bit_sz] continuous _bits_ of mixed binary/poison/pointer data as
+      laid out in memory.
+      Invariants:
+      - List.length bits = [bit_sz]
+      - BYTE_mixed must _not_ have all pointer bits (otherwise BYTE_Pointer is canonical).
+      - BYTE_mixed must _not_ have all integer bits (otherwise BYTE_I is canonical).
+
+      On the LLVM SIDE: (e.g. within a DVALUE_B),
+      - BYTE_mixed must _not_ have all poision bits
+        (otherwise DVALUE_Poison (DTYPE_Base (DTYPE_B bit_sz)) is canonical).
+
+      In the MEMORY MODEL the poison invariant above might not hold.
+      Instead  we must ensure that the translation establishes/respects the invariant.
+      In particular, the list of memory_bits might be all poison.
+    *)         
+    | BYTE_Mixed (bits : list memory_bit)        
   .
                
   Variant dvalue_base : Set :=
@@ -108,7 +149,7 @@ Section DValue.
    *)                   
   | DVALUE_Poison (t:dtyp)
   | DVALUE_None
-    (* Byte type carrier.  Invariant: length bits = sz *)
+    (* Byte type carrier.  Invariant: length bits = sz  *)
   | DVALUE_B (sz : positive) (bv : dvalue_bv sz)
   .
 
@@ -206,9 +247,8 @@ Section DValue.
 
   Definition show_dvalue_bv {sz:positive} (bv : dvalue_bv sz) : string :=
     match bv with
-    | BYTE_Pointer p => show_ptr p
+    | BYTE_Pointer p idx => show_ptr p ++ "[" ++ show idx ++ "]"
     | BYTE_I x => show (Zpos sz) ++ " " ++ show (unsigned x)
-    | BYTE_Poison => "poison"
     (* Invariant: Byte_mixed _must_ not have all pointer / all poison / all bit values
        otherwise one of the three representations above would work
      *)        
@@ -281,10 +321,12 @@ Section DValue.
     Lemma dvalue_bv_eq_dec : forall {sz} (bv1 bv2 : dvalue_bv sz), {bv1 = bv2} + {bv1 <> bv2}.
       intros *.
       destruct bv1; destruct bv2; try solve [right; intros H; inversion H].
-      - destruct (eq_dec_ptr p p0); subst; auto. right; intros H; inversion H; contradiction.
+      - destruct (eq_dec_ptr p p0); subst; auto.
+        destruct (N.eq_dec idx idx0); subst; auto.
+        right; intros H; inversion H; contradiction.
+        right; intros H; inversion H; contradiction.
       - destruct (Integers.eq_dec x x0); subst; auto.
         right. intros H; inversion H. subst_existT. contradiction.
-      - left. reflexivity.
       - destruct (list_eq_dec memory_bit_eq_dec bits bits0); subst; auto.
          + right. intros H. inversion H. subst_existT. contradiction.
     Qed.
@@ -1016,9 +1058,8 @@ Section DValue.
 (*  ------------------------------------------------------------------------- *)
 
   Variant dvalue_bv_has_sz {sz : positive} : positive -> dvalue_bv sz -> Prop :=
-    | BYTE_Pointer_sz : forall x, sz = 64%positive -> dvalue_bv_has_sz 64 (BYTE_Pointer sz x)
+    | BYTE_Pointer_sz : forall x idx, dvalue_bv_has_sz sz (BYTE_Pointer sz x idx)
     | BYTE_Int_sz : forall sz' (x: @bit_int sz), sz = sz' -> dvalue_bv_has_sz sz' (BYTE_I x)
-    | BYTE_Poison_sz : forall sz', sz = sz' -> dvalue_bv_has_sz sz' (BYTE_Poison sz)
     | BYTE_Mixed_sz bits : forall sz', length bits = (Pos.to_nat sz') -> sz = sz' -> dvalue_bv_has_sz sz' (BYTE_Mixed sz bits).
 
   Variant dvalue_base_has_dtyp_base : dvalue_base -> dtyp_base -> Prop :=

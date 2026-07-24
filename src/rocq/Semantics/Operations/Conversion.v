@@ -283,8 +283,10 @@ Section Convert.
         then ret dv
         else if bit_sizeof_dtyp t_from =? bit_sizeof_dtyp t_to
              then
-               let bytes := dvalue_to_memory_bytes dv t_from in
-               EOU_to_itree (memory_bytes_to_dvalue bytes t_to)
+               EOU_to_itree (
+                   bytes <- dvalue_to_memory_bytes dv t_from ;;
+                   memory_bytes_to_dvalue bytes t_to
+                 )
              else raise "unequal bitsize in cast"
     | CONV_Pure ct =>
         EOU_to_itree (convert_pure ct t_from dv t_to)

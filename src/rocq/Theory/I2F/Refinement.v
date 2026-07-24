@@ -91,8 +91,6 @@ Section Refinement.
   | I2F_BYTE_Pointer p p' :
     I2F_Addr p p' ->
     I2F_dvalue_bv (@BYTE_Pointer PInf sz p) (@BYTE_Pointer PFin sz p')
-  | I2F_BYTE_Poison :
-    I2F_dvalue_bv (@BYTE_Poison PInf sz) (@BYTE_Poison PFin sz)      
   | I2F_BYTE_Mixed bits bits':
     Forall2 I2F_memory_bit bits bits' ->      
     I2F_dvalue_bv (@BYTE_Mixed PInf sz bits) (@BYTE_Mixed PFin sz bits').

@@ -25,3 +25,5 @@ Class Params := {
     P2IT  :: @PITheory PROV PTR P2I;
   }.
 
+Definition pointer_size `{Pa : Params} := sizeof_dtyp (DynamicTypes.DTYPE_Base DynamicTypes.DTYPE_Pointer).
+
