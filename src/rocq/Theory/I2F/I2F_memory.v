@@ -34,7 +34,7 @@ From Vellvm Require Import
 From Vellvm Require Import
   Theory.I2F.Refinement
   Theory.I2F.I2F_exp
-  Theory.I2F.I2F_MemS.
+  Theory.I2F.I2F_memS.
 
 Existing Instance MemoryModelStateV.
 Existing Instance MemoryModelPrimitivesV.
@@ -49,12 +49,6 @@ Lemma I2F_Addr_ptr_to_int : forall (p : @ptr (@PROV PInf) (@PTR PInf)) (p' : @pt
     I2F_Addr p p' -> @ptr_to_int _ _ (@P2I PInf) p = @ptr_to_int _ _ (@P2I PFin) p'.
 Proof.
   intros [z pr] [i pr'] [HI ->]; cbn; red in HI; auto.
-Qed.
-
-Lemma I2F_Addr_ptr_provenance : forall p p',
-    I2F_Addr p p' -> ptr_provenance p = ptr_provenance p'.
-Proof.
-  intros [z pr] [i pr'] [HI ->]; cbn; auto.
 Qed.
 
 Lemma I2F_from_Z : forall z, I2F_EOU I2F_Iptr (@from_Z IPZ z) (@from_Z IP64Bit z).
@@ -130,11 +124,6 @@ Proof.
   now apply I2F_dvalue_extract_byte.
 Qed.
 
-(** [generate_num_poison_bytes_h] is defined via [N.recursion] threading a
-    start index; unfold it one step at a time via the library's
-    [recursion_0]/[recursion_succ] equations (properness in the
-    accumulator is literal Leibniz equality here, so it is trivial) rather
-    than fighting the low-level fixpoint. *)
 Lemma generate_num_poison_bytes_h_0 {Pa : Params} (dt : dtyp) (start : N) :
   generate_num_poison_bytes_h start 0 dt = [].
 Proof. reflexivity. Qed.
@@ -188,13 +177,10 @@ Qed.
 (** * State relation
 
     Componentwise relation on the concrete implementation's memory
-    state ([State], [Semantics/Implementations/Memory.v]): memories are
-    related as [IM_Refine]-related maps of [I2F_byte]-related bytes,
-    framestacks structurally (so that [pop_frame_stack]'s failure on
-    [Singleton] happens in lockstep), heaps as [IM_Refine]-related maps
-    of [I2F_Addr]-related pointer lists, and provenances *equal*
-    (feeding [Cfresh_prov]'s lockstep resolution and the [aid]/[prov]
-    payloads stored in [I2F_byte]/[I2F_Addr]). *)
+    state: memories are related as [IM_Refine]-related maps of
+    [I2F_byte]-related bytes, framestacks structurally, heaps as
+    [IM_Refine]-related maps of [I2F_Addr]-related pointer lists,
+    and provenances equal. *)
 
 Definition I2F_byte (b : @byte PInf) (b' : @byte PFin) : Prop :=
   let '(mb, aid) := b in
@@ -351,10 +337,7 @@ Proof.
   - apply I2F_add_all_to_heap'; auto.
 Qed.
 
-(** ** Accessor pack
-
-    One [I2F_memS]/[I2F_State] lemma per state combinator of
-    [Implementations/Memory.v:403-467]. *)
+(** ** Accessor pack *)
 
 Lemma I2F_get_mem : I2F_memS I2F_State I2F_memory get_mem get_mem.
 Proof.
@@ -394,15 +377,6 @@ Proof.
   eapply I2F_memS_bind; [apply I2F_memS_get |].
   intros σ1 σ2 [[Hmem Hfs Hheap] Hprov]; cbn.
   constructor; exact Hheap.
-Qed.
-
-Lemma I2F_get_provenance :
-  I2F_memS I2F_State (@Logic.eq provenance) get_provenance get_provenance.
-Proof.
-  unfold get_provenance.
-  eapply I2F_memS_bind; [apply I2F_memS_get |].
-  intros σ1 σ2 [Hms Hprov]; cbn.
-  constructor; exact Hprov.
 Qed.
 
 Lemma I2F_app_mem_stack : forall f1 f2,
@@ -490,11 +464,7 @@ Proof.
   apply I2F_upd_frame_stack; auto.
 Qed.
 
-(** ** Primitives
-
-    [Existing Instance MemoryModelPrimitivesV] (declared above) resolves
-    [read_byte]/[write_byte]/[allocate_bytes_with_pr]/[malloc_bytes_with_pr]/
-    [mempush]/[mempop]/[free] to their concrete implementations below. *)
+(** ** Primitives *)
 
 Lemma I2F_read_byte_raw : forall msg addr,
     I2F_memS I2F_State I2F_byte
@@ -777,17 +747,6 @@ Proof.
   apply I2F_memory_bytes_to_dvalue; auto.
 Qed.
 
-Lemma Forall2_zip {A1 A2 B1 B2}
-    (RA : A1 -> A2 -> Prop) (RB : B1 -> B2 -> Prop) :
-  forall xs1 xs2, Forall2 RA xs1 xs2 ->
-  forall ys1 ys2, Forall2 RB ys1 ys2 ->
-  Forall2 (prod_rel RA RB) (zip xs1 ys1) (zip xs2 ys2).
-Proof.
-  intros xs1 xs2 Hxs; induction Hxs; intros ys1 ys2 Hys; cbn.
-  - constructor.
-  - destruct Hys; cbn; constructor; auto; constructor; auto.
-Qed.
-
 Lemma I2F_write_bytes : forall (p1 : @ptr (@PROV PInf) (@PTR PInf)) (p2 : @ptr (@PROV PFin) (@PTR PFin)),
     I2F_Addr p1 p2 ->
     forall (bytes1 : list (@memory_byte PInf)) (bytes2 : list (@memory_byte PFin)),
@@ -826,13 +785,6 @@ Proof.
   apply I2F_Allocate_bytes_with_pr; auto.
 Qed.
 
-Lemma Forall2_concat {A1 A2} (R : A1 -> A2 -> Prop) :
-  forall ls1 ls2, Forall2 (Forall2 R) ls1 ls2 -> Forall2 R (List.concat ls1) (List.concat ls2).
-Proof.
-  intros ls1 ls2 H; induction H; cbn; auto.
-  apply Forall2_app; auto.
-Qed.
-
 Lemma I2F_allocate_dtyp : forall dt num_elements align,
     I2F_memS I2F_State I2F_Addr
       (@allocate_dtyp PInf _ dt num_elements align) (@allocate_dtyp PFin _ dt num_elements align).
@@ -846,12 +798,7 @@ Proof.
     apply I2F_generate_poison_bytes.
 Qed.
 
-(** ** [convert_impure]: impure type conversions
-
-    [assert_inttoptr_types_ok] is parameter-free (shared [dtyp_base]s);
-    the two arithmetic legs reuse [I2F_dvalue_base_int_unsigned]/
-    [I2F_Addr_ptr_to_int] (equal integer readings of related values) and
-    the already-proved [I2F_int_to_ptr]/[I2F_coerce_integer_to_int]. *)
+(** ** [convert_impure]: impure type conversions *)
 
 Lemma I2F_assert_inttoptr_types_ok : forall t_from t_to,
     I2F_memS I2F_State (fun (_ _ : unit) => True)
@@ -916,12 +863,7 @@ Proof.
     induction Hval; cbn; constructor; auto.
 Qed.
 
-(** ** [handle_memoryM]
-
-    Case on the two related [MemoryE] events (via [I2FE_Memory]); cross
-    pairs are ruled out by [False], and each diagonal case discharges via
-    the primitive/derived-operation lemmas above, answering per
-    [I2FA_Memory]. *)
+(** ** [handle_memoryM] *)
 
 Theorem I2F_handle_memoryM :
   forall T1 T2 (e1 : @MemoryE PInf T1) (e2 : @MemoryE PFin T2),
@@ -969,12 +911,7 @@ Proof.
     intros; simp I2FA_Memory; auto.
 Qed.
 
-(** ** [handle_intrinsicM] (memcpy/memset/malloc/free)
-
-    The intrinsic name is shared between the two sides ([I2FE_Intrinsic]
-    forces [f1 = f2]), so the string-based dispatch in [handle_intrinsicM]
-    takes the same branch on both sides; only the memory-touching bodies
-    need relating, reusing the [handle_memoryM] ladder above. *)
+(** ** [handle_intrinsicM] (memcpy/memset/malloc/free) *)
 
 Lemma I2F_memcpy : forall (src1 dst1 : @ptr (@PROV PInf) (@PTR PInf))
                           (src2 dst2 : @ptr (@PROV PFin) (@PTR PFin)),

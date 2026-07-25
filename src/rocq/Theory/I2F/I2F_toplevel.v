@@ -37,7 +37,7 @@ From Vellvm Require Import
   Theory.I2F.Refinement
   Theory.I2F.I2F_exp
   Theory.I2F.I2F_denotation
-  Theory.I2F.I2F_MemS
+  Theory.I2F.I2F_memS
   Theory.I2F.I2F_memory
   Theory.I2F.I2F_interp.
 

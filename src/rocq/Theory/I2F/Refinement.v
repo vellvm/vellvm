@@ -407,11 +407,6 @@ Hint Constructors I2F_memory_bit : core.
 Hint Constructors I2F_dvalue_base : core.
 Hint Constructors I2F_dvalue : core.
 Hint Constructors I2F_EOU : core.
-(* [dvp t] is a definition ([DVALUE_Poison (DTYPE_Base t)]), so [auto]'s
-     [simple apply] does not see the constructor underneath; go through
-     full [apply]. *)
-(* #[local] Hint Extern 1 (I2F_dvalue_base (dvp _) (dvp _)) => *)
-  (* apply I2F_dvalue_Poison : core. *)
 
 (** The [CFG]-level cut predicates against their structural
       decomposition ([rutt_cutoff]'s combinators): the [subevent]
@@ -453,42 +448,83 @@ Proof.
   intros * HR; now destruct HR.
 Qed.
 
-(** Lifting [I2F_EOU]-related pure computations into the refinement.
-      This is the workhorse for all the arithmetic cases of [denote_exp]:
-      they end in [lift (f ...)] for pure [f]s, so each of them reduces to
-      an [I2F_EOU] fact about [f], proved by first-order case analysis. *)
-Lemma I2F_refine_lift {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
+(** * Shared lifting lemmas (one proof for MCFG / MCFGbot / CFG)
+
+    [freeze], [freeze_base], [EOU_to_itree] and [ITree.map DVALUE_Base]
+    are polymorphic in the ambient event signature, and the MCFG-, bottom-
+    and CFG-level refinements are all [ruttc cutUB cutOOM _ _] with the
+    SAME cut predicates --- only the event/answer relations differ. So we
+    prove each lifting lemma once, generic over [(REv, RAns)] (and, when
+    no event is triggered, over the cut predicates too), taking as a
+    hypothesis exactly the fact about the handful of events the itree
+    triggers ([Throw] for [EOU_to_itree]'s error branch, [draw] for
+    [freeze]). The MCFG/MCFGbot/CFG instances discharge those by
+    computation, replacing the earlier primed/unprimed duplication. *)
+
+(** Mapping [DVALUE_Base] over related computations: no event is
+    triggered, so this holds for arbitrary [ruttc] parameters. *)
+Lemma refine_dvalue_base_map_gen {E1 E2}
+  {Rcutl : pred1 E1} {Rcutr : pred1 E2}
+  {REv : prerel E1 E2} {RAns : postrel E1 E2}
+  (t1 : itree E1 (@dvalue_base PInf)) (t2 : itree E2 (@dvalue_base PFin)) :
+  ruttc Rcutl Rcutr REv RAns I2F_dvalue_base t1 t2 ->
+  ruttc Rcutl Rcutr REv RAns I2F_dvalue
+    (ITree.map (@DVALUE_Base PInf) t1) (ITree.map (@DVALUE_Base PFin) t2).
+Proof.
+  intros H; eapply ruttc_bind; [exact H |].
+  intros ?? Hb; apply ruttc_ret; now constructor.
+Qed.
+
+(** Lifting [EOU_to_itree] of [I2F_EOU]-related pure computations. This is
+    the workhorse for all the arithmetic cases of [denote_exp]: they end
+    in [lift (f ...)] for pure [f]s, so each reduces to an [I2F_EOU] fact
+    about [f]. The [ret]/[ub]/[oom] branches use only the shared
+    [cutUB]/[cutOOM]; the error branch triggers a [Throw], so we require
+    [REv] to relate it --- exactly the "any two such events are related"
+    triviality the old fully-abstract attempt was missing. *)
+Lemma I2F_refine_lift_gen {E1 E2}
+  `{FailureE -< E1} `{OOME -< E1} `{UBE -< E1}
+  `{FailureE -< E2} `{OOME -< E2} `{UBE -< E2}
+  {REv : prerel E1 E2} {RAns : postrel E1 E2}
+  (HThrow : forall u1 u2 : unit,
+      REv void void (subevent _ (Throw u1)) (subevent _ (Throw u2)))
+  {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
   I2F_EOU RR m1 m2 ->
-  I2F_refine_MCFG RR (EOU_to_itree m1) (EOU_to_itree m2).
+  ruttc cutUB cutOOM REv RAns RR (EOU_to_itree m1) (EOU_to_itree m2).
 Proof.
   intros []; cbn.
   - pfold; constructor; auto.
-  - apply ruttc_trigger_cast; easy.
+  - apply ruttc_trigger_cast; apply HThrow.
   - pfold; red; cbn.
     apply EqCutL; constructor.
   - pfold; red; cbn.
     apply EqCutR; constructor.
 Qed.
 
-(** Sibling of [I2F_refine_lift] for [MCFGEbot]/[I2F_refine_MCFGbot]
-      ([Theory/I2F/I2F_state.v]): identical proof, but the fully-abstract
-      generalization over [REv]/[RAns] doesn't typecheck as one shared
-      lemma — the [raise_error]/[raise_ub]/[raise_oom] cases need
-      [I2FE_Failure]/[I2FE_UB]/[I2FE_OOM]'s specific "any two such events
-      are related" triviality, which isn't derivable for a fully abstract
-      event relation. *)
+(** The [Throw] side-condition, discharged by computation at each of the
+    three event signatures. *)
+Lemma I2FE_MCFG_Throw : forall u1 u2 : unit,
+    I2FE_MCFG (subevent _ (Throw u1)) (subevent _ (Throw u2)).
+Proof. intros; cbn; easy. Qed.
+
+Lemma I2FE_MCFGbot_Throw : forall u1 u2 : unit,
+    I2FE_MCFGbot (subevent _ (Throw u1)) (subevent _ (Throw u2)).
+Proof. intros; cbn; easy. Qed.
+
+Lemma I2FE_CFG_Throw : forall u1 u2 : unit,
+    I2FE_CFG (subevent _ (Throw u1)) (subevent _ (Throw u2)).
+Proof. intros; cbn; easy. Qed.
+
+(** [I2F_refine_lift] and its [MCFGbot] sibling as instances. *)
+Lemma I2F_refine_lift {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
+  I2F_EOU RR m1 m2 ->
+  I2F_refine_MCFG RR (EOU_to_itree m1) (EOU_to_itree m2).
+Proof. intros H; unfold I2F_refine_MCFG; apply (I2F_refine_lift_gen I2FE_MCFG_Throw); exact H. Qed.
+
 Lemma I2F_refine_lift_bot {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
   I2F_EOU RR m1 m2 ->
   I2F_refine_MCFGbot RR (EOU_to_itree m1) (EOU_to_itree m2).
-Proof.
-  intros []; cbn.
-  - pfold; constructor; auto.
-  - apply ruttc_trigger_cast; easy.
-  - pfold; red; cbn.
-    apply EqCutL; constructor.
-  - pfold; red; cbn.
-    apply EqCutR; constructor.
-Qed.
+Proof. intros H; unfold I2F_refine_MCFGbot; apply (I2F_refine_lift_gen I2FE_MCFGbot_Throw); exact H. Qed.
 
 (** [I2F_EOU] is reflexive at [eq]: parameter-independent pure
       computations (e.g. type guards, which mention no value) are related

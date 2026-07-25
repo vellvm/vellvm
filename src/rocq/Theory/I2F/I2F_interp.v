@@ -36,7 +36,7 @@ From Vellvm Require Import
 From Vellvm Require Import
   Theory.I2F.Refinement
   Theory.I2F.I2F_exp
-  Theory.I2F.I2F_MemS
+  Theory.I2F.I2F_memS
   Theory.I2F.I2F_memory.
 
 Existing Instance MemoryModelStateV.
@@ -149,13 +149,7 @@ Proof.
   destruct Hargs; [apply I2F_EOU_ret; repeat constructor | constructor].
 Qed.
 
-(** ** [ushl_sat] (saturated shift-left, [ushl_sat_{1,8,16,32,64}])
-
-    [mshl]/[munsigned]/[mmax_unsigned]/[mrepr]/[mbitwidth] ([VMemInt]) are
-    entirely [Params]-independent (fixed-width fixed_int, no [iptr]
-    involved), so the two sides thread through *literally* the same
-    control flow once [VMI] is shared explicitly; only the final wrap into
-    [dvalue_base] via [tdb] genuinely differs by [Pa]. *)
+(** ** [ushl_sat] (saturated shift-left, [ushl_sat_{1,8,16,32,64}]) *)
 Lemma I2F_ushl_sat {I : Type} (VMI : VMemInt I)
       (TDI1 : @ToDvalueBase PInf I) (TDI2 : @ToDvalueBase PFin I)
       (Htdb : forall x : I, I2F_dvalue_base (@tdb PInf I TDI1 x) (@tdb PFin I TDI2 x))
@@ -224,29 +218,10 @@ Lemma I2F_llvm_ushl_sat_64 : forall args1 args2,
     I2F_EOU (sum_rel I2F_dvalue_base I2F_dvalue_base) (llvm_ushl_sat_64 args1) (llvm_ushl_sat_64 args2).
 Proof. unfold llvm_ushl_sat_64; i2f_ushl_sat_leaf 64%positive. Qed.
 
-(** ** [va_start] / [va_copy] (the only two intrinsics touching memory)
+(** ** [va_start] / [va_copy] (the only two intrinsics touching memory) *)
 
-    Genuine [semantic_function]s, not routed through [pure_base_to_semantic]:
-    they [trigger] real [MemoryE] events via [store]/[load]. [I2FE_Memory]'s
-    [Store]/[Load] clauses only need [I2F_dvalue] on the address/value (the
-    "is this actually a pointer" concern is [handle_memoryM]'s problem, not
-    this layer's), so these are directly dischargeable from the [Forall2
-    I2F_dvalue]/[option_rel I2F_Addr] hypotheses via the same [rstep]/[erbind]
-    idiom already used for [Store]/[Load] in [I2F_denotation.v]. *)
-
-(** [raise]/[raiseUB] compile to [trigger_cast], not a plain [ITree.trigger]
-    — [rstep]'s first ([ruttc_trigger]) alternative doesn't apply to them at
-    all, and going through [first [...]] somehow also blocks its second
-    ([ruttc_trigger_cast]) alternative from firing (confirmed by direct
-    probe: bare [rstep] makes zero progress on a [raise]-headed goal, while
-    [apply ruttc_trigger_cast] alone succeeds). So [raise]/[raiseUB] goals
-    need [ruttc_trigger_cast] applied explicitly. *)
 Ltac i2f_va_fail :=
   apply ruttc_trigger_cast; cbnn; first [simp I2FE_Failure | simp I2FE_UB]; auto.
-
-Ltac i2f_va_store_step :=
-  erbind; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; repeat (split; auto); repeat constructor; auto | auto] |
-            intros; apply ruttc_ret; auto].
 
 Lemma I2F_llvm_va_start : forall args1 args2 va1 va2,
     Forall2 I2F_dvalue args1 args2 ->
@@ -258,12 +233,12 @@ Proof.
   destruct Hargs as [ | d1 d2 l1 l2 Hd Hargs]; [i2f_va_fail |].
   destruct Hargs; [ | i2f_va_fail].
   destruct Hva as [ | vp1 vp2 Hvp]; [i2f_va_fail |].
-  destruct Hd as [b1 b2 Hb | p τ1 s1 s2 Hs | v1' τ1 s1 s2 Hs].
+  destruct Hd as [b1 b2 Hb | p τ1 s1 s2 | v1' τ1 s1 s2 Hs].
   - destruct Hb as [p1 p2 Hp | sz i | ip1 ip2 Hip | d | f | dt | | sz bits bits' Hbits].
-    all: try (rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition| intros [] [] _; easy] | intros; rstep]).
+    all: try (rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition auto| intros [] [] _; easy] | intros; rstep]).
     rstep; easy.
-  - rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition| intros [] [] _; easy] | intros; rstep].
-  - rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition| intros [] [] _; easy] | intros; rstep].
+  - rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition auto| intros [] [] _; easy] | intros; rstep].
+  - rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition auto| intros [] [] _; easy] | intros; rstep].
 Qed.
 
 Lemma I2F_llvm_va_copy : forall args1 args2 va1 va2,
@@ -581,7 +556,6 @@ Proof.
 Qed.
 
 (** * Intrinsics (the internal to the memory-model ones) *)
-(* TODO: Define this lifting of Answer relations to value ones given two events *)
 Lemma I2F_fused_intrinsic :
   forall T1 T2 (e1 : @IntrinsicE PInf T1) (e2 : @IntrinsicE PFin T2),
     I2FE_Intrinsic e1 e2 ->
@@ -755,7 +729,6 @@ Qed.
 
 
 (** * The main result from this file: [interp_mcfg] *)
-(* TODO: Should this be generalized to an arbitrary relation on R? *)
 Lemma I2F_interp_mcfg {R} (t1 : @MCFGtop PInf R) (t2 : @MCFGtop PFin R):
   I2F_refine_MCFG Logic.eq t1 t2 ->
   forall s1 s2, I2F_FusedS s1 s2 ->
@@ -766,20 +739,6 @@ Proof.
   intros Hmcfg * Hfused.
   apply ruttc_interp_state_specialized; auto.
   apply I2F_interp_intrinsics; auto.
-Qed.
-
-(** * Additional utility lemmas for the top-level *)
-
-Lemma I2F_interp_mcfg_ret {R1 R2} (RR : R1 -> R2 -> Prop) (r1 : R1) (r2 : R2) :
-  RR r1 r2 ->
-  forall s1 s2, I2F_FusedS s1 s2 ->
-    I2F_refine_MCFGbot (prod_rel I2F_FusedS RR)
-      (interp_mcfg (Ret r1) s1) (interp_mcfg (Ret r2) s2).
-Proof.
-  intros Hr s1 s2 Hs.
-  unfold interp_mcfg.
-  apply ruttc_interp_state_specialized; auto.
-  apply I2F_interp_intrinsics, ruttc_ret; auto.
 Qed.
 
 Lemma I2F_interp_mcfg_bind {R1 R2 T1 T2} (RR : R1 -> R2 -> Prop) (RT : T1 -> T2 -> Prop)
@@ -797,17 +756,3 @@ Proof.
   apply I2F_interp_intrinsics.
   eapply ruttc_bind; eauto.
 Qed.
-
-Lemma I2F_interp_mcfg_trigger :
-  forall T1 T2 (e1 : @MCFGEtop PInf T1) (e2 : @MCFGEtop PFin T2),
-    I2FE_MCFG e1 e2 ->
-    forall s1 s2, I2F_FusedS s1 s2 ->
-      I2F_refine_MCFGbot (prod_rel I2F_FusedS (fun r1 r2 => I2FA_MCFG e1 r1 e2 r2))
-        (interp_mcfg (ITree.trigger e1) s1) (interp_mcfg (ITree.trigger e2) s2).
-Proof.
-  intros * HE s1 s2 Hs.
-  unfold interp_mcfg.
-  apply ruttc_interp_state_specialized; auto.
-  apply I2F_interp_intrinsics, ruttc_trigger; auto.
-Qed.
-
