@@ -41,34 +41,68 @@ Hint Unfold I2F_Addr: core.
 Hint Unfold I2F_Iptr : core.
 Hint Transparent dvp : core.
 Ltac cbnn := cbn; unfold resum, ReSum_id, id_, Id_IFun.
+Tactic Notation "cbnn" "in" ident(h) :=
+  cbn in h; unfold resum, ReSum_id, id_, Id_IFun in h.
 
+(** [refine_dvalue_base_map] is [refine_dvalue_base_map_gen]
+      (Refinement.v) at the MCFG signature. *)
 Lemma refine_dvalue_base_map t1 t2 :
   I2F_refine_MCFG I2F_dvalue_base t1 t2 ->
   I2F_refine_MCFG I2F_dvalue (ITree.map DVALUE_Base t1) (ITree.map DVALUE_Base t2).
-Proof.
-  intros; erbind; eauto.
-Qed.
+Proof. apply refine_dvalue_base_map_gen. Qed.
 
 Hint Resolve refine_dvalue_base_map : core.
+
+(** Generic [freeze]/[freeze_base], parameterized over the single event
+      they trigger: [draw]. The MCFG and CFG instances then differ only in
+      the [draw]-refinement fed in ([I2F_draw_MCFG] / [I2F_draw_CFG]). *)
+Lemma I2F_freeze_base_gen {E1 E2}
+  `{@DrawE PInf -< E1} `{FailureE -< E1} `{OOME -< E1} `{UBE -< E1}
+  `{@DrawE PFin -< E2} `{FailureE -< E2} `{OOME -< E2} `{UBE -< E2}
+  {Rcutl : pred1 E1} {Rcutr : pred1 E2}
+  {REv : prerel E1 E2} {RAns : postrel E1 E2}
+  (Hdraw : forall dt, ruttc Rcutl Rcutr REv RAns I2F_dvalue (draw dt) (draw dt))
+  (a : @dvalue_base PInf) (b : @dvalue_base PFin) :
+  I2F_dvalue_base a b ->
+  ruttc Rcutl Rcutr REv RAns I2F_dvalue (freeze_base a) (freeze_base b).
+Proof.
+  intros HDV; destruct HDV; cbn;
+    try solve [ apply ruttc_ret; auto
+              | apply refine_dvalue_base_map_gen; apply ruttc_ret; auto ].
+  apply Hdraw.
+Qed.
+
+Lemma I2F_freeze_gen {E1 E2}
+  `{@DrawE PInf -< E1} `{FailureE -< E1} `{OOME -< E1} `{UBE -< E1}
+  `{@DrawE PFin -< E2} `{FailureE -< E2} `{OOME -< E2} `{UBE -< E2}
+  {Rcutl : pred1 E1} {Rcutr : pred1 E2}
+  {REv : prerel E1 E2} {RAns : postrel E1 E2}
+  (Hdraw : forall dt, ruttc Rcutl Rcutr REv RAns I2F_dvalue (draw dt) (draw dt))
+  (a : @dvalue PInf) (b : @dvalue PFin) :
+  I2F_dvalue a b ->
+  ruttc Rcutl Rcutr REv RAns I2F_dvalue (freeze a) (freeze b).
+Proof.
+  intros HDV; induction HDV; cbn.
+  - now apply (I2F_freeze_base_gen Hdraw).
+  - eapply ruttc_bind; [apply ruttc_map_monad_gen; eauto | intros ?? HR; apply ruttc_ret; now constructor].
+  - eapply ruttc_bind; [apply ruttc_map_monad_gen; eauto | intros ?? HR; apply ruttc_ret; now constructor].
+Qed.
+
+(** [draw] refined by itself at the MCFG signature --- the sole
+      event-triggering step of [freeze]/[freeze_base]. *)
+Lemma I2F_draw_MCFG : forall dt,
+    I2F_refine_MCFG I2F_dvalue (draw dt) (draw dt).
+Proof. intros; unfold I2F_refine_MCFG, draw; rstep. Qed.
 
 Lemma I2F_freeze_base a b :
   I2F_dvalue_base a b ->
   I2F_refine (freeze_base a) (freeze_base b).
-Proof.
-  intros HDV.
-  induction HDV; cbn; eauto 8.
-  rstep.
-Qed.
+Proof. intros H; unfold I2F_refine, I2F_refine_MCFG; now apply (I2F_freeze_base_gen I2F_draw_MCFG). Qed.
 
 Lemma I2F_freeze a b :
   I2F_dvalue a b ->
   I2F_refine (freeze a) (freeze b).
-Proof.
-  intros HDV.
-  induction HDV; cbn.
-  apply I2F_freeze_base; eauto.
-  all: erbind; [apply ruttc_map_monad_gen; eauto | eauto ].
-Qed. 
+Proof. intros H; unfold I2F_refine, I2F_refine_MCFG; now apply (I2F_freeze_gen I2F_draw_MCFG). Qed.
 
 (** The pure content of the [EXP_Integer] case, and the one place where
       the 14-way case analysis on [dtyp] happens. *)
@@ -553,19 +587,6 @@ Proof.
     intros; do 2 constructor; apply Forall2_map_Base; auto.
 Qed.
 
-(** Same-instance [eval_int_icmp]: no [ToDvalue] is involved and all
-      outputs are parameter-independent constructors, so one lemma covers
-      both the [bit_int sz] case and the [Z] case used for address
-      comparisons. *)
-Lemma I2F_eval_int_icmp_refl : forall Int (VMI : VMemInt Int) samesign icmp (x y : Int),
-    I2F_EOU I2F_dvalue_base
-      (@eval_int_icmp PInf Int VMI samesign icmp x y)
-      (@eval_int_icmp PFin Int VMI samesign icmp x y).
-Proof.
-  intros; destruct icmp; cbn.
-  all: repeat (break_goal_fast; cbn); eauto.
-Qed.
-
 (* The infinite side's same-sign test is always true on unsigned values;
      the finite side's is constantly true. *)
 Lemma msamesign_Z_nonneg : forall x y : Z,
@@ -808,46 +829,6 @@ Proof.
       apply I2F_absorb_pois; intros v; repeat constructor.
 Qed.
 
-Lemma Forall2_split_every_pos {A B} (R : A -> B -> Prop) (n : positive) :
-  forall k l l',
-    (length l <= k)%nat ->
-    Forall2 R l l' ->
-    Forall2 (Forall2 R) (split_every_pos n l) (split_every_pos n l').
-Proof.
-  induction k; intros l l' LEN F; inversion F; subst.
-  - rewrite !split_every_pos_equation; constructor.
-  - cbn in LEN; lia.
-  - rewrite !split_every_pos_equation; constructor.
-  - (* [!]-rewriting would loop: the unfolding reintroduces a redex on
-         the dropped tail; pin each rewrite to its argument instead *)
-    match goal with
-    | |- Forall2 _ (split_every_pos _ ?u) (split_every_pos _ ?v) =>
-        rewrite (split_every_pos_equation _ u),
-        (split_every_pos_equation _ v)
-    end.
-    constructor.
-    + apply Forall2_take; constructor; auto.
-    + apply IHk.
-      * match goal with
-        | |- (length (drop _ (?x :: ?xs)) <= _)%nat =>
-            pose proof (@drop_length_lt _ (x :: xs) (Npos n))
-        end;
-        cbn in *.
-        forward H1; [lia|].
-        forward H1; [easy|].
-        lia.
-      * apply Forall2_drop; constructor; auto.
-Qed.
-
-Lemma Forall2_split_every_nil {A B} (R : A -> B -> Prop) :
-  forall n l l',
-    Forall2 R l l' ->
-    Forall2 (Forall2 R) (split_every_nil n l) (split_every_nil n l').
-Proof.
-  intros [|p] l l' F; cbn; [constructor|].
-  apply Forall2_split_every_pos with (k := length l); eauto.
-Qed.
-
 (** Deserialization: related byte lists deserialize to related values;
       aggregates recurse through the [Forall2] list combinators. *)
 Lemma I2F_memory_bytes_to_dvalue : forall t dbs dbs',
@@ -1052,28 +1033,6 @@ Proof.
   intros; apply I2F_memory_bytes_to_dvalue, I2F_dvalue_to_memory_bytes; auto.
 Qed.
 
-(*
-(** The single case analysis of the conversion pipeline: related inputs
-      classify into related conversion cases. The goals here are pure and
-      small (no [convert_base] body in sight), which keeps the case
-      product tractable. Bitcast is excluded: its classification runs the
-      byte round-trip, and [convert] intercepts it before [convert_base]
-      anyway. *)
-Lemma I2F_get_conv_case : forall conv t_from t_to v v',
-    conv <> Bitcast ->
-    I2F_dvalue_base v v' ->
-    I2F_conv_case
-      (@get_conv_case PInf conv t_from v t_to)
-      (@get_conv_case PFin conv t_from v' t_to).
-Proof.
-  intros * NB R.
-  destruct conv; try congruence; clear NB; cbn; auto.
-  all: destruct t_from; try constructor.
-  all: induction R; try constructor.
-  all: destruct t_to; try constructor.
-  all: repeat (break_fast; cbn); eauto.
-Qed.
-*)
 (* Related base values have equal integer interpretations: the
      convertible shapes carry shared payloads ([DVALUE_I]) or
      [to_Z]-equal ones ([DVALUE_Iptr]); everything else is interpreted
@@ -1252,38 +1211,6 @@ Qed.
 (** Related aggregates split synchronously: either both indexings are out
       of bounds (the shared UB guard), or the parts are pointwise
       related. *)
-Lemma Forall2_split_h {A B} (R : A -> B -> Prop) :
-  forall i (l1 : list A) (l2 : list B),
-    Forall2 R l1 l2 ->
-    forall pre1 pre2, Forall2 R pre1 pre2 ->
-                 match split_h pre1 i l1, split_h pre2 i l2 with
-                 | Some (p1, x1, q1), Some (p2, x2, q2) =>
-                     Forall2 R p1 p2 /\ R x1 x2 /\ Forall2 R q1 q2
-                 | None, None => True
-                 | _, _ => False
-                 end.
-Proof.
-  intros i l1 l2 F; revert i; induction F; intros i pre1 pre2 FP; cbn; auto.
-  destruct (i =? 0)%Z; cbn.
-  - repeat split; auto.
-  - apply IHF, Forall2_app; auto.
-Qed.
-
-Lemma Forall2_split {A B} (R : A -> B -> Prop) :
-  forall i (l1 : list A) (l2 : list B),
-    Forall2 R l1 l2 ->
-    match split [] i l1, split [] i l2 with
-    | Some (p1, x1, q1), Some (p2, x2, q2) =>
-        Forall2 R p1 p2 /\ R x1 x2 /\ Forall2 R q1 q2
-    | None, None => True
-    | _, _ => False
-    end.
-Proof.
-  intros i l1 l2 F; unfold split.
-  destruct (i <? 0)%Z; cbn; auto.
-  apply Forall2_split_h; auto.
-Qed.
-
 (* Split the two related aggregates of the goal synchronously: the
      out-of-bounds UB is shared, the mixed cases are contradictory, and
      [tac] finishes the successful case from the pointwise relations. *)

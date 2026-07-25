@@ -102,7 +102,10 @@ Section withParams.
    (case_ (fused_trigger (F := DebugE))
           (fused_trigger (F := FailureE))))))))))).
 
-  Definition interp_mcfg {R} (t: MCFGtop R) g l m : MCFGbot (Res R) :=
+  Definition interp_mcfg' {R} (t: MCFGtop R) g l m : MCFGbot (Res R) :=
     interp_state interp_vellvm_h (interp_intrinsics t) (m, (l, g)).
+  
+  Definition interp_mcfg {R} (t: MCFGtop R) s : MCFGbot (Res R) :=
+    interp_state interp_vellvm_h (interp_intrinsics t) s.
 
 End withParams.

@@ -883,6 +883,39 @@ Section DValue.
       None
     else
       split_h pre idx l.
+
+  (* [split]/[split_h] of related lists produce related pieces. *)
+  Lemma Forall2_split_h {A B} (R : A -> B -> Prop) :
+    forall i (l1 : list A) (l2 : list B),
+      Forall2 R l1 l2 ->
+      forall pre1 pre2, Forall2 R pre1 pre2 ->
+                   match split_h pre1 i l1, split_h pre2 i l2 with
+                   | Some (p1, x1, q1), Some (p2, x2, q2) =>
+                       Forall2 R p1 p2 /\ R x1 x2 /\ Forall2 R q1 q2
+                   | None, None => True
+                   | _, _ => False
+                   end.
+  Proof.
+    intros i l1 l2 F; revert i; induction F; intros i pre1 pre2 FP; cbn; auto.
+    destruct (i =? 0)%Z; cbn.
+    - repeat split; auto.
+    - apply IHF, Forall2_app; auto.
+  Qed.
+
+  Lemma Forall2_split {A B} (R : A -> B -> Prop) :
+    forall i (l1 : list A) (l2 : list B),
+      Forall2 R l1 l2 ->
+      match split [] i l1, split [] i l2 with
+      | Some (p1, x1, q1), Some (p2, x2, q2) =>
+          Forall2 R p1 p2 /\ R x1 x2 /\ Forall2 R q1 q2
+      | None, None => True
+      | _, _ => False
+      end.
+  Proof.
+    intros i l1 l2 F; unfold split.
+    destruct (i <? 0)%Z; cbn; auto.
+    apply Forall2_split_h; auto.
+  Qed.
     
   Fixpoint insert_value (str : dvalue) (elt : dvalue) (idxs : list Z) : EOU dvalue :=
     match idxs with

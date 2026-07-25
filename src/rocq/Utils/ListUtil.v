@@ -526,6 +526,76 @@ Section Forall2.
     intros * HR; induction HR; subst; cbn; auto.
   Qed.
 
+  (* [filter] under agreeing predicates preserves [Forall2]-relatedness. *)
+  Lemma Forall2_filter {A B} (R : A -> B -> Prop) (p1 : A -> bool) (p2 : B -> bool)
+    (Hp : forall a b, R a b -> p1 a = p2 b) :
+    forall l1 l2, Forall2 R l1 l2 -> Forall2 R (filter p1 l1) (filter p2 l2).
+  Proof.
+    intros l1 l2 F; induction F as [| x y l1 l2 Rxy F' IH]; cbn.
+    - constructor.
+    - rewrite (Hp x y Rxy).
+      destruct (p2 y); [constructor; auto | auto].
+  Qed.
+
+  Lemma Forall2_concat {A1 A2} (R : A1 -> A2 -> Prop) :
+    forall ls1 ls2, Forall2 (Forall2 R) ls1 ls2 -> Forall2 R (List.concat ls1) (List.concat ls2).
+  Proof.
+    intros ls1 ls2 H; induction H; cbn; auto.
+    apply Forall2_app; auto.
+  Qed.
+
+  Lemma Forall2_zip {A1 A2 B1 B2}
+    (RA : A1 -> A2 -> Prop) (RB : B1 -> B2 -> Prop) :
+    forall xs1 xs2, Forall2 RA xs1 xs2 ->
+               forall ys1 ys2, Forall2 RB ys1 ys2 ->
+                          Forall2 (prod_rel RA RB) (zip xs1 ys1) (zip xs2 ys2).
+  Proof.
+    intros xs1 xs2 Hxs; induction Hxs; intros ys1 ys2 Hys; cbn.
+    - constructor.
+    - destruct Hys; cbn; constructor; auto. apply IHHxs; auto.
+  Qed.
+
+  (* [split_every] of related lists yields related lists of chunks. *)
+  Lemma Forall2_split_every_pos {A B} (R : A -> B -> Prop) (n : positive) :
+    forall k l l',
+      (length l <= k)%nat ->
+      Forall2 R l l' ->
+      Forall2 (Forall2 R) (split_every_pos n l) (split_every_pos n l').
+  Proof.
+    induction k; intros l l' LEN F; inversion F; subst.
+    - rewrite !split_every_pos_equation; constructor.
+    - cbn in LEN; lia.
+    - rewrite !split_every_pos_equation; constructor.
+    - (* [!]-rewriting would loop: the unfolding reintroduces a redex on
+         the dropped tail; pin each rewrite to its argument instead *)
+      match goal with
+      | |- Forall2 _ (split_every_pos _ ?u) (split_every_pos _ ?v) =>
+          rewrite (split_every_pos_equation _ u),
+          (split_every_pos_equation _ v)
+      end.
+      constructor.
+      + apply Forall2_take; constructor; auto.
+      + apply IHk.
+        * match goal with
+          | |- (length (drop _ (?x :: ?xs)) <= _)%nat =>
+              pose proof (@drop_length_lt _ (x :: xs) (Npos n))
+          end;
+          cbn in *.
+          forward H1; [lia|].
+          forward H1; [easy|].
+          lia.
+        * apply Forall2_drop; constructor; auto.
+  Qed.
+
+  Lemma Forall2_split_every_nil {A B} (R : A -> B -> Prop) :
+    forall n l l',
+      Forall2 R l l' ->
+      Forall2 (Forall2 R) (split_every_nil n l) (split_every_nil n l').
+  Proof.
+    intros [|p] l l' F; cbn; [constructor|].
+    apply Forall2_split_every_pos with (k := length l); eauto.
+  Qed.
+
 End Forall2.
 
 (** *** Interactions between monadic computations and lists *)

@@ -301,7 +301,7 @@ Section withParams.
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
         (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog)))
-    in interp_mcfg t Maps.empty (Build_stack_frame Maps.empty None None,[]) initial_state.
+    in interp_mcfg t (initial_state, ((Build_stack_frame Maps.empty None None,[]), Maps.empty)).
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts

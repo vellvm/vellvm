@@ -287,6 +287,7 @@ Section Refinement.
     I2FA_Memory (@Alloca PInf τ1 n1 align1) dv1 (@Alloca PFin τ2 n2 align2) dv2 := I2F_dvalue dv1 dv2;
     I2FA_Memory (@Load PInf τ1 a1) dv1 (@Load PFin τ2 a2) dv2 := I2F_dvalue dv1 dv2;
     I2FA_Memory (@Store PInf τ1 a1 v1) a (@Store PFin τ2 a2 v2) b := True;
+    I2FA_Memory (@Conv PInf cv1 tf1 v1 tt1) dv1 (@Conv PFin cv2 tf2 v2 tt2) dv2 := I2F_dvalue dv1 dv2;
     I2FA_Memory _ _ _ _ := False.
 
   Equations I2FA_Draw : postrel (@DrawE PInf) (@DrawE PFin) :=
@@ -351,6 +352,26 @@ Section Refinement.
   Definition I2FA_CFG : postrel (@CFGEtop PInf) (@CFGEtop PFin) :=
     sum_postrel I2FA_Call I2FA_MCFG.
 
+  (** [MCFGEbot] (`ExternalCallE +' OOME +' LLVMExcE +' UBE +' DebugE +'
+      FailureE`, [LLVMEvents.v:219]) is the residual event signature after
+      [interp_mcfg]'s fused pass has consumed Intrinsic/Global/(Local+Stack)
+      /Memory/Draw — i.e. exactly [MCFGEtop] with those five families
+      dropped. Glue the same six leaf relations already used inside
+      [I2FE_MCFG]/[I2FA_MCFG], in the same order. *)
+  Definition I2FE_MCFGbot : prerel (@MCFGEbot PInf) (@MCFGEbot PFin) :=
+    sum_prerel I2FE_ExternalCall
+      (sum_prerel I2FE_OOM
+         (sum_prerel I2FE_Exc
+            (sum_prerel I2FE_UB
+               (sum_prerel I2FE_Debug I2FE_Failure)))).
+
+  Definition I2FA_MCFGbot : postrel (@MCFGEbot PInf) (@MCFGEbot PFin) :=
+    sum_postrel I2FA_ExternalCall
+      (sum_postrel I2FA_OOM
+         (sum_postrel I2FA_Exc
+            (sum_postrel I2FA_UB
+               (sum_postrel I2FA_Debug I2FA_Failure)))).
+
   (** * The refinement relation *)
 
   Variant cutUB {E} `{UBE -< E} : forall [A], E A -> Prop :=
@@ -373,6 +394,10 @@ Section Refinement.
     : @CFGtop PInf R1 -> @CFGtop PFin R2 -> Prop :=
     ruttc cutUB cutOOM I2FE_CFG I2FA_CFG RR.
 
+  Definition I2F_refine_MCFGbot {R1 R2} (RR : R1 -> R2 -> Prop)
+    : @MCFGbot PInf R1 -> @MCFGbot PFin R2 -> Prop :=
+    ruttc cutUB cutOOM I2FE_MCFGbot I2FA_MCFGbot RR.
+
   Definition I2F_refine : @MCFGtop PInf (@dvalue PInf) -> @MCFGtop PFin (@dvalue PFin) -> Prop :=
     I2F_refine_MCFG I2F_dvalue.
 
@@ -382,11 +407,6 @@ Hint Constructors I2F_memory_bit : core.
 Hint Constructors I2F_dvalue_base : core.
 Hint Constructors I2F_dvalue : core.
 Hint Constructors I2F_EOU : core.
-(* [dvp t] is a definition ([DVALUE_Poison (DTYPE_Base t)]), so [auto]'s
-     [simple apply] does not see the constructor underneath; go through
-     full [apply]. *)
-(* #[local] Hint Extern 1 (I2F_dvalue_base (dvp _) (dvp _)) => *)
-  (* apply I2F_dvalue_Poison : core. *)
 
 (** The [CFG]-level cut predicates against their structural
       decomposition ([rutt_cutoff]'s combinators): the [subevent]
@@ -428,22 +448,83 @@ Proof.
   intros * HR; now destruct HR.
 Qed.
 
-(** Lifting [I2F_EOU]-related pure computations into the refinement.
-      This is the workhorse for all the arithmetic cases of [denote_exp]:
-      they end in [lift (f ...)] for pure [f]s, so each of them reduces to
-      an [I2F_EOU] fact about [f], proved by first-order case analysis. *)
-Lemma I2F_refine_lift {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
+(** * Shared lifting lemmas (one proof for MCFG / MCFGbot / CFG)
+
+    [freeze], [freeze_base], [EOU_to_itree] and [ITree.map DVALUE_Base]
+    are polymorphic in the ambient event signature, and the MCFG-, bottom-
+    and CFG-level refinements are all [ruttc cutUB cutOOM _ _] with the
+    SAME cut predicates --- only the event/answer relations differ. So we
+    prove each lifting lemma once, generic over [(REv, RAns)] (and, when
+    no event is triggered, over the cut predicates too), taking as a
+    hypothesis exactly the fact about the handful of events the itree
+    triggers ([Throw] for [EOU_to_itree]'s error branch, [draw] for
+    [freeze]). The MCFG/MCFGbot/CFG instances discharge those by
+    computation, replacing the earlier primed/unprimed duplication. *)
+
+(** Mapping [DVALUE_Base] over related computations: no event is
+    triggered, so this holds for arbitrary [ruttc] parameters. *)
+Lemma refine_dvalue_base_map_gen {E1 E2}
+  {Rcutl : pred1 E1} {Rcutr : pred1 E2}
+  {REv : prerel E1 E2} {RAns : postrel E1 E2}
+  (t1 : itree E1 (@dvalue_base PInf)) (t2 : itree E2 (@dvalue_base PFin)) :
+  ruttc Rcutl Rcutr REv RAns I2F_dvalue_base t1 t2 ->
+  ruttc Rcutl Rcutr REv RAns I2F_dvalue
+    (ITree.map (@DVALUE_Base PInf) t1) (ITree.map (@DVALUE_Base PFin) t2).
+Proof.
+  intros H; eapply ruttc_bind; [exact H |].
+  intros ?? Hb; apply ruttc_ret; now constructor.
+Qed.
+
+(** Lifting [EOU_to_itree] of [I2F_EOU]-related pure computations. This is
+    the workhorse for all the arithmetic cases of [denote_exp]: they end
+    in [lift (f ...)] for pure [f]s, so each reduces to an [I2F_EOU] fact
+    about [f]. The [ret]/[ub]/[oom] branches use only the shared
+    [cutUB]/[cutOOM]; the error branch triggers a [Throw], so we require
+    [REv] to relate it --- exactly the "any two such events are related"
+    triviality the old fully-abstract attempt was missing. *)
+Lemma I2F_refine_lift_gen {E1 E2}
+  `{FailureE -< E1} `{OOME -< E1} `{UBE -< E1}
+  `{FailureE -< E2} `{OOME -< E2} `{UBE -< E2}
+  {REv : prerel E1 E2} {RAns : postrel E1 E2}
+  (HThrow : forall u1 u2 : unit,
+      REv void void (subevent _ (Throw u1)) (subevent _ (Throw u2)))
+  {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
   I2F_EOU RR m1 m2 ->
-  I2F_refine_MCFG RR (EOU_to_itree m1) (EOU_to_itree m2).
+  ruttc cutUB cutOOM REv RAns RR (EOU_to_itree m1) (EOU_to_itree m2).
 Proof.
   intros []; cbn.
   - pfold; constructor; auto.
-  - apply ruttc_trigger_cast; easy.
+  - apply ruttc_trigger_cast; apply HThrow.
   - pfold; red; cbn.
     apply EqCutL; constructor.
   - pfold; red; cbn.
     apply EqCutR; constructor.
 Qed.
+
+(** The [Throw] side-condition, discharged by computation at each of the
+    three event signatures. *)
+Lemma I2FE_MCFG_Throw : forall u1 u2 : unit,
+    I2FE_MCFG (subevent _ (Throw u1)) (subevent _ (Throw u2)).
+Proof. intros; cbn; easy. Qed.
+
+Lemma I2FE_MCFGbot_Throw : forall u1 u2 : unit,
+    I2FE_MCFGbot (subevent _ (Throw u1)) (subevent _ (Throw u2)).
+Proof. intros; cbn; easy. Qed.
+
+Lemma I2FE_CFG_Throw : forall u1 u2 : unit,
+    I2FE_CFG (subevent _ (Throw u1)) (subevent _ (Throw u2)).
+Proof. intros; cbn; easy. Qed.
+
+(** [I2F_refine_lift] and its [MCFGbot] sibling as instances. *)
+Lemma I2F_refine_lift {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
+  I2F_EOU RR m1 m2 ->
+  I2F_refine_MCFG RR (EOU_to_itree m1) (EOU_to_itree m2).
+Proof. intros H; unfold I2F_refine_MCFG; apply (I2F_refine_lift_gen I2FE_MCFG_Throw); exact H. Qed.
+
+Lemma I2F_refine_lift_bot {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
+  I2F_EOU RR m1 m2 ->
+  I2F_refine_MCFGbot RR (EOU_to_itree m1) (EOU_to_itree m2).
+Proof. intros H; unfold I2F_refine_MCFGbot; apply (I2F_refine_lift_gen I2FE_MCFGbot_Throw); exact H. Qed.
 
 (** [I2F_EOU] is reflexive at [eq]: parameter-independent pure
       computations (e.g. type guards, which mention no value) are related
@@ -512,5 +593,64 @@ Proof.
     eapply I2F_EOU_bind; [apply IHF|].
     intros bs1 bs2 HBS.
     do 2 constructor; auto.
+Qed.
+
+(** [I2F_EOU] is monotone in its result relation: massaging the
+      accumulator invariant of [I2F_EOU_map_monad_acc2] into the shape
+      expected at each recursive call needs nothing more than
+      strengthening the postcondition. *)
+Lemma I2F_EOU_mono {A1 A2} (RR RR' : A1 -> A2 -> Prop) (m1 : EOU A1) (m2 : EOU A2) :
+  (forall a1 a2, RR a1 a2 -> RR' a1 a2) ->
+  I2F_EOU RR m1 m2 -> I2F_EOU RR' m1 m2.
+Proof.
+  intros SUB []; constructor; auto.
+Qed.
+
+(** [I2F_EOU_map_monad2] for [map_monad_acc]: the tail-recursive,
+      accumulator-passing sibling of [map_monad] used by
+      [get_consecutive_ptrs]/[read_bytes] for performance
+      (see [Semantics/Implementations/Memory.v]). The accumulator
+      invariant tracks, for any pair of related accumulators, that the
+      result is the accumulator (reversed) followed by a [RB]-related
+      suffix; [rev_append (b :: acc) bs' = rev_append acc (b :: bs')]
+      holds by a single unfolding step of [rev_append], which is what
+      lets the induction thread through the accumulator update. *)
+Lemma I2F_EOU_map_monad_acc2 {A1 A2 B1 B2} (RA : A1 -> A2 -> Prop) (RB : B1 -> B2 -> Prop)
+  (f1 : A1 -> EOU B1) (f2 : A2 -> EOU B2) :
+  forall l1 l2,
+    Forall2 RA l1 l2 ->
+    (forall a1 a2, RA a1 a2 -> I2F_EOU RB (f1 a1) (f2 a2)) ->
+    I2F_EOU (Forall2 RB) (map_monad_acc f1 l1) (map_monad_acc f2 l2).
+Proof.
+  intros l1 l2 F HF.
+  unfold map_monad_acc.
+  assert (H : forall xs1 xs2, Forall2 RA xs1 xs2 -> forall acc1 acc2,
+             I2F_EOU
+               (fun r1 r2 =>
+                  exists bs1 bs2,
+                    r1 = rev_append acc1 bs1 /\
+                    r2 = rev_append acc2 bs2 /\
+                    Forall2 RB bs1 bs2)
+               ((fix loop acc l :=
+                   match l with
+                   | [] => ret (rev_append acc [])
+                   | a::l' => b <- f1 a;; loop (b::acc) l'
+                   end) acc1 xs1)
+               ((fix loop acc l :=
+                   match l with
+                   | [] => ret (rev_append acc [])
+                   | a::l' => b <- f2 a;; loop (b::acc) l'
+                   end) acc2 xs2)).
+  { intros xs1 xs2 FA; induction FA as [| x1 x2 xs1 xs2 Rx FA' IH]; intros acc1 acc2; cbn.
+    - constructor.
+      exists [], []; auto.
+    - eapply I2F_EOU_bind; [now apply HF |].
+      intros b1 b2 HB.
+      eapply I2F_EOU_mono; [| apply (IH (b1::acc1) (b2::acc2))].
+      intros r1 r2 (bs1 & bs2 & -> & -> & HBS).
+      exists (b1::bs1), (b2::bs2); auto.
+  }
+  eapply I2F_EOU_mono; [| apply (H l1 l2 F [] [])].
+  intros r1 r2 (bs1 & bs2 & -> & -> & HBS); auto.
 Qed.
 
