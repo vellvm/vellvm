@@ -91,3 +91,5 @@
 ./rocq/Theory/I2F/I2F_memory.v
 ./rocq/Theory/I2F/I2F_interp.v
 ./rocq/Theory/I2F/I2F_toplevel.v
+
+./rocq/Theory/Equational.v
