@@ -637,13 +637,12 @@ Section monad.
      through all of them — O(n) per step, O(n²) for a straight-line block
      (see perf/locals-chain.ll). The direct sequencing fold keeps the
      pending-bind depth constant. *)
-  Definition loop_monad {A B}
+  Fixpoint loop_monad {A B}
     (f: A -> m B) (l: list A): m unit :=
-    (fix loop l :=
-       match l with
-       | [] => ret tt
-       | a::l' => f a;; loop l'
-       end) l.
+    match l with
+    | [] => ret tt
+    | a::l' => f a;; loop_monad f l'
+    end.
 
   (* Value-collecting analogue of [loop_monad]: the recursive call is in
      tail position of the bind, so the pending-bind depth stays constant

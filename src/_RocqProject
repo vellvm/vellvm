@@ -80,6 +80,7 @@
 ./rocq/Semantics/InterpretationStack.v
 ./rocq/Semantics/Libraries.v
 ./rocq/Semantics/TopLevel.v
+./rocq/Semantics/Notations.v
 ./rocq/Semantics.v
 
 ./rocq/Utils/rutt_cutoff.v
@@ -90,3 +91,5 @@
 ./rocq/Theory/I2F/I2F_memory.v
 ./rocq/Theory/I2F/I2F_interp.v
 ./rocq/Theory/I2F/I2F_toplevel.v
+
+./rocq/Theory/Equational.v
