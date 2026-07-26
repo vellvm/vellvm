@@ -80,6 +80,7 @@
 ./rocq/Semantics/InterpretationStack.v
 ./rocq/Semantics/Libraries.v
 ./rocq/Semantics/TopLevel.v
+./rocq/Semantics/Notations.v
 ./rocq/Semantics.v
 
 ./rocq/Utils/rutt_cutoff.v

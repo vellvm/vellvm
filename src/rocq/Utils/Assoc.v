@@ -31,4 +31,20 @@ Section With_Eqv_Rel_Dec.
     | (a',b)::l' => if rel_dec a a' then Some b else assoc a l'
     end.
 
+  Lemma assoc_hd: forall a b tl,
+      assoc a ((a,b)::tl) = Some b.
+  Proof using All.
+    intros; cbn.
+    rewrite eq_dec_eq; reflexivity.
+  Qed.
+
+  Lemma assoc_tl : forall (a c:A) (b:B) l 
+                     (Hneq : a <> c),
+      assoc a ((c,b)::l) =
+        assoc a l.
+  Proof using All.
+    intros; cbn.
+    rewrite eq_dec_neq; auto.
+  Qed.
+
 End With_Eqv_Rel_Dec.

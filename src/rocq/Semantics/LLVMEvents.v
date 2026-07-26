@@ -216,7 +216,9 @@ Section withParams.
   Definition withCall : MCFGtop ~> CFGtop := translate inr1.
   
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [DrawE]*)
-  Definition MCFGEbot := ExternalCallE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
+  Definition CFGEbot  := CallE +' ExternalCallE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
+  Definition MCFGEbot :=          ExternalCallE +' OOME +' LLVMExcE +' UBE +' DebugE +' FailureE.
+  Definition CFGbot   := itree CFGEbot.
   Definition MCFGbot  := itree MCFGEbot.
 
 End withParams.
