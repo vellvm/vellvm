@@ -1252,6 +1252,7 @@ Proof.
   end; cbn; try (repeat constructor).
   rewrite (I2F_dvalue_to_Z R2).
   destruct (dvalue_to_Z b2) as [i |]; cbn; try (repeat constructor).
+  rewrite !split_acc_eq.
   i2f_split_case i ltac:(auto).
 Qed.
 
@@ -1279,6 +1280,7 @@ Proof.
         pose proof (Forall2_repeat _ _ n
                       (I2F_dvalue_Base (I2F_dvalue_Poison dt))) as F
     end.
+    rewrite !split_acc_eq.
     i2f_split_case i
       ltac:(do 2 constructor; apply Forall2_app; [auto | constructor; auto]).
   - (* Vector *)
@@ -1289,6 +1291,7 @@ Proof.
     end; cbn; try (repeat constructor).
     rewrite (I2F_dvalue_to_Z R3).
     destruct (dvalue_to_Z b3) as [i |]; cbn; try (repeat constructor).
+    rewrite !split_acc_eq.
     i2f_split_case i
       ltac:(do 2 constructor; apply Forall2_app; [auto | constructor; auto]).
 Qed.
