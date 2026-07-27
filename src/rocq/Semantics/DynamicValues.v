@@ -1046,6 +1046,29 @@ Section DValue.
     | _ => raise_error ("insertelement: non-vector type " ++ (show vec))%string
     end.
 
+  (* A mask element that isn't a resolvable integer or is out of range of
+     [elts1 ++ elts2] yields poison *)
+  Definition shuffle_vector (vec1 vec2 mask : dvalue) : EOU dvalue :=
+    match vec1, vec2, mask with
+    | DVALUE_Array true (DTYPE_Array true _ dt) elts1,
+      DVALUE_Array true (DTYPE_Array true _ _) elts2,
+      DVALUE_Array true (DTYPE_Array true n _) idxs =>
+        let combined := elts1 ++ elts2 in
+        let lane (idxv : dvalue) : dvalue :=
+          match dvalue_to_Z idxv with
+          | Some i =>
+              if (i <? 0)%Z then DVALUE_Base (DVALUE_Poison dt)
+              else match nth_error combined (Z.to_nat i) with
+                   | Some v => v
+                   | None => DVALUE_Base (DVALUE_Poison dt)
+                   end
+          | None => DVALUE_Base (DVALUE_Poison dt)
+          end
+        in
+        ret (DVALUE_Array true (DTYPE_Array true n dt) (List.map lane idxs))
+    | _, _, _ => raise_error "shufflevector: non-vector operand"
+    end.
+
 (*  ------------------------------------------------------------------------- *)
 
 
