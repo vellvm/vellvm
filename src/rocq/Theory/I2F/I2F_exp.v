@@ -1323,27 +1323,6 @@ Proof.
     end; cbn; auto.
 Qed.
 
-Lemma Forall2_nth_error {A B} (R : A -> B -> Prop) (l1 : list A) (l2 : list B) :
-  Forall2 R l1 l2 ->
-  forall n,
-    match nth_error l1 n, nth_error l2 n with
-    | Some a, Some b => R a b
-    | None, None => True
-    | _, _ => False
-    end.
-Proof.
-  intros F; induction F; intros [| n]; cbn; auto.
-  apply IHF.
-Qed.
-
-Lemma Forall2_map_rel {A1 A2 B1 B2} (R : A1 -> A2 -> Prop) (R' : B1 -> B2 -> Prop)
-  (f : A1 -> B1) (g : A2 -> B2) :
-  (forall a b, R a b -> R' (f a) (g b)) ->
-  forall l1 l2, Forall2 R l1 l2 -> Forall2 R' (map f l1) (map g l2).
-Proof.
-  intros HRR l1 l2 F; induction F; cbn; constructor; auto.
-Qed.
-
 Lemma I2F_shuffle_vector a1 a2 a3 b1 b2 b3 :
   I2F_dvalue a1 b1 ->
   I2F_dvalue a2 b2 ->
