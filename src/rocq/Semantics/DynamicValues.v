@@ -1046,13 +1046,21 @@ Section DValue.
     | _ => raise_error ("insertelement: non-vector type " ++ (show vec))%string
     end.
 
+  (* Need to be careful to properly compute a poison at array type rather than
+     an arry of poison values *)
+  Definition vector_elts (v : dvalue) : option (dtyp * list dvalue) :=
+    match v with
+    | DVALUE_Array true (DTYPE_Array true _ dt) elts => Some (dt, elts)
+    | DVALUE_Base (DVALUE_Poison (DTYPE_Array true sz dt)) =>
+        Some (dt, repeat (DVALUE_Base (DVALUE_Poison dt)) (N.to_nat sz))
+    | _ => None
+    end.
+
   (* A mask element that isn't a resolvable integer or is out of range of
      [elts1 ++ elts2] yields poison *)
   Definition shuffle_vector (vec1 vec2 mask : dvalue) : EOU dvalue :=
-    match vec1, vec2, mask with
-    | DVALUE_Array true (DTYPE_Array true _ dt) elts1,
-      DVALUE_Array true (DTYPE_Array true _ _) elts2,
-      DVALUE_Array true (DTYPE_Array true n _) idxs =>
+    match vector_elts vec1, vector_elts vec2, mask with
+    | Some (dt, elts1), Some (_, elts2), DVALUE_Array true (DTYPE_Array true n _) idxs =>
         let combined := elts1 ++ elts2 in
         let lane (idxv : dvalue) : dvalue :=
           match dvalue_to_Z idxv with
