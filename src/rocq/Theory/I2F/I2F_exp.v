@@ -1252,6 +1252,7 @@ Proof.
   end; cbn; try (repeat constructor).
   rewrite (I2F_dvalue_to_Z R2).
   destruct (dvalue_to_Z b2) as [i |]; cbn; try (repeat constructor).
+  rewrite !split_acc_eq.
   i2f_split_case i ltac:(auto).
 Qed.
 
@@ -1279,6 +1280,7 @@ Proof.
         pose proof (Forall2_repeat _ _ n
                       (I2F_dvalue_Base (I2F_dvalue_Poison dt))) as F
     end.
+    rewrite !split_acc_eq.
     i2f_split_case i
       ltac:(do 2 constructor; apply Forall2_app; [auto | constructor; auto]).
   - (* Vector *)
@@ -1289,8 +1291,68 @@ Proof.
     end; cbn; try (repeat constructor).
     rewrite (I2F_dvalue_to_Z R3).
     destruct (dvalue_to_Z b3) as [i |]; cbn; try (repeat constructor).
+    rewrite !split_acc_eq.
     i2f_split_case i
       ltac:(do 2 constructor; apply Forall2_app; [auto | constructor; auto]).
+Qed.
+
+(** * shufflevector *)
+
+(* [vector_elts] normalizes a whole vector operand (concrete array or the
+   scalar poison encoding) to its element dtyp/list; related dvalues
+   normalize to related pieces (or both fail). *)
+Lemma I2F_vector_elts : forall v1 v2,
+    I2F_dvalue v1 v2 ->
+    match vector_elts v1, vector_elts v2 with
+    | Some (dt1, elts1), Some (dt2, elts2) => dt1 = dt2 /\ Forall2 I2F_dvalue elts1 elts2
+    | None, None => True
+    | _, _ => False
+    end.
+Proof.
+  intros v1 v2 H; inversion H; subst; cbn.
+  - match goal with
+    | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; auto
+    end.
+    match goal with
+    | t : dtyp |- _ => destruct t as [ ? | ? ? | [|] ? ? ]
+    end; cbn; auto.
+  - auto.
+  - match goal with v : bool |- _ => destruct v end; cbn; auto.
+    match goal with
+    | t : dtyp |- _ => destruct t as [ ? | ? ? | [|] ? ? ]
+    end; cbn; auto.
+Qed.
+
+Lemma I2F_shuffle_vector a1 a2 a3 b1 b2 b3 :
+  I2F_dvalue a1 b1 ->
+  I2F_dvalue a2 b2 ->
+  I2F_dvalue a3 b3 ->
+  I2F_EOU I2F_dvalue (shuffle_vector a1 a2 a3) (shuffle_vector b1 b2 b3).
+Proof.
+  intros R1 R2 R3.
+  unfold shuffle_vector.
+  pose proof (I2F_vector_elts R1) as V1.
+  pose proof (I2F_vector_elts R2) as V2.
+  destruct (vector_elts a1) as [[dt1 elts1]|], (vector_elts b1) as [[dt1' elts1']|];
+    try contradiction; try (repeat constructor).
+  destruct (vector_elts a2) as [[dt2 elts2]|], (vector_elts b2) as [[dt2' elts2']|];
+    try contradiction; try (repeat constructor).
+  destruct V1 as [EQ1 HE1]; subst.
+  destruct V2 as [EQ2 HE2]; subst.
+  inversion R3; subst; cbn; try (repeat constructor).
+  break_match_goal; auto.
+  break_match_goal; auto.
+  break_match_goal; auto.
+  do 2 constructor.
+  eapply Forall2_map_rel; eauto.
+  intros idxv idxv' Ridx.
+  rewrite (I2F_dvalue_to_Z Ridx).
+  destruct (dvalue_to_Z idxv') as [i |]; [| repeat constructor].
+  destruct (i <? 0)%Z; [repeat constructor |].
+  pose proof (Forall2_nth_error (Forall2_app HE1 HE2) (Z.to_nat i)) as N.
+  destruct (nth_error (elts1 ++ elts2) (Z.to_nat i)) as [?v|],
+      (nth_error (elts1' ++ elts2') (Z.to_nat i)) as [v'|];
+    try contradiction; [assumption | repeat constructor].
 Qed.
 
 (** * extract_value *)
@@ -1634,7 +1696,8 @@ Proof with try (rstep || cbnn; simp I2FE_Failure; reflexivity).
   - destruct vec1,vec2,idxmask; cbn; intros _.
     erbind; [apply IHe | intros].
     erbind; [apply IHe0 | intros].
-    erbind; [apply IHe1 | intros]...
+    erbind; [apply IHe1 | intros].
+    apply I2F_refine_lift, I2F_shuffle_vector; auto.
   - destruct vec; cbn; intros _.
     erbind; [apply IHe | intros].
     apply I2F_refine_lift, I2F_extract_value; eauto.

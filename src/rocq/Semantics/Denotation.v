@@ -322,7 +322,7 @@ Section Denotation.
         vec1 <- denote_exp (Some dt_vec1) vecop1 ;;
         vec2 <- denote_exp (Some dt_vec2) vecop2 ;;
         idxmask <- denote_exp (Some dt_mask) idxmask;;
-        raise ("todo: implement shuffle_vector" )
+        lift (shuffle_vector vec1 vec2 idxmask)
 
     | OP_ExtractValue (dt, str) idxs =>
         str <- denote_exp (Some dt) str ;;

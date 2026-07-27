@@ -884,6 +884,41 @@ Section DValue.
     else
       split_h pre idx l.
 
+  (* Tail-safe analogue of [split]: [split_h]'s accumulator grows via
+     [pre ++ [h]], an append, making it quadratic in [idx] *)
+  Fixpoint split_acc_go {A} (rev_pre : list A) (idx : Z) (l : list A)
+    : option (list A * A * list A) :=
+    match l with
+    | [] => None
+    | h :: tl =>
+        (if idx =? 0 then Some (rev_append rev_pre [], h, tl)
+         else split_acc_go (h :: rev_pre) (idx - 1) tl)%Z
+    end.
+
+  Definition split_acc {A} (idx : Z) (l : list A) : option (list A * A * list A) :=
+    if (idx <? 0)%Z then None else split_acc_go [] idx l.
+
+  Lemma split_acc_go_eq {A} : forall (l : list A) idx rev_pre,
+      split_acc_go rev_pre idx l = split_h (rev_append rev_pre []) idx l.
+  Proof.
+    induction l as [| h l IH]; intros idx rev_pre; cbn [split_acc_go split_h].
+    - reflexivity.
+    - destruct (idx =? 0)%Z eqn:EQ.
+      + reflexivity.
+      + rewrite IH; f_equal.
+        cbn [rev_append].
+        rewrite rev_append_rev, rev_append_rev, app_nil_r.
+        reflexivity.
+  Qed.
+
+  Lemma split_acc_eq {A} (idx : Z) (l : list A) :
+    split_acc idx l = split [] idx l.
+  Proof.
+    unfold split_acc, split.
+    destruct (idx <? 0)%Z; auto.
+    rewrite split_acc_go_eq; reflexivity.
+  Qed.
+
   (* [split]/[split_h] of related lists produce related pieces. *)
   Lemma Forall2_split_h {A B} (R : A -> B -> Prop) :
     forall i (l1 : list A) (l2 : list B),
@@ -978,7 +1013,7 @@ Section DValue.
     | DVALUE_Array true (DTYPE_Array true _ dt) elts =>
         match dvalue_to_Z idx with
         | Some i =>
-            match split [] i elts with
+            match split_acc i elts with
             | None => ret (DVALUE_Base (DVALUE_Poison dt))
             | Some (pre, elt, post) =>  ret elt
             end
@@ -992,7 +1027,7 @@ Section DValue.
     | DVALUE_Array true (DTYPE_Array true sz dt) elts =>
         match dvalue_to_Z idx with
         | Some i =>
-            match split [] i elts with
+            match split_acc i elts with
             | None => ret (DVALUE_Base (DVALUE_Poison (DTYPE_Array true sz dt)))
             | Some (pre, _, post) =>  ret (DVALUE_Array true (DTYPE_Array true sz dt) (pre ++ [elt] ++ post))
             end
@@ -1002,13 +1037,44 @@ Section DValue.
         let elts : list dvalue := repeat (DVALUE_Base (DVALUE_Poison dt)) (N.to_nat sz) in
         match dvalue_to_Z idx with
         | Some i =>
-            match split [] i elts with
+            match split_acc i elts with
             | None => ret (DVALUE_Base (DVALUE_Poison (DTYPE_Array true sz dt)))
             | Some (pre, _, post) =>  ret (DVALUE_Array true (DTYPE_Array true sz dt) (pre ++ [elt] ++ post))
             end
         | None => raise_error "insertelement: non-integer index"
         end
     | _ => raise_error ("insertelement: non-vector type " ++ (show vec))%string
+    end.
+
+  (* Need to be careful to properly compute a poison at array type rather than
+     an arry of poison values *)
+  Definition vector_elts (v : dvalue) : option (dtyp * list dvalue) :=
+    match v with
+    | DVALUE_Array true (DTYPE_Array true _ dt) elts => Some (dt, elts)
+    | DVALUE_Base (DVALUE_Poison (DTYPE_Array true sz dt)) =>
+        Some (dt, repeat (DVALUE_Base (DVALUE_Poison dt)) (N.to_nat sz))
+    | _ => None
+    end.
+
+  (* A mask element that isn't a resolvable integer or is out of range of
+     [elts1 ++ elts2] yields poison *)
+  Definition shuffle_vector (vec1 vec2 mask : dvalue) : EOU dvalue :=
+    match vector_elts vec1, vector_elts vec2, mask with
+    | Some (dt, elts1), Some (_, elts2), DVALUE_Array true (DTYPE_Array true n _) idxs =>
+        let combined := elts1 ++ elts2 in
+        let lane (idxv : dvalue) : dvalue :=
+          match dvalue_to_Z idxv with
+          | Some i =>
+              if (i <? 0)%Z then DVALUE_Base (DVALUE_Poison dt)
+              else match nth_error combined (Z.to_nat i) with
+                   | Some v => v
+                   | None => DVALUE_Base (DVALUE_Poison dt)
+                   end
+          | None => DVALUE_Base (DVALUE_Poison dt)
+          end
+        in
+        ret (DVALUE_Array true (DTYPE_Array true n dt) (List.map lane idxs))
+    | _, _, _ => raise_error "shufflevector: non-vector operand"
     end.
 
 (*  ------------------------------------------------------------------------- *)
